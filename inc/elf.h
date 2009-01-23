@@ -1,0 +1,93 @@
+#ifndef JOS_INC_ELF_H
+#define JOS_INC_ELF_H
+
+#define ELF_MAGIC 0x464C457FU	/* "\x7FELF" in little endian */
+
+#include <inc/types.h>
+
+typedef uint32_t Elf32_Addr;
+typedef uint16_t Elf32_Half;
+typedef uint32_t Elf32_Off;
+typedef int32_t Elf32_Sword;
+typedef uint32_t Elf32_Word;
+
+struct Elf {
+	uint32_t e_magic;	// must equal ELF_MAGIC
+	uint8_t e_elf[12];
+	uint16_t e_type;
+	uint16_t e_machine;
+	uint32_t e_version;
+	uint32_t e_entry;
+	uint32_t e_phoff;
+	uint32_t e_shoff;
+	uint32_t e_flags;
+	uint16_t e_ehsize;
+	uint16_t e_phentsize;
+	uint16_t e_phnum;
+	uint16_t e_shentsize;
+	uint16_t e_shnum;
+	uint16_t e_shstrndx;
+};
+
+struct Proghdr {
+	uint32_t p_type;
+	uint32_t p_offset;
+	uint32_t p_va;
+	uint32_t p_pa;
+	uint32_t p_filesz;
+	uint32_t p_memsz;
+	uint32_t p_flags;
+	uint32_t p_align;
+};
+
+struct Secthdr {
+	uint32_t sh_name;
+	uint32_t sh_type;
+	uint32_t sh_flags;
+	uint32_t sh_addr;
+	uint32_t sh_offset;
+	uint32_t sh_size;
+	uint32_t sh_link;
+	uint32_t sh_info;
+	uint32_t sh_addralign;
+	uint32_t sh_entsize;
+};
+
+typedef struct {
+  unsigned long n_strx;         /* index into string table of name */
+  unsigned char n_type;         /* type of symbol */
+  unsigned char n_other;        /* misc info (usually empty) */
+  unsigned short n_desc;        /* description field */
+  unsigned long n_value;              /* value of symbol */
+} stab_t;
+
+/*
+typedef struct {
+        Elf32_Word      st_name;
+        Elf32_Addr      st_value;
+        Elf32_Word      st_size;
+        unsigned char   st_info;
+        unsigned char   st_other;
+        Elf32_Half      st_shndx;
+} Elf32_Sym;
+*/
+
+
+// Values for Proghdr::p_type
+#define ELF_PROG_LOAD		1
+
+// Flag bits for Proghdr::p_flags
+#define ELF_PROG_FLAG_EXEC	1
+#define ELF_PROG_FLAG_WRITE	2
+#define ELF_PROG_FLAG_READ	4
+
+// Values for Secthdr::sh_type
+#define ELF_SHT_NULL		0
+#define ELF_SHT_PROGBITS	1
+#define ELF_SHT_SYMTAB		2
+#define ELF_SHT_STRTAB		3
+
+// Values for Secthdr::sh_name
+#define ELF_SHN_UNDEF		0
+
+#endif /* !JOS_INC_ELF_H */
