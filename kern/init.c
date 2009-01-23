@@ -8,18 +8,8 @@
 
 #include <kern/monitor.h>
 #include <kern/console.h>
-
-// Test the stack backtrace function (lab 1 only)
-void
-test_backtrace(int x)
-{
-	cprintf("entering test_backtrace %d\n", x);
-	if (x > 0)
-		test_backtrace(x-1);
-	else
-		mon_backtrace(0, 0, 0);
-	cprintf("leaving test_backtrace %d\n", x);
-}
+#include <kern/pmap.h>
+#include <kern/kclock.h>
 
 void
 kernel_init(multiboot_info_t *mboot_info)
@@ -35,24 +25,11 @@ kernel_init(multiboot_info_t *mboot_info)
 	// Can't call cprintf until after we do this!
 	cons_init();
 
-	/*
-	extern stab_t stab[], estab[];
-	extern char stabstr[];
-	stab_t* symtab;
-	// Spits out the stabs for functions
-	for (symtab = stab; symtab < estab; symtab++) {
-		// gives us only functions.  not really needed if we scan by address
-		if (symtab->n_type != 36)
-			continue;
-		cprintf("Symbol name = %s\n", stabstr + symtab->n_strx);
-		cprintf("Symbol type = %d\n", symtab->n_type);
-		cprintf("Symbol value = 0x%x\n", symtab->n_value);
-		cprintf("\n");
-	}
-	*/
-
-	// Test the stack backtrace function (lab 1 only)
-	test_backtrace(5);
+	// Lab 2 memory management initialization functions
+	i386_detect_memory();
+	i386_vm_init();
+	page_init();
+	page_check();
 
 	// Drop into the kernel monitor.
 	while (1)
@@ -134,3 +111,20 @@ _warn(const char *file, int line, const char *fmt,...)
 		cprintf("Symbol vale = 0x%x\n", symtab->st_value);
 	}
 	*/
+	/*
+	extern stab_t stab[], estab[];
+	extern char stabstr[];
+	stab_t* symtab;
+	// Spits out the stabs for functions
+	for (symtab = stab; symtab < estab; symtab++) {
+		// gives us only functions.  not really needed if we scan by address
+		if (symtab->n_type != 36)
+			continue;
+		cprintf("Symbol name = %s\n", stabstr + symtab->n_strx);
+		cprintf("Symbol type = %d\n", symtab->n_type);
+		cprintf("Symbol value = 0x%x\n", symtab->n_value);
+		cprintf("\n");
+	}
+	*/
+
+
