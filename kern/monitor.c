@@ -6,7 +6,7 @@
 #include <inc/memlayout.h>
 #include <inc/assert.h>
 #include <inc/x86.h>
-#include <inc/elf.h>
+#include <inc/stab.h>
 
 #include <kern/console.h>
 #include <kern/monitor.h>
@@ -59,7 +59,7 @@ mon_kerninfo(int argc, char **argv, struct Trapframe *tf)
 	return 0;
 }
 
-char* function_of(uint32_t address) 
+static char* function_of(uint32_t address) 
 {
 	extern stab_t stab[], estab[];
 	extern char stabstr[];
@@ -69,8 +69,8 @@ char* function_of(uint32_t address)
 	
 	// ugly and unsorted
 	for (symtab = stab; symtab < estab; symtab++) {
-		// only consider functions, type = 36
-		if ((symtab->n_type == 36) && 
+		// only consider functions, type = N_FUN
+		if ((symtab->n_type == N_FUN) && 
 		    (symtab->n_value <= address) && 
 			(symtab->n_value > best_func)) {
 			best_func = symtab->n_value;
@@ -185,38 +185,3 @@ monitor(struct Trapframe *tf)
 				break;
 	}
 }
-
-/*
-// return EIP of caller.
-// does not work if inlined.
-// putting at the end of the file seems to prevent inlining.
-unsigned
-read_eip()
-{
-	uint32_t callerpc;
-	__asm __volatile("movl 4(%%ebp), %0" : "=r" (callerpc));
-	return callerpc;
-}
-
-char* function_at(uint32_t address) 
-{
-	extern stab_t stab[], estab[];
-	extern char stabstr[];
-	stab_t* symtab;
-	
-	for (symtab = stab; symtab < estab; symtab++) {
-		if (symtab->n_value == address)
-			return stabstr + symtab->n_strx;
-	}
-	return "Function not found!";
-}
-
-uint32_t called_address(uint32_t retaddr)
-{
-	// retaddr - 4 is the offset to the previous call, which
-	// gets added to the next inst after call when calling
-	return (uint32_t)(retaddr + *(uint32_t*)(retaddr - 4));
-	//used like this:
-	//function_at(called_address(*(ebp + 1))),
-}
-*/

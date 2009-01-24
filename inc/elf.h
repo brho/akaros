@@ -53,26 +53,6 @@ struct Secthdr {
 	uint32_t sh_entsize;
 };
 
-typedef struct {
-  unsigned long n_strx;         /* index into string table of name */
-  unsigned char n_type;         /* type of symbol */
-  unsigned char n_other;        /* misc info (usually empty) */
-  unsigned short n_desc;        /* description field */
-  unsigned long n_value;              /* value of symbol */
-} stab_t;
-
-/*
-typedef struct {
-        Elf32_Word      st_name;
-        Elf32_Addr      st_value;
-        Elf32_Word      st_size;
-        unsigned char   st_info;
-        unsigned char   st_other;
-        Elf32_Half      st_shndx;
-} Elf32_Sym;
-*/
-
-
 // Values for Proghdr::p_type
 #define ELF_PROG_LOAD		1
 

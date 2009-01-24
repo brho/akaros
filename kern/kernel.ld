@@ -22,16 +22,20 @@ SECTIONS
 	/* Include debugging information in kernel memory */
 	.stab : {
 		PROVIDE(stab = .);
+		PROVIDE(__STAB_BEGIN__ = .);
 		*(.stab);
 		PROVIDE(estab = .);
+		PROVIDE(__STAB_END__ = .);
 		BYTE(0)		/* Force the linker to allocate space
 				   for this section */
 	}
 
 	.stabstr : {
 		PROVIDE(stabstr = .);
+		PROVIDE(__STABSTR_BEGIN__ = .);
 		*(.stabstr);
 		PROVIDE(estabstr = .);
+		PROVIDE(__STABSTR_END__ = .);
 		BYTE(0)		/* Force the linker to allocate space
 				   for this section */
 	}

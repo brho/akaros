@@ -4,7 +4,7 @@
 #include <inc/string.h>
 #include <inc/assert.h>
 #include <inc/multiboot.h>
-#include <inc/elf.h>
+#include <inc/stab.h>
 
 #include <kern/monitor.h>
 #include <kern/console.h>

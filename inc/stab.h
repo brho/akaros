@@ -40,12 +40,12 @@
 #define	N_LENG		0xfe	// length of preceding entry
 
 // Entries in the STABS table are formatted as follows.
-struct Stab {
+typedef struct Stab {
 	uint32_t n_strx;	// index into string table of name
 	uint8_t n_type;         // type of symbol
 	uint8_t n_other;        // misc info (usually empty)
 	uint16_t n_desc;        // description field
 	uintptr_t n_value;	// value of symbol
-};
+} stab_t;
 
 #endif /* !JOS_STAB_H */
