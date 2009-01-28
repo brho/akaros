@@ -11,10 +11,9 @@
 #include <kern/pmap.h>
 #include <kern/kclock.h>
 
-void
-kernel_init(multiboot_info_t *mboot_info)
+void kernel_init(multiboot_info_t *mboot_info)
 {
-	extern char edata[], end[];
+	extern char (BND(__this, end) edata)[], (SNT end)[];
 
 	// Before doing anything else, complete the ELF loading process.
 	// Clear the uninitialized global data (BSS) section of our program.
@@ -41,14 +40,13 @@ kernel_init(multiboot_info_t *mboot_info)
  * Variable panicstr contains argument to first call to panic; used as flag
  * to indicate that the kernel has already called panic.
  */
-static const char *panicstr;
+static const char *NTS panicstr;
 
 /*
  * Panic is called on unresolvable fatal errors.
  * It prints "panic: mesg", and then enters the kernel monitor.
  */
-void
-_panic(const char *file, int line, const char *fmt,...)
+void _panic(const char *file, int line, const char *fmt,...)
 {
 	va_list ap;
 
@@ -69,8 +67,7 @@ dead:
 }
 
 /* like panic, but don't */
-void
-_warn(const char *file, int line, const char *fmt,...)
+void _warn(const char *file, int line, const char *fmt,...) 
 {
 	va_list ap;
 

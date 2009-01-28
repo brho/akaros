@@ -111,21 +111,21 @@ lpt_putc(int c)
 /***** Text-mode CGA/VGA display output *****/
 
 static unsigned addr_6845;
-static uint16_t *crt_buf;
+static uint16_t *COUNT(CRT_SIZE) crt_buf;
 static uint16_t crt_pos;
 
 void
 cga_init(void)
 {
-	volatile uint16_t *cp;
+	volatile uint16_t *COUNT(CRT_SIZE) cp;
 	uint16_t was;
 	unsigned pos;
 
-	cp = (uint16_t*) (KERNBASE + CGA_BUF);
+	cp = (uint16_t *COUNT(CRT_SIZE)) TC(KERNBASE + CGA_BUF);
 	was = *cp;
 	*cp = (uint16_t) 0xA55A;
 	if (*cp != 0xA55A) {
-		cp = (uint16_t*) (KERNBASE + MONO_BUF);
+		cp = (uint16_t *COUNT(CRT_SIZE)) TC(KERNBASE + MONO_BUF);
 		addr_6845 = MONO_BASE;
 	} else {
 		*cp = was;
@@ -138,7 +138,7 @@ cga_init(void)
 	outb(addr_6845, 15);
 	pos |= inb(addr_6845 + 1);
 
-	crt_buf = (uint16_t*) cp;
+	crt_buf = (uint16_t *COUNT(CRT_SIZE)) cp;
 	crt_pos = pos;
 }
 
@@ -177,6 +177,9 @@ cga_putc(int c)
 	}
 
 	// What is the purpose of this?
+	// The purpose of this is to allow the screen to appear as if it is scrolling as
+	// more lines are added beyond the size of the monitor.  The top line is removed, 
+	// everything is shifted up by one.
 	if (crt_pos >= CRT_SIZE) {
 		int i;
 
@@ -286,7 +289,7 @@ static uint8_t ctlmap[256] =
 	[0xD2] KEY_INS,		[0xD3] KEY_DEL
 };
 
-static uint8_t *charcode[4] = {
+static uint8_t * COUNT(256) charcode[4] = {
 	normalmap,
 	shiftmap,
 	ctlmap,

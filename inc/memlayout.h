@@ -33,7 +33,7 @@
  *                     |                              | RW/--
  *                     |   Remapped Physical Memory   | RW/--
  *                     |                              | RW/--
- *    KERNBASE ----->  +------------------------------+ 0xf0000000
+ *    KERNBASE ----->  +------------------------------+ 0xC0000000
  *                     |  Cur. Page Table (Kern. RW)  | RW/--  PTSIZE
  *    VPT,KSTACKTOP--> +------------------------------+ 0xefc00000      --+
  *                     |         Kernel Stack         | RW/--  KSTKSIZE   |

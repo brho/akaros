@@ -4,17 +4,18 @@
 # error "This is a JOS kernel header; user programs should not #include it"
 #endif
 
-struct Trapframe;
+typedef struct trapframe {
+} trapframe_t;
 
 // Activate the kernel monitor,
 // optionally providing a trap frame indicating the current state
 // (NULL if none).
-void monitor(struct Trapframe *tf);
+void monitor(trapframe_t *tf);
 
 // Functions implementing monitor commands.
-int mon_help(int argc, char **argv, struct Trapframe *tf);
-int mon_kerninfo(int argc, char **argv, struct Trapframe *tf);
-int mon_backtrace(int argc, char **argv, struct Trapframe *tf);
-int mon_reboot(int argc, char **argv, struct Trapframe *tf);
+int mon_help(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
+int mon_kerninfo(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
+int mon_backtrace(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
+int mon_reboot(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
 
 #endif	// !JOS_KERN_MONITOR_H

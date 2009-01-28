@@ -8,14 +8,17 @@
 
 
 ###################################################################
-# The kernel (this code) is linked at address (KERNBASE + 1 Meg), 
-# but the bootloader loads it at address 1 Meg.
-# Kernbase is set for a 3g/1g split
-#	
+# The kernel (this code) is linked at address (KERNBASE + 0x00100000 (1MB)), 
+# but we tell the bootloader to load it at physical address 
+# 0x00100000 (1MB), which is the start of extended memory.
+# (See kernel.ld)
+###################################################################
+
+
+###################################################################
 # RELOC(x) maps a symbol x from its link address to its actual
 # location in physical memory (its load address).	 
 ###################################################################
-
 #define	RELOC(x) ((x) - KERNBASE)
 
 

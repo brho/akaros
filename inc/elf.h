@@ -5,12 +5,6 @@
 
 #include <inc/types.h>
 
-typedef uint32_t Elf32_Addr;
-typedef uint16_t Elf32_Half;
-typedef uint32_t Elf32_Off;
-typedef int32_t Elf32_Sword;
-typedef uint32_t Elf32_Word;
-
 struct Elf {
 	uint32_t e_magic;	// must equal ELF_MAGIC
 	uint8_t e_elf[12];

@@ -3,7 +3,7 @@
 #ifndef JOS_INC_STDARG_H
 #define	JOS_INC_STDARG_H
 
-typedef char *va_list;
+typedef void * TRUSTED va_list;
 
 #define	__va_size(type) \
 	(((sizeof(type) + sizeof(long) - 1) / sizeof(long)) * sizeof(long))

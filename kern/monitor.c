@@ -14,15 +14,14 @@
 
 #define CMDBUF_SIZE	80	// enough for one VGA text line
 
-
-struct Command {
-	const char *name;
-	const char *desc;
+typedef struct command {
+	const char *NTS name;
+	const char *NTS desc;
 	// return -1 to force monitor to exit
-	int (*func)(int argc, char** argv, struct Trapframe* tf);
-};
+	int (*func)(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t* tf);
+} command_t;
 
-static struct Command commands[] = {
+static command_t commands[] = {
 	{ "help", "Display this list of commands", mon_help },
 	{ "kerninfo", "Display information about the kernel", mon_kerninfo },
 	{ "backtrace", "Dump a backtrace", mon_backtrace },
@@ -30,12 +29,9 @@ static struct Command commands[] = {
 };
 #define NCOMMANDS (sizeof(commands)/sizeof(commands[0]))
 
-unsigned read_eip();
-
 /***** Implementations of basic kernel monitor commands *****/
 
-int
-mon_help(int argc, char **argv, struct Trapframe *tf)
+int mon_help(int argc, char **argv, trapframe_t *tf)
 {
 	int i;
 
@@ -44,18 +40,17 @@ mon_help(int argc, char **argv, struct Trapframe *tf)
 	return 0;
 }
 
-int
-mon_kerninfo(int argc, char **argv, struct Trapframe *tf)
+int mon_kerninfo(int argc, char **argv, trapframe_t *tf)
 {
-	extern char _start[], etext[], edata[], end[];
+	extern char (SNT _start)[], (SNT etext)[], (SNT edata)[], (SNT end)[];
 
 	cprintf("Special kernel symbols:\n");
-	cprintf("  _start %08x (virt)  %08x (phys)\n", _start, _start - KERNBASE);
-	cprintf("  etext  %08x (virt)  %08x (phys)\n", etext, etext - KERNBASE);
-	cprintf("  edata  %08x (virt)  %08x (phys)\n", edata, edata - KERNBASE);
-	cprintf("  end    %08x (virt)  %08x (phys)\n", end, end - KERNBASE);
+	cprintf("  _start %08x (virt)  %08x (phys)\n", _start, (uint32_t)(_start - KERNBASE));
+	cprintf("  etext  %08x (virt)  %08x (phys)\n", etext, (uint32_t)(etext - KERNBASE));
+	cprintf("  edata  %08x (virt)  %08x (phys)\n", edata, (uint32_t)(edata - KERNBASE));
+	cprintf("  end    %08x (virt)  %08x (phys)\n", end, (uint32_t)(end - KERNBASE));
 	cprintf("Kernel executable memory footprint: %dKB\n",
-		(end-_start+1023)/1024);
+		(uint32_t)(end-_start+1023)/1024);
 	return 0;
 }
 
@@ -83,8 +78,7 @@ static char* function_of(uint32_t address)
 	return stabstr + best_symtab->n_strx;
 }
 
-int
-mon_backtrace(int argc, char **argv, struct Trapframe *tf)
+int mon_backtrace(int argc, char **argv, trapframe_t *tf)
 {
 	uint32_t* ebp, eip;
 	int i = 1;
@@ -110,12 +104,10 @@ mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 		eip = *(ebp + 1);
 		ebp = (uint32_t*)(*ebp);
 	}
-
 	return 0;
 }
 
-int
-mon_reboot(int argc, char **argv, struct Trapframe *tf)
+int mon_reboot(int argc, char **argv, trapframe_t *tf)
 {
 	cprintf("[Irish Accent]: She's goin' down, Cap'n!\n");
 	outb(0x92, 0x3);
@@ -124,17 +116,15 @@ mon_reboot(int argc, char **argv, struct Trapframe *tf)
 }
 
 
-
 /***** Kernel monitor command interpreter *****/
 
 #define WHITESPACE "\t\r\n "
 #define MAXARGS 16
 
-static int
-runcmd(char *buf, struct Trapframe *tf)
-{
+static int runcmd(char *COUNT(CMDBUF_SIZE) real_buf, trapframe_t* tf) {
+	char *BND(real_buf, real_buf+CMDBUF_SIZE) buf = real_buf;
 	int argc;
-	char *argv[MAXARGS];
+	char *NTS argv[MAXARGS];
 	int i;
 
 	// Parse the command buffer into whitespace-separated arguments
@@ -152,7 +142,8 @@ runcmd(char *buf, struct Trapframe *tf)
 			cprintf("Too many arguments (max %d)\n", MAXARGS);
 			return 0;
 		}
-		argv[argc++] = buf;
+		//This will get fucked at runtime..... in the ASS
+		argv[argc++] = (char *NTS) TC(buf);
 		while (*buf && !strchr(WHITESPACE, *buf))
 			buf++;
 	}
@@ -169,14 +160,11 @@ runcmd(char *buf, struct Trapframe *tf)
 	return 0;
 }
 
-void
-monitor(struct Trapframe *tf)
-{
+void monitor(trapframe_t* tf) {
 	char *buf;
 
 	cprintf("Welcome to the JOS kernel monitor!\n");
 	cprintf("Type 'help' for a list of commands.\n");
-
 
 	while (1) {
 		buf = readline("K> ");

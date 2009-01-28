@@ -6,6 +6,8 @@
 #
 
 OBJDIRS += kern
+#CC=ivycc --save-temps --trace --deputy 
+CC=ivycc 
 
 KERN_LDFLAGS := $(LDFLAGS) -T kern/kernel.ld -nostdlib
 
