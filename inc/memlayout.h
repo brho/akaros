@@ -33,25 +33,25 @@
  *                     |                              | RW/--
  *                     |   Remapped Physical Memory   | RW/--
  *                     |                              | RW/--
- *    KERNBASE ----->  +------------------------------+ 0xC0000000
+ *    KERNBASE ----->  +------------------------------+ 0xc0000000
  *                     |  Cur. Page Table (Kern. RW)  | RW/--  PTSIZE
- *    VPT,KSTACKTOP--> +------------------------------+ 0xefc00000      --+
+ *    VPT,KSTACKTOP--> +------------------------------+ 0xbfc00000      --+
  *                     |         Kernel Stack         | RW/--  KSTKSIZE   |
  *                     | - - - - - - - - - - - - - - -|                 PTSIZE
  *                     |      Invalid Memory (*)      | --/--             |
- *    ULIM     ------> +------------------------------+ 0xef800000      --+
+ *    ULIM     ------> +------------------------------+ 0xbf800000      --+
  *                     |  Cur. Page Table (User R-)   | R-/R-  PTSIZE
- *    UVPT      ---->  +------------------------------+ 0xef400000
+ *    UVPT      ---->  +------------------------------+ 0xbf400000
  *                     |          RO PAGES            | R-/R-  PTSIZE
- *    UPAGES    ---->  +------------------------------+ 0xef000000
+ *    UPAGES    ---->  +------------------------------+ 0xbf000000
  *                     |           RO ENVS            | R-/R-  PTSIZE
- * UTOP,UENVS ------>  +------------------------------+ 0xeec00000
+ * UTOP,UENVS ------>  +------------------------------+ 0xbec00000
  * UXSTACKTOP -/       |     User Exception Stack     | RW/RW  PGSIZE
- *                     +------------------------------+ 0xeebff000
+ *                     +------------------------------+ 0xbebff000
  *                     |       Empty Memory (*)       | --/--  PGSIZE
- *    USTACKTOP  --->  +------------------------------+ 0xeebfe000
+ *    USTACKTOP  --->  +------------------------------+ 0xbebfe000
  *                     |      Normal User Stack       | RW/RW  PGSIZE
- *                     +------------------------------+ 0xeebfd000
+ *                     +------------------------------+ 0xbebfd000
  *                     |                              |
  *                     |                              |
  *                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -87,7 +87,7 @@
 #define IOPHYSMEM	0x0A0000
 #define EXTPHYSMEM	0x100000
 
-// Virtual page table.  Entry PDX[VPT] in the PD contains a pointer to
+// Virtual page table.  Entry PDX(VPT) in the PD contains a pointer to
 // the page directory itself, thereby turning the PD into a page table,
 // which maps all the PTEs containing the page mappings for the entire
 // virtual address space into that 4 Meg region starting at VPT.

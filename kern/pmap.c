@@ -63,12 +63,17 @@ nvram_read(int r)
 void
 i386_detect_memory(void)
 {
+	/* For shit BIOS reasons, this isn't seeing any more than 64MB,
+	 * explained a little here: 
+	 * http://exec.h1.ru/docs/os-devel-faq/os-faq-memory.html
+	 */
+
 	// CMOS tells us how many kilobytes there are
 	basemem = ROUNDDOWN(nvram_read(NVRAM_BASELO)*1024, PGSIZE);
 	extmem = ROUNDDOWN(nvram_read(NVRAM_EXTLO)*1024, PGSIZE);
 
 	// Calculate the maximum physical address based on whether
-	// or not there is any extended memory.  See comment in <inc/mmu.h>.
+	// or not there is any extended memory.  See comment in <inc/memlayout.h>
 	if (extmem)
 		maxpa = EXTPHYSMEM + extmem;
 	else
@@ -109,13 +114,20 @@ boot_alloc(uint32_t n, uint32_t align)
 	if (boot_freemem == 0)
 		boot_freemem = end;
 
-	// LAB 2: Your code here:
 	//	Step 1: round boot_freemem up to be aligned properly
+	if (((uintptr_t)boot_freemem & align - 1) != 0) {
+		boot_freemem = (char*)((uintptr_t)boot_freemem & ~(align - 1));
+		boot_freemem += align;
+	}
 	//	Step 2: save current value of boot_freemem as allocated chunk
+	v = boot_freemem;
+	//  Step 2.5: check if we can alloc
+	if (PADDR(boot_freemem + n) > maxpa)
+		panic("Out of memory in boot alloc, you fool!\n");
 	//	Step 3: increase boot_freemem to record allocation
+	boot_freemem += n;	
 	//	Step 4: return allocated chunk
-
-	return NULL;
+	return v;
 }
 
 //
@@ -145,7 +157,17 @@ boot_alloc(uint32_t n, uint32_t align)
 static pte_t*
 boot_pgdir_walk(pde_t *pgdir, uintptr_t la, int create)
 {
-	return 0;
+	pde_t the_pde = pgdir[PDX(la)];
+	void* new_table;
+
+	if (the_pde & PTE_P)
+		return (pte_t*)((pde_t)KADDR(PTE_ADDR(the_pde)) + PTX(la));
+	if (!create)
+		return 0;
+	new_table = boot_alloc(PGSIZE, PGSIZE);
+	memset(new_table, 0, PGSIZE);
+	pgdir[PDX(la)] = (pde_t)PADDR(new_table) | PTE_P | PTE_W;
+	return (pte_t*)((pde_t)KADDR(PTE_ADDR(pgdir[PDX(la)])) + PTX(la));
 }
 
 //
@@ -180,9 +202,6 @@ i386_vm_init(void)
 	uint32_t cr0;
 	size_t n;
 
-	// Remove this line when you're ready to test this function.
-	panic("i386_vm_init: This function is not finished\n");
-
 	//////////////////////////////////////////////////////////////////////
 	// create initial page directory.
 	pgdir = boot_alloc(PGSIZE, PGSIZE);
@@ -194,7 +213,8 @@ i386_vm_init(void)
 	// Recursively insert PD in itself as a page table, to form
 	// a virtual page table at virtual address VPT.
 	// (For now, you don't have understand the greater purpose of the
-	// following two lines.)
+	// following two lines.  Unless you are eagle-eyed, in which case you
+	// should already know.)
 
 	// Permissions: kernel RW, user NONE
 	pgdir[PDX(VPT)] = PADDR(pgdir)|PTE_W|PTE_P;
@@ -202,6 +222,9 @@ i386_vm_init(void)
 	// same for UVPT
 	// Permissions: kernel R, user R 
 	pgdir[PDX(UVPT)] = PADDR(pgdir)|PTE_U|PTE_P;
+
+	// Remove this line when you're ready to test this function.
+	panic("i386_vm_init: This function is not finished\n");
 
 	//////////////////////////////////////////////////////////////////////
 	// Map the kernel stack (symbol name "bootstack").  The complete VA
@@ -653,3 +676,30 @@ page_check(void)
 	cprintf("page_check() succeeded!\n");
 }
 
+
+/* 
+    // testing code for boot_pgdir_walk 
+	pte_t* temp;
+	temp = boot_pgdir_walk(pgdir, VPT + (VPT >> 10), 1);
+	cprintf("pgdir = %p\n", pgdir);
+	cprintf("test recursive walking pte_t* = %p\n", temp);
+	cprintf("test recursive walking entry = %p\n", PTE_ADDR(temp));
+	temp = boot_pgdir_walk(pgdir, 0xc0400000, 1);
+	cprintf("LA = 0xc0400000 = %p\n", temp);
+	temp = boot_pgdir_walk(pgdir, 0xc0400070, 1);
+	cprintf("LA = 0xc0400070 = %p\n", temp);
+	temp = boot_pgdir_walk(pgdir, 0xc0800000, 0);
+	cprintf("LA = 0xc0800000, no create = %p\n", temp);
+	temp = boot_pgdir_walk(pgdir, 0xc0600070, 1);
+	cprintf("LA = 0xc0600070 = %p\n", temp);
+	temp = boot_pgdir_walk(pgdir, 0xc0600090, 0);
+	cprintf("LA = 0xc0600090, nc = %p\n", temp);
+	temp = boot_pgdir_walk(pgdir, 0xc0608070, 0);
+	cprintf("LA = 0xc0608070, nc = %p\n", temp);
+	temp = boot_pgdir_walk(pgdir, 0xc0800070, 1);
+	cprintf("LA = 0xc0800070 = %p\n", temp);
+	temp = boot_pgdir_walk(pgdir, 0xc0b00070, 0);
+	cprintf("LA = 0xc0b00070, nc = %p\n", temp);
+	temp = boot_pgdir_walk(pgdir, 0xc0c00000, 0);
+	cprintf("LA = 0xc0c00000, nc = %p\n", temp);
+*/
