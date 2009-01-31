@@ -32,6 +32,7 @@ void cons_intr(int (*proc)(void));
 #define	  COM_MCR_OUT2	0x08	// Out2 complement
 #define COM_LSR		5	// In:	Line Status Register
 #define   COM_LSR_DATA	0x01	//   Data available
+#define   COM_LSR_READY	0x20	//   Ready to send
 
 static bool serial_exists;
 
@@ -75,6 +76,34 @@ serial_init(void)
 	(void) inb(COM1+COM_IIR);
 	(void) inb(COM1+COM_RX);
 
+}
+
+static void
+serial_send_byte(uint8_t b)
+{
+	while (!(inb(COM1+COM_LSR) & COM_LSR_READY));
+	outb(COM1, b);
+}
+
+static void
+serial_putc(int c)
+{
+	switch (c & 0xff) {
+	case '\b':
+		serial_send_byte('\b');
+		serial_send_byte((uint8_t)(' '));
+		serial_send_byte('\b');
+		break;
+	case '\n':
+	case '\r':
+		serial_send_byte((uint8_t)('\n'));
+		serial_send_byte((uint8_t)('\r'));
+		break;
+	default:
+		serial_send_byte((uint8_t)(c & 0xff));
+		break;
+	}
+	return;
 }
 
 
@@ -416,6 +445,7 @@ cons_getc(void)
 void
 cons_putc(int c)
 {
+	serial_putc(c);
 	lpt_putc(c);
 	cga_putc(c);
 }
