@@ -74,8 +74,6 @@ $(OBJDIR)/kern/bochs.img: $(OBJDIR)/kern/kernel $(OBJDIR)/boot/boot
 	$(V)dd if=$(OBJDIR)/boot/boot of=$(OBJDIR)/kern/bochs.img~ conv=notrunc 2>/dev/null
 	$(V)dd if=$(OBJDIR)/kern/kernel of=$(OBJDIR)/kern/bochs.img~ seek=1 conv=notrunc 2>/dev/null
 	$(V)mv $(OBJDIR)/kern/bochs.img~ $(OBJDIR)/kern/bochs.img
-	$(V)cp $(OBJDIR)/kern/kernel mnt/hdd/texas
-	$(V)sync
 
 all: $(OBJDIR)/kern/bochs.img
 

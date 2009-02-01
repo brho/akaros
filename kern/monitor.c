@@ -163,7 +163,7 @@ static int runcmd(char *COUNT(CMDBUF_SIZE) real_buf, trapframe_t* tf) {
 void monitor(trapframe_t* tf) {
 	char *buf;
 
-	cprintf("Welcome to the JOS kernel monitor!\n");
+	cprintf("Welcome to the ROS kernel monitor!\n");
 	cprintf("Type 'help' for a list of commands.\n");
 
 	while (1) {
