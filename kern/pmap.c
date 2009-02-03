@@ -115,10 +115,8 @@ boot_alloc(uint32_t n, uint32_t align)
 		boot_freemem = end;
 
 	//	Step 1: round boot_freemem up to be aligned properly
-	if (((uintptr_t)boot_freemem & align - 1) != 0) {
-		boot_freemem = (char*)((uintptr_t)boot_freemem & ~(align - 1));
-		boot_freemem += align;
-	}
+	boot_freemem = ROUNDUP(boot_freemem, align);
+
 	//	Step 2: save current value of boot_freemem as allocated chunk
 	v = boot_freemem;
 	//  Step 2.5: check if we can alloc
@@ -157,17 +155,17 @@ boot_alloc(uint32_t n, uint32_t align)
 static pte_t*
 boot_pgdir_walk(pde_t *pgdir, uintptr_t la, int create)
 {
-	pde_t the_pde = pgdir[PDX(la)];
+	pde_t* the_pde = &pgdir[PDX(la)];
 	void* new_table;
 
-	if (the_pde & PTE_P)
-		return (pte_t*)((pde_t)KADDR(PTE_ADDR(the_pde)) + PTX(la));
+	if (*the_pde & PTE_P)
+		return &((pde_t*)KADDR(PTE_ADDR(*the_pde)))[PTX(la)];
 	if (!create)
 		return 0;
 	new_table = boot_alloc(PGSIZE, PGSIZE);
 	memset(new_table, 0, PGSIZE);
-	pgdir[PDX(la)] = (pde_t)PADDR(new_table) | PTE_P | PTE_W;
-	return (pte_t*)((pde_t)KADDR(PTE_ADDR(pgdir[PDX(la)])) + PTX(la));
+	*the_pde = (pde_t)PADDR(new_table) | PTE_P | PTE_W;
+	return &((pde_t*)KADDR(PTE_ADDR(*the_pde)))[PTX(la)];
 }
 
 //
@@ -181,6 +179,23 @@ boot_pgdir_walk(pde_t *pgdir, uintptr_t la, int create)
 static void
 boot_map_segment(pde_t *pgdir, uintptr_t la, size_t size, physaddr_t pa, int perm)
 {
+	uintptr_t i;
+	pte_t *pte;
+	// la can be page unaligned, but weird things will happen
+	// unless pa has the same offset.  pa always truncates any
+	// possible offset.  will warn.  size can be weird too. 
+	if (PGOFF(la)) {
+		warn("la not page aligned in boot_map_segment!");
+		size += PGOFF(la);
+	}
+	// even though our maxpa doesn't go above 64MB yet...
+	if (pa + size > maxpa)
+		warn("Attempting to map to physical memory beyond maxpa!");
+	// need to index with i instead of la + size, in case of wrap-around
+	for (i = 0; i < size; i += PGSIZE, la += PGSIZE, pa += PGSIZE) {
+		pte = boot_pgdir_walk(pgdir, la, 1);
+		*pte = PTE_ADDR(pa) | PTE_P | perm;
+	}
 }
 
 // Set up a two-level page table:
@@ -223,9 +238,6 @@ i386_vm_init(void)
 	// Permissions: kernel R, user R 
 	pgdir[PDX(UVPT)] = PADDR(pgdir)|PTE_U|PTE_P;
 
-	// Remove this line when you're ready to test this function.
-	panic("i386_vm_init: This function is not finished\n");
-
 	//////////////////////////////////////////////////////////////////////
 	// Map the kernel stack (symbol name "bootstack").  The complete VA
 	// range of the stack, [KSTACKTOP-PTSIZE, KSTACKTOP), breaks into two
@@ -235,6 +247,12 @@ i386_vm_init(void)
 	//     Permissions: kernel RW, user NONE
 	// Your code goes here:
 
+	// remember that the space for the kernel stack is allocated in the binary.
+	// bootstack and bootstacktop point to symbols in the data section, which 
+	// at this point are like 0xc010b000.  KSTACKTOP is the desired loc in VM
+	boot_map_segment(pgdir, (uintptr_t)KSTACKTOP - KSTKSIZE, 
+	                 KSTKSIZE, PADDR(bootstack), PTE_W);
+
 	//////////////////////////////////////////////////////////////////////
 	// Map all of physical memory at KERNBASE. 
 	// Ie.  the VA range [KERNBASE, 2^32) should map to
@@ -243,6 +261,14 @@ i386_vm_init(void)
 	// we just set up the mapping anyway.
 	// Permissions: kernel RW, user NONE
 	// Your code goes here: 
+	
+	// this maps all of the possible phys memory
+	// note the use of unsigned underflow to get size = 0x40000000
+	//boot_map_segment(pgdir, KERNBASE, -KERNBASE, 0, PTE_W);
+	// but this only maps what is available, and saves memory.  every 4MB of
+	// mapped memory requires a 2nd level page: 2^10 entries, each covering 2^12
+	// need to modify tests below to account for this
+	boot_map_segment(pgdir, KERNBASE, maxpa, 0, PTE_W);
 
 	//////////////////////////////////////////////////////////////////////
 	// Make 'pages' point to an array of size 'npage' of 'struct Page'.
@@ -256,6 +282,16 @@ i386_vm_init(void)
 	//    - pages -- kernel RW, user NONE
 	//    - the read-only version mapped at UPAGES -- kernel R, user R
 	// Your code goes here: 
+	
+	// round up to the nearest page
+	size_t page_array_size = ROUNDUP(npage*sizeof(struct Page), PGSIZE);
+	pages = (struct Page*)boot_alloc(page_array_size, PGSIZE);
+	memset(pages, 0, page_array_size);
+	if (page_array_size > PTSIZE) {
+		warn("page_array_size bigger than PTSIZE, userland will not see all pages");
+		page_array_size = PTSIZE;
+	}
+	boot_map_segment(pgdir, UPAGES, page_array_size, PADDR(pages), PTE_U);
 
 	// Check that the initial page directory has been set up correctly.
 	check_boot_pgdir();
@@ -276,6 +312,13 @@ i386_vm_init(void)
 
 	// Map VA 0:4MB same as VA KERNBASE, i.e. to PA 0:4MB.
 	// (Limits our kernel to <4MB)
+	/* They mean linear address 0:4MB, and the kernel < 4MB is only until 
+	 * segmentation is turned off.
+	 * once we turn on paging, segmentation is still on, so references to
+	 * KERNBASE+x will get mapped to linear address x, which we need to make 
+	 * sure can map to phys addr x, until we can turn off segmentation and
+	 * KERNBASE+x maps to LA KERNBASE+x, which maps to PA x, via paging
+	 */
 	pgdir[0] = pgdir[PDX(KERNBASE)];
 
 	// Install page table.
@@ -283,6 +326,8 @@ i386_vm_init(void)
 
 	// Turn on paging.
 	cr0 = rcr0();
+	// not sure why they turned on TS and EM here.  or anything other 
+	// than PG and WP
 	cr0 |= CR0_PE|CR0_PG|CR0_AM|CR0_WP|CR0_NE|CR0_TS|CR0_EM|CR0_MP;
 	cr0 &= ~(CR0_TS|CR0_EM);
 	lcr0(cr0);
@@ -335,7 +380,9 @@ check_boot_pgdir(void)
 	
 
 	// check phys mem
-	for (i = 0; KERNBASE + i != 0; i += PGSIZE)
+	//for (i = 0; KERNBASE + i != 0; i += PGSIZE)
+	// adjusted check to account for only mapping avail mem
+	for (i = 0; i < maxpa; i += PGSIZE)
 		assert(check_va2pa(pgdir, KERNBASE + i) == i);
 
 	// check kernel stack
@@ -352,7 +399,10 @@ check_boot_pgdir(void)
 			assert(pgdir[i]);
 			break;
 		default:
-			if (i >= PDX(KERNBASE))
+			//if (i >= PDX(KERNBASE))
+			// adjusted check to account for only mapping avail mem
+			// and you can't KADDR maxpa (just above legal range)
+			if (i >= PDX(KERNBASE) && i <= PDX(KADDR(maxpa-1)))
 				assert(pgdir[i]);
 			else
 				assert(pgdir[i] == 0);
@@ -678,6 +728,9 @@ page_check(void)
 
 
 /* 
+	// helpful if you want to manually walk with kvm / bochs
+	//cprintf("pgdir va = %08p, pgdir pa = %08p\n\n", pgdir, PADDR(pgdir));
+
     // testing code for boot_pgdir_walk 
 	pte_t* temp;
 	temp = boot_pgdir_walk(pgdir, VPT + (VPT >> 10), 1);
@@ -702,4 +755,48 @@ page_check(void)
 	cprintf("LA = 0xc0b00070, nc = %p\n", temp);
 	temp = boot_pgdir_walk(pgdir, 0xc0c00000, 0);
 	cprintf("LA = 0xc0c00000, nc = %p\n", temp);
+
+	// testing for boot_map_seg
+	cprintf("\n");
+	cprintf("before mapping 1 page to 0x00350000\n");
+	cprintf("0xc4000000's &pte: %08x\n",boot_pgdir_walk(pgdir, 0xc4000000, 1));
+	cprintf("0xc4000000's pte: %08x\n",*(boot_pgdir_walk(pgdir, 0xc4000000, 1)));
+	boot_map_segment(pgdir, 0xc4000000, 4096, 0x00350000, PTE_W);
+	cprintf("after mapping\n");
+	cprintf("0xc4000000's &pte: %08x\n",boot_pgdir_walk(pgdir, 0xc4000000, 1));
+	cprintf("0xc4000000's pte: %08x\n",*(boot_pgdir_walk(pgdir, 0xc4000000, 1)));
+
+	cprintf("\n");
+	cprintf("before mapping 3 pages to 0x00700000\n");
+	cprintf("0xd0000000's &pte: %08x\n",boot_pgdir_walk(pgdir, 0xd0000000, 1));
+	cprintf("0xd0000000's pte: %08x\n",*(boot_pgdir_walk(pgdir, 0xd0000000, 1)));
+	cprintf("0xd0001000's &pte: %08x\n",boot_pgdir_walk(pgdir, 0xd0001000, 1));
+	cprintf("0xd0001000's pte: %08x\n",*(boot_pgdir_walk(pgdir, 0xd0001000, 1)));
+	cprintf("0xd0002000's &pte: %08x\n",boot_pgdir_walk(pgdir, 0xd0002000, 1));
+	cprintf("0xd0002000's pte: %08x\n",*(boot_pgdir_walk(pgdir, 0xd0002000, 1)));
+	boot_map_segment(pgdir, 0xd0000000, 4096*3, 0x00700000, 0);
+	cprintf("after mapping\n");
+	cprintf("0xd0000000's &pte: %08x\n",boot_pgdir_walk(pgdir, 0xd0000000, 1));
+	cprintf("0xd0000000's pte: %08x\n",*(boot_pgdir_walk(pgdir, 0xd0000000, 1)));
+	cprintf("0xd0001000's &pte: %08x\n",boot_pgdir_walk(pgdir, 0xd0001000, 1));
+	cprintf("0xd0001000's pte: %08x\n",*(boot_pgdir_walk(pgdir, 0xd0001000, 1)));
+	cprintf("0xd0002000's &pte: %08x\n",boot_pgdir_walk(pgdir, 0xd0002000, 1));
+	cprintf("0xd0002000's pte: %08x\n",*(boot_pgdir_walk(pgdir, 0xd0002000, 1)));
+
+	cprintf("\n");
+	cprintf("before mapping 1 unaligned to 0x00500010\n");
+	cprintf("0xc8000010's &pte: %08x\n",boot_pgdir_walk(pgdir, 0xc8000010, 1));
+	cprintf("0xc8000010's pte: %08x\n",*(boot_pgdir_walk(pgdir, 0xc8000010, 1)));
+	cprintf("0xc8001010's &pte: %08x\n",boot_pgdir_walk(pgdir, 0xc8001010, 1));
+	cprintf("0xc8001010's pte: %08x\n",*(boot_pgdir_walk(pgdir, 0xc8001010, 1)));
+	boot_map_segment(pgdir, 0xc8000010, 4096, 0x00500010, PTE_W);
+	cprintf("after mapping\n");
+	cprintf("0xc8000010's &pte: %08x\n",boot_pgdir_walk(pgdir, 0xc8000010, 1));
+	cprintf("0xc8000010's pte: %08x\n",*(boot_pgdir_walk(pgdir, 0xc8000010, 1)));
+	cprintf("0xc8001010's &pte: %08x\n",boot_pgdir_walk(pgdir, 0xc8001010, 1));
+	cprintf("0xc8001010's pte: %08x\n",*(boot_pgdir_walk(pgdir, 0xc8001010, 1)));
+
+	cprintf("\n");
+	boot_map_segment(pgdir, 0xe0000000, 4096, 0x10000000, PTE_W);
+
 */
