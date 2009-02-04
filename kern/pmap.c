@@ -377,7 +377,6 @@ check_boot_pgdir(void)
 	n = ROUNDUP(npage*sizeof(struct Page), PGSIZE);
 	for (i = 0; i < n; i += PGSIZE)
 		assert(check_va2pa(pgdir, UPAGES + i) == PADDR(pages) + i);
-	
 
 	// check phys mem
 	//for (i = 0; KERNBASE + i != 0; i += PGSIZE)
@@ -460,8 +459,21 @@ page_init(void)
 	//
 	// Change the code to reflect this.
 	int i;
+	physaddr_t physaddr_after_kernel = PADDR(ROUNDUP(boot_freemem, PGSIZE));
 	LIST_INIT(&page_free_list);
-	for (i = 0; i < npage; i++) {
+
+	pages[0].pp_ref = 1;
+	for (i = 1; i < PPN(IOPHYSMEM); i++) {
+		pages[i].pp_ref = 0;
+		LIST_INSERT_HEAD(&page_free_list, &pages[i], pp_link);
+	}
+	for (i = PPN(IOPHYSMEM); i < PPN(EXTPHYSMEM); i++) {
+		pages[i].pp_ref = 1;
+	}
+	for (i = PPN(EXTPHYSMEM); i < PPN(physaddr_after_kernel); i++) {
+		pages[i].pp_ref = 1;
+	}
+	for (i = PPN(physaddr_after_kernel); i < npage; i++) {
 		pages[i].pp_ref = 0;
 		LIST_INSERT_HEAD(&page_free_list, &pages[i], pp_link);
 	}
@@ -495,8 +507,12 @@ page_initpp(struct Page *pp)
 int
 page_alloc(struct Page **pp_store)
 {
-	// Fill this function in
-	return -E_NO_MEM;
+	if (LIST_EMPTY(&page_free_list))
+		return -E_NO_MEM;
+	*pp_store = LIST_FIRST(&page_free_list);
+	LIST_REMOVE(*pp_store, pp_link);
+	page_initpp(*pp_store);
+	return 0;
 }
 
 //
@@ -506,7 +522,9 @@ page_alloc(struct Page **pp_store)
 void
 page_free(struct Page *pp)
 {
-	// Fill this function in
+	if (pp->pp_ref)
+		panic("Attempting to free page with non-zero reference count!");
+	LIST_INSERT_HEAD(&page_free_list, pp, pp_link);
 }
 
 //
@@ -535,13 +553,23 @@ page_decref(struct Page* pp)
 //
 // Hint: you can turn a Page * into the physical address of the
 // page it refers to with page2pa() from kern/pmap.h.
-pte_t *
+pte_t*
 pgdir_walk(pde_t *pgdir, const void *va, int create)
 {
-	// Fill this function in
-	return NULL;
-}
+	pde_t* the_pde = &pgdir[PDX(va)];
+	struct Page* new_table;
 
+	if (*the_pde & PTE_P)
+		return &((pde_t*)KADDR(PTE_ADDR(*the_pde)))[PTX(va)];
+	if (!create)
+		return NULL;
+	if (page_alloc(&new_table))
+		return NULL;
+	new_table->pp_ref = 1;
+	memset(page2kva(new_table), 0, PGSIZE);
+	*the_pde = (pde_t)page2pa(new_table) | PTE_P | PTE_W;
+	return &((pde_t*)KADDR(PTE_ADDR(*the_pde)))[PTX(va)];
+}
 //
 // Map the physical page 'pp' at virtual address 'va'.
 // The permissions (the low 12 bits) of the page table
@@ -553,6 +581,7 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 //     'pgdir'.
 //   - pp->pp_ref should be incremented if the insertion succeeds.
 //   - The TLB must be invalidated if a page was formerly present at 'va'.
+//     (this is handled in page_remove)
 //
 // RETURNS: 
 //   0 on success
@@ -564,7 +593,17 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 int
 page_insert(pde_t *pgdir, struct Page *pp, void *va, int perm) 
 {
-	// Fill this function in
+	pte_t* pte = pgdir_walk(pgdir, va, 1);
+	if (!pte)
+		return -E_NO_MEM;
+	// need to up the ref count in case pp is already mapped at va
+	// and we don't want to page_remove (which could free pp) and then 
+	// continue as if pp wasn't freed.  moral = up the ref asap
+	pp->pp_ref++;
+	if (*pte & PTE_P) {
+		page_remove(pgdir, va);
+	}
+	*pte = page2pa(pp) | PTE_P | perm;
 	return 0;
 }
 
@@ -581,8 +620,12 @@ page_insert(pde_t *pgdir, struct Page *pp, void *va, int perm)
 struct Page *
 page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
 {
-	// Fill this function in
-	return NULL;
+	pte_t* pte = pgdir_walk(pgdir, va, 0);
+	if (!pte || !(*pte & PTE_P))
+		return 0;
+	if (pte_store)
+		*pte_store = pte;
+	return pa2page(PTE_ADDR(*pte));
 }
 
 //
@@ -603,7 +646,14 @@ page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
 void
 page_remove(pde_t *pgdir, void *va)
 {
-	// Fill this function in
+	pte_t* pte;
+	struct Page* page;
+	page = page_lookup(pgdir, va, &pte);
+	if (!page)
+		return;
+	*pte = 0;
+	tlb_invalidate(pgdir, va);
+	page_decref(page);
 }
 
 //
