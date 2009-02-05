@@ -89,7 +89,7 @@ i386_detect_memory(void)
 // Set up initial memory mappings and turn on MMU.
 // --------------------------------------------------------------
 
-static void check_boot_pgdir(void);
+static void check_boot_pgdir(bool pse);
 
 //
 // Allocate n bytes of physical memory aligned on an 
@@ -152,16 +152,27 @@ boot_alloc(uint32_t n, uint32_t align)
 // It should panic on failure.  (Note that boot_alloc already panics
 // on failure.)
 //
+// Supports returning jumbo (4MB PSE) PTEs.  To create with a jumbo, pass in 2.
+// 
 static pte_t*
 boot_pgdir_walk(pde_t *pgdir, uintptr_t la, int create)
 {
 	pde_t* the_pde = &pgdir[PDX(la)];
 	void* new_table;
 
-	if (*the_pde & PTE_P)
+	if (*the_pde & PTE_P) {
+		if (*the_pde & PTE_PS)
+			return (pte_t*)the_pde;
 		return &((pde_t*)KADDR(PTE_ADDR(*the_pde)))[PTX(la)];
+	}
 	if (!create)
-		return 0;
+		return NULL;
+	if (create == 2) {
+		if (JPGOFF(la))
+			panic("Attempting to find a Jumbo PTE at an unaligned VA!");
+		*the_pde = PTE_PS | PTE_P;
+		return (pte_t*)the_pde;
+	}
 	new_table = boot_alloc(PGSIZE, PGSIZE);
 	memset(new_table, 0, PGSIZE);
 	*the_pde = (pde_t)PADDR(new_table) | PTE_P | PTE_W;
@@ -176,6 +187,7 @@ boot_pgdir_walk(pde_t *pgdir, uintptr_t la, int create)
 // This function may ONLY be used during initialization,
 // before the page_free_list has been set up.
 //
+// To map with Jumbos, set PTE_PS in perm
 static void
 boot_map_segment(pde_t *pgdir, uintptr_t la, size_t size, physaddr_t pa, int perm)
 {
@@ -191,10 +203,19 @@ boot_map_segment(pde_t *pgdir, uintptr_t la, size_t size, physaddr_t pa, int per
 	// even though our maxpa doesn't go above 64MB yet...
 	if (pa + size > maxpa)
 		warn("Attempting to map to physical memory beyond maxpa!");
-	// need to index with i instead of la + size, in case of wrap-around
-	for (i = 0; i < size; i += PGSIZE, la += PGSIZE, pa += PGSIZE) {
-		pte = boot_pgdir_walk(pgdir, la, 1);
-		*pte = PTE_ADDR(pa) | PTE_P | perm;
+	if (perm & PTE_PS) {
+		if (JPGOFF(la) || JPGOFF(pa))
+			panic("Tried to map a Jumbo page at an unaligned address!");
+		// need to index with i instead of la + size, in case of wrap-around
+		for (i = 0; i < size; i += JPGSIZE, la += JPGSIZE, pa += JPGSIZE) {
+			pte = boot_pgdir_walk(pgdir, la, 2);
+			*pte = PTE_ADDR(pa) | PTE_P | perm;
+		}
+	} else {
+		for (i = 0; i < size; i += PGSIZE, la += PGSIZE, pa += PGSIZE) {
+			pte = boot_pgdir_walk(pgdir, la, 1);
+			*pte = PTE_ADDR(pa) | PTE_P | perm;
+		}
 	}
 }
 
@@ -216,6 +237,34 @@ i386_vm_init(void)
 	pde_t* pgdir;
 	uint32_t cr0;
 	size_t n;
+	bool pse;
+
+	// check for PSE support (TODO)
+	pse = 1;
+	// turn on PSE
+	if (pse) {
+		uint32_t cr4;
+		cr4 = rcr4();
+		cr4 |= CR4_PSE;
+		lcr4(cr4);
+	}
+
+	/*
+	 * PSE status: 
+	 * - can walk and set up boot_map_segments with jumbos but can't
+	 *   insert yet.  
+	 * - anything related to a single struct Page still can't handle 
+	 *   jumbos.  will need to think about and adjust Page functions
+	 * - do we want to store info like this in the struct Page?  or just check
+	 *   by walking the PTE
+	 * - when we alloc a page, and we want it to be 4MB, we'll need
+	 *   to have contiguous memory, etc
+	 * - there's a difference between having 4MB page table entries
+	 *   and having 4MB Page tracking structs.  changing the latter will
+	 *   break a lot of things
+	 * - showmapping and friends work on a 4KB granularity, but map to the
+	 *   correct entries
+	 */
 
 	//////////////////////////////////////////////////////////////////////
 	// create initial page directory.
@@ -268,7 +317,10 @@ i386_vm_init(void)
 	// but this only maps what is available, and saves memory.  every 4MB of
 	// mapped memory requires a 2nd level page: 2^10 entries, each covering 2^12
 	// need to modify tests below to account for this
-	boot_map_segment(pgdir, KERNBASE, maxpa, 0, PTE_W);
+	if (pse)
+		boot_map_segment(pgdir, KERNBASE, maxpa, 0, PTE_W | PTE_PS);
+	else
+		boot_map_segment(pgdir, KERNBASE, maxpa, 0, PTE_W );
 
 	//////////////////////////////////////////////////////////////////////
 	// Make 'pages' point to an array of size 'npage' of 'struct Page'.
@@ -294,7 +346,7 @@ i386_vm_init(void)
 	boot_map_segment(pgdir, UPAGES, page_array_size, PADDR(pages), PTE_U);
 
 	// Check that the initial page directory has been set up correctly.
-	check_boot_pgdir();
+	check_boot_pgdir(pse);
 
 	//////////////////////////////////////////////////////////////////////
 	// On x86, segmentation maps a VA to a LA (linear addr) and
@@ -366,7 +418,7 @@ i386_vm_init(void)
 static physaddr_t check_va2pa(pde_t *pgdir, uintptr_t va);
 
 static void
-check_boot_pgdir(void)
+check_boot_pgdir(bool pse)
 {
 	uint32_t i, n;
 	pde_t *pgdir;
@@ -381,8 +433,13 @@ check_boot_pgdir(void)
 	// check phys mem
 	//for (i = 0; KERNBASE + i != 0; i += PGSIZE)
 	// adjusted check to account for only mapping avail mem
-	for (i = 0; i < maxpa; i += PGSIZE)
-		assert(check_va2pa(pgdir, KERNBASE + i) == i);
+	if (pse)
+		for (i = 0; i < maxpa; i += JPGSIZE)
+			assert(check_va2pa(pgdir, KERNBASE + i) == i);
+	else
+		for (i = 0; i < maxpa; i += PGSIZE)
+			assert(check_va2pa(pgdir, KERNBASE + i) == i);
+		
 
 	// check kernel stack
 	for (i = 0; i < KSTKSIZE; i += PGSIZE)
@@ -424,6 +481,8 @@ check_va2pa(pde_t *pgdir, uintptr_t va)
 	pgdir = &pgdir[PDX(va)];
 	if (!(*pgdir & PTE_P))
 		return ~0;
+	if (*pgdir & PTE_PS)
+		return PTE_ADDR(*pgdir);
 	p = (pte_t*) KADDR(PTE_ADDR(*pgdir));
 	if (!(p[PTX(va)] & PTE_P))
 		return ~0;
@@ -553,16 +612,27 @@ page_decref(struct Page* pp)
 //
 // Hint: you can turn a Page * into the physical address of the
 // page it refers to with page2pa() from kern/pmap.h.
+//
+// Supports returning jumbo (4MB PSE) PTEs.  To create with a jumbo, pass in 2.
 pte_t*
 pgdir_walk(pde_t *pgdir, const void *va, int create)
 {
 	pde_t* the_pde = &pgdir[PDX(va)];
 	struct Page* new_table;
 
-	if (*the_pde & PTE_P)
+	if (*the_pde & PTE_P) {
+		if (*the_pde & PTE_PS)
+			return (pte_t*)the_pde;
 		return &((pde_t*)KADDR(PTE_ADDR(*the_pde)))[PTX(va)];
+	}
 	if (!create)
 		return NULL;
+	if (create == 2) {
+		if (JPGOFF(va))
+			panic("Attempting to find a Jumbo PTE at an unaligned VA!");
+		*the_pde = PTE_PS | PTE_P;
+		return (pte_t*)the_pde;
+	}
 	if (page_alloc(&new_table))
 		return NULL;
 	new_table->pp_ref = 1;
@@ -617,6 +687,7 @@ page_insert(pde_t *pgdir, struct Page *pp, void *va, int perm)
 //
 // Hint: the TA solution uses pgdir_walk and pa2page.
 //
+// For jumbos, right now this returns the first Page* in the 4MB
 struct Page *
 page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
 {
@@ -643,6 +714,7 @@ page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
 // Hint: The TA solution is implemented using page_lookup,
 // 	tlb_invalidate, and page_decref.
 //
+// This may be wonky wrt Jumbo pages and decref.  
 void
 page_remove(pde_t *pgdir, void *va)
 {

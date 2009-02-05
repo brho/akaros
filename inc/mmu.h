@@ -40,6 +40,9 @@
 // offset in page
 #define PGOFF(la)	(((uintptr_t) (la)) & 0xFFF)
 
+// offset in jumbo page
+#define JPGOFF(la)	(((uintptr_t) (la)) & 0x003FFFFF)
+
 // construct linear address from indexes and offset
 #define PGADDR(d, t, o)	((void*) ((d) << PDXSHIFT | (t) << PTXSHIFT | (o)))
 
@@ -48,6 +51,7 @@
 #define NPTENTRIES	1024		// page table entries per page table
 
 #define PGSIZE		4096		// bytes mapped by a page
+#define JPGSIZE		4096*1024	// bytes mapped by a jumbo page (4MB)
 #define PGSHIFT		12		// log2(PGSIZE)
 
 #define PTSIZE		(PGSIZE*NPTENTRIES) // bytes mapped by a page directory entry
