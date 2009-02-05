@@ -11,6 +11,7 @@
 #include <kern/console.h>
 #include <kern/monitor.h>
 #include <kern/kdebug.h>
+#include <kern/pmap.h>
 
 #define CMDBUF_SIZE	80	// enough for one VGA text line
 
@@ -26,6 +27,8 @@ static command_t commands[] = {
 	{ "kerninfo", "Display information about the kernel", mon_kerninfo },
 	{ "backtrace", "Dump a backtrace", mon_backtrace },
 	{ "reboot", "Take a ride to the South Bay", mon_reboot },
+	{ "showmapping", "Shows VA->PA mappings between two virtual addresses (parameters)", mon_showmapping},
+	{ "setmapperm", "Sets permissions on a VA->PA mapping", mon_setmapperm},
 };
 #define NCOMMANDS (sizeof(commands)/sizeof(commands[0]))
 
@@ -81,7 +84,9 @@ static char* function_of(uint32_t address)
 int mon_backtrace(int argc, char **argv, trapframe_t *tf)
 {
 	uint32_t* ebp, eip;
-	int i = 1;
+	struct Eipdebuginfo debuginfo;
+	char buf[256];
+	int j, i = 1;
 	ebp = (uint32_t*)read_ebp();	
 	// this is the retaddr for what called backtrace
 	eip = *(ebp + 1);
@@ -90,17 +95,17 @@ int mon_backtrace(int argc, char **argv, trapframe_t *tf)
 	cprintf("Stack Backtrace:\n");
 	// on each iteration, ebp holds the stack frame and eip is a retaddr in that func
 	while (ebp != 0) {
-		cprintf("%02d EBP: %x EIP: %x Function: %s\n   Args: %08x %08x %08x %08x %08x\n",
-				i++,
-		        ebp,
-				eip,
-				function_of(eip),
-				*(ebp + 2),
-				*(ebp + 3),
-				*(ebp + 4),
-				*(ebp + 5),
-				*(ebp + 6)
-				);
+		debuginfo_eip(eip, &debuginfo);
+		memset(buf, 0, 256);
+		strncpy(buf, debuginfo.eip_fn_name, MIN(debuginfo.eip_fn_namelen, 256));
+		buf[MIN(debuginfo.eip_fn_namelen, 255)] = 0;
+		cprintf("#%02d [<%x>] in %s+%x(%p) from %s:%d\n", i++,  eip, buf, 
+		        debuginfo.eip_fn_addr - (uint32_t)_start, debuginfo.eip_fn_addr, 
+		        debuginfo.eip_file, debuginfo.eip_line);
+		cprintf("    ebp: %x   Args:", ebp);
+		for (j = 0; j < MIN(debuginfo.eip_fn_narg, 5); j++)
+			cprintf(" %08x", *(ebp + 2 + j));
+		cprintf("\n");
 		eip = *(ebp + 1);
 		ebp = (uint32_t*)(*ebp);
 	}
@@ -112,6 +117,68 @@ int mon_reboot(int argc, char **argv, trapframe_t *tf)
 	cprintf("[Irish Accent]: She's goin' down, Cap'n!\n");
 	outb(0x92, 0x3);
 	cprintf("Should have rebooted.  Doesn't work yet in KVM...\n");
+	return 0;
+}
+
+int mon_showmapping(int argc, char **argv, trapframe_t *tf)
+{
+	if (argc < 2) {
+		cprintf("Shows virtual -> physical mappings for a virtual address range.\n");
+		cprintf("Usage: showmappings START_ADDR [END_ADDR]\n");
+		return 1;
+	}
+	pde_t* pgdir = (pde_t*)vpd;
+	pte_t* pte;
+	struct Page* page;
+	uintptr_t start, i;
+	size_t size;
+	start = ROUNDDOWN(strtol(argv[1], 0, 16), PGSIZE);
+	size = (argc == 2) ? 1 : strtol(argv[2], 0, 16) - start;
+	if (size/PGSIZE > 512) {
+		cprintf("Not going to do this for more than 512 items\n");
+		return 1;
+	}
+	cprintf("   Virtual    Physical  Dr Ac CD WT U W\n");
+	cprintf("---------------------------------------\n");
+	for(i = 0; i < size; i += PGSIZE, start += PGSIZE) {
+		page = page_lookup(pgdir, (void*)start, &pte);
+		cprintf("%08p  ", start);
+		if (page) 
+			cprintf("%08p  %1d  %1d  %1d  %1d  %1d %1d\n", page2pa(page), 
+			(*pte & PTE_D) >> 6, (*pte & PTE_A) >> 5, (*pte & PTE_PCD) >> 4,
+			(*pte & PTE_PWT) >> 3, (*pte & PTE_U) >> 2, (*pte & PTE_W) >> 1);
+		else
+			cprintf("%08p\n", 0);
+	}
+	return 0;
+}
+
+int mon_setmapperm(int argc, char **argv, trapframe_t *tf)
+{
+	if (argc < 2) {
+		cprintf("Sets VIRT_ADDR's mapping's permissions to PERMS (in hex)\n");
+		cprintf("Usage: setmapperm VIRT_ADDR PERMS\n");
+		return 1;
+	}
+	pde_t* pgdir = (pde_t*)vpd;
+	pte_t* pte;
+	struct Page* page;
+	uintptr_t va;
+	va = ROUNDDOWN(strtol(argv[1], 0, 16), PGSIZE);
+	page = page_lookup(pgdir, (void*)va, &pte);
+	if (!page) {
+		cprintf("No such mapping\n");
+		return 1;
+	}
+	cprintf("   Virtual    Physical  Dr Ac CD WT U W\n");
+	cprintf("---------------------------------------\n");
+	cprintf("%08p  %08p  %1d  %1d  %1d  %1d  %1d %1d\n", va, page2pa(page), 
+	        (*pte & PTE_D) >> 6, (*pte & PTE_A) >> 5, (*pte & PTE_PCD) >> 4,
+	        (*pte & PTE_PWT) >> 3, (*pte & PTE_U) >> 2, (*pte & PTE_W) >> 1);
+	*pte = PTE_ADDR(*pte) | PGOFF(strtol(argv[2], 0, 16)) | PTE_P;
+	cprintf("%08p  %08p  %1d  %1d  %1d  %1d  %1d %1d\n", va, page2pa(page), 
+	       (*pte & PTE_D) >> 6, (*pte & PTE_A) >> 5, (*pte & PTE_PCD) >> 4,
+	       (*pte & PTE_PWT) >> 3, (*pte & PTE_U) >> 2, (*pte & PTE_W) >> 1);
 	return 0;
 }
 
