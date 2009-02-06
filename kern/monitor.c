@@ -10,6 +10,7 @@
 
 #include <kern/console.h>
 #include <kern/monitor.h>
+#include <kern/trap.h>
 #include <kern/kdebug.h>
 #include <kern/pmap.h>
 
@@ -19,7 +20,7 @@ typedef struct command {
 	const char *NTS name;
 	const char *NTS desc;
 	// return -1 to force monitor to exit
-	int (*func)(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t* tf);
+	int (*func)(int argc, char *NTS *NT COUNT(argc) argv, struct Trapframe* tf);
 } command_t;
 
 static command_t commands[] = {
@@ -34,7 +35,7 @@ static command_t commands[] = {
 
 /***** Implementations of basic kernel monitor commands *****/
 
-int mon_help(int argc, char **argv, trapframe_t *tf)
+int mon_help(int argc, char **argv, struct Trapframe *tf)
 {
 	int i;
 
@@ -43,7 +44,7 @@ int mon_help(int argc, char **argv, trapframe_t *tf)
 	return 0;
 }
 
-int mon_kerninfo(int argc, char **argv, trapframe_t *tf)
+int mon_kerninfo(int argc, char **argv, struct Trapframe *tf)
 {
 	extern char (SNT _start)[], (SNT etext)[], (SNT edata)[], (SNT end)[];
 
@@ -81,7 +82,7 @@ static char* function_of(uint32_t address)
 	return stabstr + best_symtab->n_strx;
 }
 
-int mon_backtrace(int argc, char **argv, trapframe_t *tf)
+int mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 {
 	uint32_t* ebp, eip;
 	struct Eipdebuginfo debuginfo;
@@ -112,7 +113,7 @@ int mon_backtrace(int argc, char **argv, trapframe_t *tf)
 	return 0;
 }
 
-int mon_reboot(int argc, char **argv, trapframe_t *tf)
+int mon_reboot(int argc, char **argv, struct Trapframe *tf)
 {
 	cprintf("[Irish Accent]: She's goin' down, Cap'n!\n");
 	outb(0x92, 0x3);
@@ -120,7 +121,7 @@ int mon_reboot(int argc, char **argv, trapframe_t *tf)
 	return 0;
 }
 
-int mon_showmapping(int argc, char **argv, trapframe_t *tf)
+int mon_showmapping(int argc, char **argv, struct Trapframe *tf)
 {
 	if (argc < 2) {
 		cprintf("Shows virtual -> physical mappings for a virtual address range.\n");
@@ -154,7 +155,7 @@ int mon_showmapping(int argc, char **argv, trapframe_t *tf)
 	return 0;
 }
 
-int mon_setmapperm(int argc, char **argv, trapframe_t *tf)
+int mon_setmapperm(int argc, char **argv, struct Trapframe *tf)
 {
 	if (argc < 2) {
 		cprintf("Sets VIRT_ADDR's mapping's permissions to PERMS (in hex)\n");
@@ -192,7 +193,7 @@ int mon_setmapperm(int argc, char **argv, trapframe_t *tf)
 #define WHITESPACE "\t\r\n "
 #define MAXARGS 16
 
-static int runcmd(char *COUNT(CMDBUF_SIZE) real_buf, trapframe_t* tf) {
+static int runcmd(char *COUNT(CMDBUF_SIZE) real_buf, struct Trapframe* tf) {
 	char *BND(real_buf, real_buf+CMDBUF_SIZE) buf = real_buf;
 	int argc;
 	char *NTS argv[MAXARGS];
@@ -231,11 +232,14 @@ static int runcmd(char *COUNT(CMDBUF_SIZE) real_buf, trapframe_t* tf) {
 	return 0;
 }
 
-void monitor(trapframe_t* tf) {
+void monitor(struct Trapframe* tf) {
 	char *buf;
 
 	cprintf("Welcome to the ROS kernel monitor!\n");
 	cprintf("Type 'help' for a list of commands.\n");
+
+	if (tf != NULL)
+		print_trapframe(tf);
 
 	while (1) {
 		buf = readline("K> ");
