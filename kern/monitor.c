@@ -89,12 +89,14 @@ int mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 	char buf[256];
 	int j, i = 1;
 	ebp = (uint32_t*)read_ebp();	
-	// this is the retaddr for what called backtrace
-	eip = *(ebp + 1);
+	// this is part of the way back into the call() instruction's bytes
+	// eagle-eyed readers should be able to explain why this is good enough,
+	// and retaddr (just *(ebp + 1) is not)
+	eip = *(ebp + 1) - 1;
 	// jump back a frame (out of mon_backtrace)
 	ebp = (uint32_t*)(*ebp);
 	cprintf("Stack Backtrace:\n");
-	// on each iteration, ebp holds the stack frame and eip is a retaddr in that func
+	// on each iteration, ebp holds the stack frame and eip an addr in that func
 	while (ebp != 0) {
 		debuginfo_eip(eip, &debuginfo);
 		memset(buf, 0, 256);
@@ -107,7 +109,7 @@ int mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 		for (j = 0; j < MIN(debuginfo.eip_fn_narg, 5); j++)
 			cprintf(" %08x", *(ebp + 2 + j));
 		cprintf("\n");
-		eip = *(ebp + 1);
+		eip = *(ebp + 1) - 1;
 		ebp = (uint32_t*)(*ebp);
 	}
 	return 0;
