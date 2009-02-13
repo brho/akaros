@@ -240,10 +240,16 @@ i386_vm_init(void)
 	size_t n;
 	bool pse;
 
-	// check for PSE support (TODO)
-	pse = 1;
+	// check for PSE support
+	asm volatile ("movl    $1, %%eax;
+                   cpuid;
+                   andl    $0x00000008, %%edx"
+	              : "=d"(pse) 
+				  : 
+	              : "%eax");
 	// turn on PSE
 	if (pse) {
+		cprintf("PSE capability detected.\n");
 		uint32_t cr4;
 		cr4 = rcr4();
 		cr4 |= CR4_PSE;

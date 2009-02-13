@@ -13,6 +13,8 @@
 #include <kern/env.h>
 #include <kern/trap.h>
 
+void print_cpuinfo(void);
+
 void kernel_init(multiboot_info_t *mboot_info)
 {
 	extern char (BND(__this, end) edata)[], (SNT end)[];
@@ -25,6 +27,8 @@ void kernel_init(multiboot_info_t *mboot_info)
 	// Initialize the console.
 	// Can't call cprintf until after we do this!
 	cons_init();
+
+	print_cpuinfo();
 
 	// Lab 2 memory management initialization functions
 	i386_detect_memory();
@@ -91,6 +95,24 @@ void _warn(const char *file, int line, const char *fmt,...)
 	vcprintf(fmt, ap);
 	cprintf("\n");
 	va_end(ap);
+}
+
+void print_cpuinfo(void) {
+	int func_num;
+	char vendor_id[13];
+
+	asm volatile ("subl    %0, %0;
+                   cpuid;
+                   movl    %%ebx, (%1);
+                   movl    %%edx, 4(%1);
+                   movl    %%ecx, 8(%1)"
+	              : "=a"(func_num) 
+				  : "D"(vendor_id)
+	              : "%ebx", "%ecx", "%edx");
+
+	vendor_id[12] = '\0';
+	cprintf("Largest Standard Function Number Supported: %d\n", func_num);
+	cprintf("Vendor ID: %s\n", vendor_id);
 }
 
 
