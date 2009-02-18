@@ -155,6 +155,9 @@ boot_alloc(uint32_t n, uint32_t align)
 //
 // Supports returning jumbo (4MB PSE) PTEs.  To create with a jumbo, pass in 2.
 // 
+// Maps non-PSE PDEs as U/W.  W so the kernel can, U so the user can read via
+// UVPT.  UVPT security comes from the UVPT mapping (U/R).  All other kernel pages
+// protected at the second layer
 static pte_t*
 boot_pgdir_walk(pde_t *pgdir, uintptr_t la, int create)
 {
@@ -176,7 +179,7 @@ boot_pgdir_walk(pde_t *pgdir, uintptr_t la, int create)
 	}
 	new_table = boot_alloc(PGSIZE, PGSIZE);
 	memset(new_table, 0, PGSIZE);
-	*the_pde = (pde_t)PADDR(new_table) | PTE_P | PTE_W;
+	*the_pde = (pde_t)PADDR(new_table) | PTE_P | PTE_W | PTE_U;
 	return &((pde_t*)KADDR(PTE_ADDR(*the_pde)))[PTX(la)];
 }
 
@@ -433,12 +436,13 @@ i386_vm_init(void)
 // but it is a pretty good sanity check. 
 //
 static physaddr_t check_va2pa(pde_t *pgdir, uintptr_t va);
+static pte_t get_vaperms(pde_t *pgdir, uintptr_t va);
 
 static void
 check_boot_pgdir(bool pse)
 {
 	uint32_t i, n;
-	pde_t *pgdir;
+	pde_t *pgdir, pte;
 
 	pgdir = boot_pgdir;
 
@@ -463,7 +467,6 @@ check_boot_pgdir(bool pse)
 	else
 		for (i = 0; i < maxpa; i += PGSIZE)
 			assert(check_va2pa(pgdir, KERNBASE + i) == i);
-		
 
 	// check kernel stack
 	for (i = 0; i < KSTKSIZE; i += PGSIZE)
@@ -490,6 +493,41 @@ check_boot_pgdir(bool pse)
 			break;
 		}
 	}
+
+	// check permissions
+	// user read-only.  check for user and write, should be only user
+	// eagle-eyed viewers should be able to explain the extra cases
+	for (i = UENVS; i < ULIM; i+=PGSIZE) {
+		pte = get_vaperms(pgdir, i);
+		if ((pte & PTE_P) && (i != UVPT+(VPT>>10))) {
+			if (pte & PTE_PS) {
+				assert((pte & PTE_U) != PTE_U);
+				assert((pte & PTE_W) != PTE_W);
+			} else {
+				assert((pte & PTE_U) == PTE_U);
+				assert((pte & PTE_W) != PTE_W);
+			}
+		}
+	}
+	// kernel read-write.
+	for (i = ULIM; i <= KERNBASE + maxpa - PGSIZE; i+=PGSIZE) {
+		pte = get_vaperms(pgdir, i);
+		if ((pte & PTE_P) && (i != VPT+(UVPT>>10))) {
+			assert((pte & PTE_U) != PTE_U);
+			assert((pte & PTE_W) == PTE_W);
+		}
+	}
+	// special mappings
+	pte = get_vaperms(pgdir, UVPT+(VPT>>10));
+	assert((pte & PTE_U) != PTE_U);
+	assert((pte & PTE_W) != PTE_W);
+
+	// note this means the kernel cannot directly manipulate this virtual address
+	// convince yourself this isn't a big deal, eagle-eyes!
+	pte = get_vaperms(pgdir, VPT+(UVPT>>10));
+	assert((pte & PTE_U) != PTE_U);
+	assert((pte & PTE_W) != PTE_W);
+
 	cprintf("check_boot_pgdir() succeeded!\n");
 }
 
@@ -512,6 +550,23 @@ check_va2pa(pde_t *pgdir, uintptr_t va)
 	if (!(p[PTX(va)] & PTE_P))
 		return ~0;
 	return PTE_ADDR(p[PTX(va)]);
+}
+
+/* 
+ * This function returns a PTE with the aggregate permissions equivalent
+ * to walking the two levels of paging.  PPN = 0.  Somewhat fragile, in that
+ * it returns PTE_PS if either entry has PTE_PS (which should only happen
+ * for some of the recusive walks)
+ */
+
+static pte_t
+get_vaperms(pde_t *pgdir, uintptr_t va)
+{
+	pde_t* pde = &pgdir[PDX(va)];
+	pte_t* pte = pgdir_walk(pgdir, (void*)va, 0);
+	if (!pte || !(*pte & PTE_P))
+		return 0;
+	return PGOFF(*pde & *pte) + PTE_PS & (*pde | *pte);
 }
 		
 // --------------------------------------------------------------
@@ -662,7 +717,7 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 		return NULL;
 	new_table->pp_ref = 1;
 	memset(page2kva(new_table), 0, PGSIZE);
-	*the_pde = (pde_t)page2pa(new_table) | PTE_P | PTE_W;
+	*the_pde = (pde_t)page2pa(new_table) | PTE_P | PTE_W | PTE_U;
 	return &((pde_t*)KADDR(PTE_ADDR(*the_pde)))[PTX(va)];
 }
 //

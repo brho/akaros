@@ -131,7 +131,7 @@ int mon_showmapping(int argc, char **argv, struct Trapframe *tf)
 		return 1;
 	}
 	pde_t* pgdir = (pde_t*)vpd;
-	pte_t* pte;
+	pte_t *pte, *pde;
 	struct Page* page;
 	uintptr_t start, i;
 	size_t size;
@@ -146,12 +146,14 @@ int mon_showmapping(int argc, char **argv, struct Trapframe *tf)
 	for(i = 0; i < size; i += PGSIZE, start += PGSIZE) {
 		page = page_lookup(pgdir, (void*)start, &pte);
 		cprintf("%08p  ", start);
-		if (page) 
+		if (page) {
+			pde = &pgdir[PDX(start)];
+			// for a jumbo, pde = pte and PTE_PS (better be) = 1
 			cprintf("%08p  %1d  %1d  %1d  %1d  %1d  %1d %1d\n", page2pa(page), 
 			       (*pte & PTE_PS) >> 7, (*pte & PTE_D) >> 6, (*pte & PTE_A) >> 5,
 			       (*pte & PTE_PCD) >> 4, (*pte & PTE_PWT) >> 3, 
-			       (*pte & PTE_U) >> 2, (*pte & PTE_W) >> 1);
-		else
+			       (*pte & *pde & PTE_U) >> 2, (*pte & *pde & PTE_W) >> 1);
+		} else
 			cprintf("%08p\n", 0);
 	}
 	return 0;
@@ -161,11 +163,13 @@ int mon_setmapperm(int argc, char **argv, struct Trapframe *tf)
 {
 	if (argc < 2) {
 		cprintf("Sets VIRT_ADDR's mapping's permissions to PERMS (in hex)\n");
+		cprintf("Only affects the lowest level PTE.  To adjust the PDE, do the math.\n");
+		cprintf("Be careful with this around UVPT, VPT, and friends.\n");
 		cprintf("Usage: setmapperm VIRT_ADDR PERMS\n");
 		return 1;
 	}
 	pde_t* pgdir = (pde_t*)vpd;
-	pte_t* pte;
+	pte_t *pte, *pde;
 	struct Page* page;
 	uintptr_t va;
 	va = ROUNDDOWN(strtol(argv[1], 0, 16), PGSIZE);
@@ -174,18 +178,19 @@ int mon_setmapperm(int argc, char **argv, struct Trapframe *tf)
 		cprintf("No such mapping\n");
 		return 1;
 	}
+	pde = &pgdir[PDX(va)];
 	cprintf("   Virtual    Physical  Ps Dr Ac CD WT U W\n");
 	cprintf("------------------------------------------\n");
 	cprintf("%08p  %08p  %1d  %1d  %1d  %1d  %1d  %1d %1d\n", va, page2pa(page), 
 	       (*pte & PTE_PS) >> 7, (*pte & PTE_D) >> 6, (*pte & PTE_A) >> 5, 
-	       (*pte & PTE_PCD) >> 4, (*pte & PTE_PWT) >> 3, (*pte & PTE_U) >> 2, 
-	       (*pte & PTE_W) >> 1);
+	       (*pte & PTE_PCD) >> 4, (*pte & PTE_PWT) >> 3, (*pte & *pde & PTE_U) >> 2, 
+	       (*pte & *pde & PTE_W) >> 1);
 	*pte = PTE_ADDR(*pte) | (*pte & PTE_PS) |
 	       (PGOFF(strtol(argv[2], 0, 16)) & ~PTE_PS ) | PTE_P;
 	cprintf("%08p  %08p  %1d  %1d  %1d  %1d  %1d  %1d %1d\n", va, page2pa(page), 
 	       (*pte & PTE_PS) >> 7, (*pte & PTE_D) >> 6, (*pte & PTE_A) >> 5, 
-	       (*pte & PTE_PCD) >> 4, (*pte & PTE_PWT) >> 3, (*pte & PTE_U) >> 2, 
-	       (*pte & PTE_W) >> 1);
+	       (*pte & PTE_PCD) >> 4, (*pte & PTE_PWT) >> 3, (*pte & *pde & PTE_U) >> 2, 
+	       (*pte & *pde & PTE_W) >> 1);
 	return 0;
 }
 
