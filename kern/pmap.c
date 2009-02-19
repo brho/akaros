@@ -24,6 +24,8 @@ static char* boot_freemem;	// Pointer to next byte of free mem
 struct Page* pages;		// Virtual address of physical page array
 static struct Page_list page_free_list;	// Free list of physical pages
 
+extern struct Env *envs;
+
 // Global descriptor table.
 //
 // The kernel and user segments are identical (except for the DPL).
@@ -363,7 +365,15 @@ i386_vm_init(void)
 	//    - envs itself -- kernel RW, user NONE
 	//    - the image of envs mapped at UENVS  -- kernel R, user R
 	
-	// LAB 3: Your code here.
+	// round up to the nearest page
+	size_t env_array_size = ROUNDUP(NENV*sizeof(struct Env), PGSIZE);
+	envs = (struct Env*)boot_alloc(env_array_size, PGSIZE);
+	memset(envs, 0, env_array_size);
+	if (env_array_size > PTSIZE) {
+		warn("env_array_size bigger than PTSIZE, userland will not see all environments");
+		env_array_size = PTSIZE;
+	}
+	boot_map_segment(pgdir, UENVS, env_array_size, PADDR(envs), PTE_U);
 
 	// Check that the initial page directory has been set up correctly.
 	check_boot_pgdir(pse);
@@ -451,12 +461,10 @@ check_boot_pgdir(bool pse)
 	for (i = 0; i < n; i += PGSIZE)
 		assert(check_va2pa(pgdir, UPAGES + i) == PADDR(pages) + i);
 
-	/* // TODO - turn this on
 	// check envs array (new test for lab 3)
 	n = ROUNDUP(NENV*sizeof(struct Env), PGSIZE);
 	for (i = 0; i < n; i += PGSIZE)
 		assert(check_va2pa(pgdir, UENVS + i) == PADDR(envs) + i);
-	*/
 
 	// check phys mem
 	//for (i = 0; KERNBASE + i != 0; i += PGSIZE)
@@ -479,7 +487,7 @@ check_boot_pgdir(bool pse)
 		case PDX(UVPT):
 		case PDX(KSTACKTOP-1):
 		case PDX(UPAGES):
-		//case PDX(UENVS): // TODO - turn this on
+		case PDX(UENVS):
 			assert(pgdir[i]);
 			break;
 		default:
