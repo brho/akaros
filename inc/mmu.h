@@ -266,7 +266,7 @@ struct Gatedesc {
 	unsigned gd_rsv1 : 3;        // reserved(should be zero I guess)
 	unsigned gd_type : 4;        // type(STS_{TG,IG32,TG32})
 	unsigned gd_s : 1;           // must be 0 (system)
-	unsigned gd_dpl : 2;         // descriptor(meaning new) privilege level
+	unsigned gd_dpl : 2;         // DPL - highest ring allowed to use this
 	unsigned gd_p : 1;           // Present
 	unsigned gd_off_31_16 : 16;  // high bits of offset in segment
 };

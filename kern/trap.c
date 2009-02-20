@@ -58,7 +58,25 @@ idt_init(void)
 {
 	extern struct Segdesc gdt[];
 	
-	// LAB 3: Your code here.
+	// This table is made in trapentry.S by each macro in that file.
+	// It is layed out such that the ith entry is the ith's traphandler's
+	// (uint32_t) trap addr, then (uint32_t) trap number
+	struct trapinfo { uint32_t trapaddr; uint32_t trapnumber; };
+	extern struct trapinfo trap_tbl[];
+	extern struct trapinfo trap_tbl_end[];
+	int i, trap_tbl_size = trap_tbl_end - trap_tbl;
+	extern void ISR_default(void);
+
+	// set all to default, to catch everything
+	for(i = 0; i < 256; i++)
+		SETGATE(idt[i], 1, GD_KT, &ISR_default, 3);
+	
+	// set all entries that have real trap handlers
+	// we need to stop short of the last one, since the last is the default
+	// handler with a fake interrupt number (500) that is out of bounds of
+	// the idt[]
+	for(i = 0; i < trap_tbl_size - 1; i++)
+		SETGATE(idt[trap_tbl[i].trapnumber], 1, GD_KT, trap_tbl[i].trapaddr, 3);
 
 	// Setup a TSS so that we get the right stack
 	// when we trap to the kernel.
@@ -142,6 +160,7 @@ trap(struct Trapframe *tf)
 	// Dispatch based on what type of trap occurred
 	trap_dispatch(tf);
 
+	// should this be if == 3?  Sort out later when we handle traps.
         // Return to the current environment, which should be runnable.
         assert(curenv && curenv->env_status == ENV_RUNNABLE);
         env_run(curenv);

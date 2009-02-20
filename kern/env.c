@@ -404,6 +404,14 @@ env_destroy(struct Env *e)
 {
 	env_free(e);
 
+	int i;
+	// ugly, but for now just linearly search through all possible
+	// environments for a runnable one.
+	for (i = 0; i < NENV; i++) {
+		e = &envs[ENVX(i)];
+		if (e && e->env_status == ENV_RUNNABLE)
+			env_run(e);
+	}
 	cprintf("Destroyed the only environment - nothing more to do!\n");
 	while (1)
 		monitor(NULL);
@@ -450,10 +458,11 @@ env_run(struct Env *e)
 	//	e->env_tf to sensible values.
 	
 		// would set the curenv->env_status if we had more states
-	curenv = e;
-	e->env_runs++;
-	lcr3(e->env_cr3);
-	panic("remove me to step through env_pop_tf or once int 0x30 is supported.");
+	if (e != curenv) {
+		curenv = e;
+		e->env_runs++;
+		lcr3(e->env_cr3);
+	}
     env_pop_tf(&e->env_tf);
 }
 
