@@ -69,14 +69,18 @@ idt_init(void)
 
 	// set all to default, to catch everything
 	for(i = 0; i < 256; i++)
-		SETGATE(idt[i], 1, GD_KT, &ISR_default, 3);
+		SETGATE(idt[i], 1, GD_KT, &ISR_default, 0);
 	
 	// set all entries that have real trap handlers
 	// we need to stop short of the last one, since the last is the default
 	// handler with a fake interrupt number (500) that is out of bounds of
 	// the idt[]
 	for(i = 0; i < trap_tbl_size - 1; i++)
-		SETGATE(idt[trap_tbl[i].trapnumber], 1, GD_KT, trap_tbl[i].trapaddr, 3);
+		SETGATE(idt[trap_tbl[i].trapnumber], 1, GD_KT, trap_tbl[i].trapaddr, 0);
+
+	// turn on syscall handling.  
+	// DPL 3 means this can be triggered by the int instruction
+	idt[48].gd_dpl = 3;
 
 	// Setup a TSS so that we get the right stack
 	// when we trap to the kernel.
