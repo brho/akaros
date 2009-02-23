@@ -19,21 +19,7 @@ sys_cputs(const char *s, size_t len)
 {
 	// Check that the user has permission to read memory [s, s+len).
 	// Destroy the environment if not.
-	
-	void *start, *end;
-	size_t num_pages, i;
-	pte_t *pte;
-
-	start = ROUNDDOWN((void*)s, PGSIZE);
-	end = ROUNDUP((void*)s + len, PGSIZE);
-	if (start >= end)
-		env_destroy(curenv);
-	num_pages = PPN(end - start);
-	for (i = 0; i < num_pages; i++, start += PGSIZE) {
-		pte = pgdir_walk(curenv->env_pgdir, start, 0);
-		if ( !pte || !(*pte & PTE_P) || !(*pte & PTE_U) ) 
-			env_destroy(curenv);
-	}
+	user_mem_assert(curenv, s, len, PTE_U);
 
 	// Print the string supplied by the user.
 	cprintf("%.*s", len, s);

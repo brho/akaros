@@ -853,8 +853,38 @@ static uintptr_t user_mem_check_addr;
 int
 user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 {
-	// LAB 3: Your code here. 
+	// TODO - will need to sort this out wrt page faulting / PTE_P
+	// also could be issues with sleeping and waking up to find pages
+	// are unmapped, though i think the lab ignores this since the 
+	// kernel is uninterruptible
+	void *start, *end;
+	size_t num_pages, i;
+	pte_t *pte;
 
+	perm |= PTE_P;
+	start = ROUNDDOWN((void*)va, PGSIZE);
+	end = ROUNDUP((void*)va + len, PGSIZE);
+	if (start >= end) {
+		warn("Blimey!  Wrap around in VM range calculation!");	
+		return -E_FAULT;
+	}
+	num_pages = PPN(end - start);
+	for (i = 0; i < num_pages; i++, start += PGSIZE) {
+		pte = pgdir_walk(env->env_pgdir, start, 0);
+		// ensures the bits we want on are turned on.  if not, E_FAULT
+		if ( !pte || ((*pte & perm) != perm) ) {
+			if (i = 0)
+				user_mem_check_addr = (uintptr_t)va;
+			else
+				user_mem_check_addr = (uintptr_t)start;
+			return -E_FAULT;
+		}
+	}
+	// this should never be needed, since the perms should catch it
+	if ((uintptr_t)end >= ULIM) {
+		warn ("I suck - Bug in user permission mappings!");
+		return -E_FAULT;
+	}
 	return 0;
 }
 

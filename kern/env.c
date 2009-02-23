@@ -218,7 +218,7 @@ segment_alloc(struct Env *e, void *va, size_t len)
 	end = ROUNDUP(va + len, PGSIZE);
 	if (start >= end)
 		panic("Wrap-around in memory allocation addresses!");
-	if ((uint32_t)end > UTOP)
+	if ((uintptr_t)end > UTOP)
 		panic("Attempting to map above UTOP!");
 	// page_insert/pgdir_walk alloc a page and read/write to it via its address
 	// starting from pgdir (e's), so we need to be using e's pgdir
