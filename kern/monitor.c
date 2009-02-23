@@ -119,7 +119,14 @@ int mon_reboot(int argc, char **argv, struct Trapframe *tf)
 {
 	cprintf("[Irish Accent]: She's goin' down, Cap'n!\n");
 	outb(0x92, 0x3);
-	cprintf("Should have rebooted.  Doesn't work yet in KVM...\n");
+	// KVM doesn't reboot yet, but this next bit will make it
+	// if you're in kernel mode and you can't do a push, when an interrupt
+	// comes in, the system just resets.  if esp = 0, there's no room left.
+	// somewhat curious about what happens in an SMP....
+	cprintf("[Irish Accent]: I'm givin' you all she's got!\n");
+	asm volatile ("movl $0, %esp; int $0");
+	// really, should never see this
+	cprintf("Sigh....\n");
 	return 0;
 }
 

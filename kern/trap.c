@@ -80,7 +80,7 @@ idt_init(void)
 
 	// turn on syscall handling.  
 	// DPL 3 means this can be triggered by the int instruction
-	idt[48].gd_dpl = 3;
+	idt[T_SYSCALL].gd_dpl = 3;
 
 	// Setup a TSS so that we get the right stack
 	// when we trap to the kernel.
