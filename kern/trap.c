@@ -78,9 +78,10 @@ idt_init(void)
 	for(i = 0; i < trap_tbl_size - 1; i++)
 		SETGATE(idt[trap_tbl[i].trapnumber], 1, GD_KT, trap_tbl[i].trapaddr, 0);
 
-	// turn on syscall handling.  
+	// turn on syscall handling and other user-accessible ints
 	// DPL 3 means this can be triggered by the int instruction
 	idt[T_SYSCALL].gd_dpl = 3;
+	idt[T_BRKPT].gd_dpl = 3;
 
 	// Setup a TSS so that we get the right stack
 	// when we trap to the kernel.
@@ -132,9 +133,13 @@ static void
 trap_dispatch(struct Trapframe *tf)
 {
 	// Handle processor exceptions.
-	// LAB 3: Your code here.
 	
 	switch(tf->tf_trapno) {
+		case (T_BRKPT):
+			while (1)
+				monitor(tf);
+			// never get to this
+			assert(0);
 		case (T_PGFLT):
 			page_fault_handler(tf);
 			break;
