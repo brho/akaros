@@ -135,26 +135,34 @@ trap_dispatch(struct Trapframe *tf)
 	// Handle processor exceptions.
 	
 	switch(tf->tf_trapno) {
-		case (T_BRKPT):
+		case T_BRKPT:
 			while (1)
 				monitor(tf);
 			// never get to this
 			assert(0);
-		case (T_PGFLT):
+		case T_PGFLT:
 			page_fault_handler(tf);
 			break;
-		default:
+		case T_SYSCALL:
+			// check for userspace, for now
+			assert(tf->tf_cs != GD_KT);
+			tf->tf_regs.reg_eax = 
+				syscall(tf->tf_regs.reg_eax, tf->tf_regs.reg_edx, 
+				        tf->tf_regs.reg_ecx, tf->tf_regs.reg_ebx, 
+				        tf->tf_regs.reg_edi, tf->tf_regs.reg_esi);
+			env_run(curenv);
 			break;
+		default:
+			// Unexpected trap: The user process or the kernel has a bug.
+			print_trapframe(tf);
+			if (tf->tf_cs == GD_KT)
+				panic("Damn Damn!  Unhandled trap in the kernel!");
+			else {
+				env_destroy(curenv);
+				return;
+			}
 	}
-
-	// Unexpected trap: The user process or the kernel has a bug.
-	print_trapframe(tf);
-	if (tf->tf_cs == GD_KT)
-		panic("unhandled trap in kernel");
-	else {
-		env_destroy(curenv);
-		return;
-	}
+	return;
 }
 
 void
@@ -180,6 +188,8 @@ trap(struct Trapframe *tf)
 	trap_dispatch(tf);
 
 	// should this be if == 3?  Sort out later when we handle traps.
+	// so far we never get here
+	assert(0);
         // Return to the current environment, which should be runnable.
         assert(curenv && curenv->env_status == ENV_RUNNABLE);
         env_run(curenv);

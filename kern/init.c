@@ -46,14 +46,14 @@ void kernel_init(multiboot_info_t *mboot_info)
 	ENV_CREATE2(TEST, TESTSIZE);
 #else
 	// Touch all you want.
-	ENV_CREATE(user_faultread);
+	//ENV_CREATE(user_faultread);
 	//ENV_CREATE(user_faultreadkernel);
 	//ENV_CREATE(user_faultwrite);
 	//ENV_CREATE(user_faultwritekernel);
 	//ENV_CREATE(user_breakpoint);
-	ENV_CREATE(user_badsegment);
+	//ENV_CREATE(user_badsegment);
 	//ENV_CREATE(user_divzero);
-	//ENV_CREATE(user_hello);
+	ENV_CREATE(user_hello);
 #endif // TEST*
 
 	// We only have one user environment for now, so just run it.

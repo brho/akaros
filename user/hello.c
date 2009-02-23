@@ -4,6 +4,7 @@
 void
 umain(void)
 {
-	cprintf("hello, world\n");
+	cprintf("goodbye, world!\n");
+	// this is just their way of generating a pagefault...
 	cprintf("i am environment %08x\n", env->env_id);
 }

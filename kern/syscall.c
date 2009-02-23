@@ -20,7 +20,20 @@ sys_cputs(const char *s, size_t len)
 	// Check that the user has permission to read memory [s, s+len).
 	// Destroy the environment if not.
 	
-	// LAB 3: Your code here.
+	void *start, *end;
+	size_t num_pages, i;
+	pte_t *pte;
+
+	start = ROUNDDOWN((void*)s, PGSIZE);
+	end = ROUNDUP((void*)s + len, PGSIZE);
+	if (start >= end)
+		env_destroy(curenv);
+	num_pages = PPN(end - start);
+	for (i = 0; i < num_pages; i++, start += PGSIZE) {
+		pte = pgdir_walk(curenv->env_pgdir, start, 0);
+		if ( !pte || !(*pte & PTE_P) || !(*pte & PTE_U) ) 
+			env_destroy(curenv);
+	}
 
 	// Print the string supplied by the user.
 	cprintf("%.*s", len, s);
@@ -77,8 +90,25 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 {
 	// Call the function corresponding to the 'syscallno' parameter.
 	// Return any appropriate return value.
-	// LAB 3: Your code here.
 
-	panic("syscall not implemented");
+	//cprintf("Incoming syscall number: %d\n    a1: %x\n    a2: %x\n    a3: %x\n    a4: %x\n    a5: %x\n", syscallno, a1, a2, a3, a4, a5);
+
+	if (syscallno >= NSYSCALLS)
+		return -E_INVAL;
+	
+	switch (syscallno) {
+		case 0:
+			sys_cputs((void*)a1, a2);
+			return 0;
+		case 1:
+			return sys_cgetc();
+		case 2:
+			return sys_getenvid();
+		case 3:
+			return sys_env_destroy((envid_t)a1);
+		default:
+			panic("invalid syscall number!");
+	}
+	return 0xdeadbeef;
 }
 
