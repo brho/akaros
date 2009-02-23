@@ -51,27 +51,30 @@ trap_tbl:
 /*
  * Lab 3: Your code here for generating entry points for the different traps.
  */
-TRAPHANDLER(ISR_divide_error, T_DIVIDE);
-TRAPHANDLER(ISR_debug_exceptions, T_DEBUG);
-TRAPHANDLER(ISR_breakpoint, T_BRKPT);
-TRAPHANDLER(ISR_overflow, T_OFLOW);
-TRAPHANDLER(ISR_bounds_check, T_BOUND);
-TRAPHANDLER(ISR_invalid_opcode, T_ILLOP);
-TRAPHANDLER(ISR_device_not_available, T_DEVICE);
-TRAPHANDLER_NOEC(ISR_double_fault, T_DBLFLT);
-TRAPHANDLER_NOEC(ISR_invalid_TSS, T_TSS);
-TRAPHANDLER_NOEC(ISR_segment_not_present, T_SEGNP);
-TRAPHANDLER_NOEC(ISR_stack_exception, T_STACK);
-TRAPHANDLER_NOEC(ISR_general_protection_fault, T_GPFLT);
-TRAPHANDLER_NOEC(ISR_page_fault, T_PGFLT);
-TRAPHANDLER(ISR_floating_point_error, T_FPERR);
+TRAPHANDLER_NOEC(ISR_divide_error, T_DIVIDE);
+TRAPHANDLER_NOEC(ISR_debug_exceptions, T_DEBUG);
+/* NMI is int 2 */
+TRAPHANDLER_NOEC(ISR_breakpoint, T_BRKPT);
+TRAPHANDLER_NOEC(ISR_overflow, T_OFLOW);
+TRAPHANDLER_NOEC(ISR_bounds_check, T_BOUND);
+TRAPHANDLER_NOEC(ISR_invalid_opcode, T_ILLOP);
+TRAPHANDLER_NOEC(ISR_device_not_available, T_DEVICE);
+TRAPHANDLER(ISR_double_fault, T_DBLFLT);
+/* 9 reserved */
+TRAPHANDLER(ISR_invalid_TSS, T_TSS);
+TRAPHANDLER(ISR_segment_not_present, T_SEGNP);
+TRAPHANDLER(ISR_stack_exception, T_STACK);
+TRAPHANDLER(ISR_general_protection_fault, T_GPFLT);
+TRAPHANDLER(ISR_page_fault, T_PGFLT);
+/* 15 reserved */
+TRAPHANDLER_NOEC(ISR_floating_point_error, T_FPERR);
 TRAPHANDLER(ISR_alignment_check, T_ALIGN);
 TRAPHANDLER_NOEC(ISR_machine_check, T_MCHK);
 TRAPHANDLER_NOEC(ISR_simd_error, T_SIMDERR);
 
-TRAPHANDLER(ISR_syscall, T_SYSCALL);
-/* make sure default is last */
-TRAPHANDLER(ISR_default, T_DEFAULT);
+TRAPHANDLER_NOEC(ISR_syscall, T_SYSCALL);
+/* Make sure default is last!! */
+TRAPHANDLER_NOEC(ISR_default, T_DEFAULT);
 
 .data
 .globl trap_tbl_end;

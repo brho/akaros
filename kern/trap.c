@@ -134,6 +134,13 @@ trap_dispatch(struct Trapframe *tf)
 	// Handle processor exceptions.
 	// LAB 3: Your code here.
 	
+	switch(tf->tf_trapno) {
+		case (T_PGFLT):
+			page_fault_handler(tf);
+			break;
+		default:
+			break;
+	}
 
 	// Unexpected trap: The user process or the kernel has a bug.
 	print_trapframe(tf);
@@ -149,6 +156,9 @@ void
 trap(struct Trapframe *tf)
 {
 	cprintf("Incoming TRAP frame at %p\n", tf);
+
+	if ((tf->tf_cs & ~3) != GD_UT && (tf->tf_cs & ~3) != GD_KT)
+		panic("Trapframe with invalid CS!");
 
 	if ((tf->tf_cs & 3) == 3) {
 		// Trapped from user mode.
