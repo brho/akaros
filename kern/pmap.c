@@ -881,7 +881,7 @@ user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 		}
 	}
 	// this should never be needed, since the perms should catch it
-	if ((uintptr_t)end >= ULIM) {
+	if ((uintptr_t)end > ULIM) {
 		warn ("I suck - Bug in user permission mappings!");
 		return -E_FAULT;
 	}
