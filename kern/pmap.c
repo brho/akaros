@@ -246,9 +246,9 @@ i386_vm_init(void)
 	bool pse;
 
 	// check for PSE support
-	asm volatile ("movl    $1, %%eax;
-                   cpuid;
-                   andl    $0x00000008, %%edx"
+	asm volatile ("movl    $1, %%eax;"
+                  "cpuid;"
+                  "andl    $0x00000008, %%edx;"
 	              : "=d"(pse) 
 				  : 
 	              : "%eax");

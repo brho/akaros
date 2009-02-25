@@ -70,7 +70,7 @@ PERL	:= perl
 # Compiler flags
 # -fno-builtin is required to avoid refs to undefined functions in the kernel.
 # Only optimize to -O1 to discourage inlining, which complicates backtraces.
-CFLAGS	:= $(CFLAGS) $(DEFS) $(LABDEFS) -O -fno-builtin -I$(TOP) -MD -Wall -Wno-format -Wno-unused -gstabs
+CFLAGS	:= $(CFLAGS) $(DEFS) $(LABDEFS) -O -fno-builtin -fno-stack-protector -I$(TOP) -MD -Wall -Wno-format -Wno-unused -gstabs
 
 # Linker flags for JOS user programs
 ULDFLAGS := -T user/user.ld

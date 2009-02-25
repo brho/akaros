@@ -109,11 +109,11 @@ void print_cpuinfo(void) {
 	int func_num;
 	char vendor_id[13];
 
-	asm volatile ("subl    %0, %0;
-                   cpuid;
-                   movl    %%ebx, (%1);
-                   movl    %%edx, 4(%1);
-                   movl    %%ecx, 8(%1)"
+	asm volatile ("subl    %0, %0;"
+                  "cpuid;"
+                  "movl    %%ebx, (%1);"
+                  "movl    %%edx, 4(%1);"
+                  "movl    %%ecx, 8(%1);"
 	              : "=a"(func_num) 
 				  : "D"(vendor_id)
 	              : "%ebx", "%ecx", "%edx");
