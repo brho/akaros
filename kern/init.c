@@ -1,5 +1,9 @@
 /* See COPYRIGHT for copyright information. */
 
+#ifdef __DEPUTY__
+#pragma nodeputy
+#endif
+
 #include <inc/stdio.h>
 #include <inc/string.h>
 #include <inc/assert.h>

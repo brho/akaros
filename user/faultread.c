@@ -4,7 +4,7 @@
 
 void
 umain(void)
-{
+{ TRUSTEDBLOCK
 	cprintf("I read %08x from location 0!\n", *(unsigned*)0);
 }
 

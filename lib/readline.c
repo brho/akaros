@@ -1,3 +1,7 @@
+#ifdef __DEPUTY__
+#pragma nodeputy
+#endif
+
 #include <inc/stdio.h>
 #include <inc/error.h>
 

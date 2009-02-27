@@ -4,7 +4,7 @@
 
 void
 umain(void)
-{
+{ TRUSTEDBLOCK
 	*(unsigned*)0xf0100000 = 0;
 }
 

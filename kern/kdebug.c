@@ -1,3 +1,7 @@
+#ifdef __DEPUTY__
+#pragma nodeputy
+#endif
+
 #include <inc/stab.h>
 #include <inc/string.h>
 #include <inc/memlayout.h>

@@ -1,3 +1,5 @@
+NATIVECC := ivycc
+
 OBJDIRS += lib
 
 LIB_SRCFILES :=		lib/console.c \
@@ -19,12 +21,12 @@ LIB_OBJFILES := $(patsubst lib/%.S, $(OBJDIR)/lib/%.o, $(LIB_OBJFILES))
 $(OBJDIR)/lib/%.o: lib/%.c
 	@echo + cc[USER] $<
 	@mkdir -p $(@D)
-	$(V)$(CC) -nostdinc $(USER_CFLAGS) -c -o $@ $<
+	$(V)$(NATIVECC) -nostdinc $(USER_CFLAGS) -c -o $@ $<
 
 $(OBJDIR)/lib/%.o: lib/%.S
 	@echo + as[USER] $<
 	@mkdir -p $(@D)
-	$(V)$(CC) -nostdinc $(USER_CFLAGS) -c -o $@ $<
+	$(V)$(NATIVECC) -nostdinc $(USER_CFLAGS) -c -o $@ $<
 
 $(OBJDIR)/lib/libjos.a: $(LIB_OBJFILES)
 	@echo + ar $@

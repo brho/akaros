@@ -1,3 +1,7 @@
+#ifdef __DEPUTY__
+#pragma nodeputy
+#endif
+
 #include <inc/x86.h>
 #include <inc/elf.h>
 

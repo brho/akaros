@@ -1,6 +1,10 @@
 // Simple command-line kernel monitor useful for
 // controlling the kernel and exploring the system interactively.
 
+#ifdef __DEPUTY__
+#pragma nodeputy
+#endif
+
 #include <inc/stdio.h>
 #include <inc/string.h>
 #include <inc/memlayout.h>

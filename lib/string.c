@@ -1,5 +1,9 @@
 // Basic string routines.  Not hardware optimized, but not shabby.
 
+#ifdef __DEPUTY__
+#pragma nodeputy
+#endif
+
 #include <inc/string.h>
 
 int

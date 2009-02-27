@@ -99,8 +99,9 @@ USER_CFLAGS := $(CFLAGS) -DJOS_USER -gstabs
 
 # Include Makefrags for subdirectories
 include boot/Makefrag
-include kern/Makefrag
 include lib/Makefrag
+include ivylib/Makefrag
+include kern/Makefrag
 include user/Makefrag
 
 

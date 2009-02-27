@@ -6,6 +6,6 @@
 void
 umain(void)
 {
-	sys_cputs((char*)1, 1);
+	sys_cputs((char*SAFE)TC(1), 1);
 }
 
