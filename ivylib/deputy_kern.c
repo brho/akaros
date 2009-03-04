@@ -97,3 +97,15 @@ int deputy_findnull(const void *e, unsigned int bytes) {
 void *__deputy_memset(void *s, int c, unsigned int n) {
   return memset(s, c, n);
 }
+
+void __ivy_handler_atomic_entry() __attribute__((weak));
+void __ivy_handler_atomic_entry() {return;}
+
+void __ivy_handler_atomic_exit() __attribute__((weak));
+void __ivy_handler_atomic_exit() {return;}
+
+void __ivy_handler_atomic_locks_entry(unsigned int n, ...) __attribute__((weak));
+void __ivy_handler_atomic_locks_entry(unsigned int n, ...) {return;}
+
+void __ivy_handler_atomic_locks_exit(unsigned int n, ...) __attribute__((weak));
+void __ivy_handler_atomic_locks_exit(unsigned int n, ...) {return;}

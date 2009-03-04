@@ -7,7 +7,7 @@
 // Activate the kernel monitor,
 // optionally providing a trap frame indicating the current state
 // (NULL if none).
-void monitor(struct Trapframe *tf);
+void (IN_HANDLER monitor)(struct Trapframe *tf);
 
 // Functions implementing monitor commands.
 int mon_help(int argc, char *NTS *NT COUNT(argc) argv, struct Trapframe *tf);

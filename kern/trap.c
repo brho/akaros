@@ -1,7 +1,3 @@
-#ifdef __DEPUTY__
-#pragma nodeputy
-#endif
-
 #include <inc/mmu.h>
 #include <inc/x86.h>
 #include <inc/assert.h>
@@ -24,9 +20,10 @@ struct Pseudodesc idt_pd = {
 };
 
 
-static const char *trapname(int trapno)
+static const char *NTS (IN_HANDLER trapname)(int trapno)
 {
-	static const char * const excnames[] = {
+    // zra: excnames is NORACE because Ivy doesn't trust const
+	static const char *NT const (NORACE excnames)[] = {
 		"Divide error",
 		"Debug",
 		"Non-Maskable Interrupt",
@@ -66,8 +63,8 @@ idt_init(void)
 	// It is layed out such that the ith entry is the ith's traphandler's
 	// (uint32_t) trap addr, then (uint32_t) trap number
 	struct trapinfo { uint32_t trapaddr; uint32_t trapnumber; };
-	extern struct trapinfo trap_tbl[];
-	extern struct trapinfo trap_tbl_end[];
+	extern struct trapinfo (BND(__this,trap_tbl_end) trap_tbl)[];
+	extern struct trapinfo (SNT trap_tbl_end)[];
 	int i, trap_tbl_size = trap_tbl_end - trap_tbl;
 	extern void ISR_default(void);
 
@@ -105,7 +102,7 @@ idt_init(void)
 }
 
 void
-print_trapframe(struct Trapframe *tf)
+(IN_HANDLER print_trapframe)(struct Trapframe *tf)
 {
 	cprintf("TRAP frame at %p\n", tf);
 	print_regs(&tf->tf_regs);
@@ -121,7 +118,7 @@ print_trapframe(struct Trapframe *tf)
 }
 
 void
-print_regs(struct PushRegs *regs)
+(IN_HANDLER print_regs)(struct PushRegs *regs)
 {
 	cprintf("  edi  0x%08x\n", regs->reg_edi);
 	cprintf("  esi  0x%08x\n", regs->reg_esi);
@@ -134,7 +131,7 @@ print_regs(struct PushRegs *regs)
 }
 
 static void
-trap_dispatch(struct Trapframe *tf)
+(IN_HANDLER trap_dispatch)(struct Trapframe *tf)
 {
 	// Handle processor exceptions.
 	
@@ -170,7 +167,7 @@ trap_dispatch(struct Trapframe *tf)
 }
 
 void
-trap(struct Trapframe *tf)
+(IN_HANDLER trap)(struct Trapframe *tf)
 {
 	cprintf("Incoming TRAP frame at %p\n", tf);
 
