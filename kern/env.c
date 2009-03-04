@@ -386,6 +386,9 @@ env_free(struct Env *e)
 		page_decref(pa2page(pa));
 	}
 
+	// need a known good pgdir before releasing the old one
+	lcr3(boot_cr3);
+
 	// free the page directory
 	pa = e->env_cr3;
 	e->env_pgdir = 0;

@@ -6,10 +6,9 @@
 #
 
 OBJDIRS += kern
-#CC=ivycc --save-temps --trace --deputy 
-CC=ivycc 
+CC=ivycc --deputy
 
-KERN_LDFLAGS := $(LDFLAGS) -T kern/kernel.ld -nostdlib
+KERN_LDFLAGS := $(LDFLAGS) -Lobj/ivylib -T kern/kernel.ld -nostdlib
 
 # entry.S must be first, so that it's the first code in the text segment!!!
 #
@@ -72,9 +71,9 @@ $(OBJDIR)/kern/%.o: lib/%.c
 	$(V)$(CC) -nostdinc $(KERN_CFLAGS) -c -o $@ $<
 
 # How to build the kernel itself
-$(OBJDIR)/kern/kernel: $(KERN_OBJFILES) $(KERN_BINFILES) kern/kernel.ld
+$(OBJDIR)/kern/kernel: $(KERN_OBJFILES) $(KERN_BINFILES) kern/kernel.ld $(OBJDIR)/ivylib/libivykern.a
 	@echo + ld $@
-	$(V)$(LD) -o $@ $(KERN_LDFLAGS) $(KERN_OBJFILES) $(GCC_LIB) -b binary $(KERN_BINFILES)
+	$(V)$(LD) -o $@ $(KERN_LDFLAGS) $(KERN_OBJFILES) -livykern $(GCC_LIB) -b binary $(KERN_BINFILES)
 	$(V)$(OBJDUMP) -S $@ > $@.asm
 	$(V)$(NM) -n $@ > $@.sym
 
@@ -85,6 +84,9 @@ $(OBJDIR)/kern/bochs.img: $(OBJDIR)/kern/kernel $(OBJDIR)/boot/boot
 	$(V)dd if=$(OBJDIR)/boot/boot of=$(OBJDIR)/kern/bochs.img~ conv=notrunc 2>/dev/null
 	$(V)dd if=$(OBJDIR)/kern/kernel of=$(OBJDIR)/kern/bochs.img~ seek=1 conv=notrunc 2>/dev/null
 	$(V)mv $(OBJDIR)/kern/bochs.img~ $(OBJDIR)/kern/bochs.img
+# brho uses these
+#	$(V)cp $(OBJDIR)/kern/kernel mnt/hdd/texas
+#	$(V)sync
 
 all: $(OBJDIR)/kern/bochs.img
 

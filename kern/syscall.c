@@ -1,8 +1,4 @@
 /* See COPYRIGHT for copyright information. */
-#ifdef __DEPUTY__
-#pragma nodeputy
-#endif
-
 #include <inc/x86.h>
 #include <inc/error.h>
 #include <inc/string.h>
@@ -18,14 +14,14 @@
 // The string is exactly 'len' characters long.
 // Destroys the environment on memory errors.
 static void
-sys_cputs(const char *s, size_t len)
+sys_cputs(const char *DANGEROUS s, size_t len)
 {
 	// Check that the user has permission to read memory [s, s+len).
 	// Destroy the environment if not.
-	user_mem_assert(curenv, s, len, PTE_U);
+    char *COUNT(len) _s = user_mem_assert(curenv, s, len, PTE_U);
 
 	// Print the string supplied by the user.
-	cprintf("%.*s", len, s);
+	cprintf("%.*s", len, _s);
 }
 
 // Read a character from the system console.
@@ -87,7 +83,7 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 	
 	switch (syscallno) {
 		case 0:
-			sys_cputs((void*)a1, a2);
+			sys_cputs(a1, a2);
 			return 0;
 		case 1:
 			return sys_cgetc();
