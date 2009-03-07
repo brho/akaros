@@ -244,17 +244,14 @@ void
 i386_vm_init(void)
 {
 	pde_t* pgdir;
-	uint32_t cr0;
+	uint32_t cr0, edx;
 	size_t n;
 	bool pse;
 
 	// check for PSE support
-	asm volatile ("movl    $1, %%eax;"
-                  "cpuid;"
-                  "andl    $0x00000008, %%edx;"
-	              : "=d"(pse) 
-				  : 
-	              : "%eax");
+	cpuid(1, 0, 0, 0, &edx);
+	pse = edx & CPUID_PSE_SUPPORT;
+
 	// turn on PSE
 	if (pse) {
 		cprintf("PSE capability detected.\n");
@@ -881,10 +878,10 @@ user_mem_check(struct Env *env, const void *DANGEROUS va, size_t len, int perm)
 	num_pages = PPN(end - start);
 	for (i = 0; i < num_pages; i++, start += PGSIZE) {
 		pte = pgdir_walk(env->env_pgdir, start, 0);
-		// ensures the bits we want on are turned on.  if not, E_FAULT
+		// ensures the bits we want on are turned on.  if not, error out
 		if ( !pte || ((*pte & perm) != perm) ) {
 			if (i = 0)
-				user_mem_check_addr = va;
+				user_mem_check_addr = (void*)va;
 			else
 				user_mem_check_addr = start;
 			return NULL;

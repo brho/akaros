@@ -3,6 +3,14 @@
 
 #include <inc/types.h>
 
+/* Model Specific Registers */
+#define IA32_APIC_BASE 	0x1b
+
+#define MSR_APIC_ENABLE	0x00000800
+
+/* CPUID */
+#define CPUID_PSE_SUPPORT 0x00000008
+
 static __inline void breakpoint(void) __attribute__((always_inline));
 static __inline uint8_t inb(int port) __attribute__((always_inline));
 static __inline void insb(int port, void *addr, int cnt) __attribute__((always_inline));
@@ -34,6 +42,8 @@ static __inline uint32_t read_ebp(void) __attribute__((always_inline));
 static __inline uint32_t read_esp(void) __attribute__((always_inline));
 static __inline void cpuid(uint32_t info, uint32_t *eaxp, uint32_t *ebxp, uint32_t *ecxp, uint32_t *edxp);
 static __inline uint64_t read_tsc(void) __attribute__((always_inline));
+static __inline uint64_t read_msr(uint32_t reg) __attribute__((always_inline));
+static __inline void write_msr(uint32_t reg, uint64_t val) __attribute__((always_inline));
 
 static __inline void
 breakpoint(void)
@@ -274,4 +284,19 @@ read_tsc(void)
         return tsc;
 }
 
+static __inline uint64_t 
+read_msr(uint32_t reg)
+{
+	uint32_t edx, eax;
+	asm volatile("rdmsr" : "=d"(edx), "=a"(eax) : "c"(reg));
+	return (uint64_t)edx << 32 | eax;
+}
+
+static __inline void 
+write_msr(uint32_t reg, uint64_t val)
+{
+	asm volatile("wrmsr" : : "d"((uint32_t)(val >> 32)),
+	                         "a"((uint32_t)(val & 0xFFFFFFFF)), 
+	                         "c"(reg));
+}
 #endif /* !JOS_INC_X86_H */

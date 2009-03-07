@@ -9,6 +9,7 @@
 #include <inc/assert.h>
 #include <inc/multiboot.h>
 #include <inc/stab.h>
+#include <inc/x86.h>
 
 #include <kern/monitor.h>
 #include <kern/console.h>
@@ -58,8 +59,8 @@ void kernel_init(multiboot_info_t *mboot_info)
 	//ENV_CREATE(user_badsegment);
 	//ENV_CREATE(user_divzero);
 	ENV_CREATE(user_hello);
-	ENV_CREATE(user_buggyhello);
-	ENV_CREATE(user_evilhello);
+	//ENV_CREATE(user_buggyhello);
+	//ENV_CREATE(user_evilhello);
 #endif // TEST*
 
 	// We only have one user environment for now, so just run it.
@@ -110,21 +111,61 @@ void _warn(const char *file, int line, const char *fmt,...)
 }
 
 void print_cpuinfo(void) {
-	int func_num;
+	uint32_t eax, ebx, ecx, edx;
+	uint32_t model, family;
+	uint64_t msr_val;
 	char vendor_id[13];
 
-	asm volatile ("subl    %0, %0;"
-                  "cpuid;"
-                  "movl    %%ebx, (%1);"
-                  "movl    %%edx, 4(%1);"
-                  "movl    %%ecx, 8(%1);"
-	              : "=a"(func_num) 
-				  : "D"(vendor_id)
+	asm volatile ("cpuid;"
+                  "movl    %%ebx, (%2);"
+                  "movl    %%edx, 4(%2);"
+                  "movl    %%ecx, 8(%2);"
+	              : "=a"(eax) 
+				  : "a"(0), "D"(vendor_id)
 	              : "%ebx", "%ecx", "%edx");
 
 	vendor_id[12] = '\0';
-	cprintf("Largest Standard Function Number Supported: %d\n", func_num);
 	cprintf("Vendor ID: %s\n", vendor_id);
+	cprintf("Largest Standard Function Number Supported: %d\n", eax);
+	cpuid(0x80000000, &eax, 0, 0, 0);
+	cprintf("Largest Extended Function Number Supported: 0x%08x\n", eax);
+	cpuid(1, &eax, &ebx, &ecx, &edx);
+	family = ((eax & 0x0FF00000) >> 20) + ((eax & 0x00000F00) >> 8);
+	model = ((eax & 0x000F0000) >> 12) + ((eax & 0x000000F0) >> 4);
+	cprintf("Family: %d\n", family);
+	cprintf("Model: %d\n", model);
+	cprintf("Stepping: %d\n", eax & 0x0000000F);
+	// eventually can fill this out with SDM Vol3B App B info, or 
+	// better yet with stepping info.  
+	switch ( family << 8 | model ) {
+		case(0x060f):
+			cprintf("Processor: Core 2 Duo or Similar\n");
+			break;
+		default:
+			cprintf("Unknown or non-Intel CPU\n");
+	}
+	if (edx & 0x00000010)
+		cprintf("Model Specific Registers supported\n");
+	else
+		panic("MSRs not supported!");
+	if (edx & 0x00000100)
+		cprintf("Local APIC Detected\n");
+	else
+		panic("Local APIC Not Detected!");
+	
+	cpuid(0x80000008, &eax, &ebx, &ecx, &edx);
+	cprintf("Physical Address Bits: %d\n", eax & 0x000000FF);
+
+
+	/*
+	msr_val = read_msr(IA32_APIC_BASE);
+	msr_val & ~MSR_APIC_ENABLE;
+	write_msr(IA32_APIC_BASE, msr_val);
+	if (edx & 0x00000100)
+		cprintf("Local APIC Detected\n");
+	else
+		panic("Local APIC Not Detected!");
+		*/
 }
 
 
