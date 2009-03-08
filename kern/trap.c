@@ -32,7 +32,7 @@ static const char *NTS (IN_HANDLER trapname)(int trapno)
 		"BOUND Range Exceeded",
 		"Invalid Opcode",
 		"Device Not Available",
-		"Double Falt",
+		"Double Fault",
 		"Coprocessor Segment Overrun",
 		"Invalid TSS",
 		"Segment Not Present",
@@ -70,14 +70,14 @@ idt_init(void)
 
 	// set all to default, to catch everything
 	for(i = 0; i < 256; i++)
-		SETGATE(idt[i], 1, GD_KT, &ISR_default, 0);
+		SETGATE(idt[i], 0, GD_KT, &ISR_default, 0);
 	
 	// set all entries that have real trap handlers
 	// we need to stop short of the last one, since the last is the default
 	// handler with a fake interrupt number (500) that is out of bounds of
 	// the idt[]
 	for(i = 0; i < trap_tbl_size - 1; i++)
-		SETGATE(idt[trap_tbl[i].trapnumber], 1, GD_KT, trap_tbl[i].trapaddr, 0);
+		SETGATE(idt[trap_tbl[i].trapnumber], 0, GD_KT, trap_tbl[i].trapaddr, 0);
 
 	// turn on syscall handling and other user-accessible ints
 	// DPL 3 means this can be triggered by the int instruction
@@ -171,8 +171,10 @@ void
 {
 	cprintf("Incoming TRAP frame at %p\n", tf);
 
-	if ((tf->tf_cs & ~3) != GD_UT && (tf->tf_cs & ~3) != GD_KT)
+	if ((tf->tf_cs & ~3) != GD_UT && (tf->tf_cs & ~3) != GD_KT) {
+		print_trapframe(tf);
 		panic("Trapframe with invalid CS!");
+	}
 
 	if ((tf->tf_cs & 3) == 3) {
 		// Trapped from user mode.

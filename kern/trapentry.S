@@ -59,7 +59,10 @@ TRAPHANDLER_NOEC(ISR_overflow, T_OFLOW);
 TRAPHANDLER_NOEC(ISR_bounds_check, T_BOUND);
 TRAPHANDLER_NOEC(ISR_invalid_opcode, T_ILLOP);
 TRAPHANDLER_NOEC(ISR_device_not_available, T_DEVICE);
-TRAPHANDLER(ISR_double_fault, T_DBLFLT);
+/* supposedly, DF generates an error code, but the one time we've had a DF so
+ * far, it didn't eventually, this should probably be handled with a task gate
+ */
+TRAPHANDLER_NOEC(ISR_double_fault, T_DBLFLT);
 /* 9 reserved */
 TRAPHANDLER(ISR_invalid_TSS, T_TSS);
 TRAPHANDLER(ISR_segment_not_present, T_SEGNP);
