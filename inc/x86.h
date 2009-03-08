@@ -4,12 +4,14 @@
 #include <inc/types.h>
 
 /* Model Specific Registers */
-#define IA32_APIC_BASE 	0x1b
+#define IA32_APIC_BASE				0x1b
+#define IA32_MTRR_DEF_TYPE			0x2ff
 
-#define MSR_APIC_ENABLE	0x00000800
+#define MSR_APIC_ENABLE				0x00000800
+#define MSR_APIC_BASE_ADDRESS		0x0000000FFFFFF000
 
 /* CPUID */
-#define CPUID_PSE_SUPPORT 0x00000008
+#define CPUID_PSE_SUPPORT			0x00000008
 
 static __inline void breakpoint(void) __attribute__((always_inline));
 static __inline uint8_t inb(int port) __attribute__((always_inline));
@@ -284,6 +286,7 @@ read_tsc(void)
         return tsc;
 }
 
+// Might need to mfence rdmsr.  supposedly wrmsr serializes, but not for x2APIC
 static __inline uint64_t 
 read_msr(uint32_t reg)
 {

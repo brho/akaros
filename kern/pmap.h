@@ -84,7 +84,7 @@ static inline struct Page*
 pa2page(physaddr_t pa)
 {
 	if (PPN(pa) >= npage)
-		panic("pa2page called with invalid pa");
+		warn("pa2page called with pa larger than npage");
 	return &pages[PPN(pa)];
 }
 

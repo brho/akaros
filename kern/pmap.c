@@ -248,6 +248,13 @@ i386_vm_init(void)
 	size_t n;
 	bool pse;
 
+	// set up MTRRs
+	// default type is normally 06 (WB), but once we have regions
+	// set up, we can set it to 00 (UC)
+	//write_msr(IA32_MTRR_DEF_TYPE, 0x00000c00);
+	write_msr(IA32_MTRR_DEF_TYPE, 0x00000c06);
+	// might need to set up MTRRS for the IO holes
+
 	// check for PSE support
 	cpuid(1, 0, 0, 0, &edx);
 	pse = edx & CPUID_PSE_SUPPORT;
@@ -333,6 +340,9 @@ i386_vm_init(void)
 		boot_map_segment(pgdir, KERNBASE, maxpa, 0, PTE_W | PTE_PS);
 	else
 		boot_map_segment(pgdir, KERNBASE, maxpa, 0, PTE_W );
+
+	// LAPIC mapping, in lieu of MTRRs for now.  TODO: remove when MTRRs are up
+	boot_map_segment(pgdir, (uintptr_t)0xfee00000, PGSIZE, 0xfee00000, PTE_W);
 
 	//////////////////////////////////////////////////////////////////////
 	// Make 'pages' point to an array of size 'npage' of 'struct Page'.
@@ -488,6 +498,7 @@ check_boot_pgdir(bool pse)
 		case PDX(KSTACKTOP-1):
 		case PDX(UPAGES):
 		case PDX(UENVS):
+		case PDX(0xfee00000): // LAPIC mapping.  TODO: remove when MTRRs are up
 			assert(pgdir[i]);
 			break;
 		default:
