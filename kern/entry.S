@@ -73,11 +73,11 @@ relocated:
 	push 	%ebx
 
 	# now to C code
+	movl	$0x1,num_cpus 		# init global var, for now
 	call	kernel_init
 
 	# Should never get here, but in case we do, just spin.
 spin:	jmp	spin
-
 
 ###################################################################	
 # See <inc/memlayout.h> for a complete description of these two symbols.

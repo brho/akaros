@@ -8,12 +8,14 @@
 #include <kern/monitor.h>
 #include <kern/env.h>
 #include <kern/syscall.h>
+#include <kern/apic.h>
 
 static struct Taskstate ts;
 
 /* Interrupt descriptor table.  (Must be built at run time because
  * shifted function addresses can't be represented in relocation records.)
  */
+// should align this on an 8 byte boundary (SDM V3A 5-13)
 struct Gatedesc idt[256] = { { 0 } };
 struct Pseudodesc idt_pd = {
 	sizeof(idt) - 1, (uint32_t) idt
@@ -76,7 +78,9 @@ idt_init(void)
 	// we need to stop short of the last one, since the last is the default
 	// handler with a fake interrupt number (500) that is out of bounds of
 	// the idt[]
-	for(i = 0; i < trap_tbl_size - 1; i++)
+	// if we set these to trap gates, be sure to handle the IRQs separately
+	// and we might need to break our pretty tables
+	for(i = 0; i < trap_tbl_size - 1; i++) 
 		SETGATE(idt[trap_tbl[i].trapnumber], 0, GD_KT, trap_tbl[i].trapaddr, 0);
 
 	// turn on syscall handling and other user-accessible ints
@@ -99,6 +103,14 @@ idt_init(void)
 
 	// Load the IDT
 	asm volatile("lidt idt_pd");
+
+	// This will go away when we start using the IOAPIC properly
+	remap_pic();
+	lapic_enable();
+	// set LINT0 to receive ExtINTs (KVM's default).  At reset they are 0x1000.
+	write_mmreg32(LAPIC_LVT_LINT0, 0x700); 
+	// mask it to shut it up for now
+	mask_lapic_lvt(LAPIC_LVT_LINT0);
 }
 
 void
@@ -198,6 +210,32 @@ void
         env_run(curenv);
 }
 
+void
+(IN_HANDLER irq_handler)(struct Trapframe *tf)
+{
+	// send EOI.  might want to do this later, and not earlier
+	// and probably in assembly.  just need to determine what's LAPIC or not
+	// this is set up to work with an old PIC for now
+	// and this is hardcoded to have only 32 be the PIC (LINT0 ExtINT)
+	if (tf->tf_trapno == 32) {
+		pic_send_eoi(tf->tf_trapno - PIC1_OFFSET);
+	} else // LAPIC style
+		lapic_send_eoi();
+
+	// consider doing James-style register_interrupt_handler instead
+	//trap(tf);
+	// this is just for handling the one time use of this in smp_boot
+	cprintf("Incoming IRQ, ISR = %d\n", tf->tf_trapno);
+	if (tf->tf_trapno == 33) {
+		cprintf("LAPIC TIMER!!!\n");
+		extern volatile bool waiting;
+		extern volatile uint8_t num_cpus;
+		{HANDLER_ATOMIC 
+			waiting = 0;
+			cprintf("Num_Cpus: %d\n", num_cpus);
+		}
+		}
+}
 
 void
 page_fault_handler(struct Trapframe *tf)

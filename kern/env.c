@@ -192,6 +192,8 @@ env_alloc(struct Env **newenv_store, envid_t parent_id)
 	e->env_tf.tf_esp = USTACKTOP;
 	e->env_tf.tf_cs = GD_UT | 3;
 	// You will set e->env_tf.tf_eip later.
+	// set the env's EFLAGSs to have interrupts enabled
+	e->env_tf.tf_eflags |= 0x00000200; // bit 9 is the interrupts-enabled
 
 	// commit the allocation
 	LIST_REMOVE(e, env_link);

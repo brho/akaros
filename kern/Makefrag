@@ -15,6 +15,7 @@ KERN_LDFLAGS := $(LDFLAGS) -Lobj/ivylib -T kern/kernel.ld -nostdlib
 # We also snatch the use of a couple handy source files
 # from the lib directory, to avoid gratuitous code duplication.
 KERN_SRCFILES :=	kern/entry.S \
+			kern/smp_entry.S \
 			kern/init.c \
 			kern/console.c \
 			kern/monitor.c \
@@ -28,6 +29,7 @@ KERN_SRCFILES :=	kern/entry.S \
 			kern/sched.c \
 			kern/syscall.c \
 			kern/kdebug.c \
+			kern/apic.c \
 			lib/printfmt.c \
 			lib/readline.c \
 			lib/string.c

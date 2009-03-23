@@ -25,13 +25,13 @@ struct Env;
 })
 
 /* This macro takes a physical address and returns the corresponding kernel
- * virtual address.  It panics if you pass an invalid physical address. */
+ * virtual address.  It warns if you pass an invalid physical address. */
 #define KADDR(pa)						\
 ({								\
 	physaddr_t __m_pa = (pa);				\
 	uint32_t __m_ppn = PPN(__m_pa);				\
 	if (__m_ppn >= npage)					\
-		panic("KADDR called with invalid pa %08lx", __m_pa);\
+		warn("KADDR called with invalid pa %08lx", __m_pa);\
 	(void*) (__m_pa + KERNBASE);				\
 })
 
@@ -48,8 +48,9 @@ extern pde_t *boot_pgdir;
 extern struct Segdesc (COUNT(6) gdt)[];
 extern struct Pseudodesc gdt_pd;
 
-void	i386_vm_init();
-void	i386_detect_memory();
+void	i386_detect_memory(void);
+bool	enable_pse(void);
+void	i386_vm_init(void);
 
 void	page_init(void);
 void	page_check(void);

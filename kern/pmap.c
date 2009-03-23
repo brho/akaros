@@ -12,6 +12,7 @@
 #include <kern/pmap.h>
 #include <kern/kclock.h>
 #include <kern/env.h>
+#include <kern/apic.h>
 
 // These variables are set by i386_detect_memory()
 static physaddr_t maxpa;	// Maximum physical address
@@ -89,6 +90,19 @@ i386_detect_memory(void)
 
 	cprintf("Physical memory: %dK available, ", (int)(maxpa/1024));
 	cprintf("base = %dK, extended = %dK\n", (int)(basemem/1024), (int)(extmem/1024));
+}
+
+bool enable_pse(void)
+{
+	uint32_t edx, cr4;
+	cpuid(1, 0, 0, 0, &edx);
+	if (edx & CPUID_PSE_SUPPORT) {
+		cr4 = rcr4();
+		cr4 |= CR4_PSE;
+		lcr4(cr4);
+		return 1;
+	} else
+		return 0;
 }
 
 // --------------------------------------------------------------
@@ -255,18 +269,9 @@ i386_vm_init(void)
 	write_msr(IA32_MTRR_DEF_TYPE, 0x00000c06);
 	// might need to set up MTRRS for the IO holes
 
-	// check for PSE support
-	cpuid(1, 0, 0, 0, &edx);
-	pse = edx & CPUID_PSE_SUPPORT;
-
-	// turn on PSE
-	if (pse) {
+	pse = enable_pse();
+	if (pse)
 		cprintf("PSE capability detected.\n");
-		uint32_t cr4;
-		cr4 = rcr4();
-		cr4 |= CR4_PSE;
-		lcr4(cr4);
-	}
 
 	/*
 	 * PSE status: 
@@ -341,8 +346,11 @@ i386_vm_init(void)
 	else
 		boot_map_segment(pgdir, KERNBASE, maxpa, 0, PTE_W );
 
-	// LAPIC mapping, in lieu of MTRRs for now.  TODO: remove when MTRRs are up
-	boot_map_segment(pgdir, (uintptr_t)0xfee00000, PGSIZE, 0xfee00000, PTE_W);
+	// APIC mapping, in lieu of MTRRs for now.  TODO: remove when MTRRs are up
+	// IOAPIC
+	boot_map_segment(pgdir, (uintptr_t)IOAPIC_BASE, PGSIZE, IOAPIC_BASE, PTE_PCD|PTE_W);
+	// Local APIC
+	boot_map_segment(pgdir, (uintptr_t)LAPIC_BASE, PGSIZE, LAPIC_BASE, PTE_PCD|PTE_W);
 
 	//////////////////////////////////////////////////////////////////////
 	// Make 'pages' point to an array of size 'npage' of 'struct Page'.
@@ -498,7 +506,7 @@ check_boot_pgdir(bool pse)
 		case PDX(KSTACKTOP-1):
 		case PDX(UPAGES):
 		case PDX(UENVS):
-		case PDX(0xfee00000): // LAPIC mapping.  TODO: remove when MTRRs are up
+		case PDX(LAPIC_BASE): // LAPIC mapping.  TODO: remove when MTRRs are up
 			assert(pgdir[i]);
 			break;
 		default:
@@ -621,7 +629,10 @@ page_init(void)
 	LIST_INIT(&page_free_list);
 
 	pages[0].pp_ref = 1;
-	for (i = 1; i < PPN(IOPHYSMEM); i++) {
+	// alloc the second page, since we will need it later to init the other cores
+	// probably need to be smarter about what page we use (make this dynamic) TODO
+	pages[1].pp_ref = 1;
+	for (i = 2; i < PPN(IOPHYSMEM); i++) {
 		pages[i].pp_ref = 0;
 		LIST_INSERT_HEAD(&page_free_list, &pages[i], pp_link);
 	}
@@ -1069,7 +1080,6 @@ page_check(void)
 
 	cprintf("page_check() succeeded!\n");
 }
-
 
 /* 
 	// helpful if you want to manually walk with kvm / bochs

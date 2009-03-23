@@ -17,8 +17,15 @@
 #include <kern/kclock.h>
 #include <kern/env.h>
 #include <kern/trap.h>
+#include <kern/apic.h>
 
-void print_cpuinfo(void);
+volatile bool waiting = 1;
+volatile uint8_t num_cpus = 0xee;
+uintptr_t smp_stack_top;
+volatile bool smp_boot_lock = 0;
+
+static void print_cpuinfo(void);
+void smp_boot(void);
 
 void kernel_init(multiboot_info_t *mboot_info)
 {
@@ -45,12 +52,9 @@ void kernel_init(multiboot_info_t *mboot_info)
 	env_init();
 	idt_init();
 
-	// Temporary test code specific to LAB 3
-#if defined(TEST)
-	// Don't touch -- used by grading script!
-	ENV_CREATE2(TEST, TESTSIZE);
-#else
-	// Touch all you want.
+	// this returns when all other cores are done and ready to receive IPIs
+	smp_boot();
+
 	//ENV_CREATE(user_faultread);
 	//ENV_CREATE(user_faultreadkernel);
 	//ENV_CREATE(user_faultwrite);
@@ -58,15 +62,74 @@ void kernel_init(multiboot_info_t *mboot_info)
 	//ENV_CREATE(user_breakpoint);
 	//ENV_CREATE(user_badsegment);
 	//ENV_CREATE(user_divzero);
-	ENV_CREATE(user_hello);
 	//ENV_CREATE(user_buggyhello);
+	ENV_CREATE(user_hello);
 	//ENV_CREATE(user_evilhello);
-#endif // TEST*
 
 	// We only have one user environment for now, so just run it.
 	env_run(&envs[0]);
 }
 
+void smp_boot(void)
+{
+	struct Page* smp_stack;
+	// NEED TO GRAB A LOWMEM FREE PAGE FOR AP BOOTUP CODE
+	// page1 (2nd page) is reserved, hardcoded in pmap.c
+	extern smp_entry(), smp_entry_end();
+	memset(KADDR(0x00001000), 0, PGSIZE);		
+	memcpy(KADDR(0x00001000), &smp_entry, &smp_entry_end - &smp_entry);		
+
+	// This mapping allows access with paging on and off
+	page_insert(boot_pgdir, pa2page(0x00001000), (void*)0x00001000, PTE_W);
+
+	// Allocate a stack for the cores starting up.  One for all, must share
+	if (page_alloc(&smp_stack))
+		panic("No memory for SMP boot stack!");
+	smp_stack_top = (uintptr_t)(page2kva(smp_stack) + PGSIZE - SIZEOF_STRUCT_TRAPFRAME);
+
+	// set up the local APIC timer to fire 0x21 once.  hardcoded to break
+	// out of the spinloop on waiting.  really just want to wait a little
+	lapic_set_timer(0xffffffff, 0x21, 0);
+	cprintf("Num_Cpus: %d\n", num_cpus);
+	send_init_ipi();
+	asm volatile("sti"); // LAPIC timer will fire, extINTs are blocked at LINT0 now
+	while (waiting); // gets set in the lapic timer
+	send_startup_ipi(0x01);
+	// replace this with something that checks to see if smp_entrys are done
+	while(1); // want other cores to do stuff for now
+	
+	// Remove the mapping of the page used by the trampoline
+	page_remove(boot_pgdir, (void*)0x00001000);
+	// It had a refcount of 2 earlier, so we need to dec once more to free it
+	// TODO - double check that
+	page_decref(pa2page(0x00001000));
+	// Dealloc the temp shared stack
+	page_decref(smp_stack);
+}
+/* 
+ * This is called from smp_entry by each core to finish the core bootstrapping.
+ * There is a spinlock around this entire function in smp_entry, for a few reasons,
+ * the most important being that all cores use the same stack when entering here.
+ */
+void smp_main(void)
+{
+	cprintf("Good morning Vietnam!\n");
+
+	enable_pse();
+    cprintf("This core's Default APIC ID: 0x%08x\n", lapic_get_default_id());
+    cprintf("This core's Current APIC ID: 0x%08x\n", lapic_get_id());
+	
+	if (read_msr(IA32_APIC_BASE) & 0x00000100)
+		cprintf("I am the Boot Strap Processor\n");
+	else
+		cprintf("I am an Application Processor\n");
+	
+	// turn me on!
+	cprintf("Spurious Vector: 0x%08x\n", read_mmreg32(LAPIC_SPURIOUS));
+	cprintf("LINT0: 0x%08x\n", read_mmreg32(LAPIC_LVT_LINT0));
+	cprintf("LINT1: 0x%08x\n", read_mmreg32(LAPIC_LVT_LINT1));
+	cprintf("Num_Cpus: %d\n\n", num_cpus);
+}
 
 /*
  * Variable panicstr contains argument to first call to panic; used as flag
@@ -110,7 +173,7 @@ void _warn(const char *file, int line, const char *fmt,...)
 	va_end(ap);
 }
 
-void print_cpuinfo(void) {
+static void print_cpuinfo(void) {
 	uint32_t eax, ebx, ecx, edx;
 	uint32_t model, family;
 	uint64_t msr_val;
@@ -136,7 +199,7 @@ void print_cpuinfo(void) {
 	cprintf("Model: %d\n", model);
 	cprintf("Stepping: %d\n", eax & 0x0000000F);
 	// eventually can fill this out with SDM Vol3B App B info, or 
-	// better yet with stepping info.  
+	// better yet with stepping info.  or cpuid 8000_000{2,3,4}
 	switch ( family << 8 | model ) {
 		case(0x060f):
 			cprintf("Processor: Core 2 Duo or Similar\n");
@@ -144,74 +207,27 @@ void print_cpuinfo(void) {
 		default:
 			cprintf("Unknown or non-Intel CPU\n");
 	}
-	if (edx & 0x00000010)
-		cprintf("Model Specific Registers supported\n");
-	else
+	if (!(edx & 0x00000010))
 		panic("MSRs not supported!");
-	if (edx & 0x00000100)
-		cprintf("Local APIC Detected\n");
-	else
+	if (!(edx & 0x00001000))
+		panic("MTRRs not supported!");
+	if (!(edx & 0x00000100))
 		panic("Local APIC Not Detected!");
-	
+	if (ecx & 0x00200000)
+		cprintf("x2APIC Detected\n");
+	else
+		cprintf("x2APIC Not Detected\n");
 	cpuid(0x80000008, &eax, &ebx, &ecx, &edx);
 	cprintf("Physical Address Bits: %d\n", eax & 0x000000FF);
-
-
-	/*
+	cprintf("Cores per Die: %d\n", (ecx & 0x000000FF) + 1);
+    cprintf("This core's Default APIC ID: 0x%08x\n", lapic_get_default_id());
 	msr_val = read_msr(IA32_APIC_BASE);
-	msr_val & ~MSR_APIC_ENABLE;
-	write_msr(IA32_APIC_BASE, msr_val);
-	if (edx & 0x00000100)
-		cprintf("Local APIC Detected\n");
+	if (msr_val & MSR_APIC_ENABLE)
+		cprintf("Local APIC Enabled\n");
 	else
-		panic("Local APIC Not Detected!");
-		*/
+		cprintf("Local APIC Disabled\n");
+	if (msr_val & 0x00000100)
+		cprintf("I am the Boot Strap Processor\n");
+	else
+		cprintf("I am an Application Processor\n");
 }
-
-
-	/* Backup of old shit that i hoard for no reason
-	 *
-	 * all of this was in kernel_init
-	cprintf("6828 decimal is %o octal!\n", 6828);
-	cprintf("Symtab section should begin at: 0x%x \n", stab);
-
-	// double check
-	mboot_info = (multiboot_info_t*)(0xc0000000 + (char*)mboot_info);
-	cprintf("Mboot info address: %p\n", mboot_info);
-	elf_section_header_table_t *elf_head= &(mboot_info->u.elf_sec);
-	cprintf("elf sec info address: %p\n", elf_head);
-    cprintf ("elf_sec: num = %u, size = 0x%x, addr = 0x%x, shndx = 0x%x\n",
-            elf_head->num, elf_head->size,
-            elf_head->addr, elf_head->shndx);
-	
-	struct Secthdr *elf_sym = (struct Secthdr*)(0xc0000000 + elf_head->addr + elf_head->size * 3);
-
-	cprintf("Symtab multiboot struct address: %p\n", elf_sym);
-	cprintf("Symtab multiboot address: %p\n", elf_sym->sh_addr);
-
-	// this walks a symtable, but we don't have one...
-	Elf32_Sym* symtab = (Elf32_Sym*)stab;
-	Elf32_Sym* oldsymtab = symtab;
-	for (; symtab < oldsymtab + 10 ; symtab++) {
-		cprintf("Symbol name index = 0x%x\n", symtab->st_name);
-		//cprintf("Symbol name = %s\n", stabstr + symtab->st_name);
-		cprintf("Symbol vale = 0x%x\n", symtab->st_value);
-	}
-	*/
-	/*
-	extern stab_t stab[], estab[];
-	extern char stabstr[];
-	stab_t* symtab;
-	// Spits out the stabs for functions
-	for (symtab = stab; symtab < estab; symtab++) {
-		// gives us only functions.  not really needed if we scan by address
-		if (symtab->n_type != 36)
-			continue;
-		cprintf("Symbol name = %s\n", stabstr + symtab->n_strx);
-		cprintf("Symbol type = %d\n", symtab->n_type);
-		cprintf("Symbol value = 0x%x\n", symtab->n_value);
-		cprintf("\n");
-	}
-	*/
-
-

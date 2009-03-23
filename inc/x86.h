@@ -46,6 +46,8 @@ static __inline void cpuid(uint32_t info, uint32_t *eaxp, uint32_t *ebxp, uint32
 static __inline uint64_t read_tsc(void) __attribute__((always_inline));
 static __inline uint64_t read_msr(uint32_t reg) __attribute__((always_inline));
 static __inline void write_msr(uint32_t reg, uint64_t val) __attribute__((always_inline));
+static __inline uint32_t read_mmreg32(uint32_t reg) __attribute__((always_inline));
+static __inline void write_mmreg32(uint32_t reg, uint32_t val) __attribute__((always_inline));
 
 static __inline void
 breakpoint(void)
@@ -287,19 +289,33 @@ read_tsc(void)
 }
 
 // Might need to mfence rdmsr.  supposedly wrmsr serializes, but not for x2APIC
-static __inline uint64_t 
+static __inline uint64_t
 read_msr(uint32_t reg)
 {
 	uint32_t edx, eax;
-	asm volatile("rdmsr" : "=d"(edx), "=a"(eax) : "c"(reg));
+	asm volatile("rdmsr; mfence" : "=d"(edx), "=a"(eax) : "c"(reg));
 	return (uint64_t)edx << 32 | eax;
 }
 
-static __inline void 
+static __inline void
 write_msr(uint32_t reg, uint64_t val)
 {
 	asm volatile("wrmsr" : : "d"((uint32_t)(val >> 32)),
 	                         "a"((uint32_t)(val & 0xFFFFFFFF)), 
 	                         "c"(reg));
+}
+
+static __inline void
+write_mmreg32(uint32_t reg, uint32_t val)
+{
+	{TRUSTEDBLOCK *((volatile uint32_t*)reg) = val; }
+	//the C ends up producing better asm than this:
+	//asm volatile("movl %0, (%1)" : : "r"(val), "r"(reg));
+}
+
+static __inline uint32_t
+read_mmreg32(uint32_t reg)
+{
+	{TRUSTEDBLOCK return *((volatile uint32_t*)reg); }
 }
 #endif /* !JOS_INC_X86_H */

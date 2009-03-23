@@ -1,0 +1,86 @@
+#include <inc/mmu.h>
+#include <inc/memlayout.h>
+#include <inc/trap.h>
+
+#define	RELOC(x) ((x) - KERNBASE)
+
+.globl			smp_entry
+smp_entry:		.code16
+	cli
+	cld
+	# Set up rudimentary segmentation
+	xorw	%ax, %ax			# Segment number zero
+	movw	%ax, %ds			# -> Data Segment
+	movw	%ax, %es			# -> Extra Segment
+	movw	%ax, %ss			# -> Stack Segment
+	# Would like to patch all of these 0x1000's at trampoline relocation time
+	# There's three of them, so we could patch the trampoline code when we load,
+	# once we're sure the entry code will not change anymore
+	# Note that this GDT is straight through, with no KERNBASE translation
+	lgdt	gdtdesc - smp_entry + 0x1000
+
+	# Turn on protected mode
+	movl	%cr0, %eax
+	orl		$CR0_PE, %eax
+	movl	%eax, %cr0
+	ljmp	$GD_KT, $(protcseg - smp_entry + 0x1000)
+	
+protcseg:	.code32
+	# Set up the protected-mode data segment registers
+	movw	$GD_KD, %ax		# Kernel segment selector
+	movw	%ax, %ds		# -> DS: Data Segment
+	movw	%ax, %es		# -> ES: Extra Segment
+	movw	%ax, %ss		# -> SS: Stack Segment
+	movw	%ax, %fs		# -> FS
+	movw	%ax, %gs		# -> GS
+
+	# Turn on Paging
+	movl	RELOC(boot_cr3), %eax
+	movl	%eax, %cr3
+	movl	%cr0, %eax	
+	# These cr0 flags are the same as in pmap.c.  Keep them in sync
+	orl		$(CR0_PE|CR0_PG|CR0_AM|CR0_WP|CR0_NE|CR0_MP), %eax  
+	andl	$(~(CR0_TS|CR0_EM)), %eax  
+	movl	%eax, %cr0
+
+	# Reload Segments, using the same gdt_pd as Core 0
+	lgdt	gdt_pd
+	movw	$GD_KD, %ax		# Kernel segment selector
+	movw	%ax, %ds		# -> DS: Data Segment
+	movw	%ax, %es		# -> ES: Extra Segment
+	movw	%ax, %ss		# -> SS: Stack Segment
+	movw	$GD_UD|3, %ax	# User segment selector, with RPL=3
+	movw	%ax, %fs		# -> FS
+	movw	%ax, %gs		# -> GS
+	ljmp	$GD_KT, $here	# jumping to original location of trampoline!
+here:
+	xorl	%eax, %eax
+	lldt	%ax
+spin_start:					# grab lock for smp_main
+	movl	$1, %eax
+	xchgl	%eax, smp_boot_lock
+	test	%eax, %eax
+	jne		spin_start
+
+	addl	$0x1, num_cpus
+	movl	(smp_stack_top), %esp
+	movl	$0, %ebp		# so backtrace works
+	call	smp_main
+	movl	$0, smp_boot_lock 	# release lock
+
+	hlt						# does not work on kvm, so spin
+spinwait:
+	jmp		spinwait
+
+	# Below here is just data, stored with the code text
+	.p2align	2						# force 4 byte alignment
+gdt:
+	SEG_NULL							# null seg
+	SEG(STA_X|STA_R, 0, 0xffffffff)		# code seg
+	SEG(STA_W, 0, 0xffffffff)			# data seg
+gdtdesc:
+	.word	gdtdesc - gdt - 1			# sizeof(gdt) - 1
+	.long	gdt - smp_entry + 0x1000	# address gdt
+
+.globl			smp_entry_end
+smp_entry_end:
