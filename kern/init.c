@@ -89,7 +89,7 @@ void smp_boot(void)
 
 	// set up the local APIC timer to fire 0x21 once.  hardcoded to break
 	// out of the spinloop on waiting.  really just want to wait a little
-	lapic_set_timer(0xffffffff, 0x21, 0);
+	lapic_set_timer(0x0000ffff, 0x21, 0);
 	cprintf("Num_Cpus: %d\n", num_cpus);
 	send_init_ipi();
 	asm volatile("sti"); // LAPIC timer will fire, extINTs are blocked at LINT0 now
@@ -115,9 +115,8 @@ void smp_main(void)
 {
 	cprintf("Good morning Vietnam!\n");
 
-	enable_pse();
-    cprintf("This core's Default APIC ID: 0x%08x\n", lapic_get_default_id());
-    cprintf("This core's Current APIC ID: 0x%08x\n", lapic_get_id());
+	cprintf("This core's Default APIC ID: 0x%08x\n", lapic_get_default_id());
+	cprintf("This core's Current APIC ID: 0x%08x\n", lapic_get_id());
 	
 	if (read_msr(IA32_APIC_BASE) & 0x00000100)
 		cprintf("I am the Boot Strap Processor\n");

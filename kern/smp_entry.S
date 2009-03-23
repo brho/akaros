@@ -3,6 +3,7 @@
 #include <inc/trap.h>
 
 #define	RELOC(x) ((x) - KERNBASE)
+#define	CPUID_PSE_SUPPORT	0x00000008
 
 .globl			smp_entry
 smp_entry:		.code16
@@ -37,6 +38,15 @@ protcseg:	.code32
 	# Turn on Paging
 	movl	RELOC(boot_cr3), %eax
 	movl	%eax, %cr3
+	# Enable PSE, if available
+	movl	$1, %eax
+	cpuid
+	test	$CPUID_PSE_SUPPORT, %edx
+	jz		past_pse
+	movl	%cr4, %eax
+	orl		$CR4_PSE, %eax
+	movl	%eax, %cr4
+past_pse:
 	movl	%cr0, %eax	
 	# These cr0 flags are the same as in pmap.c.  Keep them in sync
 	orl		$(CR0_PE|CR0_PG|CR0_AM|CR0_WP|CR0_NE|CR0_MP), %eax  
@@ -68,7 +78,7 @@ spin_start:					# grab lock for smp_main
 	call	smp_main
 	movl	$0, smp_boot_lock 	# release lock
 
-	hlt						# does not work on kvm, so spin
+	hlt						# hlts, and PC advances to the spinwait
 spinwait:
 	jmp		spinwait
 

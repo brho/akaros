@@ -5,6 +5,7 @@
 
 #include <inc/mmu.h>
 #include <inc/x86.h>
+#include <inc/assert.h>
 
 #include <kern/apic.h>
 
@@ -26,9 +27,9 @@ void remap_pic()
 	// other stuff (put in 8086/88 mode, or whatever)
 	outb(PIC1_DATA, 0x01);
 	outb(PIC2_DATA, 0x01);
-	// set masks, defaulting to all unmasked for now
-	outb(PIC1_DATA, 0x0);
-	outb(PIC2_DATA, 0x0);
+	// set masks, defaulting to all masked for now
+	outb(PIC1_DATA, 0xff);
+	outb(PIC2_DATA, 0xff);
 }
 
 /*
@@ -46,6 +47,7 @@ void lapic_set_timer(uint32_t ticks, uint8_t vector, bool periodic)
 	write_mmreg32(LAPIC_LVT_TIMER, vector | (periodic << 17));
 	write_mmreg32(LAPIC_TIMER_INIT, ticks);
 	// For debugging when we expand this
+	//cprintf("LAPIC LVT Timer: 0x%08x\n", read_mmreg32(LAPIC_LVT_TIMER));
 	//cprintf("LAPIC Init Count: 0x%08x\n", read_mmreg32(LAPIC_TIMER_INIT));
 	//cprintf("LAPIC Current Count: 0x%08x\n", read_mmreg32(LAPIC_TIMER_CURRENT));
 }
