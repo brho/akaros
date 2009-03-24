@@ -26,6 +26,7 @@ volatile bool smp_boot_lock = 0;
 
 static void print_cpuinfo(void);
 void smp_boot(void);
+void smp_boot_handler(struct Trapframe *tf);
 
 void kernel_init(multiboot_info_t *mboot_info)
 {
@@ -73,6 +74,7 @@ void kernel_init(multiboot_info_t *mboot_info)
 void smp_boot(void)
 {
 	struct Page* smp_stack;
+	extern isr_t interrupt_handlers[];
 	// NEED TO GRAB A LOWMEM FREE PAGE FOR AP BOOTUP CODE
 	// page1 (2nd page) is reserved, hardcoded in pmap.c
 	extern smp_entry(), smp_entry_end();
@@ -87,14 +89,20 @@ void smp_boot(void)
 		panic("No memory for SMP boot stack!");
 	smp_stack_top = (uintptr_t)(page2kva(smp_stack) + PGSIZE - SIZEOF_STRUCT_TRAPFRAME);
 
-	// set up the local APIC timer to fire 0x21 once.  hardcoded to break
+	// set up the local APIC timer to fire 0xf0 once.  hardcoded to break
 	// out of the spinloop on waiting.  really just want to wait a little
-	lapic_set_timer(0x0000ffff, 0x21, 0);
+	lapic_set_timer(0x0000ffff, 0xf0, 0);
+	// set the function handler to respond to this
+	register_interrupt_handler(interrupt_handlers, 0xf0, smp_boot_handler);
 	cprintf("Num_Cpus: %d\n", num_cpus);
+	// Start the IPI process (INIT, wait, SIPI)
 	send_init_ipi();
 	asm volatile("sti"); // LAPIC timer will fire, extINTs are blocked at LINT0 now
-	while (waiting); // gets set in the lapic timer
+	while (waiting); // gets released in smp_boot_handler
 	send_startup_ipi(0x01);
+	// Deregister smp_boot_handler
+	register_interrupt_handler(interrupt_handlers, 0xf0, 0);
+
 	// replace this with something that checks to see if smp_entrys are done
 	while(1); // want other cores to do stuff for now
 	
@@ -106,6 +114,14 @@ void smp_boot(void)
 	// Dealloc the temp shared stack
 	page_decref(smp_stack);
 }
+
+/* Breaks us out of the waiting loop in smp_boot */
+void smp_boot_handler(struct Trapframe *tf)
+{
+	extern volatile bool waiting;
+	{HANDLER_ATOMIC waiting = 0; }
+}
+
 /* 
  * This is called from smp_entry by each core to finish the core bootstrapping.
  * There is a spinlock around this entire function in smp_entry, for a few reasons,

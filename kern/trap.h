@@ -9,10 +9,14 @@
 #include <inc/trap.h>
 #include <inc/mmu.h>
 
+// func ptr for interrupt service routines
+typedef void (*isr_t)(struct Trapframe* tf);
+
 /* The kernel's interrupt descriptor table */
 extern struct Gatedesc idt[];
 
 void idt_init(void);
+void register_interrupt_handler(isr_t (COUNT(256)table)[], uint8_t isr, isr_t handler);
 void (IN_HANDLER print_regs)(struct PushRegs *regs);
 void (IN_HANDLER print_trapframe)(struct Trapframe *tf);
 void (IN_HANDLER page_fault_handler)(struct Trapframe *);

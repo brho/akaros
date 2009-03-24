@@ -50,9 +50,15 @@
 // IOAPIC
 #define IOAPIC_BASE					0xfec00000 // this is the default, can be changed
 
-void remap_pic(void);
+// PIT (Programmable Interrupt Timer)
+#define PIT_FREQ 					1193180
+
+void pic_remap(void);
+void pic_mask_irq(uint8_t irq);
+void pic_unmask_irq(uint8_t irq);
 void lapic_set_timer(uint32_t ticks, uint8_t vector, bool periodic);
 uint32_t lapic_get_default_id(void);
+void pit_set_timer(uint32_t freq, bool periodic); // consider adding callback func
 
 static inline void pic_send_eoi(uint32_t irq);
 static inline void lapic_send_eoi(void);

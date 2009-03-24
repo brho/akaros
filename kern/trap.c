@@ -1,3 +1,7 @@
+#ifdef __DEPUTY__
+#pragma noasync
+#endif
+
 #include <inc/mmu.h>
 #include <inc/x86.h>
 #include <inc/assert.h>
@@ -21,6 +25,11 @@ struct Pseudodesc idt_pd = {
 	sizeof(idt) - 1, (uint32_t) idt
 };
 
+/* global handler table, used by core0 (for now).  allows the registration
+ * of functions to be called when servicing an interrupt.  other cores
+ * can set up their own later.
+ */
+isr_t interrupt_handlers[256];
 
 static const char *NTS (IN_HANDLER trapname)(int trapno)
 {
@@ -105,7 +114,7 @@ idt_init(void)
 	asm volatile("lidt idt_pd");
 
 	// This will go away when we start using the IOAPIC properly
-	remap_pic();
+	pic_remap();
 	lapic_enable();
 	// set LINT0 to receive ExtINTs (KVM's default).  At reset they are 0x1000.
 	write_mmreg32(LAPIC_LVT_LINT0, 0x700); 
@@ -213,28 +222,29 @@ void
 void
 (IN_HANDLER irq_handler)(struct Trapframe *tf)
 {
-	// send EOI.  might want to do this later, and not earlier
-	// and probably in assembly.  just need to determine what's LAPIC or not
-	// this is set up to work with an old PIC for now
-	// and this is hardcoded to have only 32 be the PIC (LINT0 ExtINT)
-	if (tf->tf_trapno == 32) {
-		pic_send_eoi(tf->tf_trapno - PIC1_OFFSET);
-	} else // LAPIC style
-		lapic_send_eoi();
+	// determine the interrupt handler table to use.  for now, pick the global
+	isr_t* handler_table = interrupt_handlers;
 
-	// consider doing James-style register_interrupt_handler instead
-	//trap(tf);
-	// this is just for handling the one time use of this in smp_boot
-	cprintf("Incoming IRQ, ISR = %d\n", tf->tf_trapno);
-	if (tf->tf_trapno == 33) {
-		cprintf("LAPIC TIMER!!!\n");
-		extern volatile bool waiting;
-		extern volatile uint8_t num_cpus;
-		{HANDLER_ATOMIC 
-			waiting = 0;
-			cprintf("Num_Cpus: %d\n", num_cpus);
-		}
-		}
+	// then call the appropriate handler
+	if (handler_table[tf->tf_trapno] != 0)
+		handler_table[tf->tf_trapno](tf);
+
+	// Send EOI.  might want to do this in assembly, and possibly earlier
+	// This is set up to work with an old PIC for now
+	// Convention is that all IRQs between 32 and 47 are for the PIC.
+	// All others are LAPIC (timer, IPIs, perf, non-ExtINT LINTS, etc)
+	// For now, only 235-255 are available
+	assert(tf->tf_trapno >= 32); // slows us down, but we should never have this
+	if (tf->tf_trapno < 48)
+		pic_send_eoi(tf->tf_trapno - PIC1_OFFSET);
+	else
+		lapic_send_eoi();
+}
+
+void
+register_interrupt_handler(isr_t table[], uint8_t isr, isr_t handler)
+{
+	table[isr] = handler;
 }
 
 void

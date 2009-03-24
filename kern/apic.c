@@ -12,8 +12,12 @@
 /*
  * Remaps the Programmable Interrupt Controller to use IRQs 32-47
  * http://wiki.osdev.org/PIC
+ * Not 100% on this stuff, after looking over 
+ * http://bochs.sourceforge.net/techspec/PORTS.LST  The cascading and other 
+ * stuff might need to be in one command, and after that all we are doing
+ * is toggling masks.
  */
-void remap_pic() 
+void pic_remap() 
 {
 	// start initialization
 	outb(PIC1_CMD, 0x11);
@@ -30,6 +34,23 @@ void remap_pic()
 	// set masks, defaulting to all masked for now
 	outb(PIC1_DATA, 0xff);
 	outb(PIC2_DATA, 0xff);
+}
+
+void pic_mask_irq(uint8_t irq)
+{
+	if (irq > 7)
+		outb(PIC2_DATA, inb(PIC2_DATA) | (1 << (irq - 8)));
+	else
+		outb(PIC1_DATA, inb(PIC1_DATA) | (1 << irq));
+}
+
+void pic_unmask_irq(uint8_t irq)
+{
+	if (irq > 7) {
+		outb(PIC2_DATA, inb(PIC2_DATA) & ~(1 << (irq - 8)));
+		outb(PIC1_DATA, inb(PIC1_DATA) & 0xfd); // make sure irq2 is unmasked
+	} else
+		outb(PIC1_DATA, inb(PIC1_DATA) & ~(1 << irq));
 }
 
 /*
@@ -58,4 +79,14 @@ uint32_t lapic_get_default_id(void)
 	cpuid(1, 0, &ebx, 0, 0);
 	// p6 family only uses 4 bits here, and 0xf is reserved for the IOAPIC
 	return (ebx & 0xFF000000) >> 24;
+}
+
+void pit_set_timer(uint32_t freq, bool periodic)
+{
+	uint32_t divisor = PIT_FREQ / freq;
+	if (divisor & 0xffff0000)
+		warn("Divisor too large!");
+	outb(0x43, 0x32 | (periodic << 2));
+	outb(0x40, divisor & 0xff);
+	outb(0x40, (divisor >> 8) & 0xff);
 }
