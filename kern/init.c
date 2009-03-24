@@ -10,6 +10,7 @@
 #include <inc/multiboot.h>
 #include <inc/stab.h>
 #include <inc/x86.h>
+#include <inc/atomic.h>
 
 #include <kern/monitor.h>
 #include <kern/console.h>
@@ -19,7 +20,7 @@
 #include <kern/trap.h>
 #include <kern/apic.h>
 
-volatile bool waiting = 1;
+volatile uint32_t waiting = 1;
 volatile uint8_t num_cpus = 0xee;
 uintptr_t smp_stack_top;
 volatile bool smp_boot_lock = 0;
@@ -99,17 +100,22 @@ void smp_boot(void)
 	send_init_ipi();
 	asm volatile("sti"); // LAPIC timer will fire, extINTs are blocked at LINT0 now
 	while (waiting); // gets released in smp_boot_handler
-	send_startup_ipi(0x01);
+
+	// Since we don't know how many CPUs are out there (need to parse tables)
+	// we'll wait for a little bit, using the timer as above.  each core will
+	// also increment waiting, and decrement when it is done, all in smp_entry.
+	// core0 uses the timer for its decrement to signal "waiting a while".  
+	// Replace this shit when we parse the ACPI/MP tables
+	waiting = 1;
+	send_startup_ipi(0x01); // can also send another one if all don't report in
+	lapic_set_timer(0x0000ffff, 0xf0, 0);
+	while(waiting); // want other cores to do stuff for now
+
 	// Deregister smp_boot_handler
 	register_interrupt_handler(interrupt_handlers, 0xf0, 0);
-
-	// replace this with something that checks to see if smp_entrys are done
-	while(1); // want other cores to do stuff for now
-	
 	// Remove the mapping of the page used by the trampoline
 	page_remove(boot_pgdir, (void*)0x00001000);
 	// It had a refcount of 2 earlier, so we need to dec once more to free it
-	// TODO - double check that
 	page_decref(pa2page(0x00001000));
 	// Dealloc the temp shared stack
 	page_decref(smp_stack);
@@ -118,8 +124,8 @@ void smp_boot(void)
 /* Breaks us out of the waiting loop in smp_boot */
 void smp_boot_handler(struct Trapframe *tf)
 {
-	extern volatile bool waiting;
-	{HANDLER_ATOMIC waiting = 0; }
+	extern volatile uint32_t waiting;
+	{HANDLER_ATOMIC atomic_dec(&waiting); }
 }
 
 /* 

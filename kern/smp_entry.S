@@ -72,10 +72,12 @@ spin_start:					# grab lock for smp_main
 	test	%eax, %eax
 	jne		spin_start
 
-	addl	$0x1, num_cpus
+	incl	num_cpus
+	lock incl	waiting
 	movl	(smp_stack_top), %esp
 	movl	$0, %ebp		# so backtrace works
 	call	smp_main
+	lock decl	waiting
 	movl	$0, smp_boot_lock 	# release lock
 
 	hlt						# hlts, and PC advances to the spinwait
