@@ -208,6 +208,7 @@ struct Segdesc {
 #define STS_IG32	0xE	    // 32-bit Interrupt Gate
 #define STS_TG32	0xF	    // 32-bit Trap Gate
 
+#define SEG_COUNT 	6 		// Number of segments in the steady state
 
 /*
  *

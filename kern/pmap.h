@@ -45,7 +45,7 @@ extern size_t npage;
 extern physaddr_t boot_cr3;
 extern pde_t *boot_pgdir;
 
-extern struct Segdesc (COUNT(6) gdt)[];
+extern struct Segdesc (COUNT(SEG_COUNT) gdt)[];
 extern struct Pseudodesc gdt_pd;
 
 void	i386_detect_memory(void);

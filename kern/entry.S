@@ -66,8 +66,7 @@ relocated:
 	movl	$0x0,%ebp			# nuke frame pointer
 
     # Set the stack pointer
-    # Leave a few words on the stack for the user trap frame
- 	movl	$(bootstacktop-SIZEOF_STRUCT_TRAPFRAME),%esp
+ 	movl	$(bootstacktop),%esp
 
 	# Save multiboot info
 	push 	%ebx

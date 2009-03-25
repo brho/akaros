@@ -44,16 +44,21 @@ void kernel_init(multiboot_info_t *mboot_info)
 
 	print_cpuinfo();
 
-	// Lab 2 memory management initialization functions
 	i386_detect_memory();
 	i386_vm_init();
 	page_init();
 	page_check();
 
-	// Lab 3 user environment initialization functions
 	env_init();
 	idt_init();
 
+// Fun with timers.  Leaving this here for now (sick of hiding it)
+//pit_set_timer(1000, 1);
+//pic_unmask_irq(0);
+//cprintf("PIC1 Mask = 0x%04x\n", inb(PIC1_DATA));
+//cprintf("PIC2 Mask = 0x%04x\n", inb(PIC2_DATA));
+//unmask_lapic_lvt(LAPIC_LVT_LINT0);
+//asm volatile("sti");
 	// this returns when all other cores are done and ready to receive IPIs
 	smp_boot();
 
@@ -88,7 +93,7 @@ void smp_boot(void)
 	// Allocate a stack for the cores starting up.  One for all, must share
 	if (page_alloc(&smp_stack))
 		panic("No memory for SMP boot stack!");
-	smp_stack_top = (uintptr_t)(page2kva(smp_stack) + PGSIZE - SIZEOF_STRUCT_TRAPFRAME);
+	smp_stack_top = (uintptr_t)(page2kva(smp_stack) + PGSIZE);
 
 	// set up the local APIC timer to fire 0xf0 once.  hardcoded to break
 	// out of the spinloop on waiting.  really just want to wait a little
@@ -119,6 +124,9 @@ void smp_boot(void)
 	page_decref(pa2page(0x00001000));
 	// Dealloc the temp shared stack
 	page_decref(smp_stack);
+
+	// Should probably flush everyone's TLB at this point, to get rid of 
+	// temp mappings that were removed.  TODO
 }
 
 /* Breaks us out of the waiting loop in smp_boot */
@@ -150,6 +158,64 @@ void smp_main(void)
 	cprintf("LINT0: 0x%08x\n", read_mmreg32(LAPIC_LVT_LINT0));
 	cprintf("LINT1: 0x%08x\n", read_mmreg32(LAPIC_LVT_LINT1));
 	cprintf("Num_Cpus: %d\n\n", num_cpus);
+	
+	// Get a per-core kernel stack
+	struct Page* my_stack;
+	if (page_alloc(&my_stack))
+		panic("Unable to alloc a per-core stack!");
+	memset(page2kva(my_stack), 0, PGSIZE);
+
+	// Set up a gdt / gdt_pd for this core, stored at the top of the stack
+	// This is necessary, eagle-eyed readers know why
+	// GDT should be 4-byte aligned.  TS isn't aligned.  Not sure if it matters.
+	struct Pseudodesc* my_gdt_pd = page2kva(my_stack) + PGSIZE - 
+		sizeof(struct Pseudodesc) - sizeof(struct Segdesc)*SEG_COUNT;
+	struct Segdesc* my_gdt = page2kva(my_stack) + PGSIZE - 
+		sizeof(struct Segdesc)*SEG_COUNT;
+	// TS also needs to be permanent
+	struct Taskstate* my_ts = page2kva(my_stack) + PGSIZE - 
+		sizeof(struct Pseudodesc) - sizeof(struct Segdesc)*SEG_COUNT - 
+		sizeof(struct Taskstate);
+	// Usable portion of the KSTACK grows down from here
+	// Won't actually start using this stack til our first interrupt
+	// (issues with changing the stack pointer and then trying to "return")
+	uintptr_t my_stack_top = (uintptr_t)my_ts;
+
+	// Build and load the gdt / gdt_pd
+	memcpy(my_gdt, gdt, sizeof(struct Segdesc)*SEG_COUNT);
+	*my_gdt_pd = (struct Pseudodesc) { 
+		sizeof(struct Segdesc)*SEG_COUNT - 1, (uintptr_t) my_gdt };
+	asm volatile("lgdt %0" : : "m"(*my_gdt_pd));
+	// Ripped from pmap.c.  AFAIK, these aren't necessary, and will go away...
+	asm volatile("movw %%ax,%%gs" :: "a" (GD_UD|3));
+	asm volatile("movw %%ax,%%fs" :: "a" (GD_UD|3));
+	asm volatile("movw %%ax,%%es" :: "a" (GD_KD));
+	asm volatile("movw %%ax,%%ds" :: "a" (GD_KD));
+	asm volatile("movw %%ax,%%ss" :: "a" (GD_KD));
+	asm volatile("ljmp %0,$1f\n 1:\n" :: "i" (GD_KT));
+	asm volatile("lldt %%ax" :: "a" (0));
+	// end of unnecesary paranoia
+
+	// Need to set the TSS so we know where to trap on this core
+	my_ts->ts_esp0 = my_stack_top;
+	my_ts->ts_ss0 = GD_KD;
+	// Initialize the TSS field of my_gdt.
+	my_gdt[GD_TSS >> 3] = SEG16(STS_T32A, (uint32_t) (my_ts), sizeof(struct Taskstate), 0);
+	my_gdt[GD_TSS >> 3].sd_s = 0;
+	// Load the TSS
+	ltr(GD_TSS);
+
+	// Loads the same IDT used by the other cores
+	asm volatile("lidt idt_pd");
+
+	/*
+	// APIC shit (enable LINT0, whatevs)
+	lapic_enable();
+	// set LINT0 to receive ExtINTs (KVM's default).  At reset they are 0x1000.
+	write_mmreg32(LAPIC_LVT_LINT0, 0x700); 
+	// mask it to shut it up for now
+	mask_lapic_lvt(LAPIC_LVT_LINT0);
+	*/
 }
 
 /*
