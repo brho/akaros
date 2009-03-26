@@ -31,6 +31,7 @@
 #define LAPIC_VERSION				(LAPIC_BASE + 0x030)
 #define LAPIC_ERROR					(LAPIC_BASE + 0x280)
 #define LAPIC_ID					(LAPIC_BASE + 0x020)
+#define LAPIC_LOGICAL_ID			(LAPIC_BASE + 0x0d0)
 // LAPIC Local Vector Table
 #define LAPIC_LVT_TIMER				(LAPIC_BASE + 0x320)
 #define LAPIC_LVT_LINT0				(LAPIC_BASE + 0x350)
@@ -65,6 +66,8 @@ static inline void lapic_send_eoi(void);
 static inline uint32_t lapic_get_version(void);
 static inline uint32_t lapic_get_error(void);
 static inline uint32_t lapic_get_id(void);
+static inline uint8_t lapic_get_logid(void);
+static inline void lapic_set_logid(uint8_t id);
 static inline void lapic_disable(void);
 static inline void lapic_enable(void);
 static inline void lapic_wait_to_send(void);
@@ -107,6 +110,16 @@ static inline uint32_t lapic_get_error(void)
 static inline uint32_t lapic_get_id(void)
 {
 	return read_mmreg32(LAPIC_ID) >> 24;
+}
+
+static inline uint8_t lapic_get_logid(void)
+{
+	return read_mmreg32(LAPIC_LOGICAL_ID) >> 24;
+}
+
+static inline void lapic_set_logid(uint8_t id)
+{
+	write_mmreg32(LAPIC_LOGICAL_ID, id << 24);
 }
 
 /* There are a couple ways to do it.  The MSR route doesn't seem to work

@@ -64,10 +64,49 @@ void kernel_init(multiboot_info_t *mboot_info)
 	// this returns when all other cores are done and ready to receive IPIs
 	smp_boot();
 
-	extern isr_t interrupt_handlers[];
-	register_interrupt_handler(interrupt_handlers, 0xf1, smp_hello_world_handler);
-	send_broadcast_ipi(0xf1);
-	while(1);
+// Fun with IPIs.
+extern isr_t interrupt_handlers[];
+uint32_t i, amount = 0x7ffffff0;
+register_interrupt_handler(interrupt_handlers, 0xf1, smp_hello_world_handler);
+cprintf("\n CORE 0 sending broadcast\n");
+send_broadcast_ipi(0xf1);
+for (i = 0; i < amount; i++)
+	asm volatile("nop;");
+
+cprintf("\n CORE 0 sending all others\n");
+send_all_others_ipi(0xf1);
+for (i = 0; i < amount; i++)
+	asm volatile("nop;");
+
+cprintf("\n CORE 0 sending self\n");
+send_self_ipi(0xf1);
+for (i = 0; i < amount; i++)
+	asm volatile("nop;");
+
+cprintf("\n CORE 0 sending ipi to physical 1\n");
+send_ipi(0x01, 0, 0xf1);
+for (i = 0; i < amount; i++)
+	asm volatile("nop;");
+
+cprintf("\n CORE 0 sending ipi to physical 2\n");
+send_ipi(0x02, 0, 0xf1);
+for (i = 0; i < amount; i++)
+	asm volatile("nop;");
+
+cprintf("\n CORE 0 sending ipi to physical 3\n");
+send_ipi(0x03, 0, 0xf1);
+for (i = 0; i < amount; i++)
+	asm volatile("nop;");
+
+cprintf("\n CORE 0 sending ipi to logical 2\n");
+send_ipi(0x02, 1, 0xf1);
+for (i = 0; i < amount; i++)
+	asm volatile("nop;");
+
+cprintf("\n CORE 0 sending ipi to logical 1\n");
+send_ipi(0x01, 1, 0xf1);
+
+while(1);
 	//ENV_CREATE(user_faultread);
 	//ENV_CREATE(user_faultreadkernel);
 	//ENV_CREATE(user_faultwrite);
@@ -106,7 +145,6 @@ void smp_boot(void)
 	lapic_set_timer(0x0000ffff, 0xf0, 0);
 	// set the function handler to respond to this
 	register_interrupt_handler(interrupt_handlers, 0xf0, smp_boot_handler);
-	cprintf("Num_Cpus: %d\n", num_cpus);
 	// Start the IPI process (INIT, wait, SIPI)
 	send_init_ipi();
 	asm volatile("sti"); // LAPIC timer will fire, extINTs are blocked at LINT0 now
@@ -125,6 +163,7 @@ void smp_boot(void)
 	while(waiting); // want other cores to do stuff for now
 	// From here on, no other cores are coming up.  Grab the lock to ensure it.
 	spin_lock(&smp_boot_lock);
+	cprintf("Num_Cpus Detected: %d\n", num_cpus);
 
 	// Deregister smp_boot_handler
 	register_interrupt_handler(interrupt_handlers, 0xf0, 0);
@@ -158,7 +197,8 @@ void smp_hello_world_handler(struct Trapframe *tf)
  */
 uint32_t smp_main(void)
 {
-	// Print some diagnostics.  To be removed.
+	/*
+	// Print some diagnostics.  Uncomment if there's issues.
 	cprintf("Good morning Vietnam!\n");
 	cprintf("This core's Default APIC ID: 0x%08x\n", lapic_get_default_id());
 	cprintf("This core's Current APIC ID: 0x%08x\n", lapic_get_id());
@@ -167,6 +207,7 @@ uint32_t smp_main(void)
 	else
 		cprintf("I am an Application Processor\n");
 	cprintf("Num_Cpus: %d\n\n", num_cpus);
+	*/
 	
 	// Get a per-core kernel stack
 	struct Page* my_stack;
@@ -195,6 +236,7 @@ uint32_t smp_main(void)
 	*my_gdt_pd = (struct Pseudodesc) { 
 		sizeof(struct Segdesc)*SEG_COUNT - 1, (uintptr_t) my_gdt };
 	asm volatile("lgdt %0" : : "m"(*my_gdt_pd));
+	/*
 	// Ripped from pmap.c.  AFAIK, these aren't necessary, and will go away...
 	asm volatile("movw %%ax,%%gs" :: "a" (GD_UD|3));
 	asm volatile("movw %%ax,%%fs" :: "a" (GD_UD|3));
@@ -204,6 +246,7 @@ uint32_t smp_main(void)
 	asm volatile("ljmp %0,$1f\n 1:\n" :: "i" (GD_KT));
 	asm volatile("lldt %%ax" :: "a" (0));
 	// end of unnecesary paranoia
+	*/
 
 	// Need to set the TSS so we know where to trap on this core
 	my_ts->ts_esp0 = my_stack_top;
@@ -224,6 +267,9 @@ uint32_t smp_main(void)
 	// mask it to shut it up for now.  Doesn't seem to matter yet, since both
 	// KVM and Bochs seem to only route the PIC to core0.
 	mask_lapic_lvt(LAPIC_LVT_LINT0);
+
+	// set a default logical id for now
+	lapic_set_logid(lapic_get_id());
 
 	return my_stack_top; // will be loaded in smp_entry.S
 }
