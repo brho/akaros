@@ -78,8 +78,10 @@ spin_start:					# grab lock for smp_main
 	movl	$0, %ebp		# so backtrace works
 	call	smp_main
 	lock decl	waiting
+	movl	%eax, %esp		# use our new stack, value returned from smp_main
 	movl	$0, smp_boot_lock 	# release lock
 
+	sti						# turn on interrupts, and wait for an IPI
 	hlt						# hlts, and PC advances to the spinwait
 spinwait:
 	jmp		spinwait

@@ -129,7 +129,7 @@ static inline void lapic_wait_to_send(void)
 
 static inline void lapic_enable(void)
 {
-	write_mmreg32(LAPIC_SPURIOUS, read_mmreg32(LAPIC_SPURIOUS) | 0x00001000);
+	write_mmreg32(LAPIC_SPURIOUS, read_mmreg32(LAPIC_SPURIOUS) | 0x00000100);
 }
 
 static inline void send_init_ipi(void)

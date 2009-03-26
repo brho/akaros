@@ -23,11 +23,12 @@
 volatile uint32_t waiting = 1;
 volatile uint8_t num_cpus = 0xee;
 uintptr_t smp_stack_top;
-volatile bool smp_boot_lock = 0;
+volatile uint32_t smp_boot_lock = 0;
 
 static void print_cpuinfo(void);
 void smp_boot(void);
 void smp_boot_handler(struct Trapframe *tf);
+void smp_hello_world_handler(struct Trapframe *tf);
 
 void kernel_init(multiboot_info_t *mboot_info)
 {
@@ -58,10 +59,15 @@ void kernel_init(multiboot_info_t *mboot_info)
 //cprintf("PIC1 Mask = 0x%04x\n", inb(PIC1_DATA));
 //cprintf("PIC2 Mask = 0x%04x\n", inb(PIC2_DATA));
 //unmask_lapic_lvt(LAPIC_LVT_LINT0);
+//cprintf("Core %d's LINT0: 0x%08x\n", lapic_get_id(), read_mmreg32(LAPIC_LVT_LINT0));
 //asm volatile("sti");
 	// this returns when all other cores are done and ready to receive IPIs
 	smp_boot();
 
+	extern isr_t interrupt_handlers[];
+	register_interrupt_handler(interrupt_handlers, 0xf1, smp_hello_world_handler);
+	send_broadcast_ipi(0xf1);
+	while(1);
 	//ENV_CREATE(user_faultread);
 	//ENV_CREATE(user_faultreadkernel);
 	//ENV_CREATE(user_faultwrite);
@@ -110,11 +116,15 @@ void smp_boot(void)
 	// we'll wait for a little bit, using the timer as above.  each core will
 	// also increment waiting, and decrement when it is done, all in smp_entry.
 	// core0 uses the timer for its decrement to signal "waiting a while".  
-	// Replace this shit when we parse the ACPI/MP tables
+	// Replace this shit when we parse the ACPI/MP tables (TODO)
 	waiting = 1;
 	send_startup_ipi(0x01); // can also send another one if all don't report in
-	lapic_set_timer(0x0000ffff, 0xf0, 0);
+	// If this timer isn't long enough, then we could beat an AP past the
+	// waiting loop and compete for the lock.
+	lapic_set_timer(0x00ffffff, 0xf0, 0);
 	while(waiting); // want other cores to do stuff for now
+	// From here on, no other cores are coming up.  Grab the lock to ensure it.
+	spin_lock(&smp_boot_lock);
 
 	// Deregister smp_boot_handler
 	register_interrupt_handler(interrupt_handlers, 0xf0, 0);
@@ -136,27 +146,26 @@ void smp_boot_handler(struct Trapframe *tf)
 	{HANDLER_ATOMIC atomic_dec(&waiting); }
 }
 
+void smp_hello_world_handler(struct Trapframe *tf)
+{
+	cprintf("Incoming IRQ, ISR: %d on core %d with tf at 0x%08x\n", tf->tf_trapno, lapic_get_id(), tf);
+}
+
 /* 
  * This is called from smp_entry by each core to finish the core bootstrapping.
  * There is a spinlock around this entire function in smp_entry, for a few reasons,
  * the most important being that all cores use the same stack when entering here.
  */
-void smp_main(void)
+uint32_t smp_main(void)
 {
+	// Print some diagnostics.  To be removed.
 	cprintf("Good morning Vietnam!\n");
-
 	cprintf("This core's Default APIC ID: 0x%08x\n", lapic_get_default_id());
 	cprintf("This core's Current APIC ID: 0x%08x\n", lapic_get_id());
-	
 	if (read_msr(IA32_APIC_BASE) & 0x00000100)
 		cprintf("I am the Boot Strap Processor\n");
 	else
 		cprintf("I am an Application Processor\n");
-	
-	// turn me on!
-	cprintf("Spurious Vector: 0x%08x\n", read_mmreg32(LAPIC_SPURIOUS));
-	cprintf("LINT0: 0x%08x\n", read_mmreg32(LAPIC_LVT_LINT0));
-	cprintf("LINT1: 0x%08x\n", read_mmreg32(LAPIC_LVT_LINT1));
 	cprintf("Num_Cpus: %d\n\n", num_cpus);
 	
 	// Get a per-core kernel stack
@@ -208,14 +217,15 @@ void smp_main(void)
 	// Loads the same IDT used by the other cores
 	asm volatile("lidt idt_pd");
 
-	/*
-	// APIC shit (enable LINT0, whatevs)
+	// APIC setup
 	lapic_enable();
 	// set LINT0 to receive ExtINTs (KVM's default).  At reset they are 0x1000.
 	write_mmreg32(LAPIC_LVT_LINT0, 0x700); 
-	// mask it to shut it up for now
+	// mask it to shut it up for now.  Doesn't seem to matter yet, since both
+	// KVM and Bochs seem to only route the PIC to core0.
 	mask_lapic_lvt(LAPIC_LVT_LINT0);
-	*/
+
+	return my_stack_top; // will be loaded in smp_entry.S
 }
 
 /*
