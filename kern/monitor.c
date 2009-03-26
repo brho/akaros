@@ -17,6 +17,7 @@
 #include <kern/trap.h>
 #include <kern/kdebug.h>
 #include <kern/pmap.h>
+#include <kern/apic.h>
 
 #define CMDBUF_SIZE	80	// enough for one VGA text line
 
@@ -34,6 +35,7 @@ static command_t commands[] = {
 	{ "reboot", "Take a ride to the South Bay", mon_reboot },
 	{ "showmapping", "Shows VA->PA mappings between two virtual addresses (parameters)", mon_showmapping},
 	{ "setmapperm", "Sets permissions on a VA->PA mapping", mon_setmapperm},
+	{ "cpuinfo", "Prints CPU diagnostics", mon_cpuinfo},
 };
 #define NCOMMANDS (sizeof(commands)/sizeof(commands[0]))
 
@@ -205,6 +207,13 @@ int mon_setmapperm(int argc, char **argv, struct Trapframe *tf)
 	return 0;
 }
 
+int mon_cpuinfo(int argc, char **argv, struct Trapframe *tf)
+{
+	extern uint8_t num_cpus;
+	cprintf("Number of CPUs detected: %d\n", num_cpus);	
+	cprintf("Current CPU's LAPIC ID: 0x%08x\n", lapic_get_id());
+	return 0;
+}
 
 /***** Kernel monitor command interpreter *****/
 

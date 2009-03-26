@@ -223,9 +223,6 @@ boot_map_segment(pde_t *pgdir, uintptr_t la, size_t size, physaddr_t pa, int per
 		warn("la not page aligned in boot_map_segment!");
 		size += PGOFF(la);
 	}
-	// even though our maxpa doesn't go above 64MB yet...
-	if (pa + size > maxpa)
-		warn("Attempting to map to physical memory beyond maxpa!");
 	if (perm & PTE_PS) {
 		if (JPGOFF(la) || JPGOFF(pa))
 			panic("Tried to map a Jumbo page at an unaligned address!");

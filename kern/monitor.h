@@ -16,5 +16,6 @@ int mon_backtrace(int argc, char *NTS *NT COUNT(argc) argv, struct Trapframe *tf
 int mon_reboot(int argc, char *NTS *NT COUNT(argc) argv, struct Trapframe *tf);
 int mon_showmapping(int argc, char *NTS *NT COUNT(argc) argv, struct Trapframe *tf);
 int mon_setmapperm(int argc, char *NTS *NT COUNT(argc) argv, struct Trapframe *tf);
+int mon_cpuinfo(int argc, char *NTS *NT COUNT(argc) argv, struct Trapframe *tf);
 
 #endif	// !JOS_KERN_MONITOR_H
