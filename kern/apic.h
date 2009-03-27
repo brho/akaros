@@ -51,8 +51,8 @@
 // IOAPIC
 #define IOAPIC_BASE					0xfec00000 // this is the default, can be changed
 
-// PIT (Programmable Interrupt Timer)
-#define PIT_FREQ 					1193180
+// PIT (Programmable Interval Timer)
+#define PIT_FREQ 					1193182
 
 void pic_remap(void);
 void pic_mask_irq(uint8_t irq);

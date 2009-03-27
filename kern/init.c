@@ -19,6 +19,7 @@
 #include <kern/env.h>
 #include <kern/trap.h>
 #include <kern/apic.h>
+#include <kern/testing.h>
 
 volatile uint32_t waiting = 1;
 volatile uint8_t num_cpus = 0xee;
@@ -27,8 +28,7 @@ volatile uint32_t smp_boot_lock = 0;
 
 static void print_cpuinfo(void);
 void smp_boot(void);
-void smp_boot_handler(struct Trapframe *tf);
-void smp_hello_world_handler(struct Trapframe *tf);
+static void smp_boot_handler(struct Trapframe *tf);
 
 void kernel_init(multiboot_info_t *mboot_info)
 {
@@ -53,60 +53,9 @@ void kernel_init(multiboot_info_t *mboot_info)
 	env_init();
 	idt_init();
 
-// Fun with timers.  Leaving this here for now (sick of hiding it)
-//pit_set_timer(1000, 1);
-//pic_unmask_irq(0);
-//cprintf("PIC1 Mask = 0x%04x\n", inb(PIC1_DATA));
-//cprintf("PIC2 Mask = 0x%04x\n", inb(PIC2_DATA));
-//unmask_lapic_lvt(LAPIC_LVT_LINT0);
-//cprintf("Core %d's LINT0: 0x%08x\n", lapic_get_id(), read_mmreg32(LAPIC_LVT_LINT0));
-//asm volatile("sti");
 	// this returns when all other cores are done and ready to receive IPIs
 	smp_boot();
 
-// Fun with IPIs.
-extern isr_t interrupt_handlers[];
-uint32_t i, amount = 0x7ffffff0;
-register_interrupt_handler(interrupt_handlers, 0xf1, smp_hello_world_handler);
-cprintf("\n CORE 0 sending broadcast\n");
-send_broadcast_ipi(0xf1);
-for (i = 0; i < amount; i++)
-	asm volatile("nop;");
-
-cprintf("\n CORE 0 sending all others\n");
-send_all_others_ipi(0xf1);
-for (i = 0; i < amount; i++)
-	asm volatile("nop;");
-
-cprintf("\n CORE 0 sending self\n");
-send_self_ipi(0xf1);
-for (i = 0; i < amount; i++)
-	asm volatile("nop;");
-
-cprintf("\n CORE 0 sending ipi to physical 1\n");
-send_ipi(0x01, 0, 0xf1);
-for (i = 0; i < amount; i++)
-	asm volatile("nop;");
-
-cprintf("\n CORE 0 sending ipi to physical 2\n");
-send_ipi(0x02, 0, 0xf1);
-for (i = 0; i < amount; i++)
-	asm volatile("nop;");
-
-cprintf("\n CORE 0 sending ipi to physical 3\n");
-send_ipi(0x03, 0, 0xf1);
-for (i = 0; i < amount; i++)
-	asm volatile("nop;");
-
-cprintf("\n CORE 0 sending ipi to logical 2\n");
-send_ipi(0x02, 1, 0xf1);
-for (i = 0; i < amount; i++)
-	asm volatile("nop;");
-
-cprintf("\n CORE 0 sending ipi to logical 1\n");
-send_ipi(0x01, 1, 0xf1);
-
-while(1);
 	//ENV_CREATE(user_faultread);
 	//ENV_CREATE(user_faultreadkernel);
 	//ENV_CREATE(user_faultwrite);
@@ -147,7 +96,7 @@ void smp_boot(void)
 	register_interrupt_handler(interrupt_handlers, 0xf0, smp_boot_handler);
 	// Start the IPI process (INIT, wait, SIPI)
 	send_init_ipi();
-	asm volatile("sti"); // LAPIC timer will fire, extINTs are blocked at LINT0 now
+	enable_interrupts(); // LAPIC timer will fire, extINTs are blocked at LINT0 now
 	while (waiting); // gets released in smp_boot_handler
 
 	// Since we don't know how many CPUs are out there (need to parse tables)
@@ -185,11 +134,6 @@ void smp_boot_handler(struct Trapframe *tf)
 	{HANDLER_ATOMIC atomic_dec(&waiting); }
 }
 
-void smp_hello_world_handler(struct Trapframe *tf)
-{
-	cprintf("Incoming IRQ, ISR: %d on core %d with tf at 0x%08x\n", tf->tf_trapno, lapic_get_id(), tf);
-}
-
 /* 
  * This is called from smp_entry by each core to finish the core bootstrapping.
  * There is a spinlock around this entire function in smp_entry, for a few reasons,
@@ -198,7 +142,7 @@ void smp_hello_world_handler(struct Trapframe *tf)
 uint32_t smp_main(void)
 {
 	/*
-	// Print some diagnostics.  Uncomment if there's issues.
+	// Print some diagnostics.  Uncomment if there're issues.
 	cprintf("Good morning Vietnam!\n");
 	cprintf("This core's Default APIC ID: 0x%08x\n", lapic_get_default_id());
 	cprintf("This core's Current APIC ID: 0x%08x\n", lapic_get_id());
@@ -236,17 +180,6 @@ uint32_t smp_main(void)
 	*my_gdt_pd = (struct Pseudodesc) { 
 		sizeof(struct Segdesc)*SEG_COUNT - 1, (uintptr_t) my_gdt };
 	asm volatile("lgdt %0" : : "m"(*my_gdt_pd));
-	/*
-	// Ripped from pmap.c.  AFAIK, these aren't necessary, and will go away...
-	asm volatile("movw %%ax,%%gs" :: "a" (GD_UD|3));
-	asm volatile("movw %%ax,%%fs" :: "a" (GD_UD|3));
-	asm volatile("movw %%ax,%%es" :: "a" (GD_KD));
-	asm volatile("movw %%ax,%%ds" :: "a" (GD_KD));
-	asm volatile("movw %%ax,%%ss" :: "a" (GD_KD));
-	asm volatile("ljmp %0,$1f\n 1:\n" :: "i" (GD_KT));
-	asm volatile("lldt %%ax" :: "a" (0));
-	// end of unnecesary paranoia
-	*/
 
 	// Need to set the TSS so we know where to trap on this core
 	my_ts->ts_esp0 = my_stack_top;
