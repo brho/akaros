@@ -2,6 +2,8 @@
 #define ROS_INC_ATOMIC_H
 
 #include <inc/types.h>
+#include <inc/mmu.h>
+#include <inc/x86.h>
 
 /* //linux style atomic ops
 typedef struct {uint32_t real_num;} atomic_t;
@@ -22,16 +24,16 @@ static inline void atomic_dec(volatile uint32_t* number);
 static inline void spin_lock(volatile uint32_t* lock)
 {
 	asm volatile(
-			"spinlock:                "
+			"1:                       "
 			"	cmpb $0, %0;          "
-			"	je getlock;           "
+			"	je 2f;                "
 			"	pause;                "
-			"	jmp spinlock;         "
-			"getlock:                 " 
+			"	jmp 1b;               "
+			"2:                       " 
 			"	movb $1, %%al;        "
 			"	xchgb %%al, %0;       "
 			"	cmpb $0, %%al;        "
-			"	jne spinlock;         "
+			"	jne 1b;               "
 	        : : "m"(*lock) : "eax", "cc");
 }
 
@@ -40,32 +42,26 @@ static inline void spin_unlock(volatile uint32_t* lock)
 	*lock = 0;
 }
 
-// TODO - and test by holding a lock in a while loop, then see if ints are off
-// and the other case, etc.
-// if ints are enabled, disable them and note it in the top bit of the lock
+// If ints are enabled, disable them and note it in the top bit of the lock
+// There is an assumption about releasing locks in order here...
 static inline void spin_lock_irqsave(volatile uint32_t* lock)
 {
-	// doesn't actually do this yet
-	// probably want to push flags, cli, grab lock, examine flags, 
-	// and toggle the bit if interrupts were enabled
-	asm volatile(
-			"spinlock:                "
-			"	cmpb $0, %0;          "
-			"	je getlock;           "
-			"	pause;                "
-			"	jmp spinlock;         "
-			"getlock:                 " 
-			"	movb $1, %%al;        "
-			"	xchgb %%al, %0;       "
-			"	cmpb $0, %%al;        "
-			"	jne spinlock;         "
-	        : : "m"(*lock) : "eax", "cc");
+	uint32_t eflags;
+	eflags = read_eflags();
+	disable_interrupts();
+	spin_lock(lock);
+	if (eflags & FL_IF)
+		*lock |= 0x80000000;
 }
 
-// if the top bit of the lock is set, then re-enable interrupts (TODO)
+// if the top bit of the lock is set, then re-enable interrupts
 static inline void spin_unlock_irqsave(volatile uint32_t* lock)
 {
-	*lock = 0;
+	if (*lock & 0x80000000) {
+		*lock = 0;
+		enable_interrupts();
+	} else
+		*lock = 0;
 }
 
 // need to do this with pointers and deref.  %0 needs to be the memory address

@@ -48,6 +48,8 @@ static __inline uint64_t read_msr(uint32_t reg) __attribute__((always_inline));
 static __inline void write_msr(uint32_t reg, uint64_t val) __attribute__((always_inline));
 static __inline uint32_t read_mmreg32(uint32_t reg) __attribute__((always_inline));
 static __inline void write_mmreg32(uint32_t reg, uint32_t val) __attribute__((always_inline));
+static __inline void enable_interrupts(void) __attribute__((always_inline));
+static __inline void disable_interrupts(void) __attribute__((always_inline));
 
 static __inline void
 breakpoint(void)
@@ -317,5 +319,17 @@ static __inline uint32_t
 read_mmreg32(uint32_t reg)
 {
 	{TRUSTEDBLOCK return *((volatile uint32_t*)reg); }
+}
+
+static __inline void
+enable_interrupts(void) __attribute__((always_inline))
+{
+	asm volatile("sti");
+}
+
+static __inline void
+disable_interrupts(void) __attribute__((always_inline))
+{
+	asm volatile("cli");
 }
 #endif /* !JOS_INC_X86_H */
