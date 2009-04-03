@@ -9,6 +9,13 @@
 smp_entry:		.code16
 	cli
 	cld
+	lock incw	smp_semaphore - smp_entry + 0x1000  # announce our presence
+spin_start:						# grab lock in real mode
+	movw	$1, %ax
+	xchgw	%ax, smp_boot_lock - smp_entry + 0x1000
+	test	%ax, %ax
+	jne		spin_start
+
 	# Set up rudimentary segmentation
 	xorw	%ax, %ax			# Segment number zero
 	movw	%ax, %ds			# -> Data Segment
@@ -50,7 +57,7 @@ past_pse:
 	movl	%cr0, %eax	
 	# These cr0 flags are the same as in pmap.c.  Keep them in sync
 	orl		$(CR0_PE|CR0_PG|CR0_AM|CR0_WP|CR0_NE|CR0_MP), %eax  
-	andl	$(~(CR0_TS|CR0_EM)), %eax  
+	andl	$(~(CR0_TS|CR0_EM|CR0_CD|CR0_NW)), %eax  
 	movl	%eax, %cr0
 
 	# Reload Segments, using the same gdt_pd as Core 0
@@ -66,23 +73,17 @@ past_pse:
 here:
 	xorl	%eax, %eax
 	lldt	%ax
-spin_start:					# grab lock for smp_main
-	movl	$1, %eax
-	xchgl	%eax, smp_boot_lock
-	test	%eax, %eax
-	jne		spin_start
-
 	incl	num_cpus
-	lock incl	waiting
 	movl	(smp_stack_top), %esp
 	movl	$0, %ebp		# so backtrace works
 	call	smp_main
-	lock decl	waiting
 	movl	%eax, %esp		# use our new stack, value returned from smp_main
-	movl	$0, smp_boot_lock 	# release lock
+	# note the next two lines are using the direct mapping from smp_boot()
+	movw	$0, smp_boot_lock - smp_entry + 0x1000 	# release lock
+	lock decw	smp_semaphore - smp_entry + 0x1000  # show we are done
 
 	sti						# turn on interrupts, and wait for an IPI
-	hlt						# hlts, and PC advances to the spinwait
+	hlt						# hlts, else will just spin.
 spinwait:
 	jmp		spinwait
 
@@ -95,6 +96,12 @@ gdt:
 gdtdesc:
 	.word	gdtdesc - gdt - 1			# sizeof(gdt) - 1
 	.long	gdt - smp_entry + 0x1000	# address gdt
-
+	.p2align	2						# force 4 byte alignment
+.globl			smp_boot_lock
+smp_boot_lock:							# this lock word will be only used from
+	.word	0							# its spot in the trampoline (0x1000)
+.globl			smp_semaphore
+smp_semaphore:							# poor man's polling semaphore
+	.word	0							
 .globl			smp_entry_end
 smp_entry_end:

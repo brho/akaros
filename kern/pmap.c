@@ -345,9 +345,11 @@ i386_vm_init(void)
 
 	// APIC mapping, in lieu of MTRRs for now.  TODO: remove when MTRRs are up
 	// IOAPIC
-	boot_map_segment(pgdir, (uintptr_t)IOAPIC_BASE, PGSIZE, IOAPIC_BASE, PTE_PCD|PTE_W);
+	boot_map_segment(pgdir, (uintptr_t)IOAPIC_BASE, PGSIZE, IOAPIC_BASE, 
+	                 PTE_PCD | PTE_PWT | PTE_W);
 	// Local APIC
-	boot_map_segment(pgdir, (uintptr_t)LAPIC_BASE, PGSIZE, LAPIC_BASE, PTE_PCD|PTE_W);
+	boot_map_segment(pgdir, (uintptr_t)LAPIC_BASE, PGSIZE, LAPIC_BASE,
+	                 PTE_PCD | PTE_PWT | PTE_W);
 
 	//////////////////////////////////////////////////////////////////////
 	// Make 'pages' point to an array of size 'npage' of 'struct Page'.
@@ -423,10 +425,9 @@ i386_vm_init(void)
 
 	// Turn on paging.
 	cr0 = rcr0();
-	// not sure why they turned on TS and EM here.  or anything other 
-	// than PG and WP
-	cr0 |= CR0_PE|CR0_PG|CR0_AM|CR0_WP|CR0_NE|CR0_TS|CR0_EM|CR0_MP;
-	cr0 &= ~(CR0_TS|CR0_EM);
+	// CD and NW should already be on, but just in case these turn on caching
+	cr0 |= CR0_PE|CR0_PG|CR0_AM|CR0_WP|CR0_NE|CR0_MP;
+	cr0 &= ~(CR0_TS|CR0_EM|CR0_CD|CR0_NW);
 	lcr0(cr0);
 
 	// Current mapping: KERNBASE+x => x => x.

@@ -24,7 +24,6 @@
 volatile uint32_t waiting = 1;
 volatile uint8_t num_cpus = 0xee;
 uintptr_t smp_stack_top;
-volatile uint32_t smp_boot_lock = 0;
 
 static void print_cpuinfo(void);
 void smp_boot(void);
@@ -77,11 +76,12 @@ void smp_boot(void)
 	extern isr_t interrupt_handlers[];
 	// NEED TO GRAB A LOWMEM FREE PAGE FOR AP BOOTUP CODE
 	// page1 (2nd page) is reserved, hardcoded in pmap.c
-	extern smp_entry(), smp_entry_end();
+	extern smp_entry(), smp_entry_end(), smp_boot_lock(), smp_semaphore();
 	memset(KADDR(0x00001000), 0, PGSIZE);		
 	memcpy(KADDR(0x00001000), &smp_entry, &smp_entry_end - &smp_entry);		
 
-	// This mapping allows access with paging on and off
+	// This mapping allows access to the trampoline with paging on and off
+	// via 0x00001000
 	page_insert(boot_pgdir, pa2page(0x00001000), (void*)0x00001000, PTE_W);
 
 	// Allocate a stack for the cores starting up.  One for all, must share
@@ -91,27 +91,40 @@ void smp_boot(void)
 
 	// set up the local APIC timer to fire 0xf0 once.  hardcoded to break
 	// out of the spinloop on waiting.  really just want to wait a little
-	lapic_set_timer(0x0000ffff, 0xf0, 0);
+	lapic_set_timer(0x00000fff, 0xf0, 0); // TODO - fix timing
 	// set the function handler to respond to this
 	register_interrupt_handler(interrupt_handlers, 0xf0, smp_boot_handler);
-	// Start the IPI process (INIT, wait, SIPI)
+
+	// Start the IPI process (INIT, wait, SIPI, wait, SIPI, wait)
 	send_init_ipi();
 	enable_interrupts(); // LAPIC timer will fire, extINTs are blocked at LINT0 now
 	while (waiting); // gets released in smp_boot_handler
-
-	// Since we don't know how many CPUs are out there (need to parse tables)
-	// we'll wait for a little bit, using the timer as above.  each core will
-	// also increment waiting, and decrement when it is done, all in smp_entry.
-	// core0 uses the timer for its decrement to signal "waiting a while".  
-	// Replace this shit when we parse the ACPI/MP tables (TODO)
 	waiting = 1;
-	send_startup_ipi(0x01); // can also send another one if all don't report in
-	// If this timer isn't long enough, then we could beat an AP past the
-	// waiting loop and compete for the lock.
-	lapic_set_timer(0x00ffffff, 0xf0, 0);
-	while(waiting); // want other cores to do stuff for now
+	send_startup_ipi(0x01); // first SIPI
+	lapic_set_timer(0x00000fff, 0xf0, 0); // TODO - fix timing
+	while(waiting); // wait for the first SIPI to take effect
+	waiting = 1;
+	send_startup_ipi(0x01); // second SIPI
+	lapic_set_timer(0x000fffff, 0xf0, 0); // TODO - fix timing
+	while(waiting); // wait for the second SIPI to take effect
+	disable_interrupts();
+
+	// Each core will also increment smp_semaphore, and decrement when it is done, 
+	// all in smp_entry.  It's purpose is to keep Core0 from competing for the 
+	// smp_boot_lock.  So long as one AP increments the sem before the final 
+	// LAPIC timer goes off, all available cores will be initialized.
+	while(*(volatile uint32_t*)(&smp_semaphore - &smp_entry + 0x00001000));
+
 	// From here on, no other cores are coming up.  Grab the lock to ensure it.
-	spin_lock(&smp_boot_lock);
+	// Another core could be in it's prelock phase and be trying to grab the lock
+	// forever.... 
+	// The lock exists on the trampoline, so it can be grabbed right away in 
+	// real mode.  If core0 wins the race and blocks other CPUs from coming up
+	// it can crash the machine if the other cores are allowed to proceed with
+	// booting.  Specifically, it's when they turn on paging and have that temp
+	// mapping pulled out from under them.  Now, if a core loses, it will spin
+	// on the trampoline (which we must be careful to not deallocate)
+	spin_lock((uint32_t*)(&smp_boot_lock - &smp_entry + 0x00001000));
 	cprintf("Num_Cpus Detected: %d\n", num_cpus);
 
 	// Deregister smp_boot_handler
@@ -119,7 +132,10 @@ void smp_boot(void)
 	// Remove the mapping of the page used by the trampoline
 	page_remove(boot_pgdir, (void*)0x00001000);
 	// It had a refcount of 2 earlier, so we need to dec once more to free it
-	page_decref(pa2page(0x00001000));
+	// but only if all cores are in (or we reset / reinit those that failed)
+	// TODO after we parse ACPI tables
+	if (num_cpus == 8) // TODO - ghetto coded for our 8 way SMPs
+		page_decref(pa2page(0x00001000));
 	// Dealloc the temp shared stack
 	page_decref(smp_stack);
 
