@@ -48,7 +48,7 @@ static inline void spin_lock_irqsave(volatile uint32_t* lock)
 {
 	uint32_t eflags;
 	eflags = read_eflags();
-	disable_interrupts();
+	disable_irq();
 	spin_lock(lock);
 	if (eflags & FL_IF)
 		*lock |= 0x80000000;
@@ -59,7 +59,7 @@ static inline void spin_unlock_irqsave(volatile uint32_t* lock)
 {
 	if (*lock & 0x80000000) {
 		*lock = 0;
-		enable_interrupts();
+		enable_irq();
 	} else
 		*lock = 0;
 }

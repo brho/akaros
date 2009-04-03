@@ -16,7 +16,9 @@ void test_ipi_sending(void)
 {
 	extern isr_t interrupt_handlers[];
 	uint32_t i, amount = 0x7ffffff0; // should calibrate this
+	bool state;
 	register_interrupt_handler(interrupt_handlers, 0xf1, smp_hello_world_handler);
+	state = enable_irqsave();
 	
 	cprintf("\nCORE 0 sending broadcast\n");
 	send_broadcast_ipi(0xf1);
@@ -64,6 +66,7 @@ void test_ipi_sending(void)
 		asm volatile("nop;");
 
 	cprintf("\nDone!\n");
+	disable_irqsave(state);
 }
 
 // Note this never returns and will muck with any other timer work
@@ -76,7 +79,7 @@ void test_pic_reception(void)
 	cprintf("PIC2 Mask = 0x%04x\n", inb(PIC2_DATA));
 	unmask_lapic_lvt(LAPIC_LVT_LINT0);
 	cprintf("Core %d's LINT0: 0x%08x\n", lapic_get_id(), read_mmreg32(LAPIC_LVT_LINT0));
-	enable_interrupts();
+	enable_irq();
 	while(1);
 }
 

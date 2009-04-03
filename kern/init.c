@@ -55,6 +55,8 @@ void kernel_init(multiboot_info_t *mboot_info)
 	// this returns when all other cores are done and ready to receive IPIs
 	smp_boot();
 
+	test_ipi_sending();
+
 	//ENV_CREATE(user_faultread);
 	//ENV_CREATE(user_faultreadkernel);
 	//ENV_CREATE(user_faultwrite);
@@ -97,17 +99,24 @@ void smp_boot(void)
 
 	// Start the IPI process (INIT, wait, SIPI, wait, SIPI, wait)
 	send_init_ipi();
-	enable_interrupts(); // LAPIC timer will fire, extINTs are blocked at LINT0 now
-	while (waiting); // gets released in smp_boot_handler
+	enable_irq(); // LAPIC timer will fire, extINTs are blocked at LINT0 now
+	while (waiting) // gets released in smp_boot_handler
+		cpu_relax();
+	// first SIPI
 	waiting = 1;
-	send_startup_ipi(0x01); // first SIPI
+	send_startup_ipi(0x01);
 	lapic_set_timer(0x00000fff, 0xf0, 0); // TODO - fix timing
-	while(waiting); // wait for the first SIPI to take effect
+	while(waiting) // wait for the first SIPI to take effect
+		cpu_relax();
+	/* //BOCHS does not like this second SIPI.
+	// second SIPI
 	waiting = 1;
-	send_startup_ipi(0x01); // second SIPI
+	send_startup_ipi(0x01);
 	lapic_set_timer(0x000fffff, 0xf0, 0); // TODO - fix timing
-	while(waiting); // wait for the second SIPI to take effect
-	disable_interrupts();
+	while(waiting) // wait for the second SIPI to take effect
+		cpu_relax();
+	*/
+	disable_irq();
 
 	// Each core will also increment smp_semaphore, and decrement when it is done, 
 	// all in smp_entry.  It's purpose is to keep Core0 from competing for the 

@@ -2,6 +2,7 @@
 #define JOS_INC_X86_H
 
 #include <inc/types.h>
+#include <inc/mmu.h>
 
 /* Model Specific Registers */
 #define IA32_APIC_BASE				0x1b
@@ -48,8 +49,11 @@ static __inline uint64_t read_msr(uint32_t reg) __attribute__((always_inline));
 static __inline void write_msr(uint32_t reg, uint64_t val) __attribute__((always_inline));
 static __inline uint32_t read_mmreg32(uint32_t reg) __attribute__((always_inline));
 static __inline void write_mmreg32(uint32_t reg, uint32_t val) __attribute__((always_inline));
-static __inline void enable_interrupts(void) __attribute__((always_inline));
-static __inline void disable_interrupts(void) __attribute__((always_inline));
+static __inline void enable_irq(void) __attribute__((always_inline));
+static __inline void disable_irq(void) __attribute__((always_inline));
+static __inline bool enable_irqsave(void) __attribute__((always_inline));
+static __inline void disable_irqsave(bool state) __attribute__((always_inline));
+static __inline void cpu_relax(void) __attribute__((always_inline));
 
 static __inline void
 breakpoint(void)
@@ -322,14 +326,39 @@ read_mmreg32(uint32_t reg)
 }
 
 static __inline void
-enable_interrupts(void) __attribute__((always_inline))
+enable_irq(void)
 {
 	asm volatile("sti");
 }
 
 static __inline void
-disable_interrupts(void) __attribute__((always_inline))
+disable_irq(void)
 {
 	asm volatile("cli");
+}
+
+static __inline bool
+enable_irqsave(void)
+{
+	// if interrupts are already on, return true
+	if (read_eflags() & FL_IF)
+		return 1;
+	enable_irq();
+	return 0;
+}
+
+static __inline void
+disable_irqsave(bool state)
+{
+	// if ints were already on, leave them on.
+	if (state)
+		return;
+	disable_irq();
+}
+
+static __inline void
+cpu_relax(void)
+{
+	asm volatile("pause");
 }
 #endif /* !JOS_INC_X86_H */
