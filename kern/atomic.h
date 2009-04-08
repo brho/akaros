@@ -21,9 +21,13 @@ static inline void atomic_inc(volatile uint32_t* number);
 static inline void atomic_dec(volatile uint32_t* number);
 
 
-typedef volatile uint8_t barrier_t[MAX_NUM_CPUS];
-void init_barrier(barrier_t COUNT(MAX_NUM_CPUS) cpu_array);
-void barrier(barrier_t COUNT(MAX_NUM_CPUS) cpu_array);
+typedef struct barrier {
+	volatile uint8_t COUNT(MAX_NUM_CPUS) cpu_array[MAX_NUM_CPUS]; 
+    volatile uint8_t ready;
+	} barrier_t;
+
+void init_barrier_all(barrier_t* cpu_barrier);
+void barrier_all(barrier_t* cpu_barrier);
 
 static inline void spin_lock(volatile uint32_t* lock)
 {
