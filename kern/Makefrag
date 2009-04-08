@@ -31,6 +31,7 @@ KERN_SRCFILES :=	kern/entry.S \
 			kern/kdebug.c \
 			kern/apic.c \
 			kern/testing.c \
+			kern/atomic.c \
 			lib/printfmt.c \
 			lib/readline.c \
 			lib/string.c
@@ -92,6 +93,13 @@ $(OBJDIR)/kern/bochs.img: $(OBJDIR)/kern/kernel $(OBJDIR)/boot/boot
 #	$(V)sync
 
 all: $(OBJDIR)/kern/bochs.img
+
+#usb: all 
+#	$(V)echo "Copying to /dev/sdb4"
+#	$(V)mount /dev/sdb4
+#	$(V)cp $(OBJDIR)/kern/kernel /mnt/pornstick/texas
+#	$(V)sync
+#	$(V)umount /mnt/pornstick
 
 grub: $(OBJDIR)/jos-grub
 

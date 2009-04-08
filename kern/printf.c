@@ -4,7 +4,8 @@
 #include <inc/types.h>
 #include <inc/stdio.h>
 #include <inc/stdarg.h>
-#include <inc/atomic.h>
+
+#include <kern/atomic.h>
 
 uint32_t output_lock = 0;
 

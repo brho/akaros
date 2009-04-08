@@ -14,6 +14,9 @@
 /* CPUID */
 #define CPUID_PSE_SUPPORT			0x00000008
 
+/* Arch Constants */
+#define MAX_NUM_CPUS				255
+
 static __inline void breakpoint(void) __attribute__((always_inline));
 static __inline uint8_t inb(int port) __attribute__((always_inline));
 static __inline void insb(int port, void *addr, int cnt) __attribute__((always_inline));

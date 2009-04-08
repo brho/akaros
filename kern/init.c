@@ -10,7 +10,6 @@
 #include <inc/multiboot.h>
 #include <inc/stab.h>
 #include <inc/x86.h>
-#include <inc/atomic.h>
 
 #include <kern/monitor.h>
 #include <kern/console.h>
@@ -20,6 +19,7 @@
 #include <kern/trap.h>
 #include <kern/apic.h>
 #include <kern/testing.h>
+#include <kern/atomic.h>
 
 volatile uint32_t waiting = 1;
 volatile uint8_t num_cpus = 0xee;
@@ -55,6 +55,9 @@ void kernel_init(multiboot_info_t *mboot_info)
 	// this returns when all other cores are done and ready to receive IPIs
 	smp_boot();
 
+	test_barrier();
+	panic("Don't Panic");
+	test_print_info();
 	test_ipi_sending();
 
 	//ENV_CREATE(user_faultread);
@@ -105,7 +108,7 @@ void smp_boot(void)
 	// first SIPI
 	waiting = 1;
 	send_startup_ipi(0x01);
-	lapic_set_timer(0x00000fff, 0xf0, 0); // TODO - fix timing
+	lapic_set_timer(0x0000ffff, 0xf0, 0); // TODO - fix timing
 	while(waiting) // wait for the first SIPI to take effect
 		cpu_relax();
 	/* //BOCHS does not like this second SIPI.
