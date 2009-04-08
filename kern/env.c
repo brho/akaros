@@ -239,7 +239,6 @@ segment_alloc(struct Env *e, void *va, size_t len)
 			continue;
 		if ((r = page_alloc(&page)) < 0)
 			panic("segment_alloc: %e", r);
-		page->pp_ref++;
 		page_insert(e->env_pgdir, page, start, PTE_U | PTE_W);
 	}
 }
