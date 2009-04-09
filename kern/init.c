@@ -55,9 +55,9 @@ void kernel_init(multiboot_info_t *mboot_info)
 	// this returns when all other cores are done and ready to receive IPIs
 	smp_boot();
 
-	test_barrier();
 	panic("Don't Panic");
 	test_print_info();
+	test_barrier();
 	test_ipi_sending();
 
 	//ENV_CREATE(user_faultread);
@@ -108,7 +108,7 @@ void smp_boot(void)
 	// first SIPI
 	waiting = 1;
 	send_startup_ipi(0x01);
-	lapic_set_timer(0x0000ffff, 0xf0, 0); // TODO - fix timing
+	lapic_set_timer(0x000fffff, 0xf0, 0); // TODO - fix timing
 	while(waiting) // wait for the first SIPI to take effect
 		cpu_relax();
 	/* //BOCHS does not like this second SIPI.

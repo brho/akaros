@@ -15,9 +15,9 @@ void test_pic_reception(void);
 void test_print_info(void);
 void test_barrier(void);
 
-void smp_hello_world_handler(struct Trapframe *tf);
-void smp_print_info_handler(struct Trapframe *tf);
-void smp_barrier_test_handler(struct Trapframe *tf);
+void test_hello_world_handler(struct Trapframe *tf);
+void test_print_info_handler(struct Trapframe *tf);
+void test_barrier_handler(struct Trapframe *tf);
 
 
 

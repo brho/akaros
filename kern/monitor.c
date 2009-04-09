@@ -18,6 +18,8 @@
 #include <kern/kdebug.h>
 #include <kern/pmap.h>
 #include <kern/apic.h>
+#include <kern/smp.h>
+#include <kern/testing.h>
 
 #define CMDBUF_SIZE	80	// enough for one VGA text line
 
@@ -174,7 +176,7 @@ int mon_showmapping(int argc, char **argv, struct Trapframe *tf)
 
 int mon_setmapperm(int argc, char **argv, struct Trapframe *tf)
 {
-	if (argc < 2) {
+	if (argc < 3) {
 		cprintf("Sets VIRT_ADDR's mapping's permissions to PERMS (in hex)\n");
 		cprintf("Only affects the lowest level PTE.  To adjust the PDE, do the math.\n");
 		cprintf("Be careful with this around UVPT, VPT, and friends.\n");
@@ -210,8 +212,14 @@ int mon_setmapperm(int argc, char **argv, struct Trapframe *tf)
 int mon_cpuinfo(int argc, char **argv, struct Trapframe *tf)
 {
 	extern uint8_t num_cpus;
+
 	cprintf("Number of CPUs detected: %d\n", num_cpus);	
-	cprintf("Current CPU's LAPIC ID: 0x%08x\n", lapic_get_id());
+	cprintf("Calling CPU's LAPIC ID: 0x%08x\n", lapic_get_id());
+	if (argc < 2)
+		smp_call_function_self(test_print_info_handler, 0);
+	else
+		smp_call_function_single(strtol(argv[1], 0, 16),
+		                         test_print_info_handler, 0);
 	return 0;
 }
 
