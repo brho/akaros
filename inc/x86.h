@@ -70,8 +70,8 @@ static __inline uint32_t read_mmreg32(uint32_t reg) __attribute__((always_inline
 static __inline void write_mmreg32(uint32_t reg, uint32_t val) __attribute__((always_inline));
 static __inline void enable_irq(void) __attribute__((always_inline));
 static __inline void disable_irq(void) __attribute__((always_inline));
-static __inline bool enable_irqsave(void) __attribute__((always_inline));
-static __inline void disable_irqsave(bool state) __attribute__((always_inline));
+static __inline void enable_irqsave(int8_t* state) __attribute__((always_inline));
+static __inline void disable_irqsave(int8_t* state) __attribute__((always_inline));
 static __inline void cpu_relax(void) __attribute__((always_inline));
 static __inline void wbinvd(void) __attribute__((always_inline));
 static __inline void clflush(uintptr_t* addr) __attribute__((always_inline));
@@ -358,23 +358,33 @@ disable_irq(void)
 	asm volatile("cli");
 }
 
-static __inline bool
-enable_irqsave(void)
+static __inline void
+enable_irqsave(int8_t* state)
 {
-	// if interrupts are already on, return true
-	if (read_eflags() & FL_IF)
-		return 1;
-	enable_irq();
-	return 0;
+	// *state tracks the number of nested enables and disables
+	// initial value of state: 0 = first run / no favorite
+	// > 0 means more enabled calls have been made
+	// < 0 means more disabled calls have been made
+	// Mostly doing this so we can call disable_irqsave first if we want
+
+	// one side or another "gets a point" if interrupts were already the
+	// way it wanted to go.  o/w, state stays at 0.  if the state was not 0
+	// then, enabling/disabling isn't even an option.  just increment/decrement
+
+	// if enabling is winning or tied, make sure it's enabled
+	if ((*state == 0) && (!(read_eflags() & FL_IF)))
+		enable_irq();
+	else
+		(*state)++;
 }
 
 static __inline void
-disable_irqsave(bool state)
+disable_irqsave(int8_t* state)
 {
-	// if ints were already on, leave them on.
-	if (state)
-		return;
-	disable_irq();
+	if ((*state == 0) && (read_eflags() & FL_IF))
+		disable_irq();
+	else 
+		(*state)--;
 }
 
 static __inline void

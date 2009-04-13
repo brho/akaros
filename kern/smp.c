@@ -185,13 +185,13 @@ static void smp_call_function(uint8_t type, uint8_t dest, isr_t handler, uint8_t
 {
 	extern isr_t interrupt_handlers[];
 	uint32_t i, amount = 0x7ffffff0; // should calibrate this!!  just remove it!
-	bool state;
+	int8_t state = 0;
 
 	if (!vector)
 		vector = 0xf1; //default value
 	register_interrupt_handler(interrupt_handlers, vector, handler);
 	// WRITE MEMORY BARRIER HERE
-	state = enable_irqsave();
+	enable_irqsave(&state);
 	// Send the proper type of IPI.  I made up these numbers.
 	switch (type) {
 		case 1:
@@ -217,7 +217,7 @@ static void smp_call_function(uint8_t type, uint8_t dest, isr_t handler, uint8_t
 	// maybe should think of some sort of completion notification mech
 	for (i = 0; i < amount; i++)
 		asm volatile("nop;");
-	disable_irqsave(state);
+	disable_irqsave(&state);
 	// consider doing this, but we can't remove it before the receiver is done
 	//register_interrupt_handler(interrupt_handlers, vector, 0);
 	// we also will have issues if we call this function again too quickly

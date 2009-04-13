@@ -17,9 +17,9 @@ void test_ipi_sending(void)
 {
 	extern isr_t interrupt_handlers[];
 	uint32_t i, amount = 0x7ffffff0; // should calibrate this
-	bool state;
+	int8_t state = 0;
 	register_interrupt_handler(interrupt_handlers, 0xf1, test_hello_world_handler);
-	state = enable_irqsave();
+	enable_irqsave(&state);
 	
 	cprintf("\nCORE 0 sending broadcast\n");
 	send_broadcast_ipi(0xf1);
@@ -67,7 +67,7 @@ void test_ipi_sending(void)
 		asm volatile("nop;");
 
 	cprintf("\nDone!\n");
-	disable_irqsave(state);
+	disable_irqsave(&state);
 }
 
 // Note this never returns and will muck with any other timer work
@@ -100,6 +100,102 @@ void test_barrier(void)
 	init_barrier_all(&test_cpu_array);
 	cprintf("Core 0 asking all cores to print ids, barrier, rinse, repeat\n");
 	smp_call_function_all(test_barrier_handler, 0);
+}
+
+void test_interrupts_irqsave(void)
+{
+	int8_t state = 0;
+	printd("Testing Nesting Enabling first, turning ints off:\n");
+	disable_irq();
+	printd("Interrupts are: %x\n", read_eflags() & FL_IF);
+	assert((read_eflags() & FL_IF) == 0);
+	printd("Enabling IRQSave\n");
+	enable_irqsave(&state);
+	printd("Interrupts are: %x\n", read_eflags() & FL_IF);
+	assert((read_eflags() & FL_IF) == 0x200);
+	printd("Enabling IRQSave Again\n");
+	enable_irqsave(&state);
+	printd("Interrupts are: %x\n", read_eflags() & FL_IF);
+	assert((read_eflags() & FL_IF) == 0x200);
+	printd("Disabling IRQSave Once\n");
+	disable_irqsave(&state);
+	printd("Interrupts are: %x\n", read_eflags() & FL_IF);
+	assert((read_eflags() & FL_IF) == 0x200);
+	printd("Disabling IRQSave Again\n");
+	disable_irqsave(&state);
+	printd("Interrupts are: %x\n", read_eflags() & FL_IF);
+	assert((read_eflags() & FL_IF) == 0);
+	printd("Done.  Should have been 0, 200, 200, 200, 0\n");	
+
+	printd("Testing Nesting Disabling first, turning ints on:\n");
+	state = 0;
+	enable_irq();
+	printd("Interrupts are: %x\n", read_eflags() & FL_IF);
+	assert((read_eflags() & FL_IF) == 0x200);
+	printd("Disabling IRQSave Once\n");
+	disable_irqsave(&state);
+	printd("Interrupts are: %x\n", read_eflags() & FL_IF);
+	assert((read_eflags() & FL_IF) == 0);
+	printd("Disabling IRQSave Again\n");
+	disable_irqsave(&state);
+	printd("Interrupts are: %x\n", read_eflags() & FL_IF);
+	assert((read_eflags() & FL_IF) == 0);
+	printd("Enabling IRQSave Once\n");
+	enable_irqsave(&state);
+	printd("Interrupts are: %x\n", read_eflags() & FL_IF);
+	assert((read_eflags() & FL_IF) == 0);
+	printd("Enabling IRQSave Again\n");
+	enable_irqsave(&state);
+	printd("Interrupts are: %x\n", read_eflags() & FL_IF);
+	assert((read_eflags() & FL_IF) == 0x200);
+	printd("Done.  Should have been 200, 0, 0, 0, 200 \n");	
+
+	state = 0;
+	disable_irq();
+	printd("Ints are off, enabling then disabling.\n");
+	enable_irqsave(&state);
+	printd("Interrupts are: %x\n", read_eflags() & FL_IF);
+	assert((read_eflags() & FL_IF) == 0x200);
+	disable_irqsave(&state);
+	printd("Interrupts are: %x\n", read_eflags() & FL_IF);
+	assert((read_eflags() & FL_IF) == 0);
+	printd("Done.  Should have been 200, 0\n");	
+
+	state = 0;
+	enable_irq();
+	printd("Ints are on, enabling then disabling.\n");
+	enable_irqsave(&state);
+	printd("Interrupts are: %x\n", read_eflags() & FL_IF);
+	assert((read_eflags() & FL_IF) == 0x200);
+	disable_irqsave(&state);
+	printd("Interrupts are: %x\n", read_eflags() & FL_IF);
+	assert((read_eflags() & FL_IF) == 0x200);
+	printd("Done.  Should have been 200, 200\n");	
+
+	state = 0;
+	disable_irq();
+	printd("Ints are off, disabling then enabling.\n");
+	disable_irqsave(&state);
+	printd("Interrupts are: %x\n", read_eflags() & FL_IF);
+	assert((read_eflags() & FL_IF) == 0);
+	enable_irqsave(&state);
+	printd("Interrupts are: %x\n", read_eflags() & FL_IF);
+	assert((read_eflags() & FL_IF) == 0);
+	printd("Done.  Should have been 0, 0\n");	
+
+	state = 0;
+	enable_irq();
+	printd("Ints are on, disabling then enabling.\n");
+	disable_irqsave(&state);
+	printd("Interrupts are: %x\n", read_eflags() & FL_IF);
+	assert((read_eflags() & FL_IF) == 0);
+	enable_irqsave(&state);
+	printd("Interrupts are: %x\n", read_eflags() & FL_IF);
+	assert((read_eflags() & FL_IF) == 0x200);
+	printd("Done.  Should have been 0, 200\n");	
+
+	disable_irq();
+	cprintf("Passed enable_irqsave tests\n");
 }
 
 /* Helper Functions */
@@ -145,4 +241,3 @@ void test_barrier_handler(struct Trapframe *tf)
 	// uncomment to see it fucked up
 	//cprintf("Round 4: Core %d\n", lapic_get_id());
 }
-

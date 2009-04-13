@@ -7,6 +7,14 @@
 #define NULL	((void *) 0)
 #endif /* !NULL */
 
+#ifdef DEBUG
+#define printd(args...) cprintf(args)
+#else
+#define printd(args...) {}
+#endif
+
+#define printk(args...) cprintf(args)
+
 // lib/stdio.c
 void	cputchar(int c);
 int	getchar(void);
