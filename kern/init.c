@@ -51,8 +51,8 @@ void kernel_init(multiboot_info_t *mboot_info)
 	// this returns when all other cores are done and ready to receive IPIs
 	smp_boot();
 
-	test_barrier();
 	panic("Don't Panic");
+	test_barrier();
 	test_print_info();
 	test_ipi_sending();
 
@@ -141,17 +141,22 @@ static void print_cpuinfo(void) {
 	// eventually can fill this out with SDM Vol3B App B info, or 
 	// better yet with stepping info.  or cpuid 8000_000{2,3,4}
 	switch ( family << 8 | model ) {
+		case(0x061a):
+			cprintf("Processor: Core i7\n");
+			break;
 		case(0x060f):
 			cprintf("Processor: Core 2 Duo or Similar\n");
 			break;
 		default:
 			cprintf("Unknown or non-Intel CPU\n");
 	}
-	if (!(edx & 0x00000010))
+	if (!(edx & 0x00000020))
 		panic("MSRs not supported!");
 	if (!(edx & 0x00001000))
 		panic("MTRRs not supported!");
-	if (!(edx & 0x00000100))
+	if (!(edx & 0x00002000))
+		panic("Global Pages not supported!");
+	if (!(edx & 0x00000200))
 		panic("Local APIC Not Detected!");
 	if (ecx & 0x00200000)
 		cprintf("x2APIC Detected\n");

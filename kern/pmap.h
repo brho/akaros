@@ -62,12 +62,23 @@ struct Page *page_lookup(pde_t *pgdir, void *va, pte_t **pte_store);
 void	page_decref(struct Page *pp);
 
 void	tlb_invalidate(pde_t *pgdir, void *va);
+void tlb_flush_global(void);
 
 void *COUNT(len)
 user_mem_check(struct Env *env, const void *DANGEROUS va, size_t len, int perm);
 
 void *COUNT(len)
 user_mem_assert(struct Env *env, const void *DANGEROUS va, size_t len, int perm);
+
+static inline void cache_flush(void)
+{
+	wbinvd();
+}
+
+static inline void cacheline_flush(void* addr)
+{
+	clflush((uintptr_t*)addr);
+}
 
 static inline ppn_t
 page2ppn(struct Page *pp)

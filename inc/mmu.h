@@ -68,8 +68,9 @@
 #define PTE_PCD		0x010	// Cache-Disable
 #define PTE_A		0x020	// Accessed
 #define PTE_D		0x040	// Dirty
-#define PTE_PS		0x080	// Page Size
-#define PTE_MBZ		0x180	// Bits must be zero
+#define PTE_PS		0x080	// Page Size (only applies to PDEs)
+#define PTE_PAT		0x080	// PAT (only applies to second layer PTEs)
+#define PTE_G		0x100	// Global Page
 
 // The PTE_AVAIL bits aren't used by the kernel or interpreted by the
 // hardware, so user processes are allowed to set them arbitrarily.
@@ -87,20 +88,31 @@
 #define CR0_EM		0x00000004	// Emulation
 #define CR0_TS		0x00000008	// Task Switched
 #define CR0_ET		0x00000010	// Extension Type
-#define CR0_NE		0x00000020	// Numeric Errror
+#define CR0_NE		0x00000020	// Numeric Error
 #define CR0_WP		0x00010000	// Write Protect
 #define CR0_AM		0x00040000	// Alignment Mask
-#define CR0_NW		0x20000000	// Not Writethrough
+#define CR0_NW		0x20000000	// Not Writethrough - more tricky than it sounds
 #define CR0_CD		0x40000000	// Cache Disable
 #define CR0_PG		0x80000000	// Paging
 
-#define CR4_PCE		0x00000100	// Performance counter enable
-#define CR4_MCE		0x00000040	// Machine Check Enable
-#define CR4_PSE		0x00000010	// Page Size Extensions
-#define CR4_DE		0x00000008	// Debugging Extensions
-#define CR4_TSD		0x00000004	// Time Stamp Disable
-#define CR4_PVI		0x00000002	// Protected-Mode Virtual Interrupts
+// These two relate to the cacheability (L1, etc) of the page directory
+#define CR3_PWT		0x00000008	// Page directory caching write through
+#define CR3_PCD		0x00000010	// Page directory caching disabled
+
 #define CR4_VME		0x00000001	// V86 Mode Extensions
+#define CR4_PVI		0x00000002	// Protected-Mode Virtual Interrupts
+#define CR4_TSD		0x00000004	// Time Stamp Disable
+#define CR4_DE		0x00000008	// Debugging Extensions
+#define CR4_PSE		0x00000010	// Page Size Extensions
+#define CR4_PAE		0x00000020	// Physical Address Extensions
+#define CR4_MCE		0x00000040	// Machine Check Enable
+#define CR4_PGE		0x00000080	// Global Pages Enabled
+#define CR4_PCE		0x00000100	// Performance counter enable
+#define CR4_OSFXSR	0x00000200	// OS support for FXSAVE/FXRSTOR
+#define CR4_OSXMME	0x00000400	// OS support for unmasked SIMD FP exceptions
+#define CR4_VMXE	0x00002000	// VMX enable
+#define CR4_SMXE	0x00004000	// SMX enable
+#define CR4_OSXSAVE	0x00040000	// XSAVE and processor extended states-enabled
 
 // Eflags register
 #define FL_CF		0x00000001	// Carry Flag

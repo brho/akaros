@@ -85,6 +85,9 @@
 // IOPHYSMEM can be addressed at KERNBASE + IOPHYSMEM.  The hole ends
 // at physical address EXTPHYSMEM.
 #define IOPHYSMEM	0x0A0000
+#define VGAPHYSMEM	0x0A0000
+#define DEVPHYSMEM	0x0C0000
+#define BIOSPHYSMEM	0x0F0000
 #define EXTPHYSMEM	0x100000
 
 // Virtual page table.  Entry PDX(VPT) in the PD contains a pointer to

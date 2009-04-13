@@ -7,6 +7,22 @@
 /* Model Specific Registers */
 #define IA32_APIC_BASE				0x1b
 #define IA32_MTRR_DEF_TYPE			0x2ff
+#define IA32_MTRR_PHYSBASE0			0x200
+#define IA32_MTRR_PHYSMASK0			0x201
+#define IA32_MTRR_PHYSBASE1			0x202
+#define IA32_MTRR_PHYSMASK1			0x203
+#define IA32_MTRR_PHYSBASE2			0x204
+#define IA32_MTRR_PHYSMASK2			0x205
+#define IA32_MTRR_PHYSBASE3			0x206
+#define IA32_MTRR_PHYSMASK3			0x207
+#define IA32_MTRR_PHYSBASE4			0x208
+#define IA32_MTRR_PHYSMASK4			0x209
+#define IA32_MTRR_PHYSBASE5			0x20a
+#define IA32_MTRR_PHYSMASK5			0x20b
+#define IA32_MTRR_PHYSBASE6			0x20c
+#define IA32_MTRR_PHYSMASK6			0x20d
+#define IA32_MTRR_PHYSBASE7			0x20e
+#define IA32_MTRR_PHYSMASK7			0x20f
 
 #define MSR_APIC_ENABLE				0x00000800
 #define MSR_APIC_BASE_ADDRESS		0x0000000FFFFFF000
@@ -57,6 +73,8 @@ static __inline void disable_irq(void) __attribute__((always_inline));
 static __inline bool enable_irqsave(void) __attribute__((always_inline));
 static __inline void disable_irqsave(bool state) __attribute__((always_inline));
 static __inline void cpu_relax(void) __attribute__((always_inline));
+static __inline void wbinvd(void) __attribute__((always_inline));
+static __inline void clflush(uintptr_t* addr) __attribute__((always_inline));
 
 static __inline void
 breakpoint(void)
@@ -363,5 +381,17 @@ static __inline void
 cpu_relax(void)
 {
 	asm volatile("pause");
+}
+
+static __inline void
+wbinvd(void) __attribute__((always_inline))
+{
+	asm volatile("wbinvd");
+}
+
+static __inline void
+clflush(uintptr_t* addr) __attribute__((always_inline))
+{
+	asm volatile("clflush %0" : : "m"(*addr));
 }
 #endif /* !JOS_INC_X86_H */

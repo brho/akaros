@@ -239,6 +239,56 @@ boot_map_segment(pde_t *pgdir, uintptr_t la, size_t size, physaddr_t pa, int per
 	}
 }
 
+// could consider having an API to allow these to dynamically change
+// MTRRs are for physical, static ranges.  PAT are linear, more granular, and 
+// more dynamic
+void setup_default_mtrrs(void)
+{
+	// disable interrupts
+	//uint32_t state = enable_irqsave();	
+	// barrier
+	// disable caching	cr0: set CD and clear NW
+	lcr0((rcr0() | CR0_CD) & ~CR0_NW);
+	// flush caches
+	cache_flush();
+	// flush tlb
+	tlb_flush_global();
+	// disable MTRRs, and sets default type to WB (06)
+	write_msr(IA32_MTRR_DEF_TYPE, 0x00000006);
+
+	// Now we can actually safely adjust the MTRRs
+	// MTRR for IO Holes (note these are 64 bit values we are writing)
+	// 0x000a0000 - 0x000c0000 : VGA - WC 0x01
+	write_msr(IA32_MTRR_PHYSBASE0, PTE_ADDR(VGAPHYSMEM) | 0x01);
+	write_msr(IA32_MTRR_PHYSMASK0, 0x0000000ffffe0800);
+	// 0x000c0000 - 0x00100000 : IO devices (and ROM BIOS) - UC 0x00
+	write_msr(IA32_MTRR_PHYSBASE1, PTE_ADDR(DEVPHYSMEM) | 0x00);
+	write_msr(IA32_MTRR_PHYSMASK1, 0x0000000ffffc0800);
+	// APIC/IOAPIC holes
+	/* Going to skip them, since we set their mode using PAT when we 
+	 * map them in 
+	 */
+	// make sure all other MTRR ranges are disabled (should be unnecessary)
+	write_msr(IA32_MTRR_PHYSMASK2, 0);
+	write_msr(IA32_MTRR_PHYSMASK3, 0);
+	write_msr(IA32_MTRR_PHYSMASK4, 0);
+	write_msr(IA32_MTRR_PHYSMASK5, 0);
+	write_msr(IA32_MTRR_PHYSMASK6, 0);
+	write_msr(IA32_MTRR_PHYSMASK7, 0);
+
+	// keeps default type to WB (06), turns MTRRs on, and turns off fixed ranges
+	write_msr(IA32_MTRR_DEF_TYPE, 0x00000806);
+	// reflush caches and TLB
+	cache_flush();
+	tlb_flush_global();
+	// turn on caching
+	lcr0(rcr0() & ~(CR0_CD | CR0_NW));
+	// barrier
+	// enable interrupts
+
+}
+
+
 // Set up a two-level page table:
 //    boot_pgdir is its linear (virtual) address of the root
 //    boot_cr3 is the physical adresss of the root
@@ -259,16 +309,12 @@ i386_vm_init(void)
 	size_t n;
 	bool pse;
 
-	// set up MTRRs
-	// default type is normally 06 (WB), but once we have regions
-	// set up, we can set it to 00 (UC)
-	//write_msr(IA32_MTRR_DEF_TYPE, 0x00000c00);
-	write_msr(IA32_MTRR_DEF_TYPE, 0x00000c06);
-	// might need to set up MTRRS for the IO holes
-
 	pse = enable_pse();
 	if (pse)
 		cprintf("PSE capability detected.\n");
+
+	// set up mtrr's for core0.  other cores will do the same later
+	setup_default_mtrrs();
 
 	/*
 	 * PSE status: 
@@ -338,9 +384,12 @@ i386_vm_init(void)
 	// but this only maps what is available, and saves memory.  every 4MB of
 	// mapped memory requires a 2nd level page: 2^10 entries, each covering 2^12
 	// need to modify tests below to account for this
-	if (pse)
-		boot_map_segment(pgdir, KERNBASE, maxpa, 0, PTE_W | PTE_PS);
-	else
+	if (pse) {
+		// map the first 4MB as regular entries, to support different MTRRs
+		boot_map_segment(pgdir, KERNBASE, JPGSIZE, 0, PTE_W);
+		boot_map_segment(pgdir, KERNBASE + JPGSIZE, maxpa - JPGSIZE, JPGSIZE,
+		                 PTE_W | PTE_PS);
+	} else
 		boot_map_segment(pgdir, KERNBASE, maxpa, 0, PTE_W );
 
 	// APIC mapping, in lieu of MTRRs for now.  TODO: remove when MTRRs are up
@@ -840,12 +889,26 @@ page_remove(pde_t *pgdir, void *va)
 // Invalidate a TLB entry, but only if the page tables being
 // edited are the ones currently in use by the processor.
 //
+// Need to sort this for cross core lovin'  TODO
 void
 tlb_invalidate(pde_t *pgdir, void *va)
 {
 	// Flush the entry only if we're modifying the current address space.
 	// For now, there is only one address space, so always invalidate.
 	invlpg(va);
+}
+
+/* Flushes a TLB, including global pages.  We should always have the CR4_PGE
+ * flag set, but just in case, we'll check.  Toggling this bit flushes the TLB.
+ */
+void tlb_flush_global(void)
+{
+	uint32_t cr4 = rcr4();
+	if (cr4 & CR4_PGE) {
+		lcr4(cr4 & ~CR4_PGE);
+		lcr4(cr4);
+	} else 
+		lcr3(rcr3());
 }
 
 static void *DANGEROUS user_mem_check_addr;
