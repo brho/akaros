@@ -1,4 +1,5 @@
 *.swp
 bochs.log
+.bochsrc
 mnt/
 obj/

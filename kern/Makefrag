@@ -89,14 +89,16 @@ $(OBJDIR)/kern/bochs.img: $(OBJDIR)/kern/kernel $(OBJDIR)/boot/boot
 	$(V)dd if=$(OBJDIR)/boot/boot of=$(OBJDIR)/kern/bochs.img~ conv=notrunc 2>/dev/null
 	$(V)dd if=$(OBJDIR)/kern/kernel of=$(OBJDIR)/kern/bochs.img~ seek=1 conv=notrunc 2>/dev/null
 	$(V)mv $(OBJDIR)/kern/bochs.img~ $(OBJDIR)/kern/bochs.img
-# brho uses these
-#	$(V)cp $(OBJDIR)/kern/kernel mnt/hdd/texas
-#	$(V)sync
 
 all: $(OBJDIR)/kern/bochs.img
 
-usb: all 
-	$(V)echo "Copying to /dev/sdb4"
+kvm: $(OBJDIR)/kern/kernel
+	$(V)echo "+ (KVM) Copying to mnt/hdd"
+	$(V)cp $(OBJDIR)/kern/kernel mnt/hdd/texas
+	$(V)sync
+
+usb: $(OBJDIR)/kern/kernel
+	$(V)echo "+ (USB) Copying to /dev/sdb4"
 	$(V)mount /dev/sdb4
 	$(V)cp $(OBJDIR)/kern/kernel /mnt/pornstick/texas
 	$(V)sync
