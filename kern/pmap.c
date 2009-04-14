@@ -13,6 +13,7 @@
 #include <kern/kclock.h>
 #include <kern/env.h>
 #include <kern/apic.h>
+#include <kern/atomic.h>
 
 // These variables are set by i386_detect_memory()
 static physaddr_t maxpa;	// Maximum physical address
@@ -242,11 +243,16 @@ boot_map_segment(pde_t *pgdir, uintptr_t la, size_t size, physaddr_t pa, int per
 // could consider having an API to allow these to dynamically change
 // MTRRs are for physical, static ranges.  PAT are linear, more granular, and 
 // more dynamic
-void setup_default_mtrrs(void)
+void setup_default_mtrrs(barrier_t* smp_barrier)
 {
 	// disable interrupts
-	//uint32_t state = enable_irqsave();	
-	// barrier
+	int8_t state = 0;
+	disable_irqsave(&state);
+	// barrier - if we're meant to do this for all cores, we'll be 
+	// passed a pointer to an initialized barrier
+	if (smp_barrier)
+		barrier_all(smp_barrier);
+	
 	// disable caching	cr0: set CD and clear NW
 	lcr0((rcr0() | CR0_CD) & ~CR0_NW);
 	// flush caches
@@ -260,6 +266,7 @@ void setup_default_mtrrs(void)
 	// MTRR for IO Holes (note these are 64 bit values we are writing)
 	// 0x000a0000 - 0x000c0000 : VGA - WC 0x01
 	write_msr(IA32_MTRR_PHYSBASE0, PTE_ADDR(VGAPHYSMEM) | 0x01);
+	// if we need to have a full 64bit val, use the UINT64 macro
 	write_msr(IA32_MTRR_PHYSMASK0, 0x0000000ffffe0800);
 	// 0x000c0000 - 0x00100000 : IO devices (and ROM BIOS) - UC 0x00
 	write_msr(IA32_MTRR_PHYSBASE1, PTE_ADDR(DEVPHYSMEM) | 0x00);
@@ -284,8 +291,10 @@ void setup_default_mtrrs(void)
 	// turn on caching
 	lcr0(rcr0() & ~(CR0_CD | CR0_NW));
 	// barrier
+	if (smp_barrier)
+		barrier_all(smp_barrier);
 	// enable interrupts
-
+	enable_irqsave(&state);
 }
 
 
@@ -314,7 +323,7 @@ i386_vm_init(void)
 		cprintf("PSE capability detected.\n");
 
 	// set up mtrr's for core0.  other cores will do the same later
-	setup_default_mtrrs();
+	setup_default_mtrrs(0);
 
 	/*
 	 * PSE status: 

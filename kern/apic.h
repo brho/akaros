@@ -137,7 +137,7 @@ static inline void lapic_disable(void)
 static inline void lapic_wait_to_send(void)
 {
 	while(read_mmreg32(LAPIC_IPI_ICR_LOWER) & 0x1000)
-		asm volatile("pause");
+		cpu_relax();
 }
 
 static inline void lapic_enable(void)

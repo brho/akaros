@@ -214,14 +214,22 @@ void test_print_info_handler(struct Trapframe *tf)
 	cprintf("----------------------------\n");
 	cprintf("This is Core %d\n", lapic_get_id());
 	cprintf("MTRR_DEF_TYPE = 0x%08x\n", read_msr(IA32_MTRR_DEF_TYPE));
-	cprintf("MTRR Phys0 Base = 0x%08x, Mask = 0x%08x\n", read_msr(0x200), read_msr(0x201));
-	cprintf("MTRR Phys1 Base = 0x%08x, Mask = 0x%08x\n", read_msr(0x202), read_msr(0x203));
-	cprintf("MTRR Phys2 Base = 0x%08x, Mask = 0x%08x\n", read_msr(0x204), read_msr(0x205));
-	cprintf("MTRR Phys3 Base = 0x%08x, Mask = 0x%08x\n", read_msr(0x206), read_msr(0x207));
-	cprintf("MTRR Phys4 Base = 0x%08x, Mask = 0x%08x\n", read_msr(0x208), read_msr(0x209));
-	cprintf("MTRR Phys5 Base = 0x%08x, Mask = 0x%08x\n", read_msr(0x20a), read_msr(0x20b));
-	cprintf("MTRR Phys6 Base = 0x%08x, Mask = 0x%08x\n", read_msr(0x20c), read_msr(0x20d));
-	cprintf("MTRR Phys7 Base = 0x%08x, Mask = 0x%08x\n", read_msr(0x20e), read_msr(0x20f));
+	cprintf("MTRR Phys0 Base = 0x%016llx, Mask = 0x%016llx\n",
+	        read_msr(0x200), read_msr(0x201));
+	cprintf("MTRR Phys1 Base = 0x%016llx, Mask = 0x%016llx\n",
+	        read_msr(0x202), read_msr(0x203));
+	cprintf("MTRR Phys2 Base = 0x%016llx, Mask = 0x%016llx\n",
+	        read_msr(0x204), read_msr(0x205));
+	cprintf("MTRR Phys3 Base = 0x%016llx, Mask = 0x%016llx\n",
+	        read_msr(0x206), read_msr(0x207));
+	cprintf("MTRR Phys4 Base = 0x%016llx, Mask = 0x%016llx\n",
+	        read_msr(0x208), read_msr(0x209));
+	cprintf("MTRR Phys5 Base = 0x%016llx, Mask = 0x%016llx\n",
+	        read_msr(0x20a), read_msr(0x20b));
+	cprintf("MTRR Phys6 Base = 0x%016llx, Mask = 0x%016llx\n",
+	        read_msr(0x20c), read_msr(0x20d));
+	cprintf("MTRR Phys7 Base = 0x%016llx, Mask = 0x%016llx\n",
+	        read_msr(0x20e), read_msr(0x20f));
 	cprintf("----------------------------\n");
 	spin_unlock_irqsave(&print_info_lock);
 }

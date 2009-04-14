@@ -83,8 +83,8 @@ here:
 	lock decw	smp_semaphore - smp_entry + 0x1000  # show we are done
 
 	sti						# turn on interrupts, and wait for an IPI
-	hlt						# hlts, else will just spin.
 spinwait:
+	hlt						# hlts, else will just spin.
 	jmp		spinwait
 
 	# Below here is just data, stored with the code text

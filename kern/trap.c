@@ -115,11 +115,12 @@ idt_init(void)
 
 	// This will go away when we start using the IOAPIC properly
 	pic_remap();
-	lapic_enable();
 	// set LINT0 to receive ExtINTs (KVM's default).  At reset they are 0x1000.
 	write_mmreg32(LAPIC_LVT_LINT0, 0x700); 
 	// mask it to shut it up for now
 	mask_lapic_lvt(LAPIC_LVT_LINT0);
+	// and turn it on
+	lapic_enable();
 }
 
 void
@@ -222,6 +223,10 @@ void
 void
 (IN_HANDLER irq_handler)(struct Trapframe *tf)
 {
+	//if (lapic_get_id())
+	//	cprintf("Incoming IRQ, ISR: %d on core %d\n", tf->tf_trapno, lapic_get_id());
+	// merge this with alltraps?  other than the EOI... or do the same in all traps
+
 	// determine the interrupt handler table to use.  for now, pick the global
 	isr_t* handler_table = interrupt_handlers;
 

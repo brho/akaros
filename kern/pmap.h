@@ -8,6 +8,9 @@
 
 #include <inc/memlayout.h>
 #include <inc/assert.h>
+
+#include <kern/atomic.h>
+
 struct Env;
 
 
@@ -61,6 +64,7 @@ void	page_remove(pde_t *pgdir, void *va);
 struct Page *page_lookup(pde_t *pgdir, void *va, pte_t **pte_store);
 void	page_decref(struct Page *pp);
 
+void setup_default_mtrrs(barrier_t* smp_barrier);
 void	tlb_invalidate(pde_t *pgdir, void *va);
 void tlb_flush_global(void);
 

@@ -17,12 +17,17 @@
 volatile uint32_t waiting = 1;
 volatile uint8_t num_cpus = 0xee;
 uintptr_t smp_stack_top;
+barrier_t generic_barrier;
 
 /* Breaks us out of the waiting loop in smp_boot */
 static void smp_boot_handler(struct Trapframe *tf)
 {
-	extern volatile uint32_t waiting;
 	{HANDLER_ATOMIC atomic_dec(&waiting); }
+}
+
+static void smp_mtrr_handler(struct Trapframe *tf)
+{
+	setup_default_mtrrs(&generic_barrier);
 }
 
 void smp_boot(void)
@@ -101,6 +106,10 @@ void smp_boot(void)
 	// Dealloc the temp shared stack
 	page_decref(smp_stack);
 
+	// Set up all cores to use the proper MTRRs
+	init_barrier_all(&generic_barrier); // barrier used by smp_mtrr_handler
+	smp_call_function_all(smp_mtrr_handler, 0);
+
 	// Should probably flush everyone's TLB at this point, to get rid of 
 	// temp mappings that were removed.  TODO
 }
@@ -165,12 +174,13 @@ uint32_t smp_main(void)
 	asm volatile("lidt idt_pd");
 
 	// APIC setup
-	lapic_enable();
 	// set LINT0 to receive ExtINTs (KVM's default).  At reset they are 0x1000.
 	write_mmreg32(LAPIC_LVT_LINT0, 0x700); 
 	// mask it to shut it up for now.  Doesn't seem to matter yet, since both
 	// KVM and Bochs seem to only route the PIC to core0.
 	mask_lapic_lvt(LAPIC_LVT_LINT0);
+	// and then turn it on
+	lapic_enable();
 
 	// set a default logical id for now
 	lapic_set_logid(lapic_get_id());
@@ -210,7 +220,7 @@ static void smp_call_function(uint8_t type, uint8_t dest, isr_t handler, uint8_t
 			send_ipi(dest, 1, vector);
 			break;
 		default:
-			//panic("Invalid type for cross-core function call!");
+			panic("Invalid type for cross-core function call!");
 	}
 	// wait some arbitrary amount til we think all the cores could be done.
 	// very wonky without an idea of how long the function takes.
@@ -218,11 +228,16 @@ static void smp_call_function(uint8_t type, uint8_t dest, isr_t handler, uint8_t
 	for (i = 0; i < amount; i++)
 		asm volatile("nop;");
 	disable_irqsave(&state);
+	// TODO
 	// consider doing this, but we can't remove it before the receiver is done
 	//register_interrupt_handler(interrupt_handlers, vector, 0);
 	// we also will have issues if we call this function again too quickly
 }
 
+// I'd rather have these functions take an arbitrary function and arguments...
+// Right now, I build a handler that just calls whatever I want, which is
+// another layer of indirection.  Might like some ability to specify if
+// we want to wait or not.
 void smp_call_function_self(isr_t handler, uint8_t vector)
 {
 	smp_call_function(1, 0, handler, vector);
