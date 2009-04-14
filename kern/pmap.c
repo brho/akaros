@@ -199,7 +199,7 @@ boot_pgdir_walk(pde_t *pgdir, uintptr_t la, int create)
 	}
 	new_table = boot_alloc(PGSIZE, PGSIZE);
 	memset(new_table, 0, PGSIZE);
-	*the_pde = (pde_t)PADDR(new_table) | PTE_P | PTE_W | PTE_U;
+	*the_pde = (pde_t)PADDR(new_table) | PTE_P | PTE_W | PTE_U | PTE_G;
 	return &((pde_t*)KADDR(PTE_ADDR(*the_pde)))[PTX(la)];
 }
 
@@ -230,12 +230,12 @@ boot_map_segment(pde_t *pgdir, uintptr_t la, size_t size, physaddr_t pa, int per
 		// need to index with i instead of la + size, in case of wrap-around
 		for (i = 0; i < size; i += JPGSIZE, la += JPGSIZE, pa += JPGSIZE) {
 			pte = boot_pgdir_walk(pgdir, la, 2);
-			*pte = PTE_ADDR(pa) | PTE_P | perm;
+			*pte = PTE_ADDR(pa) | PTE_P | PTE_G | perm;
 		}
 	} else {
 		for (i = 0; i < size; i += PGSIZE, la += PGSIZE, pa += PGSIZE) {
 			pte = boot_pgdir_walk(pgdir, la, 1);
-			*pte = PTE_ADDR(pa) | PTE_P | perm;
+			*pte = PTE_ADDR(pa) | PTE_P | PTE_G | perm;
 		}
 	}
 }
@@ -322,6 +322,11 @@ i386_vm_init(void)
 	if (pse)
 		cprintf("PSE capability detected.\n");
 
+	// we paniced earlier if we don't support PGE.  turn it on now.
+	// it's used in boot_map_segment, which covers all of the mappings that are
+	// the same for all address spaces.  and also for the VPT mapping below.
+	lcr4(rcr4() | CR4_PGE);
+
 	// set up mtrr's for core0.  other cores will do the same later
 	setup_default_mtrrs(0);
 
@@ -356,12 +361,12 @@ i386_vm_init(void)
 	// following two lines.  Unless you are eagle-eyed, in which case you
 	// should already know.)
 
-	// Permissions: kernel RW, user NONE
-	pgdir[PDX(VPT)] = PADDR(pgdir)|PTE_W|PTE_P;
+	// Permissions: kernel RW, user NONE, Global Page
+	pgdir[PDX(VPT)] = PADDR(pgdir) | PTE_W | PTE_P | PTE_G;
 
 	// same for UVPT
-	// Permissions: kernel R, user R 
-	pgdir[PDX(UVPT)] = PADDR(pgdir)|PTE_U|PTE_P;
+	// Permissions: kernel R, user R, Global Page
+	pgdir[PDX(UVPT)] = PADDR(pgdir) | PTE_U | PTE_P | PTE_G;
 
 	//////////////////////////////////////////////////////////////////////
 	// Map the kernel stack (symbol name "bootstack").  The complete VA

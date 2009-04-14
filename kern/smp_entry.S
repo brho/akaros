@@ -54,6 +54,10 @@ protcseg:	.code32
 	orl		$CR4_PSE, %eax
 	movl	%eax, %cr4
 past_pse:
+	# Turn on PGE, no matter what.  Ghetto, but we panic if it's not supported.
+	movl	%cr4, %eax
+	orl		$CR4_PGE, %eax
+	movl	%eax, %cr4
 	movl	%cr0, %eax	
 	# These cr0 flags are the same as in pmap.c.  Keep them in sync
 	orl		$(CR0_PE|CR0_PG|CR0_AM|CR0_WP|CR0_NE|CR0_MP), %eax  
