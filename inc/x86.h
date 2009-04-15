@@ -4,6 +4,8 @@
 #include <inc/types.h>
 #include <inc/mmu.h>
 
+#define CHECK_FLAG(flags,bit)   ((flags) & (1 << (bit)))
+
 /* Model Specific Registers */
 #define IA32_APIC_BASE				0x1b
 #define IA32_MTRR_DEF_TYPE			0x2ff

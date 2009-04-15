@@ -8,7 +8,7 @@
 
 #include <inc/memlayout.h>
 #include <inc/assert.h>
-
+#include <inc/multiboot.h>
 #include <kern/atomic.h>
 
 struct Env;
@@ -51,7 +51,8 @@ extern pde_t *boot_pgdir;
 extern struct Segdesc (COUNT(SEG_COUNT) gdt)[];
 extern struct Pseudodesc gdt_pd;
 
-void	i386_detect_memory(void);
+void	i386_detect_memory(multiboot_info_t *mbi);
+void	i386_print_memory_map(multiboot_info_t *mbi);
 bool	enable_pse(void);
 void	i386_vm_init(void);
 

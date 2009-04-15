@@ -63,7 +63,7 @@ void smp_boot(void)
 	// first SIPI
 	waiting = 1;
 	send_startup_ipi(0x01);
-	lapic_set_timer(0x002fffff, 0xf0, 0); // TODO - fix timing
+	lapic_set_timer(SMP_BOOT_TIMEOUT, 0xf0, 0); // TODO - fix timing
 	while(waiting) // wait for the first SIPI to take effect
 		cpu_relax();
 	/* //BOCHS does not like this second SIPI.
@@ -194,7 +194,7 @@ uint32_t smp_main(void)
 static void smp_call_function(uint8_t type, uint8_t dest, isr_t handler, uint8_t vector)
 {
 	extern isr_t interrupt_handlers[];
-	uint32_t i, amount = 0x7ffffff0; // should calibrate this!!  just remove it!
+	uint32_t i, amount = SMP_CALL_FUNCTION_TIMEOUT; // should calibrate this!!  just remove it!
 	int8_t state = 0;
 
 	if (!vector)

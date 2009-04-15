@@ -17,7 +17,7 @@
 void test_ipi_sending(void)
 {
 	extern isr_t interrupt_handlers[];
-	uint32_t i, amount = 0x7ffffff0; // should calibrate this
+	uint32_t i, amount = SMP_CALL_FUNCTION_TIMEOUT; // should calibrate this
 	int8_t state = 0;
 	register_interrupt_handler(interrupt_handlers, 0xf1, test_hello_world_handler);
 	enable_irqsave(&state);

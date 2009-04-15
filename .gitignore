@@ -3,3 +3,4 @@ bochs.log
 .bochsrc
 mnt/
 obj/
+*.*~

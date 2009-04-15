@@ -40,7 +40,8 @@ void kernel_init(multiboot_info_t *mboot_info)
 
 	print_cpuinfo();
 
-	i386_detect_memory();
+	i386_detect_memory((multiboot_info_t*)((uint32_t)mboot_info + KERNBASE));
+	i386_print_memory_map((multiboot_info_t*)((uint32_t)mboot_info + KERNBASE));
 	i386_vm_init();
 	page_init();
 	page_check();

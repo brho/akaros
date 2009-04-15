@@ -68,17 +68,33 @@ nvram_read(int r)
 	return mc146818_read(r) | (mc146818_read(r + 1) << 8);
 }
 
-void
-i386_detect_memory(void)
-{
-	/* For shit BIOS reasons, this isn't seeing any more than 64MB,
-	 * explained a little here: 
-	 * http://exec.h1.ru/docs/os-devel-faq/os-faq-memory.html
-	 */
+void i386_print_memory_map(multiboot_info_t *mbi) {
+	const char* memory_type[] = {"", "FREE", "RESERVED", "UNDEFINED"};
 
-	// CMOS tells us how many kilobytes there are
-	basemem = ROUNDDOWN(nvram_read(NVRAM_BASELO)*1024, PGSIZE);
-	extmem = ROUNDDOWN(nvram_read(NVRAM_EXTLO)*1024, PGSIZE);
+
+	if(CHECK_FLAG(mbi->flags, 6)) {
+		cprintf ("mmap_addr = 0x%x, mmap_length = 0x%x\n", (unsigned long)mbi->mmap_addr,
+		                                                   (unsigned long)mbi->mmap_length);
+		
+		memory_map_t* mmap = (memory_map_t*) ((uint32_t)mbi->mmap_addr + KERNBASE);
+		while((uint32_t)mmap < ((uint32_t)mbi->mmap_addr + KERNBASE) + mbi->mmap_length) {			
+			cprintf (" size = 0x%x, base_addr = 0x%08x%08x," " length = 0x%08x%08x, type = %s\n",
+			        (unsigned) mmap->size,
+			        (unsigned) mmap->base_addr_high,
+			        (unsigned) mmap->base_addr_low,
+			        (unsigned) mmap->length_high,
+			        (unsigned) mmap->length_low,
+			        (unsigned) memory_type[mmap->type]);
+			mmap = (memory_map_t*) ((uint32_t) mmap + mmap->size + sizeof (mmap->size));
+		}
+	}
+}
+
+void i386_detect_memory(multiboot_info_t *mbi)
+{
+	// Tells us how many kilobytes there are
+	basemem = ROUNDDOWN(mbi->mem_lower*1024, PGSIZE);
+	extmem = ROUNDDOWN(mbi->mem_upper*1024, PGSIZE);
 
 	// Calculate the maximum physical address based on whether
 	// or not there is any extended memory.  See comment in <inc/memlayout.h>
