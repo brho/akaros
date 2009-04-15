@@ -6,6 +6,7 @@
 #include <inc/x86.h>
 #include <inc/stdio.h>
 #include <inc/assert.h>
+#include <inc/string.h>
 
 #include <kern/testing.h>
 #include <kern/trap.h>
@@ -196,6 +197,36 @@ void test_interrupts_irqsave(void)
 
 	disable_irq();
 	cprintf("Passed enable_irqsave tests\n");
+}
+
+void test_bitmasks(void)
+{
+#define print_mask() { \
+	for (int i = 0; i < BYTES_FOR_BITMASK(258); i++) \
+		for (int j = 0; j < 8; j++) \
+			printk("%x", (mask[i] >> j) & 1); \
+	printk("\n"); \
+} 
+
+	DECL_BITMASK(mask, 258);
+	printk("size of mask %d\n", sizeof(mask));
+	CLR_BITMASK(mask, 258);
+	print_mask();
+	printk("cleared\n");
+	SET_BITMASK_BIT(mask, 0);
+	SET_BITMASK_BIT(mask, 11);
+	SET_BITMASK_BIT(mask, 17);
+	SET_BITMASK_BIT(mask, 257);
+	printk("bits set\n");
+	print_mask();
+	CLR_BITMASK_BIT(mask, 11);
+	printk("11 cleared\n");
+	print_mask();
+	printk("bit 17 is %d (should be 1)\n", GET_BITMASK_BIT(mask, 17));
+	printk("bit 11 is %d (should be 0)\n", GET_BITMASK_BIT(mask, 11));
+	CLR_BITMASK(mask, 258);
+	print_mask();
+	printk("should be cleared\n");
 }
 
 /* Helper Functions */

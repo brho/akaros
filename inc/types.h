@@ -73,4 +73,22 @@ typedef int32_t off_t;
 // a uint64_t programatically
 #define UINT64(upper, lower) ( (((uint64_t)(upper)) << 32) | (lower) )
 
+#define BYTES_FOR_BITMASK(size) ((size) ? ((size) - 1) / 8 + 1 : 0)
+
+//#define DECL_BITMASK(name, size) (uint8_t COUNT(BYTES_FOR_BITMASK((size)))
+#define DECL_BITMASK(name, size) uint8_t \
+	(name)[BYTES_FOR_BITMASK((size))]
+
+#define CLR_BITMASK(name, size) (memset((name), 0, BYTES_FOR_BITMASK((size))))
+
+#define GET_BITMASK_BIT(name, bit) (((name)[(bit)/8] & (1 << ((bit) % 8))) ?1:0)
+
+#define SET_BITMASK_BIT(name, bit) ((name)[(bit)/8] |= (1 << ((bit) % 8)))
+
+#define CLR_BITMASK_BIT(name, bit) ((name)[(bit)/8] &= ~(1 << ((bit) % 8)))
+
+
+
+
+
 #endif /* !JOS_INC_TYPES_H */
