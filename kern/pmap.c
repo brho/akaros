@@ -17,7 +17,9 @@
 
 // These variables are set by i386_detect_memory()
 static physaddr_t maxpa;	// Maximum physical address
+static physaddr_t maxaddrpa;	// Maximum directly addressable physical address
 size_t npage;			// Amount of physical memory (in pages)
+size_t naddrpage;			// Amount of addressable physical memory (in pages)
 static size_t basemem;		// Amount of base memory (in bytes)
 static size_t extmem;		// Amount of extended memory (in bytes)
 
@@ -69,7 +71,7 @@ nvram_read(int r)
 }
 
 void i386_print_memory_map(multiboot_info_t *mbi) {
-	const char* memory_type[] = {"", "FREE", "RESERVED", "UNDEFINED"};
+	const char* memory_type[] = {"", "FREE", "RESERVED", "UNDEFINED", "UNDEFINED4"};
 
 
 	if(CHECK_FLAG(mbi->flags, 6)) {
@@ -78,8 +80,7 @@ void i386_print_memory_map(multiboot_info_t *mbi) {
 		
 		memory_map_t* mmap = (memory_map_t*) ((uint32_t)mbi->mmap_addr + KERNBASE);
 		while((uint32_t)mmap < ((uint32_t)mbi->mmap_addr + KERNBASE) + mbi->mmap_length) {			
-			cprintf (" size = 0x%x, base_addr = 0x%08x%08x," " length = 0x%08x%08x, type = %s\n",
-			        (unsigned) mmap->size,
+			cprintf ("base = 0x%08x%08x, length = 0x%08x%08x, type = %s\n",
 			        (unsigned) mmap->base_addr_high,
 			        (unsigned) mmap->base_addr_low,
 			        (unsigned) mmap->length_high,
@@ -104,9 +105,14 @@ void i386_detect_memory(multiboot_info_t *mbi)
 		maxpa = basemem;
 
 	npage = maxpa / PGSIZE;
+	// IOAPIC - KERNBASE is the max amount of virtual addresses we can use
+	// for the physical memory mapping (aka - the KERNBASE mapping)
+	maxaddrpa = MIN(maxpa, IOAPIC_BASE - KERNBASE);
+	naddrpage = maxaddrpa / PGSIZE;
 
 	cprintf("Physical memory: %dK available, ", (int)(maxpa/1024));
 	cprintf("base = %dK, extended = %dK\n", (int)(basemem/1024), (int)(extmem/1024));
+	printk("Maximum directly addressable physical memory: %dK\n", (int)(maxaddrpa/1024));
 }
 
 bool enable_pse(void)
@@ -157,7 +163,7 @@ boot_alloc(uint32_t n, uint32_t align)
 	//	Step 2: save current value of boot_freemem as allocated chunk
 	v = boot_freemem;
 	//  Step 2.5: check if we can alloc
-	if (PADDR(boot_freemem + n) > maxpa)
+	if (PADDR(boot_freemem + n) > maxaddrpa)
 		panic("Out of memory in boot alloc, you fool!\n");
 	//	Step 3: increase boot_freemem to record allocation
 	boot_freemem += n;	
@@ -246,12 +252,16 @@ boot_map_segment(pde_t *pgdir, uintptr_t la, size_t size, physaddr_t pa, int per
 		// need to index with i instead of la + size, in case of wrap-around
 		for (i = 0; i < size; i += JPGSIZE, la += JPGSIZE, pa += JPGSIZE) {
 			pte = boot_pgdir_walk(pgdir, la, 2);
-			*pte = PTE_ADDR(pa) | PTE_P | PTE_G | perm;
+			*pte = PTE_ADDR(pa) | PTE_P | perm;
 		}
 	} else {
 		for (i = 0; i < size; i += PGSIZE, la += PGSIZE, pa += PGSIZE) {
 			pte = boot_pgdir_walk(pgdir, la, 1);
-			*pte = PTE_ADDR(pa) | PTE_P | PTE_G | perm;
+			if (*pte & PTE_PS)
+				// if we start using the extra flag for PAT, which we aren't,
+				// this will warn, since PTE_PS and PTE_PAT are the same....
+				warn("Possibly attempting to map a regular page into a Jumbo PDE");
+			*pte = PTE_ADDR(pa) | PTE_P | perm;
 		}
 	}
 }
@@ -349,7 +359,7 @@ i386_vm_init(void)
 	/*
 	 * PSE status: 
 	 * - can walk and set up boot_map_segments with jumbos but can't
-	 *   insert yet.  
+	 *   insert yet.  need to look at the page_dir and friends.
 	 * - anything related to a single struct Page still can't handle 
 	 *   jumbos.  will need to think about and adjust Page functions
 	 * - do we want to store info like this in the struct Page?  or just check
@@ -361,6 +371,11 @@ i386_vm_init(void)
 	 *   break a lot of things
 	 * - showmapping and friends work on a 4KB granularity, but map to the
 	 *   correct entries
+	 * - need to not insert / boot_map a single page into an area that is 
+	 *   already holding a jumbo page.  will need to break the jumbo up so that
+	 *   we can then insert the lone page.  currently warns.
+	 * - some inherent issues with the pgdir_walks returning a PTE, and we
+	 *   don't know whether it is a jumbo (PDE) or a regular PTE.
 	 */
 
 	//////////////////////////////////////////////////////////////////////
@@ -369,6 +384,8 @@ i386_vm_init(void)
 	memset(pgdir, 0, PGSIZE);
 	boot_pgdir = pgdir;
 	boot_cr3 = PADDR(pgdir);
+	// helpful if you want to manually walk with kvm / bochs
+	//printk("pgdir va = %08p, pgdir pa = %08p\n\n", pgdir, PADDR(pgdir));
 
 	//////////////////////////////////////////////////////////////////////
 	// Recursively insert PD in itself as a page table, to form
@@ -397,7 +414,7 @@ i386_vm_init(void)
 	// bootstack and bootstacktop point to symbols in the data section, which 
 	// at this point are like 0xc010b000.  KSTACKTOP is the desired loc in VM
 	boot_map_segment(pgdir, (uintptr_t)KSTACKTOP - KSTKSIZE, 
-	                 KSTKSIZE, PADDR(bootstack), PTE_W);
+	                 KSTKSIZE, PADDR(bootstack), PTE_W | PTE_G);
 
 	//////////////////////////////////////////////////////////////////////
 	// Map all of physical memory at KERNBASE. 
@@ -416,19 +433,19 @@ i386_vm_init(void)
 	// need to modify tests below to account for this
 	if (pse) {
 		// map the first 4MB as regular entries, to support different MTRRs
-		boot_map_segment(pgdir, KERNBASE, JPGSIZE, 0, PTE_W);
-		boot_map_segment(pgdir, KERNBASE + JPGSIZE, maxpa - JPGSIZE, JPGSIZE,
-		                 PTE_W | PTE_PS);
+		boot_map_segment(pgdir, KERNBASE, JPGSIZE, 0, PTE_W | PTE_G);
+		boot_map_segment(pgdir, KERNBASE + JPGSIZE, maxaddrpa - JPGSIZE, JPGSIZE,
+		                 PTE_W | PTE_G | PTE_PS);
 	} else
-		boot_map_segment(pgdir, KERNBASE, maxpa, 0, PTE_W );
+		boot_map_segment(pgdir, KERNBASE, maxaddrpa, 0, PTE_W | PTE_G);
 
-	// APIC mapping, in lieu of MTRRs for now.  TODO: remove when MTRRs are up
+	// APIC mapping: using PAT (but not *the* PAT flag) to make these type UC
 	// IOAPIC
 	boot_map_segment(pgdir, (uintptr_t)IOAPIC_BASE, PGSIZE, IOAPIC_BASE, 
-	                 PTE_PCD | PTE_PWT | PTE_W);
+	                 PTE_PCD | PTE_PWT | PTE_W | PTE_G);
 	// Local APIC
 	boot_map_segment(pgdir, (uintptr_t)LAPIC_BASE, PGSIZE, LAPIC_BASE,
-	                 PTE_PCD | PTE_PWT | PTE_W);
+	                 PTE_PCD | PTE_PWT | PTE_W | PTE_G);
 
 	//////////////////////////////////////////////////////////////////////
 	// Make 'pages' point to an array of size 'npage' of 'struct Page'.
@@ -451,7 +468,7 @@ i386_vm_init(void)
 		warn("page_array_size bigger than PTSIZE, userland will not see all pages");
 		page_array_size = PTSIZE;
 	}
-	boot_map_segment(pgdir, UPAGES, page_array_size, PADDR(pages), PTE_U);
+	boot_map_segment(pgdir, UPAGES, page_array_size, PADDR(pages), PTE_U | PTE_G);
 
 	//////////////////////////////////////////////////////////////////////
 	// Make 'envs' point to an array of size 'NENV' of 'struct Env'.
@@ -469,7 +486,7 @@ i386_vm_init(void)
 		warn("env_array_size bigger than PTSIZE, userland will not see all environments");
 		env_array_size = PTSIZE;
 	}
-	boot_map_segment(pgdir, UENVS, env_array_size, PADDR(envs), PTE_U);
+	boot_map_segment(pgdir, UENVS, env_array_size, PADDR(envs), PTE_U | PTE_G);
 
 	// Check that the initial page directory has been set up correctly.
 	check_boot_pgdir(pse);
@@ -552,7 +569,7 @@ check_boot_pgdir(bool pse)
 	pgdir = boot_pgdir;
 
 	// check pages array
-	n = ROUNDUP(npage*sizeof(struct Page), PGSIZE);
+	n = ROUNDUP(naddrpage*sizeof(struct Page), PGSIZE);
 	for (i = 0; i < n; i += PGSIZE)
 		assert(check_va2pa(pgdir, UPAGES + i) == PADDR(pages) + i);
 
@@ -565,10 +582,10 @@ check_boot_pgdir(bool pse)
 	//for (i = 0; KERNBASE + i != 0; i += PGSIZE)
 	// adjusted check to account for only mapping avail mem
 	if (pse)
-		for (i = 0; i < maxpa; i += JPGSIZE)
+		for (i = 0; i < maxaddrpa; i += JPGSIZE)
 			assert(check_va2pa(pgdir, KERNBASE + i) == i);
 	else
-		for (i = 0; i < maxpa; i += PGSIZE)
+		for (i = 0; i < maxaddrpa; i += PGSIZE)
 			assert(check_va2pa(pgdir, KERNBASE + i) == i);
 
 	// check kernel stack
@@ -590,7 +607,8 @@ check_boot_pgdir(bool pse)
 			//if (i >= PDX(KERNBASE))
 			// adjusted check to account for only mapping avail mem
 			// and you can't KADDR maxpa (just above legal range)
-			if (i >= PDX(KERNBASE) && i <= PDX(KADDR(maxpa-1)))
+			// maxaddrpa can be up to maxpa, so assume the worst
+			if (i >= PDX(KERNBASE) && i <= PDX(KADDR(maxaddrpa-1)))
 				assert(pgdir[i]);
 			else
 				assert(pgdir[i] == 0);
@@ -614,7 +632,7 @@ check_boot_pgdir(bool pse)
 		}
 	}
 	// kernel read-write.
-	for (i = ULIM; i <= KERNBASE + maxpa - PGSIZE; i+=PGSIZE) {
+	for (i = ULIM; i <= KERNBASE + maxaddrpa - PGSIZE; i+=PGSIZE) {
 		pte = get_vaperms(pgdir, i);
 		if ((pte & PTE_P) && (i != VPT+(UVPT>>10))) {
 			assert((pte & PTE_U) != PTE_U);
@@ -719,9 +737,14 @@ page_init(void)
 	for (i = PPN(EXTPHYSMEM); i < PPN(physaddr_after_kernel); i++) {
 		pages[i].pp_ref = 1;
 	}
-	for (i = PPN(physaddr_after_kernel); i < npage; i++) {
+	for (i = PPN(physaddr_after_kernel); i < PPN(maxaddrpa); i++) {
 		pages[i].pp_ref = 0;
 		LIST_INSERT_HEAD(&page_free_list, &pages[i], pp_link);
+	}
+	// this block out all memory above maxaddrpa.  will need another mechanism
+	// to allocate and map these into the kernel address space
+	for (i = PPN(maxaddrpa); i < npage; i++) {
+		pages[i].pp_ref = 1;
 	}
 }
 
@@ -847,6 +870,9 @@ pgdir_walk(pde_t *pgdir, const void *SNT va, int create)
 // Hint: The TA solution is implemented using pgdir_walk, page_remove,
 // and page2pa.
 //
+// No support for jumbos here.  will need to be careful of trying to insert
+// regular pages into something that was already jumbo, and the overloading
+// of the PTE_PS and PTE_PAT flags...
 int
 page_insert(pde_t *pgdir, struct Page *pp, void *va, int perm) 
 {
@@ -1173,8 +1199,6 @@ page_check(void)
 }
 
 /* 
-	// helpful if you want to manually walk with kvm / bochs
-	//cprintf("pgdir va = %08p, pgdir pa = %08p\n\n", pgdir, PADDR(pgdir));
 
     // testing code for boot_pgdir_walk 
 	pte_t* temp;
