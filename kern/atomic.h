@@ -19,8 +19,38 @@ static inline void spin_lock_irqsave(volatile uint32_t* lock);
 static inline void spin_unlock_irqsave(volatile uint32_t* lock);
 static inline void atomic_inc(volatile uint32_t* number);
 static inline void atomic_dec(volatile uint32_t* number);
+static inline void atomic_andb(volatile uint8_t* number, uint8_t mask);
 
+/*********************** Checklist stuff **********************/
+typedef struct checklist_mask {
+	// only need an uint8_t, but we need the bits[] to be word aligned
+	uint32_t size;
+	volatile uint8_t (COUNT(BYTES_FOR_BITMASK(size)) bits)[];
+} checklist_mask_t;
 
+// mask contains an unspecified array, so it need to be at the bottom
+typedef struct checklist {
+	volatile uint32_t lock;
+	checklist_mask_t mask;
+} checklist_t;
+
+#define BUILD_ZEROS_ARRAY_255	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0} 
+#define ZEROS_ARRAY(size)	\
+	BUILD_ZEROS_ARRAY_##size
+
+#define INIT_CHECKLIST(nm, sz)	\
+	checklist_t nm = {0, {(sz), ZEROS_ARRAY(sz)}};
+#define INIT_CHECKLIST_MASK(nm, sz)	\
+	checklist_mask_t nm = {(sz), ZEROS_ARRAY(sz)};
+
+int commit_checklist_wait(checklist_t* list, checklist_mask_t* mask);
+int commit_checklist_nowait(checklist_t* list, checklist_mask_t* mask);
+int waiton_checklist(checklist_t* list);
+void down_checklist(checklist_t* list);
+// TODO - want a destroy checklist (when we have kmalloc, or whatever)
+/**************************************************************/
+
+/* Barrier: currently made for everyone barriering.  Change to use checklist */
 typedef struct barrier {
 	volatile uint8_t COUNT(MAX_NUM_CPUS) cpu_array[MAX_NUM_CPUS]; 
     volatile uint8_t ready;
@@ -29,6 +59,7 @@ typedef struct barrier {
 void init_barrier_all(barrier_t* cpu_barrier);
 void barrier_all(barrier_t* cpu_barrier);
 
+/* Inlined functions declared above */
 static inline void spin_lock(volatile uint32_t* lock)
 {
 	asm volatile(
@@ -81,5 +112,10 @@ static inline void atomic_inc(volatile uint32_t* number)
 static inline void atomic_dec(volatile uint32_t* number)
 {
 	asm volatile("lock decl %0" : "=m"(*number) : : "cc");
+}
+
+static inline void atomic_andb(volatile uint8_t* number, uint8_t mask)
+{
+	asm volatile("lock andb %1,%0" : "=m"(*number) : "r"(mask) : "cc");
 }
 #endif /* !ROS_INC_ATOMIC_H */
