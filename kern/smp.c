@@ -107,7 +107,7 @@ void smp_boot(void)
 	page_decref(smp_stack);
 
 	// Set up all cores to use the proper MTRRs
-	init_barrier_all(&generic_barrier); // barrier used by smp_mtrr_handler
+	init_barrier(&generic_barrier, num_cpus); // barrier used by smp_mtrr_handler
 	smp_call_function_all(smp_mtrr_handler, 0);
 
 	// Should probably flush everyone's TLB at this point, to get rid of 

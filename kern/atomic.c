@@ -70,37 +70,34 @@ void down_checklist(checklist_t* list)
 }
 
 // byte per cpu, as mentioned below
-void init_barrier_all(barrier_t* cpu_barrier)
+void init_barrier(barrier_t* barrier, uint32_t count)
 {
-	extern uint8_t num_cpus;
-	uint8_t i;
-	cpu_barrier->ready = 0;
-	for(i = 0; i < num_cpus; i++)
-		cpu_barrier->cpu_array[i] = 1;
+	barrier->lock = 0;
+	barrier->init_count = count;
+	barrier->current_count = count;
+	barrier->ready = 0;
+}
+
+void reset_barrier(barrier_t* barrier)
+{
+	barrier->current_count = barrier->init_count;
 }
 
 // primitive barrier function.  all cores call this.
-// consider changing this to use bits and lock bit ops.
-// currently uses a byte per core, and assumes it was 
-// initialized by a core such that num_cpus entries
-// are all 1
-void barrier_all(barrier_t* cpu_barrier)
+void waiton_barrier(barrier_t* barrier)
 {
-	extern uint8_t num_cpus;
-	uint8_t i;
-	uint8_t local_ready = cpu_barrier->ready;
+	uint8_t local_ready = barrier->ready;
 
-	cpu_barrier->cpu_array[lapic_get_id()] = 0;
-	if (lapic_get_id())
-		while(cpu_barrier->ready == local_ready)
+	spin_lock_irqsave(&barrier->lock);
+	barrier->current_count--;
+	if (barrier->current_count) {
+		spin_unlock_irqsave(&barrier->lock);
+		while (barrier->ready == local_ready)
 			cpu_relax();
-	else {
-		for(i = 0; i < num_cpus; i++) {
-			while(cpu_barrier->cpu_array[i]) 
-				cpu_relax();
-			cpu_barrier->cpu_array[i] = 1;
-		}
+	} else {
+		spin_unlock_irqsave(&barrier->lock);
+		reset_barrier(barrier);
 		// if we need to wmb(), it'll be here
-		cpu_barrier->ready++;
+		barrier->ready++;
 	}
 }

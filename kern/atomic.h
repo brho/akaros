@@ -38,26 +38,34 @@ typedef struct checklist {
 #define ZEROS_ARRAY(size)	\
 	BUILD_ZEROS_ARRAY_##size
 
+#define DEFAULT_CHECKLIST_MASK(sz) {(sz), ZEROS_ARRAY(sz)}
+#define DEFAULT_CHECKLIST(sz) {0, DEFAULT_CHECKLIST_MASK(sz)}
 #define INIT_CHECKLIST(nm, sz)	\
-	checklist_t nm = {0, {(sz), ZEROS_ARRAY(sz)}};
+	checklist_t nm = DEFAULT_CHECKLIST(sz);
 #define INIT_CHECKLIST_MASK(nm, sz)	\
-	checklist_mask_t nm = {(sz), ZEROS_ARRAY(sz)};
+	checklist_mask_t nm = DEFAULT_CHECKLIST_MASK(sz);
 
 int commit_checklist_wait(checklist_t* list, checklist_mask_t* mask);
 int commit_checklist_nowait(checklist_t* list, checklist_mask_t* mask);
 int waiton_checklist(checklist_t* list);
 void down_checklist(checklist_t* list);
+// TODO - do we want to adjust the size?
+// TODO - do we want to be able to call waiton without having called commit?
+// 	- in the case of protected checklists
 // TODO - want a destroy checklist (when we have kmalloc, or whatever)
 /**************************************************************/
 
 /* Barrier: currently made for everyone barriering.  Change to use checklist */
 typedef struct barrier {
-	volatile uint8_t COUNT(MAX_NUM_CPUS) cpu_array[MAX_NUM_CPUS]; 
+	volatile uint32_t lock;
+	uint32_t init_count;
+	uint32_t current_count;
     volatile uint8_t ready;
-	} barrier_t;
+} barrier_t;
 
-void init_barrier_all(barrier_t* cpu_barrier);
-void barrier_all(barrier_t* cpu_barrier);
+void init_barrier(barrier_t* barrier, uint32_t count);
+void reset_barrier(barrier_t* barrier);
+void waiton_barrier(barrier_t* barrier);
 
 /* Inlined functions declared above */
 static inline void spin_lock(volatile uint32_t* lock)

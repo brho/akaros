@@ -277,7 +277,7 @@ void setup_default_mtrrs(barrier_t* smp_barrier)
 	// barrier - if we're meant to do this for all cores, we'll be 
 	// passed a pointer to an initialized barrier
 	if (smp_barrier)
-		barrier_all(smp_barrier);
+		waiton_barrier(smp_barrier);
 	
 	// disable caching	cr0: set CD and clear NW
 	lcr0((rcr0() | CR0_CD) & ~CR0_NW);
@@ -318,7 +318,7 @@ void setup_default_mtrrs(barrier_t* smp_barrier)
 	lcr0(rcr0() & ~(CR0_CD | CR0_NW));
 	// barrier
 	if (smp_barrier)
-		barrier_all(smp_barrier);
+		waiton_barrier(smp_barrier);
 	// enable interrupts
 	enable_irqsave(&state);
 }

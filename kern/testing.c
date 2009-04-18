@@ -93,12 +93,13 @@ void test_print_info(void)
 }
 	
 
+extern uint8_t num_cpus;
 barrier_t test_cpu_array;
 
 void test_barrier(void)
 {
 	cprintf("Core 0 initializing barrier\n");
-	init_barrier_all(&test_cpu_array);
+	init_barrier(&test_cpu_array, num_cpus);
 	cprintf("Core 0 asking all cores to print ids, barrier, rinse, repeat\n");
 	smp_call_function_all(test_barrier_handler, 0);
 }
@@ -312,14 +313,14 @@ void test_print_info_handler(struct Trapframe *tf)
 void test_barrier_handler(struct Trapframe *tf)
 {
 	cprintf("Round 1: Core %d\n", lapic_get_id());
-	barrier_all(&test_cpu_array);
-	barrier_all(&test_cpu_array);
-	barrier_all(&test_cpu_array);
-	barrier_all(&test_cpu_array);
-	barrier_all(&test_cpu_array);
-	barrier_all(&test_cpu_array);
+	waiton_barrier(&test_cpu_array);
+	waiton_barrier(&test_cpu_array);
+	waiton_barrier(&test_cpu_array);
+	waiton_barrier(&test_cpu_array);
+	waiton_barrier(&test_cpu_array);
+	waiton_barrier(&test_cpu_array);
 	cprintf("Round 2: Core %d\n", lapic_get_id());
-	barrier_all(&test_cpu_array);
+	waiton_barrier(&test_cpu_array);
 	cprintf("Round 3: Core %d\n", lapic_get_id());
 	// uncomment to see it fucked up
 	//cprintf("Round 4: Core %d\n", lapic_get_id());
