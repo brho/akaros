@@ -14,9 +14,10 @@
 #include <kern/atomic.h>
 #include <kern/smp.h>
 
+#define test_vector 0xeb
+
 void test_ipi_sending(void)
 {
-	#define test_vector 0xeb
 	extern handler_t interrupt_handlers[];
 	int8_t state = 0;
 	
@@ -384,6 +385,23 @@ void test_smp_call_functions(void)
 	printk("Done\n");
 }
 
+void test_lapic_status_bit(void)
+{
+	register_interrupt_handler(interrupt_handlers, test_vector,
+	                           test_incrementer_handler, &a);
+	#define NUM_IPI 100000
+	a = 0;
+	printk("IPIs received (should be 0): %d\n", a);
+	for(int i = 0; i < NUM_IPI; i++) {
+		send_ipi(7, 0, test_vector);
+		lapic_wait_to_send();
+	}
+	// need to wait a bit to let those IPIs get there
+	udelay(5000000);
+	printk("IPIs received (should be %d): %d\n", a, NUM_IPI);
+	// hopefully that handler never fires again.  leaving it registered for now.
+}
+
 /* Helper Functions */
 
 void test_hello_world_handler(trapframe_t *tf, void* data)
@@ -436,28 +454,28 @@ void test_barrier_handler(trapframe_t *tf, void* data)
 	//cprintf("Round 4: Core %d\n", lapic_get_id());
 }
 
-volatile uint32_t waiting = 1;
-static void futurecall(trapframe_t *tf)
+static void test_waiting_handler(trapframe_t *tf, void* data)
 {
-	{HANDLER_ATOMIC atomic_dec(&waiting);}
+	{HANDLER_ATOMIC atomic_dec((uint32_t*)data);}
 }
+
 void test_pit(void)
 {
-	cprintf("starting test for pit now (10s) \n");
+	cprintf("Starting test for PIT now (10s)\n");
 	udelay(10000000);
-	cprintf("end now \n");
-	cprintf("starting test for tsc (if stable) now (10s)\n");
+	cprintf("End now\n");
+	cprintf("Starting test for TSC (if stable) now (10s)\n");
 	udelay(10000000);
-	cprintf("end now \n");
+	cprintf("End now\n");
 	
-	cprintf("starting test for lapic (if stable) now (10s)\n");
+	cprintf("Starting test for LAPIC (if stable) now (10s)\n");
 	enable_irq();
-	lapic_set_timer(10* bus_freq/128,0xeb,TRUE);
+	lapic_set_timer(10* bus_freq/128, test_vector, TRUE);
 	
-	register_interrupt_handler(interrupt_handlers, 0xeb, futurecall, 0);
-	
+	uint32_t waiting = 1;
+	register_interrupt_handler(interrupt_handlers, test_vector,
+	                           test_waiting_handler, &waiting);
 	while(waiting)
 		cpu_relax();
-	cprintf("end now");
-
+	cprintf("End now\n");
 }

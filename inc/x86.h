@@ -392,7 +392,9 @@ disable_irqsave(int8_t* state)
 static __inline void
 cpu_relax(void)
 {
-	asm volatile("pause");
+	// in case the compiler doesn't serialize for pause, the "m" will make sure
+	// no memory is reordered around this instruction.
+	asm volatile("pause" : : : "memory");
 }
 
 static __inline void

@@ -19,6 +19,7 @@ void test_bitmasks(void);
 void test_checklists(void);
 void test_pit(void);
 void test_smp_call_functions(void);
+void test_lapic_status_bit(void);
 
 void test_hello_world_handler(trapframe_t *tf, void* data);
 void test_print_info_handler(trapframe_t *tf, void* data);

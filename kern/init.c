@@ -67,6 +67,7 @@ void kernel_init(multiboot_info_t *mboot_info)
 	test_checklists();
 	test_barrier();
 	test_print_info();
+	test_lapic_status_bit();
 	test_ipi_sending();
 	test_pit();
 	*/
