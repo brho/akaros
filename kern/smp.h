@@ -6,6 +6,7 @@
 #include <inc/types.h>
 
 #include <kern/trap.h>
+#include <kern/atomic.h>
 
 #ifdef __BOCHS__
 #define SMP_CALL_FUNCTION_TIMEOUT    0x00ffffff
@@ -14,6 +15,12 @@
 #define SMP_CALL_FUNCTION_TIMEOUT    0x7ffffff0
 #define SMP_BOOT_TIMEOUT             0x002fffff
 #endif
+
+typedef struct handler_wrapper {
+	checklist_t* frontend;
+	checklist_t* backend;
+	uint8_t vector;
+} handler_wrapper_t;
 
 void smp_boot(void);
 

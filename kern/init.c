@@ -53,15 +53,15 @@ void kernel_init(multiboot_info_t *mboot_info)
 	smp_boot();
 	
 	panic("Don't Panic");
-	//test_checklists();
-	//test_barrier();
+	test_checklists();
+	test_barrier();
 
-	//test_print_info();
-	//test_ipi_sending();
-	//test_pit();
-	//test_barrier();
-	//test_print_info();
-	//test_ipi_sending();
+	test_print_info();
+	test_ipi_sending();
+	test_pit();
+	test_barrier();
+	test_print_info();
+	test_ipi_sending();
 	
 	//ENV_CREATE(user_faultread);
 	//ENV_CREATE(user_faultreadkernel);

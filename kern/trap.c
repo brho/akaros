@@ -13,6 +13,7 @@
 #include <kern/env.h>
 #include <kern/syscall.h>
 #include <kern/apic.h>
+#include <kern/smp.h>
 
 static taskstate_t ts;
 
@@ -69,7 +70,7 @@ void
 idt_init(void)
 {
 	extern segdesc_t gdt[];
-	
+
 	// This table is made in trapentry.S by each macro in that file.
 	// It is layed out such that the ith entry is the ith's traphandler's
 	// (uint32_t) trap addr, then (uint32_t) trap number
@@ -82,14 +83,14 @@ idt_init(void)
 	// set all to default, to catch everything
 	for(i = 0; i < 256; i++)
 		SETGATE(idt[i], 0, GD_KT, &ISR_default, 0);
-	
+
 	// set all entries that have real trap handlers
 	// we need to stop short of the last one, since the last is the default
 	// handler with a fake interrupt number (500) that is out of bounds of
 	// the idt[]
 	// if we set these to trap gates, be sure to handle the IRQs separately
 	// and we might need to break our pretty tables
-	for(i = 0; i < trap_tbl_size - 1; i++) 
+	for(i = 0; i < trap_tbl_size - 1; i++)
 		SETGATE(idt[trap_tbl[i].trapnumber], 0, GD_KT, trap_tbl[i].trapaddr, 0);
 
 	// turn on syscall handling and other user-accessible ints
@@ -116,7 +117,7 @@ idt_init(void)
 	// This will go away when we start using the IOAPIC properly
 	pic_remap();
 	// set LINT0 to receive ExtINTs (KVM's default).  At reset they are 0x1000.
-	write_mmreg32(LAPIC_LVT_LINT0, 0x700); 
+	write_mmreg32(LAPIC_LVT_LINT0, 0x700);
 	// mask it to shut it up for now
 	mask_lapic_lvt(LAPIC_LVT_LINT0);
 	// and turn it on
@@ -156,7 +157,7 @@ static void
 (IN_HANDLER trap_dispatch)(trapframe_t *tf)
 {
 	// Handle processor exceptions.
-	
+
 	switch(tf->tf_trapno) {
 		case T_BRKPT:
 			while (1)
@@ -169,9 +170,9 @@ static void
 		case T_SYSCALL:
 			// check for userspace, for now
 			assert(tf->tf_cs != GD_KT);
-			tf->tf_regs.reg_eax = 
-				syscall(tf->tf_regs.reg_eax, tf->tf_regs.reg_edx, 
-				        tf->tf_regs.reg_ecx, tf->tf_regs.reg_ebx, 
+			tf->tf_regs.reg_eax =
+				syscall(tf->tf_regs.reg_eax, tf->tf_regs.reg_edx,
+				        tf->tf_regs.reg_ecx, tf->tf_regs.reg_ebx,
 				        tf->tf_regs.reg_edi, tf->tf_regs.reg_esi);
 			env_run(curenv);
 			break;
@@ -208,7 +209,7 @@ void
 		// The trapframe on the stack should be ignored from here on.
 		tf = &curenv->env_tf;
 	}
-	
+
 	// Dispatch based on what type of trap occurred
 	trap_dispatch(tf);
 
@@ -227,12 +228,23 @@ void
 	//	cprintf("Incoming IRQ, ISR: %d on core %d\n", tf->tf_trapno, lapic_get_id());
 	// merge this with alltraps?  other than the EOI... or do the same in all traps
 
+	extern handler_wrapper_t handler_wrappers[5];
+
 	// determine the interrupt handler table to use.  for now, pick the global
 	isr_t* handler_table = interrupt_handlers;
 
 	// then call the appropriate handler
 	if (handler_table[tf->tf_trapno] != 0)
 		handler_table[tf->tf_trapno](tf);
+
+	// if we're a general purpose IPI function call, toggle the front 
+	// and back ends.
+	// TODO - do the front end before actually servicing the call
+	// TODO - cover the range of 0xf0..f4, and don't hardcode it
+	if (tf->tf_trapno == 0xf0) {
+		down_checklist(handler_wrappers[0].frontend);
+		down_checklist(handler_wrappers[0].backend);
+	}
 
 	// Send EOI.  might want to do this in assembly, and possibly earlier
 	// This is set up to work with an old PIC for now
@@ -261,7 +273,7 @@ page_fault_handler(trapframe_t *tf)
 	fault_va = rcr2();
 
 	// Handle kernel-mode page faults.
-	
+
 	// TODO - one day, we'll want to handle this.
 	if ((tf->tf_cs & 3) == 0)
 		panic("Page Fault in the Kernel!");
@@ -293,7 +305,7 @@ page_fault_handler(trapframe_t *tf)
 	//   user_mem_assert() and env_run() are useful here.
 	//   To change what the user environment runs, modify 'curenv->env_tf'
 	//   (the 'tf' variable points at 'curenv->env_tf').
-	
+
 	// LAB 4: Your code here.
 
 	// Destroy the environment that caused the fault.

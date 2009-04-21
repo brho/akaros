@@ -32,28 +32,30 @@ static void smp_mtrr_handler(trapframe_t *tf)
 
 void smp_boot(void)
 {
+	#define boot_vector 0xeb
+	#define trampoline_pg 0x00001000
 	page_t *smp_stack;
 	extern isr_t interrupt_handlers[];
 	// NEED TO GRAB A LOWMEM FREE PAGE FOR AP BOOTUP CODE
 	// page1 (2nd page) is reserved, hardcoded in pmap.c
 	extern smp_entry(), smp_entry_end(), smp_boot_lock(), smp_semaphore();
-	memset(KADDR(0x00001000), 0, PGSIZE);		
-	memcpy(KADDR(0x00001000), &smp_entry, &smp_entry_end - &smp_entry);		
+	memset(KADDR(trampoline_pg), 0, PGSIZE);
+	memcpy(KADDR(trampoline_pg), &smp_entry, &smp_entry_end - &smp_entry);
 
 	// This mapping allows access to the trampoline with paging on and off
-	// via 0x00001000
-	page_insert(boot_pgdir, pa2page(0x00001000), (void*)0x00001000, PTE_W);
+	// via trampoline_pg
+	page_insert(boot_pgdir, pa2page(trampoline_pg), (void*)trampoline_pg, PTE_W);
 
 	// Allocate a stack for the cores starting up.  One for all, must share
 	if (page_alloc(&smp_stack))
 		panic("No memory for SMP boot stack!");
 	smp_stack_top = (uintptr_t)(page2kva(smp_stack) + PGSIZE);
 
-	// set up the local APIC timer to fire 0xf0 once.  hardcoded to break
+	// set up the local APIC timer to fire boot_vector once.  hardcoded to break
 	// out of the spinloop on waiting.  really just want to wait a little
-	lapic_set_timer(0x0000ffff, 0xf0, 0); // TODO - fix timing
+	lapic_set_timer(0x0000ffff, boot_vector, 0); // TODO - fix timing
 	// set the function handler to respond to this
-	register_interrupt_handler(interrupt_handlers, 0xf0, smp_boot_handler);
+	register_interrupt_handler(interrupt_handlers, boot_vector, smp_boot_handler);
 
 	// Start the IPI process (INIT, wait, SIPI, wait, SIPI, wait)
 	send_init_ipi();
@@ -63,14 +65,14 @@ void smp_boot(void)
 	// first SIPI
 	waiting = 1;
 	send_startup_ipi(0x01);
-	lapic_set_timer(SMP_BOOT_TIMEOUT, 0xf0, 0); // TODO - fix timing
+	lapic_set_timer(SMP_BOOT_TIMEOUT, boot_vector, 0); // TODO - fix timing
 	while(waiting) // wait for the first SIPI to take effect
 		cpu_relax();
 	/* //BOCHS does not like this second SIPI.
 	// second SIPI
 	waiting = 1;
 	send_startup_ipi(0x01);
-	lapic_set_timer(0x000fffff, 0xf0, 0); // TODO - fix timing
+	lapic_set_timer(0x000fffff, boot_vector, 0); // TODO - fix timing
 	while(waiting) // wait for the second SIPI to take effect
 		cpu_relax();
 	*/
@@ -80,7 +82,7 @@ void smp_boot(void)
 	// all in smp_entry.  It's purpose is to keep Core0 from competing for the 
 	// smp_boot_lock.  So long as one AP increments the sem before the final 
 	// LAPIC timer goes off, all available cores will be initialized.
-	while(*(volatile uint32_t*)(&smp_semaphore - &smp_entry + 0x00001000));
+	while(*(volatile uint32_t*)(&smp_semaphore - &smp_entry + trampoline_pg));
 
 	// From here on, no other cores are coming up.  Grab the lock to ensure it.
 	// Another core could be in it's prelock phase and be trying to grab the lock
@@ -91,20 +93,23 @@ void smp_boot(void)
 	// booting.  Specifically, it's when they turn on paging and have that temp
 	// mapping pulled out from under them.  Now, if a core loses, it will spin
 	// on the trampoline (which we must be careful to not deallocate)
-	spin_lock((uint32_t*)(&smp_boot_lock - &smp_entry + 0x00001000));
+	spin_lock((uint32_t*)(&smp_boot_lock - &smp_entry + trampoline_pg));
 	cprintf("Num_Cpus Detected: %d\n", num_cpus);
 
 	// Deregister smp_boot_handler
-	register_interrupt_handler(interrupt_handlers, 0xf0, 0);
+	register_interrupt_handler(interrupt_handlers, boot_vector, 0);
 	// Remove the mapping of the page used by the trampoline
-	page_remove(boot_pgdir, (void*)0x00001000);
+	page_remove(boot_pgdir, (void*)trampoline_pg);
 	// It had a refcount of 2 earlier, so we need to dec once more to free it
 	// but only if all cores are in (or we reset / reinit those that failed)
 	// TODO after we parse ACPI tables
 	if (num_cpus == 8) // TODO - ghetto coded for our 8 way SMPs
-		page_decref(pa2page(0x00001000));
+		page_decref(pa2page(trampoline_pg));
 	// Dealloc the temp shared stack
 	page_decref(smp_stack);
+
+	// Set up the generic remote function call facility
+	init_smp_call_function();
 
 	// Set up all cores to use the proper MTRRs
 	init_barrier(&generic_barrier, num_cpus); // barrier used by smp_mtrr_handler
@@ -188,17 +193,77 @@ uint32_t smp_main(void)
 	return my_stack_top; // will be loaded in smp_entry.S
 }
 
-// as far as completion mechs go, we might want a bit mask that every sender 
-// has to toggle.  or a more general barrier that works on a queue / LL, 
-// instead of everyone.  TODO!
-static void smp_call_function(uint8_t type, uint8_t dest, isr_t handler, uint8_t vector)
+// checklists to protect the global interrupt_handlers for 0xf0, f1, f2, f3, f4
+// need to be global, since there is no function that will always exist for them
+INIT_CHECKLIST(handler_front_f0, MAX_NUM_CPUS);
+INIT_CHECKLIST(handler_back_f0, MAX_NUM_CPUS);
+
+handler_wrapper_t handler_wrappers[5];
+
+static void init_smp_call_function(void)
+{
+	handler_wrappers[0].vector = 0xf0;
+	handler_wrappers[0].frontend = &handler_front_f0;
+	handler_wrappers[0].frontend->mask.size = num_cpus;
+	handler_wrappers[0].backend = &handler_back_f0;
+	handler_wrappers[0].backend->mask.size = num_cpus;
+}
+
+// could have the backend checklists static/global too.  
+// or at least have the pointers global (save a little RAM)
+
+static void smp_call_function(uint8_t type, uint8_t dest, isr_t handler, bool wait)
 {
 	extern isr_t interrupt_handlers[];
-	uint32_t i, amount = SMP_CALL_FUNCTION_TIMEOUT; // should calibrate this!!  just remove it!
 	int8_t state = 0;
+	uint8_t vector;
 
-	if (!vector)
-		vector = 0xf1; //default value
+wait = 1;
+
+	// build the mask based on the type and destination
+	INIT_CHECKLIST_MASK(handler_mask, MAX_NUM_CPUS);
+	// set checklist mask's size dynamically to the num cpus actually present
+	handler_mask.size = num_cpus;
+	switch (type) {
+		case 1: // self
+			SET_BITMASK_BIT(handler_mask.bits, lapic_get_id());
+			break;
+		case 2: // all
+			FILL_BITMASK(handler_mask.bits, num_cpus);
+			break;
+		case 3: // all but self
+			FILL_BITMASK(handler_mask.bits, num_cpus);
+			CLR_BITMASK_BIT(handler_mask.bits, lapic_get_id());
+			break;
+		case 4: // physical mode
+			// note this only supports sending to one specific physical id
+			// (only sets one bit, so if multiple cores have the same phys id
+			// the first one through will set this).
+			SET_BITMASK_BIT(handler_mask.bits, dest);
+			break;
+		case 5: // logical mode
+			// TODO
+			warn("Logical mode bitmask handler protection not implemented!");
+			break;
+		default:
+			panic("Invalid type for cross-core function call!");
+	}
+
+	// TODO find an available vector
+	// just use the first for now.  should do a loop, checking error codes
+	// (requires adaptive support or something in atomic.c)
+	// need a way to return what vector number we are too
+	vector = 0xf0;
+	// the waiting happens on the contention by the next one
+	commit_checklist_nowait(handler_wrappers[0].frontend, &handler_mask);
+
+	// if we want to wait, we set the mask for our backend too
+	// no contention here, since this one is protected by the mask being present
+	// in the frontend
+	if (wait)
+		commit_checklist_wait(handler_wrappers[0].backend, &handler_mask);
+
+	// now register our handler to run
 	register_interrupt_handler(interrupt_handlers, vector, handler);
 	// WRITE MEMORY BARRIER HERE
 	enable_irqsave(&state);
@@ -222,16 +287,14 @@ static void smp_call_function(uint8_t type, uint8_t dest, isr_t handler, uint8_t
 		default:
 			panic("Invalid type for cross-core function call!");
 	}
-	// wait some arbitrary amount til we think all the cores could be done.
-	// very wonky without an idea of how long the function takes.
-	// maybe should think of some sort of completion notification mech
-	for (i = 0; i < amount; i++)
-		asm volatile("nop;");
+	// wait long enough to receive our own broadcast (PROBABLY WORKS) TODO
+	lapic_wait_to_send();
 	disable_irqsave(&state);
-	// TODO
-	// consider doing this, but we can't remove it before the receiver is done
-	//register_interrupt_handler(interrupt_handlers, vector, 0);
-	// we also will have issues if we call this function again too quickly
+	
+	// no longer need to wait to protect the vector (the checklist does that)
+	// if we want to wait, we need to wait on the backend checklist
+	if (wait)
+		waiton_checklist(handler_wrappers[0].backend);
 }
 
 // I'd rather have these functions take an arbitrary function and arguments...

@@ -28,7 +28,7 @@ typedef struct checklist_mask {
 	volatile uint8_t (COUNT(BYTES_FOR_BITMASK(size)) bits)[];
 } checklist_mask_t;
 
-// mask contains an unspecified array, so it need to be at the bottom
+// mask contains an unspecified array, so it needs to be at the bottom
 typedef struct checklist {
 	volatile uint32_t lock;
 	checklist_mask_t mask;
@@ -49,10 +49,15 @@ int commit_checklist_wait(checklist_t* list, checklist_mask_t* mask);
 int commit_checklist_nowait(checklist_t* list, checklist_mask_t* mask);
 int waiton_checklist(checklist_t* list);
 void down_checklist(checklist_t* list);
-// TODO - do we want to adjust the size?
+// TODO - do we want to adjust the size?  (YES, don't want to check it all)
 // TODO - do we want to be able to call waiton without having called commit?
 // 	- in the case of protected checklists
 // TODO - want a destroy checklist (when we have kmalloc, or whatever)
+// TODO - some sort of dynamic allocation of them in the future
+// TODO - think about deadlock issues with one core spinning on a lock for
+// something that it is the hold out for...
+// 	- probably should have interrupts enabled, and never grab these locks
+// 	from interrupt context (and not use irq_save)
 /**************************************************************/
 
 /* Barrier: currently made for everyone barriering.  Change to use checklist */
