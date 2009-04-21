@@ -19,6 +19,59 @@ volatile uint8_t num_cpus = 0xee;
 uintptr_t smp_stack_top;
 barrier_t generic_barrier;
 
+/*************************** IPI Wrapper Stuff ********************************/
+// checklists to protect the global interrupt_handlers for 0xf0, f1, f2, f3, f4
+// need to be global, since there is no function that will always exist for them
+#define NUM_IPI_WRAPPERS  5
+ipi_wrapper_t             ipi_wrappers[NUM_IPI_WRAPPERS];
+static ipi_wrapper_list_t ipi_wrapper_list;
+
+#define DECLARE_IPI_CHECKLISTS(vector)                          \
+	INIT_CHECKLIST(f##vector##_front_cpu_list, MAX_NUM_CPUS);   \
+	INIT_CHECKLIST(f##vector##_back_cpu_list, MAX_NUM_CPUS);
+
+#define INIT_IPI_WRAPPER(v)                                               \
+{                                                                         \
+	ipi_wrappers[(v)].vector = 0xf##v;                                    \
+	ipi_wrappers[(v)].front_cpu_list = &f##v##_front_cpu_list;            \
+	ipi_wrappers[(v)].front_cpu_list->mask.size = num_cpus;               \
+	ipi_wrappers[(v)].back_cpu_list = &f##v##_back_cpu_list;              \
+	ipi_wrappers[(v)].back_cpu_list->mask.size = num_cpus;                \
+	LIST_INSERT_HEAD(&ipi_wrapper_list, &ipi_wrappers[(v)], ipi_link);    \
+}
+/*
+
+*/
+
+DECLARE_IPI_CHECKLISTS(0);
+DECLARE_IPI_CHECKLISTS(1);
+DECLARE_IPI_CHECKLISTS(2);
+DECLARE_IPI_CHECKLISTS(3);
+DECLARE_IPI_CHECKLISTS(4);
+static void init_smp_call_function(void)
+{
+	LIST_INIT(&ipi_wrapper_list);
+	INIT_IPI_WRAPPER(0);
+	INIT_IPI_WRAPPER(1);
+	INIT_IPI_WRAPPER(2);
+	INIT_IPI_WRAPPER(3);
+	INIT_IPI_WRAPPER(4);
+}
+
+static ipi_wrapper_t *get_available_ipi_wrapper() {
+	return &ipi_wrappers[0];
+
+	ipi_wrapper_t* ipi = NULL;
+
+	//TODO implement a lock around accessing this list
+	if((ipi = LIST_FIRST(&ipi_wrapper_list)) != NULL) {
+		LIST_REMOVE(ipi, ipi_link); 
+	}
+
+	return ipi;
+}
+/******************************************************************************/
+
 /* Breaks us out of the waiting loop in smp_boot */
 static void smp_boot_handler(trapframe_t *tf)
 {
@@ -193,22 +246,6 @@ uint32_t smp_main(void)
 	return my_stack_top; // will be loaded in smp_entry.S
 }
 
-// checklists to protect the global interrupt_handlers for 0xf0, f1, f2, f3, f4
-// need to be global, since there is no function that will always exist for them
-INIT_CHECKLIST(handler_front_f0, MAX_NUM_CPUS);
-INIT_CHECKLIST(handler_back_f0, MAX_NUM_CPUS);
-
-handler_wrapper_t handler_wrappers[5];
-
-static void init_smp_call_function(void)
-{
-	handler_wrappers[0].vector = 0xf0;
-	handler_wrappers[0].frontend = &handler_front_f0;
-	handler_wrappers[0].frontend->mask.size = num_cpus;
-	handler_wrappers[0].backend = &handler_back_f0;
-	handler_wrappers[0].backend->mask.size = num_cpus;
-}
-
 // could have the backend checklists static/global too.  
 // or at least have the pointers global (save a little RAM)
 
@@ -216,32 +253,32 @@ static void smp_call_function(uint8_t type, uint8_t dest, isr_t handler, bool wa
 {
 	extern isr_t interrupt_handlers[];
 	int8_t state = 0;
-	uint8_t vector;
+	ipi_wrapper_t* ipi;
 
 // need a check to make sure the core we are trying to send to exists!  
 // if you call sending to something that never answers, we'll never be able to 
 // reuse our vector (which is a problem even if it exists....)
 
 	// build the mask based on the type and destination
-	INIT_CHECKLIST_MASK(handler_mask, MAX_NUM_CPUS);
+	INIT_CHECKLIST_MASK(cpu_mask, MAX_NUM_CPUS);
 	// set checklist mask's size dynamically to the num cpus actually present
-	handler_mask.size = num_cpus;
+	cpu_mask.size = num_cpus;
 	switch (type) {
 		case 1: // self
-			SET_BITMASK_BIT(handler_mask.bits, lapic_get_id());
+			SET_BITMASK_BIT(cpu_mask.bits, lapic_get_id());
 			break;
 		case 2: // all
-			FILL_BITMASK(handler_mask.bits, num_cpus);
+			FILL_BITMASK(cpu_mask.bits, num_cpus);
 			break;
 		case 3: // all but self
-			FILL_BITMASK(handler_mask.bits, num_cpus);
-			CLR_BITMASK_BIT(handler_mask.bits, lapic_get_id());
+			FILL_BITMASK(cpu_mask.bits, num_cpus);
+			CLR_BITMASK_BIT(cpu_mask.bits, lapic_get_id());
 			break;
 		case 4: // physical mode
 			// note this only supports sending to one specific physical id
 			// (only sets one bit, so if multiple cores have the same phys id
 			// the first one through will set this).
-			SET_BITMASK_BIT(handler_mask.bits, dest);
+			SET_BITMASK_BIT(cpu_mask.bits, dest);
 			break;
 		case 5: // logical mode
 			// TODO
@@ -251,40 +288,40 @@ static void smp_call_function(uint8_t type, uint8_t dest, isr_t handler, bool wa
 			panic("Invalid type for cross-core function call!");
 	}
 
-	// TODO find an available vector
+	// Find an available vector
 	// just use the first for now.  should do a loop, checking error codes
 	// (requires adaptive support or something in atomic.c)
 	// need a way to return what vector number we are too
-	vector = 0xf0;
+	ipi = get_available_ipi_wrapper();
 	// the waiting happens on the contention by the next one
-	commit_checklist_nowait(handler_wrappers[0].frontend, &handler_mask);
+	commit_checklist_nowait(ipi->front_cpu_list, &cpu_mask);
 
 	// if we want to wait, we set the mask for our backend too
 	// no contention here, since this one is protected by the mask being present
 	// in the frontend
 	if (wait)
-		commit_checklist_wait(handler_wrappers[0].backend, &handler_mask);
+		commit_checklist_wait(ipi->back_cpu_list, &cpu_mask);
 
 	// now register our handler to run
-	register_interrupt_handler(interrupt_handlers, vector, handler);
+	register_interrupt_handler(interrupt_handlers, ipi->vector, handler);
 	// WRITE MEMORY BARRIER HERE
 	enable_irqsave(&state);
 	// Send the proper type of IPI.  I made up these numbers.
 	switch (type) {
 		case 1:
-			send_self_ipi(vector);
+			send_self_ipi(ipi->vector);
 			break;
 		case 2:
-			send_broadcast_ipi(vector);
+			send_broadcast_ipi(ipi->vector);
 			break;
 		case 3:
-			send_all_others_ipi(vector);
+			send_all_others_ipi(ipi->vector);
 			break;
 		case 4: // physical mode
-			send_ipi(dest, 0, vector);
+			send_ipi(dest, 0, ipi->vector);
 			break;
 		case 5: // logical mode
-			send_ipi(dest, 1, vector);
+			send_ipi(dest, 1, ipi->vector);
 			break;
 		default:
 			panic("Invalid type for cross-core function call!");
@@ -296,7 +333,10 @@ static void smp_call_function(uint8_t type, uint8_t dest, isr_t handler, bool wa
 	// no longer need to wait to protect the vector (the checklist does that)
 	// if we want to wait, we need to wait on the backend checklist
 	if (wait)
-		waiton_checklist(handler_wrappers[0].backend);
+		waiton_checklist(ipi->back_cpu_list);
+	//Put the ipi vector back on the list now taht we're done with it
+	//TODO encase this in a lock
+	LIST_INSERT_HEAD(&ipi_wrapper_list, ipi, ipi_link);
 }
 
 // I'd rather have these functions take an arbitrary function and arguments...
