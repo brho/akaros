@@ -274,6 +274,90 @@ void test_checklists(void)
 
 }
 
+volatile uint32_t a = 0, b = 0, c = 0;
+
+void test_A_incrementer_handler(struct Trapframe *tf)
+{
+	atomic_inc(&a);
+}
+
+void test_B_incrementer_handler(struct Trapframe *tf)
+{
+	atomic_inc(&b);
+}
+
+void test_C_incrementer_handler(struct Trapframe *tf)
+{
+	atomic_inc(&c);
+}
+
+void test_null_handler(struct Trapframe *tf)
+{
+	asm volatile("nop");
+}
+
+void test_smp_call_functions(void)
+{
+	uint8_t me = lapic_get_id();
+	printk("\nCore %d: SMP Call Self (nowait):\n", me);
+	printk("---------------------\n");
+	smp_call_function_self(test_hello_world_handler, 0);
+	printk("\nCore %d: SMP Call Self (wait):\n", me);
+	printk("---------------------\n");
+	smp_call_function_self(test_hello_world_handler, 1);
+	printk("\nCore %d: SMP Call All (nowait):\n", me);
+	printk("---------------------\n");
+	smp_call_function_all(test_hello_world_handler, 0);
+	printk("\nCore %d: SMP Call All (wait):\n", me);
+	printk("---------------------\n");
+	smp_call_function_all(test_hello_world_handler, 1);
+	printk("\nCore %d: SMP Call All-Else Individually, in order (nowait):\n", me);
+	printk("---------------------\n");
+	smp_call_function_single(1, test_hello_world_handler, 0);
+	smp_call_function_single(2, test_hello_world_handler, 0);
+	smp_call_function_single(3, test_hello_world_handler, 0);
+	smp_call_function_single(4, test_hello_world_handler, 0);
+	smp_call_function_single(5, test_hello_world_handler, 0);
+	smp_call_function_single(6, test_hello_world_handler, 0);
+	smp_call_function_single(7, test_hello_world_handler, 0);
+	printk("\nCore %d: SMP Call Self (wait):\n", me);
+	printk("---------------------\n");
+	smp_call_function_self(test_hello_world_handler, 1);
+	printk("\nCore %d: SMP Call All-Else Individually, in order (wait):\n", me);
+	printk("---------------------\n");
+	smp_call_function_single(1, test_hello_world_handler, 1);
+	smp_call_function_single(2, test_hello_world_handler, 1);
+	smp_call_function_single(3, test_hello_world_handler, 1);
+	smp_call_function_single(4, test_hello_world_handler, 1);
+	smp_call_function_single(5, test_hello_world_handler, 1);
+	smp_call_function_single(6, test_hello_world_handler, 1);
+	smp_call_function_single(7, test_hello_world_handler, 1);
+	printk("\nTesting to see if any IPI-functions are dropped when not waiting:\n");
+	printk("A: %d, B: %d, C: %d (should be 0,0,0)\n", a, b, c);
+	smp_call_function_all(test_A_incrementer_handler, 0);
+	smp_call_function_all(test_B_incrementer_handler, 0);
+	smp_call_function_all(test_C_incrementer_handler, 0);
+	// if i can clobber a previous IPI, the interleaving might do it
+	smp_call_function_single(1, test_A_incrementer_handler, 0);
+	smp_call_function_single(2, test_B_incrementer_handler, 0);
+	smp_call_function_single(3, test_C_incrementer_handler, 0);
+	smp_call_function_single(4, test_A_incrementer_handler, 0);
+	smp_call_function_single(5, test_B_incrementer_handler, 0);
+	smp_call_function_single(6, test_C_incrementer_handler, 0);
+	smp_call_function_all(test_A_incrementer_handler, 0);
+	smp_call_function_single(3, test_C_incrementer_handler, 0);
+	smp_call_function_all(test_B_incrementer_handler, 0);
+	smp_call_function_single(1, test_A_incrementer_handler, 0);
+	smp_call_function_all(test_C_incrementer_handler, 0);
+	smp_call_function_single(2, test_B_incrementer_handler, 0);
+	// wait, so we're sure the others finish before printing.
+	// without this, we could (and did) get 19,18,19, since the B_inc
+	// handler didn't finish yet
+	smp_call_function_self(test_null_handler, 1);
+	printk("A: %d, B: %d, C: %d (should be 19,19,19)\n", a, b, c);
+	printk("Done\n");
+}
+
 /* Helper Functions */
 
 void test_hello_world_handler(trapframe_t *tf)

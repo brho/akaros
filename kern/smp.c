@@ -218,7 +218,9 @@ static void smp_call_function(uint8_t type, uint8_t dest, isr_t handler, bool wa
 	int8_t state = 0;
 	uint8_t vector;
 
-wait = 1;
+// need a check to make sure the core we are trying to send to exists!  
+// if you call sending to something that never answers, we'll never be able to 
+// reuse our vector (which is a problem even if it exists....)
 
 	// build the mask based on the type and destination
 	INIT_CHECKLIST_MASK(handler_mask, MAX_NUM_CPUS);
@@ -299,20 +301,19 @@ wait = 1;
 
 // I'd rather have these functions take an arbitrary function and arguments...
 // Right now, I build a handler that just calls whatever I want, which is
-// another layer of indirection.  Might like some ability to specify if
-// we want to wait or not.
-void smp_call_function_self(isr_t handler, uint8_t vector)
+// another layer of indirection.
+void smp_call_function_self(isr_t handler, bool wait)
 {
-	smp_call_function(1, 0, handler, vector);
+	smp_call_function(1, 0, handler, wait);
 }
 
-void smp_call_function_all(isr_t handler, uint8_t vector)
+void smp_call_function_all(isr_t handler, bool wait)
 {
-	smp_call_function(2, 0, handler, vector);
+	smp_call_function(2, 0, handler, wait);
 }
 
-void smp_call_function_single(uint8_t dest, isr_t handler, uint8_t vector)
+void smp_call_function_single(uint8_t dest, isr_t handler, bool wait)
 {
-	smp_call_function(4, dest, handler, vector);
+	smp_call_function(4, dest, handler, wait);
 }
 

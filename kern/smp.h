@@ -24,8 +24,8 @@ typedef struct handler_wrapper {
 
 void smp_boot(void);
 
-void smp_call_function_self(isr_t handler, uint8_t vector);
-void smp_call_function_all(isr_t handler, uint8_t vector);
-void smp_call_function_single(uint8_t dest, isr_t handler, uint8_t vector);
+void smp_call_function_self(isr_t handler, bool wait);
+void smp_call_function_all(isr_t handler, bool wait);
+void smp_call_function_single(uint8_t dest, isr_t handler, bool wait);
 
 #endif /* !ROS_INC_SMP_H */
