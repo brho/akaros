@@ -92,18 +92,6 @@ $(OBJDIR)/kern/bochs.img: $(OBJDIR)/kern/kernel $(OBJDIR)/boot/boot
 
 all: $(OBJDIR)/kern/bochs.img
 
-kvm: $(OBJDIR)/kern/kernel
-	$(V)echo "+ (KVM) Copying to mnt/hdd"
-	$(V)cp $(OBJDIR)/kern/kernel mnt/hdd/texas
-	$(V)sync
-
-usb: $(OBJDIR)/kern/kernel
-	$(V)echo "+ (USB) Copying to /dev/sdb4"
-	$(V)mount /dev/sdb4
-	$(V)cp $(OBJDIR)/kern/kernel /mnt/pornstick/texas
-	$(V)sync
-	$(V)umount /mnt/pornstick
-
 grub: $(OBJDIR)/jos-grub
 
 $(OBJDIR)/jos-grub: $(OBJDIR)/kern/kernel

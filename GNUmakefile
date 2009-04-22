@@ -104,6 +104,7 @@ include lib/Makefrag
 include ivylib/Makefrag
 include kern/Makefrag
 include user/Makefrag
+-include Makelocal
 
 
 IMAGES = $(OBJDIR)/kern/bochs.img
