@@ -1,25 +1,25 @@
 /* See COPYRIGHT for copyright information. */
 
-#ifndef JOS_KERN_TRAP_H
-#define JOS_KERN_TRAP_H
-#ifndef JOS_KERNEL
-# error "This is a JOS kernel header; user programs should not #include it"
+#ifndef ROS_KERN_TRAP_H
+#define ROS_KERN_TRAP_H
+#ifndef ROS_KERNEL
+# error "This is an ROS kernel header; user programs should not #include it"
 #endif
 
 #include <inc/trap.h>
 #include <inc/mmu.h>
 
 // func ptr for interrupt service routines
-typedef void (*isr_t)(struct Trapframe* tf);
+typedef void (*isr_t)(trapframe_t* tf);
 
 /* The kernel's interrupt descriptor table */
-extern struct Gatedesc idt[];
+extern gatedesc_t idt[];
 
 void idt_init(void);
 void register_interrupt_handler(isr_t (COUNT(256)table)[], uint8_t isr, isr_t handler);
-void (IN_HANDLER print_regs)(struct PushRegs *regs);
-void (IN_HANDLER print_trapframe)(struct Trapframe *tf);
-void (IN_HANDLER page_fault_handler)(struct Trapframe *);
-void backtrace(struct Trapframe *);
+void (IN_HANDLER print_regs)(push_regs_t *regs);
+void (IN_HANDLER print_trapframe)(trapframe_t *tf);
+void (IN_HANDLER page_fault_handler)(trapframe_t *tf);
+void backtrace(trapframe_t *tf);
 
-#endif /* JOS_KERN_TRAP_H */
+#endif /* ROS_KERN_TRAP_H */

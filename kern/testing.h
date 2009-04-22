@@ -18,8 +18,8 @@ void test_interrupts_irqsave(void);
 void test_bitmasks(void);
 void test_checklists(void);
 
-void test_hello_world_handler(struct Trapframe *tf);
-void test_print_info_handler(struct Trapframe *tf);
-void test_barrier_handler(struct Trapframe *tf);
+void test_hello_world_handler(trapframe_t *tf);
+void test_print_info_handler(trapframe_t *tf);
+void test_barrier_handler(trapframe_t *tf);
 
 #endif /* !ROS_INC_TESTING_H */

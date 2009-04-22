@@ -1,16 +1,16 @@
-#ifndef JOS_STAB_H
-#define JOS_STAB_H
+#ifndef ROS_STAB_H
+#define ROS_STAB_H
 #include <inc/types.h>
 
 // <inc/stab.h>
 // STABS debugging info
 
-// The JOS kernel debugger can understand some debugging information
+// The ROS kernel debugger can understand some debugging information
 // in the STABS format.  For more information on this format, see
 // http://sources.redhat.com/gdb/onlinedocs/stabs_toc.html
 
 // The constants below define some symbol types used by various debuggers
-// and compilers.  JOS uses the N_SO, N_SOL, N_FUN, and N_SLINE types.
+// and compilers.  ROS uses the N_SO, N_SOL, N_FUN, and N_SLINE types.
 
 #define	N_GSYM		0x20	// global symbol
 #define	N_FNAME		0x22	// F77 function name
@@ -48,4 +48,4 @@ typedef struct Stab {
 	uintptr_t n_value;	// value of symbol
 } stab_t;
 
-#endif /* !JOS_STAB_H */
+#endif /* !ROS_STAB_H */

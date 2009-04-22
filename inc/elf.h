@@ -1,11 +1,11 @@
-#ifndef JOS_INC_ELF_H
-#define JOS_INC_ELF_H
+#ifndef ROS_INC_ELF_H
+#define ROS_INC_ELF_H
 
 #define ELF_MAGIC 0x464C457FU	/* "\x7FELF" in little endian */
 
 #include <inc/types.h>
 
-struct Elf {
+typedef struct Elf {
 	uint32_t e_magic;	// must equal ELF_MAGIC
 	uint8_t e_elf[12];
 	uint16_t e_type;
@@ -21,9 +21,9 @@ struct Elf {
 	uint16_t e_shentsize;
 	uint16_t e_shnum;
 	uint16_t e_shstrndx;
-};
+} elf_t;
 
-struct Proghdr {
+typedef struct Proghdr {
 	uint32_t p_type;
 	uint32_t p_offset;
 	uint32_t p_va;
@@ -32,9 +32,9 @@ struct Proghdr {
 	uint32_t p_memsz;
 	uint32_t p_flags;
 	uint32_t p_align;
-};
+} proghdr_t;
 
-struct Secthdr {
+typedef struct Secthdr {
 	uint32_t sh_name;
 	uint32_t sh_type;
 	uint32_t sh_flags;
@@ -45,7 +45,7 @@ struct Secthdr {
 	uint32_t sh_info;
 	uint32_t sh_addralign;
 	uint32_t sh_entsize;
-};
+} secthdr_t;
 
 // Values for Proghdr::p_type
 #define ELF_PROG_LOAD		1
@@ -64,4 +64,4 @@ struct Secthdr {
 // Values for Secthdr::sh_name
 #define ELF_SHN_UNDEF		0
 
-#endif /* !JOS_INC_ELF_H */
+#endif /* !ROS_INC_ELF_H */

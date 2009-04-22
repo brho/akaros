@@ -73,7 +73,7 @@ PERL	:= perl
 # Only optimize to -O1 to discourage inlining, which complicates backtraces.
 CFLAGS	:= $(CFLAGS) $(DEFS) $(LABDEFS) -D$(ARCH) -O -fno-builtin -fno-stack-protector -I$(TOP) -MD -Wall -Wno-format -Wno-unused -gstabs
 
-# Linker flags for JOS user programs
+# Linker flags for ROS user programs
 ULDFLAGS := -T user/user.ld
 
 # Lists that the */Makefrag makefile fragments will add to
@@ -92,8 +92,8 @@ all:
 .PRECIOUS: %.o $(OBJDIR)/boot/%.o $(OBJDIR)/kern/%.o \
 	$(OBJDIR)/lib/%.o $(OBJDIR)/fs/%.o $(OBJDIR)/user/%.o
 
-KERN_CFLAGS := $(CFLAGS) -DJOS_KERNEL -gstabs
-USER_CFLAGS := $(CFLAGS) -DJOS_USER -gstabs
+KERN_CFLAGS := $(CFLAGS) -DROS_KERNEL -gstabs
+USER_CFLAGS := $(CFLAGS) -DROS_USER -gstabs
 
 
 

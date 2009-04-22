@@ -1,5 +1,5 @@
-#ifndef JOS_INC_TRAP_H
-#define JOS_INC_TRAP_H
+#ifndef ROS_INC_TRAP_H
+#define ROS_INC_TRAP_H
 
 // Trap numbers
 // These are processor defined:
@@ -26,14 +26,14 @@
 
 // These are arbitrarily chosen, but with care not to overlap
 // processor defined exceptions or interrupt vectors.
-#define T_SYSCALL   48		// system call
+#define T_SYSCALL   48				// system call
 #define T_DEFAULT   0xdeadbeef		// catchall
 
 #ifndef __ASSEMBLER__
 
 #include <inc/types.h>
 
-struct PushRegs {
+typedef struct PushRegs {
 	/* registers as pushed by pusha */
 	uint32_t reg_edi;
 	uint32_t reg_esi;
@@ -43,10 +43,10 @@ struct PushRegs {
 	uint32_t reg_edx;
 	uint32_t reg_ecx;
 	uint32_t reg_eax;
-};
+} push_regs_t;
 
-struct Trapframe {
-	struct PushRegs tf_regs;
+typedef struct Trapframe {
+	push_regs_t tf_regs;
 	uint16_t tf_es;
 	uint16_t tf_padding1;
 	uint16_t tf_ds;
@@ -62,13 +62,13 @@ struct Trapframe {
 	uintptr_t tf_esp;
 	uint16_t tf_ss;
 	uint16_t tf_padding4;
-};
+} trapframe_t;
 
 
 #endif /* !__ASSEMBLER__ */
 
-// Must equal 'sizeof(struct Trapframe)'.
+// Must equal 'sizeof(trapframe_t)'.
 // A static_assert in kern/trap.c checks this.
 #define SIZEOF_STRUCT_TRAPFRAME	0x44
 
-#endif /* !JOS_INC_TRAP_H */
+#endif /* !ROS_INC_TRAP_H */

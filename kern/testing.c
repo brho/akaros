@@ -235,7 +235,7 @@ void test_bitmasks(void)
 
 checklist_t* the_global_list;
 
-void test_checklist_handler(struct Trapframe *tf)
+void test_checklist_handler(trapframe_t *tf)
 {
 	for (int i = 0; i < SMP_BOOT_TIMEOUT; i++);
 	for (int i = 0; i < SMP_BOOT_TIMEOUT; i++);
@@ -276,7 +276,7 @@ void test_checklists(void)
 
 /* Helper Functions */
 
-void test_hello_world_handler(struct Trapframe *tf)
+void test_hello_world_handler(trapframe_t *tf)
 {
 	cprintf("Incoming IRQ, ISR: %d on core %d with tf at 0x%08x\n", 
 		tf->tf_trapno, lapic_get_id(), tf);
@@ -284,7 +284,7 @@ void test_hello_world_handler(struct Trapframe *tf)
 
 uint32_t print_info_lock = 0;
 
-void test_print_info_handler(struct Trapframe *tf)
+void test_print_info_handler(trapframe_t *tf)
 {
 	spin_lock_irqsave(&print_info_lock);
 	cprintf("----------------------------\n");
@@ -310,7 +310,7 @@ void test_print_info_handler(struct Trapframe *tf)
 	spin_unlock_irqsave(&print_info_lock);
 }
 
-void test_barrier_handler(struct Trapframe *tf)
+void test_barrier_handler(trapframe_t *tf)
 {
 	cprintf("Round 1: Core %d\n", lapic_get_id());
 	waiton_barrier(&test_cpu_array);

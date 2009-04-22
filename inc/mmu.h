@@ -1,5 +1,5 @@
-#ifndef JOS_INC_MMU_H
-#define JOS_INC_MMU_H
+#ifndef ROS_INC_MMU_H
+#define ROS_INC_MMU_H
 
 /*
  * This file contains definitions for the x86 memory management unit (MMU),
@@ -167,7 +167,7 @@
 #include <inc/types.h>
 
 // Segment Descriptors
-struct Segdesc {
+typedef struct Segdesc {
 	unsigned sd_lim_15_0 : 16;  // Low bits of segment limit
 	unsigned sd_base_15_0 : 16; // Low bits of segment base address
 	unsigned sd_base_23_16 : 8; // Middle bits of segment base address
@@ -181,19 +181,19 @@ struct Segdesc {
 	unsigned sd_db : 1;         // 0 = 16-bit segment, 1 = 32-bit segment
 	unsigned sd_g : 1;          // Granularity: limit scaled by 4K when set
 	unsigned sd_base_31_24 : 8; // High bits of segment base address
-};
+} segdesc_t;
 // Null segment
-#define SEG_NULL	(struct Segdesc){ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
+#define SEG_NULL	(segdesc_t){ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
 // Segment that is loadable but faults when used
-#define SEG_FAULT	(struct Segdesc){ 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0 }
+#define SEG_FAULT	(segdesc_t){ 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0 }
 // Normal segment
-#define SEG(type, base, lim, dpl) (struct Segdesc)			\
+#define SEG(type, base, lim, dpl) (segdesc_t)						\
 { ((lim) >> 12) & 0xffff, (base) & 0xffff, ((base) >> 16) & 0xff,	\
-    type, 1, dpl, 1, (unsigned) (lim) >> 28, 0, 0, 1, 1,		\
+    type, 1, dpl, 1, (unsigned) (lim) >> 28, 0, 0, 1, 1,			\
     (unsigned) (base) >> 24 }
-#define SEG16(type, base, lim, dpl) (struct Segdesc)			\
-{ (lim) & 0xffff, (base) & 0xffff, ((base) >> 16) & 0xff,		\
-    type, 1, dpl, 1, (unsigned) (lim) >> 16, 0, 0, 1, 0,		\
+#define SEG16(type, base, lim, dpl) (segdesc_t)						\
+{ (lim) & 0xffff, (base) & 0xffff, ((base) >> 16) & 0xff,			\
+    type, 1, dpl, 1, (unsigned) (lim) >> 16, 0, 0, 1, 0,			\
     (unsigned) (base) >> 24 }
 
 #endif /* !__ASSEMBLER__ */
@@ -231,7 +231,7 @@ struct Segdesc {
 #ifndef __ASSEMBLER__
 
 // Task state segment format (as described by the Pentium architecture book)
-struct Taskstate {
+typedef struct Taskstate {
 	uint32_t ts_link;	// Old ts selector
 	uintptr_t ts_esp0;	// Stack pointers and segment selectors
 	uint16_t ts_ss0;	//   after an increase in privilege level
@@ -269,10 +269,10 @@ struct Taskstate {
 	uint16_t ts_padding10;
 	uint16_t ts_t;		// Trap on task switch
 	uint16_t ts_iomb;	// I/O map base address
-};
+} taskstate_t;
 
 // Gate descriptors for interrupts and traps
-struct Gatedesc {
+typedef struct Gatedesc {
 	unsigned gd_off_15_0 : 16;   // low 16 bits of offset in segment
 	unsigned gd_ss : 16;         // segment selector
 	unsigned gd_args : 5;        // # args, 0 for interrupt/trap gates
@@ -282,7 +282,7 @@ struct Gatedesc {
 	unsigned gd_dpl : 2;         // DPL - highest ring allowed to use this
 	unsigned gd_p : 1;           // Present
 	unsigned gd_off_31_16 : 16;  // high bits of offset in segment
-};
+} gatedesc_t;
 
 // Set up a normal interrupt/trap gate descriptor.
 // - istrap: 1 for a trap (= exception) gate, 0 for an interrupt gate.
@@ -319,11 +319,11 @@ struct Gatedesc {
 }
 
 // Pseudo-descriptors used for LGDT, LLDT and LIDT instructions.
-struct Pseudodesc {
+typedef struct Pseudodesc {
 	uint16_t pd_lim;		// Limit
 	uint32_t pd_base;		// Base address
-} __attribute__ ((packed));
+} __attribute__ ((packed)) pseudodesc_t;
 
 #endif /* !__ASSEMBLER__ */
 
-#endif /* !JOS_INC_MMU_H */
+#endif /* !ROS_INC_MMU_H */

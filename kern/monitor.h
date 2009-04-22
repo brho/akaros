@@ -1,21 +1,23 @@
-#ifndef JOS_KERN_MONITOR_H
-#define JOS_KERN_MONITOR_H
-#ifndef JOS_KERNEL
-# error "This is a JOS kernel header; user programs should not #include it"
+#ifndef ROS_KERN_MONITOR_H
+#define ROS_KERN_MONITOR_H
+#ifndef ROS_KERNEL
+# error "This is a ROS kernel header; user programs should not #include it"
 #endif
+
+#include <kern/trap.h>
 
 // Activate the kernel monitor,
 // optionally providing a trap frame indicating the current state
 // (NULL if none).
-void (IN_HANDLER monitor)(struct Trapframe *tf);
+void (IN_HANDLER monitor)(trapframe_t *tf);
 
 // Functions implementing monitor commands.
-int mon_help(int argc, char *NTS *NT COUNT(argc) argv, struct Trapframe *tf);
-int mon_kerninfo(int argc, char *NTS *NT COUNT(argc) argv, struct Trapframe *tf);
-int mon_backtrace(int argc, char *NTS *NT COUNT(argc) argv, struct Trapframe *tf);
-int mon_reboot(int argc, char *NTS *NT COUNT(argc) argv, struct Trapframe *tf);
-int mon_showmapping(int argc, char *NTS *NT COUNT(argc) argv, struct Trapframe *tf);
-int mon_setmapperm(int argc, char *NTS *NT COUNT(argc) argv, struct Trapframe *tf);
-int mon_cpuinfo(int argc, char *NTS *NT COUNT(argc) argv, struct Trapframe *tf);
+int mon_help(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
+int mon_kerninfo(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
+int mon_backtrace(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
+int mon_reboot(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
+int mon_showmapping(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
+int mon_setmapperm(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
+int mon_cpuinfo(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
 
-#endif	// !JOS_KERN_MONITOR_H
+#endif	// !ROS_KERN_MONITOR_H

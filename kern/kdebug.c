@@ -11,17 +11,17 @@
 #include <kern/pmap.h>
 #include <kern/env.h>
 
-extern const struct Stab __STAB_BEGIN__[];	// Beginning of stabs table
-extern const struct Stab __STAB_END__[];	// End of stabs table
+extern const stab_t __STAB_BEGIN__[];	// Beginning of stabs table
+extern const stab_t __STAB_END__[];	// End of stabs table
 extern const char __STABSTR_BEGIN__[];		// Beginning of string table
 extern const char __STABSTR_END__[];		// End of string table
 
-struct UserStabData {
-	const struct Stab *stabs;
-	const struct Stab *stab_end;
+typedef struct UserStabData {
+	const stab_t *stabs;
+	const stab_t *stab_end;
 	const char *stabstr;
 	const char *stabstr_end;
-};
+} user_stab_data_t;
 
 
 // stab_binsearch(stabs, region_left, region_right, type, addr)
@@ -61,7 +61,7 @@ struct UserStabData {
 //	will exit setting left = 118, right = 554.
 //
 static void
-stab_binsearch(const struct Stab *stabs, int *region_left, int *region_right,
+stab_binsearch(const stab_t *stabs, int *region_left, int *region_right,
 	       int type, uintptr_t addr)
 {
 	int l = *region_left, r = *region_right, any_matches = 0;
@@ -115,9 +115,9 @@ stab_binsearch(const struct Stab *stabs, int *region_left, int *region_right,
 //	information into '*info'.
 //
 int
-debuginfo_eip(uintptr_t addr, struct Eipdebuginfo *info)
+debuginfo_eip(uintptr_t addr, eipdebuginfo_t *info)
 {
-	const struct Stab *stabs, *stab_end;
+	const stab_t *stabs, *stab_end;
 	const char *stabstr, *stabstr_end;
 	int lfile, rfile, lfun, rfun, lline, rline;
 
@@ -141,7 +141,7 @@ debuginfo_eip(uintptr_t addr, struct Eipdebuginfo *info)
 		// to __STAB_BEGIN__, __STAB_END__, __STABSTR_BEGIN__, and
 		// __STABSTR_END__) in a structure located at virtual address
 		// USTABDATA.
-		const struct UserStabData *usd = (const struct UserStabData *) USTABDATA;
+		const user_stab_data_t *usd = (const user_stab_data_t *) USTABDATA;
 
 		// Make sure this memory is valid.
 		// Return -1 if it is not.  Hint: Call user_mem_check.

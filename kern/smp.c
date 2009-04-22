@@ -20,19 +20,19 @@ uintptr_t smp_stack_top;
 barrier_t generic_barrier;
 
 /* Breaks us out of the waiting loop in smp_boot */
-static void smp_boot_handler(struct Trapframe *tf)
+static void smp_boot_handler(trapframe_t *tf)
 {
 	{HANDLER_ATOMIC atomic_dec(&waiting); }
 }
 
-static void smp_mtrr_handler(struct Trapframe *tf)
+static void smp_mtrr_handler(trapframe_t *tf)
 {
 	setup_default_mtrrs(&generic_barrier);
 }
 
 void smp_boot(void)
 {
-	struct Page* smp_stack;
+	page_t *smp_stack;
 	extern isr_t interrupt_handlers[];
 	// NEED TO GRAB A LOWMEM FREE PAGE FOR AP BOOTUP CODE
 	// page1 (2nd page) is reserved, hardcoded in pmap.c
@@ -51,7 +51,11 @@ void smp_boot(void)
 
 	// set up the local APIC timer to fire 0xf0 once.  hardcoded to break
 	// out of the spinloop on waiting.  really just want to wait a little
+<<<<<<< HEAD:kern/smp.c
 	lapic_set_timer(0x0000ffff, 0xf0, 0); // TODO - fix timing
+=======
+	lapic_set_timer(SMP_BOOT_TIMEOUT, boot_vector, 0); // TODO - fix timing
+>>>>>>> 45d6e6c... Cleanup JOS references and add typedefs:kern/smp.c
 	// set the function handler to respond to this
 	register_interrupt_handler(interrupt_handlers, 0xf0, smp_boot_handler);
 
@@ -70,7 +74,11 @@ void smp_boot(void)
 	// second SIPI
 	waiting = 1;
 	send_startup_ipi(0x01);
+<<<<<<< HEAD:kern/smp.c
 	lapic_set_timer(0x000fffff, 0xf0, 0); // TODO - fix timing
+=======
+	lapic_set_timer(SMP_BOOT_TIMEOUT, boot_vector, 0); // TODO - fix timing
+>>>>>>> 45d6e6c... Cleanup JOS references and add typedefs:kern/smp.c
 	while(waiting) // wait for the second SIPI to take effect
 		cpu_relax();
 	*/
@@ -134,7 +142,7 @@ uint32_t smp_main(void)
 	*/
 	
 	// Get a per-core kernel stack
-	struct Page* my_stack;
+	page_t *my_stack;
 	if (page_alloc(&my_stack))
 		panic("Unable to alloc a per-core stack!");
 	memset(page2kva(my_stack), 0, PGSIZE);
@@ -142,30 +150,30 @@ uint32_t smp_main(void)
 	// Set up a gdt / gdt_pd for this core, stored at the top of the stack
 	// This is necessary, eagle-eyed readers know why
 	// GDT should be 4-byte aligned.  TS isn't aligned.  Not sure if it matters.
-	struct Pseudodesc* my_gdt_pd = page2kva(my_stack) + PGSIZE - 
-		sizeof(struct Pseudodesc) - sizeof(struct Segdesc)*SEG_COUNT;
-	struct Segdesc* my_gdt = page2kva(my_stack) + PGSIZE - 
-		sizeof(struct Segdesc)*SEG_COUNT;
+	pseudodesc_t *my_gdt_pd = page2kva(my_stack) + PGSIZE - 
+		sizeof(pseudodesc_t) - sizeof(segdesc_t)*SEG_COUNT;
+	segdesc_t *my_gdt = page2kva(my_stack) + PGSIZE - 
+		sizeof(segdesc_t)*SEG_COUNT;
 	// TS also needs to be permanent
-	struct Taskstate* my_ts = page2kva(my_stack) + PGSIZE - 
-		sizeof(struct Pseudodesc) - sizeof(struct Segdesc)*SEG_COUNT - 
-		sizeof(struct Taskstate);
+	taskstate_t *my_ts = page2kva(my_stack) + PGSIZE - 
+		sizeof(pseudodesc_t) - sizeof(segdesc_t)*SEG_COUNT - 
+		sizeof(taskstate_t);
 	// Usable portion of the KSTACK grows down from here
 	// Won't actually start using this stack til our first interrupt
 	// (issues with changing the stack pointer and then trying to "return")
 	uintptr_t my_stack_top = (uintptr_t)my_ts;
 
 	// Build and load the gdt / gdt_pd
-	memcpy(my_gdt, gdt, sizeof(struct Segdesc)*SEG_COUNT);
-	*my_gdt_pd = (struct Pseudodesc) { 
-		sizeof(struct Segdesc)*SEG_COUNT - 1, (uintptr_t) my_gdt };
+	memcpy(my_gdt, gdt, sizeof(segdesc_t)*SEG_COUNT);
+	*my_gdt_pd = (pseudodesc_t) { 
+		sizeof(segdesc_t)*SEG_COUNT - 1, (uintptr_t) my_gdt };
 	asm volatile("lgdt %0" : : "m"(*my_gdt_pd));
 
 	// Need to set the TSS so we know where to trap on this core
 	my_ts->ts_esp0 = my_stack_top;
 	my_ts->ts_ss0 = GD_KD;
 	// Initialize the TSS field of my_gdt.
-	my_gdt[GD_TSS >> 3] = SEG16(STS_T32A, (uint32_t) (my_ts), sizeof(struct Taskstate), 0);
+	my_gdt[GD_TSS >> 3] = SEG16(STS_T32A, (uint32_t) (my_ts), sizeof(taskstate_t), 0);
 	my_gdt[GD_TSS >> 3].sd_s = 0;
 	// Load the TSS
 	ltr(GD_TSS);

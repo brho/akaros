@@ -1,20 +1,20 @@
-#ifndef JOS_KERN_KDEBUG_H
-#define JOS_KERN_KDEBUG_H
+#ifndef ROS_KERN_KDEBUG_H
+#define ROS_KERN_KDEBUG_H
 
 #include <inc/types.h>
 
 // Debug information about a particular instruction pointer
-struct Eipdebuginfo {
+typedef struct Eipdebuginfo {
 	const char *eip_file;		// Source code filename for EIP
-	int eip_line;			// Source code linenumber for EIP
+	int eip_line;				// Source code linenumber for EIP
 
 	const char *eip_fn_name;	// Name of function containing EIP
-					//  - Note: not null terminated!
-	int eip_fn_namelen;		// Length of function name
+								//  - Note: not null terminated!
+	int eip_fn_namelen;			// Length of function name
 	uintptr_t eip_fn_addr;		// Address of start of function
-	int eip_fn_narg;		// Number of function arguments
-};
+	int eip_fn_narg;			// Number of function arguments
+} eipdebuginfo_t;
 
-int debuginfo_eip(uintptr_t eip, struct Eipdebuginfo *info);
+int debuginfo_eip(uintptr_t eip, eipdebuginfo_t *info);
 
 #endif

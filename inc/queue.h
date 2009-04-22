@@ -32,8 +32,8 @@
  * TAILQ and CIRCLEQ definitions have been removed.   - August 9, 2005
  */
 
-#ifndef JOS_INC_QUEUE_H
-#define JOS_INC_QUEUE_H
+#ifndef ROS_INC_QUEUE_H
+#define ROS_INC_QUEUE_H
 
 /*
  * A list is headed by a single forward pointer (or an array of forward
@@ -49,15 +49,15 @@
  */
 #if 0
 
-struct Frob
+typedef struct Frob
 {
 	int frobozz;
-	LIST_ENTRY(Frob) frob_link;	/* this contains the list element pointers */
-};
+	LIST_ENTRY(frob_t) frob_link;	/* this contains the list element pointers */
+} frob_t;
 
-LIST_HEAD(Frob_list, Frob)		/* defines struct Frob_list as a list of Frob */
+LIST_HEAD(frob_list_t, frob_t)		/* defines struct Frob_list as a list of Frob */
 
-struct Frob_list flist;			/* declare a Frob list */
+frob_list_t flist;			/* declare a Frob list */
 
 LIST_INIT(&flist);			/* clear flist (globals are cleared anyway) */
 flist = LIST_HEAD_INITIALIZER(&flist);	/* alternate way to clear flist */
@@ -65,7 +65,7 @@ flist = LIST_HEAD_INITIALIZER(&flist);	/* alternate way to clear flist */
 if(LIST_EMPTY(&flist))			/* check whether list is empty */
 	printf("list is empty\n");
 
-struct Frob *f = LIST_FIRST(&flist);	/* f is first element in list */
+frob_t *f = LIST_FIRST(&flist);	/* f is first element in list */
 f = LIST_NEXT(f, frob_link);		/* now f is next (second) element in list */
 f = LIST_NEXT(f, frob_link);		/* now f is next (third) element in list */
 
@@ -102,14 +102,14 @@ LIST_INSERT_HEAD(&flist, g, frob_link);	/* add g as first element in list */
  * elements to be linked into the list.  A pointer to the head of the list can later be
  * declared as:
  * 
- *       struct HEADNAME *headp;
+ *       HEADNAME *headp;
  * 
  * (The names head and headp are user selectable.)
  */
-#define	LIST_HEAD(name, type)						\
-struct name {								\
-	struct type *lh_first;	/* first element */			\
-}
+#define	LIST_HEAD(name, type)					\
+typedef struct {								\
+	type *lh_first;	/* first element */			\
+} name;
 
 /*
  * Set a list head variable to LIST_HEAD_INITIALIZER(head)
@@ -128,8 +128,8 @@ struct name {								\
  */
 #define	LIST_ENTRY(type)						\
 struct {								\
-	struct type *le_next;	/* next element */			\
-	struct type **le_prev;	/* ptr to ptr to this element */	\
+	type *le_next;	/* next element */			\
+	type **le_prev;	/* ptr to ptr to this element */	\
 }
 
 /*

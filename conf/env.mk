@@ -1,4 +1,4 @@
-# env.mk - configuration variables for the JOS lab
+# env.mk - configuration variables for the ROS lab
 
 
 # '$(V)' controls whether the lab makefiles print verbose commands (the

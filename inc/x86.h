@@ -1,5 +1,5 @@
-#ifndef JOS_INC_X86_H
-#define JOS_INC_X86_H
+#ifndef ROS_INC_X86_H
+#define ROS_INC_X86_H
 
 #include <inc/types.h>
 #include <inc/mmu.h>
@@ -406,4 +406,4 @@ clflush(uintptr_t* addr) __attribute__((always_inline))
 {
 	asm volatile("clflush %0" : : "m"(*addr));
 }
-#endif /* !JOS_INC_X86_H */
+#endif /* !ROS_INC_X86_H */

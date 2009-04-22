@@ -1,5 +1,5 @@
-#ifndef JOS_KBDREG_H
-#define JOS_KBDREG_H
+#ifndef ROS_KBDREG_H
+#define ROS_KBDREG_H
 
 // Special keycodes
 #define KEY_HOME	0xE0
@@ -80,4 +80,4 @@
 #define	KBR_RSTDONE	0xAA	/* reset complete */
 #define	KBR_ECHO	0xEE	/* echo response */
 
-#endif /* !JOS_KBDREG_H */
+#endif /* !ROS_KBDREG_H */

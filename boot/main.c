@@ -34,7 +34,7 @@
  **********************************************************************/
 
 #define SECTSIZE	512
-#define ELFHDR		((struct Elf *) 0x10000) // scratch space
+#define ELFHDR		((elf_t *) 0x10000) // scratch space
 
 void readsect(void*, uint32_t);
 void readseg(uint32_t, uint32_t, uint32_t);
@@ -42,7 +42,7 @@ void readseg(uint32_t, uint32_t, uint32_t);
 void
 cmain(void)
 {
-	struct Proghdr *ph, *eph;
+	proghdr_t *ph, *eph;
 
 	// read 1st page off disk
 	readseg((uint32_t) ELFHDR, SECTSIZE*8, 0);
@@ -52,7 +52,7 @@ cmain(void)
 		goto bad;
 
 	// load each program segment (ignores ph flags)
-	ph = (struct Proghdr *) ((uint8_t *) ELFHDR + ELFHDR->e_phoff);
+	ph = (proghdr_t *) ((uint8_t *) ELFHDR + ELFHDR->e_phoff);
 	eph = ph + ELFHDR->e_phnum;
 	for (; ph < eph; ph++)
 		readseg(ph->p_va, ph->p_memsz, ph->p_offset);

@@ -1,5 +1,5 @@
-#ifndef JOS_INC_SYSCALL_H
-#define JOS_INC_SYSCALL_H
+#ifndef ROS_INC_SYSCALL_H
+#define ROS_INC_SYSCALL_H
 
 /* system call numbers */
 enum
@@ -11,4 +11,4 @@ enum
 	NSYSCALLS
 };
 
-#endif /* !JOS_INC_SYSCALL_H */
+#endif /* !ROS_INC_SYSCALL_H */

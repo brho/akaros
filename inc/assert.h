@@ -1,7 +1,7 @@
 /* See COPYRIGHT for copyright information. */
 
-#ifndef JOS_INC_ASSERT_H
-#define JOS_INC_ASSERT_H
+#ifndef ROS_INC_ASSERT_H
+#define ROS_INC_ASSERT_H
 
 #include <inc/stdio.h>
 
@@ -17,4 +17,4 @@ void _panic(const char* NTS, int, const char* NTS, ...) __attribute__((noreturn)
 // static_assert(x) will generate a compile-time error if 'x' is false.
 #define static_assert(x)	switch (x) case 0: case (x):
 
-#endif /* !JOS_INC_ASSERT_H */
+#endif /* !ROS_INC_ASSERT_H */

@@ -1,5 +1,5 @@
 #
-# Makefile fragment for JOS kernel.
+# Makefile fragment for ROS kernel.
 # This is NOT a complete makefile;
 # you must run GNU make in the top-level directory
 # where the GNUmakefile is located.

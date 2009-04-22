@@ -16,15 +16,15 @@
 // in order to make the lines output to the console atomic
 // and prevent interrupts from causing context switches
 // in the middle of a console output line and such.
-struct printbuf {
+typedef struct printbuf {
 	int idx;	// current buffer index
 	int cnt;	// total bytes printed so far
 	char buf[256];
-};
+} printbuf_t;
 
 
 static void
-putch(int ch, struct printbuf *b)
+putch(int ch, printbuf_t *b)
 {
 	b->buf[b->idx++] = ch;
 	if (b->idx == 256-1) {
@@ -37,7 +37,7 @@ putch(int ch, struct printbuf *b)
 int
 vcprintf(const char *fmt, va_list ap)
 {
-	struct printbuf b;
+	printbuf_t b;
 
 	b.idx = 0;
 	b.cnt = 0;

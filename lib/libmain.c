@@ -5,7 +5,7 @@
 
 extern void umain(int argc, char **argv);
 
-volatile struct Env *env;
+volatile env_t *env;
 char *binaryname = "(PROGRAM NAME UNKNOWN)";
 
 void

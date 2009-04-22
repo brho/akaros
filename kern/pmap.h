@@ -1,18 +1,16 @@
 /* See COPYRIGHT for copyright information. */
 
-#ifndef JOS_KERN_PMAP_H
-#define JOS_KERN_PMAP_H
-#ifndef JOS_KERNEL
-# error "This is a JOS kernel header; user programs should not #include it"
+#ifndef ROS_KERN_PMAP_H
+#define ROS_KERN_PMAP_H
+#ifndef ROS_KERNEL
+# error "This is a ROS kernel header; user programs should not #include it"
 #endif
 
 #include <inc/memlayout.h>
 #include <inc/assert.h>
 #include <inc/multiboot.h>
 #include <kern/atomic.h>
-
-struct Env;
-
+#include <kern/env.h>
 
 /* This macro takes a kernel virtual address -- an address that points above
  * KERNBASE, where the machine's maximum 256MB of physical memory is mapped --
@@ -42,14 +40,14 @@ struct Env;
 
 extern char bootstacktop[], bootstack[];
 
-extern struct Page *pages;
+extern page_t *pages;
 extern size_t npage;
 
 extern physaddr_t boot_cr3;
 extern pde_t *boot_pgdir;
 
-extern struct Segdesc (COUNT(SEG_COUNT) gdt)[];
-extern struct Pseudodesc gdt_pd;
+extern segdesc_t (COUNT(SEG_COUNT) gdt)[];
+extern pseudodesc_t gdt_pd;
 
 void	i386_detect_memory(multiboot_info_t *mbi);
 void	i386_print_memory_map(multiboot_info_t *mbi);
@@ -58,22 +56,22 @@ void	i386_vm_init(void);
 
 void	page_init(void);
 void	page_check(void);
-int	page_alloc(struct Page **pp_store);
-void	page_free(struct Page *pp);
-int	page_insert(pde_t *pgdir, struct Page *pp, void *va, int perm);
+int	page_alloc(page_t **pp_store);
+void	page_free(page_t *pp);
+int	page_insert(pde_t *pgdir, page_t *pp, void *va, int perm);
 void	page_remove(pde_t *pgdir, void *va);
-struct Page *page_lookup(pde_t *pgdir, void *va, pte_t **pte_store);
-void	page_decref(struct Page *pp);
+page_t *page_lookup(pde_t *pgdir, void *va, pte_t **pte_store);
+void	page_decref(page_t *pp);
 
 void setup_default_mtrrs(barrier_t* smp_barrier);
 void	tlb_invalidate(pde_t *pgdir, void *va);
 void tlb_flush_global(void);
 
 void *COUNT(len)
-user_mem_check(struct Env *env, const void *DANGEROUS va, size_t len, int perm);
+user_mem_check(env_t *env, const void *DANGEROUS va, size_t len, int perm);
 
 void *COUNT(len)
-user_mem_assert(struct Env *env, const void *DANGEROUS va, size_t len, int perm);
+user_mem_assert(env_t *env, const void *DANGEROUS va, size_t len, int perm);
 
 static inline void cache_flush(void)
 {
@@ -85,32 +83,28 @@ static inline void cacheline_flush(void* addr)
 	clflush((uintptr_t*)addr);
 }
 
-static inline ppn_t
-page2ppn(struct Page *pp)
+static inline ppn_t page2ppn(page_t *pp)
 {
 	return pp - pages;
 }
 
-static inline physaddr_t
-page2pa(struct Page *pp)
+static inline physaddr_t page2pa(page_t *pp)
 {
 	return page2ppn(pp) << PGSHIFT;
 }
 
-static inline struct Page*
-pa2page(physaddr_t pa)
+static inline page_t* pa2page(physaddr_t pa)
 {
 	if (PPN(pa) >= npage)
 		warn("pa2page called with pa larger than npage");
 	return &pages[PPN(pa)];
 }
 
-static inline void*
-page2kva(struct Page *pp)
+static inline void* page2kva(page_t *pp)
 {
 	return KADDR(page2pa(pp));
 }
 
 pte_t *pgdir_walk(pde_t *pgdir, const void *va, int create);
 
-#endif /* !JOS_KERN_PMAP_H */
+#endif /* !ROS_KERN_PMAP_H */

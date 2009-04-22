@@ -1,9 +1,9 @@
 /* See COPYRIGHT for copyright information. */
 
-#ifndef JOS_KERN_KCLOCK_H
-#define JOS_KERN_KCLOCK_H
-#ifndef JOS_KERNEL
-# error "This is a JOS kernel header; user programs should not #include it"
+#ifndef ROS_KERN_KCLOCK_H
+#define ROS_KERN_KCLOCK_H
+#ifndef ROS_KERNEL
+# error "This is a ROS kernel header; user programs should not #include it"
 #endif
 
 #define	IO_RTC		0x070		/* RTC port */
@@ -30,4 +30,4 @@ unsigned mc146818_read(unsigned reg);
 void mc146818_write(unsigned reg, unsigned datum);
 void kclock_init(void);
 
-#endif	// !JOS_KERN_KCLOCK_H
+#endif	// !ROS_KERN_KCLOCK_H

@@ -1,5 +1,5 @@
-#ifndef JOS_INC_MEMLAYOUT_H
-#define JOS_INC_MEMLAYOUT_H
+#ifndef ROS_INC_MEMLAYOUT_H
+#define ROS_INC_MEMLAYOUT_H
 
 #ifndef __ASSEMBLER__
 #include <inc/types.h>
@@ -73,7 +73,7 @@
  *
  * (*) Note: The kernel ensures that "Invalid Memory" (ULIM) is *never*
  *     mapped.  "Empty Memory" is normally unmapped, but user programs may
- *     map pages there if desired.  JOS user programs map pages temporarily
+ *     map pages there if desired.  ROS user programs map pages temporarily
  *     at UTEMP.
  */
 
@@ -157,7 +157,6 @@ typedef uint32_t pde_t;
 extern volatile pte_t vpt[];     // VA of "virtual page table"
 extern volatile pde_t vpd[];     // VA of current page directory
 
-
 /*
  * Page descriptor structures, mapped at UPAGES.
  * Read/write to the kernel, read-only to user programs.
@@ -166,11 +165,15 @@ extern volatile pde_t vpd[];     // VA of current page directory
  * You can map a Page * to the corresponding physical address
  * with page2pa() in kern/pmap.h.
  */
-LIST_HEAD(Page_list, Page);
-typedef LIST_ENTRY(Page) Page_LIST_entry_t;
+
+struct Page;
+typedef struct Page page_t;
+
+LIST_HEAD(page_list_t, page_t);
+typedef LIST_ENTRY(page_t) page_list_entry_t;
 
 struct Page {
-	Page_LIST_entry_t pp_link;	/* free list link */
+	page_list_entry_t pp_link;	/* free list link */
 
 	// pp_ref is the count of pointers (usually in page table entries)
 	// to this page, for pages allocated using page_alloc.
@@ -181,4 +184,4 @@ struct Page {
 };
 
 #endif /* !__ASSEMBLER__ */
-#endif /* !JOS_INC_MEMLAYOUT_H */
+#endif /* !ROS_INC_MEMLAYOUT_H */

@@ -1,7 +1,7 @@
 /*	$NetBSD: stdarg.h,v 1.12 1995/12/25 23:15:31 mycroft Exp $	*/
 
-#ifndef JOS_INC_STDARG_H
-#define	JOS_INC_STDARG_H
+#ifndef ROS_INC_STDARG_H
+#define	ROS_INC_STDARG_H
 
 typedef void * TRUSTED va_list;
 
@@ -16,4 +16,4 @@ typedef void * TRUSTED va_list;
 
 #define	va_end(ap)	((void)0)
 
-#endif	/* !JOS_INC_STDARG_H */
+#endif	/* !ROS_INC_STDARG_H */

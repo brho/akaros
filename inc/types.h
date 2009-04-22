@@ -1,5 +1,5 @@
-#ifndef JOS_INC_TYPES_H
-#define JOS_INC_TYPES_H
+#ifndef ROS_INC_TYPES_H
+#define ROS_INC_TYPES_H
 
 #ifndef NULL
 #define NULL ((void*) 0)
@@ -114,4 +114,4 @@ typedef int32_t off_t;
 }
 /**************************************************************/
 
-#endif /* !JOS_INC_TYPES_H */
+#endif /* !ROS_INC_TYPES_H */

@@ -1,5 +1,5 @@
-#ifndef JOS_INC_STDIO_H
-#define JOS_INC_STDIO_H
+#ifndef ROS_INC_STDIO_H
+#define ROS_INC_STDIO_H
 
 #include <inc/stdarg.h>
 
@@ -40,4 +40,4 @@ int	vfprintf(int fd, const char *fmt, va_list);
 // lib/readline.c
 char *NTS readline(const char *NTS prompt);
 
-#endif /* !JOS_INC_STDIO_H */
+#endif /* !ROS_INC_STDIO_H */

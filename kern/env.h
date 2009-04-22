@@ -1,31 +1,31 @@
 /* See COPYRIGHT for copyright information. */
 
-#ifndef JOS_KERN_ENV_H
-#define JOS_KERN_ENV_H
+#ifndef ROS_KERN_ENV_H
+#define ROS_KERN_ENV_H
 
 #include <inc/env.h>
 
-#ifndef JOS_MULTIENV
+#ifndef ROS_MULTIENV
 // Change this value to 1 once you're allowing multiple environments
 // (for UCLA: Lab 3, Part 3; for MIT: Lab 4).
-#define JOS_MULTIENV 0
+#define ROS_MULTIENV 0
 #endif
 
-extern struct Env *envs;		// All environments
-extern struct Env *NORACE curenv;	        // Current environment
+extern env_t *envs;		// All environments
+extern env_t *NORACE curenv;	        // Current environment
 
-LIST_HEAD(Env_list, Env);		// Declares 'struct Env_list'
+LIST_HEAD(env_list_t, env_t);		// Declares 'struct Env_list'
 
 void	env_init(void);
-int	env_alloc(struct Env **e, envid_t parent_id);
-void	env_free(struct Env *e);
+int		env_alloc(env_t **e, envid_t parent_id);
+void	env_free(env_t *e);
 void	env_create(uint8_t *binary, size_t size);
-void	(IN_HANDLER env_destroy)(struct Env *e);	// Does not return if e == curenv
+void	(IN_HANDLER env_destroy)(env_t *e);	// Does not return if e == curenv
 
-int	envid2env(envid_t envid, struct Env **env_store, bool checkperm);
+int	envid2env(envid_t envid, env_t **env_store, bool checkperm);
 // The following two functions do not return
-void	(IN_HANDLER env_run)(struct Env *e) __attribute__((noreturn));
-void	env_pop_tf(struct Trapframe *tf) __attribute__((noreturn));
+void	(IN_HANDLER env_run)(env_t *e) __attribute__((noreturn));
+void	env_pop_tf(trapframe_t *tf) __attribute__((noreturn));
 
 // For the grading script
 #define ENV_CREATE2(start, size)	{		\
@@ -40,4 +40,4 @@ void	env_pop_tf(struct Trapframe *tf) __attribute__((noreturn));
 		(int)_binary_obj_##x##_size);		\
 }
 
-#endif // !JOS_KERN_ENV_H
+#endif // !ROS_KERN_ENV_H

@@ -27,7 +27,7 @@ typedef struct command {
 	const char *NTS name;
 	const char *NTS desc;
 	// return -1 to force monitor to exit
-	int (*func)(int argc, char *NTS *NT COUNT(argc) argv, struct Trapframe* tf);
+	int (*func)(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
 } command_t;
 
 static command_t commands[] = {
@@ -43,7 +43,7 @@ static command_t commands[] = {
 
 /***** Implementations of basic kernel monitor commands *****/
 
-int mon_help(int argc, char **argv, struct Trapframe *tf)
+int mon_help(int argc, char **argv, trapframe_t *tf)
 {
 	int i;
 
@@ -52,7 +52,7 @@ int mon_help(int argc, char **argv, struct Trapframe *tf)
 	return 0;
 }
 
-int mon_kerninfo(int argc, char **argv, struct Trapframe *tf)
+int mon_kerninfo(int argc, char **argv, trapframe_t *tf)
 {
 	extern char (SNT _start)[], (SNT etext)[], (SNT edata)[], (SNT end)[];
 
@@ -90,10 +90,10 @@ static char* function_of(uint32_t address)
 	return stabstr + best_symtab->n_strx;
 }
 
-int mon_backtrace(int argc, char **argv, struct Trapframe *tf)
+int mon_backtrace(int argc, char **argv, trapframe_t *tf)
 {
 	uint32_t* ebp, eip;
-	struct Eipdebuginfo debuginfo;
+	eipdebuginfo_t debuginfo;
 	char buf[256];
 	int j, i = 1;
 	ebp = (uint32_t*)read_ebp();	
@@ -123,7 +123,7 @@ int mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 	return 0;
 }
 
-int mon_reboot(int argc, char **argv, struct Trapframe *tf)
+int mon_reboot(int argc, char **argv, trapframe_t *tf)
 {
 	cprintf("[Irish Accent]: She's goin' down, Cap'n!\n");
 	outb(0x92, 0x3);
@@ -138,7 +138,7 @@ int mon_reboot(int argc, char **argv, struct Trapframe *tf)
 	return 0;
 }
 
-int mon_showmapping(int argc, char **argv, struct Trapframe *tf)
+int mon_showmapping(int argc, char **argv, trapframe_t *tf)
 {
 	if (argc < 2) {
 		cprintf("Shows virtual -> physical mappings for a virtual address range.\n");
@@ -147,7 +147,7 @@ int mon_showmapping(int argc, char **argv, struct Trapframe *tf)
 	}
 	pde_t* pgdir = (pde_t*)vpd;
 	pte_t *pte, *pde;
-	struct Page* page;
+	page_t* page;
 	uintptr_t start, i;
 	size_t size;
 	start = ROUNDDOWN(strtol(argv[1], 0, 16), PGSIZE);
@@ -174,7 +174,7 @@ int mon_showmapping(int argc, char **argv, struct Trapframe *tf)
 	return 0;
 }
 
-int mon_setmapperm(int argc, char **argv, struct Trapframe *tf)
+int mon_setmapperm(int argc, char **argv, trapframe_t *tf)
 {
 	if (argc < 3) {
 		cprintf("Sets VIRT_ADDR's mapping's permissions to PERMS (in hex)\n");
@@ -185,7 +185,7 @@ int mon_setmapperm(int argc, char **argv, struct Trapframe *tf)
 	}
 	pde_t* pgdir = (pde_t*)vpd;
 	pte_t *pte, *pde;
-	struct Page* page;
+	page_t* page;
 	uintptr_t va;
 	va = ROUNDDOWN(strtol(argv[1], 0, 16), PGSIZE);
 	page = page_lookup(pgdir, (void*)va, &pte);
@@ -209,7 +209,7 @@ int mon_setmapperm(int argc, char **argv, struct Trapframe *tf)
 	return 0;
 }
 
-int mon_cpuinfo(int argc, char **argv, struct Trapframe *tf)
+int mon_cpuinfo(int argc, char **argv, trapframe_t *tf)
 {
 	extern uint8_t num_cpus;
 
@@ -228,7 +228,7 @@ int mon_cpuinfo(int argc, char **argv, struct Trapframe *tf)
 #define WHITESPACE "\t\r\n "
 #define MAXARGS 16
 
-static int runcmd(char *COUNT(CMDBUF_SIZE) real_buf, struct Trapframe* tf) {
+static int runcmd(char *COUNT(CMDBUF_SIZE) real_buf, trapframe_t *tf) {
 	char *BND(real_buf, real_buf+CMDBUF_SIZE) buf = real_buf;
 	int argc;
 	char *NTS argv[MAXARGS];
@@ -267,7 +267,7 @@ static int runcmd(char *COUNT(CMDBUF_SIZE) real_buf, struct Trapframe* tf) {
 	return 0;
 }
 
-void monitor(struct Trapframe* tf) {
+void monitor(trapframe_t *tf) {
 	char *buf;
 
 	cprintf("Welcome to the ROS kernel monitor!\n");

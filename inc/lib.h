@@ -4,8 +4,8 @@
 // and is intended to be linked into all user-mode applications
 // (NOT the kernel or boot loader).
 
-#ifndef JOS_INC_LIB_H
-#define JOS_INC_LIB_H 1
+#ifndef ROS_INC_LIB_H
+#define ROS_INC_LIB_H 1
 
 #include <inc/types.h>
 #include <inc/stdio.h>
@@ -21,9 +21,9 @@
 
 // libos.c or entry.S
 extern char *binaryname;
-extern volatile struct Env *env;
-extern volatile struct Env envs[NENV];
-extern volatile struct Page pages[];
+extern volatile env_t *env;
+extern volatile env_t envs[NENV];
+extern volatile page_t pages[];
 void	exit(void);
 
 // readline.c
@@ -48,4 +48,4 @@ int	sys_env_destroy(envid_t);
 #define	O_EXCL		0x0400		/* error if already exists */
 #define O_MKDIR		0x0800		/* create directory, not regular file */
 
-#endif	// !JOS_INC_LIB_H
+#endif	// !ROS_INC_LIB_H

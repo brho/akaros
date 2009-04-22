@@ -15,9 +15,9 @@
 #include <kern/trap.h>
 #include <kern/monitor.h>
 
-struct Env *envs = NULL;		// All environments
-struct Env *curenv = NULL;	        // The current env
-static struct Env_list env_free_list;	// Free list
+env_t *envs = NULL;		// All environments
+env_t *curenv = NULL;	        // The current env
+static env_list_t env_free_list;	// Free list
 
 #define ENVGENSHIFT	12		// >= LOGNENV
 
@@ -30,9 +30,9 @@ static struct Env_list env_free_list;	// Free list
 //   On error, sets *env_store to NULL.
 //
 int
-envid2env(envid_t envid, struct Env **env_store, bool checkperm)
+envid2env(envid_t envid, env_t **env_store, bool checkperm)
 {
-	struct Env *e;
+	env_t *e;
 
 	// If envid is zero, return the current environment.
 	if (envid == 0) {
@@ -41,7 +41,7 @@ envid2env(envid_t envid, struct Env **env_store, bool checkperm)
 	}
 
 	// Look up the Env structure via the index part of the envid,
-	// then check the env_id field in that struct Env
+	// then check the env_id field in that env_t
 	// to ensure that the envid is not stale
 	// (i.e., does not refer to a _previous_ environment
 	// that used the same slot in the envs[] array).
@@ -95,10 +95,10 @@ env_init(void)
 //	-E_NO_MEM if page directory or table could not be allocated.
 //
 static int
-env_setup_vm(struct Env *e)
+env_setup_vm(env_t *e)
 {
 	int i, r;
-	struct Page *p = NULL;
+	page_t *p = NULL;
 
 	// Allocate a page for the page directory
 	if ((r = page_alloc(&p)) < 0)
@@ -151,11 +151,11 @@ env_setup_vm(struct Env *e)
 //	-E_NO_MEM on memory exhaustion
 //
 int
-env_alloc(struct Env **newenv_store, envid_t parent_id)
+env_alloc(env_t **newenv_store, envid_t parent_id)
 {
 	int32_t generation;
 	int r;
-	struct Env *e;
+	env_t *e;
 
 	if (!(e = LIST_FIRST(&env_free_list)))
 		return -E_NO_FREE_ENV;
@@ -211,12 +211,12 @@ env_alloc(struct Env **newenv_store, envid_t parent_id)
 // Panic if any allocation attempt fails.
 //
 static void
-segment_alloc(struct Env *e, void *va, size_t len)
+segment_alloc(env_t *e, void *va, size_t len)
 {
 	void *start, *end;
 	size_t num_pages;
 	int i, r;
-	struct Page *page;
+	page_t *page;
 	pte_t *pte;
 
 	start = ROUNDDOWN(va, PGSIZE);
@@ -266,7 +266,7 @@ segment_alloc(struct Env *e, void *va, size_t len)
 //  - How might load_icode fail?  What might be wrong with the given input?
 //
 static void
-load_icode(struct Env *e, uint8_t *binary, size_t size)
+load_icode(env_t *e, uint8_t *binary, size_t size)
 {
 	// Hints: 
 	//  Load each program segment into virtual memory
@@ -297,7 +297,7 @@ load_icode(struct Env *e, uint8_t *binary, size_t size)
 	//  to make sure that the environment starts executing there.
 	//  What?  (See env_run() and env_pop_tf() below.)
 
-	struct Elf *elfhdr = (struct Elf*)binary;
+	elf_t *elfhdr = (elf_t *)binary;
 	int i, r;
 
 	// is this an elf?
@@ -311,7 +311,7 @@ load_icode(struct Env *e, uint8_t *binary, size_t size)
 	// mappings for the kernel as does boot_pgdir
 	lcr3(e->env_cr3);
 
-	struct Proghdr *phdr = (struct Proghdr*)(binary + elfhdr->e_phoff);
+	proghdr_t *phdr = (proghdr_t *)(binary + elfhdr->e_phoff);
 	for (i = 0; i < elfhdr->e_phnum; i++, phdr++) {
 		if (phdr->p_type != ELF_PROG_LOAD)
 			continue;
@@ -343,7 +343,7 @@ load_icode(struct Env *e, uint8_t *binary, size_t size)
 void
 env_create(uint8_t *binary, size_t size)
 {
-	struct Env *e;
+	env_t *e;
 	int r;
 
 	if ((r = env_alloc(&e, 0)) < 0)
@@ -355,7 +355,7 @@ env_create(uint8_t *binary, size_t size)
 // Frees env e and all memory it uses.
 // 
 void
-env_free(struct Env *e)
+env_free(env_t *e)
 {
 	pte_t *pt;
 	uint32_t pdeno, pteno;
@@ -407,7 +407,7 @@ env_free(struct Env *e)
 // to the caller).
 //
 void
-env_destroy(struct Env *e) 
+env_destroy(env_t *e) 
 {
 	env_free(e);
 
@@ -431,7 +431,7 @@ env_destroy(struct Env *e)
 // This function does not return.
 //
 void
-env_pop_tf(struct Trapframe *tf)
+env_pop_tf(trapframe_t *tf)
 {
 	__asm __volatile("movl %0,%%esp\n"
 		"\tpopal\n"
@@ -449,7 +449,7 @@ env_pop_tf(struct Trapframe *tf)
 //  (This function does not return.)
 //
 void
-env_run(struct Env *e)
+env_run(env_t *e)
 {
 	// Step 1: If this is a context switch (a new environment is running),
 	//	   then set 'curenv' to the new environment,

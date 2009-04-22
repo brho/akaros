@@ -1,7 +1,7 @@
 /* See COPYRIGHT for copyright information. */
 
-#ifndef JOS_INC_ERROR_H
-#define JOS_INC_ERROR_H
+#ifndef ROS_INC_ERROR_H
+#define ROS_INC_ERROR_H
 
 // Kernel error codes -- keep in sync with list in lib/printfmt.c.
 #define E_UNSPECIFIED	1	// Unspecified or unknown problem
@@ -15,4 +15,4 @@
 
 #define	MAXERROR	6
 
-#endif	// !JOS_INC_ERROR_H */
+#endif	// !ROS_INC_ERROR_H */

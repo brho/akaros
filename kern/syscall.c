@@ -55,7 +55,7 @@ static int
 sys_env_destroy(envid_t envid)
 {
 	int r;
-	struct Env *e;
+	env_t *e;
 
 	if ((r = envid2env(envid, &e, 1)) < 0)
 		return r;
@@ -83,7 +83,7 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 	
 	switch (syscallno) {
 		case 0:
-			sys_cputs(a1, a2);
+			sys_cputs((char *DANGEROUS)a1, (size_t)a2);
 			return 0;
 		case 1:
 			return sys_cgetc();

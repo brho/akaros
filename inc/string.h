@@ -1,5 +1,5 @@
-#ifndef JOS_INC_STRING_H
-#define JOS_INC_STRING_H
+#ifndef ROS_INC_STRING_H
+#define ROS_INC_STRING_H
 
 #include <inc/types.h>
 
@@ -21,4 +21,4 @@ void *	memfind(const void *s, int c, size_t len);
 
 long	strtol(const char *s, char **endptr, int base);
 
-#endif /* not JOS_INC_STRING_H */
+#endif /* not ROS_INC_STRING_H */

@@ -28,10 +28,10 @@ pde_t* boot_pgdir;		// Virtual address of boot time page directory
 physaddr_t boot_cr3;		// Physical address of boot time page directory
 static char* boot_freemem;	// Pointer to next byte of free mem
 
-struct Page* pages;		// Virtual address of physical page array
-static struct Page_list page_free_list;	// Free list of physical pages
+page_t *pages;		// Virtual address of physical page array
+static page_list_t page_free_list;	// Free list of physical pages
 
-extern struct Env *envs;
+extern env_t *envs;
 
 // Global descriptor table.
 //
@@ -39,7 +39,7 @@ extern struct Env *envs;
 // To load the SS register, the CPL must equal the DPL.  Thus,
 // we must duplicate the segments for the user and the kernel.
 //
-struct Segdesc gdt[] =
+segdesc_t gdt[] =
 {
 	// 0x0 - unused (always faults -- for trapping NULL far pointers)
 	SEG_NULL,
@@ -60,7 +60,7 @@ struct Segdesc gdt[] =
 	[GD_TSS >> 3] = SEG_NULL
 };
 
-struct Pseudodesc gdt_pd = {
+pseudodesc_t gdt_pd = {
 	sizeof(gdt) - 1, (unsigned long) gdt
 };
 
@@ -461,8 +461,8 @@ i386_vm_init(void)
 	// Your code goes here: 
 	
 	// round up to the nearest page
-	size_t page_array_size = ROUNDUP(npage*sizeof(struct Page), PGSIZE);
-	pages = (struct Page*)boot_alloc(page_array_size, PGSIZE);
+	size_t page_array_size = ROUNDUP(npage*sizeof(page_t), PGSIZE);
+	pages = (page_t *)boot_alloc(page_array_size, PGSIZE);
 	memset(pages, 0, page_array_size);
 	if (page_array_size > PTSIZE) {
 		warn("page_array_size bigger than PTSIZE, userland will not see all pages");
@@ -471,7 +471,7 @@ i386_vm_init(void)
 	boot_map_segment(pgdir, UPAGES, page_array_size, PADDR(pages), PTE_U | PTE_G);
 
 	//////////////////////////////////////////////////////////////////////
-	// Make 'envs' point to an array of size 'NENV' of 'struct Env'.
+	// Make 'envs' point to an array of size 'NENV' of 'env_t'.
 	// Map this array read-only by the user at linear address UENVS
 	// (ie. perm = PTE_U | PTE_P).
 	// Permissions:
@@ -479,8 +479,8 @@ i386_vm_init(void)
 	//    - the image of envs mapped at UENVS  -- kernel R, user R
 	
 	// round up to the nearest page
-	size_t env_array_size = ROUNDUP(NENV*sizeof(struct Env), PGSIZE);
-	envs = (struct Env*)boot_alloc(env_array_size, PGSIZE);
+	size_t env_array_size = ROUNDUP(NENV*sizeof(env_t), PGSIZE);
+	envs = (env_t *)boot_alloc(env_array_size, PGSIZE);
 	memset(envs, 0, env_array_size);
 	if (env_array_size > PTSIZE) {
 		warn("env_array_size bigger than PTSIZE, userland will not see all environments");
@@ -569,12 +569,12 @@ check_boot_pgdir(bool pse)
 	pgdir = boot_pgdir;
 
 	// check pages array
-	n = ROUNDUP(naddrpage*sizeof(struct Page), PGSIZE);
+	n = ROUNDUP(naddrpage*sizeof(page_t), PGSIZE);
 	for (i = 0; i < n; i += PGSIZE)
 		assert(check_va2pa(pgdir, UPAGES + i) == PADDR(pages) + i);
 
 	// check envs array (new test for lab 3)
-	n = ROUNDUP(NENV*sizeof(struct Env), PGSIZE);
+	n = ROUNDUP(NENV*sizeof(env_t), PGSIZE);
 	for (i = 0; i < n; i += PGSIZE)
 		assert(check_va2pa(pgdir, UENVS + i) == PADDR(envs) + i);
 
@@ -693,7 +693,7 @@ get_vaperms(pde_t *pgdir, uintptr_t va)
 		
 // --------------------------------------------------------------
 // Tracking of physical pages.
-// The 'pages' array has one 'struct Page' entry per physical page.
+// The 'pages' array has one 'page_t' entry per physical page.
 // Pages are reference counted, and free pages are kept on a linked list.
 // --------------------------------------------------------------
 
@@ -754,7 +754,7 @@ page_init(void)
 // Note that the corresponding physical page is NOT initialized!
 //
 static void
-page_initpp(struct Page *pp)
+page_initpp(page_t *pp)
 {
 	memset(pp, 0, sizeof(*pp));
 }
@@ -774,7 +774,7 @@ page_initpp(struct Page *pp)
 // Hint: use LIST_FIRST, LIST_REMOVE, and page_initpp
 // Hint: pp_ref should not be incremented 
 int
-page_alloc(struct Page **pp_store)
+page_alloc(page_t **pp_store)
 {
 	if (LIST_EMPTY(&page_free_list))
 		return -E_NO_MEM;
@@ -789,7 +789,7 @@ page_alloc(struct Page **pp_store)
 // (This function should only be called when pp->pp_ref reaches 0.)
 //
 void
-page_free(struct Page *pp)
+page_free(page_t *pp)
 {
 	if (pp->pp_ref)
 		panic("Attempting to free page with non-zero reference count!");
@@ -801,7 +801,7 @@ page_free(struct Page *pp)
 // freeing it if there are no more refs.
 //
 void
-page_decref(struct Page* pp)
+page_decref(page_t *pp)
 {
 	if (--pp->pp_ref == 0)
 		page_free(pp);
@@ -828,7 +828,7 @@ pte_t*
 pgdir_walk(pde_t *pgdir, const void *SNT va, int create)
 {
 	pde_t* the_pde = &pgdir[PDX(va)];
-	struct Page* new_table;
+	page_t *new_table;
 
 	if (*the_pde & PTE_P) {
 		if (*the_pde & PTE_PS)
@@ -874,7 +874,7 @@ pgdir_walk(pde_t *pgdir, const void *SNT va, int create)
 // regular pages into something that was already jumbo, and the overloading
 // of the PTE_PS and PTE_PAT flags...
 int
-page_insert(pde_t *pgdir, struct Page *pp, void *va, int perm) 
+page_insert(pde_t *pgdir, page_t *pp, void *va, int perm) 
 {
 	pte_t* pte = pgdir_walk(pgdir, va, 1);
 	if (!pte)
@@ -901,8 +901,7 @@ page_insert(pde_t *pgdir, struct Page *pp, void *va, int perm)
 // Hint: the TA solution uses pgdir_walk and pa2page.
 //
 // For jumbos, right now this returns the first Page* in the 4MB
-struct Page *
-page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
+page_t *page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
 {
 	pte_t* pte = pgdir_walk(pgdir, va, 0);
 	if (!pte || !(*pte & PTE_P))
@@ -932,7 +931,7 @@ void
 page_remove(pde_t *pgdir, void *va)
 {
 	pte_t* pte;
-	struct Page* page;
+	page_t *page;
 	page = page_lookup(pgdir, va, &pte);
 	if (!page)
 		return;
@@ -997,7 +996,7 @@ static void *DANGEROUS user_mem_check_addr;
 // -E_FAULT.
 
 void *COUNT(len)
-user_mem_check(struct Env *env, const void *DANGEROUS va, size_t len, int perm)
+user_mem_check(env_t *env, const void *DANGEROUS va, size_t len, int perm)
 {
 	// TODO - will need to sort this out wrt page faulting / PTE_P
 	// also could be issues with sleeping and waking up to find pages
@@ -1041,7 +1040,7 @@ user_mem_check(struct Env *env, const void *DANGEROUS va, size_t len, int perm)
 // If it cannot, 'env' is destroyed.
 //
 void *COUNT(len)
-user_mem_assert(struct Env *env, const void *DANGEROUS va, size_t len, int perm)
+user_mem_assert(env_t *env, const void *DANGEROUS va, size_t len, int perm)
 {
     void *COUNT(len) res = user_mem_check(env,va,len,perm | PTE_U);
 	if (!res) {
@@ -1056,8 +1055,8 @@ user_mem_assert(struct Env *env, const void *DANGEROUS va, size_t len, int perm)
 void
 page_check(void)
 {
-	struct Page *pp, *pp0, *pp1, *pp2;
-	struct Page_list fl;
+	page_t *pp, *pp0, *pp1, *pp2;
+	page_list_t fl;
 	pte_t *ptep;
 
 	// should be able to allocate three pages

@@ -14,14 +14,14 @@
 #include <kern/syscall.h>
 #include <kern/apic.h>
 
-static struct Taskstate ts;
+static taskstate_t ts;
 
 /* Interrupt descriptor table.  (Must be built at run time because
  * shifted function addresses can't be represented in relocation records.)
  */
-// should align this on an 8 byte boundary (SDM V3A 5-13)
-struct Gatedesc idt[256] = { { 0 } };
-struct Pseudodesc idt_pd = {
+// Aligned on an 8 byte boundary (SDM V3A 5-13)
+gatedesc_t __attribute__ ((aligned (8))) idt[256] = { { 0 } };
+pseudodesc_t idt_pd = {
 	sizeof(idt) - 1, (uint32_t) idt
 };
 
@@ -68,7 +68,7 @@ static const char *NTS (IN_HANDLER trapname)(int trapno)
 void
 idt_init(void)
 {
-	extern struct Segdesc gdt[];
+	extern segdesc_t gdt[];
 	
 	// This table is made in trapentry.S by each macro in that file.
 	// It is layed out such that the ith entry is the ith's traphandler's
@@ -104,7 +104,7 @@ idt_init(void)
 
 	// Initialize the TSS field of the gdt.
 	gdt[GD_TSS >> 3] = SEG16(STS_T32A, (uint32_t) (&ts),
-					sizeof(struct Taskstate), 0);
+					sizeof(taskstate_t), 0);
 	gdt[GD_TSS >> 3].sd_s = 0;
 
 	// Load the TSS
@@ -124,7 +124,7 @@ idt_init(void)
 }
 
 void
-(IN_HANDLER print_trapframe)(struct Trapframe *tf)
+(IN_HANDLER print_trapframe)(trapframe_t *tf)
 {
 	cprintf("TRAP frame at %p\n", tf);
 	print_regs(&tf->tf_regs);
@@ -140,7 +140,7 @@ void
 }
 
 void
-(IN_HANDLER print_regs)(struct PushRegs *regs)
+(IN_HANDLER print_regs)(push_regs_t *regs)
 {
 	cprintf("  edi  0x%08x\n", regs->reg_edi);
 	cprintf("  esi  0x%08x\n", regs->reg_esi);
@@ -153,7 +153,7 @@ void
 }
 
 static void
-(IN_HANDLER trap_dispatch)(struct Trapframe *tf)
+(IN_HANDLER trap_dispatch)(trapframe_t *tf)
 {
 	// Handle processor exceptions.
 	
@@ -189,7 +189,7 @@ static void
 }
 
 void
-(IN_HANDLER trap)(struct Trapframe *tf)
+(IN_HANDLER trap)(trapframe_t *tf)
 {
 	cprintf("Incoming TRAP frame at %p\n", tf);
 
@@ -221,7 +221,7 @@ void
 }
 
 void
-(IN_HANDLER irq_handler)(struct Trapframe *tf)
+(IN_HANDLER irq_handler)(trapframe_t *tf)
 {
 	//if (lapic_get_id())
 	//	cprintf("Incoming IRQ, ISR: %d on core %d\n", tf->tf_trapno, lapic_get_id());
@@ -253,7 +253,7 @@ register_interrupt_handler(isr_t table[], uint8_t isr, isr_t handler)
 }
 
 void
-page_fault_handler(struct Trapframe *tf)
+page_fault_handler(trapframe_t *tf)
 {
 	uint32_t fault_va;
 

@@ -1,12 +1,15 @@
 /* See COPYRIGHT for copyright information. */
 
-#ifndef JOS_INC_ENV_H
-#define JOS_INC_ENV_H
+#ifndef ROS_INC_ENV_H
+#define ROS_INC_ENV_H
 
 #include <inc/types.h>
 #include <inc/queue.h>
 #include <inc/trap.h>
 #include <inc/memlayout.h>
+
+struct Env;
+typedef struct Env env_t;
 
 typedef int32_t envid_t;
 
@@ -36,8 +39,8 @@ typedef int32_t envid_t;
 #define ENV_NOT_RUNNABLE	2
 
 struct Env {
-	struct Trapframe env_tf;	// Saved registers
-	LIST_ENTRY(Env) env_link;	// Free list link pointers
+	trapframe_t env_tf;	// Saved registers
+	LIST_ENTRY(env_t) env_link;	// Free list link pointers
 	envid_t env_id;			// Unique environment identifier
 	envid_t env_parent_id;		// env_id of this env's parent
 	unsigned env_status;		// Status of the environment
@@ -49,4 +52,4 @@ struct Env {
 
 };
 
-#endif // !JOS_INC_ENV_H
+#endif // !ROS_INC_ENV_H
