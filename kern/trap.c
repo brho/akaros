@@ -192,7 +192,7 @@ static void
 void
 (IN_HANDLER trap)(trapframe_t *tf)
 {
-	cprintf("Incoming TRAP frame at %p\n", tf);
+	//cprintf("Incoming TRAP frame at %p\n", tf);
 
 	if ((tf->tf_cs & ~3) != GD_UT && (tf->tf_cs & ~3) != GD_KT) {
 		print_trapframe(tf);

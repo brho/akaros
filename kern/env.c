@@ -98,18 +98,25 @@ static int
 env_setup_vm(env_t *e)
 {
 	int i, r;
-	page_t *p = NULL;
+	page_t *pgdir = NULL, *pginfo = NULL, *pgdata = NULL;
 
-	// Allocate a page for the page directory
-	if ((r = page_alloc(&p)) < 0)
+	// Allocate pages for the page directory, shared info, and shared data pages
+	r = page_alloc(&pgdir);
+	r = page_alloc(&pginfo);
+	r = page_alloc(&pgdata);
+	if (r < 0) {
+		page_free(pgdir);
+		page_free(pginfo);
 		return r;
-	
+	}
+
 	// Now, set e->env_pgdir and e->env_cr3,
 	// and initialize the page directory.
 	//
 	// Hint:
 	//    - The VA space of all envs is identical above UTOP
 	//      (except at VPT and UVPT, which we've set below).
+	//      (and not for UINFO either)
 	//	See inc/memlayout.h for permissions and layout.
 	//	Can you use boot_pgdir as a template?  Hint: Yes.
 	//	(Make sure you got the permissions right in Lab 2.)
@@ -119,26 +126,47 @@ env_setup_vm(env_t *e)
 	//	mapped above UTOP -- but you do need to increment
 	//	env_pgdir's pp_ref!
 
-	p->pp_ref++;
-	e->env_pgdir = page2kva(p);
-	e->env_cr3 = page2pa(p);
+	// need to up pgdir's reference, since it will never be done elsewhere
+	pgdir->pp_ref++;
+	e->env_pgdir = page2kva(pgdir);
+	e->env_cr3 = page2pa(pgdir);
+	e->env_procinfo = page2kva(pginfo);
+	e->env_procdata = page2kva(pgdata);
 
 	memset(e->env_pgdir, 0, PGSIZE);
+	memset(e->env_procinfo, 0, PGSIZE);
+	memset(e->env_procdata, 0, PGSIZE);
 
 	// should be able to do this so long as boot_pgdir never has
 	// anything put below UTOP
 	memcpy(e->env_pgdir, boot_pgdir, PGSIZE);
-	
+
 	// something like this.  TODO, if you want
 	//memcpy(&e->env_pgdir[PDX(UTOP)], &boot_pgdir[PDX(UTOP)], PGSIZE - PDX(UTOP));
 	// check with
 	// assert(memcmp(e->env_pgdir, boot_pgdir, PGSIZE) == 0);
-	
+
 	// VPT and UVPT map the env's own page table, with
 	// different permissions.
 	e->env_pgdir[PDX(VPT)]  = e->env_cr3 | PTE_P | PTE_W;
 	e->env_pgdir[PDX(UVPT)] = e->env_cr3 | PTE_P | PTE_U;
 
+	// Insert the per-process info and data pages into this process's pgdir
+	// I don't want to do these two pages later (like with the stack), since
+	// the kernel wants to keep pointers to it easily.
+	// Could place all of this with a function that maps a shared memory page
+	// that can work between any two address spaces or something.
+	r = page_insert(e->env_pgdir, pginfo, (void*)UINFO, PTE_U);
+	r = page_insert(e->env_pgdir, pgdata, (void*)UDATA, PTE_U | PTE_W);
+	if (r < 0) {
+		// note that we can't currently deallocate the pages created by
+		// pgdir_walk (inside insert).  should be able to gather them up when
+		// we destroy environments and their page tables.
+		page_free(pgdir);
+		page_free(pginfo);
+		page_free(pgdata);
+		return r;
+	}
 	return 0;
 }
 
@@ -169,7 +197,7 @@ env_alloc(env_t **newenv_store, envid_t parent_id)
 	if (generation <= 0)	// Don't create a negative env_id.
 		generation = 1 << ENVGENSHIFT;
 	e->env_id = generation | (e - envs);
-	
+
 	// Set the basic status variables.
 	e->env_parent_id = parent_id;
 	e->env_status = ENV_RUNNABLE;
@@ -182,7 +210,7 @@ env_alloc(env_t **newenv_store, envid_t parent_id)
 	memset(&e->env_tf, 0, sizeof(e->env_tf));
 
 	// Set up appropriate initial values for the segment registers.
-	// GD_UD is the user data segment selector in the GDT, and 
+	// GD_UD is the user data segment selector in the GDT, and
 	// GD_UT is the user text segment selector (see inc/memlayout.h).
 	// The low 2 bits of each segment register contains the
 	// Requestor Privilege Level (RPL); 3 means user mode.
@@ -198,6 +226,12 @@ env_alloc(env_t **newenv_store, envid_t parent_id)
 	// commit the allocation
 	LIST_REMOVE(e, env_link);
 	*newenv_store = e;
+
+	// TODO: for now, the only info at procinfo is this env's struct
+	// note that we need to copy this over every time we make a change to env
+	// that we want userspace to see.  also note that we don't even want to
+	// show them all of env, only specific things like PID, PPID, etc
+	memcpy(e->env_procinfo, e, sizeof(env_t));
 
 	cprintf("[%08x] new env %08x\n", curenv ? curenv->env_id : 0, e->env_id);
 	return 0;
@@ -268,7 +302,7 @@ segment_alloc(env_t *e, void *va, size_t len)
 static void
 load_icode(env_t *e, uint8_t *binary, size_t size)
 {
-	// Hints: 
+	// Hints:
 	//  Load each program segment into virtual memory
 	//  at the address specified in the ELF section header.
 	//  You should only load segments with ph->p_type == ELF_PROG_LOAD.
@@ -305,7 +339,7 @@ load_icode(env_t *e, uint8_t *binary, size_t size)
 	// make sure we have proghdrs to load
 	assert(elfhdr->e_phnum);
 
-	// to actually access any pages alloc'd for this environment, we 
+	// to actually access any pages alloc'd for this environment, we
 	// need to have the hardware use this environment's page tables.
 	// we can use e's tables as long as we want, since it has the same
 	// mappings for the kernel as does boot_pgdir
@@ -315,7 +349,7 @@ load_icode(env_t *e, uint8_t *binary, size_t size)
 	for (i = 0; i < elfhdr->e_phnum; i++, phdr++) {
 		if (phdr->p_type != ELF_PROG_LOAD)
 			continue;
-		// seg alloc creates PTE_U|PTE_W pages.  if you ever want to change 
+		// seg alloc creates PTE_U|PTE_W pages.  if you ever want to change
 		// this, there will be issues with overlapping sections
 		segment_alloc(e, (void*)phdr->p_va, phdr->p_memsz);
 		memcpy((void*)phdr->p_va, binary + phdr->p_offset, phdr->p_filesz);
@@ -336,10 +370,10 @@ load_icode(env_t *e, uint8_t *binary, size_t size)
 // before running the first user-mode environment.
 // The new env's parent ID is set to 0.
 //
-// Where does the result go? 
+// Where does the result go?
 // By convention, envs[0] is the first environment allocated, so
 // whoever calls env_create simply looks for the newly created
-// environment there. 
+// environment there.
 void
 env_create(uint8_t *binary, size_t size)
 {
@@ -353,7 +387,7 @@ env_create(uint8_t *binary, size_t size)
 
 //
 // Frees env e and all memory it uses.
-// 
+//
 void
 env_free(env_t *e)
 {
@@ -407,7 +441,7 @@ env_free(env_t *e)
 // to the caller).
 //
 void
-env_destroy(env_t *e) 
+env_destroy(env_t *e)
 {
 	env_free(e);
 
@@ -463,7 +497,7 @@ env_run(env_t *e)
 	//	e->env_tf.  Go back through the code you wrote above
 	//	and make sure you have set the relevant parts of
 	//	e->env_tf to sensible values.
-	
+
 		// would set the curenv->env_status if we had more states
 	if (e != curenv) {
 		curenv = e;

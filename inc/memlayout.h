@@ -43,15 +43,21 @@
  *                     |  Cur. Page Table (User R-)   | R-/R-  PTSIZE
  *    UVPT      ---->  +------------------------------+ 0xbf400000
  *                     |          RO PAGES            | R-/R-  PTSIZE
- *    UPAGES    ---->  +------------------------------+ 0xbf000000
- *                     |           RO ENVS            | R-/R-  PTSIZE
- * UTOP,UENVS ------>  +------------------------------+ 0xbec00000
- * UXSTACKTOP -/       |     User Exception Stack     | RW/RW  PGSIZE
- *                     +------------------------------+ 0xbebff000
+ *    UPAGES    ---->  +------------------------------+ 0xbf000000      --+
+ *                     |  Unmapped (future expansion) | --/--             |
+ *                     +------------------------------+ 0xbec01000      PTSIZE
+ *                     |     Per-Process R/O Info     | R-/R-  PGSIZE     |
+ * UTOP, UINFO  ---->  +------------------------------+ 0xbec00000      --+
+ *                     |  Unmapped (future expansion) | --/--             |
+ *                     +------------------------------+ 0xbe801000      PTSIZE
+ *                     |     Per-Process R/W Data     | RW/RW  PGSIZE     |
+ * UDATA,UXSTACKTOP--> +------------------------------+ 0xbe800000      --+
+ *                     |     User Exception Stack     | RW/RW  PGSIZE
+ *                     +------------------------------+ 0xbe7ff000
  *                     |       Empty Memory (*)       | --/--  PGSIZE
- *    USTACKTOP  --->  +------------------------------+ 0xbebfe000
+ *    USTACKTOP  --->  +------------------------------+ 0xbe7fe000
  *                     |      Normal User Stack       | RW/RW  PGSIZE
- *                     +------------------------------+ 0xbebfd000
+ *                     +------------------------------+ 0xbe7fd000
  *                     |                              |
  *                     |                              |
  *                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -108,20 +114,26 @@
 #define UVPT		(ULIM - PTSIZE)
 // Read-only copies of the Page structures
 #define UPAGES		(UVPT - PTSIZE)
-// Read-only copies of the global env structures
-#define UENVS		(UPAGES - PTSIZE)
+// Read-only, per-process shared info structures
+#define UINFO		(UPAGES - PTSIZE)
+#define UINFO_PAGES 1
 
 /*
  * Top of user VM. User can manipulate VA from UTOP-1 and down!
  */
 
 // Top of user-accessible VM
-#define UTOP		UENVS
+#define UTOP		UINFO
+
+// Read-write, per-process shared data structures
+#define UDATA		(UTOP - PTSIZE)
+#define UDATA_PAGES 1
+
 // Top of one-page user exception stack
-#define UXSTACKTOP	UTOP
+#define UXSTACKTOP	UDATA
 // Next page left invalid to guard against exception stack overflow; then:
 // Top of normal user stack
-#define USTACKTOP	(UTOP - 2*PGSIZE)
+#define USTACKTOP	(UXSTACKTOP - 2*PGSIZE)
 
 // Where user programs generally begin
 #define UTEXT		(2*PTSIZE)

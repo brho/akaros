@@ -6,8 +6,10 @@
 
 // Define the global symbols 'envs', 'pages', 'vpt', and 'vpd'
 // so that they can be used in C as if they were ordinary global arrays.
-	.globl envs
-	.set envs, UENVS
+	.globl procinfo
+	.set procinfo, UINFO
+	.globl procdata
+	.set procdata, UDATA
 	.globl pages
 	.set pages, UPAGES
 	.globl vpt

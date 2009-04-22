@@ -472,21 +472,12 @@ i386_vm_init(void)
 
 	//////////////////////////////////////////////////////////////////////
 	// Make 'envs' point to an array of size 'NENV' of 'env_t'.
-	// Map this array read-only by the user at linear address UENVS
-	// (ie. perm = PTE_U | PTE_P).
-	// Permissions:
-	//    - envs itself -- kernel RW, user NONE
-	//    - the image of envs mapped at UENVS  -- kernel R, user R
+	// No longer mapping ENVS into the address space
 	
 	// round up to the nearest page
 	size_t env_array_size = ROUNDUP(NENV*sizeof(env_t), PGSIZE);
 	envs = (env_t *)boot_alloc(env_array_size, PGSIZE);
 	memset(envs, 0, env_array_size);
-	if (env_array_size > PTSIZE) {
-		warn("env_array_size bigger than PTSIZE, userland will not see all environments");
-		env_array_size = PTSIZE;
-	}
-	boot_map_segment(pgdir, UENVS, env_array_size, PADDR(envs), PTE_U | PTE_G);
 
 	// Check that the initial page directory has been set up correctly.
 	check_boot_pgdir(pse);
@@ -573,11 +564,6 @@ check_boot_pgdir(bool pse)
 	for (i = 0; i < n; i += PGSIZE)
 		assert(check_va2pa(pgdir, UPAGES + i) == PADDR(pages) + i);
 
-	// check envs array (new test for lab 3)
-	n = ROUNDUP(NENV*sizeof(env_t), PGSIZE);
-	for (i = 0; i < n; i += PGSIZE)
-		assert(check_va2pa(pgdir, UENVS + i) == PADDR(envs) + i);
-
 	// check phys mem
 	//for (i = 0; KERNBASE + i != 0; i += PGSIZE)
 	// adjusted check to account for only mapping avail mem
@@ -599,7 +585,6 @@ check_boot_pgdir(bool pse)
 		case PDX(UVPT):
 		case PDX(KSTACKTOP-1):
 		case PDX(UPAGES):
-		case PDX(UENVS):
 		case PDX(LAPIC_BASE): // LAPIC mapping.  TODO: remove when MTRRs are up
 			assert(pgdir[i]);
 			break;
@@ -619,7 +604,7 @@ check_boot_pgdir(bool pse)
 	// check permissions
 	// user read-only.  check for user and write, should be only user
 	// eagle-eyed viewers should be able to explain the extra cases
-	for (i = UENVS; i < ULIM; i+=PGSIZE) {
+	for (i = UTOP; i < ULIM; i+=PGSIZE) {
 		pte = get_vaperms(pgdir, i);
 		if ((pte & PTE_P) && (i != UVPT+(VPT>>10))) {
 			if (pte & PTE_PS) {
@@ -791,9 +776,13 @@ page_alloc(page_t **pp_store)
 void
 page_free(page_t *pp)
 {
-	if (pp->pp_ref)
-		panic("Attempting to free page with non-zero reference count!");
-	LIST_INSERT_HEAD(&page_free_list, pp, pp_link);
+	// this check allows us to call this on null ptrs, which helps when
+	// allocating and checking for errors on several pages at once
+	if (pp) {
+		if (pp->pp_ref)
+			panic("Attempting to free page with non-zero reference count!");
+		LIST_INSERT_HEAD(&page_free_list, pp, pp_link);
+	}
 }
 
 //

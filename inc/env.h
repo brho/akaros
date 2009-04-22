@@ -39,17 +39,19 @@ typedef int32_t envid_t;
 #define ENV_NOT_RUNNABLE	2
 
 struct Env {
-	trapframe_t env_tf;	// Saved registers
+	trapframe_t env_tf;			// Saved registers
 	LIST_ENTRY(env_t) env_link;	// Free list link pointers
-	envid_t env_id;			// Unique environment identifier
+	envid_t env_id;				// Unique environment identifier
 	envid_t env_parent_id;		// env_id of this env's parent
 	unsigned env_status;		// Status of the environment
-	uint32_t env_runs;		// Number of times environment has run
+	uint32_t env_runs;			// Number of times environment has run
 
 	// Address space
-	pde_t *env_pgdir;		// Kernel virtual address of page dir
-	physaddr_t env_cr3;		// Physical address of page dir
-
+	pde_t *env_pgdir;			// Kernel virtual address of page dir
+	physaddr_t env_cr3;			// Physical address of page dir
+	// TODO - give these two proper types (pointers to structs)
+	void* env_procinfo; 	// KVA of per-process shared info table (RO)
+	void* env_procdata;  	// KVA of per-process shared data table (RW)
 };
 
 #endif // !ROS_INC_ENV_H

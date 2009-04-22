@@ -22,7 +22,10 @@
 // libos.c or entry.S
 extern char *binaryname;
 extern volatile env_t *env;
-extern volatile env_t envs[NENV];
+// will need to change these types when we have real structs
+// seems like they need to be either arrays [] or functions () for it to work
+extern volatile uint8_t procinfo[];
+extern volatile uint8_t procdata[];
 extern volatile page_t pages[];
 void	exit(void);
 
