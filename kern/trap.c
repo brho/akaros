@@ -228,23 +228,25 @@ void
 	//	cprintf("Incoming IRQ, ISR: %d on core %d\n", tf->tf_trapno, lapic_get_id());
 	// merge this with alltraps?  other than the EOI... or do the same in all traps
 
-	extern ipi_wrapper_t ipi_wrappers[5];
+	extern handler_wrapper_t handler_wrappers[NUM_HANDLER_WRAPPERS];
+	isr_t handler;
 
 	// determine the interrupt handler table to use.  for now, pick the global
 	isr_t* handler_table = interrupt_handlers;
 
-	uint8_t vector_id = tf->tf_trapno & 0x0f;
-	printk("tf_trapno: %d\n", tf->tf_trapno);
-	printk("vector_id: %d\n", vector_id);
-	//Down the checklist indicating we've started running the handler
-	if(vector_id > 0xf0)
-		down_checklist(ipi_wrappers[vector_id].front_cpu_list);
-	// then call the appropriate handler
-	if (handler_table[tf->tf_trapno] != 0)
-		handler_table[tf->tf_trapno](tf);
-	//Down the checklist indicating we've finished running the handler
-	if(vector_id > 0xf0)
-		down_checklist(ipi_wrappers[vector_id].back_cpu_list);
+	// if we're a general purpose IPI function call, store the function we
+	// will call, down the front, exec the function, and down the backend
+	if ((0xf0 <= tf->tf_trapno) && (tf->tf_trapno < 0xf0+NUM_HANDLER_WRAPPERS)) {
+		handler = handler_table[tf->tf_trapno];
+		down_checklist(handler_wrappers[tf->tf_trapno & 0x0f].front_cpu_list);
+		if (handler) // make sure we weren't called on a null ptr
+			handler(tf);
+		else
+			warn("Sent a general purpose IPI with no handler");
+		down_checklist(handler_wrappers[tf->tf_trapno & 0x0f].back_cpu_list);
+	} else // regular IRQ
+		if (handler_table[tf->tf_trapno] != 0)
+			handler_table[tf->tf_trapno](tf);
 
 	// Send EOI.  might want to do this in assembly, and possibly earlier
 	// This is set up to work with an old PIC for now

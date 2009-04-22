@@ -17,21 +17,19 @@
 #define SMP_BOOT_TIMEOUT             0x002fffff
 #endif
 
-struct IPIWrapper;
-typedef struct IPIWrapper ipi_wrapper_t;
+// be careful changing this, esp if you go over 16
+#define NUM_HANDLER_WRAPPERS  5
 
-LIST_HEAD(ipi_wrapper_list_t, ipi_wrapper_t);
-typedef LIST_ENTRY(ipi_wrapper_t) ipi_wrapper_list_entry_t;
-
-struct IPIWrapper {
-	ipi_wrapper_list_entry_t ipi_link;	/* list link */
-
+typedef struct HandlerWrapper {
 	checklist_t* front_cpu_list;
 	checklist_t* back_cpu_list;
 	uint8_t vector;
-};
+} handler_wrapper_t;
 
+/* SMP bootup functions */
 void smp_boot(void);
+
+/* SMP utility functions */
 void smp_call_function_self(isr_t handler, bool wait);
 void smp_call_function_all(isr_t handler, bool wait);
 void smp_call_function_single(uint8_t dest, isr_t handler, bool wait);

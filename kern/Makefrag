@@ -99,9 +99,10 @@ kvm: $(OBJDIR)/kern/kernel
 
 usb: $(OBJDIR)/kern/kernel
 	$(V)echo "+ (USB) Copying to /dev/sdb4"
-	$(V)cp $(OBJDIR)/kern/kernel /media/disk/texas
+	$(V)mount /dev/sdb4
+	$(V)cp $(OBJDIR)/kern/kernel /mnt/pornstick/texas
 	$(V)sync
-	$(V)umount /media/disk
+	$(V)umount /mnt/pornstick
 
 grub: $(OBJDIR)/jos-grub
 

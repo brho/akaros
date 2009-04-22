@@ -110,7 +110,7 @@ dead:
 }
 
 /* like panic, but don't */
-void _warn(const char *file, int line, const char *fmt,...) 
+void _warn(const char *file, int line, const char *fmt,...)
 {
 	va_list ap;
 
@@ -131,7 +131,7 @@ static void print_cpuinfo(void) {
                   "movl    %%ebx, (%2);"
                   "movl    %%edx, 4(%2);"
                   "movl    %%ecx, 8(%2);"
-	              : "=a"(eax) 
+	              : "=a"(eax)
 				  : "a"(0), "D"(vendor_id)
 	              : "%ebx", "%ecx", "%edx");
 
@@ -146,7 +146,7 @@ static void print_cpuinfo(void) {
 	cprintf("Family: %d\n", family);
 	cprintf("Model: %d\n", model);
 	cprintf("Stepping: %d\n", eax & 0x0000000F);
-	// eventually can fill this out with SDM Vol3B App B info, or 
+	// eventually can fill this out with SDM Vol3B App B info, or
 	// better yet with stepping info.  or cpuid 8000_000{2,3,4}
 	switch ( family << 8 | model ) {
 		case(0x061a):
