@@ -17,6 +17,7 @@ void test_barrier(void);
 void test_interrupts_irqsave(void);
 void test_bitmasks(void);
 void test_checklists(void);
+void test_pit(void);
 
 void test_hello_world_handler(trapframe_t *tf);
 void test_print_info_handler(trapframe_t *tf);

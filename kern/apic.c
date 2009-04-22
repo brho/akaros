@@ -9,6 +9,8 @@
 
 #include <kern/apic.h>
 
+uint64_t tsc_freq = 0;
+
 /*
  * Remaps the Programmable Interrupt Controller to use IRQs 32-47
  * http://wiki.osdev.org/PIC
@@ -81,12 +83,102 @@ uint32_t lapic_get_default_id(void)
 	return (ebx & 0xFF000000) >> 24;
 }
 
-void pit_set_timer(uint32_t freq, bool periodic)
+void timer_init(void){
+	uint64_t tscval[2];
+	pit_set_timer(0xffff, TIMER_RATEGEN, 1);
+	// assume tsc exist
+	tscval[0] = read_tsc();
+	udelay_pit(1000000);
+	tscval[1] = read_tsc();
+	tsc_freq = tscval[1] - tscval[0];
+	cprintf("tsc_freq %lu\n", tsc_freq);
+}
+
+void pit_set_timer(uint32_t divisor, uint32_t mode, bool periodic)
 {
-	uint32_t divisor = PIT_FREQ / freq;
 	if (divisor & 0xffff0000)
 		warn("Divisor too large!");
-	outb(0x43, 0x32 | (periodic << 2));
-	outb(0x40, divisor & 0xff);
-	outb(0x40, (divisor >> 8) & 0xff);
+	// TODO: review periodic
+	mode = TIMER_SEL0|TIMER_16BIT|mode;
+	outb(TIMER_MODE, mode | (periodic << 2));
+	outb(TIMER_CNTR0, divisor & 0xff);
+	outb(TIMER_CNTR0, (divisor >> 8) );
+	cprintf("timer mode set to %d, divisor %d\n",mode|(periodic << 2), divisor);
+}
+
+static int getpit()
+{
+    int high, low;
+	// TODO: need a lock to protect access to PIT
+
+    /* Select timer0 and latch counter value. */
+    outb(TIMER_MODE, TIMER_SEL0 | TIMER_LATCH);
+    
+    low = inb(TIMER_CNTR0);
+    high = inb(TIMER_CNTR0);
+
+    return ((high << 8) | low);
+}
+
+// forces cpu to relax for usec miliseconds
+void udelay(uint64_t usec)
+{
+	if (tsc_freq != 0)
+	{
+		uint64_t start, end, now;
+
+		start = read_tsc();
+        end = start + (tsc_freq * usec) / 1000000;
+        //cprintf("start %llu, end %llu\n", start, end);
+		if (end == 0) cprintf("This is terribly wrong \n");
+		do {
+            cpu_relax();
+            now = read_tsc();
+			//cprintf("now %llu\n", now);
+		} while (now < end || (now > start && end < start));
+        return;
+
+	} else
+	{
+		udelay_pit(usec);
+	}
+}
+
+void udelay_pit(uint64_t usec)
+{
+	
+	int64_t delta, prev_tick, tick, ticks_left;
+	prev_tick = getpit();
+	/*
+	 * Calculate (n * (i8254_freq / 1e6)) without using floating point
+	 * and without any avoidable overflows.
+	 */
+	if (usec <= 0)
+		ticks_left = 0;
+	// some optimization from bsd code
+	else if (usec < 256)
+		/*
+		 * Use fixed point to avoid a slow division by 1000000.
+		 * 39099 = 1193182 * 2^15 / 10^6 rounded to nearest.
+		 * 2^15 is the first power of 2 that gives exact results
+		 * for n between 0 and 256.
+		 */
+		ticks_left = ((uint64_t)usec * 39099 + (1 << 15) - 1) >> 15;
+	else
+		// round up the ticks left
+		ticks_left = ((uint64_t)usec * (long long)PIT_FREQ+ 999999)
+			     / 1000000; 
+	cprintf("ticks left %llu \n" , ticks_left);
+	while (ticks_left > 0) {
+		tick = getpit();
+		delta = prev_tick - tick;
+		prev_tick = tick;
+		if (delta < 0) {
+			// counter looped around during the delta time period
+			delta += 0xffff; // maximum count 
+			if (delta < 0)
+				delta = 0;
+		}
+		ticks_left -= delta;
+	}
 }

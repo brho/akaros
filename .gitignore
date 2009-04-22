@@ -5,4 +5,8 @@ bochs.log
 .bochsrc
 mnt
 obj
+run_bochs.sh
+update*
+cscope.out
+hdd.img
 *.*~

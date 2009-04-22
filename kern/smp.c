@@ -51,11 +51,7 @@ void smp_boot(void)
 
 	// set up the local APIC timer to fire 0xf0 once.  hardcoded to break
 	// out of the spinloop on waiting.  really just want to wait a little
-<<<<<<< HEAD:kern/smp.c
 	lapic_set_timer(0x0000ffff, 0xf0, 0); // TODO - fix timing
-=======
-	lapic_set_timer(SMP_BOOT_TIMEOUT, boot_vector, 0); // TODO - fix timing
->>>>>>> 45d6e6c... Cleanup JOS references and add typedefs:kern/smp.c
 	// set the function handler to respond to this
 	register_interrupt_handler(interrupt_handlers, 0xf0, smp_boot_handler);
 
@@ -74,11 +70,7 @@ void smp_boot(void)
 	// second SIPI
 	waiting = 1;
 	send_startup_ipi(0x01);
-<<<<<<< HEAD:kern/smp.c
 	lapic_set_timer(0x000fffff, 0xf0, 0); // TODO - fix timing
-=======
-	lapic_set_timer(SMP_BOOT_TIMEOUT, boot_vector, 0); // TODO - fix timing
->>>>>>> 45d6e6c... Cleanup JOS references and add typedefs:kern/smp.c
 	while(waiting) // wait for the second SIPI to take effect
 		cpu_relax();
 	*/

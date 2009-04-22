@@ -52,14 +52,48 @@
 #define IOAPIC_BASE					0xfec00000 // this is the default, can be changed
 
 // PIT (Programmable Interval Timer)
+#define	TIMER_REG_CNTR0	0	/* timer 0 counter port */
+#define	TIMER_REG_CNTR1	1	/* timer 1 counter port */
+#define	TIMER_REG_CNTR2	2	/* timer 2 counter port */
+#define	TIMER_REG_MODE	3	/* timer mode port */
+#define	TIMER_SEL0	0x00	/* select counter 0 */
+#define	TIMER_SEL1	0x40	/* select counter 1 */
+#define	TIMER_SEL2	0x80	/* select counter 2 */
+#define	TIMER_INTTC	0x00	/* mode 0, intr on terminal cnt */
+#define	TIMER_ONESHOT	0x02	/* mode 1, one shot */
+#define	TIMER_RATEGEN	0x04	/* mode 2, rate generator */
+#define	TIMER_SQWAVE	0x06	/* mode 3, square wave */
+#define	TIMER_SWSTROBE	0x08	/* mode 4, s/w triggered strobe */
+#define	TIMER_HWSTROBE	0x0a	/* mode 5, h/w triggered strobe */
+#define	TIMER_LATCH	0x00	/* latch counter for reading */
+#define	TIMER_LSB	0x10	/* r/w counter LSB */
+#define	TIMER_MSB	0x20	/* r/w counter MSB */
+#define	TIMER_16BIT	0x30	/* r/w counter 16 bits, LSB first */
+#define	TIMER_BCD	0x01	/* count in BCD */
+
 #define PIT_FREQ 					1193182
+
+#define IO_TIMER1   0x40        /* 8253 Timer #1 */
+#define TIMER_CNTR0 (IO_TIMER1 + TIMER_REG_CNTR0)
+#define TIMER_CNTR1 (IO_TIMER1 + TIMER_REG_CNTR1)
+#define TIMER_CNTR2 (IO_TIMER1 + TIMER_REG_CNTR2)
+#define TIMER_MODE  (IO_TIMER1 + TIMER_REG_MODE)
+
+extern uint64_t tsc_freq;
 
 void pic_remap(void);
 void pic_mask_irq(uint8_t irq);
 void pic_unmask_irq(uint8_t irq);
 void lapic_set_timer(uint32_t ticks, uint8_t vector, bool periodic);
 uint32_t lapic_get_default_id(void);
-void pit_set_timer(uint32_t freq, bool periodic); // consider adding callback func
+// PIT related
+void pit_set_timer(uint32_t freq, uint32_t mode, bool periodic); // consider adding callback func
+void timer_init(void);
+void udelay(uint64_t usec);
+
+static int getpit(void);
+void udelay_pit(uint64_t usec);
+
 
 static inline void pic_send_eoi(uint32_t irq);
 static inline void lapic_send_eoi(void);

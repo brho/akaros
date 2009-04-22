@@ -48,16 +48,21 @@ void kernel_init(multiboot_info_t *mboot_info)
 
 	env_init();
 	idt_init();
-
+	timer_init();
 	// this returns when all other cores are done and ready to receive IPIs
 	smp_boot();
-	test_checklists();
-	test_barrier();
+	
 	panic("Don't Panic");
+	//test_checklists();
+	//test_barrier();
 
-	test_print_info();
-	test_ipi_sending();
-
+	//test_print_info();
+	//test_ipi_sending();
+	//test_pit();
+	//test_barrier();
+	//test_print_info();
+	//test_ipi_sending();
+	
 	//ENV_CREATE(user_faultread);
 	//ENV_CREATE(user_faultreadkernel);
 	//ENV_CREATE(user_faultwrite);
