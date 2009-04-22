@@ -10,29 +10,30 @@
 
 
 void cons_intr(int (*proc)(void));
+void scroll_screen(void);
 
 
 /***** Serial I/O code *****/
 
 #define COM1		0x3F8
 
-#define COM_RX		0	// In:	Receive buffer (DLAB=0)
-#define COM_DLL		0	// Out: Divisor Latch Low (DLAB=1)
-#define COM_DLM		1	// Out: Divisor Latch High (DLAB=1)
-#define COM_IER		1	// Out: Interrupt Enable Register
-#define   COM_IER_RDI	0x01	//   Enable receiver data interrupt
-#define COM_IIR		2	// In:	Interrupt ID Register
-#define COM_FCR		2	// Out: FIFO Control Register
-#define COM_LCR		3	// Out: Line Control Register
-#define	  COM_LCR_DLAB	0x80	//   Divisor latch access bit
-#define	  COM_LCR_WLEN8	0x03	//   Wordlength: 8 bits
-#define COM_MCR		4	// Out: Modem Control Register
-#define	  COM_MCR_RTS	0x02	// RTS complement
-#define	  COM_MCR_DTR	0x01	// DTR complement
-#define	  COM_MCR_OUT2	0x08	// Out2 complement
-#define COM_LSR		5	// In:	Line Status Register
-#define   COM_LSR_DATA	0x01	//   Data available
-#define   COM_LSR_READY	0x20	//   Ready to send
+#define	COM_RX			0		// In:	Receive buffer (DLAB=0)
+#define COM_DLL			0		// Out: Divisor Latch Low (DLAB=1)
+#define COM_DLM			1		// Out: Divisor Latch High (DLAB=1)
+#define COM_IER			1		// Out: Interrupt Enable Register
+#define	COM_IER_RDI		0x01	//   Enable receiver data interrupt
+#define COM_IIR			2		// In:	Interrupt ID Register
+#define COM_FCR			2		// Out: FIFO Control Register
+#define COM_LCR			3		// Out: Line Control Register
+#define	COM_LCR_DLAB	0x80	//   Divisor latch access bit
+#define	COM_LCR_WLEN8	0x03	//   Wordlength: 8 bits
+#define COM_MCR			4		// Out: Modem Control Register
+#define	COM_MCR_RTS		0x02	// RTS complement
+#define	COM_MCR_DTR		0x01	// DTR complement
+#define	COM_MCR_OUT2	0x08	// Out2 complement
+#define COM_LSR			5		// In:	Line Status Register
+#define COM_LSR_DATA	0x01	//   Data available
+#define COM_LSR_READY	0x20	//   Ready to send
 
 static bool serial_exists;
 
@@ -137,11 +138,17 @@ lpt_putc(int c)
 
 
 
-/***** Text-mode CGA/VGA display output *****/
+/***** Text-mode CGA/VGA display output with scrolling *****/
+#define MAX_SCROLL_LENGTH	20
+#define SCROLLING_CRT_SIZE	(MAX_SCROLL_LENGTH * CRT_SIZE)
 
 static unsigned addr_6845;
 static uint16_t *COUNT(CRT_SIZE) crt_buf;
 static uint16_t crt_pos;
+
+static uint16_t scrolling_crt_buf[SCROLLING_CRT_SIZE];
+static uint16_t scrolling_crt_pos;
+static uint8_t	current_crt_buf;
 
 void
 cga_init(void)
@@ -169,9 +176,36 @@ cga_init(void)
 
 	crt_buf = (uint16_t *COUNT(CRT_SIZE)) cp;
 	crt_pos = pos;
+	scrolling_crt_pos = 0;
+	current_crt_buf = 0;
 }
 
+static void set_screen(uint8_t screen_num) {
+	uint16_t leftovers = (scrolling_crt_pos % CRT_COLS);
+	leftovers = (leftovers) ? CRT_COLS - leftovers : 0;
+	
+	int offset = scrolling_crt_pos + leftovers - (screen_num + 1)*CRT_SIZE;
+	offset = (offset > 0) ? offset : 0;
 
+	memcpy(crt_buf, scrolling_crt_buf + offset, CRT_SIZE * sizeof(uint16_t));
+}
+
+static void scroll_screen_up(void) {
+	if(current_crt_buf <  (scrolling_crt_pos / CRT_SIZE))
+		current_crt_buf++;
+	set_screen(current_crt_buf);
+}
+
+static void scroll_screen_down(void) {
+	if(current_crt_buf > 0) 
+		current_crt_buf--;
+	set_screen(current_crt_buf);
+}
+
+static void reset_screen(void) {
+	current_crt_buf = 0;
+	set_screen(current_crt_buf);
+}
 
 void
 cga_putc(int c)
@@ -184,14 +218,19 @@ cga_putc(int c)
 	case '\b':
 		if (crt_pos > 0) {
 			crt_pos--;
+			scrolling_crt_pos--;
+
 			crt_buf[crt_pos] = (c & ~0xff) | ' ';
+			scrolling_crt_buf[scrolling_crt_pos] = crt_buf[crt_pos];
 		}
 		break;
 	case '\n':
 		crt_pos += CRT_COLS;
+		scrolling_crt_pos += CRT_COLS;
 		/* fallthru */
 	case '\r':
 		crt_pos -= (crt_pos % CRT_COLS);
+		scrolling_crt_pos -= (scrolling_crt_pos % CRT_COLS);
 		break;
 	case '\t':
 		cons_putc(' ');
@@ -202,13 +241,13 @@ cga_putc(int c)
 		break;
 	default:
 		crt_buf[crt_pos++] = c;		/* write the character */
+		scrolling_crt_buf[scrolling_crt_pos++] = c;
 		break;
 	}
 
-	// What is the purpose of this?
 	// The purpose of this is to allow the screen to appear as if it is scrolling as
-	// more lines are added beyond the size of the monitor.  The top line is removed, 
-	// everything is shifted up by one.
+	// more lines are added beyond the size of the monitor.  The top line is dropped
+	// and everything is shifted up by one.
 	if (crt_pos >= CRT_SIZE) {
 		int i;
 
@@ -217,6 +256,17 @@ cga_putc(int c)
 			crt_buf[i] = 0x0700 | ' ';
 		crt_pos -= CRT_COLS;
 	}
+	// Do the same for the scrolling crt buffer when it hits its capacity
+	if (scrolling_crt_pos >= SCROLLING_CRT_SIZE) {
+		int i;
+
+		memcpy(scrolling_crt_buf, scrolling_crt_buf + CRT_COLS, 
+		       (SCROLLING_CRT_SIZE - CRT_COLS) * sizeof(uint16_t));
+		for (i = SCROLLING_CRT_SIZE - CRT_COLS; i < SCROLLING_CRT_SIZE; i++)
+			scrolling_crt_buf[i] = 0x0700 | ' ';
+		scrolling_crt_pos -= CRT_COLS;
+	}
+
 
 	/* move that little blinky thing */
 	outb(addr_6845, 14);
@@ -230,7 +280,7 @@ cga_putc(int c)
 
 #define NO		0
 
-#define SHIFT		(1<<0)
+#define SHIFT	(1<<0)
 #define CTL		(1<<1)
 #define ALT		(1<<2)
 
@@ -335,6 +385,7 @@ kbd_proc_data(void)
 	int c;
 	uint8_t data;
 	static uint32_t shift;
+	static bool crt_scrolled = FALSE;
 
 	if ((inb(KBSTATP) & KBS_DIB) == 0)
 		return -1;
@@ -360,6 +411,30 @@ kbd_proc_data(void)
 	shift ^= togglecode[data];
 
 	c = charcode[shift & (CTL | SHIFT)][data];
+
+	//Scrolling screen functionality
+	if((shift & SHIFT) && ((c == KEY_UP) || (c == KEY_PGUP))) {
+		crt_scrolled = TRUE;
+		scroll_screen_up();
+		return 0;
+	}
+	else if((shift & SHIFT) && ((c == KEY_DN) || (c == KEY_PGDN))) {
+		crt_scrolled = TRUE;
+		scroll_screen_down();
+		return 0;
+	}
+	else if((shift & SHIFT) && c == KEY_RT) {
+		crt_scrolled = FALSE;
+		reset_screen();
+		return 0;
+	}
+
+	if(crt_scrolled) {
+		crt_scrolled = FALSE;
+		reset_screen();
+	}
+
+	//Force character to capital if caps lock on
 	if (shift & CAPSLOCK) {
 		if ('a' <= c && c <= 'z')
 			c += 'A' - 'a';
@@ -395,7 +470,7 @@ kbd_init(void)
 // where we stash characters received from the keyboard or serial port
 // whenever the corresponding interrupt occurs.
 
-#define CONSBUFSIZE 512
+#define CONSBUFSIZE	512
 
 static struct {
 	uint8_t buf[CONSBUFSIZE];

@@ -34,11 +34,9 @@ typedef struct checklist {
 	checklist_mask_t mask;
 } checklist_t;
 
-#define BUILD_ZEROS_ARRAY_255	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0} 
-#define ZEROS_ARRAY(size)	\
-	BUILD_ZEROS_ARRAY_##size
+#define ZEROS_ARRAY(size) {[(size)-1] 0}
 
-#define DEFAULT_CHECKLIST_MASK(sz) {(sz), ZEROS_ARRAY(sz)}
+#define DEFAULT_CHECKLIST_MASK(sz) {(sz), ZEROS_ARRAY(BYTES_FOR_BITMASK(sz))}
 #define DEFAULT_CHECKLIST(sz) {0, DEFAULT_CHECKLIST_MASK(sz)}
 #define INIT_CHECKLIST(nm, sz)	\
 	checklist_t nm = DEFAULT_CHECKLIST(sz);

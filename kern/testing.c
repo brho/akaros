@@ -248,7 +248,8 @@ void test_checklists(void)
 {
 	INIT_CHECKLIST(a_list, MAX_NUM_CPUS);
 	the_global_list = &a_list;
-	printk("Checklist built, mask\n");
+	printk("Checklist Build, mask size: %d\n", sizeof(a_list.mask.bits));
+	printk("mask\n");
 	PRINT_MASK(a_list.mask.bits, a_list.mask.size);
 	SET_BITMASK_BIT(a_list.mask.bits, 11);
 	printk("Set bit 11\n");
