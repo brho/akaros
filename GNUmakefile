@@ -73,6 +73,14 @@ PERL	:= perl
 # Only optimize to -O1 to discourage inlining, which complicates backtraces.
 CFLAGS	:= $(CFLAGS) $(DEFS) $(LABDEFS) -D$(ARCH) -O -fno-builtin -fno-stack-protector -I$(TOP) -MD -Wall -Wno-format -Wno-unused -gstabs
 
+# 64 Bit machines need these settings to compile and link
+UNAME=$(shell uname -m)
+ifeq ($(UNAME),x86_64)
+	LD += -melf_i386
+	CFLAGS += -m32
+	GCC_LIB = $(shell $(CC) -print-libgcc-file-name | sed 's/libgcc.a/32\/libgcc.a/')
+endif
+
 # Linker flags for ROS user programs
 ULDFLAGS := -T user/user.ld
 
