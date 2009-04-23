@@ -429,7 +429,8 @@ kbd_proc_data(void)
 		return 0;
 	}
 
-	if(crt_scrolled) {
+	// On keypress other than SHIFT, reset if we were scrolled
+	if(crt_scrolled && (!(shift & SHIFT))) {
 		crt_scrolled = FALSE;
 		reset_screen();
 	}
