@@ -14,6 +14,8 @@
 #include <kern/pmap.h>
 #include <kern/trap.h>
 #include <kern/monitor.h>
+#include <kern/apic.h>
+#include <kern/smp.h>
 
 env_t *envs = NULL;		// All environments
 env_t *curenv = NULL;	        // The current env
@@ -445,10 +447,19 @@ env_destroy(env_t *e)
 {
 	env_free(e);
 
-	int i;
+	// for old envs that die on user cores.  since env run never returns, cores
+	// never get back to their old hlt/relaxed/spin state, so we need to force
+	// them back to an idle function.
+	uint32_t id = lapic_get_id();
+	if (id) {
+		smp_idle();
+		panic("should never see me");
+	}
+	// else we're core 0 and can do the usual
+
 	// ugly, but for now just linearly search through all possible
 	// environments for a runnable one.
-	for (i = 0; i < NENV; i++) {
+	for (int i = 0; i < NENV; i++) {
 		e = &envs[ENVX(i)];
 		if (e && e->env_status == ENV_RUNNABLE)
 			env_run(e);

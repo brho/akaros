@@ -212,6 +212,14 @@ uint32_t smp_main(void)
 	return my_stack_top; // will be loaded in smp_entry.S
 }
 
+// this idles a core, sometimes we need to call it directly.  never returns.
+// the pause is somewhat of a hack, since kvm isn't halting.  not sure what the
+// deal is wit that.
+void smp_idle(void)
+{
+	asm volatile("1: hlt; pause; jmp 1b;");
+}
+
 // could have the backend checklists static/global too.
 // or at least have the pointers global (save a little RAM)
 

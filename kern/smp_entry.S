@@ -89,6 +89,7 @@ here:
 	sti						# turn on interrupts, and wait for an IPI
 spinwait:
 	hlt						# hlts, else will just spin.
+	pause					# hack, since kvm is ignoring the hlt.
 	jmp		spinwait
 
 	# Below here is just data, stored with the code text

@@ -28,6 +28,7 @@ typedef struct HandlerWrapper {
 
 /* SMP bootup functions */
 void smp_boot(void);
+void smp_idle(void);
 
 /* SMP utility functions */
 void smp_call_function_self(isr_t handler, bool wait);

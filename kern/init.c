@@ -24,9 +24,14 @@
 #include <kern/apic.h>
 #include <kern/testing.h>
 #include <kern/atomic.h>
-#include <kern/smp.h> 
+#include <kern/smp.h>
 
 static void print_cpuinfo(void);
+
+static void run_env_handler(trapframe_t *tf)
+{
+	env_run(&envs[0]);
+}
 
 void kernel_init(multiboot_info_t *mboot_info)
 {
@@ -55,9 +60,8 @@ void kernel_init(multiboot_info_t *mboot_info)
 	// this returns when all other cores are done and ready to receive IPIs
 	smp_boot();
 
+	/*
 	test_smp_call_functions();
-	panic("Don't Panic");
-
 	test_checklists();
 	test_barrier();
 	test_print_info();
@@ -66,6 +70,7 @@ void kernel_init(multiboot_info_t *mboot_info)
 	test_barrier();
 	test_print_info();
 	test_ipi_sending();
+	*/
 
 	//ENV_CREATE(user_faultread);
 	//ENV_CREATE(user_faultreadkernel);
@@ -79,7 +84,16 @@ void kernel_init(multiboot_info_t *mboot_info)
 	//ENV_CREATE(user_evilhello);
 
 	// We only have one user environment for now, so just run it.
-	env_run(&envs[0]);
+	//env_run(&envs[0]);
+	// run_env_handler just runs the first env, like the prev command
+	// need a way to have call_func to pass a pointer to a struct for arguments
+	smp_call_function_single(2, run_env_handler, 0);
+
+	// wait 5 sec, then print what's in shared mem
+	udelay(5000000);
+	printk("Reading from shared mem from hello on core 2:\n");
+	printk(envs[0].env_procdata); // horrible for security!
+	panic("Don't Panic");
 }
 
 /*
