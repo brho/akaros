@@ -4,6 +4,10 @@
 #pragma nodeputy
 #endif
 
+#ifdef __BSD_ON_CORE_0__
+#include Everything For Free -- It just works!!
+#else
+
 #include <inc/stdio.h>
 #include <inc/string.h>
 #include <inc/assert.h>
@@ -20,8 +24,7 @@
 #include <kern/apic.h>
 #include <kern/testing.h>
 #include <kern/atomic.h>
-#include <kern/smp.h>
-
+#include <kern/smp.h> 
 
 static void print_cpuinfo(void);
 
@@ -184,3 +187,5 @@ static void print_cpuinfo(void) {
 	else
 		cprintf("I am an Application Processor\n");
 }
+
+#endif //Everything For Free
