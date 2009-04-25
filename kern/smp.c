@@ -51,12 +51,12 @@ static void init_smp_call_function(void)
 	INIT_HANDLER_WRAPPER(4);
 }
 
+/******************************************************************************/
+
 static void smp_mtrr_handler(trapframe_t *tf)
 {
 	setup_default_mtrrs(&generic_barrier);
 }
-
-/******************************************************************************/
 
 void smp_boot(void)
 {
@@ -82,20 +82,16 @@ void smp_boot(void)
 
 	// Start the IPI process (INIT, wait, SIPI, wait, SIPI, wait)
 	send_init_ipi();
-	enable_irq(); // LAPIC timer will fire, extINTs are blocked at LINT0 now
-	udelay(50);
+	// SDM 3A is a little wonky wrt the proper delays.  These are my best guess.
+	udelay(10000);
 	// first SIPI
 	send_startup_ipi(0x01);
-	udelay(200);
-	/* //BOCHS does not like this second SIPI.
+	/* BOCHS does not like this second SIPI.
 	// second SIPI
-	waiting = 1;
+	udelay(200);
 	send_startup_ipi(0x01);
-	lapic_set_timer(0x000fffff, boot_vector, 0); // TODO - fix timing
-	while(waiting) // wait for the second SIPI to take effect
-		cpu_relax();
 	*/
-	disable_irq();
+	udelay(100000);
 
 	// Each core will also increment smp_semaphore, and decrement when it is done,
 	// all in smp_entry.  It's purpose is to keep Core0 from competing for the

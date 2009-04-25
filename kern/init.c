@@ -211,6 +211,11 @@ static void print_cpuinfo(void) {
 		cprintf("I am the Boot Strap Processor\n");
 	else
 		cprintf("I am an Application Processor\n");
+	cpuid(0x80000007, &eax, &ebx, &ecx, &edx);
+	if (edx & 0x00000100)
+		printk("Invariant TSC present\n");
+	else
+		printk("Invariant TSC not present\n");
 }
 
 #endif //Everything For Free
