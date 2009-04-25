@@ -3,9 +3,6 @@
 #ifndef ROS_INC_ERROR_H
 #define ROS_INC_ERROR_H
 
-#define TRUE	1
-#define FALSE	0
-
 typedef enum {
 	E_FAIL		=	-1,
 	E_SUCCESS	=	0,
