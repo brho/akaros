@@ -7,8 +7,16 @@ void umain(void)
 	// this is just their way of generating a pagefault..., until now!
 	cprintf("i am environment %08x\n", env->env_id);
 
-	// hello via shared mem
-	const char* hello = "Is there anybody in there?\n";
-	memcpy(procdata, hello, strlen(hello));
-	cprintf("wrote to shared mem.  just nod if you can hear me.\n");
+	// async via shared mem
+	char* hello = "First cross-chip async syscall success!  Shiver me timbers!\n";
+	cprintf("about to write to shared mem.  hope it gets printed.  blimey! \n");
+	// note that when using the cprintf family, we can't currently call again,
+	// since the library functions use the same buffer.  the last used string
+	// will be the one printed when the syscall is serviced, regardless of
+	// whether the actual syscall can handle multiples in flight.
+	cprintf_async(hello);
+
+	// might as well spin, just to make sure nothing gets deallocated
+	// while we're waiting to test the async call
+	while (1);
 }

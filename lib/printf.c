@@ -60,3 +60,39 @@ cprintf(const char *fmt, ...)
 	return cnt;
 }
 
+// Temp async varieties
+static void
+putch_async(int ch, printbuf_t *b)
+{
+	b->buf[b->idx++] = ch;
+	if (b->idx == 256-1) {
+		sys_cputs_async(b->buf, b->idx);
+		b->idx = 0;
+	}
+	b->cnt++;
+}
+
+static int vcprintf_async(const char *fmt, va_list ap)
+{
+	printbuf_t b;
+
+	b.idx = 0;
+	b.cnt = 0;
+	vprintfmt((void*)putch_async, &b, fmt, ap);
+	sys_cputs_async(b.buf, b.idx);
+
+	return b.cnt;
+}
+
+int cprintf_async(const char *fmt, ...)
+{
+	va_list ap;
+	int cnt;
+
+	va_start(ap, fmt);
+	cnt = vcprintf_async(fmt, ap);
+	va_end(ap);
+
+	return cnt;
+}
+

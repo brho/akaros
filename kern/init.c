@@ -25,6 +25,7 @@
 #include <kern/testing.h>
 #include <kern/atomic.h>
 #include <kern/smp.h>
+#include <kern/syscall.h>
 
 static void print_cpuinfo(void);
 
@@ -91,8 +92,18 @@ void kernel_init(multiboot_info_t *mboot_info)
 
 	// wait 5 sec, then print what's in shared mem
 	udelay(5000000);
-	printk("Reading from shared mem from hello on core 2:\n");
-	printk(envs[0].env_procdata); // horrible for security!
+	/*
+	printk("Dumping from shared mem from hello on core 2:\n");
+	printk("%08x%08x%08x%08x\n",
+		*(uint32_t*)(envs[0].env_procdata),
+		*(uint32_t*)(envs[0].env_procdata + 4),
+		*(uint32_t*)(envs[0].env_procdata + 8),
+		*(uint32_t*)(envs[0].env_procdata + 12));
+		*/
+	printk("Attempting to run the syscall at the beginning of procdata:\n");
+	printk("\n");
+	syscall_async((syscall_t*)(envs[0].env_procdata));
+	printk("\n");
 	panic("Don't Panic");
 }
 

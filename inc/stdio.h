@@ -26,6 +26,7 @@ void	vprintfmt(void (*putch)(int, TV(t)), TV(t) putdat, const char *NTS fmt, va_
 
 // lib/printf.c
 int	cprintf(const char * NTS fmt, ...);
+int	cprintf_async(const char * NTS fmt, ...);
 int	vcprintf(const char * NTS fmt, va_list);
 
 // lib/sprintf.c

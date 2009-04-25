@@ -34,6 +34,21 @@ syscall(int num, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32_t a5
 	return ret;
 }
 
+static inline error_t async_syscall(syscall_t *syscall)
+{
+	// testing just one syscall at a time, and just put it at the beginning of
+	// the shared data page
+	memcpy(procdata, syscall, sizeof(syscall_t));
+	return 0;
+}
+
+void sys_cputs_async(const char *s, size_t len)
+{
+	// could just hardcode 4 0's, will eventually wrap this marshaller anyway
+	syscall_t syscall = {SYS_cputs, 0, {(uint32_t)s, len, [2 ... (NUM_SYS_ARGS-1)] 0} };
+	async_syscall(&syscall);
+}
+
 void
 sys_cputs(const char *s, size_t len)
 {

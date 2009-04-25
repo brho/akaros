@@ -82,18 +82,24 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 		return -E_INVAL;
 	
 	switch (syscallno) {
-		case 0:
+		case SYS_cputs:
 			sys_cputs((char *DANGEROUS)a1, (size_t)a2);
 			return 0;
-		case 1:
+		case SYS_cgetc:
 			return sys_cgetc();
-		case 2:
+		case SYS_getenvid:
 			return sys_getenvid();
-		case 3:
+		case SYS_env_destroy:
 			return sys_env_destroy((envid_t)a1);
 		default:
+			// or just return -E_INVAL
 			panic("invalid syscall number!");
 	}
 	return 0xdeadbeef;
 }
 
+uint32_t syscall_async(syscall_t *call)
+{
+	return syscall(call->num, call->args[0], call->args[1],
+	               call->args[2], call->args[3], call->args[4]);
+}

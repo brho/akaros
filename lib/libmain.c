@@ -13,7 +13,7 @@ libmain(int argc, char **argv)
 {
 	// set env to point at our env structure in envs[].
 	// TODO: for now, the kernel just copies our env struct to the beginning of
-	// proc_info.  When we figure out what we want there, change this.
+	// procinfo.  When we figure out what we want there, change this.
 	env = (env_t*)procinfo;
 
 	// save the name of the program so that panic() can use it
