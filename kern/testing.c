@@ -75,7 +75,7 @@ void test_ipi_sending(void)
 void test_pic_reception(void)
 {
 	register_interrupt_handler(interrupt_handlers, 0x20, test_hello_world_handler);
-	pit_set_timer(100,TIMER_RATEGEN,1); // totally arbitrary time
+	pit_set_timer(100,TIMER_RATEGEN); // totally arbitrary time
 	pic_unmask_irq(0);
 	cprintf("PIC1 Mask = 0x%04x\n", inb(PIC1_DATA));
 	cprintf("PIC2 Mask = 0x%04x\n", inb(PIC2_DATA));

@@ -14,7 +14,6 @@
 #include <kern/apic.h>
 #include <kern/atomic.h>
 
-volatile uint32_t waiting = 1;
 volatile uint8_t num_cpus = 0xee;
 uintptr_t smp_stack_top;
 barrier_t generic_barrier;
@@ -52,18 +51,12 @@ static void init_smp_call_function(void)
 	INIT_HANDLER_WRAPPER(4);
 }
 
-/******************************************************************************/
-
-/* Breaks us out of the waiting loop in smp_boot */
-static void smp_boot_handler(trapframe_t *tf)
-{
-	{HANDLER_ATOMIC atomic_dec(&waiting); }
-}
-
 static void smp_mtrr_handler(trapframe_t *tf)
 {
 	setup_default_mtrrs(&generic_barrier);
 }
+
+/******************************************************************************/
 
 void smp_boot(void)
 {
@@ -87,23 +80,13 @@ void smp_boot(void)
 		panic("No memory for SMP boot stack!");
 	smp_stack_top = (uintptr_t)(page2kva(smp_stack) + PGSIZE);
 
-	// set up the local APIC timer to fire boot_vector once.  hardcoded to break
-	// out of the spinloop on waiting.  really just want to wait a little
-	lapic_set_timer(0x0000ffff, boot_vector, 0); // TODO - fix timing
-	// set the function handler to respond to this
-	register_interrupt_handler(interrupt_handlers, boot_vector, smp_boot_handler);
-
 	// Start the IPI process (INIT, wait, SIPI, wait, SIPI, wait)
 	send_init_ipi();
 	enable_irq(); // LAPIC timer will fire, extINTs are blocked at LINT0 now
-	while (waiting) // gets released in smp_boot_handler
-		cpu_relax();
+	udelay(50);
 	// first SIPI
-	waiting = 1;
 	send_startup_ipi(0x01);
-	lapic_set_timer(SMP_BOOT_TIMEOUT, boot_vector, 0); // TODO - fix timing
-	while(waiting) // wait for the first SIPI to take effect
-		cpu_relax();
+	udelay(200);
 	/* //BOCHS does not like this second SIPI.
 	// second SIPI
 	waiting = 1;

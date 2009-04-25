@@ -117,9 +117,6 @@ include user/Makefrag
 
 IMAGES = $(OBJDIR)/kern/bochs.img
 
-bochs: $(IMAGES)
-	bochs 'display_library: nogui'
-
 # For deleting the build
 clean:
 	rm -rf $(OBJDIR)

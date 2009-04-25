@@ -85,7 +85,7 @@ uint32_t lapic_get_default_id(void)
 
 void timer_init(void){
 	uint64_t tscval[2];
-	pit_set_timer(0xffff, TIMER_RATEGEN, 1);
+	pit_set_timer(0xffff, TIMER_RATEGEN);
 	// assume tsc exist
 	tscval[0] = read_tsc();
 	udelay_pit(1000000);
@@ -94,16 +94,15 @@ void timer_init(void){
 	cprintf("tsc_freq %lu\n", tsc_freq);
 }
 
-void pit_set_timer(uint32_t divisor, uint32_t mode, bool periodic)
+void pit_set_timer(uint32_t divisor, uint32_t mode)
 {
 	if (divisor & 0xffff0000)
 		warn("Divisor too large!");
-	// TODO: review periodic
 	mode = TIMER_SEL0|TIMER_16BIT|mode;
-	outb(TIMER_MODE, mode | (periodic << 2));
+	outb(TIMER_MODE, mode); 
 	outb(TIMER_CNTR0, divisor & 0xff);
 	outb(TIMER_CNTR0, (divisor >> 8) );
-	cprintf("timer mode set to %d, divisor %d\n",mode|(periodic << 2), divisor);
+	// cprintf("timer mode set to %d, divisor %d\n",mode, divisor);
 }
 
 static int getpit()
@@ -123,6 +122,7 @@ static int getpit()
 // forces cpu to relax for usec miliseconds
 void udelay(uint64_t usec)
 {
+	#if !defined(__BOCHS__)
 	if (tsc_freq != 0)
 	{
 		uint64_t start, end, now;
@@ -139,6 +139,7 @@ void udelay(uint64_t usec)
         return;
 
 	} else
+	#endif
 	{
 		udelay_pit(usec);
 	}
@@ -168,7 +169,6 @@ void udelay_pit(uint64_t usec)
 		// round up the ticks left
 		ticks_left = ((uint64_t)usec * (long long)PIT_FREQ+ 999999)
 			     / 1000000; 
-	cprintf("ticks left %llu \n" , ticks_left);
 	while (ticks_left > 0) {
 		tick = getpit();
 		delta = prev_tick - tick;

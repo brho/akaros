@@ -87,12 +87,12 @@ void pic_unmask_irq(uint8_t irq);
 void lapic_set_timer(uint32_t ticks, uint8_t vector, bool periodic);
 uint32_t lapic_get_default_id(void);
 // PIT related
-void pit_set_timer(uint32_t freq, uint32_t mode, bool periodic); // consider adding callback func
+void pit_set_timer(uint32_t freq, uint32_t mode);
 void timer_init(void);
 void udelay(uint64_t usec);
 
 static int getpit(void);
-void udelay_pit(uint64_t usec);
+static inline void udelay_pit(uint64_t usec);
 
 
 static inline void pic_send_eoi(uint32_t irq);
