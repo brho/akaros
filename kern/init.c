@@ -29,7 +29,7 @@
 
 static void print_cpuinfo(void);
 
-static void run_env_handler(trapframe_t *tf)
+static void run_env_handler(trapframe_t *tf, void* data)
 {
 	env_run(&envs[0]);
 }
@@ -68,9 +68,6 @@ void kernel_init(multiboot_info_t *mboot_info)
 	test_print_info();
 	test_ipi_sending();
 	test_pit();
-	test_barrier();
-	test_print_info();
-	test_ipi_sending();
 	*/
 
 	//ENV_CREATE(user_faultread);
@@ -88,7 +85,7 @@ void kernel_init(multiboot_info_t *mboot_info)
 	//env_run(&envs[0]);
 	// run_env_handler just runs the first env, like the prev command
 	// need a way to have call_func to pass a pointer to a struct for arguments
-	smp_call_function_single(2, run_env_handler, 0);
+	smp_call_function_single(2, run_env_handler, 0, 0);
 
 	// wait 5 sec, then print what's in shared mem
 	udelay(5000000);

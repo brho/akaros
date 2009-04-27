@@ -16,57 +16,40 @@
 
 void test_ipi_sending(void)
 {
-	extern isr_t interrupt_handlers[];
-	uint32_t i, amount = SMP_CALL_FUNCTION_TIMEOUT; // should calibrate this
+	#define test_vector 0xeb
+	extern handler_t interrupt_handlers[];
 	int8_t state = 0;
-	register_interrupt_handler(interrupt_handlers, 0xf1, test_hello_world_handler);
+	
+	register_interrupt_handler(interrupt_handlers, test_vector,
+	                           test_hello_world_handler, 0);
 	enable_irqsave(&state);
-	
 	cprintf("\nCORE 0 sending broadcast\n");
-	send_broadcast_ipi(0xf1);
-	for (i = 0; i < amount; i++)
-		asm volatile("nop;");
-	
+	send_broadcast_ipi(test_vector);
+	udelay(3000000);
 	cprintf("\nCORE 0 sending all others\n");
-	send_all_others_ipi(0xf1);
-	for (i = 0; i < amount; i++)
-		asm volatile("nop;");
-	
+	send_all_others_ipi(test_vector);
+	udelay(3000000);
 	cprintf("\nCORE 0 sending self\n");
-	send_self_ipi(0xf1);
-	for (i = 0; i < amount; i++)
-		asm volatile("nop;");
-	
+	send_self_ipi(test_vector);
+	udelay(3000000);
 	cprintf("\nCORE 0 sending ipi to physical 1\n");
-	send_ipi(0x01, 0, 0xf1);
-	for (i = 0; i < amount; i++)
-		asm volatile("nop;");
-	
+	send_ipi(0x01, 0, test_vector);
+	udelay(3000000);
 	cprintf("\nCORE 0 sending ipi to physical 2\n");
-	send_ipi(0x02, 0, 0xf1);
-	for (i = 0; i < amount; i++)
-		asm volatile("nop;");
-	
+	send_ipi(0x02, 0, test_vector);
+	udelay(3000000);
 	cprintf("\nCORE 0 sending ipi to physical 3\n");
-	send_ipi(0x03, 0, 0xf1);
-	for (i = 0; i < amount; i++)
-		asm volatile("nop;");
-	
+	send_ipi(0x03, 0, test_vector);
+	udelay(3000000);
 	cprintf("\nCORE 0 sending ipi to physical 15\n");
-	send_ipi(0x0f, 0, 0xf1);
-	for (i = 0; i < amount; i++)
-		asm volatile("nop;");
-	
+	send_ipi(0x0f, 0, test_vector);
+	udelay(3000000);
 	cprintf("\nCORE 0 sending ipi to logical 2\n");
-	send_ipi(0x02, 1, 0xf1);
-	for (i = 0; i < amount; i++)
-		asm volatile("nop;");
-	
+	send_ipi(0x02, 1, test_vector);
+	udelay(3000000);
 	cprintf("\nCORE 0 sending ipi to logical 1\n");
-	send_ipi(0x01, 1, 0xf1);
-	for (i = 0; i < amount; i++)
-		asm volatile("nop;");
-
+	send_ipi(0x01, 1, test_vector);
+	udelay(3000000);
 	cprintf("\nDone!\n");
 	disable_irqsave(&state);
 }
@@ -74,7 +57,7 @@ void test_ipi_sending(void)
 // Note this never returns and will muck with any other timer work
 void test_pic_reception(void)
 {
-	register_interrupt_handler(interrupt_handlers, 0x20, test_hello_world_handler);
+	register_interrupt_handler(interrupt_handlers, 0x20, test_hello_world_handler, 0);
 	pit_set_timer(100,TIMER_RATEGEN); // totally arbitrary time
 	pic_unmask_irq(0);
 	cprintf("PIC1 Mask = 0x%04x\n", inb(PIC1_DATA));
@@ -88,7 +71,7 @@ void test_pic_reception(void)
 void test_print_info(void)
 {
 	cprintf("\nCORE 0 asking all cores to print info:\n");
-	smp_call_function_all(test_print_info_handler, 0);
+	smp_call_function_all(test_print_info_handler, 0, 0);
 	cprintf("\nDone!\n");
 }
 	
@@ -101,7 +84,7 @@ void test_barrier(void)
 	cprintf("Core 0 initializing barrier\n");
 	init_barrier(&test_cpu_array, num_cpus);
 	cprintf("Core 0 asking all cores to print ids, barrier, rinse, repeat\n");
-	smp_call_function_all(test_barrier_handler, 0);
+	smp_call_function_all(test_barrier_handler, 0, 0);
 }
 
 void test_interrupts_irqsave(void)
@@ -235,7 +218,7 @@ void test_bitmasks(void)
 
 checklist_t* the_global_list;
 
-void test_checklist_handler(trapframe_t *tf)
+void test_checklist_handler(trapframe_t *tf, void* data)
 {
 	for (int i = 0; i < SMP_BOOT_TIMEOUT; i++);
 	for (int i = 0; i < SMP_BOOT_TIMEOUT; i++);
@@ -261,13 +244,14 @@ void test_checklists(void)
 	//CLR_BITMASK_BIT(a_mask.bits, lapic_get_id());
 	//SET_BITMASK_BIT(a_mask.bits, 1);
 	//printk("New mask (1, 17, 25):\n");
+	printk("Created new mask, filled up to num_cpus\n");
 	PRINT_MASK(a_mask.bits, a_mask.size);
 	printk("committing new mask\n");
 	commit_checklist_wait(&a_list, &a_mask);
-	printk("Old mask (copied onto) (1, 17, 25):\n");
+	printk("Old mask (copied onto):\n");
 	PRINT_MASK(a_list.mask.bits, a_list.mask.size);
-	//smp_call_function_single(1, test_checklist_handler, 0);	
-	smp_call_function_all(test_checklist_handler, 0);	
+	//smp_call_function_single(1, test_checklist_handler, 0, 0);	
+	smp_call_function_all(test_checklist_handler, 0, 0);	
 
 	printk("Waiting on checklist\n");
 	waiton_checklist(&a_list);	
@@ -277,100 +261,101 @@ void test_checklists(void)
 
 volatile uint32_t a = 0, b = 0, c = 0;
 
-void test_A_incrementer_handler(struct Trapframe *tf)
+void test_A_incrementer_handler(struct Trapframe *tf, void* data)
 {
 	atomic_inc(&a);
 }
 
-void test_B_incrementer_handler(struct Trapframe *tf)
+void test_B_incrementer_handler(struct Trapframe *tf, void* data)
 {
 	atomic_inc(&b);
 }
 
-void test_C_incrementer_handler(struct Trapframe *tf)
+void test_C_incrementer_handler(struct Trapframe *tf, void* data)
 {
 	atomic_inc(&c);
 }
 
-void test_null_handler(struct Trapframe *tf)
+void test_null_handler(struct Trapframe *tf, void* data)
 {
 	asm volatile("nop");
 }
 
 void test_smp_call_functions(void)
 {
-	handler_wrapper_t *waiter0, *waiter1, *waiter2, *waiter3, *waiter4, *waiter5;
+	handler_wrapper_t *waiter0 = 0, *waiter1 = 0, *waiter2 = 0, *waiter3 = 0,
+	                  *waiter4 = 0, *waiter5 = 0;
 	uint8_t me = lapic_get_id();
 	printk("\nCore %d: SMP Call Self (nowait):\n", me);
 	printk("---------------------\n");
-	smp_call_function_self(test_hello_world_handler, 0);
+	smp_call_function_self(test_hello_world_handler, 0, 0);
 	printk("\nCore %d: SMP Call Self (wait):\n", me);
 	printk("---------------------\n");
-	smp_call_function_self(test_hello_world_handler, &waiter0);
+	smp_call_function_self(test_hello_world_handler, 0, &waiter0);
 	smp_call_wait(waiter0);
 	printk("\nCore %d: SMP Call All (nowait):\n", me);
 	printk("---------------------\n");
-	smp_call_function_all(test_hello_world_handler, 0);
+	smp_call_function_all(test_hello_world_handler, 0, 0);
 	printk("\nCore %d: SMP Call All (wait):\n", me);
 	printk("---------------------\n");
-	smp_call_function_all(test_hello_world_handler, &waiter0);
+	smp_call_function_all(test_hello_world_handler, 0, &waiter0);
 	smp_call_wait(waiter0);
 	printk("\nCore %d: SMP Call All-Else Individually, in order (nowait):\n", me);
 	printk("---------------------\n");
-	smp_call_function_single(1, test_hello_world_handler, 0);
-	smp_call_function_single(2, test_hello_world_handler, 0);
-	smp_call_function_single(3, test_hello_world_handler, 0);
-	smp_call_function_single(4, test_hello_world_handler, 0);
-	smp_call_function_single(5, test_hello_world_handler, 0);
-	smp_call_function_single(6, test_hello_world_handler, 0);
-	smp_call_function_single(7, test_hello_world_handler, 0);
+	smp_call_function_single(1, test_hello_world_handler, 0, 0);
+	smp_call_function_single(2, test_hello_world_handler, 0, 0);
+	smp_call_function_single(3, test_hello_world_handler, 0, 0);
+	smp_call_function_single(4, test_hello_world_handler, 0, 0);
+	smp_call_function_single(5, test_hello_world_handler, 0, 0);
+	smp_call_function_single(6, test_hello_world_handler, 0, 0);
+	smp_call_function_single(7, test_hello_world_handler, 0, 0);
 	printk("\nCore %d: SMP Call Self (wait):\n", me);
 	printk("---------------------\n");
-	smp_call_function_self(test_hello_world_handler, &waiter0);
+	smp_call_function_self(test_hello_world_handler, 0, &waiter0);
 	smp_call_wait(waiter0);
 	printk("\nCore %d: SMP Call All-Else Individually, in order (wait):\n", me);
 	printk("---------------------\n");
-	smp_call_function_single(1, test_hello_world_handler, &waiter0);
+	smp_call_function_single(1, test_hello_world_handler, 0, &waiter0);
 	smp_call_wait(waiter0);
-	smp_call_function_single(2, test_hello_world_handler, &waiter0);
+	smp_call_function_single(2, test_hello_world_handler, 0, &waiter0);
 	smp_call_wait(waiter0);
-	smp_call_function_single(3, test_hello_world_handler, &waiter0);
+	smp_call_function_single(3, test_hello_world_handler, 0, &waiter0);
 	smp_call_wait(waiter0);
-	smp_call_function_single(4, test_hello_world_handler, &waiter0);
+	smp_call_function_single(4, test_hello_world_handler, 0, &waiter0);
 	smp_call_wait(waiter0);
-	smp_call_function_single(5, test_hello_world_handler, &waiter0);
+	smp_call_function_single(5, test_hello_world_handler, 0, &waiter0);
 	smp_call_wait(waiter0);
-	smp_call_function_single(6, test_hello_world_handler, &waiter0);
+	smp_call_function_single(6, test_hello_world_handler, 0, &waiter0);
 	smp_call_wait(waiter0);
-	smp_call_function_single(7, test_hello_world_handler, &waiter0);
+	smp_call_function_single(7, test_hello_world_handler, 0, &waiter0);
 	smp_call_wait(waiter0);
 	printk("\nTesting to see if any IPI-functions are dropped when not waiting:\n");
 	printk("A: %d, B: %d, C: %d (should be 0,0,0)\n", a, b, c);
-	smp_call_function_all(test_A_incrementer_handler, 0);
-	smp_call_function_all(test_B_incrementer_handler, 0);
-	smp_call_function_all(test_C_incrementer_handler, 0);
+	smp_call_function_all(test_A_incrementer_handler, 0, 0);
+	smp_call_function_all(test_B_incrementer_handler, 0, 0);
+	smp_call_function_all(test_C_incrementer_handler, 0, 0);
 	// if i can clobber a previous IPI, the interleaving might do it
-	smp_call_function_single(1, test_A_incrementer_handler, 0);
-	smp_call_function_single(2, test_B_incrementer_handler, 0);
-	smp_call_function_single(3, test_C_incrementer_handler, 0);
-	smp_call_function_single(4, test_A_incrementer_handler, 0);
-	smp_call_function_single(5, test_B_incrementer_handler, 0);
-	smp_call_function_single(6, test_C_incrementer_handler, 0);
-	smp_call_function_all(test_A_incrementer_handler, 0);
-	smp_call_function_single(3, test_C_incrementer_handler, 0);
-	smp_call_function_all(test_B_incrementer_handler, 0);
-	smp_call_function_single(1, test_A_incrementer_handler, 0);
-	smp_call_function_all(test_C_incrementer_handler, 0);
-	smp_call_function_single(2, test_B_incrementer_handler, 0);
+	smp_call_function_single(1, test_A_incrementer_handler, 0, 0);
+	smp_call_function_single(2, test_B_incrementer_handler, 0, 0);
+	smp_call_function_single(3, test_C_incrementer_handler, 0, 0);
+	smp_call_function_single(4, test_A_incrementer_handler, 0, 0);
+	smp_call_function_single(5, test_B_incrementer_handler, 0, 0);
+	smp_call_function_single(6, test_C_incrementer_handler, 0, 0);
+	smp_call_function_all(test_A_incrementer_handler, 0, 0);
+	smp_call_function_single(3, test_C_incrementer_handler, 0, 0);
+	smp_call_function_all(test_B_incrementer_handler, 0, 0);
+	smp_call_function_single(1, test_A_incrementer_handler, 0, 0);
+	smp_call_function_all(test_C_incrementer_handler, 0, 0);
+	smp_call_function_single(2, test_B_incrementer_handler, 0, 0);
 	// wait, so we're sure the others finish before printing.
 	// without this, we could (and did) get 19,18,19, since the B_inc
 	// handler didn't finish yet
-	smp_call_function_self(test_null_handler, &waiter0);
+	smp_call_function_self(test_null_handler, 0, &waiter0);
 	// need to grab all 5 handlers (max), since the code moves to the next free.
-	smp_call_function_self(test_null_handler, &waiter1);
-	smp_call_function_self(test_null_handler, &waiter2);
-	smp_call_function_self(test_null_handler, &waiter3);
-	smp_call_function_self(test_null_handler, &waiter4);
+	smp_call_function_self(test_null_handler, 0, &waiter1);
+	smp_call_function_self(test_null_handler, 0, &waiter2);
+	smp_call_function_self(test_null_handler, 0, &waiter3);
+	smp_call_function_self(test_null_handler, 0, &waiter4);
 	smp_call_wait(waiter0);
 	smp_call_wait(waiter1);
 	smp_call_wait(waiter2);
@@ -378,23 +363,24 @@ void test_smp_call_functions(void)
 	smp_call_wait(waiter4);
 	printk("A: %d, B: %d, C: %d (should be 19,19,19)\n", a, b, c);
 	printk("Attempting to deadlock by smp_calling with an outstanding wait:\n");
-	smp_call_function_self(test_null_handler, &waiter0);
-	smp_call_function_self(test_null_handler, &waiter1);
+	smp_call_function_self(test_null_handler, 0, &waiter0);
+	smp_call_function_self(test_null_handler, 0, &waiter1);
 	smp_call_wait(waiter0);
 	smp_call_wait(waiter1);
 	printk("\tMade it through!\n");
 	printk("Attempting to deadlock by smp_calling more than are available:\n");
-	if (smp_call_function_self(test_null_handler, &waiter0))
+	printk("\tShould see an Insufficient message and a kernel warning.\n");
+	if (smp_call_function_self(test_null_handler, 0, &waiter0))
 		printk("\tInsufficient handlers to call function (0)\n");
-	if (smp_call_function_self(test_null_handler, &waiter1))
+	if (smp_call_function_self(test_null_handler, 0, &waiter1))
 		printk("\tInsufficient handlers to call function (1)\n");
-	if (smp_call_function_self(test_null_handler, &waiter2))
+	if (smp_call_function_self(test_null_handler, 0, &waiter2))
 		printk("\tInsufficient handlers to call function (2)\n");
-	if (smp_call_function_self(test_null_handler, &waiter3))
+	if (smp_call_function_self(test_null_handler, 0, &waiter3))
 		printk("\tInsufficient handlers to call function (3)\n");
-	if (smp_call_function_self(test_null_handler, &waiter4))
+	if (smp_call_function_self(test_null_handler, 0, &waiter4))
 		printk("\tInsufficient handlers to call function (4)\n");
-	if (smp_call_function_self(test_null_handler, &waiter5))
+	if (smp_call_function_self(test_null_handler, 0, &waiter5))
 		printk("\tInsufficient handlers to call function (5)\n");
 	smp_call_wait(waiter0);
 	smp_call_wait(waiter1);
@@ -409,7 +395,7 @@ void test_smp_call_functions(void)
 
 /* Helper Functions */
 
-void test_hello_world_handler(trapframe_t *tf)
+void test_hello_world_handler(trapframe_t *tf, void* data)
 {
 	cprintf("Incoming IRQ, ISR: %d on core %d with tf at 0x%08x\n", 
 		tf->tf_trapno, lapic_get_id(), tf);
@@ -417,7 +403,7 @@ void test_hello_world_handler(trapframe_t *tf)
 
 uint32_t print_info_lock = 0;
 
-void test_print_info_handler(trapframe_t *tf)
+void test_print_info_handler(trapframe_t *tf, void* data)
 {
 	spin_lock_irqsave(&print_info_lock);
 	cprintf("----------------------------\n");
@@ -443,7 +429,7 @@ void test_print_info_handler(trapframe_t *tf)
 	spin_unlock_irqsave(&print_info_lock);
 }
 
-void test_barrier_handler(trapframe_t *tf)
+void test_barrier_handler(trapframe_t *tf, void* data)
 {
 	cprintf("Round 1: Core %d\n", lapic_get_id());
 	waiton_barrier(&test_cpu_array);

@@ -30,9 +30,11 @@ void smp_boot(void);
 void smp_idle(void);
 
 /* SMP utility functions */
-int smp_call_function_self(isr_t handler, handler_wrapper_t** wait_wrapper);
-int smp_call_function_all(isr_t handler, handler_wrapper_t** wait_wrapper);
-int smp_call_function_single(uint8_t dest, isr_t handler,
+int smp_call_function_self(isr_t handler, void* data,
+                           handler_wrapper_t** wait_wrapper);
+int smp_call_function_all(isr_t handler, void* data,
+                          handler_wrapper_t** wait_wrapper);
+int smp_call_function_single(uint8_t dest, isr_t handler, void* data,
                              handler_wrapper_t** wait_wrapper);
 int smp_call_wait(handler_wrapper_t* wrapper);
 

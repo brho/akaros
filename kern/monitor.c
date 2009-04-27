@@ -216,10 +216,10 @@ int mon_cpuinfo(int argc, char **argv, trapframe_t *tf)
 	cprintf("Number of CPUs detected: %d\n", num_cpus);	
 	cprintf("Calling CPU's LAPIC ID: 0x%08x\n", lapic_get_id());
 	if (argc < 2)
-		smp_call_function_self(test_print_info_handler, 0);
+		smp_call_function_self(test_print_info_handler, 0, 0);
 	else
 		smp_call_function_single(strtol(argv[1], 0, 16),
-		                         test_print_info_handler, 0);
+		                         test_print_info_handler, 0, 0);
 	return 0;
 }
 

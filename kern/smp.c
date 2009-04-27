@@ -53,18 +53,17 @@ static void init_smp_call_function(void)
 
 /******************************************************************************/
 
-static void smp_mtrr_handler(trapframe_t *tf)
+static void smp_mtrr_handler(trapframe_t *tf, void* data)
 {
+	// TODO - pass in the barrier via data, and not the global
 	setup_default_mtrrs(&generic_barrier);
 }
 
 void smp_boot(void)
 {
-	#define boot_vector 0xeb
 	// this needs to be set in smp_entry too...
 	#define trampoline_pg 0x00001000
 	page_t *smp_stack;
-	extern isr_t interrupt_handlers[];
 	// NEED TO GRAB A LOWMEM FREE PAGE FOR AP BOOTUP CODE
 	// page1 (2nd page) is reserved, hardcoded in pmap.c
 	extern smp_entry(), smp_entry_end(), smp_boot_lock(), smp_semaphore();
@@ -111,8 +110,6 @@ void smp_boot(void)
 	spin_lock((uint32_t*)(&smp_boot_lock - &smp_entry + trampoline_pg));
 	cprintf("Num_Cpus Detected: %d\n", num_cpus);
 
-	// Deregister smp_boot_handler
-	register_interrupt_handler(interrupt_handlers, boot_vector, 0);
 	// Remove the mapping of the page used by the trampoline
 	page_remove(boot_pgdir, (void*)trampoline_pg);
 	// It had a refcount of 2 earlier, so we need to dec once more to free it
@@ -128,7 +125,7 @@ void smp_boot(void)
 
 	// Set up all cores to use the proper MTRRs
 	init_barrier(&generic_barrier, num_cpus); // barrier used by smp_mtrr_handler
-	smp_call_function_all(smp_mtrr_handler, 0);
+	smp_call_function_all(smp_mtrr_handler, 0, 0);
 
 	// Should probably flush everyone's TLB at this point, to get rid of
 	// temp mappings that were removed.  TODO
@@ -216,10 +213,10 @@ void smp_idle(void)
 	asm volatile("1: hlt; pause; jmp 1b;");
 }
 
-static int smp_call_function(uint8_t type, uint8_t dest, isr_t handler, 
+static int smp_call_function(uint8_t type, uint8_t dest, isr_t handler, void* data,
                               handler_wrapper_t** wait_wrapper)
 {
-	extern isr_t interrupt_handlers[];
+	extern handler_t interrupt_handlers[];
 	int8_t state = 0;
 	uint32_t wrapper_num;
 	handler_wrapper_t* wrapper;
@@ -302,7 +299,7 @@ static int smp_call_function(uint8_t type, uint8_t dest, isr_t handler,
 	}
 
 	// now register our handler to run
-	register_interrupt_handler(interrupt_handlers, wrapper->vector, handler);
+	register_interrupt_handler(interrupt_handlers, wrapper->vector, handler, data);
 	// WRITE MEMORY BARRIER HERE
 	enable_irqsave(&state);
 	// Send the proper type of IPI.  I made up these numbers.
@@ -331,27 +328,28 @@ static int smp_call_function(uint8_t type, uint8_t dest, isr_t handler,
 	return 0;
 }
 
-// I'd rather have these functions take an arbitrary function and arguments...
-// Right now, I build a handler that just calls whatever I want, which is
-// another layer of indirection.
-int smp_call_function_self(isr_t handler, handler_wrapper_t** wait_wrapper)
+// Wrapper functions.  Add more as they are needed.
+int smp_call_function_self(isr_t handler, void* data,
+                           handler_wrapper_t** wait_wrapper)
 {
-	return smp_call_function(1, 0, handler, wait_wrapper);
+	return smp_call_function(1, 0, handler, data, wait_wrapper);
 }
 
-int smp_call_function_all(isr_t handler, handler_wrapper_t** wait_wrapper)
+int smp_call_function_all(isr_t handler, void* data,
+                          handler_wrapper_t** wait_wrapper)
 {
-	return smp_call_function(2, 0, handler, wait_wrapper);
+	return smp_call_function(2, 0, handler, data, wait_wrapper);
 }
 
-int smp_call_function_single(uint8_t dest, isr_t handler,
+int smp_call_function_single(uint8_t dest, isr_t handler, void* data,
                              handler_wrapper_t** wait_wrapper)
 {
-	return smp_call_function(4, dest, handler, wait_wrapper);
+	return smp_call_function(4, dest, handler, data, wait_wrapper);
 }
 
 // If you want to wait, pass the address of a pointer up above, then call
-// this to do the actual waiting
+// this to do the actual waiting.  Be somewhat careful about uninitialized 
+// or old wrapper pointers.
 int smp_call_wait(handler_wrapper_t* wrapper)
 {
 	if (wrapper) {

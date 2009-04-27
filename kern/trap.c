@@ -30,7 +30,7 @@ pseudodesc_t idt_pd = {
  * of functions to be called when servicing an interrupt.  other cores
  * can set up their own later.
  */
-isr_t interrupt_handlers[256];
+handler_t interrupt_handlers[256];
 
 static const char *NTS (IN_HANDLER trapname)(int trapno)
 {
@@ -229,13 +229,12 @@ void
 	// merge this with alltraps?  other than the EOI... or do the same in all traps
 
 	extern handler_wrapper_t handler_wrappers[NUM_HANDLER_WRAPPERS];
-	isr_t handler;
 
 	// determine the interrupt handler table to use.  for now, pick the global
-	isr_t* handler_table = interrupt_handlers;
+	handler_t* handler_tbl = interrupt_handlers;
 
-	if (handler_table[tf->tf_trapno] != 0)
-		handler_table[tf->tf_trapno](tf);
+	if (handler_tbl[tf->tf_trapno].isr != 0)
+		handler_tbl[tf->tf_trapno].isr(tf, handler_tbl[tf->tf_trapno].data);
 	// if we're a general purpose IPI function call, down the cpu_list
 	if ((0xf0 <= tf->tf_trapno) && (tf->tf_trapno < 0xf0 +NUM_HANDLER_WRAPPERS))
 		down_checklist(handler_wrappers[tf->tf_trapno & 0x0f].cpu_list);
@@ -253,9 +252,11 @@ void
 }
 
 void
-register_interrupt_handler(isr_t table[], uint8_t isr, isr_t handler)
+register_interrupt_handler(handler_t table[], uint8_t int_num, isr_t handler,
+                           void* data)
 {
-	table[isr] = handler;
+	table[int_num].isr = handler;
+	table[int_num].data = data;
 }
 
 void
@@ -269,8 +270,10 @@ page_fault_handler(trapframe_t *tf)
 	// Handle kernel-mode page faults.
 
 	// TODO - one day, we'll want to handle this.
-	if ((tf->tf_cs & 3) == 0)
-		panic("Page Fault in the Kernel!");
+	if ((tf->tf_cs & 3) == 0) {
+		print_trapframe(tf);
+		panic("Page Fault in the Kernel at 0x%08x!", fault_va);
+	}
 
 	// We've already handled kernel-mode exceptions, so if we get here,
 	// the page fault happened in user mode.
