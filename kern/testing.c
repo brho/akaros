@@ -299,22 +299,22 @@ void test_null_handler(struct Trapframe *tf)
 
 void test_smp_call_functions(void)
 {
-	handler_wrapper_t *waiter, *waiter2;
+	handler_wrapper_t *waiter0, *waiter1, *waiter2, *waiter3, *waiter4, *waiter5;
 	uint8_t me = lapic_get_id();
 	printk("\nCore %d: SMP Call Self (nowait):\n", me);
 	printk("---------------------\n");
 	smp_call_function_self(test_hello_world_handler, 0);
 	printk("\nCore %d: SMP Call Self (wait):\n", me);
 	printk("---------------------\n");
-	smp_call_function_self(test_hello_world_handler, &waiter);
-	smp_call_wait(waiter);
+	smp_call_function_self(test_hello_world_handler, &waiter0);
+	smp_call_wait(waiter0);
 	printk("\nCore %d: SMP Call All (nowait):\n", me);
 	printk("---------------------\n");
 	smp_call_function_all(test_hello_world_handler, 0);
 	printk("\nCore %d: SMP Call All (wait):\n", me);
 	printk("---------------------\n");
-	smp_call_function_all(test_hello_world_handler, &waiter);
-	smp_call_wait(waiter);
+	smp_call_function_all(test_hello_world_handler, &waiter0);
+	smp_call_wait(waiter0);
 	printk("\nCore %d: SMP Call All-Else Individually, in order (nowait):\n", me);
 	printk("---------------------\n");
 	smp_call_function_single(1, test_hello_world_handler, 0);
@@ -326,24 +326,24 @@ void test_smp_call_functions(void)
 	smp_call_function_single(7, test_hello_world_handler, 0);
 	printk("\nCore %d: SMP Call Self (wait):\n", me);
 	printk("---------------------\n");
-	smp_call_function_self(test_hello_world_handler, &waiter);
-	smp_call_wait(waiter);
+	smp_call_function_self(test_hello_world_handler, &waiter0);
+	smp_call_wait(waiter0);
 	printk("\nCore %d: SMP Call All-Else Individually, in order (wait):\n", me);
 	printk("---------------------\n");
-	smp_call_function_single(1, test_hello_world_handler, &waiter);
-	smp_call_wait(waiter);
-	smp_call_function_single(2, test_hello_world_handler, &waiter);
-	smp_call_wait(waiter);
-	smp_call_function_single(3, test_hello_world_handler, &waiter);
-	smp_call_wait(waiter);
-	smp_call_function_single(4, test_hello_world_handler, &waiter);
-	smp_call_wait(waiter);
-	smp_call_function_single(5, test_hello_world_handler, &waiter);
-	smp_call_wait(waiter);
-	smp_call_function_single(6, test_hello_world_handler, &waiter);
-	smp_call_wait(waiter);
-	smp_call_function_single(7, test_hello_world_handler, &waiter);
-	smp_call_wait(waiter);
+	smp_call_function_single(1, test_hello_world_handler, &waiter0);
+	smp_call_wait(waiter0);
+	smp_call_function_single(2, test_hello_world_handler, &waiter0);
+	smp_call_wait(waiter0);
+	smp_call_function_single(3, test_hello_world_handler, &waiter0);
+	smp_call_wait(waiter0);
+	smp_call_function_single(4, test_hello_world_handler, &waiter0);
+	smp_call_wait(waiter0);
+	smp_call_function_single(5, test_hello_world_handler, &waiter0);
+	smp_call_wait(waiter0);
+	smp_call_function_single(6, test_hello_world_handler, &waiter0);
+	smp_call_wait(waiter0);
+	smp_call_function_single(7, test_hello_world_handler, &waiter0);
+	smp_call_wait(waiter0);
 	printk("\nTesting to see if any IPI-functions are dropped when not waiting:\n");
 	printk("A: %d, B: %d, C: %d (should be 0,0,0)\n", a, b, c);
 	smp_call_function_all(test_A_incrementer_handler, 0);
@@ -365,15 +365,45 @@ void test_smp_call_functions(void)
 	// wait, so we're sure the others finish before printing.
 	// without this, we could (and did) get 19,18,19, since the B_inc
 	// handler didn't finish yet
-	smp_call_function_self(test_null_handler, &waiter);
-	smp_call_wait(waiter);
-	printk("A: %d, B: %d, C: %d (should be 19,19,19)\n", a, b, c);
-	printk("Attempting to deadlock by smp_calling on a current wait: ");
-	smp_call_function_self(test_null_handler, &waiter);
+	smp_call_function_self(test_null_handler, &waiter0);
+	// need to grab all 5 handlers (max), since the code moves to the next free.
+	smp_call_function_self(test_null_handler, &waiter1);
 	smp_call_function_self(test_null_handler, &waiter2);
-	smp_call_wait(waiter);
+	smp_call_function_self(test_null_handler, &waiter3);
+	smp_call_function_self(test_null_handler, &waiter4);
+	smp_call_wait(waiter0);
+	smp_call_wait(waiter1);
 	smp_call_wait(waiter2);
-	printk("Made it through!\n");
+	smp_call_wait(waiter3);
+	smp_call_wait(waiter4);
+	printk("A: %d, B: %d, C: %d (should be 19,19,19)\n", a, b, c);
+	printk("Attempting to deadlock by smp_calling with an outstanding wait:\n");
+	smp_call_function_self(test_null_handler, &waiter0);
+	smp_call_function_self(test_null_handler, &waiter1);
+	smp_call_wait(waiter0);
+	smp_call_wait(waiter1);
+	printk("\tMade it through!\n");
+	printk("Attempting to deadlock by smp_calling more than are available:\n");
+	if (smp_call_function_self(test_null_handler, &waiter0))
+		printk("\tInsufficient handlers to call function (0)\n");
+	if (smp_call_function_self(test_null_handler, &waiter1))
+		printk("\tInsufficient handlers to call function (1)\n");
+	if (smp_call_function_self(test_null_handler, &waiter2))
+		printk("\tInsufficient handlers to call function (2)\n");
+	if (smp_call_function_self(test_null_handler, &waiter3))
+		printk("\tInsufficient handlers to call function (3)\n");
+	if (smp_call_function_self(test_null_handler, &waiter4))
+		printk("\tInsufficient handlers to call function (4)\n");
+	if (smp_call_function_self(test_null_handler, &waiter5))
+		printk("\tInsufficient handlers to call function (5)\n");
+	smp_call_wait(waiter0);
+	smp_call_wait(waiter1);
+	smp_call_wait(waiter2);
+	smp_call_wait(waiter3);
+	smp_call_wait(waiter4);
+	smp_call_wait(waiter5);
+	printk("\tMade it through!\n");
+
 	printk("Done\n");
 }
 

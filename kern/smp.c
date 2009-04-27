@@ -5,6 +5,7 @@
 #include <inc/stdio.h>
 #include <inc/string.h>
 #include <inc/assert.h>
+#include <inc/error.h>
 #include <inc/x86.h>
 
 #include <kern/smp.h>
@@ -22,18 +23,17 @@ barrier_t generic_barrier;
 // checklists to protect the global interrupt_handlers for 0xf0, f1, f2, f3, f4
 // need to be global, since there is no function that will always exist for them
 handler_wrapper_t             handler_wrappers[NUM_HANDLER_WRAPPERS];
+// tracks number of global waits on smp_calls, must be <= NUM_HANDLER_WRAPPERS
+uint32_t outstanding_calls = 0; 
 
 #define DECLARE_HANDLER_CHECKLISTS(vector)                          \
-	INIT_CHECKLIST(f##vector##_front_cpu_list, MAX_NUM_CPUS);   \
-	INIT_CHECKLIST(f##vector##_back_cpu_list, MAX_NUM_CPUS);
+	INIT_CHECKLIST(f##vector##_cpu_list, MAX_NUM_CPUS);
 
-#define INIT_HANDLER_WRAPPER(v)                                               \
-{                                                                         \
-	handler_wrappers[(v)].vector = 0xf##v;                                    \
-	handler_wrappers[(v)].front_cpu_list = &f##v##_front_cpu_list;            \
-	handler_wrappers[(v)].front_cpu_list->mask.size = num_cpus;               \
-	handler_wrappers[(v)].back_cpu_list = &f##v##_back_cpu_list;              \
-	handler_wrappers[(v)].back_cpu_list->mask.size = num_cpus;                \
+#define INIT_HANDLER_WRAPPER(v)                                     \
+{                                                                   \
+	handler_wrappers[(v)].vector = 0xf##v;                          \
+	handler_wrappers[(v)].cpu_list = &f##v##_cpu_list;              \
+	handler_wrappers[(v)].cpu_list->mask.size = num_cpus;           \
 }
 
 DECLARE_HANDLER_CHECKLISTS(0);
@@ -210,7 +210,7 @@ uint32_t smp_main(void)
 
 // this idles a core, sometimes we need to call it directly.  never returns.
 // the pause is somewhat of a hack, since kvm isn't halting.  not sure what the
-// deal is wit that.
+// deal is with that.
 void smp_idle(void)
 {
 	asm volatile("1: hlt; pause; jmp 1b;");
@@ -221,9 +221,18 @@ static int smp_call_function(uint8_t type, uint8_t dest, isr_t handler,
 {
 	extern isr_t interrupt_handlers[];
 	int8_t state = 0;
-	uint32_t vector;
+	uint32_t wrapper_num;
 	handler_wrapper_t* wrapper;
 
+	// prevents us from ever having more than NUM_HANDLER_WRAPPERS callers in
+	// the process of competing for vectors.  not decremented until both after
+	// the while(1) loop and after it's been waited on.
+	atomic_inc(&outstanding_calls);
+	if (outstanding_calls > NUM_HANDLER_WRAPPERS) {
+		atomic_dec(&outstanding_calls);
+		return E_BUSY;
+	}
+	
 	// assumes our cores are numbered in order
 	if ((type == 4) && (dest >= num_cpus))
 		panic("Destination CPU does not exist!");
@@ -257,50 +266,40 @@ static int smp_call_function(uint8_t type, uint8_t dest, isr_t handler,
 			panic("Invalid type for cross-core function call!");
 	}
 
-	// Find an available vector.  Starts with this core's vector (mod the
-	// number of wrappers).  Walk through on conflict
+	// Find an available vector/wrapper.  Starts with this core's id (mod the
+	// number of wrappers).  Walk through on conflict.
 	// Commit returns an error if it wanted to give up for some reason,
 	// like taking too long to acquire the lock or clear the mask, at which
 	// point, we try the next one.
 	// When we are done, wrapper points to the one we finally got.
-	// Note we need to make sure the backend is unused too, even if we don't
-	// want to wait.  Don't want our backend responses clobbering another
-	// waiters results.  Even if we don't plan on waiting, we need to make sure
-	// the list is done, so that old results don't trick future viewers into
-	// thinking the list is clear.  The main idea is that if a backend is
-	// unlocked, then no one is waiting on it.  If it is clear, then all
-	// previous callees have *finished* the entire handler function.  We don't
-	// want a weird sequence of events to be able to bypass that.
-	vector = lapic_get_id() % NUM_HANDLER_WRAPPERS;
+	// this wrapper_num trick doesn't work as well if you send a bunch in a row
+	// and wait, since you always check your main one (which is currently busy).
+	wrapper_num = lapic_get_id() % NUM_HANDLER_WRAPPERS;
 	while(1) {
-		wrapper = &handler_wrappers[vector];
-		if (!commit_checklist_nowait(wrapper->front_cpu_list, &cpu_mask)) {
-			// if the backend is free (not locked and clear), then we can break.
-			if ((!checklist_is_locked(wrapper->back_cpu_list)) && 
-			   (checklist_is_clear(wrapper->back_cpu_list)))
-				break;
-			else
-				reset_checklist(wrapper->front_cpu_list);	
-		}
-		vector = (vector + 1) % NUM_HANDLER_WRAPPERS;
+		wrapper = &handler_wrappers[wrapper_num];
+		if (!commit_checklist_wait(wrapper->cpu_list, &cpu_mask))
+			break;
+		wrapper_num = (wrapper_num + 1) % NUM_HANDLER_WRAPPERS;
+		/*
+		uint32_t count = 0;
+		// instead of deadlock, smp_call can fail with this.  makes it harder
+		// to use (have to check your return value).  consider putting a delay
+		// here too (like if wrapper_num == initial_wrapper_num)
+		if (count++ > NUM_HANDLER_WRAPPERS * 1000) // note 1000 isn't enough...
+			return E_BUSY;
+		*/
 	}
 
 	// Wanting to wait is expressed by having a non-NULL handler_wrapper_t**
-	// passed in.
-	// Should be no contention here, since this one is protected by the mask
-	// being present in the frontend.  the only way someone would try to commit
-	// on this would be if it holds the front.
-	// Set this mask regardless if we want to wait or not.  the recipients will
-	// all down it anyway, and it protects any future users of this handler from
-	// waiting on a backend that is actually in use.  Note that above we did not
-	// allow the use of a wrapper if the backend still isn't clear - even if we
-	// won the front end.
-	if (wait_wrapper) {
-		commit_checklist_wait(wrapper->back_cpu_list, &cpu_mask);
-		// pass out our reference to wrapper, so waiting can be done later.
+	// passed in.  Pass out our reference to wrapper, to wait later.
+	// If we don't want to wait, release the checklist (though it is still not
+	// clear, so it can't be used til everyone checks in).
+	if (wait_wrapper)
 		*wait_wrapper = wrapper;
-	} else
-		commit_checklist_nowait(wrapper->back_cpu_list, &cpu_mask);
+	else {
+		release_checklist(wrapper->cpu_list);
+		atomic_dec(&outstanding_calls);
+	}
 
 	// now register our handler to run
 	register_interrupt_handler(interrupt_handlers, wrapper->vector, handler);
@@ -355,7 +354,12 @@ int smp_call_function_single(uint8_t dest, isr_t handler,
 // this to do the actual waiting
 int smp_call_wait(handler_wrapper_t* wrapper)
 {
-	waiton_checklist(wrapper->back_cpu_list);
-	return 0;
+	if (wrapper) {
+		waiton_checklist(wrapper->cpu_list);
+		return 0;
+	} else {
+		warn("Attempting to wait on null wrapper!  Check your return values!");
+		return E_FAIL;
+	}
 }
 

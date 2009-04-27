@@ -18,11 +18,10 @@
 #endif
 
 // be careful changing this, esp if you go over 16
-#define NUM_HANDLER_WRAPPERS  5
+#define NUM_HANDLER_WRAPPERS		5
 
 typedef struct HandlerWrapper {
-	checklist_t* front_cpu_list;
-	checklist_t* back_cpu_list;
+	checklist_t* cpu_list;
 	uint8_t vector;
 } handler_wrapper_t;
 

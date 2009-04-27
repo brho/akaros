@@ -1,5 +1,6 @@
 #include <inc/string.h>
 #include <inc/assert.h>
+#include <inc/error.h>
 
 #include <kern/atomic.h>
 #include <kern/apic.h>
@@ -8,6 +9,14 @@
 int commit_checklist_wait(checklist_t* list, checklist_mask_t* mask)
 {
 	assert(list->mask.size == mask->size);
+	// abort if the list is locked.  this will protect us from trying to commit
+	// and thus spin on a checklist that we are already waiting on.  it is
+	// still possible to not get the lock, but the holder is on another core.
+	// Or, bail out if we can see the list is already in use.  This check is
+	// just an optimization before we try to use the list for real.
+	if ((checklist_is_locked(list)) || !checklist_is_clear(list))
+		return E_BUSY;
+
 	// possession of this lock means you can wait on it and set it
 	spin_lock_irqsave(&list->lock);
 	// wait til the list is available.  could have some adaptive thing here
@@ -56,9 +65,19 @@ int commit_checklist_nowait(checklist_t* list, checklist_mask_t* mask)
 // Assumed we held the lock if we ever call this
 int waiton_checklist(checklist_t* list)
 {
+	extern uint32_t outstanding_calls;
 	// can consider breakout out early, like above, and erroring out
 	while (!checklist_is_clear(list))
 		cpu_relax();
+	spin_unlock_irqsave(&list->lock);
+	// global counter of wrappers either waited on or being contended for.
+	atomic_dec(&outstanding_calls);
+	return 0;
+}
+
+// like waiton, but don't bother waiting either
+int release_checklist(checklist_t* list)
+{
 	spin_unlock_irqsave(&list->lock);
 	return 0;
 }

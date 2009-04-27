@@ -46,6 +46,7 @@ typedef struct checklist {
 int commit_checklist_wait(checklist_t* list, checklist_mask_t* mask);
 int commit_checklist_nowait(checklist_t* list, checklist_mask_t* mask);
 int waiton_checklist(checklist_t* list);
+int release_checklist(checklist_t* list);
 int checklist_is_locked(checklist_t* list);
 int checklist_is_clear(checklist_t* list);
 void reset_checklist(checklist_t* list);

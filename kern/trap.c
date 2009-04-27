@@ -234,19 +234,11 @@ void
 	// determine the interrupt handler table to use.  for now, pick the global
 	isr_t* handler_table = interrupt_handlers;
 
-	// if we're a general purpose IPI function call, store the function we
-	// will call, down the front, exec the function, and down the backend
-	if ((0xf0 <= tf->tf_trapno) && (tf->tf_trapno < 0xf0+NUM_HANDLER_WRAPPERS)) {
-		handler = handler_table[tf->tf_trapno];
-		down_checklist(handler_wrappers[tf->tf_trapno & 0x0f].front_cpu_list);
-		if (handler) // make sure we weren't called on a null ptr
-			handler(tf);
-		else
-			warn("Sent a general purpose IPI with no handler");
-		down_checklist(handler_wrappers[tf->tf_trapno & 0x0f].back_cpu_list);
-	} else // regular IRQ
-		if (handler_table[tf->tf_trapno] != 0)
-			handler_table[tf->tf_trapno](tf);
+	if (handler_table[tf->tf_trapno] != 0)
+		handler_table[tf->tf_trapno](tf);
+	// if we're a general purpose IPI function call, down the cpu_list
+	if ((0xf0 <= tf->tf_trapno) && (tf->tf_trapno < 0xf0 +NUM_HANDLER_WRAPPERS))
+		down_checklist(handler_wrappers[tf->tf_trapno & 0x0f].cpu_list);
 
 	// Send EOI.  might want to do this in assembly, and possibly earlier
 	// This is set up to work with an old PIC for now
