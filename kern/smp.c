@@ -216,10 +216,8 @@ void smp_idle(void)
 	asm volatile("1: hlt; pause; jmp 1b;");
 }
 
-// could have the backend checklists static/global too.
-// or at least have the pointers global (save a little RAM)
-
-static void smp_call_function(uint8_t type, uint8_t dest, isr_t handler, bool wait)
+static int smp_call_function(uint8_t type, uint8_t dest, isr_t handler, 
+                              handler_wrapper_t** wait_wrapper)
 {
 	extern isr_t interrupt_handlers[];
 	int8_t state = 0;
@@ -274,11 +272,19 @@ static void smp_call_function(uint8_t type, uint8_t dest, isr_t handler, bool wa
 		vector = (vector + 1) % NUM_HANDLER_WRAPPERS;
 	}
 
-	// if we want to wait, we set the mask for our backend too
+	// If we want to wait, we set the mask for our backend too.  Wanting to
+	// wait is expressed by having a non-NULL handler_wrapper_t** passed in.
 	// no contention here, since this one is protected by the mask being present
-	// in the frontend
-	if (wait)
+	// in the frontend.  the only way someone would try to commit on this would
+	// be if it holds the front.
+	// though someone could be still waiting on this backend (and be holding the
+	// checklist lock), and we would spin here for a while until they are done.
+	// We could consider erroring out and finding a new front-end.
+	if (wait_wrapper) {
 		commit_checklist_wait(wrapper->back_cpu_list, &cpu_mask);
+		// pass out our reference to wrapper, so waiting can be done later.
+		*wait_wrapper = wrapper;
+	}
 
 	// now register our handler to run
 	register_interrupt_handler(interrupt_handlers, wrapper->vector, handler);
@@ -307,28 +313,33 @@ static void smp_call_function(uint8_t type, uint8_t dest, isr_t handler, bool wa
 	// wait long enough to receive our own broadcast (PROBABLY WORKS) TODO
 	lapic_wait_to_send();
 	disable_irqsave(&state);
-
-	// no longer need to wait to protect the vector (the checklist does that)
-	// if we want to wait, we need to wait on the backend checklist
-	if (wait)
-		waiton_checklist(wrapper->back_cpu_list);
+	return 0;
 }
 
 // I'd rather have these functions take an arbitrary function and arguments...
 // Right now, I build a handler that just calls whatever I want, which is
 // another layer of indirection.
-void smp_call_function_self(isr_t handler, bool wait)
+int smp_call_function_self(isr_t handler, handler_wrapper_t** wait_wrapper)
 {
-	smp_call_function(1, 0, handler, wait);
+	return smp_call_function(1, 0, handler, wait_wrapper);
 }
 
-void smp_call_function_all(isr_t handler, bool wait)
+int smp_call_function_all(isr_t handler, handler_wrapper_t** wait_wrapper)
 {
-	smp_call_function(2, 0, handler, wait);
+	return smp_call_function(2, 0, handler, wait_wrapper);
 }
 
-void smp_call_function_single(uint8_t dest, isr_t handler, bool wait)
+int smp_call_function_single(uint8_t dest, isr_t handler,
+                             handler_wrapper_t** wait_wrapper)
 {
-	smp_call_function(4, dest, handler, wait);
+	return smp_call_function(4, dest, handler, wait_wrapper);
+}
+
+// If you want to wait, pass the address of a pointer up above, then call
+// this to do the actual waiting
+int smp_call_wait(handler_wrapper_t* wrapper)
+{
+	waiton_checklist(wrapper->back_cpu_list);
+	return 0;
 }
 

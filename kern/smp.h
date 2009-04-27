@@ -31,8 +31,10 @@ void smp_boot(void);
 void smp_idle(void);
 
 /* SMP utility functions */
-void smp_call_function_self(isr_t handler, bool wait);
-void smp_call_function_all(isr_t handler, bool wait);
-void smp_call_function_single(uint8_t dest, isr_t handler, bool wait);
+int smp_call_function_self(isr_t handler, handler_wrapper_t** wait_wrapper);
+int smp_call_function_all(isr_t handler, handler_wrapper_t** wait_wrapper);
+int smp_call_function_single(uint8_t dest, isr_t handler,
+                             handler_wrapper_t** wait_wrapper);
+int smp_call_wait(handler_wrapper_t* wrapper);
 
 #endif /* !ROS_INC_SMP_H */
