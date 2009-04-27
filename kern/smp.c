@@ -263,28 +263,44 @@ static int smp_call_function(uint8_t type, uint8_t dest, isr_t handler,
 	// like taking too long to acquire the lock or clear the mask, at which
 	// point, we try the next one.
 	// When we are done, wrapper points to the one we finally got.
+	// Note we need to make sure the backend is unused too, even if we don't
+	// want to wait.  Don't want our backend responses clobbering another
+	// waiters results.  Even if we don't plan on waiting, we need to make sure
+	// the list is done, so that old results don't trick future viewers into
+	// thinking the list is clear.  The main idea is that if a backend is
+	// unlocked, then no one is waiting on it.  If it is clear, then all
+	// previous callees have *finished* the entire handler function.  We don't
+	// want a weird sequence of events to be able to bypass that.
 	vector = lapic_get_id() % NUM_HANDLER_WRAPPERS;
 	while(1) {
 		wrapper = &handler_wrappers[vector];
 		if (!commit_checklist_nowait(wrapper->front_cpu_list, &cpu_mask)) {
-			break;
+			// if the backend is free (not locked and clear), then we can break.
+			if ((!checklist_is_locked(wrapper->back_cpu_list)) && 
+			   (checklist_is_clear(wrapper->back_cpu_list)))
+				break;
+			else
+				reset_checklist(wrapper->front_cpu_list);	
 		}
 		vector = (vector + 1) % NUM_HANDLER_WRAPPERS;
 	}
 
-	// If we want to wait, we set the mask for our backend too.  Wanting to
-	// wait is expressed by having a non-NULL handler_wrapper_t** passed in.
-	// no contention here, since this one is protected by the mask being present
-	// in the frontend.  the only way someone would try to commit on this would
-	// be if it holds the front.
-	// though someone could be still waiting on this backend (and be holding the
-	// checklist lock), and we would spin here for a while until they are done.
-	// We could consider erroring out and finding a new front-end.
+	// Wanting to wait is expressed by having a non-NULL handler_wrapper_t**
+	// passed in.
+	// Should be no contention here, since this one is protected by the mask
+	// being present in the frontend.  the only way someone would try to commit
+	// on this would be if it holds the front.
+	// Set this mask regardless if we want to wait or not.  the recipients will
+	// all down it anyway, and it protects any future users of this handler from
+	// waiting on a backend that is actually in use.  Note that above we did not
+	// allow the use of a wrapper if the backend still isn't clear - even if we
+	// won the front end.
 	if (wait_wrapper) {
 		commit_checklist_wait(wrapper->back_cpu_list, &cpu_mask);
 		// pass out our reference to wrapper, so waiting can be done later.
 		*wait_wrapper = wrapper;
-	}
+	} else
+		commit_checklist_nowait(wrapper->back_cpu_list, &cpu_mask);
 
 	// now register our handler to run
 	register_interrupt_handler(interrupt_handlers, wrapper->vector, handler);

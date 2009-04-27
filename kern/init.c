@@ -61,8 +61,8 @@ void kernel_init(multiboot_info_t *mboot_info)
 	// this returns when all other cores are done and ready to receive IPIs
 	smp_boot();
 
-	/*
 	test_smp_call_functions();
+	/*
 	test_checklists();
 	test_barrier();
 	test_print_info();

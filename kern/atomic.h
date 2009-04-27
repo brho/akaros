@@ -46,6 +46,9 @@ typedef struct checklist {
 int commit_checklist_wait(checklist_t* list, checklist_mask_t* mask);
 int commit_checklist_nowait(checklist_t* list, checklist_mask_t* mask);
 int waiton_checklist(checklist_t* list);
+int checklist_is_locked(checklist_t* list);
+int checklist_is_clear(checklist_t* list);
+void reset_checklist(checklist_t* list);
 void down_checklist(checklist_t* list);
 // TODO - do we want to adjust the size?  (YES, don't want to check it all)
 // TODO - do we want to be able to call waiton without having called commit?

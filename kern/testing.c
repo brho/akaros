@@ -299,7 +299,7 @@ void test_null_handler(struct Trapframe *tf)
 
 void test_smp_call_functions(void)
 {
-	handler_wrapper_t* waiter;
+	handler_wrapper_t *waiter, *waiter2;
 	uint8_t me = lapic_get_id();
 	printk("\nCore %d: SMP Call Self (nowait):\n", me);
 	printk("---------------------\n");
@@ -368,6 +368,12 @@ void test_smp_call_functions(void)
 	smp_call_function_self(test_null_handler, &waiter);
 	smp_call_wait(waiter);
 	printk("A: %d, B: %d, C: %d (should be 19,19,19)\n", a, b, c);
+	printk("Attempting to deadlock by smp_calling on a current wait: ");
+	smp_call_function_self(test_null_handler, &waiter);
+	smp_call_function_self(test_null_handler, &waiter2);
+	smp_call_wait(waiter);
+	smp_call_wait(waiter2);
+	printk("Made it through!\n");
 	printk("Done\n");
 }
 

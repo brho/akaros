@@ -13,7 +13,7 @@ int commit_checklist_wait(checklist_t* list, checklist_mask_t* mask)
 	// wait til the list is available.  could have some adaptive thing here
 	// where it fails after X tries (like 500), gives up the lock, and returns
 	// an error code
-	while (!(BITMASK_IS_CLEAR(list->mask.bits, list->mask.size)))
+	while (!checklist_is_clear(list))
 		cpu_relax();
 
 	// list is ours and clear, set it to the settings of our list
@@ -57,10 +57,29 @@ int commit_checklist_nowait(checklist_t* list, checklist_mask_t* mask)
 int waiton_checklist(checklist_t* list)
 {
 	// can consider breakout out early, like above, and erroring out
-	while (!(BITMASK_IS_CLEAR(list->mask.bits, list->mask.size)))
+	while (!checklist_is_clear(list))
 		cpu_relax();
 	spin_unlock_irqsave(&list->lock);
 	return 0;
+}
+
+// peaks in and sees if the list is locked with it's spinlock
+int checklist_is_locked(checklist_t* list)
+{
+	// remember the lock status is the lowest byte of the lock
+	return list->lock & 0xff;
+}
+
+// no synch guarantees - just looks at the list
+int checklist_is_clear(checklist_t* list)
+{
+	return BITMASK_IS_CLEAR(list->mask.bits, list->mask.size);
+}
+
+// no synch guarantees - just resets the list to empty
+void reset_checklist(checklist_t* list)
+{
+	CLR_BITMASK(list->mask.bits, list->mask.size);
 }
 
 // CPU mask specific - this is how cores report in
@@ -69,7 +88,7 @@ void down_checklist(checklist_t* list)
 	CLR_BITMASK_BIT_ATOMIC(list->mask.bits, lapic_get_id());
 }
 
-// byte per cpu, as mentioned below
+/* Barriers */
 void init_barrier(barrier_t* barrier, uint32_t count)
 {
 	barrier->lock = 0;
