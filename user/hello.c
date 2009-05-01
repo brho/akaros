@@ -13,8 +13,9 @@ void umain(void)
 	// since the library functions use the same buffer.  the last used string
 	// will be the one printed when the syscall is serviced, regardless of
 	// whether the actual syscall can handle multiples in flight.
-	cprintf_async("Cross-Core call, coming from env %08x\n", env->env_id);
-
+	cprintf_async("Cross-Core call 1, coming from env %08x\n", env->env_id);
+	cprintf_async("Cross-Core call 2, coming from env %08x\n", env->env_id);
+	cprintf("Calls are sent!\n");
 	// might as well spin, just to make sure nothing gets deallocated
 	// while we're waiting to test the async call
 	while (1);

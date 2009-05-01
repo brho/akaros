@@ -36,9 +36,12 @@ syscall(int num, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32_t a5
 
 static inline error_t async_syscall(syscall_t *syscall)
 {
-	// testing just one syscall at a time, and just put it at the beginning of
-	// the shared data page
-	memcpy(procdata, syscall, sizeof(syscall_t));
+	// testing just two syscalls at a time, and just put it at the beginning of
+	// the shared data page.  This is EXTREMELY GHETTO....
+	if ( ((syscall_t*)procdata)->args[0] ) // something there, presumably the first syscall
+		memcpy(((void*)procdata) + sizeof(syscall_t), syscall, sizeof(syscall_t));
+	else // nothing there, this is the first one
+		memcpy(procdata, syscall, sizeof(syscall_t));
 	return 0;
 }
 

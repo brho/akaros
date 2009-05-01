@@ -61,27 +61,48 @@ cprintf(const char *fmt, ...)
 }
 
 // Temp async varieties
-static void
-putch_async(int ch, printbuf_t *b)
+#define MAX_BUFFERS 10
+printbuf_t async_bufs[MAX_BUFFERS];
+uint32_t full_buffers = 0;
+
+static printbuf_t* get_free_buffer(void)
+{
+	// reserve a buffer.  if we actually get one, return it.  o/w, bail out.
+	// want to do this atomically eventually.
+	full_buffers++;
+	if (full_buffers <= MAX_BUFFERS)
+		return &async_bufs[full_buffers - 1];
+	full_buffers--;
+	// synchronously warn.  could consider blocking in the future
+	cprintf("Out of buffers!!!\n");
+	return NULL;
+}
+
+// this buffering is a minor pain in the ass....
+static void putch_async(int ch, printbuf_t *b)
 {
 	b->buf[b->idx++] = ch;
 	if (b->idx == 256-1) {
+		// will need some way to track the result of the syscall
 		sys_cputs_async(b->buf, b->idx);
+		b = get_free_buffer();
 		b->idx = 0;
 	}
-	b->cnt++;
+	b->cnt++; // supposed to be overall number, not just in one buffer
 }
 
 static int vcprintf_async(const char *fmt, va_list ap)
 {
-	printbuf_t b;
+	// start with an available buffer
+	printbuf_t* b = get_free_buffer();
 
-	b.idx = 0;
-	b.cnt = 0;
-	vprintfmt((void*)putch_async, &b, fmt, ap);
-	sys_cputs_async(b.buf, b.idx);
+	b->idx = 0;
+	b->cnt = 0;
+	vprintfmt((void*)putch_async, b, fmt, ap);
+	// will need some way to track the result of the syscall
+	sys_cputs_async(b->buf, b->idx);
 
-	return b.cnt;
+	return b->cnt; // this is lying if we used more than one buffer
 }
 
 int cprintf_async(const char *fmt, ...)

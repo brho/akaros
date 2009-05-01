@@ -62,8 +62,8 @@ void kernel_init(multiboot_info_t *mboot_info)
 	// this returns when all other cores are done and ready to receive IPIs
 	smp_boot();
 
-	test_smp_call_functions();
 	/*
+	test_smp_call_functions();
 	test_checklists();
 	test_barrier();
 	test_print_info();
@@ -80,7 +80,7 @@ void kernel_init(multiboot_info_t *mboot_info)
 	//ENV_CREATE(user_divzero);
 	//ENV_CREATE(user_buggyhello);
 	ENV_CREATE(user_hello);
-	ENV_CREATE(user_hello);
+	//ENV_CREATE(user_hello);
 	//ENV_CREATE(user_evilhello);
 
 	// We only have one user environment for now, so just run it.
@@ -88,7 +88,7 @@ void kernel_init(multiboot_info_t *mboot_info)
 	// run_env_handler just runs the first env, like the prev command
 	// need a way to have call_func to pass a pointer to a struct for arguments
 	smp_call_function_single(2, run_env_handler, &envs[0], 0);
-	smp_call_function_single(4, run_env_handler, &envs[1], 0);
+	//smp_call_function_single(4, run_env_handler, &envs[1], 0);
 
 	// wait 5 sec, then print what's in shared mem
 	udelay(5000000);
@@ -101,16 +101,19 @@ void kernel_init(multiboot_info_t *mboot_info)
 		*(uint32_t*)(envs[0].env_procdata + 12));
 		*/
 
-	printk("Attempting to run the syscall at the beginning of procdata for env 0:\n\n");
+	printk("Attempting to run two syscalls at the beginning of procdata for env 0:\n\n");
 	// need to switch to the right context, so we can handle the user pointer
 	// that points to a data payload of the syscall
 	lcr3(envs[0].env_cr3);
 	syscall_async((syscall_t*)(envs[0].env_procdata));
+	syscall_async(((syscall_t*)(envs[0].env_procdata)) + 1);
 	printk("\n");
+	/*
 	printk("Attempting to run the syscall at the beginning of procdata for env 1:\n\n");
 	lcr3(envs[1].env_cr3);
 	syscall_async((syscall_t*)(envs[1].env_procdata));
 	printk("\n");
+	*/
 	panic("Don't Panic");
 }
 
