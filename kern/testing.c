@@ -259,21 +259,12 @@ void test_checklists(void)
 
 }
 
-volatile uint32_t a = 0, b = 0, c = 0;
+uint32_t a = 0, b = 0, c = 0;
 
-void test_A_incrementer_handler(struct Trapframe *tf, void* data)
+void test_incrementer_handler(struct Trapframe *tf, void* data)
 {
-	atomic_inc(&a);
-}
-
-void test_B_incrementer_handler(struct Trapframe *tf, void* data)
-{
-	atomic_inc(&b);
-}
-
-void test_C_incrementer_handler(struct Trapframe *tf, void* data)
-{
-	atomic_inc(&c);
+	assert(data);
+	atomic_inc((uint32_t*)data);
 }
 
 void test_null_handler(struct Trapframe *tf, void* data)
@@ -331,22 +322,22 @@ void test_smp_call_functions(void)
 	smp_call_wait(waiter0);
 	printk("\nTesting to see if any IPI-functions are dropped when not waiting:\n");
 	printk("A: %d, B: %d, C: %d (should be 0,0,0)\n", a, b, c);
-	smp_call_function_all(test_A_incrementer_handler, 0, 0);
-	smp_call_function_all(test_B_incrementer_handler, 0, 0);
-	smp_call_function_all(test_C_incrementer_handler, 0, 0);
+	smp_call_function_all(test_incrementer_handler, &a, 0);
+	smp_call_function_all(test_incrementer_handler, &b, 0);
+	smp_call_function_all(test_incrementer_handler, &c, 0);
 	// if i can clobber a previous IPI, the interleaving might do it
-	smp_call_function_single(1, test_A_incrementer_handler, 0, 0);
-	smp_call_function_single(2, test_B_incrementer_handler, 0, 0);
-	smp_call_function_single(3, test_C_incrementer_handler, 0, 0);
-	smp_call_function_single(4, test_A_incrementer_handler, 0, 0);
-	smp_call_function_single(5, test_B_incrementer_handler, 0, 0);
-	smp_call_function_single(6, test_C_incrementer_handler, 0, 0);
-	smp_call_function_all(test_A_incrementer_handler, 0, 0);
-	smp_call_function_single(3, test_C_incrementer_handler, 0, 0);
-	smp_call_function_all(test_B_incrementer_handler, 0, 0);
-	smp_call_function_single(1, test_A_incrementer_handler, 0, 0);
-	smp_call_function_all(test_C_incrementer_handler, 0, 0);
-	smp_call_function_single(2, test_B_incrementer_handler, 0, 0);
+	smp_call_function_single(1, test_incrementer_handler, &a, 0);
+	smp_call_function_single(2, test_incrementer_handler, &b, 0);
+	smp_call_function_single(3, test_incrementer_handler, &c, 0);
+	smp_call_function_single(4, test_incrementer_handler, &a, 0);
+	smp_call_function_single(5, test_incrementer_handler, &b, 0);
+	smp_call_function_single(6, test_incrementer_handler, &c, 0);
+	smp_call_function_all(test_incrementer_handler, &a, 0);
+	smp_call_function_single(3, test_incrementer_handler, &c, 0);
+	smp_call_function_all(test_incrementer_handler, &b, 0);
+	smp_call_function_single(1, test_incrementer_handler, &a, 0);
+	smp_call_function_all(test_incrementer_handler, &c, 0);
+	smp_call_function_single(2, test_incrementer_handler, &b, 0);
 	// wait, so we're sure the others finish before printing.
 	// without this, we could (and did) get 19,18,19, since the B_inc
 	// handler didn't finish yet

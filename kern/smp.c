@@ -17,7 +17,6 @@
 
 volatile uint8_t num_cpus = 0xee;
 uintptr_t smp_stack_top;
-barrier_t generic_barrier;
 
 /*************************** IPI Wrapper Stuff ********************************/
 // checklists to protect the global interrupt_handlers for 0xf0, f1, f2, f3, f4
@@ -55,8 +54,7 @@ static void init_smp_call_function(void)
 
 static void smp_mtrr_handler(trapframe_t *tf, void* data)
 {
-	// TODO - pass in the barrier via data, and not the global
-	setup_default_mtrrs(&generic_barrier);
+	setup_default_mtrrs((barrier_t*)data);
 }
 
 void smp_boot(void)
@@ -124,8 +122,9 @@ void smp_boot(void)
 	init_smp_call_function();
 
 	// Set up all cores to use the proper MTRRs
+	barrier_t generic_barrier;
 	init_barrier(&generic_barrier, num_cpus); // barrier used by smp_mtrr_handler
-	smp_call_function_all(smp_mtrr_handler, 0, 0);
+	smp_call_function_all(smp_mtrr_handler, &generic_barrier, 0);
 
 	// Should probably flush everyone's TLB at this point, to get rid of
 	// temp mappings that were removed.  TODO
