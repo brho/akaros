@@ -9,6 +9,7 @@
 #include <inc/string.h>
 #include <inc/assert.h>
 #include <inc/elf.h>
+#include <inc/syscall.h>
 
 #include <kern/env.h>
 #include <kern/pmap.h>
@@ -138,6 +139,9 @@ env_setup_vm(env_t *e)
 	memset(e->env_pgdir, 0, PGSIZE);
 	memset(e->env_procinfo, 0, PGSIZE);
 	memset(e->env_procdata, 0, PGSIZE);
+
+	// Initialize the generic syscall ring buffer
+	SHARED_RING_INIT((syscall_sring_t*)e->env_procdata);
 
 	// should be able to do this so long as boot_pgdir never has
 	// anything put below UTOP

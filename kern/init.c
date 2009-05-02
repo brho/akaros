@@ -105,13 +105,24 @@ void kernel_init(multiboot_info_t *mboot_info)
 	// need to switch to the right context, so we can handle the user pointer
 	// that points to a data payload of the syscall
 	lcr3(envs[0].env_cr3);
-	syscall_async((syscall_t*)(envs[0].env_procdata));
-	syscall_async(((syscall_t*)(envs[0].env_procdata)) + 1);
+	syscall_back_ring_t sysbackring;
+	BACK_RING_INIT(&sysbackring, (syscall_sring_t*)envs[0].env_procdata, PGSIZE);
+
+	// not really enough, mostly just testing
+	while (!(RING_HAS_UNCONSUMED_REQUESTS(&sysbackring)))
+		cpu_relax();
+	syscall_async((syscall_req_t*)(RING_GET_REQUEST(&sysbackring, 0)));
+	printk("\n");
+	syscall_async((syscall_req_t*)(RING_GET_REQUEST(&sysbackring, 1)));
+	printk("\n");
+	syscall_async((syscall_req_t*)(RING_GET_REQUEST(&sysbackring, 2)));
+	printk("\n");
+	syscall_async((syscall_req_t*)(RING_GET_REQUEST(&sysbackring, 3)));
 	printk("\n");
 	/*
 	printk("Attempting to run the syscall at the beginning of procdata for env 1:\n\n");
 	lcr3(envs[1].env_cr3);
-	syscall_async((syscall_t*)(envs[1].env_procdata));
+	syscall_async((syscall_req_t*)(envs[1].env_procdata));
 	printk("\n");
 	*/
 	panic("Don't Panic");

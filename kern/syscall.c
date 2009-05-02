@@ -98,7 +98,7 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 	return 0xdeadbeef;
 }
 
-uint32_t syscall_async(syscall_t *call)
+uint32_t syscall_async(syscall_req_t *call)
 {
 	return syscall(call->num, call->args[0], call->args[1],
 	               call->args[2], call->args[3], call->args[4]);

@@ -1,9 +1,10 @@
-#ifndef ROS_INC_ATOMIC_H
-#define ROS_INC_ATOMIC_H
+#ifndef ROS_KERN_ATOMIC_H
+#define ROS_KERN_ATOMIC_H
 
 #include <inc/types.h>
 #include <inc/mmu.h>
 #include <inc/x86.h>
+#include <inc/atomic.h>
 
 /* //linux style atomic ops
 typedef struct {uint32_t real_num;} atomic_t;
@@ -133,4 +134,4 @@ static inline void atomic_andb(volatile uint8_t* number, uint8_t mask)
 {
 	asm volatile("lock andb %1,%0" : "=m"(*number) : "r"(mask) : "cc");
 }
-#endif /* !ROS_INC_ATOMIC_H */
+#endif /* !ROS_KERN_ATOMIC_H */
