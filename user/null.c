@@ -2,6 +2,7 @@
 #include <inc/lib.h>
 #include <inc/types.h>
 #include <inc/syscall.h>
+#include <inc/x86.h>
 
 uint64_t avg(uint32_t (COUNT(length) array)[], int length) 
 {
