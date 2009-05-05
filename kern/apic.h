@@ -80,6 +80,7 @@
 #define TIMER_MODE  (IO_TIMER1 + TIMER_REG_MODE)
 
 extern uint64_t tsc_freq;
+extern uint64_t bus_freq;
 
 void pic_remap(void);
 void pic_mask_irq(uint8_t irq);
@@ -90,6 +91,10 @@ uint32_t lapic_get_default_id(void);
 void pit_set_timer(uint32_t freq, uint32_t mode);
 void timer_init(void);
 void udelay(uint64_t usec);
+// TODO: right now timer defaults to TSC
+uint64_t gettimer(void);
+uint64_t inline getfreq(void);
+
 
 static int getpit(void);
 static inline void udelay_pit(uint64_t usec);

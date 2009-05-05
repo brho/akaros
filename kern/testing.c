@@ -436,12 +436,28 @@ void test_barrier_handler(trapframe_t *tf, void* data)
 	//cprintf("Round 4: Core %d\n", lapic_get_id());
 }
 
+volatile uint32_t waiting = 1;
+static void futurecall(trapframe_t *tf)
+{
+	{HANDLER_ATOMIC atomic_dec(&waiting);}
+}
 void test_pit(void)
 {
-	cprintf("starting now \n");
+	cprintf("starting test for pit now (10s) \n");
 	udelay(10000000);
 	cprintf("end now \n");
-	cprintf("starting now \n");
+	cprintf("starting test for tsc (if stable) now (10s)\n");
 	udelay(10000000);
 	cprintf("end now \n");
+	
+	cprintf("starting test for lapic (if stable) now (10s)\n");
+	enable_irq();
+	lapic_set_timer(10* bus_freq/128,0xeb,TRUE);
+	
+	register_interrupt_handler(interrupt_handlers, 0xeb, futurecall, 0);
+	
+	while(waiting)
+		cpu_relax();
+	cprintf("end now");
+
 }

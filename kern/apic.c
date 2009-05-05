@@ -10,6 +10,7 @@
 #include <kern/apic.h>
 
 uint64_t tsc_freq = 0;
+uint64_t bus_freq = 0;
 
 /*
  * Remaps the Programmable Interrupt Controller to use IRQs 32-47
@@ -55,6 +56,7 @@ void pic_unmask_irq(uint8_t irq)
 		outb(PIC1_DATA, inb(PIC1_DATA) & ~(1 << irq));
 }
 
+
 /*
  * Sets the LAPIC timer to go off after a certain number of ticks.  The primary
  * clock freq is actually the bus clock, so we really will need to figure out
@@ -64,8 +66,11 @@ void pic_unmask_irq(uint8_t irq)
  */
 void lapic_set_timer(uint32_t ticks, uint8_t vector, bool periodic)
 {
+	//needs to read LAPIC_TIMER_DIVIDE before writing
+	uint32_t orig_divider = read_mmreg32(LAPIC_TIMER_DIVIDE);
 	// divide the bus clock.  going with the max (128) for now (which is slow)
-	write_mmreg32(LAPIC_TIMER_DIVIDE, 0xa);
+	// clears bottom bit and then set divider to be 128
+	write_mmreg32(LAPIC_TIMER_DIVIDE, (orig_divider & ~0x1111) | 0xa);
 	// set LVT with interrupt handling information
 	write_mmreg32(LAPIC_LVT_TIMER, vector | (periodic << 17));
 	write_mmreg32(LAPIC_TIMER_INIT, ticks);
@@ -83,15 +88,27 @@ uint32_t lapic_get_default_id(void)
 	return (ebx & 0xFF000000) >> 24;
 }
 
+// timer init calibrates both tsc timer and lapic timer using PIT
 void timer_init(void){
 	uint64_t tscval[2];
+	long timercount[2];
 	pit_set_timer(0xffff, TIMER_RATEGEN);
 	// assume tsc exist
 	tscval[0] = read_tsc();
 	udelay_pit(1000000);
 	tscval[1] = read_tsc();
 	tsc_freq = tscval[1] - tscval[0];
+	
 	cprintf("tsc_freq %lu\n", tsc_freq);
+	
+	lapic_set_timer(1000000000,0xeb, TRUE);
+	timercount[0] = read_mmreg32(LAPIC_TIMER_CURRENT);
+	udelay_pit(1000000);
+	timercount[1] = read_mmreg32(LAPIC_TIMER_CURRENT);
+	bus_freq = (timercount[0] - timercount[1])*128;
+		
+	cprintf("bus_freq %u\n", bus_freq);
+	
 }
 
 void pit_set_timer(uint32_t divisor, uint32_t mode)
@@ -182,3 +199,14 @@ void udelay_pit(uint64_t usec)
 		ticks_left -= delta;
 	}
 }
+
+uint64_t gettimer(void)
+{
+	return read_tsc();	
+}
+
+uint64_t getfreq(void)
+{
+	return tsc_freq;
+}
+
