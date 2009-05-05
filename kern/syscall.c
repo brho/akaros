@@ -10,6 +10,12 @@
 #include <kern/syscall.h>
 #include <kern/console.h>
 
+//Do absolutely nothing.  Used for profiling.  
+static void sys_null() 
+{
+	return;
+}
+
 // Print a string to the system console.
 // The string is exactly 'len' characters long.
 // Destroys the environment on memory errors.
@@ -82,6 +88,9 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 		return -E_INVAL;
 	
 	switch (syscallno) {
+		case SYS_null:
+			sys_null();
+			return 0;
 		case SYS_cputs:
 			sys_cputs((char *DANGEROUS)a1, (size_t)a2);
 			return 0;

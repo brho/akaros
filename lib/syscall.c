@@ -54,6 +54,11 @@ void sys_cputs_async(const char *s, size_t len)
 	async_syscall(&syscall);
 }
 
+void sys_null()
+{
+	syscall(SYS_null,0,0,0,0,0);
+}
+
 void
 sys_cputs(const char *s, size_t len)
 {

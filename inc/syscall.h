@@ -7,12 +7,13 @@
 /* system call numbers */
 enum
 {
-	SYS_cputs = 0,
+	SYS_null = 1,
+	SYS_cputs,
 	SYS_cgetc,
 	SYS_getenvid,
 	SYS_env_destroy,
-	NSYSCALLS
 };
+#define NSYSCALLS (SYS_env_destroy)
 
 #define NUM_SYS_ARGS 6
 typedef struct SyscallRequest {
