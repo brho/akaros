@@ -1,4 +1,8 @@
 /* See COPYRIGHT for copyright information. */
+#ifdef __DEPUTY__
+#pragma nodeputy
+#endif
+
 #include <inc/x86.h>
 #include <inc/error.h>
 #include <inc/string.h>
@@ -102,7 +106,7 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 			return sys_env_destroy((envid_t)a1);
 		default:
 			// or just return -E_INVAL
-			panic("invalid syscall number!");
+			panic("invalid syscall number (%d)!", syscallno);
 	}
 	return 0xdeadbeef;
 }
@@ -111,4 +115,34 @@ uint32_t syscall_async(syscall_req_t *call)
 {
 	return syscall(call->num, call->args[0], call->args[1],
 	               call->args[2], call->args[3], call->args[4]);
+}
+
+uint32_t process_generic_syscalls(env_t* e, uint32_t max)
+{
+	uint32_t count = 0;
+	syscall_back_ring_t* sysbr = &e->env_sysbackring;
+
+	// need to switch to the right context, so we can handle the user pointer
+	// that points to a data payload of the syscall
+	lcr3(e->env_cr3);
+	// max is the most we'll process.  max = 0 means do as many as possible
+	while (RING_HAS_UNCONSUMED_REQUESTS(sysbr) && ((!max)||(count < max)) ) {
+		count++;
+		//printk("DEBUG PRE: sring->req_prod: %d, sring->rsp_prod: %d\n",\
+			   sysbr->sring->req_prod, sysbr->sring->rsp_prod);
+		// might want to think about 0-ing this out, if we aren't
+		// going to explicitly fill in all fields
+		syscall_resp_t rsp;
+		// this assumes we get our answer immediately for the syscall.
+		syscall_req_t* req = RING_GET_REQUEST(sysbr, ++(sysbr->req_cons));
+		rsp.retval = syscall_async(req);
+		// write response into the slot it came from
+		memcpy(req, &rsp, sizeof(syscall_resp_t));
+		// update our counter for what we've produced (assumes we went in order!)
+		(sysbr->rsp_prod_pvt)++;
+		RING_PUSH_RESPONSES(sysbr);
+		//printk("DEBUG POST: sring->req_prod: %d, sring->rsp_prod: %d\n",\
+			   sysbr->sring->req_prod, sysbr->sring->rsp_prod);
+	}
+	return count;
 }

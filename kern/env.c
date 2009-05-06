@@ -142,6 +142,8 @@ env_setup_vm(env_t *e)
 
 	// Initialize the generic syscall ring buffer
 	SHARED_RING_INIT((syscall_sring_t*)e->env_procdata);
+	// Initialize the backend of the ring buffer
+	BACK_RING_INIT(&e->env_sysbackring, (syscall_sring_t*)e->env_procdata, PGSIZE);
 
 	// should be able to do this so long as boot_pgdir never has
 	// anything put below UTOP

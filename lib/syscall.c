@@ -2,6 +2,7 @@
 
 #include <inc/syscall.h>
 #include <inc/lib.h>
+#include <inc/x86.h>
 
 static inline uint32_t
 syscall(int num, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32_t a5)
@@ -36,15 +37,20 @@ syscall(int num, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32_t a5
 
 static inline error_t async_syscall(syscall_req_t *syscall)
 {
-	static uint8_t next = 0; // should make sure this never goes too high
-	syscall_req_t* req = RING_GET_REQUEST(&sysfrontring, next++);	
+	// spin til there is room for our request.  ring size is currently 64.
+	while (RING_FULL(&sysfrontring))
+		cpu_relax();
+	// req_prod_pvt comes in as the previously produced item.  need to
+	// increment to the next available spot, which is the one we'll work on.
+	syscall_req_t* req = RING_GET_REQUEST(&sysfrontring, ++(sysfrontring.req_prod_pvt));
 	memcpy(req, syscall, sizeof(syscall_req_t));
-	syscall_req_t* req = RING_GET_REQUEST(&sysfrontring, next++);	
-	memcpy(req, syscall, sizeof(syscall_req_t));
-	// need to actually update our sysfrontring.req_prod_pvt
-	sysfrontring.req_prod_pvt++;
+	// push our updates to sysfrontring.req_prod_pvt
 	RING_PUSH_REQUESTS(&sysfrontring);
+	//cprintf("DEBUG: sring->req_prod: %d, sring->rsp_prod: %d\n", \
+	        sysfrontring.sring->req_prod, sysfrontring.sring->rsp_prod);
 	return 0;
+	// at some point, we need to listen for the responses.  pass back a
+	// reference of some sort, probably via a parameter.
 }
 
 void sys_cputs_async(const char *s, size_t len)

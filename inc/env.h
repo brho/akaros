@@ -8,6 +8,8 @@
 #include <inc/trap.h>
 #include <inc/memlayout.h>
 
+#include <inc/syscall.h>
+
 struct Env;
 typedef struct Env env_t;
 
@@ -45,6 +47,8 @@ struct Env {
 	envid_t env_parent_id;		// env_id of this env's parent
 	unsigned env_status;		// Status of the environment
 	uint32_t env_runs;			// Number of times environment has run
+	// Note this is the actual backring, not a pointer to it somewhere else
+	syscall_back_ring_t env_sysbackring;	// BackRing for generic syscalls
 
 	// Address space
 	pde_t *env_pgdir;			// Kernel virtual address of page dir
