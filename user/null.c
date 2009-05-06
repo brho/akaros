@@ -3,32 +3,27 @@
 #include <inc/types.h>
 #include <inc/syscall.h>
 #include <inc/x86.h>
+#include <inc/measure.h>
 
-uint64_t avg(uint32_t (COUNT(length) array)[], int length) 
+#define NUM_ITERATIONS	100000
+uint64_t times[NUM_ITERATIONS];
+
+uint64_t total(uint64_t (COUNT(length) array)[], int length) 
 {
 	uint64_t sum = 0;
 	for(int i=0; i<length; i++) {
 		sum+=array[i];
 	}
-	return (length > 0) ? sum/((uint64_t)length) : 0;
+	return sum;
+	//return (length > 0) ? sum/((uint64_t)length) : 0;
 }
 
 void umain(void)
 {
-	//Get the measurements a bunch of times to make sure its accurate
-	#define NUM_ITERATIONS	500
-	uint32_t times[NUM_ITERATIONS];
-	for(int i=0; i<NUM_ITERATIONS; i++) {
-		//times[i] = get_time();
-		sys_null();
-		//times[i] = get_time() - times[i];
-	}
-	
-	//Compute the average and print it
-	uint64_t a = avg(times, NUM_ITERATIONS);
-	cprintf_async("Average latency: %ld", a);
-	//cprintf("Standard Deviation: %d", stddev);
+	measure_function(sys_null(), NUM_ITERATIONS, "sys_null");
+	measure_function(asm volatile("nop;"), NUM_ITERATIONS, "nop");
+	measure_function(cprintf("hello\n"), 2, "printf");
 
-	//Spin to make sure we don't have any resources dealocated before done
+	// Spin to make sure we don't have any resources deallocated before done
 	while(1);
 }

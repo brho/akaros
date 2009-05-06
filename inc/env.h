@@ -54,8 +54,10 @@ struct Env {
 	pde_t *env_pgdir;			// Kernel virtual address of page dir
 	physaddr_t env_cr3;			// Physical address of page dir
 	// TODO - give these two proper types (pointers to structs)
-	void* env_procinfo; 	// KVA of per-process shared info table (RO)
-	void* env_procdata;  	// KVA of per-process shared data table (RW)
+	void* env_procinfo; 		// KVA of per-process shared info table (RO)
+	void* env_procdata;  		// KVA of per-process shared data table (RW)
+	// Eventually want to move this to a per-system shared-info page
+	uint64_t env_tscfreq;		// Frequency of the TSC for measurements
 };
 
 #endif // !ROS_INC_ENV_H

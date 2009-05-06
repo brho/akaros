@@ -235,6 +235,7 @@ env_alloc(env_t **newenv_store, envid_t parent_id)
 	LIST_REMOVE(e, env_link);
 	*newenv_store = e;
 
+	e->env_tscfreq = tsc_freq;
 	// TODO: for now, the only info at procinfo is this env's struct
 	// note that we need to copy this over every time we make a change to env
 	// that we want userspace to see.  also note that we don't even want to
