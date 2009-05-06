@@ -81,10 +81,15 @@ static printbuf_t* get_free_buffer(void)
 // this buffering is a minor pain in the ass....
 static void putch_async(int ch, printbuf_t *b)
 {
+	syscall_desc_t desc;
 	b->buf[b->idx++] = ch;
 	if (b->idx == 256-1) {
 		// will need some way to track the result of the syscall
-		sys_cputs_async(b->buf, b->idx);
+		sys_cputs_async(b->buf, b->idx, &desc);
+
+// push this up a few layers
+syscall_rsp_t rsp;
+waiton_syscall(&desc, &rsp);
 		b = get_free_buffer();
 		b->idx = 0;
 	}
@@ -93,6 +98,7 @@ static void putch_async(int ch, printbuf_t *b)
 
 static int vcprintf_async(const char *fmt, va_list ap)
 {
+	syscall_desc_t desc;
 	// start with an available buffer
 	printbuf_t* b = get_free_buffer();
 
@@ -100,7 +106,10 @@ static int vcprintf_async(const char *fmt, va_list ap)
 	b->cnt = 0;
 	vprintfmt((void*)putch_async, b, fmt, ap);
 	// will need some way to track the result of the syscall
-	sys_cputs_async(b->buf, b->idx);
+	sys_cputs_async(b->buf, b->idx, &desc);
+// push this up a few layers
+syscall_rsp_t rsp;
+waiton_syscall(&desc, &rsp);
 
 	return b->cnt; // this is lying if we used more than one buffer
 }

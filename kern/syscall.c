@@ -88,7 +88,7 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 
 	//cprintf("Incoming syscall number: %d\n    a1: %x\n    a2: %x\n    a3: %x\n    a4: %x\n    a5: %x\n", syscallno, a1, a2, a3, a4, a5);
 
-	if (syscallno >= NSYSCALLS)
+	if (INVALID_SYSCALL(syscallno))
 		return -E_INVAL;
 	
 	switch (syscallno) {
@@ -132,12 +132,12 @@ uint32_t process_generic_syscalls(env_t* e, uint32_t max)
 			   sysbr->sring->req_prod, sysbr->sring->rsp_prod);
 		// might want to think about 0-ing this out, if we aren't
 		// going to explicitly fill in all fields
-		syscall_resp_t rsp;
+		syscall_rsp_t rsp;
 		// this assumes we get our answer immediately for the syscall.
 		syscall_req_t* req = RING_GET_REQUEST(sysbr, ++(sysbr->req_cons));
 		rsp.retval = syscall_async(req);
 		// write response into the slot it came from
-		memcpy(req, &rsp, sizeof(syscall_resp_t));
+		memcpy(req, &rsp, sizeof(syscall_rsp_t));
 		// update our counter for what we've produced (assumes we went in order!)
 		(sysbr->rsp_prod_pvt)++;
 		RING_PUSH_RESPONSES(sysbr);

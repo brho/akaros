@@ -14,9 +14,12 @@ void umain(void)
 	// will be the one printed when the syscall is serviced, regardless of
 	// whether the actual syscall can handle multiples in flight.
 	cprintf_async("Cross-Core call 1, coming from env %08x\n", env->env_id);
-	cprintf_async("Cross-Core call 2, coming from env %08x\n", env->env_id);
-	cprintf("Calls are sent!\n");
+	cprintf("Call 1 is sent!\n");
+	cprintf_async("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXCross-Core call 2, coming from env %08x\n", env->env_id);
+	cprintf("Call 2 is sent!\n");
 	// might as well spin, just to make sure nothing gets deallocated
 	// while we're waiting to test the async call
 	while (1);
+
+	//check that my shit is done
 }

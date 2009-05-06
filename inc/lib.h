@@ -36,12 +36,31 @@ char*	readline(const char *buf);
 // syscall.c
 void sys_null();
 void sys_cputs(const char *string, size_t len);
-void sys_cputs_async(const char *string, size_t len);
+void sys_cputs_async(const char *string, size_t len, syscall_desc_t* desc);
 int	sys_cgetc(void);
 envid_t	sys_getenvid(void);
 int	sys_env_destroy(envid_t);
+error_t waiton_syscall(syscall_desc_t* desc, syscall_rsp_t* rsp);
 
+// async callback
+typedef uint32_t async_desc;
 
+extern syscall_desc_t ALL_ASYNC_CALLS[][];
+error_t waiton_async_call(async_desc desc);
+//get_free_async_desc
+
+/*
+typedef syscall_waiter_t;
+typedef struct syscall_waiter {
+	syscall_desc_t desc;	
+	LIST_ENTRY(syscall_waiter_t) next;
+} syscall_waiter_t;
+LIST_HEAD(syscall_waiter_list_t, syscall_waiter_t); 
+
+syscall_waiter_list_t ALL_ASYNC_CALLS[256];
+sys_cpit_async (desc)
+put_syscalls_on_a_fucking_async_callback(async_desc, desc);
+*/
 
 /* File open modes */
 #define	O_RDONLY	0x0000		/* open for reading only */

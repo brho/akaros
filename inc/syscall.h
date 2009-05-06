@@ -14,6 +14,8 @@ enum
 	SYS_env_destroy,
 };
 #define NSYSCALLS (SYS_env_destroy)
+// syscall number starts at 1 and goes up to NSYSCALLS, without holes.
+#define INVALID_SYSCALL(syscallno) ((syscallno) > NSYSCALLS)
 
 #define NUM_SYS_ARGS 6
 typedef struct SyscallRequest {
@@ -23,11 +25,15 @@ typedef struct SyscallRequest {
 } syscall_req_t;
 
 typedef struct SyscallResponse {
-	uint32_t retval;
-} syscall_resp_t;
-
+	int32_t retval;
+} syscall_rsp_t;
 
 // Generic Syscall Ring Buffer
-DEFINE_RING_TYPES(syscall, syscall_req_t, syscall_resp_t);
+DEFINE_RING_TYPES(syscall, syscall_req_t, syscall_rsp_t);
+
+typedef struct SyscallRespDesc {
+	syscall_front_ring_t* sysfr;
+	uint32_t idx;
+} syscall_desc_t;
 
 #endif /* !ROS_INC_SYSCALL_H */

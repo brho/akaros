@@ -35,29 +35,44 @@ syscall(int num, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32_t a5
 	return ret;
 }
 
-static inline error_t async_syscall(syscall_req_t *syscall)
+static inline error_t async_syscall(syscall_req_t* req, syscall_desc_t* desc)
 {
+	// Note that this assumes one global frontring (TODO)
 	// spin til there is room for our request.  ring size is currently 64.
-	while (RING_FULL(&sysfrontring))
-		cpu_relax();
+	if (RING_FULL(&sysfrontring))
+		return E_BUSY;
 	// req_prod_pvt comes in as the previously produced item.  need to
 	// increment to the next available spot, which is the one we'll work on.
-	syscall_req_t* req = RING_GET_REQUEST(&sysfrontring, ++(sysfrontring.req_prod_pvt));
-	memcpy(req, syscall, sizeof(syscall_req_t));
+	// at some point, we need to listen for the responses.
+	desc->idx = ++(sysfrontring.req_prod_pvt);
+	desc->sysfr = &sysfrontring;
+	syscall_req_t* r = RING_GET_REQUEST(&sysfrontring, desc->idx);
+	memcpy(r, req, sizeof(syscall_req_t));
 	// push our updates to sysfrontring.req_prod_pvt
 	RING_PUSH_REQUESTS(&sysfrontring);
 	//cprintf("DEBUG: sring->req_prod: %d, sring->rsp_prod: %d\n", \
 	        sysfrontring.sring->req_prod, sysfrontring.sring->rsp_prod);
 	return 0;
-	// at some point, we need to listen for the responses.  pass back a
-	// reference of some sort, probably via a parameter.
 }
 
-void sys_cputs_async(const char *s, size_t len)
+// consider a timeout too
+error_t waiton_syscall(syscall_desc_t* desc, syscall_rsp_t* rsp)
+{
+	// this forces us to call wait in the order in which they are called
+	if (desc->idx != desc->sysfr->rsp_cons + 1)
+		return E_DEADLOCK;
+	while (!(RING_HAS_UNCONSUMED_RESPONSES(desc->sysfr)))
+		cpu_relax();
+	memcpy(rsp, RING_GET_RESPONSE(desc->sysfr, desc->idx), sizeof(*rsp));
+	desc->sysfr->rsp_cons++;
+	return 0;
+}
+
+void sys_cputs_async(const char *s, size_t len, syscall_desc_t* desc)
 {
 	// could just hardcode 4 0's, will eventually wrap this marshaller anyway
 	syscall_req_t syscall = {SYS_cputs, 0, {(uint32_t)s, len, [2 ... (NUM_SYS_ARGS-1)] 0} };
-	async_syscall(&syscall);
+	async_syscall(&syscall, desc);
 }
 
 void sys_null()

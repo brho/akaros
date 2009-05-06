@@ -4,6 +4,7 @@
 #define ROS_INC_ERROR_H
 
 typedef enum {
+	E_DEADLOCK	=	-3,
 	E_BUSY		=	-2,
 	E_FAIL		=	-1,
 	E_SUCCESS	=	0,

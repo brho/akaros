@@ -80,9 +80,9 @@ void kernel_init(multiboot_info_t *mboot_info)
 	//ENV_CREATE(user_badsegment);
 	//ENV_CREATE(user_divzero);
 	//ENV_CREATE(user_buggyhello);
+	ENV_CREATE(user_hello);
 	//ENV_CREATE(user_hello);
-	//ENV_CREATE(user_hello);
-	ENV_CREATE(user_null);
+	//ENV_CREATE(user_null);
 	//ENV_CREATE(user_evilhello);
 
 	// We only have one user environment for now, so just run it.
@@ -94,14 +94,12 @@ void kernel_init(multiboot_info_t *mboot_info)
 
 	// wait 5 sec, then print what's in shared mem
 	udelay(5000000);
-	/*
 	printk("Attempting to run two syscalls at the beginning of procdata for env 0 and 1:\n\n");
 	while (1) {
 		process_generic_syscalls(&envs[0], 1);
 		//process_generic_syscalls(&envs[1], 1);
 		cpu_relax();
 	}
-	*/
 	panic("Don't Panic");
 }
 
