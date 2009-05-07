@@ -60,7 +60,7 @@ int cprintf(const char *fmt, ...)
 }
 
 // Temp async varieties
-#define MAX_BUFFERS 10
+#define MAX_BUFFERS 100
 POOL_TYPE_DEFINE(printbuf_t, print_buf_pool, MAX_BUFFERS);
 print_buf_pool_t print_buf_pool;
 

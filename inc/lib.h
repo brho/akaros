@@ -47,7 +47,7 @@ error_t waiton_syscall(syscall_desc_t* desc, syscall_rsp_t* rsp);
 
 // async callback
 #define MAX_SYSCALLS 100
-#define MAX_ASYNCCALLS 10
+#define MAX_ASYNCCALLS 100
 // The high-level object a process waits on, with multiple syscalls within.
 typedef struct async_desc {
 	syscall_desc_list_t syslist;
