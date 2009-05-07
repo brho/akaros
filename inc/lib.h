@@ -8,14 +8,16 @@
 #define ROS_INC_LIB_H 1
 
 #include <inc/types.h>
-#include <inc/stdio.h>
 #include <inc/stdarg.h>
 #include <inc/string.h>
 #include <inc/error.h>
-#include <inc/assert.h>
 #include <inc/env.h>
 #include <inc/memlayout.h>
 #include <inc/syscall.h>
+#include <inc/pool.h>
+// These two are included below because of dependency issues.
+//#include <inc/stdio.h>
+//#include <inc/assert.h>
 
 #define USED(x)		(void)(x)
 
@@ -43,24 +45,32 @@ int	sys_env_destroy(envid_t);
 error_t waiton_syscall(syscall_desc_t* desc, syscall_rsp_t* rsp);
 
 // async callback
-typedef uint32_t async_desc;
+#define MAX_SYSCALLS 100
+#define MAX_ASYNCCALLS 10
+// This is the high-level object a process waits, with multiple syscalls within.
+typedef syscall_desc_list_t async_desc_t;
+// This is per-thread, and used when entering a async library call to properly
+// group syscall_desc_t used during the processing of that async call
+extern async_desc_t* current_async_desc;
+// stdio.h needs to be included after async_desc_t.  assert.h includes stdio.h.
+#include <inc/stdio.h>
+#include <inc/assert.h>
 
-extern syscall_desc_t ALL_ASYNC_CALLS[][];
-error_t waiton_async_call(async_desc desc);
-//get_free_async_desc
 
-/*
-typedef syscall_waiter_t;
-typedef struct syscall_waiter {
-	syscall_desc_t desc;	
-	LIST_ENTRY(syscall_waiter_t) next;
-} syscall_waiter_t;
-LIST_HEAD(syscall_waiter_list_t, syscall_waiter_t); 
+// This pooltype contains syscall_desc_t, which is how you wait on one syscall.
+POOL_TYPE_DEFINE(syscall_desc_t, syscall_desc_pool, MAX_SYSCALLS);
+POOL_TYPE_DEFINE(async_desc_t, async_desc_pool, MAX_ASYNCCALLS);
+// These are declared in libmain.c
+extern syscall_desc_pool_t syscall_desc_pool;
+extern async_desc_pool_t async_desc_pool;
+// Finds a free async_desc_t, on which you can wait for a series of syscalls
+async_desc_t* get_async_desc(void);
+// Wait on all syscalls within this async call.  TODO - timeout or something?
+error_t waiton_async_call(async_desc_t* desc);
+// Finds a free sys_desc_t, on which you can wait for a specific syscall, and
+// binds it to the group desc.
+syscall_desc_t* get_sys_desc(async_desc_t* desc);
 
-syscall_waiter_list_t ALL_ASYNC_CALLS[256];
-sys_cpit_async (desc)
-put_syscalls_on_a_fucking_async_callback(async_desc, desc);
-*/
 
 /* File open modes */
 #define	O_RDONLY	0x0000		/* open for reading only */

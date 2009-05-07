@@ -1,58 +1,60 @@
 /* See COPYRIGHT for copyright information. */
 /* Kevin Klues <klueska@cs.berkeley.edu>	*/
 
-#ifndef ROS_POOL_H
-#define ROS_POOL_H   
+#ifndef ROS_INC_POOL_H
+#define ROS_INC_POOL_H   
 
-#define POOL_DECLARE(_t, p, sz)                                                \
-struct {                                                                       \
+#define POOL_TYPE_DEFINE(_type, p, sz)                                                \
+typedef struct struct_##p {                                                             \
 	uint32_t size;                                                         \
 	uint32_t free;                                                         \
 	uint32_t index;                                                        \
-	_t* queue[(sz)];                                                       \
-	_t pool[(sz)];                                                         \
-} p = {(sz), (sz), 0, {[0 ... ((sz)-1)] 0}, {[0 ... ((sz)-1)] 0}};
+	_type* queue[(sz)];                                                       \
+	_type pool[(sz)];                                                         \
+} p##_t;
 
-#define POOL_INIT(p)                                                           \
+#define POOL_INIT(p, sz)                                                       \
 ({                                                                             \
-	for(int i=0; i<(p)->size; i++) {                                       \
-		(p)->queue[i] = &((p)->pool[i]);                               \
-	}                                                                      \
+	(p)->size = (sz);                                                          \
+	(p)->free = (sz);                                                          \
+	(p)->index = 0;                                                            \
+	for(int i=0; i<(p)->size; i++) {                                           \
+		(p)->queue[i] = &((p)->pool[i]);                                       \
+	}                                                                          \
 })
 
-#define POOL_GET(p)                                                            \
-({                                                                             \
-	if((p)->free) {                                                        \
-		void* rval = (p)->queue[(p)->index];                           \
-		(p)->queue[(p)->index] = NULL;                                 \
-		(p)->free--;                                                   \
-		(p)->index++;                                                  \
-		if((p)->index == (p)->size) {                                  \
-    		(p)->index = 0;                                                \
-      	}                                                                      \
-		rval;                                                          \
-	}                                                                      \
-	NULL;                                                                  \
+#define POOL_GET(p)                                            \
+({                                                             \
+	void* rval = NULL;                                         \
+	if((p)->free) {                                            \
+		rval = (p)->queue[(p)->index];                         \
+		(p)->queue[(p)->index] = NULL;                         \
+		(p)->free--;                                           \
+		(p)->index++;                                          \
+		if((p)->index == (p)->size) {                          \
+    		(p)->index = 0;                                    \
+      	}                                                      \
+	}                                                          \
+	rval;                                                      \
 })
 
 #define POOL_PUT(p, val)                                                       \
 ({                                                                             \
-	if((p)->free >= (p)->size) {                                           \
-		-1;                                                            \
-	}                                                                      \
-	else {                                                                 \
+	int rval = -1;                                                            \
+	if((p)->free < (p)->size) {                                           \
 		int emptyIndex = ((p)->index + (p)->free);                     \
 		if (emptyIndex >= (p)->size) {                                 \
 			emptyIndex -= (p)->size;                               \
 		}                                                              \
 		(p)->queue[emptyIndex] = val;                                  \
 		(p)->free++;                                                   \
-		1;                                                             \
+		rval = 1;                                                             \
 	}                                                                      \
+	rval;                                                                 \
 })
 
 #define POOL_EMPTY(p) ((p)->free == 0)
 #define POOL_SIZE(p) ((p)->free))
 #define POOL_MAX_SIZE(p) ((p)->size))
 
-#endif //ROS_POOL_H
+#endif //ROS_INC_POOL_H

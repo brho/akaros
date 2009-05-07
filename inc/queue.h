@@ -109,6 +109,7 @@ LIST_INSERT_HEAD(&flist, g, frob_link);	/* add g as first element in list */
 #define	LIST_HEAD(name, type)					\
 typedef struct {								\
 	type *lh_first;	/* first element */			\
+	type *lh_last;	/* last element */			\
 } name;
 
 /*
@@ -116,7 +117,7 @@ typedef struct {								\
  * to reset it to the empty list.
  */
 #define	LIST_HEAD_INITIALIZER(head)					\
-	{ NULL }
+	{ NULL, NULL }
 
 /*
  * Use this inside a structure "LIST_ENTRY(type) field" to use
@@ -147,6 +148,11 @@ struct {								\
 #define	LIST_FIRST(head)	((head)->lh_first)
 
 /*
+ * Return the last element in the list named "head".
+ */
+#define	LIST_LAST(head)	((head)->lh_last)
+
+/*
  * Return the element after "elm" in the list.
  * The "field" name is the link element as above.
  */
@@ -167,13 +173,14 @@ struct {								\
  */
 #define	LIST_INIT(head) do {						\
 	LIST_FIRST((head)) = NULL;					\
+	LIST_LAST((head)) = NULL;					\
 } while (0)
 
 /*
+ * TODO : DON'T USE THIS because of tail pointer issues
  * Insert the element "elm" *after* the element "listelm" which is
  * already in the list.  The "field" name is the link element
  * as above.
- */
 #define	LIST_INSERT_AFTER(listelm, elm, field) do {			\
 	if ((LIST_NEXT((elm), field) = LIST_NEXT((listelm), field)) != NULL)\
 		LIST_NEXT((listelm), field)->field.le_prev =		\
@@ -181,18 +188,21 @@ struct {								\
 	LIST_NEXT((listelm), field) = (elm);				\
 	(elm)->field.le_prev = &LIST_NEXT((listelm), field);		\
 } while (0)
+ */
 
 /*
+ * TODO : DON'T USE THIS because of tail pointer issues
+ * Insert the element "elm" *after* the element "listelm" which is
  * Insert the element "elm" *before* the element "listelm" which is
  * already in the list.  The "field" name is the link element
  * as above.
- */
 #define	LIST_INSERT_BEFORE(listelm, elm, field) do {			\
 	(elm)->field.le_prev = (listelm)->field.le_prev;		\
 	LIST_NEXT((elm), field) = (listelm);				\
 	*(listelm)->field.le_prev = (elm);				\
 	(listelm)->field.le_prev = &LIST_NEXT((elm), field);		\
 } while (0)
+ */
 
 /*
  * Insert the element "elm" at the head of the list named "head".
@@ -201,8 +211,27 @@ struct {								\
 #define	LIST_INSERT_HEAD(head, elm, field) do {				\
 	if ((LIST_NEXT((elm), field) = LIST_FIRST((head))) != NULL)	\
 		LIST_FIRST((head))->field.le_prev = &LIST_NEXT((elm), field);\
+	else                                                       \
+		LIST_LAST((head)) = (elm);					\
 	LIST_FIRST((head)) = (elm);					\
 	(elm)->field.le_prev = &LIST_FIRST((head));			\
+} while (0)
+
+/*
+ * TODO : DO NOT USE THIS AFTER YOU'VE REMOVED AN ITEM!!
+ * Insert the element "elm" at the tail of the list named "head".
+ * The "field" name is the link element as above.
+ * (you have been warned) ((sorry))
+ */
+#define	LIST_INSERT_TAIL(head, elm, field) do {				                   \
+	if (LIST_EMPTY((head)))                                                    \
+		LIST_INSERT_HEAD((head), (elm), field);                                \
+	else {                                                                     \
+		(elm)->field.le_prev = &(LIST_LAST((head))->field.le_next);            \
+		LIST_LAST((head))->field.le_next = (elm);                              \
+		LIST_LAST((head)) = (elm);                                             \
+		(elm)->field.le_next = NULL;                                           \
+	}                                                                          \
 } while (0)
 
 /*

@@ -62,34 +62,30 @@ cprintf(const char *fmt, ...)
 
 // Temp async varieties
 #define MAX_BUFFERS 10
-printbuf_t async_bufs[MAX_BUFFERS];
-uint32_t full_buffers = 0;
+POOL_TYPE_DEFINE(printbuf_t, print_buf_pool, MAX_BUFFERS);
+print_buf_pool_t print_buf_pool;
+
+static error_t init_printf(void)
+{
+	POOL_INIT(&print_buf_pool, MAX_BUFFERS);
+	return 0;
+}
 
 static printbuf_t* get_free_buffer(void)
 {
-	// reserve a buffer.  if we actually get one, return it.  o/w, bail out.
-	// want to do this atomically eventually.
-	full_buffers++;
-	if (full_buffers <= MAX_BUFFERS)
-		return &async_bufs[full_buffers - 1];
-	full_buffers--;
-	// synchronously warn.  could consider blocking in the future
-	cprintf("Out of buffers!!!\n");
-	return NULL;
+	return POOL_GET(&print_buf_pool);
+	//cprintf("Out of buffers!!!\n");
 }
 
 // this buffering is a minor pain in the ass....
+// TODO - it will be a pain in the ass to put the buffers back after we waited.
 static void putch_async(int ch, printbuf_t *b)
 {
-	syscall_desc_t desc;
 	b->buf[b->idx++] = ch;
 	if (b->idx == 256-1) {
 		// will need some way to track the result of the syscall
-		sys_cputs_async(b->buf, b->idx, &desc);
-
-// push this up a few layers
-syscall_rsp_t rsp;
-waiton_syscall(&desc, &rsp);
+		sys_cputs_async(b->buf, b->idx, get_sys_desc(current_async_desc));
+		// TODO - this isn't getting passed back properly
 		b = get_free_buffer();
 		b->idx = 0;
 	}
@@ -98,26 +94,28 @@ waiton_syscall(&desc, &rsp);
 
 static int vcprintf_async(const char *fmt, va_list ap)
 {
-	syscall_desc_t desc;
 	// start with an available buffer
 	printbuf_t* b = get_free_buffer();
 
 	b->idx = 0;
 	b->cnt = 0;
 	vprintfmt((void*)putch_async, b, fmt, ap);
-	// will need some way to track the result of the syscall
-	sys_cputs_async(b->buf, b->idx, &desc);
-// push this up a few layers
-syscall_rsp_t rsp;
-waiton_syscall(&desc, &rsp);
+	sys_cputs_async(b->buf, b->idx, get_sys_desc(current_async_desc));
 
 	return b->cnt; // this is lying if we used more than one buffer
 }
 
-int cprintf_async(const char *fmt, ...)
+int cprintf_async(async_desc_t** desc, const char *fmt, ...)
 {
 	va_list ap;
 	int cnt;
+	static bool initialized = 0;
+	if (!initialized) {
+		init_printf();
+    	initialized = TRUE;
+	}
+	current_async_desc = get_async_desc();
+	*desc = current_async_desc;
 
 	va_start(ap, fmt);
 	cnt = vcprintf_async(fmt, ap);

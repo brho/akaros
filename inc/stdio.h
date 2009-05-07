@@ -26,7 +26,6 @@ void	vprintfmt(void (*putch)(int, TV(t)), TV(t) putdat, const char *NTS fmt, va_
 
 // lib/printf.c
 int	cprintf(const char * NTS fmt, ...);
-int	cprintf_async(const char * NTS fmt, ...);
 int	vcprintf(const char * NTS fmt, va_list);
 
 // lib/sprintf.c
@@ -40,5 +39,14 @@ int	vfprintf(int fd, const char *fmt, va_list);
 
 // lib/readline.c
 char *NTS readline(const char *NTS prompt);
+
+/* USERSPACE ONLY */
+#ifndef ROS_KERNEL
+
+#include <inc/lib.h>
+
+int	cprintf_async(async_desc_t** desc, const char * NTS fmt, ...);
+
+#endif /* USERSPACE ONLY */
 
 #endif /* !ROS_INC_STDIO_H */
