@@ -21,8 +21,9 @@ int	getchar(void);
 int	iscons(int fd);
 
 // lib/printfmt.c
-void	printfmt(void (*putch)(int, void*), void *putdat, const char *NTS fmt, ...);
-void	vprintfmt(void (*putch)(int, TV(t)), TV(t) putdat, const char *NTS fmt, va_list);
+void	printfmt(void (*putch)(int, void**), void **putdat, const char *NTS fmt, ...);
+//void	vprintfmt(void (*putch)(int, TV(t)), TV(t) putdat, const char *NTS fmt, va_list);
+void	vprintfmt(void (*putch)(int, void**), void **putdat, const char *NTS fmt, va_list);
 
 // lib/printf.c
 int	cprintf(const char * NTS fmt, ...);

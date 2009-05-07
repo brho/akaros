@@ -1,6 +1,10 @@
 // Simple implementation of cprintf console output for the kernel,
 // based on printfmt() and the kernel console's cputchar().
 
+#ifdef __DEPUTY__
+#pragma nodeputy
+#endif
+
 #include <inc/types.h>
 #include <inc/stdio.h>
 #include <inc/stdarg.h>
@@ -9,28 +13,26 @@
 
 uint32_t output_lock = 0;
 
-static void
-putch(int ch, int *cnt)
+static void putch(int ch, int **cnt)
 {
 	cputchar(ch);
-	*cnt = *cnt + 1;
+	**cnt = **cnt + 1;
 }
 
-int
-vcprintf(const char *fmt, va_list ap)
+int vcprintf(const char *fmt, va_list ap)
 {
 	int cnt = 0;
+	int *cntp = &cnt;
 
 	// lock all output.  this will catch any printfs at line granularity
 	spin_lock_irqsave(&output_lock);
-	vprintfmt(putch, &cnt, fmt, ap);
+	vprintfmt((void*)putch, (void**)&cntp, fmt, ap);
 	spin_unlock_irqsave(&output_lock);
 
 	return cnt;
 }
 
-int
-cprintf(const char *fmt, ...)
+int cprintf(const char *fmt, ...)
 {
 	va_list ap;
 	int cnt;
@@ -41,4 +43,3 @@ cprintf(const char *fmt, ...)
 
 	return cnt;
 }
-

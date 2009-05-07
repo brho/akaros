@@ -11,44 +11,43 @@
 #include <inc/lib.h>
 
 
-// Collect up to 256 characters into a buffer
+// Collect up to BUF_SIZE characters into a buffer
 // and perform ONE system call to print all of them,
 // in order to make the lines output to the console atomic
 // and prevent interrupts from causing context switches
 // in the middle of a console output line and such.
+#define BUF_SIZE 256
 typedef struct printbuf {
 	int idx;	// current buffer index
 	int cnt;	// total bytes printed so far
-	char buf[256];
+	char buf[BUF_SIZE];
 } printbuf_t;
 
 
-static void
-putch(int ch, printbuf_t *b)
+static void putch(int ch, printbuf_t **b)
 {
-	b->buf[b->idx++] = ch;
-	if (b->idx == 256-1) {
-		sys_cputs(b->buf, b->idx);
-		b->idx = 0;
+	(*b)->buf[(*b)->idx++] = ch;
+	if ((*b)->idx == BUF_SIZE) {
+		sys_cputs((*b)->buf, (*b)->idx);
+		(*b)->idx = 0;
 	}
-	b->cnt++;
+	(*b)->cnt++;
 }
 
-int
-vcprintf(const char *fmt, va_list ap)
+int vcprintf(const char *fmt, va_list ap)
 {
 	printbuf_t b;
+	printbuf_t *bp = &b;
 
 	b.idx = 0;
 	b.cnt = 0;
-	vprintfmt((void*)putch, &b, fmt, ap);
+	vprintfmt((void*)putch, (void**)&bp, fmt, ap);
 	sys_cputs(b.buf, b.idx);
 
 	return b.cnt;
 }
 
-int
-cprintf(const char *fmt, ...)
+int cprintf(const char *fmt, ...)
 {
 	va_list ap;
 	int cnt;
@@ -82,19 +81,19 @@ static void cputs_async_cleanup(void* data)
 	POOL_PUT(&print_buf_pool, (printbuf_t*)data);
 }
 
-static void putch_async(int ch, printbuf_t *b)
+static void putch_async(int ch, printbuf_t **b)
 {
-	b->buf[b->idx++] = ch;
-	if (b->idx == 256-1) {
+	(*b)->buf[(*b)->idx++] = ch;
+	if ((*b)->idx == BUF_SIZE) {
 		// will need some way to track the result of the syscall
-		sys_cputs_async(b->buf, b->idx, get_sys_desc(current_async_desc),
-		                cputs_async_cleanup, b); 
+		sys_cputs_async((*b)->buf, (*b)->idx, get_sys_desc(current_async_desc),
+		                cputs_async_cleanup, *b); 
 		// TODO - this isn't getting passed back properly
 		// TODO - should check for a return value
-		b = get_free_buffer();
-		b->idx = 0;
+		*b = get_free_buffer();
+		(*b)->idx = 0;
 	}
-	b->cnt++; // supposed to be overall number, not just in one buffer
+	(*b)->cnt++; // supposed to be overall number, not just in one buffer
 }
 
 static int vcprintf_async(const char *fmt, va_list ap)
@@ -104,7 +103,7 @@ static int vcprintf_async(const char *fmt, va_list ap)
 
 	b->idx = 0;
 	b->cnt = 0;
-	vprintfmt((void*)putch_async, b, fmt, ap);
+	vprintfmt((void*)putch_async, (void**)&b, fmt, ap);
 	sys_cputs_async(b->buf, b->idx, get_sys_desc(current_async_desc),
 	                cputs_async_cleanup, b); 
 

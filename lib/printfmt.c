@@ -37,7 +37,7 @@ static const char * const error_string[MAXERROR + 1] =
  * Print a number (base <= 16) in reverse order,
  * using specified putch function and associated pointer putdat.
  */
-static void printnum(void (*putch)(int, void*), void *putdat,
+static void printnum(void (*putch)(int, void**), void **putdat,
 	                 unsigned long long num, unsigned base, int width, int padc)
 {
 	// first recursively print all preceding (more significant) digits
@@ -79,9 +79,9 @@ static long long getint(va_list *ap, int lflag)
 
 
 // Main function to format and print a string.
-void printfmt(void (*putch)(int, void*), void *putdat, const char *fmt, ...);
+void printfmt(void (*putch)(int, void**), void **putdat, const char *fmt, ...);
 
-void vprintfmt(void (*putch)(int, void*), void *putdat, const char *fmt, va_list ap)
+void vprintfmt(void (*putch)(int, void**), void **putdat, const char *fmt, va_list ap)
 {
 	register const char *p;
 	register int ch, err;
@@ -243,7 +243,7 @@ void vprintfmt(void (*putch)(int, void*), void *putdat, const char *fmt, va_list
 	}
 }
 
-void printfmt(void (*putch)(int, void*), void *putdat, const char *fmt, ...)
+void printfmt(void (*putch)(int, void**), void **putdat, const char *fmt, ...)
 {
 	va_list ap;
 
@@ -258,22 +258,23 @@ typedef struct sprintbuf {
 	int cnt;
 } sprintbuf_t;
 
-static void sprintputch(int ch, sprintbuf_t *b)
+static void sprintputch(int ch, sprintbuf_t **b)
 {
-	b->cnt++;
-	if (b->buf < b->ebuf)
-		*b->buf++ = ch;
+	(*b)->cnt++;
+	if ((*b)->buf < (*b)->ebuf)
+		*((*b)->buf++) = ch;
 }
 
 int vsnprintf(char *buf, int n, const char *fmt, va_list ap)
 {
 	sprintbuf_t b = {buf, buf+n-1, 0};
+	sprintbuf_t *bp = &b;
 
 	if (buf == NULL || n < 1)
 		return -E_INVAL;
 
 	// print the string to the buffer
-	vprintfmt((void*)sprintputch, &b, fmt, ap);
+	vprintfmt((void*)sprintputch, (void**)&bp, fmt, ap);
 
 	// null terminate the buffer
 	*b.buf = '\0';
