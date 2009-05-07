@@ -65,13 +65,19 @@ error_t waiton_syscall(syscall_desc_t* desc, syscall_rsp_t* rsp)
 		cpu_relax();
 	memcpy(rsp, RING_GET_RESPONSE(desc->sysfr, desc->idx), sizeof(*rsp));
 	desc->sysfr->rsp_cons++;
+    // run a cleanup function for this desc, if available
+    if (desc->cleanup)
+    	desc->cleanup(desc->data);
 	return 0;
 }
 
-void sys_cputs_async(const char *s, size_t len, syscall_desc_t* desc)
+void sys_cputs_async(const char *s, size_t len, syscall_desc_t* desc,
+                     void (*cleanup_handler)(void*), void* cleanup_data)
 {
 	// could just hardcode 4 0's, will eventually wrap this marshaller anyway
 	syscall_req_t syscall = {SYS_cputs, 0, {(uint32_t)s, len, [2 ... (NUM_SYS_ARGS-1)] 0} };
+	desc->cleanup = cleanup_handler;
+	desc->data = cleanup_data;
 	async_syscall(&syscall, desc);
 }
 

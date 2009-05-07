@@ -4,6 +4,8 @@
 #ifndef ROS_INC_POOL_H
 #define ROS_INC_POOL_H   
 
+#include <inc/string.h>
+
 #define POOL_TYPE_DEFINE(_type, p, sz)                                                \
 typedef struct struct_##p {                                                             \
 	uint32_t size;                                                         \
@@ -18,6 +20,7 @@ typedef struct struct_##p {                                                     
 	(p)->size = (sz);                                                          \
 	(p)->free = (sz);                                                          \
 	(p)->index = 0;                                                            \
+	memset((p)->pool, 0, (sz) * sizeof((p)->pool[0]));                         \
 	for(int i=0; i<(p)->size; i++) {                                           \
 		(p)->queue[i] = &((p)->pool[i]);                                       \
 	}                                                                          \
@@ -54,7 +57,7 @@ typedef struct struct_##p {                                                     
 })
 
 #define POOL_EMPTY(p) ((p)->free == 0)
-#define POOL_SIZE(p) ((p)->free))
-#define POOL_MAX_SIZE(p) ((p)->size))
+#define POOL_SIZE(p) ((p)->free)
+#define POOL_MAX_SIZE(p) ((p)->size)
 
 #endif //ROS_INC_POOL_H

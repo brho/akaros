@@ -74,18 +74,23 @@ static error_t init_printf(void)
 static printbuf_t* get_free_buffer(void)
 {
 	return POOL_GET(&print_buf_pool);
-	//cprintf("Out of buffers!!!\n");
 }
 
-// this buffering is a minor pain in the ass....
-// TODO - it will be a pain in the ass to put the buffers back after we waited.
+// This is called when the syscall is waited on
+static void cputs_async_cleanup(void* data)
+{
+	POOL_PUT(&print_buf_pool, (printbuf_t*)data);
+}
+
 static void putch_async(int ch, printbuf_t *b)
 {
 	b->buf[b->idx++] = ch;
 	if (b->idx == 256-1) {
 		// will need some way to track the result of the syscall
-		sys_cputs_async(b->buf, b->idx, get_sys_desc(current_async_desc));
+		sys_cputs_async(b->buf, b->idx, get_sys_desc(current_async_desc),
+		                cputs_async_cleanup, b); 
 		// TODO - this isn't getting passed back properly
+		// TODO - should check for a return value
 		b = get_free_buffer();
 		b->idx = 0;
 	}
@@ -100,7 +105,8 @@ static int vcprintf_async(const char *fmt, va_list ap)
 	b->idx = 0;
 	b->cnt = 0;
 	vprintfmt((void*)putch_async, b, fmt, ap);
-	sys_cputs_async(b->buf, b->idx, get_sys_desc(current_async_desc));
+	sys_cputs_async(b->buf, b->idx, get_sys_desc(current_async_desc),
+	                cputs_async_cleanup, b); 
 
 	return b->cnt; // this is lying if we used more than one buffer
 }
@@ -116,6 +122,8 @@ int cprintf_async(async_desc_t** desc, const char *fmt, ...)
 	}
 	current_async_desc = get_async_desc();
 	*desc = current_async_desc;
+
+	cprintf("Pool size: %d\n", POOL_SIZE(&print_buf_pool));
 
 	va_start(ap, fmt);
 	cnt = vcprintf_async(fmt, ap);

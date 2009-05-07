@@ -37,6 +37,9 @@ struct syscall_desc {
 	LIST_ENTRY(syscall_desc_t) next;
 	syscall_front_ring_t* sysfr;
 	uint32_t idx;
+	// cleanup
+	void (*cleanup)(void* data);
+	void* data;
 };
 LIST_HEAD(syscall_desc_list_t, syscall_desc_t); 
 
