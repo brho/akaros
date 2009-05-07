@@ -48,8 +48,12 @@ error_t waiton_syscall(syscall_desc_t* desc, syscall_rsp_t* rsp);
 // async callback
 #define MAX_SYSCALLS 100
 #define MAX_ASYNCCALLS 10
-// This is the high-level object a process waits, with multiple syscalls within.
-typedef syscall_desc_list_t async_desc_t;
+// The high-level object a process waits on, with multiple syscalls within.
+typedef struct async_desc {
+	syscall_desc_list_t syslist;
+	void (*cleanup)(void* data);
+	void* data;
+} async_desc_t;
 // This is per-thread, and used when entering a async library call to properly
 // group syscall_desc_t used during the processing of that async call
 extern async_desc_t* current_async_desc;

@@ -14,8 +14,8 @@
 #include <kern/syscall.h>
 #include <kern/console.h>
 
-//Do absolutely nothing.  Used for profiling.  
-static void sys_null() 
+//Do absolutely nothing.  Used for profiling.
+static void sys_null()
 {
 	return;
 }
@@ -90,7 +90,7 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 
 	if (INVALID_SYSCALL(syscallno))
 		return -E_INVAL;
-	
+
 	switch (syscallno) {
 		case SYS_null:
 			sys_null();

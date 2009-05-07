@@ -41,6 +41,6 @@ struct syscall_desc {
 	void (*cleanup)(void* data);
 	void* data;
 };
-LIST_HEAD(syscall_desc_list_t, syscall_desc_t); 
+LIST_HEAD(syscall_desc_list_t, syscall_desc_t);
 
 #endif /* !ROS_INC_SYSCALL_H */

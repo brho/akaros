@@ -2,7 +2,7 @@
 /* Kevin Klues <klueska@cs.berkeley.edu>	*/
 
 #ifndef ROS_INC_POOL_H
-#define ROS_INC_POOL_H   
+#define ROS_INC_POOL_H
 
 #include <inc/string.h>
 

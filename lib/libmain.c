@@ -23,9 +23,9 @@ libmain(int argc, char **argv)
 	env = (env_t*)procinfo;
 
 	// Set up the front ring for the general syscall ring
-	FRONT_RING_INIT(&sysfrontring, (syscall_sring_t*)procdata, PGSIZE);	
-	POOL_INIT(&syscall_desc_pool, MAX_SYSCALLS);		
-	POOL_INIT(&async_desc_pool, MAX_ASYNCCALLS);		
+	FRONT_RING_INIT(&sysfrontring, (syscall_sring_t*)procdata, PGSIZE);
+	POOL_INIT(&syscall_desc_pool, MAX_SYSCALLS);
+	POOL_INIT(&async_desc_pool, MAX_ASYNCCALLS);
 
 	// save the name of the program so that panic() can use it
 	if (argc > 0)

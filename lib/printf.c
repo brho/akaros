@@ -2,7 +2,7 @@
 // based on printfmt() and the sys_cputs() system call.
 //
 // cprintf is a debugging statement, not a generic output statement.
-// It is very important that it always go to the console, especially when 
+// It is very important that it always go to the console, especially when
 // debugging file descriptor code!
 
 #include <inc/types.h>
@@ -87,7 +87,7 @@ static void putch_async(int ch, printbuf_t **b)
 	if ((*b)->idx == BUF_SIZE) {
 		// will need some way to track the result of the syscall
 		sys_cputs_async((*b)->buf, (*b)->idx, get_sys_desc(current_async_desc),
-		                cputs_async_cleanup, *b); 
+		                cputs_async_cleanup, *b);
 		// TODO - this isn't getting passed back properly
 		// TODO - should check for a return value
 		*b = get_free_buffer();
@@ -105,7 +105,7 @@ static int vcprintf_async(const char *fmt, va_list ap)
 	b->cnt = 0;
 	vprintfmt((void*)putch_async, (void**)&b, fmt, ap);
 	sys_cputs_async(b->buf, b->idx, get_sys_desc(current_async_desc),
-	                cputs_async_cleanup, b); 
+	                cputs_async_cleanup, b);
 
 	return b->cnt; // this is lying if we used more than one buffer
 }
@@ -114,16 +114,18 @@ int cprintf_async(async_desc_t** desc, const char *fmt, ...)
 {
 	va_list ap;
 	int cnt;
+
+	// This async call has some housekeeping it needs to do once, ever.
 	static bool initialized = 0;
 	if (!initialized) {
 		init_printf();
     	initialized = TRUE;
 	}
+	// get a free async_desc for this async call, and save it in the per-thread
+	// tracking variable (current_async_desc).  then pass it back out.
 	current_async_desc = get_async_desc();
 	*desc = current_async_desc;
-
-	cprintf("Pool size: %d\n", POOL_SIZE(&print_buf_pool));
-
+	// This is the traditional (sync) cprintf code
 	va_start(ap, fmt);
 	cnt = vcprintf_async(fmt, ap);
 	va_end(ap);

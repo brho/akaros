@@ -8,7 +8,7 @@
 #define NUM_ITERATIONS	100000
 uint64_t times[NUM_ITERATIONS];
 
-uint64_t total(uint64_t (COUNT(length) array)[], int length) 
+uint64_t total(uint64_t (COUNT(length) array)[], int length)
 {
 	uint64_t sum = 0;
 	for(int i=0; i<length; i++) {
