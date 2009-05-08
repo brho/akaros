@@ -27,13 +27,15 @@
 	ticks;                                                                     \
 })
 
-#define measure_function_async(func, desc_name, i_iters, o_iters, name)        \
+#define measure_function_async(func, _desc_type, _rsp_type, wait_func,         \
+	                           desc_name, i_iters, o_iters, name)              \
 ({                                                                             \
 	uint64_t ticks;                                                            \
+	_desc_type* desc_array[i_iters];                                           \
+	_desc_type* desc_name;                                                     \
+	_rsp_type* rsp;                                                            \
 	cpuid(0, 0, 0, 0, 0);                                                      \
 	ticks = read_tsc();                                                        \
-	async_desc_t* desc_array[i_iters];                                         \
-	async_desc_t* desc_name;                                                   \
 	/* Run this a bunch of times to make sure its accurate */                  \
 	for(int i=0; i< (o_iters); i++) {                                          \
 		for (int j = 0; j < (i_iters); j++) {                                  \
@@ -41,7 +43,7 @@
 			desc_array[j] = desc_name;                                         \
 		}                                                                      \
 		for (int j = 0; j < (i_iters); j++) {                                  \
-			waiton_async_call(desc_array[j]);                                  \
+			wait_func(desc_array[j], rsp);                                     \
 		}                                                                      \
 	}                                                                          \
 	cpuid(0, 0, 0, 0, 0);                                                      \
@@ -57,5 +59,9 @@
 	        name, ticks, ((o_iters)*(i_iters)), a);                            \
 	ticks;                                                                     \
 })
+
+#define measure_async_call(func, desc_name, i_iters, o_iters, name)            \
+	measure_function_async(func, async_desc_t, async_rsp_t, waiton_async_call, \
+	                       desc_name, i_iters, o_iters, name)
 
 #endif /* !ROS_INC_MEASURE_H */

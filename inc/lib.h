@@ -37,6 +37,7 @@ char*	readline(const char *buf);
 
 // syscall.c
 void sys_null();
+void sys_null_async(syscall_desc_t* desc);
 void sys_cputs(const char *string, size_t len);
 void sys_cputs_async(const char *s, size_t len, syscall_desc_t* desc,
                      void (*cleanup_handler)(void*), void* cleanup_data);
@@ -54,6 +55,9 @@ typedef struct async_desc {
 	void (*cleanup)(void* data);
 	void* data;
 } async_desc_t;
+typedef struct async_rsp_t {
+	int32_t retval;
+} async_rsp_t;
 // This is per-thread, and used when entering a async library call to properly
 // group syscall_desc_t used during the processing of that async call
 extern async_desc_t* current_async_desc;
@@ -71,7 +75,7 @@ extern async_desc_pool_t async_desc_pool;
 // Finds a free async_desc_t, on which you can wait for a series of syscalls
 async_desc_t* get_async_desc(void);
 // Wait on all syscalls within this async call.  TODO - timeout or something?
-error_t waiton_async_call(async_desc_t* desc);
+error_t waiton_async_call(async_desc_t* desc, async_rsp_t* rsp);
 // Finds a free sys_desc_t, on which you can wait for a specific syscall, and
 // binds it to the group desc.
 syscall_desc_t* get_sys_desc(async_desc_t* desc);

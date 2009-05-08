@@ -71,6 +71,14 @@ error_t waiton_syscall(syscall_desc_t* desc, syscall_rsp_t* rsp)
 	return 0;
 }
 
+void sys_null_async(syscall_desc_t* desc)
+{
+	syscall_req_t syscall = {SYS_null, 0, {[0 ... (NUM_SYS_ARGS-1)] 0}};
+	desc->cleanup = NULL;
+	desc->data = NULL;
+	async_syscall(&syscall, desc);
+}
+
 void sys_cputs_async(const char *s, size_t len, syscall_desc_t* desc,
                      void (*cleanup_handler)(void*), void* cleanup_data)
 {

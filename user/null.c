@@ -4,6 +4,7 @@
 #include <inc/syscall.h>
 #include <inc/x86.h>
 #include <inc/measure.h>
+#include <inc/null.h>
 
 #ifdef __DEPUTY__
 #pragma nodeputy
@@ -28,7 +29,8 @@ void umain(void)
 	measure_function(asm volatile("nop;"), NUM_ITERATIONS, "nop");
 	//measure_function(cprintf("Reg Sync call  \n"), 10, "printf");
 	//measure_function_async(cprintf_async(&desc, "Cross-Core call\n"), desc, 10,\
-	                       1, "Async Printf");
+	//                       1, "Async Printf");
+	measure_async_call(null_async(&desc), desc, 10, 1, "Async Null");
 
 	// Spin to make sure we don't have any resources deallocated before done
 	while(1);

@@ -19,13 +19,13 @@ enum
 #define INVALID_SYSCALL(syscallno) ((syscallno) > NSYSCALLS)
 
 #define NUM_SYS_ARGS 6
-typedef struct SyscallRequest {
+typedef struct syscall_req {
 	uint32_t num;
 	uint32_t flags;
 	uint32_t args[NUM_SYS_ARGS];
 } syscall_req_t;
 
-typedef struct SyscallResponse {
+typedef struct syscall_rsp {
 	int32_t retval;
 } syscall_rsp_t;
 

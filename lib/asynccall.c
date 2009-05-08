@@ -11,13 +11,15 @@ async_desc_t* get_async_desc(void)
 	return desc;
 }
 
-error_t waiton_async_call(async_desc_t* desc)
+error_t waiton_async_call(async_desc_t* desc, async_rsp_t* rsp)
 {
-	syscall_rsp_t rsp;
+	// TODO: Fill in the rsp parameter passed in here with 
+	// something meaningful
+	syscall_rsp_t syscall_rsp;
 	syscall_desc_t* d;
 	while (!(LIST_EMPTY(&desc->syslist))) {
 		d = LIST_FIRST(&desc->syslist);
-		waiton_syscall(d, &rsp);
+		waiton_syscall(d, &syscall_rsp);
 		// consider processing the retval out of rsp here (TODO)
 		// remove from the list and free the syscall desc
 		LIST_REMOVE(d, next);
