@@ -127,7 +127,7 @@ idt_init(void)
 void
 (IN_HANDLER print_trapframe)(trapframe_t *tf)
 {
-	cprintf("TRAP frame at %p\n", tf);
+	cprintf("TRAP frame at %p on core %d\n", tf, lapic_get_id());
 	print_regs(&tf->tf_regs);
 	cprintf("  es   0x----%04x\n", tf->tf_es);
 	cprintf("  ds   0x----%04x\n", tf->tf_ds);
@@ -156,8 +156,9 @@ void
 static void
 (IN_HANDLER trap_dispatch)(trapframe_t *tf)
 {
-	// Handle processor exceptions.
+	env_t* curenv = curenvs[lapic_get_id()];
 
+	// Handle processor exceptions.
 	switch(tf->tf_trapno) {
 		case T_BRKPT:
 			while (1)
@@ -171,7 +172,7 @@ static void
 			// check for userspace, for now
 			assert(tf->tf_cs != GD_KT);
 			tf->tf_regs.reg_eax =
-				syscall(tf->tf_regs.reg_eax, tf->tf_regs.reg_edx,
+				syscall(curenv, tf->tf_regs.reg_eax, tf->tf_regs.reg_edx,
 				        tf->tf_regs.reg_ecx, tf->tf_regs.reg_ebx,
 				        tf->tf_regs.reg_edi, tf->tf_regs.reg_esi);
 			env_run(curenv);
@@ -182,6 +183,7 @@ static void
 			if (tf->tf_cs == GD_KT)
 				panic("Damn Damn!  Unhandled trap in the kernel!");
 			else {
+				warn("Unexpected trap from userspace");
 				env_destroy(curenv);
 				return;
 			}
@@ -194,6 +196,7 @@ void
 {
 	//cprintf("Incoming TRAP frame at %p\n", tf);
 
+	env_t* curenv = curenvs[lapic_get_id()];
 	if ((tf->tf_cs & ~3) != GD_UT && (tf->tf_cs & ~3) != GD_KT) {
 		print_trapframe(tf);
 		panic("Trapframe with invalid CS!");
@@ -201,6 +204,7 @@ void
 
 	if ((tf->tf_cs & 3) == 3) {
 		// Trapped from user mode.
+		// TODO: this will change when an env has more than one context
 		// Copy trap frame (which is currently on the stack)
 		// into 'curenv->env_tf', so that running the environment
 		// will restart at the trap point.
@@ -306,8 +310,9 @@ page_fault_handler(trapframe_t *tf)
 	// LAB 4: Your code here.
 
 	// Destroy the environment that caused the fault.
-	cprintf("[%08x] user fault va %08x ip %08x\n",
-		curenv->env_id, fault_va, tf->tf_eip);
+	env_t* curenv = curenvs[lapic_get_id()];
+	cprintf("[%08x] user fault va %08x ip %08x from core %d\n",
+		curenv->env_id, fault_va, tf->tf_eip, lapic_get_id());
 	print_trapframe(tf);
 	env_destroy(curenv);
 }

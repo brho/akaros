@@ -19,7 +19,11 @@
 #include <kern/smp.h>
 
 env_t *envs = NULL;		// All environments
-env_t *curenv = NULL;	        // The current env
+// TODO: make this a struct of info including the pointer and cacheline-align it
+// This lets the kernel know what process is running on the core it traps into.
+// A lot of the Env business, including this and its usage, will change when we
+// redesign the env as a multi-process.
+env_t* curenvs[MAX_NUM_CPUS] = {[0 ... (MAX_NUM_CPUS-1)] NULL};
 static env_list_t env_free_list;	// Free list
 
 #define ENVGENSHIFT	12		// >= LOGNENV
@@ -36,6 +40,7 @@ int
 envid2env(envid_t envid, env_t **env_store, bool checkperm)
 {
 	env_t *e;
+	env_t* curenv = curenvs[lapic_get_id()];
 
 	// If envid is zero, return the current environment.
 	if (envid == 0) {
@@ -242,6 +247,8 @@ env_alloc(env_t **newenv_store, envid_t parent_id)
 	// show them all of env, only specific things like PID, PPID, etc
 	memcpy(e->env_procinfo, e, sizeof(env_t));
 
+	env_t* curenv = curenvs[lapic_get_id()];
+
 	cprintf("[%08x] new env %08x\n", curenv ? curenv->env_id : 0, e->env_id);
 	return 0;
 }
@@ -405,6 +412,7 @@ env_free(env_t *e)
 	physaddr_t pa;
 
 	// Note the environment's demise.
+	env_t* curenv = curenvs[lapic_get_id()];
 	cprintf("[%08x] free env %08x\n", curenv ? curenv->env_id : 0, e->env_id);
 
 	// Flush all mapped pages in the user portion of the address space
@@ -517,8 +525,8 @@ env_run(env_t *e)
 	//	e->env_tf to sensible values.
 
 		// would set the curenv->env_status if we had more states
-	if (e != curenv) {
-		curenv = e;
+	if (e != curenvs[lapic_get_id()]) {
+		curenvs[lapic_get_id()] = e;
 		e->env_runs++;
 		lcr3(e->env_cr3);
 	}

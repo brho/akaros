@@ -1034,7 +1034,7 @@ user_mem_assert(env_t *env, const void *DANGEROUS va, size_t len, int perm)
     void *COUNT(len) res = user_mem_check(env,va,len,perm | PTE_U);
 	if (!res) {
 		cprintf("[%08x] user_mem_check assertion failure for "
-			"va %08x\n", curenv->env_id, user_mem_check_addr);
+			"va %08x\n", env->env_id, user_mem_check_addr);
 		env_destroy(env);	// may not return
         return NULL;
 	}

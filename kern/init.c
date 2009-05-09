@@ -80,34 +80,30 @@ void kernel_init(multiboot_info_t *mboot_info)
 	//ENV_CREATE(user_badsegment);
 	//ENV_CREATE(user_divzero);
 	//ENV_CREATE(user_buggyhello);
+	//ENV_CREATE(user_evilhello);
+	//ENV_CREATE(user_hello);
 	//ENV_CREATE(user_hello);
 	//ENV_CREATE(user_hello);
 	ENV_CREATE(user_null);
-	//ENV_CREATE(user_evilhello);
+	ENV_CREATE(user_null);
+	ENV_CREATE(user_null);
 
-	// We only have one user environment for now, so just run it.
 	//env_run(&envs[0]);
-	// run_env_handler just runs the first env, like the prev command
-	// need a way to have call_func to pass a pointer to a struct for arguments
 	smp_call_function_single(2, run_env_handler, &envs[0], 0);
-	//smp_call_function_single(4, run_env_handler, &envs[1], 0);
+	smp_call_function_single(4, run_env_handler, &envs[1], 0);
+	smp_call_function_single(6, run_env_handler, &envs[2], 0);
 
 	// wait 5 sec, then print what's in shared mem
 	udelay(5000000);
-	printk("Attempting to run two syscalls at the beginning of procdata for env 0 and 1:\n\n");
+	printk("Servicing syscalls from Core 0:\n\n");
 	while (1) {
 		process_generic_syscalls(&envs[0], 1);
-		//process_generic_syscalls(&envs[1], 1);
+		process_generic_syscalls(&envs[1], 1);
+		process_generic_syscalls(&envs[2], 1);
 		cpu_relax();
 	}
 	panic("Don't Panic");
 }
-
-/*
- * Variable panicstr contains argument to first call to panic; used as flag
- * to indicate that the kernel has already called panic.
- */
-static const char *NTS panicstr;
 
 /*
  * Panic is called on unresolvable fatal errors.
@@ -117,18 +113,18 @@ void _panic(const char *file, int line, const char *fmt,...)
 {
 	va_list ap;
 
-	if (panicstr)
-		goto dead;
-	panicstr = fmt;
-
 	va_start(ap, fmt);
-	cprintf("kernel panic at %s:%d: ", file, line);
+	cprintf("kernel panic at %s:%d, from core %d: ", file, line, lapic_get_id());
 	vcprintf(fmt, ap);
 	cprintf("\n");
 	va_end(ap);
 
 dead:
-	/* break into the kernel monitor */
+	/* break into the kernel monitor, if we're core 0 */
+	if (lapic_get_id()) {
+		smp_idle();
+		panic("should never see me");
+	}
 	while (1)
 		monitor(NULL);
 }
@@ -139,7 +135,7 @@ void _warn(const char *file, int line, const char *fmt,...)
 	va_list ap;
 
 	va_start(ap, fmt);
-	cprintf("kernel warning at %s:%d: ", file, line);
+	cprintf("kernel warning at %s:%d, from core %d: ", file, line, lapic_get_id());
 	vcprintf(fmt, ap);
 	cprintf("\n");
 	va_end(ap);
