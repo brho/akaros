@@ -30,7 +30,9 @@ void umain(void)
 	//measure_function(cprintf("Reg Sync call  \n"), 10, "printf");
 	//measure_function_async(cprintf_async(&desc, "Cross-Core call\n"), desc, 10,\
 	//                       1, "Async Printf");
-	measure_async_call(null_async(&desc), desc, 10, 1, "Async Null");
+	// Note this won't actually do 100 inner runs (first parameter).  will stop
+	// making calls beyond the ring size and won't wait on any extra calls.
+	measure_async_call(null_async(&desc), desc, 100, 100, "Async Null");
 
 	// Spin to make sure we don't have any resources deallocated before done
 	while(1);

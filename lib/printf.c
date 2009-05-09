@@ -81,14 +81,14 @@ static void cputs_async_cleanup(void* data)
 	POOL_PUT(&print_buf_pool, (printbuf_t*)data);
 }
 
+// TODO: its a little difficult to pass back an error through vprintfmt
 static void putch_async(int ch, printbuf_t **b)
 {
 	(*b)->buf[(*b)->idx++] = ch;
 	if ((*b)->idx == BUF_SIZE) {
-		// will need some way to track the result of the syscall
+		// TODO - should check for a return value for sys_ and get_sys
 		sys_cputs_async((*b)->buf, (*b)->idx, get_sys_desc(current_async_desc),
 		                cputs_async_cleanup, *b);
-		// TODO - this isn't getting passed back properly
 		// TODO - should check for a return value
 		*b = get_free_buffer();
 		(*b)->idx = 0;
@@ -98,16 +98,17 @@ static void putch_async(int ch, printbuf_t **b)
 
 static int vcprintf_async(const char *fmt, va_list ap)
 {
-	// start with an available buffer
+	// start with an available buffer.  TODO: check return value
 	printbuf_t* b = get_free_buffer();
 
 	b->idx = 0;
 	b->cnt = 0;
 	vprintfmt((void*)putch_async, (void**)&b, fmt, ap);
+	// TODO - should check for a return value for sys_
 	sys_cputs_async(b->buf, b->idx, get_sys_desc(current_async_desc),
 	                cputs_async_cleanup, b);
 
-	return b->cnt; // this is lying if we used more than one buffer
+	return b->cnt; // this is lying if we used more than one buffer (TODO)
 }
 
 int cprintf_async(async_desc_t** desc, const char *fmt, ...)
@@ -123,6 +124,7 @@ int cprintf_async(async_desc_t** desc, const char *fmt, ...)
 	}
 	// get a free async_desc for this async call, and save it in the per-thread
 	// tracking variable (current_async_desc).  then pass it back out.
+	// TODO: check return value, return error_t
 	current_async_desc = get_async_desc();
 	*desc = current_async_desc;
 	// This is the traditional (sync) cprintf code
@@ -130,6 +132,7 @@ int cprintf_async(async_desc_t** desc, const char *fmt, ...)
 	cnt = vcprintf_async(fmt, ap);
 	va_end(ap);
 
+	// TODO: return cnt via a parameter, and return an error_t?
 	return cnt;
 }
 

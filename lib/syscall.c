@@ -35,10 +35,12 @@ syscall(int num, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32_t a5
 	return ret;
 }
 
-static inline error_t async_syscall(syscall_req_t* req, syscall_desc_t* desc)
+static error_t async_syscall(syscall_req_t* req, syscall_desc_t* desc)
 {
 	// Note that this assumes one global frontring (TODO)
-	// spin til there is room for our request.  ring size is currently 64.
+	// abort if there is no room for our request.  ring size is currently 64.
+	// we could spin til it's free, but that could deadlock if this same thread
+	// is supposed to consume the requests it is waiting on later.
 	if (RING_FULL(&sysfrontring))
 		return E_BUSY;
 	// req_prod_pvt comes in as the previously produced item.  need to
@@ -58,7 +60,11 @@ static inline error_t async_syscall(syscall_req_t* req, syscall_desc_t* desc)
 // consider a timeout too
 error_t waiton_syscall(syscall_desc_t* desc, syscall_rsp_t* rsp)
 {
-	// this forces us to call wait in the order in which they are called
+	// Make sure we were given a desc with a non-NULL frontring.  This could
+	// happen if someone forgot to check the error code on the paired syscall.
+	if (!desc->sysfr)
+		return E_FAIL;
+	// this forces us to call wait in the order in which the syscalls are made.
 	if (desc->idx != desc->sysfr->rsp_cons + 1)
 		return E_DEADLOCK;
 	while (!(RING_HAS_UNCONSUMED_RESPONSES(desc->sysfr)))
@@ -71,22 +77,22 @@ error_t waiton_syscall(syscall_desc_t* desc, syscall_rsp_t* rsp)
 	return 0;
 }
 
-void sys_null_async(syscall_desc_t* desc)
+error_t sys_null_async(syscall_desc_t* desc)
 {
 	syscall_req_t syscall = {SYS_null, 0, {[0 ... (NUM_SYS_ARGS-1)] 0}};
 	desc->cleanup = NULL;
 	desc->data = NULL;
-	async_syscall(&syscall, desc);
+	return async_syscall(&syscall, desc);
 }
 
-void sys_cputs_async(const char *s, size_t len, syscall_desc_t* desc,
+error_t sys_cputs_async(const char *s, size_t len, syscall_desc_t* desc,
                      void (*cleanup_handler)(void*), void* cleanup_data)
 {
 	// could just hardcode 4 0's, will eventually wrap this marshaller anyway
 	syscall_req_t syscall = {SYS_cputs, 0, {(uint32_t)s, len, [2 ... (NUM_SYS_ARGS-1)] 0} };
 	desc->cleanup = cleanup_handler;
 	desc->data = cleanup_data;
-	async_syscall(&syscall, desc);
+	return async_syscall(&syscall, desc);
 }
 
 void sys_null()

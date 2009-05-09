@@ -37,9 +37,9 @@ char*	readline(const char *buf);
 
 // syscall.c
 void sys_null();
-void sys_null_async(syscall_desc_t* desc);
+error_t sys_null_async(syscall_desc_t* desc);
 void sys_cputs(const char *string, size_t len);
-void sys_cputs_async(const char *s, size_t len, syscall_desc_t* desc,
+error_t sys_cputs_async(const char *s, size_t len, syscall_desc_t* desc,
                      void (*cleanup_handler)(void*), void* cleanup_data);
 int	sys_cgetc(void);
 envid_t	sys_getenvid(void);

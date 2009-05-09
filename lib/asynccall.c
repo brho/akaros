@@ -15,9 +15,12 @@ error_t waiton_async_call(async_desc_t* desc, async_rsp_t* rsp)
 {
 	syscall_rsp_t syscall_rsp;
 	syscall_desc_t* d;
+	error_t err = 0;
+	if (!desc)
+		return -E_INVAL;
 	while (!(LIST_EMPTY(&desc->syslist))) {
 		d = LIST_FIRST(&desc->syslist);
-		waiton_syscall(d, &syscall_rsp);
+		err = MIN(waiton_syscall(d, &syscall_rsp), err);
 		// TODO: processing the retval out of rsp here.  might be specific to
 		// the async call.  do we want to accumulate?  return any negative
 		// values?  depends what we want from the return value, so we might
@@ -34,7 +37,7 @@ error_t waiton_async_call(async_desc_t* desc, async_rsp_t* rsp)
 		desc->cleanup(desc->data);
 	// free the asynccall desc
 	POOL_PUT(&async_desc_pool, desc);
-	return 0;
+	return err;
 }
 
 syscall_desc_t* get_sys_desc(async_desc_t* desc)

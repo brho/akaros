@@ -11,9 +11,10 @@ void null()
 	sys_null();
 }
 
-void null_async(async_desc_t** desc)
+error_t null_async(async_desc_t** desc)
 {
-	current_async_desc = get_async_desc();
+	if ((current_async_desc = get_async_desc()) == NULL)
+		return E_BUSY;
 	*desc = current_async_desc;
-	sys_null_async(get_sys_desc(current_async_desc));
+	return sys_null_async(get_sys_desc(current_async_desc));
 }

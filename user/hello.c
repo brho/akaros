@@ -1,4 +1,3 @@
-// hello, world
 #include <inc/lib.h>
 
 #ifdef __DEPUTY__
@@ -8,17 +7,11 @@
 void umain(void)
 {
 	cprintf("goodbye, world!\n");
-	// this is just their way of generating a pagefault..., until now!
 	cprintf("i am environment %08x\n", env->env_id);
 
-	// async via shared mem
 	cprintf("about to write to shared mem.  hope it gets printed.  blimey! \n");
-	// note that when using the cprintf family, we can't currently call again,
-	// since the library functions use the same buffer.  the last used string
-	// will be the one printed when the syscall is serviced, regardless of
-	// whether the actual syscall can handle multiples in flight.
 	async_desc_t *desc1, *desc2, *desc3;
-	async_desc_t rsp1, rsp2, rsp3;
+	async_rsp_t rsp1, rsp2, rsp3;
 	cprintf_async(&desc1, "Cross-Core call 1, coming from env %08x\n", env->env_id);
 	cprintf("Call 1 is sent!\n");
 	//cprintf_async(&desc2, "Cross-Core call 2, coming from env %08x\n", env->env_id);
@@ -34,6 +27,4 @@ void umain(void)
 	// might as well spin, just to make sure nothing gets deallocated
 	// while we're waiting to test the async call
 	while (1);
-
-	//check that my shit is done
 }
