@@ -13,14 +13,18 @@ async_desc_t* get_async_desc(void)
 
 error_t waiton_async_call(async_desc_t* desc, async_rsp_t* rsp)
 {
-	// TODO: Fill in the rsp parameter passed in here with 
-	// something meaningful
 	syscall_rsp_t syscall_rsp;
 	syscall_desc_t* d;
 	while (!(LIST_EMPTY(&desc->syslist))) {
 		d = LIST_FIRST(&desc->syslist);
 		waiton_syscall(d, &syscall_rsp);
-		// consider processing the retval out of rsp here (TODO)
+		// TODO: processing the retval out of rsp here.  might be specific to
+		// the async call.  do we want to accumulate?  return any negative
+		// values?  depends what we want from the return value, so we might
+		// have to pass in a function that is used to do the processing and
+		// pass the answer back out in rsp.
+		//rsp->retval += syscall_rsp.retval; // For example
+		rsp->retval = MIN(rsp->retval, syscall_rsp.retval);
 		// remove from the list and free the syscall desc
 		LIST_REMOVE(d, next);
 		POOL_PUT(&syscall_desc_pool, d);

@@ -33,7 +33,8 @@
 	uint64_t ticks;                                                            \
 	_desc_type* desc_array[i_iters];                                           \
 	_desc_type* desc_name;                                                     \
-	_rsp_type* rsp;                                                            \
+	/* Could use an array of rsps, but we're throwing away the responses*/     \
+	_rsp_type rsp;                                                             \
 	cpuid(0, 0, 0, 0, 0);                                                      \
 	ticks = read_tsc();                                                        \
 	/* Run this a bunch of times to make sure its accurate */                  \
@@ -43,7 +44,7 @@
 			desc_array[j] = desc_name;                                         \
 		}                                                                      \
 		for (int j = 0; j < (i_iters); j++) {                                  \
-			wait_func(desc_array[j], rsp);                                     \
+			wait_func(desc_array[j], &rsp);                                    \
 		}                                                                      \
 	}                                                                          \
 	cpuid(0, 0, 0, 0, 0);                                                      \

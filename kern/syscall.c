@@ -80,8 +80,8 @@ sys_env_destroy(envid_t envid)
 
 
 // Dispatches to the correct kernel function, passing the arguments.
-uint32_t
-syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32_t a5)
+int32_t syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3,
+                uint32_t a4, uint32_t a5)
 {
 	// Call the function corresponding to the 'syscallno' parameter.
 	// Return any appropriate return value.
@@ -97,7 +97,7 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 			return 0;
 		case SYS_cputs:
 			sys_cputs((char *DANGEROUS)a1, (size_t)a2);
-			return 0;
+			return 0;  // would rather have this return the number of chars put.
 		case SYS_cgetc:
 			return sys_cgetc();
 		case SYS_getenvid:
@@ -111,7 +111,7 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 	return 0xdeadbeef;
 }
 
-uint32_t syscall_async(syscall_req_t *call)
+int32_t syscall_async(syscall_req_t *call)
 {
 	return syscall(call->num, call->args[0], call->args[1],
 	               call->args[2], call->args[3], call->args[4]);
@@ -121,6 +121,11 @@ uint32_t process_generic_syscalls(env_t* e, uint32_t max)
 {
 	uint32_t count = 0;
 	syscall_back_ring_t* sysbr = &e->env_sysbackring;
+
+	// make sure the env is still alive.  TODO: this cannot handle an env being
+	// freed async while this is processing.  (need a ref count or lock, etc).
+	if (e->env_status == ENV_FREE)
+		return 0;
 
 	// need to switch to the right context, so we can handle the user pointer
 	// that points to a data payload of the syscall
