@@ -58,10 +58,10 @@ void kernel_init(multiboot_info_t *mboot_info)
 
 	env_init();
 	idt_init();
+	sysenter_init();
 	timer_init();
 	// this returns when all other cores are done and ready to receive IPIs
 	smp_boot();
-
 	/*
 	test_smp_call_functions();
 	test_checklists();
@@ -81,11 +81,16 @@ void kernel_init(multiboot_info_t *mboot_info)
 	//ENV_CREATE(user_divzero);
 	//ENV_CREATE(user_buggyhello);
 	//ENV_CREATE(user_evilhello);
+	ENV_CREATE(user_hello);
 	//ENV_CREATE(user_hello);
 	//ENV_CREATE(user_hello);
 	//ENV_CREATE(user_hello);
 	//ENV_CREATE(user_null);
 	//ENV_CREATE(user_null);
+	env_run(&envs[0]);
+	panic("Don't Panic");
+	// ENV_CREATE(user_null);
+	/*ENV_CREATE(user_null);
 	ENV_CREATE(user_null);
 
 	//env_run(&envs[0]);
@@ -103,6 +108,7 @@ void kernel_init(multiboot_info_t *mboot_info)
 		cpu_relax();
 	}
 	panic("Don't Panic");
+	*/
 }
 
 /*

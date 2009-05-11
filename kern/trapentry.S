@@ -176,3 +176,24 @@ _allirqs:
 	popl %ds
 	addl $0x8, %esp			# skip IRQ number and err (which is 0)
 	iret
+
+.globl sysenter_handler;
+.type sysenter_handler, @function;
+sysenter_handler:
+    cld
+	pushl %ds
+    pushl %es
+    pushal
+    movw $GD_KD, %ax
+    movw %ax, %ds
+    movw %ax, %es
+    pushl %esp
+	movl $0, %ebp			# so we can backtrace to this point
+    call syscall_wrapper
+    popl %esp
+    popal
+    popl %es
+    popl %ds
+    movl %ebp, %ecx
+    movl %esi, %edx
+    sysexit

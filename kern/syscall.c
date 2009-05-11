@@ -13,6 +13,23 @@
 #include <kern/trap.h>
 #include <kern/syscall.h>
 #include <kern/console.h>
+#include <kern/apic.h>
+
+
+void syscall_wrapper(struct Trapframe *tf)
+{
+	env_t* curenv = curenvs[lapic_get_id()];
+    curenv->env_tf = *tf;
+    tf->tf_regs.reg_eax =
+        syscall(curenv,
+				tf->tf_regs.reg_eax,
+                tf->tf_regs.reg_edx,
+                tf->tf_regs.reg_ecx,
+                tf->tf_regs.reg_ebx,
+                tf->tf_regs.reg_edi,
+				0);
+    return;
+}
 
 //Do absolutely nothing.  Used for profiling.
 static void sys_null(env_t* e)
@@ -95,7 +112,7 @@ sys_env_destroy(env_t* e, envid_t envid)
 }
 
 
-
+// TODO: Build a dispatch table instead of switching on the syscallno
 // Dispatches to the correct kernel function, passing the arguments.
 int32_t syscall(env_t* e, uint32_t syscallno, uint32_t a1, uint32_t a2,
                 uint32_t a3, uint32_t a4, uint32_t a5)

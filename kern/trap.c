@@ -15,7 +15,7 @@
 #include <kern/apic.h>
 #include <kern/smp.h>
 
-static taskstate_t ts;
+taskstate_t ts;
 
 /* Interrupt descriptor table.  (Must be built at run time because
  * shifted function addresses can't be represented in relocation records.)
@@ -316,4 +316,10 @@ page_fault_handler(trapframe_t *tf)
 	print_trapframe(tf);
 	env_destroy(curenv);
 }
-
+extern void sysenter_handler();
+void sysenter_init(void)
+{
+	write_msr(MSR_IA32_SYSENTER_CS, GD_KT);
+	write_msr(MSR_IA32_SYSENTER_ESP, ts.ts_esp0);
+	write_msr(MSR_IA32_SYSENTER_EIP, (uint32_t) &sysenter_handler);
+}

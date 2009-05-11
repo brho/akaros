@@ -71,7 +71,7 @@ PERL	:= perl
 # Compiler flags
 # -fno-builtin is required to avoid refs to undefined functions in the kernel.
 # Only optimize to -O1 to discourage inlining, which complicates backtraces.
-CFLAGS	:= $(CFLAGS) $(DEFS) $(LABDEFS) -D$(ARCH) -O -fno-builtin -fno-stack-protector -I$(TOP) -MD -Wall -Wno-format -Wno-unused -gstabs
+CFLAGS	:= $(CFLAGS) $(DEFS) $(LABDEFS) -D$(ARCH) -O -fno-builtin -fno-stack-protector -I$(TOP) -MD -Wall -Wno-format -Wno-unused -gstabs #-save-temps
 
 # 64 Bit machines need these settings to compile and link
 UNAME=$(shell uname -m)

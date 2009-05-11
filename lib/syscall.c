@@ -7,6 +7,42 @@
 static inline uint32_t
 syscall(int num, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32_t a5)
 {
+	#ifndef SYSCALL_TRAP
+	return syscall_sysenter(num, a1, a2, a3, a4, a5);
+	#else
+	return syscall_trap(num, a1, a2, a3, a4, a5);
+	#endif
+}
+// TODO: modify to take only four parameters
+static uint32_t
+syscall_sysenter(int num, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32_t a5)
+{
+	uint32_t ret;
+    asm volatile(
+            //"pushl %%ecx\n\t"
+            //"pushl %%edx\n\t"
+            "pushl %%ebp\n\t"
+			"pushl %%esi\n\t"
+            "movl %%esp, %%ebp\n\t"
+            "leal after_sysenter, %%esi\n\t"
+            "sysenter\n\t"
+            "after_sysenter:\n\t"
+			"popl %%esi\n\t"
+            "popl %%ebp\n\t"
+            //"popl %%edx\n\t"
+            //"popl %%ecx"
+            :"=a" (ret)
+            : "a" (num),
+                "d" (a1),
+                "c" (a2),
+                "b" (a3),
+                "D" (a4)
+        : "cc", "memory", "%esp");
+	return ret;
+}
+static inline uint32_t
+syscall_trap(int num, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32_t a5)
+{
 	uint32_t ret;
 
 	// Generic system call: pass system call number in AX,
@@ -120,7 +156,7 @@ void sys_null()
 void
 sys_cputs(const char *s, size_t len)
 {
-	syscall(SYS_cputs, (uint32_t) s, len, 0, 0, 0);
+	syscall(SYS_cputs, (uint32_t) s,  len, 0, 0, 0);
 }
 
 int
