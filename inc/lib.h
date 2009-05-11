@@ -38,6 +38,9 @@ char*	readline(const char *buf);
 // syscall.c
 void sys_null();
 error_t sys_null_async(syscall_desc_t* desc);
+void sys_cache_buster(uint32_t num_writes, uint32_t val);
+error_t sys_cache_buster_async(syscall_desc_t* desc, uint32_t num_writes,
+                               uint32_t val);
 void sys_cputs(const char *string, size_t len);
 error_t sys_cputs_async(const char *s, size_t len, syscall_desc_t* desc,
                      void (*cleanup_handler)(void*), void* cleanup_data);
@@ -55,9 +58,13 @@ typedef struct async_desc {
 	void (*cleanup)(void* data);
 	void* data;
 } async_desc_t;
+
+// Response to an async call.  Should be some sort of aggregation of the
+// syscall responses.
 typedef struct async_rsp_t {
 	int32_t retval;
 } async_rsp_t;
+
 // This is per-thread, and used when entering a async library call to properly
 // group syscall_desc_t used during the processing of that async call
 extern async_desc_t* current_async_desc;
@@ -65,20 +72,18 @@ extern async_desc_t* current_async_desc;
 #include <inc/stdio.h>
 #include <inc/assert.h>
 
-
 // This pooltype contains syscall_desc_t, which is how you wait on one syscall.
 POOL_TYPE_DEFINE(syscall_desc_t, syscall_desc_pool, MAX_SYSCALLS);
 POOL_TYPE_DEFINE(async_desc_t, async_desc_pool, MAX_ASYNCCALLS);
+
 // These are declared in libmain.c
 extern syscall_desc_pool_t syscall_desc_pool;
 extern async_desc_pool_t async_desc_pool;
-// Finds a free async_desc_t, on which you can wait for a series of syscalls
-async_desc_t* get_async_desc(void);
-// Wait on all syscalls within this async call.  TODO - timeout or something?
+
 error_t waiton_async_call(async_desc_t* desc, async_rsp_t* rsp);
-// Finds a free sys_desc_t, on which you can wait for a specific syscall, and
-// binds it to the group desc.
+async_desc_t* get_async_desc(void);
 syscall_desc_t* get_sys_desc(async_desc_t* desc);
+error_t get_all_desc(async_desc_t** a_desc, syscall_desc_t** s_desc);
 
 
 /* File open modes */

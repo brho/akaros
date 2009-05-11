@@ -25,7 +25,13 @@ uint64_t total(uint64_t (COUNT(length) array)[], int length)
 
 void umain(void)
 {
-	measure_function(sys_null(), NUM_ITERATIONS, "sys_null");
+	async_desc_t *desc1, *desc2;
+	async_rsp_t rsp1, rsp2;
+	cache_buster_async(&desc1, 20, 0xdeadbeef);
+	cache_buster_async(&desc2, 10, 0xcafebabe);
+	waiton_async_call(desc1, &rsp1);
+	waiton_async_call(desc2, &rsp2);
+	//measure_function(sys_null(), NUM_ITERATIONS, "sys_null");
 	//measure_function(asm volatile("nop;"), NUM_ITERATIONS, "nop");
 	//measure_function(cprintf("Reg Sync call  \n"), 10, "printf");
 	//measure_function_async(cprintf_async(&desc, "Cross-Core call\n"), desc, 10,\

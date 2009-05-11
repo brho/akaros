@@ -2,15 +2,7 @@
 #include <inc/syscall.h>
 #include <inc/queue.h>
 
-async_desc_t* get_async_desc(void)
-{
-	async_desc_t* desc = POOL_GET(&async_desc_pool);
-	if (desc)
-		// Clear out any data that was in the old desc
-		memset(desc, 0, sizeof(*desc));
-	return desc;
-}
-
+// Wait on all syscalls within this async call.  TODO - timeout or something?
 error_t waiton_async_call(async_desc_t* desc, async_rsp_t* rsp)
 {
 	syscall_rsp_t syscall_rsp;
@@ -40,6 +32,18 @@ error_t waiton_async_call(async_desc_t* desc, async_rsp_t* rsp)
 	return err;
 }
 
+// Finds a free async_desc_t, on which you can wait for a series of syscalls
+async_desc_t* get_async_desc(void)
+{
+	async_desc_t* desc = POOL_GET(&async_desc_pool);
+	if (desc)
+		// Clear out any data that was in the old desc
+		memset(desc, 0, sizeof(*desc));
+	return desc;
+}
+
+// Finds a free sys_desc_t, on which you can wait for a specific syscall, and
+// binds it to the group desc.
 syscall_desc_t* get_sys_desc(async_desc_t* desc)
 {
 	syscall_desc_t* d = POOL_GET(&syscall_desc_pool);
@@ -49,4 +53,21 @@ syscall_desc_t* get_sys_desc(async_desc_t* desc)
     	LIST_INSERT_TAIL(&desc->syslist, d, next);
 	}
 	return d;
+}
+
+// Gets an async and a sys desc, with the sys bound to async.  Also sets
+// current_async_desc.  This is meant as an easy wrapper when there is only one
+// syscall for an async call.
+error_t get_all_desc(async_desc_t** a_desc, syscall_desc_t** s_desc)
+{
+	assert(a_desc && s_desc);
+	if ((current_async_desc = get_async_desc()) == NULL)
+		return E_BUSY;
+	*a_desc = current_async_desc;
+	if (*s_desc = get_sys_desc(current_async_desc))
+		return 0;
+	// in case we could get an async, but not a syscall desc, then clean up.
+	POOL_PUT(&async_desc_pool, current_async_desc);
+	current_async_desc = NULL;
+	return E_BUSY;
 }

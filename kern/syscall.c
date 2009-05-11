@@ -20,6 +20,23 @@ static void sys_null(env_t* e)
 	return;
 }
 
+// Writes 'val' to 'num_writes' entries of the well-known array in the kernel
+// address space.  It's just #defined to be some random 4MB chunk (which ought
+// to be boot_alloced or something).  Meant to grab exclusive access to cache
+// lines, to simulate doing something useful.
+static void sys_cache_buster(env_t* e, uint32_t num_writes, uint32_t val)
+{
+	#define BUSTER_ADDR 0xd0000000
+	#define MAX_WRITES 1048576
+	uint32_t* buster = (uint32_t*)BUSTER_ADDR;
+	static uint32_t buster_lock = 0;
+	
+	spin_lock(&buster_lock);
+	for (int i = 0; i < MIN(num_writes, MAX_WRITES); i++)
+		buster[i] = val;
+	spin_unlock(&buster_lock);
+}
+
 // Print a string to the system console.
 // The string is exactly 'len' characters long.
 // Destroys the environment on memory errors.
@@ -95,6 +112,9 @@ int32_t syscall(env_t* e, uint32_t syscallno, uint32_t a1, uint32_t a2,
 	switch (syscallno) {
 		case SYS_null:
 			sys_null(e);
+			return 0;
+		case SYS_cache_buster:
+			sys_cache_buster(e, a1, a2);
 			return 0;
 		case SYS_cputs:
 			sys_cputs(e, (char *DANGEROUS)a1, (size_t)a2);

@@ -9,6 +9,7 @@
 enum
 {
 	SYS_null = 1,
+	SYS_cache_buster,
 	SYS_cputs,
 	SYS_cgetc,
 	SYS_getenvid,

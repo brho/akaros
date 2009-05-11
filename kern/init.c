@@ -84,22 +84,22 @@ void kernel_init(multiboot_info_t *mboot_info)
 	//ENV_CREATE(user_hello);
 	//ENV_CREATE(user_hello);
 	//ENV_CREATE(user_hello);
-	ENV_CREATE(user_null);
-	ENV_CREATE(user_null);
+	//ENV_CREATE(user_null);
+	//ENV_CREATE(user_null);
 	ENV_CREATE(user_null);
 
 	//env_run(&envs[0]);
 	smp_call_function_single(2, run_env_handler, &envs[0], 0);
-	smp_call_function_single(4, run_env_handler, &envs[1], 0);
-	smp_call_function_single(6, run_env_handler, &envs[2], 0);
+	//smp_call_function_single(4, run_env_handler, &envs[1], 0);
+	//smp_call_function_single(6, run_env_handler, &envs[2], 0);
 
 	// wait 5 sec, then print what's in shared mem
 	udelay(5000000);
 	printk("Servicing syscalls from Core 0:\n\n");
 	while (1) {
 		process_generic_syscalls(&envs[0], 1);
-		process_generic_syscalls(&envs[1], 1);
-		process_generic_syscalls(&envs[2], 1);
+		//process_generic_syscalls(&envs[1], 1);
+		//process_generic_syscalls(&envs[2], 1);
 		cpu_relax();
 	}
 	panic("Don't Panic");
