@@ -33,5 +33,5 @@ void (IN_HANDLER page_fault_handler)(trapframe_t *tf);
 void backtrace(trapframe_t *tf);
 
 void sysenter_init(void);
-
+extern void sysenter_handler();
 #endif /* ROS_KERN_TRAP_H */

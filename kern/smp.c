@@ -14,6 +14,7 @@
 #include <kern/env.h>
 #include <kern/apic.h>
 #include <kern/atomic.h>
+#include <kern/trap.h>
 
 volatile uint8_t num_cpus = 0xee;
 uintptr_t smp_stack_top;
@@ -170,6 +171,11 @@ uint32_t smp_main(void)
 	// Won't actually start using this stack til our first interrupt
 	// (issues with changing the stack pointer and then trying to "return")
 	uintptr_t my_stack_top = (uintptr_t)my_ts;
+	
+	// Set up MSR for SYSENTER 
+	write_msr(MSR_IA32_SYSENTER_CS, GD_KT);
+	write_msr(MSR_IA32_SYSENTER_ESP, my_stack_top);
+	write_msr(MSR_IA32_SYSENTER_EIP, (uint32_t) &sysenter_handler);
 
 	// Build and load the gdt / gdt_pd
 	memcpy(my_gdt, gdt, sizeof(segdesc_t)*SEG_COUNT);

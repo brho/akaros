@@ -316,7 +316,6 @@ page_fault_handler(trapframe_t *tf)
 	print_trapframe(tf);
 	env_destroy(curenv);
 }
-extern void sysenter_handler();
 void sysenter_init(void)
 {
 	write_msr(MSR_IA32_SYSENTER_CS, GD_KT);
