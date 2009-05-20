@@ -79,8 +79,14 @@
 #define TIMER_CNTR2 (IO_TIMER1 + TIMER_REG_CNTR2)
 #define TIMER_MODE  (IO_TIMER1 + TIMER_REG_MODE)
 
-extern uint64_t tsc_freq;
-extern uint64_t bus_freq;
+typedef struct system_timing {
+	uint64_t tsc_freq;
+	uint64_t bus_freq;
+	uint16_t pit_divisor;
+	uint8_t pit_mode;
+} system_timing_t;
+
+extern system_timing_t system_timing;
 
 void pic_remap(void);
 void pic_mask_irq(uint8_t irq);

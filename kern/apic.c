@@ -9,8 +9,7 @@
 
 #include <kern/apic.h>
 
-uint64_t tsc_freq = 0;
-uint64_t bus_freq = 0;
+system_timing_t system_timing = {0, 0, 0xffff, 0};
 
 /*
  * Remaps the Programmable Interrupt Controller to use IRQs 32-47
@@ -97,17 +96,17 @@ void timer_init(void){
 	tscval[0] = read_tsc();
 	udelay_pit(1000000);
 	tscval[1] = read_tsc();
-	tsc_freq = tscval[1] - tscval[0];
+	system_timing.tsc_freq = tscval[1] - tscval[0];
 	
-	cprintf("tsc_freq %lu\n", tsc_freq);
+	cprintf("TSC Frequency: %llu\n", system_timing.tsc_freq);
 	
 	lapic_set_timer(1000000000,0xeb, TRUE);
 	timercount[0] = read_mmreg32(LAPIC_TIMER_CURRENT);
 	udelay_pit(1000000);
 	timercount[1] = read_mmreg32(LAPIC_TIMER_CURRENT);
-	bus_freq = (timercount[0] - timercount[1])*128;
+	system_timing.bus_freq = (timercount[0] - timercount[1])*128;
 		
-	cprintf("bus_freq %u\n", bus_freq);
+	cprintf("Bus Frequency: %llu\n", system_timing.bus_freq);
 	
 }
 
@@ -119,6 +118,8 @@ void pit_set_timer(uint32_t divisor, uint32_t mode)
 	outb(TIMER_MODE, mode); 
 	outb(TIMER_CNTR0, divisor & 0xff);
 	outb(TIMER_CNTR0, (divisor >> 8) );
+	system_timing.pit_mode = mode;
+	system_timing.pit_divisor = divisor;
 	// cprintf("timer mode set to %d, divisor %d\n",mode, divisor);
 }
 
@@ -140,12 +141,12 @@ static int getpit()
 void udelay(uint64_t usec)
 {
 	#if !defined(__BOCHS__)
-	if (tsc_freq != 0)
+	if (system_timing.tsc_freq != 0)
 	{
 		uint64_t start, end, now;
 
 		start = read_tsc();
-        end = start + (tsc_freq * usec) / 1000000;
+        end = start + (system_timing.tsc_freq * usec) / 1000000;
         //cprintf("start %llu, end %llu\n", start, end);
 		if (end == 0) cprintf("This is terribly wrong \n");
 		do {
@@ -192,7 +193,7 @@ void udelay_pit(uint64_t usec)
 		prev_tick = tick;
 		if (delta < 0) {
 			// counter looped around during the delta time period
-			delta += 0xffff; // maximum count 
+			delta += system_timing.pit_divisor; // maximum count 
 			if (delta < 0)
 				delta = 0;
 		}
@@ -207,6 +208,6 @@ uint64_t gettimer(void)
 
 uint64_t getfreq(void)
 {
-	return tsc_freq;
+	return system_timing.tsc_freq;
 }
 

@@ -470,7 +470,7 @@ void test_pit(void)
 	
 	cprintf("Starting test for LAPIC (if stable) now (10s)\n");
 	enable_irq();
-	lapic_set_timer(10* bus_freq/128, test_vector, TRUE);
+	lapic_set_timer(10* system_timing.bus_freq/128, test_vector, TRUE);
 	
 	uint32_t waiting = 1;
 	register_interrupt_handler(interrupt_handlers, test_vector,
