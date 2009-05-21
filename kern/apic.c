@@ -58,25 +58,29 @@ void pic_unmask_irq(uint8_t irq)
 
 /*
  * Sets the LAPIC timer to go off after a certain number of ticks.  The primary
- * clock freq is actually the bus clock, so we really will need to figure out
- * the timing of the LAPIC timer via other timing.  For now, set it to a
- * certain number of ticks, and specify an interrupt vector to send to the CPU.
+ * clock freq is actually the bus clock, which we figure out during timer_init
  * Unmasking is implied.  Ref SDM, 3A, 9.6.4
  */
-void lapic_set_timer(uint32_t ticks, uint8_t vector, bool periodic)
+void __lapic_set_timer(uint32_t ticks, uint8_t vec, bool periodic, uint8_t div)
 {
-	//needs to read LAPIC_TIMER_DIVIDE before writing
-	uint32_t orig_divider = read_mmreg32(LAPIC_TIMER_DIVIDE);
-	// divide the bus clock.  going with the max (128) for now (which is slow)
-	// clears bottom bit and then set divider to be 128
-	write_mmreg32(LAPIC_TIMER_DIVIDE, (orig_divider & ~0x1111) | 0xa);
+	// clears bottom bit and then set divider
+	write_mmreg32(LAPIC_TIMER_DIVIDE, (read_mmreg32(LAPIC_TIMER_DIVIDE) &~0xf) |
+	              (div & 0xf));
 	// set LVT with interrupt handling information
-	write_mmreg32(LAPIC_LVT_TIMER, vector | (periodic << 17));
+	write_mmreg32(LAPIC_LVT_TIMER, vec | (periodic << 17));
 	write_mmreg32(LAPIC_TIMER_INIT, ticks);
 	// For debugging when we expand this
 	//cprintf("LAPIC LVT Timer: 0x%08x\n", read_mmreg32(LAPIC_LVT_TIMER));
 	//cprintf("LAPIC Init Count: 0x%08x\n", read_mmreg32(LAPIC_TIMER_INIT));
 	//cprintf("LAPIC Current Count: 0x%08x\n", read_mmreg32(LAPIC_TIMER_CURRENT));
+}
+
+void lapic_set_timer(uint32_t usec, bool periodic)
+{
+	// divide the bus clock by 128, which is the max.
+	uint32_t ticks = (usec * system_timing.bus_freq / 128) / 1000000;
+	__lapic_set_timer(ticks, LAPIC_TIMER_DEFAULT_VECTOR, periodic,
+	                  LAPIC_TIMER_DEFAULT_DIVISOR);
 }
 
 uint32_t lapic_get_default_id(void)
@@ -99,15 +103,17 @@ void timer_init(void){
 	system_timing.tsc_freq = tscval[1] - tscval[0];
 	
 	cprintf("TSC Frequency: %llu\n", system_timing.tsc_freq);
-	
-	lapic_set_timer(1000000000,0xeb, TRUE);
+
+	__lapic_set_timer(0xffffffff, LAPIC_TIMER_DEFAULT_VECTOR, FALSE,
+	                  LAPIC_TIMER_DEFAULT_DIVISOR);
+	// Mask the LAPIC Timer, so we never receive this interrupt (minor race)
+	mask_lapic_lvt(LAPIC_LVT_TIMER);
 	timercount[0] = read_mmreg32(LAPIC_TIMER_CURRENT);
 	udelay_pit(1000000);
 	timercount[1] = read_mmreg32(LAPIC_TIMER_CURRENT);
 	system_timing.bus_freq = (timercount[0] - timercount[1])*128;
 		
 	cprintf("Bus Frequency: %llu\n", system_timing.bus_freq);
-	
 }
 
 void pit_set_timer(uint32_t divisor, uint32_t mode)

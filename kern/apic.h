@@ -44,6 +44,8 @@
 #define LAPIC_TIMER_INIT			(LAPIC_BASE + 0x380)
 #define LAPIC_TIMER_CURRENT			(LAPIC_BASE + 0x390)
 #define LAPIC_TIMER_DIVIDE			(LAPIC_BASE + 0x3e0)
+#define LAPIC_TIMER_DEFAULT_VECTOR	0xeb
+#define LAPIC_TIMER_DEFAULT_DIVISOR	0xa // This is 128.  Ref SDM 3.a 9.6.4
 // IPI Interrupt Command Register
 #define LAPIC_IPI_ICR_LOWER			(LAPIC_BASE + 0x300)
 #define LAPIC_IPI_ICR_UPPER			(LAPIC_BASE + 0x310)
@@ -91,20 +93,17 @@ extern system_timing_t system_timing;
 void pic_remap(void);
 void pic_mask_irq(uint8_t irq);
 void pic_unmask_irq(uint8_t irq);
-void lapic_set_timer(uint32_t ticks, uint8_t vector, bool periodic);
+void __lapic_set_timer(uint32_t ticks, uint8_t vec, bool periodic, uint8_t div);
+void lapic_set_timer(uint32_t usec, bool periodic);
 uint32_t lapic_get_default_id(void);
 // PIT related
 void pit_set_timer(uint32_t freq, uint32_t mode);
 void timer_init(void);
 void udelay(uint64_t usec);
+void udelay_pit(uint64_t usec);
 // TODO: right now timer defaults to TSC
 uint64_t gettimer(void);
 uint64_t inline getfreq(void);
-
-
-static int getpit(void);
-static inline void udelay_pit(uint64_t usec);
-
 
 static inline void pic_send_eoi(uint32_t irq);
 static inline void lapic_send_eoi(void);

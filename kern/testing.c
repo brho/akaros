@@ -462,7 +462,7 @@ static void test_waiting_handler(trapframe_t *tf, void* data)
 void test_pit(void)
 {
 	cprintf("Starting test for PIT now (10s)\n");
-	udelay(10000000);
+	udelay_pit(10000000);
 	cprintf("End now\n");
 	cprintf("Starting test for TSC (if stable) now (10s)\n");
 	udelay(10000000);
@@ -470,7 +470,7 @@ void test_pit(void)
 	
 	cprintf("Starting test for LAPIC (if stable) now (10s)\n");
 	enable_irq();
-	lapic_set_timer(10* system_timing.bus_freq/128, test_vector, TRUE);
+	lapic_set_timer(10000000, FALSE);
 	
 	uint32_t waiting = 1;
 	register_interrupt_handler(interrupt_handlers, test_vector,
