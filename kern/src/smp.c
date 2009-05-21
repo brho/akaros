@@ -17,6 +17,7 @@
 
 volatile uint8_t num_cpus = 0xee;
 uintptr_t smp_stack_top;
+per_cpu_info_t per_cpu_info[MAX_NUM_CPUS];
 
 /*************************** IPI Wrapper Stuff ********************************/
 // checklists to protect the global interrupt_handlers for 0xf0, f1, f2, f3, f4
@@ -209,12 +210,18 @@ uint32_t smp_main(void)
 	return my_stack_top; // will be loaded in smp_entry.S
 }
 
-// this idles a core, sometimes we need to call it directly.  never returns.
-// the pause is somewhat of a hack, since kvm isn't halting.  not sure what the
-// deal is with that.
+/* All non-zero cores call this at the end of their boot process.  They halt,
+ * and wake up when interrupted, do any work on their work queue, then halt
+ * when there is nothing to do.  
+ */
 void smp_idle(void)
 {
-	asm volatile("1: hlt; pause; jmp 1b;");
+	enable_irq();
+	while (1) {
+		process_workqueue();
+		// consider races with work added after we started leaving the last func
+		cpu_halt();
+	}
 }
 
 static int smp_call_function(uint8_t type, uint8_t dest, isr_t handler, void* data,

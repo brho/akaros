@@ -76,6 +76,7 @@ static __inline void disable_irq(void) __attribute__((always_inline));
 static __inline void enable_irqsave(int8_t* state) __attribute__((always_inline));
 static __inline void disable_irqsave(int8_t* state) __attribute__((always_inline));
 static __inline void cpu_relax(void) __attribute__((always_inline));
+static __inline void cpu_halt(void) __attribute__((always_inline));
 static __inline void wbinvd(void) __attribute__((always_inline));
 static __inline void clflush(uintptr_t* addr) __attribute__((always_inline));
 
@@ -405,6 +406,12 @@ cpu_relax(void)
 	// in case the compiler doesn't serialize for pause, the "m" will make sure
 	// no memory is reordered around this instruction.
 	asm volatile("pause" : : : "memory");
+}
+
+static __inline void
+cpu_halt(void)
+{
+	asm volatile("hlt" : : : "memory");
 }
 
 static __inline void

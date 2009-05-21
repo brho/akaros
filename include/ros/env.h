@@ -35,9 +35,10 @@ typedef int32_t envid_t;
 #define ENVX(envid)		((envid) & (NENV - 1))
 
 // Values of env_status in struct Env
-#define ENV_FREE		0
-#define ENV_RUNNABLE		1
-#define ENV_NOT_RUNNABLE	2
+#define ENV_FREE			0
+#define ENV_RUNNING			1
+#define ENV_RUNNABLE		2
+#define ENV_NOT_RUNNABLE	3
 
 struct Env {
 	trapframe_t env_tf;			// Saved registers

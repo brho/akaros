@@ -29,10 +29,16 @@
 
 static void print_cpuinfo(void);
 
+static void work_env_run(void* data)
+{
+	env_run((env_t*)data);
+}
+
 static void run_env_handler(trapframe_t *tf, void* data)
 {
 	assert(data);
-	env_run((env_t*)data);
+	per_cpu_info[lapic_get_id()].delayed_work.func = work_env_run;
+	per_cpu_info[lapic_get_id()].delayed_work.data = data;
 }
 
 void kernel_init(multiboot_info_t *mboot_info)
@@ -82,25 +88,35 @@ void kernel_init(multiboot_info_t *mboot_info)
 	//ENV_CREATE(user_buggyhello);
 	//ENV_CREATE(user_evilhello);
 	//ENV_CREATE(user_hello);
-	ENV_CREATE(user_apps_parlib_hello);
-	ENV_CREATE(user_apps_roslib_hello);
+	//ENV_CREATE(user_apps_parlib_hello);
+	//ENV_CREATE(user_apps_roslib_hello);
 	//ENV_CREATE(user_hello);
 	//ENV_CREATE(user_hello);
 	//ENV_CREATE(user_hello);
-	//ENV_CREATE(user_null);
-	//ENV_CREATE(user_null);
-	env_run(&envs[0]);
-	//env_run(&envs[1]);
-	panic("Don't Panic");
-	// ENV_CREATE(user_null);
-	/*ENV_CREATE(user_null);
+	ENV_CREATE(user_null);
+	ENV_CREATE(user_null);
+	ENV_CREATE(user_null);
+	ENV_CREATE(user_null);
+	ENV_CREATE(user_null);
+	ENV_CREATE(user_null);
+	ENV_CREATE(user_null);
 	ENV_CREATE(user_null);
 
 	//env_run(&envs[0]);
-	smp_call_function_single(2, run_env_handler, &envs[0], 0);
-	//smp_call_function_single(4, run_env_handler, &envs[1], 0);
-	//smp_call_function_single(6, run_env_handler, &envs[2], 0);
+	//env_run(&envs[1]);
+	smp_call_function_single(0, run_env_handler, &envs[0], 0);
+	smp_call_function_single(1, run_env_handler, &envs[1], 0);
+	smp_call_function_single(2, run_env_handler, &envs[2], 0);
+	smp_call_function_single(3, run_env_handler, &envs[3], 0);
+	smp_call_function_single(4, run_env_handler, &envs[4], 0);
+	smp_call_function_single(5, run_env_handler, &envs[5], 0);
+	smp_call_function_single(6, run_env_handler, &envs[6], 0);
+	smp_call_function_single(7, run_env_handler, &envs[7], 0);
+	process_workqueue();
+	udelay(5000000);
+	panic("Don't Panic");
 
+	/*
 	// wait 5 sec, then print what's in shared mem
 	udelay(5000000);
 	printk("Servicing syscalls from Core 0:\n\n");

@@ -461,6 +461,7 @@ env_free(env_t *e)
 void
 env_destroy(env_t *e)
 {
+	uint32_t status;
 	env_free(e);
 
 	// for old envs that die on user cores.  since env run never returns, cores
@@ -473,10 +474,15 @@ env_destroy(env_t *e)
 	}
 	// else we're core 0 and can do the usual
 
+//TODO: consider returning to a dispatching function instead of this, since we
+//can't get back to init.
 	// ugly, but for now just linearly search through all possible
 	// environments for a runnable one.
 	for (int i = 0; i < NENV; i++) {
 		e = &envs[ENVX(i)];
+		// TODO: race here, if another core is just about to start this env.
+		// Fix it by setting the status in something like env_dispatch when
+		// we have multi-contexted processes
 		if (e && e->env_status == ENV_RUNNABLE)
 			env_run(e);
 	}
@@ -525,7 +531,7 @@ env_run(env_t *e)
 	//	and make sure you have set the relevant parts of
 	//	e->env_tf to sensible values.
 
-		// would set the curenv->env_status if we had more states
+	e->env_status = ENV_RUNNING;
 	if (e != curenvs[lapic_get_id()]) {
 		curenvs[lapic_get_id()] = e;
 		e->env_runs++;

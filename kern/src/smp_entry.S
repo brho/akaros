@@ -85,12 +85,7 @@ here:
 	# note the next two lines are using the direct mapping from smp_boot()
 	movw	$0, smp_boot_lock - smp_entry + 0x1000 	# release lock
 	lock decw	smp_semaphore - smp_entry + 0x1000  # show we are done
-
-	sti						# turn on interrupts, and wait for an IPI
-spinwait:
-	hlt						# hlts, else will just spin.
-	pause					# hack, since kvm is ignoring the hlt.
-	jmp		spinwait
+	call 	smp_idle 		# idle loop, will have interrupts turned on
 
 	# Below here is just data, stored with the code text
 	.p2align	2						# force 4 byte alignment

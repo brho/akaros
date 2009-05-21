@@ -7,6 +7,7 @@
 #include <ros/queue.h>
 #include <atomic.h>
 #include <trap.h>
+#include <workqueue.h>
 
 #ifdef __BOCHS__
 #define SMP_CALL_FUNCTION_TIMEOUT    0x00ffffff
@@ -23,6 +24,13 @@ typedef struct HandlerWrapper {
 	checklist_t* cpu_list;
 	uint8_t vector;
 } handler_wrapper_t;
+
+typedef struct per_cpu_info {
+	// Once we have a real kmalloc, we can make this dynamic.  Want a queue.
+	work_t delayed_work;
+	// will want it padded out to an even cacheline
+} per_cpu_info_t;
+extern per_cpu_info_t per_cpu_info[MAX_NUM_CPUS];
 
 /* SMP bootup functions */
 void smp_boot(void);
