@@ -41,6 +41,19 @@ typedef struct struct_##p {                                                     
 	rval;                                                      \
 })
 
+// emptyIndex is also the first element that has been allocated, iterate thru to index-1
+
+#define POOL_FOR_EACH(p, func)									\
+({																\
+	int emptyIndex = ((p)->index + (p)->free);          	    \
+	if (emptyIndex >= (p)->size) {               				\
+		emptyIndex -= (p)->size;                           		\
+	}		                                                    \
+	for(int _i = emptyIndex;  _i < (p)->index; _i++){			\
+		func((p)->queue[_i]);									\
+	}															\
+})																\
+
 #define POOL_PUT(p, val)                                                       \
 ({                                                                             \
 	int rval = -1;                                                            \

@@ -15,6 +15,7 @@
 #include <inc/memlayout.h>
 #include <inc/syscall.h>
 #include <inc/pool.h>
+#include <inc/timer.h>
 // These two are included below because of dependency issues.
 //#include <inc/stdio.h>
 //#include <inc/assert.h>
@@ -76,9 +77,13 @@ extern async_desc_t* current_async_desc;
 POOL_TYPE_DEFINE(syscall_desc_t, syscall_desc_pool, MAX_SYSCALLS);
 POOL_TYPE_DEFINE(async_desc_t, async_desc_pool, MAX_ASYNCCALLS);
 
+// This pooltype contains all the timers used in user level time tracking
+POOL_TYPE_DEFINE(timer_t, timer_pool, MAX_TIMERS);
+
 // These are declared in libmain.c
 extern syscall_desc_pool_t syscall_desc_pool;
 extern async_desc_pool_t async_desc_pool;
+extern timer_pool_t timer_pool;
 
 error_t waiton_async_call(async_desc_t* desc, async_rsp_t* rsp);
 async_desc_t* get_async_desc(void);

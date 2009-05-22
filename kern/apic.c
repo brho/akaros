@@ -6,6 +6,7 @@
 #include <inc/mmu.h>
 #include <inc/x86.h>
 #include <inc/assert.h>
+#include <inc/timer.h>
 
 #include <kern/apic.h>
 
@@ -92,22 +93,6 @@ uint32_t lapic_get_default_id(void)
 	return (ebx & 0xFF000000) >> 24;
 }
 
-uint64_t read_tsc_serialized() __attribute__((noinline)) 
-{
-	cpuid(0, 0, 0, 0, 0);
-	return read_tsc();
-}
-
-uint64_t start_timing() __attribute__((noinline)) 
-{
-	return read_tsc_serialized();
-}
-
-uint64_t stop_timing(uint64_t val) __attribute__((noinline)) 
-{
-	return (read_tsc_serialized() - val - timing_overhead);
-}
-
 void train_timing() 
 {
 	uint16_t num_runs = 0;
@@ -122,7 +107,7 @@ void train_timing()
 		 */
 		for(int i=0; i<100; i++) {
 			uint64_t time = start_timing();
- 			uint64_t diff = stop_timing(time);
+ 			uint64_t diff = stop_timing(time, timing_overhead);
 			
 			/* In case diff was negative, I want to add its absolute value
 			 * to the cumulative error, otherwise, just diff itself

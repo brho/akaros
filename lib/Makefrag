@@ -12,7 +12,8 @@ LIB_SRCFILES :=		lib/console.c \
 			lib/readline.c \
 			lib/string.c \
 			lib/syscall.c \
-			lib/asynccall.c
+			lib/asynccall.c \
+			lib/timer.c
 
 
 
