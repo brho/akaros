@@ -41,10 +41,10 @@ KERN_SRCFILES :=	kern/entry.S \
 # Only build files if they exist.
 KERN_SRCFILES := $(wildcard $(KERN_SRCFILES))
 
-KERN_BINFILES :=  	user/null \
-					user/hello \
-					user_newlib/hello \
-					user_newlib/null \
+KERN_BINFILES :=  	user_newlib/hello
+#					user/null \
+#					user/hello \
+#					user_newlib/null \
 #   				user/hello \
 #   				user/buggyhello \
 #   				user/evilhello \

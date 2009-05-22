@@ -1,4 +1,7 @@
+/* See COPYRIGHT for copyright information. */
+/* Kevin Klues <klueska@cs.berkeley.edu>	*/
 
+#include <inc/lib.h>
 #include <newlib/libc_wrappers.h>
 
 /* environ
@@ -7,6 +10,7 @@
  */
 char *__env[1] = { 0 };
 char **environ = __env;
+extern env_t* env;
 
 /* _exit()
  * Exit a program without cleaning up files. 
@@ -15,6 +19,7 @@ char **environ = __env;
  */
 void _exit() 
 {
+	sys_env_destroy(env->env_id);
 }
     
 /* close()
@@ -67,7 +72,7 @@ int fstat(int file, struct stat *st)
  */
 int getpid(void) 
 {
-	return 1;
+	return env->env_id;
 }
 
 /* isatty()
@@ -146,22 +151,8 @@ int read(int file, char *ptr, int len)
  */
 caddr_t sbrk(int incr) 
 {
-	extern char _end;		/* Defined by the linker */
-	static char *heap_end;
-	char *prev_heap_end;
-
-	if (heap_end == 0) {
-		heap_end = &_end;
-	}
-	prev_heap_end = heap_end;
-	/*
-	if (heap_end + incr > stack_ptr) {
-		write (1, "Heap and stack collision\n", 25);
-		abort();
-	}
-	*/
-	heap_end += incr;
-	return (caddr_t) prev_heap_end;
+	errno = ENOMEM;
+	return (void*)-1;
 }
 
 /* stat()
@@ -216,17 +207,12 @@ int wait(int *status)
  */
 #define outbyte(arg)
 int write(int file, char *ptr, int len) {
-	int todo;
-
-	for (todo = 0; todo < len; todo++) {
-		outbyte (*ptr++);
-	}
-	return len;
+	return 0;
 }
 
 /* __swrite64()
  * Write to a file. 
  */
 int __swrite64(int file, char *ptr, int len) {
-	return len;
+	return 0;
 }

@@ -1,3 +1,8 @@
+/* See COPYRIGHT for copyright information. */
+/* Kevin Klues <klueska@cs.berkeley.edu>	*/
+
+#ifndef _NEWLIB_LIBC_WRAPPERS_H
+#define _NEWLIB_LIBC_WRAPPERS_H_
 
 #include <errno.h>
 #include <sys/stat.h>
@@ -135,3 +140,5 @@ int wait(int *status);
  * manufacturer) to actually perform the output.
  */
 int write(int file, char *ptr, int len);
+
+#endif //_NEWLIB_LIBC_WRAPPERS_H_
