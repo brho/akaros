@@ -6,8 +6,7 @@
 
 uint32_t bigarray[ARRAYSIZE];
 
-void
-umain(void)
+int main(int argc, char** argv)
 {
 	int i;
 
@@ -26,4 +25,5 @@ umain(void)
 	bigarray[ARRAYSIZE+1024] = 0;
 	}
 	panic("SHOULD HAVE TRAPPED!!!");
+	return 0;
 }

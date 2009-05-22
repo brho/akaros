@@ -82,7 +82,8 @@ ifeq ($(UNAME),x86_64)
 endif
 
 # Linker flags for ROS user programs
-ULDFLAGS := -T user/user.ld
+ULDFLAGS := -T user/user.ld -nostdlib
+ULDFLAGS := -T user_newlib/user_newlib.ld -nostdlib
 
 # Lists that the */Makefrag makefile fragments will add to
 OBJDIRS :=
@@ -98,22 +99,21 @@ all:
 
 # make it so that no intermediate .o files are ever deleted
 .PRECIOUS: %.o $(OBJDIR)/boot/%.o $(OBJDIR)/kern/%.o \
-	$(OBJDIR)/lib/%.o $(OBJDIR)/fs/%.o $(OBJDIR)/user/%.o
+	$(OBJDIR)/lib/%.o $(OBJDIR)/fs/%.o $(OBJDIR)/user/%.o \
+	$(OBJDIR)/newlib/%.o $(OBJDIR)/user_newlib/%.o
 
-KERN_CFLAGS := $(CFLAGS) -DROS_KERNEL -gstabs
+KERN_CFLAGS := $(CFLAGS) -DROS_KERNEL -gstabs -nostdinc
 USER_CFLAGS := $(CFLAGS) -DROS_USER -gstabs
-
-
-
 
 # Include Makefrags for subdirectories
 include boot/Makefrag
 include lib/Makefrag
+include newlib/Makefrag
 include ivylib/Makefrag
 include kern/Makefrag
 include user/Makefrag
+include user_newlib/Makefrag
 -include Makelocal
-
 
 IMAGES = $(OBJDIR)/kern/bochs.img
 
@@ -127,27 +127,10 @@ realclean: clean
 distclean: realclean
 	rm -rf conf/gcc.mk
 
-grade: $(LABSETUP)grade.sh
-	$(V)$(MAKE) clean >/dev/null 2>/dev/null
-	$(MAKE) all
-	sh $(LABSETUP)grade.sh
-
-handin: tarball
-	turnin --submit porterde cs372h-lab$(LAB) lab$(LAB)-handin.tar.gz
-
-tarball: realclean
-	tar cf - `find . -type f | grep -v '^\.*$$' | grep -v '/CVS/' | grep -v '/\.svn/' | grep -v 'lab[0-9].*\.tar\.gz'` | gzip > lab$(LAB)-handin.tar.gz
-
-# For test runs
-run-%:
-	$(V)rm -f $(OBJDIR)/kern/init.o $(IMAGES)
-	$(V)$(MAKE) "DEFS=-DTEST=_binary_obj_user_$*_start -DTESTSIZE=_binary_obj_user_$*_size" $(IMAGES)
-	bochs -q 'display_library: nogui'
-
-xrun-%:
-	$(V)rm -f $(OBJDIR)/kern/init.o $(IMAGES)
-	$(V)$(MAKE) "DEFS=-DTEST=_binary_obj_user_$*_start -DTESTSIZE=_binary_obj_user_$*_size" $(IMAGES)
-	bochs -q
+usb: $(IMAGES)
+	sudo mount /dev/sde4 /media/usb
+	sudo cp obj/kern/kernel /media/usb/
+	sudo umount /media/usb
 
 # This magic automatically generates makefile dependencies
 # for header files included from C source files we compile,

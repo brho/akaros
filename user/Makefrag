@@ -1,12 +1,21 @@
-OBJDIRS += user
+SRC_DIR = user
+OBJDIRS += $(SRC_DIR)
 
-$(OBJDIR)/user/%.o: user/%.c
+ULOCAL_CFLAGS := $(USER_CFLAGS) -nostdinc
+ULOCAL_LDDIRS := -L$(OBJDIR)/lib -L$(OBJDIR)/ivylib
+ULOCAL_LDLIBS := -static -lros -livyuser 
+ULOCAL_LDOBJS := $(OBJDIR)/ivylib/libivyuser.a  $(OBJDIR)/lib/entry.o       
+ULOCAL_LDDEPENDS := $(ULOCAL_LDOBJS) $(OBJDIR)/lib/libros.a $(OBJDIR)/$(SRC_DIR)/%.o       
+
+$(OBJDIR)/$(SRC_DIR)/%.o: $(SRC_DIR)/%.c
 	@echo + cc[USER] $<
 	@mkdir -p $(@D)
-	$(V)$(CC) -nostdinc $(USER_CFLAGS) -c -o $@ $<
+	$(V)$(CC) $(ULOCAL_CFLAGS) -c -o $@ $<
 
-$(OBJDIR)/user/%: $(OBJDIR)/ivylib/libivyuser.a $(OBJDIR)/user/%.o $(OBJDIR)/lib/entry.o $(OBJDIR)/lib/libros.a user/user.ld
+$(OBJDIR)/$(SRC_DIR)/%: $(ULOCAL_LDDEPENDS)         
 	@echo + ld $@
-	$(V)$(LD) -o $@ $(ULDFLAGS) $(LDFLAGS) -nostdlib $(OBJDIR)/lib/entry.o $@.o -L$(OBJDIR)/ivylib -livyuser -L$(OBJDIR)/lib -lros $(GCC_LIB)
+	$(V)$(LD) -o $@ $(ULDFLAGS) $(LDFLAGS) $@.o $(ULOCAL_LDOBJS) \
+	                $(ULOCAL_LDDIRS) $(ULOCAL_LDLIBS) $(GCC_LIB)
 	$(V)$(OBJDUMP) -S $@ > $@.asm
 	$(V)$(NM) -n $@ > $@.sym
+

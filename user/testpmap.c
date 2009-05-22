@@ -153,8 +153,7 @@ duplicate_range(int startva, int dupeva, int nbytes) {
 // This tries to stress test the pmap code...
 // Not the most intelligent testing strategy, 
 // just hammer at it and see if it breaks.
-void
-umain(int argc, char **argv)
+int main(int argc, char** argv)
 {  
   int max, max2, k, j, i, dupesize, dupen;
 
@@ -205,7 +204,7 @@ umain(int argc, char **argv)
     
     //unmap_range(UTEXT+PDMAP, max);
   }
-
+  return 0;
 }
 
 //#endif

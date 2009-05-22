@@ -8,7 +8,7 @@
 OBJDIRS += kern
 CC=ivycc --deputy
 
-KERN_LDFLAGS := $(LDFLAGS) -Lobj/ivylib -T kern/kernel.ld -nostdlib
+KERN_LDFLAGS := $(LDFLAGS) -Lobj/ivylib -T kern/kernel.ld
 
 # entry.S must be first, so that it's the first code in the text segment!!!
 #
@@ -41,19 +41,23 @@ KERN_SRCFILES :=	kern/entry.S \
 # Only build files if they exist.
 KERN_SRCFILES := $(wildcard $(KERN_SRCFILES))
 
-KERN_BINFILES :=	user/null \
+KERN_BINFILES :=  	user/null \
 					user/hello \
-					user/buggyhello \
-					user/evilhello \
-					user/testbss \
-					user/divzero \
-					user/breakpoint \
-					user/softint \
-					user/badsegment \
-					user/faultread \
-					user/faultreadkernel \
-					user/faultwrite \
-					user/faultwritekernel
+					user_newlib/hello \
+					user_newlib/null \
+#   				user/hello \
+#   				user/buggyhello \
+#   				user/evilhello \
+#   				user/testbss \
+#   				user/divzero \
+#   				user/breakpoint \
+#   				user/softint \
+#   				user/badsegment \
+#   				user/faultread \
+#   				user/faultreadkernel \
+#   				user/faultwrite \
+#   				user/faultwritekernel \
+#   				user_newlib/null \
 
 KERN_OBJFILES := $(patsubst %.c, $(OBJDIR)/%.o, $(KERN_SRCFILES))
 KERN_OBJFILES := $(patsubst %.S, $(OBJDIR)/%.o, $(KERN_OBJFILES))
@@ -65,17 +69,17 @@ KERN_BINFILES := $(patsubst %, $(OBJDIR)/%, $(KERN_BINFILES))
 $(OBJDIR)/kern/%.o: kern/%.c
 	@echo + cc $<
 	@mkdir -p $(@D)
-	$(V)$(CC) -nostdinc $(KERN_CFLAGS) -c -o $@ $<
+	$(V)$(CC) $(KERN_CFLAGS) -c -o $@ $<
 
 $(OBJDIR)/kern/%.o: kern/%.S
 	@echo + as $<
 	@mkdir -p $(@D)
-	$(V)$(CC) -nostdinc $(KERN_CFLAGS) -c -o $@ $<
+	$(V)$(CC) $(KERN_CFLAGS) -c -o $@ $<
 
 $(OBJDIR)/kern/%.o: lib/%.c
 	@echo + cc $<
 	@mkdir -p $(@D)
-	$(V)$(CC) -nostdinc $(KERN_CFLAGS) -c -o $@ $<
+	$(V)$(CC) $(KERN_CFLAGS) -c -o $@ $<
 
 # How to build the kernel itself
 $(OBJDIR)/kern/kernel: $(KERN_OBJFILES) $(KERN_BINFILES) kern/kernel.ld $(OBJDIR)/ivylib/libivykern.a

@@ -3,9 +3,9 @@
 
 #include <inc/lib.h>
 
-void
-umain(void)
+int main(int argc, char** argv)
 {
 	sys_cputs((char*SAFE)TC(1), 1);
+	return 0;
 }
 

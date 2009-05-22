@@ -4,9 +4,9 @@
 
 int zero;
 
-void
-umain(void)
+int main(int argc, char** argv)
 {
 	cprintf("1/0 is %08x!\n", 1/zero);
+	return 0;
 }
 

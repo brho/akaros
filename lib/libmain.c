@@ -4,7 +4,7 @@
 #include <inc/lib.h>
 #include <inc/syscall.h>
 
-extern void umain(int argc, char **argv);
+extern int main(int argc, char **argv);
 
 volatile env_t *env;
 char *binaryname = "(PROGRAM NAME UNKNOWN)";
@@ -40,7 +40,7 @@ libmain(int argc, char **argv)
 		binaryname = argv[0];
 
 	// call user main routine
-	umain(argc, argv);
+	main(argc, argv);
 
 	// exit gracefully
 	exit();

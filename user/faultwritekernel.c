@@ -2,9 +2,9 @@
 
 #include <inc/lib.h>
 
-void
-umain(void)
+int main(int argc, char** argv)
 { TRUSTEDBLOCK
 	*(unsigned*)0xf0100000 = 0;
+	return 0;
 }
 

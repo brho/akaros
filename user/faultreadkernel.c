@@ -2,9 +2,9 @@
 
 #include <inc/lib.h>
 
-void
-umain(void)
+int main(int argc, char** argv)
 { TRUSTEDBLOCK
 	cprintf("I read %08x from location 0xf0100000!\n", *(unsigned*)0xf0100000);
+	return 0;
 }
 

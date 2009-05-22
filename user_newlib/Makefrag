@@ -1,0 +1,21 @@
+SRC_DIR = user_newlib
+OBJDIRS += $(SRC_DIR)
+
+UNLLOCAL_CFLAGS := $(USER_CFLAGS) -Inewlib/include
+UNLLOCAL_LDDIRS := -L$(OBJDIR)/lib -L$(OBJDIR)/ivylib -Lnewlib/lib -L$(OBJDIR)/newlib
+UNLLOCAL_LDLIBS := -static -lros -livyuser -lc -lc_wrappers
+UNLLOCAL_LDOBJS := $(OBJDIR)/ivylib/libivyuser.a $(OBJDIR)/lib/entry.o 
+UNLLOCAL_LDDEPENDS := $(UNLLOCAL_LDOBJS) $(OBJDIR)/lib/libros.a \
+                 $(OBJDIR)/newlib/libc_wrappers.a $(OBJDIR)/$(SRC_DIR)/%.o       
+
+$(OBJDIR)/$(SRC_DIR)/%.o: $(SRC_DIR)/%.c
+	@echo + cc[UNLLOCAL] $<
+	@mkdir -p $(@D)
+	$(V)$(CC) $(UNLLOCAL_CFLAGS) -c -o $@ $<
+
+$(OBJDIR)/$(SRC_DIR)/%: $(UNLLOCAL_LDDEPENDS) 
+	@echo + ld $@
+	$(V)$(LD) -o $@ $(ULDFLAGS) $(LDFLAGS) $@.o $(UNLLOCAL_LDOBJS) \
+                    $(UNLLOCAL_LDDIRS) $(UNLLOCAL_LDLIBS) $(GCC_LIB)
+	$(V)$(OBJDUMP) -S $@ > $@.asm
+	$(V)$(NM) -n $@ > $@.sym

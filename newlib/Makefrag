@@ -1,0 +1,23 @@
+NATIVECC := ivycc
+
+OBJDIRS += newlib
+
+NEWLIB_SRCFILES =		newlib/libc_wrappers.c 
+
+NEWLIB_HEADERS = -Inewlib/include
+NEWLIB_OBJFILES = $(patsubst newlib/%.c, $(OBJDIR)/newlib/%.o, $(NEWLIB_SRCFILES))
+
+$(OBJDIR)/newlib/%.o: newlib/%.c
+	@echo + cc[USER] $<
+	@mkdir -p $(@D)
+	$(V)$(NATIVECC) $(NEWLIB_HEADERS) $(USER_CFLAGS) -c -o $@ $<
+
+$(OBJDIR)/newlib/%.o: newlib/%.S
+	@echo + as[USER] $<
+	@mkdir -p $(@D)
+	$(V)$(NATIVECC) $(NEWLIB_HEADERS) $(USER_CFLAGS) -c -o $@ $<
+
+$(OBJDIR)/newlib/libc_wrappers.a: $(NEWLIB_OBJFILES)
+	@echo + ar $@
+	@mkdir -p $(@D)
+	$(V)$(AR) r $@ $(NEWLIB_OBJFILES)
