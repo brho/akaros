@@ -16,6 +16,7 @@
 #include <pmap.h>
 #include <trap.h>
 #include <monitor.h>
+#include <manager.h>
 
 #include <ros/syscall.h>
 
@@ -383,16 +384,8 @@ load_icode(env_t *e, uint8_t *binary, size_t size)
 
 //
 // Allocates a new env and loads the named elf binary into it.
-// This function is ONLY called during kernel initialization,
-// before running the first user-mode environment.
-// The new env's parent ID is set to 0.
 //
-// Where does the result go?
-// By convention, envs[0] is the first environment allocated, so
-// whoever calls env_create simply looks for the newly created
-// environment there.
-void
-env_create(uint8_t *binary, size_t size)
+env_t* env_create(uint8_t *binary, size_t size)
 {
 	env_t *e;
 	int r;
@@ -400,6 +393,7 @@ env_create(uint8_t *binary, size_t size)
 	if ((r = env_alloc(&e, 0)) < 0)
 		panic("env_create: %e", r);
 	load_icode(e, binary, size);
+	return e;
 }
 
 //
@@ -468,14 +462,23 @@ env_destroy(env_t *e)
 	// never get back to their old hlt/relaxed/spin state, so we need to force
 	// them back to an idle function.
 	uint32_t id = lapic_get_id();
+	// There is no longer a curenv for this core. (TODO: Think about this.)
+	curenvs[id] = NULL;
 	if (id) {
 		smp_idle();
 		panic("should never see me");
 	}
 	// else we're core 0 and can do the usual
 
-//TODO: consider returning to a dispatching function instead of this, since we
-//can't get back to init.
+	/* Instead of picking a new environment to run, or defaulting to the monitor
+	 * like before, for now we'll hop into the manager() function, which
+	 * dispatches jobs.  Note that for now we start the manager from the top,
+	 * and not from where we left off the last time we called manager.  That
+	 * would require us to save some context (and a stack to work on) here.
+	 */
+	manager();
+	assert(0); // never get here
+
 	// ugly, but for now just linearly search through all possible
 	// environments for a runnable one.
 	for (int i = 0; i < NENV; i++) {

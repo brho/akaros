@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2009 The Regents of the University of California
+ * See LICENSE for details.
+ */
+
 #ifndef ROS_KERN_WORKQUEUE_H
 #define ROS_KERN_WORKQUEUE_H
 #ifndef ROS_KERNEL

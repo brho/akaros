@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2009 The Regents of the University of California
+ * See LICENSE for details.
+ */
+
 #include <inc/x86.h>
 
 #include <kern/workqueue.h>
