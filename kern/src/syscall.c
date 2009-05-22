@@ -30,8 +30,15 @@ void syscall_wrapper(struct Trapframe *tf)
 }
 
 //Do absolutely nothing.  Used for profiling.
-static void sys_null(env_t* e)
+static void sys_null(void)
 {
+	return;
+}
+
+// Invalidate the cache of this core
+static void sys_cache_invalidate(void)
+{
+	wbinvd();
 	return;
 }
 
@@ -88,6 +95,12 @@ sys_getenvid(env_t* e)
 	return e->env_id;
 }
 
+// Returns the id of the cpu this syscall is executed on.
+static envid_t sys_getcpuid(void)
+{
+	return lapic_get_id();
+}
+
 // Destroy a given environment (possibly the currently running environment).
 //
 // Returns 0 on success, < 0 on error.  Errors are:
@@ -126,7 +139,10 @@ int32_t syscall(env_t* e, uint32_t syscallno, uint32_t a1, uint32_t a2,
 
 	switch (syscallno) {
 		case SYS_null:
-			sys_null(e);
+			sys_null();
+			return 0;
+		case SYS_cache_invalidate:
+			sys_cache_invalidate();
 			return 0;
 		case SYS_cache_buster:
 			sys_cache_buster(e, a1, a2);
@@ -138,6 +154,8 @@ int32_t syscall(env_t* e, uint32_t syscallno, uint32_t a1, uint32_t a2,
 			return sys_cgetc(e);
 		case SYS_getenvid:
 			return sys_getenvid(e);
+		case SYS_getcpuid:
+			return sys_getcpuid();
 		case SYS_env_destroy:
 			return sys_env_destroy(e, (envid_t)a1);
 		default:

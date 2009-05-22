@@ -34,6 +34,7 @@ syscall_sysenter(int num, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, ui
         : "cc", "memory", "%esp");
 	return ret;
 }
+
 static inline uint32_t
 syscall_trap(int num, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32_t a5)
 {
@@ -65,13 +66,13 @@ syscall_trap(int num, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32
 	return ret;
 }
 
-static inline uint32_t
-syscall(int num, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32_t a5)
+static inline uint32_t syscall(int num, uint32_t a1, uint32_t a2, uint32_t a3,
+                               uint32_t a4, uint32_t a5)
 {
 	#ifndef SYSCALL_TRAP
-	return syscall_sysenter(num, a1, a2, a3, a4, a5);
+		return syscall_sysenter(num, a1, a2, a3, a4, a5);
 	#else
-	return syscall_trap(num, a1, a2, a3, a4, a5);
+		return syscall_trap(num, a1, a2, a3, a4, a5);
 	#endif
 }
 
@@ -157,6 +158,11 @@ void sys_null()
 	syscall(SYS_null,0,0,0,0,0);
 }
 
+void sys_cache_invalidate()
+{
+	syscall(SYS_cache_invalidate, 0, 0, 0, 0, 0);
+}
+
 void
 sys_cputs(const char *s, size_t len)
 {
@@ -179,6 +185,11 @@ envid_t
 sys_getenvid(void)
 {
 	 return syscall(SYS_getenvid, 0, 0, 0, 0, 0);
+}
+
+uint32_t sys_getcpuid(void)
+{
+	 return syscall(SYS_getcpuid, 0, 0, 0, 0, 0);
 }
 
 

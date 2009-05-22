@@ -33,3 +33,8 @@ error_t cache_buster_async(async_desc_t** desc, uint32_t num_writes, uint32_t va
 		return e;
 	return sys_cache_buster_async(sysdesc, num_writes, val);
 }
+
+uint32_t getcpuid(void)
+{
+	return sys_getcpuid();
+}

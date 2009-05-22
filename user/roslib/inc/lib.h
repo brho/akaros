@@ -34,18 +34,20 @@ void exit(void) __attribute__((noreturn));
 char*	readline(const char *buf);
 
 // syscall.c
-void sys_null();
-error_t sys_null_async(syscall_desc_t* desc);
-void sys_cache_buster(uint32_t num_writes, uint32_t val);
-error_t sys_cache_buster_async(syscall_desc_t* desc, uint32_t num_writes,
-                               uint32_t val);
-void sys_cputs(const char *string, size_t len);
-error_t sys_cputs_async(const char *s, size_t len, syscall_desc_t* desc,
-                     void (*cleanup_handler)(void*), void* cleanup_data);
-int	sys_cgetc(void);
-envid_t	sys_getenvid(void);
-int	sys_env_destroy(envid_t);
-error_t waiton_syscall(syscall_desc_t* desc, syscall_rsp_t* rsp);
+void		sys_null();
+error_t		sys_null_async(syscall_desc_t* desc);
+void		sys_cache_invalidate();
+void		sys_cache_buster(uint32_t num_writes, uint32_t val);
+error_t		sys_cache_buster_async(syscall_desc_t* desc, uint32_t num_writes,
+			                       uint32_t val);
+void		sys_cputs(const char *string, size_t len);
+error_t		sys_cputs_async(const char *s, size_t len, syscall_desc_t* desc,
+			                void (*cleanup_handler)(void*), void* cleanup_data);
+int			sys_cgetc(void);
+envid_t		sys_getenvid(void);
+uint32_t	sys_getcpuid(void);
+int			sys_env_destroy(envid_t);
+error_t		waiton_syscall(syscall_desc_t* desc, syscall_rsp_t* rsp);
 
 // async callback
 #define MAX_SYSCALLS 100

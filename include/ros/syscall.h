@@ -10,9 +10,11 @@ enum
 {
 	SYS_null = 1,
 	SYS_cache_buster,
+	SYS_cache_invalidate,
 	SYS_cputs,
 	SYS_cgetc,
 	SYS_getenvid,
+	SYS_getcpuid,
 	SYS_env_destroy,
 };
 #define NSYSCALLS (SYS_env_destroy)
