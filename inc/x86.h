@@ -66,6 +66,7 @@ static __inline uint32_t read_ebp(void) __attribute__((always_inline));
 static __inline uint32_t read_esp(void) __attribute__((always_inline));
 static __inline void cpuid(uint32_t info, uint32_t *eaxp, uint32_t *ebxp, uint32_t *ecxp, uint32_t *edxp);
 static __inline uint64_t read_tsc(void) __attribute__((always_inline));
+static __inline uint64_t read_tsc_serialized(void) __attribute__((always_inline));
 static __inline uint64_t read_msr(uint32_t reg) __attribute__((always_inline));
 static __inline void write_msr(uint32_t reg, uint64_t val) __attribute__((always_inline));
 static __inline uint32_t read_mmreg32(uint32_t reg) __attribute__((always_inline));
@@ -312,9 +313,17 @@ cpuid(uint32_t info, uint32_t *eaxp, uint32_t *ebxp, uint32_t *ecxp, uint32_t *e
 static __inline uint64_t
 read_tsc(void)
 {
-        uint64_t tsc;
-        __asm __volatile("rdtsc" : "=A" (tsc));
-        return tsc;
+	uint64_t tsc;
+	__asm __volatile("rdtsc" : "=A" (tsc));
+	return tsc;
+}
+
+static __inline uint64_t 
+read_tsc_serialized(void)
+{
+    uint64_t tsc;
+    __asm __volatile("cpuid; rdtsc" : "=A" (tsc));
+	return tsc;
 }
 
 // Might need to mfence rdmsr.  supposedly wrmsr serializes, but not for x2APIC

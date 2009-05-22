@@ -26,7 +26,7 @@ uint64_t total(uint64_t (COUNT(length) array)[], int length)
 
 void umain(void)
 {
-	FUNCBEGIN(tst);
+	TAGGED_TIMING_BEGIN(tst);
 	async_desc_t *desc1, *desc2;
 	async_rsp_t rsp1, rsp2;
 	cache_buster_async(&desc1, 20, 0xdeadbeef);
@@ -42,7 +42,7 @@ void umain(void)
 	// making calls beyond the ring size and won't wait on any extra calls.
 	measure_async_call(null_async(&desc), desc, 100, 100, "Async Null");
 	
-	FUNCEND(tst);
+    TAGGED_TIMING_END(tst);
 	// Spin to make sure we don't have any resources deallocated before done
 	while(1);
 }

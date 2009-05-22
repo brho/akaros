@@ -3,7 +3,36 @@
 
 #include <inc/types.h>
 #include <inc/stdio.h>
+#include <inc/timer.h>
 #include <inc/x86.h>
+
+/* Macro for printing out debug information about our measurement setup.
+ * If MEASURE_DEBUG is set to 1, debug info will be printed.  If set to 0
+ * no debug info will be printed.
+ */
+#define MEASURE_DEBUG	1
+#if MEASURE_DEBUG
+#ifndef ROS_KERNEL
+	#define mdebug(string, ...)	cprintf(string, ## __VA_ARGS__)
+#else
+	#define mdebug(string, ...)	printk(string, ## __VA_ARGS__)
+#endif
+#else
+	#define mdebug(string, ...)
+#endif
+
+#define __measure_runtime(__CODE_BLOCK__)                                      \
+({                                                                             \
+	uint64_t time = start_timing();                                            \
+	__CODE_BLOCK__;                                                            \
+	stop_timing(time);                                                         \
+})
+
+#define measure_func_runtime(func, ...)                                        \
+({                                                                             \
+	__measure_runtime(func(__VA_ARGS__));                                      \
+})
+
 
 #define measure_function(func, iters, name)                                    \
 ({                                                                             \
@@ -71,3 +100,6 @@
 	                       desc_name, i_iters, o_iters, name)
 
 #endif /* !ROS_INC_MEASURE_H */
+
+
+

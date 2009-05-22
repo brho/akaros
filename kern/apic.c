@@ -11,7 +11,6 @@
 #include <kern/apic.h>
 
 system_timing_t system_timing = {0, 0, 0xffff, 0};
-uint64_t timing_overhead = 0;
 
 /*
  * Remaps the Programmable Interrupt Controller to use IRQs 32-47
@@ -93,39 +92,6 @@ uint32_t lapic_get_default_id(void)
 	return (ebx & 0xFF000000) >> 24;
 }
 
-void train_timing() 
-{
-	uint16_t num_runs = 0;
-	uint16_t num_times_zero = 0;
-	uint64_t cum_overhead = 0;
-	
-	//Do this while 1/3 of all runs have not equaled 0 yet
-	do {
-		/* Run 100 times, counting how many out of that 100 
-		 * were equal to 0, adjusting the global timing_overhead
-		 * in the process.
-		 */
-		for(int i=0; i<100; i++) {
-			uint64_t time = start_timing();
- 			uint64_t diff = stop_timing(time, timing_overhead);
-			
-			/* In case diff was negative, I want to add its absolute value
-			 * to the cumulative error, otherwise, just diff itself
-			 */
-			if((int64_t)diff < 0)
-				diff = (uint64_t)(~0) - diff; 
-			cum_overhead += diff;
-
-			//TODO: Consider using diff < 2  instead of 
-			// strictly == 0 in case forcing a 0 restriction is too strict 
-			if(diff == 0) num_times_zero++;
-			num_runs++;
-			timing_overhead = (cum_overhead/num_runs);
-			printk("Timing Differences: %llu\n", diff);
-		}
-	} while(num_runs/num_times_zero > 2);
-}
-
 // timer init calibrates both tsc timer and lapic timer using PIT
 void timer_init(void){
 	uint64_t tscval[2];
@@ -149,7 +115,6 @@ void timer_init(void){
 	system_timing.bus_freq = (timercount[0] - timercount[1])*128;
 		
 	cprintf("Bus Frequency: %llu\n", system_timing.bus_freq);
-	train_timing();
 }
 
 void pit_set_timer(uint32_t divisor, uint32_t mode)

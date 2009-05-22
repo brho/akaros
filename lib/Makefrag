@@ -31,6 +31,6 @@ $(OBJDIR)/lib/%.o: lib/%.S
 	@mkdir -p $(@D)
 	$(V)$(NATIVECC) -nostdinc $(USER_CFLAGS) -c -o $@ $<
 
-$(OBJDIR)/lib/libjos.a: $(LIB_OBJFILES)
+$(OBJDIR)/lib/libros.a: $(LIB_OBJFILES)
 	@echo + ar $@
 	$(V)$(AR) r $@ $(LIB_OBJFILES)

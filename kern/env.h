@@ -3,6 +3,7 @@
 #ifndef ROS_KERN_ENV_H
 #define ROS_KERN_ENV_H
 
+#include <inc/x86.h>
 #include <inc/env.h>
 
 #ifndef ROS_MULTIENV

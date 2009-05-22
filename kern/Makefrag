@@ -94,8 +94,8 @@ $(OBJDIR)/kern/bochs.img: $(OBJDIR)/kern/kernel $(OBJDIR)/boot/boot
 
 all: $(OBJDIR)/kern/bochs.img
 
-grub: $(OBJDIR)/jos-grub
+grub: $(OBJDIR)/ros-grub
 
-$(OBJDIR)/jos-grub: $(OBJDIR)/kern/kernel
+$(OBJDIR)/ros-grub: $(OBJDIR)/kern/kernel
 	@echo + oc $@
 	$(V)$(OBJCOPY) --adjust-vma=0x10000000 $^ $@
