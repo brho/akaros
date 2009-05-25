@@ -190,29 +190,29 @@ void test_bitmasks(void)
 	DECL_BITMASK(mask, masksize);
 	printk("size of mask %d\n", sizeof(mask));
 	CLR_BITMASK(mask, masksize);
-	PRINT_MASK(mask, masksize);
+	PRINT_BITMASK(mask, masksize);
 	printk("cleared\n");
 	SET_BITMASK_BIT(mask, 0);
 	SET_BITMASK_BIT(mask, 11);
 	SET_BITMASK_BIT(mask, 17);
 	SET_BITMASK_BIT(mask, masksize-1);
 	printk("bits set\n");
-	PRINT_MASK(mask, masksize);
+	PRINT_BITMASK(mask, masksize);
 	DECL_BITMASK(mask2, masksize);
 	COPY_BITMASK(mask2, mask, masksize);
 	printk("copy of original mask, should be the same as the prev\n");
-	PRINT_MASK(mask2, masksize);
+	PRINT_BITMASK(mask2, masksize);
 	CLR_BITMASK_BIT(mask, 11);
 	printk("11 cleared\n");
-	PRINT_MASK(mask, masksize);
+	PRINT_BITMASK(mask, masksize);
 	printk("bit 17 is %d (should be 1)\n", GET_BITMASK_BIT(mask, 17));
 	printk("bit 11 is %d (should be 0)\n", GET_BITMASK_BIT(mask, 11));
 	FILL_BITMASK(mask, masksize);
-	PRINT_MASK(mask, masksize);
+	PRINT_BITMASK(mask, masksize);
 	printk("should be all 1's, except for a few at the end\n");
 	printk("Is Clear?: %d (should be 0)\n", BITMASK_IS_CLEAR(mask,masksize));
 	CLR_BITMASK(mask, masksize);
-	PRINT_MASK(mask, masksize);
+	PRINT_BITMASK(mask, masksize);
 	printk("Is Clear?: %d (should be 1)\n", BITMASK_IS_CLEAR(mask,masksize));
 	printk("should be cleared\n");
 }
@@ -234,10 +234,10 @@ void test_checklists(void)
 	the_global_list = &a_list;
 	printk("Checklist Build, mask size: %d\n", sizeof(a_list.mask.bits));
 	printk("mask\n");
-	PRINT_MASK(a_list.mask.bits, a_list.mask.size);
+	PRINT_BITMASK(a_list.mask.bits, a_list.mask.size);
 	SET_BITMASK_BIT(a_list.mask.bits, 11);
 	printk("Set bit 11\n");
-	PRINT_MASK(a_list.mask.bits, a_list.mask.size);
+	PRINT_BITMASK(a_list.mask.bits, a_list.mask.size);
 
 	CLR_BITMASK(a_list.mask.bits, a_list.mask.size);
 	INIT_CHECKLIST_MASK(a_mask, MAX_NUM_CPUS);
@@ -246,11 +246,11 @@ void test_checklists(void)
 	//SET_BITMASK_BIT(a_mask.bits, 1);
 	//printk("New mask (1, 17, 25):\n");
 	printk("Created new mask, filled up to num_cpus\n");
-	PRINT_MASK(a_mask.bits, a_mask.size);
+	PRINT_BITMASK(a_mask.bits, a_mask.size);
 	printk("committing new mask\n");
 	commit_checklist_wait(&a_list, &a_mask);
 	printk("Old mask (copied onto):\n");
-	PRINT_MASK(a_list.mask.bits, a_list.mask.size);
+	PRINT_BITMASK(a_list.mask.bits, a_list.mask.size);
 	//smp_call_function_single(1, test_checklist_handler, 0, 0);	
 	smp_call_function_all(test_checklist_handler, 0, 0);	
 

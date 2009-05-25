@@ -1,0 +1,26 @@
+USER_NEWLIB_SRC_DIR = $(USER_NEWLIB_DIR)/src
+OBJDIRS += $(USER_NEWLIB_SRC_DIR)
+
+USER_NEWLIB_SRC_CFLAGS   := $(USER_CFLAGS) --nopatch \
+                            -I$(USER_NEWLIB_SRC_DIR) \
+                            -I$(USER_NEWLIB_DIR)/include \
+                            -I$(USER_PARLIB_DIR) 
+USER_NEWLIB_SRC_SRCFILES := $(USER_NEWLIB_SRC_DIR)/libc_wrappers.c 
+USER_NEWLIB_SRC_OBJFILES := $(patsubst $(USER_NEWLIB_SRC_DIR)/%.c, \
+                            $(OBJDIR)/$(USER_NEWLIB_DIR)/%.o, \
+                            $(USER_NEWLIB_SRC_SRCFILES))
+
+$(OBJDIR)/$(USER_NEWLIB_DIR)/%.o: $(USER_NEWLIB_SRC_DIR)/%.c
+	@echo + cc [NEWLIB] $<
+	@mkdir -p $(@D)
+	$(V)$(CC) $(USER_NEWLIB_SRC_CFLAGS) -c -o $@ $<
+
+$(OBJDIR)/$(USER_NEWLIB_DIR)/%.o: $(USER_NEWLIB_SRC_DIR)/%.S
+	@echo + as [NEWLIB] $<
+	@mkdir -p $(@D)
+	$(V)$(CC) $(USER_NEWLIB_SRC_CFLAGS) -c -o $@ $<
+
+$(OBJDIR)/$(USER_NEWLIB_DIR)/libc_wrappers.a: $(USER_NEWLIB_SRC_OBJFILES)
+	@echo + ar [NEWLIB] $@
+	@mkdir -p $(@D)
+	$(V)$(AR) r $@ $(USER_NEWLIB_SRC_OBJFILES) 2>/dev/null

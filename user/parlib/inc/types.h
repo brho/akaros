@@ -87,17 +87,34 @@ typedef int32_t off_t;
 #define DECL_BITMASK(name, size) uint8_t (name)[BYTES_FOR_BITMASK((size))]
 
 #define GET_BITMASK_BIT(name, bit) (((name)[(bit)/8] & (1 << ((bit) % 8))) ? 1 : 0)
-// TODO - Need to do these atomically, or provide alternatives
 #define SET_BITMASK_BIT(name, bit) ((name)[(bit)/8] |= (1 << ((bit) % 8)))
 #define CLR_BITMASK_BIT(name, bit) ((name)[(bit)/8] &= ~(1 << ((bit) % 8)))
+#define SET_BITMASK_BIT_ATOMIC(name, bit) (atomic_orb(&(name)[(bit)/8], (1 << ((bit) % 8))))
 #define CLR_BITMASK_BIT_ATOMIC(name, bit) (atomic_andb(&(name)[(bit)/8], ~(1 << ((bit) % 8))))
 
-#define CLR_BITMASK(name, size) (memset((name), 0, BYTES_FOR_BITMASK((size))))
-#define FILL_BITMASK(name, size) ({ \
-	memset((name), 255, BYTES_FOR_BITMASK((size))); \
-	(name)[BYTES_FOR_BITMASK((size))-1] >>= (((size) % 8) ? (8 - ((size) % 8)) : 0 );}) 
+#define CLR_BITMASK(name, size) \
+({ \
+	{TRUSTEDBLOCK \
+	memset((void*)((uintptr_t)(name)), 0, BYTES_FOR_BITMASK((size))); \
+	} \
+})
 
-#define COPY_BITMASK(newmask, oldmask, size) (memcpy((newmask), (oldmask), BYTES_FOR_BITMASK((size))))
+#define FILL_BITMASK(name, size) \
+({ \
+	{TRUSTEDBLOCK \
+	memset((void*)((uintptr_t)(name)), 255, BYTES_FOR_BITMASK((size))); \
+	} \
+	(name)[BYTES_FOR_BITMASK((size))-1] >>= (((size) % 8) ? (8 - ((size) % 8)) : 0 ); \
+}) 
+
+#define COPY_BITMASK(newmask, oldmask, size) \
+({ \
+	{TRUSTEDBLOCK \
+	memcpy((void*)((uintptr_t)(newmask)), \
+           (void*)((uintptr_t)(oldmask)), \
+           BYTES_FOR_BITMASK((size))); \
+	} \
+})
 
 // this checks the entire last byte, so keep it 0 in the other macros
 #define BITMASK_IS_CLEAR(name, size) ({ \
@@ -111,7 +128,7 @@ typedef int32_t off_t;
 	} \
 	clear; })
 
-#define PRINT_MASK(name, size) { \
+#define PRINT_BITMASK(name, size) { \
 	int i;	\
 	for (i = 0; i < BYTES_FOR_BITMASK(size); i++) { \
 		int j;	\

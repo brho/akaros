@@ -1,0 +1,6 @@
+USER_PARLIB_DIR = $(USER_DIR)/parlib
+
+USER_PARLIB_CFLAGS = $(USER_CFLAGS) -I$(USER_PARLIB_DIR) -nostdinc
+
+include $(USER_PARLIB_DIR)/src/Makefrag
+include $(USER_PARLIB_DIR)/ivylib/Makefrag

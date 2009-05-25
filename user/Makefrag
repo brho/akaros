@@ -1,21 +1,4 @@
-SRC_DIR = user
-OBJDIRS += $(SRC_DIR)
-
-ULOCAL_CFLAGS := $(USER_CFLAGS) -nostdinc
-ULOCAL_LDDIRS := -L$(OBJDIR)/lib -L$(OBJDIR)/ivylib
-ULOCAL_LDLIBS := -static -lros -livyuser 
-ULOCAL_LDOBJS := $(OBJDIR)/ivylib/libivyuser.a  $(OBJDIR)/lib/entry.o       
-ULOCAL_LDDEPENDS := $(ULOCAL_LDOBJS) $(OBJDIR)/lib/libros.a $(OBJDIR)/$(SRC_DIR)/%.o       
-
-$(OBJDIR)/$(SRC_DIR)/%.o: $(SRC_DIR)/%.c
-	@echo + cc[USER] $<
-	@mkdir -p $(@D)
-	$(V)$(CC) $(ULOCAL_CFLAGS) -c -o $@ $<
-
-$(OBJDIR)/$(SRC_DIR)/%: $(ULOCAL_LDDEPENDS)         
-	@echo + ld $@
-	$(V)$(LD) -o $@ $(ULDFLAGS) $(LDFLAGS) $@.o $(ULOCAL_LDOBJS) \
-	                $(ULOCAL_LDDIRS) $(ULOCAL_LDLIBS) $(GCC_LIB)
-	$(V)$(OBJDUMP) -S $@ > $@.asm
-	$(V)$(NM) -n $@ > $@.sym
-
+USER_DIR = user
+include $(USER_DIR)/parlib/Makefrag
+include $(USER_DIR)/newlib/Makefrag
+include $(USER_DIR)/apps/Makefrag

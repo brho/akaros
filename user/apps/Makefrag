@@ -1,0 +1,3 @@
+USER_APPS_DIR = $(USER_DIR)/apps
+include $(USER_APPS_DIR)/parlib/Makefrag
+include $(USER_APPS_DIR)/newlib/Makefrag

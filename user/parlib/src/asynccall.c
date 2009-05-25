@@ -1,3 +1,7 @@
+#ifdef __DEPUTY__
+#pragma nodeputy
+#endif
+
 #include <inc/lib.h>
 #include <inc/syscall.h>
 #include <inc/queue.h>

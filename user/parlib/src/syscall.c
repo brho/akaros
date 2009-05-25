@@ -1,18 +1,12 @@
 // System call stubs.
+#ifdef __DEPUTY__
+#pragma nodeputy
+#endif
 
 #include <inc/syscall.h>
 #include <inc/lib.h>
 #include <inc/x86.h>
 
-static inline uint32_t
-syscall(int num, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32_t a5)
-{
-	#ifndef SYSCALL_TRAP
-	return syscall_sysenter(num, a1, a2, a3, a4, a5);
-	#else
-	return syscall_trap(num, a1, a2, a3, a4, a5);
-	#endif
-}
 // TODO: modify to take only four parameters
 static uint32_t
 syscall_sysenter(int num, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32_t a5)
@@ -69,6 +63,16 @@ syscall_trap(int num, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32
 		: "cc", "memory");
 
 	return ret;
+}
+
+static inline uint32_t
+syscall(int num, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32_t a5)
+{
+	#ifndef SYSCALL_TRAP
+	return syscall_sysenter(num, a1, a2, a3, a4, a5);
+	#else
+	return syscall_trap(num, a1, a2, a3, a4, a5);
+	#endif
 }
 
 static error_t async_syscall(syscall_req_t* req, syscall_desc_t* desc)

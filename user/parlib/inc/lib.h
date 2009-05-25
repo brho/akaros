@@ -31,7 +31,7 @@ extern volatile uint8_t (COUNT(PGSIZE * UINFO_PAGES) procinfo)[];
 extern volatile uint8_t (COUNT(PGSIZE * UDATA_PAGES) procdata)[];
 extern syscall_front_ring_t sysfrontring;
 extern volatile page_t pages[];
-void	exit(void);
+void exit(void) __attribute__((noreturn));
 
 // readline.c
 char*	readline(const char *buf);

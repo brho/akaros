@@ -1,56 +1,39 @@
 /* See COPYRIGHT for copyright information. */
 /* Kevin Klues <klueska@cs.berkeley.edu>	*/
 
-#include <inc/lib.h>
-#include <newlib/libc_wrappers.h>
+#ifndef _NEWLIB_LIBC_WRAPPERS_H
+#define _NEWLIB_LIBC_WRAPPERS_H_
 
-/* environ
- * A pointer to a list of environment variables and their values. 
- * For a minimal environment, this empty list is adequate.
- */
-char *__env[1] = { 0 };
-char **environ = __env;
-extern env_t* env;
+#include <errno.h>
+#include <sys/stat.h>
+#undef errno
+extern int errno;
 
 /* _exit()
  * Exit a program without cleaning up files. 
  * If your system doesn't provide this, it is best to avoid linking 
  * with subroutines that require it (exit, system).
  */
-void _exit() 
-{
-	sys_env_destroy(env->env_id);
-}
+void _exit();
     
 /* close()
  * Close a file. 
  * Minimal implementation.
  */
-int close(int file) 
-{
-	return -1;
-}
+int close(int file);
 
 /* execve()
  * Transfer control to a new process. 
  * Minimal implementation (for a system without processes).
  */
 
-int execve(char *name, char **argv, char **env) 
-{
-	errno = ENOMEM;
-	return -1;
-}
+int execve(char *name, char **argv, char **env);
 
 /* fork()
  * Create a new process. 
  * Minimal implementation (for a system without processes).
  */
-int fork(void) 
-{
-	errno = EAGAIN;
-    return -1;
-}
+int fork(void);
 
 /* fstat()
  * Status of an open file. 
@@ -59,21 +42,14 @@ int fork(void)
  * The sys/stat.h header file required is distributed in the include 
  * subdirectory for the newlib C library.
  */
-int fstat(int file, struct stat *st) 
-{
-	st->st_mode = S_IFCHR;
-	return 0;
-}
+int fstat(int file, struct stat *st);
 
 /* getpid()
  * Process-ID; this is sometimes used to generate strings unlikely to 
  * conflict with other processes. Minimal implementation, for a system 
  * without processes.
  */
-int getpid(void) 
-{
-	return env->env_id;
-}
+int getpid(void);
 
 /* isatty()
  * Query whether output stream is a terminal. 
@@ -81,66 +57,43 @@ int getpid(void)
  * which only support output to stdout, this minimal 
  * implementation is suggested.
  */
-int isatty(int file) 
-{
-	return 1;
-}
+int isatty(int file);
 
 /* kill()
  * Send a signal. 
  * Minimal implementation.
  */
-int kill(int pid, int sig) 
-{
-	errno = EINVAL;
-    return -1;
-}
+int kill(int pid, int sig);
 
 /* link()
  * Establish a new name for an existing file. 
  * Minimal implementation.
  */
-int link(char *old, char *new) 
-{
-	errno = EMLINK;
-	return -1;
-}
+int link(char *old, char *new);
 
 /* lseek()
  * Set position in a file. 
  * Minimal implementation.
  */
-int lseek(int file, int ptr, int dir) 
-{
-	return 0;
-}
+int lseek(int file, int ptr, int dir);
 
 /* __sseek64()
  * Set position in a file. 
  * Minimal implementation.
  */
-int __sseek64(int file, int ptr, int dir) 
-{
-	return 0;
-}
+int __sseek64(int file, int ptr, int dir);
 
 /* open()
  * Open a file. 
  * Minimal implementation.
  */
-int open(const char *name, int flags, int mode) 
-{
-	return -1;
-}
+int open(const char *name, int flags, int mode);
 
 /* read()
  * Read from a file. 
  * Minimal implementation.
  */
-int read(int file, char *ptr, int len) 
-{
-	return 0;
-}
+int read(int file, char *ptr, int len);
 
 /* sbrk()
  * Increase program data space. 
@@ -149,50 +102,31 @@ int read(int file, char *ptr, int len)
  * The following suffices for a standalone system; it exploits the 
  * symbol _end automatically defined by the GNU linker.
  */
-caddr_t sbrk(int incr) 
-{
-	errno = ENOMEM;
-	return (void*)-1;
-}
+caddr_t sbrk(int incr);
 
 /* stat()
  * Status of a file (by name). 
  * Minimal implementation.
  */
-int stat(char *file, struct stat *st) 
-{
-	st->st_mode = S_IFCHR;
-	return 0;
-}
+int stat(char *file, struct stat *st);
 
 /* times()
  * Timing information for current process. 
  * Minimal implementation.
  */
-int times(struct tms *buf) 
-{
-	return -1;
-}
+int times(struct tms *buf);
 
 /* unlink()
  * Remove a file's directory entry. 
  * Minimal implementation.
  */
-int unlink(char *name) 
-{
-	errno = ENOENT;
-	return -1;
-}
+int unlink(char *name);
 
 /* wait()
  * Wait for a child process. 
  * Minimal implementation.
  */
-int wait(int *status) 
-{
-	errno = ECHILD;
-	return -1;
-}
+int wait(int *status);
 
 /* write()
  * Write to a file. 
@@ -205,14 +139,6 @@ int wait(int *status)
  * write this in assembler from examples provided by your hardware 
  * manufacturer) to actually perform the output.
  */
-#define outbyte(arg)
-int write(int file, char *ptr, int len) {
-	return 0;
-}
+int write(int file, char *ptr, int len);
 
-/* __swrite64()
- * Write to a file. 
- */
-int __swrite64(int file, char *ptr, int len) {
-	return 0;
-}
+#endif //_NEWLIB_LIBC_WRAPPERS_H_

@@ -1,5 +1,8 @@
 // Called from entry.S to get us going.
 // entry.S already took care of defining envs, pages, vpd, and vpt.
+#ifdef __DEPUTY__
+#pragma nodeputy
+#endif
 
 #include <inc/lib.h>
 #include <inc/syscall.h>

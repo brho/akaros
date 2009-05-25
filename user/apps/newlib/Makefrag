@@ -1,0 +1,31 @@
+USER_APPS_NEWLIB_DIR = $(USER_APPS_DIR)/newlib
+OBJDIRS += $(USER_APPS_NEWLIB_DIR)
+
+USER_APPS_NEWLIB_CFLAGS    := $(USER_CFLAGS) -I$(USER_NEWLIB_DIR)/include
+USER_APPS_NEWLIB_LDFLAGS   := $(USER_LDFLAGS) -static \
+                              -T $(USER_APPS_NEWLIB_DIR)/apps.ld
+USER_APPS_NEWLIB_LDDIRS    := -L$(OBJDIR)/$(USER_PARLIB_DIR) \
+                              -L$(USER_NEWLIB_DIR)/lib \
+                              -L$(OBJDIR)/$(USER_NEWLIB_DIR)
+USER_APPS_NEWLIB_LDLIBS    := -lc -lc_wrappers -lparlib
+USER_APPS_NEWLIB_LDOBJS    := $(OBJDIR)/$(USER_PARLIB_DIR)/entry.o \
+                              $(OBJDIR)/$(USER_PARLIB_DIR)/libmain.o
+USER_APPS_NEWLIB_LDDEPENDS := $(USER_APPS_NEWLIB_LDOBJS) \
+                              $(OBJDIR)/$(USER_PARLIB_DIR)/libparlib.a \
+                              $(OBJDIR)/$(USER_NEWLIB_DIR)/libc_wrappers.a \
+                              $(OBJDIR)/$(USER_APPS_NEWLIB_DIR)/%.o       
+USER_APPS_NEWLIB_GCC_LIB   := $(GCC_LIB)
+
+$(OBJDIR)/$(USER_APPS_NEWLIB_DIR)/%.o: $(USER_APPS_NEWLIB_DIR)/%.c
+	@echo + cc [APPS NEWLIB] $<
+	@mkdir -p $(@D)
+	$(V)$(CC) $(USER_APPS_NEWLIB_CFLAGS) -c -o $@ $<
+
+$(OBJDIR)/$(USER_APPS_NEWLIB_DIR)/%: $(USER_APPS_NEWLIB_LDDEPENDS)
+	@echo + ld [APPS NEWLIB] $@
+	$(V)$(LD) -o $@ $(USER_APPS_NEWLIB_LDFLAGS) $@.o \
+                    $(USER_APPS_NEWLIB_LDOBJS) $(USER_APPS_NEWLIB_LDDIRS) \
+                    $(USER_APPS_NEWLIB_LDLIBS) $(USER_APPS_NEWLIB_GCC_LIB)
+	$(V)$(OBJDUMP) -S $@ > $@.asm
+	$(V)$(NM) -n $@ > $@.sym
+
