@@ -217,6 +217,7 @@ env_alloc(env_t **newenv_store, envid_t parent_id)
 	e->env_parent_id = parent_id;
 	e->env_status = ENV_RUNNABLE;
 	e->env_runs = 0;
+	e->env_refcnt = 1;
 
 	// Clear out all the saved register state,
 	// to prevent the register values
@@ -447,6 +448,42 @@ env_free(env_t *e)
 	LIST_INSERT_HEAD(&env_free_list, e, env_link);
 }
 
+/*
+ * This allows the kernel to keep this process around, in case it is being used
+ * in some asynchronous processing.
+ * The refcnt should always be greater than 0 for processes that aren't dying.
+ * When refcnt is 0, the process is dying and should not allow any more increfs.
+ * TODO: Make sure this is never called from an interrupt handler (irq_save)
+ */
+error_t env_incref(env_t* e)
+{
+	error_t retval = 0;
+	spin_lock(&e->lock);
+	if (e->env_refcnt)
+		e->env_refcnt++;
+	else
+		retval = E_BAD_ENV;
+	spin_unlock(&e->lock);
+	return retval;
+}
+
+/*
+ * When the kernel is done with a process, it decrements its reference count.
+ * When the count hits 0, no one is using it and it should be freed.
+ * env_destroy calls this.
+ * TODO: Make sure this is never called from an interrupt handler (irq_save)
+ */
+void env_decref(env_t* e)
+{
+	spin_lock(&e->lock);
+	e->env_refcnt--;
+	spin_unlock(&e->lock);
+	// if we hit 0, no one else will increment and we can check outside the lock
+	if (e->env_refcnt == 0)
+		env_free(e);
+}
+
+
 //
 // Frees environment e.
 // If e was the current env, then runs a new environment (and does not return
@@ -455,8 +492,9 @@ env_free(env_t *e)
 void
 env_destroy(env_t *e)
 {
-	uint32_t status;
-	env_free(e);
+	// TODO: race condition with env statuses, esp when running / destroying
+	e->env_status = ENV_DYING;
+	env_decref(e);
 
 	// for old envs that die on user cores.  since env run never returns, cores
 	// never get back to their old hlt/relaxed/spin state, so we need to force
@@ -534,6 +572,8 @@ env_run(env_t *e)
 	//	and make sure you have set the relevant parts of
 	//	e->env_tf to sensible values.
 
+	// TODO: race here with env destroy on the status and refcnt
+	// Could up the refcnt and down it when a process is not running
 	e->env_status = ENV_RUNNING;
 	if (e != curenvs[lapic_get_id()]) {
 		curenvs[lapic_get_id()] = e;

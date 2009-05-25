@@ -52,7 +52,7 @@ static void sys_cache_buster(env_t* e, uint32_t num_writes, uint32_t val)
 	#define MAX_WRITES 1048576
 	uint32_t* buster = (uint32_t*)BUSTER_ADDR;
 	static uint32_t buster_lock = 0;
-	
+
 	spin_lock(&buster_lock);
 	for (int i = 0; i < MIN(num_writes, MAX_WRITES); i++)
 		buster[i] = val;
@@ -171,15 +171,14 @@ int32_t syscall_async(env_t* e, syscall_req_t *call)
 	               call->args[2], call->args[3], call->args[4]);
 }
 
-uint32_t process_generic_syscalls(env_t* e, uint32_t max)
+int32_t process_generic_syscalls(env_t* e, uint32_t max)
 {
 	uint32_t count = 0;
 	syscall_back_ring_t* sysbr = &e->env_sysbackring;
 
-	// make sure the env is still alive.  TODO: this cannot handle an env being
-	// freed async while this is processing.  (need a ref count or lock, etc).
-	if (e->env_status == ENV_FREE)
-		return 0;
+	// make sure the env is still alive.  incref will return 0 on success.
+	if (env_incref(e))
+		return -1;
 
 	// need to switch to the right context, so we can handle the user pointer
 	// that points to a data payload of the syscall
@@ -203,5 +202,6 @@ uint32_t process_generic_syscalls(env_t* e, uint32_t max)
 		//printk("DEBUG POST: sring->req_prod: %d, sring->rsp_prod: %d\n",\
 			   sysbr->sring->req_prod, sysbr->sring->rsp_prod);
 	}
+	env_decref(e);
 	return count;
 }

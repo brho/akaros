@@ -39,14 +39,17 @@ typedef int32_t envid_t;
 #define ENV_RUNNING			1
 #define ENV_RUNNABLE		2
 #define ENV_NOT_RUNNABLE	3
+#define ENV_DYING			4
 
 struct Env {
+	uint32_t lock;
 	trapframe_t env_tf;			// Saved registers
 	LIST_ENTRY(env_t) env_link;	// Free list link pointers
 	envid_t env_id;				// Unique environment identifier
 	envid_t env_parent_id;		// env_id of this env's parent
 	unsigned env_status;		// Status of the environment
 	uint32_t env_runs;			// Number of times environment has run
+	uint32_t env_refcnt;		// Reference count of kernel contexts using this
 	// Note this is the actual backring, not a pointer to it somewhere else
 	syscall_back_ring_t env_sysbackring;	// BackRing for generic syscalls
 

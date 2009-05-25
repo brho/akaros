@@ -5,6 +5,7 @@
 
 #include <arch/x86.h>
 #include <ros/env.h>
+#include <error.h>
 
 extern env_t *envs;		// All environments
 extern env_t* NORACE curenvs[MAX_NUM_CPUS];
@@ -14,6 +15,8 @@ LIST_HEAD(env_list_t, env_t);		// Declares 'struct Env_list'
 void	env_init(void);
 int		env_alloc(env_t **e, envid_t parent_id);
 void	env_free(env_t *e);
+error_t	env_incref(env_t* e);
+void	env_decref(env_t* e);
 env_t*	env_create(uint8_t *binary, size_t size);
 void	(IN_HANDLER env_destroy)(env_t *e);	// Does not return if e == curenv
 

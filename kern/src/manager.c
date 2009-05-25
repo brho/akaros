@@ -15,6 +15,7 @@
 #include <kern/env.h>
 #include <kern/apic.h>
 #include <kern/workqueue.h>
+#include <kern/syscall.h>
 
 /* Helper handlers for smp_call to dispatch jobs to other cores */
 static void work_env_run(void* data)
@@ -41,12 +42,21 @@ void manager(void)
 
 	switch (progress++) {
 		case 0:
-			for (int i = 0; i < 8; i++)
-				env_batch[i] = ENV_CREATE(user_null);
-			for (int i = 0; i < 8; i++)
+			for (int i = 2; i < 8; i++)
+				env_batch[i] = ENV_CREATE(user_hello);
+			for (int i = 2; i < 8; i++)
 				smp_call_function_single(i, run_env_handler, env_batch[i], 0);
+			int count = 0;
+			while (count > -6) {
+				count = 0;
+				for (int i = 2; i < 8; i++) {
+					count += process_generic_syscalls(env_batch[i], 1);
+				}
+				cpu_relax();
+			}
 			process_workqueue(); // Will run this core (0)'s env
-			break;
+			panic("Don't Panic");
+			break; // only need this when planning to reenter manager
 		case 1:
 			for (int i = 0; i < 4; i++)
 				env_batch[i] = ENV_CREATE(user_null);
