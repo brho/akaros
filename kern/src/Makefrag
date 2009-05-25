@@ -56,7 +56,7 @@ KERN_APPFILES :=  	$(USER_APPS_NEWLIB_DIR)/hello \
 #   				apps/faultwritekernel \
 #   				apps_newlib/null \
 
-KERN_LDFLAGS   := $(KERN_LDFLAGS) -L$(OBJDIR)/$(KERN_IVYLIB_DIR) \
+KERN_LDFLAGS   := $(KERN_LDFLAGS) -L$(OBJDIR)/$(KERN_DIR) \
                   -T $(KERN_DIR)/kernel.ld
 KERN_OBJFILES  := $(patsubst $(KERN_SRC_DIR)/%.c, \
                              $(OBJDIR)/$(KERN_DIR)/%.o, \
@@ -69,7 +69,7 @@ KERN_OBJFILES  := $(patsubst $(USER_PARLIB_SRC_DIR)/%.c, \
                              $(KERN_OBJFILES))
 KERN_APPFILES  := $(patsubst %, $(OBJDIR)/%, $(KERN_APPFILES))
 KERN_LDDEPENDS := $(KERN_OBJFILES) $(KERN_APPFILES) $(KERN_DIR)/kernel.ld \
-                  $(OBJDIR)/$(KERN_IVYLIB_DIR)/libivykern.a
+                  $(OBJDIR)/$(KERN_DIR)/libivykern.a
 KERN_LDLIBS    := -livykern
 KERN_GCC_LIB   := $(GCC_LIB)
 

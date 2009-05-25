@@ -105,7 +105,7 @@ include kern/Makefrag
 	       $(OBJDIR)/$(USER_PARLIB_DIR)/%.o       \
 	       $(OBJDIR)/$(USER_NEWLIB_DIR)/%.o       \
            $(OBJDIR)/$(USER_APPS_NEWLIB_DIR)/%.o  \
-           $(OBJDIR)/$(USER_APPS_PARLAB_DIR)/%.o
+           $(OBJDIR)/$(USER_APPS_PARLIB_DIR)/%.o
 
 # This magic automatically generates makefile dependencies
 # for header files included from C source files we compile,
