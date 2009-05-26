@@ -25,13 +25,12 @@ typedef struct struct_##p {                                                     
 		(p)->queue[i] = &((p)->pool[i]);                                       \
 	}                                                                          \
 })
-
+// removed unnecessary (p)->queue[(p)->index] = NULL;
 #define POOL_GET(p)                                            \
 ({                                                             \
 	void* rval = NULL;                                         \
 	if((p)->free) {                                            \
 		rval = (p)->queue[(p)->index];                         \
-		(p)->queue[(p)->index] = NULL;                         \
 		(p)->free--;                                           \
 		(p)->index++;                                          \
 		if((p)->index == (p)->size) {                          \
@@ -50,7 +49,7 @@ typedef struct struct_##p {                                                     
 		emptyIndex -= (p)->size;                           		\
 	}		                                                    \
 	for(int _i = emptyIndex;  _i < (p)->index; _i++){			\
-		func((p)->queue[_i]);									\
+		func((p)->queue[_i]);								\
 	}															\
 })																\
 

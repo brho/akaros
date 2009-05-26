@@ -42,6 +42,7 @@ typedef struct Timer{
 	char label[TIMER_TAG_SIZE];
 } timer_t;
 
+//TODO: ifdef measurement? error check when pool runs low
 #define TAGGED_TIMING_BEGIN(tag)                    \
 	static timer_t* _timer_##tag = NULL;            \
 	if (_timer_##tag == NULL) {                     \
@@ -50,7 +51,6 @@ typedef struct Timer{
 		_timer_##tag->aggr_run = 0;                 \
 	}                                               \
 	_timer_##tag->curr_run = start_timing();
-
 #define TAGGED_TIMING_END(tag)                                              \
 ({                                                                          \
 	_timer_##tag->curr_run = stop_timing(_timer_##tag->curr_run);           \

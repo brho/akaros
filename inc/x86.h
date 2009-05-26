@@ -322,7 +322,8 @@ static __inline uint64_t
 read_tsc_serialized(void)
 {
     uint64_t tsc;
-    __asm __volatile("cpuid; rdtsc" : "=A" (tsc));
+	cpuid(0, 0, 0, 0, 0);
+	tsc = read_tsc();
 	return tsc;
 }
 

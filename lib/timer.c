@@ -29,7 +29,10 @@ uint64_t start_timing() __attribute__((noinline))
  */
 uint64_t stop_timing(uint64_t val) __attribute__((noinline))
 {
-    return (read_tsc_serialized() - val - timing_overhead);
+    uint64_t diff = (read_tsc_serialized() - val - timing_overhead);
+	if ((int64_t) diff < 0) 
+		return 1;
+	return diff;
 }
 
 /* train_timing()
@@ -40,7 +43,8 @@ uint64_t stop_timing(uint64_t val) __attribute__((noinline))
 void train_timing() 
 {
 	int i;
-	register uint64_t cum_overhead = 0;
+	// set training overhead to be something large
+	register uint64_t training_overhead = 0xffffffff;
 	register uint64_t time, diff;
 
 	//Do this 3 times outside the loop to warm up cpuid
@@ -50,7 +54,6 @@ void train_timing()
  	diff = stop_timing(time);
 	time = start_timing();
  	diff = stop_timing(time);
-
 	for(i=0; i<10000; i++) {
 		time = start_timing();
  		diff = stop_timing(time);
@@ -59,8 +62,8 @@ void train_timing()
 		 * to the cumulative error, otherwise, just diff itself
 		 */
 		if((int64_t)diff < 0)
-			diff = (uint64_t)(~0) - diff + 1; 
-		cum_overhead += diff;
+			diff = (uint64_t)(~0) - diff + 1;
+		training_overhead = MIN(training_overhead, diff);
 	}
-	timing_overhead = (cum_overhead/i);
+	timing_overhead = training_overhead;
 }

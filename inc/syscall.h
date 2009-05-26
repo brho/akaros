@@ -44,4 +44,7 @@ struct syscall_desc {
 };
 LIST_HEAD(syscall_desc_list_t, syscall_desc_t);
 
+static uint32_t
+syscall_sysenter(int num, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32_t a5);
+
 #endif /* !ROS_INC_SYSCALL_H */

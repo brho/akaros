@@ -31,7 +31,9 @@ libmain(int argc, char **argv)
 	POOL_INIT(&async_desc_pool, MAX_ASYNCCALLS);
 
 	// Setup the timer pool	
+	// TODO: ifdef measurement?
 	POOL_INIT(&timer_pool, MAX_TIMERS);
+	train_timing();
 
 	// save the name of the program so that panic() can use it
 	if (argc > 0)

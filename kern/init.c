@@ -81,12 +81,12 @@ void kernel_init(multiboot_info_t *mboot_info)
 	//ENV_CREATE(user_divzero);
 	//ENV_CREATE(user_buggyhello);
 	//ENV_CREATE(user_evilhello);
-	ENV_CREATE(user_hello);
-	ENV_CREATE(user_hello);
 	//ENV_CREATE(user_hello);
 	//ENV_CREATE(user_hello);
-	//ENV_CREATE(user_null);
-	//ENV_CREATE(user_null);
+	//ENV_CREATE(user_hello);
+	//ENV_CREATE(user_hello);
+	ENV_CREATE(user_null);
+	ENV_CREATE(user_null);
 	env_run(&envs[0]);
 	env_run(&envs[1]);
 	panic("Don't Panic");
