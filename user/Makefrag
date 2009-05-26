@@ -1,6 +1,6 @@
 USER_DIR = user
 
-USER_CFLAGS  := $(CFLAGS) -DROS_USER
+USER_CFLAGS  := $(CFLAGS) -DROS_USER -nostdinc
 USER_LDFLAGS :=
 
 # This is defined here because it is need by both

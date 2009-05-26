@@ -3,11 +3,10 @@
  * See LICENSE for details.
  */
 
-#include <inc/x86.h>
-
-#include <kern/workqueue.h>
-#include <kern/apic.h>
-#include <kern/smp.h>
+#include <arch/x86.h>
+#include <arch/apic.h>
+#include <arch/smp.h>
+#include <workqueue.h>
 
 /*
  * TODO: actually use a queue, which will change some things all over.

@@ -25,11 +25,11 @@ int	envid2env(envid_t envid, env_t **env_store, bool checkperm);
 void	(IN_HANDLER env_run)(env_t *e) __attribute__((noreturn));
 void	env_pop_tf(trapframe_t *tf) __attribute__((noreturn));
 
-#define ENV_CREATE(x)			({		\
-	extern uint8_t _binary_obj_##x##_start[],	\
-		_binary_obj_##x##_size[];		\
-	env_create(_binary_obj_##x##_start,		\
-		(int)_binary_obj_##x##_size);		\
+#define ENV_CREATE(x)			({                                             \
+	extern uint8_t _binary_obj_user_apps_##x##_start[],                        \
+		_binary_obj_user_apps_##x##_size[];                                    \
+	env_create(_binary_obj_user_apps_##x##_start,                              \
+		(int)_binary_obj_user_apps_##x##_size);                                \
 })
 
 #endif // !ROS_KERN_ENV_H

@@ -26,7 +26,7 @@
 #include <testing.h>
 #include <syscall.h>
 #include <kclock.h>
-#include <kern/manager.h>
+#include <manager.h>
 
 static void print_cpuinfo(void);
 
