@@ -2,14 +2,14 @@
 #pragma nodeputy
 #endif
 
-#include <inc/stab.h>
-#include <inc/string.h>
-#include <inc/memlayout.h>
-#include <inc/assert.h>
+#include <arch/stab.h>
+#include <string.h>
+#include <assert.h>
+#include <kdebug.h>
+#include <pmap.h>
+#include <env.h>
 
-#include <kern/kdebug.h>
-#include <kern/pmap.h>
-#include <kern/env.h>
+#include <ros/memlayout.h>
 
 extern const stab_t __STAB_BEGIN__[];	// Beginning of stabs table
 extern const stab_t __STAB_END__[];	// End of stabs table

@@ -1,13 +1,12 @@
 /* See COPYRIGHT for copyright information. */
 
-#include <inc/x86.h>
-#include <inc/memlayout.h>
-#include <inc/kbdreg.h>
-#include <inc/string.h>
-#include <inc/assert.h>
+#include <arch/x86.h>
+#include <arch/console.h>
+#include <kbdreg.h>
+#include <string.h>
+#include <assert.h>
 
-#include <kern/console.h>
-
+#include <ros/memlayout.h>
 
 void cons_intr(int (*proc)(void));
 void scroll_screen(void);

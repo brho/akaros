@@ -1,0 +1,32 @@
+#
+# Makefile fragment for the ROS kernel.
+# This is NOT a complete makefile;
+# you must run GNU make in the top-level directory
+# where the GNUmakefile is located.
+#
+
+KERN_BOOT_DIR := $(KERN_DIR)/boot
+OBJDIRS += $(KERN_BOOT_DIR)
+
+KERN_BOOT_CFLAGS  := $(KERN_CFLAGS) -Os
+KERN_BOOT_LDFLAGS := $(KERN_LDFLAGS) -N -e start -Ttext 0x7C00
+KERN_BOOT_OBJS    := $(OBJDIR)/$(KERN_DIR)/boot.o \
+                     $(OBJDIR)/$(KERN_DIR)/main.o
+
+$(OBJDIR)/$(KERN_DIR)/%.o: $(KERN_BOOT_DIR)/%.c
+	@echo + cc [BOOT] $<
+	@mkdir -p $(@D)
+	$(V)$(CC) $(KERN_BOOT_CFLAGS) -c -o $@ $<
+
+$(OBJDIR)/$(KERN_DIR)/%.o: $(KERN_BOOT_DIR)/%.S
+	@echo + as [BOOT] $<
+	@mkdir -p $(@D)
+	$(V)$(CC) $(KERN_BOOT_CFLAGS) -c -o $@ $<
+
+$(OBJDIR)/$(KERN_DIR)/boot: $(KERN_BOOT_OBJS)
+	@echo + ld [BOOT] $<
+	$(V)$(LD) $(KERN_BOOT_LDFLAGS) -o $@.out $^
+	$(V)$(OBJDUMP) -S $@.out >$@.asm
+	$(V)$(OBJCOPY) -S -O binary $@.out $@
+	$(V)perl $(KERN_BOOT_DIR)/sign.pl $(OBJDIR)/$(KERN_DIR)/boot
+

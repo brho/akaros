@@ -1,6 +1,6 @@
-#include <inc/mmu.h>
-#include <inc/memlayout.h>
-#include <inc/trap.h>
+#include <arch/mmu.h>
+#include <ros/memlayout.h>
+#include <ros/trap.h>
 
 #define	RELOC(x) ((x) - KERNBASE)
 #define	CPUID_PSE_SUPPORT	0x00000008

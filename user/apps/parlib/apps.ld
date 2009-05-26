@@ -14,7 +14,7 @@ SECTIONS
 		*(.text .stub .text.* .gnu.linkonce.t.*)
 	}
 
-	PROVIDE(etext = .);	/* Define the 'etext' symbol to this value */
+	PROVIDE(_etext = .);	/* Define the 'etext' symbol to this value */
 
 	.rodata : {
 		*(.rodata .rodata.* .gnu.linkonce.r.*)
@@ -27,13 +27,13 @@ SECTIONS
 		*(.data)
 	}
 
-	PROVIDE(edata = .);
+	PROVIDE(_edata = .);
 
 	.bss : {
 		*(.bss)
 	}
 
-	PROVIDE(end = .);
+	PROVIDE(_end = .);
 
 
 	/* Place debugging symbols so that they can be found by

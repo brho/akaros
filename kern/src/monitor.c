@@ -5,21 +5,22 @@
 #pragma nodeputy
 #endif
 
-#include <inc/stdio.h>
-#include <inc/string.h>
-#include <inc/memlayout.h>
-#include <inc/assert.h>
-#include <inc/x86.h>
-#include <inc/stab.h>
+#include <arch/x86.h>
+#include <arch/stab.h>
+#include <arch/apic.h>
+#include <arch/smp.h>
+#include <arch/console.h>
 
-#include <kern/console.h>
-#include <kern/monitor.h>
-#include <kern/trap.h>
-#include <kern/kdebug.h>
-#include <kern/pmap.h>
-#include <kern/apic.h>
-#include <kern/smp.h>
-#include <kern/testing.h>
+#include <stdio.h>
+#include <string.h>
+#include <assert.h>
+#include <monitor.h>
+#include <trap.h>
+#include <pmap.h>
+#include <kdebug.h>
+#include <testing.h>
+
+#include <ros/memlayout.h>
 
 #define CMDBUF_SIZE	80	// enough for one VGA text line
 

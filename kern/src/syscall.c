@@ -3,18 +3,16 @@
 #pragma nodeputy
 #endif
 
-#include <inc/x86.h>
-#include <inc/error.h>
-#include <inc/string.h>
-#include <inc/assert.h>
-
-#include <kern/env.h>
-#include <kern/pmap.h>
-#include <kern/trap.h>
-#include <kern/syscall.h>
-#include <kern/console.h>
-#include <kern/apic.h>
-
+#include <arch/x86.h>
+#include <arch/console.h>
+#include <arch/apic.h>
+#include <error.h>
+#include <string.h>
+#include <assert.h>
+#include <env.h>
+#include <pmap.h>
+#include <trap.h>
+#include <syscall.h>
 
 void syscall_wrapper(struct Trapframe *tf)
 {

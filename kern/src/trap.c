@@ -2,18 +2,18 @@
 #pragma noasync
 #endif
 
-#include <inc/mmu.h>
-#include <inc/x86.h>
-#include <inc/assert.h>
+#include <arch/mmu.h>
+#include <arch/x86.h>
+#include <arch/console.h>
+#include <arch/apic.h>
+#include <arch/smp.h>
+#include <assert.h>
+#include <pmap.h>
+#include <trap.h>
+#include <monitor.h>
+#include <env.h>
 
-#include <kern/pmap.h>
-#include <kern/trap.h>
-#include <kern/console.h>
-#include <kern/monitor.h>
-#include <kern/env.h>
-#include <kern/syscall.h>
-#include <kern/apic.h>
-#include <kern/smp.h>
+#include <syscall.h>
 
 taskstate_t ts;
 

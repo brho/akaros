@@ -1,8 +1,8 @@
-#include <inc/lib.h>
-
+#include <stdlib.h>
+#include <stdio.h>
 
 int main(int argc, char** argv)
 {
-	cprintf("goodbye, world!\n");
+	printf("Hello world from newlib!!\n");
 	return 0;
 }

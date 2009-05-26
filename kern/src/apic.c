@@ -3,12 +3,11 @@
  * See LICENSE for details.
  */
 
-#include <inc/mmu.h>
-#include <inc/x86.h>
-#include <inc/assert.h>
-#include <inc/timer.h>
-
-#include <kern/apic.h>
+#include <arch/mmu.h>
+#include <arch/x86.h>
+#include <arch/apic.h>
+#include <arch/timer.h>
+#include <assert.h>
 
 system_timing_t system_timing = {0, 0, 0xffff, 0};
 

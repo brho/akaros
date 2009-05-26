@@ -30,14 +30,14 @@ KERN_SRCFILES := $(KERN_SRC_DIR)/entry.S \
                  $(KERN_SRC_DIR)/testing.c \
                  $(KERN_SRC_DIR)/atomic.c \
                  $(KERN_SRC_DIR)/smp.c \
-                 $(USER_PARLIB_SRC_DIR)/printfmt.c \
-                 $(USER_PARLIB_SRC_DIR)/readline.c \
-                 $(USER_PARLIB_SRC_DIR)/string.c \
-                 $(USER_PARLIB_SRC_DIR)/timer.c
+                 $(KERN_SRC_DIR)/printfmt.c \
+                 $(KERN_SRC_DIR)/readline.c \
+                 $(KERN_SRC_DIR)/string.c \
+                 $(KERN_SRC_DIR)/timer.c
 # Only build files if they exist.
 KERN_SRCFILES := $(wildcard $(KERN_SRCFILES))
 
-KERN_APPFILES :=  	$(USER_APPS_NEWLIB_DIR)/hello \
+KERN_APPFILES :=  	$(USER_APPS_ROSLIB_DIR)/hello \
                     $(USER_APPS_PARLIB_DIR)/hello
 #					apps/null \
 #					apps/hello \
@@ -58,19 +58,21 @@ KERN_APPFILES :=  	$(USER_APPS_NEWLIB_DIR)/hello \
 
 KERN_LDFLAGS   := $(KERN_LDFLAGS) -L$(OBJDIR)/$(KERN_DIR) \
                   -T $(KERN_DIR)/kernel.ld
+
 KERN_OBJFILES  := $(patsubst $(KERN_SRC_DIR)/%.c, \
                              $(OBJDIR)/$(KERN_DIR)/%.o, \
                              $(KERN_SRCFILES))
 KERN_OBJFILES  := $(patsubst $(KERN_SRC_DIR)/%.S, \
                              $(OBJDIR)/$(KERN_DIR)/%.o, \
                              $(KERN_OBJFILES))
-KERN_OBJFILES  := $(patsubst $(USER_PARLIB_SRC_DIR)/%.c, \
-                             $(OBJDIR)/$(KERN_DIR)/%.o, \
-                             $(KERN_OBJFILES))
+
 KERN_APPFILES  := $(patsubst %, $(OBJDIR)/%, $(KERN_APPFILES))
+
 KERN_LDDEPENDS := $(KERN_OBJFILES) $(KERN_APPFILES) $(KERN_DIR)/kernel.ld \
                   $(OBJDIR)/$(KERN_DIR)/libivykern.a
+
 KERN_LDLIBS    := -livykern
+
 KERN_GCC_LIB   := $(GCC_LIB)
 
 $(OBJDIR)/$(KERN_DIR)/%.o: $(KERN_SRC_DIR)/%.c
@@ -83,11 +85,6 @@ $(OBJDIR)/$(KERN_DIR)/%.o: $(KERN_SRC_DIR)/%.S
 	@mkdir -p $(@D)
 	$(V)$(CC) $(KERN_CFLAGS) -c -o $@ $<
 
-$(OBJDIR)/$(KERN_DIR)/%.o: $(USER_PARLIB_SRC_DIR)/%.c
-	@echo + cc [KERN] $<
-	@mkdir -p $(@D)
-	$(V)$(CC) $(KERN_CFLAGS) -c -o $@ $<
-
 $(OBJDIR)/$(KERN_DIR)/kernel: $(KERN_LDDEPENDS)
 	@echo + ld [KERN] $@
 	$(V)$(LD) -o $@ $(KERN_LDFLAGS) $(KERN_OBJFILES) $(KERN_LDLIBS) \
@@ -95,10 +92,10 @@ $(OBJDIR)/$(KERN_DIR)/kernel: $(KERN_LDDEPENDS)
 	$(V)$(OBJDUMP) -S $@ > $@.asm
 	$(V)$(NM) -n $@ > $@.sym
 
-$(OBJDIR)/$(KERN_DIR)/bochs.img: $(OBJDIR)/$(KERN_DIR)/kernel $(OBJDIR)/$(BOOT_DIR)/boot
+$(OBJDIR)/$(KERN_DIR)/bochs.img: $(OBJDIR)/$(KERN_DIR)/kernel $(OBJDIR)/$(KERN_DIR)/boot
 	@echo + mk [KERN] $@
 	$(V)dd if=/dev/zero of=$(OBJDIR)/$(KERN_DIR)/bochs.img~ count=10000 2>/dev/null
-	$(V)dd if=$(OBJDIR)/$(BOOT_DIR)/boot of=$(OBJDIR)/$(KERN_DIR)/bochs.img~ conv=notrunc 2>/dev/null
+	$(V)dd if=$(OBJDIR)/$(KERN_DIR)/boot of=$(OBJDIR)/$(KERN_DIR)/bochs.img~ conv=notrunc 2>/dev/null
 	$(V)dd if=$(OBJDIR)/$(KERN_DIR)/kernel of=$(OBJDIR)/$(KERN_DIR)/bochs.img~ seek=1 conv=notrunc 2>/dev/null
 	$(V)mv $(OBJDIR)/kern/bochs.img~ $(OBJDIR)/kern/bochs.img
 

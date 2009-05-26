@@ -8,24 +8,24 @@
 #include Everything For Free -- It just works!!
 #else
 
-#include <inc/stdio.h>
-#include <inc/string.h>
-#include <inc/assert.h>
-#include <inc/multiboot.h>
-#include <inc/stab.h>
-#include <inc/x86.h>
+#include <arch/x86.h>
+#include <arch/apic.h>
+#include <arch/console.h>
+#include <arch/multiboot.h>
+#include <arch/stab.h>
+#include <arch/smp.h>
 
-#include <kern/monitor.h>
-#include <kern/console.h>
-#include <kern/pmap.h>
-#include <kern/kclock.h>
-#include <kern/env.h>
-#include <kern/trap.h>
-#include <kern/apic.h>
-#include <kern/testing.h>
-#include <kern/atomic.h>
-#include <kern/smp.h>
-#include <kern/syscall.h>
+#include <stdio.h>
+#include <atomic.h>
+#include <string.h>
+#include <assert.h>
+#include <monitor.h>
+#include <pmap.h>
+#include <env.h>
+#include <trap.h>
+#include <testing.h>
+#include <syscall.h>
+#include <kclock.h>
 
 static void print_cpuinfo(void);
 
@@ -83,7 +83,7 @@ void kernel_init(multiboot_info_t *mboot_info)
 	//ENV_CREATE(user_evilhello);
 	//ENV_CREATE(user_hello);
 	ENV_CREATE(user_apps_parlib_hello);
-	ENV_CREATE(user_apps_newlib_hello);
+	ENV_CREATE(user_apps_roslib_hello);
 	//ENV_CREATE(user_hello);
 	//ENV_CREATE(user_hello);
 	//ENV_CREATE(user_hello);

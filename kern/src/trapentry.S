@@ -1,8 +1,8 @@
 /* See COPYRIGHT for copyright information. */
 
-#include <inc/mmu.h>
-#include <inc/memlayout.h>
-#include <inc/trap.h>
+#include <arch/mmu.h>
+#include <ros/trap.h>
+#include <ros/memlayout.h>
 
 
 

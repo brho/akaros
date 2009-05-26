@@ -1,2 +1,0 @@
-USER_NEWLIB_DIR = $(USER_DIR)/newlib
-include $(USER_NEWLIB_DIR)/src/Makefrag

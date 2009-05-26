@@ -2,19 +2,18 @@
 #pragma nodeputy
 #endif
 
-#include <inc/stdio.h>
-#include <inc/string.h>
-#include <inc/assert.h>
-#include <inc/error.h>
-#include <inc/x86.h>
-
-#include <kern/smp.h>
-#include <kern/console.h>
-#include <kern/pmap.h>
-#include <kern/env.h>
-#include <kern/apic.h>
-#include <kern/atomic.h>
-#include <kern/trap.h>
+#include <arch/x86.h>
+#include <arch/smp.h>
+#include <arch/console.h>
+#include <arch/apic.h>
+#include <stdio.h>
+#include <string.h>
+#include <assert.h>
+#include <error.h>
+#include <pmap.h>
+#include <env.h>
+#include <atomic.h>
+#include <trap.h>
 
 volatile uint8_t num_cpus = 0xee;
 uintptr_t smp_stack_top;

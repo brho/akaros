@@ -1,0 +1,20 @@
+NATIVECC := ivycc
+
+KERN_IVY_DIR = $(KERN_DIR)/ivy
+OBJDIRS += $(KERN_IVY_DIR)
+
+KERN_IVY_CFLAGS   := $(KERN_CFLAGS)
+KERN_IVY_SRCFILES := $(KERN_IVY_DIR)/deputy.c
+KERN_IVY_OBJFILES := $(patsubst $(KERN_IVY_DIR)/%.c, \
+                                   $(OBJDIR)/$(KERN_DIR)/%.o, \
+                                   $(KERN_IVY_SRCFILES))
+
+$(OBJDIR)/$(KERN_DIR)/deputy.o: $(KERN_IVY_SRCFILES)
+	@echo + cc [KERN IVY] $<
+	@mkdir -p $(@D)
+	$(V)$(NATIVECC) $(KERN_IVY_CFLAGS) -c -o $@ $<
+
+$(OBJDIR)/$(KERN_DIR)/libivykern.a: $(KERN_IVY_OBJFILES)
+	@echo + ar [KERN IVY] $@
+	$(V)$(AR) r $@ $(KERN_IVY_OBJFILES) 2>/dev/null
+

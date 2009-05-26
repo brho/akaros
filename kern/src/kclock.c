@@ -5,9 +5,9 @@
  * generates interrupts on IRQ 0.
  */
 
-#include <inc/x86.h>
+#include <arch/x86.h>
 
-#include <kern/kclock.h>
+#include <kclock.h>
 
 
 unsigned

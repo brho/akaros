@@ -3,20 +3,21 @@
 #pragma nodeputy
 #endif
 
-#include <inc/x86.h>
-#include <inc/mmu.h>
-#include <inc/error.h>
-#include <inc/string.h>
-#include <inc/assert.h>
-#include <inc/elf.h>
-#include <inc/syscall.h>
+#include <arch/x86.h>
+#include <arch/mmu.h>
+#include <arch/elf.h>
+#include <arch/apic.h>
+#include <arch/smp.h>
 
-#include <kern/env.h>
-#include <kern/pmap.h>
-#include <kern/trap.h>
-#include <kern/monitor.h>
-#include <kern/apic.h>
-#include <kern/smp.h>
+#include <error.h>
+#include <string.h>
+#include <assert.h>
+#include <env.h>
+#include <pmap.h>
+#include <trap.h>
+#include <monitor.h>
+
+#include <ros/syscall.h>
 
 env_t *envs = NULL;		// All environments
 // TODO: make this a struct of info including the pointer and cacheline-align it

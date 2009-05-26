@@ -5,11 +5,10 @@
 #pragma nodeputy
 #endif
 
-#include <inc/types.h>
-#include <inc/stdio.h>
-#include <inc/stdarg.h>
-
-#include <kern/atomic.h>
+#include <arch/types.h>
+#include <stdio.h>
+#include <stdarg.h>
+#include <atomic.h>
 
 uint32_t output_lock = 0;
 

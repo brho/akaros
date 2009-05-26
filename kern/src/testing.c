@@ -2,17 +2,16 @@
 #pragma nodeputy
 #endif
 
-#include <inc/mmu.h>
-#include <inc/x86.h>
-#include <inc/stdio.h>
-#include <inc/assert.h>
-#include <inc/string.h>
-
-#include <kern/testing.h>
-#include <kern/trap.h>
-#include <kern/apic.h>
-#include <kern/atomic.h>
-#include <kern/smp.h>
+#include <arch/mmu.h>
+#include <arch/x86.h>
+#include <arch/smp.h>
+#include <arch/apic.h>
+#include <stdio.h>
+#include <assert.h>
+#include <string.h>
+#include <testing.h>
+#include <trap.h>
+#include <atomic.h>
 
 #define test_vector 0xeb
 

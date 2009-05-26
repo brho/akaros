@@ -1,4 +1,11 @@
-
 KERN_DIR := kern
-include $(KERN_DIR)/ivylib/Makefrag
+
+KERN_CFLAGS := $(CFLAGS) -DROS_KERNEL -nostdinc
+KERN_CFLAGS += -I$(INCLUDE_DIR)
+KERN_LDFLAGS := 
+
+include $(KERN_DIR)/boot/Makefrag
+include $(KERN_DIR)/ivy/Makefrag
 include $(KERN_DIR)/src/Makefrag
+
+.PRECIOUS: $(OBJDIR)/$(KERN_DIR)/%.o

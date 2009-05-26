@@ -7,7 +7,8 @@
 #
 OBJDIR := obj
 
-TOP = .
+TOP_DIR := .
+INCLUDE_DIR := $(TOP_DIR)/include
 UNAME=$(shell uname -m)
 V = @
 
@@ -54,18 +55,9 @@ ARCH ?= NONE
 CFLAGS := $(CFLAGS) -D$(ARCH) 
 CFLAGS += -O -pipe -MD -fno-builtin -fno-stack-protector -gstabs
 CFLAGS += -Wall -Wno-format -Wno-unused
-CFLAGS += -I$(TOP)
-
-# Kernel vs. user universal compiler flags
-KERN_CFLAGS := $(CFLAGS) -DROS_KERNEL -nostdinc
-USER_CFLAGS := $(CFLAGS) -DROS_USER
 
 # Universal loader flags
 LDFLAGS := -nostdlib
-
-# Kernel vs. user universal loader flags
-KERN_LDFLAGS := 
-USER_LDFLAGS :=
 
 # GCC Library path 
 GCC_LIB := $(shell $(CC) -print-libgcc-file-name)
@@ -85,10 +77,6 @@ all:
 
 # Include Makefrags for subdirectories
 include user/Makefrag
-# A hack until we get the story figured out with the kernel including files from 
-# parlib/inc
-KERN_CFLAGS += -I$(USER_PARLIB_DIR)
-include boot/Makefrag
 include kern/Makefrag
 -include Makelocal
 
@@ -97,15 +85,6 @@ include kern/Makefrag
 
 # Delete target files if there is an error (or make is interrupted)
 .DELETE_ON_ERROR:
-
-# make it so that no intermediate .o files are ever deleted
-.PRECIOUS: %.o                                    \
-           $(OBJDIR)/$(BOOT_DIR)/%.o              \
-           $(OBJDIR)/$(KERN_DIR)/%.o              \
-	       $(OBJDIR)/$(USER_PARLIB_DIR)/%.o       \
-	       $(OBJDIR)/$(USER_NEWLIB_DIR)/%.o       \
-           $(OBJDIR)/$(USER_APPS_NEWLIB_DIR)/%.o  \
-           $(OBJDIR)/$(USER_APPS_PARLIB_DIR)/%.o
 
 # This magic automatically generates makefile dependencies
 # for header files included from C source files we compile,

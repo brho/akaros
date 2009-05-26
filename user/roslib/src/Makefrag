@@ -1,0 +1,40 @@
+USER_ROSLIB_SRC_DIR = $(USER_ROSLIB_DIR)/src
+OBJDIRS += $(USER_ROSLIB_SRC_DIR)
+
+USER_ROSLIB_SRC_CFLAGS   := $(USER_CFLAGS) -nostdinc \
+                            -I$(USER_ROSLIB_INCLUDE_DIR)
+
+USER_ROSLIB_SRC_SRCFILES := $(USER_ROSLIB_SRC_DIR)/console.c \
+                            $(USER_ROSLIB_SRC_DIR)/libmain.c \
+                            $(USER_ROSLIB_SRC_DIR)/null.c \
+                            $(USER_ROSLIB_SRC_DIR)/exit.c \
+                            $(USER_ROSLIB_SRC_DIR)/panic.c \
+                            $(USER_ROSLIB_SRC_DIR)/printf.c \
+                            $(USER_ROSLIB_SRC_DIR)/printfmt.c \
+                            $(USER_ROSLIB_SRC_DIR)/readline.c \
+                            $(USER_ROSLIB_SRC_DIR)/string.c \
+                            $(USER_ROSLIB_SRC_DIR)/syscall.c \
+                            $(USER_ROSLIB_SRC_DIR)/asynccall.c \
+                            $(USER_ROSLIB_SRC_DIR)/timer.c 
+
+USER_ROSLIB_SRC_OBJFILES := $(patsubst $(USER_ROSLIB_SRC_DIR)/%.c, \
+                            $(OBJDIR)/$(USER_ROSLIB_DIR)/%.o,  \
+                            $(USER_ROSLIB_SRC_SRCFILES))
+USER_ROSLIB_SRC_OBJFILES := $(patsubst $(USER_ROSLIB_SRC_DIR)/%.S, \
+                            $(OBJDIR)/$(USER_ROSLIB_DIR)/%.o,  \
+                            $(USER_ROSLIB_SRC_OBJFILES))
+
+$(OBJDIR)/$(USER_ROSLIB_DIR)/%.o: $(USER_ROSLIB_SRC_DIR)/%.c
+	@echo + cc [ROSLIB] $<
+	@mkdir -p $(@D)
+	$(V)$(CC) $(USER_ROSLIB_SRC_CFLAGS) -c -o $@ $<
+
+$(OBJDIR)/$(USER_ROSLIB_DIR)/%.o: $(USER_ROSLIB_SRC_DIR)/%.S
+	@echo + as [ROSLIB] $<
+	@mkdir -p $(@D)
+	$(V)$(CC) $(USER_ROSLIB_SRC_CFLAGS) -c -o $@ $<
+
+$(OBJDIR)/$(USER_ROSLIB_DIR)/libroslib.a: $(USER_ROSLIB_SRC_OBJFILES)
+	@echo + ar [ROSLIB] $@
+	$(V)$(AR) r $@ $(USER_ROSLIB_SRC_OBJFILES) 2>/dev/null
+
