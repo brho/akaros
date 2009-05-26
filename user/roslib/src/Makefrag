@@ -6,7 +6,7 @@ USER_ROSLIB_SRC_CFLAGS   := $(USER_CFLAGS) -nostdinc \
 
 USER_ROSLIB_SRC_SRCFILES := $(USER_ROSLIB_SRC_DIR)/console.c \
                             $(USER_ROSLIB_SRC_DIR)/libmain.c \
-                            $(USER_ROSLIB_SRC_DIR)/null.c \
+                            $(USER_ROSLIB_SRC_DIR)/syswrapper.c \
                             $(USER_ROSLIB_SRC_DIR)/exit.c \
                             $(USER_ROSLIB_SRC_DIR)/panic.c \
                             $(USER_ROSLIB_SRC_DIR)/printf.c \

@@ -34,9 +34,10 @@ void exit(void) __attribute__((noreturn));
 void        sys_null();
 error_t     sys_null_async(syscall_desc_t* desc);
 void        sys_cache_invalidate();
-void        sys_cache_buster(uint32_t num_writes, uint32_t val);
-error_t     sys_cache_buster_async(syscall_desc_t* desc, 
-                                   uint32_t num_writes, uint32_t val);
+void        sys_cache_buster(uint32_t num_writes, uint32_t num_pages,
+                             uint32_t flags);
+error_t     sys_cache_buster_async(syscall_desc_t* desc, uint32_t num_writes,
+                                   uint32_t num_pages, uint32_t flags);
 ssize_t     sys_cputs(const char *string, size_t len);
 error_t     sys_cputs_async(const char *s, size_t len, syscall_desc_t* desc,
                             void (*cleanup_handler)(void*), void* cleanup_data);

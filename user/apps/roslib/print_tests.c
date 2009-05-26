@@ -1,5 +1,5 @@
 #include <inc/lib.h>
-#include <inc/null.h>
+#include <inc/syswrapper.h>
 
 #ifdef __DEPUTY__
 #pragma nodeputy

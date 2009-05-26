@@ -27,12 +27,12 @@ enum
 // syscall number starts at 1 and goes up to NSYSCALLS, without holes.
 #define INVALID_SYSCALL(syscallno) ((syscallno) > NSYSCALLS)
 
-//intreg_t syscall_sysenter(uint16_t num, intreg_t a1,
-//                          intreg_t a2, intreg_t a3,
-//                          intreg_t a4, intreg_t a5);
-int32_t syscall_sysenter(uint16_t num, int32_t a1,
-                         int32_t a2, int32_t a3,
-                         int32_t a4, int32_t a5);
+/* For Buster Measurement Flags */
+#define BUSTER_SHARED			0x0001
+#define BUSTER_STRIDED			0x0002
+#define BUSTER_LOCKED			0x0004
+#define BUSTER_PRINT_TICKS		0x0008
+#define BUSTER_JUST_LOCKS		0x0010 // unimplemented
 
 #define NUM_SYS_ARGS 6
 typedef struct syscall_req {

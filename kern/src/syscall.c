@@ -7,7 +7,9 @@
 #include <arch/x86.h>
 #include <arch/console.h>
 #include <arch/apic.h>
+#include <arch/timer.h>
 #include <ros/error.h>
+
 #include <string.h>
 #include <assert.h>
 #include <env.h>
@@ -69,17 +71,72 @@ static void sys_cache_invalidate(void)
 // address space.  It's just #defined to be some random 4MB chunk (which ought
 // to be boot_alloced or something).  Meant to grab exclusive access to cache
 // lines, to simulate doing something useful.
-static void sys_cache_buster(env_t* e, uint32_t num_writes, uint32_t val)
+static void sys_cache_buster(env_t* e, uint32_t num_writes, uint32_t num_pages,
+                             uint32_t flags)
 {
-	#define BUSTER_ADDR 0xd0000000
-	#define MAX_WRITES 1048576
+	#define BUSTER_ADDR		0xd0000000  // around 512 MB deep
+	#define MAX_WRITES		1048576*8
+	#define MAX_PAGES		32
+	#define INSERT_ADDR 	(UINFO + 2*PGSIZE) // should be free for these tests
 	uint32_t* buster = (uint32_t*)BUSTER_ADDR;
 	static uint32_t buster_lock = 0;
+	uint64_t ticks;
+	page_t* a_page[MAX_PAGES];
 
-	spin_lock(&buster_lock);
-	for (int i = 0; i < MIN(num_writes, MAX_WRITES); i++)
-		buster[i] = val;
-	spin_unlock(&buster_lock);
+	/* Strided Accesses or Not (adjust to step by cachelines) */
+	uint32_t stride = 1;
+	if (flags & BUSTER_STRIDED) {
+		stride = 16;
+		num_writes *= 16;
+	}
+	
+	/* Shared Accesses or Not (adjust to use per-core regions)
+	 * Careful, since this gives 8MB to each core, starting around 512MB.
+	 * Also, doesn't separate memory for core 0 if it's an async call.
+	 */
+	if (!(flags & BUSTER_SHARED))
+		buster = (uint32_t*)(BUSTER_ADDR + lapic_get_id() * 0x00800000);
+
+	/* Start the timer, if we're asked to print this info*/
+	if (flags & BUSTER_PRINT_TICKS)
+		ticks = start_timing();
+
+	/* Allocate num_pages (up to MAX_PAGES), to simulate doing some more
+	 * realistic work.  Note we don't write to these pages, even if we pick
+	 * unshared.  Mostly due to the inconvenience of having to match up the
+	 * number of pages with the number of writes.  And it's unnecessary.
+	 */
+	if (num_pages) {
+		spin_lock(&buster_lock);
+		for (int i = 0; i < MIN(num_pages, MAX_PAGES); i++) {
+			page_alloc(&a_page[i]);
+			page_insert(e->env_pgdir, a_page[i], (void*)INSERT_ADDR + PGSIZE*i,
+			            PTE_U | PTE_W);
+		}
+		spin_unlock(&buster_lock);
+	}
+
+	if (flags & BUSTER_LOCKED)
+		spin_lock(&buster_lock);
+	for (int i = 0; i < MIN(num_writes, MAX_WRITES); i=i+stride)
+		buster[i] = 0xdeadbeef;
+	if (flags & BUSTER_LOCKED)
+		spin_unlock(&buster_lock);
+
+	if (num_pages) {
+		spin_lock(&buster_lock);
+		for (int i = 0; i < MIN(num_pages, MAX_PAGES); i++) {
+			page_remove(e->env_pgdir, (void*)(INSERT_ADDR + PGSIZE * i));
+			page_decref(a_page[i]);
+		}
+		spin_unlock(&buster_lock);
+	}
+
+	/* Print info */
+	if (flags & BUSTER_PRINT_TICKS) {
+		ticks = stop_timing(ticks);
+		printk("%llu,", ticks);
+	}
 	return;
 }
 
@@ -174,7 +231,7 @@ intreg_t syscall(env_t* e, uint32_t syscallno, uint32_t a1, uint32_t a2,
 			sys_cache_invalidate();
 			return 0;
 		case SYS_cache_buster:
-			sys_cache_buster(e, a1, a2);
+			sys_cache_buster(e, a1, a2, a3);
 			return 0;
 		case SYS_cputs:
 			return sys_cputs(e, (char *DANGEROUS)a1, (size_t)a2);

@@ -1,10 +1,11 @@
 #ifndef ROS_INC_MEASURE_H
 #define ROS_INC_MEASURE_H
 
-#include <inc/types.h>
-#include <inc/stdio.h>
-#include <inc/timer.h>
-#include <inc/x86.h>
+#include <arch/types.h>
+#include <arch/timer.h>
+#include <arch/x86.h>
+
+#include <stdio.h>
 
 /* Macro for printing out debug information about our measurement setup.
  * If MEASURE_DEBUG is set to 1, debug info will be printed.  If set to 0

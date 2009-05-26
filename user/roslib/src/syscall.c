@@ -130,16 +130,16 @@ error_t sys_null_async(syscall_desc_t* desc)
 	return async_syscall(&syscall, desc);
 }
 
-void sys_cache_buster(uint32_t num_writes, uint32_t val)
+void sys_cache_buster(uint32_t num_writes, uint32_t num_pages, uint32_t flags)
 {
-	syscall(SYS_cache_buster, num_writes, val, 0, 0, 0);
+	syscall(SYS_cache_buster, num_writes, num_pages, flags, 0, 0);
 }
 
-error_t sys_cache_buster_async(syscall_desc_t* desc, uint32_t num_writes,
-                               uint32_t val)
+error_t	sys_cache_buster_async(syscall_desc_t* desc, uint32_t num_writes,
+			                       uint32_t num_pages, uint32_t flags)
 {
-	syscall_req_t syscall = {SYS_cache_buster, 0,
-	                         {num_writes, val, [2 ... (NUM_SYS_ARGS-1)] 0}};
+	syscall_req_t syscall = {SYS_cache_buster, 0, {num_writes, num_pages, flags,
+	                                               [3 ... (NUM_SYS_ARGS-1)] 0}};
 	// just to be safe, 0 these out.  they should have been 0'd right after
 	// the desc was POOL_GET'd
 	desc->cleanup = NULL;
