@@ -6,6 +6,7 @@
 
 #include <parlib.h>
 #include <stdlib.h>
+#include <debug.h>
 
 volatile env_t *env;
 extern int main(int argc, char **argv);
@@ -17,6 +18,7 @@ void parlibmain(int argc, char **argv)
 	// procinfo.  When we figure out what we want there, change this.
 	env = (env_t*)procinfo;	
 
+	debug("Hello from env %d!\n", env->env_id);
 	// call user main routine
 	int r = main(argc, argv);
 

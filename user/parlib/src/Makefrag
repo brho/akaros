@@ -6,6 +6,8 @@ USER_PARLIB_SRC_CFLAGS   := $(USER_CFLAGS) --nopatch \
                             -I$(USER_PARLIB_NEWLIB_DIR)/include
 
 USER_PARLIB_SRC_SRCFILES := $(USER_PARLIB_SRC_DIR)/newlib_backend.c \
+                            $(USER_PARLIB_SRC_DIR)/debug.c \
+                            $(USER_PARLIB_SRC_DIR)/debugfmt.c \
                             $(USER_PARLIB_SRC_DIR)/syscall.c \
                             $(USER_PARLIB_SRC_DIR)/parlibmain.c \
                             $(USER_PARLIB_SRC_DIR)/entry.S  

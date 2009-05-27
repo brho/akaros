@@ -3,6 +3,6 @@
 
 int main(int argc, char** argv)
 {
-//	printf("Hello world from newlib!!\n");
+	printf("Hello world from newlib!!\n");
 	return 0;
 }
