@@ -151,15 +151,6 @@ int lseek(int file, int ptr, int dir)
 	return 0;
 }
 
-/* __sseek64()
- * Set position in a file. 
- * Minimal implementation.
- */
-int __sseek64(int file, int ptr, int dir) 
-{
-	return 0;
-}
-
 /* open()
  * Open a file. 
  */
@@ -511,9 +502,3 @@ int write_to_channel(byte * msg, int len)
 	return sys_serial_write((char*)msg, len);
 }
 
-/* __swrite64()
- * Write to a file. 
- */
-int __swrite64(int file, char *ptr, int len) {
-	return 0;
-}
