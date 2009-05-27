@@ -28,11 +28,38 @@ void _exit()
     
 /* close()
  * Close a file. 
- * Minimal implementation.
  */
 int close(int file) 
 {
-	return -1;
+	// Allocate a new buffer of proper size
+	byte *out_msg = malloc(CLOSE_MESSAGE_FIXED_SIZE);
+	if(out_msg == NULL)
+		return -1;
+
+	byte *out_msg_pos = out_msg;
+
+	// Fill the buffer
+	*((syscall_id *)out_msg_pos) = CLOSE_ID;
+	out_msg_pos += sizeof(syscall_id);
+
+	*((int*)out_msg_pos) = file;
+	out_msg_pos += sizeof(int);
+
+
+	// Send message
+	byte *result = send_message(out_msg, CLOSE_MESSAGE_FIXED_SIZE);
+
+	free(out_msg);
+
+	if (result != NULL) {
+		// Read result
+		int return_val;
+		return_val = *((int *) result);
+		free(result);
+		return return_val;
+	} else {
+		return -1;
+	}
 }
 
 /* execve()
@@ -130,20 +157,121 @@ int __sseek64(int file, int ptr, int dir)
 
 /* open()
  * Open a file. 
- * Minimal implementation.
  */
 int open(const char *name, int flags, int mode) 
 {
-	return -1;
+	int s_len = strlen(name) + 1; // Null terminator
+	int out_msg_len = OPEN_MESSAGE_FIXED_SIZE + s_len;
+
+	// Allocate a new buffer of proper size
+	byte *out_msg = malloc(out_msg_len);
+	byte *out_msg_pos = out_msg;
+
+	if (out_msg == NULL)
+		return -1;
+
+	// Fill the buffer
+	*((syscall_id*)out_msg_pos) = OPEN_ID;
+	out_msg_pos += sizeof(syscall_id);
+
+	*((int*)out_msg_pos) = flags;
+	out_msg_pos += sizeof(int);
+
+	*((int*)out_msg_pos) = mode;
+	out_msg_pos += sizeof(int);
+
+	*((int*)out_msg_pos) = s_len;
+	out_msg_pos += sizeof(int);
+
+	memcpy(out_msg_pos, name, s_len);
+
+	// Send message
+	byte *result = send_message(out_msg, out_msg_len);
+
+	free(out_msg);
+
+	// Read result
+	int return_val;
+
+	if (result != NULL) {
+		return_val = *((int *)result);
+		free(result);
+	} else {
+		return_val = -1;
+	}
+
+	return return_val;
 }
 
 /* read()
  * Read from a file. 
- * Minimal implementation.
  */
 int read(int file, char *ptr, int len) 
 {
-	return 0;
+	// Allocate a new buffer of proper size
+	byte *out_msg = (byte*)malloc(READ_MESSAGE_FIXED_SIZE);
+	if (out_msg == NULL)
+		return -1;
+
+	byte *out_msg_pos = out_msg;
+
+	// Fill the buffer
+	*((syscall_id*)out_msg_pos) = READ_ID;
+	out_msg_pos += sizeof(syscall_id);
+
+	*((int *)out_msg_pos) = file;
+	out_msg_pos += sizeof(int);
+
+	*((int *)out_msg_pos) = len;
+	out_msg_pos += sizeof(int);
+
+	// Send message
+	byte *result = send_message(out_msg, READ_MESSAGE_FIXED_SIZE);
+
+	free(out_msg);
+
+	// Read result
+	int return_val;
+
+	if (result != NULL) {
+		return_val = *((int *)result);
+		memcpy(ptr, ((int *)result) + 1, return_val);
+		free(result);
+	} else {
+		return_val = -1;
+	}
+
+	return return_val;
+}
+
+/* Read len bytes from the given channel to the buffer.
+ * If peek is 0, will wait indefinitely until that much data is read.
+ * If peek is 1, if no data is available, will return immediately.
+ *		However once some data is available, it will block until the entire amount is available.
+ */
+int read_from_channel(byte * buf, int len, int peek)
+{
+	// TODO: NEED TO IMPLIMENT A TIMEOUT
+	// 			Also, watch out for CONNECTION TERMINATED
+	// TODO: Add a #define for peek / no peek. Don't know why I didnt do this from the start?
+	int total_read = 0;
+
+	int just_read = sys_serial_read(buf, len);
+
+
+	if (just_read < 0) return just_read;
+	if (just_read == 0 && peek) return just_read;
+
+	total_read += just_read;
+
+	while (total_read != len) {
+		just_read = read(buf + total_read, len - total_read);
+
+		if (just_read == -1) return -1;
+		total_read += just_read;
+	}
+
+	return total_read;
 }
 
 /* sbrk()
@@ -175,6 +303,121 @@ caddr_t sbrk(int incr)
 	errno = ENOMEM;
 	return (void*)-1;
 }
+
+/* send_message()
+ * Write the message defined in buffer out across the channel, and wait for a response.
+ * Caller is responsible for management of both the buffer passed in and the buffer ptr returned.
+ */
+byte *send_message(byte *message, int len)
+{
+
+	syscall_id this_call_id = *((syscall_id*)message);
+
+	if (write_to_channel(message, len) != len)
+		return NULL;
+
+	int response_value;
+
+	// Pull the response from the server out of the channel.
+	if (read_from_channel((char*)&response_value, sizeof(int), 0) == -1) return NULL;
+
+	byte* return_msg;
+
+	// TODO: Make these sizes an array we index into, and only have this code once.
+	// TODO: Will have a flag that tells us we have a variable length response (right now only for read case)
+	// TODO: Default clause with error handling.
+	switch (this_call_id) {
+		case OPEN_ID:
+			if ((return_msg = (byte*)malloc(OPEN_RETURN_MESSAGE_FIXED_SIZE)) == NULL)
+				return NULL;
+
+			break;
+
+		case CLOSE_ID:
+			if ((return_msg = (byte*)malloc(CLOSE_RETURN_MESSAGE_FIXED_SIZE)) == NULL)
+				return NULL;
+
+			break;
+
+		case READ_ID:
+			if ((return_msg = (byte*)malloc(READ_RETURN_MESSAGE_FIXED_SIZE + response_value)) == NULL)
+				return NULL;
+
+
+			if ((read_from_channel(return_msg + sizeof(int), response_value, 0)) == -1)
+				return NULL;
+
+			break;
+
+		case WRITE_ID:
+			if ((return_msg = (byte*)malloc(WRITE_RETURN_MESSAGE_FIXED_SIZE)) == NULL)
+				return NULL;
+
+			break;
+
+
+		case LSEEK_ID:
+			if ((return_msg = (byte*)malloc(LSEEK_RETURN_MESSAGE_FIXED_SIZE)) == NULL)
+				return NULL;
+
+			break;
+
+		case ISATTY_ID:
+			if ((return_msg = (byte*)malloc(ISATTY_RETURN_MESSAGE_FIXED_SIZE)) == NULL)
+				return NULL;
+
+			break;
+
+		case UNLINK_ID:
+			if ((return_msg = (byte*)malloc(UNLINK_RETURN_MESSAGE_FIXED_SIZE + ((response_value != -1) ? 0 : sizeof(int)))) == NULL)
+				return NULL;
+
+
+			if ((response_value == -1) && ((read_from_channel(return_msg + sizeof(int), sizeof(int), 0)) == -1))
+				return NULL;
+
+			break;
+
+		case LINK_ID:
+			if ((return_msg = (byte*)malloc(LINK_RETURN_MESSAGE_FIXED_SIZE + ((response_value != -1) ? 0 : sizeof(int)))) == NULL)
+				return NULL;
+
+
+			if ((response_value == -1) && ((read_from_channel(return_msg + sizeof(int), sizeof(int), 0)) == -1))
+				return NULL;
+
+			break;
+
+		case FSTAT_ID:
+			if ((return_msg = (byte*)malloc(FSTAT_RETURN_MESSAGE_FIXED_SIZE + ((response_value != -1) ? 0 : sizeof(int)))) == NULL)
+				return NULL;
+
+			if ((read_from_channel(return_msg + sizeof(int), sizeof(struct stat), 0)) == -1)
+				return NULL;
+
+			if ((response_value == -1) && ((read_from_channel(return_msg + sizeof(int) + sizeof(struct stat), sizeof(int), 0)) == -1))
+				return NULL;
+
+			break;
+
+		case STAT_ID:
+			if ((return_msg = (byte*)malloc(STAT_RETURN_MESSAGE_FIXED_SIZE + ((response_value != -1) ? 0 : sizeof(int)))) == NULL)
+				return NULL;
+
+			if ((read_from_channel(return_msg + sizeof(int), sizeof(struct stat), 0)) == -1)
+				return NULL;
+
+			if ((response_value == -1) && ((read_from_channel(return_msg + sizeof(int) + sizeof(struct stat), sizeof(int), 0)) == -1))
+				return NULL;
+
+			break;
+	}
+
+	memcpy(return_msg, &response_value, sizeof(int));
+
+	return return_msg;
+}
+
 
 /* stat()
  * Status of a file (by name). 
@@ -217,18 +460,51 @@ int wait(int *status)
 
 /* write()
  * Write to a file. 
- * libc subroutines will use this system routine for output 
- * to all files, including stdout—so if you need to generate 
- * any output, for example to a serial port for debugging, 
- * you should make your minimal write capable of doing this. 
- * The following minimal implementation is an incomplete example; 
- * it relies on a outbyte subroutine (not shown; typically, you must 
- * write this in assembler from examples provided by your hardware 
- * manufacturer) to actually perform the output.
  */
-#define outbyte(arg)
 int write(int file, char *ptr, int len) {
-	return 0;
+	int out_msg_len = WRITE_MESSAGE_FIXED_SIZE + len;
+
+	// Allocate a new buffer of proper size
+	byte *out_msg = malloc(out_msg_len);
+	byte *out_msg_pos = out_msg;
+
+	// Fill the buffer
+	*((syscall_id*)out_msg_pos) = WRITE_ID;
+	out_msg_pos += sizeof(syscall_id);
+
+	*((int*)out_msg_pos) = file;
+	out_msg_pos += sizeof(int);
+
+	*((int*)out_msg_pos) = len;
+	out_msg_pos += sizeof(int);
+
+	memcpy(out_msg_pos, ptr, len);
+
+	// Send message
+	byte *result = send_message(out_msg, out_msg_len);
+
+	free(out_msg);
+
+	// Read result
+	int return_val;
+
+	if (result != NULL) {
+		return_val = *((int *)result);
+		free(result);
+	} else {
+		return_val = -1;
+	}
+
+	return return_val;
+}
+
+
+/* write_to_channel()
+ * Send a message out over the channel, defined by msg, of length len
+ */
+int write_to_channel(byte * msg, int len)
+{
+	return sys_serial_write((char*)msg, len);
 }
 
 /* __swrite64()
