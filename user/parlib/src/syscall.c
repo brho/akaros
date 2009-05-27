@@ -4,8 +4,7 @@
 #endif
 
 #include <arch/x86.h>
-#include <ros/syscall.h>
-#include <lib.h>
+#include <parlib.h>
 
 // TODO: modify to take only four parameters
 static uint32_t
@@ -76,9 +75,10 @@ static inline uint32_t syscall(int num, uint32_t a1, uint32_t a2, uint32_t a3,
 	#endif
 }
 
-int sys_env_destroy(envid_t envid)
+void sys_env_destroy(envid_t envid)
 {
-	return syscall(SYS_env_destroy, envid, 0, 0, 0, 0);
+	syscall(SYS_env_destroy, envid, 0, 0, 0, 0);
+	while(1); //Should never get here...
 }
 
 envid_t sys_getenvid(void)
@@ -89,6 +89,11 @@ envid_t sys_getenvid(void)
 uint32_t sys_getcpuid(void)
 {
 	 return syscall(SYS_getcpuid, 0, 0, 0, 0, 0);
+}
+
+error_t sys_cputs(const char *s, size_t len)
+{
+    return syscall(SYS_cputs, (uint32_t) s,  len, 0, 0, 0);
 }
 
 //Write a buffer over the serial port

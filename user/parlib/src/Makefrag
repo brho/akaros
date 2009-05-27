@@ -7,7 +7,7 @@ USER_PARLIB_SRC_CFLAGS   := $(USER_CFLAGS) --nopatch \
 
 USER_PARLIB_SRC_SRCFILES := $(USER_PARLIB_SRC_DIR)/newlib_backend.c \
                             $(USER_PARLIB_SRC_DIR)/syscall.c \
-                            $(USER_PARLIB_SRC_DIR)/libmain.c \
+                            $(USER_PARLIB_SRC_DIR)/parlibmain.c \
                             $(USER_PARLIB_SRC_DIR)/entry.S  
 
 USER_PARLIB_SRC_OBJFILES := $(patsubst $(USER_PARLIB_SRC_DIR)/%.c, \

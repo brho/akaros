@@ -4,13 +4,13 @@
 #pragma nodeputy
 #endif
 
-#include <ros/syscall.h>
-#include <lib.h>
+#include <parlib.h>
+#include <stdlib.h>
 
 volatile env_t *env;
 extern int main(int argc, char **argv);
 
-void libmain(int argc, char **argv)
+void parlibmain(int argc, char **argv)
 {
 	// set env to point at our env structure in envs[].
 	// TODO: for now, the kernel just copies our env struct to the beginning of
@@ -18,8 +18,8 @@ void libmain(int argc, char **argv)
 	env = (env_t*)procinfo;	
 
 	// call user main routine
-	int e = main(argc, argv);
+	int r = main(argc, argv);
 
 	// exit gracefully
-	_exit(e);
+	exit(r);
 }

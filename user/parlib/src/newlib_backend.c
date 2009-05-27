@@ -5,10 +5,12 @@
 #pragma nodeputy
 #endif
 
-#include <lib.h>
+#include <parlib.h>
+#include <newlib_backend.h>
 #include <string.h>
 #include <malloc.h>
-#include <newlib_backend.h>
+#include <stdlib.h>
+#include <stdio.h>
 
 /* environ
  * A pointer to a list of environment variables and their values. 
@@ -23,9 +25,10 @@ extern env_t* env;
  * If your system doesn't provide this, it is best to avoid linking 
  * with subroutines that require it (exit, system).
  */
-void _exit() 
+void _exit(int __status) _ATTRIBUTE ((noreturn))
 {
 	sys_env_destroy(env->env_id);
+	while(1); //Should never get here...
 }
     
 /* close()
@@ -285,7 +288,7 @@ int read_from_channel(byte * buf, int len, int peek)
  */
 caddr_t sbrk(int incr) 
 {
-	#define HEAP_SIZE 5000
+	#define HEAP_SIZE 1000
 	static uint8_t array[HEAP_SIZE];
 	static uint8_t* heap_end = array;
 	static uint8_t* stack_ptr = &(array[HEAP_SIZE-1]);
@@ -460,6 +463,9 @@ int wait(int *status)
  * Write to a file. 
  */
 int write(int file, char *ptr, int len) {
+	if(file == 1) //STDOUT_FILENO
+		return sys_cputs(ptr, len);
+	
 	int out_msg_len = WRITE_MESSAGE_FIXED_SIZE + len;
 
 	// Allocate a new buffer of proper size
