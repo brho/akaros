@@ -6,7 +6,9 @@
 #endif
 
 #include <lib.h>
-#include <parlib.h>
+#include <string.h>
+#include <malloc.h>
+#include <newlib_backend.h>
 
 /* environ
  * A pointer to a list of environment variables and their values. 
@@ -265,7 +267,7 @@ int read_from_channel(byte * buf, int len, int peek)
 	total_read += just_read;
 
 	while (total_read != len) {
-		just_read = read(buf + total_read, len - total_read);
+		just_read = sys_serial_read(buf + total_read, len - total_read);
 
 		if (just_read == -1) return -1;
 		total_read += just_read;
@@ -283,25 +285,21 @@ int read_from_channel(byte * buf, int len, int peek)
  */
 caddr_t sbrk(int incr) 
 {
-/*
-	extern char _end;		// Defined by the linker
-	static char *heap_end;
-	char *prev_heap_end;
+	#define HEAP_SIZE 5000
+	static uint8_t array[HEAP_SIZE];
+	static uint8_t* heap_end = array;
+	static uint8_t* stack_ptr = &(array[HEAP_SIZE-1]);
 
-	if (heap_end == 0) {
-		heap_end = &_end;
-	}
+	uint8_t* prev_heap_end; 
+
 	prev_heap_end = heap_end;
 	if (heap_end + incr > stack_ptr) {
-		write (1, "Heap and stack collision\n", 25);
-		abort ();
+		errno = ENOMEM;
+		return (void*)-1;
 	}
       
 	heap_end += incr;
 	return (caddr_t) prev_heap_end;
-*/
-	errno = ENOMEM;
-	return (void*)-1;
 }
 
 /* send_message()
@@ -321,7 +319,7 @@ byte *send_message(byte *message, int len)
 	// Pull the response from the server out of the channel.
 	if (read_from_channel((char*)&response_value, sizeof(int), 0) == -1) return NULL;
 
-	byte* return_msg;
+	byte* return_msg = NULL;
 
 	// TODO: Make these sizes an array we index into, and only have this code once.
 	// TODO: Will have a flag that tells us we have a variable length response (right now only for read case)

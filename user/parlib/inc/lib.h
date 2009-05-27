@@ -12,7 +12,7 @@
 #include <ros/syscall.h>
 #include <ros/env.h>
 #include <ros/error.h>
-#include <parlib.h>
+#include <newlib_backend.h>
 
 extern volatile env_t *env;
 // will need to change these types when we have real structs

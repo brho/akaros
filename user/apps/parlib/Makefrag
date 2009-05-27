@@ -10,7 +10,7 @@ USER_APPS_PARLIB_LDFLAGS   := $(USER_LDFLAGS) -static \
 USER_APPS_PARLIB_LDDIRS    := -L$(OBJDIR)/$(USER_PARLIB_DIR) \
                               -L$(USER_PARLIB_NEWLIB_DIR)/lib
 
-USER_APPS_PARLIB_LDLIBS    := -lc -lm -lg -lparlib 
+USER_APPS_PARLIB_LDLIBS    := -lparlib -lc -lm -lg 
 
 USER_APPS_PARLIB_LDOBJS    := $(OBJDIR)/$(USER_PARLIB_DIR)/entry.o
 
