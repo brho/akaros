@@ -39,6 +39,7 @@ static command_t commands[] = {
 	{ "showmapping", "Shows VA->PA mappings between two virtual addresses (parameters)", mon_showmapping},
 	{ "setmapperm", "Sets permissions on a VA->PA mapping", mon_setmapperm},
 	{ "cpuinfo", "Prints CPU diagnostics", mon_cpuinfo},
+	{ "nanwan", "Meet Nanwan!!", mon_nanwan},
 };
 #define NCOMMANDS (sizeof(commands)/sizeof(commands[0]))
 
@@ -221,6 +222,38 @@ int mon_cpuinfo(int argc, char **argv, trapframe_t *tf)
 	else
 		smp_call_function_single(strtol(argv[1], 0, 16),
 		                         test_print_info_handler, 0, 0);
+	return 0;
+}
+
+int mon_nanwan(int argc, char **argv, trapframe_t *tf)
+{
+	/* Borrowed with love from http://www.geocities.com/SoHo/7373/zoo.htm
+	 * (http://www.ascii-art.com/).  Slightly modified to make it 25 lines tall.
+	 */
+	printk("\n");
+	printk("             .-.  .-.\n");
+	printk("             |  \\/  |\n");
+	printk("            /,   ,_  `'-.\n");
+	printk("          .-|\\   /`\\     '. \n");
+	printk("        .'  0/   | 0\\  \\_  `\".  \n");
+	printk("     .-'  _,/    '--'.'|#''---'\n");
+	printk("      `--'  |       /   \\#\n");
+	printk("            |      /     \\#\n");
+	printk("            \\     ;|\\    .\\#\n");
+	printk("            |' ' //  \\   ::\\# \n");
+	printk("            \\   /`    \\   ':\\#\n");
+	printk("             `\"`       \\..   \\#\n");
+	printk("                        \\::.  \\#\n");
+	printk("                         \\::   \\#\n");
+	printk("                          \\'  .:\\#\n");
+	printk("                           \\  :::\\#\n");
+	printk("                            \\  '::\\#\n");
+	printk("                             \\     \\#\n");
+	printk("                              \\:.   \\#\n");
+	printk("                               \\::   \\#\n");
+	printk("                                \\'   .\\#\n");
+	printk("                             jgs \\   ::\\#\n");
+	printk("                                  \\      \n");
 	return 0;
 }
 
