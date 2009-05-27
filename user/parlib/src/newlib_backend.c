@@ -11,6 +11,12 @@
 #include <malloc.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <debug.h>
+
+int debug(const char *fmt, ...) {
+	return 0;
+}
+
 
 /* environ
  * A pointer to a list of environment variables and their values. 
@@ -36,6 +42,8 @@ void _exit(int __status) _ATTRIBUTE ((noreturn))
  */
 int close(int file) 
 {
+	debug("CLOSE\n");
+
 	// Allocate a new buffer of proper size
 	byte *out_msg = malloc(CLOSE_MESSAGE_FIXED_SIZE);
 	if(out_msg == NULL)
@@ -74,6 +82,7 @@ int close(int file)
 
 int execve(char *name, char **argv, char **env) 
 {
+	debug("EXECVE\n");
 	errno = ENOMEM;
 	return -1;
 }
@@ -84,6 +93,7 @@ int execve(char *name, char **argv, char **env)
  */
 int fork(void) 
 {
+	debug("FORK\n");
 	errno = EAGAIN;
     return -1;
 }
@@ -97,7 +107,13 @@ int fork(void)
  */
 int fstat(int file, struct stat *st) 
 {
+	debug("FSTAT\n");	
+	debug("\tfile: %u\n", file);
 	st->st_mode = S_IFCHR;
+	
+	// stdout hack
+	if (file == 1)
+		st->st_mode = 8592;
 	return 0;
 }
 
@@ -119,6 +135,8 @@ int getpid(void)
  */
 int isatty(int file) 
 {
+	debug("ISATTY\n");
+	debug("\tfile: %u\n", file);
 	return 1;
 }
 
@@ -128,6 +146,7 @@ int isatty(int file)
  */
 int kill(int pid, int sig) 
 {
+	debug("KILL\n");
 	errno = EINVAL;
     return -1;
 }
@@ -138,6 +157,7 @@ int kill(int pid, int sig)
  */
 int link(char *old, char *new) 
 {
+	debug("LINK\n");
 	errno = EMLINK;
 	return -1;
 }
@@ -148,6 +168,7 @@ int link(char *old, char *new)
  */
 int lseek(int file, int ptr, int dir) 
 {
+	debug("LSEEK\n");
 	return 0;
 }
 
@@ -156,6 +177,8 @@ int lseek(int file, int ptr, int dir)
  */
 int open(const char *name, int flags, int mode) 
 {
+	debug("OPEN\n");
+
 	int s_len = strlen(name) + 1; // Null terminator
 	int out_msg_len = OPEN_MESSAGE_FIXED_SIZE + s_len;
 
@@ -204,6 +227,8 @@ int open(const char *name, int flags, int mode)
  */
 int read(int file, char *ptr, int len) 
 {
+	debug("READ\n");
+
 	// Allocate a new buffer of proper size
 	byte *out_msg = (byte*)malloc(READ_MESSAGE_FIXED_SIZE);
 	if (out_msg == NULL)
@@ -279,7 +304,10 @@ int read_from_channel(byte * buf, int len, int peek)
  */
 caddr_t sbrk(int incr) 
 {
-	#define HEAP_SIZE 1000
+	debug("SBRK\n");
+	debug("\tincr: %u\n", incr);	
+
+	#define HEAP_SIZE 4096
 	static uint8_t array[HEAP_SIZE];
 	static uint8_t* heap_end = array;
 	static uint8_t* stack_ptr = &(array[HEAP_SIZE-1]);
@@ -291,8 +319,9 @@ caddr_t sbrk(int incr)
 		errno = ENOMEM;
 		return (void*)-1;
 	}
-      
+     
 	heap_end += incr;
+	debug("\treturning: %u\n", prev_heap_end);
 	return (caddr_t) prev_heap_end;
 }
 
@@ -417,6 +446,7 @@ byte *send_message(byte *message, int len)
  */
 int stat(char *file, struct stat *st) 
 {
+	debug("STAT\n");
 	st->st_mode = S_IFCHR;
 	return 0;
 }
@@ -427,6 +457,7 @@ int stat(char *file, struct stat *st)
  */
 int times(struct tms *buf) 
 {
+	debug("TIMES");
 	return -1;
 }
 
@@ -436,6 +467,7 @@ int times(struct tms *buf)
  */
 int unlink(char *name) 
 {
+	debug("UNLINK\n");
 	errno = ENOENT;
 	return -1;
 }
@@ -446,6 +478,7 @@ int unlink(char *name)
  */
 int wait(int *status) 
 {
+	debug("WAIT\n");
 	errno = ECHILD;
 	return -1;
 }
@@ -454,6 +487,9 @@ int wait(int *status)
  * Write to a file. 
  */
 int write(int file, char *ptr, int len) {
+	
+	debug("WRITE\n");	
+	debug("\tFILE: %u\n", file);
 	if(file == 1) //STDOUT_FILENO
 		return sys_cputs(ptr, len);
 	

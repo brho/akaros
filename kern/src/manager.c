@@ -43,7 +43,7 @@ void manager(void)
 	switch (progress++) {
 		case 0:
 			for (int i = 2; i < 8; i++)
-				env_batch[i] = ENV_CREATE(roslib_hello);
+				env_batch[i] = ENV_CREATE(parlib_hello);
 			for (int i = 2; i < 8; i++)
 				smp_call_function_single(i, run_env_handler, env_batch[i], 0);
 			int count = 0;

@@ -14,7 +14,7 @@ typedef void * TRUSTED va_list;
 
 #define va_end(ap)  ((void)0)
 
-int	strnlen(const char *s, size_t size);
+size_t	strnlen(const char *s, size_t size);
 void debugfmt(void (*putch)(int, void**), void **putdat, const char *NTS fmt, ...);
 void vdebugfmt(void (*putch)(int, void**), void **putdat, const char *NTS fmt, va_list);
 
