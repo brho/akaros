@@ -180,11 +180,15 @@ int32_t process_generic_syscalls(env_t* e, uint32_t max)
 	if (env_incref(e))
 		return -1;
 
-	// need to switch to the right context, so we can handle the user pointer
-	// that points to a data payload of the syscall
-	lcr3(e->env_cr3);
 	// max is the most we'll process.  max = 0 means do as many as possible
 	while (RING_HAS_UNCONSUMED_REQUESTS(sysbr) && ((!max)||(count < max)) ) {
+		if (!count) {
+			// ASSUME: one queue per process
+			// only switch cr3 for the very first request for this queue
+			// need to switch to the right context, so we can handle the user pointer
+			// that points to a data payload of the syscall
+			lcr3(e->env_cr3);
+		}
 		count++;
 		//printk("DEBUG PRE: sring->req_prod: %d, sring->rsp_prod: %d\n",\
 			   sysbr->sring->req_prod, sysbr->sring->rsp_prod);
