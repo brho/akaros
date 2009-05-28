@@ -42,9 +42,9 @@ typedef int32_t envid_t;
 #define ENV_DYING			4
 
 struct Env {
+	LIST_ENTRY(env_t) env_link;	// Free list link pointers
 	uint32_t lock;
 	trapframe_t env_tf;			// Saved registers
-	LIST_ENTRY(env_t) env_link;	// Free list link pointers
 	envid_t env_id;				// Unique environment identifier
 	envid_t env_parent_id;		// env_id of this env's parent
 	unsigned env_status;		// Status of the environment

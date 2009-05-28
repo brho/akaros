@@ -785,6 +785,28 @@ page_free(page_t *pp)
 	}
 }
 
+/* 
+ * Remove the second level page table associated with virtual address va.
+ * Will 0 out the PDE for that page table.
+ * Panics if the page table has any present entries.
+ * This should be called rarely and with good cause.
+ * Currently errors if the PDE is jumbo or not present.
+ */
+error_t	pagetable_remove(pde_t *pgdir, void *va)
+{
+	pde_t* the_pde = &pgdir[PDX(va)];
+
+	if (!(*the_pde & PTE_P) || (*the_pde & PTE_PS))
+		return -E_FAULT;
+	pte_t* page_table = (pde_t*)KADDR(PTE_ADDR(*the_pde));
+	for (int i = 0; i < NPTENTRIES; i++) 
+		if (page_table[i] & PTE_P)
+			panic("Page table not empty during attempted removal!");
+	*the_pde = 0;
+	page_decref(pa2page(PADDR(page_table)));
+	return 0;
+}
+
 //
 // Decrement the reference count on a page,
 // freeing it if there are no more refs.

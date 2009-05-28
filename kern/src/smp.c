@@ -116,6 +116,8 @@ void smp_boot(void)
 	// TODO after we parse ACPI tables
 	if (num_cpus == 8) // TODO - ghetto coded for our 8 way SMPs
 		page_decref(pa2page(trampoline_pg));
+	// Remove the page table used for that mapping
+	pagetable_remove(boot_pgdir, (void*)trampoline_pg);
 	// Dealloc the temp shared stack
 	page_decref(smp_stack);
 

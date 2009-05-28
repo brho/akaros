@@ -86,6 +86,7 @@ void	page_free(page_t *pp);
 int	page_insert(pde_t *pgdir, page_t *pp, void *va, int perm);
 void	page_remove(pde_t *pgdir, void *va);
 page_t *page_lookup(pde_t *pgdir, void *va, pte_t **pte_store);
+error_t	pagetable_remove(pde_t *pgdir, void *va);
 void	page_decref(page_t *pp);
 
 void setup_default_mtrrs(barrier_t* smp_barrier);
@@ -121,7 +122,7 @@ static inline physaddr_t page2pa(page_t *pp)
 static inline page_t* pa2page(physaddr_t pa)
 {
 	if (PPN(pa) >= npage)
-		warn("pa2page called with pa larger than npage");
+		warn("pa2page called with pa (0x%08x) larger than npage", pa);
 	return &pages[PPN(pa)];
 }
 

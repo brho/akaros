@@ -202,6 +202,8 @@ env_alloc(env_t **newenv_store, envid_t parent_id)
 
 	if (!(e = LIST_FIRST(&env_free_list)))
 		return -E_NO_FREE_ENV;
+	
+	memset((void*)e + sizeof(e->env_link), 0, sizeof(*e) - sizeof(e->env_link));
 
 	// Allocate and set up the page directory for this environment.
 	if ((r = env_setup_vm(e)) < 0)
