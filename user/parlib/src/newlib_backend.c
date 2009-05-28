@@ -165,7 +165,7 @@ int link(char *old, char *new)
  * Set position in a file. 
  * Minimal implementation.
  */
-int lseek(int file, int ptr, int dir) 
+off_t lseek(int file, off_t ptr, int dir) 
 {
 	debug("LSEEK\n");
 	return 0;
@@ -224,7 +224,7 @@ int open(const char *name, int flags, int mode)
 /* read()
  * Read from a file. 
  */
-int read(int file, char *ptr, int len) 
+ssize_t read(int file, void *ptr, size_t len) 
 {
 	debug("READ\n");
 
@@ -485,7 +485,7 @@ int wait(int *status)
 /* write()
  * Write to a file. 
  */
-int write(int file, char *ptr, int len) {
+ssize_t write(int file, void *ptr, size_t len) {
 	
 	debug("WRITE\n");	
 	debug("\tFILE: %u\n", file);

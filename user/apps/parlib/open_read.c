@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <fcntl.h>
-#include <newlib_backend.h>
+#include <unistd.h>
 
 int main(int argc, char** argv)
 {
