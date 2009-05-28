@@ -21,7 +21,7 @@ extern volatile uint8_t (COUNT(PGSIZE * UINFO_PAGES) procinfo)[];
 extern volatile uint8_t (COUNT(PGSIZE * UDATA_PAGES) procdata)[];
 
 error_t 	sys_cputs(const char *s, size_t len);
-error_t 	sys_serial_write(void* buf, uint16_t len); 
+uint16_t 	sys_serial_write(void* buf, uint16_t len); 
 uint16_t	sys_serial_read(void* buf, uint16_t len);
 envid_t		sys_getenvid(void);
 uint32_t	sys_getcpuid(void);

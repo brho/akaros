@@ -36,12 +36,12 @@ static void sys_null(void)
 }
 
 //Write a buffer over the serial port
-static error_t sys_serial_write(env_t* e, const char *DANGEROUS buf, uint16_t len) 
+static uint16_t sys_serial_write(env_t* e, const char *DANGEROUS buf, uint16_t len) 
 {
 	char *COUNT(len) _buf = user_mem_assert(e, buf, len, PTE_U);
 	for(int i =0; i<len; i++)
 		serial_send_byte(buf[i]);	
-	return 0;
+	return len;
 }
 
 //Read a buffer over the serial port
