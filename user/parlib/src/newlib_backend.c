@@ -17,7 +17,6 @@ int debug(const char *fmt, ...) {
 	return 0;
 }
 
-
 /* environ
  * A pointer to a list of environment variables and their values. 
  * For a minimal environment, this empty list is adequate.

@@ -155,7 +155,7 @@ int lseek(int file, int ptr, int dir);
 /* open()
  * Open a file. 
  */
-int open(const char *name, int flags, int mode); 
+//int open(const char *name, int flags, int mode); 
 
 /* read()
  * Read from a file. 

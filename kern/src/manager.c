@@ -39,11 +39,19 @@ void manager(void)
 {
 	static uint8_t progress = 0;
 	env_t* env_batch[64]; // Fairly arbitrary, just the max I plan to use.
+	
+	if(progress == 0) {
+		progress++;
+		env_batch[0] = ENV_CREATE(parlib_open_read);
+		env_run(env_batch[0]);
+	}
+	return;
 
 	switch (progress++) {
 		case 0:
+			
 			for (int i = 2; i < 8; i++)
-				env_batch[i] = ENV_CREATE(parlib_hello);
+				env_batch[i] = ENV_CREATE(parlib_open_read);
 			for (int i = 2; i < 8; i++)
 				smp_call_function_single(i, run_env_handler, env_batch[i], 0);
 			int count = 0;
