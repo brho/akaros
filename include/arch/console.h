@@ -23,5 +23,7 @@ int cons_getc(void);
 
 void kbd_intr(void); // irq 1
 void serial_intr(void); // irq 4
+void serial_send_byte(uint8_t b);
+uint8_t serial_read_byte();
 
 #endif /* _CONSOLE_H_ */

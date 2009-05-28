@@ -38,15 +38,21 @@ static void sys_null(void)
 //Write a buffer over the serial port
 static error_t sys_serial_write(env_t* e, const char *DANGEROUS buf, uint16_t len) 
 {
-    char *COUNT(len) _buf = user_mem_assert(e, buf, len, PTE_U);
-	return -1;
+	char *COUNT(len) _buf = user_mem_assert(e, buf, len, PTE_U);
+	for(int i =0; i<len; i++)
+		serial_send_byte(buf[i]);	
+	return 0;
 }
 
 //Read a buffer over the serial port
-static uint16_t sys_serial_read(env_t* e, const char *DANGEROUS buf, uint16_t len) 
+static uint16_t sys_serial_read(env_t* e, char *DANGEROUS buf, uint16_t len) 
 {
     char *COUNT(len) _buf = user_mem_assert(e, buf, len, PTE_U);
-	return len;
+	uint16_t bytes_read = 0;
+	int c;
+	while((c = serial_read_byte()) != -1)
+		buf[bytes_read++] = (uint8_t)c;
+	return bytes_read;
 }
 
 // Invalidate the cache of this core
@@ -148,6 +154,7 @@ int32_t syscall(env_t* e, uint32_t syscallno, uint32_t a1, uint32_t a2,
 	//cprintf("Incoming syscall number: %d\n    a1: %x\n    a2: %x\n    a3: %x\n    a4: %x\n    a5: %x\n", syscallno, a1, a2, a3, a4, a5);
 
 	assert(e); // should always have an env for every syscall
+	printk("Running syscall: %d\n", syscallno);
 	if (INVALID_SYSCALL(syscallno))
 		return -E_INVAL;
 
@@ -156,6 +163,7 @@ int32_t syscall(env_t* e, uint32_t syscallno, uint32_t a1, uint32_t a2,
 			sys_null();
 			return 0;
 		case SYS_serial_write:
+			printk("I am here\n");
 			return sys_serial_write(e, (char *DANGEROUS)a1, (size_t)a2);
 		case SYS_serial_read:
 			return sys_serial_read(e, (char *DANGEROUS)a1, (size_t)a2);

@@ -44,6 +44,10 @@ serial_proc_data(void)
 	return inb(COM1+COM_RX);
 }
 
+uint8_t serial_read_byte() {
+	return serial_proc_data();
+}
+
 void
 serial_intr(void)
 {
@@ -79,8 +83,7 @@ serial_init(void)
 
 }
 
-static void
-serial_send_byte(uint8_t b)
+void serial_send_byte(uint8_t b)
 {
 	while (!(inb(COM1+COM_LSR) & COM_LSR_READY));
 	outb(COM1, b);
@@ -504,7 +507,7 @@ cons_getc(void)
 	// poll for any pending input characters,
 	// so that this function works even when interrupts are disabled
 	// (e.g., when called from the kernel monitor).
-	serial_intr();
+	//serial_intr();
 	kbd_intr();
 
 	// grab the next character from the input buffer.
@@ -521,7 +524,7 @@ cons_getc(void)
 void
 cons_putc(int c)
 {
-	serial_putc(c);
+	//serial_putc(c);
 	//lpt_putc(c);
 	cga_putc(c);
 }

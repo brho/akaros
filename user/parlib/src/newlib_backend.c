@@ -490,7 +490,7 @@ int write(int file, char *ptr, int len) {
 	
 	debug("WRITE\n");	
 	debug("\tFILE: %u\n", file);
-	if(file == 1) //STDOUT_FILENO
+	if(file == 1 || file == 2) //STDOUT_FILENO || STDERR_FILENO
 		return sys_cputs(ptr, len);
 	
 	int out_msg_len = WRITE_MESSAGE_FIXED_SIZE + len;

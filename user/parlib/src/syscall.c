@@ -99,11 +99,11 @@ error_t sys_cputs(const char *s, size_t len)
 //Write a buffer over the serial port
 error_t sys_serial_write(void* buf, uint16_t len) 
 {
-	return -1;
+	return syscall(SYS_serial_write, (uint32_t)buf, len, 0, 0, 0);
 }
 
 //Read a buffer over the serial port
 uint16_t sys_serial_read(void* buf, uint16_t len) 
 {
-	return 0;
+	return syscall(SYS_serial_read, (uint32_t)buf, len, 0, 0, 0);
 }

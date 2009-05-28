@@ -8,7 +8,9 @@
 /* system call numbers */
 enum
 {
-	SYS_null = 1,
+	SYS_begofcalls, //Should always be first
+
+	SYS_null,
 	SYS_cache_buster,
 	SYS_cache_invalidate,
 	SYS_cputs,
@@ -18,8 +20,10 @@ enum
 	SYS_env_destroy,
 	SYS_serial_write,
 	SYS_serial_read,
+
+	SYS_endofcalls //Should always be last
 };
-#define NSYSCALLS (SYS_env_destroy)
+#define NSYSCALLS (SYS_endofcalls -1)
 // syscall number starts at 1 and goes up to NSYSCALLS, without holes.
 #define INVALID_SYSCALL(syscallno) ((syscallno) > NSYSCALLS)
 
