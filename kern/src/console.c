@@ -44,7 +44,7 @@ serial_proc_data(void)
 	return inb(COM1+COM_RX);
 }
 
-uint8_t serial_read_byte() {
+int serial_read_byte() {
 	return serial_proc_data();
 }
 

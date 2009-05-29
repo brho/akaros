@@ -154,7 +154,7 @@ int32_t syscall(env_t* e, uint32_t syscallno, uint32_t a1, uint32_t a2,
 	//cprintf("Incoming syscall number: %d\n    a1: %x\n    a2: %x\n    a3: %x\n    a4: %x\n    a5: %x\n", syscallno, a1, a2, a3, a4, a5);
 
 	assert(e); // should always have an env for every syscall
-	printk("Running syscall: %d\n", syscallno);
+	//printk("Running syscall: %d\n", syscallno);
 	if (INVALID_SYSCALL(syscallno))
 		return -E_INVAL;
 
@@ -163,7 +163,7 @@ int32_t syscall(env_t* e, uint32_t syscallno, uint32_t a1, uint32_t a2,
 			sys_null();
 			return 0;
 		case SYS_serial_write:
-			printk("I am here\n");
+			//printk("I am here\n");
 			return sys_serial_write(e, (char *DANGEROUS)a1, (size_t)a2);
 		case SYS_serial_read:
 			return sys_serial_read(e, (char *DANGEROUS)a1, (size_t)a2);
