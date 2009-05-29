@@ -1,9 +1,10 @@
 USER_APPS_PARLIB_DIR = $(USER_APPS_DIR)/parlib
 OBJDIRS += $(USER_APPS_PARLIB_DIR)
 
-USER_APPS_PARLIB_CFLAGS    := $(USER_CFLAGS) \
+USER_APPS_PARLIB_CFLAGS    := $(USER_CFLAGS) --nodeputy \
                               -I$(USER_PARLIB_NEWLIB_DIR)/include \
                               -I$(USER_PARLIB_DIR)/inc
+
 
 USER_APPS_PARLIB_LDFLAGS   := $(USER_LDFLAGS) -static \
                               -T $(USER_APPS_PARLIB_DIR)/apps.ld
