@@ -39,8 +39,9 @@ KERN_SRCFILES := $(KERN_SRC_DIR)/entry.S \
 # Only build files if they exist.
 KERN_SRCFILES := $(wildcard $(KERN_SRCFILES))
 
-KERN_APPFILES :=  	$(USER_APPS_ROSLIB_DIR)/null \
-                    $(USER_APPS_PARLIB_DIR)/open_read 
+KERN_APPFILES :=  	$(USER_APPS_PARLIB_DIR)/matrix 
+#                    $(USER_APPS_PARLIB_DIR)/open_read \
+#                    $(USER_APPS_ROSLIB_DIR)/null
 #					$(USER_APPS_ROSLIB_DIR)/hello \
 #					apps/hello \
 #					apps_newlib/null \

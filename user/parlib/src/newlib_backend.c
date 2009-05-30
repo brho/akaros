@@ -6,6 +6,7 @@
 #endif
 
 #include <parlib.h>
+#include <unistd.h>
 #include <newlib_backend.h>
 #include <string.h>
 #include <malloc.h>
@@ -14,7 +15,7 @@
 #include <debug.h>
 
 #define debug_in_out(fmt, ...) // debug(fmt, __VA_ARGS__)  
-#define debug_write_check(fmt, ...) debug(fmt, __VA_ARGS__)
+#define debug_write_check(fmt, ...) // debug(fmt, __VA_ARGS__)
 
 /* environ
  * A pointer to a list of environment variables and their values. 
@@ -43,8 +44,8 @@ int close(int file)
 	debug_in_out("CLOSE\n");
 
 	// If trying to close stdin/out/err just return
-        if ((file > -1) && (file <3))
-                return 0;
+	if ((file >= STDIN_FILENO) && (file <= STDERR_FILENO))
+		return 0;
 
 	// Allocate a new buffer of proper size
 	byte *out_msg = malloc(CLOSE_MESSAGE_FIXED_SIZE);
@@ -231,6 +232,11 @@ ssize_t read(int file, void *ptr, size_t len)
 {
 	debug_in_out("READ\n");
 
+	if(file == STDIN_FILENO) {
+		for(int i=0; i<len; i++)	
+			((uint8_t*)ptr)[i] = sys_cgetc();
+		return len;
+	}
 
 	// Allocate a new buffer of proper size
 	byte *out_msg = (byte*)malloc(READ_MESSAGE_FIXED_SIZE);
@@ -306,7 +312,7 @@ int read_from_channel(byte * buf, int len, int peek)
  * The following suffices for a standalone system; it exploits the 
  * symbol _end automatically defined by the GNU linker.
  */
-caddr_t sbrk(int incr) 
+void* sbrk(ptrdiff_t incr) 
 {
 	debug_in_out("SBRK\n");
 	debug_in_out("\tincr: %u\n", incr);	
@@ -497,8 +503,8 @@ ssize_t write(int file, void *ptr, size_t len) {
 
 	debug_write_check("Writing len: %d\n", len);
 
-	if ((file > -1) && (file < 3))  //STDOUT_FILENO || STDERR_FILENO || STDIN_FILENO
-		return (sys_cputs(ptr, len) == E_SUCCESS) ? len : -1;
+	if ((file >= STDIN_FILENO) && (file <= STDERR_FILENO)) 
+		return sys_cputs(ptr, len);
 	
 	int out_msg_len = WRITE_MESSAGE_FIXED_SIZE + len;
 

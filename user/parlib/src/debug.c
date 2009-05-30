@@ -19,9 +19,9 @@
 // in the middle of a console output line and such.
 #define BUF_SIZE 256
 typedef struct debugbuf {
-	int idx;	// current buffer index
-	int cnt;	// total bytes printed so far
-	char buf[BUF_SIZE];
+	size_t  idx;	// current buffer index
+	size_t  cnt;	// total bytes printed so far
+	uint8_t buf[BUF_SIZE];
 } debugbuf_t;
 
 

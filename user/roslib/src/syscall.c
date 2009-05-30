@@ -3,15 +3,17 @@
 #pragma nodeputy
 #endif
 
+#include <arch/types.h>
 #include <arch/x86.h>
 #include <ros/syscall.h>
 #include <lib.h>
 
-// TODO: modify to take only four parameters
-static uint32_t
-syscall_sysenter(int num, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32_t a5)
+// TODO: modift to take only four parameters
+static intreg_t syscall_sysenter(uint16_t num, intreg_t a1,
+                                 intreg_t a2, intreg_t a3,
+                                 intreg_t a4, intreg_t a5)
 {
-	uint32_t ret;
+	intreg_t ret;
     asm volatile(
             //"pushl %%ecx\n\t"
             //"pushl %%edx\n\t"
@@ -35,8 +37,9 @@ syscall_sysenter(int num, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, ui
 	return ret;
 }
 
-static inline uint32_t
-syscall_trap(int num, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32_t a5)
+static intreg_t syscall_trap(uint16_t num, intreg_t a1,
+                             intreg_t a2, intreg_t a3,
+                             intreg_t a4, intreg_t a5)
 {
 	uint32_t ret;
 
@@ -66,8 +69,9 @@ syscall_trap(int num, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32
 	return ret;
 }
 
-static inline uint32_t syscall(int num, uint32_t a1, uint32_t a2, uint32_t a3,
-                               uint32_t a4, uint32_t a5)
+static intreg_t syscall(uint16_t num, intreg_t a1,
+                        intreg_t a2, intreg_t a3,
+                        intreg_t a4, intreg_t a5)
 {
 	#ifndef SYSCALL_TRAP
 		return syscall_sysenter(num, a1, a2, a3, a4, a5);
@@ -163,31 +167,27 @@ void sys_cache_invalidate()
 	syscall(SYS_cache_invalidate, 0, 0, 0, 0, 0);
 }
 
-void
-sys_cputs(const char *s, size_t len)
+ssize_t sys_cputs(const char *s, size_t len)
 {
-	syscall(SYS_cputs, (uint32_t) s,  len, 0, 0, 0);
+	return syscall(SYS_cputs, (intreg_t)s,  len, 0, 0, 0);
 }
 
-int
-sys_cgetc(void)
+uint16_t sys_cgetc(void)
 {
 	return syscall(SYS_cgetc, 0, 0, 0, 0, 0);
 }
 
-int
-sys_env_destroy(envid_t envid)
+error_t sys_env_destroy(envid_t envid)
 {
 	return syscall(SYS_env_destroy, envid, 0, 0, 0, 0);
 }
 
-envid_t
-sys_getenvid(void)
+envid_t sys_getenvid(void)
 {
 	 return syscall(SYS_getenvid, 0, 0, 0, 0, 0);
 }
 
-uint32_t sys_getcpuid(void)
+envid_t sys_getcpuid(void)
 {
 	 return syscall(SYS_getcpuid, 0, 0, 0, 0, 0);
 }

@@ -16,9 +16,9 @@
 #define printk(args...) cprintf(args)
 
 // lib/stdio.c
-void	cputchar(int c);
-int	getchar(void);
-int	iscons(int fd);
+void cputchar(int c);
+int	 getchar(void);
+int	 iscons(int fd);
 
 // lib/printfmt.c
 void	printfmt(void (*putch)(int, void**), void **putdat, const char *NTS fmt, ...);

@@ -42,52 +42,9 @@ void manager(void)
 	
 	if(progress == 0) {
 		progress++;
-		env_batch[0] = ENV_CREATE(parlib_open_read);
+		env_batch[0] = ENV_CREATE(parlib_matrix);
 		env_run(env_batch[0]);
 	}
 	return;
-
-	switch (progress++) {
-		case 0:
-			
-			for (int i = 2; i < 8; i++)
-				env_batch[i] = ENV_CREATE(parlib_open_read);
-			for (int i = 2; i < 8; i++)
-				smp_call_function_single(i, run_env_handler, env_batch[i], 0);
-			int count = 0;
-			while (count > -6) {
-				count = 0;
-				for (int i = 2; i < 8; i++) {
-					count += process_generic_syscalls(env_batch[i], 1);
-				}
-				cpu_relax();
-			}
-			process_workqueue(); // Will run this core (0)'s env
-			panic("Don't Panic");
-			break; // only need this when planning to reenter manager
-		case 1:
-			for (int i = 0; i < 4; i++)
-				env_batch[i] = ENV_CREATE(roslib_null);
-			for (int i = 0; i < 4; i++)
-				smp_call_function_single(i, run_env_handler, env_batch[i], 0);
-			//env_t* an_env = ENV_CREATE(user_null);
-			//env_run(an_env);
-			//smp_call_function_single(2, run_env_handler, an_env, 0);
-			process_workqueue();
-			break;
-		default:
-			printk("Waiting 5 sec for whatever reason\n");
-			udelay(5000000);
-			panic("Don't Panic");
-	}
-	panic("If you see me, then you probably screwed up");
-
-	/*
-	printk("Servicing syscalls from Core 0:\n\n");
-	while (1) {
-		process_generic_syscalls(&envs[0], 1);
-		cpu_relax();
-	}
-	*/
 }
 

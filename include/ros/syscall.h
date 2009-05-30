@@ -1,5 +1,5 @@
-#ifndef ROS_INC_SYSCALL_H
-#define ROS_INC_SYSCALL_H
+#ifndef ROS_INCLUDE_SYSCALL_H
+#define ROS_INCLUDE_SYSCALL_H
 
 #include <arch/types.h>
 #include <ros/ring_buffer.h>
@@ -27,6 +27,13 @@ enum
 // syscall number starts at 1 and goes up to NSYSCALLS, without holes.
 #define INVALID_SYSCALL(syscallno) ((syscallno) > NSYSCALLS)
 
+//intreg_t syscall_sysenter(uint16_t num, intreg_t a1,
+//                          intreg_t a2, intreg_t a3,
+//                          intreg_t a4, intreg_t a5);
+int32_t syscall_sysenter(uint16_t num, int32_t a1,
+                         int32_t a2, int32_t a3,
+                         int32_t a4, int32_t a5);
+
 #define NUM_SYS_ARGS 6
 typedef struct syscall_req {
 	uint32_t num;
@@ -52,7 +59,4 @@ struct syscall_desc {
 };
 LIST_HEAD(syscall_desc_list_t, syscall_desc_t);
 
-static uint32_t
-syscall_sysenter(int num, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32_t a5);
-
-#endif /* !ROS_INC_SYSCALL_H */
+#endif /* !ROS_INCLUDE_SYSCALL_H */

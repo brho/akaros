@@ -20,11 +20,12 @@ extern volatile env_t *env;
 extern volatile uint8_t (COUNT(PGSIZE * UINFO_PAGES) procinfo)[];
 extern volatile uint8_t (COUNT(PGSIZE * UDATA_PAGES) procdata)[];
 
-error_t 	sys_cputs(const char *s, size_t len);
-uint16_t 	sys_serial_write(void* buf, uint16_t len); 
-uint16_t	sys_serial_read(void* buf, uint16_t len);
-envid_t		sys_getenvid(void);
-uint32_t	sys_getcpuid(void);
-void		sys_env_destroy(envid_t);
+ssize_t     sys_cputs(const uint8_t *s, size_t len);
+uint16_t    sys_cgetc(void);
+ssize_t     sys_serial_write(void* buf, size_t len); 
+ssize_t     sys_serial_read(void* buf, size_t len);
+envid_t     sys_getenvid(void);
+envid_t     sys_getcpuid(void);
+void        sys_env_destroy(envid_t);
 
 #endif	// !ROS_INC_LIB_H

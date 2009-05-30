@@ -3,6 +3,7 @@
 #pragma nodeputy
 #endif
 
+#include <arch/types.h>
 #include <arch/x86.h>
 #include <arch/console.h>
 #include <arch/apic.h>
@@ -19,13 +20,13 @@ void syscall_wrapper(struct Trapframe *tf)
 	env_t* curenv = curenvs[lapic_get_id()];
     curenv->env_tf = *tf;
     tf->tf_regs.reg_eax =
-        syscall(curenv,
-				tf->tf_regs.reg_eax,
-                tf->tf_regs.reg_edx,
-                tf->tf_regs.reg_ecx,
-                tf->tf_regs.reg_ebx,
-                tf->tf_regs.reg_edi,
-				0);
+	    (intreg_t) syscall(curenv,
+	                       tf->tf_regs.reg_eax,
+	                       tf->tf_regs.reg_edx,
+	                       tf->tf_regs.reg_ecx,
+	                       tf->tf_regs.reg_ebx,
+	                       tf->tf_regs.reg_edi,
+	                       0);
     return;
 }
 
@@ -36,25 +37,25 @@ static void sys_null(void)
 }
 
 //Write a buffer over the serial port
-static uint16_t sys_serial_write(env_t* e, const char *DANGEROUS buf, uint16_t len) 
+static ssize_t sys_serial_write(env_t* e, const char *DANGEROUS buf, size_t len) 
 {
 	char *COUNT(len) _buf = user_mem_assert(e, buf, len, PTE_U);
 	for(int i =0; i<len; i++)
 		serial_send_byte(buf[i]);	
-	return len;
+	return (ssize_t)len;
 }
 
 //Read a buffer over the serial port
-static uint16_t sys_serial_read(env_t* e, char *DANGEROUS buf, uint16_t len) 
+static ssize_t sys_serial_read(env_t* e, char *DANGEROUS buf, size_t len) 
 {
     char *COUNT(len) _buf = user_mem_assert(e, buf, len, PTE_U);
-	uint16_t bytes_read = 0;
+	size_t bytes_read = 0;
 	int c;
 	while((c = serial_read_byte()) != -1) {
 		buf[bytes_read++] = (uint8_t)c;
 		if(bytes_read == len) break;
 	}
-	return bytes_read;
+	return (ssize_t)bytes_read;
 }
 
 // Invalidate the cache of this core
@@ -79,40 +80,39 @@ static void sys_cache_buster(env_t* e, uint32_t num_writes, uint32_t val)
 	for (int i = 0; i < MIN(num_writes, MAX_WRITES); i++)
 		buster[i] = val;
 	spin_unlock(&buster_lock);
+	return;
 }
 
 // Print a string to the system console.
 // The string is exactly 'len' characters long.
 // Destroys the environment on memory errors.
-static void
-sys_cputs(env_t* e, const char *DANGEROUS s, size_t len)
+static ssize_t sys_cputs(env_t* e, const char *DANGEROUS s, size_t len)
 {
 	// Check that the user has permission to read memory [s, s+len).
 	// Destroy the environment if not.
     char *COUNT(len) _s = user_mem_assert(e, s, len, PTE_U);
 
 	// Print the string supplied by the user.
-	cprintf("%.*s", len, _s);
+	printk("%.*s", len, _s);
+	return (ssize_t)len;
 }
 
 // Read a character from the system console.
 // Returns the character.
-static int
-sys_cgetc(env_t* e)
+static uint16_t sys_cgetc(env_t* e)
 {
-	int c;
+	uint16_t c;
 
 	// The cons_getc() primitive doesn't wait for a character,
 	// but the sys_cgetc() system call does.
 	while ((c = cons_getc()) == 0)
-		/* do nothing */;
+		cpu_relax();
 
 	return c;
 }
 
 // Returns the current environment's envid.
-static envid_t
-sys_getenvid(env_t* e)
+static envid_t sys_getenvid(env_t* e)
 {
 	return e->env_id;
 }
@@ -128,8 +128,7 @@ static envid_t sys_getcpuid(void)
 // Returns 0 on success, < 0 on error.  Errors are:
 //	-E_BAD_ENV if environment envid doesn't currently exist,
 //		or the caller doesn't have permission to change envid.
-static int
-sys_env_destroy(env_t* e, envid_t envid)
+static error_t sys_env_destroy(env_t* e, envid_t envid)
 {
 	int r;
 	env_t *env_to_die;
@@ -137,9 +136,9 @@ sys_env_destroy(env_t* e, envid_t envid)
 	if ((r = envid2env(envid, &env_to_die, 1)) < 0)
 		return r;
 	if (env_to_die == e)
-		cprintf("[%08x] exiting gracefully\n", e->env_id);
+		printk("[%08x] exiting gracefully\n", e->env_id);
 	else
-		cprintf("[%08x] destroying %08x\n", e->env_id, env_to_die->env_id);
+		printk("[%08x] destroying %08x\n", e->env_id, env_to_die->env_id);
 	env_destroy(env_to_die);
 	return 0;
 }
@@ -147,13 +146,15 @@ sys_env_destroy(env_t* e, envid_t envid)
 
 // TODO: Build a dispatch table instead of switching on the syscallno
 // Dispatches to the correct kernel function, passing the arguments.
-int32_t syscall(env_t* e, uint32_t syscallno, uint32_t a1, uint32_t a2,
+intreg_t syscall(env_t* e, uint32_t syscallno, uint32_t a1, uint32_t a2,
                 uint32_t a3, uint32_t a4, uint32_t a5)
 {
 	// Call the function corresponding to the 'syscallno' parameter.
 	// Return any appropriate return value.
 
-	//cprintf("Incoming syscall number: %d\n    a1: %x\n    a2: %x\n    a3: %x\n    a4: %x\n    a5: %x\n", syscallno, a1, a2, a3, a4, a5);
+	//cprintf("Incoming syscall number: %d\n    a1: %x\n   "
+	//        " a2: %x\n    a3: %x\n    a4: %x\n    a5: %x\n", 
+	//        syscallno, a1, a2, a3, a4, a5);
 
 	assert(e); // should always have an env for every syscall
 	//printk("Running syscall: %d\n", syscallno);
@@ -176,8 +177,7 @@ int32_t syscall(env_t* e, uint32_t syscallno, uint32_t a1, uint32_t a2,
 			sys_cache_buster(e, a1, a2);
 			return 0;
 		case SYS_cputs:
-			sys_cputs(e, (char *DANGEROUS)a1, (size_t)a2);
-			return 0;  // would rather have this return the number of chars put.
+			return sys_cputs(e, (char *DANGEROUS)a1, (size_t)a2);
 		case SYS_cgetc:
 			return sys_cgetc(e);
 		case SYS_getenvid:
@@ -193,15 +193,15 @@ int32_t syscall(env_t* e, uint32_t syscallno, uint32_t a1, uint32_t a2,
 	return 0xdeadbeef;
 }
 
-int32_t syscall_async(env_t* e, syscall_req_t *call)
+intreg_t syscall_async(env_t* e, syscall_req_t *call)
 {
 	return syscall(e, call->num, call->args[0], call->args[1],
 	               call->args[2], call->args[3], call->args[4]);
 }
 
-int32_t process_generic_syscalls(env_t* e, uint32_t max)
+intreg_t process_generic_syscalls(env_t* e, size_t max)
 {
-	uint32_t count = 0;
+	size_t count = 0;
 	syscall_back_ring_t* sysbr = &e->env_sysbackring;
 
 	// make sure the env is still alive.  incref will return 0 on success.
@@ -235,5 +235,5 @@ int32_t process_generic_syscalls(env_t* e, uint32_t max)
 			   sysbr->sring->req_prod, sysbr->sring->rsp_prod);
 	}
 	env_decref(e);
-	return count;
+	return (intreg_t)count;
 }
