@@ -6,6 +6,9 @@
 int main(int argc, char** argv)
 {
 	printf("Hello world from newlib!!\n");
+	printf("Hello\nWorld\nMulti\nLine\n");
+	printf("Hello after multiline.\n");
+
 	int fd = open("/test/file", O_RDWR, 0);
 	char buf[10];
 	int read_amt = read(fd, buf, 10);

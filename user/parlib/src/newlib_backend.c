@@ -13,9 +13,8 @@
 #include <stdio.h>
 #include <debug.h>
 
-int debug(const char *fmt, ...) {
-	return 0;
-}
+#define debug_in_out(fmt, ...) // debug(fmt, __VA_ARGS__)  
+#define debug_write_check(fmt, ...) debug(fmt, __VA_ARGS__)
 
 /* environ
  * A pointer to a list of environment variables and their values. 
@@ -41,7 +40,7 @@ void _exit(int __status) _ATTRIBUTE ((noreturn))
  */
 int close(int file) 
 {
-	debug("CLOSE\n");
+	debug_in_out("CLOSE\n");
 
 	// If trying to close stdin/out/err just return
         if ((file > -1) && (file <3))
@@ -85,7 +84,7 @@ int close(int file)
 
 int execve(char *name, char **argv, char **env) 
 {
-	debug("EXECVE\n");
+	debug_in_out("EXECVE\n");
 	errno = ENOMEM;
 	return -1;
 }
@@ -96,7 +95,7 @@ int execve(char *name, char **argv, char **env)
  */
 int fork(void) 
 {
-	debug("FORK\n");
+	debug_in_out("FORK\n");
 	errno = EAGAIN;
     return -1;
 }
@@ -110,8 +109,8 @@ int fork(void)
  */
 int fstat(int file, struct stat *st) 
 {
-	debug("FSTAT\n");	
-	debug("\tfile: %u\n", file);
+	debug_in_out("FSTAT\n");	
+	debug_in_out("\tfile: %u\n", file);
 	st->st_mode = S_IFCHR;
 	
 	// stdout hack
@@ -138,8 +137,8 @@ int getpid(void)
  */
 int isatty(int file) 
 {
-	debug("ISATTY\n");
-	debug("\tfile: %u\n", file);
+	debug_in_out("ISATTY\n");
+	debug_in_out("\tfile: %u\n", file);
 	return 1;
 }
 
@@ -149,7 +148,7 @@ int isatty(int file)
  */
 int kill(int pid, int sig) 
 {
-	debug("KILL\n");
+	debug_in_out("KILL\n");
 	errno = EINVAL;
     return -1;
 }
@@ -160,7 +159,7 @@ int kill(int pid, int sig)
  */
 int link(char *old, char *new) 
 {
-	debug("LINK\n");
+	debug_in_out("LINK\n");
 	errno = EMLINK;
 	return -1;
 }
@@ -171,7 +170,7 @@ int link(char *old, char *new)
  */
 off_t lseek(int file, off_t ptr, int dir) 
 {
-	debug("LSEEK\n");
+	debug_in_out("LSEEK\n");
 	return 0;
 }
 
@@ -180,7 +179,7 @@ off_t lseek(int file, off_t ptr, int dir)
  */
 int open(const char *name, int flags, int mode) 
 {
-	debug("OPEN\n");
+	debug_in_out("OPEN\n");
 
 	int s_len = strlen(name) + 1; // Null terminator
 	int out_msg_len = OPEN_MESSAGE_FIXED_SIZE + s_len;
@@ -230,7 +229,7 @@ int open(const char *name, int flags, int mode)
  */
 ssize_t read(int file, void *ptr, size_t len) 
 {
-	debug("READ\n");
+	debug_in_out("READ\n");
 
 
 	// Allocate a new buffer of proper size
@@ -309,8 +308,8 @@ int read_from_channel(byte * buf, int len, int peek)
  */
 caddr_t sbrk(int incr) 
 {
-	debug("SBRK\n");
-	debug("\tincr: %u\n", incr);	
+	debug_in_out("SBRK\n");
+	debug_in_out("\tincr: %u\n", incr);	
 
 	#define HEAP_SIZE 4096
 	static uint8_t array[HEAP_SIZE];
@@ -326,7 +325,7 @@ caddr_t sbrk(int incr)
 	}
      
 	heap_end += incr;
-	debug("\treturning: %u\n", prev_heap_end);
+	debug_in_out("\treturning: %u\n", prev_heap_end);
 	return (caddr_t) prev_heap_end;
 }
 
@@ -451,7 +450,7 @@ byte *send_message(byte *message, int len)
  */
 int stat(char *file, struct stat *st) 
 {
-	debug("STAT\n");
+	debug_in_out("STAT\n");
 	st->st_mode = S_IFCHR;
 	return 0;
 }
@@ -462,7 +461,7 @@ int stat(char *file, struct stat *st)
  */
 int times(struct tms *buf) 
 {
-	debug("TIMES");
+	debug_in_out("TIMES");
 	return -1;
 }
 
@@ -472,7 +471,7 @@ int times(struct tms *buf)
  */
 int unlink(char *name) 
 {
-	debug("UNLINK\n");
+	debug_in_out("UNLINK\n");
 	errno = ENOENT;
 	return -1;
 }
@@ -483,7 +482,7 @@ int unlink(char *name)
  */
 int wait(int *status) 
 {
-	debug("WAIT\n");
+	debug_in_out("WAIT\n");
 	errno = ECHILD;
 	return -1;
 }
@@ -493,11 +492,13 @@ int wait(int *status)
  */
 ssize_t write(int file, void *ptr, size_t len) {
 	
-	debug("WRITE\n");	
-	debug("\tFILE: %u\n", file);
+	debug_in_out("WRITE\n");	
+	debug_in_out("\tFILE: %u\n", file);
+
+	debug_write_check("Writing len: %d\n", len);
 
 	if ((file > -1) && (file < 3))  //STDOUT_FILENO || STDERR_FILENO || STDIN_FILENO
-		return sys_cputs(ptr, len);
+		return (sys_cputs(ptr, len) == E_SUCCESS) ? len : -1;
 	
 	int out_msg_len = WRITE_MESSAGE_FIXED_SIZE + len;
 
