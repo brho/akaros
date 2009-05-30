@@ -2,7 +2,7 @@
 
 #include <arch/x86.h>
 #include <arch/console.h>
-#include <kbdreg.h>
+#include <arch/kbdreg.h>
 #include <string.h>
 #include <assert.h>
 

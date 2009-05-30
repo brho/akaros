@@ -79,7 +79,9 @@ typedef int32_t off_t;
 })
 
 // Return the offset of 'member' relative to the beginning of a struct type
+#ifndef offsetof
 #define offsetof(type, member)  ((size_t) (&((type*)0)->member))
+#endif
 
 // Ivy currently can only handle 63 bits (OCaml thing), so use this to make
 // a uint64_t programatically
