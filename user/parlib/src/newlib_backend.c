@@ -14,7 +14,7 @@
 #include <stdio.h>
 #include <debug.h>
 
-#define debug_in_out(fmt, ...) // debug(fmt, __VA_ARGS__)  
+#define debug_in_out(...) debug(__VA_ARGS__)  
 #define debug_write_check(fmt, ...) // debug(fmt, __VA_ARGS__)
 
 /* environ
@@ -44,7 +44,7 @@ int close(int file)
 	debug_in_out("CLOSE\n");
 
 	// If trying to close stdin/out/err just return
-	if ((file >= STDIN_FILENO) && (file <= STDERR_FILENO))
+	if ((file == STDIN_FILENO) || (file == STDERR_FILENO) || (file == STDOUT_FILENO))
 		return 0;
 
 	// Allocate a new buffer of proper size
@@ -111,13 +111,48 @@ int fork(void)
 int fstat(int file, struct stat *st) 
 {
 	debug_in_out("FSTAT\n");	
-	debug_in_out("\tfile: %u\n", file);
+
 	st->st_mode = S_IFCHR;
 	
 	// stdout hack
 	if (file == 1)
 		st->st_mode = 8592;
 	return 0;
+
+
+	// Allocate a new buffer of proper size
+	byte *out_msg = malloc(FSTAT_MESSAGE_FIXED_SIZE);
+	if(out_msg == NULL)
+		return -1;
+	byte *out_msg_pos = out_msg;
+
+	// Fill the buffer
+	*((syscall_id *)out_msg_pos) = FSTAT_ID;
+	out_msg_pos += sizeof(syscall_id);
+
+	*((int*)out_msg_pos) = file;
+	out_msg_pos += sizeof(int);
+
+	// Send message
+	byte *result = send_message(out_msg, FSTAT_MESSAGE_FIXED_SIZE);
+
+	free(out_msg);
+
+	// Read result
+	int return_val;
+
+	if (result != NULL) {
+		return_val = *((int *)result);
+		if (return_val == -1)
+			errno = *(((char *)result) + sizeof(int) + sizeof(struct stat));
+		else
+			memcpy(st, ((int *)result) + 1, sizeof(struct stat));
+		free(result);
+	} else {
+		return_val = -1;
+	}
+
+	return return_val;
 }
 
 /* getpid()
@@ -139,8 +174,35 @@ int getpid(void)
 int isatty(int file) 
 {
 	debug_in_out("ISATTY\n");
-	debug_in_out("\tfile: %u\n", file);
-	return 1;
+//	return 1;
+	
+	// Allocate a new buffer of proper size
+	byte *out_msg = malloc(ISATTY_MESSAGE_FIXED_SIZE);
+	if(out_msg == NULL)
+		return -1;
+	byte *out_msg_pos = out_msg;
+
+	// Fill the buffer
+	*((syscall_id *)out_msg_pos) = ISATTY_ID;
+	out_msg_pos += sizeof(syscall_id);
+
+	*((int*)out_msg_pos) = file;
+	out_msg_pos += sizeof(int);
+
+	// Send message
+	byte *result = send_message(out_msg, ISATTY_MESSAGE_FIXED_SIZE);
+
+	free(out_msg);
+
+	if (result != NULL) {
+		// Read result
+		int return_val;
+		return_val = *((int *) result);
+		free(result);
+		return return_val;
+	} else {
+		return -1;
+	}
 }
 
 /* kill()
@@ -161,8 +223,55 @@ int kill(int pid, int sig)
 int link(char *old, char *new) 
 {
 	debug_in_out("LINK\n");
-	errno = EMLINK;
-	return -1;
+	//errno = EMLINK;
+	//return -1;
+	
+	
+	int s_len_old = strlen(old) + 1; // Null terminator
+	int s_len_new = strlen(new) + 1; // Null terminator
+
+	int out_msg_len = LINK_MESSAGE_FIXED_SIZE + s_len_old + s_len_new;
+
+	// Allocate a new buffer of proper size
+	byte *out_msg = malloc(out_msg_len);
+	byte *out_msg_pos = out_msg;
+
+	if (out_msg == NULL)
+		return -1;
+
+	// Fill the buffer
+	*((syscall_id*)out_msg_pos) = LINK_ID;
+	out_msg_pos += sizeof(syscall_id);
+
+	*((int*)out_msg_pos) = s_len_old;
+	out_msg_pos += sizeof(int);
+
+	*((int*)out_msg_pos) = s_len_new;
+	out_msg_pos += sizeof(int);
+
+	memcpy(out_msg_pos, old, s_len_old);
+	out_msg_pos += s_len_old;
+
+	memcpy(out_msg_pos, new, s_len_new);
+
+	// Send message
+	byte *result = send_message(out_msg, out_msg_len);
+
+	free(out_msg);
+
+	// Read result
+	int return_val;
+
+	if (result != NULL) {
+		return_val = *((int *)result);
+		if (return_val == -1) errno = *(((int *)result) + 1);
+		free(result);
+	} else {
+		return_val = -1;
+		errno = ECHANNEL;
+	}
+
+	return return_val;
 }
 
 /* lseek()
@@ -172,7 +281,42 @@ int link(char *old, char *new)
 off_t lseek(int file, off_t ptr, int dir) 
 {
 	debug_in_out("LSEEK\n");
-	return 0;
+//	return 0;
+	
+	
+	// Allocate a new buffer of proper size
+	byte *out_msg = malloc(LSEEK_MESSAGE_FIXED_SIZE);
+	if(out_msg == NULL)
+		return -1;
+	byte *out_msg_pos = out_msg;
+
+	// Fill the buffer
+	*((syscall_id *)out_msg_pos) = LSEEK_ID;
+	out_msg_pos += sizeof(syscall_id);
+
+	*((int*)out_msg_pos) = file;
+	out_msg_pos += sizeof(int);
+
+	*((int*)out_msg_pos) = ptr;
+	out_msg_pos += sizeof(int);
+
+	*((int*)out_msg_pos) = dir;
+	out_msg_pos += sizeof(int);
+
+	// Send message
+	byte *result = send_message(out_msg, LSEEK_MESSAGE_FIXED_SIZE);
+
+	free(out_msg);
+
+	if (result != NULL) {
+		// Read result
+		int return_val;
+		return_val = *((int *) result);
+		free(result);
+		return return_val;
+	} else {
+		return -1;
+	}
 }
 
 /* open()
@@ -459,6 +603,49 @@ int stat(char *file, struct stat *st)
 	debug_in_out("STAT\n");
 	st->st_mode = S_IFCHR;
 	return 0;
+	
+	int s_len = strlen(file) + 1; // Null terminator
+	int out_msg_len = STAT_MESSAGE_FIXED_SIZE + s_len;
+
+	// Allocate a new buffer of proper size
+	byte *out_msg = malloc(out_msg_len);
+	byte *out_msg_pos = out_msg;
+
+	if (out_msg == NULL)
+		return -1;
+
+	// Fill the buffer
+	*((syscall_id*)out_msg_pos) = STAT_ID;
+	out_msg_pos += sizeof(syscall_id);
+
+	*((int*)out_msg_pos) = s_len;
+	out_msg_pos += sizeof(int);
+
+	memcpy(out_msg_pos, file, s_len);
+
+	// Send message
+	byte *result = send_message(out_msg, out_msg_len);
+
+	free(out_msg);
+
+	// Read result
+	int return_val;
+
+	if (result != NULL) {
+		return_val = *((int *)result);
+
+		if (return_val == -1)
+			errno = *(((char *)result) + sizeof(int) + sizeof(struct stat));
+		else
+			memcpy(st, ((int *)result) + 1, sizeof(struct stat));
+
+		free(result);
+
+	} else {
+		return_val = -1;
+	}
+
+	return return_val;
 }
 
 /* times()
@@ -478,8 +665,46 @@ int times(struct tms *buf)
 int unlink(char *name) 
 {
 	debug_in_out("UNLINK\n");
-	errno = ENOENT;
-	return -1;
+//	errno = ENOENT;
+//	return -1;
+	
+	int s_len = strlen(name) + 1; // Null terminator
+	int out_msg_len = UNLINK_MESSAGE_FIXED_SIZE + s_len;
+
+	// Allocate a new buffer of proper size
+	byte *out_msg = malloc(out_msg_len);
+	byte *out_msg_pos = out_msg;
+
+	if (out_msg == NULL)
+		return -1;
+
+	// Fill the buffer
+	*((syscall_id*)out_msg_pos) = UNLINK_ID;
+	out_msg_pos += sizeof(syscall_id);
+
+	*((int*)out_msg_pos) = s_len;
+	out_msg_pos += sizeof(int);
+
+	memcpy(out_msg_pos, name, s_len);
+
+	// Send message
+	byte *result = send_message(out_msg, out_msg_len);
+
+	free(out_msg);
+
+	// Read result
+	int return_val;
+
+	if (result != NULL) {
+		return_val = *((int *)result);
+		if (return_val == -1) errno = *(((int *)result) + 1);
+		free(result);
+	} else {
+		return_val = -1;
+		errno = ECHANNEL;
+	}
+
+	return return_val;
 }
 
 /* wait()
@@ -503,7 +728,7 @@ ssize_t write(int file, void *ptr, size_t len) {
 
 	debug_write_check("Writing len: %d\n", len);
 
-	if ((file >= STDIN_FILENO) && (file <= STDERR_FILENO)) 
+	if ((file == STDIN_FILENO) || (file == STDERR_FILENO) || (file == STDOUT_FILENO))
 		return sys_cputs(ptr, len);
 	
 	int out_msg_len = WRITE_MESSAGE_FIXED_SIZE + len;

@@ -42,7 +42,7 @@ void manager(void)
 	
 	if(progress == 0) {
 		progress++;
-		env_batch[0] = ENV_CREATE(parlib_matrix);
+		env_batch[0] = ENV_CREATE(parlib_file_io);
 		env_run(env_batch[0]);
 	}
 	return;

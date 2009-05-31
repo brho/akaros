@@ -71,7 +71,7 @@ serial_init(void)
 	outb(COM1+COM_LCR, COM_LCR_WLEN8 & ~COM_LCR_DLAB);
 
 	// No modem controls
-	outb(COM1+COM_MCR, 0);
+	outb(COM1+COM_MCR, COM_MCR_RTS | COM_MCR_DTR);
 	// Enable rcv interrupts
 	outb(COM1+COM_IER, COM_IER_RDI);
 
