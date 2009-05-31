@@ -9,10 +9,10 @@ extern void draw_nanwan();
 extern void clrscrn(int leaverows);
 
 void help() {
-	printf("Possible commands to run:\n");
-//	       "  draw_nanwan: Draw a picture of Nanwan, our mascot giraffe\n"
-//	       "  clrscrn:     Clear the Screen\n"
-//	      );
+	printf("Possible commands to run:\n"
+	       "  draw_nanwan: Draw a picture of Nanwan, our mascot giraffe\n"
+	       "  clear_screen:     Clear the Screen\n"
+	      );
 }
 
 int main(int argc, char** argv)
@@ -22,12 +22,12 @@ int main(int argc, char** argv)
 	clrscrn(2);
 	while(1) {
 		char* s = readline("nanwan@ros$ ");
-//		printf("%s\n", s);
-//		if(strcmp(s, "draw_nanwan") == 0)
-//			draw_nanwan();		
-//		else if(strcmp(s, "clrsrcn") == 0)
-//			clrscrn(0);		
-//		else 
+		printf("%s\n", s);
+		if(strcmp(s, "draw_nanwan") == 0)
+			draw_nanwan();		
+		else if(strcmp(s, "clear_screen") == 0)
+			clrscrn(0);		
+		else 
 			help();	
 
 	}	

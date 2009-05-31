@@ -5,7 +5,8 @@
 
 char* readline(const char *prompt)
 {
-	int i, c;
+	int i, read_amt;
+	char c;
 	#define BUFLEN 256
 	static char buf[BUFLEN];
 
@@ -14,9 +15,9 @@ char* readline(const char *prompt)
 
 	i = 0;
 	while (1) {
-		read(STDIN_FILENO, &c, 1);
-		if (c < 0) {
-			printf("read error: %e\n", c);
+		read_amt = read(STDIN_FILENO, &c, 1);
+		if (read_amt < 0) {
+			printf("read error: %d\n",read_amt);
 			return NULL;
 		} else if (c >= ' ' && i < BUFLEN-1) {
 			write(STDOUT_FILENO, &c, 1);
