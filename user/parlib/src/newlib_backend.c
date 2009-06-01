@@ -115,8 +115,8 @@ int fstat(int file, struct stat *st)
 	st->st_mode = S_IFCHR;
 	
 	// stdout hack
-	if (file == 1)
-		st->st_mode = 8592;
+//	if (file == 1)
+//		st->st_mode = 8592;
 	return 0;
 
 
@@ -176,8 +176,8 @@ int isatty(int file)
 	debug_in_out("ISATTY\n");
 
 	// Cheap hack to avoid sending serial comm for stuff we know
-	if ((STDIN_FILENO == file) || (STDOUT_FILENO == file) || (STDERR_FILENO == file))
-		return 1;
+//	if ((STDIN_FILENO == file) || (STDOUT_FILENO == file) || (STDERR_FILENO == file))
+//		return 1;
 
 	
 	// Allocate a new buffer of proper size
