@@ -39,31 +39,31 @@ void _exit(int __status) _ATTRIBUTE ((noreturn))
 /* close()
  * Close a file. 
  */
-int close(int file) 
-{
+int close(int file) {
 	debug_in_out("CLOSE\n");
 
 	// If trying to close stdin/out/err just return
-	if ((file == STDIN_FILENO) || (file == STDERR_FILENO) || (file == STDOUT_FILENO))
+	if ((file == STDIN_FILENO) || (file == STDERR_FILENO) 
+            || (file == STDOUT_FILENO))
 		return 0;
 
 	// Allocate a new buffer of proper size
-	byte *out_msg = malloc(CLOSE_MESSAGE_FIXED_SIZE);
-	if(out_msg == NULL)
+	char *out_msg = malloc(CLOSE_MESSAGE_FIXED_SIZE);
+	if (out_msg == NULL)
 		return -1;
 
-	byte *out_msg_pos = out_msg;
+	char *out_msg_pos = out_msg;
 
 	// Fill the buffer
-	*((syscall_id *)out_msg_pos) = CLOSE_ID;
-	out_msg_pos += sizeof(syscall_id);
+	*((syscall_id_t *)out_msg_pos) = CLOSE_ID;
+	out_msg_pos += sizeof(syscall_id_t);
 
 	*((int*)out_msg_pos) = file;
 	out_msg_pos += sizeof(int);
 
 
 	// Send message
-	byte *result = send_message(out_msg, CLOSE_MESSAGE_FIXED_SIZE);
+	char *result = send_message(out_msg, CLOSE_MESSAGE_FIXED_SIZE);
 
 	free(out_msg);
 
@@ -117,24 +117,24 @@ int fstat(int file, struct stat *st)
 	// stdout hack
 //	if (file == 1)
 //		st->st_mode = 8592;
-	return 0;
+//	return 0;
 
 
 	// Allocate a new buffer of proper size
-	byte *out_msg = malloc(FSTAT_MESSAGE_FIXED_SIZE);
+	char *out_msg = malloc(FSTAT_MESSAGE_FIXED_SIZE);
 	if(out_msg == NULL)
 		return -1;
-	byte *out_msg_pos = out_msg;
+	char *out_msg_pos = out_msg;
 
 	// Fill the buffer
-	*((syscall_id *)out_msg_pos) = FSTAT_ID;
-	out_msg_pos += sizeof(syscall_id);
+	*((syscall_id_t *)out_msg_pos) = FSTAT_ID;
+	out_msg_pos += sizeof(syscall_id_t);
 
 	*((int*)out_msg_pos) = file;
 	out_msg_pos += sizeof(int);
 
 	// Send message
-	byte *result = send_message(out_msg, FSTAT_MESSAGE_FIXED_SIZE);
+	char *result = send_message(out_msg, FSTAT_MESSAGE_FIXED_SIZE);
 
 	free(out_msg);
 
@@ -144,7 +144,8 @@ int fstat(int file, struct stat *st)
 	if (result != NULL) {
 		return_val = *((int *)result);
 		if (return_val == -1)
-			errno = *(((char *)result) + sizeof(int) + sizeof(struct stat));
+			errno = *(((char *)result) + 
+                                       sizeof(int) + sizeof(struct stat));
 		else
 			memcpy(st, ((int *)result) + 1, sizeof(struct stat));
 		free(result);
@@ -176,25 +177,26 @@ int isatty(int file)
 	debug_in_out("ISATTY\n");
 
 	// Cheap hack to avoid sending serial comm for stuff we know
-//	if ((STDIN_FILENO == file) || (STDOUT_FILENO == file) || (STDERR_FILENO == file))
+//	if ((STDIN_FILENO == file) || (STDOUT_FILENO == file) 
+//                                 || (STDERR_FILENO == file))
 //		return 1;
 
 	
 	// Allocate a new buffer of proper size
-	byte *out_msg = malloc(ISATTY_MESSAGE_FIXED_SIZE);
+	char *out_msg = malloc(ISATTY_MESSAGE_FIXED_SIZE);
 	if(out_msg == NULL)
 		return -1;
-	byte *out_msg_pos = out_msg;
+	char *out_msg_pos = out_msg;
 
 	// Fill the buffer
-	*((syscall_id *)out_msg_pos) = ISATTY_ID;
-	out_msg_pos += sizeof(syscall_id);
+	*((syscall_id_t *)out_msg_pos) = ISATTY_ID;
+	out_msg_pos += sizeof(syscall_id_t);
 
 	*((int*)out_msg_pos) = file;
 	out_msg_pos += sizeof(int);
 
 	// Send message
-	byte *result = send_message(out_msg, ISATTY_MESSAGE_FIXED_SIZE);
+	char *result = send_message(out_msg, ISATTY_MESSAGE_FIXED_SIZE);
 
 	free(out_msg);
 
@@ -227,9 +229,6 @@ int kill(int pid, int sig)
 int link(char *old, char *new) 
 {
 	debug_in_out("LINK\n");
-	//errno = EMLINK;
-	//return -1;
-	
 	
 	int s_len_old = strlen(old) + 1; // Null terminator
 	int s_len_new = strlen(new) + 1; // Null terminator
@@ -237,15 +236,15 @@ int link(char *old, char *new)
 	int out_msg_len = LINK_MESSAGE_FIXED_SIZE + s_len_old + s_len_new;
 
 	// Allocate a new buffer of proper size
-	byte *out_msg = malloc(out_msg_len);
-	byte *out_msg_pos = out_msg;
+	char *out_msg = malloc(out_msg_len);
+	char *out_msg_pos = out_msg;
 
 	if (out_msg == NULL)
 		return -1;
 
 	// Fill the buffer
-	*((syscall_id*)out_msg_pos) = LINK_ID;
-	out_msg_pos += sizeof(syscall_id);
+	*((syscall_id_t *)out_msg_pos) = LINK_ID;
+	out_msg_pos += sizeof(syscall_id_t);
 
 	*((int*)out_msg_pos) = s_len_old;
 	out_msg_pos += sizeof(int);
@@ -259,7 +258,7 @@ int link(char *old, char *new)
 	memcpy(out_msg_pos, new, s_len_new);
 
 	// Send message
-	byte *result = send_message(out_msg, out_msg_len);
+	char *result = send_message(out_msg, out_msg_len);
 
 	free(out_msg);
 
@@ -284,19 +283,17 @@ int link(char *old, char *new)
  */
 off_t lseek(int file, off_t ptr, int dir) 
 {
-	debug_in_out("LSEEK\n");
-//	return 0;
-	
+	debug_in_out("LSEEK\n");	
 	
 	// Allocate a new buffer of proper size
-	byte *out_msg = malloc(LSEEK_MESSAGE_FIXED_SIZE);
+	char *out_msg = malloc(LSEEK_MESSAGE_FIXED_SIZE);
 	if(out_msg == NULL)
 		return -1;
-	byte *out_msg_pos = out_msg;
+	char *out_msg_pos = out_msg;
 
 	// Fill the buffer
-	*((syscall_id *)out_msg_pos) = LSEEK_ID;
-	out_msg_pos += sizeof(syscall_id);
+	*((syscall_id_t *)out_msg_pos) = LSEEK_ID;
+	out_msg_pos += sizeof(syscall_id_t);
 
 	*((int*)out_msg_pos) = file;
 	out_msg_pos += sizeof(int);
@@ -308,7 +305,7 @@ off_t lseek(int file, off_t ptr, int dir)
 	out_msg_pos += sizeof(int);
 
 	// Send message
-	byte *result = send_message(out_msg, LSEEK_MESSAGE_FIXED_SIZE);
+	char *result = send_message(out_msg, LSEEK_MESSAGE_FIXED_SIZE);
 
 	free(out_msg);
 
@@ -334,15 +331,15 @@ int open(const char *name, int flags, int mode)
 	int out_msg_len = OPEN_MESSAGE_FIXED_SIZE + s_len;
 
 	// Allocate a new buffer of proper size
-	byte *out_msg = malloc(out_msg_len);
-	byte *out_msg_pos = out_msg;
+	char *out_msg = malloc(out_msg_len);
+	char *out_msg_pos = out_msg;
 
 	if (out_msg == NULL)
 		return -1;
 
 	// Fill the buffer
-	*((syscall_id*)out_msg_pos) = OPEN_ID;
-	out_msg_pos += sizeof(syscall_id);
+	*((syscall_id_t *)out_msg_pos) = OPEN_ID;
+	out_msg_pos += sizeof(syscall_id_t);
 
 	*((int*)out_msg_pos) = flags;
 	out_msg_pos += sizeof(int);
@@ -356,7 +353,7 @@ int open(const char *name, int flags, int mode)
 	memcpy(out_msg_pos, name, s_len);
 
 	// Send message
-	byte *result = send_message(out_msg, out_msg_len);
+	char *result = send_message(out_msg, out_msg_len);
 
 	free(out_msg);
 
@@ -380,22 +377,22 @@ ssize_t read(int file, void *ptr, size_t len)
 {
 	debug_in_out("READ\n");
 
-	if(file == STDIN_FILENO) {
+	if (file == STDIN_FILENO) {
 		for(int i=0; i<len; i++)	
 			((uint8_t*)ptr)[i] = sys_cgetc();
 		return len;
 	}
 
 	// Allocate a new buffer of proper size
-	byte *out_msg = (byte*)malloc(READ_MESSAGE_FIXED_SIZE);
+	char *out_msg = (char*)malloc(READ_MESSAGE_FIXED_SIZE);
 	if (out_msg == NULL)
 		return -1;
 
-	byte *out_msg_pos = out_msg;
+	char *out_msg_pos = out_msg;
 
 	// Fill the buffer
-	*((syscall_id*)out_msg_pos) = READ_ID;
-	out_msg_pos += sizeof(syscall_id);
+	*((syscall_id_t *)out_msg_pos) = READ_ID;
+	out_msg_pos += sizeof(syscall_id_t);
 
 	*((int *)out_msg_pos) = file;
 	out_msg_pos += sizeof(int);
@@ -404,7 +401,7 @@ ssize_t read(int file, void *ptr, size_t len)
 	out_msg_pos += sizeof(int);
 
 	// Send message
-	byte *result = send_message(out_msg, READ_MESSAGE_FIXED_SIZE);
+	char *result = send_message(out_msg, READ_MESSAGE_FIXED_SIZE);
 
 	free(out_msg);
 
@@ -424,15 +421,15 @@ ssize_t read(int file, void *ptr, size_t len)
 }
 
 /* Read len bytes from the given channel to the buffer.
- * If peek is 0, will wait indefinitely until that much data is read.
- * If peek is 1, if no data is available, will return immediately.
- *		However once some data is available, it will block until the entire amount is available.
+ * If peek is NO_PEEK, will wait indefinitely until that much data is read.
+ * If peek is PEEK, if no data is available, will return immediately.
+ *		However once some data is available, 
+ *                      will block until the entire amount is available.
  */
-int read_from_channel(byte * buf, int len, int peek)
+int read_from_channel(char * buf, int len, int peek)
 {
 	// TODO: NEED TO IMPLIMENT A TIMEOUT
 	// 			Also, watch out for CONNECTION TERMINATED
-	// TODO: Add a #define for peek / no peek. Don't know why I didnt do this from the start?
 	int total_read = 0;
 
 	int just_read = sys_serial_read(buf, len);
@@ -484,13 +481,13 @@ void* sbrk(ptrdiff_t incr)
 }
 
 /* send_message()
- * Write the message defined in buffer out across the channel, and wait for a response.
- * Caller is responsible for management of both the buffer passed in and the buffer ptr returned.
+ * Write the message in buffer out on the channel, and wait for a response.
+ * Caller is responsible for management of buffer passed in and buffer returned.
  */
-byte *send_message(byte *message, int len)
+char *send_message(char *message, int len)
 {
 
-	syscall_id this_call_id = *((syscall_id*)message);
+	syscall_id_t this_call_id = *((syscall_id_t*)message);
 
 	if (write_to_channel(message, len) != len)
 		return NULL;
@@ -498,95 +495,152 @@ byte *send_message(byte *message, int len)
 	int response_value;
 
 	// Pull the response from the server out of the channel.
-	if (read_from_channel((char*)&response_value, sizeof(int), 0) == -1) return NULL;
+	if (read_from_channel( (char*)&response_value, 
+                               sizeof(int), 
+                               NO_PEEK) == -1) 
+		return NULL;
 
-	byte* return_msg = NULL;
+	char* return_msg = NULL;
+	int extra_sp = 0;
 
 	// TODO: Make these sizes an array we index into, and only have this code once.
 	// TODO: Will have a flag that tells us we have a variable length response (right now only for read case)
 	// TODO: Default clause with error handling.
 	switch (this_call_id) {
 		case OPEN_ID:
-			if ((return_msg = (byte*)malloc(OPEN_RETURN_MESSAGE_FIXED_SIZE)) == NULL)
+			if ((return_msg = 
+                            (char*)malloc(OPEN_RETURN_MESSAGE_FIXED_SIZE)) 
+                            == NULL)
 				return NULL;
 
 			break;
 
 		case CLOSE_ID:
-			if ((return_msg = (byte*)malloc(CLOSE_RETURN_MESSAGE_FIXED_SIZE)) == NULL)
+			if ((return_msg = 
+                            (char*)malloc(CLOSE_RETURN_MESSAGE_FIXED_SIZE)) 
+                            == NULL)
 				return NULL;
 
 			break;
 
 		case READ_ID:
-			if ((return_msg = (byte*)malloc(READ_RETURN_MESSAGE_FIXED_SIZE + ((response_value > 0) ? response_value : 0))) == NULL)
+			extra_sp = (response_value > 0) ? response_value : 0;
+			if ((return_msg 
+                            = (char*)malloc(READ_RETURN_MESSAGE_FIXED_SIZE 
+                                             + extra_sp)) 
+                            == NULL)
 				return NULL;
 
 
-			if ((response_value != -1) &&  (read_from_channel(return_msg + sizeof(int), response_value, 0) == -1))
+			if ((response_value != -1) 
+                            && (read_from_channel(return_msg + sizeof(int), 
+                                                  response_value, NO_PEEK) 
+                            == -1))
 				return NULL;
 
 			break;
 
 		case WRITE_ID:
-			if ((return_msg = (byte*)malloc(WRITE_RETURN_MESSAGE_FIXED_SIZE)) == NULL)
+			if ((return_msg = 
+                            (char*)malloc(WRITE_RETURN_MESSAGE_FIXED_SIZE)) 
+                            == NULL)
 				return NULL;
 
 			break;
 
 
 		case LSEEK_ID:
-			if ((return_msg = (byte*)malloc(LSEEK_RETURN_MESSAGE_FIXED_SIZE)) == NULL)
+			if ((return_msg = 
+                            (char*)malloc(LSEEK_RETURN_MESSAGE_FIXED_SIZE)) 
+                            == NULL)
 				return NULL;
 
 			break;
 
 		case ISATTY_ID:
-			if ((return_msg = (byte*)malloc(ISATTY_RETURN_MESSAGE_FIXED_SIZE)) == NULL)
+			if ((return_msg = 
+                            (char*)malloc(ISATTY_RETURN_MESSAGE_FIXED_SIZE)) 
+                            == NULL)
 				return NULL;
 
 			break;
 
 		case UNLINK_ID:
-			if ((return_msg = (byte*)malloc(UNLINK_RETURN_MESSAGE_FIXED_SIZE + ((response_value != -1) ? 0 : sizeof(int)))) == NULL)
+			extra_sp = (response_value != -1) ? 0 : sizeof(int);
+			if ((return_msg = 
+                            (char*)malloc(UNLINK_RETURN_MESSAGE_FIXED_SIZE 
+                                           + extra_sp)) 
+                            == NULL)
 				return NULL;
 
 
-			if ((response_value == -1) && ((read_from_channel(return_msg + sizeof(int), sizeof(int), 0)) == -1))
+			if ((response_value == -1) 
+                            && ((read_from_channel(return_msg + sizeof(int), 
+                                                   sizeof(int), NO_PEEK)) 
+                            == -1))
 				return NULL;
 
 			break;
 
 		case LINK_ID:
-			if ((return_msg = (byte*)malloc(LINK_RETURN_MESSAGE_FIXED_SIZE + ((response_value != -1) ? 0 : sizeof(int)))) == NULL)
+			extra_sp = (response_value != -1) ? 0 : sizeof(int);
+			if ((return_msg = 
+                            (char*)malloc(LINK_RETURN_MESSAGE_FIXED_SIZE 
+                                          + extra_sp)) 
+                            == NULL)
 				return NULL;
 
 
-			if ((response_value == -1) && ((read_from_channel(return_msg + sizeof(int), sizeof(int), 0)) == -1))
+			if ((response_value == -1) 
+                            && ((read_from_channel(return_msg + sizeof(int), 
+                                                   sizeof(int), NO_PEEK)) 
+                            == -1))
 				return NULL;
 
 			break;
 
 		case FSTAT_ID:
-			if ((return_msg = (byte*)malloc(FSTAT_RETURN_MESSAGE_FIXED_SIZE + ((response_value != -1) ? 0 : sizeof(int)))) == NULL)
+			extra_sp = (response_value != -1) ? 0 : sizeof(int);
+			if ((return_msg = 
+                            (char*)malloc(FSTAT_RETURN_MESSAGE_FIXED_SIZE 
+                                          + extra_sp)) 
+                            == NULL)
 				return NULL;
 
-			if (read_from_channel(return_msg + sizeof(int), sizeof(struct stat), 0) == -1)
+			if (read_from_channel(return_msg + sizeof(int), 
+                                              sizeof(struct stat), NO_PEEK) 
+                            == -1)
 				return NULL;
 
-			if ((response_value == -1) && ((read_from_channel(return_msg + sizeof(int) + sizeof(struct stat), sizeof(int), 0)) == -1))
+			if ((response_value == -1) 
+                            && ((read_from_channel(return_msg 
+                                                    + sizeof(int) 
+                                                    + sizeof(struct stat),
+                                                   sizeof(int), NO_PEEK)) 
+                            == -1))
 				return NULL;
 
 			break;
 
 		case STAT_ID:
-			if ((return_msg = (byte*)malloc(STAT_RETURN_MESSAGE_FIXED_SIZE + ((response_value != -1) ? 0 : sizeof(int)))) == NULL)
+			extra_sp = (response_value != -1) ? 0 : sizeof(int);
+			if ((return_msg = 
+                            (char*)malloc(STAT_RETURN_MESSAGE_FIXED_SIZE 
+                                          + extra_sp)) 
+                            == NULL)
 				return NULL;
 
-			if (read_from_channel(return_msg + sizeof(int), sizeof(struct stat), 0) == -1)
+			if (read_from_channel(return_msg + sizeof(int), 
+                                              sizeof(struct stat), NO_PEEK) 
+                            == -1)
 				return NULL;
 
-			if ((response_value == -1) && (read_from_channel(return_msg + sizeof(int) + sizeof(struct stat), sizeof(int), 0) == -1))
+			if ((response_value == -1) 
+                            && (read_from_channel(return_msg 
+                                                   + sizeof(int) 
+                                                   + sizeof(struct stat), 
+                                                  sizeof(int), NO_PEEK) 
+                            == -1))
 				return NULL;
 
 			break;
@@ -605,22 +659,20 @@ byte *send_message(byte *message, int len)
 int stat(char *file, struct stat *st) 
 {
 	debug_in_out("STAT\n");
-	st->st_mode = S_IFCHR;
-	return 0;
 	
 	int s_len = strlen(file) + 1; // Null terminator
 	int out_msg_len = STAT_MESSAGE_FIXED_SIZE + s_len;
 
 	// Allocate a new buffer of proper size
-	byte *out_msg = malloc(out_msg_len);
-	byte *out_msg_pos = out_msg;
+	char *out_msg = malloc(out_msg_len);
+	char *out_msg_pos = out_msg;
 
 	if (out_msg == NULL)
 		return -1;
 
 	// Fill the buffer
-	*((syscall_id*)out_msg_pos) = STAT_ID;
-	out_msg_pos += sizeof(syscall_id);
+	*((syscall_id_t *)out_msg_pos) = STAT_ID;
+	out_msg_pos += sizeof(syscall_id_t);
 
 	*((int*)out_msg_pos) = s_len;
 	out_msg_pos += sizeof(int);
@@ -628,7 +680,7 @@ int stat(char *file, struct stat *st)
 	memcpy(out_msg_pos, file, s_len);
 
 	// Send message
-	byte *result = send_message(out_msg, out_msg_len);
+	char *result = send_message(out_msg, out_msg_len);
 
 	free(out_msg);
 
@@ -639,7 +691,8 @@ int stat(char *file, struct stat *st)
 		return_val = *((int *)result);
 
 		if (return_val == -1)
-			errno = *(((char *)result) + sizeof(int) + sizeof(struct stat));
+			errno = *(((char *)result) + sizeof(int) 
+                                                   + sizeof(struct stat));
 		else
 			memcpy(st, ((int *)result) + 1, sizeof(struct stat));
 
@@ -669,22 +722,20 @@ int times(struct tms *buf)
 int unlink(char *name) 
 {
 	debug_in_out("UNLINK\n");
-//	errno = ENOENT;
-//	return -1;
 	
 	int s_len = strlen(name) + 1; // Null terminator
 	int out_msg_len = UNLINK_MESSAGE_FIXED_SIZE + s_len;
 
 	// Allocate a new buffer of proper size
-	byte *out_msg = malloc(out_msg_len);
-	byte *out_msg_pos = out_msg;
+	char *out_msg = malloc(out_msg_len);
+	char *out_msg_pos = out_msg;
 
 	if (out_msg == NULL)
 		return -1;
 
 	// Fill the buffer
-	*((syscall_id*)out_msg_pos) = UNLINK_ID;
-	out_msg_pos += sizeof(syscall_id);
+	*((syscall_id_t *)out_msg_pos) = UNLINK_ID;
+	out_msg_pos += sizeof(syscall_id_t);
 
 	*((int*)out_msg_pos) = s_len;
 	out_msg_pos += sizeof(int);
@@ -692,7 +743,7 @@ int unlink(char *name)
 	memcpy(out_msg_pos, name, s_len);
 
 	// Send message
-	byte *result = send_message(out_msg, out_msg_len);
+	char *result = send_message(out_msg, out_msg_len);
 
 	free(out_msg);
 
@@ -732,18 +783,19 @@ ssize_t write(int file, void *ptr, size_t len) {
 
 	debug_write_check("Writing len: %d\n", len);
 
-	if ((file == STDIN_FILENO) || (file == STDERR_FILENO) || (file == STDOUT_FILENO))
+	if ((file == STDIN_FILENO) || (file == STDERR_FILENO) 
+                                   || (file == STDOUT_FILENO))
 		return sys_cputs(ptr, len);
 	
 	int out_msg_len = WRITE_MESSAGE_FIXED_SIZE + len;
 
 	// Allocate a new buffer of proper size
-	byte *out_msg = malloc(out_msg_len);
-	byte *out_msg_pos = out_msg;
+	char *out_msg = malloc(out_msg_len);
+	char *out_msg_pos = out_msg;
 
 	// Fill the buffer
-	*((syscall_id*)out_msg_pos) = WRITE_ID;
-	out_msg_pos += sizeof(syscall_id);
+	*((syscall_id_t *)out_msg_pos) = WRITE_ID;
+	out_msg_pos += sizeof(syscall_id_t);
 
 	*((int*)out_msg_pos) = file;
 	out_msg_pos += sizeof(int);
@@ -754,7 +806,7 @@ ssize_t write(int file, void *ptr, size_t len) {
 	memcpy(out_msg_pos, ptr, len);
 
 	// Send message
-	byte *result = send_message(out_msg, out_msg_len);
+	char *result = send_message(out_msg, out_msg_len);
 
 	free(out_msg);
 
@@ -775,7 +827,7 @@ ssize_t write(int file, void *ptr, size_t len) {
 /* write_to_channel()
  * Send a message out over the channel, defined by msg, of length len
  */
-int write_to_channel(byte * msg, int len)
+int write_to_channel(char * msg, int len)
 {
 	return sys_serial_write((char*)msg, len);
 }

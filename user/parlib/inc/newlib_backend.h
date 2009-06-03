@@ -23,18 +23,18 @@ extern int errno;
 
 
 // Fixed size of the client->server msgs for the various calls.
-#define OPEN_MESSAGE_FIXED_SIZE 	sizeof(syscall_id) + 3*sizeof(int)
-#define CLOSE_MESSAGE_FIXED_SIZE 	sizeof(syscall_id) + sizeof(int)
-#define READ_MESSAGE_FIXED_SIZE 	sizeof(syscall_id) + 2*sizeof(int)
-#define WRITE_MESSAGE_FIXED_SIZE 	sizeof(syscall_id) + 2*sizeof(int)
-#define LSEEK_MESSAGE_FIXED_SIZE 	sizeof(syscall_id) + 3*sizeof(int)
-#define ISATTY_MESSAGE_FIXED_SIZE 	sizeof(syscall_id) + sizeof(int)
-#define LINK_MESSAGE_FIXED_SIZE 	sizeof(syscall_id) + 2*sizeof(int)
-#define UNLINK_MESSAGE_FIXED_SIZE 	sizeof(syscall_id) + sizeof(int)
-#define FSTAT_MESSAGE_FIXED_SIZE 	sizeof(syscall_id) + sizeof(int)
-#define STAT_MESSAGE_FIXED_SIZE 	sizeof(syscall_id) + sizeof(int)
+#define OPEN_MESSAGE_FIXED_SIZE 	sizeof(syscall_id_t) + 3*sizeof(int)
+#define CLOSE_MESSAGE_FIXED_SIZE 	sizeof(syscall_id_t) + sizeof(int)
+#define READ_MESSAGE_FIXED_SIZE 	sizeof(syscall_id_t) + 2*sizeof(int)
+#define WRITE_MESSAGE_FIXED_SIZE 	sizeof(syscall_id_t) + 2*sizeof(int)
+#define LSEEK_MESSAGE_FIXED_SIZE 	sizeof(syscall_id_t) + 3*sizeof(int)
+#define ISATTY_MESSAGE_FIXED_SIZE 	sizeof(syscall_id_t) + sizeof(int)
+#define LINK_MESSAGE_FIXED_SIZE 	sizeof(syscall_id_t) + 2*sizeof(int)
+#define UNLINK_MESSAGE_FIXED_SIZE 	sizeof(syscall_id_t) + sizeof(int)
+#define FSTAT_MESSAGE_FIXED_SIZE 	sizeof(syscall_id_t) + sizeof(int)
+#define STAT_MESSAGE_FIXED_SIZE 	sizeof(syscall_id_t) + sizeof(int)
 
-// What is the max number of arguments (besides the syscall_id) we can have.
+// What is the max number of arguments (besides the syscall_id_t) we can have.
 // This should be the max of the above sizes.
 // This exists so we can  allocate a fixed amount of memory to process all incoming msgs
 // TODO: This makes the implicit assumption when referenced in server.c that each argument is of type int.
@@ -42,16 +42,16 @@ extern int errno;
 #define MAX_FIXED_ARG_COUNT 3
 
 // Fixed server-> respponse msg sizes.
-#define OPEN_RETURN_MESSAGE_FIXED_SIZE 		sizeof(int)
-#define CLOSE_RETURN_MESSAGE_FIXED_SIZE 	sizeof(int)
-#define READ_RETURN_MESSAGE_FIXED_SIZE 		sizeof(int)
-#define WRITE_RETURN_MESSAGE_FIXED_SIZE 	sizeof(int)
-#define LSEEK_RETURN_MESSAGE_FIXED_SIZE 	sizeof(int)
-#define ISATTY_RETURN_MESSAGE_FIXED_SIZE 	sizeof(int)
-#define UNLINK_RETURN_MESSAGE_FIXED_SIZE 	sizeof(int)
-#define LINK_RETURN_MESSAGE_FIXED_SIZE 		sizeof(int)
-#define STAT_RETURN_MESSAGE_FIXED_SIZE 		sizeof(int) + sizeof(struct stat)
-#define FSTAT_RETURN_MESSAGE_FIXED_SIZE 	sizeof(int) + sizeof(struct stat)
+#define OPEN_RETURN_MESSAGE_FIXED_SIZE 	       sizeof(int)
+#define CLOSE_RETURN_MESSAGE_FIXED_SIZE        sizeof(int)
+#define READ_RETURN_MESSAGE_FIXED_SIZE 	       sizeof(int)
+#define WRITE_RETURN_MESSAGE_FIXED_SIZE        sizeof(int)
+#define LSEEK_RETURN_MESSAGE_FIXED_SIZE        sizeof(int)
+#define ISATTY_RETURN_MESSAGE_FIXED_SIZE       sizeof(int)
+#define UNLINK_RETURN_MESSAGE_FIXED_SIZE       sizeof(int)
+#define LINK_RETURN_MESSAGE_FIXED_SIZE 	       sizeof(int)
+#define STAT_RETURN_MESSAGE_FIXED_SIZE 	       sizeof(int) + sizeof(struct stat)
+#define FSTAT_RETURN_MESSAGE_FIXED_SIZE        sizeof(int) + sizeof(struct stat)
 
 // New errno we want to define if a channel error occurs
 // Not yet fully implimented
@@ -61,29 +61,30 @@ extern int errno;
 // Note yet fully implimented
 #define CONNECTION_TERMINATED -2
 
-// Should refactor this next typedef. Just leave it as type int.
-typedef int syscall_id;
+// Macros for the read_from_channel function
+#define PEEK    1
+#define NO_PEEK 0
 
-// Replace with uint8?
-typedef char byte;
+typedef uint32_t syscall_id_t;
 
 /* Read len bytes from the given channel to the buffer.
- * If peek is 0, will wait indefinitely until that much data is read.
- * If peek is 1, if no data is available, will return immediately.
- *		However once some data is available, it will block until the entire amount is available.
+ * If peek is NO_PEEK, will wait indefinitely until that much data is read.
+ * If peek is PEEK, if no data is available, will return immediately.
+ *              However once some data is available,
+ *                      will block until the entire amount is available.
  */
-int read_from_channel(byte * buf, int len, int peek);
+int read_from_channel(char * buf, int len, int peek);
 
 /* send_message()
  * Write the message defined in buffer out across the channel, and wait for a response.
  * Caller is responsible for management of both the buffer passed in and the buffer ptr returned.
  */
-byte *send_message(byte *message, int len);
+char *send_message(char *message, int len);
 
 /* write_to_channel()
  * Send a message out over the channel, defined by msg, of length len
  */
-int write_to_channel(byte * msg, int len);
+int write_to_channel(char *msg, int len);
 
 #endif //_NEWLIB_LIBC_WRAPPERS_H_
 
