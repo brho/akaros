@@ -8,7 +8,7 @@
 #include <arch/elf.h>
 #include <arch/apic.h>
 #include <arch/smp.h>
-#include <ros/error.h>
+#include <arch/atomic.h>
 
 #include <string.h>
 #include <assert.h>
@@ -19,8 +19,10 @@
 #include <manager.h>
 
 #include <ros/syscall.h>
+#include <ros/error.h>
 
 env_t *envs = NULL;		// All environments
+uint32_t num_envs = 0;		// Number of envs
 // TODO: make this a struct of info including the pointer and cacheline-align it
 // This lets the kernel know what process is running on the core it traps into.
 // A lot of the Env business, including this and its usage, will change when we
@@ -260,6 +262,7 @@ env_alloc(env_t **newenv_store, envid_t parent_id)
 	// commit the allocation
 	LIST_REMOVE(e, env_link);
 	*newenv_store = e;
+	atomic_inc(&num_envs);
 
 	e->env_tscfreq = system_timing.tsc_freq;
 	// TODO: for now, the only info at procinfo is this env's struct
@@ -452,8 +455,9 @@ env_free(env_t *e)
 		page_decref(pa2page(pa));
 	}
 
+	// Moved to page_decref
 	// need a known good pgdir before releasing the old one
-	lcr3(boot_cr3);
+	//lcr3(boot_cr3);
 
 	// free the page directory
 	pa = e->env_cr3;
@@ -493,6 +497,10 @@ error_t env_incref(env_t* e)
  */
 void env_decref(env_t* e)
 {
+	// need a known good pgdir before releasing the old one
+	// sometimes env_free is called on a different core than decref
+	lcr3(boot_cr3);
+
 	spin_lock(&e->lock);
 	e->env_refcnt--;
 	spin_unlock(&e->lock);
@@ -512,7 +520,9 @@ env_destroy(env_t *e)
 {
 	// TODO: race condition with env statuses, esp when running / destroying
 	e->env_status = ENV_DYING;
+
 	env_decref(e);
+	atomic_dec(&num_envs);
 
 	// for old envs that die on user cores.  since env run never returns, cores
 	// never get back to their old hlt/relaxed/spin state, so we need to force

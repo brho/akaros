@@ -7,6 +7,7 @@
 #include <arch/apic.h>
 #include <arch/smp.h>
 #include <workqueue.h>
+#include <atomic.h>
 
 /*
  * TODO: actually use a queue, which will change some things all over.
@@ -14,12 +15,16 @@
 void process_workqueue()
 {
 	work_t work;
+	per_cpu_info_t *cpuinfo = &per_cpu_info[lapic_get_id()];
 	// copy the work in, since we may never return to this stack frame
-	work = per_cpu_info[lapic_get_id()].delayed_work;
+	spin_lock_irqsave(&cpuinfo->lock);
+	work = cpuinfo->delayed_work;
+	spin_unlock_irqsave(&cpuinfo->lock);
 	if (work.func) {
 		// TODO: possible race with this.  sort it out when we have a queue.
-		// probably want a spin_lock_irqsave
-		per_cpu_info[lapic_get_id()].delayed_work.func = 0;
+		spin_lock_irqsave(&cpuinfo->lock);
+		cpuinfo->delayed_work.func = 0;
+		spin_unlock_irqsave(&cpuinfo->lock);
 		// We may never return from this (if it is env_run)
 		work.func(work.data);
 	}

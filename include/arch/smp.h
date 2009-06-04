@@ -26,6 +26,7 @@ typedef struct HandlerWrapper {
 } handler_wrapper_t;
 
 typedef struct per_cpu_info {
+	uint32_t lock;
 	// Once we have a real kmalloc, we can make this dynamic.  Want a queue.
 	work_t delayed_work;
 	// will want it padded out to an even cacheline

@@ -8,6 +8,7 @@
 #include <ros/error.h>
 
 extern env_t *envs;		// All environments
+extern uint32_t num_envs;		// Number of envs
 extern env_t* NORACE curenvs[MAX_NUM_CPUS];
 
 LIST_HEAD(env_list_t, env_t);		// Declares 'struct Env_list'
