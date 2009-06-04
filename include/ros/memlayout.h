@@ -42,7 +42,7 @@
  *                     |     Per-Process R/O Info     | R-/R-  PGSIZE     |
  * UTOP, UINFO  ---->  +------------------------------+ 0xbec00000      --+
  *                     |      Global Shared Page      | RW/RW  PGSIZE     |
- *      UGDATA  ---->  +------------------------------+ 0xbebff000        | 
+ *      UGDATA  ---->  +------------------------------+ 0xbebff000        |
  *                     |  Unmapped (future expansion) | --/--             |
  *                     +------------------------------+ 0xbe801000      PTSIZE
  *                     |     Per-Process R/W Data     | RW/RW  PGSIZE     |
@@ -98,7 +98,7 @@
 #define VPT			(KERNBASE - PTSIZE)
 #define KSTACKTOP	VPT
 #define KSTKSIZE	(8*PGSIZE)   		// size of a kernel stack
-#define ULIM		(KSTACKTOP - PTSIZE) 
+#define ULIM		(KSTACKTOP - PTSIZE)
 
 /*
  * User read-only mappings! Anything below here til UTOP are readonly to user.
@@ -142,7 +142,7 @@
 // (should not conflict with other temporary page mappings)
 #define PFTEMP		(UTEMP + PTSIZE - PGSIZE)
 // The location of the user-level STABS data structure
-#define USTABDATA	(PTSIZE / 2)	
+#define USTABDATA	(PTSIZE / 2)
 
 
 #ifndef __ASSEMBLER__

@@ -15,6 +15,7 @@ USER_ROSLIB_SRC_SRCFILES := $(USER_ROSLIB_SRC_DIR)/console.c \
                             $(USER_ROSLIB_SRC_DIR)/string.c \
                             $(USER_ROSLIB_SRC_DIR)/syscall.c \
                             $(USER_ROSLIB_SRC_DIR)/asynccall.c \
+                            $(USER_ROSLIB_SRC_DIR)/atomic.c \
                             $(USER_ROSLIB_SRC_DIR)/timer.c 
 
 USER_ROSLIB_SRC_OBJFILES := $(patsubst $(USER_ROSLIB_SRC_DIR)/%.c, \
