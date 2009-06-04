@@ -182,6 +182,22 @@ env_setup_vm(env_t *e)
 		page_free(pgdata);
 		return r;
 	}
+
+	/* Shared page for all processes.  Can't be trusted, but still very useful
+	 * at this stage for us.  Consider removing when we have real processes.
+	 * (TODO).  Note the page is alloced only the first time through
+	 */
+	static page_t* shared_page = 0;
+	if (!shared_page)
+		page_alloc(&shared_page);
+	// Up it, so it never goes away.  One per user, plus one from page_alloc
+	// This is necessary, since it's in the per-process range of memory that
+	// gets freed during page_free.
+	shared_page->pp_ref++;
+
+	// Inserted into every process's address space at UGDATA
+	page_insert(e->env_pgdir, shared_page, (void*)UGDATA, PTE_U | PTE_W);
+
 	return 0;
 }
 

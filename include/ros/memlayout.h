@@ -41,6 +41,8 @@
  *                     +------------------------------+ 0xbec01000      PTSIZE
  *                     |     Per-Process R/O Info     | R-/R-  PGSIZE     |
  * UTOP, UINFO  ---->  +------------------------------+ 0xbec00000      --+
+ *                     |      Global Shared Page      | RW/RW  PGSIZE     |
+ *      UGDATA  ---->  +------------------------------+ 0xbebff000        | 
  *                     |  Unmapped (future expansion) | --/--             |
  *                     +------------------------------+ 0xbe801000      PTSIZE
  *                     |     Per-Process R/W Data     | RW/RW  PGSIZE     |
@@ -117,6 +119,9 @@
 
 // Top of user-accessible VM
 #define UTOP		UINFO
+
+// Read-write, global page.  Shared by all processes.  Can't be trusted.
+#define UGDATA		(UTOP - PGSIZE)
 
 // Read-write, per-process shared data structures
 #define UDATA		(UTOP - PTSIZE)
