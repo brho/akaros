@@ -44,7 +44,7 @@ int close(int file) {
 
 	// If trying to close stdin/out/err just return
 	if ((file == STDIN_FILENO) || (file == STDERR_FILENO) 
-            || (file == STDOUT_FILENO))
+                                   || (file == STDOUT_FILENO))
 		return 0;
 
 	// Allocate a new buffer of proper size
@@ -67,15 +67,19 @@ int close(int file) {
 
 	free(out_msg);
 
+	int return_val;
+
 	if (result != NULL) {
 		// Read result
-		int return_val;
 		return_val = *((int *) result);
+		if (return_val == -1) errno = *(((int *)result) + 1);
 		free(result);
-		return return_val;
 	} else {
-		return -1;
+		errno = ECHANNEL;
+		return_val = -1;
 	}
+	
+	return return_val;
 }
 
 /* execve()
@@ -150,6 +154,7 @@ int fstat(int file, struct stat *st)
 			memcpy(st, ((int *)result) + 1, sizeof(struct stat));
 		free(result);
 	} else {
+		errno = ECHANNEL;
 		return_val = -1;
 	}
 
@@ -200,15 +205,19 @@ int isatty(int file)
 
 	free(out_msg);
 
+	int return_val;
+
 	if (result != NULL) {
 		// Read result
-		int return_val;
 		return_val = *((int *) result);
+		if (return_val == -1) errno = *(((int *)result) + 1);
 		free(result);
-		return return_val;
 	} else {
-		return -1;
+		errno = ECHANNEL;
+		return_val = -1;
 	}
+	
+	return return_val;
 }
 
 /* kill()
@@ -270,8 +279,8 @@ int link(char *old, char *new)
 		if (return_val == -1) errno = *(((int *)result) + 1);
 		free(result);
 	} else {
-		return_val = -1;
 		errno = ECHANNEL;
+		return_val = -1;
 	}
 
 	return return_val;
@@ -309,15 +318,19 @@ off_t lseek(int file, off_t ptr, int dir)
 
 	free(out_msg);
 
+	int return_val;
+
 	if (result != NULL) {
 		// Read result
-		int return_val;
 		return_val = *((int *) result);
+		if (return_val == -1) errno = *(((int *)result) + 1);
 		free(result);
-		return return_val;
 	} else {
-		return -1;
+		errno = ECHANNEL;
+		return_val = -1;
 	}
+
+	return return_val;
 }
 
 /* open()
@@ -362,8 +375,10 @@ int open(const char *name, int flags, int mode)
 
 	if (result != NULL) {
 		return_val = *((int *)result);
+		if (return_val == -1) errno = *(((int *)result) + 1);
 		free(result);
 	} else {
+		errno = ECHANNEL;
 		return_val = -1;
 	}
 
@@ -412,8 +427,12 @@ ssize_t read(int file, void *ptr, size_t len)
 		return_val = *((int *)result);
 		if (return_val > 0)
 			memcpy(ptr, ((int *)result) + 1, return_val);
+		else 
+			errno = *(((int *)result) + 1);
+
 		free(result);
 	} else {
+		errno = ECHANNEL;
 		return_val = -1;
 	}
 
@@ -486,7 +505,6 @@ void* sbrk(ptrdiff_t incr)
  */
 char *send_message(char *message, int len)
 {
-
 	syscall_id_t this_call_id = *((syscall_id_t*)message);
 
 	if (write_to_channel(message, len) != len)
@@ -501,151 +519,86 @@ char *send_message(char *message, int len)
 		return NULL;
 
 	char* return_msg = NULL;
-	int extra_sp = 0;
+	char* errno_pos = NULL;
+	int extra_space = (response_value == -1) ? sizeof(int) : 0;
+
 
 	// TODO: Make these sizes an array we index into, and only have this code once.
 	// TODO: Will have a flag that tells us we have a variable length response (right now only for read case)
 	// TODO: Default clause with error handling.
 	switch (this_call_id) {
-		case OPEN_ID:
-			if ((return_msg = 
-                            (char*)malloc(OPEN_RETURN_MESSAGE_FIXED_SIZE)) 
-                            == NULL)
-				return NULL;
-
-			break;
-
+		case OPEN_ID:		
 		case CLOSE_ID:
-			if ((return_msg = 
-                            (char*)malloc(CLOSE_RETURN_MESSAGE_FIXED_SIZE)) 
-                            == NULL)
-				return NULL;
-
-			break;
-
-		case READ_ID:
-			extra_sp = (response_value > 0) ? response_value : 0;
-			if ((return_msg 
-                            = (char*)malloc(READ_RETURN_MESSAGE_FIXED_SIZE 
-                                             + extra_sp)) 
-                            == NULL)
-				return NULL;
-
-
-			if ((response_value != -1) 
-                            && (read_from_channel(return_msg + sizeof(int), 
-                                                  response_value, NO_PEEK) 
-                            == -1))
-				return NULL;
-
-			break;
-
-		case WRITE_ID:
-			if ((return_msg = 
-                            (char*)malloc(WRITE_RETURN_MESSAGE_FIXED_SIZE)) 
-                            == NULL)
-				return NULL;
-
-			break;
-
-
+		case WRITE_ID:	
 		case LSEEK_ID:
-			if ((return_msg = 
-                            (char*)malloc(LSEEK_RETURN_MESSAGE_FIXED_SIZE)) 
-                            == NULL)
-				return NULL;
-
-			break;
-
 		case ISATTY_ID:
-			if ((return_msg = 
-                            (char*)malloc(ISATTY_RETURN_MESSAGE_FIXED_SIZE)) 
-                            == NULL)
-				return NULL;
-
-			break;
-
 		case UNLINK_ID:
-			extra_sp = (response_value != -1) ? 0 : sizeof(int);
-			if ((return_msg = 
-                            (char*)malloc(UNLINK_RETURN_MESSAGE_FIXED_SIZE 
-                                           + extra_sp)) 
-                            == NULL)
-				return NULL;
-
-
-			if ((response_value == -1) 
-                            && ((read_from_channel(return_msg + sizeof(int), 
-                                                   sizeof(int), NO_PEEK)) 
-                            == -1))
-				return NULL;
-
-			break;
-
 		case LINK_ID:
-			extra_sp = (response_value != -1) ? 0 : sizeof(int);
-			if ((return_msg = 
-                            (char*)malloc(LINK_RETURN_MESSAGE_FIXED_SIZE 
-                                          + extra_sp)) 
-                            == NULL)
-				return NULL;
+                        return_msg = (char*)malloc(sizeof(int) + extra_space);
+			if (return_msg == NULL)
+                                return NULL;
 
+			errno_pos = return_msg + sizeof(int);
+                        if ((response_value == -1)
+                            && (-1 == read_from_channel(errno_pos,
+                                                        sizeof(int), 
+                                                        NO_PEEK))) {
+				free(return_msg);
+                                return NULL;
+			}
 
-			if ((response_value == -1) 
-                            && ((read_from_channel(return_msg + sizeof(int), 
-                                                   sizeof(int), NO_PEEK)) 
-                            == -1))
-				return NULL;
+                        break;
 
-			break;
-
+                case STAT_ID:
 		case FSTAT_ID:
-			extra_sp = (response_value != -1) ? 0 : sizeof(int);
-			if ((return_msg = 
-                            (char*)malloc(FSTAT_RETURN_MESSAGE_FIXED_SIZE 
-                                          + extra_sp)) 
-                            == NULL)
+			return_msg = (char*)malloc(sizeof(int) 
+                                                    + sizeof(struct stat)
+                                                    + extra_space);
+                        if (return_msg == NULL)
+                                return NULL;
+
+			if (-1 == read_from_channel(return_msg + sizeof(int),
+                                                    sizeof(struct stat), 
+                                                    NO_PEEK)) {
+				free(return_msg);
+                                return NULL;
+			}
+
+                        errno_pos = return_msg + sizeof(int) 
+                                               + sizeof(struct stat);
+
+                        if ((response_value == -1)
+                            && (-1 == read_from_channel(errno_pos,
+                                                  sizeof(int), NO_PEEK))) {
+				free(return_msg);
+				return NULL;
+			}
+
+			break;
+		
+		case READ_ID:
+			if (response_value > 0)
+				extra_space = response_value;
+			else
+				extra_space = extra_space;
+
+			return_msg = (char*)malloc(sizeof(int) + extra_space);
+
+			if (return_msg == NULL)
 				return NULL;
 
-			if (read_from_channel(return_msg + sizeof(int), 
-                                              sizeof(struct stat), NO_PEEK) 
-                            == -1)
-				return NULL;
-
-			if ((response_value == -1) 
-                            && ((read_from_channel(return_msg 
-                                                    + sizeof(int) 
-                                                    + sizeof(struct stat),
-                                                   sizeof(int), NO_PEEK)) 
-                            == -1))
-				return NULL;
+	                if (-1 == read_from_channel(return_msg + sizeof(int),
+                                                    extra_space,
+                                                    NO_PEEK)) {
+                                free(return_msg);
+                                return NULL;
+                        }
 
 			break;
 
-		case STAT_ID:
-			extra_sp = (response_value != -1) ? 0 : sizeof(int);
-			if ((return_msg = 
-                            (char*)malloc(STAT_RETURN_MESSAGE_FIXED_SIZE 
-                                          + extra_sp)) 
-                            == NULL)
-				return NULL;
-
-			if (read_from_channel(return_msg + sizeof(int), 
-                                              sizeof(struct stat), NO_PEEK) 
-                            == -1)
-				return NULL;
-
-			if ((response_value == -1) 
-                            && (read_from_channel(return_msg 
-                                                   + sizeof(int) 
-                                                   + sizeof(struct stat), 
-                                                  sizeof(int), NO_PEEK) 
-                            == -1))
-				return NULL;
-
-			break;
 	}
 
+	// Copy response value in place
 	memcpy(return_msg, &response_value, sizeof(int));
 
 	return return_msg;
@@ -699,6 +652,7 @@ int stat(char *file, struct stat *st)
 		free(result);
 
 	} else {
+		errno = ECHANNEL;
 		return_val = -1;
 	}
 
@@ -755,10 +709,9 @@ int unlink(char *name)
 		if (return_val == -1) errno = *(((int *)result) + 1);
 		free(result);
 	} else {
-		return_val = -1;
 		errno = ECHANNEL;
+		return_val = -1;
 	}
-
 	return return_val;
 }
 
@@ -815,8 +768,10 @@ ssize_t write(int file, void *ptr, size_t len) {
 
 	if (result != NULL) {
 		return_val = *((int *)result);
+		if (return_val == -1) errno = *(((int *)result) + 1);
 		free(result);
 	} else {
+		errno = ECHANNEL;
 		return_val = -1;
 	}
 

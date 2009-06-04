@@ -6,8 +6,6 @@
 
 #include <errno.h>
 #include <sys/stat.h>
-#undef errno
-extern int errno;
 
 #define OPEN_ID		0
 #define CLOSE_ID	1
@@ -23,16 +21,16 @@ extern int errno;
 
 
 // Fixed size of the client->server msgs for the various calls.
-#define OPEN_MESSAGE_FIXED_SIZE 	sizeof(syscall_id_t) + 3*sizeof(int)
-#define CLOSE_MESSAGE_FIXED_SIZE 	sizeof(syscall_id_t) + sizeof(int)
-#define READ_MESSAGE_FIXED_SIZE 	sizeof(syscall_id_t) + 2*sizeof(int)
-#define WRITE_MESSAGE_FIXED_SIZE 	sizeof(syscall_id_t) + 2*sizeof(int)
-#define LSEEK_MESSAGE_FIXED_SIZE 	sizeof(syscall_id_t) + 3*sizeof(int)
-#define ISATTY_MESSAGE_FIXED_SIZE 	sizeof(syscall_id_t) + sizeof(int)
-#define LINK_MESSAGE_FIXED_SIZE 	sizeof(syscall_id_t) + 2*sizeof(int)
-#define UNLINK_MESSAGE_FIXED_SIZE 	sizeof(syscall_id_t) + sizeof(int)
-#define FSTAT_MESSAGE_FIXED_SIZE 	sizeof(syscall_id_t) + sizeof(int)
-#define STAT_MESSAGE_FIXED_SIZE 	sizeof(syscall_id_t) + sizeof(int)
+#define OPEN_MESSAGE_FIXED_SIZE       sizeof(syscall_id_t) + 3*sizeof(int)
+#define CLOSE_MESSAGE_FIXED_SIZE      sizeof(syscall_id_t) + sizeof(int)
+#define READ_MESSAGE_FIXED_SIZE       sizeof(syscall_id_t) + 2*sizeof(int)
+#define WRITE_MESSAGE_FIXED_SIZE      sizeof(syscall_id_t) + 2*sizeof(int)
+#define LSEEK_MESSAGE_FIXED_SIZE      sizeof(syscall_id_t) + 3*sizeof(int)
+#define ISATTY_MESSAGE_FIXED_SIZE     sizeof(syscall_id_t) + sizeof(int)
+#define LINK_MESSAGE_FIXED_SIZE       sizeof(syscall_id_t) + 2*sizeof(int)
+#define UNLINK_MESSAGE_FIXED_SIZE     sizeof(syscall_id_t) + sizeof(int)
+#define FSTAT_MESSAGE_FIXED_SIZE      sizeof(syscall_id_t) + sizeof(int)
+#define STAT_MESSAGE_FIXED_SIZE       sizeof(syscall_id_t) + sizeof(int)
 
 // What is the max number of arguments (besides the syscall_id_t) we can have.
 // This should be the max of the above sizes.
@@ -40,18 +38,6 @@ extern int errno;
 // TODO: This makes the implicit assumption when referenced in server.c that each argument is of type int.
 //		If we change the above defs to no longer be sizeof(int) this will break in server.c
 #define MAX_FIXED_ARG_COUNT 3
-
-// Fixed server-> respponse msg sizes.
-#define OPEN_RETURN_MESSAGE_FIXED_SIZE 	       sizeof(int)
-#define CLOSE_RETURN_MESSAGE_FIXED_SIZE        sizeof(int)
-#define READ_RETURN_MESSAGE_FIXED_SIZE 	       sizeof(int)
-#define WRITE_RETURN_MESSAGE_FIXED_SIZE        sizeof(int)
-#define LSEEK_RETURN_MESSAGE_FIXED_SIZE        sizeof(int)
-#define ISATTY_RETURN_MESSAGE_FIXED_SIZE       sizeof(int)
-#define UNLINK_RETURN_MESSAGE_FIXED_SIZE       sizeof(int)
-#define LINK_RETURN_MESSAGE_FIXED_SIZE 	       sizeof(int)
-#define STAT_RETURN_MESSAGE_FIXED_SIZE 	       sizeof(int) + sizeof(struct stat)
-#define FSTAT_RETURN_MESSAGE_FIXED_SIZE        sizeof(int) + sizeof(struct stat)
 
 // New errno we want to define if a channel error occurs
 // Not yet fully implimented

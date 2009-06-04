@@ -10,6 +10,7 @@ extern void clrscrn(int leaverows);
 extern void change_user();
 extern void set_default_user();
 extern void file_io();
+extern void file_error();
 extern char prompt[256];
 
 void help() {
@@ -18,6 +19,7 @@ void help() {
 	       "  clear_screen:     Clear the Screen\n"
 	       "  change_user:      Change Username\n"
                "  file_io:          Run File Related IO Tests\n"
+               "  file_error:       Run File Error Related Tests\n"
 	      );
 }
 
@@ -41,6 +43,8 @@ int main(int argc, char** argv)
 			change_user();
 		else if (strcmp(s, "file_io") == 0)
 			file_io();
+		else if (strcmp(s, "file_error") == 0)
+			file_error();
 		else
 			help();	
 
