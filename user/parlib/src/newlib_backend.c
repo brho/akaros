@@ -210,11 +210,11 @@ int isatty(int file)
 	if (result != NULL) {
 		// Read result
 		return_val = *((int *) result);
-		if (return_val == -1) errno = *(((int *)result) + 1);
+		if (return_val == 0) errno = *(((int *)result) + 1);
 		free(result);
 	} else {
 		errno = ECHANNEL;
-		return_val = -1;
+		return_val = 0;
 	}
 	
 	return return_val;
@@ -522,16 +522,18 @@ char *send_message(char *message, int len)
 	char* errno_pos = NULL;
 	int extra_space = (response_value == -1) ? sizeof(int) : 0;
 
-
 	// TODO: Make these sizes an array we index into, and only have this code once.
 	// TODO: Will have a flag that tells us we have a variable length response (right now only for read case)
 	// TODO: Default clause with error handling.
 	switch (this_call_id) {
+		case ISATTY_ID:
+			// This case must be at the top! Else extra space will be wrong at times 
+			// ISATTY is special, 0 signifies error, not -1. Annoying.
+                	extra_space = (response_value == 0) ? sizeof(int) : 0;
 		case OPEN_ID:		
 		case CLOSE_ID:
 		case WRITE_ID:	
 		case LSEEK_ID:
-		case ISATTY_ID:
 		case UNLINK_ID:
 		case LINK_ID:
                         return_msg = (char*)malloc(sizeof(int) + extra_space);
@@ -539,10 +541,9 @@ char *send_message(char *message, int len)
                                 return NULL;
 
 			errno_pos = return_msg + sizeof(int);
-                        if ((response_value == -1)
-                            && (-1 == read_from_channel(errno_pos,
-                                                        sizeof(int), 
-                                                        NO_PEEK))) {
+                        if (extra_space && (-1 == read_from_channel(errno_pos,
+                                                                    sizeof(int), 
+                                                                    NO_PEEK))) {
 				free(return_msg);
                                 return NULL;
 			}
@@ -567,9 +568,9 @@ char *send_message(char *message, int len)
                         errno_pos = return_msg + sizeof(int) 
                                                + sizeof(struct stat);
 
-                        if ((response_value == -1)
-                            && (-1 == read_from_channel(errno_pos,
-                                                  sizeof(int), NO_PEEK))) {
+                        if (extra_space && (-1 == read_from_channel(errno_pos,
+                                                                    sizeof(int), 
+                                                                    NO_PEEK))) {
 				free(return_msg);
 				return NULL;
 			}
