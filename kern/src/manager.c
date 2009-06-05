@@ -16,19 +16,7 @@
 #include <env.h>
 #include <workqueue.h>
 #include <syscall.h>
-
-/* Helper handlers for smp_call to dispatch jobs to other cores */
-static void work_env_run(void* data)
-{
-	env_run((env_t*)data);
-}
-
-static void run_env_handler(trapframe_t *tf, void* data)
-{
-	assert(data);
-	per_cpu_info[lapic_get_id()].delayed_work.func = work_env_run;
-	per_cpu_info[lapic_get_id()].delayed_work.data = data;
-}
+#include <testing.h>
 
 /*
  * Currently, if you leave this function by way of env_run (process_workqueue
@@ -38,13 +26,40 @@ static void run_env_handler(trapframe_t *tf, void* data)
 void manager(void)
 {
 	static uint8_t progress = 0;
-	env_t* env_batch[64]; // Fairly arbitrary, just the max I plan to use.
 	
-	if(progress == 0) {
-		progress++;
-		env_batch[0] = ENV_CREATE(parlib_matrix);
-		env_run(env_batch[0]);
+	switch (progress++) {
+		case 0:
+			printk("Beginning Tests\n");
+			test_run_measurements(progress);  // should never return
+			break;
+		case 1:
+		case 2:
+		case 3:
+		case 4:
+		case 5:
+		case 6:
+		case 7:
+		case 8:
+		case 9:
+		case 10:
+		case 11:
+		case 12:
+		case 13:
+		case 14:
+			test_run_measurements(progress);
+			break;
+		default:
+			panic("Don't Panic");
 	}
+	panic("If you see me, then you probably screwed up");
+
+	/*
+	printk("Servicing syscalls from Core 0:\n\n");
+	while (1) {
+		process_generic_syscalls(&envs[0], 1);
+		cpu_relax();
+	}
+	*/
 	return;
 }
 

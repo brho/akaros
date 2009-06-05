@@ -3,6 +3,7 @@
 #endif
 
 #include <arch/mmu.h>
+#include <ros/memlayout.h>
 #include <arch/x86.h>
 #include <arch/smp.h>
 #include <arch/apic.h>
@@ -12,6 +13,8 @@
 #include <string.h>
 #include <testing.h>
 #include <trap.h>
+#include <env.h>
+#include <syscall.h>
 
 #define test_vector 0xeb
 
@@ -19,7 +22,7 @@ void test_ipi_sending(void)
 {
 	extern handler_t interrupt_handlers[];
 	int8_t state = 0;
-	
+
 	register_interrupt_handler(interrupt_handlers, test_vector,
 	                           test_hello_world_handler, 0);
 	enable_irqsave(&state);
@@ -74,7 +77,7 @@ void test_print_info(void)
 	smp_call_function_all(test_print_info_handler, 0, 0);
 	cprintf("\nDone!\n");
 }
-	
+
 
 extern uint8_t num_cpus;
 barrier_t test_cpu_array;
@@ -110,7 +113,7 @@ void test_interrupts_irqsave(void)
 	disable_irqsave(&state);
 	printd("Interrupts are: %x\n", read_eflags() & FL_IF);
 	assert((read_eflags() & FL_IF) == 0);
-	printd("Done.  Should have been 0, 200, 200, 200, 0\n");	
+	printd("Done.  Should have been 0, 200, 200, 200, 0\n");
 
 	printd("Testing Nesting Disabling first, turning ints on:\n");
 	state = 0;
@@ -133,7 +136,7 @@ void test_interrupts_irqsave(void)
 	enable_irqsave(&state);
 	printd("Interrupts are: %x\n", read_eflags() & FL_IF);
 	assert((read_eflags() & FL_IF) == 0x200);
-	printd("Done.  Should have been 200, 0, 0, 0, 200 \n");	
+	printd("Done.  Should have been 200, 0, 0, 0, 200 \n");
 
 	state = 0;
 	disable_irq();
@@ -144,7 +147,7 @@ void test_interrupts_irqsave(void)
 	disable_irqsave(&state);
 	printd("Interrupts are: %x\n", read_eflags() & FL_IF);
 	assert((read_eflags() & FL_IF) == 0);
-	printd("Done.  Should have been 200, 0\n");	
+	printd("Done.  Should have been 200, 0\n");
 
 	state = 0;
 	enable_irq();
@@ -155,7 +158,7 @@ void test_interrupts_irqsave(void)
 	disable_irqsave(&state);
 	printd("Interrupts are: %x\n", read_eflags() & FL_IF);
 	assert((read_eflags() & FL_IF) == 0x200);
-	printd("Done.  Should have been 200, 200\n");	
+	printd("Done.  Should have been 200, 200\n");
 
 	state = 0;
 	disable_irq();
@@ -166,7 +169,7 @@ void test_interrupts_irqsave(void)
 	enable_irqsave(&state);
 	printd("Interrupts are: %x\n", read_eflags() & FL_IF);
 	assert((read_eflags() & FL_IF) == 0);
-	printd("Done.  Should have been 0, 0\n");	
+	printd("Done.  Should have been 0, 0\n");
 
 	state = 0;
 	enable_irq();
@@ -177,7 +180,7 @@ void test_interrupts_irqsave(void)
 	enable_irqsave(&state);
 	printd("Interrupts are: %x\n", read_eflags() & FL_IF);
 	assert((read_eflags() & FL_IF) == 0x200);
-	printd("Done.  Should have been 0, 200\n");	
+	printd("Done.  Should have been 0, 200\n");
 
 	disable_irq();
 	cprintf("Passed enable_irqsave tests\n");
@@ -250,11 +253,11 @@ void test_checklists(void)
 	commit_checklist_wait(&a_list, &a_mask);
 	printk("Old mask (copied onto):\n");
 	PRINT_BITMASK(a_list.mask.bits, a_list.mask.size);
-	//smp_call_function_single(1, test_checklist_handler, 0, 0);	
-	smp_call_function_all(test_checklist_handler, 0, 0);	
+	//smp_call_function_single(1, test_checklist_handler, 0, 0);
+	smp_call_function_all(test_checklist_handler, 0, 0);
 
 	printk("Waiting on checklist\n");
-	waiton_checklist(&a_list);	
+	waiton_checklist(&a_list);
 	printk("Done Waiting!\n");
 
 }
@@ -401,11 +404,142 @@ void test_lapic_status_bit(void)
 	// hopefully that handler never fires again.  leaving it registered for now.
 }
 
-/* Helper Functions */
+/******************************************************************************/
+/*            Test Measurements: Couples with measurement.c                   */
+// All user processes can R/W the UGDATA page
+barrier_t* bar = (barrier_t*)UGDATA;
+uint32_t* job_to_run = (uint32_t*)(UGDATA + sizeof(barrier_t));
+env_t* env_batch[64]; // Fairly arbitrary, just the max I plan to use.
+
+/* Helpers for test_run_measurements */
+static void wait_for_all_envs_to_die(void)
+{
+	while (num_envs)
+		cpu_relax();
+}
+
+// this never returns.
+static void sync_tests(int start_core, int num_threads, int job_num)
+{
+	assert(start_core + num_threads <= num_cpus);
+	wait_for_all_envs_to_die();
+	for (int i = start_core; i < start_core + num_threads; i++)
+		env_batch[i] = ENV_CREATE(roslib_measurements);
+	init_barrier(bar, num_threads);
+	*job_to_run = job_num;
+	for (int i = start_core; i < start_core + num_threads; i++)
+		smp_call_function_single(i, run_env_handler, env_batch[i], 0);
+	process_workqueue();
+	// we want to fake a run, to reenter manager for the next case
+	env_t *env = ENV_CREATE(roslib_null);
+	smp_call_function_single(0, run_env_handler, env, 0);
+	process_workqueue();
+	panic("whoops!\n");
+}
+
+static void async_tests(int start_core, int num_threads, int job_num)
+{
+	int count;
+
+	assert(start_core + num_threads <= num_cpus);
+	wait_for_all_envs_to_die();
+	for (int i = start_core; i < start_core + num_threads; i++)
+		env_batch[i] = ENV_CREATE(roslib_measurements);
+	init_barrier(bar, num_threads);
+	*job_to_run = job_num;
+	for (int i = start_core; i < start_core + num_threads; i++)
+		smp_call_function_single(i, run_env_handler, env_batch[i], 0);
+	count = 0;
+	while (count > -num_threads) {
+		count = 0;
+		for (int i = start_core; i < start_core + num_threads; i++) {
+			count += process_generic_syscalls(env_batch[i], 1);
+		}
+		cpu_relax();
+	}
+	// we want to fake a run, to reenter manager for the next case
+	env_t *env = ENV_CREATE(roslib_null);
+	smp_call_function_single(0, run_env_handler, env, 0);
+	process_workqueue();
+	// this all never returns
+	panic("whoops!\n");
+}
+
+void test_run_measurements(uint32_t job_num)
+{
+	switch (job_num) {
+		case 0: // Nulls
+			printk("Case 0:\n");
+			async_tests(2, 1, job_num);  // start core 2, 1 core total
+			break;
+		case 1: // Sync
+			printk("Case 1:\n");
+			sync_tests(2, 1, job_num);
+			break;
+		case 2:
+			printk("Case 2:\n");
+			sync_tests(2, 2, job_num);
+			break;
+		case 3:
+			printk("Case 3:\n");
+			sync_tests(0, 3, job_num);
+			break;
+		case 4:
+			printk("Case 4:\n");
+			sync_tests(0, 4, job_num);
+			break;
+		case 5:
+			printk("Case 5:\n");
+			sync_tests(0, 5, job_num);
+			break;
+		case 6:
+			printk("Case 6:\n");
+			sync_tests(0, 6, job_num);
+			break;
+		case 7:
+			printk("Case 7:\n");
+			sync_tests(0, 7, job_num);
+			break;
+		case 8:
+			printk("Case 8:\n");
+			sync_tests(0, 8, job_num);
+			break;
+		case 9:
+			printk("Case 9:\n");
+			async_tests(2, 1, job_num);
+			break;
+		case 10:
+			printk("Case 10:\n");
+			async_tests(2, 2, job_num);
+			break;
+		case 11:
+			printk("Case 11:\n");
+			async_tests(2, 3, job_num);
+			break;
+		case 12:
+			printk("Case 12:\n");
+			async_tests(2, 4, job_num);
+			break;
+		case 13:
+			printk("Case 13:\n");
+			async_tests(2, 5, job_num);
+			break;
+		case 14:
+			printk("Case 14:\n");
+			async_tests(2, 6, job_num);
+			break;
+		default:
+			warn("Invalid test number!!");
+	}
+	panic("Error in test setup!!");
+}
+
+/************************************************************/
+/* ISR Handler Functions */
 
 void test_hello_world_handler(trapframe_t *tf, void* data)
 {
-	cprintf("Incoming IRQ, ISR: %d on core %d with tf at 0x%08x\n", 
+	cprintf("Incoming IRQ, ISR: %d on core %d with tf at 0x%08x\n",
 		tf->tf_trapno, lapic_get_id(), tf);
 }
 
@@ -466,11 +600,11 @@ void test_pit(void)
 	cprintf("Starting test for TSC (if stable) now (10s)\n");
 	udelay(10000000);
 	cprintf("End now\n");
-	
+
 	cprintf("Starting test for LAPIC (if stable) now (10s)\n");
 	enable_irq();
 	lapic_set_timer(10000000, FALSE);
-	
+
 	uint32_t waiting = 1;
 	register_interrupt_handler(interrupt_handlers, test_vector,
 	                           test_waiting_handler, &waiting);

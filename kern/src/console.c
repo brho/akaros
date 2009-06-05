@@ -70,7 +70,7 @@ serial_init(void)
 	// 8 data bits, 1 stop bit, parity off; turn off DLAB latch
 	outb(COM1+COM_LCR, COM_LCR_WLEN8 & ~COM_LCR_DLAB);
 
-	// No modem controls
+	// This should turn on hardware flow control
 	outb(COM1+COM_MCR, COM_MCR_RTS | COM_MCR_DTR);
 	// Enable rcv interrupts
 	outb(COM1+COM_IER, COM_IER_RDI);

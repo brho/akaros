@@ -26,6 +26,9 @@ int	envid2env(envid_t envid, env_t **env_store, bool checkperm);
 void	(IN_HANDLER env_run)(env_t *e) __attribute__((noreturn));
 void	env_pop_tf(trapframe_t *tf) __attribute__((noreturn));
 
+/* Helper handler for smp_call to dispatch jobs to other cores */
+void run_env_handler(trapframe_t *tf, void* data);
+
 #define ENV_CREATE(x)			({                                             \
 	extern uint8_t _binary_obj_user_apps_##x##_start[],                        \
 		_binary_obj_user_apps_##x##_size[];                                    \

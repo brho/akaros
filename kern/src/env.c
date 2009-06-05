@@ -611,3 +611,16 @@ env_run(env_t *e)
     env_pop_tf(&e->env_tf);
 }
 
+/* This is the top-half of an interrupt handler, where the bottom half is
+ * env_run (which never returns).  Just add it to the delayed work queue,
+ * which isn't really a queue yet.
+ */
+void run_env_handler(trapframe_t *tf, void* data)
+{
+	assert(data);
+	per_cpu_info_t *cpuinfo = &per_cpu_info[lapic_get_id()];
+	spin_lock_irqsave(&cpuinfo->lock);
+	cpuinfo->delayed_work.func = (func_t)env_run;
+	cpuinfo->delayed_work.data = data;
+	spin_unlock_irqsave(&cpuinfo->lock);
+}

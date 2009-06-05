@@ -6,8 +6,9 @@
 #include <arch/x86.h>
 #include <arch/apic.h>
 #include <arch/smp.h>
+#include <arch/atomic.h>
+
 #include <workqueue.h>
-#include <atomic.h>
 
 /*
  * TODO: actually use a queue, which will change some things all over.

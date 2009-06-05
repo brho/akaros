@@ -1,5 +1,5 @@
 #include <unistd.h>
-#include <printf.h>
+#include <stdio.h>
 #include <fcntl.h>
 #include <arch/kbdreg.h>
 

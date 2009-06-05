@@ -39,26 +39,13 @@ KERN_SRCFILES := $(KERN_SRC_DIR)/entry.S \
 # Only build files if they exist.
 KERN_SRCFILES := $(wildcard $(KERN_SRCFILES))
 
-KERN_APPFILES :=  	$(USER_APPS_PARLIB_DIR)/matrix 
+KERN_APPFILES :=    $(USER_APPS_PARLIB_DIR)/matrix \
+                    $(USER_APPS_ROSLIB_DIR)/null \
+                    $(USER_APPS_ROSLIB_DIR)/hello \
+                    $(USER_APPS_ROSLIB_DIR)/measurements
 #                    $(USER_APPS_PARLIB_DIR)/draw_nanwan
 #                    $(USER_APPS_PARLIB_DIR)/open_read \
-#                    $(USER_APPS_ROSLIB_DIR)/null
-#					$(USER_APPS_ROSLIB_DIR)/hello \
-#					apps/hello \
-#					apps_newlib/null \
-#   				apps/hello \
-#   				apps/buggyhello \
-#   				apps/evilhello \
-#   				apps/testbss \
-#   				apps/divzero \
-#   				apps/breakpoint \
-#   				apps/softint \
-#   				apps/badsegment \
-#   				apps/faultread \
-#   				apps/faultreadkernel \
-#   				apps/faultwrite \
-#   				apps/faultwritekernel \
-#   				apps_newlib/null \
+#                    $(USER_APPS_PARLIB_DIR)/hello \
 
 KERN_LDFLAGS   := $(KERN_LDFLAGS) -L$(OBJDIR)/$(KERN_DIR) \
                   -T $(KERN_DIR)/kernel.ld

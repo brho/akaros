@@ -34,7 +34,6 @@
 	__measure_runtime(func(__VA_ARGS__));                                      \
 })
 
-
 #define measure_function(func, iters, name)                                    \
 ({                                                                             \
 	uint64_t ticks;                                                            \
