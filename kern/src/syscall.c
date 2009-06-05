@@ -50,8 +50,10 @@ static uint16_t sys_serial_read(env_t* e, char *DANGEROUS buf, uint16_t len)
     char *COUNT(len) _buf = user_mem_assert(e, buf, len, PTE_U);
 	uint16_t bytes_read = 0;
 	int c;
-	while((c = serial_read_byte()) != -1)
+	while((c = serial_read_byte()) != -1) {
 		buf[bytes_read++] = (uint8_t)c;
+		if(bytes_read == len) break;
+	}
 	return bytes_read;
 }
 

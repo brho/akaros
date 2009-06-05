@@ -43,6 +43,10 @@ int close(int file)
 {
 	debug("CLOSE\n");
 
+	// If trying to close stdin/out/err just return
+        if ((file > -1) && (file <3))
+                return 0;
+
 	// Allocate a new buffer of proper size
 	byte *out_msg = malloc(CLOSE_MESSAGE_FIXED_SIZE);
 	if(out_msg == NULL)
@@ -228,6 +232,7 @@ ssize_t read(int file, void *ptr, size_t len)
 {
 	debug("READ\n");
 
+
 	// Allocate a new buffer of proper size
 	byte *out_msg = (byte*)malloc(READ_MESSAGE_FIXED_SIZE);
 	if (out_msg == NULL)
@@ -255,7 +260,8 @@ ssize_t read(int file, void *ptr, size_t len)
 
 	if (result != NULL) {
 		return_val = *((int *)result);
-		memcpy(ptr, ((int *)result) + 1, return_val);
+		if (return_val > 0)
+			memcpy(ptr, ((int *)result) + 1, return_val);
 		free(result);
 	} else {
 		return_val = -1;
@@ -360,11 +366,11 @@ byte *send_message(byte *message, int len)
 			break;
 
 		case READ_ID:
-			if ((return_msg = (byte*)malloc(READ_RETURN_MESSAGE_FIXED_SIZE + response_value)) == NULL)
+			if ((return_msg = (byte*)malloc(READ_RETURN_MESSAGE_FIXED_SIZE + ((response_value > 0) ? response_value : 0))) == NULL)
 				return NULL;
 
 
-			if ((read_from_channel(return_msg + sizeof(int), response_value, 0)) == -1)
+			if ((response_value != -1) &&  (read_from_channel(return_msg + sizeof(int), response_value, 0) == -1))
 				return NULL;
 
 			break;
@@ -412,7 +418,7 @@ byte *send_message(byte *message, int len)
 			if ((return_msg = (byte*)malloc(FSTAT_RETURN_MESSAGE_FIXED_SIZE + ((response_value != -1) ? 0 : sizeof(int)))) == NULL)
 				return NULL;
 
-			if ((read_from_channel(return_msg + sizeof(int), sizeof(struct stat), 0)) == -1)
+			if (read_from_channel(return_msg + sizeof(int), sizeof(struct stat), 0) == -1)
 				return NULL;
 
 			if ((response_value == -1) && ((read_from_channel(return_msg + sizeof(int) + sizeof(struct stat), sizeof(int), 0)) == -1))
@@ -424,10 +430,10 @@ byte *send_message(byte *message, int len)
 			if ((return_msg = (byte*)malloc(STAT_RETURN_MESSAGE_FIXED_SIZE + ((response_value != -1) ? 0 : sizeof(int)))) == NULL)
 				return NULL;
 
-			if ((read_from_channel(return_msg + sizeof(int), sizeof(struct stat), 0)) == -1)
+			if (read_from_channel(return_msg + sizeof(int), sizeof(struct stat), 0) == -1)
 				return NULL;
 
-			if ((response_value == -1) && ((read_from_channel(return_msg + sizeof(int) + sizeof(struct stat), sizeof(int), 0)) == -1))
+			if ((response_value == -1) && (read_from_channel(return_msg + sizeof(int) + sizeof(struct stat), sizeof(int), 0) == -1))
 				return NULL;
 
 			break;
@@ -489,7 +495,8 @@ ssize_t write(int file, void *ptr, size_t len) {
 	
 	debug("WRITE\n");	
 	debug("\tFILE: %u\n", file);
-	if(file == 1 || file == 2) //STDOUT_FILENO || STDERR_FILENO
+
+	if ((file > -1) && (file < 3))  //STDOUT_FILENO || STDERR_FILENO || STDIN_FILENO
 		return sys_cputs(ptr, len);
 	
 	int out_msg_len = WRITE_MESSAGE_FIXED_SIZE + len;
