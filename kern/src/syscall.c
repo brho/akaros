@@ -35,6 +35,20 @@ static void sys_null(void)
 	return;
 }
 
+//Write a buffer over the serial port
+static error_t sys_serial_write(env_t* e, const char *DANGEROUS buf, uint16_t len) 
+{
+    char *COUNT(len) _buf = user_mem_assert(e, buf, len, PTE_U);
+	return -1;
+}
+
+//Read a buffer over the serial port
+static uint16_t sys_serial_read(env_t* e, const char *DANGEROUS buf, uint16_t len) 
+{
+    char *COUNT(len) _buf = user_mem_assert(e, buf, len, PTE_U);
+	return len;
+}
+
 // Invalidate the cache of this core
 static void sys_cache_invalidate(void)
 {
@@ -141,6 +155,10 @@ int32_t syscall(env_t* e, uint32_t syscallno, uint32_t a1, uint32_t a2,
 		case SYS_null:
 			sys_null();
 			return 0;
+		case SYS_serial_write:
+			return sys_serial_write(e, (char *DANGEROUS)a1, (size_t)a2);
+		case SYS_serial_read:
+			return sys_serial_read(e, (char *DANGEROUS)a1, (size_t)a2);
 		case SYS_cache_invalidate:
 			sys_cache_invalidate();
 			return 0;

@@ -16,6 +16,8 @@ enum
 	SYS_getenvid,
 	SYS_getcpuid,
 	SYS_env_destroy,
+	SYS_serial_write,
+	SYS_serial_read,
 };
 #define NSYSCALLS (SYS_env_destroy)
 // syscall number starts at 1 and goes up to NSYSCALLS, without holes.
