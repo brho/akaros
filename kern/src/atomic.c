@@ -1,8 +1,8 @@
 #include <arch/apic.h>
+#include <arch/atomic.h>
+#include <ros/error.h>
 #include <string.h>
 #include <assert.h>
-#include <error.h>
-#include <atomic.h>
 
 // Must be called in a pair with waiton_checklist
 int commit_checklist_wait(checklist_t* list, checklist_mask_t* mask)

@@ -2,19 +2,17 @@ USER_APPS_PARLIB_DIR = $(USER_APPS_DIR)/parlib
 OBJDIRS += $(USER_APPS_PARLIB_DIR)
 
 USER_APPS_PARLIB_CFLAGS    := $(USER_CFLAGS) \
-                              -I$(USER_NEWLIB_DIR)/include
+                              -I$(USER_PARLIB_NEWLIB_DIR)/include
 
 USER_APPS_PARLIB_LDFLAGS   := $(USER_LDFLAGS) -static \
                               -T $(USER_APPS_PARLIB_DIR)/apps.ld
 
 USER_APPS_PARLIB_LDDIRS    := -L$(OBJDIR)/$(USER_PARLIB_DIR) \
-                              -L$(OBJDIR)/$(USER_ROSLIB_DIR) \
-                              -L$(USER_NEWLIB_DIR)/lib
+                              -L$(USER_PARLIB_NEWLIB_DIR)/lib
 
-USER_APPS_PARLIB_LDLIBS    := -lc -lm -lg -lparlib -lroslib
+USER_APPS_PARLIB_LDLIBS    := -lc -lm -lg -lparlib 
 
-USER_APPS_PARLIB_LDOBJS    := $(OBJDIR)/$(USER_ROSLIB_DIR)/entry.o \
-                              $(OBJDIR)/$(USER_ROSLIB_DIR)/libmain.o
+USER_APPS_PARLIB_LDOBJS    := $(OBJDIR)/$(USER_PARLIB_DIR)/entry.o
 
 USER_APPS_PARLIB_LDDEPENDS := $(USER_APPS_PARLIB_LDOBJS) \
                               $(OBJDIR)/$(USER_PARLIB_DIR)/libparlib.a \

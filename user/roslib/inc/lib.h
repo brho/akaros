@@ -9,9 +9,9 @@
 
 #include <arch/types.h>
 #include <arch/timer.h>
+#include <ros/error.h>
 #include <stdarg.h>
 #include <string.h>
-#include <error.h>
 #include <pool.h>
 
 #include <ros/memlayout.h>

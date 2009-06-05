@@ -6,12 +6,12 @@
 #include <arch/x86.h>
 #include <arch/smp.h>
 #include <arch/apic.h>
+#include <arch/atomic.h>
 #include <stdio.h>
 #include <assert.h>
 #include <string.h>
 #include <testing.h>
 #include <trap.h>
-#include <atomic.h>
 
 #define test_vector 0xeb
 

@@ -1,5 +1,8 @@
 USER_PARLIB_DIR := $(USER_DIR)/parlib
 
+# This is defined here for use by the parlib library
+USER_PARLIB_NEWLIB_DIR := $(USER_PARLIB_DIR)/newlib
+
 include $(USER_PARLIB_DIR)/src/Makefrag
 
 .PRECIOUS: $(OBJDIR)/$(USER_PARLIB_DIR)/%.o 

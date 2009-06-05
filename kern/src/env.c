@@ -8,8 +8,8 @@
 #include <arch/elf.h>
 #include <arch/apic.h>
 #include <arch/smp.h>
+#include <ros/error.h>
 
-#include <error.h>
 #include <string.h>
 #include <assert.h>
 #include <env.h>

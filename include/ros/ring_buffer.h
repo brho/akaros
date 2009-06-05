@@ -27,7 +27,7 @@
 #ifndef ROS_INC_RING_BUFFER_H
 #define ROS_INC_RING_BUFFER_H
 
-#include <atomic.h>
+#include <arch/atomic.h>
 
 #define xen_mb()  mb()
 #define xen_rmb() rmb()

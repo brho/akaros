@@ -6,7 +6,7 @@
 #include <arch/x86.h>
 #include <arch/console.h>
 #include <arch/apic.h>
-#include <error.h>
+#include <ros/error.h>
 #include <string.h>
 #include <assert.h>
 #include <env.h>

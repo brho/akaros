@@ -6,13 +6,13 @@
 #include <arch/smp.h>
 #include <arch/console.h>
 #include <arch/apic.h>
+#include <arch/atomic.h>
+#include <ros/error.h>
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
-#include <error.h>
 #include <pmap.h>
 #include <env.h>
-#include <atomic.h>
 #include <trap.h>
 
 volatile uint8_t num_cpus = 0xee;

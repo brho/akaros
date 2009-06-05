@@ -7,10 +7,10 @@
 #endif
 
 #include <arch/types.h>
+#include <ros/error.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
-#include <error.h>
 
 /*
  * Space or zero padding and a field width are supported for the numeric

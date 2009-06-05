@@ -2,15 +2,20 @@ USER_PARLIB_SRC_DIR = $(USER_PARLIB_DIR)/src
 OBJDIRS += $(USER_PARLIB_SRC_DIR)
 
 USER_PARLIB_SRC_CFLAGS   := $(USER_CFLAGS) --nopatch \
-                            -I$(USER_PARLIB_SRC_DIR) \
-                            -I$(USER_ROSLIB_INCLUDE_DIR) \
-                            -I$(USER_NEWLIB_DIR)/include
+                            -I$(USER_PARLIB_DIR)/inc \
+                            -I$(USER_PARLIB_NEWLIB_DIR)/include
 
-USER_PARLIB_SRC_SRCFILES := $(USER_PARLIB_SRC_DIR)/parlib.c 
+USER_PARLIB_SRC_SRCFILES := $(USER_PARLIB_SRC_DIR)/parlib.c \
+                            $(USER_PARLIB_SRC_DIR)/syscall.c \
+                            $(USER_PARLIB_SRC_DIR)/libmain.c \
+                            $(USER_PARLIB_SRC_DIR)/entry.S  
 
 USER_PARLIB_SRC_OBJFILES := $(patsubst $(USER_PARLIB_SRC_DIR)/%.c, \
                             $(OBJDIR)/$(USER_PARLIB_DIR)/%.o, \
                             $(USER_PARLIB_SRC_SRCFILES))
+USER_PARLIB_SRC_OBJFILES := $(patsubst $(USER_PARLIB_SRC_DIR)/%.S, \
+                            $(OBJDIR)/$(USER_PARLIB_DIR)/%.o, \
+                            $(USER_PARLIB_SRC_OBJFILES))
 
 $(OBJDIR)/$(USER_PARLIB_DIR)/%.o: $(USER_PARLIB_SRC_DIR)/%.c
 	@echo + cc [PARLIB] $<
@@ -26,3 +31,4 @@ $(OBJDIR)/$(USER_PARLIB_DIR)/libparlib.a: $(USER_PARLIB_SRC_OBJFILES)
 	@echo + ar [PARLIB] $@
 	@mkdir -p $(@D)
 	$(V)$(AR) r $@ $(USER_PARLIB_SRC_OBJFILES) 2>/dev/null
+

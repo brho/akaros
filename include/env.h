@@ -5,7 +5,7 @@
 
 #include <arch/x86.h>
 #include <ros/env.h>
-#include <error.h>
+#include <ros/error.h>
 
 extern env_t *envs;		// All environments
 extern env_t* NORACE curenvs[MAX_NUM_CPUS];

@@ -6,11 +6,11 @@
 #pragma nodeputy
 #endif
 
+#include <ros/error.h>
 #include <types.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
-#include <error.h>
 
 /*
  * Space or zero padding and a field width are supported for the numeric
