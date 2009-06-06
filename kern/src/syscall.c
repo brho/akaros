@@ -41,23 +41,31 @@ static void sys_null(void)
 //Write a buffer over the serial port
 static ssize_t sys_serial_write(env_t* e, const char *DANGEROUS buf, size_t len) 
 {
-	char *COUNT(len) _buf = user_mem_assert(e, buf, len, PTE_U);
-	for(int i =0; i<len; i++)
-		serial_send_byte(buf[i]);	
-	return (ssize_t)len;
+	#ifdef SERIAL_IO
+		char *COUNT(len) _buf = user_mem_assert(e, buf, len, PTE_U);
+		for(int i =0; i<len; i++)
+			serial_send_byte(buf[i]);	
+		return (ssize_t)len;
+	#else
+		return -E_INVAL;
+	#endif
 }
 
 //Read a buffer over the serial port
 static ssize_t sys_serial_read(env_t* e, char *DANGEROUS buf, size_t len) 
 {
-    char *COUNT(len) _buf = user_mem_assert(e, buf, len, PTE_U);
-	size_t bytes_read = 0;
-	int c;
-	while((c = serial_read_byte()) != -1) {
-		buf[bytes_read++] = (uint8_t)c;
-		if(bytes_read == len) break;
-	}
-	return (ssize_t)bytes_read;
+	#ifdef SERIAL_IO
+	    char *COUNT(len) _buf = user_mem_assert(e, buf, len, PTE_U);
+		size_t bytes_read = 0;
+		int c;
+		while((c = serial_read_byte()) != -1) {
+			buf[bytes_read++] = (uint8_t)c;
+			if(bytes_read == len) break;
+		}
+		return (ssize_t)bytes_read;
+	#else
+		return -E_INVAL;
+	#endif
 }
 
 // Invalidate the cache of this core

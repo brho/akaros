@@ -507,7 +507,9 @@ cons_getc(void)
 	// poll for any pending input characters,
 	// so that this function works even when interrupts are disabled
 	// (e.g., when called from the kernel monitor).
-	//serial_intr();
+	#ifndef SERIAL_IO
+		serial_intr();
+	#endif
 	kbd_intr();
 
 	// grab the next character from the input buffer.
@@ -524,7 +526,7 @@ cons_getc(void)
 void
 cons_putc(int c)
 {
-	//serial_putc(c);
+	serial_putc(c);
 	//lpt_putc(c);
 	cga_putc(c);
 }
@@ -535,7 +537,9 @@ cons_init(void)
 {
 	cga_init();
 	kbd_init();
-	serial_init();
+	#ifndef SERIAL_IO
+		serial_init();
+	#endif
 
 	if (!serial_exists)
 		cprintf("Serial port does not exist!\n");
