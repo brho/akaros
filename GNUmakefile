@@ -37,7 +37,7 @@ GCCPREFIX := $(shell if i386-ros-elf-objdump -i 2>&1 | grep '^elf32-i386$$' >/de
 endif
 
 # Default programs for compilation
-CC	    := $(GCCPREFIX)ivycc --deputy
+CC	    := ivycc --deputy --gcc=$(GCCPREFIX)gcc
 AS	    := $(GCCPREFIX)as
 AR	    := $(GCCPREFIX)ar
 LD	    := $(GCCPREFIX)ld
