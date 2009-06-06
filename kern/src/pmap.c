@@ -6,9 +6,10 @@
 #include <arch/x86.h>
 #include <arch/mmu.h>
 #include <arch/apic.h>
-#include <arch/atomic.h>
+
 #include <ros/error.h>
 
+#include <atomic.h>
 #include <string.h>
 #include <assert.h>
 #include <pmap.h>

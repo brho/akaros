@@ -8,12 +8,10 @@
 #endif /* !NULL */
 
 #ifdef DEBUG
-#define printd(fmt, ...) cprintf(fmt, #__VA_ARGS__)
+#define printd(args...) cprintf(args)
 #else
 #define printd(fmt, ...) {}
 #endif
-
-#define printk(fmt, ...) cprintf(fmt, #__VA_ARGS__)
 
 // lib/stdio.c
 void cputchar(int c);

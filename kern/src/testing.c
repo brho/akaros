@@ -3,11 +3,13 @@
 #endif
 
 #include <arch/mmu.h>
-#include <ros/memlayout.h>
 #include <arch/x86.h>
 #include <arch/smp.h>
 #include <arch/apic.h>
-#include <arch/atomic.h>
+
+#include <ros/memlayout.h>
+
+#include <atomic.h>
 #include <stdio.h>
 #include <assert.h>
 #include <string.h>

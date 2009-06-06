@@ -6,7 +6,8 @@
 #include <arch/smp.h>
 #include <arch/console.h>
 #include <arch/apic.h>
-#include <arch/atomic.h>
+
+#include <atomic.h>
 #include <ros/error.h>
 #include <stdio.h>
 #include <string.h>

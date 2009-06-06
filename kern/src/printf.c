@@ -6,7 +6,8 @@
 #endif
 
 #include <arch/types.h>
-#include <arch/atomic.h>
+
+#include <atomic.h>
 #include <stdio.h>
 #include <stdarg.h>
 

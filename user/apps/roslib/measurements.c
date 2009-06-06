@@ -1,13 +1,13 @@
 #include <arch/types.h>
 #include <arch/x86.h>
 #include <arch/timer.h>
-#include <arch/atomic.h>
 
 #include <ros/syscall.h>
 
 #include <lib.h>
 #include <measure.h>
 #include <syswrapper.h>
+#include <atomic.h>
 
 #ifdef __DEPUTY__
 #pragma nodeputy
@@ -129,7 +129,7 @@ void buster_thruput_sync(uint32_t flags, char* text)
 		buster_sync_wrapper(100, i, flags);
 		waiton_barrier(bar);
 		thruput_ticks = stop_timing(thruput_ticks);	
-		printk("XME:BUSTER:%d:S:%s:%d:W:%llu\n", corecount, text, i, thruput_ticks);
+		cprintf("XME:BUSTER:%d:S:%s:%d:W:%llu\n", corecount, text, i, thruput_ticks);
 	}
 }
 
@@ -143,7 +143,7 @@ void buster_thruput_async(uint32_t flags, char* text)
 		buster_async_wrapper(100, i, flags);
 		waiton_barrier(bar);
 		thruput_ticks = stop_timing(thruput_ticks);	
-		printk("XME:BUSTER:%d:A:%s:%d:W:%llu\n", corecount, text, i, thruput_ticks);
+		cprintf("XME:BUSTER:%d:A:%s:%d:W:%llu\n", corecount, text, i, thruput_ticks);
 	}
 }
 
@@ -153,7 +153,7 @@ void buster_latency_sync(uint32_t flags, char* text)
 	for (int i = 1; i < MAX_CACHELINE_WRITES; i=i*2) { // 1 - 128
 		measure_func_runtime(buster_sync_wrapper, 100,  i , flags);
 		tick = measure_func_runtime(buster_sync_wrapper, 1,  i , flags);
-		printk("XME:BUSTER:%d:S:%s:LATENCY:%d:W:%llu\n", corecount, text,i, tick);
+		cprintf("XME:BUSTER:%d:S:%s:LATENCY:%d:W:%llu\n", corecount, text,i, tick);
 	}
 }
 
@@ -163,7 +163,7 @@ void buster_latency_async(uint32_t flags, char* text)
 	for (int i = 1; i < MAX_CACHELINE_WRITES; i=i*2) { // 1 - 128
 		measure_func_runtime(buster_async_wrapper, 100,  i , flags);
 		tick = measure_func_runtime(buster_async_wrapper, 1,  i , flags);
-		printk("XME:BUSTER:%d:A:%s:LATENCY:%d:W:%llu\n", corecount, text,i, tick);
+		cprintf("XME:BUSTER:%d:A:%s:LATENCY:%d:W:%llu\n", corecount, text,i, tick);
 	}
 }
 
@@ -175,7 +175,6 @@ int main(int argc, char** argv)
 	
 	#define MAX_ITERS 10
 
-	disable_irq();
 	switch(*job_to_run) {
 		case 0:
 			/* NULL SYSCALLS */
@@ -184,37 +183,37 @@ int main(int argc, char** argv)
 			// Sync Null Syscalls
 			sys_cache_invalidate();
 			ticks = measure_func_runtime(null_wrapper, 1);
-			printk("XME:Null:S:1:1:C:%llu\n", ticks);
+			cprintf("XME:Null:S:1:1:C:%llu\n", ticks);
 			for (int i = 1; i <= MAX_ITERS; i++) {
 				ticks = measure_func_runtime(null_wrapper, i);
-				printk("XME:Null:S:1:%d:W:%llu\n", i, ticks);
+				cprintf("XME:Null:S:1:%d:W:%llu\n", i, ticks);
 			}
 
 			// Async Null Syscalls
 			sys_cache_invalidate();
 			ticks = measure_func_runtime(null_async_wrapper, 1);
-			printk("XME:Null:A:1:1:C:%llu\n", ticks);
+			cprintf("XME:Null:A:1:1:C:%llu\n", ticks);
 			for (int i = 1; i <= MAX_ITERS; i++) {
 				ticks = measure_func_runtime(null_async_wrapper, i);
-				printk("XME:Null:A:1:%d:W:%llu\n", i, ticks);
+				cprintf("XME:Null:A:1:%d:W:%llu\n", i, ticks);
 			}
 
 			// raw sysenter
 			sys_cache_invalidate();
 			ticks = measure_func_runtime(sysenter_wrapper, 1);
-			printk("XME:SYSE:S:1:1:C:%llu\n", ticks);
+			cprintf("XME:SYSE:S:1:1:C:%llu\n", ticks);
 			for (int i = 1; i <= MAX_ITERS; i++) {
 				ticks = measure_func_runtime(sysenter_wrapper, i);
-				printk("XME:SYSE:S:1:%d:W:%llu\n", i, ticks);
+				cprintf("XME:SYSE:S:1:%d:W:%llu\n", i, ticks);
 			}
 
 			// raw trap
 			sys_cache_invalidate();
 			ticks = measure_func_runtime(systrap_wrapper, 1);
-			printk("XME:TRAP:S:1:1:C:%llu\n", ticks);
+			cprintf("XME:TRAP:S:1:1:C:%llu\n", ticks);
 			for (int i = 1; i <= MAX_ITERS; i++) {
 				ticks = measure_func_runtime(systrap_wrapper, i);
-				printk("XME:TRAP:S:1:%d:W:%llu\n", i, ticks);
+				cprintf("XME:TRAP:S:1:%d:W:%llu\n", i, ticks);
 			}
 
 			break;

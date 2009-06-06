@@ -1,10 +1,8 @@
 #ifndef ROS_INC_ATOMIC_H
 #define ROS_INC_ATOMIC_H
 
-// TODO - check these, wrt x86
-#define mb() {rmb(); wmb();}
-#define rmb() ({ asm volatile("lfence"); })
-#define wmb()
+#include <arch/atomic.h>
+
 
 /* Ghetto-atomics, stolen from kern/atomic.* */
 static inline void spin_lock(volatile uint32_t* lock)
@@ -38,6 +36,5 @@ typedef struct barrier {
 void init_barrier(barrier_t* barrier, uint32_t count);
 void reset_barrier(barrier_t* barrier);
 void waiton_barrier(barrier_t* barrier);
-
 
 #endif /* !ROS_INC_ATOMIC_H */

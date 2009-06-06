@@ -1,5 +1,6 @@
 #include <arch/apic.h>
-#include <arch/atomic.h>
+
+#include <atomic.h>
 #include <ros/error.h>
 #include <string.h>
 #include <assert.h>

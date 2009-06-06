@@ -7,8 +7,10 @@
 #endif
 
 #include <arch/multiboot.h>
-#include <arch/atomic.h>
+
 #include <ros/memlayout.h>
+
+#include <atomic.h>
 #include <env.h>
 #include <assert.h>
 

@@ -30,7 +30,7 @@ void manager(void)
 	switch (progress++) {
 		case 0:
 			printk("Beginning Tests\n");
-			test_run_measurements(progress);  // should never return
+			test_run_measurements(progress-1);  // should never return
 			break;
 		case 1:
 		case 2:
@@ -46,7 +46,7 @@ void manager(void)
 		case 12:
 		case 13:
 		case 14:
-			test_run_measurements(progress);
+			test_run_measurements(progress-1);
 			break;
 		default:
 			panic("Don't Panic");

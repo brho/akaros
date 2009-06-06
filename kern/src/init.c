@@ -14,8 +14,8 @@
 #include <arch/multiboot.h>
 #include <arch/stab.h>
 #include <arch/smp.h>
-#include <arch/atomic.h>
 
+#include <atomic.h>
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
