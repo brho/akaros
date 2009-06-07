@@ -35,7 +35,7 @@
 	uint32_t __m_ppn = PPN(__m_pa);				\
 	if (__m_ppn >= npage)					\
 		warn("KADDR called with invalid pa %08lx", __m_pa);\
-	(void*) (__m_pa + KERNBASE);				\
+	(void*TRUSTED) (__m_pa + KERNBASE);				\
 })
 
 /*
@@ -67,11 +67,11 @@ struct Page {
 
 extern char bootstacktop[], bootstack[];
 
-extern page_t *pages;
+extern page_t *COUNT(npage) pages;
 extern size_t npage;
 
 extern physaddr_t boot_cr3;
-extern pde_t *boot_pgdir;
+extern pde_t *COUNT(NPDENTRIES) boot_pgdir;
 
 extern segdesc_t (COUNT(SEG_COUNT) gdt)[];
 extern pseudodesc_t gdt_pd;
@@ -85,14 +85,14 @@ void	page_init(void);
 void	page_check(void);
 int	page_alloc(page_t **pp_store);
 void	page_free(page_t *pp);
-int	page_insert(pde_t *pgdir, page_t *pp, void *va, int perm);
-void	page_remove(pde_t *pgdir, void *va);
-page_t *page_lookup(pde_t *pgdir, void *va, pte_t **pte_store);
-error_t	pagetable_remove(pde_t *pgdir, void *va);
+int	page_insert(pde_t *COUNT(NPDENTRIES) pgdir, page_t *pp, void *SNT va, int perm);
+void	page_remove(pde_t *COUNT(NPDENTRIES) pgdir, void *SNT va);
+page_t *page_lookup(pde_t *COUNT(NPDENTRIES) pgdir, void *va, pte_t **pte_store);
+error_t	pagetable_remove(pde_t *COUNT(NPDENTRIES) pgdir, void *va);
 void	page_decref(page_t *pp);
 
 void setup_default_mtrrs(barrier_t* smp_barrier);
-void	tlb_invalidate(pde_t *pgdir, void *va);
+void	tlb_invalidate(pde_t *COUNT(NPDENTRIES) pgdir, void *va);
 void tlb_flush_global(void);
 
 void *COUNT(len)
@@ -128,11 +128,11 @@ static inline page_t* pa2page(physaddr_t pa)
 	return &pages[PPN(pa)];
 }
 
-static inline void* page2kva(page_t *pp)
+static inline void*COUNT(PGSIZE) page2kva(page_t *pp)
 {
 	return KADDR(page2pa(pp));
 }
 
-pte_t *pgdir_walk(pde_t *pgdir, const void *va, int create);
+pte_t *pgdir_walk(pde_t *COUNT(NPDENTRIES) pgdir, const void *SNT va, int create);
 
 #endif /* !ROS_KERN_PMAP_H */

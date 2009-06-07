@@ -108,8 +108,8 @@ LIST_INSERT_HEAD(&flist, g, frob_link);	/* add g as first element in list */
  */
 #define	LIST_HEAD(name, type)					\
 typedef struct {								\
-	type *lh_first;	/* first element */			\
-	type *lh_last;	/* last element */			\
+	type *SAFE lh_first;	/* first element */			\
+	type *SAFE lh_last;	/* last element */			\
 } name;
 
 /*
@@ -129,8 +129,8 @@ typedef struct {								\
  */
 #define	LIST_ENTRY(type)						\
 struct {								\
-	type *le_next;	/* next element */			\
-	type **le_prev;	/* ptr to ptr to this element */	\
+	type *le_next NOINIT;	/* next element */			\
+	type **le_prev NOINIT;	/* ptr to ptr to this element */	\
 }
 
 /*

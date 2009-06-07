@@ -1,6 +1,7 @@
 /* See COPYRIGHT for copyright information. */
 #ifdef __DEPUTY__
-#pragma nodeputy
+//#pragma nodeputy
+#pragma noasync
 #endif
 
 #include <arch/x86.h>
@@ -108,6 +109,8 @@ env_init(void)
 //
 static int
 env_setup_vm(env_t *e)
+WRITES(e->env_pgdir, e->env_cr3, e->env_procinfo, e->env_procdata,
+       e->env_sysbackring)
 {
 	int i, r;
 	page_t *pgdir = NULL, *pginfo = NULL, *pgdata = NULL;
@@ -150,9 +153,10 @@ env_setup_vm(env_t *e)
 	memset(e->env_procdata, 0, PGSIZE);
 
 	// Initialize the generic syscall ring buffer
-	SHARED_RING_INIT((syscall_sring_t*)e->env_procdata);
+	SHARED_RING_INIT((syscall_sring_t *SAFE)e->env_procdata);
 	// Initialize the backend of the ring buffer
-	BACK_RING_INIT(&e->env_sysbackring, (syscall_sring_t*)e->env_procdata, PGSIZE);
+	BACK_RING_INIT(&e->env_sysbackring, (syscall_sring_t *SAFE)e->env_procdata,
+	               PGSIZE);
 
 	// should be able to do this so long as boot_pgdir never has
 	// anything put below UTOP
@@ -173,8 +177,8 @@ env_setup_vm(env_t *e)
 	// the kernel wants to keep pointers to it easily.
 	// Could place all of this with a function that maps a shared memory page
 	// that can work between any two address spaces or something.
-	r = page_insert(e->env_pgdir, pginfo, (void*)UINFO, PTE_U);
-	r = page_insert(e->env_pgdir, pgdata, (void*)UDATA, PTE_U | PTE_W);
+	r = page_insert(e->env_pgdir, pginfo, (void*SNT)UINFO, PTE_U);
+	r = page_insert(e->env_pgdir, pgdata, (void*SNT)UDATA, PTE_U | PTE_W);
 	if (r < 0) {
 		// note that we can't currently deallocate the pages created by
 		// pgdir_walk (inside insert).  should be able to gather them up when
@@ -198,7 +202,7 @@ env_setup_vm(env_t *e)
 	shared_page->pp_ref++;
 
 	// Inserted into every process's address space at UGDATA
-	page_insert(e->env_pgdir, shared_page, (void*)UGDATA, PTE_U | PTE_W);
+	page_insert(e->env_pgdir, shared_page, (void*SNT)UGDATA, PTE_U | PTE_W);
 
 	return 0;
 }
@@ -221,7 +225,9 @@ env_alloc(env_t **newenv_store, envid_t parent_id)
 	if (!(e = LIST_FIRST(&env_free_list)))
 		return -E_NO_FREE_ENV;
 	
-	memset((void*)e + sizeof(e->env_link), 0, sizeof(*e) - sizeof(e->env_link));
+	//memset((void*)e + sizeof(e->env_link), 0, sizeof(*e) - sizeof(e->env_link));
+
+    { INITSTRUCT(*e)
 
 	// Allocate and set up the page directory for this environment.
 	if ((r = env_setup_vm(e)) < 0)
@@ -234,6 +240,7 @@ env_alloc(env_t **newenv_store, envid_t parent_id)
 	e->env_id = generation | (e - envs);
 
 	// Set the basic status variables.
+    e->lock = 0;
 	e->env_parent_id = parent_id;
 	e->env_status = ENV_RUNNABLE;
 	e->env_runs = 0;
@@ -274,6 +281,7 @@ env_alloc(env_t **newenv_store, envid_t parent_id)
 	env_t* curenv = curenvs[lapic_get_id()];
 
 	printk("[%08x] new env %08x\n", curenv ? curenv->env_id : 0, e->env_id);
+	} // INIT_STRUCT
 	return 0;
 }
 
@@ -285,9 +293,9 @@ env_alloc(env_t **newenv_store, envid_t parent_id)
 // Panic if any allocation attempt fails.
 //
 static void
-segment_alloc(env_t *e, void *va, size_t len)
+segment_alloc(env_t *e, void *SNT va, size_t len)
 {
-	void *start, *end;
+	void *SNT start, *SNT end;
 	size_t num_pages;
 	int i, r;
 	page_t *page;
@@ -340,7 +348,7 @@ segment_alloc(env_t *e, void *va, size_t len)
 //  - How might load_icode fail?  What might be wrong with the given input?
 //
 static void
-load_icode(env_t *e, uint8_t *binary, size_t size)
+load_icode(env_t *e, uint8_t *COUNT(size) binary, size_t size)
 {
 	// Hints:
 	//  Load each program segment into virtual memory
@@ -385,13 +393,16 @@ load_icode(env_t *e, uint8_t *binary, size_t size)
 	// mappings for the kernel as does boot_pgdir
 	lcr3(e->env_cr3);
 
+	// TODO: how do we do a runtime COUNT?
 	proghdr_t *phdr = (proghdr_t *)(binary + elfhdr->e_phoff);
-	for (i = 0; i < elfhdr->e_phnum; i++, phdr++) {
+	for (i = 0; i < elfhdr->e_phnum; i++, phdr++) { TRUSTEDBLOCK
+        // zra: TRUSTEDBLOCK until validation is done.
 		if (phdr->p_type != ELF_PROG_LOAD)
 			continue;
+        // TODO: validate elf header fields!
 		// seg alloc creates PTE_U|PTE_W pages.  if you ever want to change
 		// this, there will be issues with overlapping sections
-		segment_alloc(e, (void*)phdr->p_va, phdr->p_memsz);
+		segment_alloc(e, (void*SNT)phdr->p_va, phdr->p_memsz);
 		memcpy((void*)phdr->p_va, binary + phdr->p_offset, phdr->p_filesz);
 		memset((void*)phdr->p_va + phdr->p_filesz, 0, phdr->p_memsz - phdr->p_filesz);
 	}
@@ -401,7 +412,7 @@ load_icode(env_t *e, uint8_t *binary, size_t size)
 	// Now map one page for the program's initial stack
 	// at virtual address USTACKTOP - PGSIZE.
 
-	segment_alloc(e, (void*)(USTACKTOP - PGSIZE), PGSIZE);
+	segment_alloc(e, (void*SNT)(USTACKTOP - PGSIZE), PGSIZE);
 }
 
 //
@@ -442,7 +453,7 @@ env_free(env_t *e)
 
 		// find the pa and va of the page table
 		pa = PTE_ADDR(e->env_pgdir[pdeno]);
-		pt = (pte_t*) KADDR(pa);
+		pt = (pte_t*COUNT(NPTENTRIES)) KADDR(pa);
 
 		// unmap all PTEs in this page table
 		for (pteno = 0; pteno <= PTX(~0); pteno++) {
@@ -620,7 +631,9 @@ void run_env_handler(trapframe_t *tf, void* data)
 	assert(data);
 	per_cpu_info_t *cpuinfo = &per_cpu_info[lapic_get_id()];
 	spin_lock_irqsave(&cpuinfo->lock);
+	{ TRUSTEDBLOCK // TODO: how do we make this func_t cast work?
 	cpuinfo->delayed_work.func = (func_t)env_run;
 	cpuinfo->delayed_work.data = data;
+	}
 	spin_unlock_irqsave(&cpuinfo->lock);
 }

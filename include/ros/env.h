@@ -42,7 +42,7 @@ typedef int32_t envid_t;
 #define ENV_DYING			4
 
 struct Env {
-	LIST_ENTRY(env_t) env_link;	// Free list link pointers
+	LIST_ENTRY(env_t) env_link NOINIT;	// Free list link pointers
 	uint32_t lock;
 	trapframe_t env_tf;			// Saved registers
 	envid_t env_id;				// Unique environment identifier
@@ -54,11 +54,12 @@ struct Env {
 	syscall_back_ring_t env_sysbackring;	// BackRing for generic syscalls
 
 	// Address space
-	pde_t *env_pgdir;			// Kernel virtual address of page dir
+	pde_t *COUNT(NPDENTRIES) env_pgdir;			// Kernel virtual address of page dir
 	physaddr_t env_cr3;			// Physical address of page dir
 	// TODO - give these two proper types (pointers to structs)
-	void* env_procinfo; 		// KVA of per-process shared info table (RO)
-	void* env_procdata;  		// KVA of per-process shared data table (RW)
+	// TODO - not always going to be PGSIZE either!
+	void*COUNT(PGSIZE) env_procinfo; 		// KVA of per-process shared info table (RO)
+	void*COUNT(PGSIZE) env_procdata;  		// KVA of per-process shared data table (RW)
 	// Eventually want to move this to a per-system shared-info page
 	uint64_t env_tscfreq;		// Frequency of the TSC for measurements
 };
