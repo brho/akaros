@@ -3,7 +3,6 @@
 #endif
 
 #include <lib.h>
-#include <queue.h>
 #include <ros/syscall.h>
 
 // Wait on all syscalls within this async call.  TODO - timeout or something?
@@ -14,8 +13,8 @@ error_t waiton_async_call(async_desc_t* desc, async_rsp_t* rsp)
 	error_t err = 0;
 	if (!desc)
 		return -E_INVAL;
-	while (!(LIST_EMPTY(&desc->syslist))) {
-		d = LIST_FIRST(&desc->syslist);
+	while (!(TAILQ_EMPTY(&desc->syslist))) {
+		d = TAILQ_FIRST(&desc->syslist);
 		err = MIN(waiton_syscall(d, &syscall_rsp), err);
 		// TODO: processing the retval out of rsp here.  might be specific to
 		// the async call.  do we want to accumulate?  return any negative
@@ -25,7 +24,7 @@ error_t waiton_async_call(async_desc_t* desc, async_rsp_t* rsp)
 		//rsp->retval += syscall_rsp.retval; // For example
 		rsp->retval = MIN(rsp->retval, syscall_rsp.retval);
 		// remove from the list and free the syscall desc
-		LIST_REMOVE(d, next);
+		TAILQ_REMOVE(&desc->syslist, d, next);
 		POOL_PUT(&syscall_desc_pool, d);
 	}
 	// run a cleanup function for this desc, if available
@@ -40,9 +39,11 @@ error_t waiton_async_call(async_desc_t* desc, async_rsp_t* rsp)
 async_desc_t* get_async_desc(void)
 {
 	async_desc_t* desc = POOL_GET(&async_desc_pool);
-	if (desc)
+	if (desc) {
 		// Clear out any data that was in the old desc
 		memset(desc, 0, sizeof(*desc));
+		TAILQ_INIT(&desc->syslist);
+	}
 	return desc;
 }
 
@@ -54,7 +55,7 @@ syscall_desc_t* get_sys_desc(async_desc_t* desc)
 	if (d) {
 		// Clear out any data that was in the old desc
 		memset(d, 0, sizeof(*d));
-    	LIST_INSERT_TAIL(&desc->syslist, d, next);
+    	TAILQ_INSERT_TAIL(&desc->syslist, d, next);
 	}
 	return d;
 }

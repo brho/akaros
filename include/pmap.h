@@ -6,13 +6,12 @@
 # error "This is a ROS kernel header; user programs should not #include it"
 #endif
 
-#include <arch/multiboot.h>
-
 #include <ros/memlayout.h>
-
+#include <arch/multiboot.h>
 #include <atomic.h>
 #include <env.h>
 #include <assert.h>
+#include <sys/queue.h>
 
 /* This macro takes a kernel virtual address -- an address that points above
  * KERNBASE, where the machine's maximum 256MB of physical memory is mapped --
@@ -50,8 +49,9 @@
 struct Page;
 typedef struct Page page_t;
 
-LIST_HEAD(page_list_t, page_t);
-typedef LIST_ENTRY(page_t) page_list_entry_t;
+LIST_HEAD(page_list, Page);
+typedef struct page_list page_list_t;
+typedef LIST_ENTRY(Page) page_list_entry_t;
 
 struct Page {
 	page_list_entry_t pp_link;	/* free list link */

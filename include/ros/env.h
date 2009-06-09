@@ -3,11 +3,11 @@
 #ifndef ROS_INC_ENV_H
 #define ROS_INC_ENV_H
 
-#include <arch/types.h>
-#include <ros/queue.h>
 #include <ros/trap.h>
 #include <ros/memlayout.h>
 #include <ros/syscall.h>
+#include <arch/types.h>
+#include <sys/queue.h>
 
 struct Env;
 typedef struct Env env_t;
@@ -42,7 +42,7 @@ typedef int32_t envid_t;
 #define ENV_DYING			4
 
 struct Env {
-	LIST_ENTRY(env_t) env_link NOINIT;	// Free list link pointers
+	LIST_ENTRY(Env) env_link NOINIT;	// Free list link pointers
 	uint32_t lock;
 	trapframe_t env_tf;			// Saved registers
 	envid_t env_id;				// Unique environment identifier

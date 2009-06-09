@@ -3,7 +3,6 @@
 
 #include <arch/types.h>
 #include <ros/ring_buffer.h>
-#include <ros/queue.h>
 
 /* system call numbers */
 enum
@@ -47,16 +46,5 @@ typedef struct syscall_rsp {
 
 // Generic Syscall Ring Buffer
 DEFINE_RING_TYPES(syscall, syscall_req_t, syscall_rsp_t);
-
-typedef struct syscall_desc syscall_desc_t;
-struct syscall_desc {
-	LIST_ENTRY(syscall_desc_t) next;
-	syscall_front_ring_t* sysfr;
-	uint32_t idx;
-	// cleanup
-	void (*cleanup)(void* data);
-	void* data;
-};
-LIST_HEAD(syscall_desc_list_t, syscall_desc_t);
 
 #endif /* !ROS_INCLUDE_SYSCALL_H */

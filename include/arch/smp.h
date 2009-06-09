@@ -5,8 +5,6 @@
 
 #include <arch/types.h>
 
-#include <ros/queue.h>
-
 #include <atomic.h>
 #include <trap.h>
 #include <workqueue.h>

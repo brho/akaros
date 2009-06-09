@@ -4,7 +4,6 @@
 #ifndef __ASSEMBLER__
 #include <arch/types.h>
 #include <arch/mmu.h>
-#include <ros/queue.h>
 #endif /* not __ASSEMBLER__ */
 
 /*

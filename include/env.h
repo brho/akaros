@@ -11,7 +11,8 @@ extern env_t *COUNT(NENV) envs;		// All environments
 extern uint32_t num_envs;		// Number of envs
 extern env_t* NORACE curenvs[MAX_NUM_CPUS];
 
-LIST_HEAD(env_list_t, env_t);		// Declares 'struct Env_list'
+LIST_HEAD(env_list, Env);		// Declares 'struct env_list'
+typedef struct env_list env_list_t;
 
 void	env_init(void);
 int		env_alloc(env_t **e, envid_t parent_id);

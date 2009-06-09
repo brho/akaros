@@ -10,13 +10,14 @@
 #include <arch/types.h>
 #include <arch/timer.h>
 #include <ros/error.h>
-#include <stdarg.h>
-#include <string.h>
-#include <pool.h>
-
 #include <ros/memlayout.h>
 #include <ros/syscall.h>
 #include <ros/env.h>
+
+#include <stdarg.h>
+#include <string.h>
+#include <pool.h>
+#include <sys/queue.h>
 
 #define USED(x)		(void)(x)
 
@@ -29,6 +30,23 @@ extern volatile uint8_t (COUNT(PGSIZE * UINFO_PAGES) procinfo)[];
 extern volatile uint8_t (COUNT(PGSIZE * UDATA_PAGES) procdata)[];
 extern syscall_front_ring_t sysfrontring;
 void exit(void) __attribute__((noreturn));
+
+/*
+ * Syscall Descriptor: This helps userspace track a specific syscall.  Includes
+ * a cleanup function to be run when this syscall is complete.  Linked list of
+ * these for now. (Tail Queue)
+ */
+typedef struct syscall_desc syscall_desc_t;
+struct syscall_desc {
+	TAILQ_ENTRY(syscall_desc) next;
+	syscall_front_ring_t* sysfr;
+	uint32_t idx;
+	// cleanup
+	void (*cleanup)(void* data);
+	void* data;
+};
+TAILQ_HEAD(syscall_desc_list, syscall_desc);
+typedef struct syscall_desc_list syscall_desc_list_t;
 
 // syscall.c
 void        sys_null();
