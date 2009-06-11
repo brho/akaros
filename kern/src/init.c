@@ -28,6 +28,8 @@
 #include <kclock.h>
 #include <manager.h>
 
+#include <rl8168.h>
+
 static void print_cpuinfo(void);
 
 void kernel_init(multiboot_info_t *mboot_info)
@@ -57,6 +59,7 @@ void kernel_init(multiboot_info_t *mboot_info)
 	timer_init();
 	// this returns when all other cores are done and ready to receive IPIs
 	smp_boot();
+	init_nic();
 	/*
 	test_smp_call_functions();
 	test_checklists();
@@ -65,7 +68,7 @@ void kernel_init(multiboot_info_t *mboot_info)
 	test_lapic_status_bit();
 	test_ipi_sending();
 	test_pit();
-	*/
+	*/	
 	manager();
 }
 

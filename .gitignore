@@ -11,3 +11,5 @@ cscope.out
 hdd.img
 *.*~
 Makelocal
+ne2k*
+.textmate*

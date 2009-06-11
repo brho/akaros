@@ -18,6 +18,8 @@
 #include <env.h>
 #include <syscall.h>
 
+#include <pmap.h>
+
 #define test_vector 0xeb
 
 void test_ipi_sending(void)
