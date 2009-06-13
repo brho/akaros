@@ -35,7 +35,8 @@ static intreg_t syscall_trap(uint16_t num, intreg_t a1,
                              intreg_t a2, intreg_t a3,
                              intreg_t a4, intreg_t a5)
 {
-	debug("duh!\n");
+	intreg_t ret;
+	
 	// Generic system call: pass system call number in AX,
 	// up to five parameters in DX, CX, BX, DI, SI.
 	// Interrupt kernel with T_SYSCALL.
