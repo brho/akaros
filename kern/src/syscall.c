@@ -10,6 +10,7 @@
 #include <arch/timer.h>
 #include <ros/error.h>
 
+#include <rl8168.h>
 #include <string.h>
 #include <assert.h>
 #include <env.h>
@@ -69,6 +70,50 @@ static ssize_t sys_serial_read(env_t* e, char *DANGEROUS buf, size_t len)
 	#else
 		return -E_INVAL;
 	#endif
+}
+
+static ssize_t sys_eth_write(env_t* e, const char *DANGEROUS buf, size_t len) 
+{ 
+	extern int eth_up;
+	
+	if (eth_up) {
+		
+		char *COUNT(len) _buf = user_mem_assert(e, buf, len, PTE_U);
+		int total_sent = 0;
+		int just_sent = 0;
+		int cur_packet_len = 0;
+		while (total_sent != len) {
+			cur_packet_len = ((len - total_sent) > MAX_PACKET_DATA) ? MAX_PACKET_DATA : (len - total_sent);
+			
+			just_sent = send_packet(packet_wrap(buf + total_sent, cur_packet_len), cur_packet_len + PACKET_HEADER_SIZE);
+			
+			if (just_sent < 0)
+				return -1; // This should be an error code of its own
+			total_sent += cur_packet_len;
+		}
+		
+		return (ssize_t)len;
+		
+	}
+	else
+		return -E_INVAL;
+}
+
+static ssize_t sys_eth_read(env_t* e, char *DANGEROUS buf, size_t len) 
+{/*
+	#ifdef SERIAL_IO
+	    char *COUNT(len) _buf = user_mem_assert(e, buf, len, PTE_U);
+		size_t bytes_read = 0;
+		int c;
+		while((c = serial_read_byte()) != -1) {
+			buf[bytes_read++] = (uint8_t)c;
+			if(bytes_read == len) break;
+		}
+		return (ssize_t)bytes_read;
+	#else
+		return -E_INVAL;
+	#endif*/
+		return 0;
 }
 
 // Invalidate the cache of this core
@@ -238,6 +283,10 @@ intreg_t syscall(env_t* e, uint32_t syscallno, uint32_t a1, uint32_t a2,
 			return sys_serial_write(e, (char *DANGEROUS)a1, (size_t)a2);
 		case SYS_serial_read:
 			return sys_serial_read(e, (char *DANGEROUS)a1, (size_t)a2);
+		case SYS_eth_write:
+			return sys_eth_write(e, (char *DANGEROUS)a1, (size_t)a2);
+		case SYS_eth_read:
+			return sys_eth_read(e, (char *DANGEROUS)a1, (size_t)a2);	
 		case SYS_cache_invalidate:
 			sys_cache_invalidate();
 			return 0;

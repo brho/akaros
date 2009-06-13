@@ -19,6 +19,8 @@ enum
 	SYS_env_destroy,
 	SYS_serial_write,
 	SYS_serial_read,
+	SYS_eth_read,
+	SYS_eth_write,
 
 	SYS_endofcalls //Should always be last
 };

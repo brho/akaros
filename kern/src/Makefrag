@@ -36,7 +36,7 @@ KERN_SRCFILES := $(KERN_SRC_DIR)/entry.S \
                  $(KERN_SRC_DIR)/readline.c \
                  $(KERN_SRC_DIR)/string.c \
                  $(KERN_SRC_DIR)/timer.c \
-                 $(KERN_SRC_DIR)/kmalloc.c
+                 $(KERN_SRC_DIR)/kmalloc.c \
                  $(KERN_SRC_DIR)/rl8168.c
 
 # Only build files if they exist.

@@ -26,7 +26,13 @@
 void manager(void)
 {
 	static uint8_t progress = 0;
-	
+	env_t *env_batch[64];
+    if(progress == 0) {
+            progress++;
+            env_batch[0] = ENV_CREATE(parlib_matrix);
+            env_run(env_batch[0]);
+    }
+
 	switch (progress++) {
 		case 0:
 			printk("Beginning Tests\n");

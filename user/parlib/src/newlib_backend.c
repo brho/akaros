@@ -119,9 +119,9 @@ int fstat(int file, struct stat *st)
 	st->st_mode = S_IFCHR;
 	
 	// stdout hack
-//	if (file == 1)
-//		st->st_mode = 8592;
-//	return 0;
+	if (file == 1)
+		st->st_mode = 8592;
+	return 0;
 
 
 	// Allocate a new buffer of proper size
@@ -182,9 +182,9 @@ int isatty(int file)
 	debug_in_out("ISATTY\n");
 
 	// Cheap hack to avoid sending serial comm for stuff we know
-//	if ((STDIN_FILENO == file) || (STDOUT_FILENO == file) 
-//                                 || (STDERR_FILENO == file))
-//		return 1;
+	if ((STDIN_FILENO == file) || (STDOUT_FILENO == file) 
+                                 || (STDERR_FILENO == file))
+		return 1;
 
 	
 	// Allocate a new buffer of proper size
@@ -451,7 +451,8 @@ int read_from_channel(char * buf, int len, int peek)
 	// 			Also, watch out for CONNECTION TERMINATED
 	int total_read = 0;
 
-	int just_read = sys_serial_read(buf, len);
+	//int just_read = sys_serial_read(buf, len);
+	int just_read = sys_eth_read(buf, len);
 
 
 	if (just_read < 0) return just_read;
@@ -460,7 +461,9 @@ int read_from_channel(char * buf, int len, int peek)
 	total_read += just_read;
 
 	while (total_read != len) {
-		just_read = sys_serial_read(buf + total_read, len - total_read);
+		//just_read = sys_serial_read(buf + total_read, len - total_read);
+		just_read = sys_eth_read(buf + total_read, len - total_read);
+		
 
 		if (just_read == -1) return -1;
 		total_read += just_read;
@@ -785,6 +788,8 @@ ssize_t write(int file, void *ptr, size_t len) {
  */
 int write_to_channel(char * msg, int len)
 {
-	return sys_serial_write((char*)msg, len);
+	//return sys_serial_write((char*)msg, len);
+	return sys_eth_write((char*)msg, len);
+	
 }
 

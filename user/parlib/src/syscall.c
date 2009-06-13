@@ -35,8 +35,7 @@ static intreg_t syscall_trap(uint16_t num, intreg_t a1,
                              intreg_t a2, intreg_t a3,
                              intreg_t a4, intreg_t a5)
 {
-	intreg_t ret;
-
+	debug("duh!\n");
 	// Generic system call: pass system call number in AX,
 	// up to five parameters in DX, CX, BX, DI, SI.
 	// Interrupt kernel with T_SYSCALL.
@@ -110,4 +109,16 @@ ssize_t sys_serial_write(void* buf, size_t len)
 ssize_t sys_serial_read(void* buf, size_t len) 
 {
 	return syscall(SYS_serial_read, (intreg_t)buf, len, 0, 0, 0);
+}
+
+//Write a buffer over ethernet
+ssize_t sys_eth_write(void* buf, size_t len) 
+{
+	return syscall(SYS_eth_write, (intreg_t)buf, len, 0, 0, 0);
+}
+
+//Read a buffer via ethernet
+ssize_t sys_eth_read(void* buf, size_t len) 
+{
+	return syscall(SYS_eth_read, (intreg_t)buf, len, 0, 0, 0);
 }
