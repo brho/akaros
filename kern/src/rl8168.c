@@ -312,17 +312,18 @@ void init_nic() {
 */
 
 	//poll_rx_descriptors();
-	udelay(3000000);
+	//udelay(3000000);
 				
 	// Trigger sw based nic interrupt
-	outb(io_base_addr + 0x38, 0x1);
-	udelay(3000000);
+	//outb(io_base_addr + 0x38, 0x1);
+	//udelay(3000000);
 	
 	//nic_debug("Triggered NIC interrupt.\n");
 	
 	return;
 	
 }
+
 // We need to evaluate this routine in terms of concurrency.
 // We also need to figure out whats up with different core interrupts
 void nic_interrupt_handler(trapframe_t *tf, void* data) {
@@ -531,10 +532,7 @@ int send_packet(const char *data, size_t len) {
 	
 	nic_packet_debug("-->Sent packet.\n");
 	
-	
 	outb(io_base_addr + RL_TX_CTRL_REG, RL_TX_SEND_MASK);
-	
-	
 	
 	return len;
 }
