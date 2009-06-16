@@ -71,6 +71,12 @@ uint32_t tx_des_cur = 0;
 
 int eth_up = 0;
 
+int packet_waiting;
+int packet_buffer_size;
+char* packet_buffer;
+page_t* packet_buffer_page;
+int packet_buffer_pos = 0;
+
 int scan_pci() {
 	
 	uint32_t address;
@@ -227,30 +233,39 @@ void set_tx_descriptor(uint32_t des_num) {
 	
 	tx_des_kva[des_num].command = 0;
 	
-	if (des_num == (num_of_tx_descriptors - 1)) /* Last descriptor? if so, set the EOR bit */
+	if (des_num == (num_of_tx_descriptors - 1)) {/* Last descriptor? if so, set the EOR bit */
 		tx_des_kva[des_num].command = DES_EOR_MASK;
+	}
+	
+
+	// This is a hack. For this revision NIC, the checksum bits reside in the vlan field, for some ungodly reason
+	// I want those 6 hours of my life back. Thanks go to the BSD RE driver for saving my sanity.
+	tx_des_kva[des_num].vlan = DES_TX_IP_CHK_MASK;
+		
 }
 
 void configure_nic() {
 	
 	nic_debug("-->Configuring Device.\n");
+	
+	// Magic to handle the C+ register. Completely undocumented, ripped from the BSE RE driver.
+	outl(io_base_addr + 0xE0, 0x0008 + 0x0001 + 0x0002 + 0x0020);
 
 	outb(io_base_addr + RL_EP_CTRL_REG, RL_EP_CTRL_UL_MASK); 		// Unlock EPPROM CTRL REG
-	outl(io_base_addr + RL_TX_CFG_REG, RL_RX_CFG_MASK); 			// Configure RX
 	
     outw(io_base_addr + RL_RX_MXPKT_REG, RL_RX_MAX_SIZE); 			// Set max RX Packet Size
     outb(io_base_addr + RL_TX_MXPKT_REG, RL_TX_MAX_SIZE); 			// Set max TX Packet Size
 
 	// Note: These are the addresses the physical device will use, so we need the physical addresses of the rings
     outl(io_base_addr + RL_TX_DES_REG, (unsigned long)tx_des_pa); 	// Set TX Des Ring Start Addr
-
     outl(io_base_addr + RL_RX_DES_REG, (unsigned long)rx_des_pa); 	// Set RX Des Ring Start Addr
 
-	// Can't configure TX until enabled in ctrl reg. From spec sheet.
-	outb(io_base_addr + RL_CTRL_REG, RL_CTRL_RXTX_MASK); 			// Enable RX and TX in the CTRL Reg
 	outl(io_base_addr + RL_TX_CFG_REG, RL_TX_CFG_MASK); 			// Configure TX
+	outl(io_base_addr + RL_TX_CFG_REG, RL_RX_CFG_MASK); 			// Configure RX
 
-    outl(io_base_addr + RL_EP_CTRL_REG, RL_EP_CTRL_L_MASK); 		// Unlock the EPPROM Ctrl REG
+	outb(io_base_addr + RL_CTRL_REG, RL_CTRL_RXTX_MASK); 			// Enable RX and TX in the CTRL Reg
+
+    outl(io_base_addr + RL_EP_CTRL_REG, RL_EP_CTRL_L_MASK); 		// Lock the EPPROM Ctrl REG
 	
 	return;
 }
@@ -280,11 +295,11 @@ void poll_rx_descriptors() {
 void init_nic() {
 	
 	if (scan_pci() < 0) return;
-	eth_up = 1;
 	read_mac();
 	setup_interrupts();
 	setup_descriptors();
 	configure_nic();
+	eth_up = 1;
 
 /*
 	udelay(3000000);
@@ -443,6 +458,8 @@ void process_packet(page_t *packet, uint16_t packet_size, uint32_t command) {
 	return;
 }
 
+
+// DEAL WITH ENDIANESS ISSUES?
 void nic_handle_rx_packet() {
 	
 	uint32_t current_command = rx_des_kva[rx_des_cur].command;
@@ -484,6 +501,29 @@ void nic_handle_rx_packet() {
 	rx_buf_page_dirty = pa2page(rx_des_kva[rx_des_cur].low_buf);
 	packet_size = rx_des_kva[rx_des_cur].command & DES_RX_SIZE_MASK;
 	
+	// Hack for UDP syscall hack. 
+	// This is a quick hack to let us deal with where to put packets coming in. This is not concurrency friendly
+	// In the event that we get 2 incoming packets for our syscall test (shouldnt happen)
+	// We cant process more until another packet comes in. This is ugly, but this code goes away as soon as we integrate a real stack.
+	// This keys off the source port, fix it for dest port. 
+	if ((current_command & DES_PAM_MASK) && (*((uint16_t*)(page2kva(rx_buf_page_dirty) + 36)) == 0x9bad)) {
+		
+		if (packet_waiting) return;
+
+		packet_buffer = (char*)page2kva(rx_buf_page_dirty) + PACKET_HEADER_SIZE;
+		
+		// so ugly i want to cry
+		packet_buffer_size = *((uint16_t*)(page2kva(rx_buf_page_dirty) + 38)); 
+		packet_buffer_size = (((uint16_t)packet_buffer_size & 0xff00) >> 8) |  (((uint16_t)packet_buffer_size & 0x00ff) << 8);		
+		packet_buffer_size = packet_buffer_size - 8;
+
+		packet_buffer_page = rx_buf_page_dirty;
+		packet_buffer_pos = 0;
+		
+		packet_waiting = 1;
+	}
+	
+	
 	// Reset the command register, allocate a new page, and set it
 	set_rx_descriptor(rx_des_cur);
 	
@@ -492,7 +532,7 @@ void nic_handle_rx_packet() {
 	
 	// Chew on the packet data. This function is responsible for deallocating the memory space.
 	process_packet(rx_buf_page_dirty, packet_size, current_command);
-		
+	
 	return;
 }
 
@@ -525,8 +565,6 @@ int send_packet(const char *data, size_t len) {
 	memcpy(page2kva(tx_buf_page), data, len);
 
 	tx_des_kva[tx_des_cur].command = tx_des_kva[tx_des_cur].command | len | DES_OWN_MASK | DES_FS_MASK | DES_LS_MASK;
-	tx_des_kva[tx_des_cur].command = tx_des_kva[tx_des_cur].command | DES_TX_IP_CHK_MASK | DES_TX_UDP_CHK_MASK | DES_TX_TCP_CHK_MASK;
-	
 	
 	tx_des_cur = (tx_des_cur + 1) % num_of_tx_descriptors;
 	
@@ -626,7 +664,7 @@ const char *packet_wrap(const char* data, size_t len) {
 	udp_header->checksum = 0;
 	
 	memcpy (wrap_kva + PACKET_HEADER_SIZE, data, len);
-		
+	
 	return wrap_kva;	
 }
 

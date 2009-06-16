@@ -464,7 +464,6 @@ int read_from_channel(char * buf, int len, int peek)
 		//just_read = sys_serial_read(buf + total_read, len - total_read);
 		just_read = sys_eth_read(buf + total_read, len - total_read);
 		
-
 		if (just_read == -1) return -1;
 		total_read += just_read;
 	}

@@ -5,9 +5,9 @@
 #include <trap.h>
 #include <pmap.h>
 
-#define nic_debug(...)  cprintf(__VA_ARGS__)  
-#define nic_interrupt_debug(...)  cprintf(__VA_ARGS__)  
-#define nic_packet_debug(...)  cprintf(__VA_ARGS__)  
+#define nic_debug(...)  //cprintf(__VA_ARGS__)  
+#define nic_interrupt_debug(...)  //cprintf(__VA_ARGS__)  
+#define nic_packet_debug(...)  //cprintf(__VA_ARGS__)  
 
 
 #define MK_CONFIG_ADDR(BUS, DEV, FUNC, REG) (unsigned long)( (BUS << 16) | (DEV << 11) | \
@@ -90,16 +90,24 @@
 #define DES_PAM_MASK		0x04000000
 #define DES_BAR_MASK		0x02000000
 
-#define DES_TX_IP_CHK_MASK  0x40000
-#define DES_TX_UDP_CHK_MASK 0x20000
-#define DES_TX_TCP_CHK_MASK 0x10000
+// This is a hack. For some reaosn the bits are in an undocumented position for our NIC
+// They should be part of the command field, at the commented addrs below. instead
+// they are part of the vlan field as stated below.
+//#define DES_TX_IP_CHK_MASK  0x40000
+//#define DES_TX_UDP_CHK_MASK 0x20000
+//#define DES_TX_TCP_CHK_MASK 0x10000
+#define DES_TX_IP_CHK_MASK  0x20000000
+#define DES_TX_UDP_CHK_MASK 0x80000000
+#define DES_TX_TCP_CHK_MASK 0x40000000
+
 
 
 #define KERNEL_IRQ_OFFSET	32
 
 #define MINIMUM_PACKET_SIZE 14
 #define MAX_PACKET_SIZE		PGSIZE
-#define PACKET_HEADER_SIZE  20 + 8 + 18 //IP UDP ETH
+
+#define PACKET_HEADER_SIZE  20 + 8 + 14 //IP UDP ETH
 #define MAX_PACKET_DATA		PGSIZE - PACKET_HEADER_SIZE
 // This number needs verification! Also, this is a huge hack, as the driver shouldnt care about UDP/IP etc.
 

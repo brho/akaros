@@ -12,13 +12,13 @@ extern char * readline(const char *prompt);
 
 void file_io()
 {	
-	printf("Beginning Serial Based File IO Test...\n\n");
+	printf("Beginning Ethernet Based File IO Test...\n\n");
 	int in_fd = open("./test/input", O_RDWR, 0);
+	printf("Opened:       input\n");
+	printf("FD:           %d\n", in_fd);
 	char buf[IN_BUF_SIZE];
 	int read_amt = read(in_fd, buf, IN_BUF_SIZE - 1);
 	buf[read_amt] = '\0';
-	printf("Opened:       input\n");
-	printf("FD:           %d\n", in_fd);
 	printf("Read:         %d bytes\n", read_amt);
 	printf("Data read:    %s", buf);
 

@@ -100,20 +100,34 @@ static ssize_t sys_eth_write(env_t* e, const char *DANGEROUS buf, size_t len)
 }
 
 static ssize_t sys_eth_read(env_t* e, char *DANGEROUS buf, size_t len) 
-{/*
-	#ifdef SERIAL_IO
-	    char *COUNT(len) _buf = user_mem_assert(e, buf, len, PTE_U);
-		size_t bytes_read = 0;
-		int c;
-		while((c = serial_read_byte()) != -1) {
-			buf[bytes_read++] = (uint8_t)c;
-			if(bytes_read == len) break;
+{
+	extern int eth_up;
+	
+	if (eth_up) {
+		extern int packet_waiting;
+		extern int packet_buffer_size;
+		extern char* packet_buffer;
+		extern page_t* packet_buffer_page;
+		extern int packet_buffer_pos;
+			
+		if (packet_waiting == 0)
+			return 0;
+			
+		int read_len = ((packet_buffer_pos + len) > packet_buffer_size) ? packet_buffer_size - packet_buffer_pos : len;
+
+		memcpy(buf, packet_buffer + packet_buffer_pos, read_len);
+	
+		packet_buffer_pos = packet_buffer_pos + read_len;
+	
+		if (packet_buffer_pos == packet_buffer_size) {
+			page_free(packet_buffer_page);
+			packet_waiting = 0;
 		}
-		return (ssize_t)bytes_read;
-	#else
+	
+		return read_len;
+	}
+	else
 		return -E_INVAL;
-	#endif*/
-		return 0;
 }
 
 // Invalidate the cache of this core
