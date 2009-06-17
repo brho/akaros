@@ -50,7 +50,7 @@ void pic_unmask_irq(uint8_t irq)
 {
 	if (irq > 7) {
 		outb(PIC2_DATA, inb(PIC2_DATA) & ~(1 << (irq - 8)));
-		outb(PIC1_DATA, inb(PIC1_DATA) & 0xfd); // make sure irq2 is unmasked
+		outb(PIC1_DATA, inb(PIC1_DATA) & 0xfb); // make sure irq2 is unmasked
 	} else
 		outb(PIC1_DATA, inb(PIC1_DATA) & ~(1 << irq));
 }
