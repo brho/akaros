@@ -37,6 +37,14 @@
  * size of a packet. This needs to change. We do it this way right now because that is really our only 
  * allocation mechnism. I don't want to write some sort of kalloc just for the net driver, so until
  * that exists, I'll use a page per packet buffer.
+ * 
+ * TODO: Remove hacky syscall hack stuff (once we get a real stack).
+ * TODO: Jumbo frame support
+ * TODO: Use high priority transmit ring for syscall stuff.
+ * TODO: Discuss panic conditions.
+ * TODO: Shutdown cleanup kfrees()
+ * TODO: Use onboard timer interrupt to check for packets, instead of writing a bit each time we have a packet.
+ * TODO: CONCURRENCY!
  */
 
 
@@ -49,16 +57,10 @@ struct Descriptor
                  high_buf; /* high 32-bits of physical buffer address */
 };
 
-int rx_buffer_len = PGSIZE;
-int num_of_rx_descriptors = PGSIZE/sizeof(struct Descriptor);
-
-int tx_buffer_len = PGSIZE;
-int num_of_tx_descriptors = PGSIZE/sizeof(struct Descriptor);
-
 
 uint32_t io_base_addr = 0;
 uint32_t irq = 0;
-char mac_address[6];
+char device_mac[6];
 
 struct Descriptor *rx_des_kva;
 struct Descriptor *rx_des_pa;
@@ -69,13 +71,32 @@ struct Descriptor *tx_des_pa;
 uint32_t rx_des_cur = 0;
 uint32_t tx_des_cur = 0;
 
-int eth_up = 0;
+uint8_t eth_up = 0;
 
+// Hacky stuff for syscall hack. Go away.
 int packet_waiting;
 int packet_buffer_size;
 char* packet_buffer;
-page_t* packet_buffer_page;
+char* packet_buffer_orig;
 int packet_buffer_pos = 0;
+// End hacky stuff
+
+void init_nic() {
+	
+	if (scan_pci() < 0) return;
+	read_mac();
+	setup_descriptors();
+	configure_nic();
+	setup_interrupts();
+	eth_up = 1;
+	
+	//Trigger sw based nic interrupt
+	//outb(io_base_addr + 0x38, 0x1);
+	//udelay(3000000);
+	
+	return;
+}
+
 
 int scan_pci() {
 	
@@ -137,7 +158,8 @@ int scan_pci() {
 				result = result & PCI_MEM_MASK;
 				nic_debug("-->BAR%u: %s --> %x\n", k, "MEM", result);
 			}
-
+			
+			// TODO Switch to memory mapped instead of IO?
 			if (k == 0) // BAR0 denotes the IO Addr for the device
 				io_base_addr = result;						
 		}
@@ -154,41 +176,15 @@ int scan_pci() {
 void read_mac() {
 	
 	for (int i = 0; i < 6; i++)
-	   mac_address[i] = inb(io_base_addr + RL_MAC_OFFSET + i); 
+	   device_mac[i] = inb(io_base_addr + RL_MAC_OFFSET + i); 
 	
-	nic_debug("-->DEVICE MAC: %02x:%02x:%02x:%02x:%02x:%02x\n", 0xFF & mac_address[0], 0xFF & mac_address[1],	
-	                                                            0xFF & mac_address[2], 0xFF & mac_address[3],	
-                                                                0xFF & mac_address[4], 0xFF & mac_address[5]);
+	nic_debug("-->DEVICE MAC: %02x:%02x:%02x:%02x:%02x:%02x\n", 0xFF & device_mac[0], 0xFF & device_mac[1],	
+	                                                            0xFF & device_mac[2], 0xFF & device_mac[3],	
+                                                                0xFF & device_mac[4], 0xFF & device_mac[5]);
 	return;
 }
 
-void reset_nic() {
-	
-	nic_debug("-->Resetting device..... ");
-	outb(io_base_addr + RL_CTRL_REG, RL_CTRL_RESET_MASK);
-	while (inb(io_base_addr + RL_CTRL_REG) & RL_CTRL_RESET_MASK);
-	nic_debug(" done.\n");
-}
-
-void setup_interrupts() {
-	
-	extern handler_t interrupt_handlers[];
-	
-	nic_debug("-->Setting interrupts.\n");
-	
-	// Enable all NIC interrupts only
-	outw(io_base_addr + RL_IM_REG, RL_INTERRUPT_MASK);
-	
-	//Clear the current interrupts.
-	outw(io_base_addr + RL_IS_REG, RL_INTERRUPT_MASK);
-	
-	// Kernel based interrupt stuff
-	register_interrupt_handler(interrupt_handlers, KERNEL_IRQ_OFFSET + irq, nic_interrupt_handler, 0);
-	pic_unmask_irq(irq);
-	unmask_lapic_lvt(LAPIC_LVT_LINT0);
-	enable_irq();
-}
-
+/*
 void setup_descriptors() {
 	
 	nic_debug("-->Setting up tx/rx descriptors.\n");
@@ -196,7 +192,11 @@ void setup_descriptors() {
 	page_t *rx_des_page = NULL, *tx_des_page = NULL;
 			
 	if (page_alloc(&rx_des_page) < 0) panic("Can't allocate page for RX Ring");
+	
 	if (page_alloc(&tx_des_page) < 0) panic("Can't allocate page for TX Ring");
+	
+	if (page2pa(tx_des_page) == 0x1000)
+		if (page_alloc(&tx_des_page) < 0) panic("Can't allocate page for TX Ring");
 	
 	// extra page_alloc needed because of the strange page_alloc thing
 	if (page_alloc(&tx_des_page) < 0) panic("Can't allocate page for TX Ring");
@@ -207,136 +207,160 @@ void setup_descriptors() {
 	rx_des_pa = page2pa(rx_des_page);
 	tx_des_pa = page2pa(tx_des_page);
 
-
+	cprintf("rx_des_page: %x\n", rx_des_pa);
+	cprintf("tx_des_page: %x\n", tx_des_pa);
+	
     for (int i = 0; i < num_of_rx_descriptors; i++) 
 		set_rx_descriptor(i);
 		
 	for (int i = 0; i < num_of_tx_descriptors; i++) 
 		set_tx_descriptor(i);
 }
+*/
 
-void set_rx_descriptor(uint32_t des_num) {
+void setup_descriptors() {
 	
-	if (des_num == (num_of_rx_descriptors - 1)) /* Last descriptor? if so, set the EOR bit */
-		rx_des_kva[des_num].command = (DES_OWN_MASK | DES_EOR_MASK | (rx_buffer_len & DES_RX_SIZE_MASK));
-	else
-		rx_des_kva[des_num].command = (DES_OWN_MASK | (rx_buffer_len & DES_RX_SIZE_MASK));
+	nic_debug("-->Setting up tx/rx descriptors.\n");
+	
+	page_t *rx_des_page = NULL, *tx_des_page = NULL;
+			
+	// Allocate room for the buffers. Include an extra ALIGN space.
+	// Buffers need to be on 256 byte boundries.
+	rx_des_kva = kalloc(NUM_RX_DESCRIPTORS * sizeof(struct Descriptor) + RL_DES_ALIGN, NULL);
+	tx_des_kva = kalloc(NUM_TX_DESCRIPTORS * sizeof(struct Descriptor) + RL_DES_ALIGN, NULL);
+	
+	if (rx_des_kva == NULL) panic("Can't allocate page for RX Ring");
+	if (tx_des_kva == NULL) panic("Can't allocate page for TX Ring");
+	
+	rx_des_kva = ROUNDUP(rx_des_kva, RL_DES_ALIGN);
+	tx_des_kva = ROUNDUP(tx_des_kva, RL_DES_ALIGN);
+	
+	rx_des_pa = (struct Descriptor *)PADDR(rx_des_page);
+	tx_des_pa = (struct Descriptor *)PADDR(tx_des_page);
+	
+    for (int i = 0; i < NUM_RX_DESCRIPTORS; i++) 
+		set_rx_descriptor(i, TRUE); // Allocate memory for the descriptor
 		
-	page_t *rx_buf_page;
-	if (page_alloc(&rx_buf_page) < 0) panic ("Can't allocate page for RX Buffer");
+	for (int i = 0; i < NUM_TX_DESCRIPTORS; i++) 
+		set_tx_descriptor(i);
+		
+	return;
+}
 
-	rx_des_kva[des_num].low_buf = page2pa(rx_buf_page);
-	//.high_buf used if we do 64bit.
+
+void set_rx_descriptor(uint32_t des_num, uint8_t reset_buffer) {
+	
+	// Set the OWN bit on all descriptors. Also set the buffer size.
+	rx_des_kva[des_num].command = (DES_OWN_MASK | (RL_RX_MAX_BUFFER_SIZE & DES_RX_SIZE_MASK));
+	
+	if (des_num == (NUM_RX_DESCRIPTORS - 1)) 
+		rx_des_kva[des_num].command = rx_des_kva[des_num].command | DES_EOR_MASK;
+	
+	if (reset_buffer) {
+		char *rx_buffer = kalloc(RL_RX_MAX_BUFFER_SIZE + RL_BUF_ALIGN);
+	
+		if (rx_buffer == NULL) panic ("Can't allocate page for RX Buffer");
+		rx_buffer = ROUNDUP(rx_buffer, RL_BUF_ALIGN);
+
+		rx_des_kva[des_num].low_buf = PADDR(rx_buffer);
+		//.high_buf used if we do 64bit.
+	}
+	
+	return;
 }
 
 void set_tx_descriptor(uint32_t des_num) {
 	
+	// Clear the command bits.
 	tx_des_kva[des_num].command = 0;
 	
-	if (des_num == (num_of_tx_descriptors - 1)) {/* Last descriptor? if so, set the EOR bit */
-		tx_des_kva[des_num].command = DES_EOR_MASK;
-	}
-	
-
-	// This is a hack. For this revision NIC, the checksum bits reside in the vlan field, for some ungodly reason
-	// I want those 6 hours of my life back. Thanks go to the BSD RE driver for saving my sanity.
-	tx_des_kva[des_num].vlan = DES_TX_IP_CHK_MASK;
+	// Set EOR bit on last descriptor
+	if (des_num == (NUM_TX_DESCRIPTORS - 1))
+		tx_des_kva[des_num].command = DES_EOR_MASK;	
 		
+	char *tx_buffer = kalloc(RL_TX_MAX_BUFFER_SIZE);
+
+	if (tx_buffer == NULL) panic ("Can't allocate page for TX Buffer");
+
+	tx_des_kva[des_num].low_buf = PADDR(tx_buffer);
+	//.high_buf used if we do 64bit.
+		
+	return;
 }
 
 void configure_nic() {
 	
+	// TODO: Weigh resetting the nic. Not really needed. Remove?
+	// TODO Check ordering of what we set.
+	// TODO Remove C+ register setting?
+	
 	nic_debug("-->Configuring Device.\n");
-	
+	reset_nic();
+
 	// Magic to handle the C+ register. Completely undocumented, ripped from the BSE RE driver.
-	outl(io_base_addr + 0xE0, 0x0008 + 0x0001 + 0x0002 + 0x0020);
+	outl(io_base_addr + RL_CP_CTRL_REG, RL_CP_MAGIC_MASK);
 
-	outb(io_base_addr + RL_EP_CTRL_REG, RL_EP_CTRL_UL_MASK); 		// Unlock EPPROM CTRL REG
+	// Unlock EPPROM CTRL REG
+	outb(io_base_addr + RL_EP_CTRL_REG, RL_EP_CTRL_UL_MASK); 	
 	
-    outw(io_base_addr + RL_RX_MXPKT_REG, RL_RX_MAX_SIZE); 			// Set max RX Packet Size
-    outb(io_base_addr + RL_TX_MXPKT_REG, RL_TX_MAX_SIZE); 			// Set max TX Packet Size
+	// Set max RX Packet Size
+    outw(io_base_addr + RL_RX_MXPKT_REG, RL_RX_MAX_SIZE); 	
+		
+	// Set max TX Packet Size
+    outb(io_base_addr + RL_TX_MXPKT_REG, RL_TX_MAX_SIZE); 			
 
-	// Note: These are the addresses the physical device will use, so we need the physical addresses of the rings
-    outl(io_base_addr + RL_TX_DES_REG, (unsigned long)tx_des_pa); 	// Set TX Des Ring Start Addr
-    outl(io_base_addr + RL_RX_DES_REG, (unsigned long)rx_des_pa); 	// Set RX Des Ring Start Addr
+	// Set TX Des Ring Start Addr
+    outl(io_base_addr + RL_TX_DES_REG, (unsigned long)tx_des_pa); 
+	
+	// Set RX Des Ring Start Addr
+    outl(io_base_addr + RL_RX_DES_REG, (unsigned long)rx_des_pa); 	
 
-	outl(io_base_addr + RL_TX_CFG_REG, RL_TX_CFG_MASK); 			// Configure TX
-	outl(io_base_addr + RL_TX_CFG_REG, RL_RX_CFG_MASK); 			// Configure RX
+	// Configure TX
+	outl(io_base_addr + RL_TX_CFG_REG, RL_TX_CFG_MASK); 
+	
+	// Configure RX
+	outl(io_base_addr + RL_TX_CFG_REG, RL_RX_CFG_MASK); 			
 
-	outb(io_base_addr + RL_CTRL_REG, RL_CTRL_RXTX_MASK); 			// Enable RX and TX in the CTRL Reg
+	// Enable RX and TX in the CTRL Reg
+	outb(io_base_addr + RL_CTRL_REG, RL_CTRL_RXTX_MASK); 			
 
-    outl(io_base_addr + RL_EP_CTRL_REG, RL_EP_CTRL_L_MASK); 		// Lock the EPPROM Ctrl REG
+	// Lock the EPPROM Ctrl REG
+    outl(io_base_addr + RL_EP_CTRL_REG, RL_EP_CTRL_L_MASK); 		
 	
 	return;
 }
 
-void poll_rx_descriptors() {
+void reset_nic() {
 	
-	while (1) {
-		udelay(3000000);
-		int seen = 0;
-		for (int i = 0; i < num_of_rx_descriptors; i++) {
-			
-			if ((rx_des_kva[i].command & DES_OWN_MASK) == 0) {
-				cprintf("des: %u Status: %x OWN: %u FS: %u LS: %u SIZE: %u\n", 
-										i, 
-										rx_des_kva[i].command, 
-										rx_des_kva[i].command & DES_OWN_MASK, 
-										((rx_des_kva[i].command & DES_FS_MASK) != 0),
-										((rx_des_kva[i].command & DES_LS_MASK) != 0),
-										rx_des_kva[i].command & DES_RX_SIZE_MASK);				
-			}
-		}
-	}
+	nic_debug("-->Resetting device..... ");
+	outb(io_base_addr + RL_CTRL_REG, RL_CTRL_RESET_MASK);
+	
+	// Wait for NIC to answer "done resetting" before continuing on
+	while (inb(io_base_addr + RL_CTRL_REG) & RL_CTRL_RESET_MASK);
+	nic_debug(" done.\n");
 	
 	return;
 }
 
-void init_nic() {
+void setup_interrupts() {
 	
-	if (scan_pci() < 0) return;
-	read_mac();
-	setup_interrupts();
-	setup_descriptors();
-	configure_nic();
-	eth_up = 1;
-
-/*
-	udelay(3000000);
-	for (int i = 0; i < 10; i++)  {
-		send_packet("                    HELLO THERE", 32);
-		udelay(3000000);
-	}
-*/
-
-/*  This code is for nic stats
-	page_t *p;
-	page_alloc(&p);
+	extern handler_t interrupt_handlers[];
 	
-	uint32_t low = 0;
-	uint32_t high = 0;
+	nic_debug("-->Setting interrupts.\n");
 	
-	low = page2pa(p);
-	low = low | 0x8;
+	// Enable NIC interrupts
+	outw(io_base_addr + RL_IM_REG, RL_INTERRUPT_MASK);
 	
-	outl(io_base_addr + 0x10, low);
-	outl(io_base_addr + 0x14, 0x00);
+	//Clear the current interrupts.
+	outw(io_base_addr + RL_IS_REG, RL_INTRRUPT_CLEAR);
 	
-	udelay(3000000);
-	dump_page(p);
-*/
-
-	//poll_rx_descriptors();
-	//udelay(3000000);
-				
-	// Trigger sw based nic interrupt
-	//outb(io_base_addr + 0x38, 0x1);
-	//udelay(3000000);
-	
-	//nic_debug("Triggered NIC interrupt.\n");
+	// Kernel based interrupt stuff
+	register_interrupt_handler(interrupt_handlers, KERNEL_IRQ_OFFSET + irq, nic_interrupt_handler, 0);
+	pic_unmask_irq(irq);
+	unmask_lapic_lvt(LAPIC_LVT_LINT0);
+	enable_irq();
 	
 	return;
-	
 }
 
 // We need to evaluate this routine in terms of concurrency.
@@ -344,13 +368,12 @@ void init_nic() {
 void nic_interrupt_handler(trapframe_t *tf, void* data) {
 	
 	nic_interrupt_debug("\nNic interrupt on core %u!\n", lapic_get_id());
-	
+		
 	// Read the offending interrupt(s)
 	uint16_t interrupt_status = inw(io_base_addr + RL_IS_REG);
 
 	// We can have multiple interrupts fire at once. I've personally seen this.
 	// This means we need to handle this as a series of independent if's
-	
 	if (interrupt_status & RL_INT_ROK) {
 		nic_interrupt_debug("-->RX OK\n");
 		nic_handle_rx_packet();
@@ -399,20 +422,150 @@ void nic_interrupt_handler(trapframe_t *tf, void* data) {
 	nic_interrupt_debug("\n");
 		
 	// Clear interrupts	
-	outw(io_base_addr + RL_IS_REG, 0xFFFF);
+	outw(io_base_addr + RL_IS_REG, RL_INTRRUPT_CLEAR);
+	
 	return;
 }
 
-void process_packet(page_t *packet, uint16_t packet_size, uint32_t command) {
-	uint32_t packet_kva = page2kva(packet);
+// TODO: Does a packet too large get dropped or just set the error bits in the descriptor? Find out.
+void nic_handle_rx_packet() {
 	
-	nic_packet_debug("-->Command: %x\n", command);
-	nic_packet_debug("-->Size: %u\n", packet_size);
-	
-	if (packet_size < MINIMUM_PACKET_SIZE) {
-		nic_packet_debug("-->Packet too small. Discarding.\n");
+	uint32_t current_command = rx_des_kva[rx_des_cur].command;
+	uint16_t packet_size;
 		
-		page_free(packet);
+	nic_frame_debug("-->RX Des: %u\n", rx_des_cur);
+	
+	// Make sure we are processing from the start of a packet segment
+	if (!(current_command & DES_FS_MASK)) {
+		nic_frame_debug("-->ERR: Current RX descriptor not marked with FS mask. Panic!");
+		panic("RX Descriptor Ring FS out of sync");
+	}
+	
+	// NOTE: We are currently configured that the max packet size is large enough to fit inside 1 descriptor buffer,
+	// So we should never be in a situation where a packet spans multiple descriptors.
+	// When we change this, this should operate in a loop until the LS mask is found
+	// Loop would begin here.
+	
+	uint32_t rx_des_loop_cur = rx_des_cur;
+	uint32_t frame_size = 0;
+	uint32_t fragment_size = 0;
+	uint32_t num_frags = 0;
+	
+	char *rx_buffer = kalloc(MAX_FRAME_SIZE);
+	
+	if (rx_buffer == NULL) panic ("Can't allocate page for incoming packet.");
+	
+	do {
+		num_frags++;
+		
+		current_command =  rx_des_kva[rx_des_loop_cur].command;
+		fragment_size = rx_des_kva[rx_des_loop_cur].command & DES_RX_SIZE_MASK;
+		
+		// If we've looped through the entire ring and not found a terminating packet, bad nic state.
+		// Panic or clear all descriptors? This is a nic hardware error. 
+		if (num_frags && (rx_des_loop_cur == rx_des_cur)) {
+			//for (int i = 0; i < NUM_RX_DESCRIPTORS; i++) 
+			//	set_rx_descriptor(i, FALSE); // Dont reallocate memory for the descriptor
+			// rx_des_cur = 0;
+			// return;
+			nic_frame_debug("-->ERR: No ending segment found in RX buffer.\n");
+			panic("RX Descriptor Ring out of sync.");
+		}
+		
+		// Make sure we own the current packet. Kernel ownership is denoted by a 0. Nic by a 1.
+		if (current_command & DES_OWN_MASK) {
+			nic_frame_debug("-->ERR: Current RX descriptor not owned by kernel. Panic!");
+			panic("RX Descriptor Ring OWN out of sync");
+		}
+		
+		// Make sure if we are at the end of the buffer, the des is marked as end
+		if ((rx_des_loop_cur == (NUM_RX_DESCRIPTORS - 1)) && !(current_command & DES_EOR_MASK)) {
+			nic_frame_debug("-->ERR: Last RX descriptor not marked with EOR mask. Panic!\n");
+			panic("RX Descriptor Ring EOR Missing");
+		}
+		
+		// We set a max frame size and the nic violated that. 
+		// Panic or clear all desriptors?
+		if ((frame_size + fragment_size) > MAX_FRAME_SIZE) {
+			//for (int i = 0; i < NUM_RX_DESCRIPTORS; i++) 
+			//	set_rx_descriptor(i, FALSE); // Dont reallocate memory for the descriptor
+			// rx_des_cur = 0;
+			// return;
+			nic_frame_debug("-->ERR: Nic sent %u byte packet. Max is %u\n", frame_size, MAX_FRAME_SIZE);
+			panic("NIC Sent packets larger than configured.");
+		}
+		
+		// Move the fragment data into the buffer
+		memcpy(rx_buffer + frame_size, KADDR(rx_des_kva[rx_des_loop_cur].low_buf), fragment_size);
+		
+		// Reset the descriptor. No reuse buffer.
+		set_rx_descriptor(rx_des_loop_cur, FALSE);
+		
+		// Note: We mask out fragment sizes at 0x3FFFF. There can be at most 1024 of them.
+		// This can not overflow the uint32_t we allocated for frame size, so
+		// we dont need to worry about mallocing too little then overflowing when we read.
+		frame_size = frame_size + fragment_size;
+		
+		// Advance to the next descriptor
+		rx_des_loop_cur = (rx_des_loop_cur + 1) % NUM_RX_DESCRIPTORS;
+		
+	} while (!(current_command & DES_LS_MASK));
+	
+
+	
+	// Hack for UDP syscall hack. 
+	// This is a quick hack to let us deal with where to put packets coming in. This is not concurrency friendly
+	// In the event that we get 2 incoming frames for our syscall test (shouldnt happen)
+	// We cant process more until another packet comes in. This is ugly, but this code goes away as soon as we integrate a real stack.
+	// This keys off the source port, fix it for dest port. 
+	// Also this may access packet regions that are wrong. If someone addresses empty packet for our interface
+	// and the bits that happened to be in memory before are the right port, this will trigger. this is bad
+	// but since syscalls are a hack for only 1 machine connected, we dont care for now.
+	
+	if ((current_command & DES_PAM_MASK) && (*((uint16_t*)(rx_buffer + 36)) == 0x9bad)) {
+		
+		if (packet_waiting) return;
+
+		packet_buffer = rx_buffer + PACKET_HEADER_SIZE;
+		
+		// So ugly I want to cry
+		packet_buffer_size = *((uint16_t*)(rx_buffer + 38)); 
+		packet_buffer_size = (((uint16_t)packet_buffer_size & 0xff00) >> 8) |  (((uint16_t)packet_buffer_size & 0x00ff) << 8);		
+		packet_buffer_size = packet_buffer_size - 8;
+
+		packet_buffer_orig = rx_buffer;
+		packet_buffer_pos = 0;
+		
+		packet_waiting = 1;
+		
+		process_frame(rx_buffer, frame_size, current_command);
+		
+		return;
+	}
+	
+	// END HACKY STUFF
+	
+	// Chew on the frame data. Command bits should be the same for all frags.
+	process_frame(rx_buffer, frame_size, current_command);
+	
+	kfree(rx_buffer);
+	
+	return;
+}
+
+// This is really more of a debug level function. Will probably go away once we get a stack going.
+void process_frame(char *frame_buffer, uint32_t frame_size, uint32_t command) {
+		
+	nic_frame_debug("-->Command: %x\n", command);
+	nic_frame_debug("-->Size: %u\n", frame_size);
+	
+	if (frame_buffer == NULL)
+		return;
+	
+	// This is hacky. Once we know what our stack will look like, change this.
+	// Once remove check for 0 size.
+	if (frame_size < MINIMUM_PACKET_SIZE) {
+		nic_frame_debug("-->Packet too small. Discarding.\n");
 		return;
 	}
 	
@@ -421,161 +574,86 @@ void process_packet(page_t *packet, uint16_t packet_size, uint32_t command) {
 	char eth_type[2];
 	
 	for (int i = 0; i < 6; i++) {
-		dest_mac[i] = ((char*)packet_kva)[i];
+		dest_mac[i] = frame_buffer[i];
 	}
 	
 	for (int i = 0; i < 6; i++) {
-		source_mac[i] = ((char*)packet_kva)[i+6];
+		source_mac[i] = frame_buffer[i+6];
 	}
 	
-	eth_type[0] = ((char*)packet_kva)[12];
-	eth_type[1] = ((char*)packet_kva)[13];
+	eth_type[0] = frame_buffer[12];
+	eth_type[1] = frame_buffer[13];
 	
 	if (command & DES_MAR_MASK) {
-		nic_packet_debug("-->Multicast Packet.\n");
+		nic_frame_debug("-->Multicast Packet.\n");
 	}
 	
 	if (command & DES_PAM_MASK) {
-		nic_packet_debug("-->Physical Address Matched.\n");
+		nic_frame_debug("-->Physical Address Matched.\n");
 	}
 	
 	if (command & DES_BAR_MASK) {
-		nic_packet_debug("-->Broadcast Packet.\n");
+		nic_frame_debug("-->Broadcast Packet.\n");
 	}
 	
 	// Note: DEST comes before SRC in the ethernet frame, but that 
 	
-	nic_packet_debug("-->DEST   MAC: %02x:%02x:%02x:%02x:%02x:%02x\n", 0xFF & dest_mac[0], 0xFF & dest_mac[1],	
+	nic_frame_debug("-->DEST   MAC: %02x:%02x:%02x:%02x:%02x:%02x\n", 0xFF & dest_mac[0], 0xFF & dest_mac[1],	
 	                                                                   0xFF & dest_mac[2], 0xFF & dest_mac[3],	
                                                                        0xFF & dest_mac[4], 0xFF & dest_mac[5]);
 	
-	nic_packet_debug("-->SOURCE MAC: %02x:%02x:%02x:%02x:%02x:%02x\n", 0xFF & source_mac[0], 0xFF & source_mac[1],	
+	nic_frame_debug("-->SOURCE MAC: %02x:%02x:%02x:%02x:%02x:%02x\n", 0xFF & source_mac[0], 0xFF & source_mac[1],	
 	                                                                   0xFF & source_mac[2], 0xFF & source_mac[3],	
                                                                        0xFF & source_mac[4], 0xFF & source_mac[5]);
 
-	nic_packet_debug("-->ETHR MODE: %02x%02x\n", 0xFF & eth_type[0], 0xFF & eth_type[1]);
+	nic_frame_debug("-->ETHR MODE: %02x%02x\n", 0xFF & eth_type[0], 0xFF & eth_type[1]);
 		
 	return;
 }
 
-
-// DEAL WITH ENDIANESS ISSUES?
-void nic_handle_rx_packet() {
+// Main routine to send a frame. Just sends it and goes.
+// Card supports sending across multiple fragments.
+// Would we want to write a function that takes a larger packet and generates fragments?
+// This seems like the stacks responsibility. Leave this for now. may in future
+// Remove the max size cap and generate multiple packets.
+int send_frame(const char *data, size_t len) {
 	
-	uint32_t current_command = rx_des_kva[rx_des_cur].command;
-	uint16_t packet_size;
-	page_t *rx_buf_page_dirty; 		// Packets page with data
-	
-	nic_packet_debug("-->RX Des: %u\n", rx_des_cur);
-	
-	// Make sure we are processing from the start of a packet segment
-	if (!(current_command & DES_FS_MASK)) {
-		nic_packet_debug("-->ERR: Current RX descriptor not marked with FS mask. Panic!");
-		panic("RX Descriptor Ring FS out of sync");
-	}
-	
-	// NOTE: We are currently configured that the max packet size is large enough to fit inside 1 descriptor buffer,
-	// So we should never be in a situation where a packet spans multiple descriptors.
-	// When we change this, this should operate in a loop until the LS mask is found
-	// Loop would begin here.
-			
-	// Make sure we own the current packet. Kernel ownership is denoted by a 0. Nic by a 1.
-	if (current_command & DES_OWN_MASK) {
-		nic_packet_debug("-->ERR: Current RX descriptor not owned by kernel. Panic!");
-		panic("RX Descriptor Ring OWN out of sync");
-	}
-		
-	// Make sure if we are at the end of the buffer, the des is marked as end
-	if ((rx_des_cur == (num_of_rx_descriptors - 1)) && !(current_command & DES_EOR_MASK)) {
-		nic_packet_debug("-->ERR: Last RX descriptor not marked with EOR mask. Panic!\n");
-		panic("RX Descriptor Ring EOR Missing");
-	}
-	
-	// This is ensuring packets only span 1 descriptor, since our packet size cant exceed the buffer of 1 descriptor
-	if (!(current_command & DES_LS_MASK)) {
-		nic_packet_debug("-->ERR: Current RX descriptor not marked with LS mask. Panic!");
-		panic("RX Descriptor Ring LS out of sync");
-	}
-	
-	// Get the packet data
-	rx_buf_page_dirty = pa2page(rx_des_kva[rx_des_cur].low_buf);
-	packet_size = rx_des_kva[rx_des_cur].command & DES_RX_SIZE_MASK;
-	
-	// Hack for UDP syscall hack. 
-	// This is a quick hack to let us deal with where to put packets coming in. This is not concurrency friendly
-	// In the event that we get 2 incoming packets for our syscall test (shouldnt happen)
-	// We cant process more until another packet comes in. This is ugly, but this code goes away as soon as we integrate a real stack.
-	// This keys off the source port, fix it for dest port. 
-	if ((current_command & DES_PAM_MASK) && (*((uint16_t*)(page2kva(rx_buf_page_dirty) + 36)) == 0x9bad)) {
-		
-		if (packet_waiting) return;
-
-		packet_buffer = (char*)page2kva(rx_buf_page_dirty) + PACKET_HEADER_SIZE;
-		
-		// so ugly i want to cry
-		packet_buffer_size = *((uint16_t*)(page2kva(rx_buf_page_dirty) + 38)); 
-		packet_buffer_size = (((uint16_t)packet_buffer_size & 0xff00) >> 8) |  (((uint16_t)packet_buffer_size & 0x00ff) << 8);		
-		packet_buffer_size = packet_buffer_size - 8;
-
-		packet_buffer_page = rx_buf_page_dirty;
-		packet_buffer_pos = 0;
-		
-		packet_waiting = 1;
-	}
-	
-	
-	// Reset the command register, allocate a new page, and set it
-	set_rx_descriptor(rx_des_cur);
-	
-	// Advance to the next descriptor
-	rx_des_cur = (rx_des_cur + 1) % num_of_rx_descriptors;
-	
-	// Chew on the packet data. This function is responsible for deallocating the memory space.
-	process_packet(rx_buf_page_dirty, packet_size, current_command);
-	
-	return;
-}
-
-// Idealy, once we get the packet sizing right, we'd generate multiple descriptors to fit the current packet.
-// However, we can't do that now since the max packet size is 1 page, and thats the max buffer size, too.
-int send_packet(const char *data, size_t len) {
+	if (data == NULL)
+		return -1;
+	if (len == 0)
+		return 0;
 
 	if (tx_des_kva[tx_des_cur].command & DES_OWN_MASK) {
-		nic_packet_debug("-->TX Ring Buffer Full!\n");
+		nic_frame_debug("-->TX Ring Buffer Full!\n");
 		return -1;
 	}
 	
-	// THIS IS A HACK. MAX PACKET SIZE NEEDS TO BE FIXED BASED ON THE 128/32 QUESTION DEFINED AT THE TOP
-	// AS WELL AS THE FACT THAT THE MAX PACKET SIZE INCLUDES THINGS LIKE CRC, AND MAY INCLUDE SRC MAC DEST MAC AND PREAMBLE!
-	// IF THE MAX PACKET SIZE INCLUDES THOSE, THIS NEEDS TO BE ADJUSTED BASED ON THAT. 
-	// IN OTHER WORDS, PLEASE PLEASE PLEASE FIX THIS.
-	if (len > MAX_PACKET_SIZE) {
-		nic_packet_debug("-->Packet Too Large!\n");
+	if (len > MAX_FRAME_SIZE) {
+		nic_frame_debug("-->Frame Too Large!\n");
 		return -1;
 	}
 	
-	page_t *tx_buf_page;
-	if (page_alloc(&tx_buf_page) < 0) {
-		nic_packet_debug("Can't allocate page for TX Buffer");
-		return -1;
-	}
-
-	tx_des_kva[tx_des_cur].low_buf = page2pa(tx_buf_page);
-	
-	memcpy(page2kva(tx_buf_page), data, len);
+	memcpy((char*)tx_des_kva[tx_des_cur].low_buf, data, len);
 
 	tx_des_kva[tx_des_cur].command = tx_des_kva[tx_des_cur].command | len | DES_OWN_MASK | DES_FS_MASK | DES_LS_MASK;
+
+	// For this revision of the NIC, the checksum bits get set in the vlan field not the command field.
+	// THIS IS A HACK: Need to reach inside the frame we are sending and detect if its of type ip/udp/tcp and set right flag
+	// For now, for the syscall hack, force ip checksum on. (we dont care about udp checksum).
+	// Add an argument to function to specify packet type?
+	tx_des_kva[tx_des_cur].vlan = DES_TX_IP_CHK_MASK;
 	
-	tx_des_cur = (tx_des_cur + 1) % num_of_tx_descriptors;
+	tx_des_cur = (tx_des_cur + 1) % NUM_TX_DESCRIPTORS;
 	
-	nic_packet_debug("-->Sent packet.\n");
+	//nic_frame_debug("-->Sent packet.\n");
 	
 	outb(io_base_addr + RL_TX_CTRL_REG, RL_TX_SEND_MASK);
 	
 	return len;
 }
 
-// This function is a complete temp hack
+// This function is a complete hack for syscalls until we get a stack.
+// the day I delete this monstrosity of code I will be a happy man --Paul
 const char *packet_wrap(const char* data, size_t len) {
 	
 	#define htons(A) ((((uint16_t)(A) & 0xff00) >> 8) | \
@@ -588,7 +666,8 @@ const char *packet_wrap(const char* data, size_t len) {
 	#define ntohs  htons
 	#define ntohl  htohl
 
-	
+	if ((len == 0) || (data == NULL))
+		return NULL;
 	
 	struct ETH_Header
 	{
@@ -623,30 +702,27 @@ const char *packet_wrap(const char* data, size_t len) {
  
 	
 	if (len > MAX_PACKET_DATA) {
-		nic_packet_debug("Bad packet size for packet wrapping");
+		nic_frame_debug("Bad packet size for packet wrapping");
 		return NULL;
 	}
 	
-	page_t *wrap_page;
-	char* wrap_kva;
+	char* wrap_buffer = kalloc(MAX_PACKET_SIZE);
 	
-	if (page_alloc(&wrap_page) < 0) {
-		nic_packet_debug("Can't allocate page for packet wrapping");
+	if (wrap_buffer == NULL) {
+		nic_frame_debug("Can't allocate page for packet wrapping");
 		return NULL;
 	}
 	
-	wrap_kva = page2kva(wrap_page);
-	
-	struct ETH_Header *eth_header = (struct ETH_Header*) wrap_kva;
-	struct IP_Header *ip_header = (struct IP_Header*) (wrap_kva + sizeof(struct ETH_Header));
-	struct UDP_Header *udp_header = (struct UDP_Header*) (wrap_kva + sizeof(struct ETH_Header) + sizeof(struct IP_Header));
+	struct ETH_Header *eth_header = (struct ETH_Header*) wrap_buffer;
+	struct IP_Header *ip_header = (struct IP_Header*) (wrap_buffer + sizeof(struct ETH_Header));
+	struct UDP_Header *udp_header = (struct UDP_Header*) (wrap_buffer + sizeof(struct ETH_Header) + sizeof(struct IP_Header));
 	
 	// Setup eth data
 	for (int i = 0; i < 6; i++) 
 		eth_header->dest_mac[i] = dest_mac_address[i];
 		
 	for (int i = 0; i < 6; i++) 
-		eth_header->source_mac[i] = mac_address[i];
+		eth_header->source_mac[i] = device_mac[i];
 		
 	eth_header->eth_type = htons(0x0800);
 	
@@ -663,22 +739,7 @@ const char *packet_wrap(const char* data, size_t len) {
 	udp_header->length = htons(8 + len);
 	udp_header->checksum = 0;
 	
-	memcpy (wrap_kva + PACKET_HEADER_SIZE, data, len);
+	memcpy (wrap_buffer + PACKET_HEADER_SIZE, data, len);
 	
-	return wrap_kva;	
-}
-
-void zero_page(page_t *page) {
-	char *page_kva = page2kva(page);
-	
-	for (int i = 0; i < PGSIZE; i++ ) 
-		page_kva[i] = 0;
-}
-
-void dump_page(page_t *page) {
-	char *page_kva = page2kva(page);
-	
-	for (int i = 0; i < PGSIZE; i++ ) 
-		cprintf("%02x", page_kva[i]);	
-	cprintf("\n");
+	return wrap_buffer;	
 }

@@ -72,6 +72,7 @@ static ssize_t sys_serial_read(env_t* e, char *DANGEROUS buf, size_t len)
 	#endif
 }
 
+// This is probably not a syscall we want. Its hacky. Here just for syscall stuff until get a stack.
 static ssize_t sys_eth_write(env_t* e, const char *DANGEROUS buf, size_t len) 
 { 
 	extern int eth_up;
@@ -84,11 +85,15 @@ static ssize_t sys_eth_write(env_t* e, const char *DANGEROUS buf, size_t len)
 		int cur_packet_len = 0;
 		while (total_sent != len) {
 			cur_packet_len = ((len - total_sent) > MAX_PACKET_DATA) ? MAX_PACKET_DATA : (len - total_sent);
-			
-			just_sent = send_packet(packet_wrap(buf + total_sent, cur_packet_len), cur_packet_len + PACKET_HEADER_SIZE);
+			char* wrap_buffer = packet_wrap(buf + total_sent, cur_packet_len);
+			just_sent = send_frame(wrap_buffer, cur_packet_len + PACKET_HEADER_SIZE);
 			
 			if (just_sent < 0)
-				return -1; // This should be an error code of its own
+				return 0; // This should be an error code of its own
+				
+			if (wrap_buffer)
+				kfree(wrap_buffer);
+				
 			total_sent += cur_packet_len;
 		}
 		
@@ -98,7 +103,23 @@ static ssize_t sys_eth_write(env_t* e, const char *DANGEROUS buf, size_t len)
 	else
 		return -E_INVAL;
 }
+/*
+static ssize_t sys_eth_write(env_t* e, const char *DANGEROUS buf, size_t len) 
+{ 
+	extern int eth_up;
+	
+	if (eth_up) {
+		
+		char *COUNT(len) _buf = user_mem_assert(e, buf, len, PTE_U);
+		
+		return(send_frame(buf, len));
+	}
+	return -E_INVAL;
+}
+*/
 
+
+// This is probably not a syscall we want. Its hacky. Here just for syscall stuff until get a stack.
 static ssize_t sys_eth_read(env_t* e, char *DANGEROUS buf, size_t len) 
 {
 	extern int eth_up;
@@ -107,7 +128,7 @@ static ssize_t sys_eth_read(env_t* e, char *DANGEROUS buf, size_t len)
 		extern int packet_waiting;
 		extern int packet_buffer_size;
 		extern char* packet_buffer;
-		extern page_t* packet_buffer_page;
+		extern char* packet_buffer_orig;
 		extern int packet_buffer_pos;
 			
 		if (packet_waiting == 0)
@@ -120,7 +141,7 @@ static ssize_t sys_eth_read(env_t* e, char *DANGEROUS buf, size_t len)
 		packet_buffer_pos = packet_buffer_pos + read_len;
 	
 		if (packet_buffer_pos == packet_buffer_size) {
-			page_free(packet_buffer_page);
+			kfree(packet_buffer_orig);
 			packet_waiting = 0;
 		}
 	
