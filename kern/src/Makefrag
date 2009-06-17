@@ -35,7 +35,8 @@ KERN_SRCFILES := $(KERN_SRC_DIR)/entry.S \
                  $(KERN_SRC_DIR)/printfmt.c \
                  $(KERN_SRC_DIR)/readline.c \
                  $(KERN_SRC_DIR)/string.c \
-                 $(KERN_SRC_DIR)/timer.c
+                 $(KERN_SRC_DIR)/timer.c \
+                 $(KERN_SRC_DIR)/kmalloc.c
 # Only build files if they exist.
 KERN_SRCFILES := $(wildcard $(KERN_SRCFILES))
 
@@ -85,7 +86,7 @@ $(OBJDIR)/$(KERN_DIR)/kernel: $(KERN_LDDEPENDS)
 
 $(OBJDIR)/$(KERN_DIR)/bochs.img: $(OBJDIR)/$(KERN_DIR)/kernel $(OBJDIR)/$(KERN_DIR)/boot
 	@echo + mk [KERN] $@
-	$(V)dd if=/dev/zero of=$(OBJDIR)/$(KERN_DIR)/bochs.img~ count=10000 2>/dev/null
+	$(V)dd if=/dev/zero of=$(OBJDIR)/$(KERN_DIR)/bochs.img~ count=10080 2>/dev/null
 	$(V)dd if=$(OBJDIR)/$(KERN_DIR)/boot of=$(OBJDIR)/$(KERN_DIR)/bochs.img~ conv=notrunc 2>/dev/null
 	$(V)dd if=$(OBJDIR)/$(KERN_DIR)/kernel of=$(OBJDIR)/$(KERN_DIR)/bochs.img~ seek=1 conv=notrunc 2>/dev/null
 	$(V)mv $(OBJDIR)/kern/bochs.img~ $(OBJDIR)/kern/bochs.img

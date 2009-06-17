@@ -31,7 +31,7 @@
 #define KADDR(pa)						\
 ({								\
 	physaddr_t __m_pa = (pa);				\
-	uint32_t __m_ppn = PPN(__m_pa);				\
+	size_t __m_ppn = PPN(__m_pa);				\
 	if (__m_ppn >= npage)					\
 		warn("KADDR called with invalid pa %08lx", __m_pa);\
 	(void*TRUSTED) (__m_pa + KERNBASE);				\
@@ -55,6 +55,7 @@ typedef LIST_ENTRY(Page) page_list_entry_t;
 
 struct Page {
 	page_list_entry_t pp_link;	/* free list link */
+	size_t num_cons_links;
 
 	// pp_ref is the count of pointers (usually in page table entries)
 	// to this page, for pages allocated using page_alloc.
@@ -83,11 +84,13 @@ void	i386_vm_init(void);
 
 void	page_init(void);
 void	page_check(void);
-int	page_alloc(page_t **pp_store);
+int	    page_alloc(page_t **pp_store);
+int     page_alloc_specific(page_t **pp_store, size_t ppn);
 void	page_free(page_t *pp);
-int	page_insert(pde_t *COUNT(NPDENTRIES) pgdir, page_t *pp, void *SNT va, int perm);
+int		page_is_free(size_t ppn);
+int	    page_insert(pde_t *COUNT(NPDENTRIES) pgdir, page_t *pp, void *SNT va, int perm);
 void	page_remove(pde_t *COUNT(NPDENTRIES) pgdir, void *SNT va);
-page_t *page_lookup(pde_t *COUNT(NPDENTRIES) pgdir, void *va, pte_t **pte_store);
+page_t* page_lookup(pde_t *COUNT(NPDENTRIES) pgdir, void *va, pte_t **pte_store);
 error_t	pagetable_remove(pde_t *COUNT(NPDENTRIES) pgdir, void *va);
 void	page_decref(page_t *pp);
 
@@ -111,6 +114,13 @@ static inline void cacheline_flush(void* addr)
 	clflush((uintptr_t*)addr);
 }
 
+static inline page_t* ppn2page(size_t ppn)
+{
+	if( ppn >= npage )
+		warn("ppn2page called with ppn (%08u) larger than npage", ppn);
+	return &(pages[ppn]);
+}
+
 static inline ppn_t page2ppn(page_t *pp)
 {
 	return pp - pages;
@@ -131,6 +141,16 @@ static inline page_t* pa2page(physaddr_t pa)
 static inline void*COUNT(PGSIZE) page2kva(page_t *pp)
 {
 	return KADDR(page2pa(pp));
+}
+
+static inline void*COUNT(PGSIZE) ppn2kva(size_t pp)
+{
+	return page2kva(ppn2page(pp));
+}
+
+static inline page_t* kva2page(void* addr) 
+{
+	return pa2page(PADDR(addr));
 }
 
 pte_t *pgdir_walk(pde_t *COUNT(NPDENTRIES) pgdir, const void *SNT va, int create);

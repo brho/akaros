@@ -394,8 +394,9 @@ load_icode(env_t *e, uint8_t *COUNT(size) binary, size_t size)
 	lcr3(e->env_cr3);
 
 	// TODO: how do we do a runtime COUNT?
-	proghdr_t *phdr = (proghdr_t *)(binary + elfhdr->e_phoff);
-	for (i = 0; i < elfhdr->e_phnum; i++, phdr++) { TRUSTEDBLOCK
+	{TRUSTEDBLOCK
+	proghdr_t* phdr = (proghdr_t*)(binary + elfhdr->e_phoff);
+	for (i = 0; i < elfhdr->e_phnum; i++, phdr++) {
         // zra: TRUSTEDBLOCK until validation is done.
 		if (phdr->p_type != ELF_PROG_LOAD)
 			continue;
@@ -405,7 +406,7 @@ load_icode(env_t *e, uint8_t *COUNT(size) binary, size_t size)
 		segment_alloc(e, (void*SNT)phdr->p_va, phdr->p_memsz);
 		memcpy((void*)phdr->p_va, binary + phdr->p_offset, phdr->p_filesz);
 		memset((void*)phdr->p_va + phdr->p_filesz, 0, phdr->p_memsz - phdr->p_filesz);
-	}
+	}}
 
 	e->env_tf.tf_eip = elfhdr->e_entry;
 

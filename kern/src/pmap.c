@@ -745,22 +745,19 @@ page_initpp(page_t *pp)
 	memset(pp, 0, sizeof(*pp));
 }
 
-//
-// Allocates a physical page.
-// Does NOT set the contents of the physical page to zero -
-// the caller must do that if necessary.
-//
-// *pp_store -- is set to point to the Page struct of the newly allocated
-// page
-//
-// RETURNS 
-//   0 -- on success
-//   -E_NO_MEM -- otherwise 
-//
-// Hint: use LIST_FIRST, LIST_REMOVE, and page_initpp
-// Hint: pp_ref should not be incremented 
-int
-page_alloc(page_t **pp_store)
+/*
+ * Allocates a physical page.
+ * Does NOT set the contents of the physical page to zero -
+ * the caller must do that if necessary.
+ *
+ * *pp_store   -- is set to point to the Page struct 
+ *                of the newly allocated page
+ *
+ * RETURNS 
+ *   0         -- on success
+ *   -E_NO_MEM -- otherwise 
+ */
+int page_alloc(page_t **pp_store)
 {
 	if (LIST_EMPTY(&page_free_list))
 		return -E_NO_MEM;
@@ -770,12 +767,41 @@ page_alloc(page_t **pp_store)
 	return 0;
 }
 
+/*
+ * Allocates a specific physical page.
+ * Does NOT set the contents of the physical page to zero -
+ * the caller must do that if necessary.
+ *
+ * *pp_store   -- is set to point to the Page struct 
+ *                of the newly allocated page
+ *
+ * RETURNS 
+ *   0         -- on success
+ *   -E_NO_MEM -- otherwise 
+ */
+int page_alloc_specific(page_t **pp_store, size_t ppn)
+{
+	page_t* page = ppn2page(ppn);
+	if( page->pp_ref != 0 )
+		return -E_NO_MEM;
+	*pp_store = page;
+	LIST_REMOVE(*pp_store, pp_link);
+	page_initpp(*pp_store);
+	return 0;
+}
+
+int page_is_free(size_t ppn) {
+	page_t* page = ppn2page(ppn);
+	if( page->pp_ref == 0 )
+		return TRUE;
+	return FALSE;
+}
+
 //
 // Return a page to the free list.
 // (This function should only be called when pp->pp_ref reaches 0.)
 //
-void
-page_free(page_t *pp)
+void page_free(page_t *pp)
 {
 	// this check allows us to call this on null ptrs, which helps when
 	// allocating and checking for errors on several pages at once
