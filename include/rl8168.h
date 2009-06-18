@@ -5,9 +5,9 @@
 #include <trap.h>
 #include <pmap.h>
 
-#define nic_debug(...)  cprintf(__VA_ARGS__)  
-#define nic_interrupt_debug(...)  cprintf(__VA_ARGS__)  
-#define nic_frame_debug(...)  cprintf(__VA_ARGS__)  
+#define nic_debug(...)  //cprintf(__VA_ARGS__)  
+#define nic_interrupt_debug(...) // cprintf(__VA_ARGS__)  
+#define nic_frame_debug(...)  //cprintf(__VA_ARGS__)  
 
 // Macro for formatting PCI Configuration Address queries
 #define MK_CONFIG_ADDR(BUS, DEV, FUNC, REG) (unsigned long)( (BUS << 16) | (DEV << 11) | \
@@ -112,8 +112,8 @@
 #define MAX_FRAME_SIZE		ETHERNET_ENCAP_SIZE + MTU	
 	
 // Realtek Descriptor Related Sizing
-#define NUM_TX_DESCRIPTORS	1024 * 16
-#define NUM_RX_DESCRIPTORS	1024 * 16
+#define NUM_TX_DESCRIPTORS	1024
+#define NUM_RX_DESCRIPTORS	1024
 
 // !!!!!!!!! need to verify the 128byte nature of this field. Spec says it could be 32 for some chips.
 

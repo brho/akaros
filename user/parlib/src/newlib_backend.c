@@ -14,7 +14,7 @@
 #include <stdio.h>
 #include <debug.h>
 
-#define debug_in_out(...) // debug(__VA_ARGS__)  
+#define debug_in_out(...)  //debug(__VA_ARGS__)  
 #define debug_write_check(fmt, ...) // debug(fmt, __VA_ARGS__)
 
 /* environ

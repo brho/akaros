@@ -554,8 +554,8 @@ env_destroy(env_t *e)
 	 * and not from where we left off the last time we called manager.  That
 	 * would require us to save some context (and a stack to work on) here.
 	 */
-	manager();
-	assert(0); // never get here
+	//manager();
+	//assert(0); // never get here
 
 	// ugly, but for now just linearly search through all possible
 	// environments for a runnable one.

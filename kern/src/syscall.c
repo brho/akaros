@@ -17,6 +17,7 @@
 #include <pmap.h>
 #include <trap.h>
 #include <syscall.h>
+#include <kmalloc.h>
 
 void syscall_wrapper(struct Trapframe *tf)
 {

@@ -122,6 +122,8 @@ void smp_boot(void)
 	pagetable_remove(boot_pgdir, (void*)trampoline_pg);
 	// Dealloc the temp shared stack
 	page_decref(smp_stack);
+	smp_stack->pp_ref++;
+	
 
 	// Set up the generic remote function call facility
 	init_smp_call_function();
@@ -159,6 +161,7 @@ uint32_t smp_main(void)
 	if (page_alloc(&my_stack))
 		panic("Unable to alloc a per-core stack!");
 	my_stack->pp_ref++;
+
 	memset(page2kva(my_stack), 0, PGSIZE);
 
 	// Set up a gdt / gdt_pd for this core, stored at the top of the stack

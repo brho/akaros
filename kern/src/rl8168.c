@@ -14,6 +14,7 @@
 #include <string.h>
 #include <rl8168.h>
 #include <trap.h>
+#include <kmalloc.h>
 
 #include <pmap.h>
 
@@ -32,11 +33,6 @@
  *
  * This is an ongoing work in progress. Main thing is we need a kernel interface for PCI
  * devices and network devices, that we can hook into, instead of providing arbitary functions
- *
- * One of the big things we need to change is the page allocation. Right now we use a page as the max
- * size of a packet. This needs to change. We do it this way right now because that is really our only 
- * allocation mechnism. I don't want to write some sort of kalloc just for the net driver, so until
- * that exists, I'll use a page per packet buffer.
  * 
  * TODO: Remove hacky syscall hack stuff (once we get a real stack).
  * TODO: Jumbo frame support
@@ -221,22 +217,19 @@ void setup_descriptors() {
 void setup_descriptors() {
 	
 	nic_debug("-->Setting up tx/rx descriptors.\n");
-	
-	page_t *rx_des_page = NULL, *tx_des_page = NULL;
 			
 	// Allocate room for the buffers. Include an extra ALIGN space.
 	// Buffers need to be on 256 byte boundries.
-	rx_des_kva = kalloc(NUM_RX_DESCRIPTORS * sizeof(struct Descriptor) + RL_DES_ALIGN, NULL);
-	tx_des_kva = kalloc(NUM_TX_DESCRIPTORS * sizeof(struct Descriptor) + RL_DES_ALIGN, NULL);
+	// Note: Buffers are alligned by kmalloc automatically to powers of 2 less than the size requested
+	// We request more than 256, thus they are aligned on 256 byte boundries
+	rx_des_kva = kmalloc(NUM_RX_DESCRIPTORS * sizeof(struct Descriptor), 0);
+	tx_des_kva = kmalloc(NUM_TX_DESCRIPTORS * sizeof(struct Descriptor), 0);
 	
 	if (rx_des_kva == NULL) panic("Can't allocate page for RX Ring");
 	if (tx_des_kva == NULL) panic("Can't allocate page for TX Ring");
 	
-	rx_des_kva = ROUNDUP(rx_des_kva, RL_DES_ALIGN);
-	tx_des_kva = ROUNDUP(tx_des_kva, RL_DES_ALIGN);
-	
-	rx_des_pa = (struct Descriptor *)PADDR(rx_des_page);
-	tx_des_pa = (struct Descriptor *)PADDR(tx_des_page);
+	rx_des_pa = (struct Descriptor *)PADDR(rx_des_kva);
+	tx_des_pa = (struct Descriptor *)PADDR(tx_des_kva);
 	
     for (int i = 0; i < NUM_RX_DESCRIPTORS; i++) 
 		set_rx_descriptor(i, TRUE); // Allocate memory for the descriptor
@@ -257,10 +250,10 @@ void set_rx_descriptor(uint32_t des_num, uint8_t reset_buffer) {
 		rx_des_kva[des_num].command = rx_des_kva[des_num].command | DES_EOR_MASK;
 	
 	if (reset_buffer) {
-		char *rx_buffer = kalloc(RL_RX_MAX_BUFFER_SIZE + RL_BUF_ALIGN);
+		// Must be aligned on 8 byte boundries. Taken care of by kmalloc.
+		char *rx_buffer = kmalloc(RL_RX_MAX_BUFFER_SIZE, 0);
 	
 		if (rx_buffer == NULL) panic ("Can't allocate page for RX Buffer");
-		rx_buffer = ROUNDUP(rx_buffer, RL_BUF_ALIGN);
 
 		rx_des_kva[des_num].low_buf = PADDR(rx_buffer);
 		//.high_buf used if we do 64bit.
@@ -278,7 +271,7 @@ void set_tx_descriptor(uint32_t des_num) {
 	if (des_num == (NUM_TX_DESCRIPTORS - 1))
 		tx_des_kva[des_num].command = DES_EOR_MASK;	
 		
-	char *tx_buffer = kalloc(RL_TX_MAX_BUFFER_SIZE);
+	char *tx_buffer = kmalloc(RL_TX_MAX_BUFFER_SIZE, 0);
 
 	if (tx_buffer == NULL) panic ("Can't allocate page for TX Buffer");
 
@@ -451,13 +444,11 @@ void nic_handle_rx_packet() {
 	uint32_t fragment_size = 0;
 	uint32_t num_frags = 0;
 	
-	char *rx_buffer = kalloc(MAX_FRAME_SIZE);
+	char *rx_buffer = kmalloc(MAX_FRAME_SIZE, 0);
 	
 	if (rx_buffer == NULL) panic ("Can't allocate page for incoming packet.");
 	
 	do {
-		num_frags++;
-		
 		current_command =  rx_des_kva[rx_des_loop_cur].command;
 		fragment_size = rx_des_kva[rx_des_loop_cur].command & DES_RX_SIZE_MASK;
 		
@@ -471,6 +462,9 @@ void nic_handle_rx_packet() {
 			nic_frame_debug("-->ERR: No ending segment found in RX buffer.\n");
 			panic("RX Descriptor Ring out of sync.");
 		}
+		
+		num_frags++;
+		
 		
 		// Make sure we own the current packet. Kernel ownership is denoted by a 0. Nic by a 1.
 		if (current_command & DES_OWN_MASK) {
@@ -511,8 +505,6 @@ void nic_handle_rx_packet() {
 		
 	} while (!(current_command & DES_LS_MASK));
 	
-
-	
 	// Hack for UDP syscall hack. 
 	// This is a quick hack to let us deal with where to put packets coming in. This is not concurrency friendly
 	// In the event that we get 2 incoming frames for our syscall test (shouldnt happen)
@@ -540,6 +532,8 @@ void nic_handle_rx_packet() {
 		
 		process_frame(rx_buffer, frame_size, current_command);
 		
+		rx_des_cur = rx_des_loop_cur;
+		
 		return;
 	}
 	
@@ -547,6 +541,8 @@ void nic_handle_rx_packet() {
 	
 	// Chew on the frame data. Command bits should be the same for all frags.
 	process_frame(rx_buffer, frame_size, current_command);
+
+	rx_des_cur = rx_des_loop_cur;
 	
 	kfree(rx_buffer);
 	
@@ -617,7 +613,7 @@ void process_frame(char *frame_buffer, uint32_t frame_size, uint32_t command) {
 // This seems like the stacks responsibility. Leave this for now. may in future
 // Remove the max size cap and generate multiple packets.
 int send_frame(const char *data, size_t len) {
-	
+
 	if (data == NULL)
 		return -1;
 	if (len == 0)
@@ -633,7 +629,7 @@ int send_frame(const char *data, size_t len) {
 		return -1;
 	}
 	
-	memcpy((char*)tx_des_kva[tx_des_cur].low_buf, data, len);
+	memcpy(KADDR(tx_des_kva[tx_des_cur].low_buf), data, len);
 
 	tx_des_kva[tx_des_cur].command = tx_des_kva[tx_des_cur].command | len | DES_OWN_MASK | DES_FS_MASK | DES_LS_MASK;
 
@@ -706,7 +702,7 @@ const char *packet_wrap(const char* data, size_t len) {
 		return NULL;
 	}
 	
-	char* wrap_buffer = kalloc(MAX_PACKET_SIZE);
+	char* wrap_buffer = kmalloc(MAX_PACKET_SIZE, 0);
 	
 	if (wrap_buffer == NULL) {
 		nic_frame_debug("Can't allocate page for packet wrapping");
