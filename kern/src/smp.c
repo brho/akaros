@@ -77,6 +77,7 @@ void smp_boot(void)
 	// Allocate a stack for the cores starting up.  One for all, must share
 	if (page_alloc(&smp_stack))
 		panic("No memory for SMP boot stack!");
+	smp_stack->pp_ref++;
 	smp_stack_top = (uintptr_t)(page2kva(smp_stack) + PGSIZE);
 
 	// Start the IPI process (INIT, wait, SIPI, wait, SIPI, wait)
@@ -157,6 +158,7 @@ uint32_t smp_main(void)
 	page_t *my_stack;
 	if (page_alloc(&my_stack))
 		panic("Unable to alloc a per-core stack!");
+	my_stack->pp_ref++;
 	memset(page2kva(my_stack), 0, PGSIZE);
 
 	// Set up a gdt / gdt_pd for this core, stored at the top of the stack
