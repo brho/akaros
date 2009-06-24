@@ -1,9 +1,9 @@
 USER_APPS_ROSLIB_DIR = $(USER_APPS_DIR)/roslib
 OBJDIRS += $(USER_APPS_ROSLIB_DIR)
 
-USER_APPS_ROSLIB_CFLAGS    := $(USER_CFLAGS) -nostdinc \
+USER_APPS_ROSLIB_CFLAGS    := $(USER_CFLAGS) \
                               -I$(USER_ROSLIB_INCLUDE_DIR)
-USER_APPS_ROSLIB_LDFLAGS   := $(USER_LDFLAGS) -nostdlib -static \
+USER_APPS_ROSLIB_LDFLAGS   := $(USER_LDFLAGS) -static \
                               -T $(USER_APPS_ROSLIB_DIR)/apps.ld
 USER_APPS_ROSLIB_LDDIRS    := -L$(OBJDIR)/$(USER_ROSLIB_DIR)
 USER_APPS_ROSLIB_LDLIBS    := --start-group -livyroslib -lroslib --end-group

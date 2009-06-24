@@ -1,7 +1,7 @@
 USER_ROSLIB_IVY_DIR := $(USER_ROSLIB_DIR)/ivy
 OBJDIRS += $(USER_ROSLIB_IVY_DIR)
 
-USER_ROSLIB_IVY_CFLAGS   := $(USER_CFLAGS) --nodeputy -nostdinc \
+USER_ROSLIB_IVY_CFLAGS   := $(USER_CFLAGS) --nodeputy \
                             -I$(USER_ROSLIB_INCLUDE_DIR)
 
 USER_ROSLIB_IVY_SRCFILES := $(USER_ROSLIB_IVY_DIR)/deputy.c

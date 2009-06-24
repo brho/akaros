@@ -55,6 +55,7 @@ ARCH ?= NONE
 CFLAGS := $(CFLAGS) -D$(ARCH) 
 CFLAGS += -O -pipe -MD -fno-builtin -fno-stack-protector -gstabs
 CFLAGS += -Wall -Wno-format -Wno-unused
+CFLAGS += -nostdinc -Igccinclude/i386
 
 # Universal loader flags
 LDFLAGS := -nostdlib

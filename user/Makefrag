@@ -1,7 +1,7 @@
 USER_DIR = user
 
 USER_CFLAGS  := $(CFLAGS) -DROS_USER 
-USER_LDFLAGS :=
+USER_LDFLAGS := $(LDFLAGS)
 
 # This is defined here because it is need by both
 # roslib and parlib for compiling, but not by apps
