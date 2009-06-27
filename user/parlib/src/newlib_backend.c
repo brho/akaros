@@ -483,7 +483,7 @@ void* sbrk(ptrdiff_t incr)
 	debug_in_out("SBRK\n");
 	debug_in_out("\tincr: %u\n", incr);	
 
-	#define HEAP_SIZE 8192
+	#define HEAP_SIZE (1<<18)
 	static uint8_t array[HEAP_SIZE];
 	static uint8_t* heap_end = array;
 	static uint8_t* stack_ptr = &(array[HEAP_SIZE-1]);

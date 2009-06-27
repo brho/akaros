@@ -351,7 +351,6 @@ void setup_interrupts() {
 	register_interrupt_handler(interrupt_handlers, KERNEL_IRQ_OFFSET + irq, nic_interrupt_handler, 0);
 	pic_unmask_irq(irq);
 	unmask_lapic_lvt(LAPIC_LVT_LINT0);
-	enable_irq();
 	
 	return;
 }
@@ -361,7 +360,7 @@ void setup_interrupts() {
 void nic_interrupt_handler(trapframe_t *tf, void* data) {
 	
 	nic_interrupt_debug("\nNic interrupt on core %u!\n", lapic_get_id());
-		
+				
 	// Read the offending interrupt(s)
 	uint16_t interrupt_status = inw(io_base_addr + RL_IS_REG);
 
@@ -691,7 +690,9 @@ const char *packet_wrap(const char* data, size_t len) {
 	};	
 	
 	// Hard coded to paul's laptop's mac
-	char dest_mac_address[6] = {0x00, 0x23, 0x32, 0xd5, 0xae, 0x82};
+	//Format for Makelocal file: -DUSER_MAC_ADDRESS="{0x00, 0x23, 0x32, 0xd5, 0xae, 0x82}"
+	char dest_mac_address[6] = USER_MAC_ADDRESS;
+	
 	
 	uint32_t source_ip = 0xC0A8000A; // 192.168.0.10
 	uint32_t dest_ip   = 0xC0A8000B; // 192.168.0.11

@@ -21,6 +21,7 @@ enum
 	SYS_serial_read,
 	SYS_eth_read,
 	SYS_eth_write,
+	SYS_run_binary,
 
 	SYS_endofcalls //Should always be last
 };

@@ -77,9 +77,9 @@ OBJDIRS :=
 all:
 
 # Include Makefrags for subdirectories
+-include Makelocal
 include user/Makefrag
 include kern/Makefrag
--include Makelocal
 
 # Eliminate default suffix rules
 .SUFFIXES:

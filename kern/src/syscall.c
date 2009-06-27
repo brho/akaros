@@ -73,6 +73,18 @@ static ssize_t sys_serial_read(env_t* e, char *DANGEROUS buf, size_t len)
 	#endif
 }
 
+static ssize_t sys_run_binary(env_t* e, void* binary_buf, void* arg, size_t len) {
+	uint8_t* new_binary = kmalloc(len, 0);
+	memcpy(new_binary, binary_buf, len);
+
+	env_t* env = env_create((uint8_t*)new_binary, len);
+	kfree(new_binary);
+	
+	e->env_status = ENV_RUNNABLE;
+	env_run(env);
+	return 0;
+}
+
 // This is probably not a syscall we want. Its hacky. Here just for syscall stuff until get a stack.
 static ssize_t sys_eth_write(env_t* e, const char *DANGEROUS buf, size_t len) 
 { 
@@ -319,6 +331,9 @@ intreg_t syscall(env_t* e, uint32_t syscallno, uint32_t a1, uint32_t a2,
 			return sys_serial_write(e, (char *DANGEROUS)a1, (size_t)a2);
 		case SYS_serial_read:
 			return sys_serial_read(e, (char *DANGEROUS)a1, (size_t)a2);
+		case SYS_run_binary:
+			return sys_run_binary(e, (char *DANGEROUS)a1, 
+			                      (char* DANGEROUS)a2, (size_t)a3);
 		case SYS_eth_write:
 			return sys_eth_write(e, (char *DANGEROUS)a1, (size_t)a2);
 		case SYS_eth_read:
