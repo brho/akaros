@@ -578,17 +578,32 @@ env_destroy(env_t *e)
 // This exits the kernel and starts executing some environment's code.
 // This function does not return.
 //
-void
-env_pop_tf(trapframe_t *tf)
+void env_pop_tf(trapframe_t *tf)
 {
-	__asm __volatile("movl %0,%%esp\n"
-		"\tpopal\n"
-		"\tpopl %%es\n"
-		"\tpopl %%ds\n"
-		"\taddl $0x8,%%esp\n" /* skip tf_trapno and tf_errcode */
-		"\tiret"
-		: : "g" (tf) : "memory");
+	__asm __volatile(
+	    "movl %0,%%esp\n"
+	    "\tpopal\n"
+	    "\tpopl %%es\n"
+	    "\tpopl %%ds\n"
+	    "\taddl $0x8,%%esp\n" /* skip tf_trapno and tf_errcode */
+	    "\tiret"
+	    : : "g" (tf) : "memory");
 	panic("iret failed");  /* mostly to placate the compiler */
+}
+
+
+void env_pop_tf_sysexit(trapframe_t *tf)
+{
+	__asm __volatile(
+	    "movl %0,%%esp\n"
+	    "\tpopal\n"
+	    "\tpopl %%es\n"
+	    "\tpopl %%ds\n"
+	    "\tmovl %%ebp, %%ecx\n"
+	    "\tmovl %%esi, %%edx\n"
+	    "\tsysexit"
+	    : : "g" (tf) : "memory");
+	panic("sysexit failed");  /* mostly to placate the compiler */
 }
 
 //
@@ -619,8 +634,26 @@ env_run(env_t *e)
 		curenvs[lapic_get_id()] = e;
 		e->env_runs++;
 		lcr3(e->env_cr3);
+		
+		#ifndef SYSCALL_TRAP
+			// The first time through we need to set up 
+			// ebp and esi because there is no corresponding 
+			// sysenter call and we have not set them up yet
+			// for use by the env_pop_tf_sysexit() call that 
+			// follows
+			if(e->env_runs == 1) {
+				e->env_tf.tf_regs.reg_ebp = e->env_tf.tf_esp;
+				e->env_tf.tf_regs.reg_esi = e->env_tf.tf_eip;
+			}
+		#endif
+
 	}
-    env_pop_tf(&e->env_tf);
+	
+	#ifndef SYSCALL_TRAP
+		env_pop_tf_sysexit(&e->env_tf);
+	#else
+  		env_pop_tf(&e->env_tf);
+	#endif
 }
 
 /* This is the top-half of an interrupt handler, where the bottom half is

@@ -12,26 +12,22 @@ static intreg_t syscall_sysenter(uint16_t num, intreg_t a1,
                                  intreg_t a4, intreg_t a5)
 {
 	intreg_t ret;
-    asm volatile(
-            //"pushl %%ecx\n\t"
-            //"pushl %%edx\n\t"
-            "pushl %%ebp\n\t"
-			"pushl %%esi\n\t"
-            "movl %%esp, %%ebp\n\t"
-            "leal after_sysenter, %%esi\n\t"
-            "sysenter\n\t"
-            "after_sysenter:\n\t"
-			"popl %%esi\n\t"
-            "popl %%ebp\n\t"
-            //"popl %%edx\n\t"
-            //"popl %%ecx"
-            :"=a" (ret)
-            : "a" (num),
-                "d" (a1),
-                "c" (a2),
-                "b" (a3),
-                "D" (a4)
-        : "cc", "memory", "%esp");
+	asm volatile(
+	    "pushl %%ebp\n\t"
+	    "pushl %%esi\n\t"
+	    "movl %%esp, %%ebp\n\t"
+	    "leal after_sysenter, %%esi\n\t"
+	    "sysenter\n\t"
+	    "after_sysenter:\n\t"
+	    "\tpopl %%esi\n"
+	    "\tpopl %%ebp\n"
+	    :"=a" (ret)
+	    : "a" (num),
+	      "d" (a1),
+	      "c" (a2),
+	      "b" (a3),
+	      "D" (a4)
+	    : "cc", "memory", "%esp");
 	return ret;
 }
 

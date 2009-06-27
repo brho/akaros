@@ -526,7 +526,9 @@ cons_getc(void)
 void
 cons_putc(int c)
 {
-	serial_putc(c);
+	#ifndef SERIAL_IO
+		serial_putc(c);
+	#endif
 	//lpt_putc(c);
 	cga_putc(c);
 }
@@ -537,9 +539,7 @@ cons_init(void)
 {
 	cga_init();
 	kbd_init();
-	#ifndef SERIAL_IO
-		serial_init();
-	#endif
+	serial_init();
 
 	if (!serial_exists)
 		cprintf("Serial port does not exist!\n");

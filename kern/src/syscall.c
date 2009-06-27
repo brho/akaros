@@ -21,7 +21,10 @@ void syscall_wrapper(struct Trapframe *tf)
 {
 	env_t* curenv = curenvs[lapic_get_id()];
     curenv->env_tf = *tf;
-    tf->tf_regs.reg_eax =
+	//Re enable interrupts. sysenter disables them.
+	enable_irq();
+	
+	curenv->env_tf.tf_regs.reg_eax =
 	    (intreg_t) syscall(curenv,
 	                       tf->tf_regs.reg_eax,
 	                       tf->tf_regs.reg_edx,
@@ -29,7 +32,7 @@ void syscall_wrapper(struct Trapframe *tf)
 	                       tf->tf_regs.reg_ebx,
 	                       tf->tf_regs.reg_edi,
 	                       0);
-    return;
+	env_run(curenv);
 }
 
 //Do absolutely nothing.  Used for profiling.

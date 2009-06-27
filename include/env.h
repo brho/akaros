@@ -26,6 +26,8 @@ int	envid2env(envid_t envid, env_t **env_store, bool checkperm);
 // The following two functions do not return
 void	(IN_HANDLER env_run)(env_t *e) __attribute__((noreturn));
 void	env_pop_tf(trapframe_t *tf) __attribute__((noreturn));
+void	env_pop_tf_sysexit(trapframe_t *tf) __attribute__((noreturn));
+
 
 /* Helper handler for smp_call to dispatch jobs to other cores */
 void run_env_handler(trapframe_t *tf, void* data);
