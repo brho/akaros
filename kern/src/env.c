@@ -556,22 +556,32 @@ env_destroy(env_t *e)
 	 */
 	manager();
 	assert(0); // never get here
+}
 
-	// ugly, but for now just linearly search through all possible
-	// environments for a runnable one.
-	for (int i = 0; i < NENV; i++) {
-		e = &envs[ENVX(i)];
+/* ugly, but for now just linearly search through all possible
+ * environments for a runnable one.
+ * the current *policy* is to round-robin the search
+ */
+void schedule(void)
+{
+	env_t *e;
+	static int last_picked = 0;
+	
+	for (int i = 0, j = last_picked + 1; i < NENV; i++, j = (j + 1) % NENV) {
+		e = &envs[ENVX(j)];
 		// TODO: race here, if another core is just about to start this env.
 		// Fix it by setting the status in something like env_dispatch when
 		// we have multi-contexted processes
-		if (e && e->env_status == ENV_RUNNABLE)
+		if (e && e->env_status == ENV_RUNNABLE) {
+			last_picked = j;
 			env_run(e);
+		}
 	}
+
 	cprintf("Destroyed the only environment - nothing more to do!\n");
 	while (1)
 		monitor(NULL);
 }
-
 
 //
 // Restores the register values in the Trapframe with the 'iret' instruction.
@@ -590,7 +600,6 @@ void env_pop_tf(trapframe_t *tf)
 	    : : "g" (tf) : "memory");
 	panic("iret failed");  /* mostly to placate the compiler */
 }
-
 
 void env_pop_tf_sysexit(trapframe_t *tf)
 {

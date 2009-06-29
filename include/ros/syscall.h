@@ -14,11 +14,14 @@ enum
 	SYS_cache_invalidate,
 	SYS_cputs,
 	SYS_cgetc,
-	SYS_getenvid,
 	SYS_getcpuid,
-	SYS_env_destroy,
 	SYS_serial_write,
 	SYS_serial_read,
+	SYS_getenvid,
+	SYS_env_destroy,
+	SYS_yield,
+	SYS_proc_create,
+	SYS_proc_run,
 
 	SYS_endofcalls //Should always be last
 };

@@ -17,21 +17,24 @@
 #include <trap.h>
 #include <syscall.h>
 
+/* This is called from sysenter's asm, with the tf on the kernel stack */
 void syscall_wrapper(struct Trapframe *tf)
 {
 	env_t* curenv = curenvs[lapic_get_id()];
     curenv->env_tf = *tf;
+	// TODO: sort this interrupts shit better
 	//Re enable interrupts. sysenter disables them.
 	enable_irq();
 	
-	curenv->env_tf.tf_regs.reg_eax =
-	    (intreg_t) syscall(curenv,
-	                       tf->tf_regs.reg_eax,
-	                       tf->tf_regs.reg_edx,
-	                       tf->tf_regs.reg_ecx,
-	                       tf->tf_regs.reg_ebx,
-	                       tf->tf_regs.reg_edi,
-	                       0);
+	// The trapframe on the stack should be ignored from here on.
+	tf = &curenv->env_tf;
+    tf->tf_regs.reg_eax = (intreg_t) syscall(curenv,
+	                                         tf->tf_regs.reg_eax,
+	                                         tf->tf_regs.reg_edx,
+	                                         tf->tf_regs.reg_ecx,
+	                                         tf->tf_regs.reg_ebx,
+	                                         tf->tf_regs.reg_edi,
+	                                         0);
 	env_run(curenv);
 }
 
@@ -211,6 +214,18 @@ static error_t sys_env_destroy(env_t* e, envid_t envid)
 	return 0;
 }
 
+/*
+ * Current process yields its remaining "time slice".  Currently works for
+ * single-core processes.
+ */
+static void sys_yield(env_t *e)
+{
+	// TODO: watch for races throughout anything related to process statuses
+	// and schedule/yielding
+	assert(e->env_status == ENV_RUNNING);
+	e->env_status = ENV_RUNNABLE;
+	schedule();
+}
 
 // TODO: Build a dispatch table instead of switching on the syscallno
 // Dispatches to the correct kernel function, passing the arguments.
@@ -233,27 +248,32 @@ intreg_t syscall(env_t* e, uint32_t syscallno, uint32_t a1, uint32_t a2,
 		case SYS_null:
 			sys_null();
 			return 0;
-		case SYS_serial_write:
-			//printk("I am here\n");
-			return sys_serial_write(e, (char *DANGEROUS)a1, (size_t)a2);
-		case SYS_serial_read:
-			return sys_serial_read(e, (char *DANGEROUS)a1, (size_t)a2);
-		case SYS_cache_invalidate:
-			sys_cache_invalidate();
-			return 0;
 		case SYS_cache_buster:
 			sys_cache_buster(e, a1, a2, a3);
+			return 0;
+		case SYS_cache_invalidate:
+			sys_cache_invalidate();
 			return 0;
 		case SYS_cputs:
 			return sys_cputs(e, (char *DANGEROUS)a1, (size_t)a2);
 		case SYS_cgetc:
 			return sys_cgetc(e);
-		case SYS_getenvid:
-			return sys_getenvid(e);
 		case SYS_getcpuid:
 			return sys_getcpuid();
+		case SYS_serial_write:
+			return sys_serial_write(e, (char *DANGEROUS)a1, (size_t)a2);
+		case SYS_serial_read:
+			return sys_serial_read(e, (char *DANGEROUS)a1, (size_t)a2);
+		case SYS_getenvid:
+			return sys_getenvid(e);
 		case SYS_env_destroy:
 			return sys_env_destroy(e, (envid_t)a1);
+		case SYS_yield:
+			sys_yield(e);
+			return 0;
+		case SYS_proc_create:
+		case SYS_proc_run:
+			panic("Not implemented");
 		default:
 			// or just return -E_INVAL
 			panic("Invalid syscall number %d for env %x!", syscallno, *e);

@@ -51,18 +51,23 @@ typedef struct syscall_desc_list syscall_desc_list_t;
 // syscall.c
 void        sys_null();
 error_t     sys_null_async(syscall_desc_t* desc);
-void        sys_cache_invalidate();
 void        sys_cache_buster(uint32_t num_writes, uint32_t num_pages,
                              uint32_t flags);
 error_t     sys_cache_buster_async(syscall_desc_t* desc, uint32_t num_writes,
                                    uint32_t num_pages, uint32_t flags);
+void        sys_cache_invalidate();
 ssize_t     sys_cputs(const char *string, size_t len);
 error_t     sys_cputs_async(const char *s, size_t len, syscall_desc_t* desc,
                             void (*cleanup_handler)(void*), void* cleanup_data);
 uint16_t    sys_cgetc(void);
-envid_t     sys_getenvid(void);
 envid_t     sys_getcpuid(void);
+/* Process Management */
+envid_t     sys_getenvid(void);
 error_t     sys_env_destroy(envid_t);
+void		sys_yield(void);
+int			sys_proc_create(char* path);
+error_t		sys_proc_run(int pid);
+/* Generic Async Call */
 error_t     waiton_syscall(syscall_desc_t* desc, syscall_rsp_t* rsp);
 
 // async callback

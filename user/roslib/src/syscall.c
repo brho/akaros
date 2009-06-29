@@ -8,7 +8,7 @@
 #include <ros/syscall.h>
 #include <lib.h>
 
-// TODO: modift to take only four parameters
+// TODO: fix sysenter to take all 5 params
 static intreg_t syscall_sysenter(uint16_t num, intreg_t a1,
                                  intreg_t a2, intreg_t a3,
                                  intreg_t a4, intreg_t a5)
@@ -122,6 +122,11 @@ error_t waiton_syscall(syscall_desc_t* desc, syscall_rsp_t* rsp)
 	return 0;
 }
 
+void sys_null()
+{
+	syscall(SYS_null,0,0,0,0,0);
+}
+
 error_t sys_null_async(syscall_desc_t* desc)
 {
 	syscall_req_t syscall = {SYS_null, 0, {[0 ... (NUM_SYS_ARGS-1)] 0}};
@@ -147,8 +152,18 @@ error_t	sys_cache_buster_async(syscall_desc_t* desc, uint32_t num_writes,
 	return async_syscall(&syscall, desc);
 }
 
+void sys_cache_invalidate()
+{
+	syscall(SYS_cache_invalidate, 0, 0, 0, 0, 0);
+}
+
+ssize_t sys_cputs(const char *s, size_t len)
+{
+	return syscall(SYS_cputs, (uintreg_t)s,  len, 0, 0, 0);
+}
+
 error_t sys_cputs_async(const char *s, size_t len, syscall_desc_t* desc,
-                     void (*cleanup_handler)(void*), void* cleanup_data)
+                        void (*cleanup_handler)(void*), void* cleanup_data)
 {
 	// could just hardcode 4 0's, will eventually wrap this marshaller anyway
 	syscall_req_t syscall = {SYS_cputs, 0, {(uint32_t)s, len, [2 ... (NUM_SYS_ARGS-1)] 0} };
@@ -157,24 +172,19 @@ error_t sys_cputs_async(const char *s, size_t len, syscall_desc_t* desc,
 	return async_syscall(&syscall, desc);
 }
 
-void sys_null()
-{
-	syscall(SYS_null,0,0,0,0,0);
-}
-
-void sys_cache_invalidate()
-{
-	syscall(SYS_cache_invalidate, 0, 0, 0, 0, 0);
-}
-
-ssize_t sys_cputs(const char *s, size_t len)
-{
-	return syscall(SYS_cputs, (intreg_t)s,  len, 0, 0, 0);
-}
-
 uint16_t sys_cgetc(void)
 {
 	return syscall(SYS_cgetc, 0, 0, 0, 0, 0);
+}
+
+envid_t sys_getcpuid(void)
+{
+	return syscall(SYS_getcpuid, 0, 0, 0, 0, 0);
+}
+
+envid_t sys_getenvid(void)
+{
+	return syscall(SYS_getenvid, 0, 0, 0, 0, 0);
 }
 
 error_t sys_env_destroy(envid_t envid)
@@ -182,14 +192,19 @@ error_t sys_env_destroy(envid_t envid)
 	return syscall(SYS_env_destroy, envid, 0, 0, 0, 0);
 }
 
-envid_t sys_getenvid(void)
+void sys_yield(void)
 {
-	 return syscall(SYS_getenvid, 0, 0, 0, 0, 0);
+	syscall(SYS_yield, 0, 0, 0, 0, 0);
+	return;
 }
 
-envid_t sys_getcpuid(void)
+int sys_proc_create(char* path)
 {
-	 return syscall(SYS_getcpuid, 0, 0, 0, 0, 0);
+	return syscall(SYS_proc_create, (uintreg_t)path, 0, 0, 0, 0);
 }
 
+error_t sys_proc_run(int pid)
+{
+	return syscall(SYS_proc_run, pid, 0, 0, 0, 0);
+}
 

@@ -39,3 +39,19 @@ uint32_t getcpuid(void)
 {
 	return sys_getcpuid();
 }
+
+void yield(void)
+{
+	sys_yield();
+	return;
+}
+
+int proc_create(char* path)
+{
+	return sys_proc_create(path);
+}
+
+error_t proc_run(int pid)
+{
+	return sys_proc_run(pid);
+}
