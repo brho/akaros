@@ -75,6 +75,8 @@ static ssize_t sys_serial_read(env_t* e, char *DANGEROUS buf, size_t len)
 
 static ssize_t sys_run_binary(env_t* e, void* binary_buf, void* arg, size_t len) {
 	uint8_t* new_binary = kmalloc(len, 0);
+	if(new_binary == NULL)
+		return -E_NO_MEM;
 	memcpy(new_binary, binary_buf, len);
 
 	env_t* env = env_create((uint8_t*)new_binary, len);

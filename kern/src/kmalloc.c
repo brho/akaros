@@ -20,6 +20,8 @@ void kmalloc_init() {
 }
 
 void* kmalloc(size_t size, int flags) {
+	if(size == 0)
+		return NULL;
 	int npages = ROUNDUP(size, PGSIZE) / PGSIZE;
 	
 	// Find 'npages' free consecutive pages
@@ -28,11 +30,11 @@ void* kmalloc(size_t size, int flags) {
 	kmallocdebug("npages: %u\n", npages);
 	for(int i=(naddrpage-1); i>=(npages-1); i--) {
 		int j;
-		for(j=i; j>=i-(npages-1); j--) {
+		for(j=i; j>=(i-(npages-1)); j--) {
 			if( !page_is_free(j) )
 				break;
 		}
-		if( j == i-(npages-1)-1 ) {
+		if( j == (i-(npages-1)-1)) {
 			first = j+1;
 			break;
 		}
@@ -40,18 +42,6 @@ void* kmalloc(size_t size, int flags) {
 	//If we couldn't find them, return NULL
 	if( first == -1 )
 		return NULL;
-	/*
-	cprintf("Starting page check.\n");
-	for (int i = 0; i < naddrpage; i++) {
-		page_t* page = ppn2page(i);
-		if (((page->pp_link.le_next != NULL) && (page->pp_ref != 0)) || ((page->pp_link.le_next == NULL) && (page->pp_ref == 0))) {
-			cprintf("Out of sync on page: %u\n", i);
-			cprintf("-->pp_link: %p\n", page->pp_link);
-			cprintf("-->pp_ref: %p\n", page->pp_ref);
-		}
-	}
-	cprintf("Ending page check.\n");
-	*/
 		
 	//Otherwise go ahead and allocate them to ourselves now
 	for(int i=0; i<npages; i++) {
