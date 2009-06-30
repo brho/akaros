@@ -95,7 +95,9 @@ idt_init(void)
 
 	// turn on syscall handling and other user-accessible ints
 	// DPL 3 means this can be triggered by the int instruction
+	// STS_TG32 sets the IDT type to a Trap Gate (interrupts enabled)
 	idt[T_SYSCALL].gd_dpl = 3;
+	idt[T_SYSCALL].gd_type = STS_TG32;
 	idt[T_BRKPT].gd_dpl = 3;
 
 	// Setup a TSS so that we get the right stack

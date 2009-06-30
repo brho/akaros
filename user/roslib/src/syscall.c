@@ -14,26 +14,21 @@ static intreg_t syscall_sysenter(uint16_t num, intreg_t a1,
                                  intreg_t a4, intreg_t a5)
 {
 	intreg_t ret;
-    asm volatile(
-            //"pushl %%ecx\n\t"
-            //"pushl %%edx\n\t"
-            "pushl %%ebp\n\t"
-			"pushl %%esi\n\t"
-            "movl %%esp, %%ebp\n\t"
-            "leal after_sysenter, %%esi\n\t"
-            "sysenter\n\t"
-            "after_sysenter:\n\t"
-			"popl %%esi\n\t"
-            "popl %%ebp\n\t"
-            //"popl %%edx\n\t"
-            //"popl %%ecx"
-            :"=a" (ret)
-            : "a" (num),
-                "d" (a1),
-                "c" (a2),
-                "b" (a3),
-                "D" (a4)
-        : "cc", "memory", "%esp");
+	asm volatile ("  pushl %%ebp;        "
+	              "  pushl %%esi;        "
+	              "  movl %%esp, %%ebp;  "
+	              "  leal 1f, %%esi;     "
+	              "  sysenter;           "
+	              "1:                    "
+	              "  popl %%esi;         "
+	              "  popl %%ebp;         "
+	              : "=a" (ret)
+	              : "a" (num),
+	                "d" (a1),
+	                "c" (a2),
+	                "b" (a3),
+	                "D" (a4)
+	              : "cc", "memory");
 	return ret;
 }
 
@@ -55,23 +50,22 @@ static intreg_t syscall_trap(uint16_t num, intreg_t a1,
 	// potentially change the condition codes and arbitrary
 	// memory locations.
 
-	asm volatile("int %1\n"
-		: "=a" (ret)
-		: "i" (T_SYSCALL),
-		  "a" (num),
-		  "d" (a1),
-		  "c" (a2),
-		  "b" (a3),
-		  "D" (a4),
-		  "S" (a5)
-		: "cc", "memory");
-
+	asm volatile("int %1"
+	             : "=a" (ret)
+	             : "i" (T_SYSCALL),
+	               "a" (num),
+	               "d" (a1),
+	               "c" (a2),
+	               "b" (a3),
+	               "D" (a4),
+	               "S" (a5)
+	             : "cc", "memory");
 	return ret;
 }
 
-static intreg_t syscall(uint16_t num, intreg_t a1,
-                        intreg_t a2, intreg_t a3,
-                        intreg_t a4, intreg_t a5)
+static inline intreg_t syscall(uint16_t num, intreg_t a1,
+                               intreg_t a2, intreg_t a3,
+                               intreg_t a4, intreg_t a5)
 {
 	#ifndef SYSCALL_TRAP
 		return syscall_sysenter(num, a1, a2, a3, a4, a5);

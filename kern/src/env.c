@@ -245,6 +245,7 @@ env_alloc(env_t **newenv_store, envid_t parent_id)
 	e->env_status = ENV_RUNNABLE;
 	e->env_runs = 0;
 	e->env_refcnt = 1;
+	e->env_flags = 0;
 
 	// Clear out all the saved register state,
 	// to prevent the register values
@@ -590,28 +591,29 @@ void schedule(void)
 //
 void env_pop_tf(trapframe_t *tf)
 {
-	__asm __volatile(
-	    "movl %0,%%esp\n"
-	    "\tpopal\n"
-	    "\tpopl %%es\n"
-	    "\tpopl %%ds\n"
-	    "\taddl $0x8,%%esp\n" /* skip tf_trapno and tf_errcode */
-	    "\tiret"
-	    : : "g" (tf) : "memory");
+	asm volatile ("movl %0,%%esp;           "
+	              "popal;                   "
+	              "popl %%es;               "
+	              "popl %%ds;               "
+	              "addl $0x8,%%esp;         "
+	              "iret                     "
+	              : : "g" (tf) : "memory");
 	panic("iret failed");  /* mostly to placate the compiler */
 }
 
+/* Return path of sysexit.  See sysenter_handler's asm for details. */
 void env_pop_tf_sysexit(trapframe_t *tf)
 {
-	__asm __volatile(
-	    "movl %0,%%esp\n"
-	    "\tpopal\n"
-	    "\tpopl %%es\n"
-	    "\tpopl %%ds\n"
-	    "\tmovl %%ebp, %%ecx\n"
-	    "\tmovl %%esi, %%edx\n"
-	    "\tsysexit"
-	    : : "g" (tf) : "memory");
+	asm volatile ("movl %0,%%esp;           "
+	              "popal;                   "
+	              "popl %%es;               "
+	              "popl %%ds;               "
+	              "addl $0x10, %%esp;       "
+	              "popfl;                   "
+	              "movl %%ebp, %%ecx;       "
+	              "movl %%esi, %%edx;       "
+	              "sysexit                  "
+	              : : "g" (tf) : "memory");
 	panic("sysexit failed");  /* mostly to placate the compiler */
 }
 
@@ -643,26 +645,15 @@ env_run(env_t *e)
 		curenvs[lapic_get_id()] = e;
 		e->env_runs++;
 		lcr3(e->env_cr3);
-		
-		#ifndef SYSCALL_TRAP
-			// The first time through we need to set up 
-			// ebp and esi because there is no corresponding 
-			// sysenter call and we have not set them up yet
-			// for use by the env_pop_tf_sysexit() call that 
-			// follows
-			if(e->env_runs == 1) {
-				e->env_tf.tf_regs.reg_ebp = e->env_tf.tf_esp;
-				e->env_tf.tf_regs.reg_esi = e->env_tf.tf_eip;
-			}
-		#endif
-
 	}
-	
-	#ifndef SYSCALL_TRAP
-		env_pop_tf_sysexit(&e->env_tf);
-	#else
+	/* If the process entered the kernel via sysenter, we need to leave via
+	 * sysexit.  sysenter trapframes have 0 for a CS, which is pushed in
+	 * sysenter_handler.
+	 */
+	if (e->env_tf.tf_cs)
   		env_pop_tf(&e->env_tf);
-	#endif
+	else
+		env_pop_tf_sysexit(&e->env_tf);
 }
 
 /* This is the top-half of an interrupt handler, where the bottom half is
