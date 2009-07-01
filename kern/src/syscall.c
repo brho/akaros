@@ -5,6 +5,7 @@
 
 #include <arch/types.h>
 #include <arch/x86.h>
+#include <arch/mmu.h>
 #include <arch/console.h>
 #include <arch/apic.h>
 #include <arch/timer.h>
@@ -19,21 +20,21 @@
 #include <syscall.h>
 #include <kmalloc.h>
 
-void syscall_wrapper(struct Trapframe *tf)
+/* This is called from sysenter's asm, with the tf on the kernel stack. */
+void sysenter_callwrapper(struct Trapframe *tf)
 {
 	env_t* curenv = curenvs[lapic_get_id()];
-    curenv->env_tf = *tf;
-	//Re enable interrupts. sysenter disables them.
-	enable_irq();
+	curenv->env_tf = *tf;
 	
-	curenv->env_tf.tf_regs.reg_eax =
-	    (intreg_t) syscall(curenv,
-	                       tf->tf_regs.reg_eax,
-	                       tf->tf_regs.reg_edx,
-	                       tf->tf_regs.reg_ecx,
-	                       tf->tf_regs.reg_ebx,
-	                       tf->tf_regs.reg_edi,
-	                       0);
+	// The trapframe on the stack should be ignored from here on.
+	tf = &curenv->env_tf;
+	tf->tf_regs.reg_eax = (intreg_t) syscall(curenv,
+	                                         tf->tf_regs.reg_eax,
+	                                         tf->tf_regs.reg_edx,
+	                                         tf->tf_regs.reg_ecx,
+	                                         tf->tf_regs.reg_ebx,
+	                                         tf->tf_regs.reg_edi,
+	                                         0);
 	env_run(curenv);
 }
 
@@ -52,7 +53,7 @@ static ssize_t sys_serial_write(env_t* e, const char *DANGEROUS buf, size_t len)
 			serial_send_byte(buf[i]);	
 		return (ssize_t)len;
 	#else
-		return -E_INVAL;
+		return -EINVAL;
 	#endif
 }
 
@@ -69,14 +70,14 @@ static ssize_t sys_serial_read(env_t* e, char *DANGEROUS buf, size_t len)
 		}
 		return (ssize_t)bytes_read;
 	#else
-		return -E_INVAL;
+		return -EINVAL;
 	#endif
 }
 
 static ssize_t sys_run_binary(env_t* e, void* binary_buf, void* arg, size_t len) {
 	uint8_t* new_binary = kmalloc(len, 0);
 	if(new_binary == NULL)
-		return -E_NO_MEM;
+		return -ENOMEM;
 	memcpy(new_binary, binary_buf, len);
 
 	env_t* env = env_create((uint8_t*)new_binary, len);
@@ -116,7 +117,7 @@ static ssize_t sys_eth_write(env_t* e, const char *DANGEROUS buf, size_t len)
 		
 	}
 	else
-		return -E_INVAL;
+		return -EINVAL;
 }
 /*
 static ssize_t sys_eth_write(env_t* e, const char *DANGEROUS buf, size_t len) 
@@ -129,7 +130,7 @@ static ssize_t sys_eth_write(env_t* e, const char *DANGEROUS buf, size_t len)
 		
 		return(send_frame(buf, len));
 	}
-	return -E_INVAL;
+	return -EINVAL;
 }
 */
 
@@ -163,7 +164,7 @@ static ssize_t sys_eth_read(env_t* e, char *DANGEROUS buf, size_t len)
 		return read_len;
 	}
 	else
-		return -E_INVAL;
+		return -EINVAL;
 }
 
 // Invalidate the cache of this core
@@ -289,7 +290,7 @@ static envid_t sys_getcpuid(void)
 // Destroy a given environment (possibly the currently running environment).
 //
 // Returns 0 on success, < 0 on error.  Errors are:
-//	-E_BAD_ENV if environment envid doesn't currently exist,
+//	-EBADENV if environment envid doesn't currently exist,
 //		or the caller doesn't have permission to change envid.
 static error_t sys_env_destroy(env_t* e, envid_t envid)
 {
@@ -306,6 +307,18 @@ static error_t sys_env_destroy(env_t* e, envid_t envid)
 	return 0;
 }
 
+/*
+ * Current process yields its remaining "time slice".  Currently works for
+ * single-core processes.
+ */
+static void sys_yield(env_t *e)
+{
+	// TODO: watch for races throughout anything related to process statuses
+	// and schedule/yielding
+	assert(e->env_status == ENV_RUNNING);
+	e->env_status = ENV_RUNNABLE;
+	schedule();
+}
 
 // TODO: Build a dispatch table instead of switching on the syscallno
 // Dispatches to the correct kernel function, passing the arguments.
@@ -322,17 +335,12 @@ intreg_t syscall(env_t* e, uint32_t syscallno, uint32_t a1, uint32_t a2,
 	assert(e); // should always have an env for every syscall
 	//printk("Running syscall: %d\n", syscallno);
 	if (INVALID_SYSCALL(syscallno))
-		return -E_INVAL;
+		return -EINVAL;
 
 	switch (syscallno) {
 		case SYS_null:
 			sys_null();
 			return 0;
-		case SYS_serial_write:
-			//printk("I am here\n");
-			return sys_serial_write(e, (char *DANGEROUS)a1, (size_t)a2);
-		case SYS_serial_read:
-			return sys_serial_read(e, (char *DANGEROUS)a1, (size_t)a2);
 		case SYS_run_binary:
 			return sys_run_binary(e, (char *DANGEROUS)a1, 
 			                      (char* DANGEROUS)a2, (size_t)a3);
@@ -340,24 +348,34 @@ intreg_t syscall(env_t* e, uint32_t syscallno, uint32_t a1, uint32_t a2,
 			return sys_eth_write(e, (char *DANGEROUS)a1, (size_t)a2);
 		case SYS_eth_read:
 			return sys_eth_read(e, (char *DANGEROUS)a1, (size_t)a2);	
-		case SYS_cache_invalidate:
-			sys_cache_invalidate();
-			return 0;
 		case SYS_cache_buster:
 			sys_cache_buster(e, a1, a2, a3);
+			return 0;
+		case SYS_cache_invalidate:
+			sys_cache_invalidate();
 			return 0;
 		case SYS_cputs:
 			return sys_cputs(e, (char *DANGEROUS)a1, (size_t)a2);
 		case SYS_cgetc:
 			return sys_cgetc(e);
-		case SYS_getenvid:
-			return sys_getenvid(e);
 		case SYS_getcpuid:
 			return sys_getcpuid();
+		case SYS_serial_write:
+			return sys_serial_write(e, (char *DANGEROUS)a1, (size_t)a2);
+		case SYS_serial_read:
+			return sys_serial_read(e, (char *DANGEROUS)a1, (size_t)a2);
+		case SYS_getenvid:
+			return sys_getenvid(e);
 		case SYS_env_destroy:
 			return sys_env_destroy(e, (envid_t)a1);
+		case SYS_yield:
+			sys_yield(e);
+			return 0;
+		case SYS_proc_create:
+		case SYS_proc_run:
+			panic("Not implemented");
 		default:
-			// or just return -E_INVAL
+			// or just return -EINVAL
 			panic("Invalid syscall number %d for env %x!", syscallno, *e);
 	}
 	return 0xdeadbeef;

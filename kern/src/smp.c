@@ -246,7 +246,7 @@ static int smp_call_function(uint8_t type, uint8_t dest, isr_t handler, void* da
 	atomic_inc(&outstanding_calls);
 	if (outstanding_calls > NUM_HANDLER_WRAPPERS) {
 		atomic_dec(&outstanding_calls);
-		return E_BUSY;
+		return -EBUSY;
 	}
 	
 	// assumes our cores are numbered in order
@@ -302,7 +302,7 @@ static int smp_call_function(uint8_t type, uint8_t dest, isr_t handler, void* da
 		// to use (have to check your return value).  consider putting a delay
 		// here too (like if wrapper_num == initial_wrapper_num)
 		if (count++ > NUM_HANDLER_WRAPPERS * 1000) // note 1000 isn't enough...
-			return E_BUSY;
+			return -EBUSY;
 		*/
 	}
 
@@ -376,7 +376,7 @@ int smp_call_wait(handler_wrapper_t* wrapper)
 		return 0;
 	} else {
 		warn("Attempting to wait on null wrapper!  Check your return values!");
-		return E_FAIL;
+		return -EFAIL;
 	}
 }
 

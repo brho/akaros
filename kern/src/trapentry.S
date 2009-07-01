@@ -137,6 +137,9 @@ TRAPHANDLER_NOEC(ISR_default, T_DEFAULT)
 .globl trap_tbl_end
 trap_tbl_end:
 
+/* Keep the exit paths of _alltraps, _allirqs, and sysenter_handler in sync
+ * with the corresponding pop_tf's.
+ */
 .text
 _alltraps:
 	cld
@@ -180,20 +183,28 @@ _allirqs:
 .globl sysenter_handler;
 .type sysenter_handler, @function;
 sysenter_handler:
-    cld
+	sti						# enable interrupts (things are sane here)
+	cld
+	pushfl					# save the eflags
+	pushl $0				# these zeros keep the trapframe looking the same 
+	pushl $0				# as when we receive a trap or interrupt
+	pushl $0				# and CS == 0 lets the kernel know it was a sysenter
+	pushl $T_SYSCALL		# helps with print_trapframe
 	pushl %ds
-    pushl %es
-    pushal
-    movw $GD_KD, %ax
-    movw %ax, %ds
-    movw %ax, %es
-    pushl %esp
+	pushl %es
+	pushal
+	movw $GD_KD, %ax
+	movw %ax, %ds
+	movw %ax, %es
+	pushl %esp
 	movl $0, %ebp			# so we can backtrace to this point
-    call syscall_wrapper
-    popl %esp
-    popal
-    popl %es
-    popl %ds
-    movl %ebp, %ecx
-    movl %esi, %edx
-    sysexit
+	call sysenter_callwrapper
+	popl %esp
+	popal
+	popl %es
+	popl %ds
+	addl $0x10, %esp		# pop T_SYSCALL and the three zeros
+	popfl					# restore EFLAGS
+	movl %ebp, %ecx
+	movl %esi, %edx
+	sysexit

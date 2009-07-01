@@ -21,9 +21,11 @@ error_t	env_incref(env_t* e);
 void	env_decref(env_t *SAFE e);
 env_t*	env_create(uint8_t *COUNT(size) binary, size_t size);
 void	(IN_HANDLER env_destroy)(env_t *SAFE e);	// Does not return if e == curenv
+// Temporary scheduler function
+void	schedule(void);
 
 int	envid2env(envid_t envid, env_t **env_store, bool checkperm);
-// The following two functions do not return
+// The following three functions do not return
 void	(IN_HANDLER env_run)(env_t *e) __attribute__((noreturn));
 void	env_pop_tf(trapframe_t *tf) __attribute__((noreturn));
 void	env_pop_tf_sysexit(trapframe_t *tf) __attribute__((noreturn));

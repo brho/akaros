@@ -26,14 +26,20 @@
 void manager(void)
 {
 	static uint8_t progress = 0;
-	env_t *env_batch[64];
-    if(progress == 0) {
-            progress++;
-            env_batch[0] = ENV_CREATE(parlib_matrix);
-            env_run(env_batch[0]);
-    }
+	env_t *envs[256];
 
 	switch (progress++) {
+		case 0:
+			envs[0] = ENV_CREATE(roslib_proctests);
+			envs[1] = ENV_CREATE(roslib_proctests);
+			envs[2] = ENV_CREATE(roslib_proctests);
+			envs[3] = ENV_CREATE(roslib_proctests);
+			env_run(envs[0]);
+			break;
+		case 1:
+		case 2:
+		case 3:
+		#if 0
 		case 0:
 			printk("Beginning Tests\n");
 			test_run_measurements(progress-1);  // should never return
@@ -54,8 +60,10 @@ void manager(void)
 		case 14:
 			test_run_measurements(progress-1);
 			break;
+		#endif
 		default:
-			panic("Don't Panic");
+			printk("Manager Progress: %d\n", progress);
+			schedule();
 	}
 	panic("If you see me, then you probably screwed up");
 

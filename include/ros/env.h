@@ -50,6 +50,7 @@ struct Env {
 	unsigned env_status;		// Status of the environment
 	uint32_t env_runs;			// Number of times environment has run
 	uint32_t env_refcnt;		// Reference count of kernel contexts using this
+	uint32_t env_flags;
 	// Note this is the actual backring, not a pointer to it somewhere else
 	syscall_back_ring_t env_sysbackring;	// BackRing for generic syscalls
 
@@ -63,5 +64,8 @@ struct Env {
 	// Eventually want to move this to a per-system shared-info page
 	uint64_t env_tscfreq;		// Frequency of the TSC for measurements
 };
+
+/* Process Flags */
+// None yet
 
 #endif // !ROS_INC_ENV_H

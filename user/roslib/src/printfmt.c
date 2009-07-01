@@ -13,27 +13,6 @@
 #include <stdarg.h>
 
 /*
- * Space or zero padding and a field width are supported for the numeric
- * formats only. 
- * 
- * The special format %e takes an integer error code
- * and prints a string describing the error.
- * The integer may be positive or negative,
- * so that -E_NO_MEM and E_NO_MEM are equivalent.
- */
-
-static const char * const error_string[MAXERROR + 1] =
-{
-	NULL,
-	"unspecified error",
-	"bad environment",
-	"invalid parameter",
-	"out of memory",
-	"out of environments",
-	"segmentation fault",
-};
-
-/*
  * Print a number (base <= 16) in reverse order,
  * using specified putch function and associated pointer putdat.
  */
@@ -166,10 +145,10 @@ void vprintfmt(void (*putch)(int, void**), void **putdat, const char *fmt, va_li
 			err = va_arg(ap, int);
 			if (err < 0)
 				err = -err;
-			if (err > MAXERROR || (p = error_string[err]) == NULL)
+			if (err >= NUMERRORS)
 				printfmt(putch, putdat, "error %d", err);
 			else
-				printfmt(putch, putdat, "%s", p);
+				printfmt(putch, putdat, "%s", error_string[err]);
 			break;
 
 		// string
@@ -271,7 +250,7 @@ int vsnprintf(char *buf, int n, const char *fmt, va_list ap)
 	sprintbuf_t *bp = &b;
 
 	if (buf == NULL || n < 1)
-		return -E_INVAL;
+		return -EINVAL;
 
 	// print the string to the buffer
 	vprintfmt((void*)sprintputch, (void**)&bp, fmt, ap);

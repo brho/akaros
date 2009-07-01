@@ -37,7 +37,7 @@ static env_list_t env_free_list;	// Free list
 // Converts an envid to an env pointer.
 //
 // RETURNS
-//   0 on success, -E_BAD_ENV on error.
+//   0 on success, -EBADENV on error.
 //   On success, sets *env_store to the environment.
 //   On error, sets *env_store to NULL.
 //
@@ -61,7 +61,7 @@ envid2env(envid_t envid, env_t **env_store, bool checkperm)
 	e = &envs[ENVX(envid)];
 	if (e->env_status == ENV_FREE || e->env_id != envid) {
 		*env_store = 0;
-		return -E_BAD_ENV;
+		return -EBADENV;
 	}
 
 	// Check that the calling environment has legitimate permission
@@ -71,7 +71,7 @@ envid2env(envid_t envid, env_t **env_store, bool checkperm)
 	// or an immediate child of the current environment.
 	if (checkperm && e != curenv && e->env_parent_id != curenv->env_id) {
 		*env_store = 0;
-		return -E_BAD_ENV;
+		return -EBADENV;
 	}
 
 	*env_store = e;
@@ -105,7 +105,7 @@ env_init(void)
 // of the environment's virtual address space.
 //
 // Returns 0 on success, < 0 on error.  Errors include:
-//	-E_NO_MEM if page directory or table could not be allocated.
+//	-ENOMEM if page directory or table could not be allocated.
 //
 static int
 env_setup_vm(env_t *e)
@@ -212,8 +212,8 @@ WRITES(e->env_pgdir, e->env_cr3, e->env_procinfo, e->env_procdata,
 // On success, the new environment is stored in *newenv_store.
 //
 // Returns 0 on success, < 0 on failure.  Errors include:
-//	-E_NO_FREE_ENV if all NENVS environments are allocated
-//	-E_NO_MEM on memory exhaustion
+//	-ENOFREEENV if all NENVS environments are allocated
+//	-ENOMEM on memory exhaustion
 //
 int
 env_alloc(env_t **newenv_store, envid_t parent_id)
@@ -223,7 +223,7 @@ env_alloc(env_t **newenv_store, envid_t parent_id)
 	env_t *e;
 
 	if (!(e = LIST_FIRST(&env_free_list)))
-		return -E_NO_FREE_ENV;
+		return -ENOFREEENV;
 	
 	//memset((void*)e + sizeof(e->env_link), 0, sizeof(*e) - sizeof(e->env_link));
 
@@ -245,6 +245,7 @@ env_alloc(env_t **newenv_store, envid_t parent_id)
 	e->env_status = ENV_RUNNABLE;
 	e->env_runs = 0;
 	e->env_refcnt = 1;
+	e->env_flags = 0;
 
 	// Clear out all the saved register state,
 	// to prevent the register values
@@ -496,7 +497,7 @@ error_t env_incref(env_t* e)
 	if (e->env_refcnt)
 		e->env_refcnt++;
 	else
-		retval = E_BAD_ENV;
+		retval = -EBADENV;
 	spin_unlock(&e->lock);
 	return retval;
 }
@@ -557,21 +558,33 @@ env_destroy(env_t *e)
 	//manager();
 	//assert(0); // never get here
 
-	// ugly, but for now just linearly search through all possible
-	// environments for a runnable one.
-	for (int i = 0; i < NENV; i++) {
-		e = &envs[ENVX(i)];
+	schedule();
+}
+
+/* ugly, but for now just linearly search through all possible
+ * environments for a runnable one.
+ * the current *policy* is to round-robin the search
+ */
+void schedule(void)
+{
+	env_t *e;
+	static int last_picked = 0;
+	
+	for (int i = 0, j = last_picked + 1; i < NENV; i++, j = (j + 1) % NENV) {
+		e = &envs[ENVX(j)];
 		// TODO: race here, if another core is just about to start this env.
 		// Fix it by setting the status in something like env_dispatch when
 		// we have multi-contexted processes
-		if (e && e->env_status == ENV_RUNNABLE)
+		if (e && e->env_status == ENV_RUNNABLE) {
+			last_picked = j;
 			env_run(e);
+		}
 	}
+
 	cprintf("Destroyed the only environment - nothing more to do!\n");
 	while (1)
 		monitor(NULL);
 }
-
 
 //
 // Restores the register values in the Trapframe with the 'iret' instruction.
@@ -580,29 +593,29 @@ env_destroy(env_t *e)
 //
 void env_pop_tf(trapframe_t *tf)
 {
-	__asm __volatile(
-	    "movl %0,%%esp\n"
-	    "\tpopal\n"
-	    "\tpopl %%es\n"
-	    "\tpopl %%ds\n"
-	    "\taddl $0x8,%%esp\n" /* skip tf_trapno and tf_errcode */
-	    "\tiret"
-	    : : "g" (tf) : "memory");
+	asm volatile ("movl %0,%%esp;           "
+	              "popal;                   "
+	              "popl %%es;               "
+	              "popl %%ds;               "
+	              "addl $0x8,%%esp;         "
+	              "iret                     "
+	              : : "g" (tf) : "memory");
 	panic("iret failed");  /* mostly to placate the compiler */
 }
 
-
+/* Return path of sysexit.  See sysenter_handler's asm for details. */
 void env_pop_tf_sysexit(trapframe_t *tf)
 {
-	__asm __volatile(
-	    "movl %0,%%esp\n"
-	    "\tpopal\n"
-	    "\tpopl %%es\n"
-	    "\tpopl %%ds\n"
-	    "\tmovl %%ebp, %%ecx\n"
-	    "\tmovl %%esi, %%edx\n"
-	    "\tsysexit"
-	    : : "g" (tf) : "memory");
+	asm volatile ("movl %0,%%esp;           "
+	              "popal;                   "
+	              "popl %%es;               "
+	              "popl %%ds;               "
+	              "addl $0x10, %%esp;       "
+	              "popfl;                   "
+	              "movl %%ebp, %%ecx;       "
+	              "movl %%esi, %%edx;       "
+	              "sysexit                  "
+	              : : "g" (tf) : "memory");
 	panic("sysexit failed");  /* mostly to placate the compiler */
 }
 
@@ -634,26 +647,15 @@ env_run(env_t *e)
 		curenvs[lapic_get_id()] = e;
 		e->env_runs++;
 		lcr3(e->env_cr3);
-		
-		#ifndef SYSCALL_TRAP
-			// The first time through we need to set up 
-			// ebp and esi because there is no corresponding 
-			// sysenter call and we have not set them up yet
-			// for use by the env_pop_tf_sysexit() call that 
-			// follows
-			if(e->env_runs == 1) {
-				e->env_tf.tf_regs.reg_ebp = e->env_tf.tf_esp;
-				e->env_tf.tf_regs.reg_esi = e->env_tf.tf_eip;
-			}
-		#endif
-
 	}
-	
-	#ifndef SYSCALL_TRAP
-		env_pop_tf_sysexit(&e->env_tf);
-	#else
+	/* If the process entered the kernel via sysenter, we need to leave via
+	 * sysexit.  sysenter trapframes have 0 for a CS, which is pushed in
+	 * sysenter_handler.
+	 */
+	if (e->env_tf.tf_cs)
   		env_pop_tf(&e->env_tf);
-	#endif
+	else
+		env_pop_tf_sysexit(&e->env_tf);
 }
 
 /* This is the top-half of an interrupt handler, where the bottom half is

@@ -755,12 +755,12 @@ page_initpp(page_t *pp)
  *
  * RETURNS 
  *   0         -- on success
- *   -E_NO_MEM -- otherwise 
+ *   -ENOMEM   -- otherwise 
  */
 int page_alloc(page_t **pp_store)
 {
 	if (LIST_EMPTY(&page_free_list))
-		return -E_NO_MEM;
+		return -ENOMEM;
 	*pp_store = LIST_FIRST(&page_free_list);
 	LIST_REMOVE(*pp_store, pp_link);
 	page_initpp(*pp_store);
@@ -777,13 +777,13 @@ int page_alloc(page_t **pp_store)
  *
  * RETURNS 
  *   0         -- on success
- *   -E_NO_MEM -- otherwise 
+ *   -ENOMEM   -- otherwise 
  */
 int page_alloc_specific(page_t **pp_store, size_t ppn)
 {
 	page_t* page = ppn2page(ppn);
 	if( page->pp_ref != 0 )
-		return -E_NO_MEM;
+		return -ENOMEM;
 	*pp_store = page;
 	LIST_REMOVE(*pp_store, pp_link);
 	page_initpp(*pp_store);
@@ -824,7 +824,7 @@ error_t	pagetable_remove(pde_t *pgdir, void *va)
 	pde_t* the_pde = &pgdir[PDX(va)];
 
 	if (!(*the_pde & PTE_P) || (*the_pde & PTE_PS))
-		return -E_FAULT;
+		return -EFAULT;
 	pte_t* page_table = (pde_t*)KADDR(PTE_ADDR(*the_pde));
 	for (int i = 0; i < NPTENTRIES; i++) 
 		if (page_table[i] & PTE_P)
@@ -903,7 +903,7 @@ pgdir_walk(pde_t *pgdir, const void *SNT va, int create)
 //
 // RETURNS: 
 //   0 on success
-//   -E_NO_MEM, if page table couldn't be allocated
+//   -ENOMEM, if page table couldn't be allocated
 //
 // Hint: The TA solution is implemented using pgdir_walk, page_remove,
 // and page2pa.
@@ -916,7 +916,7 @@ page_insert(pde_t *pgdir, page_t *pp, void *va, int perm)
 {
 	pte_t* pte = pgdir_walk(pgdir, va, 1);
 	if (!pte)
-		return -E_NO_MEM;
+		return -ENOMEM;
 	// need to up the ref count in case pp is already mapped at va
 	// and we don't want to page_remove (which could free pp) and then 
 	// continue as if pp wasn't freed.  moral = up the ref asap
@@ -1031,7 +1031,7 @@ static void *DANGEROUS user_mem_check_addr;
 // check that user pointers aren't dereferenced. User pointers get the
 // DANGEROUS qualifier. After validation, these functions return a
 // COUNT(len) pointer. user_mem_check now returns NULL on error instead of
-// -E_FAULT.
+// -EFAULT.
 
 void *COUNT(len)
 user_mem_check(env_t *env, const void *DANGEROUS va, size_t len, int perm)
@@ -1112,7 +1112,7 @@ page_check(void)
 	LIST_INIT(&page_free_list);
 
 	// should be no free memory
-	assert(page_alloc(&pp) == -E_NO_MEM);
+	assert(page_alloc(&pp) == -ENOMEM);
 
 	// Fill pp1 with bogus data and check for invalid tlb entries
 	memset(page2kva(pp1), 0xFFFFFFFF, PGSIZE);
@@ -1150,7 +1150,7 @@ page_check(void)
 	}
 
 	// should be no free memory
-	assert(page_alloc(&pp) == -E_NO_MEM);
+	assert(page_alloc(&pp) == -ENOMEM);
 
 	// should be able to map pp2 at PGSIZE because it's already there
 	assert(page_insert(boot_pgdir, pp2, (void*) PGSIZE, PTE_U) == 0);
@@ -1165,7 +1165,7 @@ page_check(void)
 
 	// pp2 should NOT be on the free list
 	// could happen in ref counts are handled sloppily in page_insert
-	assert(page_alloc(&pp) == -E_NO_MEM);
+	assert(page_alloc(&pp) == -ENOMEM);
 
 	// should not be able to map at PTSIZE because need free page for page table
 	assert(page_insert(boot_pgdir, pp0, (void*) PTSIZE, 0) < 0);
@@ -1201,7 +1201,7 @@ page_check(void)
 	assert(page_alloc(&pp) == 0 && pp == pp1);
 
 	// should be no free memory
-	assert(page_alloc(&pp) == -E_NO_MEM);
+	assert(page_alloc(&pp) == -ENOMEM);
 
 	// forcibly take pp0 back
 	assert(PTE_ADDR(boot_pgdir[0]) == page2pa(pp0));
