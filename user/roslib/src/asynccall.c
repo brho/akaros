@@ -12,7 +12,7 @@ error_t waiton_async_call(async_desc_t* desc, async_rsp_t* rsp)
 	syscall_desc_t* d;
 	error_t err = 0;
 	if (!desc)
-		return -E_INVAL;
+		return -EINVAL;
 	while (!(TAILQ_EMPTY(&desc->syslist))) {
 		d = TAILQ_FIRST(&desc->syslist);
 		err = MIN(waiton_syscall(d, &syscall_rsp), err);
@@ -67,12 +67,12 @@ error_t get_all_desc(async_desc_t** a_desc, syscall_desc_t** s_desc)
 {
 	assert(a_desc && s_desc);
 	if ((current_async_desc = get_async_desc()) == NULL)
-		return E_BUSY;
+		return -EBUSY;
 	*a_desc = current_async_desc;
 	if (*s_desc = get_sys_desc(current_async_desc))
 		return 0;
 	// in case we could get an async, but not a syscall desc, then clean up.
 	POOL_PUT(&async_desc_pool, current_async_desc);
 	current_async_desc = NULL;
-	return E_BUSY;
+	return -EBUSY;
 }

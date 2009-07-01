@@ -5,6 +5,7 @@
 
 #include <arch/types.h>
 #include <arch/x86.h>
+#include <arch/mmu.h>
 #include <arch/console.h>
 #include <arch/apic.h>
 #include <arch/timer.h>
@@ -50,7 +51,7 @@ static ssize_t sys_serial_write(env_t* e, const char *DANGEROUS buf, size_t len)
 			serial_send_byte(buf[i]);	
 		return (ssize_t)len;
 	#else
-		return -E_INVAL;
+		return -EINVAL;
 	#endif
 }
 
@@ -67,7 +68,7 @@ static ssize_t sys_serial_read(env_t* e, char *DANGEROUS buf, size_t len)
 		}
 		return (ssize_t)bytes_read;
 	#else
-		return -E_INVAL;
+		return -EINVAL;
 	#endif
 }
 
@@ -194,7 +195,7 @@ static envid_t sys_getcpuid(void)
 // Destroy a given environment (possibly the currently running environment).
 //
 // Returns 0 on success, < 0 on error.  Errors are:
-//	-E_BAD_ENV if environment envid doesn't currently exist,
+//	-EBADENV if environment envid doesn't currently exist,
 //		or the caller doesn't have permission to change envid.
 static error_t sys_env_destroy(env_t* e, envid_t envid)
 {
@@ -239,8 +240,8 @@ intreg_t syscall(env_t* e, uint32_t syscallno, uint32_t a1, uint32_t a2,
 	assert(e); // should always have an env for every syscall
 	//printk("Running syscall: %d\n", syscallno);
 	if (INVALID_SYSCALL(syscallno))
-		return -E_INVAL;
-	
+		return -EINVAL;
+
 	switch (syscallno) {
 		case SYS_null:
 			sys_null();
@@ -272,7 +273,7 @@ intreg_t syscall(env_t* e, uint32_t syscallno, uint32_t a1, uint32_t a2,
 		case SYS_proc_run:
 			panic("Not implemented");
 		default:
-			// or just return -E_INVAL
+			// or just return -EINVAL
 			panic("Invalid syscall number %d for env %x!", syscallno, *e);
 	}
 	return 0xdeadbeef;

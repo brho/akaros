@@ -81,7 +81,7 @@ static error_t async_syscall(syscall_req_t* req, syscall_desc_t* desc)
 	// we could spin til it's free, but that could deadlock if this same thread
 	// is supposed to consume the requests it is waiting on later.
 	if (RING_FULL(&sysfrontring))
-		return E_BUSY;
+		return -EBUSY;
 	// req_prod_pvt comes in as the previously produced item.  need to
 	// increment to the next available spot, which is the one we'll work on.
 	// at some point, we need to listen for the responses.
@@ -102,10 +102,10 @@ error_t waiton_syscall(syscall_desc_t* desc, syscall_rsp_t* rsp)
 	// Make sure we were given a desc with a non-NULL frontring.  This could
 	// happen if someone forgot to check the error code on the paired syscall.
 	if (!desc->sysfr)
-		return E_FAIL;
+		return -EFAIL;
 	// this forces us to call wait in the order in which the syscalls are made.
 	if (desc->idx != desc->sysfr->rsp_cons + 1)
-		return E_DEADLOCK;
+		return -EDEADLOCK;
 	while (!(RING_HAS_UNCONSUMED_RESPONSES(desc->sysfr)))
 		cpu_relax();
 	memcpy(rsp, RING_GET_RESPONSE(desc->sysfr, desc->idx), sizeof(*rsp));

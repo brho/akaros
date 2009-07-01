@@ -37,7 +37,7 @@ static env_list_t env_free_list;	// Free list
 // Converts an envid to an env pointer.
 //
 // RETURNS
-//   0 on success, -E_BAD_ENV on error.
+//   0 on success, -EBADENV on error.
 //   On success, sets *env_store to the environment.
 //   On error, sets *env_store to NULL.
 //
@@ -61,7 +61,7 @@ envid2env(envid_t envid, env_t **env_store, bool checkperm)
 	e = &envs[ENVX(envid)];
 	if (e->env_status == ENV_FREE || e->env_id != envid) {
 		*env_store = 0;
-		return -E_BAD_ENV;
+		return -EBADENV;
 	}
 
 	// Check that the calling environment has legitimate permission
@@ -71,7 +71,7 @@ envid2env(envid_t envid, env_t **env_store, bool checkperm)
 	// or an immediate child of the current environment.
 	if (checkperm && e != curenv && e->env_parent_id != curenv->env_id) {
 		*env_store = 0;
-		return -E_BAD_ENV;
+		return -EBADENV;
 	}
 
 	*env_store = e;
@@ -105,7 +105,7 @@ env_init(void)
 // of the environment's virtual address space.
 //
 // Returns 0 on success, < 0 on error.  Errors include:
-//	-E_NO_MEM if page directory or table could not be allocated.
+//	-ENOMEM if page directory or table could not be allocated.
 //
 static int
 env_setup_vm(env_t *e)
@@ -212,8 +212,8 @@ WRITES(e->env_pgdir, e->env_cr3, e->env_procinfo, e->env_procdata,
 // On success, the new environment is stored in *newenv_store.
 //
 // Returns 0 on success, < 0 on failure.  Errors include:
-//	-E_NO_FREE_ENV if all NENVS environments are allocated
-//	-E_NO_MEM on memory exhaustion
+//	-ENOFREEENV if all NENVS environments are allocated
+//	-ENOMEM on memory exhaustion
 //
 int
 env_alloc(env_t **newenv_store, envid_t parent_id)
@@ -223,7 +223,7 @@ env_alloc(env_t **newenv_store, envid_t parent_id)
 	env_t *e;
 
 	if (!(e = LIST_FIRST(&env_free_list)))
-		return -E_NO_FREE_ENV;
+		return -ENOFREEENV;
 	
 	//memset((void*)e + sizeof(e->env_link), 0, sizeof(*e) - sizeof(e->env_link));
 
@@ -497,7 +497,7 @@ error_t env_incref(env_t* e)
 	if (e->env_refcnt)
 		e->env_refcnt++;
 	else
-		retval = E_BAD_ENV;
+		retval = -EBADENV;
 	spin_unlock(&e->lock);
 	return retval;
 }

@@ -72,6 +72,9 @@
 #define PTE_PAT		0x080	// PAT (only applies to second layer PTEs)
 #define PTE_G		0x100	// Global Page
 
+#define VALID_USER_PERMS(perm) \
+	(((perm) == PTE_U) || ((perm) == (PTE_U | PTE_W))) 
+
 // The PTE_AVAIL bits aren't used by the kernel or interpreted by the
 // hardware, so user processes are allowed to set them arbitrarily.
 #define PTE_AVAIL	0xE00	// Available for software use

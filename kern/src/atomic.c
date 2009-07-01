@@ -15,7 +15,7 @@ int commit_checklist_wait(checklist_t* list, checklist_mask_t* mask)
 	// Or, bail out if we can see the list is already in use.  This check is
 	// just an optimization before we try to use the list for real.
 	if ((checklist_is_locked(list)) || !checklist_is_clear(list))
-		return E_BUSY;
+		return -EBUSY;
 
 	// possession of this lock means you can wait on it and set it
 	spin_lock_irqsave(&list->lock);
