@@ -46,7 +46,7 @@ void yield(void)
 	return;
 }
 
-int proc_create(char* path)
+int proc_create(char *NT path)
 {
 	return sys_proc_create(path);
 }

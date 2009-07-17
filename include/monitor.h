@@ -20,5 +20,7 @@ int mon_showmapping(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
 int mon_setmapperm(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
 int mon_cpuinfo(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
 int mon_nanwan(int argc, char **argv, trapframe_t *tf);
+int mon_kfs_ls(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
+int mon_kfs_run(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
 
 #endif	// !ROS_KERN_MONITOR_H

@@ -35,11 +35,13 @@ typedef int32_t envid_t;
 #define ENVX(envid)		((envid) & (NENV - 1))
 
 // Values of env_status in struct Env
+// TODO: think about what states we want.
 #define ENV_FREE			0
 #define ENV_RUNNING			1
 #define ENV_RUNNABLE		2
 #define ENV_NOT_RUNNABLE	3
 #define ENV_DYING			4
+#define ENV_CREATED			5
 
 struct Env {
 	LIST_ENTRY(Env) env_link NOINIT;	// Free list link pointers

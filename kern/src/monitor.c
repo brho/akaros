@@ -19,6 +19,7 @@
 #include <pmap.h>
 #include <kdebug.h>
 #include <testing.h>
+#include <kfs.h>
 
 #include <ros/memlayout.h>
 
@@ -40,6 +41,8 @@ static command_t commands[] = {
 	{ "setmapperm", "Sets permissions on a VA->PA mapping", mon_setmapperm},
 	{ "cpuinfo", "Prints CPU diagnostics", mon_cpuinfo},
 	{ "nanwan", "Meet Nanwan!!", mon_nanwan},
+	{ "kfs_ls", "List files in KFS", mon_kfs_ls},
+	{ "kfs_run", "Create and run a program from KFS", mon_kfs_run},
 };
 #define NCOMMANDS (sizeof(commands)/sizeof(commands[0]))
 
@@ -254,6 +257,35 @@ int mon_nanwan(int argc, char **argv, trapframe_t *tf)
 	printk("                                \\'   .\\#\n");
 	printk("                             jgs \\   ::\\#\n");
 	printk("                                  \\      \n");
+	return 0;
+}
+
+int mon_kfs_ls(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
+{
+	printk("Files in KFS:\n-------------------------------\n");
+	for (int i = 0; i < MAX_KFS_FILES; i++)
+		if (kfs[i].name[0])
+			printk("%s\n", kfs[i].name);
+	return 0;
+}
+
+int mon_kfs_run(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
+{
+	if (argc != 2) {
+		printk("Usage: kfs_run FILENAME\n");
+		return 1;
+	}
+	int kfs_inode = kfs_lookup_path(argv[1]);
+	if (kfs_inode < 0) {
+		printk("Bad filename!\n");
+		return 1;
+	}
+	env_t *new_e = kfs_proc_create(kfs_inode);
+	new_e->env_status = ENV_RUNNABLE;
+	// Should never return from schedule (env_pop in there)
+	// also note you may not get the process you created, in the event there
+	// are others floating around that are runnable
+	schedule();
 	return 0;
 }
 

@@ -2,6 +2,6 @@
 
 int main(int argc, char** argv)
 {
-	cprintf("goodbye, world!\n");
+	cprintf("Goodbye, world, from PID: %d!\n", env->env_id);
 	return 0;
 }

@@ -37,8 +37,10 @@ void run_env_handler(trapframe_t *tf, void* data);
 #define ENV_CREATE(x)			({                                             \
 	extern uint8_t _binary_obj_user_apps_##x##_start[],                        \
 		_binary_obj_user_apps_##x##_size[];                                    \
-	env_create(_binary_obj_user_apps_##x##_start,                              \
+	env_t *e = env_create(_binary_obj_user_apps_##x##_start,                   \
 		(int)_binary_obj_user_apps_##x##_size);                                \
+	e->env_status = ENV_RUNNABLE;                                              \
+	e;                                                                         \
 })
 
 #endif // !ROS_KERN_ENV_H

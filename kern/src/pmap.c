@@ -1022,7 +1022,7 @@ static void *DANGEROUS user_mem_check_addr;
 // erroneous virtual address.
 //
 // Returns 0 if the user program can access this range of addresses,
-// and -E_FAULT otherwise.
+// and -EFAULT otherwise.
 //
 // Hint: The TA solution uses pgdir_walk.
 //

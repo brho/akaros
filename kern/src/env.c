@@ -242,7 +242,7 @@ env_alloc(env_t **newenv_store, envid_t parent_id)
 	// Set the basic status variables.
     e->lock = 0;
 	e->env_parent_id = parent_id;
-	e->env_status = ENV_RUNNABLE;
+	e->env_status = ENV_CREATED;
 	e->env_runs = 0;
 	e->env_refcnt = 1;
 	e->env_flags = 0;
@@ -390,8 +390,7 @@ load_icode(env_t *e, uint8_t *COUNT(size) binary, size_t size)
 
 	// to actually access any pages alloc'd for this environment, we
 	// need to have the hardware use this environment's page tables.
-	// we can use e's tables as long as we want, since it has the same
-	// mappings for the kernel as does boot_pgdir
+	uintreg_t old_cr3 = rcr3();
 	lcr3(e->env_cr3);
 
 	// TODO: how do we do a runtime COUNT?
@@ -413,8 +412,10 @@ load_icode(env_t *e, uint8_t *COUNT(size) binary, size_t size)
 
 	// Now map one page for the program's initial stack
 	// at virtual address USTACKTOP - PGSIZE.
-
 	segment_alloc(e, (void*SNT)(USTACKTOP - PGSIZE), PGSIZE);
+
+	// reload the original address space
+	lcr3(old_cr3);
 }
 
 //
@@ -424,8 +425,11 @@ env_t* env_create(uint8_t *binary, size_t size)
 {
 	env_t *e;
 	int r;
-
-	if ((r = env_alloc(&e, 0)) < 0)
+	env_t *curenv = curenvs[lapic_get_id()];
+	envid_t curid;
+	
+	curid = (curenv ? curenv->env_id : 0);	
+	if ((r = env_alloc(&e, curid)) < 0)
 		panic("env_create: %e", r);
 	load_icode(e, binary, size);
 	return e;

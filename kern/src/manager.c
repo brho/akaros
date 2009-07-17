@@ -17,6 +17,7 @@
 #include <workqueue.h>
 #include <syscall.h>
 #include <testing.h>
+#include <kfs.h>
 
 /*
  * Currently, if you leave this function by way of env_run (process_workqueue
@@ -30,13 +31,19 @@ void manager(void)
 
 	switch (progress++) {
 		case 0:
+			// careful, should check error codes returned from kfs_lookup_path
+			envs[0] = kfs_proc_create(kfs_lookup_path("roslib_spawn"));
+			env_run(envs[0]);
+			break;
+		case 1:
+			#if 0
 			envs[0] = ENV_CREATE(roslib_proctests);
 			envs[1] = ENV_CREATE(roslib_proctests);
 			envs[2] = ENV_CREATE(roslib_proctests);
 			envs[3] = ENV_CREATE(roslib_proctests);
 			env_run(envs[0]);
 			break;
-		case 1:
+			#endif
 		case 2:
 		case 3:
 		#if 0

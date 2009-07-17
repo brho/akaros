@@ -17,6 +17,7 @@ typedef enum {
 	EBADENV,                 // Bad environment 
 	ENOFREEENV,              // No free environment
 	EUNSPECIFIED,            // Unspecified
+	EMORON,                  // Moron
 	NUMERRORS,               // Total number of error codes
 } error_t;
 
@@ -35,11 +36,12 @@ static const char * const error_string[NUMERRORS] =
 	"Would cause deadlock",
 	"Currently busy, try again later",
 	"No memory available",
-	"Invalid arguments"
-	"Segmentation fault"
-	"Bad environment"
-	"No free environment"
-	"Unspecified"
+	"Invalid arguments",
+	"Segmentation fault",
+	"Bad environment",
+	"No free environment",
+	"You are a moron",
+	"Unspecified",
 };
 
 #endif	// !ROS_INC_ERROR_H */

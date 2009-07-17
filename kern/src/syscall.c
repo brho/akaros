@@ -17,6 +17,7 @@
 #include <pmap.h>
 #include <trap.h>
 #include <syscall.h>
+#include <kfs.h> // eventually replace this with vfs.h
 
 /* This is called from sysenter's asm, with the tf on the kernel stack. */
 void sysenter_callwrapper(struct Trapframe *tf)
@@ -225,10 +226,53 @@ static void sys_yield(env_t *e)
 	schedule();
 }
 
+/*
+ * Creates a process found at the user string 'path'.  Currently uses KFS.
+ * Not runnable by default, so it needs it's status to be changed so that the
+ * next call to schedule() will try to run it.
+ * TODO: once we have a decent VFS, consider splitting this up
+ */
+static int sys_proc_create(env_t *e, const char *DANGEROUS path)
+{
+	#define MAX_PATH_LEN 256 // totally arbitrary
+	int pid = 0;
+	char tpath[MAX_PATH_LEN];
+	/*
+	 * There's a bunch of issues with reading in the path, which we'll
+	 * need to sort properly in the VFS.  Main concerns are TOCTOU (copy-in),
+	 * whether or not it's a big deal that the pointer could be into kernel
+	 * space, and resolving both of these without knowing the length of the
+	 * string. (TODO)
+	 */
+	strncpy(tpath, path, MAX_PATH_LEN);
+	int kfs_inode = kfs_lookup_path(tpath);
+	if (kfs_inode < 0)
+		return -EINVAL;
+	env_t *new_e = kfs_proc_create(kfs_inode);
+	return new_e->env_id; // TODO replace this with a real proc_id
+}
+
+/* Makes process PID runnable.  Consider moving the functionality to env.c */
+static error_t sys_proc_run(env_t *e, int pid)
+{
+	// TODO PIDs are currently env_id's and encapsulate these functions better
+	// TODO worry about concurrency on the statuses
+	// get the target process (techincally a neg number is invalid)
+	env_t *target = &envs[ENVX(pid)];
+	// make sure it's in the right state to be activated
+	if (target->env_status != ENV_CREATED)
+		return -EINVAL;
+	// make sure we have access (are the parent of)
+	if (target->env_parent_id != e->env_id)
+		return -EINVAL;
+	target->env_status = ENV_RUNNABLE;	
+	return 0;
+}
+
 // TODO: Build a dispatch table instead of switching on the syscallno
 // Dispatches to the correct kernel function, passing the arguments.
 intreg_t syscall(env_t* e, uint32_t syscallno, uint32_t a1, uint32_t a2,
-                uint32_t a3, uint32_t a4, uint32_t a5)
+                 uint32_t a3, uint32_t a4, uint32_t a5)
 {
 	// Call the function corresponding to the 'syscallno' parameter.
 	// Return any appropriate return value.
@@ -270,8 +314,9 @@ intreg_t syscall(env_t* e, uint32_t syscallno, uint32_t a1, uint32_t a2,
 			sys_yield(e);
 			return 0;
 		case SYS_proc_create:
+			return sys_proc_create(e, (char *DANGEROUS)a1);
 		case SYS_proc_run:
-			panic("Not implemented");
+			return sys_proc_run(e, (size_t)a1);
 		default:
 			// or just return -EINVAL
 			panic("Invalid syscall number %d for env %x!", syscallno, *e);

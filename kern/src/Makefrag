@@ -36,6 +36,7 @@ KERN_SRCFILES := $(KERN_SRC_DIR)/entry.S \
                  $(KERN_SRC_DIR)/readline.c \
                  $(KERN_SRC_DIR)/string.c \
                  $(KERN_SRC_DIR)/timer.c \
+                 $(KERN_SRC_DIR)/kfs.c \
                  $(KERN_SRC_DIR)/kmalloc.c
 # Only build files if they exist.
 KERN_SRCFILES := $(wildcard $(KERN_SRCFILES))
@@ -44,6 +45,7 @@ KERN_APPFILES :=    $(USER_APPS_PARLIB_DIR)/matrix \
                     $(USER_APPS_ROSLIB_DIR)/null \
                     $(USER_APPS_ROSLIB_DIR)/hello \
                     $(USER_APPS_ROSLIB_DIR)/proctests \
+                    $(USER_APPS_ROSLIB_DIR)/spawn \
                     $(USER_APPS_ROSLIB_DIR)/measurements
 #                    $(USER_APPS_PARLIB_DIR)/draw_nanwan
 #                    $(USER_APPS_PARLIB_DIR)/open_read \
