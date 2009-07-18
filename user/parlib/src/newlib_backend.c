@@ -23,7 +23,6 @@
  */
 char *__env[1] = { 0 };
 char **environ = __env;
-extern env_t* env;
 
 /* _exit()
  * Exit a program without cleaning up files. 
@@ -32,7 +31,7 @@ extern env_t* env;
  */
 void _exit(int __status) _ATTRIBUTE ((noreturn))
 {
-	sys_env_destroy(env->env_id);
+	sys_proc_destroy(sys_getpid()); // TODO: can run getpid and cache it
 	while(1); //Should never get here...
 }
     
@@ -168,7 +167,7 @@ int fstat(int file, struct stat *st)
  */
 int getpid(void) 
 {
-	return env->env_id;
+	return sys_getpid(); // TODO: can run getpid and cache it
 }
 
 /* isatty()

@@ -56,7 +56,7 @@ alloc_range(int initaddr, int maxpa, int startn) {
   initva = initaddr;
   maxva = initva + maxpa;
   
-  cprintf ("[%08x] trying to alloc pages in range [%08x, %08x]\n", env->env_id, initva, maxva);
+  cprintf ("[%08x] trying to alloc pages in range [%08x, %08x]\n", sys_getpid(), initva, maxva);
 
   // how many pages can I alloc? 
   // - limit to 256 M worth of pages
@@ -76,7 +76,7 @@ alloc_range(int initaddr, int maxpa, int startn) {
   }
   cprintf("\n");
 
-  cprintf("[%08x] able to allocate [%d] pages of requested [%d] pages\n", env->env_id, n, maxnum);
+  cprintf("[%08x] able to allocate [%d] pages of requested [%d] pages\n", sys_getpid(), n, maxnum);
 
   maxva = va;
   return n;
@@ -85,14 +85,14 @@ alloc_range(int initaddr, int maxpa, int startn) {
 int
 test_range(int startva, int endva, int startn) {
   int c;
-  cprintf("[%08x] testing pages in [%08x, %08x] to see if they look okay\n", env->env_id, startva, endva);
+  cprintf("[%08x] testing pages in [%08x, %08x] to see if they look okay\n", sys_getpid(), startva, endva);
   n = startn;
   failures = 0;  
   for (va = startva, c = 0; va < endva; va += PGSIZE, n++, c++) { 
     page_id = (int*)va;
 
     if (test_page((int*)va, n)) {
-      cprintf("\n[%08x] unexpected value at [%08x]:\n  {", env->env_id, va);
+      cprintf("\n[%08x] unexpected value at [%08x]:\n  {", sys_getpid(), va);
       print_marked_page((int*)va);
       cprintf("} should be\n  {");
       print_expected_mark(n);
@@ -104,7 +104,7 @@ test_range(int startva, int endva, int startn) {
       int perm = (PTE_U | PTE_P | PTE_W | PTE_AVAIL);
 
       if ((pte & perm) != perm) {
-	cprintf("\n[%08x] unexpected PTE permissions [04x] for address [%08x]\n {", env->env_id, pte & perm, va);
+	cprintf("\n[%08x] unexpected PTE permissions [04x] for address [%08x]\n {", sys_getpid(), pte & perm, va);
 	failures++;
       }
 
@@ -120,29 +120,29 @@ test_range(int startva, int endva, int startn) {
   }
   cprintf("\n");
 
-  cprintf("[%08x] tested %d pages: %d failed assertions.\n", env->env_id, c, failures);
+  cprintf("[%08x] tested %d pages: %d failed assertions.\n", sys_getpid(), c, failures);
 
   return failures;
 }
 
 void
 unmap_range(int startva, int endva) {
-  cprintf("[%08x] unmapping range [%08x, %08x].\n", env->env_id, startva, endva);
+  cprintf("[%08x] unmapping range [%08x, %08x].\n", sys_getpid(), startva, endva);
   int xva, z;
   for (z=0, xva = startva; xva < endva; xva += PGSIZE, z++) { 
     sys_mem_unmap(0, xva);
   }
-  cprintf("[%08x] unmapped %d pages.\n", env->env_id, z);
+  cprintf("[%08x] unmapped %d pages.\n", sys_getpid(), z);
 }
 
 int
 duplicate_range(int startva, int dupeva, int nbytes) {
   cprintf("[%08x] duplicating range [%08x, %08x] at [%08x, %08x]\n", 
-	 env->env_id, startva, startva+nbytes, dupeva, dupeva+nbytes);
+	 sys_getpid(), startva, startva+nbytes, dupeva, dupeva+nbytes);
   int xva, r, k;
   for (xva = 0, k = 0; xva < nbytes; xva += PGSIZE, k+=PGSIZE) { 
     if ((r = sys_mem_map(0, startva+xva, 0, dupeva+xva, PTE_P | PTE_U | PTE_W | PTE_USER)) < 0) {
-      cprintf ("[%08x] duplicate_range FAILURE: %e\n", env->env_id, r);
+      cprintf ("[%08x] duplicate_range FAILURE: %e\n", sys_getpid(), r);
       return r;
     }
   }
@@ -158,7 +158,7 @@ int main(int argc, char** argv)
   int max, max2, k, j, i, dupesize, dupen;
 
   for (i = 0; i < 2; i++) { // might as well do this multiple times to stress the system...
-    cprintf("PMAPTEST[%08x] starting ROUND %d.\n", env->env_id, i);
+    cprintf("PMAPTEST[%08x] starting ROUND %d.\n", sys_getpid(), i);
 
     // Try to allocate as many pages as possible...
     k = alloc_range(UTEXT+PDMAP, (256 * 1024 * 1024), 0);       // alloc as many as possible
@@ -166,17 +166,17 @@ int main(int argc, char** argv)
     test_range(UTEXT+PDMAP, max, 0);                            // test if all are unique pages
 
     // If we've corrupted kernel memory, a yield might expose a problem.
-    cprintf("PMAPTEST[%08x] yielding...\n", env->env_id);
+    cprintf("PMAPTEST[%08x] yielding...\n", sys_getpid());
     sys_yield();
-    cprintf("PMAPTEST[%08x] back.\n", env->env_id);
+    cprintf("PMAPTEST[%08x] back.\n", sys_getpid());
 
-    // Free a couple of pages for use by page tables and other envs...
+    // Free a couple of pages for use by page tables and other processes...
     unmap_range(max-16 * PGSIZE, max);                           // free some pages so we have wiggle room, if extra
     max -= 16 * PGSIZE;                                          // pages are needed for page tables...
     
     // Unmap last 1024 pages and then try to reallocate them in the same place
     unmap_range(max - PDMAP, max);                              // unmap last 1024 pages
-    j = alloc_range(max - PDMAP, PDMAP, 0);                     // try to realloc them (<1024 if other envs alloc'd)
+    j = alloc_range(max - PDMAP, PDMAP, 0);                     // try to realloc them (<1024 if other processes alloc'd)
     max2 = maxva; // max2 <= max && max2 >= (max - PDMAP)
     test_range(max - PDMAP, max2, 0);                           // test if new pages are unique
   
@@ -188,7 +188,7 @@ int main(int argc, char** argv)
   
     // Remove one of the duplicate mappings and then unmap and realloc the last 1024 pages
     unmap_range(max2-PDMAP, max2-PDMAP+dupesize);           // unmap lower mapping
-    j = alloc_range(max2-PDMAP, PDMAP, 0);                  // try to alloc something, should be below 1024 (really? other envs?)
+    j = alloc_range(max2-PDMAP, PDMAP, 0);                  // try to alloc something, should be below 1024 (really? other processes?)
     unmap_range(max2-2*PDMAP, max2 - PDMAP);                // free 1024 pages
     j = alloc_range(max2-2*PDMAP, PDMAP, 0);                // alloc new pages for free'd 1024
     //max2 = maxva; // max2 <= old_max2 - PDMAP

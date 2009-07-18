@@ -12,7 +12,6 @@
 #include <ros/error.h>
 #include <ros/memlayout.h>
 #include <ros/syscall.h>
-#include <ros/env.h>
 
 #include <stdarg.h>
 #include <string.h>
@@ -23,7 +22,6 @@
 
 // libos.c or entry.S
 extern char *binaryname;
-extern volatile env_t *env;
 // will need to change these types when we have real structs
 // seems like they need to be either arrays [] or functions () for it to work
 extern volatile uint8_t (COUNT(PGSIZE * UINFO_PAGES) procinfo)[];
@@ -60,13 +58,13 @@ ssize_t     sys_cputs(const char *string, size_t len);
 error_t     sys_cputs_async(const char *s, size_t len, syscall_desc_t* desc,
                             void (*cleanup_handler)(void*), void* cleanup_data);
 uint16_t    sys_cgetc(void);
-envid_t     sys_getcpuid(void);
+size_t	    sys_getcpuid(void);
 /* Process Management */
-envid_t     sys_getenvid(void);
-error_t     sys_env_destroy(envid_t);
-void		sys_yield(void);
-int			sys_proc_create(char* path);
-error_t		sys_proc_run(int pid);
+int         sys_getpid(void);
+error_t     sys_proc_destroy(int pid);
+void        sys_yield(void);
+int         sys_proc_create(char* path);
+error_t     sys_proc_run(int pid);
 /* Generic Async Call */
 error_t     waiton_syscall(syscall_desc_t* desc, syscall_rsp_t* rsp);
 

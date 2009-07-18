@@ -5,6 +5,7 @@
 
 #include <arch/x86.h>
 #include <parlib.h>
+#include <ros/trap.h>
 
 // TODO: modify to take only four parameters
 static intreg_t syscall_sysenter(uint16_t num, intreg_t a1,
@@ -74,18 +75,17 @@ static intreg_t syscall(uint16_t num, intreg_t a1,
 	#endif
 }
 
-void sys_env_destroy(envid_t envid)
+error_t sys_proc_destroy(int pid)
 {
-	syscall(SYS_env_destroy, envid, 0, 0, 0, 0);
-	while(1); //Should never get here...
+	return syscall(SYS_proc_destroy, pid, 0, 0, 0, 0);
 }
 
-envid_t sys_getenvid(void)
+int sys_getpid(void)
 {
-	 return syscall(SYS_getenvid, 0, 0, 0, 0, 0);
+	 return syscall(SYS_getpid, 0, 0, 0, 0, 0);
 }
 
-envid_t sys_getcpuid(void)
+size_t sys_getcpuid(void)
 {
 	 return syscall(SYS_getcpuid, 0, 0, 0, 0, 0);
 }

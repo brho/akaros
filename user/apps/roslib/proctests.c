@@ -3,12 +3,13 @@
 
 int main(int argc, char** argv)
 {
-	cprintf("Process %x, Starting and yielding.\n", env->env_id);
+	int pid = sys_getpid();
+	cprintf("Process %x, Starting and yielding.\n", pid);
 	yield();
-	cprintf("Process %x, Return from yield1, starting yield2.\n", env->env_id);
+	cprintf("Process %x, Return from yield1, starting yield2.\n", pid);
 	yield();
-	cprintf("Process %x, Return from yield2, starting yield3.\n", env->env_id);
+	cprintf("Process %x, Return from yield2, starting yield3.\n", pid);
 	yield();
-	cprintf("Process %x, Return from yield3, exiting.\n", env->env_id);
+	cprintf("Process %x, Return from yield3, exiting.\n", pid);
 	return 0;
 }

@@ -310,9 +310,9 @@ intreg_t syscall(env_t* e, uint32_t syscallno, uint32_t a1, uint32_t a2,
 			return sys_serial_write(e, (char *DANGEROUS)a1, (size_t)a2);
 		case SYS_serial_read:
 			return sys_serial_read(e, (char *DANGEROUS)a1, (size_t)a2);
-		case SYS_getenvid:
+		case SYS_getpid:
 			return sys_getenvid(e);
-		case SYS_env_destroy:
+		case SYS_proc_destroy:
 			return sys_env_destroy(e, (envid_t)a1);
 		case SYS_yield:
 			sys_yield(e);

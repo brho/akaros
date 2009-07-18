@@ -3,6 +3,7 @@
 #include <arch/timer.h>
 
 #include <ros/syscall.h>
+#include <ros/trap.h>
 
 #include <lib.h>
 #include <measure.h>
@@ -267,7 +268,7 @@ int main(int argc, char** argv)
 				cprintf("Bug in Job Selection!!!\n");
 	}
 	waiton_barrier(bar);
-	//cprintf("Env %x, on core %d, finishes\n", env->env_id, coreid);
+	//cprintf("Env %x, on core %d, finishes\n", sys_getpid(), coreid);
 	return 0;
 	/* Options for Cache Buster:
 	 * BUSTER_SHARED

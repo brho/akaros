@@ -1,4 +1,4 @@
-// Implementation of cprintf console output for user environments,
+// Implementation of cprintf console output for user processes,
 // based on printfmt() and the sys_cputs() system call.
 //
 // cprintf is a debugging statement, not a generic output statement.

@@ -6,6 +6,7 @@
 #include <arch/types.h>
 #include <arch/x86.h>
 #include <ros/syscall.h>
+#include <ros/trap.h>
 #include <lib.h>
 
 // TODO: fix sysenter to take all 5 params
@@ -171,19 +172,19 @@ uint16_t sys_cgetc(void)
 	return syscall(SYS_cgetc, 0, 0, 0, 0, 0);
 }
 
-envid_t sys_getcpuid(void)
+size_t sys_getcpuid(void)
 {
 	return syscall(SYS_getcpuid, 0, 0, 0, 0, 0);
 }
 
-envid_t sys_getenvid(void)
+int sys_getpid(void)
 {
-	return syscall(SYS_getenvid, 0, 0, 0, 0, 0);
+	return syscall(SYS_getpid, 0, 0, 0, 0, 0);
 }
 
-error_t sys_env_destroy(envid_t envid)
+error_t sys_proc_destroy(int pid)
 {
-	return syscall(SYS_env_destroy, envid, 0, 0, 0, 0);
+	return syscall(SYS_proc_destroy, pid, 0, 0, 0, 0);
 }
 
 void sys_yield(void)
