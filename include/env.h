@@ -24,6 +24,12 @@ void	(IN_HANDLER env_destroy)(env_t *SAFE e);	// Does not return if e == curenv
 // Temporary scheduler function
 void	schedule(void);
 
+/*
+ * Allows the kernel to figure out what process is running on its core.
+ * Can be used just like a pointer to a struct process.
+ */
+#define current (curenvs[lapic_get_id()])
+
 int	envid2env(envid_t envid, env_t **env_store, bool checkperm);
 // The following three functions do not return
 void	(IN_HANDLER env_run)(env_t *e) __attribute__((noreturn));

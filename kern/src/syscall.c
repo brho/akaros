@@ -22,19 +22,23 @@
 /* This is called from sysenter's asm, with the tf on the kernel stack. */
 void sysenter_callwrapper(struct Trapframe *tf)
 {
-	env_t* curenv = curenvs[lapic_get_id()];
-	curenv->env_tf = *tf;
+	current->env_tf = *tf;
 	
 	// The trapframe on the stack should be ignored from here on.
-	tf = &curenv->env_tf;
-	tf->tf_regs.reg_eax = (intreg_t) syscall(curenv,
+	tf = &current->env_tf;
+	tf->tf_regs.reg_eax = (intreg_t) syscall(current,
 	                                         tf->tf_regs.reg_eax,
 	                                         tf->tf_regs.reg_edx,
 	                                         tf->tf_regs.reg_ecx,
 	                                         tf->tf_regs.reg_ebx,
 	                                         tf->tf_regs.reg_edi,
 	                                         0);
-	env_run(curenv);
+	/*
+	 * careful here - we need to make sure that this current is the right
+	 * process, which could be weird if the syscall blocked.  it would need to
+	 * restore the proper value in current before returning to here.
+	 */
+	env_run(current);
 }
 
 //Do absolutely nothing.  Used for profiling.

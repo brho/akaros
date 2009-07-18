@@ -45,11 +45,10 @@ int
 envid2env(envid_t envid, env_t **env_store, bool checkperm)
 {
 	env_t *e;
-	env_t* curenv = curenvs[lapic_get_id()];
 
 	// If envid is zero, return the current environment.
 	if (envid == 0) {
-		*env_store = curenv;
+		*env_store = current;
 		return 0;
 	}
 
@@ -69,7 +68,8 @@ envid2env(envid_t envid, env_t **env_store, bool checkperm)
 	// If checkperm is set, the specified environment
 	// must be either the current environment
 	// or an immediate child of the current environment.
-	if (checkperm && e != curenv && e->env_parent_id != curenv->env_id) {
+	// TODO: should check for current being null
+	if (checkperm && e != current && e->env_parent_id != current->env_id) {
 		*env_store = 0;
 		return -EBADENV;
 	}
@@ -279,9 +279,7 @@ env_alloc(env_t **newenv_store, envid_t parent_id)
 	// show them all of env, only specific things like PID, PPID, etc
 	memcpy(e->env_procinfo, e, sizeof(env_t));
 
-	env_t* curenv = curenvs[lapic_get_id()];
-
-	printk("[%08x] new env %08x\n", curenv ? curenv->env_id : 0, e->env_id);
+	printk("[%08x] new env %08x\n", current ? current->env_id : 0, e->env_id);
 	} // INIT_STRUCT
 	return 0;
 }
@@ -425,10 +423,9 @@ env_t* env_create(uint8_t *binary, size_t size)
 {
 	env_t *e;
 	int r;
-	env_t *curenv = curenvs[lapic_get_id()];
 	envid_t curid;
 	
-	curid = (curenv ? curenv->env_id : 0);	
+	curid = (current ? current->env_id : 0);	
 	if ((r = env_alloc(&e, curid)) < 0)
 		panic("env_create: %e", r);
 	load_icode(e, binary, size);
@@ -446,8 +443,7 @@ env_free(env_t *e)
 	physaddr_t pa;
 
 	// Note the environment's demise.
-	env_t* curenv = curenvs[lapic_get_id()];
-	cprintf("[%08x] free env %08x\n", curenv ? curenv->env_id : 0, e->env_id);
+	cprintf("[%08x] free env %08x\n", current ? current->env_id : 0, e->env_id);
 
 	// Flush all mapped pages in the user portion of the address space
 	static_assert(UTOP % PTSIZE == 0);
@@ -545,8 +541,8 @@ env_destroy(env_t *e)
 	// never get back to their old hlt/relaxed/spin state, so we need to force
 	// them back to an idle function.
 	uint32_t id = lapic_get_id();
-	// There is no longer a curenv for this core. (TODO: Think about this.)
-	curenvs[id] = NULL;
+	// There is no longer a current process for this core. (TODO: Think about this.)
+	current = NULL;
 	if (id) {
 		smp_idle();
 		panic("should never see me");
@@ -622,15 +618,15 @@ void env_pop_tf_sysexit(trapframe_t *tf)
 }
 
 //
-// Context switch from curenv to env e.
-// Note: if this is the first call to env_run, curenv is NULL.
+// Context switch from current process to env e.
+// Note: if this is the first call to env_run, current is NULL.
 //  (This function does not return.)
 //
 void
 env_run(env_t *e)
 {
 	// Step 1: If this is a context switch (a new environment is running),
-	//	   then set 'curenv' to the new environment,
+	//	   then set 'current' to the new environment,
 	//	   update its 'env_runs' counter, and
 	//	   and use lcr3() to switch to its address space.
 	// Step 2: Use env_pop_tf() to restore the environment's
@@ -645,8 +641,8 @@ env_run(env_t *e)
 	// TODO: race here with env destroy on the status and refcnt
 	// Could up the refcnt and down it when a process is not running
 	e->env_status = ENV_RUNNING;
-	if (e != curenvs[lapic_get_id()]) {
-		curenvs[lapic_get_id()] = e;
+	if (e != current) {
+		current = e;
 		e->env_runs++;
 		lcr3(e->env_cr3);
 	}

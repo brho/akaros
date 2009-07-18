@@ -18,14 +18,20 @@
  * userapps in kern/src/Makefrag.
  * Make sure to declare it, and add an entry.  Keep MAX_KFS_FILES big enough too
  */
-DECL_PROG(roslib_hello);
+DECL_PROG(parlib_matrix);
 DECL_PROG(roslib_null);
+DECL_PROG(roslib_hello);
+DECL_PROG(roslib_proctests);
 DECL_PROG(roslib_spawn);
+DECL_PROG(roslib_measurements);
 
 struct kfs_entry kfs[MAX_KFS_FILES] = {
-	KFS_ENTRY(roslib_hello)
+	KFS_ENTRY(parlib_matrix)
 	KFS_ENTRY(roslib_null)
+	KFS_ENTRY(roslib_hello)
+	KFS_ENTRY(roslib_proctests)
 	KFS_ENTRY(roslib_spawn)
+	KFS_ENTRY(roslib_measurements)
 };
 
 ssize_t kfs_lookup_path(char* path)
