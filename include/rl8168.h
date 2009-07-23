@@ -5,33 +5,16 @@
 #include <trap.h>
 #include <pmap.h>
 
-#define nic_debug(...)  //cprintf(__VA_ARGS__)  
-#define nic_interrupt_debug(...) // cprintf(__VA_ARGS__)  
+#define nic_debug(...)  cprintf(__VA_ARGS__)  
+#define nic_interrupt_debug(...) cprintf(__VA_ARGS__)  
 #define nic_frame_debug(...)  //cprintf(__VA_ARGS__)  
 
 // Macro for formatting PCI Configuration Address queries
 #define MK_CONFIG_ADDR(BUS, DEV, FUNC, REG) (unsigned long)( (BUS << 16) | (DEV << 11) | \
                                                              (FUNC << 8) | REG  | \
                                                              ((uint32_t)0x80000000))
-
-// General PCI Constants
-#define PCI_CONFIG_ADDR     0xCF8
-#define PCI_CONFIG_DATA     0xCFC
-
 #define REALTEK_VENDOR_ID   0x10ec
-#define INVALID_VENDOR_ID   0xFFFF
 #define REALTEK_DEV_ID      0x8168
-
-#define PCI_IO_MASK         0xFFF8
-#define PCI_MEM_MASK        0xFFFFFFF0
-#define PCI_IRQ_MASK		0xFF
-#define PCI_VENDOR_MASK		0xFFFF
-#define PCI_DEVICE_OFFSET	0x10
-#define PCI_IRQ_REG			0x3c
-
-#define PCI_MAX_BUS			256
-#define PCI_MAX_DEV			32
-#define PCI_BAR_IO_MASK		0x1
 
 // Realtek Offsets
 #define RL_HWREV_REG		0x40
@@ -143,7 +126,7 @@
 // v----- Good line ------v
 
 
-void init_nic(void);
+void nic_init(void);
 void reset_nic(void);
 void nic_interrupt_handler(trapframe_t *tf, void* data);
 int scan_pci(void);

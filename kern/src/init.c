@@ -29,6 +29,8 @@
 #include <manager.h>
 
 #include <rl8168.h>
+#include <mptables.h>
+#include <pci.h>
 
 static void print_cpuinfo(void);
 
@@ -57,9 +59,14 @@ void kernel_init(multiboot_info_t *mboot_info)
 	idt_init();
 	sysenter_init();
 	timer_init();
-	init_nic();
+	mptables_parse();
+	pci_init();
 	// this returns when all other cores are done and ready to receive IPIs
 	smp_boot();
+	
+	nic_init();
+
+		
 	/*
 	test_smp_call_functions();
 	test_checklists();

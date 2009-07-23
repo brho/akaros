@@ -93,6 +93,7 @@ extern system_timing_t system_timing;
 void pic_remap(void);
 void pic_mask_irq(uint8_t irq);
 void pic_unmask_irq(uint8_t irq);
+void ioapic_route_irq(uint8_t irq, uint8_t dest);
 void __lapic_set_timer(uint32_t ticks, uint8_t vec, bool periodic, uint8_t div);
 void lapic_set_timer(uint32_t usec, bool periodic);
 uint32_t lapic_get_default_id(void);

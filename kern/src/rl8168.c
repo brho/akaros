@@ -17,6 +17,7 @@
 #include <kmalloc.h>
 
 #include <pmap.h>
+#include <pci.h>
 
 /* RealTek 8168d (8111d) NIC Driver
  *
@@ -77,7 +78,7 @@ char* packet_buffer_orig;
 int packet_buffer_pos = 0;
 // End hacky stuff
 
-void init_nic() {
+void nic_init() {
 	
 	if (scan_pci() < 0) return;
 	read_mac();
@@ -87,78 +88,72 @@ void init_nic() {
 	eth_up = 1;
 	
 	//Trigger sw based nic interrupt
-	//outb(io_base_addr + 0x38, 0x1);
-	//udelay(3000000);
-	
+/*	cprintf("Generating interrupt...\n");
+	outb(io_base_addr + 0x38, 0x1);
+	cprintf("sleeping\n");
+	udelay(3000000);
+	cprintf("done\n");
+*/
 	return;
 }
 
 
 int scan_pci() {
 	
-	uint32_t address;
-	uint32_t lbus = 0;
-	uint32_t ldev = 0;
-	uint32_t lfunc = 0; // We only look at function 0 for now.
-	uint32_t lreg = 0; 
-	uint32_t result  = 0;
- 
+	extern pci_dev_entry pci_dev_map[PCI_MAX_BUS][PCI_MAX_DEV][PCI_MAX_FUNC];
+	extern uint16_t pci_irq_map[PCI_MAX_BUS][PCI_MAX_DEV][PCI_MAX_FUNC];
+
 	cprintf("Searching for RealTek 8168 Network device......");
 
 	for (int i = 0; i < PCI_MAX_BUS; i++)
-		for (int j = 0; j < PCI_MAX_DEV; j++) {
-
-		lbus = i;
-		ldev = j;
-		lreg = 0; // PCI REGISTER 0
-
-		address = MK_CONFIG_ADDR(lbus, ldev, lfunc, lreg); 
-
-		// Probe current bus/dev
-		outl(PCI_CONFIG_ADDR, address);
-		result = inl(PCI_CONFIG_DATA);
+		for (int j = 0; j < PCI_MAX_DEV; j++)
+			for (int k = 0; k < PCI_MAX_FUNC; k++) {
+				uint32_t address;
+				uint32_t lbus = i;
+				uint32_t ldev = j;
+				uint32_t lfunc = k;
+				uint32_t lreg = 0; 
+				uint32_t result  = 0;
 	
-		uint16_t dev_id = result >> PCI_DEVICE_OFFSET;
-		uint16_t ven_id = result & PCI_VENDOR_MASK;
+				uint16_t dev_id = pci_dev_map[i][j][k].dev_id;
+				uint16_t ven_id = pci_dev_map[i][j][k].ven_id;
 
-		// Vender DNE
-		if (ven_id == INVALID_VENDOR_ID) 
-			continue;
+				// Vender DNE
+				if (ven_id == INVALID_VENDOR_ID) 
+					continue;
 
-		// Ignore non RealTek 8168 Devices
-		if (ven_id != REALTEK_VENDOR_ID || dev_id != REALTEK_DEV_ID)
-			continue;
-		cprintf(" found on BUS %x DEV %x\n", i, j);
+				// Ignore non RealTek 8168 Devices
+				if (ven_id != REALTEK_VENDOR_ID || dev_id != REALTEK_DEV_ID)
+					continue;
+				cprintf(" found on BUS %x DEV %x\n", i, j);
 
-		// Find the IRQ
-		address = MK_CONFIG_ADDR(lbus, ldev, lfunc, PCI_IRQ_REG);
-		outl(PCI_CONFIG_ADDR, address);
-		irq = inl(PCI_CONFIG_DATA) & PCI_IRQ_MASK;
-		nic_debug("-->IRQ: %u\n", irq);
+				// Find the IRQ
+				irq = pci_irq_map[i][j][k];
+				nic_debug("-->IRQ: %u\n", irq);
 
-		// Loop over the BARs
-		for (int k = 0; k <= 5; k++) {
-			lreg = 4 + k;
-			address = MK_CONFIG_ADDR(lbus, ldev, lfunc, lreg << 2);	
-	        outl(PCI_CONFIG_ADDR, address);
-	        result = inl(PCI_CONFIG_DATA);
+				// Loop over the BARs
+				for (int k = 0; k <= 5; k++) {
+					lreg = 4 + k;
+					address = MK_CONFIG_ADDR(lbus, ldev, lfunc, lreg << 2);	
+			        outl(PCI_CONFIG_ADDR, address);
+			        result = inl(PCI_CONFIG_DATA);
 					
-			if (result == 0) // (0 denotes no valid data)
-				continue;
+					if (result == 0) // (0 denotes no valid data)
+						continue;
 
-			// Read the bottom bit of the BAR. 
-			if (result & PCI_BAR_IO_MASK) {
-				result = result & PCI_IO_MASK;
-				nic_debug("-->BAR%u: %s --> %x\n", k, "IO", result);
-			} else {
-				result = result & PCI_MEM_MASK;
-				nic_debug("-->BAR%u: %s --> %x\n", k, "MEM", result);
-			}
+					// Read the bottom bit of the BAR. 
+					if (result & PCI_BAR_IO_MASK) {
+						result = result & PCI_IO_MASK;
+						nic_debug("-->BAR%u: %s --> %x\n", k, "IO", result);
+					} else {
+						result = result & PCI_MEM_MASK;
+						nic_debug("-->BAR%u: %s --> %x\n", k, "MEM", result);
+					}
 			
-			// TODO Switch to memory mapped instead of IO?
-			if (k == 0) // BAR0 denotes the IO Addr for the device
-				io_base_addr = result;						
-		}
+					// TODO Switch to memory mapped instead of IO?
+					if (k == 0) // BAR0 denotes the IO Addr for the device
+						io_base_addr = result;						
+				}
 		
 		nic_debug("-->hwrev: %x\n", inl(io_base_addr + RL_HWREV_REG) & RL_HWREV_MASK);
 		
@@ -349,9 +344,9 @@ void setup_interrupts() {
 	
 	// Kernel based interrupt stuff
 	register_interrupt_handler(interrupt_handlers, KERNEL_IRQ_OFFSET + irq, nic_interrupt_handler, 0);
-	pic_unmask_irq(irq);
-	unmask_lapic_lvt(LAPIC_LVT_LINT0);
-	
+	//pic_unmask_irq(irq);
+	//unmask_lapic_lvt(LAPIC_LVT_LINT0);
+	ioapic_route_irq(irq, 7);	
 	return;
 }
 
