@@ -11,7 +11,7 @@
 #include <pmap.h>
 #include <trap.h>
 #include <monitor.h>
-#include <env.h>
+#include <process.h>
 
 #include <syscall.h>
 
@@ -219,9 +219,8 @@ void
 	// should this be if == 3?  Sort out later when we handle traps.
 	// so far we never get here
 	assert(0);
-        // Return to the current environment, which should be runnable.
-        assert(current && current->env_status == ENV_RUNNABLE);
-        env_run(current);
+	// Return to the current environment, which should be runnable.
+	env_run(current);
 }
 
 void

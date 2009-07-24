@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2009 The Regents of the University of California
+ * Barret Rhoden <brho@cs.berkeley.edu>
  * See LICENSE for details.
  */
 
@@ -13,7 +14,7 @@
 
 #include <assert.h>
 #include <manager.h>
-#include <env.h>
+#include <process.h>
 #include <workqueue.h>
 #include <syscall.h>
 #include <testing.h>
@@ -32,17 +33,19 @@ void manager(void)
 	switch (progress++) {
 		case 0:
 			// careful, should check error codes returned from kfs_lookup_path
-			envs[0] = kfs_proc_create(kfs_lookup_path("roslib_spawn"));
+			//envs[0] = kfs_proc_create(kfs_lookup_path("roslib_spawn"));
+			envs[0] = kfs_proc_create(kfs_lookup_path("roslib_hello"));
+			proc_set_state(envs[0], PROC_RUNNABLE_S);
 			env_run(envs[0]);
 			break;
 		case 1:
-			#if 0
 			envs[0] = ENV_CREATE(roslib_proctests);
 			envs[1] = ENV_CREATE(roslib_proctests);
 			envs[2] = ENV_CREATE(roslib_proctests);
 			envs[3] = ENV_CREATE(roslib_proctests);
 			env_run(envs[0]);
 			break;
+			#if 0
 			#endif
 		case 2:
 		case 3:

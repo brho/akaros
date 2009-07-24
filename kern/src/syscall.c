@@ -13,7 +13,7 @@
 
 #include <string.h>
 #include <assert.h>
-#include <env.h>
+#include <process.h>
 #include <pmap.h>
 #include <trap.h>
 #include <syscall.h>
@@ -197,6 +197,7 @@ static envid_t sys_getcpuid(void)
 	return lapic_get_id();
 }
 
+// TODO FIX Me!!!! for processes
 // Destroy a given environment (possibly the currently running environment).
 //
 // Returns 0 on success, < 0 on error.  Errors are:
@@ -220,14 +221,22 @@ static error_t sys_env_destroy(env_t* e, envid_t envid)
 /*
  * Current process yields its remaining "time slice".  Currently works for
  * single-core processes.
+ * TODO: think about how this works with async calls and multicored procs.
+ * Want it to only be callable locally.
  */
-static void sys_yield(env_t *e)
+static void sys_yield(struct proc *p)
 {
 	// TODO: watch for races throughout anything related to process statuses
 	// and schedule/yielding
-	assert(e->env_status == ENV_RUNNING);
-	e->env_status = ENV_RUNNABLE;
+	assert(p->state == PROC_RUNNING_S);
+	p->state = PROC_RUNNABLE_S;
 	schedule();
+
+	/* TODO
+	 * if running_s, give up your time slice (schedule, save silly state, block)
+	 * if running_m and 2+ cores are left, give yours up, stay runnable_m
+	 * if running_m and last core, switch to runnable_s
+	 */
 }
 
 /*
@@ -235,8 +244,9 @@ static void sys_yield(env_t *e)
  * Not runnable by default, so it needs it's status to be changed so that the
  * next call to schedule() will try to run it.
  * TODO: once we have a decent VFS, consider splitting this up
+ * and once there's an mmap, can have most of this in process.c
  */
-static int sys_proc_create(env_t *e, const char *DANGEROUS path)
+static int sys_proc_create(struct proc *p, const char *DANGEROUS path)
 {
 	#define MAX_PATH_LEN 256 // totally arbitrary
 	int pid = 0;
@@ -247,30 +257,31 @@ static int sys_proc_create(env_t *e, const char *DANGEROUS path)
 	 * whether or not it's a big deal that the pointer could be into kernel
 	 * space, and resolving both of these without knowing the length of the
 	 * string. (TODO)
+	 * Change this so that all syscalls with a pointer take a length.
 	 */
 	strncpy(tpath, path, MAX_PATH_LEN);
 	int kfs_inode = kfs_lookup_path(tpath);
 	if (kfs_inode < 0)
 		return -EINVAL;
-	env_t *new_e = kfs_proc_create(kfs_inode);
-	return new_e->env_id; // TODO replace this with a real proc_id
+	struct proc *new_p = kfs_proc_create(kfs_inode);
+	return new_p->env_id; // TODO replace this with a real proc_id
 }
 
 /* Makes process PID runnable.  Consider moving the functionality to env.c */
-static error_t sys_proc_run(env_t *e, int pid)
+static error_t sys_proc_run(struct proc *p, unsigned pid)
 {
-	// TODO PIDs are currently env_id's and encapsulate these functions better
-	// TODO worry about concurrency on the statuses
-	// get the target process (techincally a neg number is invalid)
-	env_t *target = &envs[ENVX(pid)];
-	// make sure it's in the right state to be activated
-	if (target->env_status != ENV_CREATED)
-		return -EINVAL;
-	// make sure we have access (are the parent of)
-	if (target->env_parent_id != e->env_id)
-		return -EINVAL;
-	target->env_status = ENV_RUNNABLE;	
-	return 0;
+	struct proc *target = get_proc(pid);
+	error_t retval = 0;
+	spin_lock(&p->lock); // note we can get interrupted here.  it's not bad.
+	// make sure we have access and it's in the right state to be activated
+	if (!proc_controls(p, target))
+		retval = -EPERM;
+	else if (target->state != PROC_CREATED)
+		retval = -EINVAL;
+	else
+		proc_set_state(target, PROC_RUNNABLE_S);
+	spin_unlock(&p->lock);
+	return retval;
 }
 
 // TODO: Build a dispatch table instead of switching on the syscallno

@@ -21,7 +21,7 @@
 #include <assert.h>
 #include <monitor.h>
 #include <pmap.h>
-#include <env.h>
+#include <process.h>
 #include <trap.h>
 #include <testing.h>
 #include <syscall.h>

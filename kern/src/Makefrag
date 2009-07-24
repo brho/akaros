@@ -37,6 +37,7 @@ KERN_SRCFILES := $(KERN_SRC_DIR)/entry.S \
                  $(KERN_SRC_DIR)/string.c \
                  $(KERN_SRC_DIR)/timer.c \
                  $(KERN_SRC_DIR)/kfs.c \
+                 $(KERN_SRC_DIR)/process.c \
                  $(KERN_SRC_DIR)/kmalloc.c
 # Only build files if they exist.
 KERN_SRCFILES := $(wildcard $(KERN_SRCFILES))

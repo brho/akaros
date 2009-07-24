@@ -9,7 +9,7 @@
 #include <ros/memlayout.h>
 #include <arch/multiboot.h>
 #include <atomic.h>
-#include <env.h>
+#include <process.h>
 #include <assert.h>
 #include <sys/queue.h>
 

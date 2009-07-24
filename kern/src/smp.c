@@ -13,7 +13,7 @@
 #include <string.h>
 #include <assert.h>
 #include <pmap.h>
-#include <env.h>
+#include <process.h>
 #include <trap.h>
 
 volatile uint8_t num_cpus = 0xee;

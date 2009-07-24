@@ -15,7 +15,7 @@
 #include <string.h>
 #include <testing.h>
 #include <trap.h>
-#include <env.h>
+#include <process.h>
 #include <syscall.h>
 
 #define test_vector 0xeb

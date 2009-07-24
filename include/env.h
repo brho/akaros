@@ -37,22 +37,13 @@ typedef int32_t envid_t;
 #define NENV			(1 << LOG2NENV)
 #define ENVX(envid)		((envid) & (NENV - 1))
 
-// Values of env_status in struct Env
-// TODO: think about what states we want.
-#define ENV_FREE			0
-#define ENV_RUNNING			1
-#define ENV_RUNNABLE		2
-#define ENV_NOT_RUNNABLE	3
-#define ENV_DYING			4
-#define ENV_CREATED			5
-
 struct Env {
 	LIST_ENTRY(Env) env_link NOINIT;	// Free list link pointers
 	uint32_t lock;
 	trapframe_t env_tf;			// Saved registers
 	envid_t env_id;				// Unique environment identifier
 	envid_t env_parent_id;		// env_id of this env's parent
-	unsigned env_status;		// Status of the environment
+	proc_state_t state;         // Status of the process
 	uint32_t env_runs;			// Number of times environment has run
 	uint32_t env_refcnt;		// Reference count of kernel contexts using this
 	uint32_t env_flags;
@@ -106,12 +97,13 @@ void	env_pop_tf_sysexit(trapframe_t *tf) __attribute__((noreturn));
 /* Helper handler for smp_call to dispatch jobs to other cores */
 void run_env_handler(trapframe_t *tf, void* data);
 
+// TODO remove this legacy crap
 #define ENV_CREATE(x)			({                                             \
 	extern uint8_t _binary_obj_user_apps_##x##_start[],                        \
 		_binary_obj_user_apps_##x##_size[];                                    \
 	env_t *e = env_create(_binary_obj_user_apps_##x##_start,                   \
 		(int)_binary_obj_user_apps_##x##_size);                                \
-	e->env_status = ENV_RUNNABLE;                                              \
+	proc_set_state(e, PROC_RUNNABLE_S);                                        \
 	e;                                                                         \
 })
 

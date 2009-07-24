@@ -13,7 +13,7 @@
 #include <atomic.h>
 #include <string.h>
 #include <assert.h>
-#include <env.h>
+#include <process.h>
 #include <pmap.h>
 #include <trap.h>
 #include <monitor.h>
@@ -58,7 +58,7 @@ envid2env(envid_t envid, env_t **env_store, bool checkperm)
 	// (i.e., does not refer to a _previous_ environment
 	// that used the same slot in the envs[] array).
 	e = &envs[ENVX(envid)];
-	if (e->env_status == ENV_FREE || e->env_id != envid) {
+	if (e->state == ENV_FREE || e->env_id != envid) {
 		*env_store = 0;
 		return -EBADENV;
 	}
@@ -83,6 +83,7 @@ envid2env(envid_t envid, env_t **env_store, bool checkperm)
 // and insert them into the env_free_list.
 // Insert in reverse order, so that the first call to env_alloc()
 // returns envs[0].
+// TODO: get rid of this whole array bullshit
 //
 void
 env_init(void)
@@ -91,7 +92,7 @@ env_init(void)
 	LIST_INIT(&env_free_list);
 	for (i = NENV-1; i >= 0; i--) {
 		// these should already be set from when i memset'd the array to 0
-		envs[i].env_status = ENV_FREE;
+		envs[i].state = ENV_FREE;
 		envs[i].env_id = 0;
 		LIST_INSERT_HEAD(&env_free_list, &envs[i], env_link);
 	}
@@ -160,6 +161,7 @@ WRITES(e->env_pgdir, e->env_cr3, e->env_procinfo, e->env_procdata,
 
 	// should be able to do this so long as boot_pgdir never has
 	// anything put below UTOP
+	// TODO check on this!  had a nasty bug because of it
 	memcpy(e->env_pgdir, boot_pgdir, PGSIZE);
 
 	// something like this.  TODO, if you want
@@ -225,8 +227,6 @@ env_alloc(env_t **newenv_store, envid_t parent_id)
 	if (!(e = LIST_FIRST(&env_free_list)))
 		return -ENOFREEENV;
 	
-	//memset((void*)e + sizeof(e->env_link), 0, sizeof(*e) - sizeof(e->env_link));
-
     { INITSTRUCT(*e)
 
 	// Allocate and set up the page directory for this environment.
@@ -242,7 +242,7 @@ env_alloc(env_t **newenv_store, envid_t parent_id)
 	// Set the basic status variables.
     e->lock = 0;
 	e->env_parent_id = parent_id;
-	e->env_status = ENV_CREATED;
+	proc_set_state(e, PROC_CREATED);
 	e->env_runs = 0;
 	e->env_refcnt = 1;
 	e->env_flags = 0;
@@ -479,7 +479,7 @@ env_free(env_t *e)
 	page_decref(pa2page(pa));
 
 	// return the environment to the free list
-	e->env_status = ENV_FREE;
+	e->state = ENV_FREE;
 	LIST_INSERT_HEAD(&env_free_list, e, env_link);
 }
 
@@ -531,8 +531,8 @@ void env_decref(env_t* e)
 void
 env_destroy(env_t *e)
 {
-	// TODO: race condition with env statuses, esp when running / destroying
-	e->env_status = ENV_DYING;
+	// TODO: XME race condition with env statuses, esp when running / destroying
+	proc_set_state(e, PROC_DYING);
 
 	env_decref(e);
 	atomic_dec(&num_envs);
@@ -570,10 +570,10 @@ void schedule(void)
 	
 	for (int i = 0, j = last_picked + 1; i < NENV; i++, j = (j + 1) % NENV) {
 		e = &envs[ENVX(j)];
-		// TODO: race here, if another core is just about to start this env.
+		// TODO: XME race here, if another core is just about to start this env.
 		// Fix it by setting the status in something like env_dispatch when
 		// we have multi-contexted processes
-		if (e && e->env_status == ENV_RUNNABLE) {
+		if (e && e->state == PROC_RUNNABLE_S) {
 			last_picked = j;
 			env_run(e);
 		}
@@ -638,17 +638,38 @@ env_run(env_t *e)
 	//	and make sure you have set the relevant parts of
 	//	e->env_tf to sensible values.
 
-	// TODO: race here with env destroy on the status and refcnt
+	// TODO: XME race here with env destroy on the status and refcnt
 	// Could up the refcnt and down it when a process is not running
-	e->env_status = ENV_RUNNING;
+	
+	// TODO XME need different code paths for retarting a core (pop) and
+	// running for the first time
+	if (e->state == PROC_RUNNABLE_S)
+		proc_set_state(e, PROC_RUNNING_S);
+
 	if (e != current) {
 		current = e;
 		e->env_runs++;
-		lcr3(e->env_cr3);
+		lcr3(e->env_cr3); // think about the refcnt here
 	}
 	/* If the process entered the kernel via sysenter, we need to leave via
 	 * sysexit.  sysenter trapframes have 0 for a CS, which is pushed in
 	 * sysenter_handler.
+	 *
+	 *           FFFFFFFFF UU     UU    CCCCCC  KK     KK  #
+	 *           FF        UU     UU  CCC       KK    KK   #
+	 *           FF        UU     UU CC         KK  KK     #
+	 *           FFFFFF    UU     UU CC         KKKKK      #
+	 *           FF        UU     UU CC         KK  KK     #
+	 *           FF         UU   UU   CCC       KK    KK    
+	 *           FF          UUUUU      CCCCCC  KK     KK  #
+	 *
+	 * TODO think about when we no longer need the stack, in case we are
+	 * preempted and expected to run again from somewhere else.  we can't
+	 * expect to have the kernel stack around anymore.
+	 * I think we need to make it such that the kernel in "process context"
+	 * never gets removed from the core (displaced from its stack)
+	 * would like to leave interrupts on too, so long as we come back.
+	 * Consider a moveable flag or something
 	 */
 	if (e->env_tf.tf_cs)
   		env_pop_tf(&e->env_tf);
@@ -658,7 +679,7 @@ env_run(env_t *e)
 
 /* This is the top-half of an interrupt handler, where the bottom half is
  * env_run (which never returns).  Just add it to the delayed work queue,
- * which isn't really a queue yet.
+ * which isn't really a queue yet. (TODO: better encapsulation)
  */
 void run_env_handler(trapframe_t *tf, void* data)
 {

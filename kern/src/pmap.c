@@ -14,7 +14,7 @@
 #include <assert.h>
 #include <pmap.h>
 #include <kclock.h>
-#include <env.h>
+#include <process.h>
 
 // These variables are set by i386_detect_memory()
 static physaddr_t maxpa;	// Maximum physical address

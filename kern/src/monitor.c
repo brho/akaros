@@ -280,8 +280,9 @@ int mon_kfs_run(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 		printk("Bad filename!\n");
 		return 1;
 	}
-	env_t *new_e = kfs_proc_create(kfs_inode);
-	new_e->env_status = ENV_RUNNABLE;
+	struct proc *p = kfs_proc_create(kfs_inode);
+	// go from PROC_CREATED->PROC_RUNNABLE_S
+	proc_set_state(p, PROC_RUNNABLE_S);
 	// Should never return from schedule (env_pop in there)
 	// also note you may not get the process you created, in the event there
 	// are others floating around that are runnable
