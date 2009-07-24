@@ -129,7 +129,7 @@ idt_init(void)
 void
 (IN_HANDLER print_trapframe)(trapframe_t *tf)
 {
-	cprintf("TRAP frame at %p on core %d\n", tf, lapic_get_id());
+	cprintf("TRAP frame at %p on core %d\n", tf, coreid());
 	print_regs(&tf->tf_regs);
 	cprintf("  es   0x----%04x\n", tf->tf_es);
 	cprintf("  ds   0x----%04x\n", tf->tf_ds);
@@ -226,8 +226,8 @@ void
 void
 (IN_HANDLER irq_handler)(trapframe_t *tf)
 {
-	//if (lapic_get_id())
-	//	cprintf("Incoming IRQ, ISR: %d on core %d\n", tf->tf_trapno, lapic_get_id());
+	//if (coreid())
+	//	cprintf("Incoming IRQ, ISR: %d on core %d\n", tf->tf_trapno, coreid());
 	// merge this with alltraps?  other than the EOI... or do the same in all traps
 
 	extern handler_wrapper_t handler_wrappers[NUM_HANDLER_WRAPPERS];
@@ -309,7 +309,7 @@ page_fault_handler(trapframe_t *tf)
 
 	// Destroy the environment that caused the fault.
 	cprintf("[%08x] user fault va %08x ip %08x from core %d\n",
-		current->env_id, fault_va, tf->tf_eip, lapic_get_id());
+		current->env_id, fault_va, tf->tf_eip, coreid());
 	print_trapframe(tf);
 	env_destroy(current);
 }

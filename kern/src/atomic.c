@@ -104,7 +104,7 @@ void reset_checklist(checklist_t* list)
 // CPU mask specific - this is how cores report in
 void down_checklist(checklist_t* list)
 {
-	CLR_BITMASK_BIT_ATOMIC(list->mask.bits, lapic_get_id());
+	CLR_BITMASK_BIT_ATOMIC(list->mask.bits, coreid());
 }
 
 /* Barriers */

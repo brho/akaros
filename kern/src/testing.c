@@ -68,7 +68,7 @@ void test_pic_reception(void)
 	cprintf("PIC1 Mask = 0x%04x\n", inb(PIC1_DATA));
 	cprintf("PIC2 Mask = 0x%04x\n", inb(PIC2_DATA));
 	unmask_lapic_lvt(LAPIC_LVT_LINT0);
-	cprintf("Core %d's LINT0: 0x%08x\n", lapic_get_id(), read_mmreg32(LAPIC_LVT_LINT0));
+	cprintf("Core %d's LINT0: 0x%08x\n", coreid(), read_mmreg32(LAPIC_LVT_LINT0));
 	enable_irq();
 	while(1);
 }
@@ -225,8 +225,7 @@ checklist_t* the_global_list;
 
 void test_checklist_handler(trapframe_t *tf, void* data)
 {
-	for (int i = 0; i < SMP_BOOT_TIMEOUT; i++);
-	for (int i = 0; i < SMP_BOOT_TIMEOUT; i++);
+	udelay(1000000);
 	down_checklist(the_global_list);
 }
 
@@ -246,7 +245,7 @@ void test_checklists(void)
 	CLR_BITMASK(a_list.mask.bits, a_list.mask.size);
 	INIT_CHECKLIST_MASK(a_mask, MAX_NUM_CPUS);
 	FILL_BITMASK(a_mask.bits, num_cpus);
-	//CLR_BITMASK_BIT(a_mask.bits, lapic_get_id());
+	//CLR_BITMASK_BIT(a_mask.bits, coreid());
 	//SET_BITMASK_BIT(a_mask.bits, 1);
 	//printk("New mask (1, 17, 25):\n");
 	printk("Created new mask, filled up to num_cpus\n");
@@ -281,7 +280,7 @@ void test_smp_call_functions(void)
 {
 	handler_wrapper_t *waiter0 = 0, *waiter1 = 0, *waiter2 = 0, *waiter3 = 0,
 	                  *waiter4 = 0, *waiter5 = 0;
-	uint8_t me = lapic_get_id();
+	uint8_t me = coreid();
 	printk("\nCore %d: SMP Call Self (nowait):\n", me);
 	printk("---------------------\n");
 	smp_call_function_self(test_hello_world_handler, 0, 0);
@@ -542,7 +541,7 @@ void test_run_measurements(uint32_t job_num)
 void test_hello_world_handler(trapframe_t *tf, void* data)
 {
 	cprintf("Incoming IRQ, ISR: %d on core %d with tf at 0x%08x\n",
-		tf->tf_trapno, lapic_get_id(), tf);
+		tf->tf_trapno, coreid(), tf);
 }
 
 uint32_t print_info_lock = 0;
@@ -551,7 +550,7 @@ void test_print_info_handler(trapframe_t *tf, void* data)
 {
 	spin_lock_irqsave(&print_info_lock);
 	cprintf("----------------------------\n");
-	cprintf("This is Core %d\n", lapic_get_id());
+	cprintf("This is Core %d\n", coreid());
 	cprintf("MTRR_DEF_TYPE = 0x%08x\n", read_msr(IA32_MTRR_DEF_TYPE));
 	cprintf("MTRR Phys0 Base = 0x%016llx, Mask = 0x%016llx\n",
 	        read_msr(0x200), read_msr(0x201));
@@ -575,18 +574,18 @@ void test_print_info_handler(trapframe_t *tf, void* data)
 
 void test_barrier_handler(trapframe_t *tf, void* data)
 {
-	cprintf("Round 1: Core %d\n", lapic_get_id());
+	cprintf("Round 1: Core %d\n", coreid());
 	waiton_barrier(&test_cpu_array);
 	waiton_barrier(&test_cpu_array);
 	waiton_barrier(&test_cpu_array);
 	waiton_barrier(&test_cpu_array);
 	waiton_barrier(&test_cpu_array);
 	waiton_barrier(&test_cpu_array);
-	cprintf("Round 2: Core %d\n", lapic_get_id());
+	cprintf("Round 2: Core %d\n", coreid());
 	waiton_barrier(&test_cpu_array);
-	cprintf("Round 3: Core %d\n", lapic_get_id());
+	cprintf("Round 3: Core %d\n", coreid());
 	// uncomment to see it fucked up
-	//cprintf("Round 4: Core %d\n", lapic_get_id());
+	//cprintf("Round 4: Core %d\n", coreid());
 }
 
 static void test_waiting_handler(trapframe_t *tf, void* data)

@@ -540,7 +540,7 @@ env_destroy(env_t *e)
 	// for old envs that die on user cores.  since env run never returns, cores
 	// never get back to their old hlt/relaxed/spin state, so we need to force
 	// them back to an idle function.
-	uint32_t id = lapic_get_id();
+	uint32_t id = coreid();
 	// There is no longer a current process for this core. (TODO: Think about this.)
 	current = NULL;
 	if (id) {
@@ -671,6 +671,10 @@ env_run(env_t *e)
 	 * would like to leave interrupts on too, so long as we come back.
 	 * Consider a moveable flag or something
 	 */
+	/* workqueue with the todo item put there by the interrupt handler when
+	 * it realizes we were in the kernel in the first place.  disable ints
+	 * before checking the queue and deciding to pop out or whatever.
+	 */
 	if (e->env_tf.tf_cs)
   		env_pop_tf(&e->env_tf);
 	else
@@ -679,16 +683,17 @@ env_run(env_t *e)
 
 /* This is the top-half of an interrupt handler, where the bottom half is
  * env_run (which never returns).  Just add it to the delayed work queue,
- * which isn't really a queue yet. (TODO: better encapsulation)
+ * which (incidentally) can only hold one item at this point.
  */
-void run_env_handler(trapframe_t *tf, void* data)
+void run_env_handler(trapframe_t *tf, void *data)
 {
 	assert(data);
-	per_cpu_info_t *cpuinfo = &per_cpu_info[lapic_get_id()];
-	spin_lock_irqsave(&cpuinfo->lock);
+	struct work job;
+	struct workqueue *workqueue = &per_cpu_info[coreid()].workqueue;
 	{ TRUSTEDBLOCK // TODO: how do we make this func_t cast work?
-	cpuinfo->delayed_work.func = (func_t)env_run;
-	cpuinfo->delayed_work.data = data;
+	job.func = (func_t)env_run;
+	job.data = data;
 	}
-	spin_unlock_irqsave(&cpuinfo->lock);
+	if (enqueue_work(workqueue, &job))
+		panic("Failed to enqueue work!");
 }

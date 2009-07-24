@@ -85,7 +85,7 @@ void	schedule(void);
  * Allows the kernel to figure out what process is running on its core.
  * Can be used just like a pointer to a struct process.
  */
-#define current (curenvs[lapic_get_id()])
+#define current (curenvs[coreid()])
 
 int	envid2env(envid_t envid, env_t **env_store, bool checkperm);
 // The following three functions do not return

@@ -112,7 +112,7 @@ static void sys_cache_buster(env_t* e, uint32_t num_writes, uint32_t num_pages,
 	 * Also, doesn't separate memory for core 0 if it's an async call.
 	 */
 	if (!(flags & BUSTER_SHARED))
-		buster = (uint32_t*)(BUSTER_ADDR + lapic_get_id() * 0x00800000);
+		buster = (uint32_t*)(BUSTER_ADDR + coreid() * 0x00800000);
 
 	/* Start the timer, if we're asked to print this info*/
 	if (flags & BUSTER_PRINT_TICKS)
@@ -194,7 +194,7 @@ static envid_t sys_getenvid(env_t* e)
 // Returns the id of the cpu this syscall is executed on.
 static envid_t sys_getcpuid(void)
 {
-	return lapic_get_id();
+	return coreid();
 }
 
 // TODO FIX Me!!!! for processes

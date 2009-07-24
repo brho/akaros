@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2009 The Regents of the University of California
+ * Barret Rhoden <brho@cs.berkeley.edu>
+ * See LICENSE for details.
+ */
+
 #ifndef ROS_INC_SMP_H
 #define ROS_INC_SMP_H
 
@@ -9,14 +15,6 @@
 #include <trap.h>
 #include <workqueue.h>
 
-#ifdef __BOCHS__
-#define SMP_CALL_FUNCTION_TIMEOUT    0x00ffffff
-#define SMP_BOOT_TIMEOUT             0x0000ffff
-#else
-#define SMP_CALL_FUNCTION_TIMEOUT    0x7ffffff0
-#define SMP_BOOT_TIMEOUT             0x002fffff
-#endif
-
 // be careful changing this, esp if you go over 16
 #define NUM_HANDLER_WRAPPERS		5
 
@@ -25,13 +23,12 @@ typedef struct HandlerWrapper {
 	uint8_t vector;
 } handler_wrapper_t;
 
-typedef struct per_cpu_info {
+// will want this padded out to cacheline alignment
+struct per_cpu_info {
 	uint32_t lock;
-	// Once we have a real kmalloc, we can make this dynamic.  Want a queue.
-	work_t delayed_work;
-	// will want it padded out to an even cacheline
-} per_cpu_info_t;
-extern per_cpu_info_t per_cpu_info[MAX_NUM_CPUS];
+	struct workqueue workqueue;
+};
+extern struct per_cpu_info  per_cpu_info[MAX_NUM_CPUS];
 extern volatile uint8_t num_cpus;
 
 /* SMP bootup functions */

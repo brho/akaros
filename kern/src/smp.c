@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2009 The Regents of the University of California
+ * Barret Rhoden <brho@cs.berkeley.edu>
+ * See LICENSE for details.
+ */
+
 #ifdef __DEPUTY__
 #pragma nodeputy
 #endif
@@ -18,7 +24,7 @@
 
 volatile uint8_t num_cpus = 0xee;
 uintptr_t smp_stack_top;
-per_cpu_info_t per_cpu_info[MAX_NUM_CPUS];
+struct per_cpu_info per_cpu_info[MAX_NUM_CPUS];
 
 /*************************** IPI Wrapper Stuff ********************************/
 // checklists to protect the global interrupt_handlers for 0xf0, f1, f2, f3, f4
@@ -210,7 +216,7 @@ uint32_t smp_main(void)
 	lapic_enable();
 
 	// set a default logical id for now
-	lapic_set_logid(lapic_get_id());
+	lapic_set_logid(coreid());
 
 	return my_stack_top; // will be loaded in smp_entry.S
 }
@@ -256,14 +262,14 @@ static int smp_call_function(uint8_t type, uint8_t dest, isr_t handler, void* da
 	cpu_mask.size = num_cpus;
 	switch (type) {
 		case 1: // self
-			SET_BITMASK_BIT(cpu_mask.bits, lapic_get_id());
+			SET_BITMASK_BIT(cpu_mask.bits, coreid());
 			break;
 		case 2: // all
 			FILL_BITMASK(cpu_mask.bits, num_cpus);
 			break;
 		case 3: // all but self
 			FILL_BITMASK(cpu_mask.bits, num_cpus);
-			CLR_BITMASK_BIT(cpu_mask.bits, lapic_get_id());
+			CLR_BITMASK_BIT(cpu_mask.bits, coreid());
 			break;
 		case 4: // physical mode
 			// note this only supports sending to one specific physical id
@@ -287,7 +293,7 @@ static int smp_call_function(uint8_t type, uint8_t dest, isr_t handler, void* da
 	// When we are done, wrapper points to the one we finally got.
 	// this wrapper_num trick doesn't work as well if you send a bunch in a row
 	// and wait, since you always check your main one (which is currently busy).
-	wrapper_num = lapic_get_id() % NUM_HANDLER_WRAPPERS;
+	wrapper_num = coreid() % NUM_HANDLER_WRAPPERS;
 	while(1) {
 		wrapper = &handler_wrappers[wrapper_num];
 		if (!commit_checklist_wait(wrapper->cpu_list, &cpu_mask))

@@ -78,14 +78,14 @@ void _panic(const char *file, int line, const char *fmt,...)
 	va_list ap;
 
 	va_start(ap, fmt);
-	cprintf("kernel panic at %s:%d, from core %d: ", file, line, lapic_get_id());
+	cprintf("kernel panic at %s:%d, from core %d: ", file, line, coreid());
 	vcprintf(fmt, ap);
 	cprintf("\n");
 	va_end(ap);
 
 dead:
 	/* break into the kernel monitor, if we're core 0 */
-	if (lapic_get_id()) {
+	if (coreid()) {
 		smp_idle();
 		panic("should never see me");
 	}
@@ -99,7 +99,7 @@ void _warn(const char *file, int line, const char *fmt,...)
 	va_list ap;
 
 	va_start(ap, fmt);
-	cprintf("kernel warning at %s:%d, from core %d: ", file, line, lapic_get_id());
+	cprintf("kernel warning at %s:%d, from core %d: ", file, line, coreid());
 	vcprintf(fmt, ap);
 	cprintf("\n");
 	va_end(ap);

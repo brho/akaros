@@ -219,7 +219,7 @@ int mon_cpuinfo(int argc, char **argv, trapframe_t *tf)
 	extern uint8_t num_cpus;
 
 	cprintf("Number of CPUs detected: %d\n", num_cpus);	
-	cprintf("Calling CPU's LAPIC ID: 0x%08x\n", lapic_get_id());
+	cprintf("Calling CPU's LAPIC ID: 0x%08x\n", coreid());
 	if (argc < 2)
 		smp_call_function_self(test_print_info_handler, 0, 0);
 	else
@@ -337,8 +337,8 @@ static int runcmd(char *COUNT(CMDBUF_SIZE) real_buf, trapframe_t *tf) {
 void monitor(trapframe_t *tf) {
 	char *buf;
 
-	cprintf("Welcome to the ROS kernel monitor!\n");
-	cprintf("Type 'help' for a list of commands.\n");
+	printk("Welcome to the ROS kernel monitor on core %d!\n", coreid());
+	printk("Type 'help' for a list of commands.\n");
 
 	if (tf != NULL)
 		print_trapframe(tf);

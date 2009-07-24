@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2009 The Regents of the University of California
+ * Barret Rhoden <brho@cs.berkeley.edu>
  * See LICENSE for details.
  */
 
@@ -110,6 +111,7 @@ static inline void lapic_send_eoi(void);
 static inline uint32_t lapic_get_version(void);
 static inline uint32_t lapic_get_error(void);
 static inline uint32_t lapic_get_id(void);
+static inline void lapic_set_id(uint8_t id); // Careful, may not actually work
 static inline uint8_t lapic_get_logid(void);
 static inline void lapic_set_logid(uint8_t id);
 static inline void lapic_disable(void);
@@ -154,6 +156,11 @@ static inline uint32_t lapic_get_error(void)
 static inline uint32_t lapic_get_id(void)
 {
 	return read_mmreg32(LAPIC_ID) >> 24;
+}
+
+static inline void lapic_set_id(uint8_t id)
+{
+	write_mmreg32(LAPIC_ID, id << 24);
 }
 
 static inline uint8_t lapic_get_logid(void)

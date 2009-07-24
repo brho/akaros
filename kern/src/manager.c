@@ -32,13 +32,12 @@ void manager(void)
 
 	switch (progress++) {
 		case 0:
-			// careful, should check error codes returned from kfs_lookup_path
-			//envs[0] = kfs_proc_create(kfs_lookup_path("roslib_spawn"));
 			envs[0] = kfs_proc_create(kfs_lookup_path("roslib_hello"));
 			proc_set_state(envs[0], PROC_RUNNABLE_S);
 			env_run(envs[0]);
 			break;
 		case 1:
+			panic("Do not panic");
 			envs[0] = ENV_CREATE(roslib_proctests);
 			envs[1] = ENV_CREATE(roslib_proctests);
 			envs[2] = ENV_CREATE(roslib_proctests);
@@ -48,6 +47,15 @@ void manager(void)
 			#if 0
 			#endif
 		case 2:
+			#if 0
+			// reminder of how to spawn remotely
+			for (int i = 0; i < 8; i++) {
+				envs[i] = kfs_proc_create(kfs_lookup_path("roslib_hello"));
+				proc_set_state(envs[i], PROC_RUNNABLE_S);
+				smp_call_function_single(i, run_env_handler, envs[i], 0);
+			}
+			process_workqueue();
+			#endif
 		case 3:
 		#if 0
 		case 0:
