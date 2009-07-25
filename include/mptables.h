@@ -20,8 +20,6 @@
 #define TOPOFMEM_POINTER	0x0413		/* BIOS: base memory size */
 #define IMCRP_MASK		0x8000
 
-#define IOAPIC_MAX_ID	256
-
 #define NUM_ENTRY_TYPES 5
 
 enum interrupt_modes {
@@ -155,6 +153,8 @@ typedef struct PCIINTENTRY {
     uint16_t		dstApicID; // A value of 256 or greater means not valid.
     uint8_t		dstApicINT;
 } pci_int_entry;
+
+typedef pci_int_entry isa_int_entry;
 
 typedef struct PCIINTGROUP {
 	pci_int_entry intn[4];

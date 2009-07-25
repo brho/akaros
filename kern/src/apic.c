@@ -8,8 +8,6 @@
 #include <arch/apic.h>
 #include <arch/timer.h>
 #include <assert.h>
-#include <mptables.h>
-#include <pci.h>
 
 system_timing_t system_timing = {0, 0, 0xffff, 0};
 
@@ -56,55 +54,6 @@ void pic_unmask_irq(uint8_t irq)
 	} else
 		outb(PIC1_DATA, inb(PIC1_DATA) & ~(1 << irq));
 }
-
-// MUST NOT BE CALLED BEFORE THE MPTABLES ARE PARSED
-void ioapic_route_irq(uint8_t irq, uint8_t dest) {
-	
-	extern pci_irq_entry irq_pci_map[NUM_IRQS];
-	extern uint8_t num_cpus;
-	extern pci_int_group pci_int_groups[PCI_MAX_BUS][PCI_MAX_DEV];
-	extern ioapic_entry ioapic_entries[IOAPIC_MAX_ID];
-	
-	// Need special check for PCI vs non PCI interrupts.
-
-	uint16_t bus = irq_pci_map[irq].bus;
-	uint8_t dev = irq_pci_map[irq].dev;
-	uint8_t intn = irq_pci_map[irq].intn;
-	
-	if (bus == INVALID_BUS)
-		panic("TRYING TO REROUTE TO AN INVALID IRQ!");
-	
-	// THIS IS A TEMP CHECK. IF WE USE LOGICAL PARTITIONS THIS MUST BE REMOVED
-	// Since we rely on SMP_BOOT to set the num_cpus, and we currently setup interrupt redirection BEFORE bootup. This is a problem
-//	if (dest >= num_cpus)
-//		panic("TRYING TO REROUTE TO AN INVALID DESTINATION!");
-		
-	uint16_t dstApicID = pci_int_groups[bus][dev].intn[intn].dstApicID;
-	uint8_t	dstApicINT = pci_int_groups[bus][dev].intn[intn].dstApicINT;
-	
-	// MP Tables uses 8 bits to store the apic id. If our value is larger, is invalid entry
-	if (dstApicID == 0xFFFF)
-		panic("IRQ->PCI map and PCI->IOAPIC map are out of sync");
-	
-	if ((ioapic_entries[dstApicID].apicFlags & 0x1) == 0) 
-		panic("TRYING TO ROUTE TO AN INVALID DESTINATION");
-		
-	uint32_t ioapic_base = (uint32_t)ioapic_entries[dstApicID].apicAddress;
-	
-	cprintf("ioapic_addr: %x\n", ioapic_base);
-	
-	// This is ugly. Fix it. I just gave up because i need sleep and I wanted it working so I can commit.
-	uint32_t redirect_low = KERNEL_IRQ_OFFSET + irq;
-	redirect_low = redirect_low | 0xa000;
-	uint32_t redirect_high = dest << 24;
-	
-	write_mmreg32(ioapic_base, 0x10 + 2*dstApicINT);
-	write_mmreg32(ioapic_base + 0x10, redirect_low);
-	write_mmreg32(ioapic_base, 0x10 + 2*dstApicINT + 1);
-	write_mmreg32(ioapic_base + 0x10, redirect_high);
-
-}
-
 
 /*
  * Sets the LAPIC timer to go off after a certain number of ticks.  The primary

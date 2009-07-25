@@ -24,7 +24,7 @@
  *
  * Insight into functionality goes here
  *
- * TODO: Write it
+ * TODO: See todo's below
  */
 
 // 256 or larger means invalid irq.
@@ -104,6 +104,9 @@ void pci_init() {
 					irq_pci_map[irq].dev = j;
 					irq_pci_map[irq].func = k;
 					irq_pci_map[irq].intn = intn;
+					
+					// Perform some check to make usre if we are overwriting a current irq that it goes to the same place. else panic
+					// TODO
 				}
 				
 

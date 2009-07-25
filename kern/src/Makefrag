@@ -32,6 +32,7 @@ KERN_SRCFILES := $(KERN_SRC_DIR)/entry.S \
                  $(KERN_SRC_DIR)/manager.c \
                  $(KERN_SRC_DIR)/mptables.c \
                  $(KERN_SRC_DIR)/pci.c \
+                 $(KERN_SRC_DIR)/ioapic.c \
                  $(KERN_SRC_DIR)/atomic.c \
                  $(KERN_SRC_DIR)/smp.c \
                  $(KERN_SRC_DIR)/printfmt.c \

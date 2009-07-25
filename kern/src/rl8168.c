@@ -44,7 +44,7 @@
  * TODO: CONCURRENCY!
  */
 
-
+void test_pit_handler(trapframe_t *tf, void* data);
 
 struct Descriptor
 {
@@ -344,9 +344,8 @@ void setup_interrupts() {
 	
 	// Kernel based interrupt stuff
 	register_interrupt_handler(interrupt_handlers, KERNEL_IRQ_OFFSET + irq, nic_interrupt_handler, 0);
-	//pic_unmask_irq(irq);
-	//unmask_lapic_lvt(LAPIC_LVT_LINT0);
-	ioapic_route_irq(irq, 7);	
+	ioapic_route_irq(irq, NIC_IRQ_CPU);	
+	
 	return;
 }
 

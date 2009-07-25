@@ -5,9 +5,11 @@
 #include <trap.h>
 #include <pmap.h>
 
-#define nic_debug(...)  cprintf(__VA_ARGS__)  
+#define nic_debug(...)  //cprintf(__VA_ARGS__)  
 #define nic_interrupt_debug(...) cprintf(__VA_ARGS__)  
 #define nic_frame_debug(...)  //cprintf(__VA_ARGS__)  
+
+#define NIC_IRQ_CPU			5
 
 // Macro for formatting PCI Configuration Address queries
 #define MK_CONFIG_ADDR(BUS, DEV, FUNC, REG) (unsigned long)( (BUS << 16) | (DEV << 11) | \

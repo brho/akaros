@@ -6,6 +6,8 @@
 #include <arch/x86.h>
 #include <arch/smp.h>
 #include <arch/apic.h>
+#include <arch/ioapic.h>
+
 
 #include <ros/memlayout.h>
 
@@ -45,8 +47,10 @@ void * mp_entries[NUM_ENTRY_TYPES]; // Array of entry type arrays. Indexable by 
 int mp_entries_count[NUM_ENTRY_TYPES]; // How large each array is.
 
 pci_int_group pci_int_groups[PCI_MAX_BUS][PCI_MAX_DEV];
+isa_int_entry isa_int_entries[NUM_IRQS];
 ioapic_entry ioapic_entries[IOAPIC_MAX_ID];
 
+// All this max stuff is removable. Here for debugging (originally for dynamically sized arrays.)
 int max_pci_device = -1;
 int max_pci_bus = -1;
 int num_ioapics = -1;
@@ -56,6 +60,17 @@ int max_ioapic_id = -1;
 void mptables_parse() {
 	
 	mpfps_t *mpfps;
+	
+	// Memsets.
+	// Setup the indexable ioapic array.
+	// YOU MUST check the flag field to see if its 0. If 0, unusable.
+	// Ths is defined by MPTables, and I leaverage this with the memset below.
+	memset(ioapic_entries, 0, sizeof(ioapic_entries));
+	
+	// We define an IOAPIC ID over 255 to be invalid.
+	memset(pci_int_groups, 0xFF, sizeof(pci_int_groups));
+	memset(isa_int_entries, 0xFF, sizeof(isa_int_entries));
+	
 	
 	mptables_info("Starting MPTables Parsing...\n");
 	
@@ -135,46 +150,44 @@ void mptables_parse() {
 		mptables_info("Virtual Wire\n");
 	}
 	
-	mptables_info("\n");
-	
 	configuration_parse((physaddr_t)KADDR((uint32_t)(mpfps->pap)));
 	proc_parse(		mp_entries[PROC], mp_entries_count[PROC]);
 	bus_parse(		mp_entries[BUS], mp_entries_count[BUS]);
 	ioapic_parse(	mp_entries[IOAPIC], mp_entries_count[IOAPIC]);
 	int_parse(		mp_entries[INT], mp_entries_count[INT]);
 	lint_parse(		mp_entries[LINT], mp_entries_count[LINT]);
-	
-/*
-	// debugging the parsing.
-	cprintf("\n");
-	cprintf("max_pci_device: %u\n", max_pci_device);
-	cprintf("max_pci_bus: %u\n", max_pci_bus);
-	cprintf("num_ioapics: %u\n", num_ioapics);
-	cprintf("max_ioapic_id: %u\n", max_ioapic_id);
-	int n =0;
-	for (int i = 0; i <= max_pci_bus; i++) {
-		for (int j = 0; j <= max_pci_device; j++) {
-			for (int k = 0; k < 4; k++) {
-				if (pci_int_groups[i][j].intn[k].dstApicID != 0xFF) {
-					cprintf("Bus: %u\n", i);
-					cprintf("Device: %u\n", j);
-					cprintf("ApicID: %u\n", pci_int_groups[i][j].intn[k].dstApicID);
-					cprintf("INTLINE: %u\n", pci_int_groups[i][j].intn[k].dstApicINT);
-					cprintf("\n");
-					n++;
-				}
-			}
-		}
-	}
-	cprintf("n: %u\n", n);
-	for (int i = 0; i <= max_ioapic_id; i++) {
-		if ((ioapic_entries[i].apicFlags & 0x1) != 0) {
-			cprintf("IOAPIC ID: %u\n", ioapic_entries[i].apicID);
-			cprintf("IOAPIC Offset: %x\n", ioapic_entries[i].apicAddress);
-			cprintf("\n");
-		}
-	}
-*/	
+
+
+	// // debugging the parsing.
+	// cprintf("\n");
+	// cprintf("max_pci_device: %u\n", max_pci_device);
+	// cprintf("max_pci_bus: %u\n", max_pci_bus);
+	// cprintf("num_ioapics: %u\n", num_ioapics);
+	// cprintf("max_ioapic_id: %u\n", max_ioapic_id);
+	// int n =0;
+	// for (int i = 0; i <= max_pci_bus; i++) {
+	// 	for (int j = 0; j <= max_pci_device; j++) {
+	// 		for (int k = 0; k < 4; k++) {
+	// 			if (pci_int_groups[i][j].intn[k].dstApicID != 0xFFFF) {
+	// 				cprintf("Bus: %u\n", i);
+	// 				cprintf("Device: %u\n", j);
+	// 				cprintf("ApicID: %u\n", pci_int_groups[i][j].intn[k].dstApicID);
+	// 				cprintf("INTLINE: %u\n", pci_int_groups[i][j].intn[k].dstApicINT);
+	// 				cprintf("\n");
+	// 				n++;
+	// 			}
+	// 		}
+	// 	}
+	// }
+	// cprintf("n: %u\n", n);
+	// for (int i = 0; i <= max_ioapic_id; i++) {
+	// 	if ((ioapic_entries[i].apicFlags & 0x1) != 0) {
+	// 		cprintf("IOAPIC ID: %u\n", ioapic_entries[i].apicID);
+	// 		cprintf("IOAPIC Offset: %x\n", ioapic_entries[i].apicAddress);
+	// 		cprintf("\n");
+	// 	}
+	// }
+	// panic("AHH!");	
 	
 }
 
@@ -299,6 +312,7 @@ void bus_parse(bus_entry* entries, uint32_t count) {
 		mptables_dump("-->BusID: %x\n", entries[i].busID);
 		mptables_dump("-->Bus: %c%c%c\n", entries[i].busType[0], entries[i].busType[1], entries[i].busType[2]);
 		
+		// This is removable. Just here for debugging for now.
 		if ((strncmp(entries[i].busType, "PCI", 3) == 0) && (entries[i].busID > max_pci_bus))
 			max_pci_bus = entries[i].busID;
 		
@@ -327,10 +341,7 @@ void ioapic_parse(ioapic_entry* entries, uint32_t count) {
 	}
 	mptables_dump("\n");
 	
-	// Setup the indexable ioapic array.
-	// YOU MUST check the flag field to see if its 0. If 0, unusable.
-	// Ths is defined by MPTables, and I leaverage this with the memset below.
-	memset(ioapic_entries, 0, sizeof(ioapic_entries));
+
 	
 	for (int i = 0; i < count; i++) {
 		memcpy((void*)(ioapic_entries + entries[i].apicID), (void*)(entries + i), sizeof(ioapic_entry));
@@ -345,12 +356,13 @@ void int_parse(int_entry* entries, uint32_t count) {
 		mptables_dump("-->type: %x\n", entries[i].type);
 		mptables_dump("-->intType: %x\n", entries[i].intType);
 		mptables_dump("-->srcBusID: %u\n", entries[i].srcBusID);
-		mptables_dump("-->srcDevice: %u\n", (entries[i].srcBusIRQ >> 2) & 0x1F);
+		mptables_dump("-->srcDevice: %u (PCI ONLY)\n", (entries[i].srcBusIRQ >> 2) & 0x1F);
 		mptables_dump("-->srcBusIRQ: %x\n", entries[i].srcBusIRQ);
 		mptables_dump("-->dstApicID: %u\n", entries[i].dstApicID);
 		mptables_dump("-->dstApicINT: %u\n", entries[i].dstApicINT);
 		
 		// Find the max PCI device.
+		// removable. here for debugging.
 		if (strncmp(((bus_entry*)mp_entries[BUS])[entries[i].srcBusID].busType, "PCI", 3) == 0) {
 			
 			// Mask out the device number
@@ -360,12 +372,8 @@ void int_parse(int_entry* entries, uint32_t count) {
 		}			
 	}
 	mptables_dump("\n");
-	
-	memset(pci_int_groups, 0xFF, sizeof(pci_int_groups));
 
-	// We define an IOAPIC ID over 255 to be invalid.
-
-	// Populate the PCI structure with the interrupt entries.
+	// Populate the PCI/ISA structure with the interrupt entries.
 	for (int i = 0; i < count; i++) {
 		if (strncmp(((bus_entry*)mp_entries[BUS])[entries[i].srcBusID].busType, "PCI", 3) == 0) {
 			int bus_idx, dev_idx, int_idx;
@@ -374,6 +382,32 @@ void int_parse(int_entry* entries, uint32_t count) {
 			int_idx = entries[i].srcBusIRQ & 0x3;
 			pci_int_groups[bus_idx][dev_idx].intn[int_idx].dstApicID = entries[i].dstApicID;
 			pci_int_groups[bus_idx][dev_idx].intn[int_idx].dstApicINT = entries[i].dstApicINT;
+		}
+		
+		if (strncmp(((bus_entry*)mp_entries[BUS])[entries[i].srcBusID].busType, "ISA", 3) == 0) {
+			int irq = entries[i].srcBusIRQ;
+			int int_type = entries[i].intType;
+			
+			if (int_type == 3) {
+				// THIS IS WHERE THE PIC CONNECTS TO THE IOAPIC
+				// WE DON'T CURRENTLY DO ANYTHING WITH THIS, BUT SHOULD WE NEED TO
+				// HERED WHERE TO LOOK!
+				// WE MUST NOT PLACE THIS INTO OUR TABLE AS IRQ HAS NO REAL MEANING AFAPK
+				continue;
+				
+				// Note. On the dev boxes the pit and pic both claim to be on irq 0
+				// However the pit and the pic are on different ioapic entries.
+				// Seems odd. Not sure whats up with this. Paul assumes the IRQ has no meaning
+				// in regards to the pic... which makes sense.
+			}
+						
+			if ((isa_int_entries[irq].dstApicID != 0xFFFF) && 
+				 ((isa_int_entries[irq].dstApicID != entries[i].dstApicID) 
+				   || (isa_int_entries[irq].dstApicINT != entries[i].dstApicINT)))
+				panic("SAME IRQ MAPS TO DIFFERENT IOAPIC/INTN'S. THIS DEFIES LOGIC.");
+			
+			isa_int_entries[irq].dstApicID = entries[i].dstApicID;
+			isa_int_entries[irq].dstApicINT = entries[i].dstApicINT;
 		}			
 	}
 }

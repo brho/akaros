@@ -13,6 +13,7 @@
 
 #include <arch/mmu.h>
 #include <arch/x86.h>
+#include <arch/ioapic.h>
 
 // PIC
 #define PIC1_CMD					0x20
@@ -49,9 +50,6 @@
 // IPI Interrupt Command Register
 #define LAPIC_IPI_ICR_LOWER			(LAPIC_BASE + 0x300)
 #define LAPIC_IPI_ICR_UPPER			(LAPIC_BASE + 0x310)
-
-// IOAPIC
-#define IOAPIC_BASE					0xfec00000 // this is the default, can be changed
 
 // PIT (Programmable Interval Timer)
 #define	TIMER_REG_CNTR0	0	/* timer 0 counter port */
@@ -93,7 +91,6 @@ extern system_timing_t system_timing;
 void pic_remap(void);
 void pic_mask_irq(uint8_t irq);
 void pic_unmask_irq(uint8_t irq);
-void ioapic_route_irq(uint8_t irq, uint8_t dest);
 void __lapic_set_timer(uint32_t ticks, uint8_t vec, bool periodic, uint8_t div);
 void lapic_set_timer(uint32_t usec, bool periodic);
 uint32_t lapic_get_default_id(void);

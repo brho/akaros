@@ -231,7 +231,7 @@ void
 (IN_HANDLER irq_handler)(trapframe_t *tf)
 {
 	//if (lapic_get_id())
-	//	cprintf("Incoming IRQ, ISR: %d on core %d\n", tf->tf_trapno, lapic_get_id());
+	//	cprintf("Incoming IRQ, ISR: %d on core %d\n", tf->tf_trapno, lapic_get_id());		
 	// merge this with alltraps?  other than the EOI... or do the same in all traps
 
 	extern handler_wrapper_t handler_wrappers[NUM_HANDLER_WRAPPERS];
