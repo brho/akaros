@@ -3,6 +3,7 @@
 #include <arch/x86.h>
 #include <arch/console.h>
 #include <arch/kbdreg.h>
+#include <atomic.h>
 #include <string.h>
 #include <assert.h>
 
@@ -526,11 +527,14 @@ cons_getc(void)
 void
 cons_putc(int c)
 {
+	static uint32_t lock;
+	spin_lock_irqsave(&lock);
 	#ifndef SERIAL_IO
 		serial_putc(c);
 	#endif
 	//lpt_putc(c);
 	cga_putc(c);
+	spin_unlock_irqsave(&lock);
 }
 
 // initialize the console devices
