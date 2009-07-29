@@ -20,6 +20,7 @@
 #define IOAPIC_PCI_FLAGS			0xa0
 #define IOAPIC_ISA_FLAGS			0x00
 #define IOAPIC_PIC_FLAGS			0x07 // Not used. 
+#define IOAPIC_BROKEN_PCI_FLAGS		IOAPIC_ISA_FLAGS // No idea if this is correct, or it should be pci.
 
 #define IOAPIC_MAX_ID				256
 

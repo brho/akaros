@@ -18,7 +18,7 @@
 #define EBDA_SIZE		1024
 
 #define TOPOFMEM_POINTER	0x0413		/* BIOS: base memory size */
-#define IMCRP_MASK		0x8000
+#define IMCRP_MASK		0x80
 
 #define NUM_ENTRY_TYPES 5
 

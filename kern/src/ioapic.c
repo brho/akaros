@@ -33,6 +33,8 @@ void ioapic_init() {
 	memset(ioapic_redirects, 0x0, sizeof(ioapic_redirects));
 	
 	extern uint8_t num_cpus;
+	uint32_t inconsistent_pci_mappings = 0;  // Set high if we find inconsistent mappings between
+											 //  mptables and the pci bus.
 	
 	// Pull in all the stuff we need from mptables and the pci parsing
 	extern pci_irq_entry irq_pci_map[NUM_IRQS];
@@ -54,8 +56,12 @@ void ioapic_init() {
 		
 		// MP Tables uses 8 bits to store the apic id. If our value is larger, is invalid entry
 		// If we have a valid bus in the irq->pci map, and the pic->int entry doesnt exist, we have a major problem
-		if (dstApicID == 0xFFFF)
-			panic("IRQ->PCI map and PCI->IOAPIC map are out of sync");
+		if (dstApicID == 0xFFFF) {
+			if (!inconsistent_pci_mappings)
+				cprintf("WARNING: INCONSISTENT IRQ->PCI AND PCI->IOAPIC MAPPINGS. Trying to cope...\n");
+			inconsistent_pci_mappings++;
+			continue;
+		}
 		
 		// If the lowest bit of the apic flags is set to 0, it means the ioapic is not usable.
 		// We also use this to denote non-existent ioapics in our map
@@ -83,11 +89,28 @@ void ioapic_init() {
 			//  because this shouldnt really happen
 			panic("BOTH PCI AND ISA CLAIM TO SHARE AN IRQ. BAD");
 		}
+		
+		// Code to check if this isa irq entry claims to be pci
+		uint16_t pci_bus = irq_pci_map[i].bus;
+		if (pci_bus != INVALID_BUS) {
+			// PCI bus had an entry for this irq, but we didn't set it during our pci run
+			//  This means it is likely a broken mptable implimentation. this happens on bochs and kvm
+			//  lets just set the flags as if its broken, and move on. Hopefully it will work out.
+			ioapic_redirects[i].ioapic_flags = IOAPIC_BROKEN_PCI_FLAGS;
+			inconsistent_pci_mappings--;
+		}
+		else {
+			ioapic_redirects[i].ioapic_flags = IOAPIC_ISA_FLAGS;
+		}
+		
 
 		ioapic_redirects[i].ioapic_address = ioapic_entries[dstApicID].apicAddress;
 		ioapic_redirects[i].ioapic_int = dstApicINT;
-		ioapic_redirects[i].ioapic_flags = IOAPIC_ISA_FLAGS;
 	}
+	
+	// Things didn't balance out when we scanned the isa bus for the missing pci devices. Die.
+	if (inconsistent_pci_mappings != 0) 
+		panic("FAILED TO COPE WITH INCONSISTENT IRQ->PCI AND PCI->IOAPIC MAPPINGS!");
 	
 	// Support for other type of IRQ's goes here.
 }
