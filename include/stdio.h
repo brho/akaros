@@ -17,6 +17,7 @@
 
 // lib/stdio.c
 void	cputchar(int c);
+void	cputbuf(const char*COUNT(len) buf, int len);
 int	getchar(void);
 int	iscons(int fd);
 

@@ -3,11 +3,11 @@
 #ifndef ROS_INC_ENV_H
 #define ROS_INC_ENV_H
 
-#include <ros/trap.h>
 #include <ros/memlayout.h>
 #include <ros/syscall.h>
 #include <arch/types.h>
 #include <sys/queue.h>
+#include <arch/trap.h>
 
 struct Env;
 typedef struct Env env_t;
@@ -44,7 +44,10 @@ typedef int32_t envid_t;
 struct Env {
 	LIST_ENTRY(Env) env_link NOINIT;	// Free list link pointers
 	uint32_t lock;
-	trapframe_t env_tf;			// Saved registers
+	trapframe_t env_tf			// Saved registers
+	  __attribute__((aligned (8)));		// for sparc --asw
+	ancillary_state_t env_ancillary_state	// State saved when descheduled
+	  __attribute__((aligned (8)));		// for sparc --asw
 	envid_t env_id;				// Unique environment identifier
 	envid_t env_parent_id;		// env_id of this env's parent
 	unsigned env_status;		// Status of the environment

@@ -5,10 +5,9 @@
 #pragma nodeputy
 #endif
 
-#include <arch/x86.h>
-#include <arch/stab.h>
-#include <arch/apic.h>
-#include <arch/smp.h>
+#include <arch/arch.h>
+#include <stab.h>
+#include <smp.h>
 #include <arch/console.h>
 
 #include <stdio.h>
@@ -19,6 +18,7 @@
 #include <pmap.h>
 #include <kdebug.h>
 #include <testing.h>
+#include <manager.h>
 
 #include <ros/memlayout.h>
 
@@ -40,6 +40,7 @@ static command_t commands[] = {
 	{ "setmapperm", "Sets permissions on a VA->PA mapping", mon_setmapperm},
 	{ "cpuinfo", "Prints CPU diagnostics", mon_cpuinfo},
 	{ "nanwan", "Meet Nanwan!!", mon_nanwan},
+	{ "manager", "Run the manager", mon_manager},
 };
 #define NCOMMANDS (sizeof(commands)/sizeof(commands[0]))
 
@@ -94,47 +95,15 @@ static char* function_of(uint32_t address)
 
 int mon_backtrace(int argc, char **argv, trapframe_t *tf)
 {
-	uint32_t* ebp, eip;
-	eipdebuginfo_t debuginfo;
-	char buf[256];
-	int j, i = 1;
-	ebp = (uint32_t*)read_ebp();	
-	// this is part of the way back into the call() instruction's bytes
-	// eagle-eyed readers should be able to explain why this is good enough,
-	// and retaddr (just *(ebp + 1) is not)
-	eip = *(ebp + 1) - 1;
-	// jump back a frame (out of mon_backtrace)
-	ebp = (uint32_t*)(*ebp);
-	cprintf("Stack Backtrace:\n");
-	// on each iteration, ebp holds the stack frame and eip an addr in that func
-	while (ebp != 0) {
-		debuginfo_eip(eip, &debuginfo);
-		memset(buf, 0, 256);
-		strncpy(buf, debuginfo.eip_fn_name, MIN(debuginfo.eip_fn_namelen, 256));
-		buf[MIN(debuginfo.eip_fn_namelen, 255)] = 0;
-		cprintf("#%02d [<%x>] in %s+%x(%p) from %s:%d\n", i++,  eip, buf, 
-		        debuginfo.eip_fn_addr - (uint32_t)_start, debuginfo.eip_fn_addr, 
-		        debuginfo.eip_file, debuginfo.eip_line);
-		cprintf("    ebp: %x   Args:", ebp);
-		for (j = 0; j < MIN(debuginfo.eip_fn_narg, 5); j++)
-			cprintf(" %08x", *(ebp + 2 + j));
-		cprintf("\n");
-		eip = *(ebp + 1) - 1;
-		ebp = (uint32_t*)(*ebp);
-	}
+	backtrace();
 	return 0;
 }
 
 int mon_reboot(int argc, char **argv, trapframe_t *tf)
 {
 	cprintf("[Irish Accent]: She's goin' down, Cap'n!\n");
-	outb(0x92, 0x3);
-	// KVM doesn't reboot yet, but this next bit will make it
-	// if you're in kernel mode and you can't do a push, when an interrupt
-	// comes in, the system just resets.  if esp = 0, there's no room left.
-	// somewhat curious about what happens in an SMP....
-	cprintf("[Irish Accent]: I'm givin' you all she's got!\n");
-	asm volatile ("movl $0, %esp; int $0");
+	reboot();
+
 	// really, should never see this
 	cprintf("Sigh....\n");
 	return 0;
@@ -158,26 +127,17 @@ int mon_showmapping(int argc, char **argv, trapframe_t *tf)
 		cprintf("Not going to do this for more than 512 items\n");
 		return 1;
 	}
-	cprintf("   Virtual    Physical  Ps Dr Ac CD WT U W\n");
-	cprintf("------------------------------------------\n");
-	for(i = 0; i < size; i += PGSIZE, start += PGSIZE) {
-		page = page_lookup(pgdir, (void*)start, &pte);
-		cprintf("%08p  ", start);
-		if (page) {
-			pde = &pgdir[PDX(start)];
-			// for a jumbo, pde = pte and PTE_PS (better be) = 1
-			cprintf("%08p  %1d  %1d  %1d  %1d  %1d  %1d %1d\n", page2pa(page), 
-			       (*pte & PTE_PS) >> 7, (*pte & PTE_D) >> 6, (*pte & PTE_A) >> 5,
-			       (*pte & PTE_PCD) >> 4, (*pte & PTE_PWT) >> 3, 
-			       (*pte & *pde & PTE_U) >> 2, (*pte & *pde & PTE_W) >> 1);
-		} else
-			cprintf("%08p\n", 0);
-	}
+
+	show_mapping(start,size);
 	return 0;
 }
 
 int mon_setmapperm(int argc, char **argv, trapframe_t *tf)
 {
+#ifndef __i386__
+	cprintf("I don't support this call yet!\n");
+	return 1;
+#else
 	if (argc < 3) {
 		cprintf("Sets VIRT_ADDR's mapping's permissions to PERMS (in hex)\n");
 		cprintf("Only affects the lowest level PTE.  To adjust the PDE, do the math.\n");
@@ -209,6 +169,7 @@ int mon_setmapperm(int argc, char **argv, trapframe_t *tf)
 	       (*pte & PTE_PCD) >> 4, (*pte & PTE_PWT) >> 3, (*pte & *pde & PTE_U) >> 2, 
 	       (*pte & *pde & PTE_W) >> 1);
 	return 0;
+#endif
 }
 
 int mon_cpuinfo(int argc, char **argv, trapframe_t *tf)
@@ -216,12 +177,22 @@ int mon_cpuinfo(int argc, char **argv, trapframe_t *tf)
 	extern uint8_t num_cpus;
 
 	cprintf("Number of CPUs detected: %d\n", num_cpus);	
-	cprintf("Calling CPU's LAPIC ID: 0x%08x\n", lapic_get_id());
+	cprintf("Calling CPU's ID: 0x%08x\n", core_id());
+
+#ifdef __i386__
 	if (argc < 2)
 		smp_call_function_self(test_print_info_handler, 0, 0);
 	else
 		smp_call_function_single(strtol(argv[1], 0, 16),
 		                         test_print_info_handler, 0, 0);
+#endif
+	return 0;
+}
+
+int mon_manager(int argc, char** argv, trapframe_t *tf)
+{
+	manager();
+	panic("should never get here");
 	return 0;
 }
 

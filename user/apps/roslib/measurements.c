@@ -1,7 +1,6 @@
 #include <arch/types.h>
-#include <arch/x86.h>
-#include <arch/timer.h>
-
+#include <arch/arch.h>
+#include <ros/timer.h>
 #include <ros/syscall.h>
 
 #include <lib.h>
@@ -28,10 +27,18 @@ volatile uint32_t* job_to_run = (uint32_t*)(shared_page + sizeof(barrier_t));
 uint32_t corecount = 0;
 #define MAX_CACHELINE_WRITES 129
 
+// added by asw
+intreg_t syscall(uint16_t num, intreg_t a1,
+                intreg_t a2, intreg_t a3,
+                intreg_t a4, intreg_t a5);
+
+#define syscall_sysenter syscall
+#define syscall_trap syscall
+
 /* Syscall Methods:
  * Pulling these in directly so we can measure them without other overheads. 
  */
-static uint32_t
+/*static uint32_t
 syscall_sysenter(int num, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32_t a5)
 {
 	uint32_t ret;
@@ -70,7 +77,7 @@ syscall_trap(int num, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32
 		: "cc", "memory");
 
 	return ret;
-}
+}*/
 
 /* Experiment Rappers.  Like Snoop Dogg. */
 void null_wrapper(uint32_t iters)

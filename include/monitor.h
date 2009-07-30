@@ -4,8 +4,6 @@
 # error "This is a ROS kernel header; user programs should not #include it"
 #endif
 
-#include <ros/trap.h>
-
 // Activate the kernel monitor,
 // optionally providing a trap frame indicating the current state
 // (NULL if none).
@@ -20,5 +18,6 @@ int mon_showmapping(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
 int mon_setmapperm(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
 int mon_cpuinfo(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
 int mon_nanwan(int argc, char **argv, trapframe_t *tf);
+int mon_manager(int argc, char **argv, trapframe_t *tf);
 
 #endif	// !ROS_KERN_MONITOR_H

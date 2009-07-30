@@ -3,21 +3,11 @@
 
 #include <arch/types.h>
 #include <arch/mmu.h>
-#include <arch/x86.h>
 #include <arch/atomic.h>
+#include <arch/arch.h>
 
-/* //linux style atomic ops
-typedef struct {uint32_t real_num;} atomic_t;
-#define atomic_read(atom) ((atom)->real_num)
-#define atomic_set(atom, val) (((atom)->real_num) = (val))
-#define atomic_init(i) {(i)}
-//and the atomic incs, etc take an atomic_t ptr, deref inside
-*/
-
-static inline void spin_lock(volatile uint32_t* lock);
-static inline void spin_unlock(volatile uint32_t* lock);
-static inline void spin_lock_irqsave(volatile uint32_t* lock);
-static inline void spin_unlock_irqsave(volatile uint32_t* lock);
+static inline void spin_lock_irqsave(volatile uint32_t*SAFE lock);
+static inline void spin_unlock_irqsave(volatile uint32_t*SAFE lock);
 
 /*********************** Checklist stuff **********************/
 typedef struct checklist_mask {
@@ -72,42 +62,21 @@ void init_barrier(barrier_t* barrier, uint32_t count);
 void reset_barrier(barrier_t* barrier);
 void waiton_barrier(barrier_t* barrier);
 
-/* Inlined functions declared above */
-static inline void spin_lock(volatile uint32_t* lock)
-{
-	asm volatile(
-			"1:                       "
-			"	cmpb $0, %0;          "
-			"	je 2f;                "
-			"	pause;                "
-			"	jmp 1b;               "
-			"2:                       " 
-			"	movb $1, %%al;        "
-			"	xchgb %%al, %0;       "
-			"	cmpb $0, %%al;        "
-			"	jne 1b;               "
-	        : : "m"(*lock) : "eax", "cc");
-}
-
-static inline void spin_unlock(volatile uint32_t* lock)
-{
-	*lock = 0;
-}
-
 // If ints are enabled, disable them and note it in the top bit of the lock
 // There is an assumption about releasing locks in order here...
-static inline void spin_lock_irqsave(volatile uint32_t* lock)
+static inline void spin_lock_irqsave(volatile uint32_t*SAFE lock)
 {
-	uint32_t eflags;
-	eflags = read_eflags();
+	uint32_t irq_en;
+	irq_en = irq_is_enabled();
 	disable_irq();
 	spin_lock(lock);
-	if (eflags & FL_IF)
+	if (irq_en)
 		*lock |= 0x80000000;
 }
 
-// if the top bit of the lock is set, then re-enable interrupts
-static inline void spin_unlock_irqsave(volatile uint32_t* lock)
+// if the high bit of the lock is set, then re-enable interrupts
+// (note from asw: you're lucky this works, you little-endian jerks)
+static inline void spin_unlock_irqsave(volatile uint32_t*SAFE lock)
 {
 	if (*lock & 0x80000000) {
 		*lock = 0;

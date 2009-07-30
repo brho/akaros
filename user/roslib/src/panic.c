@@ -1,5 +1,6 @@
 
 #include <lib.h>
+#include <arch/arch.h>
 
 char *argv0;
 
@@ -24,6 +25,6 @@ _panic(const char *file, int line, const char *fmt,...)
 
 	// Cause a breakpoint exception
 	while (1)
-		asm volatile("int3");
+		breakpoint();
 }
 

@@ -38,6 +38,13 @@ strcpy(char *dst, const char *src)
 }
 
 char *
+strcat(char *dst, const char *src)
+{
+	strcpy(dst+strlen(dst),src);
+	return dst;
+}
+
+char *
 strncpy(char *dst, const char *src, size_t size) {
 	size_t i;
 	char *ret;
@@ -107,17 +114,70 @@ strfind(const char *s, char c)
 	return (char *) s;
 }
 
+// n must be a multiple of 16 and v must be uint32_t-aligned
+static inline void *
+memset16(uint32_t *v, uint32_t c, size_t n)
+{
+	uint32_t *start, *end;
+
+	start = v;
+	end = v + n/sizeof(uint32_t);
+	c = c | c<<8 | c<<16 | c<<24;
+
+	while(v < end)
+	{
+		v[3] = v[2] = v[1] = v[0] = c;
+		v += 4;
+	}
+
+	return start;
+}
+
+// n must be a multiple of 16 and v must be 4-byte aligned.
+// as allowed by ISO, behavior undefined if dst/src overlap
+static inline void *
+memcpy16(uint32_t* dst, const uint32_t* src, size_t n)
+{
+	uint32_t *dststart, *dstend;
+
+	dststart = dst;
+	dstend = dst + n/sizeof(uint32_t);
+
+	while(dst < dstend)
+	{
+		dst[0] = src[0];
+		dst[1] = src[1];
+		dst[2] = src[2];
+		dst[3] = src[3];
+
+		src += 4;
+		dst += 4;
+	}
+
+	return dststart;
+}
 
 void *
 memset(void *v, int c, size_t n)
 {
 	char *p;
-	int m;
+	size_t n0;
 
 	p = v;
-	m = n;
-	while (--m >= 0)
+
+	if(n >= 16 && ((uintptr_t)v & 3) == 0)
+	{
+		n0 = (n/16)*16;
+		memset16((uint32_t*)v,c,n0);
+		n -= n0;
+		p += n0;
+	}
+
+	while (n > 0)
+	{
 		*p++ = c;
+		n--;
+	}
 
 	return v;
 }
@@ -127,9 +187,20 @@ memcpy(void *dst, const void *src, size_t n)
 {
 	const char *s;
 	char *d;
+	size_t n0;
 
 	s = src;
 	d = dst;
+
+	if(n >= 16 && ((uintptr_t)src  & 3) == 0 && ((uintptr_t)dst & 3) == 0)
+	{
+		n0 = (n/16)*16;
+		memcpy16((uint32_t*)dst,(const uint32_t*)src,n0);
+		n -= n0;
+		s += n0;
+		d += n0;
+	}
+
 	while (n-- > 0)
 		*d++ = *s++;
 

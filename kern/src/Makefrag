@@ -7,50 +7,47 @@
 KERN_SRC_DIR = $(KERN_DIR)/src
 OBJDIRS += $(KERN_SRC_DIR)
 
+include $(ARCH_DIR)/$(TARGET_ARCH)/src/Makefrag
+
 # entry.S must be first, so that it's the first code in the text segment!!!
 #
 # We also snatch the use of a couple handy source files
 # from the lib directory, to avoid gratuitous code duplication.
-KERN_SRCFILES := $(KERN_SRC_DIR)/entry.S \
-                 $(KERN_SRC_DIR)/smp_entry.S \
+KERN_SRCFILES := $(KERN_ARCH_SRCFILES) \
                  $(KERN_SRC_DIR)/init.c \
-                 $(KERN_SRC_DIR)/console.c \
                  $(KERN_SRC_DIR)/monitor.c \
-                 $(KERN_SRC_DIR)/pmap.c \
-                 $(KERN_SRC_DIR)/env.c \
-                 $(KERN_SRC_DIR)/kclock.c \
-                 $(KERN_SRC_DIR)/picirq.c \
                  $(KERN_SRC_DIR)/printf.c \
-                 $(KERN_SRC_DIR)/trap.c \
-                 $(KERN_SRC_DIR)/trapentry.S \
-                 $(KERN_SRC_DIR)/sched.c \
-                 $(KERN_SRC_DIR)/syscall.c \
-                 $(KERN_SRC_DIR)/kdebug.c \
-                 $(KERN_SRC_DIR)/apic.c \
-                 $(KERN_SRC_DIR)/testing.c \
-                 $(KERN_SRC_DIR)/workqueue.c \
-                 $(KERN_SRC_DIR)/manager.c \
-                 $(KERN_SRC_DIR)/atomic.c \
-                 $(KERN_SRC_DIR)/smp.c \
                  $(KERN_SRC_DIR)/printfmt.c \
+                 $(KERN_SRC_DIR)/smp.c \
+                 $(KERN_SRC_DIR)/multiboot.c \
                  $(KERN_SRC_DIR)/readline.c \
                  $(KERN_SRC_DIR)/string.c \
+                 $(KERN_SRC_DIR)/atomic.c \
+                 $(KERN_SRC_DIR)/workqueue.c \
+                 $(KERN_SRC_DIR)/pmap.c \
+                 $(KERN_SRC_DIR)/env.c \
+                 $(KERN_SRC_DIR)/manager.c \
+                 $(KERN_SRC_DIR)/syscall.c \
                  $(KERN_SRC_DIR)/timer.c \
-                 $(KERN_SRC_DIR)/kmalloc.c
+                 $(KERN_SRC_DIR)/kmalloc.c \
+                 $(KERN_SRC_DIR)/testing.c
+
 # Only build files if they exist.
 KERN_SRCFILES := $(wildcard $(KERN_SRCFILES))
 
-KERN_APPFILES :=    $(USER_APPS_PARLIB_DIR)/matrix \
+KERN_APPFILES := \
+                    $(USER_APPS_ROSLIB_DIR)/proctests \
+                    $(USER_APPS_ROSLIB_DIR)/fptest \
                     $(USER_APPS_ROSLIB_DIR)/null \
                     $(USER_APPS_ROSLIB_DIR)/hello \
-                    $(USER_APPS_ROSLIB_DIR)/proctests \
-                    $(USER_APPS_ROSLIB_DIR)/measurements
-#                    $(USER_APPS_PARLIB_DIR)/draw_nanwan
+                    $(USER_APPS_ROSLIB_DIR)/measurements \
+#                    $(USER_APPS_PARLIB_DIR)/matrix \
+#                    $(USER_APPS_PARLIB_DIR)/draw_nanwan \
 #                    $(USER_APPS_PARLIB_DIR)/open_read \
-#                    $(USER_APPS_PARLIB_DIR)/hello \
+#                    $(USER_APPS_PARLIB_DIR)/hello
 
 KERN_LDFLAGS   := $(KERN_LDFLAGS) -L$(OBJDIR)/$(KERN_DIR) \
-                  -T $(KERN_DIR)/kernel.ld
+                  -T $(ARCH_DIR)/$(TARGET_ARCH)/kernel.ld
 
 KERN_OBJFILES  := $(patsubst $(KERN_SRC_DIR)/%.c, \
                              $(OBJDIR)/$(KERN_DIR)/%.o, \
@@ -61,7 +58,7 @@ KERN_OBJFILES  := $(patsubst $(KERN_SRC_DIR)/%.S, \
 
 KERN_APPFILES  := $(patsubst %, $(OBJDIR)/%, $(KERN_APPFILES))
 
-KERN_LDDEPENDS := $(KERN_OBJFILES) $(KERN_APPFILES) $(KERN_DIR)/kernel.ld \
+KERN_LDDEPENDS := $(KERN_OBJFILES) $(KERN_APPFILES) $(ARCH_DIR)/$(TARGET_ARCH)/kernel.ld \
                   $(OBJDIR)/$(KERN_DIR)/libivykern.a
 
 KERN_LDLIBS    := -livykern

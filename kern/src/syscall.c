@@ -4,11 +4,10 @@
 #endif
 
 #include <arch/types.h>
-#include <arch/x86.h>
+#include <arch/arch.h>
 #include <arch/mmu.h>
 #include <arch/console.h>
-#include <arch/apic.h>
-#include <arch/timer.h>
+#include <ros/timer.h>
 #include <ros/error.h>
 
 #include <string.h>
@@ -17,24 +16,6 @@
 #include <pmap.h>
 #include <trap.h>
 #include <syscall.h>
-
-/* This is called from sysenter's asm, with the tf on the kernel stack. */
-void sysenter_callwrapper(struct Trapframe *tf)
-{
-	env_t* curenv = curenvs[lapic_get_id()];
-	curenv->env_tf = *tf;
-	
-	// The trapframe on the stack should be ignored from here on.
-	tf = &curenv->env_tf;
-	tf->tf_regs.reg_eax = (intreg_t) syscall(curenv,
-	                                         tf->tf_regs.reg_eax,
-	                                         tf->tf_regs.reg_edx,
-	                                         tf->tf_regs.reg_ecx,
-	                                         tf->tf_regs.reg_ebx,
-	                                         tf->tf_regs.reg_edi,
-	                                         0);
-	env_run(curenv);
-}
 
 //Do absolutely nothing.  Used for profiling.
 static void sys_null(void)
@@ -46,7 +27,7 @@ static void sys_null(void)
 static ssize_t sys_serial_write(env_t* e, const char *DANGEROUS buf, size_t len) 
 {
 	#ifdef SERIAL_IO
-		char *COUNT(len) _buf = user_mem_assert(e, buf, len, PTE_U);
+		char *COUNT(len) _buf = user_mem_assert(e, buf, len, PTE_USER_RO);
 		for(int i =0; i<len; i++)
 			serial_send_byte(buf[i]);	
 		return (ssize_t)len;
@@ -59,7 +40,7 @@ static ssize_t sys_serial_write(env_t* e, const char *DANGEROUS buf, size_t len)
 static ssize_t sys_serial_read(env_t* e, char *DANGEROUS buf, size_t len) 
 {
 	#ifdef SERIAL_IO
-	    char *COUNT(len) _buf = user_mem_assert(e, buf, len, PTE_U);
+	    char *COUNT(len) _buf = user_mem_assert(e, buf, len, PTE_USER_RO);
 		size_t bytes_read = 0;
 		int c;
 		while((c = serial_read_byte()) != -1) {
@@ -75,7 +56,12 @@ static ssize_t sys_serial_read(env_t* e, char *DANGEROUS buf, size_t len)
 // Invalidate the cache of this core
 static void sys_cache_invalidate(void)
 {
-	wbinvd();
+	// why is this necessary with cache coherence?
+	// is it for coherence with respect to i/o?  --asw
+
+	#ifdef __i386__
+		wbinvd();
+	#endif
 	return;
 }
 
@@ -92,7 +78,7 @@ static void sys_cache_buster(env_t* e, uint32_t num_writes, uint32_t num_pages,
 	#define INSERT_ADDR 	(UINFO + 2*PGSIZE) // should be free for these tests
 	uint32_t* buster = (uint32_t*)BUSTER_ADDR;
 	static uint32_t buster_lock = 0;
-	uint64_t ticks;
+	uint64_t ticks = -1;
 	page_t* a_page[MAX_PAGES];
 
 	/* Strided Accesses or Not (adjust to step by cachelines) */
@@ -107,7 +93,7 @@ static void sys_cache_buster(env_t* e, uint32_t num_writes, uint32_t num_pages,
 	 * Also, doesn't separate memory for core 0 if it's an async call.
 	 */
 	if (!(flags & BUSTER_SHARED))
-		buster = (uint32_t*)(BUSTER_ADDR + lapic_get_id() * 0x00800000);
+		buster = (uint32_t*)(BUSTER_ADDR + core_id() * 0x00800000);
 
 	/* Start the timer, if we're asked to print this info*/
 	if (flags & BUSTER_PRINT_TICKS)
@@ -123,7 +109,7 @@ static void sys_cache_buster(env_t* e, uint32_t num_writes, uint32_t num_pages,
 		for (int i = 0; i < MIN(num_pages, MAX_PAGES); i++) {
 			page_alloc(&a_page[i]);
 			page_insert(e->env_pgdir, a_page[i], (void*)INSERT_ADDR + PGSIZE*i,
-			            PTE_U | PTE_W);
+			            PTE_USER_RW);
 		}
 		spin_unlock(&buster_lock);
 	}
@@ -159,7 +145,7 @@ static ssize_t sys_cputs(env_t* e, const char *DANGEROUS s, size_t len)
 {
 	// Check that the user has permission to read memory [s, s+len).
 	// Destroy the environment if not.
-    char *COUNT(len) _s = user_mem_assert(e, s, len, PTE_U);
+    char *COUNT(len) _s = user_mem_assert(e, s, len, PTE_USER_RO);
 
 	// Print the string supplied by the user.
 	printk("%.*s", len, _s);
@@ -189,7 +175,7 @@ static envid_t sys_getenvid(env_t* e)
 // Returns the id of the cpu this syscall is executed on.
 static envid_t sys_getcpuid(void)
 {
-	return lapic_get_id();
+	return core_id();
 }
 
 // Destroy a given environment (possibly the currently running environment).

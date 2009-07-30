@@ -5,6 +5,7 @@
 #pragma nodeputy
 #endif
 
+#include <arch/arch.h>
 #include <arch/types.h>
 
 #include <atomic.h>
@@ -13,20 +14,49 @@
 
 uint32_t output_lock = 0;
 
-static void putch(int ch, int **cnt)
+void putch(int ch, int **cnt)
 {
 	cputchar(ch);
 	**cnt = **cnt + 1;
+}
+
+// buffered putch to (potentially) speed up printing.
+// static buffer is safe because output_lock must be held.
+// ch == -1 flushes the buffer.
+void buffered_putch(int ch, int **cnt)
+{
+	#define buffered_putch_bufsize 64
+	static char buf[buffered_putch_bufsize];
+	static int buflen = 0;
+
+	if(ch != -1)
+	{
+		buf[buflen++] = ch;
+		**cnt = **cnt + 1;
+	}
+
+	if(ch == -1 || buflen == buffered_putch_bufsize)
+	{
+		cputbuf(buf,buflen);
+		buflen = 0;
+	}
 }
 
 int vcprintf(const char *fmt, va_list ap)
 {
 	int cnt = 0;
 	int *cntp = &cnt;
+	volatile int i;
 
 	// lock all output.  this will catch any printfs at line granularity
 	spin_lock_irqsave(&output_lock);
-	vprintfmt((void*)putch, (void**)&cntp, fmt, ap);
+
+	// do the buffered printf
+	vprintfmt((void*)buffered_putch, (void**)&cntp, fmt, ap);
+
+	// write out remaining chars in the buffer
+	buffered_putch(-1,&cntp);
+
 	spin_unlock_irqsave(&output_lock);
 
 	return cnt;

@@ -94,9 +94,10 @@
 // the page directory itself, thereby turning the PD into a page table,
 // which maps all the PTEs containing the page mappings for the entire
 // virtual address space into that 4 Meg region starting at VPT.
-#define VPT			(KERNBASE - PTSIZE)
+#define VPT		(KERNBASE - PTSIZE)
 #define KSTACKTOP	VPT
-#define KSTKSIZE	(8*PGSIZE)   		// size of a kernel stack
+#define KSTKSHIFT	(PGSHIFT+3)		// KSTKSIZE == 8*PGSIZE
+#define KSTKSIZE	(1 << KSTKSHIFT)	// size of a kernel stack
 #define ULIM		(KSTACKTOP - PTSIZE)
 
 /*

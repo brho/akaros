@@ -7,7 +7,7 @@
 #endif
 
 #include <ros/memlayout.h>
-#include <arch/multiboot.h>
+#include <multiboot.h>
 #include <atomic.h>
 #include <env.h>
 #include <assert.h>
@@ -74,13 +74,15 @@ extern size_t npage;
 extern physaddr_t boot_cr3;
 extern pde_t *COUNT(NPDENTRIES) boot_pgdir;
 
-extern segdesc_t (COUNT(SEG_COUNT) gdt)[];
-extern pseudodesc_t gdt_pd;
+extern char* boot_freemem;
+extern page_list_t page_free_list;
 
-void	i386_detect_memory(multiboot_info_t *mbi);
-void	i386_print_memory_map(multiboot_info_t *mbi);
+void*	boot_alloc(uint32_t n, uint32_t align);
+
+void	multiboot_detect_memory(multiboot_info_t *mbi);
+void	multiboot_print_memory_map(multiboot_info_t *mbi);
 bool	enable_pse(void);
-void	i386_vm_init(void);
+void	vm_init(void);
 
 void	page_init(void);
 void	page_check(void);
@@ -104,15 +106,9 @@ user_mem_check(env_t *env, const void *DANGEROUS va, size_t len, int perm);
 void *COUNT(len)
 user_mem_assert(env_t *env, const void *DANGEROUS va, size_t len, int perm);
 
-static inline void cache_flush(void)
-{
-	wbinvd();
-}
-
-static inline void cacheline_flush(void* addr)
-{
-	clflush((uintptr_t*)addr);
-}
+error_t
+memcpy_from_user(env_t* env, void* COUNT(len) dest,
+                 const void *DANGEROUS va, size_t len);
 
 static inline page_t* ppn2page(size_t ppn)
 {

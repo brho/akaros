@@ -8,8 +8,7 @@
 #endif
 
 #include <arch/types.h>
-#include <arch/apic.h>
-#include <arch/smp.h>
+#include <smp.h>
 
 #include <assert.h>
 #include <manager.h>
@@ -33,7 +32,12 @@ void manager(void)
 			envs[0] = ENV_CREATE(roslib_proctests);
 			envs[1] = ENV_CREATE(roslib_proctests);
 			envs[2] = ENV_CREATE(roslib_proctests);
-			envs[3] = ENV_CREATE(roslib_proctests);
+			envs[3] = ENV_CREATE(roslib_fptest);
+			envs[4] = ENV_CREATE(roslib_fptest);
+			envs[4] = ENV_CREATE(roslib_fptest);
+			envs[5] = ENV_CREATE(roslib_hello);
+			envs[6] = ENV_CREATE(roslib_null);
+			//envs[6] = ENV_CREATE(roslib_measurements);
 			env_run(envs[0]);
 			break;
 		case 1:

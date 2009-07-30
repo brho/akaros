@@ -7,7 +7,6 @@
  */
 
 #include <arch/types.h>
-#include <trap.h>
 
 void test_ipi_sending(void);
 void test_pic_reception(void);
@@ -20,6 +19,8 @@ void test_pit(void);
 void test_smp_call_functions(void);
 void test_lapic_status_bit(void);
 void test_run_measurements(uint32_t job_num);
+
+struct trapframe_t;
 
 void test_hello_world_handler(trapframe_t *tf, void* data);
 void test_print_info_handler(trapframe_t *tf, void* data);

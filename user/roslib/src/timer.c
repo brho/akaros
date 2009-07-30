@@ -1,5 +1,5 @@
-#include <arch/x86.h>
-#include <arch/timer.h>
+#include <arch/arch.h>
+#include <ros/timer.h>
 
 /* timing_overhead
  * Any user space process that links to this file will get its own copy.  

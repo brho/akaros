@@ -3,9 +3,8 @@
  * See LICENSE for details.
  */
 
-#include <arch/x86.h>
-#include <arch/apic.h>
-#include <arch/smp.h>
+#include <atomic.h>
+#include <smp.h>
 
 #include <atomic.h>
 
@@ -17,7 +16,7 @@
 void process_workqueue()
 {
 	work_t work;
-	per_cpu_info_t *cpuinfo = &per_cpu_info[lapic_get_id()];
+	per_cpu_info_t *cpuinfo = &per_cpu_info[core_id()];
 	// copy the work in, since we may never return to this stack frame
 	spin_lock_irqsave(&cpuinfo->lock);
 	work = cpuinfo->delayed_work;
