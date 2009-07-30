@@ -327,8 +327,6 @@ segment_alloc(env_t *e, void *SNT va, size_t len)
 //
 // Set up the initial program binary, stack, and processor flags
 // for a user process.
-// This function is ONLY called during kernel initialization,
-// before running the first user-mode environment.
 //
 // This function loads all loadable segments from the ELF binary image
 // into the environment's user memory, starting at the appropriate
@@ -337,47 +335,10 @@ segment_alloc(env_t *e, void *SNT va, size_t len)
 // that are marked in the program header as being mapped
 // but not actually present in the ELF file - i.e., the program's bss section.
 //
-// All this is very similar to what our boot loader does, except the boot
-// loader also needs to read the code from disk.  Take a look at
-// boot/main.c to get ideas.
-//
 // Finally, this function maps one page for the program's initial stack.
-//
-// load_icode panics if it encounters problems.
-//  - How might load_icode fail?  What might be wrong with the given input?
-//
 static void
-load_icode(env_t *e, uint8_t *COUNT(size) binary, size_t size)
+load_icode(env_t *SAFE e, uint8_t *COUNT(size) binary, size_t size)
 {
-	// Hints:
-	//  Load each program segment into virtual memory
-	//  at the address specified in the ELF section header.
-	//  You should only load segments with ph->p_type == ELF_PROG_LOAD.
-	//  Each segment's virtual address can be found in ph->p_va
-	//  and its size in memory can be found in ph->p_memsz.
-	//  The ph->p_filesz bytes from the ELF binary, starting at
-	//  'binary + ph->p_offset', should be copied to virtual address
-	//  ph->p_va.  Any remaining memory bytes should be cleared to zero.
-	//  (The ELF header should have ph->p_filesz <= ph->p_memsz.)
-	//  Use functions from the previous lab to allocate and map pages.
-	//
-	//  All page protection bits should be user read/write for now.
-	//  ELF segments are not necessarily page-aligned, but you can
-	//  assume for this function that no two segments will touch
-	//  the same virtual page.
-	//
-	//  You may find a function like segment_alloc useful.
-	//
-	//  Loading the segments is much simpler if you can move data
-	//  directly into the virtual addresses stored in the ELF binary.
-	//  So which page directory should be in force during
-	//  this function?
-	//
-	// Hint:
-	//  You must also do something with the program's entry point,
-	//  to make sure that the environment starts executing there.
-	//  What?  (See env_run() and env_pop_tf() below.)
-
 	elf_t *elfhdr = (elf_t *)binary;
 	int i, r;
 
@@ -389,6 +350,19 @@ load_icode(env_t *e, uint8_t *COUNT(size) binary, size_t size)
 	// to actually access any pages alloc'd for this environment, we
 	// need to have the hardware use this environment's page tables.
 	uintreg_t old_cr3 = rcr3();
+	/*
+	 * Even though we'll decref later and no one should be killing us at this
+	 * stage, we're still going to wrap the lcr3s with incref/decref.
+	 *
+	 * Note we never decref on the old_cr3, since we aren't willing to let it
+	 * die.  It's also not clear who the previous process is - sometimes it
+	 * isn't even a process (when the kernel loads on its own, and not in
+	 * response to a syscall).  Probably need to think more about this (TODO)
+	 *
+	 * This can get a bit tricky if this code blocks (will need to think about a
+	 * decref then), if we try to change states, etc.
+	 */
+	env_incref(e);
 	lcr3(e->env_cr3);
 
 	// TODO: how do we do a runtime COUNT?
@@ -414,6 +388,7 @@ load_icode(env_t *e, uint8_t *COUNT(size) binary, size_t size)
 
 	// reload the original address space
 	lcr3(old_cr3);
+	env_decref(e);
 }
 
 //
@@ -443,7 +418,9 @@ env_free(env_t *e)
 	physaddr_t pa;
 
 	// Note the environment's demise.
-	cprintf("[%08x] free env %08x\n", current ? current->env_id : 0, e->env_id);
+	printk("[%08x] free env %08x\n", current ? current->env_id : 0, e->env_id);
+	// All parts of the kernel should have decref'd before env_free was called. 
+	assert(e->env_refcnt == 0);
 
 	// Flush all mapped pages in the user portion of the address space
 	static_assert(UTOP % PTSIZE == 0);
@@ -468,10 +445,6 @@ env_free(env_t *e)
 		page_decref(pa2page(pa));
 	}
 
-	// Moved to page_decref
-	// need a known good pgdir before releasing the old one
-	//lcr3(boot_cr3);
-
 	// free the page directory
 	pa = e->env_cr3;
 	e->env_pgdir = 0;
@@ -484,59 +457,90 @@ env_free(env_t *e)
 }
 
 /*
- * This allows the kernel to keep this process around, in case it is being used
- * in some asynchronous processing.
+ * The process refcnt is the number of places the process 'exists' in the
+ * system.  Creation counts as 1.  Having your page tables loaded somewhere
+ * (lcr3) counts as another 1.  A non-RUNNING_* process should have refcnt at
+ * least 1.  If the kernel is on another core and in a processes address space
+ * (like processing its backring), that counts as another 1.
+ *
+ * Note that the actual loading and unloading of cr3 is up to the caller, since
+ * that's not the only use for this (and decoupling is more flexible).
+ *
  * The refcnt should always be greater than 0 for processes that aren't dying.
  * When refcnt is 0, the process is dying and should not allow any more increfs.
- * TODO: Make sure this is never called from an interrupt handler (irq_save)
+ * A process can be dying with a refcnt greater than 0, since it could be
+ * waiting for other cores to "get the message" to die, or a kernel core can be
+ * finishing work in the processes's address space.
+ *
+ * Implementation aside, the important thing is that we atomically increment
+ * only if it wasn't already 0.  If it was 0, then we shouldn't be attaching to
+ * the process, so we return an error, which should be handled however is
+ * appropriate.  We currently use spinlocks, but some sort of clever atomics
+ * would work too.
+ *
+ * Also, no one should ever update the refcnt outside of these functions.
+ * Eventually, we'll have Ivy support for this. (TODO)
  */
 error_t env_incref(env_t* e)
 {
 	error_t retval = 0;
-	spin_lock(&e->lock);
+	spin_lock_irqsave(&e->lock);
 	if (e->env_refcnt)
 		e->env_refcnt++;
 	else
 		retval = -EBADENV;
-	spin_unlock(&e->lock);
+	spin_unlock_irqsave(&e->lock);
 	return retval;
 }
 
 /*
  * When the kernel is done with a process, it decrements its reference count.
  * When the count hits 0, no one is using it and it should be freed.
- * env_destroy calls this.
- * TODO: Make sure this is never called from an interrupt handler (irq_save)
+ * "Last one out" actually finalizes the death of the process.  This is tightly
+ * coupled with the previous function (incref)
+ * Be sure to load a different cr3 before calling this!
  */
 void env_decref(env_t* e)
 {
-	// need a known good pgdir before releasing the old one
-	// sometimes env_free is called on a different core than decref
-	lcr3(boot_cr3);
-
-	spin_lock(&e->lock);
+	spin_lock_irqsave(&e->lock);
 	e->env_refcnt--;
-	spin_unlock(&e->lock);
+	spin_unlock_irqsave(&e->lock);
 	// if we hit 0, no one else will increment and we can check outside the lock
 	if (e->env_refcnt == 0)
 		env_free(e);
 }
 
 
-//
-// Frees environment e.
-// If e was the current env, then runs a new environment (and does not return
-// to the caller).
-//
+/*
+ * Destroys the given process.  Can be called by a different process (checked
+ * via current), though that's unable to handle an async call (TODO current does
+ * not work asyncly, though it could be made to in the async processing
+ * function. 
+ */
 void
 env_destroy(env_t *e)
 {
 	// TODO: XME race condition with env statuses, esp when running / destroying
 	proc_set_state(e, PROC_DYING);
 
-	env_decref(e);
+	/*
+	 * If we are currently running this address space on our core, we need a
+	 * known good pgdir before releasing the old one.  This is currently the
+	 * major practical implication of the kernel caring about a processes
+	 * existence (the inc and decref).  This decref corresponds to the incref in
+	 * proc_startcore (though it's not the only one).
+	 */
+	if (current == e) {
+		lcr3(boot_cr3);
+		env_decref(e); // this decref is for the cr3
+	}
+	env_decref(e); // this decref is for the process in general
 	atomic_dec(&num_envs);
 
+	/*
+	 * Could consider removing this from destroy and having the caller specify
+	 * these actions
+	 */
 	// for old envs that die on user cores.  since env run never returns, cores
 	// never get back to their old hlt/relaxed/spin state, so we need to force
 	// them back to an idle function.
@@ -625,60 +629,12 @@ void env_pop_tf_sysexit(trapframe_t *tf)
 void
 env_run(env_t *e)
 {
-	// Step 1: If this is a context switch (a new environment is running),
-	//	   then set 'current' to the new environment,
-	//	   update its 'env_runs' counter, and
-	//	   and use lcr3() to switch to its address space.
-	// Step 2: Use env_pop_tf() to restore the environment's
-	//         registers and drop into user mode in the
-	//         environment.
-
-	// Hint: This function loads the new environment's state from
-	//	e->env_tf.  Go back through the code you wrote above
-	//	and make sure you have set the relevant parts of
-	//	e->env_tf to sensible values.
-
 	// TODO: XME race here with env destroy on the status and refcnt
 	// Could up the refcnt and down it when a process is not running
 	
-	// TODO XME need different code paths for retarting a core (pop) and
-	// running for the first time
-	if (e->state == PROC_RUNNABLE_S)
-		proc_set_state(e, PROC_RUNNING_S);
+	proc_set_state(e, PROC_RUNNING_S);
 
-	if (e != current) {
-		current = e;
-		e->env_runs++;
-		lcr3(e->env_cr3); // think about the refcnt here
-	}
-	/* If the process entered the kernel via sysenter, we need to leave via
-	 * sysexit.  sysenter trapframes have 0 for a CS, which is pushed in
-	 * sysenter_handler.
-	 *
-	 *           FFFFFFFFF UU     UU    CCCCCC  KK     KK  #
-	 *           FF        UU     UU  CCC       KK    KK   #
-	 *           FF        UU     UU CC         KK  KK     #
-	 *           FFFFFF    UU     UU CC         KKKKK      #
-	 *           FF        UU     UU CC         KK  KK     #
-	 *           FF         UU   UU   CCC       KK    KK    
-	 *           FF          UUUUU      CCCCCC  KK     KK  #
-	 *
-	 * TODO think about when we no longer need the stack, in case we are
-	 * preempted and expected to run again from somewhere else.  we can't
-	 * expect to have the kernel stack around anymore.
-	 * I think we need to make it such that the kernel in "process context"
-	 * never gets removed from the core (displaced from its stack)
-	 * would like to leave interrupts on too, so long as we come back.
-	 * Consider a moveable flag or something
-	 */
-	/* workqueue with the todo item put there by the interrupt handler when
-	 * it realizes we were in the kernel in the first place.  disable ints
-	 * before checking the queue and deciding to pop out or whatever.
-	 */
-	if (e->env_tf.tf_cs)
-  		env_pop_tf(&e->env_tf);
-	else
-		env_pop_tf_sysexit(&e->env_tf);
+	proc_startcore(e, &e->env_tf);
 }
 
 /* This is the top-half of an interrupt handler, where the bottom half is

@@ -37,8 +37,9 @@ void sysenter_callwrapper(struct Trapframe *tf)
 	 * careful here - we need to make sure that this current is the right
 	 * process, which could be weird if the syscall blocked.  it would need to
 	 * restore the proper value in current before returning to here.
+	 * likewise, tf could be pointing to random gibberish.
 	 */
-	env_run(current);
+	proc_startcore(current, tf);
 }
 
 //Do absolutely nothing.  Used for profiling.
@@ -230,6 +231,9 @@ static void sys_yield(struct proc *p)
 	// and schedule/yielding
 	assert(p->state == PROC_RUNNING_S);
 	p->state = PROC_RUNNABLE_S;
+	// the implied thing here is that all state has been saved.  and you need
+	// todo that before changing the state to RUNNABLE_S, since the process can
+	// get picked up somewhere else. TODO
 	schedule();
 
 	/* TODO
@@ -380,6 +384,8 @@ intreg_t process_generic_syscalls(env_t* e, size_t max)
 		//printk("DEBUG POST: sring->req_prod: %d, sring->rsp_prod: %d\n",\
 			   sysbr->sring->req_prod, sysbr->sring->rsp_prod);
 	}
+	// load sane page tables (and don't rely on decref to do it for you).
+	lcr3(boot_cr3);
 	env_decref(e);
 	return (intreg_t)count;
 }

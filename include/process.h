@@ -10,25 +10,27 @@
 #ifndef ROS_KERN_PROCESS_H
 #define ROS_KERN_PROCESS_H
 
+#include <arch/types.h>
+
 /* Process States.  Not 100% on the names yet. */
-typedef enum {
-	ENV_FREE, // TODO don't use this shit for process allocation flagging
-	PROC_CREATED,
-	PROC_RUNNABLE_S,
-	PROC_RUNNING_S,
-	PROC_WAITING,             // can split out to INT and UINT
-	PROC_DYING,
-	PROC_RUNNABLE_M,          // ready, just needs all of its resources (cores)
-	PROC_RUNNING_M            // running, manycore style
-} proc_state_t;
+#define PROC_CREATED			0x01
+#define PROC_RUNNABLE_S			0x02
+#define PROC_RUNNING_S			0x04
+#define PROC_WAITING			0x08  // can split out to INT and UINT
+#define PROC_DYING				0x10
+#define PROC_RUNNABLE_M			0x20 // ready, needs all of its resources (cores)
+#define PROC_RUNNING_M			0x40 // running, manycore style
+// TODO don't use this shit for process allocation flagging
+#define ENV_FREE				0x80
 
 #include <env.h>
 
 // Till we remove the old struct Env
 #define proc Env
 
-int proc_set_state(struct proc *p, proc_state_t state) WRITES(p->state);
+int proc_set_state(struct proc *p, uint32_t state) WRITES(p->state);
 struct proc *get_proc(unsigned pid);
 bool proc_controls(struct proc *actor, struct proc *target);
+void proc_startcore(struct proc *p, trapframe_t *tf) __attribute__((noreturn));
 
 #endif // !ROS_KERN_PROCESS_H

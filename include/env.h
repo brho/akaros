@@ -43,7 +43,7 @@ struct Env {
 	trapframe_t env_tf;			// Saved registers
 	envid_t env_id;				// Unique environment identifier
 	envid_t env_parent_id;		// env_id of this env's parent
-	proc_state_t state;         // Status of the process
+	uint32_t state;				// Status of the process
 	uint32_t env_runs;			// Number of times environment has run
 	uint32_t env_refcnt;		// Reference count of kernel contexts using this
 	uint32_t env_flags;
@@ -72,7 +72,7 @@ LIST_HEAD(env_list, Env);		// Declares 'struct env_list'
 typedef struct env_list env_list_t;
 
 void	env_init(void);
-int		env_alloc(env_t **e, envid_t parent_id);
+int		env_alloc(env_t *SAFE*SAFE e, envid_t parent_id);
 void	env_free(env_t *SAFE e);
 error_t	env_incref(env_t* e);
 void	env_decref(env_t *SAFE e);

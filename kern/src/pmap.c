@@ -538,7 +538,7 @@ i386_vm_init(void)
 	pgdir[0] = 0;
 
 	// Flush the TLB for good measure, to kill the pgdir[0] mapping.
-	lcr3(boot_cr3);
+	tlb_flush_global();
 }
 
 //

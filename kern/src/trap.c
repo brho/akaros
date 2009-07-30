@@ -175,7 +175,7 @@ static void
 				syscall(current, tf->tf_regs.reg_eax, tf->tf_regs.reg_edx,
 				        tf->tf_regs.reg_ecx, tf->tf_regs.reg_ebx,
 				        tf->tf_regs.reg_edi, tf->tf_regs.reg_esi);
-			env_run(current); // Note the comment in syscall.c
+			proc_startcore(current, tf); // Note the comment in syscall.c
 			break;
 		default:
 			// Unexpected trap: The user process or the kernel has a bug.
@@ -220,7 +220,7 @@ void
 	// so far we never get here
 	assert(0);
 	// Return to the current environment, which should be runnable.
-	env_run(current);
+	proc_startcore(current, tf); // Note the comment in syscall.c
 }
 
 void
