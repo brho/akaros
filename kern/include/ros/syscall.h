@@ -17,6 +17,8 @@ enum
 	SYS_getcpuid,
 	SYS_serial_write,
 	SYS_serial_read,
+	SYS_shared_page_alloc,
+	SYS_shared_page_free,
 	SYS_getenvid,
 	SYS_env_destroy,
 	SYS_yield,
@@ -36,11 +38,11 @@ enum
 #define BUSTER_PRINT_TICKS		0x0008
 #define BUSTER_JUST_LOCKS		0x0010 // unimplemented
 
-#define NUM_SYS_ARGS 6
+#define NUM_SYSCALL_ARGS 6
 typedef struct syscall_req {
 	uint32_t num;
 	uint32_t flags;
-	uint32_t args[NUM_SYS_ARGS];
+	uint32_t args[NUM_SYSCALL_ARGS];
 } syscall_req_t;
 
 typedef struct syscall_rsp {

@@ -182,6 +182,40 @@ page_insert(pde_t *pgdir, page_t *pp, void *va, int perm)
 }
 
 //
+// Map the physical page 'pp' at the first virtual address that is free 
+// in the range 'vab' to 'vae'.
+// The permissions (the low 12 bits) of the page table entry get set to 
+// 'perm|PTE_P'.
+//
+// Details
+//   - If there is no free entry in the range 'vab' to 'vae' this 
+//     function returns -ENOMEM.
+//   - If necessary, on demand, this function will allocate a page table 
+//     and inserts it into 'pgdir'.
+//   - pp->pp_ref should be incremented if the insertion succeeds.
+//
+// RETURNS: 
+//   NULL, if no free va in the range (vab, vae) could be found
+//   va,   the virtual address where pp has been mapped in the 
+//         range (vab, vae)
+//
+void* page_insert_in_range(pde_t *pgdir, page_t *pp, 
+                           void *vab, void *vae, int perm) 
+{
+	pte_t* pte = NULL;
+	void* new_va;
+	
+	for(new_va = vab; new_va <= vae; new_va+= PGSIZE) {
+		pte = pgdir_walk(pgdir, new_va, 1);
+		if(pte != NULL && !(*pte & PTE_P)) break;
+		else pte = NULL;
+	}
+	if (!pte) return NULL;
+	*pte = page2pa(pp) | PTE_P | perm;
+	return new_va;
+}
+
+//
 // Return the page mapped at virtual address 'va'.
 // If pte_store is not zero, then we store in it the address
 // of the pte for this page.  This is used by page_remove

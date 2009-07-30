@@ -27,6 +27,7 @@
 #ifndef ROS_INC_RING_BUFFER_H
 #define ROS_INC_RING_BUFFER_H
 
+#include <string.h>
 #include <arch/atomic.h>
 
 #define xen_mb()  mb()
@@ -90,7 +91,7 @@ typedef unsigned int RING_IDX;
 union __name##_sring_entry {                                            \
     __req_t req;                                                        \
     __rsp_t rsp;                                                        \
-};                                                                      \
+} TRUSTED;                                                              \
                                                                         \
 /* Shared ring page */                                                  \
 struct __name##_sring {                                                 \

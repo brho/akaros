@@ -9,7 +9,7 @@
 	.globl procinfo
 	.set procinfo, UINFO
 	.globl procdata
-	.set procdata, UDATA
+	.set procdata, USYSCALL
 	.globl pages
 	.set pages, UPAGES
 	.globl vpt

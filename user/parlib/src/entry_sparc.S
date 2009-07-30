@@ -9,7 +9,7 @@
 	.globl procinfo
 	.set procinfo, UINFO
 	.globl procdata
-	.set procdata, UDATA
+	.set procdata, USYSCALL
 	.globl pages
 	.set pages, UPAGES
 	.globl vpt
@@ -24,16 +24,20 @@
 .globl _start
 _start:
 	// See if we were started with arguments on the stack
-	cmpl $USTACKTOP, %esp
-	jne args_exist
+	tst	%o0
+	bne	args_exist
+	 nop
 
 	// If not, push dummy argc/argv arguments.
 	// This happens when we are loaded by the kernel,
 	// because the kernel does not know about passing arguments.
-	pushl $0
-	pushl $0
+	mov	0,%o0
+	mov	0,%o1
 
 args_exist:
-	call parlibmain
-1:      jmp 1b
+	call	parlibmain
+	 nop
+
+1:	ba	1b
+	 nop
 

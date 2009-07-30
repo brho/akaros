@@ -53,6 +53,38 @@ static ssize_t sys_serial_read(env_t* e, char *DANGEROUS buf, size_t len)
 	#endif
 }
 
+static ssize_t sys_shared_page_alloc(env_t* p1, 
+                                     void** addr, envid_t p2_id, 
+                                     int p1_flags, int p2_flags
+                                    ) 
+{
+	if (!VALID_USER_PERMS(p1_flags)) return -EPERM;
+	if (!VALID_USER_PERMS(p2_flags)) return -EPERM;
+
+	page_t* page;
+	env_t* p2 = &(envs[ENVX(p2_id)]);
+	error_t e = page_alloc(&page);
+	if(e < 0) return e;
+	
+	void* p2_addr = page_insert_in_range(p2->env_pgdir, page, 
+	                                     (void*)UTEXT, (void*)UTOP, p2_flags);
+	if(p2_addr == NULL) 
+		return -EFAIL;
+		
+	void* p1_addr = page_insert_in_range(p1->env_pgdir, page, 
+	                                    (void*)UTEXT, (void*)UTOP, p1_flags);
+	if(p1_addr == NULL) {
+		page_remove(p2->env_pgdir, p2_addr);
+		return -EFAIL;
+	}
+	*addr = p1_addr;
+	return ESUCCESS;
+}
+
+static void sys_shared_page_free(env_t* p1, void* addr, envid_t p2)
+{
+}
+
 // Invalidate the cache of this core
 static void sys_cache_invalidate(void)
 {
@@ -195,7 +227,7 @@ static error_t sys_env_destroy(env_t* e, envid_t envid)
 	else
 		printk("[%08x] destroying %08x\n", e->env_id, env_to_die->env_id);
 	env_destroy(env_to_die);
-	return 0;
+	return ESUCCESS;
 }
 
 /*
@@ -231,13 +263,19 @@ intreg_t syscall(env_t* e, uint32_t syscallno, uint32_t a1, uint32_t a2,
 	switch (syscallno) {
 		case SYS_null:
 			sys_null();
-			return 0;
+			return ESUCCESS;
 		case SYS_cache_buster:
 			sys_cache_buster(e, a1, a2, a3);
 			return 0;
 		case SYS_cache_invalidate:
 			sys_cache_invalidate();
 			return 0;
+		case SYS_shared_page_alloc:
+			return sys_shared_page_alloc(e, (void** DANGEROUS) a1, 
+		                                 a2, (int) a3, (int) a4);
+		case SYS_shared_page_free:
+			sys_shared_page_free(e, (void* DANGEROUS) a1, a2);
+		    return ESUCCESS;
 		case SYS_cputs:
 			return sys_cputs(e, (char *DANGEROUS)a1, (size_t)a2);
 		case SYS_cgetc:
@@ -254,7 +292,7 @@ intreg_t syscall(env_t* e, uint32_t syscallno, uint32_t a1, uint32_t a2,
 			return sys_env_destroy(e, (envid_t)a1);
 		case SYS_yield:
 			sys_yield(e);
-			return 0;
+			return ESUCCESS;
 		case SYS_proc_create:
 		case SYS_proc_run:
 			panic("Not implemented");
@@ -274,11 +312,12 @@ intreg_t syscall_async(env_t* e, syscall_req_t *call)
 intreg_t process_generic_syscalls(env_t* e, size_t max)
 {
 	size_t count = 0;
-	syscall_back_ring_t* sysbr = &e->env_sysbackring;
+	syscall_back_ring_t* sysbr = &e->env_syscallbackring;
 
-	// make sure the env is still alive.  incref will return 0 on success.
+	// make sure the env is still alive.  
+	// incref will return ESUCCESS on success.
 	if (env_incref(e))
-		return -1;
+		return -EFAIL;
 
 	// max is the most we'll process.  max = 0 means do as many as possible
 	while (RING_HAS_UNCONSUMED_REQUESTS(sysbr) && ((!max)||(count < max)) ) {

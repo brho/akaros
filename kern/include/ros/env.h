@@ -5,6 +5,7 @@
 
 #include <ros/memlayout.h>
 #include <ros/syscall.h>
+#include <ros/sysevent.h>
 #include <arch/types.h>
 #include <sys/queue.h>
 #include <arch/trap.h>
@@ -54,16 +55,27 @@ struct Env {
 	uint32_t env_runs;			// Number of times environment has run
 	uint32_t env_refcnt;		// Reference count of kernel contexts using this
 	uint32_t env_flags;
+	
+	// The backring for processing asynchronous system calls from the user
 	// Note this is the actual backring, not a pointer to it somewhere else
-	syscall_back_ring_t env_sysbackring;	// BackRing for generic syscalls
+	syscall_back_ring_t env_syscallbackring;
+	
+	// The front ring for pushing asynchronous system events out to the user
+	// Note this is the actual frontring, not a pointer to it somewhere else
+	sysevent_front_ring_t env_syseventfrontring;
 
 	// Address space
-	pde_t *COUNT(NPDENTRIES) env_pgdir;			// Kernel virtual address of page dir
-	physaddr_t env_cr3;			// Physical address of page dir
-	// TODO - give these two proper types (pointers to structs)
+	pde_t *COUNT(NPDENTRIES) env_pgdir;  // Kernel virtual address of page dir
+	physaddr_t env_cr3;			         // Physical address of page dir
+	
+	// TODO - give this a proper type (pointers to a struct)
 	// TODO - not always going to be PGSIZE either!
 	void*COUNT(PGSIZE) env_procinfo; 		// KVA of per-process shared info table (RO)
-	void*COUNT(PGSIZE) env_procdata;  		// KVA of per-process shared data table (RW)
+	
+	// Ring buffers for communicating with user space
+	syscall_sring_t*SAFE env_syscallring;   // Per-process ring buffer for async syscalls
+	sysevent_sring_t*SAFE env_syseventring; // Per-process ring buffer for async sysevents
+	
 	// Eventually want to move this to a per-system shared-info page
 	uint64_t env_tscfreq;		// Frequency of the TSC for measurements
 };

@@ -38,9 +38,10 @@ KERN_APPFILES := \
                     $(USER_APPS_ROSLIB_DIR)/fptest \
                     $(USER_APPS_ROSLIB_DIR)/null \
                     $(USER_APPS_ROSLIB_DIR)/hello \
-                    $(USER_APPS_ROSLIB_DIR)/measurements \
-#                    $(USER_APPS_PARLIB_DIR)/matrix \
-#                    $(USER_APPS_PARLIB_DIR)/draw_nanwan \
+                    $(USER_APPS_PARLIB_DIR)/channel_test_client \
+                    $(USER_APPS_PARLIB_DIR)/channel_test_server \
+                    $(USER_APPS_ROSLIB_DIR)/measurements
+#                    $(USER_APPS_PARLIB_DIR)/draw_nanwan
 #                    $(USER_APPS_PARLIB_DIR)/open_read \
 #                    $(USER_APPS_PARLIB_DIR)/hello
 

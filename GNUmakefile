@@ -12,6 +12,9 @@ OBJDIR := obj
 # User defined constants passed on the command line 
 TARGET_ARCH := i386
 
+# Make sure that 'all' is the first target
+all: symlinks
+
 -include Makelocal
 
 TOP_DIR := .
@@ -79,9 +82,6 @@ endif
 
 # List of directories that the */Makefrag makefile fragments will add to
 OBJDIRS :=
-
-# Make sure that 'all' is the first target
-all: symlinks
 
 kern/boot/Makefrag: symlinks
 

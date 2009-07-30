@@ -29,6 +29,12 @@ void manager(void)
 
 	switch (progress++) {
 		case 0:
+			envs[0] = ENV_CREATE(parlib_channel_test_client);
+			envs[1] = ENV_CREATE(parlib_channel_test_server);
+			smp_call_function_single(1, run_env_handler, envs[0], 0);
+			smp_call_function_single(2, run_env_handler, envs[1], 0);
+		#if 0
+		case 0:
 			envs[0] = ENV_CREATE(roslib_proctests);
 			envs[1] = ENV_CREATE(roslib_proctests);
 			envs[2] = ENV_CREATE(roslib_proctests);
@@ -43,6 +49,7 @@ void manager(void)
 		case 1:
 		case 2:
 		case 3:
+		#endif
 		#if 0
 		case 0:
 			printk("Beginning Tests\n");

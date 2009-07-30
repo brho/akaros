@@ -61,7 +61,7 @@ void sys_null()
 
 error_t sys_null_async(syscall_desc_t* desc)
 {
-	syscall_req_t syscall = {SYS_null, 0, {[0 ... (NUM_SYS_ARGS-1)] 0}};
+	syscall_req_t syscall = {SYS_null, 0, {[0 ... (NUM_SYSCALL_ARGS-1)] 0}};
 	desc->cleanup = NULL;
 	desc->data = NULL;
 	return async_syscall(&syscall, desc);
@@ -76,7 +76,7 @@ error_t	sys_cache_buster_async(syscall_desc_t* desc, uint32_t num_writes,
 			                       uint32_t num_pages, uint32_t flags)
 {
 	syscall_req_t syscall = {SYS_cache_buster, 0, {num_writes, num_pages, flags,
-	                                               [3 ... (NUM_SYS_ARGS-1)] 0}};
+	                                               [3 ... (NUM_SYSCALL_ARGS-1)] 0}};
 	// just to be safe, 0 these out.  they should have been 0'd right after
 	// the desc was POOL_GET'd
 	desc->cleanup = NULL;
@@ -98,7 +98,7 @@ error_t sys_cputs_async(const char *s, size_t len, syscall_desc_t* desc,
                         void (*cleanup_handler)(void*), void* cleanup_data)
 {
 	// could just hardcode 4 0's, will eventually wrap this marshaller anyway
-	syscall_req_t syscall = {SYS_cputs, 0, {(uint32_t)s, len, [2 ... (NUM_SYS_ARGS-1)] 0} };
+	syscall_req_t syscall = {SYS_cputs, 0, {(uint32_t)s, len, [2 ... (NUM_SYSCALL_ARGS-1)] 0} };
 	desc->cleanup = cleanup_handler;
 	desc->data = cleanup_data;
 	return async_syscall(&syscall, desc);

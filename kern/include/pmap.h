@@ -91,6 +91,8 @@ int     page_alloc_specific(page_t **pp_store, size_t ppn);
 void	page_free(page_t *pp);
 int		page_is_free(size_t ppn);
 int	    page_insert(pde_t *COUNT(NPDENTRIES) pgdir, page_t *pp, void *SNT va, int perm);
+void*   page_insert_in_range(pde_t *COUNT(NPDENTRIES) pgdir, page_t *pp, 
+                             void *SNT vab, void *SNT vae, int perm);
 void	page_remove(pde_t *COUNT(NPDENTRIES) pgdir, void *SNT va);
 page_t* page_lookup(pde_t *COUNT(NPDENTRIES) pgdir, void *va, pte_t **pte_store);
 error_t	pagetable_remove(pde_t *COUNT(NPDENTRIES) pgdir, void *va);

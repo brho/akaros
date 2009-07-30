@@ -31,7 +31,7 @@
  *                     |         Kernel Stack         | RW/--  KSTKSIZE   |
  *                     | - - - - - - - - - - - - - - -|                 PTSIZE
  *                     |      Invalid Memory (*)      | --/--             |
- *    ULIM     ------> +------------------------------+ 0xbf800000      --+
+ *    ULIM      ----> +------------------------------+ 0xbf800000      --+
  *                     |  Cur. Page Table (User R-)   | R-/R-  PTSIZE
  *    UVPT      ---->  +------------------------------+ 0xbf400000
  *                     |          RO PAGES            | R-/R-  PTSIZE
@@ -40,12 +40,14 @@
  *                     +------------------------------+ 0xbec01000      PTSIZE
  *                     |     Per-Process R/O Info     | R-/R-  PGSIZE     |
  * UTOP, UINFO  ---->  +------------------------------+ 0xbec00000      --+
+ *                     |     Async Syscall Ring       | RW/RW  PGSIZE     |
+ *   USYSCALL   ---->  +------------------------------+ 0xbebff000        |
+ *                     |     Async Sysevent Ring      | RW/RW  PGSIZE     |
+ *   USYSEVENT  ---->  +------------------------------+ 0xbebfe000      PTSIZE
  *                     |      Global Shared Page      | RW/RW  PGSIZE     |
- *      UGDATA  ---->  +------------------------------+ 0xbebff000        |
+ *     UGDATA   ---->  +------------------------------+ 0xbebfd000        |
  *                     |  Unmapped (future expansion) | --/--             |
- *                     +------------------------------+ 0xbe801000      PTSIZE
- *                     |     Per-Process R/W Data     | RW/RW  PGSIZE     |
- * UDATA,UXSTACKTOP--> +------------------------------+ 0xbe800000      --+
+ *   UXSTACKTOP ---->  +------------------------------+ 0xbe800000      --+
  *                     |     User Exception Stack     | RW/RW  PGSIZE
  *                     +------------------------------+ 0xbe7ff000
  *                     |       Empty Memory (*)       | --/--  PGSIZE
@@ -120,15 +122,19 @@
 // Top of user-accessible VM
 #define UTOP		UINFO
 
-// Read-write, global page.  Shared by all processes.  Can't be trusted.
-#define UGDATA		(UTOP - PGSIZE)
+// Read-write, per-process shared page for sending asynchronous 
+// syscalls to the kernel
+#define USYSCALL    (UTOP - PGSIZE)
 
-// Read-write, per-process shared data structures
-#define UDATA		(UTOP - PTSIZE)
-#define UDATA_PAGES 1
+// Read-write, per-process shared page for receiving asynchronous 
+// sysevents from the kernel
+#define USYSEVENT   (USYSCALL - PGSIZE)
+
+// Read-write, global page.  Shared by all processes.  Can't be trusted.
+#define UGDATA   (USYSEVENT - PGSIZE)
 
 // Top of one-page user exception stack
-#define UXSTACKTOP	UDATA
+#define UXSTACKTOP	(UTOP - PTSIZE)
 // Next page left invalid to guard against exception stack overflow; then:
 // Top of normal user stack
 #define USTACKTOP	(UXSTACKTOP - 2*PGSIZE)
