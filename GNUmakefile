@@ -5,11 +5,14 @@
 #	Recursive Make Considered Harmful
 #	http://aegis.sourceforge.net/auug97.pdf
 #
+
+-include Makelocal
+
 OBJDIR := obj
 
 TOP_DIR := .
-ARCH_DIR := $(TOP_DIR)/arch
-INCLUDE_DIR := $(TOP_DIR)/include
+ARCH_DIR := $(TOP_DIR)/kern/arch
+INCLUDE_DIR := $(TOP_DIR)/kern/include
 UNAME=$(shell uname -m)
 V = @
 
@@ -82,17 +85,16 @@ all: symlinks
 kern/boot/Makefrag: symlinks
 
 symlinks:
-	-unlink include/arch
-	ln -s ../arch/$(TARGET_ARCH)/include/ include/arch
+	-unlink kern/include/arch
+	ln -s ../arch/$(TARGET_ARCH)/ kern/include/arch
 	-unlink kern/src/arch
-	ln -s ../../arch/$(TARGET_ARCH)/src/ kern/src/arch
+	ln -s ../arch/$(TARGET_ARCH)/ kern/src/arch
 	-unlink kern/boot
-	ln -s ../arch/$(TARGET_ARCH)/boot/ kern/boot
+	ln -s arch/$(TARGET_ARCH)/boot/ kern/boot
 
 # Include Makefrags for subdirectories
 include user/Makefrag
 include kern/Makefrag
--include Makelocal
 
 # Eliminate default suffix rules
 .SUFFIXES:

@@ -1,1 +1,1 @@
-../../../../include/sys/queue.h
+../../../../kern/include/sys/queue.h

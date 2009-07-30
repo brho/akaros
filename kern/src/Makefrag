@@ -7,7 +7,7 @@
 KERN_SRC_DIR = $(KERN_DIR)/src
 OBJDIRS += $(KERN_SRC_DIR)
 
-include $(ARCH_DIR)/$(TARGET_ARCH)/src/Makefrag
+include $(KERN_SRC_DIR)/arch/Makefrag
 
 # entry.S must be first, so that it's the first code in the text segment!!!
 #
