@@ -4,7 +4,7 @@
 # where the GNUmakefile is located.
 #
 
-KERN_ARCH_SRC_DIR = $(KERN_DIR)/src/arch
+KERN_ARCH_SRC_DIR = $(KERN_DIR)/arch/$(TARGET_ARCH)
 
 # entry.S must be first, so that it's the first code in the text segment!!!
 #

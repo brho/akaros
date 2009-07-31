@@ -238,11 +238,11 @@ cga_putc(int c)
 		scrolling_crt_pos -= (scrolling_crt_pos % CRT_COLS);
 		break;
 	case '\t':
-		cons_putc(' ');
-		cons_putc(' ');
-		cons_putc(' ');
-		cons_putc(' ');
-		cons_putc(' ');
+		cga_putc(' ');
+		cga_putc(' ');
+		cga_putc(' ');
+		cga_putc(' ');
+		cga_putc(' ');
 		break;
 	default:
 		crt_buf[crt_pos++] = c;		/* write the character */

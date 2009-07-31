@@ -352,9 +352,13 @@ void test_smp_call_functions(void)
 	printk("A: %d, B: %d, C: %d (should be 19,19,19)\n", atomic_read(&a), atomic_read(&b), atomic_read(&c));
 	printk("Attempting to deadlock by smp_calling with an outstanding wait:\n");
 	smp_call_function_self(test_null_handler, 0, &waiter0);
+	printk("Sent one\n");
 	smp_call_function_self(test_null_handler, 0, &waiter1);
+	printk("Sent two\n");
 	smp_call_wait(waiter0);
+	printk("Wait one\n");
 	smp_call_wait(waiter1);
+	printk("Wait two\n");
 	printk("\tMade it through!\n");
 	printk("Attempting to deadlock by smp_calling more than are available:\n");
 	printk("\tShould see an Insufficient message and a kernel warning.\n");

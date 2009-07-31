@@ -22,6 +22,7 @@ static __inline void cpu_relax(void) __attribute__((always_inline));
 static __inline void cpu_halt(void) __attribute__((always_inline));
 static __inline void clflush(uintptr_t* addr) __attribute__((always_inline));
 static __inline int irq_is_enabled(void) __attribute__((always_inline));
+static __inline uint32_t core_id(void) __attribute__((always_inline));
 static __inline void cache_flush(void) __attribute__((always_inline));
 static __inline void reboot(void) __attribute__((always_inline)) __attribute__((noreturn));
 
@@ -133,10 +134,17 @@ irq_is_enabled(void)
 	return read_eflags() & FL_IF;
 }
 
+/*
+ * Returns the core id.  Unfortunately, this is a serializing instruction, and
+ * may not be the best way either.  This is ripped from lapic_get_default_id().
+ */
 static __inline uint32_t
 core_id(void)
 {
-	return lapic_get_id();
+	uint32_t ebx;
+	cpuid(1, 0, &ebx, 0, 0);
+	// p6 family only uses 4 bits here, and 0xf is reserved for the IOAPIC
+	return (ebx & 0xFF000000) >> 24;
 }
 
 static __inline void

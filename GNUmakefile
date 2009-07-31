@@ -6,9 +6,13 @@
 #	http://aegis.sourceforge.net/auug97.pdf
 #
 
--include Makelocal
 
 OBJDIR := obj
+
+# User defined constants passed on the command line 
+TARGET_ARCH := i386
+
+-include Makelocal
 
 TOP_DIR := .
 ARCH_DIR := $(TOP_DIR)/kern/arch
@@ -50,9 +54,6 @@ OBJDUMP	:= $(GCCPREFIX)objdump
 NM	    := $(GCCPREFIX)nm
 PERL    := perl
 
-# User defined constants passed on the command line 
-TARGET_ARCH ?= i386
-
 # Universal compiler flags
 # -fno-builtin is required to avoid refs to undefined functions in the kernel.
 # Only optimize to -O1 to discourage inlining, which complicates backtraces.
@@ -85,12 +86,10 @@ all: symlinks
 kern/boot/Makefrag: symlinks
 
 symlinks:
-	-unlink kern/include/arch
-	ln -s ../arch/$(TARGET_ARCH)/ kern/include/arch
-	-unlink kern/src/arch
-	ln -s ../arch/$(TARGET_ARCH)/ kern/src/arch
-	-unlink kern/boot
-	ln -s arch/$(TARGET_ARCH)/boot/ kern/boot
+	@-unlink kern/include/arch
+	@ln -s ../arch/$(TARGET_ARCH)/ kern/include/arch
+	@-unlink kern/boot
+	@ln -s arch/$(TARGET_ARCH)/boot/ kern/boot
 
 # Include Makefrags for subdirectories
 include user/Makefrag

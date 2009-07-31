@@ -336,7 +336,7 @@ error_t
 memcpy_from_user(env_t* env, void* COUNT(len) dest,
                  const void *DANGEROUS va, size_t len)
 {
-	void *DANGEROUS start, *DANGEROUS end;
+	const void *DANGEROUS start, *DANGEROUS end;
 	size_t num_pages, i;
 	pte_t *pte;
 	uintptr_t perm = PTE_P | PTE_USER_RO;
