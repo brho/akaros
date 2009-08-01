@@ -2,8 +2,8 @@
 #define ROS_INC_MEASURE_H
 
 #include <arch/types.h>
-#include <arch/timer.h>
-#include <arch/x86.h>
+#include <ros/timer.h>
+#include <arch/arch.h>
 
 #include <stdio.h>
 

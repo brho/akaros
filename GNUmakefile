@@ -5,10 +5,21 @@
 #	Recursive Make Considered Harmful
 #	http://aegis.sourceforge.net/auug97.pdf
 #
+
+
 OBJDIR := obj
 
+# User defined constants passed on the command line 
+TARGET_ARCH := i386
+
+# Make sure that 'all' is the first target
+all: symlinks
+
+-include Makelocal
+
 TOP_DIR := .
-INCLUDE_DIR := $(TOP_DIR)/include
+ARCH_DIR := $(TOP_DIR)/kern/arch
+INCLUDE_DIR := $(TOP_DIR)/kern/include
 UNAME=$(shell uname -m)
 V = @
 
@@ -46,16 +57,13 @@ OBJDUMP	:= $(GCCPREFIX)objdump
 NM	    := $(GCCPREFIX)nm
 PERL    := perl
 
-# User defined constants passed on the command line 
-ARCH ?= NONE
-
 # Universal compiler flags
 # -fno-builtin is required to avoid refs to undefined functions in the kernel.
 # Only optimize to -O1 to discourage inlining, which complicates backtraces.
-CFLAGS := $(CFLAGS) -D$(ARCH) 
-CFLAGS += -O -pipe -MD -fno-builtin -fno-stack-protector -gstabs
-CFLAGS += -Wall -Wno-format -Wno-unused
-CFLAGS += -nostdinc -Igccinclude/i386
+CFLAGS := $(CFLAGS) -D$(TARGET_ARCH)
+CFLAGS += -O2 -pipe -MD -fno-builtin -fno-stack-protector -gstabs
+CFLAGS += -Wall -Wno-format -Wno-unused -Wno-attributes
+CFLAGS += -nostdinc -Igccinclude/$(TARGET_ARCH)
 
 # Universal loader flags
 LDFLAGS := -nostdlib
@@ -64,20 +72,26 @@ LDFLAGS := -nostdlib
 GCC_LIB := $(shell $(CC) -print-libgcc-file-name)
 
 # 64 Bit specific flags / definitions
-ifeq ($(UNAME),x86_64)
-	CFLAGS += -m32
-	LDFLAGS += -melf_i386
-	GCC_LIB = $(shell $(CC) -print-libgcc-file-name | sed 's/libgcc.a/32\/libgcc.a/')
+ifeq ($(TARGET_ARCH),i386)
+	ifeq ($(UNAME),x86_64)
+		CFLAGS += -m32
+		LDFLAGS += -melf_i386
+		GCC_LIB = $(shell $(CC) -print-libgcc-file-name | sed 's/libgcc.a/32\/libgcc.a/')
+	endif
 endif
 
 # List of directories that the */Makefrag makefile fragments will add to
 OBJDIRS :=
 
-# Make sure that 'all' is the first target
-all:
+kern/boot/Makefrag: symlinks
+
+symlinks:
+	@-unlink kern/include/arch
+	@ln -s ../arch/$(TARGET_ARCH)/ kern/include/arch
+	@-unlink kern/boot
+	@ln -s arch/$(TARGET_ARCH)/boot/ kern/boot
 
 # Include Makefrags for subdirectories
--include Makelocal
 include user/Makefrag
 include kern/Makefrag
 

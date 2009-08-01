@@ -16,7 +16,7 @@
  * Print a number (base <= 16) in reverse order,
  * using specified putch function and associated pointer putdat.
  */
-static void printnum(void (*putch)(int, void**), void **putdat,
+void printnum(void (*putch)(int, void**), void **putdat,
 	                 unsigned long long num, unsigned base, int width, int padc)
 {
 	// first recursively print all preceding (more significant) digits

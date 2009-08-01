@@ -8,7 +8,7 @@
 #define ROS_INC_LIB_H 1
 
 #include <arch/types.h>
-#include <arch/timer.h>
+#include <ros/timer.h>
 #include <ros/error.h>
 #include <ros/memlayout.h>
 #include <ros/syscall.h>

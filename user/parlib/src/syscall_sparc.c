@@ -1,0 +1,10 @@
+__asm__ (".global syscall		\n\t"
+         "syscall:			\n\t"
+         "mov %o0,%g1		\n\t"
+         "mov %o1,%o0		\n\t"
+         "mov %o2,%o1		\n\t"
+         "mov %o3,%o2		\n\t"
+         "mov %o4,%o3		\n\t"
+         "mov %o5,%o4		\n\t"
+         "retl			\n\t"
+         "ta 8			\n\t");

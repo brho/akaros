@@ -6,7 +6,6 @@
 #include <arch/mmu.h>
 #include <arch/x86.h>
 #include <arch/apic.h>
-#include <arch/timer.h>
 #include <assert.h>
 #include <mptables.h>
 #include <pci.h>

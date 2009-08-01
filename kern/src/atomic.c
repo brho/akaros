@@ -1,4 +1,4 @@
-#include <arch/apic.h>
+#include <arch/arch.h>
 
 #include <atomic.h>
 #include <ros/error.h>
@@ -65,7 +65,7 @@ int commit_checklist_nowait(checklist_t* list, checklist_mask_t* mask)
 // Assumed we held the lock if we ever call this
 int waiton_checklist(checklist_t* list)
 {
-	extern uint32_t outstanding_calls;
+	extern atomic_t outstanding_calls;
 	// can consider breakout out early, like above, and erroring out
 	while (!checklist_is_clear(list))
 		cpu_relax();
@@ -104,7 +104,7 @@ void reset_checklist(checklist_t* list)
 // CPU mask specific - this is how cores report in
 void down_checklist(checklist_t* list)
 {
-	CLR_BITMASK_BIT_ATOMIC(list->mask.bits, lapic_get_id());
+	CLR_BITMASK_BIT_ATOMIC(list->mask.bits, core_id());
 }
 
 /* Barriers */

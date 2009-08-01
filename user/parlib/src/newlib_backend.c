@@ -183,7 +183,7 @@ int isatty(int file)
 
 	// Cheap hack to avoid sending serial comm for stuff we know
 	if ((STDIN_FILENO == file) || (STDOUT_FILENO == file) 
-                                || (STDERR_FILENO == file))
+                               || (STDERR_FILENO == file))
 		return 1;
 
 	
