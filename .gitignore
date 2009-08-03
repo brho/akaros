@@ -12,3 +12,7 @@ hdd.img
 *.*~
 Makelocal
 ros-project.tmproj
+kern/boot
+kern/include/arch
+kern/src/arch
+

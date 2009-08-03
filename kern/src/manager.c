@@ -28,12 +28,27 @@ void manager(void)
 	env_t *envs[256];
 
 	switch (progress++) {
+	
+	#ifdef __i386__
+
 		case 0:
 			envs[0] = ENV_CREATE(parlib_channel_test_client);
 			envs[1] = ENV_CREATE(parlib_channel_test_server);
 			smp_call_function_single(1, run_env_handler, envs[0], 0);
 			smp_call_function_single(2, run_env_handler, envs[1], 0);
-		#if 0
+
+	#if 0
+		case 0:
+			printk("Beginning Tests\n");
+			test_run_measurements(progress-1);  // should never return
+			break;
+	#endif
+
+		case 1:
+		case 2:
+		case 3:
+	#else
+
 		case 0:
 			envs[0] = ENV_CREATE(roslib_proctests);
 			envs[1] = ENV_CREATE(roslib_proctests);
@@ -49,15 +64,9 @@ void manager(void)
 		case 1:
 		case 2:
 		case 3:
-		#endif
-		#if 0
-		case 0:
-			printk("Beginning Tests\n");
-			test_run_measurements(progress-1);  // should never return
-			break;
-		case 1:
-		case 2:
-		case 3:
+
+	#endif
+
 		case 4:
 		case 5:
 		case 6:
@@ -69,9 +78,8 @@ void manager(void)
 		case 12:
 		case 13:
 		case 14:
-			test_run_measurements(progress-1);
+			//test_run_measurements(progress-1);
 			break;
-		#endif
 		default:
 			printk("Manager Progress: %d\n", progress);
 			schedule();

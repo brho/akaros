@@ -418,6 +418,8 @@ static void wait_for_all_envs_to_die(void)
 		cpu_relax();
 }
 
+#if 0
+
 // this never returns.
 static void sync_tests(int start_core, int num_threads, int job_num)
 {
@@ -533,6 +535,8 @@ void test_run_measurements(uint32_t job_num)
 	}
 	panic("Error in test setup!!");
 }
+
+#endif
 
 /************************************************************/
 /* ISR Handler Functions */
