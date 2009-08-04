@@ -4,9 +4,8 @@
  * See LICENSE for details.
  */
 
-#include <arch/x86.h>
-#include <arch/apic.h>
-#include <arch/smp.h>
+#include <atomic.h>
+#include <smp.h>
 
 #include <ros/error.h>
 
@@ -20,7 +19,8 @@
 void process_workqueue()
 {
 	struct work work;
-	struct per_cpu_info *cpuinfo = &per_cpu_info[coreid()];
+	struct per_cpu_info *cpuinfo = &per_cpu_info[core_id()];
+
 	// copy the work in, since we may never return to this stack frame
 	spin_lock_irqsave(&cpuinfo->lock);
 	work = cpuinfo->workqueue.statics[0];
@@ -38,11 +38,11 @@ void process_workqueue()
 int enqueue_work(struct workqueue *queue, struct work *job)
 {
 	error_t retval = 0;
-	struct per_cpu_info *cpuinfo = &per_cpu_info[coreid()];
+	struct per_cpu_info *cpuinfo = &per_cpu_info[core_id()];
 
 	spin_lock_irqsave(&cpuinfo->lock);
 	printd("Enqueuing func 0x%08x and data 0x%08x on core %d.\n",
-	       job->func, job->data, coreid());
+	       job->func, job->data, core_id());
 	if (queue->statics[0].func)
 		retval = -ENOMEM;
 	else

@@ -4,11 +4,10 @@
 #endif
 
 #include <arch/types.h>
-#include <arch/x86.h>
+#include <arch/arch.h>
 #include <arch/mmu.h>
 #include <arch/console.h>
-#include <arch/apic.h>
-#include <arch/timer.h>
+#include <ros/timer.h>
 #include <ros/error.h>
 
 #include <string.h>
@@ -18,29 +17,6 @@
 #include <trap.h>
 #include <syscall.h>
 #include <kfs.h> // eventually replace this with vfs.h
-
-/* This is called from sysenter's asm, with the tf on the kernel stack. */
-void sysenter_callwrapper(struct Trapframe *tf)
-{
-	current->env_tf = *tf;
-	
-	// The trapframe on the stack should be ignored from here on.
-	tf = &current->env_tf;
-	tf->tf_regs.reg_eax = (intreg_t) syscall(current,
-	                                         tf->tf_regs.reg_eax,
-	                                         tf->tf_regs.reg_edx,
-	                                         tf->tf_regs.reg_ecx,
-	                                         tf->tf_regs.reg_ebx,
-	                                         tf->tf_regs.reg_edi,
-	                                         0);
-	/*
-	 * careful here - we need to make sure that this current is the right
-	 * process, which could be weird if the syscall blocked.  it would need to
-	 * restore the proper value in current before returning to here.
-	 * likewise, tf could be pointing to random gibberish.
-	 */
-	proc_startcore(current, tf);
-}
 
 //Do absolutely nothing.  Used for profiling.
 static void sys_null(void)
@@ -52,7 +28,7 @@ static void sys_null(void)
 static ssize_t sys_serial_write(env_t* e, const char *DANGEROUS buf, size_t len) 
 {
 	#ifdef SERIAL_IO
-		char *COUNT(len) _buf = user_mem_assert(e, buf, len, PTE_U);
+		char *COUNT(len) _buf = user_mem_assert(e, buf, len, PTE_USER_RO);
 		for(int i =0; i<len; i++)
 			serial_send_byte(buf[i]);	
 		return (ssize_t)len;
@@ -65,7 +41,7 @@ static ssize_t sys_serial_write(env_t* e, const char *DANGEROUS buf, size_t len)
 static ssize_t sys_serial_read(env_t* e, char *DANGEROUS buf, size_t len) 
 {
 	#ifdef SERIAL_IO
-	    char *COUNT(len) _buf = user_mem_assert(e, buf, len, PTE_U);
+	    char *COUNT(len) _buf = user_mem_assert(e, buf, len, PTE_USER_RO);
 		size_t bytes_read = 0;
 		int c;
 		while((c = serial_read_byte()) != -1) {
@@ -78,10 +54,45 @@ static ssize_t sys_serial_read(env_t* e, char *DANGEROUS buf, size_t len)
 	#endif
 }
 
-// Invalidate the cache of this core
+static ssize_t sys_shared_page_alloc(env_t* p1, 
+                                     void** addr, envid_t p2_id, 
+                                     int p1_flags, int p2_flags
+                                    ) 
+{
+	if (!VALID_USER_PERMS(p1_flags)) return -EPERM;
+	if (!VALID_USER_PERMS(p2_flags)) return -EPERM;
+
+	page_t* page;
+	env_t* p2 = &(envs[ENVX(p2_id)]);
+	error_t e = page_alloc(&page);
+	if(e < 0) return e;
+	
+	void* p2_addr = page_insert_in_range(p2->env_pgdir, page, 
+	                                     (void*)UTEXT, (void*)UTOP, p2_flags);
+	if(p2_addr == NULL) 
+		return -EFAIL;
+		
+	void* p1_addr = page_insert_in_range(p1->env_pgdir, page, 
+	                                    (void*)UTEXT, (void*)UTOP, p1_flags);
+	if(p1_addr == NULL) {
+		page_remove(p2->env_pgdir, p2_addr);
+		return -EFAIL;
+	}
+	*addr = p1_addr;
+	return ESUCCESS;
+}
+
+static void sys_shared_page_free(env_t* p1, void* addr, envid_t p2)
+{
+}
+
+// Invalidate the cache of this core.  Only useful if you want a cold cache for
+// performance testing reasons.
 static void sys_cache_invalidate(void)
 {
-	wbinvd();
+	#ifdef __i386__
+		wbinvd();
+	#endif
 	return;
 }
 
@@ -98,7 +109,7 @@ static void sys_cache_buster(env_t* e, uint32_t num_writes, uint32_t num_pages,
 	#define INSERT_ADDR 	(UINFO + 2*PGSIZE) // should be free for these tests
 	uint32_t* buster = (uint32_t*)BUSTER_ADDR;
 	static uint32_t buster_lock = 0;
-	uint64_t ticks;
+	uint64_t ticks = -1;
 	page_t* a_page[MAX_PAGES];
 
 	/* Strided Accesses or Not (adjust to step by cachelines) */
@@ -113,7 +124,7 @@ static void sys_cache_buster(env_t* e, uint32_t num_writes, uint32_t num_pages,
 	 * Also, doesn't separate memory for core 0 if it's an async call.
 	 */
 	if (!(flags & BUSTER_SHARED))
-		buster = (uint32_t*)(BUSTER_ADDR + coreid() * 0x00800000);
+		buster = (uint32_t*)(BUSTER_ADDR + core_id() * 0x00800000);
 
 	/* Start the timer, if we're asked to print this info*/
 	if (flags & BUSTER_PRINT_TICKS)
@@ -129,7 +140,7 @@ static void sys_cache_buster(env_t* e, uint32_t num_writes, uint32_t num_pages,
 		for (int i = 0; i < MIN(num_pages, MAX_PAGES); i++) {
 			page_alloc(&a_page[i]);
 			page_insert(e->env_pgdir, a_page[i], (void*)INSERT_ADDR + PGSIZE*i,
-			            PTE_U | PTE_W);
+			            PTE_USER_RW);
 		}
 		spin_unlock(&buster_lock);
 	}
@@ -165,7 +176,7 @@ static ssize_t sys_cputs(env_t* e, const char *DANGEROUS s, size_t len)
 {
 	// Check that the user has permission to read memory [s, s+len).
 	// Destroy the environment if not.
-    char *COUNT(len) _s = user_mem_assert(e, s, len, PTE_U);
+    char *COUNT(len) _s = user_mem_assert(e, s, len, PTE_USER_RO);
 
 	// Print the string supplied by the user.
 	printk("%.*s", len, _s);
@@ -195,7 +206,7 @@ static envid_t sys_getenvid(env_t* e)
 // Returns the id of the cpu this syscall is executed on.
 static envid_t sys_getcpuid(void)
 {
-	return coreid();
+	return core_id();
 }
 
 // TODO FIX Me!!!! for processes
@@ -216,7 +227,7 @@ static error_t sys_env_destroy(env_t* e, envid_t envid)
 	else
 		printk("[%08x] destroying %08x\n", e->env_id, env_to_die->env_id);
 	env_destroy(env_to_die);
-	return 0;
+	return ESUCCESS;
 }
 
 /*
@@ -308,13 +319,19 @@ intreg_t syscall(env_t* e, uint32_t syscallno, uint32_t a1, uint32_t a2,
 	switch (syscallno) {
 		case SYS_null:
 			sys_null();
-			return 0;
+			return ESUCCESS;
 		case SYS_cache_buster:
 			sys_cache_buster(e, a1, a2, a3);
 			return 0;
 		case SYS_cache_invalidate:
 			sys_cache_invalidate();
 			return 0;
+		case SYS_shared_page_alloc:
+			return sys_shared_page_alloc(e, (void** DANGEROUS) a1, 
+		                                 a2, (int) a3, (int) a4);
+		case SYS_shared_page_free:
+			sys_shared_page_free(e, (void* DANGEROUS) a1, a2);
+		    return ESUCCESS;
 		case SYS_cputs:
 			return sys_cputs(e, (char *DANGEROUS)a1, (size_t)a2);
 		case SYS_cgetc:
@@ -331,7 +348,7 @@ intreg_t syscall(env_t* e, uint32_t syscallno, uint32_t a1, uint32_t a2,
 			return sys_env_destroy(e, (envid_t)a1);
 		case SYS_yield:
 			sys_yield(e);
-			return 0;
+			return ESUCCESS;
 		case SYS_proc_create:
 			return sys_proc_create(e, (char *DANGEROUS)a1);
 		case SYS_proc_run:
@@ -352,11 +369,12 @@ intreg_t syscall_async(env_t* e, syscall_req_t *call)
 intreg_t process_generic_syscalls(env_t* e, size_t max)
 {
 	size_t count = 0;
-	syscall_back_ring_t* sysbr = &e->env_sysbackring;
+	syscall_back_ring_t* sysbr = &e->env_syscallbackring;
 
-	// make sure the env is still alive.  incref will return 0 on success.
+	// make sure the env is still alive.  
+	// incref will return ESUCCESS on success.
 	if (env_incref(e))
-		return -1;
+		return -EFAIL;
 
 	// max is the most we'll process.  max = 0 means do as many as possible
 	while (RING_HAS_UNCONSUMED_REQUESTS(sysbr) && ((!max)||(count < max)) ) {

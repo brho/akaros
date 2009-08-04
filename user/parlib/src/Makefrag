@@ -9,8 +9,10 @@ USER_PARLIB_SRC_SRCFILES := $(USER_PARLIB_SRC_DIR)/newlib_backend.c \
                             $(USER_PARLIB_SRC_DIR)/debug.c \
                             $(USER_PARLIB_SRC_DIR)/debugfmt.c \
                             $(USER_PARLIB_SRC_DIR)/syscall.c \
+                            $(USER_PARLIB_SRC_DIR)/syscall_$(TARGET_ARCH).c \
                             $(USER_PARLIB_SRC_DIR)/parlibmain.c \
-                            $(USER_PARLIB_SRC_DIR)/entry.S  
+                            $(USER_PARLIB_SRC_DIR)/channel.c \
+                            $(USER_PARLIB_SRC_DIR)/entry_$(TARGET_ARCH).S  
 
 USER_PARLIB_SRC_OBJFILES := $(patsubst $(USER_PARLIB_SRC_DIR)/%.c, \
                             $(OBJDIR)/$(USER_PARLIB_DIR)/%.o, \

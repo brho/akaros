@@ -1,4 +1,4 @@
-#include <arch/x86.h>
+#include <arch/arch.h>
 
 #include <atomic.h>
 

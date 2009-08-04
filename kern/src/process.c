@@ -134,15 +134,10 @@ void proc_startcore(struct proc *p, trapframe_t *tf) {
 		/* also need to load our silly state, though this implies it's the same
 		 * context, and not just the same process
 		 * TODO: this is probably a lie, think about page faults
+		 * for now, we load this silly state down below
 		 */
 		// load_our_silly_state();
 	}
-	/* If the process entered the kernel via sysenter, we need to leave via
-	 * sysexit.  sysenter trapframes have 0 for a CS, which is pushed in
-	 * sysenter_handler.
-	 */
-	if (tf->tf_cs)
-  		env_pop_tf(tf);
-	else
-		env_pop_tf_sysexit(tf);
+	env_pop_ancillary_state(p);
+	env_pop_tf(&p->env_tf);
 }

@@ -3,10 +3,6 @@ USER_DIR = user
 USER_CFLAGS  := $(CFLAGS) -DROS_USER 
 USER_LDFLAGS := $(LDFLAGS)
 
-# This is defined here because it is need by both
-# roslib and parlib for compiling, but not by apps
-USER_ROSLIB_INCLUDE_DIR  := $(USER_DIR)/roslib/inc
-
 include $(USER_DIR)/roslib/Makefrag
 include $(USER_DIR)/parlib/Makefrag
 include $(USER_DIR)/apps/Makefrag

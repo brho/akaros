@@ -6,6 +6,7 @@ KERN_LDFLAGS := $(LDFLAGS)
 
 include $(KERN_DIR)/boot/Makefrag
 include $(KERN_DIR)/ivy/Makefrag
+include $(KERN_DIR)/arch/$(TARGET_ARCH)/Makefrag
 include $(KERN_DIR)/src/Makefrag
 
 .PRECIOUS: $(OBJDIR)/$(KERN_DIR)/%.o

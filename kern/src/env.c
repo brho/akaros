@@ -4,11 +4,10 @@
 #pragma noasync
 #endif
 
-#include <arch/x86.h>
+#include <arch/arch.h>
 #include <arch/mmu.h>
-#include <arch/elf.h>
-#include <arch/apic.h>
-#include <arch/smp.h>
+#include <elf.h>
+#include <smp.h>
 
 #include <atomic.h>
 #include <string.h>
@@ -23,7 +22,7 @@
 #include <ros/error.h>
 
 env_t *envs = NULL;		// All environments
-uint32_t num_envs = 0;		// Number of envs
+atomic_t num_envs = atomic_init(0);
 // TODO: make this a struct of info including the pointer and cacheline-align it
 // This lets the kernel know what process is running on the core it traps into.
 // A lot of the Env business, including this and its usage, will change when we
@@ -90,7 +89,8 @@ env_init(void)
 {
 	int i;
 	LIST_INIT(&env_free_list);
-	for (i = NENV-1; i >= 0; i--) {
+	assert(envs != NULL);
+	for (i = NENV-1; i >= 0; i--) { TRUSTEDBLOCK // asw ivy workaround
 		// these should already be set from when i memset'd the array to 0
 		envs[i].state = ENV_FREE;
 		envs[i].env_id = 0;
@@ -110,19 +110,37 @@ env_init(void)
 //
 static int
 env_setup_vm(env_t *e)
-WRITES(e->env_pgdir, e->env_cr3, e->env_procinfo, e->env_procdata,
-       e->env_sysbackring)
+WRITES(e->env_pgdir, e->env_cr3, e->env_procinfo, e->env_syscallring,
+       e->env_syseventring, e->env_syscallbackring, e->env_syseventfrontring)
 {
 	int i, r;
-	page_t *pgdir = NULL, *pginfo = NULL, *pgdata = NULL;
+	page_t *pgdir = NULL;
+	page_t *pginfo = NULL; 
+	page_t *pgsyscallring = NULL;
+	page_t *pgsyseventring = NULL;
 
-	// Allocate pages for the page directory, shared info, and shared data pages
+	/* 
+	 * Allocate pages for the page directory, shared info, shared data, 
+	 * and kernel message pages
+	 */
 	r = page_alloc(&pgdir);
+	if(r < 0) return r;
 	r = page_alloc(&pginfo);
-	r = page_alloc(&pgdata);
+	if (r < 0) {
+		page_free(pgdir);
+		return r;
+	}	
+	r = page_alloc(&pgsyscallring);
 	if (r < 0) {
 		page_free(pgdir);
 		page_free(pginfo);
+		return r;
+	}
+	r = page_alloc(&pgsyseventring);
+	if (r < 0) {
+		page_free(pgdir);
+		page_free(pginfo);
+		page_free(pgsyscallring);
 		return r;
 	}
 
@@ -147,22 +165,30 @@ WRITES(e->env_pgdir, e->env_cr3, e->env_procinfo, e->env_procdata,
 	e->env_pgdir = page2kva(pgdir);
 	e->env_cr3 = page2pa(pgdir);
 	e->env_procinfo = page2kva(pginfo);
-	e->env_procdata = page2kva(pgdata);
+	e->env_syscallring = page2kva(pgsyscallring);
+	e->env_syseventring = page2kva(pgsyseventring);
 
-	memset(e->env_pgdir, 0, PGSIZE);
+	memset(page2kva(pgdir), 0, PGSIZE);
 	memset(e->env_procinfo, 0, PGSIZE);
-	memset(e->env_procdata, 0, PGSIZE);
+	memset((void*COUNT(PGSIZE)) TC(e->env_syscallring), 0, PGSIZE);
+	memset((void*COUNT(PGSIZE)) TC(e->env_syseventring), 0, PGSIZE);
 
 	// Initialize the generic syscall ring buffer
-	SHARED_RING_INIT((syscall_sring_t *SAFE)e->env_procdata);
-	// Initialize the backend of the ring buffer
-	BACK_RING_INIT(&e->env_sysbackring, (syscall_sring_t *SAFE)e->env_procdata,
-	               PGSIZE);
+	SHARED_RING_INIT(e->env_syscallring);
+	// Initialize the backend of the syscall ring buffer
+	BACK_RING_INIT(&e->env_syscallbackring, e->env_syscallring, PGSIZE);
+	               
+	// Initialize the generic sysevent ring buffer
+	SHARED_RING_INIT(e->env_syseventring);
+	// Initialize the frontend of the sysevent ring buffer
+	FRONT_RING_INIT(&e->env_syseventfrontring, e->env_syseventring, PGSIZE);
 
 	// should be able to do this so long as boot_pgdir never has
 	// anything put below UTOP
 	// TODO check on this!  had a nasty bug because of it
-	memcpy(e->env_pgdir, boot_pgdir, PGSIZE);
+	// this is a bit wonky, since if it's not PGSIZE, lots of other things are
+	// screwed up...
+	memcpy(e->env_pgdir, boot_pgdir, NPDENTRIES*sizeof(pde_t));
 
 	// something like this.  TODO, if you want
 	//memcpy(&e->env_pgdir[PDX(UTOP)], &boot_pgdir[PDX(UTOP)], PGSIZE - PDX(UTOP));
@@ -171,23 +197,31 @@ WRITES(e->env_pgdir, e->env_cr3, e->env_procinfo, e->env_procdata,
 
 	// VPT and UVPT map the env's own page table, with
 	// different permissions.
-	e->env_pgdir[PDX(VPT)]  = e->env_cr3 | PTE_P | PTE_W;
-	e->env_pgdir[PDX(UVPT)] = e->env_cr3 | PTE_P | PTE_U;
+	e->env_pgdir[PDX(VPT)]  = PTE(PPN(e->env_cr3), PTE_P | PTE_KERN_RW);
+	e->env_pgdir[PDX(UVPT)] = PTE(PPN(e->env_cr3), PTE_P | PTE_USER_RO);
 
-	// Insert the per-process info and data pages into this process's pgdir
-	// I don't want to do these two pages later (like with the stack), since
-	// the kernel wants to keep pointers to it easily.
+	// Insert the per-process info and ring buffer pages into this process's 
+	// pgdir.  I don't want to do these two pages later (like with the stack), 
+	// since the kernel wants to keep pointers to it easily.
 	// Could place all of this with a function that maps a shared memory page
 	// that can work between any two address spaces or something.
-	r = page_insert(e->env_pgdir, pginfo, (void*SNT)UINFO, PTE_U);
-	r = page_insert(e->env_pgdir, pgdata, (void*SNT)UDATA, PTE_U | PTE_W);
+	r = page_insert(e->env_pgdir, pginfo, (void*SNT)UINFO, PTE_USER_RO);
+	if (r < 0) {
+		page_free(pgdir);
+		page_free(pginfo);
+		page_free(pgsyscallring);
+		page_free(pgsyseventring);
+		return r;
+	}
+	r = page_insert(e->env_pgdir, pgsyscallring, (void*SNT)USYSCALL, PTE_USER_RW);
 	if (r < 0) {
 		// note that we can't currently deallocate the pages created by
 		// pgdir_walk (inside insert).  should be able to gather them up when
 		// we destroy environments and their page tables.
 		page_free(pgdir);
 		page_free(pginfo);
-		page_free(pgdata);
+		page_free(pgsyscallring);
+		page_free(pgsyseventring);
 		return r;
 	}
 
@@ -204,7 +238,7 @@ WRITES(e->env_pgdir, e->env_cr3, e->env_procinfo, e->env_procdata,
 	shared_page->pp_ref++;
 
 	// Inserted into every process's address space at UGDATA
-	page_insert(e->env_pgdir, shared_page, (void*SNT)UGDATA, PTE_U | PTE_W);
+	page_insert(e->env_pgdir, shared_page, (void*SNT)UGDATA, PTE_USER_RW);
 
 	return 0;
 }
@@ -247,37 +281,14 @@ env_alloc(env_t **newenv_store, envid_t parent_id)
 	e->env_refcnt = 1;
 	e->env_flags = 0;
 
-	// Clear out all the saved register state,
-	// to prevent the register values
-	// of a prior environment inhabiting this Env structure
-	// from "leaking" into our new environment.
+	memset(&e->env_ancillary_state, 0, sizeof(e->env_ancillary_state));
 	memset(&e->env_tf, 0, sizeof(e->env_tf));
-
-	// Set up appropriate initial values for the segment registers.
-	// GD_UD is the user data segment selector in the GDT, and
-	// GD_UT is the user text segment selector (see inc/memlayout.h).
-	// The low 2 bits of each segment register contains the
-	// Requestor Privilege Level (RPL); 3 means user mode.
-	e->env_tf.tf_ds = GD_UD | 3;
-	e->env_tf.tf_es = GD_UD | 3;
-	e->env_tf.tf_ss = GD_UD | 3;
-	e->env_tf.tf_esp = USTACKTOP;
-	e->env_tf.tf_cs = GD_UT | 3;
-	// You will set e->env_tf.tf_eip later.
-	// set the env's EFLAGSs to have interrupts enabled
-	e->env_tf.tf_eflags |= 0x00000200; // bit 9 is the interrupts-enabled
+	env_init_trapframe(e);
 
 	// commit the allocation
 	LIST_REMOVE(e, env_link);
 	*newenv_store = e;
 	atomic_inc(&num_envs);
-
-	e->env_tscfreq = system_timing.tsc_freq;
-	// TODO: for now, the only info at procinfo is this env's struct
-	// note that we need to copy this over every time we make a change to env
-	// that we want userspace to see.  also note that we don't even want to
-	// show them all of env, only specific things like PID, PPID, etc
-	memcpy(e->env_procinfo, e, sizeof(env_t));
 
 	printk("[%08x] new env %08x\n", current ? current->env_id : 0, e->env_id);
 	} // INIT_STRUCT
@@ -310,6 +321,7 @@ segment_alloc(env_t *e, void *SNT va, size_t len)
 	// starting from pgdir (e's), so we need to be using e's pgdir
 	assert(e->env_cr3 == rcr3());
 	num_pages = PPN(end - start);
+
 	for (i = 0; i < num_pages; i++, start += PGSIZE) {
 		// skip if a page is already mapped.  yes, page_insert will page_remove
 		// whatever page was already there, but if we are seg allocing adjacent
@@ -320,7 +332,7 @@ segment_alloc(env_t *e, void *SNT va, size_t len)
 			continue;
 		if ((r = page_alloc(&page)) < 0)
 			panic("segment_alloc: %e", r);
-		page_insert(e->env_pgdir, page, start, PTE_U | PTE_W);
+		page_insert(e->env_pgdir, page, start, PTE_USER_RW);
 	}
 }
 
@@ -339,13 +351,17 @@ segment_alloc(env_t *e, void *SNT va, size_t len)
 static void
 load_icode(env_t *SAFE e, uint8_t *COUNT(size) binary, size_t size)
 {
-	elf_t *elfhdr = (elf_t *)binary;
+	// asw: copy the headers because they might not be aligned.
+	elf_t elfhdr;
+	proghdr_t phdr;
+	memcpy(&elfhdr, binary, sizeof(elfhdr));
+
 	int i, r;
 
 	// is this an elf?
-	assert(elfhdr->e_magic == ELF_MAGIC);
+	assert(elfhdr.e_magic == ELF_MAGIC);
 	// make sure we have proghdrs to load
-	assert(elfhdr->e_phnum);
+	assert(elfhdr.e_phnum);
 
 	// to actually access any pages alloc'd for this environment, we
 	// need to have the hardware use this environment's page tables.
@@ -366,21 +382,20 @@ load_icode(env_t *SAFE e, uint8_t *COUNT(size) binary, size_t size)
 	lcr3(e->env_cr3);
 
 	// TODO: how do we do a runtime COUNT?
-	{TRUSTEDBLOCK
-	proghdr_t* phdr = (proghdr_t*)(binary + elfhdr->e_phoff);
-	for (i = 0; i < elfhdr->e_phnum; i++, phdr++) {
-        // zra: TRUSTEDBLOCK until validation is done.
-		if (phdr->p_type != ELF_PROG_LOAD)
+	{TRUSTEDBLOCK // zra: TRUSTEDBLOCK until validation is done.
+	for (i = 0; i < elfhdr.e_phnum; i++) {
+		memcpy(&phdr, binary + elfhdr.e_phoff + i*sizeof(phdr), sizeof(phdr));
+		if (phdr.p_type != ELF_PROG_LOAD)
 			continue;
         // TODO: validate elf header fields!
 		// seg alloc creates PTE_U|PTE_W pages.  if you ever want to change
 		// this, there will be issues with overlapping sections
-		segment_alloc(e, (void*SNT)phdr->p_va, phdr->p_memsz);
-		memcpy((void*)phdr->p_va, binary + phdr->p_offset, phdr->p_filesz);
-		memset((void*)phdr->p_va + phdr->p_filesz, 0, phdr->p_memsz - phdr->p_filesz);
+		segment_alloc(e, (void*SNT)phdr.p_va, phdr.p_memsz);
+		memcpy((void*)phdr.p_va, binary + phdr.p_offset, phdr.p_filesz);
+		memset((void*)phdr.p_va + phdr.p_filesz, 0, phdr.p_memsz - phdr.p_filesz);
 	}}
 
-	e->env_tf.tf_eip = elfhdr->e_entry;
+	env_set_program_counter(e, elfhdr.e_entry);
 
 	// Now map one page for the program's initial stack
 	// at virtual address USTACKTOP - PGSIZE.
@@ -413,8 +428,6 @@ env_t* env_create(uint8_t *binary, size_t size)
 void
 env_free(env_t *e)
 {
-	pte_t *pt;
-	uint32_t pdeno, pteno;
 	physaddr_t pa;
 
 	// Note the environment's demise.
@@ -423,27 +436,7 @@ env_free(env_t *e)
 	assert(e->env_refcnt == 0);
 
 	// Flush all mapped pages in the user portion of the address space
-	static_assert(UTOP % PTSIZE == 0);
-	for (pdeno = 0; pdeno < PDX(UTOP); pdeno++) {
-
-		// only look at mapped page tables
-		if (!(e->env_pgdir[pdeno] & PTE_P))
-			continue;
-
-		// find the pa and va of the page table
-		pa = PTE_ADDR(e->env_pgdir[pdeno]);
-		pt = (pte_t*COUNT(NPTENTRIES)) KADDR(pa);
-
-		// unmap all PTEs in this page table
-		for (pteno = 0; pteno <= PTX(~0); pteno++) {
-			if (pt[pteno] & PTE_P)
-				page_remove(e->env_pgdir, PGADDR(pdeno, pteno, 0));
-		}
-
-		// free the page table itself
-		e->env_pgdir[pdeno] = 0;
-		page_decref(pa2page(pa));
-	}
+	env_user_mem_free(e);
 
 	// free the page directory
 	pa = e->env_cr3;
@@ -544,7 +537,7 @@ env_destroy(env_t *e)
 	// for old envs that die on user cores.  since env run never returns, cores
 	// never get back to their old hlt/relaxed/spin state, so we need to force
 	// them back to an idle function.
-	uint32_t id = coreid();
+	uint32_t id = core_id();
 	// There is no longer a current process for this core. (TODO: Think about this.)
 	current = NULL;
 	if (id) {
@@ -589,41 +582,8 @@ void schedule(void)
 }
 
 //
-// Restores the register values in the Trapframe with the 'iret' instruction.
-// This exits the kernel and starts executing some environment's code.
-// This function does not return.
-//
-void env_pop_tf(trapframe_t *tf)
-{
-	asm volatile ("movl %0,%%esp;           "
-	              "popal;                   "
-	              "popl %%es;               "
-	              "popl %%ds;               "
-	              "addl $0x8,%%esp;         "
-	              "iret                     "
-	              : : "g" (tf) : "memory");
-	panic("iret failed");  /* mostly to placate the compiler */
-}
-
-/* Return path of sysexit.  See sysenter_handler's asm for details. */
-void env_pop_tf_sysexit(trapframe_t *tf)
-{
-	asm volatile ("movl %0,%%esp;           "
-	              "popal;                   "
-	              "popl %%es;               "
-	              "popl %%ds;               "
-	              "addl $0x10, %%esp;       "
-	              "popfl;                   "
-	              "movl %%ebp, %%ecx;       "
-	              "movl %%esi, %%edx;       "
-	              "sysexit                  "
-	              : : "g" (tf) : "memory");
-	panic("sysexit failed");  /* mostly to placate the compiler */
-}
-
-//
-// Context switch from current process to env e.
-// Note: if this is the first call to env_run, current is NULL.
+// Context switch from curenv to env e.
+// Note: if this is the first call to env_run, curenv is NULL.
 //  (This function does not return.)
 //
 void
@@ -633,7 +593,6 @@ env_run(env_t *e)
 	// Could up the refcnt and down it when a process is not running
 	
 	proc_set_state(e, PROC_RUNNING_S);
-
 	proc_startcore(e, &e->env_tf);
 }
 
@@ -645,7 +604,7 @@ void run_env_handler(trapframe_t *tf, void *data)
 {
 	assert(data);
 	struct work job;
-	struct workqueue *workqueue = &per_cpu_info[coreid()].workqueue;
+	struct workqueue *workqueue = &per_cpu_info[core_id()].workqueue;
 	{ TRUSTEDBLOCK // TODO: how do we make this func_t cast work?
 	job.func = (func_t)env_run;
 	job.data = data;
