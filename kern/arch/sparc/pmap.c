@@ -8,6 +8,7 @@
 #include <pmap.h>
 #include <string.h>
 
+physaddr_t boot_cr3;
 pde_t* boot_pgdir;
 char* boot_freemem;
 page_t* pages;
@@ -21,6 +22,7 @@ vm_init(void)
 
 	extern pde_t l1_page_table[NL1ENTRIES];
 	boot_pgdir = l1_page_table;
+	boot_cr3 = PADDR(boot_pgdir);
 
 	size_t page_array_size = ROUNDUP(npage*sizeof(page_t),PGSIZE);
 	pages = (page_t*)boot_alloc(page_array_size,PGSIZE);

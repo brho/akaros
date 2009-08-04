@@ -16,6 +16,7 @@
 #include <trap.h>
 #include <process.h>
 #include <syscall.h>
+#include <timing.h>
 
 #define test_vector 0xeb
 

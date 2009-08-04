@@ -9,7 +9,7 @@ USER_APPS_PARLIB_LDFLAGS   := $(USER_LDFLAGS) -static \
                               -T $(USER_APPS_PARLIB_DIR)/apps.ld
 
 USER_APPS_PARLIB_LDDIRS    := -L$(OBJDIR)/$(USER_PARLIB_DIR) \
-                              -L$(USER_PARLIB_NEWLIB_DIR)/lib
+                              -L$(USER_PARLIB_NEWLIB_DIR)/lib/$(TARGET_ARCH)
 
 USER_APPS_PARLIB_LDLIBS    := --start-group -lc -lm -lg -lparlib -livyparlib --end-group
 

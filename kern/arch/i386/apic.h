@@ -100,7 +100,6 @@ uint32_t lapic_get_default_id(void);
 // PIT related
 void pit_set_timer(uint32_t freq, uint32_t mode);
 void timer_init(void);
-void udelay(uint64_t usec);
 void udelay_pit(uint64_t usec);
 // TODO: right now timer defaults to TSC
 uint64_t gettimer(void);
