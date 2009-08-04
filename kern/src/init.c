@@ -22,7 +22,6 @@
 #include <pmap.h>
 #include <process.h>
 #include <trap.h>
-#include <testing.h>
 #include <syscall.h>
 #include <kclock.h>
 #include <manager.h>
@@ -58,15 +57,6 @@ void kernel_init(multiboot_info_t *mboot_info)
 
 	// this returns when all other cores are done and ready to receive IPIs
 	smp_boot();
-	test_smp_call_functions();
-	test_checklists();
-	test_barrier();
-	test_print_info();
-	/*
-	test_lapic_status_bit();
-	test_ipi_sending();
-	test_pit();
-	*/
 
 	manager();
 }

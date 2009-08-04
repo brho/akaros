@@ -59,8 +59,8 @@ static ssize_t sys_shared_page_alloc(env_t* p1,
                                      int p1_flags, int p2_flags
                                     ) 
 {
-	if (!VALID_USER_PERMS(p1_flags)) return -EPERM;
-	if (!VALID_USER_PERMS(p2_flags)) return -EPERM;
+	//if (!VALID_USER_PERMS(p1_flags)) return -EPERM;
+	//if (!VALID_USER_PERMS(p2_flags)) return -EPERM;
 
 	page_t* page;
 	env_t* p2 = &(envs[ENVX(p2_id)]);

@@ -35,6 +35,17 @@ void manager(void)
 			proc_set_state(envs[0], PROC_RUNNABLE_S);
 			env_run(envs[0]);
 			break;
+	#ifdef __i386__
+		case 1:
+			panic("Do not panic");
+			envs[0] = ENV_CREATE(parlib_channel_test_client);
+			envs[1] = ENV_CREATE(parlib_channel_test_server);
+			smp_call_function_single(1, run_env_handler, envs[0], 0);
+			smp_call_function_single(2, run_env_handler, envs[1], 0);
+			break;
+		case 2:
+		case 3:
+	#else // sparc
 		case 1:
 			panic("Do not panic");
 			envs[0] = ENV_CREATE(roslib_proctests);
@@ -45,11 +56,8 @@ void manager(void)
 			envs[4] = ENV_CREATE(roslib_fptest);
 			envs[5] = ENV_CREATE(roslib_hello);
 			envs[6] = ENV_CREATE(roslib_null);
-			//envs[6] = ENV_CREATE(roslib_measurements);
 			env_run(envs[0]);
 			break;
-			#if 0
-			#endif
 		case 2:
 			#if 0
 			// reminder of how to spawn remotely
@@ -61,19 +69,30 @@ void manager(void)
 			process_workqueue();
 			#endif
 		case 3:
+	#endif
+
 		#if 0
-		case 0:
+		case 4:
 			printk("Beginning Tests\n");
 			test_run_measurements(progress-1);  // should never return
 			break;
-		case 1:
+		case 5:
 			envs[0] = ENV_CREATE(parlib_channel_test_client);
 			envs[1] = ENV_CREATE(parlib_channel_test_server);
 			smp_call_function_single(1, run_env_handler, envs[0], 0);
 			smp_call_function_single(2, run_env_handler, envs[1], 0);
-		case 2:
-		case 3:
+		case 6:
+		#endif
 		case 4:
+			/*
+			test_smp_call_functions();
+			test_checklists();
+			test_barrier();
+			test_print_info();
+			test_lapic_status_bit();
+			test_ipi_sending();
+			test_pit();
+			*/
 		case 5:
 		case 6:
 		case 7:
@@ -84,9 +103,7 @@ void manager(void)
 		case 12:
 		case 13:
 		case 14:
-			test_run_measurements(progress-1);
-			break;
-		#endif
+			//test_run_measurements(progress-1);
 		default:
 			printk("Manager Progress: %d\n", progress);
 			schedule();

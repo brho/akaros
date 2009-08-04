@@ -7,33 +7,47 @@
 #define rmb() ({ asm volatile("lfence"); })
 #define wmb() 
 
-//linux style atomic ops
-typedef struct {volatile uint32_t real_num;} atomic_t;
-#define atomic_read(atom) ((atom)->real_num)
-#define atomic_set(atom, val) (((atom)->real_num) = (val))
-#define atomic_init(i) {(i)}
-//and the atomic incs, etc take an atomic_t ptr, deref inside
+typedef void* atomic_t;
 
-static inline void atomic_inc(atomic_t* number);
-static inline void atomic_dec(atomic_t* number);
+static inline void atomic_init(atomic_t *number, int32_t val);
+static inline int32_t atomic_read(atomic_t *number);
+static inline void atomic_set(atomic_t *number, int32_t val);
+static inline void atomic_inc(atomic_t *number);
+static inline void atomic_dec(atomic_t *number);
 static inline void atomic_andb(volatile uint8_t* number, uint8_t mask);
 static inline void spin_lock(volatile uint32_t* lock);
 static inline void spin_unlock(volatile uint32_t* lock);
 
 /* Inlined functions declared above */
+static inline void atomic_init(atomic_t *number, int32_t val)
+{
+	asm volatile("movl %1,%0" : "=m"(*number) : "r"(val));
+}
+
+static inline int32_t atomic_read(atomic_t *number)
+{
+	int32_t val;
+	asm volatile("movl %1,%0" : "=r"(val) : "m"(*number));
+	return val;
+}
+
+static inline void atomic_set(atomic_t *number, int32_t val)
+{
+	asm volatile("movl %1,%0" : "=m"(*number) : "r"(val));
+}
 
 // need to do this with pointers and deref.  %0 needs to be the memory address
-static inline void atomic_inc(atomic_t* number)
+static inline void atomic_inc(atomic_t *number)
 {
-	asm volatile("lock incl %0" : "=m"(number->real_num) : : "cc");
+	asm volatile("lock incl %0" : "=m"(*number) : : "cc");
 }
 
-static inline void atomic_dec(atomic_t* number)
+static inline void atomic_dec(atomic_t *number)
 {
-	asm volatile("lock decl %0" : "=m"(number->real_num) : : "cc");
+	asm volatile("lock decl %0" : "=m"(*number) : : "cc");
 }
 
-static inline void atomic_andb(uint8_t* number, uint8_t mask)
+static inline void atomic_andb(volatile uint8_t *number, uint8_t mask)
 {
 	asm volatile("lock andb %1,%0" : "=m"(*number) : "r"(mask) : "cc");
 }

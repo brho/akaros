@@ -15,14 +15,6 @@
 #include <atomic.h>
 #include <workqueue.h>
 
-// be careful changing this, esp if you go over 16
-#define NUM_HANDLER_WRAPPERS		5
-
-typedef struct HandlerWrapper {
-	checklist_t* cpu_list;
-	uint8_t vector;
-} handler_wrapper_t;
-
 // will want this padded out to cacheline alignment
 struct per_cpu_info {
 	uint32_t lock;

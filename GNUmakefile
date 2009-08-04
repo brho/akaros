@@ -12,10 +12,10 @@ OBJDIR := obj
 # User defined constants passed on the command line 
 TARGET_ARCH := i386
 
+-include Makelocal
+
 # Make sure that 'all' is the first target
 all: symlinks
-
--include Makelocal
 
 TOP_DIR := .
 ARCH_DIR := $(TOP_DIR)/kern/arch
@@ -83,12 +83,10 @@ endif
 # List of directories that the */Makefrag makefile fragments will add to
 OBJDIRS :=
 
-kern/boot/Makefrag: symlinks
-
 symlinks:
-	@-unlink kern/include/arch
+	@rm -f kern/include/arch
 	@ln -s ../arch/$(TARGET_ARCH)/ kern/include/arch
-	@-unlink kern/boot
+	@rm -f kern/boot
 	@ln -s arch/$(TARGET_ARCH)/boot/ kern/boot
 
 # Include Makefrags for subdirectories
@@ -113,7 +111,10 @@ $(OBJDIR)/.deps: $(foreach dir, $(OBJDIRS), $(wildcard $(OBJDIR)/$(dir)/*.d))
 
 # For deleting the build
 clean:
-	rm -rf $(OBJDIR)
+	@rm -rf $(OBJDIR)
+	@rm -f kern/boot
+	@rm -f kern/include/arch
+	@echo All clean and pretty!
 
 always:
 	@:

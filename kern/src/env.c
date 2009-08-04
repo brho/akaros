@@ -22,7 +22,7 @@
 #include <ros/error.h>
 
 env_t *envs = NULL;		// All environments
-atomic_t num_envs = atomic_init(0);
+atomic_t num_envs;
 // TODO: make this a struct of info including the pointer and cacheline-align it
 // This lets the kernel know what process is running on the core it traps into.
 // A lot of the Env business, including this and its usage, will change when we
@@ -88,6 +88,8 @@ void
 env_init(void)
 {
 	int i;
+
+	atomic_init(&num_envs, 0);
 	LIST_INIT(&env_free_list);
 	assert(envs != NULL);
 	for (i = NENV-1; i >= 0; i--) { TRUSTEDBLOCK // asw ivy workaround

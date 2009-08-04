@@ -74,7 +74,7 @@ void test_pic_reception(void)
 	while(1);
 }
 
-#endif
+#endif // __i386__
 
 void test_print_info(void)
 {
@@ -268,7 +268,7 @@ void test_checklists(void)
 
 }
 
-atomic_t a = atomic_init(0), b = atomic_init(0), c = atomic_init(0);
+atomic_t a, b, c;
 
 void test_incrementer_handler(trapframe_t *tf, void* data)
 {
@@ -284,6 +284,9 @@ void test_null_handler(trapframe_t *tf, void* data)
 void test_smp_call_functions(void)
 {
 	int i;
+	atomic_init(&a, 0);
+	atomic_init(&b, 0);
+	atomic_init(&c, 0);
 	handler_wrapper_t *waiter0 = 0, *waiter1 = 0, *waiter2 = 0, *waiter3 = 0,
 	                  *waiter4 = 0, *waiter5 = 0;
 	uint8_t me = core_id();
@@ -401,7 +404,7 @@ void test_lapic_status_bit(void)
 	printk("IPIs received (should be %d): %d\n", a, NUM_IPI);
 	// hopefully that handler never fires again.  leaving it registered for now.
 }
-#endif
+#endif // __i386__
 
 /******************************************************************************/
 /*            Test Measurements: Couples with measurement.c                   */
@@ -416,6 +419,8 @@ static void wait_for_all_envs_to_die(void)
 	while (atomic_read(&num_envs))
 		cpu_relax();
 }
+
+#if 0
 
 // this never returns.
 static void sync_tests(int start_core, int num_threads, int job_num)
@@ -533,6 +538,8 @@ void test_run_measurements(uint32_t job_num)
 	panic("Error in test setup!!");
 }
 
+#endif // __i386__
+
 /************************************************************/
 /* ISR Handler Functions */
 
@@ -576,7 +583,7 @@ void test_print_info_handler(trapframe_t *tf, void* data)
 	        read_msr(0x20c), read_msr(0x20d));
 	cprintf("MTRR Phys7 Base = 0x%016llx, Mask = 0x%016llx\n",
 	        read_msr(0x20e), read_msr(0x20f));
-#endif
+#endif // __i386__
 	cprintf("----------------------------\n");
 	spin_unlock_irqsave(&print_info_lock);
 }
@@ -616,11 +623,12 @@ void test_pit(void)
 	enable_irq();
 	lapic_set_timer(10000000, FALSE);
 
-	atomic_t waiting = atomic_init(1);
+	atomic_t waiting;
+	atomic_init(&waiting, 1);
 	register_interrupt_handler(interrupt_handlers, test_vector,
 	                           test_waiting_handler, &waiting);
 	while(atomic_read(&waiting))
 		cpu_relax();
 	cprintf("End now\n");
 }
-#endif
+#endif // __i386__
