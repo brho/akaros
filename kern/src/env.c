@@ -235,6 +235,10 @@ WRITES(e->env_pgdir, e->env_cr3, e->env_procinfo, e->env_syscallring,
 
 	// Inserted into every process's address space at UGDATA
 	page_insert(e->env_pgdir, shared_page, (void*SNT)UGDATA, PTE_USER_RW);
+	
+	// THIS IS A HACK. ONLY HERE UNTIL KEVIN FINISHES CHANNEL IMPLIMENTATION
+	// THIS IS NEEDED TO KEEP KMALLOC FROM DYING POST ENV CREATE.
+	pgsyseventring->pp_ref++;
 
 	return 0;
 }

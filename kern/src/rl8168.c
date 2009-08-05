@@ -358,66 +358,82 @@ void nic_interrupt_handler(trapframe_t *tf, void* data) {
 	// Read the offending interrupt(s)
 	uint16_t interrupt_status = inw(io_base_addr + RL_IS_REG);
 
-	// We can have multiple interrupts fire at once. I've personally seen this.
-	// This means we need to handle this as a series of independent if's
-	if (interrupt_status & RL_INT_ROK) {
-		nic_interrupt_debug("-->RX OK\n");
-		nic_handle_rx_packet();
-	}	
+	// Clear interrupts immediately so we can get the flag raised again.
+	outw(io_base_addr + RL_IS_REG, interrupt_status);
 	
-	if (interrupt_status & RL_INT_RERR) {
-		nic_interrupt_debug("-->RX ERR\n");
-	}
+	// Loop to deal with TOCTOU 
+	while (interrupt_status != 0x0000) {
+		// We can have multiple interrupts fire at once. I've personally seen this.
+		// This means we need to handle this as a series of independent if's
+		if (interrupt_status & RL_INT_ROK) {
+			nic_interrupt_debug("-->RX OK\n");
+			nic_handle_rx_packet();
+		}	
 	
-	if (interrupt_status & RL_INT_TOK) {
-		nic_interrupt_debug("-->TX OK\n");
-	}
+		if (interrupt_status & RL_INT_RERR) {
+			nic_interrupt_debug("-->RX ERR\n");			
+		}
 	
-	if (interrupt_status & RL_INT_TERR) {
-		nic_interrupt_debug("-->TX ERR\n");
-	}
+		if (interrupt_status & RL_INT_TOK) {
+			nic_interrupt_debug("-->TX OK\n");
+		}
 	
-	if (interrupt_status & RL_INT_RDU) {
-		nic_interrupt_debug("-->RX Descriptor Unavailable\n");
-	}
+		if (interrupt_status & RL_INT_TERR) {
+			nic_interrupt_debug("-->TX ERR\n");			
+		}
 	
-	if (interrupt_status & RL_INT_LINKCHG) {
-		nic_interrupt_debug("-->Link Status Changed\n");
-	}
+		if (interrupt_status & RL_INT_RDU) {
+			nic_interrupt_debug("-->RX Descriptor Unavailable\n");			
+		}
 	
-	if (interrupt_status & RL_INT_FOVW) {
-		nic_interrupt_debug("-->RX Fifo Overflow\n");
-	}
+		if (interrupt_status & RL_INT_LINKCHG) {
+			nic_interrupt_debug("-->Link Status Changed\n");			
+		}
 	
-	if (interrupt_status & RL_INT_TDU) {
-		nic_interrupt_debug("-->TX Descriptor Unavailable\n");
-	}
+		if (interrupt_status & RL_INT_FOVW) {
+			nic_interrupt_debug("-->RX Fifo Overflow\n");			
+		}
 	
-	if (interrupt_status & RL_INT_SWINT) {
-		nic_interrupt_debug("-->Software Generated Interrupt\n");
-	}
+		if (interrupt_status & RL_INT_TDU) {
+			nic_interrupt_debug("-->TX Descriptor Unavailable\n");			
+		}
 	
-	if (interrupt_status & RL_INT_TIMEOUT) {
-		nic_interrupt_debug("-->Timer Expired\n");
-	}
+		if (interrupt_status & RL_INT_SWINT) {
+			nic_interrupt_debug("-->Software Generated Interrupt\n");
+		}
 	
-	if (interrupt_status & RL_INT_SERR) {
-		nic_interrupt_debug("-->PCI Bus System Error\n");
-	}
+		if (interrupt_status & RL_INT_TIMEOUT) {
+			nic_interrupt_debug("-->Timer Expired\n");
+		}
 	
-	nic_interrupt_debug("\n");
+		if (interrupt_status & RL_INT_SERR) {
+			nic_interrupt_debug("-->PCI Bus System Error\n");			
+		}
+	
+		nic_interrupt_debug("\n");
 		
-	// Clear interrupts	
-	outw(io_base_addr + RL_IS_REG, RL_INTRRUPT_CLEAR);
+		// Clear interrupts	
+		interrupt_status = inw(io_base_addr + RL_IS_REG);
+		outw(io_base_addr + RL_IS_REG, interrupt_status);
+	}
 	
+	// In the event that we got really unlucky and more data arrived after we set 
+	//  set the bit last, try one more check
+	nic_handle_rx_packet();
 	return;
 }
 
 // TODO: Does a packet too large get dropped or just set the error bits in the descriptor? Find out.
+// TODO: Should we move on to look for the next descriptor? is it safe? TOCTOU
 void nic_handle_rx_packet() {
 	
 	uint32_t current_command = rx_des_kva[rx_des_cur].command;
 	uint16_t packet_size;
+	
+	if (current_command & DES_OWN_MASK) {
+		nic_frame_debug("-->Nothing to process. Returning.");
+		return;
+	}
 		
 	nic_frame_debug("-->RX Des: %u\n", rx_des_cur);
 	

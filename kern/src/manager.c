@@ -26,6 +26,9 @@ void manager(void)
 {
 	static uint8_t progress = 0;
 	env_t *envs[256];
+	
+	env_run(ENV_CREATE(parlib_matrix));
+	
 
 	switch (progress++) {
 		case 0:

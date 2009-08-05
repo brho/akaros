@@ -6,7 +6,7 @@
 #include <pmap.h>
 
 #define nic_debug(...)  //cprintf(__VA_ARGS__)  
-#define nic_interrupt_debug(...) cprintf(__VA_ARGS__)  
+#define nic_interrupt_debug(...) //cprintf(__VA_ARGS__)  
 #define nic_frame_debug(...)  //cprintf(__VA_ARGS__)  
 
 #define NIC_IRQ_CPU			5
