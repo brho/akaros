@@ -23,12 +23,11 @@ DECL_PROG(roslib_fptest);
 DECL_PROG(roslib_null);
 DECL_PROG(roslib_spawn);
 DECL_PROG(roslib_hello);
-
-#ifdef __i386__
+DECL_PROG(roslib_measurements);
 DECL_PROG(parlib_channel_test_client);
 DECL_PROG(parlib_channel_test_server);
-DECL_PROG(roslib_measurements);
-#endif
+DECL_PROG(parlib_matrix);
+DECL_PROG(parlib_hello);
 
 struct kfs_entry kfs[MAX_KFS_FILES] = {
 	KFS_ENTRY(roslib_proctests)
@@ -36,11 +35,11 @@ struct kfs_entry kfs[MAX_KFS_FILES] = {
 	KFS_ENTRY(roslib_null)
 	KFS_ENTRY(roslib_spawn)
 	KFS_ENTRY(roslib_hello)
-	#ifdef __i386__
+	KFS_ENTRY(roslib_measurements)
 	KFS_ENTRY(parlib_channel_test_client)
 	KFS_ENTRY(parlib_channel_test_server)
-	KFS_ENTRY(roslib_measurements)
-	#endif
+	KFS_ENTRY(parlib_matrix)
+	KFS_ENTRY(parlib_hello)
 };
 
 ssize_t kfs_lookup_path(char* path)

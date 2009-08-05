@@ -1,4 +1,5 @@
 #include <arch/mmu.h>
+#include <arch/arch.h>
 #include <ros/memlayout.h>
 
 .data
@@ -16,7 +17,6 @@
 	.set vpt, UVPT
 	.globl vpd
 	.set vpd, (UVPT+(UVPT>>12)*4)
-
 
 // Entrypoint - this is where the kernel (or our parent environment)
 // starts us running when we are initially loaded into a new environment.
@@ -40,4 +40,10 @@ args_exist:
 
 1:	ba	1b
 	 nop
+
+
+.globl hart_self
+hart_self:
+	retl
+	mov	CORE_ID_REG,%o0
 

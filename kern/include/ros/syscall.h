@@ -24,6 +24,7 @@ enum
 	SYS_yield,
 	SYS_proc_create,
 	SYS_proc_run,
+	SYS_frontend,		// forward a syscall to front-end machine
 
 	SYS_endofcalls //Should always be last
 };

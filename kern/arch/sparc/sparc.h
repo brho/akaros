@@ -24,6 +24,7 @@
 
 #include <arch/types.h>
 #include <arch/trap.h>
+#include <arch/frontend.h>
 
 static __inline uint32_t read_psr(void) __attribute__((always_inline));
 static __inline uint32_t read_wim(void) __attribute__((always_inline));

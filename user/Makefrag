@@ -4,9 +4,5 @@ USER_CFLAGS  := $(CFLAGS) -DROS_USER
 USER_LDFLAGS := $(LDFLAGS)
 
 include $(USER_DIR)/roslib/Makefrag
-
-ifeq ($(TARGET_ARCH),i386)
-	include $(USER_DIR)/parlib/Makefrag
-endif
-
+include $(USER_DIR)/parlib/Makefrag
 include $(USER_DIR)/apps/Makefrag

@@ -338,10 +338,6 @@ intreg_t syscall(env_t* e, uint32_t syscallno, uint32_t a1, uint32_t a2,
 			return sys_cgetc(e);
 		case SYS_getcpuid:
 			return sys_getcpuid();
-		case SYS_serial_write:
-			return sys_serial_write(e, (char *DANGEROUS)a1, (size_t)a2);
-		case SYS_serial_read:
-			return sys_serial_read(e, (char *DANGEROUS)a1, (size_t)a2);
 		case SYS_getpid:
 			return sys_getenvid(e);
 		case SYS_proc_destroy:
@@ -353,6 +349,19 @@ intreg_t syscall(env_t* e, uint32_t syscallno, uint32_t a1, uint32_t a2,
 			return sys_proc_create(e, (char *DANGEROUS)a1);
 		case SYS_proc_run:
 			return sys_proc_run(e, (size_t)a1);
+
+	#ifdef __i386__
+		case SYS_serial_write:
+			return sys_serial_write(e, (char *DANGEROUS)a1, (size_t)a2);
+		case SYS_serial_read:
+			return sys_serial_read(e, (char *DANGEROUS)a1, (size_t)a2);
+	#endif
+
+	#ifdef __sparc_v8__
+		case SYS_frontend:
+			return frontend_syscall(a1,a2,a3,a4);
+	#endif
+
 		default:
 			// or just return -EINVAL
 			panic("Invalid syscall number %d for env %x!", syscallno, *e);

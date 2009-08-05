@@ -36,7 +36,7 @@ timer_init(void)
 
 	while(ticks == timer_ticks) ;
 
-	system_timing.tsc_freq = read_tsc() - tsc_ticks;
+	system_timing.tsc_freq = (read_tsc() - tsc_ticks)*INTERRUPT_TIMER_HZ;
 
 	cprintf("TSC Frequency: %llu\n", system_timing.tsc_freq);
 }
