@@ -44,8 +44,6 @@
  * TODO: CONCURRENCY!
  */
 
-void test_pit_handler(trapframe_t *tf, void* data);
-
 struct Descriptor
 {
     unsigned int command,  /* command/status dword */
@@ -55,8 +53,8 @@ struct Descriptor
 };
 
 
-uint32_t io_base_addr = 0;
-uint32_t irq = 0;
+uint32_t rl8168_io_base_addr = 0;
+uint32_t rl8168_irq = 0;
 char device_mac[6];
 
 struct Descriptor *rx_des_kva;
@@ -68,7 +66,7 @@ struct Descriptor *tx_des_pa;
 uint32_t rx_des_cur = 0;
 uint32_t tx_des_cur = 0;
 
-uint8_t eth_up = 0;
+uint8_t eth_up = 0; // TODO: This needs to be somewhere global.
 
 // Hacky stuff for syscall hack. Go away.
 int packet_waiting;
@@ -78,18 +76,18 @@ char* packet_buffer_orig;
 int packet_buffer_pos = 0;
 // End hacky stuff
 
-void nic_init() {
+void rl8168_init() {
 	
-	if (scan_pci() < 0) return;
-	read_mac();
-	setup_descriptors();
-	configure_nic();
-	setup_interrupts();
+	if (rl8168_scan_pci() < 0) return;
+	rl8168_read_mac();
+	rl8168_setup_descriptors();
+	rl8168_configure();
+	rl8168_setup_interrupts();
 	eth_up = 1;
 	
 	//Trigger sw based nic interrupt
 /*	cprintf("Generating interrupt...\n");
-	outb(io_base_addr + 0x38, 0x1);
+	outb(rl8168_io_base_addr + 0x38, 0x1);
 	cprintf("sleeping\n");
 	udelay(3000000);
 	cprintf("done\n");
@@ -98,7 +96,7 @@ void nic_init() {
 }
 
 
-int scan_pci() {
+int rl8168_scan_pci() {
 	
 	extern pci_dev_entry pci_dev_map[PCI_MAX_BUS][PCI_MAX_DEV][PCI_MAX_FUNC];
 	extern uint16_t pci_irq_map[PCI_MAX_BUS][PCI_MAX_DEV][PCI_MAX_FUNC];
@@ -128,8 +126,8 @@ int scan_pci() {
 				cprintf(" found on BUS %x DEV %x\n", i, j);
 
 				// Find the IRQ
-				irq = pci_irq_map[i][j][k];
-				nic_debug("-->IRQ: %u\n", irq);
+				rl8168_irq = pci_irq_map[i][j][k];
+				rl8168_debug("-->IRQ: %u\n", rl8168_irq);
 
 				// Loop over the BARs
 				for (int k = 0; k <= 5; k++) {
@@ -144,18 +142,18 @@ int scan_pci() {
 					// Read the bottom bit of the BAR. 
 					if (result & PCI_BAR_IO_MASK) {
 						result = result & PCI_IO_MASK;
-						nic_debug("-->BAR%u: %s --> %x\n", k, "IO", result);
+						rl8168_debug("-->BAR%u: %s --> %x\n", k, "IO", result);
 					} else {
 						result = result & PCI_MEM_MASK;
-						nic_debug("-->BAR%u: %s --> %x\n", k, "MEM", result);
+						rl8168_debug("-->BAR%u: %s --> %x\n", k, "MEM", result);
 					}
 			
 					// TODO Switch to memory mapped instead of IO?
 					if (k == 0) // BAR0 denotes the IO Addr for the device
-						io_base_addr = result;						
+						rl8168_io_base_addr = result;						
 				}
 		
-		nic_debug("-->hwrev: %x\n", inl(io_base_addr + RL_HWREV_REG) & RL_HWREV_MASK);
+		rl8168_debug("-->hwrev: %x\n", inl(rl8168_io_base_addr + RL_HWREV_REG) & RL_HWREV_MASK);
 		
 		return 0;
 	}
@@ -164,54 +162,20 @@ int scan_pci() {
 	return -1;
 }
 
-void read_mac() {
+void rl8168_read_mac() {
 	
 	for (int i = 0; i < 6; i++)
-	   device_mac[i] = inb(io_base_addr + RL_MAC_OFFSET + i); 
+	   device_mac[i] = inb(rl8168_io_base_addr + RL_MAC_OFFSET + i); 
 	
-	nic_debug("-->DEVICE MAC: %02x:%02x:%02x:%02x:%02x:%02x\n", 0xFF & device_mac[0], 0xFF & device_mac[1],	
+	rl8168_debug("-->DEVICE MAC: %02x:%02x:%02x:%02x:%02x:%02x\n", 0xFF & device_mac[0], 0xFF & device_mac[1],	
 	                                                            0xFF & device_mac[2], 0xFF & device_mac[3],	
                                                                 0xFF & device_mac[4], 0xFF & device_mac[5]);
 	return;
 }
 
-/*
-void setup_descriptors() {
+void rl8168_setup_descriptors() {
 	
-	nic_debug("-->Setting up tx/rx descriptors.\n");
-	
-	page_t *rx_des_page = NULL, *tx_des_page = NULL;
-			
-	if (page_alloc(&rx_des_page) < 0) panic("Can't allocate page for RX Ring");
-	
-	if (page_alloc(&tx_des_page) < 0) panic("Can't allocate page for TX Ring");
-	
-	if (page2pa(tx_des_page) == 0x1000)
-		if (page_alloc(&tx_des_page) < 0) panic("Can't allocate page for TX Ring");
-	
-	// extra page_alloc needed because of the strange page_alloc thing
-	if (page_alloc(&tx_des_page) < 0) panic("Can't allocate page for TX Ring");
-	
-	rx_des_kva = page2kva(rx_des_page);
-	tx_des_kva = page2kva(tx_des_page);
-	
-	rx_des_pa = page2pa(rx_des_page);
-	tx_des_pa = page2pa(tx_des_page);
-
-	cprintf("rx_des_page: %x\n", rx_des_pa);
-	cprintf("tx_des_page: %x\n", tx_des_pa);
-	
-    for (int i = 0; i < num_of_rx_descriptors; i++) 
-		set_rx_descriptor(i);
-		
-	for (int i = 0; i < num_of_tx_descriptors; i++) 
-		set_tx_descriptor(i);
-}
-*/
-
-void setup_descriptors() {
-	
-	nic_debug("-->Setting up tx/rx descriptors.\n");
+	rl8168_debug("-->Setting up tx/rx descriptors.\n");
 			
 	// Allocate room for the buffers. Include an extra ALIGN space.
 	// Buffers need to be on 256 byte boundries.
@@ -227,16 +191,16 @@ void setup_descriptors() {
 	tx_des_pa = (struct Descriptor *)PADDR(tx_des_kva);
 	
     for (int i = 0; i < NUM_RX_DESCRIPTORS; i++) 
-		set_rx_descriptor(i, TRUE); // Allocate memory for the descriptor
+		rl8168_set_rx_descriptor(i, TRUE); // Allocate memory for the descriptor
 		
 	for (int i = 0; i < NUM_TX_DESCRIPTORS; i++) 
-		set_tx_descriptor(i);
+		rl8168_set_tx_descriptor(i);
 		
 	return;
 }
 
 
-void set_rx_descriptor(uint32_t des_num, uint8_t reset_buffer) {
+void rl8168_set_rx_descriptor(uint32_t des_num, uint8_t reset_buffer) {
 	
 	// Set the OWN bit on all descriptors. Also set the buffer size.
 	rx_des_kva[des_num].command = (DES_OWN_MASK | (RL_RX_MAX_BUFFER_SIZE & DES_RX_SIZE_MASK));
@@ -257,7 +221,7 @@ void set_rx_descriptor(uint32_t des_num, uint8_t reset_buffer) {
 	return;
 }
 
-void set_tx_descriptor(uint32_t des_num) {
+void rl8168_set_tx_descriptor(uint32_t des_num) {
 	
 	// Clear the command bits.
 	tx_des_kva[des_num].command = 0;
@@ -276,170 +240,170 @@ void set_tx_descriptor(uint32_t des_num) {
 	return;
 }
 
-void configure_nic() {
+void rl8168_configure() {
 	
 	// TODO: Weigh resetting the nic. Not really needed. Remove?
 	// TODO Check ordering of what we set.
 	// TODO Remove C+ register setting?
 	
-	nic_debug("-->Configuring Device.\n");
-	reset_nic();
+	rl8168_debug("-->Configuring Device.\n");
+	rl8168_reset();
 
 	// Magic to handle the C+ register. Completely undocumented, ripped from the BSE RE driver.
-	outl(io_base_addr + RL_CP_CTRL_REG, RL_CP_MAGIC_MASK);
+	outl(rl8168_io_base_addr + RL_CP_CTRL_REG, RL_CP_MAGIC_MASK);
 
 	// Unlock EPPROM CTRL REG
-	outb(io_base_addr + RL_EP_CTRL_REG, RL_EP_CTRL_UL_MASK); 	
+	outb(rl8168_io_base_addr + RL_EP_CTRL_REG, RL_EP_CTRL_UL_MASK); 	
 	
 	// Set max RX Packet Size
-    outw(io_base_addr + RL_RX_MXPKT_REG, RL_RX_MAX_SIZE); 	
+    outw(rl8168_io_base_addr + RL_RX_MXPKT_REG, RL_RX_MAX_SIZE); 	
 		
 	// Set max TX Packet Size
-    outb(io_base_addr + RL_TX_MXPKT_REG, RL_TX_MAX_SIZE); 			
+    outb(rl8168_io_base_addr + RL_TX_MXPKT_REG, RL_TX_MAX_SIZE); 			
 
 	// Set TX Des Ring Start Addr
-    outl(io_base_addr + RL_TX_DES_REG, (unsigned long)tx_des_pa); 
+    outl(rl8168_io_base_addr + RL_TX_DES_REG, (unsigned long)tx_des_pa); 
 	
 	// Set RX Des Ring Start Addr
-    outl(io_base_addr + RL_RX_DES_REG, (unsigned long)rx_des_pa); 	
+    outl(rl8168_io_base_addr + RL_RX_DES_REG, (unsigned long)rx_des_pa); 	
 
 	// Configure TX
-	outl(io_base_addr + RL_TX_CFG_REG, RL_TX_CFG_MASK); 
+	outl(rl8168_io_base_addr + RL_TX_CFG_REG, RL_TX_CFG_MASK); 
 	
 	// Configure RX
-	outl(io_base_addr + RL_TX_CFG_REG, RL_RX_CFG_MASK); 			
+	outl(rl8168_io_base_addr + RL_TX_CFG_REG, RL_RX_CFG_MASK); 			
 
 	// Enable RX and TX in the CTRL Reg
-	outb(io_base_addr + RL_CTRL_REG, RL_CTRL_RXTX_MASK); 			
+	outb(rl8168_io_base_addr + RL_CTRL_REG, RL_CTRL_RXTX_MASK); 			
 
 	// Lock the EPPROM Ctrl REG
-    outl(io_base_addr + RL_EP_CTRL_REG, RL_EP_CTRL_L_MASK); 		
+    outl(rl8168_io_base_addr + RL_EP_CTRL_REG, RL_EP_CTRL_L_MASK); 		
 	
 	return;
 }
 
-void reset_nic() {
+void rl8168_reset() {
 	
-	nic_debug("-->Resetting device..... ");
-	outb(io_base_addr + RL_CTRL_REG, RL_CTRL_RESET_MASK);
+	rl8168_debug("-->Resetting device..... ");
+	outb(rl8168_io_base_addr + RL_CTRL_REG, RL_CTRL_RESET_MASK);
 	
 	// Wait for NIC to answer "done resetting" before continuing on
-	while (inb(io_base_addr + RL_CTRL_REG) & RL_CTRL_RESET_MASK);
-	nic_debug(" done.\n");
+	while (inb(rl8168_io_base_addr + RL_CTRL_REG) & RL_CTRL_RESET_MASK);
+	rl8168_debug(" done.\n");
 	
 	return;
 }
 
-void setup_interrupts() {
+void rl8168_setup_interrupts() {
 	
 	extern handler_t interrupt_handlers[];
 	
-	nic_debug("-->Setting interrupts.\n");
+	rl8168_debug("-->Setting interrupts.\n");
 	
 	// Enable NIC interrupts
-	outw(io_base_addr + RL_IM_REG, RL_INTERRUPT_MASK);
+	outw(rl8168_io_base_addr + RL_IM_REG, RL_INTERRUPT_MASK);
 	
 	//Clear the current interrupts.
-	outw(io_base_addr + RL_IS_REG, RL_INTRRUPT_CLEAR);
+	outw(rl8168_io_base_addr + RL_IS_REG, RL_INTRRUPT_CLEAR);
 	
 	// Kernel based interrupt stuff
-	register_interrupt_handler(interrupt_handlers, KERNEL_IRQ_OFFSET + irq, nic_interrupt_handler, 0);
-	ioapic_route_irq(irq, NIC_IRQ_CPU);	
+	register_interrupt_handler(interrupt_handlers, KERNEL_IRQ_OFFSET + rl8168_irq, rl8168_interrupt_handler, 0);
+	ioapic_route_irq(rl8168_irq, NE2K_IRQ_CPU);	
 	
 	return;
 }
 
 // We need to evaluate this routine in terms of concurrency.
 // We also need to figure out whats up with different core interrupts
-void nic_interrupt_handler(trapframe_t *tf, void* data) {
+void rl8168_interrupt_handler(trapframe_t *tf, void* data) {
 	
-	nic_interrupt_debug("\nNic interrupt on core %u!\n", lapic_get_id());
+	rl8168_interrupt_debug("\nNic interrupt on core %u!\n", lapic_get_id());
 				
 	// Read the offending interrupt(s)
-	uint16_t interrupt_status = inw(io_base_addr + RL_IS_REG);
+	uint16_t interrupt_status = inw(rl8168_io_base_addr + RL_IS_REG);
 
 	// Clear interrupts immediately so we can get the flag raised again.
-	outw(io_base_addr + RL_IS_REG, interrupt_status);
+	outw(rl8168_io_base_addr + RL_IS_REG, interrupt_status);
 	
 	// Loop to deal with TOCTOU 
 	while (interrupt_status != 0x0000) {
 		// We can have multiple interrupts fire at once. I've personally seen this.
 		// This means we need to handle this as a series of independent if's
 		if (interrupt_status & RL_INT_ROK) {
-			nic_interrupt_debug("-->RX OK\n");
-			nic_handle_rx_packet();
+			rl8168_interrupt_debug("-->RX OK\n");
+			rl8168_handle_rx_packet();
 		}	
 	
 		if (interrupt_status & RL_INT_RERR) {
-			nic_interrupt_debug("-->RX ERR\n");			
+			rl8168_interrupt_debug("-->RX ERR\n");			
 		}
 	
 		if (interrupt_status & RL_INT_TOK) {
-			nic_interrupt_debug("-->TX OK\n");
+			rl8168_interrupt_debug("-->TX OK\n");
 		}
 	
 		if (interrupt_status & RL_INT_TERR) {
-			nic_interrupt_debug("-->TX ERR\n");			
+			rl8168_interrupt_debug("-->TX ERR\n");			
 		}
 	
 		if (interrupt_status & RL_INT_RDU) {
-			nic_interrupt_debug("-->RX Descriptor Unavailable\n");			
+			rl8168_interrupt_debug("-->RX Descriptor Unavailable\n");			
 		}
 	
 		if (interrupt_status & RL_INT_LINKCHG) {
-			nic_interrupt_debug("-->Link Status Changed\n");			
+			rl8168_interrupt_debug("-->Link Status Changed\n");			
 		}
 	
 		if (interrupt_status & RL_INT_FOVW) {
-			nic_interrupt_debug("-->RX Fifo Overflow\n");			
+			rl8168_interrupt_debug("-->RX Fifo Overflow\n");			
 		}
 	
 		if (interrupt_status & RL_INT_TDU) {
-			nic_interrupt_debug("-->TX Descriptor Unavailable\n");			
+			rl8168_interrupt_debug("-->TX Descriptor Unavailable\n");			
 		}
 	
 		if (interrupt_status & RL_INT_SWINT) {
-			nic_interrupt_debug("-->Software Generated Interrupt\n");
+			rl8168_interrupt_debug("-->Software Generated Interrupt\n");
 		}
 	
 		if (interrupt_status & RL_INT_TIMEOUT) {
-			nic_interrupt_debug("-->Timer Expired\n");
+			rl8168_interrupt_debug("-->Timer Expired\n");
 		}
 	
 		if (interrupt_status & RL_INT_SERR) {
-			nic_interrupt_debug("-->PCI Bus System Error\n");			
+			rl8168_interrupt_debug("-->PCI Bus System Error\n");			
 		}
 	
-		nic_interrupt_debug("\n");
+		rl8168_interrupt_debug("\n");
 		
 		// Clear interrupts	
-		interrupt_status = inw(io_base_addr + RL_IS_REG);
-		outw(io_base_addr + RL_IS_REG, interrupt_status);
+		interrupt_status = inw(rl8168_io_base_addr + RL_IS_REG);
+		outw(rl8168_io_base_addr + RL_IS_REG, interrupt_status);
 	}
 	
 	// In the event that we got really unlucky and more data arrived after we set 
 	//  set the bit last, try one more check
-	nic_handle_rx_packet();
+	rl8168_handle_rx_packet();
 	return;
 }
 
 // TODO: Does a packet too large get dropped or just set the error bits in the descriptor? Find out.
 // TODO: Should we move on to look for the next descriptor? is it safe? TOCTOU
-void nic_handle_rx_packet() {
+void rl8168_handle_rx_packet() {
 	
 	uint32_t current_command = rx_des_kva[rx_des_cur].command;
 	uint16_t packet_size;
 	
 	if (current_command & DES_OWN_MASK) {
-		nic_frame_debug("-->Nothing to process. Returning.");
+		rl8168_frame_debug("-->Nothing to process. Returning.");
 		return;
 	}
 		
-	nic_frame_debug("-->RX Des: %u\n", rx_des_cur);
+	rl8168_frame_debug("-->RX Des: %u\n", rx_des_cur);
 	
 	// Make sure we are processing from the start of a packet segment
 	if (!(current_command & DES_FS_MASK)) {
-		nic_frame_debug("-->ERR: Current RX descriptor not marked with FS mask. Panic!");
+		rl8168_frame_debug("-->ERR: Current RX descriptor not marked with FS mask. Panic!");
 		panic("RX Descriptor Ring FS out of sync");
 	}
 	
@@ -468,7 +432,7 @@ void nic_handle_rx_packet() {
 			//	set_rx_descriptor(i, FALSE); // Dont reallocate memory for the descriptor
 			// rx_des_cur = 0;
 			// return;
-			nic_frame_debug("-->ERR: No ending segment found in RX buffer.\n");
+			rl8168_frame_debug("-->ERR: No ending segment found in RX buffer.\n");
 			panic("RX Descriptor Ring out of sync.");
 		}
 		
@@ -477,13 +441,13 @@ void nic_handle_rx_packet() {
 		
 		// Make sure we own the current packet. Kernel ownership is denoted by a 0. Nic by a 1.
 		if (current_command & DES_OWN_MASK) {
-			nic_frame_debug("-->ERR: Current RX descriptor not owned by kernel. Panic!");
+			rl8168_frame_debug("-->ERR: Current RX descriptor not owned by kernel. Panic!");
 			panic("RX Descriptor Ring OWN out of sync");
 		}
 		
 		// Make sure if we are at the end of the buffer, the des is marked as end
 		if ((rx_des_loop_cur == (NUM_RX_DESCRIPTORS - 1)) && !(current_command & DES_EOR_MASK)) {
-			nic_frame_debug("-->ERR: Last RX descriptor not marked with EOR mask. Panic!\n");
+			rl8168_frame_debug("-->ERR: Last RX descriptor not marked with EOR mask. Panic!\n");
 			panic("RX Descriptor Ring EOR Missing");
 		}
 		
@@ -494,7 +458,7 @@ void nic_handle_rx_packet() {
 			//	set_rx_descriptor(i, FALSE); // Dont reallocate memory for the descriptor
 			// rx_des_cur = 0;
 			// return;
-			nic_frame_debug("-->ERR: Nic sent %u byte packet. Max is %u\n", frame_size, MAX_FRAME_SIZE);
+			rl8168_frame_debug("-->ERR: Nic sent %u byte packet. Max is %u\n", frame_size, MAX_FRAME_SIZE);
 			panic("NIC Sent packets larger than configured.");
 		}
 		
@@ -502,7 +466,7 @@ void nic_handle_rx_packet() {
 		memcpy(rx_buffer + frame_size, KADDR(rx_des_kva[rx_des_loop_cur].low_buf), fragment_size);
 		
 		// Reset the descriptor. No reuse buffer.
-		set_rx_descriptor(rx_des_loop_cur, FALSE);
+		rl8168_set_rx_descriptor(rx_des_loop_cur, FALSE);
 		
 		// Note: We mask out fragment sizes at 0x3FFFF. There can be at most 1024 of them.
 		// This can not overflow the uint32_t we allocated for frame size, so
@@ -539,7 +503,7 @@ void nic_handle_rx_packet() {
 		
 		packet_waiting = 1;
 		
-		process_frame(rx_buffer, frame_size, current_command);
+		rl8168_process_frame(rx_buffer, frame_size, current_command);
 		
 		rx_des_cur = rx_des_loop_cur;
 		
@@ -549,7 +513,7 @@ void nic_handle_rx_packet() {
 	// END HACKY STUFF
 	
 	// Chew on the frame data. Command bits should be the same for all frags.
-	process_frame(rx_buffer, frame_size, current_command);
+	rl8168_process_frame(rx_buffer, frame_size, current_command);
 
 	rx_des_cur = rx_des_loop_cur;
 	
@@ -559,10 +523,10 @@ void nic_handle_rx_packet() {
 }
 
 // This is really more of a debug level function. Will probably go away once we get a stack going.
-void process_frame(char *frame_buffer, uint32_t frame_size, uint32_t command) {
+void rl8168_process_frame(char *frame_buffer, uint32_t frame_size, uint32_t command) {
 		
-	nic_frame_debug("-->Command: %x\n", command);
-	nic_frame_debug("-->Size: %u\n", frame_size);
+	rl8168_frame_debug("-->Command: %x\n", command);
+	rl8168_frame_debug("-->Size: %u\n", frame_size);
 	
 	if (frame_buffer == NULL)
 		return;
@@ -570,7 +534,7 @@ void process_frame(char *frame_buffer, uint32_t frame_size, uint32_t command) {
 	// This is hacky. Once we know what our stack will look like, change this.
 	// Once remove check for 0 size.
 	if (frame_size < MINIMUM_PACKET_SIZE) {
-		nic_frame_debug("-->Packet too small. Discarding.\n");
+		rl8168_frame_debug("-->Packet too small. Discarding.\n");
 		return;
 	}
 	
@@ -590,28 +554,28 @@ void process_frame(char *frame_buffer, uint32_t frame_size, uint32_t command) {
 	eth_type[1] = frame_buffer[13];
 	
 	if (command & DES_MAR_MASK) {
-		nic_frame_debug("-->Multicast Packet.\n");
+		rl8168_frame_debug("-->Multicast Packet.\n");
 	}
 	
 	if (command & DES_PAM_MASK) {
-		nic_frame_debug("-->Physical Address Matched.\n");
+		rl8168_frame_debug("-->Physical Address Matched.\n");
 	}
 	
 	if (command & DES_BAR_MASK) {
-		nic_frame_debug("-->Broadcast Packet.\n");
+		rl8168_frame_debug("-->Broadcast Packet.\n");
 	}
 	
 	// Note: DEST comes before SRC in the ethernet frame, but that 
 	
-	nic_frame_debug("-->DEST   MAC: %02x:%02x:%02x:%02x:%02x:%02x\n", 0xFF & dest_mac[0], 0xFF & dest_mac[1],	
-	                                                                   0xFF & dest_mac[2], 0xFF & dest_mac[3],	
-                                                                       0xFF & dest_mac[4], 0xFF & dest_mac[5]);
+	rl8168_frame_debug("-->DEST   MAC: %02x:%02x:%02x:%02x:%02x:%02x\n", 0xFF & dest_mac[0], 0xFF & dest_mac[1],	
+	                                                                     0xFF & dest_mac[2], 0xFF & dest_mac[3],	
+                                                                             0xFF & dest_mac[4], 0xFF & dest_mac[5]);
 	
-	nic_frame_debug("-->SOURCE MAC: %02x:%02x:%02x:%02x:%02x:%02x\n", 0xFF & source_mac[0], 0xFF & source_mac[1],	
-	                                                                   0xFF & source_mac[2], 0xFF & source_mac[3],	
-                                                                       0xFF & source_mac[4], 0xFF & source_mac[5]);
+	rl8168_frame_debug("-->SOURCE MAC: %02x:%02x:%02x:%02x:%02x:%02x\n", 0xFF & source_mac[0], 0xFF & source_mac[1],	
+	                                                                     0xFF & source_mac[2], 0xFF & source_mac[3],	
+                                                                             0xFF & source_mac[4], 0xFF & source_mac[5]);
 
-	nic_frame_debug("-->ETHR MODE: %02x%02x\n", 0xFF & eth_type[0], 0xFF & eth_type[1]);
+	rl8168_frame_debug("-->ETHR MODE: %02x%02x\n", 0xFF & eth_type[0], 0xFF & eth_type[1]);
 		
 	return;
 }
@@ -621,7 +585,7 @@ void process_frame(char *frame_buffer, uint32_t frame_size, uint32_t command) {
 // Would we want to write a function that takes a larger packet and generates fragments?
 // This seems like the stacks responsibility. Leave this for now. may in future
 // Remove the max size cap and generate multiple packets.
-int send_frame(const char *data, size_t len) {
+int rl8168_send_frame(const char *data, size_t len) {
 
 	if (data == NULL)
 		return -1;
@@ -629,12 +593,12 @@ int send_frame(const char *data, size_t len) {
 		return 0;
 
 	if (tx_des_kva[tx_des_cur].command & DES_OWN_MASK) {
-		nic_frame_debug("-->TX Ring Buffer Full!\n");
+		rl8168_frame_debug("-->TX Ring Buffer Full!\n");
 		return -1;
 	}
 	
 	if (len > MAX_FRAME_SIZE) {
-		nic_frame_debug("-->Frame Too Large!\n");
+		rl8168_frame_debug("-->Frame Too Large!\n");
 		return -1;
 	}
 	
@@ -650,16 +614,16 @@ int send_frame(const char *data, size_t len) {
 	
 	tx_des_cur = (tx_des_cur + 1) % NUM_TX_DESCRIPTORS;
 	
-	//nic_frame_debug("-->Sent packet.\n");
+	//rl8168_frame_debug("-->Sent packet.\n");
 	
-	outb(io_base_addr + RL_TX_CTRL_REG, RL_TX_SEND_MASK);
+	outb(rl8168_io_base_addr + RL_TX_CTRL_REG, RL_TX_SEND_MASK);
 	
 	return len;
 }
 
 // This function is a complete hack for syscalls until we get a stack.
 // the day I delete this monstrosity of code I will be a happy man --Paul
-const char *packet_wrap(const char* data, size_t len) {
+const char *rl8168_packet_wrap(const char* data, size_t len) {
 	
 	#define htons(A) ((((uint16_t)(A) & 0xff00) >> 8) | \
 	                    (((uint16_t)(A) & 0x00ff) << 8))
@@ -709,14 +673,14 @@ const char *packet_wrap(const char* data, size_t len) {
  
 	
 	if (len > MAX_PACKET_DATA) {
-		nic_frame_debug("Bad packet size for packet wrapping");
+		rl8168_frame_debug("Bad packet size for packet wrapping");
 		return NULL;
 	}
 	
 	char* wrap_buffer = kmalloc(MAX_PACKET_SIZE, 0);
 	
 	if (wrap_buffer == NULL) {
-		nic_frame_debug("Can't allocate page for packet wrapping");
+		rl8168_frame_debug("Can't allocate page for packet wrapping");
 		return NULL;
 	}
 	

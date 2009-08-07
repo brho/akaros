@@ -37,6 +37,7 @@ KERN_SRCFILES := $(KERN_ARCH_SRCFILES) \
                  $(KERN_SRC_DIR)/timer.c \
                  $(KERN_SRC_DIR)/kmalloc.c \
                  $(KERN_SRC_DIR)/rl8168.c \
+                 $(KERN_SRC_DIR)/ne2k.c \
                  $(KERN_SRC_DIR)/testing.c
 
 # Only build files if they exist.

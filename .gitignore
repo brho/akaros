@@ -11,7 +11,6 @@ cscope.out
 hdd.img
 *.*~
 Makelocal
-ne2k*
 .textmate*
 .DS_*
 ros-project.tmproj

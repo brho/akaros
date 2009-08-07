@@ -270,13 +270,14 @@ void
 	
 	lapic_send_eoi();
 	
-/*	Old PIC relatd code. Should be gone for good, but leaving it just incase.
+	/*
+	//Old PIC relatd code. Should be gone for good, but leaving it just incase.
 	if (tf->tf_trapno < 48)
-		//pic_send_eoi(tf->tf_trapno - PIC1_OFFSET);
-		ioapic_send_eoi(tf->tf_trapno); // Quick hack. Fix.
+		pic_send_eoi(tf->tf_trapno - PIC1_OFFSET);
 	else
 		lapic_send_eoi();
-*/
+	*/
+
 }
 
 void

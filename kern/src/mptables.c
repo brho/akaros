@@ -355,6 +355,7 @@ void int_parse(int_entry* entries, uint32_t count) {
 		mptables_dump("Interrupt entry %u\n", i);
 		mptables_dump("-->type: %x\n", entries[i].type);
 		mptables_dump("-->intType: %x\n", entries[i].intType);
+		mptables_dump("-->intFlags: %x\n", entries[i].intFlags);
 		mptables_dump("-->srcBusID: %u\n", entries[i].srcBusID);
 		mptables_dump("-->srcDevice: %u (PCI ONLY)\n", (entries[i].srcBusIRQ >> 2) & 0x1F);
 		mptables_dump("-->srcBusIRQ: %x\n", entries[i].srcBusIRQ);

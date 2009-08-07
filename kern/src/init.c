@@ -27,6 +27,7 @@
 #include <manager.h>
 
 #include <rl8168.h>
+#include <ne2k.h>
 #include <mptables.h>
 #include <pci.h>
 #include <arch/ioapic.h>
@@ -65,7 +66,8 @@ void kernel_init(multiboot_info_t *mboot_info)
 	// this returns when all other cores are done and ready to receive IPIs
 	smp_boot();
 	
-	nic_init();		
+	rl8168_init();		
+	ne2k_init();
 	/*
 
 	// this returns when all other cores are done and ready to receive IPIs

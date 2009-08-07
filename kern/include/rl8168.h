@@ -5,11 +5,16 @@
 #include <trap.h>
 #include <pmap.h>
 
-#define nic_debug(...)  //cprintf(__VA_ARGS__)  
-#define nic_interrupt_debug(...) //cprintf(__VA_ARGS__)  
-#define nic_frame_debug(...)  //cprintf(__VA_ARGS__)  
+#define rl8168_debug(...)  //cprintf(__VA_ARGS__)  
+#define rl8168_interrupt_debug(...) //cprintf(__VA_ARGS__)  
+#define rl8168_frame_debug(...)  //cprintf(__VA_ARGS__)  
 
-#define NIC_IRQ_CPU			5
+// We need to provide some global interface for sending and receiving packets to a generic interface
+//  for now, that is this set of Macros! They aren't in caps since the final inteface shoudn't be.
+#define packet_wrap rl8168_packet_wrap
+#define send_frame rl8168_send_frame
+
+#define NE2K_IRQ_CPU			5
 
 // Macro for formatting PCI Configuration Address queries
 #define MK_CONFIG_ADDR(BUS, DEV, FUNC, REG) (unsigned long)( (BUS << 16) | (DEV << 11) | \
@@ -123,25 +128,26 @@
 #define MAX_PACKET_DATA		MAX_FRAME_SIZE - PACKET_HEADER_SIZE
 // This number needs verification! Also, this is a huge hack, as the driver shouldnt care about UDP/IP etc.
 
+const char *rl8168_packet_wrap(const char* data, size_t len);
+
+
 // ^----- Evil line ------^
 
 // v----- Good line ------v
 
 
-void nic_init(void);
-void reset_nic(void);
-void nic_interrupt_handler(trapframe_t *tf, void* data);
-int scan_pci(void);
-void read_mac(void);
-void setup_interrupts(void);
-void setup_descriptors(void);
-void configure_nic(void);
-void nic_handle_rx_packet(void);
-void set_rx_descriptor(uint32_t des_num, uint8_t reset_buffer);
-void set_tx_descriptor(uint32_t des_num);
-void process_frame(char *frame_buffer, uint32_t frame_size, uint32_t command);
-int send_frame(const char *data, size_t len);
-const char *packet_wrap(const char* data, size_t len);
-
+void rl8168_init(void);
+void rl8168_reset(void);
+void rl8168_interrupt_handler(trapframe_t *tf, void* data);
+int rl8168_scan_pci(void);
+void rl8168_read_mac(void);
+void rl8168_setup_interrupts(void);
+void rl8168_setup_descriptors(void);
+void rl8168_configure(void);
+void rl8168_handle_rx_packet(void);
+void rl8168_set_rx_descriptor(uint32_t des_num, uint8_t reset_buffer);
+void rl8168_set_tx_descriptor(uint32_t des_num);
+void rl8168_process_frame(char *frame_buffer, uint32_t frame_size, uint32_t command);
+int rl8168_send_frame(const char *data, size_t len);
 
 #endif /* !ROS_INC_REALTEK_H */
