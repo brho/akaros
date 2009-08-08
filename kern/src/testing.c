@@ -77,7 +77,7 @@ void test_pic_reception(void)
 }
 #endif
 
-void test_ioapic_pic_reroute(void) 
+void test_ioapic_pit_reroute(void) 
 {
 	extern handler_t interrupt_handlers[];
 	register_interrupt_handler(interrupt_handlers, 0x20, test_hello_world_handler, 0);
@@ -85,13 +85,13 @@ void test_ioapic_pic_reroute(void)
 
 	cprintf("Starting pit on core 3....\n");
 	udelay(3000000);
-	pit_set_timer(100000,TIMER_RATEGEN); // totally arbitrary time
+	pit_set_timer(0xFFFE,TIMER_RATEGEN); // totally arbitrary time
 	
 	udelay(3000000);
 	ioapic_unroute_irq(0);
 	udelay(300000);
 	cprintf("Masked pit. Waiting before return...\n");
-	udelay(30000000);
+	udelay(3000000);
 }
 
 void test_print_info(void)

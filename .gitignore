@@ -9,6 +9,7 @@ run_bochs.sh
 update*
 cscope.out
 hdd.img
+hdd.vdi
 *.*~
 Makelocal
 .textmate*

@@ -126,7 +126,10 @@ void ioapic_route_irq(uint8_t irq, uint8_t dest) {
 	if (dest >= num_cpus)
 		panic("TRYING TO REROUTE TO AN INVALID DESTINATION!");
 	
-	// This is ugly. Fix it. I just gave up because i need sleep and I wanted it working so I can commit.
+	if (irq == 0 && dest != 0)
+		cprintf("WARNING: Rerouting IRQ to core != 0 may cause undefined behavior!\n");
+
+	// Bit pack our redirection entry	
 	uint32_t redirect_low = KERNEL_IRQ_OFFSET + irq;
 	redirect_low = redirect_low | (ioapic_redirects[irq].ioapic_flags << 8);
 	uint32_t redirect_high = dest << 24;

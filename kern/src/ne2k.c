@@ -46,7 +46,7 @@ int ne2k_scan_pci() {
 	extern pci_dev_entry pci_dev_map[PCI_MAX_BUS][PCI_MAX_DEV][PCI_MAX_FUNC];
 	extern uint16_t pci_irq_map[PCI_MAX_BUS][PCI_MAX_DEV][PCI_MAX_FUNC];
 
-	cprintf("Searching for NE2000 Network device......");
+	cprintf("Searching for NE2000 Network device...");
 
 	for (int i = 0; i < PCI_MAX_BUS; i++)
 		for (int j = 0; j < PCI_MAX_DEV; j++)
@@ -118,7 +118,7 @@ void ne2k_configure_nic() {
 	outb(ne2k_io_base_addr + 0x0F, 0xFF);
 
         uint8_t isr = inb(ne2k_io_base_addr + 0x07);
-        cprintf("isr: %x\n", isr);
+        //cprintf("isr: %x\n", isr);
 
 
 	cprintf("Generating Interrupt...\n");

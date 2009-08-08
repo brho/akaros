@@ -10,7 +10,7 @@
 
 void test_ipi_sending(void);
 void test_pic_reception(void);
-void test_ioapic_pic_reroute(void);
+void test_ioapic_pit_reroute(void);
 void test_print_info(void);
 void test_barrier(void);
 void test_interrupts_irqsave(void);

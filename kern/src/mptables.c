@@ -129,6 +129,24 @@ void mptables_parse() {
 			mpfps = find_floating_pointer(top_of_mem, top_of_mem + 1024 - sizeof(mpfps_t));
 		}
 	}
+	
+	if (mpfps == NULL) {
+		// Search the last KB of system memory based on a 640K limited, due to CMOS lying
+		
+		// Note: Will only be there if it not in the EBDA. So this must be called after the EBDA check.
+				
+		physaddr_t top_of_mem = DEFAULT_TOPOFMEM;
+		
+		if (top_of_mem) {
+				
+			top_of_mem = top_of_mem - 1024;
+			
+			top_of_mem = (physaddr_t)KADDR(top_of_mem);
+		
+	    	mptables_dump("-->Searching top of (real mode) Ram 640K cap, incase CMOS lied...\n");
+			mpfps = find_floating_pointer(top_of_mem, top_of_mem + 1024 - sizeof(mpfps_t));
+		}
+	}
 
 	// If we can't find the pointer, it means we are running on a non-mp compliant machine.
 	// This is bad. We can't do interrupts the way we want.
@@ -195,7 +213,7 @@ void mptables_parse() {
 // Does not esure base/bounds are sane.
 mpfps_t *find_floating_pointer(physaddr_t base, physaddr_t bound) {
 
-	mpfps_t* mpfps = (mpfps_t*)base;	
+	mpfps_t* mpfps = (mpfps_t*)base;
 
 	// Loop over the entire range looking for the signature. The signature is ascii _MP_, which is
 	//  stored in the given MP_SIG

@@ -20,6 +20,8 @@
 #define TOPOFMEM_POINTER	0x0413		/* BIOS: base memory size */
 #define IMCRP_MASK		0x80
 
+#define DEFAULT_TOPOFMEM	0xa0000
+
 #define NUM_ENTRY_TYPES 5
 
 enum interrupt_modes {
