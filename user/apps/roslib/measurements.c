@@ -117,12 +117,14 @@ void buster_sync_wrapper(uint32_t iters, uint32_t num_writes, uint32_t flags)
 
 void buster_async_wrapper(uint32_t iters, uint32_t num_writes, uint32_t flags)
 {
-	async_desc_t *desc1;
+	async_desc_t desc1;
 	async_rsp_t rsp1;
 	for (int i = 0; i < iters; i++){
-		cache_buster_async(&desc1, num_writes, 0, flags);
+	 	syscall_desc_t* sys_desc = get_sys_desc(&desc1);
+		if (sys_desc != NULL)
+	 		sys_cache_buster_async(sys_desc, num_writes, 0, flags);	
 	}
-	waiton_async_call(desc1, &rsp1);
+	waiton_async_call(&desc1, &rsp1);
 }
 
 void buster_thruput_sync(uint32_t flags, char* text)

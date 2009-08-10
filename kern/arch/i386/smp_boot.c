@@ -13,6 +13,7 @@
 #include <smp.h>
 #include <arch/console.h>
 #include <arch/apic.h>
+#include <timing.h>
 
 #include <atomic.h>
 #include <ros/error.h>
