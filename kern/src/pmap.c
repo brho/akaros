@@ -14,6 +14,7 @@
 #include <pmap.h>
 #include <kclock.h>
 #include <process.h>
+#include <stdio.h>
 
 //
 // Allocate n bytes of physical memory aligned on an 

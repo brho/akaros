@@ -215,3 +215,4 @@ uint32_t smp_main(void)
 
 	return my_stack_top; // will be loaded in smp_entry.S
 }
+

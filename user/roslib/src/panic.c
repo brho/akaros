@@ -1,6 +1,7 @@
 
 #include <lib.h>
 #include <arch/arch.h>
+#include <stdio.h>
 
 char *argv0;
 

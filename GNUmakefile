@@ -9,13 +9,13 @@
 
 OBJDIR := obj
 
+# Make sure that 'all' is the first target
+all: symlinks
+
 # User defined constants passed on the command line 
 TARGET_ARCH := i386
 
 -include Makelocal
-
-# Make sure that 'all' is the first target
-all: symlinks
 
 TOP_DIR := .
 ARCH_DIR := $(TOP_DIR)/kern/arch

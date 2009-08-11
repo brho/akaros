@@ -17,6 +17,7 @@
 #include <trap.h>
 #include <monitor.h>
 #include <manager.h>
+#include <stdio.h>
 
 #include <ros/syscall.h>
 #include <ros/error.h>
@@ -112,79 +113,36 @@ env_init(void)
 //
 static int
 env_setup_vm(env_t *e)
-WRITES(e->env_pgdir, e->env_cr3, e->env_procinfo, e->env_syscallring,
-       e->env_syseventring, e->env_syscallbackring, e->env_syseventfrontring)
+WRITES(e->env_pgdir, e->env_cr3, e->env_procinfo, e->env_procdata)
 {
 	int i, r;
 	page_t *pgdir = NULL;
-	page_t *pginfo = NULL; 
-	page_t *pgsyscallring = NULL;
-	page_t *pgsyseventring = NULL;
+	page_t *pginfo[PROCINFO_NUM_PAGES] = {NULL}; 
+	page_t *pgdata[PROCDATA_NUM_PAGES] = {NULL};
+	static page_t* shared_page = 0;
 
 	/* 
-	 * Allocate pages for the page directory, shared info, shared data, 
-	 * and kernel message pages
+	 * First, allocate a page for the pgdir of this process and up 
+	 * its reference count since this will never be done elsewhere
 	 */
 	r = page_alloc(&pgdir);
 	if(r < 0) return r;
-	r = page_alloc(&pginfo);
-	if (r < 0) {
-		page_free(pgdir);
-		return r;
-	}	
-	r = page_alloc(&pgsyscallring);
-	if (r < 0) {
-		page_free(pgdir);
-		page_free(pginfo);
-		return r;
-	}
-	r = page_alloc(&pgsyseventring);
-	if (r < 0) {
-		page_free(pgdir);
-		page_free(pginfo);
-		page_free(pgsyscallring);
-		return r;
-	}
-
-	// Now, set e->env_pgdir and e->env_cr3,
-	// and initialize the page directory.
-	//
-	// Hint:
-	//    - The VA space of all envs is identical above UTOP
-	//      (except at VPT and UVPT, which we've set below).
-	//      (and not for UINFO either)
-	//	See inc/memlayout.h for permissions and layout.
-	//	Can you use boot_pgdir as a template?  Hint: Yes.
-	//	(Make sure you got the permissions right in Lab 2.)
-	//    - The initial VA below UTOP is empty.
-	//    - You do not need to make any more calls to page_alloc.
-	//    - Note: pp_ref is not maintained for most physical pages
-	//	mapped above UTOP -- but you do need to increment
-	//	env_pgdir's pp_ref!
-
-	// need to up pgdir's reference, since it will never be done elsewhere
 	pgdir->pp_ref++;
-	e->env_pgdir = page2kva(pgdir);
-	e->env_cr3 = page2pa(pgdir);
-	e->env_procinfo = page2kva(pginfo);
-	e->env_syscallring = page2kva(pgsyscallring);
-	e->env_syseventring = page2kva(pgsyseventring);
 
+	/* 
+	 * Next, set up the e->env_pgdir and e->env_cr3 pointers to point
+	 * to this newly allocated page and clear its contents
+	 */
 	memset(page2kva(pgdir), 0, PGSIZE);
-	memset(e->env_procinfo, 0, PGSIZE);
-	memset((void*COUNT(PGSIZE)) TC(e->env_syscallring), 0, PGSIZE);
-	memset((void*COUNT(PGSIZE)) TC(e->env_syseventring), 0, PGSIZE);
+	e->env_pgdir = (pde_t *COUNT(NPDENTRIES)) TC(page2kva(pgdir));
+	e->env_cr3 =   (physaddr_t) TC(page2pa(pgdir));
 
-	// Initialize the generic syscall ring buffer
-	SHARED_RING_INIT(e->env_syscallring);
-	// Initialize the backend of the syscall ring buffer
-	BACK_RING_INIT(&e->env_syscallbackring, e->env_syscallring, PGSIZE);
-	               
-	// Initialize the generic sysevent ring buffer
-	SHARED_RING_INIT(e->env_syseventring);
-	// Initialize the frontend of the sysevent ring buffer
-	FRONT_RING_INIT(&e->env_syseventfrontring, e->env_syseventring, PGSIZE);
+	/* 
+	 * Now start filling in the pgdir with mappings required by all newly
+	 * created address spaces
+	 */
 
+	// Map in the kernel to the top of every address space
 	// should be able to do this so long as boot_pgdir never has
 	// anything put below UTOP
 	// TODO check on this!  had a nasty bug because of it
@@ -192,57 +150,74 @@ WRITES(e->env_pgdir, e->env_cr3, e->env_procinfo, e->env_syscallring,
 	// screwed up...
 	memcpy(e->env_pgdir, boot_pgdir, NPDENTRIES*sizeof(pde_t));
 
-	// something like this.  TODO, if you want
-	//memcpy(&e->env_pgdir[PDX(UTOP)], &boot_pgdir[PDX(UTOP)], PGSIZE - PDX(UTOP));
-	// check with
-	// assert(memcmp(e->env_pgdir, boot_pgdir, PGSIZE) == 0);
-
 	// VPT and UVPT map the env's own page table, with
 	// different permissions.
 	e->env_pgdir[PDX(VPT)]  = PTE(PPN(e->env_cr3), PTE_P | PTE_KERN_RW);
 	e->env_pgdir[PDX(UVPT)] = PTE(PPN(e->env_cr3), PTE_P | PTE_USER_RO);
 
-	// Insert the per-process info and ring buffer pages into this process's 
-	// pgdir.  I don't want to do these two pages later (like with the stack), 
-	// since the kernel wants to keep pointers to it easily.
-	// Could place all of this with a function that maps a shared memory page
-	// that can work between any two address spaces or something.
-	r = page_insert(e->env_pgdir, pginfo, (void*SNT)UINFO, PTE_USER_RO);
-	if (r < 0) {
-		page_free(pgdir);
-		page_free(pginfo);
-		page_free(pgsyscallring);
-		page_free(pgsyseventring);
-		return r;
+	/*
+	 * Now allocate and insert all pages required for the shared 
+	 * procinfo structure into the page table
+	 */
+	for(int i=0; i<PROCINFO_NUM_PAGES; i++) {
+		if(page_alloc(&pginfo[i]) < 0) 
+			goto env_setup_vm_error;
+		if(page_insert(e->env_pgdir, pginfo[i], (void*SNT)(UINFO + i*PGSIZE), PTE_USER_RO) < 0)
+			goto env_setup_vm_error;
 	}
-	r = page_insert(e->env_pgdir, pgsyscallring, (void*SNT)USYSCALL, PTE_USER_RW);
-	if (r < 0) {
-		// note that we can't currently deallocate the pages created by
-		// pgdir_walk (inside insert).  should be able to gather them up when
-		// we destroy environments and their page tables.
-		page_free(pgdir);
-		page_free(pginfo);
-		page_free(pgsyscallring);
-		page_free(pgsyseventring);
-		return r;
+	
+	/*
+	 * Now allocate and insert all pages required for the shared 
+	 * procdata structure into the page table
+	 */
+	for(int i=0; i<PROCDATA_NUM_PAGES; i++) {
+		if(page_alloc(&pgdata[i]) < 0)
+			goto env_setup_vm_error;
+		if(page_insert(e->env_pgdir, pgdata[i], (void*SNT)(UDATA + i*PGSIZE), PTE_USER_RW) < 0)
+			goto env_setup_vm_error;
 	}
 
-	/* Shared page for all processes.  Can't be trusted, but still very useful
-	 * at this stage for us.  Consider removing when we have real processes.
+	/* 
+	 * Now, set e->env_procinfo, and e->env_procdata to point to 
+	 * the proper pages just allocated and clear them out.
+	 */
+	e->env_procinfo = (procinfo_t *SAFE) TC(page2kva(pginfo[0]));
+	e->env_procdata = (procdata_t *SAFE) TC(page2kva(pgdata[0]));
+	
+	memset(e->env_procinfo, 0, sizeof(procinfo_t));
+	memset(e->env_procdata, 0, sizeof(procdata_t));
+	
+	/* Finally, set up the Global Shared Data page for all processes.  
+	 * Can't be trusted, but still very useful at this stage for us.  
+	 * Consider removing when we have real processes.
 	 * (TODO).  Note the page is alloced only the first time through
 	 */
-	static page_t* shared_page = 0;
-	if (!shared_page)
-		page_alloc(&shared_page);
+	if (!shared_page) {
+		if(page_alloc(&shared_page) < 0)
+			goto env_setup_vm_error;
 	// Up it, so it never goes away.  One per user, plus one from page_alloc
 	// This is necessary, since it's in the per-process range of memory that
 	// gets freed during page_free.
 	shared_page->pp_ref++;
+	}
 
 	// Inserted into every process's address space at UGDATA
-	page_insert(e->env_pgdir, shared_page, (void*SNT)UGDATA, PTE_USER_RW);
+	if(page_insert(e->env_pgdir, shared_page, (void*SNT)UGDATA, PTE_USER_RW) < 0)
+		goto env_setup_vm_error;
 
 	return 0;
+
+env_setup_vm_error:	
+	page_free(shared_page);
+	for(int i=0; i< PROCDATA_NUM_PAGES; i++) {
+		page_free(pgdata[i]);
+	}
+	for(int i=0; i< PROCINFO_NUM_PAGES; i++) {
+		page_free(pginfo[i]);
+	}
+	env_user_mem_free(e);
+	page_free(pgdir);
+	return -ENOMEM;
 }
 
 //
@@ -283,9 +258,32 @@ env_alloc(env_t **newenv_store, envid_t parent_id)
 	e->env_refcnt = 1;
 	e->env_flags = 0;
 
+
 	memset(&e->env_ancillary_state, 0, sizeof(e->env_ancillary_state));
 	memset(&e->env_tf, 0, sizeof(e->env_tf));
 	env_init_trapframe(e);
+
+	/* 
+	 * Initialize the contents of the e->env_procinfo structure
+	 */
+	 e->env_procinfo->id = (e->env_id & 0x3FF);
+	 
+	/* 
+	 * Initialize the contents of the e->env_procdata structure
+	 */
+	// Initialize the generic syscall ring buffer
+	SHARED_RING_INIT(&e->env_procdata->syscallring);
+	// Initialize the backend of the syscall ring buffer
+	BACK_RING_INIT(&e->syscallbackring, 
+	               &e->env_procdata->syscallring, 
+	               SYSCALLRINGSIZE);
+	               
+	// Initialize the generic sysevent ring buffer
+	SHARED_RING_INIT(&e->env_procdata->syseventring);
+	// Initialize the frontend of the sysevent ring buffer
+	FRONT_RING_INIT(&e->syseventfrontring, 
+	                &e->env_procdata->syseventring, 
+	                SYSEVENTRINGSIZE);
 
 	// commit the allocation
 	LIST_REMOVE(e, env_link);

@@ -421,8 +421,6 @@ static void wait_for_all_envs_to_die(void)
 		cpu_relax();
 }
 
-#if 0
-
 // this never returns.
 static void sync_tests(int start_core, int num_threads, int job_num)
 {
@@ -430,6 +428,7 @@ static void sync_tests(int start_core, int num_threads, int job_num)
 	wait_for_all_envs_to_die();
 	for (int i = start_core; i < start_core + num_threads; i++)
 		env_batch[i] = ENV_CREATE(roslib_measurements);
+	lcr3(env_batch[start_core]->env_cr3);
 	init_barrier(bar, num_threads);
 	*job_to_run = job_num;
 	for (int i = start_core; i < start_core + num_threads; i++)
@@ -450,7 +449,10 @@ static void async_tests(int start_core, int num_threads, int job_num)
 	wait_for_all_envs_to_die();
 	for (int i = start_core; i < start_core + num_threads; i++)
 		env_batch[i] = ENV_CREATE(roslib_measurements);
+	printk("async_tests: checkpoint 0\n");
+	lcr3(env_batch[start_core]->env_cr3);
 	init_barrier(bar, num_threads);
+	printk("async_tests: checkpoint 1\n");
 	*job_to_run = job_num;
 	for (int i = start_core; i < start_core + num_threads; i++)
 		smp_call_function_single(i, run_env_handler, env_batch[i], 0);
@@ -538,8 +540,6 @@ void test_run_measurements(uint32_t job_num)
 	}
 	panic("Error in test setup!!");
 }
-
-#endif // __i386__
 
 /************************************************************/
 /* ISR Handler Functions */

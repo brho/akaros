@@ -16,6 +16,7 @@
 #include <pmap.h>
 #include <trap.h>
 #include <syscall.h>
+#include <stdio.h>
 #include <kfs.h> // eventually replace this with vfs.h
 
 //Do absolutely nothing.  Used for profiling.
@@ -378,7 +379,7 @@ intreg_t syscall_async(env_t* e, syscall_req_t *call)
 intreg_t process_generic_syscalls(env_t* e, size_t max)
 {
 	size_t count = 0;
-	syscall_back_ring_t* sysbr = &e->env_syscallbackring;
+	syscall_back_ring_t* sysbr = &e->syscallbackring;
 
 	// make sure the env is still alive.  
 	// incref will return ESUCCESS on success.

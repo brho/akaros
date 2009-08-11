@@ -11,22 +11,22 @@
 #include <ros/timer.h>
 #include <ros/error.h>
 #include <ros/memlayout.h>
-#include <ros/syscall.h>
+#include <ros/procdata.h>
 
 #include <stdarg.h>
 #include <string.h>
 #include <pool.h>
+#include <assert.h>
 #include <sys/queue.h>
 
 #define USED(x)		(void)(x)
 
 // libos.c or entry.S
 extern char *binaryname;
-// will need to change these types when we have real structs
-// seems like they need to be either arrays [] or functions () for it to work
-extern volatile uint8_t (COUNT(PGSIZE * UINFO_PAGES) procinfo)[];
-extern volatile uint8_t (COUNT(PGSIZE * UDATA_PAGES) procdata)[];
-extern syscall_front_ring_t sysfrontring;
+extern procinfo_t* procinfo;
+extern procdata_t* procdata;
+extern syscall_front_ring_t syscallfrontring;
+extern sysevent_back_ring_t syseventbackring;
 void exit(void) __attribute__((noreturn));
 
 /*
@@ -71,6 +71,7 @@ error_t     waiton_syscall(syscall_desc_t* desc, syscall_rsp_t* rsp);
 // async callback
 #define MAX_SYSCALLS 100
 #define MAX_ASYNCCALLS 100
+
 // The high-level object a process waits on, with multiple syscalls within.
 typedef struct async_desc {
 	syscall_desc_list_t syslist;
@@ -87,9 +88,6 @@ typedef struct async_rsp_t {
 // This is per-thread, and used when entering a async library call to properly
 // group syscall_desc_t used during the processing of that async call
 extern async_desc_t* current_async_desc;
-// stdio.h needs to be included after async_desc_t.  assert.h includes stdio.h.
-#include <stdio.h>
-#include <assert.h>
 
 // This pooltype contains syscall_desc_t, which is how you wait on one syscall.
 POOL_TYPE_DEFINE(syscall_desc_t, syscall_desc_pool, MAX_SYSCALLS);

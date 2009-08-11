@@ -6,6 +6,7 @@
 #include <syscall.h>
 #include <monitor.h>
 #include <manager.h>
+#include <stdio.h>
 #include <smp.h>
 
 #ifdef __DEPUTY__

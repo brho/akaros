@@ -18,6 +18,7 @@
 #include <syscall.h>
 #include <testing.h>
 #include <kfs.h>
+#include <stdio.h>
 
 /*
  * Currently, if you leave this function by way of env_run (process_workqueue

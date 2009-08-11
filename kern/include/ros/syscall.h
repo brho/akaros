@@ -51,6 +51,7 @@ typedef struct syscall_rsp {
 } syscall_rsp_t;
 
 // Generic Syscall Ring Buffer
-DEFINE_RING_TYPES(syscall, syscall_req_t, syscall_rsp_t);
+#define SYSCALLRINGSIZE    PGSIZE
+DEFINE_RING_TYPES_WITH_SIZE(syscall, syscall_req_t, syscall_rsp_t, SYSCALLRINGSIZE);
 
 #endif /* !ROS_INCLUDE_SYSCALL_H */

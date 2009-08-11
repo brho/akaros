@@ -9,6 +9,7 @@
 #include <ros/error.h>
 #include <pmap.h>
 #include <kmalloc.h>
+#include <stdio.h>
 
 #define kmallocdebug(args...)  printk(args)
 

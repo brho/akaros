@@ -33,27 +33,23 @@
  *                     |      Invalid Memory (*)      | --/--             |
  *    ULIM      ----> +------------------------------+ 0xbf800000      --+
  *                     |  Cur. Page Table (User R-)   | R-/R-  PTSIZE
- *    UVPT      ---->  +------------------------------+ 0xbf400000
- *                     |          RO PAGES            | R-/R-  PTSIZE
- *    UPAGES    ---->  +------------------------------+ 0xbf000000      --+
- *                     |  Unmapped (future expansion) | --/--             |
- *                     +------------------------------+ 0xbec01000      PTSIZE
- *                     |     Per-Process R/O Info     | R-/R-  PGSIZE     |
- * UTOP, UINFO  ---->  +------------------------------+ 0xbec00000      --+
- *                     |     Async Syscall Ring       | RW/RW  PGSIZE     |
- *   USYSCALL   ---->  +------------------------------+ 0xbebff000        |
- *                     |     Async Sysevent Ring      | RW/RW  PGSIZE     |
- *   USYSEVENT  ---->  +------------------------------+ 0xbebfe000      PTSIZE
- *                     |      Global Shared Page      | RW/RW  PGSIZE     |
- *     UGDATA   ---->  +------------------------------+ 0xbebfd000        |
- *                     |  Unmapped (future expansion) | --/--             |
- *   UXSTACKTOP ---->  +------------------------------+ 0xbe800000      --+
+ *    UVPT      ---->  +------------------------------+ 0xbf400000      --+
+ *                     | Unmapped (expandable region) |                   |
+ *                     |                              | R-/R-            PTSIZE
+ *                     |     Per-Process R/O Info     |                   |
+ * UTOP, UINFO  ---->  +------------------------------+ 0xbf000000      --+
+ *                     | Unmapped (expandable region) |                   |
+ *                     |                              | RW/RW            PTSIZE
+ *                     |     Per-Process R/W Data     |                   |
+ *    UDATA     ---->  +------------------------------+ 0xbec00000      --+
+ *                     |    Global Shared R/W Data    | RW/RW  PGSIZE
+ * UXSTACKTOP,UGDATA ->+------------------------------+ 0xbebff000
  *                     |     User Exception Stack     | RW/RW  PGSIZE
- *                     +------------------------------+ 0xbe7ff000
+ *                     +------------------------------+ 0xbebfe000
  *                     |       Empty Memory (*)       | --/--  PGSIZE
- *    USTACKTOP  --->  +------------------------------+ 0xbe7fe000
+ *    USTACKTOP  --->  +------------------------------+ 0xbebfd000
  *                     |      Normal User Stack       | RW/RW  PGSIZE
- *                     +------------------------------+ 0xbe7fd000
+ *                     +------------------------------+ 0xbebfc000
  *                     |                              |
  *                     |                              |
  *                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -109,32 +105,25 @@
 
 // Same as VPT but read-only for users
 #define UVPT		(ULIM - PTSIZE)
-// Read-only copies of the Page structures
-#define UPAGES		(UVPT - PTSIZE)
-// Read-only, per-process shared info structures
-#define UINFO		(UPAGES - PTSIZE)
-#define UINFO_PAGES 1
 
 /*
  * Top of user VM. User can manipulate VA from UTOP-1 and down!
  */
 
 // Top of user-accessible VM
-#define UTOP		UINFO
+#define UTOP		(UVPT - PTSIZE)
+// Read-only, per-process shared info structures
+#define UINFO		UTOP
 
 // Read-write, per-process shared page for sending asynchronous 
 // syscalls to the kernel
-#define USYSCALL    (UTOP - PGSIZE)
-
-// Read-write, per-process shared page for receiving asynchronous 
-// sysevents from the kernel
-#define USYSEVENT   (USYSCALL - PGSIZE)
+#define UDATA    (UTOP - PTSIZE)
 
 // Read-write, global page.  Shared by all processes.  Can't be trusted.
-#define UGDATA   (USYSEVENT - PGSIZE)
+#define UGDATA   (UDATA - PGSIZE)
 
 // Top of one-page user exception stack
-#define UXSTACKTOP	(UTOP - PTSIZE)
+#define UXSTACKTOP	UGDATA
 // Next page left invalid to guard against exception stack overflow; then:
 // Top of normal user stack
 #define USTACKTOP	(UXSTACKTOP - 2*PGSIZE)

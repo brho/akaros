@@ -11,6 +11,7 @@
 #include <ros/memlayout.h>
 #include <ros/syscall.h>
 #include <ros/error.h>
+#include <ros/procdata.h>
 #include <newlib_backend.h>
 
 enum {
@@ -18,10 +19,8 @@ enum {
 	PG_RDWR   = 6,
 };
 
-// will need to change these types when we have real structs
-// seems like they need to be either arrays [] or functions () for it to work
-extern volatile uint8_t (COUNT(PGSIZE * UINFO_PAGES) procinfo)[];
-extern volatile uint8_t (COUNT(PGSIZE * UDATA_PAGES) procdata)[];
+extern procinfo_t* procinfo;
+extern procdata_t* procdata;
 
 intreg_t syscall(uint16_t num, intreg_t a1,
                 intreg_t a2, intreg_t a3,

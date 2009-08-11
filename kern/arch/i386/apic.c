@@ -10,6 +10,7 @@
 #include <arch/apic.h>
 #include <ros/timer.h>
 #include <assert.h>
+#include <stdio.h>
 
 system_timing_t system_timing = {0, 0, 0xffff, 0};
 

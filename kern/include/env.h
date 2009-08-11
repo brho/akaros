@@ -8,6 +8,7 @@
 #include <ros/syscall.h>
 #include <ros/sysevent.h>
 #include <ros/error.h>
+#include <ros/procdata.h>
 #include <arch/trap.h>
 #include <arch/types.h>
 #include <arch/arch.h>
@@ -15,8 +16,6 @@
 
 struct Env;
 typedef struct Env env_t;
-
-typedef int32_t envid_t;
 
 // An environment ID 'envid_t' has three parts:
 //
@@ -33,6 +32,8 @@ typedef int32_t envid_t;
 // All real environments are greater than 0 (so the sign bit is zero).
 // envid_ts less than 0 signify errors.  The envid_t == 0 is special, and
 // stands for the current environment.
+
+typedef int32_t envid_t;
 
 #define LOG2NENV		10
 #define NENV			(1 << LOG2NENV)
@@ -52,27 +53,22 @@ struct Env {
 	uint32_t env_runs;			// Number of times environment has run
 	uint32_t env_refcnt;		// Reference count of kernel contexts using this
 	uint32_t env_flags;
-	// The backring for processing asynchronous system calls from the user
-	// Note this is the actual backring, not a pointer to it somewhere else
-	syscall_back_ring_t env_syscallbackring;
-	// The front ring for pushing asynchronous system events out to the user
-	// Note this is the actual frontring, not a pointer to it somewhere else
-	sysevent_front_ring_t env_syseventfrontring;
 
 	// Address space
 	pde_t *COUNT(NPDENTRIES) env_pgdir;			// Kernel virtual address of page dir
 	physaddr_t env_cr3;			// Physical address of page dir
 
-	// TODO - give this a proper type (pointers to a struct)
- 	// - not always going to be PGSIZE either!
- 	void*COUNT(PGSIZE) env_procinfo; 		// KVA of per-process shared info table (RO)
-	// TODO - do we really want to get rid of procdata?
-	//void*COUNT(PGSIZE) env_procdata; 		// KVA of per-process shared data table (RW)
+	// Per process info and data pages
+ 	procinfo_t *SAFE env_procinfo;       // KVA of per-process shared info table (RO)
+	procdata_t *SAFE env_procdata;       // KVA of per-process shared data table (RW)
 	
-	// Do we need these and the above back/front rings?
-	// Ring buffers for communicating with user space
-	syscall_sring_t*SAFE env_syscallring;   // Per-process ring buffer for async syscalls
-	sysevent_sring_t*SAFE env_syseventring; // Per-process ring buffer for async sysevents
+	// The backring pointers for processing asynchronous system calls from the user
+	// Note this is the actual backring, not a pointer to it somewhere else
+	syscall_back_ring_t syscallbackring;
+	
+	// The front ring pointers for pushing asynchronous system events out to the user
+	// Note this is the actual frontring, not a pointer to it somewhere else
+	sysevent_front_ring_t syseventfrontring;
 };
 
 /* Process Flags */

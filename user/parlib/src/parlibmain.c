@@ -12,10 +12,6 @@ extern int main(int argc, char **argv);
 
 void parlibmain(int argc, char **argv)
 {
-	/* This is a good time to connect a global var to the procinfo structure
-	 * like we used to do with env_t */
-	//env = (env_t*)procinfo;	
-
 	debug("Hello from process %d!\n", getpid());
 	// call user main routine
 	int r = main(argc, argv);

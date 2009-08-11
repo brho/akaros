@@ -1,4 +1,5 @@
 #include <lib.h>
+#include <stdio.h>
 #include <syswrapper.h>
 #include <arch/arch.h>
 

@@ -1,4 +1,6 @@
+
 #include <lib.h>
+#include <stdio.h>
 #include <syswrapper.h>
 
 int main(int argc, char** argv)

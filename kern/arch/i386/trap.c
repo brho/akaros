@@ -13,6 +13,7 @@
 #include <trap.h>
 #include <monitor.h>
 #include <process.h>
+#include <stdio.h>
 
 #include <syscall.h>
 

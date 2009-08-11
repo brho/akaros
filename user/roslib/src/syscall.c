@@ -18,19 +18,19 @@ static error_t async_syscall(syscall_req_t* req, syscall_desc_t* desc)
 	// abort if there is no room for our request.  ring size is currently 64.
 	// we could spin til it's free, but that could deadlock if this same thread
 	// is supposed to consume the requests it is waiting on later.
-	if (RING_FULL(&sysfrontring))
+	if (RING_FULL(&syscallfrontring))
 		return -EBUSY;
 	// req_prod_pvt comes in as the previously produced item.  need to
 	// increment to the next available spot, which is the one we'll work on.
 	// at some point, we need to listen for the responses.
-	desc->idx = ++(sysfrontring.req_prod_pvt);
-	desc->sysfr = &sysfrontring;
-	syscall_req_t* r = RING_GET_REQUEST(&sysfrontring, desc->idx);
+	desc->idx = ++(syscallfrontring.req_prod_pvt);
+	desc->sysfr = &syscallfrontring;
+	syscall_req_t* r = RING_GET_REQUEST(&syscallfrontring, desc->idx);
 	memcpy(r, req, sizeof(syscall_req_t));
-	// push our updates to sysfrontring.req_prod_pvt
-	RING_PUSH_REQUESTS(&sysfrontring);
+	// push our updates to syscallfrontring.req_prod_pvt
+	RING_PUSH_REQUESTS(&syscallfrontring);
 	//cprintf("DEBUG: sring->req_prod: %d, sring->rsp_prod: %d\n", \
-	        sysfrontring.sring->req_prod, sysfrontring.sring->rsp_prod);
+	        syscallfrontring.sring->req_prod, syscallfrontring.sring->rsp_prod);
 	return 0;
 }
 

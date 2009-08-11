@@ -1,6 +1,7 @@
 #ifndef ROS_INC_STDIO_H
 #define ROS_INC_STDIO_H
 
+#include <lib.h>
 #include <stdarg.h>
 
 #ifndef NULL
@@ -38,8 +39,6 @@ int	vfprintf(int fd, const char *fmt, va_list);
 
 // lib/readline.c
 char *NTS readline(const char *NTS prompt);
-
-#include <lib.h>
 
 int	cprintf_async(async_desc_t** desc, const char * NTS fmt, ...);
 

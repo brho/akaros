@@ -16,6 +16,7 @@
 #include <pmap.h>
 #include <kclock.h>
 #include <env.h>
+#include <stdio.h>
 
 // These variables are set in i386_vm_init()
 pde_t* boot_pgdir;		// Virtual address of boot time page directory
@@ -362,25 +363,13 @@ vm_init(void)
 	//////////////////////////////////////////////////////////////////////
 	// Make 'pages' point to an array of size 'npage' of 'struct Page'.
 	// The kernel uses this structure to keep track of physical pages;
-	// 'npage' equals the number of physical pages in memory.  User-level
-	// programs get read-only access to the array as well.
-	// You must allocate the array yourself.
-	// Map this array read-only by the user at linear address UPAGES
-	// (ie. perm = PTE_U | PTE_P)
-	// Permissions:
-	//    - pages -- kernel RW, user NONE
-	//    - the read-only version mapped at UPAGES -- kernel R, user R
-	// Your code goes here: 
+	// 'npage' equals the number of physical pages in memory.  
+	// No longer mapping UPAGES into the address space
 	
 	// round up to the nearest page
 	size_t page_array_size = ROUNDUP(npage*sizeof(page_t), PGSIZE);
 	pages = (page_t *)boot_alloc(page_array_size, PGSIZE);
 	memset(pages, 0, page_array_size);
-	if (page_array_size > PTSIZE) {
-		warn("page_array_size bigger than PTSIZE, userland will not see all pages");
-		page_array_size = PTSIZE;
-	}
-	boot_map_segment(pgdir, UPAGES, page_array_size, PADDR(pages), PTE_U | PTE_G);
 
 	//////////////////////////////////////////////////////////////////////
 	// Make 'envs' point to an array of size 'NENV' of 'env_t'.
@@ -471,11 +460,6 @@ check_boot_pgdir(bool pse)
 
 	pgdir = boot_pgdir;
 
-	// check pages array
-	n = ROUNDUP(naddrpage*sizeof(page_t), PGSIZE);
-	for (i = 0; i < n; i += PGSIZE)
-		assert(check_va2pa(pgdir, UPAGES + i) == PADDR(pages) + i);
-
 	// check phys mem
 	//for (i = 0; KERNBASE + i != 0; i += PGSIZE)
 	// adjusted check to account for only mapping avail mem
@@ -496,7 +480,6 @@ check_boot_pgdir(bool pse)
 		case PDX(VPT):
 		case PDX(UVPT):
 		case PDX(KSTACKTOP-1):
-		case PDX(UPAGES):
 		case PDX(LAPIC_BASE): // LAPIC mapping.  TODO: remove when MTRRs are up
 			assert(pgdir[i]);
 			break;
