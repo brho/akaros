@@ -1,7 +1,8 @@
 USER_PARLIB_SRC_DIR = $(USER_PARLIB_DIR)/src
 OBJDIRS += $(USER_PARLIB_SRC_DIR)
+PATCHFILE = $(USER_PARLIB_DIR)/inc/libc_patch.i
 
-USER_PARLIB_SRC_CFLAGS   := $(USER_CFLAGS) --nopatch \
+USER_PARLIB_SRC_CFLAGS   := $(USER_CFLAGS) --nopatch --patch=$(PATCHFILE)\
                             -I$(USER_PARLIB_DIR)/inc \
                             -I$(USER_PARLIB_NEWLIB_DIR)/include
 
@@ -21,7 +22,12 @@ USER_PARLIB_SRC_OBJFILES := $(patsubst $(USER_PARLIB_SRC_DIR)/%.S, \
                             $(OBJDIR)/$(USER_PARLIB_DIR)/%.o, \
                             $(USER_PARLIB_SRC_OBJFILES))
 
-$(OBJDIR)/$(USER_PARLIB_DIR)/%.o: $(USER_PARLIB_SRC_DIR)/%.c
+ANNOTS = /usr/local/lib/ivy/include/deputy/annots.h
+$(PATCHFILE): $(USER_PARLIB_DIR)/inc/libc_patch.h
+	@echo + cpp [PARLIB] $<
+	$(V)gcc -E -include $(ANNOTS) -o $@ $^
+
+$(OBJDIR)/$(USER_PARLIB_DIR)/%.o: $(USER_PARLIB_SRC_DIR)/%.c $(PATCHFILE)
 	@echo + cc [PARLIB] $<
 	@mkdir -p $(@D)
 	$(V)$(CC) $(USER_PARLIB_SRC_CFLAGS) -c -o $@ $<
