@@ -41,8 +41,8 @@ typedef int32_t envid_t;
 
 // TODO: clean this up.
 struct Env {
-	LIST_ENTRY(Env) env_link NOINIT;	// Free list link pointers
-	uint32_t lock;
+	TAILQ_ENTRY(Env) proc_link NOINIT;	// Free list link pointers
+	spinlock_t proc_lock;
 	trapframe_t env_tf 						// Saved registers
 	  __attribute__((aligned (8)));			// for sparc --asw
 	ancillary_state_t env_ancillary_state 	// State saved when descheduled
@@ -78,9 +78,6 @@ extern env_t *COUNT(NENV) envs;		// All environments
 extern atomic_t num_envs;		// Number of envs
 extern env_t* NORACE curenvs[MAX_NUM_CPUS];
 
-LIST_HEAD(env_list, Env);		// Declares 'struct env_list'
-typedef struct env_list env_list_t;
-
 void	env_init(void);
 int		env_alloc(env_t *SAFE*SAFE e, envid_t parent_id);
 void	env_init_trapframe(env_t* e);
@@ -89,12 +86,7 @@ void	env_push_ancillary_state(env_t* e);
 void	env_pop_ancillary_state(env_t* e);
 void	env_free(env_t *SAFE e);
 void	env_user_mem_free(env_t* e);
-error_t	env_incref(env_t* e);
-void	env_decref(env_t *SAFE e);
 env_t*	env_create(uint8_t *COUNT(size) binary, size_t size);
-void	(IN_HANDLER env_destroy)(env_t *SAFE e);	// Does not return if e == curenv
-// Temporary scheduler function
-void	schedule(void);
 
 /*
  * Allows the kernel to figure out what process is running on its core.
@@ -104,21 +96,10 @@ void	schedule(void);
 
 int	envid2env(envid_t envid, env_t **env_store, bool checkperm);
 // The following three functions do not return
-void	(IN_HANDLER env_run)(env_t *e) __attribute__((noreturn));
 void	env_pop_tf(trapframe_t *tf) __attribute__((noreturn));
 
 
 /* Helper handler for smp_call to dispatch jobs to other cores */
 void run_env_handler(trapframe_t *tf, void* data);
-
-// TODO remove this legacy crap
-#define ENV_CREATE(x)			({                                             \
-	extern uint8_t _binary_obj_user_apps_##x##_start[],                        \
-		_binary_obj_user_apps_##x##_size[];                                    \
-	env_t *e = env_create(_binary_obj_user_apps_##x##_start,                   \
-		(int)_binary_obj_user_apps_##x##_size);                                \
-	proc_set_state(e, PROC_RUNNABLE_S);                                        \
-	e;                                                                         \
-})
 
 #endif // !ROS_KERN_ENV_H

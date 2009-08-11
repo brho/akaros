@@ -8,6 +8,7 @@
 #define wmb() 
 
 typedef void* atomic_t;
+typedef volatile uint32_t spinlock_t;
 
 static inline void atomic_init(atomic_t *number, int32_t val);
 static inline int32_t atomic_read(atomic_t *number);

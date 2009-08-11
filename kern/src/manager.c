@@ -14,6 +14,7 @@
 #include <assert.h>
 #include <manager.h>
 #include <process.h>
+#include <schedule.h>
 #include <workqueue.h>
 #include <syscall.h>
 #include <testing.h>
@@ -21,8 +22,8 @@
 #include <stdio.h>
 
 /*
- * Currently, if you leave this function by way of env_run (process_workqueue
- * that env_runs), you will never come back to where you left off, and the
+ * Currently, if you leave this function by way of proc_run (process_workqueue
+ * that proc_runs), you will never come back to where you left off, and the
  * function will start from the top.  Hence the hack 'progress'.
  */
 void manager(void)
@@ -34,13 +35,13 @@ void manager(void)
 		case 0:
 			envs[0] = kfs_proc_create(kfs_lookup_path("roslib_hello"));
 			proc_set_state(envs[0], PROC_RUNNABLE_S);
-			env_run(envs[0]);
+			proc_run(envs[0]);
 			break;
 	#ifdef __i386__
 		case 1:
 			panic("Do not panic");
-			envs[0] = ENV_CREATE(parlib_channel_test_client);
-			envs[1] = ENV_CREATE(parlib_channel_test_server);
+			envs[0] = kfs_proc_create(kfs_lookup_path("parlib_channel_test_client"));
+			envs[1] = kfs_proc_create(kfs_lookup_path("parlib_channel_test_server"));
 			smp_call_function_single(1, run_env_handler, envs[0], 0);
 			smp_call_function_single(2, run_env_handler, envs[1], 0);
 			break;
@@ -49,15 +50,15 @@ void manager(void)
 	#else // sparc
 		case 1:
 			panic("Do not panic");
-			envs[0] = ENV_CREATE(roslib_proctests);
-			envs[1] = ENV_CREATE(roslib_proctests);
-			envs[2] = ENV_CREATE(roslib_proctests);
-			envs[3] = ENV_CREATE(roslib_fptest);
-			envs[4] = ENV_CREATE(roslib_fptest);
-			envs[4] = ENV_CREATE(roslib_fptest);
-			envs[5] = ENV_CREATE(roslib_hello);
-			envs[6] = ENV_CREATE(roslib_null);
-			env_run(envs[0]);
+			envs[0] = kfs_proc_create(kfs_lookup_path("roslib_proctests"));
+			envs[1] = kfs_proc_create(kfs_lookup_path("roslib_proctests"));
+			envs[2] = kfs_proc_create(kfs_lookup_path("roslib_proctests"));
+			envs[3] = kfs_proc_create(kfs_lookup_path("roslib_fptest"));
+			envs[4] = kfs_proc_create(kfs_lookup_path("roslib_fptest"));
+			envs[4] = kfs_proc_create(kfs_lookup_path("roslib_fptest"));
+			envs[5] = kfs_proc_create(kfs_lookup_path("roslib_hello"));
+			envs[6] = kfs_proc_create(kfs_lookup_path("roslib_null"));
+			proc_run(envs[0]);
 			break;
 		case 2:
 			#if 0
@@ -78,8 +79,8 @@ void manager(void)
 			test_run_measurements(progress-1);  // should never return
 			break;
 		case 5:
-			envs[0] = ENV_CREATE(parlib_channel_test_client);
-			envs[1] = ENV_CREATE(parlib_channel_test_server);
+			envs[0] = kfs_proc_create(kfs_lookup_path("parlib_channel_test_client"));
+			envs[1] = kfs_proc_create(kfs_lookup_path("parlib_channel_test_server"));
 			smp_call_function_single(1, run_env_handler, envs[0], 0);
 			smp_call_function_single(2, run_env_handler, envs[1], 0);
 		case 6:

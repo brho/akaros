@@ -27,6 +27,7 @@ atomic_t outstanding_calls = 0;
 /* All non-zero cores call this at the end of their boot process.  They halt,
  * and wake up when interrupted, do any work on their work queue, then halt
  * when there is nothing to do.  
+ * TODO: think about resetting the stack pointer at the beginning.
  */
 void smp_idle(void)
 {

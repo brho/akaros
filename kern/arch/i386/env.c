@@ -44,6 +44,7 @@ void env_pop_tf(trapframe_t *tf)
 		              "popfl;                   "
 		              "movl %%ebp, %%ecx;       "
 		              "movl %%esi, %%edx;       "
+		              "sti;                     "
 		              "sysexit                  "
 		              : : "g" (tf) : "memory");
 		panic("sysexit failed");  /* mostly to placate the compiler */

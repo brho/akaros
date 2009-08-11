@@ -17,6 +17,7 @@
 #include <process.h>
 #include <syscall.h>
 #include <timing.h>
+#include <kfs.h>
 
 #define test_vector 0xeb
 
@@ -427,7 +428,7 @@ static void sync_tests(int start_core, int num_threads, int job_num)
 	assert(start_core + num_threads <= num_cpus);
 	wait_for_all_envs_to_die();
 	for (int i = start_core; i < start_core + num_threads; i++)
-		env_batch[i] = ENV_CREATE(roslib_measurements);
+		env_batch[i] = kfs_proc_create(kfs_lookup_path("roslib_measurements"));
 	lcr3(env_batch[start_core]->env_cr3);
 	init_barrier(bar, num_threads);
 	*job_to_run = job_num;
@@ -435,7 +436,7 @@ static void sync_tests(int start_core, int num_threads, int job_num)
 		smp_call_function_single(i, run_env_handler, env_batch[i], 0);
 	process_workqueue();
 	// we want to fake a run, to reenter manager for the next case
-	env_t *env = ENV_CREATE(roslib_null);
+	env_t *env = kfs_proc_create(kfs_lookup_path("roslib_null"));
 	smp_call_function_single(0, run_env_handler, env, 0);
 	process_workqueue();
 	panic("whoops!\n");
@@ -448,7 +449,7 @@ static void async_tests(int start_core, int num_threads, int job_num)
 	assert(start_core + num_threads <= num_cpus);
 	wait_for_all_envs_to_die();
 	for (int i = start_core; i < start_core + num_threads; i++)
-		env_batch[i] = ENV_CREATE(roslib_measurements);
+		env_batch[i] = kfs_proc_create(kfs_lookup_path("roslib_measurements"));
 	printk("async_tests: checkpoint 0\n");
 	lcr3(env_batch[start_core]->env_cr3);
 	init_barrier(bar, num_threads);
@@ -465,7 +466,7 @@ static void async_tests(int start_core, int num_threads, int job_num)
 		cpu_relax();
 	}
 	// we want to fake a run, to reenter manager for the next case
-	env_t *env = ENV_CREATE(roslib_null);
+	env_t *env = kfs_proc_create(kfs_lookup_path("roslib_null"));
 	smp_call_function_single(0, run_env_handler, env, 0);
 	process_workqueue();
 	// this all never returns

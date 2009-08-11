@@ -1,6 +1,5 @@
 /* See COPYRIGHT for copyright information. */
 #ifdef __DEPUTY__
-//#pragma nodeputy
 #pragma noasync
 #endif
 
@@ -18,6 +17,7 @@
 #include <monitor.h>
 #include <manager.h>
 #include <stdio.h>
+#include <schedule.h>
 
 #include <ros/syscall.h>
 #include <ros/error.h>
@@ -29,7 +29,6 @@ atomic_t num_envs;
 // A lot of the Env business, including this and its usage, will change when we
 // redesign the env as a multi-process.
 env_t* curenvs[MAX_NUM_CPUS] = {[0 ... (MAX_NUM_CPUS-1)] NULL};
-static env_list_t env_free_list;	// Free list
 
 #define ENVGENSHIFT	12		// >= LOGNENV
 
@@ -80,7 +79,7 @@ envid2env(envid_t envid, env_t **env_store, bool checkperm)
 
 //
 // Mark all environments in 'envs' as free, set their env_ids to 0,
-// and insert them into the env_free_list.
+// and insert them into the proc_freelist.
 // Insert in reverse order, so that the first call to env_alloc()
 // returns envs[0].
 // TODO: get rid of this whole array bullshit
@@ -90,14 +89,15 @@ env_init(void)
 {
 	int i;
 
+	schedule_init();
 	atomic_init(&num_envs, 0);
-	LIST_INIT(&env_free_list);
+	TAILQ_INIT(&proc_freelist);
 	assert(envs != NULL);
 	for (i = NENV-1; i >= 0; i--) { TRUSTEDBLOCK // asw ivy workaround
 		// these should already be set from when i memset'd the array to 0
 		envs[i].state = ENV_FREE;
 		envs[i].env_id = 0;
-		LIST_INSERT_HEAD(&env_free_list, &envs[i], env_link);
+		TAILQ_INSERT_HEAD(&proc_freelist, &envs[i], proc_link);
 	}
 }
 
@@ -117,19 +117,19 @@ WRITES(e->env_pgdir, e->env_cr3, e->env_procinfo, e->env_procdata)
 {
 	int i, r;
 	page_t *pgdir = NULL;
-	page_t *pginfo[PROCINFO_NUM_PAGES] = {NULL}; 
+	page_t *pginfo[PROCINFO_NUM_PAGES] = {NULL};
 	page_t *pgdata[PROCDATA_NUM_PAGES] = {NULL};
 	static page_t* shared_page = 0;
 
-	/* 
-	 * First, allocate a page for the pgdir of this process and up 
+	/*
+	 * First, allocate a page for the pgdir of this process and up
 	 * its reference count since this will never be done elsewhere
 	 */
 	r = page_alloc(&pgdir);
 	if(r < 0) return r;
 	pgdir->pp_ref++;
 
-	/* 
+	/*
 	 * Next, set up the e->env_pgdir and e->env_cr3 pointers to point
 	 * to this newly allocated page and clear its contents
 	 */
@@ -137,7 +137,7 @@ WRITES(e->env_pgdir, e->env_cr3, e->env_procinfo, e->env_procdata)
 	e->env_pgdir = (pde_t *COUNT(NPDENTRIES)) TC(page2kva(pgdir));
 	e->env_cr3 =   (physaddr_t) TC(page2pa(pgdir));
 
-	/* 
+	/*
 	 * Now start filling in the pgdir with mappings required by all newly
 	 * created address spaces
 	 */
@@ -156,18 +156,18 @@ WRITES(e->env_pgdir, e->env_cr3, e->env_procinfo, e->env_procdata)
 	e->env_pgdir[PDX(UVPT)] = PTE(PPN(e->env_cr3), PTE_P | PTE_USER_RO);
 
 	/*
-	 * Now allocate and insert all pages required for the shared 
+	 * Now allocate and insert all pages required for the shared
 	 * procinfo structure into the page table
 	 */
 	for(int i=0; i<PROCINFO_NUM_PAGES; i++) {
-		if(page_alloc(&pginfo[i]) < 0) 
+		if(page_alloc(&pginfo[i]) < 0)
 			goto env_setup_vm_error;
 		if(page_insert(e->env_pgdir, pginfo[i], (void*SNT)(UINFO + i*PGSIZE), PTE_USER_RO) < 0)
 			goto env_setup_vm_error;
 	}
-	
+
 	/*
-	 * Now allocate and insert all pages required for the shared 
+	 * Now allocate and insert all pages required for the shared
 	 * procdata structure into the page table
 	 */
 	for(int i=0; i<PROCDATA_NUM_PAGES; i++) {
@@ -177,18 +177,18 @@ WRITES(e->env_pgdir, e->env_cr3, e->env_procinfo, e->env_procdata)
 			goto env_setup_vm_error;
 	}
 
-	/* 
-	 * Now, set e->env_procinfo, and e->env_procdata to point to 
+	/*
+	 * Now, set e->env_procinfo, and e->env_procdata to point to
 	 * the proper pages just allocated and clear them out.
 	 */
 	e->env_procinfo = (procinfo_t *SAFE) TC(page2kva(pginfo[0]));
 	e->env_procdata = (procdata_t *SAFE) TC(page2kva(pgdata[0]));
-	
+
 	memset(e->env_procinfo, 0, sizeof(procinfo_t));
 	memset(e->env_procdata, 0, sizeof(procdata_t));
-	
-	/* Finally, set up the Global Shared Data page for all processes.  
-	 * Can't be trusted, but still very useful at this stage for us.  
+
+	/* Finally, set up the Global Shared Data page for all processes.
+	 * Can't be trusted, but still very useful at this stage for us.
 	 * Consider removing when we have real processes.
 	 * (TODO).  Note the page is alloced only the first time through
 	 */
@@ -207,7 +207,7 @@ WRITES(e->env_pgdir, e->env_cr3, e->env_procinfo, e->env_procdata)
 
 	return 0;
 
-env_setup_vm_error:	
+env_setup_vm_error:
 	page_free(shared_page);
 	for(int i=0; i< PROCDATA_NUM_PAGES; i++) {
 		page_free(pgdata[i]);
@@ -235,14 +235,25 @@ env_alloc(env_t **newenv_store, envid_t parent_id)
 	int r;
 	env_t *e;
 
-	if (!(e = LIST_FIRST(&env_free_list)))
+	spin_lock(&freelist_lock);
+	e = TAILQ_FIRST(&proc_freelist);
+	if (e) {
+		TAILQ_REMOVE(&proc_freelist, e, proc_link);
+		spin_unlock(&freelist_lock);
+	} else {
+		spin_unlock(&freelist_lock);
 		return -ENOFREEENV;
-	
+	}
+
     { INITSTRUCT(*e)
 
 	// Allocate and set up the page directory for this environment.
-	if ((r = env_setup_vm(e)) < 0)
+	if ((r = env_setup_vm(e)) < 0) {
+		spin_lock(&freelist_lock);
+		TAILQ_INSERT_HEAD(&proc_freelist, e, proc_link);
+		spin_unlock(&freelist_lock);
 		return r;
+	}
 
 	// Generate an env_id for this environment.
 	generation = (e->env_id + (1 << ENVGENSHIFT)) & ~(NENV - 1);
@@ -251,7 +262,7 @@ env_alloc(env_t **newenv_store, envid_t parent_id)
 	e->env_id = generation | (e - envs);
 
 	// Set the basic status variables.
-    e->lock = 0;
+    e->proc_lock = 0;
 	e->env_parent_id = parent_id;
 	proc_set_state(e, PROC_CREATED);
 	e->env_runs = 0;
@@ -263,30 +274,28 @@ env_alloc(env_t **newenv_store, envid_t parent_id)
 	memset(&e->env_tf, 0, sizeof(e->env_tf));
 	env_init_trapframe(e);
 
-	/* 
+	/*
 	 * Initialize the contents of the e->env_procinfo structure
 	 */
 	 e->env_procinfo->id = (e->env_id & 0x3FF);
-	 
-	/* 
+
+	/*
 	 * Initialize the contents of the e->env_procdata structure
 	 */
 	// Initialize the generic syscall ring buffer
 	SHARED_RING_INIT(&e->env_procdata->syscallring);
 	// Initialize the backend of the syscall ring buffer
-	BACK_RING_INIT(&e->syscallbackring, 
-	               &e->env_procdata->syscallring, 
+	BACK_RING_INIT(&e->syscallbackring,
+	               &e->env_procdata->syscallring,
 	               SYSCALLRINGSIZE);
-	               
+
 	// Initialize the generic sysevent ring buffer
 	SHARED_RING_INIT(&e->env_procdata->syseventring);
 	// Initialize the frontend of the sysevent ring buffer
-	FRONT_RING_INIT(&e->syseventfrontring, 
-	                &e->env_procdata->syseventring, 
+	FRONT_RING_INIT(&e->syseventfrontring,
+	                &e->env_procdata->syseventring,
 	                SYSEVENTRINGSIZE);
 
-	// commit the allocation
-	LIST_REMOVE(e, env_link);
 	*newenv_store = e;
 	atomic_inc(&num_envs);
 
@@ -378,7 +387,7 @@ load_icode(env_t *SAFE e, uint8_t *COUNT(size) binary, size_t size)
 	 * This can get a bit tricky if this code blocks (will need to think about a
 	 * decref then), if we try to change states, etc.
 	 */
-	env_incref(e);
+	proc_incref(e);
 	lcr3(e->env_cr3);
 
 	// TODO: how do we do a runtime COUNT?
@@ -403,7 +412,7 @@ load_icode(env_t *SAFE e, uint8_t *COUNT(size) binary, size_t size)
 
 	// reload the original address space
 	lcr3(old_cr3);
-	env_decref(e);
+	proc_decref(e);
 }
 
 //
@@ -414,8 +423,8 @@ env_t* env_create(uint8_t *binary, size_t size)
 	env_t *e;
 	int r;
 	envid_t curid;
-	
-	curid = (current ? current->env_id : 0);	
+
+	curid = (current ? current->env_id : 0);
 	if ((r = env_alloc(&e, curid)) < 0)
 		panic("env_create: %e", r);
 	load_icode(e, binary, size);
@@ -432,7 +441,7 @@ env_free(env_t *e)
 
 	// Note the environment's demise.
 	printk("[%08x] free env %08x\n", current ? current->env_id : 0, e->env_id);
-	// All parts of the kernel should have decref'd before env_free was called. 
+	// All parts of the kernel should have decref'd before env_free was called.
 	assert(e->env_refcnt == 0);
 
 	// Flush all mapped pages in the user portion of the address space
@@ -446,159 +455,14 @@ env_free(env_t *e)
 
 	// return the environment to the free list
 	e->state = ENV_FREE;
-	LIST_INSERT_HEAD(&env_free_list, e, env_link);
-}
-
-/*
- * The process refcnt is the number of places the process 'exists' in the
- * system.  Creation counts as 1.  Having your page tables loaded somewhere
- * (lcr3) counts as another 1.  A non-RUNNING_* process should have refcnt at
- * least 1.  If the kernel is on another core and in a processes address space
- * (like processing its backring), that counts as another 1.
- *
- * Note that the actual loading and unloading of cr3 is up to the caller, since
- * that's not the only use for this (and decoupling is more flexible).
- *
- * The refcnt should always be greater than 0 for processes that aren't dying.
- * When refcnt is 0, the process is dying and should not allow any more increfs.
- * A process can be dying with a refcnt greater than 0, since it could be
- * waiting for other cores to "get the message" to die, or a kernel core can be
- * finishing work in the processes's address space.
- *
- * Implementation aside, the important thing is that we atomically increment
- * only if it wasn't already 0.  If it was 0, then we shouldn't be attaching to
- * the process, so we return an error, which should be handled however is
- * appropriate.  We currently use spinlocks, but some sort of clever atomics
- * would work too.
- *
- * Also, no one should ever update the refcnt outside of these functions.
- * Eventually, we'll have Ivy support for this. (TODO)
- */
-error_t env_incref(env_t* e)
-{
-	error_t retval = 0;
-	spin_lock_irqsave(&e->lock);
-	if (e->env_refcnt)
-		e->env_refcnt++;
-	else
-		retval = -EBADENV;
-	spin_unlock_irqsave(&e->lock);
-	return retval;
-}
-
-/*
- * When the kernel is done with a process, it decrements its reference count.
- * When the count hits 0, no one is using it and it should be freed.
- * "Last one out" actually finalizes the death of the process.  This is tightly
- * coupled with the previous function (incref)
- * Be sure to load a different cr3 before calling this!
- */
-void env_decref(env_t* e)
-{
-	spin_lock_irqsave(&e->lock);
-	e->env_refcnt--;
-	spin_unlock_irqsave(&e->lock);
-	// if we hit 0, no one else will increment and we can check outside the lock
-	if (e->env_refcnt == 0)
-		env_free(e);
-}
-
-
-/*
- * Destroys the given process.  Can be called by a different process (checked
- * via current), though that's unable to handle an async call (TODO current does
- * not work asyncly, though it could be made to in the async processing
- * function. 
- */
-void
-env_destroy(env_t *e)
-{
-	// TODO: XME race condition with env statuses, esp when running / destroying
-	proc_set_state(e, PROC_DYING);
-
-	/*
-	 * If we are currently running this address space on our core, we need a
-	 * known good pgdir before releasing the old one.  This is currently the
-	 * major practical implication of the kernel caring about a processes
-	 * existence (the inc and decref).  This decref corresponds to the incref in
-	 * proc_startcore (though it's not the only one).
-	 */
-	if (current == e) {
-		lcr3(boot_cr3);
-		env_decref(e); // this decref is for the cr3
-	}
-	env_decref(e); // this decref is for the process in general
-	atomic_dec(&num_envs);
-
-	/*
-	 * Could consider removing this from destroy and having the caller specify
-	 * these actions
-	 */
-	// for old envs that die on user cores.  since env run never returns, cores
-	// never get back to their old hlt/relaxed/spin state, so we need to force
-	// them back to an idle function.
-	uint32_t id = core_id();
-	// There is no longer a current process for this core. (TODO: Think about this.)
-	current = NULL;
-	if (id) {
-		smp_idle();
-		panic("should never see me");
-	}
-	// else we're core 0 and can do the usual
-
-	/* Instead of picking a new environment to run, or defaulting to the monitor
-	 * like before, for now we'll hop into the manager() function, which
-	 * dispatches jobs.  Note that for now we start the manager from the top,
-	 * and not from where we left off the last time we called manager.  That
-	 * would require us to save some context (and a stack to work on) here.
-	 */
-	manager();
-	assert(0); // never get here
-}
-
-/* ugly, but for now just linearly search through all possible
- * environments for a runnable one.
- * the current *policy* is to round-robin the search
- */
-void schedule(void)
-{
-	env_t *e;
-	static int last_picked = 0;
-	
-	for (int i = 0, j = last_picked + 1; i < NENV; i++, j = (j + 1) % NENV) {
-		e = &envs[ENVX(j)];
-		// TODO: XME race here, if another core is just about to start this env.
-		// Fix it by setting the status in something like env_dispatch when
-		// we have multi-contexted processes
-		if (e && e->state == PROC_RUNNABLE_S) {
-			last_picked = j;
-			env_run(e);
-		}
-	}
-
-	cprintf("Destroyed the only environment - nothing more to do!\n");
-	while (1)
-		monitor(NULL);
-}
-
-//
-// Context switch from curenv to env e.
-// Note: if this is the first call to env_run, curenv is NULL.
-//  (This function does not return.)
-//
-void
-env_run(env_t *e)
-{
-	// TODO: XME race here with env destroy on the status and refcnt
-	// Could up the refcnt and down it when a process is not running
-	
-	proc_set_state(e, PROC_RUNNING_S);
-	proc_startcore(e, &e->env_tf);
+	TAILQ_INSERT_HEAD(&proc_freelist, e, proc_link);
 }
 
 /* This is the top-half of an interrupt handler, where the bottom half is
- * env_run (which never returns).  Just add it to the delayed work queue,
+ * proc_run (which never returns).  Just add it to the delayed work queue,
  * which (incidentally) can only hold one item at this point.
+ *
+ * Note this is rather old, and meant to run a RUNNABLE_S on a worker core.
  */
 void run_env_handler(trapframe_t *tf, void *data)
 {
@@ -606,7 +470,7 @@ void run_env_handler(trapframe_t *tf, void *data)
 	struct work job;
 	struct workqueue *workqueue = &per_cpu_info[core_id()].workqueue;
 	{ TRUSTEDBLOCK // TODO: how do we make this func_t cast work?
-	job.func = (func_t)env_run;
+	job.func = (func_t)proc_run;
 	job.data = data;
 	}
 	if (enqueue_work(workqueue, &job))

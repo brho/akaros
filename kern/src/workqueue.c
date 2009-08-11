@@ -30,7 +30,7 @@ void process_workqueue()
 		spin_lock_irqsave(&cpuinfo->lock);
 		cpuinfo->workqueue.statics[0].func = 0;
 		spin_unlock_irqsave(&cpuinfo->lock);
-		// We may never return from this (if it is env_run)
+		// We may never return from this (if it is proc_run)
 		work.func(work.data);
 	}
 }

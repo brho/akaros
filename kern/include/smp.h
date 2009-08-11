@@ -18,6 +18,7 @@
 // will want this padded out to cacheline alignment
 struct per_cpu_info {
 	uint32_t lock;
+	bool preempt_pending;
 	struct workqueue workqueue;
 };
 extern struct per_cpu_info  per_cpu_info[MAX_NUM_CPUS];

@@ -13,6 +13,7 @@
 #include <string.h>
 #include <assert.h>
 #include <process.h>
+#include <schedule.h>
 #include <pmap.h>
 #include <trap.h>
 #include <syscall.h>
@@ -26,12 +27,12 @@ static void sys_null(void)
 }
 
 //Write a buffer over the serial port
-static ssize_t sys_serial_write(env_t* e, const char *DANGEROUS buf, size_t len) 
+static ssize_t sys_serial_write(env_t* e, const char *DANGEROUS buf, size_t len)
 {
 	#ifdef SERIAL_IO
 		char *COUNT(len) _buf = user_mem_assert(e, buf, len, PTE_USER_RO);
 		for(int i =0; i<len; i++)
-			serial_send_byte(buf[i]);	
+			serial_send_byte(buf[i]);
 		return (ssize_t)len;
 	#else
 		return -EINVAL;
@@ -39,7 +40,7 @@ static ssize_t sys_serial_write(env_t* e, const char *DANGEROUS buf, size_t len)
 }
 
 //Read a buffer over the serial port
-static ssize_t sys_serial_read(env_t* e, char *DANGEROUS buf, size_t len) 
+static ssize_t sys_serial_read(env_t* e, char *DANGEROUS buf, size_t len)
 {
 	#ifdef SERIAL_IO
 	    char *COUNT(len) _buf = user_mem_assert(e, buf, len, PTE_USER_RO);
@@ -55,10 +56,10 @@ static ssize_t sys_serial_read(env_t* e, char *DANGEROUS buf, size_t len)
 	#endif
 }
 
-static ssize_t sys_shared_page_alloc(env_t* p1, 
-                                     void** addr, envid_t p2_id, 
+static ssize_t sys_shared_page_alloc(env_t* p1,
+                                     void** addr, envid_t p2_id,
                                      int p1_flags, int p2_flags
-                                    ) 
+                                    )
 {
 	//if (!VALID_USER_PERMS(p1_flags)) return -EPERM;
 	//if (!VALID_USER_PERMS(p2_flags)) return -EPERM;
@@ -67,13 +68,13 @@ static ssize_t sys_shared_page_alloc(env_t* p1,
 	env_t* p2 = &(envs[ENVX(p2_id)]);
 	error_t e = page_alloc(&page);
 	if(e < 0) return e;
-	
-	void* p2_addr = page_insert_in_range(p2->env_pgdir, page, 
+
+	void* p2_addr = page_insert_in_range(p2->env_pgdir, page,
 	                                     (void*)UTEXT, (void*)UTOP, p2_flags);
-	if(p2_addr == NULL) 
+	if(p2_addr == NULL)
 		return -EFAIL;
-		
-	void* p1_addr = page_insert_in_range(p1->env_pgdir, page, 
+
+	void* p1_addr = page_insert_in_range(p1->env_pgdir, page,
 	                                    (void*)UTEXT, (void*)UTOP, p1_flags);
 	if(p1_addr == NULL) {
 		page_remove(p2->env_pgdir, p2_addr);
@@ -119,7 +120,7 @@ static void sys_cache_buster(env_t* e, uint32_t num_writes, uint32_t num_pages,
 		stride = 16;
 		num_writes *= 16;
 	}
-	
+
 	/* Shared Accesses or Not (adjust to use per-core regions)
 	 * Careful, since this gives 8MB to each core, starting around 512MB.
 	 * Also, doesn't separate memory for core 0 if it's an async call.
@@ -226,8 +227,9 @@ static error_t sys_env_destroy(env_t* e, envid_t envid)
 	if (env_to_die == e)
 		printk("[%08x] exiting gracefully\n", e->env_id);
 	else
-		printk("[%08x] destroying %08x\n", e->env_id, env_to_die->env_id);
-	env_destroy(env_to_die);
+		panic("Destroying other processes is not supported yet.");
+		//printk("[%08x] destroying %08x\n", e->env_id, env_to_die->env_id);
+	proc_destroy(env_to_die);
 	return ESUCCESS;
 }
 
@@ -239,18 +241,19 @@ static error_t sys_env_destroy(env_t* e, envid_t envid)
  */
 static void sys_yield(struct proc *p)
 {
-	// TODO: watch for races throughout anything related to process statuses
-	// and schedule/yielding
+	// This is all standard single-core, local call
+	spin_lock_irqsave(&p->proc_lock);
 	assert(p->state == PROC_RUNNING_S);
-	p->state = PROC_RUNNABLE_S;
-	// the implied thing here is that all state has been saved.  and you need
-	// todo that before changing the state to RUNNABLE_S, since the process can
-	// get picked up somewhere else. TODO
+	proc_set_state(p, PROC_RUNNABLE_S);
+	schedule_proc(p);
+	spin_unlock_irqsave(&p->proc_lock);
+	// the implied thing here is that all state has been saved before leaving
+	// could do the "leaving the process context" here, mentioned in startcore
 	schedule();
 
 	/* TODO
 	 * if running_s, give up your time slice (schedule, save silly state, block)
-	 * if running_m and 2+ cores are left, give yours up, stay runnable_m
+	 * if running_m and 2+ cores are left, give yours up, stay running_m
 	 * if running_m and last core, switch to runnable_s
 	 */
 }
@@ -288,15 +291,17 @@ static error_t sys_proc_run(struct proc *p, unsigned pid)
 {
 	struct proc *target = get_proc(pid);
 	error_t retval = 0;
-	spin_lock(&p->lock); // note we can get interrupted here.  it's not bad.
+	spin_lock_irqsave(&p->proc_lock); // note we can get interrupted here. it's not bad.
 	// make sure we have access and it's in the right state to be activated
-	if (!proc_controls(p, target))
+	if (!proc_controls(p, target)) {
 		retval = -EPERM;
-	else if (target->state != PROC_CREATED)
+	} else if (target->state != PROC_CREATED) {
 		retval = -EINVAL;
-	else
+	} else {
 		proc_set_state(target, PROC_RUNNABLE_S);
-	spin_unlock(&p->lock);
+		schedule_proc(target);
+	}
+	spin_unlock_irqsave(&p->proc_lock);
 	return retval;
 }
 
@@ -309,7 +314,7 @@ intreg_t syscall(env_t* e, uint32_t syscallno, uint32_t a1, uint32_t a2,
 	// Return any appropriate return value.
 
 	//cprintf("Incoming syscall number: %d\n    a1: %x\n   "
-	//        " a2: %x\n    a3: %x\n    a4: %x\n    a5: %x\n", 
+	//        " a2: %x\n    a3: %x\n    a4: %x\n    a5: %x\n",
 	//        syscallno, a1, a2, a3, a4, a5);
 
 	assert(e); // should always have an env for every syscall
@@ -328,7 +333,7 @@ intreg_t syscall(env_t* e, uint32_t syscallno, uint32_t a1, uint32_t a2,
 			sys_cache_invalidate();
 			return 0;
 		case SYS_shared_page_alloc:
-			return sys_shared_page_alloc(e, (void** DANGEROUS) a1, 
+			return sys_shared_page_alloc(e, (void** DANGEROUS) a1,
 		                                 a2, (int) a3, (int) a4);
 		case SYS_shared_page_free:
 			sys_shared_page_free(e, (void* DANGEROUS) a1, a2);
@@ -381,9 +386,9 @@ intreg_t process_generic_syscalls(env_t* e, size_t max)
 	size_t count = 0;
 	syscall_back_ring_t* sysbr = &e->syscallbackring;
 
-	// make sure the env is still alive.  
+	// make sure the env is still alive.
 	// incref will return ESUCCESS on success.
-	if (env_incref(e))
+	if (proc_incref(e))
 		return -EFAIL;
 
 	// max is the most we'll process.  max = 0 means do as many as possible
@@ -414,6 +419,6 @@ intreg_t process_generic_syscalls(env_t* e, size_t max)
 	}
 	// load sane page tables (and don't rely on decref to do it for you).
 	lcr3(boot_cr3);
-	env_decref(e);
+	proc_decref(e);
 	return (intreg_t)count;
 }

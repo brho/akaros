@@ -142,7 +142,7 @@ unhandled_trap(trapframe_t* state)
 	{
 		warn("Unhandled trap in user!\nTrap type: %s",buf);
 		assert(current);
-		env_destroy(current);
+		proc_destroy(current);
 		panic("I shouldn't have gotten here!");
 	}
 }

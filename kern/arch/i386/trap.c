@@ -186,7 +186,7 @@ static void
 				panic("Damn Damn!  Unhandled trap in the kernel!");
 			else {
 				warn("Unexpected trap from userspace");
-				env_destroy(current);
+				proc_destroy(current);
 				return;
 			}
 	}
@@ -210,6 +210,8 @@ void
 {
 	//cprintf("Incoming TRAP frame at %p\n", tf);
 
+	// TODO: do this once we know we are are not returning to the current
+	// context.  doing it now is safe.
 	env_push_ancillary_state(current);
 
 	if ((tf->tf_cs & ~3) != GD_UT && (tf->tf_cs & ~3) != GD_KT) {
@@ -327,7 +329,7 @@ page_fault_handler(trapframe_t *tf)
 	cprintf("[%08x] user fault va %08x ip %08x from core %d\n",
 		current->env_id, fault_va, tf->tf_eip, core_id());
 	print_trapframe(tf);
-	env_destroy(current);
+	proc_destroy(current);
 }
 
 void sysenter_init(void)

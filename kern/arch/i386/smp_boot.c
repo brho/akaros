@@ -23,6 +23,7 @@
 #include <pmap.h>
 #include <env.h>
 #include <trap.h>
+#include <timing.h>
 
 extern handler_wrapper_t handler_wrappers[NUM_HANDLER_WRAPPERS];
 volatile uint8_t num_cpus = 0xee;
