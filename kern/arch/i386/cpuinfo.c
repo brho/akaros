@@ -69,6 +69,16 @@ void print_cpuinfo(void)
 		cprintf("x2APIC Detected\n");
 	else
 		cprintf("x2APIC Not Detected\n");
+	if (ecx & 0x00000060) {
+		msr_val = read_msr(IA32_FEATURE_CONTROL);
+		printd("64 Bit Feature Control: 0x%08x\n", msr_val);
+		if (msr_val & 0x5 == 0x5)
+			printk("Hardware virtualization supported\n");
+		else
+			printk("Hardware virtualization not supported\n");
+	} else { 
+		printk("Hardware virtualization not supported\n");
+	}
 	cpuid(0x80000008, &eax, &ebx, &ecx, &edx);
 	cprintf("Physical Address Bits: %d\n", eax & 0x000000FF);
 	cprintf("Cores per Die: %d\n", (ecx & 0x000000FF) + 1);
