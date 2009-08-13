@@ -30,7 +30,9 @@ sub readdeps {
 	open(DEPFILE, $filename) or return 0;
 	while (<DEPFILE>) {
 		if (/([^:]*):([^\\:]*)([\\]?)$/) {
-			my $target = $1;
+			my $target = $filename;
+			chop($target);
+			$target = $target . "o";
 			my $deplines = $2;
 			my $slash = $3;
 			while ($slash ne '') {

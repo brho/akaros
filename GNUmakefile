@@ -48,7 +48,7 @@ GCCPREFIX := $(shell if i386-ros-elf-objdump -i 2>&1 | grep '^elf32-i386$$' >/de
 endif
 
 # Default programs for compilation
-CC	    := ivycc --deputy --gcc=$(GCCPREFIX)gcc
+CC	    = ivycc --deputy --gcc=$(GCCPREFIX)gcc --save-temps=$(@D)
 AS	    := $(GCCPREFIX)as
 AR	    := $(GCCPREFIX)ar
 LD	    := $(GCCPREFIX)ld
@@ -107,6 +107,8 @@ $(OBJDIR)/.deps: $(foreach dir, $(OBJDIRS), $(wildcard $(OBJDIR)/$(dir)/*.d))
 	@mkdir -p $(@D)
 	@$(PERL) scripts/mergedep.pl $@ $^
 
+# By including this file we automatically force the target that generates it 
+# to be rerun
 -include $(OBJDIR)/.deps
 
 # For deleting the build
