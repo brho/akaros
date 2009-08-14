@@ -96,7 +96,7 @@ void*   page_insert_in_range(pde_t *COUNT(NPDENTRIES) pgdir, page_t *pp,
                              void *SNT vab, void *SNT vae, int perm);
 void	page_remove(pde_t *COUNT(NPDENTRIES) pgdir, void *SNT va);
 page_t* page_lookup(pde_t *COUNT(NPDENTRIES) pgdir, void *SNT va, pte_t **pte_store);
-error_t	pagetable_remove(pde_t *COUNT(NPDENTRIES) pgdir, void *va);
+error_t	pagetable_remove(pde_t *COUNT(NPDENTRIES) pgdir, void *SNT va);
 void	page_decref(page_t *pp);
 
 void setup_default_mtrrs(barrier_t* smp_barrier);

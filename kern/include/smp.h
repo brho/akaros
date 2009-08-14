@@ -29,11 +29,11 @@ void smp_boot(void);
 void smp_idle(void);
 
 /* SMP utility functions */
-int smp_call_function_self(isr_t handler, void* data,
+int smp_call_function_self(poly_isr_t handler, TV(t) data,
                            handler_wrapper_t** wait_wrapper);
-int smp_call_function_all(isr_t handler, void* data,
+int smp_call_function_all(poly_isr_t handler, TV(t) data,
                           handler_wrapper_t** wait_wrapper);
-int smp_call_function_single(uint8_t dest, isr_t handler, void* data,
+int smp_call_function_single(uint8_t dest, poly_isr_t handler, TV(t) data,
                              handler_wrapper_t** wait_wrapper);
 int smp_call_wait(handler_wrapper_t*SAFE wrapper);
 

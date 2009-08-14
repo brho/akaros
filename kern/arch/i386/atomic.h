@@ -16,7 +16,7 @@ static inline void atomic_set(atomic_t *number, int32_t val);
 static inline void atomic_inc(atomic_t *number);
 static inline void atomic_dec(atomic_t *number);
 static inline void atomic_andb(volatile uint8_t* number, uint8_t mask);
-static inline void spin_lock(volatile uint32_t* lock);
+static inline void spin_lock(volatile uint32_t*COUNT(1) lock);
 static inline void spin_unlock(volatile uint32_t* lock);
 
 /* Inlined functions declared above */

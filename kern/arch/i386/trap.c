@@ -32,7 +32,7 @@ pseudodesc_t idt_pd = {
  * of functions to be called when servicing an interrupt.  other cores
  * can set up their own later.
  */
-handler_t interrupt_handlers[256];
+handler_t interrupt_handlers[NUM_INTERRUPT_HANDLERS];
 
 static const char *NTS (IN_HANDLER trapname)(int trapno)
 {
