@@ -1,7 +1,3 @@
-#ifdef __DEPUTY__
-#pragma nodeputy
-#endif
-
 #include <stab.h>
 #include <string.h>
 #include <assert.h>
@@ -11,16 +7,16 @@
 
 #include <ros/memlayout.h>
 
-extern const stab_t __STAB_BEGIN__[];	// Beginning of stabs table
-extern const stab_t __STAB_END__[];	// End of stabs table
-extern const char __STABSTR_BEGIN__[];		// Beginning of string table
-extern const char __STABSTR_END__[];		// End of string table
+extern const stab_t (BND(__this,__STAB_END__) __STAB_BEGIN__)[]; // Beginning of stabs table
+extern const stab_t (SNT __STAB_END__)[]; // End of stabs table
+extern const char (NT BND(__this,__STABSTR_END__) __STABSTR_BEGIN__)[]; // Beginning of string table
+extern const char (SNT __STABSTR_END__)[]; // End of string table
 
 typedef struct UserStabData {
-	const stab_t *stabs;
-	const stab_t *stab_end;
-	const char *stabstr;
-	const char *stabstr_end;
+	const stab_t *BND(__this,stab_end) stabs;
+	const stab_t *SNT stab_end;
+	const char *NT BND(__this, stabstr_end) stabstr;
+	const char *SNT stabstr_end;
 } user_stab_data_t;
 
 
@@ -61,7 +57,9 @@ typedef struct UserStabData {
 //	will exit setting left = 118, right = 554.
 //
 static void
-stab_binsearch(const stab_t *stabs, int *region_left, int *region_right,
+stab_binsearch(const stab_t *BND(__this, stab_end) stabs,
+           const stab_t *SNT stab_end,
+           int *region_left, int *region_right,
 	       int type, uintptr_t addr)
 {
 	int l = *region_left, r = *region_right, any_matches = 0;
@@ -115,10 +113,12 @@ stab_binsearch(const stab_t *stabs, int *region_left, int *region_right,
 //	information into '*info'.
 //
 int
-debuginfo_eip(uintptr_t addr, eipdebuginfo_t *info)
+debuginfo_eip(uintptr_t addr, eipdebuginfo_t *NONNULL info)
 {
-	const stab_t *stabs, *stab_end;
-	const char *stabstr, *stabstr_end;
+	const stab_t *SNT stab_end;
+	const stab_t *BND(__this,stab_end) stabs;
+	const char *SNT stabstr_end;
+	const char *NT BND(__this,stabstr_end) stabstr;
 	int lfile, rfile, lfun, rfun, lline, rline;
 
 	// Initialize *info
@@ -131,34 +131,37 @@ debuginfo_eip(uintptr_t addr, eipdebuginfo_t *info)
 
 	// Find the relevant set of stabs
 	if (addr >= ULIM) {
-		stabs = __STAB_BEGIN__;
 		stab_end = __STAB_END__;
-		stabstr = __STABSTR_BEGIN__;
+		stabs = __STAB_BEGIN__;
 		stabstr_end = __STABSTR_END__;
+		stabstr = __STABSTR_BEGIN__;
 	} else {
 		// The user-application linker script, user/user.ld,
 		// puts information about the application's stabs (equivalent
 		// to __STAB_BEGIN__, __STAB_END__, __STABSTR_BEGIN__, and
 		// __STABSTR_END__) in a structure located at virtual address
 		// USTABDATA.
-		const user_stab_data_t *usd = (const user_stab_data_t *) USTABDATA;
+		const user_stab_data_t *usd = (const user_stab_data_t *COUNT(1))TC(USTABDATA);
 
 		// Make sure this memory is valid.
 		// Return -1 if it is not.  Hint: Call user_mem_check.
 		// LAB 3: Your code here.
-		
-		stabs = usd->stabs;
+
 		stab_end = usd->stab_end;
-		stabstr = usd->stabstr;
+		stabs = usd->stabs;
 		stabstr_end = usd->stabstr_end;
+		stabstr = usd->stabstr;
 
 		// Make sure the STABS and string table memory is valid.
 		// LAB 3: Your code here.
 	}
 
 	// String table validity checks
-	if (stabstr_end <= stabstr || stabstr_end[-1] != 0)
-		return -1;
+	{
+		int stabstrsz = stabstr_end - stabstr;
+		if (stabstr_end <= stabstr || stabstr[stabstrsz-1] != 0)
+			return -1;
+	}
 
 	// Now we find the right stabs that define the function containing
 	// 'eip'.  First, we find the basic source file containing 'eip'.
@@ -168,7 +171,7 @@ debuginfo_eip(uintptr_t addr, eipdebuginfo_t *info)
 	// Search the entire set of stabs for the source file (type N_SO).
 	lfile = 0;
 	rfile = (stab_end - stabs) - 1;
-	stab_binsearch(stabs, &lfile, &rfile, N_SO, addr);
+	stab_binsearch(stabs, stab_end, &lfile, &rfile, N_SO, addr);
 	if (lfile == 0)
 		return -1;
 
@@ -176,7 +179,7 @@ debuginfo_eip(uintptr_t addr, eipdebuginfo_t *info)
 	// (N_FUN).
 	lfun = lfile;
 	rfun = rfile;
-	stab_binsearch(stabs, &lfun, &rfun, N_FUN, addr);
+	stab_binsearch(stabs, stab_end, &lfun, &rfun, N_FUN, addr);
 
 	if (lfun <= rfun) {
 		// stabs[lfun] points to the function name
@@ -208,7 +211,7 @@ debuginfo_eip(uintptr_t addr, eipdebuginfo_t *info)
 	//	which one.
 	// Your code here.
 
-	stab_binsearch(stabs, &lline, &rline, N_SLINE, addr);
+	stab_binsearch(stabs, stab_end, &lline, &rline, N_SLINE, addr);
 	if (lline <= rline) 
 		// stabs[lline] points to the line number
 		info->eip_line = stabs[lline].n_value;

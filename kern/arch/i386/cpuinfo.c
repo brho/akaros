@@ -4,10 +4,6 @@
  * See LICENSE for details.
  */
 
-#ifdef __DEPUTY__
-#pragma nodeputy
-#endif
-
 #include <arch/arch.h>
 #include <arch/x86.h>
 #include <arch/mmu.h>
@@ -101,7 +97,7 @@ void print_cpuinfo(void)
 
 void show_mapping(uintptr_t start, size_t size)
 {
-	pde_t* pgdir = (pde_t*)vpd;
+	pde_t* pgdir = /*(pde_t*)*/vpd;
 	pte_t *pte, *pde;
 	page_t* page;
 	uintptr_t i;
@@ -109,7 +105,7 @@ void show_mapping(uintptr_t start, size_t size)
 	cprintf("   Virtual    Physical  Ps Dr Ac CD WT U W\n");
 	cprintf("------------------------------------------\n");
 	for(i = 0; i < size; i += PGSIZE, start += PGSIZE) {
-		page = page_lookup(pgdir, (void*)start, &pte);
+		page = page_lookup(pgdir, (void*SNT)start, &pte);
 		cprintf("%08p  ", start);
 		if (page) {
 			pde = &pgdir[PDX(start)];
@@ -124,12 +120,12 @@ void show_mapping(uintptr_t start, size_t size)
 }
 
 void backtrace(void)
-{
-	uint32_t* ebp, eip;
+{ TRUSTEDBLOCK
+	uint32_t *ebp, eip;
 	eipdebuginfo_t debuginfo;
 	char buf[256];
 	int j, i = 1;
-	ebp = (uint32_t*)read_ebp();	
+	ebp = (uint32_t*)read_ebp();
 	// this is part of the way back into the call() instruction's bytes
 	// eagle-eyed readers should be able to explain why this is good enough,
 	// and retaddr (just *(ebp + 1) is not)

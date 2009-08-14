@@ -159,8 +159,8 @@
 typedef uint32_t pte_t;
 typedef uint32_t pde_t;
 
-extern volatile pte_t vpt[];     // VA of "virtual page table"
-extern volatile pde_t vpd[];     // VA of current page directory
+extern volatile pte_t (COUNT(PTSIZE) vpt)[];     // VA of "virtual page table"
+extern volatile pde_t (COUNT(PTSIZE) vpd)[];     // VA of current page directory
 
 #endif /* !__ASSEMBLER__ */
 #endif /* !ROS_INC_MEMLAYOUT_H */

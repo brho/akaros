@@ -66,7 +66,7 @@ struct Page {
 };
 
 
-extern char bootstacktop[], bootstack[];
+extern char (SNT bootstacktop)[], (SNT bootstack)[];
 
 extern page_t *COUNT(npage) pages;
 extern size_t npage;
@@ -77,7 +77,8 @@ extern pde_t *COUNT(NPDENTRIES) boot_pgdir;
 extern char* boot_freemem;
 extern page_list_t page_free_list;
 
-void*	boot_alloc(uint32_t n, uint32_t align);
+void*	(DALLOC(n) boot_alloc)(uint32_t n, uint32_t align);
+void*	(DALLOC(_n*sz) boot_calloc)(uint32_t _n, size_t sz, uint32_t align);
 
 void	multiboot_detect_memory(multiboot_info_t *mbi);
 void	multiboot_print_memory_map(multiboot_info_t *mbi);
@@ -94,7 +95,7 @@ int	    page_insert(pde_t *COUNT(NPDENTRIES) pgdir, page_t *pp, void *SNT va, in
 void*   page_insert_in_range(pde_t *COUNT(NPDENTRIES) pgdir, page_t *pp, 
                              void *SNT vab, void *SNT vae, int perm);
 void	page_remove(pde_t *COUNT(NPDENTRIES) pgdir, void *SNT va);
-page_t* page_lookup(pde_t *COUNT(NPDENTRIES) pgdir, void *va, pte_t **pte_store);
+page_t* page_lookup(pde_t *COUNT(NPDENTRIES) pgdir, void *SNT va, pte_t **pte_store);
 error_t	pagetable_remove(pde_t *COUNT(NPDENTRIES) pgdir, void *va);
 void	page_decref(page_t *pp);
 

@@ -26,7 +26,7 @@ enum {
 
 typedef struct channel_msg {
 	size_t len;
-	void* buf;
+	void *COUNT(len) buf;
 } channel_msg_t;
 
 typedef struct channel_ack {
@@ -60,7 +60,7 @@ typedef struct channel_attr {
 
 /***************** Channel related functions *****************/
 
-error_t channel_create(pid_t server, channel_t* ch, channel_attr_t* attr);
+error_t channel_create(pid_t server, channel_t*COUNT(1) ch, channel_attr_t* attr);
 error_t channel_create_wait(channel_t* ch, channel_attr_t* attr);
 error_t channel_destroy(channel_t* ch);
 

@@ -51,7 +51,7 @@ error_t channel_create(pid_t server, channel_t* ch, channel_attr_t* ch_attr) {
 	 * initialization now on this end, and only accessing it on the server side
 	 * after our data page has been created.
 	 */
-	memset((void*SAFE) TC(ch), 0, sizeof(channel_t));
+	memset(ch, 0, sizeof(channel_t));
 	ch->endpoint = server;
 	ch->ring_addr = (channel_sring_t *COUNT(1)) TC(ring_addr);
 	ch->type = CHANNEL_CLIENT;

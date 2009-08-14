@@ -315,10 +315,10 @@ int system(const OPTSTRING str);
 
 unsigned int  strlen(const STRING s);
 
-void * (DMEMSET(1, 2, 3) memset)(void* p, int what, size_t sz);
-int    (DMEMCMP(1, 2, 3) memcmp)(void* s1, void* s2, size_t sz);
+void * (DMEMSET(1, 2, 3) memset)(void* p, int what, void sz);
+int    (DMEMCMP(1, 2, 3) memcmp)(void* s1, void* s2, void sz);
 void * (DMEMCPY(1, 2, 3) memcpy)(void* dst, void* src, void sz);
-void * (DMEMCPY(1, 2, 3) memmove)(void *dst, void* src, size_t sz);
+void * (DMEMCPY(1, 2, 3) memmove)(void *dst, void* src, void sz);
 
 void bzero(void * COUNT(size) buff, unsigned int size);
 
