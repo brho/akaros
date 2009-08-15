@@ -1,9 +1,5 @@
 /* See COPYRIGHT for copyright information. */
 
-#ifdef __DEPUTY__
-#pragma nodeputy
-#endif
-
 #ifdef __BSD_ON_CORE_0__
 #include Everything For Free -- It just works!!
 #else
@@ -41,8 +37,12 @@ void kernel_init(multiboot_info_t *mboot_info)
 
 	print_cpuinfo();
 
-	multiboot_detect_memory((multiboot_info_t*)((uint32_t)mboot_info + KERNBASE));
-	multiboot_print_memory_map((multiboot_info_t*)((uint32_t)mboot_info + KERNBASE));
+	// zra: using KADDR macro gives a runtime warning, but it is possibly more
+    //      clear what's going on this way?
+	//multiboot_detect_memory((multiboot_info_t*)((uint32_t)mboot_info + KERNBASE));
+	//multiboot_print_memory_map((multiboot_info_t*)((uint32_t)mboot_info + KERNBASE));
+	multiboot_detect_memory((multiboot_info_t*COUNT(1))KADDR(mboot_info));
+	multiboot_print_memory_map((multiboot_info_t*COUNT(1))KADDR(mboot_info));
 
 	vm_init();
 

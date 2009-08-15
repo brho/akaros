@@ -4,10 +4,6 @@
  * See LICENSE for details.
  */
 
-#ifdef __DEPUTY__
-#pragma nodeputy
-#endif
-
 #include <arch/types.h>
 #include <smp.h>
 

@@ -80,8 +80,8 @@ extern page_list_t page_free_list;
 void*	(DALLOC(n) boot_alloc)(uint32_t n, uint32_t align);
 void*	(DALLOC(_n*sz) boot_calloc)(uint32_t _n, size_t sz, uint32_t align);
 
-void	multiboot_detect_memory(multiboot_info_t *mbi);
-void	multiboot_print_memory_map(multiboot_info_t *mbi);
+void	multiboot_detect_memory(multiboot_info_t *COUNT(1) mbi);
+void	multiboot_print_memory_map(multiboot_info_t *COUNT(1) mbi);
 bool	enable_pse(void);
 void	vm_init(void);
 
