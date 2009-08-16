@@ -5,6 +5,7 @@
 #include <arch/apic.h>
 
 #include <ros/error.h>
+#include <sys/queue.h>
 
 #include <atomic.h>
 #include <string.h>
@@ -13,17 +14,15 @@
 #include <kclock.h>
 #include <env.h>
 #include <stdio.h>
+#include <kmalloc.h>
+#include <page_alloc.h>
 
 // These variables are set in i386_vm_init()
 pde_t* boot_pgdir;		// Virtual address of boot time page directory
 physaddr_t boot_cr3;		// Physical address of boot time page directory
-char *boot_freemem_base;
-char* boot_freemem;		// Pointer to next byte of free mem
 
-page_t *pages;		// Virtual address of physical page array
-page_list_t page_free_list;	// Free list of physical pages
-
-extern env_t *envs;
+// Global variables
+page_t *pages = NULL;          // Virtual address of physical page array
 
 // Global descriptor table.
 //
@@ -358,17 +357,6 @@ vm_init(void)
 	                 PTE_PCD | PTE_PWT | PTE_W | PTE_G);
 
 	//////////////////////////////////////////////////////////////////////
-	// Make 'pages' point to an array of size 'npage' of 'struct Page'.
-	// The kernel uses this structure to keep track of physical pages;
-	// 'npage' equals the number of physical pages in memory.  
-	// No longer mapping UPAGES into the address space
-	
-	// round up to the nearest page
-	size_t page_array_size = ROUNDUP(npage*sizeof(page_t), PGSIZE);
-	pages = /*(page_t *COUNT(npage))*/boot_calloc(page_array_size, 1, PGSIZE);
-	//memset(pages, 0, page_array_size);
-
-	//////////////////////////////////////////////////////////////////////
 	// Make 'envs' point to an array of size 'NENV' of 'env_t'.
 	// No longer mapping ENVS into the address space
 	
@@ -436,6 +424,29 @@ vm_init(void)
 
 	// Flush the TLB for good measure, to kill the pgdir[0] mapping.
 	tlb_flush_global();
+}
+
+// --------------------------------------------------------------
+// Tracking of physical pages.
+// The 'pages' array has one 'page_t' entry per physical page.
+// Pages are reference counted, and free pages are kept on a linked list.
+// --------------------------------------------------------------
+
+// Initialize page structure and memory free list.
+void page_init(void)
+{
+	// First, make 'pages' point to an array of size 'npages' of 
+	// type 'page_t'.
+	// The kernel uses this structure to keep track of physical pages;
+	// 'npages' equals the number of physical pages in memory.  
+	// round up to the nearest page
+	size_t page_array_size = ROUNDUP(npages*sizeof(page_t), PGSIZE);
+	pages = (page_t*)boot_alloc(page_array_size, PGSIZE);
+	memset(pages, 0, page_array_size);
+	
+	// Now initilaize everything so pages can start to be alloced and freed
+	// from the memory free list
+	page_alloc_init();
 }
 
 //
@@ -568,63 +579,6 @@ get_vaperms(pde_t *COUNT(NPDENTRIES) pgdir, uintptr_t va)
 		return 0;
 	return PGOFF(*pde & *pte) + PTE_PS & (*pde | *pte);
 }
-		
-// --------------------------------------------------------------
-// Tracking of physical pages.
-// The 'pages' array has one 'page_t' entry per physical page.
-// Pages are reference counted, and free pages are kept on a linked list.
-// --------------------------------------------------------------
-
-//  
-// Initialize page structure and memory free list.
-// After this point, ONLY use the functions below
-// to allocate and deallocate physical memory via the page_free_list,
-// and NEVER use boot_alloc() or the related boot-time functions above.
-//
-void
-page_init(void)
-{
-	// The example code here marks all pages as free.
-	// However this is not truly the case.  What memory is free?
-	//  1) Mark page 0 as in use.
-	//     This way we preserve the real-mode IDT and BIOS structures
-	//     in case we ever need them.  (Currently we don't, but...)
-	//  2) Mark the rest of base memory as free.
-	//  3) Then comes the IO hole [IOPHYSMEM, EXTPHYSMEM).
-	//     Mark it as in use so that it can never be allocated.      
-	//  4) Then extended memory [EXTPHYSMEM, ...).
-	//     Some of it is in use, some is free. Where is the kernel?
-	//     Which pages are used for page tables and other data structures?
-	//
-	// Change the code to reflect this.
-	int i;
-	physaddr_t physaddr_after_kernel = PADDR(ROUNDUP((unsigned int)boot_freemem, PGSIZE));
-	LIST_INIT(&page_free_list);
-
-	pages[0].pp_ref = 1;
-	// alloc the second page, since we will need it later to init the other cores
-	// probably need to be smarter about what page we use (make this dynamic) TODO
-	pages[1].pp_ref = 1;
-	for (i = 2; i < PPN(IOPHYSMEM); i++) {
-		pages[i].pp_ref = 0;
-		LIST_INSERT_HEAD(&page_free_list, &pages[i], pp_link);
-	}
-	for (i = PPN(IOPHYSMEM); i < PPN(EXTPHYSMEM); i++) {
-		pages[i].pp_ref = 1;
-	}
-	for (i = PPN(EXTPHYSMEM); i < PPN(physaddr_after_kernel); i++) {
-		pages[i].pp_ref = 1;
-	}
-	for (i = PPN(physaddr_after_kernel); i < PPN(maxaddrpa); i++) {
-		pages[i].pp_ref = 0;
-		LIST_INSERT_HEAD(&page_free_list, &pages[i], pp_link);
-	}
-	// this block out all memory above maxaddrpa.  will need another mechanism
-	// to allocate and map these into the kernel address space
-	for (i = PPN(maxaddrpa); i < npage; i++) {
-		pages[i].pp_ref = 1;
-	}
-}
 
 /* 
  * Remove the second level page table associated with virtual address va.
@@ -686,7 +640,7 @@ pgdir_walk(pde_t *pgdir, const void *SNT va, int create)
 	}
 	if (page_alloc(&new_table))
 		return NULL;
-	new_table->pp_ref = 1;
+	new_table->page_ref = 1;
 	memset(page2kva(new_table), 0, PGSIZE);
 	*the_pde = (pde_t)page2pa(new_table) | PTE_P | PTE_W | PTE_U;
 	return &((pde_t*COUNT(NPTENTRIES))KADDR(PTE_ADDR(*the_pde)))[PTX(va)];
@@ -749,13 +703,13 @@ page_check(void)
 	}
 	assert(PTE_ADDR(boot_pgdir[0]) == page2pa(pp0));
 	assert(check_va2pa(boot_pgdir, 0x0) == page2pa(pp1));
-	assert(pp1->pp_ref == 1);
-	assert(pp0->pp_ref == 1);
+	assert(pp1->page_ref == 1);
+	assert(pp0->page_ref == 1);
 
 	// should be able to map pp2 at PGSIZE because pp0 is already allocated for page table
 	assert(page_insert(boot_pgdir, pp2, (void*SNT) PGSIZE, 0) == 0);
 	assert(check_va2pa(boot_pgdir, PGSIZE) == page2pa(pp2));
-	assert(pp2->pp_ref == 1);
+	assert(pp2->page_ref == 1);
 
 	// Make sure that pgdir_walk returns a pointer to the pte and
 	// not the table or some other garbage
@@ -770,7 +724,7 @@ page_check(void)
 	// should be able to map pp2 at PGSIZE because it's already there
 	assert(page_insert(boot_pgdir, pp2, (void*SNT) PGSIZE, PTE_U) == 0);
 	assert(check_va2pa(boot_pgdir, PGSIZE) == page2pa(pp2));
-	assert(pp2->pp_ref == 1);
+	assert(pp2->page_ref == 1);
 
 	// Make sure that we actually changed the permission on pp2 when we re-mapped it
 	{
@@ -792,8 +746,8 @@ page_check(void)
 	assert(check_va2pa(boot_pgdir, 0) == page2pa(pp1));
 	assert(check_va2pa(boot_pgdir, PGSIZE) == page2pa(pp1));
 	// ... and ref counts should reflect this
-	assert(pp1->pp_ref == 2);
-	assert(pp2->pp_ref == 0);
+	assert(pp1->page_ref == 2);
+	assert(pp2->page_ref == 0);
 
 	// pp2 should be returned by page_alloc
 	assert(page_alloc(&pp) == 0 && pp == pp2);
@@ -802,15 +756,15 @@ page_check(void)
 	page_remove(boot_pgdir, 0x0);
 	assert(check_va2pa(boot_pgdir, 0x0) == ~0);
 	assert(check_va2pa(boot_pgdir, PGSIZE) == page2pa(pp1));
-	assert(pp1->pp_ref == 1);
-	assert(pp2->pp_ref == 0);
+	assert(pp1->page_ref == 1);
+	assert(pp2->page_ref == 0);
 
 	// unmapping pp1 at PGSIZE should free it
 	page_remove(boot_pgdir, (void*SNT) PGSIZE);
 	assert(check_va2pa(boot_pgdir, 0x0) == ~0);
 	assert(check_va2pa(boot_pgdir, PGSIZE) == ~0);
-	assert(pp1->pp_ref == 0);
-	assert(pp2->pp_ref == 0);
+	assert(pp1->page_ref == 0);
+	assert(pp2->page_ref == 0);
 
 	// so it should be returned by page_alloc
 	assert(page_alloc(&pp) == 0 && pp == pp1);
@@ -821,8 +775,8 @@ page_check(void)
 	// forcibly take pp0 back
 	assert(PTE_ADDR(boot_pgdir[0]) == page2pa(pp0));
 	boot_pgdir[0] = 0;
-	assert(pp0->pp_ref == 1);
-	pp0->pp_ref = 0;
+	assert(pp0->page_ref == 1);
+	pp0->page_ref = 0;
 
 	// Catch invalid pointer addition in pgdir_walk - i.e. pgdir + PDX(va)
 	{
@@ -836,7 +790,7 @@ page_check(void)
 
 	  // Clean up again
 	  boot_pgdir[PDX(va)] = 0;
-	  pp0->pp_ref = 0;
+	  pp0->page_ref = 0;
 	}
 
 	// give free list back

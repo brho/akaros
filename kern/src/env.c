@@ -124,7 +124,7 @@ WRITES(e->env_pgdir, e->env_cr3, e->env_procinfo, e->env_procdata)
 	 */
 	r = page_alloc(&pgdir);
 	if(r < 0) return r;
-	pgdir->pp_ref++;
+	page_incref(pgdir);
 
 	/*
 	 * Next, set up the e->env_pgdir and e->env_cr3 pointers to point
@@ -195,7 +195,7 @@ WRITES(e->env_pgdir, e->env_cr3, e->env_procinfo, e->env_procdata)
 	// Up it, so it never goes away.  One per user, plus one from page_alloc
 	// This is necessary, since it's in the per-process range of memory that
 	// gets freed during page_free.
-	shared_page->pp_ref++;
+	page_incref(shared_page);
 	}
 
 	// Inserted into every process's address space at UGDATA

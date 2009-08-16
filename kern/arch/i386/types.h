@@ -20,6 +20,14 @@
 // Represents true-or-false values
 typedef int bool;
 
+#define NUM_ADDR_BITS 32
+#define MAX_VADDR     ((uint64_t)(~0) >> (64-NUM_ADDR_BITS))
+
+//Constants for byte sizes
+#define ONE_KILOBYTE  (1L<<10)
+#define ONE_MEGABYTE  (1L<<20)
+#define ONE_GIGABYTE  (1L<<30)
+
 // Explicitly-sized versions of integer types
 typedef __signed char int8_t;
 typedef unsigned char uint8_t;
@@ -82,7 +90,6 @@ typedef int32_t off_t;
 	(typeof(a)) (ROUNDDOWN((uint32_t) (a) + __n - 1, __n));	\
 })
 
-
 // Round down to the nearest multiple of n
 #define PTRROUNDDOWN(a, n)						\
 ({								\
@@ -95,6 +102,14 @@ typedef int32_t off_t;
 	uint32_t __n = (uint32_t) (n);				\
 	(typeof(a)) (PTRROUNDDOWN((char *) (a) + __n - 1, __n));	\
 })
+
+// Return the integer logarithm of the value provided rounded up
+static inline uint32_t LOG2(uint32_t value)
+{
+    uint32_t l = 0;
+    while( (value >> l) > 1 ) ++l;
+    return l;
+}
 
 // Return the offset of 'member' relative to the beginning of a struct type
 #ifndef offsetof

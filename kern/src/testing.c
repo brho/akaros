@@ -15,6 +15,9 @@
 #include <syscall.h>
 #include <timing.h>
 #include <kfs.h>
+#include <multiboot.h>
+#include <pmap.h>
+#include <page_alloc.h>
 
 #define test_vector 0xeb
 
@@ -82,6 +85,76 @@ void test_print_info(void)
 	cprintf("\nDone!\n");
 }
 
+void test_page_coloring(void) 
+{
+	//Print the different cache properties of our machine
+	print_cache_properties("L1", &l1);
+	cprintf("\n");
+	print_cache_properties("L2", &l2);
+	cprintf("\n");
+	print_cache_properties("L3", &l3);
+	cprintf("\n");
+
+	//Print some stats about our memory
+	cprintf("Max Address: %u\n", MAX_VADDR);
+	cprintf("Num Pages: %u\n", npages);
+
+	//Declare a local variable for allocating pages	
+	page_t* page;
+
+	//Run through and allocate all pages through l1_page_alloc
+	cprintf("Allocating from L1 page colors:\n");
+	for(int i=0; i<get_cache_num_page_colors(&l1); i++) {
+		cprintf("  COLOR %d:\n", i);
+		while(l1_page_alloc(&page, i) != -ENOMEM)
+			cprintf("    Page: %d\n", page2ppn(page));
+	}
+
+	//Put all the pages back by reinitializing
+	page_init();
+	
+	//Run through and allocate all pages through l2_page_alloc
+	cprintf("Allocating from L2 page colors:\n");
+	for(int i=0; i<get_cache_num_page_colors(&l2); i++) {
+		cprintf("  COLOR %d:\n", i);
+		while(l2_page_alloc(&page, i) != -ENOMEM)
+			cprintf("    Page: %d\n", page2ppn(page));
+	}
+
+	//Put all the pages back by reinitializing
+	page_init();
+	
+	//Run through and allocate all pages through l3_page_alloc
+	cprintf("Allocating from L3 page colors:\n");
+	for(int i=0; i<get_cache_num_page_colors(&l3); i++) {
+		cprintf("  COLOR %d:\n", i);
+		while(l3_page_alloc(&page, i) != -ENOMEM)
+			cprintf("    Page: %d\n", page2ppn(page));
+	}
+	
+	//Put all the pages back by reinitializing
+	page_init();
+	
+	//Run through and allocate all pages through page_alloc
+	cprintf("Allocating from global allocator:\n");
+	while(page_alloc(&page) != -ENOMEM)
+		cprintf("    Page: %d\n", page2ppn(page));
+	
+	if(l2_page_alloc(&page, 0) != -ENOMEM)
+		cprintf("Should not get here, all pages should already be gone!\n");
+	cprintf("All pages gone for sure...\n");
+	
+	//Now lets put a few pages back using page_free..
+	cprintf("Reinserting pages via page_free and reallocating them...\n");
+	page_free(&pages[0]);
+	page_free(&pages[15]);
+	page_free(&pages[7]);
+	page_free(&pages[6]);
+	page_free(&pages[4]);
+
+	while(page_alloc(&page) != -ENOMEM)
+		cprintf("Page: %d\n", page2ppn(page));	
+}
 
 extern uint8_t num_cpus;
 barrier_t test_cpu_array;

@@ -31,10 +31,9 @@ sub readdeps {
 	while (<DEPFILE>) {
 		if (/([^:]*):([^\\:]*)([\\]?)$/) {
 			my $target = $filename;
-			chop($target);
-			$target = $target . "o";
 			my $deplines = $2;
 			my $slash = $3;
+			$target =~ s/\.d/\.o/;
 			while ($slash ne '') {
 				$_ = <DEPFILE>;
 				defined($_) or die

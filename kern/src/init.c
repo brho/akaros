@@ -46,6 +46,7 @@ void kernel_init(multiboot_info_t *mboot_info)
 
 	vm_init();
 
+	cache_init();
 	page_init();
 	page_check();
 

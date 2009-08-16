@@ -22,6 +22,8 @@ KERN_SRCFILES := $(KERN_ARCH_SRCFILES) \
                  $(KERN_SRC_DIR)/string.c \
                  $(KERN_SRC_DIR)/atomic.c \
                  $(KERN_SRC_DIR)/workqueue.c \
+                 $(KERN_SRC_DIR)/colored_caches.c \
+                 $(KERN_SRC_DIR)/page_alloc.c \
                  $(KERN_SRC_DIR)/pmap.c \
                  $(KERN_SRC_DIR)/env.c \
                  $(KERN_SRC_DIR)/manager.c \
