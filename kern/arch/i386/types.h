@@ -82,6 +82,20 @@ typedef int32_t off_t;
 	(typeof(a)) (ROUNDDOWN((uint32_t) (a) + __n - 1, __n));	\
 })
 
+
+// Round down to the nearest multiple of n
+#define PTRROUNDDOWN(a, n)						\
+({								\
+	char * __a = (char *) (a);				\
+	(typeof(a)) (__a - (uint32_t)__a % (n));				\
+})
+// Round pointer up to the nearest multiple of n
+#define PTRROUNDUP(a, n)						\
+({								\
+	uint32_t __n = (uint32_t) (n);				\
+	(typeof(a)) (PTRROUNDDOWN((char *) (a) + __n - 1, __n));	\
+})
+
 // Return the offset of 'member' relative to the beginning of a struct type
 #ifndef offsetof
 #define offsetof(type, member)  ((size_t) (&((type*)0)->member))

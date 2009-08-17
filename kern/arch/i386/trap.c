@@ -1,6 +1,3 @@
-#ifdef __DEPUTY__
-#pragma noasync
-#endif
 
 #include <arch/mmu.h>
 #include <arch/x86.h>
@@ -32,7 +29,7 @@ pseudodesc_t idt_pd = {
  * of functions to be called when servicing an interrupt.  other cores
  * can set up their own later.
  */
-handler_t interrupt_handlers[NUM_INTERRUPT_HANDLERS];
+handler_t TP(void *) interrupt_handlers[NUM_INTERRUPT_HANDLERS];
 
 static const char *NTS (IN_HANDLER trapname)(int trapno)
 {
@@ -251,7 +248,7 @@ void
 	extern handler_wrapper_t handler_wrappers[NUM_HANDLER_WRAPPERS];
 
 	// determine the interrupt handler table to use.  for now, pick the global
-	handler_t* handler_tbl = interrupt_handlers;
+	handler_t TP(void *) * handler_tbl = interrupt_handlers;
 
 	if (handler_tbl[tf->tf_trapno].isr != 0)
 		handler_tbl[tf->tf_trapno].isr(tf, handler_tbl[tf->tf_trapno].data);
@@ -272,7 +269,7 @@ void
 }
 
 void
-register_interrupt_handler(handler_t table[], uint8_t int_num, isr_t handler,
+register_interrupt_handler(handler_t TP(TV(t)) table[], uint8_t int_num, poly_isr_t handler,
                            void* data)
 {
 	table[int_num].isr = handler;

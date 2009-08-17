@@ -29,8 +29,9 @@ void file_io()
 		return;
 	}
 
-	char * file_name = malloc(strlen(readline_result) + 1);
-	strcpy(file_name, readline_result);
+    unsigned int fname_len = strlen(readline_result) + 1;
+	char * file_name = malloc(fname_len);
+	strncpy(file_name, readline_result, fname_len);
 
 	readline_result = readline("Enter text to write to file: ");
 
@@ -40,12 +41,14 @@ void file_io()
         }
 
 
-	char *buf2 = malloc(strlen(readline_result) + 1);
-	strcpy(buf2, readline_result);
+	unsigned int buf2_len = strlen(readline_result) + 1;
+	char *buf2 = malloc(buf2_len);
+	strncpy(buf2, readline_result, buf2_len);
 
 
-	char * output_full_path = malloc(strlen(file_name) + 8);
-	sprintf(output_full_path, "./test/%s", file_name);
+	unsigned int ofp_len = strlen(file_name) + 8;
+	char * output_full_path = malloc(ofp_len);
+	snprintf(output_full_path, ofp_len, "./test/%s", file_name);
 
 	int out_fd = open(output_full_path, O_RDWR | O_CREAT | O_TRUNC,
                       S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH);

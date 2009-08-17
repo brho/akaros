@@ -17,6 +17,7 @@
 // These variables are set in i386_vm_init()
 pde_t* boot_pgdir;		// Virtual address of boot time page directory
 physaddr_t boot_cr3;		// Physical address of boot time page directory
+char *boot_freemem_base;
 char* boot_freemem;		// Pointer to next byte of free mem
 
 page_t *pages;		// Virtual address of physical page array

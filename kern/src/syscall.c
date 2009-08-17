@@ -57,7 +57,7 @@ static ssize_t sys_serial_read(env_t* e, char *DANGEROUS buf, size_t len)
 }
 
 static ssize_t sys_shared_page_alloc(env_t* p1,
-                                     void** addr, envid_t p2_id,
+                                     void**DANGEROUS addr, envid_t p2_id,
                                      int p1_flags, int p2_flags
                                     )
 {
@@ -84,7 +84,7 @@ static ssize_t sys_shared_page_alloc(env_t* p1,
 	return ESUCCESS;
 }
 
-static void sys_shared_page_free(env_t* p1, void* addr, envid_t p2)
+static void sys_shared_page_free(env_t* p1, void*DANGEROUS addr, envid_t p2)
 {
 }
 

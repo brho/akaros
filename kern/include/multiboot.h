@@ -7,6 +7,7 @@
 
 extern physaddr_t maxpa;// Maximum physical address
 extern physaddr_t maxaddrpa;    // Maximum directly addressable physical address
+extern void *SNT maxaddrpa_ptr; // same as maxaddrpa, but ptr type for annotations
 extern size_t npage;   // Amount of physical memory (in pages)
 extern size_t naddrpage;	// Amount of addressable physical memory (in pages)
 

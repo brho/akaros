@@ -10,7 +10,7 @@
 #define MAX_NUM_CPUS				255
 
 static __inline void breakpoint(void) __attribute__((always_inline));
-static __inline void invlpg(void *addr) __attribute__((always_inline));
+static __inline void invlpg(void *SNT addr) __attribute__((always_inline));
 static __inline void tlbflush(void) __attribute__((always_inline));
 static __inline uint64_t read_tsc(void) __attribute__((always_inline));
 static __inline uint64_t read_tsc_serialized(void) __attribute__((always_inline));

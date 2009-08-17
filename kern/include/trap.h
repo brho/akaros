@@ -13,8 +13,8 @@
 typedef void (*poly_isr_t)(trapframe_t* tf, TV(t) data);
 typedef void (*isr_t)(trapframe_t* tf, void * data);
 typedef struct InterruptHandler {
-	isr_t isr;
-	void* data;
+	poly_isr_t isr;
+	TV(t) data;
 } handler_t;
 
 void idt_init(void);

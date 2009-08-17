@@ -1,7 +1,4 @@
 /* See COPYRIGHT for copyright information. */
-#ifdef __DEPUTY__
-#pragma nodeputy
-#endif
 
 #include <arch/arch.h>
 #include <arch/mmu.h>
@@ -28,7 +25,7 @@
 void*
 boot_alloc(uint32_t n, uint32_t align)
 {
-	extern char end[];
+	extern char (SNT end)[];
 	void *v;
 
 	// Initialize boot_freemem if this is the first time.
@@ -36,11 +33,12 @@ boot_alloc(uint32_t n, uint32_t align)
 	// which points to the end of the kernel's bss segment -
 	// i.e., the first virtual address that the linker
 	// did _not_ assign to any kernel code or global variables.
-	if (boot_freemem == 0)
-		boot_freemem = end;
+	if (boot_freemem == 0) {
+		boot_freemem = TC(end);
+	}
 
 	//	Step 1: round boot_freemem up to be aligned properly
-	boot_freemem = ROUNDUP(boot_freemem, align);
+	boot_freemem = PTRROUNDUP(boot_freemem, align);
 
 	//	Step 2: save current value of boot_freemem as allocated chunk
 	v = boot_freemem;
@@ -56,7 +54,7 @@ boot_alloc(uint32_t n, uint32_t align)
 void*
 boot_calloc(uint32_t _n, size_t sz, uint32_t align)
 {
-	extern char end[];
+	extern char (SNT end)[];
 	uint32_t n = _n *sz;
 	void *v;
 
@@ -66,10 +64,10 @@ boot_calloc(uint32_t _n, size_t sz, uint32_t align)
 	// i.e., the first virtual address that the linker
 	// did _not_ assign to any kernel code or global variables.
 	if (boot_freemem == 0)
-		boot_freemem = end;
+		boot_freemem = TC(end);
 
 	//	Step 1: round boot_freemem up to be aligned properly
-	boot_freemem = ROUNDUP(boot_freemem, align);
+	boot_freemem = PTRROUNDUP(boot_freemem, align);
 
 	//	Step 2: save current value of boot_freemem as allocated chunk
 	v = boot_freemem;
@@ -90,7 +88,7 @@ boot_calloc(uint32_t _n, size_t sz, uint32_t align)
 // Note that the corresponding physical page is NOT initialized!
 //
 static void
-page_initpp(page_t *pp)
+page_initpp(page_t *COUNT(1) pp)
 {
 	memset(pp, 0, sizeof(*pp));
 }
@@ -107,7 +105,7 @@ page_initpp(page_t *pp)
  *   0         -- on success
  *   -ENOMEM   -- otherwise 
  */
-int page_alloc(page_t **pp_store)
+int page_alloc(page_t *COUNT(1) *pp_store)
 {
 	if (LIST_EMPTY(&page_free_list))
 		return -ENOMEM;
@@ -235,7 +233,7 @@ void* page_insert_in_range(pde_t *pgdir, page_t *pp,
                            void *vab, void *vae, int perm) 
 {
 	pte_t* pte = NULL;
-	void* new_va;
+	void*SNT new_va;
 	
 	for(new_va = vab; new_va <= vae; new_va+= PGSIZE) {
 		pte = pgdir_walk(pgdir, new_va, 1);
@@ -244,7 +242,7 @@ void* page_insert_in_range(pde_t *pgdir, page_t *pp,
 	}
 	if (!pte) return NULL;
 	*pte = page2pa(pp) | PTE_P | perm;
-	return new_va;
+	return TC(new_va); // trusted because mapping a page is like allocation
 }
 
 //
@@ -351,8 +349,8 @@ user_mem_check(env_t *env, const void *DANGEROUS va, size_t len, int perm)
 	pte_t *pte;
 
 	perm |= PTE_P;
-	start = ROUNDDOWN((void*)va, PGSIZE);
-	end = ROUNDUP((void*)va + len, PGSIZE);
+	start = ROUNDDOWN((void*DANGEROUS)va, PGSIZE);
+	end = ROUNDUP((void*DANGEROUS)va + len, PGSIZE);
 	if (start >= end) {
 		warn("Blimey!  Wrap around in VM range calculation!");	
 		return NULL;
@@ -363,7 +361,7 @@ user_mem_check(env_t *env, const void *DANGEROUS va, size_t len, int perm)
 		// ensures the bits we want on are turned on.  if not, error out
 		if ( !pte || ((*pte & perm) != perm) ) {
 			if (i = 0)
-				user_mem_check_addr = (void*)va;
+				user_mem_check_addr = (void*DANGEROUS)va;
 			else
 				user_mem_check_addr = start;
 			return NULL;

@@ -5,10 +5,6 @@
 #include <ros/memlayout.h>
 #include <stdio.h>
 
-#ifdef __DEPUTY__
-//#pragma nodeputy
-#endif
-
 #ifdef __i386__
 #include <arch/apic.h>
 #endif
@@ -16,6 +12,7 @@
 // These variables are set by i386_detect_memory()
 physaddr_t maxpa;// Maximum physical address
 physaddr_t maxaddrpa;    // Maximum directly addressable physical address
+void *SNT maxaddrpa_ptr;
 size_t npage;   // Amount of physical memory (in pages)
 size_t naddrpage;       // Amount of addressable physical memory (in pages)
 static size_t basemem;  // Amount of base memory (in bytes)
@@ -40,6 +37,7 @@ multiboot_detect_memory(multiboot_info_t *mbi)
 	// IOAPIC - KERNBASE is the max amount of virtual addresses we can use
 	// for the physical memory mapping (aka - the KERNBASE mapping)
 	maxaddrpa = MIN(maxpa, IOAPIC_BASE - KERNBASE);
+	maxaddrpa_ptr = maxaddrpa;
 
 	naddrpage = maxaddrpa / PGSIZE;
 

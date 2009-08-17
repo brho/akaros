@@ -74,7 +74,8 @@ extern size_t npage;
 extern physaddr_t boot_cr3;
 extern pde_t *COUNT(NPDENTRIES) boot_pgdir;
 
-extern char* boot_freemem;
+extern char (SNT end)[];
+extern char*BND(end, maxaddrpa_ptr + IVY_KERNBASE) boot_freemem;
 extern page_list_t page_free_list;
 
 void*	(DALLOC(n) boot_alloc)(uint32_t n, uint32_t align);
@@ -87,20 +88,20 @@ void	vm_init(void);
 
 void	page_init(void);
 void	page_check(void);
-int	    page_alloc(page_t **pp_store);
-int     page_alloc_specific(page_t **pp_store, size_t ppn);
-void	page_free(page_t *pp);
+int	    page_alloc(page_t *COUNT(1) *pp_store);
+int     page_alloc_specific(page_t *COUNT(1) *pp_store, size_t ppn);
+void	page_free(page_t *COUNT(1) pp);
 int		page_is_free(size_t ppn);
 int	    page_insert(pde_t *COUNT(NPDENTRIES) pgdir, page_t *pp, void *SNT va, int perm);
-void*   page_insert_in_range(pde_t *COUNT(NPDENTRIES) pgdir, page_t *pp, 
+void*COUNT(PGSIZE) page_insert_in_range(pde_t *COUNT(NPDENTRIES) pgdir, page_t *pp, 
                              void *SNT vab, void *SNT vae, int perm);
 void	page_remove(pde_t *COUNT(NPDENTRIES) pgdir, void *SNT va);
-page_t* page_lookup(pde_t *COUNT(NPDENTRIES) pgdir, void *SNT va, pte_t **pte_store);
+page_t*COUNT(1) page_lookup(pde_t *COUNT(NPDENTRIES) pgdir, void *SNT va, pte_t **pte_store);
 error_t	pagetable_remove(pde_t *COUNT(NPDENTRIES) pgdir, void *SNT va);
-void	page_decref(page_t *pp);
+void	page_decref(page_t *COUNT(1) pp);
 
 void setup_default_mtrrs(barrier_t* smp_barrier);
-void	tlb_invalidate(pde_t *COUNT(NPDENTRIES) pgdir, void *va);
+void	tlb_invalidate(pde_t *COUNT(NPDENTRIES) pgdir, void *SNT va);
 void tlb_flush_global(void);
 
 void *COUNT(len)
@@ -113,7 +114,7 @@ error_t
 memcpy_from_user(env_t* env, void* COUNT(len) dest,
                  const void *DANGEROUS va, size_t len);
 
-static inline page_t* ppn2page(size_t ppn)
+static inline page_t*COUNT(1) ppn2page(size_t ppn)
 {
 	if( ppn >= npage )
 		warn("ppn2page called with ppn (%08u) larger than npage", ppn);
@@ -130,7 +131,7 @@ static inline physaddr_t page2pa(page_t *pp)
 	return page2ppn(pp) << PGSHIFT;
 }
 
-static inline page_t* pa2page(physaddr_t pa)
+static inline page_t*COUNT(1) pa2page(physaddr_t pa)
 {
 	if (PPN(pa) >= npage)
 		warn("pa2page called with pa (0x%08x) larger than npage", pa);

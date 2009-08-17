@@ -2,10 +2,6 @@
 // used in common by printf, sprintf, fprintf, etc.
 // This code is also used by both the kernel and user programs.
 
-#ifdef __DEPUTY__
-#pragma nodeputy
-#endif
-
 #include <arch/types.h>
 #include <ros/error.h>
 #include <stdio.h>
@@ -16,8 +12,13 @@
  * Print a number (base <= 16) in reverse order,
  * using specified putch function and associated pointer putdat.
  */
+#ifdef __DEPUTY__
+void printnum(void (*putch)(int, TV(t)), TV(t) putdat,
+	                 unsigned long long num, unsigned base, int width, int padc)
+#else
 void printnum(void (*putch)(int, void**), void **putdat,
 	                 unsigned long long num, unsigned base, int width, int padc)
+#endif
 {
 	// first recursively print all preceding (more significant) digits
 	if (num >= base) {
@@ -58,24 +59,36 @@ static long long getint(va_list *ap, int lflag)
 
 
 // Main function to format and print a string.
+#ifdef __DEPUTY__
+void printfmt(void (*putch)(int, TV(t)), TV(t) putdat, const char *fmt, ...);
+#else
 void printfmt(void (*putch)(int, void**), void **putdat, const char *fmt, ...);
+#endif
 
+#ifdef __DEPUTY__
+void vprintfmt(void (*putch)(int, TV(t)), TV(t) putdat, const char *fmt, va_list ap)
+#else
 void vprintfmt(void (*putch)(int, void**), void **putdat, const char *fmt, va_list ap)
+#endif
 {
-	register const char *p;
+	register const char *NTS p;
+	const char *NTS last_fmt;
 	register int ch, err;
 	unsigned long long num;
 	int base, lflag, width, precision, altflag;
 	char padc;
 
 	while (1) {
-		while ((ch = *(unsigned char *) fmt++) != '%') {
+		while ((ch = *(unsigned char *) fmt) != '%') {
 			if (ch == '\0')
 				return;
+			fmt++;
 			putch(ch, putdat);
 		}
+		fmt++;
 
 		// Process a %-escape sequence
+		last_fmt = fmt;
 		padc = ' ';
 		width = -1;
 		precision = -1;
@@ -158,11 +171,14 @@ void vprintfmt(void (*putch)(int, void**), void **putdat, const char *fmt, va_li
 			if (width > 0 && padc != '-')
 				for (width -= strnlen(p, precision); width > 0; width--)
 					putch(padc, putdat);
-			for (; (ch = *p++) != '\0' && (precision < 0 || --precision >= 0); width--)
+			for (; (ch = *p) != '\0' && (precision < 0 || --precision >= 0); width--) {
 				if (altflag && (ch < ' ' || ch > '~'))
 					putch('?', putdat);
 				else
 					putch(ch, putdat);
+				// zra: make sure *p isn't '\0' before inc'ing
+				p++;
+			}
 			for (; width > 0; width--)
 				putch(' ', putdat);
 			break;
@@ -215,14 +231,19 @@ void vprintfmt(void (*putch)(int, void**), void **putdat, const char *fmt, va_li
 		// unrecognized escape sequence - just print it literally
 		default:
 			putch('%', putdat);
-			for (fmt--; fmt[-1] != '%'; fmt--)
+			fmt = last_fmt;
+			//for (fmt--; fmt[-1] != '%'; fmt--)
 				/* do nothing */;
 			break;
 		}
 	}
 }
 
+#ifdef __DEPUTY__
+void printfmt(void (*putch)(int, TV(t)), TV(t) putdat, const char *fmt, ...)
+#else
 void printfmt(void (*putch)(int, void**), void **putdat, const char *fmt, ...)
+#endif
 {
 	va_list ap;
 
@@ -232,12 +253,12 @@ void printfmt(void (*putch)(int, void**), void **putdat, const char *fmt, ...)
 }
 
 typedef struct sprintbuf {
-	char *buf;
-	char *ebuf;
+	char *BND(__this,ebuf) buf;
+	char *SNT ebuf;
 	int cnt;
 } sprintbuf_t;
 
-static void sprintputch(int ch, sprintbuf_t **b)
+static void sprintputch(int ch, sprintbuf_t *NONNULL *NONNULL b)
 {
 	(*b)->cnt++;
 	if ((*b)->buf < (*b)->ebuf)
@@ -246,14 +267,19 @@ static void sprintputch(int ch, sprintbuf_t **b)
 
 int vsnprintf(char *buf, int n, const char *fmt, va_list ap)
 {
-	sprintbuf_t b = {buf, buf+n-1, 0};
-	sprintbuf_t *bp = &b;
+	sprintbuf_t b;// = {buf, buf+n-1, 0};
+	sprintbuf_t *COUNT(1) NONNULL bp = &b;
 
 	if (buf == NULL || n < 1)
 		return -EINVAL;
 
+	b.buf = NULL; // zra : help out the Deputy optimizer a bit
+	b.ebuf = buf+n-1;
+	b.cnt = 0;
+	b.buf = buf;
+
 	// print the string to the buffer
-	vprintfmt((void*)sprintputch, (void**)&bp, fmt, ap);
+	vprintfmt(sprintputch, (sprintbuf_t *NONNULL*NONNULL)&bp, fmt, ap);
 
 	// null terminate the buffer
 	*b.buf = '\0';
