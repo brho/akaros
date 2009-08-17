@@ -27,7 +27,7 @@ struct kfs_entry {
 	size_t size;
 };
 
-#define MAX_KFS_FILES 10
+#define MAX_KFS_FILES 20
 extern struct kfs_entry kfs[MAX_KFS_FILES];
 
 ssize_t kfs_lookup_path(char*NTS path);

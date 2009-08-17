@@ -15,6 +15,7 @@
 #include <string.h>
 #include <testing.h>
 #include <trap.h>
+#include <arch/trap.h>
 #include <process.h>
 #include <syscall.h>
 #include <timing.h>
@@ -23,8 +24,6 @@
 #include <pmap.h>
 #include <page_alloc.h>
 
-#define test_vector 0xeb
-
 #ifdef __i386__
 
 void test_ipi_sending(void)
@@ -32,35 +31,35 @@ void test_ipi_sending(void)
 	extern handler_t (COUNT(NUM_INTERRUPT_HANDLERS) interrupt_handlers)[];
 	int8_t state = 0;
 
-	register_interrupt_handler(interrupt_handlers, test_vector,
+	register_interrupt_handler(interrupt_handlers, I_TESTING,
 	                           test_hello_world_handler, NULL);
 	enable_irqsave(&state);
 	cprintf("\nCORE 0 sending broadcast\n");
-	send_broadcast_ipi(test_vector);
+	send_broadcast_ipi(I_TESTING);
 	udelay(3000000);
 	cprintf("\nCORE 0 sending all others\n");
-	send_all_others_ipi(test_vector);
+	send_all_others_ipi(I_TESTING);
 	udelay(3000000);
 	cprintf("\nCORE 0 sending self\n");
-	send_self_ipi(test_vector);
+	send_self_ipi(I_TESTING);
 	udelay(3000000);
 	cprintf("\nCORE 0 sending ipi to physical 1\n");
-	send_ipi(0x01, 0, test_vector);
+	send_ipi(0x01, 0, I_TESTING);
 	udelay(3000000);
 	cprintf("\nCORE 0 sending ipi to physical 2\n");
-	send_ipi(0x02, 0, test_vector);
+	send_ipi(0x02, 0, I_TESTING);
 	udelay(3000000);
 	cprintf("\nCORE 0 sending ipi to physical 3\n");
-	send_ipi(0x03, 0, test_vector);
+	send_ipi(0x03, 0, I_TESTING);
 	udelay(3000000);
 	cprintf("\nCORE 0 sending ipi to physical 15\n");
-	send_ipi(0x0f, 0, test_vector);
+	send_ipi(0x0f, 0, I_TESTING);
 	udelay(3000000);
 	cprintf("\nCORE 0 sending ipi to logical 2\n");
-	send_ipi(0x02, 1, test_vector);
+	send_ipi(0x02, 1, I_TESTING);
 	udelay(3000000);
 	cprintf("\nCORE 0 sending ipi to logical 1\n");
-	send_ipi(0x01, 1, test_vector);
+	send_ipi(0x01, 1, I_TESTING);
 	udelay(3000000);
 	cprintf("\nDone!\n");
 	disable_irqsave(&state);
@@ -466,13 +465,13 @@ void test_smp_call_functions(void)
 #ifdef __i386__
 void test_lapic_status_bit(void)
 {
-	register_interrupt_handler(interrupt_handlers, test_vector,
+	register_interrupt_handler(interrupt_handlers, I_TESTING,
 	                           test_incrementer_handler, &a);
 	#define NUM_IPI 100000
 	atomic_set(&a,0);
 	printk("IPIs received (should be 0): %d\n", a);
 	for(int i = 0; i < NUM_IPI; i++) {
-		send_ipi(7, 0, test_vector);
+		send_ipi(7, 0, I_TESTING);
 		lapic_wait_to_send();
 	}
 	// need to wait a bit to let those IPIs get there
@@ -701,7 +700,7 @@ void test_pit(void)
 
 	atomic_t waiting;
 	atomic_init(&waiting, 1);
-	register_interrupt_handler(interrupt_handlers, test_vector,
+	register_interrupt_handler(interrupt_handlers, I_TESTING,
 	                           test_waiting_handler, &waiting);
 	while(atomic_read(&waiting))
 		cpu_relax();

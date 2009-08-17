@@ -13,6 +13,7 @@
 #include <arch/types.h>
 #include <trap.h>
 #include <atomic.h>
+#include <process.h>
 #include <workqueue.h>
 #include <env.h>
 
@@ -20,9 +21,12 @@
 struct per_cpu_info {
 	uint32_t lock;
 	bool preempt_pending;
+	/* a proc_startcore IPI will run these.  replace with a dispatch map? */
+	struct proc *p_to_run;
+	trapframe_t *SAFE tf_to_pop;
 	struct workqueue workqueue;
 };
-extern struct per_cpu_info  per_cpu_info[MAX_NUM_CPUS];
+extern struct per_cpu_info per_cpu_info[MAX_NUM_CPUS];
 extern volatile uint8_t num_cpus;
 
 /* SMP bootup functions */

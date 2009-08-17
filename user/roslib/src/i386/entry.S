@@ -25,6 +25,10 @@ vpd:
 .text
 .globl _start
 _start:
+	// See if we are a new core
+	cmpl $1, %eax
+	je new_core
+
 	// See if we were started with arguments on the stack
 	cmpl $USTACKTOP, %esp
 	jne args_exist
@@ -39,3 +43,5 @@ args_exist:
 	call libmain
 1:      jmp 1b
 
+new_core:
+2:		jmp 2b

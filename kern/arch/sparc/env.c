@@ -88,14 +88,14 @@ env_set_program_counter(env_t* e, uintptr_t pc)
 }
 
 void
-env_init_trapframe(env_t* e)
+env_init_trapframe(trapframe_t *tf)
 {
 	extern char trap_table;
 
-	e->env_tf.gpr[14] = USTACKTOP-64;
-	e->env_tf.psr = PSR_S; // but PS = 0
-	e->env_tf.wim = 0;
-	e->env_tf.tbr = (uint32_t)&trap_table;
+	tf->gpr[14] = USTACKTOP-64;
+	tf->psr = PSR_S; // but PS = 0
+	tf->wim = 0;
+	tf->tbr = (uint32_t)&trap_table;
 }
 
 // Flush all mapped pages in the user portion of the address space

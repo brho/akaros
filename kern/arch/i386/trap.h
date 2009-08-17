@@ -33,6 +33,24 @@
 #define T_SYSCALL   0x80			// system call
 #define T_DEFAULT   0xdeadbeef		// catchall
 
+/* IPIs */
+/* Direct/Hardwired IPIs.  Hardwired in trapentry.S */
+#define I_STARTCORE 230
+#define I_DEATH     231
+/* smp_call_function IPIs, keep in sync with NUM_HANDLER_WRAPPERS (and < 16)
+ * it's important that this begins with 0xf0.  check i386/trap.c for details.
+ */
+#define I_SMP_CALL0 0xf0 // 240
+#define I_SMP_CALL1 0xf1
+#define I_SMP_CALL2 0xf2
+#define I_SMP_CALL3 0xf3
+#define I_SMP_CALL4 0xf4
+#define I_SMP_CALL_LAST I_SMP_CALL4
+/* Testing IPI (used in testing.c) */
+#define I_TESTING 0xff
+
+
+
 #ifndef __ASSEMBLER__
 
 #include <arch/types.h>

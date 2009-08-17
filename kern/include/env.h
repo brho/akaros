@@ -54,6 +54,7 @@ struct Env {
 	uint32_t env_runs;			// Number of times environment has run
 	uint32_t env_refcnt;		// Reference count of kernel contexts using this
 	uint32_t env_flags;
+	uint32_t env_entry;
 
 #ifdef __SHARC__
 	// held spin-locks
@@ -87,7 +88,7 @@ extern env_t* curenvs[MAX_NUM_CPUS];
 
 void	env_init(void);
 int		env_alloc(env_t *SAFE*SAFE e, envid_t parent_id);
-void	env_init_trapframe(env_t* e);
+void	env_init_trapframe(trapframe_t *tf);
 void	env_set_program_counter(env_t* e, uintptr_t pc);
 void	env_push_ancillary_state(env_t* e);
 void	env_pop_ancillary_state(env_t* e);

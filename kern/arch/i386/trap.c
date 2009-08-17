@@ -256,7 +256,7 @@ irq_handler(trapframe_t *tf)
 	if (handler_tbl[tf->tf_trapno].isr != 0)
 		handler_tbl[tf->tf_trapno].isr(tf, handler_tbl[tf->tf_trapno].data);
 	// if we're a general purpose IPI function call, down the cpu_list
-	if ((0xf0 <= tf->tf_trapno) && (tf->tf_trapno < 0xf0 +NUM_HANDLER_WRAPPERS))
+	if ((I_SMP_CALL0 <= tf->tf_trapno) && (tf->tf_trapno <= I_SMP_CALL_LAST))
 		down_checklist(handler_wrappers[tf->tf_trapno & 0x0f].cpu_list);
 
 	// Send EOI.  might want to do this in assembly, and possibly earlier

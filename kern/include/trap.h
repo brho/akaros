@@ -16,6 +16,7 @@ typedef struct InterruptHandler {
 	poly_isr_t isr;
 	TV(t) data;
 } handler_t;
+extern handler_t interrupt_handlers[];
 
 void idt_init(void);
 void register_interrupt_handler(handler_t (COUNT(256)table)[], uint8_t int_num,

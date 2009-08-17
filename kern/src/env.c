@@ -164,7 +164,8 @@ WRITES(e->env_pgdir, e->env_cr3, e->env_procinfo, e->env_procdata)
 	for(int i=0; i<PROCINFO_NUM_PAGES; i++) {
 		if(page_alloc(&pginfo[i]) < 0)
 			goto env_setup_vm_error;
-		if(page_insert(e->env_pgdir, pginfo[i], (void*SNT)(UINFO + i*PGSIZE), PTE_USER_RO) < 0)
+		if(page_insert(e->env_pgdir, pginfo[i], (void*SNT)(UINFO + i*PGSIZE),
+		               PTE_USER_RO) < 0)
 			goto env_setup_vm_error;
 	}
 
@@ -175,7 +176,8 @@ WRITES(e->env_pgdir, e->env_cr3, e->env_procinfo, e->env_procdata)
 	for(int i=0; i<PROCDATA_NUM_PAGES; i++) {
 		if(page_alloc(&pgdata[i]) < 0)
 			goto env_setup_vm_error;
-		if(page_insert(e->env_pgdir, pgdata[i], (void*SNT)(UDATA + i*PGSIZE), PTE_USER_RW) < 0)
+		if(page_insert(e->env_pgdir, pgdata[i], (void*SNT)(UDATA + i*PGSIZE),
+		               PTE_USER_RW) < 0)
 			goto env_setup_vm_error;
 	}
 
@@ -270,6 +272,7 @@ env_alloc(env_t **newenv_store, envid_t parent_id)
 	e->env_runs = 0;
 	e->env_refcnt = 1;
 	e->env_flags = 0;
+	e->env_entry = 0; // cheating.  this really gets set in load_icode
 
 #ifdef __SHARC__
 	/* init SharC state */
@@ -278,7 +281,7 @@ env_alloc(env_t **newenv_store, envid_t parent_id)
 
 	memset(&e->env_ancillary_state, 0, sizeof(e->env_ancillary_state));
 	memset(&e->env_tf, 0, sizeof(e->env_tf));
-	env_init_trapframe(e);
+	env_init_trapframe(&e->env_tf);
 
 	/*
 	 * Initialize the contents of the e->env_procinfo structure
@@ -411,6 +414,7 @@ load_icode(env_t *SAFE e, uint8_t *COUNT(size) binary, size_t size)
 	}}
 
 	env_set_program_counter(e, elfhdr.e_entry);
+	e->env_entry = elfhdr.e_entry;
 
 	// Now map one page for the program's initial stack
 	// at virtual address USTACKTOP - PGSIZE.

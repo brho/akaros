@@ -1,10 +1,13 @@
-/* See COPYRIGHT for copyright information. */
-
+/* See COPYRIGHT for copyright information.
+ * The two TRAP* macros (minus the .data parts) are from the JOS project.
+ * Everything else:
+ * Copyright (c) 2009 The Regents of the University of California
+ * Barret Rhoden <brho@cs.berkeley.edu>
+ * See LICENSE for details.
+ */
 #include <arch/mmu.h>
 #include <arch/trap.h>
 #include <ros/memlayout.h>
-
-
 
 ###################################################################
 # exceptions/interrupts
@@ -58,12 +61,43 @@
 	.long name;							\
 	.long num
 
+/* Same as above, but takes a specific function to jump to.  See comments 
+ * below from _allirqs for details.
+ */
+#define IRQ_HANDLER_SPEC(name, num, func)                                      \
+	.text;								                                       \
+	.globl name;						                                       \
+	.type name, @function;				                                       \
+	.align 2;							                                       \
+	name:								                                       \
+	pushl $0;                                                                  \
+	pushl $(num);                                                              \
+	cld;                                                                       \
+	pushl %ds;                                                                 \
+	pushl %es;                                                                 \
+	pushal;                                                                    \
+	movw $GD_KD, %ax;                                                          \
+	movw %ax, %ds;                                                             \
+	movw %ax, %es;                                                             \
+	pushl %esp;                                                                \
+	movl $0, %ebp;                                                             \
+	call (func);                                                               \
+	popl %esp;                                                                 \
+	popal;                                                                     \
+	popl %es;                                                                  \
+	popl %ds;                                                                  \
+	addl $0x8, %esp;                                                           \
+	iret;                                                                      \
+	.data;                                                                     \
+	.long name;                                                                \
+	.long num
+
 .data
 .globl trap_tbl
 trap_tbl:
 
 /*
- * Lab 3: Your code here for generating entry points for the different traps.
+ * Generate entry points for the different traps.
  */
 TRAPHANDLER_NOEC(ISR_divide_error, T_DIVIDE)
 TRAPHANDLER_NOEC(ISR_debug_exceptions, T_DEBUG)
@@ -106,17 +140,23 @@ IRQ_HANDLER(IRQ12, 44)
 IRQ_HANDLER(IRQ13, 45)
 IRQ_HANDLER(IRQ14, 46)
 IRQ_HANDLER(IRQ15, 47)
-/* 20 general purpose vectors, for use by the LAPIC.  Can expand later. */
+/* 25 general purpose vectors, for use by the LAPIC.  Can expand later. */
+IRQ_HANDLER_SPEC(IRQ198, I_STARTCORE, __startcore) 
+IRQ_HANDLER_SPEC(IRQ199, I_DEATH, irq_handler) 
+IRQ_HANDLER(IRQ200, 232)
+IRQ_HANDLER(IRQ201, 233)
+IRQ_HANDLER(IRQ202, 234)
 IRQ_HANDLER(IRQ203, 235)
 IRQ_HANDLER(IRQ204, 236)
 IRQ_HANDLER(IRQ205, 237)
 IRQ_HANDLER(IRQ206, 238)
 IRQ_HANDLER(IRQ207, 239)
-IRQ_HANDLER(IRQ208, 240)
-IRQ_HANDLER(IRQ209, 241)
-IRQ_HANDLER(IRQ210, 242)
-IRQ_HANDLER(IRQ211, 243)
-IRQ_HANDLER(IRQ212, 244)
+/* 0xf0 - start of the SMP_CALL IPIS */
+IRQ_HANDLER(IRQ208, I_SMP_CALL0)
+IRQ_HANDLER(IRQ209, I_SMP_CALL1)
+IRQ_HANDLER(IRQ210, I_SMP_CALL2)
+IRQ_HANDLER(IRQ211, I_SMP_CALL3)
+IRQ_HANDLER(IRQ212, I_SMP_CALL4)
 IRQ_HANDLER(IRQ213, 245)
 IRQ_HANDLER(IRQ214, 246)
 IRQ_HANDLER(IRQ215, 247)
@@ -127,10 +167,11 @@ IRQ_HANDLER(IRQ219, 251)
 IRQ_HANDLER(IRQ220, 252)
 IRQ_HANDLER(IRQ221, 253)
 IRQ_HANDLER(IRQ222, 254)
-IRQ_HANDLER(IRQ223, 255)
+IRQ_HANDLER(IRQ223, 255) # I_TESTING in testing.c
 
+/* Technically, these HANDLER entries do not need to be in numeric order */
 TRAPHANDLER_NOEC(ISR_syscall, T_SYSCALL)
-/* Make sure default is last!! */
+/* But make sure default is last!! */
 TRAPHANDLER_NOEC(ISR_default, T_DEFAULT)
 
 .data

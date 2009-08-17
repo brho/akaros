@@ -25,4 +25,5 @@ KERN_ARCH_SRCFILES := $(KERN_ARCH_SRC_DIR)/entry.S \
                       $(KERN_ARCH_SRC_DIR)/smp.c \
                       $(KERN_ARCH_SRC_DIR)/apic.c \
                       $(KERN_ARCH_SRC_DIR)/kdebug.c \
+                      $(KERN_ARCH_SRC_DIR)/process.c \
                       $(KERN_ARCH_SRC_DIR)/env.c

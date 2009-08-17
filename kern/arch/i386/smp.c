@@ -28,7 +28,6 @@ handler_wrapper_t             handler_wrappers[NUM_HANDLER_WRAPPERS];
 static int smp_call_function(uint8_t type, uint8_t dest, poly_isr_t handler, TV(t) data,
                              handler_wrapper_t** wait_wrapper)
 {
-	extern handler_t interrupt_handlers[NUM_INTERRUPT_HANDLERS];
 	int8_t state = 0;
 	uint32_t wrapper_num;
 	handler_wrapper_t* wrapper;

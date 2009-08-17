@@ -221,7 +221,7 @@ void proc_startcore(struct proc *p, trapframe_t *tf) {
 	 * We also need this to be per trapframe, and not per process...
 	 */
 	env_pop_ancillary_state(p);
-	env_pop_tf(&p->env_tf);
+	env_pop_tf(tf);
 }
 
 /*

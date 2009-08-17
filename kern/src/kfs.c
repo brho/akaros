@@ -29,6 +29,7 @@ DECL_PROG(roslib_fptest);
 DECL_PROG(roslib_null);
 DECL_PROG(roslib_spawn);
 DECL_PROG(roslib_hello);
+DECL_PROG(roslib_mhello);
 DECL_PROG(roslib_measurements);
 DECL_PROG(parlib_channel_test_client);
 DECL_PROG(parlib_channel_test_server);
@@ -41,6 +42,7 @@ struct kfs_entry kfs[MAX_KFS_FILES] = {
 	KFS_ENTRY(roslib_null)
 	KFS_ENTRY(roslib_spawn)
 	KFS_ENTRY(roslib_hello)
+	KFS_ENTRY(roslib_mhello)
 	KFS_ENTRY(roslib_measurements)
 	KFS_ENTRY(parlib_channel_test_client)
 	KFS_ENTRY(parlib_channel_test_server)
