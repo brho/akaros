@@ -8,6 +8,7 @@
 #pragma nosharc
 #endif
 
+#include <arch/arch.h>
 #include <process.h>
 #include <atomic.h>
 #include <smp.h>
@@ -16,8 +17,10 @@
 #include <manager.h>
 #include <stdio.h>
 #include <assert.h>
+#include <timing.h>
 #include <sys/queue.h>
 
+/* Process Lists */
 struct proc_list proc_freelist = TAILQ_HEAD_INITIALIZER(proc_freelist);
 spinlock_t freelist_lock = 0;
 struct proc_list proc_runnablelist = TAILQ_HEAD_INITIALIZER(proc_runnablelist);
@@ -127,26 +130,36 @@ void proc_run(struct proc *p)
 			proc_startcore(p, &p->env_tf);
 			break;
 		case (PROC_RUNNABLE_M):
-			// BIG TODO: do this.
-			// Check for how we're supposed to dispatch this
-			// Update core map or whatever with what we're about to do
-
+			proc_set_state(p, PROC_RUNNING_M);
+			/* Prep each core that we are going to run this process on.
+			 * vcoremap[i] holds the coreid of the physical core allocated to
+			 * this process.  It is set outside proc_run */
+			for (int i = 0; i < p->num_vcores; i++) {
+				per_cpu_info[p->vcoremap[i]].p_to_run = p;
+			}
+			// set virtual core 0 to run the main context
+			// TODO: handle silly state (HSS)
+			per_cpu_info[p->vcoremap[0]].tf_to_pop = &p->env_tf;
+			/* needed to make sure the writes beat the IPI.  could have done it
+			 * with other mem accesses, like grabbing a lock, and the write
+			 * would have made it */
+			wmb_f();
 			/* There a subtle (attempted) race avoidance here.  proc_startcore
 			 * can handle a death IPI, but we can't have the startcore come
 			 * after the death IPI.  Otherwise, it would look like a new
 			 * process.  So we hold the lock to make sure our IPI went out
-			 * before a possible death IPI.  We don't IPI ourselves, since we
-			 * need to let go of the lock.  This could change if we
-			 * process_workqueue in the interrupt handler path and do something
-			 * like light kernel threading, which ties into state bundling.
-			 * Also, we may never allow proc_run to run on a target/worker core.
-			 */
-			// Send IPIs to everyone else involved
+			 * before a possible death IPI.
+			 * Likewise, we disable interrupts, in case one of the IPIs was for
+			 * us, and reenable them after letting go of the lock.
+			 * Note there is no guarantee this core's interrupts were on, so it
+			 * may not get the IPI for a while... */
+			int8_t state = 0;
+			disable_irqsave(&state);
+			for (int i = 0; i < p->num_vcores; i++)
+				send_ipi(p->vcoremap[i], 0, I_STARTCORE);
 			spin_unlock_irqsave(&p->proc_lock);
-			// if (am_involved)
-			// 	proc_startcore(p, &appropriate_trapframe);
-			// if not, need to make sure we don't return to the process's core 0
-			panic("Unimplemented");
+			enable_irqsave(&state);
+			break;
 		default:
 			spin_unlock_irqsave(&p->proc_lock);
 			panic("Invalid process state in proc_run()!!");
@@ -217,7 +230,7 @@ void proc_startcore(struct proc *p, trapframe_t *tf) {
 	 * sufficient to do it in the "new process" if-block above (could be things
 	 * like page faults that cause us to keep the same process, but want a
 	 * different context.
-	 * for now, we load this silly state here. (TODO)
+	 * for now, we load this silly state here. (TODO) (HSS)
 	 * We also need this to be per trapframe, and not per process...
 	 */
 	env_pop_ancillary_state(p);

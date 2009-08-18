@@ -18,6 +18,12 @@
 #include <atomic.h>
 #include <sys/queue.h>
 
+// This could be useful for making scheduling decisions.  
+/* Physical coremap: each index is a physical core id, with a proc ptr for
+ * whoever *should be or is* running.  Very similar to current / curenvs[],
+ * which is what process is *really* running there. */
+struct proc *pcoremap[MAX_NUM_CPUS];
+
 void schedule_init(void)
 {
 	TAILQ_INIT(&proc_runnablelist);

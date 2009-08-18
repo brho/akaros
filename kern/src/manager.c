@@ -32,24 +32,16 @@ void manager(void)
 	static uint8_t progress = 0;
 	struct proc *envs[256];
 
-envs[0] = kfs_proc_create(kfs_lookup_path("roslib_mhello"));
+struct proc *p = kfs_proc_create(kfs_lookup_path("roslib_mhello"));
 // being proper and all:
-proc_set_state(envs[0], PROC_RUNNABLE_S);
-proc_set_state(envs[0], PROC_RUNNING_S);
-proc_set_state(envs[0], PROC_RUNNABLE_M);
-proc_set_state(envs[0], PROC_RUNNING_M);
-for (int i = 1; i < 8; i++) {
-	per_cpu_info[i].p_to_run = envs[0];
-	//per_cpu_info[i].tf_to_pop = &envs[0]->env_tf; // starts the main core
-}
-// needed to make sure the writes beat the IPI.  could have done it with other
-// mem accesses, like grabbing a lock, and the write would have made it (no wmb() on
-// x86)
-asm volatile("sfence");
-// actually send the IPI to do this
-for (int i = 1; i < 8; i++)
-	send_ipi(i, 0, I_STARTCORE);
-
+proc_set_state(p, PROC_RUNNABLE_S);
+proc_set_state(p, PROC_RUNNING_S);
+proc_set_state(p, PROC_RUNNABLE_M);
+// set vcoremap with dispatch plan.  usually done by schedule()
+p->num_vcores = 5;
+for (int i = 0; i < 5; i++)
+	p->vcoremap[i] = i + 1; // vcore0 -> pcore1, etc, for 3 cores
+proc_run(p);
 udelay(5000000);
 panic("This is okay");
 

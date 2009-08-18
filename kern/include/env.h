@@ -55,6 +55,10 @@ struct Env {
 	uint32_t env_refcnt;		// Reference count of kernel contexts using this
 	uint32_t env_flags;
 	uint32_t env_entry;
+	/* Virtual coremap: each index is the virtual core id, the contents at that
+	 * index is the physical core_id() corresponding to the vcore. */
+	uint32_t vcoremap[MAX_NUM_CPUS];
+	uint32_t num_vcores;
 
 #ifdef __SHARC__
 	// held spin-locks
@@ -84,6 +88,7 @@ struct Env {
 
 extern env_t *COUNT(NENV) envs;		// All environments
 extern atomic_t num_envs;		// Number of envs
+// TODO: consider moving this to struct per_cpu_info
 extern env_t* curenvs[MAX_NUM_CPUS];
 
 void	env_init(void);

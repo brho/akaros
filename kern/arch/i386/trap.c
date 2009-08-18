@@ -211,7 +211,7 @@ trap(trapframe_t *tf)
 	//cprintf("Incoming TRAP frame at %p\n", tf);
 
 	// TODO: do this once we know we are are not returning to the current
-	// context.  doing it now is safe.
+	// context.  doing it now is safe. (HSS)
 	env_push_ancillary_state(current);
 
 	if ((tf->tf_cs & ~3) != GD_UT && (tf->tf_cs & ~3) != GD_KT) {
@@ -247,6 +247,10 @@ irq_handler(trapframe_t *tf)
 	//if (core_id())
 	//	cprintf("Incoming IRQ, ISR: %d on core %d\n", tf->tf_trapno, core_id());
 	// merge this with alltraps?  other than the EOI... or do the same in all traps
+
+	// TODO: do this once we know we are are not returning to the current
+	// context.  doing it now is safe. (HSS)
+	env_push_ancillary_state(current);
 
 	extern handler_wrapper_t handler_wrappers[NUM_HANDLER_WRAPPERS];
 

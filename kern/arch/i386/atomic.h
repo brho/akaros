@@ -6,6 +6,9 @@
 #define mb() {rmb(); wmb();}
 #define rmb() ({ asm volatile("lfence"); })
 #define wmb() 
+/* Force a wmb, used in cases where an IPI could beat a write, even though
+ * write-orderings are respected. */
+#define wmb_f() ({ asm volatile("sfence"); })
 
 typedef void* atomic_t;
 typedef volatile uint32_t spinlock_t;

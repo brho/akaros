@@ -34,12 +34,13 @@
 #define T_DEFAULT   0xdeadbeef		// catchall
 
 /* IPIs */
-/* Direct/Hardwired IPIs.  Hardwired in trapentry.S */
-#define I_STARTCORE 230
-#define I_DEATH     231
+/* Direct/Hardwired IPIs.  Hardwired in trapentry.S
+ * DEATH must come before (have lower priority than) STARTCORE.  see comments in
+ * i386/process.c's proc_run() for details. */
+#define I_DEATH     230
+#define I_STARTCORE 231
 /* smp_call_function IPIs, keep in sync with NUM_HANDLER_WRAPPERS (and < 16)
- * it's important that this begins with 0xf0.  check i386/trap.c for details.
- */
+ * it's important that this begins with 0xf0.  check i386/trap.c for details. */
 #define I_SMP_CALL0 0xf0 // 240
 #define I_SMP_CALL1 0xf1
 #define I_SMP_CALL2 0xf2

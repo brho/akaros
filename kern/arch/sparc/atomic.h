@@ -6,6 +6,9 @@
 #define mb() {rmb(); wmb();}
 #define rmb()
 #define wmb() ({ asm volatile("stbar"); })
+/* Force a wmb, used in cases where an IPI could beat a write, even though
+ * write-orderings are respected.  (Used by x86) */
+#define wmb_f() wmb()
 
 typedef volatile uint32_t spinlock_t;
 
