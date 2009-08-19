@@ -9,7 +9,9 @@
 #include <assert.h>
 #include <ros/error.h>
 
-#define DECL_PROG(x) extern uint8_t _binary_obj_user_apps_##x##_start[], _binary_obj_user_apps_##x##_size[];      
+#define DECL_PROG(x) \
+    extern uint8_t (COUNT(sizeof(size_t)) _binary_obj_user_apps_##x##_size)[],\
+        (COUNT(_binary_obj_user_apps_##x##_size)_binary_obj_user_apps_##x##_start)[];
 
 #define KFS_ENTRY(x) {#x, _binary_obj_user_apps_##x##_start, (size_t) _binary_obj_user_apps_##x##_size},
 

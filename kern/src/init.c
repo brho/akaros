@@ -41,8 +41,8 @@ void kernel_init(multiboot_info_t *mboot_info)
     //      clear what's going on this way?
 	//multiboot_detect_memory((multiboot_info_t*)((uint32_t)mboot_info + KERNBASE));
 	//multiboot_print_memory_map((multiboot_info_t*)((uint32_t)mboot_info + KERNBASE));
-	multiboot_detect_memory((multiboot_info_t*COUNT(1))KADDR(mboot_info));
-	multiboot_print_memory_map((multiboot_info_t*COUNT(1))KADDR(mboot_info));
+	multiboot_detect_memory((multiboot_info_t*COUNT(1))KADDR((physaddr_t)mboot_info));
+	multiboot_print_memory_map((multiboot_info_t*COUNT(1))KADDR((physaddr_t)mboot_info));
 
 	vm_init();
 

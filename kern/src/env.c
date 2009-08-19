@@ -1,7 +1,4 @@
 /* See COPYRIGHT for copyright information. */
-#ifdef __DEPUTY__
-#pragma noasync
-#endif
 
 #include <arch/arch.h>
 #include <arch/mmu.h>
@@ -464,13 +461,13 @@ env_free(env_t *e)
  *
  * Note this is rather old, and meant to run a RUNNABLE_S on a worker core.
  */
-void run_env_handler(trapframe_t *tf, void *data)
+void run_env_handler(trapframe_t *tf, env_t *data)
 {
 	assert(data);
-	struct work job;
+	struct work TP(env_t *) job;
 	struct workqueue *workqueue = &per_cpu_info[core_id()].workqueue;
-	{ TRUSTEDBLOCK // TODO: how do we make this func_t cast work?
-	job.func = (func_t)proc_run;
+	{ //TRUSTEDBLOCK TODO: how do we make this func_t cast work?
+	job.func = proc_run;
 	job.data = data;
 	}
 	if (enqueue_work(workqueue, &job))

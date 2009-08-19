@@ -155,10 +155,11 @@ get_my_gdt_pd(page_t *my_stack)
                                      sizeof(segdesc_t)*SEG_COUNT);
 }
 
-static inline void *COUNT(sizeof(segdesc_t)*SEG_COUNT)
+//static inline void *COUNT(sizeof(segdesc_t)*SEG_COUNT)
+static inline segdesc_t *COUNT(SEG_COUNT)
 get_my_gdt(page_t *my_stack)
 {
-	return page2kva(my_stack) + PGSIZE - sizeof(segdesc_t)*SEG_COUNT;
+	return TC(page2kva(my_stack) + PGSIZE - sizeof(segdesc_t)*SEG_COUNT);
 }
 
 static inline void *COUNT(sizeof(taskstate_t))

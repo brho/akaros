@@ -37,7 +37,7 @@ multiboot_detect_memory(multiboot_info_t *mbi)
 	// IOAPIC - KERNBASE is the max amount of virtual addresses we can use
 	// for the physical memory mapping (aka - the KERNBASE mapping)
 	maxaddrpa = MIN(maxpa, IOAPIC_BASE - KERNBASE);
-	maxaddrpa_ptr = maxaddrpa;
+	maxaddrpa_ptr = (void *SNT)maxaddrpa;
 
 	naddrpage = maxaddrpa / PGSIZE;
 
@@ -68,7 +68,7 @@ multiboot_print_memory_map(multiboot_info_t *mbi) {
 			        (unsigned) mmap->length_high,
 			        (unsigned) mmap->length_low,
 			        (unsigned) memory_type[mmap->type]);
-			mmap = (char *)mmap + mmap->size + sizeof(mmap->size);
+			mmap = (memory_map_t *BND(mmap_b,mmap_e))((char *BND(mmap_b,mmap_e))mmap + mmap->size + sizeof(mmap->size));
 		}
 	}
 }

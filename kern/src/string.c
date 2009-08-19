@@ -139,13 +139,13 @@ static inline void *
 memcpy16(uint32_t *COUNT(n/sizeof(uint32_t)) _dst,
          const uint32_t *COUNT(n/sizeof(uint32_t)) _src, size_t n)
 {
-	uint32_t *dststart, *dstend, *srcend;
+	uint32_t *dststart, *SNT dstend, *SNT srcend;
 	uint32_t *BND(_dst,dstend) dst;
-	uint32_t *BND(_src,srcend) src;
+	const uint32_t *BND(_src,srcend) src;
 
 	dststart = _dst;
-	dstend = _dst + n/sizeof(uint32_t);
-	srcend = _src + n/sizeof(uint32_t);
+	dstend = (uint32_t *SNT)(_dst + n/sizeof(uint32_t));
+	srcend = (uint32_t *SNT)(_src + n/sizeof(uint32_t));
 	dst = _dst;
 	src = _src;
 
@@ -164,7 +164,7 @@ memcpy16(uint32_t *COUNT(n/sizeof(uint32_t)) _dst,
 }
 
 void *
-memset(void *v, int c, size_t _n)
+memset(void *COUNT(_n) v, int c, size_t _n)
 {
 	char *BND(v,v+_n) p;
 	size_t n0;
@@ -177,7 +177,7 @@ memset(void *v, int c, size_t _n)
 	if(n >= 16 && ((uintptr_t)v & 3) == 0)
 	{
 		n0 = (n/16)*16;
-		memset16((uint32_t*)v,c,n0);
+		memset16((uint32_t*COUNT(n0/sizeof(uint32_t)))v,c,n0);
 		n -= n0;
 		p += n0;
 	}
@@ -192,7 +192,7 @@ memset(void *v, int c, size_t _n)
 }
 
 void *
-memcpy(void *dst, const void *src, size_t _n)
+(DMEMCPY(1,2,3) memcpy)(void *COUNT(_n) dst, const void *COUNT(_n) src, size_t _n)
 {
 	const char *BND(src,src+_n) s;
 	char *BND(dst,dst+_n) d;
@@ -205,7 +205,8 @@ memcpy(void *dst, const void *src, size_t _n)
 	if(n >= 16 && ((uintptr_t)src  & 3) == 0 && ((uintptr_t)dst & 3) == 0)
 	{
 		n0 = (n/16)*16;
-		memcpy16((uint32_t*)dst,(const uint32_t*)src,n0);
+		memcpy16((uint32_t*COUNT(n0/sizeof(uint32_t)))dst,
+                 (const uint32_t*COUNT(n0/sizeof(uint32_t)))src,n0);
 		n -= n0;
 		s += n0;
 		d += n0;
@@ -218,7 +219,7 @@ memcpy(void *dst, const void *src, size_t _n)
 }
 
 void *
-memmove(void *dst, const void *src, size_t _n)
+memmove(void *COUNT(_n) dst, const void *COUNT(_n) src, size_t _n)
 {
 	const char *BND(src,src+_n) s;
 	char *BND(dst,dst+_n) d;
@@ -239,7 +240,7 @@ memmove(void *dst, const void *src, size_t _n)
 }
 
 int
-memcmp(const void *v1, const void *v2, size_t n)
+memcmp(const void *COUNT(n) v1, const void *COUNT(n) v2, size_t n)
 {
 	const uint8_t *BND(v1,v1+n) s1 = (const uint8_t *) v1;
 	const uint8_t *BND(v2,v2+n) s2 = (const uint8_t *) v2;
@@ -261,7 +262,7 @@ memfind(const void *_s, int c, size_t n)
 	for (; s < ends; s++)
 		if (*(const unsigned char *) s == (unsigned char) c)
 			break;
-	return (void *) s;
+	return (void *BND(_s,_s+n)) s;
 }
 
 long

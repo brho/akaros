@@ -1,7 +1,4 @@
 /* See COPYRIGHT for copyright information. */
-#ifdef __DEPUTY__
-#pragma nodeputy
-#endif
 
 #include <arch/types.h>
 #include <arch/arch.h>
@@ -40,10 +37,10 @@ static ssize_t sys_serial_write(env_t* e, const char *DANGEROUS buf, size_t len)
 }
 
 //Read a buffer over the serial port
-static ssize_t sys_serial_read(env_t* e, char *DANGEROUS buf, size_t len)
+static ssize_t sys_serial_read(env_t* e, char *DANGEROUS _buf, size_t len)
 {
 	#ifdef SERIAL_IO
-	    char *COUNT(len) _buf = user_mem_assert(e, buf, len, PTE_USER_RO);
+	    char *COUNT(len) buf = user_mem_assert(e, _buf, len, PTE_USER_RO);
 		size_t bytes_read = 0;
 		int c;
 		while((c = serial_read_byte()) != -1) {
@@ -57,25 +54,28 @@ static ssize_t sys_serial_read(env_t* e, char *DANGEROUS buf, size_t len)
 }
 
 static ssize_t sys_shared_page_alloc(env_t* p1,
-                                     void**DANGEROUS addr, envid_t p2_id,
+                                     void**DANGEROUS _addr, envid_t p2_id,
                                      int p1_flags, int p2_flags
                                     )
 {
 	//if (!VALID_USER_PERMS(p1_flags)) return -EPERM;
 	//if (!VALID_USER_PERMS(p2_flags)) return -EPERM;
 
+	void * COUNT(1) * COUNT(1) addr = user_mem_assert(p1, _addr, sizeof(void *), 
+                                                      PTE_USER_RW);
 	page_t* page;
 	env_t* p2 = &(envs[ENVX(p2_id)]);
 	error_t e = page_alloc(&page);
+
 	if(e < 0) return e;
 
 	void* p2_addr = page_insert_in_range(p2->env_pgdir, page,
-	                                     (void*)UTEXT, (void*)UTOP, p2_flags);
+	                                     (void*SNT)UTEXT, (void*SNT)UTOP, p2_flags);
 	if(p2_addr == NULL)
 		return -EFAIL;
 
 	void* p1_addr = page_insert_in_range(p1->env_pgdir, page,
-	                                    (void*)UTEXT, (void*)UTOP, p1_flags);
+	                                    (void*SNT)UTEXT, (void*SNT)UTOP, p1_flags);
 	if(p1_addr == NULL) {
 		page_remove(p2->env_pgdir, p2_addr);
 		return -EFAIL;
@@ -104,7 +104,7 @@ static void sys_cache_invalidate(void)
 // lines, to simulate doing something useful.
 static void sys_cache_buster(env_t* e, uint32_t num_writes, uint32_t num_pages,
                              uint32_t flags)
-{
+{ TRUSTEDBLOCK /* zra: this is not really part of the kernel */
 	#define BUSTER_ADDR		0xd0000000  // around 512 MB deep
 	#define MAX_WRITES		1048576*8
 	#define MAX_PAGES		32
@@ -277,8 +277,13 @@ static int sys_proc_create(struct proc *p, const char *DANGEROUS path)
 	 * space, and resolving both of these without knowing the length of the
 	 * string. (TODO)
 	 * Change this so that all syscalls with a pointer take a length.
+	 *
+	 * zra: I've added this user_mem_strlcpy, which I think eliminates the
+     * the TOCTOU issue. Adding a length arg to this call would allow a more
+	 * efficient implementation, though, since only one call to user_mem_check
+	 * would be required.
 	 */
-	strncpy(tpath, path, MAX_PATH_LEN);
+	int ret = user_mem_strlcpy(p,tpath, path, MAX_PATH_LEN, PTE_USER_RO);
 	int kfs_inode = kfs_lookup_path(tpath);
 	if (kfs_inode < 0)
 		return -EINVAL;

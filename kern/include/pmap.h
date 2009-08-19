@@ -104,11 +104,14 @@ void setup_default_mtrrs(barrier_t* smp_barrier);
 void	tlb_invalidate(pde_t *COUNT(NPDENTRIES) pgdir, void *SNT va);
 void tlb_flush_global(void);
 
-void *COUNT(len)
-user_mem_check(env_t *env, const void *DANGEROUS va, size_t len, int perm);
+void * (DALLOC(len) user_mem_check) (env_t *env, const void *DANGEROUS va,
+                                     size_t len, int perm);
 
-void *COUNT(len)
-user_mem_assert(env_t *env, const void *DANGEROUS va, size_t len, int perm);
+void * (DALLOC(len) user_mem_assert)(env_t *env, const void *DANGEROUS va,
+                                     size_t len, int perm);
+
+size_t user_mem_strlcpy(env_t *env, char *NT COUNT(len - 1),
+                        const char *DANGEROUS va, size_t len, int perm);
 
 error_t
 memcpy_from_user(env_t* env, void* COUNT(len) dest,

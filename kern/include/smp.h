@@ -14,6 +14,7 @@
 #include <trap.h>
 #include <atomic.h>
 #include <workqueue.h>
+#include <env.h>
 
 // will want this padded out to cacheline alignment
 struct per_cpu_info {

@@ -1,5 +1,5 @@
 #ifdef __DEPUTY__
-#pragma nodeputy
+//#pragma nodeputy
 #endif
 
 #include <arch/mmu.h>
@@ -25,11 +25,11 @@
 
 void test_ipi_sending(void)
 {
-	extern handler_t interrupt_handlers[];
+	extern handler_t (COUNT(NUM_INTERRUPT_HANDLERS) interrupt_handlers)[];
 	int8_t state = 0;
 
 	register_interrupt_handler(interrupt_handlers, test_vector,
-	                           test_hello_world_handler, 0);
+	                           test_hello_world_handler, NULL);
 	enable_irqsave(&state);
 	cprintf("\nCORE 0 sending broadcast\n");
 	send_broadcast_ipi(test_vector);
@@ -65,7 +65,7 @@ void test_ipi_sending(void)
 // Note this never returns and will muck with any other timer work
 void test_pic_reception(void)
 {
-	register_interrupt_handler(interrupt_handlers, 0x20, test_hello_world_handler, 0);
+	register_interrupt_handler(interrupt_handlers, 0x20, test_hello_world_handler, NULL);
 	pit_set_timer(100,TIMER_RATEGEN); // totally arbitrary time
 	pic_unmask_irq(0);
 	cprintf("PIC1 Mask = 0x%04x\n", inb(PIC1_DATA));
@@ -81,7 +81,7 @@ void test_pic_reception(void)
 void test_print_info(void)
 {
 	cprintf("\nCORE 0 asking all cores to print info:\n");
-	smp_call_function_all(test_print_info_handler, 0, 0);
+	smp_call_function_all(test_print_info_handler, NULL, 0);
 	cprintf("\nDone!\n");
 }
 
@@ -94,7 +94,7 @@ void test_barrier(void)
 	cprintf("Core 0 initializing barrier\n");
 	init_barrier(&test_cpu_array, num_cpus);
 	cprintf("Core 0 asking all cores to print ids, barrier, rinse, repeat\n");
-	smp_call_function_all(test_barrier_handler, 0, 0);
+	smp_call_function_all(test_barrier_handler, NULL, 0);
 }
 
 void test_interrupts_irqsave(void)
@@ -262,7 +262,7 @@ void test_checklists(void)
 	PRINT_BITMASK(a_list.mask.bits, a_list.mask.size);
 	//smp_call_function_single(1, test_checklist_handler, 0, 0);
 
-	smp_call_function_all(test_checklist_handler, 0, 0);
+	smp_call_function_all(test_checklist_handler, NULL, 0);
 
 	printk("Waiting on checklist\n");
 	waiton_checklist(&a_list);
@@ -272,10 +272,10 @@ void test_checklists(void)
 
 atomic_t a, b, c;
 
-void test_incrementer_handler(trapframe_t *tf, void* data)
+void test_incrementer_handler(trapframe_t *tf, atomic_t* data)
 {
 	assert(data);
-	atomic_inc((atomic_t*)data);
+	atomic_inc(data);
 }
 
 void test_null_handler(trapframe_t *tf, void* data)
@@ -294,31 +294,31 @@ void test_smp_call_functions(void)
 	uint8_t me = core_id();
 	printk("\nCore %d: SMP Call Self (nowait):\n", me);
 	printk("---------------------\n");
-	smp_call_function_self(test_hello_world_handler, 0, 0);
+	smp_call_function_self(test_hello_world_handler, NULL, 0);
 	printk("\nCore %d: SMP Call Self (wait):\n", me);
 	printk("---------------------\n");
-	smp_call_function_self(test_hello_world_handler, 0, &waiter0);
+	smp_call_function_self(test_hello_world_handler, NULL, &waiter0);
 	smp_call_wait(waiter0);
 	printk("\nCore %d: SMP Call All (nowait):\n", me);
 	printk("---------------------\n");
-	smp_call_function_all(test_hello_world_handler, 0, 0);
+	smp_call_function_all(test_hello_world_handler, NULL, 0);
 	printk("\nCore %d: SMP Call All (wait):\n", me);
 	printk("---------------------\n");
-	smp_call_function_all(test_hello_world_handler, 0, &waiter0);
+	smp_call_function_all(test_hello_world_handler, NULL, &waiter0);
 	smp_call_wait(waiter0);
 	printk("\nCore %d: SMP Call All-Else Individually, in order (nowait):\n", me);
 	printk("---------------------\n");
 	for(i = 1; i < num_cpus; i++)
-		smp_call_function_single(i, test_hello_world_handler, 0, 0);
+		smp_call_function_single(i, test_hello_world_handler, NULL, 0);
 	printk("\nCore %d: SMP Call Self (wait):\n", me);
 	printk("---------------------\n");
-	smp_call_function_self(test_hello_world_handler, 0, &waiter0);
+	smp_call_function_self(test_hello_world_handler, NULL, &waiter0);
 	smp_call_wait(waiter0);
 	printk("\nCore %d: SMP Call All-Else Individually, in order (wait):\n", me);
 	printk("---------------------\n");
 	for(i = 1; i < num_cpus; i++)
 	{
-		smp_call_function_single(i, test_hello_world_handler, 0, &waiter0);
+		smp_call_function_single(i, test_hello_world_handler, NULL, &waiter0);
 		smp_call_wait(waiter0);
 	}
 	printk("\nTesting to see if any IPI-functions are dropped when not waiting:\n");
@@ -342,12 +342,12 @@ void test_smp_call_functions(void)
 	// wait, so we're sure the others finish before printing.
 	// without this, we could (and did) get 19,18,19, since the B_inc
 	// handler didn't finish yet
-	smp_call_function_self(test_null_handler, 0, &waiter0);
+	smp_call_function_self(test_null_handler, NULL, &waiter0);
 	// need to grab all 5 handlers (max), since the code moves to the next free.
-	smp_call_function_self(test_null_handler, 0, &waiter1);
-	smp_call_function_self(test_null_handler, 0, &waiter2);
-	smp_call_function_self(test_null_handler, 0, &waiter3);
-	smp_call_function_self(test_null_handler, 0, &waiter4);
+	smp_call_function_self(test_null_handler, NULL, &waiter1);
+	smp_call_function_self(test_null_handler, NULL, &waiter2);
+	smp_call_function_self(test_null_handler, NULL, &waiter3);
+	smp_call_function_self(test_null_handler, NULL, &waiter4);
 	smp_call_wait(waiter0);
 	smp_call_wait(waiter1);
 	smp_call_wait(waiter2);
@@ -355,9 +355,9 @@ void test_smp_call_functions(void)
 	smp_call_wait(waiter4);
 	printk("A: %d, B: %d, C: %d (should be 19,19,19)\n", atomic_read(&a), atomic_read(&b), atomic_read(&c));
 	printk("Attempting to deadlock by smp_calling with an outstanding wait:\n");
-	smp_call_function_self(test_null_handler, 0, &waiter0);
+	smp_call_function_self(test_null_handler, NULL, &waiter0);
 	printk("Sent one\n");
-	smp_call_function_self(test_null_handler, 0, &waiter1);
+	smp_call_function_self(test_null_handler, NULL, &waiter1);
 	printk("Sent two\n");
 	smp_call_wait(waiter0);
 	printk("Wait one\n");
@@ -366,17 +366,17 @@ void test_smp_call_functions(void)
 	printk("\tMade it through!\n");
 	printk("Attempting to deadlock by smp_calling more than are available:\n");
 	printk("\tShould see an Insufficient message and a kernel warning.\n");
-	if (smp_call_function_self(test_null_handler, 0, &waiter0))
+	if (smp_call_function_self(test_null_handler, NULL, &waiter0))
 		printk("\tInsufficient handlers to call function (0)\n");
-	if (smp_call_function_self(test_null_handler, 0, &waiter1))
+	if (smp_call_function_self(test_null_handler, NULL, &waiter1))
 		printk("\tInsufficient handlers to call function (1)\n");
-	if (smp_call_function_self(test_null_handler, 0, &waiter2))
+	if (smp_call_function_self(test_null_handler, NULL, &waiter2))
 		printk("\tInsufficient handlers to call function (2)\n");
-	if (smp_call_function_self(test_null_handler, 0, &waiter3))
+	if (smp_call_function_self(test_null_handler, NULL, &waiter3))
 		printk("\tInsufficient handlers to call function (3)\n");
-	if (smp_call_function_self(test_null_handler, 0, &waiter4))
+	if (smp_call_function_self(test_null_handler, NULL, &waiter4))
 		printk("\tInsufficient handlers to call function (4)\n");
-	if (smp_call_function_self(test_null_handler, 0, &waiter5))
+	if (smp_call_function_self(test_null_handler, NULL, &waiter5))
 		printk("\tInsufficient handlers to call function (5)\n");
 	smp_call_wait(waiter0);
 	smp_call_wait(waiter1);
@@ -411,8 +411,8 @@ void test_lapic_status_bit(void)
 /******************************************************************************/
 /*            Test Measurements: Couples with measurement.c                   */
 // All user processes can R/W the UGDATA page
-barrier_t* bar = (barrier_t*)UGDATA;
-uint32_t* job_to_run = (uint32_t*)(UGDATA + sizeof(barrier_t));
+barrier_t*COUNT(1) bar = (barrier_t*COUNT(1))TC(UGDATA);
+uint32_t*COUNT(1) job_to_run = (uint32_t*COUNT(1))TC(UGDATA + sizeof(barrier_t));
 env_t* env_batch[64]; // Fairly arbitrary, just the max I plan to use.
 
 /* Helpers for test_run_measurements */
@@ -606,9 +606,9 @@ void test_barrier_handler(trapframe_t *tf, void* data)
 	//cprintf("Round 4: Core %d\n", core_id());
 }
 
-static void test_waiting_handler(trapframe_t *tf, void* data)
+static void test_waiting_handler(trapframe_t *tf, atomic_t * data)
 {
-	{HANDLER_ATOMIC atomic_dec((atomic_t*)data);}
+	{HANDLER_ATOMIC atomic_dec(data);}
 }
 
 #ifdef __i386__

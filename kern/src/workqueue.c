@@ -18,7 +18,7 @@
  */
 void process_workqueue()
 {
-	struct work work;
+	struct work TP(env_t *) work;
 	struct per_cpu_info *cpuinfo = &per_cpu_info[core_id()];
 
 	// copy the work in, since we may never return to this stack frame

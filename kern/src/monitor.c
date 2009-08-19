@@ -145,12 +145,12 @@ int mon_setmapperm(int argc, char **argv, trapframe_t *tf)
 		cprintf("Usage: setmapperm VIRT_ADDR PERMS\n");
 		return 1;
 	}
-	pde_t* pgdir = (pde_t*)vpd;
+	pde_t*COUNT(PTSIZE) pgdir = (pde_t*COUNT(PTSIZE))vpd;
 	pte_t *pte, *pde;
 	page_t* page;
 	uintptr_t va;
 	va = ROUNDDOWN(strtol(argv[1], 0, 16), PGSIZE);
-	page = page_lookup(pgdir, (void*)va, &pte);
+	page = page_lookup(pgdir, (void*SNT)va, &pte);
 	if (!page) {
 		cprintf("No such mapping\n");
 		return 1;
@@ -181,10 +181,10 @@ int mon_cpuinfo(int argc, char **argv, trapframe_t *tf)
 
 #ifdef __i386__
 	if (argc < 2)
-		smp_call_function_self(test_print_info_handler, 0, 0);
+		smp_call_function_self(test_print_info_handler, NULL, 0);
 	else
 		smp_call_function_single(strtol(argv[1], 0, 16),
-		                         test_print_info_handler, 0, 0);
+		                         test_print_info_handler, NULL, 0);
 #endif
 	return 0;
 }
@@ -266,8 +266,8 @@ int mon_kfs_run(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 #define WHITESPACE "\t\r\n "
 #define MAXARGS 16
 
-static int runcmd(char *COUNT(CMDBUF_SIZE) real_buf, trapframe_t *tf) {
-	char *BND(real_buf, real_buf+CMDBUF_SIZE) buf = real_buf;
+static int runcmd(char *NTS real_buf, trapframe_t *tf) {
+	char * buf = NTEXPAND(real_buf);
 	int argc;
 	char *NTS argv[MAXARGS];
 	int i;
@@ -288,7 +288,7 @@ static int runcmd(char *COUNT(CMDBUF_SIZE) real_buf, trapframe_t *tf) {
 			return 0;
 		}
 		//This will get fucked at runtime..... in the ASS
-		argv[argc++] = (char *NTS) TC(buf);
+		argv[argc++] = buf;
 		while (*buf && !strchr(WHITESPACE, *buf))
 			buf++;
 	}

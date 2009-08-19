@@ -18,18 +18,19 @@
 #include <arch/types.h>
 #include <process.h>
 
-#pragma nodeputy
+// zra : putting nodeputy in header files makes life difficult.
+//#pragma nodeputy
 
 struct kfs_entry {
-	char name[256];
-	uint8_t *start;
+	char (NT name)[256];
+	uint8_t *COUNT(size) start;
 	size_t size;
 };
 
 #define MAX_KFS_FILES 10
 extern struct kfs_entry kfs[MAX_KFS_FILES];
 
-ssize_t kfs_lookup_path(char* path);
+ssize_t kfs_lookup_path(char*NTS path);
 struct proc *kfs_proc_create(int kfs_inode);
 
 #endif // !ROS_KERN_KFS_H

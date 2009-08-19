@@ -97,7 +97,7 @@ void print_cpuinfo(void)
 
 void show_mapping(uintptr_t start, size_t size)
 {
-	pde_t* pgdir = /*(pde_t*)*/vpd;
+	pde_t *COUNT(PTSIZE) pgdir = (pde_t *COUNT(PTSIZE))vpd;
 	pte_t *pte, *pde;
 	page_t* page;
 	uintptr_t i;

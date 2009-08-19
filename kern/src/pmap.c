@@ -337,7 +337,7 @@ static void *DANGEROUS user_mem_check_addr;
 // COUNT(len) pointer. user_mem_check now returns NULL on error instead of
 // -EFAULT.
 
-void *COUNT(len)
+void *
 user_mem_check(env_t *env, const void *DANGEROUS va, size_t len, int perm)
 {
 	// TODO - will need to sort this out wrt page faulting / PTE_P
@@ -360,7 +360,7 @@ user_mem_check(env_t *env, const void *DANGEROUS va, size_t len, int perm)
 		pte = pgdir_walk(env->env_pgdir, start, 0);
 		// ensures the bits we want on are turned on.  if not, error out
 		if ( !pte || ((*pte & perm) != perm) ) {
-			if (i = 0)
+			if (i == 0)
 				user_mem_check_addr = (void*DANGEROUS)va;
 			else
 				user_mem_check_addr = start;
@@ -375,13 +375,36 @@ user_mem_check(env_t *env, const void *DANGEROUS va, size_t len, int perm)
 	return (void *COUNT(len))TC(va);
 }
 
+size_t
+user_mem_strlcpy(env_t *env, char *dst, const char *DANGEROUS va,
+                 size_t len, int perm)
+{
+	const char *DANGEROUS src = va;
+	char *NT COUNT(len-1) dst_in = dst;
+
+	if (len > 0) {
+		while (1) {
+			char *c;
+			if (--len <= 0) break;
+			c = user_mem_check(env, src, 1, perm);
+			if (!c) break;
+			if (*c == '\0') break;
+			*dst++ = *c;
+			src++;
+		}
+		*dst = '\0';
+	}
+
+	return dst - dst_in;
+}
+
 //
 // Checks that environment 'env' is allowed to access the range
 // of memory [va, va+len) with permissions 'perm | PTE_U'.
 // If it can, then the function simply returns.
 // If it cannot, 'env' is destroyed.
 //
-void *COUNT(len)
+void *
 user_mem_assert(env_t *env, const void *DANGEROUS va, size_t len, int perm)
 {
     void *COUNT(len) res = user_mem_check(env,va,len,perm | PTE_USER_RO);

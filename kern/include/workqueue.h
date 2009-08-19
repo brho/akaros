@@ -13,22 +13,23 @@
 
 #include <sys/queue.h>
 #include <arch/types.h>
+#include <env.h>
 
-typedef void (*func_t)(void *data);
+typedef void (*func_t)(TV(t) data);
 struct work {
 	LIST_ENTRY(work) work_link;
 	func_t func;
-	void *data;
+	TV(t) data;
 };
 
 // TODO make these dynamic and hold more than 1.  might want better list macros.
 #define WORKQUEUE_ELEMENTS 1
 struct workqueue {
-	struct work statics[WORKQUEUE_ELEMENTS];
+	struct work TP(env_t *) statics[WORKQUEUE_ELEMENTS];
 };
 
 void process_workqueue(void);
 // For now, the caller should free their struct work after this call
-int enqueue_work(struct workqueue *queue, struct work *job);
+int enqueue_work(struct workqueue *queue, struct work TP(env_t *) *job);
 
 #endif /* ROS_KERN_WORKQUEUE_H */

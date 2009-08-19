@@ -100,6 +100,6 @@ void	env_pop_tf(trapframe_t *tf) __attribute__((noreturn));
 
 
 /* Helper handler for smp_call to dispatch jobs to other cores */
-void run_env_handler(trapframe_t *tf, void* data);
+void run_env_handler(trapframe_t *tf, env_t* data);
 
 #endif // !ROS_KERN_ENV_H
