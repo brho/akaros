@@ -119,8 +119,7 @@ void proc_run(struct proc *p)
 			// There should be no core cleanup to do (like decref).
 			assert(current != p);
 			// if we're a worker core, smp_idle, o/w return
-			// TODO considering encapsulating this block (core_id too)
-			if (core_id())
+			if (!management_core())
 				smp_idle(); // this never returns
 			return;
 		case (PROC_RUNNABLE_S):
@@ -149,16 +148,15 @@ void proc_run(struct proc *p)
 			 * after the death IPI.  Otherwise, it would look like a new
 			 * process.  So we hold the lock to make sure our IPI went out
 			 * before a possible death IPI.
-			 * Likewise, we disable interrupts, in case one of the IPIs was for
-			 * us, and reenable them after letting go of the lock.
+			 * Likewise, we need interrupts to be disabled, in case one of the
+			 * IPIs was for us, and reenable them after letting go of the lock.
+			 * This is done by spin_lock_irqsave, so be careful if you change
+			 * this.
 			 * Note there is no guarantee this core's interrupts were on, so it
 			 * may not get the IPI for a while... */
-			int8_t state = 0;
-			disable_irqsave(&state);
 			for (int i = 0; i < p->num_vcores; i++)
 				send_ipi(p->vcoremap[i], 0, I_STARTCORE);
 			spin_unlock_irqsave(&p->proc_lock);
-			enable_irqsave(&state);
 			break;
 		default:
 			spin_unlock_irqsave(&p->proc_lock);
@@ -257,6 +255,8 @@ void proc_startcore(struct proc *p, trapframe_t *tf) {
  */
 void proc_destroy(struct proc *p)
 {
+	// Note this code relies on this lock disabling interrupts, similar to
+	// proc_run.
 	spin_lock_irqsave(&p->proc_lock);
 	// Could save the state and do this outside the lock
 	switch (p->state) {
@@ -270,47 +270,35 @@ void proc_destroy(struct proc *p)
 			// Think about other lists, or better ways to do this
 	}
 	proc_set_state(p, PROC_DYING);
-	// BIG TODO: check the coremap to find out who needs to die
-	// send the death IPI to everyone else involved
+	/* Send the DEATH IPI to every core running this process */
+	for (int i = 0; i < p->num_vcores; i++) {
+		send_ipi(p->vcoremap[i], 0, I_DEATH);
+	}
+	/* TODO: will need to update the pcoremap that's currently in schedule */
+
+	atomic_dec(&num_envs);
+	/* TODO: (REF) dirty hack.  decref currently uses a lock, but needs to use
+	 * CAS instead (another lock would be slightly less ghetto).  but we need to
+	 * decref before releasing the lock, since that could enable interrupts,
+	 * which would have us receive the DEATH IPI if this was called locally by
+	 * the target process. */ 
+	//proc_decref(p); // this decref is for the process in general
+	p->env_refcnt--;
+	size_t refcnt = p->env_refcnt; // need to copy this in so it's not reloaded
+	
+	/* After unlocking, we can receive a DEATH IPI and clean up */
 	spin_unlock_irqsave(&p->proc_lock);
 
-	proc_decref(p); // this decref is for the process in general
-	atomic_dec(&num_envs);
+	// coupled with the refcnt-- above, from decref.  if this happened,
+	// proc_destroy was called "remotely", and with no one else refcnting
+	if (!refcnt)
+		env_free(p);
 
-	/*
-	 * If we are currently running this address space on our core, we need a
-	 * known good pgdir before releasing the old one.  This is currently the
-	 * major practical implication of the kernel caring about a processes
-	 * existence (the inc and decref).  This decref corresponds to the incref in
-	 * proc_startcore (though it's not the only one).
-	 */
-	// TODO - probably make this a function, which the death IPI calls
-	if (current == p) {
-		lcr3(boot_cr3);
-		proc_decref(p); // this decref is for the cr3
-		current = NULL;
-	} else {
-		return;
-	}
-
-	// for old envs that die on user cores.  since env run never returns, cores
-	// never get back to their old hlt/relaxed/spin state, so we need to force
-	// them back to an idle function.
-
-	if (core_id()) {
-		smp_idle();
-		panic("should never see me");
-	}
-	// else we're core 0 and can do the usual
-
-	/* Instead of picking a new environment to run, or defaulting to the monitor
-	 * like before, for now we'll hop into the manager() function, which
-	 * dispatches jobs.  Note that for now we start the manager from the top,
-	 * and not from where we left off the last time we called manager.  That
-	 * would require us to save some context (and a stack to work on) here.
-	 */
-	manager();
-	assert(0); // never get here
+	/* If we were running the process, we should have received an IPI by now.
+	 * If not, odds are interrupts are disabled, which shouldn't happen while
+	 * servicing syscalls. */
+	assert(current != p);
+	return;
 }
 
 /*
@@ -337,6 +325,8 @@ void proc_destroy(struct proc *p)
  *
  * Also, no one should ever update the refcnt outside of these functions.
  * Eventually, we'll have Ivy support for this. (TODO)
+ *
+ * TODO: (REF) change to use CAS.
  */
 error_t proc_incref(struct proc *p)
 {
@@ -356,13 +346,17 @@ error_t proc_incref(struct proc *p)
  * "Last one out" actually finalizes the death of the process.  This is tightly
  * coupled with the previous function (incref)
  * Be sure to load a different cr3 before calling this!
+ *
+ * TODO: (REF) change to use CAS.  Note that when we do so, we may be holding
+ * the process lock when calling env_free().
  */
 void proc_decref(struct proc *p)
 {
 	spin_lock_irqsave(&p->proc_lock);
 	p->env_refcnt--;
+	size_t refcnt = p->env_refcnt; // need to copy this in so it's not reloaded
 	spin_unlock_irqsave(&p->proc_lock);
 	// if we hit 0, no one else will increment and we can check outside the lock
-	if (p->env_refcnt == 0)
+	if (!refcnt)
 		env_free(p);
 }

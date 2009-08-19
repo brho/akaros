@@ -1,11 +1,14 @@
 #include <arch/arch.h>
 #include <arch/trap.h>
 #include <process.h>
+#include <pmap.h>
 #include <smp.h>
-#include <stdio.h>
+
 #include <string.h>
 #include <assert.h>
+#include <stdio.h>
 
+/* Interrupt handler to start a process's context on this core. */
 void __startcore(trapframe_t *tf)
 {
 	uint32_t coreid = core_id();
@@ -32,4 +35,21 @@ void __startcore(trapframe_t *tf)
 	proc_startcore(p_to_run, tf_to_pop);
 }
 
-
+/* Interrupt handler to stop running whatever context is on this core and to
+ * idle.  Note this leaves no trace of what was running. */
+void __death(trapframe_t *tf)
+{
+	/* If we are currently running an address space on our core, we need a known
+	 * good pgdir before releasing the old one.  This is currently the major
+	 * practical implication of the kernel caring about a processes existence
+	 * (the inc and decref).  This decref corresponds to the incref in
+	 * proc_startcore (though it's not the only one). */
+	if (current) {
+		lcr3(boot_cr3);
+		proc_decref(current);
+		current = NULL;
+	} else {
+		warn("Sent a DEATH IPI to a core with no current process!");
+	}
+	smp_idle();		
+}

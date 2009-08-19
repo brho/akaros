@@ -150,7 +150,7 @@ static int getpit()
     return ((high << 8) | low);
 }
 
-// forces cpu to relax for usec miliseconds
+// forces cpu to relax for usec miliseconds.  declared in kern/include/timing.h
 void udelay(uint64_t usec)
 {
 	#if !defined(__BOCHS__)
