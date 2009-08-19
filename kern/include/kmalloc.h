@@ -11,7 +11,7 @@
 #include <arch/types.h>
 
 void  kmalloc_init();
-void* kmalloc(size_t size, int flags);
-void  kfree(void*COUNT(PGSIZE) addr);
+void *(DALLOC(size) kmalloc)(size_t size, int flags);
+void  DFREE(addr) kfree(void* addr);
 
 #endif //KMALLOC_H

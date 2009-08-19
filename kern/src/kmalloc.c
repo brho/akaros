@@ -19,7 +19,8 @@ void kmalloc_init() {
 	LIST_INIT(&pages_list);
 }
 
-void* kmalloc(size_t size, int flags) {
+void *(DALLOC(size) kmalloc)(size_t size, int flags) {
+	
 	if(size == 0)
 		return NULL;
 	int npages = ROUNDUP(size, PGSIZE) / PGSIZE;
@@ -56,7 +57,8 @@ void* kmalloc(size_t size, int flags) {
 	//And return the address of the first one
 	return ppn2kva(first);
 }
-void kfree(void *addr) {
+
+void DFREE(addr) kfree(void* addr) {
 	kmallocdebug("incoming address: %p\n", addr);
 	page_t* page = kva2page(addr);
 	int num_links = page->num_cons_links;

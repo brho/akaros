@@ -24,6 +24,8 @@
 
 #define NUM_ENTRY_TYPES 5
 
+#define MPFPS_SIZE 16 // For ivy
+
 enum interrupt_modes {
 	PIC, // PIC Mode (Bocsh, KVM)
 	VW,  // Virtural Wire Mode (Dev Boxes)
@@ -115,7 +117,6 @@ typedef struct MPCTH {
     uint8_t		reserved;
 } mpcth_t;
 
-
 typedef struct PROCENTRY {
     uint8_t		type;
     uint8_t		apicID;
@@ -130,7 +131,7 @@ typedef struct PROCENTRY {
 typedef struct BUSENTRY {
     uint8_t	type;
     uint8_t	busID;
-    char	busType[ 6 ];
+    char (NT busType)[ 6 ];
 } bus_entry;
 
 typedef struct IOAPICENTRY {
@@ -163,14 +164,14 @@ typedef struct PCIINTGROUP {
 } pci_int_group;
 
 void mptables_parse();
-mpfps_t *find_floating_pointer(physaddr_t base, physaddr_t bound);
+mpfps_t * COUNT(MPFPS_SIZE) find_floating_pointer(physaddr_t base, physaddr_t bound);
 bool checksum(physaddr_t addr, uint32_t len);
 void configuration_parse(physaddr_t conf_addr);
 
-void proc_parse(proc_entry* entry, uint32_t count);
-void bus_parse(bus_entry* entry, uint32_t count);
-void ioapic_parse(ioapic_entry* entry, uint32_t count);
-void int_parse(int_entry* entry, uint32_t count);
-void lint_parse(int_entry* entry, uint32_t count);
+void proc_parse();
+void bus_parse();
+void ioapic_parse();
+void int_parse();
+void lint_parse();
 
 #endif /* !ROS_INC_MPTABLES_H */

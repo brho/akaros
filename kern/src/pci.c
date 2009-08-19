@@ -1,7 +1,3 @@
-#ifdef __DEPUTY__
-#pragma nodeputy
-#endif
-
 #include <arch/mmu.h>
 #include <arch/x86.h>
 #include <arch/smp.h>

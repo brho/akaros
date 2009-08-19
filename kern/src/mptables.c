@@ -1,7 +1,3 @@
-#ifdef __DEPUTY__
-#pragma nodeputy
-#endif
-
 #include <arch/mmu.h>
 #include <arch/x86.h>
 #include <arch/smp.h>
@@ -43,19 +39,18 @@ tableEntry basetableEntryTypes[] =
 // Important global items
 enum interrupt_modes current_interrupt_mode;
 
-void * mp_entries[NUM_ENTRY_TYPES]; // Array of entry type arrays. Indexable by entry id
+proc_entry *COUNT(mp_entries_count[PROC]) mp_proc_entries;
+bus_entry *COUNT(mp_entries_count[BUS]) mp_bus_entries;
+ioapic_entry *COUNT(mp_entries_count[IOAPIC]) mp_ioapic_entries;
+int_entry *COUNT(mp_entries_count[INT]) mp_int_entries;
+int_entry *COUNT(mp_entries_count[LINT]) mp_lint_entries; // Not a type. lint entries == int entries
+
+
 int mp_entries_count[NUM_ENTRY_TYPES]; // How large each array is.
 
 pci_int_group pci_int_groups[PCI_MAX_BUS][PCI_MAX_DEV];
 isa_int_entry isa_int_entries[NUM_IRQS];
 ioapic_entry ioapic_entries[IOAPIC_MAX_ID];
-
-// All this max stuff is removable. Here for debugging (originally for dynamically sized arrays.)
-int max_pci_device = -1;
-int max_pci_bus = -1;
-int num_ioapics = -1;
-int max_ioapic_id = -1;
-
 
 void mptables_parse() {
 	
@@ -112,9 +107,7 @@ void mptables_parse() {
 
 	if (mpfps == NULL) {
 		// Search the last KB of system memory UNTESTED
-		
 		// Note: Will only be there if it not in the EBDA. So this must be called after the EBDA check.
-		
 		// This logic is ripped from mptables without much understanding. No machine to test it on.
 		
 		physaddr_t top_of_mem = read_mmreg32((uint32_t)KADDR(TOPOFMEM_POINTER));
@@ -132,7 +125,6 @@ void mptables_parse() {
 	
 	if (mpfps == NULL) {
 		// Search the last KB of system memory based on a 640K limited, due to CMOS lying
-		
 		// Note: Will only be there if it not in the EBDA. So this must be called after the EBDA check.
 				
 		physaddr_t top_of_mem = DEFAULT_TOPOFMEM;
@@ -169,43 +161,12 @@ void mptables_parse() {
 	}
 	
 	configuration_parse((physaddr_t)KADDR((uint32_t)(mpfps->pap)));
-	proc_parse(		mp_entries[PROC], mp_entries_count[PROC]);
-	bus_parse(		mp_entries[BUS], mp_entries_count[BUS]);
-	ioapic_parse(	mp_entries[IOAPIC], mp_entries_count[IOAPIC]);
-	int_parse(		mp_entries[INT], mp_entries_count[INT]);
-	lint_parse(		mp_entries[LINT], mp_entries_count[LINT]);
-
-
-	// // debugging the parsing.
-	// cprintf("\n");
-	// cprintf("max_pci_device: %u\n", max_pci_device);
-	// cprintf("max_pci_bus: %u\n", max_pci_bus);
-	// cprintf("num_ioapics: %u\n", num_ioapics);
-	// cprintf("max_ioapic_id: %u\n", max_ioapic_id);
-	// int n =0;
-	// for (int i = 0; i <= max_pci_bus; i++) {
-	// 	for (int j = 0; j <= max_pci_device; j++) {
-	// 		for (int k = 0; k < 4; k++) {
-	// 			if (pci_int_groups[i][j].intn[k].dstApicID != 0xFFFF) {
-	// 				cprintf("Bus: %u\n", i);
-	// 				cprintf("Device: %u\n", j);
-	// 				cprintf("ApicID: %u\n", pci_int_groups[i][j].intn[k].dstApicID);
-	// 				cprintf("INTLINE: %u\n", pci_int_groups[i][j].intn[k].dstApicINT);
-	// 				cprintf("\n");
-	// 				n++;
-	// 			}
-	// 		}
-	// 	}
-	// }
-	// cprintf("n: %u\n", n);
-	// for (int i = 0; i <= max_ioapic_id; i++) {
-	// 	if ((ioapic_entries[i].apicFlags & 0x1) != 0) {
-	// 		cprintf("IOAPIC ID: %u\n", ioapic_entries[i].apicID);
-	// 		cprintf("IOAPIC Offset: %x\n", ioapic_entries[i].apicAddress);
-	// 		cprintf("\n");
-	// 	}
-	// }
-	// panic("AHH!");	
+	
+	proc_parse();
+	bus_parse();
+	ioapic_parse();
+	int_parse();
+	lint_parse();
 	
 }
 
@@ -213,7 +174,11 @@ void mptables_parse() {
 // Does not esure base/bounds are sane.
 mpfps_t *find_floating_pointer(physaddr_t base, physaddr_t bound) {
 
-	mpfps_t* mpfps = (mpfps_t*)base;
+	uint32_t count = (bound - base + sizeof(mpfps_t))/sizeof(mpfps_t);
+
+	// This trusted count was authorized with the blessing of Zach.
+	// Blame Intel and the MP Spec for making me do this cast.
+	mpfps_t* mpfps = (mpfps_t* COUNT(count)) TC(base);
 
 	// Loop over the entire range looking for the signature. The signature is ascii _MP_, which is
 	//  stored in the given MP_SIG
@@ -242,9 +207,13 @@ mpfps_t *find_floating_pointer(physaddr_t base, physaddr_t bound) {
 bool checksum(physaddr_t addr, uint32_t len) {
 	// MP Table checksums must add up to 0.
 	uint8_t checksum = 0;
+	
+	// Yet another trusted cast. 
+	// See comment at start of find_floating_pointer
+	uint8_t *addr_p = (uint8_t* COUNT(len)) TC(addr);
 
 	for (int i = 0; i < len; i++)
-		checksum += *((uint8_t*)addr + i);
+		checksum += *(addr_p + i);
 
 	return (checksum == 0);
 }
@@ -256,19 +225,28 @@ void configuration_parse(physaddr_t conf_addr) {
 	
 	int num_processed[NUM_ENTRY_TYPES];
 	
-	mpcth_t *mpcth = (mpcth_t*)conf_addr;
+	// Another. See comment at start of find_floating_pointer
+	mpcth_t *mpcth = (mpcth_t* COUNT(1)) TC(conf_addr);
 	
 	for (int i = 0; i < NUM_ENTRY_TYPES; i++) {
 		mp_entries_count[i] = num_processed[i] = 0;
-		mp_entries[i] = 0;
 	}
 		
-	// Do 1 pass to figure out how much space to allocate we need.
+	// Do 1 pass to figure out how much space to allocate.
 	uint16_t num_entries = mpcth->entry_count;
-	physaddr_t current_addr = (physaddr_t)(mpcth + 1);
-		
+	uint16_t mpct_length = mpcth->base_table_length;
+	uint16_t entry_length = mpct_length - sizeof(mpcth);
+	
+	// Now perform a checksum on the configuration table
+	if (checksum((physaddr_t)mpcth, mpct_length) == FALSE) {
+		panic("FAILED MP CONFIGURATION CHECKSUM.");
+	}
+	
+	uint8_t * COUNT(entry_length) entry_base = (uint8_t* COUNT(entry_length)) TC(mpcth + 1);
+	uint8_t * BND(entry_base, entry_base + entry_length) current_addr = entry_base;
+	
 	for (int i = 0; i < num_entries; i++) {
-		uint8_t current_type = *((uint8_t*)current_addr);
+		uint8_t current_type = *current_addr;
 		if (current_type >= NUM_ENTRY_TYPES)
 			panic("CORRUPT MPTABLES CONFIGURATION ENTRY");
 			
@@ -276,20 +254,55 @@ void configuration_parse(physaddr_t conf_addr) {
 		current_addr += basetableEntryTypes[current_type].length;
 	}
 	
-	// Allocate the correct space in the mp_entries array
-	for (int i = 0; i < NUM_ENTRY_TYPES; i++) {
-		mp_entries[i] = kmalloc(mp_entries_count[i] * basetableEntryTypes[i].length , 0);
-	}
+	// Allocate the correct space in the arrays (unrolled for ivy reasons)
+	mp_proc_entries = kmalloc(mp_entries_count[PROC] * basetableEntryTypes[PROC].length , 0);
+	mp_bus_entries = kmalloc(mp_entries_count[BUS] * basetableEntryTypes[BUS].length , 0);
+	mp_ioapic_entries = kmalloc(mp_entries_count[IOAPIC] * basetableEntryTypes[IOAPIC].length , 0);
+	mp_int_entries = kmalloc(mp_entries_count[INT] * basetableEntryTypes[INT].length , 0);
+	mp_lint_entries = kmalloc(mp_entries_count[LINT] * basetableEntryTypes[LINT].length , 0);
 	
-	current_addr = current_addr = (physaddr_t)(mpcth + 1);
+	current_addr = entry_base;
+	
 	for (int i = 0; i < num_entries; i++) {
 		uint8_t current_type = *((uint8_t*)current_addr);
 		if (current_type >= NUM_ENTRY_TYPES)
 			panic("CORRUPT MPTABLES CONFIGURATION ENTRY.. after we already checked? Huh.");
 		
-		memcpy(	mp_entries[current_type] + num_processed[current_type] * basetableEntryTypes[current_type].length, 
-				(void*)current_addr,  
-				basetableEntryTypes[current_type].length);
+		if (num_processed[current_type] >= mp_entries_count[current_type])
+			panic("MPTABLES LIED ABOUT NUMBER OF ENTRIES. NO IDEA WHAT TO DO!");
+		
+		switch (current_type) {
+			case PROC:
+				memcpy(	&mp_proc_entries[num_processed[PROC]], 
+						current_addr,  
+						basetableEntryTypes[PROC].length);
+				break;
+			
+			case BUS:
+				memcpy(	&mp_bus_entries[num_processed[BUS]], 
+						current_addr,  
+						basetableEntryTypes[BUS].length);
+				break;
+			case IOAPIC:
+				memcpy(	&mp_ioapic_entries[num_processed[IOAPIC]], 
+						// This is needed due to the void* in the entry
+						//  no clean way of doing this. Sorry Zach.
+						(ioapic_entry* COUNT(1)) TC(current_addr),  
+						basetableEntryTypes[IOAPIC].length);
+				break;
+			case INT:
+				memcpy(	&mp_int_entries[num_processed[INT]], 
+						current_addr,  
+						basetableEntryTypes[INT].length);
+				break;
+			case LINT:
+				memcpy(	&mp_lint_entries[num_processed[LINT]], 
+						(void*)current_addr,  
+						basetableEntryTypes[LINT].length);
+				break;
+						
+			default: panic("UNKNOWN ENTRY TYPE");
+		}
 
 		num_processed[current_type]++;
 		current_addr += basetableEntryTypes[current_type].length;
@@ -300,117 +313,102 @@ void configuration_parse(physaddr_t conf_addr) {
 	// We now have all of our entries copied into a single structure we can index into. Yay.
 }
 
-void proc_parse(proc_entry* entries, uint32_t count) {
+void proc_parse() {
 	// For now, we don't do anything with the processor entries. Just print them.
 	
-	for (int i = 0; i < count; i++){
+	for (int i = 0; i < mp_entries_count[PROC]; i++){
 		mptables_dump("Proc entry %u\n", i);
-		mptables_dump("-->type: %x\n", entries[i].type);
-		mptables_dump("-->apicID: %x\n", entries[i].apicID);
-		mptables_dump("-->apicVersion: %x\n", entries[i].apicVersion);
-		mptables_dump("-->cpuFlags: %x\n", entries[i].cpuFlags);
-		mptables_dump("-->cpuSignaure: %x\n", entries[i].cpuSignature);
-		mptables_dump("-->featureFlags: %x\n", entries[i].featureFlags);
+		mptables_dump("-->type: %x\n", mp_proc_entires[i].type);
+		mptables_dump("-->apicID: %x\n", mp_proc_entires[i].apicID);
+		mptables_dump("-->apicVersion: %x\n", mp_proc_entires[i].apicVersion);
+		mptables_dump("-->cpuFlags: %x\n", mp_proc_entires[i].cpuFlags);
+		mptables_dump("-->cpuSignaure: %x\n", mp_proc_entires[i].cpuSignature);
+		mptables_dump("-->featureFlags: %x\n", mp_proc_entires[i].featureFlags);
 	}
 	
 	mptables_dump("\n");
 }
 
-void bus_parse(bus_entry* entries, uint32_t count) {
+void bus_parse() {
 	// Do we need to sort this?
 	// For now, don't. We assume the index into this structure matches the type.
 	// This seems to be implied from the configuration
 	
-	for (int i = 0; i < count; i++){
-		if (i != entries[i].busID) 
+	for (int i = 0; i < mp_entries_count[BUS]; i++){
+		if (i != mp_bus_entries[i].busID) 
 			panic("Oh noes! We need to sort entries. The MP Spec lied! Ok lied is too strong a word, it implied.");
 			
 		mptables_dump("Bus entry %u\n", i);
-		mptables_dump("-->type: %x\n", entries[i].type);
-		mptables_dump("-->BusID: %x\n", entries[i].busID);
-		mptables_dump("-->Bus: %c%c%c\n", entries[i].busType[0], entries[i].busType[1], entries[i].busType[2]);
-		
-		// This is removable. Just here for debugging for now.
-		if ((strncmp(entries[i].busType, "PCI", 3) == 0) && (entries[i].busID > max_pci_bus))
-			max_pci_bus = entries[i].busID;
-		
+		mptables_dump("-->type: %x\n", mp_bus_entries[i].type);
+		mptables_dump("-->BusID: %x\n", mp_bus_entries[i].busID);
+		mptables_dump("-->Bus: %c%c%c\n", mp_bus_entries[i].busType[0], mp_bus_entries[i].busType[1], mp_bus_entries[i].busType[2]);
+	
 	}
 	
 	mptables_dump("\n");
 }
 
-void ioapic_parse(ioapic_entry* entries, uint32_t count) {
+void ioapic_parse() {
 
 	// Note: We don't check if the apicFlags is 0. If zero, unusable
 	// This should be done elsewhere.
 	
-	num_ioapics = count;
+	num_ioapics = mp_entries_count[IOAPIC];
 	
-	for (int i = 0; i < count; i++){
+	for (int i = 0; i < mp_entries_count[IOAPIC]; i++){
 		mptables_dump("IOAPIC entry %u\n", i);
-		mptables_dump("-->type: %x\n", entries[i].type);
-		mptables_dump("-->apicID: %x\n", entries[i].apicID);
-		mptables_dump("-->apicVersion: %x\n", entries[i].apicVersion);
-		mptables_dump("-->apicFlags: %x\n", entries[i].apicFlags);
-		mptables_dump("-->apicAddress: %p\n", entries[i].apicAddress);
+		mptables_dump("-->type: %x\n", mp_ioapic_entries[i].type);
+		mptables_dump("-->apicID: %x\n", mp_ioapic_entries[i].apicID);
+		mptables_dump("-->apicVersion: %x\n", mp_ioapic_entries[i].apicVersion);
+		mptables_dump("-->apicFlags: %x\n", mp_ioapic_entries[i].apicFlags);
+		mptables_dump("-->apicAddress: %p\n", mp_ioapic_entries[i].apicAddress);
 		
-		if (entries[i].apicID > max_ioapic_id)
-			max_ioapic_id = entries[i].apicID;
+		if (mp_ioapic_entries[i].apicID > max_ioapic_id)
+			max_ioapic_id = mp_ioapic_entries[i].apicID;
 	}
 	mptables_dump("\n");
 	
-
-	
-	for (int i = 0; i < count; i++) {
-		memcpy((void*)(ioapic_entries + entries[i].apicID), (void*)(entries + i), sizeof(ioapic_entry));
+	for (int i = 0; i < mp_entries_count[IOAPIC]; i++) {
+		memcpy((void*)(ioapic_entries + mp_ioapic_entries[i].apicID), (void*)(mp_ioapic_entries + i), sizeof(ioapic_entry));
 	}
 }
 
-void int_parse(int_entry* entries, uint32_t count) {
+void int_parse() {
 	// create a massive array, tied together with bus/dev, for indexing
 	
-	for (int i = 0; i < count; i++){
+	for (int i = 0; i < mp_entries_count[INT]; i++){
 		mptables_dump("Interrupt entry %u\n", i);
-		mptables_dump("-->type: %x\n", entries[i].type);
-		mptables_dump("-->intType: %x\n", entries[i].intType);
-		mptables_dump("-->intFlags: %x\n", entries[i].intFlags);
-		mptables_dump("-->srcBusID: %u\n", entries[i].srcBusID);
-		mptables_dump("-->srcDevice: %u (PCI ONLY)\n", (entries[i].srcBusIRQ >> 2) & 0x1F);
-		mptables_dump("-->srcBusIRQ: %x\n", entries[i].srcBusIRQ);
-		mptables_dump("-->dstApicID: %u\n", entries[i].dstApicID);
-		mptables_dump("-->dstApicINT: %u\n", entries[i].dstApicINT);
-		
-		// Find the max PCI device.
-		// removable. here for debugging.
-		if (strncmp(((bus_entry*)mp_entries[BUS])[entries[i].srcBusID].busType, "PCI", 3) == 0) {
-			
-			// Mask out the device number
-			int device_num = (entries[i].srcBusIRQ >> 2) & 0x1F;
-			if (device_num > max_pci_device)
-				max_pci_device= device_num;
-		}			
+		mptables_dump("-->type: %x\n", mp_int_entries[i].type);
+		mptables_dump("-->intType: %x\n", mp_int_entries[i].intType);
+		mptables_dump("-->intFlags: %x\n", mp_int_entries[i].intFlags);
+		mptables_dump("-->srcBusID: %u\n", mp_int_entries[i].srcBusID);
+		mptables_dump("-->srcDevice: %u (PCI ONLY)\n", (mp_int_entries[i].srcBusIRQ >> 2) & 0x1F);
+		mptables_dump("-->srcBusIRQ: %x\n", mp_int_entries[i].srcBusIRQ);
+		mptables_dump("-->dstApicID: %u\n", mp_int_entries[i].dstApicID);
+		mptables_dump("-->dstApicINT: %u\n", mp_int_entries[i].dstApicINT);
+					
 	}
 	mptables_dump("\n");
 
 	// Populate the PCI/ISA structure with the interrupt entries.
-	for (int i = 0; i < count; i++) {
-		if (strncmp(((bus_entry*)mp_entries[BUS])[entries[i].srcBusID].busType, "PCI", 3) == 0) {
+	for (int i = 0; i < mp_entries_count[INT]; i++) {
+		if (strncmp(mp_bus_entries[mp_int_entries[i].srcBusID].busType, "PCI", 3) == 0) {
 			int bus_idx, dev_idx, int_idx;
-			bus_idx = entries[i].srcBusID;
-			dev_idx = (entries[i].srcBusIRQ >> 2) & 0x1F;
-			int_idx = entries[i].srcBusIRQ & 0x3;
-			pci_int_groups[bus_idx][dev_idx].intn[int_idx].dstApicID = entries[i].dstApicID;
-			pci_int_groups[bus_idx][dev_idx].intn[int_idx].dstApicINT = entries[i].dstApicINT;
+			bus_idx = mp_int_entries[i].srcBusID;
+			dev_idx = (mp_int_entries[i].srcBusIRQ >> 2) & 0x1F;
+			int_idx = mp_int_entries[i].srcBusIRQ & 0x3;
+			pci_int_groups[bus_idx][dev_idx].intn[int_idx].dstApicID = mp_int_entries[i].dstApicID;
+			pci_int_groups[bus_idx][dev_idx].intn[int_idx].dstApicINT = mp_int_entries[i].dstApicINT;
 		}
 		
-		if (strncmp(((bus_entry*)mp_entries[BUS])[entries[i].srcBusID].busType, "ISA", 3) == 0) {
-			int irq = entries[i].srcBusIRQ;
-			int int_type = entries[i].intType;
+		if (strncmp(mp_bus_entries[mp_int_entries[i].srcBusID].busType, "ISA", 3) == 0) {
+			int irq = mp_int_entries[i].srcBusIRQ;
+			int int_type = mp_int_entries[i].intType;
 			
 			if (int_type == 3) {
 				// THIS IS WHERE THE PIC CONNECTS TO THE IOAPIC
 				// WE DON'T CURRENTLY DO ANYTHING WITH THIS, BUT SHOULD WE NEED TO
-				// HERED WHERE TO LOOK!
+				// HERES WHERE TO LOOK!
 				// WE MUST NOT PLACE THIS INTO OUR TABLE AS IRQ HAS NO REAL MEANING AFAPK
 				continue;
 				
@@ -421,301 +419,27 @@ void int_parse(int_entry* entries, uint32_t count) {
 			}
 						
 			if ((isa_int_entries[irq].dstApicID != 0xFFFF) && 
-				 ((isa_int_entries[irq].dstApicID != entries[i].dstApicID) 
-				   || (isa_int_entries[irq].dstApicINT != entries[i].dstApicINT)))
+				 ((isa_int_entries[irq].dstApicID != mp_int_entries[i].dstApicID) 
+				   || (isa_int_entries[irq].dstApicINT != mp_int_entries[i].dstApicINT)))
 				panic("SAME IRQ MAPS TO DIFFERENT IOAPIC/INTN'S. THIS DEFIES LOGIC.");
 			
-			isa_int_entries[irq].dstApicID = entries[i].dstApicID;
-			isa_int_entries[irq].dstApicINT = entries[i].dstApicINT;
+			isa_int_entries[irq].dstApicID = mp_int_entries[i].dstApicID;
+			isa_int_entries[irq].dstApicINT = mp_int_entries[i].dstApicINT;
 		}			
 	}
 }
 
-void lint_parse(int_entry* entries, uint32_t count) {
+void lint_parse() {
 	// For now, we don't do anything with the local interrupt entries
 	
-	for (int i = 0; i < count; i++){
+	for (int i = 0; i < mp_entries_count[LINT]; i++){
 		mptables_dump("Local Interrupt entry %u\n", i);
-		mptables_dump("-->type: %x\n", entries[i].type);
-		mptables_dump("-->intType: %x\n", entries[i].intType);
-		mptables_dump("-->srcBusID: %x\n", entries[i].srcBusID);
-		mptables_dump("-->srcBusIRQ: %x\n", entries[i].srcBusIRQ);
-		mptables_dump("-->dstApicID: %p\n", entries[i].dstApicID);
-		mptables_dump("-->dstApicINT: %p\n", entries[i].dstApicINT);
+		mptables_dump("-->type: %x\n", mp_lint_entries[i].type);
+		mptables_dump("-->intType: %x\n", mp_lint_entries[i].intType);
+		mptables_dump("-->srcBusID: %x\n", mp_lint_entries[i].srcBusID);
+		mptables_dump("-->srcBusIRQ: %x\n", mp_lint_entries[i].srcBusIRQ);
+		mptables_dump("-->dstApicID: %p\n", mp_lint_entries[i].dstApicID);
+		mptables_dump("-->dstApicINT: %p\n", mp_lint_entries[i].dstApicINT);
 		
 	}
 }
-
-
-
-// Old backup code of how we made it work before. 
-// void setup_interrupts() {
-// 	
-// 	extern handler_t interrupt_handlers[];
-// 	
-// 	nic_debug("-->Setting interrupts.\n");
-// 	
-// 	// Enable NIC interrupts
-// 	outw(io_base_addr + RL_IM_REG, RL_INTERRUPT_MASK);
-// 	
-// 	//Clear the current interrupts.
-// 	outw(io_base_addr + RL_IS_REG, RL_INTRRUPT_CLEAR);
-// 	
-// 	// Kernel based interrupt stuff
-// 	register_interrupt_handler(interrupt_handlers, KERNEL_IRQ_OFFSET + irq, nic_interrupt_handler, 0);
-// 	//pic_unmask_irq(irq); // move this after we setup redirection
-// 	//unmask_lapic_lvt(LAPIC_LVT_LINT0);
-// 	
-// 	// Program the IOAPIC
-// 	
-// 	uint32_t redirect_low = KERNEL_IRQ_OFFSET + irq;
-// 	redirect_low = redirect_low | 0xa000;
-// 	uint32_t redirect_high = 0x7000000;
-// 
-// 	cprintf("Trying table entry....\n");
-// 	
-// 	uint32_t table_entry = 16;
-// 	write_mmreg32(IOAPIC_BASE, 0x10 + 2*table_entry);
-// 	write_mmreg32(IOAPIC_BASE + 0x10, redirect_low);
-// 	
-// 	write_mmreg32(IOAPIC_BASE, 0x10 + 2*table_entry + 1);
-// 	write_mmreg32(IOAPIC_BASE + 0x10, redirect_high);
-// 	
-// 	udelay(1000000);
-// 	outb(io_base_addr + 0x38, 0x1);
-// 	
-// 	udelay(100000000);
-// 	
-// 	
-// /*
-// 	udelay(1000000);
-// 	uint32_t ka_mp_table = 0;
-// 	uint32_t ka_mp_table_base = 0;
-// 
-// 	for (int i = 0xf0000; i < 0xf0000 + 0x10000; i=i+4)
-// 	{
-// 		if(read_mmreg32((int)KADDR(i)) == 0x5f504d5f)
-// 		{
-// 			cprintf("VICTORY! ");
-// 			ka_mp_table_base = (int)KADDR(i);
-// 			ka_mp_table = (int)KADDR(read_mmreg32((int)KADDR(i+4)));
-// 			cprintf("ADDR: %p\n", PADDR(ka_mp_table));
-// 			break;
-// 		}
-// 	}
-// 	
-// 	uint32_t ka_mp_table_cur_ptr = ka_mp_table;
-// 	uint32_t num_entries = read_mmreg32(ka_mp_table_cur_ptr + 0x20) >> 16;
-// 	
-// 	cprintf("num_entires: %d\n", num_entries);
-// 	cprintf("spec_rev: %x\n",   read_mmreg32(ka_mp_table_base + 9) & 0xFF);
-// 	cprintf("checksum: %x\n",   read_mmreg32(ka_mp_table_base + 10) & 0xFF);
-// 	cprintf("byte 1: %x\n",   read_mmreg32(ka_mp_table_base + 11) & 0xFF);
-// 	cprintf("byte 2: %x\n",   read_mmreg32(ka_mp_table_base + 12) & 0xFF);
-// 	
-// 	
-// 	ka_mp_table_cur_ptr = ka_mp_table + 0x2c;
-// 	for (int i = 0; i < num_entries; i++) {
-// 		
-// 		uint32_t low = read_mmreg32(ka_mp_table_cur_ptr);
-// 		uint32_t high = read_mmreg32(ka_mp_table_cur_ptr + 4);
-// 		uint8_t type = low & 0xFF;
-// 		
-// 		switch(type) {
-// 			case 0:
-// 				cprintf("Found Processor Entry\n");
-// 				ka_mp_table_cur_ptr += 20;
-// 				break;
-// 			
-// 			case 1:
-// 				cprintf("Found Bus Entry\n");
-// 
-// 				cprintf("-->%c%c%c\n", (char)(low >>16 & 0xFF), (char)(low >> 24 & 0xFF), (char)(high & 0xFF));
-// 				cprintf("-->id: %u\n\n", (low >> 8) & 0xFF);
-// 				
-// 				
-// 				ka_mp_table_cur_ptr += 8;
-// 				break;
-// 			
-// 			case 2:
-// 				cprintf("Found IOAPIC Entry\n");
-// 				cprintf("-->ID: %u\n", (low >> 8) & 0xFF);
-// 				cprintf("-->addr: %p\n", high);
-// 				
-// 				ka_mp_table_cur_ptr += 8;
-// 				break;
-// 			
-// 			case 3:
-// 				cprintf("Found IO Interrupt Entry\n");
-// 
-// 				// only print if we found something hooked to the ioapic
-// 				if (((high >> 16) & 0xFF) == 8) {
-// 	
-// 					cprintf("-->TYPE: %u\n", (low >> 8) & 0xFF);
-// 					cprintf("-->FLAGS: %x\n", (low >> 16) & 0xFFFF);
-// 					cprintf("-->BUS ID: %u\n", (high) & 0xFF);
-// 					cprintf("-->BUS IRQ: %x\n", (high >> 8) & 0xFF);
-// 					cprintf("---->SOURCE INT#: %x\n", (high >> 8) & 0x03);
-// 					cprintf("---->SOURCE DEV#: %x\n", (high >> 10) & 0x1F);
-// 					cprintf("-->DEST APIC ID: %u\n", (high >> 16) & 0xFF);
-// 					cprintf("-->DEST APIC ID INITIN: %u\n\n", (high >> 24) & 0xFF);
-// 				}
-// 			
-// 				
-// 				ka_mp_table_cur_ptr += 8;
-// 				break;
-// 			
-// 			case 4:
-// 				cprintf("Found Local Interrupt Entry\n");
-// 				ka_mp_table_cur_ptr += 8;
-// 				break;
-// 			
-// 			default:
-// 				cprintf("Unknown type! Danger! Failing out\n");
-// 				i = num_entries;
-// 		}
-// 		
-// 	
-// 		
-// 	}
-// */
-// /*
-// 	// ugly test code for ioapic
-// 	udelay(1000000);
-// 
-// 	cprintf("flooding table\n");
-// 	
-// 	for (int j = 0; j < 256; j++) {
-// 		redirect_low = j << 8;
-// 		redirect_low = redirect_low | (KERNEL_IRQ_OFFSET + irq);
-// 		cprintf("trying %x\n", j);
-// 		
-// 		for (int i = 16; i < 17; i++) {
-// 			write_mmreg32(IOAPIC_BASE, 0x10 + 2*i);
-// 			write_mmreg32(IOAPIC_BASE + 0x10, redirect_low);
-// 		
-// 			write_mmreg32(IOAPIC_BASE, 0x10 + 2*i + 1);
-// 			write_mmreg32(IOAPIC_BASE + 0x10, redirect_high);
-// 		}
-// 		
-// 		udelay(100000);
-// 		
-// 		outb(io_base_addr + 0x38, 0x1);
-// 		
-// 		udelay(100000);
-// 	}
-// 
-// 	udelay(10000000000);	
-// */		
-// 
-// /*
-// 	
-// 	cprintf("Generating test interrupt....\n");
-// 	outb(io_base_addr + 0x38, 0x1);
-// 
-// 	udelay(1000000);
-// 	uint32_t old_low = -1;
-// 	uint32_t old_high = -1;
-// 	uint32_t new_low = -1;
-// 	uint32_t new_high = -1;
-// 
-// 	for (int i = 0; i <= 24; i++) {
-// 		
-// 		if (i != 0) {
-// 			cprintf("     masking %u with: %x %x\n\n", i-1, old_high, old_low);
-// 			write_mmreg32(IOAPIC_BASE, 0x10 + 2*(i-1));
-// 			write_mmreg32(IOAPIC_BASE + 0x10, old_low);
-// 			
-// 			write_mmreg32(IOAPIC_BASE, 0x10 + 2*(i-1) + 1);
-// 			write_mmreg32(IOAPIC_BASE + 0x10, old_high);
-// 		}
-// 		
-// 		if (i == 24)
-// 			break;
-// 		
-// 		write_mmreg32(IOAPIC_BASE, 0x10 + 2*i);
-// 		old_low = read_mmreg32(IOAPIC_BASE + 0x10);
-// 		
-// 		write_mmreg32(IOAPIC_BASE, 0x10 + 2*i + 1);
-// 		old_high = read_mmreg32(IOAPIC_BASE + 0x10);
-// 		
-// 		write_mmreg32(IOAPIC_BASE, 0x10 + 2*i);
-// 		write_mmreg32(IOAPIC_BASE + 0x10, redirect_low);
-// 		write_mmreg32(IOAPIC_BASE, 0x10 + 2*i + 1);
-// 		write_mmreg32(IOAPIC_BASE + 0x10, redirect_high);
-// 		
-// 		write_mmreg32(IOAPIC_BASE, 0x10 + 2*i);
-// 		new_low = read_mmreg32(IOAPIC_BASE + 0x10);
-// 		write_mmreg32(IOAPIC_BASE, 0x10 + 2*i + 1);
-// 		new_high = read_mmreg32(IOAPIC_BASE + 0x10);	
-// 		
-// 		//Trigger sw based nic interrupt
-// 		cprintf("Trying entry: %u....(WAS: %x %x   NOW: %x %x)\n", i, old_high, old_low, new_high, new_low);
-// 		outb(io_base_addr + 0x38, 0x1);
-// 		udelay(100000);
-// 		outb(io_base_addr + 0x38, 0x1);
-// 		udelay(1000000);
-// 	}
-// */	
-// 	
-// 	/*
-// 	udelay(1000000);
-// 	
-// 	old_high = -1;
-// 	old_low = -1;
-// 	
-// 	for (int i = 23; i >= -1; i--) {
-// 		
-// 		if (i != 23) {
-// 			cprintf("     masking %u with: %x %x\n\n", i+1, old_high, old_low);
-// 			
-// 			write_mmreg32(IOAPIC_BASE, 0x10 + 2*(i + 1));
-// 			write_mmreg32(IOAPIC_BASE + 0x10, old_low);
-// 			
-// 			write_mmreg32(IOAPIC_BASE, 0x10 + 2*(i + 1) + 1);
-// 			write_mmreg32(IOAPIC_BASE + 0x10, old_high);
-// 
-// 		}
-// 		
-// 		if (i == -1)
-// 			break;
-// 		
-// 		write_mmreg32(IOAPIC_BASE, 0x10 + 2*i);
-// 		old_low = read_mmreg32(IOAPIC_BASE + 0x10);
-// 		
-// 		write_mmreg32(IOAPIC_BASE, 0x10 + 2*i + 1);
-// 		old_high = read_mmreg32(IOAPIC_BASE + 0x10);
-// 		
-// 		write_mmreg32(IOAPIC_BASE, 0x10 + 2*i);
-// 		write_mmreg32(IOAPIC_BASE + 0x10, redirect_low);
-// 		write_mmreg32(IOAPIC_BASE, 0x10 + 2*i + 1);
-// 		write_mmreg32(IOAPIC_BASE + 0x10, redirect_high);	
-// 		
-// 		write_mmreg32(IOAPIC_BASE, 0x10 + 2*i);
-// 		new_low = read_mmreg32(IOAPIC_BASE + 0x10);
-// 		write_mmreg32(IOAPIC_BASE, 0x10 + 2*i + 1);
-// 		new_high = read_mmreg32(IOAPIC_BASE + 0x10);	
-// 		
-// 		//Trigger sw based nic interrupt
-// 		cprintf("Trying entry: %u....(WAS: %x %x   NOW: %x %x)\n", i, old_high, old_low, new_high, new_low);
-// 		outb(io_base_addr + 0x38, 0x1);
-// 		udelay(100000);
-// 		outb(io_base_addr + 0x38, 0x1);
-// 		udelay(1000000);
-// 	}
-// 	udelay(1000000); 
-// 	
-// */	
-// 	/*
-// 	cprintf("low: %u\nhigh %u\n", redirect_low, redirect_high);
-// 
-// 	write_mmreg32(IOAPIC_BASE, 0xA0 );
-// 	cprintf("IOAPIC Mappings%x\n", read_mmreg32(IOAPIC_BASE + 0x10));*/
-// 
-// //	cprintf("Core 1 LAPIC ID: %x\n", read_mmreg32(0x0FEE00020));
-// 
-// 	
-// //	panic("WERE ALL GONNA DIE!");
-// 
-// 	return;
-// }
