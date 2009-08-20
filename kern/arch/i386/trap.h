@@ -35,8 +35,9 @@
 
 /* IPIs */
 /* Direct/Hardwired IPIs.  Hardwired in trapentry.S
- * DEATH must come before (have lower priority than) STARTCORE.  see comments in
- * i386/process.c's proc_run() for details. */
+ * Never send a process management IPI without making sure per_cpu_info's
+ * proc_ipi_pending is clear. */
+// TODO: replace this ghetto with an active message (AM)
 #define I_DEATH     230
 #define I_STARTCORE 231
 /* smp_call_function IPIs, keep in sync with NUM_HANDLER_WRAPPERS (and < 16)

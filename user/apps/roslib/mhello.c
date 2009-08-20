@@ -20,7 +20,7 @@ void udelay(uint64_t usec, uint64_t tsc_freq)
 int main(int argc, char** argv)
 {
 	cprintf("Multi-Goodbye, world, from PID: %d!\n", sys_getpid());
-	//while(1);
+	while(1);
 	udelay(5000000, 1995014570); // KVM's freq.  Whatever.
 
 	return 0;

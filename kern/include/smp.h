@@ -21,6 +21,12 @@
 struct per_cpu_info {
 	uint32_t lock;
 	bool preempt_pending;
+ 	/* this flag is only ever set when holding the global scheduler lock, and
+	 * only cleared (without a lock) by the core in a proc_mgmt IPI.  it is
+	 * somewhat arch specific (no in order active messages).  same with the
+	 * p_to_run and tf_to_pop */
+	// TODO: replace this ghetto with an active message (AM)
+	bool proc_ipi_pending;
 	/* a proc_startcore IPI will run these.  replace with a dispatch map? */
 	struct proc *p_to_run;
 	trapframe_t *SAFE tf_to_pop;

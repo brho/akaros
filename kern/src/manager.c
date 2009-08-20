@@ -38,10 +38,15 @@ proc_set_state(p, PROC_RUNNABLE_S);
 proc_set_state(p, PROC_RUNNING_S);
 proc_set_state(p, PROC_RUNNABLE_M);
 // set vcoremap with dispatch plan.  usually done by schedule()
+spin_lock_irqsave(&p->proc_lock);
 p->num_vcores = 5;
 for (int i = 0; i < 5; i++)
 	p->vcoremap[i] = i + 1; // vcore0 -> pcore1, etc, for 3 cores
+spin_unlock_irqsave(&p->proc_lock);
 proc_run(p);
+printk("Killing p\n");
+proc_destroy(p);
+printk("Killed p\n");
 udelay(5000000);
 panic("This is okay");
 
