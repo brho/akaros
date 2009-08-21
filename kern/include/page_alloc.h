@@ -42,7 +42,8 @@ error_t l3_page_alloc(page_t *SAFE *page, size_t color);
 error_t page_free(page_t *SAFE page);
 void page_incref(page_t *SAFE page);
 void page_decref(page_t *SAFE page);
-void page_refset(page_t *SAFE page, size_t val);
+size_t page_getref(page_t *SAFE page);
+void page_setref(page_t *SAFE page, size_t val);
 int page_is_free(size_t ppn);
 
 #endif //PAGE_ALLOC_H

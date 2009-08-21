@@ -33,7 +33,7 @@ sub readdeps {
 			my $target = $filename;
 			my $deplines = $2;
 			my $slash = $3;
-			$target =~ s/\.d/\.o/;
+			$target =~ s/\.d$/\.o/;
 			while ($slash ne '') {
 				$_ = <DEPFILE>;
 				defined($_) or die

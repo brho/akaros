@@ -54,6 +54,22 @@ typedef int32_t ssize_t;
 // off_t is used for file offsets and lengths.
 typedef int32_t off_t;
 
+#define NUM_ADDR_BITS 32
+#define MAX_VADDR     ((uint64_t)(~0) >> (64-NUM_ADDR_BITS))
+
+//Constants for byte sizes
+#define ONE_KILOBYTE  (1L<<10)
+#define ONE_MEGABYTE  (1L<<20)
+#define ONE_GIGABYTE  (1L<<30)
+
+// Return the integer logarithm of the value provided rounded up
+static inline uint32_t LOG2(uint32_t value)
+{
+    uint32_t l = 0;
+    while( (value >> l) > 1 ) ++l;
+    return l;
+}
+
 // Efficient min and max operations
 #define MIN(_a, _b)						\
 ({								\

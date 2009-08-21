@@ -5,6 +5,7 @@
 
 #include <ros/error.h>
 
+#include <kmalloc.h>
 #include <atomic.h>
 #include <string.h>
 #include <assert.h>
@@ -14,6 +15,29 @@
 #include <stdio.h>
 
 static void *DANGEROUS user_mem_check_addr;
+
+// --------------------------------------------------------------
+// Tracking of physical pages.
+// The 'pages' array has one 'page_t' entry per physical page.
+// Pages are reference counted, and free pages are kept on a linked list.
+// --------------------------------------------------------------
+  
+// Initialize page structure and memory free list.
+void page_init(void)
+{
+	// First, make 'pages' point to an array of size 'npages' of
+	// type 'page_t'.
+	// The kernel uses this structure to keep track of physical pages;
+	// 'npages' equals the number of physical pages in memory.
+	// round up to the nearest page
+	size_t page_array_size = ROUNDUP(npages*sizeof(page_t), PGSIZE);
+	pages = (page_t*)boot_alloc(page_array_size, PGSIZE);
+	memset(pages, 0, page_array_size);
+
+	// Now initilaize everything so pages can start to be alloced and freed
+	// from the memory free list
+	page_alloc_init();
+}
 
 //
 // Map the physical page 'pp' at virtual address 'va'.

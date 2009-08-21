@@ -4,7 +4,7 @@
 #pragma nodeputy
 #endif
 
-volatile int magic_mem[8] __attribute__((align(32)));
+volatile int magic_mem[8] __attribute__((aligned(32)));
 
 int32_t frontend_syscall(int32_t syscall_num, uint32_t arg0, uint32_t arg1, uint32_t arg2)
 {
@@ -26,12 +26,6 @@ int32_t frontend_syscall(int32_t syscall_num, uint32_t arg0, uint32_t arg1, uint
 
 	// wait for front-end response
 	while(magic_mem[7] == 0)
-		;
-
-	magic_mem[0] = 0;
-
-	// wait for front-end ack
-	while(magic_mem[7] == 1)
 		;
 
 	ret = magic_mem[1];

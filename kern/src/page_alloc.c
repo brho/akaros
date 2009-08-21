@@ -155,3 +155,11 @@ void page_setref(page_t *page, size_t val)
 	page->page_ref = val;
 }
 
+/*
+ * Get the reference count on a page
+ */
+size_t page_getref(page_t *page)
+{
+	return page->page_ref;
+}
+

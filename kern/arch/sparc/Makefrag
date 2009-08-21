@@ -21,6 +21,8 @@ KERN_ARCH_SRCFILES := $(KERN_ARCH_SRC_DIR)/entry.S \
                       $(KERN_ARCH_SRC_DIR)/console.c \
                       $(KERN_ARCH_SRC_DIR)/frontend.c \
                       $(KERN_ARCH_SRC_DIR)/pmap.c \
+                      $(KERN_ARCH_SRC_DIR)/page_alloc.c \
+                      $(KERN_ARCH_SRC_DIR)/colored_caches.c \
                       $(KERN_ARCH_SRC_DIR)/timer.c \
                       $(KERN_ARCH_SRC_DIR)/env.c \
                       $(KERN_ARCH_SRC_DIR)/smp.c

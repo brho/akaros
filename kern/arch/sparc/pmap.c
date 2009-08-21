@@ -4,13 +4,12 @@
 
 #include <arch/mmu.h>
 #include <ros/memlayout.h>
-#include <multiboot.h>
 #include <pmap.h>
 #include <string.h>
+#include <kmalloc.h>
 
 physaddr_t boot_cr3;
 pde_t* boot_pgdir;
-char* boot_freemem;
 page_t* pages;
 page_list_t page_free_list;
 
@@ -24,37 +23,9 @@ vm_init(void)
 	boot_pgdir = l1_page_table;
 	boot_cr3 = PADDR(boot_pgdir);
 
-	size_t page_array_size = ROUNDUP(npage*sizeof(page_t),PGSIZE);
-	pages = (page_t*)boot_alloc(page_array_size,PGSIZE);
-	memset(pages,0,page_array_size);
-
 	size_t env_array_size = ROUNDUP(NENV*sizeof(env_t), PGSIZE);
 	envs = (env_t *)boot_alloc(env_array_size, PGSIZE);
 	memset(envs, 0, env_array_size);
-}
-
-void
-page_init(void)
-{
-	uintptr_t i;
-	physaddr_t physaddr_after_kernel = PADDR(ROUNDUP(boot_freemem,PGSIZE));
-
-	LIST_INIT(&page_free_list);
-
-	// mark [0, physaddr_after_kernel) as in-use
-	for(i = 0; i < PPN(physaddr_after_kernel); i++)
-		pages[i].pp_ref = 1;
-
-	// mark [physaddr_after_kernel, maxaddrpa) as free
-	for(i = PPN(physaddr_after_kernel); i < PPN(maxaddrpa); i++)
-	{
-		pages[i].pp_ref = 0;
-		LIST_INSERT_HEAD(&page_free_list,&pages[i],pp_link);
-	}
-
-	// mark [maxaddrpa, ...) as in-use (as they are invalid)
-	for(i = PPN(maxaddrpa); i < npage; i++)
-		pages[i].pp_ref = 1;
 }
 
 error_t
@@ -87,7 +58,7 @@ pgdir_walk(pde_t* l1pt, const void*SNT va, int create)
 
 		if(page_alloc(&new_table))
 			return NULL;
-		new_table->pp_ref = 1;
+		page_setref(new_table,1);
 		memset(page2kva(new_table),0,PGSIZE);
 
 		l2_tables_per_page = PGSIZE/(sizeof(pte_t)*NL2ENTRIES);
@@ -98,7 +69,7 @@ pgdir_walk(pde_t* l1pt, const void*SNT va, int create)
 			if(l1pt[l1x_start+i] != 0)
 				continue;
 
-			new_table->pp_ref++;
+			page_incref(new_table);
 			pa = page2pa(new_table) + i*sizeof(pte_t)*NL2ENTRIES;
 			l1pt[l1x_start+i] = PTD(pa);
 		}
@@ -120,7 +91,7 @@ pgdir_walk(pde_t* l1pt, const void*SNT va, int create)
 
 		if(page_alloc(&new_table))
 			return NULL;
-		new_table->pp_ref = 1;
+		page_setref(new_table,1);
 		memset(page2kva(new_table),0,PGSIZE);
 
 		l3_tables_per_page = PGSIZE/(sizeof(pte_t)*NL3ENTRIES);
@@ -131,7 +102,7 @@ pgdir_walk(pde_t* l1pt, const void*SNT va, int create)
 			if(l2pt[l2x_start+i] != 0)
 				continue;
 
-			new_table->pp_ref++;
+			page_incref(new_table);
 			pa = page2pa(new_table) + i*sizeof(pte_t)*NL3ENTRIES;
 			l2pt[l2x_start+i] = PTD(pa);
 		}
@@ -188,13 +159,13 @@ page_check(void)
 	}
 	assert(PTD_ADDR(boot_pgdir[0]) == page2pa(pp0));
 	assert(check_va2pa(boot_pgdir, 0x0) == page2pa(pp1));
-	assert(pp1->pp_ref == 1);
-	assert(pp0->pp_ref == 1);
+	assert(pp1->page_ref == 1);
+	assert(pp0->page_ref == 1);
 
 	// should be able to map pp2 at PGSIZE because pp0 is already allocated for page table
 	assert(page_insert(boot_pgdir, pp2, (void*) PGSIZE, 0) == 0);
 	assert(check_va2pa(boot_pgdir, PGSIZE) == page2pa(pp2));
-	assert(pp2->pp_ref == 1);
+	assert(pp2->page_ref == 1);
 
 	// Make sure that pgdir_walk returns a pointer to the pte and
 	// not the table or some other garbage
@@ -209,7 +180,7 @@ page_check(void)
 	// should be able to map pp2 at PGSIZE because it's already there
 	assert(page_insert(boot_pgdir, pp2, (void*) PGSIZE, PTE_U) == 0);
 	assert(check_va2pa(boot_pgdir, PGSIZE) == page2pa(pp2));
-	assert(pp2->pp_ref == 1);
+	assert(pp2->page_ref == 1);
 
 	// Make sure that we actually changed the permission on pp2 when we re-mapped it
 	{
@@ -231,8 +202,8 @@ page_check(void)
 	assert(check_va2pa(boot_pgdir, 0) == page2pa(pp1));
 	assert(check_va2pa(boot_pgdir, PGSIZE) == page2pa(pp1));
 	// ... and ref counts should reflect this
-	assert(pp1->pp_ref == 2);
-	assert(pp2->pp_ref == 0);
+	assert(pp1->page_ref == 2);
+	assert(pp2->page_ref == 0);
 
 	// pp2 should be returned by page_alloc
 	assert(page_alloc(&pp) == 0 && pp == pp2);
@@ -241,15 +212,15 @@ page_check(void)
 	page_remove(boot_pgdir, 0x0);
 	assert(check_va2pa(boot_pgdir, 0x0) == ~0);
 	assert(check_va2pa(boot_pgdir, PGSIZE) == page2pa(pp1));
-	assert(pp1->pp_ref == 1);
-	assert(pp2->pp_ref == 0);
+	assert(pp1->page_ref == 1);
+	assert(pp2->page_ref == 0);
 
 	// unmapping pp1 at PGSIZE should free it
 	page_remove(boot_pgdir, (void*) PGSIZE);
 	assert(check_va2pa(boot_pgdir, 0x0) == ~0);
 	assert(check_va2pa(boot_pgdir, PGSIZE) == ~0);
-	assert(pp1->pp_ref == 0);
-	assert(pp2->pp_ref == 0);
+	assert(pp1->page_ref == 0);
+	assert(pp2->page_ref == 0);
 
 	// so it should be returned by page_alloc
 	assert(page_alloc(&pp) == 0 && pp == pp1);
@@ -260,8 +231,8 @@ page_check(void)
 	// forcibly take pp0 back
 	assert(PTD_ADDR(boot_pgdir[0]) == page2pa(pp0));
 	boot_pgdir[0] = 0;
-	assert(pp0->pp_ref == 1);
-	pp0->pp_ref = 0;
+	assert(pp0->page_ref == 1);
+	pp0->page_ref = 0;
 
 	// Catch invalid pointer addition in pgdir_walk - i.e. pgdir + PDX(va)
 	{
@@ -275,7 +246,7 @@ page_check(void)
 
 	  // Clean up again
 	  boot_pgdir[PDX(va)] = 0;
-	  pp0->pp_ref = 0;
+	  pp0->page_ref = 0;
 	}
 
 	// give free list back

@@ -96,7 +96,7 @@ void test_page_coloring(void)
 	cprintf("\n");
 
 	//Print some stats about our memory
-	cprintf("Max Address: %u\n", MAX_VADDR);
+	cprintf("Max Address: %llu\n", MAX_VADDR);
 	cprintf("Num Pages: %u\n", npages);
 
 	//Declare a local variable for allocating pages	

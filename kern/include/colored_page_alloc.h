@@ -27,7 +27,7 @@
 error_t _cache##_page_alloc(page_t** page, size_t color)                      \
 {                                                                             \
 	/* 	TODO: Put a lock around this */                                       \
-	if(!LIST_EMPTY(&(_cache##_cache_colored_page_list)[(color)])) {           \
+	if(available_caches._cache && !LIST_EMPTY(&(_cache##_cache_colored_page_list)[(color)])) {           \
 		*(page) = LIST_FIRST(&(_cache##_cache_colored_page_list)[(color)]);   \
 		LIST_REMOVE(*page, global_link);                                      \
 		REMOVE_CACHE_COLORING_PAGE_FROM_FREE_LISTS(page);                     \

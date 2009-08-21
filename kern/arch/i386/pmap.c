@@ -426,29 +426,6 @@ vm_init(void)
 	tlb_flush_global();
 }
 
-// --------------------------------------------------------------
-// Tracking of physical pages.
-// The 'pages' array has one 'page_t' entry per physical page.
-// Pages are reference counted, and free pages are kept on a linked list.
-// --------------------------------------------------------------
-
-// Initialize page structure and memory free list.
-void page_init(void)
-{
-	// First, make 'pages' point to an array of size 'npages' of 
-	// type 'page_t'.
-	// The kernel uses this structure to keep track of physical pages;
-	// 'npages' equals the number of physical pages in memory.  
-	// round up to the nearest page
-	size_t page_array_size = ROUNDUP(npages*sizeof(page_t), PGSIZE);
-	pages = (page_t*)boot_alloc(page_array_size, PGSIZE);
-	memset(pages, 0, page_array_size);
-	
-	// Now initilaize everything so pages can start to be alloced and freed
-	// from the memory free list
-	page_alloc_init();
-}
-
 //
 // Checks that the kernel part of virtual address space
 // has been setup roughly correctly(by i386_vm_init()).
@@ -640,7 +617,7 @@ pgdir_walk(pde_t *pgdir, const void *SNT va, int create)
 	}
 	if (page_alloc(&new_table))
 		return NULL;
-	new_table->page_ref = 1;
+	page_setref(new_table,1);
 	memset(page2kva(new_table), 0, PGSIZE);
 	*the_pde = (pde_t)page2pa(new_table) | PTE_P | PTE_W | PTE_U;
 	return &((pde_t*COUNT(NPTENTRIES))KADDR(PTE_ADDR(*the_pde)))[PTX(va)];

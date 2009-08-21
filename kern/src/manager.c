@@ -27,6 +27,8 @@ void manager(void)
 	static uint8_t progress = 0;
 	env_t *envs[256];
 
+	test_page_coloring();
+
 	switch (progress++) {
 		case 0:
 			envs[0] = kfs_proc_create(kfs_lookup_path("roslib_hello"));
