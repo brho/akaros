@@ -25,7 +25,7 @@
 // need to be global, since there is no function that will always exist for them
 handler_wrapper_t             handler_wrappers[NUM_HANDLER_WRAPPERS];
 
-static int smp_call_function(uint8_t type, uint8_t dest, poly_isr_t handler, TV(t) data,
+static int smp_call_function(uint8_t type, uint32_t dest, poly_isr_t handler, TV(t) data,
                              handler_wrapper_t** wait_wrapper)
 {
 	int8_t state = 0;
@@ -41,7 +41,7 @@ static int smp_call_function(uint8_t type, uint8_t dest, poly_isr_t handler, TV(
 		atomic_dec(&outstanding_calls);
 		return -EBUSY;
 	}
-	
+
 	// assumes our cores are numbered in order
 	if ((type == 4) && (dest >= num_cpus))
 		panic("Destination CPU does not exist!");
@@ -153,7 +153,7 @@ int smp_call_function_all(poly_isr_t handler, TV(t) data,
 	return smp_call_function(2, 0, handler, data, wait_wrapper);
 }
 
-int smp_call_function_single(uint8_t dest, poly_isr_t handler, TV(t) data,
+int smp_call_function_single(uint32_t dest, poly_isr_t handler, TV(t) data,
                              handler_wrapper_t** wait_wrapper)
 {
 	return smp_call_function(4, dest, handler, data, wait_wrapper);

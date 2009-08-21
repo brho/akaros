@@ -40,6 +40,7 @@
 // TODO: replace this ghetto with an active message (AM)
 #define I_DEATH     230
 #define I_STARTCORE 231
+#define I_ACTIVE_MSG 232
 /* smp_call_function IPIs, keep in sync with NUM_HANDLER_WRAPPERS (and < 16)
  * it's important that this begins with 0xf0.  check i386/trap.c for details. */
 #define I_SMP_CALL0 0xf0 // 240
@@ -51,6 +52,8 @@
 /* Testing IPI (used in testing.c) */
 #define I_TESTING 0xff
 
+/* Number of active messages available per core (arbitrary) */
+#define NUM_ACTIVE_MESSAGES 5
 
 
 #ifndef __ASSEMBLER__

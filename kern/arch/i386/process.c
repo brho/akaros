@@ -60,5 +60,5 @@ void __death(trapframe_t *tf)
 	// TODO: replace this ghetto with an active message (AM)
 	per_cpu_info[core_id()].proc_ipi_pending = 0;
 	lapic_send_eoi();
-	smp_idle();		
+	smp_idle();	
 }

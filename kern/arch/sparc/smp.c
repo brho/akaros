@@ -107,7 +107,7 @@ int smp_call_function_all(isr_t handler, void* data,
 	return 0;
 }
 
-int smp_call_function_single(uint8_t dest, isr_t handler, void* data,
+int smp_call_function_single(uint32_t dest, isr_t handler, void* data,
                              handler_wrapper_t** wait_wrapper)
 {
 	int8_t state = 0;

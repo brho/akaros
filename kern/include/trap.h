@@ -26,4 +26,33 @@ void ( page_fault_handler)(trapframe_t *tf);
 
 void sysenter_init(void);
 extern void sysenter_handler();
+
+/* Active messages.  Each arch implements them in their own way.  Both should be
+ * guaranteeing in-order delivery.  Kept here in trap.h, since sparc is using
+ * trap.h for AMs
+ *
+ * These are different (for now) than the smp_calls in smp.h, since
+ * they will be executed immediately, and in the order in which they are sent.
+ * smp_calls are currently not run in order, and if they put things on the
+ * workqueue, they don't get run until smp_idle (for now).
+ *
+ * Also, a big difference is that smp_calls can use the same message (registered
+ * in the interrupt_handlers[] for x86) for every recipient, but the active
+ * messages require a unique message.  Also for now, but it might be like that
+ * for a while on x86. */
+
+typedef void (*amr_t)(trapframe_t* tf, uint32_t srcid, uint32_t a0, uint32_t a1,
+                      uint32_t a2);
+typedef struct
+{
+	uint32_t srcid;
+	amr_t pc;
+	uint32_t arg0;
+	uint32_t arg1;
+	uint32_t arg2;
+	uint32_t pad;
+} active_message_t;
+
+uint32_t send_active_message(uint32_t dst, amr_t pc, uint32_t arg0,
+                             uint32_t arg1, uint32_t arg2);
 #endif /* ROS_KERN_TRAP_H */

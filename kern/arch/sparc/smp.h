@@ -13,4 +13,4 @@ typedef struct
 	spinlock_t lock;
 } handler_wrapper_t;
 
-#endif
+#endif /* !ROS_ARCH_SMP_H */

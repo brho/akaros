@@ -7,6 +7,7 @@
 #include <arch/arch.h>
 #include <arch/console.h>
 #include <arch/apic.h>
+#include <ros/common.h>
 #include <smp.h>
 #include <assert.h>
 #include <pmap.h>
@@ -347,7 +348,7 @@ void sysenter_init(void)
 void sysenter_callwrapper(struct Trapframe *tf)
 {
 	current->env_tf = *tf;
-	
+
 	// The trapframe on the stack should be ignored from here on.
 	tf = &current->env_tf;
 	tf->tf_regs.reg_eax = (intreg_t) syscall(current,
@@ -364,4 +365,60 @@ void sysenter_callwrapper(struct Trapframe *tf)
 	 * likewise, tf could be pointing to random gibberish.
 	 */
 	proc_startcore(current, tf);
+}
+
+uint32_t send_active_message(uint32_t dst, amr_t pc, uint32_t arg0,
+                             uint32_t arg1, uint32_t arg2)
+{
+	error_t retval = -EBUSY;
+	spin_lock_irqsave(&per_cpu_info[dst].amsg_lock);
+	size_t current_amsg = per_cpu_info[dst].amsg_current;
+	// If there's a PC there, then that means it's an outstanding message
+	FOR_CIRC_BUFFER(current_amsg, NUM_ACTIVE_MESSAGES, i) {
+		if (per_cpu_info[dst].active_msgs[i].pc)
+			continue;
+		per_cpu_info[dst].active_msgs[i].pc = pc;
+		per_cpu_info[dst].active_msgs[i].arg0 = arg0;
+		per_cpu_info[dst].active_msgs[i].arg1 = arg1;
+		per_cpu_info[dst].active_msgs[i].arg2 = arg2;
+		per_cpu_info[dst].active_msgs[i].srcid = core_id();
+		retval = 0;
+		break;
+	}
+	spin_unlock_irqsave(&per_cpu_info[dst].amsg_lock);
+	if (!retval)
+		send_ipi(dst, 0, I_ACTIVE_MSG);
+	return retval;
+}
+
+/* Active message handler.  We don't want to block other AMs from coming in, so
+ * we'll copy out the message and let go of the lock.  This won't return until
+ * all pending AMs are executed.  If the PC is 0, then this was an extra IPI and
+ * we already handled the message (or someone is sending IPIs without loading
+ * the active message...)
+ * Note that all of this happens from interrupt context, and interrupts are
+ * currently disabled for this gate. */
+void __active_message(trapframe_t *tf)
+{
+	struct per_cpu_info *myinfo = &per_cpu_info[core_id()];
+	active_message_t amsg;
+
+	while (1) { // will break out when we find an empty amsg
+		/* Get the message */
+		spin_lock_irqsave(&myinfo->amsg_lock);
+		if (myinfo->active_msgs[myinfo->amsg_current].pc) {
+			amsg = myinfo->active_msgs[myinfo->amsg_current];
+			myinfo->active_msgs[myinfo->amsg_current].pc = 0;
+			myinfo->amsg_current = (myinfo->amsg_current + 1) %
+			                       NUM_ACTIVE_MESSAGES;
+		} else { // was no PC in the current active message, meaning we do nothing
+			spin_unlock_irqsave(&myinfo->amsg_lock);
+			lapic_send_eoi();
+			return;
+		}
+		spin_unlock_irqsave(&myinfo->amsg_lock);
+		/* Execute the active message */
+		amsg.pc(tf, amsg.srcid, amsg.arg0, amsg.arg1, amsg.arg2);
+	}
+
 }

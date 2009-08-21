@@ -157,7 +157,7 @@ void proc_run(struct proc *p)
 			 * - This turns out to not be enough, although it is necessary.  We
 			 *   also need to make sure no other proc management IPIs are sent,
 			 *   since IPIs can be received out of order, hence the use of the
-			 *   pending flag. 
+			 *   pending flag.
 			// TODO: replace this ghetto with an active message (AM)
 			 * - Be *very* careful with this, since there may be a deadlock when
 			 *   sending an IPI to yourself when another is outstanding.  This
@@ -329,11 +329,11 @@ void proc_destroy(struct proc *p)
 	 * CAS instead (another lock would be slightly less ghetto).  but we need to
 	 * decref before releasing the lock, since that could enable interrupts,
 	 * which would have us receive the DEATH IPI if this was called locally by
-	 * the target process. */ 
+	 * the target process. */
 	//proc_decref(p); // this decref is for the process in general
 	p->env_refcnt--;
 	size_t refcnt = p->env_refcnt; // need to copy this in so it's not reloaded
-	
+
 	/* After unlocking, we can receive a DEATH IPI and clean up */
 	spin_unlock_irqsave(&p->proc_lock);
 

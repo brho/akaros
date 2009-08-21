@@ -22,18 +22,6 @@ typedef struct
 	uint64_t timestamp;
 } trapframe_t;
 
-typedef void (*amr_t)(trapframe_t* tf, uint32_t srcid, uint32_t a0, uint32_t a1, uint32_t a2);
-
-typedef struct
-{
-	uint32_t srcid;
-	amr_t pc;
-	uint32_t arg0;
-	uint32_t arg1;
-	uint32_t arg2;
-	uint32_t pad;
-} active_message_t;
-
 typedef struct
 {
 	uint32_t fpr[32];

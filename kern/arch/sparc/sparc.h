@@ -23,7 +23,7 @@
 #define XSTR(arg) STR(arg)
 
 #include <arch/types.h>
-#include <arch/trap.h>
+#include <trap.h>
 #include <arch/frontend.h>
 
 static __inline uint32_t read_psr(void) __attribute__((always_inline));
@@ -42,7 +42,6 @@ static __inline void write_fsr(uint32_t val) __attribute__((always_inline));
 static __inline uint32_t memsize_mb(void) __attribute__((always_inline));
 static __inline uint32_t mmu_probe(uint32_t va) __attribute__((always_inline));
 
-uint32_t send_active_message(uint32_t dst, amr_t pc, uint32_t arg0, uint32_t arg1, uint32_t arg2);
 void flush_windows();
 
 #define store_alternate(addr,asi,data) ({ uint32_t __my_addr = (addr); uint32_t __my_data = (data); __asm__ __volatile__ ("sta %0,[%1] %2" : : "r"(__my_data),"r"(__my_addr),"i"(asi)); })

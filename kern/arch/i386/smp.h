@@ -19,4 +19,4 @@ typedef struct HandlerWrapper {
 	uint8_t vector;
 } handler_wrapper_t;
 
-#endif
+#endif /* !ROS_ARCH_SMP_H */
