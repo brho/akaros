@@ -1,7 +1,4 @@
 // System call stubs.
-#ifdef __DEPUTY__
-#pragma nodeputy
-#endif
 
 #include <parlib.h>
 

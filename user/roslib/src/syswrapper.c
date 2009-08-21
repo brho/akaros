@@ -1,6 +1,3 @@
-#ifdef __DEPUTY__
-#pragma nodeputy
-#endif
 
 #include <types.h>
 #include <lib.h>

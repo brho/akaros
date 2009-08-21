@@ -1,12 +1,8 @@
-#ifdef __DEPUTY__
-#pragma nodeputy
-#endif
-
 #include <ros/error.h>
 #include <stdio.h>
 
 #define BUFLEN 1024
-static char buf[BUFLEN];
+static char (NT buf)[BUFLEN];
 
 char *
 readline(const char *prompt)

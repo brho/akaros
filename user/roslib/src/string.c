@@ -1,9 +1,5 @@
 // Basic string routines.  Not hardware optimized, but not shabby.
 
-#ifdef __DEPUTY__
-#pragma nodeputy
-#endif
-
 #include <string.h>
 
 int
@@ -26,6 +22,8 @@ strnlen(const char *s, size_t size)
 	return n;
 }
 
+#if 0
+// zra: strcpy should not be.
 char *
 strcpy(char *dst, const char *src)
 {
@@ -36,6 +34,7 @@ strcpy(char *dst, const char *src)
 		/* do nothing */;
 	return ret;
 }
+#endif
 
 char *
 strncpy(char *dst, const char *src, size_t size) {
@@ -109,10 +108,11 @@ strfind(const char *s, char c)
 
 
 void *
-memset(void *v, int c, size_t n)
+memset(void *COUNT(_n) v, int c, size_t _n)
 {
-	char *p;
+	char *BND(v,v+_n) p;
 	int m;
+	size_t n = _n;
 
 	p = v;
 	m = n;
@@ -123,10 +123,11 @@ memset(void *v, int c, size_t n)
 }
 
 void *
-memcpy(void *dst, const void *src, size_t n)
+(DMEMCPY(1,2,3) memcpy)(void *COUNT(_n) dst, const void *COUNT(_n) src, size_t _n)
 {
-	const char *s;
-	char *d;
+	const char *BND(src,src+_n) s;
+	char *BND(dst,dst+_n) d;
+	size_t n = _n;
 
 	s = src;
 	d = dst;
@@ -137,10 +138,11 @@ memcpy(void *dst, const void *src, size_t n)
 }
 
 void *
-memmove(void *dst, const void *src, size_t n)
+memmove(void *COUNT(_n) dst, const void *COUNT(_n) src, size_t _n)
 {
-	const char *s;
-	char *d;
+	const char *BND(src,src+_n) s;
+	char *BND(dst,dst+_n) d;
+	size_t n = _n;
 	
 	s = src;
 	d = dst;
@@ -157,10 +159,10 @@ memmove(void *dst, const void *src, size_t n)
 }
 
 int
-memcmp(const void *v1, const void *v2, size_t n)
+memcmp(const void *COUNT(n) v1, const void *COUNT(n) v2, size_t n)
 {
-	const uint8_t *s1 = (const uint8_t *) v1;
-	const uint8_t *s2 = (const uint8_t *) v2;
+	const uint8_t *BND(v1,v1+n) s1 = (const uint8_t *) v1;
+	const uint8_t *BND(v2,v2+n) s2 = (const uint8_t *) v2;
 
 	while (n-- > 0) {
 		if (*s1 != *s2)
@@ -172,13 +174,14 @@ memcmp(const void *v1, const void *v2, size_t n)
 }
 
 void *
-memfind(const void *s, int c, size_t n)
+memfind(const void *COUNT(n) _s, int c, size_t n)
 {
-	const void *ends = (const char *) s + n;
+	const void *SNT ends = (const char *) _s + n;
+	const void *BND(_s,_s + n) s = _s;
 	for (; s < ends; s++)
 		if (*(const unsigned char *) s == (unsigned char) c)
 			break;
-	return (void *) s;
+	return (void *BND(_s,_s + n)) s;
 }
 
 long

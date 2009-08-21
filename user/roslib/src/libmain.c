@@ -1,12 +1,12 @@
 // Called from entry.S to get us going.
-#ifdef __DEPUTY__
-#pragma nodeputy
-#endif
 
+#include <arch/mmu.h>
+#include <ros/memlayout.h>
 #include <lib.h>
+#include <stdio.h>
 #include <ros/syscall.h>
 
-extern int main(int argc, char **argv);
+extern int main(int argc, char *NTS*NT COUNT(argc) argv);
 
 char *binaryname = "(PROGRAM NAME UNKNOWN)";
 syscall_front_ring_t syscallfrontring;
@@ -18,7 +18,7 @@ timer_pool_t timer_pool;
 // This is meant to be PER USER THREAD!!! (TODO (benh))
 async_desc_t* current_async_desc;
 
-void libmain(int argc, char **argv)
+void libmain(int argc, char * NTS * NT COUNT(argc) argv)
 {
 	// Set up the front ring for the general syscall ring
 	// and the back ring for the general sysevent ring

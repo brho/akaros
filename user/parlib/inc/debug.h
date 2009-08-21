@@ -10,13 +10,18 @@ typedef void * TRUSTED va_list;
     ((ap) = (va_list)&(last) + __va_size(last))
 
 #define va_arg(ap, type) \
-    (*(type *)((ap) += __va_size(type), (ap) - __va_size(type)))
+    (*(type *COUNT(1))((ap) += __va_size(type), (ap) - __va_size(type)))
 
 #define va_end(ap)  ((void)0)
 
-size_t	strnlen(const char *s, size_t size);
+size_t	strnlen(const char *NTS s, size_t size);
+#ifdef __DEPUTY__
+void debugfmt(void (*putch)(int, TV(t)), TV(t) putdat, const char *NTS fmt, ...);
+void vdebugfmt(void (*putch)(int, TV(t)), TV(t) putdat, const char *NTS fmt, va_list);
+#else
 void debugfmt(void (*putch)(int, void**), void **putdat, const char *NTS fmt, ...);
 void vdebugfmt(void (*putch)(int, void**), void **putdat, const char *NTS fmt, va_list);
+#endif
 
 int	debug(const char * NTS fmt, ...);
 int	vdebug(const char * NTS fmt, va_list);

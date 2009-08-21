@@ -1,7 +1,3 @@
-#ifdef __DEPUTY__
-#pragma nodeputy
-#endif
-
 #include <lib.h>
 #include <ros/syscall.h>
 

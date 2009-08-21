@@ -1,7 +1,4 @@
 // System call stubs.
-#ifdef __DEPUTY__
-#pragma nodeputy
-#endif
 
 #include <arch/types.h>
 #include <arch/arch.h>
@@ -12,7 +9,7 @@ intreg_t syscall(uint16_t num, intreg_t a1,
                 intreg_t a2, intreg_t a3,
                 intreg_t a4, intreg_t a5);
 
-static error_t async_syscall(syscall_req_t* req, syscall_desc_t* desc)
+static error_t async_syscall(syscall_req_t *COUNT(1) req, syscall_desc_t* desc)
 {
 	// Note that this assumes one global frontring (TODO)
 	// abort if there is no room for our request.  ring size is currently 64.

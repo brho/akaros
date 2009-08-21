@@ -1,10 +1,6 @@
 #include <inc/lib.h>
 #include <inc/syswrapper.h>
 
-#ifdef __DEPUTY__
-#pragma nodeputy
-#endif
-
 int main(int argc, char** argv)
 {
 	int pid = sys_getpid();

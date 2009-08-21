@@ -8,10 +8,6 @@
 #include <syswrapper.h>
 #include <atomic.h>
 
-#ifdef __DEPUTY__
-#pragma nodeputy
-#endif
-
 /* System-Global shared page */
 #define shared_page UGDATA
 
@@ -20,8 +16,9 @@
  * - Second is some job info in here too.
  */
 
-barrier_t* bar = (barrier_t*)shared_page;
-volatile uint32_t* job_to_run = (uint32_t*)(shared_page + sizeof(barrier_t));
+barrier_t*COUNT(1) bar = (barrier_t*COUNT(1))TC(shared_page);
+volatile uint32_t*COUNT(1) job_to_run =
+    (uint32_t*COUNT(1))TC(shared_page + sizeof(barrier_t));
 
 // Experiment constants
 uint32_t corecount = 0;
@@ -127,7 +124,7 @@ void buster_async_wrapper(uint32_t iters, uint32_t num_writes, uint32_t flags)
 	waiton_async_call(&desc1, &rsp1);
 }
 
-void buster_thruput_sync(uint32_t flags, char* text)
+void buster_thruput_sync(uint32_t flags, char*NTS text)
 {
 	uint64_t thruput_ticks = 0;;	
 	for (int i = 1; i < MAX_CACHELINE_WRITES; i= i*2) {
@@ -142,7 +139,7 @@ void buster_thruput_sync(uint32_t flags, char* text)
 	}
 }
 
-void buster_thruput_async(uint32_t flags, char* text)
+void buster_thruput_async(uint32_t flags, char*NTS text)
 {
 	uint64_t thruput_ticks = 0;;	
 	for (int i = 1; i < MAX_CACHELINE_WRITES; i= i*2) {
@@ -156,7 +153,7 @@ void buster_thruput_async(uint32_t flags, char* text)
 	}
 }
 
-void buster_latency_sync(uint32_t flags, char* text) 
+void buster_latency_sync(uint32_t flags, char*NTS text) 
 {
 	uint64_t tick;
 	for (int i = 1; i < MAX_CACHELINE_WRITES; i=i*2) { // 1 - 128
@@ -166,7 +163,7 @@ void buster_latency_sync(uint32_t flags, char* text)
 	}
 }
 
-void buster_latency_async(uint32_t flags, char* text) 
+void buster_latency_async(uint32_t flags, char*NTS text) 
 {
 	uint64_t tick;
 	for (int i = 1; i < MAX_CACHELINE_WRITES; i=i*2) { // 1 - 128

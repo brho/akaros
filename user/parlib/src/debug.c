@@ -4,9 +4,6 @@
 // cprintf is a debugging statement, not a generic output statement.
 // It is very important that it always go to the console, especially when
 // debugging file descriptor code!
-#ifdef __DEPUTY__
-#pragma nodeputy
-#endif
 
 #include <arch/types.h>
 #include <parlib.h>
@@ -38,11 +35,11 @@ static void putch(int ch, debugbuf_t **b)
 int vdebug(const char *fmt, va_list ap)
 {
 	debugbuf_t b;
-	debugbuf_t *bp = &b;
+	debugbuf_t *COUNT(1) bp = &b;
 
 	b.idx = 0;
 	b.cnt = 0;
-	vdebugfmt((void*)putch, (void**)&bp, fmt, ap);
+	vdebugfmt(putch, &bp, fmt, ap);
 	sys_cputs(b.buf, b.idx);
 
 	return b.cnt;

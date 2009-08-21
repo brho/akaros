@@ -255,7 +255,7 @@ memcmp(const void *COUNT(n) v1, const void *COUNT(n) v2, size_t n)
 }
 
 void *
-memfind(const void *_s, int c, size_t n)
+memfind(const void *COUNT(n) _s, int c, size_t n)
 {
 	const void *SNT ends = (const char *) _s + n;
 	const void *BND(_s,_s + n) s = _s;

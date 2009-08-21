@@ -1,21 +1,23 @@
 #include <arch/mmu.h>
 #include <ros/memlayout.h>
 
-.data
+.section .data
 
 
 // Define the global symbols 'procinfo', 'procdata', 'pages', 'vpt', and 'vpd'
 // so that they can be used in C as if they were ordinary global arrays.
-	.globl procinfo
-	.set procinfo, UINFO
-	.globl procdata
-	.set procdata, UDATA
-	.globl pages
-	.set pages, UPAGES
-	.globl vpt
-	.set vpt, UVPT
-	.globl vpd
-	.set vpd, (UVPT+(UVPT>>12)*4)
+.globl procinfo
+procinfo:
+.long UINFO
+.globl procdata
+procdata:
+.long UDATA
+.globl vpt
+vpt:
+.long UVPT
+.globl vpd
+vpd:
+.long (UVPT+(UVPT>>12)*4)
 
 
 // Entrypoint - this is where the kernel (or our parent process)
