@@ -386,6 +386,8 @@ uint32_t send_active_message(uint32_t dst, amr_t pc, uint32_t arg0,
 		break;
 	}
 	spin_unlock_irqsave(&per_cpu_info[dst].amsg_lock);
+	// since we touched memory the other core will touch (the lock), we don't
+	// need an wmb_f()
 	if (!retval)
 		send_ipi(dst, 0, I_ACTIVE_MSG);
 	return retval;
@@ -403,6 +405,7 @@ void __active_message(trapframe_t *tf)
 	struct per_cpu_info *myinfo = &per_cpu_info[core_id()];
 	active_message_t amsg;
 
+	lapic_send_eoi();
 	while (1) { // will break out when we find an empty amsg
 		/* Get the message */
 		spin_lock_irqsave(&myinfo->amsg_lock);
@@ -413,12 +416,18 @@ void __active_message(trapframe_t *tf)
 			                       NUM_ACTIVE_MESSAGES;
 		} else { // was no PC in the current active message, meaning we do nothing
 			spin_unlock_irqsave(&myinfo->amsg_lock);
-			lapic_send_eoi();
 			return;
 		}
+		/* In case the function doesn't return (which is common: __startcore,
+		 * __death, etc), there is a chance we could lose an amsg.  We can only
+		 * have up to two interrupts outstanding, and if we never return, we
+		 * never deal with any other amsgs.  This extra IPI hurts performance
+		 * but is only necessary if there is another outstanding message in the
+		 * buffer, but makes sure we never miss out on an amsg. */
+		if (myinfo->active_msgs[myinfo->amsg_current].pc)
+			send_ipi(core_id(), 0, I_ACTIVE_MSG);
 		spin_unlock_irqsave(&myinfo->amsg_lock);
 		/* Execute the active message */
 		amsg.pc(tf, amsg.srcid, amsg.arg0, amsg.arg1, amsg.arg2);
 	}
-
 }

@@ -136,48 +136,33 @@ void proc_run(struct proc *p)
 			break;
 		case (PROC_RUNNABLE_M):
 			proc_set_state(p, PROC_RUNNING_M);
-			/* Prep each core that we are going to run this process on.
-			 * vcoremap[i] holds the coreid of the physical core allocated to
-			 * this process.  It is set outside proc_run */
-			for (int i = 0; i < p->num_vcores; i++) {
-				per_cpu_info[p->vcoremap[i]].p_to_run = p;
+			/* vcoremap[i] holds the coreid of the physical core allocated to
+			 * this process.  It is set outside proc_run.  For the active
+			 * message, a0 = struct proc*, a1 = struct trapframe*.   */
+			if (p->num_vcores) {
+				// TODO: handle silly state (HSS)
+				// set virtual core 0 to run the main context
+				send_active_msg_sync(p->vcoremap[0], __startcore, p,
+				                     &p->env_tf, 0);
+				/* handle the others.  note the sync message will spin until
+				 * there is a free active message slot, which could lock up the
+				 * system.  think about this. (TODO) */
+				for (int i = 1; i < p->num_vcores; i++)
+					send_active_msg_sync(p->vcoremap[i], __startcore, p, 0, 0);
 			}
-			// set virtual core 0 to run the main context
-			// TODO: handle silly state (HSS)
-			per_cpu_info[p->vcoremap[0]].tf_to_pop = &p->env_tf;
-			/* needed to make sure the writes beat the IPI.  could have done it
-			 * with other mem accesses, like grabbing a lock, and the write
-			 * would have made it */
-			wmb_f();
 			/* There a subtle (attempted) race avoidance here.  proc_startcore
-			 * can handle a death IPI, but we can't have the startcore come
-			 * after the death IPI.  Otherwise, it would look like a new
-			 * process.  So we hold the lock to make sure our IPI went out
-			 * before a possible death IPI.
-			 * - This turns out to not be enough, although it is necessary.  We
-			 *   also need to make sure no other proc management IPIs are sent,
-			 *   since IPIs can be received out of order, hence the use of the
-			 *   pending flag.
-			// TODO: replace this ghetto with an active message (AM)
-			 * - Be *very* careful with this, since there may be a deadlock when
-			 *   sending an IPI to yourself when another is outstanding.  This
-			 *   shouldn't happen, since we should be holding some sort of
-			 *   global proc management lock when sending any of these IPIs out.
+			 * can handle a death message, but we can't have the startcore come
+			 * after the death message.  Otherwise, it would look like a new
+			 * process.  So we hold the lock to make sure our message went out
+			 * before a possible death message.
 			 * - Likewise, we need interrupts to be disabled, in case one of the
-			 *   IPIs was for us, and reenable them after letting go of the
+			 *   messages was for us, and reenable them after letting go of the
 			 *   lock.  This is done by spin_lock_irqsave, so be careful if you
 			 *   change this.
 			 * - This can also be done far more intelligently / efficiently,
 			 *   like skipping in case it's busy and coming back later.
 			 * - Note there is no guarantee this core's interrupts were on, so
-			 *   it may not get the IPI for a while... */
-			for (int i = 0; i < p->num_vcores; i++) {
-				// TODO: replace this ghetto with an active message (AM)
-				while(per_cpu_info[p->vcoremap[i]].proc_ipi_pending)
-					cpu_relax();
-				per_cpu_info[p->vcoremap[i]].proc_ipi_pending = TRUE;
-				send_ipi(p->vcoremap[i], 0, I_STARTCORE);
-			}
+			 *   it may not get the message for a while... */
 			spin_unlock_irqsave(&p->proc_lock);
 			break;
 		default:
@@ -292,32 +277,22 @@ void proc_destroy(struct proc *p)
 			deschedule_proc(p);
 			break;
 		case PROC_RUNNING_S:
-			/* We could use the IPI regardless, but the common case here
-			 * probably isn't remote death. */
+			#if 0
+			// here's how to do it manually
 			if (current == p) {
 				lcr3(boot_cr3);
 				proc_decref(p); // this decref is for the cr3
 				current = NULL;
-			} else {
-				// TODO: replace this ghetto with an active message (AM)
-				while(per_cpu_info[p->vcoremap[0]].proc_ipi_pending)
-					cpu_relax();
-				per_cpu_info[p->vcoremap[0]].proc_ipi_pending = TRUE;
-				send_ipi(p->vcoremap[0], 0, I_DEATH);
 			}
-			smp_idle();
+			#endif
+			send_active_msg_sync(p->vcoremap[0], __death, 0, 0, 0);
+			break;
 		case PROC_RUNNING_M:
-			/* Send the DEATH IPI to every core running this process.  See notes
-			 * above about issues with this while loop and proc_ipi_pending */
-			for (int i = 0; i < p->num_vcores; i++) {
-				// TODO: replace this ghetto with an active message (AM)
-				while(per_cpu_info[p->vcoremap[i]].proc_ipi_pending)
-					cpu_relax();
-				per_cpu_info[p->vcoremap[i]].proc_ipi_pending = TRUE;
-				send_ipi(p->vcoremap[i], 0, I_DEATH);
-			}
-			/* TODO: will need to update the pcoremap that's currently in
-			 * schedule */
+			/* Send the DEATH message to every core running this process. */
+			for (int i = 0; i < p->num_vcores; i++)
+				send_active_msg_sync(p->vcoremap[i], __death, 0, 0, 0);
+			/* TODO: might need to update the pcoremap that's currently in
+			 * schedule, though probably not. */
 			break;
 		default:
 			panic("Weird state in proc_destroy");

@@ -32,8 +32,6 @@ void manager(void)
 	static uint8_t progress = 0;
 	struct proc *envs[256];
 
-test_active_messages();
-panic("");
 struct proc *p = kfs_proc_create(kfs_lookup_path("roslib_mhello"));
 // being proper and all:
 proc_set_state(p, PROC_RUNNABLE_S);
@@ -46,6 +44,7 @@ for (int i = 0; i < 5; i++)
 	p->vcoremap[i] = i + 1; // vcore0 -> pcore1, etc, for 3 cores
 spin_unlock_irqsave(&p->proc_lock);
 proc_run(p);
+udelay(5000000);
 printk("Killing p\n");
 proc_destroy(p);
 printk("Killed p\n");

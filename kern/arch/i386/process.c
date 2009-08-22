@@ -8,23 +8,15 @@
 #include <assert.h>
 #include <stdio.h>
 
-/* Interrupt handler to start a process's context on this core. */
-void __startcore(trapframe_t *tf)
+/* Active message handler to start a process's context on this core.  Tightly
+ * coupled with proc_run() */
+void __startcore(trapframe_t *tf, uint32_t srcid, uint32_t a0, uint32_t a1,
+                 uint32_t a2)
 {
 	uint32_t coreid = core_id();
-	struct proc *p_to_run = per_cpu_info[coreid].p_to_run;
-	trapframe_t local_tf, *tf_to_pop = per_cpu_info[coreid].tf_to_pop;
-
-	/* Once we copied in the message and are in the handler, we can allow future
-	 * proc_management IPIs to this core. */
-	// TODO: replace this ghetto with an active message (AM)
-	per_cpu_info[coreid].proc_ipi_pending = 0;
-
-	/* EOI - we received the interrupt.  probably no issues with receiving
-	 * further interrupts in this function.  need to do this before
-	 * proc_startcore.  incidentally, interrupts are off in this handler
-	 * anyways, since it's set up as an interrupt gate for now. */
-	lapic_send_eoi();
+	struct proc *p_to_run = (struct proc *SAFE) TC(a0);
+	trapframe_t local_tf;
+	trapframe_t *tf_to_pop = (trapframe_t *SAFE) TC(a1);
 
 	printk("Startcore on core %d\n", coreid);
 	assert(p_to_run);
@@ -40,11 +32,12 @@ void __startcore(trapframe_t *tf)
 	proc_startcore(p_to_run, tf_to_pop);
 }
 
-/* Interrupt handler to stop running whatever context is on this core and to
- * idle.  Note this leaves no trace of what was running.
+/* Active message handler to stop running whatever context is on this core and
+ * to idle.  Note this leaves no trace of what was running.
  * It's okay if death comes to a core that's already idling and has no current.
  * It could happen if a process decref'd before proc_startcore could incref. */
-void __death(trapframe_t *tf)
+void __death(trapframe_t *tf, uint32_t srcid, uint32_t a0, uint32_t a1,
+             uint32_t a2)
 {
 	/* If we are currently running an address space on our core, we need a known
 	 * good pgdir before releasing the old one.  This is currently the major
@@ -56,9 +49,5 @@ void __death(trapframe_t *tf)
 		proc_decref(current);
 		current = NULL;
 	}
-	// As above, signal that it's okay to send us a proc mgmt IPI
-	// TODO: replace this ghetto with an active message (AM)
-	per_cpu_info[core_id()].proc_ipi_pending = 0;
-	lapic_send_eoi();
-	smp_idle();	
+	smp_idle();
 }

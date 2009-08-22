@@ -33,7 +33,7 @@ atomic_t outstanding_calls = 0;
  *   queue, then halt again.
  *
  * TODO: think about resetting the stack pointer at the beginning for worker
- * cores.
+ * cores. (keeps the stack from growing if we never go back to userspace).
  * TODO: think about unifying the manager into a workqueue function, so we don't
  * need to check mgmt_core in here.  it gets a little ugly, since there are
  * other places where we check for mgmt and might not smp_idle / call manager.

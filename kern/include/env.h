@@ -93,7 +93,7 @@ extern env_t* curenvs[MAX_NUM_CPUS];
 
 void	env_init(void);
 int		env_alloc(env_t *SAFE*SAFE e, envid_t parent_id);
-void	env_init_trapframe(trapframe_t *tf);
+void	env_init_trapframe(trapframe_t *SAFE tf);
 void	env_set_program_counter(env_t* e, uintptr_t pc);
 void	env_push_ancillary_state(env_t* e);
 void	env_pop_ancillary_state(env_t* e);

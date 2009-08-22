@@ -34,23 +34,18 @@
 #define T_DEFAULT   0xdeadbeef		// catchall
 
 /* IPIs */
-/* Direct/Hardwired IPIs.  Hardwired in trapentry.S
- * Never send a process management IPI without making sure per_cpu_info's
- * proc_ipi_pending is clear. */
-// TODO: replace this ghetto with an active message (AM)
-#define I_DEATH     230
-#define I_STARTCORE 231
-#define I_ACTIVE_MSG 232
+/* Testing IPI (used in testing.c) */
+#define I_TESTING		230
 /* smp_call_function IPIs, keep in sync with NUM_HANDLER_WRAPPERS (and < 16)
  * it's important that this begins with 0xf0.  check i386/trap.c for details. */
-#define I_SMP_CALL0 0xf0 // 240
-#define I_SMP_CALL1 0xf1
-#define I_SMP_CALL2 0xf2
-#define I_SMP_CALL3 0xf3
-#define I_SMP_CALL4 0xf4
+#define I_SMP_CALL0 	0xf0 // 240
+#define I_SMP_CALL1 	0xf1
+#define I_SMP_CALL2 	0xf2
+#define I_SMP_CALL3 	0xf3
+#define I_SMP_CALL4 	0xf4
 #define I_SMP_CALL_LAST I_SMP_CALL4
-/* Testing IPI (used in testing.c) */
-#define I_TESTING 0xff
+/* Direct/Hardwired IPIs.  Hardwired in trapentry.S */
+#define I_ACTIVE_MSG	255
 
 /* Number of active messages available per core (arbitrary) */
 #define NUM_ACTIVE_MESSAGES 5

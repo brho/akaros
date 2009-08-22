@@ -17,7 +17,7 @@
  * a trap.  It pushes a trap number onto the stack, then jumps to _alltraps.
  * It also builds this traps portion of the trap_tbl.
  * Use TRAPHANDLER for traps where the CPU automatically pushes an error code.
- */ 
+ */
 #define TRAPHANDLER(name, num)									\
 	.text;														\
 	.globl name;		/* define global symbol for 'name' */	\
@@ -61,7 +61,7 @@
 	.long name;							\
 	.long num
 
-/* Same as above, but takes a specific function to jump to.  See comments 
+/* Same as above, but takes a specific function to jump to.  See comments
  * below from _allirqs for details.
  */
 #define IRQ_HANDLER_SPEC(name, num, func)                                      \
@@ -141,9 +141,9 @@ IRQ_HANDLER(IRQ13, 45)
 IRQ_HANDLER(IRQ14, 46)
 IRQ_HANDLER(IRQ15, 47)
 /* 25 general purpose vectors, for use by the LAPIC.  Can expand later. */
-IRQ_HANDLER_SPEC(IRQ198, I_DEATH, __death) 
-IRQ_HANDLER_SPEC(IRQ199, I_STARTCORE, __startcore) 
-IRQ_HANDLER_SPEC(IRQ200, I_ACTIVE_MSG, __active_message) 
+IRQ_HANDLER(IRQ198, I_TESTING) # used in testing.c
+IRQ_HANDLER(IRQ199, 231)
+IRQ_HANDLER(IRQ200, 232)
 IRQ_HANDLER(IRQ201, 233)
 IRQ_HANDLER(IRQ202, 234)
 IRQ_HANDLER(IRQ203, 235)
@@ -167,7 +167,7 @@ IRQ_HANDLER(IRQ219, 251)
 IRQ_HANDLER(IRQ220, 252)
 IRQ_HANDLER(IRQ221, 253)
 IRQ_HANDLER(IRQ222, 254)
-IRQ_HANDLER(IRQ223, 255) # I_TESTING in testing.c
+IRQ_HANDLER_SPEC(IRQ223, I_ACTIVE_MSG, __active_message)
 
 /* Technically, these HANDLER entries do not need to be in numeric order */
 TRAPHANDLER_NOEC(ISR_syscall, T_SYSCALL)
@@ -201,7 +201,7 @@ _alltraps:
 	iret
 
 /* will need to think about when we reenable interrupts.  right now, iret does it,
- * if the previous EFLAGS had interrupts enabled 
+ * if the previous EFLAGS had interrupts enabled
  */
 _allirqs:
 	cld
@@ -227,7 +227,7 @@ sysenter_handler:
 	sti						# enable interrupts (things are sane here)
 	cld
 	pushfl					# save the eflags
-	pushl $0				# these zeros keep the trapframe looking the same 
+	pushl $0				# these zeros keep the trapframe looking the same
 	pushl $0				# as when we receive a trap or interrupt
 	pushl $0				# and CS == 0 lets the kernel know it was a sysenter
 	pushl $T_SYSCALL		# helps with print_trapframe

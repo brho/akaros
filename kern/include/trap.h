@@ -6,6 +6,7 @@
 # error "This is an ROS kernel header; user programs should not #include it"
 #endif
 
+#include <arch/arch.h>
 #include <arch/mmu.h>
 #include <arch/trap.h>
 
@@ -16,7 +17,7 @@ typedef struct InterruptHandler {
 	poly_isr_t isr;
 	TV(t) data;
 } handler_t;
-extern handler_t interrupt_handlers[];
+extern handler_t (COUNT(256) interrupt_handlers)[];
 
 void idt_init(void);
 void register_interrupt_handler(handler_t (COUNT(256)table)[], uint8_t int_num,
@@ -55,4 +56,14 @@ typedef struct
 
 uint32_t send_active_message(uint32_t dst, amr_t pc, uint32_t arg0,
                              uint32_t arg1, uint32_t arg2);
+
+/* Spins til the active message is sent.  Could block in the future. */
+static inline void send_active_msg_sync(uint32_t dst, amr_t pc, uint32_t arg0,
+                                        uint32_t arg1, uint32_t arg2)
+{
+	while (send_active_message(dst, pc, arg0, arg1, arg2))
+		cpu_relax();
+	return;
+}
+
 #endif /* ROS_KERN_TRAP_H */
