@@ -377,10 +377,11 @@ user_mem_check(env_t *env, const void *DANGEROUS va, size_t len, int perm)
 
 size_t
 user_mem_strlcpy(env_t *env, char *dst, const char *DANGEROUS va,
-                 size_t len, int perm)
+                 size_t _len, int perm)
 {
 	const char *DANGEROUS src = va;
-	char *NT COUNT(len-1) dst_in = dst;
+	size_t len = _len;
+	char *NT COUNT(_len-1) dst_in = dst;
 
 	if (len > 0) {
 		while (1) {
