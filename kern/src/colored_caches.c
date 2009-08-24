@@ -108,3 +108,4 @@ inline size_t get_cache_pages_per_way(cache_t *c) {
 inline size_t get_cache_num_page_colors(cache_t *c) {
 	return get_cache_pages_per_way(c);
 }
+

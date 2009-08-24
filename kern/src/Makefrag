@@ -52,7 +52,7 @@ KERN_APPFILES := \
 #                 $(USER_APPS_PARLIB_DIR)/open_read
 
 KERN_LDFLAGS   := $(KERN_LDFLAGS) -L$(OBJDIR)/$(KERN_DIR) \
-                  -T $(ARCH_DIR)/$(TARGET_ARCH)/kernel.ld
+                  -T $(KERN_ARCH_SRC_DIR)/kernel.ld
 
 KERN_OBJFILES  := $(patsubst $(KERN_DIR)/%.c, \
                              $(OBJDIR)/$(KERN_DIR)/%.o, \

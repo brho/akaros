@@ -35,3 +35,4 @@ typedef struct sysevent_rsp {
 DEFINE_RING_TYPES_WITH_SIZE(sysevent, sysevent_t, sysevent_rsp_t, SYSEVENTRINGSIZE);
 
 #endif //ROS_SYSEVENT_H
+

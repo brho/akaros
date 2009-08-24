@@ -111,6 +111,17 @@ $(OBJDIR)/.deps: $(foreach dir, $(OBJDIRS), $(wildcard $(OBJDIR)/$(dir)/*.d))
 # to be rerun
 -include $(OBJDIR)/.deps
 
+# Use doxygen to make documentation for ROS
+docs: all
+	@doxygen doc/rosdoc.cfg
+	@if [ ! -d doc/rosdoc/html/img ];          \
+	 then                                      \
+	 	ln -s ../../img doc/rosdoc/html;       \
+	 fi
+
+doxyclean:
+	rm -rf doc/rosdoc
+
 # For deleting the build
 clean:
 	@rm -rf $(OBJDIR)
@@ -121,5 +132,5 @@ clean:
 always:
 	@:
 
-.PHONY: all always clean
+.PHONY: all always docs clean
 

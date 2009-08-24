@@ -58,3 +58,4 @@ size_t get_cache_pages_per_way(cache_t *c);
 size_t get_cache_num_page_colors(cache_t *c);
 
 #endif // ROS_KERN_COLORED_CACHES_H
+

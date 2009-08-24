@@ -3,6 +3,7 @@
 bochs.out
 bochs.log
 .bochsrc
+bochsrc
 mnt
 obj
 run_bochs.sh
@@ -10,9 +11,11 @@ update*
 cscope.out
 hdd.img
 *.*~
+ivy_errordb.sql
 Makelocal
 ros-project.tmproj
 kern/boot
 kern/include/arch
 kern/src/arch
+doc/rosdoc
 

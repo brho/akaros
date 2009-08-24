@@ -10,8 +10,9 @@
 #include <pmap.h>
 #include <string.h>
 
-/*
- * Clear a Page structure.
+/**
+ * @brief Clear a Page structure.
+ *
  * The result has null links and 0 refcount.
  * Note that the corresponding physical page is NOT initialized!
  */
@@ -20,17 +21,17 @@ static void page_clear(page_t *SAFE page)
 	memset(page, 0, sizeof(page_t));
 }
 
-/*
- * Allocates a physical page.
+/**
+ * @brief Allocates a physical page from a pool of unused physical memory
+ *
  * Does NOT set the contents of the physical page to zero -
  * the caller must do that if necessary.
  *
- * *page       -- is set to point to the Page struct 
- *                of the newly allocated page
+ * @param[out] page  set to point to the Page struct
+ *                   of the newly allocated page
  *
- * RETURNS 
- *   ESUCCESS  -- on success
- *   -ENOMEM   -- otherwise 
+ * @return ESUCCESS on success
+ * @return -ENOMEM  otherwise
  */
 error_t page_alloc(page_t** page) 
 {
@@ -45,7 +46,7 @@ error_t page_alloc(page_t** page)
 	return -ENOMEM;
 }
 
-/* 
+/*
  * This macro defines multiple functions of the form:
  * error_t _cache##_page_alloc(page_t** page, size_t color)
  *

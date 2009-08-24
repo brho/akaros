@@ -13,7 +13,7 @@ USER_APPS_PARLIB_LDDIRS    := -L$(OBJDIR)/$(USER_PARLIB_DIR) \
 
 USER_APPS_PARLIB_LDLIBS    := --start-group -lc -lm -lg -lparlib -livyparlib --end-group
 
-USER_APPS_PARLIB_LDOBJS    := $(OBJDIR)/$(USER_PARLIB_DIR)/$(TARGET_ARCH)/entry.o \
+USER_APPS_PARLIB_LDOBJS    := $(OBJDIR)/$(USER_PARLIB_ARCH_SRC_DIR)/entry.o \
                               $(OBJDIR)/$(USER_APPS_PARLIB_DIR)/readline.o \
                               $(OBJDIR)/$(USER_APPS_PARLIB_DIR)/file_io.o \
                               $(OBJDIR)/$(USER_APPS_PARLIB_DIR)/file_error.o \

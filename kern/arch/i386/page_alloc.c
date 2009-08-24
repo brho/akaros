@@ -67,3 +67,4 @@ void page_alloc_init()
 		pages[i].page_ref = 1;
 	}
 }
+

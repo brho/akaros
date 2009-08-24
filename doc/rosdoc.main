@@ -1,0 +1,17 @@
+/*! \mainpage The ROS Source Documentation
+    \htmlonly
+
+<p>
+Looks like I can now put whatever I want in here in HTML format, 
+so have at it.....
+</p>
+<img src="img/nanwan.png" align=left width=200></img>
+<img src="img/nanwan.png" align=right width=200></img>
+<center><font size=200>
+INCOMPLETE DOCUMENTATION:<br><br>
+ONLY ONE FILE MARKED UP SO FAR: KERN/SRC/PMAP.C<br><br>
+CLICK ON THE 'FILES' TAB IN THE UPPER LEFT AND SCROLL DOWN TO SEE IT
+</font></center>
+
+    \endhtmlonly
+ */

@@ -1,5 +1,16 @@
 /* See COPYRIGHT for copyright information. */
 
+/** @file 
+ * This file is responsible for managing physical pages as they 
+ * are mapped into the page tables of a particular virtual address
+ * space.  The functions defined in this file operate on these
+ * page tables to insert and remove physical pages from them at 
+ * particular virtual addresses.
+ *
+ * @author Kevin Klues <klueska@cs.berkeley.edu>
+ * @author Barret Rhoden <brho@cs.berkeley.edu>
+ */
+
 #include <arch/arch.h>
 #include <arch/mmu.h>
 
@@ -14,56 +25,73 @@
 #include <process.h>
 #include <stdio.h>
 
+/**
+ * @brief Global variable used to store erroneous virtual addresses as the
+ *        result of a failed user_mem_check().
+ */
 static void *DANGEROUS user_mem_check_addr;
 
-// --------------------------------------------------------------
-// Tracking of physical pages.
-// The 'pages' array has one 'page_t' entry per physical page.
-// Pages are reference counted, and free pages are kept on a linked list.
-// --------------------------------------------------------------
-  
-// Initialize page structure and memory free list.
+/**
+ * @brief Initialize the array of physical pages and memory free list.
+ *
+ * The 'pages' array has one 'page_t' entry per physical page.
+ * Pages are reference counted, and free pages are kept on a linked list.
+ */
 void page_init(void)
 {
-	// First, make 'pages' point to an array of size 'npages' of
-	// type 'page_t'.
-	// The kernel uses this structure to keep track of physical pages;
-	// 'npages' equals the number of physical pages in memory.
-	// round up to the nearest page
+	/*
+     * First, make 'pages' point to an array of size 'npages' of
+	 * type 'page_t'.
+	 * The kernel uses this structure to keep track of physical pages;
+	 * 'npages' equals the number of physical pages in memory.
+	 * round up to the nearest page
+	 */
 	size_t page_array_size = ROUNDUP(npages*sizeof(page_t), PGSIZE);
 	pages = (page_t*)boot_alloc(page_array_size, PGSIZE);
-	memset(pages, 0, page_array_size);
+	memset(pages, 0, npages*sizeof(page_t));
 
-	// Now initilaize everything so pages can start to be alloced and freed
-	// from the memory free list
+	/*
+     * Then initilaize everything so pages can start to be alloced and freed
+	 * from the memory free list
+	 */
 	page_alloc_init();
 }
 
-//
-// Map the physical page 'pp' at virtual address 'va'.
-// The permissions (the low 12 bits) of the page table
-//  entry should be set to 'perm|PTE_P'.
-//
-// Details
-//   - If there is already a page mapped at 'va', it is page_remove()d.
-//   - If necessary, on demand, allocates a page table and inserts it into
-//     'pgdir'.
-//   - page_incref() should be called if the insertion succeeds.
-//   - The TLB must be invalidated if a page was formerly present at 'va'.
-//     (this is handled in page_remove)
-//
-// RETURNS: 
-//   0 on success
-//   -ENOMEM, if page table couldn't be allocated
-//
-// Hint: The TA solution is implemented using pgdir_walk, page_remove,
-// and page2pa.
-//
-// No support for jumbos here.  will need to be careful of trying to insert
-// regular pages into something that was already jumbo, and the overloading
-// of the PTE_PS and PTE_PAT flags...
-int
-page_insert(pde_t *pgdir, page_t *pp, void *va, int perm) 
+/** 
+ * @brief Map the physical page 'pp' into the virtual address 'va' in page
+ *        directory 'pgdir'
+ *
+ * Map the physical page 'pp' at virtual address 'va'.
+ * The permissions (the low 12 bits) of the page table
+ * entry should be set to 'perm|PTE_P'.
+ * 
+ * Details:
+ *   - If there is already a page mapped at 'va', it is page_remove()d.
+ *   - If necessary, on demand, allocates a page table and inserts it into 
+ *     'pgdir'.
+ *   - page_incref() should be called if the insertion succeeds. 
+ *   - The TLB must be invalidated if a page was formerly present at 'va'.
+ *     (this is handled in page_remove)
+ *
+ * No support for jumbos here.  We will need to be careful when trying to
+ * insert regular pages into something that was already jumbo.  We will
+ * also need to be careful with our overloading of the PTE_PS and 
+ * PTE_PAT flags...
+ *
+ * @param[in] pgdir the page directory to insert the page into
+ * @param[in] pp    a pointr to the page struct representing the
+ *                  physical page that should be inserted.
+ * @param[in] va    the virtual address where the page should be
+ *                  inserted.
+ * @param[in] perm  the permition bits with which to set up the 
+ *                  virtual mapping.
+ *
+ * @return ESUCCESS  on success
+ * @return -ENOMEM   if a page table could not be allocated
+ *                   into which the page should be inserted
+ *
+ */
+int page_insert(pde_t *pgdir, page_t *pp, void *va, int perm) 
 {
 	pte_t* pte = pgdir_walk(pgdir, va, 1);
 	if (!pte)
@@ -79,24 +107,34 @@ page_insert(pde_t *pgdir, page_t *pp, void *va, int perm)
 	return 0;
 }
 
-//
-// Map the physical page 'pp' at the first virtual address that is free 
-// in the range 'vab' to 'vae'.
-// The permissions (the low 12 bits) of the page table entry get set to 
-// 'perm|PTE_P'.
-//
-// Details
-//   - If there is no free entry in the range 'vab' to 'vae' this 
-//     function returns -ENOMEM.
-//   - If necessary, on demand, this function will allocate a page table 
-//     and inserts it into 'pgdir'.
-//   - page_incref() should be called if the insertion succeeds.
-//
-// RETURNS: 
-//   NULL, if no free va in the range (vab, vae) could be found
-//   va,   the virtual address where pp has been mapped in the 
-//         range (vab, vae)
-//
+/**
+ * @brief Map the physical page 'pp' at the first virtual address that is free 
+ * in the range 'vab' to 'vae' in page directory 'pgdir'.
+ *
+ * The permissions (the low 12 bits) of the page table entry get set to 
+ * 'perm|PTE_P'.
+ *
+ * Details:
+ *   - If there is no free entry in the range 'vab' to 'vae' this 
+ *     function returns NULL.
+ *   - If necessary, on demand, this function will allocate a page table 
+ *     and inserts it into 'pgdir'.
+ *   - page_incref() will be called if the insertion succeeds.
+ * 
+ * @param[in] pgdir the page directory to insert the page into
+ * @param[in] pp    a pointr to the page struct representing the
+ *                  physical page that should be inserted.
+ * @param[in] vab   the first virtual address in the range in which the 
+ *                  page can be inserted.
+ * @param[in] vae   the last virtual address in the range in which the 
+ *                  page can be inserted.
+ * @param[in] perm  the permition bits with which to set up the 
+ *                  virtual mapping.
+ *
+ * @return VA   the virtual address where pp has been mapped in the 
+ *              range (vab, vae)
+ * @return NULL no free va in the range (vab, vae) could be found
+ */
 void* page_insert_in_range(pde_t *pgdir, page_t *pp, 
                            void *vab, void *vae, int perm) 
 {
@@ -113,17 +151,23 @@ void* page_insert_in_range(pde_t *pgdir, page_t *pp,
 	return TC(new_va); // trusted because mapping a page is like allocation
 }
 
-//
-// Return the page mapped at virtual address 'va'.
-// If pte_store is not zero, then we store in it the address
-// of the pte for this page.  This is used by page_remove
-// but should not be used by other callers.
-//
-// Return 0 if there is no page mapped at va.
-//
-// Hint: the TA solution uses pgdir_walk and pa2page.
-//
-// For jumbos, right now this returns the first Page* in the 4MB
+/**
+ * @brief Return the page mapped at virtual address 'va' in 
+ * page directory 'pgdir'.
+ *
+ * If pte_store is not NULL, then we store in it the address
+ * of the pte for this page.  This is used by page_remove
+ * but should not be used by other callers.
+ *
+ * For jumbos, right now this returns the first Page* in the 4MB range
+ *
+ * @param[in]  pgdir     the page directory from which we should do the lookup
+ * @param[in]  va        the virtual address of the page we are looking up
+ * @param[out] pte_store the address of the page table entry for the returned page
+ *
+ * @return PAGE the page mapped at virtual address 'va'
+ * @return NULL No mapping exists at virtual address 'va'   
+ */
 page_t *page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
 {
 	pte_t* pte = pgdir_walk(pgdir, va, 0);
@@ -134,24 +178,27 @@ page_t *page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
 	return pa2page(PTE_ADDR(*pte));
 }
 
-//
-// Unmaps the physical page at virtual address 'va'.
-// If there is no physical page at that address, silently does nothing.
-//
-// Details:
-//   - The ref count on the physical page should decrement.
-//   - The physical page should be freed if the refcount reaches 0.
-//   - The pg table entry corresponding to 'va' should be set to 0.
-//     (if such a PTE exists)
-//   - The TLB must be invalidated if you remove an entry from
-//     the pg dir/pg table.
-//
-// Hint: The TA solution is implemented using page_lookup,
-// 	tlb_invalidate, and page_decref.
-//
-// This may be wonky wrt Jumbo pages and decref.  
-void
-page_remove(pde_t *pgdir, void *va)
+/**
+ * @brief Unmaps the physical page at virtual address 'va' in page directory
+ * 'pgdir'.
+ *
+ * If there is no physical page at that address, this function silently 
+ * does nothing.
+ *
+ * Details:
+ *   - The ref count on the physical page is decrement when the page is removed
+ *   - The physical page is freed if the refcount reaches 0.
+ *   - The pg table entry corresponding to 'va' is set to 0.
+ *     (if such a PTE exists)
+ *   - The TLB is invalidated if an entry is removes from the pg dir/pg table.
+ *
+ * This may be wonky wrt Jumbo pages and decref.  
+ *
+ * @param pgdir the page directory from with the page sholuld be removed
+ * @param va    the virtual address at which the page we are trying to 
+ *              remove is mapped
+ */
+void page_remove(pde_t *pgdir, void *va)
 {
 	pte_t* pte;
 	page_t *page;
@@ -163,48 +210,49 @@ page_remove(pde_t *pgdir, void *va)
 	page_decref(page);
 }
 
-//
-// Invalidate a TLB entry, but only if the page tables being
-// edited are the ones currently in use by the processor.
-//
-// Need to sort this for cross core lovin'  TODO
-void
-tlb_invalidate(pde_t *pgdir, void *va)
+/**
+ * @brief Invalidate a TLB entry, but only if the page tables being
+ * edited are the ones currently in use by the processor.
+ *
+ * TODO: Need to sort this for cross core lovin'
+ *
+ * @param pgdir the page directory assocaited with the tlb entry 
+ *              we are trying to invalidate
+ * @param va    the virtual address associated with the tlb entry
+ *              we are trying to invalidate
+ */
+void tlb_invalidate(pde_t *pgdir, void *va)
 {
 	// Flush the entry only if we're modifying the current address space.
 	// For now, there is only one address space, so always invalidate.
 	invlpg(va);
 }
 
-//
-// Check that an environment is allowed to access the range of memory
-// [va, va+len) with permissions 'perm | PTE_P'.
-// Normally 'perm' will contain PTE_U at least, but this is not required.
-// 'va' and 'len' need not be page-aligned; you must test every page that
-// contains any of that range.  You will test either 'len/PGSIZE',
-// 'len/PGSIZE + 1', or 'len/PGSIZE + 2' pages.
-//
-// A user program can access a virtual address if (1) the address is below
-// ULIM, and (2) the page table gives it permission.  These are exactly
-// the tests you should implement here.
-//
-// If there is an error, set the 'user_mem_check_addr' variable to the first
-// erroneous virtual address.
-//
-// Returns 0 if the user program can access this range of addresses,
-// and -EFAULT otherwise.
-//
-// Hint: The TA solution uses pgdir_walk.
-//
-
-// zra: I've modified the interface to these two functions so that Ivy can
-// check that user pointers aren't dereferenced. User pointers get the
-// DANGEROUS qualifier. After validation, these functions return a
-// COUNT(len) pointer. user_mem_check now returns NULL on error instead of
-// -EFAULT.
-
-void *
-user_mem_check(env_t *env, const void *DANGEROUS va, size_t len, int perm)
+/**
+ * @brief Check that an environment is allowed to access the range of memory
+ * [va, va+len) with permissions 'perm | PTE_P'.
+ *
+ * Normally 'perm' will contain PTE_U at least, but this is not required.
+ * 'va' and 'len' need not be page-aligned;
+ *
+ * A user program can access a virtual address if:
+ *     -# the address is below ULIM
+ *     -# the page table gives it permission.  
+ *
+ * If there is an error, 'user_mem_check_addr' is set to the first
+ * erroneous virtual address.
+ *
+ * @param env  the environment associated with the user program trying to access
+ *             the virtual address range
+ * @param va   the first virtual address in the range
+ * @param len  the length of the virtual address range
+ * @param perm the permissions the user is trying to access the virtual address 
+ *             range with
+ *
+ * @return VA a pointer of type COUNT(len) to the address range
+ * @return NULL trying to access this range of virtual addresses is not allowed
+ */
+void* user_mem_check(env_t *env, const void *DANGEROUS va, size_t len, int perm)
 {
 	// TODO - will need to sort this out wrt page faulting / PTE_P
 	// also could be issues with sleeping and waking up to find pages
@@ -241,8 +289,23 @@ user_mem_check(env_t *env, const void *DANGEROUS va, size_t len, int perm)
 	return (void *COUNT(len))TC(va);
 }
 
-size_t
-user_mem_strlcpy(env_t *env, char *dst, const char *DANGEROUS va,
+/**
+ * @brief Use the kernel to copy a string from a buffer stored in userspace
+ *        to a buffer stored elsewhere in the address space (potentially in 
+ *        memory only accessible by the kernel)
+ *
+ * @param env  the environment associated with the user program from which
+ *             the string is being copied
+ * @param dst  the destination of the buffer into which the string 
+ *             is being copied
+ * @param va   the start address of the buffer where the string resides
+ * @param len  the length of the buffer 
+ * @param perm the permissions with which the user is trying to access 
+ *             elements of the original buffer 
+ *
+ * @return LEN the length of the new buffer copied into 'dst'
+ */
+size_t user_mem_strlcpy(env_t *env, char *dst, const char *DANGEROUS va,
                  size_t len, int perm)
 {
 	const char *DANGEROUS src = va;
@@ -264,12 +327,25 @@ user_mem_strlcpy(env_t *env, char *dst, const char *DANGEROUS va,
 	return dst - dst_in;
 }
 
-//
-// Checks that environment 'env' is allowed to access the range
-// of memory [va, va+len) with permissions 'perm | PTE_U'.
-// If it can, then the function simply returns.
-// If it cannot, 'env' is destroyed.
-//
+/**
+ * @brief Checks that environment 'env' is allowed to access the range
+ * of memory [va, va+len) with permissions 'perm | PTE_U'. Destroy 
+ * environment 'env' if the assertion fails.
+ *
+ * This function is identical to user_mem_assert() except that it has a side
+ * affect of destroying the environment 'env' if the memory check fails.
+ *
+ * @param env  the environment associated with the user program trying to access
+ *             the virtual address range
+ * @param va   the first virtual address in the range
+ * @param len  the length of the virtual address range
+ * @param perm the permissions the user is trying to access the virtual address 
+ *             range with
+ *
+ * @return VA a pointer of type COUNT(len) to the address range
+ * @return NULL trying to access this range of virtual addresses is not allowed
+ *              environment 'env' is destroyed
+ */
 void *
 user_mem_assert(env_t *env, const void *DANGEROUS va, size_t len, int perm)
 {
@@ -283,10 +359,20 @@ user_mem_assert(env_t *env, const void *DANGEROUS va, size_t len, int perm)
     return res;
 }
 
-// copies data from a user buffer to a kernel buffer.
-// EFAULT if page not present, user lacks perms, or invalid addr.
-error_t
-memcpy_from_user(env_t* env, void* COUNT(len) dest,
+/**
+ * @brief Copies data from a user buffer to a kernel buffer.
+ * 
+ * @param env  the environment associated with the user program
+ *             from which the buffer is being copied
+ * @param dest the destination address of the kernel buffer
+ * @param va   the address of the userspace buffer from which we are copying
+ * @param len  the length of the userspace buffer
+ *
+ * @return ESUCCESS on success
+ * @return -EFAULT  the page assocaited with 'va' is not present, the user 
+ *                  lacks the proper permissions, or there was an invalid 'va'
+ */
+error_t memcpy_from_user(env_t* env, void* COUNT(len) dest,
                  const void *DANGEROUS va, size_t len)
 {
 	const void *DANGEROUS start, *DANGEROUS end;
@@ -327,3 +413,4 @@ memcpy_from_user(env_t* env, void* COUNT(len) dest,
 
 	return ESUCCESS;
 }
+
