@@ -56,7 +56,11 @@ sub readdeps {
 				$slash = $2;
 			}
 			#print "DEPENDENCY [[$target]]: [[$deplines]]\n";
-			$dephash{$target} = " ".makedirname($filename)."/Makefrag".$deplines;
+			my $new_deplines = $deplines;
+			if($use_filename) {
+				my $new_deplines = " ".makedirname($filename)."/Makefrag".$deplines;
+			}
+			$dephash{$target} = $new_deplines;
 		} elsif (/^[#]?[ \t]*$/) {
 			# ignore blank lines and comments
 		} else {
