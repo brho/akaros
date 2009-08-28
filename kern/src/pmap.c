@@ -11,6 +11,10 @@
  * @author Barret Rhoden <brho@cs.berkeley.edu>
  */
 
+#ifdef __SHARC__
+#pragma nosharc
+#endif
+
 #include <arch/arch.h>
 #include <arch/mmu.h>
 
@@ -30,6 +34,9 @@
  *        result of a failed user_mem_check().
  */
 static void *DANGEROUS user_mem_check_addr;
+
+volatile uint32_t vpt_lock = 0;
+volatile uint32_t vpd_lock = 0;
 
 /**
  * @brief Initialize the array of physical pages and memory free list.

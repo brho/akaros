@@ -10,7 +10,7 @@
 #include <arch/trap.h>
 
 // func ptr for interrupt service routines
-typedef void (*poly_isr_t)(trapframe_t* tf, TV(t) data);
+typedef void ( *poly_isr_t)(trapframe_t* tf, TV(t) data);
 typedef void (*isr_t)(trapframe_t* tf, void * data);
 typedef struct InterruptHandler {
 	poly_isr_t isr;
@@ -20,8 +20,8 @@ typedef struct InterruptHandler {
 void idt_init(void);
 void register_interrupt_handler(handler_t (COUNT(256)table)[], uint8_t int_num,
                                 poly_isr_t handler, TV(t) data);
-void (IN_HANDLER print_trapframe)(trapframe_t *tf);
-void (IN_HANDLER page_fault_handler)(trapframe_t *tf);
+void ( print_trapframe)(trapframe_t *tf);
+void ( page_fault_handler)(trapframe_t *tf);
 
 void sysenter_init(void);
 extern void sysenter_handler();

@@ -37,7 +37,7 @@ void scroll_screen(void);
 #define COM_LSR_DATA	0x01	//   Data available
 #define COM_LSR_READY	0x20	//   Ready to send
 
-static bool serial_exists;
+static bool SREADONLY serial_exists;
 
 int
 serial_proc_data(void)
@@ -47,7 +47,8 @@ serial_proc_data(void)
 	return inb(COM1+COM_RX);
 }
 
-int serial_read_byte() {
+int serial_read_byte()
+{
 	return serial_proc_data();
 }
 
@@ -80,7 +81,10 @@ serial_init(void)
 
 	// Clear any preexisting overrun indications and interrupts
 	// Serial port doesn't exist if COM_LSR returns 0xFF
-	serial_exists = (inb(COM1+COM_LSR) != 0xFF);
+	{
+		bool lbool = ((inb(COM1+COM_LSR) != 0xFF));
+		serial_exists = SINIT(lbool);
+	}
 	(void) inb(COM1+COM_IIR);
 	(void) inb(COM1+COM_RX);
 
@@ -148,30 +152,35 @@ lpt_putc(int c)
 #define MAX_SCROLL_LENGTH	20
 #define SCROLLING_CRT_SIZE	(MAX_SCROLL_LENGTH * CRT_SIZE)
 
-static unsigned addr_6845;
-static uint16_t *COUNT(CRT_SIZE) crt_buf;
-static uint16_t crt_pos;
+static volatile uint32_t SRACY lock = 0;
 
-static uint16_t scrolling_crt_buf[SCROLLING_CRT_SIZE];
-static uint16_t scrolling_crt_pos;
-static uint8_t	current_crt_buf;
+static unsigned SREADONLY addr_6845;
+static uint16_t *SLOCKED(&lock) COUNT(CRT_SIZE) crt_buf;
+static uint16_t SLOCKED(&lock) crt_pos;
+
+static uint16_t (SLOCKED(&lock) scrolling_crt_buf)[SCROLLING_CRT_SIZE];
+static uint16_t SLOCKED(&lock) scrolling_crt_pos;
+static uint8_t	SLOCKED(&lock) current_crt_buf;
 
 void
 cga_init(void)
 {
-	volatile uint16_t *COUNT(CRT_SIZE) cp;
+	volatile uint16_t SLOCKED(&lock)*COUNT(CRT_SIZE) cp;
 	uint16_t was;
 	unsigned pos;
+
+	// zra: I suppose this isn't needed, but it makes Ivy shut up
+	//spin_lock_irqsave(&lock);
 
 	cp = (uint16_t *COUNT(CRT_SIZE)) TC(KERNBASE + CGA_BUF);
 	was = *cp;
 	*cp = (uint16_t) 0xA55A;
 	if (*cp != 0xA55A) {
 		cp = (uint16_t *COUNT(CRT_SIZE)) TC(KERNBASE + MONO_BUF);
-		addr_6845 = MONO_BASE;
+		addr_6845 = SINIT(MONO_BASE);
 	} else {
 		*cp = was;
-		addr_6845 = CGA_BASE;
+		addr_6845 = SINIT(CGA_BASE);
 	}
 	
 	/* Extract cursor location */
@@ -180,13 +189,16 @@ cga_init(void)
 	outb(addr_6845, 15);
 	pos |= inb(addr_6845 + 1);
 
-	crt_buf = (uint16_t *COUNT(CRT_SIZE)) cp;
+	crt_buf = (uint16_t SLOCKED(&lock)*COUNT(CRT_SIZE)) cp;
 	crt_pos = pos;
 	scrolling_crt_pos = 0;
 	current_crt_buf = 0;
+
+	//spin_unlock_irqsave(&lock);
 }
 
-static void set_screen(uint8_t screen_num) {
+static void set_screen(uint8_t screen_num)
+{
 	uint16_t leftovers = (scrolling_crt_pos % CRT_COLS);
 	leftovers = (leftovers) ? CRT_COLS - leftovers : 0;
 	
@@ -196,19 +208,22 @@ static void set_screen(uint8_t screen_num) {
 	memcpy(crt_buf, scrolling_crt_buf + offset, CRT_SIZE * sizeof(uint16_t));
 }
 
-static void scroll_screen_up(void) {
+static void scroll_screen_up(void)
+{
 	if(current_crt_buf <  (scrolling_crt_pos / CRT_SIZE))
 		current_crt_buf++;
 	set_screen(current_crt_buf);
 }
 
-static void scroll_screen_down(void) {
+static void scroll_screen_down(void)
+{
 	if(current_crt_buf > 0) 
 		current_crt_buf--;
 	set_screen(current_crt_buf);
 }
 
-static void reset_screen(void) {
+static void reset_screen(void)
+{
 	current_crt_buf = 0;
 	set_screen(current_crt_buf);
 }
@@ -296,7 +311,7 @@ cga_putc(int c)
 
 #define E0ESC		(1<<6)
 
-static uint8_t shiftcode[256] = 
+static uint8_t (SREADONLY shiftcode)[256] = 
 {
 	[0x1D] CTL,
 	[0x2A] SHIFT,
@@ -306,7 +321,7 @@ static uint8_t shiftcode[256] =
 	[0xB8] ALT
 };
 
-static uint8_t togglecode[256] = 
+static uint8_t (SREADONLY togglecode)[256] = 
 {
 	[0x3A] CAPSLOCK,
 	[0x45] NUMLOCK,
@@ -374,7 +389,7 @@ static uint8_t ctlmap[256] =
 	[0xD2] KEY_INS,		[0xD3] KEY_DEL
 };
 
-static uint8_t * COUNT(256) charcode[4] = {
+static uint8_t * COUNT(256) (SREADONLY charcode)[4] = {
 	normalmap,
 	shiftmap,
 	ctlmap,
@@ -385,13 +400,17 @@ static uint8_t * COUNT(256) charcode[4] = {
  * Get data from the keyboard.  If we finish a character, return it.  Else 0.
  * Return -1 if no data.
  */
+#pragma cilnoremove("cons_lock")
+static volatile uint32_t SRACY cons_lock = 0;
+static uint32_t SLOCKED(&cons_lock) shift;
+static bool SLOCKED(&cons_lock) crt_scrolled = FALSE;
+
 static int
 kbd_proc_data(void)
 {
 	int c;
 	uint8_t data;
-	static uint32_t shift;
-	static bool crt_scrolled = FALSE;
+
 
 	if ((inb(KBSTATP) & KBS_DIB) == 0)
 		return -1;
@@ -478,12 +497,13 @@ kbd_init(void)
 // whenever the corresponding interrupt occurs.
 
 #define CONSBUFSIZE	512
-
-static struct {
+struct cons {
 	uint8_t buf[CONSBUFSIZE];
 	uint32_t rpos;
 	uint32_t wpos;
-} cons;
+};
+
+static struct cons SLOCKED(&cons_lock) cons;
 
 // called by device interrupt routines to feed input characters
 // into the circular console input buffer.
@@ -507,6 +527,8 @@ cons_getc(void)
 {
 	int c;
 
+	spin_lock_irqsave(&cons_lock);
+
 	// poll for any pending input characters,
 	// so that this function works even when interrupts are disabled
 	// (e.g., when called from the kernel monitor).
@@ -520,8 +542,10 @@ cons_getc(void)
 		c = cons.buf[cons.rpos++];
 		if (cons.rpos == CONSBUFSIZE)
 			cons.rpos = 0;
+		spin_unlock_irqsave(&cons_lock);
 		return c;
 	}
+	spin_unlock_irqsave(&cons_lock);
 	return 0;
 }
 
@@ -529,7 +553,7 @@ cons_getc(void)
 void
 cons_putc(int c)
 {
-	static uint32_t lock;
+	//static uint32_t lock; zra: moving up for sharC annotations
 	spin_lock_irqsave(&lock);
 	#ifndef SERIAL_IO
 		serial_putc(c);

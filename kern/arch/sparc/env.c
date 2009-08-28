@@ -10,7 +10,7 @@
 #include <pmap.h>
 
 void
-(IN_HANDLER env_push_ancillary_state)(env_t* e)
+( env_push_ancillary_state)(env_t* e)
 {
 	static_assert(offsetof(ancillary_state_t,fpr) % 8 == 0);
 
@@ -46,7 +46,7 @@ void
 }
 
 void
-(IN_HANDLER env_pop_ancillary_state)(env_t* e)
+( env_pop_ancillary_state)(env_t* e)
 { 
 
 	#define pop_two_fp_regs(pdest,n) \

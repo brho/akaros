@@ -20,6 +20,7 @@ TARGET_ARCH := i386
 TOP_DIR := .
 ARCH_DIR := $(TOP_DIR)/kern/arch
 INCLUDE_DIR := $(TOP_DIR)/kern/include
+
 UNAME=$(shell uname -m)
 V = @
 
@@ -48,7 +49,15 @@ GCCPREFIX := $(shell if i386-ros-elf-objdump -i 2>&1 | grep '^elf32-i386$$' >/de
 endif
 
 # Default programs for compilation
-CC	    := ivycc --deputy --gcc=$(GCCPREFIX)gcc --enable-error-db $(EXTRAARGS)
+KERN_IVY_FLAGS := --deputy\
+                  --enable-error-db\
+                  --no-rc-sharc\
+                  --sc-dynamic-is-error\
+                  --sc-ops=$(INCLUDE_DIR)/ivy/sharc.h\
+                  --sc-all-in-thread
+                  $(EXTRAARGS)
+USER_IVY_FLAGS := --deputy --enable-error-db $(EXTRAARGS)
+CC	    := ivycc --gcc=$(GCCPREFIX)gcc
 AS	    := $(GCCPREFIX)as
 AR	    := $(GCCPREFIX)ar
 LD	    := $(GCCPREFIX)ld

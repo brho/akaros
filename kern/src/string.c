@@ -1,5 +1,9 @@
 // Basic string routines.  Not hardware optimized, but not shabby.
 
+#ifdef __SHARC__
+#pragma nosharc
+#endif
+
 #include <string.h>
 
 int

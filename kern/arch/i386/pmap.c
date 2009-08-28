@@ -1,3 +1,7 @@
+#ifdef __SHARC__
+#pragma nosharc
+#endif
+
 /* See COPYRIGHT for copyright information. */
 #include <arch/x86.h>
 #include <arch/arch.h>
@@ -22,6 +26,7 @@ pde_t* boot_pgdir;		// Virtual address of boot time page directory
 physaddr_t boot_cr3;		// Physical address of boot time page directory
 
 // Global variables
+volatile uint32_t pages_lock = 0;
 page_t *pages = NULL;          // Virtual address of physical page array
 
 // Global descriptor table.

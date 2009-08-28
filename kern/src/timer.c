@@ -1,3 +1,8 @@
+
+#ifdef __SHARC__
+#pragma nosharc
+#endif
+
 #include <arch/arch.h>
 #include <ros/timer.h>
 

@@ -1,6 +1,10 @@
 // Simple command-line kernel monitor useful for
 // controlling the kernel and exploring the system interactively.
 
+#ifdef __SHARC__
+#pragma nosharc
+#endif
+
 #include <arch/arch.h>
 #include <stab.h>
 #include <smp.h>

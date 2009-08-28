@@ -6,8 +6,10 @@
 #include <arch/atomic.h>
 #include <arch/arch.h>
 
-static inline void spin_lock_irqsave(volatile uint32_t*SAFE lock);
-static inline void spin_unlock_irqsave(volatile uint32_t*SAFE lock);
+static inline void
+(SLOCK(0) spin_lock_irqsave)(volatile uint32_t SRACY*SAFE lock);
+static inline void
+(SUNLOCK(0) spin_unlock_irqsave)(volatile uint32_t SRACY*SAFE lock);
 
 /*********************** Checklist stuff **********************/
 typedef struct checklist_mask {

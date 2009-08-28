@@ -4,6 +4,10 @@
  * See LICENSE for details.
  */
 
+#ifdef __SHARC__
+#pragma nosharc
+#endif
+
 #include <kfs.h>
 #include <string.h>
 #include <assert.h>

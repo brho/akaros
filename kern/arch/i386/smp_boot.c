@@ -4,6 +4,10 @@
  * See LICENSE for details.
  */
 
+#ifdef __SHARC__
+#pragma nosharc
+#endif
+
 #include <arch/x86.h>
 #include <arch/arch.h>
 #include <smp.h>
@@ -52,7 +56,7 @@ static void init_smp_call_function(void)
 
 /******************************************************************************/
 
-static void smp_mtrr_handler(trapframe_t *tf, barrier_t *data)
+static void ( smp_mtrr_handler)(trapframe_t *tf, barrier_t *data)
 {
 	setup_default_mtrrs(data);
 }

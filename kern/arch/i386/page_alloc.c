@@ -4,7 +4,11 @@
  * 
  * Kevin Klues <klueska@cs.berkeley.edu>    
  */
- 
+
+#ifdef __SHARC__
+#pragma nosharc
+#endif
+
 #ifdef __DEPUTY__
 #pragma nodeputy
 #endif

@@ -1,3 +1,6 @@
+#ifdef __SHARC__
+#pragma nosharc
+#endif
 
 #include <arch/mmu.h>
 #include <arch/x86.h>
@@ -31,10 +34,10 @@ pseudodesc_t idt_pd = {
  */
 handler_t TP(void *) interrupt_handlers[NUM_INTERRUPT_HANDLERS];
 
-static const char *NTS (IN_HANDLER trapname)(int trapno)
+static const char *NTS trapname(int trapno)
 {
-    // zra: excnames is NORACE because Ivy doesn't trust const
-	static const char *NT const (NORACE excnames)[] = {
+    // zra: excnames is SREADONLY because Ivy doesn't trust const
+	static const char *NT const ( excnames)[] = {
 		"Divide error",
 		"Debug",
 		"Non-Maskable Interrupt",
@@ -126,7 +129,7 @@ idt_init(void)
 }
 
 void
-(IN_HANDLER print_regs)(push_regs_t *regs)
+print_regs(push_regs_t *regs)
 {
 	cprintf("  edi  0x%08x\n", regs->reg_edi);
 	cprintf("  esi  0x%08x\n", regs->reg_esi);
@@ -139,7 +142,7 @@ void
 }
 
 void
-(IN_HANDLER print_trapframe)(trapframe_t *tf)
+print_trapframe(trapframe_t *tf)
 {
 	cprintf("TRAP frame at %p on core %d\n", tf, core_id());
 	print_regs(&tf->tf_regs);
@@ -155,7 +158,7 @@ void
 }
 
 static void
-(IN_HANDLER trap_dispatch)(trapframe_t *tf)
+trap_dispatch(trapframe_t *tf)
 {
 	// Handle processor exceptions.
 	switch(tf->tf_trapno) {
@@ -191,19 +194,19 @@ static void
 }
 
 void
-(IN_HANDLER env_push_ancillary_state)(env_t* e)
+env_push_ancillary_state(env_t* e)
 {
 	// Here's where you'll save FP/MMX/XMM regs
 }
 
 void
-(IN_HANDLER env_pop_ancillary_state)(env_t* e)
+env_pop_ancillary_state(env_t* e)
 {
 	// Here's where you'll restore FP/MMX/XMM regs
 }
 
 void
-(IN_HANDLER trap)(trapframe_t *tf)
+trap(trapframe_t *tf)
 {
 	//cprintf("Incoming TRAP frame at %p\n", tf);
 
@@ -239,7 +242,7 @@ void
 }
 
 void
-(IN_HANDLER irq_handler)(trapframe_t *tf)
+irq_handler(trapframe_t *tf)
 {
 	//if (core_id())
 	//	cprintf("Incoming IRQ, ISR: %d on core %d\n", tf->tf_trapno, core_id());
@@ -269,8 +272,8 @@ void
 }
 
 void
-register_interrupt_handler(handler_t TP(TV(t)) table[], uint8_t int_num, poly_isr_t handler,
-                           void* data)
+register_interrupt_handler(handler_t TP(TV(t)) table[],
+                           uint8_t int_num, poly_isr_t handler, void* data)
 {
 	table[int_num].isr = handler;
 	table[int_num].data = data;

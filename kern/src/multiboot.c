@@ -1,3 +1,7 @@
+#ifdef __SHARC__
+#pragma nosharc
+#endif
+
 #include <multiboot.h>
 #include <arch/types.h>
 #include <arch/mmu.h>

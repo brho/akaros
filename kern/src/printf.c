@@ -1,6 +1,10 @@
 // Simple implementation of cprintf console output for the kernel,
 // based on printfmt() and the kernel console's cputchar().
 
+#ifdef __SHARC__
+#pragma nosharc
+#endif
+
 #include <arch/arch.h>
 #include <arch/types.h>
 
