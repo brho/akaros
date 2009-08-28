@@ -5,6 +5,10 @@
  * generates interrupts on IRQ 0.
  */
 
+#ifdef __SHARC__
+#pragma nosharc
+#endif
+
 #include <arch/x86.h>
 
 #include <kclock.h>

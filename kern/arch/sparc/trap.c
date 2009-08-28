@@ -35,7 +35,7 @@ trap_handled(void)
 }
 
 void
-(IN_HANDLER print_trapframe)(trapframe_t *tf)
+( print_trapframe)(trapframe_t *tf)
 {
 	int i, len;
 	char buf[1024];

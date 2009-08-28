@@ -1,4 +1,8 @@
 
+#ifdef __SHARC__
+#pragma nosharc
+#endif
+
 #include <arch/mmu.h>
 #include <arch/arch.h>
 #include <smp.h>

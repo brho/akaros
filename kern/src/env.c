@@ -1,5 +1,9 @@
 /* See COPYRIGHT for copyright information. */
 
+#ifdef __SHARC__
+#pragma nosharc
+#endif
+
 #include <arch/arch.h>
 #include <arch/mmu.h>
 #include <elf.h>
@@ -90,12 +94,13 @@ env_init(void)
 	atomic_init(&num_envs, 0);
 	TAILQ_INIT(&proc_freelist);
 	assert(envs != NULL);
-	for (i = NENV-1; i >= 0; i--) { TRUSTEDBLOCK // asw ivy workaround
+	for (i = NENV-1; i >= 0; i--) {
 		// these should already be set from when i memset'd the array to 0
 		envs[i].state = ENV_FREE;
 		envs[i].env_id = 0;
 		TAILQ_INSERT_HEAD(&proc_freelist, &envs[i], proc_link);
 	}
+
 }
 
 //
@@ -266,6 +271,10 @@ env_alloc(env_t **newenv_store, envid_t parent_id)
 	e->env_refcnt = 1;
 	e->env_flags = 0;
 
+#ifdef __SHARC__
+	/* init SharC state */
+	sharC_env_init(&e->sharC_env);
+#endif
 
 	memset(&e->env_ancillary_state, 0, sizeof(e->env_ancillary_state));
 	memset(&e->env_tf, 0, sizeof(e->env_tf));
@@ -455,6 +464,18 @@ env_free(env_t *e)
 	TAILQ_INSERT_HEAD(&proc_freelist, e, proc_link);
 }
 
+
+#define PER_CPU_THING(type,name)\
+type SLOCKED(name##_lock) * RWPROTECT name;\
+type SLOCKED(name##_lock) *\
+(get_per_cpu_##name)()\
+{\
+	{ R_PERMITTED(global(name))\
+		return &name[core_id()];\
+	}\
+}
+
+
 /* This is the top-half of an interrupt handler, where the bottom half is
  * proc_run (which never returns).  Just add it to the delayed work queue,
  * which (incidentally) can only hold one item at this point.
@@ -466,7 +487,7 @@ void run_env_handler(trapframe_t *tf, env_t *data)
 	assert(data);
 	struct work TP(env_t *) job;
 	struct workqueue *workqueue = &per_cpu_info[core_id()].workqueue;
-	{ //TRUSTEDBLOCK TODO: how do we make this func_t cast work?
+	{
 	job.func = proc_run;
 	job.data = data;
 	}

@@ -40,6 +40,7 @@ typedef int32_t envid_t;
 #define ENVX(envid)		((envid) & (NENV - 1))
 
 // TODO: clean this up.
+typedef sharC_env_t;
 struct Env {
 	TAILQ_ENTRY(Env) proc_link NOINIT;	// Free list link pointers
 	spinlock_t proc_lock;
@@ -53,6 +54,12 @@ struct Env {
 	uint32_t env_runs;			// Number of times environment has run
 	uint32_t env_refcnt;		// Reference count of kernel contexts using this
 	uint32_t env_flags;
+
+#ifdef __SHARC__
+	// held spin-locks
+	// zra: Used by Ivy. Let me know if this should go elsewhere.
+	sharC_env_t sharC_env;
+#endif
 
 	// Address space
 	pde_t *COUNT(NPDENTRIES) env_pgdir;			// Kernel virtual address of page dir
@@ -76,7 +83,7 @@ struct Env {
 
 extern env_t *COUNT(NENV) envs;		// All environments
 extern atomic_t num_envs;		// Number of envs
-extern env_t* NORACE curenvs[MAX_NUM_CPUS];
+extern env_t* curenvs[MAX_NUM_CPUS];
 
 void	env_init(void);
 int		env_alloc(env_t *SAFE*SAFE e, envid_t parent_id);

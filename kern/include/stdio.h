@@ -31,7 +31,7 @@ void	vprintfmt(void (*putch)(int, void**), void **putdat, const char *NTS fmt, v
 #endif
 
 // lib/printf.c
-int	cprintf(const char * NTS fmt, ...);
+int	( cprintf)(const char * NTS fmt, ...);
 int	vcprintf(const char * NTS fmt, va_list);
 
 // lib/sprintf.c

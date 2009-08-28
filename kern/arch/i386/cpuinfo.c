@@ -4,6 +4,10 @@
  * See LICENSE for details.
  */
 
+#ifdef __SHARC__
+#pragma nosharc
+#endif
+
 #include <arch/arch.h>
 #include <arch/x86.h>
 #include <arch/mmu.h>
@@ -20,7 +24,7 @@ void print_cpuinfo(void)
 	uint32_t model, family;
 	uint64_t msr_val;
 	char vendor_id[13];
-	extern char (SNT _start)[];
+	extern char (SNT SREADONLY _start)[];
 
 	asm volatile ("cpuid;"
 	          "movl    %%ebx, (%2);"
@@ -97,9 +101,11 @@ void print_cpuinfo(void)
 
 void show_mapping(uintptr_t start, size_t size)
 {
-	pde_t *COUNT(PTSIZE) pgdir = (pde_t *COUNT(PTSIZE))vpd;
-	pte_t *pte, *pde;
-	page_t* page;
+	pde_t SLOCKED(&vpd_lock) *COUNT(PTSIZE) pgdir =
+	    (pde_t SLOCKED(&vpd_lock) *COUNT(PTSIZE))vpd;
+	pte_t *pte;
+	pte_t SLOCKED(&vpd_lock) *pde;
+	page_t *page;
 	uintptr_t i;
 
 	cprintf("   Virtual    Physical  Ps Dr Ac CD WT U W\n");

@@ -4,6 +4,10 @@
  * See LICENSE for details.
  */
 
+#ifdef __SHARC__
+#pragma nosharc
+#endif
+
 #include <atomic.h>
 #include <smp.h>
 

@@ -5,6 +5,10 @@
  * Kevin Klues <klueska@cs.berkeley.edu>    
  */
 
+#ifdef __SHARC__
+#pragma nosharc
+#endif
+
 #include <arch/types.h>
 #include <ros/error.h>
 #include <pmap.h>

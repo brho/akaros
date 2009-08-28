@@ -162,8 +162,12 @@
 typedef uint32_t pte_t;
 typedef uint32_t pde_t;
 
-extern volatile pte_t (COUNT(PTSIZE) vpt)[];     // VA of "virtual page table"
-extern volatile pde_t (COUNT(PTSIZE) vpd)[];     // VA of current page directory
+#pragma cilnoremove("vpt_lock", "vpd_lock")
+extern volatile uint32_t vpt_lock;
+extern volatile uint32_t vpd_lock;
+
+extern volatile pte_t SLOCKED(&vpt_lock) (COUNT(PTSIZE) SREADONLY vpt)[]; // VA of "virtual page table"
+extern volatile pde_t SLOCKED(&vpd_lock) (COUNT(PTSIZE) SREADONLY vpd)[]; // VA of current page directory
 
 #endif /* !__ASSEMBLER__ */
 #endif /* !ROS_INC_MEMLAYOUT_H */

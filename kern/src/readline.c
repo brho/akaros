@@ -1,4 +1,8 @@
 
+#ifdef __SHARC__
+#pragma nosharc
+#endif
+
 #include <ros/error.h>
 #include <stdio.h>
 

@@ -1,5 +1,9 @@
 /* See COPYRIGHT for copyright information. */
 
+#ifdef __SHARC__
+#pragma nosharc
+#endif
+
 #ifdef __BSD_ON_CORE_0__
 #include Everything For Free -- It just works!!
 #else

@@ -24,11 +24,18 @@
 #define noreturn __attribute__((noreturn))
 #endif
 
+extern int __ivy_checking_on;
+
 asmlinkage
 void deputy_fail_mayreturn(const char *check, const char *text,
                            __LOCATION__FORMALS) {
+	int old;
+	if (!__ivy_checking_on) return;
+	old = __ivy_checking_on;
+	__ivy_checking_on = 0;
     cprintf("%s:%d: %s: Assertion failed in %s: %s\n",
             __LOCATION__ACTUALS, check, text);
+	__ivy_checking_on = old;
 /*
     dump_stack();
 */
@@ -36,7 +43,9 @@ void deputy_fail_mayreturn(const char *check, const char *text,
 
 asmlinkage noreturn
 void deputy_fail_noreturn_fast(void) {
+	__ivy_checking_on = 0;
     panic("Deputy assertion failure\n");
+	__ivy_checking_on = 1;
 }
 
 int deputy_strlen(const char *str) {
@@ -86,7 +95,10 @@ int deputy_findnull(const void *e, unsigned int bytes) {
             NULLCHECK(long);
             break;
         default:
+			if (!__ivy_checking_on) return length;
+			__ivy_checking_on = 0;
             cprintf("Invalid byte size for nullcheck.\n");
+			__ivy_checking_on = 1;
             break;
     }
 
@@ -98,14 +110,3 @@ void *__deputy_memset(void *s, int c, unsigned int n) {
   return memset(s, c, n);
 }
 
-void __ivy_handler_atomic_entry() __attribute__((weak));
-void __ivy_handler_atomic_entry() {return;}
-
-void __ivy_handler_atomic_exit() __attribute__((weak));
-void __ivy_handler_atomic_exit() {return;}
-
-void __ivy_handler_atomic_locks_entry(unsigned int n, ...) __attribute__((weak));
-void __ivy_handler_atomic_locks_entry(unsigned int n, ...) {return;}
-
-void __ivy_handler_atomic_locks_exit(unsigned int n, ...) __attribute__((weak));
-void __ivy_handler_atomic_locks_exit(unsigned int n, ...) {return;}

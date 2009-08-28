@@ -135,7 +135,7 @@ irq_is_enabled(void)
 }
 
 static __inline uint32_t
-core_id(void)
+( core_id)(void)
 {
 	return lapic_get_id();
 }

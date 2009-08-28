@@ -5,6 +5,10 @@
  * Kevin Klues <klueska@cs.berkeley.edu>    
  */
 
+#ifdef __SHARC__
+#pragma nosharc
+#endif
+
 #include <colored_caches.h>
 
 // Global variables

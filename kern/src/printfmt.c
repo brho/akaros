@@ -2,6 +2,10 @@
 // used in common by printf, sprintf, fprintf, etc.
 // This code is also used by both the kernel and user programs.
 
+#ifdef __SHARC__
+#pragma nosharc
+#endif
+
 #include <arch/types.h>
 #include <ros/error.h>
 #include <stdio.h>

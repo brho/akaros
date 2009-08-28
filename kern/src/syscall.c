@@ -1,5 +1,9 @@
 /* See COPYRIGHT for copyright information. */
 
+#ifdef __SHARC__
+#pragma nosharc
+#endif
+
 #include <arch/types.h>
 #include <arch/arch.h>
 #include <arch/mmu.h>

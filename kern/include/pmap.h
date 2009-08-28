@@ -41,7 +41,9 @@
 
 extern char (SNT bootstacktop)[], (SNT bootstack)[];
 
-extern page_t *COUNT(npages) pages; // List of pysical pages
+// List of pysical pages
+extern volatile uint32_t pages_lock;
+extern page_t SLOCKED(&pages_lock) * SREADONLY COUNT(npages) pages;
 
 extern physaddr_t boot_cr3;
 extern pde_t *COUNT(NPDENTRIES) boot_pgdir;
@@ -59,7 +61,7 @@ int	    page_insert(pde_t *COUNT(NPDENTRIES) pgdir, page_t *pp, void *SNT va, in
 void*COUNT(PGSIZE) page_insert_in_range(pde_t *COUNT(NPDENTRIES) pgdir, page_t *pp, 
                              void *SNT vab, void *SNT vae, int perm);
 void	page_remove(pde_t *COUNT(NPDENTRIES) pgdir, void *SNT va);
-page_t*COUNT(1) page_lookup(pde_t *COUNT(NPDENTRIES) pgdir, void *SNT va, pte_t **pte_store);
+page_t*COUNT(1) page_lookup(pde_t SSOMELOCK*COUNT(NPDENTRIES) pgdir, void *SNT va, pte_t **pte_store);
 error_t	pagetable_remove(pde_t *COUNT(NPDENTRIES) pgdir, void *SNT va);
 void	page_decref(page_t *COUNT(1) pp);
 

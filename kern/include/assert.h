@@ -3,8 +3,9 @@
 #ifndef ROS_INC_ASSERT_H
 #define ROS_INC_ASSERT_H
 
-void _warn(const char* NTS, int, const char* NTS, ...);
-void _panic(const char* NTS, int, const char* NTS, ...) __attribute__((noreturn));
+void ( _warn)(const char* NTS, int, const char* NTS, ...);
+void ( _panic)(const char* NTS, int, const char* NTS, ...)
+    __attribute__((noreturn));
 
 #define warn(...) _warn(__FILE__, __LINE__, __VA_ARGS__)
 #define panic(...) _panic(__FILE__, __LINE__, __VA_ARGS__)

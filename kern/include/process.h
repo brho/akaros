@@ -39,8 +39,8 @@ int proc_set_state(struct proc *p, uint32_t state) WRITES(p->state);
 struct proc *get_proc(unsigned pid);
 bool proc_controls(struct proc *actor, struct proc *target);
 void proc_run(struct proc *p);
-void proc_startcore(struct proc *p, trapframe_t *tf) __attribute__((noreturn));
-void proc_destroy(struct proc *SAFE p);
+void (proc_startcore)(struct proc *p, trapframe_t *tf) __attribute__((noreturn));
+void (proc_destroy)(struct proc *SAFE p);
 
 /* The reference counts are mostly to track how many cores loaded the cr3 */
 error_t proc_incref(struct proc *SAFE p);

@@ -1,6 +1,6 @@
 /* See COPYRIGHT for copyright information. */
-#ifdef __DEPUTY__
-#pragma noasync
+#ifdef __SHARC__
+#pragma nosharc
 #endif
 
 #include <arch/trap.h>
