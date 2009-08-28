@@ -11,7 +11,7 @@
 #include <kmalloc.h>
 #include <stdio.h>
 
-#define kmallocdebug(args...)  printk(args)
+#define kmallocdebug(args...)  //printk(args)
 
 char*BND(end, maxaddrpa_ptr + IVY_KERNBASE) boot_freemem;
 static page_list_t pages_list;	//List of physical pages used by kmalloc
@@ -90,6 +90,9 @@ void kmalloc_init()
 
 void* kmalloc(size_t size, int flags) 
 {
+	if (size == 0)
+		return NULL;
+
 	int npages = ROUNDUP(size, PGSIZE) / PGSIZE;
 	
 	// Find 'npages' free consecutive pages
@@ -115,6 +118,7 @@ void* kmalloc(size_t size, int flags)
 	for(int i=0; i<npages; i++) {
 		page_t* page;
 		page_alloc_specific(&page, first+i);
+		page_incref(page);
 		page->num_cons_links = npages-i;
 		LIST_INSERT_HEAD(&pages_list, page, global_link);
 		kmallocdebug("mallocing page: %u\n", first+i);
