@@ -7,7 +7,7 @@ USER_APPS_ROSLIB_LDFLAGS   := $(USER_LDFLAGS) -static \
                               -T $(USER_APPS_ROSLIB_DIR)/apps_$(TARGET_ARCH).ld
 USER_APPS_ROSLIB_LDDIRS    := -L$(OBJDIR)/$(USER_ROSLIB_DIR)
 USER_APPS_ROSLIB_LDLIBS    := --start-group -livyroslib -lroslib --end-group
-USER_APPS_ROSLIB_LDOBJS    := $(OBJDIR)/$(USER_ROSLIB_DIR)/entry_$(TARGET_ARCH).o 
+USER_APPS_ROSLIB_LDOBJS    := $(OBJDIR)/$(USER_ROSLIB_ARCH_SRC_DIR)/entry.o 
 USER_APPS_ROSLIB_LDDEPENDS := $(USER_APPS_ROSLIB_LDOBJS) \
                               $(OBJDIR)/$(USER_ROSLIB_DIR)/libivyroslib.a \
                               $(OBJDIR)/$(USER_ROSLIB_DIR)/libroslib.a \

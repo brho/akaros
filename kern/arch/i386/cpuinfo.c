@@ -1,8 +1,8 @@
-/* See COPYRIGHT for copyright information. */
-
-#ifdef __DEPUTY__
-#pragma nodeputy
-#endif
+/*
+ * Copyright (c) 2009 The Regents of the University of California
+ * Barret Rhoden <brho@cs.berkeley.edu>
+ * See LICENSE for details.
+ */
 
 #include <arch/arch.h>
 #include <arch/x86.h>
@@ -14,8 +14,8 @@
 #include <kdebug.h>
 #include <string.h>
 
-void
-print_cpuinfo(void) {
+void print_cpuinfo(void)
+{
 	uint32_t eax, ebx, ecx, edx;
 	uint32_t model, family;
 	uint64_t msr_val;
@@ -65,6 +65,16 @@ print_cpuinfo(void) {
 		cprintf("x2APIC Detected\n");
 	else
 		cprintf("x2APIC Not Detected\n");
+	if (ecx & 0x00000060) {
+		msr_val = read_msr(IA32_FEATURE_CONTROL);
+		printd("64 Bit Feature Control: 0x%08x\n", msr_val);
+		if (msr_val & 0x5 == 0x5)
+			printk("Hardware virtualization supported\n");
+		else
+			printk("Hardware virtualization not supported\n");
+	} else { 
+		printk("Hardware virtualization not supported\n");
+	}
 	cpuid(0x80000008, &eax, &ebx, &ecx, &edx);
 	cprintf("Physical Address Bits: %d\n", eax & 0x000000FF);
 	cprintf("Cores per Die: %d\n", (ecx & 0x000000FF) + 1);
@@ -87,7 +97,7 @@ print_cpuinfo(void) {
 
 void show_mapping(uintptr_t start, size_t size)
 {
-	pde_t* pgdir = (pde_t*)vpd;
+	pde_t *COUNT(PTSIZE) pgdir = (pde_t *COUNT(PTSIZE))vpd;
 	pte_t *pte, *pde;
 	page_t* page;
 	uintptr_t i;
@@ -95,7 +105,7 @@ void show_mapping(uintptr_t start, size_t size)
 	cprintf("   Virtual    Physical  Ps Dr Ac CD WT U W\n");
 	cprintf("------------------------------------------\n");
 	for(i = 0; i < size; i += PGSIZE, start += PGSIZE) {
-		page = page_lookup(pgdir, (void*)start, &pte);
+		page = page_lookup(pgdir, (void*SNT)start, &pte);
 		cprintf("%08p  ", start);
 		if (page) {
 			pde = &pgdir[PDX(start)];
@@ -109,14 +119,13 @@ void show_mapping(uintptr_t start, size_t size)
 	}
 }
 
-void
-backtrace(void)
-{
-	uint32_t* ebp, eip;
+void backtrace(void)
+{ TRUSTEDBLOCK
+	uint32_t *ebp, eip;
 	eipdebuginfo_t debuginfo;
 	char buf[256];
 	int j, i = 1;
-	ebp = (uint32_t*)read_ebp();	
+	ebp = (uint32_t*)read_ebp();
 	// this is part of the way back into the call() instruction's bytes
 	// eagle-eyed readers should be able to explain why this is good enough,
 	// and retaddr (just *(ebp + 1) is not)

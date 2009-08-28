@@ -1,6 +1,8 @@
-#ifdef __DEPUTY__
-#pragma nodeputy
-#endif
+/*
+ * Copyright (c) 2009 The Regents of the University of California
+ * Barret Rhoden <brho@cs.berkeley.edu>
+ * See LICENSE for details.
+ */
 
 #include <arch/arch.h>
 #include <smp.h>
@@ -19,10 +21,10 @@
 // need to be global, since there is no function that will always exist for them
 handler_wrapper_t             handler_wrappers[NUM_HANDLER_WRAPPERS];
 
-static int smp_call_function(uint8_t type, uint8_t dest, isr_t handler, void* data,
-                              handler_wrapper_t** wait_wrapper)
+static int smp_call_function(uint8_t type, uint8_t dest, poly_isr_t handler, TV(t) data,
+                             handler_wrapper_t** wait_wrapper)
 {
-	extern handler_t interrupt_handlers[];
+	extern handler_t interrupt_handlers[NUM_INTERRUPT_HANDLERS];
 	int8_t state = 0;
 	uint32_t wrapper_num;
 	handler_wrapper_t* wrapper;
@@ -136,19 +138,19 @@ static int smp_call_function(uint8_t type, uint8_t dest, isr_t handler, void* da
 }
 
 // Wrapper functions.  Add more as they are needed.
-int smp_call_function_self(isr_t handler, void* data,
+int smp_call_function_self(poly_isr_t handler, TV(t) data,
                            handler_wrapper_t** wait_wrapper)
 {
 	return smp_call_function(1, 0, handler, data, wait_wrapper);
 }
 
-int smp_call_function_all(isr_t handler, void* data,
+int smp_call_function_all(poly_isr_t handler, TV(t) data,
                           handler_wrapper_t** wait_wrapper)
 {
 	return smp_call_function(2, 0, handler, data, wait_wrapper);
 }
 
-int smp_call_function_single(uint8_t dest, isr_t handler, void* data,
+int smp_call_function_single(uint8_t dest, poly_isr_t handler, TV(t) data,
                              handler_wrapper_t** wait_wrapper)
 {
 	return smp_call_function(4, dest, handler, data, wait_wrapper);

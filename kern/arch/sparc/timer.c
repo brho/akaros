@@ -3,6 +3,7 @@
 #include <arch/trap.h>
 #include <arch/arch.h>
 #include <stdio.h>
+#include <assert.h>
 
 system_timing_t system_timing = {0};
 volatile uint32_t timer_ticks = 0;
@@ -35,7 +36,26 @@ timer_init(void)
 
 	while(ticks == timer_ticks) ;
 
-	system_timing.tsc_freq = read_tsc() - tsc_ticks;
+	system_timing.tsc_freq = (read_tsc() - tsc_ticks)*INTERRUPT_TIMER_HZ;
 
 	cprintf("TSC Frequency: %llu\n", system_timing.tsc_freq);
+}
+
+void
+udelay(uint64_t usec)
+{
+	if (system_timing.tsc_freq != 0)
+	{
+		uint64_t start, end, now;
+        
+		start = read_tsc();
+		end = start + (system_timing.tsc_freq * usec) / 1000000;
+
+		do
+		{
+			cpu_relax();
+			now = read_tsc();
+		} while (now < end || (now > start && end < start));
+	}
+	else panic("udelay() was called before timer_init(), moron!");
 }

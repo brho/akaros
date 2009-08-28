@@ -1,9 +1,5 @@
 // Basic string routines.  Not hardware optimized, but not shabby.
 
-#ifdef __DEPUTY__
-#pragma nodeputy
-#endif
-
 #include <string.h>
 
 int
@@ -26,6 +22,7 @@ strnlen(const char *s, size_t size)
 	return n;
 }
 
+/* zra: These aren't being used, and they are dangerous, so I'm rm'ing them
 char *
 strcpy(char *dst, const char *src)
 {
@@ -33,7 +30,7 @@ strcpy(char *dst, const char *src)
 
 	ret = dst;
 	while ((*dst++ = *src++) != '\0')
-		/* do nothing */;
+		;
 	return ret;
 }
 
@@ -43,6 +40,7 @@ strcat(char *dst, const char *src)
 	strcpy(dst+strlen(dst),src);
 	return dst;
 }
+*/
 
 char *
 strncpy(char *dst, const char *src, size_t size) {
@@ -116,12 +114,14 @@ strfind(const char *s, char c)
 
 // n must be a multiple of 16 and v must be uint32_t-aligned
 static inline void *
-memset16(uint32_t *v, uint32_t c, size_t n)
+memset16(uint32_t *COUNT(n/sizeof(uint32_t)) _v, uint32_t c, size_t n)
 {
 	uint32_t *start, *end;
+	uint32_t *BND(_v, end) v;
 
-	start = v;
-	end = v + n/sizeof(uint32_t);
+	start = _v;
+	end = _v + n/sizeof(uint32_t);
+	v = _v;
 	c = c | c<<8 | c<<16 | c<<24;
 
 	while(v < end)
@@ -136,14 +136,20 @@ memset16(uint32_t *v, uint32_t c, size_t n)
 // n must be a multiple of 16 and v must be 4-byte aligned.
 // as allowed by ISO, behavior undefined if dst/src overlap
 static inline void *
-memcpy16(uint32_t* dst, const uint32_t* src, size_t n)
+memcpy16(uint32_t *COUNT(n/sizeof(uint32_t)) _dst,
+         const uint32_t *COUNT(n/sizeof(uint32_t)) _src, size_t n)
 {
-	uint32_t *dststart, *dstend;
+	uint32_t *dststart, *SNT dstend, *SNT srcend;
+	uint32_t *BND(_dst,dstend) dst;
+	const uint32_t *BND(_src,srcend) src;
 
-	dststart = dst;
-	dstend = dst + n/sizeof(uint32_t);
+	dststart = _dst;
+	dstend = (uint32_t *SNT)(_dst + n/sizeof(uint32_t));
+	srcend = (uint32_t *SNT)(_src + n/sizeof(uint32_t));
+	dst = _dst;
+	src = _src;
 
-	while(dst < dstend)
+	while(dst < dstend && src < srcend)
 	{
 		dst[0] = src[0];
 		dst[1] = src[1];
@@ -158,17 +164,20 @@ memcpy16(uint32_t* dst, const uint32_t* src, size_t n)
 }
 
 void *
-memset(void *v, int c, size_t n)
+memset(void *COUNT(_n) v, int c, size_t _n)
 {
-	char *p;
+	char *BND(v,v+_n) p;
 	size_t n0;
+	size_t n = _n;
+
+	if (n == 0) return NULL; // zra: complain here?
 
 	p = v;
 
 	if(n >= 16 && ((uintptr_t)v & 3) == 0)
 	{
 		n0 = (n/16)*16;
-		memset16((uint32_t*)v,c,n0);
+		memset16((uint32_t*COUNT(n0/sizeof(uint32_t)))v,c,n0);
 		n -= n0;
 		p += n0;
 	}
@@ -183,11 +192,12 @@ memset(void *v, int c, size_t n)
 }
 
 void *
-memcpy(void *dst, const void *src, size_t n)
+(DMEMCPY(1,2,3) memcpy)(void *COUNT(_n) dst, const void *COUNT(_n) src, size_t _n)
 {
-	const char *s;
-	char *d;
+	const char *BND(src,src+_n) s;
+	char *BND(dst,dst+_n) d;
 	size_t n0;
+	size_t n = _n;
 
 	s = src;
 	d = dst;
@@ -195,7 +205,8 @@ memcpy(void *dst, const void *src, size_t n)
 	if(n >= 16 && ((uintptr_t)src  & 3) == 0 && ((uintptr_t)dst & 3) == 0)
 	{
 		n0 = (n/16)*16;
-		memcpy16((uint32_t*)dst,(const uint32_t*)src,n0);
+		memcpy16((uint32_t*COUNT(n0/sizeof(uint32_t)))dst,
+                 (const uint32_t*COUNT(n0/sizeof(uint32_t)))src,n0);
 		n -= n0;
 		s += n0;
 		d += n0;
@@ -208,10 +219,11 @@ memcpy(void *dst, const void *src, size_t n)
 }
 
 void *
-memmove(void *dst, const void *src, size_t n)
+memmove(void *COUNT(_n) dst, const void *COUNT(_n) src, size_t _n)
 {
-	const char *s;
-	char *d;
+	const char *BND(src,src+_n) s;
+	char *BND(dst,dst+_n) d;
+	size_t n = _n;
 	
 	s = src;
 	d = dst;
@@ -228,10 +240,10 @@ memmove(void *dst, const void *src, size_t n)
 }
 
 int
-memcmp(const void *v1, const void *v2, size_t n)
+memcmp(const void *COUNT(n) v1, const void *COUNT(n) v2, size_t n)
 {
-	const uint8_t *s1 = (const uint8_t *) v1;
-	const uint8_t *s2 = (const uint8_t *) v2;
+	const uint8_t *BND(v1,v1+n) s1 = (const uint8_t *) v1;
+	const uint8_t *BND(v2,v2+n) s2 = (const uint8_t *) v2;
 
 	while (n-- > 0) {
 		if (*s1 != *s2)
@@ -243,13 +255,14 @@ memcmp(const void *v1, const void *v2, size_t n)
 }
 
 void *
-memfind(const void *s, int c, size_t n)
+memfind(const void *COUNT(n) _s, int c, size_t n)
 {
-	const void *ends = (const char *) s + n;
+	const void *SNT ends = (const char *) _s + n;
+	const void *BND(_s,_s + n) s = _s;
 	for (; s < ends; s++)
 		if (*(const unsigned char *) s == (unsigned char) c)
 			break;
-	return (void *) s;
+	return (void *BND(_s,_s+n)) s;
 }
 
 long

@@ -1,12 +1,15 @@
-#ifdef __DEPUTY__
-#pragma nodeputy
-#endif
+/*
+ * Copyright (c) 2009 The Regents of the University of California
+ * Barret Rhoden <brho@cs.berkeley.edu>
+ * See LICENSE for details.
+ */
 
 #include <arch/x86.h>
 #include <arch/arch.h>
 #include <smp.h>
 #include <arch/console.h>
 #include <arch/apic.h>
+#include <timing.h>
 
 #include <atomic.h>
 #include <ros/error.h>
@@ -16,6 +19,7 @@
 #include <pmap.h>
 #include <env.h>
 #include <trap.h>
+#include <timing.h>
 
 extern handler_wrapper_t handler_wrappers[NUM_HANDLER_WRAPPERS];
 volatile uint8_t num_cpus = 0xee;
@@ -48,30 +52,44 @@ static void init_smp_call_function(void)
 
 /******************************************************************************/
 
-static void smp_mtrr_handler(trapframe_t *tf, void* data)
+static void smp_mtrr_handler(trapframe_t *tf, barrier_t *data)
 {
-	setup_default_mtrrs((barrier_t*)data);
+	setup_default_mtrrs(data);
+}
+
+// this needs to be set in smp_entry too...
+#define trampoline_pg 0x00001000
+extern smp_entry(), smp_entry_end(), smp_boot_lock(), smp_semaphore();
+
+static inline volatile uint32_t *COUNT(1)
+get_smp_semaphore()
+{
+	return (volatile uint32_t *COUNT(1))TC(&smp_semaphore - &smp_entry + trampoline_pg);
+}
+
+static inline uint32_t *COUNT(1)
+get_smp_bootlock()
+{
+	return (uint32_t *COUNT(1))TC(&smp_boot_lock - &smp_entry + trampoline_pg);
 }
 
 void smp_boot(void)
 {
-	// this needs to be set in smp_entry too...
-	#define trampoline_pg 0x00001000
 	page_t *smp_stack;
 	// NEED TO GRAB A LOWMEM FREE PAGE FOR AP BOOTUP CODE
 	// page1 (2nd page) is reserved, hardcoded in pmap.c
-	extern smp_entry(), smp_entry_end(), smp_boot_lock(), smp_semaphore();
 	memset(KADDR(trampoline_pg), 0, PGSIZE);
-	memcpy(KADDR(trampoline_pg), &smp_entry, &smp_entry_end - &smp_entry);
+	memcpy(KADDR(trampoline_pg), (void *COUNT(PGSIZE))TC(&smp_entry),
+           &smp_entry_end - &smp_entry);
 
 	// This mapping allows access to the trampoline with paging on and off
 	// via trampoline_pg
-	page_insert(boot_pgdir, pa2page(trampoline_pg), (void*)trampoline_pg, PTE_W);
+	page_insert(boot_pgdir, pa2page(trampoline_pg), (void*SNT)trampoline_pg, PTE_W);
 
 	// Allocate a stack for the cores starting up.  One for all, must share
 	if (page_alloc(&smp_stack))
 		panic("No memory for SMP boot stack!");
-	smp_stack->pp_ref++;
+	page_incref(smp_stack);
 	smp_stack_top = (uintptr_t)(page2kva(smp_stack) + PGSIZE);
 
 	// Start the IPI process (INIT, wait, SIPI, wait, SIPI, wait)
@@ -91,7 +109,7 @@ void smp_boot(void)
 	// all in smp_entry.  It's purpose is to keep Core0 from competing for the
 	// smp_boot_lock.  So long as one AP increments the sem before the final
 	// LAPIC timer goes off, all available cores will be initialized.
-	while(*(volatile uint32_t*)(&smp_semaphore - &smp_entry + trampoline_pg));
+	while(*get_smp_semaphore());
 
 	// From here on, no other cores are coming up.  Grab the lock to ensure it.
 	// Another core could be in it's prelock phase and be trying to grab the lock
@@ -102,18 +120,18 @@ void smp_boot(void)
 	// booting.  Specifically, it's when they turn on paging and have that temp
 	// mapping pulled out from under them.  Now, if a core loses, it will spin
 	// on the trampoline (which we must be careful to not deallocate)
-	spin_lock((uint32_t*)(&smp_boot_lock - &smp_entry + trampoline_pg));
+	spin_lock(get_smp_bootlock());
 	cprintf("Num_Cpus Detected: %d\n", num_cpus);
 
 	// Remove the mapping of the page used by the trampoline
-	page_remove(boot_pgdir, (void*)trampoline_pg);
+	page_remove(boot_pgdir, (void*SNT)trampoline_pg);
 	// It had a refcount of 2 earlier, so we need to dec once more to free it
 	// but only if all cores are in (or we reset / reinit those that failed)
 	// TODO after we parse ACPI tables
 	if (num_cpus == 8) // TODO - ghetto coded for our 8 way SMPs
 		page_decref(pa2page(trampoline_pg));
 	// Remove the page table used for that mapping
-	pagetable_remove(boot_pgdir, (void*)trampoline_pg);
+	pagetable_remove(boot_pgdir, (void*SNT)trampoline_pg);
 	// Dealloc the temp shared stack
 	page_decref(smp_stack);
 
@@ -127,6 +145,29 @@ void smp_boot(void)
 
 	// Should probably flush everyone's TLB at this point, to get rid of
 	// temp mappings that were removed.  TODO
+}
+
+/* zra: sometimes Deputy needs some hints */
+static inline void *COUNT(sizeof(pseudodesc_t))
+get_my_gdt_pd(page_t *my_stack)
+{
+	return page2kva(my_stack) + (PGSIZE - sizeof(pseudodesc_t) -
+                                     sizeof(segdesc_t)*SEG_COUNT);
+}
+
+//static inline void *COUNT(sizeof(segdesc_t)*SEG_COUNT)
+static inline segdesc_t *COUNT(SEG_COUNT)
+get_my_gdt(page_t *my_stack)
+{
+	return TC(page2kva(my_stack) + PGSIZE - sizeof(segdesc_t)*SEG_COUNT);
+}
+
+static inline void *COUNT(sizeof(taskstate_t))
+get_my_ts(page_t *my_stack)
+{
+	return page2kva(my_stack) + PGSIZE -
+		sizeof(pseudodesc_t) - sizeof(segdesc_t)*SEG_COUNT -
+		sizeof(taskstate_t);
 }
 
 /*
@@ -152,20 +193,16 @@ uint32_t smp_main(void)
 	page_t *my_stack;
 	if (page_alloc(&my_stack))
 		panic("Unable to alloc a per-core stack!");
-	my_stack->pp_ref++;
+	page_incref(my_stack);
 	memset(page2kva(my_stack), 0, PGSIZE);
 
 	// Set up a gdt / gdt_pd for this core, stored at the top of the stack
 	// This is necessary, eagle-eyed readers know why
 	// GDT should be 4-byte aligned.  TS isn't aligned.  Not sure if it matters.
-	pseudodesc_t *my_gdt_pd = page2kva(my_stack) + PGSIZE -
-		sizeof(pseudodesc_t) - sizeof(segdesc_t)*SEG_COUNT;
-	segdesc_t *my_gdt = page2kva(my_stack) + PGSIZE -
-		sizeof(segdesc_t)*SEG_COUNT;
+	pseudodesc_t *my_gdt_pd = get_my_gdt_pd(my_stack);
+	segdesc_t *COUNT(SEG_COUNT) my_gdt = get_my_gdt(my_stack);
 	// TS also needs to be permanent
-	taskstate_t *my_ts = page2kva(my_stack) + PGSIZE -
-		sizeof(pseudodesc_t) - sizeof(segdesc_t)*SEG_COUNT -
-		sizeof(taskstate_t);
+	taskstate_t *my_ts = get_my_ts(my_stack);
 	// Usable portion of the KSTACK grows down from here
 	// Won't actually start using this stack til our first interrupt
 	// (issues with changing the stack pointer and then trying to "return")
@@ -208,3 +245,4 @@ uint32_t smp_main(void)
 
 	return my_stack_top; // will be loaded in smp_entry.S
 }
+

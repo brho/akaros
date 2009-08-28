@@ -1,7 +1,9 @@
 /* See COPYRIGHT for copyright information. */
+
 #ifdef __DEPUTY__
 #pragma nodeputy
 #endif
+
 
 #include <arch/types.h>
 #include <arch/arch.h>
@@ -13,11 +15,14 @@
 #include <rl8168.h>
 #include <string.h>
 #include <assert.h>
-#include <env.h>
+#include <process.h>
+#include <schedule.h>
 #include <pmap.h>
 #include <trap.h>
 #include <syscall.h>
 #include <kmalloc.h>
+#include <stdio.h>
+#include <kfs.h> // eventually replace this with vfs.h
 
 //Do absolutely nothing.  Used for profiling.
 static void sys_null(void)
@@ -26,12 +31,12 @@ static void sys_null(void)
 }
 
 //Write a buffer over the serial port
-static ssize_t sys_serial_write(env_t* e, const char *DANGEROUS buf, size_t len) 
+static ssize_t sys_serial_write(env_t* e, const char *DANGEROUS buf, size_t len)
 {
 	#ifdef SERIAL_IO
 		char *COUNT(len) _buf = user_mem_assert(e, buf, len, PTE_USER_RO);
 		for(int i =0; i<len; i++)
-			serial_send_byte(buf[i]);	
+			serial_send_byte(buf[i]);
 		return (ssize_t)len;
 	#else
 		return -EINVAL;
@@ -39,10 +44,10 @@ static ssize_t sys_serial_write(env_t* e, const char *DANGEROUS buf, size_t len)
 }
 
 //Read a buffer over the serial port
-static ssize_t sys_serial_read(env_t* e, char *DANGEROUS buf, size_t len) 
+static ssize_t sys_serial_read(env_t* e, char *DANGEROUS _buf, size_t len)
 {
 	#ifdef SERIAL_IO
-	    char *COUNT(len) _buf = user_mem_assert(e, buf, len, PTE_USER_RO);
+	    char *COUNT(len) buf = user_mem_assert(e, _buf, len, PTE_USER_RO);
 		size_t bytes_read = 0;
 		int c;
 		while((c = serial_read_byte()) != -1) {
@@ -55,17 +60,17 @@ static ssize_t sys_serial_read(env_t* e, char *DANGEROUS buf, size_t len)
 	#endif
 }
 
-static ssize_t sys_run_binary(env_t* e, void* binary_buf, void* arg, size_t len) {
+static ssize_t sys_run_binary(env_t* e, void *binary_buf, void* arg, size_t len) {
 	uint8_t* new_binary = kmalloc(len, 0);
 	if(new_binary == NULL)
 		return -ENOMEM;
 	memcpy(new_binary, binary_buf, len);
 
-	env_t* env = env_create((uint8_t*)new_binary, len);
+        env_t* env = env_create((uint8_t*)new_binary, len);
 	kfree(new_binary);
-	
-	e->env_status = ENV_RUNNABLE;
-	env_run(env);
+	proc_set_state(env, PROC_RUNNABLE_S);
+        proc_run(env);
+
 	return 0;
 }
 
@@ -148,26 +153,29 @@ static ssize_t sys_eth_read(env_t* e, char *DANGEROUS buf, size_t len)
 		return -EINVAL;
 }
 
-static ssize_t sys_shared_page_alloc(env_t* p1, 
-                                     void** addr, envid_t p2_id, 
+static ssize_t sys_shared_page_alloc(env_t* p1,
+                                     void**DANGEROUS _addr, envid_t p2_id,
                                      int p1_flags, int p2_flags
-                                    ) 
+                                    )
 {
-	if (!VALID_USER_PERMS(p1_flags)) return -EPERM;
-	if (!VALID_USER_PERMS(p2_flags)) return -EPERM;
+	//if (!VALID_USER_PERMS(p1_flags)) return -EPERM;
+	//if (!VALID_USER_PERMS(p2_flags)) return -EPERM;
 
+	void * COUNT(1) * COUNT(1) addr = user_mem_assert(p1, _addr, sizeof(void *), 
+                                                      PTE_USER_RW);
 	page_t* page;
 	env_t* p2 = &(envs[ENVX(p2_id)]);
 	error_t e = page_alloc(&page);
+
 	if(e < 0) return e;
-	
-	void* p2_addr = page_insert_in_range(p2->env_pgdir, page, 
-	                                     (void*)UTEXT, (void*)UTOP, p2_flags);
-	if(p2_addr == NULL) 
+
+	void* p2_addr = page_insert_in_range(p2->env_pgdir, page,
+	                                     (void*SNT)UTEXT, (void*SNT)UTOP, p2_flags);
+	if(p2_addr == NULL)
 		return -EFAIL;
-		
-	void* p1_addr = page_insert_in_range(p1->env_pgdir, page, 
-	                                    (void*)UTEXT, (void*)UTOP, p1_flags);
+
+	void* p1_addr = page_insert_in_range(p1->env_pgdir, page,
+	                                    (void*SNT)UTEXT, (void*SNT)UTOP, p1_flags);
 	if(p1_addr == NULL) {
 		page_remove(p2->env_pgdir, p2_addr);
 		return -EFAIL;
@@ -176,16 +184,14 @@ static ssize_t sys_shared_page_alloc(env_t* p1,
 	return ESUCCESS;
 }
 
-static void sys_shared_page_free(env_t* p1, void* addr, envid_t p2)
+static void sys_shared_page_free(env_t* p1, void*DANGEROUS addr, envid_t p2)
 {
 }
 
-// Invalidate the cache of this core
+// Invalidate the cache of this core.  Only useful if you want a cold cache for
+// performance testing reasons.
 static void sys_cache_invalidate(void)
 {
-	// why is this necessary with cache coherence?
-	// is it for coherence with respect to i/o?  --asw
-
 	#ifdef __i386__
 		wbinvd();
 	#endif
@@ -198,7 +204,7 @@ static void sys_cache_invalidate(void)
 // lines, to simulate doing something useful.
 static void sys_cache_buster(env_t* e, uint32_t num_writes, uint32_t num_pages,
                              uint32_t flags)
-{
+{ TRUSTEDBLOCK /* zra: this is not really part of the kernel */
 	#define BUSTER_ADDR		0xd0000000  // around 512 MB deep
 	#define MAX_WRITES		1048576*8
 	#define MAX_PAGES		32
@@ -214,7 +220,7 @@ static void sys_cache_buster(env_t* e, uint32_t num_writes, uint32_t num_pages,
 		stride = 16;
 		num_writes *= 16;
 	}
-	
+
 	/* Shared Accesses or Not (adjust to use per-core regions)
 	 * Careful, since this gives 8MB to each core, starting around 512MB.
 	 * Also, doesn't separate memory for core 0 if it's an async call.
@@ -305,6 +311,7 @@ static envid_t sys_getcpuid(void)
 	return core_id();
 }
 
+// TODO FIX Me!!!! for processes
 // Destroy a given environment (possibly the currently running environment).
 //
 // Returns 0 on success, < 0 on error.  Errors are:
@@ -320,34 +327,99 @@ static error_t sys_env_destroy(env_t* e, envid_t envid)
 	if (env_to_die == e)
 		printk("[%08x] exiting gracefully\n", e->env_id);
 	else
-		printk("[%08x] destroying %08x\n", e->env_id, env_to_die->env_id);
-	env_destroy(env_to_die);
+		panic("Destroying other processes is not supported yet.");
+		//printk("[%08x] destroying %08x\n", e->env_id, env_to_die->env_id);
+	proc_destroy(env_to_die);
 	return ESUCCESS;
 }
 
 /*
  * Current process yields its remaining "time slice".  Currently works for
  * single-core processes.
+ * TODO: think about how this works with async calls and multicored procs.
+ * Want it to only be callable locally.
  */
-static void sys_yield(env_t *e)
+static void sys_yield(struct proc *p)
 {
-	// TODO: watch for races throughout anything related to process statuses
-	// and schedule/yielding
-	assert(e->env_status == ENV_RUNNING);
-	e->env_status = ENV_RUNNABLE;
+	// This is all standard single-core, local call
+	spin_lock_irqsave(&p->proc_lock);
+	assert(p->state == PROC_RUNNING_S);
+	proc_set_state(p, PROC_RUNNABLE_S);
+	schedule_proc(p);
+	spin_unlock_irqsave(&p->proc_lock);
+	// the implied thing here is that all state has been saved before leaving
+	// could do the "leaving the process context" here, mentioned in startcore
 	schedule();
+
+	/* TODO
+	 * if running_s, give up your time slice (schedule, save silly state, block)
+	 * if running_m and 2+ cores are left, give yours up, stay running_m
+	 * if running_m and last core, switch to runnable_s
+	 */
+}
+
+/*
+ * Creates a process found at the user string 'path'.  Currently uses KFS.
+ * Not runnable by default, so it needs it's status to be changed so that the
+ * next call to schedule() will try to run it.
+ * TODO: once we have a decent VFS, consider splitting this up
+ * and once there's an mmap, can have most of this in process.c
+ */
+static int sys_proc_create(struct proc *p, const char *DANGEROUS path)
+{
+	#define MAX_PATH_LEN 256 // totally arbitrary
+	int pid = 0;
+	char tpath[MAX_PATH_LEN];
+	/*
+	 * There's a bunch of issues with reading in the path, which we'll
+	 * need to sort properly in the VFS.  Main concerns are TOCTOU (copy-in),
+	 * whether or not it's a big deal that the pointer could be into kernel
+	 * space, and resolving both of these without knowing the length of the
+	 * string. (TODO)
+	 * Change this so that all syscalls with a pointer take a length.
+	 *
+	 * zra: I've added this user_mem_strlcpy, which I think eliminates the
+     * the TOCTOU issue. Adding a length arg to this call would allow a more
+	 * efficient implementation, though, since only one call to user_mem_check
+	 * would be required.
+	 */
+	int ret = user_mem_strlcpy(p,tpath, path, MAX_PATH_LEN, PTE_USER_RO);
+	int kfs_inode = kfs_lookup_path(tpath);
+	if (kfs_inode < 0)
+		return -EINVAL;
+	struct proc *new_p = kfs_proc_create(kfs_inode);
+	return new_p->env_id; // TODO replace this with a real proc_id
+}
+
+/* Makes process PID runnable.  Consider moving the functionality to env.c */
+static error_t sys_proc_run(struct proc *p, unsigned pid)
+{
+	struct proc *target = get_proc(pid);
+	error_t retval = 0;
+	spin_lock_irqsave(&p->proc_lock); // note we can get interrupted here. it's not bad.
+	// make sure we have access and it's in the right state to be activated
+	if (!proc_controls(p, target)) {
+		retval = -EPERM;
+	} else if (target->state != PROC_CREATED) {
+		retval = -EINVAL;
+	} else {
+		proc_set_state(target, PROC_RUNNABLE_S);
+		schedule_proc(target);
+	}
+	spin_unlock_irqsave(&p->proc_lock);
+	return retval;
 }
 
 // TODO: Build a dispatch table instead of switching on the syscallno
 // Dispatches to the correct kernel function, passing the arguments.
 intreg_t syscall(env_t* e, uint32_t syscallno, uint32_t a1, uint32_t a2,
-                uint32_t a3, uint32_t a4, uint32_t a5)
+                 uint32_t a3, uint32_t a4, uint32_t a5)
 {
 	// Call the function corresponding to the 'syscallno' parameter.
 	// Return any appropriate return value.
 
 	//cprintf("Incoming syscall number: %d\n    a1: %x\n   "
-	//        " a2: %x\n    a3: %x\n    a4: %x\n    a5: %x\n", 
+	//        " a2: %x\n    a3: %x\n    a4: %x\n    a5: %x\n",
 	//        syscallno, a1, a2, a3, a4, a5);
 
 	assert(e); // should always have an env for every syscall
@@ -373,7 +445,7 @@ intreg_t syscall(env_t* e, uint32_t syscallno, uint32_t a1, uint32_t a2,
 			sys_cache_invalidate();
 			return 0;
 		case SYS_shared_page_alloc:
-			return sys_shared_page_alloc(e, (void** DANGEROUS) a1, 
+			return sys_shared_page_alloc(e, (void** DANGEROUS) a1,
 		                                 a2, (int) a3, (int) a4);
 		case SYS_shared_page_free:
 			sys_shared_page_free(e, (void* DANGEROUS) a1, a2);
@@ -384,20 +456,30 @@ intreg_t syscall(env_t* e, uint32_t syscallno, uint32_t a1, uint32_t a2,
 			return sys_cgetc(e);
 		case SYS_getcpuid:
 			return sys_getcpuid();
-		case SYS_serial_write:
-			return sys_serial_write(e, (char *DANGEROUS)a1, (size_t)a2);
-		case SYS_serial_read:
-			return sys_serial_read(e, (char *DANGEROUS)a1, (size_t)a2);
-		case SYS_getenvid:
+		case SYS_getpid:
 			return sys_getenvid(e);
-		case SYS_env_destroy:
+		case SYS_proc_destroy:
 			return sys_env_destroy(e, (envid_t)a1);
 		case SYS_yield:
 			sys_yield(e);
 			return ESUCCESS;
 		case SYS_proc_create:
+			return sys_proc_create(e, (char *DANGEROUS)a1);
 		case SYS_proc_run:
-			panic("Not implemented");
+			return sys_proc_run(e, (size_t)a1);
+
+	#ifdef __i386__
+		case SYS_serial_write:
+			return sys_serial_write(e, (char *DANGEROUS)a1, (size_t)a2);
+		case SYS_serial_read:
+			return sys_serial_read(e, (char *DANGEROUS)a1, (size_t)a2);
+	#endif
+
+	#ifdef __sparc_v8__
+		case SYS_frontend:
+			return frontend_syscall(a1,a2,a3,a4);
+	#endif
+
 		default:
 			// or just return -EINVAL
 			panic("Invalid syscall number %d for env %x!", syscallno, *e);
@@ -414,11 +496,11 @@ intreg_t syscall_async(env_t* e, syscall_req_t *call)
 intreg_t process_generic_syscalls(env_t* e, size_t max)
 {
 	size_t count = 0;
-	syscall_back_ring_t* sysbr = &e->env_syscallbackring;
+	syscall_back_ring_t* sysbr = &e->syscallbackring;
 
-	// make sure the env is still alive.  
+	// make sure the env is still alive.
 	// incref will return ESUCCESS on success.
-	if (env_incref(e))
+	if (proc_incref(e))
 		return -EFAIL;
 
 	// max is the most we'll process.  max = 0 means do as many as possible
@@ -447,6 +529,8 @@ intreg_t process_generic_syscalls(env_t* e, size_t max)
 		//printk("DEBUG POST: sring->req_prod: %d, sring->rsp_prod: %d\n",\
 			   sysbr->sring->req_prod, sysbr->sring->rsp_prod);
 	}
-	env_decref(e);
+	// load sane page tables (and don't rely on decref to do it for you).
+	lcr3(boot_cr3);
+	proc_decref(e);
 	return (intreg_t)count;
 }

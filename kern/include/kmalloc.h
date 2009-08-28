@@ -5,13 +5,18 @@
  * Kevin Klues <klueska@cs.berkeley.edu>    
  */
 
-#ifndef KMALLOC_H
-#define KMALLOC_H
+#ifndef ROS_KERN_KMALLOC_H
+#define ROS_KERN_KMALLOC_H
 
 #include <arch/types.h>
 
 void  kmalloc_init();
-void *(DALLOC(size) kmalloc)(size_t size, int flags);
-void  DFREE(addr) kfree(void* addr);
 
-#endif //KMALLOC_H
+void* (DALLOC(n) boot_alloc)(uint32_t n, uint32_t align);
+void* (DALLOC(_n*sz) boot_calloc)(uint32_t _n, size_t sz, uint32_t align);
+
+void* (DALLOC(size) kmalloc)(size_t size, int flags);
+void  (DFREE(addr) kfree)(void *addr);
+
+#endif //ROS_KERN_KMALLOC_H
+

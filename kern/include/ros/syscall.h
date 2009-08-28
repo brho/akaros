@@ -20,13 +20,14 @@ enum
 	SYS_eth_read,
 	SYS_eth_write,
 	SYS_run_binary,
+	SYS_getpid,
+	SYS_proc_destroy,
 	SYS_shared_page_alloc,
 	SYS_shared_page_free,
-	SYS_getenvid,
-	SYS_env_destroy,
 	SYS_yield,
 	SYS_proc_create,
 	SYS_proc_run,
+	SYS_frontend,		// forward a syscall to front-end machine
 
 	SYS_endofcalls //Should always be last
 };
@@ -53,6 +54,7 @@ typedef struct syscall_rsp {
 } syscall_rsp_t;
 
 // Generic Syscall Ring Buffer
-DEFINE_RING_TYPES(syscall, syscall_req_t, syscall_rsp_t);
+#define SYSCALLRINGSIZE    PGSIZE
+DEFINE_RING_TYPES_WITH_SIZE(syscall, syscall_req_t, syscall_rsp_t, SYSCALLRINGSIZE);
 
 #endif /* !ROS_INCLUDE_SYSCALL_H */

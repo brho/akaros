@@ -4,6 +4,7 @@ USER_PARLIB_INCLUDE_DIR  := $(USER_PARLIB_DIR)/inc
 # This is defined here for use by the parlib library
 USER_PARLIB_NEWLIB_DIR := $(USER_PARLIB_DIR)/newlib
 
+include $(USER_PARLIB_DIR)/src/$(TARGET_ARCH)/Makefrag
 include $(USER_PARLIB_DIR)/src/Makefrag
 include $(USER_PARLIB_DIR)/ivy/Makefrag
 

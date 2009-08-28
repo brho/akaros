@@ -24,8 +24,17 @@
 # so it is compatible with GCC3's -MP option.
 #
 
+sub makedirname($) 
+{
+	my $file = shift; 
+	$file =~ s!/?[^/]*/*$!!; 
+	$file =~ s!^[^/]*/!!; 
+	return $file; 
+}
+
 sub readdeps {
 	my $filename = shift;
+	my $use_filename = shift;
 
 	open(DEPFILE, $filename) or return 0;
 	while (<DEPFILE>) {
@@ -33,6 +42,10 @@ sub readdeps {
 			my $target = $1;
 			my $deplines = $2;
 			my $slash = $3;
+			if($use_filename) {
+				$target = $filename;
+				$target =~ s/\.d$/\.o/;
+			}
 			while ($slash ne '') {
 				$_ = <DEPFILE>;
 				defined($_) or die
@@ -43,7 +56,11 @@ sub readdeps {
 				$slash = $2;
 			}
 			#print "DEPENDENCY [[$target]]: [[$deplines]]\n";
-			$dephash{$target} = $deplines;
+			my $new_deplines = $deplines;
+			if($use_filename) {
+				my $new_deplines = " ".makedirname($filename)."/Makefrag".$deplines;
+			}
+			$dephash{$target} = $new_deplines;
 		} elsif (/^[#]?[ \t]*$/) {
 			# ignore blank lines and comments
 		} else {
@@ -64,11 +81,11 @@ if ($#ARGV < 0) {
 
 # Read the main dependency file
 $maindeps = $ARGV[0];
-readdeps($maindeps);
+readdeps($maindeps, 0);
 
 # Read and merge in the new dependency files
 foreach $i (1 .. $#ARGV) {
-	readdeps($ARGV[$i]) or die "Can't open $ARGV[$i]";
+	readdeps($ARGV[$i], 1) or die "Can't open $ARGV[$i]";
 }
 
 # Update the main dependency file

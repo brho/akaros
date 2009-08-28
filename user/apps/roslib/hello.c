@@ -1,7 +1,8 @@
 #include <lib.h>
+#include <stdio.h>
 
 int main(int argc, char** argv)
 {
-	cprintf("goodbye, world!\n");
+	cprintf("Goodbye, world, from PID: %d!\n", sys_getpid());
 	return 0;
 }

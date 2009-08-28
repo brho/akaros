@@ -3,6 +3,7 @@
 bochs.out
 bochs.log
 .bochsrc
+bochsrc
 mnt
 obj
 run_bochs.sh
@@ -11,7 +12,13 @@ cscope.out
 hdd.img
 hdd.vdi
 *.*~
+ivy_errordb.sql
 Makelocal
 .textmate*
 .DS_*
 ros-project.tmproj
+kern/boot
+kern/include/arch
+kern/src/arch
+doc/rosdoc
+

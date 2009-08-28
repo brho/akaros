@@ -29,7 +29,7 @@ int main(int argc, char** argv)
 {	
 	set_default_user();
 	printf("Welcome to the Tessellation OS newlib test suite!\n");
-	printf("Enter at you're own risk....\n");
+	printf("Enter at your own risk....\n");
 	clrscrn(2);
 	while(1) {
 		char* s = readline(prompt);

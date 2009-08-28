@@ -1,14 +1,11 @@
 /* See COPYRIGHT for copyright information. */
-#ifdef __DEPUTY__
-#pragma nodeputy
-#endif
-
 #include <arch/x86.h>
 #include <arch/arch.h>
 #include <arch/mmu.h>
 #include <arch/apic.h>
 
 #include <ros/error.h>
+#include <sys/queue.h>
 
 #include <atomic.h>
 #include <string.h>
@@ -16,16 +13,16 @@
 #include <pmap.h>
 #include <kclock.h>
 #include <env.h>
+#include <stdio.h>
+#include <kmalloc.h>
+#include <page_alloc.h>
 
 // These variables are set in i386_vm_init()
 pde_t* boot_pgdir;		// Virtual address of boot time page directory
 physaddr_t boot_cr3;		// Physical address of boot time page directory
-char* boot_freemem;		// Pointer to next byte of free mem
 
-page_t *pages;		// Virtual address of physical page array
-page_list_t page_free_list;	// Free list of physical pages
-
-extern env_t *envs;
+// Global variables
+page_t *pages = NULL;          // Virtual address of physical page array
 
 // Global descriptor table.
 //
@@ -113,7 +110,7 @@ static void check_boot_pgdir(bool pse);
 // UVPT.  UVPT security comes from the UVPT mapping (U/R).  All other kernel pages
 // protected at the second layer
 static pte_t*
-boot_pgdir_walk(pde_t *pgdir, uintptr_t la, int create)
+boot_pgdir_walk(pde_t *COUNT(NPDENTRIES) pgdir, uintptr_t la, int create)
 {
 	pde_t* the_pde = &pgdir[PDX(la)];
 	void* new_table;
@@ -121,7 +118,7 @@ boot_pgdir_walk(pde_t *pgdir, uintptr_t la, int create)
 	if (*the_pde & PTE_P) {
 		if (*the_pde & PTE_PS)
 			return (pte_t*)the_pde;
-		return &((pde_t*)KADDR(PTE_ADDR(*the_pde)))[PTX(la)];
+		return &((pde_t*COUNT(NPTENTRIES))KADDR(PTE_ADDR(*the_pde)))[PTX(la)];
 	}
 	if (!create)
 		return NULL;
@@ -134,7 +131,7 @@ boot_pgdir_walk(pde_t *pgdir, uintptr_t la, int create)
 	new_table = boot_alloc(PGSIZE, PGSIZE);
 	memset(new_table, 0, PGSIZE);
 	*the_pde = (pde_t)PADDR(new_table) | PTE_P | PTE_W | PTE_U | PTE_G;
-	return &((pde_t*)KADDR(PTE_ADDR(*the_pde)))[PTX(la)];
+	return &((pde_t*COUNT(NPTENTRIES))KADDR(PTE_ADDR(*the_pde)))[PTX(la)];
 }
 
 //
@@ -147,7 +144,7 @@ boot_pgdir_walk(pde_t *pgdir, uintptr_t la, int create)
 //
 // To map with Jumbos, set PTE_PS in perm
 static void
-boot_map_segment(pde_t *pgdir, uintptr_t la, size_t size, physaddr_t pa, int perm)
+boot_map_segment(pde_t *COUNT(NPDENTRIES) pgdir, uintptr_t la, size_t size, physaddr_t pa, int perm)
 {
 	uintptr_t i;
 	pte_t *pte;
@@ -360,36 +357,13 @@ vm_init(void)
 	                 PTE_PCD | PTE_PWT | PTE_W | PTE_G);
 
 	//////////////////////////////////////////////////////////////////////
-	// Make 'pages' point to an array of size 'npage' of 'struct Page'.
-	// The kernel uses this structure to keep track of physical pages;
-	// 'npage' equals the number of physical pages in memory.  User-level
-	// programs get read-only access to the array as well.
-	// You must allocate the array yourself.
-	// Map this array read-only by the user at linear address UPAGES
-	// (ie. perm = PTE_U | PTE_P)
-	// Permissions:
-	//    - pages -- kernel RW, user NONE
-	//    - the read-only version mapped at UPAGES -- kernel R, user R
-	// Your code goes here: 
-	
-	// round up to the nearest page
-	size_t page_array_size = ROUNDUP(npage*sizeof(page_t), PGSIZE);
-	pages = (page_t *)boot_alloc(page_array_size, PGSIZE);
-	memset(pages, 0, page_array_size);
-	if (page_array_size > PTSIZE) {
-		warn("page_array_size bigger than PTSIZE, userland will not see all pages");
-		page_array_size = PTSIZE;
-	}
-	boot_map_segment(pgdir, UPAGES, page_array_size, PADDR(pages), PTE_U | PTE_G);
-
-	//////////////////////////////////////////////////////////////////////
 	// Make 'envs' point to an array of size 'NENV' of 'env_t'.
 	// No longer mapping ENVS into the address space
 	
 	// round up to the nearest page
 	size_t env_array_size = ROUNDUP(NENV*sizeof(env_t), PGSIZE);
-	envs = (env_t *)boot_alloc(env_array_size, PGSIZE);
-	memset(envs, 0, env_array_size);
+	envs = /*(env_t *)*/boot_calloc(env_array_size, 1, PGSIZE);
+	//memset(envs, 0, env_array_size);
 
 	// Check that the initial page directory has been set up correctly.
 	check_boot_pgdir(pse);
@@ -449,7 +423,7 @@ vm_init(void)
 	pgdir[0] = 0;
 
 	// Flush the TLB for good measure, to kill the pgdir[0] mapping.
-	lcr3(boot_cr3);
+	tlb_flush_global();
 }
 
 //
@@ -460,8 +434,8 @@ vm_init(void)
 // in fact it doesn't test the permission bits at all,
 // but it is a pretty good sanity check. 
 //
-static physaddr_t check_va2pa(pde_t *pgdir, uintptr_t va);
-static pte_t get_vaperms(pde_t *pgdir, uintptr_t va);
+static physaddr_t check_va2pa(pde_t *COUNT(NPDENTRIES) pgdir, uintptr_t va);
+static pte_t get_vaperms(pde_t *COUNT(NPDENTRIES) pgdir, uintptr_t va);
 
 static void
 check_boot_pgdir(bool pse)
@@ -470,11 +444,6 @@ check_boot_pgdir(bool pse)
 	pde_t *pgdir, pte;
 
 	pgdir = boot_pgdir;
-
-	// check pages array
-	n = ROUNDUP(naddrpage*sizeof(page_t), PGSIZE);
-	for (i = 0; i < n; i += PGSIZE)
-		assert(check_va2pa(pgdir, UPAGES + i) == PADDR(pages) + i);
 
 	// check phys mem
 	//for (i = 0; KERNBASE + i != 0; i += PGSIZE)
@@ -496,7 +465,6 @@ check_boot_pgdir(bool pse)
 		case PDX(VPT):
 		case PDX(UVPT):
 		case PDX(KSTACKTOP-1):
-		case PDX(UPAGES):
 		case PDX(LAPIC_BASE): // LAPIC mapping.  TODO: remove when MTRRs are up
 			assert(pgdir[i]);
 			break;
@@ -556,16 +524,17 @@ check_boot_pgdir(bool pse)
 // the check_boot_pgdir() function; it shouldn't be used elsewhere.
 
 static physaddr_t
-check_va2pa(pde_t *pgdir, uintptr_t va)
+check_va2pa(pde_t *COUNT(NPDENTRIES) _pgdir, uintptr_t va)
 {
-	pte_t *p;
+	pte_t *COUNT(NPTENTRIES) p;
+	pde_t *COUNT(1) pgdir;
 
-	pgdir = &pgdir[PDX(va)];
+	pgdir = &_pgdir[PDX(va)];
 	if (!(*pgdir & PTE_P))
 		return ~0;
 	if (*pgdir & PTE_PS)
 		return PTE_ADDR(*pgdir);
-	p = (pte_t*) KADDR(PTE_ADDR(*pgdir));
+	p = (pte_t*COUNT(NPTENTRIES)) KADDR(PTE_ADDR(*pgdir));
 	if (!(p[PTX(va)] & PTE_P))
 		return ~0;
 	return PTE_ADDR(p[PTX(va)]);
@@ -579,70 +548,13 @@ check_va2pa(pde_t *pgdir, uintptr_t va)
  */
 
 static pte_t
-get_vaperms(pde_t *pgdir, uintptr_t va)
+get_vaperms(pde_t *COUNT(NPDENTRIES) pgdir, uintptr_t va)
 {
 	pde_t* pde = &pgdir[PDX(va)];
-	pte_t* pte = pgdir_walk(pgdir, (void*)va, 0);
+	pte_t* pte = pgdir_walk(pgdir, (void*SNT)va, 0);
 	if (!pte || !(*pte & PTE_P))
 		return 0;
 	return PGOFF(*pde & *pte) + PTE_PS & (*pde | *pte);
-}
-		
-// --------------------------------------------------------------
-// Tracking of physical pages.
-// The 'pages' array has one 'page_t' entry per physical page.
-// Pages are reference counted, and free pages are kept on a linked list.
-// --------------------------------------------------------------
-
-//  
-// Initialize page structure and memory free list.
-// After this point, ONLY use the functions below
-// to allocate and deallocate physical memory via the page_free_list,
-// and NEVER use boot_alloc() or the related boot-time functions above.
-//
-void
-page_init(void)
-{
-	// The example code here marks all pages as free.
-	// However this is not truly the case.  What memory is free?
-	//  1) Mark page 0 as in use.
-	//     This way we preserve the real-mode IDT and BIOS structures
-	//     in case we ever need them.  (Currently we don't, but...)
-	//  2) Mark the rest of base memory as free.
-	//  3) Then comes the IO hole [IOPHYSMEM, EXTPHYSMEM).
-	//     Mark it as in use so that it can never be allocated.      
-	//  4) Then extended memory [EXTPHYSMEM, ...).
-	//     Some of it is in use, some is free. Where is the kernel?
-	//     Which pages are used for page tables and other data structures?
-	//
-	// Change the code to reflect this.
-	int i;
-	physaddr_t physaddr_after_kernel = PADDR(ROUNDUP(boot_freemem, PGSIZE));
-	LIST_INIT(&page_free_list);
-
-	pages[0].pp_ref = 1;
-	// alloc the second page, since we will need it later to init the other cores
-	// probably need to be smarter about what page we use (make this dynamic) TODO
-	pages[1].pp_ref = 1;
-	for (i = 2; i < PPN(IOPHYSMEM); i++) {
-		pages[i].pp_ref = 0;
-		LIST_INSERT_HEAD(&page_free_list, &pages[i], pp_link);
-	}
-	for (i = PPN(IOPHYSMEM); i < PPN(EXTPHYSMEM); i++) {
-		pages[i].pp_ref = 1;
-	}
-	for (i = PPN(EXTPHYSMEM); i < PPN(physaddr_after_kernel); i++) {
-		pages[i].pp_ref = 1;
-	}
-	for (i = PPN(physaddr_after_kernel); i < PPN(maxaddrpa); i++) {
-		pages[i].pp_ref = 0;
-		LIST_INSERT_HEAD(&page_free_list, &pages[i], pp_link);
-	}
-	// this block out all memory above maxaddrpa.  will need another mechanism
-	// to allocate and map these into the kernel address space
-	for (i = PPN(maxaddrpa); i < npage; i++) {
-		pages[i].pp_ref = 1;
-	}
 }
 
 /* 
@@ -658,7 +570,7 @@ error_t	pagetable_remove(pde_t *pgdir, void *va)
 
 	if (!(*the_pde & PTE_P) || (*the_pde & PTE_PS))
 		return -EFAULT;
-	pte_t* page_table = (pde_t*)KADDR(PTE_ADDR(*the_pde));
+	pte_t* page_table = (pde_t*COUNT(NPTENTRIES))KADDR(PTE_ADDR(*the_pde));
 	for (int i = 0; i < NPTENTRIES; i++) 
 		if (page_table[i] & PTE_P)
 			panic("Page table not empty during attempted removal!");
@@ -693,7 +605,7 @@ pgdir_walk(pde_t *pgdir, const void *SNT va, int create)
 	if (*the_pde & PTE_P) {
 		if (*the_pde & PTE_PS)
 			return (pte_t*)the_pde;
-		return &((pde_t*)KADDR(PTE_ADDR(*the_pde)))[PTX(va)];
+		return &((pde_t*COUNT(NPTENTRIES))KADDR(PTE_ADDR(*the_pde)))[PTX(va)];
 	}
 	if (!create)
 		return NULL;
@@ -705,10 +617,10 @@ pgdir_walk(pde_t *pgdir, const void *SNT va, int create)
 	}
 	if (page_alloc(&new_table))
 		return NULL;
-	new_table->pp_ref = 1;
+	page_setref(new_table,1);
 	memset(page2kva(new_table), 0, PGSIZE);
 	*the_pde = (pde_t)page2pa(new_table) | PTE_P | PTE_W | PTE_U;
-	return &((pde_t*)KADDR(PTE_ADDR(*the_pde)))[PTX(va)];
+	return &((pde_t*COUNT(NPTENTRIES))KADDR(PTE_ADDR(*the_pde)))[PTX(va)];
 }
 
 /* Flushes a TLB, including global pages.  We should always have the CR4_PGE
@@ -762,38 +674,38 @@ page_check(void)
 	assert(page_insert(boot_pgdir, pp1, 0x0, 0) == 0);
 	tlb_invalidate(boot_pgdir, 0x0);
 	// DEP Should have shot down invalid TLB entry - let's check
-	{
+	{ TRUSTEDBLOCK
 	  int *x = 0x0;
 	  assert(*x == 0xFFFFFFFF);
 	}
 	assert(PTE_ADDR(boot_pgdir[0]) == page2pa(pp0));
 	assert(check_va2pa(boot_pgdir, 0x0) == page2pa(pp1));
-	assert(pp1->pp_ref == 1);
-	assert(pp0->pp_ref == 1);
+	assert(pp1->page_ref == 1);
+	assert(pp0->page_ref == 1);
 
 	// should be able to map pp2 at PGSIZE because pp0 is already allocated for page table
-	assert(page_insert(boot_pgdir, pp2, (void*) PGSIZE, 0) == 0);
+	assert(page_insert(boot_pgdir, pp2, (void*SNT) PGSIZE, 0) == 0);
 	assert(check_va2pa(boot_pgdir, PGSIZE) == page2pa(pp2));
-	assert(pp2->pp_ref == 1);
+	assert(pp2->page_ref == 1);
 
 	// Make sure that pgdir_walk returns a pointer to the pte and
 	// not the table or some other garbage
 	{
-	  pte_t *p = KADDR(PTE_ADDR(boot_pgdir[PDX(PGSIZE)]));
-	  assert(pgdir_walk(boot_pgdir, (void *)PGSIZE, 0) == &p[PTX(PGSIZE)]);
+	  pte_t *p = (pte_t*COUNT(NPTENTRIES))KADDR(PTE_ADDR(boot_pgdir[PDX(PGSIZE)]));
+	  assert(pgdir_walk(boot_pgdir, (void *SNT)PGSIZE, 0) == &p[PTX(PGSIZE)]);
 	}
 
 	// should be no free memory
 	assert(page_alloc(&pp) == -ENOMEM);
 
 	// should be able to map pp2 at PGSIZE because it's already there
-	assert(page_insert(boot_pgdir, pp2, (void*) PGSIZE, PTE_U) == 0);
+	assert(page_insert(boot_pgdir, pp2, (void*SNT) PGSIZE, PTE_U) == 0);
 	assert(check_va2pa(boot_pgdir, PGSIZE) == page2pa(pp2));
-	assert(pp2->pp_ref == 1);
+	assert(pp2->page_ref == 1);
 
 	// Make sure that we actually changed the permission on pp2 when we re-mapped it
 	{
-	  pte_t *p = pgdir_walk(boot_pgdir, (void*)PGSIZE, 0);
+	  pte_t *p = pgdir_walk(boot_pgdir, (void*SNT)PGSIZE, 0);
 	  assert(((*p) & PTE_U) == PTE_U);
 	}
 
@@ -802,17 +714,17 @@ page_check(void)
 	assert(page_alloc(&pp) == -ENOMEM);
 
 	// should not be able to map at PTSIZE because need free page for page table
-	assert(page_insert(boot_pgdir, pp0, (void*) PTSIZE, 0) < 0);
+	assert(page_insert(boot_pgdir, pp0, (void*SNT) PTSIZE, 0) < 0);
 
 	// insert pp1 at PGSIZE (replacing pp2)
-	assert(page_insert(boot_pgdir, pp1, (void*) PGSIZE, 0) == 0);
+	assert(page_insert(boot_pgdir, pp1, (void*SNT) PGSIZE, 0) == 0);
 
 	// should have pp1 at both 0 and PGSIZE, pp2 nowhere, ...
 	assert(check_va2pa(boot_pgdir, 0) == page2pa(pp1));
 	assert(check_va2pa(boot_pgdir, PGSIZE) == page2pa(pp1));
 	// ... and ref counts should reflect this
-	assert(pp1->pp_ref == 2);
-	assert(pp2->pp_ref == 0);
+	assert(pp1->page_ref == 2);
+	assert(pp2->page_ref == 0);
 
 	// pp2 should be returned by page_alloc
 	assert(page_alloc(&pp) == 0 && pp == pp2);
@@ -821,15 +733,15 @@ page_check(void)
 	page_remove(boot_pgdir, 0x0);
 	assert(check_va2pa(boot_pgdir, 0x0) == ~0);
 	assert(check_va2pa(boot_pgdir, PGSIZE) == page2pa(pp1));
-	assert(pp1->pp_ref == 1);
-	assert(pp2->pp_ref == 0);
+	assert(pp1->page_ref == 1);
+	assert(pp2->page_ref == 0);
 
 	// unmapping pp1 at PGSIZE should free it
-	page_remove(boot_pgdir, (void*) PGSIZE);
+	page_remove(boot_pgdir, (void*SNT) PGSIZE);
 	assert(check_va2pa(boot_pgdir, 0x0) == ~0);
 	assert(check_va2pa(boot_pgdir, PGSIZE) == ~0);
-	assert(pp1->pp_ref == 0);
-	assert(pp2->pp_ref == 0);
+	assert(pp1->page_ref == 0);
+	assert(pp2->page_ref == 0);
 
 	// so it should be returned by page_alloc
 	assert(page_alloc(&pp) == 0 && pp == pp1);
@@ -840,22 +752,22 @@ page_check(void)
 	// forcibly take pp0 back
 	assert(PTE_ADDR(boot_pgdir[0]) == page2pa(pp0));
 	boot_pgdir[0] = 0;
-	assert(pp0->pp_ref == 1);
-	pp0->pp_ref = 0;
+	assert(pp0->page_ref == 1);
+	pp0->page_ref = 0;
 
 	// Catch invalid pointer addition in pgdir_walk - i.e. pgdir + PDX(va)
 	{
 	  // Give back pp0 for a bit
 	  page_free(pp0);
 
-	  void * va = (void *)((PGSIZE * NPDENTRIES) + PGSIZE);
+	  void *SNT va = (void *SNT)((PGSIZE * NPDENTRIES) + PGSIZE);
 	  pte_t *p2 = pgdir_walk(boot_pgdir, va, 1);
-	  pte_t *p = KADDR(PTE_ADDR(boot_pgdir[PDX(va)]));
+	  pte_t *p = (pte_t*COUNT(NPTENTRIES))KADDR(PTE_ADDR(boot_pgdir[PDX(va)]));
 	  assert(p2 == &p[PTX(va)]);
 
 	  // Clean up again
 	  boot_pgdir[PDX(va)] = 0;
-	  pp0->pp_ref = 0;
+	  pp0->page_ref = 0;
 	}
 
 	// give free list back

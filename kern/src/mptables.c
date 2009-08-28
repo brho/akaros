@@ -255,11 +255,20 @@ void configuration_parse(physaddr_t conf_addr) {
 	}
 	
 	// Allocate the correct space in the arrays (unrolled for ivy reasons)
-	mp_proc_entries = kmalloc(mp_entries_count[PROC] * basetableEntryTypes[PROC].length , 0);
-	mp_bus_entries = kmalloc(mp_entries_count[BUS] * basetableEntryTypes[BUS].length , 0);
-	mp_ioapic_entries = kmalloc(mp_entries_count[IOAPIC] * basetableEntryTypes[IOAPIC].length , 0);
-	mp_int_entries = kmalloc(mp_entries_count[INT] * basetableEntryTypes[INT].length , 0);
-	mp_lint_entries = kmalloc(mp_entries_count[LINT] * basetableEntryTypes[LINT].length , 0);
+	if (mp_entries_count[PROC] != 0)
+		mp_proc_entries = kmalloc(mp_entries_count[PROC] * basetableEntryTypes[PROC].length , 0);
+
+	if (mp_entries_count[BUS] != 0)
+		mp_bus_entries = kmalloc(mp_entries_count[BUS] * basetableEntryTypes[BUS].length , 0);
+
+	if (mp_entries_count[IOAPIC] != 0)
+		mp_ioapic_entries = kmalloc(mp_entries_count[IOAPIC] * basetableEntryTypes[IOAPIC].length , 0);
+	
+	if (mp_entries_count[INT] != 0)
+		mp_int_entries = kmalloc(mp_entries_count[INT] * basetableEntryTypes[INT].length , 0);
+
+	if (mp_entries_count[LINT] != 0)
+		mp_lint_entries = kmalloc(mp_entries_count[LINT] * basetableEntryTypes[LINT].length , 0);
 	
 	current_addr = entry_base;
 	
@@ -353,7 +362,7 @@ void ioapic_parse() {
 	// Note: We don't check if the apicFlags is 0. If zero, unusable
 	// This should be done elsewhere.
 	
-	num_ioapics = mp_entries_count[IOAPIC];
+	// mp_entries_count[IOAPIC] contains the number of ioapics on this system
 	
 	for (int i = 0; i < mp_entries_count[IOAPIC]; i++){
 		mptables_dump("IOAPIC entry %u\n", i);
@@ -363,8 +372,6 @@ void ioapic_parse() {
 		mptables_dump("-->apicFlags: %x\n", mp_ioapic_entries[i].apicFlags);
 		mptables_dump("-->apicAddress: %p\n", mp_ioapic_entries[i].apicAddress);
 		
-		if (mp_ioapic_entries[i].apicID > max_ioapic_id)
-			max_ioapic_id = mp_ioapic_entries[i].apicID;
 	}
 	mptables_dump("\n");
 	

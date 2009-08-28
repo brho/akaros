@@ -58,7 +58,7 @@ typedef struct barrier {
     volatile uint8_t ready;
 } barrier_t;
 
-void init_barrier(barrier_t* barrier, uint32_t count);
+void init_barrier(barrier_t*COUNT(1) barrier, uint32_t count);
 void reset_barrier(barrier_t* barrier);
 void waiton_barrier(barrier_t* barrier);
 

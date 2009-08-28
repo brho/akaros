@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2009 The Regents of the University of California
+ * Barret Rhoden <brho@cs.berkeley.edu>
  * See LICENSE for details.
  */
 
@@ -97,7 +98,6 @@ uint32_t lapic_get_default_id(void);
 // PIT related
 void pit_set_timer(uint32_t freq, uint32_t mode);
 void timer_init(void);
-void udelay(uint64_t usec);
 void udelay_pit(uint64_t usec);
 // TODO: right now timer defaults to TSC
 uint64_t gettimer(void);
@@ -108,6 +108,7 @@ static inline void lapic_send_eoi(void);
 static inline uint32_t lapic_get_version(void);
 static inline uint32_t lapic_get_error(void);
 static inline uint32_t lapic_get_id(void);
+static inline void lapic_set_id(uint8_t id); // Careful, may not actually work
 static inline uint8_t lapic_get_logid(void);
 static inline void lapic_set_logid(uint8_t id);
 static inline void lapic_disable(void);
@@ -152,6 +153,11 @@ static inline uint32_t lapic_get_error(void)
 static inline uint32_t lapic_get_id(void)
 {
 	return read_mmreg32(LAPIC_ID) >> 24;
+}
+
+static inline void lapic_set_id(uint8_t id)
+{
+	write_mmreg32(LAPIC_ID, id << 24);
 }
 
 static inline uint8_t lapic_get_logid(void)

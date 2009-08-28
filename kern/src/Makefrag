@@ -30,35 +30,40 @@ KERN_SRCFILES := $(KERN_ARCH_SRCFILES) \
                  $(KERN_SRC_DIR)/string.c \
                  $(KERN_SRC_DIR)/atomic.c \
                  $(KERN_SRC_DIR)/workqueue.c \
+                 $(KERN_SRC_DIR)/colored_caches.c \
+                 $(KERN_SRC_DIR)/page_alloc.c \
                  $(KERN_SRC_DIR)/pmap.c \
                  $(KERN_SRC_DIR)/env.c \
                  $(KERN_SRC_DIR)/manager.c \
                  $(KERN_SRC_DIR)/syscall.c \
                  $(KERN_SRC_DIR)/timer.c \
+                 $(KERN_SRC_DIR)/kfs.c \
+                 $(KERN_SRC_DIR)/process.c \
                  $(KERN_SRC_DIR)/kmalloc.c \
                  $(KERN_SRC_DIR)/rl8168.c \
                  $(KERN_SRC_DIR)/ne2k.c \
+                 $(KERN_SRC_DIR)/schedule.c \
                  $(KERN_SRC_DIR)/testing.c
 
 # Only build files if they exist.
 KERN_SRCFILES := $(wildcard $(KERN_SRCFILES))
 
 KERN_APPFILES := \
-                    $(USER_APPS_ROSLIB_DIR)/proctests \
-                    $(USER_APPS_ROSLIB_DIR)/fptest \
-                    $(USER_APPS_ROSLIB_DIR)/null \
-                    $(USER_APPS_ROSLIB_DIR)/hello \
-                    $(USER_APPS_PARLIB_DIR)/draw_nanwan_standalone \
-                    $(USER_APPS_PARLIB_DIR)/channel_test_client \
-                    $(USER_APPS_PARLIB_DIR)/channel_test_server \
-                    $(USER_APPS_PARLIB_DIR)/matrix \
-                    $(USER_APPS_ROSLIB_DIR)/measurements
-#                    $(USER_APPS_PARLIB_DIR)/draw_nanwan
-#                    $(USER_APPS_PARLIB_DIR)/open_read \
-#                    $(USER_APPS_PARLIB_DIR)/hello
+                 $(USER_APPS_ROSLIB_DIR)/proctests \
+                 $(USER_APPS_ROSLIB_DIR)/fptest \
+                 $(USER_APPS_ROSLIB_DIR)/null \
+                 $(USER_APPS_ROSLIB_DIR)/spawn \
+                 $(USER_APPS_ROSLIB_DIR)/hello \
+                 $(USER_APPS_ROSLIB_DIR)/measurements \
+                 $(USER_APPS_PARLIB_DIR)/draw_nanwan_standalone \
+                 $(USER_APPS_PARLIB_DIR)/channel_test_client \
+                 $(USER_APPS_PARLIB_DIR)/channel_test_server \
+                 $(USER_APPS_PARLIB_DIR)/hello \
+                 $(USER_APPS_PARLIB_DIR)/matrix
+#                 $(USER_APPS_PARLIB_DIR)/open_read
 
 KERN_LDFLAGS   := $(KERN_LDFLAGS) -L$(OBJDIR)/$(KERN_DIR) \
-                  -T $(ARCH_DIR)/$(TARGET_ARCH)/kernel.ld
+                  -T $(KERN_ARCH_SRC_DIR)/kernel.ld
 
 KERN_OBJFILES  := $(patsubst $(KERN_DIR)/%.c, \
                              $(OBJDIR)/$(KERN_DIR)/%.o, \

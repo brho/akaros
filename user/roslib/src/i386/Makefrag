@@ -1,0 +1,14 @@
+# Makefile fragment for ROS kernel.
+# This is NOT a complete makefile;
+# you must run GNU make in the top-level directory
+# where the GNUmakefile is located.
+#
+
+USER_ROSLIB_ARCH_SRC_DIR = $(USER_ROSLIB_DIR)/src/$(TARGET_ARCH)
+OBJDIRS += $(USER_ROSLIB_ARCH_SRC_DIR)
+
+# We also snatch the use of a couple handy source files
+# from the lib directory, to avoid gratuitous code duplication.
+USER_ROSLIB_ARCH_SRCFILES := $(USER_ROSLIB_ARCH_SRC_DIR)/syscall.c \
+                             $(USER_ROSLIB_ARCH_SRC_DIR)/entry.S
+

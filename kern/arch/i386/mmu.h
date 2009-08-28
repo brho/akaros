@@ -81,10 +81,6 @@
 #define PTE_USER_RW	(PTE_W | PTE_U)	// Kernel/User Read/Write
 #define PTE_USER_RO	PTE_U		// Kernel/User Read-Only
 
-
-#define VALID_USER_PERMS(perm) \
-	(((perm) == PTE_U) || ((perm) == (PTE_U | PTE_W))) 
-
 // The PTE_AVAIL bits aren't used by the kernel or interpreted by the
 // hardware, so user processes are allowed to set them arbitrarily.
 #define PTE_AVAIL	0xE00	// Available for software use

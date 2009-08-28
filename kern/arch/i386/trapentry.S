@@ -207,4 +207,5 @@ sysenter_handler:
 	popfl					# restore EFLAGS
 	movl %ebp, %ecx
 	movl %esi, %edx
+	sti						# interrupts are turned off when starting a core
 	sysexit

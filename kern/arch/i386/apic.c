@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2009 The Regents of the University of California
+ * Barret Rhoden <brho@cs.berkeley.edu>
  * See LICENSE for details.
  */
 
@@ -9,6 +10,7 @@
 #include <arch/apic.h>
 #include <ros/timer.h>
 #include <assert.h>
+#include <stdio.h>
 
 system_timing_t system_timing = {0, 0, 0xffff, 0};
 

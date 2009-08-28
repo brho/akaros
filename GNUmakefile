@@ -9,11 +9,11 @@
 
 OBJDIR := obj
 
-# User defined constants passed on the command line 
-TARGET_ARCH := i386
-
 # Make sure that 'all' is the first target
 all: symlinks
+
+# User defined constants passed on the command line 
+TARGET_ARCH := i386
 
 -include Makelocal
 
@@ -48,7 +48,7 @@ GCCPREFIX := $(shell if i386-ros-elf-objdump -i 2>&1 | grep '^elf32-i386$$' >/de
 endif
 
 # Default programs for compilation
-CC	    := ivycc --deputy --gcc=$(GCCPREFIX)gcc
+CC	    := ivycc --deputy --gcc=$(GCCPREFIX)gcc --enable-error-db $(EXTRAARGS)
 AS	    := $(GCCPREFIX)as
 AR	    := $(GCCPREFIX)ar
 LD	    := $(GCCPREFIX)ld
@@ -83,12 +83,10 @@ endif
 # List of directories that the */Makefrag makefile fragments will add to
 OBJDIRS :=
 
-kern/boot/Makefrag: symlinks
-
 symlinks:
-	@-unlink kern/include/arch
+	@rm -f kern/include/arch
 	@ln -s ../arch/$(TARGET_ARCH)/ kern/include/arch
-	@-unlink kern/boot
+	@rm -f kern/boot
 	@ln -s arch/$(TARGET_ARCH)/boot/ kern/boot
 
 # Include Makefrags for subdirectories
@@ -109,14 +107,30 @@ $(OBJDIR)/.deps: $(foreach dir, $(OBJDIRS), $(wildcard $(OBJDIR)/$(dir)/*.d))
 	@mkdir -p $(@D)
 	@$(PERL) scripts/mergedep.pl $@ $^
 
+# By including this file we automatically force the target that generates it 
+# to be rerun
 -include $(OBJDIR)/.deps
+
+# Use doxygen to make documentation for ROS
+docs: all
+	@doxygen doc/rosdoc.cfg
+	@if [ ! -d doc/rosdoc/html/img ];          \
+	 then                                      \
+	 	ln -s ../../img doc/rosdoc/html;       \
+	 fi
+
+doxyclean:
+	rm -rf doc/rosdoc
 
 # For deleting the build
 clean:
-	rm -rf $(OBJDIR)
+	@rm -rf $(OBJDIR)
+	@rm -f kern/boot
+	@rm -f kern/include/arch
+	@echo All clean and pretty!
 
 always:
 	@:
 
-.PHONY: all always clean
+.PHONY: all always docs clean
 

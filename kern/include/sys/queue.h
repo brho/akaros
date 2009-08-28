@@ -273,7 +273,7 @@ struct {								\
  */
 #define	LIST_HEAD(name, type)						\
 struct name {								\
-	struct type *SAFE lh_first;	/* first element */			\
+	struct type *COUNT(1) lh_first;	/* first element */			\
 }
 
 #define	LIST_HEAD_INITIALIZER(head)					\
@@ -281,8 +281,8 @@ struct name {								\
 
 #define	LIST_ENTRY(type)						\
 struct {								\
-	struct type *le_next NOINIT;	/* next element */			\
-	struct type **le_prev NOINIT;	/* address of previous next element */	\
+	struct type *COUNT(1) le_next NOINIT;	/* next element */			\
+	struct type *COUNT(1) *le_prev NOINIT;	/* address of previous next element */	\
 }
 
 /*

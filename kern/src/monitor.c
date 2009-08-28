@@ -1,10 +1,6 @@
 // Simple command-line kernel monitor useful for
 // controlling the kernel and exploring the system interactively.
 
-#ifdef __DEPUTY__
-#pragma nodeputy
-#endif
-
 #include <arch/arch.h>
 #include <stab.h>
 #include <smp.h>
@@ -18,7 +14,9 @@
 #include <pmap.h>
 #include <kdebug.h>
 #include <testing.h>
+#include <kfs.h>
 #include <manager.h>
+#include <schedule.h>
 
 #include <ros/memlayout.h>
 
@@ -40,6 +38,8 @@ static command_t commands[] = {
 	{ "setmapperm", "Sets permissions on a VA->PA mapping", mon_setmapperm},
 	{ "cpuinfo", "Prints CPU diagnostics", mon_cpuinfo},
 	{ "nanwan", "Meet Nanwan!!", mon_nanwan},
+	{ "kfs_ls", "List files in KFS", mon_kfs_ls},
+	{ "kfs_run", "Create and run a program from KFS", mon_kfs_run},
 	{ "manager", "Run the manager", mon_manager},
 };
 #define NCOMMANDS (sizeof(commands)/sizeof(commands[0]))
@@ -69,19 +69,19 @@ int mon_kerninfo(int argc, char **argv, trapframe_t *tf)
 	return 0;
 }
 
-static char* function_of(uint32_t address) 
+static char* function_of(uint32_t address)
 {
 	extern stab_t stab[], estab[];
 	extern char stabstr[];
 	stab_t* symtab;
 	stab_t* best_symtab = 0;
 	uint32_t best_func = 0;
-	
+
 	// ugly and unsorted
 	for (symtab = stab; symtab < estab; symtab++) {
 		// only consider functions, type = N_FUN
-		if ((symtab->n_type == N_FUN) && 
-		    (symtab->n_value <= address) && 
+		if ((symtab->n_type == N_FUN) &&
+		    (symtab->n_value <= address) &&
 			(symtab->n_value > best_func)) {
 			best_func = symtab->n_value;
 			best_symtab = symtab;
@@ -145,12 +145,12 @@ int mon_setmapperm(int argc, char **argv, trapframe_t *tf)
 		cprintf("Usage: setmapperm VIRT_ADDR PERMS\n");
 		return 1;
 	}
-	pde_t* pgdir = (pde_t*)vpd;
+	pde_t*COUNT(PTSIZE) pgdir = (pde_t*COUNT(PTSIZE))vpd;
 	pte_t *pte, *pde;
 	page_t* page;
 	uintptr_t va;
 	va = ROUNDDOWN(strtol(argv[1], 0, 16), PGSIZE);
-	page = page_lookup(pgdir, (void*)va, &pte);
+	page = page_lookup(pgdir, (void*SNT)va, &pte);
 	if (!page) {
 		cprintf("No such mapping\n");
 		return 1;
@@ -158,15 +158,15 @@ int mon_setmapperm(int argc, char **argv, trapframe_t *tf)
 	pde = &pgdir[PDX(va)];
 	cprintf("   Virtual    Physical  Ps Dr Ac CD WT U W\n");
 	cprintf("------------------------------------------\n");
-	cprintf("%08p  %08p  %1d  %1d  %1d  %1d  %1d  %1d %1d\n", va, page2pa(page), 
-	       (*pte & PTE_PS) >> 7, (*pte & PTE_D) >> 6, (*pte & PTE_A) >> 5, 
-	       (*pte & PTE_PCD) >> 4, (*pte & PTE_PWT) >> 3, (*pte & *pde & PTE_U) >> 2, 
+	cprintf("%08p  %08p  %1d  %1d  %1d  %1d  %1d  %1d %1d\n", va, page2pa(page),
+	       (*pte & PTE_PS) >> 7, (*pte & PTE_D) >> 6, (*pte & PTE_A) >> 5,
+	       (*pte & PTE_PCD) >> 4, (*pte & PTE_PWT) >> 3, (*pte & *pde & PTE_U) >> 2,
 	       (*pte & *pde & PTE_W) >> 1);
 	*pte = PTE_ADDR(*pte) | (*pte & PTE_PS) |
 	       (PGOFF(strtol(argv[2], 0, 16)) & ~PTE_PS ) | PTE_P;
-	cprintf("%08p  %08p  %1d  %1d  %1d  %1d  %1d  %1d %1d\n", va, page2pa(page), 
-	       (*pte & PTE_PS) >> 7, (*pte & PTE_D) >> 6, (*pte & PTE_A) >> 5, 
-	       (*pte & PTE_PCD) >> 4, (*pte & PTE_PWT) >> 3, (*pte & *pde & PTE_U) >> 2, 
+	cprintf("%08p  %08p  %1d  %1d  %1d  %1d  %1d  %1d %1d\n", va, page2pa(page),
+	       (*pte & PTE_PS) >> 7, (*pte & PTE_D) >> 6, (*pte & PTE_A) >> 5,
+	       (*pte & PTE_PCD) >> 4, (*pte & PTE_PWT) >> 3, (*pte & *pde & PTE_U) >> 2,
 	       (*pte & *pde & PTE_W) >> 1);
 	return 0;
 #endif
@@ -176,15 +176,15 @@ int mon_cpuinfo(int argc, char **argv, trapframe_t *tf)
 {
 	extern uint8_t num_cpus;
 
-	cprintf("Number of CPUs detected: %d\n", num_cpus);	
+	cprintf("Number of CPUs detected: %d\n", num_cpus);
 	cprintf("Calling CPU's ID: 0x%08x\n", core_id());
 
 #ifdef __i386__
 	if (argc < 2)
-		smp_call_function_self(test_print_info_handler, 0, 0);
+		smp_call_function_self(test_print_info_handler, NULL, 0);
 	else
 		smp_call_function_single(strtol(argv[1], 0, 16),
-		                         test_print_info_handler, 0, 0);
+		                         test_print_info_handler, NULL, 0);
 #endif
 	return 0;
 }
@@ -228,13 +228,46 @@ int mon_nanwan(int argc, char **argv, trapframe_t *tf)
 	return 0;
 }
 
+int mon_kfs_ls(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
+{
+	printk("Files in KFS:\n-------------------------------\n");
+	for (int i = 0; i < MAX_KFS_FILES; i++)
+		if (kfs[i].name[0])
+			printk("%s\n", kfs[i].name);
+	return 0;
+}
+
+int mon_kfs_run(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
+{
+	if (argc != 2) {
+		printk("Usage: kfs_run FILENAME\n");
+		return 1;
+	}
+	int kfs_inode = kfs_lookup_path(argv[1]);
+	if (kfs_inode < 0) {
+		printk("Bad filename!\n");
+		return 1;
+	}
+	struct proc *p = kfs_proc_create(kfs_inode);
+	// go from PROC_CREATED->PROC_RUNNABLE_S
+	spin_lock_irqsave(&p->proc_lock); // might not be necessary for a mon function
+	proc_set_state(p, PROC_RUNNABLE_S);
+	schedule_proc(p);
+	spin_unlock_irqsave(&p->proc_lock);
+	// Should never return from schedule (env_pop in there)
+	// also note you may not get the process you created, in the event there
+	// are others floating around that are runnable
+	schedule();
+	return 0;
+}
+
 /***** Kernel monitor command interpreter *****/
 
 #define WHITESPACE "\t\r\n "
 #define MAXARGS 16
 
-static int runcmd(char *COUNT(CMDBUF_SIZE) real_buf, trapframe_t *tf) {
-	char *BND(real_buf, real_buf+CMDBUF_SIZE) buf = real_buf;
+static int runcmd(char *NTS real_buf, trapframe_t *tf) {
+	char * buf = NTEXPAND(real_buf);
 	int argc;
 	char *NTS argv[MAXARGS];
 	int i;
@@ -255,7 +288,7 @@ static int runcmd(char *COUNT(CMDBUF_SIZE) real_buf, trapframe_t *tf) {
 			return 0;
 		}
 		//This will get fucked at runtime..... in the ASS
-		argv[argc++] = (char *NTS) TC(buf);
+		argv[argc++] = buf;
 		while (*buf && !strchr(WHITESPACE, *buf))
 			buf++;
 	}
@@ -275,8 +308,8 @@ static int runcmd(char *COUNT(CMDBUF_SIZE) real_buf, trapframe_t *tf) {
 void monitor(trapframe_t *tf) {
 	char *buf;
 
-	cprintf("Welcome to the ROS kernel monitor!\n");
-	cprintf("Type 'help' for a list of commands.\n");
+	printk("Welcome to the ROS kernel monitor on core %d!\n", core_id());
+	printk("Type 'help' for a list of commands.\n");
 
 	if (tf != NULL)
 		print_trapframe(tf);

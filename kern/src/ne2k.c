@@ -18,6 +18,7 @@
 #include <pmap.h>
 #include <pci.h>
 #include <ne2k.h>
+#include <timing.h>
 
 /* NE2000 NIC Driver Sketch
  *

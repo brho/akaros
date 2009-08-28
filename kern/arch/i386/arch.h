@@ -10,7 +10,7 @@
 #define MAX_NUM_CPUS				255
 
 static __inline void breakpoint(void) __attribute__((always_inline));
-static __inline void invlpg(void *addr) __attribute__((always_inline));
+static __inline void invlpg(void *SNT addr) __attribute__((always_inline));
 static __inline void tlbflush(void) __attribute__((always_inline));
 static __inline uint64_t read_tsc(void) __attribute__((always_inline));
 static __inline uint64_t read_tsc_serialized(void) __attribute__((always_inline));
@@ -134,17 +134,10 @@ irq_is_enabled(void)
 	return read_eflags() & FL_IF;
 }
 
-/*
- * Returns the core id.  Unfortunately, this is a serializing instruction, and
- * may not be the best way either.  This is ripped from lapic_get_default_id().
- */
 static __inline uint32_t
 core_id(void)
 {
-	uint32_t ebx;
-	cpuid(1, 0, &ebx, 0, 0);
-	// p6 family only uses 4 bits here, and 0xf is reserved for the IOAPIC
-	return (ebx & 0xFF000000) >> 24;
+	return lapic_get_id();
 }
 
 static __inline void

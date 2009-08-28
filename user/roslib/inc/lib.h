@@ -11,24 +11,22 @@
 #include <ros/timer.h>
 #include <ros/error.h>
 #include <ros/memlayout.h>
-#include <ros/syscall.h>
-#include <ros/env.h>
+#include <ros/procdata.h>
 
 #include <stdarg.h>
 #include <string.h>
 #include <pool.h>
+#include <assert.h>
 #include <sys/queue.h>
 
 #define USED(x)		(void)(x)
 
 // libos.c or entry.S
-extern char *binaryname;
-extern volatile env_t *env;
-// will need to change these types when we have real structs
-// seems like they need to be either arrays [] or functions () for it to work
-extern volatile uint8_t (COUNT(PGSIZE * UINFO_PAGES) procinfo)[];
-extern volatile uint8_t (COUNT(PGSIZE * UDATA_PAGES) procdata)[];
-extern syscall_front_ring_t sysfrontring;
+extern char *NTS binaryname;
+extern procinfo_t* procinfo;
+extern procdata_t* procdata;
+extern syscall_front_ring_t syscallfrontring;
+extern sysevent_back_ring_t syseventbackring;
 void exit(void) __attribute__((noreturn));
 
 /*
@@ -60,19 +58,20 @@ ssize_t     sys_cputs(const char *string, size_t len);
 error_t     sys_cputs_async(const char *s, size_t len, syscall_desc_t* desc,
                             void (*cleanup_handler)(void*), void* cleanup_data);
 uint16_t    sys_cgetc(void);
-envid_t     sys_getcpuid(void);
+size_t	    sys_getcpuid(void);
 /* Process Management */
-envid_t     sys_getenvid(void);
-error_t     sys_env_destroy(envid_t);
-void		sys_yield(void);
-int			sys_proc_create(char* path);
-error_t		sys_proc_run(int pid);
+int         sys_getpid(void);
+error_t     sys_proc_destroy(int pid);
+void        sys_yield(void);
+int         sys_proc_create(char* path);
+error_t     sys_proc_run(int pid);
 /* Generic Async Call */
-error_t     waiton_syscall(syscall_desc_t* desc, syscall_rsp_t* rsp);
+error_t     waiton_syscall(syscall_desc_t* desc, syscall_rsp_t*COUNT(1) rsp);
 
 // async callback
 #define MAX_SYSCALLS 100
 #define MAX_ASYNCCALLS 100
+
 // The high-level object a process waits on, with multiple syscalls within.
 typedef struct async_desc {
 	syscall_desc_list_t syslist;
@@ -88,10 +87,7 @@ typedef struct async_rsp_t {
 
 // This is per-thread, and used when entering a async library call to properly
 // group syscall_desc_t used during the processing of that async call
-extern async_desc_t* current_async_desc;
-// stdio.h needs to be included after async_desc_t.  assert.h includes stdio.h.
-#include <stdio.h>
-#include <assert.h>
+extern async_desc_t*COUNT(1) current_async_desc;
 
 // This pooltype contains syscall_desc_t, which is how you wait on one syscall.
 POOL_TYPE_DEFINE(syscall_desc_t, syscall_desc_pool, MAX_SYSCALLS);
@@ -105,8 +101,8 @@ extern syscall_desc_pool_t syscall_desc_pool;
 extern async_desc_pool_t async_desc_pool;
 extern timer_pool_t timer_pool;
 
-error_t waiton_async_call(async_desc_t* desc, async_rsp_t* rsp);
-async_desc_t* get_async_desc(void);
+error_t waiton_async_call(async_desc_t*COUNT(1) desc, async_rsp_t* rsp);
+async_desc_t*COUNT(1) get_async_desc(void);
 syscall_desc_t* get_sys_desc(async_desc_t* desc);
 error_t get_all_desc(async_desc_t** a_desc, syscall_desc_t** s_desc);
 

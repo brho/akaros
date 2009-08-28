@@ -46,6 +46,7 @@
 	cpuid(0, 0, 0, 0, 0);                                                      \
 	ticks = read_tsc() - ticks;                                                \
 	/* Compute the average and print it */                                     \
+	/* env->whatever doesn't work, but these functions are never used. */      \
 	uint64_t a = (1000000000LL/(iters) * ticks) / (env->env_tscfreq);          \
 	if ((name))                                                                \
 		cprintf("Measuring %s:\n"                                              \

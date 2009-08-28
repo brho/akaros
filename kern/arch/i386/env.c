@@ -15,8 +15,17 @@
 //
 void env_pop_tf(trapframe_t *tf)
 {
-	if(tf->tf_cs)
-	{
+	/*
+	 * If the process entered the kernel via sysenter, we need to leave via
+	 * sysexit.  sysenter trapframes have 0 for a CS, which is pushed in
+	 * sysenter_handler.
+	 */
+	if(tf->tf_cs) {
+		/*
+		 * Restores the register values in the Trapframe with the 'iret'
+		 * instruction.  This exits the kernel and starts executing some
+		 * environment's code.  This function does not return.
+		 */
 		asm volatile ("movl %0,%%esp;           "
 		              "popal;                   "
 		              "popl %%es;               "
@@ -25,9 +34,8 @@ void env_pop_tf(trapframe_t *tf)
 		              "iret                     "
 		              : : "g" (tf) : "memory");
 		panic("iret failed");  /* mostly to placate the compiler */
-	}
-	else
-	{
+	} else {
+		/* Return path of sysexit.  See sysenter_handler's asm for details. */
 		asm volatile ("movl %0,%%esp;           "
 		              "popal;                   "
 		              "popl %%es;               "
@@ -36,6 +44,7 @@ void env_pop_tf(trapframe_t *tf)
 		              "popfl;                   "
 		              "movl %%ebp, %%ecx;       "
 		              "movl %%esi, %%edx;       "
+		              "sti;                     "
 		              "sysexit                  "
 		              : : "g" (tf) : "memory");
 		panic("sysexit failed");  /* mostly to placate the compiler */

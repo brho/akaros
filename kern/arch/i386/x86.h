@@ -6,6 +6,7 @@
 
 /* Model Specific Registers */
 #define IA32_APIC_BASE				0x1b
+#define IA32_FEATURE_CONTROL 		0x3a
 #define IA32_MTRR_DEF_TYPE			0x2ff
 #define IA32_MTRR_PHYSBASE0			0x200
 #define IA32_MTRR_PHYSMASK0			0x201

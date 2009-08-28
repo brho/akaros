@@ -1,6 +1,3 @@
-#ifdef __DEPUTY__
-#pragma nodeputy
-#endif
 
 #include <arch/mmu.h>
 #include <arch/arch.h>
@@ -14,22 +11,27 @@
 #include <string.h>
 #include <testing.h>
 #include <trap.h>
-#include <env.h>
+#include <process.h>
 #include <syscall.h>
+#include <timing.h>
+#include <kfs.h>
+#include <multiboot.h>
+#include <pmap.h>
+#include <page_alloc.h>
 
 #include <pmap.h>
 
 #define test_vector 0xeb
 
-#if 0
+#ifdef __i386__
 
 void test_ipi_sending(void)
 {
-	extern handler_t interrupt_handlers[];
+	extern handler_t (COUNT(NUM_INTERRUPT_HANDLERS) interrupt_handlers)[];
 	int8_t state = 0;
 
 	register_interrupt_handler(interrupt_handlers, test_vector,
-	                           test_hello_world_handler, 0);
+	                           test_hello_world_handler, NULL);
 	enable_irqsave(&state);
 	cprintf("\nCORE 0 sending broadcast\n");
 	send_broadcast_ipi(test_vector);
@@ -65,7 +67,7 @@ void test_ipi_sending(void)
 // Note this never returns and will muck with any other timer work
 void test_pic_reception(void)
 {
-	register_interrupt_handler(interrupt_handlers, 0x20, test_hello_world_handler, 0);
+	register_interrupt_handler(interrupt_handlers, 0x20, test_hello_world_handler, NULL);
 	pit_set_timer(100,TIMER_RATEGEN); // totally arbitrary time
 	pic_unmask_irq(0);
 	cprintf("PIC1 Mask = 0x%04x\n", inb(PIC1_DATA));
@@ -75,12 +77,10 @@ void test_pic_reception(void)
 	enable_irq();
 	while(1);
 }
-#endif
 
 void test_ioapic_pit_reroute(void) 
 {
-	extern handler_t interrupt_handlers[];
-	register_interrupt_handler(interrupt_handlers, 0x20, test_hello_world_handler, 0);
+	register_interrupt_handler(interrupt_handlers, 0x20, test_hello_world_handler, NULL);
 	ioapic_route_irq(0, 3);	
 
 	cprintf("Starting pit on core 3....\n");
@@ -94,13 +94,86 @@ void test_ioapic_pit_reroute(void)
 	udelay(3000000);
 }
 
+#endif // __i386__
+
+
 void test_print_info(void)
 {
 	cprintf("\nCORE 0 asking all cores to print info:\n");
-	smp_call_function_all(test_print_info_handler, 0, 0);
+	smp_call_function_all(test_print_info_handler, NULL, 0);
 	cprintf("\nDone!\n");
 }
 
+void test_page_coloring(void) 
+{
+	//Print the different cache properties of our machine
+	print_cache_properties("L1", &l1);
+	cprintf("\n");
+	print_cache_properties("L2", &l2);
+	cprintf("\n");
+	print_cache_properties("L3", &l3);
+	cprintf("\n");
+
+	//Print some stats about our memory
+	cprintf("Max Address: %llu\n", MAX_VADDR);
+	cprintf("Num Pages: %u\n", npages);
+
+	//Declare a local variable for allocating pages	
+	page_t* page;
+
+	//Run through and allocate all pages through l1_page_alloc
+	cprintf("Allocating from L1 page colors:\n");
+	for(int i=0; i<get_cache_num_page_colors(&l1); i++) {
+		cprintf("  COLOR %d:\n", i);
+		while(l1_page_alloc(&page, i) != -ENOMEM)
+			cprintf("    Page: %d\n", page2ppn(page));
+	}
+
+	//Put all the pages back by reinitializing
+	page_init();
+	
+	//Run through and allocate all pages through l2_page_alloc
+	cprintf("Allocating from L2 page colors:\n");
+	for(int i=0; i<get_cache_num_page_colors(&l2); i++) {
+		cprintf("  COLOR %d:\n", i);
+		while(l2_page_alloc(&page, i) != -ENOMEM)
+			cprintf("    Page: %d\n", page2ppn(page));
+	}
+
+	//Put all the pages back by reinitializing
+	page_init();
+	
+	//Run through and allocate all pages through l3_page_alloc
+	cprintf("Allocating from L3 page colors:\n");
+	for(int i=0; i<get_cache_num_page_colors(&l3); i++) {
+		cprintf("  COLOR %d:\n", i);
+		while(l3_page_alloc(&page, i) != -ENOMEM)
+			cprintf("    Page: %d\n", page2ppn(page));
+	}
+	
+	//Put all the pages back by reinitializing
+	page_init();
+	
+	//Run through and allocate all pages through page_alloc
+	cprintf("Allocating from global allocator:\n");
+	while(page_alloc(&page) != -ENOMEM)
+		cprintf("    Page: %d\n", page2ppn(page));
+	
+	if(l2_page_alloc(&page, 0) != -ENOMEM)
+		cprintf("Should not get here, all pages should already be gone!\n");
+	cprintf("All pages gone for sure...\n");
+	
+	//Now lets put a few pages back using page_free..
+	cprintf("Reinserting pages via page_free and reallocating them...\n");
+	page_free(&pages[0]);
+	page_free(&pages[15]);
+	page_free(&pages[7]);
+	page_free(&pages[6]);
+	page_free(&pages[4]);
+
+	while(page_alloc(&page) != -ENOMEM)
+		cprintf("Page: %d\n", page2ppn(page));	
+}
 
 extern uint8_t num_cpus;
 barrier_t test_cpu_array;
@@ -110,7 +183,7 @@ void test_barrier(void)
 	cprintf("Core 0 initializing barrier\n");
 	init_barrier(&test_cpu_array, num_cpus);
 	cprintf("Core 0 asking all cores to print ids, barrier, rinse, repeat\n");
-	smp_call_function_all(test_barrier_handler, 0, 0);
+	smp_call_function_all(test_barrier_handler, NULL, 0);
 }
 
 void test_interrupts_irqsave(void)
@@ -246,9 +319,8 @@ checklist_t* the_global_list;
 
 void test_checklist_handler(trapframe_t *tf, void* data)
 {
-	for (int i = 0; i < SMP_BOOT_TIMEOUT; i++);
-	for (int i = 0; i < SMP_BOOT_TIMEOUT; i++);
-	cprintf("down_checklist(%x,%d)\n",the_global_list,core_id());
+	udelay(1000000);
+	cprintf("down_checklist(%x,%d)\n", the_global_list, core_id());
 	down_checklist(the_global_list);
 }
 
@@ -279,7 +351,7 @@ void test_checklists(void)
 	PRINT_BITMASK(a_list.mask.bits, a_list.mask.size);
 	//smp_call_function_single(1, test_checklist_handler, 0, 0);
 
-	smp_call_function_all(test_checklist_handler, 0, 0);
+	smp_call_function_all(test_checklist_handler, NULL, 0);
 
 	printk("Waiting on checklist\n");
 	waiton_checklist(&a_list);
@@ -287,12 +359,12 @@ void test_checklists(void)
 
 }
 
-atomic_t a = atomic_init(0), b = atomic_init(0), c = atomic_init(0);
+atomic_t a, b, c;
 
-void test_incrementer_handler(trapframe_t *tf, void* data)
+void test_incrementer_handler(trapframe_t *tf, atomic_t* data)
 {
 	assert(data);
-	atomic_inc((atomic_t*)data);
+	atomic_inc(data);
 }
 
 void test_null_handler(trapframe_t *tf, void* data)
@@ -303,36 +375,39 @@ void test_null_handler(trapframe_t *tf, void* data)
 void test_smp_call_functions(void)
 {
 	int i;
+	atomic_init(&a, 0);
+	atomic_init(&b, 0);
+	atomic_init(&c, 0);
 	handler_wrapper_t *waiter0 = 0, *waiter1 = 0, *waiter2 = 0, *waiter3 = 0,
 	                  *waiter4 = 0, *waiter5 = 0;
 	uint8_t me = core_id();
 	printk("\nCore %d: SMP Call Self (nowait):\n", me);
 	printk("---------------------\n");
-	smp_call_function_self(test_hello_world_handler, 0, 0);
+	smp_call_function_self(test_hello_world_handler, NULL, 0);
 	printk("\nCore %d: SMP Call Self (wait):\n", me);
 	printk("---------------------\n");
-	smp_call_function_self(test_hello_world_handler, 0, &waiter0);
+	smp_call_function_self(test_hello_world_handler, NULL, &waiter0);
 	smp_call_wait(waiter0);
 	printk("\nCore %d: SMP Call All (nowait):\n", me);
 	printk("---------------------\n");
-	smp_call_function_all(test_hello_world_handler, 0, 0);
+	smp_call_function_all(test_hello_world_handler, NULL, 0);
 	printk("\nCore %d: SMP Call All (wait):\n", me);
 	printk("---------------------\n");
-	smp_call_function_all(test_hello_world_handler, 0, &waiter0);
+	smp_call_function_all(test_hello_world_handler, NULL, &waiter0);
 	smp_call_wait(waiter0);
 	printk("\nCore %d: SMP Call All-Else Individually, in order (nowait):\n", me);
 	printk("---------------------\n");
 	for(i = 1; i < num_cpus; i++)
-		smp_call_function_single(i, test_hello_world_handler, 0, 0);
+		smp_call_function_single(i, test_hello_world_handler, NULL, 0);
 	printk("\nCore %d: SMP Call Self (wait):\n", me);
 	printk("---------------------\n");
-	smp_call_function_self(test_hello_world_handler, 0, &waiter0);
+	smp_call_function_self(test_hello_world_handler, NULL, &waiter0);
 	smp_call_wait(waiter0);
 	printk("\nCore %d: SMP Call All-Else Individually, in order (wait):\n", me);
 	printk("---------------------\n");
 	for(i = 1; i < num_cpus; i++)
 	{
-		smp_call_function_single(i, test_hello_world_handler, 0, &waiter0);
+		smp_call_function_single(i, test_hello_world_handler, NULL, &waiter0);
 		smp_call_wait(waiter0);
 	}
 	printk("\nTesting to see if any IPI-functions are dropped when not waiting:\n");
@@ -356,12 +431,12 @@ void test_smp_call_functions(void)
 	// wait, so we're sure the others finish before printing.
 	// without this, we could (and did) get 19,18,19, since the B_inc
 	// handler didn't finish yet
-	smp_call_function_self(test_null_handler, 0, &waiter0);
+	smp_call_function_self(test_null_handler, NULL, &waiter0);
 	// need to grab all 5 handlers (max), since the code moves to the next free.
-	smp_call_function_self(test_null_handler, 0, &waiter1);
-	smp_call_function_self(test_null_handler, 0, &waiter2);
-	smp_call_function_self(test_null_handler, 0, &waiter3);
-	smp_call_function_self(test_null_handler, 0, &waiter4);
+	smp_call_function_self(test_null_handler, NULL, &waiter1);
+	smp_call_function_self(test_null_handler, NULL, &waiter2);
+	smp_call_function_self(test_null_handler, NULL, &waiter3);
+	smp_call_function_self(test_null_handler, NULL, &waiter4);
 	smp_call_wait(waiter0);
 	smp_call_wait(waiter1);
 	smp_call_wait(waiter2);
@@ -369,9 +444,9 @@ void test_smp_call_functions(void)
 	smp_call_wait(waiter4);
 	printk("A: %d, B: %d, C: %d (should be 19,19,19)\n", atomic_read(&a), atomic_read(&b), atomic_read(&c));
 	printk("Attempting to deadlock by smp_calling with an outstanding wait:\n");
-	smp_call_function_self(test_null_handler, 0, &waiter0);
+	smp_call_function_self(test_null_handler, NULL, &waiter0);
 	printk("Sent one\n");
-	smp_call_function_self(test_null_handler, 0, &waiter1);
+	smp_call_function_self(test_null_handler, NULL, &waiter1);
 	printk("Sent two\n");
 	smp_call_wait(waiter0);
 	printk("Wait one\n");
@@ -380,17 +455,17 @@ void test_smp_call_functions(void)
 	printk("\tMade it through!\n");
 	printk("Attempting to deadlock by smp_calling more than are available:\n");
 	printk("\tShould see an Insufficient message and a kernel warning.\n");
-	if (smp_call_function_self(test_null_handler, 0, &waiter0))
+	if (smp_call_function_self(test_null_handler, NULL, &waiter0))
 		printk("\tInsufficient handlers to call function (0)\n");
-	if (smp_call_function_self(test_null_handler, 0, &waiter1))
+	if (smp_call_function_self(test_null_handler, NULL, &waiter1))
 		printk("\tInsufficient handlers to call function (1)\n");
-	if (smp_call_function_self(test_null_handler, 0, &waiter2))
+	if (smp_call_function_self(test_null_handler, NULL, &waiter2))
 		printk("\tInsufficient handlers to call function (2)\n");
-	if (smp_call_function_self(test_null_handler, 0, &waiter3))
+	if (smp_call_function_self(test_null_handler, NULL, &waiter3))
 		printk("\tInsufficient handlers to call function (3)\n");
-	if (smp_call_function_self(test_null_handler, 0, &waiter4))
+	if (smp_call_function_self(test_null_handler, NULL, &waiter4))
 		printk("\tInsufficient handlers to call function (4)\n");
-	if (smp_call_function_self(test_null_handler, 0, &waiter5))
+	if (smp_call_function_self(test_null_handler, NULL, &waiter5))
 		printk("\tInsufficient handlers to call function (5)\n");
 	smp_call_wait(waiter0);
 	smp_call_wait(waiter1);
@@ -403,7 +478,7 @@ void test_smp_call_functions(void)
 	printk("Done\n");
 }
 
-#if 0
+#ifdef __i386__
 void test_lapic_status_bit(void)
 {
 	register_interrupt_handler(interrupt_handlers, test_vector,
@@ -420,13 +495,13 @@ void test_lapic_status_bit(void)
 	printk("IPIs received (should be %d): %d\n", a, NUM_IPI);
 	// hopefully that handler never fires again.  leaving it registered for now.
 }
-#endif
+#endif // __i386__
 
 /******************************************************************************/
 /*            Test Measurements: Couples with measurement.c                   */
 // All user processes can R/W the UGDATA page
-barrier_t* bar = (barrier_t*)UGDATA;
-uint32_t* job_to_run = (uint32_t*)(UGDATA + sizeof(barrier_t));
+barrier_t*COUNT(1) bar = (barrier_t*COUNT(1))TC(UGDATA);
+uint32_t*COUNT(1) job_to_run = (uint32_t*COUNT(1))TC(UGDATA + sizeof(barrier_t));
 env_t* env_batch[64]; // Fairly arbitrary, just the max I plan to use.
 
 /* Helpers for test_run_measurements */
@@ -442,14 +517,15 @@ static void sync_tests(int start_core, int num_threads, int job_num)
 	assert(start_core + num_threads <= num_cpus);
 	wait_for_all_envs_to_die();
 	for (int i = start_core; i < start_core + num_threads; i++)
-		env_batch[i] = ENV_CREATE(roslib_measurements);
+		env_batch[i] = kfs_proc_create(kfs_lookup_path("roslib_measurements"));
+	lcr3(env_batch[start_core]->env_cr3);
 	init_barrier(bar, num_threads);
 	*job_to_run = job_num;
 	for (int i = start_core; i < start_core + num_threads; i++)
 		smp_call_function_single(i, run_env_handler, env_batch[i], 0);
 	process_workqueue();
 	// we want to fake a run, to reenter manager for the next case
-	env_t *env = ENV_CREATE(roslib_null);
+	env_t *env = kfs_proc_create(kfs_lookup_path("roslib_null"));
 	smp_call_function_single(0, run_env_handler, env, 0);
 	process_workqueue();
 	panic("whoops!\n");
@@ -462,8 +538,11 @@ static void async_tests(int start_core, int num_threads, int job_num)
 	assert(start_core + num_threads <= num_cpus);
 	wait_for_all_envs_to_die();
 	for (int i = start_core; i < start_core + num_threads; i++)
-		env_batch[i] = ENV_CREATE(roslib_measurements);
+		env_batch[i] = kfs_proc_create(kfs_lookup_path("roslib_measurements"));
+	printk("async_tests: checkpoint 0\n");
+	lcr3(env_batch[start_core]->env_cr3);
 	init_barrier(bar, num_threads);
+	printk("async_tests: checkpoint 1\n");
 	*job_to_run = job_num;
 	for (int i = start_core; i < start_core + num_threads; i++)
 		smp_call_function_single(i, run_env_handler, env_batch[i], 0);
@@ -476,7 +555,7 @@ static void async_tests(int start_core, int num_threads, int job_num)
 		cpu_relax();
 	}
 	// we want to fake a run, to reenter manager for the next case
-	env_t *env = ENV_CREATE(roslib_null);
+	env_t *env = kfs_proc_create(kfs_lookup_path("roslib_null"));
 	smp_call_function_single(0, run_env_handler, env, 0);
 	process_workqueue();
 	// this all never returns
@@ -567,7 +646,7 @@ void test_hello_world_handler(trapframe_t *tf, void* data)
 	#endif
 
 	cprintf("Incoming IRQ, ISR: %d on core %d with tf at 0x%08x\n",
-		trapno, core_id(), tf);
+	        trapno, core_id(), tf);
 }
 
 uint32_t print_info_lock = 0;
@@ -577,7 +656,7 @@ void test_print_info_handler(trapframe_t *tf, void* data)
 	spin_lock_irqsave(&print_info_lock);
 	cprintf("----------------------------\n");
 	cprintf("This is Core %d\n", core_id());
-#if 0
+#ifdef __i386__
 	cprintf("MTRR_DEF_TYPE = 0x%08x\n", read_msr(IA32_MTRR_DEF_TYPE));
 	cprintf("MTRR Phys0 Base = 0x%016llx, Mask = 0x%016llx\n",
 	        read_msr(0x200), read_msr(0x201));
@@ -595,7 +674,7 @@ void test_print_info_handler(trapframe_t *tf, void* data)
 	        read_msr(0x20c), read_msr(0x20d));
 	cprintf("MTRR Phys7 Base = 0x%016llx, Mask = 0x%016llx\n",
 	        read_msr(0x20e), read_msr(0x20f));
-#endif
+#endif // __i386__
 	cprintf("----------------------------\n");
 	spin_unlock_irqsave(&print_info_lock);
 }
@@ -616,12 +695,12 @@ void test_barrier_handler(trapframe_t *tf, void* data)
 	//cprintf("Round 4: Core %d\n", core_id());
 }
 
-static void test_waiting_handler(trapframe_t *tf, void* data)
+static void test_waiting_handler(trapframe_t *tf, atomic_t * data)
 {
-	{HANDLER_ATOMIC atomic_dec((atomic_t*)data);}
+	{HANDLER_ATOMIC atomic_dec(data);}
 }
 
-#if 0
+#ifdef __i386__
 void test_pit(void)
 {
 	cprintf("Starting test for PIT now (10s)\n");
@@ -635,11 +714,12 @@ void test_pit(void)
 	enable_irq();
 	lapic_set_timer(10000000, FALSE);
 
-	atomic_t waiting = atomic_init(1);
+	atomic_t waiting;
+	atomic_init(&waiting, 1);
 	register_interrupt_handler(interrupt_handlers, test_vector,
 	                           test_waiting_handler, &waiting);
 	while(atomic_read(&waiting))
 		cpu_relax();
 	cprintf("End now\n");
 }
-#endif
+#endif // __i386__

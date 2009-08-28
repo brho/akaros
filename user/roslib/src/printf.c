@@ -1,12 +1,9 @@
-// Implementation of cprintf console output for user environments,
+// Implementation of cprintf console output for user processes,
 // based on printfmt() and the sys_cputs() system call.
 //
 // cprintf is a debugging statement, not a generic output statement.
 // It is very important that it always go to the console, especially when
 // debugging file descriptor code!
-#ifdef __DEPUTY__
-#pragma nodeputy
-#endif
 
 #include <types.h>
 #include <stdio.h>
@@ -40,11 +37,11 @@ static void putch(int ch, printbuf_t **b)
 int vcprintf(const char *fmt, va_list ap)
 {
 	printbuf_t b;
-	printbuf_t *bp = &b;
+	printbuf_t *COUNT(1) bp = &b;
 
 	b.idx = 0;
 	b.cnt = 0;
-	vprintfmt((void*)putch, (void**)&bp, fmt, ap);
+	vprintfmt(putch, &bp, fmt, ap);
 	sys_cputs(b.buf, b.idx);
 
 	return b.cnt;
@@ -99,14 +96,14 @@ static void putch_async(int ch, printbuf_t **b)
 	(*b)->cnt++; // supposed to be overall number, not just in one buffer
 }
 
-static int vcprintf_async(const char *fmt, va_list ap)
+static int vcprintf_async(const char *NTS fmt, va_list ap)
 {
 	// start with an available buffer.  TODO: check return value
 	printbuf_t* b = get_free_buffer();
 
 	b->idx = 0;
 	b->cnt = 0;
-	vprintfmt((void*)putch_async, (void**)&b, fmt, ap);
+	vprintfmt(putch_async, &b, fmt, ap);
 	// TODO - should check for a return value for sys_
 	sys_cputs_async(b->buf, b->idx, get_sys_desc(current_async_desc),
 	                cputs_async_cleanup, b);

@@ -1,10 +1,6 @@
 // Simple implementation of cprintf console output for the kernel,
 // based on printfmt() and the kernel console's cputchar().
 
-#ifdef __DEPUTY__
-#pragma nodeputy
-#endif
-
 #include <arch/arch.h>
 #include <arch/types.h>
 
@@ -52,7 +48,7 @@ int vcprintf(const char *fmt, va_list ap)
 	spin_lock_irqsave(&output_lock);
 
 	// do the buffered printf
-	vprintfmt((void*)buffered_putch, (void**)&cntp, fmt, ap);
+	vprintfmt(buffered_putch, &cntp, fmt, ap);
 
 	// write out remaining chars in the buffer
 	buffered_putch(-1,&cntp);

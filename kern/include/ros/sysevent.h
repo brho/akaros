@@ -30,7 +30,9 @@ typedef struct sysevent_rsp {
 	error_t rsp;
 } sysevent_rsp_t;
 
-// Generic Syscall Ring Buffer
-DEFINE_RING_TYPES(sysevent, sysevent_t, sysevent_rsp_t);
+// Generic Sysevent Ring Buffer
+#define SYSEVENTRINGSIZE    PGSIZE
+DEFINE_RING_TYPES_WITH_SIZE(sysevent, sysevent_t, sysevent_rsp_t, SYSEVENTRINGSIZE);
 
 #endif //ROS_SYSEVENT_H
+

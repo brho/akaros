@@ -1,9 +1,5 @@
 /* See COPYRIGHT for copyright information. */
 
-#ifdef __DEPUTY__
-#pragma nodeputy
-#endif
-
 #ifdef __BSD_ON_CORE_0__
 #include Everything For Free -- It just works!!
 #else
@@ -20,8 +16,8 @@
 #include <assert.h>
 #include <monitor.h>
 #include <pmap.h>
-#include <env.h>
-#include <testing.h>
+#include <process.h>
+#include <trap.h>
 #include <syscall.h>
 #include <kclock.h>
 #include <manager.h>
@@ -47,11 +43,16 @@ void kernel_init(multiboot_info_t *mboot_info)
 
 	print_cpuinfo();
 
-	multiboot_detect_memory((multiboot_info_t*)((uint32_t)mboot_info + KERNBASE));
-	multiboot_print_memory_map((multiboot_info_t*)((uint32_t)mboot_info + KERNBASE));
+	// zra: using KADDR macro gives a runtime warning, but it is possibly more
+    //      clear what's going on this way?
+	//multiboot_detect_memory((multiboot_info_t*)((uint32_t)mboot_info + KERNBASE));
+	//multiboot_print_memory_map((multiboot_info_t*)((uint32_t)mboot_info + KERNBASE));
+	multiboot_detect_memory((multiboot_info_t*COUNT(1))KADDR((physaddr_t)mboot_info));
+	multiboot_print_memory_map((multiboot_info_t*COUNT(1))KADDR((physaddr_t)mboot_info));
 
 	vm_init();
 
+	cache_init();
 	page_init();
 	page_check();
 
@@ -68,18 +69,6 @@ void kernel_init(multiboot_info_t *mboot_info)
 	
 	rl8168_init();		
 	ne2k_init();
-	/*
-
-	// this returns when all other cores are done and ready to receive IPIs
-	smp_boot();
-	test_smp_call_functions();
-	test_checklists();
-	test_barrier();
-	test_print_info();
-	test_lapic_status_bit();
-	test_ipi_sending();
-	test_pit();
-	*/
 
 	manager();
 }

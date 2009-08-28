@@ -3,8 +3,6 @@
 #ifndef ROS_INC_ASSERT_H
 #define ROS_INC_ASSERT_H
 
-#include <stdio.h>
-
 void _warn(const char* NTS, int, const char* NTS, ...);
 void _panic(const char* NTS, int, const char* NTS, ...) __attribute__((noreturn));
 

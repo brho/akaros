@@ -4,10 +4,10 @@ OBJDIRS += $(KERN_IVY_DIR)
 KERN_IVY_CFLAGS   := $(KERN_CFLAGS) --nodeputy
 KERN_IVY_SRCFILES := $(KERN_IVY_DIR)/deputy.c
 KERN_IVY_OBJFILES := $(patsubst $(KERN_IVY_DIR)/%.c, \
-                                   $(OBJDIR)/$(KERN_DIR)/%.o, \
+                                   $(OBJDIR)/$(KERN_IVY_DIR)/%.o, \
                                    $(KERN_IVY_SRCFILES))
 
-$(OBJDIR)/$(KERN_DIR)/deputy.o: $(KERN_IVY_SRCFILES)
+$(OBJDIR)/$(KERN_IVY_DIR)/%.o: $(KERN_IVY_DIR)/%.c 
 	@echo + cc [KERN IVY] $<
 	@mkdir -p $(@D)
 	$(V)$(CC) $(KERN_IVY_CFLAGS) -c -o $@ $<

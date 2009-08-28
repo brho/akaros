@@ -1,6 +1,3 @@
-#ifdef __DEPUTY__
-#pragma noasync
-#endif
 
 #include <arch/mmu.h>
 #include <arch/x86.h>
@@ -12,7 +9,8 @@
 #include <pmap.h>
 #include <trap.h>
 #include <monitor.h>
-#include <env.h>
+#include <process.h>
+#include <stdio.h>
 
 #include <syscall.h>
 
@@ -31,7 +29,7 @@ pseudodesc_t idt_pd = {
  * of functions to be called when servicing an interrupt.  other cores
  * can set up their own later.
  */
-handler_t interrupt_handlers[256];
+handler_t TP(void *) interrupt_handlers[NUM_INTERRUPT_HANDLERS];
 
 static const char *NTS (IN_HANDLER trapname)(int trapno)
 {
@@ -143,7 +141,7 @@ void
 void
 (IN_HANDLER print_trapframe)(trapframe_t *tf)
 {
-	cprintf("TRAP frame at %p on core %d\n", tf, lapic_get_id());
+	cprintf("TRAP frame at %p on core %d\n", tf, core_id());
 	print_regs(&tf->tf_regs);
 	cprintf("  es   0x----%04x\n", tf->tf_es);
 	cprintf("  ds   0x----%04x\n", tf->tf_ds);
@@ -159,8 +157,6 @@ void
 static void
 (IN_HANDLER trap_dispatch)(trapframe_t *tf)
 {
-	env_t* curenv = curenvs[core_id()];
-
 	// Handle processor exceptions.
 	switch(tf->tf_trapno) {
 		case T_BRKPT:
@@ -175,10 +171,10 @@ static void
 			// check for userspace, for now
 			assert(tf->tf_cs != GD_KT);
 			tf->tf_regs.reg_eax =
-				syscall(curenv, tf->tf_regs.reg_eax, tf->tf_regs.reg_edx,
+				syscall(current, tf->tf_regs.reg_eax, tf->tf_regs.reg_edx,
 				        tf->tf_regs.reg_ecx, tf->tf_regs.reg_ebx,
 				        tf->tf_regs.reg_edi, tf->tf_regs.reg_esi);
-			env_run(curenv);
+			proc_startcore(current, tf); // Note the comment in syscall.c
 			break;
 		default:
 			// Unexpected trap: The user process or the kernel has a bug.
@@ -187,7 +183,7 @@ static void
 				panic("Damn Damn!  Unhandled trap in the kernel!");
 			else {
 				warn("Unexpected trap from userspace");
-				env_destroy(curenv);
+				proc_destroy(current);
 				return;
 			}
 	}
@@ -211,9 +207,9 @@ void
 {
 	//cprintf("Incoming TRAP frame at %p\n", tf);
 
-	env_t* curenv = curenvs[lapic_get_id()];
-
-	env_push_ancillary_state(curenv);
+	// TODO: do this once we know we are are not returning to the current
+	// context.  doing it now is safe.
+	env_push_ancillary_state(current);
 
 	if ((tf->tf_cs & ~3) != GD_UT && (tf->tf_cs & ~3) != GD_KT) {
 		print_trapframe(tf);
@@ -224,12 +220,12 @@ void
 		// Trapped from user mode.
 		// TODO: this will change when an env has more than one context
 		// Copy trap frame (which is currently on the stack)
-		// into 'curenv->env_tf', so that running the environment
+		// into 'current->env_tf', so that running the environment
 		// will restart at the trap point.
-		assert(curenv);
-		curenv->env_tf = *tf;
+		assert(current);
+		current->env_tf = *tf;
 		// The trapframe on the stack should be ignored from here on.
-		tf = &curenv->env_tf;
+		tf = &current->env_tf;
 	}
 
 	// Dispatch based on what type of trap occurred
@@ -238,22 +234,21 @@ void
 	// should this be if == 3?  Sort out later when we handle traps.
 	// so far we never get here
 	assert(0);
-        // Return to the current environment, which should be runnable.
-        assert(curenv && curenv->env_status == ENV_RUNNABLE);
-        env_run(curenv);
+	// Return to the current environment, which should be runnable.
+	proc_startcore(current, tf); // Note the comment in syscall.c
 }
 
 void
 (IN_HANDLER irq_handler)(trapframe_t *tf)
 {
-	//if (lapic_get_id())
-	//	cprintf("Incoming IRQ, ISR: %d on core %d\n", tf->tf_trapno, lapic_get_id());		
+	//if (core_id())
+	//	cprintf("Incoming IRQ, ISR: %d on core %d\n", tf->tf_trapno, core_id());
 	// merge this with alltraps?  other than the EOI... or do the same in all traps
 
 	extern handler_wrapper_t handler_wrappers[NUM_HANDLER_WRAPPERS];
 
 	// determine the interrupt handler table to use.  for now, pick the global
-	handler_t* handler_tbl = interrupt_handlers;
+	handler_t TP(void *) * handler_tbl = interrupt_handlers;
 
 	if (handler_tbl[tf->tf_trapno].isr != 0)
 		handler_tbl[tf->tf_trapno].isr(tf, handler_tbl[tf->tf_trapno].data);
@@ -281,7 +276,7 @@ void
 }
 
 void
-register_interrupt_handler(handler_t table[], uint8_t int_num, isr_t handler,
+register_interrupt_handler(handler_t TP(TV(t)) table[], uint8_t int_num, poly_isr_t handler,
                            void* data)
 {
 	table[int_num].isr = handler;
@@ -309,7 +304,7 @@ page_fault_handler(trapframe_t *tf)
 
 	// Call the environment's page fault upcall, if one exists.  Set up a
 	// page fault stack frame on the user exception stack (below
-	// UXSTACKTOP), then branch to curenv->env_pgfault_upcall.
+	// UXSTACKTOP), then branch to current->env_pgfault_upcall.
 	//
 	// The page fault upcall might cause another page fault, in which case
 	// we branch to the page fault upcall recursively, pushing another
@@ -329,17 +324,16 @@ page_fault_handler(trapframe_t *tf)
 	//
 	// Hints:
 	//   user_mem_assert() and env_run() are useful here.
-	//   To change what the user environment runs, modify 'curenv->env_tf'
-	//   (the 'tf' variable points at 'curenv->env_tf').
+	//   To change what the user environment runs, modify 'current->env_tf'
+	//   (the 'tf' variable points at 'current->env_tf').
 
 	// LAB 4: Your code here.
 
 	// Destroy the environment that caused the fault.
-	env_t* curenv = curenvs[lapic_get_id()];
 	cprintf("[%08x] user fault va %08x ip %08x from core %d\n",
-		curenv->env_id, fault_va, tf->tf_eip, lapic_get_id());
+		current->env_id, fault_va, tf->tf_eip, core_id());
 	print_trapframe(tf);
-	env_destroy(curenv);
+	proc_destroy(current);
 }
 
 void sysenter_init(void)
@@ -352,17 +346,22 @@ void sysenter_init(void)
 /* This is called from sysenter's asm, with the tf on the kernel stack. */
 void sysenter_callwrapper(struct Trapframe *tf)
 {
-	env_t* curenv = curenvs[lapic_get_id()];
-	curenv->env_tf = *tf;
+	current->env_tf = *tf;
 	
 	// The trapframe on the stack should be ignored from here on.
-	tf = &curenv->env_tf;
-	tf->tf_regs.reg_eax = (intreg_t) syscall(curenv,
+	tf = &current->env_tf;
+	tf->tf_regs.reg_eax = (intreg_t) syscall(current,
 	                                         tf->tf_regs.reg_eax,
 	                                         tf->tf_regs.reg_edx,
 	                                         tf->tf_regs.reg_ecx,
 	                                         tf->tf_regs.reg_ebx,
 	                                         tf->tf_regs.reg_edi,
 	                                         0);
-	env_run(curenv);
+	/*
+	 * careful here - we need to make sure that this current is the right
+	 * process, which could be weird if the syscall blocked.  it would need to
+	 * restore the proper value in current before returning to here.
+	 * likewise, tf could be pointing to random gibberish.
+	 */
+	proc_startcore(current, tf);
 }

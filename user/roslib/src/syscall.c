@@ -1,7 +1,4 @@
 // System call stubs.
-#ifdef __DEPUTY__
-#pragma nodeputy
-#endif
 
 #include <arch/types.h>
 #include <arch/arch.h>
@@ -12,25 +9,25 @@ intreg_t syscall(uint16_t num, intreg_t a1,
                 intreg_t a2, intreg_t a3,
                 intreg_t a4, intreg_t a5);
 
-static error_t async_syscall(syscall_req_t* req, syscall_desc_t* desc)
+static error_t async_syscall(syscall_req_t *COUNT(1) req, syscall_desc_t* desc)
 {
 	// Note that this assumes one global frontring (TODO)
 	// abort if there is no room for our request.  ring size is currently 64.
 	// we could spin til it's free, but that could deadlock if this same thread
 	// is supposed to consume the requests it is waiting on later.
-	if (RING_FULL(&sysfrontring))
+	if (RING_FULL(&syscallfrontring))
 		return -EBUSY;
 	// req_prod_pvt comes in as the previously produced item.  need to
 	// increment to the next available spot, which is the one we'll work on.
 	// at some point, we need to listen for the responses.
-	desc->idx = ++(sysfrontring.req_prod_pvt);
-	desc->sysfr = &sysfrontring;
-	syscall_req_t* r = RING_GET_REQUEST(&sysfrontring, desc->idx);
+	desc->idx = ++(syscallfrontring.req_prod_pvt);
+	desc->sysfr = &syscallfrontring;
+	syscall_req_t* r = RING_GET_REQUEST(&syscallfrontring, desc->idx);
 	memcpy(r, req, sizeof(syscall_req_t));
-	// push our updates to sysfrontring.req_prod_pvt
-	RING_PUSH_REQUESTS(&sysfrontring);
+	// push our updates to syscallfrontring.req_prod_pvt
+	RING_PUSH_REQUESTS(&syscallfrontring);
 	//cprintf("DEBUG: sring->req_prod: %d, sring->rsp_prod: %d\n", \
-	        sysfrontring.sring->req_prod, sysfrontring.sring->rsp_prod);
+	        syscallfrontring.sring->req_prod, syscallfrontring.sring->rsp_prod);
 	return 0;
 }
 
@@ -109,19 +106,19 @@ uint16_t sys_cgetc(void)
 	return syscall(SYS_cgetc, 0, 0, 0, 0, 0);
 }
 
-envid_t sys_getcpuid(void)
+size_t sys_getcpuid(void)
 {
 	return syscall(SYS_getcpuid, 0, 0, 0, 0, 0);
 }
 
-envid_t sys_getenvid(void)
+int sys_getpid(void)
 {
-	return syscall(SYS_getenvid, 0, 0, 0, 0, 0);
+	return syscall(SYS_getpid, 0, 0, 0, 0, 0);
 }
 
-error_t sys_env_destroy(envid_t envid)
+error_t sys_proc_destroy(int pid)
 {
-	return syscall(SYS_env_destroy, envid, 0, 0, 0, 0);
+	return syscall(SYS_proc_destroy, pid, 0, 0, 0, 0);
 }
 
 void sys_yield(void)

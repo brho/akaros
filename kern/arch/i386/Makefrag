@@ -5,6 +5,7 @@
 #
 
 KERN_ARCH_SRC_DIR = $(KERN_DIR)/arch/$(TARGET_ARCH)
+OBJDIRS += $(KERN_ARCH_SRC_DIR)
 
 # entry.S must be first, so that it's the first code in the text segment!!!
 #
@@ -15,6 +16,8 @@ KERN_ARCH_SRCFILES := $(KERN_ARCH_SRC_DIR)/entry.S \
                       $(KERN_ARCH_SRC_DIR)/cpuinfo.c \
                       $(KERN_ARCH_SRC_DIR)/console.c \
                       $(KERN_ARCH_SRC_DIR)/smp_boot.c \
+                      $(KERN_ARCH_SRC_DIR)/colored_caches.c \
+                      $(KERN_ARCH_SRC_DIR)/page_alloc.c \
                       $(KERN_ARCH_SRC_DIR)/pmap.c \
                       $(KERN_ARCH_SRC_DIR)/trapentry.S \
                       $(KERN_ARCH_SRC_DIR)/trap.c \

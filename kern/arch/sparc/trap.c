@@ -2,10 +2,11 @@
 #include <assert.h>
 #include <arch/trap.h>
 #include <string.h>
-#include <env.h>
+#include <process.h>
 #include <syscall.h>
 #include <monitor.h>
 #include <manager.h>
+#include <stdio.h>
 #include <smp.h>
 
 #ifdef __DEPUTY__
@@ -25,9 +26,8 @@ sysenter_init(void)
 void
 trap_handled(void)
 {
-	env_t* curenv = curenvs[core_id()];
-	if(curenv)
-		env_run(curenv);
+	if(current)
+		proc_startcore(current,&current->env_tf);
 	else if(core_id() == 0)
 		manager();
 	else
@@ -108,14 +108,11 @@ void
 trap(trapframe_t* state, active_message_t* msg,
      void (*handler)(trapframe_t*,active_message_t*))
 {
-	env_t* curenv = curenvs[core_id()];
-	//assert(curenv);
-
 	// TODO: this will change with multicore processes
-	if(curenv)
+	if(current)
 	{
-		curenv->env_tf = *state;
-		handler(&curenv->env_tf,msg);
+		current->env_tf = *state;
+		handler(&current->env_tf,msg);
 	}
 	else
 		handler(state,msg);
@@ -134,7 +131,6 @@ void
 unhandled_trap(trapframe_t* state)
 {
 	char buf[TRAPNAME_MAX];
-	env_t* curenv = curenvs[core_id()];
 	uint32_t trap_type = (state->tbr >> 4) & 0xFF;
 	get_trapname(trap_type,buf);
 
@@ -145,8 +141,8 @@ unhandled_trap(trapframe_t* state)
 	else
 	{
 		warn("Unhandled trap in user!\nTrap type: %s",buf);
-		assert(curenv);
-		env_destroy(curenv);
+		assert(current);
+		proc_destroy(current);
 		panic("I shouldn't have gotten here!");
 	}
 }
@@ -212,8 +208,6 @@ fp_disabled(trapframe_t* state)
 void
 handle_syscall(trapframe_t* state)
 {
-	env_t* curenv = curenvs[core_id()];
-
 	uint32_t num = state->gpr[1];
 	uint32_t a1 = state->gpr[8];
 	uint32_t a2 = state->gpr[9];
@@ -225,9 +219,9 @@ handle_syscall(trapframe_t* state)
 	state->pc = state->npc;
 	state->npc += 4;
 
-	env_push_ancillary_state(curenv);
+	env_push_ancillary_state(current);
 
-	state->gpr[8] = syscall(curenv,num,a1,a2,a3,a4,a5);
+	state->gpr[8] = syscall(current,num,a1,a2,a3,a4,a5);
 
 	trap_handled();
 }
@@ -266,7 +260,7 @@ handle_breakpoint(trapframe_t* state)
 	state->pc = state->npc;
 	state->npc += 4;
 
-	env_push_ancillary_state(state);
+	env_push_ancillary_state(current);
 
 	// run the monitor
 	monitor(state);
