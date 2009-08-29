@@ -53,8 +53,7 @@ void page_init(void)
 	 * 'npages' equals the number of physical pages in memory.
 	 * round up to the nearest page
 	 */
-	size_t page_array_size = ROUNDUP(npages*sizeof(page_t), PGSIZE);
-	pages = (page_t*)boot_alloc(page_array_size, PGSIZE);
+	pages = (page_t*)boot_alloc(npages*sizeof(page_t), PGSIZE);
 	memset(pages, 0, npages*sizeof(page_t));
 
 	/*

@@ -41,11 +41,15 @@ void kernel_init(multiboot_info_t *mboot_info)
 
 	print_cpuinfo();
 
-	// zra: using KADDR macro gives a runtime warning, but it is possibly more
-    //      clear what's going on this way?
+	// Old way, pre Zach's Ivy annotations
 	//multiboot_detect_memory((multiboot_info_t*)((uint32_t)mboot_info + KERNBASE));
 	//multiboot_print_memory_map((multiboot_info_t*)((uint32_t)mboot_info + KERNBASE));
-	multiboot_detect_memory((multiboot_info_t*COUNT(1))KADDR((physaddr_t)mboot_info));
+	
+	// Paul: Can't use KADDR as arg to multiboot_detect_memory
+	//  since multiboot_detect_memory is what sets npages. 
+	//  Must simulate KADDR macro (ugly).
+	multiboot_detect_memory((multiboot_info_t*SAFE)(void*TRUSTED)((physaddr_t)mboot_info + KERNBASE));
+	
 	multiboot_print_memory_map((multiboot_info_t*COUNT(1))KADDR((physaddr_t)mboot_info));
 
 	vm_init();
