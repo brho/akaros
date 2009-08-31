@@ -91,6 +91,12 @@ env_init(void)
 	int i;
 
 	schedule_init();
+	// core 0 is not idle, all others are (for now)
+	spin_lock(&idle_lock);
+	num_idlecores = num_cpus - 1;
+	for (i = 0; i < num_idlecores; i++)
+		idlecoremap[i] = i + 1;
+	spin_unlock(&idle_lock);
 	atomic_init(&num_envs, 0);
 	TAILQ_INIT(&proc_freelist);
 	assert(envs != NULL);
@@ -282,7 +288,7 @@ env_alloc(env_t **newenv_store, envid_t parent_id)
 
 	memset(&e->env_ancillary_state, 0, sizeof(e->env_ancillary_state));
 	memset(&e->env_tf, 0, sizeof(e->env_tf));
-	env_init_trapframe(&e->env_tf);
+	proc_init_trapframe(&e->env_tf);
 
 	/*
 	 * Initialize the contents of the e->env_procinfo structure
@@ -414,7 +420,7 @@ load_icode(env_t *SAFE e, uint8_t *COUNT(size) binary, size_t size)
 		memset((void*)phdr.p_va + phdr.p_filesz, 0, phdr.p_memsz - phdr.p_filesz);
 	}}
 
-	env_set_program_counter(e, elfhdr.e_entry);
+	proc_set_program_counter(&e->env_tf, elfhdr.e_entry);
 	e->env_entry = elfhdr.e_entry;
 
 	// Now map one page for the program's initial stack

@@ -21,5 +21,6 @@ int mon_nanwan(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
 int mon_kfs_ls(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
 int mon_kfs_run(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
 int mon_manager(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
+int mon_procinfo(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
 
 #endif	// !ROS_KERN_MONITOR_H

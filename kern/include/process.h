@@ -36,6 +36,10 @@ extern spinlock_t freelist_lock;
 extern struct proc_list proc_runnablelist;
 extern spinlock_t runnablelist_lock;
 
+extern spinlock_t idle_lock;
+extern uint32_t idlecoremap[MAX_NUM_CPUS];
+extern uint32_t num_idlecores;
+
 int proc_set_state(struct proc *p, uint32_t state) WRITES(p->state);
 struct proc *get_proc(unsigned pid);
 bool proc_controls(struct proc *SAFE actor, struct proc *SAFE target);
@@ -44,6 +48,10 @@ void proc_run(struct proc *SAFE p);
 void (proc_startcore)(struct proc *SAFE p, trapframe_t *SAFE tf)
      __attribute__((noreturn));
 void (proc_destroy)(struct proc *SAFE p);
+void proc_destroy(struct proc *SAFE p);
+void proc_init_trapframe(trapframe_t *SAFE tf);
+void proc_set_program_counter(trapframe_t *SAFE tf, uintptr_t pc);
+void proc_set_tfcoreid(trapframe_t *SAFE tf, uint32_t id);
 
 /* The reference counts are mostly to track how many cores loaded the cr3 */
 error_t proc_incref(struct proc *SAFE p);
@@ -54,5 +62,8 @@ void __startcore(trapframe_t *tf, uint32_t srcid, uint32_t a0, uint32_t a1,
                  uint32_t a2);
 void __death(trapframe_t *tf, uint32_t srcid, uint32_t a0, uint32_t a1,
              uint32_t a2);
+
+/* Degubbing */
+void print_idlecoremap(void);
 
 #endif // !ROS_KERN_PROCESS_H

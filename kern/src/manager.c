@@ -31,44 +31,52 @@ void manager(void)
 {
 	static uint8_t progress = 0;
 	struct proc *envs[256];
-
-struct proc *p = kfs_proc_create(kfs_lookup_path("roslib_mhello"));
-// being proper and all:
-proc_set_state(p, PROC_RUNNABLE_S);
-proc_set_state(p, PROC_RUNNING_S);
-proc_set_state(p, PROC_RUNNABLE_M);
-// set vcoremap with dispatch plan.  usually done by schedule()
-spin_lock_irqsave(&p->proc_lock);
-p->num_vcores = 5;
-for (int i = 0; i < 5; i++)
-	p->vcoremap[i] = i + 1; // vcore0 -> pcore1, etc, for 3 cores
-spin_unlock_irqsave(&p->proc_lock);
-proc_run(p);
-udelay(5000000);
-printk("Killing p\n");
-proc_destroy(p);
-printk("Killed p\n");
-udelay(5000000);
-panic("This is okay");
+	struct proc *p ;
 
 	switch (progress++) {
 		case 0:
+			// Here's how to do a multicored/parallel process:
+			p = kfs_proc_create(kfs_lookup_path("roslib_mhello"));
+			// being proper and all:
+			proc_set_state(p, PROC_RUNNABLE_S);
+			proc_set_state(p, PROC_RUNNING_S);
+			proc_set_state(p, PROC_RUNNABLE_M);
+	
+			// set vcoremap with dispatch plan.  usually done by schedule()
+			spin_lock_irqsave(&p->proc_lock);
+			p->num_vcores = 5; // assuming 5 are free, this is just an example
+			spin_lock(&idle_lock); // need to grab the cores
+			for (int i = 0; i < 5; i++) {
+ 				// grab the last one on the list
+				p->vcoremap[i] = idlecoremap[num_idlecores-1];
+				num_idlecores--;
+			}
+			spin_unlock(&idle_lock);
+			spin_unlock_irqsave(&p->proc_lock);
+			proc_run(p);
+			udelay(5000000);
+			printk("Killing p\n");
+			proc_destroy(p);
+			printk("Killed p\n");
+			udelay(1000000);
+			panic("This is okay");
+			break;
+		case 1:
 			envs[0] = kfs_proc_create(kfs_lookup_path("roslib_hello"));
 			proc_set_state(envs[0], PROC_RUNNABLE_S);
 			proc_run(envs[0]);
 			break;
 	#ifdef __i386__
-		case 1:
+		case 2:
 			panic("Do not panic");
 			envs[0] = kfs_proc_create(kfs_lookup_path("parlib_channel_test_client"));
 			envs[1] = kfs_proc_create(kfs_lookup_path("parlib_channel_test_server"));
 			smp_call_function_single(1, run_env_handler, envs[0], 0);
 			smp_call_function_single(2, run_env_handler, envs[1], 0);
 			break;
-		case 2:
 		case 3:
 	#else // sparc
-		case 1:
+		case 2:
 			panic("Do not panic");
 			envs[0] = kfs_proc_create(kfs_lookup_path("roslib_proctests"));
 			envs[1] = kfs_proc_create(kfs_lookup_path("roslib_proctests"));
@@ -80,7 +88,7 @@ panic("This is okay");
 			envs[6] = kfs_proc_create(kfs_lookup_path("roslib_null"));
 			proc_run(envs[0]);
 			break;
-		case 2:
+		case 3:
 			#if 0
 			// reminder of how to spawn remotely
 			for (int i = 0; i < 8; i++) {
@@ -90,7 +98,6 @@ panic("This is okay");
 			}
 			process_workqueue();
 			#endif
-		case 3:
 	#endif
 
 		#if 0

@@ -51,30 +51,6 @@ void env_pop_tf(trapframe_t *tf)
 	}
 }
 
-void
-env_set_program_counter(env_t* e, uintptr_t pc)
-{
-	e->env_tf.tf_eip = pc;
-}
-
-void
-env_init_trapframe(trapframe_t *tf)
-{
-	// Set up appropriate initial values for the segment registers.
-	// GD_UD is the user data segment selector in the GDT, and
-	// GD_UT is the user text segment selector (see inc/memlayout.h).
-	// The low 2 bits of each segment register contains the
-	// Requestor Privilege Level (RPL); 3 means user mode.
-	tf->tf_ds = GD_UD | 3;
-	tf->tf_es = GD_UD | 3;
-	tf->tf_ss = GD_UD | 3;
-	tf->tf_esp = USTACKTOP;
-	tf->tf_cs = GD_UT | 3;
-	// You will set e->env_tf.tf_eip later.
-	// set the env's EFLAGSs to have interrupts enabled
-	tf->tf_eflags |= 0x00000200; // bit 9 is the interrupts-enabled
-}
-
 // Flush all mapped pages in the user portion of the address space
 void
 env_user_mem_free(env_t* e)

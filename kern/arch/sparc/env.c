@@ -81,14 +81,14 @@ void
 }
 
 void
-env_set_program_counter(env_t* e, uintptr_t pc)
+proc_set_program_counter(trapframe_t *tf, uintptr_t pc)
 {
-	e->env_tf.pc = pc;
-	e->env_tf.npc = pc+4;
+	tf->pc = pc;
+	tf->npc = pc+4;
 }
 
 void
-env_init_trapframe(trapframe_t *tf)
+proc_init_trapframe(trapframe_t *tf)
 {
 	extern char trap_table;
 

@@ -26,8 +26,8 @@ vpd:
 .globl _start
 _start:
 	// See if we are a new core
-	cmpl $1, %eax
-	je new_core
+	cmpl $0, %eax
+	jne new_core
 
 	// See if we were started with arguments on the stack
 	cmpl $USTACKTOP, %esp

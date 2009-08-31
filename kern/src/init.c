@@ -58,14 +58,13 @@ void kernel_init(multiboot_info_t *mboot_info)
 	page_init();
 	page_check();
 
-	env_init();
-
 	idt_init();
 	sysenter_init();
 	timer_init();
 
 	// this returns when all other cores are done and ready to receive IPIs
 	smp_boot();
+	env_init();
 
 	manager();
 }

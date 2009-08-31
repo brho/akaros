@@ -322,10 +322,12 @@ user_mem_strlcpy(env_t *env, char *dst, const char *DANGEROUS va,
 	if (len > 0) {
 		while (1) {
 			char *c;
+			// what if len was 1?
 			if (--len <= 0) break;
 			c = user_mem_check(env, src, 1, perm);
 			if (!c) break;
 			if (*c == '\0') break;
+			// TODO: ivy bitches about this
 			*dst++ = *c;
 			src++;
 		}

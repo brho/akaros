@@ -45,6 +45,7 @@ static command_t commands[] = {
 	{ "kfs_ls", "List files in KFS", mon_kfs_ls},
 	{ "kfs_run", "Create and run a program from KFS", mon_kfs_run},
 	{ "manager", "Run the manager", mon_manager},
+	{ "procinfo", "Show information about processes", mon_procinfo},
 };
 #define NCOMMANDS (sizeof(commands)/sizeof(commands[0]))
 
@@ -262,6 +263,23 @@ int mon_kfs_run(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 	// also note you may not get the process you created, in the event there
 	// are others floating around that are runnable
 	schedule();
+	return 0;
+}
+
+int mon_procinfo(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
+{
+	if (argc != 2) {
+		printk("Usage: procinfo OPTION\n");
+		printk("\tidle_cores: show idle core map\n");
+		printk("\trunnable: show proc_runnablelist\n");
+		return 1;
+	}
+	if (!strcmp(argv[1], "idle_cores"))
+		print_idlecoremap();
+	else if (!strcmp(argv[1], "runnable"))
+		dump_proclist(&proc_runnablelist);
+	else
+		printk("Bad option\n");
 	return 0;
 }
 

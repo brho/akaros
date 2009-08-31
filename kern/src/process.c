@@ -26,6 +26,12 @@ spinlock_t freelist_lock = 0;
 struct proc_list proc_runnablelist = TAILQ_HEAD_INITIALIZER(proc_runnablelist);
 spinlock_t runnablelist_lock = 0;
 
+/* Tracks which cores are idle, similar to the vcoremap.  Each value is the
+ * physical coreid of an unallocated core. */
+spinlock_t idle_lock = 0;
+uint32_t idlecoremap[MAX_NUM_CPUS];
+uint32_t num_idlecores = 0;
+
 /*
  * While this could be done with just an assignment, this gives us the
  * opportunity to check for bad transitions.  Might compile these out later, so
@@ -148,7 +154,7 @@ void proc_run(struct proc *p)
 				 * there is a free active message slot, which could lock up the
 				 * system.  think about this. (TODO) */
 				for (int i = 1; i < p->num_vcores; i++)
-					send_active_msg_sync(p->vcoremap[i], __startcore, p, 0, 0);
+					send_active_msg_sync(p->vcoremap[i], __startcore, p, 0, i);
 			}
 			/* There a subtle (attempted) race avoidance here.  proc_startcore
 			 * can handle a death message, but we can't have the startcore come
@@ -286,13 +292,28 @@ void proc_destroy(struct proc *p)
 			}
 			#endif
 			send_active_msg_sync(p->vcoremap[0], __death, 0, 0, 0);
+			#if 0
+			/* right now, RUNNING_S only runs on a mgmt core (0), not cores
+			 * managed by the idlecoremap.  so don't do this yet. */
+			spin_lock(&idle_lock);
+			idlecoremap[num_idlecores++] = p->vcoremap[0];
+			spin_unlock(&idle_lock);
+			#endif
 			break;
 		case PROC_RUNNING_M:
-			/* Send the DEATH message to every core running this process. */
-			for (int i = 0; i < p->num_vcores; i++)
+			/* Send the DEATH message to every core running this process, and
+			 * deallocate the cores.
+			 * The rule is that the vcoremap is set before proc_run, and reset
+			 * within proc_destroy */
+			spin_lock(&idle_lock);
+			for (int i = 0; i < p->num_vcores; i++) {
 				send_active_msg_sync(p->vcoremap[i], __death, 0, 0, 0);
-			/* TODO: might need to update the pcoremap that's currently in
-			 * schedule, though probably not. */
+				// give the pcore back to the idlecoremap
+				assert(num_idlecores < num_cpus); // sanity
+				idlecoremap[num_idlecores++] = p->vcoremap[i];
+				p->vcoremap[i] = 0; // TODO: might need a better signal
+			}
+			spin_unlock(&idle_lock);
 			break;
 		default:
 			panic("Weird state in proc_destroy");
@@ -382,4 +403,56 @@ void proc_decref(struct proc *p)
 	// if we hit 0, no one else will increment and we can check outside the lock
 	if (!refcnt)
 		env_free(p);
+}
+
+/* Active message handler to start a process's context on this core.  Tightly
+ * coupled with proc_run() */
+void __startcore(trapframe_t *tf, uint32_t srcid, uint32_t a0, uint32_t a1,
+                 uint32_t a2)
+{
+	uint32_t coreid = core_id();
+	struct proc *p_to_run = (struct proc *SAFE) TC(a0);
+	trapframe_t local_tf;
+	trapframe_t *tf_to_pop = (trapframe_t *SAFE) TC(a1);
+
+	printk("Startcore on core %d\n", coreid);
+	assert(p_to_run);
+	// TODO: handle silly state (HSS)
+	if (!tf_to_pop) {
+		tf_to_pop = &local_tf;
+		memset(tf_to_pop, 0, sizeof(*tf_to_pop));
+		proc_init_trapframe(tf_to_pop);
+		// Note the init_tf sets tf_to_pop->tf_esp = USTACKTOP;
+		proc_set_tfcoreid(tf_to_pop, a2);
+		proc_set_program_counter(tf_to_pop, p_to_run->env_entry);
+	}
+	proc_startcore(p_to_run, tf_to_pop);
+}
+
+/* Active message handler to stop running whatever context is on this core and
+ * to idle.  Note this leaves no trace of what was running.
+ * It's okay if death comes to a core that's already idling and has no current.
+ * It could happen if a process decref'd before proc_startcore could incref. */
+void __death(trapframe_t *tf, uint32_t srcid, uint32_t a0, uint32_t a1,
+             uint32_t a2)
+{
+	/* If we are currently running an address space on our core, we need a known
+	 * good pgdir before releasing the old one.  This is currently the major
+	 * practical implication of the kernel caring about a processes existence
+	 * (the inc and decref).  This decref corresponds to the incref in
+	 * proc_startcore (though it's not the only one). */
+	if (current) {
+		lcr3(boot_cr3);
+		proc_decref(current);
+		current = NULL;
+	}
+	smp_idle();
+}
+
+void print_idlecoremap(void)
+{
+	spin_lock(&idle_lock);
+	for (int i = 0; i < num_idlecores; i++)
+		printk("idlecoremap[%d] = %d\n", i, idlecoremap[i]);
+	spin_unlock(&idle_lock);
 }
