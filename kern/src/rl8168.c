@@ -98,7 +98,7 @@ void rl8168_init() {
 
 int rl8168_scan_pci() {
 	
-	extern pci_dev_entry pci_dev_map[PCI_MAX_BUS][PCI_MAX_DEV][PCI_MAX_FUNC];
+	extern pci_dev_entry_t pci_dev_map[PCI_MAX_BUS][PCI_MAX_DEV][PCI_MAX_FUNC];
 	extern uint16_t pci_irq_map[PCI_MAX_BUS][PCI_MAX_DEV][PCI_MAX_FUNC];
 
 	cprintf("Searching for RealTek 8168 Network device...");
@@ -107,10 +107,10 @@ int rl8168_scan_pci() {
 		for (int j = 0; j < PCI_MAX_DEV; j++)
 			for (int k = 0; k < PCI_MAX_FUNC; k++) {
 				uint32_t address;
-				uint32_t lbus = i;
-				uint32_t ldev = j;
-				uint32_t lfunc = k;
-				uint32_t lreg = 0; 
+				uint32_t bus = i;
+				uint32_t dev = j;
+				uint32_t func = k;
+				uint32_t reg = 0; 
 				uint32_t result  = 0;
 	
 				uint16_t dev_id = pci_dev_map[i][j][k].dev_id;
@@ -131,8 +131,8 @@ int rl8168_scan_pci() {
 
 				// Loop over the BARs
 				for (int k = 0; k <= 5; k++) {
-					lreg = 4 + k;
-					address = MK_CONFIG_ADDR(lbus, ldev, lfunc, lreg << 2);	
+					reg = 4 + k;
+					address = MK_CONFIG_ADDR(bus, dev, func, reg << 2);	
 			        outl(PCI_CONFIG_ADDR, address);
 			        result = inl(PCI_CONFIG_DATA);
 					

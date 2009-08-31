@@ -44,7 +44,7 @@ void ne2k_init() {
 
 int ne2k_scan_pci() {
 	
-	extern pci_dev_entry pci_dev_map[PCI_MAX_BUS][PCI_MAX_DEV][PCI_MAX_FUNC];
+	extern pci_dev_entry_t pci_dev_map[PCI_MAX_BUS][PCI_MAX_DEV][PCI_MAX_FUNC];
 	extern uint16_t pci_irq_map[PCI_MAX_BUS][PCI_MAX_DEV][PCI_MAX_FUNC];
 
 	cprintf("Searching for NE2000 Network device...");

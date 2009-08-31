@@ -14,12 +14,8 @@
 #define packet_wrap rl8168_packet_wrap
 #define send_frame rl8168_send_frame
 
-#define NE2K_IRQ_CPU			5
+#define NE2K_IRQ_CPU		5
 
-// Macro for formatting PCI Configuration Address queries
-#define MK_CONFIG_ADDR(BUS, DEV, FUNC, REG) (unsigned long)( (BUS << 16) | (DEV << 11) | \
-                                                             (FUNC << 8) | REG  | \
-                                                             ((uint32_t)0x80000000))
 #define REALTEK_VENDOR_ID   0x10ec
 #define REALTEK_DEV_ID      0x8168
 

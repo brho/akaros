@@ -24,6 +24,8 @@
 #include <stdio.h>
 #include <kfs.h> // eventually replace this with vfs.h
 
+static void sys_yield(struct proc *p);
+
 //Do absolutely nothing.  Used for profiling.
 static void sys_null(void)
 {
@@ -66,11 +68,12 @@ static ssize_t sys_run_binary(env_t* e, void *binary_buf, void* arg, size_t len)
 		return -ENOMEM;
 	memcpy(new_binary, binary_buf, len);
 
-        env_t* env = env_create((uint8_t*)new_binary, len);
+	env_t* env = env_create((uint8_t*)new_binary, len);
 	kfree(new_binary);
 	proc_set_state(env, PROC_RUNNABLE_S);
-        proc_run(env);
-
+	schedule_proc(env);
+	sys_yield(e);
+	
 	return 0;
 }
 
