@@ -12,7 +12,7 @@
 #include <ros/syscall.h>
 #include <ros/error.h>
 #include <ros/procdata.h>
-#include <newlib_backend.h>
+#include <errno.h>
 
 enum {
 	PG_RDONLY = 4,
