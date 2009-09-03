@@ -628,6 +628,23 @@ pgdir_walk(pde_t *pgdir, const void *SNT va, int create)
 	return &((pde_t*COUNT(NPTENTRIES))KADDR(PTE_ADDR(*the_pde)))[PTX(va)];
 }
 
+/* Returns the effective permissions for PTE_U, PTE_W, and PTE_P on a given
+ * virtual address.  Note we need to consider the composition of every PTE in
+ * the page table walk. */
+int get_va_perms(pde_t *pgdir, const void *SNT va)
+{
+	pde_t the_pde = pgdir[PDX(va)];
+	pte_t the_pte = 0;
+
+	if (!(the_pde & PTE_P))
+		return 0;
+	if (the_pde & PTE_PS)
+		return the_pde & (PTE_U | PTE_W | PTE_P);
+	// else
+	the_pte = ((pde_t*COUNT(NPTENTRIES))KADDR(PTE_ADDR(the_pde)))[PTX(va)];
+	return the_pte & the_pde & (PTE_U | PTE_W | PTE_P);
+}
+
 /* Flushes a TLB, including global pages.  We should always have the CR4_PGE
  * flag set, but just in case, we'll check.  Toggling this bit flushes the TLB.
  */

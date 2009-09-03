@@ -238,7 +238,9 @@ void tlb_invalidate(pde_t *pgdir, void *va)
  * @brief Check that an environment is allowed to access the range of memory
  * [va, va+len) with permissions 'perm | PTE_P'.
  *
- * Normally 'perm' will contain PTE_U at least, but this is not required.
+ * Normally 'perm' will contain PTE_U at least, but this is not required.  The
+ * function get_va_perms only checks for PTE_U, PTE_W, and PTE_P.  It won't
+ * check for things like PTE_PS, PTE_A, etc.
  * 'va' and 'len' need not be page-aligned;
  *
  * A user program can access a virtual address if:
@@ -266,7 +268,7 @@ void* user_mem_check(env_t *env, const void *DANGEROUS va, size_t len, int perm)
 	// kernel is uninterruptible
 	void *DANGEROUS start, *DANGEROUS end;
 	size_t num_pages, i;
-	pte_t *pte;
+	int page_perms = 0;
 
 	perm |= PTE_P;
 	start = ROUNDDOWN((void*DANGEROUS)va, PGSIZE);
@@ -277,9 +279,9 @@ void* user_mem_check(env_t *env, const void *DANGEROUS va, size_t len, int perm)
 	}
 	num_pages = PPN(end - start);
 	for (i = 0; i < num_pages; i++, start += PGSIZE) {
-		pte = pgdir_walk(env->env_pgdir, start, 0);
+		page_perms = get_va_perms(env->env_pgdir, start);
 		// ensures the bits we want on are turned on.  if not, error out
-		if ( !pte || ((*pte & perm) != perm) ) {
+		if ((page_perms & perm) != perm) {
 			if (i == 0)
 				user_mem_check_addr = (void*DANGEROUS)va;
 			else

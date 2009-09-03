@@ -114,6 +114,14 @@ pgdir_walk(pde_t* l1pt, const void*SNT va, int create)
 	l3pte = &l3pt[L3X(va)];
 	return l3pte;
 }
+
+/* TODO: this is probably wrong, since it only returns the pte as if it were the
+ * perms. */
+int get_va_perms(pde_t *pgdir, const void *SNT va)
+{
+	return (int)pgdir_walk(pgdir, va, 0);
+}
+
 void
 page_check(void)
 {

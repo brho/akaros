@@ -82,7 +82,8 @@ error_t
 memcpy_from_user(env_t* env, void* COUNT(len) dest,
                  const void *DANGEROUS va, size_t len);
                  
-pte_t *pgdir_walk(pde_t *COUNT(NPDENTRIES) pgdir, const void *SNT va, int create);                 
+pte_t *pgdir_walk(pde_t *COUNT(NPDENTRIES) pgdir, const void *SNT va, int create);
+int get_va_perms(pde_t *pgdir, const void *SNT va);
 
 static inline page_t *SAFE ppn2page(size_t ppn)
 {
