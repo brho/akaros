@@ -1,7 +1,7 @@
 #ifndef ROS_KERN_ATOMIC_H
 #define ROS_KERN_ATOMIC_H
 
-#include <arch/types.h>
+#include <ros/common.h>
 #include <arch/mmu.h>
 #include <arch/atomic.h>
 #include <arch/arch.h>
@@ -15,13 +15,15 @@ static inline void
 typedef struct checklist_mask {
 	// only need an uint8_t, but we need the bits[] to be word aligned
 	uint32_t size;
-	volatile uint8_t (COUNT(BYTES_FOR_BITMASK(size)) bits)[];
+	volatile uint8_t (COUNT(BYTES_FOR_BITMASK(size)) bits)[MAX_NUM_CPUS];
 } checklist_mask_t;
 
 // mask contains an unspecified array, so it needs to be at the bottom
 typedef struct checklist {
 	volatile uint32_t lock;
 	checklist_mask_t mask;
+	// eagle-eyed readers may know why this might have been needed. 2009-09-04
+	//volatile uint8_t (COUNT(BYTES_FOR_BITMASK(size)) bits)[];
 } checklist_t;
 
 #define ZEROS_ARRAY(size) {[0 ... ((size)-1)] 0}

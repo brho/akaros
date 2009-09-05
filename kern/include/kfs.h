@@ -15,11 +15,8 @@
 #ifndef ROS_KERN_KFS_H
 #define ROS_KERN_KFS_H
 
-#include <arch/types.h>
+#include <ros/common.h>
 #include <process.h>
-
-// zra : putting nodeputy in header files makes life difficult.
-//#pragma nodeputy
 
 struct kfs_entry {
 	char (NT name)[256];

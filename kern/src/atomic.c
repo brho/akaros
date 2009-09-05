@@ -37,7 +37,7 @@ int commit_checklist_wait(checklist_t* list, checklist_mask_t* mask)
 int commit_checklist_nowait(checklist_t* list, checklist_mask_t* mask)
 {
 	int e = 0;
-	if (e = commit_checklist_wait(list, mask))
+	if ((e = commit_checklist_wait(list, mask)))
 		return e;
 	// give up the lock, since we won't wait for completion
 	spin_unlock_irqsave(&list->lock);

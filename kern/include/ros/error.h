@@ -3,8 +3,12 @@
 #ifndef ROS_INC_ERROR_H
 #define ROS_INC_ERROR_H
 
+#include <ros/common.h>
+
 #define DECLARE_ERROR_CODE(e, s)
 
+// define this to prevent conflicts with newlib's errno.h
+#define __error_t_defined
 typedef enum {
 	ESUCCESS = 0,            // Success
 	EFAIL,                   // Generic Failure

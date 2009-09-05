@@ -1,3 +1,5 @@
+#ifdef __IVY__
+
 #include <stdio.h>
 #include <string.h>
 #include <lib.h>
@@ -168,3 +170,4 @@ asmlinkage
 void *__deputy_memset(void *s, int c, unsigned int n) {
   return memset(s, c, n);
 }
+#endif // __IVY__

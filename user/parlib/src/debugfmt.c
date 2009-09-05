@@ -1,4 +1,4 @@
-#include <arch/types.h>
+#include <ros/common.h>
 #include <ros/error.h>
 #include <debug.h>
 

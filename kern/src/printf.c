@@ -6,7 +6,7 @@
 #endif
 
 #include <arch/arch.h>
-#include <arch/types.h>
+#include <ros/common.h>
 
 #include <atomic.h>
 #include <stdio.h>
@@ -52,7 +52,11 @@ int vcprintf(const char *fmt, va_list ap)
 	spin_lock_irqsave(&output_lock);
 
 	// do the buffered printf
+	#ifdef __DEPUTY__
 	vprintfmt(buffered_putch, &cntp, fmt, ap);
+	#else
+	vprintfmt((void*)buffered_putch, (void**)&cntp, fmt, ap);
+	#endif
 
 	// write out remaining chars in the buffer
 	buffered_putch(-1,&cntp);

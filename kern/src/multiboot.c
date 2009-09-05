@@ -3,7 +3,7 @@
 #endif
 
 #include <multiboot.h>
-#include <arch/types.h>
+#include <ros/common.h>
 #include <arch/mmu.h>
 #include <arch/arch.h>
 #include <ros/memlayout.h>

@@ -1,7 +1,7 @@
 /* See COPYRIGHT for copyright information. */
 /* Kevin Klues <klueska@cs.berkeley.edu>	*/
 
-#ifndef _NEWLIB_LIBC_WRAPPERS_H
+#ifndef _NEWLIB_LIBC_WRAPPERS_H_
 #define _NEWLIB_LIBC_WRAPPERS_H_
 
 #include <errno.h>

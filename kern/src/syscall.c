@@ -4,7 +4,11 @@
 #pragma nosharc
 #endif
 
-#include <arch/types.h>
+#ifdef __IVY__
+#pragma nodeputy
+#endif
+
+#include <ros/common.h>
 #include <arch/arch.h>
 #include <arch/mmu.h>
 #include <arch/console.h>
@@ -316,8 +320,8 @@ static error_t sys_proc_run(struct proc *p, unsigned pid)
 
 // TODO: Build a dispatch table instead of switching on the syscallno
 // Dispatches to the correct kernel function, passing the arguments.
-intreg_t syscall(env_t* e, uint32_t syscallno, uint32_t a1, uint32_t a2,
-                 uint32_t a3, uint32_t a4, uint32_t a5)
+intreg_t syscall(env_t* e, uintreg_t syscallno, uintreg_t a1, uintreg_t a2,
+                 uintreg_t a3, uintreg_t a4, uintreg_t a5)
 {
 	// Call the function corresponding to the 'syscallno' parameter.
 	// Return any appropriate return value.
@@ -325,6 +329,9 @@ intreg_t syscall(env_t* e, uint32_t syscallno, uint32_t a1, uint32_t a2,
 	//cprintf("Incoming syscall number: %d\n    a1: %x\n   "
 	//        " a2: %x\n    a3: %x\n    a4: %x\n    a5: %x\n",
 	//        syscallno, a1, a2, a3, a4, a5);
+
+	// used if we need more args, like in mmap
+	int32_t _a4, _a5, _a6, *COUNT(3) args;
 
 	assert(e); // should always have an env for every syscall
 	//printk("Running syscall: %d\n", syscallno);
@@ -364,6 +371,17 @@ intreg_t syscall(env_t* e, uint32_t syscallno, uint32_t a1, uint32_t a2,
 			return sys_proc_create(e, (char *DANGEROUS)a1);
 		case SYS_proc_run:
 			return sys_proc_run(e, (size_t)a1);
+		case SYS_mmap:
+			// we only have 4 parameters from sysenter currently, need to copy
+			// in the others.  if we stick with this, we can make a func for it.
+    		args = user_mem_assert(e, (void*)a4, 3*sizeof(_a4), PTE_USER_RW);
+			_a4 = *(args++);
+			_a5 = *(args++);
+			_a6 = *(args++);
+			return (intreg_t) mmap(e, a1, a2, a3, _a4, _a5, _a6);
+		case SYS_brk:
+			printk("brk not implemented yet\n");
+			return -EINVAL;
 
 	#ifdef __i386__
 		case SYS_serial_write:
@@ -410,8 +428,8 @@ intreg_t process_generic_syscalls(env_t* e, size_t max)
 			lcr3(e->env_cr3);
 		}
 		count++;
-		//printk("DEBUG PRE: sring->req_prod: %d, sring->rsp_prod: %d\n",\
-			   sysbr->sring->req_prod, sysbr->sring->rsp_prod);
+		//printk("DEBUG PRE: sring->req_prod: %d, sring->rsp_prod: %d\n",
+		//	   sysbr->sring->req_prod, sysbr->sring->rsp_prod);
 		// might want to think about 0-ing this out, if we aren't
 		// going to explicitly fill in all fields
 		syscall_rsp_t rsp;
@@ -423,8 +441,8 @@ intreg_t process_generic_syscalls(env_t* e, size_t max)
 		// update our counter for what we've produced (assumes we went in order!)
 		(sysbr->rsp_prod_pvt)++;
 		RING_PUSH_RESPONSES(sysbr);
-		//printk("DEBUG POST: sring->req_prod: %d, sring->rsp_prod: %d\n",\
-			   sysbr->sring->req_prod, sysbr->sring->rsp_prod);
+		//printk("DEBUG POST: sring->req_prod: %d, sring->rsp_prod: %d\n",
+		//	   sysbr->sring->req_prod, sysbr->sring->rsp_prod);
 	}
 	// load sane page tables (and don't rely on decref to do it for you).
 	lcr3(boot_cr3);

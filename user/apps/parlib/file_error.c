@@ -35,7 +35,7 @@ void file_error()
 
 	errno = 0;
 	printf("\n");
-	int result = read(bad_fd, buf, IN_BUF_SIZE - 1);
+	result = read(bad_fd, buf, IN_BUF_SIZE - 1);
 	printf("Read:         %d bytes\n", result);
 	printf("ERRNO:        %s\n", strerror(errno));
 

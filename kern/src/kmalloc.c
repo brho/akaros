@@ -9,7 +9,7 @@
 #pragma nosharc
 #endif
 
-#include <arch/types.h>
+#include <ros/common.h>
 #include <ros/error.h>
 #include <pmap.h>
 #include <kmalloc.h>

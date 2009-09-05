@@ -1,6 +1,6 @@
 #include <lib.h>
 
-void exit(void) __attribute__((noreturn))
+void exit(void)
 {
 	sys_proc_destroy(sys_getpid());
 	//Shouldn't get here, but include anyway so the compiler is happy.. 

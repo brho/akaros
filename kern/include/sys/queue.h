@@ -40,7 +40,7 @@
 #define ROS_INCLUDE_SYS_QUEUE_H
 
 //#include <machine/ansi.h>	/* for __offsetof */
-#include <arch/types.h>	/* for __offsetof */
+#include <ros/common.h>	/* for __offsetof */
 
 /*
  * This file defines four types of data structures: singly-linked lists,

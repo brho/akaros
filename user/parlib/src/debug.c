@@ -5,7 +5,7 @@
 // It is very important that it always go to the console, especially when
 // debugging file descriptor code!
 
-#include <arch/types.h>
+#include <ros/common.h>
 #include <parlib.h>
 #include <debug.h>
 
@@ -39,7 +39,11 @@ int vdebug(const char *fmt, va_list ap)
 
 	b.idx = 0;
 	b.cnt = 0;
+	#ifdef __DEPUTY__
 	vdebugfmt(putch, &bp, fmt, ap);
+	#else
+	vdebugfmt((void*)putch, (void**)&bp, fmt, ap);
+	#endif
 	sys_cputs(b.buf, b.idx);
 
 	return b.cnt;

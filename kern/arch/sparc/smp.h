@@ -1,7 +1,7 @@
 #ifndef ROS_ARCH_SMP_H
 #define ROS_ARCH_SMP_H
 
-#include <arch/types.h>
+#include <ros/common.h>
 #include <arch/arch.h>
 #include <atomic.h>
 

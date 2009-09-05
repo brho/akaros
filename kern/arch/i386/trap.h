@@ -53,7 +53,7 @@
 
 #ifndef __ASSEMBLER__
 
-#include <arch/types.h>
+#include <ros/common.h>
 #include <arch/mmu.h>
 
 /* The kernel's interrupt descriptor table */

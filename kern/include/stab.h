@@ -1,6 +1,6 @@
 #ifndef ROS_STAB_H
 #define ROS_STAB_H
-#include <arch/types.h>
+#include <ros/common.h>
 
 // <inc/stab.h>
 // STABS debugging info

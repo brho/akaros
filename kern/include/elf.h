@@ -1,7 +1,7 @@
 #ifndef ROS_INC_ELF_H
 #define ROS_INC_ELF_H
 
-#include <arch/types.h>
+#include <ros/common.h>
 
 #if defined(LITTLE_ENDIAN)
 #  define ELF_MAGIC 0x464C457FU	/* "\x7FELF" in little endian */

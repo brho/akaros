@@ -1,5 +1,5 @@
 #include <arch/timer.h>
-#include <arch/types.h>
+#include <ros/common.h>
 #include <arch/trap.h>
 #include <arch/arch.h>
 #include <stdio.h>

@@ -1,6 +1,6 @@
 // System call stubs.
 
-#include <arch/types.h>
+#include <ros/common.h>
 #include <arch/arch.h>
 
 // TODO: fix sysenter to take all 5 params

@@ -1,3 +1,4 @@
+#ifdef __IVY__
 #include <stdio.h>
 #include <assert.h>
 #include <string.h>
@@ -110,3 +111,4 @@ void *__deputy_memset(void *s, int c, unsigned int n) {
   return memset(s, c, n);
 }
 
+#endif // __IVY__

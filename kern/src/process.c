@@ -148,13 +148,14 @@ void proc_run(struct proc *p)
 			if (p->num_vcores) {
 				// TODO: handle silly state (HSS)
 				// set virtual core 0 to run the main context
-				send_active_msg_sync(p->vcoremap[0], __startcore, p,
-				                     &p->env_tf, 0);
+				send_active_msg_sync(p->vcoremap[0], __startcore, (uint32_t)p,
+				                     (uint32_t)&p->env_tf, 0);
 				/* handle the others.  note the sync message will spin until
 				 * there is a free active message slot, which could lock up the
 				 * system.  think about this. (TODO) */
 				for (int i = 1; i < p->num_vcores; i++)
-					send_active_msg_sync(p->vcoremap[i], __startcore, p, 0, i);
+					send_active_msg_sync(p->vcoremap[i], __startcore,
+					                     (uint32_t)p, 0, i);
 			}
 			/* There a subtle (attempted) race avoidance here.  proc_startcore
 			 * can handle a death message, but we can't have the startcore come
@@ -316,7 +317,10 @@ void proc_destroy(struct proc *p)
 			spin_unlock(&idle_lock);
 			break;
 		default:
-			panic("Weird state in proc_destroy");
+			// TODO: getting here if it's already dead and free (ENV_FREE).
+			// Need to sort reusing process structures and having pointers to
+			// them floating around the system.
+			panic("Weird state(0x%08x) in proc_destroy", p->state);
 	}
 	proc_set_state(p, PROC_DYING);
 

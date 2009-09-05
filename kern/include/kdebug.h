@@ -1,7 +1,7 @@
 #ifndef ROS_KERN_KDEBUG_H
 #define ROS_KERN_KDEBUG_H
 
-#include <arch/types.h>
+#include <ros/common.h>
 
 // Debug information about a particular instruction pointer
 typedef struct Eipdebuginfo {

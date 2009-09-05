@@ -440,7 +440,6 @@ vm_init(void)
 // but it is a pretty good sanity check. 
 //
 static physaddr_t check_va2pa(pde_t *COUNT(NPDENTRIES) pgdir, uintptr_t va);
-static pte_t get_vaperms(pde_t *COUNT(NPDENTRIES) pgdir, uintptr_t va);
 
 static void
 check_boot_pgdir(bool pse)
@@ -486,13 +485,21 @@ check_boot_pgdir(bool pse)
 		}
 	}
 
-	// check permissions
-	// user read-only.  check for user and write, should be only user
-	// eagle-eyed viewers should be able to explain the extra cases
+	/* check permissions
+	 * user read-only.  check for user and write, should be only user
+	 * eagle-eyed viewers should be able to explain the extra cases.
+	 * for the mongoose-eyed, remember that weird shit happens when you loop
+	 * through UVPT.  Specifically, you can't loop once, then look at a jumbo
+	 * page that is kernel only.  That's the end of the page table for you, so
+	 * having a U on the entry doesn't make sense.  Thus we check for a jumbo
+	 * page, and special case it.  This will happen at 0xbf701000.  Why is this
+	 * magical?  Get your eagle glasses and figure it out. */
 	for (i = UTOP; i < ULIM; i+=PGSIZE) {
-		pte = get_vaperms(pgdir, i);
-		if ((pte & PTE_P) && (i != UVPT+(VPT>>10))) {
-			if (pte & PTE_PS) {
+		pte = get_va_perms(pgdir, (void*SAFE)TC(i));
+		if (pte & PTE_P) {
+			if (i == UVPT+(VPT >> 10))
+				continue;
+			if (*pgdir_walk(pgdir, (void*SAFE)TC(i), 0) & PTE_PS) {
 				assert((pte & PTE_U) != PTE_U);
 				assert((pte & PTE_W) != PTE_W);
 			} else {
@@ -503,20 +510,20 @@ check_boot_pgdir(bool pse)
 	}
 	// kernel read-write.
 	for (i = ULIM; i <= KERNBASE + maxaddrpa - PGSIZE; i+=PGSIZE) {
-		pte = get_vaperms(pgdir, i);
+		pte = get_va_perms(pgdir, (void*SAFE)TC(i));
 		if ((pte & PTE_P) && (i != VPT+(UVPT>>10))) {
 			assert((pte & PTE_U) != PTE_U);
 			assert((pte & PTE_W) == PTE_W);
 		}
 	}
 	// special mappings
-	pte = get_vaperms(pgdir, UVPT+(VPT>>10));
+	pte = get_va_perms(pgdir, (void*SAFE)TC(UVPT+(VPT>>10)));
 	assert((pte & PTE_U) != PTE_U);
 	assert((pte & PTE_W) != PTE_W);
 
 	// note this means the kernel cannot directly manipulate this virtual address
 	// convince yourself this isn't a big deal, eagle-eyes!
-	pte = get_vaperms(pgdir, VPT+(UVPT>>10));
+	pte = get_va_perms(pgdir, (void*SAFE)TC(VPT+(UVPT>>10)));
 	assert((pte & PTE_U) != PTE_U);
 	assert((pte & PTE_W) != PTE_W);
 
@@ -543,23 +550,6 @@ check_va2pa(pde_t *COUNT(NPDENTRIES) _pgdir, uintptr_t va)
 	if (!(p[PTX(va)] & PTE_P))
 		return ~0;
 	return PTE_ADDR(p[PTX(va)]);
-}
-
-/* 
- * This function returns a PTE with the aggregate permissions equivalent
- * to walking the two levels of paging.  PPN = 0.  Somewhat fragile, in that
- * it returns PTE_PS if either entry has PTE_PS (which should only happen
- * for some of the recusive walks)
- */
-
-static pte_t
-get_vaperms(pde_t *COUNT(NPDENTRIES) pgdir, uintptr_t va)
-{
-	pde_t* pde = &pgdir[PDX(va)];
-	pte_t* pte = pgdir_walk(pgdir, (void*SNT)va, 0);
-	if (!pte || !(*pte & PTE_P))
-		return 0;
-	return PGOFF(*pde & *pte) + PTE_PS & (*pde | *pte);
 }
 
 /* 
@@ -634,15 +624,46 @@ pgdir_walk(pde_t *pgdir, const void *SNT va, int create)
 int get_va_perms(pde_t *pgdir, const void *SNT va)
 {
 	pde_t the_pde = pgdir[PDX(va)];
-	pte_t the_pte = 0;
+	pte_t the_pte;
 
 	if (!(the_pde & PTE_P))
 		return 0;
 	if (the_pde & PTE_PS)
 		return the_pde & (PTE_U | PTE_W | PTE_P);
-	// else
 	the_pte = ((pde_t*COUNT(NPTENTRIES))KADDR(PTE_ADDR(the_pde)))[PTX(va)];
+	if (!(the_pte & PTE_P))
+		return 0;
 	return the_pte & the_pde & (PTE_U | PTE_W | PTE_P);
+}
+
+void *get_free_va_range(pde_t *pgdir, uintptr_t addr, size_t len)
+{
+{TRUSTEDBLOCK
+	// want to make sure there aren't mappings already.  will need to do this
+	// later with zones, for when we lazily allocate memory
+
+	uintptr_t startaddr;
+
+	int npages = ROUNDUP(len, PGSIZE) / PGSIZE;
+
+	addr &= ~0xfff;
+	if (!addr)
+ 		// some sensible default.  can cache the previous value somewhere
+		addr = USTACKTOP - PGSIZE; // TODO: not looking down
+	startaddr = addr;	
+	pte_t *pte = pgdir_walk(pgdir, (void*)addr, 0);
+	// what about jumbo pages?
+	// consider looping around, esp if we start from a cached spot
+	// don't map at pg 0, or below brk
+	// consider local memory ranges...
+
+	/*
+	first fit?
+	what if we have a sorted structure of what mem ranges are already in use?
+	*/
+
+	return (void*)0xdeadbeef;
+}
 }
 
 /* Flushes a TLB, including global pages.  We should always have the CR4_PGE

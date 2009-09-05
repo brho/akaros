@@ -1,6 +1,10 @@
 #ifndef ROS_INC_MMU_H
 #define ROS_INC_MMU_H
 
+#ifndef __ASSEMBLER__
+#include <ros/common.h>
+#endif
+
 /*
  * This file contains definitions for the x86 memory management unit (MMU),
  * including paging- and segmentation-related data structures and constants,
@@ -180,7 +184,7 @@
 
 #else	// not __ASSEMBLER__
 
-#include <arch/types.h>
+#include <ros/common.h>
 
 // Segment Descriptors
 typedef struct Segdesc {
@@ -199,15 +203,15 @@ typedef struct Segdesc {
 	unsigned sd_base_31_24 : 8; // High bits of segment base address
 } segdesc_t;
 // Null segment
-#define SEG_NULL	(segdesc_t){ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
+#define SEG_NULL	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
 // Segment that is loadable but faults when used
-#define SEG_FAULT	(segdesc_t){ 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0 }
+#define SEG_FAULT	{ 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0 }
 // Normal segment
-#define SEG(type, base, lim, dpl) (segdesc_t)						\
+#define SEG(type, base, lim, dpl) 									\
 { ((lim) >> 12) & 0xffff, (base) & 0xffff, ((base) >> 16) & 0xff,	\
     type, 1, dpl, 1, (unsigned) (lim) >> 28, 0, 0, 1, 1,			\
     (unsigned) (base) >> 24 }
-#define SEG16(type, base, lim, dpl) (segdesc_t)						\
+#define SEG16(type, base, lim, dpl) 								\
 { (lim) & 0xffff, (base) & 0xffff, ((base) >> 16) & 0xff,			\
     type, 1, dpl, 1, (unsigned) (lim) >> 16, 0, 0, 1, 0,			\
     (unsigned) (base) >> 24 }

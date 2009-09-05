@@ -22,7 +22,7 @@
 #define STR(arg) #arg
 #define XSTR(arg) STR(arg)
 
-#include <arch/types.h>
+#include <ros/common.h>
 #include <trap.h>
 #include <arch/frontend.h>
 

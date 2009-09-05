@@ -7,8 +7,7 @@
 #include <ros/syscall.h>
 #include <ros/sysevent.h>
 #include <ros/error.h>
-
-typedef int32_t pid_t;
+#include <ros/common.h>
 
 typedef struct procinfo {
 	pid_t id;

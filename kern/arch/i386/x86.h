@@ -1,7 +1,7 @@
 #ifndef ROS_INC_X86_H
 #define ROS_INC_X86_H
 
-#include <arch/types.h>
+#include <ros/common.h>
 #include <arch/mmu.h>
 
 /* Model Specific Registers */
@@ -66,6 +66,7 @@ static __inline void write_msr(uint32_t reg, uint64_t val) __attribute__((always
 static __inline uint32_t read_mmreg32(uint32_t reg) __attribute__((always_inline));
 static __inline void write_mmreg32(uint32_t reg, uint32_t val) __attribute__((always_inline));
 static __inline void wbinvd(void) __attribute__((always_inline));
+static __inline void __cpu_relax(void) __attribute__((always_inline));
 
 static __inline uint8_t
 inb(int port)
@@ -310,9 +311,19 @@ read_mmreg32(uint32_t reg)
 }
 
 static __inline void
-wbinvd(void) __attribute__((always_inline))
+wbinvd(void)
 {
 	asm volatile("wbinvd");
+}
+
+/* this version of cpu_relax is needed to resolve some circular dependencies
+ * with arch/arch.h and arch/apic.h */
+static __inline void
+__cpu_relax(void)
+{
+	// in case the compiler doesn't serialize for pause, the "m" will make sure
+	// no memory is reordered around this instruction.
+	asm volatile("pause" : : : "memory");
 }
 
 #endif /* !ROS_INC_X86_H */

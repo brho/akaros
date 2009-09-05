@@ -3,7 +3,7 @@
 
 #ifndef __ASSEMBLER__
 
-#include <arch/types.h>
+#include <ros/common.h>
 
 extern physaddr_t maxpa;        // Maximum physical address in the system
 extern physaddr_t maxaddrpa;    // Maximum addressable physical address

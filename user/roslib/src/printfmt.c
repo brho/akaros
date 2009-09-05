@@ -3,7 +3,7 @@
 // This code is also used by both the kernel and user programs.
 
 #include <ros/error.h>
-#include <types.h>
+#include <ros/common.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
@@ -275,7 +275,11 @@ int vsnprintf(char *buf, int n, const char *fmt, va_list ap)
 	b.buf = buf;
 
 	// print the string to the buffer
-	vprintfmt(sprintputch, (sprintbuf_t *NONNULL*NONNULL)&bp, fmt, ap);
+	#ifdef __DEPUTY__
+	vprintfmt((void*)sprintputch, (sprintbuf_t *NONNULL*NONNULL)&bp, fmt, ap);
+	#else
+	vprintfmt((void*)sprintputch, (void**)&bp, fmt, ap);
+	#endif
 
 	// null terminate the buffer
 	*b.buf = '\0';

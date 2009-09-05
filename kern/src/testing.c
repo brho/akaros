@@ -3,6 +3,10 @@
 #pragma nosharc
 #endif
 
+#ifdef __IVY__
+#pragma nodeputy
+#endif
+
 #include <arch/mmu.h>
 #include <arch/arch.h>
 #include <smp.h>
@@ -160,7 +164,6 @@ void test_page_coloring(void)
 		cprintf("Page: %d\n", page2ppn(page));	
 }
 
-extern uint8_t num_cpus;
 barrier_t test_cpu_array;
 
 void test_barrier(void)
@@ -309,8 +312,6 @@ void test_checklist_handler(trapframe_t *tf, void* data)
 	down_checklist(the_global_list);
 }
 
-extern uint8_t num_cpus;
-
 void test_checklists(void)
 {
 	INIT_CHECKLIST(a_list, MAX_NUM_CPUS);
@@ -346,7 +347,7 @@ void test_checklists(void)
 
 atomic_t a, b, c;
 
-void test_incrementer_handler(trapframe_t *tf, atomic_t* data)
+void test_incrementer_handler(trapframe_t *tf, void *data)
 {
 	assert(data);
 	atomic_inc(data);
@@ -680,7 +681,7 @@ void test_barrier_handler(trapframe_t *tf, void* data)
 	//cprintf("Round 4: Core %d\n", core_id());
 }
 
-static void test_waiting_handler(trapframe_t *tf, atomic_t * data)
+static void test_waiting_handler(trapframe_t *tf, void *data)
 {
 	{HANDLER_ATOMIC atomic_dec(data);}
 }

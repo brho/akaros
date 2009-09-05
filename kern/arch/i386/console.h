@@ -6,7 +6,7 @@
 # error "This is a ROS kernel header; user programs should not #include it"
 #endif
 
-#include <arch/types.h>
+#include <ros/common.h>
 
 #define MONO_BASE	0x3B4
 #define MONO_BUF	0xB0000

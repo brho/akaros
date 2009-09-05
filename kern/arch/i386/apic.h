@@ -103,7 +103,7 @@ void timer_init(void);
 void udelay_pit(uint64_t usec);
 // TODO: right now timer defaults to TSC
 uint64_t gettimer(void);
-uint64_t inline getfreq(void);
+uint64_t getfreq(void);
 
 static inline void pic_send_eoi(uint32_t irq);
 static inline void lapic_send_eoi(void);
@@ -186,9 +186,8 @@ static inline void lapic_disable(void)
  */
 static inline void lapic_wait_to_send(void)
 {
-	static inline void cpu_relax(void);
 	while(read_mmreg32(LAPIC_IPI_ICR_LOWER) & 0x1000)
-		cpu_relax();
+		__cpu_relax();
 }
 
 static inline void lapic_enable(void)

@@ -10,7 +10,7 @@
 #include <ros/error.h>
 #include <ros/procdata.h>
 #include <arch/trap.h>
-#include <arch/types.h>
+#include <ros/common.h>
 #include <arch/arch.h>
 #include <sys/queue.h>
 
@@ -40,7 +40,9 @@ typedef int32_t envid_t;
 #define ENVX(envid)		((envid) & (NENV - 1))
 
 // TODO: clean this up.
+#ifdef __SHARC__
 typedef sharC_env_t;
+#endif
 struct Env {
 	TAILQ_ENTRY(Env) proc_link NOINIT;	// Free list link pointers
 	spinlock_t proc_lock;
@@ -69,6 +71,7 @@ struct Env {
 	// Address space
 	pde_t *COUNT(NPDENTRIES) env_pgdir;			// Kernel virtual address of page dir
 	physaddr_t env_cr3;			// Physical address of page dir
+//	struct memregion_list memregions;
 
 	// Per process info and data pages
  	procinfo_t *SAFE env_procinfo;       // KVA of per-process shared info table (RO)
@@ -111,6 +114,6 @@ void	env_pop_tf(trapframe_t *tf) __attribute__((noreturn));
 
 
 /* Helper handler for smp_call to dispatch jobs to other cores */
-void run_env_handler(trapframe_t *tf, env_t* data);
+void run_env_handler(trapframe_t *tf, TV(t) data);
 
 #endif // !ROS_KERN_ENV_H

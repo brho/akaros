@@ -8,7 +8,7 @@
 #ifndef ROS_LISTABLE_H
 #define ROS_LISTABLE_H
  
-#include <arch/types.h>
+#include <ros/common.h>
 #include <sys/queue.h>
 
 #define DECLARE_LISTABLE_ITEM(name, link, item)   \

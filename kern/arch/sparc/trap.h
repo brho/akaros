@@ -6,7 +6,7 @@
 
 #ifndef __ASSEMBLER__
 
-#include <arch/types.h>
+#include <ros/common.h>
 
 typedef struct
 {

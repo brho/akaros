@@ -6,7 +6,7 @@
  * Someone else should actually make these useful on their own
  */
 
-#include <arch/types.h>
+#include <ros/common.h>
 
 void test_ipi_sending(void);
 void test_pic_reception(void);

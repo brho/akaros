@@ -18,7 +18,7 @@ uint64_t timing_overhead = 0;
  * value.  It is pusposefully annotated with a noinline so that the overheads 
  * assocaited with calling it are as deterministic as possible.
  */
-uint64_t start_timing() __attribute__((noinline))
+uint64_t start_timing()
 {
     return read_tsc_serialized();
 }
@@ -32,7 +32,7 @@ uint64_t start_timing() __attribute__((noinline))
  * This function is purposefully annotated with a noinline so that 
  * the overheads assocaited with calling it are as deterministic as possible.
  */
-uint64_t stop_timing(uint64_t val) __attribute__((noinline))
+uint64_t stop_timing(uint64_t val)
 {
     uint64_t diff = (read_tsc_serialized() - val - timing_overhead);
 	if ((int64_t) diff < 0) 

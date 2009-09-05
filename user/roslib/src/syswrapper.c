@@ -1,7 +1,7 @@
 
-#include <types.h>
-#include <lib.h>
+#include <ros/common.h>
 #include <ros/syscall.h>
+#include <lib.h>
 
 void null()
 {
@@ -12,7 +12,7 @@ error_t null_async(async_desc_t** desc)
 {
 	error_t e;
 	syscall_desc_t* sysdesc;
-	if (e = get_all_desc(desc, &sysdesc))
+	if ((e = get_all_desc(desc, &sysdesc)))
 		return e;
 	return sys_null_async(sysdesc);
 }
@@ -28,7 +28,7 @@ error_t cache_buster_async(async_desc_t** desc, uint32_t num_writes,
 {
 	error_t e;
 	syscall_desc_t* sysdesc;
-	if (e = get_all_desc(desc, &sysdesc))
+	if ((e = get_all_desc(desc, &sysdesc)))
 		return e;
 	return sys_cache_buster_async(sysdesc, num_writes, num_pages, flags);
 }

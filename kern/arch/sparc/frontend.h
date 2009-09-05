@@ -1,7 +1,7 @@
 #ifndef ROS_ARCH_FRONTEND_H
 #define ROS_ARCH_FRONTEND_H
 
-#include <arch/types.h>
+#include <ros/common.h>
 
 int32_t frontend_syscall(int32_t syscall_num, uint32_t arg0, uint32_t arg1, uint32_t arg2);
 

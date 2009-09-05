@@ -65,7 +65,7 @@ error_t get_all_desc(async_desc_t** a_desc, syscall_desc_t** s_desc)
 	if ((current_async_desc = get_async_desc()) == NULL)
 		return -EBUSY;
 	*a_desc = current_async_desc;
-	if (*s_desc = get_sys_desc(current_async_desc))
+	if ((*s_desc = get_sys_desc(current_async_desc)))
 		return 0;
 	// in case we could get an async, but not a syscall desc, then clean up.
 	POOL_PUT(&async_desc_pool, current_async_desc);

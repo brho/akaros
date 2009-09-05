@@ -1,7 +1,7 @@
 #ifndef ROS_INCLUDE_ATOMIC_H
 #define ROS_INCLUDE_ATOMIC_H
 
-#include <arch/types.h>
+#include <ros/common.h>
 
 #define mb() {rmb(); wmb();}
 #define rmb() ({ asm volatile("lfence"); })

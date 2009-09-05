@@ -175,7 +175,8 @@ typedef struct __name##_back_ring __name##_back_ring_t;                 \
 /* This is a dummy function just used to statically assert that         \
  * there are no weird padding issues associated with our sring structs  \
  */                                                                     \
-static void __name##_assert_sring_size() __attribute__((used)) {        \
+static void __name##_assert_sring_size() __attribute__((used));         \
+static void __name##_assert_sring_size() {                              \
 	__ASSERT_EQUAL( sizeof(__name##_sring_t),                           \
 	                ( __RING_HEADER_SIZE()  +                           \
 	                  ( __RING_SIZE_STATIC(__name, __size) *            \

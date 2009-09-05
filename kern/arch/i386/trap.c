@@ -109,8 +109,8 @@ idt_init(void)
 	ts.ts_ss0 = GD_KD;
 
 	// Initialize the TSS field of the gdt.
-	gdt[GD_TSS >> 3] = SEG16(STS_T32A, (uint32_t) (&ts),
-					sizeof(taskstate_t), 0);
+	gdt[GD_TSS >> 3] = (segdesc_t)SEG16(STS_T32A, (uint32_t) (&ts),
+					   sizeof(taskstate_t), 0);
 	gdt[GD_TSS >> 3].sd_s = 0;
 
 	// Load the TSS

@@ -72,7 +72,7 @@ void print_cpuinfo(void)
 	if (ecx & 0x00000060) {
 		msr_val = read_msr(IA32_FEATURE_CONTROL);
 		printd("64 Bit Feature Control: 0x%08x\n", msr_val);
-		if (msr_val & 0x5 == 0x5)
+		if ((msr_val & 0x5) == 0x5)
 			printk("Hardware virtualization supported\n");
 		else
 			printk("Hardware virtualization not supported\n");
@@ -127,6 +127,7 @@ void show_mapping(uintptr_t start, size_t size)
 
 void backtrace(void)
 { TRUSTEDBLOCK
+	extern char (SNT SREADONLY _start)[];
 	uint32_t *ebp, eip;
 	eipdebuginfo_t debuginfo;
 	char buf[256];

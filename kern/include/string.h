@@ -1,7 +1,7 @@
 #ifndef ROS_INC_STRING_H
 #define ROS_INC_STRING_H
 
-#include <arch/types.h>
+#include <ros/common.h>
 
 #define STRING char *NTS
 #define STRBUF(n) char *NT COUNT(n)

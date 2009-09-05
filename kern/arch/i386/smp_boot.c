@@ -8,6 +8,10 @@
 #pragma nosharc
 #endif
 
+#ifdef __IVY__
+#pragma nodeputy
+#endif
+
 #include <arch/x86.h>
 #include <arch/arch.h>
 #include <smp.h>
@@ -56,25 +60,28 @@ static void init_smp_call_function(void)
 
 /******************************************************************************/
 
-static void ( smp_mtrr_handler)(trapframe_t *tf, barrier_t *data)
+static void smp_mtrr_handler(trapframe_t *tf, TV(t) data)
 {
 	setup_default_mtrrs(data);
 }
 
 // this needs to be set in smp_entry too...
 #define trampoline_pg 0x00001000
-extern smp_entry(), smp_entry_end(), smp_boot_lock(), smp_semaphore();
+extern char (SNT SREADONLY smp_entry)[];
+extern char (SNT SREADONLY smp_entry_end)[];
+extern char (SNT SREADONLY smp_boot_lock)[];
+extern char (SNT SREADONLY smp_semaphore)[];
 
 static inline volatile uint32_t *COUNT(1)
 get_smp_semaphore()
 {
-	return (volatile uint32_t *COUNT(1))TC(&smp_semaphore - &smp_entry + trampoline_pg);
+	return (volatile uint32_t *COUNT(1))TC(smp_semaphore - smp_entry + trampoline_pg);
 }
 
 static inline uint32_t *COUNT(1)
 get_smp_bootlock()
 {
-	return (uint32_t *COUNT(1))TC(&smp_boot_lock - &smp_entry + trampoline_pg);
+	return (uint32_t *COUNT(1))TC(smp_boot_lock - smp_entry + trampoline_pg);
 }
 
 void smp_boot(void)
@@ -83,8 +90,8 @@ void smp_boot(void)
 	// NEED TO GRAB A LOWMEM FREE PAGE FOR AP BOOTUP CODE
 	// page1 (2nd page) is reserved, hardcoded in pmap.c
 	memset(KADDR(trampoline_pg), 0, PGSIZE);
-	memcpy(KADDR(trampoline_pg), (void *COUNT(PGSIZE))TC(&smp_entry),
-           &smp_entry_end - &smp_entry);
+	memcpy(KADDR(trampoline_pg), (void *COUNT(PGSIZE))TC(smp_entry),
+           smp_entry_end - smp_entry);
 
 	// This mapping allows access to the trampoline with paging on and off
 	// via trampoline_pg
@@ -227,7 +234,8 @@ uint32_t smp_main(void)
 	my_ts->ts_esp0 = my_stack_top;
 	my_ts->ts_ss0 = GD_KD;
 	// Initialize the TSS field of my_gdt.
-	my_gdt[GD_TSS >> 3] = SEG16(STS_T32A, (uint32_t) (my_ts), sizeof(taskstate_t), 0);
+	my_gdt[GD_TSS >> 3] = (segdesc_t)SEG16(STS_T32A, (uint32_t) (my_ts),
+	                      sizeof(taskstate_t), 0);
 	my_gdt[GD_TSS >> 3].sd_s = 0;
 	// Load the TSS
 	ltr(GD_TSS);

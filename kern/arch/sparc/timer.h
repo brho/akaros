@@ -3,7 +3,7 @@
 
 #define INTERRUPT_TIMER_HZ	100
 
-#include <arch/types.h>
+#include <ros/common.h>
 
 typedef struct system_timing {
 	uint64_t tsc_freq;

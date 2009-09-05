@@ -8,7 +8,11 @@
 #pragma nosharc
 #endif
 
-#include <arch/types.h>
+#ifdef __IVY__
+#pragma nodeputy
+#endif
+
+#include <ros/common.h>
 #include <smp.h>
 
 #include <assert.h>

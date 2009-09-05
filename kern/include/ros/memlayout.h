@@ -2,7 +2,7 @@
 #define ROS_INC_MEMLAYOUT_H
 
 #ifndef __ASSEMBLER__
-#include <arch/types.h>
+#include <ros/common.h>
 #include <arch/mmu.h>
 #endif /* not __ASSEMBLER__ */
 
@@ -31,7 +31,7 @@
  *                     |         Kernel Stack         | RW/--  KSTKSIZE   |
  *                     | - - - - - - - - - - - - - - -|                 PTSIZE
  *                     |      Invalid Memory (*)      | --/--             |
- *    ULIM      ----> +------------------------------+ 0xbf800000      --+
+ *    ULIM      ---->  +------------------------------+ 0xbf800000      --+
  *                     |  Cur. Page Table (User R-)   | R-/R-  PTSIZE
  *    UVPT      ---->  +------------------------------+ 0xbf400000      --+
  *                     | Unmapped (expandable region) |                   |
@@ -162,7 +162,9 @@
 typedef uint32_t pte_t;
 typedef uint32_t pde_t;
 
+#ifdef __IVY__
 #pragma cilnoremove("vpt_lock", "vpd_lock")
+#endif
 extern volatile uint32_t vpt_lock;
 extern volatile uint32_t vpd_lock;
 

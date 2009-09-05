@@ -22,7 +22,7 @@
  */
 void process_workqueue()
 {
-	struct work TP(env_t *) work;
+	struct work TP(void*) work;
 	struct per_cpu_info *cpuinfo = &per_cpu_info[core_id()];
 
 	// copy the work in, since we may never return to this stack frame
@@ -39,7 +39,7 @@ void process_workqueue()
 	}
 }
 
-int enqueue_work(struct workqueue *queue, struct work *job)
+int enqueue_work(struct workqueue TP(void*) *queue, struct work TP(TV(t)) *job)
 {
 	error_t retval = 0;
 	struct per_cpu_info *cpuinfo = &per_cpu_info[core_id()];

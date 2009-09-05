@@ -4,10 +4,10 @@
 // and is intended to be linked into all user-mode applications
 // (NOT the kernel or boot loader).
 
-#ifndef ROS_INC_LIB_H
-#define ROS_INC_LIB_H 1
+#ifndef ROS_INC_PARLIB_H
+#define ROS_INC_PARLIB_H 1
 
-#include <arch/types.h>
+#include <ros/common.h>
 #include <ros/memlayout.h>
 #include <ros/syscall.h>
 #include <ros/error.h>
@@ -37,4 +37,4 @@ ssize_t     sys_shared_page_alloc(void *COUNT(PGSIZE) *addr, pid_t p2,
                                   int p1_flags, int p2_flags);
 ssize_t     sys_shared_page_free(void *COUNT(PGSIZE) addr, pid_t p2);
 
-#endif	// !ROS_INC_LIB_H
+#endif	// !ROS_INC_PARLIB_H

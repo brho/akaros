@@ -5,7 +5,7 @@
 // It is very important that it always go to the console, especially when
 // debugging file descriptor code!
 
-#include <types.h>
+#include <ros/common.h>
 #include <stdio.h>
 #include <stdarg.h>
 #include <lib.h>
@@ -41,7 +41,11 @@ int vcprintf(const char *fmt, va_list ap)
 
 	b.idx = 0;
 	b.cnt = 0;
+	#ifdef __DEPUTY__
 	vprintfmt(putch, &bp, fmt, ap);
+	#else
+	vprintfmt((void*)putch, (void**)&bp, fmt, ap);
+	#endif
 	sys_cputs(b.buf, b.idx);
 
 	return b.cnt;
@@ -103,7 +107,11 @@ static int vcprintf_async(const char *NTS fmt, va_list ap)
 
 	b->idx = 0;
 	b->cnt = 0;
+	#ifdef __DEPUTY__
 	vprintfmt(putch_async, &b, fmt, ap);
+	#else
+	vprintfmt((void*)putch_async, (void**)&b, fmt, ap);
+	#endif
 	// TODO - should check for a return value for sys_
 	sys_cputs_async(b->buf, b->idx, get_sys_desc(current_async_desc),
 	                cputs_async_cleanup, b);

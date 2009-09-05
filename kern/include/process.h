@@ -10,7 +10,7 @@
 #ifndef ROS_KERN_PROCESS_H
 #define ROS_KERN_PROCESS_H
 
-#include <arch/types.h>
+#include <ros/common.h>
 #include <trap.h>
 #include <atomic.h>
 

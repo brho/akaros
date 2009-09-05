@@ -1,7 +1,7 @@
 #include <multiboot.h>
 #include <arch/mmu.h>
 #include <arch/arch.h>
-#include <arch/types.h>
+#include <ros/common.h>
 #include <ros/memlayout.h>
 #include <string.h>
 

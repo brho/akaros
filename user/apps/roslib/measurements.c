@@ -1,4 +1,4 @@
-#include <arch/types.h>
+#include <ros/common.h>
 #include <arch/arch.h>
 #include <ros/timer.h>
 #include <ros/syscall.h>

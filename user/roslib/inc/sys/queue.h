@@ -1,1 +1,0 @@
-../../../../kern/include/sys/queue.h

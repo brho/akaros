@@ -1,7 +1,7 @@
 #ifndef ROS_INC_MEASURE_H
 #define ROS_INC_MEASURE_H
 
-#include <arch/types.h>
+#include <ros/common.h>
 #include <ros/timer.h>
 #include <arch/arch.h>
 

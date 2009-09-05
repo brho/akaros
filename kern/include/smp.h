@@ -10,7 +10,7 @@
 /* SMP related functions */
 
 #include <arch/smp.h>
-#include <arch/types.h>
+#include <ros/common.h>
 #include <trap.h>
 #include <atomic.h>
 #include <process.h>
@@ -21,7 +21,7 @@
 struct per_cpu_info {
 	spinlock_t lock;
 	bool preempt_pending;
-	struct workqueue workqueue;
+	struct workqueue TP(void*) workqueue;
 #ifdef __i386__
 	spinlock_t amsg_lock;
 	unsigned amsg_current;

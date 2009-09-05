@@ -2,11 +2,9 @@
 
 #ifndef ROS_KERN_PMAP_H
 #define ROS_KERN_PMAP_H
-#ifndef ROS_KERNEL
-# error "This is a ROS kernel header; user programs should not #include it"
-#endif
 
 #include <ros/memlayout.h>
+#include <ros/mman.h>
 #include <sys/queue.h>
 #include <multiboot.h>
 #include <atomic.h>
@@ -41,7 +39,7 @@
 
 extern char (SNT bootstacktop)[], (SNT bootstack)[];
 
-// List of pysical pages
+// List of physical pages
 extern volatile uint32_t pages_lock;
 extern page_t SLOCKED(&pages_lock) * SREADONLY COUNT(npages) pages;
 
@@ -82,8 +80,10 @@ error_t
 memcpy_from_user(env_t* env, void* COUNT(len) dest,
                  const void *DANGEROUS va, size_t len);
                  
+/* Arch specific implementations for these */
 pte_t *pgdir_walk(pde_t *COUNT(NPDENTRIES) pgdir, const void *SNT va, int create);
-int get_va_perms(pde_t *pgdir, const void *SNT va);
+int get_va_perms(pde_t *COUNT(NPDENTRIES) pgdir, const void *SNT va);
+void *get_free_va_range(pde_t *pgdir, uintptr_t addr, size_t len);
 
 static inline page_t *SAFE ppn2page(size_t ppn)
 {
@@ -123,5 +123,24 @@ static inline page_t* kva2page(void* addr)
 {
 	return pa2page(PADDR(addr));
 }
+
+/*
+ * Memory management for processes: syscall related functions, virtual memory
+ * regions, etc.
+ */
+void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags, int fd, size_t offset);
+
+/* Memory region for a process, consisting of linear(virtual) addresses.  This
+ * is what the kernel allocates a process, and the physical mapping can be done
+ * lazily (or not).  This way, if a page is swapped out, and the PTE says it
+ * isn't present, we still have a way to account for how the whole region ought
+ * to be dealt with. */
+struct memregion {
+	LIST_ENTRY(memregion) link; // actually, i'd like a sorted tree of these
+	uintptr_t base;
+	size_t len;
+	int perm;
+};
+TAILQ_HEAD(memregion_list, memregion); // Declares 'struct memregion_list'
 
 #endif /* !ROS_KERN_PMAP_H */

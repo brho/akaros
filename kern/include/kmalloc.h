@@ -8,7 +8,7 @@
 #ifndef ROS_KERN_KMALLOC_H
 #define ROS_KERN_KMALLOC_H
 
-#include <arch/types.h>
+#include <ros/common.h>
 
 void  kmalloc_init();
 

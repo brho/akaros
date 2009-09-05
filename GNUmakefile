@@ -6,7 +6,6 @@
 #	http://aegis.sourceforge.net/auug97.pdf
 #
 
-
 OBJDIR := obj
 
 # Make sure that 'all' is the first target
@@ -14,6 +13,7 @@ all: symlinks
 
 # User defined constants passed on the command line 
 TARGET_ARCH := i386
+COMPILER := IVY
 
 -include Makelocal
 
@@ -49,15 +49,19 @@ GCCPREFIX := $(shell if i386-ros-elf-objdump -i 2>&1 | grep '^elf32-i386$$' >/de
 endif
 
 # Default programs for compilation
-KERN_IVY_FLAGS := --deputy\
+ifeq ($(COMPILER),IVY)
+KERN_CFLAGS := --deputy\
                   --enable-error-db\
                   --no-rc-sharc\
                   --sc-dynamic-is-error\
                   --sc-ops=$(INCLUDE_DIR)/ivy/sharc.h\
                   --sc-all-in-thread
-                  $(EXTRAARGS)
-USER_IVY_FLAGS := --deputy --enable-error-db $(EXTRAARGS)
+USER_CFLAGS := --deputy --enable-error-db
 CC	    := ivycc --gcc=$(GCCPREFIX)gcc
+else
+CC	    := $(GCCPREFIX)gcc -std=gnu99
+endif
+
 AS	    := $(GCCPREFIX)as
 AR	    := $(GCCPREFIX)ar
 LD	    := $(GCCPREFIX)ld
@@ -69,7 +73,7 @@ PERL    := perl
 # Universal compiler flags
 # -fno-builtin is required to avoid refs to undefined functions in the kernel.
 # Only optimize to -O1 to discourage inlining, which complicates backtraces.
-CFLAGS := $(CFLAGS) -D$(TARGET_ARCH)
+CFLAGS := $(CFLAGS) -D$(TARGET_ARCH) $(EXTRAARGS)
 CFLAGS += -O2 -pipe -MD -fno-builtin -fno-stack-protector -gstabs
 CFLAGS += -Wall -Wno-format -Wno-unused -Wno-attributes
 CFLAGS += -nostdinc -Igccinclude/$(TARGET_ARCH)

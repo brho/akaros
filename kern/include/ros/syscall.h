@@ -1,7 +1,7 @@
 #ifndef ROS_INCLUDE_SYSCALL_H
 #define ROS_INCLUDE_SYSCALL_H
 
-#include <arch/types.h>
+#include <ros/common.h>
 #include <ros/ring_buffer.h>
 
 /* system call numbers */
@@ -15,8 +15,6 @@ enum
 	SYS_cputs,
 	SYS_cgetc,
 	SYS_getcpuid,
-	SYS_serial_write,
-	SYS_serial_read,
 	SYS_getpid,
 	SYS_proc_destroy,
 	SYS_shared_page_alloc,
@@ -24,6 +22,20 @@ enum
 	SYS_yield,
 	SYS_proc_create,
 	SYS_proc_run,
+
+	SYS_mmap,
+	SYS_brk,
+	/*
+	SYS_mprotect,
+	SYS_mremap,
+	SYS_mincore, // can read page tables instead
+	SYS_madvise,
+	SYS_mlock,
+	SYS_msync,
+	*/
+
+	SYS_serial_write,
+	SYS_serial_read,
 	SYS_frontend,		// forward a syscall to front-end machine
 
 	SYS_endofcalls //Should always be last
@@ -52,6 +64,7 @@ typedef struct syscall_rsp {
 
 // Generic Syscall Ring Buffer
 #define SYSCALLRINGSIZE    PGSIZE
-DEFINE_RING_TYPES_WITH_SIZE(syscall, syscall_req_t, syscall_rsp_t, SYSCALLRINGSIZE);
+//DEFINE_RING_TYPES_WITH_SIZE(syscall, syscall_req_t, syscall_rsp_t, SYSCALLRINGSIZE);
+DEFINE_RING_TYPES(syscall, syscall_req_t, syscall_rsp_t);
 
 #endif /* !ROS_INCLUDE_SYSCALL_H */

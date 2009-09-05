@@ -179,8 +179,6 @@ int mon_setmapperm(int argc, char **argv, trapframe_t *tf)
 
 int mon_cpuinfo(int argc, char **argv, trapframe_t *tf)
 {
-	extern uint8_t num_cpus;
-
 	cprintf("Number of CPUs detected: %d\n", num_cpus);
 	cprintf("Calling CPU's ID: 0x%08x\n", core_id());
 

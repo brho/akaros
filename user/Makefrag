@@ -1,6 +1,6 @@
 USER_DIR = user
 
-USER_CFLAGS  := $(USER_IVY_FLAGS) $(CFLAGS) -DROS_USER 
+USER_CFLAGS  += $(CFLAGS) -DROS_USER 
 USER_LDFLAGS := $(LDFLAGS)
 
 include $(USER_DIR)/roslib/Makefrag

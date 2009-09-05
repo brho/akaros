@@ -6,7 +6,7 @@
 # error "This is a ROS kernel header; user programs should not #include it"
 #endif
 
-#include <arch/types.h>
+#include <ros/common.h>
 
 #define CRT_ROWS	25
 #define CRT_COLS	80

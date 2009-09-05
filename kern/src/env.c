@@ -4,6 +4,10 @@
 #pragma nosharc
 #endif
 
+#ifdef __IVY__
+#pragma nodeputy
+#endif
+
 #include <arch/arch.h>
 #include <arch/mmu.h>
 #include <elf.h>
@@ -493,15 +497,14 @@ type SLOCKED(name##_lock) *\
  *
  * Note this is rather old, and meant to run a RUNNABLE_S on a worker core.
  */
-void run_env_handler(trapframe_t *tf, env_t *data)
+void run_env_handler(trapframe_t *tf, TV(t) data)
 {
 	assert(data);
-	struct work TP(env_t *) job;
-	struct workqueue *workqueue = &per_cpu_info[core_id()].workqueue;
-	{
-	job.func = proc_run;
+	struct work TP(TV(t)) job;
+	struct workqueue TP(void*) *workqueue = &per_cpu_info[core_id()].workqueue;
+	// this doesn't work, and making it a TP(env_t) is wrong
+	job.func = (func_t)proc_run;
 	job.data = data;
-	}
 	if (enqueue_work(workqueue, &job))
 		panic("Failed to enqueue work!");
 }

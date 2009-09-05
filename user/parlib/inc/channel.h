@@ -9,7 +9,7 @@
 #define ROS_CHANNEL_H
  
 #include <stdint.h>
-#include <arch/types.h>
+#include <ros/common.h>
 #include <ros/error.h>
 #include <ros/ring_buffer.h>
 

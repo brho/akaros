@@ -9,7 +9,7 @@
 #pragma nosharc
 #endif
 
-#include <arch/types.h>
+#include <ros/common.h>
 #include <arch/mmu.h>
 #include <colored_caches.h>
 #include <stdio.h>

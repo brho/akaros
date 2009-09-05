@@ -7,11 +7,11 @@
 #ifndef ROS_INC_LIB_H
 #define ROS_INC_LIB_H 1
 
-#include <arch/types.h>
 #include <ros/timer.h>
 #include <ros/error.h>
 #include <ros/memlayout.h>
 #include <ros/procdata.h>
+#include <ros/common.h>
 
 #include <stdarg.h>
 #include <string.h>
@@ -65,6 +65,9 @@ error_t     sys_proc_destroy(int pid);
 void        sys_yield(void);
 int         sys_proc_create(char* path);
 error_t     sys_proc_run(int pid);
+/* Memory Management */
+void *sys_mmap(void *addr, size_t length, int prot, int flags, int fd,
+               size_t offset);
 /* Generic Async Call */
 error_t     waiton_syscall(syscall_desc_t* desc, syscall_rsp_t*COUNT(1) rsp);
 

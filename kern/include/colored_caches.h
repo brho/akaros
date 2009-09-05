@@ -8,7 +8,7 @@
 #ifndef ROS_KERN_COLORED_CACHES_H
 #define ROS_KERN_COLORED_CACHES_H
 
-#include <arch/types.h>
+#include <ros/common.h>
 
 /****************** Cache Structures ********************/
 typedef struct Cache {

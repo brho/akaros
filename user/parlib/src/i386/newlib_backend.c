@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <debug.h>
+#include <sys/times.h>
 
 #define debug_in_out(...) // debug(__VA_ARGS__)  
 #define debug_write_check(fmt, ...) // debug(fmt, __VA_ARGS__)
@@ -29,7 +30,7 @@ char **environ = __env;
  * If your system doesn't provide this, it is best to avoid linking 
  * with subroutines that require it (exit, system).
  */
-void _exit(int __status) _ATTRIBUTE ((noreturn))
+void _exit(int __status)
 {
 	sys_proc_destroy(sys_getpid()); // TODO: can run getpid and cache it
 	while(1); //Should never get here...
@@ -86,7 +87,7 @@ int close(int file) {
  * Minimal implementation (for a system without processes).
  */
 
-int execve(char *name, char **argv, char **env) 
+int execve(const char *name, char * const argv[], char * const env[]) 
 {
 	debug_in_out("EXECVE\n");
 	errno = ENOMEM;
@@ -97,7 +98,7 @@ int execve(char *name, char **argv, char **env)
  * Create a new process. 
  * Minimal implementation (for a system without processes).
  */
-int fork(void) 
+pid_t fork(void) 
 {
 	debug_in_out("FORK\n");
 	errno = EAGAIN;
@@ -165,7 +166,7 @@ int fstat(int file, struct stat *st)
  * conflict with other processes. Minimal implementation, for a system 
  * without processes.
  */
-int getpid(void) 
+pid_t getpid(void) 
 {
 	return sys_getpid(); // TODO: can run getpid and cache it
 }
@@ -234,7 +235,7 @@ int kill(int pid, int sig)
  * Establish a new name for an existing file. 
  * Minimal implementation.
  */
-int link(char *old, char *new) 
+int link(const char *old, const char *new) 
 {
 	debug_in_out("LINK\n");
 	
@@ -609,7 +610,7 @@ char *send_message(char *message, int len)
  * Status of a file (by name). 
  * Minimal implementation.
  */
-int stat(char *file, struct stat *st) 
+int stat(const char *file, struct stat *st) 
 {
 	debug_in_out("STAT\n");
 	
@@ -663,7 +664,7 @@ int stat(char *file, struct stat *st)
  * Timing information for current process. 
  * Minimal implementation.
  */
-int times(struct tms *buf) 
+clock_t times(struct tms *buf) 
 {
 	debug_in_out("TIMES");
 	return -1;
@@ -673,7 +674,7 @@ int times(struct tms *buf)
  * Remove a file's directory entry. 
  * Minimal implementation.
  */
-int unlink(char *name) 
+int unlink(const char *name) 
 {
 	debug_in_out("UNLINK\n");
 	
@@ -729,7 +730,7 @@ int wait(int *status)
 /* write()
  * Write to a file. 
  */
-ssize_t write(int file, void *ptr, size_t len) {
+ssize_t write(int file, const void *ptr, size_t len) {
 	
 	debug_in_out("WRITE\n");	
 	debug_in_out("\tFILE: %u\n", file);

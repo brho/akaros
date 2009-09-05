@@ -2,7 +2,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <unistd.h>
-#include <arch/types.h>
+#include <ros/common.h>
 
 extern char * readline(const char *prompt);
 extern void draw_nanwan();

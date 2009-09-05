@@ -2,9 +2,9 @@
 #define ROS_INC_ARCH_H
 
 #include <arch/x86.h>
-#include <arch/types.h>
-#include <arch/apic.h>
+#include <ros/common.h>
 #include <arch/trap.h>
+#include <arch/apic.h>
 
 /* Arch Constants */
 #define MAX_NUM_CPUS				255
@@ -111,9 +111,7 @@ disable_irqsave(int8_t* state)
 static __inline void
 cpu_relax(void)
 {
-	// in case the compiler doesn't serialize for pause, the "m" will make sure
-	// no memory is reordered around this instruction.
-	asm volatile("pause" : : : "memory");
+	__cpu_relax();
 }
 
 static __inline void
@@ -123,7 +121,7 @@ cpu_halt(void)
 }
 
 static __inline void
-clflush(uintptr_t* addr) __attribute__((always_inline))
+clflush(uintptr_t* addr)
 {
 	asm volatile("clflush %0" : : "m"(*addr));
 }
@@ -135,7 +133,7 @@ irq_is_enabled(void)
 }
 
 static __inline uint32_t
-( core_id)(void)
+core_id(void)
 {
 	return lapic_get_id();
 }
@@ -143,7 +141,7 @@ static __inline uint32_t
 static __inline void
 cache_flush(void)
 {
-        wbinvd();
+	wbinvd();
 }
 
 static __inline void
@@ -154,4 +152,4 @@ reboot(void)
 	while(1);
 }
 
-#endif /* !ROS_INC_X86_H */
+#endif /* !ROS_INC_ARCH_H */

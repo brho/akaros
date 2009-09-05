@@ -400,7 +400,9 @@ static uint8_t * COUNT(256) (SREADONLY charcode)[4] = {
  * Get data from the keyboard.  If we finish a character, return it.  Else 0.
  * Return -1 if no data.
  */
+#ifdef __IVY__
 #pragma cilnoremove("cons_lock")
+#endif
 static volatile uint32_t SRACY cons_lock = 0;
 static uint32_t SLOCKED(&cons_lock) shift;
 static bool SLOCKED(&cons_lock) crt_scrolled = FALSE;

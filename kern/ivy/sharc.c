@@ -1,3 +1,4 @@
+#ifdef __IVY__
 #include <assert.h>
 
 int __ivy_checking_on = 1;
@@ -23,3 +24,5 @@ void __sharc_lock_coerce_error(void *dstlck, void *srclck, char *msg)
 	warn("Ivy: The locks in the coercion at %s must be the same\n", msg);
 	__ivy_checking_on = old;
 }
+
+#endif // __IVY__
