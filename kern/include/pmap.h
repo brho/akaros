@@ -1,4 +1,17 @@
-/* See COPYRIGHT for copyright information. */
+/* See COPYRIGHT for copyright information.
+ * Inlines, macros, and most function prototypes (c) the JOS project.
+ *
+ * Actual implementation:
+ * Copyright (c) 2009 The Regents of the University of California
+ * Barret Rhoden <brho@cs.berkeley.edu>
+ * Kevin Klues <klueska@cs.berkeley.edu> (multiboot functions)
+ * Ander Waterman <waterman@cs.berkeley.edu> (memcpy_from_user)
+ * Zach Anderson (zra@cs.berkeley.edu> (user_mem_strlcpy)
+ * See LICENSE for details.
+ *
+ * Physical memory mangement, low-level virtual address space initialization and
+ * management, and other things related to virtual->physical mappings.
+ */
 
 #ifndef ROS_KERN_PMAP_H
 #define ROS_KERN_PMAP_H
@@ -66,6 +79,7 @@ void setup_default_mtrrs(barrier_t* smp_barrier);
 void	tlb_invalidate(pde_t *COUNT(NPDENTRIES) pgdir, void *SNT va);
 void tlb_flush_global(void);
 
+/* TODO: either move these, or make them take a pgdir */
 void * (DALLOC(len) user_mem_check) (env_t *env, const void *DANGEROUS va,
                                      size_t len, int perm);
 
@@ -82,6 +96,8 @@ memcpy_from_user(env_t* env, void* COUNT(len) dest,
 /* Arch specific implementations for these */
 pte_t *pgdir_walk(pde_t *COUNT(NPDENTRIES) pgdir, const void *SNT va, int create);
 int get_va_perms(pde_t *COUNT(NPDENTRIES) pgdir, const void *SNT va);
+// TODO: should this be per process, per mm, per pgdir, etc?
+// - can't ask this question without knowing the "context"
 void *get_free_va_range(pde_t *pgdir, uintptr_t addr, size_t len);
 
 static inline page_t *SAFE ppn2page(size_t ppn)
@@ -122,24 +138,5 @@ static inline page_t* kva2page(void* addr)
 {
 	return pa2page(PADDR(addr));
 }
-
-/*
- * Memory management for processes: syscall related functions, virtual memory
- * regions, etc.
- */
-void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags, int fd, size_t offset);
-
-/* Memory region for a process, consisting of linear(virtual) addresses.  This
- * is what the kernel allocates a process, and the physical mapping can be done
- * lazily (or not).  This way, if a page is swapped out, and the PTE says it
- * isn't present, we still have a way to account for how the whole region ought
- * to be dealt with. */
-struct memregion {
-	LIST_ENTRY(memregion) link; // actually, i'd like a sorted tree of these
-	uintptr_t base;
-	size_t len;
-	int perm;
-};
-TAILQ_HEAD(memregion_list, memregion); // Declares 'struct memregion_list'
 
 #endif /* !ROS_KERN_PMAP_H */

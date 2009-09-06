@@ -443,16 +443,3 @@ error_t memcpy_from_user(env_t* env, void* COUNT(len) dest,
 
 	return ESUCCESS;
 }
-
-/* mmap2() semantics on the offset */
-void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags, int fd,
-           size_t offset)
-{
-	if (fd || offset) {
-		printk("[kernel] mmap() does not support files yet.\n");
-		return (void*SAFE)TC(-1);
-	}
-	void *tmp = get_free_va_range(p->env_pgdir, addr, len);
-	printk("tmp = 0x%08x\n", tmp);
-	return 0;
-}

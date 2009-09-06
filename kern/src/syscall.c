@@ -17,6 +17,7 @@
 #include <process.h>
 #include <schedule.h>
 #include <pmap.h>
+#include <mm.h>
 #include <trap.h>
 #include <syscall.h>
 #include <kmalloc.h>

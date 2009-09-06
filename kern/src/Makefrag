@@ -40,6 +40,7 @@ KERN_SRCFILES := $(KERN_ARCH_SRCFILES) \
                  $(KERN_SRC_DIR)/hashtable.c \
                  $(KERN_SRC_DIR)/hashtable_itr.c \
                  $(KERN_SRC_DIR)/schedule.c \
+                 $(KERN_SRC_DIR)/mm.c \
                  $(KERN_SRC_DIR)/testing.c
 
 # Only build files if they exist.

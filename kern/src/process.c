@@ -357,6 +357,8 @@ void proc_destroy(struct proc *p)
 	/* If we were running the process, we should have received an IPI by now.
 	 * If not, odds are interrupts are disabled, which shouldn't happen while
 	 * servicing syscalls. */
+	// TODO: this trips if we die in a trap that kills a process, like a page
+	// fault
 	assert(current != p);
 	return;
 }
