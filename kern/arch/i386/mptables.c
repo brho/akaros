@@ -4,13 +4,13 @@
  */
 
 #include <arch/ioapic.h>
-#include <pci.h>
+#include <arch/pci.h>
+#include <arch/mptables.h>
+
 #include <stdio.h>
 #include <string.h>
 #include <kmalloc.h>
 #include <arch/x86.h>
-
-#include <mptables.h>
 
 /** @file
  * @brief Basic MP Tables Parser

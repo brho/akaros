@@ -6,6 +6,8 @@
 #include <arch/x86.h>
 #include <arch/smp.h>
 #include <arch/apic.h>
+#include <arch/pci.h>
+#include <arch/ne2k.h>
 
 #include <ros/memlayout.h>
 
@@ -16,8 +18,6 @@
 #include <kmalloc.h>
 
 #include <pmap.h>
-#include <pci.h>
-#include <ne2k.h>
 #include <timing.h>
 
 /* NE2000 NIC Driver Sketch

@@ -23,8 +23,8 @@
 #include <arch/mmu.h>
 #include <arch/x86.h>
 #include <arch/apic.h>
-#include <mptables.h>
-#include <pci.h>
+#include <arch/mptables.h>
+#include <arch/pci.h>
 
 ioapic_redirect_t ioapic_redirects[NUM_IRQS];
 

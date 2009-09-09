@@ -20,9 +20,6 @@ KERN_SRCFILES := $(KERN_ARCH_SRCFILES) \
                  $(KERN_SRC_DIR)/sched.c \
                  $(KERN_SRC_DIR)/kdebug.c \
                  $(KERN_SRC_DIR)/apic.c \
-                 $(KERN_SRC_DIR)/mptables.c \
-                 $(KERN_SRC_DIR)/pci.c \
-                 $(KERN_SRC_DIR)/ioapic.c \
                  $(KERN_SRC_DIR)/printfmt.c \
                  $(KERN_SRC_DIR)/smp.c \
                  $(KERN_SRC_DIR)/multiboot.c \
@@ -40,8 +37,6 @@ KERN_SRCFILES := $(KERN_ARCH_SRCFILES) \
                  $(KERN_SRC_DIR)/kfs.c \
                  $(KERN_SRC_DIR)/process.c \
                  $(KERN_SRC_DIR)/kmalloc.c \
-                 $(KERN_SRC_DIR)/rl8168.c \
-                 $(KERN_SRC_DIR)/ne2k.c \
                  $(KERN_SRC_DIR)/schedule.c \
                  $(KERN_SRC_DIR)/testing.c
 

@@ -22,10 +22,10 @@
 #include <kclock.h>
 #include <manager.h>
 
-#include <rl8168.h>
-#include <ne2k.h>
-#include <mptables.h>
-#include <pci.h>
+#include <arch/rl8168.h>
+#include <arch/ne2k.h>
+#include <arch/mptables.h>
+#include <arch/pci.h>
 #include <arch/ioapic.h>
 
 void kernel_init(multiboot_info_t *mboot_info)
@@ -61,14 +61,21 @@ void kernel_init(multiboot_info_t *mboot_info)
 	idt_init();
 	sysenter_init();
 	timer_init();
+	
+	#ifdef __i386__
 	mptables_parse();
 	pci_init();
 	ioapic_init(); // MUST BE AFTER PCI/ISA INIT!
+	#endif // __i386__
+	
+	
 	// this returns when all other cores are done and ready to receive IPIs
 	smp_boot();
 	
+	#ifdef __i386__
 	rl8168_init();		
 	ne2k_init();
+	#endif // __i386__
 
 	manager();
 }

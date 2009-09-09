@@ -6,18 +6,18 @@
 #include <arch/x86.h>
 #include <arch/smp.h>
 #include <arch/apic.h>
+#include <arch/pci.h>
+#include <arch/rl8168.h>
 
 #include <ros/memlayout.h>
 
 #include <atomic.h>
 #include <stdio.h>
 #include <string.h>
-#include <rl8168.h>
 #include <trap.h>
 #include <kmalloc.h>
 
 #include <pmap.h>
-#include <pci.h>
 
 /* RealTek 8168d (8111d) NIC Driver
  *

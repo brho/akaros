@@ -20,7 +20,7 @@
 #include <arch/x86.h>
 #include <stdio.h>
 #include <string.h>
-#include <pci.h>
+#include <arch/pci.h>
 
 // A value of INVALID_IRQ (something 256 or larger) means invalid
 uint16_t pci_irq_map[PCI_MAX_BUS][PCI_MAX_DEV][PCI_MAX_FUNC];

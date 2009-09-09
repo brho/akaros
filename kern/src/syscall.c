@@ -12,7 +12,7 @@
 #include <ros/timer.h>
 #include <ros/error.h>
 
-#include <rl8168.h>
+#include <arch/rl8168.h>
 #include <string.h>
 #include <assert.h>
 #include <process.h>
