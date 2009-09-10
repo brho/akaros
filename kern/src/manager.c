@@ -68,9 +68,9 @@ void manager(void)
 			spin_unlock_irqsave(&p->proc_lock);
 			proc_run(p);
 			udelay(5000000);
-			printk("Killing p\n");
-			proc_destroy(p);
-			printk("Killed p\n");
+	//		printk("Killing p\n");
+	//		proc_destroy(p);
+	//		printk("Killed p\n");
 			udelay(1000000);
 			panic("This is okay");
 			break;

@@ -179,8 +179,9 @@ trap_dispatch(trapframe_t *tf)
 		case T_SYSCALL:
 			// check for userspace, for now
 			assert(tf->tf_cs != GD_KT);
+			// Note we pass the tf ptr along, in case syscall needs to block
 			tf->tf_regs.reg_eax =
-				syscall(current, tf->tf_regs.reg_eax, tf->tf_regs.reg_edx,
+				syscall(current, tf, tf->tf_regs.reg_eax, tf->tf_regs.reg_edx,
 				        tf->tf_regs.reg_ecx, tf->tf_regs.reg_ebx,
 				        tf->tf_regs.reg_edi, tf->tf_regs.reg_esi);
 			proc_startcore(current, tf); // Note the comment in syscall.c
@@ -214,27 +215,16 @@ env_pop_ancillary_state(env_t* e)
 void
 trap(trapframe_t *tf)
 {
-	//cprintf("Incoming TRAP frame at %p\n", tf);
+	//printk("Incoming TRAP frame on core %d at %p\n", core_id(), tf);
 
 	// TODO: do this once we know we are are not returning to the current
 	// context.  doing it now is safe. (HSS)
+	// we also need to sort this wrt multiple contexts
 	env_push_ancillary_state(current);
 
 	if ((tf->tf_cs & ~3) != GD_UT && (tf->tf_cs & ~3) != GD_KT) {
 		print_trapframe(tf);
 		panic("Trapframe with invalid CS!");
-	}
-
-	if ((tf->tf_cs & 3) == 3) {
-		// Trapped from user mode.
-		// TODO: this will change when an env has more than one context
-		// Copy trap frame (which is currently on the stack)
-		// into 'current->env_tf', so that running the environment
-		// will restart at the trap point.
-		assert(current);
-		current->env_tf = *tf;
-		// The trapframe on the stack should be ignored from here on.
-		tf = &current->env_tf;
 	}
 
 	// Dispatch based on what type of trap occurred
@@ -359,11 +349,8 @@ void sysenter_init(void)
 /* This is called from sysenter's asm, with the tf on the kernel stack. */
 void sysenter_callwrapper(struct Trapframe *tf)
 {
-	current->env_tf = *tf;
-
-	// The trapframe on the stack should be ignored from here on.
-	tf = &current->env_tf;
-	tf->tf_regs.reg_eax = (intreg_t) syscall(current,
+	// Note we pass the tf ptr along, in case syscall needs to block
+	tf->tf_regs.reg_eax = (intreg_t) syscall(current, tf,
 	                                         tf->tf_regs.reg_eax,
 	                                         tf->tf_regs.reg_edx,
 	                                         tf->tf_regs.reg_ecx,

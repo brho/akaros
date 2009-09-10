@@ -92,21 +92,21 @@ static ssize_t sys_run_binary(env_t* e, void *DANGEROUS binary_buf,
 	proc_set_state(env, PROC_RUNNABLE_S);
 	schedule_proc(env);
 	sys_yield(e);
-	
+
 	return 0;
 }
 
 #ifdef __NETWORK__
 // This is not a syscall we want. Its hacky. Here just for syscall stuff until get a stack.
-static ssize_t sys_eth_write(env_t* e, const char *DANGEROUS buf, size_t len) 
-{ 
+static ssize_t sys_eth_write(env_t* e, const char *DANGEROUS buf, size_t len)
+{
 	extern int eth_up;
-	
+
 	if (eth_up) {
-		
+
 		if (len == 0)
 			return 0;
-		
+
 		char *COUNT(len) _buf = user_mem_assert(e, buf, len, PTE_U);
 		int total_sent = 0;
 		int just_sent = 0;
@@ -115,25 +115,25 @@ static ssize_t sys_eth_write(env_t* e, const char *DANGEROUS buf, size_t len)
 			cur_packet_len = ((len - total_sent) > MAX_PACKET_DATA) ? MAX_PACKET_DATA : (len - total_sent);
 			char* wrap_buffer = packet_wrap(_buf + total_sent, cur_packet_len);
 			just_sent = send_frame(wrap_buffer, cur_packet_len + PACKET_HEADER_SIZE);
-			
+
 			if (just_sent < 0)
 				return 0; // This should be an error code of its own
-				
+
 			if (wrap_buffer)
 				kfree(wrap_buffer);
-				
+
 			total_sent += cur_packet_len;
 		}
-		
+
 		return (ssize_t)len;
-		
+
 	}
 	else
 		return -EINVAL;
 }
 
 // This is not a syscall we want. Its hacky. Here just for syscall stuff until get a stack.
-static ssize_t sys_eth_read(env_t* e, char *DANGEROUS buf, size_t len) 
+static ssize_t sys_eth_read(env_t* e, char *DANGEROUS buf, size_t len)
 {
 	extern int eth_up;
 
@@ -148,21 +148,21 @@ static ssize_t sys_eth_read(env_t* e, char *DANGEROUS buf, size_t len)
 			return 0;
 
 		char *CT(len) _buf = user_mem_assert(e, buf,len, PTE_U);
-			
+
 		if (packet_waiting == 0)
 			return 0;
-			
+
 		int read_len = ((packet_buffer_pos + len) > packet_buffer_size) ? packet_buffer_size - packet_buffer_pos : len;
 
 		memcpy(_buf, packet_buffer + packet_buffer_pos, read_len);
-	
+
 		packet_buffer_pos = packet_buffer_pos + read_len;
-	
+
 		if (packet_buffer_pos == packet_buffer_size) {
 			kfree(packet_buffer_orig);
 			packet_waiting = 0;
 		}
-	
+
 		return read_len;
 	}
 	else
@@ -182,7 +182,7 @@ static ssize_t sys_shared_page_alloc(env_t* p1,
 	//if (!VALID_USER_PERMS(p1_flags)) return -EPERM;
 	//if (!VALID_USER_PERMS(p2_flags)) return -EPERM;
 
-	void * COUNT(1) * COUNT(1) addr = user_mem_assert(p1, _addr, sizeof(void *), 
+	void * COUNT(1) * COUNT(1) addr = user_mem_assert(p1, _addr, sizeof(void *),
                                                       PTE_USER_RW);
 	page_t* page;
 	env_t* p2 = &(envs[ENVX(p2_id)]);
@@ -432,22 +432,30 @@ static error_t sys_proc_run(struct proc *p, unsigned pid)
 	return retval;
 }
 
-// TODO: Build a dispatch table instead of switching on the syscallno
-// Dispatches to the correct kernel function, passing the arguments.
-intreg_t syscall(env_t* e, uintreg_t syscallno, uintreg_t a1, uintreg_t a2,
-                 uintreg_t a3, uintreg_t a4, uintreg_t a5)
+/* Executes the given syscall.
+ *
+ * Note tf is passed in, which points to the tf of the context on the kernel
+ * stack.  If any syscall needs to block, it needs to save this info, as well as
+ * any silly state.
+ *
+ * TODO: Build a dispatch table instead of switching on the syscallno
+ * Dispatches to the correct kernel function, passing the arguments.
+ */
+intreg_t syscall(struct proc *p, trapframe_t *tf, uintreg_t syscallno,
+                 uintreg_t a1, uintreg_t a2, uintreg_t a3, uintreg_t a4,
+				 uintreg_t a5)
 {
 	// Call the function corresponding to the 'syscallno' parameter.
 	// Return any appropriate return value.
 
-	//cprintf("Incoming syscall number: %d\n    a1: %x\n   "
-	//        " a2: %x\n    a3: %x\n    a4: %x\n    a5: %x\n",
+	//cprintf("Incoming syscall on core: %d number: %d\n    a1: %x\n   "
+	//        " a2: %x\n    a3: %x\n    a4: %x\n    a5: %x\n", core_id(),
 	//        syscallno, a1, a2, a3, a4, a5);
 
 	// used if we need more args, like in mmap
 	int32_t _a4, _a5, _a6, *COUNT(3) args;
 
-	assert(e); // should always have an env for every syscall
+	assert(p); // should always have an env for every syscall
 	//printk("Running syscall: %d\n", syscallno);
 	if (INVALID_SYSCALL(syscallno))
 		return -EINVAL;
@@ -457,61 +465,61 @@ intreg_t syscall(env_t* e, uintreg_t syscallno, uintreg_t a1, uintreg_t a2,
 			sys_null();
 			return ESUCCESS;
 		case SYS_cache_buster:
-			sys_cache_buster(e, a1, a2, a3);
+			sys_cache_buster(p, a1, a2, a3);
 			return 0;
 		case SYS_cache_invalidate:
 			sys_cache_invalidate();
 			return 0;
 		case SYS_shared_page_alloc:
-			return sys_shared_page_alloc(e, (void** DANGEROUS) a1,
+			return sys_shared_page_alloc(p, (void** DANGEROUS) a1,
 		                                 a2, (int) a3, (int) a4);
 		case SYS_shared_page_free:
-			sys_shared_page_free(e, (void* DANGEROUS) a1, a2);
+			sys_shared_page_free(p, (void* DANGEROUS) a1, a2);
 		    return ESUCCESS;
 		case SYS_cputs:
-			return sys_cputs(e, (char *DANGEROUS)a1, (size_t)a2);
+			return sys_cputs(p, (char *DANGEROUS)a1, (size_t)a2);
 		case SYS_cgetc:
-			return sys_cgetc(e);
+			return sys_cgetc(p); // this will need to block
 		case SYS_getcpuid:
 			return sys_getcpuid();
 		case SYS_getpid:
-			return sys_getenvid(e);
+			return sys_getenvid(p);
 		case SYS_proc_destroy:
-			return sys_env_destroy(e, (envid_t)a1);
+			return sys_env_destroy(p, (envid_t)a1);
 		case SYS_yield:
-			sys_yield(e);
+			sys_yield(p);
 			return ESUCCESS;
 		case SYS_proc_create:
-			return sys_proc_create(e, (char *DANGEROUS)a1);
+			return sys_proc_create(p, (char *DANGEROUS)a1);
 		case SYS_proc_run:
-			return sys_proc_run(e, (size_t)a1);
+			return sys_proc_run(p, (size_t)a1);
 		case SYS_mmap:
 			// we only have 4 parameters from sysenter currently, need to copy
 			// in the others.  if we stick with this, we can make a func for it.
-    		args = user_mem_assert(e, (void*DANGEROUS)a4,
+			args = user_mem_assert(p, (void*DANGEROUS)a4,
 			                       3*sizeof(_a4), PTE_USER_RW);
 			_a4 = args[0];
 			_a5 = args[1];
 			_a6 = args[2];
-			return (intreg_t) mmap(e, a1, a2, a3, _a4, _a5, _a6);
+			return (intreg_t) mmap(p, a1, a2, a3, _a4, _a5, _a6);
 		case SYS_brk:
 			printk("brk not implemented yet\n");
 			return -EINVAL;
 
 	#ifdef __i386__
 		case SYS_serial_write:
-			return sys_serial_write(e, (char *DANGEROUS)a1, (size_t)a2);
+			return sys_serial_write(p, (char *DANGEROUS)a1, (size_t)a2);
 		case SYS_serial_read:
-			return sys_serial_read(e, (char *DANGEROUS)a1, (size_t)a2);
+			return sys_serial_read(p, (char *DANGEROUS)a1, (size_t)a2);
 		case SYS_run_binary:
-			return sys_run_binary(e, (char *DANGEROUS)a1,
+			return sys_run_binary(p, (char *DANGEROUS)a1,
 			                      (char* DANGEROUS)a2, (size_t)a3);
 	#endif
 	#ifdef __NETWORK__
 		case SYS_eth_write:
-			return sys_eth_write(e, (char *DANGEROUS)a1, (size_t)a2);
+			return sys_eth_write(p, (char *DANGEROUS)a1, (size_t)a2);
 		case SYS_eth_read:
-			return sys_eth_read(e, (char *DANGEROUS)a1, (size_t)a2);
+			return sys_eth_read(p, (char *DANGEROUS)a1, (size_t)a2);
 	#endif
 	#ifdef __sparc_v8__
 		case SYS_frontend:
@@ -520,14 +528,14 @@ intreg_t syscall(env_t* e, uintreg_t syscallno, uintreg_t a1, uintreg_t a2,
 
 		default:
 			// or just return -EINVAL
-			panic("Invalid syscall number %d for env %x!", syscallno, *e);
+			panic("Invalid syscall number %d for env %x!", syscallno, *p);
 	}
 	return 0xdeadbeef;
 }
 
 intreg_t syscall_async(env_t* e, syscall_req_t *call)
 {
-	return syscall(e, call->num, call->args[0], call->args[1],
+	return syscall(e, NULL, call->num, call->args[0], call->args[1],
 	               call->args[2], call->args[3], call->args[4]);
 }
 

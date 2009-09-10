@@ -10,5 +10,6 @@ OBJDIRS += $(USER_ROSLIB_ARCH_SRC_DIR)
 # We also snatch the use of a couple handy source files
 # from the lib directory, to avoid gratuitous code duplication.
 USER_ROSLIB_ARCH_SRCFILES := $(USER_ROSLIB_ARCH_SRC_DIR)/syscall.c \
+                             $(USER_ROSLIB_ARCH_SRC_DIR)/libmain.c \
                              $(USER_ROSLIB_ARCH_SRC_DIR)/entry.S
 

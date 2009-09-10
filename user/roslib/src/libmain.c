@@ -37,6 +37,8 @@ void libmain(int argc, char * NTS * NT COUNT(argc) argv)
 	if (argc > 0)
 		binaryname = argv[0];
 
+	// signal main this is vcore0
+	setvcore0();
 	// call user main routine
 	main(argc, argv);
 

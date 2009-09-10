@@ -110,6 +110,11 @@ async_desc_t*COUNT(1) get_async_desc(void);
 syscall_desc_t* get_sys_desc(async_desc_t* desc);
 error_t get_all_desc(async_desc_t** a_desc, syscall_desc_t** s_desc);
 
+// Arch specific, in roslib/ARCH/libmain.c
+// Can move these to a inc/arch/lib.h when we don't maintain that symlink to the
+// kernel's arch folder
+uint32_t newcore(void);
+void setvcore0(void);
 
 /* File open modes */
 #define	O_RDONLY	0x0000		/* open for reading only */

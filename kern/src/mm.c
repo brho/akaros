@@ -20,9 +20,6 @@ void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 		printk("[kernel] mmap() does not support files yet.\n");
 		return (void*SAFE)TC(-1);
 	}
-	if (flags != MAP_ANONYMOUS)
-		printk("[kernel] mmap() only supports MAP_ANONYMOUS for now, other"
-		       "flags ignored.\n");
 	/* TODO: make this work, instead of a ghetto hack
 	 * Find a valid range, make sure it doesn't run into the kernel
 	 * make sure there's enough memory (not exceeding quotas)
@@ -44,6 +41,7 @@ void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 	int num_pages = ROUNDUP(len, PGSIZE) / PGSIZE;
 	pte_t *a_pte;
 	// TODO: grab the appropriate mm_lock
+	spin_lock_irqsave(&p->proc_lock);
 	// make sure all pages are available, and in a reasonable range
 	// TODO: can probably do this better with vm_regions.
 	for (int i = 0; i < num_pages; i++) {
@@ -65,6 +63,7 @@ void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 		}
 	}
 	// TODO: release the appropriate mm_lock
+	spin_unlock_irqsave(&p->proc_lock);
 	return (void*SAFE)TC(addr);
 
 	// TODO: if there's a failure, we should go back through the addr+len range
@@ -72,6 +71,7 @@ void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 	// out of memory.
 	mmap_abort:
 		// TODO: release the appropriate mm_lock
+		spin_unlock_irqsave(&p->proc_lock);
 		printk("[kernel] mmap() aborted!\n");
 		// mmap's semantics.  we need a better error propagation system
 		return (void*SAFE)TC(-1); // this is also ridiculous
