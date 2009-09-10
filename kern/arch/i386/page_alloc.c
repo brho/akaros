@@ -10,7 +10,7 @@
 #endif
 
 #ifdef __DEPUTY__
-#pragma nodeputy
+//#pragma nodeputy
 #endif
 
 #include <sys/queue.h>
@@ -43,7 +43,8 @@ void page_alloc_init()
 	//  4) Then extended memory [EXTPHYSMEM, ...).
 	//     Some of it is in use, some is free.
 	int i;
-	physaddr_t physaddr_after_kernel = PADDR(ROUNDUP(boot_freemem, PGSIZE));
+	extern char (SNT end)[];
+	physaddr_t physaddr_after_kernel = PADDR(PTRROUNDUP(boot_freemem, PGSIZE));
 
 	pages[0].page_ref = 1;
 	// alloc the second page, since we will need it later to init the other cores

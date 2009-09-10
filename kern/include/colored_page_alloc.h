@@ -18,10 +18,12 @@
 	page_list_entry_t _cache##_cache_colored_page_link;
 	
 #define DECLARE_CACHE_COLORED_PAGE_FREE_LIST(_cache)                          \
-	page_list_t *COUNT(npages) _cache##_cache_colored_page_list = NULL;
+	uint8_t _cache##_num_colors = 0;                                          \
+	page_list_t *COUNT(_cache##_num_colors) _cache##_cache_colored_page_list = NULL;
 	
 #define DECLARE_EXTERN_CACHE_COLORED_PAGE_FREE_LIST(_cache)                   \
-	extern page_list_t *COUNT(npages) _cache##_cache_colored_page_list;
+    extern uint8_t _cache##_num_colors;                                       \
+	extern page_list_t *COUNT(_cache##_num_colors) _cache##_cache_colored_page_list;
 	
 #define DECLARE_CACHE_COLORED_PAGE_ALLOC_FUNCTION(_cache)                     \
 error_t _cache##_page_alloc(page_t** page, size_t color)                      \
@@ -40,11 +42,11 @@ error_t _cache##_page_alloc(page_t** page, size_t color)                      \
 #define INIT_CACHE_COLORED_PAGE_FREE_LIST(_cache)                             \
 {                                                                             \
 	if(available_caches._cache == TRUE) {                                     \
-	    uint8_t num_colors = get_cache_num_page_colors(&(_cache));            \
-	    size_t list_size = num_colors*sizeof(page_list_t);                    \
+	    _cache##_num_colors = get_cache_num_page_colors(&(_cache));           \
+	    size_t list_size = _cache##_num_colors*sizeof(page_list_t);            \
 	    _cache##_cache_colored_page_list                                      \
 	       = (page_list_t*) boot_alloc(list_size, PGSIZE);                    \
-		for(int i=0; i<num_colors; i++) {                                     \
+		for(int i=0; i<_cache##_num_colors; i++) {                            \
 			LIST_INIT(&(_cache##_cache_colored_page_list[i]));                \
 		}                                                                     \
 	}                                                                         \

@@ -400,12 +400,8 @@ static uint8_t * COUNT(256) (SREADONLY charcode)[4] = {
  * Get data from the keyboard.  If we finish a character, return it.  Else 0.
  * Return -1 if no data.
  */
-#ifdef __IVY__
-#pragma cilnoremove("cons_lock")
-#endif
-static volatile uint32_t SRACY cons_lock = 0;
-static uint32_t SLOCKED(&cons_lock) shift;
-static bool SLOCKED(&cons_lock) crt_scrolled = FALSE;
+static uint32_t SLOCKED(&lock) shift;
+static bool SLOCKED(&lock) crt_scrolled = FALSE;
 
 static int
 kbd_proc_data(void)
@@ -505,7 +501,7 @@ struct cons {
 	uint32_t wpos;
 };
 
-static struct cons SLOCKED(&cons_lock) cons;
+static struct cons SLOCKED(&lock) cons;
 
 // called by device interrupt routines to feed input characters
 // into the circular console input buffer.
@@ -529,7 +525,7 @@ cons_getc(void)
 {
 	int c;
 
-	spin_lock_irqsave(&cons_lock);
+	spin_lock_irqsave(&lock);
 
 	// poll for any pending input characters,
 	// so that this function works even when interrupts are disabled
@@ -544,10 +540,10 @@ cons_getc(void)
 		c = cons.buf[cons.rpos++];
 		if (cons.rpos == CONSBUFSIZE)
 			cons.rpos = 0;
-		spin_unlock_irqsave(&cons_lock);
+		spin_unlock_irqsave(&lock);
 		return c;
 	}
-	spin_unlock_irqsave(&cons_lock);
+	spin_unlock_irqsave(&lock);
 	return 0;
 }
 

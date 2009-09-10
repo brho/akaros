@@ -314,12 +314,13 @@ void* user_mem_check(env_t *env, const void *DANGEROUS va, size_t len, int perm)
  * @return LEN the length of the new buffer copied into 'dst'
  */
 size_t
-user_mem_strlcpy(env_t *env, char *dst, const char *DANGEROUS va,
+user_mem_strlcpy(env_t *env, char *_dst, const char *DANGEROUS va,
                  size_t _len, int perm)
 {
 	const char *DANGEROUS src = va;
 	size_t len = _len;
-	char *NT COUNT(_len-1) dst_in = dst;
+	char *NT COUNT(_len-1) dst_in = _dst;
+	char *NT BND(_dst,_dst + _len - 1) dst = _dst;
 
 	if (len > 0) {
 		while (1) {
