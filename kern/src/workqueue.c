@@ -22,8 +22,8 @@
  */
 void process_workqueue()
 {
-	struct work TP(void*) work;
-	struct per_cpu_info *cpuinfo = &per_cpu_info[core_id()];
+	struct work TP(TV(t)) work;
+	per_cpu_info_t *cpuinfo = &per_cpu_info[core_id()];
 
 	// copy the work in, since we may never return to this stack frame
 	spin_lock_irqsave(&cpuinfo->lock);
@@ -39,10 +39,10 @@ void process_workqueue()
 	}
 }
 
-int enqueue_work(struct workqueue TP(void*) *queue, struct work TP(TV(t)) *job)
+int enqueue_work(struct workqueue TP(TV(t)) *queue, struct work TP(TV(t)) *job)
 {
 	error_t retval = 0;
-	struct per_cpu_info *cpuinfo = &per_cpu_info[core_id()];
+	per_cpu_info_t *cpuinfo = &per_cpu_info[core_id()];
 
 	spin_lock_irqsave(&cpuinfo->lock);
 	printd("Enqueuing func 0x%08x and data 0x%08x on core %d.\n",

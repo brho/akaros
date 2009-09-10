@@ -95,6 +95,8 @@
 
 #define TV(x)           void *
 #define TP(x)           
+#define NTP(n,x)
+#define NTPTV(n)
 
 /* Sharc Stuff */
 

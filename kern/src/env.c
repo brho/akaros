@@ -4,10 +4,6 @@
 #pragma nosharc
 #endif
 
-#ifdef __IVY__
-#pragma nodeputy
-#endif
-
 #include <arch/arch.h>
 #include <arch/mmu.h>
 #include <elf.h>
@@ -497,13 +493,22 @@ type SLOCKED(name##_lock) *\
  *
  * Note this is rather old, and meant to run a RUNNABLE_S on a worker core.
  */
-void run_env_handler(trapframe_t *tf, TV(t) data)
+void run_env_handler(trapframe_t *tf, env_t * data)
 {
 	assert(data);
-	struct work TP(TV(t)) job;
-	struct workqueue TP(void*) *workqueue = &per_cpu_info[core_id()].workqueue;
+	struct work TP(env_t *) job;
+	struct workqueue TP(env_t *) *CT(1) workqueue =
+	    TC(&per_cpu_info[core_id()].workqueue);
 	// this doesn't work, and making it a TP(env_t) is wrong
+	// zra: When you want to use other types, let me know, and I can help
+    // make something that Ivy is happy with. We'll have to use some tagged
+    // unions for the elements of the work queue, and for the args to this
+    // function.
+#ifndef __IVY__
 	job.func = (func_t)proc_run;
+#else
+	job.func = proc_run;
+#endif
 	job.data = data;
 	if (enqueue_work(workqueue, &job))
 		panic("Failed to enqueue work!");

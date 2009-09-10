@@ -4,10 +4,6 @@
 #pragma nosharc
 #endif
 
-#ifdef __IVY__
-#pragma nodeputy
-#endif
-
 #include <ros/common.h>
 #include <arch/arch.h>
 #include <arch/mmu.h>
@@ -374,10 +370,11 @@ intreg_t syscall(env_t* e, uintreg_t syscallno, uintreg_t a1, uintreg_t a2,
 		case SYS_mmap:
 			// we only have 4 parameters from sysenter currently, need to copy
 			// in the others.  if we stick with this, we can make a func for it.
-    		args = user_mem_assert(e, (void*)a4, 3*sizeof(_a4), PTE_USER_RW);
-			_a4 = *(args++);
-			_a5 = *(args++);
-			_a6 = *(args++);
+    		args = user_mem_assert(e, (void*DANGEROUS)a4,
+			                       3*sizeof(_a4), PTE_USER_RW);
+			_a4 = args[0];
+			_a5 = args[1];
+			_a6 = args[2];
 			return (intreg_t) mmap(e, a1, a2, a3, _a4, _a5, _a6);
 		case SYS_brk:
 			printk("brk not implemented yet\n");

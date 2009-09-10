@@ -9,10 +9,6 @@
 #pragma nosharc
 #endif
 
-#ifdef __DEPUTY__
-//#pragma nodeputy
-#endif
-
 #include <sys/queue.h>
 #include <page_alloc.h>
 #include <pmap.h>

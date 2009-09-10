@@ -367,8 +367,8 @@ void sysenter_callwrapper(struct Trapframe *tf)
 	proc_startcore(current, tf);
 }
 
-uint32_t send_active_message(uint32_t dst, amr_t pc, uint32_t arg0,
-                             uint32_t arg1, uint32_t arg2)
+uint32_t send_active_message(uint32_t dst, amr_t pc,
+                             TV(a0t) arg0, TV(a1t) arg1, TV(a2t) arg2)
 {
 	error_t retval = -EBUSY;
 	spin_lock_irqsave(&per_cpu_info[dst].amsg_lock);
@@ -402,7 +402,7 @@ uint32_t send_active_message(uint32_t dst, amr_t pc, uint32_t arg0,
  * currently disabled for this gate. */
 void __active_message(trapframe_t *tf)
 {
-	struct per_cpu_info *myinfo = &per_cpu_info[core_id()];
+	per_cpu_info_t *myinfo = &per_cpu_info[core_id()];
 	active_message_t amsg;
 
 	lapic_send_eoi();

@@ -3,10 +3,6 @@
 #pragma nosharc
 #endif
 
-#ifdef __IVY__
-#pragma nodeputy
-#endif
-
 #include <arch/mmu.h>
 #include <arch/arch.h>
 #include <smp.h>
@@ -347,7 +343,7 @@ void test_checklists(void)
 
 atomic_t a, b, c;
 
-void test_incrementer_handler(trapframe_t *tf, void *data)
+void test_incrementer_handler(trapframe_t *tf, atomic_t *data)
 {
 	assert(data);
 	atomic_inc(data);
@@ -681,9 +677,9 @@ void test_barrier_handler(trapframe_t *tf, void* data)
 	//cprintf("Round 4: Core %d\n", core_id());
 }
 
-static void test_waiting_handler(trapframe_t *tf, void *data)
+static void test_waiting_handler(trapframe_t *tf, atomic_t *data)
 {
-	{HANDLER_ATOMIC atomic_dec(data);}
+	atomic_dec(data);
 }
 
 #ifdef __i386__

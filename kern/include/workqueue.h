@@ -30,6 +30,6 @@ struct workqueue {
 
 void process_workqueue(void);
 // For now, the caller should free their struct work after this call
-int enqueue_work(struct workqueue *queue, struct work *job);
+int enqueue_work(struct workqueue TP(TV(t)) *queue, struct work TP(TV(t)) *job);
 
 #endif /* ROS_KERN_WORKQUEUE_H */

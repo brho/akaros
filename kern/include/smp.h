@@ -21,14 +21,17 @@
 struct per_cpu_info {
 	spinlock_t lock;
 	bool preempt_pending;
-	struct workqueue TP(void*) workqueue;
+	struct workqueue NTPTV(t) workqueue;
 #ifdef __i386__
 	spinlock_t amsg_lock;
 	unsigned amsg_current;
 	active_message_t active_msgs[NUM_ACTIVE_MESSAGES];
 #endif
 };
-extern struct per_cpu_info per_cpu_info[MAX_NUM_CPUS];
+
+typedef struct per_cpu_info NTPTV(t) NTPTV(a0t) NTPTV(a1t) NTPTV(a2t) per_cpu_info_t;
+
+extern per_cpu_info_t per_cpu_info[MAX_NUM_CPUS];
 extern volatile uint8_t num_cpus;
 
 /* SMP bootup functions */

@@ -8,10 +8,6 @@
 #pragma nosharc
 #endif
 
-#ifdef __IVY__
-#pragma nodeputy
-#endif
-
 #include <ros/common.h>
 #include <smp.h>
 
