@@ -493,7 +493,11 @@ type SLOCKED(name##_lock) *\
  *
  * Note this is rather old, and meant to run a RUNNABLE_S on a worker core.
  */
+#ifdef __IVY__
 void run_env_handler(trapframe_t *tf, env_t * data)
+#else
+void run_env_handler(trapframe_t *tf, void * data)
+#endif
 {
 	assert(data);
 	struct work TP(env_t *) job;
@@ -501,13 +505,11 @@ void run_env_handler(trapframe_t *tf, env_t * data)
 	    TC(&per_cpu_info[core_id()].workqueue);
 	// this doesn't work, and making it a TP(env_t) is wrong
 	// zra: When you want to use other types, let me know, and I can help
-    // make something that Ivy is happy with. We'll have to use some tagged
-    // unions for the elements of the work queue, and for the args to this
-    // function.
-#ifndef __IVY__
-	job.func = (func_t)proc_run;
-#else
+    // make something that Ivy is happy with. 
+#ifdef __IVY__
 	job.func = proc_run;
+#else
+	job.func = (func_t)proc_run;
 #endif
 	job.data = data;
 	if (enqueue_work(workqueue, &job))

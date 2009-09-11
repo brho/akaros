@@ -343,7 +343,11 @@ void test_checklists(void)
 
 atomic_t a, b, c;
 
+#ifdef __IVY__
 void test_incrementer_handler(trapframe_t *tf, atomic_t *data)
+#else
+void test_incrementer_handler(trapframe_t *tf, void *data)
+#endif
 {
 	assert(data);
 	atomic_inc(data);
@@ -677,7 +681,11 @@ void test_barrier_handler(trapframe_t *tf, void* data)
 	//cprintf("Round 4: Core %d\n", core_id());
 }
 
+#ifdef __IVY__
 static void test_waiting_handler(trapframe_t *tf, atomic_t *data)
+#else
+static void test_waiting_handler(trapframe_t *tf, void *data)
+#endif
 {
 	atomic_dec(data);
 }
@@ -716,8 +724,13 @@ void test_circ_buffer(void)
 	return;
 }
 
+#ifdef __IVY__
 void test_am_handler(trapframe_t* tf, uint32_t srcid, uint32_t a0, uint32_t a1,
                      uint32_t a2)
+#else
+void test_am_handler(trapframe_t* tf, uint32_t srcid, void * a0, void * a1,
+                     void * a2)
+#endif
 {
 	printk("Received AM on core %d from core %d: arg0= 0x%08x, arg1 = "
 	       "0x%08x, arg2 = 0x%08x\n", core_id(), srcid, a0, a1, a2);
@@ -730,13 +743,25 @@ void test_active_messages(void)
 	// messages work.
 	printk("sending NUM_ACTIVE_MESSAGES to core 1, sending (#,deadbeef,0)\n");
 	for (int i = 0; i < NUM_ACTIVE_MESSAGES; i++)
+#ifdef __IVY__
 		while (send_active_message(1, test_am_handler, i, 0xdeadbeef, 0))
 			cpu_relax();
+#else
+		while (send_active_message(1, test_am_handler, (void *)i,
+		                           (void *)0xdeadbeef, (void *)0))
+			cpu_relax();
+#endif
 	udelay(5000000);
 	printk("sending 2*NUM_ACTIVE_MESSAGES to core 1, sending (#,cafebabe,0)\n");
 	for (int i = 0; i < 2*NUM_ACTIVE_MESSAGES; i++)
-		while (send_active_message(1, test_am_handler, i, 0xcafebabe, 0))
+#ifdef __IVY__
+		while (send_active_message(1, test_am_handler, i, 0xdeadbeef, 0))
 			cpu_relax();
+#else
+		while (send_active_message(1, test_am_handler, (void *)i,
+		                           (void *)0xdeadbeef, (void *)0))
+			cpu_relax();
+#endif
 	udelay(5000000);
 	return;
 }

@@ -56,7 +56,11 @@ static void init_smp_call_function(void)
 
 /******************************************************************************/
 
+#ifdef __IVY__
 static void smp_mtrr_handler(trapframe_t *tf, barrier_t *data)
+#else
+static void smp_mtrr_handler(trapframe_t *tf, void *data)
+#endif
 {
 	setup_default_mtrrs(data);
 }

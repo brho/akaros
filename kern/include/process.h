@@ -58,10 +58,17 @@ error_t proc_incref(struct proc *SAFE p);
 void proc_decref(struct proc *SAFE p);
 
 /* Active message handlers for process management */
-void __startcore(trapframe_t *tf, uint32_t srcid, uint32_t a0, uint32_t a1,
-                 uint32_t a2);
-void __death(trapframe_t *tf, uint32_t srcid, uint32_t a0, uint32_t a1,
-             uint32_t a2);
+#ifdef __IVY__
+void __startcore(trapframe_t *tf, uint32_t srcid, struct proc *CT(1) a0,
+                 trapframe_t *CT(1) a1, void *SNT a2);
+void __death(trapframe_t *tf, uint32_t srcid, void *SNT a0, void *SNT a1,
+             void *SNT a2);
+#else
+void __startcore(trapframe_t *tf, uint32_t srcid, void * a0, void * a1,
+                 void * a2);
+void __death(trapframe_t *tf, uint32_t srcid, void * a0, void * a1,
+             void * a2);
+#endif
 
 /* Degubbing */
 void print_idlecoremap(void);

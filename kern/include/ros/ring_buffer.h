@@ -36,6 +36,9 @@
 
 typedef unsigned int RING_IDX;
 
+// zra: smp.c is v. slow to build because these RDn() things cause expressions
+//      to grow exponentially.
+
 /* Round a 32-bit unsigned constant down to the nearest power of two. */
 #define __RD2(_x)  (((_x) & 0x00000002UL) ? 0x2                  : ((_x) & 0x1))
 #define __RD4(_x)  (((_x) & 0x0000000cUL) ? __RD2((_x)>>2)<<2    : __RD2(_x))
@@ -130,8 +133,12 @@ typedef unsigned int RING_IDX;
     RING_IDX rsp_prod, rsp_event;                                       \
     uint8_t  pad[48];
     
+struct rhs_struct {
+	__RING_HEADER()
+};
+
 #define __RING_HEADER_SIZE() \
-    (sizeof(struct {__RING_HEADER()} ))
+    (sizeof(struct rhs_struct))
 
 #define DEFINE_RING_TYPES(__name, __req_t, __rsp_t)                     \
 	DEFINE_RING_TYPES_WITH_SIZE(__name, __req_t, __rsp_t,               \
@@ -171,7 +178,6 @@ struct __name##_back_ring {                                             \
 typedef struct __name##_sring __name##_sring_t;                         \
 typedef struct __name##_front_ring __name##_front_ring_t;               \
 typedef struct __name##_back_ring __name##_back_ring_t;                 \
-                                                                        \
 /* This is a dummy function just used to statically assert that         \
  * there are no weird padding issues associated with our sring structs  \
  */                                                                     \
@@ -185,6 +191,7 @@ static void __name##_assert_sring_size() {                              \
 	                )                                                   \
 	              );                                                    \
 }              
+
 
 /*
  * Macros for manipulating rings.

@@ -148,14 +148,24 @@ void proc_run(struct proc *p)
 			if (p->num_vcores) {
 				// TODO: handle silly state (HSS)
 				// set virtual core 0 to run the main context
-				send_active_msg_sync(p->vcoremap[0], __startcore, (uint32_t)p,
-				                     (uint32_t)&p->env_tf, 0);
+#ifdef __IVY__
+				send_active_msg_sync(p->vcoremap[0], __startcore, p,
+				                     &p->env_tf, (void *SNT)0);
+#else
+				send_active_msg_sync(p->vcoremap[0], (void *)__startcore,
+				                     (void *)p, (void *)&p->env_tf, 0);
+#endif
 				/* handle the others.  note the sync message will spin until
 				 * there is a free active message slot, which could lock up the
 				 * system.  think about this. (TODO) */
 				for (int i = 1; i < p->num_vcores; i++)
+#ifdef __IVY__
 					send_active_msg_sync(p->vcoremap[i], __startcore,
-					                     (uint32_t)p, 0, i);
+					                     p, (trapframe_t *CT(1))NULL, (void *SNT)i);
+#else
+					send_active_msg_sync(p->vcoremap[i], (void *)__startcore,
+					                     (void *)p, (void *)0, (void *)i);
+#endif
 			}
 			/* There a subtle (attempted) race avoidance here.  proc_startcore
 			 * can handle a death message, but we can't have the startcore come
@@ -292,7 +302,8 @@ void proc_destroy(struct proc *p)
 				current = NULL;
 			}
 			#endif
-			send_active_msg_sync(p->vcoremap[0], __death, 0, 0, 0);
+			send_active_msg_sync(p->vcoremap[0], __death, (void *SNT)0,
+			                     (void *SNT)0, (void *SNT)0);
 			#if 0
 			/* right now, RUNNING_S only runs on a mgmt core (0), not cores
 			 * managed by the idlecoremap.  so don't do this yet. */
@@ -308,7 +319,8 @@ void proc_destroy(struct proc *p)
 			 * within proc_destroy */
 			spin_lock(&idle_lock);
 			for (int i = 0; i < p->num_vcores; i++) {
-				send_active_msg_sync(p->vcoremap[i], __death, 0, 0, 0);
+				send_active_msg_sync(p->vcoremap[i], __death, (void *SNT)0,
+				                     (void *SNT)0, (void *SNT)0);
 				// give the pcore back to the idlecoremap
 				assert(num_idlecores < num_cpus); // sanity
 				idlecoremap[num_idlecores++] = p->vcoremap[i];
@@ -411,13 +423,18 @@ void proc_decref(struct proc *p)
 
 /* Active message handler to start a process's context on this core.  Tightly
  * coupled with proc_run() */
-void __startcore(trapframe_t *tf, uint32_t srcid, uint32_t a0, uint32_t a1,
-                 uint32_t a2)
+#ifdef __IVY__
+void __startcore(trapframe_t *tf, uint32_t srcid, struct proc *CT(1) a0,
+                 trapframe_t *CT(1) a1, void *SNT a2)
+#else
+void __startcore(trapframe_t *tf, uint32_t srcid, void * a0, void * a1,
+                 void * a2)
+#endif
 {
 	uint32_t coreid = core_id();
-	struct proc *p_to_run = (struct proc *SAFE) TC(a0);
+	struct proc *p_to_run = (struct proc *CT(1))a0;
 	trapframe_t local_tf;
-	trapframe_t *tf_to_pop = (trapframe_t *SAFE) TC(a1);
+	trapframe_t *tf_to_pop = (trapframe_t *CT(1))a1;
 
 	printk("Startcore on core %d\n", coreid);
 	assert(p_to_run);
@@ -427,7 +444,7 @@ void __startcore(trapframe_t *tf, uint32_t srcid, uint32_t a0, uint32_t a1,
 		memset(tf_to_pop, 0, sizeof(*tf_to_pop));
 		proc_init_trapframe(tf_to_pop);
 		// Note the init_tf sets tf_to_pop->tf_esp = USTACKTOP;
-		proc_set_tfcoreid(tf_to_pop, a2);
+		proc_set_tfcoreid(tf_to_pop, (uint32_t)a2);
 		proc_set_program_counter(tf_to_pop, p_to_run->env_entry);
 	}
 	proc_startcore(p_to_run, tf_to_pop);
@@ -437,8 +454,8 @@ void __startcore(trapframe_t *tf, uint32_t srcid, uint32_t a0, uint32_t a1,
  * to idle.  Note this leaves no trace of what was running.
  * It's okay if death comes to a core that's already idling and has no current.
  * It could happen if a process decref'd before proc_startcore could incref. */
-void __death(trapframe_t *tf, uint32_t srcid, uint32_t a0, uint32_t a1,
-             uint32_t a2)
+void __death(trapframe_t *tf, uint32_t srcid, void *SNT a0, void *SNT a1,
+             void *SNT a2)
 {
 	/* If we are currently running an address space on our core, we need a known
 	 * good pgdir before releasing the old one.  This is currently the major
