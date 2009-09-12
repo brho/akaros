@@ -25,6 +25,7 @@
 #include <syscall.h>
 #include <kclock.h>
 #include <manager.h>
+#include <testing.h>
 
 void kernel_init(multiboot_info_t *mboot_info)
 {
@@ -57,6 +58,7 @@ void kernel_init(multiboot_info_t *mboot_info)
 	cache_init();
 	page_init();
 	page_check();
+	//test_page_coloring();
 
 	idt_init();
 	sysenter_init();

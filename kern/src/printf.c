@@ -55,7 +55,7 @@ int vcprintf(const char *fmt, va_list ap)
 	#ifdef __DEPUTY__
 	vprintfmt(buffered_putch, &cntp, fmt, ap);
 	#else
-	vprintfmt((void*)buffered_putch, (void**)&cntp, fmt, ap);
+	vprintfmt((void*)buffered_putch, (void*)&cntp, fmt, ap);
 	#endif
 
 	// write out remaining chars in the buffer

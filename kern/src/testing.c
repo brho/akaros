@@ -106,6 +106,14 @@ void test_page_coloring(void)
 	//Declare a local variable for allocating pages	
 	page_t* page;
 
+	cprintf("Contents of the page free list:\n");
+	for(int i=0; i<llc_num_colors; i++) {
+		cprintf("  COLOR %d:\n", i);
+		LIST_FOREACH(page, &colored_page_free_list[i], page_link) {
+			cprintf("    Page: %d\n", page2ppn(page));
+		}
+	}
+
 	//Run through and allocate all pages through l1_page_alloc
 	cprintf("Allocating from L1 page colors:\n");
 	for(int i=0; i<get_cache_num_page_colors(&l1); i++) {

@@ -124,7 +124,7 @@ void* kmalloc(size_t size, int flags)
 		page_alloc_specific(&page, first+i);
 		page_incref(page);
 		page->num_cons_links = npages-i;
-		LIST_INSERT_HEAD(&pages_list, page, global_link);
+		LIST_INSERT_HEAD(&pages_list, page, page_link);
 		kmallocdebug("mallocing page: %u\n", first+i);
 		kmallocdebug("at addr: %p\n", ppn2kva(first+i));
 	}
@@ -140,7 +140,7 @@ void kfree(void *addr)
 	kmallocdebug("getting page: %u\n", page2ppn(page));
 	for(int i=0; i<num_links; i++) {
 		page_t* p = ppn2page((page2ppn(page) + i));
-		LIST_REMOVE(p, global_link);
+		LIST_REMOVE(p, page_link);
 		page_free(p);
 		kmallocdebug("freeing page: %d\n", page2ppn(p));
 	}

@@ -44,7 +44,7 @@ int vcprintf(const char *fmt, va_list ap)
 	#ifdef __DEPUTY__
 	vprintfmt(putch, &bp, fmt, ap);
 	#else
-	vprintfmt((void*)putch, (void**)&bp, fmt, ap);
+	vprintfmt((void*)putch, (void*)&bp, fmt, ap);
 	#endif
 	sys_cputs(b.buf, b.idx);
 
@@ -110,7 +110,7 @@ static int vcprintf_async(const char *NTS fmt, va_list ap)
 	#ifdef __DEPUTY__
 	vprintfmt(putch_async, &b, fmt, ap);
 	#else
-	vprintfmt((void*)putch_async, (void**)&b, fmt, ap);
+	vprintfmt((void*)putch_async, (void*)&b, fmt, ap);
 	#endif
 	// TODO - should check for a return value for sys_
 	sys_cputs_async(b->buf, b->idx, get_sys_desc(current_async_desc),
