@@ -23,7 +23,7 @@
 
 // These variables are set in i386_vm_init()
 pde_t* boot_pgdir;		// Virtual address of boot time page directory
-physaddr_t boot_cr3;		// Physical address of boot time page directory
+physaddr_t RO boot_cr3;		// Physical address of boot time page directory
 
 // Global variables
 volatile uint32_t pages_lock = 0;

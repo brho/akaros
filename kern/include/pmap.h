@@ -43,7 +43,7 @@ extern char (SNT bootstacktop)[], (SNT bootstack)[];
 extern volatile uint32_t pages_lock;
 extern page_t SLOCKED(&pages_lock) * SREADONLY COUNT(npages) pages;
 
-extern physaddr_t boot_cr3;
+extern physaddr_t RO boot_cr3;
 extern pde_t *COUNT(NPDENTRIES) boot_pgdir;
 
 extern char*BND(end, maxaddrpa_ptr + IVY_KERNBASE) boot_freemem;

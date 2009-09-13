@@ -29,8 +29,8 @@ spinlock_t runnablelist_lock = 0;
 /* Tracks which cores are idle, similar to the vcoremap.  Each value is the
  * physical coreid of an unallocated core. */
 spinlock_t idle_lock = 0;
-uint32_t idlecoremap[MAX_NUM_CPUS];
-uint32_t num_idlecores = 0;
+uint32_t LCKD(&idle_lock) (RO idlecoremap)[MAX_NUM_CPUS];
+uint32_t LCKD(&idle_lock) num_idlecores = 0;
 
 /*
  * While this could be done with just an assignment, this gives us the
@@ -248,7 +248,7 @@ void proc_startcore(struct proc *p, trapframe_t *tf) {
 		// process's context".
 		if (current)
 			proc_decref(current);
-		current = p;
+		set_cpu_curenv(p);
 	}
 	/* need to load our silly state, preferably somewhere other than here so we
 	 * can avoid the case where the context was just running here.  it's not
@@ -465,7 +465,7 @@ void __death(trapframe_t *tf, uint32_t srcid, void *SNT a0, void *SNT a1,
 	if (current) {
 		lcr3(boot_cr3);
 		proc_decref(current);
-		current = NULL;
+		set_cpu_curenv(NULL);
 	}
 	smp_idle();
 }

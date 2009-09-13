@@ -24,14 +24,14 @@ struct per_cpu_info {
 	struct workqueue NTPTV(t) workqueue;
 #ifdef __i386__
 	spinlock_t amsg_lock;
-	unsigned amsg_current;
-	active_message_t active_msgs[NUM_ACTIVE_MESSAGES];
+	unsigned LCKD(&amsg_lock) amsg_current;
+	active_message_t LCKD(&amsg_lock) (RO active_msgs)[NUM_ACTIVE_MESSAGES];
 #endif
 };
 
 typedef struct per_cpu_info NTPTV(t) NTPTV(a0t) NTPTV(a1t) NTPTV(a2t) per_cpu_info_t;
 
-extern per_cpu_info_t ( per_cpu_info)[MAX_NUM_CPUS];
+extern per_cpu_info_t (RO per_cpu_info)[MAX_NUM_CPUS];
 extern volatile uint8_t RO num_cpus;
 
 /* SMP bootup functions */

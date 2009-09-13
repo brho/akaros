@@ -1,5 +1,5 @@
 #ifdef __SHARC__
-#pragma nosharc
+//#pragma nosharc
 #endif
 
 #include <arch/mmu.h>
@@ -18,14 +18,14 @@
 
 #include <syscall.h>
 
-taskstate_t ts;
+taskstate_t RO ts;
 
 /* Interrupt descriptor table.  (Must be built at run time because
  * shifted function addresses can't be represented in relocation records.)
  */
 // Aligned on an 8 byte boundary (SDM V3A 5-13)
-gatedesc_t __attribute__ ((aligned (8))) idt[256] = { { 0 } };
-pseudodesc_t idt_pd = {
+gatedesc_t __attribute__ ((aligned (8))) (RO idt)[256] = { { 0 } };
+pseudodesc_t RO idt_pd = {
 	sizeof(idt) - 1, (uint32_t) idt
 };
 
@@ -37,12 +37,12 @@ pseudodesc_t idt_pd = {
 #pragma cilnoremove("iht_lock")
 #endif
 spinlock_t iht_lock;
-handler_t TP(void *) LCKD(&iht_lock) (RO interrupt_handlers)[NUM_INTERRUPT_HANDLERS];
+handler_t TP(TV(t)) LCKD(&iht_lock) (RO interrupt_handlers)[NUM_INTERRUPT_HANDLERS];
 
 static const char *NTS trapname(int trapno)
 {
     // zra: excnames is SREADONLY because Ivy doesn't trust const
-	static const char *NT const ( excnames)[] = {
+	static const char *NT const (RO excnames)[] = {
 		"Divide error",
 		"Debug",
 		"Non-Maskable Interrupt",
@@ -76,20 +76,20 @@ static const char *NTS trapname(int trapno)
 void
 idt_init(void)
 {
-	extern segdesc_t gdt[];
+	extern segdesc_t (RO gdt)[];
 
 	// This table is made in trapentry.S by each macro in that file.
 	// It is layed out such that the ith entry is the ith's traphandler's
 	// (uint32_t) trap addr, then (uint32_t) trap number
 	struct trapinfo { uint32_t trapaddr; uint32_t trapnumber; };
-	extern struct trapinfo (BND(__this,trap_tbl_end) trap_tbl)[];
-	extern struct trapinfo (SNT trap_tbl_end)[];
+	extern struct trapinfo (BND(__this,trap_tbl_end) RO trap_tbl)[];
+	extern struct trapinfo (SNT RO trap_tbl_end)[];
 	int i, trap_tbl_size = trap_tbl_end - trap_tbl;
 	extern void ISR_default(void);
 
 	// set all to default, to catch everything
 	for(i = 0; i < 256; i++)
-		SETGATE(idt[i], 0, GD_KT, &ISR_default, 0);
+		ROSETGATE(idt[i], 0, GD_KT, &ISR_default, 0);
 
 	// set all entries that have real trap handlers
 	// we need to stop short of the last one, since the last is the default
@@ -98,24 +98,25 @@ idt_init(void)
 	// if we set these to trap gates, be sure to handle the IRQs separately
 	// and we might need to break our pretty tables
 	for(i = 0; i < trap_tbl_size - 1; i++)
-		SETGATE(idt[trap_tbl[i].trapnumber], 0, GD_KT, trap_tbl[i].trapaddr, 0);
+		ROSETGATE(idt[trap_tbl[i].trapnumber], 0, GD_KT, trap_tbl[i].trapaddr, 0);
 
 	// turn on syscall handling and other user-accessible ints
 	// DPL 3 means this can be triggered by the int instruction
 	// STS_TG32 sets the IDT type to a Trap Gate (interrupts enabled)
-	idt[T_SYSCALL].gd_dpl = 3;
-	idt[T_SYSCALL].gd_type = STS_TG32;
-	idt[T_BRKPT].gd_dpl = 3;
+	idt[T_SYSCALL].gd_dpl = SINIT(3);
+	idt[T_SYSCALL].gd_type = SINIT(STS_TG32);
+	idt[T_BRKPT].gd_dpl = SINIT(3);
 
 	// Setup a TSS so that we get the right stack
 	// when we trap to the kernel.
-	ts.ts_esp0 = KSTACKTOP;
-	ts.ts_ss0 = GD_KD;
+	ts.ts_esp0 = SINIT(KSTACKTOP);
+	ts.ts_ss0 = SINIT(GD_KD);
 
 	// Initialize the TSS field of the gdt.
-	gdt[GD_TSS >> 3] = (segdesc_t)SEG16(STS_T32A, (uint32_t) (&ts),
-					   sizeof(taskstate_t), 0);
-	gdt[GD_TSS >> 3].sd_s = 0;
+	SEG16ROINIT(gdt[GD_TSS >> 3],STS_T32A, (uint32_t)(&ts),sizeof(taskstate_t),0);
+	//gdt[GD_TSS >> 3] = (segdesc_t)SEG16(STS_T32A, (uint32_t) (&ts),
+	//				   sizeof(taskstate_t), 0);
+	gdt[GD_TSS >> 3].sd_s = SINIT(0);
 
 	// Load the TSS
 	ltr(GD_TSS);
@@ -257,10 +258,10 @@ irq_handler(trapframe_t *tf)
 	// context.  doing it now is safe. (HSS)
 	env_push_ancillary_state(current);
 
-	extern handler_wrapper_t handler_wrappers[NUM_HANDLER_WRAPPERS];
+	extern handler_wrapper_t (RO handler_wrappers)[NUM_HANDLER_WRAPPERS];
 
 	// determine the interrupt handler table to use.  for now, pick the global
-	handler_t TP(void *) * handler_tbl = interrupt_handlers;
+	handler_t TP(TV(t)) LCKD(&iht_lock) * handler_tbl = interrupt_handlers;
 
 	if (handler_tbl[tf->tf_trapno].isr != 0)
 		handler_tbl[tf->tf_trapno].isr(tf, handler_tbl[tf->tf_trapno].data);
@@ -282,7 +283,7 @@ irq_handler(trapframe_t *tf)
 
 void
 register_interrupt_handler(handler_t TP(TV(t)) table[],
-                           uint8_t int_num, poly_isr_t handler, void* data)
+                           uint8_t int_num, poly_isr_t handler, TV(t) data)
 {
 	table[int_num].isr = handler;
 	table[int_num].data = data;
@@ -406,7 +407,7 @@ uint32_t send_active_message(uint32_t dst, amr_t pc,
  * currently disabled for this gate. */
 void __active_message(trapframe_t *tf)
 {
-	per_cpu_info_t *myinfo = &per_cpu_info[core_id()];
+	per_cpu_info_t RO*myinfo = &per_cpu_info[core_id()];
 	active_message_t amsg;
 
 	lapic_send_eoi();
