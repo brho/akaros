@@ -31,8 +31,8 @@ struct per_cpu_info {
 
 typedef struct per_cpu_info NTPTV(t) NTPTV(a0t) NTPTV(a1t) NTPTV(a2t) per_cpu_info_t;
 
-extern per_cpu_info_t per_cpu_info[MAX_NUM_CPUS];
-extern volatile uint8_t num_cpus;
+extern per_cpu_info_t ( per_cpu_info)[MAX_NUM_CPUS];
+extern volatile uint8_t RO num_cpus;
 
 /* SMP bootup functions */
 void smp_boot(void);

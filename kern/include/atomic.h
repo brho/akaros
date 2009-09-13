@@ -19,12 +19,13 @@ typedef struct checklist_mask {
 } checklist_mask_t;
 
 // mask contains an unspecified array, so it needs to be at the bottom
-typedef struct checklist {
+struct checklist {
 	volatile uint32_t lock;
 	checklist_mask_t mask;
 	// eagle-eyed readers may know why this might have been needed. 2009-09-04
 	//volatile uint8_t (COUNT(BYTES_FOR_BITMASK(size)) bits)[];
-} checklist_t;
+};
+typedef struct checklist RACY checklist_t;
 
 #define ZEROS_ARRAY(size) {[0 ... ((size)-1)] 0}
 

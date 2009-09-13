@@ -169,9 +169,6 @@ cga_init(void)
 	uint16_t was;
 	unsigned pos;
 
-	// zra: I suppose this isn't needed, but it makes Ivy shut up
-	//spin_lock_irqsave(&lock);
-
 	cp = (uint16_t *COUNT(CRT_SIZE)) TC(KERNBASE + CGA_BUF);
 	was = *cp;
 	*cp = (uint16_t) 0xA55A;
@@ -194,7 +191,6 @@ cga_init(void)
 	scrolling_crt_pos = 0;
 	current_crt_buf = 0;
 
-	//spin_unlock_irqsave(&lock);
 }
 
 static void set_screen(uint8_t screen_num)

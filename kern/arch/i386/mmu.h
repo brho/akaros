@@ -211,10 +211,28 @@ typedef struct Segdesc {
 { ((lim) >> 12) & 0xffff, (base) & 0xffff, ((base) >> 16) & 0xff,	\
     type, 1, dpl, 1, (unsigned) (lim) >> 28, 0, 0, 1, 1,			\
     (unsigned) (base) >> 24 }
+
 #define SEG16(type, base, lim, dpl) 								\
 { (lim) & 0xffff, (base) & 0xffff, ((base) >> 16) & 0xff,			\
     type, 1, dpl, 1, (unsigned) (lim) >> 16, 0, 0, 1, 0,			\
     (unsigned) (base) >> 24 }
+
+#define SEG16ROINIT(seg,type,base,lim,dpl) \
+	{\
+		(seg).sd_lim_15_0 = SINIT((lim) & 0xffff);\
+		(seg).sd_base_15_0 = SINIT((base)&0xffff);\
+		(seg).sd_base_23_16 = SINIT(((base)>>16)&0xff);\
+		(seg).sd_type = SINIT(type);\
+		(seg).sd_s = SINIT(1);\
+		(seg).sd_dpl = SINIT(dpl);\
+		(seg).sd_p = SINIT(1);\
+		(seg).sd_lim_19_16 = SINIT((unsigned)(lim)>>16);\
+		(seg).sd_avl = SINIT(0);\
+		(seg).sd_rsv1 = SINIT(0);\
+		(seg).sd_db = SINIT(1);\
+		(seg).sd_g = SINIT(0);\
+		(seg).sd_base_31_24 = SINIT((unsigned)(base)>> 24);\
+	}
 
 #endif /* !__ASSEMBLER__ */
 
@@ -323,6 +341,19 @@ typedef struct Gatedesc {
 	(gate).gd_dpl = (dpl);					\
 	(gate).gd_p = 1;					\
 	(gate).gd_off_31_16 = (uint32_t) (off) >> 16;		\
+}
+
+#define ROSETGATE(gate, istrap, sel, off, dpl)			\
+{								\
+	(gate).gd_off_15_0 = SINIT((uint32_t) (off) & 0xffff);		\
+	(gate).gd_ss = SINIT(sel);					\
+	(gate).gd_args = SINIT(0);					\
+	(gate).gd_rsv1 = SINIT(0);					\
+	(gate).gd_type = SINIT((istrap) ? STS_TG32 : STS_IG32);	\
+	(gate).gd_s = SINIT(0);					\
+	(gate).gd_dpl = SINIT(dpl);					\
+	(gate).gd_p = SINIT(1);					\
+	(gate).gd_off_31_16 = SINIT((uint32_t) (off) >> 16);		\
 }
 
 // Set up a call gate descriptor.

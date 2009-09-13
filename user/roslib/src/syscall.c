@@ -137,15 +137,13 @@ error_t sys_proc_run(int pid)
 	return syscall(SYS_proc_run, pid, 0, 0, 0, 0);
 }
 
-#ifdef __IVY__
-#pragma nodeputy
-#endif
 /* We need to do some hackery to pass 6 arguments.  Arg4 pts to the real arg4,
  * arg5, and arg6.  Keep this in sync with kern/src/syscall.c.
  * TODO: consider a syscall_multi that can take more args, and keep it in sync
  * with the kernel.  Maybe wait til we fix sysenter to have 5 or 6 args. */
-void *sys_mmap(void *addr, size_t length, int prot, int flags, int fd,
-               size_t offset)
+void *CT(length)
+sys_mmap(void *SNT addr, size_t length, int prot, int flags, int fd,
+         size_t offset)
 {
 	struct args {
 		int _flags;
@@ -156,6 +154,6 @@ void *sys_mmap(void *addr, size_t length, int prot, int flags, int fd,
 	extra_args._fd = fd;
 	extra_args._offset = offset;
 	// TODO: deputy bitches about this
-	return (void*)syscall(SYS_mmap, (uint32_t)addr, length, prot,
-	                      (int32_t)&extra_args, 0);
+	return (void*CT(length))TC(syscall(SYS_mmap, (uint32_t)addr, length, prot,
+	                      (int32_t)&extra_args, 0));
 }

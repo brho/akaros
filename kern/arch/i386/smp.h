@@ -14,9 +14,11 @@
 
 #define NUM_INTERRUPT_HANDLERS 256
 
-typedef struct HandlerWrapper {
+struct HandlerWrapper {
 	checklist_t* cpu_list;
 	uint8_t vector;
-} handler_wrapper_t;
+};
+
+typedef struct HandlerWrapper LCKD(&cpu_list->lock) handler_wrapper_t;
 
 #endif /* !ROS_ARCH_SMP_H */

@@ -66,8 +66,9 @@ void        sys_yield(void);
 int         sys_proc_create(char* path);
 error_t     sys_proc_run(int pid);
 /* Memory Management */
-void *sys_mmap(void *addr, size_t length, int prot, int flags, int fd,
-               size_t offset);
+void *COUNT(length)
+sys_mmap(void *SNT addr, size_t length, int prot, int flags, int fd,
+         size_t offset);
 /* Generic Async Call */
 error_t     waiton_syscall(syscall_desc_t* desc, syscall_rsp_t*COUNT(1) rsp);
 

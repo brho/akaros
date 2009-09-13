@@ -17,13 +17,10 @@ void udelay(uint64_t usec, uint64_t tsc_freq)
 	return;
 }
 
-#ifdef __IVY__
-#pragma nodeputy
-#endif
 int main(int argc, char** argv)
 {
 	cprintf("Multi-Goodbye, world, from PID: %d!\n", sys_getpid());
-	sys_mmap((void*)1, 2, 3, 4, 0, 0);
+	sys_mmap((void*SNT)1, 2, 3, 4, 0, 0);
 	while(1);
 	udelay(5000000, 1995014570); // KVM's freq.  Whatever.
 

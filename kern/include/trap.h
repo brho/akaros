@@ -17,10 +17,16 @@ typedef struct InterruptHandler {
 	poly_isr_t isr;
 	TV(t) data;
 } handler_t;
-extern handler_t (COUNT(256) interrupt_handlers)[];
+
+#ifdef __IVY__
+#pragma cilnoremove("iht_lock")
+#endif
+extern spinlock_t iht_lock;
+extern handler_t LCKD(&iht_lock) (CT(NUM_INTERRUPT_HANDLERS) RO interrupt_handlers)[];
 
 void idt_init(void);
-void register_interrupt_handler(handler_t (COUNT(256)table)[], uint8_t int_num,
+void register_interrupt_handler(handler_t SSOMELOCK (CT(NUM_INTERRUPT_HANDLERS)table)[],
+                                uint8_t int_num,
                                 poly_isr_t handler, TV(t) data);
 void ( print_trapframe)(trapframe_t *tf);
 void ( page_fault_handler)(trapframe_t *tf);

@@ -3,7 +3,7 @@
 #include <fcntl.h>
 #include <arch/kbdreg.h>
 
-char* readline(const char *prompt)
+char* readline(const char * prompt)
 {
 	int i, read_amt;
 	char c;

@@ -33,7 +33,11 @@ pseudodesc_t idt_pd = {
  * of functions to be called when servicing an interrupt.  other cores
  * can set up their own later.
  */
-handler_t TP(void *) interrupt_handlers[NUM_INTERRUPT_HANDLERS];
+#ifdef __IVY__
+#pragma cilnoremove("iht_lock")
+#endif
+spinlock_t iht_lock;
+handler_t TP(void *) LCKD(&iht_lock) (RO interrupt_handlers)[NUM_INTERRUPT_HANDLERS];
 
 static const char *NTS trapname(int trapno)
 {

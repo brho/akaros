@@ -434,7 +434,7 @@ OPTSTRING getcwd (STRINGBUF(__size) __buf, size_t __size);
 
 // reent.h
 
-#ifdef __CYGWIN__
+//#ifdef __CYGWIN__
 // Take care of the union in reent.h (on cygwin)
 // This union is not actually used, so we can use WHEN 
 // clauses to enable only the used field.
@@ -444,7 +444,7 @@ struct _reent {
         void _unused WHEN(0);
     } _new;
 };
-#endif
+//#endif
 
 // siginfo.h
 

@@ -5,7 +5,7 @@
  */
 
 #ifdef __SHARC__
-#pragma nosharc
+//#pragma nosharc
 #endif
 
 #include <arch/arch.h>
@@ -23,7 +23,7 @@
 /*************************** IPI Wrapper Stuff ********************************/
 // checklists to protect the global interrupt_handlers for 0xf0, f1, f2, f3, f4
 // need to be global, since there is no function that will always exist for them
-handler_wrapper_t             handler_wrappers[NUM_HANDLER_WRAPPERS];
+handler_wrapper_t             (RO handler_wrappers)[NUM_HANDLER_WRAPPERS];
 
 static int smp_call_function(uint8_t type, uint32_t dest, poly_isr_t handler, TV(t) data,
                              handler_wrapper_t** wait_wrapper)
