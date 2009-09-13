@@ -27,4 +27,5 @@ void cache_init()
 	available_caches.l1 = TRUE;
 	available_caches.l2 = TRUE;
 	available_caches.l3 = TRUE;
+	available_caches.llc = &l3;
 }

@@ -42,7 +42,7 @@ int vdebug(const char *fmt, va_list ap)
 	#ifdef __DEPUTY__
 	vdebugfmt(putch, &bp, fmt, ap);
 	#else
-	vdebugfmt((void*)putch, (void**)&bp, fmt, ap);
+	vdebugfmt((void*)putch, (void*)&bp, fmt, ap);
 	#endif
 	sys_cputs(b.buf, b.idx);
 

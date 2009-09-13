@@ -683,7 +683,7 @@ void
 page_check(void)
 {
 	page_t *pp, *pp0, *pp1, *pp2;
-	page_list_t fl;
+	page_list_t fl[1024];
 	pte_t *ptep;
 
 	// should be able to allocate three pages
@@ -697,8 +697,10 @@ page_check(void)
 	assert(pp2 && pp2 != pp1 && pp2 != pp0);
 
 	// temporarily steal the rest of the free pages
-	fl = page_free_list;
-	LIST_INIT(&page_free_list);
+	for(int i=0; i<llc_num_colors; i++) {
+		fl[i] = colored_page_free_list[i];
+		LIST_INIT(&colored_page_free_list[i]);
+	}
 
 	// should be no free memory
 	assert(page_alloc(&pp) == -ENOMEM);
@@ -814,7 +816,8 @@ page_check(void)
 	}
 
 	// give free list back
-	page_free_list = fl;
+	for(int i=0; i<llc_num_colors; i++)
+		colored_page_free_list[i] = fl[i];
 
 	// free the pages we took
 	page_free(pp0);

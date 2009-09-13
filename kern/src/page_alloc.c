@@ -25,6 +25,30 @@ static void page_clear(page_t *SAFE page)
 	memset(page, 0, sizeof(page_t));
 }
 
+error_t page_alloc_from_color_range(page_t** page,  
+                                    uint16_t base_color,
+                                    uint16_t range) {
+
+	// Find first available color with pages available
+    //  in the proper range
+	int i = base_color;
+	spin_lock_irqsave(&colored_page_free_list_lock);
+	for(i; i<(base_color+range); i++) {
+		if(!LIST_EMPTY(&colored_page_free_list[i]))
+			break;
+	}
+	// Alocate a page from that color
+	if(i < (base_color+range)) {
+		*page = LIST_FIRST(&colored_page_free_list[i]);
+		LIST_REMOVE(*page, page_link);
+		page_clear(*page);
+		spin_unlock_irqsave(&colored_page_free_list_lock);
+		return ESUCCESS;
+	}
+	spin_unlock_irqsave(&colored_page_free_list_lock);
+	return -ENOMEM;
+}
+
 /**
  * @brief Allocates a physical page from a pool of unused physical memory
  *
@@ -39,15 +63,7 @@ static void page_clear(page_t *SAFE page)
  */
 error_t page_alloc(page_t** page) 
 {
-	//TODO: Put a lock around this
-	if(!LIST_EMPTY(&page_free_list)) {
-		*page = LIST_FIRST(&page_free_list);
-		LIST_REMOVE(*page, global_link);
-		REMOVE_CACHE_COLORING_PAGE_FROM_FREE_LISTS(page);
-		page_clear(*page);
-		return ESUCCESS;
-	}
-	return -ENOMEM;
+	return page_alloc_from_color_range(page, 0, llc_num_colors);
 }
 
 /*
@@ -82,7 +98,38 @@ error_t page_alloc(page_t** page)
  *	 return -ENOMEM;
  * }
  */
-DECLARE_CACHE_COLORED_PAGE_ALLOC_FUNCTIONS();
+error_t l1_page_alloc(page_t** page, size_t color)
+{
+	if(available_caches.l1)
+	{
+		uint16_t range = llc_num_colors / get_cache_num_page_colors(&l1);
+		uint16_t base_color = color*range;
+		return page_alloc_from_color_range(page, base_color, range);
+	}
+	return -ENOCACHE;
+}
+
+error_t l2_page_alloc(page_t** page, size_t color)
+{
+	if(available_caches.l2)
+	{
+		uint16_t range = llc_num_colors / get_cache_num_page_colors(&l2);
+		uint16_t base_color = color*range;
+		return page_alloc_from_color_range(page, base_color, range);
+	}
+	return -ENOCACHE;
+}
+
+error_t l3_page_alloc(page_t** page, size_t color)
+{
+	if(available_caches.l3)
+	{
+		uint16_t range = llc_num_colors / get_cache_num_page_colors(&l3);
+		uint16_t base_color = color*range;
+		return page_alloc_from_color_range(page, base_color, range);
+	}
+	return -ENOCACHE;
+}
 
 /*
  * Allocates a specific physical page.
@@ -99,13 +146,14 @@ DECLARE_CACHE_COLORED_PAGE_ALLOC_FUNCTIONS();
  */
 error_t page_alloc_specific(page_t** page, size_t ppn)
 {
-	//TODO: Put a lock around this
+	spin_lock_irqsave(&colored_page_free_list_lock);
 	page_t* sp_page = ppn2page(ppn);
 	if( sp_page->page_ref != 0 )
 		return -ENOMEM;
 	*page = sp_page;
-	LIST_REMOVE(*page, global_link);
-	REMOVE_CACHE_COLORING_PAGE_FROM_FREE_LISTS(page);
+	LIST_REMOVE(*page, page_link);
+	spin_unlock_irqsave(&colored_page_free_list_lock);
+
 	page_clear(*page);
 	return 0;
 }
@@ -118,8 +166,16 @@ error_t page_free(page_t* page)
 {
 	//TODO: Put a lock around this
 	page_clear(page);
-	LIST_INSERT_HEAD(&page_free_list, page, global_link);
-	INSERT_CACHE_COLORING_PAGE_ONTO_FREE_LISTS(page);	
+	cache_t* llc = available_caches.llc;
+
+	spin_lock_irqsave(&colored_page_free_list_lock);
+	LIST_INSERT_HEAD(
+	   &(colored_page_free_list[get_page_color(page2ppn(page), llc)]),
+	   page,
+	   page_link
+	);
+	spin_unlock_irqsave(&colored_page_free_list_lock);
+
 	return ESUCCESS;
 }
 
@@ -127,7 +183,6 @@ error_t page_free(page_t* page)
  * Check if a page with the given pyhysical page # is free
  */
 int page_is_free(size_t ppn) {
-	//TODO: Put a lock around this
 	page_t* page = ppn2page(ppn);
 	if( page->page_ref == 0 )
 		return TRUE;

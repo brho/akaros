@@ -18,9 +18,8 @@ void cache_init()
 	// TODO: Should call out to something reading the acpi tables from 
 	// memory, or something similar.  For now, just initialize them inline
 	init_cache_properties(&l1,   32,  8, 64);
-	init_cache_properties(&l2,  256,  8, 64);
-	init_cache_properties(&l3, 8192, 16, 64);
 	available_caches.l1 = TRUE;
 	available_caches.l2 = FALSE;
 	available_caches.l3 = FALSE;
+	available_caches.llc = &l1;
 }

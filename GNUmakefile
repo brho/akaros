@@ -59,7 +59,7 @@ KERN_CFLAGS := --deputy\
 USER_CFLAGS := --deputy --enable-error-db
 CC	    := ivycc --gcc=$(GCCPREFIX)gcc
 else
-CC	    := $(GCCPREFIX)gcc -std=gnu99
+CC	    := $(GCCPREFIX)gcc -std=gnu99 -fgnu89-inline
 endif
 
 AS	    := $(GCCPREFIX)as

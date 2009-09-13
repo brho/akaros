@@ -16,6 +16,7 @@ typedef enum {
 	EDEADLOCK,               // Would cause deadlock
 	EBUSY,                   // Currently busy, try again later
 	ENOMEM,                  // No memory available
+	ENOCACHE,                // No cache available
 	EINVAL,                  // Invalid arguments
 	EFAULT,                  // Segmentation fault
 	EBADENV,                 // Bad environment 
@@ -40,6 +41,7 @@ static const char *NTS const error_string[NUMERRORS] =
 	"Would cause deadlock",
 	"Currently busy, try again later",
 	"No memory available",
+	"No cache available",
 	"Invalid arguments",
 	"Segmentation fault",
 	"Bad environment",

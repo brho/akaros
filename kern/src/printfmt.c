@@ -286,7 +286,7 @@ int vsnprintf(char *buf, int n, const char *fmt, va_list ap)
 	#ifdef __DEPUTY__
 	vprintfmt((void*)sprintputch, (sprintbuf_t *NONNULL*NONNULL)&bp, fmt, ap);
 	#else
-	vprintfmt((void*)sprintputch, (void**)&bp, fmt, ap);
+	vprintfmt((void*)sprintputch, (void*)&bp, fmt, ap);
 	#endif
 
 	// null terminate the buffer
