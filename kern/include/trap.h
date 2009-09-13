@@ -20,8 +20,8 @@ typedef struct InterruptHandler {
 
 #ifdef __IVY__
 #pragma cilnoremove("iht_lock")
-#endif
 extern spinlock_t iht_lock;
+#endif
 extern handler_t LCKD(&iht_lock) (CT(NUM_INTERRUPT_HANDLERS) RO interrupt_handlers)[];
 
 void idt_init(void);

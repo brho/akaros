@@ -10,7 +10,7 @@
  * write-orderings are respected. */
 #define wmb_f() ({ asm volatile("sfence"); })
 
-typedef void*RACY atomic_t;
+typedef void * RACY atomic_t;
 typedef volatile uint32_t RACY spinlock_t;
 
 static inline void atomic_init(atomic_t *number, int32_t val);
@@ -18,7 +18,7 @@ static inline int32_t atomic_read(atomic_t *number);
 static inline void atomic_set(atomic_t *number, int32_t val);
 static inline void atomic_inc(atomic_t *number);
 static inline void atomic_dec(atomic_t *number);
-static inline void atomic_andb(volatile uint8_t* number, uint8_t mask);
+static inline void atomic_andb(volatile uint8_t RACY* number, uint8_t mask);
 static inline void spin_lock(volatile uint32_t SRACY*COUNT(1) lock);
 static inline void spin_unlock(volatile uint32_t SRACY* lock);
 

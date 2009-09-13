@@ -125,6 +125,11 @@
 #define SOUTDYNAMIC
 #define SDYNBAR(b)
 
+#define RO
+#define LCKD(x)
+#define RACY
+#define PRIVATE
+
 #define BASE(p)
 
 #define SGROUP(g)
