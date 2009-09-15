@@ -1,4 +1,3 @@
-
 #ifdef __SHARC__
 #pragma nosharc
 #endif
@@ -7,7 +6,8 @@
 #include <stdio.h>
 
 #define BUFLEN 1024
-static char (NT buf)[BUFLEN];
+// zra: used only by monitor.c.
+static char RACY (RO NT buf)[BUFLEN];
 
 char *
 readline(const char *prompt)

@@ -11,10 +11,17 @@
 
 #include <ros/memlayout.h>
 
-extern const stab_t (BND(__this,__STAB_END__) __STAB_BEGIN__)[]; // Beginning of stabs table
-extern const stab_t (SNT __STAB_END__)[]; // End of stabs table
-extern const char (NT BND(__this,__STABSTR_END__) __STABSTR_BEGIN__)[]; // Beginning of string table
-extern const char (SNT __STABSTR_END__)[]; // End of string table
+// Beginning of stabs table
+extern const stab_t (RO BND(__this,__STAB_END__) __STAB_BEGIN__)[];
+
+// End of stabs table
+extern const stab_t (RO SNT __STAB_END__)[];
+
+// Beginning of string table
+extern const char (RO NT BND(__this,__STABSTR_END__) __STABSTR_BEGIN__)[];
+
+ // End of string table
+extern const char (RO SNT __STABSTR_END__)[];
 
 typedef struct UserStabData {
 	const stab_t *BND(__this,stab_end) stabs;

@@ -89,7 +89,7 @@ struct Env {
 /* Process Flags */
 // None yet
 
-extern env_t *COUNT(NENV) envs;		// All environments
+extern env_t *CT(NENV) RO envs;		// All environments
 extern atomic_t num_envs;		// Number of envs
 // TODO: consider moving this to struct per_cpu_info
 extern env_t * (RO curenvs)[MAX_NUM_CPUS];

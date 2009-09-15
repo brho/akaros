@@ -7,13 +7,14 @@
 
 #ifdef __SHARC__
 #pragma nosharc
+#define SINIT(x) x
 #endif
 
 #include <colored_caches.h>
 
 // Global variables
-cache_t l1,l2,l3;
-available_caches_t available_caches;
+cache_t RO l1,l2,l3;
+available_caches_t RO available_caches;
 
 /************** Cache Related Functions  *****************/
 void cache_init() 
@@ -24,8 +25,8 @@ void cache_init()
 	init_cache_properties(&l1,   32,  8, 64);
 	init_cache_properties(&l2,  256,  8, 64);
 	init_cache_properties(&l3, 8192, 16, 64);
-	available_caches.l1 = TRUE;
-	available_caches.l2 = TRUE;
-	available_caches.l3 = TRUE;
-	available_caches.llc = &l3;
+	available_caches.l1 = SINIT(TRUE);
+	available_caches.l2 = SINIT(TRUE);
+	available_caches.l3 = SINIT(TRUE);
+	available_caches.llc = SINIT(&l3);
 }

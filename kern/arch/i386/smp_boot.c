@@ -6,6 +6,7 @@
 
 #ifdef __SHARC__
 #pragma nosharc
+#define SINIT(x) x
 #endif
 
 #include <arch/x86.h>
@@ -25,9 +26,9 @@
 #include <trap.h>
 #include <timing.h>
 
-extern handler_wrapper_t handler_wrappers[NUM_HANDLER_WRAPPERS];
+extern handler_wrapper_t (RO handler_wrappers)[NUM_HANDLER_WRAPPERS];
 volatile uint8_t num_cpus = 0xee;
-uintptr_t smp_stack_top;
+uintptr_t RO smp_stack_top;
 
 #define DECLARE_HANDLER_CHECKLISTS(vector)                          \
 	INIT_CHECKLIST(f##vector##_cpu_list, MAX_NUM_CPUS);
@@ -101,7 +102,7 @@ void smp_boot(void)
 	if (page_alloc(&smp_stack))
 		panic("No memory for SMP boot stack!");
 	page_incref(smp_stack);
-	smp_stack_top = (uintptr_t)(page2kva(smp_stack) + PGSIZE);
+	smp_stack_top = SINIT((uintptr_t)(page2kva(smp_stack) + PGSIZE));
 
 	// Start the IPI process (INIT, wait, SIPI, wait, SIPI, wait)
 	send_init_ipi();

@@ -33,7 +33,7 @@ typedef enum {
  * so that -ENOMEM and ENOMEM are equivalent.
  */
 
-static const char *NTS const error_string[NUMERRORS] =
+static const char *NTS const (RO error_string)[NUMERRORS] =
 {
 	"Success",
 	"Generic Failure",

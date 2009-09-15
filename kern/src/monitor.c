@@ -33,7 +33,7 @@ typedef struct command {
 	int (*func)(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
 } command_t;
 
-static command_t commands[] = {
+static command_t (RO commands)[] = {
 	{ "help", "Display this list of commands", mon_help },
 	{ "kerninfo", "Display information about the kernel", mon_kerninfo },
 	{ "backtrace", "Dump a backtrace", mon_backtrace },
@@ -62,7 +62,7 @@ int mon_help(int argc, char **argv, trapframe_t *tf)
 
 int mon_kerninfo(int argc, char **argv, trapframe_t *tf)
 {
-	extern char (SNT _start)[], (SNT etext)[], (SNT edata)[], (SNT end)[];
+	extern char (RO SNT _start)[], (RO SNT etext)[], (RO SNT edata)[], (RO SNT end)[];
 
 	cprintf("Special kernel symbols:\n");
 	cprintf("  _start %08x (virt)  %08x (phys)\n", _start, (uint32_t)(_start - KERNBASE));
@@ -74,10 +74,12 @@ int mon_kerninfo(int argc, char **argv, trapframe_t *tf)
 	return 0;
 }
 
-static char* function_of(uint32_t address)
+#if 0
+zra: not called
+static char RO* function_of(uint32_t address)
 {
-	extern stab_t stab[], estab[];
-	extern char stabstr[];
+	extern stab_t (RO stab)[], (RO estab)[];
+	extern char (RO stabstr)[];
 	stab_t* symtab;
 	stab_t* best_symtab = 0;
 	uint32_t best_func = 0;
@@ -97,6 +99,7 @@ static char* function_of(uint32_t address)
 		return "Function not found!";
 	return stabstr + best_symtab->n_strx;
 }
+#endif
 
 int mon_backtrace(int argc, char **argv, trapframe_t *tf)
 {

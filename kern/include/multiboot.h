@@ -5,11 +5,11 @@
 
 #include <ros/common.h>
 
-extern physaddr_t maxpa;        // Maximum physical address in the system
-extern physaddr_t maxaddrpa;    // Maximum addressable physical address
-extern void *SNT maxaddrpa_ptr; // same as maxaddrpa, but ptr type for annotations
-extern size_t npages;           // Total number of physical memory pages
-extern size_t naddrpages;	    // Number of addressable physical memory pages
+extern physaddr_t RO maxpa;        // Maximum physical address in the system
+extern physaddr_t RO maxaddrpa;    // Maximum addressable physical address
+extern void *SNT RO maxaddrpa_ptr; // same as maxaddrpa, but ptr type for annotations
+extern size_t RO npages;           // Total number of physical memory pages
+extern size_t RO naddrpages;	    // Number of addressable physical memory pages
 
 #endif /* !__ASSEMBLER__ */
 

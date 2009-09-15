@@ -29,7 +29,7 @@
 
 void kernel_init(multiboot_info_t *mboot_info)
 {
-	extern char (BND(__this, end) edata)[], (SNT end)[];
+	extern char (RO BND(__this, end) edata)[], (RO SNT end)[];
 
 	// Before doing anything else, complete the ELF loading process.
 	// Clear the uninitialized global data (BSS) section of our program.
@@ -49,9 +49,9 @@ void kernel_init(multiboot_info_t *mboot_info)
 	// Paul: Can't use KADDR as arg to multiboot_detect_memory
 	//  since multiboot_detect_memory is what sets npages. 
 	//  Must simulate KADDR macro (ugly).
-	multiboot_detect_memory((multiboot_info_t*SAFE)(void*TRUSTED)((physaddr_t)mboot_info + KERNBASE));
-	
-	multiboot_print_memory_map((multiboot_info_t*COUNT(1))KADDR((physaddr_t)mboot_info));
+	multiboot_detect_memory((multiboot_info_t*CT(1))TC((physaddr_t)mboot_info + KERNBASE));
+
+	multiboot_print_memory_map((multiboot_info_t*CT(1))KADDR((physaddr_t)mboot_info));
 
 	vm_init();
 

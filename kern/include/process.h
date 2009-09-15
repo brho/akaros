@@ -31,14 +31,17 @@
 #define proc Env
 
 TAILQ_HEAD(proc_list, proc);		// Declares 'struct proc_list'
-extern struct proc_list proc_freelist;
+
 extern spinlock_t freelist_lock;
-extern struct proc_list proc_runnablelist;
+extern struct proc_list LCKD(&freelist_lock)proc_freelist;
+
 extern spinlock_t runnablelist_lock;
+extern struct proc_list LCKD(&runnablelist_lock) proc_runnablelist;
+
 
 extern spinlock_t idle_lock;
-extern uint32_t idlecoremap[MAX_NUM_CPUS];
-extern uint32_t num_idlecores;
+extern uint32_t LCKD(&idle_lock) (RO idlecoremap)[MAX_NUM_CPUS];
+extern uint32_t LCKD(&idle_lock) num_idlecores;
 
 int proc_set_state(struct proc *p, uint32_t state) WRITES(p->state);
 struct proc *get_proc(unsigned pid);

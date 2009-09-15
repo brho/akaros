@@ -29,7 +29,7 @@
  */
 void manager(void)
 {
-	static uint8_t progress = 0;
+	static uint8_t RACY progress = 0;
 	struct proc *envs[256];
 	struct proc *p ;
 

@@ -22,17 +22,18 @@ typedef LIST_HEAD(PageList, Page) page_list_t;
 typedef LIST_ENTRY(Page) page_list_entry_t;
 
 struct Page {
-	page_list_entry_t page_link;
-	
+	page_list_entry_t LCKD(&colored_page_free_list_lock)page_link;
+
 	size_t num_cons_links;
     size_t page_ref;
 };
 
 
 /******** Externally visible global variables ************/
-extern uint16_t llc_num_colors;
-extern page_list_t *COUNT(llc_num_colors) colored_page_free_list;
+extern uint16_t RO llc_num_colors;
 extern spinlock_t colored_page_free_list_lock;
+extern page_list_t LCKD(&colored_page_free_list_lock) * RO CT(llc_num_colors)
+    colored_page_free_list;
 
 /*************** Functional Interface *******************/
 void page_alloc_init(void);

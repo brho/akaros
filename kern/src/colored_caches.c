@@ -7,6 +7,7 @@
 
 #ifdef __SHARC__
 #pragma nosharc
+#define SINIT(x) x
 #endif
 
 #include <ros/common.h>
@@ -16,12 +17,13 @@
 
 /************** Cache Related Functions  *****************/
 inline void init_cache_properties(cache_t *c, size_t sz_k, size_t wa, size_t clsz) {
-	c->wa = wa;
-	c->sz_k = sz_k;
-	c->clsz = clsz;
+	c->wa = SINIT(wa);
+	c->sz_k = SINIT(sz_k);
+	c->clsz = SINIT(clsz);
 	
 	//Added as optimization (derived from above);
-	c->num_colors = get_cache_num_page_colors(c);
+	size_t nc = get_cache_num_page_colors(c);
+	c->num_colors = SINIT(nc);
 }
 inline size_t get_page_color(uintptr_t page, cache_t *c) {
     return (page % c->num_colors);

@@ -307,7 +307,7 @@ void test_bitmasks(void)
 	printk("should be cleared\n");
 }
 
-checklist_t* the_global_list;
+checklist_t *RO the_global_list;
 
 void test_checklist_handler(trapframe_t *tf, void* data)
 {

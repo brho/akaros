@@ -1,5 +1,6 @@
 #ifdef __SHARC__
 #pragma nosharc
+#define SINIT(x) x
 #endif
 
 #include <multiboot.h>
@@ -14,37 +15,39 @@
 #endif
 
 // These variables are set by i386_detect_memory()
-physaddr_t maxpa;      // Maximum physical address in the system
-physaddr_t maxaddrpa;  // Maximum addressable physical address
-void *SNT maxaddrpa_ptr;
-size_t npages;         // Total number of physical memory pages
-size_t naddrpages;	  // Number of addressable physical memory pages
+physaddr_t RO maxpa;      // Maximum physical address in the system
+physaddr_t RO maxaddrpa;  // Maximum addressable physical address
+void *SNT RO maxaddrpa_ptr;
+size_t RO npages;         // Total number of physical memory pages
+size_t RO naddrpages;	  // Number of addressable physical memory pages
 
-static size_t basemem;  // Amount of base memory (in bytes)
-static size_t extmem;   // Amount of extended memory (in bytes)
+static size_t RO basemem;  // Amount of base memory (in bytes)
+static size_t RO extmem;   // Amount of extended memory (in bytes)
 
 void
 multiboot_detect_memory(multiboot_info_t *mbi)
 {
 	// Tells us how many kilobytes there are
-	basemem = ROUNDDOWN(mbi->mem_lower*1024, PGSIZE);
-	extmem = ROUNDDOWN(mbi->mem_upper*1024, PGSIZE);
+	size_t b = ROUNDDOWN(mbi->mem_lower*1024, PGSIZE);
+	size_t e = ROUNDDOWN(mbi->mem_upper*1024, PGSIZE);
+	basemem = SINIT(b);
+	extmem = SINIT(e);
 
 	// Calculate the maximum physical address based on whether
 	// or not there is any extended memory.  See comment in <inc/memlayout.h>
 	if (extmem)
-		maxpa = EXTPHYSMEM + extmem;
+		maxpa = SINIT(EXTPHYSMEM + extmem);
 	else
-		maxpa = basemem;
+		maxpa = SINIT(basemem);
 
-	npages = maxpa / PGSIZE;
+	npages = SINIT(maxpa / PGSIZE);
 
 	// IOAPIC - KERNBASE is the max amount of virtual addresses we can use
 	// for the physical memory mapping (aka - the KERNBASE mapping)
-	maxaddrpa = MIN(maxpa, IOAPIC_BASE - KERNBASE);
-	maxaddrpa_ptr = (void *SNT)maxaddrpa;
+	maxaddrpa = SINIT(MIN(maxpa, IOAPIC_BASE - KERNBASE));
+	maxaddrpa_ptr = SINIT((void *SNT)maxaddrpa);
 
-	naddrpages = maxaddrpa / PGSIZE;
+	naddrpages = SINIT(maxaddrpa / PGSIZE);
 
 	cprintf("Physical memory: %dK available, ", (int)(maxpa/1024));
 	cprintf("base = %dK, extended = %dK\n", (int)(basemem/1024), (int)(extmem/1024));

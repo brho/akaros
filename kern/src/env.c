@@ -127,7 +127,7 @@ WRITES(e->env_pgdir, e->env_cr3, e->env_procinfo, e->env_procdata)
 	page_t *pgdir = NULL;
 	page_t *pginfo[PROCINFO_NUM_PAGES] = {NULL};
 	page_t *pgdata[PROCDATA_NUM_PAGES] = {NULL};
-	static page_t* shared_page = 0;
+	static page_t * RO shared_page = 0;
 
 	/*
 	 * First, allocate a page for the pgdir of this process and up
@@ -205,10 +205,10 @@ WRITES(e->env_pgdir, e->env_cr3, e->env_procinfo, e->env_procdata)
 	if (!shared_page) {
 		if(page_alloc(&shared_page) < 0)
 			goto env_setup_vm_error;
-	// Up it, so it never goes away.  One per user, plus one from page_alloc
-	// This is necessary, since it's in the per-process range of memory that
-	// gets freed during page_free.
-	page_incref(shared_page);
+		// Up it, so it never goes away.  One per user, plus one from page_alloc
+		// This is necessary, since it's in the per-process range of memory that
+		// gets freed during page_free.
+		page_incref(shared_page);
 	}
 
 	// Inserted into every process's address space at UGDATA

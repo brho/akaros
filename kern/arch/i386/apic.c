@@ -6,6 +6,7 @@
 
 #ifdef __SHARC__
 #pragma nosharc
+#define SINIT(x) x
 #endif
 
 #include <arch/mmu.h>
@@ -16,7 +17,7 @@
 #include <assert.h>
 #include <stdio.h>
 
-system_timing_t system_timing = {0, 0, 0xffff, 0};
+system_timing_t RO system_timing = {0, 0, 0xffff, 0};
 
 /*
  * Remaps the Programmable Interrupt Controller to use IRQs 32-47
@@ -107,7 +108,7 @@ void timer_init(void){
 	tscval[0] = read_tsc();
 	udelay_pit(1000000);
 	tscval[1] = read_tsc();
-	system_timing.tsc_freq = tscval[1] - tscval[0];
+	system_timing.tsc_freq = SINIT(tscval[1] - tscval[0]);
 	
 	cprintf("TSC Frequency: %llu\n", system_timing.tsc_freq);
 
@@ -118,7 +119,7 @@ void timer_init(void){
 	timercount[0] = read_mmreg32(LAPIC_TIMER_CURRENT);
 	udelay_pit(1000000);
 	timercount[1] = read_mmreg32(LAPIC_TIMER_CURRENT);
-	system_timing.bus_freq = (timercount[0] - timercount[1])*128;
+	system_timing.bus_freq = SINIT((timercount[0] - timercount[1])*128);
 		
 	cprintf("Bus Frequency: %llu\n", system_timing.bus_freq);
 }
@@ -131,8 +132,8 @@ void pit_set_timer(uint32_t divisor, uint32_t mode)
 	outb(TIMER_MODE, mode); 
 	outb(TIMER_CNTR0, divisor & 0xff);
 	outb(TIMER_CNTR0, (divisor >> 8) );
-	system_timing.pit_mode = mode;
-	system_timing.pit_divisor = divisor;
+	system_timing.pit_mode = SINIT(mode);
+	system_timing.pit_divisor = SINIT(divisor);
 	// cprintf("timer mode set to %d, divisor %d\n",mode, divisor);
 }
 

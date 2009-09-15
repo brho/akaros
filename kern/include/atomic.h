@@ -56,12 +56,14 @@ void down_checklist(checklist_t* list);
 /**************************************************************/
 
 /* Barrier: currently made for everyone barriering.  Change to use checklist */
-typedef struct barrier {
+struct barrier {
 	volatile uint32_t lock;
 	uint32_t init_count;
 	uint32_t current_count;
     volatile uint8_t ready;
-} barrier_t;
+};
+
+typedef struct barrier RACY barrier_t;
 
 void init_barrier(barrier_t*COUNT(1) barrier, uint32_t count);
 void reset_barrier(barrier_t* barrier);

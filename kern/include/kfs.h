@@ -25,7 +25,7 @@ struct kfs_entry {
 };
 
 #define MAX_KFS_FILES 20
-extern struct kfs_entry kfs[MAX_KFS_FILES];
+extern struct kfs_entry (RO kfs)[MAX_KFS_FILES];
 
 ssize_t kfs_lookup_path(char*NTS path);
 struct proc *kfs_proc_create(int kfs_inode);

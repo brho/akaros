@@ -37,16 +37,15 @@
 	(void*TRUSTED) (__m_pa + KERNBASE);				\
 })
 
-extern char (SNT bootstacktop)[], (SNT bootstack)[];
+extern char (SNT RO bootstacktop)[], (SNT RO bootstack)[];
 
 // List of physical pages
-extern volatile uint32_t pages_lock;
-extern page_t SLOCKED(&pages_lock) * SREADONLY COUNT(npages) pages;
+extern page_t * RO CT(npages) pages;
 
 extern physaddr_t RO boot_cr3;
-extern pde_t *COUNT(NPDENTRIES) boot_pgdir;
+extern pde_t *CT(NPDENTRIES) RO boot_pgdir;
 
-extern char*BND(end, maxaddrpa_ptr + IVY_KERNBASE) boot_freemem;
+extern char *RO BND(end, maxaddrpa_ptr + IVY_KERNBASE) boot_freemem;
 
 void	multiboot_detect_memory(multiboot_info_t *COUNT(1) mbi);
 void	multiboot_print_memory_map(multiboot_info_t *COUNT(1) mbi);

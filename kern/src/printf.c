@@ -12,7 +12,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 
-uint32_t output_lock = 0;
+spinlock_t output_lock = 0;
 
 void putch(int ch, int **cnt)
 {
@@ -26,8 +26,8 @@ void putch(int ch, int **cnt)
 void buffered_putch(int ch, int **cnt)
 {
 	#define buffered_putch_bufsize 64
-	static char buf[buffered_putch_bufsize];
-	static int buflen = 0;
+	static char LCKD(&output_lock) (RO buf)[buffered_putch_bufsize];
+	static int LCKD(&output_lock) buflen = 0;
 
 	if(ch != -1)
 	{

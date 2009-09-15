@@ -1,4 +1,6 @@
 
+// zra: why is this in the kernel?
+
 #ifdef __SHARC__
 #pragma nosharc
 #endif

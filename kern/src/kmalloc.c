@@ -7,6 +7,7 @@
 
 #ifdef __SHARC__
 #pragma nosharc
+#define SINIT(x) x
 #endif
 
 #include <ros/common.h>
@@ -17,8 +18,11 @@
 
 #define kmallocdebug(args...)  //printk(args)
 
-char*BND(end, maxaddrpa_ptr + IVY_KERNBASE) boot_freemem;
-static page_list_t pages_list;	//List of physical pages used by kmalloc
+char *RO BND(end, maxaddrpa_ptr + IVY_KERNBASE) boot_freemem;
+
+//List of physical pages used by kmalloc
+static spinlock_t pages_list_lock = 0;
+static page_list_t LCKD(&pages_list_lock)pages_list;
 
 /*
  * Allocate n bytes of physical memory aligned on an 
@@ -31,7 +35,7 @@ static page_list_t pages_list;	//List of physical pages used by kmalloc
  */
 void* boot_alloc(uint32_t n, uint32_t align)
 {
-	extern char (SNT end)[];
+	extern char (SNT RO end)[];
 	void *v;
 
 	// Initialize boot_freemem if this is the first time.
@@ -40,11 +44,12 @@ void* boot_alloc(uint32_t n, uint32_t align)
 	// i.e., the first virtual address that the linker
 	// did _not_ assign to any kernel code or global variables.
 	if (boot_freemem == 0) {
-		boot_freemem = TC(end);
+		boot_freemem = SINIT(TC(end));
 	}
 
 	//	Step 1: round boot_freemem up to be aligned properly
-	boot_freemem = PTRROUNDUP(boot_freemem, align);
+	char RO*tmp = PTRROUNDUP(boot_freemem, align);
+	boot_freemem = SINIT(tmp);
 
 	//	Step 2: save current value of boot_freemem as allocated chunk
 	v = boot_freemem;
@@ -52,14 +57,14 @@ void* boot_alloc(uint32_t n, uint32_t align)
 	if (PADDR(boot_freemem + n) > maxaddrpa)
 		panic("Out of memory in boot alloc, you fool!\n");
 	//	Step 3: increase boot_freemem to record allocation
-	boot_freemem += n;	
+	boot_freemem = SINIT(boot_freemem + n);
 	//	Step 4: return allocated chunk
 	return v;
 }
 
 void* boot_calloc(uint32_t _n, size_t sz, uint32_t align)
 {
-	extern char (SNT end)[];
+	extern char (SNT RO end)[];
 	uint32_t n = _n *sz;
 	void *v;
 
@@ -69,10 +74,11 @@ void* boot_calloc(uint32_t _n, size_t sz, uint32_t align)
 	// i.e., the first virtual address that the linker
 	// did _not_ assign to any kernel code or global variables.
 	if (boot_freemem == 0)
-		boot_freemem = TC(end);
+		boot_freemem = SINIT(TC(end));
 
 	//	Step 1: round boot_freemem up to be aligned properly
-	boot_freemem = PTRROUNDUP(boot_freemem, align);
+	char RO*tmp = PTRROUNDUP(boot_freemem, align);
+	boot_freemem = SINIT(tmp);
 
 	//	Step 2: save current value of boot_freemem as allocated chunk
 	v = boot_freemem;
@@ -80,7 +86,7 @@ void* boot_calloc(uint32_t _n, size_t sz, uint32_t align)
 	if (PADDR(boot_freemem + n) > maxaddrpa)
 		panic("Out of memory in boot alloc, you fool!\n");
 	//	Step 3: increase boot_freemem to record allocation
-	boot_freemem += n;
+	boot_freemem = SINIT(boot_freemem + n);
 	//  Step 4: zero allocated chunk
 	memset(v,0,n);
 	//	Step 5: return allocated chunk
@@ -121,10 +127,15 @@ void* kmalloc(size_t size, int flags)
 	//Otherwise go ahead and allocate them to ourselves now
 	for(int i=0; i<npages; i++) {
 		page_t* page;
+
 		page_alloc_specific(&page, first+i);
 		page_incref(page);
 		page->num_cons_links = npages-i;
+
+		spin_lock_irqsave(&pages_list_lock);
 		LIST_INSERT_HEAD(&pages_list, page, page_link);
+		spin_unlock_irqsave(&pages_list_lock);
+
 		kmallocdebug("mallocing page: %u\n", first+i);
 		kmallocdebug("at addr: %p\n", ppn2kva(first+i));
 	}

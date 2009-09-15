@@ -7,6 +7,7 @@
 
 #ifdef __SHARC__
 #pragma nosharc
+#define SINIT(x) x
 #endif
 
 #include <sys/queue.h>
@@ -15,17 +16,22 @@
 #include <kmalloc.h>
 
 // llc stands for last-level-cache
-uint16_t llc_num_colors;
-page_list_t *COUNT(llc_num_colors) colored_page_free_list = NULL;
+uint16_t RO llc_num_colors;
 spinlock_t colored_page_free_list_lock;
 
-void page_alloc_bootstrap(cache_t* llc) {
+page_list_t LCKD(&colored_page_free_list_lock) * CT(llc_num_colors) RO
+  colored_page_free_list = NULL;
+
+static void page_alloc_bootstrap(cache_t RO* llc) {
 	// Initialize the properties of the last level cache used by this allocator
-	llc_num_colors = get_cache_num_page_colors(llc);
+	size_t nc = get_cache_num_page_colors(llc);
+	llc_num_colors = SINIT(nc);
 
 	// Allocate space for the array required to manage the free lists
 	size_t list_size = llc_num_colors*sizeof(page_list_t);
-	colored_page_free_list = (page_list_t*) boot_alloc(list_size, PGSIZE);
+	page_list_t LCKD(&colored_page_free_list_lock)*tmp =
+	    (page_list_t*)boot_alloc(list_size,PGSIZE);
+	colored_page_free_list = SINIT(tmp);
 }
 
 /*
@@ -36,12 +42,12 @@ void page_alloc_bootstrap(cache_t* llc) {
  */
 void page_alloc_init() 
 {
-	cache_t* llc = available_caches.llc;
+	cache_t RO* llc = available_caches.llc;
 
 	// First Bootstrap the page alloc process
-	static bool bootstrapped = FALSE;
+	static bool RO bootstrapped = FALSE;
 	if(!bootstrapped) {
-		bootstrapped = TRUE;
+		bootstrapped = SINIT(TRUE);
 		page_alloc_bootstrap(llc);
 	}
 
@@ -60,7 +66,7 @@ void page_alloc_init()
 	//  4) Then extended memory [EXTPHYSMEM, ...).
 	//     Some of it is in use, some is free.
 	int i;
-	extern char (SNT end)[];
+	extern char (SNT RO end)[];
 	physaddr_t physaddr_after_kernel = PADDR(PTRROUNDUP(boot_freemem, PGSIZE));
 
 	pages[0].page_ref = 1;

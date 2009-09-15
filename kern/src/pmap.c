@@ -32,8 +32,11 @@
 /**
  * @brief Global variable used to store erroneous virtual addresses as the
  *        result of a failed user_mem_check().
+ *
+ * zra: What if two checks fail at the same time? Maybe this should be per-cpu?
+ *
  */
-static void *DANGEROUS user_mem_check_addr;
+static void *DANGEROUS RACY user_mem_check_addr;
 
 volatile uint32_t vpt_lock = 0;
 volatile uint32_t vpd_lock = 0;
