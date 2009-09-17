@@ -114,7 +114,7 @@ void smp_boot(void)
 	udelay(200);
 	send_startup_ipi(0x01);
 	*/
-	udelay(100000);
+	udelay(500000);
 
 	// Each core will also increment smp_semaphore, and decrement when it is done,
 	// all in smp_entry.  It's purpose is to keep Core0 from competing for the

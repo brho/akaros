@@ -118,7 +118,7 @@ int mon_showmapping(int argc, char **argv, trapframe_t *tf)
 {
 	if (argc < 2) {
 		cprintf("Shows virtual -> physical mappings for a virtual address range.\n");
-		cprintf("Usage: showmappings START_ADDR [END_ADDR]\n");
+		cprintf("Usage: showmapping START_ADDR [END_ADDR]\n");
 		return 1;
 	}
 	pde_t* pgdir = (pde_t*)vpd;

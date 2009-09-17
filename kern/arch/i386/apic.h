@@ -14,6 +14,7 @@
 
 #include <arch/mmu.h>
 #include <arch/x86.h>
+#include <arch/ioapic.h>
 
 // PIC
 #define PIC1_CMD					0x20
@@ -50,9 +51,6 @@
 // IPI Interrupt Command Register
 #define LAPIC_IPI_ICR_LOWER			(LAPIC_BASE + 0x300)
 #define LAPIC_IPI_ICR_UPPER			(LAPIC_BASE + 0x310)
-
-// IOAPIC
-#define IOAPIC_BASE					0xfec00000 // this is the default, can be changed
 
 // PIT (Programmable Interval Timer)
 #define	TIMER_REG_CNTR0	0	/* timer 0 counter port */

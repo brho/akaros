@@ -125,7 +125,7 @@ $(OBJDIR)/.deps: $(foreach dir, $(OBJDIRS), $(wildcard $(OBJDIR)/$(dir)/*.d))
 -include $(OBJDIR)/.deps
 
 # Use doxygen to make documentation for ROS
-docs: all
+docs: 
 	@doxygen doc/rosdoc.cfg
 	@if [ ! -d doc/rosdoc/html/img ];          \
 	 then                                      \

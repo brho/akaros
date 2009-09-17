@@ -30,8 +30,21 @@
 void manager(void)
 {
 	static uint8_t progress = 0;
+
 	struct proc *envs[256];
 	struct proc *p ;
+
+	// This is a bypass of the standard manager structure, for network use
+	// If enabled, this spawns parlib_matrix, and allows the execution
+	// of a remote binary to function correctly (schedule() call below)
+	#ifdef __NETWORK__	
+	if (progress++ == 0) {
+		envs[0] = kfs_proc_create(kfs_lookup_path("parlib_matrix"));
+		proc_set_state(envs[0], PROC_RUNNABLE_S);
+		proc_run(envs[0]);
+	}
+	schedule();
+	#endif 
 
 	switch (progress++) {
 		case 0:

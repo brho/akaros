@@ -10,9 +10,12 @@ run_bochs.sh
 update*
 cscope.out
 hdd.img
+hdd.vdi
 *.*~
 ivy_errordb.sql
 Makelocal
+.textmate*
+.DS_*
 ros-project.tmproj
 kern/boot
 kern/include/arch

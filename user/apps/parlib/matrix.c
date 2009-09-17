@@ -11,6 +11,7 @@ extern void change_user();
 extern void set_default_user();
 extern void file_io();
 extern void file_error();
+extern void run_binary();
 extern char prompt[256];
 
 void help() {
@@ -18,8 +19,9 @@ void help() {
 	       "  draw_nanwan:      Draw a picture of Nanwan, our mascot giraffe\n"
 	       "  clear_screen:     Clear the Screen\n"
 	       "  change_user:      Change Username\n"
-               "  file_io:          Run File Related IO Tests\n"
-               "  file_error:       Run File Error Related Tests\n"
+           "  file_io:          Run File Related IO Tests\n"
+           "  file_error:       Run File Error Related Tests\n"
+           "  run_binary:       Load and run a binary located on the remote server\n"
 	      );
 }
 
@@ -45,6 +47,8 @@ int main(int argc, char** argv)
 			file_io();
 		else if (strcmp(s, "file_error") == 0)
 			file_error();
+		else if (strcmp(s, "run_binary") == 0)
+			run_binary();
 		else
 			help();	
 
