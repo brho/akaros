@@ -11,10 +11,6 @@
  *
  */
 
-#ifdef __DEPUTY__
-#pragma nodeputy
-#endif
-
 #include <parlib.h>
 #include <unistd.h>
 #include <newlib_backend.h>
@@ -349,12 +345,13 @@ int open(const char *name, int flags, int mode)
  */
 ssize_t read(int file, void *ptr, size_t len) 
 {
+	uint8_t *CT(len) _ptr = ptr;
 	debug_in_out("READ\n");
 
 	// Console hack.
 	if (file == STDIN_FILENO) {
 		for(int i=0; i<len; i++)	
-			((uint8_t*)ptr)[i] = sys_cgetc();
+			_ptr[i] = (uint8_t)sys_cgetc();
 		return len;
 	}
 
@@ -383,7 +380,7 @@ ssize_t read(int file, void *ptr, size_t len)
 		if (return_val < 0)
 			errno = result->err;
 		else
-			memcpy(ptr, result->buf, return_val);
+			memcpy(_ptr, result->buf, return_val);
 
 		free(result);
 	}
@@ -425,7 +422,7 @@ int read_from_channel(char * buf, int len, int peek)
 
 int read_response_from_channel(response_t *response) 
 {
-	return read_from_channel(	(char*) response, 
+	return read_from_channel(	(char*CT(sizeof(response_t))) TC(response), 
                					sizeof(response_t), 
 								NO_PEEK);
 }
@@ -451,15 +448,15 @@ void* sbrk(ptrdiff_t incr)
 
 	#define HEAP_SIZE (1<<18)
 	static uint8_t array[HEAP_SIZE];
-	static uint8_t* heap_end = array;
-	static uint8_t* stack_ptr = &(array[HEAP_SIZE-1]);
+	static uint8_t *BND(array, array + HEAP_SIZE) heap_end = array;
+	static uint8_t *stack_ptr = &(array[HEAP_SIZE-1]);
 
 	uint8_t* prev_heap_end; 
 
 	prev_heap_end = heap_end;
 	if (heap_end + incr > stack_ptr) {
 		errno = ENOMEM;
-		return (void*)-1;
+		return (void*CT(1))TC(-1);
 	}
      
 	heap_end += incr;
@@ -681,6 +678,6 @@ ssize_t write(int file, const void *ptr, size_t len) {
 int write_to_channel(msg_t * msg, int len)
 {
 	//return sys_serial_write((char*)msg, len);
-	return sys_eth_write((char*)msg, len);
+	return sys_eth_write((char*CT(sizeof(msg_t)))TC(msg), len);
 	
 }

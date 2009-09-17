@@ -15,10 +15,6 @@
 #pragma nosharc
 #endif
 
-#ifdef __DEPUTY__
-#pragma nodeputy
-#endif
-
 #include <arch/mmu.h>
 #include <arch/x86.h>
 #include <arch/smp.h>
@@ -95,11 +91,11 @@ uint32_t rl8168_io_base_addr = 0;
 uint32_t rl8168_irq = 0;
 char device_mac[6];
 
-struct Descriptor *rx_des_kva;
-struct Descriptor *rx_des_pa;
+struct Descriptor *CT(NUM_RX_DESCRIPTORS) rx_des_kva;
+unsigned long rx_des_pa;
 
-struct Descriptor *tx_des_kva;
-struct Descriptor *tx_des_pa;
+struct Descriptor *CT(NUM_TX_DESCRIPTORS) tx_des_kva;
+unsigned long tx_des_pa;
 
 uint32_t rx_des_cur = 0;
 uint32_t tx_des_cur = 0;
@@ -109,8 +105,8 @@ uint8_t eth_up = 0; // TODO: This needs to be somewhere global.
 // Hacky stuff for syscall hack. Go away.
 int packet_waiting;
 int packet_buffer_size;
-char* packet_buffer;
-char* packet_buffer_orig;
+char *CT(packet_buffer_size) packet_buffer;
+char *CT(MAX_FRAME_SIZE) packet_buffer_orig;
 int packet_buffer_pos = 0;
 // End hacky stuff
 
@@ -225,8 +221,8 @@ void rl8168_setup_descriptors() {
 	if (rx_des_kva == NULL) panic("Can't allocate page for RX Ring");
 	if (tx_des_kva == NULL) panic("Can't allocate page for TX Ring");
 	
-	rx_des_pa = (struct Descriptor *)PADDR(rx_des_kva);
-	tx_des_pa = (struct Descriptor *)PADDR(tx_des_kva);
+	rx_des_pa = PADDR(rx_des_kva);
+	tx_des_pa = PADDR(tx_des_kva);
 	
     for (int i = 0; i < NUM_RX_DESCRIPTORS; i++) 
 		rl8168_set_rx_descriptor(i, TRUE); // Allocate memory for the descriptor
@@ -345,7 +341,11 @@ void rl8168_setup_interrupts() {
 	outw(rl8168_io_base_addr + RL_IS_REG, RL_INTRRUPT_CLEAR);
 	
 	// Kernel based interrupt stuff
+#ifdef __IVY__
+	register_interrupt_handler(interrupt_handlers, KERNEL_IRQ_OFFSET + rl8168_irq, rl8168_interrupt_handler, (void *)0);
+#else
 	register_interrupt_handler(interrupt_handlers, KERNEL_IRQ_OFFSET + rl8168_irq, rl8168_interrupt_handler, 0);
+#endif
 	ioapic_route_irq(rl8168_irq, NE2K_IRQ_CPU);	
 	
 	return;
@@ -528,13 +528,13 @@ void rl8168_handle_rx_packet() {
 	if ((current_command & DES_PAM_MASK) && (*((uint16_t*)(rx_buffer + 36)) == 0x9bad)) {
 		
 		if (packet_waiting) return;
-
-		packet_buffer = rx_buffer + PACKET_HEADER_SIZE;
 		
 		// So ugly I want to cry
 		packet_buffer_size = *((uint16_t*)(rx_buffer + 38)); 
 		packet_buffer_size = (((uint16_t)packet_buffer_size & 0xff00) >> 8) |  (((uint16_t)packet_buffer_size & 0x00ff) << 8);		
 		packet_buffer_size = packet_buffer_size - 8;
+
+		packet_buffer = rx_buffer + PACKET_HEADER_SIZE;
 
 		packet_buffer_orig = rx_buffer;
 		packet_buffer_pos = 0;
@@ -675,32 +675,7 @@ char *rl8168_packet_wrap(const char* data, size_t len) {
 
 	if ((len == 0) || (data == NULL))
 		return NULL;
-	
-	struct ETH_Header
-	{
-		char dest_mac[6];
-		char source_mac[6];
-		uint16_t eth_type;
-	};
 
-	
-	struct IP_Header
-	{
-		uint32_t ip_opts0;
-		uint32_t ip_opts1;
-		uint32_t ip_opts2;
-		uint32_t source_ip;
-		uint32_t dest_ip;
-	};
-	
-	struct UDP_Header
-	{
-		uint16_t source_port;
-		uint16_t dest_port;
-		uint16_t length;
-		uint16_t checksum;
-	};	
-	
 	// Hard coded to paul's laptop's mac
 	//Format for Makelocal file: -DUSER_MAC_ADDRESS="{0x00, 0x23, 0x32, 0xd5, 0xae, 0x82}"
 	char dest_mac_address[6] = USER_MAC_ADDRESS;
@@ -715,16 +690,17 @@ char *rl8168_packet_wrap(const char* data, size_t len) {
 		return NULL;
 	}
 	
-	char* wrap_buffer = kmalloc(MAX_PACKET_SIZE, 0);
+	struct rl8168_packet* wrap_buffer = kmalloc(MAX_PACKET_SIZE, 0);
 	
 	if (wrap_buffer == NULL) {
 		rl8168_frame_debug("Can't allocate page for packet wrapping");
 		return NULL;
 	}
 	
-	struct ETH_Header *eth_header = (struct ETH_Header*) wrap_buffer;
-	struct IP_Header *ip_header = (struct IP_Header*) (wrap_buffer + sizeof(struct ETH_Header));
-	struct UDP_Header *udp_header = (struct UDP_Header*) (wrap_buffer + sizeof(struct ETH_Header) + sizeof(struct IP_Header));
+
+	struct ETH_Header *eth_header = &wrap_buffer->rl8168_head.eth_head;
+	struct IP_Header *ip_header = &wrap_buffer->rl8168_head.ip_head;
+	struct UDP_Header *udp_header = &wrap_buffer->rl8168_head.udp_head;
 	
 	// Setup eth data
 	for (int i = 0; i < 6; i++) 
@@ -748,7 +724,7 @@ char *rl8168_packet_wrap(const char* data, size_t len) {
 	udp_header->length = htons(8 + len);
 	udp_header->checksum = 0;
 	
-	memcpy (wrap_buffer + PACKET_HEADER_SIZE, data, len);
+	memcpy (&wrap_buffer->data[0], data, len);
 	
-	return wrap_buffer;	
+	return (char *CT(PACKET_HEADER_SIZE + len))wrap_buffer;	
 }

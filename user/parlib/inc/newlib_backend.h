@@ -7,17 +7,7 @@
 #include <errno.h>
 #include <sys/stat.h>
 
-#define OPEN_ID		0
-#define CLOSE_ID	1
-#define READ_ID		2
-#define WRITE_ID	3
-#define LINK_ID		4
-#define UNLINK_ID	5
-#define LSEEK_ID	6
-#define FSTAT_ID	7
-#define ISATTY_ID	8
-#define STAT_ID		9
-#define NUM_CALLS	10
+
 
 #define debug_in_out(...) // debug(__VA_ARGS__)  
 #define debug_write_check(fmt, ...)  //debug(fmt, __VA_ARGS__)
@@ -31,7 +21,7 @@ typedef struct open_subheader {
 	uint32_t flags;
 	uint32_t mode;
 	uint32_t len;
-	char buf[0];
+	char (CT(len) buf)[0];
 } open_subheader_t;
 
 typedef struct close_subheader {
@@ -50,7 +40,7 @@ typedef struct write_subheader {
 	uint32_t fd;
 	uint32_t len;
 	uint32_t FILL1;
-	char buf[0];
+	char (CT(len) buf)[0];
 } write_subheader_t;
 
 typedef struct lseek_subheader {
@@ -69,14 +59,14 @@ typedef struct link_subheader {
 	uint32_t old_len;
 	uint32_t new_len;
 	uint32_t FILL1;
-	char buf[0];
+	char (CT(old_len + new_len) buf)[0];
 } link_subheader_t;
 
 typedef struct unlink_subheader {
 	uint32_t len;
 	uint32_t FILL1;
 	uint32_t FILL2;
-	char buf[0];
+	char (CT(len) buf)[0];
 } unlink_subheader_t;
 
 typedef struct fstat_subheader {
@@ -89,22 +79,34 @@ typedef struct stat_subheader {
 	uint32_t len;
 	uint32_t FILL1;
 	uint32_t FILL2;
-	char buf[0];
+	char (CT(len) buf)[0];
 } stat_subheader_t;
+
+#define OPEN_ID		0
+#define CLOSE_ID	1
+#define READ_ID		2
+#define WRITE_ID	3
+#define LINK_ID		4
+#define UNLINK_ID	5
+#define LSEEK_ID	6
+#define FSTAT_ID	7
+#define ISATTY_ID	8
+#define STAT_ID		9
+#define NUM_CALLS	10
 
 typedef struct backend_msg {
 	syscall_id_t id;
 	union {
-		open_subheader_t open;
-		close_subheader_t close;
-		read_subheader_t read;
-		write_subheader_t write;
-		lseek_subheader_t lseek;
-		isatty_subheader_t isatty;
-		link_subheader_t link;
-		unlink_subheader_t unlink;
-		fstat_subheader_t fstat;
-		stat_subheader_t stat;	
+		open_subheader_t open WHEN(id == OPEN_ID);
+		close_subheader_t close WHEN(id == CLOSE_ID);
+		read_subheader_t read WHEN(id == READ_ID);
+		write_subheader_t write WHEN(id == WRITE_ID);
+		lseek_subheader_t lseek WHEN(id == LSEEK_ID);
+		isatty_subheader_t isatty WHEN(id == ISATTY_ID);
+		link_subheader_t link WHEN(id == LINK_ID);
+		unlink_subheader_t unlink WHEN(id == UNLINK_ID);
+		fstat_subheader_t fstat WHEN(id == FSTAT_ID);
+		stat_subheader_t stat WHEN(id == STAT_ID);	
 	};
 } msg_t;
 
@@ -112,7 +114,7 @@ typedef struct response {
 	int32_t ret;
 	uint32_t err;
 	struct stat st;
-	char buf[0];
+	char (CT(ret) buf)[0];
 } response_t;
 
 
@@ -135,10 +137,10 @@ typedef struct response {
  *              However once some data is available,
  *                      will block until the entire amount is available.
  */
-int read_from_channel(char * buf, int len, int peek);
+int read_from_channel(char *CT(len) buf, int len, int peek);
 
-int read_response_from_channel(response_t *response);
-int read_buffer_from_channel(char *buf, int len);
+int read_response_from_channel(response_t *CT(1) response);
+int read_buffer_from_channel(char *CT(len) buf, int len);
 
 
 /* send_message()

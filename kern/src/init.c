@@ -27,11 +27,13 @@
 #include <manager.h>
 #include <testing.h>
 
+#ifdef __i386__
 #include <arch/rl8168.h>
 #include <arch/ne2k.h>
 #include <arch/mptables.h>
 #include <arch/pci.h>
 #include <arch/ioapic.h>
+#endif
 
 void kernel_init(multiboot_info_t *mboot_info)
 {

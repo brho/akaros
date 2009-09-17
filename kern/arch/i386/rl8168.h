@@ -117,14 +117,51 @@
 // v----- Evil line ------v
 // Hacky stuff for syscalls go away.
 
+struct ETH_Header
+{
+	char dest_mac[6];
+	char source_mac[6];
+	uint16_t eth_type;
+};
+
+
+struct IP_Header
+{
+	uint32_t ip_opts0;
+	uint32_t ip_opts1;
+	uint32_t ip_opts2;
+	uint32_t source_ip;
+	uint32_t dest_ip;
+};
+
+struct UDP_Header
+{
+	uint16_t source_port;
+	uint16_t dest_port;
+	uint16_t length;
+	uint16_t checksum;
+};	
+
 #define MINIMUM_PACKET_SIZE 14 // kinda evil. probably evil.
 #define MAX_PACKET_SIZE		MTU
 
-#define PACKET_HEADER_SIZE  20 + 8 + 14 //IP UDP ETH
+#define PACKET_HEADER_SIZE  sizeof(struct rl8168_header) //IP UDP ETH
 #define MAX_PACKET_DATA		MAX_FRAME_SIZE - PACKET_HEADER_SIZE
 // This number needs verification! Also, this is a huge hack, as the driver shouldnt care about UDP/IP etc.
 
-char *rl8168_packet_wrap(const char* data, size_t len);
+struct rl8168_header {
+	struct ETH_Header eth_head;
+	struct IP_Header ip_head;
+	struct UDP_Header udp_head;
+};
+
+struct rl8168_packet {
+	struct rl8168_header rl8168_head;
+	char data[MTU-PACKET_HEADER_SIZE];
+} __attribute__((packed));
+
+char *CT(PACKET_HEADER_SIZE + len)
+rl8168_packet_wrap(const char *CT(len) data, size_t len);
 
 
 // ^----- Evil line ------^
@@ -143,7 +180,8 @@ void rl8168_configure(void);
 void rl8168_handle_rx_packet(void);
 void rl8168_set_rx_descriptor(uint32_t des_num, uint8_t reset_buffer);
 void rl8168_set_tx_descriptor(uint32_t des_num);
-void rl8168_process_frame(char *frame_buffer, uint32_t frame_size, uint32_t command);
-int rl8168_send_frame(const char *data, size_t len);
+void rl8168_process_frame(char *CT(frame_size) frame_buffer,
+                          uint32_t frame_size, uint32_t command);
+int rl8168_send_frame(const char *CT(len) data, size_t len);
 
 #endif /* !ROS_INC_REALTEK_H */

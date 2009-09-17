@@ -3,10 +3,6 @@
  * See LICENSE for details.
  */
 
-#ifdef __DEPUTY__
-#pragma nodeputy
-#endif
-
 #ifdef __SHARC__
 #pragma nosharc
 #endif
@@ -160,7 +156,12 @@ void ne2k_setup_interrupts() {
 	ne2k_debug("-->Setting interrupts.\n");
 	
 	// Kernel based interrupt stuff
+#ifdef __IVY__
+	register_interrupt_handler(interrupt_handlers, KERNEL_IRQ_OFFSET + ne2k_irq, ne2k_interrupt_handler, (void *)0);
+#else
 	register_interrupt_handler(interrupt_handlers, KERNEL_IRQ_OFFSET + ne2k_irq, ne2k_interrupt_handler, 0);
+#endif
+
 	
 	ioapic_route_irq(ne2k_irq, 6);	
 	

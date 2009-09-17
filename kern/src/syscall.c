@@ -4,10 +4,6 @@
 #pragma nosharc
 #endif
 
-#ifdef __DEPUTY__
-#pragma nodeputy
-#endif
-
 #include <ros/common.h>
 #include <arch/types.h>
 #include <arch/arch.h>
@@ -70,14 +66,20 @@ static ssize_t sys_serial_read(env_t* e, char *DANGEROUS _buf, size_t len)
 /* START OF REMOTE SYSTEMCALL SUPPORT SYSCALLS. THESE WILL GO AWAY AS THINGS MATURE */
 //
 
-static ssize_t sys_run_binary(env_t* e, void *binary_buf, void* arg, size_t len) {
+static ssize_t sys_run_binary(env_t* e, void *DANGEROUS binary_buf,
+                              void*DANGEROUS arg, size_t len) {
+	uint8_t *CT(len) checked_binary_buf;
+	checked_binary_buf = user_mem_assert(e, binary_buf, len, PTE_USER_RO);
+#if 0
+	zra: copied into new address space, so no copy needed here.
 	uint8_t* new_binary = kmalloc(len, 0);
 	if(new_binary == NULL)
 		return -ENOMEM;
-	memcpy(new_binary, binary_buf, len);
+	memcpy(new_binary, checked_binary_buf, len);
+#endif
 
-	env_t* env = env_create((uint8_t*)new_binary, len);
-	kfree(new_binary);
+	env_t* env = env_create(checked_binary_buf, len);
+	//kfree(new_binary);
 	proc_set_state(env, PROC_RUNNABLE_S);
 	schedule_proc(env);
 	sys_yield(e);
@@ -99,7 +101,7 @@ static ssize_t sys_eth_write(env_t* e, const char *DANGEROUS buf, size_t len)
 		int cur_packet_len = 0;
 		while (total_sent != len) {
 			cur_packet_len = ((len - total_sent) > MAX_PACKET_DATA) ? MAX_PACKET_DATA : (len - total_sent);
-			char* wrap_buffer = packet_wrap(buf + total_sent, cur_packet_len);
+			char* wrap_buffer = packet_wrap(_buf + total_sent, cur_packet_len);
 			just_sent = send_frame(wrap_buffer, cur_packet_len + PACKET_HEADER_SIZE);
 			
 			if (just_sent < 0)
@@ -122,20 +124,21 @@ static ssize_t sys_eth_write(env_t* e, const char *DANGEROUS buf, size_t len)
 static ssize_t sys_eth_read(env_t* e, char *DANGEROUS buf, size_t len) 
 {
 	extern int eth_up;
-	
+
 	if (eth_up) {
 		extern int packet_waiting;
 		extern int packet_buffer_size;
-		extern char* packet_buffer;
-		extern char* packet_buffer_orig;
+		extern char*CT(packet_buffer_size) packet_buffer;
+		extern char*CT(MAX_FRAME_SIZE) packet_buffer_orig;
 		extern int packet_buffer_pos;
+		char *CT(len) _buf = user_mem_assert(e, buf,len, PTE_U);
 			
 		if (packet_waiting == 0)
 			return 0;
 			
 		int read_len = ((packet_buffer_pos + len) > packet_buffer_size) ? packet_buffer_size - packet_buffer_pos : len;
 
-		memcpy(buf, packet_buffer + packet_buffer_pos, read_len);
+		memcpy(_buf, packet_buffer + packet_buffer_pos, read_len);
 	
 		packet_buffer_pos = packet_buffer_pos + read_len;
 	
