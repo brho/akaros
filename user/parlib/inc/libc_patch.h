@@ -231,7 +231,7 @@ int chmod(const STRING __path, __MODE_T __mode);
 int mkdir(const STRING __path, __MODE_T __mode);
 int mkfifo(const STRING __path, __MODE_T __mode);
 int stat(const STRING __path, struct stat * SAFE NONNULL __sbuf);
-
+int fstat(int fd, struct stat * SAFE NONNULL __sbuf);
 int lstat(const STRING __path, struct stat * SAFE NONNULL __sbuf);
 int _stat(const STRING __path, struct stat * SAFE NONNULL __sbuf);
 

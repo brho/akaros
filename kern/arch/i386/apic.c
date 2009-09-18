@@ -63,7 +63,6 @@ void pic_unmask_irq(uint8_t irq)
 		outb(PIC1_DATA, inb(PIC1_DATA) & ~(1 << irq));
 }
 
-
 /*
  * Sets the LAPIC timer to go off after a certain number of ticks.  The primary
  * clock freq is actually the bus clock, which we figure out during timer_init

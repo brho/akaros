@@ -12,7 +12,7 @@
 #include <ros/syscall.h>
 #include <ros/error.h>
 #include <ros/procdata.h>
-#include <newlib_backend.h>
+#include <errno.h>
 
 enum {
 	PG_RDONLY = 4,
@@ -30,6 +30,9 @@ ssize_t     sys_cputs(const uint8_t *s, size_t len);
 uint16_t    sys_cgetc(void);
 ssize_t     sys_serial_write(void* buf, size_t len); 
 ssize_t     sys_serial_read(void* buf, size_t len);
+ssize_t     sys_eth_write(void* buf, size_t len); 
+ssize_t     sys_eth_read(void* buf, size_t len);
+ssize_t     sys_run_binary(void* binary_buf, void* arg, size_t len);
 int         sys_getpid(void);
 size_t      sys_getcpuid(void);
 error_t     sys_proc_destroy(int pid);

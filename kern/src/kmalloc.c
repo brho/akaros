@@ -111,11 +111,11 @@ void* kmalloc(size_t size, int flags)
 	kmallocdebug("npages: %u\n", npages);
 	for(int i=(naddrpages-1); i>=(npages-1); i--) {
 		int j;
-		for(j=i; j>=i-(npages-1); j--) {
+		for(j=i; j>=(i-(npages-1)); j--) {
 			if( !page_is_free(j) )
 				break;
 		}
-		if( j == i-(npages-1)-1 ) {
+		if( j == (i-(npages-1)-1)) {
 			first = j+1;
 			break;
 		}
@@ -123,13 +123,14 @@ void* kmalloc(size_t size, int flags)
 	//If we couldn't find them, return NULL
 	if( first == -1 )
 		return NULL;
-	
+		
 	//Otherwise go ahead and allocate them to ourselves now
 	for(int i=0; i<npages; i++) {
 		page_t* page;
 
 		page_alloc_specific(&page, first+i);
-		page_incref(page);
+		// Kevin doesn't like this next line 
+		page_incref(page); 
 		page->num_cons_links = npages-i;
 
 		spin_lock_irqsave(&pages_list_lock);

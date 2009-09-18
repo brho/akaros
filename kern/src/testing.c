@@ -24,6 +24,7 @@
 #include <multiboot.h>
 #include <pmap.h>
 #include <page_alloc.h>
+#include <pmap.h>
 
 #ifdef __i386__
 
@@ -80,7 +81,24 @@ void test_pic_reception(void)
 	while(1);
 }
 
+void test_ioapic_pit_reroute(void) 
+{
+	register_interrupt_handler(interrupt_handlers, 0x20, test_hello_world_handler, NULL);
+	ioapic_route_irq(0, 3);	
+
+	cprintf("Starting pit on core 3....\n");
+	udelay(3000000);
+	pit_set_timer(0xFFFE,TIMER_RATEGEN); // totally arbitrary time
+	
+	udelay(3000000);
+	ioapic_unroute_irq(0);
+	udelay(300000);
+	cprintf("Masked pit. Waiting before return...\n");
+	udelay(3000000);
+}
+
 #endif // __i386__
+
 
 void test_print_info(void)
 {

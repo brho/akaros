@@ -15,6 +15,17 @@ enum
 	SYS_cputs,
 	SYS_cgetc,
 	SYS_getcpuid,
+
+	// The next 3 syscalls go with the experimental network
+	// driver. These syscalls are used by newlib_backend /
+	// our remote binary loader to pull data from / put data
+	// into a buffer managed by the network driver.
+	// These should go away as things mature. 
+	SYS_eth_read,
+	SYS_eth_write,
+	SYS_run_binary,
+	// End of extra network syscalls
+
 	SYS_getpid,
 	SYS_proc_destroy,
 	SYS_shared_page_alloc,

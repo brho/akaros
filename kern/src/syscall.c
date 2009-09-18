@@ -5,12 +5,14 @@
 #endif
 
 #include <ros/common.h>
+#include <arch/types.h>
 #include <arch/arch.h>
 #include <arch/mmu.h>
 #include <arch/console.h>
 #include <ros/timer.h>
 #include <ros/error.h>
 
+#include <arch/rl8168.h>
 #include <string.h>
 #include <assert.h>
 #include <process.h>
@@ -18,8 +20,11 @@
 #include <pmap.h>
 #include <trap.h>
 #include <syscall.h>
+#include <kmalloc.h>
 #include <stdio.h>
 #include <kfs.h> // eventually replace this with vfs.h
+
+static void sys_yield(struct proc *p);
 
 //Do absolutely nothing.  Used for profiling.
 static void sys_null(void)
@@ -56,6 +61,101 @@ static ssize_t sys_serial_read(env_t* e, char *DANGEROUS _buf, size_t len)
 		return -EINVAL;
 	#endif
 }
+
+//
+/* START OF REMOTE SYSTEMCALL SUPPORT SYSCALLS. THESE WILL GO AWAY AS THINGS MATURE */
+//
+
+static ssize_t sys_run_binary(env_t* e, void *DANGEROUS binary_buf,
+                              void*DANGEROUS arg, size_t len) {
+	uint8_t *CT(len) checked_binary_buf;
+	checked_binary_buf = user_mem_assert(e, binary_buf, len, PTE_USER_RO);
+#if 0
+	zra: copied into new address space, so no copy needed here.
+	uint8_t* new_binary = kmalloc(len, 0);
+	if(new_binary == NULL)
+		return -ENOMEM;
+	memcpy(new_binary, checked_binary_buf, len);
+#endif
+
+	env_t* env = env_create(checked_binary_buf, len);
+	//kfree(new_binary);
+	proc_set_state(env, PROC_RUNNABLE_S);
+	schedule_proc(env);
+	sys_yield(e);
+	
+	return 0;
+}
+
+
+// This is not a syscall we want. Its hacky. Here just for syscall stuff until get a stack.
+static ssize_t sys_eth_write(env_t* e, const char *DANGEROUS buf, size_t len) 
+{ 
+	extern int eth_up;
+	
+	if (eth_up) {
+		
+		char *COUNT(len) _buf = user_mem_assert(e, buf, len, PTE_U);
+		int total_sent = 0;
+		int just_sent = 0;
+		int cur_packet_len = 0;
+		while (total_sent != len) {
+			cur_packet_len = ((len - total_sent) > MAX_PACKET_DATA) ? MAX_PACKET_DATA : (len - total_sent);
+			char* wrap_buffer = packet_wrap(_buf + total_sent, cur_packet_len);
+			just_sent = send_frame(wrap_buffer, cur_packet_len + PACKET_HEADER_SIZE);
+			
+			if (just_sent < 0)
+				return 0; // This should be an error code of its own
+				
+			if (wrap_buffer)
+				kfree(wrap_buffer);
+				
+			total_sent += cur_packet_len;
+		}
+		
+		return (ssize_t)len;
+		
+	}
+	else
+		return -EINVAL;
+}
+
+// This is not a syscall we want. Its hacky. Here just for syscall stuff until get a stack.
+static ssize_t sys_eth_read(env_t* e, char *DANGEROUS buf, size_t len) 
+{
+	extern int eth_up;
+
+	if (eth_up) {
+		extern int packet_waiting;
+		extern int packet_buffer_size;
+		extern char*CT(packet_buffer_size) packet_buffer;
+		extern char*CT(MAX_FRAME_SIZE) packet_buffer_orig;
+		extern int packet_buffer_pos;
+		char *CT(len) _buf = user_mem_assert(e, buf,len, PTE_U);
+			
+		if (packet_waiting == 0)
+			return 0;
+			
+		int read_len = ((packet_buffer_pos + len) > packet_buffer_size) ? packet_buffer_size - packet_buffer_pos : len;
+
+		memcpy(_buf, packet_buffer + packet_buffer_pos, read_len);
+	
+		packet_buffer_pos = packet_buffer_pos + read_len;
+	
+		if (packet_buffer_pos == packet_buffer_size) {
+			kfree(packet_buffer_orig);
+			packet_waiting = 0;
+		}
+	
+		return read_len;
+	}
+	else
+		return -EINVAL;
+}
+
+//
+/* END OF REMOTE SYSTEMCALL SUPPORT SYSCALLS. */
+//
 
 static ssize_t sys_shared_page_alloc(env_t* p1,
                                      void**DANGEROUS _addr, envid_t p2_id,
@@ -385,6 +485,14 @@ intreg_t syscall(env_t* e, uintreg_t syscallno, uintreg_t a1, uintreg_t a2,
 			return sys_serial_write(e, (char *DANGEROUS)a1, (size_t)a2);
 		case SYS_serial_read:
 			return sys_serial_read(e, (char *DANGEROUS)a1, (size_t)a2);
+                case SYS_run_binary:
+                        return sys_run_binary(e, (char *DANGEROUS)a1,
+                                              (char* DANGEROUS)a2, (size_t)a3);
+                case SYS_eth_write:
+                        return sys_eth_write(e, (char *DANGEROUS)a1, (size_t)a2);
+                case SYS_eth_read:
+                        return sys_eth_read(e, (char *DANGEROUS)a1, (size_t)a2);
+
 	#endif
 
 	#ifdef __sparc_v8__

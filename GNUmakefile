@@ -55,7 +55,8 @@ KERN_CFLAGS := --deputy\
                   --no-rc-sharc\
                   --sc-dynamic-is-error\
                   --sc-ops=$(INCLUDE_DIR)/ivy/sharc.h\
-                  --sc-all-in-thread
+                  --sc-all-in-thread\
+                  --enable-precompile
 USER_CFLAGS := --deputy --enable-error-db
 CC	    := ivycc --gcc=$(GCCPREFIX)gcc
 else
@@ -125,7 +126,7 @@ $(OBJDIR)/.deps: $(foreach dir, $(OBJDIRS), $(wildcard $(OBJDIR)/$(dir)/*.d))
 -include $(OBJDIR)/.deps
 
 # Use doxygen to make documentation for ROS
-docs: all
+docs: 
 	@doxygen doc/rosdoc.cfg
 	@if [ ! -d doc/rosdoc/html/img ];          \
 	 then                                      \

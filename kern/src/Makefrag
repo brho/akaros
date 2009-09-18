@@ -15,6 +15,11 @@ KERN_SRCFILES := $(KERN_ARCH_SRCFILES) \
                  $(KERN_SRC_DIR)/init.c \
                  $(KERN_SRC_DIR)/monitor.c \
                  $(KERN_SRC_DIR)/printf.c \
+                 $(KERN_SRC_DIR)/trap.c \
+                 $(KERN_SRC_DIR)/trapentry.S \
+                 $(KERN_SRC_DIR)/sched.c \
+                 $(KERN_SRC_DIR)/kdebug.c \
+                 $(KERN_SRC_DIR)/apic.c \
                  $(KERN_SRC_DIR)/printfmt.c \
                  $(KERN_SRC_DIR)/smp.c \
                  $(KERN_SRC_DIR)/multiboot.c \
@@ -45,9 +50,10 @@ KERN_APPFILES := \
                  $(USER_APPS_ROSLIB_DIR)/spawn \
                  $(USER_APPS_ROSLIB_DIR)/hello \
                  $(USER_APPS_ROSLIB_DIR)/mhello \
+                 $(USER_APPS_ROSLIB_DIR)/measurements \
+                 $(USER_APPS_PARLIB_DIR)/draw_nanwan_standalone \
                  $(USER_APPS_PARLIB_DIR)/channel_test_client \
                  $(USER_APPS_PARLIB_DIR)/channel_test_server \
-                 $(USER_APPS_ROSLIB_DIR)/measurements \
                  $(USER_APPS_PARLIB_DIR)/hello \
                  $(USER_APPS_PARLIB_DIR)/matrix
 #                 $(USER_APPS_PARLIB_DIR)/open_read

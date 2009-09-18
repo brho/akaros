@@ -31,10 +31,11 @@ DECL_PROG(roslib_spawn);
 DECL_PROG(roslib_hello);
 DECL_PROG(roslib_mhello);
 DECL_PROG(roslib_measurements);
+DECL_PROG(parlib_draw_nanwan_standalone);
 DECL_PROG(parlib_channel_test_client);
 DECL_PROG(parlib_channel_test_server);
-DECL_PROG(parlib_matrix);
 DECL_PROG(parlib_hello);
+DECL_PROG(parlib_matrix);
 
 struct kfs_entry kfs[MAX_KFS_FILES] = {
 	KFS_ENTRY(roslib_proctests)
@@ -44,10 +45,11 @@ struct kfs_entry kfs[MAX_KFS_FILES] = {
 	KFS_ENTRY(roslib_hello)
 	KFS_ENTRY(roslib_mhello)
 	KFS_ENTRY(roslib_measurements)
+	KFS_ENTRY(parlib_draw_nanwan_standalone)
 	KFS_ENTRY(parlib_channel_test_client)
 	KFS_ENTRY(parlib_channel_test_server)
-	KFS_ENTRY(parlib_matrix)
 	KFS_ENTRY(parlib_hello)
+	KFS_ENTRY(parlib_matrix)
 };
 
 ssize_t kfs_lookup_path(char* path)
