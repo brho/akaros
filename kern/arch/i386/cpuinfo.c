@@ -24,7 +24,7 @@ void print_cpuinfo(void)
 	uint32_t model, family;
 	uint64_t msr_val;
 	char vendor_id[13];
-	extern char (SNT SREADONLY _start)[];
+	extern char (SNT RO _start)[];
 
 	asm volatile ("cpuid;"
 	          "movl    %%ebx, (%2);"
@@ -101,10 +101,10 @@ void print_cpuinfo(void)
 
 void show_mapping(uintptr_t start, size_t size)
 {
-	pde_t SLOCKED(&vpd_lock) *COUNT(PTSIZE) pgdir =
-	    (pde_t SLOCKED(&vpd_lock) *COUNT(PTSIZE))vpd;
+	pde_t LCKD(&vpd_lock) *CT(PTSIZE) pgdir =
+	    (pde_t LCKD(&vpd_lock) *CT(PTSIZE))vpd;
 	pte_t *pte;
-	pte_t SLOCKED(&vpd_lock) *pde;
+	pte_t LCKD(&vpd_lock) *pde;
 	page_t *page;
 	uintptr_t i;
 
@@ -127,7 +127,7 @@ void show_mapping(uintptr_t start, size_t size)
 
 void backtrace(void)
 { TRUSTEDBLOCK
-	extern char (SNT SREADONLY _start)[];
+	extern char (SNT RO _start)[];
 	uint32_t *ebp, eip;
 	eipdebuginfo_t debuginfo;
 	char buf[256];

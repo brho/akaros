@@ -40,7 +40,7 @@ static void page_alloc_bootstrap(cache_t RO* llc) {
  * to allocate and deallocate physical memory via the 
  * page_free_lists. 
  */
-void page_alloc_init() 
+void page_alloc_init()
 {
 	cache_t RO* llc = available_caches.llc;
 

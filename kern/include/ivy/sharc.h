@@ -1,12 +1,25 @@
 #include <assert.h>
 #include <string.h>
 
-#define SINLINE inline
+#ifdef IVY_FAST_CHECKS
+  #define SINLINE __attribute__((always_inline))
+#else
+  #define SINLINE inline
+#endif
+
 #define SUNUSED __attribute__((unused))
+
+#ifndef sasmlinkage
+#define sasmlinkage __attribute__((regparm(0)))
+#endif
+
+#ifndef snoreturn
+#define snoreturn __attribute__((noreturn))
+#endif
 
 typedef struct __ivy_sharC_thread {
 #define SHARC_MAX_LOCKS 16
-    void *held_locks[SHARC_MAX_LOCKS];
+    const void *held_locks[SHARC_MAX_LOCKS];
     unsigned int max_lock;
 } sharC_env_t;
 
@@ -25,8 +38,8 @@ WRITES(sharC_env->max_lock,sharC_env->held_locks)
 }
 
 #pragma cilnoremove("__sharc_single_threaded")
-static SINLINE void __sharc_single_threaded(void *msg) TRUSTED;
-static SINLINE void __sharc_single_threaded(void *msg)
+static SINLINE void __sharc_single_threaded(const void *msg) TRUSTED;
+static SINLINE void __sharc_single_threaded(const void *msg)
 {
 	// TODO: how do I know how many threads/cores are running?
     //assert(1);
@@ -46,17 +59,34 @@ static SINLINE void __sharc_single_threaded(void *msg)
  * Locks
  */
 
-extern void
-__sharc_lock_error(const void *lck, const void *what,
-                   unsigned int sz, char *msg);
+extern void sasmlinkage snoreturn
+__sharc_lock_error_noreturn(const void *lck, const void *what,
+                            unsigned int sz, const char *msg);
 
-extern void
-__sharc_lock_coerce_error(void *dstlck, void *srclck, char *msg);
+extern void sasmlinkage
+__sharc_lock_error_mayreturn(const void *lck, const void *what,
+                             unsigned int sz, const char *msg);
+
+extern void sasmlinkage snoreturn
+__sharc_lock_coerce_error_noreturn(const void *dstlck, const void *srclck,
+                                   const char *msg);
+
+extern void sasmlinkage
+__sharc_lock_coerce_error_mayreturn(const void *dstlck, const void *srclck,
+                                    const char *msg);
+
+#ifdef IVY_FAST_CHECKS
+#define __sharc_lock_error         __sharc_lock_error_noreturn
+#define __sharc_lock_coerce_error  __sharc_lock_coerce_error_noreturn
+#else
+#define __sharc_lock_error         __sharc_lock_error_mayreturn
+#define __sharc_lock_coerce_error  __sharc_lock_coerce_error_mayreturn
+#endif
 
 /* assumes no double-locking */
 #pragma cilnoremove("__sharc_add_lock")
-static SINLINE void __sharc_add_lock(void *lck) TRUSTED;
-static SINLINE void __sharc_add_lock(void *lck)
+static SINLINE void __sharc_add_lock(const void *lck) TRUSTED;
+static SINLINE void __sharc_add_lock(const void *lck)
 {
     unsigned int i;
 
@@ -75,8 +105,8 @@ static SINLINE void __sharc_add_lock(void *lck)
 
 /* this will be very inefficient if the lock isn't actually held */
 #pragma cilnoremove("__sharc_rm_lock")
-static SINLINE void __sharc_rm_lock(void *lck) TRUSTED;
-static SINLINE void __sharc_rm_lock(void *lck)
+static SINLINE void __sharc_rm_lock(const void *lck) TRUSTED;
+static SINLINE void __sharc_rm_lock(const void *lck)
 {
     unsigned int i;
 
@@ -95,9 +125,11 @@ static SINLINE void __sharc_rm_lock(void *lck)
 
 #pragma cilnoremove("__sharc_chk_lock")
 static SINLINE void
-__sharc_chk_lock(void *lck, void *what, unsigned int sz, char *msg) TRUSTED;
+__sharc_chk_lock(const void *lck, const void *what, unsigned int sz,
+                 const char *msg) TRUSTED;
 static SINLINE void
-__sharc_chk_lock(void *lck, void *what, unsigned int sz, char *msg)
+__sharc_chk_lock(const void *lck, const void *what, unsigned int sz,
+                 const char *msg)
 {
     unsigned int i;
 
@@ -117,9 +149,11 @@ __sharc_chk_lock(void *lck, void *what, unsigned int sz, char *msg)
 
 #pragma cilnoremove("__sharc_coerce_lock")
 static SINLINE void
-__sharc_coerce_lock(void *dstlck, void *srclck, char *msg) TRUSTED;
+__sharc_coerce_lock(const void *dstlck, const void *srclck,
+                    const char *msg) TRUSTED;
 static SINLINE void
-__sharc_coerce_lock(void *dstlck, void *srclck, char *msg)
+__sharc_coerce_lock(const void *dstlck, const void *srclck,
+                    const char *msg)
 {
 	if (!__ivy_checking_on) return;
 
