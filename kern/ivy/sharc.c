@@ -3,7 +3,16 @@
 
 int __ivy_checking_on = 1;
 
-void __sharc_lock_error(const void *lck, const void *what,
+void __sharc_single_thread_error_mayreturn(const char *msg)
+{
+	int old;
+	if (!__ivy_checking_on) return;
+	old = __ivy_checking_on;
+	warn("Ivy: Not single threaded: %s\n", msg);
+	__ivy_checking_on = old;
+}
+
+void __sharc_lock_error_mayreturn(const void *lck, const void *what,
                         unsigned int sz, char *msg)
 {
 	int old;
@@ -15,7 +24,7 @@ void __sharc_lock_error(const void *lck, const void *what,
 	__ivy_checking_on = old;
 }
 
-void __sharc_lock_coerce_error(void *dstlck, void *srclck, char *msg)
+void __sharc_lock_coerce_error_mayreturn(void *dstlck, void *srclck, char *msg)
 {
 	int old;
 	if (!__ivy_checking_on) return;

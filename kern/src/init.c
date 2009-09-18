@@ -35,6 +35,9 @@
 #include <arch/ioapic.h>
 #endif
 
+// zra: flag for Ivy
+int booting = 1;
+
 void kernel_init(multiboot_info_t *mboot_info)
 {
 	extern char (RO BND(__this, end) edata)[], (RO SNT end)[];
@@ -99,6 +102,9 @@ void kernel_init(multiboot_info_t *mboot_info)
 	rl8168_init();		
 	ne2k_init();
 	#endif // __NETWORK__
+
+	// zra: let's Ivy know we're done booting
+	booting = 0;
 
 	manager();
 }

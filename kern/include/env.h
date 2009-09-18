@@ -40,9 +40,6 @@ typedef int32_t envid_t;
 #define ENVX(envid)		((envid) & (NENV - 1))
 
 // TODO: clean this up.
-#ifdef __SHARC__
-typedef sharC_env_t;
-#endif
 struct Env {
 	TAILQ_ENTRY(Env) proc_link NOINIT;	// Free list link pointers
 	spinlock_t proc_lock;
@@ -61,12 +58,6 @@ struct Env {
 	 * index is the physical core_id() corresponding to the vcore. */
 	uint32_t vcoremap[MAX_NUM_CPUS];
 	uint32_t num_vcores;
-
-#ifdef __SHARC__
-	// held spin-locks
-	// zra: Used by Ivy. Let me know if this should go elsewhere.
-	sharC_env_t sharC_env;
-#endif
 
 	// Address space
 	pde_t *COUNT(NPDENTRIES) env_pgdir;			// Kernel virtual address of page dir

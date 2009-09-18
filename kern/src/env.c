@@ -279,10 +279,6 @@ env_alloc(env_t **newenv_store, envid_t parent_id)
 	e->env_refcnt = 1;
 	e->env_flags = 0;
 	e->env_entry = 0; // cheating.  this really gets set in load_icode
-#ifdef __SHARC__
-	/* init SharC state */
-	sharC_env_init(&e->sharC_env);
-#endif
 	e->num_vcores = 0;
 	memset(&e->vcoremap, 0, sizeof(e->vcoremap));
 

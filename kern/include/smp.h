@@ -17,11 +17,22 @@
 #include <workqueue.h>
 #include <env.h>
 
+#ifdef __SHARC__
+typedef sharC_env_t;
+#endif
 // will want this padded out to cacheline alignment
 struct per_cpu_info {
 	spinlock_t lock;
 	bool preempt_pending;
 	struct workqueue NTPTV(t) workqueue;
+
+#ifdef __SHARC__
+	// held spin-locks. this will have to go elsewhere if multiple kernel
+	// threads can share a CPU.
+	// zra: Used by Ivy. Let me know if this should go elsewhere.
+	sharC_env_t sharC_env;
+#endif
+
 #ifdef __i386__
 	spinlock_t amsg_lock;
 	unsigned LCKD(&amsg_lock) amsg_current;

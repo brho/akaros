@@ -23,8 +23,10 @@ typedef struct __ivy_sharC_thread {
     unsigned int max_lock;
 } sharC_env_t;
 
-#include <env.h>
+#include <smp.h>
+#include <process.h>
 
+extern int booting;
 extern int __ivy_checking_on;
 
 #pragma cilnoremove("sharC_env_init")
@@ -37,17 +39,35 @@ WRITES(sharC_env->max_lock,sharC_env->held_locks)
 	return;
 }
 
+static __attribute__((always_inline)) int
+is_single_threaded() TRUSTED
+{
+	return booting || (num_idlecores == num_cpus - 1);
+}
+
+extern void sasmlinkage
+__sharc_single_thread_error_mayreturn(const char *msg);
+
+extern void sasmlinkage snoreturn
+__sharc_single_thread_error_noreturn(const char *msg);
+
+#ifdef IVY_FAST_CHECKS
+#define __sharc_single_thread_error __sharc_single_thread_error_noreturn
+#else
+#define __sharc_single_thread_error __sharc_single_thread_error_mayreturn
+#endif
+
 #pragma cilnoremove("__sharc_single_threaded")
 static SINLINE void __sharc_single_threaded(const void *msg) TRUSTED;
 static SINLINE void __sharc_single_threaded(const void *msg)
 {
-	// TODO: how do I know how many threads/cores are running?
-    //assert(1);
+	if (is_single_threaded()) return;
+	__sharc_single_thread_error(msg);
     return;
 }
 
-
-#define GET_SHARC_THREAD() current->sharC_env
+#define sharc_current      (&per_cpu_info[core_id()])
+#define GET_SHARC_THREAD() sharc_current->sharC_env
 
 #define THREAD_LOCKS(thread,i) (thread.held_locks[(i)])
 #define THREAD_MAX_LOCK(thread) (thread.max_lock)
@@ -90,7 +110,7 @@ static SINLINE void __sharc_add_lock(const void *lck)
 {
     unsigned int i;
 
-	if (!__ivy_checking_on || !current) return;
+	if (!__ivy_checking_on || is_single_threaded()) return;
 
     for (i = 0; i <= THIS_MAX_LOCK; i++)
         if (!THIS_LOCKS(i))
@@ -110,7 +130,7 @@ static SINLINE void __sharc_rm_lock(const void *lck)
 {
     unsigned int i;
 
-	if (!__ivy_checking_on || !current) return;
+	if (!__ivy_checking_on || is_single_threaded()) return;
 
     for (i = 0; i <= THIS_MAX_LOCK; i++)
         if (THIS_LOCKS(i) == lck)
@@ -136,7 +156,7 @@ __sharc_chk_lock(const void *lck, const void *what, unsigned int sz,
 	// TODO: how do I find how many threads are running?
     //if (__sharc_num_threads == 1) return;
 
-	if (!__ivy_checking_on || !current) return;
+	if (!__ivy_checking_on || is_single_threaded()) return;
 
     for (i = 0; i <= THIS_MAX_LOCK; i++)
         if (THIS_LOCKS(i) == lck)
@@ -155,7 +175,7 @@ static SINLINE void
 __sharc_coerce_lock(const void *dstlck, const void *srclck,
                     const char *msg)
 {
-	if (!__ivy_checking_on) return;
+	if (!__ivy_checking_on || is_single_threaded()) return;
 
     if (dstlck != srclck)
         __sharc_lock_coerce_error(dstlck,srclck,msg);
