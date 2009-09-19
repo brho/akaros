@@ -43,25 +43,19 @@ void _exit(int __status)
  * Close a file. 
  */
 int close(int file) {
+	close_subheader_t msg;
 	debug_in_out("CLOSE\n");
 
 	// If trying to close stdin/out/err just return
 	if ((file == STDIN_FILENO) || (file == STDERR_FILENO) 
                                    || (file == STDOUT_FILENO))
 		return 0;
-
-	// Allocate a new buffer of proper size
-	msg_t *msg = malloc(sizeof(msg_t));
-	if (msg == NULL)
-		return -1;
 	
-	msg->id = CLOSE_ID;
-	msg->close.fd = file;
+	msg.id = CLOSE_ID;
+	msg.fd = file;
 	
 	// Send message
-	response_t *result = send_message(msg, sizeof(msg_t));
-
-	free(msg);
+	response_t *result = send_message(&msg, sizeof(close_subheader_t),CLOSE_ID);
 
 	int return_val;
 
@@ -110,6 +104,7 @@ pid_t fork(void)
  */
 int fstat(int file, struct stat *st) 
 {
+	fstat_subheader_t msg;
 	debug_in_out("FSTAT\n");	
 
 	// Kevin added this. I believe its needed for the serial branch
@@ -121,20 +116,12 @@ int fstat(int file, struct stat *st)
 		st->st_mode = 8592;
 		return 0;
 	}
-
-
-	// Allocate a new buffer of proper size	
-	msg_t *msg = malloc(sizeof(msg_t));
-	if (msg == NULL)
-		return -1;
 	
-	msg->id = FSTAT_ID;
-	msg->fstat.fd = file;
+	msg.id = FSTAT_ID;
+	msg.fd = file;
 
 	// Send message
-	response_t *result = send_message(msg, sizeof(msg_t));
-
-	free(msg);
+	response_t *result = send_message(&msg, sizeof(fstat_subheader_t),FSTAT_ID);
 
 	// Read result
 	int return_val;
@@ -173,6 +160,7 @@ pid_t getpid(void)
  */
 int isatty(int file) 
 {
+	isatty_subheader_t msg;
 	debug_in_out("ISATTY\n");
 
 	// Cheap hack to avoid sending serial comm for stuff we know
@@ -180,18 +168,11 @@ int isatty(int file)
                                || (STDERR_FILENO == file))
 		return 1;
 	
-	// Allocate a new buffer of proper size
-	msg_t *msg = malloc(sizeof(msg_t));
-	if (msg == NULL)
-		return -1;
-	
-	msg->id = ISATTY_ID;
-	msg->isatty.fd = file;
+	msg.id = ISATTY_ID;
+	msg.fd = file;
 
 	// Send message
-	response_t *result = send_message(msg, sizeof(msg_t));
-
-	free(msg);
+	response_t *result = send_message(&msg, sizeof(isatty_subheader_t),ISATTY_ID);
 
 	int return_val; 
 
@@ -226,24 +207,31 @@ int kill(int pid, int sig)
  */
 int link(const char *old, const char *new) 
 {
+	link_subheader_t *msg;
+	response_t *result;
 	debug_in_out("LINK\n");
 	
 	int s_len_old = strlen(old) + 1; // Null terminator
 	int s_len_new = strlen(new) + 1; // Null terminator
 
-	msg_t *msg = malloc(sizeof(msg_t) + s_len_old + s_len_new);
+	msg = malloc(sizeof(link_subheader_t) + s_len_old + s_len_new);
 	if (msg == NULL)
 		return -1;
 	
 	msg->id = LINK_ID;
-	msg->link.old_len = s_len_old;
-	msg->link.new_len = s_len_new;
+	msg->old_len = s_len_old;
+	msg->new_len = s_len_new;
+	msg->total_len = s_len_old + s_len_new;
 	
-	memcpy(msg->link.buf, old, s_len_old);
-	memcpy(msg->link.buf + s_len_old, new, s_len_new);
+	memcpy(msg->buf, old, s_len_old - 1);
+	msg->buf[s_len_old - 1] = '\0';
+	memcpy(msg->buf + s_len_old, new, s_len_new - 1);
+	msg->buf[s_len_old + s_len_new - 1] = '\0';
 
 	// Send message
-	response_t *result = send_message(msg, sizeof(msg_t) + s_len_old + s_len_new);
+	result =
+		send_message((char *CT(sizeof(link_subheader_t)+s_len_old+s_len_new))TC(msg),
+	                 sizeof(link_subheader_t) + msg->total_len,LINK_ID);
 
 	free(msg);
 
@@ -268,22 +256,16 @@ int link(const char *old, const char *new)
  */
 off_t lseek(int file, off_t ptr, int dir) 
 {
+	lseek_subheader_t msg;
 	debug_in_out("LSEEK\n");	
 	
-	// Allocate a new buffer of proper size and pack
-	msg_t *msg = malloc(sizeof(msg_t));
-	if (msg == NULL)
-		return -1;
-	
-	msg->id = LSEEK_ID;
-	msg->lseek.fd = file;
-	msg->lseek.ptr = ptr;
-	msg->lseek.dir = dir;
+	msg.id = LSEEK_ID;
+	msg.fd = file;
+	msg.ptr = ptr;
+	msg.dir = dir;
 
 	// Send message
-	response_t *result = send_message(msg, sizeof(msg_t));
-
-	free(msg);
+	response_t *result = send_message(&msg, sizeof(lseek_subheader_t),LSEEK_ID);
 
 	int return_val;
 
@@ -305,23 +287,27 @@ off_t lseek(int file, off_t ptr, int dir)
  */
 int open(const char *name, int flags, int mode) 
 {
+	open_subheader_t *msg;
 	debug_in_out("OPEN\n");
 
 	int s_len = strlen(name) + 1; // Null terminator
 
-	msg_t *msg = malloc(sizeof(msg_t) + s_len);
+	msg = malloc(sizeof(open_subheader_t) + s_len);
 	if (msg == NULL)
 		return -1;
 
 	msg->id = OPEN_ID;
-	msg->open.flags = flags;
-	msg->open.mode = mode;
-	msg->open.len = s_len;
+	msg->flags = flags;
+	msg->mode = mode;
+	msg->len = s_len;
 
-	memcpy(msg->open.buf, name, s_len);
+	memcpy(msg->buf, name, s_len - 1);
+	msg->buf[s_len - 1] = '\0';
 
 	// Send message
-	response_t *result = send_message(msg, sizeof(msg_t) + s_len);
+	response_t *result =
+		send_message((char *CT(sizeof(open_subheader_t)+s_len))TC(msg),
+	                 sizeof(open_subheader_t) + s_len,OPEN_ID);
 
 	free(msg);
 
@@ -345,6 +331,7 @@ int open(const char *name, int flags, int mode)
  */
 ssize_t read(int file, void *ptr, size_t len) 
 {
+	read_subheader_t msg;
 	uint8_t *CT(len) _ptr = ptr;
 	debug_in_out("READ\n");
 
@@ -354,20 +341,13 @@ ssize_t read(int file, void *ptr, size_t len)
 			_ptr[i] = (uint8_t)sys_cgetc();
 		return len;
 	}
-
-	// Allocate a new buffer of proper size and pack
-	msg_t *msg = malloc(sizeof(msg_t));
-	if (msg == NULL)
-		return -1;
 	
-	msg->id = READ_ID;
-	msg->read.fd = file;
-	msg->read.len = len;
+	msg.id = READ_ID;
+	msg.fd = file;
+	msg.len = len;
 	
 	// Send message
-	response_t *result = send_message(msg, sizeof(msg_t));
-
-	free(msg);
+	response_t *result = send_message(&msg, sizeof(read_subheader_t),READ_ID);
 
 	// Read result
 	int return_val;
@@ -468,10 +448,8 @@ void* sbrk(ptrdiff_t incr)
  * Write the message in buffer out on the channel, and wait for a response.
  * Caller is responsible for management of buffer passed in and buffer returned.
  */
-response_t *send_message(msg_t *msg, int len)
+response_t *send_message(char *msg, int len, syscall_id_t this_call_id)
 {
-	syscall_id_t this_call_id = msg->id;
-
 	if (write_to_channel(msg, len) != len)
 		return NULL;
 
@@ -525,22 +503,26 @@ response_t *send_message(msg_t *msg, int len)
  */
 int stat(const char *file, struct stat *st) 
 {
+	stat_subheader_t *msg;
 	debug_in_out("STAT\n");
 	
 	int s_len = strlen(file) + 1; // Null terminator
 
 	// Allocate a new buffer of proper size and pack
-	msg_t *msg = malloc(sizeof(msg_t) + s_len);
+	msg = malloc(sizeof(stat_subheader_t) + s_len);
 	if (msg == NULL)
 		return -1;
 	
 	msg->id = STAT_ID;
-	msg->stat.len = s_len;
+	msg->len = s_len;
 
-	memcpy(msg->stat.buf, file, s_len);
+	memcpy(msg->buf, file, s_len - 1);
+	msg->buf[s_len - 1] = '\0';
 
 	// Send message
-	response_t *result = send_message(msg, sizeof(msg_t) + s_len);
+	response_t *result =
+		send_message((char *CT(sizeof(stat_subheader_t) + s_len))TC(msg),
+		             sizeof(stat_subheader_t) + s_len, STAT_ID);
 
 	free(msg);
 
@@ -581,22 +563,26 @@ clock_t times(struct tms *buf)
  */
 int unlink(const char *name) 
 {
+	unlink_subheader_t *msg;
 	debug_in_out("UNLINK\n");
 	
 	int s_len = strlen(name) + 1; // Null terminator
 
 	// Allocate a new buffer of proper size and pack
-	msg_t *msg = malloc(sizeof(msg_t) + s_len);
+	msg = malloc(sizeof(unlink_subheader_t) + s_len);
 	if (msg == NULL)
 		return -1;
 	
 	msg->id = UNLINK_ID;
-	msg->unlink.len = s_len;
+	msg->len = s_len;
 	
-	memcpy(msg->unlink.buf, name, s_len);
+	memcpy(msg->buf, name, s_len - 1);
+	msg->buf[s_len - 1] = '\0';
 
 	// Send message
-	response_t *result = send_message(msg, sizeof(msg_t) + s_len);
+	response_t *result =
+		send_message((char *CT(sizeof(unlink_subheader_t) + s_len))TC(msg),
+		             sizeof(unlink_subheader_t) + s_len,UNLINK_ID);
 
 	free(msg);
 
@@ -629,8 +615,9 @@ int wait(int *status)
 /* write()
  * Write to a file. 
  */
-ssize_t write(int file, const void *ptr, size_t len) {
-	
+ssize_t write(int file, const void *ptr, size_t len)
+{
+	write_subheader_t *msg;
 	debug_in_out("WRITE\n");	
 	debug_in_out("\tFILE: %u\n", file);
 
@@ -641,18 +628,20 @@ ssize_t write(int file, const void *ptr, size_t len) {
 		return sys_cputs(ptr, len);
 	
 	// Allocate a new buffer of proper size and pack
-	msg_t *msg = malloc(sizeof(msg_t) + len);
+	msg = malloc(sizeof(write_subheader_t) + len);
 	if (msg == NULL)
 		return -1;
 	
 	msg->id = WRITE_ID;
-	msg->write.fd = file;
-	msg->write.len = len;
+	msg->fd = file;
+	msg->len = len;
 
-	memcpy(msg->write.buf, ptr, len);
+	memcpy(msg->buf, ptr, len);
 
 	// Send message
-	response_t *result = send_message(msg, sizeof(msg_t) + len);
+	response_t *result =
+		send_message((char *CT(sizeof(write_subheader_t) + len))TC(msg),
+		             sizeof(write_subheader_t) + len,WRITE_ID);
 
 	free(msg);
 
@@ -675,9 +664,9 @@ ssize_t write(int file, const void *ptr, size_t len) {
 /* write_to_channel()
  * Send a message out over the channel, defined by msg, of length len
  */
-int write_to_channel(msg_t * msg, int len)
+int write_to_channel(char * msg, int len)
 {
 	//return sys_serial_write((char*)msg, len);
-	return sys_eth_write((char*CT(sizeof(msg_t)))TC(msg), len);
+	return sys_eth_write(msg, len);
 	
 }

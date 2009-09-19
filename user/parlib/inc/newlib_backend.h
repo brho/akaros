@@ -18,6 +18,7 @@ typedef uint32_t syscall_id_t;
 // Basically, to make IVY annotation possible with as few TC's as possible
 // We do some ugly things with unions, which results in us needing this padding
 typedef struct open_subheader {
+	syscall_id_t id;
 	uint32_t flags;
 	uint32_t mode;
 	uint32_t len;
@@ -25,18 +26,21 @@ typedef struct open_subheader {
 } open_subheader_t;
 
 typedef struct close_subheader {
+	syscall_id_t id;
 	uint32_t fd;
 	uint32_t FILL1;
 	uint32_t FILL2;
 } close_subheader_t;
 
 typedef struct read_subheader {
+	syscall_id_t id;
 	uint32_t fd;
 	uint32_t len;
 	uint32_t FILL1;
 } read_subheader_t;
 
 typedef struct write_subheader {
+	syscall_id_t id;
 	uint32_t fd;
 	uint32_t len;
 	uint32_t FILL1;
@@ -44,25 +48,29 @@ typedef struct write_subheader {
 } write_subheader_t;
 
 typedef struct lseek_subheader {
+	syscall_id_t id;
 	uint32_t fd;
 	uint32_t ptr;
 	uint32_t dir;
 } lseek_subheader_t;
 
 typedef struct isatty_subheader {
+	syscall_id_t id;
 	uint32_t fd;
 	uint32_t FILL1;
 	uint32_t FILL2;
 } isatty_subheader_t;
 
 typedef struct link_subheader {
+	syscall_id_t id;
 	uint32_t old_len;
 	uint32_t new_len;
-	uint32_t FILL1;
-	char (CT(old_len + new_len) buf)[0];
+	uint32_t total_len;
+	char (CT(total_len) buf)[0];
 } link_subheader_t;
 
 typedef struct unlink_subheader {
+	syscall_id_t id;
 	uint32_t len;
 	uint32_t FILL1;
 	uint32_t FILL2;
@@ -70,12 +78,14 @@ typedef struct unlink_subheader {
 } unlink_subheader_t;
 
 typedef struct fstat_subheader {
+	syscall_id_t id;
 	uint32_t fd;
 	uint32_t FILL1;
 	uint32_t FILL2;
 } fstat_subheader_t;
 
 typedef struct stat_subheader {
+	syscall_id_t id;
 	uint32_t len;
 	uint32_t FILL1;
 	uint32_t FILL2;
@@ -94,6 +104,10 @@ typedef struct stat_subheader {
 #define STAT_ID		9
 #define NUM_CALLS	10
 
+#if 0
+
+zra: this sort of thing is more useful if the C code is receiving a message.
+
 typedef struct backend_msg {
 	syscall_id_t id;
 	union {
@@ -109,6 +123,7 @@ typedef struct backend_msg {
 		stat_subheader_t stat WHEN(id == STAT_ID);	
 	};
 } msg_t;
+#endif
 
 typedef struct response {
 	int32_t ret;
@@ -147,12 +162,12 @@ int read_buffer_from_channel(char *CT(len) buf, int len);
  * Write the message defined in buffer out across the channel, and wait for a response.
  * Caller is responsible for management of both the buffer passed in and the buffer ptr returned.
  */
-response_t *send_message(msg_t *msg, int len);
+response_t *send_message(char *msg, int len, syscall_id_t id);
 
 /* write_to_channel()
  * Send a message out over the channel, defined by msg, of length len
  */
-int write_to_channel(msg_t *msg, int len);
+int write_to_channel(char *msg, int len);
 
 #endif //_NEWLIB_LIBC_WRAPPERS_H_
 
