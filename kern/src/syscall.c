@@ -70,16 +70,14 @@ static ssize_t sys_run_binary(env_t* e, void *DANGEROUS binary_buf,
                               void*DANGEROUS arg, size_t len) {
 	uint8_t *CT(len) checked_binary_buf;
 	checked_binary_buf = user_mem_assert(e, binary_buf, len, PTE_USER_RO);
-#if 0
-	zra: copied into new address space, so no copy needed here.
+
 	uint8_t* new_binary = kmalloc(len, 0);
 	if(new_binary == NULL)
 		return -ENOMEM;
 	memcpy(new_binary, checked_binary_buf, len);
-#endif
 
-	env_t* env = env_create(checked_binary_buf, len);
-	//kfree(new_binary);
+	env_t* env = env_create(new_binary, len);
+	kfree(new_binary);
 	proc_set_state(env, PROC_RUNNABLE_S);
 	schedule_proc(env);
 	sys_yield(e);
@@ -94,6 +92,9 @@ static ssize_t sys_eth_write(env_t* e, const char *DANGEROUS buf, size_t len)
 	extern int eth_up;
 	
 	if (eth_up) {
+		
+		if (len == 0)
+			return 0;
 		
 		char *COUNT(len) _buf = user_mem_assert(e, buf, len, PTE_U);
 		int total_sent = 0;
@@ -131,6 +132,10 @@ static ssize_t sys_eth_read(env_t* e, char *DANGEROUS buf, size_t len)
 		extern char*CT(packet_buffer_size) packet_buffer;
 		extern char*CT(MAX_FRAME_SIZE) packet_buffer_orig;
 		extern int packet_buffer_pos;
+
+		if (len == 0)
+			return 0;
+
 		char *CT(len) _buf = user_mem_assert(e, buf,len, PTE_U);
 			
 		if (packet_waiting == 0)

@@ -1,14 +1,12 @@
 /** @file
- * @brief NE2K Driver Sketch       
+ * @brief RL8168 Driver       
  *
  * EXPERIMENTAL. DO NOT USE IF YOU DONT KNOW WHAT YOU ARE DOING
  *
- * This driver will attempt to detect a ne2k device and run some interrupt
- * tests. This is used for ioapic debugging in simulation
+ * See Info below 
  *
  * @author Paul Pearce <pearce@eecs.berkeley.edu>
  *
- * @todo Everything                   
  */
 
 #ifdef __SHARC__
@@ -74,6 +72,7 @@
  * TODO: CONCURRENCY!
  */
 
+// This is to make it simply compile when not in __NETWORK__ mode.
 #ifndef USER_MAC_ADDRESS
 #define USER_MAC_ADDRESS {0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
 #endif
@@ -105,7 +104,7 @@ uint8_t eth_up = 0; // TODO: This needs to be somewhere global.
 // Hacky stuff for syscall hack. Go away.
 int packet_waiting;
 int packet_buffer_size;
-char *CT(packet_buffer_size) packet_buffer;
+char *CT(MAX_FRAME_SIZE - PACKET_HEADER_SIZE) packet_buffer;
 char *CT(MAX_FRAME_SIZE) packet_buffer_orig;
 int packet_buffer_pos = 0;
 // End hacky stuff

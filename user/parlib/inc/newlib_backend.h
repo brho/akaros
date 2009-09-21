@@ -162,12 +162,12 @@ int read_buffer_from_channel(char *CT(len) buf, int len);
  * Write the message defined in buffer out across the channel, and wait for a response.
  * Caller is responsible for management of both the buffer passed in and the buffer ptr returned.
  */
-response_t *send_message(char *msg, int len, syscall_id_t id);
+response_t *send_message(char *COUNT(len) msg, int len, syscall_id_t id);
 
 /* write_to_channel()
  * Send a message out over the channel, defined by msg, of length len
  */
-int write_to_channel(char *msg, int len);
+int write_to_channel(char *COUNT(len) msg, int len);
 
 #endif //_NEWLIB_LIBC_WRAPPERS_H_
 

@@ -61,11 +61,17 @@ ssize_t sys_run_binary(void* binary_buf, void* arg, size_t len)
 //Write a buffer over ethernet
 ssize_t sys_eth_write(void* buf, size_t len) 
 {
+	if (len == 0)
+		return 0;
+	
 	return syscall(SYS_eth_write, (intreg_t)buf, len, 0, 0, 0);
 }
 
 //Read a buffer via ethernet
 ssize_t sys_eth_read(void* buf, size_t len) 
 {
+	if (len == 0)
+		return 0;
+		
 	return syscall(SYS_eth_read, (intreg_t)buf, len, 0, 0, 0);
 }

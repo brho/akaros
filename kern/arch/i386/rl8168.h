@@ -153,7 +153,7 @@ struct rl8168_header {
 	struct ETH_Header eth_head;
 	struct IP_Header ip_head;
 	struct UDP_Header udp_head;
-};
+} __attribute__((packed));
 
 struct rl8168_packet {
 	struct rl8168_header rl8168_head;
