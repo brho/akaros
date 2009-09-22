@@ -227,6 +227,13 @@ trap(trapframe_t *tf)
 		panic("Trapframe with invalid CS!");
 	}
 
+	/* If we're PROC_RUNNING_S, save the trapframe (which is vcore0's) in the
+	 * proc's env_tf.  make sure silly state is sorted (HSS).  Consider
+	 * extending this for PROC_RUNNING_M and vcore0. */
+	if (current->state == PROC_RUNNING_S) {
+		current->env_tf = *tf;
+		tf = &current->env_tf;
+	}
 	// Dispatch based on what type of trap occurred
 	trap_dispatch(tf);
 
@@ -349,6 +356,13 @@ void sysenter_init(void)
 /* This is called from sysenter's asm, with the tf on the kernel stack. */
 void sysenter_callwrapper(struct Trapframe *tf)
 {
+	/* If we're PROC_RUNNING_S, save the trapframe (which is vcore0's) in the
+	 * proc's env_tf.  make sure silly state is sorted (HSS).  Consider
+	 * extending this for PROC_RUNNING_M and vcore0. */
+	if (current->state == PROC_RUNNING_S) {
+		current->env_tf = *tf;
+		tf = &current->env_tf;
+	}
 	// Note we pass the tf ptr along, in case syscall needs to block
 	tf->tf_regs.reg_eax = (intreg_t) syscall(current, tf,
 	                                         tf->tf_regs.reg_eax,
@@ -370,6 +384,7 @@ uint32_t send_active_message(uint32_t dst, amr_t pc,
                              TV(a0t) arg0, TV(a1t) arg1, TV(a2t) arg2)
 {
 	error_t retval = -EBUSY;
+	assert(pc);
 	spin_lock_irqsave(&per_cpu_info[dst].amsg_lock);
 	size_t current_amsg = per_cpu_info[dst].amsg_current;
 	// If there's a PC there, then that means it's an outstanding message

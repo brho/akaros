@@ -32,7 +32,10 @@ void manager(void)
 	static uint8_t RACY progress = 0;
 
 	struct proc *envs[256];
-	struct proc *p ;
+	static struct proc *p ;
+
+	uint32_t corelist[MAX_NUM_CPUS];
+	uint32_t num = 3;
 
 	// This is a bypass of the standard manager structure, for network use
 	// If enabled, this spawns parlib_matrix, and allows the execution
@@ -51,12 +54,13 @@ void manager(void)
 			// Here's how to do a multicored/parallel process:
 			p = kfs_proc_create(kfs_lookup_path("roslib_mhello"));
 			// being proper and all:
+			spin_lock_irqsave(&p->proc_lock);
 			proc_set_state(p, PROC_RUNNABLE_S);
+			/* // uncomment this to transition to a parallel process manually
 			proc_set_state(p, PROC_RUNNING_S);
 			proc_set_state(p, PROC_RUNNABLE_M);
 	
 			// set vcoremap with dispatch plan.  usually done by schedule()
-			spin_lock_irqsave(&p->proc_lock);
 			p->num_vcores = 5; // assuming 5 are free, this is just an example
 			spin_lock(&idle_lock); // need to grab the cores
 			for (int i = 0; i < 5; i++) {
@@ -65,16 +69,26 @@ void manager(void)
 				num_idlecores--;
 			}
 			spin_unlock(&idle_lock);
+			*/
 			spin_unlock_irqsave(&p->proc_lock);
 			proc_run(p);
-			udelay(5000000);
-	//		printk("Killing p\n");
-	//		proc_destroy(p);
-	//		printk("Killed p\n");
-			udelay(1000000);
-			panic("This is okay");
 			break;
 		case 1:
+			//panic("This is okay");
+			udelay(10000000);
+			printk("taking 3 cores from p\n");
+			for (int i = 0; i < num; i++)
+				corelist[i] = 7-i; // 7, 6, and 5
+			spin_lock_irqsave(&p->proc_lock);
+			proc_take_cores(p, corelist, &num, __death);
+			spin_unlock_irqsave(&p->proc_lock);
+			udelay(5000000);
+			printk("Killing p\n");
+			proc_destroy(p);
+			printk("Killed p\n");
+			udelay(1000000);
+			panic("This is okay");
+
 			envs[0] = kfs_proc_create(kfs_lookup_path("roslib_hello"));
 			proc_set_state(envs[0], PROC_RUNNABLE_S);
 			proc_run(envs[0]);

@@ -22,6 +22,7 @@
 #include <syscall.h>
 #include <kmalloc.h>
 #include <stdio.h>
+#include <resource.h>
 #include <kfs.h> // eventually replace this with vfs.h
 
 #ifdef __NETWORK__
@@ -505,6 +506,13 @@ intreg_t syscall(struct proc *p, trapframe_t *tf, uintreg_t syscallno,
 		case SYS_brk:
 			printk("brk not implemented yet\n");
 			return -EINVAL;
+		case SYS_resource_req:
+			/* preemptively set the return code to 0.  if it's not, it will get
+			 * overwriten on a proper return path.  if it ends up being a core
+			 * request from a RUNNING_S, it will never return out this way
+			 */
+			proc_set_syscall_retval(tf, ESUCCESS);
+			return resource_req(p, a1, a2, a3);
 
 	#ifdef __i386__
 		case SYS_serial_write:

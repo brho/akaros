@@ -157,3 +157,9 @@ sys_mmap(void *SNT addr, size_t length, int prot, int flags, int fd,
 	return (void*CT(length))TC(syscall(SYS_mmap, (uint32_t)addr, length, prot,
 	                      (int32_t)&extra_args, 0));
 }
+
+/* Request resources from the kernel.  Flags in ros/resource.h. */
+ssize_t sys_resource_req(int type, size_t amount, uint32_t flags)
+{
+	return syscall(SYS_resource_req, type, amount, flags, 0, 0);
+}

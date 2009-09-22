@@ -21,6 +21,7 @@
 #include <kfs.h>
 #include <manager.h>
 #include <schedule.h>
+#include <resource.h>
 
 #include <ros/memlayout.h>
 
@@ -273,12 +274,15 @@ int mon_procinfo(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 		printk("Usage: procinfo OPTION\n");
 		printk("\tidle_cores: show idle core map\n");
 		printk("\trunnable: show proc_runnablelist\n");
+		printk("\tresources: show resources wanted/granted for all procs\n");
 		return 1;
 	}
 	if (!strcmp(argv[1], "idle_cores"))
 		print_idlecoremap();
 	else if (!strcmp(argv[1], "runnable"))
 		dump_proclist(&proc_runnablelist);
+	else if (!strcmp(argv[1], "resources"))
+		print_all_resources();
 	else
 		printk("Bad option\n");
 	return 0;

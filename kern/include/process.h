@@ -14,14 +14,31 @@
 #include <trap.h>
 #include <atomic.h>
 
-/* Process States.  Not 100% on the names yet. */
+/* Process States.  Not 100% on the names yet.  RUNNABLE_* are waiting to go to
+ * RUNNING_*.  For instance, RUNNABLE_M is expecting to go to RUNNING_M.  It
+ * could be waiting for it's timeslice, or possibly for all the cores it asked
+ * for.  You use proc_run() to transition between these states.
+ *
+ * Difference between the _M and the _S states:
+ * - _S : legacy process mode
+ * - RUNNING_M implies *guaranteed* core(s).  You can be a single core in the
+ *   RUNNING_M state.  The guarantee is subject to time slicing, but when you
+ *   run, you get all of your cores.
+ * - The time slicing is at a coarser granularity for _M states.  This means
+ *   that when you run an _S on a core, it should be interrupted/time sliced
+ *   more often, which also means the core should be classified differently for
+ *   a while.  Possibly even using it's local APIC timer.
+ * - A process in an _M state will be informed about changes to its state, e.g.,
+ *   will have a handler run in the event of a page fault
+ */
+
 #define PROC_CREATED			0x01
 #define PROC_RUNNABLE_S			0x02
 #define PROC_RUNNING_S			0x04
-#define PROC_WAITING			0x08  // can split out to INT and UINT
+#define PROC_WAITING			0x08 // can split out to INT and UINT
 #define PROC_DYING				0x10
-#define PROC_RUNNABLE_M			0x20 // ready, needs all of its resources (cores)
-#define PROC_RUNNING_M			0x40 // running, manycore style
+#define PROC_RUNNABLE_M			0x20
+#define PROC_RUNNING_M			0x40
 // TODO don't use this shit for process allocation flagging
 #define ENV_FREE				0x80
 
@@ -38,23 +55,44 @@ extern struct proc_list LCKD(&freelist_lock)proc_freelist;
 extern spinlock_t runnablelist_lock;
 extern struct proc_list LCKD(&runnablelist_lock) proc_runnablelist;
 
-
-extern spinlock_t idle_lock;
+/* Idle cores: ones able to be exclusively given to a process (worker cores). */
+extern spinlock_t idle_lock;  // never grab this before a proc_lock
 extern uint32_t LCKD(&idle_lock) (RO idlecoremap)[MAX_NUM_CPUS];
 extern uint32_t LCKD(&idle_lock) num_idlecores;
 
+/* Process management: */
 int proc_set_state(struct proc *p, uint32_t state) WRITES(p->state);
 struct proc *get_proc(unsigned pid);
 bool proc_controls(struct proc *SAFE actor, struct proc *SAFE target);
+/* Transition from RUNNABLE_* to RUNNING_*. */
 void proc_run(struct proc *SAFE p);
-// TODO: why do we need these parentheses?
-void (proc_startcore)(struct proc *SAFE p, trapframe_t *SAFE tf)
+void proc_startcore(struct proc *SAFE p, trapframe_t *SAFE tf)
      __attribute__((noreturn));
-void (proc_destroy)(struct proc *SAFE p);
 void proc_destroy(struct proc *SAFE p);
+
+/* Process core management.  Only call these if you are RUNNING_M or RUNNABLE_M.
+ * These all adjust the vcoremap and take appropriate actions (like __startcore
+ * if you were already RUNNING_M.  You could be RUNNABLE_M with no vcores when
+ * these are done (basically preempted, and waiting to get run again).
+ * All of these could modify corelist and *num to communicate info back out,
+ * which would be the list of cores that are known to be free.
+ *
+ * WARNING: YOU MUST HOLD THE PROC_LOCK BEFORE CALLING THESE! */
+/* Gives process p the additional num cores listed in corelist */
+error_t proc_give_cores(struct proc *SAFE p, uint32_t corelist[], size_t *num);
+/* Makes process p's coremap look like corelist (add, remove, etc) */
+error_t proc_set_allcores(struct proc *SAFE p, uint32_t corelist[], size_t *num,
+                          amr_t message);
+/* Takes from process p the num cores listed in corelist */
+error_t proc_take_cores(struct proc *SAFE p, uint32_t corelist[], size_t *num,
+                        amr_t message);
+error_t proc_take_allcores(struct proc *SAFE p, amr_t message);
+
+/* Arch Specific */
 void proc_init_trapframe(trapframe_t *SAFE tf);
 void proc_set_program_counter(trapframe_t *SAFE tf, uintptr_t pc);
 void proc_set_tfcoreid(trapframe_t *SAFE tf, uint32_t id);
+void proc_set_syscall_retval(trapframe_t *SAFE tf, intreg_t value);
 
 /* The reference counts are mostly to track how many cores loaded the cr3 */
 error_t proc_incref(struct proc *SAFE p);

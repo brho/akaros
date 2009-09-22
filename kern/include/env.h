@@ -9,6 +9,7 @@
 #include <ros/sysevent.h>
 #include <ros/error.h>
 #include <ros/procdata.h>
+#include <ros/resource.h>
 #include <arch/trap.h>
 #include <ros/common.h>
 #include <arch/arch.h>
@@ -55,9 +56,13 @@ struct Env {
 	uint32_t env_flags;
 	uint32_t env_entry;
 	/* Virtual coremap: each index is the virtual core id, the contents at that
-	 * index is the physical core_id() corresponding to the vcore. */
-	uint32_t vcoremap[MAX_NUM_CPUS];
+	 * index is the physical core_id() corresponding to the vcore.  -1 means it
+	 * is unused */
+	int32_t vcoremap[MAX_NUM_CPUS];
 	uint32_t num_vcores;
+
+	/* Info about this process's resources (granted, desired) for each type. */
+	struct resource resources[MAX_NUM_RESOURCES];
 
 	// Address space
 	pde_t *COUNT(NPDENTRIES) env_pgdir;			// Kernel virtual address of page dir

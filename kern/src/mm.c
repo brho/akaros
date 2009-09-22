@@ -44,6 +44,7 @@ void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 	spin_lock_irqsave(&p->proc_lock);
 	// make sure all pages are available, and in a reasonable range
 	// TODO: can probably do this better with vm_regions.
+	// can also consider not mapping to 0x00000000
 	for (int i = 0; i < num_pages; i++) {
 		a_pte = pgdir_walk(p->env_pgdir, (void*SNT)addr, 0);
 		if (a_pte && *a_pte & PTE_P)

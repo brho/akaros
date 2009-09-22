@@ -25,19 +25,21 @@
 #define SYS_mlock
 #define SYS_msync
 */
-#define SYS_serial_write			16
-#define SYS_serial_read				17
+#define SYS_resource_req			16
+/* Read and write buffers over the serial port */
+#define SYS_serial_write			17
+#define SYS_serial_read				18
 /* The next 3 syscalls go with the experimental network driver. These syscalls
  * are used by newlib_backend / our remote binary loader to pull data from /
  * put data into a buffer managed by the network driver.  These should go away
  * as things mature. */
-#define SYS_eth_read				18
-#define SYS_eth_write				19
-#define SYS_run_binary				20
+#define SYS_eth_read				19
+#define SYS_eth_write				20
+#define SYS_run_binary				21
 // forward a syscall to front-end machine
-#define SYS_frontend				21
+#define SYS_frontend				22
 // Keep this in sync with the last syscall number
-#define NSYSCALLS 					21
+#define NSYSCALLS 					22
 // syscall number starts at 1 and goes up to NSYSCALLS, without holes.
 #define INVALID_SYSCALL(syscallno) ((syscallno) > NSYSCALLS)
 

@@ -13,6 +13,7 @@
 #include <atomic.h>
 #include <smp.h>
 #include <pmap.h>
+#include <trap.h>
 #include <schedule.h>
 #include <manager.h>
 #include <stdio.h>
@@ -110,11 +111,16 @@ bool proc_controls(struct proc *actor, struct proc *target)
 	return target->env_parent_id == actor->env_id;
 }
 
-/*
- * Dispatches a process to run, either on the current core in the case of a
- * RUNNABLE_S, or on its partition in the case of a RUNNABLE_M.
- * This should never be called to "restart" a core.
- */
+/* Dispatches a process to run, either on the current core in the case of a
+ * RUNNABLE_S, or on its partition in the case of a RUNNABLE_M.  This should
+ * never be called to "restart" a core.  This expects that the "instructions"
+ * for which core(s) to run this on will be in the vcoremap, which needs to be
+ * set externally.
+ *
+ * When a process goes from RUNNABLE_M to RUNNING_M, its vcoremap will be
+ * "packed" (no holes in the vcore->pcore mapping), vcore0 will continue to run
+ * it's old core0 context, and the other cores will come in at the entry point.
+ * Including in the case of preemption.  */
 void proc_run(struct proc *p)
 {
 	spin_lock_irqsave(&p->proc_lock);
@@ -157,7 +163,7 @@ void proc_run(struct proc *p)
 #endif
 				/* handle the others.  note the sync message will spin until
 				 * there is a free active message slot, which could lock up the
-				 * system.  think about this. (TODO) */
+				 * system.  think about this. (TODO)(AMDL) */
 				for (int i = 1; i < p->num_vcores; i++)
 #ifdef __IVY__
 					send_active_msg_sync(p->vcoremap[i], __startcore,
@@ -284,12 +290,18 @@ void proc_destroy(struct proc *p)
 {
 	// Note this code relies on this lock disabling interrupts, similar to
 	// proc_run.
+	uint32_t corelist[MAX_NUM_CPUS];
+	size_t num_cores_freed;
 	spin_lock_irqsave(&p->proc_lock);
 	switch (p->state) {
 		case PROC_DYING:
 			return; // someone else killed this already.
-		case PROC_RUNNABLE_S:
 		case PROC_RUNNABLE_M:
+			/* Need to reclaim any cores this proc might have, even though it's
+			 * not running yet. */
+			proc_take_allcores(p, 0);
+			// fallthrough
+		case PROC_RUNNABLE_S:
 			// Think about other lists, like WAITING, or better ways to do this
 			deschedule_proc(p);
 			break;
@@ -317,16 +329,11 @@ void proc_destroy(struct proc *p)
 			 * deallocate the cores.
 			 * The rule is that the vcoremap is set before proc_run, and reset
 			 * within proc_destroy */
-			spin_lock(&idle_lock);
-			for (int i = 0; i < p->num_vcores; i++) {
+
 				send_active_msg_sync(p->vcoremap[i], __death, (void *SNT)0,
 				                     (void *SNT)0, (void *SNT)0);
-				// give the pcore back to the idlecoremap
-				assert(num_idlecores < num_cpus); // sanity
-				idlecoremap[num_idlecores++] = p->vcoremap[i];
-				p->vcoremap[i] = 0; // TODO: might need a better signal
-			}
-			spin_unlock(&idle_lock);
+
+			proc_take_allcores(p, __death);
 			break;
 		default:
 			// TODO: getting here if it's already dead and free (ENV_FREE).
@@ -357,10 +364,224 @@ void proc_destroy(struct proc *p)
 	/* If we were running the process, we should have received an IPI by now.
 	 * If not, odds are interrupts are disabled, which shouldn't happen while
 	 * servicing syscalls. */
-	// TODO: this trips if we die in a trap that kills a process, like a page
-	// fault
-	assert(current != p);
+	if (current == p) {
+		/* a death IPI should be on its way, either from the RUNNING_S one, or
+		 * from proc_take_cores with a __death.  in general, interrupts should
+		 * be on when you call proc_destroy locally, but currently aren't for
+		 * all things (like traphandlers).  since we're dying anyway, it seems
+		 * reasonable to turn on interrupts.  note this means all non-proc
+		 * management interrupt handlers must return (which they need to do
+		 * anyway), so that we get back to this point.  Eventually, we can
+		 * remove the enable_irq.  think about this (TODO) */
+		enable_irq();
+		udelay(1000000);
+		panic("Waiting too long for an IPI in proc_destroy()!");
+	}
 	return;
+}
+
+/* Helper function.  Starting from prev, it will find the next free vcoreid,
+ * which is the next slot with a -1 in it.
+ * You better hold the lock before calling this. */
+static uint32_t get_free_vcoreid(struct proc *SAFE p, uint32_t prev)
+{
+	uint32_t i;
+	for (i = prev; i < MAX_NUM_CPUS; i++)
+		if (p->vcoremap[i] == -1)
+			break;
+	if (i + 1 >= MAX_NUM_CPUS)
+		warn("At the end of the vcorelist.  Might want to check that out.");
+	return i;
+}
+
+/* Helper function.  Starting from prev, it will find the next busy vcoreid,
+ * which is the next slot with something other than a -1 in it.
+ * You better hold the lock before calling this. */
+static uint32_t get_busy_vcoreid(struct proc *SAFE p, uint32_t prev)
+{
+	uint32_t i;
+	for (i = prev; i < MAX_NUM_CPUS; i++)
+		if (p->vcoremap[i] != -1)
+			break;
+	if (i + 1 >= MAX_NUM_CPUS)
+		warn("At the end of the vcorelist.  Might want to check that out.");
+	return i;
+}
+
+/* Helper function.  Find the vcoreid for a given physical core id.
+ * You better hold the lock before calling this. */
+static uint32_t get_vcoreid(struct proc *SAFE p, int32_t pcoreid)
+{
+	uint32_t i;
+	for (i = 0; i < MAX_NUM_CPUS; i++)
+		if (p->vcoremap[i] == pcoreid)
+			break;
+	if (i + 1 >= MAX_NUM_CPUS)
+		warn("At the end of the vcorelist.  Might want to check that out.");
+	return i;
+}
+
+/* Gives process p the additional num cores listed in corelist.  You must be
+ * RUNNABLE_M or RUNNING_M before calling this.  If you're RUNNING_M, this will
+ * startup your new cores at the entry point with their virtual IDs.  If you're
+ * RUNNABLE_M, you should call proc_run after this so that the process can start
+ * to use its cores.
+ *
+ * If you're *_S, make sure your core0's TF is set (which is done when coming in
+ * via arch/trap.c and we are RUNNING_S), change your state, then call this.
+ * Then call proc_run().
+ *
+ * The reason I didn't bring the _S cases from core_request over here is so we
+ * can keep this family of calls dealing with only *_Ms, to avoiding caring if
+ * this is called from another core, and to avoid the need_to_idle business.
+ * The other way would be to have this function have the side effect of changing
+ * state, and finding another way to do the need_to_idle.
+ *
+ * In the event of an error, corelist will include all the cores that were *NOT*
+ * given to the process (cores that are still free).  Practically, this will be
+ * all of them, since it seems like an all or nothing deal right now.
+ *
+ * WARNING: You must hold the proc_lock before calling this!*/
+error_t proc_give_cores(struct proc *SAFE p, uint32_t corelist[], size_t *num)
+{
+	uint32_t free_vcoreid = 0;
+	switch (p->state) {
+		case (PROC_RUNNABLE_S):
+		case (PROC_RUNNING_S):
+			panic("Don't give cores to a process in a *_S state!\n");
+			return -EINVAL;
+			break;
+		case (PROC_DYING):
+			// just FYI, for debugging
+			printk("[kernel] attempted to give cores to a DYING process.\n");
+			return -EFAIL;
+			break;
+		case (PROC_RUNNABLE_M):
+			// set up vcoremap.  list should be empty, but could be called
+			// multiple times before proc_running (someone changed their mind?)
+			if (p->num_vcores) {
+				printk("[kernel] Yaaaaaarrrrr!  Giving extra cores, are we?\n");
+				// debugging: if we aren't packed, then there's a problem
+				// somewhere, like someone forgot to take vcores after
+				// preempting.
+				for (int i = 0; i < p->num_vcores; i++)
+					assert(p->vcoremap[i]);
+			}
+			// add new items to the vcoremap
+			for (int i = 0; i < *num; i++) {
+				// find the next free slot, which should be the next one
+				free_vcoreid = get_free_vcoreid(p, free_vcoreid);
+				printd("setting vcore %d to pcore %d\n", free_vcoreid, corelist[i]);
+				p->vcoremap[free_vcoreid] = corelist[i];
+				p->num_vcores++;
+			}
+			break;
+		case (PROC_RUNNING_M):
+			for (int i = 0; i < *num; i++) {
+				free_vcoreid = get_free_vcoreid(p, free_vcoreid);
+				printd("setting vcore %d to pcore %d\n", free_vcoreid, corelist[i]);
+				p->vcoremap[free_vcoreid] = corelist[i];
+				p->num_vcores++;
+				// TODO: careful of active message deadlock (AMDL)
+				assert(corelist[i] != core_id()); // sanity
+				send_active_msg_sync(corelist[i], __startcore, (uint32_t)p,
+				                     0, free_vcoreid);
+			}
+			break;
+		default:
+			panic("Weird proc state %d in proc_give_cores()!\n", p->state);
+	}
+	return ESUCCESS;
+}
+
+/* Makes process p's coremap look like corelist (add, remove, etc).  Caller
+ * needs to know what cores are free after this call (removed, failed, etc).
+ * This info will be returned via corelist and *num.  This will send message to
+ * any cores that are getting removed.
+ *
+ * Before implementing this, we should probably think about when this will be
+ * used.  Implies preempting for the message.
+ *
+ * WARNING: You must hold the proc_lock before calling this!*/
+error_t proc_set_allcores(struct proc *SAFE p, uint32_t corelist[], size_t *num,
+                          amr_t message)
+{
+	panic("Set all cores not implemented.\n");
+}
+
+/* Takes from process p the num cores listed in corelist.  In the event of an
+ * error, corelist will contain the list of cores that are free, and num will
+ * contain how many items are in corelist.  This isn't implemented yet, but
+ * might be necessary later.  Or not, and we'll never do it.
+ *
+ * TODO: think about taking vcore0.  probably are issues...
+ *
+ * WARNING: You must hold the proc_lock before calling this!*/
+error_t proc_take_cores(struct proc *SAFE p, uint32_t corelist[], size_t *num,
+                        amr_t message)
+{
+	uint32_t vcoreid;
+	switch (p->state) {
+		case (PROC_RUNNABLE_M):
+			assert(!message);
+			break;
+		case (PROC_RUNNING_M):
+			assert(message);
+			break;
+		default:
+			panic("Weird state %d in proc_take_cores()!\n", p->state);
+	}
+	spin_lock(&idle_lock);
+	assert((*num <= p->num_vcores) && (num_idlecores + *num <= num_cpus));
+	for (int i = 0; i < *num; i++) {
+		vcoreid = get_vcoreid(p, corelist[i]);
+		assert(p->vcoremap[vcoreid] == corelist[i]);
+		if (message)
+			// TODO: careful of active message deadlock (AMDL)
+			send_active_msg_sync(corelist[i], message, 0, 0, 0);
+		// give the pcore back to the idlecoremap
+		idlecoremap[num_idlecores++] = corelist[i];
+		p->vcoremap[vcoreid] = -1;
+	}
+	spin_unlock(&idle_lock);
+	p->num_vcores -= *num;
+	return 0;
+}
+
+/* Takes all cores from a process, which must be in an _M state.  Cores are
+ * placed back in the idlecoremap.  If there's a message, such as __death or
+ * __preempt, it will be sent to the cores.
+ *
+ * WARNING: You must hold the proc_lock before calling this! */
+error_t proc_take_allcores(struct proc *SAFE p, amr_t message)
+{
+	uint32_t active_vcoreid = 0;
+	switch (p->state) {
+		case (PROC_RUNNABLE_M):
+			assert(!message);
+			break;
+		case (PROC_RUNNING_M):
+			assert(message);
+			break;
+		default:
+			panic("Weird state %d in proc_take_allcores()!\n", p->state);
+	}
+	spin_lock(&idle_lock);
+	assert(num_idlecores + p->num_vcores <= num_cpus); // sanity
+	for (int i = 0; i < p->num_vcores; i++) {
+		// find next active vcore
+		active_vcoreid = get_busy_vcoreid(p, active_vcoreid);
+		if (message)
+			// TODO: careful of active message deadlock (AMDL)
+			send_active_msg_sync(p->vcoremap[active_vcoreid], message,
+			                     (void *SNT)0, (void *SNT)0, (void *SNT)0);
+		// give the pcore back to the idlecoremap
+		idlecoremap[num_idlecores++] = p->vcoremap[active_vcoreid];
+		p->vcoremap[active_vcoreid] = -1;
+	}
+	spin_unlock(&idle_lock);
+	p->num_vcores = 0;
+	return 0;
 }
 
 /*
@@ -438,7 +659,7 @@ void __startcore(trapframe_t *tf, uint32_t srcid, void * a0, void * a1,
 	trapframe_t local_tf;
 	trapframe_t *tf_to_pop = (trapframe_t *CT(1))a1;
 
-	printk("Startcore on core %d\n", coreid);
+	printk("[kernel] Startcore on physical core %d\n", coreid);
 	assert(p_to_run);
 	// TODO: handle silly state (HSS)
 	if (!tf_to_pop) {
@@ -475,6 +696,7 @@ void __death(trapframe_t *tf, uint32_t srcid, void *SNT a0, void *SNT a1,
 void print_idlecoremap(void)
 {
 	spin_lock(&idle_lock);
+	printk("There are %d idle cores.\n", num_idlecores);
 	for (int i = 0; i < num_idlecores; i++)
 		printk("idlecoremap[%d] = %d\n", i, idlecoremap[i]);
 	spin_unlock(&idle_lock);
