@@ -265,6 +265,11 @@ void tlb_invalidate(pde_t *pgdir, void *va)
  */
 void* user_mem_check(env_t *env, const void *DANGEROUS va, size_t len, int perm)
 {
+	if (len == 0) {
+		warn("Called user_mem_check with a len of 0. Don't do that. Returning NULL");
+		return NULL;
+	}
+	
 	// TODO - will need to sort this out wrt page faulting / PTE_P
 	// also could be issues with sleeping and waking up to find pages
 	// are unmapped, though i think the lab ignores this since the 
@@ -365,6 +370,11 @@ user_mem_strlcpy(env_t *env, char *_dst, const char *DANGEROUS va,
 void *
 user_mem_assert(env_t *env, const void *DANGEROUS va, size_t len, int perm)
 {
+	if (len == 0) {
+		warn("Called user_mem_assert with a len of 0. Don't do that. Returning NULL");
+		return NULL;
+	}
+	
     void *COUNT(len) res = user_mem_check(env,va,len,perm | PTE_USER_RO);
 	if (!res) {
 		cprintf("[%08x] user_mem_check assertion failure for "
