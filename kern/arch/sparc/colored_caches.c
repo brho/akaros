@@ -7,6 +7,10 @@
 
 #include <colored_caches.h>
 
+#ifdef __SHARC__
+#pragma nosharc
+#endif
+
 // Global variables
 cache_t l1,l2,l3;
 available_caches_t available_caches;
@@ -17,7 +21,7 @@ void cache_init()
 	// Initialize the caches available on this system.
 	// TODO: Should call out to something reading the acpi tables from 
 	// memory, or something similar.  For now, just initialize them inline
-	init_cache_properties(&l1,   32,  8, 64);
+	init_cache_properties(&l1, 32,  8, 64);
 	available_caches.l1 = TRUE;
 	available_caches.l2 = FALSE;
 	available_caches.l3 = FALSE;

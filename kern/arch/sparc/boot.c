@@ -5,9 +5,15 @@
 #include <ros/memlayout.h>
 #include <string.h>
 
+#ifdef __SHARC__
+#pragma nosharc
+#endif
+
 #ifdef __DEPUTY__
 #pragma nodeputy
 #endif
+
+extern uintptr_t mmu_context_table[NCONTEXTS];
 
 void
 build_multiboot_info(multiboot_info_t* mbi)
@@ -26,7 +32,6 @@ build_multiboot_info(multiboot_info_t* mbi)
 void
 build_boot_pgdir(void)
 {
-	extern uintptr_t mmu_context_table[NCONTEXTS];
 	extern uintptr_t l1_page_table[NL1ENTRIES];
 
 	// relocate symbols

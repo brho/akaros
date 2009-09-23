@@ -8,6 +8,10 @@
 #pragma nosharc
 #endif
 
+#ifdef __DEPUTY__
+#pragma nodeputy
+#endif
+
 #include <kfs.h>
 #include <string.h>
 #include <assert.h>

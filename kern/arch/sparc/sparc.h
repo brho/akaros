@@ -23,7 +23,6 @@
 #define XSTR(arg) STR(arg)
 
 #include <ros/common.h>
-#include <trap.h>
 #include <arch/frontend.h>
 
 static __inline uint32_t read_psr(void) __attribute__((always_inline));
@@ -158,7 +157,7 @@ num_cores(void)
 static __inline uint32_t
 mmu_probe(uint32_t va)
 {
-	return load_alternate(va & ~0xFFF | 0x400, 3);
+	return load_alternate((va & ~0xFFF) | 0x400, 3);
 }
 
 #endif /* !__ASSEMBLER__ */

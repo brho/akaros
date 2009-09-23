@@ -5,6 +5,10 @@
  * Kevin Klues <klueska@cs.berkeley.edu>    
  */
  
+#ifdef __SHARC__
+#pragma nosharc
+#endif
+
 #ifdef __DEPUTY__
 #pragma nodeputy
 #endif
@@ -15,8 +19,19 @@
 #include <kmalloc.h>
 #include <multiboot.h>
 
-page_list_t page_free_list;    // Free list of physical pages
-DECLARE_CACHE_COLORED_PAGE_FREE_LISTS(); // Free list of pages filed by color
+// llc stands for last-level-cache
+uint16_t llc_num_colors;
+page_list_t *COUNT(llc_num_colors) colored_page_free_list = NULL;
+spinlock_t colored_page_free_list_lock;
+
+void page_alloc_bootstrap(cache_t* llc) {
+        // Initialize the properties of the last level cache used by this allocator
+        llc_num_colors = get_cache_num_page_colors(llc);
+
+        // Allocate space for the array required to manage the free lists
+        size_t list_size = llc_num_colors*sizeof(page_list_t);
+        colored_page_free_list = (page_list_t*) boot_alloc(list_size, PGSIZE);
+}
 
 /*
  * Initialize the memory free lists.
@@ -26,9 +41,19 @@ DECLARE_CACHE_COLORED_PAGE_FREE_LISTS(); // Free list of pages filed by color
  */
 void page_alloc_init() 
 {
-	// Now, initialize the lists required to manage the page free lists
-	LIST_INIT(&page_free_list);
-	INIT_CACHE_COLORED_PAGE_FREE_LISTS();
+        cache_t* llc = available_caches.llc;
+
+        // First Bootstrap the page alloc process
+        static bool bootstrapped = FALSE;
+        if(!bootstrapped) {
+                bootstrapped = TRUE;
+                page_alloc_bootstrap(llc);
+        }
+
+        // Then, initialize the array required to manage the colored page free list
+        for(int i=0; i<llc_num_colors; i++) {
+                LIST_INIT(&(colored_page_free_list[i]));
+        }
 	
 	//  Finally, mark the pages already in use by the kernel. 
 	//  1) Mark page 0 as in use.
@@ -50,8 +75,11 @@ void page_alloc_init()
 	for(i = PPN(physaddr_after_kernel); i < PPN(maxaddrpa); i++)
 	{
 		pages[i].page_ref = 0;
-		LIST_INSERT_HEAD(&page_free_list,&pages[i],global_link);
-		INSERT_CACHE_COLORING_PAGE_ONTO_FREE_LISTS(&pages[i]);
+                LIST_INSERT_HEAD(
+                   &(colored_page_free_list[get_page_color(page2ppn(&pages[i]), llc)]),
+                   &pages[i],
+                   page_link
+                );
 	}
 
 	// mark [maxaddrpa, ...) as in-use (as they are invalid)

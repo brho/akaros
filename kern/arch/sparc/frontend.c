@@ -1,5 +1,9 @@
 #include <atomic.h>
 
+#ifdef __SHARC__
+#pragma nosharc
+#endif
+
 #ifdef __DEPUTY__
 #pragma nodeputy
 #endif

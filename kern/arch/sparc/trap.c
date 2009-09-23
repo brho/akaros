@@ -9,6 +9,10 @@
 #include <stdio.h>
 #include <smp.h>
 
+#ifdef __SHARC__
+#pragma nosharc
+#endif
+
 #ifdef __DEPUTY__
 #pragma nodeputy
 #endif
@@ -99,7 +103,7 @@ get_trapname(uint8_t tt, char buf[TRAPNAME_MAX])
 	else if(tt >= sizeof(trapnames)/sizeof(trapnames[0]) || !trapnames[tt])
 		snprintf(buf,TRAPNAME_MAX,"(unknown trap 0x%02x)",tt);
 	else
-		strcpy(buf,trapnames[tt]);
+		strncpy(buf,trapnames[tt],sizeof(trapnames) + 1);
 
 	return buf;
 }

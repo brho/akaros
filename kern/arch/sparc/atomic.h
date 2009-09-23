@@ -1,7 +1,7 @@
 #ifndef ROS_INCLUDE_ATOMIC_H
 #define ROS_INCLUDE_ATOMIC_H
 
-#include <arch/types.h>
+#include <ros/common.h>
 
 #define mb() {rmb(); wmb();}
 #define rmb()
@@ -21,6 +21,7 @@ static inline void atomic_set(atomic_t* number, int32_t val);
 static inline void atomic_add(atomic_t* number, int32_t inc);
 static inline void atomic_inc(atomic_t* number);
 static inline void atomic_dec(atomic_t* number);
+static inline void atomic_andb(volatile uint8_t RACY* number, uint8_t mask);
 static inline uint32_t spin_trylock(spinlock_t*SAFE lock);
 static inline void spin_lock(spinlock_t*SAFE lock);
 static inline void spin_unlock(spinlock_t*SAFE lock);
@@ -53,7 +54,7 @@ static inline void atomic_add(atomic_t* number, int32_t inc)
 	atomic_init(number,inc);
 }
 
-static inline void atomic_set(atomic_t* number, uint32_t val)
+static inline void atomic_set(atomic_t* number, int32_t val)
 {
 	// this works basically the same as atomic_add... but without the add
 	spin_lock((spinlock_t*)number);
@@ -69,6 +70,13 @@ static inline void atomic_dec(atomic_t* number)
 {
 	atomic_add(number,-1);
 }
+
+static inline void atomic_andb(volatile uint8_t RACY*number, uint8_t mask)
+{
+       // asm volatile("lock andb %1,%0" : "=m"(*number) : "r"(mask) : "cc");
+      // SARAH TODO: change to sparc
+}
+
 
 static inline uint32_t spin_trylock(spinlock_t*SAFE lock)
 {

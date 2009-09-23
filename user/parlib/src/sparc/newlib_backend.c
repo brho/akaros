@@ -4,6 +4,8 @@
 #include <arch/frontend.h>
 #include <parlib.h>
 #include <sys/unistd.h>
+#include <sys/times.h>
+#include <sys/time.h>
 
 char *__env[1] = { 0 };
 char **environ = __env;
@@ -40,7 +42,7 @@ fork(void)
 }
 
 int
-execve(char* name, char** argv, char** env)
+execve(const char* name, char* const argv[], char* const env[])
 {
 	return -1;
 }
@@ -58,13 +60,13 @@ wait(int* status)
 }
 
 int
-link(char* old, char* new)
+link(const char *old, const char *new)
 {
 	return -1;
 }
 
 int
-unlink(char* old)
+unlink(const char* old)
 {
 	return syscall(SYS_frontend,RAMP_SYSCALL_unlink,(int)old,0,0,0);
 }
@@ -76,7 +78,7 @@ fstat(int fd, struct stat* st)
 }
 
 int
-stat(char* name, struct stat* st)
+stat(const char* name, struct stat* st)
 {
 	return syscall(SYS_frontend,RAMP_SYSCALL_stat,(int)name,(int)st,0,0);
 }
@@ -87,13 +89,13 @@ lseek(int fd, off_t ptr, int dir)
 	return syscall(SYS_frontend,RAMP_SYSCALL_lseek,fd,ptr,dir,0);
 }
 
-size_t
-write(int fd, void* ptr, size_t len)
+ssize_t
+write(int fd, const void* ptr, size_t len)
 {
 	return syscall(SYS_frontend,RAMP_SYSCALL_write,fd,(int)ptr,len,0);
 }
 
-size_t
+ssize_t
 read(int fd, void* ptr, size_t len)
 {
 	return syscall(SYS_frontend,RAMP_SYSCALL_read,fd,(int)ptr,len,0);
@@ -113,7 +115,7 @@ close(int fd)
 	return syscall(SYS_frontend,RAMP_SYSCALL_close,fd,0,0,0);
 }
 
-int
+clock_t
 times(struct tms* buf)
 {
 	return -1;

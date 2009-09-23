@@ -10,8 +10,8 @@
 
 #ifndef __ASSEMBLER__
 
+#include <ros/common.h>
 #include <arch/timer.h>
-#include <arch/types.h>
 #include <arch/frontend.h>
 
 static __inline void breakpoint(void) __attribute__((always_inline));

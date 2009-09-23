@@ -6,6 +6,10 @@
 #include <smp.h>
 #include <pmap.h>
 
+#ifdef __SHARC__
+#pragma nosharc
+#endif
+
 #ifdef __DEPUTY__
 #pragma nodeputy
 #endif

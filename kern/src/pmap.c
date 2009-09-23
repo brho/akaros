@@ -15,6 +15,10 @@
 #pragma nosharc
 #endif
 
+#ifdef __DEPUTY__
+#pragma nodeputy
+#endif
+
 #include <arch/arch.h>
 #include <arch/mmu.h>
 

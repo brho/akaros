@@ -5,6 +5,10 @@
 #include <stdio.h>
 #include <assert.h>
 
+#ifdef __SHARC__
+#pragma nosharc
+#endif
+
 system_timing_t system_timing = {0};
 volatile uint32_t timer_ticks = 0;
 

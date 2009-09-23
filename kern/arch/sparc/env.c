@@ -1,4 +1,8 @@
 /* See COPYRIGHT for copyright information. */
+#ifdef __SHARC__
+#pragma nosharc
+#endif
+
 #ifdef __DEPUTY__
 #pragma noasync
 #endif
@@ -80,23 +84,6 @@ void
 	}
 }
 
-void
-proc_set_program_counter(trapframe_t *tf, uintptr_t pc)
-{
-	tf->pc = pc;
-	tf->npc = pc+4;
-}
-
-void
-proc_init_trapframe(trapframe_t *tf)
-{
-	extern char trap_table;
-
-	tf->gpr[14] = USTACKTOP-64;
-	tf->psr = PSR_S; // but PS = 0
-	tf->wim = 0;
-	tf->tbr = (uint32_t)&trap_table;
-}
 
 // Flush all mapped pages in the user portion of the address space
 // TODO: only supports L3 user pages
