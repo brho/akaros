@@ -55,7 +55,7 @@ int close(int file) {
 	msg.fd = file;
 	
 	// Send message
-	response_t *result = send_message(&msg, sizeof(close_subheader_t),CLOSE_ID);
+	response_t *result = send_message((char*)&msg, sizeof(close_subheader_t),CLOSE_ID);
 
 	int return_val;
 
@@ -121,7 +121,7 @@ int fstat(int file, struct stat *st)
 	msg.fd = file;
 
 	// Send message
-	response_t *result = send_message(&msg, sizeof(fstat_subheader_t),FSTAT_ID);
+	response_t *result = send_message((char*)&msg, sizeof(fstat_subheader_t),FSTAT_ID);
 
 	// Read result
 	int return_val;
@@ -172,7 +172,7 @@ int isatty(int file)
 	msg.fd = file;
 
 	// Send message
-	response_t *result = send_message(&msg, sizeof(isatty_subheader_t),ISATTY_ID);
+	response_t *result = send_message((char*)&msg, sizeof(isatty_subheader_t),ISATTY_ID);
 
 	int return_val; 
 
@@ -265,7 +265,7 @@ off_t lseek(int file, off_t ptr, int dir)
 	msg.dir = dir;
 
 	// Send message
-	response_t *result = send_message(&msg, sizeof(lseek_subheader_t),LSEEK_ID);
+	response_t *result = send_message((char*)&msg, sizeof(lseek_subheader_t),LSEEK_ID);
 
 	int return_val;
 
@@ -347,7 +347,7 @@ ssize_t read(int file, void *ptr, size_t len)
 	msg.len = len;
 	
 	// Send message
-	response_t *result = send_message(&msg, sizeof(read_subheader_t),READ_ID);
+	response_t *result = send_message((char*)&msg, sizeof(read_subheader_t),READ_ID);
 
 	// Read result
 	int return_val;

@@ -12,7 +12,6 @@
 #include <ros/timer.h>
 #include <ros/error.h>
 
-#include <arch/rl8168.h>
 #include <string.h>
 #include <assert.h>
 #include <process.h>
@@ -23,6 +22,10 @@
 #include <kmalloc.h>
 #include <stdio.h>
 #include <kfs.h> // eventually replace this with vfs.h
+
+#ifdef __NETWORK__
+#include <arch/rl8168.h>
+#endif
 
 static void sys_yield(struct proc *p);
 
@@ -85,7 +88,7 @@ static ssize_t sys_run_binary(env_t* e, void *DANGEROUS binary_buf,
 	return 0;
 }
 
-
+#ifdef __NETWORK__
 // This is not a syscall we want. Its hacky. Here just for syscall stuff until get a stack.
 static ssize_t sys_eth_write(env_t* e, const char *DANGEROUS buf, size_t len) 
 { 
@@ -157,6 +160,7 @@ static ssize_t sys_eth_read(env_t* e, char *DANGEROUS buf, size_t len)
 	else
 		return -EINVAL;
 }
+#endif // Network
 
 //
 /* END OF REMOTE SYSTEMCALL SUPPORT SYSCALLS. */
