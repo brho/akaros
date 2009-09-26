@@ -38,6 +38,8 @@ static void sys_null(void)
 //Write a buffer over the serial port
 static ssize_t sys_serial_write(env_t* e, const char *DANGEROUS buf, size_t len)
 {
+	if (len == 0)
+		return 0;
 	#ifdef SERIAL_IO
 		char *COUNT(len) _buf = user_mem_assert(e, buf, len, PTE_USER_RO);
 		for(int i =0; i<len; i++)
@@ -51,6 +53,9 @@ static ssize_t sys_serial_write(env_t* e, const char *DANGEROUS buf, size_t len)
 //Read a buffer over the serial port
 static ssize_t sys_serial_read(env_t* e, char *DANGEROUS _buf, size_t len)
 {
+	if (len == 0)
+		return 0;
+
 	#ifdef SERIAL_IO
 	    char *COUNT(len) buf = user_mem_assert(e, _buf, len, PTE_USER_RO);
 		size_t bytes_read = 0;
@@ -494,15 +499,15 @@ intreg_t syscall(env_t* e, uintreg_t syscallno, uintreg_t a1, uintreg_t a2,
 			return sys_serial_write(e, (char *DANGEROUS)a1, (size_t)a2);
 		case SYS_serial_read:
 			return sys_serial_read(e, (char *DANGEROUS)a1, (size_t)a2);
-                case SYS_run_binary:
-                        return sys_run_binary(e, (char *DANGEROUS)a1,
-                                              (char* DANGEROUS)a2, (size_t)a3);
+		case SYS_run_binary:
+			return sys_run_binary(e, (char *DANGEROUS)a1,
+			                      (char* DANGEROUS)a2, (size_t)a3);
 	#endif
 	#ifdef __NETWORK__
-                case SYS_eth_write:
-                        return sys_eth_write(e, (char *DANGEROUS)a1, (size_t)a2);
-                case SYS_eth_read:
-                        return sys_eth_read(e, (char *DANGEROUS)a1, (size_t)a2);
+		case SYS_eth_write:
+			return sys_eth_write(e, (char *DANGEROUS)a1, (size_t)a2);
+		case SYS_eth_read:
+			return sys_eth_read(e, (char *DANGEROUS)a1, (size_t)a2);
 	#endif
 	#ifdef __sparc_v8__
 		case SYS_frontend:

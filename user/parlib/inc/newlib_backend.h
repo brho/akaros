@@ -9,7 +9,7 @@
 
 
 
-#define debug_in_out(...) // debug(__VA_ARGS__)  
+#define debug_in_out(...) //debug(__VA_ARGS__)  
 #define debug_write_check(fmt, ...)  //debug(fmt, __VA_ARGS__)
 
 typedef uint32_t syscall_id_t;
@@ -128,7 +128,6 @@ typedef struct backend_msg {
 typedef struct response {
 	int32_t ret;
 	uint32_t err;
-	struct stat st;
 	char (CT(ret) buf)[0];
 } response_t;
 

@@ -21,4 +21,5 @@ kern/boot
 kern/include/arch
 kern/src/arch
 doc/rosdoc
-
+sim/
+tools/.*

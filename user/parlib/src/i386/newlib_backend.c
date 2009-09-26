@@ -134,7 +134,7 @@ int fstat(int file, struct stat *st)
 		if (return_val == -1)
 			errno = result->err;
 		else
-			memcpy(st, (&result->st), sizeof(struct stat));
+			memcpy(st, result->buf, sizeof(struct stat));
 			
 		free(result);
 	}
@@ -381,7 +381,7 @@ int read_from_channel(char * buf, int len, int peek)
 	int total_read = 0;
 
 	//int just_read = sys_serial_read(buf, len);
-	int just_read = sys_eth_read(buf, len);
+	int just_read = sys_serial_read(buf, len);
 
 
 	if (just_read < 0) return just_read;
@@ -391,7 +391,7 @@ int read_from_channel(char * buf, int len, int peek)
 
 	while (total_read != len) {
 		//just_read = sys_serial_read(buf + total_read, len - total_read);
-		just_read = sys_eth_read(buf + total_read, len - total_read);
+		just_read = sys_serial_read(buf + total_read, len - total_read);
 		
 		if (just_read == -1) return -1;
 		total_read += just_read;
@@ -466,21 +466,28 @@ response_t *send_message(char *msg, int len, syscall_id_t this_call_id)
 	
 	char* buffer = NULL;
 
-	if (this_call_id == READ_ID) 
+	if (   this_call_id == READ_ID 
+	    || this_call_id == FSTAT_ID 
+	    || this_call_id == STAT_ID)
 	{
 		if (ret_value < 0)
 			buffer_size = 0;
-		else
-			buffer_size = ret_value;
+		else {
+			if(this_call_id == READ_ID) 
+				buffer_size = ret_value;
+			else
+				buffer_size = sizeof(struct stat);
+		}
 			
 		return_response = malloc(sizeof(response_t) + buffer_size);
 
 		if (return_response == NULL)
 			return NULL;
 		
-		if (read_buffer_from_channel(return_response->buf, buffer_size) == -1)
+		if (read_buffer_from_channel(return_response->buf, buffer_size) == -1) {
+			free(return_response);
 			return NULL;
-
+		}
 	} 
 	else 
 	{
@@ -538,7 +545,7 @@ int stat(const char *file, struct stat *st)
 		if (return_val == -1)
 			errno = result->err;
 		else
-			memcpy(st, &(result->st), sizeof(struct stat));
+			memcpy(st, result->buf, sizeof(struct stat));
 
 		free(result);
 
@@ -667,6 +674,6 @@ ssize_t write(int file, const void *ptr, size_t len)
 int write_to_channel(char * msg, int len)
 {
 	//return sys_serial_write((char*)msg, len);
-	return sys_eth_write(msg, len);
+	return sys_serial_write(msg, len);
 	
 }
