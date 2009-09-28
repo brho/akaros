@@ -1,12 +1,38 @@
+CFLAGS += -I.
+V = @
 
-all: syscall_server
+SYSCALL_SERVER_OBJS = translate_state.o syscall_server.o
+SYSCALL_SERVER_HEADS = syscall_server.h
 
-translate_state.o: translate_state.c syscall_server.h
-	gcc -c -I. -o translate_state.o translate_state.c 
+all: syscall_server_pty syscall_server_pipe
+	$(V)rm -rf *.o
 
-syscall_server: translate_state.o syscall_server.h syscall_server.c
-	gcc -I. -o syscall_server translate_state.o syscall_server.c 
+.syscall_server_pipe.in: 
+	$(V)mkfifo $@
+	$(V)chmod ug+rw $@
+
+.syscall_server_pipe.out: 
+	$(V)mkfifo $@
+	$(V)chmod ug+rw $@
+
+syscall_server_pipes: .syscall_server_pipe.in .syscall_server_pipe.out 
+
+%.o: %.c $(SYSCALL_SERVER_HEADS)
+	@echo + cc [SYSCALL_SERVER] $<
+	$(V)$(CC) -c $(CFLAGS) -o $@ $<
+
+SYSCALL_SERVER_PTY_OBJS = $(SYSCALL_SERVER_OBJS) pty_init.o
+syscall_server_pty: $(SYSCALL_SERVER_PTY_OBJS)
+	@echo + cc [SYSCALL_SERVER] $@
+	$(V)$(CC) $(CFLAGS) -o $@ $(SYSCALL_SERVER_PTY_OBJS)
+        
+SYSCALL_SERVER_PIPE_OBJS = $(SYSCALL_SERVER_OBJS) pipe_init.o
+syscall_server_pipe: $(SYSCALL_SERVER_PIPE_OBJS) syscall_server_pipes
+	@echo + cc [SYSCALL_SERVER] $@
+	$(V)$(CC) $(CFLAGS) -o $@ $(SYSCALL_SERVER_PIPE_OBJS)
 
 clean:
 	rm -rf *.o
-	rm -rf syscall_server
+	rm -rf syscall_server_*
+	rm -rf .syscall_server_*
+

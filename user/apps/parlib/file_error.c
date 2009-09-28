@@ -20,7 +20,7 @@ void file_error()
 	printf("Starting error testing....\n\n");
 
 	errno = 0;
-	int bad_fd = open("./test/DNE", O_RDWR, 0);
+	int bad_fd = open("DNE", O_RDWR, 0);
 	printf("Opened:       DNE\n");
         printf("FD:           %d\n", bad_fd);
         printf("ERRNO:        %s\n", strerror(errno));

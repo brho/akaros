@@ -13,8 +13,8 @@ extern char * readline(const char *prompt);
 void file_io()
 {	
 	printf("Beginning Ethernet Based File IO Test...\n\n");
-	int in_fd = open("./test/input", O_RDWR, 0);
-	printf("Opened:       input\n");
+	int in_fd = open("sample", O_RDWR, 0);
+	printf("Opened:       sample\n");
 	printf("FD:           %d\n", in_fd);
 	char buf[IN_BUF_SIZE];
 	int read_amt = read(in_fd, buf, IN_BUF_SIZE - 1);
@@ -48,7 +48,7 @@ void file_io()
 
 	unsigned int ofp_len = strlen(file_name) + 8;
 	char * output_full_path = malloc(ofp_len);
-	snprintf(output_full_path, ofp_len, "./test/%s", file_name);
+	snprintf(output_full_path, ofp_len, "%s", file_name);
 
 	int out_fd = open(output_full_path, O_RDWR | O_CREAT | O_TRUNC,
                       S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH);

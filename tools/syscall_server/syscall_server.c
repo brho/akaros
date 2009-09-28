@@ -5,6 +5,8 @@
 #include <stdio.h>
 #include <sys/stat.h>
 #include <malloc.h>
+#include <termios.h>
+#include <strings.h>
 #include "syscall_server.h"
 
 #define debug(...) printf(__VA_ARGS__)  
@@ -21,23 +23,13 @@ void run_server()
 	// Struct for reading the syscall over the serial port
 	syscall_req_t syscall_req;
 	syscall_rsp_t syscall_rsp;
-
-	// File descriptor of our open serial port
-	int fd = posix_openpt(O_RDWR | O_NOCTTY);
-	grantpt (fd);
-    unlockpt (fd);
-	char* slave_dev = ptsname(fd);
-	printf("Master PTY fd: %d\n", fd);
-	printf("Slave  TTY device name: %s\n", slave_dev);
-	printf("\nStarting server.....\n");
-	fflush(stdout);
 	
-	//Output the newly allocated slave device into a file
-	int slave_fd = open(ROS_SLAVE_PTY, 
-	               O_RDWR | O_CREAT | O_TRUNC, 
-	               S_IRUSR | S_IWUSR);
-	write(slave_fd, slave_dev, strnlen(slave_dev));
+	int fd_read, fd_write;
+	int ret = init_syscall_server(&fd_read, &fd_write);
+	if(ret < 0)
+		error(ret, "Could not open file desciptors for communication\n");
 
+	printf("Server started....");
 	// Continuously read in data from the serial port socket
 	while(1) {
 		syscall_req.payload_len = 0;
@@ -46,11 +38,13 @@ void run_server()
 		syscall_rsp.payload = NULL;
 	
 		debug("\nWaiting for syscall...\n");
-		read_syscall_req(fd, &syscall_req);	
+		read_syscall_req(fd_read, &syscall_req);	
+
 		debug("Processing syscall: %d\n", syscall_req.header.id);
 		handle_syscall(&syscall_req, &syscall_rsp);
+
 		debug("Writing response: %d\n", syscall_req.header.id);
-		write_syscall_rsp(fd, &syscall_rsp);
+		write_syscall_rsp(fd_write, &syscall_rsp);
 
 		if(syscall_req.payload != NULL)
 			free(syscall_req.payload);
@@ -62,10 +56,8 @@ void run_server()
 void read_syscall_req(int fd, syscall_req_t* req) 
 {
 	read_syscall_req_header(fd, req);
-	debug("Read Header for :%d...\n", req->header.id);
 	set_syscall_req_payload_len(req);
 	read_syscall_req_payload(fd, req);
-	debug("Read Payload...\n");
 }
 
 void set_syscall_req_payload_len(syscall_req_t* req)
@@ -100,14 +92,12 @@ void read_syscall_req_header(int fd, syscall_req_t* req)
    	// If no data, or the ID we got is bad, terminate process.
 	uint32_t id = req->header.id;
    	if ((bytes_read < 0) || (id < 0) || (id > NUM_SYSCALLS)) {
-		printf("Bytes Read: %d\n", bytes_read);
 		perror("Problems reading the id from the serial port...");
 	}
 
    	// Otherwise, start grabbing the rest of the data
    	bytes_read = read_from_serial(fd, &req->header.subheader, 
                                   sizeof(req->header.subheader) , 0);
-
    	if(bytes_read < 0)
 		error(fd, "Problems reading header from the serial port...");
 }
@@ -149,9 +139,9 @@ int read_from_serial(int fd, void* buf, int len, int peek)
 // Send CONNECTION_TERMINATED over the FD (if possible)
 void error(int fd, const char* s)
 {
-	printf("Error: Spawned Process, FD: %i\n",fd);
+	fprintf(stderr, "Error: Spawned Process, FD: %i\n",fd);
 	perror(s);
-    printf("Sending CONNECTION_TERMINATED.... \n");
+    fprintf(stderr, "Sending CONNECTION_TERMINATED.... \n");
 	close(fd);
 	exit(-1);
 }
@@ -221,17 +211,19 @@ void write_syscall_rsp_payload(int fd, syscall_rsp_t* rsp)
 		error(fd, "Problems writing all bytes in the response payload...");	
 }
 
+char* sandbox_file_name(char* name, uint32_t len) {
+	char* new_name = malloc(len + strnlen(SANDBOX_DIR));
+	sprintf(new_name, "%s%s", SANDBOX_DIR, name);
+	printf("%s\n", new_name);
+	return new_name;
+}
+
 void handle_open(syscall_req_t* req, syscall_rsp_t* rsp)
 {
+	char* name = sandbox_file_name(req->payload, req->payload_len);
 	open_subheader_t* o = &req->header.subheader.open;	
-	debug("Flags: %d\n", o->flags);
-	debug("Newlib Flags: %d\n", O_RDWR | O_CREAT | O_TRUNC);
-	debug("Mode: %d\n", o->mode);
-	debug("Newlib Mode: %d\n", 
-           S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH);
-	rsp->header.return_val = open(req->payload, o->flags, o->mode);
-	debug("Return Value: %d\n", rsp->header.return_val);
-	debug("Payload: %s\n", (char*)req->payload);
+	rsp->header.return_val = open(name, o->flags, o->mode);
+	free(name);
 }
 
 void handle_close(syscall_req_t* req, syscall_rsp_t* rsp)
@@ -244,8 +236,6 @@ void handle_read(syscall_req_t* req, syscall_rsp_t* rsp)
 {
 	read_subheader_t* r = &req->header.subheader.read;	
 	rsp->payload = malloc(r->len);
-	debug("File descriptor: %d\n", r->fd);
-	debug("Length to read: %d\n", r->len);
 	rsp->header.return_val = read(r->fd, rsp->payload, r->len);
 	if(rsp->header.return_val >= 0)
 		rsp->payload_len = rsp->header.return_val;
@@ -260,13 +250,18 @@ void handle_write(syscall_req_t* req, syscall_rsp_t* rsp)
 void handle_link(syscall_req_t* req, syscall_rsp_t* rsp)
 {
 	link_subheader_t* l = &req->header.subheader.link;	
-	rsp->header.return_val = link(req->payload, 
-                                  req->payload + l->old_len);
+	char* old_name = sandbox_file_name(req->payload, l->old_len);
+	char* new_name = sandbox_file_name(req->payload + l->old_len, l->new_len);
+	rsp->header.return_val = link(old_name, new_name); 
+	free(old_name);
+	free(new_name);
 }
 
 void handle_unlink(syscall_req_t* req, syscall_rsp_t* rsp)
 {
-	rsp->header.return_val = unlink(req->payload); 
+	char* name = sandbox_file_name(req->payload, req->payload_len);
+	rsp->header.return_val = unlink(name); 
+	free(name);
 }
 
 void handle_lseek(syscall_req_t* req, syscall_rsp_t* rsp)

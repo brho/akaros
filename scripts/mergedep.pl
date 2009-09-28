@@ -58,7 +58,17 @@ sub readdeps {
 			#print "DEPENDENCY [[$target]]: [[$deplines]]\n";
 			my $new_deplines = $deplines;
 			if($use_filename) {
-				my $new_deplines = " ".makedirname($filename)."/Makefrag".$deplines;
+				my $makelocal = "Makelocal";
+				my $sim_makelocal = "sim/Makelocal";
+				if (! -e $makelocal) {
+					$makelocal = ""
+				}
+				if (! -e $sim_makelocal) {
+					$sim_makelocal = ""
+				}
+				$new_deplines = 
+				      " " . $makelocal . " " . $sim_makelocal . " " 
+				          . makedirname($filename) . "/Makefrag" . $deplines;
 			}
 			$dephash{$target} = $new_deplines;
 		} elsif (/^[#]?[ \t]*$/) {

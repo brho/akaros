@@ -2,9 +2,10 @@
 #define SERIAL_SERVER_H
 
 #include <stdint.h>
+#include <sys/stat.h>
 #include <newlib_stat.h>
 
-#define ROS_SLAVE_PTY ".ros_slave_pty"
+#define SANDBOX_DIR "sandbox/"
 
 #define OPEN_ID			0
 #define CLOSE_ID		1
@@ -128,6 +129,7 @@ void write_syscall_rsp_header(int fd, syscall_rsp_t* rsp);
 void write_syscall_rsp_payload(int fd, syscall_rsp_t* rsp);
 int read_from_serial(int fd, void* buf, int len, int peek); 
 void error(int fd, const char* s);
+char* sandbox_file_name(char* name, uint32_t len);
 
 void handle_syscall(syscall_req_t* req, syscall_rsp_t* rsp);
 void handle_open(syscall_req_t* req, syscall_rsp_t* rsp);
