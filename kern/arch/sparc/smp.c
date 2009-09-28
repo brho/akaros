@@ -43,7 +43,7 @@ smp_init(void)
 }
 
 handler_wrapper_t
-wrapper_pool[MAX_NUM_CPUS*8] = {{0},0};
+wrapper_pool[MAX_NUM_CPUS*8] = {{{0},0}};
 
 handler_wrapper_t*
 smp_make_wrapper()
@@ -95,14 +95,12 @@ int smp_call_function_all(isr_t handler, void* data,
 			continue;
 
 		while(send_active_message(i,(amr_t)smp_call_wrapper,
-	        	                  (uint32_t)handler,(uint32_t)wrapper,
-	        	                  (uint32_t)data) != 0);
+	        	                  handler, wrapper, data) != 0);
 	}
 
 	// send to me
 	while(send_active_message(core_id(),(amr_t)smp_call_wrapper,
-	                          (uint32_t)handler,(uint32_t)wrapper,
-	                          (uint32_t)data) != 0);
+	                          handler,wrapper,data) != 0);
 
 	cpu_relax(); // wait to get the interrupt
 
@@ -127,8 +125,7 @@ int smp_call_function_single(uint32_t dest, isr_t handler, void* data,
 	enable_irqsave(&state);
 
 	while(send_active_message(dest,(amr_t)smp_call_wrapper,
-	                          (uint32_t)handler,(uint32_t)wrapper,
-	                          (uint32_t)data) != 0);
+	                          handler,wrapper,data) != 0);
 
 	cpu_relax(); // wait to get the interrupt, if it's to this core
 

@@ -3,6 +3,7 @@
 
 #include <arch/frontend.h>
 #include <parlib.h>
+#include <sys/stat.h>
 #include <sys/unistd.h>
 #include <sys/times.h>
 #include <sys/time.h>

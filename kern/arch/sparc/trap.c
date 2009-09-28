@@ -125,8 +125,10 @@ trap(trapframe_t* state, active_message_t* msg,
 void
 handle_active_message(trapframe_t* state, active_message_t* message)
 {
-	uint32_t src = message->srcid, a0 = message->arg0, a1 = message->arg1;
-	uint32_t a2 = message->arg2;
+	uint32_t src = message->srcid;
+	TV(a0t) a0 = message->arg0;
+	TV(a1t) a1 = message->arg1;
+	TV(a2t) a2 = message->arg2;
 	(message->pc)(state,src,a0,a1,a2);
 	env_pop_tf(state);
 }
@@ -170,14 +172,14 @@ stack_fucked(trapframe_t* state)
 void
 stack_misaligned(trapframe_t* state)
 {
-	state->tbr = state->tbr & ~0xFFF | 0x070;
+	state->tbr = (state->tbr & ~0xFFF) | 0x070;
 	stack_fucked(state);
 }
 
 void
 stack_pagefault(trapframe_t* state)
 {
-	state->tbr = state->tbr & ~0xFFF | 0x090;
+	state->tbr = (state->tbr & ~0xFFF) | 0x090;
 	stack_fucked(state);
 }
 
