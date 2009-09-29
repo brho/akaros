@@ -74,6 +74,7 @@
 // Page table/directory entry flags.
 #define PTE_PTD		0x001	// Entry is a Page Table Descriptor
 #define PTE_PTE		0x002	// Entry is a Page Table Entry
+#define PTE_ACC		0x01C	// Access modes (aka permissions, see below)
 #define PTE_R		0x020	// Referenced
 #define PTE_M		0x040	// Modified
 #define PTE_C		0x080	// Cacheable
@@ -90,13 +91,6 @@
 #define NPDENTRIES	NL1ENTRIES		// this either
 #define PDX(la)		L1X(la)			// for env stuff
 #define PTX(la)		L3X(la)			// same
-
-#define PTE_ACC(PTE)	(((PTE) & 0x1C) >> 2)	// Access bits
-
-// based upon PTE and Supervisor bit, can I read/write/execute this page?
-#define PTE_RD(PTE,S)	(PTE_ACC(PTE) != 4 && (PTE_ACC(PTE) < 6 || (S)))
-#define PTE_WR(PTE,S)	((PTE_ACC(PTE) & 0x1) && (PTE_ACC(PTE) < 4 || (S)))
-#define PTE_EX(PTE,S)	(PTE_ACC(PTE) == 4 || (PTE_ACC(PTE) & 0x2) && (PTE_ACC(PTE) < 4 || (S)))
 
 // +-----+-------------------+
 // |     |   Allowed Access  |

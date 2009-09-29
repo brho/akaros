@@ -74,7 +74,7 @@ void show_mapping(uintptr_t start, size_t size)
 		{
 			cprintf("%08p  %1d %1d %1d  %1x  %1d\n",page2pa(page),
 			        !!(*pte & PTE_C),!!(*pte & PTE_M),
-			        !!(*pte & PTE_R),PTE_ACC(*pte),
+			        !!(*pte & PTE_R),(*pte & PTE_ACC) >> 2,
 			        !!(*pte & PTE_PTE));
 		}
 		else

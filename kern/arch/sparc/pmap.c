@@ -123,37 +123,14 @@ pgdir_walk(pde_t* l1pt, const void*SNT va, int create)
  * perms. */
 int get_va_perms(pde_t *pgdir, const void *SNT va)
 {
-	return (int)pgdir_walk(pgdir, va, 0);
+	pte_t* pte = pgdir_walk(pgdir, va, 0);
+	return pte == NULL ? 0 : (*pte & (PTE_ACC | PTE_PTE));
 }
-//SARAH TODO: add sparc code here
+
 void *get_free_va_range(pde_t *pgdir, uintptr_t addr, size_t len)
-{ 
-/*{TRUSTEDBLOCK
-        // want to make sure there aren't mappings already.  will need to do this
-        // later with zones, for when we lazily allocate memory
-
-        uintptr_t startaddr;
-
-        int npages = ROUNDUP(len, PGSIZE) / PGSIZE;
-
-        addr &= ~0xfff;
-        if (!addr)
-                // some sensible default.  can cache the previous value somewhere
-                addr = USTACKTOP - PGSIZE; // TODO: not looking down
-        startaddr = addr;
-        pte_t *pte = pgdir_walk(pgdir, (void*)addr, 0);
-        // what about jumbo pages?
-        // consider looping around, esp if we start from a cached spot
-        // don't map at pg 0, or below brk
-        // consider local memory ranges...
-
-       
-        first fit?
-        what if we have a sorted structure of what mem ranges are already in use?
-        */
-
-        return (void*)0xdeadbeef;
-//}
+{
+	// SARAH TODO
+	assert(0);
 }
 
 

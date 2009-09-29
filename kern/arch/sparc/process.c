@@ -31,10 +31,7 @@ proc_init_trapframe(trapframe_t *tf)
         tf->tbr = (uint32_t)&trap_table;
 }
 
-
-
-//SARAH TODO: FILL in these functions
 void proc_set_tfcoreid(trapframe_t *tf, uint32_t id)
 {
-//	tf->tf_regs.reg_eax = id;
+	tf->gpr[8] = id;
 }
