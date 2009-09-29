@@ -497,13 +497,13 @@ intreg_t syscall(env_t* e, uintreg_t syscallno, uintreg_t a1, uintreg_t a2,
                 case SYS_run_binary:
                         return sys_run_binary(e, (char *DANGEROUS)a1,
                                               (char* DANGEROUS)a2, (size_t)a3);
+	#endif
+	#ifdef __NETWORK__
                 case SYS_eth_write:
                         return sys_eth_write(e, (char *DANGEROUS)a1, (size_t)a2);
                 case SYS_eth_read:
                         return sys_eth_read(e, (char *DANGEROUS)a1, (size_t)a2);
-
 	#endif
-
 	#ifdef __sparc_v8__
 		case SYS_frontend:
 			return frontend_syscall(a1,a2,a3,a4);

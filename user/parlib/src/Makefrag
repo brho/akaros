@@ -1,12 +1,11 @@
 USER_PARLIB_SRC_DIR = $(USER_PARLIB_DIR)/src
 OBJDIRS += $(USER_PARLIB_SRC_DIR)
 
-PATCHFILE = $(OBJDIR)/$(USER_PARLIB_DIR)/libc_patch.i
-
 USER_PARLIB_SRC_CFLAGS   := $(USER_CFLAGS) \
                             -I$(USER_PARLIB_DIR)/inc \
                             -I$(USER_PARLIB_NEWLIB_DIR)/include
 ifeq ($(COMPILER),IVY)
+PATCHFILE = $(OBJDIR)/$(USER_PARLIB_DIR)/libc_patch.i
 USER_PARLIB_SRC_CFLAGS   += --nopatch --patch=$(PATCHFILE)
 endif
 

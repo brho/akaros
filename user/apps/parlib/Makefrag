@@ -1,12 +1,11 @@
 USER_APPS_PARLIB_DIR = $(USER_APPS_DIR)/parlib
 OBJDIRS += $(USER_APPS_PARLIB_DIR)
 
-PATCHFILE = $(OBJDIR)/$(USER_PARLIB_DIR)/libc_patch.i
-
 USER_APPS_PARLIB_CFLAGS    := $(USER_CFLAGS)  \
                               -I$(USER_PARLIB_NEWLIB_DIR)/include \
                               -I$(USER_PARLIB_DIR)/inc
 ifeq ($(COMPILER),IVY)
+	PATCHFILE = $(OBJDIR)/$(USER_PARLIB_DIR)/libc_patch.i
 	USER_APPS_PARLIB_CFLAGS    += --nodeputy --nopatch #--patch=$(PATCHFILE) 
 endif
 
