@@ -21,7 +21,6 @@ static inline void atomic_set(atomic_t* number, int32_t val);
 static inline void atomic_add(atomic_t* number, int32_t inc);
 static inline void atomic_inc(atomic_t* number);
 static inline void atomic_dec(atomic_t* number);
-static inline void atomic_andb(volatile uint8_t RACY* number, uint8_t mask);
 static inline uint32_t spin_trylock(spinlock_t*SAFE lock);
 static inline void spin_lock(spinlock_t*SAFE lock);
 static inline void spin_unlock(spinlock_t*SAFE lock);
@@ -70,13 +69,6 @@ static inline void atomic_dec(atomic_t* number)
 {
 	atomic_add(number,-1);
 }
-
-static inline void atomic_andb(volatile uint8_t RACY*number, uint8_t mask)
-{
-       // asm volatile("lock andb %1,%0" : "=m"(*number) : "r"(mask) : "cc");
-      // SARAH TODO: change to sparc
-}
-
 
 static inline uint32_t spin_trylock(spinlock_t*SAFE lock)
 {

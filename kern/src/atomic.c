@@ -3,6 +3,7 @@
 #endif
 
 #include <arch/arch.h>
+#include <arch/bitmask.h>
 
 #include <atomic.h>
 #include <ros/error.h>

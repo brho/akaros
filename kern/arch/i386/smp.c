@@ -9,6 +9,7 @@
 #endif
 
 #include <arch/arch.h>
+#include <arch/bitmask.h>
 #include <smp.h>
 
 #include <atomic.h>

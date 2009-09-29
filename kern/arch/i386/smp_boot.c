@@ -14,6 +14,7 @@
 #include <smp.h>
 #include <arch/console.h>
 #include <arch/apic.h>
+#include <arch/bitmask.h>
 #include <timing.h>
 
 #include <atomic.h>
