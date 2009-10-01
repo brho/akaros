@@ -127,7 +127,7 @@ void read_syscall_req_payload(int fd, syscall_req_t* req);
 void write_syscall_rsp(int fd, syscall_rsp_t* rsp);
 void write_syscall_rsp_header(int fd, syscall_rsp_t* rsp);
 void write_syscall_rsp_payload(int fd, syscall_rsp_t* rsp);
-int read_from_serial(int fd, void* buf, int len, int peek); 
+int read_from_channel(int fd, void* buf, int len, int peek); 
 void error(int fd, const char* s);
 char* sandbox_file_name(char* name, uint32_t len);
 

@@ -20,7 +20,7 @@ int main()
 // Poll for incoming messages and send responses. 
 void run_server() 
 {
-	// Struct for reading the syscall over the serial port
+	// Struct for reading the syscall over the channel
 	syscall_req_t syscall_req;
 	syscall_rsp_t syscall_rsp;
 	
@@ -30,7 +30,7 @@ void run_server()
 		error(ret, "Could not open file desciptors for communication\n");
 
 	printf("Server started....");
-	// Continuously read in data from the serial port socket
+	// Continuously read in data from the channel socket
 	while(1) {
 		syscall_req.payload_len = 0;
 		syscall_req.payload = NULL;
@@ -87,19 +87,19 @@ void read_syscall_req_header(int fd, syscall_req_t* req)
 	// Try to read the syscall id from the socket.
 	// If no data available, spin until there is
 	int bytes_read = 0;
-	bytes_read = read_from_serial(fd, &req->header, sizeof(req->header.id), 0);
+	bytes_read = read_from_channel(fd, &req->header, sizeof(req->header.id), 0);
 
    	// If no data, or the ID we got is bad, terminate process.
 	uint32_t id = req->header.id;
    	if ((bytes_read < 0) || (id < 0) || (id > NUM_SYSCALLS)) {
-		perror("Problems reading the id from the serial port...");
+		perror("Problems reading the id from the channel...");
 	}
 
    	// Otherwise, start grabbing the rest of the data
-   	bytes_read = read_from_serial(fd, &req->header.subheader, 
+   	bytes_read = read_from_channel(fd, &req->header.subheader, 
                                   sizeof(req->header.subheader) , 0);
    	if(bytes_read < 0)
-		error(fd, "Problems reading header from the serial port...");
+		error(fd, "Problems reading header from the channel...");
 }
 
 void read_syscall_req_payload(int fd, syscall_req_t* req) {
@@ -110,18 +110,18 @@ void read_syscall_req_payload(int fd, syscall_req_t* req) {
 	if (req->payload == NULL) 
 		error(fd, "No free memory!");
 
-	int bytes_read = read_from_serial(fd, req->payload, req->payload_len, 0);
+	int bytes_read = read_from_channel(fd, req->payload, req->payload_len, 0);
 	if (bytes_read < 0)
-		error(fd, "Problems reading payload from serial port");
+		error(fd, "Problems reading payload from channel");
 }
 
 // Read len bytes from the given socket to the buffer.
 // If peek is 0, will wait indefinitely until that much data is read.
 // If peek is 1, if no data is available, will return immediately.
-int read_from_serial(int fd, void* buf, int len, int peek) 
+int read_from_channel(int fd, void* buf, int len, int peek) 
 {
 	int total_read = 0;
-	int just_read = read(fd, buf, len);
+	int just_read = read_syscall_server(fd, buf, len);
 
 	if (just_read < 0) return just_read;
 	if (just_read == 0 && peek) return just_read;
@@ -129,7 +129,7 @@ int read_from_serial(int fd, void* buf, int len, int peek)
 	total_read += just_read;
 
 	while (total_read != len) {
-		just_read = read(fd, buf + total_read, len - total_read);
+		just_read = read_syscall_server(fd, buf + total_read, len - total_read);
 		if (just_read < 0) return just_read;
 		total_read += just_read;
 	}
@@ -139,7 +139,7 @@ int read_from_serial(int fd, void* buf, int len, int peek)
 // Send CONNECTION_TERMINATED over the FD (if possible)
 void error(int fd, const char* s)
 {
-	fprintf(stderr, "Error: Spawned Process, FD: %i\n",fd);
+	fprintf(stderr, "Error: FD: %i\n",fd);
 	perror(s);
     fprintf(stderr, "Sending CONNECTION_TERMINATED.... \n");
 	close(fd);
@@ -194,7 +194,7 @@ void write_syscall_rsp(int fd, syscall_rsp_t* rsp)
 
 void write_syscall_rsp_header(int fd, syscall_rsp_t* rsp) 
 {
-   	int written = write(fd, &rsp->header, sizeof(syscall_rsp_header_t));
+   	int written = write_syscall_server(fd, &rsp->header, sizeof(syscall_rsp_header_t), rsp->payload_len);
 	if (written < 0)
 		error(fd, "Problems writing the syscall response header...");	
 }
@@ -204,7 +204,7 @@ void write_syscall_rsp_payload(int fd, syscall_rsp_t* rsp)
 	if(rsp->payload_len == 0)
 		return;
 
-   	int written = write(fd, rsp->payload, rsp->payload_len);
+   	int written = write_syscall_server(fd, rsp->payload, rsp->payload_len, 0);
 	if (written < 0)
 		error(fd, "Problems writing the syscall response payload...");	
 	if (written < rsp->payload_len)

@@ -22,3 +22,13 @@ int init_syscall_server(int* fd_read, int* fd_write) {
 	*fd_read = *fd_write = fd;
 	return fd;
 }
+
+int read_syscall_server(int fd, char* buf, int len) {
+        return read(fd, buf, len);
+}
+
+int write_syscall_server(int fd, char* buf, int len, int bytes_to_follow) {
+        return write(fd, buf, len);
+}
+
+

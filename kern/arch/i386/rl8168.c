@@ -99,23 +99,27 @@ unsigned long tx_des_pa;
 uint32_t rx_des_cur = 0;
 uint32_t tx_des_cur = 0;
 
-uint8_t eth_up = 0; // TODO: This needs to be somewhere global.
+extern int eth_up;
+extern int packet_waiting;
+extern int packet_buffer_size;
+extern char *CT(MAX_FRAME_SIZE - PACKET_HEADER_SIZE) packet_buffer;
+extern char *CT(MAX_FRAME_SIZE) packet_buffer_orig;
+extern int packet_buffer_pos;
 
-// Hacky stuff for syscall hack. Go away.
-int packet_waiting;
-int packet_buffer_size;
-char *CT(MAX_FRAME_SIZE - PACKET_HEADER_SIZE) packet_buffer;
-char *CT(MAX_FRAME_SIZE) packet_buffer_orig;
-int packet_buffer_pos = 0;
-// End hacky stuff
+extern char* (*packet_wrap)(const char *CT(len) data, size_t len);
+extern int (*send_frame)(const char *CT(len) data, size_t len);
+
 
 void rl8168_init() {
-	
+
 	if (rl8168_scan_pci() < 0) return;
 	rl8168_read_mac();
 	rl8168_setup_descriptors();
 	rl8168_configure();
 	rl8168_setup_interrupts();
+      	packet_wrap = &rl8168_packet_wrap;
+        send_frame = &rl8168_send_frame;
+
 	eth_up = 1;
 	
 	//Trigger sw based nic interrupt
@@ -689,7 +693,7 @@ char *rl8168_packet_wrap(const char* data, size_t len) {
 		return NULL;
 	}
 	
-	struct rl8168_packet* wrap_buffer = kmalloc(MAX_PACKET_SIZE, 0);
+	struct eth_packet* wrap_buffer = kmalloc(MAX_PACKET_SIZE, 0);
 	
 	if (wrap_buffer == NULL) {
 		rl8168_frame_debug("Can't allocate page for packet wrapping");
@@ -697,9 +701,9 @@ char *rl8168_packet_wrap(const char* data, size_t len) {
 	}
 	
 
-	struct ETH_Header *eth_header = &wrap_buffer->rl8168_head.eth_head;
-	struct IP_Header *ip_header = &wrap_buffer->rl8168_head.ip_head;
-	struct UDP_Header *udp_header = &wrap_buffer->rl8168_head.udp_head;
+	struct ETH_Header *eth_header = &wrap_buffer->eth_head.eth_head;
+	struct IP_Header *ip_header = &wrap_buffer->eth_head.ip_head;
+	struct UDP_Header *udp_header = &wrap_buffer->eth_head.udp_head;
 	
 	// Setup eth data
 	for (int i = 0; i < 6; i++) 

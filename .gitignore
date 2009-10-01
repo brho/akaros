@@ -23,3 +23,6 @@ kern/src/arch
 doc/rosdoc
 sim/
 tools/.*
+tools/syscall_server/syscall_server_*
+tools/syscall_server/sandbox/
+tools/syscall_server/apps/*

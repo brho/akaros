@@ -4,15 +4,11 @@
 #include <ros/common.h>
 #include <trap.h>
 #include <pmap.h>
+#include <arch/nic_common.h>
 
 #define rl8168_debug(...)  //cprintf(__VA_ARGS__)  
 #define rl8168_interrupt_debug(...) //cprintf(__VA_ARGS__)  
 #define rl8168_frame_debug(...)  //cprintf(__VA_ARGS__)  
-
-// We need to provide some global interface for sending and receiving packets to a generic interface
-//  for now, that is this set of Macros! They aren't in caps since the final inteface shoudn't be.
-#define packet_wrap rl8168_packet_wrap
-#define send_frame rl8168_send_frame
 
 #define NE2K_IRQ_CPU		5
 
@@ -91,12 +87,6 @@
 // Offset used for indexing IRQs
 #define KERNEL_IRQ_OFFSET	32
 
-// Basic packet sizing
-// TODO handle jumbo packets
-#define ETHERNET_ENCAP_SIZE	18
-#define MTU					1500	
-#define MAX_FRAME_SIZE		ETHERNET_ENCAP_SIZE + MTU	
-	
 // Realtek Descriptor Related Sizing
 #define NUM_TX_DESCRIPTORS	1024
 #define NUM_RX_DESCRIPTORS	1024
@@ -115,54 +105,9 @@
 // ^----- Good line ------^
 
 // v----- Evil line ------v
-// Hacky stuff for syscalls go away.
-
-struct ETH_Header
-{
-	char dest_mac[6];
-	char source_mac[6];
-	uint16_t eth_type;
-};
-
-
-struct IP_Header
-{
-	uint32_t ip_opts0;
-	uint32_t ip_opts1;
-	uint32_t ip_opts2;
-	uint32_t source_ip;
-	uint32_t dest_ip;
-};
-
-struct UDP_Header
-{
-	uint16_t source_port;
-	uint16_t dest_port;
-	uint16_t length;
-	uint16_t checksum;
-};	
-
-#define MINIMUM_PACKET_SIZE 14 // kinda evil. probably evil.
-#define MAX_PACKET_SIZE		MTU
-
-#define PACKET_HEADER_SIZE  sizeof(struct rl8168_header) //IP UDP ETH
-#define MAX_PACKET_DATA		MAX_FRAME_SIZE - PACKET_HEADER_SIZE
-// This number needs verification! Also, this is a huge hack, as the driver shouldnt care about UDP/IP etc.
-
-struct rl8168_header {
-	struct ETH_Header eth_head;
-	struct IP_Header ip_head;
-	struct UDP_Header udp_head;
-} __attribute__((packed));
-
-struct rl8168_packet {
-	struct rl8168_header rl8168_head;
-	char data[MTU-PACKET_HEADER_SIZE];
-} __attribute__((packed));
 
 char *CT(PACKET_HEADER_SIZE + len)
 rl8168_packet_wrap(const char *CT(len) data, size_t len);
-
 
 // ^----- Evil line ------^
 

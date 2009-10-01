@@ -24,7 +24,9 @@
 #include <kfs.h> // eventually replace this with vfs.h
 
 #ifdef __NETWORK__
-#include <arch/rl8168.h>
+#include <arch/nic_common.h>
+extern char* (*packet_wrap)(const char *CT(len) data, size_t len);
+extern int (*send_frame)(const char *CT(len) data, size_t len);
 #endif
 
 static void sys_yield(struct proc *p);

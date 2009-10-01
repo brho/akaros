@@ -14,7 +14,7 @@ extern char * readline(const char *prompt);
 uint8_t* binary_buf;
 
 static void fd_error() {
-	fprintf(stderr, "Error: Unable to run remote binary: %s\n", strerror(errno));
+	fprintf(stderr, "Error: Unable to run remote binary (fd error): %s\n", strerror(errno));
 }
 
 static void malloc_error() {
@@ -24,7 +24,7 @@ static void malloc_error() {
 static void read_error(void* buf, int fd) {
 	free(binary_buf);
 	close(fd);
-	fprintf(stderr, "Error: Unable to run remote binary: %s\n", strerror(errno));
+	fprintf(stderr, "Error: Unable to run remote binary (read error): %s\n", strerror(errno));
 }
 
 static void realloc_error(void* buf, int fd) {
@@ -42,7 +42,7 @@ void run_binary()
 	}
 
 	char * file_name = malloc(strlen(readline_result) + 8);
-	sprintf(file_name, "./test/%s", readline_result);
+	sprintf(file_name, "./apps/%s", readline_result);
 	int fd = open(file_name, O_RDONLY, 0);
 	if(fd < 0) { fd_error(); return; };
 	

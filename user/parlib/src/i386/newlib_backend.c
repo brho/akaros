@@ -380,9 +380,11 @@ int read_from_channel(char * buf, int len, int peek)
 	// 			Also, watch out for CONNECTION TERMINATED
 	int total_read = 0;
 
-	//int just_read = sys_serial_read(buf, len);
-	int just_read = sys_serial_read(buf, len);
-
+	#ifdef __NETWORK__
+		int just_read = sys_eth_read(buf, len);
+	#else
+		int just_read = sys_serial_read(buf, len);
+	#endif
 
 	if (just_read < 0) return just_read;
 	if (just_read == 0 && peek) return just_read;
@@ -390,9 +392,13 @@ int read_from_channel(char * buf, int len, int peek)
 	total_read += just_read;
 
 	while (total_read != len) {
-		//just_read = sys_serial_read(buf + total_read, len - total_read);
-		just_read = sys_serial_read(buf + total_read, len - total_read);
 		
+		#ifdef __NETWORK__
+			just_read = sys_eth_read(buf + total_read, len - total_read);
+		#else
+			just_read = sys_serial_read(buf + total_read, len - total_read);
+		#endif
+	
 		if (just_read == -1) return -1;
 		total_read += just_read;
 	}
@@ -673,7 +679,9 @@ ssize_t write(int file, const void *ptr, size_t len)
  */
 int write_to_channel(char * msg, int len)
 {
-	//return sys_serial_write((char*)msg, len);
-	return sys_serial_write(msg, len);
-	
+	#ifdef __NETWORK__
+		return sys_eth_write(msg, len);
+	#else
+		return sys_serial_write(msg, len);
+	#endif
 }
