@@ -1,8 +1,8 @@
 CFLAGS += -I.
 V = @
 
-SYSCALL_SERVER_OBJS = translate_state.o syscall_server.o
-SYSCALL_SERVER_HEADS = syscall_server.h
+SYSCALL_SERVER_OBJS = newlib_trans.o syscall_server.o
+SYSCALL_SERVER_HEADS = syscall_server.h newlib_trans.h
 
 all: syscall_server_pty syscall_server_pipe
 	$(V)rm -rf *.o

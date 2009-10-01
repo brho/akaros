@@ -222,7 +222,9 @@ void handle_open(syscall_req_t* req, syscall_rsp_t* rsp)
 {
 	char* name = sandbox_file_name(req->payload, req->payload_len);
 	open_subheader_t* o = &req->header.subheader.open;	
-	rsp->header.return_val = open(name, o->flags, o->mode);
+	int native_flags = translate_flags(o->flags);
+	int native_mode = translate_mode(o->mode);
+	rsp->header.return_val = open(name, native_flags, native_mode);
 	free(name);
 }
 
@@ -267,7 +269,8 @@ void handle_unlink(syscall_req_t* req, syscall_rsp_t* rsp)
 void handle_lseek(syscall_req_t* req, syscall_rsp_t* rsp)
 {
 	lseek_subheader_t* l = &req->header.subheader.lseek;	
-	rsp->header.return_val = lseek(l->fd, l->ptr, l->dir);
+	int native_whence = translate_whence(l->dir); 
+	rsp->header.return_val = lseek(l->fd, l->ptr, native_whence);
 }
 
 void handle_fstat(syscall_req_t* req, syscall_rsp_t* rsp)

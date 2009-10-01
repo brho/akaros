@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 #include <sys/stat.h>
-#include <newlib_stat.h>
+#include <newlib_trans.h>
 
 #define SANDBOX_DIR "sandbox/"
 
@@ -116,9 +116,9 @@ typedef struct syscall_rsp {
 
 void run_server();
 void translate_stat(struct stat* native, struct newlib_stat* newlib);
-void translate_flags(int native, int newlib);
-void translate_mode(int native, int newlib);
-void translate_dir(int native, int newlib);
+int translate_flags(int native_flags);
+int translate_mode(int native_mode);
+int translate_whence(int native_whence);
 void translate_errno(int native, int newlib);
 void set_syscall_req_payload_len(syscall_req_t* req);
 void read_syscall_req(int fd, syscall_req_t* req);

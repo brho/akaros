@@ -297,7 +297,6 @@ static ssize_t sys_cputs(env_t* e, const char *DANGEROUS s, size_t len)
 	// Check that the user has permission to read memory [s, s+len).
 	// Destroy the environment if not.
 	pte_t* p = pgdir_walk(e->env_pgdir,s,0);
-	printk("%x %x\n",*p,PTE_USER_RO);
 	char *COUNT(len) _s = user_mem_assert(e, s, len, PTE_USER_RO);
 
 	// Print the string supplied by the user.

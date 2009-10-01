@@ -1,5 +1,5 @@
-#ifndef NEWLIB_STRUCT_H
-#define NEWLIB_STRUCT_H
+#ifndef NEWLIB_TRANS_H
+#define NEWLIB_TRANS_H
 
 #include <stdint.h>
 
@@ -51,8 +51,8 @@ typedef struct newlib_stat {
 #define     NEWLIB_S_IXOTH 0000001/* execute/search permission, other */
 
 // For translating lseek's whence
-# define    SEEK_SET    0
-# define    SEEK_CUR    1
-# define    SEEK_END    2
+# define    NEWLIB_SEEK_SET    0
+# define    NEWLIB_SEEK_CUR    1
+# define    NEWLIB_SEEK_END    2
 
-#endif
+#endif //NEWLIB_TRANS_H
