@@ -69,6 +69,7 @@ void proc_run(struct proc *SAFE p);
 void proc_startcore(struct proc *SAFE p, trapframe_t *SAFE tf)
      __attribute__((noreturn));
 void proc_destroy(struct proc *SAFE p);
+void proc_yield(struct proc *SAFE p);
 
 /* Process core management.  Only call these if you are RUNNING_M or RUNNABLE_M.
  * These all adjust the vcoremap and take appropriate actions (like __startcore
@@ -98,6 +99,8 @@ void proc_set_syscall_retval(trapframe_t *SAFE tf, intreg_t value);
 error_t proc_incref(struct proc *SAFE p);
 void proc_decref(struct proc *SAFE p);
 
+void abandon_core(void);
+
 /* Active message handlers for process management */
 #ifdef __IVY__
 void __startcore(trapframe_t *tf, uint32_t srcid, struct proc *CT(1) a0,
@@ -113,5 +116,6 @@ void __death(trapframe_t *tf, uint32_t srcid, void * a0, void * a1,
 
 /* Degubbing */
 void print_idlecoremap(void);
+void print_proc_info(pid_t pid);
 
 #endif // !ROS_KERN_PROCESS_H

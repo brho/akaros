@@ -150,6 +150,9 @@ print_regs(push_regs_t *regs)
 void
 print_trapframe(trapframe_t *tf)
 {
+	static spinlock_t ptf_lock;
+
+	spin_lock_irqsave(&ptf_lock);
 	cprintf("TRAP frame at %p on core %d\n", tf, core_id());
 	print_regs(&tf->tf_regs);
 	cprintf("  es   0x----%04x\n", tf->tf_es);
@@ -161,6 +164,7 @@ print_trapframe(trapframe_t *tf)
 	cprintf("  flag 0x%08x\n", tf->tf_eflags);
 	cprintf("  esp  0x%08x\n", tf->tf_esp);
 	cprintf("  ss   0x----%04x\n", tf->tf_ss);
+	spin_unlock_irqsave(&ptf_lock);
 }
 
 static void
@@ -227,10 +231,9 @@ trap(trapframe_t *tf)
 		panic("Trapframe with invalid CS!");
 	}
 
-	/* If we're PROC_RUNNING_S, save the trapframe (which is vcore0's) in the
-	 * proc's env_tf.  make sure silly state is sorted (HSS).  Consider
-	 * extending this for PROC_RUNNING_M and vcore0. */
-	if (current->state == PROC_RUNNING_S) {
+	/* If we're vcore0, save the trapframe in the proc's env_tf.  make sure
+	 * silly state is sorted (HSS). This applies to any RUNNING_* state. */
+	if (current->vcoremap[0] == core_id()) {
 		current->env_tf = *tf;
 		tf = &current->env_tf;
 	}
@@ -238,7 +241,9 @@ trap(trapframe_t *tf)
 	trap_dispatch(tf);
 
 	// should this be if == 3?  Sort out later when we handle traps.
-	// so far we never get here
+	// so far we never get here.  managed to get here once when a MCP took two
+	// page faults and both called proc_destroy().  one of which returned since
+	// it was already DYING (though it should have waited for it's death IPI).
 	assert(0);
 	// Return to the current environment, which should be runnable.
 	proc_startcore(current, tf); // Note the comment in syscall.c
@@ -356,10 +361,9 @@ void sysenter_init(void)
 /* This is called from sysenter's asm, with the tf on the kernel stack. */
 void sysenter_callwrapper(struct Trapframe *tf)
 {
-	/* If we're PROC_RUNNING_S, save the trapframe (which is vcore0's) in the
-	 * proc's env_tf.  make sure silly state is sorted (HSS).  Consider
-	 * extending this for PROC_RUNNING_M and vcore0. */
-	if (current->state == PROC_RUNNING_S) {
+	/* If we're vcore0, save the trapframe in the proc's env_tf.  make sure
+	 * silly state is sorted (HSS). This applies to any RUNNING_* state. */
+	if (current->vcoremap[0] == core_id()) {
 		current->env_tf = *tf;
 		tf = &current->env_tf;
 	}

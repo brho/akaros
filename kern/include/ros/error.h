@@ -9,25 +9,45 @@
 
 // define this to prevent conflicts with newlib's errno.h
 #define __error_t_defined
-typedef enum {
-	ESUCCESS = 0,            // Success
-	EFAIL,                   // Generic Failure
-	EPERM,                   // Wrong permissions
-	EDEADLOCK,               // Would cause deadlock
-	EBUSY,                   // Currently busy, try again later
-	ENOMEM,                  // No memory available
-	ENOCACHE,                // No cache available
-	EINVAL,                  // Invalid arguments
-	EFAULT,                  // Segmentation fault
-	EBADENV,                 // Bad environment 
-	ENOFREEENV,              // No free environment
-	EUNSPECIFIED,            // Unspecified
-	EMORON,                  // Moron
-	NUMERRORS,               // Total number of error codes
-} error_t;
+#if 0
+#define ESUCCESS			 0		// Success
+#define EFAIL				 1		// Generic Failure
+#define EPERM				 2		// Wrong permissions
+#define EDEADLOCK			 3		// Would cause deadlock
+#define EBUSY				 4		// Currently busy, try again later
+#define ENOMEM				 5		// No memory available
+#define ENOCACHE			 6		// No memory available
+#define EINVAL				 7		// Invalid arguments
+#define EFAULT				 8		// Segmentation fault
+#define EBADENV				 9		// Bad environment
+#define ENOFREEENV			10		// No free environment
+#define EUNSPECIFIED		11		// Unspecified
+#define EMORON				12		// Moron
+#define NUMERRORS			13		// Total number of error codes
+#endif
 
-/* 
- * The special format for printk %e takes an integer 
+/* this enum is ghetto, but #defining collides with newlib.  right now, we
+ * collide on names *and* numbers, which needs to be sorted.  (TODO) */
+enum {
+	ESUCCESS,
+	EFAIL,
+	EPERM,
+	EDEADLOCK,
+	EBUSY,
+	ENOMEM,
+	ENOCACHE,
+	EINVAL,
+	EFAULT,
+	EBADENV,
+	ENOFREEENV,
+	EUNSPECIFIED,
+	EMORON,
+	NUMERRORS,
+};
+
+typedef int error_t;
+
+/* The special format for printk %e takes an integer
  * error code and prints a string describing the error.
  * The integer may be positive or negative,
  * so that -ENOMEM and ENOMEM are equivalent.
@@ -46,8 +66,8 @@ static const char *NTS const (RO error_string)[NUMERRORS] =
 	"Segmentation fault",
 	"Bad environment",
 	"No free environment",
-	"You are a moron",
 	"Unspecified",
+	"You are a moron",
 };
 
 #endif	// !ROS_INC_ERROR_H */

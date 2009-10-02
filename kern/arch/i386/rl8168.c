@@ -72,11 +72,6 @@
  * TODO: CONCURRENCY!
  */
 
-// This is to make it simply compile when not in __NETWORK__ mode.
-#ifndef USER_MAC_ADDRESS
-#define USER_MAC_ADDRESS {0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
-#endif
-
 struct Descriptor
 {
     unsigned int command,  /* command/status dword */

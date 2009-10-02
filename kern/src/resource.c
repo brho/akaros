@@ -21,7 +21,7 @@
  *
  * Will return either the number actually granted or an error code.
  */
-static ssize_t core_request(struct proc *p)
+ssize_t core_request(struct proc *p)
 {
 	size_t num_granted;
 	ssize_t amt_new;
@@ -96,9 +96,9 @@ static ssize_t core_request(struct proc *p)
 			proc_run(p);
 		/* if we are moving to a partitionable core from a RUNNING_S on a
 		 * management core, the kernel needs to do something else on this core
-		 * (just like in proc_destroy).  __death cleans up the core and idles. */
+		 * (just like in proc_destroy).  this cleans up the core and idles. */
 		if (need_to_idle)
-			__death(0, 0, 0, 0, 0);
+			abandon_core();
 	} else { // nothing granted, just return
 		spin_unlock_irqsave(&p->proc_lock);
 	}

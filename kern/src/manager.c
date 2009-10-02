@@ -40,41 +40,39 @@ void manager(void)
 	// This is a bypass of the standard manager structure, for network use
 	// If enabled, this spawns parlib_matrix, and allows the execution
 	// of a remote binary to function correctly (schedule() call below)
-	//#ifdef __NETWORK__	
+	#ifdef __NETWORK__	
 	if (progress++ == 0) {
 		envs[0] = kfs_proc_create(kfs_lookup_path("parlib_matrix"));
 		proc_set_state(envs[0], PROC_RUNNABLE_S);
 		proc_run(envs[0]);
 	}
 	schedule();
-	//#endif 
+	#endif 
 
 	switch (progress++) {
 		case 0:
-			// Here's how to do a multicored/parallel process:
+			//p = kfs_proc_create(kfs_lookup_path("roslib_proctests"));
 			p = kfs_proc_create(kfs_lookup_path("roslib_mhello"));
 			// being proper and all:
 			spin_lock_irqsave(&p->proc_lock);
 			proc_set_state(p, PROC_RUNNABLE_S);
-			/* // uncomment this to transition to a parallel process manually
-			proc_set_state(p, PROC_RUNNING_S);
-			proc_set_state(p, PROC_RUNNABLE_M);
-	
-			// set vcoremap with dispatch plan.  usually done by schedule()
-			p->num_vcores = 5; // assuming 5 are free, this is just an example
-			spin_lock(&idle_lock); // need to grab the cores
-			for (int i = 0; i < 5; i++) {
- 				// grab the last one on the list
-				p->vcoremap[i] = idlecoremap[num_idlecores-1];
-				num_idlecores--;
-			}
-			spin_unlock(&idle_lock);
-			*/
+			// normal single-cored way
 			spin_unlock_irqsave(&p->proc_lock);
 			proc_run(p);
+			#if 0
+			// this is how you can transition to a parallel process manually
+			// make sure you don't proc run first
+			proc_set_state(p, PROC_RUNNING_S);
+			proc_set_state(p, PROC_RUNNABLE_M);
+			p->resources[RES_CORES].amt_wanted = 5;
+			spin_unlock_irqsave(&p->proc_lock);
+			core_request(p);
+			panic("This is okay");
+			#endif
 			break;
 		case 1:
-			//panic("This is okay");
+			#if 0
+			panic("This is okay");
 			udelay(10000000);
 			printk("taking 3 cores from p\n");
 			for (int i = 0; i < num; i++)
@@ -93,14 +91,17 @@ void manager(void)
 			proc_set_state(envs[0], PROC_RUNNABLE_S);
 			proc_run(envs[0]);
 			break;
+			#endif
 	#ifdef __i386__
 		case 2:
+			#if 0
 			panic("Do not panic");
 			envs[0] = kfs_proc_create(kfs_lookup_path("parlib_channel_test_client"));
 			envs[1] = kfs_proc_create(kfs_lookup_path("parlib_channel_test_server"));
 			smp_call_function_single(1, run_env_handler, envs[0], 0);
 			smp_call_function_single(2, run_env_handler, envs[1], 0);
 			break;
+			#endif
 		case 3:
 	#else // sparc
 		case 2:
@@ -162,6 +163,8 @@ void manager(void)
 			//test_run_measurements(progress-1);
 		default:
 			printk("Manager Progress: %d\n", progress);
+			// delay if you want to test rescheduling an MCP that yielded
+			//udelay(15000000);
 			schedule();
 	}
 	panic("If you see me, then you probably screwed up");

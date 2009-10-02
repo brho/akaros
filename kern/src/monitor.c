@@ -270,21 +270,30 @@ int mon_kfs_run(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 
 int mon_procinfo(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 {
-	if (argc != 2) {
+	if (argc < 2) {
 		printk("Usage: procinfo OPTION\n");
 		printk("\tidle_cores: show idle core map\n");
 		printk("\trunnable: show proc_runnablelist\n");
 		printk("\tresources: show resources wanted/granted for all procs\n");
+		printk("\tpid NUM: show a lot of info for proc NUM\n");
 		return 1;
 	}
-	if (!strcmp(argv[1], "idle_cores"))
+	if (!strcmp(argv[1], "idle_cores")) {
 		print_idlecoremap();
-	else if (!strcmp(argv[1], "runnable"))
+	} else if (!strcmp(argv[1], "runnable")) {
 		dump_proclist(&proc_runnablelist);
-	else if (!strcmp(argv[1], "resources"))
+	} else if (!strcmp(argv[1], "resources")) {
 		print_all_resources();
-	else
+	} else if (!strcmp(argv[1], "pid")) {
+		if (argc != 3) {
+			printk("Give me a pid number.\n");
+			return 1;
+		}
+		print_proc_info(strtol(argv[2], 0, 0));
+	} else {
 		printk("Bad option\n");
+		return 1;
+	}
 	return 0;
 }
 

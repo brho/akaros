@@ -136,10 +136,12 @@ void proc_run(struct proc *p)
 			return;
 		case (PROC_RUNNABLE_S):
 			proc_set_state(p, PROC_RUNNING_S);
-			// We will want to know where this process is running, even if it is
-			// only in RUNNING_S.  can use the vcoremap, which makes death easy.
-			// we may need the pcoremap entry to mark it as a RUNNING_S core, or
-			// else update it here. (TODO) (PCORE)
+			/* We will want to know where this process is running, even if it is
+			 * only in RUNNING_S.  can use the vcoremap, which makes death easy.
+			 * Also, this is the signal used in trap.c to know to save the tf in
+			 * env_tf.
+			 * We may need the pcoremap entry to mark it as a RUNNING_S core, or
+			 * else update it here. (TODO) (PCORE) */
 			p->num_vcores = 0;
 			p->vcoremap[0] = core_id();
 			spin_unlock_irqsave(&p->proc_lock);
@@ -190,7 +192,7 @@ void proc_run(struct proc *p)
 			break;
 		default:
 			spin_unlock_irqsave(&p->proc_lock);
-			panic("Invalid process state in proc_run()!!");
+			panic("Invalid process state %p in proc_run()!!", p->state);
 	}
 }
 
@@ -251,7 +253,7 @@ void proc_startcore(struct proc *p, trapframe_t *tf) {
 		lcr3(p->env_cr3);
 		// we unloaded the old cr3, so decref it (if it exists)
 		// TODO: Consider moving this to wherever we really "mean to leave the
-		// process's context".
+		// process's context".  abandon_core() does this.
 		if (current)
 			proc_decref(current);
 		set_cpu_curenv(p);
@@ -266,6 +268,28 @@ void proc_startcore(struct proc *p, trapframe_t *tf) {
 	 */
 	env_pop_ancillary_state(p);
 	env_pop_tf(tf);
+}
+
+/* Helper function, helps with receiving local death IPIs, for the cases when
+ * this core is running the process.  We should received an IPI shortly.  If
+ * not, odds are interrupts are disabled, which shouldn't happen while servicing
+ * syscalls. */
+static void check_for_local_death(struct proc *p)
+{
+	if (current == p) {
+		/* a death IPI should be on its way, either from the RUNNING_S one, or
+		 * from proc_take_cores with a __death.  in general, interrupts should
+		 * be on when you call proc_destroy locally, but currently aren't for
+		 * all things (like traphandlers).  since we're dying anyway, it seems
+		 * reasonable to turn on interrupts.  note this means all non-proc
+		 * management interrupt handlers must return (which they need to do
+		 * anyway), so that we get back to this point.  Eventually, we can
+		 * remove the enable_irq.  think about this (TODO) */
+		enable_irq();
+		udelay(1000000);
+		panic("Waiting too long on core %d for an IPI in proc_destroy()!",
+		      core_id());
+	}
 }
 
 /*
@@ -294,8 +318,10 @@ void proc_destroy(struct proc *p)
 	size_t num_cores_freed;
 	spin_lock_irqsave(&p->proc_lock);
 	switch (p->state) {
-		case PROC_DYING:
-			return; // someone else killed this already.
+		case PROC_DYING: // someone else killed this already.
+			spin_unlock_irqsave(&p->proc_lock);
+			check_for_local_death(p); // IPI may be on it's way.
+			return;
 		case PROC_RUNNABLE_M:
 			/* Need to reclaim any cores this proc might have, even though it's
 			 * not running yet. */
@@ -329,10 +355,6 @@ void proc_destroy(struct proc *p)
 			 * deallocate the cores.
 			 * The rule is that the vcoremap is set before proc_run, and reset
 			 * within proc_destroy */
-
-				send_active_msg_sync(p->vcoremap[i], __death, (void *SNT)0,
-				                     (void *SNT)0, (void *SNT)0);
-
 			proc_take_allcores(p, __death);
 			break;
 		default:
@@ -361,22 +383,8 @@ void proc_destroy(struct proc *p)
 	if (!refcnt)
 		env_free(p);
 
-	/* If we were running the process, we should have received an IPI by now.
-	 * If not, odds are interrupts are disabled, which shouldn't happen while
-	 * servicing syscalls. */
-	if (current == p) {
-		/* a death IPI should be on its way, either from the RUNNING_S one, or
-		 * from proc_take_cores with a __death.  in general, interrupts should
-		 * be on when you call proc_destroy locally, but currently aren't for
-		 * all things (like traphandlers).  since we're dying anyway, it seems
-		 * reasonable to turn on interrupts.  note this means all non-proc
-		 * management interrupt handlers must return (which they need to do
-		 * anyway), so that we get back to this point.  Eventually, we can
-		 * remove the enable_irq.  think about this (TODO) */
-		enable_irq();
-		udelay(1000000);
-		panic("Waiting too long for an IPI in proc_destroy()!");
-	}
+	/* if our core is part of process p, then check/wait for the death IPI. */
+	check_for_local_death(p);
 	return;
 }
 
@@ -409,7 +417,8 @@ static uint32_t get_busy_vcoreid(struct proc *SAFE p, uint32_t prev)
 }
 
 /* Helper function.  Find the vcoreid for a given physical core id.
- * You better hold the lock before calling this. */
+ * You better hold the lock before calling this.  If we use some sort of
+ * pcoremap, we can avoid this linear search. */
 static uint32_t get_vcoreid(struct proc *SAFE p, int32_t pcoreid)
 {
 	uint32_t i;
@@ -419,6 +428,51 @@ static uint32_t get_vcoreid(struct proc *SAFE p, int32_t pcoreid)
 	if (i + 1 >= MAX_NUM_CPUS)
 		warn("At the end of the vcorelist.  Might want to check that out.");
 	return i;
+}
+
+/* Yields the calling core.  Must be called locally (not async) for now.
+ * - If RUNNING_S, you just give up your time slice and will eventually return.
+ * - If RUNNING_M, you give up the current vcore (which never returns), and
+ *   adjust the amount of cores wanted/granted.
+ * - If you have only one vcore, you switch to RUNNABLE_S.
+ * - If you yield from vcore0 but are still RUNNING_M, your context will be
+ *   saved, but may not be restarted, depending on how you get that core back.
+ *   (currently)  see proc_give_cores for details.
+ * - RES_CORES amt_wanted will be the amount running after taking away the
+ *   yielder.
+ */
+void proc_yield(struct proc *SAFE p)
+{
+	spin_lock_irqsave(&p->proc_lock);
+	switch (p->state) {
+		case (PROC_RUNNING_S):
+			proc_set_state(p, PROC_RUNNABLE_S);
+			schedule_proc(p);
+			break;
+		case (PROC_RUNNING_M):
+			p->resources[RES_CORES].amt_granted = --(p->num_vcores);
+			p->resources[RES_CORES].amt_wanted = p->num_vcores;
+			// give up core
+			p->vcoremap[get_vcoreid(p, core_id())] = -1;
+			// add to idle list
+			spin_lock(&idle_lock);
+			idlecoremap[num_idlecores++] = core_id();
+			spin_unlock(&idle_lock);
+			// out of vcores?  if so, we're now a regular process
+			if (p->num_vcores == 0) {
+				// switch to runnable_s
+				proc_set_state(p, PROC_RUNNABLE_S);
+				schedule_proc(p);
+			}
+			break;
+		default:
+			// there are races that can lead to this (async death, preempt, etc)
+			panic("Weird state(0x%08x) in sys_yield", p->state);
+	}
+	spin_unlock_irqsave(&p->proc_lock);
+	// clean up the core and idle.  for mgmt cores, they will ultimately call
+	// manager, which will call schedule(), which will repick the yielding proc.
+	abandon_core();
 }
 
 /* Gives process p the additional num cores listed in corelist.  You must be
@@ -484,8 +538,15 @@ error_t proc_give_cores(struct proc *SAFE p, uint32_t corelist[], size_t *num)
 				p->num_vcores++;
 				// TODO: careful of active message deadlock (AMDL)
 				assert(corelist[i] != core_id()); // sanity
-				send_active_msg_sync(corelist[i], __startcore, (uint32_t)p,
-				                     0, free_vcoreid);
+				/* if we want to allow yielding of vcore0 and restarting it at
+				 * its yield point *while still RUNNING_M*, uncomment this */
+				/*
+				if (i == 0)
+					send_active_msg_sync(p->vcoremap[0], __startcore,
+					                     (uint32_t)p, (uint32_t)&p->env_tf, 0);
+				else */
+				send_active_msg_sync(corelist[i], __startcore, p,
+				                     (void*)0, (void*)free_vcoreid);
 			}
 			break;
 		default:
@@ -673,12 +734,9 @@ void __startcore(trapframe_t *tf, uint32_t srcid, void * a0, void * a1,
 	proc_startcore(p_to_run, tf_to_pop);
 }
 
-/* Active message handler to stop running whatever context is on this core and
- * to idle.  Note this leaves no trace of what was running.
- * It's okay if death comes to a core that's already idling and has no current.
- * It could happen if a process decref'd before proc_startcore could incref. */
-void __death(trapframe_t *tf, uint32_t srcid, void *SNT a0, void *SNT a1,
-             void *SNT a2)
+/* Stop running whatever context is on this core and to 'idle'.  Note this
+ * leaves no trace of what was running. This "leaves the process's context. */
+void abandon_core(void)
 {
 	/* If we are currently running an address space on our core, we need a known
 	 * good pgdir before releasing the old one.  This is currently the major
@@ -692,6 +750,15 @@ void __death(trapframe_t *tf, uint32_t srcid, void *SNT a0, void *SNT a1,
 	}
 	smp_idle();
 }
+/* Active message handler to clean up the core when a process is dying.
+ * Note this leaves no trace of what was running.
+ * It's okay if death comes to a core that's already idling and has no current.
+ * It could happen if a process decref'd before proc_startcore could incref. */
+void __death(trapframe_t *tf, uint32_t srcid, void *SNT a0, void *SNT a1,
+             void *SNT a2)
+{
+	abandon_core();
+}
 
 void print_idlecoremap(void)
 {
@@ -701,3 +768,38 @@ void print_idlecoremap(void)
 		printk("idlecoremap[%d] = %d\n", i, idlecoremap[i]);
 	spin_unlock(&idle_lock);
 }
+
+void print_proc_info(pid_t pid)
+{
+	int j = 0;
+	struct proc *p = 0;
+	envid2env(pid, &p, 0);
+	// not concerned with a race on the state...
+	if ((!p) || (p->state == ENV_FREE)) {
+		printk("Bad PID.\n");
+		return;
+	}
+	spin_lock_irqsave(&p->proc_lock);
+	printk("PID: %d\n", p->env_id);
+	printk("PPID: %d\n", p->env_parent_id);
+	printk("State: 0x%08x\n", p->state);
+	printk("Runs: %d\n", p->env_runs);
+	printk("Refcnt: %d\n", p->env_refcnt);
+	printk("Flags: 0x%08x\n", p->env_flags);
+	printk("CR3(phys): 0x%08x\n", p->env_cr3);
+	printk("Num Vcores: %d\n", p->num_vcores);
+	printk("Vcoremap:\n");
+	for (int i = 0; i < p->num_vcores; i++) {
+		j = get_busy_vcoreid(p, j);
+		printk("\tVcore %d: Pcore %d\n", j, p->vcoremap[j]);
+		j++;
+	}
+	printk("Resources:\n");
+	for (int i = 0; i < MAX_NUM_RESOURCES; i++)
+		printk("\tRes type: %02d, amt wanted: %08d, amt granted: %08d\n", i,
+		       p->resources[i].amt_wanted, p->resources[i].amt_granted);
+	printk("Vcore 0's Last Trapframe:\n");
+	print_trapframe(&p->env_tf);
+	spin_unlock_irqsave(&p->proc_lock);
+}
+

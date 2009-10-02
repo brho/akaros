@@ -73,7 +73,8 @@ void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 	mmap_abort:
 		// TODO: release the appropriate mm_lock
 		spin_unlock_irqsave(&p->proc_lock);
-		printk("[kernel] mmap() aborted!\n");
+		// not a kernel problem, like if they ask to mmap a mapped location.
+		printd("[kernel] mmap() aborted!\n");
 		// mmap's semantics.  we need a better error propagation system
 		return (void*SAFE)TC(-1); // this is also ridiculous
 }

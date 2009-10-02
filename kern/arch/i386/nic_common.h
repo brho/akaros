@@ -12,6 +12,11 @@
 #define MTU			1500	
 #define MAX_FRAME_SIZE		ETHERNET_ENCAP_SIZE + MTU	
 	
+// This is to make it simply compile when not in __NETWORK__ mode.
+#ifndef USER_MAC_ADDRESS
+#define USER_MAC_ADDRESS {0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
+#endif
+
 // v----- Evil line ------v
 // Hacky stuff for syscalls go away.
 

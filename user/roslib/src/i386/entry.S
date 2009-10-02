@@ -64,8 +64,13 @@ new_core:
 	movl $mmap_args, %edi
 	mov $SYS_mmap, %eax
 	int $T_SYSCALL
-	addl $PGSIZE, %eax
-	movl %eax, %esp
+	// by using edx instead of eax, we're assuming our request was satisfied.
+	// eax has the actual address we can use.  since we would have used eax
+	// without checking, it would fail anyways, and now we can handle mmap
+	// aborting in the event a stack is already allocated here.  this is all
+	// extremely dangerous to do, so be careful...
+	addl $PGSIZE, %edx
+	movl %edx, %esp
 	movl %esi, %eax // restore the vcoreid
 	call main // main will check to see if it came from here or not
 	// spin when we return.  ought to yield before this ever happens

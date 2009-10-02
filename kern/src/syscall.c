@@ -31,8 +31,6 @@ extern char *CT(PACKET_HEADER_SIZE + len) (*packet_wrap)(const char *CT(len) dat
 extern int (*send_frame)(const char *CT(len) data, size_t len);
 #endif
 
-static void sys_yield(struct proc *p);
-
 //Do absolutely nothing.  Used for profiling.
 static void sys_null(void)
 {
@@ -92,8 +90,7 @@ static ssize_t sys_run_binary(env_t* e, void *DANGEROUS binary_buf,
 	kfree(new_binary);
 	proc_set_state(env, PROC_RUNNABLE_S);
 	schedule_proc(env);
-	sys_yield(e);
-
+	proc_yield(e); // changed from sys_yield.  did not test this at all.
 	return 0;
 }
 
@@ -357,31 +354,6 @@ static error_t sys_env_destroy(env_t* e, envid_t envid)
 }
 
 /*
- * Current process yields its remaining "time slice".  Currently works for
- * single-core processes.
- * TODO: think about how this works with async calls and multicored procs.
- * Want it to only be callable locally.
- */
-static void sys_yield(struct proc *p)
-{
-	// This is all standard single-core, local call
-	spin_lock_irqsave(&p->proc_lock);
-	assert(p->state == PROC_RUNNING_S);
-	proc_set_state(p, PROC_RUNNABLE_S);
-	schedule_proc(p);
-	spin_unlock_irqsave(&p->proc_lock);
-	// the implied thing here is that all state has been saved before leaving
-	// could do the "leaving the process context" here, mentioned in startcore
-	schedule();
-
-	/* TODO
-	 * if running_s, give up your time slice (schedule, save silly state, block)
-	 * if running_m and 2+ cores are left, give yours up, stay running_m
-	 * if running_m and last core, switch to runnable_s
-	 */
-}
-
-/*
  * Creates a process found at the user string 'path'.  Currently uses KFS.
  * Not runnable by default, so it needs it's status to be changed so that the
  * next call to schedule() will try to run it.
@@ -488,7 +460,7 @@ intreg_t syscall(struct proc *p, trapframe_t *tf, uintreg_t syscallno,
 		case SYS_proc_destroy:
 			return sys_env_destroy(p, (envid_t)a1);
 		case SYS_yield:
-			sys_yield(p);
+			proc_yield(p);
 			return ESUCCESS;
 		case SYS_proc_create:
 			return sys_proc_create(p, (char *DANGEROUS)a1);
