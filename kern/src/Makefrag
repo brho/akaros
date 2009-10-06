@@ -37,6 +37,8 @@ KERN_SRCFILES := $(KERN_ARCH_SRCFILES) \
                  $(KERN_SRC_DIR)/kfs.c \
                  $(KERN_SRC_DIR)/process.c \
                  $(KERN_SRC_DIR)/kmalloc.c \
+                 $(KERN_SRC_DIR)/hashtable.c \
+                 $(KERN_SRC_DIR)/hashtable_itr.c \
                  $(KERN_SRC_DIR)/schedule.c \
                  $(KERN_SRC_DIR)/testing.c
 

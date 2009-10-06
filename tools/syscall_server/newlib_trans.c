@@ -95,7 +95,7 @@ int translate_mode(int newlib_mode) {
 	return native_mode;	
 }
 int translate_whence(int newlib_whence) {
-	int native_whence;
+	int native_whence = 0;
 	if (newlib_whence == NEWLIB_SEEK_SET)
 		native_whence = SEEK_SET;
 	else if (newlib_whence == NEWLIB_SEEK_CUR)

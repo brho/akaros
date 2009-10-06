@@ -1,3 +1,4 @@
+#CC = ivycc --deputy
 CFLAGS += -I.
 V = @
 

@@ -46,7 +46,7 @@ void run_server()
 		debug("Writing response: %d\n", syscall_req.header.id);
 		write_syscall_rsp(fd_write, &syscall_rsp);
 
-		if(syscall_req.payload != NULL)
+		if(syscall_req.payload != NULL) 
 			free(syscall_req.payload);
 		if(syscall_rsp.payload != NULL)
 			free(syscall_rsp.payload);
@@ -194,7 +194,8 @@ void write_syscall_rsp(int fd, syscall_rsp_t* rsp)
 
 void write_syscall_rsp_header(int fd, syscall_rsp_t* rsp) 
 {
-   	int written = write_syscall_server(fd, &rsp->header, sizeof(syscall_rsp_header_t), rsp->payload_len);
+   	int written = write_syscall_server(fd, (char*)&rsp->header, 
+	                   sizeof(syscall_rsp_header_t), rsp->payload_len);
 	if (written < 0)
 		error(fd, "Problems writing the syscall response header...");	
 }
@@ -212,7 +213,9 @@ void write_syscall_rsp_payload(int fd, syscall_rsp_t* rsp)
 }
 
 char* sandbox_file_name(char* name, uint32_t len) {
-	char* new_name = malloc(len + strnlen(SANDBOX_DIR));
+	char* new_name = malloc(len + sizeof(SANDBOX_DIR) - 1);
+	if (new_name == NULL) 
+		perror("No free memory!");
 	sprintf(new_name, "%s%s", SANDBOX_DIR, name);
 	printf("%s\n", new_name);
 	return new_name;
@@ -238,6 +241,8 @@ void handle_read(syscall_req_t* req, syscall_rsp_t* rsp)
 {
 	read_subheader_t* r = &req->header.subheader.read;	
 	rsp->payload = malloc(r->len);
+	if (rsp->payload == NULL) 
+		perror("No free memory!");
 	rsp->header.return_val = read(r->fd, rsp->payload, r->len);
 	if(rsp->header.return_val >= 0)
 		rsp->payload_len = rsp->header.return_val;
@@ -278,6 +283,8 @@ void handle_fstat(syscall_req_t* req, syscall_rsp_t* rsp)
 	struct stat native_struct;
 	fstat_subheader_t* f = &req->header.subheader.fstat;	
 	rsp->payload = malloc(sizeof(newlib_stat_t));
+	if (rsp->payload == NULL) 
+		perror("No free memory!");
 	rsp->header.return_val = fstat(f->fd, &native_struct); 
 	if(rsp->header.return_val >= 0)
 		rsp->payload_len = sizeof(newlib_stat_t);
@@ -295,6 +302,8 @@ void handle_stat(syscall_req_t* req, syscall_rsp_t* rsp)
 {
 	struct stat native_struct;
 	rsp->payload = malloc(sizeof(newlib_stat_t));
+	if (rsp->payload == NULL) 
+		perror("No free memory!");
 	rsp->header.return_val = stat(req->payload, &native_struct); 
 	if(rsp->header.return_val >= 0)
 		rsp->payload_len = sizeof(newlib_stat_t);

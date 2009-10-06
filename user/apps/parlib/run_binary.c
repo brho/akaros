@@ -40,10 +40,10 @@ void run_binary()
 		printf("Error reading from console.\n");
 		return;
 	}
-
 	char * file_name = malloc(strlen(readline_result) + 8);
 	sprintf(file_name, "./apps/%s", readline_result);
 	int fd = open(file_name, O_RDONLY, 0);
+	free(file_name);
 	if(fd < 0) { fd_error(); return; };
 	
 	int iters = 1;
@@ -69,6 +69,5 @@ void run_binary()
 	}
 	free(binary_buf);
 	close(fd);
-
 }
 

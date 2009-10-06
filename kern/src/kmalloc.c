@@ -144,6 +144,11 @@ void* kmalloc(size_t size, int flags)
 	return ppn2kva(first);
 }
 
+void* krealloc(void* buf, size_t size, int flags) {
+	kfree(buf);
+	return kmalloc(size, flags);
+}
+
 void kfree(void *addr)
 {
 	kmallocdebug("incoming address: %p\n", addr);

@@ -115,6 +115,7 @@ typedef struct syscall_rsp {
 } syscall_rsp_t;
 
 void run_server();
+int init_syscall_server(int* fd_read, int* fd_write);
 void translate_stat(struct stat* native, struct newlib_stat* newlib);
 int translate_flags(int native_flags);
 int translate_mode(int native_mode);
@@ -127,7 +128,8 @@ void read_syscall_req_payload(int fd, syscall_req_t* req);
 void write_syscall_rsp(int fd, syscall_rsp_t* rsp);
 void write_syscall_rsp_header(int fd, syscall_rsp_t* rsp);
 void write_syscall_rsp_payload(int fd, syscall_rsp_t* rsp);
-int read_from_channel(int fd, void* buf, int len, int peek); 
+int read_syscall_server(int fd, char* buf, int len);
+int write_syscall_server(int fd, char* buf, int len, int bytes_to_follow); 
 void error(int fd, const char* s);
 char* sandbox_file_name(char* name, uint32_t len);
 
