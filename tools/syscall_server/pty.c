@@ -1,6 +1,7 @@
 #define _XOPEN_SOURCE 600
 #include <stdlib.h>
 #include <fcntl.h>
+#include <string.h>
 
 #define SYSCALL_SERVER_PTY ".syscall_server_pty"
 
@@ -18,7 +19,7 @@ int init_syscall_server(int* fd_read, int* fd_write) {
 	int pty_fd = open(SYSCALL_SERVER_PTY, 
 	                  O_RDWR | O_CREAT | O_TRUNC, 
 	                  S_IRUSR | S_IWUSR);
-	write(pty_fd, pty_dev, strnlen(pty_dev));
+	write(pty_fd, pty_dev, strlen(pty_dev));
 	*fd_read = *fd_write = fd;
 	return fd;
 }
