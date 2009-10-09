@@ -79,7 +79,7 @@ char device_mac[6];
 void* base_page;
 uint32_t num_pages = 0;
 
-extern char* (*packet_wrap)(const char *CT(len) data, size_t len);
+extern char *CT(PACKET_HEADER_SIZE + len) (*packet_wrap)(const char *CT(len) data, size_t len);
 extern int (*send_frame)(const char *CT(len) data, size_t len);
 
 
@@ -416,26 +416,30 @@ void ne2k_handle_rx_packet() {
 
 // copied with love (and modification) from tcp/ip illistrated vl 2 1995 pg 236
 // bsd licenced
-uint16_t cksum(char *ip, int len) {
+uint16_t cksum(char *CT(len) ip, int len) {
 	
-	uint32_t sum = 0;  /* assume 32 bit long, 16 bit short */
+	uint32_t sum = 0;
+	// Next two lines for ivy. Grr.
+	char *curr_ip = ip;
+	int curr_len = len;
 
-	while(len > 1){
-             sum += *((uint16_t*) ip);
-	     ip = ip + 2;
-             if(sum & 0x80000000)   /* if high order bit set, fold */
-               sum = (sum & 0xFFFF) + (sum >> 16);
-             len -= 2;
-           }
+	while(curr_len > 1) {
+		sum += *((uint16_t*) curr_ip);
+		curr_ip = curr_ip + 2;
+		
+		if(sum & 0x80000000)	/* if high order bit set, fold */
+			sum = (sum & 0xFFFF) + (sum >> 16);
+			curr_len -= 2;
+		}
 
-           if(len)       /* take care of left over byte */
-             sum += (uint16_t) *(uint8_t *)ip;
-          
-           while(sum>>16)
-             sum = (sum & 0xFFFF) + (sum >> 16);
+		if(curr_len)		 /* take care of left over byte */
+			sum += *curr_ip;
+		  
+		while(sum>>16)
+			sum = (sum & 0xFFFF) + (sum >> 16);
 
-           return ~sum;
-         }
+		return ~sum;
+}
 
 
 // Main routine to send a frame. May be completely broken.
@@ -494,7 +498,7 @@ int ne2k_send_frame(const char *data, size_t len) {
 
 // This function is a complete hack for syscalls until we get a stack.
 // the day I delete this monstrosity of code I will be a happy man --Paul
-char *ne2k_packet_wrap(const char* data, size_t len) {
+char *CT(PACKET_HEADER_SIZE + len) ne2k_packet_wrap(const char* data, size_t len) {
  	
  	#define htons(A) ((((uint16_t)(A) & 0xff00) >> 8) | \
  	                    (((uint16_t)(A) & 0x00ff) << 8))

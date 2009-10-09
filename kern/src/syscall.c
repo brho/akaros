@@ -25,7 +25,7 @@
 
 #ifdef __NETWORK__
 #include <arch/nic_common.h>
-extern char* (*packet_wrap)(const char *CT(len) data, size_t len);
+extern char *CT(PACKET_HEADER_SIZE + len) (*packet_wrap)(const char *CT(len) data, size_t len);
 extern int (*send_frame)(const char *CT(len) data, size_t len);
 #endif
 

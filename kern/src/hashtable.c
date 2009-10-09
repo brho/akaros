@@ -6,6 +6,16 @@
 #include <string.h>
 #include <kmalloc.h>
 
+// File was not annotated and caused ivy based compilation to fail
+// Someone should really annotate it.
+#ifdef __DEPUTY__
+#pragma nodeputy
+#endif
+
+#ifdef __SHARC__
+#pragma nosharc
+#endif
+
 /*
 Credit for primes table: Aaron Krowne
  http://br.endernet.org/~akrowne/

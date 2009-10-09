@@ -106,7 +106,7 @@ extern char *CT(MAX_FRAME_SIZE - PACKET_HEADER_SIZE) packet_buffer;
 extern char *CT(MAX_FRAME_SIZE) packet_buffer_orig;
 extern int packet_buffer_pos;
 
-extern char* (*packet_wrap)(const char *CT(len) data, size_t len);
+extern char *CT(PACKET_HEADER_SIZE + len) (*packet_wrap)(const char *CT(len) data, size_t len);
 extern int (*send_frame)(const char *CT(len) data, size_t len);
 
 
@@ -664,7 +664,7 @@ int rl8168_send_frame(const char *data, size_t len) {
 
 // This function is a complete hack for syscalls until we get a stack.
 // the day I delete this monstrosity of code I will be a happy man --Paul
-char *rl8168_packet_wrap(const char* data, size_t len) {
+char *CT(PACKET_HEADER_SIZE + len) rl8168_packet_wrap(const char* data, size_t len) {
 	
 	#define htons(A) ((((uint16_t)(A) & 0xff00) >> 8) | \
 	                    (((uint16_t)(A) & 0x00ff) << 8))

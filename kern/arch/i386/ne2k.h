@@ -28,8 +28,7 @@ void ne2k_mem_alloc();
 void ne2k_read_mac();
 void ne2k_test_interrupts();
 void ne2k_handle_rx_packet();
-int ne2k_send_frame(const char *data, size_t len);
-char *ne2k_packet_wrap(const char* data, size_t len);
-
+int ne2k_send_frame(const char *CT(len) data, size_t len);
+char *CT(PACKET_HEADER_SIZE + len) ne2k_packet_wrap(const char *CT(len) data, size_t len);
 
 #endif /* !ROS_INC_NE2K_H */
