@@ -1,4 +1,5 @@
 #include <arch/frontend.h>
+#include <pmap.h>
 
 void
 cons_init(void)
@@ -10,7 +11,7 @@ cons_init(void)
 void
 cputbuf(const char*COUNT(len) buf, int len)
 {
-	frontend_syscall(RAMP_SYSCALL_write,1,(uint32_t)buf,len);
+	frontend_syscall(RAMP_SYSCALL_write,1,(uint32_t)PADDR(buf),len);
 }
 
 // Low-level console I/O

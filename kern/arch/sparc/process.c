@@ -33,5 +33,13 @@ proc_init_trapframe(trapframe_t *tf)
 
 void proc_set_tfcoreid(trapframe_t *tf, uint32_t id)
 {
-	tf->gpr[8] = id;
+	tf->gpr[10] = id;
+}
+
+/* For cases that we won't return from a syscall via the normal path, and need
+ * to set the syscall return value in the registers manually.  Like in a syscall
+ * moving to RUNNING_M */
+void proc_set_syscall_retval(trapframe_t *SAFE tf, intreg_t value)
+{
+	tf->gpr[8] = value;
 }

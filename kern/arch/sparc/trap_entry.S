@@ -28,17 +28,12 @@ handle_trap:
 	bne,a	1f
 	 sub	%fp,64+SIZEOF_TRAPFRAME_T+SIZEOF_ACTIVE_MESSAGE_T,%l6
 
-1:	# back up what might be an active message (%asr8-12)
-	mov	%asr8,%l3
-	st	%l3,[%l6+64+SIZEOF_TRAPFRAME_T+0]
-	mov	%asr9,%l3
+1:	# back up what might be an active message
+	st	%l0,[%l6+64+SIZEOF_TRAPFRAME_T+0]
 	st	%l3,[%l6+64+SIZEOF_TRAPFRAME_T+4]
-	mov	%asr10,%l3
-	st	%l3,[%l6+64+SIZEOF_TRAPFRAME_T+8]
-	mov	%asr11,%l3
-	st	%l3,[%l6+64+SIZEOF_TRAPFRAME_T+12]
-	mov	%asr12,%l3
-	st	%l3,[%l6+64+SIZEOF_TRAPFRAME_T+16]
+	st	%l4,[%l6+64+SIZEOF_TRAPFRAME_T+8]
+	st	%l5,[%l6+64+SIZEOF_TRAPFRAME_T+12]
+	st	%g0,[%l6+64+SIZEOF_TRAPFRAME_T+16]
 
 	mov	%l7,%l0
 	# At this point we may use %l3/4/5/7 as temporary regs

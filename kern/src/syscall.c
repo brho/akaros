@@ -25,6 +25,10 @@
 #include <resource.h>
 #include <kfs.h> // eventually replace this with vfs.h
 
+#ifdef __sparc_v8__
+#include <arch/frontend.h>
+#endif 
+
 #ifdef __NETWORK__
 #include <arch/nic_common.h>
 extern char *CT(PACKET_HEADER_SIZE + len) (*packet_wrap)(const char *CT(len) data, size_t len);
@@ -491,10 +495,10 @@ intreg_t syscall(struct proc *p, trapframe_t *tf, uintreg_t syscallno,
 			return sys_serial_write(p, (char *DANGEROUS)a1, (size_t)a2);
 		case SYS_serial_read:
 			return sys_serial_read(p, (char *DANGEROUS)a1, (size_t)a2);
+	#endif
 		case SYS_run_binary:
 			return sys_run_binary(p, (char *DANGEROUS)a1,
 			                      (char* DANGEROUS)a2, (size_t)a3);
-	#endif
 	#ifdef __NETWORK__
 		case SYS_eth_write:
 			return sys_eth_write(p, (char *DANGEROUS)a1, (size_t)a2);
@@ -503,7 +507,7 @@ intreg_t syscall(struct proc *p, trapframe_t *tf, uintreg_t syscallno,
 	#endif
 	#ifdef __sparc_v8__
 		case SYS_frontend:
-			return frontend_syscall(a1,a2,a3,a4);
+			return frontend_syscall_from_user(p,a1,a2,a3,a4);
 	#endif
 
 		default:

@@ -5,7 +5,7 @@
  * Copyright (c) 2009 The Regents of the University of California
  * Barret Rhoden <brho@cs.berkeley.edu>
  * Kevin Klues <klueska@cs.berkeley.edu> (multiboot functions)
- * Ander Waterman <waterman@cs.berkeley.edu> (memcpy_from_user)
+ * Andrew Waterman <waterman@cs.berkeley.edu> (memcpy_to/from_user)
  * Zach Anderson (zra@cs.berkeley.edu> (user_mem_strlcpy)
  * See LICENSE for details.
  *
@@ -92,6 +92,10 @@ size_t user_mem_strlcpy(env_t *env, char *NT COUNT(len - 1),
 error_t
 memcpy_from_user(env_t* env, void* COUNT(len) dest,
                  const void *DANGEROUS va, size_t len);
+
+error_t
+memcpy_to_user(env_t* env, void*DANGEROUS va,
+                 const void *COUNT(len) src, size_t len);
                  
 /* Arch specific implementations for these */
 pte_t *pgdir_walk(pde_t *COUNT(NPDENTRIES) pgdir, const void *SNT va, int create);

@@ -7,6 +7,7 @@
 #include <sys/unistd.h>
 #include <sys/times.h>
 #include <sys/time.h>
+#include <debug.h>
 
 char *__env[1] = { 0 };
 char **environ = __env;
@@ -128,22 +129,28 @@ gettimeofday(struct timeval* tp, void* tzp)
 	return -1;
 }
 
-void*SNT
-sbrk(ptrdiff_t incr)
+/* sbrk()
+ * Increase program data space. 
+ * As malloc and related functions depend on this, it is 
+ * useful to have a working implementation. 
+ * The following suffices for a standalone system; it exploits the 
+ * symbol _end automatically defined by the GNU linker.
+ */
+void* sbrk(ptrdiff_t incr) 
 {
-	#define HEAP_SIZE 8192
+	#define HEAP_SIZE (1<<23)
 	static uint8_t array[HEAP_SIZE];
-	static uint8_t*SNT heap_end = array;
-	static uint8_t*SNT stack_ptr = &(array[HEAP_SIZE-1]);
+	static uint8_t *BND(array, array + HEAP_SIZE) heap_end = array;
+	static uint8_t *stack_ptr = &(array[HEAP_SIZE-1]);
 
-	uint8_t*SNT prev_heap_end;
+	uint8_t* prev_heap_end; 
 
 	prev_heap_end = heap_end;
 	if (heap_end + incr > stack_ptr) {
 		errno = ENOMEM;
-		return (void*SNT)-1;
+		return (void*CT(1))TC(-1);
 	}
 
 	heap_end += incr;
-	return (caddr_t SNT) prev_heap_end;
+	return (caddr_t) prev_heap_end;
 }

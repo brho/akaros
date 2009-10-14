@@ -3,7 +3,13 @@
 
 #include <ros/common.h>
 
+#ifdef ROS_KERNEL
+
+#include <env.h>
+int32_t frontend_syscall_from_user(env_t* p, int32_t syscall_num, uint32_t arg0, uint32_t arg1, uint32_t arg2);
 int32_t frontend_syscall(int32_t syscall_num, uint32_t arg0, uint32_t arg1, uint32_t arg2);
+
+#endif
 
 #define RAMP_SYSCALL_exit		1
 #define RAMP_SYSCALL_read		3
