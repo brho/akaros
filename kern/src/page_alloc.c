@@ -14,6 +14,10 @@
 #include <pmap.h>
 #include <string.h>
 
+static void __page_decref(page_t *page);
+static error_t __page_alloc_specific(page_t** page, size_t ppn);
+static error_t __page_free(page_t* page);
+
 /**
  * @brief Clear a Page structure.
  *
@@ -64,6 +68,62 @@ error_t page_alloc_from_color_range(page_t** page,
 error_t page_alloc(page_t** page) 
 {
 	return page_alloc_from_color_range(page, 0, llc_num_colors);
+}
+
+/**
+ * @brief Allocated 2^order contiguous physical pages.  Will incrememnt the
+ * reference count for the pages.
+ *
+ * @param[in] order order of the allocation
+ * @param[in] flags memory allocation flags
+ *
+ * @return The KVA of the first page, NULL otherwise.
+ */
+void *get_cont_pages(size_t order, int flags)
+{
+	size_t npages = 1 << order;	
+
+	// Find 'npages' free consecutive pages
+	int first = -1;
+	spin_lock_irqsave(&colored_page_free_list_lock);
+	for(int i=(naddrpages-1); i>=(npages-1); i--) {
+		int j;
+		for(j=i; j>=(i-(npages-1)); j--) {
+			if( !page_is_free(j) ) {
+				i = j - 1;
+				break;
+			}
+		}
+		if( j == (i-(npages-1)-1)) {
+			first = j+1;
+			break;
+		}
+	}
+	//If we couldn't find them, return NULL
+	if( first == -1 ) {
+		spin_unlock_irqsave(&colored_page_free_list_lock);
+		return NULL;
+	}
+
+	for(int i=0; i<npages; i++) {
+		page_t* page;
+		__page_alloc_specific(&page, first+i);
+		page_incref(page); 
+	}
+	spin_unlock_irqsave(&colored_page_free_list_lock);
+	return ppn2kva(first);
+}
+
+void free_cont_pages(void *buf, size_t order)
+{
+	size_t npages = 1 << order;	
+	spin_lock_irqsave(&colored_page_free_list_lock);
+	for (int i = kva2ppn(buf); i < kva2ppn(buf) + npages; i++) {
+		__page_decref(ppn2page(i));
+		assert(page_is_free(i));
+	}
+	spin_unlock_irqsave(&colored_page_free_list_lock);
+	return;	
 }
 
 /*
@@ -131,6 +191,19 @@ error_t l3_page_alloc(page_t** page, size_t color)
 	return -ENOCACHE;
 }
 
+/* Internal version of page_alloc_specific.  Grab the lock first. */
+static error_t __page_alloc_specific(page_t** page, size_t ppn)
+{
+	page_t* sp_page = ppn2page(ppn);
+	if( sp_page->page_ref != 0 )
+		return -ENOMEM;
+	*page = sp_page;
+	LIST_REMOVE(*page, page_link);
+
+	page_clear(*page);
+	return 0;
+}
+
 /*
  * Allocates a specific physical page.
  * Does NOT set the contents of the physical page to zero -
@@ -147,36 +220,37 @@ error_t l3_page_alloc(page_t** page, size_t color)
 error_t page_alloc_specific(page_t** page, size_t ppn)
 {
 	spin_lock_irqsave(&colored_page_free_list_lock);
-	page_t* sp_page = ppn2page(ppn);
-	if( sp_page->page_ref != 0 )
-		return -ENOMEM;
-	*page = sp_page;
-	LIST_REMOVE(*page, page_link);
+	__page_alloc_specific(page, ppn);
 	spin_unlock_irqsave(&colored_page_free_list_lock);
-
-	page_clear(*page);
 	return 0;
 }
 
 /*
  * Return a page to the free list.
  * (This function should only be called when pp->page_ref reaches 0.)
+ * You must hold the page_free list lock before calling this.
  */
-error_t page_free(page_t* page) 
+static error_t __page_free(page_t* page) 
 {
-	//TODO: Put a lock around this
 	page_clear(page);
 	cache_t* llc = available_caches.llc;
 
-	spin_lock_irqsave(&colored_page_free_list_lock);
 	LIST_INSERT_HEAD(
 	   &(colored_page_free_list[get_page_color(page2ppn(page), llc)]),
 	   page,
 	   page_link
 	);
-	spin_unlock_irqsave(&colored_page_free_list_lock);
 
 	return ESUCCESS;
+}
+
+error_t page_free(page_t *SAFE page)
+{
+	error_t retval;
+	spin_lock_irqsave(&colored_page_free_list_lock);
+	retval = __page_free(page);
+	spin_unlock_irqsave(&colored_page_free_list_lock);
+	return retval;
 }
 
 /*
@@ -203,8 +277,19 @@ void page_incref(page_t *page)
  */
 void page_decref(page_t *page)
 {
+	spin_lock_irqsave(&colored_page_free_list_lock);
+	__page_decref(page);
+	spin_unlock_irqsave(&colored_page_free_list_lock);
+}
+
+/*
+ * Decrement the reference count on a page,
+ * freeing it if there are no more refs.
+ */
+static void __page_decref(page_t *page)
+{
 	if (--page->page_ref == 0)
-		page_free(page);
+		__page_free(page);
 }
 
 /*

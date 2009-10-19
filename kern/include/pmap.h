@@ -139,4 +139,9 @@ static inline page_t* kva2page(void* addr)
 	return pa2page(PADDR(addr));
 }
 
+static inline ppn_t kva2ppn(void* addr) 
+{
+	return page2ppn(kva2page(addr));
+}
+
 #endif /* !ROS_KERN_PMAP_H */

@@ -71,10 +71,10 @@ inline size_t get_cache_size_megabytes(cache_t *c) {
 	return (c->sz_k / ONE_KILOBYTE);
 }
 inline size_t get_cache_num_offset_bits(cache_t *c) {
-	return (LOG2(get_cache_line_size_bytes(c)));
+	return (LOG2_UP(get_cache_line_size_bytes(c)));
 }
 inline size_t get_cache_num_index_bits(cache_t *c) {
-	return (LOG2(get_cache_size_bytes(c) 
+	return (LOG2_UP(get_cache_size_bytes(c) 
                    / get_cache_ways_associative(c)
                    / get_cache_line_size_bytes(c)));
 }

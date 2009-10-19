@@ -26,8 +26,10 @@
 #include <kclock.h>
 #include <manager.h>
 #include <testing.h>
+#include <kmalloc.h>
 
 #include <arch/init.h>
+#include <slab.h>
 
 // zra: flag for Ivy
 int booting = 1;
@@ -63,7 +65,8 @@ void kernel_init(multiboot_info_t *mboot_info)
 	cache_init();
 	page_init();
 	page_check();
-	//test_page_coloring();
+	kmem_cache_init();
+	kmalloc_init();
 
 	idt_init();
 	sysenter_init();

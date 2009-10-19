@@ -23,6 +23,8 @@ void test_lapic_status_bit(void);
 void test_run_measurements(uint32_t job_num);
 void test_circ_buffer(void);
 void test_active_messages(void);
+void test_slab(void);
+void test_kmalloc(void);
 
 struct trapframe_t;
 

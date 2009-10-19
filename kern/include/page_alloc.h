@@ -21,10 +21,11 @@ typedef struct Page page_t;
 typedef LIST_HEAD(PageList, Page) page_list_t;
 typedef LIST_ENTRY(Page) page_list_entry_t;
 
+/* TODO: this struct is not protected from concurrent operations in any
+ * function.  We may want a lock, but a better thing would be a good use of
+ * reference counting and atomic operations. */
 struct Page {
 	page_list_entry_t LCKD(&colored_page_free_list_lock)page_link;
-
-	size_t num_cons_links;
     size_t page_ref;
 };
 
@@ -38,6 +39,8 @@ extern page_list_t LCKD(&colored_page_free_list_lock) * RO CT(llc_num_colors)
 /*************** Functional Interface *******************/
 void page_alloc_init(void);
 error_t page_alloc(page_t *SAFE *page);
+void *get_cont_pages(size_t order, int flags);
+void free_cont_pages(void *buf, size_t order);
 error_t page_alloc_specific(page_t *SAFE *page, size_t ppn);
 error_t l1_page_alloc(page_t *SAFE *page, size_t color);
 error_t l2_page_alloc(page_t *SAFE *page, size_t color);

@@ -72,12 +72,27 @@ typedef int bool;
 	(typeof(a)) (PTRROUNDDOWN((char *) (a) + __n - 1, __n));	\
 })
 
-// Return the integer logarithm of the value provided rounded up
-static inline uint32_t LOG2(uint32_t value)
+// Return the integer logarithm of the value provided rounded down
+static inline uint32_t LOG2_DOWN(uint32_t value)
 {
-    uint32_t l = 0;
-    while( (value >> l) > 1 ) ++l;
-    return l;
+	uint32_t l = 0;
+	while( (value >> l) > 1 ) ++l;
+	return l;
+}
+
+// Return the integer logarithm of the value provided rounded up
+static inline uint32_t LOG2_UP(uint32_t value)
+{
+	uint32_t _v = LOG2_DOWN(value);
+	if (value ^ (1 << _v))
+		return _v + 1;
+	else
+		return _v;
+}
+
+static inline uint32_t ROUNDUPPWR2(uint32_t value)
+{
+	return 1 << LOG2_UP(value);
 }
 
 // Return the offset of 'member' relative to the beginning of a struct type
