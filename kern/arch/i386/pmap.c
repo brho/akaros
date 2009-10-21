@@ -650,7 +650,7 @@ void *get_free_va_range(pde_t *pgdir, uintptr_t addr, size_t len)
 	addr &= ~0xfff;
 	if (!addr)
  		// some sensible default.  can cache the previous value somewhere
-		addr = USTACKTOP - PGSIZE; // TODO: not looking down
+		addr = USTACKBOT; // TODO: not looking down
 	startaddr = addr;	
 	pte_t *pte = pgdir_walk(pgdir, (void*)addr, 0);
 	// what about jumbo pages?

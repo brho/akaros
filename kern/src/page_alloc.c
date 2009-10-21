@@ -288,6 +288,10 @@ void page_decref(page_t *page)
  */
 static void __page_decref(page_t *page)
 {
+	if (page->page_ref == 0) {
+		warn("Trying to Free already freed page...\n");
+		return;
+	}
 	if (--page->page_ref == 0)
 		__page_free(page);
 }

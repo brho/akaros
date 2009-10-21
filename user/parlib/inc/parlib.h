@@ -35,6 +35,7 @@ ssize_t     sys_eth_read(void *COUNT(len) buf, size_t len);
 ssize_t     sys_run_binary(void* binary_buf, void* arg, size_t len);
 int         sys_getpid(void);
 size_t      sys_getcpuid(void);
+error_t     sys_brk(void* addr);
 error_t     sys_proc_destroy(int pid);
 ssize_t     sys_shared_page_alloc(void *COUNT(PGSIZE) *addr, pid_t p2, 
                                   int p1_flags, int p2_flags);

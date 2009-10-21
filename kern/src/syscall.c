@@ -409,6 +409,26 @@ static error_t sys_proc_run(struct proc *p, unsigned pid)
 	return retval;
 }
 
+static error_t sys_brk(struct proc *p, void* addr) {
+	size_t range;
+
+	if((addr < p->end_text_segment) || (addr >= (void*)USTACKBOT))
+		return -EINVAL;
+	if(addr == p->end_data_segment)
+		return ESUCCESS;
+
+	if (addr > p->end_data_segment) {
+		range = addr - p->end_data_segment;
+		env_segment_alloc(p, p->end_data_segment, range);
+	}
+	else if (addr < p->end_data_segment) {
+		range = p->end_data_segment - addr;
+		env_segment_free(p, addr, range);
+	}
+	p->end_data_segment = addr;
+	return ESUCCESS;
+}
+
 /* Executes the given syscall.
  *
  * Note tf is passed in, which points to the tf of the context on the kernel
@@ -480,8 +500,7 @@ intreg_t syscall(struct proc *p, trapframe_t *tf, uintreg_t syscallno,
 			_a6 = args[2];
 			return (intreg_t) mmap(p, a1, a2, a3, _a4, _a5, _a6);
 		case SYS_brk:
-			printk("brk not implemented yet\n");
-			return -EINVAL;
+			return sys_brk(p, (void*)a1);
 		case SYS_resource_req:
 			/* preemptively set the return code to 0.  if it's not, it will get
 			 * overwriten on a proper return path.  if it ends up being a core

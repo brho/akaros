@@ -7,6 +7,11 @@ error_t sys_proc_destroy(int pid)
 	return syscall(SYS_proc_destroy, pid, 0, 0, 0, 0);
 }
 
+error_t sys_brk(void* addr)
+{
+	return syscall(SYS_brk, (intreg_t)addr, 0, 0, 0, 0);
+}
+
 int sys_getpid(void)
 {
 	 return syscall(SYS_getpid, 0, 0, 0, 0, 0);

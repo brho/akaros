@@ -49,7 +49,7 @@ void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 		a_pte = pgdir_walk(p->env_pgdir, (void*SNT)addr, 0);
 		if (a_pte && *a_pte & PTE_P)
 			goto mmap_abort;
-		if (addr + i*PGSIZE >= USTACKTOP - PGSIZE)
+		if (addr + i*PGSIZE >= USTACKBOT)
 			goto mmap_abort;
 	}
 	page_t *a_page;

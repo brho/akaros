@@ -48,7 +48,7 @@ int main(int argc, char** argv)
 			case TEST_MMAP:
 				cprintf("Testing MMAP\n");
 				void* addr;
-				addr = sys_mmap((void*SNT)USTACKTOP - 20*PGSIZE, 8*PGSIZE, 3,
+				addr = sys_mmap((void*SNT)USTACKBOT-8*PGSIZE, 8*PGSIZE, 3,
 				                MAP_FIXED, 0, 0);
 				cprintf("got addr = 0x%08x\n", addr);
 				*(int*)addr = 0xdeadbeef;

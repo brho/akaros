@@ -103,6 +103,8 @@ env_init(void)
 	for (i = NENV-1; i >= 0; i--) {
 		// these should already be set from when i memset'd the array to 0
 		envs[i].state = ENV_FREE;
+		envs[i].end_text_segment = (void*)UTEXT;
+		envs[i].end_data_segment = (void*)UTEXT;
 		envs[i].env_id = 0;
 		TAILQ_INSERT_HEAD(&proc_freelist, &envs[i], proc_link);
 	}
@@ -291,7 +293,7 @@ env_alloc(env_t **newenv_store, envid_t parent_id)
 	/*
 	 * Initialize the contents of the e->env_procinfo structure
 	 */
-	 e->env_procinfo->id = (e->env_id & 0x3FF);
+	e->env_procinfo->id = (e->env_id & 0x3FF);
 
 	/*
 	 * Initialize the contents of the e->env_procdata structure
@@ -325,8 +327,8 @@ env_alloc(env_t **newenv_store, envid_t parent_id)
 // Pages should be writable by user and kernel.
 // Panic if any allocation attempt fails.
 //
-static void
-segment_alloc(env_t *e, void *SNT va, size_t len)
+void
+env_segment_alloc(env_t *e, void *SNT va, size_t len)
 {
 	void *SNT start, *SNT end;
 	size_t num_pages;
@@ -354,8 +356,36 @@ segment_alloc(env_t *e, void *SNT va, size_t len)
 		if (pte && *pte & PTE_P)
 			continue;
 		if ((r = page_alloc(&page)) < 0)
-			panic("segment_alloc: %e", r);
+			panic("env_segment_alloc: %e", r);
 		page_insert(e->env_pgdir, page, start, PTE_USER_RW);
+	}
+}
+
+void
+env_segment_free(env_t *e, void *SNT va, size_t len)
+{
+	void *SNT start, *SNT end;
+	size_t num_pages;
+	page_t *page;
+	pte_t *pte;
+
+	// Round this up this time so we don't free the page that va is actually on
+	start = ROUNDUP(va, PGSIZE);
+	end = ROUNDUP(va + len, PGSIZE);
+	if (start >= end)
+		panic("Wrap-around in memory free addresses!");
+	if ((uintptr_t)end > UTOP)
+		panic("Attempting to unmap above UTOP!");
+	// page_insert/pgdir_walk alloc a page and read/write to it via its address
+	// starting from pgdir (e's), so we need to be using e's pgdir
+	assert(e->env_cr3 == rcr3());
+	num_pages = PPN(end - start);
+
+	for (int i = 0; i < num_pages; i++, start += PGSIZE) {
+		// skip if a page is already unmapped. 
+		pte = pgdir_walk(e->env_pgdir, start, 0);
+		if (pte && *pte & PTE_P)
+			page_decref(ppn2page(PPN(*pte)));
 	}
 }
 
@@ -371,12 +401,13 @@ segment_alloc(env_t *e, void *SNT va, size_t len)
 // but not actually present in the ELF file - i.e., the program's bss section.
 //
 // Finally, this function maps one page for the program's initial stack.
-static void
+static void*
 load_icode(env_t *SAFE e, uint8_t *COUNT(size) binary, size_t size)
 {
 	// asw: copy the headers because they might not be aligned.
 	elf_t elfhdr;
 	proghdr_t phdr;
+	void* _end = 0;
 	memcpy(&elfhdr, binary, sizeof(elfhdr));
 
 	int i, r;
@@ -413,21 +444,26 @@ load_icode(env_t *SAFE e, uint8_t *COUNT(size) binary, size_t size)
         // TODO: validate elf header fields!
 		// seg alloc creates PTE_U|PTE_W pages.  if you ever want to change
 		// this, there will be issues with overlapping sections
-		segment_alloc(e, (void*SNT)phdr.p_va, phdr.p_memsz);
+		_end = MAX(_end, (void*)(phdr.p_va + phdr.p_memsz));
+		env_segment_alloc(e, (void*SNT)phdr.p_va, phdr.p_memsz);
 		memcpy((void*)phdr.p_va, binary + phdr.p_offset, phdr.p_filesz);
-		memset((void*)phdr.p_va + phdr.p_filesz, 0, phdr.p_memsz - phdr.p_filesz);
+		memset((void*)phdr.p_va + phdr.p_filesz, 0, 
+		              phdr.p_memsz - phdr.p_filesz);
 	}}
 
 	proc_set_program_counter(&e->env_tf, elfhdr.e_entry);
 	e->env_entry = elfhdr.e_entry;
 
-	// Now map one page for the program's initial stack
-	// at virtual address USTACKTOP - PGSIZE.
-	segment_alloc(e, (void*SNT)(USTACKTOP - PGSIZE), PGSIZE);
+	// Now map USTACK_NUM_PAGES pages for the program's initial stack
+	// starting at virtual address USTACKTOP - USTACK_NUM_PAGES*PGSIZE.
+	env_segment_alloc(e, (void*SNT)(USTACKTOP - USTACK_NUM_PAGES*PGSIZE), 
+	                  USTACK_NUM_PAGES*PGSIZE);
 
 	// reload the original address space
 	lcr3(old_cr3);
 	proc_decref(e);
+	
+	return _end;
 }
 
 //
@@ -442,7 +478,12 @@ env_t* env_create(uint8_t *binary, size_t size)
 	curid = (current ? current->env_id : 0);
 	if ((r = env_alloc(&e, curid)) < 0)
 		panic("env_create: %e", r);
-	load_icode(e, binary, size);
+	
+	/* Load the binary and set the current locations of the elf segments.
+	 * All end-of-segment pointers are page aligned (invariant) */
+	e->end_text_segment = load_icode(e, binary, size);
+	e->end_data_segment = e->end_text_segment;
+
 	return e;
 }
 

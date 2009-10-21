@@ -432,15 +432,14 @@ void* sbrk(ptrdiff_t incr)
 	debug_in_out("SBRK\n");
 	debug_in_out("\tincr: %u\n", incr);	
 
-	#define HEAP_SIZE (1<<18)
-	static uint8_t array[HEAP_SIZE];
-	static uint8_t *BND(array, array + HEAP_SIZE) heap_end = array;
-	static uint8_t *stack_ptr = &(array[HEAP_SIZE-1]);
+	extern char (SNT RO _end)[];
+	static void* heap_end = NULL;
+	if (heap_end == NULL)
+		heap_end = (void*)_end;
 
 	uint8_t* prev_heap_end; 
-
 	prev_heap_end = heap_end;
-	if (heap_end + incr > stack_ptr) {
+	if (sys_brk(heap_end + incr) < 0) {
 		errno = ENOMEM;
 		return (void*CT(1))TC(-1);
 	}

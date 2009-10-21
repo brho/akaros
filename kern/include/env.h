@@ -64,6 +64,11 @@ struct Env {
 	/* Info about this process's resources (granted, desired) for each type. */
 	struct resource resources[MAX_NUM_RESOURCES];
 
+	/* Keeps track of this process's current memory allocation 
+         * (i.e. its heap pointer */
+	void* end_text_segment;
+	void* end_data_segment;
+
 	// Address space
 	pde_t *COUNT(NPDENTRIES) env_pgdir;			// Kernel virtual address of page dir
 	physaddr_t env_cr3;			// Physical address of page dir
@@ -108,6 +113,8 @@ void	env_push_ancillary_state(env_t* e);
 void	env_pop_ancillary_state(env_t* e);
 void	env_free(env_t *SAFE e);
 void	env_user_mem_free(env_t* e);
+void	env_segment_alloc(env_t *e, void *SNT va, size_t len);
+void	env_segment_free(env_t *e, void *SNT va, size_t len);
 env_t*	env_create(uint8_t *COUNT(size) binary, size_t size);
 
 /*
