@@ -11,6 +11,7 @@
 
 #include <arch/smp.h>
 #include <ros/common.h>
+#include <sys/queue.h>
 #include <trap.h>
 #include <atomic.h>
 #include <process.h>
@@ -33,11 +34,8 @@ struct per_cpu_info {
 	sharC_env_t sharC_env;
 #endif
 
-#ifdef __i386__
 	spinlock_t amsg_lock;
-	unsigned LCKD(&amsg_lock) amsg_current;
-	active_message_t LCKD(&amsg_lock) (RO active_msgs)[NUM_ACTIVE_MESSAGES];
-#endif
+	struct active_msg_list active_msgs;
 };
 
 typedef struct per_cpu_info NTPTV(t) NTPTV(a0t) NTPTV(a1t) NTPTV(a2t) per_cpu_info_t;

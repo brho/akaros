@@ -257,6 +257,10 @@ uint32_t smp_main(void)
 	// set a default logical id for now
 	lapic_set_logid(lapic_get_id());
 
+	// TODO: do this somewhere else.  in general, we need to do some per_cpu
+	// info init.  or a per_cpu active_msg init
+	STAILQ_INIT(&per_cpu_info[core_id()].active_msgs);
+
 	return my_stack_top; // will be loaded in smp_entry.S
 }
 

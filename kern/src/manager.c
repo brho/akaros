@@ -37,6 +37,7 @@ void manager(void)
 	uint32_t corelist[MAX_NUM_CPUS];
 	uint32_t num = 3;
 
+	/*
 	// This is a bypass of the standard manager structure, for network use
 	// If enabled, this spawns parlib_matrix, and allows the execution
 	// of a remote binary to function correctly (schedule() call below)
@@ -46,10 +47,11 @@ void manager(void)
 		proc_run(envs[0]);
 	}
 	schedule();
+	*/
 
 	switch (progress++) {
 		case 0:
-			//p = kfs_proc_create(kfs_lookup_path("roslib_proctests"));
+			//p = kfs_proc_create(kfs_lookup_path("roslib_mproctests"));
 			p = kfs_proc_create(kfs_lookup_path("roslib_mhello"));
 			// being proper and all:
 			spin_lock_irqsave(&p->proc_lock);

@@ -9,6 +9,7 @@
 #include <arch/arch.h>
 #include <arch/mmu.h>
 #include <arch/trap.h>
+#include <sys/queue.h>
 
 // func ptr for interrupt service routines
 typedef void ( *poly_isr_t)(trapframe_t* tf, TV(t) data);
@@ -49,18 +50,20 @@ extern void sysenter_handler();
  * messages require a unique message.  Also for now, but it might be like that
  * for a while on x86. */
 
+void active_msg_init(void);
 typedef void (*amr_t)(trapframe_t* tf, uint32_t srcid,
                       TV(a0t) a0, TV(a1t) a1, TV(a2t) a2);
 
 struct active_message
 {
+	STAILQ_ENTRY(active_message) link;
 	uint32_t srcid;
 	amr_t pc;
 	TV(a0t) arg0;
 	TV(a1t) arg1;
 	TV(a2t) arg2;
-	uint32_t pad;
 };
+STAILQ_HEAD(active_msg_list, active_message);
 typedef struct active_message NTPTV(a0t) NTPTV(a1t) NTPTV(a2t) active_message_t;
 
 uint32_t send_active_message(uint32_t dst, amr_t pc,

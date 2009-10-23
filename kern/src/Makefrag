@@ -55,6 +55,7 @@ KERN_APPFILES := \
                  $(USER_APPS_ROSLIB_DIR)/spawn \
                  $(USER_APPS_ROSLIB_DIR)/hello \
                  $(USER_APPS_ROSLIB_DIR)/mhello \
+                 $(USER_APPS_ROSLIB_DIR)/mproctests \
                  $(USER_APPS_ROSLIB_DIR)/measurements \
                  $(USER_APPS_PARLIB_DIR)/draw_nanwan_standalone \
                  $(USER_APPS_PARLIB_DIR)/channel_test_client \
