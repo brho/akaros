@@ -61,11 +61,15 @@ struct Env {
 	int32_t vcoremap[MAX_NUM_CPUS];
 	uint32_t num_vcores;
 
+	/* Cache color map: bitmap of the cache colors currently allocated to this
+	 * process */
+	uint8_t* cache_colors_map;
+
 	/* Info about this process's resources (granted, desired) for each type. */
 	struct resource resources[MAX_NUM_RESOURCES];
 
 	/* Keeps track of this process's current memory allocation 
-         * (i.e. its heap pointer */
+     * (i.e. its heap pointer) */
 	void* end_text_segment;
 	void* end_data_segment;
 

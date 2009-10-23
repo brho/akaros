@@ -12,19 +12,36 @@
 
 #include <ros/common.h>
 #include <arch/mmu.h>
+#include <arch/bitmask.h>
 #include <colored_caches.h>
 #include <stdio.h>
+#include <atomic.h>
+#include <kmalloc.h>
+
+#define l1 (available_caches.l1)
+#define l2 (available_caches.l2)
+#define l3 (available_caches.l3)
+
+spinlock_t cache_colors_lock;
 
 /************** Cache Related Functions  *****************/
 inline void init_cache_properties(cache_t *c, size_t sz_k, size_t wa, size_t clsz) {
 	c->wa = SINIT(wa);
 	c->sz_k = SINIT(sz_k);
 	c->clsz = SINIT(clsz);
-	
+
 	//Added as optimization (derived from above);
 	size_t nc = get_cache_num_page_colors(c);
 	c->num_colors = SINIT(nc);
 }
+
+inline void init_free_cache_colors_map(cache_t* c) 
+{
+	// Initialize the free colors map
+	c->free_colors_map = kmalloc(c->num_colors, 0);
+	FILL_BITMASK(c->free_colors_map, c->num_colors);
+}
+
 inline size_t get_page_color(uintptr_t page, cache_t *c) {
     return (page % c->num_colors);
 }
@@ -113,5 +130,141 @@ inline size_t get_cache_pages_per_way(cache_t *c) {
 }
 inline size_t get_cache_num_page_colors(cache_t *c) {
 	return get_cache_pages_per_way(c);
+}
+
+static inline void set_color_range(uint16_t color, uint8_t* map, 
+                                   cache_t* smaller, cache_t* bigger)
+{
+	size_t base, r;
+	if(smaller->num_colors <= bigger->num_colors) {
+		r = bigger->num_colors / smaller->num_colors;
+		base = color*r;
+		SET_BITMASK_RANGE(map, base, base+r);
+	}
+	else {
+		r = smaller->num_colors / bigger->num_colors;
+		base = color/r;
+		if(BITMASK_IS_SET_IN_RANGE(smaller->free_colors_map, 
+		                           base*r, base*r+r-1))
+			SET_BITMASK_BIT(map, base);
+	}
+}
+
+static inline void clr_color_range(uint16_t color, uint8_t* map, 
+                                   cache_t* smaller, cache_t* bigger)
+{
+	size_t base, r;
+	if(smaller->num_colors <= bigger->num_colors) {
+		r = bigger->num_colors / smaller->num_colors;
+		base = color*r;
+		CLR_BITMASK_RANGE(map, base, base+r);
+	}
+	else {
+		r = smaller->num_colors / bigger->num_colors;
+		base = color/r;
+		CLR_BITMASK_BIT(map, base);
+	}
+}
+
+static inline error_t __cache_color_alloc_specific(size_t color, cache_t* c, 
+                                                              struct proc* p) 
+{
+	if(!GET_BITMASK_BIT(c->free_colors_map, color))
+		return -ENOCACHE;	
+	
+	if(l1)
+		clr_color_range(color, l1->free_colors_map, c, l1);
+	if(l2)
+		clr_color_range(color, l2->free_colors_map, c, l2);
+	if(l3)
+		clr_color_range(color, l3->free_colors_map, c, l3);
+
+	printk("I am here now three...\n");
+	set_color_range(color, p->cache_colors_map, c, llc_cache);
+	return ESUCCESS;
+}
+
+static inline error_t __cache_color_alloc(cache_t* c, struct proc* p) 
+{
+	if(BITMASK_IS_CLEAR(c->free_colors_map, c->num_colors))
+		return -ENOCACHE;	
+
+	int color=0;
+	do {
+		if(GET_BITMASK_BIT(c->free_colors_map, color))
+			break;
+	} while(++color);
+
+	return __cache_color_alloc_specific(color, c, p);	
+}
+
+static inline void __cache_color_free_specific(size_t color, cache_t* c, 
+                                                          struct proc* p) 
+{
+	if(GET_BITMASK_BIT(c->free_colors_map, color))
+		return;
+	else {
+		size_t r = llc_cache->num_colors / c->num_colors;
+		size_t base = color*r;
+		if(!BITMASK_IS_SET_IN_RANGE(p->cache_colors_map, base, base+r))
+			return;
+	}
+
+	if(l3)
+		set_color_range(color, l3->free_colors_map, c, l3);
+	if(l2)
+		set_color_range(color, l2->free_colors_map, c, l2);
+	if(l1)
+		set_color_range(color, l1->free_colors_map, c, l1);
+
+	clr_color_range(color, p->cache_colors_map, c, llc_cache);
+}
+
+static inline void __cache_color_free(cache_t* c, struct proc* p) 
+{
+	if(BITMASK_IS_FULL(c->free_colors_map, c->num_colors))
+		return;	
+
+	int color=0;
+	do {
+		if(!GET_BITMASK_BIT(c->free_colors_map, color)) {
+			size_t r = llc_cache->num_colors / c->num_colors;
+			size_t base = color*r;
+			if(BITMASK_IS_SET_IN_RANGE(p->cache_colors_map, base, base+r))
+				break;
+		}
+	} while(++color < c->num_colors);
+	if(color == c->num_colors)
+		return;
+
+	__cache_color_free_specific(color, c, p);	
+}
+
+error_t cache_color_alloc(cache_t* c, struct proc* p) 
+{
+	spin_lock_irqsave(&cache_colors_lock);
+	error_t e = __cache_color_alloc(c, p);
+	spin_unlock_irqsave(&cache_colors_lock);
+	return e;
+}
+error_t cache_color_alloc_specific(size_t color, cache_t* c, struct proc* p) 
+{
+	spin_lock_irqsave(&cache_colors_lock);
+	error_t e = __cache_color_alloc_specific(color, c, p);
+	spin_unlock_irqsave(&cache_colors_lock);
+	return e;
+}
+
+void cache_color_free(cache_t* c, struct proc* p) 
+{
+	spin_lock_irqsave(&cache_colors_lock);
+	__cache_color_free(c, p);
+	spin_unlock_irqsave(&cache_colors_lock);
+}
+void cache_color_free_specific(size_t color, cache_t* c, struct proc* p) 
+{
+	spin_lock_irqsave(&cache_colors_lock);
+	__cache_color_free_specific(color, c, p);
+	spin_unlock_irqsave(&cache_colors_lock);
 }
 

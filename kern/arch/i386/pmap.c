@@ -698,7 +698,7 @@ page_check(void)
 	assert(pp2 && pp2 != pp1 && pp2 != pp0);
 
 	// temporarily steal the rest of the free pages
-	for(int i=0; i<llc_num_colors; i++) {
+	for(int i=0; i<llc_cache->num_colors; i++) {
 		fl[i] = colored_page_free_list[i];
 		LIST_INIT(&colored_page_free_list[i]);
 	}
@@ -817,7 +817,7 @@ page_check(void)
 	}
 
 	// give free list back
-	for(int i=0; i<llc_num_colors; i++)
+	for(int i=0; i<llc_cache->num_colors; i++)
 		colored_page_free_list[i] = fl[i];
 
 	// free the pages we took

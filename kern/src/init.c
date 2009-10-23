@@ -29,7 +29,9 @@
 #include <kmalloc.h>
 
 #include <arch/init.h>
+#include <arch/bitmask.h>
 #include <slab.h>
+#include <kfs.h>
 
 // zra: flag for Ivy
 int booting = 1;
@@ -67,6 +69,7 @@ void kernel_init(multiboot_info_t *mboot_info)
 	page_check();
 	kmem_cache_init();
 	kmalloc_init();
+	//cache_color_alloc_init();
 
 	idt_init();
 	sysenter_init();
@@ -74,6 +77,10 @@ void kernel_init(multiboot_info_t *mboot_info)
 	
 	// At this point our boot paths diverge based on arch. 
 	arch_init();
+		
+//	printk("Starting tests....\n");
+//	test_color_alloc();
+//	printk("Testing complete....\n");
 
 	// zra: let's Ivy know we're done booting
 	booting = 0;

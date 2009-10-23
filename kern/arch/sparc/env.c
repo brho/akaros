@@ -128,7 +128,7 @@ env_user_mem_free(env_t* e)
 			l2pt[l2x] = 0;
 
 			// free the L3 PT itself
-			page_decref(pa2page(l2ptpa));
+			page_decref(pa2page(l3ptpa));
 		}
 
 		l1pt[l1x] = 0;

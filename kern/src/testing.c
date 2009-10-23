@@ -29,6 +29,10 @@
 #include <slab.h>
 #include <kmalloc.h>
 
+#define l1 (available_caches.l1)
+#define l2 (available_caches.l2)
+#define l3 (available_caches.l3)
+
 #ifdef __i386__
 
 void test_ipi_sending(void)
@@ -113,11 +117,11 @@ void test_print_info(void)
 void test_page_coloring(void) 
 {
 	//Print the different cache properties of our machine
-	print_cache_properties("L1", &l1);
+	print_cache_properties("L1", l1);
 	cprintf("\n");
-	print_cache_properties("L2", &l2);
+	print_cache_properties("L2", l2);
 	cprintf("\n");
-	print_cache_properties("L3", &l3);
+	print_cache_properties("L3", l3);
 	cprintf("\n");
 
 	//Print some stats about our memory
@@ -128,7 +132,7 @@ void test_page_coloring(void)
 	page_t* page;
 
 	cprintf("Contents of the page free list:\n");
-	for(int i=0; i<llc_num_colors; i++) {
+	for(int i=0; i<llc_cache->num_colors; i++) {
 		cprintf("  COLOR %d:\n", i);
 		LIST_FOREACH(page, &colored_page_free_list[i], page_link) {
 			cprintf("    Page: %d\n", page2ppn(page));
@@ -137,7 +141,7 @@ void test_page_coloring(void)
 
 	//Run through and allocate all pages through l1_page_alloc
 	cprintf("Allocating from L1 page colors:\n");
-	for(int i=0; i<get_cache_num_page_colors(&l1); i++) {
+	for(int i=0; i<get_cache_num_page_colors(l1); i++) {
 		cprintf("  COLOR %d:\n", i);
 		while(l1_page_alloc(&page, i) != -ENOMEM)
 			cprintf("    Page: %d\n", page2ppn(page));
@@ -148,7 +152,7 @@ void test_page_coloring(void)
 	
 	//Run through and allocate all pages through l2_page_alloc
 	cprintf("Allocating from L2 page colors:\n");
-	for(int i=0; i<get_cache_num_page_colors(&l2); i++) {
+	for(int i=0; i<get_cache_num_page_colors(l2); i++) {
 		cprintf("  COLOR %d:\n", i);
 		while(l2_page_alloc(&page, i) != -ENOMEM)
 			cprintf("    Page: %d\n", page2ppn(page));
@@ -159,7 +163,7 @@ void test_page_coloring(void)
 	
 	//Run through and allocate all pages through l3_page_alloc
 	cprintf("Allocating from L3 page colors:\n");
-	for(int i=0; i<get_cache_num_page_colors(&l3); i++) {
+	for(int i=0; i<get_cache_num_page_colors(l3); i++) {
 		cprintf("  COLOR %d:\n", i);
 		while(l3_page_alloc(&page, i) != -ENOMEM)
 			cprintf("    Page: %d\n", page2ppn(page));
@@ -187,6 +191,43 @@ void test_page_coloring(void)
 
 	while(page_alloc(&page) != -ENOMEM)
 		cprintf("Page: %d\n", page2ppn(page));	
+}
+
+void test_color_alloc() {
+	size_t checkpoint = 0;
+	struct proc* p = kfs_proc_create(kfs_lookup_path("parlib_matrix"));
+	cache_color_alloc(l2, p);
+	cache_color_alloc(l3, p);
+	cache_color_alloc(l3, p);
+	cache_color_alloc(l2, p);
+	cache_color_free(llc_cache, p);
+	cache_color_free(llc_cache, p);
+	cache_color_free(llc_cache, p);
+	cache_color_free(llc_cache, p);
+	cache_color_free(llc_cache, p);
+	cache_color_free(llc_cache, p);
+	cache_color_free(llc_cache, p);
+	cache_color_free(llc_cache, p);
+	cache_color_free(llc_cache, p);
+	cache_color_free(llc_cache, p);
+	cache_color_free(llc_cache, p);
+	cache_color_free(llc_cache, p);
+	cache_color_free(llc_cache, p);
+	cache_color_free(llc_cache, p);
+	cache_color_free(llc_cache, p);
+	cache_color_free(llc_cache, p);
+	cache_color_free(l2, p);
+	cache_color_free(llc_cache, p);
+	cache_color_free(llc_cache, p);
+	printk("L1 free colors, tot colors: %d\n", l1->num_colors);
+	PRINT_BITMASK(l1->free_colors_map, l1->num_colors);
+	printk("L2 free colors, tot colors: %d\n", l2->num_colors);
+	PRINT_BITMASK(l2->free_colors_map, l2->num_colors);
+	printk("L3 free colors, tot colors: %d\n", l3->num_colors);
+	PRINT_BITMASK(l3->free_colors_map, l3->num_colors);
+	printk("Process allocated colors\n");
+	PRINT_BITMASK(p->cache_colors_map, llc_cache->num_colors);
+	printk("test_color_alloc() complete!\n");
 }
 
 barrier_t test_cpu_array;

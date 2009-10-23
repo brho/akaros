@@ -6,6 +6,7 @@
 
 #include <arch/arch.h>
 #include <arch/mmu.h>
+#include <arch/bitmask.h>
 #include <elf.h>
 #include <smp.h>
 
@@ -19,6 +20,7 @@
 #include <manager.h>
 #include <stdio.h>
 #include <schedule.h>
+#include <kmalloc.h>
 
 #include <ros/syscall.h>
 #include <ros/error.h>
@@ -108,7 +110,6 @@ env_init(void)
 		envs[i].env_id = 0;
 		TAILQ_INSERT_HEAD(&proc_freelist, &envs[i], proc_link);
 	}
-
 }
 
 //
@@ -284,6 +285,8 @@ env_alloc(env_t **newenv_store, envid_t parent_id)
 	e->num_vcores = 0;
 	for (int i = 0; i < MAX_NUM_CPUS; i++)
 		e->vcoremap[i] = -1;
+	e->cache_colors_map = kmalloc(llc_cache->num_colors, 0);
+	CLR_BITMASK(e->cache_colors_map, llc_cache->num_colors);
 	memset(&e->resources, 0, sizeof(e->resources));
 
 	memset(&e->env_ancillary_state, 0, sizeof(e->env_ancillary_state));
@@ -508,6 +511,9 @@ env_free(env_t *e)
 	e->env_pgdir = 0;
 	e->env_cr3 = 0;
 	page_decref(pa2page(pa));
+
+	//Free any memory allocated by this process
+	kfree(e->cache_colors_map);
 
 	// return the environment to the free list
 	e->state = ENV_FREE;

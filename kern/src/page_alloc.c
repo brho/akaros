@@ -14,9 +14,17 @@
 #include <pmap.h>
 #include <string.h>
 
+#define l1 (available_caches.l1)
+#define l2 (available_caches.l2)
+#define l3 (available_caches.l3)
+
 static void __page_decref(page_t *page);
+static void __page_incref(page_t *page);
 static error_t __page_alloc_specific(page_t** page, size_t ppn);
 static error_t __page_free(page_t* page);
+
+// Global list of colors allocated to the general purpose memory allocator
+static uint8_t* global_colors_map;
 
 /**
  * @brief Clear a Page structure.
@@ -37,7 +45,8 @@ error_t page_alloc_from_color_range(page_t** page,
     //  in the proper range
 	int i = base_color;
 	spin_lock_irqsave(&colored_page_free_list_lock);
-	for(i; i<(base_color+range); i++) {
+	//for(i; i < (base_color+range); i++) {
+	for (i; i < (base_color+range); i++) {
 		if(!LIST_EMPTY(&colored_page_free_list[i]))
 			break;
 	}
@@ -67,7 +76,23 @@ error_t page_alloc_from_color_range(page_t** page,
  */
 error_t page_alloc(page_t** page) 
 {
-	return page_alloc_from_color_range(page, 0, llc_num_colors);
+	static size_t next_color = 0;
+	error_t e;
+	for(int i=next_color; i<llc_cache->num_colors; i++) {
+		e = page_alloc_from_color_range(page, i, 1);
+		if(e == ESUCCESS) {
+			next_color = i+1;
+			return e;
+		}
+	}
+	for(int i=0; i<next_color; i++) {
+		e = page_alloc_from_color_range(page, i, 1);
+		if(e == ESUCCESS) {
+			next_color = i+1;
+			return e;
+		}
+	}
+	return -ENOMEM;
 }
 
 /**
@@ -145,24 +170,12 @@ void free_cont_pages(void *buf, size_t order)
  * RETURNS 
  *   ESUCCESS  -- on success
  *   -ENOMEM   -- otherwise 
- *
- * error_t _cache##_page_alloc(page_t** page, size_t color)
- * {
- *	 if(!LIST_EMPTY(&(_cache##_cache_colored_page_list)[(color)])) {
- *	  *(page) = LIST_FIRST(&(_cache##_cache_colored_page_list)[(color)]);
- *		 LIST_REMOVE(*page, global_link);
- *		 REMOVE_CACHE_COLORING_PAGE_FROM_FREE_LISTS(page);
- *		 page_clear(*page);
- *		 return ESUCCESS;
- *	 }
- *	 return -ENOMEM;
- * }
  */
 error_t l1_page_alloc(page_t** page, size_t color)
 {
-	if(available_caches.l1)
+	if(l1)
 	{
-		uint16_t range = llc_num_colors / get_cache_num_page_colors(&l1);
+		uint16_t range = llc_cache->num_colors / get_cache_num_page_colors(l1);
 		uint16_t base_color = color*range;
 		return page_alloc_from_color_range(page, base_color, range);
 	}
@@ -171,9 +184,9 @@ error_t l1_page_alloc(page_t** page, size_t color)
 
 error_t l2_page_alloc(page_t** page, size_t color)
 {
-	if(available_caches.l2)
+	if(l2)
 	{
-		uint16_t range = llc_num_colors / get_cache_num_page_colors(&l2);
+		uint16_t range = llc_cache->num_colors / get_cache_num_page_colors(l2);
 		uint16_t base_color = color*range;
 		return page_alloc_from_color_range(page, base_color, range);
 	}
@@ -182,9 +195,9 @@ error_t l2_page_alloc(page_t** page, size_t color)
 
 error_t l3_page_alloc(page_t** page, size_t color)
 {
-	if(available_caches.l3)
+	if(l3)
 	{
-		uint16_t range = llc_num_colors / get_cache_num_page_colors(&l3);
+		uint16_t range = llc_cache->num_colors / get_cache_num_page_colors(l3);
 		uint16_t base_color = color*range;
 		return page_alloc_from_color_range(page, base_color, range);
 	}
@@ -233,10 +246,9 @@ error_t page_alloc_specific(page_t** page, size_t ppn)
 static error_t __page_free(page_t* page) 
 {
 	page_clear(page);
-	cache_t* llc = available_caches.llc;
 
 	LIST_INSERT_HEAD(
-	   &(colored_page_free_list[get_page_color(page2ppn(page), llc)]),
+	   &(colored_page_free_list[get_page_color(page2ppn(page), llc_cache)]),
 	   page,
 	   page_link
 	);
@@ -268,6 +280,11 @@ int page_is_free(size_t ppn) {
  */
 void page_incref(page_t *page)
 {
+	__page_incref(page);
+}
+
+void __page_incref(page_t *page)
+{
 	page->page_ref++;
 }
 
@@ -289,7 +306,7 @@ void page_decref(page_t *page)
 static void __page_decref(page_t *page)
 {
 	if (page->page_ref == 0) {
-		warn("Trying to Free already freed page...\n");
+		warn("Trying to Free already freed page: %d...\n", page2ppn(page));
 		return;
 	}
 	if (--page->page_ref == 0)

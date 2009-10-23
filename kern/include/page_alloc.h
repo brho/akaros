@@ -31,7 +31,6 @@ struct Page {
 
 
 /******** Externally visible global variables ************/
-extern uint16_t RO llc_num_colors;
 extern spinlock_t colored_page_free_list_lock;
 extern page_list_t LCKD(&colored_page_free_list_lock) * RO CT(llc_num_colors)
     colored_page_free_list;
