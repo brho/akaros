@@ -509,9 +509,11 @@ cons_intr(int (*proc)(void))
 	while ((c = (*proc)()) != -1) {
 		if (c == 0)
 			continue;
+		spin_lock_irqsave(&lock);
 		cons.buf[cons.wpos++] = c;
 		if (cons.wpos == CONSBUFSIZE)
 			cons.wpos = 0;
+		spin_unlock_irqsave(&lock);
 	}
 }
 
@@ -520,8 +522,6 @@ int
 cons_getc(void)
 {
 	int c;
-
-	spin_lock_irqsave(&lock);
 
 	// poll for any pending input characters,
 	// so that this function works even when interrupts are disabled
@@ -532,6 +532,7 @@ cons_getc(void)
 	kbd_intr();
 
 	// grab the next character from the input buffer.
+	spin_lock_irqsave(&lock);
 	if (cons.rpos != cons.wpos) {
 		c = cons.buf[cons.rpos++];
 		if (cons.rpos == CONSBUFSIZE)
