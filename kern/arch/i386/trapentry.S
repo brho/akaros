@@ -245,7 +245,7 @@ sysenter_handler:
 	popl %es
 	popl %ds
 	addl $0x10, %esp		# pop T_SYSCALL and the three zeros
-	popfl					# restore EFLAGS
+	popfl					# restore EFLAGS (and usually enables interrupts!)
 	movl %ebp, %ecx
 	movl %esi, %edx
 	sti						# interrupts are turned off when starting a core
