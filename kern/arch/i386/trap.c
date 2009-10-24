@@ -452,14 +452,6 @@ void __active_message(trapframe_t *tf)
 		if (!STAILQ_EMPTY(&myinfo->active_msgs))
 			send_self_ipi(I_ACTIVE_MSG);
 		spin_unlock_irqsave(&myinfo->amsg_lock);
-
-		/* TODO: for some reason, this is breaking things (startcore loses the
-		 * proc_lock at some point...  it's a null interrupt, so you should just
-		 * take it and return.  this happens for any interrupt that comes in
-		 * (like from proc_destroy too) when the cores are about to grab the
-		 * proc_lock.  Note there is no reason to self ipi #254. */
-		//send_self_ipi(254);
-
 		/* Execute the active message */
 		my_msg.pc(tf, my_msg.srcid, my_msg.arg0, my_msg.arg1, my_msg.arg2);
 	}
