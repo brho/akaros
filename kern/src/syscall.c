@@ -233,7 +233,7 @@ static void sys_cache_buster(env_t* e, uint32_t num_writes, uint32_t num_pages,
 	#define MAX_PAGES		32
 	#define INSERT_ADDR 	(UINFO + 2*PGSIZE) // should be free for these tests
 	uint32_t* buster = (uint32_t*)BUSTER_ADDR;
-	static uint32_t buster_lock = 0;
+	static spinlock_t buster_lock = SPINLOCK_INITIALIZER;
 	uint64_t ticks = -1;
 	page_t* a_page[MAX_PAGES];
 

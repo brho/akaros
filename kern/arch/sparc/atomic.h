@@ -22,6 +22,7 @@ static inline void atomic_add(atomic_t* number, int32_t inc);
 static inline void atomic_inc(atomic_t* number);
 static inline void atomic_dec(atomic_t* number);
 static inline uint32_t spin_trylock(spinlock_t*SAFE lock);
+static inline uint32_t spin_locked(spinlock_t*SAFE lock);
 static inline void spin_lock(spinlock_t*SAFE lock);
 static inline void spin_unlock(spinlock_t*SAFE lock);
 

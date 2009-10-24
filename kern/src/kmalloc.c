@@ -23,7 +23,7 @@
 char *RO BND(end, maxaddrpa_ptr + IVY_KERNBASE) boot_freemem;
 
 //List of physical pages used by kmalloc
-static spinlock_t pages_list_lock = 0;
+static spinlock_t pages_list_lock = SPINLOCK_INITIALIZER;
 static page_list_t LCKD(&pages_list_lock)pages_list;
 
 /*

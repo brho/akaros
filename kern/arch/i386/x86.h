@@ -59,6 +59,7 @@ static __inline uint32_t rcr4(void) __attribute__((always_inline));
 static __inline uint32_t read_eflags(void) __attribute__((always_inline));
 static __inline void write_eflags(uint32_t eflags) __attribute__((always_inline));
 static __inline uint32_t read_ebp(void) __attribute__((always_inline));
+static __inline uint32_t read_eip(void) __attribute__((always_inline));
 static __inline uint32_t read_esp(void) __attribute__((always_inline));
 static __inline void cpuid(uint32_t info, uint32_t *eaxp, uint32_t *ebxp, uint32_t *ecxp, uint32_t *edxp);
 static __inline uint64_t read_msr(uint32_t reg) __attribute__((always_inline));
@@ -252,6 +253,14 @@ read_ebp(void)
         uint32_t ebp;
         __asm __volatile("movl %%ebp,%0" : "=r" (ebp));
         return ebp;
+}
+
+static __inline uint32_t
+read_eip(void)
+{
+        uint32_t eip;
+        asm volatile("call 1f; 1: popl %0" : "=r"(eip));
+        return eip;
 }
 
 static __inline uint32_t

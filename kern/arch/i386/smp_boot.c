@@ -133,7 +133,7 @@ void smp_boot(void)
 	// booting.  Specifically, it's when they turn on paging and have that temp
 	// mapping pulled out from under them.  Now, if a core loses, it will spin
 	// on the trampoline (which we must be careful to not deallocate)
-	spin_lock(get_smp_bootlock());
+	__spin_lock(get_smp_bootlock());
 	cprintf("Num_Cpus Detected: %d\n", num_cpus);
 
 	// Remove the mapping of the page used by the trampoline

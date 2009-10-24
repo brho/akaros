@@ -23,13 +23,13 @@
 
 /* Process Lists */
 struct proc_list proc_freelist = TAILQ_HEAD_INITIALIZER(proc_freelist);
-spinlock_t freelist_lock = 0;
+spinlock_t freelist_lock = SPINLOCK_INITIALIZER;
 struct proc_list proc_runnablelist = TAILQ_HEAD_INITIALIZER(proc_runnablelist);
-spinlock_t runnablelist_lock = 0;
+spinlock_t runnablelist_lock = SPINLOCK_INITIALIZER;
 
 /* Tracks which cores are idle, similar to the vcoremap.  Each value is the
  * physical coreid of an unallocated core. */
-spinlock_t idle_lock = 0;
+spinlock_t idle_lock = SPINLOCK_INITIALIZER;
 uint32_t LCKD(&idle_lock) (RO idlecoremap)[MAX_NUM_CPUS];
 uint32_t LCKD(&idle_lock) num_idlecores = 0;
 
@@ -780,6 +780,8 @@ void print_proc_info(pid_t pid)
 		return;
 	}
 	spin_lock_irqsave(&p->proc_lock);
+	spinlock_debug(&p->proc_lock);
+	printk("struct proc: %p\n", p);
 	printk("PID: %d\n", p->env_id);
 	printk("PPID: %d\n", p->env_parent_id);
 	printk("State: 0x%08x\n", p->state);
@@ -802,4 +804,3 @@ void print_proc_info(pid_t pid)
 	print_trapframe(&p->env_tf);
 	spin_unlock_irqsave(&p->proc_lock);
 }
-

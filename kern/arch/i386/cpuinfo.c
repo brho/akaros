@@ -146,7 +146,7 @@ void backtrace(void)
 		memset(buf, 0, 256);
 		strncpy(buf, debuginfo.eip_fn_name, MIN(debuginfo.eip_fn_namelen, 256));
 		buf[MIN(debuginfo.eip_fn_namelen, 255)] = 0;
-		cprintf("#%02d [<%x>] in %s+%x(%p) from %s:%d\n", i++,  eip, buf, 
+		cprintf("#%02d [<%p>] in %s+%x(%p) from %s:%d\n", i++,  eip, buf, 
 		        debuginfo.eip_fn_addr - (uint32_t)_start, debuginfo.eip_fn_addr, 
 		        debuginfo.eip_file, debuginfo.eip_line);
 		cprintf("    ebp: %x   Args:", ebp);
@@ -157,3 +157,21 @@ void backtrace(void)
 		ebp = (uint32_t*)(*ebp);
 	}
 }
+
+/* Like backtrace, this is probably not the best place for this. */
+void spinlock_debug(spinlock_t *lock)
+{
+#ifdef SPINLOCK_DEBUG
+	eipdebuginfo_t debuginfo;
+	char buf[256];
+	uint32_t eip = (uint32_t)lock->call_site;
+
+	debuginfo_eip(eip, &debuginfo);
+	memset(buf, 0, 256);
+	strncpy(buf, debuginfo.eip_fn_name, MIN(debuginfo.eip_fn_namelen, 256));
+	buf[MIN(debuginfo.eip_fn_namelen, 255)] = 0;
+	printk("Lock %p: last locked at [<%p>] in %s(%p) on core %d\n", lock, eip, buf,
+	       debuginfo.eip_fn_addr, lock->calling_core);
+#endif
+}
+
