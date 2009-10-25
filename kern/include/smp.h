@@ -21,7 +21,7 @@
 #ifdef __SHARC__
 typedef sharC_env_t;
 #endif
-// will want this padded out to cacheline alignment
+
 struct per_cpu_info {
 	spinlock_t lock;
 	bool preempt_pending;
@@ -36,7 +36,7 @@ struct per_cpu_info {
 
 	spinlock_t amsg_lock;
 	struct active_msg_list active_msgs;
-};
+}__attribute__((aligned(HW_CACHE_ALIGN)));
 
 typedef struct per_cpu_info NTPTV(t) NTPTV(a0t) NTPTV(a1t) NTPTV(a2t) per_cpu_info_t;
 
@@ -46,6 +46,7 @@ extern volatile uint8_t RO num_cpus;
 /* SMP bootup functions */
 void smp_boot(void);
 void smp_idle(void);
+void smp_percpu_init(void); // this must be called by each core individually
 
 /* SMP utility functions */
 int smp_call_function_self(poly_isr_t handler, TV(t) data,

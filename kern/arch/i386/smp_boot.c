@@ -156,6 +156,9 @@ void smp_boot(void)
 	init_barrier(&generic_barrier, num_cpus); // barrier used by smp_mtrr_handler
 	smp_call_function_all(smp_mtrr_handler, &generic_barrier, 0);
 
+	// initialize my per-cpu info
+	smp_percpu_init();
+
 	// Should probably flush everyone's TLB at this point, to get rid of
 	// temp mappings that were removed.  TODO
 }
@@ -257,10 +260,17 @@ uint32_t smp_main(void)
 	// set a default logical id for now
 	lapic_set_logid(lapic_get_id());
 
-	// TODO: do this somewhere else.  in general, we need to do some per_cpu
-	// info init.  or a per_cpu active_msg init
-	STAILQ_INIT(&per_cpu_info[core_id()].active_msgs);
+	// initialize my per-cpu info
+	smp_percpu_init();
 
 	return my_stack_top; // will be loaded in smp_entry.S
 }
 
+/* Perform any initialization needed by per_cpu_info.  Right now, this just
+ * inits the amsg list (which sparc will probably also want).  Make sure every
+ * core calls this at some point in the smp_boot process. */
+void smp_percpu_init(void)
+{
+	uint32_t coreid = core_id();
+	STAILQ_INIT(&per_cpu_info[coreid].active_msgs);
+}

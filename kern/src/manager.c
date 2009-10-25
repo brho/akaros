@@ -52,7 +52,7 @@ void manager(void)
 	switch (progress++) {
 		case 0:
 			//p = kfs_proc_create(kfs_lookup_path("roslib_mproctests"));
-			p = kfs_proc_create(kfs_lookup_path("roslib_mhello"));
+			p = kfs_proc_create(kfs_lookup_path("roslib_spawn"));
 			// being proper and all:
 			spin_lock_irqsave(&p->proc_lock);
 			proc_set_state(p, PROC_RUNNABLE_S);

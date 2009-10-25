@@ -143,3 +143,13 @@ int smp_call_wait(handler_wrapper_t* wrapper)
 	spin_unlock(&wrapper->lock);
 	return 0;
 }
+
+/* Perform any initialization needed by per_cpu_info.  Right now, this just
+ * inits the amsg list (which sparc will probably also want).  Make sure every
+ * core calls this at some point in the smp_boot process. */
+void smp_percpu_init(void)
+{
+	static_assert(0);
+	uint32_t coreid = core_id();
+	STAILQ_INIT(&per_cpu_info[coreid].active_msgs);
+}

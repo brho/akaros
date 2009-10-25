@@ -779,8 +779,8 @@ void print_proc_info(pid_t pid)
 		printk("Bad PID.\n");
 		return;
 	}
-	spin_lock_irqsave(&p->proc_lock);
 	spinlock_debug(&p->proc_lock);
+	spin_lock_irqsave(&p->proc_lock);
 	printk("struct proc: %p\n", p);
 	printk("PID: %d\n", p->env_id);
 	printk("PPID: %d\n", p->env_parent_id);
