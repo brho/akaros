@@ -277,6 +277,7 @@ int mon_procinfo(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 		printk("\tresources: show resources wanted/granted for all procs\n");
 		printk("\tpid NUM: show a lot of info for proc NUM\n");
 		printk("\tunlock NUM: unlock the lock for proc NUM (OMG!!!)\n");
+		printk("\tkill NUM: destroy proc NUM\n");
 		return 1;
 	}
 	if (!strcmp(argv[1], "idle_cores")) {
@@ -299,6 +300,14 @@ int mon_procinfo(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 		struct proc *p;
 		envid2env(strtol(argv[2], 0, 0), &p, 0);
 		spin_unlock_irqsave(&p->proc_lock);
+	} else if (!strcmp(argv[1], "kill")) {
+		if (argc != 3) {
+			printk("Give me a pid number.\n");
+			return 1;
+		}
+		struct proc *p;
+		envid2env(strtol(argv[2], 0, 0), &p, 0);
+		proc_destroy(p);
 	} else {
 		printk("Bad option\n");
 		return 1;

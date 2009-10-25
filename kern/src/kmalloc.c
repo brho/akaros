@@ -74,6 +74,8 @@ void *boot_calloc(uint32_t n, size_t sz, uint32_t align)
 struct kmem_cache *kmalloc_caches[NUM_KMALLOC_CACHES];
 void kmalloc_init(void)
 {
+	// i want to know if we ever make the tag bigger (should be below 16 bytes)
+	static_assert(sizeof(struct kmalloc_tag) <= KMALLOC_ALIGNMENT);
 	// build caches of common sizes
 	size_t ksize = KMALLOC_SMALLEST;
 	for (int i = 0; i < NUM_KMALLOC_CACHES; i++) {
@@ -105,6 +107,7 @@ void *kmalloc(size_t size, int flags)
 		struct kmalloc_tag *tag = buf;
 		tag->flags = KMALLOC_TAG_PAGES;
 		tag->num_pages = num_pgs;
+		tag->canary = KMALLOC_CANARY;
 		return buf + KMALLOC_OFFSET;
 	}
 	// else, alloc from the appropriate cache
@@ -115,6 +118,7 @@ void *kmalloc(size_t size, int flags)
 	struct kmalloc_tag *tag = buf;
 	tag->flags = KMALLOC_TAG_CACHE;
 	tag->my_cache = kmalloc_caches[cache_id];
+	tag->canary = KMALLOC_CANARY;
 	return buf + KMALLOC_OFFSET;
 }
 
@@ -130,6 +134,7 @@ void kfree(void *addr)
 {
 	assert(addr);
 	struct kmalloc_tag *tag = (struct kmalloc_tag*)(addr - KMALLOC_OFFSET);
+	assert(tag->canary == KMALLOC_CANARY);
 	if (tag->flags & KMALLOC_TAG_CACHE)
 		kmem_cache_free(tag->my_cache, addr - KMALLOC_OFFSET);
 	else if (tag->flags & KMALLOC_TAG_PAGES) {

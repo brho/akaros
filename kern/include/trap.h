@@ -69,14 +69,4 @@ typedef struct active_message NTPTV(a0t) NTPTV(a1t) NTPTV(a2t) active_message_t;
 uint32_t send_active_message(uint32_t dst, amr_t pc,
                              TV(a0t) arg0, TV(a1t) arg1, TV(a2t) arg2);
 
-/* Spins til the active message is sent.  Could block in the future. */
-static inline void
-send_active_msg_sync(uint32_t dst, amr_t pc,
-                     TV(a0t) arg0, TV(a1t) arg1, TV(a2t) arg2)
-{
-	while (send_active_message(dst, pc, arg0, arg1, arg2))
-		cpu_relax();
-	return;
-}
-
 #endif /* ROS_KERN_TRAP_H */

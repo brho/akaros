@@ -156,23 +156,22 @@ void proc_run(struct proc *p)
 			if (p->num_vcores) {
 				// TODO: handle silly state (HSS)
 				// set virtual core 0 to run the main context
+				// TODO: this should only happen on transition (VC0)
 #ifdef __IVY__
-				send_active_msg_sync(p->vcoremap[0], __startcore, p,
-				                     &p->env_tf, (void *SNT)0);
+				send_active_message(p->vcoremap[0], __startcore, p,
+				                    &p->env_tf, (void *SNT)0);
 #else
-				send_active_msg_sync(p->vcoremap[0], (void *)__startcore,
-				                     (void *)p, (void *)&p->env_tf, 0);
+				send_active_message(p->vcoremap[0], (void *)__startcore,
+				                    (void *)p, (void *)&p->env_tf, 0);
 #endif
-				/* handle the others.  note the sync message will spin until
-				 * there is a free active message slot, which could lock up the
-				 * system.  think about this. (TODO)(AMDL) */
+				/* handle the others. */
 				for (int i = 1; i < p->num_vcores; i++)
 #ifdef __IVY__
-					send_active_msg_sync(p->vcoremap[i], __startcore,
-					                     p, (trapframe_t *CT(1))NULL, (void *SNT)i);
+					send_active_message(p->vcoremap[i], __startcore,
+					                    p, (trapframe_t *CT(1))NULL, (void *SNT)i);
 #else
-					send_active_msg_sync(p->vcoremap[i], (void *)__startcore,
-					                     (void *)p, (void *)0, (void *)i);
+					send_active_message(p->vcoremap[i], (void *)__startcore,
+					                    (void *)p, (void *)0, (void *)i);
 #endif
 			}
 			/* There a subtle (attempted) race avoidance here.  proc_startcore
@@ -340,8 +339,8 @@ void proc_destroy(struct proc *p)
 				current = NULL;
 			}
 			#endif
-			send_active_msg_sync(p->vcoremap[0], __death, (void *SNT)0,
-			                     (void *SNT)0, (void *SNT)0);
+			send_active_message(p->vcoremap[0], __death, (void *SNT)0,
+			                    (void *SNT)0, (void *SNT)0);
 			#if 0
 			/* right now, RUNNING_S only runs on a mgmt core (0), not cores
 			 * managed by the idlecoremap.  so don't do this yet. */
@@ -536,17 +535,17 @@ error_t proc_give_cores(struct proc *SAFE p, uint32_t corelist[], size_t *num)
 				printd("setting vcore %d to pcore %d\n", free_vcoreid, corelist[i]);
 				p->vcoremap[free_vcoreid] = corelist[i];
 				p->num_vcores++;
-				// TODO: careful of active message deadlock (AMDL)
 				assert(corelist[i] != core_id()); // sanity
 				/* if we want to allow yielding of vcore0 and restarting it at
 				 * its yield point *while still RUNNING_M*, uncomment this */
+				// TODO: we don't (VC0)
 				/*
 				if (i == 0)
-					send_active_msg_sync(p->vcoremap[0], __startcore,
-					                     (uint32_t)p, (uint32_t)&p->env_tf, 0);
+					send_active_message(p->vcoremap[0], __startcore,
+					                    (uint32_t)p, (uint32_t)&p->env_tf, 0);
 				else */
-				send_active_msg_sync(corelist[i], __startcore, p,
-				                     (void*)0, (void*)free_vcoreid);
+				send_active_message(corelist[i], __startcore, p,
+				                    (void*)0, (void*)free_vcoreid);
 			}
 			break;
 		default:
@@ -575,7 +574,7 @@ error_t proc_set_allcores(struct proc *SAFE p, uint32_t corelist[], size_t *num,
  * contain how many items are in corelist.  This isn't implemented yet, but
  * might be necessary later.  Or not, and we'll never do it.
  *
- * TODO: think about taking vcore0.  probably are issues...
+ * TODO: think about taking vcore0.  probably are issues... (or not (VC0))
  *
  * WARNING: You must hold the proc_lock before calling this!*/
 error_t proc_take_cores(struct proc *SAFE p, uint32_t corelist[], size_t *num,
@@ -598,8 +597,7 @@ error_t proc_take_cores(struct proc *SAFE p, uint32_t corelist[], size_t *num,
 		vcoreid = get_vcoreid(p, corelist[i]);
 		assert(p->vcoremap[vcoreid] == corelist[i]);
 		if (message)
-			// TODO: careful of active message deadlock (AMDL)
-			send_active_msg_sync(corelist[i], message, 0, 0, 0);
+			send_active_message(corelist[i], message, 0, 0, 0);
 		// give the pcore back to the idlecoremap
 		idlecoremap[num_idlecores++] = corelist[i];
 		p->vcoremap[vcoreid] = -1;
@@ -633,9 +631,8 @@ error_t proc_take_allcores(struct proc *SAFE p, amr_t message)
 		// find next active vcore
 		active_vcoreid = get_busy_vcoreid(p, active_vcoreid);
 		if (message)
-			// TODO: careful of active message deadlock (AMDL)
-			send_active_msg_sync(p->vcoremap[active_vcoreid], message,
-			                     (void *SNT)0, (void *SNT)0, (void *SNT)0);
+			send_active_message(p->vcoremap[active_vcoreid], message,
+			                    (void *SNT)0, (void *SNT)0, (void *SNT)0);
 		// give the pcore back to the idlecoremap
 		idlecoremap[num_idlecores++] = p->vcoremap[active_vcoreid];
 		p->vcoremap[active_vcoreid] = -1;
