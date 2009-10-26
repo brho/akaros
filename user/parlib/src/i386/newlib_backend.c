@@ -420,35 +420,6 @@ int read_buffer_from_channel(char *buf, int len)
 								NO_PEEK);
 }
 
-/* sbrk()
- * Increase program data space. 
- * As malloc and related functions depend on this, it is 
- * useful to have a working implementation. 
- * The following suffices for a standalone system; it exploits the 
- * symbol _end automatically defined by the GNU linker.
- */
-void* sbrk(ptrdiff_t incr) 
-{
-	debug_in_out("SBRK\n");
-	debug_in_out("\tincr: %u\n", incr);	
-
-	extern char (SNT RO _end)[];
-	static void* heap_end = NULL;
-	if (heap_end == NULL)
-		heap_end = (void*)_end;
-
-	uint8_t* prev_heap_end; 
-	prev_heap_end = heap_end;
-	if (sys_brk(heap_end + incr) < 0) {
-		errno = ENOMEM;
-		return (void*CT(1))TC(-1);
-	}
-     
-	heap_end += incr;
-	debug_in_out("\treturning: %u\n", prev_heap_end);
-	return (caddr_t) prev_heap_end;
-}
-
 /* send_message()
  * Write the message in buffer out on the channel, and wait for a response.
  * Caller is responsible for management of buffer passed in and buffer returned.

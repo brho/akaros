@@ -335,9 +335,18 @@ static envid_t sys_getcpuid(void)
 	return core_id();
 }
 
+// TODO: Temporary hack until thread-local storage is implemented on i386
 static size_t sys_getvcoreid(env_t* e)
 {
-	return e->vcoremap[core_id()];
+	if(e->state == PROC_RUNNING_S)
+		return 0;
+
+	size_t i;
+	for(i = 0; i < e->num_vcores; i++)
+		if(core_id() == e->vcoremap[i])
+			return i;
+
+	panic("virtual core id not found in sys_getvcoreid()!");
 }
 
 // TODO FIX Me!!!! for processes

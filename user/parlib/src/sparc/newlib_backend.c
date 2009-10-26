@@ -139,28 +139,3 @@ gettimeofday(struct timeval* tp, void* tzp)
 	return syscall(SYS_frontend,RAMP_SYSCALL_gettimeofday,(int)tp,(int)tzp,0,0);
 }
 
-/* sbrk()
- * Increase program data space. 
- * As malloc and related functions depend on this, it is 
- * useful to have a working implementation. 
- * The following suffices for a standalone system; it exploits the 
- * symbol _end automatically defined by the GNU linker.
- */
-void* sbrk(ptrdiff_t incr) 
-{
-	#define HEAP_SIZE (1<<23)
-	static uint8_t array[HEAP_SIZE];
-	static uint8_t *BND(array, array + HEAP_SIZE) heap_end = array;
-	static uint8_t *stack_ptr = &(array[HEAP_SIZE-1]);
-
-	uint8_t* prev_heap_end; 
-
-	prev_heap_end = heap_end;
-	if (heap_end + incr > stack_ptr) {
-		errno = ENOMEM;
-		return (void*CT(1))TC(-1);
-	}
-
-	heap_end += incr;
-	return (caddr_t) prev_heap_end;
-}

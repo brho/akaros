@@ -15,6 +15,7 @@ USER_PARLIB_SRC_SRCFILES := $(USER_PARLIB_SRC_DIR)/debug.c \
                             $(USER_PARLIB_SRC_DIR)/parlibmain.c \
                             $(USER_PARLIB_SRC_DIR)/channel.c \
                             $(USER_PARLIB_SRC_DIR)/hart.c \
+                            $(USER_PARLIB_SRC_DIR)/newlib_backend.c \
                             $(USER_PARLIB_ARCH_SRCFILES)
 
 USER_PARLIB_SRC_OBJFILES := $(patsubst $(USER_PARLIB_SRC_DIR)/%.c, \
