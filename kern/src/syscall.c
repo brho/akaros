@@ -82,13 +82,15 @@ static ssize_t sys_serial_read(env_t* e, char *DANGEROUS _buf, size_t len)
 
 static ssize_t sys_run_binary(env_t* e, void *DANGEROUS binary_buf,
                               void*DANGEROUS arg, size_t len) {
-	uint8_t *CT(len) checked_binary_buf;
-	checked_binary_buf = user_mem_assert(e, binary_buf, len, PTE_USER_RO);
-	
 	uint8_t* new_binary = kmalloc(len, 0);
 	if(new_binary == NULL)
 		return -ENOMEM;
-	memcpy(new_binary, checked_binary_buf, len);
+	if(memcpy_from_user(e, new_binary, binary_buf, len))
+	{
+		kfree(new_binary);
+		proc_destroy(e);
+		return 0;
+	}
 
 	env_t* env = env_create(new_binary, len);
 	kfree(new_binary);

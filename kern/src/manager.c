@@ -205,30 +205,36 @@ void manager_waterman()
 	{
 		case 0:
 			printk("got here\n");
-			envs[0] = kfs_proc_create(kfs_lookup_path("parlib_draw_nanwan_standalone"));
-			proc_set_state(envs[0], PROC_RUNNABLE_S);
-			proc_run(envs[0]);
+			envs[progress] = kfs_proc_create(kfs_lookup_path("parlib_draw_nanwan_standalone"));
+			proc_set_state(envs[progress], PROC_RUNNABLE_S);
+			proc_run(envs[progress]);
 			break;
 
 		case 1:
-			envs[1] = kfs_proc_create(kfs_lookup_path("parlib_manycore_test"));
-			proc_set_state(envs[1], PROC_RUNNABLE_S);
-			proc_run(envs[1]);
+			envs[progress] = kfs_proc_create(kfs_lookup_path("parlib_manycore_test"));
+			proc_set_state(envs[progress], PROC_RUNNABLE_S);
+			proc_run(envs[progress]);
 			break;
 
 		case 2:
-			envs[2] = kfs_proc_create(kfs_lookup_path("parlib_draw_nanwan_standalone"));
-			proc_set_state(envs[2], PROC_RUNNABLE_S);
-			proc_run(envs[2]);
+			envs[progress] = kfs_proc_create(kfs_lookup_path("parlib_draw_nanwan_standalone"));
+			proc_set_state(envs[progress], PROC_RUNNABLE_S);
+			proc_run(envs[progress]);
 			break;
 
 		case 3:
-			envs[3] = kfs_proc_create(kfs_lookup_path("parlib_draw_nanwan_standalone"));
-			//envs[3] = kfs_proc_create(kfs_lookup_path("parlib_manycore_test"));
-			proc_set_state(envs[3], PROC_RUNNABLE_S);
-			proc_run(envs[3]);
+			envs[progress] = kfs_proc_create(kfs_lookup_path("parlib_pthread_pthread_test"));
+			proc_set_state(envs[progress], PROC_RUNNABLE_S);
+			proc_run(envs[progress]);
+			break;
+
+		case 4:
+			envs[progress] = kfs_proc_create(kfs_lookup_path("parlib_matrix"));
+			proc_set_state(envs[progress], PROC_RUNNABLE_S);
+			proc_run(envs[progress]);
 			break;
 	}
+
 	schedule();
 
 	panic("DON'T PANIC");

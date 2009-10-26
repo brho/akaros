@@ -41,6 +41,8 @@ DECL_PROG(parlib_channel_test_server);
 DECL_PROG(parlib_hello);
 DECL_PROG(parlib_matrix);
 DECL_PROG(parlib_manycore_test);
+DECL_PROG(parlib_pthread_pthread_test);
+DECL_PROG(parlib_pthread_blackscholes);
 
 struct kfs_entry kfs[MAX_KFS_FILES] = {
 	KFS_ENTRY(roslib_proctests)
@@ -56,6 +58,8 @@ struct kfs_entry kfs[MAX_KFS_FILES] = {
 	KFS_ENTRY(parlib_hello)
 	KFS_ENTRY(parlib_matrix)
 	KFS_ENTRY(parlib_manycore_test)
+	KFS_ENTRY(parlib_pthread_pthread_test)
+	KFS_ENTRY(parlib_pthread_blackscholes)
 };
 
 ssize_t kfs_lookup_path(char* path)

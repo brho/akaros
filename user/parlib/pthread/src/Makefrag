@@ -1,0 +1,12 @@
+# Makefile fragment for ROS kernel.
+# This is NOT a complete makefile;
+# you must run GNU make in the top-level directory
+# where the GNUmakefile is located.
+#
+
+# We also snatch the use of a couple handy source files
+# from the lib directory, to avoid gratuitous code duplication.
+
+USER_PARLIB_PTHREAD_SRC_SRCFILES := $(USER_PARLIB_PTHREAD_SRC_DIR)/pthread.c
+
+OBJDIRS += $(USER_PARLIB_PTHREAD_SRC_DIR)

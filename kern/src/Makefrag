@@ -56,12 +56,14 @@ KERN_APPFILES := \
                  $(USER_APPS_ROSLIB_DIR)/hello \
                  $(USER_APPS_ROSLIB_DIR)/mhello \
                  $(USER_APPS_ROSLIB_DIR)/measurements \
+                 $(USER_APPS_PARLIB_PTHREAD_DIR)/pthread_test \
+                 $(USER_APPS_PARLIB_PTHREAD_DIR)/blackscholes \
                  $(USER_APPS_PARLIB_DIR)/draw_nanwan_standalone \
                  $(USER_APPS_PARLIB_DIR)/channel_test_client \
                  $(USER_APPS_PARLIB_DIR)/channel_test_server \
                  $(USER_APPS_PARLIB_DIR)/hello \
                  $(USER_APPS_PARLIB_DIR)/manycore_test \
-                 $(USER_APPS_PARLIB_DIR)/matrix
+                 $(USER_APPS_PARLIB_DIR)/matrix 
 #                 $(USER_APPS_PARLIB_DIR)/open_read
 
 KERN_LDFLAGS   := $(KERN_LDFLAGS) -L$(OBJDIR)/$(KERN_DIR) \
