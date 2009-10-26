@@ -65,7 +65,7 @@ void page_alloc_init()
 	// alloc the second page, since we will need it later to init the other cores
 	// probably need to be smarter about what page we use (make this dynamic) TODO
 	pages[1].page_ref = 1;
-	for (i = 2; i < PPN(IOPHYSMEM); i++) {
+	for (i = 2; i < LA2PPN(IOPHYSMEM); i++) {
 		pages[i].page_ref = 0;
 		LIST_INSERT_HEAD(
 		   &(colored_page_free_list[get_page_color(page2ppn(&pages[i]), 
@@ -74,13 +74,13 @@ void page_alloc_init()
 		   page_link
 		);
 	}
-	for (i = PPN(IOPHYSMEM); i < PPN(EXTPHYSMEM); i++) {
+	for (i = LA2PPN(IOPHYSMEM); i < LA2PPN(EXTPHYSMEM); i++) {
 		pages[i].page_ref = 1;
 	}
-	for (i = PPN(EXTPHYSMEM); i < PPN(physaddr_after_kernel); i++) {
+	for (i = LA2PPN(EXTPHYSMEM); i < LA2PPN(physaddr_after_kernel); i++) {
 		pages[i].page_ref = 1;
 	}
-	for (i = PPN(physaddr_after_kernel); i < PPN(maxaddrpa); i++) {
+	for (i = LA2PPN(physaddr_after_kernel); i < LA2PPN(maxaddrpa); i++) {
 		pages[i].page_ref = 0;
 		LIST_INSERT_HEAD(
 		   &(colored_page_free_list[get_page_color(page2ppn(&pages[i]), 
@@ -91,7 +91,7 @@ void page_alloc_init()
 	}
 	// this block out all memory above maxaddrpa.  will need another mechanism
 	// to allocate and map these into the kernel address space
-	for (i = PPN(maxaddrpa); i < npages; i++) {
+	for (i = LA2PPN(maxaddrpa); i < npages; i++) {
 		pages[i].page_ref = 1;
 	}
 	printk("Page alloc init successful\n");

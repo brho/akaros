@@ -163,8 +163,8 @@ WRITES(e->env_pgdir, e->env_cr3, e->env_procinfo, e->env_procdata)
 
 	// VPT and UVPT map the env's own page table, with
 	// different permissions.
-	e->env_pgdir[PDX(VPT)]  = PTE(PPN(e->env_cr3), PTE_P | PTE_KERN_RW);
-	e->env_pgdir[PDX(UVPT)] = PTE(PPN(e->env_cr3), PTE_P | PTE_USER_RO);
+	e->env_pgdir[PDX(VPT)]  = PTE(LA2PPN(e->env_cr3), PTE_P | PTE_KERN_RW);
+	e->env_pgdir[PDX(UVPT)] = PTE(LA2PPN(e->env_cr3), PTE_P | PTE_USER_RO);
 
 	/*
 	 * Now allocate and insert all pages required for the shared
@@ -354,7 +354,7 @@ env_segment_alloc(env_t *e, void *SNT va, size_t len)
 	// page_insert/pgdir_walk alloc a page and read/write to it via its address
 	// starting from pgdir (e's), so we need to be using e's pgdir
 	assert(e->env_cr3 == rcr3());
-	num_pages = PPN(end - start);
+	num_pages = LA2PPN(end - start);
 
 	for (i = 0; i < num_pages; i++, start += PGSIZE) {
 		// skip if a page is already mapped.  yes, page_insert will page_remove
@@ -388,13 +388,13 @@ env_segment_free(env_t *e, void *SNT va, size_t len)
 	// page_insert/pgdir_walk alloc a page and read/write to it via its address
 	// starting from pgdir (e's), so we need to be using e's pgdir
 	assert(e->env_cr3 == rcr3());
-	num_pages = PPN(end - start);
+	num_pages = LA2PPN(end - start);
 
 	for (int i = 0; i < num_pages; i++, start += PGSIZE) {
 		// skip if a page is already unmapped. 
 		pte = pgdir_walk(e->env_pgdir, start, 0);
 		if (pte && *pte & PTE_P)
-			page_decref(ppn2page(PPN(*pte)));
+			page_remove(e->env_pgdir,start);
 	}
 }
 

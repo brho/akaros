@@ -306,7 +306,7 @@ void page_decref(page_t *page)
 static void __page_decref(page_t *page)
 {
 	if (page->page_ref == 0) {
-		warn("Trying to Free already freed page: %d...\n", page2ppn(page));
+		panic("Trying to Free already freed page: %d...\n", page2ppn(page));
 		return;
 	}
 	if (--page->page_ref == 0)

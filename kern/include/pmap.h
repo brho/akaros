@@ -44,7 +44,7 @@
 #define KADDR(pa)						\
 ({								\
 	physaddr_t __m_pa = (pa);				\
-	size_t __m_ppn = PPN(__m_pa);				\
+	size_t __m_ppn = LA2PPN(__m_pa);			\
 	if (__m_ppn >= npages)					\
 		warn("KADDR called with invalid pa %08lx", __m_pa);\
 	(void*TRUSTED) (__m_pa + KERNBASE);				\
@@ -123,9 +123,9 @@ static inline physaddr_t page2pa(page_t *pp)
 
 static inline page_t*COUNT(1) pa2page(physaddr_t pa)
 {
-	if (PPN(pa) >= npages)
+	if (LA2PPN(pa) >= npages)
 		warn("pa2page called with pa (0x%08x) larger than npages", pa);
-	return &pages[PPN(pa)];
+	return &pages[LA2PPN(pa)];
 }
 
 static inline void*COUNT(PGSIZE) page2kva(page_t *pp)

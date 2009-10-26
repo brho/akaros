@@ -63,11 +63,11 @@ void page_alloc_init()
 	physaddr_t physaddr_after_kernel = PADDR(ROUNDUP(boot_freemem, PGSIZE));
 
 	// mark [0, physaddr_after_kernel) as in-use
-	for(i = 0; i < PPN(physaddr_after_kernel); i++)
+	for(i = 0; i < LA2PPN(physaddr_after_kernel); i++)
 		pages[i].page_ref = 1;
 
 	// mark [physaddr_after_kernel, maxaddrpa) as free
-	for(i = PPN(physaddr_after_kernel); i < PPN(maxaddrpa); i++)
+	for(i = LA2PPN(physaddr_after_kernel); i < LA2PPN(maxaddrpa); i++)
 	{
 		pages[i].page_ref = 0;
                 LIST_INSERT_HEAD(
@@ -79,7 +79,7 @@ void page_alloc_init()
 	}
 
 	// mark [maxaddrpa, ...) as in-use (as they are invalid)
-	for(i = PPN(maxaddrpa); i < npages; i++)
+	for(i = LA2PPN(maxaddrpa); i < npages; i++)
 		pages[i].page_ref = 1;
 }
 

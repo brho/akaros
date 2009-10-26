@@ -191,6 +191,9 @@ void manager_klueska()
 		proc_set_state(envs[0], PROC_RUNNABLE_S);
 		proc_run(envs[0]);
 	}
+	schedule();
+
+	panic("DON'T PANIC");
 }
 
 void manager_waterman()
@@ -205,21 +208,18 @@ void manager_waterman()
 			envs[0] = kfs_proc_create(kfs_lookup_path("parlib_draw_nanwan_standalone"));
 			proc_set_state(envs[0], PROC_RUNNABLE_S);
 			proc_run(envs[0]);
-			schedule();
 			break;
 
 		case 1:
 			envs[1] = kfs_proc_create(kfs_lookup_path("parlib_manycore_test"));
 			proc_set_state(envs[1], PROC_RUNNABLE_S);
 			proc_run(envs[1]);
-			schedule();
 			break;
 
 		case 2:
 			envs[2] = kfs_proc_create(kfs_lookup_path("parlib_draw_nanwan_standalone"));
 			proc_set_state(envs[2], PROC_RUNNABLE_S);
 			proc_run(envs[2]);
-			schedule();
 			break;
 
 		case 3:
@@ -227,9 +227,9 @@ void manager_waterman()
 			//envs[3] = kfs_proc_create(kfs_lookup_path("parlib_manycore_test"));
 			proc_set_state(envs[3], PROC_RUNNABLE_S);
 			proc_run(envs[3]);
-			schedule();
 			break;
 	}
+	schedule();
 
 	panic("DON'T PANIC");
 }

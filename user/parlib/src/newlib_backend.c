@@ -13,7 +13,7 @@
 void* sbrk(ptrdiff_t incr) 
 {
 	debug_in_out("SBRK\n");
-	debug_in_out("\tincr: %u\n", incr);	
+	debug_in_out("\tincr: %d\n", incr);	
 
 	extern char (SNT RO _end)[];
 	static void* heap_end = NULL;

@@ -27,7 +27,10 @@
 // and PGOFF(la), use PGADDR(L1X(la), L2X(la), L3X(la), PGOFF(la)).
 
 // page number field of address
-#define PPN(la)		(((uintptr_t) (la)) >> L3PGSHIFT)
+#define LA2PPN(la)	(((uintptr_t) (la)) >> L3PGSHIFT)
+
+// page number field of PPN
+#define PTE2PPN(pte)	(((uintptr_t) (pte)) >> 8)
 
 // index into L1 PT
 #define L1X(la)		((((uintptr_t) (la)) >> L1PGSHIFT) & 0xFF)
