@@ -35,6 +35,8 @@ void print_cpuinfo(void);
 void show_mapping(uintptr_t start, size_t size);
 void backtrace(void);
 
+extern uintptr_t mmu_context_tables[MAX_NUM_CPUS][NCONTEXTS+CONTEXT_TABLE_PAD];
+
 static __inline void
 breakpoint(void)
 {
@@ -58,7 +60,7 @@ tlbflush(void)
 static __inline uint64_t
 read_tsc(void)
 {
-	return read_perfctr(0);
+	return read_perfctr(0,0);
 }
 
 static __inline uint64_t 
@@ -156,16 +158,14 @@ reboot(void)
 static __inline void
 lcr3(uint32_t val)
 {
-	extern uintptr_t mmu_context_table[NCONTEXTS];
-	*mmu_context_table = val >> 4 | PTE_PTD;
+	mmu_context_tables[core_id()][0] = val >> 4 | PTE_PTD;
 	tlbflush();
 }
 
 static __inline uint32_t
 rcr3(void)
 {
-	extern uintptr_t mmu_context_table[NCONTEXTS];
-	return (*mmu_context_table & ~0x3) << 4;
+	return (mmu_context_tables[core_id()][0] & ~0x3) << 4;
 }
 
 #endif /* !__ASSEMBLER__ */

@@ -11,6 +11,7 @@
 
 typedef struct procinfo {
 	pid_t id;
+	size_t max_harts;
 } procinfo_t;
 #define PROCINFO_NUM_PAGES  ((sizeof(procinfo_t)-1)/PGSIZE + 1)	
 

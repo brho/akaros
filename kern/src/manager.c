@@ -29,6 +29,20 @@
  */
 void manager(void)
 {
+	#ifndef DEVELOPER_NAME
+		#define DEVELOPER_NAME brho
+	#endif
+
+	// LoL
+	#define PASTE(s1,s2) s1 ## s2
+	#define MANAGER_FUNC(dev) PASTE(manager_,dev)
+
+	void MANAGER_FUNC(DEVELOPER_NAME)(void);
+	MANAGER_FUNC(DEVELOPER_NAME)();
+}
+
+void manager_brho(void)
+{
 	static uint8_t RACY progress = 0;
 
 	struct proc *envs[256];
@@ -36,16 +50,6 @@ void manager(void)
 
 	uint32_t corelist[MAX_NUM_CPUS];
 	uint32_t num = 3;
-
-	// This is a bypass of the standard manager structure, for network use
-	// If enabled, this spawns parlib_matrix, and allows the execution
-	// of a remote binary to function correctly (schedule() call below)
-	if (progress++ == 0) {
-		envs[0] = kfs_proc_create(kfs_lookup_path("parlib_matrix"));
-		proc_set_state(envs[0], PROC_RUNNABLE_S);
-		proc_run(envs[0]);
-	}
-	schedule();
 
 	switch (progress++) {
 		case 0:
@@ -175,4 +179,57 @@ void manager(void)
 	}
 	*/
 	return;
+}
+
+void manager_klueska()
+{
+	struct proc *envs[256];
+	static uint8_t progress = 0;
+
+	if (progress++ == 0) {
+		envs[0] = kfs_proc_create(kfs_lookup_path("parlib_matrix"));
+		proc_set_state(envs[0], PROC_RUNNABLE_S);
+		proc_run(envs[0]);
+	}
+}
+
+void manager_waterman()
+{
+	struct proc *envs[256];
+	static uint8_t progress = 0;
+
+	switch(progress++)
+	{
+		case 0:
+			printk("got here\n");
+			envs[0] = kfs_proc_create(kfs_lookup_path("parlib_draw_nanwan_standalone"));
+			proc_set_state(envs[0], PROC_RUNNABLE_S);
+			proc_run(envs[0]);
+			schedule();
+			break;
+
+		case 1:
+			envs[1] = kfs_proc_create(kfs_lookup_path("parlib_manycore_test"));
+			proc_set_state(envs[1], PROC_RUNNABLE_S);
+			proc_run(envs[1]);
+			schedule();
+			break;
+
+		case 2:
+			envs[2] = kfs_proc_create(kfs_lookup_path("parlib_draw_nanwan_standalone"));
+			proc_set_state(envs[2], PROC_RUNNABLE_S);
+			proc_run(envs[2]);
+			schedule();
+			break;
+
+		case 3:
+			envs[3] = kfs_proc_create(kfs_lookup_path("parlib_draw_nanwan_standalone"));
+			//envs[3] = kfs_proc_create(kfs_lookup_path("parlib_manycore_test"));
+			proc_set_state(envs[3], PROC_RUNNABLE_S);
+			proc_run(envs[3]);
+			schedule();
+			break;
+	}
+
+	panic("DON'T PANIC");
 }

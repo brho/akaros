@@ -1,4 +1,3 @@
-#include <arch/mmu.h>
 #include <ros/memlayout.h>
 
 .data
@@ -10,12 +9,12 @@
 	.set procinfo, UINFO
 	.globl procdata
 	.set procdata, UDATA
-	.globl pages
-	.set pages, UPAGES
-	.globl vpt
-	.set vpt, UVPT
-	.globl vpd
-	.set vpd, (UVPT+(UVPT>>12)*4)
+
+// TODO: We're not exposing these yet.  Think about how to do so judiciously.
+//	.globl vpt
+//	.set vpt, UVPT
+//	.globl vpd
+//	.set vpd, (UVPT+(UVPT>>12)*4)
 
 
 // Entrypoint - this is where the kernel (or our parent environment)

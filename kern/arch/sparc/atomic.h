@@ -21,6 +21,7 @@ static inline void atomic_set(atomic_t* number, int32_t val);
 static inline void atomic_add(atomic_t* number, int32_t inc);
 static inline void atomic_inc(atomic_t* number);
 static inline void atomic_dec(atomic_t* number);
+static inline uint32_t atomic_swap(uint32_t* addr, uint32_t val);
 static inline uint32_t spin_trylock(spinlock_t*SAFE lock);
 static inline void spin_lock(spinlock_t*SAFE lock);
 static inline void spin_unlock(spinlock_t*SAFE lock);
@@ -68,6 +69,12 @@ static inline void atomic_inc(atomic_t* number)
 static inline void atomic_dec(atomic_t* number)
 {
 	atomic_add(number,-1);
+}
+
+static inline uint32_t atomic_swap(uint32_t* addr, uint32_t val)
+{
+	asm volatile ("swap [%2],%0" : "=r"(val) : "0"(val),"r"(addr) : "memory");
+	return val;
 }
 
 static inline uint32_t spin_trylock(spinlock_t*SAFE lock)

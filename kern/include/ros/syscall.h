@@ -38,8 +38,9 @@
 #define SYS_run_binary				21
 // forward a syscall to front-end machine
 #define SYS_frontend				22
+#define SYS_getvcoreid				23
 // Keep this in sync with the last syscall number
-#define NSYSCALLS 					22
+#define NSYSCALLS 					23
 // syscall number starts at 1 and goes up to NSYSCALLS, without holes.
 #define INVALID_SYSCALL(syscallno) ((syscallno) > NSYSCALLS)
 

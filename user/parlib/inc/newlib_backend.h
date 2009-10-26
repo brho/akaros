@@ -11,6 +11,7 @@
 
 #define debug_in_out(...) //debug(__VA_ARGS__)  
 #define debug_write_check(fmt, ...)  //debug(fmt, __VA_ARGS__)
+uint32_t newcore(void);
 
 typedef uint32_t syscall_id_t;
 

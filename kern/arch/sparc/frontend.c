@@ -10,7 +10,7 @@
 #include <pmap.h>
 #include <arch/frontend.h>
 
-volatile int magic_mem[8] __attribute__((aligned(32)));
+volatile int magic_mem[10];
 
 int32_t frontend_syscall_from_user(env_t* p, int32_t syscall_num, uint32_t arg0, uint32_t arg1, uint32_t arg2)
 {
@@ -25,7 +25,14 @@ int32_t frontend_syscall_from_user(env_t* p, int32_t syscall_num, uint32_t arg0,
 			if(memcpy_from_user(p,buf,(void*)arg1,arg2))
 				return -1;
 			arg1 = PADDR((uint32_t)buf);
+
+			extern spinlock_t output_lock;
+			spin_lock(&output_lock);
+
 			ret = frontend_syscall(syscall_num,arg0,arg1,arg2);
+
+			spin_unlock(&output_lock);
+
 			break;
 
 		case RAMP_SYSCALL_open:
@@ -51,6 +58,39 @@ int32_t frontend_syscall_from_user(env_t* p, int32_t syscall_num, uint32_t arg0,
 		case RAMP_SYSCALL_getch:
 			return frontend_syscall(RAMP_SYSCALL_getch,0,0,0);
 
+		case RAMP_SYSCALL_gettimeofday:
+		{
+			struct timeval
+			{
+				size_t tv_sec;
+				size_t tv_usec;
+			};
+
+			static spinlock_t gettimeofday_lock = 0;
+			static size_t t0 = 0;
+			spin_lock(&gettimeofday_lock);
+
+			if(!t0)
+			{
+				volatile struct timeval tp;
+				ret = frontend_syscall(RAMP_SYSCALL_gettimeofday,(int)PADDR((uint32_t)&tp),0,0);
+				if(ret == 0)
+					t0 = tp.tv_sec;
+			}
+			else ret = 0;
+
+			spin_unlock(&gettimeofday_lock);
+
+			if(ret == 0)
+			{
+				struct timeval tp;
+				long long dt = read_tsc();
+				tp.tv_sec = t0 + dt/system_timing.tsc_freq;
+				tp.tv_usec = (dt % system_timing.tsc_freq)*1000000/system_timing.tsc_freq;
+
+				ret = memcpy_to_user(p,(void*)arg0,&tp,sizeof(tp));
+			}
+		}
 		default:
 			ret = -1;
 			break;
@@ -86,4 +126,36 @@ int32_t frontend_syscall(int32_t syscall_num, uint32_t arg0, uint32_t arg1, uint
 	spin_unlock_irqsave(&lock);
 
 	return ret;
+}
+
+int32_t sys_nbputch(char ch)
+{
+	static spinlock_t putch_lock = 0;
+	spin_lock(&putch_lock);
+
+	int ret = -1;
+	if(magic_mem[8] == 0)
+	{
+		magic_mem[8] = (unsigned int)(unsigned char)ch;
+		ret = 0;
+	}
+
+	spin_unlock(&putch_lock);
+	return ret;
+}
+
+int32_t sys_nbgetch()
+{
+	static spinlock_t getch_lock = 0;
+	spin_lock(&getch_lock);
+
+	int result = -1;
+	if(magic_mem[9]) 
+	{
+		result = magic_mem[9];
+		magic_mem[9] = 0;
+	}
+
+	spin_unlock(&getch_lock);
+	return result;
 }

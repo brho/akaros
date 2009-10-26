@@ -14,9 +14,10 @@ handle_trap:
 	# At this point, %l1 = pc, %l2 = npc, and %l0/3/4/5
 	# might contain an active message.  so we only get %l6/%l7
 
-        # calculate stack pointer (-64 is space for window spill)
-        # sp = bootstacktop - core_id*KSTKSIZE - 64 - sizeof(trapframe_t)
-        set     bootstacktop-64-SIZEOF_TRAPFRAME_T-SIZEOF_ACTIVE_MESSAGE_T,%l6
+        # calculate stack pointer (-64 is space for window spill).
+        # sp = bootstacktop - core_id*KSTKSIZE - 64 - sizeof(trapframe_t).
+	# should you change this, make sure to change stack_fucked()
+        set     bootstacktop-64-SIZEOF_TRAPFRAME_T,%l6
         mov     CORE_ID_REG,%l7
 	sll	%l7,KSTKSHIFT,%l7
         sub     %l6,%l7,%l6
@@ -26,16 +27,11 @@ handle_trap:
 	mov	%psr,%l7
 	btst	PSR_PS,%l7
 	bne,a	1f
-	 sub	%fp,64+SIZEOF_TRAPFRAME_T+SIZEOF_ACTIVE_MESSAGE_T,%l6
+	 sub	%fp,64+SIZEOF_TRAPFRAME_T,%l6
 
-1:	# back up what might be an active message
-	st	%l0,[%l6+64+SIZEOF_TRAPFRAME_T+0]
-	st	%l3,[%l6+64+SIZEOF_TRAPFRAME_T+4]
-	st	%l4,[%l6+64+SIZEOF_TRAPFRAME_T+8]
-	st	%l5,[%l6+64+SIZEOF_TRAPFRAME_T+12]
-	st	%g0,[%l6+64+SIZEOF_TRAPFRAME_T+16]
+	# here is where we might do something with an active message
 
-	mov	%l7,%l0
+1:	mov	%l7,%l0
 	# At this point we may use %l3/4/5/7 as temporary regs
 
 	# is CWP valid?
@@ -86,9 +82,8 @@ tflush:	 save	%sp,0,%sp
 
 	# call the handler and pass in the tf, message, and handler addr
 	add	%sp,64,%o0
-	add	%sp,64+SIZEOF_TRAPFRAME_T,%o1
 	call	trap
-	 mov	%l5,%o2
+	 mov	%l5,%o1
 
 	# should never get here
 	unimp
@@ -230,7 +225,7 @@ env_pop_tf:
 	jmp	%l1
 	rett	%l2
 
-	.global send_active_message
-send_active_message:
+	.global send_active_message_raw
+send_active_message_raw:
 	retl
-	 .word	0x81f00000	! this is the opcode for SENDAM
+	 .word	0x81f00000

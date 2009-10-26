@@ -24,6 +24,7 @@
 // libos.c or entry.S
 extern char *NTS binaryname;
 extern procinfo_t* procinfo;
+extern void** stack_ptr_array;
 extern procdata_t* procdata;
 extern syscall_front_ring_t syscallfrontring;
 extern sysevent_back_ring_t syseventbackring;

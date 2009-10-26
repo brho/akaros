@@ -2,10 +2,10 @@
 #define ROS_INC_MMU_H
 
 /*
- * This file contains definitions for the x86 memory management unit (MMU),
- * including paging- and segmentation-related data structures and constants,
- * the %cr0, %cr4, and %eflags registers, and traps.
+ * This file contains definitions for the SRMMU.
  */
+
+#include <ros/arch/mmu.h>
 
 /*
  *
@@ -52,6 +52,7 @@
 
 // Number of L1 page tables (contexts) the MMU can store at any time
 #define NCONTEXTS	8
+#define CONTEXT_TABLE_PAD 8 // we require NCONTEXTS+CONTEXT_TBALE_PAD % 16 == 0
 
 // Page directory and page table constants.
 #define NL3ENTRIES	64		// # entries in an L3 page table
@@ -66,10 +67,6 @@
 
 #define L1PGSIZE	(4096*64*64)	// bytes mapped by an L1 page
 #define L1PGSHIFT	(12+6+6)	// log2(L1PGSIZE)
-
-// The only page size we actually support for now is L3
-#define PGSIZE		L3PGSIZE
-#define	PGSHIFT		L3PGSHIFT
 
 // Page table/directory entry flags.
 #define PTE_PTD		0x001	// Entry is a Page Table Descriptor

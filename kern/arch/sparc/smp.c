@@ -94,13 +94,13 @@ int smp_call_function_all(isr_t handler, void* data,
 		if(i == core_id())
 			continue;
 
-		while(send_active_message(i,(amr_t)smp_call_wrapper,
-	        	                  handler, wrapper, data) != 0);
+		send_active_msg_sync(i,(amr_t)smp_call_wrapper,
+	        	                  handler, wrapper, data);
 	}
 
 	// send to me
-	while(send_active_message(core_id(),(amr_t)smp_call_wrapper,
-	                          handler,wrapper,data) != 0);
+	send_active_msg_sync(core_id(),(amr_t)smp_call_wrapper,
+	                          handler,wrapper,data);
 
 	cpu_relax(); // wait to get the interrupt
 
@@ -124,8 +124,8 @@ int smp_call_function_single(uint32_t dest, isr_t handler, void* data,
 
 	enable_irqsave(&state);
 
-	while(send_active_message(dest,(amr_t)smp_call_wrapper,
-	                          handler,wrapper,data) != 0);
+	send_active_msg_sync(dest,(amr_t)smp_call_wrapper,
+	                          handler,wrapper,data);
 
 	cpu_relax(); // wait to get the interrupt, if it's to this core
 

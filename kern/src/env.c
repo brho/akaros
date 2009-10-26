@@ -233,6 +233,15 @@ env_setup_vm_error:
 	return -ENOMEM;
 }
 
+static void
+proc_init_procinfo(struct proc* p)
+{
+	p->env_procinfo->id = (p->env_id & 0x3FF);
+
+	// TODO: maybe do something smarter here
+	p->env_procinfo->max_harts = num_cpus-1;
+}
+
 //
 // Allocates and initializes a new environment.
 // On success, the new environment is stored in *newenv_store.
@@ -275,7 +284,7 @@ env_alloc(env_t **newenv_store, envid_t parent_id)
 	e->env_id = generation | (e - envs);
 
 	// Set the basic status variables.
-    e->proc_lock = 0;
+	e->proc_lock = 0;
 	e->env_parent_id = parent_id;
 	proc_set_state(e, PROC_CREATED);
 	e->env_runs = 0;
@@ -293,10 +302,7 @@ env_alloc(env_t **newenv_store, envid_t parent_id)
 	memset(&e->env_tf, 0, sizeof(e->env_tf));
 	proc_init_trapframe(&e->env_tf);
 
-	/*
-	 * Initialize the contents of the e->env_procinfo structure
-	 */
-	e->env_procinfo->id = (e->env_id & 0x3FF);
+	proc_init_procinfo(e);
 
 	/*
 	 * Initialize the contents of the e->env_procdata structure
@@ -444,7 +450,7 @@ load_icode(env_t *SAFE e, uint8_t *COUNT(size) binary, size_t size)
 		memcpy(&phdr, binary + elfhdr.e_phoff + i*sizeof(phdr), sizeof(phdr));
 		if (phdr.p_type != ELF_PROG_LOAD)
 			continue;
-        // TODO: validate elf header fields!
+		// TODO: validate elf header fields!
 		// seg alloc creates PTE_U|PTE_W pages.  if you ever want to change
 		// this, there will be issues with overlapping sections
 		_end = MAX(_end, (void*)(phdr.p_va + phdr.p_memsz));

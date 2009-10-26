@@ -30,7 +30,10 @@
 
 // These are arbitrarily chosen, but with care not to overlap
 // processor defined exceptions or interrupt vectors.
-#define T_SYSCALL   0x80			// system call
+
+// T_SYSCALL is defined by the following include:
+#include <ros/arch/syscall.h>
+
 #define T_DEFAULT   0xdeadbeef		// catchall
 
 /* IPIs */

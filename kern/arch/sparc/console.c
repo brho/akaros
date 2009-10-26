@@ -11,7 +11,9 @@ cons_init(void)
 void
 cputbuf(const char*COUNT(len) buf, int len)
 {
-	frontend_syscall(RAMP_SYSCALL_write,1,(uint32_t)PADDR(buf),len);
+	int i;
+	for(i = 0; i < len; i++)
+		cputchar(buf[i]);
 }
 
 // Low-level console I/O
@@ -35,13 +37,14 @@ cons_putc(int c)
 void
 cputchar(int c)
 {
-        cons_putc(c);
+	while(sys_nbputch(c));
 }
 
 int
 cons_getc()
 {
-	return frontend_syscall(RAMP_SYSCALL_getch,0,0,0);
+	int ret = sys_nbgetch();
+	return ret < 0 ? 0 : ret;
 }
 
 int

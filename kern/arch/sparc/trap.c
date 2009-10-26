@@ -17,6 +17,30 @@
 #pragma nodeputy
 #endif
 
+spinlock_t active_message_buf_busy[MAX_NUM_CPUS] = {0};
+active_message_t active_message_buf[MAX_NUM_CPUS];
+
+uint32_t send_active_message(uint32_t dst, amr_t pc,
+                             TV(a0t) arg0, TV(a1t) arg1, TV(a2t) arg2)
+{
+	if(dst >= num_cpus || spin_trylock(&active_message_buf_busy[dst]))
+		return -1;
+
+	active_message_buf[dst].srcid = core_id();
+	active_message_buf[dst].pc = pc;
+	active_message_buf[dst].arg0 = arg0;
+	active_message_buf[dst].arg1 = arg1;
+	active_message_buf[dst].arg2 = arg2;
+
+	if(send_ipi(dst))
+	{
+		spin_unlock(&active_message_buf_busy[dst]);
+		return -1;
+	}
+
+	return 0;
+}
+
 void
 idt_init(void)
 {
@@ -25,17 +49,6 @@ idt_init(void)
 void
 sysenter_init(void)
 {
-}
-
-void
-trap_handled(void)
-{
-	if(current)
-		proc_startcore(current,&current->env_tf);
-	else if(core_id() == 0)
-		manager();
-	else
-		smp_idle();
 }
 
 void
@@ -70,10 +83,10 @@ void
 
 #define TRAPNAME_MAX	32
 
-char*
+static char*
 get_trapname(uint8_t tt, char buf[TRAPNAME_MAX])
 {
-	const char* trapnames[] = {
+	static const char* trapnames[] = {
 		[0x00] "reset",
 		[0x01] "instruction access exception",
 		[0x02] "illegal instruction",
@@ -109,27 +122,31 @@ get_trapname(uint8_t tt, char buf[TRAPNAME_MAX])
 }
 
 void
-trap(trapframe_t* state, active_message_t* msg,
-     void (*handler)(trapframe_t*,active_message_t*))
+trap(trapframe_t* state, void (*handler)(trapframe_t*))
 {
-	// TODO: this will change with multicore processes
-	if(current)
+	// TODO: must save other cores' trap frames
+	// if we want them to migrate, block, etc.
+	if(current && current->vcoremap[0] == core_id())
 	{
 		current->env_tf = *state;
-		handler(&current->env_tf,msg);
+		handler(&current->env_tf);
 	}
 	else
-		handler(state,msg);
+		handler(state);
 }
 
 void
-handle_active_message(trapframe_t* state, active_message_t* message)
+handle_ipi(trapframe_t* state)
 {
-	uint32_t src = message->srcid;
-	TV(a0t) a0 = message->arg0;
-	TV(a1t) a1 = message->arg1;
-	TV(a2t) a2 = message->arg2;
-	(message->pc)(state,src,a0,a1,a2);
+	active_message_t m;
+	m = active_message_buf[core_id()];
+	spin_unlock(&active_message_buf_busy[core_id()]);
+
+	uint32_t src = m.srcid;
+	TV(a0t) a0 = m.arg0;
+	TV(a1t) a1 = m.arg1;
+	TV(a2t) a2 = m.arg2;
+	(m.pc)(state,src,a0,a1,a2);
 	env_pop_tf(state);
 }
 
@@ -140,12 +157,14 @@ unhandled_trap(trapframe_t* state)
 	uint32_t trap_type = (state->tbr >> 4) & 0xFF;
 	get_trapname(trap_type,buf);
 
-	print_trapframe(state);
-
 	if(state->psr & PSR_PS)
+	{
+		print_trapframe(state);
 		panic("Unhandled trap in kernel!\nTrap type: %s",buf);
+	}
 	else
 	{
+		print_trapframe(state);
 		warn("Unhandled trap in user!\nTrap type: %s",buf);
 		assert(current);
 		proc_destroy(current);
@@ -153,7 +172,7 @@ unhandled_trap(trapframe_t* state)
 	}
 }
 
-void
+static void
 stack_fucked(trapframe_t* state)
 {
 	// see if the problem arose when flushing out
@@ -161,11 +180,13 @@ stack_fucked(trapframe_t* state)
 	extern uint32_t tflush;
 	if(state->pc == (uint32_t)&tflush)
 	{
-		// if so, copy original trap state, except for trap type
-		uint32_t tbr = state->tbr;
-		*state = *(trapframe_t*)(state->gpr[14]+64);
-		state->tbr = tbr;
+		// the trap happened while flushing out windows.
+		// hope this happened in the user, or else we're hosed...
+		extern char bootstacktop;
+		state = (trapframe_t*)(&bootstacktop-SIZEOF_TRAPFRAME_T-core_id()*KSTKSIZE);
 	}
+
+	warn("You just got stack fucked!");
 	unhandled_trap(state);
 }
 
@@ -225,11 +246,14 @@ handle_syscall(trapframe_t* state)
 	state->pc = state->npc;
 	state->npc += 4;
 
-	env_push_ancillary_state(current);
+	// TODO: must save other cores' ancillary state
+	// if we want them to migrate, block, etc.
+	if(current->vcoremap[0] == core_id())
+		env_push_ancillary_state(current);
 
 	state->gpr[8] = syscall(current,state,num,a1,a2,a3,a4,a5);
 
-	trap_handled();
+	proc_startcore(current,state);
 }
 
 void
@@ -266,7 +290,10 @@ handle_breakpoint(trapframe_t* state)
 	state->pc = state->npc;
 	state->npc += 4;
 
-	env_push_ancillary_state(current);
+	// TODO: must save other cores' ancillary state
+	// if we want them to migrate, block, etc.
+	if(current->vcoremap[0] == core_id())
+		env_push_ancillary_state(current);
 
 	// run the monitor
 	monitor(state);

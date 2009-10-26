@@ -110,6 +110,9 @@ _start:
 	mov	NUM_CORES_REG,%l1
 	st	%l1,[%l0]
 
+	cmp	%l1,MAX_NUM_CPUS
+	tg	0x7f
+
 	sub	%sp,64,%sp		! 64 >= sizeof(multiboot_header_t)
 	call	build_multiboot_info
 	 add	%sp,64,%o0
@@ -185,11 +188,10 @@ bootstacktop:
 ###################################################################
 # page tables
 ###################################################################
-	.align		64
-	.align		NCONTEXTS*4
-	.global		mmu_context_table
-mmu_context_table:
-	.skip		NCONTEXTS*4
+	.align		(NCONTEXTS+CONTEXT_TABLE_PAD)*4
+	.global		mmu_context_tables
+mmu_context_tables:
+	.skip		MAX_NUM_CPUS*(NCONTEXTS+CONTEXT_TABLE_PAD)*4
 
 	.align		1024
 	.global		l1_page_table

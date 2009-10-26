@@ -335,6 +335,11 @@ static envid_t sys_getcpuid(void)
 	return core_id();
 }
 
+static size_t sys_getvcoreid(env_t* e)
+{
+	return e->vcoremap[core_id()];
+}
+
 // TODO FIX Me!!!! for processes
 // Destroy a given environment (possibly the currently running environment).
 //
@@ -479,6 +484,8 @@ intreg_t syscall(struct proc *p, trapframe_t *tf, uintreg_t syscallno,
 			return sys_cgetc(p); // this will need to block
 		case SYS_getcpuid:
 			return sys_getcpuid();
+		case SYS_getvcoreid:
+			return sys_getvcoreid(p);
 		case SYS_getpid:
 			return sys_getenvid(p);
 		case SYS_proc_destroy:

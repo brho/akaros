@@ -32,13 +32,13 @@ trap_table:
 	UNHANDLED_TRAP				! 0x15
 	UNHANDLED_TRAP				! 0x16
 	UNHANDLED_TRAP				! 0x17
-	TRAP_TABLE_ENTRY(handle_active_message)	! 0x18
+	UNHANDLED_TRAP				! 0x18
 	UNHANDLED_TRAP				! 0x19
 	JMP(handle_timer_interrupt)		! 0x1A
 	UNHANDLED_TRAP				! 0x1B
 	UNHANDLED_TRAP				! 0x1C
 	UNHANDLED_TRAP				! 0x1D
-	UNHANDLED_TRAP				! 0x1E
+	TRAP_TABLE_ENTRY(handle_ipi)		! 0x1E
 	UNHANDLED_TRAP				! 0x1F
 	UNHANDLED_TRAP				! 0x20
 	UNHANDLED_TRAP				! 0x21

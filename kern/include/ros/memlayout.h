@@ -3,8 +3,9 @@
 
 #ifndef __ASSEMBLER__
 #include <ros/common.h>
-#include <arch/mmu.h>
 #endif /* not __ASSEMBLER__ */
+
+#include <ros/arch/mmu.h>
 
 /*
  * This file contains definitions for memory management in our OS,
