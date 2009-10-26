@@ -29,7 +29,15 @@ int32_t frontend_syscall_from_user(env_t* p, int32_t syscall_num, uint32_t arg0,
 			extern spinlock_t output_lock;
 			spin_lock(&output_lock);
 
-			ret = frontend_syscall(syscall_num,arg0,arg1,arg2);
+			if(arg0 == 1 || arg0 == 2)
+			{
+				int i;
+				for(i = 0; i < arg2; i++)
+					cputchar(buf[i]);
+				ret = arg2;
+			}
+			else
+				ret = frontend_syscall(syscall_num,arg0,arg1,arg2);
 
 			spin_unlock(&output_lock);
 
@@ -50,7 +58,21 @@ int32_t frontend_syscall_from_user(env_t* p, int32_t syscall_num, uint32_t arg0,
 
 		case RAMP_SYSCALL_read:
 			arg2 = arg2 > KBUFSIZE ? KBUFSIZE : arg2;
-			ret = frontend_syscall(syscall_num,arg0,PADDR((uint32_t)buf),arg2);
+
+			if(arg0 == 0)
+			{
+				if(arg2 > 0)
+				{
+					int ch = getchar();
+					buf[0] = (char)ch;
+					ret = 1;
+				}
+				else
+					ret = 0;
+			}
+			else
+				ret = frontend_syscall(syscall_num,arg0,PADDR((uint32_t)buf),arg2);
+
 			if(memcpy_to_user(p,(void*)arg1,buf,arg2))
 				return -1;
 			break;
@@ -131,7 +153,7 @@ int32_t frontend_syscall(int32_t syscall_num, uint32_t arg0, uint32_t arg1, uint
 int32_t sys_nbputch(char ch)
 {
 	static spinlock_t putch_lock = 0;
-	spin_lock(&putch_lock);
+	spin_lock_irqsave(&putch_lock);
 
 	int ret = -1;
 	if(magic_mem[8] == 0)
@@ -140,14 +162,14 @@ int32_t sys_nbputch(char ch)
 		ret = 0;
 	}
 
-	spin_unlock(&putch_lock);
+	spin_unlock_irqsave(&putch_lock);
 	return ret;
 }
 
 int32_t sys_nbgetch()
 {
 	static spinlock_t getch_lock = 0;
-	spin_lock(&getch_lock);
+	spin_lock_irqsave(&getch_lock);
 
 	int result = -1;
 	if(magic_mem[9]) 
@@ -156,6 +178,6 @@ int32_t sys_nbgetch()
 		magic_mem[9] = 0;
 	}
 
-	spin_unlock(&getch_lock);
+	spin_unlock_irqsave(&getch_lock);
 	return result;
 }
