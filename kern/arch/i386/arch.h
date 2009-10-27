@@ -8,6 +8,7 @@
 
 /* Arch Constants */
 #define MAX_NUM_CPUS				255
+#define HW_CACHE_ALIGN				 64
 
 static __inline void breakpoint(void) __attribute__((always_inline));
 static __inline void invlpg(void *SNT addr) __attribute__((always_inline));

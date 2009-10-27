@@ -24,8 +24,11 @@ void* (DALLOC(size) kmalloc)(size_t size, int flags);
 void* (DALLOC(size) krealloc)(void* buf, size_t size, int flags);
 void  (DFREE(addr) kfree)(void *addr);
 
+/* Flags */
 #define KMALLOC_TAG_CACHE 1
 #define KMALLOC_TAG_PAGES 2
+
+#define KMALLOC_CANARY 0xdeadbabe
 
 struct kmalloc_tag {
 	int flags;
@@ -33,6 +36,7 @@ struct kmalloc_tag {
 		struct kmem_cache *my_cache WHEN(flags == KMALLOC_TAG_CACHE);
 		size_t num_pages WHEN(flags == KMALLOC_TAG_PAGES);
 	};
+	uint32_t canary;
 };
 
 #endif //ROS_KERN_KMALLOC_H

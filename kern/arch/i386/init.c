@@ -18,6 +18,8 @@ void arch_init()
 	pci_init();
 	ioapic_init(); // MUST BE AFTER PCI/ISA INIT!
 		
+	// TODO: move these back to regular init.  requires fixing the __NETWORK__
+	// inits to not need multiple cores running.
 	// this returns when all other cores are done and ready to receive IPIs
 	smp_boot();
 	env_init();

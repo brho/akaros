@@ -29,7 +29,8 @@ asm (
 
 void
 timer_init(void)
-{
+{	
+#if 0
 	uint32_t ticks = timer_ticks;
 	uint64_t tsc_ticks;
 
@@ -41,6 +42,8 @@ timer_init(void)
 	while(ticks == timer_ticks) ;
 
 	system_timing.tsc_freq = (read_tsc() - tsc_ticks)*INTERRUPT_TIMER_HZ;
+#endif
+	system_timing.tsc_freq = 1000000;
 
 	cprintf("TSC Frequency: %llu\n", system_timing.tsc_freq);
 }

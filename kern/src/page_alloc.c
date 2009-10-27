@@ -71,7 +71,7 @@ error_t page_alloc(page_t** page)
 }
 
 /**
- * @brief Allocated 2^order contiguous physical pages.  Will incrememnt the
+ * @brief Allocated 2^order contiguous physical pages.  Will increment the
  * reference count for the pages.
  *
  * @param[in] order order of the allocation

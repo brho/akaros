@@ -133,7 +133,7 @@ void smp_boot(void)
 	// booting.  Specifically, it's when they turn on paging and have that temp
 	// mapping pulled out from under them.  Now, if a core loses, it will spin
 	// on the trampoline (which we must be careful to not deallocate)
-	spin_lock(get_smp_bootlock());
+	__spin_lock(get_smp_bootlock());
 	cprintf("Num_Cpus Detected: %d\n", num_cpus);
 
 	// Remove the mapping of the page used by the trampoline
@@ -155,6 +155,9 @@ void smp_boot(void)
 	barrier_t generic_barrier;
 	init_barrier(&generic_barrier, num_cpus); // barrier used by smp_mtrr_handler
 	smp_call_function_all(smp_mtrr_handler, &generic_barrier, 0);
+
+	// initialize my per-cpu info
+	smp_percpu_init();
 
 	// Should probably flush everyone's TLB at this point, to get rid of
 	// temp mappings that were removed.  TODO
@@ -257,6 +260,17 @@ uint32_t smp_main(void)
 	// set a default logical id for now
 	lapic_set_logid(lapic_get_id());
 
+	// initialize my per-cpu info
+	smp_percpu_init();
+
 	return my_stack_top; // will be loaded in smp_entry.S
 }
 
+/* Perform any initialization needed by per_cpu_info.  Right now, this just
+ * inits the amsg list (which sparc will probably also want).  Make sure every
+ * core calls this at some point in the smp_boot process. */
+void smp_percpu_init(void)
+{
+	uint32_t coreid = core_id();
+	STAILQ_INIT(&per_cpu_info[coreid].active_msgs);
+}

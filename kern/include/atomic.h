@@ -7,9 +7,9 @@
 #include <arch/arch.h>
 
 static inline void
-(SLOCK(0) spin_lock_irqsave)(volatile uint32_t SRACY*SAFE lock);
+(SLOCK(0) spin_lock_irqsave)(spinlock_t SRACY*SAFE lock);
 static inline void
-(SUNLOCK(0) spin_unlock_irqsave)(volatile uint32_t SRACY*SAFE lock);
+(SUNLOCK(0) spin_unlock_irqsave)(spinlock_t SRACY*SAFE lock);
 
 /*********************** Checklist stuff **********************/
 typedef struct checklist_mask {
@@ -20,7 +20,7 @@ typedef struct checklist_mask {
 
 // mask contains an unspecified array, so it needs to be at the bottom
 struct checklist {
-	volatile uint32_t lock;
+	spinlock_t lock;
 	checklist_mask_t mask;
 	// eagle-eyed readers may know why this might have been needed. 2009-09-04
 	//volatile uint8_t (COUNT(BYTES_FOR_BITMASK(size)) bits)[];
@@ -30,7 +30,7 @@ typedef struct checklist RACY checklist_t;
 #define ZEROS_ARRAY(size) {[0 ... ((size)-1)] 0}
 
 #define DEFAULT_CHECKLIST_MASK(sz) {(sz), ZEROS_ARRAY(BYTES_FOR_BITMASK(sz))}
-#define DEFAULT_CHECKLIST(sz) {0, DEFAULT_CHECKLIST_MASK(sz)}
+#define DEFAULT_CHECKLIST(sz) {SPINLOCK_INITIALIZER, DEFAULT_CHECKLIST_MASK(sz)}
 #define INIT_CHECKLIST(nm, sz)	\
 	checklist_t nm = DEFAULT_CHECKLIST(sz);
 #define INIT_CHECKLIST_MASK(nm, sz)	\
@@ -57,7 +57,7 @@ void down_checklist(checklist_t* list);
 
 /* Barrier: currently made for everyone barriering.  Change to use checklist */
 struct barrier {
-	volatile uint32_t lock;
+	spinlock_t lock;
 	uint32_t init_count;
 	uint32_t current_count;
     volatile uint8_t ready;
@@ -71,25 +71,25 @@ void waiton_barrier(barrier_t* barrier);
 
 // If ints are enabled, disable them and note it in the top bit of the lock
 // There is an assumption about releasing locks in order here...
-static inline void spin_lock_irqsave(volatile uint32_t*SAFE lock)
+static inline void spin_lock_irqsave(spinlock_t *SAFE lock)
 {
 	uint32_t irq_en;
 	irq_en = irq_is_enabled();
 	disable_irq();
 	spin_lock(lock);
 	if (irq_en)
-		*lock |= 0x80000000;
+		lock->rlock |= 0x80000000;
 }
 
 // if the high bit of the lock is set, then re-enable interrupts
 // (note from asw: you're lucky this works, you little-endian jerks)
-static inline void spin_unlock_irqsave(volatile uint32_t*SAFE lock)
+static inline void spin_unlock_irqsave(spinlock_t *SAFE lock)
 {
-	if (*lock & 0x80000000) {
-		*lock = 0;
+	if (lock->rlock & 0x80000000) {
+		spin_unlock(lock);
 		enable_irq();
 	} else
-		*lock = 0;
+		spin_unlock(lock);
 }
 
 #endif /* !ROS_KERN_ATOMIC_H */

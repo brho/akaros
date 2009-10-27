@@ -1,18 +1,11 @@
 #ifndef PARLIB_INC_DEBUG_H
 #define PARLIB_INC_DEBUG_H
 
-typedef void * TRUSTED va_list;
+typedef __builtin_va_list va_list;
 
-#define __va_size(type) \
-    (((sizeof(type) + sizeof(long) - 1) / sizeof(long)) * sizeof(long))
-
-#define va_start(ap, last) \
-    ((ap) = (va_list)&(last) + __va_size(last))
-
-#define va_arg(ap, type) \
-    (*(type *COUNT(1))((ap) += __va_size(type), (ap) - __va_size(type)))
-
-#define va_end(ap)  ((void)0)
+#define va_start(v,l)   __builtin_va_start(v,l)
+#define va_end(v)	__builtin_va_end(v)
+#define va_arg(v,l)     __builtin_va_arg(v,l)
 
 size_t	strnlen(const char *NTS s, size_t size);
 #ifdef __DEPUTY__

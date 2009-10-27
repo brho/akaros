@@ -15,6 +15,7 @@
 #include <monitor.h>
 #include <process.h>
 #include <stdio.h>
+#include <slab.h>
 
 #include <syscall.h>
 
@@ -384,31 +385,32 @@ void sysenter_callwrapper(struct Trapframe *tf)
 	proc_startcore(current, tf);
 }
 
+struct kmem_cache *active_msg_cache;
+void active_msg_init(void)
+{
+	active_msg_cache = kmem_cache_create("active_msgs",
+	                   sizeof(struct active_message), HW_CACHE_ALIGN, 0, 0, 0);
+}
+
 uint32_t send_active_message(uint32_t dst, amr_t pc,
                              TV(a0t) arg0, TV(a1t) arg1, TV(a2t) arg2)
 {
-	error_t retval = -EBUSY;
+	active_message_t *a_msg;
 	assert(pc);
+	// note this will be freed on the destination core
+	a_msg = kmem_cache_alloc(active_msg_cache, 0);
+	a_msg->srcid = core_id();
+	a_msg->pc = pc;
+	a_msg->arg0 = arg0;
+	a_msg->arg1 = arg1;
+	a_msg->arg2 = arg2;
 	spin_lock_irqsave(&per_cpu_info[dst].amsg_lock);
-	size_t current_amsg = per_cpu_info[dst].amsg_current;
-	// If there's a PC there, then that means it's an outstanding message
-	FOR_CIRC_BUFFER(current_amsg, NUM_ACTIVE_MESSAGES, i) {
-		if (per_cpu_info[dst].active_msgs[i].pc)
-			continue;
-		per_cpu_info[dst].active_msgs[i].pc = pc;
-		per_cpu_info[dst].active_msgs[i].arg0 = arg0;
-		per_cpu_info[dst].active_msgs[i].arg1 = arg1;
-		per_cpu_info[dst].active_msgs[i].arg2 = arg2;
-		per_cpu_info[dst].active_msgs[i].srcid = core_id();
-		retval = 0;
-		break;
-	}
+	STAILQ_INSERT_TAIL(&per_cpu_info[dst].active_msgs, a_msg, link);
 	spin_unlock_irqsave(&per_cpu_info[dst].amsg_lock);
 	// since we touched memory the other core will touch (the lock), we don't
 	// need an wmb_f()
-	if (!retval)
-		send_ipi(dst, 0, I_ACTIVE_MSG);
-	return retval;
+	send_ipi(dst, 0, I_ACTIVE_MSG);
+	return 0;
 }
 
 /* Active message handler.  We don't want to block other AMs from coming in, so
@@ -417,35 +419,40 @@ uint32_t send_active_message(uint32_t dst, amr_t pc,
  * we already handled the message (or someone is sending IPIs without loading
  * the active message...)
  * Note that all of this happens from interrupt context, and interrupts are
- * currently disabled for this gate. */
+ * currently disabled for this gate.  Interrupts need to be disabled so that the
+ * self-ipi doesn't preempt the execution of this active message. */
 void __active_message(trapframe_t *tf)
 {
 	per_cpu_info_t RO*myinfo = &per_cpu_info[core_id()];
-	active_message_t amsg;
+	active_message_t my_msg, *a_msg;
 
 	lapic_send_eoi();
-	while (1) { // will break out when we find an empty amsg
+	while (1) { // will break out when there are no more messages
 		/* Get the message */
 		spin_lock_irqsave(&myinfo->amsg_lock);
-		if (myinfo->active_msgs[myinfo->amsg_current].pc) {
-			amsg = myinfo->active_msgs[myinfo->amsg_current];
-			myinfo->active_msgs[myinfo->amsg_current].pc = 0;
-			myinfo->amsg_current = (myinfo->amsg_current + 1) %
-			                       NUM_ACTIVE_MESSAGES;
-		} else { // was no PC in the current active message, meaning we do nothing
+		a_msg = STAILQ_FIRST(&myinfo->active_msgs);
+		/* No messages to execute, so break out, etc. */
+		if (!a_msg) {
 			spin_unlock_irqsave(&myinfo->amsg_lock);
 			return;
 		}
+		STAILQ_REMOVE_HEAD(&myinfo->active_msgs, link);
+		spin_unlock_irqsave(&myinfo->amsg_lock);
+		// copy in, and then free, in case we don't return
+		my_msg = *a_msg;
+		kmem_cache_free(active_msg_cache, a_msg);
+		assert(my_msg.pc);
 		/* In case the function doesn't return (which is common: __startcore,
 		 * __death, etc), there is a chance we could lose an amsg.  We can only
 		 * have up to two interrupts outstanding, and if we never return, we
 		 * never deal with any other amsgs.  This extra IPI hurts performance
 		 * but is only necessary if there is another outstanding message in the
 		 * buffer, but makes sure we never miss out on an amsg. */
-		if (myinfo->active_msgs[myinfo->amsg_current].pc)
-			send_ipi(core_id(), 0, I_ACTIVE_MSG);
+		spin_lock_irqsave(&myinfo->amsg_lock);
+		if (!STAILQ_EMPTY(&myinfo->active_msgs))
+			send_self_ipi(I_ACTIVE_MSG);
 		spin_unlock_irqsave(&myinfo->amsg_lock);
 		/* Execute the active message */
-		amsg.pc(tf, amsg.srcid, amsg.arg0, amsg.arg1, amsg.arg2);
+		my_msg.pc(tf, my_msg.srcid, my_msg.arg0, my_msg.arg1, my_msg.arg2);
 	}
 }

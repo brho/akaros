@@ -12,7 +12,6 @@
 
 #include <ros/common.h>
 #include <arch/timer.h>
-#include <arch/frontend.h>
 
 static __inline void breakpoint(void) __attribute__((always_inline));
 static __inline void invlpg(void *addr) __attribute__((always_inline));
@@ -151,7 +150,6 @@ cache_flush(void)
 static __inline void
 reboot(void)
 {
-	frontend_syscall(RAMP_SYSCALL_exit,0,0,0);
 	while(1);
 }
 

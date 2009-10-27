@@ -664,7 +664,7 @@ void test_hello_world_handler(trapframe_t *tf, void* data)
 	        trapno, core_id(), tf);
 }
 
-uint32_t print_info_lock = 0;
+spinlock_t print_info_lock = SPINLOCK_INITIALIZER;
 
 void test_print_info_handler(trapframe_t *tf, void* data)
 {

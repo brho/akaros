@@ -12,7 +12,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 
-spinlock_t output_lock = 0;
+spinlock_t output_lock = SPINLOCK_INITIALIZER;
 
 void putch(int ch, int **cnt)
 {

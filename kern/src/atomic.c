@@ -90,8 +90,7 @@ int release_checklist(checklist_t* list)
 // peaks in and sees if the list is locked with it's spinlock
 int checklist_is_locked(checklist_t* list)
 {
-	// remember the lock status is the lowest byte of the lock
-	return list->lock & 0xff;
+	return spin_locked(&list->lock);
 }
 
 // no synch guarantees - just looks at the list
@@ -115,7 +114,7 @@ void down_checklist(checklist_t* list)
 /* Barriers */
 void init_barrier(barrier_t* barrier, uint32_t count)
 {
-	barrier->lock = 0;
+	spinlock_init(&barrier->lock);
 	barrier->init_count = count;
 	barrier->current_count = count;
 	barrier->ready = 0;

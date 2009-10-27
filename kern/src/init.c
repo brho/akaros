@@ -69,6 +69,7 @@ void kernel_init(multiboot_info_t *mboot_info)
 	kmalloc_init();
 
 	idt_init();
+	active_msg_init();
 	sysenter_init();
 	timer_init();
 	

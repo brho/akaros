@@ -4,7 +4,7 @@
 #include <arch/atomic.h>
 
 typedef struct barrier {
-	volatile uint32_t lock;
+	spinlock_t lock;
 	uint32_t init_count;
 	uint32_t current_count;
     volatile uint8_t ready;

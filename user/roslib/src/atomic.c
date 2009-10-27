@@ -4,7 +4,7 @@
 
 void init_barrier(barrier_t* barrier, uint32_t count)
 {
-	barrier->lock = 0;
+	spinlock_init(&barrier->lock);
 	barrier->init_count = count;
 	barrier->current_count = count;
 	barrier->ready = 0;

@@ -227,7 +227,7 @@ handle_syscall(trapframe_t* state)
 
 	env_push_ancillary_state(current);
 
-	state->gpr[8] = syscall(current,num,a1,a2,a3,a4,a5);
+	state->gpr[8] = syscall(current,state,num,a1,a2,a3,a4,a5);
 
 	trap_handled();
 }

@@ -426,14 +426,69 @@ error_t memcpy_from_user(env_t* env, void* COUNT(len) dest,
 		if(!pte || (*pte & perm) != perm)
 			return -EFAULT;
 
-		void*COUNT(PGSIZE) kpage = KADDR(PTE_ADDR(pte));
-		void* src_start = i > 0 ? kpage : kpage+(va-start);
+		void*COUNT(PGSIZE) kpage = KADDR(PTE_ADDR(*pte));
+		const void* src_start = i > 0 ? kpage : kpage+(va-start);
 		void* dst_start = dest+bytes_copied;
 		size_t copy_len = PGSIZE;
 		if(i == 0)
 			copy_len -= va-start;
 		if(i == num_pages-1)
-			copy_len -= end-(start+len);
+			copy_len -= end-(va+len);
+
+		memcpy(dst_start,src_start,copy_len);
+		bytes_copied += copy_len;
+	}
+
+	assert(bytes_copied == len);
+
+	return ESUCCESS;
+}
+
+/**
+ * @brief Copies data to a user buffer from a kernel buffer.
+ * 
+ * @param env  the environment associated with the user program
+ *             to which the buffer is being copied
+ * @param dest the destination address of the user buffer
+ * @param va   the address of the kernel buffer from which we are copying
+ * @param len  the length of the user buffer
+ *
+ * @return ESUCCESS on success
+ * @return -EFAULT  the page assocaited with 'va' is not present, the user 
+ *                  lacks the proper permissions, or there was an invalid 'va'
+ */
+error_t memcpy_to_user(env_t* env, void*DANGEROUS va,
+                 const void *COUNT(len) src, size_t len)
+{
+	const void *DANGEROUS start, *DANGEROUS end;
+	size_t num_pages, i;
+	pte_t *pte;
+	uintptr_t perm = PTE_P | PTE_USER_RW;
+	size_t bytes_copied = 0;
+
+	static_assert(ULIM % PGSIZE == 0 && ULIM != 0); // prevent wrap-around
+
+	start = ROUNDDOWN(va, PGSIZE);
+	end = ROUNDUP(va + len, PGSIZE);
+
+	if(start >= (void*SNT)ULIM || end >= (void*SNT)ULIM)
+		return -EFAULT;
+
+	num_pages = PPN(end - start);
+	for(i = 0; i < num_pages; i++)
+	{
+		pte = pgdir_walk(env->env_pgdir, start+i*PGSIZE, 0);
+		if(!pte || (*pte & perm) != perm)
+			return -EFAULT;
+
+		void*COUNT(PGSIZE) kpage = KADDR(PTE_ADDR(*pte));
+		void* dst_start = i > 0 ? kpage : kpage+(va-start);
+		const void* src_start = src+bytes_copied;
+		size_t copy_len = PGSIZE;
+		if(i == 0)
+			copy_len -= va-start;
+		if(i == num_pages-1)
+			copy_len -= end-(va+len);
 
 		memcpy(dst_start,src_start,copy_len);
 		bytes_copied += copy_len;

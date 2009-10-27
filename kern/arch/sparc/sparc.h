@@ -23,7 +23,6 @@
 #define XSTR(arg) STR(arg)
 
 #include <ros/common.h>
-#include <arch/frontend.h>
 
 static __inline uint32_t read_psr(void) __attribute__((always_inline));
 static __inline uint32_t read_wim(void) __attribute__((always_inline));

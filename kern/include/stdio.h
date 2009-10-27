@@ -14,6 +14,8 @@
 #endif
 
 #define printk(args...) cprintf(args)
+#define I_AM_HERE printk("Core %d is in %s() at %s:%d\n", core_id(), \
+                         __FUNCTION__, __FILE__, __LINE__);
 
 // lib/stdio.c
 void	cputchar(int c);
