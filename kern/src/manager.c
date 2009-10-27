@@ -45,7 +45,7 @@ void manager_brho(void)
 {
 	static uint8_t RACY progress = 0;
 
-	struct proc *envs[256];
+	static struct proc *envs[256];
 	static struct proc *p ;
 
 	uint32_t corelist[MAX_NUM_CPUS];
@@ -183,7 +183,7 @@ void manager_brho(void)
 
 void manager_klueska()
 {
-	struct proc *envs[256];
+	static struct proc *envs[256];
 	static uint8_t progress = 0;
 
 	if (progress++ == 0) {
@@ -196,42 +196,76 @@ void manager_klueska()
 	panic("DON'T PANIC");
 }
 
+static char*
+itoa(int num, char* buf0, size_t base)
+{
+	if(base > 16)
+		return NULL;
+
+	char* buf = buf0;
+	int len = 0, i;
+
+	if(num < 0)
+	{
+		*buf++ = '-';
+		num = -num;
+	}
+
+	do {
+		buf[len++] = "0123456789abcdef"[num%base];
+		num /= base;
+	} while(num);
+
+	for(i = 0; i < len/2; i++)
+	{
+		char temp = buf[i];
+		buf[i] = buf[len-i-1];
+		buf[len-i-1] = temp;
+	}
+	buf[len] = 0;
+
+	return buf0;
+}
+
 void manager_waterman()
 {
-	struct proc *envs[256];
+	static struct proc *envs[256];
 	static uint8_t progress = 0;
+	char buf0[32],buf1[32];
+
+	#define RUN_APP(name,nargs,args...) \
+		do { \
+			envs[progress-1] = kfs_proc_create(kfs_lookup_path(name)); \
+			proc_set_state(envs[progress-1], PROC_RUNNABLE_S); \
+			if(nargs) proc_init_argc_argv(envs[progress-1],nargs,##args); \
+			proc_run(envs[progress-1]); \
+		} while(0)
+	
 
 	switch(progress++)
 	{
 		case 0:
-			printk("got here\n");
-			envs[progress] = kfs_proc_create(kfs_lookup_path("parlib_draw_nanwan_standalone"));
-			proc_set_state(envs[progress], PROC_RUNNABLE_S);
-			proc_run(envs[progress]);
+			RUN_APP("parlib_draw_nanwan_standalone",0);
 			break;
-
 		case 1:
-			envs[progress] = kfs_proc_create(kfs_lookup_path("parlib_manycore_test"));
-			proc_set_state(envs[progress], PROC_RUNNABLE_S);
-			proc_run(envs[progress]);
+			RUN_APP("parlib_manycore_test",0);
 			break;
-
 		case 2:
-			envs[progress] = kfs_proc_create(kfs_lookup_path("parlib_draw_nanwan_standalone"));
-			proc_set_state(envs[progress], PROC_RUNNABLE_S);
-			proc_run(envs[progress]);
+			RUN_APP("parlib_draw_nanwan_standalone",0);
 			break;
-
 		case 3:
-			envs[progress] = kfs_proc_create(kfs_lookup_path("parlib_pthread_pthread_test"));
-			proc_set_state(envs[progress], PROC_RUNNABLE_S);
-			proc_run(envs[progress]);
+			RUN_APP("parlib_pthread_pthread_test",0);
+			break;
+		case 4:
+			RUN_APP("parlib_pthread_blackscholes",3,"blackscholes",itoa(num_cpus-1,buf0,10),itoa(256,buf1,10));
+			break;
+		case 5:
+			while(*(volatile uint32_t*)&envs[4]->state != ENV_FREE);
+			reboot();
 			break;
 
-		case 4:
-			envs[progress] = kfs_proc_create(kfs_lookup_path("parlib_matrix"));
-			proc_set_state(envs[progress], PROC_RUNNABLE_S);
-			proc_run(envs[progress]);
+		case 10:
+			RUN_APP("parlib_matrix",0);
 			break;
 	}
 

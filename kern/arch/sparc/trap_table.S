@@ -7,7 +7,7 @@ trap_table:
 
 	UNHANDLED_TRAP				! 0x00
 	TRAP_TABLE_ENTRY(access_exception)	! 0x01
-	UNHANDLED_TRAP				! 0x02
+	TRAP_TABLE_ENTRY(illegal_instruction)	! 0x02
 	UNHANDLED_TRAP				! 0x03
 	TRAP_TABLE_ENTRY(fp_disabled)		! 0x04
 	JMP(handle_window_overflow)		! 0x05
@@ -15,9 +15,9 @@ trap_table:
 
 #ifndef TINY_MEM
 
-	TRAP_TABLE_ENTRY(address_unaligned)	! 0x01
+	TRAP_TABLE_ENTRY(address_unaligned)	! 0x07
 	TRAP_TABLE_ENTRY(fp_exception)		! 0x08
-	TRAP_TABLE_ENTRY(access_exception)	! 0x01
+	TRAP_TABLE_ENTRY(access_exception)	! 0x09
 	UNHANDLED_TRAP				! 0x0A
 	UNHANDLED_TRAP				! 0x0B
 	UNHANDLED_TRAP				! 0x0C

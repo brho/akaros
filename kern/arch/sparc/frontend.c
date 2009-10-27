@@ -9,6 +9,7 @@
 #include <atomic.h>
 #include <pmap.h>
 #include <arch/frontend.h>
+#include <smp.h>
 
 volatile int magic_mem[10];
 
@@ -180,4 +181,21 @@ int32_t sys_nbgetch()
 
 	spin_unlock_irqsave(&getch_lock);
 	return result;
+}
+
+void __diediedie(trapframe_t* tf, uint32_t srcid, uint32_t code, uint32_t a1, uint32_t a2)
+{
+	frontend_syscall(RAMP_SYSCALL_exit,(int)code,0,0);
+	while(1);
+}
+
+void appserver_die(int code)
+{
+	int i;
+	for(i = 0; i < num_cpus; i++)
+		if(i != core_id())
+			while(send_active_message(i,(amr_t)&__diediedie,(void*)code,0,0));
+
+	// just in case.
+	__diediedie(0,0,code,0,0);
 }

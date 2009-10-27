@@ -152,6 +152,8 @@ cache_flush(void)
 static __inline void
 reboot(void)
 {
+	extern void appserver_die(int code);
+	appserver_die(0);
 	while(1);
 }
 

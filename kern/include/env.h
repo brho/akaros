@@ -44,10 +44,8 @@ typedef int32_t envid_t;
 struct Env {
 	TAILQ_ENTRY(Env) proc_link NOINIT;	// Free list link pointers
 	spinlock_t proc_lock;
-	trapframe_t env_tf 						// Saved registers
-	  __attribute__((aligned (8)));			// for sparc --asw
-	ancillary_state_t env_ancillary_state 	// State saved when descheduled
-	  __attribute__((aligned (8)));			// for sparc --asw
+	trapframe_t env_tf; 						// Saved registers
+	ancillary_state_t env_ancillary_state; 	// State saved when descheduled
 	envid_t env_id;				// Unique environment identifier
 	envid_t env_parent_id;		// env_id of this env's parent
 	uint32_t state;				// Status of the process

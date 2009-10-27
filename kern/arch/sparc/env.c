@@ -16,72 +16,77 @@
 void
 ( env_push_ancillary_state)(env_t* e)
 {
-	static_assert(offsetof(ancillary_state_t,fpr) % 8 == 0);
+	if(e->env_tf.psr & PSR_EF)
+		save_fp_state(&e->env_ancillary_state);
+}
 
+void
+save_fp_state(ancillary_state_t* silly)
+{
 	#define push_two_fp_regs(pdest,n) \
 	    __asm__ __volatile__ ("std	%%f" XSTR(n) ",[%0+4*" XSTR(n) "]" \
 	                      : : "r"(pdest) : "memory");
 
-	if(e->env_tf.psr & PSR_EF)
-	{
-		write_psr(read_psr() | PSR_EF);
+	write_psr(read_psr() | PSR_EF);
 
-		e->env_ancillary_state.fsr = read_fsr();
+	silly->fsr = read_fsr();
 
-		push_two_fp_regs(e->env_ancillary_state.fpr,0);
-		push_two_fp_regs(e->env_ancillary_state.fpr,2);
-		push_two_fp_regs(e->env_ancillary_state.fpr,4);
-		push_two_fp_regs(e->env_ancillary_state.fpr,6);
-		push_two_fp_regs(e->env_ancillary_state.fpr,8);
-		push_two_fp_regs(e->env_ancillary_state.fpr,10);
-		push_two_fp_regs(e->env_ancillary_state.fpr,12);
-		push_two_fp_regs(e->env_ancillary_state.fpr,14);
-		push_two_fp_regs(e->env_ancillary_state.fpr,16);
-		push_two_fp_regs(e->env_ancillary_state.fpr,18);
-		push_two_fp_regs(e->env_ancillary_state.fpr,20);
-		push_two_fp_regs(e->env_ancillary_state.fpr,22);
-		push_two_fp_regs(e->env_ancillary_state.fpr,24);
-		push_two_fp_regs(e->env_ancillary_state.fpr,26);
-		push_two_fp_regs(e->env_ancillary_state.fpr,28);
-		push_two_fp_regs(e->env_ancillary_state.fpr,30);
+	push_two_fp_regs(silly->fpr,0);
+	push_two_fp_regs(silly->fpr,2);
+	push_two_fp_regs(silly->fpr,4);
+	push_two_fp_regs(silly->fpr,6);
+	push_two_fp_regs(silly->fpr,8);
+	push_two_fp_regs(silly->fpr,10);
+	push_two_fp_regs(silly->fpr,12);
+	push_two_fp_regs(silly->fpr,14);
+	push_two_fp_regs(silly->fpr,16);
+	push_two_fp_regs(silly->fpr,18);
+	push_two_fp_regs(silly->fpr,20);
+	push_two_fp_regs(silly->fpr,22);
+	push_two_fp_regs(silly->fpr,24);
+	push_two_fp_regs(silly->fpr,26);
+	push_two_fp_regs(silly->fpr,28);
+	push_two_fp_regs(silly->fpr,30);
 
-		write_psr(read_psr() & ~PSR_EF);
-	}
+	write_psr(read_psr() & ~PSR_EF);
 }
 
 void
 ( env_pop_ancillary_state)(env_t* e)
 { 
+	if(e->env_tf.psr & PSR_EF)
+		restore_fp_state(&e->env_ancillary_state);
+}
 
+void
+restore_fp_state(ancillary_state_t* silly)
+{
 	#define pop_two_fp_regs(pdest,n) \
 	    __asm__ __volatile__ ("ldd	[%0+4*" XSTR(n) "], %%f" XSTR(n) \
 	                      : : "r"(pdest) : "memory");
 
-	if(e->env_tf.psr & PSR_EF)
-	{
-		write_psr(read_psr() | PSR_EF);
+	write_psr(read_psr() | PSR_EF);
 
-		pop_two_fp_regs(e->env_ancillary_state.fpr,0);
-		pop_two_fp_regs(e->env_ancillary_state.fpr,2);
-		pop_two_fp_regs(e->env_ancillary_state.fpr,4);
-		pop_two_fp_regs(e->env_ancillary_state.fpr,6);
-		pop_two_fp_regs(e->env_ancillary_state.fpr,8);
-		pop_two_fp_regs(e->env_ancillary_state.fpr,10);
-		pop_two_fp_regs(e->env_ancillary_state.fpr,12);
-		pop_two_fp_regs(e->env_ancillary_state.fpr,14);
-		pop_two_fp_regs(e->env_ancillary_state.fpr,16);
-		pop_two_fp_regs(e->env_ancillary_state.fpr,18);
-		pop_two_fp_regs(e->env_ancillary_state.fpr,20);
-		pop_two_fp_regs(e->env_ancillary_state.fpr,22);
-		pop_two_fp_regs(e->env_ancillary_state.fpr,24);
-		pop_two_fp_regs(e->env_ancillary_state.fpr,26);
-		pop_two_fp_regs(e->env_ancillary_state.fpr,28);
-		pop_two_fp_regs(e->env_ancillary_state.fpr,30);
+	pop_two_fp_regs(silly->fpr,0);
+	pop_two_fp_regs(silly->fpr,2);
+	pop_two_fp_regs(silly->fpr,4);
+	pop_two_fp_regs(silly->fpr,6);
+	pop_two_fp_regs(silly->fpr,8);
+	pop_two_fp_regs(silly->fpr,10);
+	pop_two_fp_regs(silly->fpr,12);
+	pop_two_fp_regs(silly->fpr,14);
+	pop_two_fp_regs(silly->fpr,16);
+	pop_two_fp_regs(silly->fpr,18);
+	pop_two_fp_regs(silly->fpr,20);
+	pop_two_fp_regs(silly->fpr,22);
+	pop_two_fp_regs(silly->fpr,24);
+	pop_two_fp_regs(silly->fpr,26);
+	pop_two_fp_regs(silly->fpr,28);
+	pop_two_fp_regs(silly->fpr,30);
 
-		write_fsr(e->env_ancillary_state.fsr);
+	write_fsr(silly->fsr);
 
-		write_psr(read_psr() & ~PSR_EF);
-	}
+	write_psr(read_psr() & ~PSR_EF);
 }
 
 

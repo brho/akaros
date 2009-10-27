@@ -217,9 +217,31 @@ access_exception(trapframe_t* state)
 }
 
 void
-fp_exception(trapframe_t* state)
+illegal_instruction(trapframe_t* state)
 {
 	unhandled_trap(state);
+}
+
+void
+real_fp_exception(trapframe_t* state, ancillary_state_t* sillystate)
+{
+	unhandled_trap(state);
+}
+
+void
+fp_exception(trapframe_t* state)
+{
+	ancillary_state_t sillystate;
+	save_fp_state(&sillystate);	
+
+	// since our FP HW exception behavior is sketchy, reexecute
+	// any faulting FP instruction in SW, which may call
+	// real_fp_exception above
+	emulate_fpu(state,&sillystate);
+
+	restore_fp_state(&sillystate);
+
+	env_pop_tf(state);
 }
 
 void
