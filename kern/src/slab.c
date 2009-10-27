@@ -11,6 +11,11 @@
  * controlling bufctl at the top of the slab object.  Fix this with TODO (BUF).
  */
 
+#ifdef __IVY__
+#pragma nodeputy
+#pragma nosharc
+#endif
+
 #include <slab.h>
 #include <stdio.h>
 #include <assert.h>

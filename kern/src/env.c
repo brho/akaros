@@ -280,8 +280,9 @@ env_alloc(env_t **newenv_store, envid_t parent_id)
 	e->env_flags = 0;
 	e->env_entry = 0; // cheating.  this really gets set in load_icode
 	e->num_vcores = 0;
-	for (int i = 0; i < MAX_NUM_CPUS; i++)
-		e->vcoremap[i] = -1;
+	memset(&e->vcoremap, -1, sizeof(e->vcoremap));
+	//for (int i = 0; i < MAX_NUM_CPUS; i++)
+		//e->vcoremap[i] = -1;
 	memset(&e->resources, 0, sizeof(e->resources));
 
 	memset(&e->env_ancillary_state, 0, sizeof(e->env_ancillary_state));

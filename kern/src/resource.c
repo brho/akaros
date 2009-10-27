@@ -6,6 +6,10 @@
  * Kernel resource management.
  */
 
+#ifdef __IVY__
+#pragma nosharc
+#endif
+
 #include <resource.h>
 #include <process.h>
 #include <stdio.h>

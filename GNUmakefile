@@ -51,12 +51,13 @@ endif
 # Default programs for compilation
 ifeq ($(COMPILER),IVY)
 KERN_CFLAGS := --deputy\
-                  --enable-error-db\
                   --no-rc-sharc\
                   --sc-dynamic-is-error\
                   --sc-ops=$(INCLUDE_DIR)/ivy/sharc.h\
                   --sc-all-in-thread\
-                  --enable-precompile
+                  --enable-precompile\
+#                  --enable-error-db\
+
 USER_CFLAGS := --deputy --enable-error-db
 CC	    := ivycc --gcc=$(GCCPREFIX)gcc
 else

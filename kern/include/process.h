@@ -83,11 +83,12 @@ void proc_yield(struct proc *SAFE p);
 error_t proc_give_cores(struct proc *SAFE p, uint32_t corelist[], size_t *num);
 /* Makes process p's coremap look like corelist (add, remove, etc) */
 error_t proc_set_allcores(struct proc *SAFE p, uint32_t corelist[], size_t *num,
-                          amr_t message);
+                          amr_t message,TV(a0t) arg0, TV(a1t) arg1, TV(a2t) arg2);
 /* Takes from process p the num cores listed in corelist */
 error_t proc_take_cores(struct proc *SAFE p, uint32_t corelist[], size_t *num,
-                        amr_t message);
-error_t proc_take_allcores(struct proc *SAFE p, amr_t message);
+                        amr_t message, TV(a0t) arg0, TV(a1t) arg1, TV(a2t) arg2);
+error_t proc_take_allcores(struct proc *SAFE p, amr_t message, TV(a0t) arg0,
+                           TV(a1t) arg1, TV(a2t) arg2);
 
 /* Arch Specific */
 void proc_init_trapframe(trapframe_t *SAFE tf);

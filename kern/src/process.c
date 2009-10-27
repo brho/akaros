@@ -325,7 +325,7 @@ void proc_destroy(struct proc *p)
 		case PROC_RUNNABLE_M:
 			/* Need to reclaim any cores this proc might have, even though it's
 			 * not running yet. */
-			proc_take_allcores(p, 0);
+			proc_take_allcores(p, NULL, NULL, NULL, NULL);
 			// fallthrough
 		case PROC_RUNNABLE_S:
 			// Think about other lists, like WAITING, or better ways to do this
@@ -355,7 +355,8 @@ void proc_destroy(struct proc *p)
 			 * deallocate the cores.
 			 * The rule is that the vcoremap is set before proc_run, and reset
 			 * within proc_destroy */
-			proc_take_allcores(p, __death);
+			proc_take_allcores(p, __death, (void *SNT)0, (void *SNT)0,
+			                   (void *SNT)0);
 			break;
 		default:
 			// TODO: getting here if it's already dead and free (ENV_FREE).
@@ -496,8 +497,13 @@ void proc_yield(struct proc *SAFE p)
  * all of them, since it seems like an all or nothing deal right now.
  *
  * WARNING: You must hold the proc_lock before calling this!*/
+
+// zra: If corelist has *num elements, then it would be best if the value is
+// passed instead of a pointer to it. If in the future some way will be needed
+// to return the number of cores, then it might be best to use a separate
+// parameter for that.
 error_t proc_give_cores(struct proc *SAFE p, uint32_t corelist[], size_t *num)
-{
+{ TRUSTEDBLOCK
 	uint32_t free_vcoreid = 0;
 	switch (p->state) {
 		case (PROC_RUNNABLE_S):
@@ -546,7 +552,8 @@ error_t proc_give_cores(struct proc *SAFE p, uint32_t corelist[], size_t *num)
 					                     (uint32_t)p, (uint32_t)&p->env_tf, 0);
 				else */
 				send_active_msg_sync(corelist[i], __startcore, p,
-				                     (void*)0, (void*)free_vcoreid);
+				                     (struct Trapframe *)0,
+				                     (void*SNT)free_vcoreid);
 			}
 			break;
 		default:
@@ -565,7 +572,7 @@ error_t proc_give_cores(struct proc *SAFE p, uint32_t corelist[], size_t *num)
  *
  * WARNING: You must hold the proc_lock before calling this!*/
 error_t proc_set_allcores(struct proc *SAFE p, uint32_t corelist[], size_t *num,
-                          amr_t message)
+                          amr_t message,TV(a0t) arg0, TV(a1t) arg1, TV(a2t) arg2)
 {
 	panic("Set all cores not implemented.\n");
 }
@@ -579,8 +586,8 @@ error_t proc_set_allcores(struct proc *SAFE p, uint32_t corelist[], size_t *num,
  *
  * WARNING: You must hold the proc_lock before calling this!*/
 error_t proc_take_cores(struct proc *SAFE p, uint32_t corelist[], size_t *num,
-                        amr_t message)
-{
+                        amr_t message, TV(a0t) arg0, TV(a1t) arg1, TV(a2t) arg2)
+{ TRUSTEDBLOCK
 	uint32_t vcoreid;
 	switch (p->state) {
 		case (PROC_RUNNABLE_M):
@@ -599,7 +606,7 @@ error_t proc_take_cores(struct proc *SAFE p, uint32_t corelist[], size_t *num,
 		assert(p->vcoremap[vcoreid] == corelist[i]);
 		if (message)
 			// TODO: careful of active message deadlock (AMDL)
-			send_active_msg_sync(corelist[i], message, 0, 0, 0);
+			send_active_msg_sync(corelist[i], message, arg0, arg1, arg2);
 		// give the pcore back to the idlecoremap
 		idlecoremap[num_idlecores++] = corelist[i];
 		p->vcoremap[vcoreid] = -1;
@@ -614,7 +621,8 @@ error_t proc_take_cores(struct proc *SAFE p, uint32_t corelist[], size_t *num,
  * __preempt, it will be sent to the cores.
  *
  * WARNING: You must hold the proc_lock before calling this! */
-error_t proc_take_allcores(struct proc *SAFE p, amr_t message)
+error_t proc_take_allcores(struct proc *SAFE p, amr_t message,
+                           TV(a0t) arg0, TV(a1t) arg1, TV(a2t) arg2)
 {
 	uint32_t active_vcoreid = 0;
 	switch (p->state) {
@@ -635,7 +643,7 @@ error_t proc_take_allcores(struct proc *SAFE p, amr_t message)
 		if (message)
 			// TODO: careful of active message deadlock (AMDL)
 			send_active_msg_sync(p->vcoremap[active_vcoreid], message,
-			                     (void *SNT)0, (void *SNT)0, (void *SNT)0);
+			                     arg0, arg1, arg2);
 		// give the pcore back to the idlecoremap
 		idlecoremap[num_idlecores++] = p->vcoremap[active_vcoreid];
 		p->vcoremap[active_vcoreid] = -1;

@@ -10,6 +10,10 @@
 #define SINIT(x) x
 #endif
 
+#ifdef __DEPUTY__
+#pragma nodeputy
+#endif
+
 #include <ros/common.h>
 #include <ros/error.h>
 #include <pmap.h>

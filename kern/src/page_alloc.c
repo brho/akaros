@@ -14,9 +14,9 @@
 #include <pmap.h>
 #include <string.h>
 
-static void __page_decref(page_t *page);
+static void __page_decref(page_t *CT(1) page);
 static error_t __page_alloc_specific(page_t** page, size_t ppn);
-static error_t __page_free(page_t* page);
+static error_t __page_free(page_t *CT(1) page);
 
 /**
  * @brief Clear a Page structure.

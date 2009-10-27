@@ -816,16 +816,17 @@ static void test_single_cache(int iters, size_t size, int align, int flags,
 	printk("\n\n\n\n");
 }
 
+void a_ctor(void *buf, size_t size)
+{
+	printk("constructin tests\n");
+}
+void a_dtor(void *buf, size_t size)
+{
+	printk("destructin tests\n");
+}
+
 void test_slab(void)
 {
-	void a_ctor(void *buf, size_t size)
-	{
-		printk("constructin tests\n");
-	}
-	void a_dtor(void *buf, size_t size)
-	{
-		printk("destructin tests\n");
-	}
 	test_single_cache(10, 128, 512, 0, 0, 0);
 	test_single_cache(10, 128, 4, 0, a_ctor, a_dtor);
 	test_single_cache(10, 1024, 16, 0, 0, 0);

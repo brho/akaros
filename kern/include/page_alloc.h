@@ -39,7 +39,7 @@ extern page_list_t LCKD(&colored_page_free_list_lock) * RO CT(llc_num_colors)
 /*************** Functional Interface *******************/
 void page_alloc_init(void);
 error_t page_alloc(page_t *SAFE *page);
-void *get_cont_pages(size_t order, int flags);
+void *CT(1 << order) get_cont_pages(size_t order, int flags);
 void free_cont_pages(void *buf, size_t order);
 error_t page_alloc_specific(page_t *SAFE *page, size_t ppn);
 error_t l1_page_alloc(page_t *SAFE *page, size_t color);
