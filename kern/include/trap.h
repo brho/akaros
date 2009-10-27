@@ -56,14 +56,15 @@ typedef void (*amr_t)(trapframe_t* tf, uint32_t srcid,
 
 struct active_message
 {
-	STAILQ_ENTRY(active_message) link;
+	STAILQ_ENTRY(active_message NTPTV(a0t) NTPTV(a1t) NTPTV(a2t))
+		NTPTV(a0t) NTPTV(a1t) NTPTV(a2t) link;
 	uint32_t srcid;
 	amr_t pc;
 	TV(a0t) arg0;
 	TV(a1t) arg1;
 	TV(a2t) arg2;
 };
-STAILQ_HEAD(active_msg_list, active_message);
+STAILQ_HEAD(active_msg_list, active_message NTPTV(a0t) NTPTV(a1t) NTPTV(a2t));
 typedef struct active_message NTPTV(a0t) NTPTV(a1t) NTPTV(a2t) active_message_t;
 
 uint32_t send_active_message(uint32_t dst, amr_t pc,

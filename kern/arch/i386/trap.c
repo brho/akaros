@@ -1,5 +1,6 @@
 #ifdef __SHARC__
-//#pragma nosharc
+#pragma nosharc
+#define SINIT(x) x
 #endif
 
 #include <arch/mmu.h>
@@ -398,7 +399,7 @@ uint32_t send_active_message(uint32_t dst, amr_t pc,
 	active_message_t *a_msg;
 	assert(pc);
 	// note this will be freed on the destination core
-	a_msg = kmem_cache_alloc(active_msg_cache, 0);
+	a_msg = (active_message_t *CT(1))TC(kmem_cache_alloc(active_msg_cache, 0));
 	a_msg->srcid = core_id();
 	a_msg->pc = pc;
 	a_msg->arg0 = arg0;
@@ -440,7 +441,7 @@ void __active_message(trapframe_t *tf)
 		spin_unlock_irqsave(&myinfo->amsg_lock);
 		// copy in, and then free, in case we don't return
 		my_msg = *a_msg;
-		kmem_cache_free(active_msg_cache, a_msg);
+		kmem_cache_free(active_msg_cache, (void *CT(1))TC(a_msg));
 		assert(my_msg.pc);
 		/* In case the function doesn't return (which is common: __startcore,
 		 * __death, etc), there is a chance we could lose an amsg.  We can only

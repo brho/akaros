@@ -35,7 +35,7 @@ struct per_cpu_info {
 #endif
 
 	spinlock_t amsg_lock;
-	struct active_msg_list active_msgs;
+	struct active_msg_list NTPTV(a0t) NTPTV(a1t) NTPTV(a2t) active_msgs;
 }__attribute__((aligned(HW_CACHE_ALIGN)));
 
 typedef struct per_cpu_info NTPTV(t) NTPTV(a0t) NTPTV(a1t) NTPTV(a2t) per_cpu_info_t;

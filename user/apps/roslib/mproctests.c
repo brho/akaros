@@ -47,7 +47,7 @@ int main(int argc, char** argv)
 		switch (test) {
 			case TEST_MMAP:
 				cprintf("Testing MMAP\n");
-				void* addr;
+				void *CT(8*PGSIZE) addr;
 				addr = sys_mmap((void*SNT)USTACKTOP - 20*PGSIZE, 8*PGSIZE, 3,
 				                MAP_FIXED, 0, 0);
 				cprintf("got addr = 0x%08x\n", addr);
@@ -58,7 +58,9 @@ int main(int argc, char** argv)
 				cprintf("reading addr+3pg: 0x%08x\n", *(int*)(addr + 3*PGSIZE));
 				// this should fault
 				cprintf("Should page fault and die now.\n");
+				{ TRUSTEDBLOCK
 				*(int*)(addr - 3*PGSIZE) = 0xdeadbeef;
+				}
 				cprintf("Should not see me!!!!!!!!!!!!!!!!!!\n");
 				while(1);
 			case TEST_ONE_CORE:

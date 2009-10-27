@@ -550,7 +550,7 @@ error_t proc_give_cores(struct proc *SAFE p, uint32_t corelist[], size_t *num)
 					send_active_message(p->vcoremap[0], __startcore,
 					                    (uint32_t)p, (uint32_t)&p->env_tf, 0);
 				else */
-				send_active_msg_sync(corelist[i], __startcore, p,
+				send_active_message(corelist[i], __startcore, p,
 				                     (struct Trapframe *)0,
 				                     (void*SNT)free_vcoreid);
 				//send_active_message(corelist[i], __startcore, p,
@@ -606,7 +606,7 @@ error_t proc_take_cores(struct proc *SAFE p, uint32_t corelist[], size_t *num,
 		vcoreid = get_vcoreid(p, corelist[i]);
 		assert(p->vcoremap[vcoreid] == corelist[i]);
 		if (message)
-			send_active_msg_sync(corelist[i], message, arg0, arg1, arg2);
+			send_active_message(corelist[i], message, arg0, arg1, arg2);
 		// give the pcore back to the idlecoremap
 		idlecoremap[num_idlecores++] = corelist[i];
 		p->vcoremap[vcoreid] = -1;
@@ -641,7 +641,7 @@ error_t proc_take_allcores(struct proc *SAFE p, amr_t message,
 		// find next active vcore
 		active_vcoreid = get_busy_vcoreid(p, active_vcoreid);
 		if (message)
-			send_active_msg_sync(p->vcoremap[active_vcoreid], message,
+			send_active_message(p->vcoremap[active_vcoreid], message,
 			                     arg0, arg1, arg2);
 		// give the pcore back to the idlecoremap
 		idlecoremap[num_idlecores++] = p->vcoremap[active_vcoreid];

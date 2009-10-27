@@ -16,13 +16,14 @@
 #define wmb_f() ({ asm volatile("sfence"); })
 
 typedef void * RACY atomic_t;
-typedef struct spinlock {
+struct spinlock {
 	volatile uint32_t RACY rlock;
 #ifdef SPINLOCK_DEBUG
 	void *call_site;	
 	uint32_t calling_core;
 #endif
-} spinlock_t;
+};
+typedef struct spinlock RACY spinlock_t;
 #define SPINLOCK_INITIALIZER {0}
 
 static inline void atomic_init(atomic_t *number, int32_t val);
@@ -98,7 +99,7 @@ static inline void spin_lock(spinlock_t *lock)
 {
 	__spin_lock(&lock->rlock);
 #ifdef SPINLOCK_DEBUG
-	lock->call_site = (void*)read_eip();
+	lock->call_site = (void RACY*CT(1))TC(read_eip());
 	lock->calling_core = core_id();
 #endif
 }
@@ -109,6 +110,11 @@ static inline void spin_unlock(spinlock_t *lock)
 }
 
 static inline void spinlock_init(spinlock_t *lock)
+#ifdef SPINLOCK_DEBUG
+WRITES(lock->rlock,lock->call_site,lock->calling_core)
+#else
+WRITES(lock->rlock)
+#endif
 {
 	lock->rlock = 0;
 #ifdef SPINLOCK_DEBUG

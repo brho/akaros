@@ -192,6 +192,12 @@ struct {								\
 	struct type *stqe_next NOINIT;	/* next element */			\
 }
 
+#define	STAILQ_ENTRY_WITH_ATTRS(type,attrs)						\
+struct type##_link {								\
+	struct type attrs *stqe_next NOINIT;	/* next element */			\
+};\
+typedef struct type##_link attrs type##_link_t;
+
 /*
  * Singly-linked Tail queue functions.
  */

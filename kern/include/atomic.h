@@ -7,9 +7,9 @@
 #include <arch/arch.h>
 
 static inline void
-(SLOCK(0) spin_lock_irqsave)(spinlock_t SRACY*SAFE lock);
+(SLOCK(0) spin_lock_irqsave)(spinlock_t RACY*SAFE lock);
 static inline void
-(SUNLOCK(0) spin_unlock_irqsave)(spinlock_t SRACY*SAFE lock);
+(SUNLOCK(0) spin_unlock_irqsave)(spinlock_t RACY*SAFE lock);
 
 /*********************** Checklist stuff **********************/
 typedef struct checklist_mask {
