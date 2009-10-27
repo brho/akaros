@@ -239,7 +239,7 @@ proc_init_procinfo(struct proc* p)
 	p->env_procinfo->id = (p->env_id & 0x3FF);
 
 	// TODO: maybe do something smarter here
-	p->env_procinfo->max_harts = num_cpus-1;
+	p->env_procinfo->max_harts = num_cpus > 1 ? num_cpus-1 : 1;
 }
 
 // Sets up argc/argv in procinfo.  Returns number of
