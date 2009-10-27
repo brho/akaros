@@ -31,19 +31,11 @@ _start:
 	test	%eax,%eax
 	jne	notcore0
 
-	// See if we were started with arguments on the stack
-	cmpl $USTACKTOP, %esp
-	jne args_exist
-
-	// If not, push dummy argc/argv arguments.
-	// This happens when we are loaded by the kernel,
-	// because the kernel does not know about passing arguments.
-	pushl $0
-	pushl $0
-
-args_exist:
+	// argc/argv are provided by procinfo and are accessed in parlibmain
 	call parlibmain
-1:      jmp 1b
+
+	// illegal instruction in case parlibmain accidentally returns
+	mov	(0),%eax
 
 notcore0:
 	mov	stack_ptr_array,%edx
@@ -53,4 +45,5 @@ notcore0:
 
 	call	hart_yield
 
-1:	jmp	1b
+	// illegal instruction in case hart_yield accidentally returns
+	mov	(0),%eax

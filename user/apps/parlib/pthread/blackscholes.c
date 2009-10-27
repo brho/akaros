@@ -70,6 +70,8 @@
 #include <math.h>
 #include <string.h>
 
+#define ENABLE_THREADS
+
 #ifdef ENABLE_PARSEC_HOOKS
 #include <hooks.h>
 #endif

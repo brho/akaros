@@ -33,21 +33,6 @@ _start:
 	bne     notcore0
 	 nop
 
-	// Save top 256 bytes of stack for other threads to allocate their stacks
-	//sub   %sp,256,%sp
-
-	// See if we were started with arguments on the stack
-	tst     %o0
-	bne     args_exist
-	 nop
-
-	// If not, push dummy argc/argv arguments.
-	// This happens when we are loaded by the kernel,
-	// because the kernel does not know about passing arguments.
-	mov	0,%o0
-	mov	0,%o1
-
-args_exist:
 	call	parlibmain
 	 nop
 

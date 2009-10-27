@@ -242,6 +242,56 @@ proc_init_procinfo(struct proc* p)
 	p->env_procinfo->max_harts = num_cpus-1;
 }
 
+// Sets up argc/argv in procinfo.  Returns number of
+// args successfully imported (because of size restrictions).
+// The procinfo pages must have been mapped into the user's
+// address space before this function can be called.
+static size_t
+proc_init_argc_argv_v(struct proc* p, size_t nargs, va_list args)
+{
+	// TODO: right now we assume procinfo can be directly addressed
+	// by the kernel (i.e. it's continguous.
+	static_assert(sizeof(struct procinfo) <= PGSIZE);
+
+	if(nargs > PROCINFO_MAX_ARGC)
+		nargs = PROCINFO_MAX_ARGC;
+
+	char* argv[PROCINFO_MAX_ARGC] = {0};
+	static_assert(sizeof(argv) == sizeof(p->env_procinfo->argv));
+
+	size_t size = 0, argc;
+	for(argc = 0; argc < nargs; argc++)
+	{
+		const char* arg = va_arg(args,const char*);
+		size_t len = strnlen(arg,PROCINFO_MAX_ARGV_SIZE);
+		if(size+len+1 > PROCINFO_MAX_ARGV_SIZE)
+			break;
+		memcpy(&p->env_procinfo->argv_buf[size],arg,len+1);
+		argv[argc] = (char*)(UINFO+offsetof(struct procinfo,argv_buf)+size);
+		size += len+1;
+	}
+
+	p->env_procinfo->argc = argc;
+	memcpy(p->env_procinfo->argv,argv,sizeof(argv));
+
+	return argc;
+}
+
+size_t
+proc_init_argc_argv(struct proc* p, size_t nargs, ...)
+{
+	size_t ret;
+
+	va_list list;
+	va_start(list,nargs);
+
+	ret = proc_init_argc_argv_v(p,nargs,list);
+
+	va_end(list);
+
+	return ret;
+}
+
 //
 // Allocates and initializes a new environment.
 // On success, the new environment is stored in *newenv_store.
