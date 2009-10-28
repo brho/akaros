@@ -4,7 +4,8 @@
 #include <string.h>
 #include <assert.h>
 
-int threads_left = 1;
+int threads_active = 1;
+int current_harts = 1;
 hart_lock_t work_queue_lock = HART_LOCK_INIT;
 pthread_t work_queue_head = 0;
 pthread_t work_queue_tail = 0;
@@ -33,9 +34,18 @@ pthread_t queue_remove(pthread_t* head, pthread_t* tail)
 
 void hart_entry()
 {
-  hart_lock_lock(&work_queue_lock);
-  pthread_t node = queue_remove(&work_queue_head,&work_queue_tail);
-  hart_lock_unlock(&work_queue_lock);
+  pthread_t node = NULL;
+  while(1)
+  {
+    hart_lock_lock(&work_queue_lock);
+    if(work_queue_head)
+      node = queue_remove(&work_queue_head,&work_queue_tail);
+    hart_lock_unlock(&work_queue_lock);
+
+    if(node)
+      break;
+    hart_relax();
+  }
 
   active_threads[hart_self()] = node;
 
@@ -69,13 +79,20 @@ int pthread_create(pthread_t* thread, const pthread_attr_t* attr,
   (*thread)->finished = 0;
   (*thread)->detached = 0;
 
+  int request_hart = 0;
+
   hart_lock_lock(&work_queue_lock);
-  threads_left++;
-  queue_insert(&work_queue_head,&work_queue_tail,*thread);
+  {
+    threads_active++;
+    if(threads_active > current_harts)
+      request_hart = 1;
+
+    queue_insert(&work_queue_head,&work_queue_tail,*thread);
+  }
   hart_lock_unlock(&work_queue_lock);
 
   // don't return until we get a hart
-  while(hart_request(1));
+  while(request_hart && hart_request(1));
   return 0;
 }
 
@@ -228,8 +245,8 @@ void pthread_exit(void* ret)
   pthread_t t = pthread_self();
 
   hart_lock_lock(&work_queue_lock);
-  threads_left--;
-  if(threads_left == 0)
+  threads_active--;
+  if(threads_active == 0)
     exit(0);
   hart_lock_unlock(&work_queue_lock);
 
@@ -241,7 +258,7 @@ void pthread_exit(void* ret)
       free(t);
   }
 
-  hart_yield();
+  hart_entry();
 }
 
 int pthread_once(pthread_once_t* once_control, void (*init_routine)(void))
