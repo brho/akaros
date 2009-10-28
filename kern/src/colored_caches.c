@@ -167,7 +167,7 @@ static inline void clr_color_range(uint16_t color, uint8_t* map,
 }
 
 static inline error_t __cache_color_alloc_specific(size_t color, cache_t* c, 
-                                                              struct proc* p) 
+                                                         uint8_t* colors_map) 
 {
 	if(!GET_BITMASK_BIT(c->free_colors_map, color))
 		return -ENOCACHE;	
@@ -179,12 +179,11 @@ static inline error_t __cache_color_alloc_specific(size_t color, cache_t* c,
 	if(l3)
 		clr_color_range(color, l3->free_colors_map, c, l3);
 
-	printk("I am here now three...\n");
-	set_color_range(color, p->cache_colors_map, c, llc_cache);
+	set_color_range(color, colors_map, c, llc_cache);
 	return ESUCCESS;
 }
 
-static inline error_t __cache_color_alloc(cache_t* c, struct proc* p) 
+static inline error_t __cache_color_alloc(cache_t* c, uint8_t* colors_map) 
 {
 	if(BITMASK_IS_CLEAR(c->free_colors_map, c->num_colors))
 		return -ENOCACHE;	
@@ -195,18 +194,18 @@ static inline error_t __cache_color_alloc(cache_t* c, struct proc* p)
 			break;
 	} while(++color);
 
-	return __cache_color_alloc_specific(color, c, p);	
+	return __cache_color_alloc_specific(color, c, colors_map);	
 }
 
 static inline void __cache_color_free_specific(size_t color, cache_t* c, 
-                                                          struct proc* p) 
+                                                     uint8_t* colors_map) 
 {
 	if(GET_BITMASK_BIT(c->free_colors_map, color))
 		return;
 	else {
 		size_t r = llc_cache->num_colors / c->num_colors;
 		size_t base = color*r;
-		if(!BITMASK_IS_SET_IN_RANGE(p->cache_colors_map, base, base+r))
+		if(!BITMASK_IS_SET_IN_RANGE(colors_map, base, base+r))
 			return;
 	}
 
@@ -217,10 +216,10 @@ static inline void __cache_color_free_specific(size_t color, cache_t* c,
 	if(l1)
 		set_color_range(color, l1->free_colors_map, c, l1);
 
-	clr_color_range(color, p->cache_colors_map, c, llc_cache);
+	clr_color_range(color, colors_map, c, llc_cache);
 }
 
-static inline void __cache_color_free(cache_t* c, struct proc* p) 
+static inline void __cache_color_free(cache_t* c, uint8_t* colors_map) 
 {
 	if(BITMASK_IS_FULL(c->free_colors_map, c->num_colors))
 		return;	
@@ -230,41 +229,52 @@ static inline void __cache_color_free(cache_t* c, struct proc* p)
 		if(!GET_BITMASK_BIT(c->free_colors_map, color)) {
 			size_t r = llc_cache->num_colors / c->num_colors;
 			size_t base = color*r;
-			if(BITMASK_IS_SET_IN_RANGE(p->cache_colors_map, base, base+r))
+			if(BITMASK_IS_SET_IN_RANGE(colors_map, base, base+r))
 				break;
 		}
 	} while(++color < c->num_colors);
 	if(color == c->num_colors)
 		return;
 
-	__cache_color_free_specific(color, c, p);	
+	__cache_color_free_specific(color, c, colors_map);	
 }
 
-error_t cache_color_alloc(cache_t* c, struct proc* p) 
+uint8_t* cache_colors_map_alloc() {
+	uint8_t* colors_map = kmalloc(llc_cache->num_colors, 0);
+	if(colors_map)
+		CLR_BITMASK(colors_map, llc_cache->num_colors);
+	return colors_map;
+}
+
+void cache_colors_map_free(uint8_t* colors_map) {
+	kfree(colors_map);
+}
+
+error_t cache_color_alloc(cache_t* c, uint8_t* colors_map) 
 {
 	spin_lock_irqsave(&cache_colors_lock);
-	error_t e = __cache_color_alloc(c, p);
+	error_t e = __cache_color_alloc(c, colors_map);
 	spin_unlock_irqsave(&cache_colors_lock);
 	return e;
 }
-error_t cache_color_alloc_specific(size_t color, cache_t* c, struct proc* p) 
+error_t cache_color_alloc_specific(size_t color, cache_t* c, uint8_t* colors_map) 
 {
 	spin_lock_irqsave(&cache_colors_lock);
-	error_t e = __cache_color_alloc_specific(color, c, p);
+	error_t e = __cache_color_alloc_specific(color, c, colors_map);
 	spin_unlock_irqsave(&cache_colors_lock);
 	return e;
 }
 
-void cache_color_free(cache_t* c, struct proc* p) 
+void cache_color_free(cache_t* c, uint8_t* colors_map) 
 {
 	spin_lock_irqsave(&cache_colors_lock);
-	__cache_color_free(c, p);
+	__cache_color_free(c, colors_map);
 	spin_unlock_irqsave(&cache_colors_lock);
 }
-void cache_color_free_specific(size_t color, cache_t* c, struct proc* p) 
+void cache_color_free_specific(size_t color, cache_t* c, uint8_t* colors_map) 
 {
 	spin_lock_irqsave(&cache_colors_lock);
-	__cache_color_free_specific(color, c, p);
+	__cache_color_free_specific(color, c, colors_map);
 	spin_unlock_irqsave(&cache_colors_lock);
 }
 

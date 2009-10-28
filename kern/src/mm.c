@@ -54,7 +54,7 @@ void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 	}
 	page_t *a_page;
 	for (int i = 0; i < num_pages; i++) {
-		if (page_alloc(&a_page))
+		if (upage_alloc(p, &a_page))
 			goto mmap_abort;
 		// TODO: give them the permissions they actually want
 		if (page_insert(p->env_pgdir, a_page, (void*SNT)addr + i*PGSIZE,

@@ -66,10 +66,11 @@ void kernel_init(multiboot_info_t *mboot_info)
 
 	cache_init();
 	page_init();
-	page_check();
 	kmem_cache_init();
 	kmalloc_init();
-	//cache_color_alloc_init();
+	cache_color_alloc_init();
+	colored_page_alloc_init();
+	page_check();
 
 	idt_init();
 	sysenter_init();

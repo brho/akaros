@@ -58,9 +58,11 @@ ssize_t sys_serial_read(void* buf, size_t len)
 }
 
 //Run a binary loaded at the specificed address with the specified arguments
-ssize_t sys_run_binary(void* binary_buf, void* arg, size_t len) 
+ssize_t sys_run_binary(void* binary_buf, void* arg, size_t len, 
+                                              size_t num_colors) 
 {
-	return syscall(SYS_run_binary, (intreg_t)binary_buf, (intreg_t)arg, len, 0, 0);
+	return syscall(SYS_run_binary, (intreg_t)binary_buf, (intreg_t)arg, len, 
+	                                                          num_colors, 0);
 }
 
 //Write a buffer over ethernet

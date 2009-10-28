@@ -60,9 +60,8 @@ pgdir_walk(pde_t* l1pt, const void*SNT va, int create)
 		// space than needed, so also use it for the adjacent
 		// l2_tables_per_page-1 pages (if they're unmapped)
 
-		if(page_alloc(&new_table))
+		if(kpage_alloc(&new_table))
 			return NULL;
-		page_setref(new_table,1);
 		memset(page2kva(new_table),0,PGSIZE);
 
 		l2_tables_per_page = PGSIZE/(sizeof(pte_t)*NL2ENTRIES);
@@ -93,9 +92,8 @@ pgdir_walk(pde_t* l1pt, const void*SNT va, int create)
 		if(!create)
 			return NULL;
 
-		if(page_alloc(&new_table))
+		if(kpage_alloc(&new_table))
 			return NULL;
-		page_setref(new_table,1);
 		memset(page2kva(new_table),0,PGSIZE);
 
 		l3_tables_per_page = PGSIZE/(sizeof(pte_t)*NL3ENTRIES);

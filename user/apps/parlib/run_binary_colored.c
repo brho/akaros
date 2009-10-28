@@ -14,37 +14,48 @@ extern char * readline(const char *prompt);
 uint8_t* binary_buf;
 
 static void fd_error() {
-	fprintf(stderr, "Error: Unable to run remote binary (fd error): %s\n", strerror(errno));
+	fprintf(stderr, "Error: Unable to run remote binary (fd error): %s\n", 
+	                                                      strerror(errno));
 }
 
 static void malloc_error() {
-	fprintf(stderr, "Error: Unable to run remote binary: No more memory avaialable!\n");
+	fprintf(stderr, 
+	        "Error: Unable to run remote binary: No more memory avaialable!\n");
 }
 
 static void read_error(void* buf, int fd) {
 	free(binary_buf);
 	close(fd);
-	fprintf(stderr, "Error: Unable to run remote binary (read error): %s\n", strerror(errno));
+	fprintf(stderr, "Error: Unable to run remote binary (read error): %s\n", 
+	                                                        strerror(errno));
 }
 
 static void realloc_error(void* buf, int fd) {
 	free(binary_buf);
 	close(fd);
-	fprintf(stderr, "Error: Unable to run remote binary: No more memory available!\n");
+	fprintf(stderr, 
+	        "Error: Unable to run remote binary: No more memory available!\n");
 }
 
-void run_binary()
+void run_binary_colored()
 {	
-	char * readline_result = readline("\nEnter name of binary to execute: ");
-	if (readline_result == NULL) {
+	char* name = readline("\nEnter name of binary to execute: ");
+	if (name == NULL) {
 		printf("Error reading from console.\n");
 		return;
 	}
-	char * file_name = malloc(strlen(readline_result) + 8);
-	sprintf(file_name, "./apps/%s", readline_result);
+	char * file_name = malloc(strlen(name) + 8);
+	sprintf(file_name, "./apps/%s", name);
 	int fd = open(file_name, O_RDONLY, 0);
 	free(file_name);
 	if(fd < 0) { fd_error(); return; };
+
+	char* colors = readline("\nEnter number of colors: ");
+	if (colors == NULL) {
+		printf("Error reading from console.\n");
+		return;
+	}
+	size_t num_colors = atoi(colors);
 	
 	int iters = 1;
 	binary_buf = malloc(READ_SIZE);
@@ -62,8 +73,9 @@ void run_binary()
 		bytes_read = read(fd, binary_buf+total_bytes_read, READ_SIZE);
 		if(bytes_read < 0) { read_error(binary_buf, fd); return; }
 	}
-	printf("Loading Binary: %s, ROMSIZE: %d\n", readline_result, total_bytes_read);
-	ssize_t error = sys_run_binary(binary_buf, NULL, total_bytes_read, 0);
+	printf("Loading Binary: %s, ROMSIZE: %d\n", name, total_bytes_read);
+	ssize_t error = sys_run_binary(binary_buf, NULL, 
+	                    total_bytes_read, num_colors);
 	if(error < 0) {
 		fprintf(stderr, "Error: Unable to run remote binary\n");
 	}
