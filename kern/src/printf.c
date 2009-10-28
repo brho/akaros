@@ -49,7 +49,7 @@ int vcprintf(const char *fmt, va_list ap)
 	volatile int i;
 
 	// lock all output.  this will catch any printfs at line granularity
-//	spin_lock_irqsave(&output_lock);
+	spin_lock_irqsave(&output_lock);
 
 	// do the buffered printf
 	#ifdef __DEPUTY__
@@ -61,7 +61,7 @@ int vcprintf(const char *fmt, va_list ap)
 	// write out remaining chars in the buffer
 	buffered_putch(-1,&cntp);
 
-//	spin_unlock_irqsave(&output_lock);
+	spin_unlock_irqsave(&output_lock);
 
 	return cnt;
 }
