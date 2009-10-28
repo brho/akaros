@@ -30,4 +30,5 @@ KERN_ARCH_SRCFILES := $(KERN_ARCH_SRC_DIR)/entry.S \
                       $(KERN_ARCH_SRC_DIR)/smp.c \
                       $(KERN_ARCH_SRC_DIR)/fpu.c \
                       $(KERN_ARCH_SRC_DIR)/sparcfpu.c \
-                      $(KERN_ARCH_SRC_DIR)/softfloat.c
+                      $(KERN_ARCH_SRC_DIR)/softfloat.c \
+                      $(KERN_ARCH_SRC_DIR)/recip.S

@@ -1,6 +1,7 @@
 #include <arch/sparc.h>
 #include <arch/trap.h>
 #include <arch/mmu.h>
+#include <arch/trap_table.h>
 #include <ros/memlayout.h>
 
 	.section	".text"!,#alloc,#execinstr,#progbits

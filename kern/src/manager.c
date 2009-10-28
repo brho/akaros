@@ -245,10 +245,9 @@ void manager_waterman()
 	switch(progress++)
 	{
 		case 0:
-			RUN_APP("parlib_fptest",0);
+			RUN_APP("parlib_draw_nanwan_standalone",0);
 			break;
 		case 1:
-			reboot();
 			RUN_APP("parlib_manycore_test",0);
 			break;
 		case 2:
@@ -258,7 +257,7 @@ void manager_waterman()
 			RUN_APP("parlib_pthread_pthread_test",0);
 			break;
 		case 4:
-			RUN_APP("parlib_pthread_blackscholes",3,"blackscholes",itoa(num_cpus-1,buf0,10),itoa(256,buf1,10));
+			RUN_APP("parlib_pthread_blackscholes",3,"blackscholes",itoa(num_cpus>1?num_cpus-1:1,buf0,10),itoa(256,buf1,10));
 			break;
 		case 5:
 			while(*(volatile uint32_t*)&envs[4]->state != ENV_FREE);

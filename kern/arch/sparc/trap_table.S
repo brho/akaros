@@ -16,7 +16,7 @@ trap_table:
 #ifndef TINY_MEM
 
 	TRAP_TABLE_ENTRY(address_unaligned)	! 0x07
-	TRAP_TABLE_ENTRY(fp_exception)		! 0x08
+	JMP(fast_fp_exception)			! 0x08
 	TRAP_TABLE_ENTRY(access_exception)	! 0x09
 	UNHANDLED_TRAP				! 0x0A
 	UNHANDLED_TRAP				! 0x0B

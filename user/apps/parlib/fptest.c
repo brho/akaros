@@ -11,11 +11,8 @@ int main()
 	volatile long long yy = *(long long*)&y;
 	volatile long long zz = *(long long*)&z;
 
-	for(int i = 0; i < 100000; i++)
-	{
-		xx = float64_div(&sf,yy,zz);
-//		x = y/z;
-	}
+	for(int i = 0; i < 200000; i++)
+		x = y/z;
 
 	printf("%.2f\n",x);
 
