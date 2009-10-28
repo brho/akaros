@@ -100,8 +100,7 @@ mmu_boot(void)
 {
 	int id = core_id(), i, ncores = num_cores();
 
-	static volatile int barrier[MAX_NUM_CPUS] = {0};
-	static volatile int done_0 = 0, done1 = 0;
+	static volatile int done_0 = 0;
 	volatile int* done0 = (int*)((uintptr_t)&done_0 - KERNBASE); 
 
 	if(id == 0)
@@ -113,9 +112,15 @@ mmu_boot(void)
 		while(!*done0);
 
 	mmu_init();
+}
 
-	extern void relocate(void);
-	relocate();
+void
+mmu_boot_finish(void)
+{
+	int id = core_id(), i, ncores = num_cores();
+
+	static volatile int barrier[MAX_NUM_CPUS] = {0};
+	static volatile int done1 = 0;
 
 	if(id == 0)
 	{

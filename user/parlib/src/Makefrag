@@ -41,7 +41,7 @@ $(OBJDIR)/$(USER_PARLIB_SRC_DIR)/%.o: $(USER_PARLIB_SRC_DIR)/%.c $(PATCHFILE)
 $(OBJDIR)/$(USER_PARLIB_SRC_DIR)/%.o: $(USER_PARLIB_SRC_DIR)/%.S
 	@echo + as [PARLIB] $<
 	@mkdir -p $(@D)
-	$(V)$(CC) $(USER_PARLIB_SRC_CFLAGS) -c -o $@ $<
+	$(V)$(CC) $(USER_PARLIB_SRC_CFLAGS) -D__ASSEMBLER__ -c -o $@ $<
 
 $(OBJDIR)/$(USER_PARLIB_DIR)/libparlib.a: $(USER_PARLIB_SRC_OBJFILES)
 	@echo + ar [PARLIB] $@

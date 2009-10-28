@@ -34,7 +34,7 @@ $(OBJDIR)/$(USER_ROSLIB_SRC_DIR)/%.o: $(USER_ROSLIB_SRC_DIR)/%.c
 $(OBJDIR)/$(USER_ROSLIB_SRC_DIR)/%.o: $(USER_ROSLIB_SRC_DIR)/%.S
 	@echo + as [ROSLIB] $<
 	@mkdir -p $(@D)
-	$(V)$(CC) $(USER_ROSLIB_SRC_CFLAGS) -c -o $@ $<
+	$(V)$(CC) $(USER_ROSLIB_SRC_CFLAGS) -D__ASSEMBLER__ -c -o $@ $<
 
 $(OBJDIR)/$(USER_ROSLIB_DIR)/libroslib.a: $(USER_ROSLIB_SRC_OBJFILES)
 	@echo + ar [ROSLIB] $@

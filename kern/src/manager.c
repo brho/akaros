@@ -245,9 +245,10 @@ void manager_waterman()
 	switch(progress++)
 	{
 		case 0:
-			RUN_APP("parlib_draw_nanwan_standalone",0);
+			RUN_APP("parlib_fptest",0);
 			break;
 		case 1:
+			reboot();
 			RUN_APP("parlib_manycore_test",0);
 			break;
 		case 2:

@@ -60,7 +60,7 @@ KERN_CFLAGS := --deputy\
 USER_CFLAGS := --deputy --enable-error-db
 CC	    := ivycc --gcc=$(GCCPREFIX)gcc
 else
-CC	    := $(GCCPREFIX)gcc -std=gnu99 -fgnu89-inline
+CC	    := $(GCCPREFIX)gcc -std=gnu99
 endif
 
 AS	    := $(GCCPREFIX)as
@@ -71,12 +71,14 @@ OBJDUMP	:= $(GCCPREFIX)objdump
 NM	    := $(GCCPREFIX)nm
 PERL    := perl
 
+EXTRAARGS ?= -Wno-attributes -fno-stack-protector -fgnu89-inline
+
 # Universal compiler flags
 # -fno-builtin is required to avoid refs to undefined functions in the kernel.
 # Only optimize to -O1 to discourage inlining, which complicates backtraces.
 CFLAGS := $(CFLAGS) -D$(TARGET_ARCH) $(EXTRAARGS)
-CFLAGS += -O2 -pipe -MD -fno-builtin -fno-stack-protector -gstabs
-CFLAGS += -Wall -Wno-format -Wno-unused -Wno-attributes
+CFLAGS += -O2 -pipe -MD -fno-builtin -gstabs
+CFLAGS += -Wall -Wno-format -Wno-unused
 CFLAGS += -nostdinc -Igccinclude/$(TARGET_ARCH)
 
 # Universal loader flags
