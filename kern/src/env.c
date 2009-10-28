@@ -136,9 +136,8 @@ WRITES(e->env_pgdir, e->env_cr3, e->env_procinfo, e->env_procdata)
 	 * First, allocate a page for the pgdir of this process and up
 	 * its reference count since this will never be done elsewhere
 	 */
-	r = page_alloc(&pgdir);
+	r = kpage_alloc(&pgdir);
 	if(r < 0) return r;
-	page_incref(pgdir);
 
 	/*
 	 * Next, set up the e->env_pgdir and e->env_cr3 pointers to point
@@ -171,7 +170,7 @@ WRITES(e->env_pgdir, e->env_cr3, e->env_procinfo, e->env_procdata)
 	 * procinfo structure into the page table
 	 */
 	for(int i=0; i<PROCINFO_NUM_PAGES; i++) {
-		if(page_alloc(&pginfo[i]) < 0)
+		if(upage_alloc(e, &pginfo[i]) < 0)
 			goto env_setup_vm_error;
 		if(page_insert(e->env_pgdir, pginfo[i], (void*SNT)(UINFO + i*PGSIZE),
 		               PTE_USER_RO) < 0)
@@ -183,7 +182,7 @@ WRITES(e->env_pgdir, e->env_cr3, e->env_procinfo, e->env_procdata)
 	 * procdata structure into the page table
 	 */
 	for(int i=0; i<PROCDATA_NUM_PAGES; i++) {
-		if(page_alloc(&pgdata[i]) < 0)
+		if(upage_alloc(e, &pgdata[i]) < 0)
 			goto env_setup_vm_error;
 		if(page_insert(e->env_pgdir, pgdata[i], (void*SNT)(UDATA + i*PGSIZE),
 		               PTE_USER_RW) < 0)
@@ -206,7 +205,7 @@ WRITES(e->env_pgdir, e->env_cr3, e->env_procinfo, e->env_procdata)
 	 * (TODO).  Note the page is alloced only the first time through
 	 */
 	if (!shared_page) {
-		if(page_alloc(&shared_page) < 0)
+		if(upage_alloc(e, &shared_page) < 0)
 			goto env_setup_vm_error;
 		// Up it, so it never goes away.  One per user, plus one from page_alloc
 		// This is necessary, since it's in the per-process range of memory that
@@ -319,6 +318,10 @@ env_alloc(env_t **newenv_store, envid_t parent_id)
 
     { INITSTRUCT(*e)
 
+	// Setup the default map of where to get cache colors from
+	e->cache_colors_map = global_cache_colors_map;
+	e->next_cache_color = 0;
+
 	// Allocate and set up the page directory for this environment.
 	if ((r = env_setup_vm(e)) < 0) {
 		spin_lock(&freelist_lock);
@@ -344,8 +347,6 @@ env_alloc(env_t **newenv_store, envid_t parent_id)
 	e->num_vcores = 0;
 	for (int i = 0; i < MAX_NUM_CPUS; i++)
 		e->vcoremap[i] = -1;
-	e->cache_colors_map = kmalloc(llc_cache->num_colors, 0);
-	CLR_BITMASK(e->cache_colors_map, llc_cache->num_colors);
 	memset(&e->resources, 0, sizeof(e->resources));
 
 	memset(&e->env_ancillary_state, 0, sizeof(e->env_ancillary_state));
@@ -414,7 +415,7 @@ env_segment_alloc(env_t *e, void *SNT va, size_t len)
 		pte = pgdir_walk(e->env_pgdir, start, 0);
 		if (pte && *pte & PTE_P)
 			continue;
-		if ((r = page_alloc(&page)) < 0)
+		if ((r = upage_alloc(e, &page)) < 0)
 			panic("env_segment_alloc: %e", r);
 		page_insert(e->env_pgdir, page, start, PTE_USER_RW);
 	}
@@ -559,6 +560,13 @@ env_free(env_t *e)
 	// All parts of the kernel should have decref'd before env_free was called.
 	assert(e->env_refcnt == 0);
 
+	// Free any colors allocated to this process
+	if(e->cache_colors_map != global_cache_colors_map) {
+		for(int i=0; i<llc_cache->num_colors; i++)
+			cache_color_free(llc_cache, e->cache_colors_map);
+		cache_colors_map_free(e->cache_colors_map);
+	}
+
 	// Flush all mapped pages in the user portion of the address space
 	env_user_mem_free(e);
 
@@ -567,9 +575,6 @@ env_free(env_t *e)
 	e->env_pgdir = 0;
 	e->env_cr3 = 0;
 	page_decref(pa2page(pa));
-
-	//Free any memory allocated by this process
-	kfree(e->cache_colors_map);
 
 	// return the environment to the free list
 	e->state = ENV_FREE;

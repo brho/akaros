@@ -62,6 +62,7 @@ struct Env {
 	/* Cache color map: bitmap of the cache colors currently allocated to this
 	 * process */
 	uint8_t* cache_colors_map;
+	size_t next_cache_color;
 
 	/* Info about this process's resources (granted, desired) for each type. */
 	struct resource resources[MAX_NUM_RESOURCES];

@@ -116,6 +116,7 @@ void test_print_info(void)
 
 void test_page_coloring(void) 
 {
+/*
 	//Print the different cache properties of our machine
 	print_cache_properties("L1", l1);
 	cprintf("\n");
@@ -143,7 +144,7 @@ void test_page_coloring(void)
 	cprintf("Allocating from L1 page colors:\n");
 	for(int i=0; i<get_cache_num_page_colors(l1); i++) {
 		cprintf("  COLOR %d:\n", i);
-		while(l1_page_alloc(&page, i) != -ENOMEM)
+		while(colored_page_alloc(l1, &page, i) != -ENOMEM)
 			cprintf("    Page: %d\n", page2ppn(page));
 	}
 
@@ -154,7 +155,7 @@ void test_page_coloring(void)
 	cprintf("Allocating from L2 page colors:\n");
 	for(int i=0; i<get_cache_num_page_colors(l2); i++) {
 		cprintf("  COLOR %d:\n", i);
-		while(l2_page_alloc(&page, i) != -ENOMEM)
+		while(colored_page_alloc(l2, &page, i) != -ENOMEM)
 			cprintf("    Page: %d\n", page2ppn(page));
 	}
 
@@ -165,7 +166,7 @@ void test_page_coloring(void)
 	cprintf("Allocating from L3 page colors:\n");
 	for(int i=0; i<get_cache_num_page_colors(l3); i++) {
 		cprintf("  COLOR %d:\n", i);
-		while(l3_page_alloc(&page, i) != -ENOMEM)
+		while(colored_page_alloc(l3, &page, i) != -ENOMEM)
 			cprintf("    Page: %d\n", page2ppn(page));
 	}
 	
@@ -174,10 +175,10 @@ void test_page_coloring(void)
 	
 	//Run through and allocate all pages through page_alloc
 	cprintf("Allocating from global allocator:\n");
-	while(page_alloc(&page) != -ENOMEM)
+	while(upage_alloc(&page) != -ENOMEM)
 		cprintf("    Page: %d\n", page2ppn(page));
 	
-	if(l2_page_alloc(&page, 0) != -ENOMEM)
+	if(colored_page_alloc(l2, &page, 0) != -ENOMEM)
 		cprintf("Should not get here, all pages should already be gone!\n");
 	cprintf("All pages gone for sure...\n");
 	
@@ -189,36 +190,41 @@ void test_page_coloring(void)
 	page_free(&pages[6]);
 	page_free(&pages[4]);
 
-	while(page_alloc(&page) != -ENOMEM)
+	while(upage_alloc(&page) != -ENOMEM)
 		cprintf("Page: %d\n", page2ppn(page));	
+	
+	page_init();
+*/
 }
 
 void test_color_alloc() {
 	size_t checkpoint = 0;
-	struct proc* p = kfs_proc_create(kfs_lookup_path("parlib_matrix"));
-	cache_color_alloc(l2, p);
-	cache_color_alloc(l3, p);
-	cache_color_alloc(l3, p);
-	cache_color_alloc(l2, p);
-	cache_color_free(llc_cache, p);
-	cache_color_free(llc_cache, p);
-	cache_color_free(llc_cache, p);
-	cache_color_free(llc_cache, p);
-	cache_color_free(llc_cache, p);
-	cache_color_free(llc_cache, p);
-	cache_color_free(llc_cache, p);
-	cache_color_free(llc_cache, p);
-	cache_color_free(llc_cache, p);
-	cache_color_free(llc_cache, p);
-	cache_color_free(llc_cache, p);
-	cache_color_free(llc_cache, p);
-	cache_color_free(llc_cache, p);
-	cache_color_free(llc_cache, p);
-	cache_color_free(llc_cache, p);
-	cache_color_free(llc_cache, p);
-	cache_color_free(l2, p);
-	cache_color_free(llc_cache, p);
-	cache_color_free(llc_cache, p);
+	uint8_t* colors_map = kmalloc(BYTES_FOR_BITMASK(llc_cache->num_colors), 0);
+	cache_color_alloc(l2, colors_map);
+	cache_color_alloc(l3, colors_map);
+	cache_color_alloc(l3, colors_map);
+	cache_color_alloc(l2, colors_map);
+	cache_color_free(llc_cache, colors_map);
+	cache_color_free(llc_cache, colors_map);
+	cache_color_free(llc_cache, colors_map);
+	cache_color_free(llc_cache, colors_map);
+	cache_color_free(llc_cache, colors_map);
+	cache_color_free(llc_cache, colors_map);
+	cache_color_free(llc_cache, colors_map);
+	cache_color_free(llc_cache, colors_map);
+	cache_color_free(llc_cache, colors_map);
+	cache_color_free(llc_cache, colors_map);
+	cache_color_free(llc_cache, colors_map);
+	cache_color_free(llc_cache, colors_map);
+	cache_color_free(llc_cache, colors_map);
+	cache_color_free(llc_cache, colors_map);
+	cache_color_free(llc_cache, colors_map);
+	cache_color_free(llc_cache, colors_map);
+	cache_color_free(l2, colors_map);
+	cache_color_free(llc_cache, colors_map);
+	cache_color_free(llc_cache, colors_map);
+
+print_cache_colors:
 	printk("L1 free colors, tot colors: %d\n", l1->num_colors);
 	PRINT_BITMASK(l1->free_colors_map, l1->num_colors);
 	printk("L2 free colors, tot colors: %d\n", l2->num_colors);
@@ -226,7 +232,7 @@ void test_color_alloc() {
 	printk("L3 free colors, tot colors: %d\n", l3->num_colors);
 	PRINT_BITMASK(l3->free_colors_map, l3->num_colors);
 	printk("Process allocated colors\n");
-	PRINT_BITMASK(p->cache_colors_map, llc_cache->num_colors);
+	PRINT_BITMASK(colors_map, llc_cache->num_colors);
 	printk("test_color_alloc() complete!\n");
 }
 

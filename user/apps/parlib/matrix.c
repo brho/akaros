@@ -12,6 +12,7 @@ extern void set_default_user();
 extern void file_io();
 extern void file_error();
 extern void run_binary();
+extern void run_binary_colored();
 extern char prompt[256];
 
 void help() {
@@ -22,6 +23,7 @@ void help() {
            "  file_io:          Run File Related IO Tests\n"
            "  file_error:       Run File Error Related Tests\n"
            "  run_binary:       Load and run a binary located on the remote server\n"
+           "  run_binary_colored:       Load and run a binary located on the remote server with a specified number of page colors\n"
 	      );
 }
 
@@ -49,6 +51,8 @@ int main(int argc, char** argv)
 			file_error();
 		else if (strcmp(s, "run_binary") == 0)
 			run_binary();
+		else if (strcmp(s, "run_binary_colored") == 0)
+			run_binary_colored();
 		else
 			help();	
 

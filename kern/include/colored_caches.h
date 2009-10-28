@@ -10,7 +10,7 @@
 
 #include <ros/common.h>
 #include <ros/error.h>
-#include <process.h>
+#include <atomic.h>
 
 /****************** Cache Structures ********************/
 typedef struct Cache {
@@ -42,10 +42,14 @@ void init_free_cache_colors_map(cache_t* c);
 size_t get_page_color(uintptr_t page, cache_t RO*c);
 size_t get_offset_in_cache_line(uintptr_t addr, cache_t RO*c);
 void print_cache_properties(char *NT lstring, cache_t RO*c);
-error_t cache_color_alloc(cache_t* c, struct proc* p);
-error_t cache_color_alloc_specific(size_t color, cache_t* c, struct proc* p);
-void cache_color_free(cache_t* c, struct proc* p);
-void cache_color_free_specific(size_t color, cache_t* c, struct proc* p);
+
+uint8_t* cache_colors_map_alloc();
+void cache_colors_map_free(uint8_t* colors_map);
+error_t cache_color_alloc(cache_t* c, uint8_t* colors_map);
+error_t cache_color_alloc_specific(size_t color, cache_t* c, 
+                                         uint8_t* colors_map);
+void cache_color_free(cache_t* c, uint8_t* colors_map);
+void cache_color_free_specific(size_t color, cache_t* c, uint8_t* colors_map);
 
 /****************** Cache Properties *********************/
 inline size_t get_cache_ways_associative(cache_t RO*c);

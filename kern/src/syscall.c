@@ -23,6 +23,8 @@
 #include <kmalloc.h>
 #include <stdio.h>
 #include <resource.h>
+#include <colored_caches.h>
+#include <arch/bitmask.h>
 #include <kfs.h> // eventually replace this with vfs.h
 
 #ifdef __sparc_v8__
@@ -81,22 +83,27 @@ static ssize_t sys_serial_read(env_t* e, char *DANGEROUS _buf, size_t len)
 //
 
 static ssize_t sys_run_binary(env_t* e, void *DANGEROUS binary_buf,
-                              void*DANGEROUS arg, size_t len) {
+                  void*DANGEROUS arg, size_t len, size_t num_colors)
+{
 	uint8_t* new_binary = kmalloc(len, 0);
 	if(new_binary == NULL)
 		return -ENOMEM;
-	if(memcpy_from_user(e, new_binary, binary_buf, len))
-	{
+	if(memcpy_from_user(e, new_binary, binary_buf, len)) {
 		kfree(new_binary);
 		proc_destroy(e);
 		return 0;
 	}
+	kfree(new_binary);
 
 	env_t* env = env_create(new_binary, len);
-	kfree(new_binary);
+	if(num_colors > 0) {
+		env->cache_colors_map = cache_colors_map_alloc();
+		for(int i=0; i<num_colors; i++)
+			cache_color_alloc(llc_cache, env->cache_colors_map);
+	}
 	proc_set_state(env, PROC_RUNNABLE_S);
 	schedule_proc(env);
-	proc_yield(e); // changed from sys_yield.  did not test this at all.
+	proc_yield(e);
 	return 0;
 }
 
@@ -190,17 +197,17 @@ static ssize_t sys_shared_page_alloc(env_t* p1,
                                                       PTE_USER_RW);
 	page_t* page;
 	env_t* p2 = &(envs[ENVX(p2_id)]);
-	error_t e = page_alloc(&page);
+	error_t e = upage_alloc(p1, &page);
 
 	if(e < 0) return e;
 
 	void* p2_addr = page_insert_in_range(p2->env_pgdir, page,
-	                                     (void*SNT)UTEXT, (void*SNT)UTOP, p2_flags);
+	                (void*SNT)UTEXT, (void*SNT)UTOP, p2_flags);
 	if(p2_addr == NULL)
 		return -EFAIL;
 
 	void* p1_addr = page_insert_in_range(p1->env_pgdir, page,
-	                                    (void*SNT)UTEXT, (void*SNT)UTOP, p1_flags);
+	                (void*SNT)UTEXT, (void*SNT)UTOP, p1_flags);
 	if(p1_addr == NULL) {
 		page_remove(p2->env_pgdir, p2_addr);
 		return -EFAIL;
@@ -265,7 +272,7 @@ static void sys_cache_buster(env_t* e, uint32_t num_writes, uint32_t num_pages,
 	if (num_pages) {
 		spin_lock(&buster_lock);
 		for (int i = 0; i < MIN(num_pages, MAX_PAGES); i++) {
-			page_alloc(&a_page[i]);
+			upage_alloc(e, &a_page[i]);
 			page_insert(e->env_pgdir, a_page[i], (void*)INSERT_ADDR + PGSIZE*i,
 			            PTE_USER_RW);
 		}
@@ -534,8 +541,8 @@ intreg_t syscall(struct proc *p, trapframe_t *tf, uintreg_t syscallno,
 			return sys_serial_read(p, (char *DANGEROUS)a1, (size_t)a2);
 	#endif
 		case SYS_run_binary:
-			return sys_run_binary(p, (char *DANGEROUS)a1,
-			                      (char* DANGEROUS)a2, (size_t)a3);
+			return sys_run_binary(p, (char *DANGEROUS)a1, (char* DANGEROUS)a2, 
+			                                           (size_t)a3, (size_t)a4);
 	#ifdef __NETWORK__
 		case SYS_eth_write:
 			return sys_eth_write(p, (char *DANGEROUS)a1, (size_t)a2);

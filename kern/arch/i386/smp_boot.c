@@ -100,9 +100,8 @@ void smp_boot(void)
 	page_insert(boot_pgdir, pa2page(trampoline_pg), (void*SNT)trampoline_pg, PTE_W);
 
 	// Allocate a stack for the cores starting up.  One for all, must share
-	if (page_alloc(&smp_stack))
+	if (kpage_alloc(&smp_stack))
 		panic("No memory for SMP boot stack!");
-	page_incref(smp_stack);
 	smp_stack_top = SINIT((uintptr_t)(page2kva(smp_stack) + PGSIZE));
 
 	// Start the IPI process (INIT, wait, SIPI, wait, SIPI, wait)
@@ -204,9 +203,8 @@ uint32_t smp_main(void)
 
 	// Get a per-core kernel stack
 	page_t *my_stack;
-	if (page_alloc(&my_stack))
+	if (kpage_alloc(&my_stack))
 		panic("Unable to alloc a per-core stack!");
-	page_incref(my_stack);
 	memset(page2kva(my_stack), 0, PGSIZE);
 
 	// Set up a gdt / gdt_pd for this core, stored at the top of the stack

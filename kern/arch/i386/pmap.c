@@ -611,7 +611,7 @@ pgdir_walk(pde_t *pgdir, const void *SNT va, int create)
 		*the_pde = PTE_PS | PTE_P;
 		return (pte_t*)the_pde;
 	}
-	if (page_alloc(&new_table))
+	if (kpage_alloc(&new_table))
 		return NULL;
 	page_setref(new_table,1);
 	memset(page2kva(new_table), 0, PGSIZE);
@@ -689,9 +689,12 @@ page_check(void)
 
 	// should be able to allocate three pages
 	pp0 = pp1 = pp2 = 0;
-	assert(page_alloc(&pp0) == 0);
-	assert(page_alloc(&pp1) == 0);
-	assert(page_alloc(&pp2) == 0);
+	assert(kpage_alloc(&pp0) == 0);
+	assert(kpage_alloc(&pp1) == 0);
+	assert(kpage_alloc(&pp2) == 0);
+	page_setref(pp0, 0);
+	page_setref(pp1, 0);
+	page_setref(pp2, 0);
 
 	assert(pp0);
 	assert(pp1 && pp1 != pp0);
@@ -704,7 +707,7 @@ page_check(void)
 	}
 
 	// should be no free memory
-	assert(page_alloc(&pp) == -ENOMEM);
+	assert(kpage_alloc(&pp) == -ENOMEM);
 
 	// Fill pp1 with bogus data and check for invalid tlb entries
 	memset(page2kva(pp1), 0xFFFFFFFF, PGSIZE);
@@ -742,7 +745,7 @@ page_check(void)
 	}
 
 	// should be no free memory
-	assert(page_alloc(&pp) == -ENOMEM);
+	assert(kpage_alloc(&pp) == -ENOMEM);
 
 	// should be able to map pp2 at PGSIZE because it's already there
 	assert(page_insert(boot_pgdir, pp2, (void*SNT) PGSIZE, PTE_U) == 0);
@@ -757,7 +760,7 @@ page_check(void)
 
 	// pp2 should NOT be on the free list
 	// could happen in ref counts are handled sloppily in page_insert
-	assert(page_alloc(&pp) == -ENOMEM);
+	assert(kpage_alloc(&pp) == -ENOMEM);
 
 	// should not be able to map at PTSIZE because need free page for page table
 	assert(page_insert(boot_pgdir, pp0, (void*SNT) PTSIZE, 0) < 0);
@@ -773,7 +776,8 @@ page_check(void)
 	assert(pp2->page_ref == 0);
 
 	// pp2 should be returned by page_alloc
-	assert(page_alloc(&pp) == 0 && pp == pp2);
+	assert(kpage_alloc(&pp) == 0 && pp == pp2);
+	page_setref(pp, 0);
 
 	// unmapping pp1 at 0 should keep pp1 at PGSIZE
 	page_remove(boot_pgdir, 0x0);
@@ -790,10 +794,11 @@ page_check(void)
 	assert(pp2->page_ref == 0);
 
 	// so it should be returned by page_alloc
-	assert(page_alloc(&pp) == 0 && pp == pp1);
+	assert(kpage_alloc(&pp) == 0 && pp == pp1);
+	page_setref(pp, 0);
 
 	// should be no free memory
-	assert(page_alloc(&pp) == -ENOMEM);
+	assert(kpage_alloc(&pp) == -ENOMEM);
 
 	// forcibly take pp0 back
 	assert(PTE_ADDR(boot_pgdir[0]) == page2pa(pp0));
