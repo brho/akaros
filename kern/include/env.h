@@ -118,7 +118,8 @@ void	env_free(env_t *SAFE e);
 void	env_user_mem_free(env_t* e);
 void	env_segment_alloc(env_t *e, void *SNT va, size_t len);
 void	env_segment_free(env_t *e, void *SNT va, size_t len);
-env_t*	env_create(uint8_t *COUNT(size) binary, size_t size);
+env_t*	env_create();
+void	env_load_icode(env_t* e, env_t* binary_env, uint8_t *COUNT(size) binary, size_t size);
 
 /*
  * Allows the kernel to figure out what process is running on its core.

@@ -107,10 +107,9 @@ static error_t __page_alloc_specific(page_t** page, size_t ppn)
 }
 
 /**
- * @brief Allocates a physical page from a pool of unused physical memory
+ * @brief Allocates a physical page from a pool of unused physical memory.
  *
- * Does NOT set the contents of the physical page to zero -
- * the caller must do that if necessary.
+ * Zeroes the page.
  *
  * @param[out] page  set to point to the Page struct
  *                   of the newly allocated page
@@ -124,6 +123,8 @@ error_t upage_alloc(struct proc* p, page_t** page)
 	ssize_t ret = __colored_page_alloc(p->cache_colors_map, 
 	                                     page, p->next_cache_color);
 	spin_unlock_irqsave(&colored_page_free_list_lock);
+
+	memset(page2kva(*page),0,PGSIZE);
 
 	if(ret >= 0)
 		p->next_cache_color = ret;

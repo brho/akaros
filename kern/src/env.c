@@ -238,7 +238,7 @@ proc_init_procinfo(struct proc* p)
 	p->env_procinfo->id = (p->env_id & 0x3FF);
 
 	// TODO: maybe do something smarter here
-	p->env_procinfo->max_harts = num_cpus > 1 ? num_cpus-1 : 1;
+	p->env_procinfo->max_harts = MAX(1,num_cpus-1);
 }
 
 // Sets up argc/argv in procinfo.  Returns number of
@@ -383,7 +383,7 @@ env_alloc(env_t **newenv_store, envid_t parent_id)
 //
 // Allocate len bytes of physical memory for environment env,
 // and map it at virtual address va in the environment's address space.
-// Does not zero or otherwise initialize the mapped pages in any way.
+// Pages are zeroed by upage_alloc.
 // Pages should be writable by user and kernel.
 // Panic if any allocation attempt fails.
 //
@@ -402,9 +402,6 @@ env_segment_alloc(env_t *e, void *SNT va, size_t len)
 		panic("Wrap-around in memory allocation addresses!");
 	if ((uintptr_t)end > UTOP)
 		panic("Attempting to map above UTOP!");
-	// page_insert/pgdir_walk alloc a page and read/write to it via its address
-	// starting from pgdir (e's), so we need to be using e's pgdir
-	assert(e->env_cr3 == rcr3());
 	num_pages = LA2PPN(end - start);
 
 	for (i = 0; i < num_pages; i++, start += PGSIZE) {
@@ -449,6 +446,52 @@ env_segment_free(env_t *e, void *SNT va, size_t len)
 	}
 }
 
+// this helper function handles all cases of copying to/from user/kernel
+// or between two users.
+static error_t
+load_icode_memcpy(env_t* e, env_t* binary_env, void* dest, const void* src, size_t len)
+{
+	if(src < (void*)UTOP)
+	{
+		if(binary_env == NULL)
+			return -EFAULT;
+
+		if(e == NULL)
+			return memcpy_from_user(binary_env,dest,src,len);
+		else
+		{
+			// TODO: do something more elegant & faster here.
+			// e.g. a memcpy_from_user_to_user
+			uint8_t kbuf[1024];
+			while(len > 0)
+			{
+				size_t thislen = MIN(len,sizeof(kbuf));
+				if(memcpy_from_user(binary_env,kbuf,src,thislen))
+					return -EFAULT;
+				if(memcpy_to_user(e,dest,kbuf,thislen))
+					panic("destination env isn't mapped!");
+				len -= thislen;
+				src += thislen;
+				dest += thislen;
+			}
+			return ESUCCESS;
+		}
+
+	}
+	else
+	{
+		if(binary_env != NULL)
+			return -EFAULT;
+
+		if(e == NULL)
+			memcpy(dest,src,len);
+		else if(memcpy_to_user(e,dest,src,len))
+			panic("destination env isn't mapped!");
+
+		return ESUCCESS;
+	}
+}
+
 //
 // Set up the initial program binary, stack, and processor flags
 // for a user process.
@@ -462,13 +505,14 @@ env_segment_free(env_t *e, void *SNT va, size_t len)
 //
 // Finally, this function maps one page for the program's initial stack.
 static void*
-load_icode(env_t *SAFE e, uint8_t *COUNT(size) binary, size_t size)
+load_icode(env_t *SAFE e, env_t* binary_env, uint8_t *COUNT(size) binary, size_t size)
 {
 	// asw: copy the headers because they might not be aligned.
 	elf_t elfhdr;
 	proghdr_t phdr;
 	void* _end = 0;
-	memcpy(&elfhdr, binary, sizeof(elfhdr));
+
+	assert(load_icode_memcpy(NULL,binary_env,&elfhdr, binary, sizeof(elfhdr)) == ESUCCESS);
 
 	int i, r;
 
@@ -477,28 +521,12 @@ load_icode(env_t *SAFE e, uint8_t *COUNT(size) binary, size_t size)
 	// make sure we have proghdrs to load
 	assert(elfhdr.e_phnum);
 
-	// to actually access any pages alloc'd for this environment, we
-	// need to have the hardware use this environment's page tables.
-	uintreg_t old_cr3 = rcr3();
-	/*
-	 * Even though we'll decref later and no one should be killing us at this
-	 * stage, we're still going to wrap the lcr3s with incref/decref.
-	 *
-	 * Note we never decref on the old_cr3, since we aren't willing to let it
-	 * die.  It's also not clear who the previous process is - sometimes it
-	 * isn't even a process (when the kernel loads on its own, and not in
-	 * response to a syscall).  Probably need to think more about this (TODO)
-	 *
-	 * This can get a bit tricky if this code blocks (will need to think about a
-	 * decref then), if we try to change states, etc.
-	 */
-	proc_incref(e);
-	lcr3(e->env_cr3);
-
 	// TODO: how do we do a runtime COUNT?
 	{TRUSTEDBLOCK // zra: TRUSTEDBLOCK until validation is done.
 	for (i = 0; i < elfhdr.e_phnum; i++) {
-		memcpy(&phdr, binary + elfhdr.e_phoff + i*sizeof(phdr), sizeof(phdr));
+		// copy phdr to kernel mem
+		assert(load_icode_memcpy(NULL,binary_env,&phdr, binary + elfhdr.e_phoff + i*sizeof(phdr), sizeof(phdr)) == ESUCCESS);
+
 		if (phdr.p_type != ELF_PROG_LOAD)
 			continue;
 		// TODO: validate elf header fields!
@@ -506,9 +534,12 @@ load_icode(env_t *SAFE e, uint8_t *COUNT(size) binary, size_t size)
 		// this, there will be issues with overlapping sections
 		_end = MAX(_end, (void*)(phdr.p_va + phdr.p_memsz));
 		env_segment_alloc(e, (void*SNT)phdr.p_va, phdr.p_memsz);
-		memcpy((void*)phdr.p_va, binary + phdr.p_offset, phdr.p_filesz);
-		memset((void*)phdr.p_va + phdr.p_filesz, 0, 
-		              phdr.p_memsz - phdr.p_filesz);
+
+		// copy section to user mem
+		assert(load_icode_memcpy(e,binary_env,(void*)phdr.p_va, binary + phdr.p_offset, phdr.p_filesz) == ESUCCESS);
+
+		//no need to memclr the remaining p_memsz-p_filesz bytes
+		//because upage_alloc'd pages are zeroed
 	}}
 
 	proc_set_program_counter(&e->env_tf, elfhdr.e_entry);
@@ -518,10 +549,6 @@ load_icode(env_t *SAFE e, uint8_t *COUNT(size) binary, size_t size)
 	// starting at virtual address USTACKTOP - USTACK_NUM_PAGES*PGSIZE.
 	env_segment_alloc(e, (void*SNT)(USTACKTOP - USTACK_NUM_PAGES*PGSIZE), 
 	                  USTACK_NUM_PAGES*PGSIZE);
-
-	// reload the original address space
-	lcr3(old_cr3);
-	proc_decref(e);
 	
 	return _end;
 }
@@ -529,7 +556,7 @@ load_icode(env_t *SAFE e, uint8_t *COUNT(size) binary, size_t size)
 //
 // Allocates a new env and loads the named elf binary into it.
 //
-env_t* env_create(uint8_t *binary, size_t size)
+env_t* env_create()
 {
 	env_t *e;
 	int r;
@@ -538,13 +565,21 @@ env_t* env_create(uint8_t *binary, size_t size)
 	curid = (current ? current->env_id : 0);
 	if ((r = env_alloc(&e, curid)) < 0)
 		panic("env_create: %e", r);
-	
-	/* Load the binary and set the current locations of the elf segments.
-	 * All end-of-segment pointers are page aligned (invariant) */
-	e->end_text_segment = load_icode(e, binary, size);
-	e->end_data_segment = e->end_text_segment;
+
+	// default PC: will cause page fault if not otherwise set.
+	proc_set_program_counter(&e->env_tf, 0);
+	e->end_text_segment = 0;
+	e->end_data_segment = 0;
 
 	return e;
+}
+
+void env_load_icode(env_t* e, env_t* binary_env, uint8_t* binary, size_t size)
+{
+	/* Load the binary and set the current locations of the elf segments.
+	 * All end-of-segment pointers are page aligned (invariant) */
+	e->end_text_segment = load_icode(e, binary_env, binary, size);
+	e->end_data_segment = e->end_text_segment;
 }
 
 //

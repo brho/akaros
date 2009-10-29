@@ -82,5 +82,8 @@ struct proc *kfs_proc_create(int kfs_inode)
 {
 	if (kfs_inode < 0 || kfs_inode >= MAX_KFS_FILES)
 		panic("Invalid kfs_inode.  Check you error codes!");
-	return env_create(kfs[kfs_inode].start, kfs[kfs_inode].size);
+	struct proc* p = env_create();
+	if(p != NULL)
+		env_load_icode(p,NULL,kfs[kfs_inode].start, kfs[kfs_inode].size);
+	return p;
 }
