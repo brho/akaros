@@ -3,9 +3,9 @@ USER_APPS_PARLIB_PTHREAD_DIR := $(USER_APPS_PARLIB_DIR)/pthread
 USER_APPS_PARLIB_PTHREAD_LDLIBS := $(USER_APPS_PARLIB_LDLIBS) -lpthread
                              
 USER_APPS_PARLIB_PTHREAD_LDDEPENDS := $(OBJDIR)/$(USER_APPS_PARLIB_PTHREAD_DIR)/%.o \
-                                      $(OBJDIR)/$(USER_PARLIB_PTHREAD_DIR)/libpthread.a \
                                       $(USER_APPS_PARLIB_LDOBJS) \
                                       $(OBJDIR)/$(USER_PARLIB_DIR)/libparlib.a \
+                                      $(OBJDIR)/$(USER_PARLIB_DIR)/libpthread.a \
                                       $(OBJDIR)/$(USER_PARLIB_DIR)/libivyparlib.a
 
 $(OBJDIR)/$(USER_APPS_PARLIB_PTHREAD_DIR)/%: $(USER_APPS_PARLIB_PTHREAD_LDDEPENDS)

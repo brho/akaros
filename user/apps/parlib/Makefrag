@@ -2,9 +2,8 @@ USER_APPS_PARLIB_DIR = $(USER_APPS_DIR)/parlib
 OBJDIRS += $(USER_APPS_PARLIB_DIR)
 
 USER_APPS_PARLIB_CFLAGS    := $(USER_CFLAGS)  \
-                              -I$(USER_PARLIB_PTHREAD_DIR)/include \
-                              -I$(USER_PARLIB_NEWLIB_DIR)/include \
-                              -I$(USER_PARLIB_DIR)/inc
+                              -I$(USER_PARLIB_DIR)/inc \
+                              -I$(USER_PARLIB_NEWLIB_DIR)/include
 ifeq ($(COMPILER),IVY)
 	PATCHFILE = $(OBJDIR)/$(USER_PARLIB_DIR)/libc_patch.i
 	USER_APPS_PARLIB_CFLAGS    += --nodeputy --nopatch #--patch=$(PATCHFILE) 
@@ -14,7 +13,6 @@ USER_APPS_PARLIB_LDFLAGS   := $(USER_LDFLAGS) -static \
                               -T $(USER_APPS_PARLIB_DIR)/apps_$(TARGET_ARCH).ld
 
 USER_APPS_PARLIB_LDDIRS    := -L$(OBJDIR)/$(USER_PARLIB_DIR) \
-                              -L$(OBJDIR)/$(USER_PARLIB_PTHREAD_DIR) \
                               -L$(USER_PARLIB_NEWLIB_DIR)/lib/$(TARGET_ARCH)
 
 USER_APPS_PARLIB_LDLIBS    := --start-group -lc -lm -lg -lparlib -livyparlib --end-group

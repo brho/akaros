@@ -25,6 +25,15 @@ USER_PARLIB_SRC_OBJFILES := $(patsubst $(USER_PARLIB_SRC_DIR)/%.S, \
                             $(OBJDIR)/$(USER_PARLIB_SRC_DIR)/%.o, \
                             $(USER_PARLIB_SRC_OBJFILES))
 
+USER_PARLIB_PTHREAD_SRCFILES := $(USER_PARLIB_SRC_DIR)/pthread.c
+
+USER_PARLIB_PTHREAD_OBJFILES := $(patsubst $(USER_PARLIB_SRC_DIR)/%.c, \
+                                $(OBJDIR)/$(USER_PARLIB_SRC_DIR)/%.o, \
+                                $(USER_PARLIB_PTHREAD_SRCFILES))
+USER_PARLIB_PTHREAD_OBJFILES := $(patsubst $(USER_PARLIB_SRC_DIR)/%.S, \
+                                $(OBJDIR)/$(USER_PARLIB_SRC_DIR)/%.o, \
+                                $(USER_PARLIB_PTHREAD_OBJFILES))
+
 ANNOTS := $(shell dirname $(shell which ivycc))
 ANNOTS := $(ANNOTS)/../lib/ivy/include/deputy/annots.h
 
@@ -47,4 +56,9 @@ $(OBJDIR)/$(USER_PARLIB_DIR)/libparlib.a: $(USER_PARLIB_SRC_OBJFILES)
 	@echo + ar [PARLIB] $@
 	@mkdir -p $(@D)
 	$(V)$(AR) r $@ $(USER_PARLIB_SRC_OBJFILES) 2>/dev/null
+
+$(OBJDIR)/$(USER_PARLIB_DIR)/libpthread.a: $(USER_PARLIB_PTHREAD_OBJFILES)
+	@echo + ar [PARLIB] $@
+	@mkdir -p $(@D)
+	$(V)$(AR) r $@ $(USER_PARLIB_PTHREAD_OBJFILES) 2>/dev/null
 

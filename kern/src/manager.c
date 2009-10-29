@@ -259,12 +259,13 @@ void manager_waterman()
 		case 4:
 			RUN_APP("parlib_pthread_blackscholes",3,"blackscholes",itoa(num_cpus>1?num_cpus-1:1,buf0,10),itoa(256,buf1,10));
 			break;
-		case 5:
-			while(*(volatile uint32_t*)&envs[4]->state != ENV_FREE);
-			reboot();
-			break;
 
-		case 10:
+		//case 5:
+		//	//while(*(volatile uint32_t*)&envs[4]->state != ENV_FREE);
+		//	//reboot();
+		//	break;
+
+		case 5:
 			RUN_APP("parlib_matrix",0);
 			break;
 	}
