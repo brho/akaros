@@ -45,3 +45,21 @@ void libmain(int argc, char * NTS * NT COUNT(argc) argv)
 	// exit gracefully
 	exit();
 }
+
+#pragma weak hart_entry
+void hart_entry()
+{
+	cprintf("Need to implement a hart entry!\n");
+}
+
+/* At the very least, we need to set this flag so that vcore0 can come up at the
+ * hart_entry, like everyone else.  When this is set, it will come up at the
+ * regular entry point (_start:) and jump to newcore:.  
+ *
+ * This function would be a decent place to mmap all the stacks in, which would
+ * simplify the logic of newcore. */
+void prepare_for_multi_mode(void)
+{
+	extern char (SAFE in_multi_mode)[];
+	*in_multi_mode = 1;
+}

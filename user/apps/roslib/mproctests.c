@@ -20,27 +20,29 @@ void udelay(uint64_t usec, uint64_t tsc_freq)
 	return;
 }
 
-#define TEST_MMAP					1
-#define TEST_ONE_CORE				2
-#define TEST_ASK_FOR_TOO_MANY_CORES	3
-#define TEST_INCREMENTAL_CHANGES	4
-#define TEST_YIELD_OUT_OF_ORDER		5
-#define TEST_YIELD_0_OUT_OF_ORDER	6
-#define TEST_SWITCH_TO_RUNNABLE_S	7
-#define TEST_CRAZY_YIELDS			8
-#define TEST_CONCURRENT_SYSCALLS	9
+#define TEST_MMAP					 1
+#define TEST_ONE_CORE				 2
+#define TEST_ASK_FOR_TOO_MANY_CORES	 3
+#define TEST_INCREMENTAL_CHANGES	 4
+#define TEST_YIELD_OUT_OF_ORDER		 5
+#define TEST_YIELD_0_OUT_OF_ORDER	 6
+#define TEST_YIELD_ALL               7
+#define TEST_SWITCH_TO_RUNNABLE_S	 8
+#define TEST_CRAZY_YIELDS			 9
+#define TEST_CONCURRENT_SYSCALLS	10
+
+int test = TEST_SWITCH_TO_RUNNABLE_S;
+
+static void global_tests(uint32_t vcoreid);
 
 int main(int argc, char** argv)
 {
 	uint32_t vcoreid;
 	error_t retval;
-
-	int test = TEST_INCREMENTAL_CHANGES;
-
-	static int first_time = 1; // used by vcore2
+	prepare_for_multi_mode();
 
 	if ((vcoreid = newcore())) {
-		cprintf("Hello from vcore %d\n", vcoreid);
+		cprintf("Should never see me! (from vcore %d)\n", vcoreid);
 	} else { // core 0
 		cprintf("Hello from else vcore 0\n");
 		cprintf("Multi-Goodbye, world, from PID: %d!\n", sys_getpid());
@@ -81,6 +83,36 @@ int main(int argc, char** argv)
 		cprintf("Should see me if you want to relocate core0's context "
 		        "when moving from RUNNING_S\n");
 	}
+
+	// vcore0 only below here
+	switch (test) {
+		case TEST_YIELD_OUT_OF_ORDER:
+			udelay(10000000, 1995014570);
+			cprintf("Core 2 should have yielded, asking for another\n");
+			retval = sys_resource_req(RES_CORES, 7, 0);
+			break;
+		case TEST_YIELD_0_OUT_OF_ORDER:
+			udelay(5000000, 1995014570);
+			cprintf("Core %d yielding\n", vcoreid);
+			yield();
+			cprintf("Core 0 came back where it left off in RUNNING_M!!!\n");
+			break;
+	}
+	global_tests(vcoreid);
+	cprintf("Vcore %d Done!\n", vcoreid);
+	while (1);
+	return 0;
+}
+
+void hart_entry(void)
+{
+	uint32_t vcoreid;
+	static int first_time = 1; // used by vcore2
+	error_t retval;
+
+	vcoreid = newcore();
+	cprintf("Hello from hart_entry in vcore %d\n", vcoreid);
+
 	if ((vcoreid == 2) && first_time) {
 		first_time = 0;
 		switch (test) {
@@ -101,37 +133,33 @@ int main(int argc, char** argv)
 				yield();
 				break;
 			case TEST_YIELD_0_OUT_OF_ORDER:
-				udelay(5000000, 1995014570);
+				udelay(7500000, 1995014570);
 				cprintf("Core 0 should have yielded, asking for another\n");
 				retval = sys_resource_req(RES_CORES, 7, 0);
 		}
 	}
-	if (vcoreid == 0) {
-		switch (test) {
-			case TEST_YIELD_OUT_OF_ORDER:
-				udelay(10000000, 1995014570);
-				cprintf("Core 2 should have yielded, asking for another\n");
-				retval = sys_resource_req(RES_CORES, 7, 0);
-				break;
-			case TEST_YIELD_0_OUT_OF_ORDER:
-				udelay(5000000, 1995014570);
-				cprintf("Core %d yielding\n", vcoreid);
-				yield();
-				cprintf("Core 0 came back where it left off in RUNNING_M!!!\n");
-				break;
-		}
-	}
-	/* This assumes the "core0 is the one who gets saved" style */
+	global_tests(vcoreid);
+	cprintf("Vcore %d Done!\n", vcoreid);
+}
+
+static void global_tests(uint32_t vcoreid)
+{
+	error_t retval;
 	switch (test) {
+		case TEST_YIELD_ALL:
+			cprintf("Core %d yielding\n", vcoreid);
+			yield();
+			// should be RUNNABLE_M now, amt_wanted == 1
+			while(1);
 		case TEST_SWITCH_TO_RUNNABLE_S:
-			if (vcoreid) {
-				yield();
-			} else {
-				udelay(5000000, 1995014570);
-				cprintf("Core %d yielding\n", vcoreid);
-				yield();
-				cprintf("Should see me if you are ever scheduled again.\n");
-			}
+			if (vcoreid == 2) {
+				cprintf("Core %d trying to request 0/ switch to _S\n", vcoreid);
+				retval = sys_resource_req(RES_CORES, 0, 0);
+				// will only see this if we are scheduled()
+				cprintf("Core %d back up! (retval:%d)\n", vcoreid, retval);
+				cprintf("And exiting\n");
+				exit();
+			} 
 			while(1);
 		case TEST_CRAZY_YIELDS:
 			udelay(300000*vcoreid, 1995014570);
@@ -147,7 +175,4 @@ int main(int argc, char** argv)
 			}
 			break;
 	}
-	cprintf("Vcore %d Done!\n", vcoreid);
-	while (1);
-	return 0;
 }

@@ -46,7 +46,7 @@ void ioapic_init() {
 	// We define a entry to be invalid by having an ioapic_address of NULL (0x0)
 	memset(ioapic_redirects, 0x0, sizeof(ioapic_redirects));
 	
-	extern uint8_t num_cpus;
+	extern volatile uint32_t num_cpus;
 	uint32_t num_inconsistent_pci_mappings = 0;	// Increment if we find inconsistent mappings between
 											 	//  mptables and the pci bus.
 	
@@ -164,7 +164,7 @@ void ioapic_route_irq(uint8_t irq, uint8_t dest) {
 	}
 
 	// THIS IS A TEMP CHECK. IF WE USE LOGICAL PARTITIONS THIS MUST BE REMOVED
-        extern uint8_t num_cpus;
+        extern volatile uint32_t num_cpus;
 	if (dest >= num_cpus)
 		panic("TRYING TO REROUTE TO AN INVALID DESTINATION!");
 	

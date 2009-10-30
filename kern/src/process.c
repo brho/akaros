@@ -33,6 +33,16 @@ spinlock_t idle_lock = SPINLOCK_INITIALIZER;
 uint32_t LCKD(&idle_lock) (RO idlecoremap)[MAX_NUM_CPUS];
 uint32_t LCKD(&idle_lock) num_idlecores = 0;
 
+/* Helper function to return a core to the idlemap.  It causes some more lock
+ * acquisitions (like in a for loop), but it's a little easier.  Plus, one day
+ * we might be able to do this without locks (for the putting). */
+static void put_idle_core(uint32_t coreid)
+{
+	spin_lock(&idle_lock);
+	idlecoremap[num_idlecores++] = coreid;
+	spin_unlock(&idle_lock);
+}
+
 /*
  * While this could be done with just an assignment, this gives us the
  * opportunity to check for bad transitions.  Might compile these out later, so
@@ -58,7 +68,7 @@ int proc_set_state(struct proc *p, uint32_t state)
 	 * RBS -> D
 	 * RBM -> D
 	 *
-	 * This isn't allowed yet, may be later.
+	 * This isn't allowed yet, should be later.  Is definitely causable.
 	 * C   -> D
 	 */
 	#if 1 // some sort of correctness flag
@@ -154,18 +164,22 @@ void proc_run(struct proc *p)
 			 * this process.  It is set outside proc_run.  For the active
 			 * message, a0 = struct proc*, a1 = struct trapframe*.   */
 			if (p->num_vcores) {
+				int i = 0;
 				// TODO: handle silly state (HSS)
-				// set virtual core 0 to run the main context
-				// TODO: this should only happen on transition (VC0)
+				// set virtual core 0 to run the main context on transition
+				if (p->env_flags & PROC_TRANSITION_TO_M) {
+					p->env_flags &= !PROC_TRANSITION_TO_M;
 #ifdef __IVY__
-				send_active_message(p->vcoremap[0], __startcore, p,
-				                    &p->env_tf, (void *SNT)0);
+					send_active_message(p->vcoremap[0], __startcore, p,
+					                    &p->env_tf, (void *SNT)0);
 #else
-				send_active_message(p->vcoremap[0], (void *)__startcore,
-				                    (void *)p, (void *)&p->env_tf, 0);
+					send_active_message(p->vcoremap[0], (void *)__startcore,
+					                    (void *)p, (void *)&p->env_tf, 0);
 #endif
+					i = 1; // start at vcore1 in the loop below
+				}
 				/* handle the others. */
-				for (int i = 1; i < p->num_vcores; i++)
+				for (/* i set above */; i < p->num_vcores; i++)
 #ifdef __IVY__
 					send_active_message(p->vcoremap[i], __startcore,
 					                    p, (trapframe_t *CT(1))NULL, (void *SNT)i);
@@ -231,7 +245,6 @@ void proc_startcore(struct proc *p, trapframe_t *tf) {
 	// it's possible to be DYING, but it's a rare race.
 	//if (p->state & (PROC_RUNNING_S | PROC_RUNNING_M))
 	//	printk("dying before (re)startcore on core %d\n", core_id());
-
 	// sucks to have ints disabled when doing env_decref and possibly freeing
 	disable_irq();
 	if (per_cpu_info[core_id()].preempt_pending) {
@@ -255,7 +268,7 @@ void proc_startcore(struct proc *p, trapframe_t *tf) {
 		// process's context".  abandon_core() does this.
 		if (current)
 			proc_decref(current);
-		set_cpu_curenv(p);
+		set_current_proc(p);
 	}
 	/* need to load our silly state, preferably somewhere other than here so we
 	 * can avoid the case where the context was just running here.  it's not
@@ -344,9 +357,7 @@ void proc_destroy(struct proc *p)
 			#if 0
 			/* right now, RUNNING_S only runs on a mgmt core (0), not cores
 			 * managed by the idlecoremap.  so don't do this yet. */
-			spin_lock(&idle_lock);
-			idlecoremap[num_idlecores++] = p->vcoremap[0];
-			spin_unlock(&idle_lock);
+			put_idle_core(p->vcoremap[0]);
 			#endif
 			break;
 		case PROC_RUNNING_M:
@@ -434,18 +445,19 @@ static uint32_t get_vcoreid(struct proc *SAFE p, int32_t pcoreid)
  * - If RUNNING_S, you just give up your time slice and will eventually return.
  * - If RUNNING_M, you give up the current vcore (which never returns), and
  *   adjust the amount of cores wanted/granted.
- * - If you have only one vcore, you switch to RUNNABLE_S.
- * - If you yield from vcore0 but are still RUNNING_M, your context will be
- *   saved, but may not be restarted, depending on how you get that core back.
- *   (currently)  see proc_give_cores for details.
+ * - If you have only one vcore, you switch to RUNNABLE_M.  When you run again,
+ *   you'll have one guaranteed core, starting from the entry point.
+ *
  * - RES_CORES amt_wanted will be the amount running after taking away the
- *   yielder.
+ *   yielder, unless there are none left, in which case it will be 1.
  */
 void proc_yield(struct proc *SAFE p)
 {
 	spin_lock_irqsave(&p->proc_lock);
 	switch (p->state) {
 		case (PROC_RUNNING_S):
+			p->env_tf= *current_tf;
+			env_push_ancillary_state(p);
 			proc_set_state(p, PROC_RUNNABLE_S);
 			schedule_proc(p);
 			break;
@@ -455,19 +467,18 @@ void proc_yield(struct proc *SAFE p)
 			// give up core
 			p->vcoremap[get_vcoreid(p, core_id())] = -1;
 			// add to idle list
-			spin_lock(&idle_lock);
-			idlecoremap[num_idlecores++] = core_id();
-			spin_unlock(&idle_lock);
-			// out of vcores?  if so, we're now a regular process
+			put_idle_core(core_id());
+			// last vcore?  then we really want 1, and to yield the gang
 			if (p->num_vcores == 0) {
-				// switch to runnable_s
-				proc_set_state(p, PROC_RUNNABLE_S);
+				// might replace this with m_yield, if we have it directly
+				p->resources[RES_CORES].amt_wanted = 1;
+				proc_set_state(p, PROC_RUNNABLE_M);
 				schedule_proc(p);
 			}
 			break;
 		default:
 			// there are races that can lead to this (async death, preempt, etc)
-			panic("Weird state(0x%08x) in sys_yield", p->state);
+			panic("Weird state(0x%08x) in proc_yield", p->state);
 	}
 	spin_unlock_irqsave(&p->proc_lock);
 	// clean up the core and idle.  for mgmt cores, they will ultimately call
@@ -542,14 +553,6 @@ error_t proc_give_cores(struct proc *SAFE p, uint32_t corelist[], size_t *num)
 				p->vcoremap[free_vcoreid] = corelist[i];
 				p->num_vcores++;
 				assert(corelist[i] != core_id()); // sanity
-				/* if we want to allow yielding of vcore0 and restarting it at
-				 * its yield point *while still RUNNING_M*, uncomment this */
-				// TODO: we don't (VC0)
-				/*
-				if (i == 0)
-					send_active_message(p->vcoremap[0], __startcore,
-					                    (uint32_t)p, (uint32_t)&p->env_tf, 0);
-				else */
 				send_active_message(corelist[i], __startcore, p,
 				                     (struct Trapframe *)0,
 				                     (void*SNT)free_vcoreid);
@@ -583,8 +586,6 @@ error_t proc_set_allcores(struct proc *SAFE p, uint32_t corelist[], size_t *num,
  * contain how many items are in corelist.  This isn't implemented yet, but
  * might be necessary later.  Or not, and we'll never do it.
  *
- * TODO: think about taking vcore0.  probably are issues... (or not (VC0))
- *
  * WARNING: You must hold the proc_lock before calling this!*/
 error_t proc_take_cores(struct proc *SAFE p, uint32_t corelist[], size_t *num,
                         amr_t message, TV(a0t) arg0, TV(a1t) arg1, TV(a2t) arg2)
@@ -602,17 +603,18 @@ error_t proc_take_cores(struct proc *SAFE p, uint32_t corelist[], size_t *num,
 	}
 	spin_lock(&idle_lock);
 	assert((*num <= p->num_vcores) && (num_idlecores + *num <= num_cpus));
+	spin_unlock(&idle_lock);
 	for (int i = 0; i < *num; i++) {
 		vcoreid = get_vcoreid(p, corelist[i]);
 		assert(p->vcoremap[vcoreid] == corelist[i]);
 		if (message)
 			send_active_message(corelist[i], message, arg0, arg1, arg2);
 		// give the pcore back to the idlecoremap
-		idlecoremap[num_idlecores++] = corelist[i];
+		put_idle_core(corelist[i]);
 		p->vcoremap[vcoreid] = -1;
 	}
-	spin_unlock(&idle_lock);
 	p->num_vcores -= *num;
+	p->resources[RES_CORES].amt_granted -= *num;
 	return 0;
 }
 
@@ -637,6 +639,7 @@ error_t proc_take_allcores(struct proc *SAFE p, amr_t message,
 	}
 	spin_lock(&idle_lock);
 	assert(num_idlecores + p->num_vcores <= num_cpus); // sanity
+	spin_unlock(&idle_lock);
 	for (int i = 0; i < p->num_vcores; i++) {
 		// find next active vcore
 		active_vcoreid = get_busy_vcoreid(p, active_vcoreid);
@@ -644,11 +647,11 @@ error_t proc_take_allcores(struct proc *SAFE p, amr_t message,
 			send_active_message(p->vcoremap[active_vcoreid], message,
 			                     arg0, arg1, arg2);
 		// give the pcore back to the idlecoremap
-		idlecoremap[num_idlecores++] = p->vcoremap[active_vcoreid];
+		put_idle_core(p->vcoremap[active_vcoreid]);
 		p->vcoremap[active_vcoreid] = -1;
 	}
-	spin_unlock(&idle_lock);
 	p->num_vcores = 0;
+	p->resources[RES_CORES].amt_granted = 0;
 	return 0;
 }
 
@@ -753,10 +756,11 @@ void abandon_core(void)
 	if (current) {
 		lcr3(boot_cr3);
 		proc_decref(current);
-		set_cpu_curenv(NULL);
+		set_current_proc(NULL);
 	}
 	smp_idle();
 }
+
 /* Active message handler to clean up the core when a process is dying.
  * Note this leaves no trace of what was running.
  * It's okay if death comes to a core that's already idling and has no current.

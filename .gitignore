@@ -20,7 +20,7 @@ ros-project.tmproj
 kern/boot
 kern/include/arch
 kern/src/arch
-doc/rosdoc
+Documentation/doxygen/rosdoc
 sim/
 tools/.*
 tools/syscall_server/syscall_server_*

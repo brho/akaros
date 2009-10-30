@@ -17,7 +17,6 @@
 #include <process.h>
 #include <stdio.h>
 #include <slab.h>
-
 #include <syscall.h>
 
 taskstate_t RO ts;
@@ -185,9 +184,8 @@ trap_dispatch(trapframe_t *tf)
 		case T_SYSCALL:
 			// check for userspace, for now
 			assert(tf->tf_cs != GD_KT);
-			// Note we pass the tf ptr along, in case syscall needs to block
 			tf->tf_regs.reg_eax =
-				syscall(current, tf, tf->tf_regs.reg_eax, tf->tf_regs.reg_edx,
+				syscall(current, tf->tf_regs.reg_eax, tf->tf_regs.reg_edx,
 				        tf->tf_regs.reg_ecx, tf->tf_regs.reg_ebx,
 				        tf->tf_regs.reg_edi, tf->tf_regs.reg_esi);
 			proc_startcore(current, tf); // Note the comment in syscall.c
@@ -209,6 +207,7 @@ trap_dispatch(trapframe_t *tf)
 void
 env_push_ancillary_state(env_t* e)
 {
+	// TODO: (HSS) handle silly state (don't really want this per-process)
 	// Here's where you'll save FP/MMX/XMM regs
 }
 
@@ -223,22 +222,18 @@ trap(trapframe_t *tf)
 {
 	//printk("Incoming TRAP frame on core %d at %p\n", core_id(), tf);
 
-	// TODO: do this once we know we are are not returning to the current
-	// context.  doing it now is safe. (HSS)
-	// we also need to sort this wrt multiple contexts
-	env_push_ancillary_state(current);
+	/* Note we are not preemptively saving the TF in the env_tf.  We do maintain
+	 * a reference to it in current_tf (a per-cpu pointer).
+	 * In general, only save the tf and any silly state once you know it
+	 * is necessary (blocking).  And only save it in env_tf when you know you
+	 * are single core (PROC_RUNNING_S) */
+	set_current_tf(tf);
 
 	if ((tf->tf_cs & ~3) != GD_UT && (tf->tf_cs & ~3) != GD_KT) {
 		print_trapframe(tf);
 		panic("Trapframe with invalid CS!");
 	}
 
-	/* If we're vcore0, save the trapframe in the proc's env_tf.  make sure
-	 * silly state is sorted (HSS). This applies to any RUNNING_* state. */
-	if (current->vcoremap[0] == core_id()) {
-		current->env_tf = *tf;
-		tf = &current->env_tf;
-	}
 	// Dispatch based on what type of trap occurred
 	trap_dispatch(tf);
 
@@ -254,13 +249,11 @@ trap(trapframe_t *tf)
 void
 irq_handler(trapframe_t *tf)
 {
+	// save a per-core reference to the tf
+	set_current_tf(tf);
 	//if (core_id())
 	//	cprintf("Incoming IRQ, ISR: %d on core %d\n", tf->tf_trapno, core_id());
 	// merge this with alltraps?  other than the EOI... or do the same in all traps
-
-	// TODO: do this once we know we are are not returning to the current
-	// context.  doing it now is safe. (HSS)
-	env_push_ancillary_state(current);
 
 	extern handler_wrapper_t (RO handler_wrappers)[NUM_HANDLER_WRAPPERS];
 
@@ -363,14 +356,10 @@ void sysenter_init(void)
 /* This is called from sysenter's asm, with the tf on the kernel stack. */
 void sysenter_callwrapper(struct Trapframe *tf)
 {
-	/* If we're vcore0, save the trapframe in the proc's env_tf.  make sure
-	 * silly state is sorted (HSS). This applies to any RUNNING_* state. */
-	if (current->vcoremap[0] == core_id()) {
-		current->env_tf = *tf;
-		tf = &current->env_tf;
-	}
-	// Note we pass the tf ptr along, in case syscall needs to block
-	tf->tf_regs.reg_eax = (intreg_t) syscall(current, tf,
+	// save a per-core reference to the tf
+	set_current_tf(tf);
+
+	tf->tf_regs.reg_eax = (intreg_t) syscall(current,
 	                                         tf->tf_regs.reg_eax,
 	                                         tf->tf_regs.reg_edx,
 	                                         tf->tf_regs.reg_ecx,

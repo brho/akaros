@@ -117,6 +117,7 @@ error_t get_all_desc(async_desc_t** a_desc, syscall_desc_t** s_desc);
 // kernel's arch folder
 uint32_t newcore(void);
 void setvcore0(void);
+void prepare_for_multi_mode(void);
 
 /* File open modes */
 #define	O_RDONLY	0x0000		/* open for reading only */

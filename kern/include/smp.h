@@ -16,7 +16,6 @@
 #include <atomic.h>
 #include <process.h>
 #include <workqueue.h>
-#include <env.h>
 
 #ifdef __SHARC__
 typedef sharC_env_t;
@@ -24,6 +23,8 @@ typedef sharC_env_t;
 
 struct per_cpu_info {
 	spinlock_t lock;
+	struct proc *cur_proc;
+	trapframe_t *cur_tf;
 	bool preempt_pending;
 	struct workqueue NTPTV(t) workqueue;
 
@@ -41,7 +42,7 @@ struct per_cpu_info {
 typedef struct per_cpu_info NTPTV(t) NTPTV(a0t) NTPTV(a1t) NTPTV(a2t) per_cpu_info_t;
 
 extern per_cpu_info_t (RO per_cpu_info)[MAX_NUM_CPUS];
-extern volatile uint8_t RO num_cpus;
+extern volatile uint32_t RO num_cpus;
 
 /* SMP bootup functions */
 void smp_boot(void);

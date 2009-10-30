@@ -14,6 +14,7 @@
 #include <process.h>
 #include <stdio.h>
 #include <assert.h>
+#include <schedule.h>
 
 /* This deals with a request for more cores.  The request is already stored in
  * the proc's amt_wanted (it is compared to amt_granted). 
@@ -23,7 +24,9 @@
  * such as if there was not a new request, but it's time to look at the
  * difference between amt_wanted and amt_granted (maybe on a timer interrupt).
  *
- * Will return either the number actually granted or an error code.
+ * Will return either the number actually granted or an error code.  This will
+ * not decrease the actual amount of cores (e.g. from 5 to 2), but it will
+ * transition a process from _M to _S (amt_wanted == 0).
  */
 ssize_t core_request(struct proc *p)
 {
@@ -33,6 +36,20 @@ ssize_t core_request(struct proc *p)
 	bool need_to_idle = FALSE;
 
 	spin_lock_irqsave(&p->proc_lock);
+	/* check to see if this is a full deallocation.  for cores, it's a
+	 * transition from _M to _S */
+	if (!p->resources[RES_CORES].amt_wanted) {
+		assert(p->state == PROC_RUNNING_M);
+		// save the context, to be restarted in _S mode
+		p->env_tf = *current_tf;
+		env_push_ancillary_state(p);
+		proc_set_syscall_retval(&p->env_tf, ESUCCESS);
+		// in this case, it's not our job to save contexts or anything
+		proc_take_allcores(p, __death, 0, 0, 0);
+		proc_set_state(p, PROC_RUNNABLE_S);
+		schedule_proc(p);
+	}
+	/* otherwise, see how many new cores are wanted */
 	amt_new = p->resources[RES_CORES].amt_wanted -
 	          p->resources[RES_CORES].amt_granted;
 	if (amt_new < 0) {
@@ -71,8 +88,16 @@ ssize_t core_request(struct proc *p)
 				// either of these should trip it.
 				if ((current != p) || (p->vcoremap[0] != core_id()))
 					panic("We don't handle async RUNNING_S core requests yet.");
-				/* in the async case, we'll need to bundle vcore0's TF.  this is
-				 * already done for the sync case (local syscall). */
+				/* save the tf to be restarted on another core (in proc_run) */
+				p->env_tf = *current_tf;
+				env_push_ancillary_state(p);
+				/* set the return code to 0. since we're transitioning, vcore0
+				 * will start up with the tf manually, and not get the return
+				 * value through the regular syscall return path */
+				proc_set_syscall_retval(&p->env_tf, ESUCCESS);
+				/* in the async case, we'll need to remotely stop and bundle
+				 * vcore0's TF.  this is already done for the sync case (local
+				 * syscall). */
 				/* this process no longer runs on its old location (which is
 				 * this core, for now, since we don't handle async calls) */
 				p->vcoremap[0] = -1;
@@ -80,6 +105,8 @@ ssize_t core_request(struct proc *p)
 				need_to_idle = TRUE;
 				// change to runnable_m (it's TF is already saved)
 				proc_set_state(p, PROC_RUNNABLE_M);
+				// signals to proc_run that this is a _S to _M transition
+				p->env_flags |= PROC_TRANSITION_TO_M;
 				break;
 			case (PROC_RUNNABLE_S):
 				/* Issues: being on the runnable_list, proc_set_state not liking

@@ -83,24 +83,10 @@ struct Env {
 };
 
 /* Process Flags */
-// None yet
+#define PROC_TRANSITION_TO_M			0x0001
 
 extern env_t *CT(NENV) RO envs;		// All environments
 extern atomic_t num_envs;		// Number of envs
-// TODO: consider moving this to struct per_cpu_info
-extern env_t * (RO curenvs)[MAX_NUM_CPUS];
-
-static inline env_t *
-get_cpu_curenv() TRUSTED
-{
-	return curenvs[core_id()];
-}
-
-static inline void
-set_cpu_curenv(env_t *p) TRUSTED
-{
-	curenvs[core_id()] = p;
-}
 
 void	env_init(void);
 int		env_alloc(env_t *SAFE*SAFE e, envid_t parent_id);
@@ -109,13 +95,6 @@ void	env_pop_ancillary_state(env_t* e);
 void	env_free(env_t *SAFE e);
 void	env_user_mem_free(env_t* e);
 env_t*	env_create(uint8_t *COUNT(size) binary, size_t size);
-
-/*
- * Allows the kernel to figure out what process is running on its core.
- * Can be used just like a pointer to a struct process.
- */
-#define current (get_cpu_curenv())
-//#define current (curenvs[core_id()])
 
 int	envid2env(envid_t envid, env_t **env_store, bool checkperm);
 // The following three functions do not return

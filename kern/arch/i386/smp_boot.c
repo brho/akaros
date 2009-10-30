@@ -28,7 +28,7 @@
 #include <timing.h>
 
 extern handler_wrapper_t (RO handler_wrappers)[NUM_HANDLER_WRAPPERS];
-volatile uint8_t num_cpus = 0xee;
+volatile uint32_t num_cpus = 0xee;
 uintptr_t RO smp_stack_top;
 
 #define DECLARE_HANDLER_CHECKLISTS(vector)                          \

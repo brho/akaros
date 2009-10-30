@@ -225,9 +225,19 @@ handle_syscall(trapframe_t* state)
 	state->pc = state->npc;
 	state->npc += 4;
 
-	env_push_ancillary_state(current);
+	// this comment is from i386.  we don't save silly state early either
+	// hopefully you don't need to save it now.  let me know if otherwise
+	static_assert(0);
+	/* Note we are not preemptively saving the TF in the env_tf.  We do maintain
+	 * a reference to it in current_tf (a per-cpu pointer).
+	 * In general, only save the tf and any silly state once you know it
+	 * is necessary (blocking).  And only save it in env_tf when you know you
+	 * are single core (PROC_RUNNING_S) */
+	set_current_tf(tf);
 
-	state->gpr[8] = syscall(current,state,num,a1,a2,a3,a4,a5);
+	//env_push_ancillary_state(current); // remove this if you don't need it
+
+	state->gpr[8] = syscall(current,num,a1,a2,a3,a4,a5);
 
 	trap_handled();
 }
@@ -266,7 +276,9 @@ handle_breakpoint(trapframe_t* state)
 	state->pc = state->npc;
 	state->npc += 4;
 
-	env_push_ancillary_state(current);
+	// see comment above about tf's
+	static_assert(0);
+	//env_push_ancillary_state(current);
 
 	// run the monitor
 	monitor(state);

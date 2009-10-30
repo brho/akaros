@@ -86,7 +86,6 @@ void
 backtrace(void)
 {
 	int i = 0, j;
-	env_t* curenv = curenvs[core_id()];
 
 	flush_windows();
 
@@ -119,11 +118,11 @@ backtrace(void)
 			newsp = *((void**)sp+14);
 			pc = *((void**)sp+15);
 		}
-		else if(curenv)
+		else if(current)
 		{
 			error_t ret;
-			ret  = memcpy_from_user(curenv,&newsp,(void**)sp+14,sizeof(void*));
-			ret |= memcpy_from_user(curenv,&pc,(void**)sp+15,sizeof(void*));
+			ret  = memcpy_from_user(current,&newsp,(void**)sp+14,sizeof(void*));
+			ret |= memcpy_from_user(current,&pc,(void**)sp+15,sizeof(void*));
 			if(ret)
 			{
 				warn("Backtrace would have caused access exception; corrupt user stack?");
@@ -132,7 +131,7 @@ backtrace(void)
 		}
 		else
 		{
-			warn("Can't backtrace from user with curenv == NULL!");
+			warn("Can't backtrace from user with current == NULL!");
 			break;
 		}
 	}

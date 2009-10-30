@@ -21,6 +21,7 @@
 #include <kfs.h>
 #include <stdio.h>
 #include <timing.h>
+#include <resource.h>
 
 /*
  * Currently, if you leave this function by way of proc_run (process_workqueue
@@ -34,6 +35,7 @@ void manager(void)
 	struct proc *envs[256];
 	static struct proc *p ;
 
+	// for testing taking cores, check in case 1 for usage
 	uint32_t corelist[MAX_NUM_CPUS];
 	uint32_t num = 3;
 
@@ -51,8 +53,9 @@ void manager(void)
 
 	switch (progress++) {
 		case 0:
-			//p = kfs_proc_create(kfs_lookup_path("roslib_mproctests"));
-			p = kfs_proc_create(kfs_lookup_path("roslib_spawn"));
+			//p = kfs_proc_create(kfs_lookup_path("roslib_mhello"));
+			p = kfs_proc_create(kfs_lookup_path("roslib_mproctests"));
+			//p = kfs_proc_create(kfs_lookup_path("roslib_spawn"));
 			// being proper and all:
 			spin_lock_irqsave(&p->proc_lock);
 			proc_set_state(p, PROC_RUNNABLE_S);
@@ -72,19 +75,28 @@ void manager(void)
 			break;
 		case 1:
 			#if 0
-			panic("This is okay");
 			udelay(10000000);
-			printk("taking 3 cores from p\n");
-			for (int i = 0; i < num; i++)
-				corelist[i] = 7-i; // 7, 6, and 5
-			spin_lock_irqsave(&p->proc_lock);
-			proc_take_cores(p, corelist, &num, __death);
-			spin_unlock_irqsave(&p->proc_lock);
-			udelay(5000000);
-			printk("Killing p\n");
-			proc_destroy(p);
-			printk("Killed p\n");
-			udelay(1000000);
+			// this is a ghetto way to test restarting an _M
+				printk("\nattempting to ghetto preempt...\n");
+				spin_lock_irqsave(&p->proc_lock);
+				proc_take_allcores(p, __death);
+				proc_set_state(p, PROC_RUNNABLE_M);
+				spin_unlock_irqsave(&p->proc_lock);
+				udelay(5000000);
+				printk("\nattempting to restart...\n");
+				core_request(p); // proc still wants the cores
+			panic("This is okay");
+			// this tests taking some cores, and later killing an _M
+				printk("taking 3 cores from p\n");
+				for (int i = 0; i < num; i++)
+					corelist[i] = 7-i; // 7, 6, and 5
+				spin_lock_irqsave(&p->proc_lock);
+				proc_take_cores(p, corelist, &num, __death);
+				spin_unlock_irqsave(&p->proc_lock);
+				udelay(5000000);
+				printk("Killing p\n");
+				proc_destroy(p);
+				printk("Killed p\n");
 			panic("This is okay");
 
 			envs[0] = kfs_proc_create(kfs_lookup_path("roslib_hello"));

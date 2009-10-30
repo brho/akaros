@@ -25,11 +25,6 @@
 
 env_t *envs = NULL;		// All environments
 atomic_t num_envs;
-// TODO: make this a struct of info including the pointer and cacheline-align it
-// This lets the kernel know what process is running on the core it traps into.
-// A lot of the Env business, including this and its usage, will change when we
-// redesign the env as a multi-process.
-env_t* (RO curenvs)[MAX_NUM_CPUS] = {[0 ... (MAX_NUM_CPUS-1)] NULL};
 
 #define ENVGENSHIFT	12		// >= LOGNENV
 

@@ -32,6 +32,10 @@ _start:
 	cmpl $0, %eax
 	jne new_core
 
+	// See if we should start up normally, or act like a new core
+	cmpl $0, in_multi_mode
+	jne new_core
+
 	// See if we were started with arguments on the stack
 	cmpl $USTACKTOP, %esp
 	jne args_exist
@@ -72,7 +76,7 @@ new_core:
 	addl $PGSIZE, %edx
 	movl %edx, %esp
 	movl %esi, %eax // restore the vcoreid
-	call main // main will check to see if it came from here or not
+	call hart_entry
 	// spin when we return.  ought to yield before this ever happens
 2:		jmp 2b
 
@@ -81,3 +85,6 @@ mmap_args:
 	.long MAP_ANONYMOUS|MAP_FIXED|MAP_STACK|MAP_POPULATE|MAP_GROWSDOWN // arg4
 	.long 0              // arg5
 	.long 0              // arg6
+.globl in_multi_mode
+in_multi_mode:
+	.long 0              // flag for vcore0 to know to act like other cores

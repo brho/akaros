@@ -94,7 +94,6 @@ static ssize_t sys_run_binary(env_t* e, void *DANGEROUS binary_buf,
 	kfree(new_binary);
 	proc_set_state(env, PROC_RUNNABLE_S);
 	schedule_proc(env);
-	proc_yield(e); // changed from sys_yield.  did not test this at all.
 	return 0;
 }
 
@@ -418,9 +417,8 @@ static error_t sys_proc_run(struct proc *p, unsigned pid)
  * TODO: Build a dispatch table instead of switching on the syscallno
  * Dispatches to the correct kernel function, passing the arguments.
  */
-intreg_t syscall(struct proc *p, trapframe_t *tf, uintreg_t syscallno,
-                 uintreg_t a1, uintreg_t a2, uintreg_t a3, uintreg_t a4,
-				 uintreg_t a5)
+intreg_t syscall(struct proc *p, uintreg_t syscallno, uintreg_t a1,
+                 uintreg_t a2, uintreg_t a3, uintreg_t a4, uintreg_t a5)
 {
 	// Call the function corresponding to the 'syscallno' parameter.
 	// Return any appropriate return value.
@@ -483,11 +481,6 @@ intreg_t syscall(struct proc *p, trapframe_t *tf, uintreg_t syscallno,
 			printk("brk not implemented yet\n");
 			return -EINVAL;
 		case SYS_resource_req:
-			/* preemptively set the return code to 0.  if it's not, it will get
-			 * overwriten on a proper return path.  if it ends up being a core
-			 * request from a RUNNING_S, it will never return out this way
-			 */
-			proc_set_syscall_retval(tf, ESUCCESS);
 			return resource_req(p, a1, a2, a3);
 
 	#ifdef __i386__
@@ -519,7 +512,7 @@ intreg_t syscall(struct proc *p, trapframe_t *tf, uintreg_t syscallno,
 
 intreg_t syscall_async(env_t* e, syscall_req_t *call)
 {
-	return syscall(e, NULL, call->num, call->args[0], call->args[1],
+	return syscall(e, call->num, call->args[0], call->args[1],
 	               call->args[2], call->args[3], call->args[4]);
 }
 

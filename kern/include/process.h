@@ -90,15 +90,23 @@ error_t proc_take_cores(struct proc *SAFE p, uint32_t corelist[], size_t *num,
 error_t proc_take_allcores(struct proc *SAFE p, amr_t message, TV(a0t) arg0,
                            TV(a1t) arg1, TV(a2t) arg2);
 
-/* Arch Specific */
-void proc_init_trapframe(trapframe_t *SAFE tf);
-void proc_set_program_counter(trapframe_t *SAFE tf, uintptr_t pc);
-void proc_set_tfcoreid(trapframe_t *SAFE tf, uint32_t id);
-void proc_set_syscall_retval(trapframe_t *SAFE tf, intreg_t value);
-
 /* The reference counts are mostly to track how many cores loaded the cr3 */
 error_t proc_incref(struct proc *SAFE p);
 void proc_decref(struct proc *SAFE p);
+
+/* Allows the kernel to figure out what process is running on this core.  Can be
+ * used just like a pointer to a struct proc.  Need these to be macros due to
+ * some circular dependencies with smp.h. */
+#include <smp.h>
+#define current per_cpu_info[core_id()].cur_proc
+#define set_current_proc(p) per_cpu_info[core_id()].cur_proc = (p)
+
+/* Allows the kernel to figure out what tf is on this core's stack.  Can be used
+ * just like a pointer to a struct Trapframe.  Need these to be macros due to
+ * some circular dependencies with smp.h.  This is done here instead of
+ * elsewhere (like trap.h) for other elliptical reasons. */
+#define current_tf per_cpu_info[core_id()].cur_tf
+#define set_current_tf(tf) per_cpu_info[core_id()].cur_tf = (tf)
 
 void abandon_core(void);
 
@@ -114,6 +122,12 @@ void __startcore(trapframe_t *tf, uint32_t srcid, void * a0, void * a1,
 void __death(trapframe_t *tf, uint32_t srcid, void * a0, void * a1,
              void * a2);
 #endif
+
+/* Arch Specific */
+void proc_set_program_counter(trapframe_t *SAFE tf, uintptr_t pc);
+void proc_init_trapframe(trapframe_t *SAFE tf);
+void proc_set_tfcoreid(trapframe_t *SAFE tf, uint32_t id);
+void proc_set_syscall_retval(trapframe_t *SAFE tf, intreg_t value);
 
 /* Degubbing */
 void print_idlecoremap(void);

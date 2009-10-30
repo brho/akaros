@@ -25,16 +25,23 @@ int main(int argc, char** argv)
 	uint32_t vcoreid;
 	error_t retval;
 
-	static int first_time = 1; // used by vcore2
+	prepare_for_multi_mode();
 
 	if ((vcoreid = newcore())) {
-		cprintf("Hello from vcore %d\n", vcoreid);
+		cprintf("Should never see me! (from vcore %d)\n", vcoreid);
 	} else { // core 0
-		cprintf("Hello from else vcore 0\n");
+		cprintf("Hello from vcore 0\n");
 		cprintf("Multi-Goodbye, world, from PID: %d!\n", sys_getpid());
 		retval = sys_resource_req(RES_CORES, 7, 0);
 	}
 	cprintf("Vcore %d Done!\n", vcoreid);
 	while (1);
 	return 0;
+}
+
+void hart_entry(void)
+{
+	uint32_t vcoreid;
+	vcoreid = newcore();
+	cprintf("Hello from hart_entry in vcore %d\n", vcoreid);
 }

@@ -1,0 +1,531 @@
+All things processes!  This explains processes from a high level, especially
+focusing on the user-kernel boundary and transitions to the multi-cored state,
+which is the way in which parallel processes run.  This doesn't discuss deep
+details of the ROS kernel's process code.
+
+This is motivated by two things: kernel scalability and direct support for
+parallel applications.
+
+Part 1: Overview
+Part 2: How They Work
+Part 3: Resource Requests
+Part 4: Notification
+Part 5: Old Arguments (mostly for archival purposes))
+Part 6: Parlab app use cases
+
+Part 1: World View of Processes
+==================================
+A process is the lowest level of control, protection, and organization in the
+kernel.
+
+1.1: What's a process?
+-------------------------------
+Features:
+- They are an executing instance of a program.  A program can load multiple
+  other chunks of code and run them (libraries), but they are written to work
+  with each other, within the same address space, and are in essence one
+  entity.
+- They have one address space/ protection domain.  
+- They run in Ring 3 / Usermode.
+- They can interact with each other, subject to permissions enforced by the
+  kernel.
+- They can make requests from the kernel, for things like resource guarantees.
+  They have a list of resources that are given/leased to them.
+
+None of these are new.  Here's what's new:
+- They can run in a multi-core mode, where its cores run at the same time, and
+  it is aware of changes to these conditions (page faults, preemptions).  It
+  can still request more resources (cores, memory, whatever).
+- Every core in a multi-cored process is *not* backed by a kernel
+  thread/kernel stack, unlike with Linux tasks.
+	- There are *no* per-core run-queues in the kernel that decide for
+	  themselves which kernel thread to run.
+- They are not fork()/execed().  They are created(), and then later made
+  runnable.  This allows the controlling process (parent) to do whatever it
+  wants: pass file descriptors, give resources, whatever.
+
+These changes are directly motivated by what is wrong with current SMP
+operating systems as we move towards many-core: direct (first class) support
+for truly parallel processes, kernel scalability, and an ability of a process
+to see through classic abstractions (the virtual processor) to understand (and
+make requests about) the underlying state of the machine.
+
+1.2: What's a partition?
+-------------------------------
+So a process can make resource requests, but some part of the system needs to
+decide what to grant, when to grant it, etc.  This goes by several names:
+scheduler / resource allocator / resource manager.  The scheduler simply says
+when you get some resources, then calls functions from lower parts of the
+kernel to make it happen.
+
+This is where the partitioning of resources comes in.  In the simple case (one
+process per partitioned block of resources), the scheduler just finds a slot
+and runs the process, giving it its resources.  
+
+A big distinction is that the *partitioning* of resources only makes sense
+from the scheduler on up in the stack (towards userspace).  The lower levels
+of the kernel know about resources that are granted to a process.  The
+partitioning is about the accounting of resources and an interface for
+adjusting their allocation.  It is a method for telling the 'scheduler' how
+you want resources to be granted to processes.
+
+A possible interface for this is procfs, which has a nice hierarchy.
+Processes can be grouped together, and resources can be granted to them.  Who
+does this?  A process can create it's own directory entry (a partition), and
+move anyone it controls (parent of, though that's not necessary) into its
+partition or a sub-partition.  Likewise, a sysadmin/user can simply move PIDs
+around in the tree, creating partitions consisting of processes completely
+unaware of each other.
+
+Now you can say things like "give 25% of the system's resources to apache and
+mysql".  They don't need to know about each other.  If you want finer-grained
+control, you can create subdirectories (subpartitions), and give resources on
+a per-process basis.  This is back to the simple case of one process for one
+(sub)partition.
+
+This is all influenced by Linux's cgroups (process control groups).
+http://www.mjmwired.net/kernel/Documentation/cgroups.txt. They group processes
+together, and allow subsystems to attach meaning to those groups.
+
+Ultimately, I view partitioning as something that tells the kernel how to
+grant resources.  It's an abstraction presented to userspace and higher levels
+of the kernel.  The specifics still need to be worked out, but by separating
+them from the process abstraction, we can work it out and try a variety of
+approaches.
+
+The actual granting of resources and enforcement is done by the lower levels
+of the kernel (or by hardware, depending on future architectural changes).
+
+Part 2: How They Work
+===============================
+2.1: States
+-------------------------------
+PROC_CREATED
+PROC_RUNNABLE_S
+PROC_RUNNING_S
+PROC_WAITING
+PROC_DYING
+PROC_RUNNABLE_M
+PROC_RUNNING_M
+
+Difference between the _M and the _S states:
+- _S : legacy process mode
+- RUNNING_M implies *guaranteed* core(s).  You can be a single core in the
+  RUNNING_M state.  The guarantee is subject to time slicing, but when you
+  run, you get all of your cores.
+- The time slicing is at a coarser granularity for _M states.  This means that
+  when you run an _S on a core, it should be interrupted/time sliced more
+  often, which also means the core should be classified differently for a
+  while.  Possibly even using it's local APIC timer.
+- A process in an _M state will be informed about changes to its state, e.g.,
+  will have a handler run in the event of a page fault
+
+For more details, check out kern/inc/process.h  For valid transitions between
+these, check out kern/src/process.c's proc_set_state().
+
+2.2: Creation and Running
+-------------------------------
+Unlike the fork-exec model, processes are created, and then explicitly made
+runnable.  In the time between creation and running, the parent (or another
+controlling process) can do whatever it wants with the child, such as pass
+specific file descriptors, map shared memory regions (which can be used to
+pass arguments).
+
+New processes are not a copy-on-write version of the parent's address space.
+Due to our changes in the threading model, we no longer need (or want) this
+behavior left over from the fork-exec model.
+
+By splitting the creation from the running and by explicitly sharing state
+between processes (like inherited file descriptors), we avoid a lot of
+concurrency and security issues.
+
+2.3: Vcoreid vs Pcoreid
+-------------------------------
+The vcoreid is a virtual cpu number.  Its purpose is to provide an easy way
+for the kernel and userspace to talk about the same core.  pcoreid (physical)
+would also work.  The vcoreid makes things a little easier, such as when a
+process wants to refer to one of its other cores (not the calling core).  It
+also makes the event notification mechanisms easier to specify and maintain.
+
+The vcoreid only makes sense when in an _M mode.  In _S mode, your vcoreid is
+0.  Vcoreid's only persist when in _M mode.  If you leave _M mode on a non-0
+vcore, that context becomes vcore0.  This can get tricky for userspace's
+stacks (more below).
+
+Processes that care about locality should check what their pcoreid is.  This
+is currently done via sys_getcpuid().  The name will probably change.
+
+2.4: Transitioning to and from states
+-------------------------------
+2.4.1: To go from _S to _M, a process requests cores.
+--------------
+A resource request from 0 to 1 or more causes a transition from _S to _M.  The
+calling context moves to vcore0 (proc_run() handles that) and continues from
+where it left off (the return point of the syscall).  
+
+For all other cores, and all subsequently allocated cores, they start at the
+elf entry point, with vcoreid in eax or a suitable arch-specific manner.  This
+could be replaced with a syscall that returns the vcoreid, but probably won't
+to help out sparc.
+
+Future proc_runs(), like from RUNNABLE_M to RUNNING_M start all cores at the
+entry point, including vcore0.  The magic of moving contexts only happens on
+the transition from _S to _M (which the process needs to be aware of for a
+variety of reasons).  This also means that userspace needs to handle vcore0
+coming up at the entry point again (and not starting the program over).  I
+recommend setting a global variable that can be checked from assembly before
+going to _M the first time.
+
+When coming in to the entry point, new cores should grab a stack.  There are a
+few ways to do this.  They ought to be the same stack every time for a
+specific vcore.  They will be the transition stacks (in Lithe terms) that are
+used as jumping-off points for future function calls.  These stacks need to be
+used in a continuation-passing style.  Start from the top every time.  The
+reason for that is actual contexts may move around, and vcores will come and
+go - and each vcore will always reuse the same stack.  Lithe works this way,
+so it's not an issue.
+
+It's recommended that while in _S mode the process allocates stacks and puts
+them in an array, indexed by vcoreid for the entry point to easily find them.
+Then each core grabs its transition stack, then goes into hart_entry.
+
+Userspace needs to make sure the calling context (which will become vcore0) is
+on a good stack, like USTACKTOP.  This could happen if you leave _M from a core
+other than vcore0, then return to _M mode.  While in _S mode, you were still
+on whatever stack you came from (like vcore3's transition stack).
+
+2.4.2: To go from _M to _S, a process requests 0 cores
+--------------
+The caller becomes the new _S context.  Everyone else gets trashed
+(abandon_core()).  Their stacks are still allocated and it is up to userspace
+to deal with this.  In general, they will regrab their transition stacks when
+they come back up.  Their other stacks and whatnot (like TBB threads) need to
+be dealt with.
+
+As mentioned above, when the caller next switches to _M, that context
+(including its stack) becomes the new vcore0.
+
+2.4.3: Requesting more cores while in _M
+--------------
+Any core can request more cores and adjust the resource allocation in any way.
+These new cores come up just like the original new cores in the transition
+from _S to _M: at the entry point.
+
+2.4.4: Yielding
+--------------
+Yielding gives up a core.  In _S mode, it will transition from RUNNING_S to
+RUNNABLE_S.  The context is saved in env_tf.  A yield will *not* transition
+from _M to _S.
+
+In _M mode, this yields the calling core.  The kernel will rip it out of your
+vcore list.  A process can yield its cores in any order.  The kernel will
+"fill in the holes of the vcoremap" when for any future newcores (e.g., proc A
+has 4 vcores, yields vcore2, and then asks for another vcore.  The new one
+will be vcore2).
+
+When you are in _M and yield your last core, it is an m_yield.  This
+completely suspends all cores, like a voluntary preemption.  When the process
+is run again, all cores will come up at the entry point (including vcore0 and
+the calling core).  This isn't implemented yet, and will wait on some work
+with preemption.
+
+2.4.5: Others
+--------------
+There are other transitions, mostly self-explanatory.  We don't currently use
+any WAITING states, since we have nothing to block on yet.  DYING is a state
+when the kernel is trying to kill your process, which can take a little while
+to clean up.
+	
+2.5: Preemption
+-------------------------------
+None of this is implemented yet, or fully flushed out.
+
+2.5.1: Ideas
+--------------
+The rough plan is to notify beforehand, then take action if userspace doesn't
+yield.
+
+When a core is preempted or interrupted for any reason (like a pagefault or
+other trap), the context is saved in a structure in procinfo that contains the
+vcoreid, a code for what happened, and the actual context (probably always
+including FP/SSE registers).
+
+If userspace is keeping the core, like with a page fault or other trap, that
+core will start up at the entry point, and regrab its transition stack.  There
+could be issues with this, if the trap came while operating on that stack.
+There'll probably be some way other way to help userspace know something
+happened.  Recursive (page) faults are also tricky.
+
+If it lost the core, like in a preemption, the context is saved (fully), and
+the process is notified (in the manner it wishes).  See Part 4.
+
+When a process loses all of its cores, it just loses them all.  There is no
+notification interrupt (though there will be a message posted).  When a
+process comes up at the entry point once it is run again, it should check its
+event queue (if it cares).
+
+2.5.2: Issues with preemption, trap redirection, and event notification
+--------------
+There are other issues with cascading interrupts (when contexts are still
+running handlers).  Imagine a pagefault, followed by preempting the handler.
+It doesn't make sense to run the preempt context after the page fault.  The
+difficulty is in determining when the context is no longer handling an event.
+We could consider using a register, controllable by userspace, to give the
+kernel this hint.  Maybe have a window of time we won't preempt again (though
+that is really painful.  How long is this window?).
+
+Even worse, consider vcore0 is set up to receive all events.  If events come
+in faster than it can process them, it will both nest too deep and process out
+of order.
+
+Also, we don't have a good way to handle interrupts/events when on the
+transition stack at all (let alone cascading or overflow).  The kernel will
+just start you from the top of the stack, which will eventually clobber
+whatever the core was doing previously.
+
+We can consider using another register to signal some sort of exceptional
+event, and before touching the transition stack, the core can jump to a
+per-core exception stack.  Perhaps to avoid nesting exceptions, when an
+interrupt comes in, the kernel can see userspace is on it's exception stack
+and not post the event, and it's up to userspace to check for any missed
+events before leaving its core.  Ugly.  And can't handle traps.
+
+Pre-Notification issues: how much time does userspace need to clean up and
+yield?  How quickly does the kernel need the core back (for scheduling
+reasons)?
+
+Part 3: Resource Requests
+===============================
+A process can ask for resources from the kernel.  The kernel either grants
+these requests or not, subject to QoS guarantees, or other scheduler-related
+criteria.
+
+A process requests resources, currently via sys_resource_req.  The form of a
+request is to tell the kernel how much of a resource it wants.  Currently,
+this is the amt_wanted.  We'll also have a minimum amount wanted, which tells
+the scheduler not to run the process until the minimum amount of resources are
+available.
+
+How the kernel actually grants resources is resource-specific.  In general,
+there are functions like proc_give_cores() (which gives certain cores to a
+process) that actually does the allocation, as well as adjusting the
+amt_granted for that resource.
+
+For expressing QoS guarantees, we'll probably use something like procfs (as
+mentioned above) to explicitly tell the scheduler/resource manager what the
+user/sysadmin wants.  An interface like this ought to be usable both by
+programs as well as simple filesystem tools (cat, etc).
+
+Guarantees exist regardless of whether or not the allocation has happened.  An
+example of this is when a process may be guaranteed to use 8 cores, but
+currently only needs 2.  Whenever it asks for up to 8 cores, it will get them.
+The exact nature of the guarantee is TBD, but there will be some sort of
+latency involved in the guarantee for systems that want to take advantage of
+idle resources (compared to simply reserving and not allowing anyone else to
+use them).  A latency of 0 would mean a process wants it instantly, which
+probably means they ought to be already allocated (and billed to) that
+process.  
+
+Part 4: Event Notification
+===============================
+One of the philosophical goals of ROS is to expose information up to userspace
+(and allow requests based on that information).  There will be a variety of
+events in the system that processes will want to know about.  To handle this,
+we'll eventually build something like the following.
+
+All events will have a number, like an interrupt vector.  Each process will
+have an event queue.  On most architectures, it will be a simple
+producer-consumer ring buffer sitting in the "shared memory" procdata region
+(shared between the kernel and userspace).  The kernel writes a message into
+the buffer with the event number and some other helpful information.  For
+instance, a preemption event will say which vcore was preempted and provide a
+pointer to the context that was preempted.
+
+Additionally, the process may request to be actively notified of specific
+events.  This is done by having the process write into an event vector table
+(like an IDT) in procdata.  For each event, the process can write a function
+pointer and a vcoreid.  The kernel will execute that function on the given
+core (and pass appropriate arguments, such as a pointer to the message in the
+event queue and a pointer to the context that was just interrupted).
+
+Part 5: Old Arguments about Processes vs Partitions
+===============================
+This is based on my interpretation of the cell (formerly what I thought was
+called a partition).
+
+5.1: Program vs OS
+-------------------------------
+A big difference is what runs inside the object.  I think trying to support
+OS-like functionality is a quick path to unnecessary layers and complexity,
+esp for the common case.  This leads to discussions of physical memory
+management, spawning new programs, virtualizing HW, shadow page tables,
+exporting protection rings, etc.
+
+This unnecessarily brings in the baggage and complexity of supporting VMs,
+which are a special case.  Yes, we want processes to be able to use their
+resources, but I'd rather approach this from the perspective of "what do they
+need?" than "how can we make it look like a real machine."  Virtual machines
+are cool, and paravirtualization influenced a lot of my ideas, but they have
+their place and I don't think this is it.
+
+For example, exporting direct control of physical pages is a bad idea.  I
+wasn't clear if anyone was advocating this or not.  By exposing actual machine
+physical frames, we lose our ability to do all sorts of things (like swapping,
+for all practical uses, and other VM tricks).  If the cell/process thinks it
+is manipulating physical pages, but really isn't, we're in the VM situation of
+managing nested or shadow page tables, which we don't want.
+
+For memory, we'd be better off giving an allocation of a quantity frames, not
+specific frames.  A process can pin up to X pages, for instance.  It can also
+pick pages to be evicted when there's memory pressure.  There are already
+similar ideas out there, both in POSIX and in ACPM.
+
+Instead of mucking with faking multiple programs / entities within an cell,
+just make more processes.  Otherwise, you'd have to export weird controls that
+the kernel is doing anyway (and can do better!), and have complicated middle
+layers.
+
+5.2: Multiple "Things" in a "partition"
+-------------------------------
+In the process-world, the kernel can make a distinction between different
+entities that are using a block of resources.  Yes, "you" can still do
+whatever you want with your resources.  But the kernel directly supports
+useful controls that you want. 
+- Multiple protection domains are no problem.  They are just multiple
+  processes.  Resource allocation is a separate topic.
+- Processes can control one another, based on a rational set of rules.  Even
+  if you have just cells, we still need them to be able to control one another
+  (it's a sysadmin thing).
+
+"What happens in a cell, stays in a cell."  What does this really mean?  If
+it's about resource allocation and passing of resources around, we can do that
+with process groups.  If it's about the kernel not caring about what code runs
+inside a protection domain, a process provides that.  If it's about a "parent"
+program trying to control/kill/whatever a "child" (even if it's within a cell,
+in the cell model), you *want* the kernel to be involved.  The kernel is the
+one that can do protection between entities.
+
+5.3: Other Things
+-------------------------------
+Let the kernel do what it's made to do, and in the best position to do: manage
+protection and low-level resources.
+
+Both processes and partitions "have" resources.  They are at different levels
+in the system.  A process actually gets to use the resources.  A partition is
+a collection of resources allocated to one or more processes.
+
+In response to this:
+
+On 2009-09-15 at 22:33 John Kubiatowicz wrote:
+> John Shalf wrote:  
+> >
+> > Anyhow, Barret is asking that resource requirements attributes be 
+> > assigned on a process basis rather than partition basis.  We need
+> > to justify why gang scheduling of a partition and resource
+> > management should be linked.  
+
+I want a process to be aware of it's specific resources, as well as the other
+members of it's partition.  An individual process (which is gang-scheduled in
+multi-core mode) has a specific list of resources.  Its just that the overall
+'partition of system resources' is separate from the list of specific
+resources of a process, simply because there can be many processes under the
+same partition (collection of resources allocated).
+
+> >  
+> Simplicity!
+> 
+> Yes, we can allow lots of options, but at the end of the day, the 
+> simplest model that does what we need is likely the best. I don't
+> want us to hack together a frankenscheduler.  
+
+My view is also simple in the case of one address space/process per
+'partition.'  Extending it to multiple address spaces is simply asking that
+resources be shared between processes, but without design details that I
+imagine will be brutally complicated in the Cell model.
+
+
+Part 6: Use Cases
+===============================
+6.1: Matrix Multiply / Trusting Many-core app
+-------------------------------
+The process is created by something (bash, for instance).  It's parent makes
+it runnable.  The process requests a bunch of cores and RAM.  The scheduler
+decides to give it a certain amount of resources, which creates it's partition
+(aka, chunk of resources granted to it's process group, of which it is the
+only member).  The sysadmin can tweak this allocation via procfs.
+
+The process runs on its cores in it's multicore mode.  It is gang scheduled,
+and knows how many cores there are.  When the kernel starts the process on
+it's extra cores, it passes control to a known spot in code (the ELF entry
+point), with the virtual core id passed as a parameter.
+
+The code runs from a single binary image, eventually with shared
+object/library support.  It's view of memory is a virtual address space, but
+it also can see it's own page tables to see which pages are really resident
+(similar to POSIX's mincore()).
+
+When it comes time to lose a core, or be completely preempted, the process is
+notified by the OS running a handler of the process's choosing (in userspace).
+The process can choose what to do (pick a core to yield, prepare to be
+preempted, etc).
+
+To deal with memory, the process is notified when it page faults, and keeps
+its core.  The process can pin pages in memory.  If there is memory pressure,
+the process can tell the kernel which pages to unmap.
+
+This is the simple case.
+
+6.2: Browser
+-------------------------------
+In this case, a process wants to create multiple protection domains that share
+the same pool of resources.  Or rather, with it's own allocated resources.
+
+The browser process is created, as above.  It creates, but does not run, it's
+untrusted children.  The kernel will have a variety of ways a process can
+"mess with" a process it controls.  So for this untrusted child, the parent
+can pass (for example), a file descriptor of what to render, "sandbox" that
+process (only allow a whitelist of syscalls, e.g. can only read and write
+descriptors it has).  You can't do this easily in the cell model.
+
+The parent can also set up a shared memory mapping / channel with the child.
+
+For resources, the parent can put the child in a subdirectory/ subpartition
+and give a portion of its resources to that subpartition.  The scheduler will
+ensure that both the parent and the child are run at the same time, and will
+give the child process the resources specified.  (cores, RAM, etc).
+
+After this setup, the parent will then make the child "runnable".  This is why
+we want to separate the creation from the runnability of a process, which we
+can't do with the fork/exec model.
+
+The parent can later kill the child if it wants, reallocate the resources in
+the partition (perhaps to another process rendering a more important page),
+preempt that process, whatever.
+
+6.3: SMP Virtual Machines
+-------------------------------
+The main issue (regardless of paravirt or full virt), is that what's running
+on the cores may or may not trust one another.  One solution is to run each
+VM-core in it's own process (like with Linux's KVM, it uses N tasks (part of
+one process) for an N-way SMP VM).  The processes set up the appropriate
+shared memory mapping between themselves early on.  Another approach would be
+to allow a multi-cored process to install specific address spaces on each
+core, and interpose on syscalls, privileged instructions, and page faults.
+This sounds very much like the Cell approach, which may be fine for a VM, but
+not for the general case of a process.
+
+Or with a paravirtualized SMP guest, you could (similar to the L4Linux way,)
+make any Guest OS processes actual processes in our OS.  The resource
+allocation to the Guest OS partition would be managed by the parent process of
+the group (which would be running the Guest OS kernel).  We still need to play
+tricks with syscall redirection.
+
+For full virtualization, we'd need to make use of hardware virtualization
+instructions. Dealing with the VMEXITs, emulation, and other things is a real
+pain, but already done.  The long range plan was to wait til the
+http://v3vee.org/ project supported Intel's instructions and eventually
+incorporate that.
+
+All of these ways involve subtle and not-so-subtle difficulties.  The
+Cell-as-OS mode will have to deal with them for the common case, which seems
+brutal.  And rather unnecessary.
