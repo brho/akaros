@@ -72,7 +72,7 @@ void proc_destroy(struct proc *SAFE p);
 void proc_yield(struct proc *SAFE p);
 
 /* argc/argv.  TODO: figure out how to move this out of the kernel. */
-size_t proc_init_argc_argv(struct proc* p, size_t nargs, ...);
+size_t proc_init_argc_argv(struct proc* p, size_t nargs, const char** args);
 
 /* Process core management.  Only call these if you are RUNNING_M or RUNNABLE_M.
  * These all adjust the vcoremap and take appropriate actions (like __startcore

@@ -245,8 +245,8 @@ proc_init_procinfo(struct proc* p)
 // args successfully imported (because of size restrictions).
 // The procinfo pages must have been mapped into the user's
 // address space before this function can be called.
-static size_t
-proc_init_argc_argv_v(struct proc* p, size_t nargs, va_list args)
+size_t
+proc_init_argc_argv(struct proc* p, size_t nargs, const char** args)
 {
 	// TODO: right now we assume procinfo can be directly addressed
 	// by the kernel (i.e. it's continguous.
@@ -261,11 +261,10 @@ proc_init_argc_argv_v(struct proc* p, size_t nargs, va_list args)
 	size_t size = 0, argc;
 	for(argc = 0; argc < nargs; argc++)
 	{
-		const char* arg = va_arg(args,const char*);
-		size_t len = strnlen(arg,PROCINFO_MAX_ARGV_SIZE);
+		size_t len = strnlen(args[argc],PROCINFO_MAX_ARGV_SIZE);
 		if(size+len+1 > PROCINFO_MAX_ARGV_SIZE)
 			break;
-		memcpy(&p->env_procinfo->argv_buf[size],arg,len+1);
+		memcpy(&p->env_procinfo->argv_buf[size],args[argc],len+1);
 		argv[argc] = (char*)(UINFO+offsetof(struct procinfo,argv_buf)+size);
 		size += len+1;
 	}
@@ -274,21 +273,6 @@ proc_init_argc_argv_v(struct proc* p, size_t nargs, va_list args)
 	memcpy(p->env_procinfo->argv,argv,sizeof(argv));
 
 	return argc;
-}
-
-size_t
-proc_init_argc_argv(struct proc* p, size_t nargs, ...)
-{
-	size_t ret;
-
-	va_list list;
-	va_start(list,nargs);
-
-	ret = proc_init_argc_argv_v(p,nargs,list);
-
-	va_end(list);
-
-	return ret;
 }
 
 //
@@ -414,6 +398,7 @@ env_segment_alloc(env_t *e, void *SNT va, size_t len)
 			continue;
 		if ((r = upage_alloc(e, &page)) < 0)
 			panic("env_segment_alloc: %e", r);
+		printk("env_segment_alloc: va %p -> pa %p\n",start,page2pa(page));
 		page_insert(e->env_pgdir, page, start, PTE_USER_RW);
 	}
 }
