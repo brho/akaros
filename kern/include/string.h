@@ -27,5 +27,6 @@ void * (DMEMCPY(1, 2, 3) memmove)(void *dst, const void* src, size_t sz);
 void *BND(s,s+len)	memfind(const void *COUNT(len) s, int c, size_t len);
 
 long	strtol(const char *NTS s, char **endptr, int base);
+int	atoi(const char*NTS s);
 
 #endif /* not ROS_INC_STRING_H */

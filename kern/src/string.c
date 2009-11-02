@@ -317,3 +317,9 @@ strtol(const char *s, char **endptr, int base)
 	return (neg ? -val : val);
 }
 
+int
+atoi(const char* s)
+{
+	// no overflow detection
+	return (int)strtol(s,NULL,10);
+}
