@@ -12,7 +12,7 @@ static hart_lock_t _hart_lock = HART_LOCK_INIT;
 static void hart_abort(const char* str)
 {
 	write(2,str,strlen(str));
-	abort();
+	exit(-1);
 }
 
 #pragma weak hart_entry
@@ -31,7 +31,8 @@ static void _hart_init()
 
 	#ifdef HART_ALLOCATE_STACKS
 	extern void** stack_ptr_array;
-	stack_ptr_array = (void**)calloc(hart_max_harts(),sizeof(void*));
+	stack_ptr_array = (void**)malloc(hart_max_harts()*sizeof(void*));
+	memset(stack_ptr_array,0,hart_max_harts()*sizeof(void*));
 	if(stack_ptr_array == NULL)
 		hart_abort("Harts initialization ran out of memory!\n");
 	#endif
@@ -150,7 +151,8 @@ error_t hart_barrier_init(hart_barrier_t* b, size_t np)
 {
 	if(np > hart_max_harts())
 		return -1;
-	b->allnodes = (hart_dissem_flags_t*)calloc(np,sizeof(hart_dissem_flags_t));
+	b->allnodes = (hart_dissem_flags_t*)malloc(np*sizeof(hart_dissem_flags_t));
+	memset(b->allnodes,0,np*sizeof(hart_dissem_flags_t));
 	b->nprocs = np;
 
 	b->logp = (np & (np-1)) != 0;

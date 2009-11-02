@@ -270,7 +270,9 @@ int pthread_once(pthread_once_t* once_control, void (*init_routine)(void))
 
 int pthread_barrier_init(pthread_barrier_t* b, const pthread_barrierattr_t* a, int count)
 {
-  b->local_sense = (int*)calloc(32*sizeof(int),count);
+  b->local_sense = (int*)malloc(32*sizeof(int)*count);
+  memset(b->local_sense,0,32*sizeof(int)*count);
+
   b->sense = 0;
   b->nprocs = b->count = count;
   hart_lock_init(&b->lock);
