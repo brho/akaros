@@ -88,7 +88,7 @@ static ssize_t __colored_page_alloc(uint8_t* map, page_t** page,
 {
 	ssize_t ret;
 	if((ret = __page_alloc_from_color_map_range(page, map, 
-	                           next_color, llc_cache->num_colors)) < 0)
+	                           next_color, llc_cache->num_colors - next_color)) < 0)
 		ret = __page_alloc_from_color_map_range(page, map, 0, next_color);
 	return ret;
 }
@@ -124,10 +124,11 @@ error_t upage_alloc(struct proc* p, page_t** page)
 	                                     page, p->next_cache_color);
 	spin_unlock_irqsave(&colored_page_free_list_lock);
 
-	memset(page2kva(*page),0,PGSIZE);
-
 	if(ret >= 0)
-		p->next_cache_color = ret;
+	{
+		memset(page2kva(*page),0,PGSIZE);
+		p->next_cache_color = (ret + 1) % llc_cache->num_colors;
+	}
 	return ret;
 }
 
