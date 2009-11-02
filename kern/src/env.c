@@ -398,7 +398,6 @@ env_segment_alloc(env_t *e, void *SNT va, size_t len)
 			continue;
 		if ((r = upage_alloc(e, &page)) < 0)
 			panic("env_segment_alloc: %e", r);
-		printk("env_segment_alloc: va %p -> pa %p\n",start,page2pa(page));
 		page_insert(e->env_pgdir, page, start, PTE_USER_RW);
 	}
 }
