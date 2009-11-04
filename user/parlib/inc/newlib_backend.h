@@ -5,6 +5,8 @@
 #define _NEWLIB_LIBC_WRAPPERS_H_
 
 #include <errno.h>
+#undef errno
+extern int errno;
 #include <sys/stat.h>
 
 
