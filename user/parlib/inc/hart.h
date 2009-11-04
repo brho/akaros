@@ -57,6 +57,7 @@ size_t hart_self();
 error_t hart_request(size_t k);
 void hart_yield();
 size_t hart_max_harts();
+size_t hart_current_harts();
 
 #ifdef __cplusplus
 }

@@ -94,12 +94,20 @@ error_t hart_request(size_t k)
 
 void hart_yield()
 {
+	hart_lock_lock(&_hart_lock);
+	_hart_current_harts--;
+	hart_lock_unlock(&_hart_lock);
 	syscall(SYS_yield,0,0,0,0,0);
 }
 
 size_t hart_max_harts()
 {
 	return procinfo.max_harts < HART_MAX_MAX_HARTS ? procinfo.max_harts : HART_MAX_MAX_HARTS;
+}
+
+size_t hart_current_harts()
+{
+	return _hart_current_harts;
 }
 
 // MCS locks!!

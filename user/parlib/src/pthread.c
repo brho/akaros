@@ -5,7 +5,6 @@
 #include <assert.h>
 
 int threads_active = 1;
-int current_harts = 1;
 hart_lock_t work_queue_lock = HART_LOCK_INIT;
 pthread_t work_queue_head = 0;
 pthread_t work_queue_tail = 0;
@@ -79,20 +78,15 @@ int pthread_create(pthread_t* thread, const pthread_attr_t* attr,
   (*thread)->finished = 0;
   (*thread)->detached = 0;
 
-  int request_hart = 0;
-
   hart_lock_lock(&work_queue_lock);
   {
     threads_active++;
-    if(threads_active > current_harts)
-      request_hart = 1;
-
     queue_insert(&work_queue_head,&work_queue_tail,*thread);
+    // don't return until we get a hart
+    while(threads_active > hart_current_harts() && hart_request(1));
   }
   hart_lock_unlock(&work_queue_lock);
 
-  // don't return until we get a hart
-  while(request_hart && hart_request(1));
   return 0;
 }
 
