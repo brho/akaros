@@ -45,7 +45,7 @@ void manager(void)
 	// of a remote binary to function correctly (schedule() call below)
 	if (progress++ == 0) {
 		envs[0] = kfs_proc_create(kfs_lookup_path("parlib_matrix"));
-		proc_set_state(envs[0], PROC_RUNNABLE_S);
+		__proc_set_state(envs[0], PROC_RUNNABLE_S);
 		proc_run(envs[0]);
 	}
 	schedule();
@@ -58,15 +58,15 @@ void manager(void)
 			//p = kfs_proc_create(kfs_lookup_path("roslib_spawn"));
 			// being proper and all:
 			spin_lock_irqsave(&p->proc_lock);
-			proc_set_state(p, PROC_RUNNABLE_S);
+			__proc_set_state(p, PROC_RUNNABLE_S);
 			// normal single-cored way
 			spin_unlock_irqsave(&p->proc_lock);
 			proc_run(p);
 			#if 0
 			// this is how you can transition to a parallel process manually
 			// make sure you don't proc run first
-			proc_set_state(p, PROC_RUNNING_S);
-			proc_set_state(p, PROC_RUNNABLE_M);
+			__proc_set_state(p, PROC_RUNNING_S);
+			__proc_set_state(p, PROC_RUNNABLE_M);
 			p->resources[RES_CORES].amt_wanted = 5;
 			spin_unlock_irqsave(&p->proc_lock);
 			core_request(p);
@@ -80,7 +80,7 @@ void manager(void)
 				printk("\nattempting to ghetto preempt...\n");
 				spin_lock_irqsave(&p->proc_lock);
 				proc_take_allcores(p, __death);
-				proc_set_state(p, PROC_RUNNABLE_M);
+				__proc_set_state(p, PROC_RUNNABLE_M);
 				spin_unlock_irqsave(&p->proc_lock);
 				udelay(5000000);
 				printk("\nattempting to restart...\n");
@@ -100,7 +100,7 @@ void manager(void)
 			panic("This is okay");
 
 			envs[0] = kfs_proc_create(kfs_lookup_path("roslib_hello"));
-			proc_set_state(envs[0], PROC_RUNNABLE_S);
+			__proc_set_state(envs[0], PROC_RUNNABLE_S);
 			proc_run(envs[0]);
 			break;
 			#endif
@@ -133,7 +133,7 @@ void manager(void)
 			// reminder of how to spawn remotely
 			for (int i = 0; i < 8; i++) {
 				envs[i] = kfs_proc_create(kfs_lookup_path("roslib_hello"));
-				proc_set_state(envs[i], PROC_RUNNABLE_S);
+				__proc_set_state(envs[i], PROC_RUNNABLE_S);
 				smp_call_function_single(i, run_env_handler, envs[i], 0);
 			}
 			process_workqueue();

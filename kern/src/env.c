@@ -269,7 +269,7 @@ env_alloc(env_t **newenv_store, envid_t parent_id)
 	// Set the basic status variables.
     spinlock_init(&e->proc_lock);
 	e->env_parent_id = parent_id;
-	proc_set_state(e, PROC_CREATED);
+	__proc_set_state(e, PROC_CREATED);
 	e->env_runs = 0;
 	e->env_refcnt = 1;
 	e->env_flags = 0;

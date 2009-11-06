@@ -258,7 +258,7 @@ int mon_kfs_run(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 	struct proc *p = kfs_proc_create(kfs_inode);
 	// go from PROC_CREATED->PROC_RUNNABLE_S
 	spin_lock_irqsave(&p->proc_lock); // might not be necessary for a mon function
-	proc_set_state(p, PROC_RUNNABLE_S);
+	__proc_set_state(p, PROC_RUNNABLE_S);
 	schedule_proc(p);
 	spin_unlock_irqsave(&p->proc_lock);
 	// Should never return from schedule (env_pop in there)

@@ -92,7 +92,7 @@ static ssize_t sys_run_binary(env_t* e, void *DANGEROUS binary_buf,
 
 	env_t* env = env_create(new_binary, len);
 	kfree(new_binary);
-	proc_set_state(env, PROC_RUNNABLE_S);
+	__proc_set_state(env, PROC_RUNNABLE_S);
 	schedule_proc(env);
 	return 0;
 }
@@ -401,7 +401,7 @@ static error_t sys_proc_run(struct proc *p, unsigned pid)
 	} else if (target->state != PROC_CREATED) {
 		retval = -EINVAL;
 	} else {
-		proc_set_state(target, PROC_RUNNABLE_S);
+		__proc_set_state(target, PROC_RUNNABLE_S);
 		schedule_proc(target);
 	}
 	spin_unlock_irqsave(&p->proc_lock);

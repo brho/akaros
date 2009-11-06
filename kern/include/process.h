@@ -61,7 +61,7 @@ extern uint32_t LCKD(&idle_lock) (RO idlecoremap)[MAX_NUM_CPUS];
 extern uint32_t LCKD(&idle_lock) num_idlecores;
 
 /* Process management: */
-int proc_set_state(struct proc *p, uint32_t state) WRITES(p->state);
+int __proc_set_state(struct proc *p, uint32_t state) WRITES(p->state);
 struct proc *get_proc(unsigned pid);
 bool proc_controls(struct proc *SAFE actor, struct proc *SAFE target);
 /* Transition from RUNNABLE_* to RUNNING_*. */
@@ -80,15 +80,17 @@ void proc_yield(struct proc *SAFE p);
  *
  * WARNING: YOU MUST HOLD THE PROC_LOCK BEFORE CALLING THESE! */
 /* Gives process p the additional num cores listed in corelist */
-error_t proc_give_cores(struct proc *SAFE p, uint32_t corelist[], size_t *num);
+error_t __proc_give_cores(struct proc *SAFE p, uint32_t corelist[], size_t *num);
 /* Makes process p's coremap look like corelist (add, remove, etc) */
-error_t proc_set_allcores(struct proc *SAFE p, uint32_t corelist[], size_t *num,
-                          amr_t message,TV(a0t) arg0, TV(a1t) arg1, TV(a2t) arg2);
+error_t __proc_set_allcores(struct proc *SAFE p, uint32_t corelist[],
+                            size_t *num, amr_t message, TV(a0t) arg0,
+                            TV(a1t) arg1, TV(a2t) arg2);
 /* Takes from process p the num cores listed in corelist */
-error_t proc_take_cores(struct proc *SAFE p, uint32_t corelist[], size_t *num,
-                        amr_t message, TV(a0t) arg0, TV(a1t) arg1, TV(a2t) arg2);
-error_t proc_take_allcores(struct proc *SAFE p, amr_t message, TV(a0t) arg0,
-                           TV(a1t) arg1, TV(a2t) arg2);
+error_t __proc_take_cores(struct proc *SAFE p, uint32_t corelist[],
+                          size_t *num, amr_t message, TV(a0t) arg0,
+                          TV(a1t) arg1, TV(a2t) arg2);
+error_t __proc_take_allcores(struct proc *SAFE p, amr_t message, TV(a0t) arg0,
+                             TV(a1t) arg1, TV(a2t) arg2);
 
 /* The reference counts are mostly to track how many cores loaded the cr3 */
 error_t proc_incref(struct proc *SAFE p);

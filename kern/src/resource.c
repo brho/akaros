@@ -45,8 +45,8 @@ ssize_t core_request(struct proc *p)
 		env_push_ancillary_state(p);
 		proc_set_syscall_retval(&p->env_tf, ESUCCESS);
 		// in this case, it's not our job to save contexts or anything
-		proc_take_allcores(p, __death, 0, 0, 0);
-		proc_set_state(p, PROC_RUNNABLE_S);
+		__proc_take_allcores(p, __death, 0, 0, 0);
+		__proc_set_state(p, PROC_RUNNABLE_S);
 		schedule_proc(p);
 	}
 	/* otherwise, see how many new cores are wanted */
@@ -104,7 +104,7 @@ ssize_t core_request(struct proc *p)
 				// will need to give up this core / idle later (sync)
 				need_to_idle = TRUE;
 				// change to runnable_m (it's TF is already saved)
-				proc_set_state(p, PROC_RUNNABLE_M);
+				__proc_set_state(p, PROC_RUNNABLE_M);
 				// signals to proc_run that this is a _S to _M transition
 				p->env_flags |= PROC_TRANSITION_TO_M;
 				break;
@@ -119,7 +119,7 @@ ssize_t core_request(struct proc *p)
 				break;
 		}
 		/* give them the cores.  this will start up the extras if RUNNING_M */
-		proc_give_cores(p, corelist, &num_granted);
+		__proc_give_cores(p, corelist, &num_granted);
 		spin_unlock_irqsave(&p->proc_lock);
 		/* if there's a race on state (like DEATH), it'll get handled by
 		 * proc_run or proc_destroy */

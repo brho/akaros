@@ -48,7 +48,7 @@ static void put_idle_core(uint32_t coreid)
  * opportunity to check for bad transitions.  Might compile these out later, so
  * we shouldn't rely on them for sanity checking from userspace.
  */
-int proc_set_state(struct proc *p, uint32_t state)
+int __proc_set_state(struct proc *p, uint32_t state)
 {
 	uint32_t curstate = p->state;
 	/* Valid transitions:
@@ -115,7 +115,8 @@ struct proc *get_proc(unsigned pid)
 	return &envs[ENVX(pid)];
 }
 
-/* Whether or not actor can control target */
+/* Whether or not actor can control target.  Note we currently don't need
+ * locking for this. */
 bool proc_controls(struct proc *actor, struct proc *target)
 {
 	return target->env_parent_id == actor->env_id;
@@ -145,7 +146,7 @@ void proc_run(struct proc *p)
 				smp_idle(); // this never returns
 			return;
 		case (PROC_RUNNABLE_S):
-			proc_set_state(p, PROC_RUNNING_S);
+			__proc_set_state(p, PROC_RUNNING_S);
 			/* We will want to know where this process is running, even if it is
 			 * only in RUNNING_S.  can use the vcoremap, which makes death easy.
 			 * Also, this is the signal used in trap.c to know to save the tf in
@@ -159,7 +160,7 @@ void proc_run(struct proc *p)
 			proc_startcore(p, &p->env_tf);
 			break;
 		case (PROC_RUNNABLE_M):
-			proc_set_state(p, PROC_RUNNING_M);
+			__proc_set_state(p, PROC_RUNNING_M);
 			/* vcoremap[i] holds the coreid of the physical core allocated to
 			 * this process.  It is set outside proc_run.  For the active
 			 * message, a0 = struct proc*, a1 = struct trapframe*.   */
@@ -337,7 +338,7 @@ void proc_destroy(struct proc *p)
 		case PROC_RUNNABLE_M:
 			/* Need to reclaim any cores this proc might have, even though it's
 			 * not running yet. */
-			proc_take_allcores(p, NULL, NULL, NULL, NULL);
+			__proc_take_allcores(p, NULL, NULL, NULL, NULL);
 			// fallthrough
 		case PROC_RUNNABLE_S:
 			// Think about other lists, like WAITING, or better ways to do this
@@ -365,8 +366,8 @@ void proc_destroy(struct proc *p)
 			 * deallocate the cores.
 			 * The rule is that the vcoremap is set before proc_run, and reset
 			 * within proc_destroy */
-			proc_take_allcores(p, __death, (void *SNT)0, (void *SNT)0,
-			                   (void *SNT)0);
+			__proc_take_allcores(p, __death, (void *SNT)0, (void *SNT)0,
+			                     (void *SNT)0);
 			break;
 		default:
 			// TODO: getting here if it's already dead and free (ENV_FREE).
@@ -374,7 +375,7 @@ void proc_destroy(struct proc *p)
 			// them floating around the system.
 			panic("Weird state(0x%08x) in proc_destroy", p->state);
 	}
-	proc_set_state(p, PROC_DYING);
+	__proc_set_state(p, PROC_DYING);
 
 	atomic_dec(&num_envs);
 	/* TODO: (REF) dirty hack.  decref currently uses a lock, but needs to use
@@ -458,7 +459,7 @@ void proc_yield(struct proc *SAFE p)
 		case (PROC_RUNNING_S):
 			p->env_tf= *current_tf;
 			env_push_ancillary_state(p);
-			proc_set_state(p, PROC_RUNNABLE_S);
+			__proc_set_state(p, PROC_RUNNABLE_S);
 			schedule_proc(p);
 			break;
 		case (PROC_RUNNING_M):
@@ -472,7 +473,7 @@ void proc_yield(struct proc *SAFE p)
 			if (p->num_vcores == 0) {
 				// might replace this with m_yield, if we have it directly
 				p->resources[RES_CORES].amt_wanted = 1;
-				proc_set_state(p, PROC_RUNNABLE_M);
+				__proc_set_state(p, PROC_RUNNABLE_M);
 				schedule_proc(p);
 			}
 			break;
@@ -512,7 +513,7 @@ void proc_yield(struct proc *SAFE p)
 // passed instead of a pointer to it. If in the future some way will be needed
 // to return the number of cores, then it might be best to use a separate
 // parameter for that.
-error_t proc_give_cores(struct proc *SAFE p, uint32_t corelist[], size_t *num)
+error_t __proc_give_cores(struct proc *SAFE p, uint32_t corelist[], size_t *num)
 { TRUSTEDBLOCK
 	uint32_t free_vcoreid = 0;
 	switch (p->state) {
@@ -556,8 +557,6 @@ error_t proc_give_cores(struct proc *SAFE p, uint32_t corelist[], size_t *num)
 				send_active_message(corelist[i], __startcore, p,
 				                     (struct Trapframe *)0,
 				                     (void*SNT)free_vcoreid);
-				//send_active_message(corelist[i], __startcore, p,
-				//                    (void*)0, (void*)free_vcoreid);
 			}
 			break;
 		default:
@@ -575,8 +574,9 @@ error_t proc_give_cores(struct proc *SAFE p, uint32_t corelist[], size_t *num)
  * used.  Implies preempting for the message.
  *
  * WARNING: You must hold the proc_lock before calling this!*/
-error_t proc_set_allcores(struct proc *SAFE p, uint32_t corelist[], size_t *num,
-                          amr_t message,TV(a0t) arg0, TV(a1t) arg1, TV(a2t) arg2)
+error_t __proc_set_allcores(struct proc *SAFE p, uint32_t corelist[],
+                            size_t *num, amr_t message,TV(a0t) arg0,
+                            TV(a1t) arg1, TV(a2t) arg2)
 {
 	panic("Set all cores not implemented.\n");
 }
@@ -587,8 +587,9 @@ error_t proc_set_allcores(struct proc *SAFE p, uint32_t corelist[], size_t *num,
  * might be necessary later.  Or not, and we'll never do it.
  *
  * WARNING: You must hold the proc_lock before calling this!*/
-error_t proc_take_cores(struct proc *SAFE p, uint32_t corelist[], size_t *num,
-                        amr_t message, TV(a0t) arg0, TV(a1t) arg1, TV(a2t) arg2)
+error_t __proc_take_cores(struct proc *SAFE p, uint32_t corelist[],
+                          size_t *num, amr_t message, TV(a0t) arg0,
+                          TV(a1t) arg1, TV(a2t) arg2)
 { TRUSTEDBLOCK
 	uint32_t vcoreid;
 	switch (p->state) {
@@ -623,8 +624,8 @@ error_t proc_take_cores(struct proc *SAFE p, uint32_t corelist[], size_t *num,
  * __preempt, it will be sent to the cores.
  *
  * WARNING: You must hold the proc_lock before calling this! */
-error_t proc_take_allcores(struct proc *SAFE p, amr_t message,
-                           TV(a0t) arg0, TV(a1t) arg1, TV(a2t) arg2)
+error_t __proc_take_allcores(struct proc *SAFE p, amr_t message,
+                             TV(a0t) arg0, TV(a1t) arg1, TV(a2t) arg2)
 {
 	uint32_t active_vcoreid = 0;
 	switch (p->state) {
