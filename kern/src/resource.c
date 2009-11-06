@@ -136,11 +136,12 @@ ssize_t core_request(struct proc *p)
 	return num_granted;
 }
 
-error_t resource_req(struct proc *p, int type, size_t amount, uint32_t flags)
+error_t resource_req(struct proc *p, int type, size_t amt_wanted,
+                     size_t amt_wanted_min, uint32_t flags)
 {
 	error_t retval;
-	printk("Received request for type: %d, amount: %d, flag: %d\n",
-	       type, amount, flags);
+	printk("Received request for type: %d, amt_wanted: %d, amt_wanted_min: %d, "
+	       "flag: %d\n", type, amt_wanted, amt_wanted_min, flags);
 	if (flags & REQ_ASYNC)
 		// We have no sense of time yet, or of half-filling requests
 		printk("[kernel] Async requests treated synchronously for now.\n");
@@ -148,12 +149,13 @@ error_t resource_req(struct proc *p, int type, size_t amount, uint32_t flags)
 	/* set the desired resource amount in the process's resource list. */
 	spin_lock_irqsave(&p->proc_lock);
 	size_t old_amount = p->resources[type].amt_wanted;
-	p->resources[type].amt_wanted = amount;
+	p->resources[type].amt_wanted = amt_wanted;
+	p->resources[type].amt_wanted_min = MIN(amt_wanted_min, amt_wanted);
 	p->resources[type].flags = flags;
 	spin_unlock_irqsave(&p->proc_lock);
 
 	// no change in the amt_wanted
-	if (old_amount == amount)
+	if (old_amount == amt_wanted)
 		return 0;
 
 	switch (type) {

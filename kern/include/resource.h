@@ -16,7 +16,8 @@
 #include <process.h>
 
 ssize_t core_request(struct proc *p);
-error_t resource_req(struct proc *p, int type, size_t amount, uint32_t flags);
+error_t resource_req(struct proc *p, int type, size_t amt_wanted,
+                     size_t amt_wanted_min, uint32_t flags);
 
 void print_resources(struct proc *p);
 void print_all_resources(void);

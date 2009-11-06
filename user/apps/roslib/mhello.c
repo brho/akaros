@@ -32,7 +32,7 @@ int main(int argc, char** argv)
 	} else { // core 0
 		cprintf("Hello from vcore 0\n");
 		cprintf("Multi-Goodbye, world, from PID: %d!\n", sys_getpid());
-		retval = sys_resource_req(RES_CORES, 7, 0);
+		retval = sys_resource_req(RES_CORES, 7, 1, 0);
 	}
 	cprintf("Vcore %d Done!\n", vcoreid);
 	while (1);

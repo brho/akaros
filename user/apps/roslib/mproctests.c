@@ -66,19 +66,19 @@ int main(int argc, char** argv)
 				cprintf("Should not see me!!!!!!!!!!!!!!!!!!\n");
 				while(1);
 			case TEST_ONE_CORE:
-				retval = sys_resource_req(RES_CORES, 1, 0);
+				retval = sys_resource_req(RES_CORES, 1, 1, 0);
 				cprintf("One core test's core0's retval: %d\n", retval);
 				cprintf("Check to see it's on a worker core.\n");
 				while(1);
 			case TEST_ASK_FOR_TOO_MANY_CORES:
-				retval = sys_resource_req(RES_CORES, 12, 0);
+				retval = sys_resource_req(RES_CORES, 12, 1, 0);
 				cprintf("Asked for too many, retval: %d\n", retval);
 				return 0;
 			case TEST_INCREMENTAL_CHANGES:
-				retval = sys_resource_req(RES_CORES, 4, 0);
+				retval = sys_resource_req(RES_CORES, 4, 1, 0);
 				break;
 			default:
-				retval = sys_resource_req(RES_CORES, 7, 0);
+				retval = sys_resource_req(RES_CORES, 7, 1, 0);
 		}
 		cprintf("Should see me if you want to relocate core0's context "
 		        "when moving from RUNNING_S\n");
@@ -89,7 +89,7 @@ int main(int argc, char** argv)
 		case TEST_YIELD_OUT_OF_ORDER:
 			udelay(10000000, 1995014570);
 			cprintf("Core 2 should have yielded, asking for another\n");
-			retval = sys_resource_req(RES_CORES, 7, 0);
+			retval = sys_resource_req(RES_CORES, 7, 1, 0);
 			break;
 		case TEST_YIELD_0_OUT_OF_ORDER:
 			udelay(5000000, 1995014570);
@@ -120,12 +120,12 @@ void hart_entry(void)
 				// Testing asking for less than we already have
 				udelay(1000000, 1995014570); // KVM's freq.  Whatever.
 				cprintf("Asking for too few:\n");
-				retval = sys_resource_req(RES_CORES, 2, 0);
+				retval = sys_resource_req(RES_CORES, 2, 1, 0);
 				cprintf("Should be -EINVAL(7): %d\n", retval);
 				// Testing getting more while running
 				cprintf("Asking for more while running:\n");
 				udelay(1000000, 1995014570);
-				retval = sys_resource_req(RES_CORES, 7, 0);
+				retval = sys_resource_req(RES_CORES, 7, 1, 0);
 				cprintf("core2's retval: %d\n", retval);
 				break;
 			case TEST_YIELD_OUT_OF_ORDER:
@@ -135,7 +135,7 @@ void hart_entry(void)
 			case TEST_YIELD_0_OUT_OF_ORDER:
 				udelay(7500000, 1995014570);
 				cprintf("Core 0 should have yielded, asking for another\n");
-				retval = sys_resource_req(RES_CORES, 7, 0);
+				retval = sys_resource_req(RES_CORES, 7, 1, 0);
 		}
 	}
 	global_tests(vcoreid);
@@ -154,7 +154,7 @@ static void global_tests(uint32_t vcoreid)
 		case TEST_SWITCH_TO_RUNNABLE_S:
 			if (vcoreid == 2) {
 				cprintf("Core %d trying to request 0/ switch to _S\n", vcoreid);
-				retval = sys_resource_req(RES_CORES, 0, 0);
+				retval = sys_resource_req(RES_CORES, 0, 0, 0);
 				// will only see this if we are scheduled()
 				cprintf("Core %d back up! (retval:%d)\n", vcoreid, retval);
 				cprintf("And exiting\n");
@@ -163,7 +163,7 @@ static void global_tests(uint32_t vcoreid)
 			while(1);
 		case TEST_CRAZY_YIELDS:
 			udelay(300000*vcoreid, 1995014570);
-			sys_resource_req(RES_CORES, 7, 0);
+			sys_resource_req(RES_CORES, 7, 1, 0);
 			yield();
 			cprintf("should  never see me, unless you slip into *_S\n");
 			break;

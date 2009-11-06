@@ -481,7 +481,7 @@ intreg_t syscall(struct proc *p, uintreg_t syscallno, uintreg_t a1,
 			printk("brk not implemented yet\n");
 			return -EINVAL;
 		case SYS_resource_req:
-			return resource_req(p, a1, a2, a3);
+			return resource_req(p, a1, a2, a3, a4);
 
 	#ifdef __i386__
 		case SYS_serial_write:

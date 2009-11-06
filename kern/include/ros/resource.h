@@ -25,6 +25,8 @@
  * pain too.  The batch one is nice, since it amortizes the overhead of the syscall,
  * but it doesn't really matter that much, esp when there are only a few resources.
  *
+ * amt_wanted_min is the least amount you are will to run with.
+ *
  * A few caveats for cores:
  * - when someone yields (esp if the wish > grant): yielding means take one
  *   away, and set wished = current.  don't yield if you want another core still
@@ -46,6 +48,7 @@
 struct resource {
 	int type;
 	size_t amt_wanted;
+	size_t amt_wanted_min;
 	size_t amt_granted;
 	uint32_t flags;
 };
