@@ -1,0 +1,46 @@
+Channels
+This summarizes brainstorming ideas around different types of channels, and 
+will eventually contain the design of different types of channels. 
+
+Protection and semantics of the message
+- Immutability of messages after sending
+	- writes allowed (full trust)
+	- read only
+	- hand-off (enforce through PL or pagetable?)
+- Support for a twoway channel
+	- just two one-way channels
+
+- variability of the size in the channel
+	- Request and Response size are different, so maybe we should handle them differently?
+	Constant size: embed in the ring buffer? 
+	Variable size: Splitting request and data (fixed size ring buffer with pointers into a data page)
+- size of the msg
+	- large -> remapping
+	- small -> in buffer/ copy semantics
+
+- Ack required for one way channel?
+
+- Kernel one of the end point? syscall/sysevent
+	- diff trust model etc
+
+- Access control and Naming
+	- related but distinct
+	- Xenstore like/ hierarchical namespace
+	- single entity knowing all channels? or managed by individual partitions?
+	- create a channel to a service, what is the interface for that?
+
+	Access control: 
+	- check at load time
+	- Singularity style manifests for diff. applications
+
+- Multi-producer / Multi-consumer
+	- Trust between the producers and trust between consumers
+	- typically no trust between address spaces/ partitions, and full trust within?
+
+	- per core channel vs. per address space channel
+
+- blocking semantics (block, fail, retry)
+- what to do when the queue is full? admission policy for channels?
+
+
+
