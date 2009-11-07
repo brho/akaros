@@ -1,4 +1,12 @@
-/* Copyright (C) 2002 Christopher Clark <firstname.lastname@cl.cam.ac.uk> */
+/* Copyright (C) 2002, 2004 Christopher Clark <firstname.lastname@cl.cam.ac.uk>
+ * 
+ * Modified 2009 by Barret Rhoden <brho@cs.berkeley.edu>
+ * Changes include:
+ *   - No longer frees keys or values.  It's up to the client to do that.
+ *   - Provides common hash and equality functions (meant for longs)
+ *   - Uses the slab allocator for hash entry allocation.
+ *   - Merges the iterator code with the main hash table code, mostly to avoid
+ *   externing the hentry cache. */
 
 #ifndef __ROS_KERN_HASHTABLE_H__
 #define __ROS_KERN_HASHTABLE_H__
@@ -36,11 +44,11 @@ static inline size_t indexFor(unsigned int tablelength, unsigned int hashvalue)
 {
 	return (hashvalue % tablelength);
 };
-#define freekey(X) kfree(X)
 
 /*****************************************************************************/
 
 /* Example of use:
+ *		hashtable_init(); // Do this once during kernel initialization
  *
  *      struct hashtable  *h;
  *      struct some_key   *k;
@@ -96,6 +104,13 @@ static inline size_t indexFor(unsigned int tablelength, unsigned int hashvalue)
  *
  */
 
+/* Call this once on bootup, after initializing the slab allocator.  */
+void hashtable_init(void);
+
+/* Common hash/equals functions.  Don't call these directly. */
+size_t __generic_hash(void *k);
+ssize_t __generic_eq(void *k1, void *k2);
+
 /*****************************************************************************
  * create_hashtable
    
@@ -116,8 +131,8 @@ create_hashtable(size_t minsize,
    
  * @name        hashtable_insert
  * @param   h   the hashtable to insert into
- * @param   k   the key - hashtable claims ownership and will free on removal
- * @param   v   the value - does not claim ownership
+ * @param   k   the key
+ * @param   v   the value
  * @return      non-zero for successful insertion
  *
  * This function will cause the table to expand if the insertion would take
@@ -144,7 +159,7 @@ ssize_t fnname (hashtable_t *h, keytype *k, valuetype *v) \
    
  * @name        hashtable_search
  * @param   h   the hashtable to search
- * @param   k   the key to search for  - does not claim ownership
+ * @param   k   the key to search for
  * @return      the value associated with the key, or NULL if none found
  */
 
@@ -162,8 +177,10 @@ valuetype * fnname (hashtable_t *h, keytype *k) \
    
  * @name        hashtable_remove
  * @param   h   the hashtable to remove the item from
- * @param   k   the key to search for  - does not claim ownership
+ * @param   k   the key to search for
  * @return      the value associated with the key, or NULL if none found
+ *
+ * Caller ought to free the key, if appropriate.
  */
 
 void * /* returns value */
@@ -183,6 +200,7 @@ valuetype * fnname (hashtable_t *h, keytype *k) \
  * @param   h   the hashtable
  * @return      the number of items stored in the hashtable
  */
+
 size_t
 hashtable_count(hashtable_t *h);
 
@@ -192,16 +210,95 @@ hashtable_count(hashtable_t *h);
    
  * @name        hashtable_destroy
  * @param   h   the hashtable
- * @param       free_values     whether to call 'free' on the remaining values
+ *
+ * This will not free the values or the keys.  Each user of the hashtable may
+ * have a different way of freeing (such as the slab allocator, kfree, or
+ * nothing (key is just an integer)).
+ *
+ * If the htable isn't empty, you ought to iterate through and destroy manually.
+ * This will warn if you try to destroy an non-empty htable.
  */
 
 void
-hashtable_destroy(hashtable_t *h, int free_values);
+hashtable_destroy(hashtable_t *h);
+
+/***************************** Hashtable Iterator ****************************/
+/*****************************************************************************/
+/* This struct is only concrete here to allow the inlining of two of the
+ * accessor functions. */
+typedef struct hashtable_itr {
+    hashtable_t *h;
+    hash_entry_t *e;
+    hash_entry_t *parent;
+    size_t index;
+} hashtable_itr_t;
+
+/*****************************************************************************/
+/* hashtable_iterator
+ */
+
+hashtable_itr_t *
+hashtable_iterator(hashtable_t *h);
+
+/*****************************************************************************/
+/* hashtable_iterator_key
+ * - return the key of the (key,value) pair at the current position
+ *
+ * Keep this in sync with the non-externed version in the .c */
+
+extern inline void *
+hashtable_iterator_key(hashtable_itr_t *i)
+{
+    return i->e->k;
+}
+
+/*****************************************************************************/
+/* value - return the value of the (key,value) pair at the current position
+ *
+ * Keep this in sync with the non-externed version in the .c */
+
+extern inline void *
+hashtable_iterator_value(hashtable_itr_t *i)
+{
+    return i->e->v;
+}
+
+/*****************************************************************************/
+/* advance - advance the iterator to the next element
+ *           returns zero if advanced to end of table */
+
+ssize_t
+hashtable_iterator_advance(hashtable_itr_t *itr);
+
+/*****************************************************************************/
+/* remove - remove current element and advance the iterator to the next element
+ *          NB: if you need the key or value to free it, read it before
+ *          removing. ie: beware memory leaks!  this will not remove the key.
+ *          returns zero if advanced to end of table */
+
+ssize_t
+hashtable_iterator_remove(hashtable_itr_t *itr);
+
+/*****************************************************************************/
+/* search - overwrite the supplied iterator, to point to the entry
+ *          matching the supplied key.
+ *          h points to the hashtable to be searched.
+ *          returns zero if not found. */
+ssize_t
+hashtable_iterator_search(hashtable_itr_t *itr,
+                          hashtable_t *h, void *k);
+
+#define DEFINE_HASHTABLE_ITERATOR_SEARCH(fnname, keytype) \
+ssize_t fnname (hashtable_itr_t *i, hashtable_t *h, keytype *k) \
+{ \
+    return (hashtable_iterator_search(i,h,k)); \
+}
+
 
 #endif /* __ROS_KERN_HASHTABLE_H__ */
 
 /*
- * Copyright (c) 2002, Christopher Clark
+ * Copyright (c) 2002, 2004, Christopher Clark
  * All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without

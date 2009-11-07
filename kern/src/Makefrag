@@ -15,11 +15,7 @@ KERN_SRCFILES := $(KERN_ARCH_SRCFILES) \
                  $(KERN_SRC_DIR)/init.c \
                  $(KERN_SRC_DIR)/monitor.c \
                  $(KERN_SRC_DIR)/printf.c \
-                 $(KERN_SRC_DIR)/trap.c \
-                 $(KERN_SRC_DIR)/trapentry.S \
                  $(KERN_SRC_DIR)/sched.c \
-                 $(KERN_SRC_DIR)/kdebug.c \
-                 $(KERN_SRC_DIR)/apic.c \
                  $(KERN_SRC_DIR)/printfmt.c \
                  $(KERN_SRC_DIR)/smp.c \
                  $(KERN_SRC_DIR)/multiboot.c \
@@ -38,7 +34,6 @@ KERN_SRCFILES := $(KERN_ARCH_SRCFILES) \
                  $(KERN_SRC_DIR)/process.c \
                  $(KERN_SRC_DIR)/kmalloc.c \
                  $(KERN_SRC_DIR)/hashtable.c \
-                 $(KERN_SRC_DIR)/hashtable_itr.c \
                  $(KERN_SRC_DIR)/schedule.c \
                  $(KERN_SRC_DIR)/mm.c \
                  $(KERN_SRC_DIR)/resource.c \

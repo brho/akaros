@@ -28,6 +28,7 @@
 #include <pmap.h>
 #include <slab.h>
 #include <kmalloc.h>
+#include <hashtable.h>
 
 #ifdef __i386__
 
@@ -851,5 +852,105 @@ void test_kmalloc(void)
 	bufs[0] = kmalloc(size, 0);
 	printk("Size %d, Addr = %p\n", size, bufs[0]);
 	kfree(bufs[0]);
+}
+
+static size_t test_hash_fn_col(void *k)
+{
+	return (size_t)k % 2; // collisions in slots 0 and 1
+}
+
+void test_hashtable(void)
+{
+	struct test {int x; int y;};
+	struct test tstruct[10];
+
+	struct hashtable *h;
+	int k = 5;
+	struct test *v = &tstruct[0];
+
+	h = create_hashtable(32, __generic_hash, __generic_eq);
+	
+	// test inserting one item, then finding it again
+	printk("Tesing one item, insert, search, and removal\n");
+	if(!hashtable_insert(h, (void*)k, v))
+		printk("Failed to insert to hashtable!\n");
+	v = NULL;
+	if (!(v = hashtable_search(h, (void*)k)))
+		printk("Failed to find in hashtable!\n");
+	if (v != &tstruct[0])
+		printk("Got the wrong item! (got %p, wanted %p)\n", v, &tstruct[0]);
+	v = NULL;
+	if (!(v = hashtable_remove(h, (void*)k)))
+		printk("Failed to remove from hashtable!\n");
+	// shouldn't be able to find it again
+	if ((v = hashtable_search(h, (void*)k)))
+		printk("Should not have been able to find in hashtable!\n");
+	
+	printk("Tesing a bunch of items, insert, search, and removal\n");
+	for (int i = 0; i < 10; i++) {
+		k = i; // vary the key, we don't do KEY collisions
+		if(!hashtable_insert(h, (void*)k, &tstruct[i]))
+			printk("Failed to insert iter %d to hashtable!\n", i);
+	}
+	// read out the 10 items
+	for (int i = 0; i < 10; i++) {
+		k = i;
+		if (!(v = hashtable_search(h, (void*)k)))
+			printk("Failed to find in hashtable!\n");
+		if (v != &tstruct[i])
+			printk("Got the wrong item! (got %p, wanted %p)\n", v, &tstruct[i]);
+	}
+	if (hashtable_count(h) != 10)
+		printk("Wrong accounting of number of elements!\n");
+	// remove the 10 items
+	for (int i = 0; i < 10; i++) {
+		k = i;
+		if (!(v = hashtable_remove(h, (void*)k)))
+			printk("Failed to remove from hashtable!\n");
+	}
+	// make sure they are all gone
+	for (int i = 0; i < 10; i++) {
+		k = i;
+		if ((v = hashtable_search(h, (void*)k)))
+			printk("Should not have been able to find in hashtable!\n");
+	}
+	if (hashtable_count(h))
+		printk("Wrong accounting of number of elements!\n");
+	hashtable_destroy(h);
+
+	// same test of a bunch of items, but with collisions.
+	printk("Tesing a bunch of items with collisions, etc.\n");
+	h = create_hashtable(32, test_hash_fn_col, __generic_eq);
+	// insert 10 items
+	for (int i = 0; i < 10; i++) {
+		k = i; // vary the key, we don't do KEY collisions
+		if(!hashtable_insert(h, (void*)k, &tstruct[i]))
+			printk("Failed to insert iter %d to hashtable!\n", i);
+	}
+	// read out the 10 items
+	for (int i = 0; i < 10; i++) {
+		k = i;
+		if (!(v = hashtable_search(h, (void*)k)))
+			printk("Failed to find in hashtable!\n");
+		if (v != &tstruct[i])
+			printk("Got the wrong item! (got %p, wanted %p)\n", v, &tstruct[i]);
+	}
+	if (hashtable_count(h) != 10)
+		printk("Wrong accounting of number of elements!\n");
+	// remove the 10 items
+	for (int i = 0; i < 10; i++) {
+		k = i;
+		if (!(v = hashtable_remove(h, (void*)k)))
+			printk("Failed to remove from hashtable!\n");
+	}
+	// make sure they are all gone
+	for (int i = 0; i < 10; i++) {
+		k = i;
+		if ((v = hashtable_search(h, (void*)k)))
+			printk("Should not have been able to find in hashtable!\n");
+	}
+	if (hashtable_count(h))
+		printk("Wrong accounting of number of elements!\n");
+	hashtable_destroy(h);
 }
 

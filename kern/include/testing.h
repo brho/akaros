@@ -25,6 +25,7 @@ void test_circ_buffer(void);
 void test_active_messages(void);
 void test_slab(void);
 void test_kmalloc(void);
+void test_hashtable(void);
 
 struct trapframe_t;
 

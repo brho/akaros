@@ -27,6 +27,7 @@
 #include <manager.h>
 #include <testing.h>
 #include <kmalloc.h>
+#include <hashtable.h>
 
 #include <arch/init.h>
 #include <slab.h>
@@ -67,6 +68,7 @@ void kernel_init(multiboot_info_t *mboot_info)
 	page_check();
 	kmem_cache_init();
 	kmalloc_init();
+	hashtable_init();
 
 	idt_init();
 	active_msg_init();

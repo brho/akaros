@@ -1,9 +1,18 @@
-/* Copyright (C) 2004 Christopher Clark <firstname.lastname@cl.cam.ac.uk> */
+/* Copyright (C) 2002, 2004 Christopher Clark  <firstname.lastname@cl.cam.ac.uk>
+ * 
+ * Modified 2009 by Barret Rhoden <brho@cs.berkeley.edu>
+ * Changes include:
+ *   - No longer frees keys or values.  It's up to the client to do that.
+ *   - Uses the slab allocator for hash entry allocation.
+ *   - Merges the iterator code with the main hash table code, mostly to avoid
+ *   externing the hentry cache. */
 
 #include <ros/common.h>
 #include <hashtable.h>
 #include <stdio.h>
+#include <assert.h>
 #include <string.h>
+#include <slab.h>
 #include <kmalloc.h>
 
 // File was not annotated and caused ivy based compilation to fail
@@ -34,6 +43,29 @@ const unsigned int prime_table_length = sizeof(primes)/sizeof(primes[0]);
 #define APPLY_MAX_LOAD_FACTOR(size) \
     ((size * 13)/20)
 //const float max_load_factor = 0.65;
+
+struct kmem_cache *hentry_cache;
+
+/* Call this once on bootup, after initializing the slab allocator.  */
+void hashtable_init(void)
+{
+	hentry_cache = kmem_cache_create("hash_entry", sizeof(struct hash_entry),
+	                                 __alignof__(struct hash_entry), 0, 0, 0);
+}
+
+/* Common hash/equals functions.  Don't call these directly. */
+size_t __generic_hash(void *k)
+{
+	/* 0x9e370001UL used by Linux (32 bit)
+	 * (prime approx to the golden ratio to the max integer, IAW Knuth)
+	 */
+	return (size_t)k * 0x9e370001UL;	
+}
+
+ssize_t __generic_eq(void *k1, void *k2)
+{
+	return k1 == k2;
+}
 
 /*****************************************************************************/
 hashtable_t *
@@ -158,7 +190,7 @@ hashtable_insert(hashtable_t *h, void *k, void *v)
          * element may be ok. Next time we insert, we'll try expanding again.*/
         hashtable_expand(h);
     }
-    e = (hash_entry_t *)kmalloc(sizeof(hash_entry_t), 0);
+    e = (hash_entry_t *)kmem_cache_alloc(hentry_cache, 0);
     if (NULL == e) { --(h->entrycount); return 0; } /*oom*/
     e->h = hash(h,k);
     index = indexFor(h->tablelength,e->h);
@@ -211,8 +243,7 @@ hashtable_remove(hashtable_t *h, void *k)
             *pE = e->next;
             h->entrycount--;
             v = e->v;
-            freekey(e->k);
-            kfree(e);
+			kmem_cache_free(hentry_cache, e);
             return v;
         }
         pE = &(e->next);
@@ -224,35 +255,177 @@ hashtable_remove(hashtable_t *h, void *k)
 /*****************************************************************************/
 /* destroy */
 void
-hashtable_destroy(hashtable_t *h, int free_values)
+hashtable_destroy(hashtable_t *h)
 {
+	if (hashtable_count(h))
+		warn("Destroying a non-empty hashtable, clean up after yourself!\n");
+
     size_t i;
     hash_entry_t *e, *f;
     hash_entry_t **table = h->table;
-    if (free_values)
-    {
-        for (i = 0; i < h->tablelength; i++)
-        {
-            e = table[i];
-            while (NULL != e)
-            { f = e; e = e->next; freekey(f->k); kfree(f->v); kfree(f); }
-        }
-    }
-    else
-    {
-        for (i = 0; i < h->tablelength; i++)
-        {
-            e = table[i];
-            while (NULL != e)
-            { f = e; e = e->next; freekey(f->k); kfree(f); }
-        }
-    }
+	for (i = 0; i < h->tablelength; i++) {
+		e = table[i];
+		while (NULL != e) {
+			f = e;
+			e = e->next;
+			kmem_cache_free(hentry_cache, f);
+		}
+	}
     kfree(h->table);
     kfree(h);
 }
 
+/*****************************************************************************/
+/* hashtable_iterator    - iterator constructor
+ *
+ * If the htable isn't empty, e and index will refer to the first entry. */
+
+hashtable_itr_t *
+hashtable_iterator(hashtable_t *h)
+{
+    size_t i, tablelength;
+    hashtable_itr_t *itr = (hashtable_itr_t *)
+        kmalloc(sizeof(hashtable_itr_t), 0);
+    if (NULL == itr) return NULL;
+    itr->h = h;
+    itr->e = NULL;
+    itr->parent = NULL;
+    tablelength = h->tablelength;
+    itr->index = tablelength;
+    if (0 == h->entrycount) return itr;
+
+    for (i = 0; i < tablelength; i++)
+    {
+        if (NULL != h->table[i])
+        {
+            itr->e = h->table[i];
+            itr->index = i;
+            break;
+        }
+    }
+    return itr;
+}
+
+/*****************************************************************************/
+/* key      - return the key of the (key,value) pair at the current position */
+/* value    - return the value of the (key,value) pair at the current position */
+
+void *
+hashtable_iterator_key(hashtable_itr_t *i)
+{ return i->e->k; }
+
+void *
+hashtable_iterator_value(hashtable_itr_t *i)
+{ return i->e->v; }
+
+/*****************************************************************************/
+/* advance - advance the iterator to the next element
+ *           returns zero if advanced to end of table */
+
+ssize_t
+hashtable_iterator_advance(hashtable_itr_t *itr)
+{
+    size_t j,tablelength;
+    hash_entry_t **table;
+    hash_entry_t *next;
+    if (NULL == itr->e) return 0; /* stupidity check */
+
+    next = itr->e->next;
+    if (NULL != next)
+    {
+        itr->parent = itr->e;
+        itr->e = next;
+        return -1;
+    }
+    tablelength = itr->h->tablelength;
+    itr->parent = NULL;
+    if (tablelength <= (j = ++(itr->index)))
+    {
+        itr->e = NULL;
+        return 0;
+    }
+    table = itr->h->table;
+    while (NULL == (next = table[j]))
+    {
+        if (++j >= tablelength)
+        {
+            itr->index = tablelength;
+            itr->e = NULL;
+            return 0;
+        }
+    }
+    itr->index = j;
+    itr->e = next;
+    return -1;
+}
+
+/*****************************************************************************/
+/* remove - remove the entry at the current iterator position
+ *          and advance the iterator, if there is a successive
+ *          element.
+ *          If you want the value, read it before you remove:
+ *          beware memory leaks if you don't.
+ *          Returns zero if end of iteration. */
+
+ssize_t
+hashtable_iterator_remove(hashtable_itr_t *itr)
+{
+    hash_entry_t *remember_e, *remember_parent;
+    ssize_t ret;
+
+    /* Do the removal */
+    if (NULL == (itr->parent))
+    {
+        /* element is head of a chain */
+        itr->h->table[itr->index] = itr->e->next;
+    } else {
+        /* element is mid-chain */
+        itr->parent->next = itr->e->next;
+    }
+    /* itr->e is now outside the hashtable */
+    remember_e = itr->e;
+    itr->h->entrycount--;
+
+    /* Advance the iterator, correcting the parent */
+    remember_parent = itr->parent;
+    ret = hashtable_iterator_advance(itr);
+    if (itr->parent == remember_e) { itr->parent = remember_parent; }
+	kmem_cache_free(hentry_cache, remember_e);
+    return ret;
+}
+
+/*****************************************************************************/
+ssize_t /* returns zero if not found */
+hashtable_iterator_search(hashtable_itr_t *itr,
+                          hashtable_t *h, void *k)
+{
+    hash_entry_t *e, *parent;
+    size_t hashvalue, index;
+
+    hashvalue = hash(h,k);
+    index = indexFor(h->tablelength,hashvalue);
+
+    e = h->table[index];
+    parent = NULL;
+    while (NULL != e)
+    {
+        /* Check hash value to short circuit heavier comparison */
+        if ((hashvalue == e->h) && (h->eqfn(k, e->k)))
+        {
+            itr->index = index;
+            itr->e = e;
+            itr->parent = parent;
+            itr->h = h;
+            return -1;
+        }
+        parent = e;
+        e = e->next;
+    }
+    return 0;
+}
+
 /*
- * Copyright (c) 2002, Christopher Clark
+ * Copyright (c) 2002, 2004, Christopher Clark
  * All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
