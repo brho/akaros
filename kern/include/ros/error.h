@@ -19,8 +19,8 @@
 #define ENOCACHE			 6		// No memory available
 #define EINVAL				 7		// Invalid arguments
 #define EFAULT				 8		// Segmentation fault
-#define EBADENV				 9		// Bad environment
-#define ENOFREEENV			10		// No free environment
+#define EBADPROC			 9		// Bad process
+#define ENOFREEPID			10		// No free pid
 #define EUNSPECIFIED		11		// Unspecified
 #define EMORON				12		// Moron
 #define NUMERRORS			13		// Total number of error codes
@@ -38,8 +38,8 @@ enum {
 	ENOCACHE,
 	EINVAL,
 	EFAULT,
-	EBADENV,
-	ENOFREEENV,
+	EBADPROC,
+	ENOFREEPID,
 	EUNSPECIFIED,
 	EMORON,
 	NUMERRORS,
@@ -64,8 +64,8 @@ static const char *NTS const (RO error_string)[NUMERRORS] =
 	"No cache available",
 	"Invalid arguments",
 	"Segmentation fault",
-	"Bad environment",
-	"No free environment",
+	"Bad process",
+	"No free pid",
 	"Unspecified",
 	"You are a moron",
 };

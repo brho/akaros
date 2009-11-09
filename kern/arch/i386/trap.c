@@ -341,7 +341,7 @@ page_fault_handler(trapframe_t *tf)
 
 	// Destroy the environment that caused the fault.
 	cprintf("[%08x] user fault va %08x ip %08x from core %d\n",
-		current->env_id, fault_va, tf->tf_eip, core_id());
+		current->pid, fault_va, tf->tf_eip, core_id());
 	print_trapframe(tf);
 	proc_destroy(current);
 }

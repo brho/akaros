@@ -90,7 +90,7 @@ static ssize_t sys_run_binary(env_t* e, void *DANGEROUS binary_buf,
 		return -ENOMEM;
 	memcpy(new_binary, checked_binary_buf, len);
 
-	env_t* env = env_create(new_binary, len);
+	env_t* env = proc_create(new_binary, len);
 	kfree(new_binary);
 	__proc_set_state(env, PROC_RUNNABLE_S);
 	schedule_proc(env);
@@ -176,7 +176,7 @@ static ssize_t sys_eth_read(env_t* e, char *DANGEROUS buf, size_t len)
 //
 
 static ssize_t sys_shared_page_alloc(env_t* p1,
-                                     void**DANGEROUS _addr, envid_t p2_id,
+                                     void**DANGEROUS _addr, pid_t p2_id,
                                      int p1_flags, int p2_flags
                                     )
 {
@@ -186,7 +186,7 @@ static ssize_t sys_shared_page_alloc(env_t* p1,
 	void * COUNT(1) * COUNT(1) addr = user_mem_assert(p1, _addr, sizeof(void *),
                                                       PTE_USER_RW);
 	page_t* page;
-	env_t* p2 = &(envs[ENVX(p2_id)]);
+	env_t* p2 = pid2proc(p2_id);
 	error_t e = page_alloc(&page);
 
 	if(e < 0) return e;
@@ -206,7 +206,7 @@ static ssize_t sys_shared_page_alloc(env_t* p1,
 	return ESUCCESS;
 }
 
-static void sys_shared_page_free(env_t* p1, void*DANGEROUS addr, envid_t p2)
+static void sys_shared_page_free(env_t* p1, void*DANGEROUS addr, pid_t p2)
 {
 }
 
@@ -224,8 +224,8 @@ static void sys_cache_invalidate(void)
 // address space.  It's just #defined to be some random 4MB chunk (which ought
 // to be boot_alloced or something).  Meant to grab exclusive access to cache
 // lines, to simulate doing something useful.
-static void sys_cache_buster(env_t* e, uint32_t num_writes, uint32_t num_pages,
-                             uint32_t flags)
+static void sys_cache_buster(struct proc *p, uint32_t num_writes,
+                             uint32_t num_pages, uint32_t flags)
 { TRUSTEDBLOCK /* zra: this is not really part of the kernel */
 	#define BUSTER_ADDR		0xd0000000  // around 512 MB deep
 	#define MAX_WRITES		1048576*8
@@ -263,7 +263,7 @@ static void sys_cache_buster(env_t* e, uint32_t num_writes, uint32_t num_pages,
 		spin_lock(&buster_lock);
 		for (int i = 0; i < MIN(num_pages, MAX_PAGES); i++) {
 			page_alloc(&a_page[i]);
-			page_insert(e->env_pgdir, a_page[i], (void*)INSERT_ADDR + PGSIZE*i,
+			page_insert(p->env_pgdir, a_page[i], (void*)INSERT_ADDR + PGSIZE*i,
 			            PTE_USER_RW);
 		}
 		spin_unlock(&buster_lock);
@@ -279,7 +279,7 @@ static void sys_cache_buster(env_t* e, uint32_t num_writes, uint32_t num_pages,
 	if (num_pages) {
 		spin_lock(&buster_lock);
 		for (int i = 0; i < MIN(num_pages, MAX_PAGES); i++) {
-			page_remove(e->env_pgdir, (void*)(INSERT_ADDR + PGSIZE * i));
+			page_remove(p->env_pgdir, (void*)(INSERT_ADDR + PGSIZE * i));
 			page_decref(a_page[i]);
 		}
 		spin_unlock(&buster_lock);
@@ -300,7 +300,6 @@ static ssize_t sys_cputs(env_t* e, const char *DANGEROUS s, size_t len)
 {
 	// Check that the user has permission to read memory [s, s+len).
 	// Destroy the environment if not.
-	pte_t* p = pgdir_walk(e->env_pgdir,s,0);
 	char *COUNT(len) _s = user_mem_assert(e, s, len, PTE_USER_RO);
 
 	// Print the string supplied by the user.
@@ -322,37 +321,37 @@ static uint16_t sys_cgetc(env_t* e)
 	return c;
 }
 
-// Returns the current environment's envid.
-static envid_t sys_getenvid(env_t* e)
+/* Returns the calling process's pid */
+static pid_t sys_getpid(struct proc *p)
 {
-	return e->env_id;
+	return p->pid;
 }
 
-// Returns the id of the cpu this syscall is executed on.
-static envid_t sys_getcpuid(void)
+/* Returns the id of the cpu this syscall is executed on. */
+static uint32_t sys_getcpuid(void)
 {
 	return core_id();
 }
 
-// TODO FIX Me!!!! for processes
-// Destroy a given environment (possibly the currently running environment).
-//
-// Returns 0 on success, < 0 on error.  Errors are:
-//	-EBADENV if environment envid doesn't currently exist,
-//		or the caller doesn't have permission to change envid.
-static error_t sys_env_destroy(env_t* e, envid_t envid)
+/* Destroy proc pid.  If this is called by the dying process, it will never
+ * return.  o/w it will return 0 on success, or an error.  Errors include:
+ * - EBADPROC: if there is no such process with pid
+ * - EPERM: if caller does not control pid */
+static error_t sys_proc_destroy(struct proc *p, pid_t pid)
 {
-	int r;
-	env_t *env_to_die;
+	error_t r;
+	struct proc *p_to_die = pid2proc(pid);
 
-	if ((r = envid2env(envid, &env_to_die, 1)) < 0)
-		return r;
-	if (env_to_die == e)
-		printk("[%08x] exiting gracefully\n", e->env_id);
+	if (!p_to_die)
+		return -EBADPROC;
+	if (!proc_controls(p, p_to_die))
+		return -EPERM;
+	if (p_to_die == p)
+		printk("[PID %d] proc exiting gracefully\n", p->pid);
 	else
 		panic("Destroying other processes is not supported yet.");
-		//printk("[%08x] destroying %08x\n", e->env_id, env_to_die->env_id);
-	proc_destroy(env_to_die);
+		//printk("[%d] destroying proc %d\n", p->pid, p_to_die->pid);
+	proc_destroy(p_to_die);
 	return ESUCCESS;
 }
 
@@ -386,13 +385,13 @@ static int sys_proc_create(struct proc *p, const char *DANGEROUS path)
 	if (kfs_inode < 0)
 		return -EINVAL;
 	struct proc *new_p = kfs_proc_create(kfs_inode);
-	return new_p->env_id; // TODO replace this with a real proc_id
+	return new_p->pid;
 }
 
-/* Makes process PID runnable.  Consider moving the functionality to env.c */
+/* Makes process PID runnable.  Consider moving the functionality to process.c */
 static error_t sys_proc_run(struct proc *p, unsigned pid)
 {
-	struct proc *target = get_proc(pid);
+	struct proc *target = pid2proc(pid);
 	error_t retval = 0;
 	spin_lock_irqsave(&p->proc_lock); // note we can get interrupted here. it's not bad.
 	// make sure we have access and it's in the right state to be activated
@@ -430,7 +429,7 @@ intreg_t syscall(struct proc *p, uintreg_t syscallno, uintreg_t a1,
 	// used if we need more args, like in mmap
 	int32_t _a4, _a5, _a6, *COUNT(3) args;
 
-	assert(p); // should always have an env for every syscall
+	assert(p); // should always have a process for every syscall
 	//printk("Running syscall: %d\n", syscallno);
 	if (INVALID_SYSCALL(syscallno))
 		return -EINVAL;
@@ -458,9 +457,9 @@ intreg_t syscall(struct proc *p, uintreg_t syscallno, uintreg_t a1,
 		case SYS_getcpuid:
 			return sys_getcpuid();
 		case SYS_getpid:
-			return sys_getenvid(p);
+			return sys_getpid(p);
 		case SYS_proc_destroy:
-			return sys_env_destroy(p, (envid_t)a1);
+			return sys_proc_destroy(p, (pid_t)a1);
 		case SYS_yield:
 			proc_yield(p);
 			return ESUCCESS;
@@ -505,25 +504,27 @@ intreg_t syscall(struct proc *p, uintreg_t syscallno, uintreg_t a1,
 
 		default:
 			// or just return -EINVAL
-			panic("Invalid syscall number %d for env %x!", syscallno, *p);
+			panic("Invalid syscall number %d for proc %x!", syscallno, *p);
 	}
 	return 0xdeadbeef;
 }
 
-intreg_t syscall_async(env_t* e, syscall_req_t *call)
+intreg_t syscall_async(struct proc *p, syscall_req_t *call)
 {
-	return syscall(e, call->num, call->args[0], call->args[1],
+	return syscall(p, call->num, call->args[0], call->args[1],
 	               call->args[2], call->args[3], call->args[4]);
 }
 
-intreg_t process_generic_syscalls(env_t* e, size_t max)
+intreg_t process_generic_syscalls(struct proc *p, size_t max)
 {
 	size_t count = 0;
-	syscall_back_ring_t* sysbr = &e->syscallbackring;
+	syscall_back_ring_t* sysbr = &p->syscallbackring;
 
-	// make sure the env is still alive.
-	// incref will return ESUCCESS on success.
-	if (proc_incref(e))
+	/* make sure the proc is still alive, and keep it from dying from under us
+	 * incref will return ESUCCESS on success.  This might need some thought
+	 * regarding when the incref should have happened (like by whoever passed us
+	 * the *p). */
+	if (proc_incref(p))
 		return -EFAIL;
 
 	// max is the most we'll process.  max = 0 means do as many as possible
@@ -533,7 +534,7 @@ intreg_t process_generic_syscalls(env_t* e, size_t max)
 			// only switch cr3 for the very first request for this queue
 			// need to switch to the right context, so we can handle the user pointer
 			// that points to a data payload of the syscall
-			lcr3(e->env_cr3);
+			lcr3(p->env_cr3);
 		}
 		count++;
 		//printk("DEBUG PRE: sring->req_prod: %d, sring->rsp_prod: %d\n",
@@ -543,7 +544,7 @@ intreg_t process_generic_syscalls(env_t* e, size_t max)
 		syscall_rsp_t rsp;
 		// this assumes we get our answer immediately for the syscall.
 		syscall_req_t* req = RING_GET_REQUEST(sysbr, ++(sysbr->req_cons));
-		rsp.retval = syscall_async(e, req);
+		rsp.retval = syscall_async(p, req);
 		// write response into the slot it came from
 		memcpy(req, &rsp, sizeof(syscall_rsp_t));
 		// update our counter for what we've produced (assumes we went in order!)
@@ -554,6 +555,6 @@ intreg_t process_generic_syscalls(env_t* e, size_t max)
 	}
 	// load sane page tables (and don't rely on decref to do it for you).
 	lcr3(boot_cr3);
-	proc_decref(e);
+	proc_decref(p);
 	return (intreg_t)count;
 }

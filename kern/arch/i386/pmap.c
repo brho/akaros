@@ -361,16 +361,6 @@ vm_init(void)
 	boot_map_segment(pgdir, (uintptr_t)LAPIC_BASE, PGSIZE, LAPIC_BASE,
 	                 PTE_PCD | PTE_PWT | PTE_W | PTE_G);
 
-	//////////////////////////////////////////////////////////////////////
-	// Make 'envs' point to an array of size 'NENV' of 'env_t'.
-	// No longer mapping ENVS into the address space
-	
-	// round up to the nearest page
-	size_t env_array_size = ROUNDUP(NENV*sizeof(env_t), PGSIZE);
-	env_t * tmpenv = (env_t *)boot_calloc(env_array_size, 1, PGSIZE);
-	envs = SINIT(tmpenv);
-	//memset(envs, 0, env_array_size);
-
 	// Check that the initial page directory has been set up correctly.
 	check_boot_pgdir(pse);
 

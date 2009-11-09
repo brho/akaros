@@ -9,6 +9,7 @@
 #endif
 
 #include <arch/arch.h>
+#include <arch/bitmask.h>
 #include <process.h>
 #include <atomic.h>
 #include <smp.h>
@@ -19,13 +20,14 @@
 #include <stdio.h>
 #include <assert.h>
 #include <timing.h>
+#include <hashtable.h>
+#include <slab.h>
 #include <sys/queue.h>
 
 /* Process Lists */
-struct proc_list proc_freelist = TAILQ_HEAD_INITIALIZER(proc_freelist);
-spinlock_t freelist_lock = SPINLOCK_INITIALIZER;
 struct proc_list proc_runnablelist = TAILQ_HEAD_INITIALIZER(proc_runnablelist);
 spinlock_t runnablelist_lock = SPINLOCK_INITIALIZER;
+struct kmem_cache *proc_cache;
 
 /* Tracks which cores are idle, similar to the vcoremap.  Each value is the
  * physical coreid of an unallocated core. */
@@ -43,11 +45,49 @@ static void put_idle_core(uint32_t coreid)
 	spin_unlock(&idle_lock);
 }
 
-/*
- * While this could be done with just an assignment, this gives us the
+/* PID management. */
+#define PID_MAX 32767 // goes from 0 to 32767, with 0 reserved
+static DECL_BITMASK(pid_bmask, PID_MAX + 1);
+spinlock_t pid_bmask_lock = SPINLOCK_INITIALIZER;
+struct hashtable *pid_hash;
+spinlock_t pid_hash_lock; // initialized in proc_init
+
+/* Finds the next free entry (zero) entry in the pid_bitmask.  Set means busy.
+ * PID 0 is reserved (in proc_init).  A return value of 0 is a failure (and
+ * you'll also see a warning, for now).  Consider doing this with atomics. */
+static pid_t get_free_pid(void)
+{
+	static pid_t next_free_pid = 1;
+	pid_t my_pid = 0;
+
+	spin_lock(&pid_bmask_lock);
+	// atomically (can lock for now, then change to atomic_and_return
+	FOR_CIRC_BUFFER(next_free_pid, PID_MAX + 1, i) {
+		// always points to the next to test
+		next_free_pid = (next_free_pid + 1) % (PID_MAX + 1);
+		if (!GET_BITMASK_BIT(pid_bmask, i)) {
+			SET_BITMASK_BIT(pid_bmask, i);
+			my_pid = i;
+			break;
+		}
+	}
+	spin_unlock(&pid_bmask_lock);
+	if (!my_pid)
+		warn("Shazbot!  Unable to find a PID!  You need to deal with this!\n");
+	return my_pid;
+}
+
+/* Return a pid to the pid bitmask */
+static void put_free_pid(pid_t pid)
+{
+	spin_lock(&pid_bmask_lock);
+	CLR_BITMASK_BIT(pid_bmask, pid);
+	spin_unlock(&pid_bmask_lock);
+}
+
+/* While this could be done with just an assignment, this gives us the
  * opportunity to check for bad transitions.  Might compile these out later, so
- * we shouldn't rely on them for sanity checking from userspace.
- */
+ * we shouldn't rely on them for sanity checking from userspace.  */
 int __proc_set_state(struct proc *p, uint32_t state)
 {
 	uint32_t curstate = p->state;
@@ -108,18 +148,187 @@ int __proc_set_state(struct proc *p, uint32_t state)
 	return 0;
 }
 
-/* Change this when we aren't using an array */
-struct proc *get_proc(unsigned pid)
+/* Returns a pointer to the proc with the given pid, or 0 if there is none */
+/* TODO: handle refcnting */
+struct proc *pid2proc(pid_t pid)
 {
-	// should have some error checking when we do this for real
-	return &envs[ENVX(pid)];
+	spin_lock(&pid_hash_lock);
+	struct proc *p = hashtable_search(pid_hash, (void*)pid);
+	spin_unlock(&pid_hash_lock);
+	return p;
+}
+
+/* Performs any intialization related to processes, such as create the proc
+ * cache, prep the scheduler, etc.  When this returns, we should be ready to use
+ * any process related function. */
+void proc_init(void)
+{
+	proc_cache = kmem_cache_create("proc", sizeof(struct proc),
+	             MAX(HW_CACHE_ALIGN, __alignof__(struct proc)), 0, 0, 0);
+	/* Init PID mask and hash.  pid 0 is reserved. */
+	SET_BITMASK_BIT(pid_bmask, 0);
+	spinlock_init(&pid_hash_lock);
+	spin_lock(&pid_hash_lock);
+	pid_hash = create_hashtable(100, __generic_hash, __generic_eq);
+	spin_unlock(&pid_hash_lock);
+	schedule_init();
+	/* Init idle cores.  core 0 is not idle, all others are (for now) */
+	spin_lock(&idle_lock);
+	num_idlecores = num_cpus - 1;
+	for (int i = 0; i < num_idlecores; i++)
+		idlecoremap[i] = i + 1;
+	spin_unlock(&idle_lock);
+	atomic_init(&num_envs, 0);
+}
+
+/* Allocates and initializes a process, with the given parent.  Currently
+ * writes the *p into **pp, and returns 0 on success, < 0 for an error.
+ * Errors include:
+ *  - ENOFREEPID if it can't get a PID
+ *  - ENOMEM on memory exhaustion */
+static error_t proc_alloc(struct proc *SAFE*SAFE pp, pid_t parent_id)
+{
+	error_t r;
+	struct proc *p;
+
+	if (!(p = kmem_cache_alloc(proc_cache, 0)))
+		return -ENOMEM;
+
+    { INITSTRUCT(*p)
+
+	/* Initialize the address space */
+	if ((r = env_setup_vm(p)) < 0) {
+		kmem_cache_free(proc_cache, p);
+		return r;
+	}
+
+	/* Get a pid, then store a reference in the pid_hash */
+	if (!(p->pid = get_free_pid())) {
+		kmem_cache_free(proc_cache, p);
+		return -ENOFREEPID;
+	}
+	spin_lock(&pid_hash_lock);
+	hashtable_insert(pid_hash, (void*)p->pid, p);
+	spin_unlock(&pid_hash_lock);
+
+	/* Set the basic status variables. */
+    spinlock_init(&p->proc_lock);
+	p->ppid = parent_id;
+	__proc_set_state(p, PROC_CREATED);
+	p->env_refcnt = 1;
+	p->env_flags = 0;
+	p->env_entry = 0; // cheating.  this really gets set in load_icode
+	p->num_vcores = 0;
+	memset(&p->vcoremap, -1, sizeof(p->vcoremap));
+	memset(&p->resources, 0, sizeof(p->resources));
+	memset(&p->env_ancillary_state, 0, sizeof(p->env_ancillary_state));
+	memset(&p->env_tf, 0, sizeof(p->env_tf));
+	proc_init_trapframe(&p->env_tf);
+
+	/* Initialize the contents of the e->env_procinfo structure */
+	p->env_procinfo->pid = p->pid;
+	/* Initialize the contents of the e->env_procdata structure */
+
+	/* Initialize the generic syscall ring buffer */
+	SHARED_RING_INIT(&p->env_procdata->syscallring);
+	/* Initialize the backend of the syscall ring buffer */
+	BACK_RING_INIT(&p->syscallbackring,
+	               &p->env_procdata->syscallring,
+	               SYSCALLRINGSIZE);
+
+	/* Initialize the generic sysevent ring buffer */
+	SHARED_RING_INIT(&p->env_procdata->syseventring);
+	/* Initialize the frontend of the sysevent ring buffer */
+	FRONT_RING_INIT(&p->syseventfrontring,
+	                &p->env_procdata->syseventring,
+	                SYSEVENTRINGSIZE);
+	*pp = p;
+	atomic_inc(&num_envs);
+
+	printk("[%08x] new process %08x\n", current ? current->pid : 0, p->pid);
+	} // INIT_STRUCT
+	return 0;
+}
+
+/* Creates a process from the specified binary, which is of size size.
+ * Currently, the binary must be a contiguous block of memory, which needs to
+ * change.  On any failure, it just panics, which ought to be sorted. */
+struct proc *proc_create(uint8_t *binary, size_t size)
+{
+	struct proc *p;
+	error_t r;
+	pid_t curid;
+
+	curid = (current ? current->pid : 0);
+	if ((r = proc_alloc(&p, curid)) < 0)
+		panic("proc_create: %e", r); // one of 3 quaint usages of %e.
+	load_icode(p, binary, size);
+	return p;
+}
+
+/* This is called by proc_decref, once the last reference to the process is
+ * gone.  Don't call this otherwise (it will panic).  It will clean up the
+ * address space and deallocate any other used memory. */
+static void __proc_free(struct proc *p)
+{
+	physaddr_t pa;
+
+	printk("[PID %d] freeing proc: %d\n", current ? current->pid : 0, p->pid);
+	// All parts of the kernel should have decref'd before __proc_free is called
+	assert(p->env_refcnt == 0);
+
+	// Flush all mapped pages in the user portion of the address space
+	env_user_mem_free(p);
+
+	// free the page directory
+	pa = p->env_cr3;
+	p->env_pgdir = 0;
+	p->env_cr3 = 0;
+	page_decref(pa2page(pa));
+
+	/* between when someone grabs the *proc (from pid), til they use it, it
+	 * could be killed and/or deallocated.  lots of our protections come from
+	 * the state, which needs to be dereferenced, and isn't protected from this.
+	 *
+	 * (TODO) rule: when you get a *proc, you up the refcnt.  need to down it
+	 * when you are done.  if you fail, someone else is deallocating it.  you
+	 * shouldn't have dereferenced it (it may be 'gone' already), so there is a
+	 * slight race, but if you do this check quickly, it's *probably* not an
+	 * issue.  so do it with interrupts off.  pid2proc will handle that, but you
+	 * need to decref still
+	 * - getting the pointer from current is a refcnt'd source.  when current is
+	 *   set, the refcnt is up anyway (for protecting the page tables), so just
+	 *   use it normally.
+	 * - if you pass the pointer (via amsg, etc), the code that uses it should
+	 *   up its refcnt or otherwise deal with the issue (which startcore should
+	 *   do), though this might need to change. (freed and realloc before the
+	 *   message arrives).  perhaps up the refcnt in advance, and down it if it
+	 *   was unnecessary (TODO).
+	 * - if the pointer is stored somewhere (like in an IO continuation), the
+	 *   refcnt needs to stay up.
+	 * - can check for DYING too, though some situations may want to grab a
+	 *   dying proc's *
+	 * - i am not concerned with pointing to a new proc with that same PID, the
+	 *   concern is with referencing kernel memory.
+	 * Might move this to proc_destroy.  depends if we want parents to wait().
+	 */
+	/* Remove self from the pid hash, return PID.  Note the reversed order. */
+	spin_lock(&pid_hash_lock);
+	if (!hashtable_remove(pid_hash, (void*)p->pid))
+		panic("Proc not in the pid table in %s", __FUNCTION__);
+	spin_unlock(&pid_hash_lock);
+	put_free_pid(p->pid);
+	atomic_dec(&num_envs);
+
+	/* Dealloc the struct proc */
+	kmem_cache_free(proc_cache, p);
 }
 
 /* Whether or not actor can control target.  Note we currently don't need
- * locking for this. */
+ * locking for this. TODO: think about that, esp wrt proc's dying. */
 bool proc_controls(struct proc *actor, struct proc *target)
 {
-	return target->env_parent_id == actor->env_id;
+	return ((actor == target) || (target->ppid == actor->pid));
 }
 
 /* Dispatches a process to run, either on the current core in the case of a
@@ -138,7 +347,7 @@ void proc_run(struct proc *p)
 	switch (p->state) {
 		case (PROC_DYING):
 			spin_unlock_irqsave(&p->proc_lock);
-			printk("Process %d not starting due to async death\n", p->env_id);
+			printk("Process %d not starting due to async death\n", p->pid);
 			// There should be no core cleanup to do (like decref).
 			assert(current != p);
 			// if we're a worker core, smp_idle, o/w return
@@ -370,14 +579,10 @@ void proc_destroy(struct proc *p)
 			                     (void *SNT)0);
 			break;
 		default:
-			// TODO: getting here if it's already dead and free (ENV_FREE).
-			// Need to sort reusing process structures and having pointers to
-			// them floating around the system.
 			panic("Weird state(0x%08x) in proc_destroy", p->state);
 	}
 	__proc_set_state(p, PROC_DYING);
 
-	atomic_dec(&num_envs);
 	/* TODO: (REF) dirty hack.  decref currently uses a lock, but needs to use
 	 * CAS instead (another lock would be slightly less ghetto).  but we need to
 	 * decref before releasing the lock, since that could enable interrupts,
@@ -393,7 +598,7 @@ void proc_destroy(struct proc *p)
 	// coupled with the refcnt-- above, from decref.  if this happened,
 	// proc_destroy was called "remotely", and with no one else refcnting
 	if (!refcnt)
-		env_free(p);
+		__proc_free(p);
 
 	/* if our core is part of process p, then check/wait for the death IPI. */
 	check_for_local_death(p);
@@ -690,7 +895,7 @@ error_t proc_incref(struct proc *p)
 	if (p->env_refcnt)
 		p->env_refcnt++;
 	else
-		retval = -EBADENV;
+		retval = -EBADPROC;
 	spin_unlock_irqsave(&p->proc_lock);
 	return retval;
 }
@@ -703,7 +908,7 @@ error_t proc_incref(struct proc *p)
  * Be sure to load a different cr3 before calling this!
  *
  * TODO: (REF) change to use CAS.  Note that when we do so, we may be holding
- * the process lock when calling env_free().
+ * the process lock when calling __proc_free().
  */
 void proc_decref(struct proc *p)
 {
@@ -713,7 +918,7 @@ void proc_decref(struct proc *p)
 	spin_unlock_irqsave(&p->proc_lock);
 	// if we hit 0, no one else will increment and we can check outside the lock
 	if (!refcnt)
-		env_free(p);
+		__proc_free(p);
 }
 
 /* Active message handler to start a process's context on this core.  Tightly
@@ -781,23 +986,33 @@ void print_idlecoremap(void)
 	spin_unlock(&idle_lock);
 }
 
+void print_allpids(void)
+{
+	spin_lock(&pid_hash_lock);
+	if (hashtable_count(pid_hash)) {
+		hashtable_itr_t *phtable_i = hashtable_iterator(pid_hash);
+		do {
+			printk("PID: %d\n", hashtable_iterator_key(phtable_i));
+		} while (hashtable_iterator_advance(phtable_i));
+	}
+	spin_unlock(&pid_hash_lock);
+}
+
 void print_proc_info(pid_t pid)
 {
 	int j = 0;
-	struct proc *p = 0;
-	envid2env(pid, &p, 0);
+	struct proc *p = pid2proc(pid);
 	// not concerned with a race on the state...
-	if ((!p) || (p->state == ENV_FREE)) {
+	if (!p) {
 		printk("Bad PID.\n");
 		return;
 	}
 	spinlock_debug(&p->proc_lock);
 	spin_lock_irqsave(&p->proc_lock);
 	printk("struct proc: %p\n", p);
-	printk("PID: %d\n", p->env_id);
-	printk("PPID: %d\n", p->env_parent_id);
+	printk("PID: %d\n", p->pid);
+	printk("PPID: %d\n", p->ppid);
 	printk("State: 0x%08x\n", p->state);
-	printk("Runs: %d\n", p->env_runs);
 	printk("Refcnt: %d\n", p->env_refcnt);
 	printk("Flags: 0x%08x\n", p->env_flags);
 	printk("CR3(phys): 0x%08x\n", p->env_cr3);

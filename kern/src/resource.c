@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include <schedule.h>
+#include <hashtable.h>
 
 /* This deals with a request for more cores.  The request is already stored in
  * the proc's amt_wanted (it is compared to amt_granted). 
@@ -185,17 +186,21 @@ error_t resource_req(struct proc *p, int type, size_t amt_wanted,
 void print_resources(struct proc *p)
 {
 	printk("--------------------\n");
-	printk("PID: %d\n", p->env_id);
+	printk("PID: %d\n", p->pid);
 	printk("--------------------\n");
 	for (int i = 0; i < MAX_NUM_RESOURCES; i++)
 		printk("Res type: %02d, amt wanted: %08d, amt granted: %08d\n", i,
 		       p->resources[i].amt_wanted, p->resources[i].amt_granted);
 }
 
-/* TODO: change this when we get rid of the env array */
 void print_all_resources(void)
 {
-	for (int i = 0; i < NENV; i++)
-		if (envs[i].state != ENV_FREE)
-			print_resources(&envs[i]);
+	spin_lock(&pid_hash_lock);
+	if (hashtable_count(pid_hash)) {
+		hashtable_itr_t *phtable_i = hashtable_iterator(pid_hash);
+		do {
+			print_resources(hashtable_iterator_value(phtable_i));
+		} while (hashtable_iterator_advance(phtable_i));
+	}
+	spin_unlock(&pid_hash_lock);
 }

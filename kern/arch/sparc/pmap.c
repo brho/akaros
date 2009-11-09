@@ -26,10 +26,6 @@ vm_init(void)
 	extern pde_t l1_page_table[NL1ENTRIES];
 	boot_pgdir = l1_page_table;
 	boot_cr3 = PADDR(boot_pgdir);
-
-	size_t env_array_size = ROUNDUP(NENV*sizeof(env_t), PGSIZE);
-	envs = /*(env_t *)*/boot_calloc(env_array_size, 1, PGSIZE);
-	//memset(envs, 0, env_array_size);
 }
 
 error_t

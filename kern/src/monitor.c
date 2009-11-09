@@ -272,7 +272,8 @@ int mon_procinfo(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 {
 	if (argc < 2) {
 		printk("Usage: procinfo OPTION\n");
-		printk("\tidle_cores: show idle core map\n");
+		printk("\tidlecores: show idle core map\n");
+		printk("\tall: show all active pids\n");
 		printk("\trunnable: show proc_runnablelist\n");
 		printk("\tresources: show resources wanted/granted for all procs\n");
 		printk("\tpid NUM: show a lot of info for proc NUM\n");
@@ -280,8 +281,10 @@ int mon_procinfo(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 		printk("\tkill NUM: destroy proc NUM\n");
 		return 1;
 	}
-	if (!strcmp(argv[1], "idle_cores")) {
+	if (!strcmp(argv[1], "idlecores")) {
 		print_idlecoremap();
+	} else if (!strcmp(argv[1], "all")) {
+		print_allpids();
 	} else if (!strcmp(argv[1], "runnable")) {
 		dump_proclist(&proc_runnablelist);
 	} else if (!strcmp(argv[1], "resources")) {
@@ -297,16 +300,22 @@ int mon_procinfo(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 			printk("Give me a pid number.\n");
 			return 1;
 		}
-		struct proc *p;
-		envid2env(strtol(argv[2], 0, 0), &p, 0);
+		struct proc *p = pid2proc(strtol(argv[2], 0, 0));
+		if (!p) {
+			printk("No such proc\n");
+			return 1;
+		}
 		spin_unlock_irqsave(&p->proc_lock);
 	} else if (!strcmp(argv[1], "kill")) {
 		if (argc != 3) {
 			printk("Give me a pid number.\n");
 			return 1;
 		}
-		struct proc *p;
-		envid2env(strtol(argv[2], 0, 0), &p, 0);
+		struct proc *p = pid2proc(strtol(argv[2], 0, 0));
+		if (!p) {
+			printk("No such proc\n");
+			return 1;
+		}
 		proc_destroy(p);
 	} else {
 		printk("Bad option\n");

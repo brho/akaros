@@ -33,16 +33,20 @@ void schedule_init(void)
 void schedule_proc(struct proc *p)
 {
 	spin_lock_irqsave(&runnablelist_lock);
-	printd("Scheduling PID: %d\n", p->env_id);
+	printd("Scheduling PID: %d\n", p->pid);
 	TAILQ_INSERT_TAIL(&proc_runnablelist, p, proc_link);
 	spin_unlock_irqsave(&runnablelist_lock);
 	return;
 }
 
+/* TODO: race here.  it's possible that p was already removed from the
+ * list (by schedule()), while proc_destroy is trying to remove it from the
+ * list.  schedule()'s proc_run() won't actually run it (since it's DYING), but
+ * this code will probably fuck up. */
 void deschedule_proc(struct proc *p)
 {
 	spin_lock_irqsave(&runnablelist_lock);
-	printd("Descheduling PID: %d\n", p->env_id);
+	printd("Descheduling PID: %d\n", p->pid);
 	TAILQ_REMOVE(&proc_runnablelist, p, proc_link);
 	spin_unlock_irqsave(&runnablelist_lock);
 	return;
@@ -62,7 +66,7 @@ void schedule(void)
 	if (p) {
 		TAILQ_REMOVE(&proc_runnablelist, p, proc_link);
 		spin_unlock_irqsave(&runnablelist_lock);
-		printd("PID of proc i'm running: %d\n", p->env_id);
+		printd("PID of proc i'm running: %d\n", p->pid);
 		proc_run(p);
 	} else {
 		spin_unlock_irqsave(&runnablelist_lock);
@@ -77,6 +81,6 @@ void dump_proclist(struct proc_list *list)
 {
 	struct proc *p;
 	TAILQ_FOREACH(p, list, proc_link)
-		printk("PID: %d\n", p->env_id);
+		printk("PID: %d\n", p->pid);
 	return;
 }

@@ -10,7 +10,7 @@
 #include <ros/common.h>
 
 typedef struct procinfo {
-	pid_t id;
+	pid_t pid;
 } procinfo_t;
 #define PROCINFO_NUM_PAGES  ((sizeof(procinfo_t)-1)/PGSIZE + 1)	
 

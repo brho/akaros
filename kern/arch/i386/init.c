@@ -22,7 +22,7 @@ void arch_init()
 	// inits to not need multiple cores running.
 	// this returns when all other cores are done and ready to receive IPIs
 	smp_boot();
-	env_init();
+	proc_init();
 
 	/* EXPERIMENTAL NETWORK FUNCTIONALITY
 	 * To enable, define __NETWORK__ in your Makelocal

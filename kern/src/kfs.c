@@ -70,11 +70,11 @@ ssize_t kfs_lookup_path(char* path)
 /*
  * Creates a process from the file pointed to by the KFS inode (index)
  * This should take a real inode or something to point to the real location,
- * and env_create shouldn't assume everything is contiguous
+ * and proc_create shouldn't assume everything is contiguous
  */
 struct proc *kfs_proc_create(int kfs_inode)
 {
 	if (kfs_inode < 0 || kfs_inode >= MAX_KFS_FILES)
 		panic("Invalid kfs_inode.  Check you error codes!");
-	return env_create(kfs[kfs_inode].start, kfs[kfs_inode].size);
+	return proc_create(kfs[kfs_inode].start, kfs[kfs_inode].size);
 }

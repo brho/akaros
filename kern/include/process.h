@@ -39,8 +39,6 @@
 #define PROC_DYING				0x10
 #define PROC_RUNNABLE_M			0x20
 #define PROC_RUNNING_M			0x40
-// TODO don't use this shit for process allocation flagging
-#define ENV_FREE				0x80
 
 #include <env.h>
 
@@ -49,22 +47,26 @@
 
 TAILQ_HEAD(proc_list, proc);		// Declares 'struct proc_list'
 
-extern spinlock_t freelist_lock;
-extern struct proc_list LCKD(&freelist_lock)proc_freelist;
-
 extern spinlock_t runnablelist_lock;
 extern struct proc_list LCKD(&runnablelist_lock) proc_runnablelist;
+
+/* Can use a htable iterator to iterate through all active procs */
+extern struct hashtable *pid_hash;
+extern spinlock_t pid_hash_lock;
 
 /* Idle cores: ones able to be exclusively given to a process (worker cores). */
 extern spinlock_t idle_lock;  // never grab this before a proc_lock
 extern uint32_t LCKD(&idle_lock) (RO idlecoremap)[MAX_NUM_CPUS];
 extern uint32_t LCKD(&idle_lock) num_idlecores;
 
+/* Initialization */
+void proc_init(void);
+
 /* Process management: */
+struct proc *proc_create(uint8_t *COUNT(size) binary, size_t size);
 int __proc_set_state(struct proc *p, uint32_t state) WRITES(p->state);
-struct proc *get_proc(unsigned pid);
+struct proc *pid2proc(pid_t pid);
 bool proc_controls(struct proc *SAFE actor, struct proc *SAFE target);
-/* Transition from RUNNABLE_* to RUNNING_*. */
 void proc_run(struct proc *SAFE p);
 void proc_startcore(struct proc *SAFE p, trapframe_t *SAFE tf)
      __attribute__((noreturn));
@@ -133,6 +135,7 @@ void proc_set_syscall_retval(trapframe_t *SAFE tf, intreg_t value);
 
 /* Degubbing */
 void print_idlecoremap(void);
+void print_allpids(void);
 void print_proc_info(pid_t pid);
 
 #endif // !ROS_KERN_PROCESS_H

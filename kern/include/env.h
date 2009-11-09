@@ -18,28 +18,6 @@
 struct Env;
 typedef struct Env env_t;
 
-// An environment ID 'envid_t' has three parts:
-//
-// +1+---------------21-----------------+--------10--------+
-// |0|          Uniqueifier             |   Environment    |
-// | |                                  |      Index       |
-// +------------------------------------+------------------+
-//                                       \--- ENVX(eid) --/
-//
-// The environment index ENVX(eid) equals the environment's offset in the
-// 'envs[]' array.  The uniqueifier distinguishes environments that were
-// created at different times, but share the same environment index.
-//
-// All real environments are greater than 0 (so the sign bit is zero).
-// envid_ts less than 0 signify errors.  The envid_t == 0 is special, and
-// stands for the current environment.
-
-typedef int32_t envid_t;
-
-#define LOG2NENV		10
-#define NENV			(1 << LOG2NENV)
-#define ENVX(envid)		((envid) & (NENV - 1))
-
 // TODO: clean this up.
 struct Env {
 	TAILQ_ENTRY(Env) proc_link NOINIT;	// Free list link pointers
@@ -48,10 +26,9 @@ struct Env {
 	  __attribute__((aligned (8)));			// for sparc --asw
 	ancillary_state_t env_ancillary_state 	// State saved when descheduled
 	  __attribute__((aligned (8)));			// for sparc --asw
-	envid_t env_id;				// Unique environment identifier
-	envid_t env_parent_id;		// env_id of this env's parent
+	pid_t pid;
+	pid_t ppid;                 // Parent's PID
 	uint32_t state;				// Status of the process
-	uint32_t env_runs;			// Number of times environment has run
 	uint32_t env_refcnt;		// Reference count of kernel contexts using this
 	uint32_t env_flags;
 	uint32_t env_entry;
@@ -85,18 +62,14 @@ struct Env {
 /* Process Flags */
 #define PROC_TRANSITION_TO_M			0x0001
 
-extern env_t *CT(NENV) RO envs;		// All environments
 extern atomic_t num_envs;		// Number of envs
 
-void	env_init(void);
-int		env_alloc(env_t *SAFE*SAFE e, envid_t parent_id);
+int		env_setup_vm(env_t *e);
+void	load_icode(env_t *SAFE e, uint8_t *COUNT(size) binary, size_t size);
 void	env_push_ancillary_state(env_t* e);
 void	env_pop_ancillary_state(env_t* e);
-void	env_free(env_t *SAFE e);
 void	env_user_mem_free(env_t* e);
-env_t*	env_create(uint8_t *COUNT(size) binary, size_t size);
 
-int	envid2env(envid_t envid, env_t **env_store, bool checkperm);
 // The following three functions do not return
 void	env_pop_tf(trapframe_t *tf) __attribute__((noreturn));
 
