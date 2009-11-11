@@ -134,7 +134,7 @@ int pthread_mutex_init(pthread_mutex_t* m, const pthread_mutexattr_t* attr)
 int pthread_mutex_lock(pthread_mutex_t* m)
 {
   while(pthread_mutex_trylock(m))
-    while((volatile size_t*)m->lock);
+    while(*(volatile size_t*)&m->lock);
   return 0;
 }
 
@@ -264,8 +264,7 @@ int pthread_once(pthread_once_t* once_control, void (*init_routine)(void))
 
 int pthread_barrier_init(pthread_barrier_t* b, const pthread_barrierattr_t* a, int count)
 {
-  b->local_sense = (int*)malloc(32*sizeof(int)*count);
-  memset(b->local_sense,0,32*sizeof(int)*count);
+  memset(b->local_sense,0,sizeof(b->local_sense));
 
   b->sense = 0;
   b->nprocs = b->count = count;
@@ -297,6 +296,5 @@ int pthread_barrier_wait(pthread_barrier_t* b)
 
 int pthread_barrier_destroy(pthread_barrier_t* b)
 {
-  free(b->local_sense);
   return 0;
 }

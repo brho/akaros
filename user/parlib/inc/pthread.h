@@ -18,15 +18,6 @@ struct pthread_wqt
 
 typedef struct
 {
-  int* local_sense;
-  volatile int sense;
-  int count;
-  int nprocs;
-  hart_lock_t lock;
-} pthread_barrier_t;
-
-typedef struct
-{
   int type;
 } pthread_mutexattr_t;
 
@@ -35,6 +26,15 @@ typedef struct
   const pthread_mutexattr_t* attr;
   size_t lock;
 } pthread_mutex_t;
+
+typedef struct
+{
+  int local_sense[32*HART_MAX_MAX_HARTS];
+  volatile int sense;
+  int count;
+  int nprocs;
+  hart_lock_t lock;
+} pthread_barrier_t;
 
 typedef struct
 {
