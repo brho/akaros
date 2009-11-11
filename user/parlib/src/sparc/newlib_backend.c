@@ -10,9 +10,6 @@
 #include <debug.h>
 #include <hart.h>
 
-char *__env[1] = { 0 };
-char **environ = __env;
-
 #define IS_CONSOLE(fd) ((uint32_t)(fd) < 3)
 
 /* Return the vcoreid, which is set in entry.S right before calling libmain.
