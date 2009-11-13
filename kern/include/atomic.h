@@ -10,6 +10,7 @@ static inline void
 (SLOCK(0) spin_lock_irqsave)(spinlock_t RACY*SAFE lock);
 static inline void
 (SUNLOCK(0) spin_unlock_irqsave)(spinlock_t RACY*SAFE lock);
+static inline bool spin_lock_irq_enabled(spinlock_t *SAFE lock);
 
 /*********************** Checklist stuff **********************/
 typedef struct checklist_mask {
@@ -69,6 +70,9 @@ void init_barrier(barrier_t*COUNT(1) barrier, uint32_t count);
 void reset_barrier(barrier_t* barrier);
 void waiton_barrier(barrier_t* barrier);
 
+/* Spinlock bit flags */
+#define SPINLOCK_IRQ_EN			0x80000000
+
 // If ints are enabled, disable them and note it in the top bit of the lock
 // There is an assumption about releasing locks in order here...
 static inline void spin_lock_irqsave(spinlock_t *SAFE lock)
@@ -78,18 +82,25 @@ static inline void spin_lock_irqsave(spinlock_t *SAFE lock)
 	disable_irq();
 	spin_lock(lock);
 	if (irq_en)
-		lock->rlock |= 0x80000000;
+		lock->rlock |= SPINLOCK_IRQ_EN;
 }
 
 // if the high bit of the lock is set, then re-enable interrupts
 // (note from asw: you're lucky this works, you little-endian jerks)
 static inline void spin_unlock_irqsave(spinlock_t *SAFE lock)
 {
-	if (lock->rlock & 0x80000000) {
+	if (spin_lock_irq_enabled(lock)) {
 		spin_unlock(lock);
 		enable_irq();
 	} else
 		spin_unlock(lock);
+}
+
+/* Returns whether or not unlocking this lock should enable interrupts or not.
+ * Is meaningless on locks that weren't locked with irqsave. */
+static inline bool spin_lock_irq_enabled(spinlock_t *SAFE lock)
+{
+	return lock->rlock & SPINLOCK_IRQ_EN;
 }
 
 #endif /* !ROS_KERN_ATOMIC_H */

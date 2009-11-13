@@ -583,22 +583,20 @@ void proc_destroy(struct proc *p)
 	}
 	__proc_set_state(p, PROC_DYING);
 
-	/* TODO: (REF) dirty hack.  decref currently uses a lock, but needs to use
-	 * CAS instead (another lock would be slightly less ghetto).  but we need to
-	 * decref before releasing the lock, since that could enable interrupts,
-	 * which would have us receive the DEATH IPI if this was called locally by
-	 * the target process. */
-	//proc_decref(p); // this decref is for the process in general
-	p->env_refcnt--;
-	size_t refcnt = p->env_refcnt; // need to copy this in so it's not reloaded
+	/* Leave interrupts turned off, but unlock.  Store whether or not we should
+	 * reenable interrupts down below.  We're manually doing the unlock_irqsave,
+	 * since we need to make sure we finish this function before turning
+	 * interrupts back on (in case a death/abandon_core comes in). */
+	bool irq_en = spin_lock_irq_enabled(&p->proc_lock);
+	spin_unlock(&p->proc_lock);
 
-	/* After unlocking, we can receive a DEATH IPI and clean up */
-	spin_unlock_irqsave(&p->proc_lock);
-
-	// coupled with the refcnt-- above, from decref.  if this happened,
-	// proc_destroy was called "remotely", and with no one else refcnting
-	if (!refcnt)
-		__proc_free(p);
+	proc_decref(p); // this decref is for the process in general
+	
+	/* Reenable interrupts if we should have from the spin_unlock_irqsave.  We
+	 * should almost always be reenabling.  Once we reenable, we can receive a
+	 * death IPI (if applicable) and never return. */
+	if (irq_en)
+		enable_irq();
 
 	/* if our core is part of process p, then check/wait for the death IPI. */
 	check_for_local_death(p);
