@@ -1,12 +1,18 @@
 #ifndef _ROS_ARCH_HART_H
 #define _ROS_ARCH_HART_H
 
+#define __RAMP__
+double do_fdiv(double,double);
+double do_fsqrt(double);
+double do_recip(double);
+double do_rsqrt(double);
+
 #define HART_ALLOCATE_STACKS
 
-static inline size_t
+static inline int
 __hart_self()
 {
-	size_t id;
+	int id;
 	asm volatile ("mov %%g6,%0" : "=r"(id));
 	return id;
 }

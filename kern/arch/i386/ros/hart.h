@@ -6,11 +6,11 @@
 #include <parlib.h>
 
 // The actual hart_self() function is a global symbol that invokes this routine.
-static inline size_t
+static inline int
 __hart_self()
 {
 	// TODO: use some kind of thread-local storage to speed this up!
-	return (size_t)syscall(SYS_getvcoreid,0,0,0,0,0);
+	return (int)syscall(SYS_getvcoreid,0,0,0,0,0);
 }
 
 static inline void

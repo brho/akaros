@@ -53,7 +53,7 @@ void hart_lock_init(hart_lock_t* lock);
 void hart_lock_unlock(hart_lock_t* lock);
 void hart_lock_lock(hart_lock_t* l);
 
-size_t hart_self();
+int hart_self();
 error_t hart_request(size_t k);
 void hart_yield();
 size_t hart_max_harts();
