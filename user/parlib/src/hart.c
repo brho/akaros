@@ -198,7 +198,7 @@ void hart_barrier_wait(hart_barrier_t* b, size_t pid)
 	localflags->parity = 1-localflags->parity;
 }
 
-size_t
+int
 hart_self()
 {
 	// defined in ros/arch/hart.h

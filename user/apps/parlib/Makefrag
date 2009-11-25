@@ -30,6 +30,7 @@ USER_APPS_PARLIB_LDOBJS    := $(OBJDIR)/$(USER_PARLIB_ARCH_SRC_DIR)/entry.o \
 
 USER_APPS_PARLIB_LDDEPENDS := $(USER_APPS_PARLIB_LDOBJS) \
                               $(OBJDIR)/$(USER_PARLIB_DIR)/libparlib.a \
+                              $(OBJDIR)/$(USER_PARLIB_DIR)/libparlib-pthread.a \
                               $(OBJDIR)/$(USER_PARLIB_DIR)/libivyparlib.a \
                               $(OBJDIR)/$(USER_APPS_PARLIB_DIR)/%.o
 

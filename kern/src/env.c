@@ -95,9 +95,9 @@ env_init(void)
 	schedule_init();
 	// core 0 is not idle, all others are (for now)
 	spin_lock(&idle_lock);
-	num_idlecores = num_cpus - 1;
+	num_idlecores = num_cpus; // hack to use all cores
 	for (i = 0; i < num_idlecores; i++)
-		idlecoremap[i] = i + 1;
+		idlecoremap[i] = i; // hack to use all cores
 	spin_unlock(&idle_lock);
 	atomic_init(&num_envs, 0);
 	TAILQ_INIT(&proc_freelist);
@@ -238,7 +238,7 @@ proc_init_procinfo(struct proc* p)
 	p->env_procinfo->id = (p->env_id & 0x3FF);
 
 	// TODO: maybe do something smarter here
-	p->env_procinfo->max_harts = MAX(1,num_cpus-1);
+	p->env_procinfo->max_harts = MAX(1,num_cpus); // hack to use all cores
 }
 
 // Sets up argc/argv in procinfo.  Returns number of

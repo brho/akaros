@@ -43,7 +43,19 @@ DECL_PROG(parlib_matrix);
 DECL_PROG(parlib_manycore_test);
 DECL_PROG(parlib_pthread_pthread_test);
 DECL_PROG(parlib_pthread_blackscholes);
-DECL_PROG(parlib_fptest);
+
+#ifndef __i386__
+DECL_PROG(usr_blackscholes);
+DECL_PROG(usr_streamcluster);
+DECL_PROG(usr_swaptions);
+DECL_PROG(usr_bodytrack);
+DECL_PROG(usr_fluidanimate);
+DECL_PROG(usr_x264);
+DECL_PROG(usr_synthetic_procobv_cacheobv_offbwobv);
+DECL_PROG(usr_synthetic_procplus_cacheplus_offbwplus);
+DECL_PROG(usr_cpptest);
+DECL_PROG(usr_condtest);
+#endif
 
 struct kfs_entry kfs[MAX_KFS_FILES] = {
 	KFS_ENTRY(roslib_proctests)
@@ -61,7 +73,18 @@ struct kfs_entry kfs[MAX_KFS_FILES] = {
 	KFS_ENTRY(parlib_manycore_test)
 	KFS_ENTRY(parlib_pthread_pthread_test)
 	KFS_ENTRY(parlib_pthread_blackscholes)
-	KFS_ENTRY(parlib_fptest)
+#ifndef __i386__
+	KFS_ENTRY(usr_blackscholes)
+	KFS_ENTRY(usr_streamcluster)
+	KFS_ENTRY(usr_swaptions)
+	KFS_ENTRY(usr_bodytrack)
+	KFS_ENTRY(usr_fluidanimate)
+	KFS_ENTRY(usr_x264)
+	KFS_ENTRY(usr_synthetic_procobv_cacheobv_offbwobv)
+	KFS_ENTRY(usr_synthetic_procplus_cacheplus_offbwplus)
+	KFS_ENTRY(usr_cpptest)
+	KFS_ENTRY(usr_condtest)
+#endif
 };
 
 ssize_t kfs_lookup_path(char* path)

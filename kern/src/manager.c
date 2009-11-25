@@ -10,6 +10,7 @@
 
 #include <ros/common.h>
 #include <smp.h>
+#include <arch/init.h>
 
 #include <assert.h>
 #include <manager.h>
@@ -21,6 +22,8 @@
 #include <kfs.h>
 #include <stdio.h>
 #include <timing.h>
+#include <colored_caches.h>
+#include <string.h>
 
 /*
  * Currently, if you leave this function by way of proc_run (process_workqueue
@@ -196,6 +199,8 @@ void manager_klueska()
 	panic("DON'T PANIC");
 }
 
+#ifdef __sparc_v8__
+
 static char*
 itoa(int num, char* buf0, size_t base)
 {
@@ -227,50 +232,124 @@ itoa(int num, char* buf0, size_t base)
 	return buf0;
 }
 
+void gsf_set_frame_cycles(int cycles)
+{
+	store_alternate(26*4,2,cycles);
+}
+
+void gsf_set_partition_credits(int partition, int credits)
+{
+	store_alternate((32+partition)*4,2,credits);
+}
+
+void gsf_set_core_partition(int core, int partition)
+{
+	store_alternate((64+core)*4,2,partition);
+}
+
+#endif
+
 void manager_waterman()
 {
-	static struct proc *envs[256];
-	static uint8_t progress = 0;
-	char buf0[32],buf1[32];
+#ifdef __sparc_v8__
 
-	#define RUN_APP(name,nargs,args...) \
-		do { \
-			envs[progress-1] = kfs_proc_create(kfs_lookup_path(name)); \
-			proc_set_state(envs[progress-1], PROC_RUNNABLE_S); \
-			if(nargs) proc_init_argc_argv(envs[progress-1],nargs,##args); \
-			proc_run(envs[progress-1]); \
-		} while(0)
-	
+        static uint8_t progress = 0;
+	if(progress > 0)
+		goto run_some_apps;	
 
-	switch(progress++)
+	#define MAX_APPS 2
+	struct app
 	{
-		case 0:
-			RUN_APP("parlib_draw_nanwan_standalone",0);
-			break;
-		case 1:
-			RUN_APP("parlib_manycore_test",0);
-			break;
-		case 2:
-			RUN_APP("parlib_draw_nanwan_standalone",0);
-			break;
-		case 3:
-			RUN_APP("parlib_pthread_pthread_test",0);
-			break;
-		case 4:
-			RUN_APP("parlib_pthread_blackscholes",3,"blackscholes",itoa(num_cpus>1?num_cpus-1:1,buf0,10),itoa(256,buf1,10));
-			break;
+		int threads;
+		int colors;
+		int credits;
+		int argc;
+		char** argv;
+	};
 
-		//case 5:
-		//	//while(*(volatile uint32_t*)&envs[4]->state != ENV_FREE);
-		//	//reboot();
-		//	break;
+	static struct app apps[MAX_APPS];
+	static int napps = 0;
 
-		case 5:
-			RUN_APP("parlib_matrix",0);
-			break;
+	// arg format:
+	// #apps [#threads #colors #credits name args] - [#threads ...] - ...
+	assert(argc > 0);
+	napps = atoi(argv[0]);
+	assert(napps <= MAX_APPS);
+	argc--; argv++;
+	for(int a = 0; a < napps; a++)
+	{
+		assert(argc >= 4);
+		apps[a].threads = atoi(argv[0]);
+		apps[a].colors = atoi(argv[1]);
+		apps[a].credits = atoi(argv[2]);
+		argc -= 3; argv += 3;
+
+		apps[a].argc = 0;
+		apps[a].argv = argv;
+		while(argc)
+		{
+			argc--;
+			if(strcmp(*argv++,"-") != 0)
+				apps[a].argc++;
+			else
+				break;
+		}
+
+		printk("app %d: %d threads, %d colors, %d credits\ncommand line: ",a,apps[a].threads,apps[a].colors,apps[a].credits);
+		for(int i = 0; i < apps[a].argc; i++)
+			printk("%s ",apps[a].argv[i]);
+		printk("\n");
 	}
 
-	schedule();
+	// DRAM can process requests every 40 cycles.
+	// In a 480-cycle window, this gives us 12 total credits.
+	gsf_set_frame_cycles(482);
+	for(int a = 0, cores_used = 0; a < napps; a++)
+	{
+		gsf_set_partition_credits(a,apps[a].credits);
+		for(int i = 0; i < apps[a].threads; i++, cores_used++)
+			gsf_set_core_partition(num_cpus-cores_used-1,a);
+	}
 
-	panic("DON'T PANIC");
+run_some_apps:
+	;
+
+	static struct proc *envs[MAX_APPS];
+	int apps_running = napps;
+	int envs_free[MAX_APPS] = {0};
+	if(progress == napps)
+	{
+		while(apps_running)
+		{
+			for(int i = 0; i < napps; i++)
+			{
+				if(*(volatile uint32_t*)&envs[i]->state == ENV_FREE && !envs_free[i])
+				{
+					envs_free[i] = 1;
+					apps_running--;
+					printk("Finished application %d at cycle %lld\n", i, read_tsc()); 
+				}
+			}
+		}
+		reboot();
+	}
+	else
+	{
+		envs[progress] = kfs_proc_create(kfs_lookup_path(apps[progress].argv[0]));
+
+		envs[progress]->cache_colors_map = cache_colors_map_alloc();
+		for(int i = 0; i < apps[progress].colors; i++)
+			assert(cache_color_alloc(llc_cache, envs[progress]->cache_colors_map) == ESUCCESS);
+
+		proc_set_state(envs[progress], PROC_RUNNABLE_S);
+
+		if(apps[progress].argc)
+			proc_init_argc_argv(envs[progress],apps[progress].argc,(const char**)apps[progress].argv);
+
+		proc_run(envs[progress++]);
+
+		schedule();
+	}
+#endif
+	panic("professional bomb technician at work.  if you see me running, try to keep up!");
 }

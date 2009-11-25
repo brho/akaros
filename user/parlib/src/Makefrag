@@ -57,6 +57,20 @@ $(OBJDIR)/$(USER_PARLIB_DIR)/libparlib.a: $(USER_PARLIB_SRC_OBJFILES)
 	@mkdir -p $(@D)
 	$(V)$(AR) r $@ $(USER_PARLIB_SRC_OBJFILES) 2>/dev/null
 
+$(OBJDIR)/$(USER_PARLIB_DIR)/libparlib-pthread.a: $(USER_PARLIB_DIR)/newlib/lib/$(TARGET_ARCH)/libc.a $(USER_PARLIB_DIR)/newlib/lib/$(TARGET_ARCH)/libg.a $(USER_PARLIB_DIR)/newlib/lib/$(TARGET_ARCH)/libm.a $(OBJDIR)/$(USER_PARLIB_DIR)/libparlib.a $(OBJDIR)/$(USER_PARLIB_DIR)/libpthread.a
+	@mkdir -p $(OBJDIR)/$(USER_PARLIB_DIR)/tmp
+	@rm -f $(OBJDIR)/$(USER_PARLIB_DIR)/*.o
+	@cp $(USER_PARLIB_DIR)/newlib/lib/$(TARGET_ARCH)/libc.a $(OBJDIR)/$(USER_PARLIB_DIR)/tmp
+	@cp $(USER_PARLIB_DIR)/newlib/lib/$(TARGET_ARCH)/libg.a $(OBJDIR)/$(USER_PARLIB_DIR)/tmp
+	@cp $(USER_PARLIB_DIR)/newlib/lib/$(TARGET_ARCH)/libm.a $(OBJDIR)/$(USER_PARLIB_DIR)/tmp
+	@cd $(OBJDIR)/$(USER_PARLIB_DIR)/tmp; $(AR) x libc.a
+	@cd $(OBJDIR)/$(USER_PARLIB_DIR)/tmp; $(AR) x libg.a
+	@cd $(OBJDIR)/$(USER_PARLIB_DIR)/tmp; $(AR) x libm.a
+	@cd $(OBJDIR)/$(USER_PARLIB_DIR)/tmp; $(AR) x $(GCC_LIB)
+	@echo + ar [PARLIB] $@
+	@mkdir -p $(@D)
+	$(V)$(AR) r $@ $(USER_PARLIB_PTHREAD_OBJFILES) $(USER_PARLIB_SRC_OBJFILES) $(OBJDIR)/$(USER_PARLIB_DIR)/tmp/*.o 2>/dev/null
+
 $(OBJDIR)/$(USER_PARLIB_DIR)/libpthread.a: $(USER_PARLIB_PTHREAD_OBJFILES)
 	@echo + ar [PARLIB] $@
 	@mkdir -p $(@D)

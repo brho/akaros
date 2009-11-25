@@ -13,4 +13,5 @@ USER_PARLIB_ARCH_SRCFILES := $(USER_PARLIB_ARCH_SRC_DIR)/syscall.c \
                              $(USER_PARLIB_ARCH_SRC_DIR)/entry.S \
                              $(USER_PARLIB_ARCH_SRC_DIR)/crtbegin.S \
                              $(USER_PARLIB_ARCH_SRC_DIR)/crtend.S \
+                             $(USER_PARLIB_ARCH_SRC_DIR)/divsqrt.c \
                              $(USER_PARLIB_ARCH_SRC_DIR)/newlib_backend.c

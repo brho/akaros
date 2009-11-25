@@ -103,6 +103,9 @@ void _panic(const char *file, int line, const char *fmt,...)
 	cprintf("\n");
 	va_end(ap);
 
+	#ifndef __i386__
+		reboot();
+	#endif
 dead:
 	/* break into the kernel monitor, if we're core 0 */
 	if (core_id()) {
