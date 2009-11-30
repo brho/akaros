@@ -17,7 +17,7 @@ static inline unsigned long long d2i(double d)
 double do_recip(double b)
 {
   unsigned long long i = d2i(b);
-  unsigned long long i2 = ((2046-((i>>52)&~0x800)) | (i>>52)&0x800) << 52;
+  unsigned long long i2 = ((2046-((i>>52)&~0x800)) | ((i>>52)&0x800)) << 52;
   unsigned long long i3 = (i >> 50) & 3;
   static const double divlut[4] = {1.0,0.8,0.666,0.571};
   double x = i2d(i2)*divlut[i3];
@@ -34,7 +34,7 @@ double do_recip(double b)
 double do_rsqrt(double b)
 {
   unsigned long long i = d2i(b);
-  unsigned long long i2 = ((3069-((i>>52)&~0x800))>>1 | (i>>52)&0x800) << 52;
+  unsigned long long i2 = ((3069-((i>>52)&~0x800))>>1 | ((i>>52)&0x800)) << 52;
   unsigned long long i3 = (i >> 50) & 7;
   double x = i2d(i2);
 
