@@ -15,9 +15,13 @@ USER_APPS_PARLIB_LDFLAGS   := $(USER_LDFLAGS) -static \
 USER_APPS_PARLIB_LDDIRS    := -L$(OBJDIR)/$(USER_PARLIB_DIR) \
                               -L$(USER_PARLIB_NEWLIB_DIR)/lib/$(TARGET_ARCH)
 
-USER_APPS_PARLIB_LDLIBS    := --start-group -lc -lm -lg -lparlib -livyparlib --end-group
+USER_APPS_PARLIB_LDLIBS    := --start-group -lc -lm -lg -lparlib -lpthread \
+                              -livyparlib --end-group
 
-USER_APPS_PARLIB_LDOBJS    := $(OBJDIR)/$(USER_PARLIB_ARCH_SRC_DIR)/entry.o \
+USER_APPS_PARLIB_LDOBJS    := \
+                              $(OBJDIR)/$(USER_PARLIB_ARCH_SRC_DIR)/entry.o \
+                              $(OBJDIR)/$(USER_PARLIB_ARCH_SRC_DIR)/crtbegin.o \
+                              $(OBJDIR)/$(USER_PARLIB_ARCH_SRC_DIR)/crtend.o \
                               $(OBJDIR)/$(USER_APPS_PARLIB_DIR)/readline.o \
                               $(OBJDIR)/$(USER_APPS_PARLIB_DIR)/file_io.o \
                               $(OBJDIR)/$(USER_APPS_PARLIB_DIR)/file_error.o \
@@ -30,7 +34,6 @@ USER_APPS_PARLIB_LDOBJS    := $(OBJDIR)/$(USER_PARLIB_ARCH_SRC_DIR)/entry.o \
 
 USER_APPS_PARLIB_LDDEPENDS := $(USER_APPS_PARLIB_LDOBJS) \
                               $(OBJDIR)/$(USER_PARLIB_DIR)/libparlib.a \
-                              $(OBJDIR)/$(USER_PARLIB_DIR)/libparlib-pthread.a \
                               $(OBJDIR)/$(USER_PARLIB_DIR)/libivyparlib.a \
                               $(OBJDIR)/$(USER_APPS_PARLIB_DIR)/%.o
 
