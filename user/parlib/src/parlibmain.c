@@ -14,7 +14,7 @@ void parlib_dtors()
 	int ndtor = ((unsigned int)(__DTOR_END__ - __DTOR_LIST__))/sizeof(void*);
 
 	// make sure only one thread actually runs the dtors
-	static size_t already_done = 0;
+	static int already_done = 0;
 	if(hart_swap(&already_done,1) == 1)
 		return;
 

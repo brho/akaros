@@ -31,6 +31,7 @@ pthread_t queue_remove(pthread_t* head, pthread_t* tail)
   return node;
 }
 
+#pragma weak hart_entry
 void hart_entry()
 {
   pthread_t node = NULL;

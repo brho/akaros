@@ -55,6 +55,8 @@ void hart_lock_lock(hart_lock_t* l);
 
 // "int" rather than size_t because of a newlib compiling issue
 int hart_self();
+void hart_relax();
+int hart_swap(int* addr, int val);
 
 error_t hart_request(size_t k);
 void hart_yield();

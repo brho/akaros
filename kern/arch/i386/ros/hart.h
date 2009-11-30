@@ -14,13 +14,13 @@ __hart_self()
 }
 
 static inline void
-hart_relax()
+__hart_relax()
 {
 	asm volatile ("pause" : : : "memory");
 }
 
-static inline size_t
-hart_swap(size_t* addr, size_t val)
+static inline int
+__hart_swap(int* addr, int val)
 {
 	asm volatile ("xchg %0, (%2)" : "=r"(val) : "0"(val),"r"(addr) : "memory");
 	return val;

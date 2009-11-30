@@ -24,7 +24,7 @@ typedef struct
 typedef struct
 {
   const pthread_mutexattr_t* attr;
-  size_t lock;
+  int lock;
 } pthread_mutex_t;
 
 typedef struct
@@ -51,7 +51,7 @@ typedef struct pthread_wqt work_queue_t;
 typedef work_queue_t* pthread_t;
 typedef int pthread_attr_t;
 typedef int pthread_barrierattr_t;
-typedef size_t pthread_once_t;
+typedef int pthread_once_t;
 typedef void** pthread_key_t;
 
 #define PTHREAD_ONCE_INIT 0

@@ -15,12 +15,6 @@ static void hart_abort(const char* str)
 	exit(-1);
 }
 
-#pragma weak hart_entry
-void hart_entry()
-{
-	hart_abort("You should write your own damn hart_entry()!\n");
-}
-
 static void _hart_init()
 {
 	static int initialized = 0;
@@ -118,7 +112,7 @@ void hart_lock_init(hart_lock_t* lock)
 
 static inline hart_lock_qnode_t* hart_qnode_swap(hart_lock_qnode_t** addr, hart_lock_qnode_t* val)
 {
-	return (hart_lock_qnode_t*)hart_swap((size_t*)addr,(size_t)val);
+	return (hart_lock_qnode_t*)hart_swap((int*)addr,(int)val);
 }
 
 void hart_lock_lock(hart_lock_t* lock)
@@ -204,3 +198,16 @@ hart_self()
 	// defined in ros/arch/hart.h
 	return __hart_self();
 }
+
+int
+hart_swap(int* addr, int val)
+{
+	return __hart_swap(addr,val);
+}
+
+void
+hart_relax()
+{
+	__hart_relax();
+}
+
