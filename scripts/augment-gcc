@@ -32,6 +32,7 @@ LIBM=`find $1 -iname libm.a`
 LIBG=`find $1 -iname libg.a`
 LIBPARLIB=../obj/user/parlib/libparlib.a
 LIBPTHREAD=../obj/user/parlib/libpthread.a
+rm -rf tmp
 mkdir tmp
 cd tmp
 ar x $LIBPARLIB
@@ -53,4 +54,5 @@ rm -rf tmp
 SYS_INC=`find $1 -iname sys-include`
 rm -rf $SYS_INC/ros
 cp -r user/parlib/inc/ros $SYS_INC
+cp -r user/parlib/inc/sys/* $SYS_INC/sys
 
