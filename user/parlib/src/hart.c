@@ -27,7 +27,12 @@ static void _hart_init()
 	extern void** stack_ptr_array;
 	stack_ptr_array = (void**)malloc(hart_max_harts()*sizeof(void*));
 	memset(stack_ptr_array,0,hart_max_harts()*sizeof(void*));
-	if(stack_ptr_array == NULL)
+
+	extern void** tls_array;
+	tls_array = (void**)malloc(hart_max_harts()*sizeof(void*));
+	memset(tls_array,0,hart_max_harts()*sizeof(void*));
+
+	if(stack_ptr_array == NULL || tls_array == NULL)
 		hart_abort("Harts initialization ran out of memory!\n");
 	#endif
 }
@@ -35,10 +40,11 @@ static void _hart_init()
 error_t hart_request(size_t k)
 {
 	size_t i,j;
-	const int user_stack_size = 1024*1024;
+	const int user_stack_size = 1024*1024, tls_size = 1024*1024;
 
 	#ifdef HART_ALLOCATE_STACKS
 	extern void** stack_ptr_array;
+	extern void** tls_array;
 	#endif
 
 	_hart_init();
@@ -51,18 +57,19 @@ error_t hart_request(size_t k)
 	#ifdef HART_ALLOCATE_STACKS
 	for(i = _hart_current_harts; i < _hart_current_harts+k; i++)
 	{
-		char* stack = (char*)malloc(user_stack_size);
+		char* stack = (char*)malloc(user_stack_size+tls_size);
 		if(stack == NULL)
 		{
 			for(j = _hart_current_harts; j < i; j++)
 			{
 				free(stack_ptr_array[j]);
-				stack_ptr_array[j] = 0;
+				stack_ptr_array[j] = tls_array[i] = 0;
 			}
 			hart_lock_unlock(&_hart_lock);
 			return -ENOMEM;
 		}
 		stack_ptr_array[i] = stack + user_stack_size;
+		tls_array[i] = stack_ptr_array[i]+tls_size;
 	}
 	#endif
 
@@ -78,7 +85,7 @@ error_t hart_request(size_t k)
 	for(i = _hart_current_harts; i < _hart_current_harts+k; i++)
 	{
 		free(stack_ptr_array[i]);
-		stack_ptr_array[i] = 0;
+		stack_ptr_array[i] = tls_array[i] = 0;
 	}
 	#endif
 

@@ -21,7 +21,14 @@
 .align 4
 .globl stack_ptr_array
 stack_ptr_array:
-   .word 0
+	.word 0
+.globl tls_array
+tls_array:
+	.word 0
+
+.align 8
+core0_tls:
+	.skip 1024*1024
 
 
 // Entrypoint - this is where the kernel (or our parent environment)
@@ -32,6 +39,9 @@ _start:
 	tst     %g6
 	bne     notcore0
 	 nop
+
+	// Set up TLS
+	set	core0_tls,%g7
 
 	call	parlibmain
 	 nop
@@ -45,8 +55,13 @@ notcore0:
 	set	stack_ptr_array, %l0
 	ld	[%l0], %l0
 	sll	%g6, 2, %l1
-	ld	[%l0+%l1], %l1
-	sub	%l1, 64, %sp
+	ld	[%l0+%l1], %l0
+	sub	%l0, 64, %sp
+
+	// Set up TLS
+	set	tls_array, %l0
+	ld	[%l0], %l0
+	ld	[%l0+%l1],%g7
 
 	call    hart_entry
 	 nop

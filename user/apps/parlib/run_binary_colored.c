@@ -44,10 +44,11 @@ void run_binary_colored()
 		printf("Error reading from console.\n");
 		return;
 	}
-	char * file_name = malloc(strlen(name) + 8);
-	sprintf(file_name, "./apps/%s", name);
+	char* file_name = name;
+	//char * file_name = malloc(strlen(name) + 8);
+	//sprintf(file_name, "./apps/%s", name);
 	int fd = open(file_name, O_RDONLY, 0);
-	free(file_name);
+	//free(file_name);
 	if(fd < 0) { fd_error(); return; };
 
 	char* colors = readline("\nEnter number of colors: ");

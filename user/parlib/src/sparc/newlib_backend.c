@@ -113,7 +113,8 @@ read(int fd, void* ptr, size_t len)
 int
 open(char* name, int flags, int mode)
 {
-	return syscall(SYS_frontend,RAMP_SYSCALL_open,(int)name,flags,mode,0);
+	int ret = syscall(SYS_frontend,RAMP_SYSCALL_open,(int)name,flags,mode,0);
+	return ret;
 }
 
 int
