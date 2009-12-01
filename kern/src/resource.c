@@ -28,27 +28,37 @@
  * Will return either the number actually granted or an error code.  This will
  * not decrease the actual amount of cores (e.g. from 5 to 2), but it will
  * transition a process from _M to _S (amt_wanted == 0).
+ *
+ * This needs a consumable/edible reference of p, in case it doesn't return.
+ *
+ * TODO: this is a giant function.  need to split it up a bit, probably move the
+ * guts to process.c and have functions to call for the brains.
  */
 ssize_t core_request(struct proc *p)
 {
 	size_t num_granted;
 	ssize_t amt_new;
-	uint32_t corelist[MAX_NUM_CPUS];
+	int32_t corelist[MAX_NUM_CPUS];
 	bool need_to_idle = FALSE;
+	bool self_ipi_pending = FALSE;
 
 	spin_lock_irqsave(&p->proc_lock);
 	/* check to see if this is a full deallocation.  for cores, it's a
-	 * transition from _M to _S */
+	 * transition from _M to _S.  Will be issues with handling this async. */
 	if (!p->resources[RES_CORES].amt_wanted) {
-		assert(p->state == PROC_RUNNING_M);
+		assert(p->state == PROC_RUNNING_M); // TODO: (ACR) async core req
 		// save the context, to be restarted in _S mode
 		p->env_tf = *current_tf;
 		env_push_ancillary_state(p);
 		proc_set_syscall_retval(&p->env_tf, ESUCCESS);
-		// in this case, it's not our job to save contexts or anything
-		__proc_take_allcores(p, __death, 0, 0, 0);
+		/* sending death, since it's not our job to save contexts or anything in
+		 * this case.  also, if this returns true, we will not return down
+		 * below, and need to eat the reference to p */
+		self_ipi_pending = __proc_take_allcores(p, __death, 0, 0, 0);
 		__proc_set_state(p, PROC_RUNNABLE_S);
 		schedule_proc(p);
+		__proc_unlock_ipi_pending(p, self_ipi_pending);
+		return 0;
 	}
 	/* otherwise, see how many new cores are wanted */
 	amt_new = p->resources[RES_CORES].amt_wanted -
@@ -86,7 +96,7 @@ ssize_t core_request(struct proc *p)
 		switch (p->state) {
 			case (PROC_RUNNING_S):
 				// issue with if we're async or not (need to preempt it)
-				// either of these should trip it.
+				// either of these should trip it. TODO: (ACR) async core req
 				if ((current != p) || (p->vcoremap[0] != core_id()))
 					panic("We don't handle async RUNNING_S core requests yet.");
 				/* save the tf to be restarted on another core (in proc_run) */
@@ -119,18 +129,21 @@ ssize_t core_request(struct proc *p)
 			default:
 				break;
 		}
-		/* give them the cores.  this will start up the extras if RUNNING_M */
-		__proc_give_cores(p, corelist, &num_granted);
-		spin_unlock_irqsave(&p->proc_lock);
+		/* give them the cores.  this will start up the extras if RUNNING_M. */
+		self_ipi_pending = __proc_give_cores(p, corelist, num_granted);
+		__proc_unlock_ipi_pending(p, self_ipi_pending);
 		/* if there's a race on state (like DEATH), it'll get handled by
 		 * proc_run or proc_destroy */
 		if (p->state == PROC_RUNNABLE_M)
 			proc_run(p);
 		/* if we are moving to a partitionable core from a RUNNING_S on a
 		 * management core, the kernel needs to do something else on this core
-		 * (just like in proc_destroy).  this cleans up the core and idles. */
-		if (need_to_idle)
+		 * (just like in proc_destroy).  it also needs to decref, to consume the
+		 * reference that came into this function (since we don't return).  */
+		if (need_to_idle) {
+			proc_decref(p, 1);
 			abandon_core();
+		}
 	} else { // nothing granted, just return
 		spin_unlock_irqsave(&p->proc_lock);
 	}

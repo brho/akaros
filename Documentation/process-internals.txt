@@ -1,0 +1,314 @@
+This discusses core issues with process design and implementation.  Most of this
+info is available in the source in the comments (but may not be in the future).
+For now, it's a dumping ground for topics that people ought to understand before
+they muck with how processes work.
+
+1. Reference Counting
+===========================
+1.1 Basics:
+---------------------------
+Reference counts (proc_refcnt) exist to keep a process alive.  Eventually, this
+will probably turn into a regular "kernel design pattern", like it is in Linux
+(http://lwn.net/Articles/336224/).  The style of reference counting we use for
+processes is similar to a kref:
+- Can only incref if the current value is greater than 0, meaning there is
+  already a reference to it.  It is a bug to try to incref on something that has
+  no references, so always make sure you incref something that you know has a
+  reference.  If you don't know, you need to get it manually (CAREFULLY!) or use
+  pid2proc (which is a careful way of doing this).  If you incref and there are
+  0 references, the kernel will panic.  Fix your bug / don't incref random
+  pointers.
+- Can always decref.
+- When the decref returns 0, perform some operation.  This does some final
+  cleanup on the object.
+
+For a process, proc_destroy() decrefs, and other codes using the proc also
+decref.  The last one to decref calls proc_free to do the final cleanup.
+
+1.2 Brief History of the Refcnt:
+---------------------------
+Originally, the refcnt was created to keep page tables from being destroyed (in
+proc_free()) while cores were still using them, which is what was happens during
+an ARSC (async remote syscall).  It was then defined to be a count of places in
+the kernel that had an interest in the process staying alive, practically just
+to protect current/cr3.  This 'interest' actually extends to any code holding a
+pointer to the proc, such as one acquired via pid2proc(), which is its current
+meaning.
+
+1.3 Quick Aside: The current Macro:
+---------------------------
+current is a pointer to the proc that is currently loaded/running on any given
+core.  It is stored in the per_cpu_info struct, and set/managed by low-level
+process code.  It is necessary for the kernel to quickly figure out who is
+running on its code, especially when servicing interrupts and traps.  current is
+protected by a refcnt.
+
+1.4 Reference Counting Rules:
+---------------------------
++1 for existing.
+- The fact that the process is supposed to exist is worth +1.  When it is time
+  to die, we decref, and it will eventually be cleaned up.
+
++1 for someone using it or planning to use it.
+- This includes simply having a pointer to the proc, since presumably you will
+  use it.  pid2proc() will incref for you.  When you are done, decref.
+- Functions that create a process and return a pointer (like proc_create() or
+  kfs_proc_create()) will also up the refcnt for you.  Decref when you're done.
+- If the *proc is stored somewhere where it will be used again, such as in an IO
+  continuation, it needs to be refcnt'd.  Note that if you already had a
+  reference from pid2proc(), simply don't decref after you store the pointer.
+
++1 for current.
+- current counts as someone using it (expressing interest in the core), but is
+  also a source of the pointer, so its a bit different.
+- You have a reference from current and can use it without refcnting, but
+  anything that needs to eat a reference or store/use it needs an incref first.
+  To be clear, your reference is *NOT* edible.  It protects the cr3, guarantees
+  the process won't die, and serves as a bootstrappable reference.
+- Specifically, if you get a ref from current, but then save it somewhere (like
+  an IO continuation request), then clearly you must incref, since it's both
+  current and stored/used.
+- If you don't know what might be downstream from your function, then incref
+  before passing the reference, and decref when it returns.  Like when handling
+  syscalls, for example.
+
+All functions that take a *proc have a refcnt'd reference, though it may not be
+edible (it could be current).  It is the callers responsibility to make sure
+it'd edible if it necessary.  It is the callees responsibility to incref if it
+stores or makes a copy of the reference.
+
+1.5 Functions That Don't or Might Not Return:
+---------------------------
+Refcnting and especially decreffing gets tricky when there are functions that
+MAY not return.  proc_startcore() does not return (it pops into userspace).
+proc_run() might not return, if the core it was called on will pop into
+userspace (if it was a _S, or if the core is part of the vcoremap for a _M).
+
+Functions that MAY not return will "eat" your reference *IF* they do not return.
+This means that you must have a reference when you call them (like always), and
+that reference will be consumed / decref'd for you if the function doesn't
+return.  Or something similarly appropriate.
+
+We do this because when the function does not return, you will not have the
+chance to decref (your decref code will never run).  We need the reference when
+going in to keep the object alive (like with any other refcnt).  We can't have
+the function always eat the reference, since you cannot simply re-incref the
+pointer (not allowed to incref unless you know you had a good reference).  You'd
+have to do something like p = pid2proc(p_pid);  It's clunky to do that, easy to
+screw up, and semantically, if the function returns, then we may still have an
+interest in p and should decref later.
+
+The downside is that functions need to determine if they will return or not,
+which can be a pain (a linear time search when running an _M, for instance,
+which can suck if we are trying to use a broadcast/logical IPI).
+
+As the caller, you usually won't know if the function will return or not, so you
+need to provide a consumable reference.  Current doesn't count.  For example,
+proc_run() requires a reference.  You can proc_run(p), and use p afterwards, and
+later decref.  You need to make sure you have a reference, so things like
+proc_run(pid2proc(55)) works, since pid2proc() increfs for you.  But you cannot
+proc_run(current), unless you incref current in advance.  Incidentally,
+proc_running current doesn't make a lot of sense.
+
+As another example, proc_startcore() will take your reference and store it
+in current.  Since it is used by both the __startcore and the interrupt return
+paths, we're currently going with the model of "caller makes sure there is a ref
+for current".  Check its comments for details.
+
+1.6 Runnable List:
+---------------------------
+Procs on the runnable list need to have a refcnt (other than the +1 for
+existing).  It's something that cares that the process exists.  We could have
+had it implicitly be refcnt'd (the fact that it's on the list is enough, sort of
+as if it was part of the +1 for existing), but that complicates things.  For
+instance, it is a source of a reference (for the scheduler) and you could not
+proc_run() a process from the runnable list without worrying about increfing it
+before hand.  Remember that proc_run() might consume your reference (which
+actually turns into a current reference, which is later destroyed by decref in
+abandon_core()).
+
+1.7 Internal Details for Specific Functions:
+---------------------------
+proc_run(): makes sure enough refcnts are in place for all places that will
+install current.  This also makes it easier on the system (one big incref(n),
+instead of n increfs of (1) from multiple cores).  In the off chance current was
+already set for a core receiving the active message, __startcore will decref.
+Also note that while proc_run() consumes your reference, it's not actually
+decreffing, so there's no danger within proc_run() of the process dying /
+__proc_free()ing.
+
+proc_startcore(): assumes all references to p are sorted.  *p is already
+accounted for as if it was current on the core startcore runs on. (there is only
+one refcnt for both *p and current, not 2 separate ones).
+
+proc_destroy(): it might not return (if the calling core belongs to the
+process), so it may eat your reference and you must have an edible reference.
+It is possible you called proc_destroy(current).  The cleanup of the current
+will be its own decref, so you need to have a usable/real reference (current
+doesn't count as an edible reference).  So incref before doing that.  Even if p
+== current, proc_destroy() can't tell if you sent it p (and had a reference) or
+current and didn't.
+
+proc_yield(): this never returns, so it eats your reference.  It will also
+decref when it abandon_core()s.
+
+__proc_give_cores() and friends: you call this while holding the lock, but it is
+possible that your core is in the corelist you gave it.  In this case, it will
+detect it, and return a bool signalling if an IPI is pending.  It will not
+consume your reference.  The reasoning behind this is that it is an internal
+function, and you may want to do other things before decreffing.  There is also
+a helper function that will unlock and possibly decref/wait for the IPI, called
+__proc_unlock_ipi_pending().  Use this when it is time to unlock.  It's just a
+helper, which may go away.
+
+abandon_core(): it was not given a reference, so it doesn't eat one.  It will
+decref when it unloads the cr3.  Note that this is a potential performance
+issue.  When preempting or killing, there are n cores that are fighting for the
+cacheline to decref.  An alternative would be to have one core decref for all n
+cores, after it knows all cores unloaded the cr3.  This would be a good use of
+the checklist (possibly with one cacheline per core).  It would take a large
+amount of memory for better scalability.
+
+1.8 Core Request:
+---------------------------
+core_request() is run outside of the process code (for now), though it is fairly
+intricate.  It's another function that might not return, but the reasons for
+this vary:
+	1: The process is moving from _S to _M so the return path to userspace won't
+	happen (and sort of will on the new core / the other side), but that will
+	happen when popping into userspace.
+	2: The scheduler is giving the current core to the process, which can kick
+	in via either proc_run() or __proc_give_cores().
+	3: It was a request to give up all cores, which means the current core will
+	receive an IPI (if it wasn't an async call, which isn't handled yet).
+
+For these reasons, core_request() needs to have an edible reference.
+
+Also, since core_request calls functions that might not return, there are cases
+where it will not be able to call abandon_core() and leave process context.
+This is an example of why we have the fallback case of leaving process context
+in proc_startcore().  See the section below about process context for more
+information.
+
+Eventually, core_request() will be split better, probably with the brutal logic
+in process.c that would call out some functions in resource.c that actually make
+choices.
+
+1.9 Things I Could Have Done But Didn't And Why:
+---------------------------
+Q: Could we have the first reference (existence) mean it could be on the runnable
+list or otherwise in the proc system (but not other subsystems)?  In this case,
+proc_run() won't need to eat a reference at all - it will just incref for every
+current it will set up.
+
+A: No: if you pid2proc(), then proc_run() but never return, you have (and lose)
+an extra reference.  We need proc_run() to eat the reference when it does not
+return.  If you decref between pid2proc() and proc_run(), there's a (rare) race
+where the refcnt hits 0 by someone else trying to kill it.  While proc_run()
+will check to see if someone else is trying to kill it, there's a slight chance
+that the struct will be reused and recreated.  It'll probably never happen, but
+it could, and out of principle we shouldn't be referencing memory after it's
+been deallocated.  Avoiding races like this is one of the reasons for our refcnt
+discipline.
+
+Q: Could proc_run() always eat your reference, which would make it easier for
+its implementation?
+
+A: Yeah, technically, but it'd be a pain, as mentioned above.  You'd need to
+reaquire a reference via pid2proc, and is rather easy to mess up.
+
+Q: Could we have made proc_destroy() take a flag, saying whether or not it was
+called on current and needed a decref instead of wasting an incref?
+
+A: We could, but won't.  This is one case where the external caller is the one
+that knows the function needs to decref or not.  But it breaks the convention a
+bit, doesn't mirror proc_create() as well, and we need to pull in the cacheline
+with the refcnt anyways.  So for now, no.
+
+Q: Could we make __proc_give_cores() simply not return if an IPI is coming?
+
+A: I did this originally, and manually unlocked and __wait_for_ipi()d.  Though
+we'd then need to deal with it like that for all of the related functions, which
+doesn't work if you wanted to do something afterwards (like schedule(p)).  Also
+these functions are meant to be internal helpers, so returning the bool makes
+more sense.  It eventually led to having __proc_unlock_ipi_pending(), which made
+proc_destroy() much cleaner and helped with a general model of dealing with
+these issues.  Win-win.
+
+2 When Do We Really Leave "Process Context"?
+===========================
+2.1 Overview
+---------------------------
+First off, it's not really "process context" in the way Linux deals with it.  We
+aren't operating in kernel mode on behalf of the process (always).  We are
+specifically talking about when a process's cr3 is loaded on a core.  Usually,
+current is also set (the exception for now is when processing ARSCs).
+
+There are a couple different ways to do this.  One is to never unload a context
+until something new is being run there (handled solely in proc_startcore()).
+Another way is to always explicitly leave the core, like by abandon_core()ing.
+
+The issue with the former is that you could have contexts sitting around for a
+while, and also would have a bit of extra latency when __proc_free()ing during
+someone *else's* proc_startcore() (though that could be avoided if it becomes a
+real issue, via some form of reaping).  You'll also probably have excessive
+decrefs (based on the interactions between proc_run() and __startcore()).
+
+The issue with the latter is excessive TLB shootdowns and corner cases.  There
+could be some weird cases (in core_request() for example) where the core you are
+running on has the context loaded for proc A on a mgmt core, but decides to give
+it to proc B.
+
+If no process is running there, current == 0 and boot_cr3 is loaded, meaning no
+process's context is loaded.
+
+2.2 Here's how it is done now:
+---------------------------
+We try to proactively leave, but have the ability to stay in context til
+proc_startcore() to handle the corner cases (and to maybe cut down the TLB
+flushes later).  To stop proactively leaving, just change abandon_core() to not
+do anything with current/cr3.  You'll see weird things like processes that won't
+die until their old cores are reused.  The reason we proactively leave context
+is to help with sanity for these issues, and also to avoid decref's in
+__startcore().
+
+A couple other details: __startcore() sorts the extra increfs, and
+proc_startcore() sorts leaving the old context.  Anytime a __startcore active
+message is sent, the sender increfs in advance for the current refcnt.  If that
+was in error, __startcore decrefs.  proc_startcore(), which the last moment
+before we *must* have the cr3/current issues sorted, does the actual check if
+there was an old process there or not, while it handles the lcr3 (if necessary).
+In general, lcr3's ought to have refcnts near them, or else comments explaining
+why not.
+
+So we leave process context when told to do so (__death/abandon_core()) or if
+another process is run there.  The _M code is such that a proc will stay on its
+core until it receives a message, and that message would cleanup/restore a
+generic context (boot_cr3).  A _S could stay on its core until another _S came
+in.  This is much simpler for cases when a timer interrupt goes off to force a
+schedule() decision.  It also avoids a TLB flush in case the scheduler picked
+that same proc to run again.  This could also happen to an _M, if for some
+reason it was given a management core (!!!) or some other event happened that
+caused some management/scheduling function to run on one of it's cores (perhaps
+it asked).
+
+proc_yield() abandons the core / leaves context.
+
+2.3 Other issues:
+---------------------------
+Note that it is not clear exactly how we want to deal with interrupting
+processes that are in the kernel.  There is no true process context, so we can't
+leave a core until the kernel is in a "safe place", i.e. it's state is bundled
+enough that it can be recontinued later.  We might end up letting the call
+proceed, but not return to userspace (since that's a good save point).  There's
+some rough comments about this in proc_startcore() (check for a pending
+preempt).
+
+This same thing applies to __death messages.  Even though a process is dying, it
+doesn't mean we can just drop whatever the kernel was doing on its behalf.  For
+instance, it might be holding a reference that will never get decreffed if its
+stack gets dropped.  This is a big TODO.
+
+3. Leaving the Kernel Stack:
+===========================
+Next painful commit will deal with this a bit more...

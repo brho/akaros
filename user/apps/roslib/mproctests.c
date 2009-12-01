@@ -154,6 +154,7 @@ static void global_tests(uint32_t vcoreid)
 		case TEST_SWITCH_TO_RUNNABLE_S:
 			if (vcoreid == 2) {
 				cprintf("Core %d trying to request 0/ switch to _S\n", vcoreid);
+				udelay(3000000, 1995014570);
 				retval = sys_resource_req(RES_CORES, 0, 0, 0);
 				// will only see this if we are scheduled()
 				cprintf("Core %d back up! (retval:%d)\n", vcoreid, retval);

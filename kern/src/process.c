@@ -45,6 +45,13 @@ static void put_idle_core(uint32_t coreid)
 	spin_unlock(&idle_lock);
 }
 
+/* Other helpers, implemented later. */
+static uint32_t get_free_vcoreid(struct proc *SAFE p, uint32_t prev);
+static uint32_t get_busy_vcoreid(struct proc *SAFE p, uint32_t prev);
+static int32_t __get_vcoreid(int32_t *corelist, size_t num, int32_t pcoreid);
+static int32_t get_vcoreid(struct proc *SAFE p, int32_t pcoreid);
+static inline void __wait_for_ipi(const char *fnname);
+
 /* PID management. */
 #define PID_MAX 32767 // goes from 0 to 32767, with 0 reserved
 static DECL_BITMASK(pid_bmask, PID_MAX + 1);
@@ -149,12 +156,14 @@ int __proc_set_state(struct proc *p, uint32_t state)
 }
 
 /* Returns a pointer to the proc with the given pid, or 0 if there is none */
-/* TODO: handle refcnting */
 struct proc *pid2proc(pid_t pid)
 {
 	spin_lock(&pid_hash_lock);
 	struct proc *p = hashtable_search(pid_hash, (void*)pid);
 	spin_unlock(&pid_hash_lock);
+	/* if the refcnt was 0, decref and return 0 (we failed). (TODO) */
+	if (p)
+		proc_incref(p, 1); // TODO:(REF) to do this all atomically and not panic
 	return p;
 }
 
@@ -215,7 +224,7 @@ static error_t proc_alloc(struct proc *SAFE*SAFE pp, pid_t parent_id)
     spinlock_init(&p->proc_lock);
 	p->ppid = parent_id;
 	__proc_set_state(p, PROC_CREATED);
-	p->env_refcnt = 1;
+	p->env_refcnt = 2; // one for the object, one for the ref we pass back
 	p->env_flags = 0;
 	p->env_entry = 0; // cheating.  this really gets set in load_icode
 	p->num_vcores = 0;
@@ -286,32 +295,6 @@ static void __proc_free(struct proc *p)
 	p->env_cr3 = 0;
 	page_decref(pa2page(pa));
 
-	/* between when someone grabs the *proc (from pid), til they use it, it
-	 * could be killed and/or deallocated.  lots of our protections come from
-	 * the state, which needs to be dereferenced, and isn't protected from this.
-	 *
-	 * (TODO) rule: when you get a *proc, you up the refcnt.  need to down it
-	 * when you are done.  if you fail, someone else is deallocating it.  you
-	 * shouldn't have dereferenced it (it may be 'gone' already), so there is a
-	 * slight race, but if you do this check quickly, it's *probably* not an
-	 * issue.  so do it with interrupts off.  pid2proc will handle that, but you
-	 * need to decref still
-	 * - getting the pointer from current is a refcnt'd source.  when current is
-	 *   set, the refcnt is up anyway (for protecting the page tables), so just
-	 *   use it normally.
-	 * - if you pass the pointer (via amsg, etc), the code that uses it should
-	 *   up its refcnt or otherwise deal with the issue (which startcore should
-	 *   do), though this might need to change. (freed and realloc before the
-	 *   message arrives).  perhaps up the refcnt in advance, and down it if it
-	 *   was unnecessary (TODO).
-	 * - if the pointer is stored somewhere (like in an IO continuation), the
-	 *   refcnt needs to stay up.
-	 * - can check for DYING too, though some situations may want to grab a
-	 *   dying proc's *
-	 * - i am not concerned with pointing to a new proc with that same PID, the
-	 *   concern is with referencing kernel memory.
-	 * Might move this to proc_destroy.  depends if we want parents to wait().
-	 */
 	/* Remove self from the pid hash, return PID.  Note the reversed order. */
 	spin_lock(&pid_hash_lock);
 	if (!hashtable_remove(pid_hash, (void*)p->pid))
@@ -340,16 +323,19 @@ bool proc_controls(struct proc *actor, struct proc *target)
  * When a process goes from RUNNABLE_M to RUNNING_M, its vcoremap will be
  * "packed" (no holes in the vcore->pcore mapping), vcore0 will continue to run
  * it's old core0 context, and the other cores will come in at the entry point.
- * Including in the case of preemption.  */
+ * Including in the case of preemption.
+ *
+ * This won't return if the current core is going to be one of the processes
+ * cores (either for _S mode or for _M if it's in the vcoremap).  proc_run will
+ * eat your reference if it does not return. */
 void proc_run(struct proc *p)
 {
+	bool self_ipi_pending = FALSE;
 	spin_lock_irqsave(&p->proc_lock);
 	switch (p->state) {
 		case (PROC_DYING):
 			spin_unlock_irqsave(&p->proc_lock);
 			printk("Process %d not starting due to async death\n", p->pid);
-			// There should be no core cleanup to do (like decref).
-			assert(current != p);
 			// if we're a worker core, smp_idle, o/w return
 			if (!management_core())
 				smp_idle(); // this never returns
@@ -365,16 +351,27 @@ void proc_run(struct proc *p)
 			p->num_vcores = 0;
 			p->vcoremap[0] = core_id();
 			spin_unlock_irqsave(&p->proc_lock);
-			// This normally doesn't return, but might error out in the future.
+			/* Transferring our reference to startcore, where p will become
+			 * current.  If it already is, decref in advance.  This is similar
+			 * to __startcore(), in that it sorts out the refcnt accounting.  */
+			if (current == p)
+				proc_decref(p, 1);
 			proc_startcore(p, &p->env_tf);
 			break;
 		case (PROC_RUNNABLE_M):
-			__proc_set_state(p, PROC_RUNNING_M);
 			/* vcoremap[i] holds the coreid of the physical core allocated to
 			 * this process.  It is set outside proc_run.  For the active
 			 * message, a0 = struct proc*, a1 = struct trapframe*.   */
 			if (p->num_vcores) {
+				__proc_set_state(p, PROC_RUNNING_M);
 				int i = 0;
+				/* Up the refcnt, since num_vcores are going to start using this
+				 * process and have it loaded in their 'current'. */
+				p->env_refcnt += p->num_vcores; // TODO: (REF) use incref
+				/* If the core we are running on is in the vcoremap, we will get
+				 * an IPI (once we reenable interrupts) and never return. */
+				if (__get_vcoreid(p->vcoremap, p->num_vcores, core_id()) != -1)
+					self_ipi_pending = TRUE;
 				// TODO: handle silly state (HSS)
 				// set virtual core 0 to run the main context on transition
 				if (p->env_flags & PROC_TRANSITION_TO_M) {
@@ -397,21 +394,24 @@ void proc_run(struct proc *p)
 					send_active_message(p->vcoremap[i], (void *)__startcore,
 					                    (void *)p, (void *)0, (void *)i);
 #endif
+			} else {
+				warn("Tried to proc_run() an _M with no vcores!");
 			}
-			/* There a subtle (attempted) race avoidance here.  proc_startcore
-			 * can handle a death message, but we can't have the startcore come
-			 * after the death message.  Otherwise, it would look like a new
-			 * process.  So we hold the lock to make sure our message went out
-			 * before a possible death message.
+			/* Unlock and decref/wait for the IPI if one is pending.  This will
+			 * eat the reference if we aren't returning. 
+			 *
+			 * There a subtle race avoidance here.  proc_startcore can handle a
+			 * death message, but we can't have the startcore come after the
+			 * death message.  Otherwise, it would look like a new process.  So
+			 * we hold the lock til after we send our message, which prevents a
+			 * possible death message.
 			 * - Likewise, we need interrupts to be disabled, in case one of the
 			 *   messages was for us, and reenable them after letting go of the
 			 *   lock.  This is done by spin_lock_irqsave, so be careful if you
 			 *   change this.
-			 * - This can also be done far more intelligently / efficiently,
-			 *   like skipping in case it's busy and coming back later.
 			 * - Note there is no guarantee this core's interrupts were on, so
 			 *   it may not get the message for a while... */
-			spin_unlock_irqsave(&p->proc_lock);
+			__proc_unlock_ipi_pending(p, self_ipi_pending);
 			break;
 		default:
 			spin_unlock_irqsave(&p->proc_lock);
@@ -419,11 +419,8 @@ void proc_run(struct proc *p)
 	}
 }
 
-/*
- * Runs the given context (trapframe) of process p on the core this code
- * executes on.  The refcnt tracks how many cores have "an interest" in this
- * process, which so far just means it uses the process's page table.  See the
- * massive comments around the incref function
+/* Runs the given context (trapframe) of process p on the core this code
+ * executes on.
  *
  * Given we are RUNNING_*, an IPI for death or preemption could come in:
  * 1. death attempt (IPI to kill whatever is on your core):
@@ -450,7 +447,16 @@ void proc_run(struct proc *p)
  * I think we need to make it such that the kernel in "process context" never
  * gets removed from the core (displaced from its stack) without going through
  * some "bundling" code.
- */
+ *
+ * A note on refcnting: this function will not return, and your proc reference
+ * will end up stored in current.  This will make no changes to p's refcnt, so
+ * do your accounting such that there is only the +1 for current.  This means if
+ * it is already in current (like in the trap return path), don't up it.  If
+ * it's already in current and you have another reference (like pid2proc or from
+ * an IPI), then down it (which is what happens in __startcore()).  If it's not
+ * in current and you have one reference, like proc_run(non_current_p), then
+ * also do nothing.  The refcnt for your *p will count for the reference stored
+ * in current. */
 void proc_startcore(struct proc *p, trapframe_t *tf) {
 	// it's possible to be DYING, but it's a rare race.
 	//if (p->state & (PROC_RUNNING_S | PROC_RUNNING_M))
@@ -464,20 +470,15 @@ void proc_startcore(struct proc *p, trapframe_t *tf) {
 	}
 	/* If the process wasn't here, then we need to load its address space. */
 	if (p != current) {
-		if (proc_incref(p)) {
-			// getting here would mean someone tried killing this while we tried
-			// to start one of it's contexts (from scratch, o/w we had it's CR3
-			// loaded already)
-			// if this happens, a no-op death-IPI ought to be on its way...  we can
-			// just smp_idle()
-			smp_idle();
-		}
+		/* Do not incref here.  We were given the reference to current,
+		 * pre-upped. */
 		lcr3(p->env_cr3);
-		// we unloaded the old cr3, so decref it (if it exists)
-		// TODO: Consider moving this to wherever we really "mean to leave the
-		// process's context".  abandon_core() does this.
+		/* This is "leaving the process context" of the previous proc.  The
+		 * previous lcr3 unloaded the previous proc's context.  This should
+		 * rarely happen, since we usually proactively leave process context,
+		 * but is the fallback. */
 		if (current)
-			proc_decref(current);
+			proc_decref(current, 1);
 		set_current_proc(p);
 	}
 	/* need to load our silly state, preferably somewhere other than here so we
@@ -490,28 +491,6 @@ void proc_startcore(struct proc *p, trapframe_t *tf) {
 	 */
 	env_pop_ancillary_state(p);
 	env_pop_tf(tf);
-}
-
-/* Helper function, helps with receiving local death IPIs, for the cases when
- * this core is running the process.  We should received an IPI shortly.  If
- * not, odds are interrupts are disabled, which shouldn't happen while servicing
- * syscalls. */
-static void check_for_local_death(struct proc *p)
-{
-	if (current == p) {
-		/* a death IPI should be on its way, either from the RUNNING_S one, or
-		 * from proc_take_cores with a __death.  in general, interrupts should
-		 * be on when you call proc_destroy locally, but currently aren't for
-		 * all things (like traphandlers).  since we're dying anyway, it seems
-		 * reasonable to turn on interrupts.  note this means all non-proc
-		 * management interrupt handlers must return (which they need to do
-		 * anyway), so that we get back to this point.  Eventually, we can
-		 * remove the enable_irq.  think about this (TODO) */
-		enable_irq();
-		udelay(1000000);
-		panic("Waiting too long on core %d for an IPI in proc_destroy()!",
-		      core_id());
-	}
 }
 
 /*
@@ -530,19 +509,25 @@ static void check_for_local_death(struct proc *p)
  * (Last core/kernel thread to decref cleans up and deallocates resources.)
  *
  * Note that some cores can be processing async calls, but will eventually
- * decref.  Should think about this more.
- */
+ * decref.  Should think about this more, like some sort of callback/revocation.
+ *
+ * This will eat your reference if it won't return.  Note that this function
+ * needs to change anyways when we make __death more like __preempt.  (TODO) */
 void proc_destroy(struct proc *p)
 {
-	// Note this code relies on this lock disabling interrupts, similar to
-	// proc_run.
+	/* TODO: this corelist is taking up a lot of space on the stack */
 	uint32_t corelist[MAX_NUM_CPUS];
 	size_t num_cores_freed;
+	bool self_ipi_pending = FALSE;
 	spin_lock_irqsave(&p->proc_lock);
+
+	/* TODO: (DEATH) look at this again when we sort the __death IPI */
+	if (current == p)
+		self_ipi_pending = TRUE;
+
 	switch (p->state) {
 		case PROC_DYING: // someone else killed this already.
-			spin_unlock_irqsave(&p->proc_lock);
-			check_for_local_death(p); // IPI may be on it's way.
+			__proc_unlock_ipi_pending(p, self_ipi_pending);
 			return;
 		case PROC_RUNNABLE_M:
 			/* Need to reclaim any cores this proc might have, even though it's
@@ -558,7 +543,7 @@ void proc_destroy(struct proc *p)
 			// here's how to do it manually
 			if (current == p) {
 				lcr3(boot_cr3);
-				proc_decref(p); // this decref is for the cr3
+				proc_decref(p, 1); // this decref is for the cr3
 				current = NULL;
 			}
 			#endif
@@ -582,24 +567,15 @@ void proc_destroy(struct proc *p)
 			panic("Weird state(0x%08x) in proc_destroy", p->state);
 	}
 	__proc_set_state(p, PROC_DYING);
+	/* this decref is for the process in general */
+	p->env_refcnt--; // TODO (REF)
+	//proc_decref(p, 1);
 
-	/* Leave interrupts turned off, but unlock.  Store whether or not we should
-	 * reenable interrupts down below.  We're manually doing the unlock_irqsave,
-	 * since we need to make sure we finish this function before turning
-	 * interrupts back on (in case a death/abandon_core comes in). */
-	bool irq_en = spin_lock_irq_enabled(&p->proc_lock);
-	spin_unlock(&p->proc_lock);
-
-	proc_decref(p); // this decref is for the process in general
-	
-	/* Reenable interrupts if we should have from the spin_unlock_irqsave.  We
-	 * should almost always be reenabling.  Once we reenable, we can receive a
-	 * death IPI (if applicable) and never return. */
-	if (irq_en)
-		enable_irq();
-
-	/* if our core is part of process p, then check/wait for the death IPI. */
-	check_for_local_death(p);
+	/* Unlock and possible decref and wait.  A death IPI should be on its way,
+	 * either from the RUNNING_S one, or from proc_take_cores with a __death.
+	 * in general, interrupts should be on when you call proc_destroy locally,
+	 * but currently aren't for all things (like traphandlers). */
+	__proc_unlock_ipi_pending(p, self_ipi_pending);
 	return;
 }
 
@@ -631,18 +607,45 @@ static uint32_t get_busy_vcoreid(struct proc *SAFE p, uint32_t prev)
 	return i;
 }
 
-/* Helper function.  Find the vcoreid for a given physical core id.
- * You better hold the lock before calling this.  If we use some sort of
- * pcoremap, we can avoid this linear search. */
-static uint32_t get_vcoreid(struct proc *SAFE p, int32_t pcoreid)
+/* Helper function.  Find the vcoreid for a given physical core id.  If we use
+ * some sort of pcoremap, we can avoid this linear search.  You better hold the
+ * lock before calling this.  Returns -1 on failure. */
+static int32_t __get_vcoreid(int32_t *corelist, size_t num, int32_t pcoreid)
 {
-	uint32_t i;
-	for (i = 0; i < MAX_NUM_CPUS; i++)
-		if (p->vcoremap[i] == pcoreid)
+	int32_t i;
+	bool found = FALSE;
+	for (i = 0; i < num; i++)
+		if (corelist[i] == pcoreid) {
+			found = TRUE;
 			break;
-	if (i + 1 >= MAX_NUM_CPUS)
-		warn("At the end of the vcorelist.  Might want to check that out.");
-	return i;
+		}
+	if (found)
+		return i;
+	else
+		return -1;
+}
+
+/* Helper function.  Just like the one above, but this one panics on failure.
+ * You better hold the lock before calling this.  */
+static int32_t get_vcoreid(struct proc *SAFE p, int32_t pcoreid)
+{
+	int32_t vcoreid = __get_vcoreid(p->vcoremap, p->num_vcores, pcoreid);
+	assert(vcoreid != -1);
+	return vcoreid;
+}
+
+/* Use this when you are waiting for an IPI that you sent yourself.  In most
+ * cases, interrupts should already be on (like after a spin_unlock_irqsave from
+ * process context), but aren't always, like in proc_destroy().  We might be
+ * able to remove the enable_irq in the future.  Think about this (TODO).
+ *
+ * Note this means all non-proc management interrupt handlers must return (which
+ * they need to do anyway), so that we get back to this point.  */
+static inline void __wait_for_ipi(const char *fnname)
+{
+	enable_irq();
+	udelay(1000000);
+	panic("Waiting too long on core %d for an IPI in %s()!", core_id(), fnname);
 }
 
 /* Yields the calling core.  Must be called locally (not async) for now.
@@ -654,7 +657,8 @@ static uint32_t get_vcoreid(struct proc *SAFE p, int32_t pcoreid)
  *
  * - RES_CORES amt_wanted will be the amount running after taking away the
  *   yielder, unless there are none left, in which case it will be 1.
- */
+ *
+ * This does not return (abandon_core()), so it will eat your reference.  */
 void proc_yield(struct proc *SAFE p)
 {
 	spin_lock_irqsave(&p->proc_lock);
@@ -685,8 +689,9 @@ void proc_yield(struct proc *SAFE p)
 			panic("Weird state(0x%08x) in proc_yield", p->state);
 	}
 	spin_unlock_irqsave(&p->proc_lock);
-	// clean up the core and idle.  for mgmt cores, they will ultimately call
-	// manager, which will call schedule(), which will repick the yielding proc.
+	proc_decref(p, 1);
+	/* Clean up the core and idle.  For mgmt cores, they will ultimately call
+	 * manager, which will call schedule() and will repick the yielding proc. */
 	abandon_core();
 }
 
@@ -706,29 +711,21 @@ void proc_yield(struct proc *SAFE p)
  * The other way would be to have this function have the side effect of changing
  * state, and finding another way to do the need_to_idle.
  *
- * In the event of an error, corelist will include all the cores that were *NOT*
- * given to the process (cores that are still free).  Practically, this will be
- * all of them, since it seems like an all or nothing deal right now.
+ * The returned bool signals whether or not a stack-crushing IPI will come in
+ * once you unlock after this function.
  *
- * WARNING: You must hold the proc_lock before calling this!*/
-
-// zra: If corelist has *num elements, then it would be best if the value is
-// passed instead of a pointer to it. If in the future some way will be needed
-// to return the number of cores, then it might be best to use a separate
-// parameter for that.
-error_t __proc_give_cores(struct proc *SAFE p, uint32_t corelist[], size_t *num)
+ * WARNING: You must hold the proc_lock before calling this! */
+bool __proc_give_cores(struct proc *SAFE p, int32_t *corelist, size_t num)
 { TRUSTEDBLOCK
+	bool self_ipi_pending = FALSE;
 	uint32_t free_vcoreid = 0;
 	switch (p->state) {
 		case (PROC_RUNNABLE_S):
 		case (PROC_RUNNING_S):
 			panic("Don't give cores to a process in a *_S state!\n");
-			return -EINVAL;
 			break;
 		case (PROC_DYING):
-			// just FYI, for debugging
-			printk("[kernel] attempted to give cores to a DYING process.\n");
-			return -EFAIL;
+			panic("Attempted to give cores to a DYING process.\n");
 			break;
 		case (PROC_RUNNABLE_M):
 			// set up vcoremap.  list should be empty, but could be called
@@ -742,7 +739,7 @@ error_t __proc_give_cores(struct proc *SAFE p, uint32_t corelist[], size_t *num)
 					assert(p->vcoremap[i]);
 			}
 			// add new items to the vcoremap
-			for (int i = 0; i < *num; i++) {
+			for (int i = 0; i < num; i++) {
 				// find the next free slot, which should be the next one
 				free_vcoreid = get_free_vcoreid(p, free_vcoreid);
 				printd("setting vcore %d to pcore %d\n", free_vcoreid, corelist[i]);
@@ -751,21 +748,26 @@ error_t __proc_give_cores(struct proc *SAFE p, uint32_t corelist[], size_t *num)
 			}
 			break;
 		case (PROC_RUNNING_M):
-			for (int i = 0; i < *num; i++) {
+			/* Up the refcnt, since num cores are going to start using this
+			 * process and have it loaded in their 'current'. */
+			// TODO: (REF) use proc_incref once we have atomics
+			p->env_refcnt += num;
+			if (__get_vcoreid(corelist, num, core_id()) != -1)
+				self_ipi_pending = TRUE;
+			for (int i = 0; i < num; i++) {
 				free_vcoreid = get_free_vcoreid(p, free_vcoreid);
 				printd("setting vcore %d to pcore %d\n", free_vcoreid, corelist[i]);
 				p->vcoremap[free_vcoreid] = corelist[i];
 				p->num_vcores++;
-				assert(corelist[i] != core_id()); // sanity
 				send_active_message(corelist[i], __startcore, p,
-				                     (struct Trapframe *)0,
-				                     (void*SNT)free_vcoreid);
+				                    (struct Trapframe *)0,
+				                    (void*SNT)free_vcoreid);
 			}
 			break;
 		default:
 			panic("Weird proc state %d in proc_give_cores()!\n", p->state);
 	}
-	return ESUCCESS;
+	return self_ipi_pending;
 }
 
 /* Makes process p's coremap look like corelist (add, remove, etc).  Caller
@@ -774,27 +776,29 @@ error_t __proc_give_cores(struct proc *SAFE p, uint32_t corelist[], size_t *num)
  * any cores that are getting removed.
  *
  * Before implementing this, we should probably think about when this will be
- * used.  Implies preempting for the message.
+ * used.  Implies preempting for the message.  The more that I think about this,
+ * the less I like it.  For now, don't use this, and think hard before
+ * implementing it.
  *
- * WARNING: You must hold the proc_lock before calling this!*/
-error_t __proc_set_allcores(struct proc *SAFE p, uint32_t corelist[],
-                            size_t *num, amr_t message,TV(a0t) arg0,
-                            TV(a1t) arg1, TV(a2t) arg2)
+ * WARNING: You must hold the proc_lock before calling this! */
+bool __proc_set_allcores(struct proc *SAFE p, int32_t *corelist,
+                         size_t *num, amr_t message,TV(a0t) arg0,
+                         TV(a1t) arg1, TV(a2t) arg2)
 {
 	panic("Set all cores not implemented.\n");
 }
 
-/* Takes from process p the num cores listed in corelist.  In the event of an
- * error, corelist will contain the list of cores that are free, and num will
- * contain how many items are in corelist.  This isn't implemented yet, but
- * might be necessary later.  Or not, and we'll never do it.
+/* Takes from process p the num cores listed in corelist, using the given
+ * message for the active message (__death, __preempt, etc).  Like the others
+ * in this function group, bool signals whether or not an IPI is pending.
  *
- * WARNING: You must hold the proc_lock before calling this!*/
-error_t __proc_take_cores(struct proc *SAFE p, uint32_t corelist[],
-                          size_t *num, amr_t message, TV(a0t) arg0,
-                          TV(a1t) arg1, TV(a2t) arg2)
+ * WARNING: You must hold the proc_lock before calling this! */
+bool __proc_take_cores(struct proc *SAFE p, int32_t *corelist,
+                       size_t num, amr_t message, TV(a0t) arg0,
+                       TV(a1t) arg1, TV(a2t) arg2)
 { TRUSTEDBLOCK
 	uint32_t vcoreid;
+	bool self_ipi_pending = FALSE;
 	switch (p->state) {
 		case (PROC_RUNNABLE_M):
 			assert(!message);
@@ -806,31 +810,36 @@ error_t __proc_take_cores(struct proc *SAFE p, uint32_t corelist[],
 			panic("Weird state %d in proc_take_cores()!\n", p->state);
 	}
 	spin_lock(&idle_lock);
-	assert((*num <= p->num_vcores) && (num_idlecores + *num <= num_cpus));
+	assert((num <= p->num_vcores) && (num_idlecores + num <= num_cpus));
 	spin_unlock(&idle_lock);
-	for (int i = 0; i < *num; i++) {
+	for (int i = 0; i < num; i++) {
 		vcoreid = get_vcoreid(p, corelist[i]);
 		assert(p->vcoremap[vcoreid] == corelist[i]);
-		if (message)
+		if (message) {
+			if (p->vcoremap[vcoreid] == core_id())
+				self_ipi_pending = TRUE;
 			send_active_message(corelist[i], message, arg0, arg1, arg2);
+		}
 		// give the pcore back to the idlecoremap
 		put_idle_core(corelist[i]);
 		p->vcoremap[vcoreid] = -1;
 	}
-	p->num_vcores -= *num;
-	p->resources[RES_CORES].amt_granted -= *num;
-	return 0;
+	p->num_vcores -= num;
+	p->resources[RES_CORES].amt_granted -= num;
+	return self_ipi_pending;
 }
 
 /* Takes all cores from a process, which must be in an _M state.  Cores are
  * placed back in the idlecoremap.  If there's a message, such as __death or
- * __preempt, it will be sent to the cores.
+ * __preempt, it will be sent to the cores.  The bool signals whether or not an
+ * IPI is coming in once you unlock.
  *
  * WARNING: You must hold the proc_lock before calling this! */
-error_t __proc_take_allcores(struct proc *SAFE p, amr_t message,
-                             TV(a0t) arg0, TV(a1t) arg1, TV(a2t) arg2)
+bool __proc_take_allcores(struct proc *SAFE p, amr_t message,
+                          TV(a0t) arg0, TV(a1t) arg1, TV(a2t) arg2)
 {
 	uint32_t active_vcoreid = 0;
+	bool self_ipi_pending = FALSE;
 	switch (p->state) {
 		case (PROC_RUNNABLE_M):
 			assert(!message);
@@ -847,76 +856,72 @@ error_t __proc_take_allcores(struct proc *SAFE p, amr_t message,
 	for (int i = 0; i < p->num_vcores; i++) {
 		// find next active vcore
 		active_vcoreid = get_busy_vcoreid(p, active_vcoreid);
-		if (message)
+		if (message) {
+			if (p->vcoremap[active_vcoreid] == core_id())
+				self_ipi_pending = TRUE;
 			send_active_message(p->vcoremap[active_vcoreid], message,
 			                     arg0, arg1, arg2);
+		}
 		// give the pcore back to the idlecoremap
 		put_idle_core(p->vcoremap[active_vcoreid]);
 		p->vcoremap[active_vcoreid] = -1;
 	}
 	p->num_vcores = 0;
 	p->resources[RES_CORES].amt_granted = 0;
-	return 0;
+	return self_ipi_pending;
 }
 
-/*
- * The process refcnt is the number of places the process 'exists' in the
- * system.  Creation counts as 1.  Having your page tables loaded somewhere
- * (lcr3) counts as another 1.  A non-RUNNING_* process should have refcnt at
- * least 1.  If the kernel is on another core and in a processes address space
- * (like processing its backring), that counts as another 1.
- *
- * Note that the actual loading and unloading of cr3 is up to the caller, since
- * that's not the only use for this (and decoupling is more flexible).
- *
- * The refcnt should always be greater than 0 for processes that aren't dying.
- * When refcnt is 0, the process is dying and should not allow any more increfs.
- * A process can be dying with a refcnt greater than 0, since it could be
- * waiting for other cores to "get the message" to die, or a kernel core can be
- * finishing work in the processes's address space.
+/* Helper, to be used when unlocking after calling the above functions that
+ * might cause an IPI to be sent.  TODO inline this, so the __FUNCTION__ works.
+ * Will require an overhaul of core_request (break it up, etc) */
+void __proc_unlock_ipi_pending(struct proc *p, bool ipi_pending)
+{
+	if (ipi_pending) {
+		p->env_refcnt--; // TODO: (REF) (atomics)
+		spin_unlock_irqsave(&p->proc_lock);
+		__wait_for_ipi(__FUNCTION__);
+	} else {
+		spin_unlock_irqsave(&p->proc_lock);
+	}
+}
+
+
+/* This takes a referenced process and ups the refcnt by count.  If the refcnt
+ * was already 0, then someone has a bug, so panic.  Check out the Documentation
+ * for brutal details about refcnting.
  *
  * Implementation aside, the important thing is that we atomically increment
- * only if it wasn't already 0.  If it was 0, then we shouldn't be attaching to
- * the process, so we return an error, which should be handled however is
- * appropriate.  We currently use spinlocks, but some sort of clever atomics
- * would work too.
+ * only if it wasn't already 0.  If it was 0, panic.
  *
- * Also, no one should ever update the refcnt outside of these functions.
- * Eventually, we'll have Ivy support for this. (TODO)
- *
- * TODO: (REF) change to use CAS.
- */
-error_t proc_incref(struct proc *p)
+ * TODO: (REF) change to use CAS / atomics. */
+void proc_incref(struct proc *p, size_t count)
 {
-	error_t retval = 0;
 	spin_lock_irqsave(&p->proc_lock);
 	if (p->env_refcnt)
-		p->env_refcnt++;
+		p->env_refcnt += count;
 	else
-		retval = -EBADPROC;
+		panic("Tried to incref a proc with no existing refernces!");
 	spin_unlock_irqsave(&p->proc_lock);
-	return retval;
 }
 
-/*
- * When the kernel is done with a process, it decrements its reference count.
- * When the count hits 0, no one is using it and it should be freed.
- * "Last one out" actually finalizes the death of the process.  This is tightly
- * coupled with the previous function (incref)
- * Be sure to load a different cr3 before calling this!
+/* When the kernel is done with a process, it decrements its reference count.
+ * When the count hits 0, no one is using it and it should be freed.  "Last one
+ * out" actually finalizes the death of the process.  This is tightly coupled
+ * with the previous function (incref)
  *
  * TODO: (REF) change to use CAS.  Note that when we do so, we may be holding
- * the process lock when calling __proc_free().
- */
-void proc_decref(struct proc *p)
+ * the process lock when calling __proc_free(). */
+void proc_decref(struct proc *p, size_t count)
 {
 	spin_lock_irqsave(&p->proc_lock);
-	p->env_refcnt--;
+	p->env_refcnt -= count;
 	size_t refcnt = p->env_refcnt; // need to copy this in so it's not reloaded
 	spin_unlock_irqsave(&p->proc_lock);
 	// if we hit 0, no one else will increment and we can check outside the lock
 	if (!refcnt)
 		__proc_free(p);
+	if (refcnt < 0)
+		panic("Too many decrefs!");
 }
 
 /* Active message handler to start a process's context on this core.  Tightly
@@ -945,21 +950,23 @@ void __startcore(trapframe_t *tf, uint32_t srcid, void * a0, void * a1,
 		proc_set_tfcoreid(tf_to_pop, (uint32_t)a2);
 		proc_set_program_counter(tf_to_pop, p_to_run->env_entry);
 	}
+	/* the sender of the amsg increfed, thinking we weren't running current. */
+	if (p_to_run == current)
+		proc_decref(p_to_run, 1);
 	proc_startcore(p_to_run, tf_to_pop);
 }
 
-/* Stop running whatever context is on this core and to 'idle'.  Note this
- * leaves no trace of what was running. This "leaves the process's context. */
+/* Stop running whatever context is on this core, load a known-good cr3, and
+ * 'idle'.  Note this leaves no trace of what was running. This "leaves the
+ * process's context. */
 void abandon_core(void)
 {
 	/* If we are currently running an address space on our core, we need a known
-	 * good pgdir before releasing the old one.  This is currently the major
-	 * practical implication of the kernel caring about a processes existence
-	 * (the inc and decref).  This decref corresponds to the incref in
-	 * proc_startcore (though it's not the only one). */
+	 * good pgdir before releasing the old one.  We decref, since current no
+	 * longer tracks the proc (and current no longer protects the cr3). */
 	if (current) {
 		lcr3(boot_cr3);
-		proc_decref(current);
+		proc_decref(current, 1);
 		set_current_proc(NULL);
 	}
 	smp_idle();
@@ -1011,7 +1018,7 @@ void print_proc_info(pid_t pid)
 	printk("PID: %d\n", p->pid);
 	printk("PPID: %d\n", p->ppid);
 	printk("State: 0x%08x\n", p->state);
-	printk("Refcnt: %d\n", p->env_refcnt);
+	printk("Refcnt: %d\n", p->env_refcnt - 1); // don't report our ref
 	printk("Flags: 0x%08x\n", p->env_flags);
 	printk("CR3(phys): 0x%08x\n", p->env_cr3);
 	printk("Num Vcores: %d\n", p->num_vcores);
@@ -1028,4 +1035,5 @@ void print_proc_info(pid_t pid)
 	printk("Vcore 0's Last Trapframe:\n");
 	print_trapframe(&p->env_tf);
 	spin_unlock_irqsave(&p->proc_lock);
+	proc_decref(p, 1); /* decref for the pid2proc reference */
 }

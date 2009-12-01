@@ -77,26 +77,34 @@ void proc_yield(struct proc *SAFE p);
  * These all adjust the vcoremap and take appropriate actions (like __startcore
  * if you were already RUNNING_M.  You could be RUNNABLE_M with no vcores when
  * these are done (basically preempted, and waiting to get run again).
- * All of these could modify corelist and *num to communicate info back out,
- * which would be the list of cores that are known to be free.
+ *
+ * These are internal functions.  Error checking is to catch bugs, and you
+ * shouldn't call these functions with parameters you are not sure about (like
+ * an invalid corelist).  
+ *
+ * They also may cause an IPI to be sent to core it is called on.  If so, the
+ * return value will be true.  Once you unlock (and enable interrupts) you will
+ * be preempted, and usually lose your stack.  There is a helper to unlock and
+ * handle the refcnt.
  *
  * WARNING: YOU MUST HOLD THE PROC_LOCK BEFORE CALLING THESE! */
 /* Gives process p the additional num cores listed in corelist */
-error_t __proc_give_cores(struct proc *SAFE p, uint32_t corelist[], size_t *num);
-/* Makes process p's coremap look like corelist (add, remove, etc) */
-error_t __proc_set_allcores(struct proc *SAFE p, uint32_t corelist[],
-                            size_t *num, amr_t message, TV(a0t) arg0,
-                            TV(a1t) arg1, TV(a2t) arg2);
+bool __proc_give_cores(struct proc *SAFE p, int32_t *corelist, size_t num);
+/* Makes process p's coremap look like corelist (add, remove, etc). Not used */
+bool __proc_set_allcores(struct proc *SAFE p, int32_t *corelist,
+                         size_t *num, amr_t message, TV(a0t) arg0,
+                         TV(a1t) arg1, TV(a2t) arg2);
 /* Takes from process p the num cores listed in corelist */
-error_t __proc_take_cores(struct proc *SAFE p, uint32_t corelist[],
-                          size_t *num, amr_t message, TV(a0t) arg0,
+bool __proc_take_cores(struct proc *SAFE p, int32_t *corelist,
+                       size_t num, amr_t message, TV(a0t) arg0,
+                       TV(a1t) arg1, TV(a2t) arg2);
+bool __proc_take_allcores(struct proc *SAFE p, amr_t message, TV(a0t) arg0,
                           TV(a1t) arg1, TV(a2t) arg2);
-error_t __proc_take_allcores(struct proc *SAFE p, amr_t message, TV(a0t) arg0,
-                             TV(a1t) arg1, TV(a2t) arg2);
+void __proc_unlock_ipi_pending(struct proc *p, bool ipi_pending);
 
-/* The reference counts are mostly to track how many cores loaded the cr3 */
-error_t proc_incref(struct proc *SAFE p);
-void proc_decref(struct proc *SAFE p);
+/* Will probably have generic versions of these later. */
+void proc_incref(struct proc *SAFE p, size_t count);
+void proc_decref(struct proc *SAFE p, size_t count);
 
 /* Allows the kernel to figure out what process is running on this core.  Can be
  * used just like a pointer to a struct proc.  Need these to be macros due to

@@ -148,6 +148,7 @@ unhandled_trap(trapframe_t* state)
 	{
 		warn("Unhandled trap in user!\nTrap type: %s",buf);
 		assert(current);
+		proc_incref(current, 1);
 		proc_destroy(current);
 		panic("I shouldn't have gotten here!");
 	}
@@ -237,7 +238,10 @@ handle_syscall(trapframe_t* state)
 
 	//env_push_ancillary_state(current); // remove this if you don't need it
 
+	// syscall code wants an edible reference for current
+	proc_incref(current, 1);
 	state->gpr[8] = syscall(current,num,a1,a2,a3,a4,a5);
+	proc_decref(current, 1);
 
 	trap_handled();
 }

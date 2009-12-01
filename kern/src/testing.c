@@ -543,6 +543,7 @@ static void sync_tests(int start_core, int num_threads, int job_num)
 	// we want to fake a run, to reenter manager for the next case
 	env_t *env = kfs_proc_create(kfs_lookup_path("roslib_null"));
 	smp_call_function_single(0, run_env_handler, env, 0);
+	// Note we are still holding references to all the processes
 	process_workqueue();
 	panic("whoops!\n");
 }
@@ -573,6 +574,7 @@ static void async_tests(int start_core, int num_threads, int job_num)
 	// we want to fake a run, to reenter manager for the next case
 	env_t *env = kfs_proc_create(kfs_lookup_path("roslib_null"));
 	smp_call_function_single(0, run_env_handler, env, 0);
+	// Note we are still holding references to all the processes
 	process_workqueue();
 	// this all never returns
 	panic("whoops!\n");

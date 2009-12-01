@@ -32,6 +32,8 @@ void schedule_init(void)
 
 void schedule_proc(struct proc *p)
 {
+	p->env_refcnt++; // TODO (REF) (usually is called while locked)
+	//proc_incref(p, 1); /* up the refcnt since we are storing the reference */
 	spin_lock_irqsave(&runnablelist_lock);
 	printd("Scheduling PID: %d\n", p->pid);
 	TAILQ_INSERT_TAIL(&proc_runnablelist, p, proc_link);
@@ -49,6 +51,8 @@ void deschedule_proc(struct proc *p)
 	printd("Descheduling PID: %d\n", p->pid);
 	TAILQ_REMOVE(&proc_runnablelist, p, proc_link);
 	spin_unlock_irqsave(&runnablelist_lock);
+	p->env_refcnt--; // TODO (REF) (usually is called while locked)
+	//proc_decref(p, 1); /* down the refcnt, since its no longer stored */
 	return;
 }
 
@@ -67,7 +71,9 @@ void schedule(void)
 		TAILQ_REMOVE(&proc_runnablelist, p, proc_link);
 		spin_unlock_irqsave(&runnablelist_lock);
 		printd("PID of proc i'm running: %d\n", p->pid);
+		/* proc_run will either eat the ref, or we'll decref manually. */
 		proc_run(p);
+		proc_decref(p, 1);
 	} else {
 		spin_unlock_irqsave(&runnablelist_lock);
 		printk("No processes to schedule, enjoy the Monitor!\n");

@@ -229,7 +229,7 @@ void load_icode(env_t *SAFE e, uint8_t *COUNT(size) binary, size_t size)
 	 * This can get a bit tricky if this code blocks (will need to think about a
 	 * decref then), if we try to change states, etc.
 	 */
-	proc_incref(e);
+	proc_incref(e, 1);
 	lcr3(e->env_cr3);
 
 	// TODO: how do we do a runtime COUNT?
@@ -255,7 +255,7 @@ void load_icode(env_t *SAFE e, uint8_t *COUNT(size) binary, size_t size)
 
 	// reload the original address space
 	lcr3(old_cr3);
-	proc_decref(e);
+	proc_decref(e, 1);
 }
 
 #define PER_CPU_THING(type,name)\

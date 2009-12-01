@@ -94,6 +94,7 @@ static ssize_t sys_run_binary(env_t* e, void *DANGEROUS binary_buf,
 	kfree(new_binary);
 	__proc_set_state(env, PROC_RUNNABLE_S);
 	schedule_proc(env);
+	proc_decref(env, 1);
 	return 0;
 }
 
@@ -185,24 +186,35 @@ static ssize_t sys_shared_page_alloc(env_t* p1,
 
 	void * COUNT(1) * COUNT(1) addr = user_mem_assert(p1, _addr, sizeof(void *),
                                                       PTE_USER_RW);
-	page_t* page;
 	env_t* p2 = pid2proc(p2_id);
-	error_t e = page_alloc(&page);
+	if (!p2)
+		return -EBADPROC;
 
-	if(e < 0) return e;
+	page_t* page;
+	error_t e = page_alloc(&page);
+	if (e < 0) {
+		proc_decref(p2, 1);
+		return e;
+	}
 
 	void* p2_addr = page_insert_in_range(p2->env_pgdir, page,
 	                                     (void*SNT)UTEXT, (void*SNT)UTOP, p2_flags);
-	if(p2_addr == NULL)
+	if (p2_addr == NULL) {
+		page_free(page);
+		proc_decref(p2, 1);
 		return -EFAIL;
+	}
 
 	void* p1_addr = page_insert_in_range(p1->env_pgdir, page,
 	                                    (void*SNT)UTEXT, (void*SNT)UTOP, p1_flags);
 	if(p1_addr == NULL) {
 		page_remove(p2->env_pgdir, p2_addr);
+		page_free(page);
+		proc_decref(p2, 1);
 		return -EFAIL;
 	}
 	*addr = p1_addr;
+	proc_decref(p2, 1);
 	return ESUCCESS;
 }
 
@@ -344,13 +356,18 @@ static error_t sys_proc_destroy(struct proc *p, pid_t pid)
 
 	if (!p_to_die)
 		return -EBADPROC;
-	if (!proc_controls(p, p_to_die))
+	if (!proc_controls(p, p_to_die)) {
+		proc_decref(p_to_die, 1);
 		return -EPERM;
-	if (p_to_die == p)
+	}
+	if (p_to_die == p) {
+		// syscall code and pid2proc both have edible references, only need 1.
+		proc_decref(p, 1);
 		printk("[PID %d] proc exiting gracefully\n", p->pid);
-	else
+	} else {
 		panic("Destroying other processes is not supported yet.");
 		//printk("[%d] destroying proc %d\n", p->pid, p_to_die->pid);
+	}
 	proc_destroy(p_to_die);
 	return ESUCCESS;
 }
@@ -385,7 +402,9 @@ static int sys_proc_create(struct proc *p, const char *DANGEROUS path)
 	if (kfs_inode < 0)
 		return -EINVAL;
 	struct proc *new_p = kfs_proc_create(kfs_inode);
-	return new_p->pid;
+	pid = new_p->pid;
+	proc_decref(new_p, 1); // let go of the reference created in proc_create()
+	return pid;
 }
 
 /* Makes process PID runnable.  Consider moving the functionality to process.c */
@@ -393,17 +412,24 @@ static error_t sys_proc_run(struct proc *p, unsigned pid)
 {
 	struct proc *target = pid2proc(pid);
 	error_t retval = 0;
-	spin_lock_irqsave(&p->proc_lock); // note we can get interrupted here. it's not bad.
+
+	if (!target)
+		return -EBADPROC;
+ 	// note we can get interrupted here. it's not bad.
+	spin_lock_irqsave(&p->proc_lock);
 	// make sure we have access and it's in the right state to be activated
 	if (!proc_controls(p, target)) {
+		proc_decref(target, 1);
 		retval = -EPERM;
 	} else if (target->state != PROC_CREATED) {
+		proc_decref(target, 1);
 		retval = -EINVAL;
 	} else {
 		__proc_set_state(target, PROC_RUNNABLE_S);
 		schedule_proc(target);
 	}
 	spin_unlock_irqsave(&p->proc_lock);
+	proc_decref(target, 1);
 	return retval;
 }
 
@@ -515,6 +541,7 @@ intreg_t syscall_async(struct proc *p, syscall_req_t *call)
 	               call->args[2], call->args[3], call->args[4]);
 }
 
+/* You should already have a refcnt'd ref to p before calling this */
 intreg_t process_generic_syscalls(struct proc *p, size_t max)
 {
 	size_t count = 0;
@@ -524,8 +551,9 @@ intreg_t process_generic_syscalls(struct proc *p, size_t max)
 	 * incref will return ESUCCESS on success.  This might need some thought
 	 * regarding when the incref should have happened (like by whoever passed us
 	 * the *p). */
-	if (proc_incref(p))
-		return -EFAIL;
+	// TODO: ought to be unnecessary, if you called this right, kept here for
+	// now in case anyone actually uses the ARSCs.
+	proc_incref(p, 1);
 
 	// max is the most we'll process.  max = 0 means do as many as possible
 	while (RING_HAS_UNCONSUMED_REQUESTS(sysbr) && ((!max)||(count < max)) ) {
@@ -555,6 +583,6 @@ intreg_t process_generic_syscalls(struct proc *p, size_t max)
 	}
 	// load sane page tables (and don't rely on decref to do it for you).
 	lcr3(boot_cr3);
-	proc_decref(p);
+	proc_decref(p, 1);
 	return (intreg_t)count;
 }

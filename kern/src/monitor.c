@@ -261,6 +261,7 @@ int mon_kfs_run(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 	__proc_set_state(p, PROC_RUNNABLE_S);
 	schedule_proc(p);
 	spin_unlock_irqsave(&p->proc_lock);
+	proc_decref(p, 1); // let go of the reference created in proc_create()
 	// Should never return from schedule (env_pop in there)
 	// also note you may not get the process you created, in the event there
 	// are others floating around that are runnable
@@ -306,6 +307,7 @@ int mon_procinfo(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 			return 1;
 		}
 		spin_unlock_irqsave(&p->proc_lock);
+		proc_decref(p, 1);
 	} else if (!strcmp(argv[1], "kill")) {
 		if (argc != 3) {
 			printk("Give me a pid number.\n");
@@ -317,6 +319,7 @@ int mon_procinfo(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 			return 1;
 		}
 		proc_destroy(p);
+		proc_decref(p, 1);
 	} else {
 		printk("Bad option\n");
 		return 1;

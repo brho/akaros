@@ -22,6 +22,7 @@
 #include <stdio.h>
 #include <timing.h>
 #include <resource.h>
+#include <monitor.h>
 
 /*
  * Currently, if you leave this function by way of proc_run (process_workqueue
@@ -33,7 +34,7 @@ void manager(void)
 	static uint8_t RACY progress = 0;
 
 	struct proc *envs[256];
-	static struct proc *p ;
+	static struct proc *p;
 
 	// for testing taking cores, check in case 1 for usage
 	uint32_t corelist[MAX_NUM_CPUS];
@@ -53,6 +54,7 @@ void manager(void)
 
 	switch (progress++) {
 		case 0:
+			// TODO: need to store the pid for future manager runs, not the *p
 			//p = kfs_proc_create(kfs_lookup_path("roslib_mhello"));
 			p = kfs_proc_create(kfs_lookup_path("roslib_mproctests"));
 			//p = kfs_proc_create(kfs_lookup_path("roslib_spawn"));
@@ -62,6 +64,7 @@ void manager(void)
 			// normal single-cored way
 			spin_unlock_irqsave(&p->proc_lock);
 			proc_run(p);
+			proc_decref(p, 1);
 			#if 0
 			// this is how you can transition to a parallel process manually
 			// make sure you don't proc run first
@@ -74,6 +77,7 @@ void manager(void)
 			#endif
 			break;
 		case 1:
+			monitor(0);
 			#if 0
 			udelay(10000000);
 			// this is a ghetto way to test restarting an _M
