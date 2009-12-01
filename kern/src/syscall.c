@@ -546,6 +546,10 @@ intreg_t syscall(struct proc *p, trapframe_t *tf, uintreg_t syscallno,
 			return frontend_syscall_from_user(p,a1,a2,a3,a4);
 	#endif
 
+		case SYS_reboot:
+			reboot();
+			return 0;
+
 		default:
 			// or just return -EINVAL
 			panic("Invalid syscall number %d for env %x!", syscallno, *p);
