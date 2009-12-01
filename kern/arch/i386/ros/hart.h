@@ -1,8 +1,6 @@
 #ifndef _ROS_ARCH_HART_H
 #define _ROS_ARCH_HART_H
 
-#define HART_ALLOCATE_STACKS
-
 #include <parlib.h>
 
 // The actual hart_self() function is a global symbol that invokes this routine.

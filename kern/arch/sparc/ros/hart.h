@@ -7,8 +7,6 @@ double do_fsqrt(double);
 double do_recip(double);
 double do_rsqrt(double);
 
-#define HART_ALLOCATE_STACKS
-
 static inline int
 __hart_self()
 {

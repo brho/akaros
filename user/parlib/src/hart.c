@@ -1,19 +1,12 @@
 #include <hart.h>
 #include <string.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <parlib.h>
 
-// TODO: HART_ALLOCATE_STACKS should be disposed of by means of a better ABI.
-
-static size_t _hart_current_harts = 1;
+static size_t _current_harts = 1;
 static hart_lock_t _hart_lock = HART_LOCK_INIT;
-
-static void hart_abort(const char* str)
-{
-	write(2,str,strlen(str));
-	exit(-1);
-}
 
 static void _hart_init()
 {
@@ -23,18 +16,15 @@ static void _hart_init()
 
 	initialized = 1;
 
-	#ifdef HART_ALLOCATE_STACKS
-	extern void** stack_ptr_array;
-	stack_ptr_array = (void**)malloc(hart_max_harts()*sizeof(void*));
-	memset(stack_ptr_array,0,hart_max_harts()*sizeof(void*));
-
-	extern void** tls_array;
-	tls_array = (void**)malloc(hart_max_harts()*sizeof(void*));
-	memset(tls_array,0,hart_max_harts()*sizeof(void*));
+	extern void **stack_ptr_array, **tls_array;
+	stack_ptr_array = (void**)calloc(hart_max_harts(),sizeof(void*));
+	tls_array = (void**)calloc(hart_max_harts(),sizeof(void*));
 
 	if(stack_ptr_array == NULL || tls_array == NULL)
-		hart_abort("Harts initialization ran out of memory!\n");
-	#endif
+	{
+		fputs("Harts initialization ran out of memory!\n",stderr);
+		abort();
+	}	
 }
 
 error_t hart_request(size_t k)
@@ -42,52 +32,40 @@ error_t hart_request(size_t k)
 	size_t i,j;
 	const int user_stack_size = 1024*1024, tls_size = 1024*1024;
 
-	#ifdef HART_ALLOCATE_STACKS
 	extern void** stack_ptr_array;
 	extern void** tls_array;
-	#endif
 
 	_hart_init();
 
 	hart_lock_lock(&_hart_lock);
 
-	if(k < 0 || _hart_current_harts+k > hart_max_harts())
+	if(k < 0 || _current_harts+k > hart_max_harts())
 		return -1;
 
-	#ifdef HART_ALLOCATE_STACKS
-	for(i = _hart_current_harts; i < _hart_current_harts+k; i++)
+	char* stack = (char*)calloc(user_stack_size+tls_size,k);
+	if(stack == NULL)
 	{
-		char* stack = (char*)malloc(user_stack_size+tls_size);
-		if(stack == NULL)
-		{
-			for(j = _hart_current_harts; j < i; j++)
-			{
-				free(stack_ptr_array[j]);
-				stack_ptr_array[j] = tls_array[i] = 0;
-			}
-			hart_lock_unlock(&_hart_lock);
-			return -ENOMEM;
-		}
-		stack_ptr_array[i] = stack + user_stack_size;
+		hart_lock_unlock(&_hart_lock);
+		return -ENOMEM;
+	}
+
+	for(i = _current_harts, j = 0; i < _current_harts+k; i++, j++)
+	{
+		stack_ptr_array[i] = stack + j*(user_stack_size+tls_size);
 		tls_array[i] = stack_ptr_array[i]+tls_size;
 	}
-	#endif
 
 	error_t ret;
-	if((ret = sys_resource_req(0,_hart_current_harts+k,0)) == 0)
+	if((ret = sys_resource_req(0,_current_harts+k,0)) == 0)
 	{
-		_hart_current_harts += k;
+		_current_harts += k;
 		hart_lock_unlock(&_hart_lock);
 		return 0;
 	}
 
-	#ifdef HART_ALLOCATE_STACKS
-	for(i = _hart_current_harts; i < _hart_current_harts+k; i++)
-	{
-		free(stack_ptr_array[i]);
+	free(stack);
+	for(i = _current_harts; i < _current_harts+k; i++)
 		stack_ptr_array[i] = tls_array[i] = 0;
-	}
-	#endif
 
 	hart_lock_unlock(&_hart_lock);
 	return ret;
@@ -96,7 +74,7 @@ error_t hart_request(size_t k)
 void hart_yield()
 {
 	hart_lock_lock(&_hart_lock);
-	_hart_current_harts--;
+	_current_harts--;
 	hart_lock_unlock(&_hart_lock);
 	syscall(SYS_yield,0,0,0,0,0);
 }
@@ -108,7 +86,7 @@ size_t hart_max_harts()
 
 size_t hart_current_harts()
 {
-	return _hart_current_harts;
+	return _current_harts;
 }
 
 // MCS locks!!
