@@ -116,6 +116,8 @@ $(OBJDIR)/$(KERN_DIR)/kernel: $(KERN_LDDEPENDS)
 	$(V)$(OBJDUMP) -S $@ > $@.asm
 	$(V)$(NM) -n $@ > $@.sym
 
+all: $(OBJDIR)/$(KERN_DIR)/kernel
+
 #$(OBJDIR)/$(KERN_DIR)/bochs.img: $(OBJDIR)/$(KERN_DIR)/kernel $(OBJDIR)/$(KERN_DIR)/boot
 #	@echo + mk [KERN] $@
 #	$(V)dd if=/dev/zero of=$(OBJDIR)/$(KERN_DIR)/bochs.img~ count=10080 2>/dev/null
@@ -123,5 +125,6 @@ $(OBJDIR)/$(KERN_DIR)/kernel: $(KERN_LDDEPENDS)
 #	$(V)dd if=$(OBJDIR)/$(KERN_DIR)/kernel of=$(OBJDIR)/$(KERN_DIR)/bochs.img~ seek=1 conv=notrunc 2>/dev/null
 #	$(V)mv $(OBJDIR)/kern/bochs.img~ $(OBJDIR)/kern/bochs.img
 
-all: $(OBJDIR)/$(KERN_DIR)/kernel
-
+ifeq ($(AUGMENT_GCC),TRUE)
+all: augment-gcc
+endif
