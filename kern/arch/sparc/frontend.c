@@ -59,24 +59,21 @@ int32_t frontend_syscall_from_user(env_t* p, int32_t syscall_num, uint32_t arg0,
 
 		case RAMP_SYSCALL_read:
 			arg2 = arg2 > KBUFSIZE ? KBUFSIZE : arg2;
+			if(arg2 <= 0)
+				return arg2 < 0 ? -1 : 0;
 
 			if(arg0 == 0)
 			{
-				if(arg2 > 0)
-				{
-					int ch = getchar();
-					buf[0] = (char)ch;
-					ret = 1;
-				}
-				else
-					ret = 0;
+				int ch = getchar();
+				buf[0] = (char)ch;
+				ret = 1;
 			}
 			else
 				ret = frontend_syscall(syscall_num,arg0,PADDR((uint32_t)buf),arg2);
 
-			if(memcpy_to_user(p,(void*)arg1,buf,arg2))
+			if(ret > 0 && memcpy_to_user(p,(void*)arg1,buf,arg2))
 				return -1;
-			break;
+			return ret;
 
 		case RAMP_SYSCALL_getch:
 			return frontend_syscall(RAMP_SYSCALL_getch,0,0,0);
