@@ -52,7 +52,4 @@ overwrite $1 tmp/libgcc.a libgcc.a
 rm -rf tmp
 
 SYS_INC=`find $1 -iname sys-include`
-rm -rf $SYS_INC/ros
-cp -r user/parlib/inc/ros $SYS_INC
-cp -r user/parlib/inc/sys/* $SYS_INC/sys
-
+cp -Lr user/parlib/inc/* $SYS_INC

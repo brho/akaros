@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <ros/common.h>
+#include <sys/stat.h>
 
 extern char * readline(const char *prompt);
 extern void draw_nanwan();
