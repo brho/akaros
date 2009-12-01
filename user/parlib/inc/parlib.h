@@ -42,6 +42,6 @@ ssize_t     sys_shared_page_alloc(void *COUNT(PGSIZE) *addr, pid_t p2,
                                   int p1_flags, int p2_flags);
 ssize_t     sys_shared_page_free(void *COUNT(PGSIZE) addr, pid_t p2);
 ssize_t     sys_resource_req(int type, size_t amount, uint32_t flags);
-
+void        sys_reboot();
 
 #endif	// !ROS_INC_PARLIB_H

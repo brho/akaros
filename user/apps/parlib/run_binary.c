@@ -10,8 +10,8 @@
 
 extern char * readline(const char *prompt);
 
+#define MALLOC_SIZE     1048576
 #define READ_SIZE       1024
-uint8_t* binary_buf;
 
 static void fd_error() {
 	fprintf(stderr, "Error: Unable to run remote binary (fd error): %s\n", strerror(errno));
@@ -22,13 +22,13 @@ static void malloc_error() {
 }
 
 static void read_error(void* buf, int fd) {
-	free(binary_buf);
+	free(buf);
 	close(fd);
 	fprintf(stderr, "Error: Unable to run remote binary (read error): %s\n", strerror(errno));
 }
 
 static void realloc_error(void* buf, int fd) {
-	free(binary_buf);
+	free(buf);
 	close(fd);
 	fprintf(stderr, "Error: Unable to run remote binary: No more memory available!\n");
 }
@@ -47,17 +47,22 @@ void run_binary()
 	//free(file_name);
 	if(fd < 0) { fd_error(); return; };
 	
-	int iters = 0;
 	int total_bytes_read = 0;
 	int bytes_read = 0;
-	binary_buf = NULL;
+	int bufsz = 0;
+	void* binary_buf = NULL;
 	
 	while(1) {
-		total_bytes_read += bytes_read;	
-		void* temp_buf = realloc(binary_buf, READ_SIZE*(++iters));
-		if(temp_buf == NULL) { realloc_error(binary_buf, fd); return; }	
-		binary_buf = temp_buf;
+		if(total_bytes_read+READ_SIZE > bufsz)
+		{
+			void* temp_buf = realloc(binary_buf,bufsz+MALLOC_SIZE);
+			if(temp_buf == NULL) { realloc_error(binary_buf, fd); return; }
+			binary_buf = temp_buf;
+			bufsz += MALLOC_SIZE;
+		}
+
 		bytes_read = read(fd, binary_buf+total_bytes_read, READ_SIZE);
+		total_bytes_read += bytes_read;
 		if(bytes_read < 0) { read_error(binary_buf, fd); return; }
 		if(bytes_read == 0) break;
 	}
