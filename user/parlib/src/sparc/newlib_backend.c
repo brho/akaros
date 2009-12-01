@@ -9,6 +9,8 @@
 #include <sys/time.h>
 #include <debug.h>
 #include <hart.h>
+#include <utime.h>
+#include <dirent.h>
 
 #define IS_CONSOLE(fd) ((uint32_t)(fd) < 3)
 
@@ -20,6 +22,131 @@ uint32_t newcore(void)
 	return hart_self();
 }
 
+mode_t
+umask (mode_t mask)
+{
+	return -1;
+}
+
+int
+chmod (const char *path, mode_t mode)
+{
+	return -1;
+}
+
+int
+access (const char *pathname, int mode)
+{
+	return -1;
+}
+
+char *
+getwd (char *buf)
+{
+	return NULL;
+}
+
+long int
+pathconf (const char *path, int name) 
+{
+	return -1;
+}
+
+int
+utime (const char *filename, const struct utimbuf *buf)
+{
+	return -1;
+}
+
+int
+lstat (const char *pathname, struct stat *pstat)
+{
+	return -1;
+}
+
+int
+chown (const char *path, uid_t owner, gid_t group)
+{
+	return -1;
+}
+
+int
+mkdir (const char *path, mode_t mode)
+{
+	return -1;
+}
+
+
+int
+rmdir (const char *path)
+{
+	return -1;
+}
+
+long int 
+sysconf (int name)
+{
+	return -1;
+}
+
+DIR *opendir (const char *dir) 
+{
+	return NULL;
+}
+
+struct dirent *readdir (DIR *dir)
+{
+	return NULL;
+}
+
+void rewinddir (DIR *dir)
+{
+}
+
+int closedir (DIR *dir)
+{
+	return -1;
+}
+
+int pipe (int __fildes[2])
+{
+	return -1;
+}
+
+int dup2 (int __fildes, int __fildes2)
+{
+	return -1;
+}
+
+unsigned sleep (unsigned int __seconds)
+{
+	return -1;
+}
+
+unsigned alarm(unsigned __secs)
+{
+	return -1;
+}
+
+int execvp(const char *__file, char * const __argv[])
+{
+	return -1;
+}
+
+int execv(const char *path, char *const argv[])
+{
+	return -1;
+}
+
+int fcntl (int fd, int cmd, ...) 
+{
+	return -1;
+}
+
+int chdir(const char *__path)
+{
+	return -1;
+}
 
 int
 getpid(void)
