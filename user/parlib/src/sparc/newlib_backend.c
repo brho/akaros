@@ -8,11 +8,145 @@
 #include <sys/times.h>
 #include <sys/time.h>
 #include <debug.h>
-
-char *__env[1] = { 0 };
-char **environ = __env;
+#include <hart.h>
+#include <utime.h>
+#include <dirent.h>
 
 #define IS_CONSOLE(fd) ((uint32_t)(fd) < 3)
+
+/* Return the vcoreid, which is set in entry.S right before calling libmain.
+ * This should only be used in libmain() and main(), before any code that might
+ * use a register.  It just returns eax. */
+uint32_t newcore(void)
+{
+	return hart_self();
+}
+
+mode_t
+umask (mode_t mask)
+{
+	return -1;
+}
+
+int
+chmod (const char *path, mode_t mode)
+{
+	return -1;
+}
+
+int
+access (const char *pathname, int mode)
+{
+	return -1;
+}
+
+char *
+getwd (char *buf)
+{
+	return NULL;
+}
+
+long int
+pathconf (const char *path, int name) 
+{
+	return -1;
+}
+
+int
+utime (const char *filename, const struct utimbuf *buf)
+{
+	return -1;
+}
+
+int
+lstat (const char *pathname, struct stat *pstat)
+{
+	return -1;
+}
+
+int
+chown (const char *path, uid_t owner, gid_t group)
+{
+	return -1;
+}
+
+int
+mkdir (const char *path, mode_t mode)
+{
+	return -1;
+}
+
+
+int
+rmdir (const char *path)
+{
+	return -1;
+}
+
+long int 
+sysconf (int name)
+{
+	return -1;
+}
+
+DIR *opendir (const char *dir) 
+{
+	return NULL;
+}
+
+struct dirent *readdir (DIR *dir)
+{
+	return NULL;
+}
+
+void rewinddir (DIR *dir)
+{
+}
+
+int closedir (DIR *dir)
+{
+	return -1;
+}
+
+int pipe (int __fildes[2])
+{
+	return -1;
+}
+
+int dup2 (int __fildes, int __fildes2)
+{
+	return -1;
+}
+
+unsigned sleep (unsigned int __seconds)
+{
+	return -1;
+}
+
+unsigned alarm(unsigned __secs)
+{
+	return -1;
+}
+
+int execvp(const char *__file, char * const __argv[])
+{
+	return -1;
+}
+
+int execv(const char *path, char *const argv[])
+{
+	return -1;
+}
+
+int fcntl (int fd, int cmd, ...) 
+{
+	return -1;
+}
+
+int chdir(const char *__path)
+{
+	return -1;
+}
 
 int
 getpid(void)
@@ -106,7 +240,8 @@ read(int fd, void* ptr, size_t len)
 int
 open(char* name, int flags, int mode)
 {
-	return syscall(SYS_frontend,RAMP_SYSCALL_open,(int)name,flags,mode,0);
+	int ret = syscall(SYS_frontend,RAMP_SYSCALL_open,(int)name,flags,mode,0);
+	return ret;
 }
 
 int
@@ -126,31 +261,6 @@ times(struct tms* buf)
 int
 gettimeofday(struct timeval* tp, void* tzp)
 {
-	return -1;
+	return syscall(SYS_frontend,RAMP_SYSCALL_gettimeofday,(int)tp,(int)tzp,0,0);
 }
 
-/* sbrk()
- * Increase program data space. 
- * As malloc and related functions depend on this, it is 
- * useful to have a working implementation. 
- * The following suffices for a standalone system; it exploits the 
- * symbol _end automatically defined by the GNU linker.
- */
-void* sbrk(ptrdiff_t incr) 
-{
-	#define HEAP_SIZE (1<<23)
-	static uint8_t array[HEAP_SIZE];
-	static uint8_t *BND(array, array + HEAP_SIZE) heap_end = array;
-	static uint8_t *stack_ptr = &(array[HEAP_SIZE-1]);
-
-	uint8_t* prev_heap_end; 
-
-	prev_heap_end = heap_end;
-	if (heap_end + incr > stack_ptr) {
-		errno = ENOMEM;
-		return (void*CT(1))TC(-1);
-	}
-
-	heap_end += incr;
-	return (caddr_t) prev_heap_end;
-}

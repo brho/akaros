@@ -1,4 +1,3 @@
-#include <arch/mmu.h>
 #include <ros/memlayout.h>
 
 .data
@@ -10,12 +9,20 @@
 	.set procinfo, UINFO
 	.globl procdata
 	.set procdata, UDATA
-	.globl pages
-	.set pages, UPAGES
-	.globl vpt
-	.set vpt, UVPT
-	.globl vpd
-	.set vpd, (UVPT+(UVPT>>12)*4)
+
+// Stack pointers, to be allocated by the hart lib
+	.globl stack_ptr_array
+	stack_ptr_array:
+		.word 0
+	.globl tls_array
+	tls_array:
+		.word 0
+
+// TODO: We're not exposing these yet.  Think about how to do so judiciously.
+//	.globl vpt
+//	.set vpt, UVPT
+//	.globl vpd
+//	.set vpd, (UVPT+(UVPT>>12)*4)
 
 
 // Entrypoint - this is where the kernel (or our parent environment)
@@ -23,17 +30,23 @@
 .text
 .globl _start
 _start:
-	// See if we were started with arguments on the stack
-	cmpl $USTACKTOP, %esp
-	jne args_exist
+	// Are we core 0?
+	test	%eax,%eax
+	jne	notcore0
 
-	// If not, push dummy argc/argv arguments.
-	// This happens when we are loaded by the kernel,
-	// because the kernel does not know about passing arguments.
-	pushl $0
-	pushl $0
-
-args_exist:
+	// argc/argv are provided by procinfo and are accessed in parlibmain
 	call parlibmain
-1:      jmp 1b
 
+	// illegal instruction in case parlibmain accidentally returns
+	mov	(0),%eax
+
+notcore0:
+	mov	stack_ptr_array,%edx
+	mov	(%edx,%eax,4),%esp
+
+	call	hart_entry
+
+	call	hart_yield
+
+	// illegal instruction in case hart_yield accidentally returns
+	mov	(0),%eax

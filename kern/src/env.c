@@ -6,6 +6,7 @@
 
 #include <arch/arch.h>
 #include <arch/mmu.h>
+#include <arch/bitmask.h>
 #include <elf.h>
 #include <smp.h>
 
@@ -19,15 +20,13 @@
 #include <manager.h>
 #include <stdio.h>
 #include <schedule.h>
+#include <kmalloc.h>
 
 #include <ros/syscall.h>
 #include <ros/error.h>
 
 atomic_t num_envs;
 
-#define ENVGENSHIFT	12		// >= LOGNENV
-
-//
 // Initialize the kernel virtual memory layout for environment e.
 // Allocate a page directory, set e->env_pgdir and e->env_cr3 accordingly,
 // and initialize the kernel portion of the new environment's address space.
@@ -50,9 +49,8 @@ WRITES(e->env_pgdir, e->env_cr3, e->env_procinfo, e->env_procdata)
 	 * First, allocate a page for the pgdir of this process and up
 	 * its reference count since this will never be done elsewhere
 	 */
-	r = page_alloc(&pgdir);
+	r = kpage_alloc(&pgdir);
 	if(r < 0) return r;
-	page_incref(pgdir);
 
 	/*
 	 * Next, set up the e->env_pgdir and e->env_cr3 pointers to point
@@ -77,15 +75,15 @@ WRITES(e->env_pgdir, e->env_cr3, e->env_procinfo, e->env_procdata)
 
 	// VPT and UVPT map the env's own page table, with
 	// different permissions.
-	e->env_pgdir[PDX(VPT)]  = PTE(PPN(e->env_cr3), PTE_P | PTE_KERN_RW);
-	e->env_pgdir[PDX(UVPT)] = PTE(PPN(e->env_cr3), PTE_P | PTE_USER_RO);
+	e->env_pgdir[PDX(VPT)]  = PTE(LA2PPN(e->env_cr3), PTE_P | PTE_KERN_RW);
+	e->env_pgdir[PDX(UVPT)] = PTE(LA2PPN(e->env_cr3), PTE_P | PTE_USER_RO);
 
 	/*
 	 * Now allocate and insert all pages required for the shared
 	 * procinfo structure into the page table
 	 */
 	for(int i=0; i<PROCINFO_NUM_PAGES; i++) {
-		if(page_alloc(&pginfo[i]) < 0)
+		if(upage_alloc(e, &pginfo[i]) < 0)
 			goto env_setup_vm_error;
 		if(page_insert(e->env_pgdir, pginfo[i], (void*SNT)(UINFO + i*PGSIZE),
 		               PTE_USER_RO) < 0)
@@ -97,7 +95,7 @@ WRITES(e->env_pgdir, e->env_cr3, e->env_procinfo, e->env_procdata)
 	 * procdata structure into the page table
 	 */
 	for(int i=0; i<PROCDATA_NUM_PAGES; i++) {
-		if(page_alloc(&pgdata[i]) < 0)
+		if(upage_alloc(e, &pgdata[i]) < 0)
 			goto env_setup_vm_error;
 		if(page_insert(e->env_pgdir, pgdata[i], (void*SNT)(UDATA + i*PGSIZE),
 		               PTE_USER_RW) < 0)
@@ -120,7 +118,7 @@ WRITES(e->env_pgdir, e->env_cr3, e->env_procinfo, e->env_procdata)
 	 * (TODO).  Note the page is alloced only the first time through
 	 */
 	if (!shared_page) {
-		if(page_alloc(&shared_page) < 0)
+		if(upage_alloc(e, &shared_page) < 0)
 			goto env_setup_vm_error;
 		// Up it, so it never goes away.  One per user, plus one from page_alloc
 		// This is necessary, since it's in the per-process range of memory that
@@ -147,15 +145,57 @@ env_setup_vm_error:
 	return -ENOMEM;
 }
 
-//
+static void
+proc_init_procinfo(struct proc* p)
+{
+	p->env_procinfo->pid = p->pid;
+
+	// TODO: maybe do something smarter here
+	p->env_procinfo->max_harts = MAX(1,num_cpus); // hack to use all cores
+}
+
+// Sets up argc/argv in procinfo.  Returns number of
+// args successfully imported (because of size restrictions).
+// The procinfo pages must have been mapped into the user's
+// address space before this function can be called.
+size_t
+proc_init_argc_argv(struct proc* p, size_t nargs, const char** args)
+{
+	// TODO: right now we assume procinfo can be directly addressed
+	// by the kernel (i.e. it's continguous.
+	static_assert(sizeof(struct procinfo) <= PGSIZE);
+
+	if(nargs > PROCINFO_MAX_ARGC)
+		nargs = PROCINFO_MAX_ARGC;
+
+	char* argv[PROCINFO_MAX_ARGC] = {0};
+	static_assert(sizeof(argv) == sizeof(p->env_procinfo->argv));
+
+	size_t size = 0, argc;
+	for(argc = 0; argc < nargs; argc++)
+	{
+		size_t len = strnlen(args[argc],PROCINFO_MAX_ARGV_SIZE);
+		if(size+len+1 > PROCINFO_MAX_ARGV_SIZE)
+			break;
+		memcpy(&p->env_procinfo->argv_buf[size],args[argc],len+1);
+		argv[argc] = (char*)(UINFO+offsetof(struct procinfo,argv_buf)+size);
+		size += len+1;
+	}
+
+	p->env_procinfo->argc = argc;
+	memcpy(p->env_procinfo->argv,argv,sizeof(argv));
+
+	return argc;
+}
+
 // Allocate len bytes of physical memory for environment env,
 // and map it at virtual address va in the environment's address space.
-// Does not zero or otherwise initialize the mapped pages in any way.
+// Pages are zeroed by upage_alloc.
 // Pages should be writable by user and kernel.
 // Panic if any allocation attempt fails.
 //
-static void
-segment_alloc(env_t *e, void *SNT va, size_t len)
+void
+env_segment_alloc(env_t *e, void *SNT va, size_t len)
 {
 	void *SNT start, *SNT end;
 	size_t num_pages;
@@ -169,10 +209,7 @@ segment_alloc(env_t *e, void *SNT va, size_t len)
 		panic("Wrap-around in memory allocation addresses!");
 	if ((uintptr_t)end > UTOP)
 		panic("Attempting to map above UTOP!");
-	// page_insert/pgdir_walk alloc a page and read/write to it via its address
-	// starting from pgdir (e's), so we need to be using e's pgdir
-	assert(e->env_cr3 == rcr3());
-	num_pages = PPN(end - start);
+	num_pages = LA2PPN(end - start);
 
 	for (i = 0; i < num_pages; i++, start += PGSIZE) {
 		// skip if a page is already mapped.  yes, page_insert will page_remove
@@ -182,9 +219,83 @@ segment_alloc(env_t *e, void *SNT va, size_t len)
 		pte = pgdir_walk(e->env_pgdir, start, 0);
 		if (pte && *pte & PTE_P)
 			continue;
-		if ((r = page_alloc(&page)) < 0)
-			panic("segment_alloc: %e", r);
+		if ((r = upage_alloc(e, &page)) < 0)
+			panic("env_segment_alloc: %e", r);
 		page_insert(e->env_pgdir, page, start, PTE_USER_RW);
+	}
+}
+
+void
+env_segment_free(env_t *e, void *SNT va, size_t len)
+{
+	void *SNT start, *SNT end;
+	size_t num_pages;
+	page_t *page;
+	pte_t *pte;
+
+	// Round this up this time so we don't free the page that va is actually on
+	start = ROUNDUP(va, PGSIZE);
+	end = ROUNDUP(va + len, PGSIZE);
+	if (start >= end)
+		panic("Wrap-around in memory free addresses!");
+	if ((uintptr_t)end > UTOP)
+		panic("Attempting to unmap above UTOP!");
+	// page_insert/pgdir_walk alloc a page and read/write to it via its address
+	// starting from pgdir (e's), so we need to be using e's pgdir
+	assert(e->env_cr3 == rcr3());
+	num_pages = LA2PPN(end - start);
+
+	for (int i = 0; i < num_pages; i++, start += PGSIZE) {
+		// skip if a page is already unmapped. 
+		pte = pgdir_walk(e->env_pgdir, start, 0);
+		if (pte && *pte & PTE_P)
+			page_remove(e->env_pgdir,start);
+	}
+}
+
+// this helper function handles all cases of copying to/from user/kernel
+// or between two users.
+static error_t load_icode_memcpy(struct proc *dest_p, struct proc *src_p,
+                                 void* dest, const void* src, size_t len)
+{
+	if(src < (void*)UTOP)
+	{
+		if(src_p == NULL)
+			return -EFAULT;
+
+		if(dest_p == NULL)
+			return memcpy_from_user(src_p, dest, src, len);
+		else
+		{
+			// TODO: do something more elegant & faster here.
+			// e.g. a memcpy_from_user_to_user
+			uint8_t kbuf[1024];
+			while(len > 0)
+			{
+				size_t thislen = MIN(len,sizeof(kbuf));
+				if (memcpy_from_user(src_p, kbuf, src, thislen))
+					return -EFAULT;
+				if (memcpy_to_user(dest_p, dest, kbuf, thislen))
+					panic("destination env isn't mapped!");
+				len -= thislen;
+				src += thislen;
+				dest += thislen;
+			}
+			return ESUCCESS;
+		}
+
+	}
+	else
+	{
+		if(src_p != NULL)
+			return -EFAULT;
+
+		if(dest_p == NULL)
+			memcpy(dest, src, len);
+		else if(memcpy_to_user(dest_p, dest, src, len))
+			panic("destination env isn't mapped!");
+
+		return ESUCCESS;
 	}
 }
 
@@ -200,12 +311,16 @@ segment_alloc(env_t *e, void *SNT va, size_t len)
 // but not actually present in the ELF file - i.e., the program's bss section.
 //
 // Finally, this function maps one page for the program's initial stack.
-void load_icode(env_t *SAFE e, uint8_t *COUNT(size) binary, size_t size)
+static void* load_icode(env_t *SAFE e, env_t* binary_env,
+                        uint8_t *COUNT(size) binary, size_t size)
 {
 	// asw: copy the headers because they might not be aligned.
 	elf_t elfhdr;
 	proghdr_t phdr;
-	memcpy(&elfhdr, binary, sizeof(elfhdr));
+	void* _end = 0;
+
+	assert(load_icode_memcpy(NULL,binary_env,&elfhdr, binary, sizeof(elfhdr))
+	       == ESUCCESS);
 
 	int i, r;
 
@@ -214,48 +329,44 @@ void load_icode(env_t *SAFE e, uint8_t *COUNT(size) binary, size_t size)
 	// make sure we have proghdrs to load
 	assert(elfhdr.e_phnum);
 
-	// to actually access any pages alloc'd for this environment, we
-	// need to have the hardware use this environment's page tables.
-	uintreg_t old_cr3 = rcr3();
-	/*
-	 * Even though we'll decref later and no one should be killing us at this
-	 * stage, we're still going to wrap the lcr3s with incref/decref.
-	 *
-	 * Note we never decref on the old_cr3, since we aren't willing to let it
-	 * die.  It's also not clear who the previous process is - sometimes it
-	 * isn't even a process (when the kernel loads on its own, and not in
-	 * response to a syscall).  Probably need to think more about this (TODO)
-	 *
-	 * This can get a bit tricky if this code blocks (will need to think about a
-	 * decref then), if we try to change states, etc.
-	 */
-	proc_incref(e, 1);
-	lcr3(e->env_cr3);
-
 	// TODO: how do we do a runtime COUNT?
 	{TRUSTEDBLOCK // zra: TRUSTEDBLOCK until validation is done.
 	for (i = 0; i < elfhdr.e_phnum; i++) {
-		memcpy(&phdr, binary + elfhdr.e_phoff + i*sizeof(phdr), sizeof(phdr));
+		// copy phdr to kernel mem
+		assert(load_icode_memcpy(NULL,binary_env,&phdr, binary + elfhdr.e_phoff + i*sizeof(phdr), sizeof(phdr)) == ESUCCESS);
+
 		if (phdr.p_type != ELF_PROG_LOAD)
 			continue;
-        // TODO: validate elf header fields!
+		// TODO: validate elf header fields!
 		// seg alloc creates PTE_U|PTE_W pages.  if you ever want to change
 		// this, there will be issues with overlapping sections
-		segment_alloc(e, (void*SNT)phdr.p_va, phdr.p_memsz);
-		memcpy((void*)phdr.p_va, binary + phdr.p_offset, phdr.p_filesz);
-		memset((void*)phdr.p_va + phdr.p_filesz, 0, phdr.p_memsz - phdr.p_filesz);
+		_end = MAX(_end, (void*)(phdr.p_va + phdr.p_memsz));
+		env_segment_alloc(e, (void*SNT)phdr.p_va, phdr.p_memsz);
+
+		// copy section to user mem
+		assert(load_icode_memcpy(e,binary_env,(void*)phdr.p_va, binary + phdr.p_offset, phdr.p_filesz) == ESUCCESS);
+
+		//no need to memclr the remaining p_memsz-p_filesz bytes
+		//because upage_alloc'd pages are zeroed
 	}}
 
 	proc_set_program_counter(&e->env_tf, elfhdr.e_entry);
 	e->env_entry = elfhdr.e_entry;
 
-	// Now map one page for the program's initial stack
-	// at virtual address USTACKTOP - PGSIZE.
-	segment_alloc(e, (void*SNT)(USTACKTOP - PGSIZE), PGSIZE);
+	// Now map USTACK_NUM_PAGES pages for the program's initial stack
+	// starting at virtual address USTACKTOP - USTACK_NUM_PAGES*PGSIZE.
+	env_segment_alloc(e, (void*SNT)(USTACKTOP - USTACK_NUM_PAGES*PGSIZE), 
+	                  USTACK_NUM_PAGES*PGSIZE);
+	
+	return _end;
+}
 
-	// reload the original address space
-	lcr3(old_cr3);
-	proc_decref(e, 1);
+void env_load_icode(env_t* e, env_t* binary_env, uint8_t* binary, size_t size)
+{
+	/* Load the binary and set the current locations of the elf segments.
+	 * All end-of-segment pointers are page aligned (invariant) */
+	e->heap_bottom = load_icode(e, binary_env, binary, size);
+	e->heap_top = e->heap_bottom;
 }
 
 #define PER_CPU_THING(type,name)\

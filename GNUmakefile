@@ -27,22 +27,22 @@ V = @
 # Cross-compiler ros toolchain
 #
 # This Makefile will automatically use the cross-compiler toolchain
-# installed as 'i386-ros-elf-*', if one exists.  If the host tools ('gcc',
+# installed as 'i386-ros-*', if one exists.  If the host tools ('gcc',
 # 'objdump', and so forth) compile for a 32-bit x86 ELF target, that will
 # be detected as well.  If you have the right compiler toolchain installed
-# using a different name, set GCCPREFIX explicitly in conf/env.mk
+# using a different name, set GCCPREFIX explicitly in your Makelocal file
 
 # try to infer the correct GCCPREFIX
 ifndef GCCPREFIX
-GCCPREFIX := $(shell if i386-ros-elf-objdump -i 2>&1 | grep '^elf32-i386$$' >/dev/null 2>&1; \
-	then echo 'i386-ros-elf-'; \
+GCCPREFIX := $(shell if i386-ros-objdump -i 2>&1 | grep '^elf32-i386$$' >/dev/null 2>&1; \
+	then echo 'i386-ros-'; \
 	elif objdump -i 2>&1 | grep 'elf32-i386' >/dev/null 2>&1; \
 	then echo ''; \
 	else echo "***" 1>&2; \
 	echo "*** Error: Couldn't find an i386-*-elf version of GCC/binutils." 1>&2; \
-	echo "*** Is the directory with i386-ros-elf-gcc in your PATH?" 1>&2; \
+	echo "*** Is the directory with i386-ros-gcc in your PATH?" 1>&2; \
 	echo "*** If your i386-*-elf toolchain is installed with a command" 1>&2; \
-	echo "*** prefix other than 'i386-ros-elf-', set your GCCPREFIX" 1>&2; \
+	echo "*** prefix other than 'i386-ros-', set your GCCPREFIX" 1>&2; \
 	echo "*** environment variable to that prefix and run 'make' again." 1>&2; \
 	echo "*** To turn off this error, run 'gmake GCCPREFIX= ...'." 1>&2; \
 	echo "***" 1>&2; exit 1; fi)
@@ -61,7 +61,7 @@ KERN_CFLAGS := --deputy\
 USER_CFLAGS := --deputy --enable-error-db
 CC	    := ivycc --gcc=$(GCCPREFIX)gcc
 else
-CC	    := $(GCCPREFIX)gcc -std=gnu99 -fgnu89-inline
+CC	    := $(GCCPREFIX)gcc 
 endif
 
 AS	    := $(GCCPREFIX)as
@@ -72,28 +72,21 @@ OBJDUMP	:= $(GCCPREFIX)objdump
 NM	    := $(GCCPREFIX)nm
 PERL    := perl
 
+EXTRAARGS ?= -std=gnu99 -Wno-attributes -fno-stack-protector -fgnu89-inline
+
 # Universal compiler flags
 # -fno-builtin is required to avoid refs to undefined functions in the kernel.
 # Only optimize to -O1 to discourage inlining, which complicates backtraces.
 CFLAGS := $(CFLAGS) -D$(TARGET_ARCH) $(EXTRAARGS)
-CFLAGS += -O2 -pipe -MD -fno-builtin -fno-stack-protector -gstabs
-CFLAGS += -Wall -Wno-format -Wno-unused -Wno-attributes
-CFLAGS += -nostdinc -Igccinclude/$(TARGET_ARCH)
+CFLAGS += -O2 -pipe -MD -fno-builtin -gstabs
+CFLAGS += -Wall -Wno-format -Wno-unused -fno-strict-aliasing
+#CFLAGS += -nostdinc -Igccinclude/$(TARGET_ARCH)
 
 # Universal loader flags
 LDFLAGS := -nostdlib
 
 # GCC Library path 
 GCC_LIB := $(shell $(CC) -print-libgcc-file-name)
-
-# 64 Bit specific flags / definitions
-ifeq ($(TARGET_ARCH),i386)
-	ifeq ($(UNAME),x86_64)
-		CFLAGS += -m32
-		LDFLAGS += -melf_i386
-		GCC_LIB = $(shell $(CC) -print-libgcc-file-name | sed 's/libgcc.a/32\/libgcc.a/')
-	endif
-endif
 
 # List of directories that the */Makefrag makefile fragments will add to
 OBJDIRS :=
@@ -136,6 +129,9 @@ docs:
 
 doxyclean:
 	rm -rf doc/rosdoc
+
+augment-gcc: symlinks
+	scripts/augment-gcc $(dir $(shell which $(CC))).. $(TARGET_ARCH)
 
 # For deleting the build
 clean:

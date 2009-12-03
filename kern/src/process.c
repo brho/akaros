@@ -205,6 +205,10 @@ static error_t proc_alloc(struct proc *SAFE*SAFE pp, pid_t parent_id)
 
     { INITSTRUCT(*p)
 
+	// Setup the default map of where to get cache colors from
+	p->cache_colors_map = global_cache_colors_map;
+	p->next_cache_color = 0;
+
 	/* Initialize the address space */
 	if ((r = env_setup_vm(p)) < 0) {
 		kmem_cache_free(proc_cache, p);
@@ -228,6 +232,8 @@ static error_t proc_alloc(struct proc *SAFE*SAFE pp, pid_t parent_id)
 	p->env_flags = 0;
 	p->env_entry = 0; // cheating.  this really gets set in load_icode
 	p->num_vcores = 0;
+	p->heap_bottom = (void*)UTEXT;
+	p->heap_top = (void*)UTEXT;
 	memset(&p->vcoremap, -1, sizeof(p->vcoremap));
 	memset(&p->resources, 0, sizeof(p->resources));
 	memset(&p->env_ancillary_state, 0, sizeof(p->env_ancillary_state));
@@ -271,7 +277,7 @@ struct proc *proc_create(uint8_t *binary, size_t size)
 	curid = (current ? current->pid : 0);
 	if ((r = proc_alloc(&p, curid)) < 0)
 		panic("proc_create: %e", r); // one of 3 quaint usages of %e.
-	load_icode(p, binary, size);
+	env_load_icode(p, NULL, binary, size);
 	return p;
 }
 
@@ -285,6 +291,13 @@ static void __proc_free(struct proc *p)
 	printk("[PID %d] freeing proc: %d\n", current ? current->pid : 0, p->pid);
 	// All parts of the kernel should have decref'd before __proc_free is called
 	assert(p->env_refcnt == 0);
+
+	// Free any colors allocated to this process
+	if(p->cache_colors_map != global_cache_colors_map) {
+		for(int i=0; i<llc_cache->num_colors; i++)
+			cache_color_free(llc_cache, p->cache_colors_map);
+		cache_colors_map_free(p->cache_colors_map);
+	}
 
 	// Flush all mapped pages in the user portion of the address space
 	env_user_mem_free(p);
@@ -939,7 +952,8 @@ void __startcore(trapframe_t *tf, uint32_t srcid, void * a0, void * a1,
 	trapframe_t local_tf;
 	trapframe_t *tf_to_pop = (trapframe_t *CT(1))a1;
 
-	printk("[kernel] Startcore on physical core %d\n", coreid);
+	printk("[kernel] Startcore on physical core %d for Process %d\n",
+	       coreid, p_to_run->pid);
 	assert(p_to_run);
 	// TODO: handle silly state (HSS)
 	if (!tf_to_pop) {

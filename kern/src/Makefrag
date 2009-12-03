@@ -52,12 +52,29 @@ KERN_APPFILES := \
                  $(USER_APPS_ROSLIB_DIR)/mhello \
                  $(USER_APPS_ROSLIB_DIR)/mproctests \
                  $(USER_APPS_ROSLIB_DIR)/measurements \
+                 $(USER_APPS_PARLIB_PTHREAD_DIR)/pthread_test \
+                 $(USER_APPS_PARLIB_PTHREAD_DIR)/blackscholes \
                  $(USER_APPS_PARLIB_DIR)/draw_nanwan_standalone \
                  $(USER_APPS_PARLIB_DIR)/channel_test_client \
                  $(USER_APPS_PARLIB_DIR)/channel_test_server \
                  $(USER_APPS_PARLIB_DIR)/hello \
+                 $(USER_APPS_PARLIB_DIR)/manycore_test \
                  $(USER_APPS_PARLIB_DIR)/matrix
 #                 $(USER_APPS_PARLIB_DIR)/open_read
+
+ifeq ($(TARGET_ARCH),sparc)
+KERN_APPFILES += \
+                 $(USER_APPS_USR_DIR)/blackscholes \
+                 $(USER_APPS_USR_DIR)/streamcluster \
+                 $(USER_APPS_USR_DIR)/swaptions \
+                 $(USER_APPS_USR_DIR)/bodytrack \
+                 $(USER_APPS_USR_DIR)/fluidanimate \
+                 $(USER_APPS_USR_DIR)/x264 \
+                 $(USER_APPS_USR_DIR)/cpptest \
+                 $(USER_APPS_USR_DIR)/condtest \
+                 $(USER_APPS_USR_DIR)/synthetic_procobv_cacheobv_offbwobv \
+                 $(USER_APPS_USR_DIR)/synthetic_procplus_cacheplus_offbwplus 
+endif
 
 KERN_LDFLAGS   := $(KERN_LDFLAGS) -L$(OBJDIR)/$(KERN_DIR) \
                   -T $(KERN_ARCH_SRC_DIR)/kernel.ld
@@ -76,7 +93,7 @@ KERN_LDDEPENDS := $(KERN_OBJFILES) $(KERN_APPFILES) $(ARCH_DIR)/$(TARGET_ARCH)/k
 
 KERN_LDLIBS    := -livykern
 
-KERN_GCC_LIB   := $(GCC_LIB)
+KERN_GCC_LIB   ?= $(GCC_LIB)
 
 $(OBJDIR)/$(KERN_DIR)/%.o: $(KERN_DIR)/%.c
 	@echo + cc [KERN] $<
@@ -86,7 +103,7 @@ $(OBJDIR)/$(KERN_DIR)/%.o: $(KERN_DIR)/%.c
 $(OBJDIR)/$(KERN_DIR)/%.o: $(KERN_DIR)/%.S
 	@echo + as [KERN] $<
 	@mkdir -p $(@D)
-	$(V)$(CC) $(KERN_CFLAGS) -c -o $@ $<
+	$(V)$(CC) $(KERN_CFLAGS) -D__ASSEMBLER__ -c -o $@ $<
 
 $(OBJDIR)/$(KERN_DIR)/kernel: $(KERN_LDDEPENDS)
 	@echo + ld [KERN] $@
@@ -95,6 +112,8 @@ $(OBJDIR)/$(KERN_DIR)/kernel: $(KERN_LDDEPENDS)
 	$(V)$(OBJDUMP) -S $@ > $@.asm
 	$(V)$(NM) -n $@ > $@.sym
 
+all: $(OBJDIR)/$(KERN_DIR)/kernel
+
 #$(OBJDIR)/$(KERN_DIR)/bochs.img: $(OBJDIR)/$(KERN_DIR)/kernel $(OBJDIR)/$(KERN_DIR)/boot
 #	@echo + mk [KERN] $@
 #	$(V)dd if=/dev/zero of=$(OBJDIR)/$(KERN_DIR)/bochs.img~ count=10080 2>/dev/null
@@ -102,5 +121,6 @@ $(OBJDIR)/$(KERN_DIR)/kernel: $(KERN_LDDEPENDS)
 #	$(V)dd if=$(OBJDIR)/$(KERN_DIR)/kernel of=$(OBJDIR)/$(KERN_DIR)/bochs.img~ seek=1 conv=notrunc 2>/dev/null
 #	$(V)mv $(OBJDIR)/kern/bochs.img~ $(OBJDIR)/kern/bochs.img
 
-all: $(OBJDIR)/$(KERN_DIR)/kernel
-
+ifeq ($(AUGMENT_GCC),TRUE)
+all: augment-gcc
+endif

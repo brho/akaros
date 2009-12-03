@@ -10,7 +10,7 @@
 #include <string.h>
 #include <channel.h>
 #include <ros/syscall.h>
-#include <arch/arch.h>
+#include <hart.h>
 
 void simulate_rsp(channel_t* ch) {
 	channel_t ch_server;
@@ -121,7 +121,7 @@ error_t channel_sendmsg(channel_t* ch, channel_msg_t* msg) {
 	RING_PUSH_REQUESTS(&(ch->ring_side.front));
 	
 	while (!(RING_HAS_UNCONSUMED_RESPONSES(&(ch->ring_side.front))))
-		cpu_relax();
+		hart_relax();
 	RING_GET_RESPONSE(&(ch->ring_side.front), ch->ring_side.front.rsp_cons++);
 	
 	return ESUCCESS;

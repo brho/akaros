@@ -245,9 +245,8 @@ void kmem_cache_grow(struct kmem_cache *cp)
 	if (cp->obj_size <= SLAB_LARGE_CUTOFF) {
 		// Just get a single page for small slabs
 		page_t *a_page;
-		if (page_alloc(&a_page))
+		if (kpage_alloc(&a_page))
 			panic("[German Accent]: OOM!!!");
-		page_incref(a_page);
 		// the slab struct is stored at the end of the page
 		a_slab = (struct kmem_slab*)(page2kva(a_page) + PGSIZE -
 		                             sizeof(struct kmem_slab));

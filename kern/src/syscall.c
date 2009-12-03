@@ -23,6 +23,8 @@
 #include <kmalloc.h>
 #include <stdio.h>
 #include <resource.h>
+#include <colored_caches.h>
+#include <arch/bitmask.h>
 #include <kfs.h> // eventually replace this with vfs.h
 
 #ifdef __sparc_v8__
@@ -81,20 +83,19 @@ static ssize_t sys_serial_read(env_t* e, char *DANGEROUS _buf, size_t len)
 //
 
 static ssize_t sys_run_binary(env_t* e, void *DANGEROUS binary_buf,
-                              void*DANGEROUS arg, size_t len) {
-	uint8_t *CT(len) checked_binary_buf;
-	checked_binary_buf = user_mem_assert(e, binary_buf, len, PTE_USER_RO);
-
-	uint8_t* new_binary = kmalloc(len, 0);
-	if(new_binary == NULL)
-		return -ENOMEM;
-	memcpy(new_binary, checked_binary_buf, len);
-
-	env_t* env = proc_create(new_binary, len);
-	kfree(new_binary);
+                  void*DANGEROUS arg, size_t len, size_t num_colors)
+{
+	env_t* env = proc_create(0, 0);
+	env_load_icode(env, e, binary_buf, len);
 	__proc_set_state(env, PROC_RUNNABLE_S);
 	schedule_proc(env);
+	if(num_colors > 0) {
+		env->cache_colors_map = cache_colors_map_alloc();
+		for(int i=0; i<num_colors; i++)
+			cache_color_alloc(llc_cache, env->cache_colors_map);
+	}
 	proc_decref(env, 1);
+	proc_yield(e);
 	return 0;
 }
 
@@ -186,19 +187,19 @@ static ssize_t sys_shared_page_alloc(env_t* p1,
 
 	void * COUNT(1) * COUNT(1) addr = user_mem_assert(p1, _addr, sizeof(void *),
                                                       PTE_USER_RW);
-	env_t* p2 = pid2proc(p2_id);
+	struct proc *p2 = pid2proc(p2_id);
 	if (!p2)
 		return -EBADPROC;
 
 	page_t* page;
-	error_t e = page_alloc(&page);
+	error_t e = upage_alloc(p1, &page);
 	if (e < 0) {
 		proc_decref(p2, 1);
 		return e;
 	}
 
 	void* p2_addr = page_insert_in_range(p2->env_pgdir, page,
-	                                     (void*SNT)UTEXT, (void*SNT)UTOP, p2_flags);
+	                (void*SNT)UTEXT, (void*SNT)UTOP, p2_flags);
 	if (p2_addr == NULL) {
 		page_free(page);
 		proc_decref(p2, 1);
@@ -206,7 +207,7 @@ static ssize_t sys_shared_page_alloc(env_t* p1,
 	}
 
 	void* p1_addr = page_insert_in_range(p1->env_pgdir, page,
-	                                    (void*SNT)UTEXT, (void*SNT)UTOP, p1_flags);
+	                (void*SNT)UTEXT, (void*SNT)UTOP, p1_flags);
 	if(p1_addr == NULL) {
 		page_remove(p2->env_pgdir, p2_addr);
 		page_free(page);
@@ -274,7 +275,7 @@ static void sys_cache_buster(struct proc *p, uint32_t num_writes,
 	if (num_pages) {
 		spin_lock(&buster_lock);
 		for (int i = 0; i < MIN(num_pages, MAX_PAGES); i++) {
-			page_alloc(&a_page[i]);
+			upage_alloc(p, &a_page[i]);
 			page_insert(p->env_pgdir, a_page[i], (void*)INSERT_ADDR + PGSIZE*i,
 			            PTE_USER_RW);
 		}
@@ -343,6 +344,20 @@ static pid_t sys_getpid(struct proc *p)
 static uint32_t sys_getcpuid(void)
 {
 	return core_id();
+}
+
+// TODO: Temporary hack until thread-local storage is implemented on i386
+static size_t sys_getvcoreid(env_t* e)
+{
+	if(e->state == PROC_RUNNING_S)
+		return 0;
+
+	size_t i;
+	for(i = 0; i < e->num_vcores; i++)
+		if(core_id() == e->vcoremap[i])
+			return i;
+
+	panic("virtual core id not found in sys_getvcoreid()!");
 }
 
 /* Destroy proc pid.  If this is called by the dying process, it will never
@@ -433,6 +448,26 @@ static error_t sys_proc_run(struct proc *p, unsigned pid)
 	return retval;
 }
 
+static error_t sys_brk(struct proc *p, void* addr) {
+	size_t range;
+
+	if((addr < p->heap_bottom) || (addr >= (void*)USTACKBOT))
+		return -EINVAL;
+	if(addr == p->heap_top)
+		return ESUCCESS;
+
+	if (addr > p->heap_top) {
+		range = addr - p->heap_top;
+		env_segment_alloc(p, p->heap_top, range);
+	}
+	else if (addr < p->heap_top) {
+		range = p->heap_top - addr;
+		env_segment_free(p, addr, range);
+	}
+	p->heap_top = addr;
+	return ESUCCESS;
+}
+
 /* Executes the given syscall.
  *
  * Note tf is passed in, which points to the tf of the context on the kernel
@@ -482,6 +517,8 @@ intreg_t syscall(struct proc *p, uintreg_t syscallno, uintreg_t a1,
 			return sys_cgetc(p); // this will need to block
 		case SYS_getcpuid:
 			return sys_getcpuid();
+		case SYS_getvcoreid:
+			return sys_getvcoreid(p);
 		case SYS_getpid:
 			return sys_getpid(p);
 		case SYS_proc_destroy:
@@ -503,8 +540,7 @@ intreg_t syscall(struct proc *p, uintreg_t syscallno, uintreg_t a1,
 			_a6 = args[2];
 			return (intreg_t) mmap(p, a1, a2, a3, _a4, _a5, _a6);
 		case SYS_brk:
-			printk("brk not implemented yet\n");
-			return -EINVAL;
+			return sys_brk(p, (void*)a1);
 		case SYS_resource_req:
 			return resource_req(p, a1, a2, a3, a4);
 
@@ -515,8 +551,8 @@ intreg_t syscall(struct proc *p, uintreg_t syscallno, uintreg_t a1,
 			return sys_serial_read(p, (char *DANGEROUS)a1, (size_t)a2);
 	#endif
 		case SYS_run_binary:
-			return sys_run_binary(p, (char *DANGEROUS)a1,
-			                      (char* DANGEROUS)a2, (size_t)a3);
+			return sys_run_binary(p, (char *DANGEROUS)a1, (char* DANGEROUS)a2, 
+			                                           (size_t)a3, (size_t)a4);
 	#ifdef __NETWORK__
 		case SYS_eth_write:
 			return sys_eth_write(p, (char *DANGEROUS)a1, (size_t)a2);
@@ -527,6 +563,10 @@ intreg_t syscall(struct proc *p, uintreg_t syscallno, uintreg_t a1,
 		case SYS_frontend:
 			return frontend_syscall_from_user(p,a1,a2,a3,a4);
 	#endif
+
+		case SYS_reboot:
+			reboot();
+			return 0;
 
 		default:
 			// or just return -EINVAL

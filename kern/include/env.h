@@ -22,10 +22,8 @@ typedef struct Env env_t;
 struct Env {
 	TAILQ_ENTRY(Env) proc_link NOINIT;	// Free list link pointers
 	spinlock_t proc_lock;
-	trapframe_t env_tf 						// Saved registers
-	  __attribute__((aligned (8)));			// for sparc --asw
-	ancillary_state_t env_ancillary_state 	// State saved when descheduled
-	  __attribute__((aligned (8)));			// for sparc --asw
+	trapframe_t env_tf; 						// Saved registers
+	ancillary_state_t env_ancillary_state; 	// State saved when descheduled
 	pid_t pid;
 	pid_t ppid;                 // Parent's PID
 	uint32_t state;				// Status of the process
@@ -38,8 +36,18 @@ struct Env {
 	int32_t vcoremap[MAX_NUM_CPUS];
 	uint32_t num_vcores;
 
+	/* Cache color map: bitmap of the cache colors currently allocated to this
+	 * process */
+	uint8_t* cache_colors_map;
+	size_t next_cache_color;
+
 	/* Info about this process's resources (granted, desired) for each type. */
 	struct resource resources[MAX_NUM_RESOURCES];
+
+	/* Keeps track of this process's current memory allocation 
+     * (i.e. its heap pointer) */
+	void* heap_bottom;
+	void* heap_top;
 
 	// Address space
 	pde_t *COUNT(NPDENTRIES) env_pgdir;			// Kernel virtual address of page dir
@@ -65,10 +73,12 @@ struct Env {
 extern atomic_t num_envs;		// Number of envs
 
 int		env_setup_vm(env_t *e);
-void	load_icode(env_t *SAFE e, uint8_t *COUNT(size) binary, size_t size);
 void	env_push_ancillary_state(env_t* e);
 void	env_pop_ancillary_state(env_t* e);
 void	env_user_mem_free(env_t* e);
+void	env_segment_alloc(env_t *e, void *SNT va, size_t len);
+void	env_segment_free(env_t *e, void *SNT va, size_t len);
+void	env_load_icode(env_t* e, env_t* binary_env, uint8_t *COUNT(size) binary, size_t size);
 
 // The following three functions do not return
 void	env_pop_tf(trapframe_t *tf) __attribute__((noreturn));

@@ -1,6 +1,7 @@
 #include <arch/sparc.h>
 #include <arch/trap.h>
 #include <arch/mmu.h>
+#include <arch/trap_table.h>
 #include <ros/memlayout.h>
 
 	.section	".text"!,#alloc,#execinstr,#progbits
@@ -11,34 +12,30 @@
 	.global handle_trap
 handle_trap:
 
-	# At this point, %l1 = pc, %l2 = npc, and %l0/3/4/5
-	# might contain an active message.  so we only get %l6/%l7
+	// At this point, %l1 = pc, %l2 = npc, and %l0/3/4/5
+	// might contain an active message.  so we only get %l6/%l7
 
-        # calculate stack pointer (-64 is space for window spill)
-        # sp = bootstacktop - core_id*KSTKSIZE - 64 - sizeof(trapframe_t)
-        set     bootstacktop-64-SIZEOF_TRAPFRAME_T-SIZEOF_ACTIVE_MESSAGE_T,%l6
+        // calculate stack pointer (-64 is space for window spill).
+        // sp = bootstacktop - core_id*KSTKSIZE - 64 - sizeof(trapframe_t).
+	// should you change this, make sure to change stack_fucked()
+        set     bootstacktop-64-SIZEOF_TRAPFRAME_T,%l6
         mov     CORE_ID_REG,%l7
 	sll	%l7,KSTKSHIFT,%l7
         sub     %l6,%l7,%l6
 
-	# see if trap came from kernel; if so, use that stack
-	# also preserve the psr, since we'll screw with the condition codes
+	// see if trap came from kernel; if so, use that stack
+	// also preserve the psr, since we'll screw with the condition codes
 	mov	%psr,%l7
 	btst	PSR_PS,%l7
 	bne,a	1f
-	 sub	%fp,64+SIZEOF_TRAPFRAME_T+SIZEOF_ACTIVE_MESSAGE_T,%l6
+	 sub	%fp,64+SIZEOF_TRAPFRAME_T,%l6
 
-1:	# back up what might be an active message
-	st	%l0,[%l6+64+SIZEOF_TRAPFRAME_T+0]
-	st	%l3,[%l6+64+SIZEOF_TRAPFRAME_T+4]
-	st	%l4,[%l6+64+SIZEOF_TRAPFRAME_T+8]
-	st	%l5,[%l6+64+SIZEOF_TRAPFRAME_T+12]
-	st	%g0,[%l6+64+SIZEOF_TRAPFRAME_T+16]
+	// here is where we might do something with an active message
 
-	mov	%l7,%l0
-	# At this point we may use %l3/4/5/7 as temporary regs
+1:	mov	%l7,%l0
+	// At this point we may use %l3/4/5/7 as temporary regs
 
-	# is CWP valid?
+	// is CWP valid?
 	and	%l0,PSR_CWP,%l4	! %l4 = cwp
 	mov	1,%l7
 	sll	%l7,%l4,%l4	! %l4 = 1 << cwp
@@ -50,8 +47,8 @@ handle_trap:
 	 nop
 
 
-	# At this point we may use %o0-7, %l3/4/5/7 as temporary regs
-	# save the whole user context to a trapframe_t
+	// At this point we may use %o0-7, %l3/4/5/7 as temporary regs
+	// save the whole user context to a trapframe_t
 
 2:	mov	%l0,%psr
 	mov	%l6,%sp
@@ -60,14 +57,14 @@ handle_trap:
 	call	env_save_tf
 	 add	%sp,64,%o0
 
-	# enable traps (but not interrupts)
+	// enable traps (but not interrupts)
 	or	%l0,PSR_PIL,%l3
 	wr	%l3,0,%psr
 	wr	%l3,PSR_ET,%psr
 
-	# spill all trapper's windows out to the stack.
-	# the 'save' may trap (triggering the spill),
-	# and if the stack is corrupted, the process may die
+	// spill all trapper's windows out to the stack.
+	// the 'save' may trap (triggering the spill),
+	// and if the stack is corrupted, the process may die
 	set	NWINDOWS,%g1
 	ld	[%g1],%g1
 	sub	%g1,1,%g2
@@ -75,25 +72,24 @@ handle_trap:
 	bne,a	5b
 tflush:	 save	%sp,0,%sp
 
-	# get our old cwp back (restore should NOT trap)
+	// get our old cwp back (restore should NOT trap)
 	sub	%g1,1,%g2
 6:	deccc	%g2
 	bne,a	6b
 	 restore
 
-	# restore interrupt level
+	// restore interrupt level
 	wr	%l0,PSR_ET,%psr
 
-	# call the handler and pass in the tf, message, and handler addr
+	// call the handler and pass in the tf, message, and handler addr
 	add	%sp,64,%o0
-	add	%sp,64+SIZEOF_TRAPFRAME_T,%o1
 	call	trap
-	 mov	%l5,%o2
+	 mov	%l5,%o1
 
-	# should never get here
+	// should never get here
 	unimp
 
-# void env_save_tf(trapframe_t* tf, uint32_t trap_pc, uint32_t trap_npc)
+// void env_save_tf(trapframe_t* tf, uint32_t trap_pc, uint32_t trap_npc)
 	.global env_save_tf
 env_save_tf:
 
@@ -145,14 +141,14 @@ env_save_tf:
 	.global	env_pop_tf
 env_pop_tf:
 
-	# disable interrupts.
-	# since wrpsr/rdpsr is interruptible, all interrupt handlers
-	# must restore the psr to its interrupt-time value
+	// disable interrupts.
+	// since wrpsr/rdpsr is interruptible, all interrupt handlers
+	// must restore the psr to its interrupt-time value
 	mov	%psr,%o1
 	or	%o1,PSR_PIL,%o2
 	wr	%o2,%psr
 
-	# spill all kernel windows to the stack
+	// spill all kernel windows to the stack
 	set	NWINDOWS,%g1
 	ld	[%g1],%g1
 	sub	%g1,1,%g2
@@ -160,18 +156,24 @@ env_pop_tf:
 	bne,a	5b
 	 save	%sp,0,%sp
 
-	# get our old cwp back (restore should NOT trap)
+	// get our old cwp back (restore should NOT trap)
 	sub	%g1,1,%g2
 6:	deccc	%g2
 	bne,a	6b
 	 restore
 	
 
-	# disable traps, and restore interrupt level
+	// disable traps, and restore interrupt level
 	wr	%o2,PSR_ET,%psr
 	wr	%o1,PSR_ET,%psr
 
-	# is (CWP+1) % NWINDOWS valid?
+	// if we did this right (and didn't get an NMI!),
+	// then (CWP+1) % NWINDOWS should be invalid.  fix that.
+	save
+	mov	%i0,%o0
+
+#if 0
+	// is (CWP+1) % NWINDOWS valid?
 	and	%o1,PSR_CWP,%o2
 	set	NWINDOWS,%o1
 	ld	[%o1],%o1
@@ -192,7 +194,9 @@ env_pop_tf:
 	 save	%o3,0,%l7		! fill returns to %l7
 	restore
 
-	# restore user context
+#endif
+
+	// restore user context
 4:	mov	%o0,%g2
 	restore
 	ldd	[%g2+32],%o0
@@ -230,7 +234,7 @@ env_pop_tf:
 	jmp	%l1
 	rett	%l2
 
-	.global send_active_message
-send_active_message:
+	.global send_active_message_raw
+send_active_message_raw:
 	retl
-	 .word	0x81f00000	! this is the opcode for SENDAM
+	 .word	0x81f00000

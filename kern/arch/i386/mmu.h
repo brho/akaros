@@ -5,6 +5,8 @@
 #include <ros/common.h>
 #endif
 
+#include <ros/arch/mmu.h>
+
 /*
  * This file contains definitions for the x86 memory management unit (MMU),
  * including paging- and segmentation-related data structures and constants,
@@ -31,7 +33,8 @@
 // use PGADDR(PDX(la), PTX(la), PGOFF(la)).
 
 // page number field of address
-#define PPN(la)		(((uintptr_t) (la)) >> PTXSHIFT)
+#define LA2PPN(la)	(((uintptr_t) (la)) >> PTXSHIFT)
+#define PTE2PPN(pte)	LA2PPN(pte)
 #define VPN(la)		PPN(la)		// used to index into vpt[]
 
 // page directory index
@@ -56,13 +59,6 @@
 // Page directory and page table constants.
 #define NPDENTRIES	1024		// page directory entries per page directory
 #define NPTENTRIES	1024		// page table entries per page table
-
-#define PGSIZE		4096		// bytes mapped by a page
-#define JPGSIZE		4096*1024	// bytes mapped by a jumbo page (4MB)
-#define PGSHIFT		12		// log2(PGSIZE)
-
-#define PTSIZE		(PGSIZE*NPTENTRIES) // bytes mapped by a page directory entry
-#define PTSHIFT		22		// log2(PTSIZE)
 
 #define PTXSHIFT	12		// offset of PTX in a linear address
 #define PDXSHIFT	22		// offset of PDX in a linear address

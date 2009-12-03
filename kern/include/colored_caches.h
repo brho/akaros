@@ -9,36 +9,47 @@
 #define ROS_KERN_COLORED_CACHES_H
 
 #include <ros/common.h>
+#include <ros/error.h>
+#include <atomic.h>
 
 /****************** Cache Structures ********************/
 typedef struct Cache {
 	size_t wa;
 	size_t sz_k;
 	size_t clsz;
+	uint8_t* free_colors_map;
 	
 	//Added as optimization (derived from above);
 	size_t num_colors;
 } cache_t;
 
 typedef struct AvailableCaches {
-	uint8_t l1 : 1;
-	uint8_t l2 : 1;
-	uint8_t l3 : 1;
-
-	// Pointer to the last level cache
-	cache_t RO*   llc;
+	cache_t* l1;
+	cache_t* l2;
+	cache_t* l3;
 } available_caches_t;
 
 /******** Externally visible global variables ************/
-extern cache_t RO l1,l2,l3;
 extern available_caches_t RO available_caches;
+extern cache_t* llc_cache;
+extern spinlock_t cache_colors_lock;
 
 /************** Cache Related Functions  *****************/
 void cache_init();
+void cache_color_alloc_init();
 void init_cache_properties(cache_t RO*c, size_t sz_k, size_t wa, size_t clsz);
+void init_free_cache_colors_map(cache_t* c);
 size_t get_page_color(uintptr_t page, cache_t RO*c);
 size_t get_offset_in_cache_line(uintptr_t addr, cache_t RO*c);
 void print_cache_properties(char *NT lstring, cache_t RO*c);
+
+uint8_t* cache_colors_map_alloc();
+void cache_colors_map_free(uint8_t* colors_map);
+error_t cache_color_alloc(cache_t* c, uint8_t* colors_map);
+error_t cache_color_alloc_specific(size_t color, cache_t* c, 
+                                         uint8_t* colors_map);
+void cache_color_free(cache_t* c, uint8_t* colors_map);
+void cache_color_free_specific(size_t color, cache_t* c, uint8_t* colors_map);
 
 /****************** Cache Properties *********************/
 inline size_t get_cache_ways_associative(cache_t RO*c);

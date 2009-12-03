@@ -1,0 +1,18 @@
+USER_APPS_PARLIB_PTHREAD_DIR := $(USER_APPS_PARLIB_DIR)/pthread
+
+USER_APPS_PARLIB_PTHREAD_LDLIBS := $(USER_APPS_PARLIB_LDLIBS)
+
+USER_APPS_PARLIB_PTHREAD_LDDEPENDS := $(OBJDIR)/$(USER_APPS_PARLIB_PTHREAD_DIR)/%.o \
+                                      $(USER_APPS_PARLIB_LDOBJS) \
+                                      $(OBJDIR)/$(USER_PARLIB_DIR)/libparlib.a \
+                                      $(OBJDIR)/$(USER_PARLIB_DIR)/libpthread.a \
+                                      $(OBJDIR)/$(USER_PARLIB_DIR)/libivyparlib.a
+
+$(OBJDIR)/$(USER_APPS_PARLIB_PTHREAD_DIR)/%: $(USER_APPS_PARLIB_PTHREAD_LDDEPENDS)
+	@echo + ld [APPS PARLIB PTHREAD] $@
+	$(V)$(LD) -o $@ $(USER_APPS_PARLIB_LDFLAGS) $@.o \
+                    $(USER_APPS_PARLIB_LDOBJS) $(USER_APPS_PARLIB_LDDIRS) \
+                    $(USER_APPS_PARLIB_PTHREAD_LDLIBS) \
+                    $(USER_APPS_PARLIB_GCC_LIB)
+	$(V)$(OBJDUMP) -S $@ > $@.asm
+	$(V)$(NM) -n $@ > $@.sym

@@ -30,7 +30,7 @@ static __inline uint32_t read_tbr(void) __attribute__((always_inline));
 static __inline uint32_t read_mmu_reg(uint32_t which) __attribute__((always_inline));
 static __inline uint32_t read_y(void) __attribute__((always_inline));
 static __inline uint32_t read_fsr(void) __attribute__((always_inline));
-static __inline uint64_t read_perfctr(uint32_t which) __attribute__((always_inline));
+static __inline uint64_t read_perfctr(uint32_t core, uint32_t which) __attribute__((always_inline));
 static __inline void write_psr(uint32_t val) __attribute__((always_inline));
 static __inline void write_wim(uint32_t val) __attribute__((always_inline));
 static __inline void write_tbr(uint32_t val) __attribute__((always_inline));
@@ -39,6 +39,7 @@ static __inline void write_y(uint32_t val) __attribute__((always_inline));
 static __inline void write_fsr(uint32_t val) __attribute__((always_inline));
 static __inline uint32_t memsize_mb(void) __attribute__((always_inline));
 static __inline uint32_t mmu_probe(uint32_t va) __attribute__((always_inline));
+static __inline uint32_t send_ipi(uint32_t dst) __attribute__((always_inline));
 
 void flush_windows();
 
@@ -92,10 +93,10 @@ read_fsr(void)
 }
 
 static __inline uint64_t
-read_perfctr(uint32_t which)
+read_perfctr(uint32_t cpu, uint32_t which)
 {
 	uint32_t hi,lo;
-	intptr_t addr = which<<3;
+	intptr_t addr = cpu<<10 | which<<3;
 	hi = load_alternate(addr,2);
 	lo = load_alternate(addr+4,2);
 	return (((uint64_t)hi) << 32) | lo;
@@ -157,6 +158,13 @@ static __inline uint32_t
 mmu_probe(uint32_t va)
 {
 	return load_alternate((va & ~0xFFF) | 0x400, 3);
+}
+
+static __inline uint32_t
+send_ipi(uint32_t dst)
+{
+	store_alternate(2 << 16 | dst << 10, 2, 0);
+	return 0;
 }
 
 #endif /* !__ASSEMBLER__ */

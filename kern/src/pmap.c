@@ -289,7 +289,7 @@ void* user_mem_check(env_t *env, const void *DANGEROUS va, size_t len, int perm)
 		warn("Blimey!  Wrap around in VM range calculation!");	
 		return NULL;
 	}
-	num_pages = PPN(end - start);
+	num_pages = LA2PPN(end - start);
 	for (i = 0; i < num_pages; i++, start += PGSIZE) {
 		page_perms = get_va_perms(env->env_pgdir, start);
 		// ensures the bits we want on are turned on.  if not, error out
@@ -379,7 +379,7 @@ user_mem_assert(env_t *env, const void *DANGEROUS va, size_t len, int perm)
 		return NULL;
 	}
 	
-    void *COUNT(len) res = user_mem_check(env,va,len,perm | PTE_USER_RO);
+	void *COUNT(len) res = user_mem_check(env,va,len,perm | PTE_USER_RO);
 	if (!res) {
 		cprintf("[%08x] user_mem_check assertion failure for "
 			"va %08x\n", env->pid, user_mem_check_addr);
@@ -419,7 +419,7 @@ error_t memcpy_from_user(env_t* env, void* COUNT(len) dest,
 	if(start >= (void*SNT)ULIM || end >= (void*SNT)ULIM)
 		return -EFAULT;
 
-	num_pages = PPN(end - start);
+	num_pages = LA2PPN(end - start);
 	for(i = 0; i < num_pages; i++)
 	{
 		pte = pgdir_walk(env->env_pgdir, start+i*PGSIZE, 0);
@@ -474,7 +474,7 @@ error_t memcpy_to_user(env_t* env, void*DANGEROUS va,
 	if(start >= (void*SNT)ULIM || end >= (void*SNT)ULIM)
 		return -EFAULT;
 
-	num_pages = PPN(end - start);
+	num_pages = LA2PPN(end - start);
 	for(i = 0; i < num_pages; i++)
 	{
 		pte = pgdir_walk(env->env_pgdir, start+i*PGSIZE, 0);

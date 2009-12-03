@@ -3,9 +3,9 @@
 #include <arch/trap.h>
 #include <ros/memlayout.h>
 
-# before spilling a window, we must be certain
-# that %sp is 8-byte aligned and the range [%sp,%sp+64)
-# is validly mapped in
+// before spilling a window, we must be certain
+// that %sp is 8-byte aligned and the range [%sp,%sp+64)
+// is validly mapped in
 #define VALIDATE_STACK(reg1,reg2,misaligned,pagefault)	\
 	mov	%psr,reg1		;\
 	btst	7,%sp			;\
@@ -119,7 +119,7 @@ spill_patchme:
 	jmp	%l7+8
 	mov	%l4,%g1
 
-# spill failed!
+// spill failed!
 1:	restore
 	RETHROW_TRAP(stack_misaligned)
 2:	restore
@@ -166,7 +166,7 @@ fill_patchme:
 	mov	%l4,%g1
 
 
-# spill failed!
+// spill failed!
 3:	save
 	save
 	RETHROW_TRAP(stack_misaligned)

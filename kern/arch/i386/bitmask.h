@@ -10,15 +10,45 @@
 #include <atomic.h>
 #include <stdio.h>
 
-#define BYTES_FOR_BITMASK(size) (((size) - 1) / 8 + 1)
-#define BYTES_FOR_BITMASK_WITH_CHECK(size) ((size) ? ((size) - (1)) / (8) + (1) : (0))
-#define DECL_BITMASK(name, size) uint8_t (name)[BYTES_FOR_BITMASK((size))]
+#define DECL_BITMASK(name, size) \
+	uint8_t (name)[BYTES_FOR_BITMASK((size))]
 
-#define GET_BITMASK_BIT(name, bit) (((name)[(bit)/8] & (1 << ((bit) % 8))) ? 1 : 0)
-#define SET_BITMASK_BIT(name, bit) ((name)[(bit)/8] |= (1 << ((bit) % 8)))
-#define CLR_BITMASK_BIT(name, bit) ((name)[(bit)/8] &= ~(1 << ((bit) % 8)))
-#define SET_BITMASK_BIT_ATOMIC(name, bit) (atomic_orb(&(name)[(bit)/8], (1 << ((bit) % 8))))
-#define CLR_BITMASK_BIT_ATOMIC(name, bit) (atomic_andb(&(name)[(bit)/8], ~(1 << ((bit) % 8))))
+#define BYTES_FOR_BITMASK(size) \
+	(((size) - 1) / 8 + 1)
+
+#define BYTES_FOR_BITMASK_WITH_CHECK(size) \
+	((size) ? ((size) - (1)) / (8) + (1) : (0))
+
+static bool GET_BITMASK_BIT(uint8_t* name, size_t bit) 
+{
+	return (((name)[(bit)/8] & (1 << ((bit) % 8))) ? 1 : 0);
+}
+
+#define SET_BITMASK_BIT(name, bit) \
+	((name)[(bit)/8] |= (1 << ((bit) % 8)));
+/*
+static void SET_BITMASK_BIT(uint8_t* name, size_t bit)
+{
+	((name)[(bit)/8] |= (1 << ((bit) % 8)));
+}
+*/
+
+#define CLR_BITMASK_BIT(name, bit) \
+	((name)[(bit)/8] &= ~(1 << ((bit) % 8)));
+/*
+static void CLR_BITMASK_BIT(uint8_t* name, size_t bit) 
+{
+	((name)[(bit)/8] &= ~(1 << ((bit) % 8)));
+}
+*/
+
+static void SET_BITMASK_BIT_ATOMIC(uint8_t* name, size_t bit) 
+{
+	(atomic_orb(&(name)[(bit)/8], (1 << ((bit) % 8))));
+}
+
+#define CLR_BITMASK_BIT_ATOMIC(name, bit) \
+	(atomic_andb(&(name)[(bit)/8], ~(1 << ((bit) % 8))))
 
 #define CLR_BITMASK(name, size) \
 ({ \
@@ -56,14 +86,59 @@
 	} \
 	clear; })
 
+static inline bool BITMASK_IS_FULL(uint8_t* map, size_t size)
+{
+	int _size = size;
+	for (int i = 0; i < BYTES_FOR_BITMASK(size); i++) {
+		for (int j = 0; j < MIN(8,_size); j++)
+			if(!((map[i] >> j) &1))
+				return FALSE;
+			_size--;
+	}
+	return TRUE;
+}
+
 #define PRINT_BITMASK(name, size) { \
 	int i;	\
+	int _size = size; \
 	for (i = 0; i < BYTES_FOR_BITMASK(size); i++) { \
 		int j;	\
-		for (j = 0; j < 8; j++) \
+		for (j = 0; j < MIN(8,_size); j++) \
 			printk("%x", ((name)[i] >> j) & 1);	\
+			_size--; \
 	} \
 	printk("\n"); \
 }
 
+static inline bool BITMASK_IS_SET_IN_RANGE(uint8_t* m, size_t beg, size_t end)
+{
+	for(size_t i=beg; i<end; i++) {
+		if(!GET_BITMASK_BIT(m, i))
+			return FALSE;
+	}
+	return TRUE;
+}
+
+static inline bool BITMASK_IS_CLR_IN_RANGE(uint8_t* m, size_t beg, size_t end)
+{
+	for(size_t i=beg; i<end; i++) {
+		if(GET_BITMASK_BIT(m, i))
+			return FALSE;
+	}
+	return TRUE;
+}
+
+static inline void SET_BITMASK_RANGE(uint8_t* m, size_t beg, size_t end)
+{
+	for(size_t i=beg; i<end; i++) {
+		SET_BITMASK_BIT(m, i);
+	}
+}
+
+static inline void CLR_BITMASK_RANGE(uint8_t* m, size_t beg, size_t end)
+{
+	for(size_t i=beg; i<end; i++) {
+		CLR_BITMASK_BIT(m, i);
+	}
+}
 #endif /* ROS_ARCH_BITMASK_H */

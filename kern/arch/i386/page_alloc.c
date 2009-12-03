@@ -15,20 +15,14 @@
 #include <pmap.h>
 #include <kmalloc.h>
 
-// llc stands for last-level-cache
-uint16_t RO llc_num_colors;
 spinlock_t colored_page_free_list_lock;
 
-page_list_t LCKD(&colored_page_free_list_lock) * CT(llc_num_colors) RO
+page_list_t LCKD(&colored_page_free_list_lock) * CT(llc_cache->num_colors) RO
   colored_page_free_list = NULL;
 
-static void page_alloc_bootstrap(cache_t RO* llc) {
-	// Initialize the properties of the last level cache used by this allocator
-	size_t nc = get_cache_num_page_colors(llc);
-	llc_num_colors = SINIT(nc);
-
+static void page_alloc_bootstrap() {
 	// Allocate space for the array required to manage the free lists
-	size_t list_size = llc_num_colors*sizeof(page_list_t);
+	size_t list_size = llc_cache->num_colors*sizeof(page_list_t);
 	page_list_t LCKD(&colored_page_free_list_lock)*tmp =
 	    (page_list_t*)boot_alloc(list_size,PGSIZE);
 	colored_page_free_list = SINIT(tmp);
@@ -42,17 +36,15 @@ static void page_alloc_bootstrap(cache_t RO* llc) {
  */
 void page_alloc_init()
 {
-	cache_t RO* llc = available_caches.llc;
-
 	// First Bootstrap the page alloc process
 	static bool RO bootstrapped = FALSE;
 	if(!bootstrapped) {
 		bootstrapped = SINIT(TRUE);
-		page_alloc_bootstrap(llc);
+		page_alloc_bootstrap();
 	}
 
 	// Then, initialize the array required to manage the colored page free list
-	for(int i=0; i<llc_num_colors; i++) {
+	for(int i=0; i<llc_cache->num_colors; i++) {
 		LIST_INIT(&(colored_page_free_list[i]));
 	}
 
@@ -73,32 +65,35 @@ void page_alloc_init()
 	// alloc the second page, since we will need it later to init the other cores
 	// probably need to be smarter about what page we use (make this dynamic) TODO
 	pages[1].page_ref = 1;
-	for (i = 2; i < PPN(IOPHYSMEM); i++) {
+	for (i = 2; i < LA2PPN(IOPHYSMEM); i++) {
 		pages[i].page_ref = 0;
 		LIST_INSERT_HEAD(
-		   &(colored_page_free_list[get_page_color(page2ppn(&pages[i]), llc)]),
+		   &(colored_page_free_list[get_page_color(page2ppn(&pages[i]), 
+			                                       llc_cache)]),
 		   &pages[i],
 		   page_link
 		);
 	}
-	for (i = PPN(IOPHYSMEM); i < PPN(EXTPHYSMEM); i++) {
+	for (i = LA2PPN(IOPHYSMEM); i < LA2PPN(EXTPHYSMEM); i++) {
 		pages[i].page_ref = 1;
 	}
-	for (i = PPN(EXTPHYSMEM); i < PPN(physaddr_after_kernel); i++) {
+	for (i = LA2PPN(EXTPHYSMEM); i < LA2PPN(physaddr_after_kernel); i++) {
 		pages[i].page_ref = 1;
 	}
-	for (i = PPN(physaddr_after_kernel); i < PPN(maxaddrpa); i++) {
+	for (i = LA2PPN(physaddr_after_kernel); i < LA2PPN(maxaddrpa); i++) {
 		pages[i].page_ref = 0;
 		LIST_INSERT_HEAD(
-		   &(colored_page_free_list[get_page_color(page2ppn(&pages[i]), llc)]),
+		   &(colored_page_free_list[get_page_color(page2ppn(&pages[i]), 
+			                                       llc_cache)]),
 		   &pages[i],
 		   page_link
 		);
 	}
 	// this block out all memory above maxaddrpa.  will need another mechanism
 	// to allocate and map these into the kernel address space
-	for (i = PPN(maxaddrpa); i < npages; i++) {
+	for (i = LA2PPN(maxaddrpa); i < npages; i++) {
 		pages[i].page_ref = 1;
 	}
+	printk("Page alloc init successful\n");
 }
 

@@ -14,6 +14,8 @@ USER_PARLIB_SRC_SRCFILES := $(USER_PARLIB_SRC_DIR)/debug.c \
                             $(USER_PARLIB_SRC_DIR)/syscall.c \
                             $(USER_PARLIB_SRC_DIR)/parlibmain.c \
                             $(USER_PARLIB_SRC_DIR)/channel.c \
+                            $(USER_PARLIB_SRC_DIR)/hart.c \
+                            $(USER_PARLIB_SRC_DIR)/newlib_backend.c \
                             $(USER_PARLIB_ARCH_SRCFILES)
 
 USER_PARLIB_SRC_OBJFILES := $(patsubst $(USER_PARLIB_SRC_DIR)/%.c, \
@@ -22,6 +24,15 @@ USER_PARLIB_SRC_OBJFILES := $(patsubst $(USER_PARLIB_SRC_DIR)/%.c, \
 USER_PARLIB_SRC_OBJFILES := $(patsubst $(USER_PARLIB_SRC_DIR)/%.S, \
                             $(OBJDIR)/$(USER_PARLIB_SRC_DIR)/%.o, \
                             $(USER_PARLIB_SRC_OBJFILES))
+
+USER_PARLIB_PTHREAD_SRCFILES := $(USER_PARLIB_SRC_DIR)/pthread.c
+
+USER_PARLIB_PTHREAD_OBJFILES := $(patsubst $(USER_PARLIB_SRC_DIR)/%.c, \
+                                $(OBJDIR)/$(USER_PARLIB_SRC_DIR)/%.o, \
+                                $(USER_PARLIB_PTHREAD_SRCFILES))
+USER_PARLIB_PTHREAD_OBJFILES := $(patsubst $(USER_PARLIB_SRC_DIR)/%.S, \
+                                $(OBJDIR)/$(USER_PARLIB_SRC_DIR)/%.o, \
+                                $(USER_PARLIB_PTHREAD_OBJFILES))
 
 ANNOTS := $(shell dirname $(shell which ivycc))
 ANNOTS := $(ANNOTS)/../lib/ivy/include/deputy/annots.h
@@ -39,10 +50,29 @@ $(OBJDIR)/$(USER_PARLIB_SRC_DIR)/%.o: $(USER_PARLIB_SRC_DIR)/%.c $(PATCHFILE)
 $(OBJDIR)/$(USER_PARLIB_SRC_DIR)/%.o: $(USER_PARLIB_SRC_DIR)/%.S
 	@echo + as [PARLIB] $<
 	@mkdir -p $(@D)
-	$(V)$(CC) $(USER_PARLIB_SRC_CFLAGS) -c -o $@ $<
+	$(V)$(CC) $(USER_PARLIB_SRC_CFLAGS) -D__ASSEMBLER__ -c -o $@ $<
 
 $(OBJDIR)/$(USER_PARLIB_DIR)/libparlib.a: $(USER_PARLIB_SRC_OBJFILES)
 	@echo + ar [PARLIB] $@
 	@mkdir -p $(@D)
 	$(V)$(AR) r $@ $(USER_PARLIB_SRC_OBJFILES) 2>/dev/null
+
+$(OBJDIR)/$(USER_PARLIB_DIR)/libparlib-pthread.a: $(USER_PARLIB_DIR)/newlib/lib/$(TARGET_ARCH)/libc.a $(USER_PARLIB_DIR)/newlib/lib/$(TARGET_ARCH)/libg.a $(USER_PARLIB_DIR)/newlib/lib/$(TARGET_ARCH)/libm.a $(OBJDIR)/$(USER_PARLIB_DIR)/libparlib.a $(OBJDIR)/$(USER_PARLIB_DIR)/libpthread.a
+	@mkdir -p $(OBJDIR)/$(USER_PARLIB_DIR)/tmp
+	@rm -f $(OBJDIR)/$(USER_PARLIB_DIR)/*.o
+	@cp $(USER_PARLIB_DIR)/newlib/lib/$(TARGET_ARCH)/libc.a $(OBJDIR)/$(USER_PARLIB_DIR)/tmp
+	@cp $(USER_PARLIB_DIR)/newlib/lib/$(TARGET_ARCH)/libg.a $(OBJDIR)/$(USER_PARLIB_DIR)/tmp
+	@cp $(USER_PARLIB_DIR)/newlib/lib/$(TARGET_ARCH)/libm.a $(OBJDIR)/$(USER_PARLIB_DIR)/tmp
+	@cd $(OBJDIR)/$(USER_PARLIB_DIR)/tmp; $(AR) x libc.a
+	@cd $(OBJDIR)/$(USER_PARLIB_DIR)/tmp; $(AR) x libg.a
+	@cd $(OBJDIR)/$(USER_PARLIB_DIR)/tmp; $(AR) x libm.a
+	@cd $(OBJDIR)/$(USER_PARLIB_DIR)/tmp; $(AR) x $(GCC_LIB)
+	@echo + ar [PARLIB] $@
+	@mkdir -p $(@D)
+	$(V)$(AR) r $@ $(USER_PARLIB_PTHREAD_OBJFILES) $(USER_PARLIB_SRC_OBJFILES) $(OBJDIR)/$(USER_PARLIB_DIR)/tmp/*.o 2>/dev/null
+
+$(OBJDIR)/$(USER_PARLIB_DIR)/libpthread.a: $(USER_PARLIB_PTHREAD_OBJFILES)
+	@echo + ar [PARLIB] $@
+	@mkdir -p $(@D)
+	$(V)$(AR) r $@ $(USER_PARLIB_PTHREAD_OBJFILES) 2>/dev/null
 

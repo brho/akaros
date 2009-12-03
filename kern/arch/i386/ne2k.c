@@ -168,6 +168,7 @@ int ne2k_scan_pci() {
 
 void ne2k_configure_nic() {
 	
+	printk("I made it here...\n");
 	ne2k_debug("-->Configuring Device.\n");
 	
 	// Reset. Yes reading from this addr resets it

@@ -3,8 +3,9 @@
 
 #ifndef __ASSEMBLER__
 #include <ros/common.h>
-#include <arch/mmu.h>
 #endif /* not __ASSEMBLER__ */
+
+#include <ros/arch/mmu.h>
 
 /*
  * This file contains definitions for memory management in our OS,
@@ -48,8 +49,10 @@
  *                     +------------------------------+ 0xbebfe000
  *                     |       Empty Memory (*)       | --/--  PGSIZE
  *    USTACKTOP  --->  +------------------------------+ 0xbebfd000
- *                     |      Normal User Stack       | RW/RW  PGSIZE
- *                     +------------------------------+ 0xbebfc000
+ *                     |      Normal User Stack       | RW/RW  256*PGSIZE (1MB)
+ *                     +------------------------------+ 0xbeafd000
+ *                     |       Empty Memory (*)       | --/--  PGSIZE
+ *    USTACKBOT  --->  +------------------------------+ 0xbeafc000
  *                     |                              |
  *                     |                              |
  *                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -130,6 +133,11 @@
 // Next page left invalid to guard against exception stack overflow; then:
 // Top of normal user stack
 #define USTACKTOP	(UXSTACKTOP - 2*PGSIZE)
+// Maximum stack depth preallocated to 1MB
+#define USTACK_NUM_PAGES	256
+// Next page left invalid to guard against stack overflow
+// Maximum bottom of normal user stack
+#define USTACKBOT	(USTACKTOP - (USTACK_NUM_PAGES+1)*PGSIZE)
 
 // Where user programs generally begin
 #define UTEXT		(2*PTSIZE)

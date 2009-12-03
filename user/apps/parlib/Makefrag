@@ -2,8 +2,8 @@ USER_APPS_PARLIB_DIR = $(USER_APPS_DIR)/parlib
 OBJDIRS += $(USER_APPS_PARLIB_DIR)
 
 USER_APPS_PARLIB_CFLAGS    := $(USER_CFLAGS)  \
-                              -I$(USER_PARLIB_NEWLIB_DIR)/include \
-                              -I$(USER_PARLIB_DIR)/inc
+                              -I$(USER_PARLIB_DIR)/inc \
+                              -I$(USER_PARLIB_NEWLIB_DIR)/include
 ifeq ($(COMPILER),IVY)
 	PATCHFILE = $(OBJDIR)/$(USER_PARLIB_DIR)/libc_patch.i
 	USER_APPS_PARLIB_CFLAGS    += --nodeputy --nopatch #--patch=$(PATCHFILE) 
@@ -15,24 +15,31 @@ USER_APPS_PARLIB_LDFLAGS   := $(USER_LDFLAGS) -static \
 USER_APPS_PARLIB_LDDIRS    := -L$(OBJDIR)/$(USER_PARLIB_DIR) \
                               -L$(USER_PARLIB_NEWLIB_DIR)/lib/$(TARGET_ARCH)
 
-USER_APPS_PARLIB_LDLIBS    := --start-group -lc -lm -lg -lparlib -livyparlib --end-group
+USER_APPS_PARLIB_LDLIBS    := --start-group -lc -lm -lg -lparlib -lpthread \
+                              -livyparlib --end-group
 
-USER_APPS_PARLIB_LDOBJS    := $(OBJDIR)/$(USER_PARLIB_ARCH_SRC_DIR)/entry.o \
+USER_APPS_PARLIB_LDOBJS    := \
+                              $(OBJDIR)/$(USER_PARLIB_ARCH_SRC_DIR)/entry.o \
+                              $(OBJDIR)/$(USER_PARLIB_ARCH_SRC_DIR)/crtbegin.o \
+                              $(OBJDIR)/$(USER_PARLIB_ARCH_SRC_DIR)/crtend.o \
                               $(OBJDIR)/$(USER_APPS_PARLIB_DIR)/readline.o \
                               $(OBJDIR)/$(USER_APPS_PARLIB_DIR)/file_io.o \
                               $(OBJDIR)/$(USER_APPS_PARLIB_DIR)/file_error.o \
                               $(OBJDIR)/$(USER_APPS_PARLIB_DIR)/clrscrn.o \
                               $(OBJDIR)/$(USER_APPS_PARLIB_DIR)/draw_nanwan.o \
                               $(OBJDIR)/$(USER_APPS_PARLIB_DIR)/run_binary.o \
+                              $(OBJDIR)/$(USER_APPS_PARLIB_DIR)/run_binary_colored.o \
                               $(OBJDIR)/$(USER_APPS_PARLIB_DIR)/change_user.o  
 
 
 USER_APPS_PARLIB_LDDEPENDS := $(USER_APPS_PARLIB_LDOBJS) \
                               $(OBJDIR)/$(USER_PARLIB_DIR)/libparlib.a \
                               $(OBJDIR)/$(USER_PARLIB_DIR)/libivyparlib.a \
-                              $(OBJDIR)/$(USER_APPS_PARLIB_DIR)/%.o       
+                              $(OBJDIR)/$(USER_APPS_PARLIB_DIR)/%.o
 
 USER_APPS_PARLIB_GCC_LIB   := $(GCC_LIB)
+
+include $(USER_APPS_PARLIB_DIR)/pthread/Makefrag
 
 $(OBJDIR)/$(USER_APPS_PARLIB_DIR)/%.o: $(USER_APPS_PARLIB_DIR)/%.c $(PATCHFILE)
 	@echo + cc [APPS PARLIB] $<
@@ -46,4 +53,3 @@ $(OBJDIR)/$(USER_APPS_PARLIB_DIR)/%: $(USER_APPS_PARLIB_LDDEPENDS)
                     $(USER_APPS_PARLIB_LDLIBS) $(USER_APPS_PARLIB_GCC_LIB)
 	$(V)$(OBJDUMP) -S $@ > $@.asm
 	$(V)$(NM) -n $@ > $@.sym
-

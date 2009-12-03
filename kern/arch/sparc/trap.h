@@ -10,7 +10,7 @@
 
 typedef struct
 {
-	uint32_t gpr[32];
+	uint32_t gpr[32] __attribute__((aligned (8)));
 	uint32_t psr;
 	uint32_t pc;
 	uint32_t npc;
@@ -24,9 +24,18 @@ typedef struct
 
 typedef struct
 {
-	uint32_t fpr[32];
+	uint32_t fpr[32] __attribute__((aligned (8)));
 	uint32_t fsr;
 } ancillary_state_t;
+
+void access_exception(trapframe_t* state);
+void real_fp_exception(trapframe_t* state, ancillary_state_t* astate);
+void address_unaligned(trapframe_t* state);
+void illegal_instruction(trapframe_t* state);
+
+void save_fp_state(ancillary_state_t* silly);
+void restore_fp_state(ancillary_state_t* silly);
+void emulate_fpu(trapframe_t* state, ancillary_state_t* astate);
 
 #endif /* !__ASSEMBLER__ */
 

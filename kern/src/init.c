@@ -30,7 +30,9 @@
 #include <hashtable.h>
 
 #include <arch/init.h>
+#include <arch/bitmask.h>
 #include <slab.h>
+#include <kfs.h>
 
 // zra: flag for Ivy
 int booting = 1;
@@ -61,14 +63,15 @@ void kernel_init(multiboot_info_t *mboot_info)
 
 	multiboot_print_memory_map((multiboot_info_t*CT(1))KADDR((physaddr_t)mboot_info));
 
-	vm_init();
-
-	cache_init();
-	page_init();
-	page_check();
-	kmem_cache_init();
+	vm_init();                      // Sets up pages tables, turns on paging
+	cache_init();					// Determine systems's cache properties
+	page_init();					// Initializes free page list, etc
+	kmem_cache_init();              // Sets up slab allocator
 	kmalloc_init();
 	hashtable_init();
+	cache_color_alloc_init();       // Inits data structs
+	colored_page_alloc_init();      // Allocates colors for agnostic processes
+	page_check();
 
 	idt_init();
 	active_msg_init();
@@ -77,6 +80,10 @@ void kernel_init(multiboot_info_t *mboot_info)
 	
 	// At this point our boot paths diverge based on arch. 
 	arch_init();
+		
+//	printk("Starting tests....\n");
+//	test_color_alloc();
+//	printk("Testing complete....\n");
 
 	// zra: let's Ivy know we're done booting
 	booting = 0;
@@ -98,6 +105,9 @@ void _panic(const char *file, int line, const char *fmt,...)
 	cprintf("\n");
 	va_end(ap);
 
+	#ifndef __i386__
+		reboot();
+	#endif
 dead:
 	/* break into the kernel monitor, if we're core 0 */
 	if (core_id()) {

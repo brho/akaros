@@ -1,0 +1,55 @@
+#!/bin/bash
+
+function overwrite
+{
+	for i in `find $1 -iname $3`
+	do
+		if [ ! -f $i.bak ]
+		then
+			cp $i $i.bak
+		fi
+		cp $2 $i
+	done
+}
+
+if [ -z "$1" -o -z "$2" ]
+then
+	echo usage: $1 path-to-ros-gcc target-arch
+	exit
+fi
+
+overwrite $1 obj/user/parlib/src/$2/crtbegin.o crtbegin.o
+overwrite $1 obj/user/parlib/src/$2/crtend.o crtend.o
+overwrite $1 obj/user/parlib/src/$2/entry.o crt0.o
+
+LIBGCC=`find $1 -iname libgcc.a.bak`
+if [ -z "$LIBGCC" ]
+then
+	LIBGCC=`find $1 -iname libgcc.a`
+fi
+LIBC=`find $1 -iname libc.a`
+LIBM=`find $1 -iname libm.a`
+LIBG=`find $1 -iname libg.a`
+LIBPARLIB=../obj/user/parlib/libparlib.a
+LIBPTHREAD=../obj/user/parlib/libpthread.a
+rm -rf tmp
+mkdir tmp
+cd tmp
+ar x $LIBPARLIB
+for i in *.o; do mv $i first-$i; ar xN 1 $LIBPARLIB $i 2> /dev/null; done
+ar rcs libgcc.a *.o; rm *.o
+ar x $LIBPTHREAD
+for i in *.o; do mv $i first-$i; ar xN 1 $LIBPTHREAD $i 2> /dev/null; done
+ar rcs libgcc.a *.o; rm *.o
+ar x $LIBGCC
+ar x $LIBC
+ar x $LIBM
+ar x $LIBG
+ar rcs libgcc.a *.o
+cd ..
+
+overwrite $1 tmp/libgcc.a libgcc.a
+rm -rf tmp
+
+SYS_INC=`find $1 -iname sys-include`
+cp -Lr user/parlib/inc/* $SYS_INC

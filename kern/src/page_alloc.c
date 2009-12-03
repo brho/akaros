@@ -10,13 +10,35 @@
 #endif
 
 #include <sys/queue.h>
+#include <arch/bitmask.h>
 #include <page_alloc.h>
 #include <pmap.h>
 #include <string.h>
+#include <kmalloc.h>
+
+#define l1 (available_caches.l1)
+#define l2 (available_caches.l2)
+#define l3 (available_caches.l3)
 
 static void __page_decref(page_t *CT(1) page);
+static void __page_incref(page_t *CT(1) page);
 static error_t __page_alloc_specific(page_t** page, size_t ppn);
 static error_t __page_free(page_t *CT(1) page);
+
+// Global list of colors allocated to the general purpose memory allocator
+uint8_t* global_cache_colors_map;
+
+void colored_page_alloc_init()
+{
+	global_cache_colors_map = 
+	       kmalloc(BYTES_FOR_BITMASK(llc_cache->num_colors), 0);
+	CLR_BITMASK(global_cache_colors_map, llc_cache->num_colors);
+	cache_color_alloc(llc_cache, global_cache_colors_map);
+	cache_color_alloc(llc_cache, global_cache_colors_map);
+	cache_color_alloc(llc_cache, global_cache_colors_map);
+	cache_color_alloc(llc_cache, global_cache_colors_map);
+	cache_color_alloc(llc_cache, global_cache_colors_map);
+}
 
 /**
  * @brief Clear a Page structure.
@@ -24,40 +46,70 @@ static error_t __page_free(page_t *CT(1) page);
  * The result has null links and 0 refcount.
  * Note that the corresponding physical page is NOT initialized!
  */
-static void page_clear(page_t *SAFE page)
+static void __page_clear(page_t *SAFE page)
 {
 	memset(page, 0, sizeof(page_t));
 }
 
-error_t page_alloc_from_color_range(page_t** page,  
-                                    uint16_t base_color,
-                                    uint16_t range) {
-
-	// Find first available color with pages available
-    //  in the proper range
-	int i = base_color;
-	spin_lock_irqsave(&colored_page_free_list_lock);
-	for(i; i<(base_color+range); i++) {
-		if(!LIST_EMPTY(&colored_page_free_list[i]))
-			break;
-	}
-	// Alocate a page from that color
-	if(i < (base_color+range)) {
-		*page = LIST_FIRST(&colored_page_free_list[i]);
-		LIST_REMOVE(*page, page_link);
-		page_clear(*page);
-		spin_unlock_irqsave(&colored_page_free_list_lock);
-		return ESUCCESS;
-	}
-	spin_unlock_irqsave(&colored_page_free_list_lock);
+#define __PAGE_ALLOC_FROM_RANGE_GENERIC(page, base_color, range, predicate) \
+	/* Find first available color with pages available */                   \
+    /* in the given range */                                                \
+	int i = base_color;                                                     \
+	for (i; i < (base_color+range); i++) {                                  \
+		if((predicate))                                                     \
+			break;                                                          \
+	}                                                                       \
+	/* Allocate a page from that color */                                   \
+	if(i < (base_color+range)) {                                            \
+		*page = LIST_FIRST(&colored_page_free_list[i]);                     \
+		LIST_REMOVE(*page, page_link);                                      \
+		__page_clear(*page);                                                \
+		return i;                                                           \
+	}                                                                       \
 	return -ENOMEM;
+
+static ssize_t __page_alloc_from_color_range(page_t** page,  
+                                           uint16_t base_color,
+                                           uint16_t range) 
+{
+	__PAGE_ALLOC_FROM_RANGE_GENERIC(page, base_color, range, 
+	                 !LIST_EMPTY(&colored_page_free_list[i]));
+}
+
+static ssize_t __page_alloc_from_color_map_range(page_t** page, uint8_t* map, 
+                                              size_t base_color, size_t range)
+{  
+	__PAGE_ALLOC_FROM_RANGE_GENERIC(page, base_color, range, 
+		    GET_BITMASK_BIT(map, i) && !LIST_EMPTY(&colored_page_free_list[i]))
+}
+
+static ssize_t __colored_page_alloc(uint8_t* map, page_t** page, 
+                                               size_t next_color)
+{
+	ssize_t ret;
+	if((ret = __page_alloc_from_color_map_range(page, map, 
+	                           next_color, llc_cache->num_colors - next_color)) < 0)
+		ret = __page_alloc_from_color_map_range(page, map, 0, next_color);
+	return ret;
+}
+
+/* Internal version of page_alloc_specific.  Grab the lock first. */
+static error_t __page_alloc_specific(page_t** page, size_t ppn)
+{
+	page_t* sp_page = ppn2page(ppn);
+	if( sp_page->page_ref != 0 )
+		return -ENOMEM;
+	*page = sp_page;
+	LIST_REMOVE(*page, page_link);
+
+	__page_clear(*page);
+	return 0;
 }
 
 /**
- * @brief Allocates a physical page from a pool of unused physical memory
+ * @brief Allocates a physical page from a pool of unused physical memory.
  *
- * Does NOT set the contents of the physical page to zero -
- * the caller must do that if necessary.
+ * Zeroes the page.
  *
  * @param[out] page  set to point to the Page struct
  *                   of the newly allocated page
@@ -65,9 +117,38 @@ error_t page_alloc_from_color_range(page_t** page,
  * @return ESUCCESS on success
  * @return -ENOMEM  otherwise
  */
-error_t page_alloc(page_t** page) 
+error_t upage_alloc(struct proc* p, page_t** page)
 {
-	return page_alloc_from_color_range(page, 0, llc_num_colors);
+	spin_lock_irqsave(&colored_page_free_list_lock);
+	ssize_t ret = __colored_page_alloc(p->cache_colors_map, 
+	                                     page, p->next_cache_color);
+	spin_unlock_irqsave(&colored_page_free_list_lock);
+
+	if(ret >= 0)
+	{
+		memset(page2kva(*page),0,PGSIZE);
+		p->next_cache_color = (ret + 1) % llc_cache->num_colors;
+	}
+	return ret;
+}
+
+error_t kpage_alloc(page_t** page) 
+{
+	static size_t next_color = 0;
+	ssize_t ret;
+	spin_lock_irqsave(&colored_page_free_list_lock);
+	if((ret = __page_alloc_from_color_range(page, next_color, 
+	                            llc_cache->num_colors)) < 0)
+		ret = __page_alloc_from_color_range(page, 0, next_color);
+
+	if(ret >= 0) {
+		next_color = ret;        
+		page_incref(*page);
+		ret = ESUCCESS;
+	}
+	spin_unlock_irqsave(&colored_page_free_list_lock);
+	
+	return ret;
 }
 
 /**
@@ -127,84 +208,6 @@ void free_cont_pages(void *buf, size_t order)
 }
 
 /*
- * This macro defines multiple functions of the form:
- * error_t _cache##_page_alloc(page_t** page, size_t color)
- *
- * Each of these functions operates on a different level of 
- * of the cache heirarchy, and allocates a physical page
- * from the list of pages corresponding to the supplied 
- * color for the given cache.  
- * 
- * Does NOT set the contents of the physical page to zero -
- * the caller must do that if necessary.
- *
- * color       -- the color from which to allocate a page
- * *page       -- is set to point to the Page struct 
- *                of the newly allocated page
- *
- * RETURNS 
- *   ESUCCESS  -- on success
- *   -ENOMEM   -- otherwise 
- *
- * error_t _cache##_page_alloc(page_t** page, size_t color)
- * {
- *	 if(!LIST_EMPTY(&(_cache##_cache_colored_page_list)[(color)])) {
- *	  *(page) = LIST_FIRST(&(_cache##_cache_colored_page_list)[(color)]);
- *		 LIST_REMOVE(*page, global_link);
- *		 REMOVE_CACHE_COLORING_PAGE_FROM_FREE_LISTS(page);
- *		 page_clear(*page);
- *		 return ESUCCESS;
- *	 }
- *	 return -ENOMEM;
- * }
- */
-error_t l1_page_alloc(page_t** page, size_t color)
-{
-	if(available_caches.l1)
-	{
-		uint16_t range = llc_num_colors / get_cache_num_page_colors(&l1);
-		uint16_t base_color = color*range;
-		return page_alloc_from_color_range(page, base_color, range);
-	}
-	return -ENOCACHE;
-}
-
-error_t l2_page_alloc(page_t** page, size_t color)
-{
-	if(available_caches.l2)
-	{
-		uint16_t range = llc_num_colors / get_cache_num_page_colors(&l2);
-		uint16_t base_color = color*range;
-		return page_alloc_from_color_range(page, base_color, range);
-	}
-	return -ENOCACHE;
-}
-
-error_t l3_page_alloc(page_t** page, size_t color)
-{
-	if(available_caches.l3)
-	{
-		uint16_t range = llc_num_colors / get_cache_num_page_colors(&l3);
-		uint16_t base_color = color*range;
-		return page_alloc_from_color_range(page, base_color, range);
-	}
-	return -ENOCACHE;
-}
-
-/* Internal version of page_alloc_specific.  Grab the lock first. */
-static error_t __page_alloc_specific(page_t** page, size_t ppn)
-{
-	page_t* sp_page = ppn2page(ppn);
-	if( sp_page->page_ref != 0 )
-		return -ENOMEM;
-	*page = sp_page;
-	LIST_REMOVE(*page, page_link);
-
-	page_clear(*page);
-	return 0;
-}
-
-/*
  * Allocates a specific physical page.
  * Does NOT set the contents of the physical page to zero -
  * the caller must do that if necessary.
@@ -217,10 +220,19 @@ static error_t __page_alloc_specific(page_t** page, size_t ppn)
  *   ESUCCESS  -- on success
  *   -ENOMEM   -- otherwise 
  */
-error_t page_alloc_specific(page_t** page, size_t ppn)
+error_t upage_alloc_specific(struct proc* p, page_t** page, size_t ppn)
 {
 	spin_lock_irqsave(&colored_page_free_list_lock);
 	__page_alloc_specific(page, ppn);
+	spin_unlock_irqsave(&colored_page_free_list_lock);
+	return 0;
+}
+
+error_t kpage_alloc_specific(page_t** page, size_t ppn)
+{
+	spin_lock_irqsave(&colored_page_free_list_lock);
+	__page_alloc_specific(page, ppn);
+	page_incref(*page);
 	spin_unlock_irqsave(&colored_page_free_list_lock);
 	return 0;
 }
@@ -232,11 +244,10 @@ error_t page_alloc_specific(page_t** page, size_t ppn)
  */
 static error_t __page_free(page_t* page) 
 {
-	page_clear(page);
-	cache_t* llc = available_caches.llc;
+	__page_clear(page);
 
 	LIST_INSERT_HEAD(
-	   &(colored_page_free_list[get_page_color(page2ppn(page), llc)]),
+	   &(colored_page_free_list[get_page_color(page2ppn(page), llc_cache)]),
 	   page,
 	   page_link
 	);
@@ -268,6 +279,11 @@ int page_is_free(size_t ppn) {
  */
 void page_incref(page_t *page)
 {
+	__page_incref(page);
+}
+
+void __page_incref(page_t *page)
+{
 	page->page_ref++;
 }
 
@@ -288,6 +304,10 @@ void page_decref(page_t *page)
  */
 static void __page_decref(page_t *page)
 {
+	if (page->page_ref == 0) {
+		panic("Trying to Free already freed page: %d...\n", page2ppn(page));
+		return;
+	}
 	if (--page->page_ref == 0)
 		__page_free(page);
 }

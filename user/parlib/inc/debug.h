@@ -1,7 +1,9 @@
 #ifndef PARLIB_INC_DEBUG_H
 #define PARLIB_INC_DEBUG_H
 
+#ifndef __va_list__
 typedef __builtin_va_list va_list;
+#endif
 
 #define va_start(v,l)   __builtin_va_start(v,l)
 #define va_end(v)	__builtin_va_end(v)
