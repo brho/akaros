@@ -10,7 +10,12 @@
  * write-orderings are respected.  (Used by x86) */
 #define wmb_f() wmb()
 
-typedef volatile uint32_t spinlock_t;
+typedef struct
+{
+	volatile uint32_t rlock;
+} spinlock_t;
+
+#define SPINLOCK_INITIALIZER {0}
 
 // atomic_t is void*, so we can't accidentally dereference it
 typedef void* atomic_t;
@@ -81,14 +86,14 @@ static inline uint32_t atomic_swap(uint32_t* addr, uint32_t val)
 static inline uint32_t spin_trylock(spinlock_t*SAFE lock)
 {
 	uint32_t reg;
-	asm volatile("ldstub [%1+3],%0" : "=r"(reg) : "r"(lock) : "memory");
+	asm volatile("ldstub [%1+3],%0" : "=r"(reg) : "r"(&lock->rlock) : "memory");
 	return reg;
 }
 
 static inline uint32_t spin_locked(spinlock_t*SAFE lock)
 {
 	uint32_t reg;
-	asm volatile("ldub [%1+3],%0" : "=r"(reg) : "r"(lock));
+	asm volatile("ldub [%1+3],%0" : "=r"(reg) : "r"(&lock->rlock));
 	return reg;
 }
 
@@ -101,7 +106,16 @@ static inline void spin_lock(spinlock_t*SAFE lock)
 static inline void spin_unlock(spinlock_t*SAFE lock)
 {
 	wmb();
-	asm volatile("stub %%g0,[%0+3]" : : "r"(lock) : "memory");
+	asm volatile("stub %%g0,[%0+3]" : : "r"(&lock->rlock) : "memory");
+}
+
+static inline void spinlock_init(spinlock_t* lock)
+{
+	lock->rlock = 0;
+}
+
+static inline void spinlock_debug(spinlock_t* lock)
+{
 }
 
 #endif /* !ROS_INCLUDE_ATOMIC_H */

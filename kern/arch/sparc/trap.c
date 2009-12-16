@@ -8,6 +8,7 @@
 #include <manager.h>
 #include <stdio.h>
 #include <smp.h>
+#include <slab.h>
 
 #ifdef __SHARC__
 #pragma nosharc
@@ -17,7 +18,7 @@
 #pragma nodeputy
 #endif
 
-spinlock_t active_message_buf_busy[MAX_NUM_CPUS] = {0};
+spinlock_t active_message_buf_busy[MAX_NUM_CPUS] = {SPINLOCK_INITIALIZER};
 active_message_t active_message_buf[MAX_NUM_CPUS];
 
 uint32_t send_active_message(uint32_t dst, amr_t pc,
@@ -269,15 +270,12 @@ handle_syscall(trapframe_t* state)
 	state->pc = state->npc;
 	state->npc += 4;
 
-	// this comment is from i386.  we don't save silly state early either
-	// hopefully you don't need to save it now.  let me know if otherwise
-	static_assert(0);
 	/* Note we are not preemptively saving the TF in the env_tf.  We do maintain
 	 * a reference to it in current_tf (a per-cpu pointer).
 	 * In general, only save the tf and any silly state once you know it
 	 * is necessary (blocking).  And only save it in env_tf when you know you
 	 * are single core (PROC_RUNNING_S) */
-	set_current_tf(tf);
+	set_current_tf(state);
 	// TODO: must save other cores' ancillary state
 	//if(current->vcoremap[0] == core_id())
 	//	env_push_ancillary_state(current); // remove this if you don't need it
@@ -324,8 +322,6 @@ handle_breakpoint(trapframe_t* state)
 	state->pc = state->npc;
 	state->npc += 4;
 
-	// see comment above about tf's
-	static_assert(0);
 	// TODO: must save other cores' ancillary state
 	// if we want them to migrate, block, etc.
 	//if(current->vcoremap[0] == core_id())
@@ -335,4 +331,11 @@ handle_breakpoint(trapframe_t* state)
 	monitor(state);
 
 	assert(0);
+}
+
+struct kmem_cache *active_msg_cache;
+void active_msg_init(void)
+{
+	active_msg_cache = kmem_cache_create("active_msgs",
+	                   sizeof(struct active_message), HW_CACHE_ALIGN, 0, 0, 0);
 }

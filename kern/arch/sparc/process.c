@@ -17,7 +17,7 @@
 void
 proc_init_arch(struct proc *SAFE p)
 {
-	pid_t parent_id = p->env_parent_id, id = p->env_id;
+	pid_t parent_id = p->ppid, id = p->pid;
 	if(frontend_syscall(parent_id,RAMP_SYSCALL_proc_init,id,0,0))
 		panic("Front-end server couldn't initialize new process!");
 }
@@ -26,7 +26,7 @@ proc_init_arch(struct proc *SAFE p)
 void
 proc_free_arch(struct proc *SAFE p)
 {
-	if(frontend_syscall(0,RAMP_SYSCALL_proc_free,p->env_id,0,0))
+	if(frontend_syscall(0,RAMP_SYSCALL_proc_free,p->pid,0,0))
 		panic("Front-end server couldn't free process!");
 }
 

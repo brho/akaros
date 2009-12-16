@@ -31,7 +31,7 @@ smp_boot(void)
 void
 smp_init(void)
 {
-	static spinlock_t report_in_lock = 0;
+	static spinlock_t report_in_lock = SPINLOCK_INITIALIZER;
 
 	cprintf("Good morning, Vietnam! (core id = %d)\n",core_id());
 
@@ -43,7 +43,7 @@ smp_init(void)
 }
 
 handler_wrapper_t
-wrapper_pool[MAX_NUM_CPUS*8] = {{{0},0}};
+wrapper_pool[MAX_NUM_CPUS*8] = {{{0},SPINLOCK_INITIALIZER}};
 
 handler_wrapper_t*
 smp_make_wrapper()
@@ -94,12 +94,12 @@ int smp_call_function_all(isr_t handler, void* data,
 		if(i == core_id())
 			continue;
 
-		send_active_msg_sync(i,(amr_t)smp_call_wrapper,
+		send_active_message(i,(amr_t)smp_call_wrapper,
 	        	                  handler, wrapper, data);
 	}
 
 	// send to me
-	send_active_msg_sync(core_id(),(amr_t)smp_call_wrapper,
+	send_active_message(core_id(),(amr_t)smp_call_wrapper,
 	                          handler,wrapper,data);
 
 	cpu_relax(); // wait to get the interrupt
@@ -124,7 +124,7 @@ int smp_call_function_single(uint32_t dest, isr_t handler, void* data,
 
 	enable_irqsave(&state);
 
-	send_active_msg_sync(dest,(amr_t)smp_call_wrapper,
+	send_active_message(dest,(amr_t)smp_call_wrapper,
 	                          handler,wrapper,data);
 
 	cpu_relax(); // wait to get the interrupt, if it's to this core
@@ -149,7 +149,6 @@ int smp_call_wait(handler_wrapper_t* wrapper)
  * core calls this at some point in the smp_boot process. */
 void smp_percpu_init(void)
 {
-	static_assert(0);
 	uint32_t coreid = core_id();
 	STAILQ_INIT(&per_cpu_info[coreid].active_msgs);
 }

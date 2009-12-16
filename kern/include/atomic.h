@@ -61,7 +61,7 @@ struct barrier {
 	spinlock_t lock;
 	uint32_t init_count;
 	uint32_t current_count;
-    volatile uint8_t ready;
+	volatile uint8_t ready;
 };
 
 typedef struct barrier RACY barrier_t;

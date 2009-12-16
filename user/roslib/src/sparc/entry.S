@@ -19,6 +19,9 @@
 	.set vpd, (UVPT+(UVPT>>12)*4)
 
 .align 4
+.globl in_multi_mode
+in_multi_mode:
+   .word 0
 .globl stack_ptr_array
 stack_ptr_array:
    .word 0

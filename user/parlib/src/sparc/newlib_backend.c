@@ -258,7 +258,7 @@ int chdir(const char *name)
 int
 getpid(void)
 {
-	return procinfo.id;
+	return procinfo.pid;
 }
 
 void

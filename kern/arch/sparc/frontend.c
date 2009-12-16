@@ -16,7 +16,7 @@ volatile int magic_mem[10];
 int32_t frontend_syscall_from_user(env_t* p, int32_t syscall_num, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t translate_args)
 {
 	// really, we just want to pin pages, but irqdisable works
-	static spinlock_t lock = 0;
+	static spinlock_t lock = SPINLOCK_INITIALIZER;
 	spin_lock_irqsave(&lock);
 
 	uint32_t arg[3] = {arg0,arg1,arg2};
@@ -36,14 +36,14 @@ int32_t frontend_syscall_from_user(env_t* p, int32_t syscall_num, uint32_t arg0,
 		}
 	}
 
-	int32_t ret = frontend_syscall(p->env_id,syscall_num,arg[0],arg[1],arg[2]);
+	int32_t ret = frontend_syscall(p->pid,syscall_num,arg[0],arg[1],arg[2]);
 	spin_unlock_irqsave(&lock);
 	return ret;
 }
 
 int32_t frontend_syscall(pid_t pid, int32_t syscall_num, uint32_t arg0, uint32_t arg1, uint32_t arg2)
 {
-	static spinlock_t lock = 0;
+	static spinlock_t lock = SPINLOCK_INITIALIZER;
 	int32_t ret;
 
 	// only one frontend request at a time.
@@ -73,7 +73,7 @@ int32_t frontend_syscall(pid_t pid, int32_t syscall_num, uint32_t arg0, uint32_t
 
 int32_t sys_nbputch(char ch)
 {
-	static spinlock_t putch_lock = 0;
+	static spinlock_t putch_lock = SPINLOCK_INITIALIZER;
 	spin_lock_irqsave(&putch_lock);
 
 	int ret = -1;
@@ -89,7 +89,7 @@ int32_t sys_nbputch(char ch)
 
 int32_t sys_nbgetch()
 {
-	static spinlock_t getch_lock = 0;
+	static spinlock_t getch_lock = SPINLOCK_INITIALIZER;
 	spin_lock_irqsave(&getch_lock);
 
 	int result = -1;

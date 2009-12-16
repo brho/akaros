@@ -260,7 +260,7 @@ static error_t proc_alloc(struct proc *SAFE*SAFE pp, pid_t parent_id)
 	*pp = p;
 	atomic_inc(&num_envs);
 
-	proc_init_arch(e);
+	proc_init_arch(p);
 
 	printk("[%08x] new process %08x\n", current ? current->pid : 0, p->pid);
 	} // INIT_STRUCT
@@ -294,7 +294,7 @@ static void __proc_free(struct proc *p)
 	// All parts of the kernel should have decref'd before __proc_free is called
 	assert(p->env_refcnt == 0);
 
-	proc_free_arch(e);
+	proc_free_arch(p);
 
 	// Free any colors allocated to this process
 	if(p->cache_colors_map != global_cache_colors_map) {

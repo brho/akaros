@@ -241,7 +241,7 @@ void gsf_set_core_partition(int core, int partition)
 
 void manager_waterman()
 {
-#ifdef __sparc_v8__
+#if 0
 
         static uint8_t progress = 0;
 	if(progress > 0)
