@@ -23,7 +23,7 @@ smp_boot(void)
 	cprintf("Cores, report in!\n");
 	time_for_smp_init = 1;
 
-	while(*(volatile uint8_t*)&num_cpus < num_cores());
+	while(*(volatile uint32_t*)&num_cpus < num_cores());
 
 	cprintf("All cores reporting!\n");
 }
@@ -33,11 +33,11 @@ smp_init(void)
 {
 	static spinlock_t report_in_lock = SPINLOCK_INITIALIZER;
 
-	cprintf("Good morning, Vietnam! (core id = %d)\n",core_id());
-
 	spin_lock(&report_in_lock);
 	num_cpus++;
 	spin_unlock(&report_in_lock);
+
+	cprintf("Good morning, Vietnam! (core id = %d)\n",core_id());
 
 	smp_idle();
 }

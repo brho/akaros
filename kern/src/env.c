@@ -145,15 +145,6 @@ env_setup_vm_error:
 	return -ENOMEM;
 }
 
-static void
-proc_init_procinfo(struct proc* p)
-{
-	p->env_procinfo->pid = p->pid;
-	p->env_procinfo->tsc_freq = system_timing.tsc_freq;
-	// TODO: maybe do something smarter here
-	p->env_procinfo->max_harts = MAX(1,num_cpus); // hack to use all cores
-}
-
 // Sets up argc/argv in procinfo.  Returns number of
 // args successfully imported (because of size restrictions).
 // The procinfo pages must have been mapped into the user's
@@ -319,8 +310,8 @@ static void* load_icode(env_t *SAFE e, env_t* binary_env,
 	proghdr_t phdr;
 	void* _end = 0;
 
-	assert(load_icode_memcpy(NULL,binary_env,&elfhdr, binary, sizeof(elfhdr))
-	       == ESUCCESS);
+	assert(load_icode_memcpy(NULL,binary_env,&elfhdr, binary,
+	                         sizeof(elfhdr)) == ESUCCESS);
 
 	int i, r;
 

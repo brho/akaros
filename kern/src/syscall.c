@@ -85,8 +85,9 @@ static ssize_t sys_serial_read(env_t* e, char *DANGEROUS _buf, size_t len)
 static ssize_t sys_run_binary(env_t* e, void *DANGEROUS binary_buf,
                   void*DANGEROUS arg, size_t len, size_t num_colors)
 {
-	env_t* env = proc_create(0, 0);
-	env_load_icode(env, e, binary_buf, len);
+	env_t* env = proc_create(NULL,0);
+	assert(env != NULL);
+	env_load_icode(env,e,binary_buf,len);
 	__proc_set_state(env, PROC_RUNNABLE_S);
 	schedule_proc(env);
 	if(num_colors > 0) {

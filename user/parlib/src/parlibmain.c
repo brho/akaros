@@ -12,7 +12,7 @@ void parlib_dtors()
 {
 	typedef void (*dtor)(void);
 	extern char __DTOR_LIST__[],__DTOR_END__[];
-	int ndtor = ((unsigned int)(__DTOR_END__ - __DTOR_LIST__))/sizeof(void*);
+	int ndtor = ((unsigned int)(__DTOR_END__-__DTOR_LIST__))/sizeof(void*);
 
 	// make sure only one thread actually runs the dtors
 	static int already_done = 0;
@@ -38,9 +38,19 @@ struct timeval timeval_start;
 
 void parlibmain()
 {
+	// only core 0 runs parlibmain, but if it yields then
+	// is given back, we don't want it to reinit things
+	static int initialized = 0;
+	if(initialized)
+	{
+		hart_entry();
+		hart_yield();
+	}
+	initialized = 1;
+
 	// get start time (for times)
 	if(gettimeofday(&timeval_start,NULL))
-		timeval_start.tv_sec = 0;
+		timeval_start.tv_sec = timeval_start.tv_usec = 0;
 
 	// call static destructors
 	parlib_ctors();

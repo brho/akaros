@@ -33,19 +33,10 @@ static void realloc_error(void* buf, int fd) {
 	fprintf(stderr, "Error: Unable to run remote binary: No more memory available!\n");
 }
 
-void run_binary()
+int run_binary_filename(const char* file_name)
 {	
-	char * readline_result = readline("\nEnter name of binary to execute: ");
-	if (readline_result == NULL) {
-		printf("Error reading from console.\n");
-		return;
-	}
-	char* file_name = readline_result;
-	//char * file_name = malloc(strlen(readline_result) + 8);
-	//sprintf(file_name, "./apps/%s", readline_result);
 	int fd = open(file_name, O_RDONLY, 0);
-	//free(file_name);
-	if(fd < 0) { fd_error(); return; };
+	if(fd < 0) return fd;
 	
 	int total_bytes_read = 0;
 	int bytes_read = 0;
@@ -56,17 +47,17 @@ void run_binary()
 		if(total_bytes_read+READ_SIZE > bufsz)
 		{
 			void* temp_buf = realloc(binary_buf,bufsz+MALLOC_SIZE);
-			if(temp_buf == NULL) { realloc_error(binary_buf, fd); return; }
+			if(temp_buf == NULL) { realloc_error(binary_buf, fd); return 0; }
 			binary_buf = temp_buf;
 			bufsz += MALLOC_SIZE;
 		}
 
 		bytes_read = read(fd, binary_buf+total_bytes_read, READ_SIZE);
 		total_bytes_read += bytes_read;
-		if(bytes_read < 0) { read_error(binary_buf, fd); return; }
+		if(bytes_read < 0) { read_error(binary_buf, fd); return 0; }
 		if(bytes_read == 0) break;
 	}
-	printf("Loading Binary: %s, ROMSIZE: %d\n", readline_result, total_bytes_read);
+	printf("Loading Binary: %s, ROMSIZE: %d\n",file_name,total_bytes_read);
 	ssize_t error = sys_run_binary(binary_buf, NULL, total_bytes_read, 0);
 	if(error < 0) {
 		fprintf(stderr, "Error: Unable to run remote binary\n");
@@ -74,5 +65,17 @@ void run_binary()
 	free(binary_buf);
 	close(fd);
 	syscall(SYS_yield,0,0,0,0,0);
+	return 0;
+}
+
+void run_binary()
+{
+	char* readline_result = readline("\nEnter name of binary to execute: ");
+	if (readline_result == NULL) {
+		printf("Error reading from console.\n");
+		return;
+	}
+	if(run_binary_filename(readline_result) < 0)
+		fd_error();
 }
 

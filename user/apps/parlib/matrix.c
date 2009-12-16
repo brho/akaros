@@ -14,6 +14,7 @@ extern void set_default_user();
 extern void file_io();
 extern void file_error();
 extern void run_binary();
+extern int  run_binary_filename(const char* fn);
 extern void run_binary_colored();
 extern char prompt[256];
 
@@ -58,6 +59,8 @@ int main(int argc, char** argv)
 			run_binary();
 		else if (strcmp(s, "run_binary_colored") == 0)
 			run_binary_colored();
+		else if (run_binary_filename(s) == 0)
+			;
 		else
 			help();	
 

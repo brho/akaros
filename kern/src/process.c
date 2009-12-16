@@ -190,6 +190,15 @@ void proc_init(void)
 	atomic_init(&num_envs, 0);
 }
 
+static void
+proc_init_procinfo(struct proc* p)
+{
+	p->env_procinfo->pid = p->pid;
+	p->env_procinfo->tsc_freq = system_timing.tsc_freq;
+	// TODO: maybe do something smarter here
+	p->env_procinfo->max_harts = MAX(1,num_cpus); // hack to use all cores
+}
+
 /* Allocates and initializes a process, with the given parent.  Currently
  * writes the *p into **pp, and returns 0 on success, < 0 for an error.
  * Errors include:
@@ -241,7 +250,7 @@ static error_t proc_alloc(struct proc *SAFE*SAFE pp, pid_t parent_id)
 	proc_init_trapframe(&p->env_tf);
 
 	/* Initialize the contents of the e->env_procinfo structure */
-	p->env_procinfo->pid = p->pid;
+	proc_init_procinfo(p);
 	/* Initialize the contents of the e->env_procdata structure */
 
 	/* Initialize the generic syscall ring buffer */
@@ -279,7 +288,8 @@ struct proc *proc_create(uint8_t *binary, size_t size)
 	curid = (current ? current->pid : 0);
 	if ((r = proc_alloc(&p, curid)) < 0)
 		panic("proc_create: %e", r); // one of 3 quaint usages of %e.
-	env_load_icode(p, NULL, binary, size);
+	if(binary != NULL)
+		env_load_icode(p, NULL, binary, size);
 	return p;
 }
 
