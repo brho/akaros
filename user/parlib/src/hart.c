@@ -51,7 +51,7 @@ error_t hart_request(size_t k)
 
 	for(i = _current_harts, j = 0; i < _current_harts+k; i++, j++)
 	{
-		stack_ptr_array[i] = stack + j*(user_stack_size+tls_size);
+		stack_ptr_array[i] = stack + (j+1)*user_stack_size+j*tls_size;
 		tls_array[i] = stack_ptr_array[i]+tls_size;
 	}
 

@@ -79,12 +79,6 @@
  */
 
 
-// All physical memory mapped at this address
-#define	KERNBASE	0xC0000000
-
-// Use this if needed in annotations
-#define IVY_KERNBASE (0xC000U << 16)
-
 // At IOPHYSMEM (640K) there is a 384K hole for I/O.  From the kernel,
 // IOPHYSMEM can be addressed at KERNBASE + IOPHYSMEM.  The hole ends
 // at physical address EXTPHYSMEM.

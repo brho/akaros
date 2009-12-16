@@ -16,6 +16,8 @@ char* readline(const char * prompt)
 	i = 0;
 	while (1) {
 		read_amt = read(STDIN_FILENO, &c, 1);
+		if(c == 0x7F) c = '\b';
+
 		if (read_amt < 0) {
 			printf("read error: %d\n",read_amt);
 			return NULL;
@@ -23,7 +25,7 @@ char* readline(const char * prompt)
 			write(STDOUT_FILENO, &c, 1);
 			buf[i++] = c;
 		} else if (c == '\b' && i > 0) {
-			write(STDOUT_FILENO, &c, 1);
+			write(STDOUT_FILENO, "\b \b", 3);
 			i--;
 		} else if (c == '\n' || c == '\r') {
 			write(STDOUT_FILENO, &c, 1);

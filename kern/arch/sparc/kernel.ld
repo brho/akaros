@@ -9,7 +9,7 @@ SECTIONS
 {
 	/* Link the kernel for 0xC01000C0, but load it at 0x001000C0) */
 
-	.text 0xC0000000 : AT(0x00000000) {
+	.text 0x80000000 : AT(0x00000000) {
 		*(.text .stub .text.* .gnu.linkonce.t.*)
 	}
 

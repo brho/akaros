@@ -8,6 +8,16 @@
 #include <assert.h>
 #include <stdio.h>
 
+// architecture-specific process initialization code
+void proc_init_arch(struct proc *SAFE p)
+{
+}
+
+// architecture-specific process termination code
+void proc_free_arch(struct proc *SAFE p)
+{
+}
+
 void proc_set_program_counter(trapframe_t *tf, uintptr_t pc)
 {
 	tf->tf_eip = pc;

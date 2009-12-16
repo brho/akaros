@@ -12,6 +12,7 @@
 #include <ros/syscall.h>
 #include <ros/error.h>
 #include <ros/procdata.h>
+#include <sys/time.h>
 #include <errno.h>
 
 enum {
@@ -43,5 +44,6 @@ ssize_t     sys_shared_page_alloc(void *COUNT(PGSIZE) *addr, pid_t p2,
 ssize_t     sys_shared_page_free(void *COUNT(PGSIZE) addr, pid_t p2);
 ssize_t     sys_resource_req(int type, size_t amount, uint32_t flags);
 void        sys_reboot();
+int         gettimeofday(struct timeval* tp, void* tzp);
 
 #endif	// !ROS_INC_PARLIB_H

@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <dirent.h>
 
 #define IN_BUF_SIZE 1024
 
@@ -29,7 +30,7 @@ void file_io()
 		return;
 	}
 
-    unsigned int fname_len = strlen(readline_result) + 1;
+	unsigned int fname_len = strlen(readline_result) + 1;
 	char * file_name = malloc(fname_len);
 	strncpy(file_name, readline_result, fname_len);
 
@@ -70,6 +71,26 @@ void file_io()
 	printf("Closing remote file descriptor: %d.... %s\n", in_fd, ((close(in_fd) == 0) ? "successful" : "failure"));
 	printf("Closing remote file descriptor: %d.... %s\n", out_fd, ((close(out_fd) == 0) ? "successful" : "failure"));
 	close(in_fd2);
+
+	DIR* d = opendir(".");
+	printf("opendir(\".\"): %s\n",d ? "succeeded" : "failed");
+	if(d)
+	{
+		struct dirent* de = readdir(d);
+		if(!de)
+			printf("readdir failed\n");
+		else
+		{
+			printf("first readdir: %s\n",de->d_name);
+			printf("rewinddir\n");
+			rewinddir(d);
+
+			while((de = readdir(d)))
+				printf("readdir: %s\n",de->d_name);
+			printf("closedir\n");
+			closedir(d);
+		}
+	}
 
 	printf("\nTests Complete.\n\n");
 }

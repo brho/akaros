@@ -13,113 +13,35 @@
 
 volatile int magic_mem[10];
 
-int32_t frontend_syscall_from_user(env_t* p, int32_t syscall_num, uint32_t arg0, uint32_t arg1, uint32_t arg2)
+int32_t frontend_syscall_from_user(env_t* p, int32_t syscall_num, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t translate_args)
 {
-	int32_t ret;
-	#define KBUFSIZE 1024
-	char buf[KBUFSIZE];
+	// really, we just want to pin pages, but irqdisable works
+	static spinlock_t lock = 0;
+	spin_lock_irqsave(&lock);
 
-	switch(syscall_num)
+	uint32_t arg[3] = {arg0,arg1,arg2};
+	for(int i = 0; i < 3; i++)
 	{
-		case RAMP_SYSCALL_write:
-			arg2 = arg2 > KBUFSIZE ? KBUFSIZE : arg2;
-			if(memcpy_from_user(p,buf,(void*)arg1,arg2))
-				return -1;
-			arg1 = PADDR((uint32_t)buf);
-
-			extern spinlock_t output_lock;
-			spin_lock(&output_lock);
-
-			if(arg0 == 1 || arg0 == 2)
-			{
-				int i;
-				for(i = 0; i < arg2; i++)
-					cputchar(buf[i]);
-				ret = arg2;
-			}
-			else
-				ret = frontend_syscall(syscall_num,arg0,arg1,arg2);
-
-			spin_unlock(&output_lock);
-
-			break;
-
-		case RAMP_SYSCALL_open:
-			if(memcpy_from_user(p,buf,(void*)arg0,KBUFSIZE))
-				return -1;
-			arg0 = PADDR((uint32_t)buf);
-			ret = frontend_syscall(syscall_num,arg0,arg1,arg2);
-			break;
-
-		case RAMP_SYSCALL_fstat:
-			ret = frontend_syscall(syscall_num,arg0,PADDR((uint32_t)buf),arg2);
-			if(memcpy_to_user(p,(void*)arg1,buf,64))
-				return -1;
-			break;
-
-		case RAMP_SYSCALL_read:
-			arg2 = arg2 > KBUFSIZE ? KBUFSIZE : arg2;
-			if(arg2 <= 0)
-				return arg2 < 0 ? -1 : 0;
-
-			if(arg0 == 0)
-			{
-				int ch = getchar();
-				buf[0] = (char)ch;
-				ret = 1;
-			}
-			else
-				ret = frontend_syscall(syscall_num,arg0,PADDR((uint32_t)buf),arg2);
-
-			if(ret > 0 && memcpy_to_user(p,(void*)arg1,buf,arg2))
-				return -1;
-			return ret;
-
-		case RAMP_SYSCALL_getch:
-			return frontend_syscall(RAMP_SYSCALL_getch,0,0,0);
-
-		case RAMP_SYSCALL_gettimeofday:
+		int flags = (translate_args & (1 << (i+3))) ? PTE_USER_RW :
+		           ((translate_args & (1 << i)) ? PTE_USER_RO : 0);
+		if(flags)
 		{
-			struct timeval
+			pte_t* pte = pgdir_walk(p->env_pgdir,(void*)arg[i],0);
+			if(pte == NULL || !(*pte & flags))
 			{
-				size_t tv_sec;
-				size_t tv_usec;
-			};
-
-			static spinlock_t gettimeofday_lock = 0;
-			static size_t t0 = 0;
-			spin_lock(&gettimeofday_lock);
-
-			if(!t0)
-			{
-				volatile struct timeval tp;
-				ret = frontend_syscall(RAMP_SYSCALL_gettimeofday,(int)PADDR((uint32_t)&tp),0,0);
-				if(ret == 0)
-					t0 = tp.tv_sec;
+				spin_unlock_irqsave(&lock);
+				return -1;
 			}
-			else ret = 0;
-
-			spin_unlock(&gettimeofday_lock);
-
-			if(ret == 0)
-			{
-				struct timeval tp;
-				long long dt = read_tsc();
-				tp.tv_sec = t0 + dt/system_timing.tsc_freq;
-				tp.tv_usec = (dt % system_timing.tsc_freq)*1000000/system_timing.tsc_freq;
-
-				ret = memcpy_to_user(p,(void*)arg0,&tp,sizeof(tp));
-			}
+			arg[i] = PTE_ADDR(*pte) | PGOFF(arg[i]);
 		}
-		default:
-			ret = -1;
-			break;
 	}
 
+	int32_t ret = frontend_syscall(p->env_id,syscall_num,arg[0],arg[1],arg[2]);
+	spin_unlock_irqsave(&lock);
 	return ret;
 }
 
-int32_t frontend_syscall(int32_t syscall_num, uint32_t arg0, uint32_t arg1, uint32_t arg2)
+int32_t frontend_syscall(pid_t pid, int32_t syscall_num, uint32_t arg0, uint32_t arg1, uint32_t arg2)
 {
 	static spinlock_t lock = 0;
 	int32_t ret;
@@ -135,6 +57,7 @@ int32_t frontend_syscall(int32_t syscall_num, uint32_t arg0, uint32_t arg1, uint
 	magic_mem[2] = arg0;
 	magic_mem[3] = arg1;
 	magic_mem[4] = arg2;
+	magic_mem[6] = pid;
 	magic_mem[0] = 0x80;
 
 	// wait for front-end response
@@ -182,7 +105,7 @@ int32_t sys_nbgetch()
 
 void __diediedie(trapframe_t* tf, uint32_t srcid, uint32_t code, uint32_t a1, uint32_t a2)
 {
-	frontend_syscall(RAMP_SYSCALL_exit,(int)code,0,0);
+	frontend_syscall(0,RAMP_SYSCALL_exit,(int)code,0,0);
 	while(1);
 }
 

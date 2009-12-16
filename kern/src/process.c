@@ -203,7 +203,7 @@ static error_t proc_alloc(struct proc *SAFE*SAFE pp, pid_t parent_id)
 	if (!(p = kmem_cache_alloc(proc_cache, 0)))
 		return -ENOMEM;
 
-    { INITSTRUCT(*p)
+	{ INITSTRUCT(*p)
 
 	// Setup the default map of where to get cache colors from
 	p->cache_colors_map = global_cache_colors_map;
@@ -225,7 +225,7 @@ static error_t proc_alloc(struct proc *SAFE*SAFE pp, pid_t parent_id)
 	spin_unlock(&pid_hash_lock);
 
 	/* Set the basic status variables. */
-    spinlock_init(&p->proc_lock);
+	spinlock_init(&p->proc_lock);
 	p->ppid = parent_id;
 	__proc_set_state(p, PROC_CREATED);
 	p->env_refcnt = 2; // one for the object, one for the ref we pass back
@@ -260,6 +260,8 @@ static error_t proc_alloc(struct proc *SAFE*SAFE pp, pid_t parent_id)
 	*pp = p;
 	atomic_inc(&num_envs);
 
+	proc_init_arch(e);
+
 	printk("[%08x] new process %08x\n", current ? current->pid : 0, p->pid);
 	} // INIT_STRUCT
 	return 0;
@@ -291,6 +293,8 @@ static void __proc_free(struct proc *p)
 	printk("[PID %d] freeing proc: %d\n", current ? current->pid : 0, p->pid);
 	// All parts of the kernel should have decref'd before __proc_free is called
 	assert(p->env_refcnt == 0);
+
+	proc_free_arch(e);
 
 	// Free any colors allocated to this process
 	if(p->cache_colors_map != global_cache_colors_map) {

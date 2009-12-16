@@ -11,9 +11,7 @@ cons_init(void)
 void
 cputbuf(const char*COUNT(len) buf, int len)
 {
-	int i;
-	for(i = 0; i < len; i++)
-		cputchar(buf[i]);
+	frontend_syscall(0,RAMP_SYSCALL_write,1,PADDR((int32_t)buf),len);
 }
 
 // Low-level console I/O
@@ -21,7 +19,7 @@ cputbuf(const char*COUNT(len) buf, int len)
 inline void
 cons_putc(int c)
 {
-	if(c == '\b')
+	if(c == '\b' || c == 0x7F)
 	{
 		char buf[3] = {'\b', ' ', '\b'};
 		cputbuf(buf,3);
@@ -33,18 +31,21 @@ cons_putc(int c)
 	}
 }
 
-
 void
 cputchar(int c)
 {
-	while(sys_nbputch(c));
+	char ch = c;
+	cputbuf(&ch,1);
 }
 
 int
 cons_getc()
 {
-	int ret = sys_nbgetch();
-	return ret < 0 ? 0 : ret;
+	char ch;
+	int32_t ret = frontend_syscall(0,RAMP_SYSCALL_read,0,(int32_t)&ch,1);
+	return ret < 0 ? 0 : ch;
+	//int ret = sys_nbgetch();
+	//return ret < 0 ? 0 : ret;
 }
 
 int

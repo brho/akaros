@@ -561,7 +561,7 @@ intreg_t syscall(struct proc *p, uintreg_t syscallno, uintreg_t a1,
 	#endif
 	#ifdef __sparc_v8__
 		case SYS_frontend:
-			return frontend_syscall_from_user(p,a1,a2,a3,a4);
+			return frontend_syscall_from_user(p,a1,a2,a3,a4,a5);
 	#endif
 
 		case SYS_reboot:

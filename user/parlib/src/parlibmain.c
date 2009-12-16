@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <debug.h>
 #include <hart.h>
+#include <assert.h>
 
 // call static destructors.
 void parlib_dtors()
@@ -27,14 +28,20 @@ void parlib_ctors()
 {
 	typedef void (*ctor)(void);
 	extern char __CTOR_LIST__[],__CTOR_END__[];
-	int nctor = ((unsigned int)(__CTOR_END__ - __CTOR_LIST__))/sizeof(void*);
+	int nctor = ((unsigned int)(__CTOR_END__-__CTOR_LIST__))/sizeof(void*);
 
 	for(int i = 0; i < nctor; i++)
 		((ctor*)__CTOR_LIST__)[nctor-i-1]();
 }
 
+struct timeval timeval_start;
+
 void parlibmain()
 {
+	// get start time (for times)
+	if(gettimeofday(&timeval_start,NULL))
+		timeval_start.tv_sec = 0;
+
 	// call static destructors
 	parlib_ctors();
 
@@ -48,3 +55,4 @@ void parlibmain()
 	// exit gracefully
 	exit(r);
 }
+

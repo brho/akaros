@@ -108,7 +108,7 @@ void __proc_unlock_ipi_pending(struct proc *p, bool ipi_pending);
 /* Will probably have generic versions of these later. */
 void proc_incref(struct proc *SAFE p, size_t count);
 void proc_decref(struct proc *SAFE p, size_t count);
-
+ 
 /* Allows the kernel to figure out what process is running on this core.  Can be
  * used just like a pointer to a struct proc.  Need these to be macros due to
  * some circular dependencies with smp.h. */
@@ -139,6 +139,8 @@ void __death(trapframe_t *tf, uint32_t srcid, void * a0, void * a1,
 #endif
 
 /* Arch Specific */
+void proc_init_arch(struct proc *SAFE p);
+void proc_free_arch(struct proc *SAFE p);
 void proc_set_program_counter(trapframe_t *SAFE tf, uintptr_t pc);
 void proc_init_trapframe(trapframe_t *SAFE tf);
 void proc_set_tfcoreid(trapframe_t *SAFE tf, uint32_t id);

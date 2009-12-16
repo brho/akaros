@@ -1,5 +1,6 @@
 #include <arch/arch.h>
 #include <arch/trap.h>
+#include <arch/frontend.h>
 #include <process.h>
 #include <pmap.h>
 #include <smp.h>
@@ -12,6 +13,22 @@
 #pragma nosharc
 #endif
 
+// architecture-specific process initialization code
+void
+proc_init_arch(struct proc *SAFE p)
+{
+	pid_t parent_id = p->env_parent_id, id = p->env_id;
+	if(frontend_syscall(parent_id,RAMP_SYSCALL_proc_init,id,0,0))
+		panic("Front-end server couldn't initialize new process!");
+}
+
+// architecture-specific process termination code
+void
+proc_free_arch(struct proc *SAFE p)
+{
+	if(frontend_syscall(0,RAMP_SYSCALL_proc_free,p->env_id,0,0))
+		panic("Front-end server couldn't free process!");
+}
 
 void
 proc_set_program_counter(trapframe_t *tf, uintptr_t pc)
