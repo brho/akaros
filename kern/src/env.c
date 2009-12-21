@@ -145,40 +145,6 @@ env_setup_vm_error:
 	return -ENOMEM;
 }
 
-// Sets up argc/argv in procinfo.  Returns number of
-// args successfully imported (because of size restrictions).
-// The procinfo pages must have been mapped into the user's
-// address space before this function can be called.
-size_t
-proc_init_argc_argv(struct proc* p, size_t nargs, const char** args)
-{
-	// TODO: right now we assume procinfo can be directly addressed
-	// by the kernel (i.e. it's continguous.
-	static_assert(sizeof(struct procinfo) <= PGSIZE);
-
-	if(nargs > PROCINFO_MAX_ARGC)
-		nargs = PROCINFO_MAX_ARGC;
-
-	char* argv[PROCINFO_MAX_ARGC] = {0};
-	static_assert(sizeof(argv) == sizeof(p->env_procinfo->argv));
-
-	size_t size = 0, argc;
-	for(argc = 0; argc < nargs; argc++)
-	{
-		size_t len = strnlen(args[argc],PROCINFO_MAX_ARGV_SIZE);
-		if(size+len+1 > PROCINFO_MAX_ARGV_SIZE)
-			break;
-		memcpy(&p->env_procinfo->argv_buf[size],args[argc],len+1);
-		argv[argc] = (char*)(UINFO+offsetof(struct procinfo,argv_buf)+size);
-		size += len+1;
-	}
-
-	p->env_procinfo->argc = argc;
-	memcpy(p->env_procinfo->argv,argv,sizeof(argv));
-
-	return argc;
-}
-
 // Allocate len bytes of physical memory for environment env,
 // and map it at virtual address va in the environment's address space.
 // Pages are zeroed by upage_alloc.

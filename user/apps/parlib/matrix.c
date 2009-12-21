@@ -13,8 +13,8 @@ extern void change_user();
 extern void set_default_user();
 extern void file_io();
 extern void file_error();
-extern void run_binary();
-extern int  run_binary_filename(const char* fn);
+extern void run_binary(size_t colors);
+extern int  run_binary_filename(const char* fn, size_t colors);
 extern void run_binary_colored();
 extern char prompt[256];
 
@@ -56,10 +56,10 @@ int main(int argc, char** argv)
 		else if (strcmp(s, "file_error") == 0)
 			file_error();
 		else if (strcmp(s, "run_binary") == 0)
-			run_binary();
+			run_binary(0);
 		else if (strcmp(s, "run_binary_colored") == 0)
 			run_binary_colored();
-		else if (run_binary_filename(s) == 0)
+		else if (run_binary_filename(s,0) == 0)
 			;
 		else
 			help();	

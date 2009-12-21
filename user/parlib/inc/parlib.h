@@ -33,8 +33,9 @@ ssize_t     sys_serial_write(void* buf, size_t len);
 ssize_t     sys_serial_read(void* buf, size_t len);
 ssize_t     sys_eth_write(void *COUNT(len) buf, size_t len); 
 ssize_t     sys_eth_read(void *COUNT(len) buf, size_t len);
-ssize_t     sys_run_binary(void* binary_buf, void* arg, size_t len, 
-                                                 size_t num_colors);
+ssize_t     sys_run_binary(void* binary_buf, size_t len,
+                           void* arg, size_t arglen, 
+                           size_t num_colors);
 int         sys_getpid(void);
 size_t      sys_getcpuid(void);
 error_t     sys_brk(void* addr);

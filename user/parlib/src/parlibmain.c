@@ -34,6 +34,26 @@ void parlib_ctors()
 		((ctor*)__CTOR_LIST__)[nctor-i-1]();
 }
 
+// build argv from procinfo.argv_buf, which is a packed array
+// of null-terminated strings, terminated by a final null character
+char** parlib_build_argc_argv(int* argc)
+{
+	char* buf = procinfo.argv_buf;
+	for(*argc = 0; *buf; (*argc)++)
+		buf += strlen(buf)+1;
+
+	buf = procinfo.argv_buf;
+	char** argv = (char**)malloc(sizeof(char*)*(*argc+1));
+	for(int i = 0; i < *argc; i++)
+	{
+		argv[i] = buf;
+		buf += strlen(buf)+1;
+	}
+	argv[*argc] = 0;
+
+	return argv;
+}
+
 struct timeval timeval_start;
 
 void parlibmain()
@@ -58,9 +78,15 @@ void parlibmain()
 	// call static destructors on exit
 	atexit(&parlib_dtors);
 
+	// set up argc/argv
+	int argc;
+	char** argv = parlib_build_argc_argv(&argc);
+
 	// call user main routine
 	extern int main(int argc, char * NTS * COUNT(argc) NT argv);
-	int r = main(procinfo.argc, procinfo.argv);
+	int r = main(argc,argv);
+
+	// here I'd free(argv), but since we're exiting, it doesn't matter...
 
 	// exit gracefully
 	exit(r);

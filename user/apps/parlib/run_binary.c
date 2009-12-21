@@ -13,30 +13,43 @@ extern char * readline(const char *prompt);
 #define MALLOC_SIZE     1048576
 #define READ_SIZE       1024
 
-static void fd_error() {
-	fprintf(stderr, "Error: Unable to run remote binary (fd error): %s\n", strerror(errno));
-}
+int run_binary_filename(const char* cmdline, size_t colors)
+{
+	int ret = 0;
 
-static void malloc_error() {
-	fprintf(stderr, "Error: Unable to run remote binary: No more memory avaialable!\n");
-}
+	char argv_buf[PROCINFO_MAX_ARGV_SIZE] = {0};
+	char* argv_buf_ptr = argv_buf;
+	for(int argc = 0; ; argc++)
+	{
+		while(*cmdline == ' ')
+			cmdline++;
+		if(*cmdline == 0)
+			break;
 
-static void read_error(void* buf, int fd) {
-	free(buf);
-	close(fd);
-	fprintf(stderr, "Error: Unable to run remote binary (read error): %s\n", strerror(errno));
-}
+		char* p = strchr(cmdline,' ');
+		int len = p == NULL ? strlen(cmdline) : p-cmdline;
 
-static void realloc_error(void* buf, int fd) {
-	free(buf);
-	close(fd);
-	fprintf(stderr, "Error: Unable to run remote binary: No more memory available!\n");
-}
+		memcpy(argv_buf_ptr,cmdline,len);
+		argv_buf_ptr[len] = 0;
+		argv_buf_ptr += len+1;
 
-int run_binary_filename(const char* file_name)
-{	
-	int fd = open(file_name, O_RDONLY, 0);
-	if(fd < 0) return fd;
+		if(p == NULL)
+		{
+			argc++;
+			break;
+		}
+
+		cmdline = p;
+	}
+	
+
+	int fd = open(argv_buf, O_RDONLY, 0);
+	if(fd < 0)
+	{
+		printf("open failed\n");
+		ret = -1;
+		goto open_error;
+	}
 	
 	int total_bytes_read = 0;
 	int bytes_read = 0;
@@ -47,35 +60,49 @@ int run_binary_filename(const char* file_name)
 		if(total_bytes_read+READ_SIZE > bufsz)
 		{
 			void* temp_buf = realloc(binary_buf,bufsz+MALLOC_SIZE);
-			if(temp_buf == NULL) { realloc_error(binary_buf, fd); return 0; }
+			if(temp_buf == NULL)
+			{
+				printf("realloc failed\n");
+				ret = -1;
+				goto realloc_error;
+			}
+
 			binary_buf = temp_buf;
 			bufsz += MALLOC_SIZE;
 		}
 
 		bytes_read = read(fd, binary_buf+total_bytes_read, READ_SIZE);
 		total_bytes_read += bytes_read;
-		if(bytes_read < 0) { read_error(binary_buf, fd); return 0; }
+		if(bytes_read < 0)
+		{
+			printf("read error\n");
+			ret = -1;
+			goto read_error;
+		}
 		if(bytes_read == 0) break;
 	}
-	printf("Loading Binary: %s, ROMSIZE: %d\n",file_name,total_bytes_read);
-	ssize_t error = sys_run_binary(binary_buf, NULL, total_bytes_read, 0);
-	if(error < 0) {
+	printf("Loading Binary: %s, ROMSIZE: %d\n",argv_buf,total_bytes_read);
+	ret = sys_run_binary(binary_buf, total_bytes_read, argv_buf, PROCINFO_MAX_ARGV_SIZE, colors);
+	if(ret < 0)
 		fprintf(stderr, "Error: Unable to run remote binary\n");
-	}
+	else
+		syscall(SYS_yield,0,0,0,0,0);
+
+read_error:
+realloc_error:
 	free(binary_buf);
 	close(fd);
-	syscall(SYS_yield,0,0,0,0,0);
-	return 0;
+open_error:
+	return ret;
 }
 
-void run_binary()
+void run_binary(size_t colors)
 {
 	char* readline_result = readline("\nEnter name of binary to execute: ");
 	if (readline_result == NULL) {
 		printf("Error reading from console.\n");
 		return;
 	}
-	if(run_binary_filename(readline_result) < 0)
-		fd_error();
+	run_binary_filename(readline_result, colors);
 }
 

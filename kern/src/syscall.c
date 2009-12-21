@@ -82,11 +82,16 @@ static ssize_t sys_serial_read(env_t* e, char *DANGEROUS _buf, size_t len)
 /* START OF REMOTE SYSTEMCALL SUPPORT SYSCALLS. THESE WILL GO AWAY AS THINGS MATURE */
 //
 
-static ssize_t sys_run_binary(env_t* e, void *DANGEROUS binary_buf,
-                  void*DANGEROUS arg, size_t len, size_t num_colors)
+static ssize_t sys_run_binary(env_t* e, void *DANGEROUS binary_buf, size_t len,
+                              void*DANGEROUS arg, size_t arglen,
+                              size_t num_colors)
 {
 	env_t* env = proc_create(NULL,0);
 	assert(env != NULL);
+
+	static_assert(PROCINFO_NUM_PAGES == 1);
+	assert(memcpy_from_user(e,env->env_procinfo->argv_buf,arg,arglen) == ESUCCESS);
+
 	env_load_icode(env,e,binary_buf,len);
 	__proc_set_state(env, PROC_RUNNABLE_S);
 	schedule_proc(env);
@@ -552,8 +557,7 @@ intreg_t syscall(struct proc *p, uintreg_t syscallno, uintreg_t a1,
 			return sys_serial_read(p, (char *DANGEROUS)a1, (size_t)a2);
 	#endif
 		case SYS_run_binary:
-			return sys_run_binary(p, (char *DANGEROUS)a1, (char* DANGEROUS)a2, 
-			                                           (size_t)a3, (size_t)a4);
+			return sys_run_binary(p, (char *DANGEROUS)a1, (size_t)a2, (void* DANGEROUS)a3, (size_t)a4, (size_t)a5);
 	#ifdef __NETWORK__
 		case SYS_eth_write:
 			return sys_eth_write(p, (char *DANGEROUS)a1, (size_t)a2);

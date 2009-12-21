@@ -9,17 +9,11 @@
 #include <ros/error.h>
 #include <ros/common.h>
 
-#define PROCINFO_MAX_ARGC 32
-#define PROCINFO_MAX_ARGV_SIZE 1024
+#define PROCINFO_MAX_ARGV_SIZE 2048
 
 typedef struct procinfo {
 	pid_t pid;
 	size_t max_harts;
-
-	// Temp way to pass arguments to a new process
-	size_t argc;
-	char* argv[PROCINFO_MAX_ARGC];
-
 	uint64_t tsc_freq;
 
 	char argv_buf[PROCINFO_MAX_ARGV_SIZE];
