@@ -28,7 +28,7 @@ build_multiboot_info(multiboot_info_t* mbi)
 
 // set up a basic virtual -> physical mapping so we can boot the kernel
 void
-build_boot_pgdir(void)
+pagetable_init(void)
 {
 	extern uintptr_t l1_page_table[NL1ENTRIES];
 
@@ -84,7 +84,7 @@ mmu_init(void)
 
 // delete temporary mappings used by the entry code
 void
-mmu_boot_cleanup(void)
+mmu_boot_cleanup_core0(void)
 {
 	extern uintptr_t l1_page_table[NL1ENTRIES];
 	uintptr_t kernsize = -KERNBASE;
@@ -96,44 +96,8 @@ mmu_boot_cleanup(void)
 }
 
 void
-mmu_boot(void)
+mmu_boot_cleanup_all(void)
 {
-	int id = core_id(), i, ncores = num_cores();
-
-	static volatile int done_0 = 0;
-	volatile int* done0 = (int*)((uintptr_t)&done_0 - KERNBASE); 
-
-	if(id == 0)
-	{
-		build_boot_pgdir();
-		*done0 = 1;
-	}
-	else
-		while(!*done0);
-
-	mmu_init();
-}
-
-void
-mmu_boot_finish(void)
-{
-	int id = core_id(), i, ncores = num_cores();
-
-	static volatile int barrier[MAX_NUM_CPUS] = {0};
-	static volatile int done1 = 0;
-
-	if(id == 0)
-	{
-		for(i = 1; i < ncores; i++)
-			while(!barrier[i]);
-		mmu_boot_cleanup();
-		done1 = 1;
-	}
-	else
-	{
-		barrier[id] = 1;
-		while(!done1);
-	}
-
+	// nothing special here
 	tlbflush();
 }

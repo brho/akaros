@@ -35,16 +35,14 @@ _start:
 
 	// compute NWINDOWS
 
-	mov	-1,%wim			! mark all windows invalid.
-	mov	(PSR_S|PSR_PS),%psr
-	nop				! 3 insns between wrwim/rdwim
-	mov	0,%g2		! g2 will contain NWINDOWS-1
-	mov	%wim,%g1	! get wim. nonexistent windows set to 0
-
-1:	srl	%g1,1,%g1
-	tst	%g1
-	bne,a	1b
-	 inc	%g2
+	mov	0,%wim				! mark all windows valid
+	mov (PSR_S|PSR_PS),%psr	! CWP = 0
+	nop; nop; nop			! 3 insns between write -> read state reg
+	save					! CWP = (CWP-1) % NWINDOWS = NWINDOWS-1
+	mov	%psr,%g2
+	and	%g2,PSR_CWP,%g2		! g2 = NWINDOWS-1
+	restore					! CWP = 0
+	mov	1<<1,%wim			! mark window 1 invalid (trap on restore)
 
 	// now g2 = NWINDOWS - 1.  Patch the window spill trap handler.
 	set	RELOC(spill_patchme),%g1
@@ -65,10 +63,6 @@ _start:
 	inc	%g2
 	st	%g2,[%g1]
 
-	// PSR.CWP (current window pointer) == 0.
-	// Set WIM so we'll trap on the next save instruction.
-	mov	1 << 1,%wim
-
 	// set up the TBR (trap base register)
 	set	RELOC(trap_table),%g1
 	mov	%g1,%tbr
@@ -80,11 +74,28 @@ _start:
 	// sp = bootstacktop - core_id*KSTKSIZE - 64
 	set	RELOC(bootstacktop)-64,%sp
 	mov	CORE_ID_REG,%g1
-	sll	%g1,KSTKSHIFT,%g1
-	sub	%sp,%g1,%sp
+	sll	%g1,KSTKSHIFT,%g2
+	sub	%sp,%g2,%sp
 
 	// set up a virtual->physical mapping
-	call	mmu_boot
+	tst	%g1
+	set	RELOC(pagetable_init_done),%l0
+	bne pagetable_init_wait
+	 nop
+
+	// core 0 initializes the pagetable
+	call	pagetable_init
+	 nop
+	mov	1,%g2
+	st	%g2,[%l0]
+
+pagetable_init_wait:
+	ld	[%l0],%g1
+	tst	%g1
+	be	pagetable_init_wait
+	 nop
+
+	call	mmu_init
 	 nop
 
 	// relocate
@@ -95,9 +106,26 @@ _start:
 	jmp	%g1
 	 add	%g2,%sp,%sp
 reloc:
+	call	mmu_boot_cleanup_all
+	 nop
 
-	// finish mmu_boot
-	call	mmu_boot_finish
+	mov	1,%g1
+	set	cores_relocated,%g2
+	set	cores_relocated_lock,%g3
+	swap	[%g3],%g1
+	tst	%g1
+	bne	reloc
+	 nop
+	ld	[%g2],%g1
+	inc	%g1
+	st	%g1,[%g2]
+	st	%g0,[%g3]
+
+wait_for_reloc:
+	ld	[%g2],%g1
+	mov	NUM_CORES_REG,%g3
+	cmp	%g1,%g3
+	bl	wait_for_reloc
 	 nop
 
 	// now it's safe to enable traps
@@ -112,6 +140,9 @@ reloc:
 	 nop
 
 	// only core 0 gets here
+	call	mmu_boot_cleanup_core0
+	 nop
+
 	// set num_cpus
 	set	num_cpus,%l0
 	mov	NUM_CORES_REG,%l1
@@ -119,6 +150,10 @@ reloc:
 
 	cmp	%l1,MAX_NUM_CPUS
 	tg	0x7f
+
+	// use a stack in the data section (as opposed to bss) here,
+	// since kernel_init will zero the stack
+	set	core0_bootstacktop-64,%sp
 
 	sub	%sp,64,%sp		! 64 >= sizeof(multiboot_header_t)
 	call	build_multiboot_info
@@ -153,6 +188,15 @@ reloc:
 ///////////////////////////////////////////////////////////////////
 // various data
 ///////////////////////////////////////////////////////////////////
+.data
+
+pagetable_init_done:
+	.word 0
+
+cores_relocated:
+	.word 0
+cores_relocated_lock:
+	.word 0
 
 	.global		time_for_smp_init
 time_for_smp_init:
@@ -170,12 +214,17 @@ num_cpus:
 // boot stack
 ///////////////////////////////////////////////////////////////////
 
-	.align		PGSIZE		! force page alignment
-	.global		bootstack
-bootstack:
+.section ".bss"
+	.align		PGSIZE
 	.space		KSTKSIZE*MAX_NUM_CPUS
 	.global		bootstacktop   
 bootstacktop:
+
+.data
+	.align		PGSIZE
+	.space		KSTKSIZE
+	.global		core0_bootstacktop
+core0_bootstacktop:
 
 ///////////////////////////////////////////////////////////////////
 // page tables

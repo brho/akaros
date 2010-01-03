@@ -71,8 +71,7 @@ void page_alloc_init()
 	{
 		pages[i].page_ref = 0;
                 LIST_INSERT_HEAD(
-                   &(colored_page_free_list[get_page_color(page2ppn(&pages[i]),
-				                            llc_cache)]),
+                   &(colored_page_free_list[get_page_color(i,llc_cache)]),
                    &pages[i],
                    page_link
                 );
@@ -82,4 +81,3 @@ void page_alloc_init()
 	for(i = LA2PPN(maxaddrpa); i < npages; i++)
 		pages[i].page_ref = 1;
 }
-
