@@ -40,6 +40,15 @@
 #define PROC_RUNNABLE_M			0x20
 #define PROC_RUNNING_M			0x40
 
+#define procstate2str(state) ((state)==PROC_CREATED    ? "CREATED   " : \
+                              (state)==PROC_RUNNABLE_S ? "RUNNABLE_S" : \
+                              (state)==PROC_RUNNING_S  ? "RUNNING_S " : \
+                              (state)==PROC_WAITING    ? "WAITING   " : \
+                              (state)==PROC_DYING      ? "DYING     " : \
+                              (state)==PROC_RUNNABLE_M ? "RUNNABLE_M" : \
+                              (state)==PROC_RUNNING_M  ? "RUNNING_M " : \
+                                                         "UNKNOWN   ")
+
 #include <env.h>
 
 // Till we remove the old struct Env
@@ -139,7 +148,7 @@ void __death(trapframe_t *tf, uint32_t srcid, void * a0, void * a1,
 void proc_init_arch(struct proc *SAFE p);
 void proc_free_arch(struct proc *SAFE p);
 void proc_set_program_counter(trapframe_t *SAFE tf, uintptr_t pc);
-void proc_init_trapframe(trapframe_t *SAFE tf);
+void proc_init_trapframe(trapframe_t *SAFE tf, uint32_t vcoreid);
 void proc_set_tfcoreid(trapframe_t *SAFE tf, uint32_t id);
 void proc_set_syscall_retval(trapframe_t *SAFE tf, intreg_t value);
 

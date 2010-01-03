@@ -18,7 +18,8 @@ void
 proc_init_arch(struct proc *SAFE p)
 {
 	pid_t parent_id = p->ppid, id = p->pid;
-	if(frontend_syscall(parent_id,RAMP_SYSCALL_proc_init,id,0,0))
+	int32_t errno;
+	if(frontend_syscall(parent_id,RAMP_SYSCALL_proc_init,id,0,0,&errno))
 		panic("Front-end server couldn't initialize new process!");
 }
 
@@ -26,7 +27,8 @@ proc_init_arch(struct proc *SAFE p)
 void
 proc_free_arch(struct proc *SAFE p)
 {
-	if(frontend_syscall(0,RAMP_SYSCALL_proc_free,p->pid,0,0))
+	int32_t errno;
+	if(frontend_syscall(0,RAMP_SYSCALL_proc_free,p->pid,0,0,&errno))
 		panic("Front-end server couldn't free process!");
 }
 
@@ -38,7 +40,7 @@ proc_set_program_counter(trapframe_t *tf, uintptr_t pc)
 }
 
 void
-proc_init_trapframe(trapframe_t *tf)
+proc_init_trapframe(trapframe_t *tf, uint32_t vcoreid)
 {
         extern char trap_table;
 
@@ -46,6 +48,8 @@ proc_init_trapframe(trapframe_t *tf)
         tf->psr = PSR_S; // but PS = 0
         tf->wim = 0;
         tf->tbr = (uint32_t)&trap_table;
+
+	proc_set_tfcoreid(tf,vcoreid);
 }
 
 void proc_set_tfcoreid(trapframe_t *tf, uint32_t id)

@@ -23,7 +23,7 @@ void proc_set_program_counter(trapframe_t *tf, uintptr_t pc)
 	tf->tf_eip = pc;
 }
 
-void proc_init_trapframe(trapframe_t *tf)
+void proc_init_trapframe(trapframe_t *tf, uint32_t vcoreid)
 {
 	/* Set up appropriate initial values for the segment registers.
 	 * GD_UD is the user data segment selector in the GDT, and
@@ -37,6 +37,8 @@ void proc_init_trapframe(trapframe_t *tf)
 	tf->tf_cs = GD_UT | 3;
 	/* set the env's EFLAGSs to have interrupts enabled */
 	tf->tf_eflags |= 0x00000200; // bit 9 is the interrupts-enabled
+
+	proc_set_tfcoreid(tf,vcoreid);
 }
 
 /* Coupled closely with userland's entry.S.  id is the vcoreid, which entry.S
