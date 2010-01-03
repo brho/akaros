@@ -127,7 +127,8 @@ error_t upage_alloc(struct proc* p, page_t** page)
 	if(ret >= 0)
 	{
 		memset(page2kva(*page),0,PGSIZE);
-		p->next_cache_color = (ret + 1) % llc_cache->num_colors;
+		p->next_cache_color = (ret + 1) & (llc_cache->num_colors-1);
+		return 0;
 	}
 	return ret;
 }

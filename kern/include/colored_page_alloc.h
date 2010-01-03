@@ -43,7 +43,8 @@ error_t _cache##_page_alloc(page_t** page, size_t color)                      \
 {                                                                             \
 	if(available_caches._cache == TRUE) {                                     \
 	    _cache##_num_colors = get_cache_num_page_colors(&(_cache));           \
-	    size_t list_size = _cache##_num_colors*sizeof(page_list_t);            \
+	    assert(((_cache##_num_colors) & ((_cache##_num_colors)-1)) == 0);     \
+	    size_t list_size = _cache##_num_colors*sizeof(page_list_t);           \
 	    _cache##_cache_colored_page_list                                      \
 	       = (page_list_t*) boot_alloc(list_size, PGSIZE);                    \
 		for(int i=0; i<_cache##_num_colors; i++) {                            \

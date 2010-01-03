@@ -39,9 +39,13 @@ void cache_init();
 void cache_color_alloc_init();
 void init_cache_properties(cache_t RO*c, size_t sz_k, size_t wa, size_t clsz);
 void init_free_cache_colors_map(cache_t* c);
-size_t get_page_color(uintptr_t page, cache_t RO*c);
 size_t get_offset_in_cache_line(uintptr_t addr, cache_t RO*c);
 void print_cache_properties(char *NT lstring, cache_t RO*c);
+
+static inline size_t get_page_color(uintptr_t page, cache_t *c) {
+    return (page & (c->num_colors-1));
+}
+
 
 uint8_t* cache_colors_map_alloc();
 void cache_colors_map_free(uint8_t* colors_map);
