@@ -42,9 +42,6 @@ inline void init_free_cache_colors_map(cache_t* c)
 	FILL_BITMASK(c->free_colors_map, c->num_colors);
 }
 
-inline size_t get_page_color(uintptr_t page, cache_t *c) {
-    return (page % c->num_colors);
-}
 inline size_t get_offset_in_cache_line(uintptr_t addr, cache_t *c) {
     return (addr % get_cache_bytes_per_line(c));
 }
