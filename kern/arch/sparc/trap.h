@@ -37,6 +37,11 @@ void save_fp_state(ancillary_state_t* silly);
 void restore_fp_state(ancillary_state_t* silly);
 void emulate_fpu(trapframe_t* state, ancillary_state_t* astate);
 
+static inline void set_errno(trapframe_t* tf, uint32_t errno)
+{
+	tf->gpr[9] = errno;
+}
+
 #endif /* !__ASSEMBLER__ */
 
 #endif /* !ROS_INC_ARCH_TRAP_H */

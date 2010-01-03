@@ -7,7 +7,7 @@
 
 #include <env.h>
 int32_t frontend_syscall_from_user(env_t* p, int32_t syscall_num, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t translate_args);
-int32_t frontend_syscall(pid_t pid, int32_t syscall_num, uint32_t arg0, uint32_t arg1, uint32_t arg2);
+int32_t frontend_syscall(pid_t pid, int32_t syscall_num, uint32_t arg0, uint32_t arg1, uint32_t arg2, int32_t* errno);
 
 int32_t sys_nbgetch();
 int32_t sys_nbputch(char ch);
@@ -24,10 +24,16 @@ int32_t sys_nbputch(char ch);
 #define RAMP_SYSCALL_link		9
 #define RAMP_SYSCALL_unlink		10
 #define RAMP_SYSCALL_chdir		12
+#define RAMP_SYSCALL_chmod		15
 #define RAMP_SYSCALL_brk		17
 #define RAMP_SYSCALL_stat		18
 #define RAMP_SYSCALL_lseek		19
 #define RAMP_SYSCALL_fstat		28
+#define RAMP_SYSCALL_utime		30
+#define RAMP_SYSCALL_access		33
+#define RAMP_SYSCALL_dup		41
+#define RAMP_SYSCALL_umask		60
+#define RAMP_SYSCALL_fcntl		62
 #define RAMP_SYSCALL_lstat		88
 #define RAMP_SYSCALL_closedir		91
 #define RAMP_SYSCALL_rewinddir		92

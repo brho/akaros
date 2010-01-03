@@ -280,6 +280,11 @@ handle_syscall(trapframe_t* state)
 	//if(current->vcoremap[0] == core_id())
 	//	env_push_ancillary_state(current); // remove this if you don't need it
 
+	// some syscalls don't return this way if they succed,
+	// e.g. run_binary.  so by default set the return value to success
+	state->gpr[8] = 0;
+	set_errno(current_tf,0);
+
 	// syscall code wants an edible reference for current
 	proc_incref(current, 1);
 	state->gpr[8] = syscall(current,num,a1,a2,a3,a4,a5);
