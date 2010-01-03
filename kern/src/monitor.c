@@ -42,6 +42,7 @@ static command_t (RO commands)[] = {
 	{ "showmapping", "Shows VA->PA mappings between two virtual addresses (parameters)", mon_showmapping},
 	{ "setmapperm", "Sets permissions on a VA->PA mapping", mon_setmapperm},
 	{ "cpuinfo", "Prints CPU diagnostics", mon_cpuinfo},
+	{ "ps", "Prints process list", mon_ps},
 	{ "nanwan", "Meet Nanwan!!", mon_nanwan},
 	{ "kfs_ls", "List files in KFS", mon_kfs_ls},
 	{ "kfs_run", "Create and run a program from KFS", mon_kfs_run},
@@ -58,6 +59,12 @@ int mon_help(int argc, char **argv, trapframe_t *tf)
 
 	for (i = 0; i < NCOMMANDS; i++)
 		cprintf("%s - %s\n", commands[i].name, commands[i].desc);
+	return 0;
+}
+
+int mon_ps(int argc, char** argv, trapframe_t *tf)
+{
+	print_allpids();
 	return 0;
 }
 

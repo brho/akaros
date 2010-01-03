@@ -13,6 +13,7 @@ void ( monitor)(trapframe_t *tf);
 int mon_help(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
 int mon_kerninfo(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
 int mon_backtrace(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
+int mon_ps(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
 int mon_reboot(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
 int mon_showmapping(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
 int mon_setmapperm(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
