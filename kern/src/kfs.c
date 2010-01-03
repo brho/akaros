@@ -29,7 +29,7 @@
  * Make sure to declare it, and add an entry.  Keep MAX_KFS_FILES big enough too
  */
 DECL_PROG(parlib_matrix);
-#ifndef MINIMAL_KFS
+#ifdef __i386__
 DECL_PROG(roslib_proctests);
 DECL_PROG(roslib_fptest);
 DECL_PROG(roslib_null);
@@ -47,7 +47,7 @@ DECL_PROG(parlib_manycore_test);
 
 struct kfs_entry kfs[MAX_KFS_FILES] = {
 	KFS_ENTRY(parlib_matrix)
-#ifndef MINIMAL_KFS
+#ifdef __i386__
 	KFS_ENTRY(roslib_proctests)
 	KFS_ENTRY(roslib_fptest)
 	KFS_ENTRY(roslib_null)
