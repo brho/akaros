@@ -366,8 +366,7 @@ int chdir(const char *name)
 int
 getppid(void)
 {
-	assert(0);
-//	return procinfo.ppid;
+	return procinfo.ppid;
 }
 
 int

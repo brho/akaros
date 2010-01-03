@@ -194,6 +194,7 @@ static void
 proc_init_procinfo(struct proc* p)
 {
 	p->env_procinfo->pid = p->pid;
+	p->env_procinfo->ppid = p->ppid;
 	p->env_procinfo->tsc_freq = system_timing.tsc_freq;
 	// TODO: maybe do something smarter here
 	p->env_procinfo->max_harts = MAX(1,num_cpus); // hack to use all cores
@@ -235,6 +236,7 @@ static error_t proc_alloc(struct proc *SAFE*SAFE pp, pid_t parent_id)
 
 	/* Set the basic status variables. */
 	spinlock_init(&p->proc_lock);
+	p->exitcode = 0;
 	p->ppid = parent_id;
 	__proc_set_state(p, PROC_CREATED);
 	p->env_refcnt = 2; // one for the object, one for the ref we pass back
@@ -247,7 +249,7 @@ static error_t proc_alloc(struct proc *SAFE*SAFE pp, pid_t parent_id)
 	memset(&p->resources, 0, sizeof(p->resources));
 	memset(&p->env_ancillary_state, 0, sizeof(p->env_ancillary_state));
 	memset(&p->env_tf, 0, sizeof(p->env_tf));
-	proc_init_trapframe(&p->env_tf);
+	proc_init_trapframe(&p->env_tf,0);
 
 	/* Initialize the contents of the e->env_procinfo structure */
 	proc_init_procinfo(p);
@@ -271,7 +273,7 @@ static error_t proc_alloc(struct proc *SAFE*SAFE pp, pid_t parent_id)
 
 	proc_init_arch(p);
 
-	printk("[%08x] new process %08x\n", current ? current->pid : 0, p->pid);
+	printd("[%08x] new process %08x\n", current ? current->pid : 0, p->pid);
 	} // INIT_STRUCT
 	return 0;
 }
@@ -300,7 +302,7 @@ static void __proc_free(struct proc *p)
 {
 	physaddr_t pa;
 
-	printk("[PID %d] freeing proc: %d\n", current ? current->pid : 0, p->pid);
+	printd("[PID %d] freeing proc: %d\n", current ? current->pid : 0, p->pid);
 	// All parts of the kernel should have decref'd before __proc_free is called
 	assert(p->env_refcnt == 0);
 
@@ -973,9 +975,8 @@ void __startcore(trapframe_t *tf, uint32_t srcid, void * a0, void * a1,
 	if (!tf_to_pop) {
 		tf_to_pop = &local_tf;
 		memset(tf_to_pop, 0, sizeof(*tf_to_pop));
-		proc_init_trapframe(tf_to_pop);
+		proc_init_trapframe(tf_to_pop,(uint32_t)a2);
 		// Note the init_tf sets tf_to_pop->tf_esp = USTACKTOP;
-		proc_set_tfcoreid(tf_to_pop, (uint32_t)a2);
 		proc_set_program_counter(tf_to_pop, p_to_run->env_entry);
 	}
 	/* the sender of the amsg increfed, thinking we weren't running current. */
@@ -1024,8 +1025,11 @@ void print_allpids(void)
 	spin_lock(&pid_hash_lock);
 	if (hashtable_count(pid_hash)) {
 		hashtable_itr_t *phtable_i = hashtable_iterator(pid_hash);
+		printk("PID      STATE    \n");
+		printk("------------------\n");
 		do {
-			printk("PID: %d\n", hashtable_iterator_key(phtable_i));
+			struct proc* p = hashtable_iterator_value(phtable_i);
+			printk("%8d %s\n", hashtable_iterator_key(phtable_i),p ? procstate2str(p->state) : "(null)");
 		} while (hashtable_iterator_advance(phtable_i));
 	}
 	spin_unlock(&pid_hash_lock);

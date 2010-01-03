@@ -40,8 +40,11 @@
 #define SYS_frontend				22
 #define SYS_getvcoreid				23
 #define SYS_reboot				24
+#define SYS_fork				25
+#define SYS_exec				26
+#define SYS_trywait				27
 // Keep this in sync with the last syscall number
-#define NSYSCALLS 					24
+#define NSYSCALLS 					27
 // syscall number starts at 1 and goes up to NSYSCALLS, without holes.
 #define INVALID_SYSCALL(syscallno) ((syscallno) > NSYSCALLS)
 

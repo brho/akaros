@@ -82,15 +82,144 @@ static ssize_t sys_serial_read(env_t* e, char *DANGEROUS _buf, size_t len)
 /* START OF REMOTE SYSTEMCALL SUPPORT SYSCALLS. THESE WILL GO AWAY AS THINGS MATURE */
 //
 
+static ssize_t sys_fork(env_t* e)
+{
+	// TODO: right now we only support fork for single-core processes
+	if(e->state != PROC_RUNNING_S)
+		return -1;
+
+	env_t* env = proc_create(NULL,0);
+	assert(env != NULL);
+
+	env->heap_bottom = e->heap_bottom;
+	env->heap_top = e->heap_top;
+	env->ppid = e->pid;
+	env->env_tf = *current_tf;
+
+	env->cache_colors_map = cache_colors_map_alloc();
+	for(int i=0; i < llc_cache->num_colors; i++)
+		if(GET_BITMASK_BIT(e->cache_colors_map,i))
+			cache_color_alloc(llc_cache, env->cache_colors_map);
+
+	// copy page table and page contents.
+	// TODO: does not work with mmap.  only text, heap, stack are copied.
+	for(char* va = 0; va < (char*)UTOP; va += PGSIZE)
+	{
+		// copy [0,heaptop] and [stackbot,utop]
+		if(va == env->heap_top)
+			va = (char*)USTACKBOT;
+
+		int perms = get_va_perms(e->env_pgdir,va);
+		if(perms) // I think this should always be true
+		{
+			page_t* pp;
+			assert(upage_alloc(env,&pp) == 0);
+			assert(page_insert(env->env_pgdir,pp,va,perms) == 0);
+			assert(memcpy_from_user(e,page2kva(pp),va,PGSIZE) == 0);
+		}
+	}
+
+	__proc_set_state(env, PROC_RUNNABLE_S);
+	schedule_proc(env);
+
+	// don't decref the new process.
+	// that will happen when the parent waits for it.
+
+	printd("[PID %d] fork PID %d\n",e->pid,env->pid);
+
+	return env->pid;
+}
+
+static ssize_t sys_trywait(env_t* e, pid_t pid, int* status)
+{
+	struct proc* p = pid2proc(pid);
+
+	// TODO: this syscall is racy, so we only support for single-core procs
+	if(e->state != PROC_RUNNING_S)
+		return -1;
+
+	// TODO: need to use errno properly.  sadly, ROS error codes conflict..
+
+	if(p)
+	{
+		ssize_t ret;
+
+		if(current->pid == p->ppid)
+		{
+			if(p->state == PROC_DYING)
+			{
+				memcpy_to_user(e,status,&p->exitcode,sizeof(int));
+				printd("[PID %d] waited for PID %d (code %d)\n",
+				       e->pid,p->pid,p->exitcode);
+				ret = 0;
+			}
+			else // not dead yet
+			{
+				set_errno(current_tf,0);
+				ret = -1;
+			}
+		}
+		else // not a child of the calling process
+		{
+			set_errno(current_tf,1);
+			ret = -1;
+		}
+
+		// if the wait succeeded, decref twice
+		proc_decref(p,1 + (ret == 0));
+		return ret;
+	}
+
+	set_errno(current_tf,1);
+	return -1;
+}
+
+static ssize_t sys_exec(env_t* e, void *DANGEROUS binary_buf, size_t len,
+                        void*DANGEROUS arg, void*DANGEROUS env)
+{
+	// TODO: right now we only support exec for single-core processes
+	if(e->state != PROC_RUNNING_S)
+		return -1;
+
+	if(memcpy_from_user(e,e->env_procinfo->argv_buf,arg,PROCINFO_MAX_ARGV_SIZE))
+		return -1;
+	if(memcpy_from_user(e,e->env_procinfo->env_buf,env,PROCINFO_MAX_ENV_SIZE))
+		return -1;
+
+	void* binary = kmalloc(len,0);
+	if(binary == NULL)
+		return -1;
+	if(memcpy_from_user(e,binary,binary_buf,len))
+	{
+		kfree(binary);
+		return -1;
+	}
+
+	// TODO: this is probably slow.  as with fork, should walk page table
+	env_segment_free(e,0,USTACKTOP);
+
+	env_load_icode(e,NULL,binary,len);
+	proc_init_trapframe(current_tf,0);
+
+	/*printk("[PID %d] exec ",e->pid);
+	char argv[PROCINFO_MAX_ARGV_SIZE];
+	int* offsets = (int*)e->env_procinfo->argv_buf;
+	for(int i = 0; offsets[i]; i++)
+		printk("%s%c",e->env_procinfo->argv_buf+offsets[i],offsets[i+1] ? ' ' : '\n');*/
+
+	kfree(binary);
+	return 0;
+}
+
 static ssize_t sys_run_binary(env_t* e, void *DANGEROUS binary_buf, size_t len,
-                              void*DANGEROUS arg, size_t arglen,
-                              size_t num_colors)
+                              void*DANGEROUS arg, size_t num_colors)
 {
 	env_t* env = proc_create(NULL,0);
 	assert(env != NULL);
 
 	static_assert(PROCINFO_NUM_PAGES == 1);
-	assert(memcpy_from_user(e,env->env_procinfo->argv_buf,arg,arglen) == ESUCCESS);
+	assert(memcpy_from_user(e,env->env_procinfo->argv_buf,arg,PROCINFO_MAX_ARGV_SIZE) == ESUCCESS);
+	*(intptr_t*)env->env_procinfo->env_buf = 0;
 
 	env_load_icode(env,e,binary_buf,len);
 	__proc_set_state(env, PROC_RUNNABLE_S);
@@ -370,7 +499,7 @@ static size_t sys_getvcoreid(env_t* e)
  * return.  o/w it will return 0 on success, or an error.  Errors include:
  * - EBADPROC: if there is no such process with pid
  * - EPERM: if caller does not control pid */
-static error_t sys_proc_destroy(struct proc *p, pid_t pid)
+static error_t sys_proc_destroy(struct proc *p, pid_t pid, int exitcode)
 {
 	error_t r;
 	struct proc *p_to_die = pid2proc(pid);
@@ -383,8 +512,9 @@ static error_t sys_proc_destroy(struct proc *p, pid_t pid)
 	}
 	if (p_to_die == p) {
 		// syscall code and pid2proc both have edible references, only need 1.
+		p->exitcode = exitcode;
 		proc_decref(p, 1);
-		printk("[PID %d] proc exiting gracefully\n", p->pid);
+		printd("[PID %d] proc exiting gracefully (code %d)\n", p->pid,exitcode);
 	} else {
 		panic("Destroying other processes is not supported yet.");
 		//printk("[%d] destroying proc %d\n", p->pid, p_to_die->pid);
@@ -528,7 +658,7 @@ intreg_t syscall(struct proc *p, uintreg_t syscallno, uintreg_t a1,
 		case SYS_getpid:
 			return sys_getpid(p);
 		case SYS_proc_destroy:
-			return sys_proc_destroy(p, (pid_t)a1);
+			return sys_proc_destroy(p, (pid_t)a1, (int)a2);
 		case SYS_yield:
 			proc_yield(p);
 			return ESUCCESS;
@@ -557,7 +687,7 @@ intreg_t syscall(struct proc *p, uintreg_t syscallno, uintreg_t a1,
 			return sys_serial_read(p, (char *DANGEROUS)a1, (size_t)a2);
 	#endif
 		case SYS_run_binary:
-			return sys_run_binary(p, (char *DANGEROUS)a1, (size_t)a2, (void* DANGEROUS)a3, (size_t)a4, (size_t)a5);
+			return sys_run_binary(p, (char *DANGEROUS)a1, (size_t)a2, (void* DANGEROUS)a3, (size_t)a4);
 	#ifdef __NETWORK__
 		case SYS_eth_write:
 			return sys_eth_write(p, (char *DANGEROUS)a1, (size_t)a2);
@@ -572,6 +702,15 @@ intreg_t syscall(struct proc *p, uintreg_t syscallno, uintreg_t a1,
 		case SYS_reboot:
 			reboot();
 			return 0;
+
+		case SYS_fork:
+			return sys_fork(p);
+
+		case SYS_trywait:
+			return sys_trywait(p,(pid_t)a1,(int*)a2);
+
+		case SYS_exec:
+			return sys_exec(p, (char *DANGEROUS)a1, (size_t)a2, (void* DANGEROUS)a3, (void* DANGEROUS)a4);
 
 		default:
 			// or just return -EINVAL

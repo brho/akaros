@@ -26,6 +26,7 @@ struct Env {
 	ancillary_state_t env_ancillary_state; 	// State saved when descheduled
 	pid_t pid;
 	pid_t ppid;                 // Parent's PID
+	pid_t exitcode;				// exit() param or main() return value
 	uint32_t state;				// Status of the process
 	uint32_t env_refcnt;		// Reference count of kernel contexts using this
 	uint32_t env_flags;

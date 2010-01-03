@@ -14,7 +14,7 @@
 
 typedef struct procinfo {
 	pid_t pid;
-	//pid_t ppid;
+	pid_t ppid;
 	size_t max_harts;
 	uint64_t tsc_freq;
 
