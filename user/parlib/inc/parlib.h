@@ -7,6 +7,10 @@
 #ifndef ROS_INC_PARLIB_H
 #define ROS_INC_PARLIB_H 1
 
+#define PARLIB_TLS_SIZE 16384
+
+#ifndef __ASSEMBLER__
+
 #include <ros/common.h>
 #include <ros/memlayout.h>
 #include <ros/syscall.h>
@@ -34,17 +38,19 @@ ssize_t     sys_serial_read(void* buf, size_t len);
 ssize_t     sys_eth_write(void *COUNT(len) buf, size_t len); 
 ssize_t     sys_eth_read(void *COUNT(len) buf, size_t len);
 ssize_t     sys_run_binary(void* binary_buf, size_t len,
-                           void* arg, size_t arglen, 
-                           size_t num_colors);
+                           char arg[PROCINFO_MAX_ARGV_SIZE], size_t num_colors);
 int         sys_getpid(void);
 size_t      sys_getcpuid(void);
 error_t     sys_brk(void* addr);
-error_t     sys_proc_destroy(int pid);
+error_t     sys_proc_destroy(int pid, int exitcode);
 ssize_t     sys_shared_page_alloc(void *COUNT(PGSIZE) *addr, pid_t p2, 
                                   int p1_flags, int p2_flags);
 ssize_t     sys_shared_page_free(void *COUNT(PGSIZE) addr, pid_t p2);
 ssize_t     sys_resource_req(int type, size_t amount, uint32_t flags);
 void        sys_reboot();
+void        sys_yield();
 int         gettimeofday(struct timeval* tp, void* tzp);
+
+#endif	// !ASSEMBLER
 
 #endif	// !ROS_INC_PARLIB_H

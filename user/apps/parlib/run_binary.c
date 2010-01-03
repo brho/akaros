@@ -2,11 +2,98 @@
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <fcntl.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <parlib.h>
+#include <newlib_backend.h>
+
+int shell_exec(const char* cmdline)
+{
+	#define MY_MAX_ARGV 16
+	char* argv[MY_MAX_ARGV+1] = {0};
+	char* p0 = strdup(cmdline);
+	char* p = p0;
+	for(int i = 0; i < MY_MAX_ARGV; i++)
+	{
+		argv[i] = p;
+		p = strchr(p,' ');
+		if(p)
+			*p++ = 0;
+		else
+			break;
+	}
+
+	int ret = fork();
+	if(ret == 0)
+	{
+		char** envp = environ;
+		const char* path = NULL;
+		int nenv;
+		for(nenv = 0; environ[nenv]; nenv++)
+			if(strncmp(environ[nenv],"PATH=",5) == 0)
+				path = environ[nenv]+5;
+
+		if(path == NULL)
+		{
+			envp = (char**)malloc(sizeof(char**)*(nenv+2));
+			for(int i = 0; i < nenv; i++)
+				envp[i] = environ[i];
+			envp[nenv] = "PATH=:/bin:/usr/bin";
+			path = envp[nenv]+5;
+			envp[nenv+1] = 0;
+		}
+
+		char* fn = NULL, *buf = NULL;
+		if(argv[0][0] == '/')
+			fn = argv[0];
+		else
+		{
+			buf = (char*)malloc(sizeof(char)*(strlen(argv[0])+strlen(path)+2));
+			while(fn == NULL)
+			{
+				const char* end = strchr(path,':');
+				int len = end ? end-path : strlen(path);
+				memcpy(buf,path,len);
+				if(len && buf[len-1] != '/')
+					buf[len++] = '/';
+				strcpy(buf+len,argv[0]);
+
+				if(access(buf,X_OK) == 0)
+					fn = buf;
+				if(end == NULL)
+					break;
+				path = end+1;
+			}
+
+			if(fn == NULL)
+			{
+				printf("%s: not found\n",argv[0]);
+				exit(1);
+			}
+		}
+
+		execve(fn,argv,envp);
+		free(buf);
+		perror("execvp");
+		exit(1);
+	}
+	else if(ret > 0)
+	{
+		int status;
+		if(wait(&status))
+			perror("wait");
+		else
+			debug_in_out("%s returned %d\n",argv[0],status);
+	}
+	else
+		perror("fork");
+
+	free(p0);
+	return 0;
+}
 
 extern char * readline(const char *prompt);
 
@@ -17,21 +104,22 @@ int run_binary_filename(const char* cmdline, size_t colors)
 {
 	int ret = 0;
 
+	const char* cmdptr = cmdline;
 	char argv_buf[PROCINFO_MAX_ARGV_SIZE] = {0};
-	char* argv_buf_ptr = argv_buf;
-	for(int argc = 0; ; argc++)
+	intreg_t* argv = (intreg_t*)argv_buf;
+	argv[0] = 0;
+	int argc;
+	for(argc = 0; ; argc++)
 	{
-		while(*cmdline == ' ')
-			cmdline++;
-		if(*cmdline == 0)
+		while(*cmdptr == ' ')
+			cmdptr++;
+		if(*cmdptr == 0)
 			break;
 
-		char* p = strchr(cmdline,' ');
-		int len = p == NULL ? strlen(cmdline) : p-cmdline;
+		char* p = strchr(cmdptr,' ');
+		int len = p == NULL ? 1+strlen(cmdptr) : 1+p-cmdptr;
 
-		memcpy(argv_buf_ptr,cmdline,len);
-		argv_buf_ptr[len] = 0;
-		argv_buf_ptr += len+1;
+		argv[argc+1] = argv[argc]+len;
 
 		if(p == NULL)
 		{
@@ -39,11 +127,19 @@ int run_binary_filename(const char* cmdline, size_t colors)
 			break;
 		}
 
-		cmdline = p;
+		cmdptr = p;
 	}
-	
+	for(int i = 0; i < argc; i++)
+	{
+		intreg_t offset = argv[i];
+		argv[i] += (argc+1)*sizeof(char*);
+		memcpy(argv_buf+argv[i],cmdline+offset,argv[i+1]-offset-1);
+		argv_buf[argv[i]+argv[i+1]-offset-1] = 0;
+	}
+	argv[argc] = 0;
 
-	int fd = open(argv_buf, O_RDONLY, 0);
+	char* filename = argv_buf+argv[0];
+	int fd = open(filename, O_RDONLY, 0);
 	if(fd < 0)
 	{
 		printf("open failed\n");
@@ -81,8 +177,8 @@ int run_binary_filename(const char* cmdline, size_t colors)
 		}
 		if(bytes_read == 0) break;
 	}
-	printf("Loading Binary: %s, ROMSIZE: %d\n",argv_buf,total_bytes_read);
-	ret = sys_run_binary(binary_buf, total_bytes_read, argv_buf, PROCINFO_MAX_ARGV_SIZE, colors);
+	//printf("Loading Binary: %s, ROMSIZE: %d\n",filename,total_bytes_read);
+	ret = sys_run_binary(binary_buf, total_bytes_read, argv_buf, colors);
 	if(ret < 0)
 		fprintf(stderr, "Error: Unable to run remote binary\n");
 	else

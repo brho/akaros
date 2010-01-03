@@ -35,7 +35,7 @@ char **environ = __env;
  */
 void _exit(int __status)
 {
-	sys_proc_destroy(sys_getpid()); // TODO: can run getpid and cache it
+	sys_proc_destroy(sys_getpid(),__status); // TODO: can run getpid and cache it
 	while(1); //Should never get here...
 }
     

@@ -1,11 +1,5 @@
 USER_APPS_DIR = $(USER_DIR)/apps
 
-USER_APPS_USR_DIR := $(USER_APPS_DIR)/usr
-
-$(OBJDIR)/$(USER_APPS_USR_DIR)/%: usrbin/$(TARGET_ARCH)/%
-	@mkdir -p $(OBJDIR)/$(USER_APPS_USR_DIR)
-	@cp $< $@
-
 include $(USER_APPS_DIR)/roslib/Makefrag
 include $(USER_APPS_DIR)/parlib/Makefrag
 

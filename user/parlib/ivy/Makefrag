@@ -2,8 +2,8 @@ USER_PARLIB_IVY_DIR := $(USER_PARLIB_DIR)/ivy
 OBJDIRS += $(USER_PARLIB_IVY_DIR)
 
 USER_PARLIB_IVY_CFLAGS   := $(USER_CFLAGS) \
-                            -I$(USER_PARLIB_NEWLIB_DIR)/include \
                             -I$(USER_PARLIB_INCLUDE_DIR)
+                            # -I$(USER_PARLIB_NEWLIB_DIR)/include
 ifeq ($(COMPILER),IVY)
 USER_PARLIB_IVY_CFLAGS   += --nodeputy
 endif

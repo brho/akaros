@@ -44,9 +44,7 @@ notcore0:
 	mov	stack_ptr_array,%edx
 	mov	(%edx,%eax,4),%esp
 
-	call	hart_entry
-
-	call	hart_yield
+	call	parlib_unmain
 
 	// illegal instruction in case hart_yield accidentally returns
 	mov	(0),%eax

@@ -7,11 +7,14 @@ char* readline(const char * prompt)
 {
 	int i, read_amt;
 	char c;
-	#define BUFLEN 256
+	#define BUFLEN 512
 	static char buf[BUFLEN];
 
 	if (prompt != NULL)
-		printf("%s", prompt); fflush(stdout);
+	{
+		printf("%s", prompt);
+		fflush(stdout);
+	}
 
 	i = 0;
 	while (1) {

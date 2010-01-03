@@ -1,6 +1,7 @@
 #include <arch/mmu.h>
 #include <arch/arch.h>
 #include <ros/memlayout.h>
+#include <parlib.h>
 
 .data
 
@@ -26,11 +27,6 @@ stack_ptr_array:
 tls_array:
 	.word 0
 
-.align 8
-core0_tls:
-	.skip 1024*1024
-
-
 // Entrypoint - this is where the kernel (or our parent environment)
 // starts us running when we are initially loaded into a new environment.
 .text
@@ -41,9 +37,9 @@ _start:
 	 nop
 
 	// Set up TLS
-	set	core0_tls,%g7
+	set	core0_tls+PARLIB_TLS_SIZE,%g7
 
-	call	parlibmain
+	call	parlib_main
 	 nop
 
 	unimp
@@ -63,10 +59,7 @@ notcore0:
 	ld	[%l0], %l0
 	ld	[%l0+%l1],%g7
 
-	call    hart_entry
-	 nop
-
-	call	hart_yield
+	call	parlib_unmain
 	 nop
 
 	unimp

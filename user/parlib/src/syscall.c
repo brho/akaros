@@ -2,9 +2,9 @@
 
 #include <parlib.h>
 
-error_t sys_proc_destroy(int pid)
+error_t sys_proc_destroy(int pid, int exitcode)
 {
-	return syscall(SYS_proc_destroy, pid, 0, 0, 0, 0);
+	return syscall(SYS_proc_destroy, pid, exitcode, 0, 0, 0);
 }
 
 error_t sys_brk(void* addr)
@@ -58,12 +58,11 @@ ssize_t sys_serial_read(void* buf, size_t len)
 }
 
 //Run a binary loaded at the specificed address with the specified arguments
-ssize_t sys_run_binary(void* binary_buf, size_t len, void* arg, size_t arglen,
-                                              size_t num_colors) 
+ssize_t sys_run_binary(void* binary_buf, size_t len,
+                       char arg[PROCINFO_MAX_ARGV_SIZE], size_t num_colors) 
 {
 	return syscall(SYS_run_binary, (intreg_t)binary_buf, (intreg_t)len,
-                                       (intreg_t)arg, (intreg_t)arglen,
-	                               (intreg_t)num_colors);
+                                       (intreg_t)arg,(intreg_t)num_colors,0);
 }
 
 //Write a buffer over ethernet
@@ -93,4 +92,9 @@ ssize_t sys_resource_req(int type, size_t amount, uint32_t flags)
 void sys_reboot()
 {
 	syscall(SYS_reboot,0,0,0,0,0);
+}
+
+void sys_yield()
+{
+	syscall(SYS_yield,0,0,0,0,0);
 }
