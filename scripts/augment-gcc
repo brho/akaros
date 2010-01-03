@@ -27,9 +27,9 @@ if [ -z "$LIBGCC" ]
 then
 	LIBGCC=`find $1 -iname libgcc.a`
 fi
-LIBC=`find $1 -iname libc.a`
-LIBM=`find $1 -iname libm.a`
-LIBG=`find $1 -iname libg.a`
+LIBC=$1/$2-elf/lib/libc.a
+LIBM=$1/$2-elf/lib/libm.a
+LIBG=$1/$2-elf/lib/libg.a
 LIBPARLIB=../obj/user/parlib/libparlib.a
 LIBPTHREAD=../obj/user/parlib/libpthread.a
 rm -rf tmp
@@ -51,5 +51,5 @@ cd ..
 overwrite $1 tmp/libgcc.a libgcc.a
 rm -rf tmp
 
-SYS_INC=`find $1 -iname sys-include`
+SYS_INC=$1/$2-elf/sys-include
 cp -Lr user/parlib/inc/* $SYS_INC
