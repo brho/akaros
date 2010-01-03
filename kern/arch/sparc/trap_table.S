@@ -144,8 +144,8 @@ trap_table:
 	UNHANDLED_TRAP				! 0x85
 	UNHANDLED_TRAP				! 0x86
 	UNHANDLED_TRAP				! 0x87
-	TRAP_TABLE_ENTRY(handle_syscall)	! 0x80
-	UNHANDLED_TRAP				! 0x89
+	TRAP_TABLE_ENTRY(handle_syscall)	! 0x88
+	JMP(handle_perfctr)			! 0x89
 	UNHANDLED_TRAP				! 0x8A
 	UNHANDLED_TRAP				! 0x8B
 	UNHANDLED_TRAP				! 0x8C

@@ -95,10 +95,15 @@ read_fsr(void)
 static __inline uint64_t
 read_perfctr(uint32_t cpu, uint32_t which)
 {
-	uint32_t hi,lo;
+	register uint32_t hi asm("o0"), lo asm("o1");
 	intptr_t addr = cpu<<10 | which<<3;
-	hi = load_alternate(addr,2);
-	lo = load_alternate(addr+4,2);
+	#ifdef ROS_KERNEL
+		hi = load_alternate(addr,2);
+		lo = load_alternate(addr+4,2);
+	#else
+		asm volatile("mov %2,%%o0; ta 9"
+		             : "=r"(hi),"=r"(lo) : "r"(addr));
+	#endif
 	return (((uint64_t)hi) << 32) | lo;
 }
 

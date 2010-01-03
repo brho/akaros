@@ -234,6 +234,15 @@ env_pop_tf:
 	jmp	%l1
 	rett	%l2
 
+	.global handle_perfctr
+handle_perfctr:
+	andn	%i0,7,%i1
+	lda	[%i1] 2,%i0
+	add	%i1,4,%i1
+	lda	[%i1] 2,%i1
+	jmp	%l2
+	 rett	%l2+4
+
 	.global send_active_message_raw
 send_active_message_raw:
 	retl
