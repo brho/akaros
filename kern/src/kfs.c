@@ -28,6 +28,8 @@
  * userapps in kern/src/Makefrag.
  * Make sure to declare it, and add an entry.  Keep MAX_KFS_FILES big enough too
  */
+DECL_PROG(parlib_matrix);
+#ifndef MINIMAL_KFS
 DECL_PROG(roslib_proctests);
 DECL_PROG(roslib_fptest);
 DECL_PROG(roslib_null);
@@ -40,25 +42,12 @@ DECL_PROG(parlib_draw_nanwan_standalone);
 DECL_PROG(parlib_channel_test_client);
 DECL_PROG(parlib_channel_test_server);
 DECL_PROG(parlib_hello);
-DECL_PROG(parlib_matrix);
 DECL_PROG(parlib_manycore_test);
-DECL_PROG(parlib_pthread_pthread_test);
-DECL_PROG(parlib_pthread_blackscholes);
-
-#ifndef __i386__
-DECL_PROG(usr_blackscholes);
-DECL_PROG(usr_streamcluster);
-DECL_PROG(usr_swaptions);
-DECL_PROG(usr_bodytrack);
-DECL_PROG(usr_fluidanimate);
-DECL_PROG(usr_x264);
-DECL_PROG(usr_synthetic_procobv_cacheobv_offbwobv);
-DECL_PROG(usr_synthetic_procplus_cacheplus_offbwplus);
-DECL_PROG(usr_cpptest);
-DECL_PROG(usr_condtest);
 #endif
 
 struct kfs_entry kfs[MAX_KFS_FILES] = {
+	KFS_ENTRY(parlib_matrix)
+#ifndef MINIMAL_KFS
 	KFS_ENTRY(roslib_proctests)
 	KFS_ENTRY(roslib_fptest)
 	KFS_ENTRY(roslib_null)
@@ -71,21 +60,7 @@ struct kfs_entry kfs[MAX_KFS_FILES] = {
 	KFS_ENTRY(parlib_channel_test_client)
 	KFS_ENTRY(parlib_channel_test_server)
 	KFS_ENTRY(parlib_hello)
-	KFS_ENTRY(parlib_matrix)
 	KFS_ENTRY(parlib_manycore_test)
-	KFS_ENTRY(parlib_pthread_pthread_test)
-	KFS_ENTRY(parlib_pthread_blackscholes)
-#ifndef __i386__
-	KFS_ENTRY(usr_blackscholes)
-	KFS_ENTRY(usr_streamcluster)
-	KFS_ENTRY(usr_swaptions)
-	KFS_ENTRY(usr_bodytrack)
-	KFS_ENTRY(usr_fluidanimate)
-	KFS_ENTRY(usr_x264)
-	KFS_ENTRY(usr_synthetic_procobv_cacheobv_offbwobv)
-	KFS_ENTRY(usr_synthetic_procplus_cacheplus_offbwplus)
-	KFS_ENTRY(usr_cpptest)
-	KFS_ENTRY(usr_condtest)
 #endif
 };
 

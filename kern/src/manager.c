@@ -189,6 +189,11 @@ void manager_klueska()
 	panic("DON'T PANIC");
 }
 
+void manager_waterman()
+{
+	manager_klueska();
+}
+
 #ifdef __sparc_v8__
 
 static char*
@@ -239,107 +244,3 @@ void gsf_set_core_partition(int core, int partition)
 
 #endif
 
-void manager_waterman()
-{
-#if 0
-
-        static uint8_t progress = 0;
-	if(progress > 0)
-		goto run_some_apps;	
-
-	#define MAX_APPS 2
-	struct app
-	{
-		int threads;
-		int colors;
-		int credits;
-		int argc;
-		char** argv;
-	};
-
-	static struct app apps[MAX_APPS];
-	static int napps = 0;
-
-	// arg format:
-	// #apps [#threads #colors #credits name args] - [#threads ...] - ...
-	assert(argc > 0);
-	napps = atoi(argv[0]);
-	assert(napps <= MAX_APPS);
-	argc--; argv++;
-	for(int a = 0; a < napps; a++)
-	{
-		assert(argc >= 4);
-		apps[a].threads = atoi(argv[0]);
-		apps[a].colors = atoi(argv[1]);
-		apps[a].credits = atoi(argv[2]);
-		argc -= 3; argv += 3;
-
-		apps[a].argc = 0;
-		apps[a].argv = argv;
-		while(argc)
-		{
-			argc--;
-			if(strcmp(*argv++,"-") != 0)
-				apps[a].argc++;
-			else
-				break;
-		}
-
-		printk("app %d: %d threads, %d colors, %d credits\ncommand line: ",a,apps[a].threads,apps[a].colors,apps[a].credits);
-		for(int i = 0; i < apps[a].argc; i++)
-			printk("%s ",apps[a].argv[i]);
-		printk("\n");
-	}
-
-	// DRAM can process requests every 40 cycles.
-	// In a 480-cycle window, this gives us 12 total credits.
-	gsf_set_frame_cycles(482);
-	for(int a = 0, cores_used = 0; a < napps; a++)
-	{
-		gsf_set_partition_credits(a,apps[a].credits);
-		for(int i = 0; i < apps[a].threads; i++, cores_used++)
-			gsf_set_core_partition(num_cpus-cores_used-1,a);
-	}
-
-run_some_apps:
-	;
-
-	static struct proc *envs[MAX_APPS];
-	int apps_running = napps;
-	int envs_free[MAX_APPS] = {0};
-	if(progress == napps)
-	{
-		while(apps_running)
-		{
-			for(int i = 0; i < napps; i++)
-			{
-				if(*(volatile uint32_t*)&envs[i]->state == ENV_FREE && !envs_free[i])
-				{
-					envs_free[i] = 1;
-					apps_running--;
-					printk("Finished application %d at cycle %lld\n", i, read_tsc()); 
-				}
-			}
-		}
-		reboot();
-	}
-	else
-	{
-		envs[progress] = kfs_proc_create(kfs_lookup_path(apps[progress].argv[0]));
-
-		envs[progress]->cache_colors_map = cache_colors_map_alloc();
-		for(int i = 0; i < apps[progress].colors; i++)
-			assert(cache_color_alloc(llc_cache, envs[progress]->cache_colors_map) == ESUCCESS);
-
-		proc_set_state(envs[progress], PROC_RUNNABLE_S);
-
-		if(apps[progress].argc)
-			proc_init_argc_argv(envs[progress],apps[progress].argc,(const char**)apps[progress].argv);
-
-		proc_run(envs[progress++]);
-
-		schedule();
-	}
-#endif
-	panic("professional bomb technician at work.  if you see me running, try to keep up!");
-}

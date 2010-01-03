@@ -44,6 +44,10 @@ KERN_SRCFILES := $(KERN_ARCH_SRCFILES) \
 KERN_SRCFILES := $(wildcard $(KERN_SRCFILES))
 
 KERN_APPFILES := \
+                 $(USER_APPS_PARLIB_DIR)/matrix
+
+ifeq ($(TARGET_ARCH),i386)
+KERN_APPFILES += \
                  $(USER_APPS_ROSLIB_DIR)/proctests \
                  $(USER_APPS_ROSLIB_DIR)/fptest \
                  $(USER_APPS_ROSLIB_DIR)/null \
@@ -52,28 +56,11 @@ KERN_APPFILES := \
                  $(USER_APPS_ROSLIB_DIR)/mhello \
                  $(USER_APPS_ROSLIB_DIR)/mproctests \
                  $(USER_APPS_ROSLIB_DIR)/measurements \
-                 $(USER_APPS_PARLIB_PTHREAD_DIR)/pthread_test \
-                 $(USER_APPS_PARLIB_PTHREAD_DIR)/blackscholes \
                  $(USER_APPS_PARLIB_DIR)/draw_nanwan_standalone \
                  $(USER_APPS_PARLIB_DIR)/channel_test_client \
                  $(USER_APPS_PARLIB_DIR)/channel_test_server \
                  $(USER_APPS_PARLIB_DIR)/hello \
-                 $(USER_APPS_PARLIB_DIR)/manycore_test \
-                 $(USER_APPS_PARLIB_DIR)/matrix
-#                 $(USER_APPS_PARLIB_DIR)/open_read
-
-ifeq ($(TARGET_ARCH),sparc)
-KERN_APPFILES += \
-                 $(USER_APPS_USR_DIR)/blackscholes \
-                 $(USER_APPS_USR_DIR)/streamcluster \
-                 $(USER_APPS_USR_DIR)/swaptions \
-                 $(USER_APPS_USR_DIR)/bodytrack \
-                 $(USER_APPS_USR_DIR)/fluidanimate \
-                 $(USER_APPS_USR_DIR)/x264 \
-                 $(USER_APPS_USR_DIR)/cpptest \
-                 $(USER_APPS_USR_DIR)/condtest \
-                 $(USER_APPS_USR_DIR)/synthetic_procobv_cacheobv_offbwobv \
-                 $(USER_APPS_USR_DIR)/synthetic_procplus_cacheplus_offbwplus 
+                 $(USER_APPS_PARLIB_DIR)/manycore_test
 endif
 
 KERN_LDFLAGS   := $(KERN_LDFLAGS) -L$(OBJDIR)/$(KERN_DIR) \
