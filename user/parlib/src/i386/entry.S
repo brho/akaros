@@ -35,7 +35,7 @@ _start:
 	jne	notcore0
 
 	// argc/argv are provided by procinfo and are accessed in parlibmain
-	call parlibmain
+	call parlib_main
 
 	// illegal instruction in case parlibmain accidentally returns
 	mov	(0),%eax

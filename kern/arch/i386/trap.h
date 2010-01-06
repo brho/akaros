@@ -98,6 +98,12 @@ typedef struct AncillaryState {
 	uint32_t silly; // remove this when you actually use this struct
 } ancillary_state_t;
 
+// TODO: WE MUST DECIDE HOW TO HANDLE THIS.
+static inline void set_errno(trapframe_t* tf, uint32_t errno)
+{
+	return;
+}
+
 #endif /* !__ASSEMBLER__ */
 
 // Must equal 'sizeof(trapframe_t)'.

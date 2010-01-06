@@ -194,6 +194,12 @@ void manager_waterman()
 	manager_klueska();
 }
 
+void manager_pearce()
+{
+	manager_klueska();
+}
+
+
 #ifdef __sparc_v8__
 
 static char*
