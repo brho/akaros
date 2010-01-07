@@ -215,6 +215,7 @@ uint32_t smp_main(void)
 	// GDT should be 4-byte aligned.  TS isn't aligned.  Not sure if it matters.
 	pseudodesc_t *my_gdt_pd = get_my_gdt_pd(my_stack);
 	segdesc_t *COUNT(SEG_COUNT) my_gdt = get_my_gdt(my_stack);
+	per_cpu_info[core_id()].gdt = my_gdt;
 	// TS also needs to be permanent
 	taskstate_t *my_ts = get_my_ts(my_stack);
 	// Usable portion of the KSTACK grows down from here

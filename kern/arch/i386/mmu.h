@@ -159,11 +159,13 @@
  */
 
 // Global descriptor numbers
+#define GD_NULL   0x00     // NULL descriptor
 #define GD_KT     0x08     // kernel text
 #define GD_KD     0x10     // kernel data
 #define GD_UT     0x18     // user text
 #define GD_UD     0x20     // user data
 #define GD_TSS    0x28     // Task segment selector
+#define GD_LDT    0x30     // local descriptor table
 
 #ifdef __ASSEMBLER__
 
@@ -206,6 +208,11 @@ typedef struct Segdesc {
 #define SEG(type, base, lim, dpl) 									\
 { ((lim) >> 12) & 0xffff, (base) & 0xffff, ((base) >> 16) & 0xff,	\
     type, 1, dpl, 1, (unsigned) (lim) >> 28, 0, 0, 1, 1,			\
+    (unsigned) (base) >> 24 }
+// System segment (LDT)
+#define SEG_SYS(type, base, lim, dpl) 									\
+{ ((lim) >> 12) & 0xffff, (base) & 0xffff, ((base) >> 16) & 0xff,	\
+    type, 0, dpl, 1, (unsigned) (lim) >> 28, 0, 0, 1, 1,			\
     (unsigned) (base) >> 24 }
 
 #define SEG16(type, base, lim, dpl) 								\
@@ -254,7 +261,7 @@ typedef struct Segdesc {
 #define STS_IG32	0xE	    // 32-bit Interrupt Gate
 #define STS_TG32	0xF	    // 32-bit Trap Gate
 
-#define SEG_COUNT 	6 		// Number of segments in the steady state
+#define SEG_COUNT 	7 		// Number of segments in the steady state
 
 /*
  *

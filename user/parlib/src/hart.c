@@ -30,7 +30,7 @@ static void _hart_init()
 error_t hart_request(size_t k)
 {
 	size_t i,j;
-	const int user_stack_size = 1024*1024, tls_size = 1024*1024;
+	const int user_stack_size = 1024*1024, tls_size = PARLIB_TLS_SIZE;
 
 	extern void** stack_ptr_array;
 	extern void** tls_array;
