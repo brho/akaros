@@ -41,8 +41,6 @@ WRITES(e->env_pgdir, e->env_cr3, e->env_procinfo, e->env_procdata)
 {
 	int i, r;
 	page_t *pgdir = NULL;
-	page_t *pginfo[PROCINFO_NUM_PAGES] = {NULL};
-	page_t *pgdata[PROCDATA_NUM_PAGES] = {NULL};
 	static page_t * RO shared_page = 0;
 
 	/*
@@ -78,36 +76,25 @@ WRITES(e->env_pgdir, e->env_cr3, e->env_procinfo, e->env_procdata)
 	e->env_pgdir[PDX(VPT)]  = PTE(LA2PPN(e->env_cr3), PTE_P | PTE_KERN_RW);
 	e->env_pgdir[PDX(UVPT)] = PTE(LA2PPN(e->env_cr3), PTE_P | PTE_USER_RO);
 
-	/*
-	 * Now allocate and insert all pages required for the shared
-	 * procinfo structure into the page table
-	 */
-	for(int i=0; i<PROCINFO_NUM_PAGES; i++) {
-		if(upage_alloc(e, &pginfo[i],1) < 0)
-			goto env_setup_vm_error;
-		if(page_insert(e->env_pgdir, pginfo[i], (void*SNT)(UINFO + i*PGSIZE),
-		               PTE_USER_RO) < 0)
-			goto env_setup_vm_error;
-	}
-
-	/*
-	 * Now allocate and insert all pages required for the shared
-	 * procdata structure into the page table
-	 */
-	for(int i=0; i<PROCDATA_NUM_PAGES; i++) {
-		if(upage_alloc(e, &pgdata[i],1) < 0)
-			goto env_setup_vm_error;
-		if(page_insert(e->env_pgdir, pgdata[i], (void*SNT)(UDATA + i*PGSIZE),
-		               PTE_USER_RW) < 0)
+	/* These need to be contiguous, so the kernel can alias them.  Note the
+	 * pages return with a refcnt, but it's okay to insert them since we free
+	 * them manually when the process is cleaned up. */
+	if (!(e->env_procinfo = get_cont_pages(LOG2_UP(PROCINFO_NUM_PAGES), 0)))
+		goto env_setup_vm_error_i;
+	if (!(e->env_procdata = get_cont_pages(LOG2_UP(PROCDATA_NUM_PAGES), 0)))
+		goto env_setup_vm_error_d;
+	for (int i = 0; i < PROCINFO_NUM_PAGES; i++) {
+		if (page_insert(e->env_pgdir, kva2page((void*)e->env_procinfo + i *
+		                PGSIZE), (void*SNT)(UINFO + i*PGSIZE), PTE_USER_RO) < 0)
 			goto env_setup_vm_error;
 	}
-
-	/*
-	 * Now, set e->env_procinfo, and e->env_procdata to point to
-	 * the proper pages just allocated and clear them out.
-	 */
-	e->env_procinfo = (procinfo_t *SAFE) TC(page2kva(pginfo[0]));
-	e->env_procdata = (procdata_t *SAFE) TC(page2kva(pgdata[0]));
+	for (int i = 0; i < PROCDATA_NUM_PAGES; i++) {
+		if (page_insert(e->env_pgdir, kva2page((void*)e->env_procdata + i *
+		                PGSIZE), (void*SNT)(UDATA + i*PGSIZE), PTE_USER_RW) < 0)
+			goto env_setup_vm_error;
+	}
+	memset(e->env_procinfo, 0, sizeof(procinfo_t));
+	memset(e->env_procdata, 0, sizeof(procdata_t));
 
 	/* Finally, set up the Global Shared Data page for all processes.
 	 * Can't be trusted, but still very useful at this stage for us.
@@ -130,13 +117,11 @@ WRITES(e->env_pgdir, e->env_cr3, e->env_procinfo, e->env_procdata)
 	return 0;
 
 env_setup_vm_error:
+	free_cont_pages(e->env_procdata, LOG2_UP(PROCDATA_NUM_PAGES));
+env_setup_vm_error_d:
+	free_cont_pages(e->env_procinfo, LOG2_UP(PROCINFO_NUM_PAGES));
+env_setup_vm_error_i:
 	page_free(shared_page);
-	for(int i=0; i< PROCDATA_NUM_PAGES; i++) {
-		page_free(pgdata[i]);
-	}
-	for(int i=0; i< PROCINFO_NUM_PAGES; i++) {
-		page_free(pginfo[i]);
-	}
 	env_user_mem_free(e);
 	page_free(pgdir);
 	return -ENOMEM;
