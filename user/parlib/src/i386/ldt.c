@@ -11,23 +11,40 @@
  * the memory at %gs:0x0 to hold the address of the top of the TLS.
  *
  * @author Paul Pearce <pearce@eecs.berkeley.edu>
- *
+ * @author Barret Rhoden <brho@eecs.berkeley.edu>
  */
 
-
 #include <ros/common.h>
-#include <parlib.h>
+#include <ros/mman.h>
 #include <arch/mmu.h>
-
-void* core0_tls_top_ptr;
+#include <parlib.h>
+#include <hart.h>
+#include <stdlib.h>
+#include <assert.h>
 
 void ldt_init(uint32_t core_id) {
 
 	extern void **tls_array;
 	extern char core0_tls[];
 
+	static void *core0_tls_top_ptr;
+	static bool initialized = 0;
 	void **tls_handle;
-	
+
+	/* mmap in only the LDT that we need.  once the kernel supports un-FIXED
+	 * mmap(), we can stop hardcoding the location (USTACKBOT - LDTSIZE) */
+	if (!initialized++) {
+		procdata.ldt = sys_mmap((void*)USTACKBOT - LDT_SIZE,
+		                        sizeof(segdesc_t) * hart_max_harts(),
+		                        PROT_READ | PROT_WRITE,
+		                        MAP_ANONYMOUS | MAP_FIXED | MAP_POPULATE, 0, 0);
+		sys_getpid(); // force a kernel crossing to reload the LDT
+		if (!procdata.ldt) {
+			debug("Unable to mmap() an LDT!  Exiting...\n");
+			exit(-EFAIL);
+		}
+	}
+
 	core0_tls_top_ptr = core0_tls + PARLIB_TLS_SIZE;
 
 	// Get a handle to this core's tls

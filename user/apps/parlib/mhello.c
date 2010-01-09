@@ -24,7 +24,6 @@ __thread int temp;
 
 int main(int argc, char** argv)
 {
-
 	uint32_t vcoreid;
 	error_t retval;
 

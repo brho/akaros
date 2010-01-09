@@ -25,7 +25,7 @@ typedef struct procinfo {
 
 typedef struct procdata {
 #ifdef __i386__
-	segdesc_t ldt[8192];
+	segdesc_t *ldt;
 #endif
 	// The actual ring buffers for communicating with user space
 	syscall_sring_t  syscallring;  // Per-process ring buffer for async syscalls

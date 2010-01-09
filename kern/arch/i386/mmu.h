@@ -261,7 +261,8 @@ typedef struct Segdesc {
 #define STS_IG32	0xE	    // 32-bit Interrupt Gate
 #define STS_TG32	0xF	    // 32-bit Trap Gate
 
-#define SEG_COUNT 	7 		// Number of segments in the steady state
+#define SEG_COUNT	7 		// Number of segments in the steady state
+#define LDT_SIZE	(8192 * sizeof(segdesc_t))
 
 /*
  *
