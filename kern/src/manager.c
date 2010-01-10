@@ -177,9 +177,10 @@ void manager_brho(void)
 void manager_klueska()
 {
 	static struct proc *envs[256];
-	static uint8_t progress = 0;
+	static volatile uint8_t progress = 0;
 
-	if (progress++ == 0) {
+	if (progress == 0) {
+		progress++;
 		envs[0] = kfs_proc_create(kfs_lookup_path("parlib_matrix"));
 		__proc_set_state(envs[0], PROC_RUNNABLE_S);
 		proc_run(envs[0]);
