@@ -238,7 +238,7 @@ static error_t proc_alloc(struct proc *SAFE*SAFE pp, pid_t parent_id)
 	spinlock_init(&p->proc_lock);
 	p->exitcode = 0;
 	p->ppid = parent_id;
-	__proc_set_state(p, PROC_CREATED);
+	p->state = PROC_CREATED; // shouldn't go through state machine for init
 	p->env_refcnt = 2; // one for the object, one for the ref we pass back
 	p->env_flags = 0;
 	p->env_entry = 0; // cheating.  this really gets set in load_icode
