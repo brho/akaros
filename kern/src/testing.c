@@ -252,46 +252,46 @@ void test_interrupts_irqsave(void)
 	int8_t state = 0;
 	printd("Testing Nesting Enabling first, turning ints off:\n");
 	disable_irq();
-	printd("Interrupts are: %x\n", read_eflags() & FL_IF);
+	printd("Interrupts are: %x\n", irq_is_enabled());
 	assert(!irq_is_enabled());
 	printd("Enabling IRQSave\n");
 	enable_irqsave(&state);
-	printd("Interrupts are: %x\n", read_eflags() & FL_IF);
+	printd("Interrupts are: %x\n", irq_is_enabled());
 	assert(irq_is_enabled());
 	printd("Enabling IRQSave Again\n");
 	enable_irqsave(&state);
-	printd("Interrupts are: %x\n", read_eflags() & FL_IF);
+	printd("Interrupts are: %x\n", irq_is_enabled());
 	assert(irq_is_enabled());
 	printd("Disabling IRQSave Once\n");
 	disable_irqsave(&state);
-	printd("Interrupts are: %x\n", read_eflags() & FL_IF);
+	printd("Interrupts are: %x\n", irq_is_enabled());
 	assert(irq_is_enabled());
 	printd("Disabling IRQSave Again\n");
 	disable_irqsave(&state);
-	printd("Interrupts are: %x\n", read_eflags() & FL_IF);
+	printd("Interrupts are: %x\n", irq_is_enabled());
 	assert(!irq_is_enabled());
 	printd("Done.  Should have been 0, 200, 200, 200, 0\n");
 
 	printd("Testing Nesting Disabling first, turning ints on:\n");
 	state = 0;
 	enable_irq();
-	printd("Interrupts are: %x\n", read_eflags() & FL_IF);
+	printd("Interrupts are: %x\n", irq_is_enabled());
 	assert(irq_is_enabled());
 	printd("Disabling IRQSave Once\n");
 	disable_irqsave(&state);
-	printd("Interrupts are: %x\n", read_eflags() & FL_IF);
+	printd("Interrupts are: %x\n", irq_is_enabled());
 	assert(!irq_is_enabled());
 	printd("Disabling IRQSave Again\n");
 	disable_irqsave(&state);
-	printd("Interrupts are: %x\n", read_eflags() & FL_IF);
+	printd("Interrupts are: %x\n", irq_is_enabled());
 	assert(!irq_is_enabled());
 	printd("Enabling IRQSave Once\n");
 	enable_irqsave(&state);
-	printd("Interrupts are: %x\n", read_eflags() & FL_IF);
+	printd("Interrupts are: %x\n", irq_is_enabled());
 	assert(!irq_is_enabled());
 	printd("Enabling IRQSave Again\n");
 	enable_irqsave(&state);
-	printd("Interrupts are: %x\n", read_eflags() & FL_IF);
+	printd("Interrupts are: %x\n", irq_is_enabled());
 	assert(irq_is_enabled());
 	printd("Done.  Should have been 200, 0, 0, 0, 200 \n");
 
@@ -299,10 +299,10 @@ void test_interrupts_irqsave(void)
 	disable_irq();
 	printd("Ints are off, enabling then disabling.\n");
 	enable_irqsave(&state);
-	printd("Interrupts are: %x\n", read_eflags() & FL_IF);
+	printd("Interrupts are: %x\n", irq_is_enabled());
 	assert(irq_is_enabled());
 	disable_irqsave(&state);
-	printd("Interrupts are: %x\n", read_eflags() & FL_IF);
+	printd("Interrupts are: %x\n", irq_is_enabled());
 	assert(!irq_is_enabled());
 	printd("Done.  Should have been 200, 0\n");
 
@@ -310,10 +310,10 @@ void test_interrupts_irqsave(void)
 	enable_irq();
 	printd("Ints are on, enabling then disabling.\n");
 	enable_irqsave(&state);
-	printd("Interrupts are: %x\n", read_eflags() & FL_IF);
+	printd("Interrupts are: %x\n", irq_is_enabled());
 	assert(irq_is_enabled());
 	disable_irqsave(&state);
-	printd("Interrupts are: %x\n", read_eflags() & FL_IF);
+	printd("Interrupts are: %x\n", irq_is_enabled());
 	assert(irq_is_enabled());
 	printd("Done.  Should have been 200, 200\n");
 
@@ -321,10 +321,10 @@ void test_interrupts_irqsave(void)
 	disable_irq();
 	printd("Ints are off, disabling then enabling.\n");
 	disable_irqsave(&state);
-	printd("Interrupts are: %x\n", read_eflags() & FL_IF);
+	printd("Interrupts are: %x\n", irq_is_enabled());
 	assert(!irq_is_enabled());
 	enable_irqsave(&state);
-	printd("Interrupts are: %x\n", read_eflags() & FL_IF);
+	printd("Interrupts are: %x\n", irq_is_enabled());
 	assert(!irq_is_enabled());
 	printd("Done.  Should have been 0, 0\n");
 
@@ -332,10 +332,10 @@ void test_interrupts_irqsave(void)
 	enable_irq();
 	printd("Ints are on, disabling then enabling.\n");
 	disable_irqsave(&state);
-	printd("Interrupts are: %x\n", read_eflags() & FL_IF);
+	printd("Interrupts are: %x\n", irq_is_enabled());
 	assert(!irq_is_enabled());
 	enable_irqsave(&state);
-	printd("Interrupts are: %x\n", read_eflags() & FL_IF);
+	printd("Interrupts are: %x\n", irq_is_enabled());
 	assert(irq_is_enabled());
 	printd("Done.  Should have been 0, 200\n");
 
