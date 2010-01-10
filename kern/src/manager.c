@@ -60,8 +60,9 @@ void manager_brho(void)
 	switch (progress++) {
 		case 0:
 			// TODO: need to store the pid for future manager runs, not the *p
+			p = kfs_proc_create(kfs_lookup_path("parlib_mhello"));
 			//p = kfs_proc_create(kfs_lookup_path("roslib_mhello"));
-			p = kfs_proc_create(kfs_lookup_path("roslib_mproctests"));
+			//p = kfs_proc_create(kfs_lookup_path("roslib_mproctests"));
 			//p = kfs_proc_create(kfs_lookup_path("roslib_spawn"));
 			// being proper and all:
 			spin_lock_irqsave(&p->proc_lock);
@@ -194,6 +195,12 @@ void manager_waterman()
 {
 	manager_klueska();
 }
+
+void manager_pearce()
+{
+	manager_klueska();
+}
+
 
 #ifdef __sparc_v8__
 

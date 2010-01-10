@@ -98,3 +98,24 @@ void sys_yield()
 {
 	syscall(SYS_yield,0,0,0,0,0);
 }
+
+/* We need to do some hackery to pass 6 arguments.  Arg4 pts to the real arg4,
+ * arg5, and arg6.  Keep this in sync with kern/src/syscall.c.
+ * TODO: consider a syscall_multi that can take more args, and keep it in sync
+ * with the kernel.  Maybe wait til we fix sysenter to have 5 or 6 args. */
+void *CT(length) sys_mmap(void *SNT addr, size_t length, int prot, int flags,
+                          int fd, size_t offset)
+{
+	struct args {
+		int _flags;
+		int _fd;
+		size_t _offset;
+	} extra_args;
+	extra_args._flags = flags;
+	extra_args._fd = fd;
+	extra_args._offset = offset;
+	// TODO: deputy bitches about this
+	return (void*CT(length))TC(syscall(SYS_mmap, (uint32_t)addr, length, prot,
+	                      (int32_t)&extra_args, 0));
+}
+

@@ -77,26 +77,36 @@ typedef struct PushRegs {
 
 typedef struct Trapframe {
 	push_regs_t tf_regs;
-	uint16_t tf_es;
+	uint16_t tf_gs;
 	uint16_t tf_padding1;
-	uint16_t tf_ds;
+	uint16_t tf_fs;
 	uint16_t tf_padding2;
+	uint16_t tf_es;
+	uint16_t tf_padding3;
+	uint16_t tf_ds;
+	uint16_t tf_padding4;
 	uint32_t tf_trapno;
 	/* below here defined by x86 hardware */
 	uint32_t tf_err;
 	uintptr_t tf_eip;
 	uint16_t tf_cs;
-	uint16_t tf_padding3;
+	uint16_t tf_padding5;
 	uint32_t tf_eflags;
 	/* below here only when crossing rings, such as from user to kernel */
 	uintptr_t tf_esp;
 	uint16_t tf_ss;
-	uint16_t tf_padding4;
+	uint16_t tf_padding6;
 } trapframe_t;
 
 typedef struct AncillaryState {
 	uint32_t silly; // remove this when you actually use this struct
 } ancillary_state_t;
+
+// TODO: WE MUST DECIDE HOW TO HANDLE THIS.
+static inline void set_errno(trapframe_t* tf, uint32_t errno)
+{
+	return;
+}
 
 #endif /* !__ASSEMBLER__ */
 

@@ -34,6 +34,9 @@ struct per_cpu_info {
 	// zra: Used by Ivy. Let me know if this should go elsewhere.
 	sharC_env_t sharC_env;
 #endif
+#ifdef __i386__
+	segdesc_t *gdt;
+#endif
 
 	spinlock_t amsg_lock;
 	struct active_msg_list NTPTV(a0t) NTPTV(a1t) NTPTV(a2t) active_msgs;

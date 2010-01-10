@@ -186,6 +186,8 @@ _alltraps:
 	cld
 	pushl %ds
 	pushl %es
+	pushl %fs
+	pushl %gs
 	pushal
 	movw $GD_KD, %ax		# data segments aren't accessible by default
 	movw %ax, %ds
@@ -195,6 +197,8 @@ _alltraps:
 	call trap
 	popl %esp
 	popal
+	popl %gs
+	popl %fs
 	popl %es
 	popl %ds
 	addl $0x8, %esp			# skip trapno and err
@@ -207,6 +211,8 @@ _allirqs:
 	cld
 	pushl %ds
 	pushl %es
+	pushl %fs
+	pushl %gs
 	pushal
 	movw $GD_KD, %ax		# data segments aren't accessible by default
 	movw %ax, %ds
@@ -216,6 +222,8 @@ _allirqs:
 	call irq_handler
 	popl %esp
 	popal
+	popl %gs
+	popl %fs
 	popl %es
 	popl %ds
 	addl $0x8, %esp			# skip IRQ number and err (which is 0)
@@ -233,6 +241,8 @@ sysenter_handler:
 	pushl $T_SYSCALL		# helps with print_trapframe
 	pushl %ds
 	pushl %es
+	pushl %fs
+	pushl %gs
 	pushal
 	movw $GD_KD, %ax
 	movw %ax, %ds
@@ -242,6 +252,8 @@ sysenter_handler:
 	call sysenter_callwrapper
 	popl %esp
 	popal
+	popl %gs
+	popl %fs
 	popl %es
 	popl %ds
 	addl $0x10, %esp		# pop T_SYSCALL and the three zeros

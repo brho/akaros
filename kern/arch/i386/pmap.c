@@ -53,7 +53,10 @@ segdesc_t gdt[] =
 	[GD_UD >> 3] = SEG(STA_W, 0x0, 0xffffffff, 3),
 
 	// 0x28 - tss, initialized in idt_init()
-	[GD_TSS >> 3] = SEG_NULL
+	[GD_TSS >> 3] = SEG_NULL,
+
+	// 0x30 - LDT, set per-process in proc_startcore()
+	[GD_LDT >> 3] = SEG_NULL
 };
 
 pseudodesc_t gdt_pd = {
@@ -413,6 +416,10 @@ vm_init(void)
 	asm volatile("lldt %%ax" :: "a" (0));
 
 	// Final mapping: KERNBASE+x => KERNBASE+x => x.
+
+	// need to store this for access to change the LDT later
+	assert(core_id() == 0);
+	per_cpu_info[core_id()].gdt = gdt;
 
 	// This mapping was only used after paging was turned on but
 	// before the segment registers were reloaded.

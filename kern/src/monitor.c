@@ -48,6 +48,7 @@ static command_t (RO commands)[] = {
 	{ "kfs_run", "Create and run a program from KFS", mon_kfs_run},
 	{ "manager", "Run the manager", mon_manager},
 	{ "procinfo", "Show information about processes", mon_procinfo},
+	{ "exit", "Leave the monitor", mon_exit},
 };
 #define NCOMMANDS (sizeof(commands)/sizeof(commands[0]))
 
@@ -332,6 +333,11 @@ int mon_procinfo(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 		return 1;
 	}
 	return 0;
+}
+
+int mon_exit(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
+{
+	return -1;
 }
 
 /***** Kernel monitor command interpreter *****/

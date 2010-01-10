@@ -13,10 +13,10 @@
 // Stack pointers, to be allocated by the hart lib
 	.globl stack_ptr_array
 	stack_ptr_array:
-		.word 0
+		.long 0
 	.globl tls_array
 	tls_array:
-		.word 0
+		.long 0
 
 // TODO: We're not exposing these yet.  Think about how to do so judiciously.
 //	.globl vpt
@@ -34,8 +34,15 @@ _start:
 	test	%eax,%eax
 	jne	notcore0
 
+	// Push the core id onto the stack
+	push	%eax
+	// Setup the LDT
+	call ldt_init
+	// Restore the core id
+	pop	%eax
+
 	// argc/argv are provided by procinfo and are accessed in parlibmain
-	call parlibmain
+	call parlib_main
 
 	// illegal instruction in case parlibmain accidentally returns
 	mov	(0),%eax
@@ -43,6 +50,13 @@ _start:
 notcore0:
 	mov	stack_ptr_array,%edx
 	mov	(%edx,%eax,4),%esp
+
+	// Push the core id onto the stack
+	push 	%eax
+	// Setup the LDT
+	call ldt_init
+	// Restore the core id
+	pop	%eax
 
 	call	parlib_unmain
 

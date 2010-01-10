@@ -20,13 +20,30 @@
 #include <stdio.h>
 #include <debug.h>
 #include <sys/times.h>
+#include <assert.h>
+#include <dirent.h>
+
+/* These are stubs for newlib syscalls that 
+   exist on the sparc platform, but not x86.
+
+   Paul TODO: Ship or do locally?
+*/
+
+DIR *opendir (const char *name) { assert(0); }
+struct dirent *readdir (DIR *d) { assert(0); }
+void rewinddir (DIR *d) { assert(0); }
+int closedir (DIR *d) { assert(0); }
+int access (const char *name, int mode) { return 0; }
+int gettimeofday(struct timeval* tp, void* tzp) { return 0; }
 
 /* environ
  * A pointer to a list of environment variables and their values. 
  * For a minimal environment, this empty list is adequate.
  */
+/* These are defined inside of newlib.
 char *__env[1] = { 0 };
 char **environ = __env;
+*/
 
 /* _exit()
  * Exit a program without cleaning up files. 

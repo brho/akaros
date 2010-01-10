@@ -174,10 +174,8 @@ trap_dispatch(trapframe_t *tf)
 	// Handle processor exceptions.
 	switch(tf->tf_trapno) {
 		case T_BRKPT:
-			while (1)
-				monitor(tf);
-			// never get to this
-			assert(0);
+			monitor(tf);
+			break;
 		case T_PGFLT:
 			page_fault_handler(tf);
 			break;
@@ -191,7 +189,6 @@ trap_dispatch(trapframe_t *tf)
 				        tf->tf_regs.reg_ecx, tf->tf_regs.reg_ebx,
 				        tf->tf_regs.reg_edi, tf->tf_regs.reg_esi);
 			proc_decref(current, 1);
-			proc_startcore(current, tf); // Note the comment in syscall.c
 			break;
 		default:
 			// Unexpected trap: The user process or the kernel has a bug.
@@ -241,12 +238,7 @@ trap(trapframe_t *tf)
 	// Dispatch based on what type of trap occurred
 	trap_dispatch(tf);
 
-	// should this be if == 3?  Sort out later when we handle traps.
-	// so far we never get here.  managed to get here once when a MCP took two
-	// page faults and both called proc_destroy().  one of which returned since
-	// it was already DYING (though it should have waited for it's death IPI).
-	assert(0);
-	// Return to the current environment, which should be runnable.
+	// Return to the current process, which should be runnable.
 	proc_startcore(current, tf); // Note the comment in syscall.c
 }
 

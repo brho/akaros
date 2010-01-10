@@ -18,6 +18,7 @@
 #include <ros/procdata.h>
 #include <sys/time.h>
 #include <errno.h>
+#include <debug.h>
 
 enum {
 	PG_RDONLY = 4,
@@ -50,6 +51,8 @@ ssize_t     sys_resource_req(int type, size_t amount, uint32_t flags);
 void        sys_reboot();
 void        sys_yield();
 int         gettimeofday(struct timeval* tp, void* tzp);
+void *COUNT(length) sys_mmap(void *SNT addr, size_t length, int prot, int flags,
+                             int fd, size_t offset);
 
 #endif	// !ASSEMBLER
 
