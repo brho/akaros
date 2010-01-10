@@ -5,7 +5,7 @@
 
 #define mb() {rmb(); wmb();}
 #define rmb()
-#define wmb() ({ asm volatile("stbar"); })
+#define wmb() ({ __asm__ __volatile__ ("stbar"); })
 /* Force a wmb, used in cases where an IPI could beat a write, even though
  * write-orderings are respected.  (Used by x86) */
 #define wmb_f() wmb()
@@ -37,13 +37,13 @@ static inline void spin_unlock(spinlock_t*SAFE lock);
 static inline void atomic_init(atomic_t* number, int32_t val)
 {
 	val <<= 8;
-	asm volatile ("st %0,[%1]" : : "r"(val), "r"(number) : "memory");
+	__asm__ __volatile__ ("st %0,[%1]" : : "r"(val), "r"(number) : "memory");
 }
 
 static inline int32_t atomic_read(atomic_t* number)
 {
 	int32_t val;
-	asm volatile ("ld [%1],%0" : "=r"(val) : "r"(number));
+	__asm__ __volatile__ ("ld [%1],%0" : "=r"(val) : "r"(number));
 	return val >> 8;
 }
 
@@ -79,21 +79,21 @@ static inline void atomic_dec(atomic_t* number)
 
 static inline uint32_t atomic_swap(uint32_t* addr, uint32_t val)
 {
-	asm volatile ("swap [%2],%0" : "=r"(val) : "0"(val),"r"(addr) : "memory");
+	__asm__ __volatile__ ("swap [%2],%0" : "=r"(val) : "0"(val),"r"(addr) : "memory");
 	return val;
 }
 
 static inline uint32_t spin_trylock(spinlock_t*SAFE lock)
 {
 	uint32_t reg;
-	asm volatile("ldstub [%1+3],%0" : "=r"(reg) : "r"(&lock->rlock) : "memory");
+	__asm__ __volatile__ ("ldstub [%1+3],%0" : "=r"(reg) : "r"(&lock->rlock) : "memory");
 	return reg;
 }
 
 static inline uint32_t spin_locked(spinlock_t*SAFE lock)
 {
 	uint32_t reg;
-	asm volatile("ldub [%1+3],%0" : "=r"(reg) : "r"(&lock->rlock));
+	__asm__ __volatile__ ("ldub [%1+3],%0" : "=r"(reg) : "r"(&lock->rlock));
 	return reg;
 }
 
@@ -106,7 +106,7 @@ static inline void spin_lock(spinlock_t*SAFE lock)
 static inline void spin_unlock(spinlock_t*SAFE lock)
 {
 	wmb();
-	asm volatile("stub %%g0,[%0+3]" : : "r"(&lock->rlock) : "memory");
+	__asm__ __volatile__ ("stub %%g0,[%0+3]" : : "r"(&lock->rlock) : "memory");
 }
 
 static inline void spinlock_init(spinlock_t* lock)

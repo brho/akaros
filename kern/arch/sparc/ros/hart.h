@@ -11,7 +11,7 @@ static inline int
 __hart_self()
 {
 	int id;
-	asm volatile ("mov %%g6,%0" : "=r"(id));
+	__asm__ __volatile__ ("mov %%g6,%0" : "=r"(id));
 	return id;
 }
 
@@ -24,7 +24,7 @@ __hart_relax()
 static inline int
 __hart_swap(int* addr, int val)
 {
-	asm volatile ("swap [%2],%0" :"=r"(val) :"0"(val),"r"(addr) :"memory");
+	__asm__ __volatile__ ("swap [%2],%0" :"=r"(val) :"0"(val),"r"(addr) :"memory");
 	return val;
 }
 
