@@ -968,7 +968,7 @@ void __startcore(trapframe_t *tf, uint32_t srcid, void * a0, void * a1,
 	trapframe_t local_tf;
 	trapframe_t *tf_to_pop = (trapframe_t *CT(1))a1;
 
-	printk("[kernel] Startcore on physical core %d for Process %d\n",
+	printd("[kernel] Startcore on physical core %d for Process %d\n",
 	       coreid, p_to_run->pid);
 	assert(p_to_run);
 	// TODO: handle silly state (HSS)
