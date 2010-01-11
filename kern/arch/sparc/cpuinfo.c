@@ -40,6 +40,7 @@ print_cpuinfo(void)
 
 	cprintf("CPU Info:\n");
 	cprintf("ISA:             SPARC V8\n");
+	cprintf("Number of cores: %d\n",num_cores());
 	cprintf("Implementation:  0x%x\n",(psr >> 28) & 0xF);
 	cprintf("Version:         0x%x\n",(psr >> 24) & 0xF);
 	cprintf("Number of Cores: %d\n",num_cpus);

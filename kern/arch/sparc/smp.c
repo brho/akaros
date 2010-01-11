@@ -20,12 +20,12 @@ smp_boot(void)
 {
 	extern int time_for_smp_init;
 	num_cpus = 1;
-	cprintf("Cores, report in!\n");
+	printd("Cores, report in!\n");
 	time_for_smp_init = 1;
 
 	while(*(volatile uint32_t*)&num_cpus < num_cores());
 
-	cprintf("All cores reporting!\n");
+	printd("%d cores reporting!\n",num_cpus);
 }
 
 void
@@ -37,7 +37,7 @@ smp_init(void)
 	num_cpus++;
 	spin_unlock(&report_in_lock);
 
-	cprintf("Good morning, Vietnam! (core id = %d)\n",core_id());
+	printd("Good morning, Vietnam! (core id = %d)\n",core_id());
 
 	smp_idle();
 }
