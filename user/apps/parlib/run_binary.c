@@ -47,8 +47,11 @@ int shell_exec(const char* cmdline)
 		}
 
 		char* fn = NULL, *buf = NULL;
-		if(argv[0][0] == '/')
-			fn = argv[0];
+		if(strchr(argv[0],'/'))
+		{
+			if(access(argv[0],X_OK) == 0)
+				fn = argv[0];
+		}
 		else
 		{
 			buf = (char*)malloc(sizeof(char)*(strlen(argv[0])+strlen(path)+2));
@@ -67,12 +70,12 @@ int shell_exec(const char* cmdline)
 					break;
 				path = end+1;
 			}
+		}
 
-			if(fn == NULL)
-			{
-				printf("%s: not found\n",argv[0]);
-				exit(1);
-			}
+		if(fn == NULL)
+		{
+			printf("%s: not found\n",argv[0]);
+			exit(1);
 		}
 
 		execve(fn,argv,envp);

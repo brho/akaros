@@ -53,7 +53,7 @@ int main(int argc, char** argv)
 	while(1) {
 		char* s = readline(prompt);
 
-		if (s == NULL)
+		if (!s || !*s)
 			continue;
 
 		if(strcmp(s, "draw_nanwan") == 0)
