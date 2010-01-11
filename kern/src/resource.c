@@ -154,7 +154,7 @@ error_t resource_req(struct proc *p, int type, size_t amt_wanted,
                      size_t amt_wanted_min, uint32_t flags)
 {
 	error_t retval;
-	printk("Received request for type: %d, amt_wanted: %d, amt_wanted_min: %d, "
+	printd("Received request for type: %d, amt_wanted: %d, amt_wanted_min: %d, "
 	       "flag: %d\n", type, amt_wanted, amt_wanted_min, flags);
 	if (flags & REQ_ASYNC)
 		// We have no sense of time yet, or of half-filling requests
