@@ -129,6 +129,19 @@ memset16(uint32_t *COUNT(n/sizeof(uint32_t)) _v, uint32_t c, size_t n)
 	v = _v;
 	c = c | c<<8 | c<<16 | c<<24;
 
+	if(n >= 64 && ((intptr_t)v) % 8 == 0)
+	{
+		uint64_t* v64 = (uint64_t*)v;
+		uint64_t c64 = c | ((uint64_t)c)<<32;
+		while(v64 < (uint64_t*)end-7)
+		{
+			v64[3] = v64[2] = v64[1] = v64[0] = c64;
+			v64[7] = v64[6] = v64[5] = v64[4] = c64;
+			v64 += 8;
+		}
+		v = (uint32_t*)v64;
+	}
+
 	while(v < end)
 	{
 		v[3] = v[2] = v[1] = v[0] = c;
@@ -179,10 +192,16 @@ memset(void *COUNT(_n) v, int c, size_t _n)
 
 	p = v;
 
-	if(n >= 16 && ((uintptr_t)v & 3) == 0)
+    while (n > 0 && ((uintptr_t)p & 7))
+	{
+		*p++ = c;
+		n--;
+	}
+
+	if(n >= 16 && ((uintptr_t)p & 3) == 0)
 	{
 		n0 = (n/16)*16;
-		memset16((uint32_t*COUNT(n0/sizeof(uint32_t)))v,c,n0);
+		memset16((uint32_t*COUNT(n0/sizeof(uint32_t)))p,c,n0);
 		n -= n0;
 		p += n0;
 	}
