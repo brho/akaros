@@ -631,19 +631,45 @@ lseek(int fd, off_t ptr, int dir)
 ssize_t
 write(int fd, const void* ptr, size_t len)
 {
-	len = MIN(PGSIZE,len);
-	memcpy_if_off_page(ptr,len);
-	return fe(write,fd,ptr,len,IN1);
+	for(int pos = 0; pos < len; )
+	{
+		int thislen = MIN(PGSIZE,len-pos);
+		const void* thisptr = ptr+pos;
+
+		memcpy_if_off_page(thisptr,thislen);
+		int ret = fe(write,fd,thisptr,thislen,IN1);
+
+		if(ret == -1)
+			return -1;
+
+		pos += ret;
+		if(ret < thislen)
+			return pos;
+	}
+	return len;
 }
 
 ssize_t
 read(int fd, void* ptr, size_t len)
 {
-	len = MIN(PGSIZE,len);
-	buf_if_off_page(ptr,len);
-	int ret = fe(read,fd,ptr,len,OUT1);
-	copyout_if_off_page(ptr,len);
-	return ret;
+	for(int pos = 0; pos < len; )
+	{
+		int thislen = MIN(PGSIZE,len-pos);
+		const void* thisptr = ptr+pos;
+
+		buf_if_off_page(thisptr,thislen);
+		int ret = fe(read,fd,thisptr,thislen,OUT1);
+		copyout_if_off_page(thisptr,thislen);
+
+		if(ret == -1)
+			return -1;
+
+		pos += ret;
+		if(ret < thislen)
+			return pos;
+	}
+
+	return len;
 }
 
 int
