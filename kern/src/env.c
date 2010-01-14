@@ -83,7 +83,7 @@ WRITES(e->env_pgdir, e->env_cr3, e->env_procinfo, e->env_procdata)
 	 * procinfo structure into the page table
 	 */
 	for(int i=0; i<PROCINFO_NUM_PAGES; i++) {
-		if(upage_alloc(e, &pginfo[i]) < 0)
+		if(upage_alloc(e, &pginfo[i],1) < 0)
 			goto env_setup_vm_error;
 		if(page_insert(e->env_pgdir, pginfo[i], (void*SNT)(UINFO + i*PGSIZE),
 		               PTE_USER_RO) < 0)
@@ -95,7 +95,7 @@ WRITES(e->env_pgdir, e->env_cr3, e->env_procinfo, e->env_procdata)
 	 * procdata structure into the page table
 	 */
 	for(int i=0; i<PROCDATA_NUM_PAGES; i++) {
-		if(upage_alloc(e, &pgdata[i]) < 0)
+		if(upage_alloc(e, &pgdata[i],1) < 0)
 			goto env_setup_vm_error;
 		if(page_insert(e->env_pgdir, pgdata[i], (void*SNT)(UDATA + i*PGSIZE),
 		               PTE_USER_RW) < 0)
@@ -109,16 +109,13 @@ WRITES(e->env_pgdir, e->env_cr3, e->env_procinfo, e->env_procdata)
 	e->env_procinfo = (procinfo_t *SAFE) TC(page2kva(pginfo[0]));
 	e->env_procdata = (procdata_t *SAFE) TC(page2kva(pgdata[0]));
 
-	memset(e->env_procinfo, 0, sizeof(procinfo_t));
-	memset(e->env_procdata, 0, sizeof(procdata_t));
-
 	/* Finally, set up the Global Shared Data page for all processes.
 	 * Can't be trusted, but still very useful at this stage for us.
 	 * Consider removing when we have real processes.
 	 * (TODO).  Note the page is alloced only the first time through
 	 */
 	if (!shared_page) {
-		if(upage_alloc(e, &shared_page) < 0)
+		if(upage_alloc(e, &shared_page,1) < 0)
 			goto env_setup_vm_error;
 		// Up it, so it never goes away.  One per user, plus one from page_alloc
 		// This is necessary, since it's in the per-process range of memory that
@@ -176,7 +173,7 @@ env_segment_alloc(env_t *e, void *SNT va, size_t len)
 		pte = pgdir_walk(e->env_pgdir, start, 0);
 		if (pte && *pte & PTE_P)
 			continue;
-		if ((r = upage_alloc(e, &page)) < 0)
+		if ((r = upage_alloc(e, &page, 1)) < 0)
 			panic("env_segment_alloc: %e", r);
 		page_insert(e->env_pgdir, page, start, PTE_USER_RW);
 	}
