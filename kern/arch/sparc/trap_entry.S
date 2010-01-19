@@ -141,10 +141,31 @@ env_save_tf:
 	.global	env_pop_tf
 env_pop_tf:
 
-	// disable interrupts.
+	mov	%psr,%o1
+	btst	PSR_PS,%o1	! return to kernel or user?
+	bne	1f
+
+	// we're returning to userspace.
+	wr	%o1,PSR_ET,%psr
+
+	// CWP = 0 (therefore 1 after rett), so set window 2 invalid
+	mov	0,%wim
+	mov	%o0,%g2
+	mov	%psr,%g1
+	andn	%g1,PSR_CWP,%g1
+	mov	%g1,%psr
+	mov	1<<2,%wim; nop
+	// time to restore user context and rett
+	ba	4f
+	 mov	%g2,%o0
+
+1:
+	// this general version of the code works for kernel and user,
+	// but it is slow because it spills the windows.
+
+	// first disable interrupts.
 	// since wrpsr/rdpsr is interruptible, all interrupt handlers
 	// must restore the psr to its interrupt-time value
-	mov	%psr,%o1
 	or	%o1,PSR_PIL,%o2
 	wr	%o2,%psr
 
@@ -162,7 +183,6 @@ env_pop_tf:
 	bne,a	6b
 	 restore
 	
-
 	// disable traps, and restore interrupt level
 	wr	%o2,PSR_ET,%psr
 	wr	%o1,PSR_ET,%psr
@@ -171,33 +191,9 @@ env_pop_tf:
 	// then (CWP+1) % NWINDOWS should be invalid.  fix that.
 	save
 	mov	%i0,%o0
+	mov	%o0,%g2
 
-#if 0
-	// is (CWP+1) % NWINDOWS valid?
-	and	%o1,PSR_CWP,%o2
-	set	NWINDOWS,%o1
-	ld	[%o1],%o1
-	add	%o2,1,%o2
-	cmp	%o2,%o1
-	be,a	3f
-	 mov	0,%o2
-
-3:	mov	1,%o3
-	sll	%o3,%o2,%o2		! %o2 = 1 << ((CWP+1)%NWINDOWS)
-	mov	%wim,%o3
-	btst	%o2,%o3			! (%wim & %o2) == 0?
-	be	4f
-	 nop
-
-	sethi	%hi(fill),%o3		! gotta fill a window
-	jmpl	%lo(fill)+%o3,%o3
-	 save	%o3,0,%l7		! fill returns to %l7
-	restore
-
-#endif
-
-	// restore user context
-4:	mov	%o0,%g2
+4:	// restore user context
 	restore
 	ldd	[%g2+32],%o0
 	ldd	[%g2+40],%o2
@@ -224,10 +220,8 @@ env_pop_tf:
 	andn	%l0,PSR_CWP,%l0
 	wr	%l2,%l0,%psr
 
-	ldd	[%o0+136],%l2
-	!mov	%l3,%wim
-	ldd	[%o0+144],%l4
-	mov	%l4,%tbr
+	ld	[%o0+136],%l2
+	ld	[%o0+148],%l5
 	mov	%l5,%y
 	nop
 
@@ -242,8 +236,3 @@ handle_perfctr:
 	lda	[%i1] 2,%i1
 	jmp	%l2
 	 rett	%l2+4
-
-	.global send_active_message_raw
-send_active_message_raw:
-	retl
-	 .word	0x81f00000
