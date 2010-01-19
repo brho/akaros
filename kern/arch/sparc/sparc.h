@@ -165,11 +165,25 @@ mmu_probe(uint32_t va)
 	return load_alternate((va & ~0xFFF) | 0x400, 3);
 }
 
+static __inline void
+store_iobus(uint32_t device, uint32_t addr, uint32_t data)
+{
+	store_alternate(device << 16 | addr, 2, data);
+}
+
 static __inline uint32_t
 send_ipi(uint32_t dst)
 {
-	store_alternate(2 << 16 | dst << 10, 2, 0);
+	store_iobus(2,dst<<10,0);
 	return 0;
+}
+
+// arm the calling core's interrupt timer.
+// enable must be 1 or 0; clocks must be a power of 2
+static __inline void
+sparc_set_timer(uint32_t clocks, uint32_t enable)
+{
+	store_iobus(1,0,enable << 24 | (clocks-1));
 }
 
 #endif /* !__ASSEMBLER__ */

@@ -30,22 +30,27 @@ asm (
 void
 timer_init(void)
 {	
-#if 0
-	uint32_t ticks = timer_ticks;
-	uint64_t tsc_ticks;
-
-	while(ticks == timer_ticks) ;
-
-	ticks = timer_ticks;
-	tsc_ticks = read_tsc();
-
-	while(ticks == timer_ticks) ;
-
-	system_timing.tsc_freq = (read_tsc() - tsc_ticks)*INTERRUPT_TIMER_HZ;
-#endif
-	system_timing.tsc_freq = 1000000;
-
+	system_timing.tsc_freq = TSC_HZ;
 	cprintf("TSC Frequency: %llu\n", system_timing.tsc_freq);
+}
+
+void
+set_timer(uint32_t usec)
+{
+	uint32_t clocks =  (uint64_t)usec*TSC_HZ/1000000;
+	if(clocks & (clocks-1))
+	{
+		clocks = ROUNDUPPWR2(clocks);
+		warn("set_timer: rounding up to %d usec",
+		     (uint64_t)clocks*1000000/TSC_HZ);
+	}
+	if(clocks > TIMER_MAX_PERIOD)
+	{
+		clocks = TIMER_MAX_PERIOD;
+		warn("set_timer: truncating to %d usec",
+		     (uint64_t)clocks*1000000/TSC_HZ);
+	}
+	sparc_set_timer(clocks,!!clocks);
 }
 
 void

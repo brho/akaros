@@ -90,6 +90,11 @@ void lapic_set_timer(uint32_t usec, bool periodic)
 	                  LAPIC_TIMER_DEFAULT_DIVISOR);
 }
 
+void set_timer(uint32_t usec)
+{
+	lapic_set_timer(usec,!!usec);
+}
+
 uint32_t lapic_get_default_id(void)
 {
 	uint32_t ebx;
