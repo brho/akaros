@@ -110,12 +110,15 @@ static ssize_t sys_fork(env_t* e)
 			va = (char*)USTACKBOT;
 
 		int perms = get_va_perms(e->env_pgdir,va);
-		if(perms) // I think this should always be true
+		if(perms)
 		{
 			page_t* pp;
-			assert(upage_alloc(env,&pp) == 0);
+			assert(upage_alloc(env,&pp,0) == 0);
 			assert(page_insert(env->env_pgdir,pp,va,perms) == 0);
-			assert(memcpy_from_user(e,page2kva(pp),va,PGSIZE) == 0);
+
+			pte_t* pte = pgdir_walk(e->env_pgdir,va,0);
+			assert(pte);
+			pagecopy(page2kva(pp),ppn2kva(PTE2PPN(*pte)));
 		}
 	}
 
@@ -195,17 +198,12 @@ static ssize_t sys_exec(env_t* e, void *DANGEROUS binary_buf, size_t len,
 		return -1;
 	}
 
-	// TODO: this is probably slow.  as with fork, should walk page table
-	env_segment_free(e,0,USTACKTOP);
+	// TODO: this breaks with mmap
+	env_segment_free(e,0,(intptr_t)e->heap_top);
+	env_segment_free(e,(void*)USTACKBOT,USTACKTOP-USTACKBOT);
 
 	env_load_icode(e,NULL,binary,len);
 	proc_init_trapframe(current_tf,0);
-
-	/*printk("[PID %d] exec ",e->pid);
-	char argv[PROCINFO_MAX_ARGV_SIZE];
-	int* offsets = (int*)e->env_procinfo->argv_buf;
-	for(int i = 0; offsets[i]; i++)
-		printk("%s%c",e->env_procinfo->argv_buf+offsets[i],offsets[i+1] ? ' ' : '\n');*/
 
 	kfree(binary);
 	return 0;
@@ -327,7 +325,7 @@ static ssize_t sys_shared_page_alloc(env_t* p1,
 		return -EBADPROC;
 
 	page_t* page;
-	error_t e = upage_alloc(p1, &page);
+	error_t e = upage_alloc(p1, &page,1);
 	if (e < 0) {
 		proc_decref(p2, 1);
 		return e;
@@ -410,7 +408,7 @@ static void sys_cache_buster(struct proc *p, uint32_t num_writes,
 	if (num_pages) {
 		spin_lock(&buster_lock);
 		for (int i = 0; i < MIN(num_pages, MAX_PAGES); i++) {
-			upage_alloc(p, &a_page[i]);
+			upage_alloc(p, &a_page[i],1);
 			page_insert(p->env_pgdir, a_page[i], (void*)INSERT_ADDR + PGSIZE*i,
 			            PTE_USER_RW);
 		}

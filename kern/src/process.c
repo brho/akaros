@@ -317,6 +317,9 @@ static void __proc_free(struct proc *p)
 
 	// Flush all mapped pages in the user portion of the address space
 	env_user_mem_free(p);
+	/* These need to be free again, since they were allocated with a refcnt. */
+	free_cont_pages(p->env_procinfo, LOG2_UP(PROCINFO_NUM_PAGES));
+	free_cont_pages(p->env_procdata, LOG2_UP(PROCDATA_NUM_PAGES));
 
 	// free the page directory
 	pa = p->env_cr3;
@@ -968,7 +971,7 @@ void __startcore(trapframe_t *tf, uint32_t srcid, void * a0, void * a1,
 	trapframe_t local_tf;
 	trapframe_t *tf_to_pop = (trapframe_t *CT(1))a1;
 
-	printk("[kernel] Startcore on physical core %d for Process %d\n",
+	printd("[kernel] Startcore on physical core %d for Process %d\n",
 	       coreid, p_to_run->pid);
 	assert(p_to_run);
 	// TODO: handle silly state (HSS)

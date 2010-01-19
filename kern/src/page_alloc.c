@@ -114,7 +114,7 @@ static error_t __page_alloc_specific(page_t** page, size_t ppn)
  * @return ESUCCESS on success
  * @return -ENOMEM  otherwise
  */
-error_t upage_alloc(struct proc* p, page_t** page)
+error_t upage_alloc(struct proc* p, page_t** page, int zero)
 {
 	spin_lock_irqsave(&colored_page_free_list_lock);
 	ssize_t ret = __colored_page_alloc(p->cache_colors_map, 
@@ -123,7 +123,8 @@ error_t upage_alloc(struct proc* p, page_t** page)
 
 	if(ret >= 0)
 	{
-		memset(page2kva(*page),0,PGSIZE);
+		if(zero)
+			memset(page2kva(*page),0,PGSIZE);
 		p->next_cache_color = (ret + 1) & (llc_cache->num_colors-1);
 		return 0;
 	}

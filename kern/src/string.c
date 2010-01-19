@@ -5,6 +5,7 @@
 #endif
 
 #include <string.h>
+#include <ros/memlayout.h>
 
 int
 strlen(const char *s)
@@ -179,6 +180,25 @@ memcpy16(uint32_t *COUNT(n/sizeof(uint32_t)) _dst,
 	}
 
 	return dststart;
+}
+
+void *
+pagecopy(void* dst, void* src)
+{
+	uint64_t* s = (uint64_t*)src;
+	uint64_t* d = (uint64_t*)dst;
+	for(int i = 0; i < PGSIZE/sizeof(uint64_t); i += 8)
+	{
+		d[i+0] = s[i+0];
+		d[i+1] = s[i+1];
+		d[i+2] = s[i+2];
+		d[i+3] = s[i+3];
+		d[i+4] = s[i+4];
+		d[i+5] = s[i+5];
+		d[i+6] = s[i+6];
+		d[i+7] = s[i+7];
+	}
+	return dst;
 }
 
 void *

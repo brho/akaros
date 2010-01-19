@@ -209,13 +209,16 @@ void rl8168_setup_descriptors() {
 	
 	rl8168_debug("-->Setting up tx/rx descriptors.\n");
 			
-	// Allocate room for the buffers. Include an extra ALIGN space.
+	// Allocate room for the buffers. 
 	// Buffers need to be on 256 byte boundries.
-	// Note: Buffers are alligned by kmalloc automatically to powers of 2 less than the size requested
-	// We request more than 256, thus they are aligned on 256 byte boundries
-	rx_des_kva = kmalloc(NUM_RX_DESCRIPTORS * sizeof(struct Descriptor), 0);
-	tx_des_kva = kmalloc(NUM_TX_DESCRIPTORS * sizeof(struct Descriptor), 0);
+	// Note: We use get_cont_pages to force page alignment, and thus 256 byte aligned
+
+        uint32_t num_rx_pages = ROUNDUP(NUM_RX_DESCRIPTORS * sizeof(struct Descriptor), PGSIZE) / PGSIZE;
+        uint32_t num_tx_pages = ROUNDUP(NUM_TX_DESCRIPTORS * sizeof(struct Descriptor), PGSIZE) / PGSIZE;
 	
+	rx_des_kva = get_cont_pages(LOG2_UP(num_rx_pages), 0);
+	tx_des_kva = get_cont_pages(LOG2_UP(num_tx_pages), 0);
+
 	if (rx_des_kva == NULL) panic("Can't allocate page for RX Ring");
 	if (tx_des_kva == NULL) panic("Can't allocate page for TX Ring");
 	

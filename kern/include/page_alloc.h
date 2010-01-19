@@ -41,7 +41,7 @@ extern page_list_t LCKD(&colored_page_free_list_lock) * RO CT(llc_num_colors)
 void page_alloc_init(void);
 void colored_page_alloc_init(void);
 
-error_t upage_alloc(struct proc* p, page_t *SAFE *page);
+error_t upage_alloc(struct proc* p, page_t *SAFE *page, int zero);
 error_t kpage_alloc(page_t *SAFE *page);
 error_t upage_alloc_specific(struct proc* p, page_t *SAFE *page, size_t ppn);
 error_t kpage_alloc_specific(page_t *SAFE *page, size_t ppn);
