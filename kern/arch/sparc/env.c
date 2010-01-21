@@ -103,8 +103,8 @@ env_user_mem_free(env_t* e)
 	l2_tables_per_page = PGSIZE/(sizeof(pte_t)*NL2ENTRIES);
 	l3_tables_per_page = PGSIZE/(sizeof(pte_t)*NL3ENTRIES);
 
-	static_assert(L2X(UTOP) == 0 && L3X(UTOP) == 0);
-	for(l1x = 0; l1x < L1X(UTOP); l1x++)
+	static_assert(L2X(KERNBASE) == 0 && L3X(KERNBASE) == 0);
+	for(l1x = 0; l1x < L1X(KERNBASE); l1x++)
 	{
 		if(!(l1pt[l1x] & PTE_PTD))
 			continue;
