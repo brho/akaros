@@ -92,8 +92,11 @@ restore_fp_state(ancillary_state_t* silly)
 
 // Flush all mapped pages in the user portion of the address space
 // TODO: only supports L3 user pages
+
+typedef void (*env_user_mem_walk_t)(env_t* e, void* va, pte_t* pte, void* arg);
+
 void
-env_user_mem_free(env_t* e)
+env_user_mem_walk(env_t* e, env_user_mem_walk_t callback, void* arg)
 {
 	pte_t *l1pt = e->env_pgdir, *l2pt, *l3pt;
 	uint32_t l1x,l2x,l3x;
@@ -124,9 +127,8 @@ env_user_mem_free(env_t* e)
 			{
 				if(l3pt[l3x] & PTE_PTE)
 				{
-					page_pa = PTE_ADDR(l3pt[l3x]);
-					l3pt[l3x] = 0;
-					page_decref(pa2page(page_pa));
+					callback(e,PGADDR(l1x,l2x,l3x,0),
+					         &l3pt[l3x],arg);
 				}
 			}
 
@@ -144,3 +146,16 @@ env_user_mem_free(env_t* e)
 
 	tlbflush();
 }
+
+void
+env_user_mem_free(env_t* e)
+{
+	void mem_free_callback(env_t* e, void* va, pte_t* pte, void* arg)
+	{
+		page_t* page = ppn2page(PTE2PPN(*pte));
+		page_decref(page);
+		*pte = 0;
+	}
+	env_user_mem_walk(e,&mem_free_callback,NULL);
+}
+

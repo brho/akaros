@@ -35,19 +35,22 @@ proc_free_arch(struct proc *SAFE p)
 void
 proc_set_program_counter(trapframe_t *tf, uintptr_t pc)
 {
-        tf->pc = pc;
-        tf->npc = pc+4;
+	tf->pc = pc;
+	tf->npc = pc+4;
 }
 
 void
 proc_init_trapframe(trapframe_t *tf, uint32_t vcoreid)
 {
-        extern char trap_table;
+	extern char trap_table;
 
-        tf->gpr[14] = USTACKTOP-64;
-        tf->psr = PSR_S; // but PS = 0
-        tf->wim = 0;
-        tf->tbr = (uint32_t)&trap_table;
+	memset(tf,0,sizeof(*tf));
+	tf->gpr[14] = USTACKTOP-96;
+	tf->psr = PSR_S; // but PS = 0
+
+	// unused
+	//tf->wim = 0;
+	//tf->tbr = (uint32_t)&trap_table;
 
 	proc_set_tfcoreid(tf,vcoreid);
 }
