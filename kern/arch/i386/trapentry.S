@@ -75,6 +75,8 @@
 	cld;                                                                       \
 	pushl %ds;                                                                 \
 	pushl %es;                                                                 \
+	pushl %fs;                                                                 \
+	pushl %gs;                                                                 \
 	pushal;                                                                    \
 	movw $GD_KD, %ax;                                                          \
 	movw %ax, %ds;                                                             \
@@ -84,6 +86,8 @@
 	call (func);                                                               \
 	popl %esp;                                                                 \
 	popal;                                                                     \
+	popl %gs;                                                                  \
+	popl %fs;                                                                  \
 	popl %es;                                                                  \
 	popl %ds;                                                                  \
 	addl $0x8, %esp;                                                           \
