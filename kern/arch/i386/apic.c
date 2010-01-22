@@ -92,7 +92,10 @@ void lapic_set_timer(uint32_t usec, bool periodic)
 
 void set_timer(uint32_t usec)
 {
-	lapic_set_timer(usec,!!usec);
+	if (usec)
+		lapic_set_timer(usec, TRUE);
+	else
+		lapic_disable_timer();
 }
 
 uint32_t lapic_get_default_id(void)
