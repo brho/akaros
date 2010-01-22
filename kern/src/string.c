@@ -107,6 +107,16 @@ strchr(const char *s, char c)
 	return 0;
 }
 
+void *
+memchr(void* mem, int chr, int len)
+{
+	char* s = (char*)mem;
+	for(int i = 0; i < len; i++)
+		if(s[i] == (char)chr)
+			return s+i;
+	return NULL;
+}
+
 // Return a pointer to the first occurrence of 'c' in 's',
 // or a pointer to the string-ending null character if the string has no 'c'.
 char *
