@@ -24,6 +24,7 @@ int    (DMEMCMP(1, 2, 3) memcmp)(const void* s1, const void* s2, size_t sz);
 void * (DMEMCPY(1, 2, 3) memcpy)(void* dst, const void* src, size_t sz);
 void * (DMEMCPY(1, 2, 3) memmove)(void *dst, const void* src, size_t sz);
 void * pagecopy(void* dst, void* src);
+void * memchr(void* mem, int chr, int len);
 
 void *BND(s,s+len)	memfind(const void *COUNT(len) s, int c, size_t len);
 
