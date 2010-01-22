@@ -7,9 +7,9 @@ error_t sys_proc_destroy(int pid, int exitcode)
 	return syscall(SYS_proc_destroy, pid, exitcode, 0, 0, 0);
 }
 
-error_t sys_brk(void* addr)
+void* sys_brk(void* addr)
 {
-	return syscall(SYS_brk, (intreg_t)addr, 0, 0, 0, 0);
+	return (void*)syscall(SYS_brk, (intreg_t)addr, 0, 0, 0, 0);
 }
 
 int sys_getpid(void)

@@ -25,7 +25,7 @@ void* sbrk(ptrdiff_t incr)
 
 	uint8_t* prev_heap_end; 
 	prev_heap_end = heap_end;
-	if (sys_brk(heap_end + incr) < 0) {
+	if (sys_brk(heap_end + incr) != heap_end + incr) {
 		debug_in_out("\tsys_brk(%p+%d) failed\n",heap_end,incr);
 		hart_lock_unlock(&sbrk_lock);
 		errno = ENOMEM;

@@ -42,7 +42,7 @@ ssize_t     sys_run_binary(void* binary_buf, size_t len,
                            char arg[PROCINFO_MAX_ARGV_SIZE], size_t num_colors);
 int         sys_getpid(void);
 size_t      sys_getcpuid(void);
-error_t     sys_brk(void* addr);
+void *      sys_brk(void* addr);
 error_t     sys_proc_destroy(int pid, int exitcode);
 ssize_t     sys_shared_page_alloc(void *COUNT(PGSIZE) *addr, pid_t p2, 
                                   int p1_flags, int p2_flags);

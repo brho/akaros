@@ -202,8 +202,8 @@ static ssize_t sys_exec(env_t* e, void *DANGEROUS binary_buf, size_t len,
 	env_segment_free(e,0,(intptr_t)e->heap_top);
 	env_segment_free(e,(void*)USTACKBOT,USTACKTOP-USTACKBOT);
 
-	env_load_icode(e,NULL,binary,len);
 	proc_init_trapframe(current_tf,0);
+	env_load_icode(e,NULL,binary,len);
 
 	kfree(binary);
 	return 0;
@@ -582,13 +582,11 @@ static error_t sys_proc_run(struct proc *p, unsigned pid)
 	return retval;
 }
 
-static error_t sys_brk(struct proc *p, void* addr) {
+static void* sys_brk(struct proc *p, void* addr) {
 	size_t range;
 
 	if((addr < p->heap_bottom) || (addr >= (void*)USTACKBOT))
-		return -EINVAL;
-	if(addr == p->heap_top)
-		return ESUCCESS;
+		goto out;
 
 	if (addr > p->heap_top) {
 		range = addr - p->heap_top;
@@ -599,7 +597,18 @@ static error_t sys_brk(struct proc *p, void* addr) {
 		env_segment_free(p, addr, range);
 	}
 	p->heap_top = addr;
-	return ESUCCESS;
+
+out:
+	return p->heap_top;
+}
+
+void* sys_mmap(struct proc* p, uintreg_t a1, uintreg_t a2, uintreg_t a3,
+               uintreg_t* a456)
+{
+	uintreg_t _a456[3];
+	if(memcpy_from_user(p,_a456,a456,3*sizeof(uintreg_t)))
+		sys_proc_destroy(p,p->pid,-1);
+	return mmap(p,a1,a2,a3,_a456[0],_a456[1],_a456[2]);
 }
 
 /* Executes the given syscall.
@@ -614,107 +623,54 @@ static error_t sys_brk(struct proc *p, void* addr) {
 intreg_t syscall(struct proc *p, uintreg_t syscallno, uintreg_t a1,
                  uintreg_t a2, uintreg_t a3, uintreg_t a4, uintreg_t a5)
 {
-	// Call the function corresponding to the 'syscallno' parameter.
-	// Return any appropriate return value.
+	typedef intreg_t (*syscall_t)(struct proc*,uintreg_t,uintreg_t,
+	                              uintreg_t,uintreg_t,uintreg_t);
 
-	//cprintf("Incoming syscall on core: %d number: %d\n    a1: %x\n   "
-	//        " a2: %x\n    a3: %x\n    a4: %x\n    a5: %x\n", core_id(),
-	//        syscallno, a1, a2, a3, a4, a5);
-
-	// used if we need more args, like in mmap
-	int32_t _a4, _a5, _a6, *COUNT(3) args;
-
-	assert(p); // should always have a process for every syscall
-	//printk("Running syscall: %d\n", syscallno);
-	if (INVALID_SYSCALL(syscallno))
-		return -EINVAL;
-
-	switch (syscallno) {
-		case SYS_null:
-			sys_null();
-			return ESUCCESS;
-		case SYS_cache_buster:
-			sys_cache_buster(p, a1, a2, a3);
-			return 0;
-		case SYS_cache_invalidate:
-			sys_cache_invalidate();
-			return 0;
-		case SYS_shared_page_alloc:
-			return sys_shared_page_alloc(p, (void** DANGEROUS) a1,
-		                                 a2, (int) a3, (int) a4);
-		case SYS_shared_page_free:
-			sys_shared_page_free(p, (void* DANGEROUS) a1, a2);
-		    return ESUCCESS;
-		case SYS_cputs:
-			return sys_cputs(p, (char *DANGEROUS)a1, (size_t)a2);
-		case SYS_cgetc:
-			return sys_cgetc(p); // this will need to block
-		case SYS_getcpuid:
-			return sys_getcpuid();
-		case SYS_getvcoreid:
-			return sys_getvcoreid(p);
-		case SYS_getpid:
-			return sys_getpid(p);
-		case SYS_proc_destroy:
-			return sys_proc_destroy(p, (pid_t)a1, (int)a2);
-		case SYS_yield:
-			proc_yield(p);
-			return ESUCCESS;
-		case SYS_proc_create:
-			return sys_proc_create(p, (char *DANGEROUS)a1);
-		case SYS_proc_run:
-			return sys_proc_run(p, (size_t)a1);
-		case SYS_mmap:
-			// we only have 4 parameters from sysenter currently, need to copy
-			// in the others.  if we stick with this, we can make a func for it.
-			args = user_mem_assert(p, (void*DANGEROUS)a4,
-			                       3*sizeof(_a4), PTE_USER_RW);
-			_a4 = args[0];
-			_a5 = args[1];
-			_a6 = args[2];
-			return (intreg_t) mmap(p, a1, a2, a3, _a4, _a5, _a6);
-		case SYS_brk:
-			return sys_brk(p, (void*)a1);
-		case SYS_resource_req:
-			return resource_req(p, a1, a2, a3, a4);
-
+	const static syscall_t syscall_table[] = {
+		[SYS_null] = (syscall_t)sys_null,
+		[SYS_cache_buster] = (syscall_t)sys_cache_buster,
+		[SYS_cache_invalidate] = (syscall_t)sys_cache_invalidate,
+		[SYS_shared_page_alloc] = (syscall_t)sys_shared_page_alloc,
+		[SYS_shared_page_free] = (syscall_t)sys_shared_page_free,
+		[SYS_cputs] = (syscall_t)sys_cputs,
+		[SYS_cgetc] = (syscall_t)sys_cgetc,
+		[SYS_getcpuid] = (syscall_t)sys_getcpuid,
+		[SYS_getvcoreid] = (syscall_t)sys_getvcoreid,
+		[SYS_proc_destroy] = (syscall_t)sys_proc_destroy,
+		[SYS_yield] = (syscall_t)proc_yield,
+		[SYS_proc_create] = (syscall_t)sys_proc_create,
+		[SYS_proc_run] = (syscall_t)sys_proc_run,
+		[SYS_mmap] = (syscall_t)sys_mmap,
+		[SYS_brk] = (syscall_t)sys_brk,
+		[SYS_resource_req] = (syscall_t)resource_req,
 	#ifdef __i386__
-		case SYS_serial_write:
-			return sys_serial_write(p, (char *DANGEROUS)a1, (size_t)a2);
-		case SYS_serial_read:
-			return sys_serial_read(p, (char *DANGEROUS)a1, (size_t)a2);
+		[SYS_serial_read] = (syscall_t)sys_serial_read,
+		[SYS_serial_write] = (syscall_t)sys_serial_write,
 	#endif
-		case SYS_run_binary:
-			return sys_run_binary(p, (char *DANGEROUS)a1, (size_t)a2, (void* DANGEROUS)a3, (size_t)a4);
+		[SYS_run_binary] = (syscall_t)sys_run_binary,
 	#ifdef __NETWORK__
-		case SYS_eth_write:
-			return sys_eth_write(p, (char *DANGEROUS)a1, (size_t)a2);
-		case SYS_eth_read:
-			return sys_eth_read(p, (char *DANGEROUS)a1, (size_t)a2);
+		[SYS_eth_read] = (syscall_t)sys_eth_read,
+		[SYS_eth_write] = (syscall_t)sys_eth_write,
 	#endif
+		[SYS_reboot] = (syscall_t)reboot,
+		[SYS_fork] = (syscall_t)sys_fork,
+		[SYS_trywait] = (syscall_t)sys_trywait,
+		[SYS_exec] = (syscall_t)sys_exec,
 	#ifdef __sparc_v8__
-		case SYS_frontend:
-			return frontend_syscall_from_user(p,a1,a2,a3,a4,a5);
+		[SYS_frontend] = (syscall_t)frontend_syscall_from_user,
+		[SYS_read] = (syscall_t)sys_read,
+		[SYS_write] = (syscall_t)sys_write,
+		[SYS_open] = (syscall_t)sys_open,
+		[SYS_close] = (syscall_t)sys_close,
 	#endif
+	};
 
-		case SYS_reboot:
-			reboot();
-			return 0;
+	const int max_syscall = sizeof(syscall_table)/sizeof(syscall_table[0]);
 
-		case SYS_fork:
-			return sys_fork(p);
+	if(syscallno > max_syscall || syscall_table[syscallno] == NULL)
+		panic("Invalid syscall number %d for proc %x!", syscallno, *p);
 
-		case SYS_trywait:
-			return sys_trywait(p,(pid_t)a1,(int*)a2);
-
-		case SYS_exec:
-			return sys_exec(p, (char *DANGEROUS)a1, (size_t)a2, (void* DANGEROUS)a3, (void* DANGEROUS)a4);
-
-		default:
-			// or just return -EINVAL
-			panic("Invalid syscall number %d for proc %x!", syscallno, *p);
-	}
-	return 0xdeadbeef;
+	return syscall_table[syscallno](p,a1,a2,a3,a4,a5);
 }
 
 intreg_t syscall_async(struct proc *p, syscall_req_t *call)
