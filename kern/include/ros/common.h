@@ -8,11 +8,11 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <sys/types.h>
+#include <stdbool.h>
 
 typedef uintptr_t physaddr_t;
 typedef ssize_t intreg_t;
 typedef size_t uintreg_t;
-typedef int bool;
 
 #ifndef NULL
 #define NULL ((void*) 0)
