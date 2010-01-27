@@ -165,11 +165,14 @@ unhandled_trap(trapframe_t* state)
 	}
 	else
 	{
-		print_trapframe(state);
 		warn("Unhandled trap in user!\nTrap type: %s",buf);
+		print_trapframe(state);
+		backtrace();
+
 		assert(current);
 		proc_incref(current, 1);
 		proc_destroy(current);
+
 		panic("I shouldn't have gotten here!");
 	}
 }
