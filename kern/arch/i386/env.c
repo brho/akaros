@@ -91,8 +91,8 @@ env_user_mem_free(env_t* e)
 	uint32_t pdeno, pteno;
 	physaddr_t pa;
 
-	static_assert(KERNBASE % PTSIZE == 0);
-	for (pdeno = 0; pdeno < PDX(KERNBASE); pdeno++) {
+	static_assert(UVPT % PTSIZE == 0);
+	for (pdeno = 0; pdeno < PDX(UVPT); pdeno++) {
 
 		// only look at mapped page tables
 		if (!(e->env_pgdir[pdeno] & PTE_P))

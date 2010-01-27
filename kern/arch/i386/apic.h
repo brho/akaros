@@ -111,6 +111,7 @@ static inline uint32_t lapic_get_id(void);
 static inline void lapic_set_id(uint8_t id); // Careful, may not actually work
 static inline uint8_t lapic_get_logid(void);
 static inline void lapic_set_logid(uint8_t id);
+static inline void lapic_disable_timer(void);
 static inline void lapic_disable(void);
 static inline void lapic_enable(void);
 static inline void lapic_wait_to_send(void);
@@ -168,6 +169,11 @@ static inline uint8_t lapic_get_logid(void)
 static inline void lapic_set_logid(uint8_t id)
 {
 	write_mmreg32(LAPIC_LOGICAL_ID, id << 24);
+}
+
+static inline void lapic_disable_timer(void)
+{
+	write_mmreg32(LAPIC_LVT_TIMER, 0);
 }
 
 /* There are a couple ways to do it.  The MSR route doesn't seem to work

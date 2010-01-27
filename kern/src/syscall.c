@@ -37,341 +37,18 @@ extern char *CT(PACKET_HEADER_SIZE + len) (*packet_wrap)(const char *CT(len) dat
 extern int (*send_frame)(const char *CT(len) data, size_t len);
 #endif
 
-//Do absolutely nothing.  Used for profiling.
-static void sys_null(void)
+/************** Utility Syscalls **************/
+
+static int sys_null(void)
 {
-	return;
-}
-
-//Write a buffer over the serial port
-static ssize_t sys_serial_write(env_t* e, const char *DANGEROUS buf, size_t len)
-{
-	if (len == 0)
-		return 0;
-	#ifdef SERIAL_IO
-		char *COUNT(len) _buf = user_mem_assert(e, buf, len, PTE_USER_RO);
-		for(int i =0; i<len; i++)
-			serial_send_byte(buf[i]);
-		return (ssize_t)len;
-	#else
-		return -EINVAL;
-	#endif
-}
-
-//Read a buffer over the serial port
-static ssize_t sys_serial_read(env_t* e, char *DANGEROUS _buf, size_t len)
-{
-	if (len == 0)
-		return 0;
-
-	#ifdef SERIAL_IO
-	    char *COUNT(len) buf = user_mem_assert(e, _buf, len, PTE_USER_RO);
-		size_t bytes_read = 0;
-		int c;
-		while((c = serial_read_byte()) != -1) {
-			buf[bytes_read++] = (uint8_t)c;
-			if(bytes_read == len) break;
-		}
-		return (ssize_t)bytes_read;
-	#else
-		return -EINVAL;
-	#endif
-}
-
-//
-/* START OF REMOTE SYSTEMCALL SUPPORT SYSCALLS. THESE WILL GO AWAY AS THINGS MATURE */
-//
-
-static ssize_t sys_fork(env_t* e)
-{
-	// TODO: right now we only support fork for single-core processes
-	if(e->state != PROC_RUNNING_S)
-		return -1;
-
-	env_t* env = proc_create(NULL,0);
-	assert(env != NULL);
-
-	env->heap_bottom = e->heap_bottom;
-	env->heap_top = e->heap_top;
-	env->ppid = e->pid;
-	env->env_tf = *current_tf;
-
-	env->cache_colors_map = cache_colors_map_alloc();
-	for(int i=0; i < llc_cache->num_colors; i++)
-		if(GET_BITMASK_BIT(e->cache_colors_map,i))
-			cache_color_alloc(llc_cache, env->cache_colors_map);
-
-	// copy page table and page contents.
-	for(char* va = 0; va < (char*)UTOP; va += PGSIZE)
-	{
-		// TODO: this is slow but correct.
-		// don't skip any va's so fork will copy mmap'd pages
-		// // copy [0,heaptop] and [stackbot,utop]
-		//if(va == ROUNDUP(env->heap_top,PGSIZE))
-		//	va = (char*)USTACKBOT;
-
-		int perms = get_va_perms(e->env_pgdir,va);
-		if(perms)
-		{
-			page_t* pp;
-			assert(upage_alloc(env,&pp,0) == 0);
-			assert(page_insert(env->env_pgdir,pp,va,perms) == 0);
-
-			pte_t* pte = pgdir_walk(e->env_pgdir,va,0);
-			assert(pte);
-			pagecopy(page2kva(pp),ppn2kva(PTE2PPN(*pte)));
-		}
-	}
-
-	__proc_set_state(env, PROC_RUNNABLE_S);
-	schedule_proc(env);
-
-	// don't decref the new process.
-	// that will happen when the parent waits for it.
-
-	printd("[PID %d] fork PID %d\n",e->pid,env->pid);
-
-	return env->pid;
-}
-
-static ssize_t sys_trywait(env_t* e, pid_t pid, int* status)
-{
-	struct proc* p = pid2proc(pid);
-
-	// TODO: this syscall is racy, so we only support for single-core procs
-	if(e->state != PROC_RUNNING_S)
-		return -1;
-
-	// TODO: need to use errno properly.  sadly, ROS error codes conflict..
-
-	if(p)
-	{
-		ssize_t ret;
-
-		if(current->pid == p->ppid)
-		{
-			if(p->state == PROC_DYING)
-			{
-				memcpy_to_user(e,status,&p->exitcode,sizeof(int));
-				printd("[PID %d] waited for PID %d (code %d)\n",
-				       e->pid,p->pid,p->exitcode);
-				ret = 0;
-			}
-			else // not dead yet
-			{
-				set_errno(current_tf,0);
-				ret = -1;
-			}
-		}
-		else // not a child of the calling process
-		{
-			set_errno(current_tf,1);
-			ret = -1;
-		}
-
-		// if the wait succeeded, decref twice
-		proc_decref(p,1 + (ret == 0));
-		return ret;
-	}
-
-	set_errno(current_tf,1);
-	return -1;
-}
-
-static ssize_t sys_exec(env_t* e, void *DANGEROUS binary_buf, size_t len,
-                        procinfo_t*DANGEROUS procinfo)
-{
-	// TODO: right now we only support exec for single-core processes
-	if(e->state != PROC_RUNNING_S)
-		return -1;
-
-	if(memcpy_from_user(e,e->env_procinfo,procinfo,sizeof(*procinfo)))
-		return -1;
-
-	void* binary = kmalloc(len,0);
-	if(binary == NULL)
-		return -1;
-	if(memcpy_from_user(e,binary,binary_buf,len))
-	{
-		kfree(binary);
-		return -1;
-	}
-
-	// TODO: this is slow but correct.
-	// don't skip any va's so exec behaves right
-	env_segment_free(e,0,USTACKTOP);
-	//env_segment_free(e,0,ROUNDUP((intptr_t)e->heap_top,PGSIZE));
-	//env_segment_free(e,(void*)USTACKBOT,USTACKTOP-USTACKBOT);
-
-	proc_init_trapframe(current_tf,0);
-	env_load_icode(e,NULL,binary,len);
-
-	kfree(binary);
 	return 0;
-}
-
-static ssize_t sys_run_binary(env_t* e, void *DANGEROUS binary_buf, size_t len,
-                              void*DANGEROUS arg, size_t num_colors)
-{
-	env_t* env = proc_create(NULL,0);
-	assert(env != NULL);
-
-	static_assert(PROCINFO_NUM_PAGES == 1);
-	assert(memcpy_from_user(e,env->env_procinfo->argv_buf,arg,PROCINFO_MAX_ARGV_SIZE) == ESUCCESS);
-	*(intptr_t*)env->env_procinfo->env_buf = 0;
-
-	env_load_icode(env,e,binary_buf,len);
-	__proc_set_state(env, PROC_RUNNABLE_S);
-	schedule_proc(env);
-	if(num_colors > 0) {
-		env->cache_colors_map = cache_colors_map_alloc();
-		for(int i=0; i<num_colors; i++)
-			cache_color_alloc(llc_cache, env->cache_colors_map);
-	}
-	proc_decref(env, 1);
-	proc_yield(e);
-	return 0;
-}
-
-#ifdef __NETWORK__
-// This is not a syscall we want. Its hacky. Here just for syscall stuff until get a stack.
-static ssize_t sys_eth_write(env_t* e, const char *DANGEROUS buf, size_t len)
-{
-	extern int eth_up;
-
-	if (eth_up) {
-
-		if (len == 0)
-			return 0;
-
-		char *COUNT(len) _buf = user_mem_assert(e, buf, len, PTE_U);
-		int total_sent = 0;
-		int just_sent = 0;
-		int cur_packet_len = 0;
-		while (total_sent != len) {
-			cur_packet_len = ((len - total_sent) > MAX_PACKET_DATA) ? MAX_PACKET_DATA : (len - total_sent);
-			char* wrap_buffer = packet_wrap(_buf + total_sent, cur_packet_len);
-			just_sent = send_frame(wrap_buffer, cur_packet_len + PACKET_HEADER_SIZE);
-
-			if (just_sent < 0)
-				return 0; // This should be an error code of its own
-
-			if (wrap_buffer)
-				kfree(wrap_buffer);
-
-			total_sent += cur_packet_len;
-		}
-
-		return (ssize_t)len;
-
-	}
-	else
-		return -EINVAL;
-}
-
-// This is not a syscall we want. Its hacky. Here just for syscall stuff until get a stack.
-static ssize_t sys_eth_read(env_t* e, char *DANGEROUS buf, size_t len)
-{
-	extern int eth_up;
-
-	if (eth_up) {
-		extern int packet_waiting;
-		extern int packet_buffer_size;
-		extern char*CT(packet_buffer_size) packet_buffer;
-		extern char*CT(MAX_FRAME_SIZE) packet_buffer_orig;
-		extern int packet_buffer_pos;
-
-		if (len == 0)
-			return 0;
-
-		char *CT(len) _buf = user_mem_assert(e, buf,len, PTE_U);
-
-		if (packet_waiting == 0)
-			return 0;
-
-		int read_len = ((packet_buffer_pos + len) > packet_buffer_size) ? packet_buffer_size - packet_buffer_pos : len;
-
-		memcpy(_buf, packet_buffer + packet_buffer_pos, read_len);
-
-		packet_buffer_pos = packet_buffer_pos + read_len;
-
-		if (packet_buffer_pos == packet_buffer_size) {
-			kfree(packet_buffer_orig);
-			packet_waiting = 0;
-		}
-
-		return read_len;
-	}
-	else
-		return -EINVAL;
-}
-#endif // Network
-
-//
-/* END OF REMOTE SYSTEMCALL SUPPORT SYSCALLS. */
-//
-
-static ssize_t sys_shared_page_alloc(env_t* p1,
-                                     void**DANGEROUS _addr, pid_t p2_id,
-                                     int p1_flags, int p2_flags
-                                    )
-{
-	//if (!VALID_USER_PERMS(p1_flags)) return -EPERM;
-	//if (!VALID_USER_PERMS(p2_flags)) return -EPERM;
-
-	void * COUNT(1) * COUNT(1) addr = user_mem_assert(p1, _addr, sizeof(void *),
-                                                      PTE_USER_RW);
-	struct proc *p2 = pid2proc(p2_id);
-	if (!p2)
-		return -EBADPROC;
-
-	page_t* page;
-	error_t e = upage_alloc(p1, &page,1);
-	if (e < 0) {
-		proc_decref(p2, 1);
-		return e;
-	}
-
-	void* p2_addr = page_insert_in_range(p2->env_pgdir, page,
-	                (void*SNT)UTEXT, (void*SNT)UTOP, p2_flags);
-	if (p2_addr == NULL) {
-		page_free(page);
-		proc_decref(p2, 1);
-		return -EFAIL;
-	}
-
-	void* p1_addr = page_insert_in_range(p1->env_pgdir, page,
-	                (void*SNT)UTEXT, (void*SNT)UTOP, p1_flags);
-	if(p1_addr == NULL) {
-		page_remove(p2->env_pgdir, p2_addr);
-		page_free(page);
-		proc_decref(p2, 1);
-		return -EFAIL;
-	}
-	*addr = p1_addr;
-	proc_decref(p2, 1);
-	return ESUCCESS;
-}
-
-static void sys_shared_page_free(env_t* p1, void*DANGEROUS addr, pid_t p2)
-{
-}
-
-// Invalidate the cache of this core.  Only useful if you want a cold cache for
-// performance testing reasons.
-static void sys_cache_invalidate(void)
-{
-	#ifdef __i386__
-		wbinvd();
-	#endif
-	return;
 }
 
 // Writes 'val' to 'num_writes' entries of the well-known array in the kernel
 // address space.  It's just #defined to be some random 4MB chunk (which ought
 // to be boot_alloced or something).  Meant to grab exclusive access to cache
 // lines, to simulate doing something useful.
-static void sys_cache_buster(struct proc *p, uint32_t num_writes,
+static int sys_cache_buster(struct proc *p, uint32_t num_writes,
                              uint32_t num_pages, uint32_t flags)
 { TRUSTEDBLOCK /* zra: this is not really part of the kernel */
 	#define BUSTER_ADDR		0xd0000000  // around 512 MB deep
@@ -437,8 +114,18 @@ static void sys_cache_buster(struct proc *p, uint32_t num_writes,
 		ticks = stop_timing(ticks);
 		printk("%llu,", ticks);
 	}
-	return;
+	return 0;
 }
+
+static int sys_cache_invalidate(void)
+{
+	#ifdef __i386__
+		wbinvd();
+	#endif
+	return 0;
+}
+
+/* sys_reboot(): called directly from dispatch table. */
 
 // Print a string to the system console.
 // The string is exactly 'len' characters long.
@@ -468,12 +155,6 @@ static uint16_t sys_cgetc(env_t* e)
 	return c;
 }
 
-/* Returns the calling process's pid */
-static pid_t sys_getpid(struct proc *p)
-{
-	return p->pid;
-}
-
 /* Returns the id of the cpu this syscall is executed on. */
 static uint32_t sys_getcpuid(void)
 {
@@ -494,32 +175,12 @@ static size_t sys_getvcoreid(env_t* e)
 	panic("virtual core id not found in sys_getvcoreid()!");
 }
 
-/* Destroy proc pid.  If this is called by the dying process, it will never
- * return.  o/w it will return 0 on success, or an error.  Errors include:
- * - EBADPROC: if there is no such process with pid
- * - EPERM: if caller does not control pid */
-static error_t sys_proc_destroy(struct proc *p, pid_t pid, int exitcode)
-{
-	error_t r;
-	struct proc *p_to_die = pid2proc(pid);
+/************** Process management syscalls **************/
 
-	if (!p_to_die)
-		return -EBADPROC;
-	if (!proc_controls(p, p_to_die)) {
-		proc_decref(p_to_die, 1);
-		return -EPERM;
-	}
-	if (p_to_die == p) {
-		// syscall code and pid2proc both have edible references, only need 1.
-		p->exitcode = exitcode;
-		proc_decref(p, 1);
-		printd("[PID %d] proc exiting gracefully (code %d)\n", p->pid,exitcode);
-	} else {
-		panic("Destroying other processes is not supported yet.");
-		//printk("[%d] destroying proc %d\n", p->pid, p_to_die->pid);
-	}
-	proc_destroy(p_to_die);
-	return ESUCCESS;
+/* Returns the calling process's pid */
+static pid_t sys_getpid(struct proc *p)
+{
+	return p->pid;
 }
 
 /*
@@ -583,10 +244,206 @@ static error_t sys_proc_run(struct proc *p, unsigned pid)
 	return retval;
 }
 
+/* Destroy proc pid.  If this is called by the dying process, it will never
+ * return.  o/w it will return 0 on success, or an error.  Errors include:
+ * - EBADPROC: if there is no such process with pid
+ * - EPERM: if caller does not control pid */
+static error_t sys_proc_destroy(struct proc *p, pid_t pid, int exitcode)
+{
+	error_t r;
+	struct proc *p_to_die = pid2proc(pid);
+
+	if (!p_to_die)
+		return -EBADPROC;
+	if (!proc_controls(p, p_to_die)) {
+		proc_decref(p_to_die, 1);
+		return -EPERM;
+	}
+	if (p_to_die == p) {
+		// syscall code and pid2proc both have edible references, only need 1.
+		p->exitcode = exitcode;
+		proc_decref(p, 1);
+		printd("[PID %d] proc exiting gracefully (code %d)\n", p->pid,exitcode);
+	} else {
+		panic("Destroying other processes is not supported yet.");
+		//printk("[%d] destroying proc %d\n", p->pid, p_to_die->pid);
+	}
+	proc_destroy(p_to_die);
+	return ESUCCESS;
+}
+
+static int sys_proc_yield(struct proc *p)
+{
+	proc_yield(p);
+	return 0;
+}
+
+static ssize_t sys_run_binary(env_t* e, void *DANGEROUS binary_buf, size_t len,
+                              void*DANGEROUS arg, size_t num_colors)
+{
+	env_t* env = proc_create(NULL,0);
+	assert(env != NULL);
+
+	static_assert(PROCINFO_NUM_PAGES == 1);
+	assert(memcpy_from_user(e,env->env_procinfo->argv_buf,arg,PROCINFO_MAX_ARGV_SIZE) == ESUCCESS);
+	*(intptr_t*)env->env_procinfo->env_buf = 0;
+
+	env_load_icode(env,e,binary_buf,len);
+	__proc_set_state(env, PROC_RUNNABLE_S);
+	schedule_proc(env);
+	if(num_colors > 0) {
+		env->cache_colors_map = cache_colors_map_alloc();
+		for(int i=0; i<num_colors; i++)
+			cache_color_alloc(llc_cache, env->cache_colors_map);
+	}
+	proc_decref(env, 1);
+	proc_yield(e);
+	return 0;
+}
+
+static ssize_t sys_fork(env_t* e)
+{
+	// TODO: right now we only support fork for single-core processes
+	if(e->state != PROC_RUNNING_S)
+		return -1;
+
+	env_t* env = proc_create(NULL,0);
+	assert(env != NULL);
+
+	env->heap_bottom = e->heap_bottom;
+	env->heap_top = e->heap_top;
+	env->ppid = e->pid;
+	env->env_tf = *current_tf;
+
+	env->cache_colors_map = cache_colors_map_alloc();
+	for(int i=0; i < llc_cache->num_colors; i++)
+		if(GET_BITMASK_BIT(e->cache_colors_map,i))
+			cache_color_alloc(llc_cache, env->cache_colors_map);
+
+	// copy page table and page contents.
+	for(char* va = 0; va < (char*)UTOP; va += PGSIZE)
+	{
+		// TODO: this is slow but correct.
+		// don't skip any va's so fork will copy mmap'd pages
+		// // copy [0,heaptop] and [stackbot,utop]
+		//if(va == ROUNDUP(env->heap_top,PGSIZE))
+		//	va = (char*)USTACKBOT;
+
+		int perms = get_va_perms(e->env_pgdir,va);
+		if(perms)
+		{
+			page_t* pp;
+			assert(upage_alloc(env,&pp,0) == 0);
+			assert(page_insert(env->env_pgdir,pp,va,perms) == 0);
+
+			pte_t* pte = pgdir_walk(e->env_pgdir,va,0);
+			assert(pte);
+			pagecopy(page2kva(pp),ppn2kva(PTE2PPN(*pte)));
+		}
+	}
+
+	__proc_set_state(env, PROC_RUNNABLE_S);
+	schedule_proc(env);
+
+	// don't decref the new process.
+	// that will happen when the parent waits for it.
+
+	printd("[PID %d] fork PID %d\n",e->pid,env->pid);
+
+	return env->pid;
+}
+
+static ssize_t sys_exec(env_t* e, void *DANGEROUS binary_buf, size_t len,
+                        procinfo_t*DANGEROUS procinfo)
+{
+	// TODO: right now we only support exec for single-core processes
+	if(e->state != PROC_RUNNING_S)
+		return -1;
+
+	if(memcpy_from_user(e,e->env_procinfo,procinfo,sizeof(*procinfo)))
+		return -1;
+
+	void* binary = kmalloc(len,0);
+	if(binary == NULL)
+		return -1;
+	if(memcpy_from_user(e,binary,binary_buf,len))
+	{
+		kfree(binary);
+		return -1;
+	}
+
+	// TODO: this is slow but correct.
+	// don't skip any va's so exec behaves right
+	env_segment_free(e,0,USTACKTOP);
+	//env_segment_free(e,0,ROUNDUP((intptr_t)e->heap_top,PGSIZE));
+	//env_segment_free(e,(void*)USTACKBOT,USTACKTOP-USTACKBOT);
+
+	proc_init_trapframe(current_tf,0);
+	env_load_icode(e,NULL,binary,len);
+
+	kfree(binary);
+	return 0;
+}
+
+static ssize_t sys_trywait(env_t* e, pid_t pid, int* status)
+{
+	struct proc* p = pid2proc(pid);
+
+	// TODO: this syscall is racy, so we only support for single-core procs
+	if(e->state != PROC_RUNNING_S)
+		return -1;
+
+	// TODO: need to use errno properly.  sadly, ROS error codes conflict..
+
+	if(p)
+	{
+		ssize_t ret;
+
+		if(current->pid == p->ppid)
+		{
+			if(p->state == PROC_DYING)
+			{
+				memcpy_to_user(e,status,&p->exitcode,sizeof(int));
+				printd("[PID %d] waited for PID %d (code %d)\n",
+				       e->pid,p->pid,p->exitcode);
+				ret = 0;
+			}
+			else // not dead yet
+			{
+				set_errno(current_tf,0);
+				ret = -1;
+			}
+		}
+		else // not a child of the calling process
+		{
+			set_errno(current_tf,1);
+			ret = -1;
+		}
+
+		// if the wait succeeded, decref twice
+		proc_decref(p,1 + (ret == 0));
+		return ret;
+	}
+
+	set_errno(current_tf,1);
+	return -1;
+}
+
+/************** Memory Management Syscalls **************/
+
+static void *sys_mmap(struct proc* p, uintreg_t a1, uintreg_t a2, uintreg_t a3,
+                      uintreg_t* a456)
+{
+	uintreg_t _a456[3];
+	if(memcpy_from_user(p,_a456,a456,3*sizeof(uintreg_t)))
+		sys_proc_destroy(p,p->pid,-1);
+	return mmap(p,a1,a2,a3,_a456[0],_a456[1],_a456[2]);
+}
+
 static void* sys_brk(struct proc *p, void* addr) {
 	size_t range;
 
-	if((addr < p->heap_bottom) || (addr >= (void*)UMMAP_START))
+	if((addr < p->heap_bottom) || (addr >= (void*)USTACKBOT))
 		goto out;
 
 	if (addr > p->heap_top) {
@@ -603,14 +460,173 @@ out:
 	return p->heap_top;
 }
 
-void* sys_mmap(struct proc* p, uintreg_t a1, uintreg_t a2, uintreg_t a3,
-               uintreg_t* a456)
+static ssize_t sys_shared_page_alloc(env_t* p1,
+                                     void**DANGEROUS _addr, pid_t p2_id,
+                                     int p1_flags, int p2_flags
+                                    )
 {
-	uintreg_t _a456[3];
-	if(memcpy_from_user(p,_a456,a456,3*sizeof(uintreg_t)))
-		sys_proc_destroy(p,p->pid,-1);
-	return mmap(p,a1,a2,a3,_a456[0],_a456[1],_a456[2]);
+	//if (!VALID_USER_PERMS(p1_flags)) return -EPERM;
+	//if (!VALID_USER_PERMS(p2_flags)) return -EPERM;
+
+	void * COUNT(1) * COUNT(1) addr = user_mem_assert(p1, _addr, sizeof(void *),
+                                                      PTE_USER_RW);
+	struct proc *p2 = pid2proc(p2_id);
+	if (!p2)
+		return -EBADPROC;
+
+	page_t* page;
+	error_t e = upage_alloc(p1, &page,1);
+	if (e < 0) {
+		proc_decref(p2, 1);
+		return e;
+	}
+
+	void* p2_addr = page_insert_in_range(p2->env_pgdir, page,
+	                (void*SNT)UTEXT, (void*SNT)UTOP, p2_flags);
+	if (p2_addr == NULL) {
+		page_free(page);
+		proc_decref(p2, 1);
+		return -EFAIL;
+	}
+
+	void* p1_addr = page_insert_in_range(p1->env_pgdir, page,
+	                (void*SNT)UTEXT, (void*SNT)UTOP, p1_flags);
+	if(p1_addr == NULL) {
+		page_remove(p2->env_pgdir, p2_addr);
+		page_free(page);
+		proc_decref(p2, 1);
+		return -EFAIL;
+	}
+	*addr = p1_addr;
+	proc_decref(p2, 1);
+	return ESUCCESS;
 }
+
+static int sys_shared_page_free(env_t* p1, void*DANGEROUS addr, pid_t p2)
+{
+	return -1;
+}
+
+
+/************** Resource Request Syscalls **************/
+
+/* sys_resource_req(): called directly from dispatch table. */
+
+/************** Platform Specific Syscalls **************/
+
+//Read a buffer over the serial port
+static ssize_t sys_serial_read(env_t* e, char *DANGEROUS _buf, size_t len)
+{
+	if (len == 0)
+		return 0;
+
+	#ifdef SERIAL_IO
+	    char *COUNT(len) buf = user_mem_assert(e, _buf, len, PTE_USER_RO);
+		size_t bytes_read = 0;
+		int c;
+		while((c = serial_read_byte()) != -1) {
+			buf[bytes_read++] = (uint8_t)c;
+			if(bytes_read == len) break;
+		}
+		return (ssize_t)bytes_read;
+	#else
+		return -EINVAL;
+	#endif
+}
+
+//Write a buffer over the serial port
+static ssize_t sys_serial_write(env_t* e, const char *DANGEROUS buf, size_t len)
+{
+	if (len == 0)
+		return 0;
+	#ifdef SERIAL_IO
+		char *COUNT(len) _buf = user_mem_assert(e, buf, len, PTE_USER_RO);
+		for(int i =0; i<len; i++)
+			serial_send_byte(buf[i]);
+		return (ssize_t)len;
+	#else
+		return -EINVAL;
+	#endif
+}
+
+#ifdef __NETWORK__
+// This is not a syscall we want. Its hacky. Here just for syscall stuff until get a stack.
+static ssize_t sys_eth_read(env_t* e, char *DANGEROUS buf, size_t len)
+{
+	extern int eth_up;
+
+	if (eth_up) {
+		extern int packet_waiting;
+		extern int packet_buffer_size;
+		extern char*CT(packet_buffer_size) packet_buffer;
+		extern char*CT(MAX_FRAME_SIZE) packet_buffer_orig;
+		extern int packet_buffer_pos;
+
+		if (len == 0)
+			return 0;
+
+		char *CT(len) _buf = user_mem_assert(e, buf,len, PTE_U);
+
+		if (packet_waiting == 0)
+			return 0;
+
+		int read_len = ((packet_buffer_pos + len) > packet_buffer_size) ? packet_buffer_size - packet_buffer_pos : len;
+
+		memcpy(_buf, packet_buffer + packet_buffer_pos, read_len);
+
+		packet_buffer_pos = packet_buffer_pos + read_len;
+
+		if (packet_buffer_pos == packet_buffer_size) {
+			kfree(packet_buffer_orig);
+			packet_waiting = 0;
+		}
+
+		return read_len;
+	}
+	else
+		return -EINVAL;
+}
+
+// This is not a syscall we want. Its hacky. Here just for syscall stuff until get a stack.
+static ssize_t sys_eth_write(env_t* e, const char *DANGEROUS buf, size_t len)
+{
+	extern int eth_up;
+
+	if (eth_up) {
+
+		if (len == 0)
+			return 0;
+
+		char *COUNT(len) _buf = user_mem_assert(e, buf, len, PTE_U);
+		int total_sent = 0;
+		int just_sent = 0;
+		int cur_packet_len = 0;
+		while (total_sent != len) {
+			cur_packet_len = ((len - total_sent) > MAX_PACKET_DATA) ? MAX_PACKET_DATA : (len - total_sent);
+			char* wrap_buffer = packet_wrap(_buf + total_sent, cur_packet_len);
+			just_sent = send_frame(wrap_buffer, cur_packet_len + PACKET_HEADER_SIZE);
+
+			if (just_sent < 0)
+				return 0; // This should be an error code of its own
+
+			if (wrap_buffer)
+				kfree(wrap_buffer);
+
+			total_sent += cur_packet_len;
+		}
+
+		return (ssize_t)len;
+
+	}
+	else
+		return -EINVAL;
+}
+
+#endif // Network
+
+/* sys_frontend_syscall_from_user(): called directly from dispatch table. */
+
+/************** Syscall Invokation **************/
 
 /* Executes the given syscall.
  *
@@ -631,32 +647,33 @@ intreg_t syscall(struct proc *p, uintreg_t syscallno, uintreg_t a1,
 		[SYS_null] = (syscall_t)sys_null,
 		[SYS_cache_buster] = (syscall_t)sys_cache_buster,
 		[SYS_cache_invalidate] = (syscall_t)sys_cache_invalidate,
-		[SYS_shared_page_alloc] = (syscall_t)sys_shared_page_alloc,
-		[SYS_shared_page_free] = (syscall_t)sys_shared_page_free,
+		[SYS_reboot] = (syscall_t)reboot,
 		[SYS_cputs] = (syscall_t)sys_cputs,
 		[SYS_cgetc] = (syscall_t)sys_cgetc,
 		[SYS_getcpuid] = (syscall_t)sys_getcpuid,
 		[SYS_getvcoreid] = (syscall_t)sys_getvcoreid,
-		[SYS_proc_destroy] = (syscall_t)sys_proc_destroy,
-		[SYS_yield] = (syscall_t)proc_yield,
+		[SYS_getpid] = (syscall_t)sys_getpid,
 		[SYS_proc_create] = (syscall_t)sys_proc_create,
 		[SYS_proc_run] = (syscall_t)sys_proc_run,
+		[SYS_proc_destroy] = (syscall_t)sys_proc_destroy,
+		[SYS_yield] = (syscall_t)sys_proc_yield,
+		[SYS_run_binary] = (syscall_t)sys_run_binary,
+		[SYS_fork] = (syscall_t)sys_fork,
+		[SYS_exec] = (syscall_t)sys_exec,
+		[SYS_trywait] = (syscall_t)sys_trywait,
 		[SYS_mmap] = (syscall_t)sys_mmap,
 		[SYS_brk] = (syscall_t)sys_brk,
+		[SYS_shared_page_alloc] = (syscall_t)sys_shared_page_alloc,
+		[SYS_shared_page_free] = (syscall_t)sys_shared_page_free,
 		[SYS_resource_req] = (syscall_t)resource_req,
 	#ifdef __i386__
 		[SYS_serial_read] = (syscall_t)sys_serial_read,
 		[SYS_serial_write] = (syscall_t)sys_serial_write,
 	#endif
-		[SYS_run_binary] = (syscall_t)sys_run_binary,
 	#ifdef __NETWORK__
 		[SYS_eth_read] = (syscall_t)sys_eth_read,
 		[SYS_eth_write] = (syscall_t)sys_eth_write,
 	#endif
-		[SYS_reboot] = (syscall_t)reboot,
-		[SYS_fork] = (syscall_t)sys_fork,
-		[SYS_trywait] = (syscall_t)sys_trywait,
-		[SYS_exec] = (syscall_t)sys_exec,
 	#ifdef __sparc_v8__
 		[SYS_frontend] = (syscall_t)frontend_syscall_from_user,
 		[SYS_read] = (syscall_t)sys_read,
@@ -680,6 +697,10 @@ intreg_t syscall(struct proc *p, uintreg_t syscallno, uintreg_t a1,
 	};
 
 	const int max_syscall = sizeof(syscall_table)/sizeof(syscall_table[0]);
+
+	//printk("Incoming syscall on core: %d number: %d\n    a1: %x\n   "
+	//       " a2: %x\n    a3: %x\n    a4: %x\n    a5: %x\n", core_id(),
+	//       syscallno, a1, a2, a3, a4, a5);
 
 	if(syscallno > max_syscall || syscall_table[syscallno] == NULL)
 		panic("Invalid syscall number %d for proc %x!", syscallno, *p);
