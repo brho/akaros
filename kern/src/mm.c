@@ -27,12 +27,8 @@ void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 	 * return appropriate pointer
 	 * Right now, all we can do is give them the range they ask for.
 	 */
-	//void *tmp = get_free_va_range(p->env_pgdir, addr, len);
-	//printk("tmp = 0x%08x\n", tmp);
-	if (!addr) {
-		printk("[kernel] mmap() requires an address, since it's ghetto\n");
-		return (void*SAFE)TC(-1);
-	}
+	if (!addr)
+		addr = (uintptr_t)get_free_va_range(p->env_pgdir,UMMAP_START,len);
 	// brief sanity check.  must be page aligned and not reaching too high
 	if (PGOFF(addr)) {
 		printk("[kernel] mmap() page align your addr.\n");
