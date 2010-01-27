@@ -42,7 +42,7 @@ int32_t sys_nbputch(char ch);
 #define RAMP_SYSCALL_dup2		95
 #define RAMP_SYSCALL_proc_free		96
 #define RAMP_SYSCALL_proc_init		97
-#define RAMP_SYSCALL_gettimeofday	156
+#define RAMP_SYSCALL_time		98
 #define RAMP_SYSCALL_getcwd		229
 
 #endif /* !ROS_ARCH_FRONTEND_H */

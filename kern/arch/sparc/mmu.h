@@ -87,7 +87,6 @@
 
 // x86 equivalencies
 #define PTE_P		PTE_PTE			// present <=> PTE
-#define PTSIZE		L1PGSIZE		// dunno yet
 #define NPDENTRIES	NL1ENTRIES		// this either
 #define PDX(la)		L1X(la)			// for env stuff
 #define PTX(la)		L3X(la)			// same

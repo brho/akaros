@@ -9,5 +9,6 @@
 
 #define PGSHIFT 12
 #define PGSIZE (1 << PGSHIFT)
+#define PTSIZE PGSIZE
 
 #endif
