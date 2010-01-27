@@ -7,13 +7,7 @@
 #include <ros/common.h>
 #include <arch/x86.h>
 #include <arch/arch.h>
-
-#define mb() {rmb(); wmb();}
-#define rmb() ({ asm volatile("lfence"); })
-#define wmb() 
-/* Force a wmb, used in cases where an IPI could beat a write, even though
- * write-orderings are respected. */
-#define wmb_f() ({ asm volatile("sfence"); })
+#include <arch/membar.h>
 
 typedef void * RACY atomic_t;
 struct spinlock {
