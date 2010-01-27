@@ -39,6 +39,24 @@
 #define SYS_eth_write				26
 #define SYS_frontend				27
 
+#define SYS_read				100
+#define SYS_write				101
+#define SYS_open				102
+#define SYS_close				103
+#define SYS_fstat				104
+#define SYS_stat				105
+#define SYS_lstat				106
+#define SYS_fcntl				107
+#define SYS_access				108
+#define SYS_umask				109
+#define SYS_chmod				110
+#define SYS_lseek				111
+#define SYS_link				112
+#define SYS_unlink				113
+#define SYS_chdir				114
+#define SYS_getcwd				115
+#define SYS_gettimeofday			116
+
 /* For Buster Measurement Flags */
 #define BUSTER_SHARED			0x0001
 #define BUSTER_STRIDED			0x0002
@@ -46,26 +64,4 @@
 #define BUSTER_PRINT_TICKS		0x0008
 #define BUSTER_JUST_LOCKS		0x0010 // unimplemented
 
-#ifndef __ASSEMBLER__
-
-#include <ros/common.h>
-#include <ros/ring_buffer.h>
-
-#define NUM_SYSCALL_ARGS 6
-typedef struct syscall_req {
-	uint32_t num;
-	uint32_t flags;
-	uint32_t args[NUM_SYSCALL_ARGS];
-} syscall_req_t;
-
-typedef struct syscall_rsp {
-	int32_t retval;
-} syscall_rsp_t;
-
-// Generic Syscall Ring Buffer
-#define SYSCALLRINGSIZE    PGSIZE
-//DEFINE_RING_TYPES_WITH_SIZE(syscall, syscall_req_t, syscall_rsp_t, SYSCALLRINGSIZE);
-DEFINE_RING_TYPES(syscall, syscall_req_t, syscall_rsp_t);
-
-#endif /* __ASSEMBLER__ */
 #endif /* !ROS_INCLUDE_SYSCALL_H */

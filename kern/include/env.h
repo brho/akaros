@@ -14,6 +14,7 @@
 #include <ros/common.h>
 #include <arch/arch.h>
 #include <sys/queue.h>
+#include <atomic.h>
 
 struct Env;
 typedef struct Env env_t;
