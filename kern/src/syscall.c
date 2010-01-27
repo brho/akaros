@@ -102,12 +102,13 @@ static ssize_t sys_fork(env_t* e)
 			cache_color_alloc(llc_cache, env->cache_colors_map);
 
 	// copy page table and page contents.
-	// TODO: does not work with mmap.  only text, heap, stack are copied.
 	for(char* va = 0; va < (char*)UTOP; va += PGSIZE)
 	{
-		// copy [0,heaptop] and [stackbot,utop]
-		if(va == env->heap_top)
-			va = (char*)USTACKBOT;
+		// TODO: this is slow but correct.
+		// don't skip any va's so fork will copy mmap'd pages
+		// // copy [0,heaptop] and [stackbot,utop]
+		//if(va == ROUNDUP(env->heap_top,PGSIZE))
+		//	va = (char*)USTACKBOT;
 
 		int perms = get_va_perms(e->env_pgdir,va);
 		if(perms)
@@ -178,15 +179,13 @@ static ssize_t sys_trywait(env_t* e, pid_t pid, int* status)
 }
 
 static ssize_t sys_exec(env_t* e, void *DANGEROUS binary_buf, size_t len,
-                        void*DANGEROUS arg, void*DANGEROUS env)
+                        procinfo_t*DANGEROUS procinfo)
 {
 	// TODO: right now we only support exec for single-core processes
 	if(e->state != PROC_RUNNING_S)
 		return -1;
 
-	if(memcpy_from_user(e,e->env_procinfo->argv_buf,arg,PROCINFO_MAX_ARGV_SIZE))
-		return -1;
-	if(memcpy_from_user(e,e->env_procinfo->env_buf,env,PROCINFO_MAX_ENV_SIZE))
+	if(memcpy_from_user(e,e->env_procinfo,procinfo,sizeof(*procinfo)))
 		return -1;
 
 	void* binary = kmalloc(len,0);
@@ -198,9 +197,11 @@ static ssize_t sys_exec(env_t* e, void *DANGEROUS binary_buf, size_t len,
 		return -1;
 	}
 
-	// TODO: this breaks with mmap
-	env_segment_free(e,0,(intptr_t)e->heap_top);
-	env_segment_free(e,(void*)USTACKBOT,USTACKTOP-USTACKBOT);
+	// TODO: this is slow but correct.
+	// don't skip any va's so exec behaves right
+	env_segment_free(e,0,USTACKTOP);
+	//env_segment_free(e,0,ROUNDUP((intptr_t)e->heap_top,PGSIZE));
+	//env_segment_free(e,(void*)USTACKBOT,USTACKTOP-USTACKBOT);
 
 	proc_init_trapframe(current_tf,0);
 	env_load_icode(e,NULL,binary,len);
@@ -585,7 +586,7 @@ static error_t sys_proc_run(struct proc *p, unsigned pid)
 static void* sys_brk(struct proc *p, void* addr) {
 	size_t range;
 
-	if((addr < p->heap_bottom) || (addr >= (void*)USTACKBOT))
+	if((addr < p->heap_bottom) || (addr >= (void*)UMMAP_START))
 		goto out;
 
 	if (addr > p->heap_top) {
@@ -662,6 +663,19 @@ intreg_t syscall(struct proc *p, uintreg_t syscallno, uintreg_t a1,
 		[SYS_write] = (syscall_t)sys_write,
 		[SYS_open] = (syscall_t)sys_open,
 		[SYS_close] = (syscall_t)sys_close,
+		[SYS_fstat] = (syscall_t)sys_fstat,
+		[SYS_stat] = (syscall_t)sys_stat,
+		[SYS_lstat] = (syscall_t)sys_lstat,
+		[SYS_fcntl] = (syscall_t)sys_fcntl,
+		[SYS_access] = (syscall_t)sys_access,
+		[SYS_umask] = (syscall_t)sys_umask,
+		[SYS_chmod] = (syscall_t)sys_chmod,
+		[SYS_lseek] = (syscall_t)sys_lseek,
+		[SYS_link] = (syscall_t)sys_link,
+		[SYS_unlink] = (syscall_t)sys_unlink,
+		[SYS_chdir] = (syscall_t)sys_chdir,
+		[SYS_getcwd] = (syscall_t)sys_getcwd,
+		[SYS_gettimeofday] = (syscall_t)sys_gettimeofday,
 	#endif
 	};
 

@@ -40,7 +40,7 @@ void parlib_ctors()
 // build argv from procinfo.argv_buf
 char** parlib_build_argc_argv(char* buf, int* argc)
 {
-	intreg_t* offset = (intreg_t*)buf;
+	char** offset = (char**)buf;
 	for(*argc = 0; offset[*argc]; (*argc)++)
 		;
 
@@ -48,7 +48,7 @@ char** parlib_build_argc_argv(char* buf, int* argc)
 	assert(argv);
 	for(int i = 0; i < *argc; i++)
 	{
-		argv[i] = strdup(buf + offset[i]);
+		argv[i] = strdup(offset[i]);
 		assert(argv[i]);
 	}
 	argv[*argc] = 0;

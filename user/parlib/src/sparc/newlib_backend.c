@@ -423,7 +423,7 @@ fork(void)
 }
 
 static int
-pack_argv(const char* const argv[], char* buf, size_t bufsz)
+pack_argv(const char* const argv[], void* base, char* buf, size_t bufsz)
 {
 	int argc = 0, size = sizeof(intreg_t);
 	while(argv[argc])
@@ -436,11 +436,11 @@ pack_argv(const char* const argv[], char* buf, size_t bufsz)
 		return -1;
 
 	intreg_t* offset = (intreg_t*)buf;
-	offset[0] = (argc+1)*sizeof(intreg_t);
+	offset[0] = (argc+1)*sizeof(intreg_t)+(intreg_t)base;
 	for(int i = 0; i < argc; i++)
 	{
 		int len = strlen(argv[i])+1;
-		memcpy(buf+offset[i],argv[i],len);
+		memcpy(buf+offset[i]-(intreg_t)base,argv[i],len);
 		offset[i+1] = offset[i]+len;
 	}
 	offset[argc] = 0;
@@ -495,9 +495,9 @@ readfile(const char* filename, void** binary, int* size)
 int
 execve(const char* name, char* const argv[], char* const env[])
 {
-	char argv_buf[PROCINFO_MAX_ARGV_SIZE],env_buf[PROCINFO_MAX_ENV_SIZE];
-	if(pack_argv(argv,argv_buf,PROCINFO_MAX_ARGV_SIZE) ||
-	   pack_argv(env,env_buf,PROCINFO_MAX_ENV_SIZE))
+	procinfo_t pi;
+	if(pack_argv(argv,procinfo.argv_buf,pi.argv_buf,PROCINFO_MAX_ARGV_SIZE)
+	   || pack_argv(env,procinfo.env_buf,pi.env_buf,PROCINFO_MAX_ENV_SIZE))
 	{
 		errno = ENOMEM;
 		return -1;
@@ -509,7 +509,7 @@ execve(const char* name, char* const argv[], char* const env[])
 		return -1;
 
 	return syscall(SYS_exec,(intreg_t)binary,(intreg_t)binarysz,
-                       (intreg_t)argv_buf,(intreg_t)env_buf,0);
+                       (intreg_t)&pi,0,0);
 }
 
 int
@@ -631,6 +631,8 @@ lseek(int fd, off_t ptr, int dir)
 ssize_t
 write(int fd, const void* ptr, size_t len)
 {
+	return syscall(SYS_write,fd,ptr,len,0,0);
+
 	for(int pos = 0; pos < len; )
 	{
 		int thislen = MIN(PGSIZE,len-pos);
@@ -652,6 +654,8 @@ write(int fd, const void* ptr, size_t len)
 ssize_t
 read(int fd, void* ptr, size_t len)
 {
+	return syscall(SYS_read,fd,ptr,len,0,0);
+
 	for(int pos = 0; pos < len; )
 	{
 		int thislen = MIN(PGSIZE,len-pos);
@@ -675,10 +679,15 @@ read(int fd, void* ptr, size_t len)
 int
 open(const char* name, int flags, ...)
 {
-	va_list vl;
-	va_start(vl,flags);
-	int mode = va_arg(vl,int);
-	va_end(vl);
+	int mode;
+	if(flags & O_CREAT)
+	{
+		va_list vl;
+		va_start(vl,flags);
+		mode = va_arg(vl,int);
+		va_end(vl);
+	}
+	return syscall(SYS_open,name,flags,mode,0,0);
 
 	size_t len = strlen(name)+1;
 	if(len > RAMP_MAXPATH)
@@ -691,6 +700,8 @@ open(const char* name, int flags, ...)
 int
 close(int fd)
 {
+	return syscall(SYS_close,fd,0,0,0,0);
+
 	return fe(close,fd,0,0,0);
 }
 
@@ -718,11 +729,7 @@ gettimeofday(struct timeval* tp, void* tzp)
 {
 	static struct timeval tp0 __attribute__((aligned(sizeof(*tp))));
 	if(tp0.tv_sec == 0)
-	{
-		int ret = fe(gettimeofday,&tp0,0,0,OUT0);
-		if(ret)
-			return ret;
-	}
+		tp0.tv_sec = fe(time,0,0,0,0);
 
 	long long dt = read_tsc();
 	tp->tv_sec = tp0.tv_sec + dt/procinfo.tsc_freq;
