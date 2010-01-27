@@ -133,6 +133,9 @@
 // Maximum bottom of normal user stack
 #define USTACKBOT	(USTACKTOP - (USTACK_NUM_PAGES+1)*PGSIZE)
 
+#define UMMAP_NUM_PAGES	131072
+#define UMMAP_START	(USTACKBOT - UMMAP_NUM_PAGES*PGSIZE)
+
 // Where user programs generally begin
 #define UTEXT		(2*PTSIZE)
 
