@@ -305,7 +305,10 @@ static ssize_t sys_fork(env_t* e)
 {
 	// TODO: right now we only support fork for single-core processes
 	if(e->state != PROC_RUNNING_S)
+	{
+		set_errno(current_tf,EINVAL);
 		return -1;
+	}
 
 	env_t* env = proc_create(NULL,0);
 	assert(env != NULL);
@@ -320,26 +323,28 @@ static ssize_t sys_fork(env_t* e)
 		if(GET_BITMASK_BIT(e->cache_colors_map,i))
 			cache_color_alloc(llc_cache, env->cache_colors_map);
 
-	// copy page table and page contents.
-	for(char* va = 0; va < (char*)UTOP; va += PGSIZE)
+	int copy_page(env_t* e, pte_t* pte, void* va, void* arg)
 	{
-		// TODO: this is slow but correct.
-		// don't skip any va's so fork will copy mmap'd pages
-		// // copy [0,heaptop] and [stackbot,utop]
-		//if(va == ROUNDUP(env->heap_top,PGSIZE))
-		//	va = (char*)USTACKBOT;
+		env_t* env = (env_t*)arg;
 
-		int perms = get_va_perms(e->env_pgdir,va);
-		if(perms)
+		page_t* pp;
+		if(upage_alloc(env,&pp,0))
+			return -1;
+		if(page_insert(env->env_pgdir,pp,va,*pte & PTE_PERM))
 		{
-			page_t* pp;
-			assert(upage_alloc(env,&pp,0) == 0);
-			assert(page_insert(env->env_pgdir,pp,va,perms) == 0);
-
-			pte_t* pte = pgdir_walk(e->env_pgdir,va,0);
-			assert(pte);
-			pagecopy(page2kva(pp),ppn2kva(PTE2PPN(*pte)));
+			page_decref(pp);
+			return -1;
 		}
+
+		pagecopy(page2kva(pp),ppn2kva(PTE2PPN(*pte)));
+		return 0;
+	}
+
+	if(env_user_mem_walk(e,0,UTOP,&copy_page,env))
+	{
+		proc_decref(env,2);
+		set_errno(current_tf,ENOMEM);
+		return -1;
 	}
 
 	__proc_set_state(env, PROC_RUNNABLE_S);
@@ -362,6 +367,7 @@ static ssize_t sys_exec(env_t* e, void *DANGEROUS binary_buf, size_t len,
 
 	if(memcpy_from_user(e,e->env_procinfo,procinfo,sizeof(*procinfo)))
 		return -1;
+	proc_init_procinfo(e);
 
 	void* binary = kmalloc(len,0);
 	if(binary == NULL)
@@ -372,11 +378,7 @@ static ssize_t sys_exec(env_t* e, void *DANGEROUS binary_buf, size_t len,
 		return -1;
 	}
 
-	// TODO: this is slow but correct.
-	// don't skip any va's so exec behaves right
 	env_segment_free(e,0,USTACKTOP);
-	//env_segment_free(e,0,ROUNDUP((intptr_t)e->heap_top,PGSIZE));
-	//env_segment_free(e,(void*)USTACKBOT,USTACKTOP-USTACKBOT);
 
 	proc_init_trapframe(current_tf,0);
 	env_load_icode(e,NULL,binary,len);

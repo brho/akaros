@@ -345,11 +345,12 @@ void run_env_handler(trapframe_t *tf, void * data)
 void
 env_user_mem_free(env_t* e, void* start, size_t len)
 {
-	void user_page_free(env_t* e, pte_t* pte, void* va, void* arg)
+	int user_page_free(env_t* e, pte_t* pte, void* va, void* arg)
 	{
 		page_t* page = ppn2page(PTE2PPN(*pte));
 		*pte = 0;
 		page_decref(page);
+		return 0;
 	}
 
 	env_user_mem_walk(e,start,len,&user_page_free,NULL);

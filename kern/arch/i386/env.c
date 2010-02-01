@@ -84,7 +84,7 @@ void env_pop_tf(trapframe_t *tf)
 }
 
 // Flush all mapped pages in the user portion of the address space
-void
+int
 env_user_mem_walk(env_t* e, void* start, size_t len,
                   mem_walk_callback_t callback, void* arg)
 {
@@ -111,11 +111,14 @@ env_user_mem_walk(env_t* e, void* start, size_t len,
 		uint32_t pteno_start = pdeno == pdeno_start ? PTX(start) : 0;
 		uint32_t pteno_end = pdeno == pdeno_end-1 && PTX(end) != 0 ?
 		                     PTX(end) : NPTENTRIES;
+		int ret;
 		for (pteno = pteno_start; pteno < pteno_end; pteno++) {
 			if (pt[pteno] & PTE_P)
-			  	callback(e, &pt[pteno], PGADDR(pdeno, pteno, 0), arg);
+				if((ret = callback(e, &pt[pteno], PGADDR(pdeno, pteno, 0), arg)))
+					return ret;
 		}
 	}
+	return 0;
 }
 
 void

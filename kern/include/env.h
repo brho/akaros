@@ -83,8 +83,8 @@ void	env_segment_alloc(env_t *e, void *SNT va, size_t len);
 void	env_segment_free(env_t *e, void *SNT va, size_t len);
 void	env_load_icode(env_t* e, env_t* binary_env, uint8_t *COUNT(size) binary, size_t size);
 
-typedef	void (*mem_walk_callback_t)(env_t* e, pte_t* pte, void* va, void* arg);
-void	env_user_mem_walk(env_t* e, void* start, size_t len, mem_walk_callback_t callback, void* arg);
+typedef int (*mem_walk_callback_t)(env_t* e, pte_t* pte, void* va, void* arg);
+int		env_user_mem_walk(env_t* e, void* start, size_t len, mem_walk_callback_t callback, void* arg);
 
 // The following three functions do not return
 void	env_pop_tf(trapframe_t *tf) __attribute__((noreturn));

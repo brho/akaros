@@ -70,6 +70,7 @@ extern uint32_t LCKD(&idle_lock) num_idlecores;
 
 /* Initialization */
 void proc_init(void);
+void proc_init_procinfo(struct proc *p);
 
 /* Process management: */
 struct proc *proc_create(uint8_t *COUNT(size) binary, size_t size);

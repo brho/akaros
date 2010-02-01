@@ -6,6 +6,7 @@
 
 #include <string.h>
 #include <ros/memlayout.h>
+#include <assert.h>
 
 int
 strlen(const char *s)
@@ -193,22 +194,21 @@ memcpy16(uint32_t *COUNT(n/sizeof(uint32_t)) _dst,
 }
 
 void *
-pagecopy(void* dst, void* src)
+pagecopy(void* d, void* s)
 {
-	uint64_t* s = (uint64_t*)src;
-	uint64_t* d = (uint64_t*)dst;
-	for(int i = 0; i < PGSIZE/sizeof(uint64_t); i += 8)
+	static_assert(PGSIZE % 64 == 0);
+	for(int i = 0; i < PGSIZE; i += 64)
 	{
-		d[i+0] = s[i+0];
-		d[i+1] = s[i+1];
-		d[i+2] = s[i+2];
-		d[i+3] = s[i+3];
-		d[i+4] = s[i+4];
-		d[i+5] = s[i+5];
-		d[i+6] = s[i+6];
-		d[i+7] = s[i+7];
+		*((uint64_t*)(d+i+0)) = *((uint64_t*)(s+i+0));
+		*((uint64_t*)(d+i+8)) = *((uint64_t*)(s+i+8));
+		*((uint64_t*)(d+i+16)) = *((uint64_t*)(s+i+16));
+		*((uint64_t*)(d+i+24)) = *((uint64_t*)(s+i+24));
+		*((uint64_t*)(d+i+32)) = *((uint64_t*)(s+i+32));
+		*((uint64_t*)(d+i+40)) = *((uint64_t*)(s+i+40));
+		*((uint64_t*)(d+i+48)) = *((uint64_t*)(s+i+48));
+		*((uint64_t*)(d+i+56)) = *((uint64_t*)(s+i+56));
 	}
-	return dst;
+	return d;
 }
 
 void *

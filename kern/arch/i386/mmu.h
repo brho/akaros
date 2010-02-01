@@ -75,6 +75,7 @@
 #define PTE_PAT		0x080	// PAT (only applies to second layer PTEs)
 #define PTE_G		0x100	// Global Page
 
+#define PTE_PERM	(PTE_W | PTE_U) // The permissions fields
 // commly used access modes
 #define PTE_KERN_RW	PTE_W		// Kernel Read/Write
 #define PTE_KERN_RO	0		// Kernel Read-Only

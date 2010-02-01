@@ -78,9 +78,9 @@
 
 // x86 equivalencies
 #define PTE_P		PTE_PTE			// present <=> PTE
-#define NPDENTRIES	NL1ENTRIES		// this either
+#define PTE_PERM	PTE_ACC			// perms <=> ACC
+#define NPDENTRIES	NL1ENTRIES		// to calculate size of pgdir
 #define PDX(la)		L1X(la)			// for env stuff
-#define PTX(la)		L3X(la)			// same
 
 // +-----+-------------------+
 // |     |   Allowed Access  |

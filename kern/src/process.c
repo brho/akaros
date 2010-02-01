@@ -190,7 +190,7 @@ void proc_init(void)
 	atomic_init(&num_envs, 0);
 }
 
-static void
+void
 proc_init_procinfo(struct proc* p)
 {
 	p->env_procinfo->pid = p->pid;
