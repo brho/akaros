@@ -8,6 +8,7 @@
 #include <ros/ring_syscall.h>
 #include <ros/common.h>
 #include <ros/procinfo.h>
+#include <arch/mmu.h>
 
 typedef struct procdata {
 	// The actual ring buffers for communicating with user space

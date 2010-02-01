@@ -62,15 +62,6 @@
 #define NL2ENTRIES	64		// # entries in an L2 page table
 #define NL1ENTRIES	256		// # entries in an L1 page table
 
-#define L3PGSIZE	4096		// bytes mapped by an L3 page
-#define L3PGSHIFT	12		// log2(L3PGSIZE)
-
-#define L2PGSIZE	(4096*64)	// bytes mapped by an L2 page
-#define L2PGSHIFT	(12+6)		// log2(L2PGSIZE)
-
-#define L1PGSIZE	(4096*64*64)	// bytes mapped by an L1 page
-#define L1PGSHIFT	(12+6+6)	// log2(L1PGSIZE)
-
 // Page table/directory entry flags.
 #define PTE_PTD		0x001	// Entry is a Page Table Descriptor
 #define PTE_PTE		0x002	// Entry is a Page Table Entry

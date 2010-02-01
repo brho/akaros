@@ -85,14 +85,19 @@ void env_pop_tf(trapframe_t *tf)
 
 // Flush all mapped pages in the user portion of the address space
 void
-env_user_mem_free(env_t* e)
+env_user_mem_walk(env_t* e, void* start, size_t len,
+                  mem_walk_callback_t callback, void* arg)
 {
 	pte_t *pt;
 	uint32_t pdeno, pteno;
 	physaddr_t pa;
 
-	static_assert(UVPT % PTSIZE == 0);
-	for (pdeno = 0; pdeno < PDX(UVPT); pdeno++) {
+	assert((intptr_t)start % PGSIZE == 0 && len % PGSIZE == 0);
+	void* end = (char*)start+len;
+	uint32_t pdeno_start = PDX(start);
+	uint32_t pdeno_end = PDX(ROUNDUP(end,PTSIZE));
+
+	for (pdeno = pdeno_start; pdeno < pdeno_end; pdeno++) {
 
 		// only look at mapped page tables
 		if (!(e->env_pgdir[pdeno] & PTE_P))
@@ -103,13 +108,38 @@ env_user_mem_free(env_t* e)
 		pt = (pte_t*COUNT(NPTENTRIES)) KADDR(pa);
 
 		// unmap all PTEs in this page table 
-		for (pteno = 0; pteno <= PTX(~0); pteno++) {
+		uint32_t pteno_start = pdeno == pdeno_start ? PTX(start) : 0;
+		uint32_t pteno_end = pdeno == pdeno_end-1 && PTX(end) != 0 ?
+		                     PTX(end) : NPTENTRIES;
+		for (pteno = pteno_start; pteno < pteno_end; pteno++) {
 			if (pt[pteno] & PTE_P)
-			  	page_remove(e->env_pgdir, PGADDR(pdeno, pteno, 0));
+			  	callback(e, &pt[pteno], PGADDR(pdeno, pteno, 0), arg);
 		}
+	}
+}
+
+void
+env_pagetable_free(env_t* e)
+{
+	static_assert(UVPT % PTSIZE == 0);
+	for(uint32_t pdeno = 0; pdeno < PDX(UVPT); pdeno++)
+	{
+		// only look at mapped page tables
+		if (!(e->env_pgdir[pdeno] & PTE_P))
+			continue;
+
+		// find the pa and va of the page table
+		physaddr_t pa = PTE_ADDR(e->env_pgdir[pdeno]);
 
 		// free the page table itself
 		e->env_pgdir[pdeno] = 0;
 		page_decref(pa2page(pa));
 	}
+
+	// free the page directory
+	physaddr_t pa = e->env_cr3;
+	e->env_cr3 = 0;
+	page_decref(pa2page(pa));
+	tlbflush();
 }
+

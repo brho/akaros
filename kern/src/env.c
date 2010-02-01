@@ -122,8 +122,8 @@ env_setup_vm_error_d:
 	free_cont_pages(e->env_procinfo, LOG2_UP(PROCINFO_NUM_PAGES));
 env_setup_vm_error_i:
 	page_free(shared_page);
-	env_user_mem_free(e);
-	page_free(pgdir);
+	env_user_mem_free(e,0,KERNBASE);
+	env_pagetable_free(e);
 	return -ENOMEM;
 }
 
@@ -184,12 +184,7 @@ env_segment_free(env_t *e, void *SNT va, size_t len)
 	assert(e->env_cr3 == rcr3());
 	num_pages = LA2PPN(end - start);
 
-	for (int i = 0; i < num_pages; i++, start += PGSIZE) {
-		// skip if a page is already unmapped. 
-		pte = pgdir_walk(e->env_pgdir, start, 0);
-		if (pte && *pte & PTE_P)
-			page_remove(e->env_pgdir,start);
-	}
+	env_user_mem_free(e,start,(char*)end-(char*)start);
 }
 
 // this helper function handles all cases of copying to/from user/kernel
@@ -346,3 +341,18 @@ void run_env_handler(trapframe_t *tf, void * data)
 	if (enqueue_work(workqueue, &job))
 		panic("Failed to enqueue work!");
 }
+
+void
+env_user_mem_free(env_t* e, void* start, size_t len)
+{
+	void user_page_free(env_t* e, pte_t* pte, void* va, void* arg)
+	{
+		page_t* page = ppn2page(PTE2PPN(*pte));
+		*pte = 0;
+		page_decref(page);
+	}
+
+	env_user_mem_walk(e,start,len,&user_page_free,NULL);
+	tlbflush();
+}
+

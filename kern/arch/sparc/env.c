@@ -89,73 +89,77 @@ restore_fp_state(ancillary_state_t* silly)
 	write_psr(read_psr() & ~PSR_EF);
 }
 
-
 // Flush all mapped pages in the user portion of the address space
 // TODO: only supports L3 user pages
-
-typedef void (*env_user_mem_walk_t)(env_t* e, void* va, pte_t* pte, void* arg);
-
 void
-env_user_mem_walk(env_t* e, env_user_mem_walk_t callback, void* arg)
+env_user_mem_walk(env_t* e, void* start, size_t len,
+                  mem_walk_callback_t callback, void* arg)
 {
-	pte_t *l1pt = e->env_pgdir, *l2pt, *l3pt;
-	uint32_t l1x,l2x,l3x;
-	physaddr_t l2ptpa,l3ptpa,page_pa;
-	uint32_t l2_tables_per_page,l3_tables_per_page;
+	pte_t *l1pt = e->env_pgdir;
 
-	l2_tables_per_page = PGSIZE/(sizeof(pte_t)*NL2ENTRIES);
-	l3_tables_per_page = PGSIZE/(sizeof(pte_t)*NL3ENTRIES);
+	assert((intptr_t)start % PGSIZE == 0 && len % PGSIZE == 0);
+	void* end = (char*)start+len;
 
-	static_assert(L2X(KERNBASE) == 0 && L3X(KERNBASE) == 0);
-	for(l1x = 0; l1x < L1X(KERNBASE); l1x++)
+	int l1x_start = L1X(start);
+	int l1x_end = L1X(ROUNDUP(end,L1PGSIZE));
+	for(int l1x = l1x_start; l1x < l1x_end; l1x++)
 	{
 		if(!(l1pt[l1x] & PTE_PTD))
 			continue;
 
-		l2ptpa = PTD_ADDR(l1pt[l1x]);
-		l2pt = (pte_t*COUNT(NL2ENTRIES)) KADDR(l2ptpa);
+		physaddr_t l2ptpa = PTD_ADDR(l1pt[l1x]);
+		pte_t* l2pt = (pte_t*)KADDR(l2ptpa);
 
-		for(l2x = 0; l2x < NL2ENTRIES; l2x++)
+		int l2x_start = l1x == l1x_start ? L2X(start) : 0;
+		int l2x_end = l1x == l1x_end-1 && L2X(ROUNDUP(end,L2PGSIZE)) ?
+		              L2X(ROUNDUP(end,L2PGSIZE)) : NL2ENTRIES;
+		for(int l2x = l2x_start; l2x < l2x_end; l2x++)
 		{
 			if(!(l2pt[l2x] & PTE_PTD))
 				continue;
 
-			l3ptpa = PTD_ADDR(l2pt[l2x]);
-			l3pt = (pte_t*COUNT(NL3ENTRIES)) KADDR(l3ptpa);
+			physaddr_t l3ptpa = PTD_ADDR(l2pt[l2x]);
+			pte_t* l3pt = (pte_t*)KADDR(l3ptpa);
 
-			for(l3x = 0; l3x < NL3ENTRIES; l3x++)
-			{
+			int l3x_start = l1x == l1x_start && l2x == l2x_start ?
+			                L3X(start) : 0;
+			int l3x_end = l1x == l1x_end-1 && l2x == l2x_end-1 && L3X(end) ?
+			              L3X(end) : NL3ENTRIES;
+			for(int l3x = l3x_start; l3x < l3x_end; l3x++)
 				if(l3pt[l3x] & PTE_PTE)
-				{
-					callback(e,PGADDR(l1x,l2x,l3x,0),
-					         &l3pt[l3x],arg);
-				}
-			}
+					callback(e,&l3pt[l3x],PGADDR(l1x,l2x,l3x,0),arg);
+		}
+	}
+}
 
+void
+env_pagetable_free(env_t* e)
+{
+	static_assert(L2X(KERNBASE) == 0 && L3X(KERNBASE) == 0);
+	pte_t *l1pt = e->env_pgdir;
+
+	for(int l1x = 0; l1x < L1X(KERNBASE); l1x++)
+	{
+		if(!(l1pt[l1x] & PTE_PTD))
+			continue;
+
+		physaddr_t l2ptpa = PTD_ADDR(l1pt[l1x]);
+		pte_t* l2pt = (pte_t*)KADDR(l2ptpa);
+
+		for(int l2x = 0; l2x < NL2ENTRIES; l2x++)
+		{
+			if(!(l2pt[l2x] & PTE_PTD))
+				continue;
+
+			physaddr_t l3ptpa = PTD_ADDR(l2pt[l2x]);
 			l2pt[l2x] = 0;
-
-			// free the L3 PT itself
 			page_decref(pa2page(l3ptpa));
 		}
 
 		l1pt[l1x] = 0;
-
-		// free the L2 PT itself
 		page_decref(pa2page(l2ptpa));
 	}
 
+	page_decref(pa2page(e->env_cr3));
 	tlbflush();
 }
-
-void
-env_user_mem_free(env_t* e)
-{
-	void mem_free_callback(env_t* e, void* va, pte_t* pte, void* arg)
-	{
-		page_t* page = ppn2page(PTE2PPN(*pte));
-		page_decref(page);
-		*pte = 0;
-	}
-	env_user_mem_walk(e,&mem_free_callback,NULL);
-}
-
