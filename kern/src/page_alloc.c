@@ -137,7 +137,7 @@ error_t kpage_alloc(page_t** page)
 	ssize_t ret;
 	spin_lock_irqsave(&colored_page_free_list_lock);
 	if((ret = __page_alloc_from_color_range(page, next_color, 
-	                            llc_cache->num_colors)) < 0)
+	                            llc_cache->num_colors - next_color)) < 0)
 		ret = __page_alloc_from_color_range(page, 0, next_color);
 
 	if(ret >= 0) {
