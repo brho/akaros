@@ -54,22 +54,22 @@ void test_ipi_sending(void)
 	send_self_ipi(I_TESTING);
 	udelay(3000000);
 	cprintf("\nCORE 0 sending ipi to physical 1\n");
-	send_ipi(0x01, 0, I_TESTING);
+	send_ipi(get_hw_coreid(0x01), I_TESTING);
 	udelay(3000000);
 	cprintf("\nCORE 0 sending ipi to physical 2\n");
-	send_ipi(0x02, 0, I_TESTING);
+	send_ipi(get_hw_coreid(0x02), I_TESTING);
 	udelay(3000000);
 	cprintf("\nCORE 0 sending ipi to physical 3\n");
-	send_ipi(0x03, 0, I_TESTING);
+	send_ipi(get_hw_coreid(0x03), I_TESTING);
 	udelay(3000000);
 	cprintf("\nCORE 0 sending ipi to physical 15\n");
-	send_ipi(0x0f, 0, I_TESTING);
+	send_ipi(get_hw_coreid(0x0f), I_TESTING);
 	udelay(3000000);
 	cprintf("\nCORE 0 sending ipi to logical 2\n");
-	send_ipi(0x02, 1, I_TESTING);
+	send_group_ipi(0x02, I_TESTING);
 	udelay(3000000);
 	cprintf("\nCORE 0 sending ipi to logical 1\n");
-	send_ipi(0x01, 1, I_TESTING);
+	send_group_ipi(0x01, I_TESTING);
 	udelay(3000000);
 	cprintf("\nDone!\n");
 	disable_irqsave(&state);
@@ -550,7 +550,7 @@ void test_lapic_status_bit(void)
 	atomic_set(&a,0);
 	printk("IPIs received (should be 0): %d\n", a);
 	for(int i = 0; i < NUM_IPI; i++) {
-		send_ipi(7, 0, I_TESTING);
+		send_ipi(get_hw_coreid(7), I_TESTING);
 		lapic_wait_to_send();
 	}
 	// need to wait a bit to let those IPIs get there
@@ -722,6 +722,7 @@ void test_print_info_handler(trapframe_t *tf, void* data)
 	cprintf("----------------------------\n");
 	cprintf("This is Core %d\n", core_id());
 #ifdef __i386__
+	cprintf("Hardware core %d\n", hw_core_id());
 	cprintf("MTRR_DEF_TYPE = 0x%08x\n", read_msr(IA32_MTRR_DEF_TYPE));
 	cprintf("MTRR Phys0 Base = 0x%016llx, Mask = 0x%016llx\n",
 	        read_msr(0x200), read_msr(0x201));

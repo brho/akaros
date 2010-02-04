@@ -399,7 +399,7 @@ uint32_t send_active_message(uint32_t dst, amr_t pc,
 	spin_unlock_irqsave(&per_cpu_info[dst].amsg_lock);
 	// since we touched memory the other core will touch (the lock), we don't
 	// need an wmb_f()
-	send_ipi(dst, 0, I_ACTIVE_MSG);
+	send_ipi(get_hw_coreid(dst), I_ACTIVE_MSG);
 	return 0;
 }
 

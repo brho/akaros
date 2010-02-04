@@ -21,6 +21,10 @@
 #include <env.h>
 #include <trap.h>
 
+/* Lookup table for core_id and per_cpu_inf, indexed by real __core_id() */
+int hw_coreid_lookup[MAX_NUM_CPUS] = {[0 ... (MAX_NUM_CPUS - 1)] -1};
+int os_coreid_lookup[MAX_NUM_CPUS] = {[0 ... (MAX_NUM_CPUS - 1)] -1};
+
 /*************************** IPI Wrapper Stuff ********************************/
 // checklists to protect the global interrupt_handlers for 0xf0, f1, f2, f3, f4
 // need to be global, since there is no function that will always exist for them
@@ -45,7 +49,7 @@ static int smp_call_function(uint8_t type, uint32_t dest, poly_isr_t handler, TV
 
 	// assumes our cores are numbered in order
 	if ((type == 4) && (dest >= num_cpus))
-		panic("Destination CPU does not exist!");
+		panic("Destination CPU %d does not exist!", dest);
 
 	// build the mask based on the type and destination
 	INIT_CHECKLIST_MASK(cpu_mask, MAX_NUM_CPUS);
@@ -127,10 +131,10 @@ static int smp_call_function(uint8_t type, uint32_t dest, poly_isr_t handler, TV
 			send_all_others_ipi(wrapper->vector);
 			break;
 		case 4: // physical mode
-			send_ipi(dest, 0, wrapper->vector);
+			send_ipi(get_hw_coreid(dest), wrapper->vector);
 			break;
 		case 5: // logical mode
-			send_ipi(dest, 1, wrapper->vector);
+			send_group_ipi(dest, wrapper->vector);
 			break;
 		default:
 			panic("Invalid type for cross-core function call!");

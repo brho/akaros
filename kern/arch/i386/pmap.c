@@ -417,10 +417,6 @@ vm_init(void)
 
 	// Final mapping: KERNBASE+x => KERNBASE+x => x.
 
-	// need to store this for access to change the LDT later
-	assert(core_id() == 0);
-	per_cpu_info[core_id()].gdt = gdt;
-
 	// This mapping was only used after paging was turned on but
 	// before the segment registers were reloaded.
 	pgdir[0] = 0;

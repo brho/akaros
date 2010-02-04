@@ -1,8 +1,8 @@
 #ifndef ROS_INC_ARCH_H
 #define ROS_INC_ARCH_H
 
-#include <arch/x86.h>
 #include <ros/common.h>
+#include <arch/x86.h>
 #include <arch/trap.h>
 #include <arch/apic.h>
 
@@ -23,13 +23,20 @@ static __inline void cpu_relax(void) __attribute__((always_inline));
 static __inline void cpu_halt(void) __attribute__((always_inline));
 static __inline void clflush(uintptr_t* addr) __attribute__((always_inline));
 static __inline int irq_is_enabled(void) __attribute__((always_inline));
-static __inline uint32_t core_id(void) __attribute__((always_inline));
+static __inline int get_hw_coreid(int coreid);
+static __inline int hw_core_id(void) __attribute__((always_inline));
+static __inline int get_os_coreid(int hw_coreid);
+static __inline int core_id(void) __attribute__((always_inline));
 static __inline void cache_flush(void) __attribute__((always_inline));
 static __inline void reboot(void) __attribute__((always_inline)) __attribute__((noreturn));
 
 void print_cpuinfo(void);
 void show_mapping(uintptr_t start, size_t size);
 void backtrace(void);
+
+/* declared in smp.c */
+int hw_coreid_lookup[MAX_NUM_CPUS];
+int os_coreid_lookup[MAX_NUM_CPUS];
 
 static __inline void
 breakpoint(void)
@@ -133,10 +140,33 @@ irq_is_enabled(void)
 	return read_eflags() & FL_IF;
 }
 
-static __inline uint32_t
-core_id(void)
+/* os_coreid -> hw_coreid */
+static __inline int
+get_hw_coreid(int coreid)
+{
+	return hw_coreid_lookup[coreid];
+}
+
+static __inline int
+hw_core_id(void)
 {
 	return lapic_get_id();
+}
+
+/* hw_coreid -> os_coreid */
+static __inline int
+get_os_coreid(int hw_coreid)
+{
+	return os_coreid_lookup[hw_coreid];
+}
+
+/* core_id() returns the OS core number, not to be confused with the
+ * hardware-specific core identifier (such as the lapic id) returned by
+ * hw_core_id() */
+static __inline int
+core_id(void)
+{
+	return get_os_coreid(hw_core_id());
 }
 
 static __inline void
