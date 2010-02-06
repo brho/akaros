@@ -264,7 +264,7 @@ error_t page_free(page_t *SAFE page)
 }
 
 /*
- * Check if a page with the given pyhysical page # is free
+ * Check if a page with the given physical page # is free
  */
 int page_is_free(size_t ppn) {
 	page_t* page = ppn2page(ppn);

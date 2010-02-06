@@ -21,7 +21,11 @@ void arch_init()
 	// TODO: move these back to regular init.  requires fixing the __NETWORK__
 	// inits to not need multiple cores running.
 	// this returns when all other cores are done and ready to receive IPIs
-	smp_boot();
+	#ifndef __SINGLE_CORE__
+		smp_boot();
+	#else
+		smp_percpu_init();
+	#endif
 	proc_init();
 
 	/* EXPERIMENTAL NETWORK FUNCTIONALITY

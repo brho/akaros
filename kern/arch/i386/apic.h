@@ -120,7 +120,8 @@ static inline void send_startup_ipi(uint8_t vector);
 static inline void send_self_ipi(uint8_t vector);
 static inline void send_broadcast_ipi(uint8_t vector);
 static inline void send_all_others_ipi(uint8_t vector);
-static inline void send_ipi(uint8_t dest, bool logical_mode, uint8_t vector);
+static inline void send_ipi(uint8_t hw_coreid, uint8_t vector);
+static inline void send_group_ipi(uint8_t hw_groupid, uint8_t vector);
 
 #define mask_lapic_lvt(entry) \
 	write_mmreg32(entry, read_mmreg32(entry) | LAPIC_LVT_MASK)
@@ -201,33 +202,56 @@ static inline void lapic_enable(void)
 
 static inline void send_init_ipi(void)
 {
+	lapic_wait_to_send();
 	write_mmreg32(LAPIC_IPI_ICR_LOWER, 0x000c4500);
 }
 
 static inline void send_startup_ipi(uint8_t vector)
 {
+	lapic_wait_to_send();
 	write_mmreg32(LAPIC_IPI_ICR_LOWER, 0x000c4600 | vector);
 }
 
 static inline void send_self_ipi(uint8_t vector)
 {
+	lapic_wait_to_send();
 	write_mmreg32(LAPIC_IPI_ICR_LOWER, 0x00044000 | vector);
 }
 
 static inline void send_broadcast_ipi(uint8_t vector)
 {
+	lapic_wait_to_send();
 	write_mmreg32(LAPIC_IPI_ICR_LOWER, 0x00084000 | vector);
 }
 
 static inline void send_all_others_ipi(uint8_t vector)
 {
+	lapic_wait_to_send();
 	write_mmreg32(LAPIC_IPI_ICR_LOWER, 0x000c4000 | vector);
 }
 
-static inline void send_ipi(uint8_t dest, bool logical_mode, uint8_t vector)
+static inline void __send_ipi(uint8_t hw_coreid, uint8_t vector)
 {
-	write_mmreg32(LAPIC_IPI_ICR_UPPER, dest << 24);
-	write_mmreg32(LAPIC_IPI_ICR_LOWER, 0x00004000 | (logical_mode << 11) | vector);
+	lapic_wait_to_send();
+	write_mmreg32(LAPIC_IPI_ICR_UPPER, hw_coreid << 24);
+	write_mmreg32(LAPIC_IPI_ICR_LOWER, 0x00004000 | vector);
+}
+
+static inline void send_ipi(uint8_t hw_coreid, uint8_t vector)
+{
+	/* 255 is a broadcast, which should use send_broadcast_ipi, and it is also
+	 * what would come in if you tried sending an IPI to an os_coreid that
+	 * doesn't exist (since they are initialized to -1). */
+	if (hw_coreid == 255)
+		return;
+	__send_ipi(hw_coreid, vector);
+}
+
+static inline void send_group_ipi(uint8_t hw_groupid, uint8_t vector)
+{
+	lapic_wait_to_send();
+	write_mmreg32(LAPIC_IPI_ICR_UPPER, hw_groupid << 24);
+	write_mmreg32(LAPIC_IPI_ICR_LOWER, 0x00004800 | vector);
 }
 
 /* To change the LAPIC Base (not recommended):

@@ -59,12 +59,13 @@ static void init_smp_call_function(void)
 /******************************************************************************/
 
 #ifdef __IVY__
-static void smp_mtrr_handler(trapframe_t *tf, barrier_t *data)
+static void smp_final_core_init(trapframe_t *tf, barrier_t *data)
 #else
-static void smp_mtrr_handler(trapframe_t *tf, void *data)
+static void smp_final_core_init(trapframe_t *tf, void *data)
 #endif
 {
 	setup_default_mtrrs(data);
+	smp_percpu_init();
 }
 
 // this needs to be set in smp_entry too...
@@ -86,8 +87,33 @@ get_smp_bootlock()
 	return (uint32_t *COUNT(1))TC(smp_boot_lock - smp_entry + trampoline_pg);
 }
 
+/* hw_coreid_lookup will get packed, but keep it's hw values.  
+ * os_coreid_lookup will remain sparse, but it's values will be consecutive.
+ * for both arrays, -1 means an empty slot.  hw_step tracks the next valid entry
+ * in hw_coreid_lookup, jumping over gaps of -1's. */
+static void smp_remap_coreids(void)
+{
+	for (int i = 0, hw_step = 0; i < num_cpus; i++, hw_step++) {
+		if (hw_coreid_lookup[i] == -1) {
+			while (hw_coreid_lookup[hw_step] == -1) {
+				hw_step++;
+				if (hw_step == MAX_NUM_CPUS)
+					panic("Mismatch in num_cpus and hw_step");
+			}
+			hw_coreid_lookup[i] = hw_coreid_lookup[hw_step];
+			hw_coreid_lookup[hw_step] = -1;
+			os_coreid_lookup[hw_step] = i;
+		}
+	}
+}
+
 void smp_boot(void)
 {
+	/* set core0's mappings */
+	assert(lapic_get_id() == 0);
+	os_coreid_lookup[0] = 0;
+	hw_coreid_lookup[0] = 0;
+
 	page_t *smp_stack;
 	// NEED TO GRAB A LOWMEM FREE PAGE FOR AP BOOTUP CODE
 	// page1 (2nd page) is reserved, hardcoded in pmap.c
@@ -134,6 +160,7 @@ void smp_boot(void)
 	// on the trampoline (which we must be careful to not deallocate)
 	__spin_lock(get_smp_bootlock());
 	cprintf("Num_Cpus Detected: %d\n", num_cpus);
+	smp_remap_coreids();
 
 	// Remove the mapping of the page used by the trampoline
 	page_remove(boot_pgdir, (void*SNT)trampoline_pg);
@@ -150,13 +177,10 @@ void smp_boot(void)
 	// Set up the generic remote function call facility
 	init_smp_call_function();
 
-	// Set up all cores to use the proper MTRRs
+	/* Final core initialization */
 	barrier_t generic_barrier;
-	init_barrier(&generic_barrier, num_cpus); // barrier used by smp_mtrr_handler
-	smp_call_function_all(smp_mtrr_handler, &generic_barrier, 0);
-
-	// initialize my per-cpu info
-	smp_percpu_init();
+	init_barrier(&generic_barrier, num_cpus);
+	smp_call_function_all(smp_final_core_init, &generic_barrier, 0);
 
 	// Should probably flush everyone's TLB at this point, to get rid of
 	// temp mappings that were removed.  TODO
@@ -185,10 +209,12 @@ get_my_ts(page_t *my_stack)
 		sizeof(taskstate_t);
 }
 
-/*
- * This is called from smp_entry by each core to finish the core bootstrapping.
- * There is a spinlock around this entire function in smp_entry, for a few reasons,
- * the most important being that all cores use the same stack when entering here.
+/* This is called from smp_entry by each core to finish the core bootstrapping.
+ * There is a spinlock around this entire function in smp_entry, for a few
+ * reasons, the most important being that all cores use the same stack when
+ * entering here.
+ *
+ * Do not use per_cpu_info in here.  Do whatever you need in smp_percpu_init().
  */
 uint32_t smp_main(void)
 {
@@ -203,6 +229,10 @@ uint32_t smp_main(void)
 		cprintf("I am an Application Processor\n");
 	cprintf("Num_Cpus: %d\n\n", num_cpus);
 	*/
+	/* set up initial mappings.  core0 will adjust it later */
+	unsigned long my_hw_id = lapic_get_id();
+	os_coreid_lookup[my_hw_id] = my_hw_id;
+	hw_coreid_lookup[my_hw_id] = my_hw_id;
 
 	// Get a per-core kernel stack
 	page_t *my_stack;
@@ -215,7 +245,6 @@ uint32_t smp_main(void)
 	// GDT should be 4-byte aligned.  TS isn't aligned.  Not sure if it matters.
 	pseudodesc_t *my_gdt_pd = get_my_gdt_pd(my_stack);
 	segdesc_t *COUNT(SEG_COUNT) my_gdt = get_my_gdt(my_stack);
-	per_cpu_info[core_id()].gdt = my_gdt;
 	// TS also needs to be permanent
 	taskstate_t *my_ts = get_my_ts(my_stack);
 	// Usable portion of the KSTACK grows down from here
@@ -259,17 +288,23 @@ uint32_t smp_main(void)
 	// set a default logical id for now
 	lapic_set_logid(lapic_get_id());
 
-	// initialize my per-cpu info
-	smp_percpu_init();
-
 	return my_stack_top; // will be loaded in smp_entry.S
 }
 
-/* Perform any initialization needed by per_cpu_info.  Right now, this just
- * inits the amsg list (which sparc will probably also want).  Make sure every
- * core calls this at some point in the smp_boot process. */
+/* Perform any initialization needed by per_cpu_info.  Make sure every core
+ * calls this at some point in the smp_boot process.  If you don't smp_boot, you
+ * must still call this for core 0.  This must NOT be called from smp_main,
+ * since it relies on the kernel stack pointer to find the gdt.  Be careful not
+ * to call it on too deep of a stack frame. */
 void smp_percpu_init(void)
 {
 	uint32_t coreid = core_id();
+
+	/* core 0 sets up via the global gdt symbol */
+	if (!coreid)
+		per_cpu_info[0].gdt = gdt;
+	else
+		per_cpu_info[coreid].gdt = (segdesc_t*)(ROUNDUP(read_esp(), PGSIZE)
+		                           - sizeof(segdesc_t)*SEG_COUNT);
 	STAILQ_INIT(&per_cpu_info[coreid].active_msgs);
 }

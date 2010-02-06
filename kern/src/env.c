@@ -121,8 +121,8 @@ env_setup_vm_error:
 env_setup_vm_error_d:
 	free_cont_pages(e->env_procinfo, LOG2_UP(PROCINFO_NUM_PAGES));
 env_setup_vm_error_i:
-	page_free(shared_page);
-	env_user_mem_free(e,0,KERNBASE);
+	page_decref(shared_page);
+	env_user_mem_free(e, 0, UVPT);
 	env_pagetable_free(e);
 	return -ENOMEM;
 }
@@ -342,9 +342,10 @@ void run_env_handler(trapframe_t *tf, void * data)
 		panic("Failed to enqueue work!");
 }
 
-void
-env_user_mem_free(env_t* e, void* start, size_t len)
+/* Frees (decrefs) all memory mapped in the given range */
+void env_user_mem_free(env_t* e, void* start, size_t len)
 {
+	assert((uintptr_t)start + len <= UVPT); //since this keeps fucking happening
 	int user_page_free(env_t* e, pte_t* pte, void* va, void* arg)
 	{
 		page_t* page = ppn2page(PTE2PPN(*pte));
