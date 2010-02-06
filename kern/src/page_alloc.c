@@ -33,7 +33,7 @@ void colored_page_alloc_init()
 	global_cache_colors_map = 
 	       kmalloc(BYTES_FOR_BITMASK(llc_cache->num_colors), 0);
 	CLR_BITMASK(global_cache_colors_map, llc_cache->num_colors);
-	for(int i = 0; i < llc_cache->num_colors/2; i++)
+	for(int i = 0; i < llc_cache->num_colors/8; i++)
 		cache_color_alloc(llc_cache, global_cache_colors_map);
 }
 

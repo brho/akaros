@@ -19,6 +19,8 @@ intreg_t process_generic_syscalls(env_t* e, size_t max);
 
 intreg_t sys_read(struct proc* p, int fd, void* buf, int len);
 intreg_t sys_write(struct proc* p, int fd, const void* buf, int len);
+intreg_t sys_pread(struct proc* p, int fd, void* buf, int len, int offset);
+intreg_t sys_pwrite(struct proc* p, int fd, const void* buf, int len, int offset);
 intreg_t sys_open(struct proc* p, const char* path, int oflag, int mode);
 intreg_t sys_close(struct proc* p, int fd);
 intreg_t sys_fstat(struct proc* p, int fd, void* buf);
@@ -34,5 +36,7 @@ intreg_t sys_unlink(struct proc* p, const char* path);
 intreg_t sys_chdir(struct proc* p, const char* path);
 intreg_t sys_getcwd(struct proc* p, char* pwd, int size);
 intreg_t sys_gettimeofday(struct proc* p, int* buf);
+intreg_t sys_mprotect(struct proc* p, void* addr, size_t len, int prot);
+intreg_t sys_munmap(struct proc* p, void* addr, size_t len);
 
 #endif /* !ROS_KERN_SYSCALL_H */

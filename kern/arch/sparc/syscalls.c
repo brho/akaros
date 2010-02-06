@@ -8,6 +8,9 @@
 
 void* user_memdup(struct proc* p, const void* va, int len)
 {
+	if(!p)
+		return (void*)va;
+
 	void* kva = NULL;
 	if(len < 0 || (kva = kmalloc(len,0)) == NULL)
 		return ERR_PTR(-ENOMEM);
@@ -31,8 +34,17 @@ static void* user_memdup_errno(struct proc* p, const void* va, int len)
 	return kva;
 }
 
+static void user_memdup_free(struct proc* p, void* va)
+{
+	if(p)
+		kfree(va);
+}
+
 char* user_strdup(struct proc* p, const char* va0, int max)
 {
+	if(!p)
+		return (char*)va0;
+
 	max++;
 	char* kbuf = (char*)kmalloc(PGSIZE,0);
 	if(kbuf == NULL)
@@ -76,7 +88,9 @@ static char* user_strdup_errno(struct proc* p, const char* va, int max)
 static int memcpy_to_user_errno(struct proc* p, void* dst, const void* src,
                                 int len)
 {
-	if(memcpy_to_user(p,dst,src,len))
+	if(!p)
+		memcpy(dst,src,len);
+	else if(memcpy_to_user(p,dst,src,len))
 	{
 		set_errno(current_tf,EINVAL);
 		return -1;
@@ -92,36 +106,58 @@ static void* kmalloc_errno(int len)
 	return kva;
 }
 
-int user_frontend_syscall_errno(struct proc* p, int n, int a0, int a1, int a2)
+int user_frontend_syscall_errno(struct proc* p, int n, int a0, int a1, int a2, int a3)
 {
-	int errno, ret = frontend_syscall(p->pid,n,a0,a1,a2,&errno);
-	if(errno)
+	int errno, ret = frontend_syscall(p?p->pid:0,n,a0,a1,a2,a3,&errno);
+	if(errno && p)
 		set_errno(current_tf,errno);
 	return ret;
 }
-#define fe(which,a0,a1,a2) \
+#define fe(which,a0,a1,a2,a3) \
 	user_frontend_syscall_errno(p,RAMP_SYSCALL_##which,\
-                                    (int)(a0),(int)(a1),(int)(a2))
+	                   (int)(a0),(int)(a1),(int)(a2),(int)(a3))
 
 intreg_t sys_write(struct proc* p, int fd, const void* buf, int len)
 {
 	void* kbuf = user_memdup_errno(p,buf,len);
 	if(kbuf == NULL)
 		return -1;
-	int ret = fe(write,fd,PADDR(kbuf),len);
-	kfree(kbuf);
+	int ret = fe(write,fd,PADDR(kbuf),len,0);
+	user_memdup_free(p,kbuf);
 	return ret;
 }
 
 intreg_t sys_read(struct proc* p, int fd, void* buf, int len)
 {
-	void* kbuf = kmalloc_errno(len);
+	void* kbuf = p ? kmalloc_errno(len) : buf;
 	if(kbuf == NULL)
 		return -1;
-	int ret = fe(read,fd,PADDR(kbuf),len);
-	if(ret != -1 && memcpy_to_user_errno(p,buf,kbuf,len))
+	int ret = fe(read,fd,PADDR(kbuf),len,0);
+	if(ret != -1 && p && memcpy_to_user_errno(p,buf,kbuf,len))
 		ret = -1;
-	kfree(kbuf);
+	user_memdup_free(p,kbuf);
+	return ret;
+}
+
+intreg_t sys_pwrite(struct proc* p, int fd, const void* buf, int len, int offset)
+{
+	void* kbuf = user_memdup_errno(p,buf,len);
+	if(kbuf == NULL)
+		return -1;
+	int ret = fe(pwrite,fd,PADDR(kbuf),len,offset);
+	user_memdup_free(p,kbuf);
+	return ret;
+}
+
+intreg_t sys_pread(struct proc* p, int fd, void* buf, int len, int offset)
+{
+	void* kbuf = p ? kmalloc_errno(len) : buf;
+	if(kbuf == NULL)
+		return -1;
+	int ret = fe(pread,fd,PADDR(kbuf),len,offset);
+	if(ret != -1 && p && memcpy_to_user_errno(p,buf,kbuf,len))
+		ret = -1;
+	user_memdup_free(p,kbuf);
 	return ret;
 }
 
@@ -130,20 +166,20 @@ intreg_t sys_open(struct proc* p, const char* path, int oflag, int mode)
 	char* fn = user_strdup_errno(p,path,PGSIZE);
 	if(fn == NULL)
 		return -1;
-	int ret = fe(open,PADDR(fn),oflag,mode);
-	kfree(fn);
+	int ret = fe(open,PADDR(fn),oflag,mode,0);
+	user_memdup_free(p,fn);
 	return ret;
 }
 intreg_t sys_close(struct proc* p, int fd)
 {
-	return fe(close,fd,0,0);
+	return fe(close,fd,0,0,0);
 }
 
 #define NEWLIB_STAT_SIZE 64
 intreg_t sys_fstat(struct proc* p, int fd, void* buf)
 {
 	int kbuf[NEWLIB_STAT_SIZE/sizeof(int)];
-	int ret = fe(fstat,fd,PADDR(kbuf),0);
+	int ret = fe(fstat,fd,PADDR(kbuf),0,0);
 	if(ret != -1 && memcpy_to_user_errno(p,buf,kbuf,NEWLIB_STAT_SIZE))
 		ret = -1;
 	return ret;
@@ -156,11 +192,11 @@ intreg_t sys_stat(struct proc* p, const char* path, void* buf)
 	if(fn == NULL)
 		return -1;
 
-	int ret = fe(stat,PADDR(fn),PADDR(kbuf),0);
+	int ret = fe(stat,PADDR(fn),PADDR(kbuf),0,0);
 	if(ret != -1 && memcpy_to_user_errno(p,buf,kbuf,NEWLIB_STAT_SIZE))
 		ret = -1;
 
-	kfree(fn);
+	user_memdup_free(p,fn);
 	return ret;
 }
 
@@ -171,17 +207,17 @@ intreg_t sys_lstat(struct proc* p, const char* path, void* buf)
 	if(fn == NULL)
 		return -1;
 
-	int ret = fe(lstat,PADDR(fn),PADDR(kbuf),0);
+	int ret = fe(lstat,PADDR(fn),PADDR(kbuf),0,0);
 	if(ret != -1 && memcpy_to_user_errno(p,buf,kbuf,NEWLIB_STAT_SIZE))
 		ret = -1;
 
-	kfree(fn);
+	user_memdup_free(p,fn);
 	return ret;
 }
 
 intreg_t sys_fcntl(struct proc* p, int fd, int cmd, int arg)
 {
-	return fe(fcntl,fd,cmd,arg);
+	return fe(fcntl,fd,cmd,arg,0);
 }
 
 intreg_t sys_access(struct proc* p, const char* path, int type)
@@ -189,14 +225,14 @@ intreg_t sys_access(struct proc* p, const char* path, int type)
 	char* fn = user_strdup_errno(p,path,PGSIZE);
 	if(fn == NULL)
 		return -1;
-	int ret = fe(access,PADDR(fn),type,0);
-	kfree(fn);
+	int ret = fe(access,PADDR(fn),type,0,0);
+	user_memdup_free(p,fn);
 	return ret;
 }
 
 intreg_t sys_umask(struct proc* p, int mask)
 {
-	return fe(umask,mask,0,0);
+	return fe(umask,mask,0,0,0);
 }
 
 intreg_t sys_chmod(struct proc* p, const char* path, int mode)
@@ -204,14 +240,14 @@ intreg_t sys_chmod(struct proc* p, const char* path, int mode)
 	char* fn = user_strdup_errno(p,path,PGSIZE);
 	if(fn == NULL)
 		return -1;
-	int ret = fe(chmod,PADDR(fn),mode,0);
-	kfree(fn);
+	int ret = fe(chmod,PADDR(fn),mode,0,0);
+	user_memdup_free(p,fn);
 	return ret;
 }
 
 intreg_t sys_lseek(struct proc* p, int fd, int offset, int whence)
 {
-	return fe(lseek,fd,offset,whence);
+	return fe(lseek,fd,offset,whence,0);
 }
 
 intreg_t sys_link(struct proc* p, const char* _old, const char* _new)
@@ -223,13 +259,13 @@ intreg_t sys_link(struct proc* p, const char* _old, const char* _new)
 	char* newpath = user_strdup_errno(p,_new,PGSIZE);
 	if(newpath == NULL)
 	{
-		kfree(oldpath);
+		user_memdup_free(p,oldpath);
 		return -1;
 	}
 
-	int ret = fe(link,PADDR(oldpath),PADDR(newpath),0);
-	kfree(oldpath);
-	kfree(newpath);
+	int ret = fe(link,PADDR(oldpath),PADDR(newpath),0,0);
+	user_memdup_free(p,oldpath);
+	user_memdup_free(p,newpath);
 	return ret;
 }
 
@@ -238,8 +274,8 @@ intreg_t sys_unlink(struct proc* p, const char* path)
 	char* fn = user_strdup_errno(p,path,PGSIZE);
 	if(fn == NULL)
 		return -1;
-	int ret = fe(unlink,PADDR(fn),0,0);
-	kfree(fn);
+	int ret = fe(unlink,PADDR(fn),0,0,0);
+	user_memdup_free(p,fn);
 	return ret;
 }
 
@@ -248,20 +284,20 @@ intreg_t sys_chdir(struct proc* p, const char* path)
 	char* fn = user_strdup_errno(p,path,PGSIZE);
 	if(fn == NULL)
 		return -1;
-	int ret = fe(chdir,PADDR(fn),0,0);
-	kfree(fn);
+	int ret = fe(chdir,PADDR(fn),0,0,0);
+	user_memdup_free(p,fn);
 	return ret;
 }
 
 intreg_t sys_getcwd(struct proc* p, char* pwd, int size)
 {
-	void* kbuf = kmalloc_errno(size);
+	void* kbuf = p ? kmalloc_errno(size) : pwd;
 	if(kbuf == NULL)
 		return -1;
-	int ret = fe(read,PADDR(kbuf),size,0);
-	if(ret != -1 && memcpy_to_user_errno(p,pwd,kbuf,strnlen(kbuf,size)))
+	int ret = fe(read,PADDR(kbuf),size,0,0);
+	if(ret != -1 && p && memcpy_to_user_errno(p,pwd,kbuf,strnlen(kbuf,size)))
 		ret = -1;
-	kfree(kbuf);
+	user_memdup_free(p,kbuf);
 	return ret;
 }
 
@@ -272,7 +308,7 @@ intreg_t sys_gettimeofday(struct proc* p, int* buf)
 
 	spin_lock(&gtod_lock);
 	if(t0 == 0)
-		t0 = fe(time,0,0,0);
+		t0 = fe(time,0,0,0,0);
 	spin_unlock(&gtod_lock);
 
 	long long dt = read_tsc();

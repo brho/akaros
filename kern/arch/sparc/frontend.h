@@ -7,7 +7,7 @@
 
 #include <env.h>
 int32_t frontend_syscall_from_user(env_t* p, int32_t syscall_num, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t translate_args);
-int32_t frontend_syscall(pid_t pid, int32_t syscall_num, uint32_t arg0, uint32_t arg1, uint32_t arg2, int32_t* errno);
+int32_t frontend_syscall(pid_t pid, int32_t syscall_num, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3, int32_t* errno);
 
 int32_t sys_nbgetch();
 int32_t sys_nbputch(char ch);
@@ -43,6 +43,8 @@ int32_t sys_nbputch(char ch);
 #define RAMP_SYSCALL_proc_free		96
 #define RAMP_SYSCALL_proc_init		97
 #define RAMP_SYSCALL_time		98
+#define RAMP_SYSCALL_pread		173
+#define RAMP_SYSCALL_pwrite		174
 #define RAMP_SYSCALL_getcwd		229
 
 #endif /* !ROS_ARCH_FRONTEND_H */

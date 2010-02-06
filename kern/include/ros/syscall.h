@@ -24,8 +24,6 @@
 #define SYS_shared_page_alloc		20
 #define SYS_shared_page_free		21
 /*
-#define SYS_mprotect
-#define SYS_mremap
 #define SYS_mincore // can read page tables instead
 #define SYS_madvise
 #define SYS_mlock
@@ -38,6 +36,8 @@
 #define SYS_eth_read				25
 #define SYS_eth_write				26
 #define SYS_frontend				27
+#define SYS_mprotect				28
+#define SYS_munmap					29
 
 #define SYS_read				100
 #define SYS_write				101

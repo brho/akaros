@@ -85,7 +85,7 @@ WRITES(e->env_pgdir, e->env_cr3, e->env_procinfo, e->env_procdata)
 		goto env_setup_vm_error_d;
 	for (int i = 0; i < PROCINFO_NUM_PAGES; i++) {
 		if (page_insert(e->env_pgdir, kva2page((void*)e->env_procinfo + i *
-		                PGSIZE), (void*SNT)(UINFO + i*PGSIZE), PTE_USER_RO) < 0)
+		                PGSIZE), (void*SNT)(UINFO + i*PGSIZE), PTE_USER_RW) < 0)
 			goto env_setup_vm_error;
 	}
 	for (int i = 0; i < PROCDATA_NUM_PAGES; i++) {

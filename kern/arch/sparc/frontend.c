@@ -37,14 +37,14 @@ int32_t frontend_syscall_from_user(env_t* p, int32_t syscall_num, uint32_t arg0,
 	}
 
 	int32_t errno;
-	int32_t ret = frontend_syscall(p->pid,syscall_num,arg[0],arg[1],arg[2],&errno);
+	int32_t ret = frontend_syscall(p->pid,syscall_num,arg[0],arg[1],arg[2],0,&errno);
 	set_errno(current_tf,errno);
 
 	spin_unlock_irqsave(&lock);
 	return ret;
 }
 
-int32_t frontend_syscall(pid_t pid, int32_t syscall_num, uint32_t arg0, uint32_t arg1, uint32_t arg2, int32_t* errno)
+int32_t frontend_syscall(pid_t pid, int32_t syscall_num, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3, int32_t* errno)
 {
 	static spinlock_t lock = SPINLOCK_INITIALIZER;
 	int32_t ret;
@@ -60,6 +60,7 @@ int32_t frontend_syscall(pid_t pid, int32_t syscall_num, uint32_t arg0, uint32_t
 	magic_mem[2] = arg0;
 	magic_mem[3] = arg1;
 	magic_mem[4] = arg2;
+	magic_mem[5] = arg3;
 	magic_mem[6] = pid;
 	magic_mem[0] = 0x80;
 
@@ -110,7 +111,7 @@ int32_t sys_nbgetch()
 void __diediedie(trapframe_t* tf, uint32_t srcid, uint32_t code, uint32_t a1, uint32_t a2)
 {
 	int32_t errno;
-	frontend_syscall(0,RAMP_SYSCALL_exit,(int)code,0,0,&errno);
+	frontend_syscall(0,RAMP_SYSCALL_exit,(int)code,0,0,0,&errno);
 	while(1);
 }
 
