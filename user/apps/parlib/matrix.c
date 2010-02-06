@@ -44,8 +44,21 @@ void date()
 	puts(asctime(tt));
 }
 
+void setup_environ()
+{
+	static char* my_environ[] = {
+		"PATH=:/bin:/usr/bin",
+		"LD_LIBRARY_PATH=/lib:/usr/lib",
+		0
+	};
+
+	environ = my_environ;
+}
+
 int main(int argc, char** argv)
 {	
+	setup_environ();
+
 	set_default_user();
 	printf("Welcome to the Tessellation OS newlib test suite!\n");
 	printf("Enter at your own risk....\n");

@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <string.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -35,16 +36,7 @@ int shell_exec(const char* cmdline)
 		for(nenv = 0; environ[nenv]; nenv++)
 			if(strncmp(environ[nenv],"PATH=",5) == 0)
 				path = environ[nenv]+5;
-
-		if(path == NULL)
-		{
-			envp = (char**)malloc(sizeof(char**)*(nenv+2));
-			for(int i = 0; i < nenv; i++)
-				envp[i] = environ[i];
-			envp[nenv] = "PATH=:/bin:/usr/bin";
-			path = envp[nenv]+5;
-			envp[nenv+1] = 0;
-		}
+		assert(path);
 
 		char* fn = NULL, *buf = NULL;
 		if(strchr(argv[0],'/'))
