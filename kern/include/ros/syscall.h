@@ -55,7 +55,9 @@
 #define SYS_unlink				113
 #define SYS_chdir				114
 #define SYS_getcwd				115
-#define SYS_gettimeofday			116
+#define SYS_gettimeofday		116
+#define SYS_tcgetattr			117
+#define SYS_tcsetattr			118
 
 /* For Buster Measurement Flags */
 #define BUSTER_SHARED			0x0001

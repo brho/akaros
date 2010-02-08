@@ -318,3 +318,23 @@ intreg_t sys_gettimeofday(struct proc* p, int* buf)
 	return memcpy_to_user_errno(p,buf,kbuf,sizeof(kbuf));
 }
 
+#define SIZEOF_STRUCT_TERMIOS 60
+intreg_t sys_tcgetattr(struct proc* p, int fd, void* termios_p)
+{
+	int kbuf[SIZEOF_STRUCT_TERMIOS/sizeof(int)];
+	int ret = fe(tcgetattr,fd,PADDR(kbuf),0,0);
+	if(ret != -1 && memcpy_to_user_errno(p,termios_p,kbuf,SIZEOF_STRUCT_TERMIOS))
+		ret = -1;
+	return ret;
+}
+
+intreg_t sys_tcsetattr(struct proc* p, int fd, int optional_actions, const void* termios_p)
+{
+	void* kbuf = user_memdup_errno(p,termios_p,SIZEOF_STRUCT_TERMIOS);
+	if(kbuf == NULL)
+		return -1;
+	int ret = fe(tcsetattr,fd,optional_actions,PADDR(kbuf),0);
+	user_memdup_free(p,kbuf);
+	return ret;
+}
+

@@ -35,6 +35,8 @@ int32_t sys_nbputch(char ch);
 #define RAMP_SYSCALL_umask		60
 #define RAMP_SYSCALL_fcntl		62
 #define RAMP_SYSCALL_lstat		88
+#define RAMP_SYSCALL_tcgetattr		89
+#define RAMP_SYSCALL_tcsetattr		90
 #define RAMP_SYSCALL_closedir		91
 #define RAMP_SYSCALL_rewinddir		92
 #define RAMP_SYSCALL_readdir		93

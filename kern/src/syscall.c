@@ -697,6 +697,8 @@ intreg_t syscall(struct proc *p, uintreg_t syscallno, uintreg_t a1,
 		[SYS_chdir] = (syscall_t)sys_chdir,
 		[SYS_getcwd] = (syscall_t)sys_getcwd,
 		[SYS_gettimeofday] = (syscall_t)sys_gettimeofday,
+		[SYS_tcgetattr] = (syscall_t)sys_tcgetattr,
+		[SYS_tcsetattr] = (syscall_t)sys_tcsetattr
 	#endif
 	};
 
