@@ -442,6 +442,16 @@ static void *sys_mmap(struct proc* p, uintreg_t a1, uintreg_t a2, uintreg_t a3,
 	return mmap(p,a1,a2,a3,_a456[0],_a456[1],_a456[2]);
 }
 
+static intreg_t sys_mprotect(struct proc* p, void* addr, size_t len, int prot)
+{
+	return mprotect(p, addr, len, prot);
+}
+
+static intreg_t sys_munmap(struct proc* p, void* addr, size_t len)
+{
+	return munmap(p, addr, len);
+}
+
 static void* sys_brk(struct proc *p, void* addr) {
 	size_t range;
 
