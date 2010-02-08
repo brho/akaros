@@ -20,24 +20,24 @@
 #define SYS_exec					16
 #define SYS_trywait					17
 #define SYS_mmap					18
-#define SYS_brk						19
-#define SYS_shared_page_alloc		20
-#define SYS_shared_page_free		21
-/*
+#define SYS_munmap					19
+#define SYS_mprotect				20
+/* // these are the other mmap related calls, some of which we'll implement
 #define SYS_mincore // can read page tables instead
 #define SYS_madvise
 #define SYS_mlock
 #define SYS_msync
 */
-#define SYS_resource_req			22
+#define SYS_brk						21
+#define SYS_shared_page_alloc		22
+#define SYS_shared_page_free		23
+#define SYS_resource_req			24
 /* Platform specific syscalls */
-#define SYS_serial_read				23
-#define SYS_serial_write			24
-#define SYS_eth_read				25
-#define SYS_eth_write				26
-#define SYS_frontend				27
-#define SYS_mprotect				28
-#define SYS_munmap					29
+#define SYS_serial_read				25
+#define SYS_serial_write			26
+#define SYS_eth_read				27
+#define SYS_eth_write				28
+#define SYS_frontend				29
 
 #define SYS_read				100
 #define SYS_write				101

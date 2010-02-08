@@ -70,7 +70,9 @@ struct mm {
 
 };
 // would rather this be a mm struct
-void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags, int fd, size_t offset);
-
+void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
+           int fd, size_t offset);
+int mprotect(struct proc* p, void* addr, size_t len, int prot);
+int munmap(struct proc* p, void* addr, size_t len);
 
 #endif // !ROS_KERN_MM_H
