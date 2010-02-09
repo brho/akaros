@@ -1,0 +1,51 @@
+USER_LWIP_DIR := $(USER_DIR)/lwip
+USER_LWIP_SRC_DIR = $(USER_LWIP_DIR)
+OBJDIRS += $(USER_LWIP_SRC_DIR)
+USER_LWIP_INCLUDE_DIR := $(USER_DIR)/lwip/include
+
+USER_LWIP_SRC_CFLAGS	:= $(USER_CFLAGS) -I$(USER_PARLIB_INCLUDE_DIR) \
+			                  -I$(USER_PARLIB_NEWLIB_DIR)/include \
+			                  -I$(USER_LWIP_INCLUDE_DIR)
+
+USER_LWIP_SRC_SRCFILES	:= $(USER_LWIP_SRC_DIR)/api/api_msg.c \
+			   $(USER_LWIP_SRC_DIR)/api/api_lib.c \
+			   $(USER_LWIP_SRC_DIR)/api/err.c \
+			   $(USER_LWIP_SRC_DIR)/api/netbuf.c \
+			   $(USER_LWIP_SRC_DIR)/api/netdb.c \
+			   $(USER_LWIP_SRC_DIR)/api/sockets.c \
+			   $(USER_LWIP_SRC_DIR)/api/tcpip.c \
+			   $(USER_LWIP_SRC_DIR)/core/init.c \
+			   $(USER_LWIP_SRC_DIR)/core/sys_arch.c \
+			   $(USER_LWIP_SRC_DIR)/core/mem.c \
+			   $(USER_LWIP_SRC_DIR)/core/memp.c \
+			   $(USER_LWIP_SRC_DIR)/core/netif.c \
+			   $(USER_LWIP_SRC_DIR)/core/pbuf.c  \
+			   $(USER_LWIP_SRC_DIR)/core/stats.c \
+			   $(USER_LWIP_SRC_DIR)/core/udp.c \
+			   $(USER_LWIP_SRC_DIR)/core/tcp.c \
+			   $(USER_LWIP_SRC_DIR)/core/raw.c \
+			   $(USER_LWIP_SRC_DIR)/core/sys.c \
+			   $(USER_LWIP_SRC_DIR)/core/tcp_out.c \
+			   $(USER_LWIP_SRC_DIR)/core/tcp_in.c \
+			   $(USER_LWIP_SRC_DIR)/core/ipv4/icmp.c \
+			   $(USER_LWIP_SRC_DIR)/core/ipv4/inet.c \
+			   $(USER_LWIP_SRC_DIR)/core/ipv4/ip.c  \
+			   $(USER_LWIP_SRC_DIR)/core/ipv4/ip_addr.c \
+			   $(USER_LWIP_SRC_DIR)/core/ipv4/ip_frag.c \
+			   $(USER_LWIP_SRC_DIR)/core/ipv4/inet_chksum.c \
+			   $(USER_LWIP_SRC_DIR)/netif/etharp.c \
+			   $(USER_LWIP_SRC_DIR)/netif/ethernetif.c
+							
+USER_LWIP_SRC_OBJFILES	:= $(patsubst $(USER_LWIP_SRC_DIR)/%.c, \
+			   $(OBJDIR)/$(USER_LWIP_DIR)/%.o,  \
+			   $(USER_LWIP_SRC_SRCFILES))
+
+
+$(OBJDIR)/$(USER_LWIP_DIR)/%.o: $(USER_LWIP_SRC_DIR)/%.c
+	@echo + cc [LWIP] $<
+	@mkdir -p $(@D)
+	$(V)$(CC) $(USER_LWIP_SRC_CFLAGS) -c -o $@ $<
+	
+$(OBJDIR)/$(USER_LWIP_DIR)/liblwip.a: $(USER_LWIP_SRC_OBJFILES)
+	@echo + ar [LWIP] $@
+	$(V)$(AR) r $@ $(USER_LWIP_SRC_OBJFILES) 2>/dev/null

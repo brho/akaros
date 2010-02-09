@@ -2,7 +2,8 @@ USER_APPS_PARLIB_DIR = $(USER_APPS_DIR)/parlib
 OBJDIRS += $(USER_APPS_PARLIB_DIR)
 
 USER_APPS_PARLIB_CFLAGS    := $(USER_CFLAGS)  \
-                              -I$(USER_PARLIB_DIR)/inc
+                              -I$(USER_PARLIB_DIR)/inc \
+                              -I$(USER_LWIP_DIR)/include
                               # -I$(USER_PARLIB_NEWLIB_DIR)/include
 ifeq ($(COMPILER),IVY)
 	PATCHFILE = $(OBJDIR)/$(USER_PARLIB_DIR)/libc_patch.i
@@ -12,10 +13,11 @@ endif
 USER_APPS_PARLIB_LDFLAGS   := -static \
                               -T $(USER_APPS_PARLIB_DIR)/apps_$(TARGET_ARCH).ld
 
-USER_APPS_PARLIB_LDDIRS    := -L$(OBJDIR)/$(USER_PARLIB_DIR)
+USER_APPS_PARLIB_LDDIRS    := -L$(OBJDIR)/$(USER_PARLIB_DIR) \
+                              -L$(OBJDIR)/$(USER_LWIP_DIR)
 
-USER_APPS_PARLIB_LDLIBS    := --start-group -lc -lm -lg -lparlib -lpthread \
-                              -livyparlib --end-group
+USER_APPS_PARLIB_LDLIBS    := --start-group -lc -lm -lg -lparlib -llwip \
+                              -lpthread -livyparlib --end-group
 
 USER_APPS_PARLIB_LDOBJS    := \
                               $(OBJDIR)/$(USER_PARLIB_ARCH_SRC_DIR)/entry.o \
@@ -28,11 +30,14 @@ USER_APPS_PARLIB_LDOBJS    := \
                               $(OBJDIR)/$(USER_APPS_PARLIB_DIR)/draw_nanwan.o \
                               $(OBJDIR)/$(USER_APPS_PARLIB_DIR)/run_binary.o \
                               $(OBJDIR)/$(USER_APPS_PARLIB_DIR)/run_binary_colored.o \
-                              $(OBJDIR)/$(USER_APPS_PARLIB_DIR)/change_user.o  
+                              $(OBJDIR)/$(USER_APPS_PARLIB_DIR)/change_user.o \
+			      $(OBJDIR)/$(USER_APPS_PARLIB_DIR)/ping.o \
+                              $(OBJDIR)/$(USER_APPS_PARLIB_DIR)/network_init.o
 
 
 USER_APPS_PARLIB_LDDEPENDS := $(USER_APPS_PARLIB_LDOBJS) \
                               $(OBJDIR)/$(USER_PARLIB_DIR)/libparlib.a \
+                              $(OBJDIR)/$(USER_LWIP_DIR)/liblwip.a \
                               $(OBJDIR)/$(USER_PARLIB_DIR)/libpthread.a \
                               $(OBJDIR)/$(USER_PARLIB_DIR)/libivyparlib.a \
                               $(OBJDIR)/$(USER_APPS_PARLIB_DIR)/%.o

@@ -634,6 +634,20 @@ static ssize_t sys_eth_write(env_t* e, const char *DANGEROUS buf, size_t len)
 		return -EINVAL;
 }
 
+static ssize_t sys_eth_get_mac_addr(env_t* e, char *DANGEROUS buf) {
+	
+	extern int eth_up;
+
+	if (eth_up) {
+		extern char device_mac[];
+		for (int i = 0; i < 6; i++)
+			buf[i] = device_mac[i];
+		return 0;
+	}
+	else
+		return -EINVAL;
+}
+
 #endif // Network
 
 /* sys_frontend_syscall_from_user(): called directly from dispatch table. */
@@ -687,6 +701,7 @@ intreg_t syscall(struct proc *p, uintreg_t syscallno, uintreg_t a1,
 	#ifdef __NETWORK__
 		[SYS_eth_read] = (syscall_t)sys_eth_read,
 		[SYS_eth_write] = (syscall_t)sys_eth_write,
+		[SYS_eth_get_mac_addr] = (syscall_t)sys_eth_get_mac_addr,
 	#endif
 	#ifdef __sparc_v8__
 		[SYS_frontend] = (syscall_t)frontend_syscall_from_user,

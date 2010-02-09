@@ -27,3 +27,7 @@ tools/syscall_server/syscall_server_*
 tools/syscall_server/sandbox/
 tools/syscall_server/apps/*
 tools/syscall_server/test/*
+kern/include/2nd-level-sched
+kern/include/mapping-layer
+kern/include/policy-layer
+

@@ -83,6 +83,10 @@ ssize_t sys_eth_read(void* buf, size_t len)
 	return syscall(SYS_eth_read, (intreg_t)buf, len, 0, 0, 0);
 }
 
+ssize_t sys_eth_get_mac_addr(void* buf) {
+	return syscall(SYS_eth_get_mac_addr, (intreg_t)buf, 0, 0, 0, 0);
+}
+
 /* Request resources from the kernel.  Flags in ros/resource.h. */
 ssize_t sys_resource_req(int type, size_t amount, uint32_t flags)
 {

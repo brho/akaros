@@ -38,6 +38,7 @@ ssize_t     sys_serial_write(void* buf, size_t len);
 ssize_t     sys_serial_read(void* buf, size_t len);
 ssize_t     sys_eth_write(void *COUNT(len) buf, size_t len); 
 ssize_t     sys_eth_read(void *COUNT(len) buf, size_t len);
+ssize_t     sys_eth_get_mac_addr(void* buf);
 ssize_t     sys_run_binary(void* binary_buf, size_t len,
                            char arg[PROCINFO_MAX_ARGV_SIZE], size_t num_colors);
 int         sys_getpid(void);

@@ -18,6 +18,7 @@ extern int  shell_exec(const char* cmdline);
 extern void run_binary(size_t colors);
 extern int  run_binary_filename(const char* fn, size_t colors);
 extern void run_binary_colored();
+extern void ping();
 extern char prompt[256];
 
 void help() {
@@ -91,6 +92,8 @@ int main(int argc, char** argv)
 			run_binary(0);
 		else if (strcmp(s, "run_binary_colored") == 0)
 			run_binary_colored();
+		else if (strcmp(s, "ping") == 0)
+			ping();
 		else if (shell_exec(s) == 0)
 			;
 		else
