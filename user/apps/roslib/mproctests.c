@@ -51,7 +51,7 @@ int main(int argc, char** argv)
 				cprintf("Testing MMAP\n");
 				void *CT(8*PGSIZE) addr;
 				addr = sys_mmap((void*SNT)USTACKTOP - 20*PGSIZE, 8*PGSIZE, 3,
-				                MAP_FIXED, 0, 0);
+				                MAP_FIXED | MAP_ANONYMOUS, -1, 0);
 				cprintf("got addr = 0x%08x\n", addr);
 				*(int*)addr = 0xdeadbeef;
 				*(int*)(addr + 3*PGSIZE) = 0xcafebabe;

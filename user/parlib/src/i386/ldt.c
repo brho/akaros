@@ -37,7 +37,7 @@ void ldt_init(uint32_t core_id) {
 		procdata.ldt = sys_mmap((void*)USTACKBOT - LDT_SIZE,
 		                        sizeof(segdesc_t) * hart_max_harts(),
 		                        PROT_READ | PROT_WRITE,
-		                        MAP_ANONYMOUS | MAP_FIXED | MAP_POPULATE, 0, 0);
+		                        MAP_ANONYMOUS | MAP_FIXED | MAP_POPULATE, -1, 0);
 		sys_getpid(); // force a kernel crossing to reload the LDT
 		if (!procdata.ldt) {
 			debug("Unable to mmap() an LDT!  Exiting...\n");

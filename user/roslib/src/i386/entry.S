@@ -83,7 +83,7 @@ new_core:
 .data
 mmap_args:
 	.long MAP_ANONYMOUS|MAP_FIXED|MAP_STACK|MAP_POPULATE|MAP_GROWSDOWN // arg4
-	.long 0              // arg5
+	.long -1             // arg5
 	.long 0              // arg6
 .globl in_multi_mode
 in_multi_mode:
