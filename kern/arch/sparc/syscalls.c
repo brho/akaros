@@ -3,14 +3,12 @@
 #include <kmalloc.h>
 #include <ros/error.h>
 #include <pmap.h>
+#include <mm.h>
 #include <arch/frontend.h>
 #include <syscall.h>
 
 void* user_memdup(struct proc* p, const void* va, int len)
 {
-	if(!p)
-		return (void*)va;
-
 	void* kva = NULL;
 	if(len < 0 || (kva = kmalloc(len,0)) == NULL)
 		return ERR_PTR(-ENOMEM);
@@ -36,15 +34,11 @@ static void* user_memdup_errno(struct proc* p, const void* va, int len)
 
 static void user_memdup_free(struct proc* p, void* va)
 {
-	if(p)
-		kfree(va);
+	kfree(va);
 }
 
 char* user_strdup(struct proc* p, const char* va0, int max)
 {
-	if(!p)
-		return (char*)va0;
-
 	max++;
 	char* kbuf = (char*)kmalloc(PGSIZE,0);
 	if(kbuf == NULL)
@@ -88,9 +82,7 @@ static char* user_strdup_errno(struct proc* p, const char* va, int max)
 static int memcpy_to_user_errno(struct proc* p, void* dst, const void* src,
                                 int len)
 {
-	if(!p)
-		memcpy(dst,src,len);
-	else if(memcpy_to_user(p,dst,src,len))
+	if(memcpy_to_user(p,dst,src,len))
 	{
 		set_errno(current_tf,EINVAL);
 		return -1;
@@ -108,7 +100,7 @@ static void* kmalloc_errno(int len)
 
 int user_frontend_syscall_errno(struct proc* p, int n, int a0, int a1, int a2, int a3)
 {
-	int errno, ret = frontend_syscall(p?p->pid:0,n,a0,a1,a2,a3,&errno);
+	int errno, ret = frontend_syscall(p->pid,n,a0,a1,a2,a3,&errno);
 	if(errno && p)
 		set_errno(current_tf,errno);
 	return ret;
@@ -129,11 +121,11 @@ intreg_t sys_write(struct proc* p, int fd, const void* buf, int len)
 
 intreg_t sys_read(struct proc* p, int fd, void* buf, int len)
 {
-	void* kbuf = p ? kmalloc_errno(len) : buf;
+	void* kbuf = kmalloc_errno(len);
 	if(kbuf == NULL)
 		return -1;
 	int ret = fe(read,fd,PADDR(kbuf),len,0);
-	if(ret != -1 && p && memcpy_to_user_errno(p,buf,kbuf,len))
+	if(ret != -1 && memcpy_to_user_errno(p,buf,kbuf,len))
 		ret = -1;
 	user_memdup_free(p,kbuf);
 	return ret;
@@ -149,16 +141,40 @@ intreg_t sys_pwrite(struct proc* p, int fd, const void* buf, int len, int offset
 	return ret;
 }
 
+error_t read_page(struct proc* p, int fd, physaddr_t pa, int pgoff)
+{
+	int errno;
+	int ret = frontend_syscall(p->pid,RAMP_SYSCALL_pread,fd,
+	                        pa,PGSIZE,pgoff*PGSIZE,&errno);
+
+	if(ret >= 0)
+		memset(KADDR(pa)+ret,0,PGSIZE-ret);
+	return ret;
+}
+
 intreg_t sys_pread(struct proc* p, int fd, void* buf, int len, int offset)
 {
-	void* kbuf = p ? kmalloc_errno(len) : buf;
+	void* kbuf = kmalloc_errno(len);
 	if(kbuf == NULL)
 		return -1;
 	int ret = fe(pread,fd,PADDR(kbuf),len,offset);
-	if(ret != -1 && p && memcpy_to_user_errno(p,buf,kbuf,len))
+	if(ret != -1 && memcpy_to_user_errno(p,buf,kbuf,len))
 		ret = -1;
 	user_memdup_free(p,kbuf);
 	return ret;
+}
+
+error_t open_file(struct proc* p, const char* path, int oflag, int mode)
+{
+	int errno;
+	return frontend_syscall(p->pid,RAMP_SYSCALL_open,PADDR(path),
+	                        oflag,mode,0,&errno);
+}
+
+error_t close_file(struct proc* p, int fd)
+{
+	int errno;
+	return frontend_syscall(p->pid,RAMP_SYSCALL_close,fd,0,0,0,&errno);
 }
 
 intreg_t sys_open(struct proc* p, const char* path, int oflag, int mode)
@@ -291,11 +307,11 @@ intreg_t sys_chdir(struct proc* p, const char* path)
 
 intreg_t sys_getcwd(struct proc* p, char* pwd, int size)
 {
-	void* kbuf = p ? kmalloc_errno(size) : pwd;
+	void* kbuf = kmalloc_errno(size);
 	if(kbuf == NULL)
 		return -1;
 	int ret = fe(read,PADDR(kbuf),size,0,0);
-	if(ret != -1 && p && memcpy_to_user_errno(p,pwd,kbuf,strnlen(kbuf,size)))
+	if(ret != -1 && memcpy_to_user_errno(p,pwd,kbuf,strnlen(kbuf,size)))
 		ret = -1;
 	user_memdup_free(p,kbuf);
 	return ret;

@@ -36,8 +36,6 @@ intreg_t sys_unlink(struct proc* p, const char* path);
 intreg_t sys_chdir(struct proc* p, const char* path);
 intreg_t sys_getcwd(struct proc* p, char* pwd, int size);
 intreg_t sys_gettimeofday(struct proc* p, int* buf);
-intreg_t sys_mprotect(struct proc* p, void* addr, size_t len, int prot);
-intreg_t sys_munmap(struct proc* p, void* addr, size_t len);
 intreg_t sys_tcsetattr(struct proc* p, int fd, int optional_actions, const void* termios_p);
 intreg_t sys_tcgetattr(struct proc* p, int fd, void* termios_p);
 

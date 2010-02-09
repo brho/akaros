@@ -11,6 +11,7 @@
 #include <ros/common.h>
 #include <smp.h>
 #include <arch/init.h>
+#include <mm.h>
 
 #include <assert.h>
 #include <manager.h>
@@ -26,6 +27,7 @@
 #include <monitor.h>
 #include <colored_caches.h>
 #include <string.h>
+#include <pmap.h>
 
 /*
  * Currently, if you leave this function by way of proc_run (process_workqueue
@@ -193,7 +195,58 @@ void manager_klueska()
 
 void manager_waterman()
 {
-	manager_klueska();
+#ifndef __i386__
+	static int init = 0;
+	if(!init)
+	{
+		init = 1;
+		struct proc* p = proc_create(NULL,0);
+		int fd = open_file(p,"/lib/ld.so.1",0,0);
+
+		const int MAX_LDSO_PAGES = 256;
+		static int buf[PGSIZE*MAX_LDSO_PAGES/sizeof(int)];
+		for(int i = 0; read_page(p,fd,PADDR((char*)buf+PGSIZE*i),i) == PGSIZE; i++);
+		close_file(p,fd);
+
+		env_load_icode(p,NULL,(void*)buf,MAX_LDSO_PAGES*PGSIZE);
+
+		int pack(struct proc* p, uintptr_t base, int sz, char** args)
+		{
+			int argc = 0;
+			while(args[argc])
+				argc++;
+
+			uintptr_t* argv = (uintptr_t*)((uintptr_t)p->env_procinfo+base);
+			int pos = (argc+1)*sizeof(char*);
+			if(pos > sz)
+				return -1;
+
+			argv[0] = UINFO+base+(argc+1)*sizeof(char*);
+			for(int i = 0; i < argc; i++)
+			{
+				int len = strlen(args[i])+1;
+				if(pos+len > sz)
+					return -1;
+
+				memcpy((char*)argv+pos,args[i],len);
+				pos += len;
+				argv[i+1] = argv[i]+len;
+			}
+			argv[argc] = 0;
+
+			return 0;
+		}
+
+		char* argv[] = {"/lib/ld.so.1","/bin/sh","-l",0};
+		char* env[] = {"LD_LIBRARY_PATH=/lib",0};
+
+		pack(p,offsetof(procinfo_t,argv_buf),PROCINFO_MAX_ARGV_SIZE,argv);
+		pack(p,offsetof(procinfo_t,env_buf),PROCINFO_MAX_ENV_SIZE,env);
+		__proc_set_state(p, PROC_RUNNABLE_S);
+		proc_run(p);
+	}
+#endif
+	schedule();
 }
 
 void manager_pearce()

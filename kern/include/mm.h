@@ -75,4 +75,9 @@ void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 int mprotect(struct proc* p, void* addr, size_t len, int prot);
 int munmap(struct proc* p, void* addr, size_t len);
 
+// not sure where to put this (asw)
+error_t open_file(struct proc* p, const char* fn, int flag, int mode);
+error_t close_file(struct proc* p, int fd);
+error_t read_page(struct proc* p, int fd, physaddr_t pa, int pgoff);
+
 #endif // !ROS_KERN_MM_H

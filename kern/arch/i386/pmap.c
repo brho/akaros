@@ -632,32 +632,7 @@ int get_va_perms(pde_t *pgdir, const void *SNT va)
 
 void *get_free_va_range(pde_t *pgdir, uintptr_t addr, size_t len)
 {
-{TRUSTEDBLOCK
-	// want to make sure there aren't mappings already.  will need to do this
-	// later with zones, for when we lazily allocate memory
-
-	uintptr_t startaddr;
-
-	int npages = ROUNDUP(len, PGSIZE) / PGSIZE;
-
-	addr &= ~0xfff;
-	if (!addr)
- 		// some sensible default.  can cache the previous value somewhere
-		addr = USTACKBOT; // TODO: not looking down
-	startaddr = addr;	
-	pte_t *pte = pgdir_walk(pgdir, (void*)addr, 0);
-	// what about jumbo pages?
-	// consider looping around, esp if we start from a cached spot
-	// don't map at pg 0, or below brk
-	// consider local memory ranges...
-
-	/*
-	first fit?
-	what if we have a sorted structure of what mem ranges are already in use?
-	*/
-
-	return (void*)0xdeadbeef;
-}
+	return NULL;
 }
 
 /* Flushes a TLB, including global pages.  We should always have the CR4_PGE
