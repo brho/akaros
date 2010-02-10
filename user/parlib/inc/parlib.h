@@ -41,7 +41,7 @@ ssize_t     sys_eth_read(void *COUNT(len) buf);
 ssize_t     sys_eth_get_mac_addr(void* buf);
 int         sys_eth_recv_check();
 ssize_t     sys_run_binary(void* binary_buf, size_t len,
-                           char arg[PROCINFO_MAX_ARGV_SIZE], size_t num_colors);
+                           procinfo_t* procinfo, size_t num_colors);
 int         sys_getpid(void);
 size_t      sys_getcpuid(void);
 void *      sys_brk(void* addr);

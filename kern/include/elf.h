@@ -1,6 +1,7 @@
 #ifndef ROS_INC_ELF_H
 #define ROS_INC_ELF_H
 
+#include <process.h>
 #include <ros/common.h>
 
 #if defined(LITTLE_ENDIAN)
@@ -53,8 +54,12 @@ typedef struct Secthdr {
 	uint32_t sh_entsize;
 } secthdr_t;
 
+typedef long elf_aux_t[2];
+
 // Values for Proghdr::p_type
 #define ELF_PROG_LOAD		1
+#define ELF_PROG_INTERP		3
+#define ELF_PROG_PHDR		6
 
 // Flag bits for Proghdr::p_flags
 #define ELF_PROG_FLAG_EXEC	1
@@ -69,5 +74,13 @@ typedef struct Secthdr {
 
 // Values for Secthdr::sh_name
 #define ELF_SHN_UNDEF		0
+
+// Values for auxiliary fields
+#define ELF_AUX_PHDR		3
+#define ELF_AUX_PHENT		4
+#define ELF_AUX_PHNUM		5
+#define ELF_AUX_ENTRY		9
+
+int load_elf(struct proc* p, const char* fn);
 
 #endif /* !ROS_INC_ELF_H */

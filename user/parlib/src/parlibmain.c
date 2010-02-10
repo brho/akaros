@@ -37,24 +37,6 @@ void parlib_ctors()
 		((ctor*)__CTOR_LIST__)[nctor-i-1]();
 }
 
-// build argv from procinfo.argv_buf
-char** parlib_build_argc_argv(char* buf, int* argc)
-{
-	char** offset = (char**)buf;
-	for(*argc = 0; offset[*argc]; (*argc)++)
-		;
-
-	char** argv = (char**)malloc((*argc+1)*sizeof(char*));
-	assert(argv);
-	for(int i = 0; i < *argc; i++)
-	{
-		argv[i] = strdup(offset[i]);
-		assert(argv[i]);
-	}
-	argv[*argc] = 0;
-	return argv;
-}
-
 struct timeval timeval_start;
 
 // the first time any thread enters, it calls this function
@@ -96,9 +78,14 @@ void parlib_main()
 	atexit(&parlib_dtors);
 
 	// set up argc/argv/envp
-	int argc,envc;
-	char** argv = parlib_build_argc_argv(procinfo.argv_buf,&argc);
-	environ = parlib_build_argc_argv(procinfo.env_buf,&envc);
+	int argc = 0;
+	while(procinfo.argp[argc])
+		argc++;
+	char** argv = (char**)alloca(sizeof(char*)*(argc+1));
+	for(int i = 0; i < argc; i++)
+		argv[i] = strdup(procinfo.argp[i]);
+	argv[argc] = 0;
+	environ = procinfo.argp+argc+1;
 
 	// call user main routine
 	extern int main(int argc, char * NTS * COUNT(argc) NT argv,

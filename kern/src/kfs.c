@@ -28,8 +28,8 @@
  * userapps in kern/src/Makefrag.
  * Make sure to declare it, and add an entry.  Keep MAX_KFS_FILES big enough too
  */
-DECL_PROG(parlib_matrix);
 #ifdef __i386__
+DECL_PROG(parlib_matrix);
 DECL_PROG(roslib_proctests);
 DECL_PROG(roslib_fptest);
 DECL_PROG(roslib_null);
@@ -49,8 +49,8 @@ DECL_PROG(parlib_lock_test);
 #endif
 
 struct kfs_entry kfs[MAX_KFS_FILES] = {
-	KFS_ENTRY(parlib_matrix)
 #ifdef __i386__
+	KFS_ENTRY(parlib_matrix)
 	KFS_ENTRY(roslib_proctests)
 	KFS_ENTRY(roslib_fptest)
 	KFS_ENTRY(roslib_null)

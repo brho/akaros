@@ -16,6 +16,7 @@ int shell_exec(const char* cmdline)
 	#define MY_MAX_ARGV 16
 	char* argv[MY_MAX_ARGV+1] = {0};
 	char* p0 = strdup(cmdline);
+	assert(p0);
 	char* p = p0;
 	for(int i = 0; i < MY_MAX_ARGV; i++)
 	{
@@ -95,12 +96,13 @@ extern char * readline(const char *prompt);
 #define MALLOC_SIZE     1048576
 #define READ_SIZE       1024
 
+#if 0
 int run_binary_filename(const char* cmdline, size_t colors)
 {
 	int ret = 0;
 
 	const char* cmdptr = cmdline;
-	char argv_buf[PROCINFO_MAX_ARGV_SIZE] = {0};
+	char argv_buf[PROCINFO_ARGBUF_SIZE] = {0};
 	intreg_t* argv = (intreg_t*)argv_buf;
 	argv[0] = 0;
 	int argc;
@@ -186,6 +188,7 @@ realloc_error:
 open_error:
 	return ret;
 }
+#endif
 
 void run_binary(size_t colors)
 {
@@ -194,6 +197,6 @@ void run_binary(size_t colors)
 		printf("Error reading from console.\n");
 		return;
 	}
-	run_binary_filename(readline_result, colors);
+	shell_exec(readline_result);
+	//run_binary_filename(readline_result, colors);
 }
-

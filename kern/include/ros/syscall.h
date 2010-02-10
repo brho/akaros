@@ -68,4 +68,7 @@
 #define BUSTER_PRINT_TICKS		0x0008
 #define BUSTER_JUST_LOCKS		0x0010 // unimplemented
 
+// for system calls that pass filenames
+#define MAX_PATH_LEN 256
+
 #endif /* !ROS_INCLUDE_SYSCALL_H */

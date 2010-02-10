@@ -70,8 +70,14 @@ void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 		// This is dumb--should not read until faulted in.
 		// This is just to get it correct at first
 		if(!(flags & MAP_ANON))
+		{
 			if(read_page(p,fd,page2pa(a_page),offset+i) < 0)
 				goto mmap_abort;
+
+			// zero-fill end of last page
+			if(len % PGSIZE && i == num_pages-1)
+				memset(page2kva(a_page)+len%PGSIZE,0,PGSIZE-len%PGSIZE);
+		}
 		#endif
 
 		// TODO: TLB shootdown if replacing an old mapping

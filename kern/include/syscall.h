@@ -38,5 +38,5 @@ intreg_t sys_getcwd(struct proc* p, char* pwd, int size);
 intreg_t sys_gettimeofday(struct proc* p, int* buf);
 intreg_t sys_tcsetattr(struct proc* p, int fd, int optional_actions, const void* termios_p);
 intreg_t sys_tcgetattr(struct proc* p, int fd, void* termios_p);
-
+intreg_t sys_exec(struct proc* p, const char fn[MAX_PATH_LEN], procinfo_t* pi);
 #endif /* !ROS_KERN_SYSCALL_H */

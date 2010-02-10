@@ -192,7 +192,6 @@ static pid_t sys_getpid(struct proc *p)
  */
 static int sys_proc_create(struct proc *p, const char *DANGEROUS path)
 {
-	#define MAX_PATH_LEN 256 // totally arbitrary
 	int pid = 0;
 	char tpath[MAX_PATH_LEN];
 	/*
@@ -279,14 +278,14 @@ static int sys_proc_yield(struct proc *p)
 }
 
 static ssize_t sys_run_binary(env_t* e, void *DANGEROUS binary_buf, size_t len,
-                              void*DANGEROUS arg, size_t num_colors)
+                              procinfo_t*DANGEROUS procinfo, size_t num_colors)
 {
 	env_t* env = proc_create(NULL,0);
 	assert(env != NULL);
 
-	static_assert(PROCINFO_NUM_PAGES == 1);
-	assert(memcpy_from_user(e,env->env_procinfo->argv_buf,arg,PROCINFO_MAX_ARGV_SIZE) == ESUCCESS);
-	*(intptr_t*)env->env_procinfo->env_buf = 0;
+	if(memcpy_from_user(e,e->env_procinfo,procinfo,sizeof(*procinfo)))
+		return -1;
+	proc_init_procinfo(e);
 
 	env_load_icode(env,e,binary_buf,len);
 	__proc_set_state(env, PROC_RUNNABLE_S);
@@ -356,35 +355,6 @@ static ssize_t sys_fork(env_t* e)
 	printd("[PID %d] fork PID %d\n",e->pid,env->pid);
 
 	return env->pid;
-}
-
-static ssize_t sys_exec(env_t* e, void *DANGEROUS binary_buf, size_t len,
-                        procinfo_t*DANGEROUS procinfo)
-{
-	// TODO: right now we only support exec for single-core processes
-	if(e->state != PROC_RUNNING_S)
-		return -1;
-
-	if(memcpy_from_user(e,e->env_procinfo,procinfo,sizeof(*procinfo)))
-		return -1;
-	proc_init_procinfo(e);
-
-	void* binary = kmalloc(len,0);
-	if(binary == NULL)
-		return -1;
-	if(memcpy_from_user(e,binary,binary_buf,len))
-	{
-		kfree(binary);
-		return -1;
-	}
-
-	env_segment_free(e,0,USTACKTOP);
-
-	proc_init_trapframe(current_tf,0);
-	env_load_icode(e,NULL,binary,len);
-
-	kfree(binary);
-	return 0;
 }
 
 static ssize_t sys_trywait(env_t* e, pid_t pid, int* status)

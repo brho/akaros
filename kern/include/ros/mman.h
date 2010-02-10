@@ -37,6 +37,8 @@
 #define MAP_NONBLOCK	0x10000
 #define MAP_STACK		0x20000
 
+#define MAP_FAILED		((void*)-1)
+
 /* Other mmap flags, which we probably won't support
 #define MAP_32BIT
 */

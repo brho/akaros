@@ -422,94 +422,17 @@ fork(void)
 	return ret;
 }
 
-static int
-pack_argv(const char* const argv[], void* base, char* buf, size_t bufsz)
-{
-	int argc = 0, size = sizeof(intreg_t);
-	while(argv[argc])
-	{
-		size += sizeof(intreg_t)+strlen(argv[argc])+1;
-		argc++;
-	}
-
-	if(size > bufsz)
-		return -1;
-
-	intreg_t* offset = (intreg_t*)buf;
-	offset[0] = (argc+1)*sizeof(intreg_t)+(intreg_t)base;
-	for(int i = 0; i < argc; i++)
-	{
-		int len = strlen(argv[i])+1;
-		memcpy(buf+offset[i]-(intreg_t)base,argv[i],len);
-		offset[i+1] = offset[i]+len;
-	}
-	offset[argc] = 0;
-
-	return 0;
-}
-
-static int
-readfile(const char* filename, void** binary, int* size)
-{
-	int fd = open(filename,O_RDONLY,0);
-	if(fd == -1)
-		return -1;
-
-	*size = 0;
-	*binary = NULL;
-	int bytes_read = 0;
-	int bufsz = 0;
-
-	int READ_SIZE = 1024;
-	int MALLOC_SIZE = 1024*1024;
-
-	while(1)
-	{
-		if(*size+READ_SIZE > bufsz)
-		{
-			void* temp_buf = realloc(*binary,bufsz+MALLOC_SIZE);
-			if(temp_buf == NULL)
-			{
-				close(fd);
-				free(*binary);
-				errno = ENOMEM;
-				return -1;
-			}
-
-			*binary = temp_buf;
-			bufsz += MALLOC_SIZE;
-		}
-
-		bytes_read = read(fd, *binary+*size, READ_SIZE);
-		*size += bytes_read;
-		if(bytes_read <= 0)
-		{
-			close(fd);
-			if(bytes_read < 0)
-				free(*binary);
-			return bytes_read;
-		}
-	}
-}
-
 int
 execve(const char* name, char* const argv[], char* const env[])
 {
 	procinfo_t pi;
-	if(pack_argv(argv,procinfo.argv_buf,pi.argv_buf,PROCINFO_MAX_ARGV_SIZE)
-	   || pack_argv(env,procinfo.env_buf,pi.env_buf,PROCINFO_MAX_ENV_SIZE))
-	{
-		errno = ENOMEM;
-		return -1;
-	}
+	procinfo_pack_args(&pi,argv,env);
 
-	void* binary;
-	size_t binarysz;
-	if(readfile(name,&binary,&binarysz))
+	char name2[MAX_PATH_LEN];
+	if(strncpy(name2,name,MAX_PATH_LEN) == MAX_PATH_LEN)
 		return -1;
-
-	return syscall(SYS_exec,(intreg_t)binary,(intreg_t)binarysz,
-                       (intreg_t)&pi,0,0);
+	
+	return syscall(SYS_exec,(intreg_t)name,(intreg_t)&pi,0,0,0);
 }
 
 int
