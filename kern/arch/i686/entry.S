@@ -59,6 +59,8 @@ _start:
 	movw	%ax,%ss				# -> SS: Stack Segment
 	ljmp	$CODE_SEL,$relocated		# reload CS by jumping
 relocated:
+	movl	$0x0, os_coreid_lookup
+	movl	$0x0, hw_coreid_lookup
 
 	# Clear the frame pointer register (EBP)
 	# so that once we get into debugging C code,
