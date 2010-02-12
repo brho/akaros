@@ -14,19 +14,29 @@
 
 #include <kfs.h>
 #include <string.h>
+#include <stdio.h>
 #include <assert.h>
 #include <error.h>
 
+/* For obj files compiled with the kernel */
 #define DECL_PROG(x) \
     extern uint8_t (COUNT(sizeof(size_t)) _binary_obj_tests_##x##_size)[],\
         (COUNT(_binary_obj_user_apps_##x##_size)_binary_obj_tests_##x##_start)[];
 
-#define KFS_ENTRY(x) {#x, _binary_obj_tests_##x##_start, (size_t) _binary_obj_tests_##x##_size},
+#define KFS_PENTRY(x) {#x, _binary_obj_tests_##x##_start, (size_t) _binary_obj_tests_##x##_size},
+
+/* For generic files in kern/kfs */
+#define DECL_FILE(x) \
+    extern uint8_t (COUNT(sizeof(size_t)) _binary_kern_kfs_##x##_size)[],\
+        (COUNT(_binary_kern_kfs_##x##_size)_binary_kern_kfs_##x##_start)[];
+
+#define KFS_FENTRY(x) {#x, _binary_kern_kfs_##x##_start, (size_t) _binary_kern_kfs_##x##_size},
 
 /*
- * Hardcode the files included in the KFS.  This needs to be in sync with the
- * userapps in kern/src/Makefrag.
+ * Hardcode the files included in the KFS.  PROGs need to be in sync with the
+ * userapps in kern/src/Makefrag.  Files need to be in kern/kfs/
  * Make sure to declare it, and add an entry.  Keep MAX_KFS_FILES big enough too
+ * Note that files with a . in their name will have an _ instead.
  */
 #ifdef __CONFIG_KFS__
 DECL_PROG(tlstest);
@@ -39,20 +49,24 @@ DECL_PROG(draw_nanwan);
 DECL_PROG(hello);
 DECL_PROG(mhello);
 DECL_PROG(manycore_test);
+DECL_FILE(kfs_test_txt);
+DECL_FILE(hello_txt);
 #endif
 
 struct kfs_entry kfs[MAX_KFS_FILES] = {
 #ifdef __CONFIG_KFS__
-	KFS_ENTRY(tlstest)
-	KFS_ENTRY(proctests)
-	KFS_ENTRY(fp_test)
-	KFS_ENTRY(null)
-	KFS_ENTRY(spawn)
-	KFS_ENTRY(mproctests)
-	KFS_ENTRY(draw_nanwan)
-	KFS_ENTRY(hello)
-	KFS_ENTRY(mhello)
-	KFS_ENTRY(manycore_test)
+	KFS_PENTRY(tlstest)
+	KFS_PENTRY(proctests)
+	KFS_PENTRY(fp_test)
+	KFS_PENTRY(null)
+	KFS_PENTRY(spawn)
+	KFS_PENTRY(mproctests)
+	KFS_PENTRY(draw_nanwan)
+	KFS_PENTRY(hello)
+	KFS_PENTRY(mhello)
+	KFS_PENTRY(manycore_test)
+	KFS_FENTRY(kfs_test_txt)
+	KFS_FENTRY(hello_txt)
 #endif
 };
 
@@ -77,3 +91,13 @@ struct proc *kfs_proc_create(int kfs_inode)
 	return proc_create(kfs[kfs_inode].start, kfs[kfs_inode].size);
 }
 
+/* Dumps the contents of the KFS file to the console.  Not meant to be taken
+ * too seriously - just dumps each char. */
+void kfs_cat(int kfs_inode)
+{
+	if (kfs_inode < 0 || kfs_inode >= MAX_KFS_FILES)
+		panic("Invalid kfs_inode.  Check you error codes!");
+	uint8_t *end = kfs[kfs_inode].start + kfs[kfs_inode].size;
+	for (uint8_t *ptr = kfs[kfs_inode].start; ptr < end; ptr++)
+		cputchar(*ptr);
+}

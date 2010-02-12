@@ -77,6 +77,8 @@ KERN_OBJFILES  := $(patsubst $(KERN_DIR)/%.S, \
 
 KERN_APPFILES  := $(patsubst %, $(OBJDIR)/%, $(KERN_APPFILES))
 
+KERN_APPFILES  += $(KERN_DIR)/kfs/*
+
 KERN_LDDEPENDS := $(KERN_OBJFILES) $(KERN_APPFILES) $(ARCH_DIR)/$(TARGET_ARCH)/kernel.ld \
                   $(OBJDIR)/$(KERN_DIR)/libivykern.a
 

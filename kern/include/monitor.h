@@ -21,6 +21,7 @@ int mon_cpuinfo(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
 int mon_nanwan(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
 int mon_kfs_ls(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
 int mon_kfs_run(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
+int mon_kfs_cat(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
 int mon_manager(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
 int mon_procinfo(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
 int mon_exit(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
