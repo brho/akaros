@@ -36,6 +36,7 @@
 #include <arch/bitmask.h>
 #include <slab.h>
 #include <kfs.h>
+#include <vfs.h>
 
 // zra: flag for Ivy
 int booting = 1;

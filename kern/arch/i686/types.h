@@ -27,6 +27,8 @@ typedef unsigned long long uint64_t;
 
 typedef long ssize_t;
 typedef int pid_t;
+typedef int uid_t;
+typedef int gid_t;
 
 // Pointers and addresses are 32 bits long.
 // We use pointer types to represent virtual addresses and
