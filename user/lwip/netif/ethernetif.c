@@ -40,9 +40,7 @@ low_level_init(struct netif *netif)
 	 netif->hwaddr_len = ETHARP_HWADDR_LEN;
 
 	 /* set MAC hardware address */
-	printf("buffer addr: %u\n", netif->hwaddr);
 	sys_eth_get_mac_addr(&(netif->hwaddr));
-	printf("chkpt\n");
 	 /* maximum transfer unit */
 	 netif->mtu = 1500;
  

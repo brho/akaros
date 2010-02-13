@@ -609,6 +609,18 @@ static ssize_t sys_eth_write(env_t* e, const char *DANGEROUS buf, size_t len)
 		if (len == 0)
 			return 0;
 
+		// HACK TO BYPASS HACK
+		int just_sent = send_frame( buf, len);
+
+		if (just_sent < 0) {
+			printk("Packet send fail\n");
+			return 0;
+		}
+
+		return just_sent;
+
+		// END OF RECURSIVE HACK
+/*
 		char *COUNT(len) _buf = user_mem_assert(e, buf, len, PTE_U);
 		int total_sent = 0;
 		int just_sent = 0;
@@ -628,11 +640,12 @@ static ssize_t sys_eth_write(env_t* e, const char *DANGEROUS buf, size_t len)
 		}
 
 		return (ssize_t)len;
-
+*/
 	}
 	else
 		return -EINVAL;
 }
+
 
 static ssize_t sys_eth_get_mac_addr(env_t* e, char *DANGEROUS buf) {
 	

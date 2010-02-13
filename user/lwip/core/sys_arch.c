@@ -36,92 +36,347 @@
 #include "lwip/opt.h"
 #include "lwip/stats.h"
 
+#include <pthread.h>
+#include <arch/arch.h>
 
+#define sys_debug(...) //printf(__VA_ARGS__)
+
+pthread_mutex_t sys_lock;
+
+uint8_t protection_status;
+
+__thread struct sys_timeouts local_timeouts;
+
+typedef struct sys_hart_startup {
+
+        void (*hart_startup)(void* arg);
+        void *arg;
+
+} sys_hart_startup_t;
+
+// HACK
 void sys_init(void) {
-	printf("TODO: SYS_INIT\n");
-	return;
+	sys_debug("In sys_init\n");
+
+	pthread_mutex_init(&sys_lock, NULL);
+	
+	protection_status = 0;
+
+	printf("Register callback\n");
 }
 
+// HACK
 u32_t sys_now(void) {
-	printf("TODO: SYS_NOW\n");
-	return 0xDEADBEEF;
+
+	sys_debug("In sys_now\n");
+
+	uint64_t now = read_tsc();
+
+	now = now / procinfo.tsc_freq;
+
+	now = now * 1000;
+
+	return (uint32_t)now;
 }
 
+// OK
 sys_sem_t sys_sem_new(u8_t count) {
-	sys_sem_t ret = 0;
-	printf("TODO: SYS_SEM_NEW\n");
-	return ret;
+
+	sys_debug("In sys_sem_new\n");
+
+	sys_sem_t sem = (sys_sem_t)malloc(sizeof(struct sys_sem));
+
+	if (sem == NULL)
+		return SYS_SEM_NULL;
+
+	pthread_mutex_init(&(sem->lock), NULL);
+
+	sem->count = count;
+
+	return sem;
 }
 
-
+// OK
 void sys_sem_free(sys_sem_t sem) {
-	printf("TODO: SYS_SEM_FREE\n");
+
+	sys_debug("In sys_sem_free\n");
+
+	pthread_mutex_destroy(&(sem->lock));	
+
+	free(sem);
+
 	return;
 }
 
-
+// OK
 void sys_sem_signal(sys_sem_t sem) {
-	printf("TODO: SYS_SEM_SIGNAL\n");
+
+	sys_debug("In sys_sem_signal\n");
+
+	pthread_mutex_lock(&(sem->lock));
+
+	sem->count = sem->count + 1;
+
+	pthread_mutex_unlock(&(sem->lock));
+	
 	return;
 }
 
-
+// OK
 u32_t sys_arch_sem_wait(sys_sem_t sem, u32_t timeout) {
-	printf("TODO: SYS ARCH SEM WAIT\n");	
-	return 0;
+
+	sys_debug("In sys_arch_sem_wait\n");
+
+	uint32_t start = sys_now();
+	uint32_t current = 0;
+
+	pthread_mutex_lock(&(sem->lock));
+
+	while (sem->count == 0) {
+
+		pthread_mutex_unlock(&(sem->lock));
+
+		current = sys_now();
+		
+		if (((current - start) > timeout) && (timeout != 0)) {
+			return SYS_ARCH_TIMEOUT;
+		}
+
+		hart_relax();
+		
+		pthread_mutex_lock(&(sem->lock));
+	}
+
+	sem->count = sem->count - 1;
+
+	pthread_mutex_unlock(&(sem->lock));
+
+	return sys_now() - start;
 }
 
+
+//HACK
 sys_mbox_t sys_mbox_new(int size) {
-	printf("TODO: SYS MBOX NEW\n");
-	sys_mbox_t box = 0;
-	return box;
+
+	sys_debug("In sys_mbox_new\n");
+
+
+	// HACK:
+	if (size == 0)
+		size = 20;
+
+	sys_mbox_t new_box = (sys_mbox_t)malloc(sizeof(struct sys_mbox) + size * sizeof(char*));
+
+	if (new_box == NULL)
+		return SYS_MBOX_NULL;
+	memset(new_box, 0x00, sizeof(struct sys_mbox) + size * sizeof(char*));
+
+	pthread_mutex_init(&(new_box->lock), NULL);
+
+	new_box->size = size;
+	new_box->count = 0;
+	new_box->first = 0;
+	
+	return new_box;
 }
 
+// HACK
 void sys_mbox_free(sys_mbox_t mbox) {
-	printf("TODO: SYS MBOX FREE\n");
+
+	sys_debug("In sys_mbox_new\n");
+
+	
+	// Should we aquire the lock here?
+	if (mbox->count != 0) {
+		printf("LWIP Stack errror. Bad.\n");
+		return;
+	}
+
+	pthread_mutex_destroy(&(mbox->lock));
+
+	free(mbox);
+
 	return;
 }
 
+
+// HACK
 void sys_mbox_post(sys_mbox_t mbox, void *msg) {
-	printf("TODO: SYS MBOX POST\n");
+
+	sys_debug("In sys_mbox_post\n");
+
+	pthread_mutex_lock(&(mbox->lock));
+
+	while(mbox->count >= mbox->size) {
+		
+		pthread_mutex_unlock(&(mbox->lock));
+		
+		hart_relax();
+		
+		pthread_mutex_lock(&(mbox->lock));
+	}
+
+	mbox->buf[(mbox->first + mbox->count) % mbox->size] = msg;
+	mbox->count = mbox->count + 1;
+	
+	pthread_mutex_unlock(&(mbox->lock));
+
 	return;
 }
 
+// HACK
 err_t sys_mbox_trypost(sys_mbox_t mbox, void *msg) {
-	printf("TODO: SYS MBOX TRYPOST\n");
-	return 0;
+
+	sys_debug("In sys_mbox_trypost\n");
+
+	pthread_mutex_lock(&(mbox->lock));
+
+	if (mbox->count >= mbox->size) {
+		
+		pthread_mutex_unlock(&(mbox->lock));
+
+		return ERR_MEM;
+	}
+
+
+	mbox->buf[(mbox->first + mbox->count) % mbox->size] = msg;
+	mbox->count = mbox->count + 1;
+
+	pthread_mutex_unlock(&(mbox->lock));
+
+	return ERR_OK;
 }
 
+// HACK
 u32_t sys_arch_mbox_fetch(sys_mbox_t mbox, void **msg, u32_t timeout) {
-	printf("TODO: SYS ARCH MBOX FETCH\n");
-	return 0;
+
+	sys_debug("In sys_arch_mbox_fetch\n");
+
+	uint32_t start = sys_now();
+	uint32_t current = 0;
+
+	pthread_mutex_lock(&(mbox->lock));
+
+        while (mbox->count == 0) {
+
+                pthread_mutex_unlock(&(mbox->lock));
+
+                current = sys_now();
+
+                if (((current - start) > timeout) && (timeout != 0)) {
+                        return SYS_ARCH_TIMEOUT;
+                }
+
+                hart_relax();
+
+                pthread_mutex_lock(&(mbox->lock));
+        }
+
+	*msg = mbox->buf[mbox->first];
+
+	mbox->first = (mbox->first + 1) % (mbox->size);
+
+        mbox->count = mbox->count - 1;
+
+        pthread_mutex_unlock(&(mbox->lock));
+
+        return sys_now() - start;
 }
 
+// HACK
 u32_t sys_arch_mbox_tryfetch(sys_mbox_t mbox, void **msg) {
-	printf("TODO: SYS ARCH MBOX TRYFETCH\n");
+
+	sys_debug("In sys_arch_mbox_tryfetch\n");
+
+	pthread_mutex_lock(&(mbox->lock));
+
+        if (mbox->count == 0) {
+
+                pthread_mutex_unlock(&(mbox->lock));
+
+		return SYS_MBOX_EMPTY;
+        }
+
+	*msg = mbox->buf[mbox->first];
+
+	mbox->first = (mbox->first + 1) % (mbox->size);
+
+        mbox->count = mbox->count - 1;
+
+        pthread_mutex_unlock(&(mbox->lock));
+
+        return 0;
+}
+
+// HACK
+struct sys_timeouts *sys_arch_timeouts(void) {
+
+	sys_debug("In sys_timeouts\n");
+
+	return &local_timeouts;
+}
+
+void sys_thread_wrapper(void *arg) {
+
+	sys_hart_startup_t* ptr = arg;
+
+	local_timeouts.next = NULL;
+
+	ptr->hart_startup(ptr->arg);
+
+	free(ptr);
+}
+
+// HACK
+sys_thread_t sys_thread_new(char *name, void (* thread)(void *arg), void *arg, int stacksize, int prio) {
+
+	sys_debug("In sys_thread_new");
+
+	extern void (*hart_startup)();
+	extern void *hart_startup_arg;
+
+	sys_hart_startup_t* wrapper_arg = malloc(sizeof(sys_hart_startup_t));
+
+	if (wrapper_arg == NULL)
+		return NULL;
+
+	wrapper_arg->hart_startup = thread;
+	wrapper_arg->arg = arg;
+
+	hart_startup = sys_thread_wrapper;
+	hart_startup_arg = wrapper_arg;
+
+	hart_request(1);
+
 	return 0;
 }
 
-struct sys_timeouts *sys_arch_timeouts(void) {
-	printf("TODO: SYS_TIMEOUTS\n");
-	struct sys_timeouts *ret = 0;
-	return ret;
-}
-
-sys_thread_t sys_thread_new(char *name, void (* thread)(void *arg), void *arg, int stacksize, int prio) {
-	printf("TODO: SYS THREAD NEW\n");
-	sys_thread_t ret = 0;
-	return ret;
-}
-
+// HACK
 sys_prot_t sys_arch_protect(void) {
-	printf("TODO: SYS ARCH PROTECT\n");
-	sys_prot_t ret = 0;
-	return ret;
+
+	sys_debug("In sys_arch_protect\n");
+
+	pthread_mutex_lock(&sys_lock);
+
+	sys_prot_t old = protection_status;
+
+	protection_status = 1;
+
+	pthread_mutex_unlock(&sys_lock);
+
+	return old;
 }
 
+// HACK
 void sys_arch_unprotect(sys_prot_t pval) {
-	printf("TODO: SYS ARCH UNPROTECT\n");
-	return;
+
+	sys_debug("In sys_arch_unprotect\n");
+
+	pthread_mutex_lock(&sys_lock);
+
+	protection_status = pval;
+
+	pthread_mutex_unlock(&sys_lock);
+
 }
 

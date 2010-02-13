@@ -3,6 +3,12 @@
 #define LWIP_SOCKET 1
 #define LWIP_NETCONN 1
 #define LWIP_TCP 1
+#define SYS_LIGHTWEIGHT_PROT 1
+#define LWIP_DHCP 1
+
+#define TCP_SND_BUF 1096
+//#define MEMP_NUM_TCP_SEG 32
+ 
 #define ETHARP_DEBUG LWIP_DBG_ON
 #define NETIF_DEBUG LWIP_DBG_ON
 #define PBUF_DEBUG LWIP_DBG_ON

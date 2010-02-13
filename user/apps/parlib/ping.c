@@ -38,6 +38,8 @@
  *
  */
 
+#include <stdio.h>
+
 #include "lwip/opt.h"
 
 #if LWIP_RAW && LWIP_ICMP /* don't build if not configured for use in lwipopts.h */
@@ -46,10 +48,13 @@
 #include "lwip/raw.h"
 #include "lwip/icmp.h"
 #include "lwip/netif.h"
+#include "lwip/dhcp.h"
 #include "lwip/sys.h"
 #include "lwip/sockets.h"
 #include "lwip/inet.h"
 #include "lwip/inet_chksum.h"
+#include <lwip/tcpip.h>
+#include <netif/ethernetif.h>
 
 /**
  * PING_DEBUG: Enable debugging for PING.
@@ -121,11 +126,39 @@ ping_prepare_echo( struct icmp_echo_hdr *iecho, u16_t len)
 
 #if LWIP_SOCKET
 
+/* Network interface variables */
+struct ip_addr ipaddr, netmask, gw;
+struct netif netif;
+/* Set network address variables */
+
+void network_init()
+{
+        printf("Starting up network stack....\n");
+
+        IP4_ADDR(&gw, 0,0,0,0);
+        IP4_ADDR(&ipaddr, 0,0,0,0);
+        IP4_ADDR(&netmask, 0,0,0,0);
+
+	netif.name[0] = 'P';
+	netif.name[1] = 'J';
+
+        tcpip_init(NULL, NULL);
+
+        netif_add(&netif, &ipaddr, &netmask, &gw, NULL, ethernetif_init, tcpip_input);
+        /* ethhw_init() is user-defined */
+        /* use ip_input instead of ethernet_input for non-ethernet hardware */
+        /* (this function is assigned to netif.input and should be called by the hardware driver) */
+
+        netif_set_default(&netif);
+
+	dhcp_start(&netif);
+        
+	printf("Done...\n");
+
+}
 
 
-
-
-void ping() {
+int main(int argc, char** argv) {
 
 	printf("Starting the ping nightmare....\n");
 
@@ -134,12 +167,21 @@ void ping() {
 	static struct ip_addr ping_addr;
 	
 	IP4_ADDR(&ping_addr, 192,168,0,3);
-	
+
+	network_init();
+
 	if ((s = lwip_socket(AF_INET, SOCK_RAW, IP_PROTO_ICMP)) < 0) {
-		return;
+		return -1;
 	}
 
 	ping_init();
+	
+	printf("DONE STARTING PING. SPINNING\n");
+
+	while(1);
+
+	return 0;
+
 }
 
 

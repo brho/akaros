@@ -168,7 +168,6 @@ int ne2k_scan_pci() {
 
 void ne2k_configure_nic() {
 	
-	printk("I made it here...\n");
 	ne2k_debug("-->Configuring Device.\n");
 	
 	// Reset. Yes reading from this addr resets it
@@ -216,9 +215,8 @@ void ne2k_setup_interrupts() {
 
 void ne2k_mem_alloc() {
 	
-	num_pages = NE2K_NUM_PAGES;
-	base_page = kmalloc(num_pages * NE2K_PAGE_SIZE, 0);
-	
+	num_pages = ROUNDUP(NE2K_NUM_PAGES * NE2K_PAGE_SIZE, PGSIZE) / PGSIZE;
+	base_page = get_cont_pages(LOG2_UP(num_pages), 0);	
 }
 
 void ne2k_read_mac() {
@@ -286,6 +284,7 @@ void ne2k_interrupt_handler(trapframe_t *tf, void* data) {
 	return;				
 }
 
+// @TODO: Is this broken? Didn't change it after kmalloc changed
 void ne2k_handle_rx_packet() {
 
         uint8_t bound = inb(ne2k_io_base_addr + NE2K_PG0_RW_BNRY);
@@ -445,7 +444,6 @@ uint16_t cksum(char *CT(len) ip, int len) {
 
 // Main routine to send a frame. May be completely broken.
 int ne2k_send_frame(const char *data, size_t len) {
-
 
 	if (data == NULL)
 		return -1;

@@ -1,4 +1,4 @@
-/** @file
+/** @filec
  * @brief RL8168 Driver       
  *
  * EXPERIMENTAL. DO NOT USE IF YOU DONT KNOW WHAT YOU ARE DOING
@@ -649,8 +649,10 @@ int rl8168_send_frame(const char *data, size_t len) {
 	// THIS IS A HACK: Need to reach inside the frame we are sending and detect if its of type ip/udp/tcp and set right flag
 	// For now, for the syscall hack, force ip checksum on. (we dont care about udp checksum).
 	// Add an argument to function to specify packet type?
-	tx_des_kva[tx_des_cur].vlan = DES_TX_IP_CHK_MASK;
-	
+	//tx_des_kva[tx_des_cur].vlan = DES_TX_IP_CHK_MASK;
+	tx_des_kva[tx_des_cur].vlan = 0;
+
+
 	tx_des_cur = (tx_des_cur + 1) % NUM_TX_DESCRIPTORS;
 	
 	//rl8168_frame_debug("-->Sent packet.\n");

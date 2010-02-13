@@ -32,17 +32,31 @@
 #ifndef __ARCH_SYS_ARCH_H__
 #define __ARCH_SYS_ARCH_H__
 
+// Don't reverse the order of these includes. Newlib uglyness.
+#include <pthread.h>
 #include <errno.h>
 
 #define SYS_MBOX_NULL NULL
 #define SYS_SEM_NULL  NULL
 
-typedef u32_t sys_prot_t;
+typedef u8_t sys_prot_t;
 
-struct sys_sem;
-typedef struct sys_sem * sys_sem_t;
+struct sys_sem {
+	pthread_mutex_t lock;
+	uint8_t count;
+};
 
-struct sys_mbox;
+// I hate this I hate this I hate this I hate this. -Paul
+typedef struct sys_sem* sys_sem_t;
+
+
+struct sys_mbox {
+	pthread_mutex_t lock;
+	int size;
+	int count;
+	int first;
+	char* buf[];
+};
 typedef struct sys_mbox *sys_mbox_t;
 
 struct sys_thread;

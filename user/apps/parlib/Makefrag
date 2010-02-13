@@ -31,8 +31,7 @@ USER_APPS_PARLIB_LDOBJS    := \
                               $(OBJDIR)/$(USER_APPS_PARLIB_DIR)/run_binary.o \
                               $(OBJDIR)/$(USER_APPS_PARLIB_DIR)/run_binary_colored.o \
                               $(OBJDIR)/$(USER_APPS_PARLIB_DIR)/change_user.o \
-			      $(OBJDIR)/$(USER_APPS_PARLIB_DIR)/ping.o \
-                              $(OBJDIR)/$(USER_APPS_PARLIB_DIR)/network_init.o
+                              $(OBJDIR)/$(USER_APPS_PARLIB_DIR)/hart_entry.o
 
 
 USER_APPS_PARLIB_LDDEPENDS := $(USER_APPS_PARLIB_LDOBJS) \

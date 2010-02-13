@@ -14,6 +14,7 @@ USER_LWIP_SRC_SRCFILES	:= $(USER_LWIP_SRC_DIR)/api/api_msg.c \
 			   $(USER_LWIP_SRC_DIR)/api/netdb.c \
 			   $(USER_LWIP_SRC_DIR)/api/sockets.c \
 			   $(USER_LWIP_SRC_DIR)/api/tcpip.c \
+			   $(USER_LWIP_SRC_DIR)/core/dhcp.c \
 			   $(USER_LWIP_SRC_DIR)/core/init.c \
 			   $(USER_LWIP_SRC_DIR)/core/sys_arch.c \
 			   $(USER_LWIP_SRC_DIR)/core/mem.c \

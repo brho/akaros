@@ -43,6 +43,7 @@ DECL_PROG(parlib_channel_test_client);
 DECL_PROG(parlib_channel_test_server);
 DECL_PROG(parlib_hello);
 DECL_PROG(parlib_mhello);
+DECL_PROG(parlib_ping);
 DECL_PROG(parlib_manycore_test);
 #endif
 
@@ -62,6 +63,7 @@ struct kfs_entry kfs[MAX_KFS_FILES] = {
 	KFS_ENTRY(parlib_channel_test_server)
 	KFS_ENTRY(parlib_hello)
 	KFS_ENTRY(parlib_mhello)
+	KFS_ENTRY(parlib_ping)
 	KFS_ENTRY(parlib_manycore_test)
 #endif
 };

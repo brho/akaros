@@ -61,6 +61,7 @@ KERN_APPFILES += \
                  $(USER_APPS_PARLIB_DIR)/channel_test_server \
                  $(USER_APPS_PARLIB_DIR)/hello \
                  $(USER_APPS_PARLIB_DIR)/mhello \
+                 $(USER_APPS_PARLIB_DIR)/ping \
                  $(USER_APPS_PARLIB_DIR)/manycore_test
 endif
 

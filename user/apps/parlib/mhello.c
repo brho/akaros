@@ -22,6 +22,16 @@ void udelay(uint64_t usec, uint64_t tsc_freq)
 
 __thread int temp;
 
+void startup(void *arg)
+{
+        uint32_t vcoreid = hart_self();
+        temp = 0xcafebabe;
+        printf("Hello from hart_entry in vcore %d with temp addr %p and temp %p\n",
+               vcoreid, &temp, temp);
+        while(1);
+}
+
+
 int main(int argc, char** argv)
 {
 	uint32_t vcoreid;
@@ -35,19 +45,14 @@ int main(int argc, char** argv)
 		       vcoreid, &temp, temp);
 		printf("Multi-Goodbye, world, from PID: %d!\n", sys_getpid());
 		//retval = sys_resource_req(RES_CORES, 2, 0);
-		retval = hart_request(2);
+		extern void *hart_startup_arg;
+		extern void (*hart_startup)();
+		hart_startup_arg = NULL;
+		hart_startup = startup;		
+		retval = hart_request(4);
 		//debug("retval = %d\n", retval);
 	}
 	printf("Vcore %d Done!\n", vcoreid);
 	while (1);
 	return 0;
-}
-
-void hart_entry(void)
-{
-	uint32_t vcoreid = hart_self();
-	temp = 0xcafebabe;
-	printf("Hello from hart_entry in vcore %d with temp addr %p and temp %p\n",
-	       vcoreid, &temp, temp);
-	while(1);
 }
