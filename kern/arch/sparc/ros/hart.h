@@ -11,8 +11,14 @@ static inline int
 __hart_self()
 {
 	int id;
-	__asm__ __volatile__ ("mov %%g6,%0" : "=r"(id));
+	asm ("mov %%asr13,%0" : "=r"(id));
 	return id;
+}
+
+static inline void
+__hart_set_stack_pointer(void* sp)
+{
+	__asm__ __volatile__ ("mov %0,%%sp" : : "r"(sp));
 }
 
 static inline void

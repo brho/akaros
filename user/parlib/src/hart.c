@@ -16,11 +16,11 @@ static void _hart_init()
 
 	initialized = 1;
 
-	extern void **stack_ptr_array, **tls_array;
-	stack_ptr_array = (void**)calloc(hart_max_harts(),sizeof(void*));
-	tls_array = (void**)calloc(hart_max_harts(),sizeof(void*));
+	extern void **hart_stack_pointers, **hart_thread_control_blocks;
+	hart_stack_pointers = (void**)calloc(hart_max_harts(),sizeof(void*));
+	hart_thread_control_blocks = (void**)calloc(hart_max_harts(),sizeof(void*));
 
-	if(stack_ptr_array == NULL || tls_array == NULL)
+	if(hart_stack_pointers == NULL || hart_thread_control_blocks == NULL)
 	{
 		fputs("Harts initialization ran out of memory!\n",stderr);
 		abort();
@@ -30,10 +30,13 @@ static void _hart_init()
 error_t hart_request(size_t k)
 {
 	size_t i,j;
-	const int user_stack_size = PARLIB_TLS_SIZE, tls_size = PARLIB_TLS_SIZE;
+	const int user_stack_size = PARLIB_TLS_SIZE;
+	error_t ret = -1;
 
-	extern void** stack_ptr_array;
-	extern void** tls_array;
+	extern void** hart_stack_pointers;
+	extern void** hart_thread_control_blocks;
+	extern void* _dl_allocate_tls(void*);
+	extern void _dl_deallocate_tls(void*,bool);
 
 	_hart_init();
 
@@ -42,31 +45,39 @@ error_t hart_request(size_t k)
 	if(k < 0 || _current_harts+k > hart_max_harts())
 		return -1;
 
-	char* stack = (char*)calloc(user_stack_size+tls_size,k);
+	char* stack = (char*)calloc(user_stack_size,k);
 	if(stack == NULL)
 	{
-		hart_lock_unlock(&_hart_lock);
-		return -ENOMEM;
+		errno = ENOMEM;
+		goto fail;
 	}
 
 	for(i = _current_harts, j = 0; i < _current_harts+k; i++, j++)
 	{
-		stack_ptr_array[i] = stack + (j+1)*user_stack_size+j*tls_size;
-		tls_array[i] = stack_ptr_array[i]+tls_size;
+		hart_stack_pointers[i] = stack + (j+1)*user_stack_size-96;
+		if(!(hart_thread_control_blocks[i] = _dl_allocate_tls(NULL)))
+		{
+			errno = ENOMEM;
+			goto fail;
+		}
 	}
 
-	error_t ret;
 	if((ret = sys_resource_req(0,_current_harts+k,0)) == 0)
 	{
 		_current_harts += k;
-		hart_lock_unlock(&_hart_lock);
-		return 0;
+		goto success;
 	}
+	errno = EBUSY;
 
+fail:
 	free(stack);
 	for(i = _current_harts; i < _current_harts+k; i++)
-		stack_ptr_array[i] = tls_array[i] = 0;
+	{
+		free(hart_thread_control_blocks[i]);
+		hart_stack_pointers[i] = hart_thread_control_blocks[i] = 0;
+	}
 
+success:
 	hart_lock_unlock(&_hart_lock);
 	return ret;
 }

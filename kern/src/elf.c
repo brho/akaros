@@ -14,7 +14,7 @@ struct elf_info
 	char interp[256];
 };
 
-int load_one_elf(struct proc* p, int fd, struct elf_info* ei)
+int load_one_elf(struct proc* p, int fd, int pgoffset, struct elf_info* ei)
 {
 	int ret = -1;
 	ei->phdr = -1;
@@ -66,21 +66,21 @@ int load_one_elf(struct proc* p, int fd, struct elf_info* ei)
 
 			// mmap will zero the rest of the page if filesz % PGSIZE != 0
 			if(filesz)
-				if(mmap(p, memstart, filesz,
+				if(mmap(p, memstart+pgoffset*PGSIZE, filesz,
 				        PROT_READ|PROT_WRITE|PROT_EXEC, MAP_FIXED,
 				        fd, filestart/PGSIZE) == MAP_FAILED)
 					goto fail;
 
 			filesz = ROUNDUP(filesz,PGSIZE);
 			if(filesz < memsz)
-				if(mmap(p, memstart+filesz, memsz-filesz,
+				if(mmap(p, memstart+filesz+pgoffset*PGSIZE, memsz-filesz,
 				        PROT_READ|PROT_WRITE|PROT_EXEC, MAP_FIXED|MAP_ANON,
 				        -1, 0) == MAP_FAILED)
 					goto fail;
 		}
 	}
 
-	ei->entry = elfhdr->e_entry;
+	ei->entry = elfhdr->e_entry + pgoffset*PGSIZE;
 	ei->phnum = elfhdr->e_phnum;
 
 	ret = 0;
@@ -93,14 +93,14 @@ int load_elf(struct proc* p, const char* fn)
 {
 	struct elf_info ei,interp_ei;
 	int fd = open_file(p,fn,0,0);
-	if(fd == -1 || load_one_elf(p,fd,&ei))
+	if(fd == -1 || load_one_elf(p,fd,0,&ei))
 		return -1;
 	close_file(p,fd);
 
 	if(ei.dynamic)
 	{
 		int fd2 = open_file(p,ei.interp,0,0);
-		if(fd2 == -1 || load_one_elf(p,fd2,&interp_ei))
+		if(fd2 == -1 || load_one_elf(p,fd2,1,&interp_ei))
 			return -1;
 		close_file(p,fd2);
 
@@ -123,8 +123,9 @@ int load_elf(struct proc* p, const char* fn)
 		memcpy(p->env_procinfo->argp+auxp_pos,auxp,sizeof(auxp));
 	}
 
-	p->env_entry = ei.dynamic ? interp_ei.entry : ei.entry;
-	proc_set_program_counter(&p->env_tf,p->env_entry);
+	intptr_t core0_entry = ei.dynamic ? interp_ei.entry : ei.entry;
+	proc_set_program_counter(&p->env_tf,core0_entry);
+	p->env_entry = ei.entry;
 
 	uintptr_t stacksz = USTACK_NUM_PAGES*PGSIZE;
 	if(mmap(p,USTACKTOP-stacksz,stacksz,PROT_READ|PROT_WRITE,

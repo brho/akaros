@@ -102,16 +102,18 @@ env_save_tf:
 	mov	%tbr,%o4
 	mov	%y,%o5
 	std	%o4,[%o0+144]
+	mov	%asr13,%o5
+	st	%o5,[%o0+152]
 
 	set	0x300,%o4
 	set	0x400,%o5
 	lda	[%o4] 4,%o4
 	lda	[%o5] 4,%o5
-	std	%o4,[%o0+152]
+	std	%o4,[%o0+160]
 	lda	[%g0] 2,%o4
 	mov	4,%o5
 	lda	[%o5] 2,%o5
-	std	%o4,[%o0+160]
+	std	%o4,[%o0+168]
 
 	std	%g0,[%o0+ 0]
 	std	%g2,[%o0+ 8]
@@ -223,7 +225,8 @@ env_pop_tf:
 	ld	[%o0+136],%l2
 	ld	[%o0+148],%l5
 	mov	%l5,%y
-	nop
+	ld	[%o0+152],%l5
+	mov %l5,%asr13
 
 	jmp	%l1
 	rett	%l2

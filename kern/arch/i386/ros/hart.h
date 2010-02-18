@@ -12,6 +12,12 @@ __hart_self()
 }
 
 static inline void
+__hart_set_stack_pointer(void* sp)
+{
+	FIXME
+}
+
+static inline void
 __hart_relax()
 {
 	asm volatile ("pause" : : : "memory");

@@ -1,7 +1,7 @@
 #ifndef ROS_INC_ARCH_TRAP_H
 #define ROS_INC_ARCH_TRAP_H
 
-#define SIZEOF_TRAPFRAME_T	0xA8
+#define SIZEOF_TRAPFRAME_T	0xB0
 #define SIZEOF_ACTIVE_MESSAGE_T	0x18
 
 #ifndef __ASSEMBLER__
@@ -17,6 +17,8 @@ typedef struct
 	uint32_t wim;
 	uint32_t tbr;
 	uint32_t y;
+	uint32_t asr13;
+	uint32_t pad;
 	uint32_t fault_status;
 	uint32_t fault_addr;
 	uint64_t timestamp;

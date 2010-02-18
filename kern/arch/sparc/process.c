@@ -57,7 +57,7 @@ proc_init_trapframe(trapframe_t *tf, uint32_t vcoreid)
 
 void proc_set_tfcoreid(trapframe_t *tf, uint32_t id)
 {
-	tf->gpr[6] = id;
+	tf->asr13 = id;
 }
 
 /* For cases that we won't return from a syscall via the normal path, and need

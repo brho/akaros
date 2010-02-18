@@ -1,5 +1,6 @@
 // System call stubs.
 
+#include <unistd.h>
 #include <parlib.h>
 
 error_t sys_proc_destroy(int pid, int exitcode)
@@ -59,10 +60,10 @@ ssize_t sys_serial_read(void* buf, size_t len)
 
 //Run a binary loaded at the specificed address with the specified arguments
 ssize_t sys_run_binary(void* binary_buf, size_t len,
-                       procinfo_t* procinfo, size_t num_colors) 
+                       procinfo_t* pi, size_t num_colors) 
 {
 	return syscall(SYS_run_binary, (intreg_t)binary_buf, (intreg_t)len,
-                                   (intreg_t)procinfo,(intreg_t)num_colors, 0);
+                                   (intreg_t)pi,(intreg_t)num_colors, 0);
 }
 
 //Write a buffer over ethernet

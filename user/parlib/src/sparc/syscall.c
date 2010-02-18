@@ -1,7 +1,7 @@
 #include <parlib.h>
 #include <errno.h>
 
-intreg_t syscall(uint16_t _num, intreg_t _a1,
+intreg_t ros_syscall(uint16_t _num, intreg_t _a1,
                 intreg_t _a2, intreg_t _a3,
                 intreg_t _a4, intreg_t _a5)
 {

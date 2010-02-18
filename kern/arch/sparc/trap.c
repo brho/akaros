@@ -74,8 +74,8 @@ void
 	                "  psr  0x%08x  pc   0x%08x  npc  0x%08x  wim  0x%08x\n",
 	                tf->psr,tf->pc,tf->npc,tf->wim);
 	len += snprintf(buf+len,sizeof(buf)-len,
-	                "  tbr  0x%08x  y    0x%08x  fsr  0x%08x  far  0x%08x\n",
-	                tf->tbr,tf->y,tf->fault_status,tf->fault_addr);
+	                "  y    0x%08x  fsr  0x%08x  far  0x%08x\n",
+	                tf->y,tf->fault_status,tf->fault_addr);
 	len += snprintf(buf+len,sizeof(buf)-len,
 	                "  timestamp  %21lld\n",tf->timestamp);
 

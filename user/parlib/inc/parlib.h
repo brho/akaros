@@ -25,10 +25,10 @@ enum {
 	PG_RDWR   = 6,
 };
 
-extern procinfo_t procinfo;
-extern procdata_t procdata;
+#define procinfo (*(procinfo_t*)UINFO)
+#define procdata (*(procdata_t*)UDATA)
 
-intreg_t syscall(uint16_t num, intreg_t a1,
+intreg_t ros_syscall(uint16_t num, intreg_t a1,
                 intreg_t a2, intreg_t a3,
                 intreg_t a4, intreg_t a5);
 
@@ -41,7 +41,7 @@ ssize_t     sys_eth_read(void *COUNT(len) buf);
 ssize_t     sys_eth_get_mac_addr(void* buf);
 int         sys_eth_recv_check();
 ssize_t     sys_run_binary(void* binary_buf, size_t len,
-                           procinfo_t* procinfo, size_t num_colors);
+                           procinfo_t* pi, size_t num_colors);
 int         sys_getpid(void);
 size_t      sys_getcpuid(void);
 void *      sys_brk(void* addr);
@@ -52,7 +52,6 @@ ssize_t     sys_shared_page_free(void *COUNT(PGSIZE) addr, pid_t p2);
 ssize_t     sys_resource_req(int type, size_t amount, uint32_t flags);
 void        sys_reboot();
 void        sys_yield();
-int         gettimeofday(struct timeval* tp, void* tzp);
 void *COUNT(length) sys_mmap(void *SNT addr, size_t length, int prot, int flags,
                              int fd, size_t offset);
 

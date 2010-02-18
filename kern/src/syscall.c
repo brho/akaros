@@ -425,6 +425,8 @@ static intreg_t sys_munmap(struct proc* p, void* addr, size_t len)
 static void* sys_brk(struct proc *p, void* addr) {
 	size_t range;
 
+	spin_lock_irqsave(&p->proc_lock);
+
 	if((addr < p->heap_bottom) || (addr >= (void*)USTACKBOT))
 		goto out;
 
@@ -439,6 +441,7 @@ static void* sys_brk(struct proc *p, void* addr) {
 	p->heap_top = addr;
 
 out:
+	spin_unlock_irqsave(&p->proc_lock);
 	return p->heap_top;
 }
 

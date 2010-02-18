@@ -86,16 +86,21 @@ CFLAGS += -Wall -Wno-format -Wno-unused -fno-strict-aliasing
 LDFLAGS := -nostdlib
 
 # GCC Library path 
+ifneq ($(shell which $(CC)),)
 GCC_LIB := $(shell $(CC) -print-libgcc-file-name)
+endif
 
 # List of directories that the */Makefrag makefile fragments will add to
 OBJDIRS :=
 
-symlinks:
-	@rm -f kern/include/arch
-	@ln -s ../arch/$(TARGET_ARCH)/ kern/include/arch
-	@rm -f kern/boot
-	@ln -s arch/$(TARGET_ARCH)/boot/ kern/boot
+ROS_ARCH_DIR ?= $(TARGET_ARCH)
+symlinks-remove:
+	@rm -rf kern/include/arch
+	@rm -rf kern/boot
+
+symlinks: symlinks-remove
+	@ln -s ../arch/$(ROS_ARCH_DIR)/ kern/include/arch
+	@ln -s arch/$(ROS_ARCH_DIR)/boot/ kern/boot
 
 # Include Makefrags for subdirectories
 include user/Makefrag
