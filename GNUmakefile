@@ -20,6 +20,7 @@ COMPILER := IVY
 TOP_DIR := .
 ARCH_DIR := $(TOP_DIR)/kern/arch
 INCLUDE_DIR := $(TOP_DIR)/kern/include
+DOXYGEN_DIR := $(TOP_DIR)/Documentation/doxygen
 
 UNAME=$(shell uname -m)
 V = @
@@ -50,13 +51,13 @@ endif
 
 # Default programs for compilation
 ifeq ($(COMPILER),IVY)
-KERN_CFLAGS := --deputy\
-                  --no-rc-sharc\
-                  --sc-dynamic-is-error\
-                  --sc-ops=$(INCLUDE_DIR)/ivy/sharc.h\
-                  --sc-all-in-thread\
-                  --enable-precompile\
-#                  --enable-error-db\
+KERN_CFLAGS := --deputy \
+                  --no-rc-sharc \
+                  --sc-dynamic-is-error \
+                  --sc-ops=$(INCLUDE_DIR)/ivy/sharc.h \
+                  --sc-all-in-thread \
+                  --enable-precompile \
+#                  --enable-error-db \
 
 USER_CFLAGS := --deputy --enable-error-db
 CC	    := ivycc --gcc=$(GCCPREFIX)gcc
@@ -103,7 +104,6 @@ symlinks: symlinks-remove
 	@ln -s arch/$(ROS_ARCH_DIR)/boot/ kern/boot
 
 # Include Makefrags for subdirectories
-include user/Makefrag
 include kern/Makefrag
 
 # Eliminate default suffix rules
@@ -126,14 +126,14 @@ $(OBJDIR)/.deps: $(foreach dir, $(OBJDIRS), $(wildcard $(OBJDIR)/$(dir)/*.d))
 
 # Use doxygen to make documentation for ROS
 docs: 
-	@doxygen doc/rosdoc.cfg
-	@if [ ! -d doc/rosdoc/html/img ];          \
-	 then                                      \
-	 	ln -s ../../img doc/rosdoc/html;       \
+	@DOXYGEN_DIR=$(DOXYGEN_DIR) doxygen $(DOXYGEN_DIR)/rosdoc.cfg
+	@if [ ! -d $(DOXYGEN_DIR)/rosdoc/html/img ]; \
+	 then \
+	 	ln -s ../../img $(DOXYGEN_DIR)/rosdoc/html; \
 	 fi
 
 doxyclean:
-	rm -rf doc/rosdoc
+	rm -rf $(DOXYGEN_DIR)/rosdoc
 
 augment-gcc: symlinks
 	scripts/augment-gcc $(dir $(shell which $(CC))).. $(TARGET_ARCH)

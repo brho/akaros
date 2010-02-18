@@ -1,7 +1,0 @@
-USER_APPS_DIR = $(USER_DIR)/apps
-
-include $(USER_APPS_DIR)/roslib/Makefrag
-include $(USER_APPS_DIR)/parlib/Makefrag
-
-.PRECIOUS: $(OBJDIR)/$(USER_APPS_DIR)/roslib/%.o \
-           $(OBJDIR)/$(USER_APPS_DIR)/parlib/%.o

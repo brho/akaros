@@ -1,0 +1,3506 @@
+diff -ruN gcc-4.3.2/config.sub gcc-4.3.2.new/config.sub
+--- gcc-4.3.2/config.sub	2008-01-22 18:37:40.000000000 -0800
++++ gcc-4.3.2.new/config.sub	2010-02-12 22:02:57.000000000 -0800
+@@ -1239,7 +1239,7 @@
+ 	      | -*vms* | -sco* | -esix* | -isc* | -aix* | -sunos | -sunos[34]*\
+ 	      | -hpux* | -unos* | -osf* | -luna* | -dgux* | -solaris* | -sym* \
+ 	      | -amigaos* | -amigados* | -msdos* | -newsos* | -unicos* | -aof* \
+-	      | -aos* \
++	      | -aos* | -ros* \
+ 	      | -nindy* | -vxsim* | -vxworks* | -ebmon* | -hms* | -mvs* \
+ 	      | -clix* | -riscos* | -uniplus* | -iris* | -rtu* | -xenix* \
+ 	      | -hiux* | -386bsd* | -knetbsd* | -mirbsd* | -netbsd* \
+diff -ruN gcc-4.3.2/gcc/config/i386/ros.h gcc-4.3.2.new/gcc/config/i386/ros.h
+--- gcc-4.3.2/gcc/config/i386/ros.h	1969-12-31 16:00:00.000000000 -0800
++++ gcc-4.3.2.new/gcc/config/i386/ros.h	2010-02-12 22:02:57.000000000 -0800
+@@ -0,0 +1,11 @@
++#undef TARGET_OS_CPP_BUILTINS
++#define TARGET_OS_CPP_BUILTINS()      \
++do {                                  \
++	builtin_define_std ("ros");       \
++	builtin_define_std ("unix");      \
++	builtin_assert ("system=ros");    \
++	builtin_assert ("system=unix");   \
++} while(0);
++#undef TARGET_VERSION
++#define TARGET_VERSION fprintf(stderr, " (i386 ros)");
++
+diff -ruN gcc-4.3.2/gcc/config/sparc/ros.h gcc-4.3.2.new/gcc/config/sparc/ros.h
+--- gcc-4.3.2/gcc/config/sparc/ros.h	1969-12-31 16:00:00.000000000 -0800
++++ gcc-4.3.2.new/gcc/config/sparc/ros.h	2010-02-12 22:02:57.000000000 -0800
+@@ -0,0 +1,241 @@
++/* Definitions for SPARC running Linux-based GNU systems with ELF.
++   Copyright (C) 1996, 1997, 1998, 1999, 2000, 2002, 2003, 2004, 2005, 2006,
++   2007 Free Software Foundation, Inc.
++   Contributed by Eddie C. Dost (ecd@skynet.be)
++
++This file is part of GCC.
++
++GCC is free software; you can redistribute it and/or modify
++it under the terms of the GNU General Public License as published by
++the Free Software Foundation; either version 3, or (at your option)
++any later version.
++
++GCC is distributed in the hope that it will be useful,
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU General Public License for more details.
++
++You should have received a copy of the GNU General Public License
++along with GCC; see the file COPYING3.  If not see
++<http://www.gnu.org/licenses/>.  */
++
++#define TARGET_OS_CPP_BUILTINS()		\
++  do						\
++    {						\
++      builtin_define_std ("unix");		\
++      builtin_define_std ("ros");		\
++      builtin_define ("__ros__");		\
++      builtin_assert ("system=ros");		\
++      builtin_assert ("system=unix");		\
++      builtin_assert ("system=posix");		\
++      if (TARGET_LONG_DOUBLE_128)               \
++        builtin_define ("__LONG_DOUBLE_128__"); \
++    }						\
++  while (0)
++
++/* Don't assume anything about the header files.  */
++#define NO_IMPLICIT_EXTERN_C
++
++#undef MD_EXEC_PREFIX
++#undef MD_STARTFILE_PREFIX
++
++/* Provide a STARTFILE_SPEC appropriate for GNU/Linux.  Here we add
++   the GNU/Linux magical crtbegin.o file (see crtstuff.c) which
++   provides part of the support for getting C++ file-scope static
++   object constructed before entering `main'.  */
++   
++#undef  STARTFILE_SPEC
++#if defined HAVE_LD_PIE
++#define STARTFILE_SPEC \
++  "%{!shared: %{pg|p:gcrt1.o%s;pie:Scrt1.o%s;:crt1.o%s}}\
++   crti.o%s %{static:crtbeginT.o%s;shared|pie:crtbeginS.o%s;:crtbegin.o%s}"
++#else
++#define STARTFILE_SPEC \
++  "%{!shared: %{pg|p:gcrt1.o%s;:crt1.o%s}}\
++   crti.o%s %{static:crtbeginT.o%s;shared|pie:crtbeginS.o%s;:crtbegin.o%s}"
++#endif
++
++/* Provide a ENDFILE_SPEC appropriate for GNU/Linux.  Here we tack on
++   the GNU/Linux magical crtend.o file (see crtstuff.c) which
++   provides part of the support for getting C++ file-scope static
++   object constructed before entering `main', followed by a normal
++   GNU/Linux "finalizer" file, `crtn.o'.  */
++
++#undef  ENDFILE_SPEC
++#define ENDFILE_SPEC \
++  "%{ffast-math|funsafe-math-optimizations:crtfastmath.o%s} \
++   %{shared|pie:crtendS.o%s;:crtend.o%s} crtn.o%s"
++
++/* This is for -profile to use -lc_p instead of -lc.  */
++#undef	CC1_SPEC
++#define	CC1_SPEC "%{profile:-p} \
++%{sun4:} %{target:} \
++%{mcypress:-mcpu=cypress} \
++%{msparclite:-mcpu=sparclite} %{mf930:-mcpu=f930} %{mf934:-mcpu=f934} \
++%{mv8:-mcpu=v8} %{msupersparc:-mcpu=supersparc} \
++"
++
++/* The GNU C++ standard library requires that these macros be defined.  */
++#undef CPLUSPLUS_CPP_SPEC
++#define CPLUSPLUS_CPP_SPEC "-D_GNU_SOURCE %(cpp)"
++
++#undef TARGET_VERSION
++#define TARGET_VERSION fprintf (stderr, " (sparc GNU/Linux with ELF)");
++
++#undef SIZE_TYPE
++#define SIZE_TYPE "unsigned int"
++ 
++#undef PTRDIFF_TYPE
++#define PTRDIFF_TYPE "int"
++  
++#undef WCHAR_TYPE
++#define WCHAR_TYPE "int"
++   
++#undef WCHAR_TYPE_SIZE
++#define WCHAR_TYPE_SIZE 32
++
++#undef CPP_SUBTARGET_SPEC
++#define CPP_SUBTARGET_SPEC \
++"%{posix:-D_POSIX_SOURCE} %{pthread:-D_REENTRANT}"
++
++#undef LIB_SPEC
++#define LIB_SPEC \
++  "%{pthread:-lpthread} \
++   %{shared:-lc} \
++   %{!shared:%{mieee-fp:-lieee} %{profile:-lc_p}%{!profile:-lc}}"
++
++/* Provide a LINK_SPEC appropriate for GNU/Linux.  Here we provide support
++   for the special GCC options -static and -shared, which allow us to
++   link things in one of these three modes by applying the appropriate
++   combinations of options at link-time. We like to support here for
++   as many of the other GNU linker options as possible. But I don't
++   have the time to search for those flags. I am sure how to add
++   support for -soname shared_object_name. H.J.
++
++   I took out %{v:%{!V:-V}}. It is too much :-(. They can use
++   -Wl,-V.
++
++   When the -shared link option is used a final link is not being
++   done.  */
++
++/* If ELF is the default format, we should not use /lib/elf.  */
++
++#define GLIBC_DYNAMIC_LINKER "/lib/ld.so.1"
++#define UCLIBC_DYNAMIC_LINKER "/lib/ld-uClibc.so.0"
++#if UCLIBC_DEFAULT
++#define CHOOSE_DYNAMIC_LINKER(G, U) "%{mglibc:%{muclibc:%e-mglibc and -muclibc used together}" G ";:" U "}"
++#else
++#define CHOOSE_DYNAMIC_LINKER(G, U) "%{muclibc:%{mglibc:%e-mglibc and -muclibc used together}" U ";:" G "}"
++#endif
++#define LINUX_DYNAMIC_LINKER \
++  CHOOSE_DYNAMIC_LINKER (GLIBC_DYNAMIC_LINKER, UCLIBC_DYNAMIC_LINKER)
++
++
++#undef  LINK_SPEC
++#define LINK_SPEC "-m elf32_sparc -Y P,/usr/lib %{shared:-shared} \
++  %{!mno-relax:%{!r:-relax}} \
++  %{!shared: \
++    %{!ibcs: \
++      %{!static: \
++        %{rdynamic:-export-dynamic} \
++        %{!dynamic-linker:-dynamic-linker " LINUX_DYNAMIC_LINKER "}} \
++        %{static:-static}}}"
++
++/* The sun bundled assembler doesn't accept -Yd, (and neither does gas).
++   It's safe to pass -s always, even if -g is not used.  */
++#undef ASM_SPEC
++#define ASM_SPEC \
++  "%{V} %{v:%{!V:-V}} %{!Qn:-Qy} %{n} %{T} %{Ym,*} %{Wa,*:%*} -s \
++   %{fpic|fPIC|fpie|fPIE:-K PIC} %(asm_cpu) %(asm_relax)"
++
++/* Same as sparc.h */
++#undef DBX_REGISTER_NUMBER
++#define DBX_REGISTER_NUMBER(REGNO) (REGNO)
++
++#undef ASM_OUTPUT_ALIGNED_LOCAL
++#define ASM_OUTPUT_ALIGNED_LOCAL(FILE, NAME, SIZE, ALIGN)		\
++do {									\
++  fputs ("\t.local\t", (FILE));		\
++  assemble_name ((FILE), (NAME));					\
++  putc ('\n', (FILE));							\
++  ASM_OUTPUT_ALIGNED_COMMON (FILE, NAME, SIZE, ALIGN);			\
++} while (0)
++
++#undef COMMON_ASM_OP
++#define COMMON_ASM_OP "\t.common\t"
++
++#undef  LOCAL_LABEL_PREFIX
++#define LOCAL_LABEL_PREFIX  "."
++
++/* This is how to store into the string LABEL
++   the symbol_ref name of an internal numbered label where
++   PREFIX is the class of label and NUM is the number within the class.
++   This is suitable for output with `assemble_name'.  */
++
++#undef  ASM_GENERATE_INTERNAL_LABEL
++#define ASM_GENERATE_INTERNAL_LABEL(LABEL,PREFIX,NUM)	\
++  sprintf (LABEL, "*.L%s%ld", PREFIX, (long)(NUM))
++
++
++
++/* Define for support of TFmode long double.
++ *    SPARC ABI says that long double is 4 words.  */
++#undef LONG_DOUBLE_TYPE_SIZE
++#define LONG_DOUBLE_TYPE_SIZE (TARGET_LONG_DOUBLE_128 ? 128 : 64)
++
++/* Define this to set long double type size to use in libgcc2.c, which can
++ *    not depend on target_flags.  */
++#ifdef __LONG_DOUBLE_128__
++#define LIBGCC2_LONG_DOUBLE_TYPE_SIZE 128
++#else
++#define LIBGCC2_LONG_DOUBLE_TYPE_SIZE 64
++#endif
++
++#undef DITF_CONVERSION_LIBFUNCS
++#define DITF_CONVERSION_LIBFUNCS 1
++
++#if defined(HAVE_LD_EH_FRAME_HDR)
++#define LINK_EH_SPEC "%{!static:--eh-frame-hdr} "
++#endif
++
++#ifdef HAVE_AS_TLS
++#undef TARGET_SUN_TLS
++#undef TARGET_GNU_TLS
++#define TARGET_SUN_TLS 0
++#define TARGET_GNU_TLS 1
++#endif
++
++/* Don't be different from other Linux platforms in this regard.  */
++#define HANDLE_PRAGMA_PACK_PUSH_POP
++
++/* We use GNU ld so undefine this so that attribute((init_priority)) works.  */
++#undef CTORS_SECTION_ASM_OP
++#undef DTORS_SECTION_ASM_OP
++
++#define TARGET_POSIX_IO
++
++#undef LINK_GCC_C_SEQUENCE_SPEC
++#define LINK_GCC_C_SEQUENCE_SPEC \
++  "%{static:--start-group} %G %L %{static:--end-group}%{!static:%G}"
++
++/* Use --as-needed -lgcc_s for eh support.  */
++#ifdef HAVE_LD_AS_NEEDED
++#define USE_LD_AS_NEEDED 1
++#endif
++
++/* Linux currently uses RMO in uniprocessor mode, which is equivalent to
++   TMO, and TMO in multiprocessor mode.  But they reserve the right to
++   change their minds.  */
++#undef SPARC_RELAXED_ORDERING
++#define SPARC_RELAXED_ORDERING true
++
++#undef NEED_INDICATE_EXEC_STACK
++#define NEED_INDICATE_EXEC_STACK 1
++
++#ifdef TARGET_LIBC_PROVIDES_SSP
++/* sparc glibc provides __stack_chk_guard in [%g7 + 0x14].  */
++#define TARGET_THREAD_SSP_OFFSET	0x14
++#endif
++
++/* Define if long doubles should be mangled as 'g'.  */
++#define TARGET_ALTERNATE_LONG_DOUBLE_MANGLING
+diff -ruN gcc-4.3.2/gcc/config.gcc gcc-4.3.2.new/gcc/config.gcc
+--- gcc-4.3.2/gcc/config.gcc	2008-06-09 09:32:15.000000000 -0700
++++ gcc-4.3.2.new/gcc/config.gcc	2010-02-12 22:02:57.000000000 -0800
+@@ -609,6 +609,12 @@
+   # Assume that newlib is being used and so __cxa_atexit is provided.
+   default_use_cxa_atexit=yes
+   ;;
++*-*-ros*)
++  extra_parts="crti.o crtn.o crtbegin.o crtbeginS.o crtend.o crtendS.o"
++  gas=yes
++  gnu_ld=yes
++  default_use_cxa_atexit=yes
++  ;;
+ esac
+ 
+ case ${target} in
+@@ -1090,6 +1096,11 @@
+ 	tmake_file="i386/t-i386elf t-svr4"
+ 	use_fixproto=yes
+ 	;;
++i[34567]86-*-ros*)
++	tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h i386/i386elf.h i386/ros.h"
++	tmake_file="i386/t-i386elf t-svr4 t-slibgcc-elf-ver"
++	use_fixproto=yes
++	;;
+ x86_64-*-elf*)
+ 	tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h i386/i386elf.h i386/x86-64.h"
+ 	tmake_file="i386/t-i386elf t-svr4"
+@@ -2343,6 +2354,11 @@
+ 	extra_parts="crti.o crtn.o crtbegin.o crtend.o"
+ 	use_fixproto=yes
+ 	;;
++sparc-*-ros*)
++	tm_file="${tm_file} dbxelf.h elfos.h svr4.h sparc/sysv4.h sparc/sp-elf.h sparc/ros.h"
++	tmake_file="sparc/t-elf sparc/t-crtfm t-slibgcc-elf-ver"
++	use_fixproto=yes
++	;;
+ sparc-*-linux*)		# SPARC's running GNU/Linux, libc6
+ 	tm_file="${tm_file} dbxelf.h elfos.h svr4.h sparc/sysv4.h sparc/linux.h"
+ 	extra_options="${extra_options} sparc/long-double-switch.opt"
+diff -ruN gcc-4.3.2/libgcc/config.host gcc-4.3.2.new/libgcc/config.host
+--- gcc-4.3.2/libgcc/config.host	2008-01-25 12:49:04.000000000 -0800
++++ gcc-4.3.2.new/libgcc/config.host	2010-02-12 22:02:57.000000000 -0800
+@@ -323,6 +323,8 @@
+ 	;;
+ i[34567]86-*-openbsd*)
+ 	;;
++i[34567]86-*-ros*)
++	;;
+ i[34567]86-*-coff*)
+ 	;;
+ i[34567]86-*-linux* | i[34567]86-*-kfreebsd*-gnu | i[34567]86-*-knetbsd*-gnu)
+@@ -572,6 +574,8 @@
+ 	;;
+ sparc-*-elf*)
+ 	;;
++sparc-*-ros*)
++	;;
+ sparc-*-linux*)		# SPARC's running GNU/Linux, libc6
+ 	extra_parts="$extra_parts crtfastmath.o"
+ 	tmake_file="${tmake_file} sparc/t-crtfm"
+diff -ruN gcc-4.3.2/libstdc++-v3/configure gcc-4.3.2.new/libstdc++-v3/configure
+--- gcc-4.3.2/libstdc++-v3/configure	2008-07-07 12:49:54.000000000 -0700
++++ gcc-4.3.2.new/libstdc++-v3/configure	2010-02-12 22:03:09.000000000 -0800
+@@ -112811,6 +112811,3153 @@
+ _ACEOF
+ 
+     ;;
++  *-ros*)
++
++
++
++for ac_header in sys/types.h locale.h float.h
++do
++as_ac_Header=`echo "ac_cv_header_$ac_header" | $as_tr_sh`
++if eval "test \"\${$as_ac_Header+set}\" = set"; then
++  echo "$as_me:$LINENO: checking for $ac_header" >&5
++echo $ECHO_N "checking for $ac_header... $ECHO_C" >&6
++if eval "test \"\${$as_ac_Header+set}\" = set"; then
++  echo $ECHO_N "(cached) $ECHO_C" >&6
++fi
++echo "$as_me:$LINENO: result: `eval echo '${'$as_ac_Header'}'`" >&5
++echo "${ECHO_T}`eval echo '${'$as_ac_Header'}'`" >&6
++else
++  # Is the header compilable?
++echo "$as_me:$LINENO: checking $ac_header usability" >&5
++echo $ECHO_N "checking $ac_header usability... $ECHO_C" >&6
++cat >conftest.$ac_ext <<_ACEOF
++/* confdefs.h.  */
++_ACEOF
++cat confdefs.h >>conftest.$ac_ext
++cat >>conftest.$ac_ext <<_ACEOF
++/* end confdefs.h.  */
++$ac_includes_default
++#include <$ac_header>
++_ACEOF
++rm -f conftest.$ac_objext
++if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
++  (eval $ac_compile) 2>conftest.er1
++  ac_status=$?
++  grep -v '^ *+' conftest.er1 >conftest.err
++  rm -f conftest.er1
++  cat conftest.err >&5
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); } &&
++	 { ac_try='test -z "$ac_c_werror_flag"
++			 || test ! -s conftest.err'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; } &&
++	 { ac_try='test -s conftest.$ac_objext'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; }; then
++  ac_header_compiler=yes
++else
++  echo "$as_me: failed program was:" >&5
++sed 's/^/| /' conftest.$ac_ext >&5
++
++ac_header_compiler=no
++fi
++rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
++echo "$as_me:$LINENO: result: $ac_header_compiler" >&5
++echo "${ECHO_T}$ac_header_compiler" >&6
++
++# Is the header present?
++echo "$as_me:$LINENO: checking $ac_header presence" >&5
++echo $ECHO_N "checking $ac_header presence... $ECHO_C" >&6
++cat >conftest.$ac_ext <<_ACEOF
++/* confdefs.h.  */
++_ACEOF
++cat confdefs.h >>conftest.$ac_ext
++cat >>conftest.$ac_ext <<_ACEOF
++/* end confdefs.h.  */
++#include <$ac_header>
++_ACEOF
++if { (eval echo "$as_me:$LINENO: \"$ac_cpp conftest.$ac_ext\"") >&5
++  (eval $ac_cpp conftest.$ac_ext) 2>conftest.er1
++  ac_status=$?
++  grep -v '^ *+' conftest.er1 >conftest.err
++  rm -f conftest.er1
++  cat conftest.err >&5
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); } >/dev/null; then
++  if test -s conftest.err; then
++    ac_cpp_err=$ac_c_preproc_warn_flag
++    ac_cpp_err=$ac_cpp_err$ac_c_werror_flag
++  else
++    ac_cpp_err=
++  fi
++else
++  ac_cpp_err=yes
++fi
++if test -z "$ac_cpp_err"; then
++  ac_header_preproc=yes
++else
++  echo "$as_me: failed program was:" >&5
++sed 's/^/| /' conftest.$ac_ext >&5
++
++  ac_header_preproc=no
++fi
++rm -f conftest.err conftest.$ac_ext
++echo "$as_me:$LINENO: result: $ac_header_preproc" >&5
++echo "${ECHO_T}$ac_header_preproc" >&6
++
++# So?  What about this header?
++case $ac_header_compiler:$ac_header_preproc:$ac_c_preproc_warn_flag in
++  yes:no: )
++    { echo "$as_me:$LINENO: WARNING: $ac_header: accepted by the compiler, rejected by the preprocessor!" >&5
++echo "$as_me: WARNING: $ac_header: accepted by the compiler, rejected by the preprocessor!" >&2;}
++    { echo "$as_me:$LINENO: WARNING: $ac_header: proceeding with the compiler's result" >&5
++echo "$as_me: WARNING: $ac_header: proceeding with the compiler's result" >&2;}
++    ac_header_preproc=yes
++    ;;
++  no:yes:* )
++    { echo "$as_me:$LINENO: WARNING: $ac_header: present but cannot be compiled" >&5
++echo "$as_me: WARNING: $ac_header: present but cannot be compiled" >&2;}
++    { echo "$as_me:$LINENO: WARNING: $ac_header:     check for missing prerequisite headers?" >&5
++echo "$as_me: WARNING: $ac_header:     check for missing prerequisite headers?" >&2;}
++    { echo "$as_me:$LINENO: WARNING: $ac_header: see the Autoconf documentation" >&5
++echo "$as_me: WARNING: $ac_header: see the Autoconf documentation" >&2;}
++    { echo "$as_me:$LINENO: WARNING: $ac_header:     section \"Present But Cannot Be Compiled\"" >&5
++echo "$as_me: WARNING: $ac_header:     section \"Present But Cannot Be Compiled\"" >&2;}
++    { echo "$as_me:$LINENO: WARNING: $ac_header: proceeding with the preprocessor's result" >&5
++echo "$as_me: WARNING: $ac_header: proceeding with the preprocessor's result" >&2;}
++    { echo "$as_me:$LINENO: WARNING: $ac_header: in the future, the compiler will take precedence" >&5
++echo "$as_me: WARNING: $ac_header: in the future, the compiler will take precedence" >&2;}
++    (
++      cat <<\_ASBOX
++## ----------------------------------------- ##
++## Report this to the package-unused lists.  ##
++## ----------------------------------------- ##
++_ASBOX
++    ) |
++      sed "s/^/$as_me: WARNING:     /" >&2
++    ;;
++esac
++echo "$as_me:$LINENO: checking for $ac_header" >&5
++echo $ECHO_N "checking for $ac_header... $ECHO_C" >&6
++if eval "test \"\${$as_ac_Header+set}\" = set"; then
++  echo $ECHO_N "(cached) $ECHO_C" >&6
++else
++  eval "$as_ac_Header=\$ac_header_preproc"
++fi
++echo "$as_me:$LINENO: result: `eval echo '${'$as_ac_Header'}'`" >&5
++echo "${ECHO_T}`eval echo '${'$as_ac_Header'}'`" >&6
++
++fi
++if test `eval echo '${'$as_ac_Header'}'` = yes; then
++  cat >>confdefs.h <<_ACEOF
++#define `echo "HAVE_$ac_header" | $as_tr_cpp` 1
++_ACEOF
++
++fi
++
++done
++
++
++
++  echo "$as_me:$LINENO: checking for __builtin_abs declaration" >&5
++echo $ECHO_N "checking for __builtin_abs declaration... $ECHO_C" >&6
++  if test x${glibcxx_cv_func___builtin_abs_use+set} != xset; then
++    if test "${glibcxx_cv_func___builtin_abs_use+set}" = set; then
++  echo $ECHO_N "(cached) $ECHO_C" >&6
++else
++
++
++
++      ac_ext=cc
++ac_cpp='$CXXCPP $CPPFLAGS'
++ac_compile='$CXX -c $CXXFLAGS $CPPFLAGS conftest.$ac_ext >&5'
++ac_link='$CXX -o conftest$ac_exeext $CXXFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
++ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
++
++      cat >conftest.$ac_ext <<_ACEOF
++/* confdefs.h.  */
++_ACEOF
++cat confdefs.h >>conftest.$ac_ext
++cat >>conftest.$ac_ext <<_ACEOF
++/* end confdefs.h.  */
++#include <math.h>
++int
++main ()
++{
++ __builtin_abs(0);
++  ;
++  return 0;
++}
++_ACEOF
++rm -f conftest.$ac_objext
++if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
++  (eval $ac_compile) 2>conftest.er1
++  ac_status=$?
++  grep -v '^ *+' conftest.er1 >conftest.err
++  rm -f conftest.er1
++  cat conftest.err >&5
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); } &&
++	 { ac_try='test -z "$ac_cxx_werror_flag"
++			 || test ! -s conftest.err'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; } &&
++	 { ac_try='test -s conftest.$ac_objext'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; }; then
++  glibcxx_cv_func___builtin_abs_use=yes
++else
++  echo "$as_me: failed program was:" >&5
++sed 's/^/| /' conftest.$ac_ext >&5
++
++glibcxx_cv_func___builtin_abs_use=no
++fi
++rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
++      ac_ext=c
++ac_cpp='$CPP $CPPFLAGS'
++ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
++ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
++ac_compiler_gnu=$ac_cv_c_compiler_gnu
++
++
++fi
++
++  fi
++  echo "$as_me:$LINENO: result: $glibcxx_cv_func___builtin_abs_use" >&5
++echo "${ECHO_T}$glibcxx_cv_func___builtin_abs_use" >&6
++  if test x$glibcxx_cv_func___builtin_abs_use = x"yes"; then
++    echo "$as_me:$LINENO: checking for __builtin_abs linkage" >&5
++echo $ECHO_N "checking for __builtin_abs linkage... $ECHO_C" >&6
++    if test x${glibcxx_cv_func___builtin_abs_link+set} != xset; then
++      if test "${glibcxx_cv_func___builtin_abs_link+set}" = set; then
++  echo $ECHO_N "(cached) $ECHO_C" >&6
++else
++
++        if test x$gcc_no_link = xyes; then
++  { { echo "$as_me:$LINENO: error: Link tests are not allowed after GCC_NO_EXECUTABLES." >&5
++echo "$as_me: error: Link tests are not allowed after GCC_NO_EXECUTABLES." >&2;}
++   { (exit 1); exit 1; }; }
++fi
++cat >conftest.$ac_ext <<_ACEOF
++/* confdefs.h.  */
++_ACEOF
++cat confdefs.h >>conftest.$ac_ext
++cat >>conftest.$ac_ext <<_ACEOF
++/* end confdefs.h.  */
++#include <math.h>
++int
++main ()
++{
++ __builtin_abs(0);
++  ;
++  return 0;
++}
++_ACEOF
++rm -f conftest.$ac_objext conftest$ac_exeext
++if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
++  (eval $ac_link) 2>conftest.er1
++  ac_status=$?
++  grep -v '^ *+' conftest.er1 >conftest.err
++  rm -f conftest.er1
++  cat conftest.err >&5
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); } &&
++	 { ac_try='test -z "$ac_c_werror_flag"
++			 || test ! -s conftest.err'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; } &&
++	 { ac_try='test -s conftest$ac_exeext'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; }; then
++  glibcxx_cv_func___builtin_abs_link=yes
++else
++  echo "$as_me: failed program was:" >&5
++sed 's/^/| /' conftest.$ac_ext >&5
++
++glibcxx_cv_func___builtin_abs_link=no
++fi
++rm -f conftest.err conftest.$ac_objext \
++      conftest$ac_exeext conftest.$ac_ext
++
++fi
++
++    fi
++    echo "$as_me:$LINENO: result: $glibcxx_cv_func___builtin_abs_link" >&5
++echo "${ECHO_T}$glibcxx_cv_func___builtin_abs_link" >&6
++
++    if test x$glibcxx_cv_func___builtin_abs_link = x"yes"; then
++
++cat >>confdefs.h <<\_ACEOF
++#define HAVE___BUILTIN_ABS 1
++_ACEOF
++
++    fi
++
++  fi
++
++
++  echo "$as_me:$LINENO: checking for __builtin_fabsf declaration" >&5
++echo $ECHO_N "checking for __builtin_fabsf declaration... $ECHO_C" >&6
++  if test x${glibcxx_cv_func___builtin_fabsf_use+set} != xset; then
++    if test "${glibcxx_cv_func___builtin_fabsf_use+set}" = set; then
++  echo $ECHO_N "(cached) $ECHO_C" >&6
++else
++
++
++
++      ac_ext=cc
++ac_cpp='$CXXCPP $CPPFLAGS'
++ac_compile='$CXX -c $CXXFLAGS $CPPFLAGS conftest.$ac_ext >&5'
++ac_link='$CXX -o conftest$ac_exeext $CXXFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
++ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
++
++      cat >conftest.$ac_ext <<_ACEOF
++/* confdefs.h.  */
++_ACEOF
++cat confdefs.h >>conftest.$ac_ext
++cat >>conftest.$ac_ext <<_ACEOF
++/* end confdefs.h.  */
++#include <math.h>
++int
++main ()
++{
++ __builtin_fabsf(0);
++  ;
++  return 0;
++}
++_ACEOF
++rm -f conftest.$ac_objext
++if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
++  (eval $ac_compile) 2>conftest.er1
++  ac_status=$?
++  grep -v '^ *+' conftest.er1 >conftest.err
++  rm -f conftest.er1
++  cat conftest.err >&5
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); } &&
++	 { ac_try='test -z "$ac_cxx_werror_flag"
++			 || test ! -s conftest.err'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; } &&
++	 { ac_try='test -s conftest.$ac_objext'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; }; then
++  glibcxx_cv_func___builtin_fabsf_use=yes
++else
++  echo "$as_me: failed program was:" >&5
++sed 's/^/| /' conftest.$ac_ext >&5
++
++glibcxx_cv_func___builtin_fabsf_use=no
++fi
++rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
++      ac_ext=c
++ac_cpp='$CPP $CPPFLAGS'
++ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
++ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
++ac_compiler_gnu=$ac_cv_c_compiler_gnu
++
++
++fi
++
++  fi
++  echo "$as_me:$LINENO: result: $glibcxx_cv_func___builtin_fabsf_use" >&5
++echo "${ECHO_T}$glibcxx_cv_func___builtin_fabsf_use" >&6
++  if test x$glibcxx_cv_func___builtin_fabsf_use = x"yes"; then
++    echo "$as_me:$LINENO: checking for __builtin_fabsf linkage" >&5
++echo $ECHO_N "checking for __builtin_fabsf linkage... $ECHO_C" >&6
++    if test x${glibcxx_cv_func___builtin_fabsf_link+set} != xset; then
++      if test "${glibcxx_cv_func___builtin_fabsf_link+set}" = set; then
++  echo $ECHO_N "(cached) $ECHO_C" >&6
++else
++
++        if test x$gcc_no_link = xyes; then
++  { { echo "$as_me:$LINENO: error: Link tests are not allowed after GCC_NO_EXECUTABLES." >&5
++echo "$as_me: error: Link tests are not allowed after GCC_NO_EXECUTABLES." >&2;}
++   { (exit 1); exit 1; }; }
++fi
++cat >conftest.$ac_ext <<_ACEOF
++/* confdefs.h.  */
++_ACEOF
++cat confdefs.h >>conftest.$ac_ext
++cat >>conftest.$ac_ext <<_ACEOF
++/* end confdefs.h.  */
++#include <math.h>
++int
++main ()
++{
++ __builtin_fabsf(0);
++  ;
++  return 0;
++}
++_ACEOF
++rm -f conftest.$ac_objext conftest$ac_exeext
++if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
++  (eval $ac_link) 2>conftest.er1
++  ac_status=$?
++  grep -v '^ *+' conftest.er1 >conftest.err
++  rm -f conftest.er1
++  cat conftest.err >&5
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); } &&
++	 { ac_try='test -z "$ac_c_werror_flag"
++			 || test ! -s conftest.err'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; } &&
++	 { ac_try='test -s conftest$ac_exeext'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; }; then
++  glibcxx_cv_func___builtin_fabsf_link=yes
++else
++  echo "$as_me: failed program was:" >&5
++sed 's/^/| /' conftest.$ac_ext >&5
++
++glibcxx_cv_func___builtin_fabsf_link=no
++fi
++rm -f conftest.err conftest.$ac_objext \
++      conftest$ac_exeext conftest.$ac_ext
++
++fi
++
++    fi
++    echo "$as_me:$LINENO: result: $glibcxx_cv_func___builtin_fabsf_link" >&5
++echo "${ECHO_T}$glibcxx_cv_func___builtin_fabsf_link" >&6
++
++    if test x$glibcxx_cv_func___builtin_fabsf_link = x"yes"; then
++
++cat >>confdefs.h <<\_ACEOF
++#define HAVE___BUILTIN_FABSF 1
++_ACEOF
++
++    fi
++
++  fi
++
++
++  echo "$as_me:$LINENO: checking for __builtin_fabs declaration" >&5
++echo $ECHO_N "checking for __builtin_fabs declaration... $ECHO_C" >&6
++  if test x${glibcxx_cv_func___builtin_fabs_use+set} != xset; then
++    if test "${glibcxx_cv_func___builtin_fabs_use+set}" = set; then
++  echo $ECHO_N "(cached) $ECHO_C" >&6
++else
++
++
++
++      ac_ext=cc
++ac_cpp='$CXXCPP $CPPFLAGS'
++ac_compile='$CXX -c $CXXFLAGS $CPPFLAGS conftest.$ac_ext >&5'
++ac_link='$CXX -o conftest$ac_exeext $CXXFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
++ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
++
++      cat >conftest.$ac_ext <<_ACEOF
++/* confdefs.h.  */
++_ACEOF
++cat confdefs.h >>conftest.$ac_ext
++cat >>conftest.$ac_ext <<_ACEOF
++/* end confdefs.h.  */
++#include <math.h>
++int
++main ()
++{
++ __builtin_fabs(0);
++  ;
++  return 0;
++}
++_ACEOF
++rm -f conftest.$ac_objext
++if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
++  (eval $ac_compile) 2>conftest.er1
++  ac_status=$?
++  grep -v '^ *+' conftest.er1 >conftest.err
++  rm -f conftest.er1
++  cat conftest.err >&5
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); } &&
++	 { ac_try='test -z "$ac_cxx_werror_flag"
++			 || test ! -s conftest.err'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; } &&
++	 { ac_try='test -s conftest.$ac_objext'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; }; then
++  glibcxx_cv_func___builtin_fabs_use=yes
++else
++  echo "$as_me: failed program was:" >&5
++sed 's/^/| /' conftest.$ac_ext >&5
++
++glibcxx_cv_func___builtin_fabs_use=no
++fi
++rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
++      ac_ext=c
++ac_cpp='$CPP $CPPFLAGS'
++ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
++ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
++ac_compiler_gnu=$ac_cv_c_compiler_gnu
++
++
++fi
++
++  fi
++  echo "$as_me:$LINENO: result: $glibcxx_cv_func___builtin_fabs_use" >&5
++echo "${ECHO_T}$glibcxx_cv_func___builtin_fabs_use" >&6
++  if test x$glibcxx_cv_func___builtin_fabs_use = x"yes"; then
++    echo "$as_me:$LINENO: checking for __builtin_fabs linkage" >&5
++echo $ECHO_N "checking for __builtin_fabs linkage... $ECHO_C" >&6
++    if test x${glibcxx_cv_func___builtin_fabs_link+set} != xset; then
++      if test "${glibcxx_cv_func___builtin_fabs_link+set}" = set; then
++  echo $ECHO_N "(cached) $ECHO_C" >&6
++else
++
++        if test x$gcc_no_link = xyes; then
++  { { echo "$as_me:$LINENO: error: Link tests are not allowed after GCC_NO_EXECUTABLES." >&5
++echo "$as_me: error: Link tests are not allowed after GCC_NO_EXECUTABLES." >&2;}
++   { (exit 1); exit 1; }; }
++fi
++cat >conftest.$ac_ext <<_ACEOF
++/* confdefs.h.  */
++_ACEOF
++cat confdefs.h >>conftest.$ac_ext
++cat >>conftest.$ac_ext <<_ACEOF
++/* end confdefs.h.  */
++#include <math.h>
++int
++main ()
++{
++ __builtin_fabs(0);
++  ;
++  return 0;
++}
++_ACEOF
++rm -f conftest.$ac_objext conftest$ac_exeext
++if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
++  (eval $ac_link) 2>conftest.er1
++  ac_status=$?
++  grep -v '^ *+' conftest.er1 >conftest.err
++  rm -f conftest.er1
++  cat conftest.err >&5
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); } &&
++	 { ac_try='test -z "$ac_c_werror_flag"
++			 || test ! -s conftest.err'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; } &&
++	 { ac_try='test -s conftest$ac_exeext'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; }; then
++  glibcxx_cv_func___builtin_fabs_link=yes
++else
++  echo "$as_me: failed program was:" >&5
++sed 's/^/| /' conftest.$ac_ext >&5
++
++glibcxx_cv_func___builtin_fabs_link=no
++fi
++rm -f conftest.err conftest.$ac_objext \
++      conftest$ac_exeext conftest.$ac_ext
++
++fi
++
++    fi
++    echo "$as_me:$LINENO: result: $glibcxx_cv_func___builtin_fabs_link" >&5
++echo "${ECHO_T}$glibcxx_cv_func___builtin_fabs_link" >&6
++
++    if test x$glibcxx_cv_func___builtin_fabs_link = x"yes"; then
++
++cat >>confdefs.h <<\_ACEOF
++#define HAVE___BUILTIN_FABS 1
++_ACEOF
++
++    fi
++
++  fi
++
++
++  echo "$as_me:$LINENO: checking for __builtin_fabsl declaration" >&5
++echo $ECHO_N "checking for __builtin_fabsl declaration... $ECHO_C" >&6
++  if test x${glibcxx_cv_func___builtin_fabsl_use+set} != xset; then
++    if test "${glibcxx_cv_func___builtin_fabsl_use+set}" = set; then
++  echo $ECHO_N "(cached) $ECHO_C" >&6
++else
++
++
++
++      ac_ext=cc
++ac_cpp='$CXXCPP $CPPFLAGS'
++ac_compile='$CXX -c $CXXFLAGS $CPPFLAGS conftest.$ac_ext >&5'
++ac_link='$CXX -o conftest$ac_exeext $CXXFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
++ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
++
++      cat >conftest.$ac_ext <<_ACEOF
++/* confdefs.h.  */
++_ACEOF
++cat confdefs.h >>conftest.$ac_ext
++cat >>conftest.$ac_ext <<_ACEOF
++/* end confdefs.h.  */
++#include <math.h>
++int
++main ()
++{
++ __builtin_fabsl(0);
++  ;
++  return 0;
++}
++_ACEOF
++rm -f conftest.$ac_objext
++if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
++  (eval $ac_compile) 2>conftest.er1
++  ac_status=$?
++  grep -v '^ *+' conftest.er1 >conftest.err
++  rm -f conftest.er1
++  cat conftest.err >&5
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); } &&
++	 { ac_try='test -z "$ac_cxx_werror_flag"
++			 || test ! -s conftest.err'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; } &&
++	 { ac_try='test -s conftest.$ac_objext'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; }; then
++  glibcxx_cv_func___builtin_fabsl_use=yes
++else
++  echo "$as_me: failed program was:" >&5
++sed 's/^/| /' conftest.$ac_ext >&5
++
++glibcxx_cv_func___builtin_fabsl_use=no
++fi
++rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
++      ac_ext=c
++ac_cpp='$CPP $CPPFLAGS'
++ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
++ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
++ac_compiler_gnu=$ac_cv_c_compiler_gnu
++
++
++fi
++
++  fi
++  echo "$as_me:$LINENO: result: $glibcxx_cv_func___builtin_fabsl_use" >&5
++echo "${ECHO_T}$glibcxx_cv_func___builtin_fabsl_use" >&6
++  if test x$glibcxx_cv_func___builtin_fabsl_use = x"yes"; then
++    echo "$as_me:$LINENO: checking for __builtin_fabsl linkage" >&5
++echo $ECHO_N "checking for __builtin_fabsl linkage... $ECHO_C" >&6
++    if test x${glibcxx_cv_func___builtin_fabsl_link+set} != xset; then
++      if test "${glibcxx_cv_func___builtin_fabsl_link+set}" = set; then
++  echo $ECHO_N "(cached) $ECHO_C" >&6
++else
++
++        if test x$gcc_no_link = xyes; then
++  { { echo "$as_me:$LINENO: error: Link tests are not allowed after GCC_NO_EXECUTABLES." >&5
++echo "$as_me: error: Link tests are not allowed after GCC_NO_EXECUTABLES." >&2;}
++   { (exit 1); exit 1; }; }
++fi
++cat >conftest.$ac_ext <<_ACEOF
++/* confdefs.h.  */
++_ACEOF
++cat confdefs.h >>conftest.$ac_ext
++cat >>conftest.$ac_ext <<_ACEOF
++/* end confdefs.h.  */
++#include <math.h>
++int
++main ()
++{
++ __builtin_fabsl(0);
++  ;
++  return 0;
++}
++_ACEOF
++rm -f conftest.$ac_objext conftest$ac_exeext
++if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
++  (eval $ac_link) 2>conftest.er1
++  ac_status=$?
++  grep -v '^ *+' conftest.er1 >conftest.err
++  rm -f conftest.er1
++  cat conftest.err >&5
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); } &&
++	 { ac_try='test -z "$ac_c_werror_flag"
++			 || test ! -s conftest.err'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; } &&
++	 { ac_try='test -s conftest$ac_exeext'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; }; then
++  glibcxx_cv_func___builtin_fabsl_link=yes
++else
++  echo "$as_me: failed program was:" >&5
++sed 's/^/| /' conftest.$ac_ext >&5
++
++glibcxx_cv_func___builtin_fabsl_link=no
++fi
++rm -f conftest.err conftest.$ac_objext \
++      conftest$ac_exeext conftest.$ac_ext
++
++fi
++
++    fi
++    echo "$as_me:$LINENO: result: $glibcxx_cv_func___builtin_fabsl_link" >&5
++echo "${ECHO_T}$glibcxx_cv_func___builtin_fabsl_link" >&6
++
++    if test x$glibcxx_cv_func___builtin_fabsl_link = x"yes"; then
++
++cat >>confdefs.h <<\_ACEOF
++#define HAVE___BUILTIN_FABSL 1
++_ACEOF
++
++    fi
++
++  fi
++
++
++  echo "$as_me:$LINENO: checking for __builtin_labs declaration" >&5
++echo $ECHO_N "checking for __builtin_labs declaration... $ECHO_C" >&6
++  if test x${glibcxx_cv_func___builtin_labs_use+set} != xset; then
++    if test "${glibcxx_cv_func___builtin_labs_use+set}" = set; then
++  echo $ECHO_N "(cached) $ECHO_C" >&6
++else
++
++
++
++      ac_ext=cc
++ac_cpp='$CXXCPP $CPPFLAGS'
++ac_compile='$CXX -c $CXXFLAGS $CPPFLAGS conftest.$ac_ext >&5'
++ac_link='$CXX -o conftest$ac_exeext $CXXFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
++ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
++
++      cat >conftest.$ac_ext <<_ACEOF
++/* confdefs.h.  */
++_ACEOF
++cat confdefs.h >>conftest.$ac_ext
++cat >>conftest.$ac_ext <<_ACEOF
++/* end confdefs.h.  */
++#include <math.h>
++int
++main ()
++{
++ __builtin_labs(0);
++  ;
++  return 0;
++}
++_ACEOF
++rm -f conftest.$ac_objext
++if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
++  (eval $ac_compile) 2>conftest.er1
++  ac_status=$?
++  grep -v '^ *+' conftest.er1 >conftest.err
++  rm -f conftest.er1
++  cat conftest.err >&5
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); } &&
++	 { ac_try='test -z "$ac_cxx_werror_flag"
++			 || test ! -s conftest.err'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; } &&
++	 { ac_try='test -s conftest.$ac_objext'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; }; then
++  glibcxx_cv_func___builtin_labs_use=yes
++else
++  echo "$as_me: failed program was:" >&5
++sed 's/^/| /' conftest.$ac_ext >&5
++
++glibcxx_cv_func___builtin_labs_use=no
++fi
++rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
++      ac_ext=c
++ac_cpp='$CPP $CPPFLAGS'
++ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
++ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
++ac_compiler_gnu=$ac_cv_c_compiler_gnu
++
++
++fi
++
++  fi
++  echo "$as_me:$LINENO: result: $glibcxx_cv_func___builtin_labs_use" >&5
++echo "${ECHO_T}$glibcxx_cv_func___builtin_labs_use" >&6
++  if test x$glibcxx_cv_func___builtin_labs_use = x"yes"; then
++    echo "$as_me:$LINENO: checking for __builtin_labs linkage" >&5
++echo $ECHO_N "checking for __builtin_labs linkage... $ECHO_C" >&6
++    if test x${glibcxx_cv_func___builtin_labs_link+set} != xset; then
++      if test "${glibcxx_cv_func___builtin_labs_link+set}" = set; then
++  echo $ECHO_N "(cached) $ECHO_C" >&6
++else
++
++        if test x$gcc_no_link = xyes; then
++  { { echo "$as_me:$LINENO: error: Link tests are not allowed after GCC_NO_EXECUTABLES." >&5
++echo "$as_me: error: Link tests are not allowed after GCC_NO_EXECUTABLES." >&2;}
++   { (exit 1); exit 1; }; }
++fi
++cat >conftest.$ac_ext <<_ACEOF
++/* confdefs.h.  */
++_ACEOF
++cat confdefs.h >>conftest.$ac_ext
++cat >>conftest.$ac_ext <<_ACEOF
++/* end confdefs.h.  */
++#include <math.h>
++int
++main ()
++{
++ __builtin_labs(0);
++  ;
++  return 0;
++}
++_ACEOF
++rm -f conftest.$ac_objext conftest$ac_exeext
++if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
++  (eval $ac_link) 2>conftest.er1
++  ac_status=$?
++  grep -v '^ *+' conftest.er1 >conftest.err
++  rm -f conftest.er1
++  cat conftest.err >&5
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); } &&
++	 { ac_try='test -z "$ac_c_werror_flag"
++			 || test ! -s conftest.err'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; } &&
++	 { ac_try='test -s conftest$ac_exeext'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; }; then
++  glibcxx_cv_func___builtin_labs_link=yes
++else
++  echo "$as_me: failed program was:" >&5
++sed 's/^/| /' conftest.$ac_ext >&5
++
++glibcxx_cv_func___builtin_labs_link=no
++fi
++rm -f conftest.err conftest.$ac_objext \
++      conftest$ac_exeext conftest.$ac_ext
++
++fi
++
++    fi
++    echo "$as_me:$LINENO: result: $glibcxx_cv_func___builtin_labs_link" >&5
++echo "${ECHO_T}$glibcxx_cv_func___builtin_labs_link" >&6
++
++    if test x$glibcxx_cv_func___builtin_labs_link = x"yes"; then
++
++cat >>confdefs.h <<\_ACEOF
++#define HAVE___BUILTIN_LABS 1
++_ACEOF
++
++    fi
++
++  fi
++
++
++
++  echo "$as_me:$LINENO: checking for __builtin_sqrtf declaration" >&5
++echo $ECHO_N "checking for __builtin_sqrtf declaration... $ECHO_C" >&6
++  if test x${glibcxx_cv_func___builtin_sqrtf_use+set} != xset; then
++    if test "${glibcxx_cv_func___builtin_sqrtf_use+set}" = set; then
++  echo $ECHO_N "(cached) $ECHO_C" >&6
++else
++
++
++
++      ac_ext=cc
++ac_cpp='$CXXCPP $CPPFLAGS'
++ac_compile='$CXX -c $CXXFLAGS $CPPFLAGS conftest.$ac_ext >&5'
++ac_link='$CXX -o conftest$ac_exeext $CXXFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
++ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
++
++      cat >conftest.$ac_ext <<_ACEOF
++/* confdefs.h.  */
++_ACEOF
++cat confdefs.h >>conftest.$ac_ext
++cat >>conftest.$ac_ext <<_ACEOF
++/* end confdefs.h.  */
++#include <math.h>
++int
++main ()
++{
++ __builtin_sqrtf(0);
++  ;
++  return 0;
++}
++_ACEOF
++rm -f conftest.$ac_objext
++if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
++  (eval $ac_compile) 2>conftest.er1
++  ac_status=$?
++  grep -v '^ *+' conftest.er1 >conftest.err
++  rm -f conftest.er1
++  cat conftest.err >&5
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); } &&
++	 { ac_try='test -z "$ac_cxx_werror_flag"
++			 || test ! -s conftest.err'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; } &&
++	 { ac_try='test -s conftest.$ac_objext'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; }; then
++  glibcxx_cv_func___builtin_sqrtf_use=yes
++else
++  echo "$as_me: failed program was:" >&5
++sed 's/^/| /' conftest.$ac_ext >&5
++
++glibcxx_cv_func___builtin_sqrtf_use=no
++fi
++rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
++      ac_ext=c
++ac_cpp='$CPP $CPPFLAGS'
++ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
++ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
++ac_compiler_gnu=$ac_cv_c_compiler_gnu
++
++
++fi
++
++  fi
++  echo "$as_me:$LINENO: result: $glibcxx_cv_func___builtin_sqrtf_use" >&5
++echo "${ECHO_T}$glibcxx_cv_func___builtin_sqrtf_use" >&6
++  if test x$glibcxx_cv_func___builtin_sqrtf_use = x"yes"; then
++    echo "$as_me:$LINENO: checking for __builtin_sqrtf linkage" >&5
++echo $ECHO_N "checking for __builtin_sqrtf linkage... $ECHO_C" >&6
++    if test x${glibcxx_cv_func___builtin_sqrtf_link+set} != xset; then
++      if test "${glibcxx_cv_func___builtin_sqrtf_link+set}" = set; then
++  echo $ECHO_N "(cached) $ECHO_C" >&6
++else
++
++        if test x$gcc_no_link = xyes; then
++  { { echo "$as_me:$LINENO: error: Link tests are not allowed after GCC_NO_EXECUTABLES." >&5
++echo "$as_me: error: Link tests are not allowed after GCC_NO_EXECUTABLES." >&2;}
++   { (exit 1); exit 1; }; }
++fi
++cat >conftest.$ac_ext <<_ACEOF
++/* confdefs.h.  */
++_ACEOF
++cat confdefs.h >>conftest.$ac_ext
++cat >>conftest.$ac_ext <<_ACEOF
++/* end confdefs.h.  */
++#include <math.h>
++int
++main ()
++{
++ __builtin_sqrtf(0);
++  ;
++  return 0;
++}
++_ACEOF
++rm -f conftest.$ac_objext conftest$ac_exeext
++if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
++  (eval $ac_link) 2>conftest.er1
++  ac_status=$?
++  grep -v '^ *+' conftest.er1 >conftest.err
++  rm -f conftest.er1
++  cat conftest.err >&5
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); } &&
++	 { ac_try='test -z "$ac_c_werror_flag"
++			 || test ! -s conftest.err'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; } &&
++	 { ac_try='test -s conftest$ac_exeext'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; }; then
++  glibcxx_cv_func___builtin_sqrtf_link=yes
++else
++  echo "$as_me: failed program was:" >&5
++sed 's/^/| /' conftest.$ac_ext >&5
++
++glibcxx_cv_func___builtin_sqrtf_link=no
++fi
++rm -f conftest.err conftest.$ac_objext \
++      conftest$ac_exeext conftest.$ac_ext
++
++fi
++
++    fi
++    echo "$as_me:$LINENO: result: $glibcxx_cv_func___builtin_sqrtf_link" >&5
++echo "${ECHO_T}$glibcxx_cv_func___builtin_sqrtf_link" >&6
++
++    if test x$glibcxx_cv_func___builtin_sqrtf_link = x"yes"; then
++
++cat >>confdefs.h <<\_ACEOF
++#define HAVE___BUILTIN_SQRTF 1
++_ACEOF
++
++    fi
++
++  fi
++
++
++  echo "$as_me:$LINENO: checking for __builtin_sqrt declaration" >&5
++echo $ECHO_N "checking for __builtin_sqrt declaration... $ECHO_C" >&6
++  if test x${glibcxx_cv_func___builtin_sqrt_use+set} != xset; then
++    if test "${glibcxx_cv_func___builtin_sqrt_use+set}" = set; then
++  echo $ECHO_N "(cached) $ECHO_C" >&6
++else
++
++
++
++      ac_ext=cc
++ac_cpp='$CXXCPP $CPPFLAGS'
++ac_compile='$CXX -c $CXXFLAGS $CPPFLAGS conftest.$ac_ext >&5'
++ac_link='$CXX -o conftest$ac_exeext $CXXFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
++ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
++
++      cat >conftest.$ac_ext <<_ACEOF
++/* confdefs.h.  */
++_ACEOF
++cat confdefs.h >>conftest.$ac_ext
++cat >>conftest.$ac_ext <<_ACEOF
++/* end confdefs.h.  */
++#include <math.h>
++int
++main ()
++{
++ __builtin_sqrt(0);
++  ;
++  return 0;
++}
++_ACEOF
++rm -f conftest.$ac_objext
++if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
++  (eval $ac_compile) 2>conftest.er1
++  ac_status=$?
++  grep -v '^ *+' conftest.er1 >conftest.err
++  rm -f conftest.er1
++  cat conftest.err >&5
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); } &&
++	 { ac_try='test -z "$ac_cxx_werror_flag"
++			 || test ! -s conftest.err'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; } &&
++	 { ac_try='test -s conftest.$ac_objext'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; }; then
++  glibcxx_cv_func___builtin_sqrt_use=yes
++else
++  echo "$as_me: failed program was:" >&5
++sed 's/^/| /' conftest.$ac_ext >&5
++
++glibcxx_cv_func___builtin_sqrt_use=no
++fi
++rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
++      ac_ext=c
++ac_cpp='$CPP $CPPFLAGS'
++ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
++ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
++ac_compiler_gnu=$ac_cv_c_compiler_gnu
++
++
++fi
++
++  fi
++  echo "$as_me:$LINENO: result: $glibcxx_cv_func___builtin_sqrt_use" >&5
++echo "${ECHO_T}$glibcxx_cv_func___builtin_sqrt_use" >&6
++  if test x$glibcxx_cv_func___builtin_sqrt_use = x"yes"; then
++    echo "$as_me:$LINENO: checking for __builtin_sqrt linkage" >&5
++echo $ECHO_N "checking for __builtin_sqrt linkage... $ECHO_C" >&6
++    if test x${glibcxx_cv_func___builtin_sqrt_link+set} != xset; then
++      if test "${glibcxx_cv_func___builtin_sqrt_link+set}" = set; then
++  echo $ECHO_N "(cached) $ECHO_C" >&6
++else
++
++        if test x$gcc_no_link = xyes; then
++  { { echo "$as_me:$LINENO: error: Link tests are not allowed after GCC_NO_EXECUTABLES." >&5
++echo "$as_me: error: Link tests are not allowed after GCC_NO_EXECUTABLES." >&2;}
++   { (exit 1); exit 1; }; }
++fi
++cat >conftest.$ac_ext <<_ACEOF
++/* confdefs.h.  */
++_ACEOF
++cat confdefs.h >>conftest.$ac_ext
++cat >>conftest.$ac_ext <<_ACEOF
++/* end confdefs.h.  */
++#include <math.h>
++int
++main ()
++{
++ __builtin_sqrt(0);
++  ;
++  return 0;
++}
++_ACEOF
++rm -f conftest.$ac_objext conftest$ac_exeext
++if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
++  (eval $ac_link) 2>conftest.er1
++  ac_status=$?
++  grep -v '^ *+' conftest.er1 >conftest.err
++  rm -f conftest.er1
++  cat conftest.err >&5
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); } &&
++	 { ac_try='test -z "$ac_c_werror_flag"
++			 || test ! -s conftest.err'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; } &&
++	 { ac_try='test -s conftest$ac_exeext'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; }; then
++  glibcxx_cv_func___builtin_sqrt_link=yes
++else
++  echo "$as_me: failed program was:" >&5
++sed 's/^/| /' conftest.$ac_ext >&5
++
++glibcxx_cv_func___builtin_sqrt_link=no
++fi
++rm -f conftest.err conftest.$ac_objext \
++      conftest$ac_exeext conftest.$ac_ext
++
++fi
++
++    fi
++    echo "$as_me:$LINENO: result: $glibcxx_cv_func___builtin_sqrt_link" >&5
++echo "${ECHO_T}$glibcxx_cv_func___builtin_sqrt_link" >&6
++
++    if test x$glibcxx_cv_func___builtin_sqrt_link = x"yes"; then
++
++cat >>confdefs.h <<\_ACEOF
++#define HAVE___BUILTIN_SQRT 1
++_ACEOF
++
++    fi
++
++  fi
++
++
++  echo "$as_me:$LINENO: checking for __builtin_sqrtl declaration" >&5
++echo $ECHO_N "checking for __builtin_sqrtl declaration... $ECHO_C" >&6
++  if test x${glibcxx_cv_func___builtin_sqrtl_use+set} != xset; then
++    if test "${glibcxx_cv_func___builtin_sqrtl_use+set}" = set; then
++  echo $ECHO_N "(cached) $ECHO_C" >&6
++else
++
++
++
++      ac_ext=cc
++ac_cpp='$CXXCPP $CPPFLAGS'
++ac_compile='$CXX -c $CXXFLAGS $CPPFLAGS conftest.$ac_ext >&5'
++ac_link='$CXX -o conftest$ac_exeext $CXXFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
++ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
++
++      cat >conftest.$ac_ext <<_ACEOF
++/* confdefs.h.  */
++_ACEOF
++cat confdefs.h >>conftest.$ac_ext
++cat >>conftest.$ac_ext <<_ACEOF
++/* end confdefs.h.  */
++#include <math.h>
++int
++main ()
++{
++ __builtin_sqrtl(0);
++  ;
++  return 0;
++}
++_ACEOF
++rm -f conftest.$ac_objext
++if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
++  (eval $ac_compile) 2>conftest.er1
++  ac_status=$?
++  grep -v '^ *+' conftest.er1 >conftest.err
++  rm -f conftest.er1
++  cat conftest.err >&5
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); } &&
++	 { ac_try='test -z "$ac_cxx_werror_flag"
++			 || test ! -s conftest.err'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; } &&
++	 { ac_try='test -s conftest.$ac_objext'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; }; then
++  glibcxx_cv_func___builtin_sqrtl_use=yes
++else
++  echo "$as_me: failed program was:" >&5
++sed 's/^/| /' conftest.$ac_ext >&5
++
++glibcxx_cv_func___builtin_sqrtl_use=no
++fi
++rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
++      ac_ext=c
++ac_cpp='$CPP $CPPFLAGS'
++ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
++ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
++ac_compiler_gnu=$ac_cv_c_compiler_gnu
++
++
++fi
++
++  fi
++  echo "$as_me:$LINENO: result: $glibcxx_cv_func___builtin_sqrtl_use" >&5
++echo "${ECHO_T}$glibcxx_cv_func___builtin_sqrtl_use" >&6
++  if test x$glibcxx_cv_func___builtin_sqrtl_use = x"yes"; then
++    echo "$as_me:$LINENO: checking for __builtin_sqrtl linkage" >&5
++echo $ECHO_N "checking for __builtin_sqrtl linkage... $ECHO_C" >&6
++    if test x${glibcxx_cv_func___builtin_sqrtl_link+set} != xset; then
++      if test "${glibcxx_cv_func___builtin_sqrtl_link+set}" = set; then
++  echo $ECHO_N "(cached) $ECHO_C" >&6
++else
++
++        if test x$gcc_no_link = xyes; then
++  { { echo "$as_me:$LINENO: error: Link tests are not allowed after GCC_NO_EXECUTABLES." >&5
++echo "$as_me: error: Link tests are not allowed after GCC_NO_EXECUTABLES." >&2;}
++   { (exit 1); exit 1; }; }
++fi
++cat >conftest.$ac_ext <<_ACEOF
++/* confdefs.h.  */
++_ACEOF
++cat confdefs.h >>conftest.$ac_ext
++cat >>conftest.$ac_ext <<_ACEOF
++/* end confdefs.h.  */
++#include <math.h>
++int
++main ()
++{
++ __builtin_sqrtl(0);
++  ;
++  return 0;
++}
++_ACEOF
++rm -f conftest.$ac_objext conftest$ac_exeext
++if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
++  (eval $ac_link) 2>conftest.er1
++  ac_status=$?
++  grep -v '^ *+' conftest.er1 >conftest.err
++  rm -f conftest.er1
++  cat conftest.err >&5
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); } &&
++	 { ac_try='test -z "$ac_c_werror_flag"
++			 || test ! -s conftest.err'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; } &&
++	 { ac_try='test -s conftest$ac_exeext'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; }; then
++  glibcxx_cv_func___builtin_sqrtl_link=yes
++else
++  echo "$as_me: failed program was:" >&5
++sed 's/^/| /' conftest.$ac_ext >&5
++
++glibcxx_cv_func___builtin_sqrtl_link=no
++fi
++rm -f conftest.err conftest.$ac_objext \
++      conftest$ac_exeext conftest.$ac_ext
++
++fi
++
++    fi
++    echo "$as_me:$LINENO: result: $glibcxx_cv_func___builtin_sqrtl_link" >&5
++echo "${ECHO_T}$glibcxx_cv_func___builtin_sqrtl_link" >&6
++
++    if test x$glibcxx_cv_func___builtin_sqrtl_link = x"yes"; then
++
++cat >>confdefs.h <<\_ACEOF
++#define HAVE___BUILTIN_SQRTL 1
++_ACEOF
++
++    fi
++
++  fi
++
++
++
++  echo "$as_me:$LINENO: checking for __builtin_sinf declaration" >&5
++echo $ECHO_N "checking for __builtin_sinf declaration... $ECHO_C" >&6
++  if test x${glibcxx_cv_func___builtin_sinf_use+set} != xset; then
++    if test "${glibcxx_cv_func___builtin_sinf_use+set}" = set; then
++  echo $ECHO_N "(cached) $ECHO_C" >&6
++else
++
++
++
++      ac_ext=cc
++ac_cpp='$CXXCPP $CPPFLAGS'
++ac_compile='$CXX -c $CXXFLAGS $CPPFLAGS conftest.$ac_ext >&5'
++ac_link='$CXX -o conftest$ac_exeext $CXXFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
++ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
++
++      cat >conftest.$ac_ext <<_ACEOF
++/* confdefs.h.  */
++_ACEOF
++cat confdefs.h >>conftest.$ac_ext
++cat >>conftest.$ac_ext <<_ACEOF
++/* end confdefs.h.  */
++#include <math.h>
++int
++main ()
++{
++ __builtin_sinf(0);
++  ;
++  return 0;
++}
++_ACEOF
++rm -f conftest.$ac_objext
++if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
++  (eval $ac_compile) 2>conftest.er1
++  ac_status=$?
++  grep -v '^ *+' conftest.er1 >conftest.err
++  rm -f conftest.er1
++  cat conftest.err >&5
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); } &&
++	 { ac_try='test -z "$ac_cxx_werror_flag"
++			 || test ! -s conftest.err'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; } &&
++	 { ac_try='test -s conftest.$ac_objext'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; }; then
++  glibcxx_cv_func___builtin_sinf_use=yes
++else
++  echo "$as_me: failed program was:" >&5
++sed 's/^/| /' conftest.$ac_ext >&5
++
++glibcxx_cv_func___builtin_sinf_use=no
++fi
++rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
++      ac_ext=c
++ac_cpp='$CPP $CPPFLAGS'
++ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
++ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
++ac_compiler_gnu=$ac_cv_c_compiler_gnu
++
++
++fi
++
++  fi
++  echo "$as_me:$LINENO: result: $glibcxx_cv_func___builtin_sinf_use" >&5
++echo "${ECHO_T}$glibcxx_cv_func___builtin_sinf_use" >&6
++  if test x$glibcxx_cv_func___builtin_sinf_use = x"yes"; then
++    echo "$as_me:$LINENO: checking for __builtin_sinf linkage" >&5
++echo $ECHO_N "checking for __builtin_sinf linkage... $ECHO_C" >&6
++    if test x${glibcxx_cv_func___builtin_sinf_link+set} != xset; then
++      if test "${glibcxx_cv_func___builtin_sinf_link+set}" = set; then
++  echo $ECHO_N "(cached) $ECHO_C" >&6
++else
++
++        if test x$gcc_no_link = xyes; then
++  { { echo "$as_me:$LINENO: error: Link tests are not allowed after GCC_NO_EXECUTABLES." >&5
++echo "$as_me: error: Link tests are not allowed after GCC_NO_EXECUTABLES." >&2;}
++   { (exit 1); exit 1; }; }
++fi
++cat >conftest.$ac_ext <<_ACEOF
++/* confdefs.h.  */
++_ACEOF
++cat confdefs.h >>conftest.$ac_ext
++cat >>conftest.$ac_ext <<_ACEOF
++/* end confdefs.h.  */
++#include <math.h>
++int
++main ()
++{
++ __builtin_sinf(0);
++  ;
++  return 0;
++}
++_ACEOF
++rm -f conftest.$ac_objext conftest$ac_exeext
++if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
++  (eval $ac_link) 2>conftest.er1
++  ac_status=$?
++  grep -v '^ *+' conftest.er1 >conftest.err
++  rm -f conftest.er1
++  cat conftest.err >&5
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); } &&
++	 { ac_try='test -z "$ac_c_werror_flag"
++			 || test ! -s conftest.err'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; } &&
++	 { ac_try='test -s conftest$ac_exeext'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; }; then
++  glibcxx_cv_func___builtin_sinf_link=yes
++else
++  echo "$as_me: failed program was:" >&5
++sed 's/^/| /' conftest.$ac_ext >&5
++
++glibcxx_cv_func___builtin_sinf_link=no
++fi
++rm -f conftest.err conftest.$ac_objext \
++      conftest$ac_exeext conftest.$ac_ext
++
++fi
++
++    fi
++    echo "$as_me:$LINENO: result: $glibcxx_cv_func___builtin_sinf_link" >&5
++echo "${ECHO_T}$glibcxx_cv_func___builtin_sinf_link" >&6
++
++    if test x$glibcxx_cv_func___builtin_sinf_link = x"yes"; then
++
++cat >>confdefs.h <<\_ACEOF
++#define HAVE___BUILTIN_SINF 1
++_ACEOF
++
++    fi
++
++  fi
++
++
++  echo "$as_me:$LINENO: checking for __builtin_sin declaration" >&5
++echo $ECHO_N "checking for __builtin_sin declaration... $ECHO_C" >&6
++  if test x${glibcxx_cv_func___builtin_sin_use+set} != xset; then
++    if test "${glibcxx_cv_func___builtin_sin_use+set}" = set; then
++  echo $ECHO_N "(cached) $ECHO_C" >&6
++else
++
++
++
++      ac_ext=cc
++ac_cpp='$CXXCPP $CPPFLAGS'
++ac_compile='$CXX -c $CXXFLAGS $CPPFLAGS conftest.$ac_ext >&5'
++ac_link='$CXX -o conftest$ac_exeext $CXXFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
++ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
++
++      cat >conftest.$ac_ext <<_ACEOF
++/* confdefs.h.  */
++_ACEOF
++cat confdefs.h >>conftest.$ac_ext
++cat >>conftest.$ac_ext <<_ACEOF
++/* end confdefs.h.  */
++#include <math.h>
++int
++main ()
++{
++ __builtin_sin(0);
++  ;
++  return 0;
++}
++_ACEOF
++rm -f conftest.$ac_objext
++if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
++  (eval $ac_compile) 2>conftest.er1
++  ac_status=$?
++  grep -v '^ *+' conftest.er1 >conftest.err
++  rm -f conftest.er1
++  cat conftest.err >&5
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); } &&
++	 { ac_try='test -z "$ac_cxx_werror_flag"
++			 || test ! -s conftest.err'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; } &&
++	 { ac_try='test -s conftest.$ac_objext'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; }; then
++  glibcxx_cv_func___builtin_sin_use=yes
++else
++  echo "$as_me: failed program was:" >&5
++sed 's/^/| /' conftest.$ac_ext >&5
++
++glibcxx_cv_func___builtin_sin_use=no
++fi
++rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
++      ac_ext=c
++ac_cpp='$CPP $CPPFLAGS'
++ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
++ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
++ac_compiler_gnu=$ac_cv_c_compiler_gnu
++
++
++fi
++
++  fi
++  echo "$as_me:$LINENO: result: $glibcxx_cv_func___builtin_sin_use" >&5
++echo "${ECHO_T}$glibcxx_cv_func___builtin_sin_use" >&6
++  if test x$glibcxx_cv_func___builtin_sin_use = x"yes"; then
++    echo "$as_me:$LINENO: checking for __builtin_sin linkage" >&5
++echo $ECHO_N "checking for __builtin_sin linkage... $ECHO_C" >&6
++    if test x${glibcxx_cv_func___builtin_sin_link+set} != xset; then
++      if test "${glibcxx_cv_func___builtin_sin_link+set}" = set; then
++  echo $ECHO_N "(cached) $ECHO_C" >&6
++else
++
++        if test x$gcc_no_link = xyes; then
++  { { echo "$as_me:$LINENO: error: Link tests are not allowed after GCC_NO_EXECUTABLES." >&5
++echo "$as_me: error: Link tests are not allowed after GCC_NO_EXECUTABLES." >&2;}
++   { (exit 1); exit 1; }; }
++fi
++cat >conftest.$ac_ext <<_ACEOF
++/* confdefs.h.  */
++_ACEOF
++cat confdefs.h >>conftest.$ac_ext
++cat >>conftest.$ac_ext <<_ACEOF
++/* end confdefs.h.  */
++#include <math.h>
++int
++main ()
++{
++ __builtin_sin(0);
++  ;
++  return 0;
++}
++_ACEOF
++rm -f conftest.$ac_objext conftest$ac_exeext
++if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
++  (eval $ac_link) 2>conftest.er1
++  ac_status=$?
++  grep -v '^ *+' conftest.er1 >conftest.err
++  rm -f conftest.er1
++  cat conftest.err >&5
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); } &&
++	 { ac_try='test -z "$ac_c_werror_flag"
++			 || test ! -s conftest.err'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; } &&
++	 { ac_try='test -s conftest$ac_exeext'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; }; then
++  glibcxx_cv_func___builtin_sin_link=yes
++else
++  echo "$as_me: failed program was:" >&5
++sed 's/^/| /' conftest.$ac_ext >&5
++
++glibcxx_cv_func___builtin_sin_link=no
++fi
++rm -f conftest.err conftest.$ac_objext \
++      conftest$ac_exeext conftest.$ac_ext
++
++fi
++
++    fi
++    echo "$as_me:$LINENO: result: $glibcxx_cv_func___builtin_sin_link" >&5
++echo "${ECHO_T}$glibcxx_cv_func___builtin_sin_link" >&6
++
++    if test x$glibcxx_cv_func___builtin_sin_link = x"yes"; then
++
++cat >>confdefs.h <<\_ACEOF
++#define HAVE___BUILTIN_SIN 1
++_ACEOF
++
++    fi
++
++  fi
++
++
++  echo "$as_me:$LINENO: checking for __builtin_sinl declaration" >&5
++echo $ECHO_N "checking for __builtin_sinl declaration... $ECHO_C" >&6
++  if test x${glibcxx_cv_func___builtin_sinl_use+set} != xset; then
++    if test "${glibcxx_cv_func___builtin_sinl_use+set}" = set; then
++  echo $ECHO_N "(cached) $ECHO_C" >&6
++else
++
++
++
++      ac_ext=cc
++ac_cpp='$CXXCPP $CPPFLAGS'
++ac_compile='$CXX -c $CXXFLAGS $CPPFLAGS conftest.$ac_ext >&5'
++ac_link='$CXX -o conftest$ac_exeext $CXXFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
++ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
++
++      cat >conftest.$ac_ext <<_ACEOF
++/* confdefs.h.  */
++_ACEOF
++cat confdefs.h >>conftest.$ac_ext
++cat >>conftest.$ac_ext <<_ACEOF
++/* end confdefs.h.  */
++#include <math.h>
++int
++main ()
++{
++ __builtin_sinl(0);
++  ;
++  return 0;
++}
++_ACEOF
++rm -f conftest.$ac_objext
++if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
++  (eval $ac_compile) 2>conftest.er1
++  ac_status=$?
++  grep -v '^ *+' conftest.er1 >conftest.err
++  rm -f conftest.er1
++  cat conftest.err >&5
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); } &&
++	 { ac_try='test -z "$ac_cxx_werror_flag"
++			 || test ! -s conftest.err'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; } &&
++	 { ac_try='test -s conftest.$ac_objext'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; }; then
++  glibcxx_cv_func___builtin_sinl_use=yes
++else
++  echo "$as_me: failed program was:" >&5
++sed 's/^/| /' conftest.$ac_ext >&5
++
++glibcxx_cv_func___builtin_sinl_use=no
++fi
++rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
++      ac_ext=c
++ac_cpp='$CPP $CPPFLAGS'
++ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
++ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
++ac_compiler_gnu=$ac_cv_c_compiler_gnu
++
++
++fi
++
++  fi
++  echo "$as_me:$LINENO: result: $glibcxx_cv_func___builtin_sinl_use" >&5
++echo "${ECHO_T}$glibcxx_cv_func___builtin_sinl_use" >&6
++  if test x$glibcxx_cv_func___builtin_sinl_use = x"yes"; then
++    echo "$as_me:$LINENO: checking for __builtin_sinl linkage" >&5
++echo $ECHO_N "checking for __builtin_sinl linkage... $ECHO_C" >&6
++    if test x${glibcxx_cv_func___builtin_sinl_link+set} != xset; then
++      if test "${glibcxx_cv_func___builtin_sinl_link+set}" = set; then
++  echo $ECHO_N "(cached) $ECHO_C" >&6
++else
++
++        if test x$gcc_no_link = xyes; then
++  { { echo "$as_me:$LINENO: error: Link tests are not allowed after GCC_NO_EXECUTABLES." >&5
++echo "$as_me: error: Link tests are not allowed after GCC_NO_EXECUTABLES." >&2;}
++   { (exit 1); exit 1; }; }
++fi
++cat >conftest.$ac_ext <<_ACEOF
++/* confdefs.h.  */
++_ACEOF
++cat confdefs.h >>conftest.$ac_ext
++cat >>conftest.$ac_ext <<_ACEOF
++/* end confdefs.h.  */
++#include <math.h>
++int
++main ()
++{
++ __builtin_sinl(0);
++  ;
++  return 0;
++}
++_ACEOF
++rm -f conftest.$ac_objext conftest$ac_exeext
++if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
++  (eval $ac_link) 2>conftest.er1
++  ac_status=$?
++  grep -v '^ *+' conftest.er1 >conftest.err
++  rm -f conftest.er1
++  cat conftest.err >&5
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); } &&
++	 { ac_try='test -z "$ac_c_werror_flag"
++			 || test ! -s conftest.err'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; } &&
++	 { ac_try='test -s conftest$ac_exeext'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; }; then
++  glibcxx_cv_func___builtin_sinl_link=yes
++else
++  echo "$as_me: failed program was:" >&5
++sed 's/^/| /' conftest.$ac_ext >&5
++
++glibcxx_cv_func___builtin_sinl_link=no
++fi
++rm -f conftest.err conftest.$ac_objext \
++      conftest$ac_exeext conftest.$ac_ext
++
++fi
++
++    fi
++    echo "$as_me:$LINENO: result: $glibcxx_cv_func___builtin_sinl_link" >&5
++echo "${ECHO_T}$glibcxx_cv_func___builtin_sinl_link" >&6
++
++    if test x$glibcxx_cv_func___builtin_sinl_link = x"yes"; then
++
++cat >>confdefs.h <<\_ACEOF
++#define HAVE___BUILTIN_SINL 1
++_ACEOF
++
++    fi
++
++  fi
++
++
++
++  echo "$as_me:$LINENO: checking for __builtin_cosf declaration" >&5
++echo $ECHO_N "checking for __builtin_cosf declaration... $ECHO_C" >&6
++  if test x${glibcxx_cv_func___builtin_cosf_use+set} != xset; then
++    if test "${glibcxx_cv_func___builtin_cosf_use+set}" = set; then
++  echo $ECHO_N "(cached) $ECHO_C" >&6
++else
++
++
++
++      ac_ext=cc
++ac_cpp='$CXXCPP $CPPFLAGS'
++ac_compile='$CXX -c $CXXFLAGS $CPPFLAGS conftest.$ac_ext >&5'
++ac_link='$CXX -o conftest$ac_exeext $CXXFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
++ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
++
++      cat >conftest.$ac_ext <<_ACEOF
++/* confdefs.h.  */
++_ACEOF
++cat confdefs.h >>conftest.$ac_ext
++cat >>conftest.$ac_ext <<_ACEOF
++/* end confdefs.h.  */
++#include <math.h>
++int
++main ()
++{
++ __builtin_cosf(0);
++  ;
++  return 0;
++}
++_ACEOF
++rm -f conftest.$ac_objext
++if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
++  (eval $ac_compile) 2>conftest.er1
++  ac_status=$?
++  grep -v '^ *+' conftest.er1 >conftest.err
++  rm -f conftest.er1
++  cat conftest.err >&5
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); } &&
++	 { ac_try='test -z "$ac_cxx_werror_flag"
++			 || test ! -s conftest.err'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; } &&
++	 { ac_try='test -s conftest.$ac_objext'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; }; then
++  glibcxx_cv_func___builtin_cosf_use=yes
++else
++  echo "$as_me: failed program was:" >&5
++sed 's/^/| /' conftest.$ac_ext >&5
++
++glibcxx_cv_func___builtin_cosf_use=no
++fi
++rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
++      ac_ext=c
++ac_cpp='$CPP $CPPFLAGS'
++ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
++ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
++ac_compiler_gnu=$ac_cv_c_compiler_gnu
++
++
++fi
++
++  fi
++  echo "$as_me:$LINENO: result: $glibcxx_cv_func___builtin_cosf_use" >&5
++echo "${ECHO_T}$glibcxx_cv_func___builtin_cosf_use" >&6
++  if test x$glibcxx_cv_func___builtin_cosf_use = x"yes"; then
++    echo "$as_me:$LINENO: checking for __builtin_cosf linkage" >&5
++echo $ECHO_N "checking for __builtin_cosf linkage... $ECHO_C" >&6
++    if test x${glibcxx_cv_func___builtin_cosf_link+set} != xset; then
++      if test "${glibcxx_cv_func___builtin_cosf_link+set}" = set; then
++  echo $ECHO_N "(cached) $ECHO_C" >&6
++else
++
++        if test x$gcc_no_link = xyes; then
++  { { echo "$as_me:$LINENO: error: Link tests are not allowed after GCC_NO_EXECUTABLES." >&5
++echo "$as_me: error: Link tests are not allowed after GCC_NO_EXECUTABLES." >&2;}
++   { (exit 1); exit 1; }; }
++fi
++cat >conftest.$ac_ext <<_ACEOF
++/* confdefs.h.  */
++_ACEOF
++cat confdefs.h >>conftest.$ac_ext
++cat >>conftest.$ac_ext <<_ACEOF
++/* end confdefs.h.  */
++#include <math.h>
++int
++main ()
++{
++ __builtin_cosf(0);
++  ;
++  return 0;
++}
++_ACEOF
++rm -f conftest.$ac_objext conftest$ac_exeext
++if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
++  (eval $ac_link) 2>conftest.er1
++  ac_status=$?
++  grep -v '^ *+' conftest.er1 >conftest.err
++  rm -f conftest.er1
++  cat conftest.err >&5
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); } &&
++	 { ac_try='test -z "$ac_c_werror_flag"
++			 || test ! -s conftest.err'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; } &&
++	 { ac_try='test -s conftest$ac_exeext'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; }; then
++  glibcxx_cv_func___builtin_cosf_link=yes
++else
++  echo "$as_me: failed program was:" >&5
++sed 's/^/| /' conftest.$ac_ext >&5
++
++glibcxx_cv_func___builtin_cosf_link=no
++fi
++rm -f conftest.err conftest.$ac_objext \
++      conftest$ac_exeext conftest.$ac_ext
++
++fi
++
++    fi
++    echo "$as_me:$LINENO: result: $glibcxx_cv_func___builtin_cosf_link" >&5
++echo "${ECHO_T}$glibcxx_cv_func___builtin_cosf_link" >&6
++
++    if test x$glibcxx_cv_func___builtin_cosf_link = x"yes"; then
++
++cat >>confdefs.h <<\_ACEOF
++#define HAVE___BUILTIN_COSF 1
++_ACEOF
++
++    fi
++
++  fi
++
++
++  echo "$as_me:$LINENO: checking for __builtin_cos declaration" >&5
++echo $ECHO_N "checking for __builtin_cos declaration... $ECHO_C" >&6
++  if test x${glibcxx_cv_func___builtin_cos_use+set} != xset; then
++    if test "${glibcxx_cv_func___builtin_cos_use+set}" = set; then
++  echo $ECHO_N "(cached) $ECHO_C" >&6
++else
++
++
++
++      ac_ext=cc
++ac_cpp='$CXXCPP $CPPFLAGS'
++ac_compile='$CXX -c $CXXFLAGS $CPPFLAGS conftest.$ac_ext >&5'
++ac_link='$CXX -o conftest$ac_exeext $CXXFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
++ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
++
++      cat >conftest.$ac_ext <<_ACEOF
++/* confdefs.h.  */
++_ACEOF
++cat confdefs.h >>conftest.$ac_ext
++cat >>conftest.$ac_ext <<_ACEOF
++/* end confdefs.h.  */
++#include <math.h>
++int
++main ()
++{
++ __builtin_cos(0);
++  ;
++  return 0;
++}
++_ACEOF
++rm -f conftest.$ac_objext
++if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
++  (eval $ac_compile) 2>conftest.er1
++  ac_status=$?
++  grep -v '^ *+' conftest.er1 >conftest.err
++  rm -f conftest.er1
++  cat conftest.err >&5
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); } &&
++	 { ac_try='test -z "$ac_cxx_werror_flag"
++			 || test ! -s conftest.err'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; } &&
++	 { ac_try='test -s conftest.$ac_objext'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; }; then
++  glibcxx_cv_func___builtin_cos_use=yes
++else
++  echo "$as_me: failed program was:" >&5
++sed 's/^/| /' conftest.$ac_ext >&5
++
++glibcxx_cv_func___builtin_cos_use=no
++fi
++rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
++      ac_ext=c
++ac_cpp='$CPP $CPPFLAGS'
++ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
++ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
++ac_compiler_gnu=$ac_cv_c_compiler_gnu
++
++
++fi
++
++  fi
++  echo "$as_me:$LINENO: result: $glibcxx_cv_func___builtin_cos_use" >&5
++echo "${ECHO_T}$glibcxx_cv_func___builtin_cos_use" >&6
++  if test x$glibcxx_cv_func___builtin_cos_use = x"yes"; then
++    echo "$as_me:$LINENO: checking for __builtin_cos linkage" >&5
++echo $ECHO_N "checking for __builtin_cos linkage... $ECHO_C" >&6
++    if test x${glibcxx_cv_func___builtin_cos_link+set} != xset; then
++      if test "${glibcxx_cv_func___builtin_cos_link+set}" = set; then
++  echo $ECHO_N "(cached) $ECHO_C" >&6
++else
++
++        if test x$gcc_no_link = xyes; then
++  { { echo "$as_me:$LINENO: error: Link tests are not allowed after GCC_NO_EXECUTABLES." >&5
++echo "$as_me: error: Link tests are not allowed after GCC_NO_EXECUTABLES." >&2;}
++   { (exit 1); exit 1; }; }
++fi
++cat >conftest.$ac_ext <<_ACEOF
++/* confdefs.h.  */
++_ACEOF
++cat confdefs.h >>conftest.$ac_ext
++cat >>conftest.$ac_ext <<_ACEOF
++/* end confdefs.h.  */
++#include <math.h>
++int
++main ()
++{
++ __builtin_cos(0);
++  ;
++  return 0;
++}
++_ACEOF
++rm -f conftest.$ac_objext conftest$ac_exeext
++if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
++  (eval $ac_link) 2>conftest.er1
++  ac_status=$?
++  grep -v '^ *+' conftest.er1 >conftest.err
++  rm -f conftest.er1
++  cat conftest.err >&5
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); } &&
++	 { ac_try='test -z "$ac_c_werror_flag"
++			 || test ! -s conftest.err'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; } &&
++	 { ac_try='test -s conftest$ac_exeext'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; }; then
++  glibcxx_cv_func___builtin_cos_link=yes
++else
++  echo "$as_me: failed program was:" >&5
++sed 's/^/| /' conftest.$ac_ext >&5
++
++glibcxx_cv_func___builtin_cos_link=no
++fi
++rm -f conftest.err conftest.$ac_objext \
++      conftest$ac_exeext conftest.$ac_ext
++
++fi
++
++    fi
++    echo "$as_me:$LINENO: result: $glibcxx_cv_func___builtin_cos_link" >&5
++echo "${ECHO_T}$glibcxx_cv_func___builtin_cos_link" >&6
++
++    if test x$glibcxx_cv_func___builtin_cos_link = x"yes"; then
++
++cat >>confdefs.h <<\_ACEOF
++#define HAVE___BUILTIN_COS 1
++_ACEOF
++
++    fi
++
++  fi
++
++
++  echo "$as_me:$LINENO: checking for __builtin_cosl declaration" >&5
++echo $ECHO_N "checking for __builtin_cosl declaration... $ECHO_C" >&6
++  if test x${glibcxx_cv_func___builtin_cosl_use+set} != xset; then
++    if test "${glibcxx_cv_func___builtin_cosl_use+set}" = set; then
++  echo $ECHO_N "(cached) $ECHO_C" >&6
++else
++
++
++
++      ac_ext=cc
++ac_cpp='$CXXCPP $CPPFLAGS'
++ac_compile='$CXX -c $CXXFLAGS $CPPFLAGS conftest.$ac_ext >&5'
++ac_link='$CXX -o conftest$ac_exeext $CXXFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
++ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
++
++      cat >conftest.$ac_ext <<_ACEOF
++/* confdefs.h.  */
++_ACEOF
++cat confdefs.h >>conftest.$ac_ext
++cat >>conftest.$ac_ext <<_ACEOF
++/* end confdefs.h.  */
++#include <math.h>
++int
++main ()
++{
++ __builtin_cosl(0);
++  ;
++  return 0;
++}
++_ACEOF
++rm -f conftest.$ac_objext
++if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
++  (eval $ac_compile) 2>conftest.er1
++  ac_status=$?
++  grep -v '^ *+' conftest.er1 >conftest.err
++  rm -f conftest.er1
++  cat conftest.err >&5
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); } &&
++	 { ac_try='test -z "$ac_cxx_werror_flag"
++			 || test ! -s conftest.err'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; } &&
++	 { ac_try='test -s conftest.$ac_objext'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; }; then
++  glibcxx_cv_func___builtin_cosl_use=yes
++else
++  echo "$as_me: failed program was:" >&5
++sed 's/^/| /' conftest.$ac_ext >&5
++
++glibcxx_cv_func___builtin_cosl_use=no
++fi
++rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
++      ac_ext=c
++ac_cpp='$CPP $CPPFLAGS'
++ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
++ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
++ac_compiler_gnu=$ac_cv_c_compiler_gnu
++
++
++fi
++
++  fi
++  echo "$as_me:$LINENO: result: $glibcxx_cv_func___builtin_cosl_use" >&5
++echo "${ECHO_T}$glibcxx_cv_func___builtin_cosl_use" >&6
++  if test x$glibcxx_cv_func___builtin_cosl_use = x"yes"; then
++    echo "$as_me:$LINENO: checking for __builtin_cosl linkage" >&5
++echo $ECHO_N "checking for __builtin_cosl linkage... $ECHO_C" >&6
++    if test x${glibcxx_cv_func___builtin_cosl_link+set} != xset; then
++      if test "${glibcxx_cv_func___builtin_cosl_link+set}" = set; then
++  echo $ECHO_N "(cached) $ECHO_C" >&6
++else
++
++        if test x$gcc_no_link = xyes; then
++  { { echo "$as_me:$LINENO: error: Link tests are not allowed after GCC_NO_EXECUTABLES." >&5
++echo "$as_me: error: Link tests are not allowed after GCC_NO_EXECUTABLES." >&2;}
++   { (exit 1); exit 1; }; }
++fi
++cat >conftest.$ac_ext <<_ACEOF
++/* confdefs.h.  */
++_ACEOF
++cat confdefs.h >>conftest.$ac_ext
++cat >>conftest.$ac_ext <<_ACEOF
++/* end confdefs.h.  */
++#include <math.h>
++int
++main ()
++{
++ __builtin_cosl(0);
++  ;
++  return 0;
++}
++_ACEOF
++rm -f conftest.$ac_objext conftest$ac_exeext
++if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
++  (eval $ac_link) 2>conftest.er1
++  ac_status=$?
++  grep -v '^ *+' conftest.er1 >conftest.err
++  rm -f conftest.er1
++  cat conftest.err >&5
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); } &&
++	 { ac_try='test -z "$ac_c_werror_flag"
++			 || test ! -s conftest.err'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; } &&
++	 { ac_try='test -s conftest$ac_exeext'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; }; then
++  glibcxx_cv_func___builtin_cosl_link=yes
++else
++  echo "$as_me: failed program was:" >&5
++sed 's/^/| /' conftest.$ac_ext >&5
++
++glibcxx_cv_func___builtin_cosl_link=no
++fi
++rm -f conftest.err conftest.$ac_objext \
++      conftest$ac_exeext conftest.$ac_ext
++
++fi
++
++    fi
++    echo "$as_me:$LINENO: result: $glibcxx_cv_func___builtin_cosl_link" >&5
++echo "${ECHO_T}$glibcxx_cv_func___builtin_cosl_link" >&6
++
++    if test x$glibcxx_cv_func___builtin_cosl_link = x"yes"; then
++
++cat >>confdefs.h <<\_ACEOF
++#define HAVE___BUILTIN_COSL 1
++_ACEOF
++
++    fi
++
++  fi
++
++
++
++
++echo "$as_me:$LINENO: checking for main in -lm" >&5
++echo $ECHO_N "checking for main in -lm... $ECHO_C" >&6
++if test "${ac_cv_lib_m_main+set}" = set; then
++  echo $ECHO_N "(cached) $ECHO_C" >&6
++else
++  ac_check_lib_save_LIBS=$LIBS
++LIBS="-lm  $LIBS"
++if test x$gcc_no_link = xyes; then
++  { { echo "$as_me:$LINENO: error: Link tests are not allowed after GCC_NO_EXECUTABLES." >&5
++echo "$as_me: error: Link tests are not allowed after GCC_NO_EXECUTABLES." >&2;}
++   { (exit 1); exit 1; }; }
++fi
++cat >conftest.$ac_ext <<_ACEOF
++/* confdefs.h.  */
++_ACEOF
++cat confdefs.h >>conftest.$ac_ext
++cat >>conftest.$ac_ext <<_ACEOF
++/* end confdefs.h.  */
++
++
++int
++main ()
++{
++main ();
++  ;
++  return 0;
++}
++_ACEOF
++rm -f conftest.$ac_objext conftest$ac_exeext
++if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
++  (eval $ac_link) 2>conftest.er1
++  ac_status=$?
++  grep -v '^ *+' conftest.er1 >conftest.err
++  rm -f conftest.er1
++  cat conftest.err >&5
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); } &&
++	 { ac_try='test -z "$ac_c_werror_flag"
++			 || test ! -s conftest.err'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; } &&
++	 { ac_try='test -s conftest$ac_exeext'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; }; then
++  ac_cv_lib_m_main=yes
++else
++  echo "$as_me: failed program was:" >&5
++sed 's/^/| /' conftest.$ac_ext >&5
++
++ac_cv_lib_m_main=no
++fi
++rm -f conftest.err conftest.$ac_objext \
++      conftest$ac_exeext conftest.$ac_ext
++LIBS=$ac_check_lib_save_LIBS
++fi
++echo "$as_me:$LINENO: result: $ac_cv_lib_m_main" >&5
++echo "${ECHO_T}$ac_cv_lib_m_main" >&6
++if test $ac_cv_lib_m_main = yes; then
++  cat >>confdefs.h <<_ACEOF
++#define HAVE_LIBM 1
++_ACEOF
++
++  LIBS="-lm $LIBS"
++
++fi
++
++
++for ac_func in copysignf
++do
++as_ac_var=`echo "ac_cv_func_$ac_func" | $as_tr_sh`
++echo "$as_me:$LINENO: checking for $ac_func" >&5
++echo $ECHO_N "checking for $ac_func... $ECHO_C" >&6
++if eval "test \"\${$as_ac_var+set}\" = set"; then
++  echo $ECHO_N "(cached) $ECHO_C" >&6
++else
++  if test x$gcc_no_link = xyes; then
++  { { echo "$as_me:$LINENO: error: Link tests are not allowed after GCC_NO_EXECUTABLES." >&5
++echo "$as_me: error: Link tests are not allowed after GCC_NO_EXECUTABLES." >&2;}
++   { (exit 1); exit 1; }; }
++fi
++cat >conftest.$ac_ext <<_ACEOF
++/* confdefs.h.  */
++_ACEOF
++cat confdefs.h >>conftest.$ac_ext
++cat >>conftest.$ac_ext <<_ACEOF
++/* end confdefs.h.  */
++/* Define $ac_func to an innocuous variant, in case <limits.h> declares $ac_func.
++   For example, HP-UX 11i <limits.h> declares gettimeofday.  */
++#define $ac_func innocuous_$ac_func
++
++/* System header to define __stub macros and hopefully few prototypes,
++    which can conflict with char $ac_func (); below.
++    Prefer <limits.h> to <assert.h> if __STDC__ is defined, since
++    <limits.h> exists even on freestanding compilers.  */
++
++#ifdef __STDC__
++# include <limits.h>
++#else
++# include <assert.h>
++#endif
++
++#undef $ac_func
++
++/* Override any gcc2 internal prototype to avoid an error.  */
++#ifdef __cplusplus
++extern "C"
++{
++#endif
++/* We use char because int might match the return type of a gcc2
++   builtin and then its argument prototype would still apply.  */
++char $ac_func ();
++/* The GNU C library defines this for functions which it implements
++    to always fail with ENOSYS.  Some functions are actually named
++    something starting with __ and the normal name is an alias.  */
++#if defined (__stub_$ac_func) || defined (__stub___$ac_func)
++choke me
++#else
++char (*f) () = $ac_func;
++#endif
++#ifdef __cplusplus
++}
++#endif
++
++int
++main ()
++{
++return f != $ac_func;
++  ;
++  return 0;
++}
++_ACEOF
++rm -f conftest.$ac_objext conftest$ac_exeext
++if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
++  (eval $ac_link) 2>conftest.er1
++  ac_status=$?
++  grep -v '^ *+' conftest.er1 >conftest.err
++  rm -f conftest.er1
++  cat conftest.err >&5
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); } &&
++	 { ac_try='test -z "$ac_c_werror_flag"
++			 || test ! -s conftest.err'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; } &&
++	 { ac_try='test -s conftest$ac_exeext'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; }; then
++  eval "$as_ac_var=yes"
++else
++  echo "$as_me: failed program was:" >&5
++sed 's/^/| /' conftest.$ac_ext >&5
++
++eval "$as_ac_var=no"
++fi
++rm -f conftest.err conftest.$ac_objext \
++      conftest$ac_exeext conftest.$ac_ext
++fi
++echo "$as_me:$LINENO: result: `eval echo '${'$as_ac_var'}'`" >&5
++echo "${ECHO_T}`eval echo '${'$as_ac_var'}'`" >&6
++if test `eval echo '${'$as_ac_var'}'` = yes; then
++  cat >>confdefs.h <<_ACEOF
++#define `echo "HAVE_$ac_func" | $as_tr_cpp` 1
++_ACEOF
++
++else
++  LIBMATHOBJS="$LIBMATHOBJS ${ac_func}.lo"
++fi
++done
++
++
++
++for ac_func in __signbit
++do
++as_ac_var=`echo "ac_cv_func_$ac_func" | $as_tr_sh`
++echo "$as_me:$LINENO: checking for $ac_func" >&5
++echo $ECHO_N "checking for $ac_func... $ECHO_C" >&6
++if eval "test \"\${$as_ac_var+set}\" = set"; then
++  echo $ECHO_N "(cached) $ECHO_C" >&6
++else
++  if test x$gcc_no_link = xyes; then
++  { { echo "$as_me:$LINENO: error: Link tests are not allowed after GCC_NO_EXECUTABLES." >&5
++echo "$as_me: error: Link tests are not allowed after GCC_NO_EXECUTABLES." >&2;}
++   { (exit 1); exit 1; }; }
++fi
++cat >conftest.$ac_ext <<_ACEOF
++/* confdefs.h.  */
++_ACEOF
++cat confdefs.h >>conftest.$ac_ext
++cat >>conftest.$ac_ext <<_ACEOF
++/* end confdefs.h.  */
++/* Define $ac_func to an innocuous variant, in case <limits.h> declares $ac_func.
++   For example, HP-UX 11i <limits.h> declares gettimeofday.  */
++#define $ac_func innocuous_$ac_func
++
++/* System header to define __stub macros and hopefully few prototypes,
++    which can conflict with char $ac_func (); below.
++    Prefer <limits.h> to <assert.h> if __STDC__ is defined, since
++    <limits.h> exists even on freestanding compilers.  */
++
++#ifdef __STDC__
++# include <limits.h>
++#else
++# include <assert.h>
++#endif
++
++#undef $ac_func
++
++/* Override any gcc2 internal prototype to avoid an error.  */
++#ifdef __cplusplus
++extern "C"
++{
++#endif
++/* We use char because int might match the return type of a gcc2
++   builtin and then its argument prototype would still apply.  */
++char $ac_func ();
++/* The GNU C library defines this for functions which it implements
++    to always fail with ENOSYS.  Some functions are actually named
++    something starting with __ and the normal name is an alias.  */
++#if defined (__stub_$ac_func) || defined (__stub___$ac_func)
++choke me
++#else
++char (*f) () = $ac_func;
++#endif
++#ifdef __cplusplus
++}
++#endif
++
++int
++main ()
++{
++return f != $ac_func;
++  ;
++  return 0;
++}
++_ACEOF
++rm -f conftest.$ac_objext conftest$ac_exeext
++if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
++  (eval $ac_link) 2>conftest.er1
++  ac_status=$?
++  grep -v '^ *+' conftest.er1 >conftest.err
++  rm -f conftest.er1
++  cat conftest.err >&5
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); } &&
++	 { ac_try='test -z "$ac_c_werror_flag"
++			 || test ! -s conftest.err'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; } &&
++	 { ac_try='test -s conftest$ac_exeext'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; }; then
++  eval "$as_ac_var=yes"
++else
++  echo "$as_me: failed program was:" >&5
++sed 's/^/| /' conftest.$ac_ext >&5
++
++eval "$as_ac_var=no"
++fi
++rm -f conftest.err conftest.$ac_objext \
++      conftest$ac_exeext conftest.$ac_ext
++fi
++echo "$as_me:$LINENO: result: `eval echo '${'$as_ac_var'}'`" >&5
++echo "${ECHO_T}`eval echo '${'$as_ac_var'}'`" >&6
++if test `eval echo '${'$as_ac_var'}'` = yes; then
++  cat >>confdefs.h <<_ACEOF
++#define `echo "HAVE_$ac_func" | $as_tr_cpp` 1
++_ACEOF
++
++else
++  LIBMATHOBJS="$LIBMATHOBJS signbit.lo"
++fi
++done
++
++
++
++for ac_func in __signbitf
++do
++as_ac_var=`echo "ac_cv_func_$ac_func" | $as_tr_sh`
++echo "$as_me:$LINENO: checking for $ac_func" >&5
++echo $ECHO_N "checking for $ac_func... $ECHO_C" >&6
++if eval "test \"\${$as_ac_var+set}\" = set"; then
++  echo $ECHO_N "(cached) $ECHO_C" >&6
++else
++  if test x$gcc_no_link = xyes; then
++  { { echo "$as_me:$LINENO: error: Link tests are not allowed after GCC_NO_EXECUTABLES." >&5
++echo "$as_me: error: Link tests are not allowed after GCC_NO_EXECUTABLES." >&2;}
++   { (exit 1); exit 1; }; }
++fi
++cat >conftest.$ac_ext <<_ACEOF
++/* confdefs.h.  */
++_ACEOF
++cat confdefs.h >>conftest.$ac_ext
++cat >>conftest.$ac_ext <<_ACEOF
++/* end confdefs.h.  */
++/* Define $ac_func to an innocuous variant, in case <limits.h> declares $ac_func.
++   For example, HP-UX 11i <limits.h> declares gettimeofday.  */
++#define $ac_func innocuous_$ac_func
++
++/* System header to define __stub macros and hopefully few prototypes,
++    which can conflict with char $ac_func (); below.
++    Prefer <limits.h> to <assert.h> if __STDC__ is defined, since
++    <limits.h> exists even on freestanding compilers.  */
++
++#ifdef __STDC__
++# include <limits.h>
++#else
++# include <assert.h>
++#endif
++
++#undef $ac_func
++
++/* Override any gcc2 internal prototype to avoid an error.  */
++#ifdef __cplusplus
++extern "C"
++{
++#endif
++/* We use char because int might match the return type of a gcc2
++   builtin and then its argument prototype would still apply.  */
++char $ac_func ();
++/* The GNU C library defines this for functions which it implements
++    to always fail with ENOSYS.  Some functions are actually named
++    something starting with __ and the normal name is an alias.  */
++#if defined (__stub_$ac_func) || defined (__stub___$ac_func)
++choke me
++#else
++char (*f) () = $ac_func;
++#endif
++#ifdef __cplusplus
++}
++#endif
++
++int
++main ()
++{
++return f != $ac_func;
++  ;
++  return 0;
++}
++_ACEOF
++rm -f conftest.$ac_objext conftest$ac_exeext
++if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
++  (eval $ac_link) 2>conftest.er1
++  ac_status=$?
++  grep -v '^ *+' conftest.er1 >conftest.err
++  rm -f conftest.er1
++  cat conftest.err >&5
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); } &&
++	 { ac_try='test -z "$ac_c_werror_flag"
++			 || test ! -s conftest.err'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; } &&
++	 { ac_try='test -s conftest$ac_exeext'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; }; then
++  eval "$as_ac_var=yes"
++else
++  echo "$as_me: failed program was:" >&5
++sed 's/^/| /' conftest.$ac_ext >&5
++
++eval "$as_ac_var=no"
++fi
++rm -f conftest.err conftest.$ac_objext \
++      conftest$ac_exeext conftest.$ac_ext
++fi
++echo "$as_me:$LINENO: result: `eval echo '${'$as_ac_var'}'`" >&5
++echo "${ECHO_T}`eval echo '${'$as_ac_var'}'`" >&6
++if test `eval echo '${'$as_ac_var'}'` = yes; then
++  cat >>confdefs.h <<_ACEOF
++#define `echo "HAVE_$ac_func" | $as_tr_cpp` 1
++_ACEOF
++
++else
++  LIBMATHOBJS="$LIBMATHOBJS signbitf.lo"
++fi
++done
++
++
++          if test x$ac_cv_func_copysignl = x"yes"; then
++
++for ac_func in __signbitl
++do
++as_ac_var=`echo "ac_cv_func_$ac_func" | $as_tr_sh`
++echo "$as_me:$LINENO: checking for $ac_func" >&5
++echo $ECHO_N "checking for $ac_func... $ECHO_C" >&6
++if eval "test \"\${$as_ac_var+set}\" = set"; then
++  echo $ECHO_N "(cached) $ECHO_C" >&6
++else
++  if test x$gcc_no_link = xyes; then
++  { { echo "$as_me:$LINENO: error: Link tests are not allowed after GCC_NO_EXECUTABLES." >&5
++echo "$as_me: error: Link tests are not allowed after GCC_NO_EXECUTABLES." >&2;}
++   { (exit 1); exit 1; }; }
++fi
++cat >conftest.$ac_ext <<_ACEOF
++/* confdefs.h.  */
++_ACEOF
++cat confdefs.h >>conftest.$ac_ext
++cat >>conftest.$ac_ext <<_ACEOF
++/* end confdefs.h.  */
++/* Define $ac_func to an innocuous variant, in case <limits.h> declares $ac_func.
++   For example, HP-UX 11i <limits.h> declares gettimeofday.  */
++#define $ac_func innocuous_$ac_func
++
++/* System header to define __stub macros and hopefully few prototypes,
++    which can conflict with char $ac_func (); below.
++    Prefer <limits.h> to <assert.h> if __STDC__ is defined, since
++    <limits.h> exists even on freestanding compilers.  */
++
++#ifdef __STDC__
++# include <limits.h>
++#else
++# include <assert.h>
++#endif
++
++#undef $ac_func
++
++/* Override any gcc2 internal prototype to avoid an error.  */
++#ifdef __cplusplus
++extern "C"
++{
++#endif
++/* We use char because int might match the return type of a gcc2
++   builtin and then its argument prototype would still apply.  */
++char $ac_func ();
++/* The GNU C library defines this for functions which it implements
++    to always fail with ENOSYS.  Some functions are actually named
++    something starting with __ and the normal name is an alias.  */
++#if defined (__stub_$ac_func) || defined (__stub___$ac_func)
++choke me
++#else
++char (*f) () = $ac_func;
++#endif
++#ifdef __cplusplus
++}
++#endif
++
++int
++main ()
++{
++return f != $ac_func;
++  ;
++  return 0;
++}
++_ACEOF
++rm -f conftest.$ac_objext conftest$ac_exeext
++if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
++  (eval $ac_link) 2>conftest.er1
++  ac_status=$?
++  grep -v '^ *+' conftest.er1 >conftest.err
++  rm -f conftest.er1
++  cat conftest.err >&5
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); } &&
++	 { ac_try='test -z "$ac_c_werror_flag"
++			 || test ! -s conftest.err'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; } &&
++	 { ac_try='test -s conftest$ac_exeext'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; }; then
++  eval "$as_ac_var=yes"
++else
++  echo "$as_me: failed program was:" >&5
++sed 's/^/| /' conftest.$ac_ext >&5
++
++eval "$as_ac_var=no"
++fi
++rm -f conftest.err conftest.$ac_objext \
++      conftest$ac_exeext conftest.$ac_ext
++fi
++echo "$as_me:$LINENO: result: `eval echo '${'$as_ac_var'}'`" >&5
++echo "${ECHO_T}`eval echo '${'$as_ac_var'}'`" >&6
++if test `eval echo '${'$as_ac_var'}'` = yes; then
++  cat >>confdefs.h <<_ACEOF
++#define `echo "HAVE_$ac_func" | $as_tr_cpp` 1
++_ACEOF
++
++else
++  LIBMATHOBJS="$LIBMATHOBJS signbitl.lo"
++fi
++done
++
++  fi
++
++  # Used in libmath/Makefile.am.
++  if test -n "$LIBMATHOBJS"; then
++    need_libmath=yes
++  fi
++
++
++
++  ac_test_CXXFLAGS="${CXXFLAGS+set}"
++  ac_save_CXXFLAGS="$CXXFLAGS"
++  CXXFLAGS='-fno-builtin -D_GNU_SOURCE'
++
++
++  echo "$as_me:$LINENO: checking for strtold declaration" >&5
++echo $ECHO_N "checking for strtold declaration... $ECHO_C" >&6
++  if test x${glibcxx_cv_func_strtold_use+set} != xset; then
++    if test "${glibcxx_cv_func_strtold_use+set}" = set; then
++  echo $ECHO_N "(cached) $ECHO_C" >&6
++else
++
++
++
++      ac_ext=cc
++ac_cpp='$CXXCPP $CPPFLAGS'
++ac_compile='$CXX -c $CXXFLAGS $CPPFLAGS conftest.$ac_ext >&5'
++ac_link='$CXX -o conftest$ac_exeext $CXXFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
++ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
++
++      cat >conftest.$ac_ext <<_ACEOF
++/* confdefs.h.  */
++_ACEOF
++cat confdefs.h >>conftest.$ac_ext
++cat >>conftest.$ac_ext <<_ACEOF
++/* end confdefs.h.  */
++#include <stdlib.h>
++int
++main ()
++{
++ strtold(0, 0);
++  ;
++  return 0;
++}
++_ACEOF
++rm -f conftest.$ac_objext
++if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
++  (eval $ac_compile) 2>conftest.er1
++  ac_status=$?
++  grep -v '^ *+' conftest.er1 >conftest.err
++  rm -f conftest.er1
++  cat conftest.err >&5
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); } &&
++	 { ac_try='test -z "$ac_cxx_werror_flag"
++			 || test ! -s conftest.err'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; } &&
++	 { ac_try='test -s conftest.$ac_objext'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; }; then
++  glibcxx_cv_func_strtold_use=yes
++else
++  echo "$as_me: failed program was:" >&5
++sed 's/^/| /' conftest.$ac_ext >&5
++
++glibcxx_cv_func_strtold_use=no
++fi
++rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
++      ac_ext=c
++ac_cpp='$CPP $CPPFLAGS'
++ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
++ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
++ac_compiler_gnu=$ac_cv_c_compiler_gnu
++
++
++fi
++
++  fi
++  echo "$as_me:$LINENO: result: $glibcxx_cv_func_strtold_use" >&5
++echo "${ECHO_T}$glibcxx_cv_func_strtold_use" >&6
++  if test x$glibcxx_cv_func_strtold_use = x"yes"; then
++
++for ac_func in strtold
++do
++as_ac_var=`echo "ac_cv_func_$ac_func" | $as_tr_sh`
++echo "$as_me:$LINENO: checking for $ac_func" >&5
++echo $ECHO_N "checking for $ac_func... $ECHO_C" >&6
++if eval "test \"\${$as_ac_var+set}\" = set"; then
++  echo $ECHO_N "(cached) $ECHO_C" >&6
++else
++  if test x$gcc_no_link = xyes; then
++  { { echo "$as_me:$LINENO: error: Link tests are not allowed after GCC_NO_EXECUTABLES." >&5
++echo "$as_me: error: Link tests are not allowed after GCC_NO_EXECUTABLES." >&2;}
++   { (exit 1); exit 1; }; }
++fi
++cat >conftest.$ac_ext <<_ACEOF
++/* confdefs.h.  */
++_ACEOF
++cat confdefs.h >>conftest.$ac_ext
++cat >>conftest.$ac_ext <<_ACEOF
++/* end confdefs.h.  */
++/* Define $ac_func to an innocuous variant, in case <limits.h> declares $ac_func.
++   For example, HP-UX 11i <limits.h> declares gettimeofday.  */
++#define $ac_func innocuous_$ac_func
++
++/* System header to define __stub macros and hopefully few prototypes,
++    which can conflict with char $ac_func (); below.
++    Prefer <limits.h> to <assert.h> if __STDC__ is defined, since
++    <limits.h> exists even on freestanding compilers.  */
++
++#ifdef __STDC__
++# include <limits.h>
++#else
++# include <assert.h>
++#endif
++
++#undef $ac_func
++
++/* Override any gcc2 internal prototype to avoid an error.  */
++#ifdef __cplusplus
++extern "C"
++{
++#endif
++/* We use char because int might match the return type of a gcc2
++   builtin and then its argument prototype would still apply.  */
++char $ac_func ();
++/* The GNU C library defines this for functions which it implements
++    to always fail with ENOSYS.  Some functions are actually named
++    something starting with __ and the normal name is an alias.  */
++#if defined (__stub_$ac_func) || defined (__stub___$ac_func)
++choke me
++#else
++char (*f) () = $ac_func;
++#endif
++#ifdef __cplusplus
++}
++#endif
++
++int
++main ()
++{
++return f != $ac_func;
++  ;
++  return 0;
++}
++_ACEOF
++rm -f conftest.$ac_objext conftest$ac_exeext
++if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
++  (eval $ac_link) 2>conftest.er1
++  ac_status=$?
++  grep -v '^ *+' conftest.er1 >conftest.err
++  rm -f conftest.er1
++  cat conftest.err >&5
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); } &&
++	 { ac_try='test -z "$ac_c_werror_flag"
++			 || test ! -s conftest.err'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; } &&
++	 { ac_try='test -s conftest$ac_exeext'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; }; then
++  eval "$as_ac_var=yes"
++else
++  echo "$as_me: failed program was:" >&5
++sed 's/^/| /' conftest.$ac_ext >&5
++
++eval "$as_ac_var=no"
++fi
++rm -f conftest.err conftest.$ac_objext \
++      conftest$ac_exeext conftest.$ac_ext
++fi
++echo "$as_me:$LINENO: result: `eval echo '${'$as_ac_var'}'`" >&5
++echo "${ECHO_T}`eval echo '${'$as_ac_var'}'`" >&6
++if test `eval echo '${'$as_ac_var'}'` = yes; then
++  cat >>confdefs.h <<_ACEOF
++#define `echo "HAVE_$ac_func" | $as_tr_cpp` 1
++_ACEOF
++
++fi
++done
++
++  fi
++
++
++
++
++
++  echo "$as_me:$LINENO: checking for strtof declaration" >&5
++echo $ECHO_N "checking for strtof declaration... $ECHO_C" >&6
++  if test x${glibcxx_cv_func_strtof_use+set} != xset; then
++    if test "${glibcxx_cv_func_strtof_use+set}" = set; then
++  echo $ECHO_N "(cached) $ECHO_C" >&6
++else
++
++
++
++      ac_ext=cc
++ac_cpp='$CXXCPP $CPPFLAGS'
++ac_compile='$CXX -c $CXXFLAGS $CPPFLAGS conftest.$ac_ext >&5'
++ac_link='$CXX -o conftest$ac_exeext $CXXFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
++ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
++
++      cat >conftest.$ac_ext <<_ACEOF
++/* confdefs.h.  */
++_ACEOF
++cat confdefs.h >>conftest.$ac_ext
++cat >>conftest.$ac_ext <<_ACEOF
++/* end confdefs.h.  */
++#include <stdlib.h>
++int
++main ()
++{
++ strtof(0, 0);
++  ;
++  return 0;
++}
++_ACEOF
++rm -f conftest.$ac_objext
++if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
++  (eval $ac_compile) 2>conftest.er1
++  ac_status=$?
++  grep -v '^ *+' conftest.er1 >conftest.err
++  rm -f conftest.er1
++  cat conftest.err >&5
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); } &&
++	 { ac_try='test -z "$ac_cxx_werror_flag"
++			 || test ! -s conftest.err'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; } &&
++	 { ac_try='test -s conftest.$ac_objext'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; }; then
++  glibcxx_cv_func_strtof_use=yes
++else
++  echo "$as_me: failed program was:" >&5
++sed 's/^/| /' conftest.$ac_ext >&5
++
++glibcxx_cv_func_strtof_use=no
++fi
++rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
++      ac_ext=c
++ac_cpp='$CPP $CPPFLAGS'
++ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
++ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
++ac_compiler_gnu=$ac_cv_c_compiler_gnu
++
++
++fi
++
++  fi
++  echo "$as_me:$LINENO: result: $glibcxx_cv_func_strtof_use" >&5
++echo "${ECHO_T}$glibcxx_cv_func_strtof_use" >&6
++  if test x$glibcxx_cv_func_strtof_use = x"yes"; then
++
++for ac_func in strtof
++do
++as_ac_var=`echo "ac_cv_func_$ac_func" | $as_tr_sh`
++echo "$as_me:$LINENO: checking for $ac_func" >&5
++echo $ECHO_N "checking for $ac_func... $ECHO_C" >&6
++if eval "test \"\${$as_ac_var+set}\" = set"; then
++  echo $ECHO_N "(cached) $ECHO_C" >&6
++else
++  if test x$gcc_no_link = xyes; then
++  { { echo "$as_me:$LINENO: error: Link tests are not allowed after GCC_NO_EXECUTABLES." >&5
++echo "$as_me: error: Link tests are not allowed after GCC_NO_EXECUTABLES." >&2;}
++   { (exit 1); exit 1; }; }
++fi
++cat >conftest.$ac_ext <<_ACEOF
++/* confdefs.h.  */
++_ACEOF
++cat confdefs.h >>conftest.$ac_ext
++cat >>conftest.$ac_ext <<_ACEOF
++/* end confdefs.h.  */
++/* Define $ac_func to an innocuous variant, in case <limits.h> declares $ac_func.
++   For example, HP-UX 11i <limits.h> declares gettimeofday.  */
++#define $ac_func innocuous_$ac_func
++
++/* System header to define __stub macros and hopefully few prototypes,
++    which can conflict with char $ac_func (); below.
++    Prefer <limits.h> to <assert.h> if __STDC__ is defined, since
++    <limits.h> exists even on freestanding compilers.  */
++
++#ifdef __STDC__
++# include <limits.h>
++#else
++# include <assert.h>
++#endif
++
++#undef $ac_func
++
++/* Override any gcc2 internal prototype to avoid an error.  */
++#ifdef __cplusplus
++extern "C"
++{
++#endif
++/* We use char because int might match the return type of a gcc2
++   builtin and then its argument prototype would still apply.  */
++char $ac_func ();
++/* The GNU C library defines this for functions which it implements
++    to always fail with ENOSYS.  Some functions are actually named
++    something starting with __ and the normal name is an alias.  */
++#if defined (__stub_$ac_func) || defined (__stub___$ac_func)
++choke me
++#else
++char (*f) () = $ac_func;
++#endif
++#ifdef __cplusplus
++}
++#endif
++
++int
++main ()
++{
++return f != $ac_func;
++  ;
++  return 0;
++}
++_ACEOF
++rm -f conftest.$ac_objext conftest$ac_exeext
++if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
++  (eval $ac_link) 2>conftest.er1
++  ac_status=$?
++  grep -v '^ *+' conftest.er1 >conftest.err
++  rm -f conftest.er1
++  cat conftest.err >&5
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); } &&
++	 { ac_try='test -z "$ac_c_werror_flag"
++			 || test ! -s conftest.err'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; } &&
++	 { ac_try='test -s conftest$ac_exeext'
++  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  echo "$as_me:$LINENO: \$? = $ac_status" >&5
++  (exit $ac_status); }; }; then
++  eval "$as_ac_var=yes"
++else
++  echo "$as_me: failed program was:" >&5
++sed 's/^/| /' conftest.$ac_ext >&5
++
++eval "$as_ac_var=no"
++fi
++rm -f conftest.err conftest.$ac_objext \
++      conftest$ac_exeext conftest.$ac_ext
++fi
++echo "$as_me:$LINENO: result: `eval echo '${'$as_ac_var'}'`" >&5
++echo "${ECHO_T}`eval echo '${'$as_ac_var'}'`" >&6
++if test `eval echo '${'$as_ac_var'}'` = yes; then
++  cat >>confdefs.h <<_ACEOF
++#define `echo "HAVE_$ac_func" | $as_tr_cpp` 1
++_ACEOF
++
++fi
++done
++
++  fi
++
++
++
++
++
++  CXXFLAGS="$ac_save_CXXFLAGS"
++
++    ;;
+   *-solaris*)
+     case "$target" in
+     #  *-solaris2.5)
+diff -ruN gcc-4.3.2/libstdc++-v3/crossconfig.m4 gcc-4.3.2.new/libstdc++-v3/crossconfig.m4
+--- gcc-4.3.2/libstdc++-v3/crossconfig.m4	2008-01-14 16:15:43.000000000 -0800
++++ gcc-4.3.2.new/libstdc++-v3/crossconfig.m4	2010-02-12 22:02:57.000000000 -0800
+@@ -299,6 +299,12 @@
+     AC_DEFINE(HAVE_SINHF)
+     AC_DEFINE(HAVE_SINHL)
+     ;;
++  *-ros*)
++    AC_CHECK_HEADERS([sys/types.h locale.h float.h])
++    GLIBCXX_CHECK_BUILTIN_MATH_SUPPORT
++    GLIBCXX_CHECK_COMPLEX_MATH_SUPPORT
++    GLIBCXX_CHECK_STDLIB_SUPPORT
++    ;;
+   *-solaris*)
+     case "$target" in
+     #  *-solaris2.5)

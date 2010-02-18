@@ -1,0 +1,6 @@
+libc {
+  GLIBC_2.0 {
+    __errno_location;
+  }
+}
+

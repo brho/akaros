@@ -1,8 +1,0 @@
-USER_ROSLIB_DIR := $(USER_DIR)/roslib
-USER_ROSLIB_INCLUDE_DIR  := $(USER_ROSLIB_DIR)/inc
-
-include $(USER_ROSLIB_DIR)/src/$(TARGET_ARCH)/Makefrag
-include $(USER_ROSLIB_DIR)/src/Makefrag
-include $(USER_ROSLIB_DIR)/ivy/Makefrag
-
-.PRECIOUS: $(OBJDIR)/$(USER_ROSLIB_DIR)/%.o
