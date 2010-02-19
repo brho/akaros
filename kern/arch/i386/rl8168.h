@@ -6,8 +6,8 @@
 #include <pmap.h>
 #include <arch/nic_common.h>
 
-#define rl8168_debug(...)  //cprintf(__VA_ARGS__)  
-#define rl8168_interrupt_debug(...) cprintf(__VA_ARGS__)  
+#define rl8168_debug(...) // cprintf(__VA_ARGS__)  
+#define rl8168_interrupt_debug(...) //cprintf(__VA_ARGS__)  
 #define rl8168_frame_debug(...)  //cprintf(__VA_ARGS__)  
 
 #define NE2K_IRQ_CPU		5

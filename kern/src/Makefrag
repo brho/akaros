@@ -61,8 +61,10 @@ KERN_APPFILES += \
                  $(USER_APPS_PARLIB_DIR)/channel_test_server \
                  $(USER_APPS_PARLIB_DIR)/hello \
                  $(USER_APPS_PARLIB_DIR)/mhello \
-                 $(USER_APPS_PARLIB_DIR)/ping \
-                 $(USER_APPS_PARLIB_DIR)/manycore_test
+                 $(USER_APPS_PARLIB_DIR)/httpserver \
+                 $(USER_APPS_PARLIB_DIR)/manycore_test \
+                 $(USER_APPS_PARLIB_DIR)/lock_test 
+		
 endif
 
 KERN_LDFLAGS   := $(KERN_LDFLAGS) -L$(OBJDIR)/$(KERN_DIR) \

@@ -15,8 +15,6 @@
 #include "netif/etharp.h"
 #include "netif/ppp_oe.h"
 
-
-
 static void
 low_level_init(struct netif *netif);
 
@@ -25,7 +23,7 @@ low_level_output(struct netif *netif, struct pbuf *p);
 
 static struct pbuf *low_level_input(struct netif *netif);
 
-static void
+void
 ethernetif_input(struct netif *netif);
 
 err_t

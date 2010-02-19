@@ -95,11 +95,12 @@ uint32_t rx_des_cur = 0;
 uint32_t tx_des_cur = 0;
 
 extern int eth_up;
-extern int packet_waiting;
-extern int packet_buffer_size;
-extern char *CT(MAX_FRAME_SIZE - PACKET_HEADER_SIZE) packet_buffer;
-extern char *CT(MAX_FRAME_SIZE) packet_buffer_orig;
-extern int packet_buffer_pos;
+extern uint32_t packet_buffer_count;
+extern char* packet_buffer[PACKET_BUFFER_SIZE];
+extern uint32_t packet_buffer_sizes[PACKET_BUFFER_SIZE];
+extern uint32_t packet_buffer_head;
+extern uint32_t packet_buffer_tail;
+spinlock_t packet_buffer_lock;
 
 extern char *CT(PACKET_HEADER_SIZE + len) (*packet_wrap)(const char *CT(len) data, size_t len);
 extern int (*send_frame)(const char *CT(len) data, size_t len);
@@ -355,7 +356,7 @@ void rl8168_setup_interrupts() {
 // We need to evaluate this routine in terms of concurrency.
 // We also need to figure out whats up with different core interrupts
 void rl8168_interrupt_handler(trapframe_t *tf, void* data) {
-	
+
 	rl8168_interrupt_debug("\nNic interrupt on core %u!\n", lapic_get_id());
 				
 	// Read the offending interrupt(s)
@@ -423,6 +424,7 @@ void rl8168_interrupt_handler(trapframe_t *tf, void* data) {
 	// In the event that we got really unlucky and more data arrived after we set 
 	//  set the bit last, try one more check
 	rl8168_handle_rx_packet();
+
 	return;
 }
 
@@ -517,46 +519,28 @@ void rl8168_handle_rx_packet() {
 		
 	} while (!(current_command & DES_LS_MASK));
 	
-	// Hack for UDP syscall hack. 
-	// This is a quick hack to let us deal with where to put packets coming in. This is not concurrency friendly
-	// In the event that we get 2 incoming frames for our syscall test (shouldnt happen)
-	// We cant process more until another packet comes in. This is ugly, but this code goes away as soon as we integrate a real stack.
-	// This keys off the source port, fix it for dest port. 
-	// Also this may access packet regions that are wrong. If someone addresses empty packet for our interface
-	// and the bits that happened to be in memory before are the right port, this will trigger. this is bad
-	// but since syscalls are a hack for only 1 machine connected, we dont care for now.
-	
-	if ((current_command & DES_PAM_MASK) && (*((uint16_t*)(rx_buffer + 36)) == 0x9bad)) {
-		
-		if (packet_waiting) return;
-		
-		// So ugly I want to cry
-		packet_buffer_size = *((uint16_t*)(rx_buffer + 38)); 
-		packet_buffer_size = (((uint16_t)packet_buffer_size & 0xff00) >> 8) |  (((uint16_t)packet_buffer_size & 0x00ff) << 8);		
-		packet_buffer_size = packet_buffer_size - 8;
 
-		packet_buffer = rx_buffer + PACKET_HEADER_SIZE;
+	spin_lock(&packet_buffer_lock);
 
-		packet_buffer_orig = rx_buffer;
-		packet_buffer_pos = 0;
-		
-		packet_waiting = 1;
-		
-		rl8168_process_frame(rx_buffer, frame_size, current_command);
-		
-		rx_des_cur = rx_des_loop_cur;
-		
+	if (packet_buffer_count >= PACKET_BUFFER_SIZE) {
+		printk("WARNING: DROPPING PACKET!\n");
+		spin_unlock(&packet_buffer_lock);
+		kfree(rx_buffer);
 		return;
 	}
-	
-	// END HACKY STUFF
-	
+
+	packet_buffer[packet_buffer_tail] = rx_buffer;
+	packet_buffer_sizes[packet_buffer_tail] = frame_size;
+		
+	packet_buffer_tail = (packet_buffer_tail + 1) % PACKET_BUFFER_SIZE;
+	packet_buffer_count = packet_buffer_count + 1;
+
+	spin_unlock(&packet_buffer_lock);
+				
+	rx_des_cur = rx_des_loop_cur;
+				
 	// Chew on the frame data. Command bits should be the same for all frags.
 	rl8168_process_frame(rx_buffer, frame_size, current_command);
-
-	rx_des_cur = rx_des_loop_cur;
-	
-	kfree(rx_buffer);
 	
 	return;
 }

@@ -390,6 +390,7 @@ void ne2k_handle_rx_packet() {
 		extern char* packet_buffer;
 		extern char* packet_buffer_orig;
 
+#if 0
 		if (packet_waiting) return;
 		
 		// So ugly I want to cry
@@ -403,7 +404,7 @@ void ne2k_handle_rx_packet() {
 		packet_buffer_pos = 0;
 		
 		packet_waiting = 1;
-						
+#endif				
 		return;
 	}
 	

@@ -398,7 +398,9 @@ int read_from_channel(char * buf, int len, int peek)
 	int total_read = 0;
 
 	#ifdef __NETWORK__
-		int just_read = sys_eth_read(buf, len);
+		printf("PAUL BROKE ME FIX SYS ETH READ\n");
+		int just_read = 0;
+		//int just_read = sys_eth_read(buf, len);
 	#else
 		int just_read = sys_serial_read(buf, len);
 	#endif
@@ -411,7 +413,8 @@ int read_from_channel(char * buf, int len, int peek)
 	while (total_read != len) {
 		
 		#ifdef __NETWORK__
-			just_read = sys_eth_read(buf + total_read, len - total_read);
+			printf("PAUL BROKE ME. FIX SYS ETH READ\n");
+			//just_read = sys_eth_read(buf + total_read, len - total_read);
 		#else
 			just_read = sys_serial_read(buf + total_read, len - total_read);
 		#endif

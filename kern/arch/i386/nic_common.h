@@ -20,6 +20,8 @@
 // v----- Evil line ------v
 // Hacky stuff for syscalls go away.
 
+#define PACKET_BUFFER_SIZE 1024
+
 struct ETH_Header
 {
 	char dest_mac[6];

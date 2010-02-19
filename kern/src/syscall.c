@@ -563,37 +563,44 @@ static ssize_t sys_serial_write(env_t* e, const char *DANGEROUS buf, size_t len)
 
 #ifdef __NETWORK__
 // This is not a syscall we want. Its hacky. Here just for syscall stuff until get a stack.
-static ssize_t sys_eth_read(env_t* e, char *DANGEROUS buf, size_t len)
+static ssize_t sys_eth_read(env_t* e, char *DANGEROUS buf)
 {
 	extern int eth_up;
 
+        extern uint32_t packet_buffer_count;
+        extern char* packet_buffer[PACKET_BUFFER_SIZE];
+        extern uint32_t packet_buffer_sizes[PACKET_BUFFER_SIZE];
+        extern uint32_t packet_buffer_head;
+        extern uint32_t packet_buffer_tail;
+        extern spinlock_t packet_buffer_lock;
+
 	if (eth_up) {
-		extern int packet_waiting;
-		extern int packet_buffer_size;
-		extern char*CT(packet_buffer_size) packet_buffer;
-		extern char*CT(MAX_FRAME_SIZE) packet_buffer_orig;
-		extern int packet_buffer_pos;
 
-		if (len == 0)
+		uint32_t len;
+		char *ptr;
+
+		spin_lock(&packet_buffer_lock);
+
+		if (packet_buffer_count == 0) {
+			spin_unlock(&packet_buffer_lock);
 			return 0;
-
-		char *CT(len) _buf = user_mem_assert(e, buf,len, PTE_U);
-
-		if (packet_waiting == 0)
-			return 0;
-
-		int read_len = ((packet_buffer_pos + len) > packet_buffer_size) ? packet_buffer_size - packet_buffer_pos : len;
-
-		memcpy(_buf, packet_buffer + packet_buffer_pos, read_len);
-
-		packet_buffer_pos = packet_buffer_pos + read_len;
-
-		if (packet_buffer_pos == packet_buffer_size) {
-			kfree(packet_buffer_orig);
-			packet_waiting = 0;
 		}
 
-		return read_len;
+		ptr = packet_buffer[packet_buffer_head];
+		len = packet_buffer_sizes[packet_buffer_head];
+
+		packet_buffer_count = packet_buffer_count - 1;
+		packet_buffer_head = (packet_buffer_head + 1) % PACKET_BUFFER_SIZE;
+
+		spin_unlock(&packet_buffer_lock);
+
+		char* _buf = user_mem_assert(e, buf, len, PTE_U);
+
+		memcpy(_buf, ptr, len);
+
+		kfree(ptr);
+
+		return len;
 	}
 	else
 		return -EINVAL;
@@ -646,7 +653,6 @@ static ssize_t sys_eth_write(env_t* e, const char *DANGEROUS buf, size_t len)
 		return -EINVAL;
 }
 
-
 static ssize_t sys_eth_get_mac_addr(env_t* e, char *DANGEROUS buf) {
 	
 	extern int eth_up;
@@ -659,6 +665,18 @@ static ssize_t sys_eth_get_mac_addr(env_t* e, char *DANGEROUS buf) {
 	}
 	else
 		return -EINVAL;
+}
+
+
+static int sys_eth_recv_check(env_t* e) {
+
+	extern uint32_t packet_buffer_count;
+	
+	if (packet_buffer_count != 0) {
+		return 1;
+	}
+	else
+		return 0;
 }
 
 #endif // Network
@@ -715,6 +733,7 @@ intreg_t syscall(struct proc *p, uintreg_t syscallno, uintreg_t a1,
 		[SYS_eth_read] = (syscall_t)sys_eth_read,
 		[SYS_eth_write] = (syscall_t)sys_eth_write,
 		[SYS_eth_get_mac_addr] = (syscall_t)sys_eth_get_mac_addr,
+		[SYS_eth_recv_check] = (syscall_t)sys_eth_recv_check,
 	#endif
 	#ifdef __sparc_v8__
 		[SYS_frontend] = (syscall_t)frontend_syscall_from_user,

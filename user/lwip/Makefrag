@@ -14,6 +14,8 @@ USER_LWIP_SRC_SRCFILES	:= $(USER_LWIP_SRC_DIR)/api/api_msg.c \
 			   $(USER_LWIP_SRC_DIR)/api/netdb.c \
 			   $(USER_LWIP_SRC_DIR)/api/sockets.c \
 			   $(USER_LWIP_SRC_DIR)/api/tcpip.c \
+			   $(USER_LWIP_SRC_DIR)/netif/etharp.c \
+			   $(USER_LWIP_SRC_DIR)/netif/ethernetif.c \
 			   $(USER_LWIP_SRC_DIR)/core/dhcp.c \
 			   $(USER_LWIP_SRC_DIR)/core/init.c \
 			   $(USER_LWIP_SRC_DIR)/core/sys_arch.c \
@@ -33,9 +35,7 @@ USER_LWIP_SRC_SRCFILES	:= $(USER_LWIP_SRC_DIR)/api/api_msg.c \
 			   $(USER_LWIP_SRC_DIR)/core/ipv4/ip.c  \
 			   $(USER_LWIP_SRC_DIR)/core/ipv4/ip_addr.c \
 			   $(USER_LWIP_SRC_DIR)/core/ipv4/ip_frag.c \
-			   $(USER_LWIP_SRC_DIR)/core/ipv4/inet_chksum.c \
-			   $(USER_LWIP_SRC_DIR)/netif/etharp.c \
-			   $(USER_LWIP_SRC_DIR)/netif/ethernetif.c
+			   $(USER_LWIP_SRC_DIR)/core/ipv4/inet_chksum.c 
 							
 USER_LWIP_SRC_OBJFILES	:= $(patsubst $(USER_LWIP_SRC_DIR)/%.c, \
 			   $(OBJDIR)/$(USER_LWIP_DIR)/%.o,  \

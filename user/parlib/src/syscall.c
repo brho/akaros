@@ -75,16 +75,17 @@ ssize_t sys_eth_write(void* buf, size_t len)
 }
 
 //Read a buffer via ethernet
-ssize_t sys_eth_read(void* buf, size_t len) 
+ssize_t sys_eth_read(void* buf) 
 {
-	if (len == 0)
-		return 0;
-		
-	return syscall(SYS_eth_read, (intreg_t)buf, len, 0, 0, 0);
+	return syscall(SYS_eth_read, (intreg_t)buf, 0, 0, 0, 0);
 }
 
 ssize_t sys_eth_get_mac_addr(void* buf) {
 	return syscall(SYS_eth_get_mac_addr, (intreg_t)buf, 0, 0, 0, 0);
+}
+
+int sys_eth_recv_check() {
+	return syscall(SYS_eth_recv_check, 0, 0, 0, 0, 0);
 }
 
 /* Request resources from the kernel.  Flags in ros/resource.h. */

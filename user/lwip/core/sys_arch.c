@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2001-2003 Swedish Institute of Computer Science.
+t * Copyright (c) 2001-2003 Swedish Institute of Computer Science.
  * All rights reserved. 
  * 
  * Redistribution and use in source and binary forms, with or without modification, 
@@ -35,6 +35,7 @@
 #include "lwip/sys.h"
 #include "lwip/opt.h"
 #include "lwip/stats.h"
+#include "netif/ethernetif.h"
 
 #include <pthread.h>
 #include <arch/arch.h>
@@ -54,6 +55,21 @@ typedef struct sys_hart_startup {
 
 } sys_hart_startup_t;
 
+
+void  sys_recv_thread(void) {
+
+	while(1) {
+
+		if (sys_eth_recv_check() == 1) {
+
+			extern struct netif* registered_netif;
+
+			ethernetif_input(registered_netif);
+		}
+	}
+
+}
+
 // HACK
 void sys_init(void) {
 	sys_debug("In sys_init\n");
@@ -62,7 +78,13 @@ void sys_init(void) {
 	
 	protection_status = 0;
 
-	printf("Register callback\n");
+	extern void (*hart_startup)();
+	extern void *hart_startup_arg;
+
+        hart_startup = sys_recv_thread;
+        hart_startup_arg = NULL;
+
+        hart_request(1);
 }
 
 // HACK
@@ -111,7 +133,7 @@ void sys_sem_free(sys_sem_t sem) {
 // OK
 void sys_sem_signal(sys_sem_t sem) {
 
-	sys_debug("In sys_sem_signal\n");
+	sys_debug("In sys_sem_signal. Signal on %x\n", sem);
 
 	pthread_mutex_lock(&(sem->lock));
 
@@ -125,7 +147,7 @@ void sys_sem_signal(sys_sem_t sem) {
 // OK
 u32_t sys_arch_sem_wait(sys_sem_t sem, u32_t timeout) {
 
-	sys_debug("In sys_arch_sem_wait\n");
+	sys_debug("In sys_arch_sem_wait. Wait on sem\n");
 
 	uint32_t start = sys_now();
 	uint32_t current = 0;
@@ -160,10 +182,10 @@ sys_mbox_t sys_mbox_new(int size) {
 
 	sys_debug("In sys_mbox_new\n");
 
-
-	// HACK:
-	if (size == 0)
+	if (size == 0) {
+		printf("DANGER. BAD MBOX SIZE\n");
 		size = 20;
+	}
 
 	sys_mbox_t new_box = (sys_mbox_t)malloc(sizeof(struct sys_mbox) + size * sizeof(char*));
 
@@ -185,7 +207,6 @@ void sys_mbox_free(sys_mbox_t mbox) {
 
 	sys_debug("In sys_mbox_new\n");
 
-	
 	// Should we aquire the lock here?
 	if (mbox->count != 0) {
 		printf("LWIP Stack errror. Bad.\n");
@@ -203,7 +224,7 @@ void sys_mbox_free(sys_mbox_t mbox) {
 // HACK
 void sys_mbox_post(sys_mbox_t mbox, void *msg) {
 
-	sys_debug("In sys_mbox_post\n");
+	sys_debug("In sys_mbox_post. Post on %x\n", mbox);
 
 	pthread_mutex_lock(&(mbox->lock));
 
@@ -227,7 +248,7 @@ void sys_mbox_post(sys_mbox_t mbox, void *msg) {
 // HACK
 err_t sys_mbox_trypost(sys_mbox_t mbox, void *msg) {
 
-	sys_debug("In sys_mbox_trypost\n");
+	sys_debug("In sys_mbox_trypost. Post on %x\n", mbox);
 
 	pthread_mutex_lock(&(mbox->lock));
 
@@ -237,7 +258,6 @@ err_t sys_mbox_trypost(sys_mbox_t mbox, void *msg) {
 
 		return ERR_MEM;
 	}
-
 
 	mbox->buf[(mbox->first + mbox->count) % mbox->size] = msg;
 	mbox->count = mbox->count + 1;
@@ -250,7 +270,7 @@ err_t sys_mbox_trypost(sys_mbox_t mbox, void *msg) {
 // HACK
 u32_t sys_arch_mbox_fetch(sys_mbox_t mbox, void **msg, u32_t timeout) {
 
-	sys_debug("In sys_arch_mbox_fetch\n");
+	sys_debug("In sys_arch_mbox_fetch. Fetch on mbox %x\n", mbox);
 
 	uint32_t start = sys_now();
 	uint32_t current = 0;
@@ -270,11 +290,12 @@ u32_t sys_arch_mbox_fetch(sys_mbox_t mbox, void **msg, u32_t timeout) {
                 hart_relax();
 
                 pthread_mutex_lock(&(mbox->lock));
+
         }
 
 	*msg = mbox->buf[mbox->first];
 
-	mbox->first = (mbox->first + 1) % (mbox->size);
+	mbox->first = (mbox->first + 1) % mbox->size;
 
         mbox->count = mbox->count - 1;
 
@@ -286,7 +307,7 @@ u32_t sys_arch_mbox_fetch(sys_mbox_t mbox, void **msg, u32_t timeout) {
 // HACK
 u32_t sys_arch_mbox_tryfetch(sys_mbox_t mbox, void **msg) {
 
-	sys_debug("In sys_arch_mbox_tryfetch\n");
+	sys_debug("In sys_arch_mbox_tryfetch. Fetch on %x\n", &mbox);
 
 	pthread_mutex_lock(&(mbox->lock));
 

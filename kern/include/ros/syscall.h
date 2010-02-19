@@ -38,7 +38,8 @@
 #define SYS_eth_read				27
 #define SYS_eth_write				28
 #define SYS_eth_get_mac_addr			29
-#define SYS_frontend				30
+#define SYS_eth_recv_check			30
+#define SYS_frontend				31
 
 #define SYS_read				100
 #define SYS_write				101
