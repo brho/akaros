@@ -1,31 +1,13 @@
-#ifndef _ROS_STAT_H
-#define _ROS_STAT_H
+#ifndef _ROS_CONVERT_STAT_H
+#define _ROS_CONVERT_STAT_H
 
-struct newlib_stat
-{
-   int16_t st_dev;
-  uint32_t st_ino;
-  uint16_t st_mode;
-  uint16_t st_nlink;
-  uint16_t st_uid;
-  uint16_t st_gid;
-   int16_t st_rdev;
-   int32_t st_size;
-   int32_t st_atime;
-   int32_t st_spare1;
-   int32_t st_mtime;
-   int32_t st_spare2;
-   int32_t st_ctime;
-   int32_t st_spare3;
-   int32_t st_blksize;
-   int32_t st_blocks;
-   int32_t st_spare4[2];
-};
+#include <ros/stat.h>
 
-static void __convert_stat(const struct newlib_stat* nst, struct stat* st)
+#define __stat_copy_field(field) \
+  st->st_##field = (typeof(st->st_##field))nst->st_##field
+
+static void __convert_stat(const struct ros_stat* nst, struct stat* st)
 {
-  #define __stat_copy_field(field) \
-    st->st_##field = (typeof(st->st_##field))nst->st_##field
   __stat_copy_field(dev);
   __stat_copy_field(ino);
   __stat_copy_field(mode);

@@ -19,7 +19,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <stddef.h>
-#include "ros_syscall.h"
+#include <ros/syscall.h>
 
 /* Get the pathname of the current working directory,
    and put it in SIZE bytes of BUF.  Returns NULL if the

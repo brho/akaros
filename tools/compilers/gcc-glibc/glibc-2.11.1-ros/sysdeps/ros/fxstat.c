@@ -21,7 +21,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include "ros_syscall.h"
+#include <ros/syscall.h>
 #include "ros_stat.h"
 
 /* Get information about the file descriptor FD in BUF.  */
@@ -46,7 +46,7 @@ __fxstat (int vers, int fd, struct stat *buf)
     }
 
   
-  struct newlib_stat nst;
+  struct ros_stat nst;
   int ret = (int)ros_syscall(SYS_fstat,fd,&nst,0,0,0);
   __convert_stat(&nst,buf);
   return ret;

@@ -20,7 +20,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <bits/libc-lock.h>
-#include "ros_syscall.h"
+#include <ros/syscall.h>
 
 __libc_lock_define(,__fork_lock);
 int* child_list = NULL;

@@ -18,7 +18,7 @@
 
 #include <errno.h>
 #include <signal.h>
-#include "ros_syscall.h"
+#include <ros/syscall.h>
 
 /* Send signal SIG to process number PID.  If PID is zero,
    send SIG to all processes in the current process's process group.

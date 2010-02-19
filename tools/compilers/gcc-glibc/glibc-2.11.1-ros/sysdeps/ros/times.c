@@ -20,7 +20,8 @@
 #include <sys/times.h>
 #include <sys/time.h>
 #include <stddef.h>
-#include "ros_syscall.h"
+#include <ros/syscall.h>
+#include <ros/procinfo.h>
 
 /* Store the CPU time used by this process and all its
    dead children (and their dead children) in BUFFER.

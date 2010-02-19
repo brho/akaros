@@ -23,7 +23,7 @@
 #include <stdarg.h>
 #include <string.h>
 #include <sys/stat.h>
-#include "ros_syscall.h"
+#include <ros/syscall.h>
 
 /* Return 1 if FD is a terminal, 0 if not.  */
 int

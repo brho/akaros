@@ -75,21 +75,21 @@ PERL    := perl
 
 EXTRAARGS ?= -std=gnu99 -Wno-attributes -fno-stack-protector -fgnu89-inline
 
+# GCC Library path
+ifneq ($(shell which $(CC)),)
+GCC_LIB := $(shell $(CC) -print-libgcc-file-name)
+endif
+
 # Universal compiler flags
 # -fno-builtin is required to avoid refs to undefined functions in the kernel.
 # Only optimize to -O1 to discourage inlining, which complicates backtraces.
 CFLAGS := $(CFLAGS) -D$(TARGET_ARCH) $(EXTRAARGS)
 CFLAGS += -O2 -pipe -MD -fno-builtin -gstabs
 CFLAGS += -Wall -Wno-format -Wno-unused -fno-strict-aliasing
-#CFLAGS += -nostdinc -Igccinclude/$(TARGET_ARCH)
+CFLAGS += -nostdinc -I$(dir $(GCC_LIB))/include
 
 # Universal loader flags
 LDFLAGS := -nostdlib
-
-# GCC Library path 
-ifneq ($(shell which $(CC)),)
-GCC_LIB := $(shell $(CC) -print-libgcc-file-name)
-endif
 
 # List of directories that the */Makefrag makefile fragments will add to
 OBJDIRS :=

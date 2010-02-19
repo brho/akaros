@@ -1,6 +1,6 @@
 #include <unistd.h>
 #include <errno.h>
-#include "ros_syscall.h"
+#include <ros/memlayout.h>
 
 int
 __getpagesize (void)

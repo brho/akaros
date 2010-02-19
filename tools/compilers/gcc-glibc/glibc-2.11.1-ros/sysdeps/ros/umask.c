@@ -19,7 +19,7 @@
 #include <sys/stat.h>
 #include <errno.h>
 #include <sys/types.h>
-#include "ros_syscall.h"
+#include <ros/syscall.h>
 
 /* Set the file creation mask to MASK, returning the old mask.  */
 mode_t

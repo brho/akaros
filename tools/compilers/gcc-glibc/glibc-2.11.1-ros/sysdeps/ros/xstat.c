@@ -21,7 +21,7 @@
 #include <stddef.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include "ros_syscall.h"
+#include <ros/syscall.h>
 #include "ros_stat.h"
 
 /* Get file information about FILE in BUF.  */
@@ -34,7 +34,7 @@ __xstat (int vers, const char *file, struct stat *buf)
     return -1;
   }
 
-  struct newlib_stat nst;
+  struct ros_stat nst;
   int ret = (int)ros_syscall(SYS_stat,file,&nst,0,0,0);
   __convert_stat(&nst,buf);
   return ret;

@@ -18,7 +18,7 @@
 
 #include <errno.h>
 #include <sys/time.h>
-#include "ros_syscall.h"
+#include <ros/syscall.h>
 
 #undef __gettimeofday
 

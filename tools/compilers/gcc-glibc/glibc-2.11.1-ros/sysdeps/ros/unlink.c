@@ -19,7 +19,7 @@
 #include <errno.h>
 #include <stddef.h>
 #include <unistd.h>
-#include "ros_syscall.h"
+#include <ros/syscall.h>
 
 /* Remove the link named NAME.  */
 int

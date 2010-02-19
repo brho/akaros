@@ -18,7 +18,7 @@
 
 #include <errno.h>
 #include <sched.h>
-#include "ros_syscall.h"
+#include <ros/syscall.h>
 
 /* Yield the processor.  */
 int

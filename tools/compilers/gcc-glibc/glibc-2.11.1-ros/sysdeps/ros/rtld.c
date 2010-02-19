@@ -2,7 +2,8 @@
 #include <elf/rtld.c>
 #undef _dl_start
 
-#include "ros_syscall.h"
+#include <ros/syscall.h>
+#include <ros/procinfo.h>
 
 static ElfW(Addr) __attribute_used__ internal_function
 _dl_start(void* arg0)

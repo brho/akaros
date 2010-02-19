@@ -19,7 +19,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <bits/libc-lock.h>
-#include "ros_syscall.h"
+#include <ros/syscall.h>
 
 /* sbrk.c expects this.  */
 void *__curbrk;

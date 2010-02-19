@@ -19,10 +19,11 @@
 #include <errno.h>
 #include <stddef.h>
 #include <unistd.h>
-#include "ros_syscall.h"
+#include <ros/syscall.h>
 #include <string.h>
 #include <fcntl.h>
 #include <elf/elf.h>
+#include <ros/procinfo.h>
 
 /* Replace the current process, executing PATH with arguments ARGV and
    environment ENVP.  ARGV and ENVP are terminated by NULL pointers.  */

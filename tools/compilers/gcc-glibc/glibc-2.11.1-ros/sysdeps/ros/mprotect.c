@@ -19,7 +19,7 @@
 #include <sys/types.h>
 #include <sys/mman.h>
 #include <errno.h>
-#include "ros_syscall.h"
+#include <ros/syscall.h>
 
 /* Change the memory protection of the region starting at ADDR and
    extending LEN bytes to PROT.  Returns 0 if successful, -1 for errors

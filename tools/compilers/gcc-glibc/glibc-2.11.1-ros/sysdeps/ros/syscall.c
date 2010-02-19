@@ -20,7 +20,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <stdarg.h>
-#include "ros_syscall.h"
+#include <ros/syscall.h>
 
 long int
 syscall(long int num, ...)

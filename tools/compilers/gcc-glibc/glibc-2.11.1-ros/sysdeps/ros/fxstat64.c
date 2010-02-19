@@ -21,7 +21,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include "ros_syscall.h"
+#include <ros/syscall.h>
 #include "ros_stat.h"
 
 /* Get information about the file descriptor FD in BUF.  */

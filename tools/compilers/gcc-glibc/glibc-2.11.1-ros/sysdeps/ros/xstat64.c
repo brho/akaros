@@ -21,7 +21,7 @@
 #include <stddef.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include "ros_syscall.h"
+#include <ros/syscall.h>
 #include "ros_stat.h"
 
 /* Get file information about FILE in BUF.  */

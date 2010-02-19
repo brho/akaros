@@ -19,7 +19,8 @@
 #include <sys/types.h>
 #include <sys/mman.h>
 #include <errno.h>
-#include "ros_syscall.h"
+#include <ros/syscall.h>
+#include <ros/memlayout.h>
 
 /* Map addresses starting near ADDR and extending for LEN bytes.  From
    OFFSET into the file FD describes according to PROT and FLAGS.  If ADDR

@@ -26,7 +26,9 @@
 #include <limits.h>
 #include <sys/param.h>
 #include <sys/sysinfo.h>
-#include "ros_syscall.h"
+#include <ros/syscall.h>
+#include <ros/procinfo.h>
+#include <ros/memlayout.h>
 
 /* Get the value of the system variable NAME.  */
 long int

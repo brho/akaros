@@ -21,7 +21,7 @@
 #include <unistd.h>
 #include <sysdep.h>
 #include <abort-instr.h>
-#include "ros_syscall.h"
+#include <ros/syscall.h>
 
 void
 _exit (status)

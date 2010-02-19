@@ -19,7 +19,7 @@
 #include <errno.h>
 #include <stddef.h>
 #include <termios.h>
-#include "ros_syscall.h"
+#include <ros/syscall.h>
 
 /* Set the state of FD to *TERMIOS_P.  */
 int

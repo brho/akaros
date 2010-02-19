@@ -54,6 +54,11 @@ procinfo_pack_args(procinfo_t* p, char* const* argv, char* const* envp)
 	p->argp[nargv+nenvp+1] = 0;
 	
 	return 0;
-}   
+}
+
+// this is how user programs access the procinfo page
+#ifndef ROS_KERNEL
+# define __procinfo (*(procinfo_t*)UINFO)
+#endif
 
 #endif // !ROS_PROCDATA_H

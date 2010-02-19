@@ -21,7 +21,7 @@
 #include <sys/types.h>
 #include <sched.h>
 #include <bits/libc-lock.h>
-#include "ros_syscall.h"
+#include <ros/syscall.h>
 
 /* Wait for a child matching PID to die.
    If PID is greater than 0, match any process whose process ID is PID.

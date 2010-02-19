@@ -2,7 +2,8 @@
 #include <string.h>
 #include <ros/arch/hart.h>
 #include <stdio.h>
-#include "ros_syscall.h"
+#include <ros/syscall.h>
+#include <ros/procinfo.h>
 
 void** __hart_stack_pointers = NULL;
 weak_alias(__hart_stack_pointers,hart_stack_pointers)

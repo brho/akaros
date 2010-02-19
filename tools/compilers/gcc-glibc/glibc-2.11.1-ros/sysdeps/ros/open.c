@@ -21,7 +21,7 @@
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdio.h>
-#include "ros_syscall.h"
+#include <ros/syscall.h>
 
 /* Open FILE with access OFLAG.  If OFLAG includes O_CREAT,
    a third argument is the file protection.  */

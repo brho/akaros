@@ -1,7 +1,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <errno.h>
-#include "ros_syscall.h"
+#include <ros/syscall.h>
 
 off_t
 __libc_lseek (int fd, off_t offset, int whence)

@@ -18,7 +18,8 @@
 
 #include <errno.h>
 #include <unistd.h>
-#include "ros_syscall.h"
+#include <ros/syscall.h>
+#include <ros/procinfo.h>
 
 /* Get the process ID of the calling process.  */
 int

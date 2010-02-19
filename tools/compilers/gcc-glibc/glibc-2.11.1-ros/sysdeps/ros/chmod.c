@@ -20,7 +20,7 @@
 #include <stddef.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include "ros_syscall.h"
+#include <ros/syscall.h>
 
 /* Change the protections of FILE to MODE.  */
 int

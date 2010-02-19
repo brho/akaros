@@ -142,6 +142,8 @@ gcc-$(GCC_VERSION):
 glibc-$(GLIBC_VERSION): 
 	rm -rf glibc-$(GLIBC_VERSION)
 	tar -jxf glibc-$(GLIBC_VERSION).tar.bz2
+	rm glibc-$(GLIBC_VERSION)/sysdeps/sparc/sparc32/elf/start.S
+	rm glibc-$(GLIBC_VERSION)/sysdeps/i386/elf/start.S
 	$(MAKE) .glibc-patch
 
 .glibc-patch: glibc-$(GLIBC_VERSION)
