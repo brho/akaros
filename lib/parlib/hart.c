@@ -91,7 +91,7 @@ int hart_request(size_t k)
 	if(k < 0 || _current_harts+k > hart_max_harts())
 	{
 		errno = EAGAIN;
-		goto fail;
+		goto out;
 	}
 
 	for(i = _current_harts, j = 0; i < _current_harts+k; i++, j++)
@@ -103,7 +103,7 @@ int hart_request(size_t k)
 	if((ret = sys_resource_req(0,_current_harts+k,0)) == 0)
 	{
 		_current_harts += k;
-		goto success;
+		goto out;
 	}
 
 fail:
@@ -113,7 +113,7 @@ fail:
 		hart_free_stack(i);
 	}
 
-success:
+out:
 	hart_lock_unlock(&_hart_lock);
 	return ret;
 }

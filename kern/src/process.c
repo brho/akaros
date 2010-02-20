@@ -197,7 +197,7 @@ proc_init_procinfo(struct proc* p)
 	p->env_procinfo->ppid = p->ppid;
 	p->env_procinfo->tsc_freq = system_timing.tsc_freq;
 	// TODO: maybe do something smarter here
-	p->env_procinfo->max_harts = MAX(1,num_cpus); // hack to use all cores
+	p->env_procinfo->max_harts = MAX(1,num_cpus-1);
 }
 
 /* Allocates and initializes a process, with the given parent.  Currently
