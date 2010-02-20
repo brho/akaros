@@ -700,10 +700,10 @@ void proc_yield(struct proc *SAFE p)
 			schedule_proc(p);
 			break;
 		case (PROC_RUNNING_M):
-			p->resources[RES_CORES].amt_granted = --(p->num_vcores);
-			p->resources[RES_CORES].amt_wanted = p->num_vcores;
 			// give up core
 			p->vcoremap[get_vcoreid(p, core_id())] = -1;
+			p->resources[RES_CORES].amt_granted = --(p->num_vcores);
+			p->resources[RES_CORES].amt_wanted = p->num_vcores;
 			// add to idle list
 			put_idle_core(core_id());
 			// last vcore?  then we really want 1, and to yield the gang

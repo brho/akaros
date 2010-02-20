@@ -218,11 +218,11 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 
 .$(BINARY_PREFIX)ros-headers-install: $(ROSDIR)
 	$(MAKE) -C $(ROSDIR) symlinks
-	mkdir -p $(INSTDIR)/$(ARCH)-ros/sys-include
+	mkdir -p $(INSTDIR)/$(ARCH)-ros/sys-include/arch
 	cp -r $(ROSDIR)/kern/include/ros \
 	   $(INSTDIR)/$(ARCH)-ros/sys-include/
-	cp -r $(ROSDIR)/kern/include/arch \
-	   $(INSTDIR)/$(ARCH)-ros/sys-include/
+	cp -r $(ROSDIR)/kern/include/arch/* \
+	   $(INSTDIR)/$(ARCH)-ros/sys-include/arch/
 
 .$(BINARY_PREFIX)gcc-stage1-configure: 
 	$(MAKE) $(BINARY_PREFIX)gcc-stage1-builddir

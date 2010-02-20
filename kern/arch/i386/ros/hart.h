@@ -5,6 +5,9 @@
 
 #include <ros/syscall.h>
 
+// this is how we get our thread id on entry.
+register int __hart_self_on_entry asm ("eax");
+
 // The actual hart_self() function is a global symbol that invokes this routine.
 static inline int
 __hart_self()

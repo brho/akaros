@@ -7,6 +7,8 @@ double do_fsqrt(double);
 double do_recip(double);
 double do_rsqrt(double);
 
+#define __hart_self_on_entry (__hart_self())
+
 static inline int
 __hart_self()
 {

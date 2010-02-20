@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <ros/syscall.h>
 #include <ros/procinfo.h>
+#include <unistd.h>
 
 void** __hart_stack_pointers = NULL;
 weak_alias(__hart_stack_pointers,hart_stack_pointers)
@@ -24,23 +25,32 @@ __hart_yield(void)
 }
 weak_alias(__hart_yield,hart_yield)
 
+#define failmsg(str) write(2,str"\n",sizeof(str"\n")-1)
+
 void
 _start(void)
 {
-	// threads besides thread 0 must acquire a stack and TCB
-	if(__hart_self() != 0)
+	// threads besides thread 0 must acquire a stack and TCB.
+	// WARNING: no function calls or register spills may occur
+	// before the stack pointer is set!
+	// WARNING2: __hart_self_on_entry must be read before
+	// anything is register-allocated!
+	int id = __hart_self_on_entry;
+	if(id != 0)
 	{
-		__hart_set_stack_pointer(__hart_stack_pointers[__hart_self()]);
-		TLS_INIT_TP(__hart_thread_control_blocks[__hart_self()],0);
+		__hart_set_stack_pointer(__hart_stack_pointers[id]);
+		TLS_INIT_TP(__hart_thread_control_blocks[id],0);
 		hart_entry();
 		hart_yield();
+		failmsg("why did hart_yield() return?");
+		goto diediedie;
 	}
 
 	static int init = 0;
 	if(init)
 	{
-		fputs("why is thread 0 re-entering _start, foo?!",stderr);
-		abort();
+		failmsg("why did thread 0 re-enter _start?");
+		goto diediedie;
 	}
 	init = 1;
 
@@ -68,6 +78,10 @@ _start(void)
 
 	__libc_start_main(&main,argc,argv,&__libc_csu_init,&__libc_csu_fini,0,0);
 
+	failmsg("why did main() return?");
+
+diediedie:
+	abort();
 	#ifdef ABORT_INSTRUCTION
 	ABORT_INSTRUCTION;
 	#endif
