@@ -22,6 +22,7 @@ kern/include/arch
 kern/src/arch
 Documentation/doxygen/rosdoc
 sim/
+sim
 fs
 tools/.*
 tools/compilers/gcc-glibc/.*
