@@ -6,9 +6,9 @@
 #include <pmap.h>
 #include <arch/nic_common.h>
 
-#define ne2k_debug(...)  cprintf(__VA_ARGS__)  
+#define ne2k_debug(...)  //cprintf(__VA_ARGS__)  
 #define ne2k_interrupt_debug(...) //cprintf(__VA_ARGS__)  
-#define ne2k_frame_debug(...) // cprintf(__VA_ARGS__)  
+#define ne2k_frame_debug(...) //cprintf(__VA_ARGS__)  
 
 #define NIC_IRQ_CPU			5
 

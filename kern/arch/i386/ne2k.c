@@ -71,10 +71,20 @@
 #define NE2K_FIRST_SEND_PAGE	NE2K_LAST_RECV_PAGE + 1
 
 
+#define SET_PAGE_0() (inb(ne2k_io_base_addr + NE2K_PG0_RW_CR) & 0x3F)
+
 extern uint32_t eth_up; // Fix this                               
 uint32_t ne2k_irq;      // And this
 uint32_t ne2k_io_base_addr;
 char device_mac[6];
+
+extern uint32_t packet_buffer_count;
+extern char* packet_buffer[PACKET_BUFFER_SIZE];
+extern uint32_t packet_buffer_sizes[PACKET_BUFFER_SIZE];
+extern uint32_t packet_buffer_head;
+extern uint32_t packet_buffer_tail;
+spinlock_t packet_buffer_lock;
+
 
 void* base_page;
 uint32_t num_pages = 0;
@@ -97,7 +107,7 @@ void ne2k_init() {
         ne2k_setup_interrupts();
 
 	eth_up = 1;
-	
+
 	return;
 }
 
@@ -189,7 +199,7 @@ void ne2k_configure_nic() {
 	outb(ne2k_io_base_addr + NE2K_PG0_W_TCR,  0xE0);
 	
 
-	//uint8_t isr = inb(ne2k_io_base_addr + 0x07);
+	//uint8_t isr = inb(ne2k_io_base_addr + NE2K_PG0_RW_ISR);
 	//cprintf("isr: %x\n", isr);
 
 	
@@ -207,9 +217,11 @@ void ne2k_setup_interrupts() {
 	
 	ioapic_route_irq(ne2k_irq, 6);	
 	
+	SET_PAGE_0();
+
+        outb(ne2k_io_base_addr + NE2K_PG0_W_IMR,  0xBF);
+
 	outb(ne2k_io_base_addr + NE2K_PG0_RW_ISR, 0xFF);
-	outb(ne2k_io_base_addr + NE2K_PG0_W_IMR,  0xFF);
-	
 	return;
 }
 
@@ -270,27 +282,44 @@ void ne2k_test_interrupts() {
 void ne2k_interrupt_handler(trapframe_t *tf, void* data) {
 	
 	ne2k_interrupt_debug("\nNE2K interrupt on core %u!\n", lapic_get_id());
-	uint8_t isr= inb(ne2k_io_base_addr + 0x07);
+
+	SET_PAGE_0();
+
+	uint8_t isr= inb(ne2k_io_base_addr + NE2K_PG0_RW_ISR);
 	ne2k_interrupt_debug("isr: %x\n", isr);
 	
-	if (isr & 0x1) {
-		ne2k_interrupt_debug("-->Packet received.\n");
-		ne2k_handle_rx_packet();
+	while (isr != 0x0) {
+
+		// TODO: Other interrupt cases.
+
+		if (isr & 0x1) {
+			ne2k_interrupt_debug("-->Packet received.\n");
+			ne2k_handle_rx_packet();
+		}
+		
+		SET_PAGE_0();
+
+		// Clear interrupts
+		isr = inb(ne2k_io_base_addr + NE2K_PG0_RW_ISR);
+		outb(ne2k_io_base_addr + NE2K_PG0_RW_ISR, isr);
+
 	}
 
-
-	outb(ne2k_io_base_addr + 0x07, isr);
-	//ne2k_handle_rx_packet();
+	ne2k_handle_rx_packet();
+	
 	return;				
 }
 
 // @TODO: Is this broken? Didn't change it after kmalloc changed
 void ne2k_handle_rx_packet() {
+	
+	SET_PAGE_0();
 
         uint8_t bound = inb(ne2k_io_base_addr + NE2K_PG0_RW_BNRY);
 
         uint8_t cr = inb(ne2k_io_base_addr + NE2K_PG0_RW_CR);
-        // Set page 1
+        
+	// Set page 1
         outb(ne2k_io_base_addr + NE2K_PG0_RW_CR, (cr & 0x3F) | 0x40);
 
 	uint8_t next = inb(ne2k_io_base_addr + NE2K_PG1_RW_CURR);
@@ -303,6 +332,7 @@ void ne2k_handle_rx_packet() {
 
 	// Broken mult packets?
 	if (((bound + 1) == next) || (((bound + 1) == stop) && (start == next))) {
+		ne2k_debug("NO PACKET TO PROCESS\n");
 		return;
 	}
 
@@ -320,12 +350,10 @@ void ne2k_handle_rx_packet() {
 
         uint8_t curr = bound + 1;
 
-//cprintf("reading from: %x\n", curr);
-
 	uint8_t header[4];
 	uint16_t packet_len = 0xFFFF;
 	uint16_t page_count = 0;
-	for (int i = 0; i < (MAX_FRAME_SIZE / NE2K_PAGE_SIZE); i++) {
+	for (int i = 0, n = 0; i < (MAX_FRAME_SIZE / NE2K_PAGE_SIZE); i++) {
 		if (curr == stop)
 			curr = start;			
 
@@ -337,23 +365,19 @@ void ne2k_handle_rx_packet() {
         	outb(ne2k_io_base_addr + NE2K_PG0_W_RBCR0, 0);
         	outb(ne2k_io_base_addr + NE2K_PG0_W_RBCR1, 0x1);
 	
-
 		outb(ne2k_io_base_addr + NE2K_PG0_RW_CR, 0x0A);
 
 		for (int j = 0; j < NE2K_PAGE_SIZE; j++) {
 			uint8_t val = inb(ne2k_io_base_addr + 0x10);
 			if ((i == 0) && (j < 4)) {
-//				cprintf("header %u %x\n", j, (uint8_t)val);
 				header[j] = val;
-			} 
-			rx_buffer[i*NE2K_PAGE_SIZE + j] = val;
+			} else { 
+				rx_buffer[n++] = val;
+			}
 		}
-
 
 		if (i == 0) {
 			packet_len = ((uint16_t)header[3] << 8) | (uint16_t)header[2];
-//		cprintf("header 2 %u header 3 %u header 3 shifted %u\n", (uint16_t)header[2], (uint16_t)header[3], (uint16_t)header[3] << 8);
-//		cprintf("packet len: %u\n", packet_len);
 			if (packet_len % NE2K_PAGE_SIZE) {
 				page_count = (packet_len / NE2K_PAGE_SIZE) + 1;
 			} else {
@@ -365,52 +389,26 @@ void ne2k_handle_rx_packet() {
 			break;
 
 		curr++;
-
-		
+	
 	}
-//cprintf("last page: %x\n", curr);
 	outb(ne2k_io_base_addr + NE2K_PG0_RW_BNRY, curr);
-	
 
-	// Hack for UDP syscall hack. 
-	// This is a quick hack to let us deal with where to put packets coming in. This is not concurrency friendly
-	// In the event that we get 2 incoming frames for our syscall test (shouldnt happen)
-	// We cant process more until another packet comes in. This is ugly, but this code goes away as soon as we integrate a real stack.
-	// This keys off the source port, fix it for dest port. 
-	// Also this may access packet regions that are wrong. If someone addresses empty packet for our interface
-	// and the bits that happened to be in memory before are the right port, this will trigger. this is bad
-	// but since syscalls are a hack for only 1 machine connected, we dont care for now.
-	
-	if (*((uint16_t*)(rx_buffer + 40)) == 0x9bad) {
-		
+	spin_lock(&packet_buffer_lock);
 
-		extern int packet_waiting;	
-		extern int packet_buffer_size;
-		extern int packet_buffer_pos;
-		extern char* packet_buffer;
-		extern char* packet_buffer_orig;
-
-#if 0
-		if (packet_waiting) return;
-		
-		// So ugly I want to cry
-		packet_buffer_size = *((uint16_t*)(rx_buffer + 42)); 
-		packet_buffer_size = (((uint16_t)packet_buffer_size & 0xff00) >> 8) |  (((uint16_t)packet_buffer_size & 0x00ff) << 8);		
-		packet_buffer_size = packet_buffer_size - 8;	
-
-		packet_buffer = rx_buffer + PACKET_HEADER_SIZE + 4;
-
-		packet_buffer_orig = rx_buffer;
-		packet_buffer_pos = 0;
-		
-		packet_waiting = 1;
-#endif				
+	if (packet_buffer_count >= PACKET_BUFFER_SIZE) {
+		printk("WARNING: DROPPING PACKET!\n");
+		spin_unlock(&packet_buffer_lock);
+		kfree(rx_buffer);
 		return;
 	}
-	
-	// END HACKY STUFF
-		
-	kfree(rx_buffer);
+
+	packet_buffer[packet_buffer_tail] = rx_buffer;
+	packet_buffer_sizes[packet_buffer_tail] = packet_len;
+
+	packet_buffer_tail = (packet_buffer_tail + 1) % PACKET_BUFFER_SIZE;
+	packet_buffer_count = packet_buffer_count + 1;
+
+	spin_unlock(&packet_buffer_lock);
 	
 	return;
 }
@@ -484,11 +482,11 @@ int ne2k_send_frame(const char *data, size_t len) {
 		//printk("sent: %x\n", *(uint8_t*)(data + i));
 	}
 	
-	while(( inb(ne2k_io_base_addr + 0x07) & 0x40) == 0);
+	while(( inb(ne2k_io_base_addr + NE2K_PG0_RW_ISR) & 0x40) == 0);
 
-        outb(ne2k_io_base_addr + 0x07,  0x40);
+        outb(ne2k_io_base_addr + NE2K_PG0_RW_ISR,  0x40);
 
-        outb(ne2k_io_base_addr + NE2K_PG0_W_IMR,  0xFF);
+        outb(ne2k_io_base_addr + NE2K_PG0_W_IMR,  0xBF);
 
         outb(ne2k_io_base_addr + NE2K_PG0_RW_CR,  0x1E);
 	
