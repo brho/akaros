@@ -111,6 +111,26 @@ disable_irqsave(int8_t* state)
 		(*state)--;
 }
 
+static __inline uint64_t
+read_perfctr(uint32_t cpu, uint32_t which)
+{
+	register uint32_t hi asm("o0"), lo asm("o1");
+	intptr_t addr = cpu<<10 | which<<3;
+
+	#ifdef ROS_KERNEL
+		int8_t state = 0;
+		disable_irqsave(&state);
+		hi = load_iobus(0,addr);
+		lo = load_iobus(0,addr+4);
+		enable_irqsave(&state);
+	#else
+		// can't use two load_iobuses in userspace because of atomicity
+		asm volatile("mov %2,%%o0; ta 9"
+		             : "=r"(hi),"=r"(lo) : "r"(addr));
+	#endif
+	return (((uint64_t)hi) << 32) | lo;
+}
+
 static __inline void
 cpu_relax(void)
 {

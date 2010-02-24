@@ -92,21 +92,6 @@ read_fsr(void)
 	return reg;
 }
 
-static __inline uint64_t
-read_perfctr(uint32_t cpu, uint32_t which)
-{
-	register uint32_t hi asm("o0"), lo asm("o1");
-	intptr_t addr = cpu<<10 | which<<3;
-	#ifdef ROS_KERNEL
-		hi = load_alternate(addr,2);
-		lo = load_alternate(addr+4,2);
-	#else
-		asm volatile("mov %2,%%o0; ta 9"
-		             : "=r"(hi),"=r"(lo) : "r"(addr));
-	#endif
-	return (((uint64_t)hi) << 32) | lo;
-}
-
 static __inline void
 write_psr(uint32_t val)
 {
@@ -168,7 +153,25 @@ mmu_probe(uint32_t va)
 static __inline void
 store_iobus(uint32_t device, uint32_t addr, uint32_t data)
 {
-	store_alternate(device << 16 | addr, 2, data);
+	#ifdef ROS_KERNEL
+		store_alternate(device << 16 | addr, 2, data);
+	#else
+		register uint32_t __my_addr asm("o0") = (addr);
+		register uint32_t __my_data asm("o1") = (data);
+		__asm__ __volatile__ ("ta 11" : : "r"(__my_addr),"r"(__my_data));
+	#endif
+}
+
+static __inline uint32_t
+load_iobus(uint32_t device, uint32_t addr)
+{
+	#ifdef ROS_KERNEL
+		return load_alternate(device << 16 | addr, 2);
+	#else
+		register uint32_t __my_addr asm("o0") = (addr);
+		__asm__ __volatile__ ("ta 10" : "=r"(__my_addr) : "0"(__my_addr));
+		return __my_addr;
+	#endif
 }
 
 static __inline uint32_t
