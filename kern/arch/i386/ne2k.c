@@ -393,6 +393,11 @@ void ne2k_handle_rx_packet() {
 	}
 	outb(ne2k_io_base_addr + NE2K_PG0_RW_BNRY, curr);
 
+	if (packet_len == 0) {
+		ne2k_debug("Triggered on an empty packet.\n");
+		return;
+	}
+
 	spin_lock(&packet_buffer_lock);
 
 	if (packet_buffer_count >= PACKET_BUFFER_SIZE) {
