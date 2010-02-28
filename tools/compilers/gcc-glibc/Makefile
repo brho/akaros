@@ -1,11 +1,6 @@
 # Defines where to install the toolchain
 -include Makelocal
 
-ifndef ROSDIR
-busted0: 
-	@echo "You need to set ROSDIR to the path of the ROS source code. The best way to do this is to create a 'Makelocal' file in the current directory and put it in there."
-endif
-
 ifndef RAMP_INSTDIR
 ifndef X86_INSTDIR
 busted: 
@@ -18,17 +13,20 @@ GCC_VERSION := 4.3.2
 GLIBC_VERSION := 2.11.1
 
 BUILDDIR ?= $(shell pwd)/
+ROSDIR ?= $(BUILDDIR)/../../../
 DESTDIR ?= /
 
 # Configuration parameters for make-ramp
 RAMP_ARCH := sparc
 RAMP_BINARY_PREFIX := $(RAMP_ARCH)-ros-
 RAMP_GCC_BUILD_FLAGS := --with-cpu=v8
+RAMP_CFLAGS :=
 
 # Configuration parameters for x86
-X86_ARCH := i386
+X86_ARCH := i686
 X86_BINARY_PREFIX := $(X86_ARCH)-ros-
 X86_GCC_BUILD_FLAGS := 
+X86_CFLAGS := -march=i486
 
 all:
 	@echo "You need to run one of the following commands, "
@@ -47,6 +45,7 @@ ramp:
 	export INSTDIR=$(RAMP_INSTDIR);\
 	export PATH=$(DESTDIR)$(RAMP_INSTDIR)/bin:$(PATH);\
 	export ARCH=$(RAMP_ARCH);\
+	export ARCH_CFLAGS=$(RAMP_CFLAGS);\
 	export ROS_ARCH_DIR=$(RAMP_ARCH);\
 	export BINARY_PREFIX=$(RAMP_BINARY_PREFIX);\
 	export GCC_BUILD_FLAGS=$(RAMP_GCC_BUILD_FLAGS);\
@@ -59,7 +58,8 @@ x86:
 	export INSTDIR=$(X86_INSTDIR);\
 	export PATH=$(DESTDIR)$(X86_INSTDIR)/bin:$(PATH);\
 	export ARCH=$(X86_ARCH);\
-	export ROS_ARCH_DIR=$(X86_ARCH);\
+	export ARCH_CFLAGS=$(X86_CFLAGS);\
+	export ROS_ARCH_DIR=i386;\
 	export BINARY_PREFIX=$(X86_BINARY_PREFIX);\
 	export GCC_BUILD_FLAGS=$(X86_GCC_BUILD_FLAGS);\
 	$(MAKE) make-all
@@ -68,18 +68,14 @@ make-all:
 	$(MAKE) .glibc-patch
 	$(MAKE) .$(BINARY_PREFIX)binutils-make
 	$(MAKE) .$(BINARY_PREFIX)binutils-install
-	$(MAKE) .$(BINARY_PREFIX)glibc-headers-install
 	$(MAKE) .$(BINARY_PREFIX)ros-headers-install
+	$(MAKE) .$(BINARY_PREFIX)glibc-headers-install
 	$(MAKE) .$(BINARY_PREFIX)gcc-stage1-make
 	$(MAKE) .$(BINARY_PREFIX)gcc-stage1-install
 	$(MAKE) .$(BINARY_PREFIX)glibc-make
 	$(MAKE) .$(BINARY_PREFIX)glibc-install
 	$(MAKE) .$(BINARY_PREFIX)gcc-stage2-make
 	$(MAKE) .$(BINARY_PREFIX)gcc-stage2-install
-	ln -f $(INSTDIR)/lib/gcc/$(ARCH)-ros/$(GCC_VERSION)/crtbegin.o \
-	      $(INSTDIR)/lib/gcc/$(ARCH)-ros/$(GCC_VERSION)/crtbeginT.o
-	ln -f $(INSTDIR)/lib/gcc/$(ARCH)-ros/$(GCC_VERSION)/crtend.o \
-	      $(INSTDIR)/lib/gcc/$(ARCH)-ros/$(GCC_VERSION)/crtendT.o
 	mkdir -p $(ROSDIR)/fs/$(ARCH)/lib
 	cp -r $(INSTDIR)/$(ARCH)-ros/lib/* $(ROSDIR)/fs/$(ARCH)/lib
 
@@ -144,6 +140,9 @@ glibc-$(GLIBC_VERSION):
 	tar -jxf glibc-$(GLIBC_VERSION).tar.bz2
 	rm glibc-$(GLIBC_VERSION)/sysdeps/sparc/sparc32/elf/start.S
 	rm glibc-$(GLIBC_VERSION)/sysdeps/i386/elf/start.S
+	rm glibc-$(GLIBC_VERSION)/sysdeps/i386/____longjmp_chk.S
+	rm glibc-$(GLIBC_VERSION)/sysdeps/i386/init-first.c
+	rm glibc-$(GLIBC_VERSION)/sysdeps/i386/sysdep.h
 	$(MAKE) .glibc-patch
 
 .glibc-patch: glibc-$(GLIBC_VERSION)
@@ -179,6 +178,7 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 	cd $(BINARY_PREFIX)binutils-builddir; \
 	./configure --enable-shared \
 	            --disable-multilib \
+	            --disable-nls \
 	            --target=$(ARCH)-ros \
 	            --prefix=$(INSTDIR) \
 	            --includedir=$(INSTDIR)/include \
@@ -193,18 +193,19 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 	cd $(BINARY_PREFIX)binutils-builddir; \
 	make -j install
 
-.$(BINARY_PREFIX)glibc-headers-configure: 
+.$(BINARY_PREFIX)glibc-headers-configure:
 	$(MAKE) $(BINARY_PREFIX)glibc-headers-builddir
 	cd $(BINARY_PREFIX)glibc-headers-builddir; \
 	../glibc-$(GLIBC_VERSION)/configure \
 	          --host=$(ARCH)-ros \
 	          --enable-hacker-mode \
 	          --enable-shared \
+	          --disable-nls \
 	          --with-elf \
 	          --with-tls \
 	          --with-__thread \
 	          --prefix=$(INSTDIR)/$(ARCH)-ros \
-	          --with-headers=$(ROSDIR)/kern/include/ \
+	          --with-headers=$(INSTDIR)/$(ARCH)-ros/sys-include \
 	          libc_cv_forced_unwind=yes \
 	          libc_cv_c_cleanup=yes;
 	touch $@
@@ -213,15 +214,14 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 	cd $(BINARY_PREFIX)glibc-headers-builddir; \
 	make -j install-headers; \
 	mkdir -p $(INSTDIR)/$(ARCH)-ros/include/gnu; \
-	touch $(INSTDIR)/$(ARCH)-ros/include/gnu/stubs.h; \
+	echo > $(INSTDIR)/$(ARCH)-ros/include/gnu/stubs.h; \
 	cp bits/stdio_lim.h $(INSTDIR)/$(ARCH)-ros/include/bits/
 
 .$(BINARY_PREFIX)ros-headers-install: $(ROSDIR)
-	$(MAKE) -C $(ROSDIR) symlinks
 	mkdir -p $(INSTDIR)/$(ARCH)-ros/sys-include/arch
 	cp -r $(ROSDIR)/kern/include/ros \
 	   $(INSTDIR)/$(ARCH)-ros/sys-include/
-	cp -r $(ROSDIR)/kern/include/arch/* \
+	cp -r $(ROSDIR)/kern/arch/$(ROS_ARCH_DIR)/* \
 	   $(INSTDIR)/$(ARCH)-ros/sys-include/arch/
 
 .$(BINARY_PREFIX)gcc-stage1-configure: 
@@ -236,6 +236,7 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
         	--disable-libmudflap \
         	--disable-libssp \
         	--disable-libgomp \
+	        --disable-nls \
 	        --program-prefix=$(BINARY_PREFIX) \
 	        --target=$(ARCH)-ros \
 	        --prefix=$(INSTDIR) \
@@ -249,11 +250,13 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 	# It appears to still work though since this is just stage 1 of compiling
 	# Should really look into fixing this though...
 	-cd $(BINARY_PREFIX)gcc-stage1-builddir; \
-	make -j
+	make -j inhibit_libc=true cross-compiling=yes
 
 .$(BINARY_PREFIX)gcc-stage1-install: 
 	cd $(BINARY_PREFIX)gcc-stage1-builddir; \
 	make -j install
+	#-ln -vs libgcc.a `$(BINARY_PREFIX)gcc -print-libgcc-file-name | \
+	#                 sed 's/libgcc/&_eh/'`
 
 .$(BINARY_PREFIX)glibc-configure: 
 	$(MAKE) $(BINARY_PREFIX)glibc-builddir
@@ -264,11 +267,13 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 	          --enable-shared \
 	          --with-elf \
 	          --with-tls \
+        	  --disable-nls \
 	          --with-__thread \
-	          --with-headers=$(ROSDIR)/kern/include/ \
+	          --with-headers=$(INSTDIR)/$(ARCH)-ros/sys-include \
 	          --prefix=$(INSTDIR)/$(ARCH)-ros \
 	          libc_cv_forced_unwind=yes \
-	          libc_cv_c_cleanup=yes;
+	          libc_cv_c_cleanup=yes \
+	          CFLAGS="$(ARCH_CFLAGS) -O2 -pipe";
 	touch $@
 
 .$(BINARY_PREFIX)glibc-make: .$(BINARY_PREFIX)glibc-configure
@@ -279,12 +284,13 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 	cd $(BINARY_PREFIX)glibc-builddir; \
 	make -j install
 
-.$(BINARY_PREFIX)gcc-stage2-configure: 
+.$(BINARY_PREFIX)gcc-stage2-configure:
 	$(MAKE) $(BINARY_PREFIX)gcc-stage2-builddir
 	cd $(BINARY_PREFIX)gcc-stage2-builddir; \
 	../gcc-$(GCC_VERSION)/configure \
 	          --enable-shared \
 	          --disable-multilib \
+        	  --disable-nls \
 	          --program-prefix=$(BINARY_PREFIX) \
 	          --target=$(ARCH)-ros \
 	          --prefix=$(INSTDIR) \
@@ -305,15 +311,6 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 	make -j install
 
 patches:
-	-cd glibc-$(GLIBC_VERSION)/manual; make realclean
-	rm -rf glibc-$(GLIBC_VERSION)/autom4te.cache
-	mv glibc-$(GLIBC_VERSION) glibc-$(GLIBC_VERSION).new
-	tar -jxf glibc-$(GLIBC_VERSION).tar.bz2
-	-diff -ruN glibc-$(GLIBC_VERSION) glibc-$(GLIBC_VERSION).new \
-	      > glibc-$(GLIBC_VERSION)-ros.patch
-	rm -rf glibc-$(GLIBC_VERSION)
-	mv glibc-$(GLIBC_VERSION).new glibc-$(GLIBC_VERSION)
-	
 	mv gcc-$(GCC_VERSION)/gmp .
 	mv gcc-$(GCC_VERSION)/mpfr .
 	rm -rf gcc-$(GCC_VERSION)/libstdc++-v3/autom4te.cache

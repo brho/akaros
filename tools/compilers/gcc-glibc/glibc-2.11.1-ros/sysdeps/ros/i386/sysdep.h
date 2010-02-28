@@ -21,10 +21,8 @@
 #include <sysdeps/generic/sysdep.h>
 
 #ifdef __ASSEMBLER__
-# define PTR_MANGLE(dst,src,tmp) movl src,dst
-# define PTR_DEMANGLE(dst,src,tmp) PTR_MANGLE(dst,src,tmp)
-# define PTR_MANGLE2(dst,src,tmp) PTR_MANGLE(dst,src,tmp)
-# define PTR_DEMANGLE2(dst,src,tmp) PTR_MANGLE2(dst,src,tmp)
+# define PTR_MANGLE(a)
+# define PTR_DEMANGLE(a)
 #else
 # define PTR_MANGLE(a) (a)
 # define PTR_DEMANGLE(a) (a)

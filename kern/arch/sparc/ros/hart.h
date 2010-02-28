@@ -7,6 +7,9 @@ double do_fsqrt(double);
 double do_recip(double);
 double do_rsqrt(double);
 
+#define HART_CL_SIZE 128
+#define HART_ATOMIC_HASHTABLE_SIZE 17
+
 #define __hart_self_on_entry (__hart_self())
 
 static inline int
@@ -38,10 +41,10 @@ __hart_swap(int* addr, int val)
 
 extern int __hart_atomic_hash_locks[HART_CL_SIZE*HART_ATOMIC_HASHTABLE_SIZE];
 static inline int*
-__hart_atomic_hash(int* addr)
+__hart_atomic_hash_lock(int* addr)
 {
 	int hash = ((unsigned int)addr/sizeof(int*))/HART_ATOMIC_HASHTABLE_SIZE;
-	return __hart_atomic_hash_locks[HART_CL_SIZE/sizeof(int)*hash];
+	return &__hart_atomic_hash_locks[HART_CL_SIZE/sizeof(int)*hash];
 }
 
 static inline int
@@ -65,7 +68,7 @@ __hart_compare_and_swap(int* addr, int testval, int newval)
 
 	int old = *addr;
 	if(old == testval)
-		*word = newval;
+		*addr = newval;
 
 	*lock = 0;
 	return old;

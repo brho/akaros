@@ -1,6 +1,6 @@
 diff -ruN gcc-4.3.2/config.sub gcc-4.3.2.new/config.sub
 --- gcc-4.3.2/config.sub	2008-01-22 18:37:40.000000000 -0800
-+++ gcc-4.3.2.new/config.sub	2010-02-12 22:02:57.000000000 -0800
++++ gcc-4.3.2.new/config.sub	2010-02-27 15:21:04.000000000 -0800
 @@ -1239,7 +1239,7 @@
  	      | -*vms* | -sco* | -esix* | -isc* | -aix* | -sunos | -sunos[34]*\
  	      | -hpux* | -unos* | -osf* | -luna* | -dgux* | -solaris* | -sym* \
@@ -12,23 +12,342 @@ diff -ruN gcc-4.3.2/config.sub gcc-4.3.2.new/config.sub
  	      | -hiux* | -386bsd* | -knetbsd* | -mirbsd* | -netbsd* \
 diff -ruN gcc-4.3.2/gcc/config/i386/ros.h gcc-4.3.2.new/gcc/config/i386/ros.h
 --- gcc-4.3.2/gcc/config/i386/ros.h	1969-12-31 16:00:00.000000000 -0800
-+++ gcc-4.3.2.new/gcc/config/i386/ros.h	2010-02-12 22:02:57.000000000 -0800
-@@ -0,0 +1,11 @@
-+#undef TARGET_OS_CPP_BUILTINS
-+#define TARGET_OS_CPP_BUILTINS()      \
-+do {                                  \
-+	builtin_define_std ("ros");       \
-+	builtin_define_std ("unix");      \
-+	builtin_assert ("system=ros");    \
-+	builtin_assert ("system=unix");   \
-+} while(0);
-+#undef TARGET_VERSION
-+#define TARGET_VERSION fprintf(stderr, " (i386 ros)");
++++ gcc-4.3.2.new/gcc/config/i386/ros.h	2010-02-27 15:21:04.000000000 -0800
+@@ -0,0 +1,201 @@
++/* Definitions for Intel 386 running Linux-based GNU systems with ELF format.
++   Copyright (C) 1994, 1995, 1996, 1997, 1998, 1999, 2001, 2002, 2004, 2005,
++   2006, 2007 Free Software Foundation, Inc.
++   Contributed by Eric Youngdale.
++   Modified for stabs-in-ELF by H.J. Lu.
 +
++This file is part of GCC.
++
++GCC is free software; you can redistribute it and/or modify
++it under the terms of the GNU General Public License as published by
++the Free Software Foundation; either version 3, or (at your option)
++any later version.
++
++GCC is distributed in the hope that it will be useful,
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU General Public License for more details.
++
++You should have received a copy of the GNU General Public License
++along with GCC; see the file COPYING3.  If not see
++<http://www.gnu.org/licenses/>.  */
++
++/* Output at beginning of assembler file.  */
++/* The .file command should always begin the output.  */
++#define TARGET_ASM_FILE_START_FILE_DIRECTIVE true
++
++#define TARGET_VERSION fprintf (stderr, " (i386 ROS/ELF)");
++
++/* The svr4 ABI for the i386 says that records and unions are returned
++   in memory.  */
++#undef DEFAULT_PCC_STRUCT_RETURN
++#define DEFAULT_PCC_STRUCT_RETURN 1
++
++/* We arrange for the whole %gs segment to map the tls area.  */
++#undef TARGET_TLS_DIRECT_SEG_REFS_DEFAULT
++#define TARGET_TLS_DIRECT_SEG_REFS_DEFAULT MASK_TLS_DIRECT_SEG_REFS
++
++#undef ASM_COMMENT_START
++#define ASM_COMMENT_START "#"
++
++#undef DBX_REGISTER_NUMBER
++#define DBX_REGISTER_NUMBER(n) \
++  (TARGET_64BIT ? dbx64_register_map[n] : svr4_dbx_register_map[n])
++
++/* Output assembler code to FILE to call the profiler.
++   To the best of my knowledge, no Linux libc has required the label
++   argument to mcount.  */
++
++#define NO_PROFILE_COUNTERS	1
++
++#undef MCOUNT_NAME
++#define MCOUNT_NAME "mcount"
++
++/* The GLIBC version of mcount for the x86 assumes that there is a
++   frame, so we cannot allow profiling without a frame pointer.  */
++
++#undef SUBTARGET_FRAME_POINTER_REQUIRED
++#define SUBTARGET_FRAME_POINTER_REQUIRED current_function_profile
++
++#undef SIZE_TYPE
++#define SIZE_TYPE "unsigned int"
++ 
++#undef PTRDIFF_TYPE
++#define PTRDIFF_TYPE "int"
++  
++#undef WCHAR_TYPE
++#define WCHAR_TYPE "long int"
++   
++#undef WCHAR_TYPE_SIZE
++#define WCHAR_TYPE_SIZE BITS_PER_WORD
++    
++#define TARGET_OS_CPP_BUILTINS()		\
++  do						\
++    {						\
++	LINUX_TARGET_OS_CPP_BUILTINS();		\
++    }						\
++  while (0)
++
++#undef CPP_SPEC
++#define CPP_SPEC "%{posix:-D_POSIX_SOURCE} %{pthread:-D_REENTRANT}"
++
++#undef CC1_SPEC
++#define CC1_SPEC "%(cc1_cpu) %{profile:-p}"
++
++/* Provide a LINK_SPEC appropriate for Linux.  Here we provide support
++   for the special GCC options -static and -shared, which allow us to
++   link things in one of these three modes by applying the appropriate
++   combinations of options at link-time. We like to support here for
++   as many of the other GNU linker options as possible. But I don't
++   have the time to search for those flags. I am sure how to add
++   support for -soname shared_object_name. H.J.
++
++   I took out %{v:%{!V:-V}}. It is too much :-(. They can use
++   -Wl,-V.
++
++   When the -shared link option is used a final link is not being
++   done.  */
++
++/* If ELF is the default format, we should not use /lib/elf.  */
++
++/* These macros may be overridden in k*bsd-gnu.h and i386/k*bsd-gnu.h. */
++#define LINK_EMULATION "elf_i386"
++#define GLIBC_DYNAMIC_LINKER "/lib/ld.so.1"
++
++#undef  SUBTARGET_EXTRA_SPECS
++#define SUBTARGET_EXTRA_SPECS \
++  { "link_emulation", LINK_EMULATION },\
++  { "dynamic_linker", GLIBC_DYNAMIC_LINKER }
++
++#undef	LINK_SPEC
++#define LINK_SPEC "-m %(link_emulation) %{shared:-shared} \
++  %{!shared: \
++    %{!ibcs: \
++      %{!static: \
++	%{rdynamic:-export-dynamic} \
++	%{!dynamic-linker:-dynamic-linker %(dynamic_linker)}} \
++	%{static:-static}}}"
++
++/* Similar to standard Linux, but adding -ffast-math support.  */
++#undef  ENDFILE_SPEC
++#define ENDFILE_SPEC \
++  "%{ffast-math|funsafe-math-optimizations:crtfastmath.o%s} \
++   %{mpc32:crtprec32.o%s} \
++   %{mpc64:crtprec64.o%s} \
++   %{mpc80:crtprec80.o%s} \
++   %{shared|pie:crtendS.o%s;:crtend.o%s} crtn.o%s"
++
++/* A C statement (sans semicolon) to output to the stdio stream
++   FILE the assembler definition of uninitialized global DECL named
++   NAME whose size is SIZE bytes and alignment is ALIGN bytes.
++   Try to use asm_output_aligned_bss to implement this macro.  */
++
++#define ASM_OUTPUT_ALIGNED_BSS(FILE, DECL, NAME, SIZE, ALIGN) \
++  asm_output_aligned_bss (FILE, DECL, NAME, SIZE, ALIGN)
++
++/* A C statement to output to the stdio stream FILE an assembler
++   command to advance the location counter to a multiple of 1<<LOG
++   bytes if it is within MAX_SKIP bytes.
++
++   This is used to align code labels according to Intel recommendations.  */
++
++#ifdef HAVE_GAS_MAX_SKIP_P2ALIGN
++#define ASM_OUTPUT_MAX_SKIP_ALIGN(FILE,LOG,MAX_SKIP)			\
++  do {									\
++    if ((LOG) != 0) {							\
++      if ((MAX_SKIP) == 0) fprintf ((FILE), "\t.p2align %d\n", (LOG));	\
++      else {								\
++	fprintf ((FILE), "\t.p2align %d,,%d\n", (LOG), (MAX_SKIP));	\
++	/* Make sure that we have at least 8 byte alignment if > 8 byte \
++	   alignment is preferred.  */					\
++	if ((LOG) > 3 && (1 << (LOG)) > ((MAX_SKIP) + 1))		\
++	  fprintf ((FILE), "\t.p2align 3\n");				\
++      }									\
++    }									\
++  } while (0)
++#endif
++
++/* Handle special EH pointer encodings.  Absolute, pc-relative, and
++   indirect are handled automatically.  */
++#define ASM_MAYBE_OUTPUT_ENCODED_ADDR_RTX(FILE, ENCODING, SIZE, ADDR, DONE) \
++  do {									\
++    if ((SIZE) == 4 && ((ENCODING) & 0x70) == DW_EH_PE_datarel)		\
++      {									\
++        fputs (ASM_LONG, FILE);			\
++        assemble_name (FILE, XSTR (ADDR, 0));				\
++	fputs (((ENCODING) & DW_EH_PE_indirect ? "@GOT" : "@GOTOFF"), FILE); \
++        goto DONE;							\
++      }									\
++  } while (0)
++
++/* Used by crtstuff.c to initialize the base of data-relative relocations.
++   These are GOT relative on x86, so return the pic register.  */
++#ifdef __PIC__
++#define CRT_GET_RFIB_DATA(BASE)			\
++  {						\
++    register void *ebx_ __asm__("ebx");		\
++    BASE = ebx_;				\
++  }
++#else
++#define CRT_GET_RFIB_DATA(BASE)						\
++  __asm__ ("call\t.LPR%=\n"						\
++	   ".LPR%=:\n\t"						\
++	   "pop{l}\t%0\n\t"						\
++	   /* Due to a GAS bug, this cannot use EAX.  That encodes	\
++	      smaller than the traditional EBX, which results in the	\
++	      offset being off by one.  */				\
++	   "add{l}\t{$_GLOBAL_OFFSET_TABLE_+[.-.LPR%=],%0"		\
++		   "|%0,_GLOBAL_OFFSET_TABLE_+(.-.LPR%=)}"		\
++	   : "=d"(BASE))
++#endif
++
++#undef NEED_INDICATE_EXEC_STACK
++#define NEED_INDICATE_EXEC_STACK 1
++
++/* This macro may be overridden in i386/k*bsd-gnu.h.  */
++#define REG_NAME(reg) reg
++
++#ifdef TARGET_LIBC_PROVIDES_SSP
++/* i386 glibc provides __stack_chk_guard in %gs:0x14.  */
++#define TARGET_THREAD_SSP_OFFSET	0x14
++#endif
+diff -ruN gcc-4.3.2/gcc/config/ros.h gcc-4.3.2.new/gcc/config/ros.h
+--- gcc-4.3.2/gcc/config/ros.h	1969-12-31 16:00:00.000000000 -0800
++++ gcc-4.3.2.new/gcc/config/ros.h	2010-02-27 15:21:04.000000000 -0800
+@@ -0,0 +1,125 @@
++/* Definitions for Linux-based GNU systems with ELF format
++   Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2003, 2004, 2005, 2006,
++   2007 Free Software Foundation, Inc.
++   Contributed by Eric Youngdale.
++   Modified for stabs-in-ELF by H.J. Lu (hjl@lucon.org).
++
++This file is part of GCC.
++
++GCC is free software; you can redistribute it and/or modify
++it under the terms of the GNU General Public License as published by
++the Free Software Foundation; either version 3, or (at your option)
++any later version.
++
++GCC is distributed in the hope that it will be useful,
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU General Public License for more details.
++
++You should have received a copy of the GNU General Public License
++along with GCC; see the file COPYING3.  If not see
++<http://www.gnu.org/licenses/>.  */
++
++/* Don't assume anything about the header files.  */
++#define NO_IMPLICIT_EXTERN_C
++
++#undef ASM_APP_ON
++#define ASM_APP_ON "#APP\n"
++
++#undef ASM_APP_OFF
++#define ASM_APP_OFF "#NO_APP\n"
++
++#undef MD_EXEC_PREFIX
++#undef MD_STARTFILE_PREFIX
++
++/* Provide a STARTFILE_SPEC appropriate for GNU/Linux.  Here we add
++   the GNU/Linux magical crtbegin.o file (see crtstuff.c) which
++   provides part of the support for getting C++ file-scope static
++   object constructed before entering `main'.  */
++   
++#undef	STARTFILE_SPEC
++#if defined HAVE_LD_PIE
++#define STARTFILE_SPEC \
++  "%{!shared: %{pg|p|profile:gcrt1.o%s;pie:Scrt1.o%s;:crt1.o%s}} \
++   crti.o%s %{static:crtbeginT.o%s;shared|pie:crtbeginS.o%s;:crtbegin.o%s}"
++#else
++#define STARTFILE_SPEC \
++  "%{!shared: %{pg|p|profile:gcrt1.o%s;:crt1.o%s}} \
++   crti.o%s %{static:crtbeginT.o%s;shared|pie:crtbeginS.o%s;:crtbegin.o%s}"
++#endif
++
++/* Provide a ENDFILE_SPEC appropriate for GNU/Linux.  Here we tack on
++   the GNU/Linux magical crtend.o file (see crtstuff.c) which
++   provides part of the support for getting C++ file-scope static
++   object constructed before entering `main', followed by a normal
++   GNU/Linux "finalizer" file, `crtn.o'.  */
++
++#undef	ENDFILE_SPEC
++#define ENDFILE_SPEC \
++  "%{shared|pie:crtendS.o%s;:crtend.o%s} crtn.o%s"
++
++/* This is for -profile to use -lc_p instead of -lc.  */
++#ifndef CC1_SPEC
++#define CC1_SPEC "%{profile:-p}"
++#endif
++
++/* The GNU C++ standard library requires that these macros be defined.  */
++#undef CPLUSPLUS_CPP_SPEC
++#define CPLUSPLUS_CPP_SPEC "-D_GNU_SOURCE %(cpp)"
++
++#undef	LIB_SPEC
++#define LIB_SPEC \
++  "%{pthread:-lpthread} \
++   %{shared:-lc} \
++   %{!shared:%{mieee-fp:-lieee} %{profile:-lc_p}%{!profile:-lc}}"
++
++#define LINUX_TARGET_OS_CPP_BUILTINS()				\
++    do {							\
++	builtin_define ("__gnu_ros__");			\
++	builtin_define_std ("ros");				\
++	builtin_define_std ("unix");				\
++	builtin_assert ("system=ros");			\
++	builtin_assert ("system=unix");				\
++	builtin_assert ("system=posix");			\
++    } while (0)
++
++#if defined(HAVE_LD_EH_FRAME_HDR)
++#define LINK_EH_SPEC "%{!static:--eh-frame-hdr} "
++#endif
++
++/* Define this so we can compile MS code for use with WINE.  */
++#define HANDLE_PRAGMA_PACK_PUSH_POP
++
++#undef LINK_GCC_C_SEQUENCE_SPEC
++#define LINK_GCC_C_SEQUENCE_SPEC \
++  "%{static:--start-group} %G %L %{static:--end-group}%{!static:%G}"
++
++/* Use --as-needed -lgcc_s for eh support.  */
++#ifdef HAVE_LD_AS_NEEDED
++#define USE_LD_AS_NEEDED 1
++#endif
++
++/* Determine which dynamic linker to use depending on whether GLIBC or
++   uClibc is the default C library and whether -muclibc or -mglibc has
++   been passed to change the default.  */
++#if UCLIBC_DEFAULT
++#define CHOOSE_DYNAMIC_LINKER(G, U) "%{mglibc:%{muclibc:%e-mglibc and -muclibc used together}" G ";:" U "}"
++#else
++#define CHOOSE_DYNAMIC_LINKER(G, U) "%{muclibc:%{mglibc:%e-mglibc and -muclibc used together}" U ";:" G "}"
++#endif
++
++/* For most targets the following definitions suffice;
++   GLIBC_DYNAMIC_LINKER must be defined for each target using them, or
++   GLIBC_DYNAMIC_LINKER32 and GLIBC_DYNAMIC_LINKER64 for targets
++   supporting both 32-bit and 64-bit compilation.  */
++#define UCLIBC_DYNAMIC_LINKER "/lib/ld-uClibc.so.0"
++#define UCLIBC_DYNAMIC_LINKER32 "/lib/ld-uClibc.so.0"
++#define UCLIBC_DYNAMIC_LINKER64 "/lib/ld64-uClibc.so.0"
++#define LINUX_DYNAMIC_LINKER \
++  CHOOSE_DYNAMIC_LINKER (GLIBC_DYNAMIC_LINKER, UCLIBC_DYNAMIC_LINKER)
++#define LINUX_DYNAMIC_LINKER32 \
++  CHOOSE_DYNAMIC_LINKER (GLIBC_DYNAMIC_LINKER32, UCLIBC_DYNAMIC_LINKER32)
++#define LINUX_DYNAMIC_LINKER64 \
++  CHOOSE_DYNAMIC_LINKER (GLIBC_DYNAMIC_LINKER64, UCLIBC_DYNAMIC_LINKER64)
++
++#define TARGET_POSIX_IO
 diff -ruN gcc-4.3.2/gcc/config/sparc/ros.h gcc-4.3.2.new/gcc/config/sparc/ros.h
 --- gcc-4.3.2/gcc/config/sparc/ros.h	1969-12-31 16:00:00.000000000 -0800
-+++ gcc-4.3.2.new/gcc/config/sparc/ros.h	2010-02-12 22:02:57.000000000 -0800
-@@ -0,0 +1,241 @@
++++ gcc-4.3.2.new/gcc/config/sparc/ros.h	2010-02-27 15:21:04.000000000 -0800
+@@ -0,0 +1,240 @@
 +/* Definitions for SPARC running Linux-based GNU systems with ELF.
 +   Copyright (C) 1996, 1997, 1998, 1999, 2000, 2002, 2003, 2004, 2005, 2006,
 +   2007 Free Software Foundation, Inc.
@@ -59,8 +378,8 @@ diff -ruN gcc-4.3.2/gcc/config/sparc/ros.h gcc-4.3.2.new/gcc/config/sparc/ros.h
 +      builtin_assert ("system=ros");		\
 +      builtin_assert ("system=unix");		\
 +      builtin_assert ("system=posix");		\
-+      if (TARGET_LONG_DOUBLE_128)               \
-+        builtin_define ("__LONG_DOUBLE_128__"); \
++      if (TARGET_LONG_DOUBLE_128)       	\
++	builtin_define ("__LONG_DOUBLE_128__");	\
 +    }						\
 +  while (0)
 +
@@ -111,7 +430,7 @@ diff -ruN gcc-4.3.2/gcc/config/sparc/ros.h gcc-4.3.2.new/gcc/config/sparc/ros.h
 +#define CPLUSPLUS_CPP_SPEC "-D_GNU_SOURCE %(cpp)"
 +
 +#undef TARGET_VERSION
-+#define TARGET_VERSION fprintf (stderr, " (sparc GNU/Linux with ELF)");
++#define TARGET_VERSION fprintf (stderr, " (sparc ROS/ELF)");
 +
 +#undef SIZE_TYPE
 +#define SIZE_TYPE "unsigned int"
@@ -208,14 +527,13 @@ diff -ruN gcc-4.3.2/gcc/config/sparc/ros.h gcc-4.3.2.new/gcc/config/sparc/ros.h
 +  sprintf (LABEL, "*.L%s%ld", PREFIX, (long)(NUM))
 +
 +
-+
 +/* Define for support of TFmode long double.
-+ *    SPARC ABI says that long double is 4 words.  */
++   SPARC ABI says that long double is 4 words.  */
 +#undef LONG_DOUBLE_TYPE_SIZE
 +#define LONG_DOUBLE_TYPE_SIZE (TARGET_LONG_DOUBLE_128 ? 128 : 64)
 +
 +/* Define this to set long double type size to use in libgcc2.c, which can
-+ *    not depend on target_flags.  */
++   not depend on target_flags.  */
 +#ifdef __LONG_DOUBLE_128__
 +#define LIBGCC2_LONG_DOUBLE_TYPE_SIZE 128
 +#else
@@ -272,13 +590,13 @@ diff -ruN gcc-4.3.2/gcc/config/sparc/ros.h gcc-4.3.2.new/gcc/config/sparc/ros.h
 +#define TARGET_ALTERNATE_LONG_DOUBLE_MANGLING
 diff -ruN gcc-4.3.2/gcc/config.gcc gcc-4.3.2.new/gcc/config.gcc
 --- gcc-4.3.2/gcc/config.gcc	2008-06-09 09:32:15.000000000 -0700
-+++ gcc-4.3.2.new/gcc/config.gcc	2010-02-12 22:02:57.000000000 -0800
++++ gcc-4.3.2.new/gcc/config.gcc	2010-02-27 15:21:04.000000000 -0800
 @@ -609,6 +609,12 @@
    # Assume that newlib is being used and so __cxa_atexit is provided.
    default_use_cxa_atexit=yes
    ;;
 +*-*-ros*)
-+  extra_parts="crti.o crtn.o crtbegin.o crtbeginS.o crtend.o crtendS.o"
++  extra_parts="crtbegin.o crtend.o crtbeginS.o crtendS.o crtbeginT.o"
 +  gas=yes
 +  gnu_ld=yes
 +  default_use_cxa_atexit=yes
@@ -290,21 +608,22 @@ diff -ruN gcc-4.3.2/gcc/config.gcc gcc-4.3.2.new/gcc/config.gcc
  	tmake_file="i386/t-i386elf t-svr4"
  	use_fixproto=yes
  	;;
-+i[34567]86-*-ros*)
-+	tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h i386/i386elf.h i386/ros.h"
-+	tmake_file="i386/t-i386elf t-svr4 t-slibgcc-elf-ver"
++i[34567]86-*-ros*) 
++	tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h svr4.h ros.h i386/ros.h"
++	tmake_file="t-slibgcc-elf-ver t-linux"
 +	use_fixproto=yes
 +	;;
  x86_64-*-elf*)
  	tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h i386/i386elf.h i386/x86-64.h"
  	tmake_file="i386/t-i386elf t-svr4"
-@@ -2343,6 +2354,11 @@
+@@ -2343,6 +2354,12 @@
  	extra_parts="crti.o crtn.o crtbegin.o crtend.o"
  	use_fixproto=yes
  	;;
 +sparc-*-ros*)
-+	tm_file="${tm_file} dbxelf.h elfos.h svr4.h sparc/sysv4.h sparc/sp-elf.h sparc/ros.h"
++	tm_file="${tm_file} dbxelf.h elfos.h svr4.h sparc/sysv4.h sparc/ros.h"
 +	tmake_file="sparc/t-elf sparc/t-crtfm t-slibgcc-elf-ver"
++	extra_parts="$extra_parts crtfastmath.o"
 +	use_fixproto=yes
 +	;;
  sparc-*-linux*)		# SPARC's running GNU/Linux, libc6
@@ -312,8 +631,18 @@ diff -ruN gcc-4.3.2/gcc/config.gcc gcc-4.3.2.new/gcc/config.gcc
  	extra_options="${extra_options} sparc/long-double-switch.opt"
 diff -ruN gcc-4.3.2/libgcc/config.host gcc-4.3.2.new/libgcc/config.host
 --- gcc-4.3.2/libgcc/config.host	2008-01-25 12:49:04.000000000 -0800
-+++ gcc-4.3.2.new/libgcc/config.host	2010-02-12 22:02:57.000000000 -0800
-@@ -323,6 +323,8 @@
++++ gcc-4.3.2.new/libgcc/config.host	2010-02-27 15:21:04.000000000 -0800
+@@ -166,6 +166,9 @@
+   # Must come before *-*-gnu* (because of *-*-linux-gnu* systems).
+   extra_parts="crtbegin.o crtbeginS.o crtbeginT.o crtend.o crtendS.o"
+   ;;
++*-*-ros*)
++  extra_parts="crtbegin.o crtend.o crtbeginS.o crtendS.o crtbeginT.o"
++  ;;
+ *-*-gnu*)
+   ;;
+ *-*-netbsd*)
+@@ -323,6 +326,8 @@
  	;;
  i[34567]86-*-openbsd*)
  	;;
@@ -322,18 +651,20 @@ diff -ruN gcc-4.3.2/libgcc/config.host gcc-4.3.2.new/libgcc/config.host
  i[34567]86-*-coff*)
  	;;
  i[34567]86-*-linux* | i[34567]86-*-kfreebsd*-gnu | i[34567]86-*-knetbsd*-gnu)
-@@ -572,6 +574,8 @@
+@@ -572,6 +577,10 @@
  	;;
  sparc-*-elf*)
  	;;
 +sparc-*-ros*)
++	extra_parts="$extra_parts crtfastmath.o"
++	tmake_file="${tmake_file} sparc/t-crtfm"
 +	;;
  sparc-*-linux*)		# SPARC's running GNU/Linux, libc6
  	extra_parts="$extra_parts crtfastmath.o"
  	tmake_file="${tmake_file} sparc/t-crtfm"
 diff -ruN gcc-4.3.2/libstdc++-v3/configure gcc-4.3.2.new/libstdc++-v3/configure
 --- gcc-4.3.2/libstdc++-v3/configure	2008-07-07 12:49:54.000000000 -0700
-+++ gcc-4.3.2.new/libstdc++-v3/configure	2010-02-12 22:03:09.000000000 -0800
++++ gcc-4.3.2.new/libstdc++-v3/configure	2010-02-27 15:21:17.000000000 -0800
 @@ -112811,6 +112811,3153 @@
  _ACEOF
  
@@ -3490,7 +3821,7 @@ diff -ruN gcc-4.3.2/libstdc++-v3/configure gcc-4.3.2.new/libstdc++-v3/configure
      #  *-solaris2.5)
 diff -ruN gcc-4.3.2/libstdc++-v3/crossconfig.m4 gcc-4.3.2.new/libstdc++-v3/crossconfig.m4
 --- gcc-4.3.2/libstdc++-v3/crossconfig.m4	2008-01-14 16:15:43.000000000 -0800
-+++ gcc-4.3.2.new/libstdc++-v3/crossconfig.m4	2010-02-12 22:02:57.000000000 -0800
++++ gcc-4.3.2.new/libstdc++-v3/crossconfig.m4	2010-02-27 15:21:04.000000000 -0800
 @@ -299,6 +299,12 @@
      AC_DEFINE(HAVE_SINHF)
      AC_DEFINE(HAVE_SINHL)

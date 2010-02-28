@@ -5,8 +5,14 @@
 
 #include <ros/syscall.h>
 
+#define HART_CL_SIZE 64
+
 // this is how we get our thread id on entry.
-register int __hart_self_on_entry asm ("eax");
+#define __hart_self_on_entry \
+({ \
+	register int temp asm ("eax"); \
+	temp; \
+})
 
 // The actual hart_self() function is a global symbol that invokes this routine.
 static inline int

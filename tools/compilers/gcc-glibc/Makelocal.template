@@ -1,4 +1,3 @@
 RAMP_INSTDIR := /scratch/klueska/ros-gcc-glibc/install-sparc-ros-gcc/
 X86_INSTDIR := /scratch/klueska/ros-gcc-glibc/install-i386-ros-gcc/
 
-ROSDIR := /scratch/klueska/ros

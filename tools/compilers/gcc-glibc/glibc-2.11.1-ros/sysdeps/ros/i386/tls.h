@@ -26,7 +26,7 @@
 # include <stddef.h>
 # include <stdint.h>
 # include <stdlib.h>
-# include <list.h>
+//# include <list.h>
 # include <sysdep.h>
 # include <kernel-features.h>
 
@@ -113,7 +113,7 @@ union user_desc_init
 
 
 /* Get the thread descriptor definition.  */
-# include <nptl/descr.h>
+//# include <nptl/descr.h>
 
 /* This is the size of the initial TCB.  Can't be just sizeof (tcbhead_t),
    because NPTL getpid, __libc_alloca_cutoff etc. need (almost) the whole

@@ -66,6 +66,7 @@ int load_one_elf(struct proc* p, int fd, int pgoffset, struct elf_info* ei)
 
 			// mmap will zero the rest of the page if filesz % PGSIZE != 0
 			if(filesz)
+				// TODO: waterman, figure out proper permissions
 				if(mmap(p, memstart+pgoffset*PGSIZE, filesz,
 				        PROT_READ|PROT_WRITE|PROT_EXEC, MAP_FIXED,
 				        fd, filestart/PGSIZE) == MAP_FAILED)
@@ -140,8 +141,8 @@ intreg_t sys_exec(struct proc* p, const char fn[MAX_PATH_LEN], procinfo_t* pi)
 	if(p->state != PROC_RUNNING_S)
 		return -1;
 
-	char kfn[PGSIZE];
-	if(memcpy_from_user(p,kfn,fn,PGSIZE))
+	char kfn[MAX_PATH_LEN];
+	if(memcpy_from_user(p,kfn,fn,MAX_PATH_LEN))
 		return -1;
 
 	if(memcpy_from_user(p,p->env_procinfo,pi,sizeof(procinfo_t)))

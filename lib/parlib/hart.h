@@ -10,7 +10,6 @@ extern "C" {
 
 #define HART_LOG2_MAX_MAX_HARTS 6
 #define HART_MAX_MAX_HARTS (1 << HART_LOG2_MAX_MAX_HARTS)
-#define HART_CL_SIZE 128
 
 typedef struct hart_lock_qnode
 {

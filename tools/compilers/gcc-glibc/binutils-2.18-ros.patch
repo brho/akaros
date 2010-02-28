@@ -1,6 +1,6 @@
 diff -ruN binutils-2.18/bfd/config.bfd binutils-2.18.new/bfd/config.bfd
 --- binutils-2.18/bfd/config.bfd	2007-08-28 10:19:33.000000000 -0700
-+++ binutils-2.18.new/bfd/config.bfd	2010-02-12 21:57:57.000000000 -0800
++++ binutils-2.18.new/bfd/config.bfd	2010-02-27 15:18:45.000000000 -0800
 @@ -499,6 +499,9 @@
    i[3-7]86-*-aros*)
      targ_defvec=bfd_elf32_i386_vec
@@ -23,7 +23,7 @@ diff -ruN binutils-2.18/bfd/config.bfd binutils-2.18.new/bfd/config.bfd
      targ_defvec=bfd_elf32_sparc_vec
 diff -ruN binutils-2.18/config.sub binutils-2.18.new/config.sub
 --- binutils-2.18/config.sub	2007-08-06 13:00:30.000000000 -0700
-+++ binutils-2.18.new/config.sub	2010-02-12 21:57:57.000000000 -0800
++++ binutils-2.18.new/config.sub	2010-02-27 15:18:45.000000000 -0800
 @@ -1207,7 +1207,7 @@
  	      | -*vms* | -sco* | -esix* | -isc* | -aix* | -sunos | -sunos[34]*\
  	      | -hpux* | -unos* | -osf* | -luna* | -dgux* | -solaris* | -sym* \
@@ -35,7 +35,7 @@ diff -ruN binutils-2.18/config.sub binutils-2.18.new/config.sub
  	      | -hiux* | -386bsd* | -knetbsd* | -mirbsd* | -netbsd* \
 diff -ruN binutils-2.18/gas/configure.tgt binutils-2.18.new/gas/configure.tgt
 --- binutils-2.18/gas/configure.tgt	2007-08-28 10:19:36.000000000 -0700
-+++ binutils-2.18.new/gas/configure.tgt	2010-02-12 21:57:57.000000000 -0800
++++ binutils-2.18.new/gas/configure.tgt	2010-02-27 15:18:45.000000000 -0800
 @@ -173,6 +173,7 @@
    i386-*-beos*)				fmt=elf ;;
    i386-*-coff)				fmt=coff ;;
@@ -54,7 +54,7 @@ diff -ruN binutils-2.18/gas/configure.tgt binutils-2.18.new/gas/configure.tgt
    sparc-*-netbsdelf*)			fmt=elf em=nbsd ;;
 diff -ruN binutils-2.18/ld/configure.tgt binutils-2.18.new/ld/configure.tgt
 --- binutils-2.18/ld/configure.tgt	2007-08-28 10:19:42.000000000 -0700
-+++ binutils-2.18.new/ld/configure.tgt	2010-02-12 21:57:57.000000000 -0800
++++ binutils-2.18.new/ld/configure.tgt	2010-02-27 15:18:45.000000000 -0800
 @@ -231,6 +231,7 @@
  			esac ;;
  i[3-7]86-*-netware)	targ_emul=i386nw ;;
@@ -73,7 +73,7 @@ diff -ruN binutils-2.18/ld/configure.tgt binutils-2.18.new/ld/configure.tgt
  sparc64-*-freebsd* | sparcv9-*-freebsd* | sparc64-*-kfreebsd*-gnu | sparcv9-*-kfreebsd*-gnu)
 diff -ruN binutils-2.18/ld/emulparams/elf32_sparc.sh binutils-2.18.new/ld/emulparams/elf32_sparc.sh
 --- binutils-2.18/ld/emulparams/elf32_sparc.sh	2007-08-12 12:00:07.000000000 -0700
-+++ binutils-2.18.new/ld/emulparams/elf32_sparc.sh	2010-02-12 21:57:57.000000000 -0800
++++ binutils-2.18.new/ld/emulparams/elf32_sparc.sh	2010-02-27 15:18:45.000000000 -0800
 @@ -3,7 +3,7 @@
  
  SCRIPT_NAME=elf
