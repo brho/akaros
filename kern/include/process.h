@@ -149,6 +149,7 @@ void __death(trapframe_t *tf, uint32_t srcid, void * a0, void * a1,
 void proc_init_trapframe(trapframe_t *SAFE tf, uint32_t vcoreid,
                          uint32_t entryp, uint32_t stack_top);
 void proc_set_syscall_retval(trapframe_t *SAFE tf, intreg_t value);
+void __abandon_core(void);
 
 /* Degubbing */
 void print_idlecoremap(void);

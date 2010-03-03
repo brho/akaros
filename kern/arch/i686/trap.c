@@ -155,19 +155,22 @@ print_trapframe(trapframe_t *tf)
 	static spinlock_t ptf_lock;
 
 	spin_lock_irqsave(&ptf_lock);
-	cprintf("TRAP frame at %p on core %d\n", tf, core_id());
+	printk("TRAP frame at %p on core %d\n", tf, core_id());
 	print_regs(&tf->tf_regs);
-	cprintf("  gs   0x----%04x\n", tf->tf_gs);
-	cprintf("  fs   0x----%04x\n", tf->tf_fs);
-	cprintf("  es   0x----%04x\n", tf->tf_es);
-	cprintf("  ds   0x----%04x\n", tf->tf_ds);
-	cprintf("  trap 0x%08x %s\n", tf->tf_trapno, trapname(tf->tf_trapno));
-	cprintf("  err  0x%08x\n", tf->tf_err);
-	cprintf("  eip  0x%08x\n", tf->tf_eip);
-	cprintf("  cs   0x----%04x\n", tf->tf_cs);
-	cprintf("  flag 0x%08x\n", tf->tf_eflags);
-	cprintf("  esp  0x%08x\n", tf->tf_esp);
-	cprintf("  ss   0x----%04x\n", tf->tf_ss);
+	printk("  gs   0x----%04x\n", tf->tf_gs);
+	printk("  fs   0x----%04x\n", tf->tf_fs);
+	printk("  es   0x----%04x\n", tf->tf_es);
+	printk("  ds   0x----%04x\n", tf->tf_ds);
+	printk("  trap 0x%08x %s\n", tf->tf_trapno, trapname(tf->tf_trapno));
+	printk("  err  0x%08x\n", tf->tf_err);
+	printk("  eip  0x%08x\n", tf->tf_eip);
+	printk("  cs   0x----%04x\n", tf->tf_cs);
+	printk("  flag 0x%08x\n", tf->tf_eflags);
+	/* Prevents us from thinking these mean something for nested interrupts. */
+	if (tf->tf_cs != GD_KT) {
+		printk("  esp  0x%08x\n", tf->tf_esp);
+		printk("  ss   0x----%04x\n", tf->tf_ss);
+	}
 	spin_unlock_irqsave(&ptf_lock);
 }
 

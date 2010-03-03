@@ -34,3 +34,14 @@ void proc_set_syscall_retval(trapframe_t *SAFE tf, intreg_t value)
 {
 	tf->gpr[8] = value;
 }
+
+/* Called when we are currently running an address space on our core and want to
+ * abandon it.  We need a known good pgdir before releasing the old one.  We
+ * decref, since current no longer tracks the proc (and current no longer
+ * protects the cr3). */
+void __abandon_core(void)
+{
+	lcr3(boot_cr3);
+	proc_decref(current, 1);
+	set_current_proc(NULL);
+}

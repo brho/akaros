@@ -998,14 +998,8 @@ void __startcore(trapframe_t *tf, uint32_t srcid, void * a0, void * a1,
  * process's context. */
 void abandon_core(void)
 {
-	/* If we are currently running an address space on our core, we need a known
-	 * good pgdir before releasing the old one.  We decref, since current no
-	 * longer tracks the proc (and current no longer protects the cr3). */
-	if (current) {
-		lcr3(boot_cr3);
-		proc_decref(current, 1);
-		set_current_proc(NULL);
-	}
+	if (current)
+		__abandon_core();
 	smp_idle();
 }
 
