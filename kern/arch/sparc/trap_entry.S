@@ -15,26 +15,25 @@ handle_trap:
 	// At this point, %l1 = pc, %l2 = npc, and %l0/3/4/5
 	// might contain an active message.  so we only get %l6/%l7
 
-        // calculate stack pointer (-64 is space for window spill).
-        // sp = bootstacktop - core_id*KSTKSIZE - 64 - sizeof(trapframe_t).
+	// calculate stack pointer (-64 is space for window spill).
+	// sp = bootstacktop - core_id*KSTKSIZE - 64 - sizeof(trapframe_t).
 	// should you change this, make sure to change stack_fucked()
-        set     bootstacktop-64-SIZEOF_TRAPFRAME_T,%l6
-        mov     CORE_ID_REG,%l7
+	set	bootstacktop-64-SIZEOF_TRAPFRAME_T,%l6
+	mov	CORE_ID_REG,%l7
 	sll	%l7,KSTKSHIFT,%l7
-        sub     %l6,%l7,%l6
+	sub	%l6,%l7,%l6
 
 	// see if trap came from kernel; if so, use that stack
 	// also preserve the psr, since we'll screw with the condition codes
-	mov	%psr,%l7
-	btst	PSR_PS,%l7
+	mov	%psr,%l0
+	btst	PSR_PS,%l0
 	bne,a	1f
 	 sub	%fp,64+SIZEOF_TRAPFRAME_T,%l6
 
 	// here is where we might do something with an active message
 
-1:	mov	%l7,%l0
 	// At this point we may use %l3/4/5/7 as temporary regs
-
+1:
 	// is CWP valid?
 	and	%l0,PSR_CWP,%l4	! %l4 = cwp
 	mov	1,%l7
@@ -46,11 +45,10 @@ handle_trap:
 	jmpl	%lo(spill)+%l7,%l7	!no, spill a window
 	 nop
 
-
 	// At this point we may use %o0-7, %l3/4/5/7 as temporary regs
 	// save the whole user context to a trapframe_t
 
-2:	mov	%l0,%psr
+2:
 	mov	%l6,%sp
 	mov	%l1,%o1
 	mov	%l2,%o2
@@ -65,6 +63,9 @@ handle_trap:
 	// spill all trapper's windows out to the stack.
 	// the 'save' may trap (triggering the spill),
 	// and if the stack is corrupted, the process may die
+	mov	%l0,%g3
+	mov	%sp,%g4
+
 	set	NWINDOWS,%g1
 	ld	[%g1],%g1
 	sub	%g1,1,%g2
@@ -72,19 +73,13 @@ handle_trap:
 	bne,a	5b
 tflush:	 save	%sp,0,%sp
 
-	// get our old cwp back (restore should NOT trap)
-	sub	%g1,1,%g2
-6:	deccc	%g2
-	bne,a	6b
-	 restore
-
 	// restore interrupt level
-	wr	%l0,PSR_ET,%psr
+	mov	%g4,%sp	
+	wr	%g3,PSR_ET,%psr
 
-	// call the handler and pass in the tf, message, and handler addr
-	add	%sp,64,%o0
-	call	trap
-	 mov	%l5,%o1
+	// call the handler and pass in the tf and handler address
+	call	%l5
+	 add	%sp,64,%o0
 
 	// should never get here
 	unimp
@@ -140,60 +135,23 @@ env_save_tf:
 	retl
 	 nop
 
+	// this routine only works for returning to userspace.
+	// right now, there's no mechanism to resume kernel operation after
+	// a fault
 	.global	env_pop_tf
 env_pop_tf:
 
 	mov	%psr,%o1
-	btst	PSR_PS,%o1	! return to kernel or user?
-	bne	1f
-
-	// we're returning to userspace.
 	wr	%o1,PSR_ET,%psr
 
 	// CWP = 0 (therefore 1 after rett), so set window 2 invalid
-	mov	0,%wim
+	mov	1<<2,%wim
+	ld	[%o0+128],%o1
 	mov	%o0,%g2
-	mov	%psr,%g1
-	andn	%g1,PSR_CWP,%g1
-	mov	%g1,%psr
-	mov	1<<2,%wim; nop
-	// time to restore user context and rett
-	ba	4f
-	 mov	%g2,%o0
-
-1:
-	// this general version of the code works for kernel and user,
-	// but it is slow because it spills the windows.
-
-	// first disable interrupts.
-	// since wrpsr/rdpsr is interruptible, all interrupt handlers
-	// must restore the psr to its interrupt-time value
-	or	%o1,PSR_PIL,%o2
-	wr	%o2,%psr
-
-	// spill all kernel windows to the stack
-	set	NWINDOWS,%g1
-	ld	[%g1],%g1
-	sub	%g1,1,%g2
-5:	deccc	%g2
-	bne,a	5b
-	 save	%sp,0,%sp
-
-	// get our old cwp back (restore should NOT trap)
-	sub	%g1,1,%g2
-6:	deccc	%g2
-	bne,a	6b
-	 restore
-	
-	// disable traps, and restore interrupt level
-	wr	%o2,PSR_ET,%psr
-	wr	%o1,PSR_ET,%psr
-
-	// if we did this right (and didn't get an NMI!),
-	// then (CWP+1) % NWINDOWS should be invalid.  fix that.
-	save
-	mov	%i0,%o0
-	mov	%o0,%g2
+	andn	%o1,PSR_CWP,%o1
+	mov	%o1,%psr
+	nop; nop; nop
+	mov	%g2,%o0
 
 4:	// restore user context
 	restore
@@ -216,17 +174,12 @@ env_pop_tf:
 	ldd	[%o0+16],%g4
 	ldd	[%o0+24],%g6
 
-	ldd	[%o0+128],%l0
-	mov	%psr,%l2
-	and	%l2,PSR_CWP,%l2
-	andn	%l0,PSR_CWP,%l0
-	wr	%l2,%l0,%psr
-
+	ld	[%o0+132],%l1
 	ld	[%o0+136],%l2
 	ld	[%o0+148],%l5
 	mov	%l5,%y
 	ld	[%o0+152],%l5
-	mov %l5,%asr13
+	mov	%l5,%asr13
 
 	jmp	%l1
 	rett	%l2

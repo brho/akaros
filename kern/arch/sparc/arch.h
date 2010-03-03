@@ -41,7 +41,7 @@ extern uintptr_t mmu_context_tables[MAX_NUM_CPUS][NCONTEXTS+CONTEXT_TABLE_PAD];
 static __inline void
 breakpoint(void)
 {
-	__asm __volatile("ta 0x7f");
+	asm volatile ("ta 0x7f");
 }
 
 static __inline void 
@@ -161,7 +161,7 @@ static __inline uint32_t
 core_id(void)
 {
 	uint32_t reg;
-	__asm__ __volatile__("mov %" XSTR(CORE_ID_REG) ",%0" : "=r"(reg));
+	asm ("mov %" XSTR(CORE_ID_REG) ",%0" : "=r"(reg));
 	return reg;
 }
 

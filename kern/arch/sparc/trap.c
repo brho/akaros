@@ -43,6 +43,13 @@ uint32_t send_active_message(uint32_t dst, amr_t pc,
 }
 
 void
+advance_pc(trapframe_t* state)
+{
+	state->pc = state->npc;
+	state->npc += 4;
+}
+
+void
 idt_init(void)
 {
 }
@@ -120,20 +127,6 @@ get_trapname(uint8_t tt, char buf[TRAPNAME_MAX])
 		strncpy(buf,trapnames[tt],sizeof(trapnames) + 1);
 
 	return buf;
-}
-
-void
-trap(trapframe_t* state, void (*handler)(trapframe_t*))
-{
-	// TODO: must save other cores' trap frames
-	// if we want them to migrate, block, etc.
-	if(current && current->vcoremap[0] == core_id())
-	{
-		current->env_tf = *state;
-		handler(&current->env_tf);
-	}
-	else
-		handler(state);
 }
 
 void
@@ -269,9 +262,7 @@ handle_syscall(trapframe_t* state)
 	uint32_t a4 = state->gpr[11];
 	uint32_t a5 = state->gpr[12];
 
-	// advance pc (else we reexecute the syscall)
-	state->pc = state->npc;
-	state->npc += 4;
+	advance_pc(state);
 
 	/* Note we are not preemptively saving the TF in the env_tf.  We do maintain
 	 * a reference to it in current_tf (a per-cpu pointer).
@@ -279,9 +270,6 @@ handle_syscall(trapframe_t* state)
 	 * is necessary (blocking).  And only save it in env_tf when you know you
 	 * are single core (PROC_RUNNING_S) */
 	set_current_tf(state);
-	// TODO: must save other cores' ancillary state
-	//if(current->vcoremap[0] == core_id())
-	//	env_push_ancillary_state(current); // remove this if you don't need it
 
 	// some syscalls don't return this way if they succed,
 	// e.g. run_binary.  so by default set the return value to success
@@ -293,7 +281,7 @@ handle_syscall(trapframe_t* state)
 	state->gpr[8] = syscall(current,num,a1,a2,a3,a4,a5);
 	proc_decref(current, 1);
 
-	proc_startcore(current,state);
+	env_pop_tf(state);
 }
 
 void
@@ -317,28 +305,18 @@ flush_windows()
 void
 handle_flushw(trapframe_t* state)
 {
-	flush_windows();
-	state->pc = state->npc;
-	state->npc += 4;
+	// don't actually need to do anything here.
+	// trap_entry flushes user windows to the stack.
+	advance_pc(state);
 	env_pop_tf(state);
 }
 
 void
 handle_breakpoint(trapframe_t* state)
 {
-	// advance the pc
-	state->pc = state->npc;
-	state->npc += 4;
-
-	// TODO: must save other cores' ancillary state
-	// if we want them to migrate, block, etc.
-	//if(current->vcoremap[0] == core_id())
-	//	env_push_ancillary_state(current);
-
-	// run the monitor
+	advance_pc(state);
 	monitor(state);
-
-	assert(0);
+	env_pop_tf(state);
 }
 
 struct kmem_cache *active_msg_cache;

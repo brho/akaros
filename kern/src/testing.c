@@ -718,9 +718,12 @@ spinlock_t print_info_lock = SPINLOCK_INITIALIZER;
 
 void test_print_info_handler(trapframe_t *tf, void* data)
 {
+	uint64_t tsc = read_tsc();
+
 	spin_lock_irqsave(&print_info_lock);
 	cprintf("----------------------------\n");
 	cprintf("This is Core %d\n", core_id());
+	cprintf("Timestamp = %lld\n", tsc);
 #ifdef __i386__
 	cprintf("Hardware core %d\n", hw_core_id());
 	cprintf("MTRR_DEF_TYPE = 0x%08x\n", read_msr(IA32_MTRR_DEF_TYPE));

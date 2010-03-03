@@ -194,13 +194,11 @@ int mon_cpuinfo(int argc, char **argv, trapframe_t *tf)
 	cprintf("Number of CPUs detected: %d\n", num_cpus);
 	cprintf("Calling CPU's ID: 0x%08x\n", core_id());
 
-#ifdef __i386__
 	if (argc < 2)
 		smp_call_function_self(test_print_info_handler, NULL, 0);
 	else
 		smp_call_function_single(strtol(argv[1], 0, 10),
 		                         test_print_info_handler, NULL, 0);
-#endif
 	return 0;
 }
 
