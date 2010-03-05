@@ -153,13 +153,13 @@ intreg_t sys_exec(struct proc* p, const char fn[MAX_PATH_LEN], procinfo_t* pi)
 	proc_init_procinfo(p);
 
 	env_segment_free(p,0,USTACKTOP);
-	proc_init_trapframe(current_tf,0);
 
 	if(load_elf(p,kfn))
 	{
 		proc_destroy(p);
 		return -1;
 	}
+	*current_tf = p->env_tf;
 
 	return 0;
 }
