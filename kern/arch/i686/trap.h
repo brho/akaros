@@ -1,5 +1,5 @@
-#ifndef ROS_INCLUDE_ARCH_TRAP_H
-#define ROS_INCLUDE_ARCH_TRAP_H
+#ifndef ROS_KERN_ARCH_TRAP_H
+#define ROS_KERN_ARCH_TRAP_H
 
 #define MSR_IA32_SYSENTER_CS 0x174
 #define MSR_IA32_SYSENTER_ESP 0x175
@@ -58,49 +58,13 @@
 
 #include <ros/common.h>
 #include <arch/mmu.h>
+#include <ros/arch/trapframe.h>
 
 /* The kernel's interrupt descriptor table */
 extern gatedesc_t idt[];
 extern taskstate_t ts;
 
-typedef struct PushRegs {
-	/* registers as pushed by pusha */
-	uint32_t reg_edi;
-	uint32_t reg_esi;
-	uint32_t reg_ebp;
-	uint32_t reg_oesp;		/* Useless */
-	uint32_t reg_ebx;
-	uint32_t reg_edx;
-	uint32_t reg_ecx;
-	uint32_t reg_eax;
-} push_regs_t;
-
-typedef struct Trapframe {
-	push_regs_t tf_regs;
-	uint16_t tf_gs;
-	uint16_t tf_padding1;
-	uint16_t tf_fs;
-	uint16_t tf_padding2;
-	uint16_t tf_es;
-	uint16_t tf_padding3;
-	uint16_t tf_ds;
-	uint16_t tf_padding4;
-	uint32_t tf_trapno;
-	/* below here defined by x86 hardware */
-	uint32_t tf_err;
-	uintptr_t tf_eip;
-	uint16_t tf_cs;
-	uint16_t tf_padding5;
-	uint32_t tf_eflags;
-	/* below here only when crossing rings, such as from user to kernel */
-	uintptr_t tf_esp;
-	uint16_t tf_ss;
-	uint16_t tf_padding6;
-} trapframe_t;
-
-typedef struct AncillaryState {
-	uint32_t silly; // remove this when you actually use this struct
-} ancillary_state_t;
+/* the struct trapframe and friends are in ros/arch/trapframe.h */
 
 static inline void set_errno(trapframe_t* tf, uint32_t errno)
 {

@@ -362,7 +362,7 @@ void sysenter_init(void)
 }
 
 /* This is called from sysenter's asm, with the tf on the kernel stack. */
-void sysenter_callwrapper(struct Trapframe *tf)
+void sysenter_callwrapper(struct trapframe *tf)
 {
 	// save a per-core reference to the tf
 	set_current_tf(tf);

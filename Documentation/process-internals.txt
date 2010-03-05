@@ -1,7 +1,17 @@
+process-internals.txt
+Barret Rhoden
+
 This discusses core issues with process design and implementation.  Most of this
 info is available in the source in the comments (but may not be in the future).
 For now, it's a dumping ground for topics that people ought to understand before
 they muck with how processes work.
+
+Contents:
+1. Reference Counting
+2. When Do We Really Leave "Process Context"?
+3. Leaving the Kernel Stack:
+4. Preemption and Notification Issues:
+5. TBD
 
 1. Reference Counting
 ===========================
@@ -235,7 +245,7 @@ more sense.  It eventually led to having __proc_unlock_ipi_pending(), which made
 proc_destroy() much cleaner and helped with a general model of dealing with
 these issues.  Win-win.
 
-2 When Do We Really Leave "Process Context"?
+2. When Do We Really Leave "Process Context"?
 ===========================
 2.1 Overview
 ---------------------------
@@ -296,19 +306,307 @@ proc_yield() abandons the core / leaves context.
 
 2.3 Other issues:
 ---------------------------
-Note that it is not clear exactly how we want to deal with interrupting
-processes that are in the kernel.  There is no true process context, so we can't
+Note that dealing with interrupting
+processes that are in the kernel is tricky.  There is no true process context, so we can't
 leave a core until the kernel is in a "safe place", i.e. it's state is bundled
-enough that it can be recontinued later.  We might end up letting the call
-proceed, but not return to userspace (since that's a good save point).  There's
-some rough comments about this in proc_startcore() (check for a pending
-preempt).
+enough that it can be recontinued later.  Calls of this type are not immediate
+active messages, executed at a convenient time (specifically, before we return
+to userspace in proc_startcore().
 
 This same thing applies to __death messages.  Even though a process is dying, it
 doesn't mean we can just drop whatever the kernel was doing on its behalf.  For
 instance, it might be holding a reference that will never get decreffed if its
-stack gets dropped.  This is a big TODO.
+stack gets dropped.
 
 3. Leaving the Kernel Stack:
 ===========================
-Next painful commit will deal with this a bit more...
+Just because a message comes in saying to kill a process, it does not mean we
+should immediately abandon_core().  The problem is more obvious when there is
+a preempt message, instead of a death message, but either way there is state
+that needs cleaned up (refcnts that need downed, etc).
+
+The solution to this is rather simple: don't abandon right away.  That was
+always somewhat the plan for preemption, but was never done for death.  And
+there are several other cases to worry about too.  To enforce this, we expand
+the active messages into a generic work execution message that can be delayed
+or shipped to another core.  These types of messages will not be executed
+immediately on the receiving pcore - instead they are on the queue for "when
+there's nothing else to do in the kernel", which is checked in smp_idle() and
+before returning to userspace in proc_startcore().  Additionally, these active
+messages can also be queued on an alarm queue, delaying their activation as
+part of a generic kernel alarm facility.
+
+4. Preemption and Notification Issues:
+===========================
+4.1: Message Ordering and Local Calls:
+---------------------------
+Since we go with the model of cores being told what to do, there are issues
+with messages being received in the wrong order.  That is why we have the
+active messages (guaranteed, in-order delivery), with the proc-lock protecting
+the send order.  However, this is not enough for some rare races.
+
+Local calls can also perform the same tasks as messages (calling
+proc_destroy() while a death IPI is on its way). We refer to these calls as
+messing with "local fate" (compared to global state (we're clever).
+Preempting a single vcore doesn't change the process's state).  These calls
+are a little different, because they also involve a check to see if it should
+perform the function or other action (e.g., death just idling and waiting for
+an IPI instead of trying to kill itself), instead of just blindly doing
+something.
+
+4.1.1: Possible Solutions
+----------------
+There are two ways to deal with this.  One (and the better one, I think) is to
+check state, and determine if it should proceed or abort.  This requires that
+all local-fate dependent calls always have enough state, meaning that any
+function that results in sending a directive to a vcore store enough info in
+the proc struct that a local call can determine if it should take action or
+abort.  This might be sufficient.  This works for death already, since you
+aren't supposed to do anything other than die (and restore any invariants
+first, handled in Section 3).  We'll go with this way.
+
+The other way is to send the work (including the checks) in a self-ipi active
+message.  This will guarantee that the message is executed after any existing
+messages (making the a_msg queue the authority for what should happen to a
+core).  The check is also performed later (when the a_msg executes).  There
+are a couple issues with this: if we allow the local core to send itself an
+a_msg that could be out of order (meaning it should not be sent, and is only
+sent due to ignorance of its sealed fate), AND if we return the core to the
+idle-core-list once its fate is sealed, we need to detect that the message is
+for the wrong process and that the process is in the wrong state.  To do this,
+we probably need local versioning on the pcore so it can detect that the
+message is late/wrong.  We might get by with just the proc* (though that is
+tricky with death and proc reuse), so long as we don't allow new startcores
+for a proc until AFTER the preemption is completed.
+
+4.2: Preempt-Served Flag
+----------------
+We want to be able to consider a pcore free once its owning proc has dealt
+with removing it (not necessarily taken from the vcoremap, but at least it is
+a done-deal that the core will go away and the messages are sent).  This
+allows a scheduler-like function to easily take a core and then give it to
+someone else, without waiting for each vcore to respond, saying that the pcore
+is free/idle.
+
+Since we want to keep the pcore in the vcoremap, we need another signal to let
+a process know a message is already on its way.  preempt_pending is a signal
+to userspace that the alarm was set, not that an actual message is on its way
+and that a vcore's fate is sealed.  Since we can't use a pcore's presence in
+the vcoremap to determine that the core should be revoked, we have to check
+the "fate sealed"/preempt-served flag. 
+
+It's a bit of a pain to have this flag, just to resolve this race in the
+kernel, though the local call would have to check the vcoremap anyway,
+incurring a cache miss if we go with using the vcoremap to signal the
+impending message.
+
+The preempt_pending flag is actual a timestamp, with the expiration time of
+the core at which the message will be sent.  We could try to use that, but
+since alarms aren't fired at exactly the time they are scheduled, the message
+might not actually be sent yet (though it will, really soon).  Still, we'll
+just go with the preempt-served flag for now.
+
+4.3: Impending Notifications
+----------------
+It's also possible that there is an impending notification.  There's no change
+in fate (though there could be a fate-changing preempt on its way), just the
+user wants a notification handler to run.  We need a flag anyways for this
+(discussed below), so proc_yield() or whatever other local call we have can
+check this flag as well.  
+
+Though for proc_yield(), it doesn't care if a notification is on its way (can
+be dependent on a flag to yield from userspace, based on the nature of the
+yield (which still needs to be sorted)).  If the yield is in response to a
+preempt_pending, it actually should yield and not receive the notification.
+So it should destroy its vcoreid->pcoreid mapping and abandon_core().  When
+that notification hits, it will be for a proc that isn't current, and will be
+ignored (it will get run the next time that vcore fires up, handled below).
+
+There is a slight chance that the same proc will run on that pcore, but with a
+different vcore.  In the off chance this happens, the new vcore will get a
+spurious notification.  Userspace needs to be able to handle spurious
+notifications anyways, (there are a couple other cases, and in general it's
+not hard to do), so this is not a problem.  Instead of trying to have the
+kernel ignore the notification, we just send a spurious one.  A crappy
+alternative would be to send the vcoreid with the notification, but that would
+mean we can't send a generic message (broadcast) to a bunch of cores, which
+will probably be a problem later.
+
+Note that this specific case is because the "local work message" gets
+processed out of order with respect to the notification.  And we want this in
+that case, since that proc_yield() is more important than the notification.
+
+4.4: Preemption / Allocation Phases and Alarm Delays
+---------------------------
+A per-vcore preemption phase starts when the kernel marks the core's
+preempt_pending flag/counter and can includes the time when an alarm is
+waiting to go off to reclaim the core.  The phase ends when the vcore's pcore
+is reclaimed, either as a result of the kernel taking control, or because a
+process voluntarily yielded.
+
+Specifically, the preempt_pending variable is actually a timestamp for when
+the core will be revoked (this assumes some form of global time, which we need
+anyways).  If its value is 0, then there is no preempt-pending, it is not in a
+phase, and the vcore can be given out again. 
+
+When a preempt alarm goes off, the alarm only means to check a process for
+expired vcores.  If the vcore has been yielded while the alarm was pending,
+the preempt_pending flag will be reset to 0.  To speed up the search for
+vcores to preempt, there's a circular buffer corelist in the proc struct, with
+vcoreids of potential suspects.  Or at least this will exist at some point.
+Also note that the preemption list isn't bound to a specific alarm: you can
+check the list at any time (not necessarily on a specific alarm), and you can
+have spurious alarms (the list is empty, so it'll be a noop).
+
+Likewise, a global preemption phase is when an entire MCP is getting
+gang_prempted, and the global deadline is set.  A function can quickly check
+to see if the process responded, since the list of vcores with preemptions
+pending will be empty.
+
+It seems obvious, but we do not allow allocation of a vcore during its
+preemption phase.  The main reason is that it can potentially break
+assumptions about the vcore->pcore mapping and can result in multiple
+instances of the same vcore on different pcores.  Imagine a preempt message
+sent to a pcore (after the alarm goes off), meanwhile that vcore/pcore yields
+and the vcore reactivates somewhere else.  There is a potential race on the
+preempt_tf state: the new vcore is reading while the old is writing.  This
+issue is sorted naturally: the vcore entry in the vcoremap isn't cleared until
+the vcore/pcore is actually yielded/taken away, so the code looking for a free
+vcoreid slot will not try to use it.
+
+Note that if we didn't design the alarm system to simply check for
+preemptions (perhaps it has a stored list of vcores to preempt), then we
+couldn't end the preempt-phase until the alarm was sorted.  If that is the
+case, we could easily give out a vcore that had been yielded but was still in
+a preempt-phase.  Stopping an alarm would be tricky too, since there could be
+lots of vcores in different states that need to be sorted by the alarm (so
+ripping it out isn't enough).  Setting a flag might not be enough either.
+Vcore version numbers/history (as well as global proc histories) is a pain I'd
+like to avoid too.  So don't change the alarm / delayed preemption system
+without thinking about this.
+
+Also, allowing a vcore to restart while preemptions are pending also mucks
+with keeping the vcore mapping "old" (while the message is in flight).  A
+pcore will want to use that to determine which vcore is running on it.  It
+would be possible to keep a pcoremap for the reverse mapping out of sync, but
+that seems like a bad idea.  In general, having the pcoremap is a good idea
+(whenever we talk about a vcoremap, we're usually talking about both
+directions: "the vcore->pcore mapping").
+
+4.5: Global Preemption Flags
+---------------------------
+If we are trying to preempt an entire process at the same time, instead of
+playing with the circular buffer of vcores pending preemption, we could have a
+global timer as well.  This avoids some O(n) operations, though it means that
+userspace needs to check two "flags" (expiration dates) when grabbing its
+preempt-critical locks.
+
+4.6: Notifications Mixed with Preemption and Sleeping
+---------------------------
+It is possible that notifications will mix with preemptions or come while a
+process is not running.  Ultimately, the process wants to be notified on a
+given vcore.  Whenever we send an active notification, we set a flag in
+procdata.  If the vcore is offline or is in a preempt-phase, we don't bother
+sending the IPI/notif message.  The kernel will make sure it runs the
+notification handler (as well as restoring the preempt_tf) the next time that
+vcore is restarted.  Note that userspace can toggle this, so they can handle
+the notifications from a different core if it likes, or they can independently
+send a notification.
+ 
+4.7: Notifs While a Preempt Message is Served
+---------------------------
+It is possible to have the kernel handling a notification a_msg and to have a
+preempt a_msg in the queue (preempt-served flag is set).  Ultimately, what we
+want is for the core to be preempted and the notification handler to run on
+the next execution.  Both messages are in the a_msg queue for "a convenient
+time to leave the kernel" (I'll have a better name for that later).  What we
+do is execute the notification handler and jump to userspace.  Since there is
+still an a_msg in the queue (and we self_ipi'd ourselves, it's part of how
+a_msgs work), the IPI will fire and push us right back into the kernel to
+execute the preemption, and the notif handler's context will be saved in the
+preempt_tf (ready to go when the vcore gets started again).
+
+We could try to just set the notif_pending flag and ignore the message, but
+that would involve inspecting the queue for the preempt a_msg.  Additionally,
+a preempt a_msg can arrive anyway.  Finally, it's possible to have another
+message in the queue between the notif and the preempt, and it gets ugly
+quickly trying to determine what to do.
+
+4.8: When a Pcore is "Free"
+---------------------------
+There are a couple ways to handle pcores.  One approach would be to not
+consider them free and able to be given to another process until the old
+process is completely removed (abandon_core()).  Another approach is to free
+the core once its fate is sealed (which we do).  This probably gives more
+flexibility in schedule()-like functions (no need to wait to give the core
+out), quicker dispatch latencies, less contention on shared structs (like the
+idle-core-map), etc.
+
+Also, we don't remove the pcore from the vcoremap, even if it is being
+allocated to another core (the same pcore can exist in two vcoremaps, contrary
+to older statements).  Taking the pcore from the vcoremap would mean some
+non-fate related local calls (sys_get_vcoreid()) will fail, since the vcoreid
+is gone!  Additionally, we don't need a vcoreid in the a_msg (we would have if
+we could not use the vcore/pcoremappings).  There should not be any issues
+with the new process sending messages to the pcore before the core is sorted,
+since a_msgs are delivered in order.
+
+4.9: Future Broadcast/Messaging Needs
+---------------------------
+Currently, messaging is serialized.  Broadcast IPIs exist, but the active
+message system is based on adding an a_msg to a list in a pcore's
+per_cpu_info.  Further the sending of these messages is in a loop.  In the
+future, we would like to have broadcast messaging of some sort (literally a
+broadcast, like the IPIs, and if not that, then a communication tree of
+sorts).  
+
+Given those desires, we want to make sure that no message we send needs
+details specific to a pcore (such as the vcoreid running on it, a history
+number, or anything like that).  Thus no a_msg related to process management
+should have anything that cannot apply to the entire process.  At this point,
+most just have a struct proc *.  A pcore ought to be able to figure out what
+is happening based on the pcoremap, information in the struct proc, and in the
+preempt struct in procdata.
+
+4.10: Other Things We Thought of but Don't Like
+---------------------------
+All local fate-related work is sent as a self a_msg, to enforce ordering.
+It doesn't capture the difference between a local call and a remote a_msg.
+The a_msg has already considered state and made its decision.  The local call
+is an attempt.  It is also unnecessary, if we put in enough information to
+make a decision in the proc struct.  Finally, it caused a few other problems
+(like needing to detect arbitrary stale messages).
+
+Overall message history: doesn't work well when you do per-core stuff, since
+it will invalidate other messages for the process.  We then though of a pcore
+history counter to detect stale messages.  Don't like that either.  We'd have
+to send the history in the message, since it's a per-message, per-core
+expiration.  There might be other ways around this, but this doesn't seem
+necessary.
+
+Alarms have pointers to a list of which cores should be preempted when that
+specific alarm goes off (saved with the alarm).  Ugh.  It gets ugly with
+multiple outstanding preemptions and cores getting yielded while the alarms
+sleep (and possibly could get reallocated, though we'd make a rule to prevent
+that).  Like with notifications, being able to handle spurious alarms and
+thinking of an alarm as just a prod to check somewhere is much more flexible
+and simple.  It is similar to generic messages that have the actual important
+information stored somewhere else (as with allowing broadcasts, with different
+receivers performing slightly different operations).
+
+Synchrony for messages (wanting a response to a preempt a_msg, for example)
+sucks.  Just encode the state of impending fate in the proc struct, where it
+belongs.  Additionally, we don't want to hold the proc lock even longer than
+we do now (which is probably too long as it is).  Finally, it breaks a golden
+rule: never wait while holding a lock: you will deadlock the system (e.g. if
+the receiver is already in the kernel spinning on the lock).  We'd have to
+send messages, unlock (which might cause a message to hit the calling pcore,
+as in the case of locally called proc_destroy()), and in the meantime some
+useful invariant might be broken.
+
+We also considered using the transition stack as a signal that a process is in
+a notification handler.  The kernel can inspect the stack pointer to determine
+this.  It's possible, but unnecessary.
+
+5. TBD
+===========================

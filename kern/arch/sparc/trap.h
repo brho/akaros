@@ -7,28 +7,9 @@
 #ifndef __ASSEMBLER__
 
 #include <ros/common.h>
+#include <ros/arch/trapframe.h>
 
-typedef struct
-{
-	uint32_t gpr[32] __attribute__((aligned (8)));
-	uint32_t psr;
-	uint32_t pc;
-	uint32_t npc;
-	uint32_t wim;
-	uint32_t tbr;
-	uint32_t y;
-	uint32_t asr13;
-	uint32_t pc_insn;
-	uint32_t fault_status;
-	uint32_t fault_addr;
-	uint64_t timestamp;
-} trapframe_t;
-
-typedef struct
-{
-	uint32_t fpr[32] __attribute__((aligned (8)));
-	uint32_t fsr;
-} ancillary_state_t;
+/* the struct trapframe and friends are in ros/arch/trapframe.h */
 
 void data_access_exception(trapframe_t* state);
 void real_fp_exception(trapframe_t* state, ancillary_state_t* astate);

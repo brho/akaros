@@ -1,5 +1,8 @@
+processes.txt
+Barret Rhoden
+
 All things processes!  This explains processes from a high level, especially
-focusing on the user-kernel boundary and transitions to the multi-cored state,
+focusing on the user-kernel boundary and transitions to the many-core state,
 which is the way in which parallel processes run.  This doesn't discuss deep
 details of the ROS kernel's process code.
 
@@ -9,9 +12,13 @@ parallel applications.
 Part 1: Overview
 Part 2: How They Work
 Part 3: Resource Requests
-Part 4: Notification
+Part 4: Preemption and Notification
 Part 5: Old Arguments (mostly for archival purposes))
 Part 6: Parlab app use cases
+
+Revision History:
+2009-10-30 - Initial version
+2010-03-04 - Preemption/Notification, changed to many-core processes
 
 Part 1: World View of Processes
 ==================================
@@ -33,10 +40,10 @@ Features:
   They have a list of resources that are given/leased to them.
 
 None of these are new.  Here's what's new:
-- They can run in a multi-core mode, where its cores run at the same time, and
+- They can run in a many-core mode, where its cores run at the same time, and
   it is aware of changes to these conditions (page faults, preemptions).  It
   can still request more resources (cores, memory, whatever).
-- Every core in a multi-cored process is *not* backed by a kernel
+- Every core in a many-core process (MCP) is *not* backed by a kernel
   thread/kernel stack, unlike with Linux tasks.
 	- There are *no* per-core run-queues in the kernel that decide for
 	  themselves which kernel thread to run.
@@ -147,11 +154,6 @@ would also work.  The vcoreid makes things a little easier, such as when a
 process wants to refer to one of its other cores (not the calling core).  It
 also makes the event notification mechanisms easier to specify and maintain.
 
-The vcoreid only makes sense when in an _M mode.  In _S mode, your vcoreid is
-0.  Vcoreid's only persist when in _M mode.  If you leave _M mode on a non-0
-vcore, that context becomes vcore0.  This can get tricky for userspace's
-stacks (more below).
-
 Processes that care about locality should check what their pcoreid is.  This
 is currently done via sys_getcpuid().  The name will probably change.
 
@@ -176,23 +178,14 @@ coming up at the entry point again (and not starting the program over).  I
 recommend setting a global variable that can be checked from assembly before
 going to _M the first time.
 
-When coming in to the entry point, new cores should grab a stack.  There are a
-few ways to do this.  They ought to be the same stack every time for a
-specific vcore.  They will be the transition stacks (in Lithe terms) that are
+When coming in to the entry point, whether as the result of a startcore or a
+notification, the kernel will set the stack pointer to whatever is requested
+by userspace in procdata.  A process should allocate stacks of whatever size
+it wants for its vcores when it is in _S mode, and write these location to
+procdata.  These stacks are the transition stacks (in Lithe terms) that are
 used as jumping-off points for future function calls.  These stacks need to be
-used in a continuation-passing style.  Start from the top every time.  The
-reason for that is actual contexts may move around, and vcores will come and
-go - and each vcore will always reuse the same stack.  Lithe works this way,
-so it's not an issue.
-
-It's recommended that while in _S mode the process allocates stacks and puts
-them in an array, indexed by vcoreid for the entry point to easily find them.
-Then each core grabs its transition stack, then goes into hart_entry.
-
-Userspace needs to make sure the calling context (which will become vcore0) is
-on a good stack, like USTACKTOP.  This could happen if you leave _M from a core
-other than vcore0, then return to _M mode.  While in _S mode, you were still
-on whatever stack you came from (like vcore3's transition stack).
+used in a continuation-passing style, and each time they are used, they start
+from the top.
 
 2.4.2: To go from _M to _S, a process requests 0 cores
 --------------
@@ -202,8 +195,10 @@ to deal with this.  In general, they will regrab their transition stacks when
 they come back up.  Their other stacks and whatnot (like TBB threads) need to
 be dealt with.
 
-As mentioned above, when the caller next switches to _M, that context
-(including its stack) becomes the new vcore0.
+When the caller next switches to _M, that context (including its stack)
+maintains its old vcore identity.  If vcore3 causes the switch to _S mode, it
+ought to remain vcore3 (lots of things get broken otherwise).
+As of March 2010, the code does not reflect this
 
 2.4.3: Requesting more cores while in _M
 --------------
@@ -213,6 +208,8 @@ from _S to _M: at the entry point.
 
 2.4.4: Yielding
 --------------
+This will get revised soon, to account for different types of yields.
+
 Yielding gives up a core.  In _S mode, it will transition from RUNNING_S to
 RUNNABLE_S.  The context is saved in env_tf.  A yield will *not* transition
 from _M to _S.
@@ -229,70 +226,18 @@ is run again, all cores will come up at the entry point (including vcore0 and
 the calling core).  This isn't implemented yet, and will wait on some work
 with preemption.
 
+We also need a type of yield (or a flag) that says the process is just giving
+up the core temporarily, but actually wants the core and does not want
+resource requests to be readjusted.  For example, in the event of a preemption
+notification, a process may yield (ought to!) so that the kernel does not need
+to waste effort with full preemption.
+
 2.4.5: Others
 --------------
 There are other transitions, mostly self-explanatory.  We don't currently use
 any WAITING states, since we have nothing to block on yet.  DYING is a state
 when the kernel is trying to kill your process, which can take a little while
 to clean up.
-	
-2.5: Preemption
--------------------------------
-None of this is implemented yet, or fully flushed out.
-
-2.5.1: Ideas
---------------
-The rough plan is to notify beforehand, then take action if userspace doesn't
-yield.
-
-When a core is preempted or interrupted for any reason (like a pagefault or
-other trap), the context is saved in a structure in procinfo that contains the
-vcoreid, a code for what happened, and the actual context (probably always
-including FP/SSE registers).
-
-If userspace is keeping the core, like with a page fault or other trap, that
-core will start up at the entry point, and regrab its transition stack.  There
-could be issues with this, if the trap came while operating on that stack.
-There'll probably be some way other way to help userspace know something
-happened.  Recursive (page) faults are also tricky.
-
-If it lost the core, like in a preemption, the context is saved (fully), and
-the process is notified (in the manner it wishes).  See Part 4.
-
-When a process loses all of its cores, it just loses them all.  There is no
-notification interrupt (though there will be a message posted).  When a
-process comes up at the entry point once it is run again, it should check its
-event queue (if it cares).
-
-2.5.2: Issues with preemption, trap redirection, and event notification
---------------
-There are other issues with cascading interrupts (when contexts are still
-running handlers).  Imagine a pagefault, followed by preempting the handler.
-It doesn't make sense to run the preempt context after the page fault.  The
-difficulty is in determining when the context is no longer handling an event.
-We could consider using a register, controllable by userspace, to give the
-kernel this hint.  Maybe have a window of time we won't preempt again (though
-that is really painful.  How long is this window?).
-
-Even worse, consider vcore0 is set up to receive all events.  If events come
-in faster than it can process them, it will both nest too deep and process out
-of order.
-
-Also, we don't have a good way to handle interrupts/events when on the
-transition stack at all (let alone cascading or overflow).  The kernel will
-just start you from the top of the stack, which will eventually clobber
-whatever the core was doing previously.
-
-We can consider using another register to signal some sort of exceptional
-event, and before touching the transition stack, the core can jump to a
-per-core exception stack.  Perhaps to avoid nesting exceptions, when an
-interrupt comes in, the kernel can see userspace is on it's exception stack
-and not post the event, and it's up to userspace to check for any missed
-events before leaving its core.  Ugly.  And can't handle traps.
-
-Pre-Notification issues: how much time does userspace need to clean up and
-yield?  How quickly does the kernel need the core back (for scheduling
-reasons)?
 
 Part 3: Resource Requests
 ===============================
@@ -326,27 +271,251 @@ use them).  A latency of 0 would mean a process wants it instantly, which
 probably means they ought to be already allocated (and billed to) that
 process.  
 
-Part 4: Event Notification
+Part 4: Preemption and Event Notification
 ===============================
+Preemption and Notification are tied together.  Preemption is when the kernel
+takes a resource (specifically, cores).  There are two types core_preempt()
+(one core) and gang_preempt() (all cores).  Notification (discussed below) is
+when the kernel informs a process of an event, usually referring to the act of
+running a function on a core (active notification).
+
+The rough plan for preemption is to notify beforehand, then take action if
+userspace doesn't yield.  This is a notification a process can ignore, though
+it is highly recommended to at least be aware of impending core_preempt()
+events.
+
+4.1: Notification Basics
+-------------------------------
 One of the philosophical goals of ROS is to expose information up to userspace
 (and allow requests based on that information).  There will be a variety of
 events in the system that processes will want to know about.  To handle this,
 we'll eventually build something like the following.
 
 All events will have a number, like an interrupt vector.  Each process will
-have an event queue.  On most architectures, it will be a simple
-producer-consumer ring buffer sitting in the "shared memory" procdata region
-(shared between the kernel and userspace).  The kernel writes a message into
-the buffer with the event number and some other helpful information.  For
-instance, a preemption event will say which vcore was preempted and provide a
-pointer to the context that was preempted.
+have an event queue (per core, described below).  On most architectures, it
+will be a simple producer-consumer ring buffer sitting in the "shared memory"
+procdata region (shared between the kernel and userspace).  The kernel writes
+a message into the buffer with the event number and some other helpful
+information.
 
 Additionally, the process may request to be actively notified of specific
 events.  This is done by having the process write into an event vector table
-(like an IDT) in procdata.  For each event, the process can write a function
-pointer and a vcoreid.  The kernel will execute that function on the given
-core (and pass appropriate arguments, such as a pointer to the message in the
-event queue and a pointer to the context that was just interrupted).
+(like an IDT) in procdata.  For each event, the process writes the vcoreid it
+wants to be notified on.
+
+4.2: Notification Specifics
+-------------------------------
+In procdata there is an array of per-vcore data, holding some
+preempt/notification information and space for two trapframes: one for
+notification and one for preemption.
+
+When a notification arrives to a process under normal circumstances, the
+kernel places the previous running context in the notification trapframe, and
+returns to userspace at the program entry point (the elf entry point) on the
+transition stack.  If a process is already handling a notification on that
+core, the kernel will not interrupt it.  It is the processes's responsibility
+to check for more notifications before returning to its normal work.  The
+process must also unmask notifications (in procdata) before it returns to do
+normal work.  Unmasking notifications is the signal to the kernel to not
+bother sending IPIs, and if an IPI is sent before notifications are masked,
+then the kernel will double-check this flag to make sure interrupts should
+have arrived.
+
+Notification unmasking is done by setting the notif_enabled flag (similar to
+turning interrupts on in hardware).  When a core starts up, this flag is off,
+meaning that notifications are disabled by default.  It is the process's
+responsibility to turn on notifications for a given vcore.
+
+When the process runs the handler, it is actually starting up at the same
+location in code as it always does, so the kernel will pass it a parameter in
+a register to let it know that it is in a notification.  Additionally, the
+kernel will mask notifications (much like an x86 interrupt gate).  The process
+must check its per-core event queue to see why it was called, and deal with
+all of the events on the queue.  In the case where the event queue overflows,
+the kernel will up a counter so the process can at least be aware things are
+missed.
+
+For missed events, and for events that do not need messages (they have no
+parameters and multiple notifications are irrelevant), the kernel will toggle
+that event's bit in a bitmask.  For the events that don't want messages, we may
+have a flag that userspace sets, meaning they just want to know it happened.
+This might be too much of a pain, so we'll see.  For notification events that
+overflowed the queue, the parameters will be lost, but hopefully the application
+can sort it out.  Again, we'll see.  A specific notif_event should not appear in
+both the event buffers and in the bitmask.
+
+These notification events include things such as: an IO is complete, a
+preemption is pending to this core, the process just returned from a
+preemption, there was a trap (divide by 0, page fault), and many other things.
+We plan to allow this list to grow at runtime (a process can request new event
+notification types).  These messages will often need some form of a timestamp,
+especially ones that will expire in meaning (such as a preempt_pending).
+
+Note that only one notification can be active at a time, including a fault.
+This means that if a process page faults or something while notifications are
+masked, the process will simply be killed.    It is up to the process to make
+sure the appropriate pages are pinned, which it should do before entering _M
+mode.
+
+We considered having the kernel be aware of a process's transition stacks and
+sizes so that it can detect if a vcore is in a notification handler based on
+the stack pointer in the trapframe when a trap or interrupt fires.  While
+cool, the flag for notif_enabled is much easier and just as capable.
+Userspace needs to be aware of various races, and only enable notifications
+when it is ready to have its transition stack clobbered.  This means that when
+switching from big user-thread to user-thread, the process should temporarily
+disable notifications and reenable them before starting the new thread fully.
+This is analogous to having a kernel that disables interrupts while in process
+context.
+
+A process can fake not being on its transition stack, and even unmapping their
+stack.  At worst, a vcore could recursively page fault (the kernel does not
+know it is in a handler, if they keep enabling notifs before faulting), and
+that would continue til the core is forcibly preempted.  This is not an issue
+for the kernel.
+
+When a process wants to use its transition stack, it ought to check
+preempt_pending, mask notifications, jump to its transition stack, do its work
+(e.g. process notifications, check for new notifications, schedule a new
+thread) periodically checking for a pending preemption, and making sure the
+notification queue/list is empty before moving back to real code.  Then it
+should jump back to a real stack, unmask notifications, and jump to the newly
+scheduled thread.
+
+4.3: Preemption Specifics
+-------------------------------
+When a vcore is preempted, the kernel takes whatever context was running (which
+could be a notification context) and stores it in the preempt trapframe for
+that vcore in procdata.  There is also a flag (actually a counter) that states
+if the context there has been sorted out.  Userspace should set this once it
+has copied out the data and dealt with it accordingly.
+
+The invariant regarding the preemption slot is that there should never be
+anything running on a vcore when there is a valid/not-sorted preempt
+trapframe.  The reason is that a preemption can come in at any time (such as
+right after returning from a preemption).
+
+To maintain this invariant, when the kernel starts a vcore, it will run the
+context that is in the preempt trapframe if the "preempt_tf_sorted" (name will
+change) flag is not set.  A process needs to be careful of a race here.  If
+they are trying to deal with a preempt trapframe (must be from another vcore,
+btw), the kernel could start to run that trapframe (in case it is granting a
+core request / proc_startcore()ing).  When the kernel prepares to use the
+trapframe (which it will do regardless of userspace activities), it will up
+the flag/counter.  If the process notices a change in that flag, it ought to
+abort its operation.  It can up the counter on its own when it no longer wants
+the kernel to run that context (this means it can get clobbered).
+
+4.4: Other trickiness
+-------------------------------
+4.4.1: Preemption -> deadlock
+-------------------------------
+One issue is that a context can be holding a lock that is necessary for the
+userspace scheduler to manage preempted threads, and this context can be
+preempted.  This would deadlock the scheduler.  To assist a process from
+locking itself up, the kernel will toggle a preempt_pending flag in
+procdata for that vcore before sending the actual preemption.  Whenever the
+scheduler is grabbing one of these critical spinlocks, it needs to check that
+flag first, and yield if a preemption is coming in.
+
+Another option we may implement is for the process to be able to signal to the
+kernel that it is in one of these ultra-critical sections by writing a magic
+value to a specific register in the trapframe.  If there kernel sees this, it
+will allow the process to run for a little longer.  The issue with this is
+that the kernel would need to assume processes will always do this (malicious
+ones will) and add this extra wait time to the worst case preemption time.
+
+Finally, a scheduler could try to use non-blocking synchronization (no
+spinlocks), or one of our other long-term research synchronization methods to
+avoid deadlock, though we realize this is a pain for userspace for now.  FWIW,
+there are some OSs out there with only non-blocking synchronization (I think).
+
+4.4.2: Cascading and overflow
+-------------------------------
+There used to be issues with cascading interrupts (when contexts are still
+running handlers).  Imagine a pagefault, followed by preempting the handler.
+It doesn't make sense to run the preempt context after the page fault.
+Earlier designs had issues where it was hard for a vcore to determine the
+order of events and unmixing preemption, notification, and faults.  We deal
+with this by having separate slots for preemption and notification, and by
+treating faults as another form of notification.  Faulting while handling a
+notification just leads to death.  Perhaps there is a better way to do that.
+
+Another thing we considered would be to have two stacks - transition for
+notification and an exception stack for faults.  We'd also need a fault slot
+for the faulting trapframe.  This begins to take up even more memory, and it
+is not clear how to handle mixed faults and notifications.  If you fault while
+on the notification slot, then fine.  But you could fault for other reasons,
+and then receive a notification.  And then if you fault in that handler, we're
+back to where we started - might as well just kill them.
+
+Another issue was overload.  Consider if vcore0 is set up to receive all
+events.  If events come in faster than it can process them, it will both nest
+too deep and process out of order.  To handle this, we only notify once, and
+will not send future active notifications / interrupts until the process
+issues an "end of interrupt" (EOI) for that vcore.  This is modelled after
+hardware interrupts (on x86, at least).
+
+4.4.3: Restarting a Preempted Notification
+-------------------------------
+There will be cases where the trapframe in the preempt_tf slot is actually a
+notification handler, which was running on the transition stack of that
+particular vcore.  Userspace needs to be careful about restarting contexts
+that were on those cores.  They can tell by examining the stack pointer to see
+if it was on a transition stack.  Alternatively, if notifications are masked,
+it is also likely they in a notification handler.  The real concern is the
+transition stack.  If a vcore is processing on the transition stack of another
+vcore, there is a risk that the vcore comes back up and starts clobbering the
+transition stack.
+
+To avoid this, userspace should allocate a new transition stack and switch the
+target vcore to use that new stack (in procdata).  The only time (for now)
+that the kernel cares about a transition stack is when it is popping a tf on a
+new or freshly notified vcore.
+
+This all should be a rare occurance, since the vcore should see the
+preempt_pending when it starts its notification and yield, instead of being
+forced into this weird situation.  This also means that notifications should
+take less time than the kernel will wait before preempting.
+
+This issue ties in with deadlocking in 4.4.1.  If userspace is never in a
+notif handler when it gets preempted, that deadlock will not happen (and we
+also may need only one trapframe slot).  Userspace probably cannot guarantee
+that, so we'll have to deal with it.  Avoiding the deadlock on a spinlock is
+much more reasonable (and we can provide the locking function).
+
+4.4.4: Userspace Yield Races
+-------------------------------
+Imagine a vcore realizes it is getting preempted soon, so it starts to yield.
+However, it is too slow and doesn't make it into the kernel before a preempt
+message takes over.  When that vcore is run again, it will continue where it
+left off and yield its core.  The desired outcome is for yield to fail, since
+the process doesn't really want to yield that core.  To sort this out, yield
+will take a parameter saying that the yield is in response to a pending
+preemption.  If the phase is over (preempted and returned), the call will not
+yield and simply return to userspace.
+
+4.4.5: Userspace m_yield
+-------------------------------
+There are a variety of ways to implement an m_yield (yield the entire MCP).
+We could have a "no niceness" yield - just immediately preempt, but there is a danger of the
+locking business.  We could do the usual delay game, though if userspace is
+requesting its yield, arguably we don't need to give warning. 
+
+Another approach would be to not have an explicit m_yield call.  Instead, we
+can provide a notify_all call, where the notification sent to every vcore is
+to yield.  I imagine we'll have a notify_all (or rather, flags to the notify
+call) anyway, so we can do this for now.
+
+The fastest way will probably be the no niceness way.  One way to make this
+work would be for vcore0 to hold all of the low-level locks (from 4.4.1) and
+manually unlock them when it wakes up.  Yikes!
+
+4.5: Random Other Stuff
+-------------------------------
+Pre-Notification issues: how much time does userspace need to clean up and
+yield?  How quickly does the kernel need the core back (for scheduling
+reasons)?
 
 Part 5: Old Arguments about Processes vs Partitions
 ===============================
@@ -426,7 +595,7 @@ On 2009-09-15 at 22:33 John Kubiatowicz wrote:
 
 I want a process to be aware of it's specific resources, as well as the other
 members of it's partition.  An individual process (which is gang-scheduled in
-multi-core mode) has a specific list of resources.  Its just that the overall
+many-core mode) has a specific list of resources.  Its just that the overall
 'partition of system resources' is separate from the list of specific
 resources of a process, simply because there can be many processes under the
 same partition (collection of resources allocated).
@@ -454,7 +623,7 @@ decides to give it a certain amount of resources, which creates it's partition
 (aka, chunk of resources granted to it's process group, of which it is the
 only member).  The sysadmin can tweak this allocation via procfs.
 
-The process runs on its cores in it's multicore mode.  It is gang scheduled,
+The process runs on its cores in it's many-core mode.  It is gang scheduled,
 and knows how many cores there are.  When the kernel starts the process on
 it's extra cores, it passes control to a known spot in code (the ELF entry
 point), with the virtual core id passed as a parameter.
@@ -509,7 +678,7 @@ on the cores may or may not trust one another.  One solution is to run each
 VM-core in it's own process (like with Linux's KVM, it uses N tasks (part of
 one process) for an N-way SMP VM).  The processes set up the appropriate
 shared memory mapping between themselves early on.  Another approach would be
-to allow a multi-cored process to install specific address spaces on each
+to allow a many-cored process to install specific address spaces on each
 core, and interpose on syscalls, privileged instructions, and page faults.
 This sounds very much like the Cell approach, which may be fine for a VM, but
 not for the general case of a process.
