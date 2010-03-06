@@ -124,8 +124,6 @@ gcc-$(GCC_VERSION):
 	rm -rf gcc-$(GCC_VERSION)
 	tar -zxf gcc-$(GCC_VERSION).tar.gz
 	patch -p0 < gcc-$(GCC_VERSION)-ros.patch
-	cd gcc-$(GCC_VERSION)/libstdc++-v3; \
-	autoconf
 	
 	cd gcc-$(GCC_VERSION); \
 	tar -zxf ../mpfr-2.3.2.tar.gz; \

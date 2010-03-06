@@ -1,6 +1,6 @@
 diff -ruN gcc-4.3.2/config.sub gcc-4.3.2.new/config.sub
 --- gcc-4.3.2/config.sub	2008-01-22 18:37:40.000000000 -0800
-+++ gcc-4.3.2.new/config.sub	2010-02-27 15:21:04.000000000 -0800
++++ gcc-4.3.2.new/config.sub	2010-03-05 18:33:03.494162381 -0800
 @@ -1239,7 +1239,7 @@
  	      | -*vms* | -sco* | -esix* | -isc* | -aix* | -sunos | -sunos[34]*\
  	      | -hpux* | -unos* | -osf* | -luna* | -dgux* | -solaris* | -sym* \
@@ -12,7 +12,7 @@ diff -ruN gcc-4.3.2/config.sub gcc-4.3.2.new/config.sub
  	      | -hiux* | -386bsd* | -knetbsd* | -mirbsd* | -netbsd* \
 diff -ruN gcc-4.3.2/gcc/config/i386/ros.h gcc-4.3.2.new/gcc/config/i386/ros.h
 --- gcc-4.3.2/gcc/config/i386/ros.h	1969-12-31 16:00:00.000000000 -0800
-+++ gcc-4.3.2.new/gcc/config/i386/ros.h	2010-02-27 15:21:04.000000000 -0800
++++ gcc-4.3.2.new/gcc/config/i386/ros.h	2010-03-05 18:33:03.494162381 -0800
 @@ -0,0 +1,201 @@
 +/* Definitions for Intel 386 running Linux-based GNU systems with ELF format.
 +   Copyright (C) 1994, 1995, 1996, 1997, 1998, 1999, 2001, 2002, 2004, 2005,
@@ -217,7 +217,7 @@ diff -ruN gcc-4.3.2/gcc/config/i386/ros.h gcc-4.3.2.new/gcc/config/i386/ros.h
 +#endif
 diff -ruN gcc-4.3.2/gcc/config/ros.h gcc-4.3.2.new/gcc/config/ros.h
 --- gcc-4.3.2/gcc/config/ros.h	1969-12-31 16:00:00.000000000 -0800
-+++ gcc-4.3.2.new/gcc/config/ros.h	2010-02-27 15:21:04.000000000 -0800
++++ gcc-4.3.2.new/gcc/config/ros.h	2010-03-05 18:33:03.494162381 -0800
 @@ -0,0 +1,125 @@
 +/* Definitions for Linux-based GNU systems with ELF format
 +   Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2003, 2004, 2005, 2006,
@@ -346,7 +346,7 @@ diff -ruN gcc-4.3.2/gcc/config/ros.h gcc-4.3.2.new/gcc/config/ros.h
 +#define TARGET_POSIX_IO
 diff -ruN gcc-4.3.2/gcc/config/sparc/ros.h gcc-4.3.2.new/gcc/config/sparc/ros.h
 --- gcc-4.3.2/gcc/config/sparc/ros.h	1969-12-31 16:00:00.000000000 -0800
-+++ gcc-4.3.2.new/gcc/config/sparc/ros.h	2010-02-27 15:21:04.000000000 -0800
++++ gcc-4.3.2.new/gcc/config/sparc/ros.h	2010-03-05 18:33:03.494162381 -0800
 @@ -0,0 +1,240 @@
 +/* Definitions for SPARC running Linux-based GNU systems with ELF.
 +   Copyright (C) 1996, 1997, 1998, 1999, 2000, 2002, 2003, 2004, 2005, 2006,
@@ -590,7 +590,7 @@ diff -ruN gcc-4.3.2/gcc/config/sparc/ros.h gcc-4.3.2.new/gcc/config/sparc/ros.h
 +#define TARGET_ALTERNATE_LONG_DOUBLE_MANGLING
 diff -ruN gcc-4.3.2/gcc/config.gcc gcc-4.3.2.new/gcc/config.gcc
 --- gcc-4.3.2/gcc/config.gcc	2008-06-09 09:32:15.000000000 -0700
-+++ gcc-4.3.2.new/gcc/config.gcc	2010-02-27 15:21:04.000000000 -0800
++++ gcc-4.3.2.new/gcc/config.gcc	2010-03-05 18:33:03.494162381 -0800
 @@ -609,6 +609,12 @@
    # Assume that newlib is being used and so __cxa_atexit is provided.
    default_use_cxa_atexit=yes
@@ -631,7 +631,7 @@ diff -ruN gcc-4.3.2/gcc/config.gcc gcc-4.3.2.new/gcc/config.gcc
  	extra_options="${extra_options} sparc/long-double-switch.opt"
 diff -ruN gcc-4.3.2/libgcc/config.host gcc-4.3.2.new/libgcc/config.host
 --- gcc-4.3.2/libgcc/config.host	2008-01-25 12:49:04.000000000 -0800
-+++ gcc-4.3.2.new/libgcc/config.host	2010-02-27 15:21:04.000000000 -0800
++++ gcc-4.3.2.new/libgcc/config.host	2010-03-05 18:33:03.494162381 -0800
 @@ -166,6 +166,9 @@
    # Must come before *-*-gnu* (because of *-*-linux-gnu* systems).
    extra_parts="crtbegin.o crtbeginS.o crtbeginT.o crtend.o crtendS.o"
@@ -662,9 +662,21 @@ diff -ruN gcc-4.3.2/libgcc/config.host gcc-4.3.2.new/libgcc/config.host
  sparc-*-linux*)		# SPARC's running GNU/Linux, libc6
  	extra_parts="$extra_parts crtfastmath.o"
  	tmake_file="${tmake_file} sparc/t-crtfm"
+diff -ruN gcc-4.3.2/libstdc++-v3/acinclude.m4 gcc-4.3.2.new/libstdc++-v3/acinclude.m4
+--- gcc-4.3.2/libstdc++-v3/acinclude.m4	2008-04-25 09:52:57.000000000 -0700
++++ gcc-4.3.2.new/libstdc++-v3/acinclude.m4	2010-03-05 18:33:03.494162381 -0800
+@@ -104,7 +104,7 @@
+   AC_PROG_CC
+   AC_PROG_CXX
+   CXXFLAGS="$save_CXXFLAGS"
+-  m4_rename([glibcxx_PRECIOUS],[_AC_ARG_VAR_PRECIOUS])
++  m4_rename_force([glibcxx_PRECIOUS],[_AC_ARG_VAR_PRECIOUS])
+   AC_SUBST(CFLAGS)
+   AC_SUBST(CXXFLAGS)
+ 
 diff -ruN gcc-4.3.2/libstdc++-v3/configure gcc-4.3.2.new/libstdc++-v3/configure
 --- gcc-4.3.2/libstdc++-v3/configure	2008-07-07 12:49:54.000000000 -0700
-+++ gcc-4.3.2.new/libstdc++-v3/configure	2010-02-27 15:21:17.000000000 -0800
++++ gcc-4.3.2.new/libstdc++-v3/configure	2010-03-05 18:41:44.354163440 -0800
 @@ -112811,6 +112811,3153 @@
  _ACEOF
  
@@ -3821,7 +3833,7 @@ diff -ruN gcc-4.3.2/libstdc++-v3/configure gcc-4.3.2.new/libstdc++-v3/configure
      #  *-solaris2.5)
 diff -ruN gcc-4.3.2/libstdc++-v3/crossconfig.m4 gcc-4.3.2.new/libstdc++-v3/crossconfig.m4
 --- gcc-4.3.2/libstdc++-v3/crossconfig.m4	2008-01-14 16:15:43.000000000 -0800
-+++ gcc-4.3.2.new/libstdc++-v3/crossconfig.m4	2010-02-27 15:21:04.000000000 -0800
++++ gcc-4.3.2.new/libstdc++-v3/crossconfig.m4	2010-03-05 18:33:03.494162381 -0800
 @@ -299,6 +299,12 @@
      AC_DEFINE(HAVE_SINHF)
      AC_DEFINE(HAVE_SINHL)
