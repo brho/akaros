@@ -66,6 +66,7 @@ static void smp_final_core_init(trapframe_t *tf, void *data)
 {
 	setup_default_mtrrs(data);
 	smp_percpu_init();
+	waiton_barrier(data);
 }
 
 // this needs to be set in smp_entry too...
