@@ -26,6 +26,11 @@ struct vcore {
 	struct trapframe	*tf_to_run;
 };
 
+struct pcore {
+	uint32_t			vcoreid;
+	bool 				valid;
+};
+
 typedef struct procinfo {
 	pid_t pid;
 	pid_t ppid;
@@ -38,6 +43,7 @@ typedef struct procinfo {
 	 * rebuild glibc. */
 	struct vcore		vcoremap[MAX_NUM_CPUS];
 	uint32_t			num_vcores;
+	struct pcore		pcoremap[MAX_NUM_CPUS];
 	seq_ctr_t			coremap_edit;
 } procinfo_t;
 #define PROCINFO_NUM_PAGES  ((sizeof(procinfo_t)-1)/PGSIZE + 1)	
