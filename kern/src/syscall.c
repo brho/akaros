@@ -160,18 +160,11 @@ static uint32_t sys_getcpuid(void)
 	return core_id();
 }
 
-// TODO: Temporary hack until thread-local storage is implemented on i386
-static size_t sys_getvcoreid(env_t* e)
+// TODO: Temporary hack until thread-local storage is implemented on i386 and
+// this is removed from the user interface
+static size_t sys_getvcoreid(struct proc *p)
 {
-	if(e->state == PROC_RUNNING_S)
-		return 0;
-
-	size_t i;
-	for(i = 0; i < e->procinfo->num_vcores; i++)
-		if(core_id() == e->procinfo->vcoremap[i].pcoreid)
-			return i;
-
-	panic("virtual core id not found in sys_getvcoreid()!");
+	return proc_get_vcoreid(p, core_id());
 }
 
 /************** Process management syscalls **************/

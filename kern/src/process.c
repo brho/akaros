@@ -605,7 +605,8 @@ void proc_destroy(struct proc *p)
 			                     (void *SNT)0);
 			break;
 		default:
-			panic("Weird state(0x%08x) in proc_destroy", p->state);
+			panic("Weird state(%s) in %s()", procstate2str(p->state),
+			      __FUNCTION__);
 	}
 	__proc_set_state(p, PROC_DYING);
 	/* this decref is for the process in general */
@@ -716,13 +717,36 @@ void proc_yield(struct proc *SAFE p)
 			break;
 		default:
 			// there are races that can lead to this (async death, preempt, etc)
-			panic("Weird state(0x%08x) in proc_yield", p->state);
+			panic("Weird state(%s) in %s()", procstate2str(p->state),
+			      __FUNCTION__);
 	}
 	spin_unlock_irqsave(&p->proc_lock);
 	proc_decref(p, 1);
 	/* Clean up the core and idle.  For mgmt cores, they will ultimately call
 	 * manager, which will call schedule() and will repick the yielding proc. */
 	abandon_core();
+}
+
+/* Global version of the helper, for sys_get_vcoreid (might phase that syscall
+ * out). */
+uint32_t proc_get_vcoreid(struct proc *SAFE p, uint32_t pcoreid)
+{
+	uint32_t vcoreid;
+	// TODO: the code currently doesn't track the vcoreid properly for _S
+	spin_lock_irqsave(&p->proc_lock);
+	switch (p->state) {
+		case PROC_RUNNING_S:
+			spin_unlock_irqsave(&p->proc_lock);
+			return 0; // TODO: here's the ugly part
+		case PROC_RUNNING_M:
+			vcoreid = get_vcoreid(p, pcoreid);
+			spin_unlock_irqsave(&p->proc_lock);
+			return vcoreid;
+		default:
+			spin_unlock_irqsave(&p->proc_lock);
+			panic("Weird state(%s) in %s()", procstate2str(p->state),
+			      __FUNCTION__);
+	}
 }
 
 /* Gives process p the additional num cores listed in pcorelist.  You must be
@@ -800,7 +824,8 @@ bool __proc_give_cores(struct proc *SAFE p, uint32_t *pcorelist, size_t num)
 			}
 			break;
 		default:
-			panic("Weird proc state %d in proc_give_cores()!\n", p->state);
+			panic("Weird state(%s) in %s()", procstate2str(p->state),
+			      __FUNCTION__);
 	}
 	return self_ipi_pending;
 }
@@ -842,7 +867,8 @@ bool __proc_take_cores(struct proc *SAFE p, uint32_t *pcorelist,
 			assert(message);
 			break;
 		default:
-			panic("Weird state %d in proc_take_cores()!\n", p->state);
+			panic("Weird state(%s) in %s()", procstate2str(p->state),
+			      __FUNCTION__);
 	}
 	spin_lock(&idle_lock);
 	assert((num <= p->procinfo->num_vcores) &&
@@ -886,7 +912,8 @@ bool __proc_take_allcores(struct proc *SAFE p, amr_t message,
 			assert(message);
 			break;
 		default:
-			panic("Weird state %d in proc_take_allcores()!\n", p->state);
+			panic("Weird state(%s) in %s()", procstate2str(p->state),
+			      __FUNCTION__);
 	}
 	spin_lock(&idle_lock);
 	assert(num_idlecores + p->procinfo->num_vcores <= num_cpus); // sanity
