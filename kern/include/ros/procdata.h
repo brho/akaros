@@ -9,6 +9,7 @@
 #include <ros/common.h>
 #include <ros/procinfo.h>
 #include <arch/mmu.h>
+#include <arch/arch.h>
 
 typedef struct procdata {
 	// The actual ring buffers for communicating with user space
@@ -19,6 +20,8 @@ typedef struct procdata {
 #ifdef __i386__
 	segdesc_t *ldt;
 #endif
+
+	char stack_pointers[MAX_NUM_CPUS];
 } procdata_t;
 #define PROCDATA_NUM_PAGES  ((sizeof(procdata_t)-1)/PGSIZE + 1)
 

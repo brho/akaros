@@ -125,7 +125,7 @@ int load_elf(struct proc* p, const char* fn)
 	}
 
 	intptr_t core0_entry = ei.dynamic ? interp_ei.entry : ei.entry;
-	proc_set_program_counter(&p->env_tf,core0_entry);
+	proc_init_trapframe(&p->env_tf,0,core0_entry,USTACKTOP);
 	p->env_entry = ei.entry;
 
 	uintptr_t stacksz = USTACK_NUM_PAGES*PGSIZE;

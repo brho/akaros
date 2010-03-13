@@ -249,7 +249,6 @@ static error_t proc_alloc(struct proc *SAFE*SAFE pp, pid_t parent_id)
 	memset(&p->resources, 0, sizeof(p->resources));
 	memset(&p->env_ancillary_state, 0, sizeof(p->env_ancillary_state));
 	memset(&p->env_tf, 0, sizeof(p->env_tf));
-	proc_init_trapframe(&p->env_tf,0);
 
 	/* Initialize the contents of the e->env_procinfo structure */
 	proc_init_procinfo(p);
@@ -965,6 +964,7 @@ void __startcore(trapframe_t *tf, uint32_t srcid, void * a0, void * a1,
 #endif
 {
 	uint32_t coreid = core_id();
+	uint32_t vcoreid = (uint32_t)a2;
 	struct proc *p_to_run = (struct proc *CT(1))a0;
 	trapframe_t local_tf;
 	trapframe_t *tf_to_pop = (trapframe_t *CT(1))a1;
@@ -976,9 +976,8 @@ void __startcore(trapframe_t *tf, uint32_t srcid, void * a0, void * a1,
 	if (!tf_to_pop) {
 		tf_to_pop = &local_tf;
 		memset(tf_to_pop, 0, sizeof(*tf_to_pop));
-		proc_init_trapframe(tf_to_pop,(uint32_t)a2);
-		// Note the init_tf sets tf_to_pop->tf_esp = USTACKTOP;
-		proc_set_program_counter(tf_to_pop, p_to_run->env_entry);
+		proc_init_trapframe(tf_to_pop, vcoreid, p_to_run->env_entry,
+		                    p_to_run->env_procdata->stack_pointers[vcoreid]);
 	}
 	/* the sender of the amsg increfed, thinking we weren't running current. */
 	if (p_to_run == current)

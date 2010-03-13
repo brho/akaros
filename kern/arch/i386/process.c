@@ -18,12 +18,8 @@ void proc_free_arch(struct proc *SAFE p)
 {
 }
 
-void proc_set_program_counter(trapframe_t *tf, uintptr_t pc)
-{
-	tf->tf_eip = pc;
-}
-
-void proc_init_trapframe(trapframe_t *tf, uint32_t vcoreid)
+void proc_init_trapframe(trapframe_t *tf, uint32_t vcoreid,
+                         uint32_t entryp, uint32_t stack_top)
 {
 	/* Set up appropriate initial values for the segment registers.
 	 * GD_UD is the user data segment selector in the GDT, and
@@ -33,19 +29,16 @@ void proc_init_trapframe(trapframe_t *tf, uint32_t vcoreid)
 	tf->tf_ds = GD_UD | 3;
 	tf->tf_es = GD_UD | 3;
 	tf->tf_ss = GD_UD | 3;
-	tf->tf_esp = USTACKTOP;
+	tf->tf_esp = stack_top;
 	tf->tf_cs = GD_UT | 3;
 	/* set the env's EFLAGSs to have interrupts enabled */
 	tf->tf_eflags |= 0x00000200; // bit 9 is the interrupts-enabled
 
-	proc_set_tfcoreid(tf,vcoreid);
-}
+	tf->tf_eip = entryp;
 
-/* Coupled closely with userland's entry.S.  id is the vcoreid, which entry.S
- * uses to determine what to do.  vcoreid == 0 is the main core/context. */
-void proc_set_tfcoreid(trapframe_t *tf, uint32_t id)
-{
-	tf->tf_regs.reg_eax = id;
+	/* Coupled closely with user's entry.S.  id is the vcoreid, which entry.S
+	 * uses to determine what to do.  vcoreid == 0 is the main core/context. */
+	tf->tf_regs.reg_eax = vcoreid;
 }
 
 /* For cases that we won't return from a syscall via the normal path, and need

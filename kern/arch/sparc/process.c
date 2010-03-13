@@ -33,31 +33,17 @@ proc_free_arch(struct proc *SAFE p)
 }
 
 void
-proc_set_program_counter(trapframe_t *tf, uintptr_t pc)
+proc_init_trapframe(trapframe_t *tf, uint32_t vcoreid,
+                    uint32_t entryp, uint32_t stack_top)
 {
-	tf->pc = pc;
-	tf->npc = pc+4;
-}
-
-void
-proc_init_trapframe(trapframe_t *tf, uint32_t vcoreid)
-{
-	extern char trap_table;
-
 	memset(tf,0,sizeof(*tf));
-	tf->gpr[14] = USTACKTOP-96;
+
 	tf->psr = PSR_S; // but PS = 0
+	tf->gpr[14] = stack_top-96;
+	tf->asr13 = vcoreid;
 
-	// unused
-	//tf->wim = 0;
-	//tf->tbr = (uint32_t)&trap_table;
-
-	proc_set_tfcoreid(tf,vcoreid);
-}
-
-void proc_set_tfcoreid(trapframe_t *tf, uint32_t id)
-{
-	tf->asr13 = id;
+	tf->pc = entryp;
+	tf->npc = entryp+4;
 }
 
 /* For cases that we won't return from a syscall via the normal path, and need

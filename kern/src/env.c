@@ -284,7 +284,7 @@ static void* load_icode(env_t *SAFE e, env_t* binary_env,
 		//because upage_alloc'd pages are zeroed
 	}}
 
-	proc_set_program_counter(&e->env_tf, elfhdr.e_entry);
+	proc_init_trapframe(&e->env_tf, 0, elfhdr.e_entry, USTACKTOP);
 	e->env_entry = elfhdr.e_entry;
 
 	// Now map USTACK_NUM_PAGES pages for the program's initial stack
