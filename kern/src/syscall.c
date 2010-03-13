@@ -167,8 +167,8 @@ static size_t sys_getvcoreid(env_t* e)
 		return 0;
 
 	size_t i;
-	for(i = 0; i < e->num_vcores; i++)
-		if(core_id() == e->vcoremap[i])
+	for(i = 0; i < e->procinfo->num_vcores; i++)
+		if(core_id() == e->procinfo->vcoremap[i].pcoreid)
 			return i;
 
 	panic("virtual core id not found in sys_getvcoreid()!");
@@ -285,7 +285,9 @@ static ssize_t sys_run_binary(env_t* e, void *DANGEROUS binary_buf, size_t len,
 	env_t* env = proc_create(NULL,0);
 	assert(env != NULL);
 
-	if(memcpy_from_user(e,e->env_procinfo,procinfo,sizeof(*procinfo)))
+	// let me know if you use this.  we need to sort process creation better.
+	printk("sys_run_binary() is deprecated.  Use at your own risk.");
+	if(memcpy_from_user(e,e->procinfo,procinfo,sizeof(*procinfo)))
 		return -1;
 	proc_init_procinfo(e);
 
@@ -358,11 +360,12 @@ static ssize_t sys_fork(env_t* e)
 		return 0;
 	}
 
+	// TODO: (PC) this won't work.  Needs revisiting.
 	// copy procdata and procinfo
-	memcpy(env->env_procdata,e->env_procdata,sizeof(struct procdata));
-	memcpy(env->env_procinfo,e->env_procinfo,sizeof(struct procinfo));
-	env->env_procinfo->pid = env->pid;
-	env->env_procinfo->ppid = env->ppid;
+	memcpy(env->procdata,e->procdata,sizeof(struct procdata));
+	memcpy(env->procinfo,e->procinfo,sizeof(struct procinfo));
+	env->procinfo->pid = env->pid;
+	env->procinfo->ppid = env->ppid;
 
 	// copy all memory below procdata
 	if(env_user_mem_walk(e,0,UDATA,&copy_page,env))
@@ -395,12 +398,14 @@ intreg_t sys_exec(struct proc* p, int fd, procinfo_t* pi)
 		goto out;
 	}
 
-	if(memcpy_from_user(p,p->env_procinfo,pi,sizeof(procinfo_t))) {
+	// TODO: don't copy procinfo from the user (PC)
+	if(memcpy_from_user(p,p->procinfo,pi,sizeof(procinfo_t))) {
 		proc_destroy(p);
 		goto out;
 	}
 	proc_init_procinfo(p);
-	memset(p->env_procdata, 0, sizeof(procdata_t));
+	// TODO: don't do this either (PC)
+	memset(p->procdata, 0, sizeof(procdata_t));
 
 	env_user_mem_free(p,0,USTACKTOP);
 
@@ -489,7 +494,7 @@ static void* sys_brk(struct proc *p, void* addr) {
 
 	spin_lock_irqsave(&p->proc_lock);
 
-	if((addr < p->env_procinfo->heap_bottom) || (addr >= (void*)BRK_END))
+	if((addr < p->procinfo->heap_bottom) || (addr >= (void*)BRK_END))
 		goto out;
 
 	uintptr_t real_heap_top = ROUNDUP((uintptr_t)p->heap_top,PGSIZE);

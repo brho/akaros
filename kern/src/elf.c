@@ -120,13 +120,13 @@ int load_elf(struct proc* p, struct file* f)
 		// put auxp after argv, envp in procinfo
 		int auxp_pos = -1;
 		for(int i = 0, zeros = 0; i < PROCINFO_MAX_ARGP; i++)
-			if(p->env_procinfo->argp[i] == NULL)
+			if(p->procinfo->argp[i] == NULL)
 				if(++zeros == 2)
 					auxp_pos = i+1;
 		if(auxp_pos == -1 ||
 		   auxp_pos+sizeof(auxp)/sizeof(char*) >= PROCINFO_MAX_ARGP)
 			return -1;
-		memcpy(p->env_procinfo->argp+auxp_pos,auxp,sizeof(auxp));
+		memcpy(p->procinfo->argp+auxp_pos,auxp,sizeof(auxp));
 	}
 
 	uintptr_t core0_entry = ei.dynamic ? interp_ei.entry : ei.entry;
@@ -142,7 +142,7 @@ int load_elf(struct proc* p, struct file* f)
 	// Set the heap bottom and top to just past where the text 
 	// region has been loaded
 	p->heap_top = (void*)ei.highest_addr;
-	p->env_procinfo->heap_bottom = p->heap_top;
+	p->procinfo->heap_bottom = p->heap_top;
 
 	return 0;
 }

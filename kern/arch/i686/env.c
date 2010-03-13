@@ -19,7 +19,7 @@ void env_pop_tf(trapframe_t *tf)
 	segdesc_t *my_gdt = per_cpu_info[core_id()].gdt;
 	/* copy-in and check the LDT location.  the segmentation hardware write the
 	 * accessed bit, so we want the memory to be in the user-writeable area. */
-	segdesc_t *ldt = current->env_procdata->ldt;
+	segdesc_t *ldt = current->procdata->ldt;
 	ldt = (segdesc_t*)MIN((uintptr_t)ldt, UTOP - LDT_SIZE);
 	segdesc_t ldt_temp = SEG_SYS(STS_LDT, (uint32_t)ldt, LDT_SIZE, 3);
 	my_gdt[GD_LDT >> 3] = ldt_temp;

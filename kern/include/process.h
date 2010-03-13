@@ -99,13 +99,13 @@ void proc_yield(struct proc *SAFE p);
  *
  * WARNING: YOU MUST HOLD THE PROC_LOCK BEFORE CALLING THESE! */
 /* Gives process p the additional num cores listed in corelist */
-bool __proc_give_cores(struct proc *SAFE p, int32_t *corelist, size_t num);
+bool __proc_give_cores(struct proc *SAFE p, uint32_t *pcorelist, size_t num);
 /* Makes process p's coremap look like corelist (add, remove, etc). Not used */
-bool __proc_set_allcores(struct proc *SAFE p, int32_t *corelist,
+bool __proc_set_allcores(struct proc *SAFE p, uint32_t *pcorelist,
                          size_t *num, amr_t message, TV(a0t) arg0,
                          TV(a1t) arg1, TV(a2t) arg2);
 /* Takes from process p the num cores listed in corelist */
-bool __proc_take_cores(struct proc *SAFE p, int32_t *corelist,
+bool __proc_take_cores(struct proc *SAFE p, uint32_t *pcorelist,
                        size_t num, amr_t message, TV(a0t) arg0,
                        TV(a1t) arg1, TV(a2t) arg2);
 bool __proc_take_allcores(struct proc *SAFE p, amr_t message, TV(a0t) arg0,

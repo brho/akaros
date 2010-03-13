@@ -216,7 +216,7 @@ void manager_waterman()
 
 		char* argv[] = {"/bin/sh","-l",0};
 		char* envp[] = {"LD_LIBRARY_PATH=/lib",0};
-		procinfo_pack_args(p->env_procinfo,argv,envp);
+		procinfo_pack_args(p->procinfo,argv,envp);
 
 		struct file* f = file_open("/bin/busybox",0,0);
 		assert(f != NULL);

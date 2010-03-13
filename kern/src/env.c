@@ -38,7 +38,7 @@ atomic_t num_envs;
 //	-ENOMEM if page directory or table could not be allocated.
 //
 int env_setup_vm(env_t *e)
-WRITES(e->env_pgdir, e->env_cr3, e->env_procinfo, e->env_procdata)
+WRITES(e->env_pgdir, e->env_cr3, e->procinfo, e->procdata)
 {
 	int i, r;
 	page_t *pgdir = NULL;
@@ -80,22 +80,22 @@ WRITES(e->env_pgdir, e->env_cr3, e->env_procinfo, e->env_procdata)
 	/* These need to be contiguous, so the kernel can alias them.  Note the
 	 * pages return with a refcnt, but it's okay to insert them since we free
 	 * them manually when the process is cleaned up. */
-	if (!(e->env_procinfo = get_cont_pages(LOG2_UP(PROCINFO_NUM_PAGES), 0)))
+	if (!(e->procinfo = get_cont_pages(LOG2_UP(PROCINFO_NUM_PAGES), 0)))
 		goto env_setup_vm_error_i;
-	if (!(e->env_procdata = get_cont_pages(LOG2_UP(PROCDATA_NUM_PAGES), 0)))
+	if (!(e->procdata = get_cont_pages(LOG2_UP(PROCDATA_NUM_PAGES), 0)))
 		goto env_setup_vm_error_d;
 	for (int i = 0; i < PROCINFO_NUM_PAGES; i++) {
-		if (page_insert(e->env_pgdir, kva2page((void*)e->env_procinfo + i *
+		if (page_insert(e->env_pgdir, kva2page((void*)e->procinfo + i *
 		                PGSIZE), (void*SNT)(UINFO + i*PGSIZE), PTE_USER_RO) < 0)
 			goto env_setup_vm_error;
 	}
 	for (int i = 0; i < PROCDATA_NUM_PAGES; i++) {
-		if (page_insert(e->env_pgdir, kva2page((void*)e->env_procdata + i *
+		if (page_insert(e->env_pgdir, kva2page((void*)e->procdata + i *
 		                PGSIZE), (void*SNT)(UDATA + i*PGSIZE), PTE_USER_RW) < 0)
 			goto env_setup_vm_error;
 	}
-	memset(e->env_procinfo, 0, sizeof(procinfo_t));
-	memset(e->env_procdata, 0, sizeof(procdata_t));
+	memset(e->procinfo, 0, sizeof(struct procinfo));
+	memset(e->procdata, 0, sizeof(struct procdata));
 
 	/* Finally, set up the Global Shared Data page for all processes.
 	 * Can't be trusted, but still very useful at this stage for us.
@@ -118,9 +118,9 @@ WRITES(e->env_pgdir, e->env_cr3, e->env_procinfo, e->env_procdata)
 	return 0;
 
 env_setup_vm_error:
-	free_cont_pages(e->env_procdata, LOG2_UP(PROCDATA_NUM_PAGES));
+	free_cont_pages(e->procdata, LOG2_UP(PROCDATA_NUM_PAGES));
 env_setup_vm_error_d:
-	free_cont_pages(e->env_procinfo, LOG2_UP(PROCINFO_NUM_PAGES));
+	free_cont_pages(e->procinfo, LOG2_UP(PROCINFO_NUM_PAGES));
 env_setup_vm_error_i:
 	page_decref(shared_page);
 	env_user_mem_free(e, 0, UVPT);
@@ -254,7 +254,7 @@ void env_load_icode(env_t* e, env_t* binary_env, uint8_t* binary, size_t size)
 	/* Load the binary and set the current locations of the elf segments.
 	 * All end-of-segment pointers are page aligned (invariant) */
 	e->heap_top = load_icode(e, binary_env, binary, size);
-	e->env_procinfo->heap_bottom = e->heap_top;
+	e->procinfo->heap_bottom = e->heap_top;
 }
 
 #define PER_CPU_THING(type,name)\

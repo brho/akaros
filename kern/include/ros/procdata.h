@@ -22,6 +22,8 @@ typedef struct procdata {
 #endif
 	// TODO: will replace these in a later commit
 	uintptr_t stack_pointers[MAX_NUM_CPUS];
+	/* glibc relies on stuff above this point.  if you change it, you need to
+	 * rebuild glibc. */
 	struct notif_method		notif_methods[MAX_NR_NOTIF];
 	/* Long range, would like these to be mapped in lazily, as the vcores are
 	 * requested.  Sharing MAX_NUM_CPUS is a bit weird too. */

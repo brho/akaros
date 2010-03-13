@@ -38,7 +38,7 @@ ssize_t core_request(struct proc *p)
 {
 	size_t num_granted;
 	ssize_t amt_new;
-	int32_t corelist[MAX_NUM_CPUS];
+	uint32_t corelist[MAX_NUM_CPUS];
 	bool need_to_idle = FALSE;
 	bool self_ipi_pending = FALSE;
 
@@ -97,7 +97,8 @@ ssize_t core_request(struct proc *p)
 			case (PROC_RUNNING_S):
 				// issue with if we're async or not (need to preempt it)
 				// either of these should trip it. TODO: (ACR) async core req
-				if ((current != p) || (p->vcoremap[0] != core_id()))
+				// TODO: relies on vcore0 being the caller (VC#)
+				if ((current != p) || (p->procinfo->vcoremap[0].pcoreid != core_id()))
 					panic("We don't handle async RUNNING_S core requests yet.");
 				/* save the tf to be restarted on another core (in proc_run) */
 				p->env_tf = *current_tf;
@@ -111,7 +112,8 @@ ssize_t core_request(struct proc *p)
 				 * syscall). */
 				/* this process no longer runs on its old location (which is
 				 * this core, for now, since we don't handle async calls) */
-				p->vcoremap[0] = -1;
+				// TODO: (VSEQ) signal these vcore changes
+				p->procinfo->vcoremap[0].valid = FALSE;
 				// will need to give up this core / idle later (sync)
 				need_to_idle = TRUE;
 				// change to runnable_m (it's TF is already saved)

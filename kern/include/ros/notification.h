@@ -11,7 +11,10 @@
 #include <ros/arch/trapframe.h>
 // TODO: #include some one-way queue macros for the notif_event queue
 // TODO: move me to an atomic header, and give me some support functions.
+#ifndef __TMP_SEQ_CTR
+#define __TMP_SEQ_CTR
 typedef uint8_t seq_ctr_t;
+#endif
 
 /* How/If a process wants to be notified about an event */
 struct notif_method {

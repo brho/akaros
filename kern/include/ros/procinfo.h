@@ -5,9 +5,26 @@
 
 #include <ros/memlayout.h>
 #include <ros/common.h>
+#include <ros/arch/arch.h>
 
 #define PROCINFO_MAX_ARGP 32
 #define PROCINFO_ARGBUF_SIZE 3072
+
+// TODO: move me to an atomic header, and give me some support functions.
+#ifndef __TMP_SEQ_CTR
+#define __TMP_SEQ_CTR
+typedef uint8_t seq_ctr_t;
+#endif
+
+/* Not necessary to expose all of this, but it doesn't hurt, and is convenient
+ * for the kernel. */
+struct vcore {
+	uint32_t			pcoreid;
+	bool				valid;
+	bool				preempt_served;
+	uint64_t			preempt_pending;
+	struct trapframe	*tf_to_run;
+};
 
 typedef struct procinfo {
 	pid_t pid;
@@ -15,9 +32,13 @@ typedef struct procinfo {
 	size_t max_harts;
 	uint64_t tsc_freq;
 	void* heap_bottom;
-
 	char* argp[PROCINFO_MAX_ARGP];
 	char argbuf[PROCINFO_ARGBUF_SIZE];
+	/* glibc relies on stuff above this point.  if you change it, you need to
+	 * rebuild glibc. */
+	struct vcore		vcoremap[MAX_NUM_CPUS];
+	uint32_t			num_vcores;
+	seq_ctr_t			coremap_edit;
 } procinfo_t;
 #define PROCINFO_NUM_PAGES  ((sizeof(procinfo_t)-1)/PGSIZE + 1)	
 

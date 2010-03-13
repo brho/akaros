@@ -7,6 +7,7 @@
 #include <ros/memlayout.h>
 #include <ros/syscall.h>
 #include <ros/sysevent.h>
+#include <ros/procinfo.h>
 #include <error.h>
 #include <ros/procdata.h>
 #include <ros/procinfo.h>
@@ -33,11 +34,6 @@ struct Env {
 	uint32_t env_refcnt;		// Reference count of kernel contexts using this
 	uint32_t env_flags;
 	uint32_t env_entry;
-	/* Virtual coremap: each index is the virtual core id, the contents at that
-	 * index is the physical core_id() corresponding to the vcore.  -1 means it
-	 * is unused */
-	int32_t vcoremap[MAX_NUM_CPUS];
-	uint32_t num_vcores;
 
 	/* Cache color map: bitmap of the cache colors currently allocated to this
 	 * process */
@@ -57,8 +53,8 @@ struct Env {
 //	struct memregion_list memregions;
 
 	// Per process info and data pages
- 	procinfo_t *SAFE env_procinfo;       // KVA of per-process shared info table (RO)
-	procdata_t *SAFE env_procdata;       // KVA of per-process shared data table (RW)
+ 	procinfo_t *SAFE procinfo;       // KVA of per-process shared info table (RO)
+	procdata_t *SAFE procdata;       // KVA of per-process shared data table (RW)
 	
 	// The backring pointers for processing asynchronous system calls from the user
 	// Note this is the actual backring, not a pointer to it somewhere else

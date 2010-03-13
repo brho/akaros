@@ -49,8 +49,9 @@ static void put_idle_core(uint32_t coreid)
 /* Other helpers, implemented later. */
 static uint32_t get_free_vcoreid(struct proc *SAFE p, uint32_t prev);
 static uint32_t get_busy_vcoreid(struct proc *SAFE p, uint32_t prev);
-static int32_t __get_vcoreid(int32_t *corelist, size_t num, int32_t pcoreid);
-static int32_t get_vcoreid(struct proc *SAFE p, int32_t pcoreid);
+static uint32_t __get_vcoreid(struct vcore *vcoremap, size_t num,
+                              uint32_t pcoreid);
+static uint32_t get_vcoreid(struct proc *SAFE p, uint32_t pcoreid);
 static inline void __wait_for_ipi(const char *fnname);
 
 /* PID management. */
@@ -168,7 +169,7 @@ struct proc *pid2proc(pid_t pid)
 	return p;
 }
 
-/* Performs any intialization related to processes, such as create the proc
+/* Performs any initialization related to processes, such as create the proc
  * cache, prep the scheduler, etc.  When this returns, we should be ready to use
  * any process related function. */
 void proc_init(void)
@@ -201,11 +202,14 @@ void proc_init(void)
 void
 proc_init_procinfo(struct proc* p)
 {
-	p->env_procinfo->pid = p->pid;
-	p->env_procinfo->ppid = p->ppid;
-	p->env_procinfo->tsc_freq = system_timing.tsc_freq;
+	memset(&p->procinfo->vcoremap, 0, sizeof(p->procinfo->vcoremap));
+	p->procinfo->num_vcores = 0;
+	// TODO: change these too
+	p->procinfo->pid = p->pid;
+	p->procinfo->ppid = p->ppid;
+	p->procinfo->tsc_freq = system_timing.tsc_freq;
 	// TODO: maybe do something smarter here
-	p->env_procinfo->max_harts = MAX(1,num_cpus-1);
+	p->procinfo->max_harts = MAX(1,num_cpus-1);
 }
 
 /* Allocates and initializes a process, with the given parent.  Currently
@@ -250,30 +254,28 @@ static error_t proc_alloc(struct proc *SAFE*SAFE pp, pid_t parent_id)
 	p->env_refcnt = 2; // one for the object, one for the ref we pass back
 	p->env_flags = 0;
 	p->env_entry = 0; // cheating.  this really gets set in load_icode
-	p->num_vcores = 0;
-	p->env_procinfo->heap_bottom = (void*)UTEXT;
+	p->procinfo->heap_bottom = (void*)UTEXT;
 	p->heap_top = (void*)UTEXT;
-	memset(&p->vcoremap, -1, sizeof(p->vcoremap));
 	memset(&p->resources, 0, sizeof(p->resources));
 	memset(&p->env_ancillary_state, 0, sizeof(p->env_ancillary_state));
 	memset(&p->env_tf, 0, sizeof(p->env_tf));
 
-	/* Initialize the contents of the e->env_procinfo structure */
+	/* Initialize the contents of the e->procinfo structure */
 	proc_init_procinfo(p);
-	/* Initialize the contents of the e->env_procdata structure */
+	/* Initialize the contents of the e->procdata structure */
 
 	/* Initialize the generic syscall ring buffer */
-	SHARED_RING_INIT(&p->env_procdata->syscallring);
+	SHARED_RING_INIT(&p->procdata->syscallring);
 	/* Initialize the backend of the syscall ring buffer */
 	BACK_RING_INIT(&p->syscallbackring,
-	               &p->env_procdata->syscallring,
+	               &p->procdata->syscallring,
 	               SYSCALLRINGSIZE);
 
 	/* Initialize the generic sysevent ring buffer */
-	SHARED_RING_INIT(&p->env_procdata->syseventring);
+	SHARED_RING_INIT(&p->procdata->syseventring);
 	/* Initialize the frontend of the sysevent ring buffer */
 	FRONT_RING_INIT(&p->syseventfrontring,
-	                &p->env_procdata->syseventring,
+	                &p->procdata->syseventring,
 	                SYSEVENTRINGSIZE);
 	*pp = p;
 	atomic_inc(&num_envs);
@@ -325,8 +327,8 @@ static void __proc_free(struct proc *p)
 	// Flush all mapped pages in the user portion of the address space
 	env_user_mem_free(p, 0, UVPT);
 	/* These need to be free again, since they were allocated with a refcnt. */
-	free_cont_pages(p->env_procinfo, LOG2_UP(PROCINFO_NUM_PAGES));
-	free_cont_pages(p->env_procdata, LOG2_UP(PROCDATA_NUM_PAGES));
+	free_cont_pages(p->procinfo, LOG2_UP(PROCINFO_NUM_PAGES));
+	free_cont_pages(p->procdata, LOG2_UP(PROCDATA_NUM_PAGES));
 
 	env_pagetable_free(p);
 	p->env_pgdir = 0;
@@ -385,8 +387,10 @@ void proc_run(struct proc *p)
 			 * env_tf.
 			 * We may need the pcoremap entry to mark it as a RUNNING_S core, or
 			 * else update it here. (TODO) (PCORE) */
-			p->num_vcores = 0;
-			p->vcoremap[0] = core_id();
+			// TODO: (VSEQ) signal these vcore changes
+			p->procinfo->num_vcores = 0;
+			p->procinfo->vcoremap[0].pcoreid = core_id();
+			p->procinfo->vcoremap[0].valid = TRUE; // sort of.  this needs work.
 			spin_unlock_irqsave(&p->proc_lock);
 			/* Transferring our reference to startcore, where p will become
 			 * current.  If it already is, decref in advance.  This is similar
@@ -399,37 +403,42 @@ void proc_run(struct proc *p)
 			/* vcoremap[i] holds the coreid of the physical core allocated to
 			 * this process.  It is set outside proc_run.  For the active
 			 * message, a0 = struct proc*, a1 = struct trapframe*.   */
-			if (p->num_vcores) {
+			if (p->procinfo->num_vcores) {
 				__proc_set_state(p, PROC_RUNNING_M);
 				int i = 0;
 				/* Up the refcnt, since num_vcores are going to start using this
 				 * process and have it loaded in their 'current'. */
-				p->env_refcnt += p->num_vcores; // TODO: (REF) use incref
+				p->env_refcnt += p->procinfo->num_vcores; // TODO: (REF) use incref
 				/* If the core we are running on is in the vcoremap, we will get
 				 * an IPI (once we reenable interrupts) and never return. */
-				if (__get_vcoreid(p->vcoremap, p->num_vcores, core_id()) != -1)
+				if (__get_vcoreid(p->procinfo->vcoremap,
+				                  p->procinfo->num_vcores, core_id()) != -1)
 					self_ipi_pending = TRUE;
 				// TODO: handle silly state (HSS)
 				// set virtual core 0 to run the main context on transition
 				if (p->env_flags & PROC_TRANSITION_TO_M) {
 					p->env_flags &= !PROC_TRANSITION_TO_M;
 #ifdef __IVY__
-					send_active_message(p->vcoremap[0], __startcore, p,
+					send_active_message(p->procinfo->vcoremap[0].pcoreid,
+					                    __startcore, p,
 					                    &p->env_tf, (void *SNT)0);
 #else
-					send_active_message(p->vcoremap[0], (void *)__startcore,
-					                    (void *)p, (void *)&p->env_tf, 0);
+					send_active_message(p->procinfo->vcoremap[0].pcoreid,
+					                    (void *)__startcore, (void *)p,
+										(void *)&p->env_tf, 0);
 #endif
 					i = 1; // start at vcore1 in the loop below
 				}
 				/* handle the others. */
-				for (/* i set above */; i < p->num_vcores; i++)
+				for (/* i set above */; i < p->procinfo->num_vcores; i++)
 #ifdef __IVY__
-					send_active_message(p->vcoremap[i], __startcore,
-					                    p, (trapframe_t *CT(1))NULL, (void *SNT)i);
+					send_active_message(p->procinfo->vcoremap[i].pcoreid,
+					                    __startcore, p,
+										(trapframe_t *CT(1))NULL, (void *SNT)i);
 #else
-					send_active_message(p->vcoremap[i], (void *)__startcore,
-					                    (void *)p, (void *)0, (void *)i);
+					send_active_message(p->procinfo->vcoremap[i].pcoreid,
+					                    (void *)__startcore, (void *)p,
+										(void *)0, (void *)i);
 #endif
 			} else {
 				warn("Tried to proc_run() an _M with no vcores!");
@@ -552,9 +561,6 @@ void proc_startcore(struct proc *p, trapframe_t *tf) {
  * needs to change anyways when we make __death more like __preempt.  (TODO) */
 void proc_destroy(struct proc *p)
 {
-	/* TODO: this corelist is taking up a lot of space on the stack */
-	uint32_t corelist[MAX_NUM_CPUS];
-	size_t num_cores_freed;
 	bool self_ipi_pending = FALSE;
 	spin_lock_irqsave(&p->proc_lock);
 
@@ -584,12 +590,12 @@ void proc_destroy(struct proc *p)
 				current = NULL;
 			}
 			#endif
-			send_active_message(p->vcoremap[0], __death, (void *SNT)0,
-			                    (void *SNT)0, (void *SNT)0);
+			send_active_message(p->procinfo->vcoremap[0].pcoreid, __death,
+			                   (void *SNT)0, (void *SNT)0, (void *SNT)0);
 			#if 0
 			/* right now, RUNNING_S only runs on a mgmt core (0), not cores
 			 * managed by the idlecoremap.  so don't do this yet. */
-			put_idle_core(p->vcoremap[0]);
+			put_idle_core(p->procinfo->vcoremap[0].pcoreid);
 			#endif
 			break;
 		case PROC_RUNNING_M:
@@ -617,13 +623,13 @@ void proc_destroy(struct proc *p)
 }
 
 /* Helper function.  Starting from prev, it will find the next free vcoreid,
- * which is the next slot with a -1 in it.
+ * which is the next vcore that is not valid.
  * You better hold the lock before calling this. */
 static uint32_t get_free_vcoreid(struct proc *SAFE p, uint32_t prev)
 {
 	uint32_t i;
 	for (i = prev; i < MAX_NUM_CPUS; i++)
-		if (p->vcoremap[i] == -1)
+		if (!p->procinfo->vcoremap[i].valid)
 			break;
 	if (i + 1 >= MAX_NUM_CPUS)
 		warn("At the end of the vcorelist.  Might want to check that out.");
@@ -631,13 +637,13 @@ static uint32_t get_free_vcoreid(struct proc *SAFE p, uint32_t prev)
 }
 
 /* Helper function.  Starting from prev, it will find the next busy vcoreid,
- * which is the next slot with something other than a -1 in it.
+ * which is the next vcore that is valid.
  * You better hold the lock before calling this. */
 static uint32_t get_busy_vcoreid(struct proc *SAFE p, uint32_t prev)
 {
 	uint32_t i;
 	for (i = prev; i < MAX_NUM_CPUS; i++)
-		if (p->vcoremap[i] != -1)
+		if (p->procinfo->vcoremap[i].valid)
 			break;
 	if (i + 1 >= MAX_NUM_CPUS)
 		warn("At the end of the vcorelist.  Might want to check that out.");
@@ -647,12 +653,13 @@ static uint32_t get_busy_vcoreid(struct proc *SAFE p, uint32_t prev)
 /* Helper function.  Find the vcoreid for a given physical core id.  If we use
  * some sort of pcoremap, we can avoid this linear search.  You better hold the
  * lock before calling this.  Returns -1 on failure. */
-static int32_t __get_vcoreid(int32_t *corelist, size_t num, int32_t pcoreid)
+static uint32_t __get_vcoreid(struct vcore *vcoremap, size_t num,
+                              uint32_t pcoreid)
 {
-	int32_t i;
+	uint32_t i;
 	bool found = FALSE;
 	for (i = 0; i < num; i++)
-		if (corelist[i] == pcoreid) {
+		if (vcoremap[i].pcoreid == pcoreid) {
 			found = TRUE;
 			break;
 		}
@@ -664,10 +671,11 @@ static int32_t __get_vcoreid(int32_t *corelist, size_t num, int32_t pcoreid)
 
 /* Helper function.  Just like the one above, but this one panics on failure.
  * You better hold the lock before calling this.  */
-static int32_t get_vcoreid(struct proc *SAFE p, int32_t pcoreid)
+static uint32_t get_vcoreid(struct proc *SAFE p, uint32_t pcoreid)
 {
-	int32_t vcoreid = __get_vcoreid(p->vcoremap, p->num_vcores, pcoreid);
-	assert(vcoreid != -1);
+	uint32_t vcoreid = __get_vcoreid(p->procinfo->vcoremap,
+	                                 p->procinfo->num_vcores, pcoreid);
+	assert(p->procinfo->vcoremap[vcoreid].valid);
 	return vcoreid;
 }
 
@@ -707,14 +715,15 @@ void proc_yield(struct proc *SAFE p)
 			schedule_proc(p);
 			break;
 		case (PROC_RUNNING_M):
+			// TODO: (VSEQ) signal these vcore changes
 			// give up core
-			p->vcoremap[get_vcoreid(p, core_id())] = -1;
-			p->resources[RES_CORES].amt_granted = --(p->num_vcores);
-			p->resources[RES_CORES].amt_wanted = p->num_vcores;
+			p->procinfo->vcoremap[get_vcoreid(p, core_id())].valid = FALSE;
+			p->resources[RES_CORES].amt_granted = --(p->procinfo->num_vcores);
+			p->resources[RES_CORES].amt_wanted = p->procinfo->num_vcores;
 			// add to idle list
 			put_idle_core(core_id());
 			// last vcore?  then we really want 1, and to yield the gang
-			if (p->num_vcores == 0) {
+			if (p->procinfo->num_vcores == 0) {
 				// might replace this with m_yield, if we have it directly
 				p->resources[RES_CORES].amt_wanted = 1;
 				__proc_set_state(p, PROC_RUNNABLE_M);
@@ -732,7 +741,7 @@ void proc_yield(struct proc *SAFE p)
 	abandon_core();
 }
 
-/* Gives process p the additional num cores listed in corelist.  You must be
+/* Gives process p the additional num cores listed in pcorelist.  You must be
  * RUNNABLE_M or RUNNING_M before calling this.  If you're RUNNING_M, this will
  * startup your new cores at the entry point with their virtual IDs.  If you're
  * RUNNABLE_M, you should call proc_run after this so that the process can start
@@ -752,7 +761,7 @@ void proc_yield(struct proc *SAFE p)
  * once you unlock after this function.
  *
  * WARNING: You must hold the proc_lock before calling this! */
-bool __proc_give_cores(struct proc *SAFE p, int32_t *corelist, size_t num)
+bool __proc_give_cores(struct proc *SAFE p, uint32_t *pcorelist, size_t num)
 { TRUSTEDBLOCK
 	bool self_ipi_pending = FALSE;
 	uint32_t free_vcoreid = 0;
@@ -767,21 +776,24 @@ bool __proc_give_cores(struct proc *SAFE p, int32_t *corelist, size_t num)
 		case (PROC_RUNNABLE_M):
 			// set up vcoremap.  list should be empty, but could be called
 			// multiple times before proc_running (someone changed their mind?)
-			if (p->num_vcores) {
+			if (p->procinfo->num_vcores) {
 				printk("[kernel] Yaaaaaarrrrr!  Giving extra cores, are we?\n");
 				// debugging: if we aren't packed, then there's a problem
 				// somewhere, like someone forgot to take vcores after
 				// preempting.
-				for (int i = 0; i < p->num_vcores; i++)
-					assert(p->vcoremap[i]);
+				for (int i = 0; i < p->procinfo->num_vcores; i++)
+					assert(p->procinfo->vcoremap[i].valid);
 			}
+			// TODO: (VSEQ) signal these vcore changes
 			// add new items to the vcoremap
 			for (int i = 0; i < num; i++) {
 				// find the next free slot, which should be the next one
 				free_vcoreid = get_free_vcoreid(p, free_vcoreid);
-				printd("setting vcore %d to pcore %d\n", free_vcoreid, corelist[i]);
-				p->vcoremap[free_vcoreid] = corelist[i];
-				p->num_vcores++;
+				printd("setting vcore %d to pcore %d\n", free_vcoreid,
+				       pcorelist[i]);
+				p->procinfo->vcoremap[free_vcoreid].pcoreid = pcorelist[i];
+				p->procinfo->vcoremap[free_vcoreid].valid = TRUE;
+				p->procinfo->num_vcores++;
 			}
 			break;
 		case (PROC_RUNNING_M):
@@ -789,16 +801,19 @@ bool __proc_give_cores(struct proc *SAFE p, int32_t *corelist, size_t num)
 			 * process and have it loaded in their 'current'. */
 			// TODO: (REF) use proc_incref once we have atomics
 			p->env_refcnt += num;
-			if (__get_vcoreid(corelist, num, core_id()) != -1)
-				self_ipi_pending = TRUE;
+			// TODO: (VSEQ) signal these vcore changes
 			for (int i = 0; i < num; i++) {
 				free_vcoreid = get_free_vcoreid(p, free_vcoreid);
-				printd("setting vcore %d to pcore %d\n", free_vcoreid, corelist[i]);
-				p->vcoremap[free_vcoreid] = corelist[i];
-				p->num_vcores++;
-				send_active_message(corelist[i], __startcore, p,
-				                    (struct Trapframe *)0,
+				printd("setting vcore %d to pcore %d\n", free_vcoreid,
+				       pcorelist[i]);
+				p->procinfo->vcoremap[free_vcoreid].pcoreid = pcorelist[i];
+				p->procinfo->vcoremap[free_vcoreid].valid = TRUE;
+				p->procinfo->num_vcores++;
+				send_active_message(pcorelist[i], __startcore, p,
+				                    (struct trapframe *)0,
 				                    (void*SNT)free_vcoreid);
+				if (pcorelist[i] == core_id())
+					self_ipi_pending = TRUE;
 			}
 			break;
 		default:
@@ -807,7 +822,7 @@ bool __proc_give_cores(struct proc *SAFE p, int32_t *corelist, size_t num)
 	return self_ipi_pending;
 }
 
-/* Makes process p's coremap look like corelist (add, remove, etc).  Caller
+/* Makes process p's coremap look like pcorelist (add, remove, etc).  Caller
  * needs to know what cores are free after this call (removed, failed, etc).
  * This info will be returned via corelist and *num.  This will send message to
  * any cores that are getting removed.
@@ -818,19 +833,19 @@ bool __proc_give_cores(struct proc *SAFE p, int32_t *corelist, size_t num)
  * implementing it.
  *
  * WARNING: You must hold the proc_lock before calling this! */
-bool __proc_set_allcores(struct proc *SAFE p, int32_t *corelist,
+bool __proc_set_allcores(struct proc *SAFE p, uint32_t *pcorelist,
                          size_t *num, amr_t message,TV(a0t) arg0,
                          TV(a1t) arg1, TV(a2t) arg2)
 {
 	panic("Set all cores not implemented.\n");
 }
 
-/* Takes from process p the num cores listed in corelist, using the given
+/* Takes from process p the num cores listed in pcorelist, using the given
  * message for the active message (__death, __preempt, etc).  Like the others
  * in this function group, bool signals whether or not an IPI is pending.
  *
  * WARNING: You must hold the proc_lock before calling this! */
-bool __proc_take_cores(struct proc *SAFE p, int32_t *corelist,
+bool __proc_take_cores(struct proc *SAFE p, uint32_t *pcorelist,
                        size_t num, amr_t message, TV(a0t) arg0,
                        TV(a1t) arg1, TV(a2t) arg2)
 { TRUSTEDBLOCK
@@ -847,21 +862,23 @@ bool __proc_take_cores(struct proc *SAFE p, int32_t *corelist,
 			panic("Weird state %d in proc_take_cores()!\n", p->state);
 	}
 	spin_lock(&idle_lock);
-	assert((num <= p->num_vcores) && (num_idlecores + num <= num_cpus));
+	assert((num <= p->procinfo->num_vcores) &&
+	       (num_idlecores + num <= num_cpus));
 	spin_unlock(&idle_lock);
+	// TODO: (VSEQ) signal these vcore changes
 	for (int i = 0; i < num; i++) {
-		vcoreid = get_vcoreid(p, corelist[i]);
-		assert(p->vcoremap[vcoreid] == corelist[i]);
+		vcoreid = get_vcoreid(p, pcorelist[i]);
+		assert(p->procinfo->vcoremap[vcoreid].pcoreid == pcorelist[i]);
 		if (message) {
-			if (p->vcoremap[vcoreid] == core_id())
+			if (p->procinfo->vcoremap[vcoreid].pcoreid == core_id())
 				self_ipi_pending = TRUE;
-			send_active_message(corelist[i], message, arg0, arg1, arg2);
+			send_active_message(pcorelist[i], message, arg0, arg1, arg2);
 		}
 		// give the pcore back to the idlecoremap
-		put_idle_core(corelist[i]);
-		p->vcoremap[vcoreid] = -1;
+		p->procinfo->vcoremap[vcoreid].valid = FALSE;
+		put_idle_core(pcorelist[i]);
 	}
-	p->num_vcores -= num;
+	p->procinfo->num_vcores -= num;
 	p->resources[RES_CORES].amt_granted -= num;
 	return self_ipi_pending;
 }
@@ -888,22 +905,23 @@ bool __proc_take_allcores(struct proc *SAFE p, amr_t message,
 			panic("Weird state %d in proc_take_allcores()!\n", p->state);
 	}
 	spin_lock(&idle_lock);
-	assert(num_idlecores + p->num_vcores <= num_cpus); // sanity
+	assert(num_idlecores + p->procinfo->num_vcores <= num_cpus); // sanity
 	spin_unlock(&idle_lock);
-	for (int i = 0; i < p->num_vcores; i++) {
+	// TODO: (VSEQ) signal these vcore changes
+	for (int i = 0; i < p->procinfo->num_vcores; i++) {
 		// find next active vcore
 		active_vcoreid = get_busy_vcoreid(p, active_vcoreid);
 		if (message) {
-			if (p->vcoremap[active_vcoreid] == core_id())
+			if (p->procinfo->vcoremap[active_vcoreid].pcoreid == core_id())
 				self_ipi_pending = TRUE;
-			send_active_message(p->vcoremap[active_vcoreid], message,
-			                     arg0, arg1, arg2);
+			send_active_message(p->procinfo->vcoremap[active_vcoreid].pcoreid,
+			                    message, arg0, arg1, arg2);
 		}
 		// give the pcore back to the idlecoremap
-		put_idle_core(p->vcoremap[active_vcoreid]);
-		p->vcoremap[active_vcoreid] = -1;
+		p->procinfo->vcoremap[active_vcoreid].valid = FALSE;
+		put_idle_core(p->procinfo->vcoremap[active_vcoreid].pcoreid);
 	}
-	p->num_vcores = 0;
+	p->procinfo->num_vcores = 0;
 	p->resources[RES_CORES].amt_granted = 0;
 	return self_ipi_pending;
 }
@@ -985,7 +1003,7 @@ void __startcore(trapframe_t *tf, uint32_t srcid, void * a0, void * a1,
 		tf_to_pop = &local_tf;
 		memset(tf_to_pop, 0, sizeof(*tf_to_pop));
 		proc_init_trapframe(tf_to_pop, vcoreid, p_to_run->env_entry,
-		                    p_to_run->env_procdata->stack_pointers[vcoreid]);
+		                    p_to_run->procdata->stack_pointers[vcoreid]);
 	}
 	/* the sender of the amsg increfed, thinking we weren't running current. */
 	if (p_to_run == current)
@@ -1030,8 +1048,9 @@ void print_allpids(void)
 		printk("PID      STATE    \n");
 		printk("------------------\n");
 		do {
-			struct proc* p = hashtable_iterator_value(phtable_i);
-			printk("%8d %s\n", hashtable_iterator_key(phtable_i),p ? procstate2str(p->state) : "(null)");
+			struct proc *p = hashtable_iterator_value(phtable_i);
+			printk("%8d %s\n", hashtable_iterator_key(phtable_i),
+			       p ? procstate2str(p->state) : "(null)");
 		} while (hashtable_iterator_advance(phtable_i));
 	}
 	spin_unlock(&pid_hash_lock);
@@ -1055,11 +1074,11 @@ void print_proc_info(pid_t pid)
 	printk("Refcnt: %d\n", p->env_refcnt - 1); // don't report our ref
 	printk("Flags: 0x%08x\n", p->env_flags);
 	printk("CR3(phys): 0x%08x\n", p->env_cr3);
-	printk("Num Vcores: %d\n", p->num_vcores);
+	printk("Num Vcores: %d\n", p->procinfo->num_vcores);
 	printk("Vcoremap:\n");
-	for (int i = 0; i < p->num_vcores; i++) {
+	for (int i = 0; i < p->procinfo->num_vcores; i++) {
 		j = get_busy_vcoreid(p, j);
-		printk("\tVcore %d: Pcore %d\n", j, p->vcoremap[j]);
+		printk("\tVcore %d: Pcore %d\n", j, p->procinfo->vcoremap[j].pcoreid);
 		j++;
 	}
 	printk("Resources:\n");
