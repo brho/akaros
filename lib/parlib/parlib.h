@@ -13,6 +13,7 @@
 #include <ros/memlayout.h>
 #include <ros/syscall.h>
 #include <ros/procinfo.h>
+#include <ros/procdata.h>
 #include <stdint.h>
 
 enum {

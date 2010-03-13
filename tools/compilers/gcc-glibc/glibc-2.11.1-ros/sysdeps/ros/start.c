@@ -6,8 +6,6 @@
 #include <ros/procinfo.h>
 #include <unistd.h>
 
-void** __hart_stack_pointers = NULL;
-weak_alias(__hart_stack_pointers,hart_stack_pointers)
 void** __hart_thread_control_blocks = NULL;
 weak_alias(__hart_thread_control_blocks,hart_thread_control_blocks)
 
@@ -30,15 +28,12 @@ weak_alias(__hart_yield,hart_yield)
 void
 _start(void)
 {
-	// threads besides thread 0 must acquire a stack and TCB.
-	// WARNING: no function calls or register spills may occur
-	// before the stack pointer is set!
-	// WARNING2: __hart_self_on_entry must be read before
+	// threads besides thread 0 must acquire a TCB.
+	// WARNING: __hart_self_on_entry must be read before
 	// anything is register-allocated!
 	int id = __hart_self_on_entry;
 	if(id != 0)
 	{
-		__hart_set_stack_pointer(__hart_stack_pointers[id]);
 		TLS_INIT_TP(__hart_thread_control_blocks[id],0);
 		hart_entry();
 		hart_yield();

@@ -21,8 +21,13 @@ typedef struct procdata {
 	segdesc_t *ldt;
 #endif
 
-	char stack_pointers[MAX_NUM_CPUS];
+	intptr_t stack_pointers[MAX_NUM_CPUS];
 } procdata_t;
 #define PROCDATA_NUM_PAGES  ((sizeof(procdata_t)-1)/PGSIZE + 1)
+
+// this is how user programs access the procdata page
+#ifndef ROS_KERNEL
+# define __procdata (*(procdata_t*)UDATA)
+#endif
 
 #endif // !ROS_PROCDATA_H

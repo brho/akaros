@@ -8,7 +8,6 @@
 #ifndef ROS_SYSEVENT_H
 #define ROS_SYSEVENT_H
 
-#include <ros/error.h>
 #include <ros/ring_buffer.h>
 
 typedef enum {
@@ -27,7 +26,7 @@ typedef struct sysevent {
 } sysevent_t;
 
 typedef struct sysevent_rsp {
-	error_t rsp;
+	int rsp;
 } sysevent_rsp_t;
 
 // Generic Sysevent Ring Buffer

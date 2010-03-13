@@ -8,7 +8,6 @@
 static size_t _current_harts = 1;
 static hart_lock_t _hart_lock = HART_LOCK_INIT;
 
-extern char** hart_stack_pointers;
 extern void** hart_thread_control_blocks;
 
 static void hart_free_tls(int id)
@@ -36,7 +35,6 @@ static int hart_allocate_tls(int id)
 }
 
 #define HART_STACK_SIZE (32*1024)
-#define HART_STACK_POINTER_OFFSET (HART_STACK_SIZE-96)
 
 static void hart_free_stack(int id)
 {
@@ -45,15 +43,14 @@ static void hart_free_stack(int id)
 
 static int hart_allocate_stack(int id)
 {
-	if(hart_stack_pointers[id])
+	if(__procdata.stack_pointers[id])
 		return 0; // reuse old stack
 
-	if((hart_stack_pointers[id] = malloc(HART_STACK_SIZE)) == NULL)
+	if(!(__procdata.stack_pointers[id] = (intptr_t)malloc(HART_STACK_SIZE)))
 	{
 		errno = ENOMEM;
 		return -1;
 	}
-	hart_stack_pointers[id] += HART_STACK_POINTER_OFFSET;
 	return 0;
 }
 
@@ -63,13 +60,11 @@ static int hart_init()
 	if(initialized)
 		return 0;
 
-	hart_stack_pointers = (char**)calloc(hart_max_harts(),sizeof(char*));
 	hart_thread_control_blocks = (void**)calloc(hart_max_harts(),sizeof(void*));
 
-	if(!hart_thread_control_blocks || !hart_stack_pointers)
+	if(!hart_thread_control_blocks)
 	{
 		free(hart_thread_control_blocks);
-		free(hart_stack_pointers);
 		errno = ENOMEM;
 		return -1;
 	}
