@@ -112,8 +112,10 @@ ssize_t core_request(struct proc *p)
 				 * syscall). */
 				/* this process no longer runs on its old location (which is
 				 * this core, for now, since we don't handle async calls) */
-				// TODO: (VSEQ) signal these vcore changes
+				__seq_start_write(&p->procinfo->coremap_seqctr);
+				// TODO: (VC#) might need to adjust num_vcores
 				__unmap_vcore(p, 0);
+				__seq_end_write(&p->procinfo->coremap_seqctr);
 				// will need to give up this core / idle later (sync)
 				need_to_idle = TRUE;
 				// change to runnable_m (it's TF is already saved)

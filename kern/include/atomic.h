@@ -2,15 +2,33 @@
 #define ROS_KERN_ATOMIC_H
 
 #include <ros/common.h>
+#include <ros/atomic.h>
 #include <arch/mmu.h>
 #include <arch/atomic.h>
 #include <arch/arch.h>
+#include <assert.h>
+
+#define SEQLOCK_DEBUG
 
 static inline void
 (SLOCK(0) spin_lock_irqsave)(spinlock_t RACY*SAFE lock);
 static inline void
 (SUNLOCK(0) spin_unlock_irqsave)(spinlock_t RACY*SAFE lock);
 static inline bool spin_lock_irq_enabled(spinlock_t *SAFE lock);
+
+/* An example seq lock, built from the counter.  I don't particularly like this,
+ * since it forces you to use a specific locking type.  */
+typedef struct seq_lock {
+	spinlock_t			w_lock;
+	seq_ctr_t			r_ctr;
+} seqlock_t;
+
+static inline void __seq_start_write(seq_ctr_t *seq_ctr);
+static inline void __seq_end_write(seq_ctr_t *seq_ctr);
+static inline void write_seqlock(seqlock_t *lock);
+static inline void write_sequnlock(seqlock_t *lock);
+static inline seq_ctr_t read_seqbegin(seqlock_t *lock);
+static inline bool read_seqretry(seqlock_t *lock, seq_ctr_t ctr);
 
 /*********************** Checklist stuff **********************/
 typedef struct checklist_mask {
@@ -101,6 +119,51 @@ static inline void spin_unlock_irqsave(spinlock_t *SAFE lock)
 static inline bool spin_lock_irq_enabled(spinlock_t *SAFE lock)
 {
 	return lock->rlock & SPINLOCK_IRQ_EN;
+}
+
+/* Note, the seq_ctr is not a full seq lock - just the counter guts.  Write
+ * access can be controlled by another lock (like the proc-lock).  start_ and
+ * end_write are the writer's responsibility to signal the readers of a
+ * concurrent write. */
+static inline void __seq_start_write(seq_ctr_t *seq_ctr)
+{
+#ifdef SEQLOCK_DEBUG
+	assert(*seq_ctr % 2 == 0);
+#endif
+	(*seq_ctr)++;
+}
+
+static inline void __seq_end_write(seq_ctr_t *seq_ctr)
+{
+#ifdef SEQLOCK_DEBUG
+	assert(*seq_ctr % 2 == 1);
+#endif
+	(*seq_ctr)++;
+}
+
+/* Untested reference implementation of a seq lock.  As mentioned above, we
+ * might need a variety of these (for instance, this doesn't do an irqsave).  Or
+ * there may be other invariants that we need the lock to protect. */
+static inline void write_seqlock(seqlock_t *lock)
+{
+	spin_lock(&lock->w_lock);
+	__seq_start_write(&lock->r_ctr);
+}
+
+static inline void write_sequnlock(seqlock_t *lock)
+{
+	__seq_end_write(&lock->r_ctr);
+	spin_unlock(&lock->w_lock);
+}
+
+static inline seq_ctr_t read_seqbegin(seqlock_t *lock)
+{
+	return lock->r_ctr;
+}
+
+static inline bool read_seqretry(seqlock_t *lock, seq_ctr_t ctr)
+{
+	return seqctr_retry(lock->r_ctr, ctr);
 }
 
 #endif /* !ROS_KERN_ATOMIC_H */

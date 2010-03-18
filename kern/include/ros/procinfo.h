@@ -5,16 +5,12 @@
 
 #include <ros/memlayout.h>
 #include <ros/common.h>
+#include <ros/atomic.h>
 #include <ros/arch/arch.h>
 
 #define PROCINFO_MAX_ARGP 32
 #define PROCINFO_ARGBUF_SIZE 3072
 
-// TODO: move me to an atomic header, and give me some support functions.
-#ifndef __TMP_SEQ_CTR
-#define __TMP_SEQ_CTR
-typedef uint8_t seq_ctr_t;
-#endif
 
 /* Not necessary to expose all of this, but it doesn't hurt, and is convenient
  * for the kernel. */
@@ -44,7 +40,7 @@ typedef struct procinfo {
 	struct vcore		vcoremap[MAX_NUM_CPUS];
 	uint32_t			num_vcores;
 	struct pcore		pcoremap[MAX_NUM_CPUS];
-	seq_ctr_t			coremap_edit;
+	seq_ctr_t			coremap_seqctr;
 } procinfo_t;
 #define PROCINFO_NUM_PAGES  ((sizeof(procinfo_t)-1)/PGSIZE + 1)	
 
