@@ -34,8 +34,8 @@ USER_PARLIB_PTHREAD_OBJFILES := $(patsubst $(USER_PARLIB_SRC_DIR)/%.S, \
                                 $(OBJDIR)/$(USER_PARLIB_SRC_DIR)/%.o, \
                                 $(USER_PARLIB_PTHREAD_OBJFILES))
 
-ANNOTS := $(dir $(shell which ivycc))
-ANNOTS := $(ANNOTS)/../lib/ivy/include/deputy/annots.h
+ANNOTS = $(dir $(shell which ivycc))
+ANNOTS = $(ANNOTS)/../lib/ivy/include/deputy/annots.h
 
 $(PATCHFILE): $(USER_PARLIB_DIR)/inc/libc_patch.h
 	@echo + cpp [PARLIB] $^
