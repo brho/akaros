@@ -271,7 +271,7 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 	          --prefix=$(INSTDIR)/$(ARCH)-ros \
 	          libc_cv_forced_unwind=yes \
 	          libc_cv_c_cleanup=yes \
-	          CFLAGS="$(ARCH_CFLAGS) -O2 -pipe";
+	          CFLAGS="$(ARCH_CFLAGS) -fpermissive -O2 -pipe";
 	touch $@
 
 .$(BINARY_PREFIX)glibc-make: .$(BINARY_PREFIX)glibc-configure
