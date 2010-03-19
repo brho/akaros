@@ -551,6 +551,22 @@ we could not use the vcore/pcoremappings).  There should not be any issues
 with the new process sending messages to the pcore before the core is sorted,
 since a_msgs are delivered in order.
 
+Another tricky part is the seq_ctr used to signal userspace of changes to the
+coremap or num_vcores (coremap_seqctr).  While we may not even need this in the
+long run, it still seems like it could be useful.  The trickiness comes from
+when we update the seq_ctr when we are unmapping vcores on the receive side of a
+message (like __death or __preempt).  We'd rather not have each pcore contend on
+the seq_ctr cache line (let alone any locking) while they perform a somewhat
+data-parallel task.  So we continue to have the sending core handle the seq_ctr
+upping and downing.  This works, since the "unlocking" happens after messages
+are sent, which means the receiving core is no longer in userspace (if there is
+a delay, it is because the remote core is in the kernel, possibly with
+interrupts disabled).  Because of this, userspace will be unable to read the new
+value of the seq_ctr before the IPI hits and does the unmapping that the seq_ctr
+protects/advertises.  This is most likely true.  It wouldn't be if the "last IPI
+was sent" flag clears before the IPI actually hit the other core.
+
+
 4.9: Future Broadcast/Messaging Needs
 ---------------------------
 Currently, messaging is serialized.  Broadcast IPIs exist, but the active

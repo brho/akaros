@@ -592,7 +592,7 @@ void proc_destroy(struct proc *p)
 			                   (void *SNT)0, (void *SNT)0, (void *SNT)0);
 			__seq_start_write(&p->procinfo->coremap_seqctr);
 			// TODO: might need to sort num_vcores too later (VC#)
-			__unmap_vcore(p, 0);
+			/* vcore is unmapped on the receive side */
 			__seq_end_write(&p->procinfo->coremap_seqctr);
 			#if 0
 			/* right now, RUNNING_S only runs on a mgmt core (0), not cores
@@ -884,15 +884,19 @@ bool __proc_take_cores(struct proc *SAFE p, uint32_t *pcorelist,
 	__seq_start_write(&p->procinfo->coremap_seqctr);
 	for (int i = 0; i < num; i++) {
 		vcoreid = get_vcoreid(p, pcorelist[i]);
+		// while ugly, this is done to facilitate merging with take_all_cores
 		pcoreid = p->procinfo->vcoremap[vcoreid].pcoreid;
 		assert(pcoreid == pcorelist[i]);
 		if (message) {
 			if (pcoreid == core_id())
 				self_ipi_pending = TRUE;
 			send_active_message(pcoreid, message, arg0, arg1, arg2);
+		} else {
+			/* if there was a msg, the vcore is unmapped on the receive side.
+			 * o/w, we need to do it here. */
+			__unmap_vcore(p, vcoreid);
 		}
 		// give the pcore back to the idlecoremap
-		__unmap_vcore(p, vcoreid);
 		put_idle_core(pcoreid);
 	}
 	p->procinfo->num_vcores -= num;
@@ -935,10 +939,14 @@ bool __proc_take_allcores(struct proc *SAFE p, amr_t message,
 			if (pcoreid == core_id())
 				self_ipi_pending = TRUE;
 			send_active_message(pcoreid, message, arg0, arg1, arg2);
+		} else {
+			/* if there was a msg, the vcore is unmapped on the receive side.
+			 * o/w, we need to do it here. */
+			__unmap_vcore(p, active_vcoreid);
 		}
 		// give the pcore back to the idlecoremap
-		__unmap_vcore(p, active_vcoreid);
 		put_idle_core(pcoreid);
+		active_vcoreid++; // for the next loop, skip the one we just used
 	}
 	p->procinfo->num_vcores = 0;
 	__seq_end_write(&p->procinfo->coremap_seqctr);
@@ -1032,8 +1040,8 @@ void __startcore(trapframe_t *tf, uint32_t srcid, void * a0, void * a1,
 	trapframe_t local_tf;
 	trapframe_t *tf_to_pop = (trapframe_t *CT(1))a1;
 
-	printd("[kernel] Startcore on physical core %d for Process %d\n",
-	       coreid, p_to_run->pid);
+	printd("[kernel] startcore on physical core %d for process %d's vcore %d\n",
+	       coreid, p_to_run->pid, get_vcoreid(p_to_run, coreid));
 	assert(p_to_run);
 	// TODO: handle silly state (HSS)
 	if (!tf_to_pop) {
@@ -1065,6 +1073,12 @@ void abandon_core(void)
 void __death(trapframe_t *tf, uint32_t srcid, void *SNT a0, void *SNT a1,
              void *SNT a2)
 {
+	uint32_t coreid = core_id();
+	if (current) {
+		printd("[kernel] death on physical core %d for process %d's vcore %d\n",
+		       coreid, current->pid, get_vcoreid(current, coreid));
+		__unmap_vcore(current, coreid);
+	}
 	abandon_core();
 }
 

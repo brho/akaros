@@ -114,6 +114,7 @@ ssize_t core_request(struct proc *p)
 				 * this core, for now, since we don't handle async calls) */
 				__seq_start_write(&p->procinfo->coremap_seqctr);
 				// TODO: (VC#) might need to adjust num_vcores
+				// TODO: (ACR) will need to unmap remotely (receive-side)
 				__unmap_vcore(p, 0);
 				__seq_end_write(&p->procinfo->coremap_seqctr);
 				// will need to give up this core / idle later (sync)
