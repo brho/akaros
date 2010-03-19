@@ -404,7 +404,6 @@ void proc_run(struct proc *p)
 			 * message, a0 = struct proc*, a1 = struct trapframe*.   */
 			if (p->procinfo->num_vcores) {
 				__proc_set_state(p, PROC_RUNNING_M);
-				int i = 0;
 				/* Up the refcnt, since num_vcores are going to start using this
 				 * process and have it loaded in their 'current'. */
 				p->env_refcnt += p->procinfo->num_vcores; // TODO: (REF) use incref
@@ -416,28 +415,16 @@ void proc_run(struct proc *p)
 				// set virtual core 0 to run the main context on transition
 				if (p->env_flags & PROC_TRANSITION_TO_M) {
 					p->env_flags &= !PROC_TRANSITION_TO_M;
-#ifdef __IVY__
-					send_active_message(p->procinfo->vcoremap[0].pcoreid,
-					                    __startcore, p,
-					                    &p->env_tf, (void *SNT)0);
-#else
-					send_active_message(p->procinfo->vcoremap[0].pcoreid,
-					                    (void *)__startcore, (void *)p,
-										(void *)&p->env_tf, 0);
-#endif
-					i = 1; // start at vcore1 in the loop below
+					p->procinfo->vcoremap[0].tf_to_run = &p->env_tf;
+				} else {
+					assert(!p->procinfo->vcoremap[0].tf_to_run);
 				}
-				/* handle the others. */
-				for (/* i set above */; i < p->procinfo->num_vcores; i++)
-#ifdef __IVY__
+				/* others should be zeroed after a previous use too. */
+				for (int i = 1; i < p->procinfo->num_vcores; i++)
+					assert(!p->procinfo->vcoremap[i].tf_to_run);
+				for (int i = 0; i < p->procinfo->num_vcores; i++)
 					send_active_message(p->procinfo->vcoremap[i].pcoreid,
-					                    __startcore, p,
-										(trapframe_t *CT(1))NULL, (void *SNT)i);
-#else
-					send_active_message(p->procinfo->vcoremap[i].pcoreid,
-					                    (void *)__startcore, (void *)p,
-										(void *)0, (void *)i);
-#endif
+					                    (void *)__startcore, (void *)p, 0, 0);
 			} else {
 				warn("Tried to proc_run() an _M with no vcores!");
 			}
@@ -817,14 +804,13 @@ bool __proc_give_cores(struct proc *SAFE p, uint32_t *pcorelist, size_t num)
 			__seq_start_write(&p->procinfo->coremap_seqctr);
 			for (int i = 0; i < num; i++) {
 				free_vcoreid = get_free_vcoreid(p, free_vcoreid);
-				//todo
 				printd("setting vcore %d to pcore %d\n", free_vcoreid,
 				       pcorelist[i]);
 				__map_vcore(p, free_vcoreid, pcorelist[i]);
 				p->procinfo->num_vcores++;
-				send_active_message(pcorelist[i], __startcore, p,
-				                    (struct trapframe *)0,
-				                    (void*SNT)free_vcoreid);
+				/* should be a fresh core */
+				assert(!p->procinfo->vcoremap[i].tf_to_run);
+				send_active_message(pcorelist[i], __startcore, p, 0, 0);
 				if (pcorelist[i] == core_id())
 					self_ipi_pending = TRUE;
 			}
@@ -1026,29 +1012,27 @@ void proc_decref(struct proc *p, size_t count)
 
 /* Active message handler to start a process's context on this core.  Tightly
  * coupled with proc_run() */
-#ifdef __IVY__
-void __startcore(trapframe_t *tf, uint32_t srcid, struct proc *CT(1) a0,
-                 trapframe_t *CT(1) a1, void *SNT a2)
-#else
-void __startcore(trapframe_t *tf, uint32_t srcid, void * a0, void * a1,
-                 void * a2)
-#endif
+void __startcore(trapframe_t *tf, uint32_t srcid, void *a0, void *a1, void *a2)
 {
-	uint32_t coreid = core_id();
-	uint32_t vcoreid = (uint32_t)a2;
+	uint32_t pcoreid = core_id(), vcoreid;
 	struct proc *p_to_run = (struct proc *CT(1))a0;
-	trapframe_t local_tf;
-	trapframe_t *tf_to_pop = (trapframe_t *CT(1))a1;
+	struct trapframe local_tf, *tf_to_pop;
 
-	printd("[kernel] startcore on physical core %d for process %d's vcore %d\n",
-	       coreid, p_to_run->pid, get_vcoreid(p_to_run, coreid));
 	assert(p_to_run);
+	vcoreid = get_vcoreid(p_to_run, pcoreid);
+	tf_to_pop = p_to_run->procinfo->vcoremap[vcoreid].tf_to_run;
+	printd("[kernel] startcore on physical core %d for process %d's vcore %d\n",
+	       pcoreid, p_to_run->pid, vcoreid);
 	// TODO: handle silly state (HSS)
 	if (!tf_to_pop) {
 		tf_to_pop = &local_tf;
 		memset(tf_to_pop, 0, sizeof(*tf_to_pop));
 		proc_init_trapframe(tf_to_pop, vcoreid, p_to_run->env_entry,
 		                    p_to_run->procdata->stack_pointers[vcoreid]);
+	} else {
+		/* Don't want to accidentally reuse this tf (saves on a for loop in
+		 * proc_run, though we check there to be safe for now). */
+		p_to_run->procinfo->vcoremap[vcoreid].tf_to_run = 0;
 	}
 	/* the sender of the amsg increfed, thinking we weren't running current. */
 	if (p_to_run == current)
