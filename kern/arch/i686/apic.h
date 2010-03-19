@@ -202,39 +202,39 @@ static inline void lapic_enable(void)
 
 static inline void send_init_ipi(void)
 {
-	lapic_wait_to_send();
 	write_mmreg32(LAPIC_IPI_ICR_LOWER, 0x000c4500);
+	lapic_wait_to_send();
 }
 
 static inline void send_startup_ipi(uint8_t vector)
 {
-	lapic_wait_to_send();
 	write_mmreg32(LAPIC_IPI_ICR_LOWER, 0x000c4600 | vector);
+	lapic_wait_to_send();
 }
 
 static inline void send_self_ipi(uint8_t vector)
 {
-	lapic_wait_to_send();
 	write_mmreg32(LAPIC_IPI_ICR_LOWER, 0x00044000 | vector);
+	lapic_wait_to_send();
 }
 
 static inline void send_broadcast_ipi(uint8_t vector)
 {
-	lapic_wait_to_send();
 	write_mmreg32(LAPIC_IPI_ICR_LOWER, 0x00084000 | vector);
+	lapic_wait_to_send();
 }
 
 static inline void send_all_others_ipi(uint8_t vector)
 {
-	lapic_wait_to_send();
 	write_mmreg32(LAPIC_IPI_ICR_LOWER, 0x000c4000 | vector);
+	lapic_wait_to_send();
 }
 
 static inline void __send_ipi(uint8_t hw_coreid, uint8_t vector)
 {
-	lapic_wait_to_send();
 	write_mmreg32(LAPIC_IPI_ICR_UPPER, hw_coreid << 24);
 	write_mmreg32(LAPIC_IPI_ICR_LOWER, 0x00004000 | vector);
+	lapic_wait_to_send();
 }
 
 static inline void send_ipi(uint8_t hw_coreid, uint8_t vector)
@@ -249,9 +249,9 @@ static inline void send_ipi(uint8_t hw_coreid, uint8_t vector)
 
 static inline void send_group_ipi(uint8_t hw_groupid, uint8_t vector)
 {
-	lapic_wait_to_send();
 	write_mmreg32(LAPIC_IPI_ICR_UPPER, hw_groupid << 24);
 	write_mmreg32(LAPIC_IPI_ICR_LOWER, 0x00004800 | vector);
+	lapic_wait_to_send();
 }
 
 /* To change the LAPIC Base (not recommended):
