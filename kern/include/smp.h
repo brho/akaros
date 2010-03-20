@@ -38,8 +38,10 @@ struct per_cpu_info {
 	segdesc_t *gdt;
 #endif
 
-	spinlock_t amsg_lock;
-	struct active_msg_list NTPTV(a0t) NTPTV(a1t) NTPTV(a2t) active_msgs;
+	spinlock_t immed_amsg_lock;
+	struct kernel_msg_list NTPTV(a0t) NTPTV(a1t) NTPTV(a2t) immed_amsgs;
+	spinlock_t routine_amsg_lock;
+	struct kernel_msg_list NTPTV(a0t) NTPTV(a1t) NTPTV(a2t) routine_amsgs;
 }__attribute__((aligned(HW_CACHE_ALIGN)));
 
 typedef struct per_cpu_info NTPTV(t) NTPTV(a0t) NTPTV(a1t) NTPTV(a2t) per_cpu_info_t;

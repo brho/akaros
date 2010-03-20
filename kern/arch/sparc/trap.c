@@ -21,24 +21,28 @@
 #pragma nodeputy
 #endif
 
-spinlock_t active_message_buf_busy[MAX_NUM_CPUS] = {SPINLOCK_INITIALIZER};
-active_message_t active_message_buf[MAX_NUM_CPUS];
+spinlock_t kernel_message_buf_busy[MAX_NUM_CPUS] = {SPINLOCK_INITIALIZER};
+kernel_message_t kernel_message_buf[MAX_NUM_CPUS];
 
-uint32_t send_active_message(uint32_t dst, amr_t pc,
-                             TV(a0t) arg0, TV(a1t) arg1, TV(a2t) arg2)
+uint32_t send_kernel_message(uint32_t dst, amr_t pc,
+                             TV(a0t) arg0, TV(a1t) arg1, TV(a2t) arg2, int type)
 {
-	if(dst >= num_cpus || spin_trylock(&active_message_buf_busy[dst]))
+	/* TODO: need to merge with x86 for one unified messaging (based on IPIs).
+	 * you can temporarily get by with ignoring the distinction between routine
+	 * and urgent, but certain races will ruin the system.  also note that no
+	 * code is able to handle a failure of this function. */
+	if(dst >= num_cpus || spin_trylock(&kernel_message_buf_busy[dst]))
 		return -1;
 
-	active_message_buf[dst].srcid = core_id();
-	active_message_buf[dst].pc = pc;
-	active_message_buf[dst].arg0 = arg0;
-	active_message_buf[dst].arg1 = arg1;
-	active_message_buf[dst].arg2 = arg2;
+	kernel_message_buf[dst].srcid = core_id();
+	kernel_message_buf[dst].pc = pc;
+	kernel_message_buf[dst].arg0 = arg0;
+	kernel_message_buf[dst].arg1 = arg1;
+	kernel_message_buf[dst].arg2 = arg2;
 
 	if(send_ipi(dst))
 	{
-		spin_unlock(&active_message_buf_busy[dst]);
+		spin_unlock(&kernel_message_buf_busy[dst]);
 		return -1;
 	}
 
@@ -138,9 +142,9 @@ get_trapname(uint8_t tt, char buf[TRAPNAME_MAX])
 void
 handle_ipi(trapframe_t* state)
 {
-	active_message_t m;
-	m = active_message_buf[core_id()];
-	spin_unlock(&active_message_buf_busy[core_id()]);
+	kernel_message_t m;
+	m = kernel_message_buf[core_id()];
+	spin_unlock(&kernel_message_buf_busy[core_id()]);
 
 	uint32_t src = m.srcid;
 	TV(a0t) a0 = m.arg0;
@@ -333,9 +337,9 @@ handle_breakpoint(trapframe_t* state)
 	env_pop_tf(state);
 }
 
-struct kmem_cache *active_msg_cache;
-void active_msg_init(void)
+struct kmem_cache *kernel_msg_cache;
+void kernel_msg_init(void)
 {
-	active_msg_cache = kmem_cache_create("active_msgs",
-	                   sizeof(struct active_message), HW_CACHE_ALIGN, 0, 0, 0);
+	kernel_msg_cache = kmem_cache_create("kernel_msgs",
+	                   sizeof(struct kernel_message), HW_CACHE_ALIGN, 0, 0, 0);
 }

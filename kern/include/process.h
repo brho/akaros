@@ -137,7 +137,7 @@ void proc_decref(struct proc *SAFE p, size_t count);
 
 void abandon_core(void);
 
-/* Active message handlers for process management */
+/* Kernel message handlers for process management */
 #ifdef __IVY__
 void __startcore(trapframe_t *tf, uint32_t srcid, struct proc *CT(1) a0,
                  trapframe_t *CT(1) a1, void *SNT a2);

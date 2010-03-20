@@ -2,7 +2,7 @@
 #define ROS_INC_ARCH_TRAP_H
 
 #define SIZEOF_TRAPFRAME_T	0xB0
-#define SIZEOF_ACTIVE_MESSAGE_T	0x18
+#define SIZEOF_KERNEL_MESSAGE_T	0x18
 
 #ifndef __ASSEMBLER__
 
@@ -23,6 +23,13 @@ void emulate_fpu(trapframe_t* state, ancillary_state_t* astate);
 static inline void set_errno(trapframe_t* tf, uint32_t errno)
 {
 	tf->gpr[9] = errno;
+}
+
+/* TODO: Need to determine if the TF was in the kernel. */
+static inline bool in_kernel(struct trapframe *tf)
+{
+	static_assert(0);
+	return LIES;
 }
 
 #endif /* !__ASSEMBLER__ */

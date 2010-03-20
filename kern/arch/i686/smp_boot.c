@@ -307,5 +307,8 @@ void smp_percpu_init(void)
 	else
 		per_cpu_info[coreid].gdt = (segdesc_t*)(ROUNDUP(read_esp(), PGSIZE)
 		                           - sizeof(segdesc_t)*SEG_COUNT);
-	STAILQ_INIT(&per_cpu_info[coreid].active_msgs);
+	spinlock_init(&per_cpu_info[coreid].immed_amsg_lock);
+	STAILQ_INIT(&per_cpu_info[coreid].immed_amsgs);
+	spinlock_init(&per_cpu_info[coreid].routine_amsg_lock);
+	STAILQ_INIT(&per_cpu_info[coreid].routine_amsgs);
 }

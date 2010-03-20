@@ -807,44 +807,44 @@ void test_circ_buffer(void)
 	return;
 }
 
-#ifdef __IVY__
-void test_am_handler(trapframe_t* tf, uint32_t srcid, uint32_t a0, uint32_t a1,
-                     uint32_t a2)
-#else
-void test_am_handler(trapframe_t* tf, uint32_t srcid, void * a0, void * a1,
-                     void * a2)
-#endif
+void test_km_handler(trapframe_t* tf, uint32_t srcid, void *a0, void *a1,
+                     void *a2)
 {
-	printk("Received AM on core %d from core %d: arg0= 0x%08x, arg1 = "
+	printk("Received KM on core %d from core %d: arg0= 0x%08x, arg1 = "
 	       "0x%08x, arg2 = 0x%08x\n", core_id(), srcid, a0, a1, a2);
 	return;
 }
 
-void test_active_messages(void)
+void test_kernel_messages(void)
 {
-	// basic tests, make sure we can handle a wraparound and that the error
-	// messages work.
-	printk("sending NUM_ACTIVE_MESSAGES to core 1, sending (#,deadbeef,0)\n");
-	for (int i = 0; i < NUM_ACTIVE_MESSAGES; i++)
-#ifdef __IVY__
-		while (send_active_message(1, test_am_handler, i, 0xdeadbeef, 0))
-			cpu_relax();
-#else
-		while (send_active_message(1, test_am_handler, (void *)i,
-		                           (void *)0xdeadbeef, (void *)0))
-			cpu_relax();
-#endif
+	printk("Testing Kernel Messages\n");
+	/* Testing sending multiples, sending different types, alternating, and
+	 * precendence (the immediates should trump the others) */
+	printk("sending 5 IMMED to core 1, sending (#,deadbeef,0)\n");
+	for (int i = 0; i < 5; i++)
+		send_kernel_message(1, test_km_handler, (void*)i, (void*)0xdeadbeef,
+		                    (void*)0, AMSG_IMMEDIATE);
 	udelay(5000000);
-	printk("sending 2*NUM_ACTIVE_MESSAGES to core 1, sending (#,cafebabe,0)\n");
-	for (int i = 0; i < 2*NUM_ACTIVE_MESSAGES; i++)
-#ifdef __IVY__
-		while (send_active_message(1, test_am_handler, i, 0xdeadbeef, 0))
-			cpu_relax();
-#else
-		while (send_active_message(1, test_am_handler, (void *)i,
-		                           (void *)0xdeadbeef, (void *)0))
-			cpu_relax();
-#endif
+	printk("sending 5 routine to core 1, sending (#,cafebabe,0)\n");
+	for (int i = 0; i < 5; i++)
+		send_kernel_message(1, test_km_handler, (void*)i, (void*)0xcafebabe,
+		                    (void*)0, AMSG_ROUTINE);
+	udelay(5000000);
+	printk("sending 10 routine and 3 immediate to core 2\n");
+	for (int i = 0; i < 10; i++)
+		send_kernel_message(2, test_km_handler, (void*)i, (void*)0xcafebabe,
+		                    (void*)0, AMSG_ROUTINE);
+	for (int i = 0; i < 3; i++)
+		send_kernel_message(2, test_km_handler, (void*)i, (void*)0xdeadbeef,
+		                    (void*)0, AMSG_IMMEDIATE);
+	udelay(5000000);
+	printk("sending 5 ea alternating to core 2\n");
+	for (int i = 0; i < 5; i++) {
+		send_kernel_message(2, test_km_handler, (void*)i, (void*)0xdeadbeef,
+		                    (void*)0, AMSG_IMMEDIATE);
+		send_kernel_message(2, test_km_handler, (void*)i, (void*)0xcafebabe,
+		                    (void*)0, AMSG_ROUTINE);
+	}
 	udelay(5000000);
 	return;
 }

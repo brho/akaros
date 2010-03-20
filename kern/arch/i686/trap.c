@@ -386,74 +386,99 @@ void sysenter_callwrapper(struct trapframe *tf)
 	proc_startcore(current, tf);
 }
 
-struct kmem_cache *active_msg_cache;
-void active_msg_init(void)
+struct kmem_cache *kernel_msg_cache;
+void kernel_msg_init(void)
 {
-	active_msg_cache = kmem_cache_create("active_msgs",
-	                   sizeof(struct active_message), HW_CACHE_ALIGN, 0, 0, 0);
+	kernel_msg_cache = kmem_cache_create("kernel_msgs",
+	                   sizeof(struct kernel_message), HW_CACHE_ALIGN, 0, 0, 0);
 }
 
-uint32_t send_active_message(uint32_t dst, amr_t pc,
-                             TV(a0t) arg0, TV(a1t) arg1, TV(a2t) arg2)
+uint32_t send_kernel_message(uint32_t dst, amr_t pc, TV(a0t) arg0, TV(a1t) arg1,
+                             TV(a2t) arg2, int type)
 {
-	active_message_t *a_msg;
+	kernel_message_t *k_msg;
 	assert(pc);
 	// note this will be freed on the destination core
-	a_msg = (active_message_t *CT(1))TC(kmem_cache_alloc(active_msg_cache, 0));
-	a_msg->srcid = core_id();
-	a_msg->pc = pc;
-	a_msg->arg0 = arg0;
-	a_msg->arg1 = arg1;
-	a_msg->arg2 = arg2;
-	spin_lock_irqsave(&per_cpu_info[dst].amsg_lock);
-	STAILQ_INSERT_TAIL(&per_cpu_info[dst].active_msgs, a_msg, link);
-	spin_unlock_irqsave(&per_cpu_info[dst].amsg_lock);
+	k_msg = (kernel_message_t *CT(1))TC(kmem_cache_alloc(kernel_msg_cache, 0));
+	k_msg->srcid = core_id();
+	k_msg->pc = pc;
+	k_msg->arg0 = arg0;
+	k_msg->arg1 = arg1;
+	k_msg->arg2 = arg2;
+	switch (type) {
+		case AMSG_IMMEDIATE:
+			spin_lock_irqsave(&per_cpu_info[dst].immed_amsg_lock);
+			STAILQ_INSERT_TAIL(&per_cpu_info[dst].immed_amsgs, k_msg, link);
+			spin_unlock_irqsave(&per_cpu_info[dst].immed_amsg_lock);
+			break;
+		case AMSG_ROUTINE:
+			spin_lock_irqsave(&per_cpu_info[dst].routine_amsg_lock);
+			STAILQ_INSERT_TAIL(&per_cpu_info[dst].routine_amsgs, k_msg, link);
+			spin_unlock_irqsave(&per_cpu_info[dst].routine_amsg_lock);
+			break;
+		default:
+			panic("Unknown type of kernel message!");
+	}
 	// since we touched memory the other core will touch (the lock), we don't
 	// need an wmb_f()
-	send_ipi(get_hw_coreid(dst), I_ACTIVE_MSG);
+	send_ipi(get_hw_coreid(dst), I_KERNEL_MSG);
 	return 0;
 }
 
-/* Active message handler.  We don't want to block other AMs from coming in, so
- * we'll copy out the message and let go of the lock.  This won't return until
- * all pending AMs are executed.  If the PC is 0, then this was an extra IPI and
- * we already handled the message (or someone is sending IPIs without loading
- * the active message...)
+/* Helper function.  Returns 0 if the list was empty. */
+static kernel_message_t *get_next_amsg(struct kernel_msg_list *list_head,
+                                       spinlock_t *list_lock)
+{
+	kernel_message_t *k_msg;
+	spin_lock_irqsave(list_lock);
+	k_msg = STAILQ_FIRST(list_head);
+	if (k_msg)
+		STAILQ_REMOVE_HEAD(list_head, link);
+	spin_unlock_irqsave(list_lock);
+	return k_msg;
+}
+
+/* Kernel message handler.  Extensive documentation is in
+ * Documentation/kernel_messages.txt.
+ *
+ * In general: this processes immediate messages, then routine messages.
+ * Routine messages might not return (__startcore, etc), so we need to be
+ * careful about a few things.
+ *
  * Note that all of this happens from interrupt context, and interrupts are
  * currently disabled for this gate.  Interrupts need to be disabled so that the
- * self-ipi doesn't preempt the execution of this active message. */
-void __active_message(trapframe_t *tf)
+ * self-ipi doesn't preempt the execution of this kernel message. */
+void __kernel_message(struct trapframe *tf)
 {
-	per_cpu_info_t RO*myinfo = &per_cpu_info[core_id()];
-	active_message_t my_msg, *a_msg;
+	per_cpu_info_t *myinfo = &per_cpu_info[core_id()];
+	kernel_message_t msg_cp, *k_msg;
 
 	lapic_send_eoi();
 	while (1) { // will break out when there are no more messages
-		/* Get the message */
-		spin_lock_irqsave(&myinfo->amsg_lock);
-		a_msg = STAILQ_FIRST(&myinfo->active_msgs);
-		/* No messages to execute, so break out, etc. */
-		if (!a_msg) {
-			spin_unlock_irqsave(&myinfo->amsg_lock);
-			return;
+		/* Try to get an immediate message.  Exec and free it. */
+		k_msg = get_next_amsg(&myinfo->immed_amsgs, &myinfo->immed_amsg_lock);
+		if (k_msg) {
+			assert(k_msg->pc);
+			k_msg->pc(tf, k_msg->srcid, k_msg->arg0, k_msg->arg1, k_msg->arg2);
+			kmem_cache_free(kernel_msg_cache, (void*)k_msg);
+		} else { // no immediate, might be a routine
+			if (in_kernel(tf))
+				return; // don't execute routine msgs if we were in the kernel
+			k_msg = get_next_amsg(&myinfo->routine_amsgs,
+			                      &myinfo->routine_amsg_lock);
+			if (!k_msg) // no routines either
+				return;
+			/* copy in, and then free, in case we don't return */
+			msg_cp = *k_msg;
+			kmem_cache_free(kernel_msg_cache, (void*)k_msg);
+			/* make sure an IPI is pending if we have more work */
+			/* techincally, we don't need to lock when checking */
+			if (!STAILQ_EMPTY(&myinfo->routine_amsgs) &&
+		               !ipi_is_pending(I_KERNEL_MSG))
+				send_self_ipi(I_KERNEL_MSG);
+			/* Execute the kernel message */
+			assert(msg_cp.pc);
+			msg_cp.pc(tf, msg_cp.srcid, msg_cp.arg0, msg_cp.arg1, msg_cp.arg2);
 		}
-		STAILQ_REMOVE_HEAD(&myinfo->active_msgs, link);
-		spin_unlock_irqsave(&myinfo->amsg_lock);
-		// copy in, and then free, in case we don't return
-		my_msg = *a_msg;
-		kmem_cache_free(active_msg_cache, (void *CT(1))TC(a_msg));
-		assert(my_msg.pc);
-		/* In case the function doesn't return (which is common: __startcore,
-		 * __death, etc), there is a chance we could lose an amsg.  We can only
-		 * have up to two interrupts outstanding, and if we never return, we
-		 * never deal with any other amsgs.  This extra IPI hurts performance
-		 * but is only necessary if there is another outstanding message in the
-		 * buffer, but makes sure we never miss out on an amsg. */
-		spin_lock_irqsave(&myinfo->amsg_lock);
-		if (!STAILQ_EMPTY(&myinfo->active_msgs))
-			send_self_ipi(I_ACTIVE_MSG);
-		spin_unlock_irqsave(&myinfo->amsg_lock);
-		/* Execute the active message */
-		my_msg.pc(tf, my_msg.srcid, my_msg.arg0, my_msg.arg1, my_msg.arg2);
 	}
 }

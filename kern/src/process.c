@@ -400,7 +400,7 @@ void proc_run(struct proc *p)
 			break;
 		case (PROC_RUNNABLE_M):
 			/* vcoremap[i] holds the coreid of the physical core allocated to
-			 * this process.  It is set outside proc_run.  For the active
+			 * this process.  It is set outside proc_run.  For the kernel
 			 * message, a0 = struct proc*, a1 = struct trapframe*.   */
 			if (p->procinfo->num_vcores) {
 				__proc_set_state(p, PROC_RUNNING_M);
@@ -423,8 +423,9 @@ void proc_run(struct proc *p)
 				for (int i = 1; i < p->procinfo->num_vcores; i++)
 					assert(!p->procinfo->vcoremap[i].tf_to_run);
 				for (int i = 0; i < p->procinfo->num_vcores; i++)
-					send_active_message(p->procinfo->vcoremap[i].pcoreid,
-					                    (void *)__startcore, (void *)p, 0, 0);
+					send_kernel_message(p->procinfo->vcoremap[i].pcoreid,
+					                    (void *)__startcore, (void *)p, 0, 0,
+					                    AMSG_IMMEDIATE);
 			} else {
 				warn("Tried to proc_run() an _M with no vcores!");
 			}
@@ -575,8 +576,9 @@ void proc_destroy(struct proc *p)
 				current = NULL;
 			}
 			#endif
-			send_active_message(p->procinfo->vcoremap[0].pcoreid, __death,
-			                   (void *SNT)0, (void *SNT)0, (void *SNT)0);
+			send_kernel_message(p->procinfo->vcoremap[0].pcoreid, __death,
+			                   (void *SNT)0, (void *SNT)0, (void *SNT)0,
+			                   AMSG_IMMEDIATE);
 			__seq_start_write(&p->procinfo->coremap_seqctr);
 			// TODO: might need to sort num_vcores too later (VC#)
 			/* vcore is unmapped on the receive side */
@@ -810,7 +812,8 @@ bool __proc_give_cores(struct proc *SAFE p, uint32_t *pcorelist, size_t num)
 				p->procinfo->num_vcores++;
 				/* should be a fresh core */
 				assert(!p->procinfo->vcoremap[i].tf_to_run);
-				send_active_message(pcorelist[i], __startcore, p, 0, 0);
+				send_kernel_message(pcorelist[i], __startcore, p, 0, 0,
+				                    AMSG_IMMEDIATE);
 				if (pcorelist[i] == core_id())
 					self_ipi_pending = TRUE;
 			}
@@ -842,7 +845,7 @@ bool __proc_set_allcores(struct proc *SAFE p, uint32_t *pcorelist,
 }
 
 /* Takes from process p the num cores listed in pcorelist, using the given
- * message for the active message (__death, __preempt, etc).  Like the others
+ * message for the kernel message (__death, __preempt, etc).  Like the others
  * in this function group, bool signals whether or not an IPI is pending.
  *
  * WARNING: You must hold the proc_lock before calling this! */
@@ -876,7 +879,8 @@ bool __proc_take_cores(struct proc *SAFE p, uint32_t *pcorelist,
 		if (message) {
 			if (pcoreid == core_id())
 				self_ipi_pending = TRUE;
-			send_active_message(pcoreid, message, arg0, arg1, arg2);
+			send_kernel_message(pcoreid, message, arg0, arg1, arg2,
+			                    AMSG_IMMEDIATE);
 		} else {
 			/* if there was a msg, the vcore is unmapped on the receive side.
 			 * o/w, we need to do it here. */
@@ -924,7 +928,8 @@ bool __proc_take_allcores(struct proc *SAFE p, amr_t message,
 		if (message) {
 			if (pcoreid == core_id())
 				self_ipi_pending = TRUE;
-			send_active_message(pcoreid, message, arg0, arg1, arg2);
+			send_kernel_message(pcoreid, message, arg0, arg1, arg2,
+			                    AMSG_IMMEDIATE);
 		} else {
 			/* if there was a msg, the vcore is unmapped on the receive side.
 			 * o/w, we need to do it here. */
@@ -1010,7 +1015,7 @@ void proc_decref(struct proc *p, size_t count)
 		panic("Too many decrefs!");
 }
 
-/* Active message handler to start a process's context on this core.  Tightly
+/* Kernel message handler to start a process's context on this core.  Tightly
  * coupled with proc_run() */
 void __startcore(trapframe_t *tf, uint32_t srcid, void *a0, void *a1, void *a2)
 {
@@ -1050,7 +1055,7 @@ void abandon_core(void)
 	smp_idle();
 }
 
-/* Active message handler to clean up the core when a process is dying.
+/* Kernel message handler to clean up the core when a process is dying.
  * Note this leaves no trace of what was running.
  * It's okay if death comes to a core that's already idling and has no current.
  * It could happen if a process decref'd before proc_startcore could incref. */

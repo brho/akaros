@@ -48,11 +48,7 @@
 #define I_SMP_CALL4 	0xf4
 #define I_SMP_CALL_LAST I_SMP_CALL4
 /* Direct/Hardwired IPIs.  Hardwired in trapentry.S */
-#define I_ACTIVE_MSG	255
-
-/* Number of active messages available per core (arbitrary) */
-#define NUM_ACTIVE_MESSAGES 5
-
+#define I_KERNEL_MSG	255
 
 #ifndef __ASSEMBLER__
 
@@ -69,6 +65,12 @@ extern taskstate_t ts;
 static inline void set_errno(trapframe_t* tf, uint32_t errno)
 {
 	tf->tf_regs.reg_esi = errno;
+}
+
+/* Determines if the given TF was in the kernel or not. */
+static inline bool in_kernel(struct trapframe *tf)
+{
+	return (tf->tf_cs & ~3) == GD_KT;
 }
 
 #endif /* !__ASSEMBLER__ */

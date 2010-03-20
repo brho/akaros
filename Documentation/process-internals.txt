@@ -142,7 +142,7 @@ abandon_core()).
 proc_run(): makes sure enough refcnts are in place for all places that will
 install current.  This also makes it easier on the system (one big incref(n),
 instead of n increfs of (1) from multiple cores).  In the off chance current was
-already set for a core receiving the active message, __startcore will decref.
+already set for a core receiving the kernel message, __startcore will decref.
 Also note that while proc_run() consumes your reference, it's not actually
 decreffing, so there's no danger within proc_run() of the process dying /
 __proc_free()ing.
@@ -283,7 +283,7 @@ is to help with sanity for these issues, and also to avoid decref's in
 __startcore().
 
 A couple other details: __startcore() sorts the extra increfs, and
-proc_startcore() sorts leaving the old context.  Anytime a __startcore active
+proc_startcore() sorts leaving the old context.  Anytime a __startcore kernel
 message is sent, the sender increfs in advance for the current refcnt.  If that
 was in error, __startcore decrefs.  proc_startcore(), which the last moment
 before we *must* have the cr3/current issues sorted, does the actual check if
@@ -306,12 +306,11 @@ proc_yield() abandons the core / leaves context.
 
 2.3 Other issues:
 ---------------------------
-Note that dealing with interrupting
-processes that are in the kernel is tricky.  There is no true process context, so we can't
-leave a core until the kernel is in a "safe place", i.e. it's state is bundled
-enough that it can be recontinued later.  Calls of this type are not immediate
-active messages, executed at a convenient time (specifically, before we return
-to userspace in proc_startcore().
+Note that dealing with interrupting processes that are in the kernel is tricky.
+There is no true process context, so we can't leave a core until the kernel is
+in a "safe place", i.e. it's state is bundled enough that it can be recontinued
+later.  Calls of this type are routine kernel messages, executed at a convenient
+time (specifically, before we return to userspace in proc_startcore().
 
 This same thing applies to __death messages.  Even though a process is dying, it
 doesn't mean we can just drop whatever the kernel was doing on its behalf.  For
@@ -328,13 +327,13 @@ that needs cleaned up (refcnts that need downed, etc).
 The solution to this is rather simple: don't abandon right away.  That was
 always somewhat the plan for preemption, but was never done for death.  And
 there are several other cases to worry about too.  To enforce this, we expand
-the active messages into a generic work execution message that can be delayed
-or shipped to another core.  These types of messages will not be executed
-immediately on the receiving pcore - instead they are on the queue for "when
-there's nothing else to do in the kernel", which is checked in smp_idle() and
-before returning to userspace in proc_startcore().  Additionally, these active
-messages can also be queued on an alarm queue, delaying their activation as
-part of a generic kernel alarm facility.
+the old "active messages" into a generic work execution message (a kernel
+message) that can be delayed or shipped to another core.  These types of
+messages will not be executed immediately on the receiving pcore - instead they
+are on the queue for "when there's nothing else to do in the kernel", which is
+checked in smp_idle() and before returning to userspace in proc_startcore().
+Additionally, these kernel messages can also be queued on an alarm queue,
+delaying their activation as part of a generic kernel alarm facility.
 
 4. Preemption and Notification Issues:
 ===========================
@@ -342,7 +341,7 @@ part of a generic kernel alarm facility.
 ---------------------------
 Since we go with the model of cores being told what to do, there are issues
 with messages being received in the wrong order.  That is why we have the
-active messages (guaranteed, in-order delivery), with the proc-lock protecting
+kernel messages (guaranteed, in-order delivery), with the proc-lock protecting
 the send order.  However, this is not enough for some rare races.
 
 Local calls can also perform the same tasks as messages (calling
@@ -365,12 +364,12 @@ abort.  This might be sufficient.  This works for death already, since you
 aren't supposed to do anything other than die (and restore any invariants
 first, handled in Section 3).  We'll go with this way.
 
-The other way is to send the work (including the checks) in a self-ipi active
+The other way is to send the work (including the checks) in a self-ipi kernel
 message.  This will guarantee that the message is executed after any existing
-messages (making the a_msg queue the authority for what should happen to a
-core).  The check is also performed later (when the a_msg executes).  There
+messages (making the k_msg queue the authority for what should happen to a
+core).  The check is also performed later (when the k_msg executes).  There
 are a couple issues with this: if we allow the local core to send itself an
-a_msg that could be out of order (meaning it should not be sent, and is only
+k_msg that could be out of order (meaning it should not be sent, and is only
 sent due to ignorance of its sealed fate), AND if we return the core to the
 idle-core-list once its fate is sealed, we need to detect that the message is
 for the wrong process and that the process is in the wrong state.  To do this,
@@ -515,20 +514,20 @@ send a notification.
  
 4.7: Notifs While a Preempt Message is Served
 ---------------------------
-It is possible to have the kernel handling a notification a_msg and to have a
-preempt a_msg in the queue (preempt-served flag is set).  Ultimately, what we
+It is possible to have the kernel handling a notification k_msg and to have a
+preempt k_msg in the queue (preempt-served flag is set).  Ultimately, what we
 want is for the core to be preempted and the notification handler to run on
-the next execution.  Both messages are in the a_msg queue for "a convenient
+the next execution.  Both messages are in the k_msg queue for "a convenient
 time to leave the kernel" (I'll have a better name for that later).  What we
 do is execute the notification handler and jump to userspace.  Since there is
-still an a_msg in the queue (and we self_ipi'd ourselves, it's part of how
-a_msgs work), the IPI will fire and push us right back into the kernel to
+still an k_msg in the queue (and we self_ipi'd ourselves, it's part of how
+k_msgs work), the IPI will fire and push us right back into the kernel to
 execute the preemption, and the notif handler's context will be saved in the
 preempt_tf (ready to go when the vcore gets started again).
 
 We could try to just set the notif_pending flag and ignore the message, but
-that would involve inspecting the queue for the preempt a_msg.  Additionally,
-a preempt a_msg can arrive anyway.  Finally, it's possible to have another
+that would involve inspecting the queue for the preempt k_msg.  Additionally,
+a preempt k_msg can arrive anyway.  Finally, it's possible to have another
 message in the queue between the notif and the preempt, and it gets ugly
 quickly trying to determine what to do.
 
@@ -546,10 +545,10 @@ Also, we don't remove the pcore from the vcoremap, even if it is being
 allocated to another core (the same pcore can exist in two vcoremaps, contrary
 to older statements).  Taking the pcore from the vcoremap would mean some
 non-fate related local calls (sys_get_vcoreid()) will fail, since the vcoreid
-is gone!  Additionally, we don't need a vcoreid in the a_msg (we would have if
+is gone!  Additionally, we don't need a vcoreid in the k_msg (we would have if
 we could not use the vcore/pcoremappings).  There should not be any issues
 with the new process sending messages to the pcore before the core is sorted,
-since a_msgs are delivered in order.
+since k_msgs are delivered in order.
 
 Another tricky part is the seq_ctr used to signal userspace of changes to the
 coremap or num_vcores (coremap_seqctr).  While we may not even need this in the
@@ -566,11 +565,10 @@ value of the seq_ctr before the IPI hits and does the unmapping that the seq_ctr
 protects/advertises.  This is most likely true.  It wouldn't be if the "last IPI
 was sent" flag clears before the IPI actually hit the other core.
 
-
 4.9: Future Broadcast/Messaging Needs
 ---------------------------
-Currently, messaging is serialized.  Broadcast IPIs exist, but the active
-message system is based on adding an a_msg to a list in a pcore's
+Currently, messaging is serialized.  Broadcast IPIs exist, but the kernel
+message system is based on adding an k_msg to a list in a pcore's
 per_cpu_info.  Further the sending of these messages is in a loop.  In the
 future, we would like to have broadcast messaging of some sort (literally a
 broadcast, like the IPIs, and if not that, then a communication tree of
@@ -578,7 +576,7 @@ sorts).
 
 Given those desires, we want to make sure that no message we send needs
 details specific to a pcore (such as the vcoreid running on it, a history
-number, or anything like that).  Thus no a_msg related to process management
+number, or anything like that).  Thus no k_msg related to process management
 should have anything that cannot apply to the entire process.  At this point,
 most just have a struct proc *.  A pcore ought to be able to figure out what
 is happening based on the pcoremap, information in the struct proc, and in the
@@ -586,9 +584,9 @@ preempt struct in procdata.
 
 4.10: Other Things We Thought of but Don't Like
 ---------------------------
-All local fate-related work is sent as a self a_msg, to enforce ordering.
-It doesn't capture the difference between a local call and a remote a_msg.
-The a_msg has already considered state and made its decision.  The local call
+All local fate-related work is sent as a self k_msg, to enforce ordering.
+It doesn't capture the difference between a local call and a remote k_msg.
+The k_msg has already considered state and made its decision.  The local call
 is an attempt.  It is also unnecessary, if we put in enough information to
 make a decision in the proc struct.  Finally, it caused a few other problems
 (like needing to detect arbitrary stale messages).
@@ -610,7 +608,7 @@ and simple.  It is similar to generic messages that have the actual important
 information stored somewhere else (as with allowing broadcasts, with different
 receivers performing slightly different operations).
 
-Synchrony for messages (wanting a response to a preempt a_msg, for example)
+Synchrony for messages (wanting a response to a preempt k_msg, for example)
 sucks.  Just encode the state of impending fate in the proc struct, where it
 belongs.  Additionally, we don't want to hold the proc lock even longer than
 we do now (which is probably too long as it is).  Finally, it breaks a golden

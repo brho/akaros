@@ -51,6 +51,9 @@
 // IPI Interrupt Command Register
 #define LAPIC_IPI_ICR_LOWER			(LAPIC_BASE + 0x300)
 #define LAPIC_IPI_ICR_UPPER			(LAPIC_BASE + 0x310)
+// Interrupts being serviced (in-service) and pending (interrupt request reg)
+#define LAPIC_ISR					(LAPIC_BASE + 0x170)
+#define LAPIC_IRR					(LAPIC_BASE + 0x310)
 
 // PIT (Programmable Interval Timer)
 #define	TIMER_REG_CNTR0	0	/* timer 0 counter port */
@@ -122,6 +125,7 @@ static inline void send_broadcast_ipi(uint8_t vector);
 static inline void send_all_others_ipi(uint8_t vector);
 static inline void send_ipi(uint8_t hw_coreid, uint8_t vector);
 static inline void send_group_ipi(uint8_t hw_groupid, uint8_t vector);
+static inline bool ipi_is_pending(uint8_t vector);
 
 #define mask_lapic_lvt(entry) \
 	write_mmreg32(entry, read_mmreg32(entry) | LAPIC_LVT_MASK)
@@ -252,6 +256,13 @@ static inline void send_group_ipi(uint8_t hw_groupid, uint8_t vector)
 	write_mmreg32(LAPIC_IPI_ICR_UPPER, hw_groupid << 24);
 	write_mmreg32(LAPIC_IPI_ICR_LOWER, 0x00004800 | vector);
 	lapic_wait_to_send();
+}
+
+/* This works for any interrupt that goes through the LAPIC, but not things like
+ * ExtInts.  To prevent abuse, we'll use it just for IPIs for now. */
+static inline bool ipi_is_pending(uint8_t vector)
+{
+	return (LAPIC_ISR & vector) || (LAPIC_IRR & vector);
 }
 
 /* To change the LAPIC Base (not recommended):

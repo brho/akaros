@@ -65,7 +65,7 @@ struct preempt_data {
 	// TODO: move to procinfo!
 	uint64_t				preempt_pending;
 	bool					notif_enabled;		/* vcore is willing to receive*/
-	bool					notif_pending;		/* notif a_msg on the way */
+	bool					notif_pending;		/* notif k_msg on the way */
 	seq_ctr_t				preempt_tf_valid;
 	uint8_t					notif_bmask[(NR_PERCORE_EVENTS - 1) / 8 + 1];
 	struct notif_event		notif_events[NR_PERCORE_EVENTS];

@@ -1,0 +1,120 @@
+kernel_messages.txt
+Barret Rhoden
+2010-03-19
+
+This document explains the basic ideas behind our "kernel messages" and some of
+the arcane bits behind the implementation.  These were formerly called active
+messages, since they were an implementation of the low-level hardware messaging.
+
+Overview:
+--------------------------------
+Our kernel messages are just work that is shipped remotely, delayed, or both.
+They currently consist of a PC and a few arguments.  Initially, they were meant
+to be a way to immediately execute code on another core (once interrupts are
+enabled), in the order in which the messages were sent.  This is insufficient
+(and wasn't what we wanted for the task, incidentally).  We simply want to do
+work on another core, but not necessarily instantly.  And not necessarily on
+another core.
+
+Currently, there are two types, distinguished by which list they are sent to per
+core: immediate and routine.  Urgent messages will get executed as soon as
+possible (once interrupts are enabled).  Routine messages will be executed at
+convenient points in the kernel.  This includes when the kernel is about to pop
+back to userspace, or smp_idle()ing.  Routine messages are necessary when their
+function does not return, such as a __startcore, __death, or anything else that
+can ruin whatever the kernel was doing.  They should also be used if the work is
+not worth fully interrupting the kernel.  (An IPI will still be sent, but the
+work will be delayed)
+
+Kernel messages of a given type will be executed in order.  If immediate
+messages show up while processing a routine message, the immediate message will
+get processed next, at the latest.  Even if the routine function doesn't return,
+once interrupts are reenabled (like when popping to userspace), the
+__kernel_message() handler will fire again.
+
+History:
+--------------------------------
+A bit of history: we used to use "immediate" messages (when all messages were
+immediate) for __death calls.  The idea was that we didn't care what the core
+was doing, since we didn't need to save state or anything.  I could see that
+there were going to be issues with preemption, since we would want to do some
+saving of what the core was doing (and what the kernel was doing on its behalf),
+so we prepared to deal with that.  However, even __death could break certain
+codes that were holding a reference (and hence a refcnt) for a process, which
+would prevent the process from ever being cleaned up.  It was a specific case of
+a job that the kernel needed to finish before executing the message.
+
+An example of an immediate message would be a TLB_shootdown.  Check current,
+flush if applicable, and return.  It doesn't harm the kernel at all.  Another
+example would be certain debug routines.
+
+Kernel messages are currently an arch-dependent thing, but this ought to change
+when sparc has IPI functions similar to x86.
+
+Other Uses:
+--------------------------------
+Kernel messages will also be the basis for the alarm system.  All it is is
+expressing work that needs to be done.  That being said, the k_msg struct will
+probably receive a timestamp field, among other things.  Routine messages also
+will replace the old workqueue, which hasn't really been used in 10 months or
+so.
+
+To Return or Not:
+--------------------------------
+Routine k_msgs do not have to return.  Urgent messages must.  The distinction is
+in how they are sent (send_kernel_message() will take a flag), so be careful.
+Technically, an immediate message could not return, but only if the kernel code
+that was interrupted was not holding any locks, mucking with any invariants, or
+otherwise doing work that needed to be done.  Those cases seem rather rare.
+
+Trickiness:
+--------------------------------
+If a function does not return, then the code might not check the list again, or
+send the EOI.  This is one reason why we send the EOI first, and insist that the
+__kernel_message() handler execute with interrupts disabled.  The routine
+messages do not need to have their interrupts disabled (if they are executed
+somewhere else).  If another IPI comes in, immediate messages will run, but
+other routine messages won't (they will get executed when the list is checked
+again).  However, enabling interrupts in the __kernel_message() handler can be
+problematic, depending on when the EOI is sent (nesting on the same code).
+
+The other reason we send_eoi() first is that we can only send it once per
+handler (not per message).  Otherwise, it can start acknowleding other interrupt
+vectors, which is bad.  We might move it in the while loop and protect it with a
+static check, but it doesn't seem worth it.  We still can't turn on interrupts,
+since the self_ipi could would fire and return while processing a routine
+function, negating the intent of the self_ipi.
+
+Since IPIs get "squashed" (my word, meaning if a core receives more than two at
+a time, future IPIs for a vector are ignored), and since functions might not
+return, there is the possibility of losing a message.  There can be more
+messages than IPIs (imagine three k_msgs, each that doesn't return).  To protect
+against this, if there is not an IPI pending (you can check on x86), and if
+there are messages in the routine list, then the code self_ipi's the current
+core.
+
+We don't need to check the immediate list, since we just checked it higher in
+the code (o/w, we wouldn't be executing routine messages).  If an immediate
+showed up since we executed the lapic_send_eoi(), an IPI will be on the way
+(messages are enqueued before sending the IPI).
+
+When we check the routine list, we don't need to lock.  All that macro does is
+check to see if head->item == 0 (and the list head won't get changed).  It's
+basically just a read, which gains no protection from a lock.
+
+Other Notes:
+--------------------------------
+Unproven hunch, but the main performance bottleneck with multiple senders and
+receivers of k_msgs will be the slab allocator.  We use the slab so we can
+dynamically create the k_msgs (can pass them around easily, delay with them
+easily (alarms), and most importantly we can't deadlock by running out of room
+in a static buffer).
+
+Architecture Dependence:
+--------------------------------
+Some details will differ, based on architectural support.  For instance,
+immediate messages can be implemented with true active messages.  Other systems
+with maskable IPI vectors can use a different IPI for routine messages, and that
+interrupt can get masked whenever we enter the kernel (note, that means making
+every trap gate an interrupt gate), and we unmask that interrupt when we want to
+process routine messages.

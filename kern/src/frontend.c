@@ -284,7 +284,8 @@ void appserver_die(int code)
 	int i;
 	for(i = 0; i < num_cpus; i++)
 		if(i != core_id())
-			while(send_active_message(i,(amr_t)&__diediedie,(void*)code,0,0));
+			while(send_kernel_message(i,(amr_t)&__diediedie,(void*)code,0,0,
+			                          AMSG_IMMEDIATE));
 
 	// just in case.
 	__diediedie(0,0,code,0,0);
