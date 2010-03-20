@@ -8,6 +8,7 @@
 
 #include <ros/common.h>
 #include <ros/arch/trapframe.h>
+#include <arch/sparc.h>
 
 /* the struct trapframe and friends are in ros/arch/trapframe.h */
 
@@ -25,11 +26,9 @@ static inline void set_errno(trapframe_t* tf, uint32_t errno)
 	tf->gpr[9] = errno;
 }
 
-/* TODO: Need to determine if the TF was in the kernel. */
 static inline bool in_kernel(struct trapframe *tf)
 {
-	static_assert(0);
-	return LIES;
+	return tf->psr & PSR_PS;
 }
 
 #endif /* !__ASSEMBLER__ */

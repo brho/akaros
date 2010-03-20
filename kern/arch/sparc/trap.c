@@ -21,31 +21,44 @@
 #pragma nodeputy
 #endif
 
+struct kmem_cache *kernel_msg_cache;
+void kernel_msg_init(void)
+{
+	kernel_msg_cache = kmem_cache_create("kernel_msgs",
+	                   sizeof(struct kernel_message), HW_CACHE_ALIGN, 0, 0, 0);
+}
+
 spinlock_t kernel_message_buf_busy[MAX_NUM_CPUS] = {SPINLOCK_INITIALIZER};
 kernel_message_t kernel_message_buf[MAX_NUM_CPUS];
 
+/* This is mostly identical to x86's, minus the different send_ipi call. */
 uint32_t send_kernel_message(uint32_t dst, amr_t pc,
                              TV(a0t) arg0, TV(a1t) arg1, TV(a2t) arg2, int type)
 {
-	/* TODO: need to merge with x86 for one unified messaging (based on IPIs).
-	 * you can temporarily get by with ignoring the distinction between routine
-	 * and urgent, but certain races will ruin the system.  also note that no
-	 * code is able to handle a failure of this function. */
-	if(dst >= num_cpus || spin_trylock(&kernel_message_buf_busy[dst]))
-		return -1;
-
-	kernel_message_buf[dst].srcid = core_id();
-	kernel_message_buf[dst].pc = pc;
-	kernel_message_buf[dst].arg0 = arg0;
-	kernel_message_buf[dst].arg1 = arg1;
-	kernel_message_buf[dst].arg2 = arg2;
-
-	if(send_ipi(dst))
-	{
-		spin_unlock(&kernel_message_buf_busy[dst]);
-		return -1;
+	kernel_message_t *k_msg;
+	assert(pc);
+	// note this will be freed on the destination core
+	k_msg = (kernel_message_t *CT(1))TC(kmem_cache_alloc(kernel_msg_cache, 0));
+	k_msg->srcid = core_id();
+	k_msg->pc = pc;
+	k_msg->arg0 = arg0;
+	k_msg->arg1 = arg1;
+	k_msg->arg2 = arg2;
+	switch (type) {
+		case AMSG_IMMEDIATE:
+			spin_lock_irqsave(&per_cpu_info[dst].immed_amsg_lock);
+			STAILQ_INSERT_TAIL(&per_cpu_info[dst].immed_amsgs, k_msg, link);
+			spin_unlock_irqsave(&per_cpu_info[dst].immed_amsg_lock);
+			break;
+		case AMSG_ROUTINE:
+			spin_lock_irqsave(&per_cpu_info[dst].routine_amsg_lock);
+			STAILQ_INSERT_TAIL(&per_cpu_info[dst].routine_amsgs, k_msg, link);
+			spin_unlock_irqsave(&per_cpu_info[dst].routine_amsg_lock);
+			break;
+		default:
+			panic("Unknown type of kernel message!");
 	}
-
+	send_ipi(dst);
 	return 0;
 }
 
@@ -139,19 +152,54 @@ get_trapname(uint8_t tt, char buf[TRAPNAME_MAX])
 	return buf;
 }
 
-void
-handle_ipi(trapframe_t* state)
+/* Helper function.  Returns 0 if the list was empty. */
+static kernel_message_t *get_next_amsg(struct kernel_msg_list *list_head,
+                                       spinlock_t *list_lock)
 {
-	kernel_message_t m;
-	m = kernel_message_buf[core_id()];
-	spin_unlock(&kernel_message_buf_busy[core_id()]);
+	kernel_message_t *k_msg;
+	spin_lock_irqsave(list_lock);
+	k_msg = STAILQ_FIRST(list_head);
+	if (k_msg)
+		STAILQ_REMOVE_HEAD(list_head, link);
+	spin_unlock_irqsave(list_lock);
+	return k_msg;
+}
 
-	uint32_t src = m.srcid;
-	TV(a0t) a0 = m.arg0;
-	TV(a1t) a1 = m.arg1;
-	TV(a2t) a2 = m.arg2;
-	(m.pc)(state,src,a0,a1,a2);
-	env_pop_tf(state);
+/* Mostly the same as x86's implementation.  Keep them in sync.  This assumes
+ * you can send yourself an IPI, and that IPIs can get squashed like on x86. */
+void handle_ipi(trapframe_t* tf)
+{
+	per_cpu_info_t *myinfo = &per_cpu_info[core_id()];
+	kernel_message_t msg_cp, *k_msg;
+
+	while (1) { // will break out when there are no more messages
+		/* Try to get an immediate message.  Exec and free it. */
+		k_msg = get_next_amsg(&myinfo->immed_amsgs, &myinfo->immed_amsg_lock);
+		if (k_msg) {
+			assert(k_msg->pc);
+			k_msg->pc(tf, k_msg->srcid, k_msg->arg0, k_msg->arg1, k_msg->arg2);
+			kmem_cache_free(kernel_msg_cache, (void*)k_msg);
+		} else { // no immediate, might be a routine
+			if (in_kernel(tf))
+				return; // don't execute routine msgs if we were in the kernel
+			k_msg = get_next_amsg(&myinfo->routine_amsgs,
+			                      &myinfo->routine_amsg_lock);
+			if (!k_msg) // no routines either
+				return;
+			/* copy in, and then free, in case we don't return */
+			msg_cp = *k_msg;
+			kmem_cache_free(kernel_msg_cache, (void*)k_msg);
+			/* make sure an IPI is pending if we have more work */
+			/* techincally, we don't need to lock when checking */
+			if (!STAILQ_EMPTY(&myinfo->routine_amsgs))
+				send_ipi(core_id());
+			/* Execute the kernel message */
+			assert(msg_cp.pc);
+			msg_cp.pc(tf, msg_cp.srcid, msg_cp.arg0, msg_cp.arg1, msg_cp.arg2);
+		}
+	}
+	/* slightly different than x86 - returns from the handler directly */
+	env_pop_tf(tf);
 }
 
 void
@@ -335,11 +383,4 @@ handle_breakpoint(trapframe_t* state)
 	advance_pc(state);
 	monitor(state);
 	env_pop_tf(state);
-}
-
-struct kmem_cache *kernel_msg_cache;
-void kernel_msg_init(void)
-{
-	kernel_msg_cache = kmem_cache_create("kernel_msgs",
-	                   sizeof(struct kernel_message), HW_CACHE_ALIGN, 0, 0, 0);
 }
