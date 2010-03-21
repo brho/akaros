@@ -28,7 +28,7 @@
  * userapps in kern/src/Makefrag.
  * Make sure to declare it, and add an entry.  Keep MAX_KFS_FILES big enough too
  */
-#ifdef __i386__
+#ifndef __NO_KFS__
 DECL_PROG(parlib_matrix);
 DECL_PROG(roslib_proctests);
 DECL_PROG(roslib_fptest);
@@ -49,7 +49,7 @@ DECL_PROG(parlib_lock_test);
 #endif
 
 struct kfs_entry kfs[MAX_KFS_FILES] = {
-#ifdef __i386__
+#ifndef __NO_KFS__
 	KFS_ENTRY(parlib_matrix)
 	KFS_ENTRY(roslib_proctests)
 	KFS_ENTRY(roslib_fptest)
@@ -90,3 +90,4 @@ struct proc *kfs_proc_create(int kfs_inode)
 		panic("Invalid kfs_inode.  Check you error codes!");
 	return proc_create(kfs[kfs_inode].start, kfs[kfs_inode].size);
 }
+

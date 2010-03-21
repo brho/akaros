@@ -1,7 +1,7 @@
 #include <arch/arch.h>
 #include <arch/trap.h>
-#include <arch/frontend.h>
 #include <process.h>
+#include <frontend.h>
 #include <pmap.h>
 #include <smp.h>
 
@@ -19,7 +19,7 @@ proc_init_arch(struct proc *SAFE p)
 {
 	pid_t parent_id = p->ppid, id = p->pid;
 	int32_t errno;
-	if(frontend_syscall(parent_id,RAMP_SYSCALL_proc_init,id,0,0,0,&errno))
+	if(frontend_syscall(parent_id,APPSERVER_SYSCALL_proc_init,id,0,0,0,&errno))
 		panic("Front-end server couldn't initialize new process!");
 }
 
@@ -28,7 +28,7 @@ void
 proc_free_arch(struct proc *SAFE p)
 {
 	int32_t errno;
-	if(frontend_syscall(0,RAMP_SYSCALL_proc_free,p->pid,0,0,0,&errno))
+	if(frontend_syscall(0,APPSERVER_SYSCALL_proc_free,p->pid,0,0,0,&errno))
 		panic("Front-end server couldn't free process!");
 }
 

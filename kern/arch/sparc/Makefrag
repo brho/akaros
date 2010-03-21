@@ -19,8 +19,6 @@ KERN_ARCH_SRCFILES := $(KERN_ARCH_SRC_DIR)/entry.S \
                       $(KERN_ARCH_SRC_DIR)/boot.c \
                       $(KERN_ARCH_SRC_DIR)/cpuinfo.c \
                       $(KERN_ARCH_SRC_DIR)/console.c \
-                      $(KERN_ARCH_SRC_DIR)/frontend.c \
-                      $(KERN_ARCH_SRC_DIR)/syscalls.c \
                       $(KERN_ARCH_SRC_DIR)/pmap.c \
                       $(KERN_ARCH_SRC_DIR)/page_alloc.c \
                       $(KERN_ARCH_SRC_DIR)/process.c \
@@ -33,3 +31,4 @@ KERN_ARCH_SRCFILES := $(KERN_ARCH_SRC_DIR)/entry.S \
                       $(KERN_ARCH_SRC_DIR)/sparcfpu.c \
                       $(KERN_ARCH_SRC_DIR)/softfloat.c \
                       $(KERN_ARCH_SRC_DIR)/recip.S
+

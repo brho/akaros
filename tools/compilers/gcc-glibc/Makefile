@@ -59,7 +59,7 @@ x86:
 	export PATH=$(DESTDIR)$(X86_INSTDIR)/bin:$(PATH);\
 	export ARCH=$(X86_ARCH);\
 	export ARCH_CFLAGS=$(X86_CFLAGS);\
-	export ROS_ARCH_DIR=i386;\
+	export ROS_ARCH_DIR=$(X86_ARCH);\
 	export BINARY_PREFIX=$(X86_BINARY_PREFIX);\
 	export GCC_BUILD_FLAGS=$(X86_GCC_BUILD_FLAGS);\
 	$(MAKE) make-all

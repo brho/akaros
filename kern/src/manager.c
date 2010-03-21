@@ -206,7 +206,6 @@ struct elf_info
 
 void manager_waterman()
 {
-#ifndef __i386__
 	static int init = 0;
 	if(!init)
 	{
@@ -217,12 +216,13 @@ void manager_waterman()
 		char* envp[] = {"LD_LIBRARY_PATH=/lib",0};
 		procinfo_pack_args(p->env_procinfo,argv,envp);
 
+		printk("loading busybox\n");
 		assert(load_elf(p,"/bin/busybox") == 0);
+		printk("loaded busybox\n");
 
 		__proc_set_state(p, PROC_RUNNABLE_S);
 		proc_run(p);
 	}
-#endif
 	schedule();
 }
 

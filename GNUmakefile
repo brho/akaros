@@ -12,8 +12,8 @@ OBJDIR := obj
 all: symlinks
 
 # User defined constants passed on the command line 
-TARGET_ARCH := i386
-COMPILER := IVY
+TARGET_ARCH := i686
+COMPILER := GCC
 
 -include Makelocal
 
@@ -28,22 +28,22 @@ V = @
 # Cross-compiler ros toolchain
 #
 # This Makefile will automatically use the cross-compiler toolchain
-# installed as 'i386-ros-*', if one exists.  If the host tools ('gcc',
+# installed as 'i686-ros-*', if one exists.  If the host tools ('gcc',
 # 'objdump', and so forth) compile for a 32-bit x86 ELF target, that will
 # be detected as well.  If you have the right compiler toolchain installed
 # using a different name, set GCCPREFIX explicitly in your Makelocal file
 
 # try to infer the correct GCCPREFIX
 ifndef GCCPREFIX
-GCCPREFIX := $(shell if i386-ros-objdump -i 2>&1 | grep '^elf32-i386$$' >/dev/null 2>&1; \
-	then echo 'i386-ros-'; \
-	elif objdump -i 2>&1 | grep 'elf32-i386' >/dev/null 2>&1; \
+GCCPREFIX := $(shell if i686-ros-objdump -i 2>&1 | grep '^elf32-i686$$' >/dev/null 2>&1; \
+	then echo 'i686-ros-'; \
+	elif objdump -i 2>&1 | grep 'elf32-i686' >/dev/null 2>&1; \
 	then echo ''; \
 	else echo "***" 1>&2; \
-	echo "*** Error: Couldn't find an i386-*-elf version of GCC/binutils." 1>&2; \
-	echo "*** Is the directory with i386-ros-gcc in your PATH?" 1>&2; \
-	echo "*** If your i386-*-elf toolchain is installed with a command" 1>&2; \
-	echo "*** prefix other than 'i386-ros-', set your GCCPREFIX" 1>&2; \
+	echo "*** Error: Couldn't find an i686-*-elf version of GCC/binutils." 1>&2; \
+	echo "*** Is the directory with i686-ros-gcc in your PATH?" 1>&2; \
+	echo "*** If your i686-*-elf toolchain is installed with a command" 1>&2; \
+	echo "*** prefix other than 'i686-ros-', set your GCCPREFIX" 1>&2; \
 	echo "*** environment variable to that prefix and run 'make' again." 1>&2; \
 	echo "*** To turn off this error, run 'gmake GCCPREFIX= ...'." 1>&2; \
 	echo "***" 1>&2; exit 1; fi)

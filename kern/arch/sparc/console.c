@@ -1,4 +1,4 @@
-#include <arch/frontend.h>
+#include <frontend.h>
 #include <pmap.h>
 
 void
@@ -12,7 +12,7 @@ void
 cputbuf(const char*COUNT(len) buf, int len)
 {
 	int32_t errno;
-	frontend_syscall(0,RAMP_SYSCALL_write,1,PADDR((int32_t)buf),len,0,&errno);
+	frontend_syscall(0,APPSERVER_SYSCALL_write,1,PADDR((int32_t)buf),len,0,&errno);
 }
 
 // Low-level console I/O
@@ -44,7 +44,7 @@ cons_getc()
 {
 	char ch;
 	int32_t errno;
-	int32_t ret = frontend_syscall(0,RAMP_SYSCALL_read,0,PADDR((int32_t)&ch),1,0,&errno);
+	int32_t ret = frontend_syscall(0,APPSERVER_SYSCALL_read,0,PADDR((int32_t)&ch),1,0,&errno);
 	if(ch == 0x7F)
 		ch = '\b';
 	return ret <= 0 ? 0 : ch;

@@ -23,18 +23,16 @@
 #include <kmalloc.h>
 #include <stdio.h>
 #include <resource.h>
+#include <frontend.h>
 #include <colored_caches.h>
 #include <arch/bitmask.h>
 #include <kfs.h> // eventually replace this with vfs.h
 
-#ifdef __sparc_v8__
-#include <arch/frontend.h>
-#endif 
 
 #ifdef __NETWORK__
 #include <arch/nic_common.h>
-extern char *CT(PACKET_HEADER_SIZE + len) (*packet_wrap)(const char *CT(len) data, size_t len);
 extern int (*send_frame)(const char *CT(len) data, size_t len);
+extern char device_mac[6];
 #endif
 
 /************** Utility Syscalls **************/
@@ -606,9 +604,10 @@ static ssize_t sys_eth_write(env_t* e, const char *DANGEROUS buf, size_t len)
 		int just_sent = 0;
 		int cur_packet_len = 0;
 		while (total_sent != len) {
-			cur_packet_len = ((len - total_sent) > MAX_PACKET_DATA) ? MAX_PACKET_DATA : (len - total_sent);
-			char* wrap_buffer = packet_wrap(_buf + total_sent, cur_packet_len);
-			just_sent = send_frame(wrap_buffer, cur_packet_len + PACKET_HEADER_SIZE);
+			cur_packet_len = ((len - total_sent) > MTU) ? MTU : (len - total_sent);
+			char dest_mac[6] = APPSERVER_MAC_ADDRESS;
+			char* wrap_buffer = eth_wrap(_buf + total_sent, cur_packet_len, device_mac, dest_mac, APPSERVER_PORT);
+			just_sent = send_frame(wrap_buffer, cur_packet_len + sizeof(struct ETH_Header));
 
 			if (just_sent < 0)
 				return 0; // This should be an error code of its own
@@ -640,7 +639,6 @@ static ssize_t sys_eth_get_mac_addr(env_t* e, char *DANGEROUS buf) {
 		return -EINVAL;
 }
 
-
 static int sys_eth_recv_check(env_t* e) {
 
 	extern uint32_t packet_buffer_count;
@@ -654,8 +652,263 @@ static int sys_eth_recv_check(env_t* e) {
 
 #endif // Network
 
-/* sys_frontend_syscall_from_user(): called directly from dispatch table. */
+// Syscalls below here are serviced by the appserver for now.
+#define ufe(which,a0,a1,a2,a3) \
+	user_frontend_syscall(p,APPSERVER_SYSCALL_##which,\
+	                   (int)(a0),(int)(a1),(int)(a2),(int)(a3))
 
+int32_t sys_frontend(env_t* p, int32_t syscall_num, 
+                     uint32_t arg0, uint32_t arg1, 
+                     uint32_t arg2, uint32_t translate_args)
+{
+	// really, we just want to pin pages, but irqdisable works
+	static spinlock_t lock = SPINLOCK_INITIALIZER;
+	spin_lock_irqsave(&lock);
+
+	uint32_t arg[3] = {arg0,arg1,arg2};
+	for(int i = 0; i < 3; i++)
+	{
+		int flags = (translate_args & (1 << (i+3))) ? PTE_USER_RW :
+		           ((translate_args & (1 << i)) ? PTE_USER_RO : 0);
+		if(flags)
+		{
+			pte_t* pte = pgdir_walk(p->env_pgdir,(void*)arg[i],0);
+			if(pte == NULL || !(*pte & flags))
+			{
+				spin_unlock_irqsave(&lock);
+				return -1;
+			}
+			arg[i] = PTE_ADDR(*pte) | PGOFF(arg[i]);
+		}
+	}
+
+	int32_t ret = user_frontend_syscall(p,syscall_num,arg[0],arg[1],arg[2],0);
+
+	spin_unlock_irqsave(&lock);
+	return ret;
+}
+
+
+intreg_t sys_write(struct proc* p, int fd, const void* buf, int len)
+{
+	void* kbuf = user_memdup_errno(p,buf,len);
+	if(kbuf == NULL)
+		return -1;
+	int ret = ufe(write,fd,PADDR(kbuf),len,0);
+	user_memdup_free(p,kbuf);
+	return ret;
+}
+
+intreg_t sys_read(struct proc* p, int fd, void* buf, int len)
+{
+	void* kbuf = kmalloc_errno(len);
+	if(kbuf == NULL)
+		return -1;
+	int ret = ufe(read,fd,PADDR(kbuf),len,0);
+	if(ret != -1 && memcpy_to_user_errno(p,buf,kbuf,len))
+		ret = -1;
+	user_memdup_free(p,kbuf);
+	return ret;
+}
+
+intreg_t sys_pwrite(struct proc* p, int fd, const void* buf, int len, int offset)
+{
+	void* kbuf = user_memdup_errno(p,buf,len);
+	if(kbuf == NULL)
+		return -1;
+	int ret = ufe(pwrite,fd,PADDR(kbuf),len,offset);
+	user_memdup_free(p,kbuf);
+	return ret;
+}
+
+intreg_t sys_pread(struct proc* p, int fd, void* buf, int len, int offset)
+{
+	void* kbuf = kmalloc_errno(len);
+	if(kbuf == NULL)
+		return -1;
+	int ret = ufe(pread,fd,PADDR(kbuf),len,offset);
+	if(ret != -1 && memcpy_to_user_errno(p,buf,kbuf,len))
+		ret = -1;
+	user_memdup_free(p,kbuf);
+	return ret;
+}
+
+intreg_t sys_open(struct proc* p, const char* path, int oflag, int mode)
+{
+	char* fn = user_strdup_errno(p,path,PGSIZE);
+	if(fn == NULL)
+		return -1;
+	int ret = ufe(open,PADDR(fn),oflag,mode,0);
+	user_memdup_free(p,fn);
+	return ret;
+}
+intreg_t sys_close(struct proc* p, int fd)
+{
+	return ufe(close,fd,0,0,0);
+}
+
+#define NEWLIB_STAT_SIZE 64
+intreg_t sys_fstat(struct proc* p, int fd, void* buf)
+{
+	int kbuf[NEWLIB_STAT_SIZE/sizeof(int)];
+	int ret = ufe(fstat,fd,PADDR(kbuf),0,0);
+	if(ret != -1 && memcpy_to_user_errno(p,buf,kbuf,NEWLIB_STAT_SIZE))
+		ret = -1;
+	return ret;
+}
+
+intreg_t sys_stat(struct proc* p, const char* path, void* buf)
+{
+	int kbuf[NEWLIB_STAT_SIZE/sizeof(int)];
+	char* fn = user_strdup_errno(p,path,PGSIZE);
+	if(fn == NULL)
+		return -1;
+
+	int ret = ufe(stat,PADDR(fn),PADDR(kbuf),0,0);
+	if(ret != -1 && memcpy_to_user_errno(p,buf,kbuf,NEWLIB_STAT_SIZE))
+		ret = -1;
+
+	user_memdup_free(p,fn);
+	return ret;
+}
+
+intreg_t sys_lstat(struct proc* p, const char* path, void* buf)
+{
+	int kbuf[NEWLIB_STAT_SIZE/sizeof(int)];
+	char* fn = user_strdup_errno(p,path,PGSIZE);
+	if(fn == NULL)
+		return -1;
+
+	int ret = ufe(lstat,PADDR(fn),PADDR(kbuf),0,0);
+	if(ret != -1 && memcpy_to_user_errno(p,buf,kbuf,NEWLIB_STAT_SIZE))
+		ret = -1;
+
+	user_memdup_free(p,fn);
+	return ret;
+}
+
+intreg_t sys_fcntl(struct proc* p, int fd, int cmd, int arg)
+{
+	return ufe(fcntl,fd,cmd,arg,0);
+}
+
+intreg_t sys_access(struct proc* p, const char* path, int type)
+{
+	char* fn = user_strdup_errno(p,path,PGSIZE);
+	if(fn == NULL)
+		return -1;
+	int ret = ufe(access,PADDR(fn),type,0,0);
+	user_memdup_free(p,fn);
+	return ret;
+}
+
+intreg_t sys_umask(struct proc* p, int mask)
+{
+	return ufe(umask,mask,0,0,0);
+}
+
+intreg_t sys_chmod(struct proc* p, const char* path, int mode)
+{
+	char* fn = user_strdup_errno(p,path,PGSIZE);
+	if(fn == NULL)
+		return -1;
+	int ret = ufe(chmod,PADDR(fn),mode,0,0);
+	user_memdup_free(p,fn);
+	return ret;
+}
+
+intreg_t sys_lseek(struct proc* p, int fd, int offset, int whence)
+{
+	return ufe(lseek,fd,offset,whence,0);
+}
+
+intreg_t sys_link(struct proc* p, const char* _old, const char* _new)
+{
+	char* oldpath = user_strdup_errno(p,_old,PGSIZE);
+	if(oldpath == NULL)
+		return -1;
+
+	char* newpath = user_strdup_errno(p,_new,PGSIZE);
+	if(newpath == NULL)
+	{
+		user_memdup_free(p,oldpath);
+		return -1;
+	}
+
+	int ret = ufe(link,PADDR(oldpath),PADDR(newpath),0,0);
+	user_memdup_free(p,oldpath);
+	user_memdup_free(p,newpath);
+	return ret;
+}
+
+intreg_t sys_unlink(struct proc* p, const char* path)
+{
+	char* fn = user_strdup_errno(p,path,PGSIZE);
+	if(fn == NULL)
+		return -1;
+	int ret = ufe(unlink,PADDR(fn),0,0,0);
+	user_memdup_free(p,fn);
+	return ret;
+}
+
+intreg_t sys_chdir(struct proc* p, const char* path)
+{
+	char* fn = user_strdup_errno(p,path,PGSIZE);
+	if(fn == NULL)
+		return -1;
+	int ret = ufe(chdir,PADDR(fn),0,0,0);
+	user_memdup_free(p,fn);
+	return ret;
+}
+
+intreg_t sys_getcwd(struct proc* p, char* pwd, int size)
+{
+	void* kbuf = kmalloc_errno(size);
+	if(kbuf == NULL)
+		return -1;
+	int ret = ufe(read,PADDR(kbuf),size,0,0);
+	if(ret != -1 && memcpy_to_user_errno(p,pwd,kbuf,strnlen(kbuf,size)))
+		ret = -1;
+	user_memdup_free(p,kbuf);
+	return ret;
+}
+
+intreg_t sys_gettimeofday(struct proc* p, int* buf)
+{
+	static spinlock_t gtod_lock = SPINLOCK_INITIALIZER;
+	static int t0 = 0;
+
+	spin_lock(&gtod_lock);
+	if(t0 == 0)
+		t0 = ufe(time,0,0,0,0);
+	spin_unlock(&gtod_lock);
+
+	long long dt = read_tsc();
+	int kbuf[2] = {t0+dt/system_timing.tsc_freq,
+	    (dt%system_timing.tsc_freq)*1000000/system_timing.tsc_freq};
+
+	return memcpy_to_user_errno(p,buf,kbuf,sizeof(kbuf));
+}
+
+#define SIZEOF_STRUCT_TERMIOS 60
+intreg_t sys_tcgetattr(struct proc* p, int fd, void* termios_p)
+{
+	int kbuf[SIZEOF_STRUCT_TERMIOS/sizeof(int)];
+	int ret = ufe(tcgetattr,fd,PADDR(kbuf),0,0);
+	if(ret != -1 && memcpy_to_user_errno(p,termios_p,kbuf,SIZEOF_STRUCT_TERMIOS))
+		ret = -1;
+	return ret;
+}
+
+intreg_t sys_tcsetattr(struct proc* p, int fd, int optional_actions, const void* termios_p)
+{
+	void* kbuf = user_memdup_errno(p,termios_p,SIZEOF_STRUCT_TERMIOS);
+	if(kbuf == NULL)
+		return -1;
+	int ret = ufe(tcsetattr,fd,optional_actions,PADDR(kbuf),0);
+	user_memdup_free(p,kbuf);
+	return ret;
+}
 /************** Syscall Invokation **************/
 
 /* Executes the given syscall.
@@ -708,8 +961,8 @@ intreg_t syscall(struct proc *p, uintreg_t syscallno, uintreg_t a1,
 		[SYS_eth_get_mac_addr] = (syscall_t)sys_eth_get_mac_addr,
 		[SYS_eth_recv_check] = (syscall_t)sys_eth_recv_check,
 	#endif
-	#ifdef __sparc_v8__
-		[SYS_frontend] = (syscall_t)frontend_syscall_from_user,
+		// Syscalls serviced by the appserver for now.
+		[SYS_frontend] = (syscall_t)sys_frontend,
 		[SYS_read] = (syscall_t)sys_read,
 		[SYS_write] = (syscall_t)sys_write,
 		[SYS_open] = (syscall_t)sys_open,
@@ -729,7 +982,6 @@ intreg_t syscall(struct proc *p, uintreg_t syscallno, uintreg_t a1,
 		[SYS_gettimeofday] = (syscall_t)sys_gettimeofday,
 		[SYS_tcgetattr] = (syscall_t)sys_tcgetattr,
 		[SYS_tcsetattr] = (syscall_t)sys_tcsetattr
-	#endif
 	};
 
 	const int max_syscall = sizeof(syscall_table)/sizeof(syscall_table[0]);
@@ -795,3 +1047,4 @@ intreg_t process_generic_syscalls(struct proc *p, size_t max)
 	proc_decref(p, 1);
 	return (intreg_t)count;
 }
+

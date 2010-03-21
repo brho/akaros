@@ -100,8 +100,6 @@ void ne2k_init() {
 	ne2k_configure_nic();
 	ne2k_read_mac();
 	//ne2k_test_interrupts();
-
-	packet_wrap = &ne2k_packet_wrap;
 	send_frame = &ne2k_send_frame;
 
         ne2k_setup_interrupts();
@@ -499,77 +497,3 @@ int ne2k_send_frame(const char *data, size_t len) {
 	return len;
 }
 
-// This function is a complete hack for syscalls until we get a stack.
-// the day I delete this monstrosity of code I will be a happy man --Paul
-char *CT(PACKET_HEADER_SIZE + len) ne2k_packet_wrap(const char* data, size_t len) {
- 	
- 	#define htons(A) ((((uint16_t)(A) & 0xff00) >> 8) | \
- 	                    (((uint16_t)(A) & 0x00ff) << 8))
- 	#define htonl(A) ((((uint32_t)(A) & 0xff000000) >> 24) | \
- 	                    (((uint32_t)(A) & 0x00ff0000) >> 8)  | \
- 	                    (((uint32_t)(A) & 0x0000ff00) << 8)  | \
- 	                    (((uint32_t)(A) & 0x000000ff) << 24))
- 
- 	#define ntohs  htons
- 	#define ntohl  htohl
- 
- 	if ((len == 0) || (data == NULL))
- 		return NULL;
- 
- 	// Hard coded to paul's laptop's mac
- 	//Format for Makelocal file: -DUSER_MAC_ADDRESS="{0x00, 0x23, 0x32, 0xd5, 0xae, 0x82}"
- 	char dest_mac_address[6] = USER_MAC_ADDRESS;
- 	
- 	
- 	uint32_t source_ip = 0xC0A8000A; // 192.168.0.10
- 	uint32_t dest_ip   = 0xC0A8000B; // 192.168.0.11
-  
- 	
- 	if (len > MAX_PACKET_DATA) {
- 		ne2k_frame_debug("Bad packet size for packet wrapping");
- 		return NULL;
- 	}
- 	
- 	struct eth_packet* wrap_buffer = kmalloc(MAX_PACKET_SIZE, 0);
- 	
- 	if (wrap_buffer == NULL) {
- 		ne2k_frame_debug("Can't allocate page for packet wrapping");
- 		return NULL;
- 	}
- 	
- 
- 	struct ETH_Header *eth_header = &wrap_buffer->eth_head.eth_head;
- 	struct IP_Header *ip_header = &wrap_buffer->eth_head.ip_head;
- 	struct UDP_Header *udp_header = &wrap_buffer->eth_head.udp_head;
- 	
- 	// Setup eth data
- 	for (int i = 0; i < 6; i++) 
- 		eth_header->dest_mac[i] = dest_mac_address[i];
- 		
- 	for (int i = 0; i < 6; i++) 
- 		eth_header->source_mac[i] = device_mac[i];
- 		
- 	eth_header->eth_type = htons(0x0800);
- 	
- 	// Setup IP data
- 	ip_header->ip_opts0 = htonl((4<<28) | (5 << 24) | (len + 28));
- 	ip_header->ip_opts1 = 0;
- 	//ip_header->ip_opts2 = 0x4f2f110a;
-        ip_header->ip_opts2 = 0x0000110a;
-
-	ip_header->source_ip = htonl(source_ip);
- 	ip_header->dest_ip = htonl(dest_ip);
- 	
-
-	ip_header->ip_opts2 = 	ip_header->ip_opts2 | 
-				((uint32_t)cksum((char*)ip_header, sizeof(struct IP_Header)) << 16);
- 	// Setup UDP Data
- 	udp_header->source_port = htons(44443);
- 	udp_header->dest_port = htons(44444);
- 	udp_header->length = htons(8 + len);
- 	udp_header->checksum = 0;
- 	
- 	memcpy (&wrap_buffer->data[0], data, len);
- 	
- 	return (char *CT(PACKET_HEADER_SIZE + len))wrap_buffer;	
-}
