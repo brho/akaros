@@ -88,12 +88,12 @@ KERN_LDLIBS    := -livykern
 
 KERN_GCC_LIB   ?= $(GCC_LIB)
 
-$(OBJDIR)/$(KERN_DIR)/%.o: $(KERN_DIR)/%.c
+$(OBJDIR)/$(KERN_DIR)/%.o: $(KERN_DIR)/%.c $(DEPENDS)
 	@echo + cc [KERN] $<
 	@mkdir -p $(@D)
 	$(V)$(CC) $(KERN_CFLAGS) -c -o $@ $<
 
-$(OBJDIR)/$(KERN_DIR)/%.o: $(KERN_DIR)/%.S
+$(OBJDIR)/$(KERN_DIR)/%.o: $(KERN_DIR)/%.S $(DEPENDS)
 	@echo + as [KERN] $<
 	@mkdir -p $(@D)
 	$(V)$(CC) $(KERN_CFLAGS) -D__ASSEMBLER__ -c -o $@ $<

@@ -9,7 +9,7 @@
 OBJDIR := obj
 
 # Make sure that 'all' is the first target
-all: symlinks
+all:
 
 # User defined constants passed on the command line 
 TARGET_ARCH := i686
@@ -35,17 +35,12 @@ V = @
 
 # try to infer the correct GCCPREFIX
 ifndef GCCPREFIX
-GCCPREFIX := $(shell if i686-ros-objdump -i 2>&1 | grep '^elf32-i686$$' >/dev/null 2>&1; \
-	then echo 'i686-ros-'; \
-	elif objdump -i 2>&1 | grep 'elf32-i686' >/dev/null 2>&1; \
+GCCPREFIX := $(shell if $(TARGET_ARCH)-ros-objdump -i 2>&1 >/dev/null 2>&1; \
+	then echo '$(TARGET_ARCH)-ros-'; \
+	elif objdump -i 2>&1 | grep 'elf32-$(TARGET_ARCH)' >/dev/null 2>&1; \
 	then echo ''; \
 	else echo "***" 1>&2; \
-	echo "*** Error: Couldn't find an i686-*-elf version of GCC/binutils." 1>&2; \
-	echo "*** Is the directory with i686-ros-gcc in your PATH?" 1>&2; \
-	echo "*** If your i686-*-elf toolchain is installed with a command" 1>&2; \
-	echo "*** prefix other than 'i686-ros-', set your GCCPREFIX" 1>&2; \
-	echo "*** environment variable to that prefix and run 'make' again." 1>&2; \
-	echo "*** To turn off this error, run 'gmake GCCPREFIX= ...'." 1>&2; \
+	echo "*** Error: Couldn't find $(TARGET_ARCH)-*-ros version of GCC/binutils." 1>&2; \
 	echo "***" 1>&2; exit 1; fi)
 endif
 
@@ -95,13 +90,12 @@ LDFLAGS := -nostdlib
 OBJDIRS :=
 
 ROS_ARCH_DIR ?= $(TARGET_ARCH)
-symlinks-remove:
-	@rm -rf kern/include/arch
-	@rm -rf kern/boot
 
-symlinks: symlinks-remove
+kern/include/arch:
 	@ln -s ../arch/$(ROS_ARCH_DIR)/ kern/include/arch
+kern/boot:
 	@ln -s arch/$(ROS_ARCH_DIR)/boot/ kern/boot
+DEPENDS := kern/boot kern/include/arch
 
 # Include Makefrags for subdirectories
 include kern/Makefrag
