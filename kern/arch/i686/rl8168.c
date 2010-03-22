@@ -83,7 +83,6 @@ struct Descriptor
 
 uint32_t rl8168_io_base_addr = 0;
 uint32_t rl8168_irq = 0;
-char device_mac[6];
 
 struct Descriptor *CT(NUM_RX_DESCRIPTORS) rx_des_kva;
 unsigned long rx_des_pa;
@@ -94,16 +93,6 @@ unsigned long tx_des_pa;
 uint32_t rx_des_cur = 0;
 uint32_t tx_des_cur = 0;
 
-extern int eth_up;
-extern uint32_t packet_buffer_count;
-extern char* packet_buffer[PACKET_BUFFER_SIZE];
-extern uint32_t packet_buffer_sizes[PACKET_BUFFER_SIZE];
-extern uint32_t packet_buffer_head;
-extern uint32_t packet_buffer_tail;
-spinlock_t packet_buffer_lock;
-
-extern char *CT(PACKET_HEADER_SIZE + len) (*packet_wrap)(const char *CT(len) data, size_t len);
-extern int (*send_frame)(const char *CT(len) data, size_t len);
 
 
 void rl8168_init() {
@@ -519,22 +508,22 @@ void rl8168_handle_rx_packet() {
 	} while (!(current_command & DES_LS_MASK));
 	
 
-	spin_lock(&packet_buffer_lock);
+	spin_lock(&packet_buffers_lock);
 
-	if (packet_buffer_count >= PACKET_BUFFER_SIZE) {
+	if (num_packet_buffers >= MAX_PACKET_BUFFERS) {
 		printk("WARNING: DROPPING PACKET!\n");
-		spin_unlock(&packet_buffer_lock);
+		spin_unlock(&packet_buffers_lock);
 		kfree(rx_buffer);
 		return;
 	}
 
-	packet_buffer[packet_buffer_tail] = rx_buffer;
-	packet_buffer_sizes[packet_buffer_tail] = frame_size;
+	packet_buffers[packet_buffers_tail] = rx_buffer;
+	packet_buffers_sizes[packet_buffers_tail] = frame_size;
 		
-	packet_buffer_tail = (packet_buffer_tail + 1) % PACKET_BUFFER_SIZE;
-	packet_buffer_count = packet_buffer_count + 1;
+	packet_buffers_tail = (packet_buffers_tail + 1) % MAX_PACKET_BUFFERS;
+	num_packet_buffers++;
 
-	spin_unlock(&packet_buffer_lock);
+	spin_unlock(&packet_buffers_lock);
 				
 	rx_des_cur = rx_des_loop_cur;
 				

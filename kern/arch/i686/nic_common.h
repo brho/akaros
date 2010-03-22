@@ -5,67 +5,58 @@
 #include <trap.h>
 #include <pmap.h>
 
+// Packet sizes
+#define MTU              1500
+#define MAX_FRAME_SIZE   (MTU + 14)
+#define MIN_FRAME_SIZE   60 // See the spec...
 
-// Basic packet sizing
-// TODO handle jumbo packets
-#define ETHERNET_ENCAP_SIZE	18
-#define MTU			1500	
-#define MAX_FRAME_SIZE		ETHERNET_ENCAP_SIZE + MTU	
-	
-// This is to make it simply compile when not in __NETWORK__ mode.
-#ifndef USER_MAC_ADDRESS
-#define USER_MAC_ADDRESS {0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
-#endif
+// Maximum packet buffers we can handle at any given time
+#define MAX_PACKET_BUFFERS    1024
+ 
+// Global send_frame function pointer
+// Means we can only have one network card per system right now...
+extern int (*send_frame)(const char *data, size_t len);
 
-// v----- Evil line ------v
-// Hacky stuff for syscalls go away.
+// Global variables for managing ethernet packets over a nic
+// Again, since these are global for all network cards we are 
+// limited to only one for now
+extern char device_mac[6];
+extern uint8_t eth_up;
+extern uint32_t num_packet_buffers;
+extern char* packet_buffers[MAX_PACKET_BUFFERS];
+extern uint32_t packet_buffers_sizes[MAX_PACKET_BUFFERS];
+extern uint32_t packet_buffers_head;
+extern uint32_t packet_buffers_tail;
+extern spinlock_t packet_buffers_lock; 
 
-#define PACKET_BUFFER_SIZE 1024
-
-struct ETH_Header
+// Host to network format conversions and vice-versa
+static inline uint16_t htons(uint16_t x)
 {
+	__asm__ ("xchgb %%al,%%ah" : "=a" (x) : "a" (x));
+	return x;
+}
+
+static inline uint32_t htonl(uint32_t x)
+{
+	__asm__ ("bswapl %0" : "=r" (x) : "r" (x));
+	return x;
+}
+#define ntohs htons
+#define ntohl htonl
+
+// Creates a new ethernet packet and puts the header on it
+char* eth_wrap(const char* data, size_t len, char src_mac[6], 
+               char dest_mac[6], uint16_t eth_type);
+
+struct ETH_Header {
 	char dest_mac[6];
 	char source_mac[6];
 	uint16_t eth_type;
 };
 
-
-struct IP_Header
-{
-	uint32_t ip_opts0;
-	uint32_t ip_opts1;
-	uint32_t ip_opts2;
-	uint32_t source_ip;
-	uint32_t dest_ip;
-};
-
-struct UDP_Header
-{
-	uint16_t source_port;
-	uint16_t dest_port;
-	uint16_t length;
-	uint16_t checksum;
-};	
-
-#define MINIMUM_PACKET_SIZE 14 // kinda evil. probably evil.
-#define MAX_PACKET_SIZE		MTU
-
-#define PACKET_HEADER_SIZE  sizeof(struct packet_header) //IP UDP ETH
-#define MAX_PACKET_DATA		MAX_FRAME_SIZE - PACKET_HEADER_SIZE
-// This number needs verification! Also, this is a huge hack, as the driver shouldnt care about UDP/IP etc.
-
-struct packet_header {
+struct eth_frame {
 	struct ETH_Header eth_head;
-	struct IP_Header ip_head;
-	struct UDP_Header udp_head;
+	char data[MTU];
 } __attribute__((packed));
-
-struct eth_packet {
-	struct packet_header eth_head;
-	char data[MTU-PACKET_HEADER_SIZE];
-} __attribute__((packed));
-
-
-// ^----- Evil line ------^
 
 #endif /* !ROS_INC_NIC_COMMON_H */

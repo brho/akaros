@@ -8,6 +8,11 @@
 #include <env.h>
 #include <process.h>
 
+// Default APPSERVER_ETH_TYPE if not defined externally
+#ifndef APPSERVER_ETH_TYPE
+#define APPSERVER_ETH_TYPE 0x8888
+#endif
+
 int32_t frontend_syscall_from_user(env_t* p, int32_t syscall_num, 
                                    uint32_t arg0, uint32_t arg1, 
                                    uint32_t arg2, uint32_t translate_args);

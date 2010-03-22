@@ -536,34 +536,25 @@ static ssize_t sys_serial_write(env_t* e, const char *DANGEROUS buf, size_t len)
 // This is not a syscall we want. Its hacky. Here just for syscall stuff until get a stack.
 static ssize_t sys_eth_read(env_t* e, char *DANGEROUS buf)
 {
-	extern int eth_up;
-
-        extern uint32_t packet_buffer_count;
-        extern char* packet_buffer[PACKET_BUFFER_SIZE];
-        extern uint32_t packet_buffer_sizes[PACKET_BUFFER_SIZE];
-        extern uint32_t packet_buffer_head;
-        extern uint32_t packet_buffer_tail;
-        extern spinlock_t packet_buffer_lock;
-
 	if (eth_up) {
 
 		uint32_t len;
 		char *ptr;
 
-		spin_lock(&packet_buffer_lock);
+		spin_lock(&packet_buffers_lock);
 
-		if (packet_buffer_count == 0) {
-			spin_unlock(&packet_buffer_lock);
+		if (num_packet_buffers == 0) {
+			spin_unlock(&packet_buffers_lock);
 			return 0;
 		}
 
-		ptr = packet_buffer[packet_buffer_head];
-		len = packet_buffer_sizes[packet_buffer_head];
+		ptr = packet_buffers[packet_buffers_head];
+		len = packet_buffers_sizes[packet_buffers_head];
 
-		packet_buffer_count = packet_buffer_count - 1;
-		packet_buffer_head = (packet_buffer_head + 1) % PACKET_BUFFER_SIZE;
+		num_packet_buffers--;
+		packet_buffers_head = (packet_buffers_head + 1) % MAX_PACKET_BUFFERS;
 
-		spin_unlock(&packet_buffer_lock);
+		spin_unlock(&packet_buffers_lock);
 
 		char* _buf = user_mem_assert(e, buf, len, PTE_U);
 
@@ -580,15 +571,13 @@ static ssize_t sys_eth_read(env_t* e, char *DANGEROUS buf)
 // This is not a syscall we want. Its hacky. Here just for syscall stuff until get a stack.
 static ssize_t sys_eth_write(env_t* e, const char *DANGEROUS buf, size_t len)
 {
-	extern int eth_up;
-
 	if (eth_up) {
 
 		if (len == 0)
 			return 0;
 
 		// HACK TO BYPASS HACK
-		int just_sent = send_frame( buf, len);
+		int just_sent = send_frame(buf, len);
 
 		if (just_sent < 0) {
 			printk("Packet send fail\n");
@@ -625,12 +614,9 @@ static ssize_t sys_eth_write(env_t* e, const char *DANGEROUS buf, size_t len)
 		return -EINVAL;
 }
 
-static ssize_t sys_eth_get_mac_addr(env_t* e, char *DANGEROUS buf) {
-	
-	extern int eth_up;
-
+static ssize_t sys_eth_get_mac_addr(env_t* e, char *DANGEROUS buf) 
+{
 	if (eth_up) {
-		extern char device_mac[];
 		for (int i = 0; i < 6; i++)
 			buf[i] = device_mac[i];
 		return 0;
@@ -639,13 +625,10 @@ static ssize_t sys_eth_get_mac_addr(env_t* e, char *DANGEROUS buf) {
 		return -EINVAL;
 }
 
-static int sys_eth_recv_check(env_t* e) {
-
-	extern uint32_t packet_buffer_count;
-	
-	if (packet_buffer_count != 0) {
+static int sys_eth_recv_check(env_t* e) 
+{
+	if (num_packet_buffers != 0) 
 		return 1;
-	}
 	else
 		return 0;
 }

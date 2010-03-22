@@ -73,25 +73,11 @@
 
 #define SET_PAGE_0() (inb(ne2k_io_base_addr + NE2K_PG0_RW_CR) & 0x3F)
 
-extern uint32_t eth_up; // Fix this                               
-uint32_t ne2k_irq;      // And this
+uint32_t ne2k_irq;      // Fix this
 uint32_t ne2k_io_base_addr;
-char device_mac[6];
-
-extern uint32_t packet_buffer_count;
-extern char* packet_buffer[PACKET_BUFFER_SIZE];
-extern uint32_t packet_buffer_sizes[PACKET_BUFFER_SIZE];
-extern uint32_t packet_buffer_head;
-extern uint32_t packet_buffer_tail;
-spinlock_t packet_buffer_lock;
-
 
 void* base_page;
 uint32_t num_pages = 0;
-
-extern char *CT(PACKET_HEADER_SIZE + len) (*packet_wrap)(const char *CT(len) data, size_t len);
-extern int (*send_frame)(const char *CT(len) data, size_t len);
-
 
 void ne2k_init() {
 	
@@ -102,7 +88,7 @@ void ne2k_init() {
 	//ne2k_test_interrupts();
 	send_frame = &ne2k_send_frame;
 
-        ne2k_setup_interrupts();
+	ne2k_setup_interrupts();
 
 	eth_up = 1;
 
@@ -396,22 +382,32 @@ void ne2k_handle_rx_packet() {
 		return;
 	}
 
-	spin_lock(&packet_buffer_lock);
-
-	if (packet_buffer_count >= PACKET_BUFFER_SIZE) {
-		printk("WARNING: DROPPING PACKET!\n");
-		spin_unlock(&packet_buffer_lock);
+	// Treat as a syscall frontend response packet if eth_type says so
+	// Will eventually go away, so not too worried about elegance here...
+	#include <frontend.h>
+	#include <arch/frontend.h>
+	if((uint16_t)(rx_buffer[13]) == APPSERVER_ETH_TYPE) {
+		handle_appserver_packet(rx_buffer, packet_len);
 		kfree(rx_buffer);
 		return;
 	}
 
-	packet_buffer[packet_buffer_tail] = rx_buffer;
-	packet_buffer_sizes[packet_buffer_tail] = packet_len;
+	spin_lock(&packet_buffers_lock);
 
-	packet_buffer_tail = (packet_buffer_tail + 1) % PACKET_BUFFER_SIZE;
-	packet_buffer_count = packet_buffer_count + 1;
+	if (num_packet_buffers >= MAX_PACKET_BUFFERS) {
+		printk("WARNING: DROPPING PACKET!\n");
+		spin_unlock(&packet_buffers_lock);
+		kfree(rx_buffer);
+		return;
+	}
 
-	spin_unlock(&packet_buffer_lock);
+	packet_buffers[packet_buffers_tail] = rx_buffer;
+	packet_buffers_sizes[packet_buffers_tail] = packet_len;
+
+	packet_buffers_tail = (packet_buffers_tail + 1) % MAX_PACKET_BUFFERS;
+	num_packet_buffers++;
+
+	spin_unlock(&packet_buffers_lock);
 	
 	return;
 }
