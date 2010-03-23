@@ -110,8 +110,4 @@ static inline void set_errno(trapframe_t* tf, uint32_t errno)
 
 #endif /* !__ASSEMBLER__ */
 
-// Must equal 'sizeof(trapframe_t)'.
-// A static_assert in kern/trap.c checks this.
-#define SIZEOF_STRUCT_TRAPFRAME	0x44
-
 #endif /* !ROS_INC_ARCH_TRAP_H */

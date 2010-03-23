@@ -156,6 +156,8 @@ print_trapframe(trapframe_t *tf)
 	spin_lock_irqsave(&ptf_lock);
 	cprintf("TRAP frame at %p on core %d\n", tf, core_id());
 	print_regs(&tf->tf_regs);
+	cprintf("  gs   0x----%04x\n", tf->tf_gs);
+	cprintf("  fs   0x----%04x\n", tf->tf_fs);
 	cprintf("  es   0x----%04x\n", tf->tf_es);
 	cprintf("  ds   0x----%04x\n", tf->tf_ds);
 	cprintf("  trap 0x%08x %s\n", tf->tf_trapno, trapname(tf->tf_trapno));
@@ -184,6 +186,7 @@ trap_dispatch(trapframe_t *tf)
 			assert(tf->tf_cs != GD_KT);
 			// syscall code wants an edible reference for current
 			proc_incref(current, 1);
+print_trapframe(tf);
 			tf->tf_regs.reg_eax =
 				syscall(current, tf->tf_regs.reg_eax, tf->tf_regs.reg_edx,
 				        tf->tf_regs.reg_ecx, tf->tf_regs.reg_ebx,

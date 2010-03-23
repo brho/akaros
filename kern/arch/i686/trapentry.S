@@ -238,6 +238,8 @@ _allirqs:
 sysenter_handler:
 	sti						# enable interrupts (things are sane here)
 	cld
+	pushl $0				# esp
+	pushl $0				# ss
 	pushfl					# save the eflags
 	pushl $0				# these zeros keep the trapframe looking the same
 	pushl $0				# as when we receive a trap or interrupt
