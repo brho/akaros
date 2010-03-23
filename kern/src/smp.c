@@ -40,14 +40,24 @@ atomic_t outstanding_calls = 0;
  */
 void smp_idle(void)
 {
+	int8_t state = 0;
+	per_cpu_info_t *myinfo = &per_cpu_info[core_id()];
+
 	if (!management_core()) {
 		enable_irq();
 		while (1) {
 			process_routine_kmsg();
-			// consider races with work added after we started leaving the last func
 			cpu_halt();
 		}
 	} else {
+		/* techincally, this check is arch dependent.  i want to know if it
+		 * happens.  the enabling/disabling could be interesting. */
+		enable_irqsave(&state);
+		if (!STAILQ_EMPTY(&myinfo->immed_amsgs) ||
+		        !STAILQ_EMPTY(&myinfo->routine_amsgs)) 
+			printk("[kernel] kmsgs in smp_idle() on a management core.\n");
+		process_routine_kmsg();
+		disable_irqsave(&state);
 		manager();
 	}
 	assert(0);
