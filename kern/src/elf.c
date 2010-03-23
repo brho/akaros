@@ -8,6 +8,7 @@
 struct elf_info
 {
 	long entry;
+	long highest_addr;
 	long phdr;
 	int phnum;
 	int dynamic;
@@ -19,6 +20,7 @@ int load_one_elf(struct proc* p, int fd, int pgoffset, struct elf_info* ei)
 	int ret = -1;
 	ei->phdr = -1;
 	ei->dynamic = 0;
+	ei->highest_addr = 0;
 
 	char* elf = (char*)kmalloc(PGSIZE,0);
 	if(!elf || read_page(p,fd,PADDR(elf),0) == -1)
@@ -63,6 +65,8 @@ int load_one_elf(struct proc* p, int fd, int pgoffset, struct elf_info* ei)
 			uintptr_t memstart = ROUNDDOWN(ph->p_va,PGSIZE);
 			uintptr_t memend = ROUNDUP(ph->p_va + ph->p_memsz,PGSIZE);
 			uintptr_t memsz = memend-memstart;
+			if(memend > ei->highest_addr)
+				ei->highest_addr = memend;
 
 			// mmap will zero the rest of the page if filesz % PGSIZE != 0
 			if(filesz)
@@ -132,6 +136,11 @@ int load_elf(struct proc* p, const char* fn)
 	if(mmap(p,USTACKTOP-stacksz,stacksz,PROT_READ|PROT_WRITE,
 	        MAP_FIXED|MAP_ANON,-1,0) == MAP_FAILED)
 		return -1;
+
+	// Set the heap bottom and top to just past where the text 
+	// region has been loaded
+	p->heap_bottom = (void*)ei.highest_addr;
+	p->heap_top = p->heap_bottom;
 
 	return 0;
 }
