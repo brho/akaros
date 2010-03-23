@@ -67,6 +67,23 @@ Technically, an immediate message could not return, but only if the kernel code
 that was interrupted was not holding any locks, mucking with any invariants, or
 otherwise doing work that needed to be done.  Those cases seem rather rare.
 
+To retain some sort of sanity, the functions that do not return must adhere to
+some rules.  At some point they need to end in a place where they check routine
+messages or enable interrupts.  Returning to userspace will do this (interrupts
+are enabled).  __death will eventually call smp_idle(), which will check.  The
+idea behind this is that route messages will get processed once the kernel is
+able to (at a convenient place).
+
+Since some routine messages do not return by popping to userspace, we need to
+self-ipi to make sure the kernel regains control (this need might go away in the
+future).  Since we also want immediate messages to get processed before routine
+messages, and we want the system to be able to have a bunch of outstanding
+routine messages (though that is unlikely at this point), we briefly check
+for immed's inside process_routine_kmsg().  By only turning interrupts on for
+this means we avoid receiving excessive self_ipis for potentially not-returning
+routine messages.  Keep in mind that each one of those IPIs would be useless,
+since they will only run their functions when interrupting from userspace.
+
 Trickiness:
 --------------------------------
 If a function does not return, then the code might not check the list again, or
@@ -109,6 +126,13 @@ receivers of k_msgs will be the slab allocator.  We use the slab so we can
 dynamically create the k_msgs (can pass them around easily, delay with them
 easily (alarms), and most importantly we can't deadlock by running out of room
 in a static buffer).
+
+When running our process_routine_kmsg()s, we could have made a userspace process
+that would get interrupted if there were any outstanding IPIs for routine
+messages.  We'd have to self_ipi, then switch to this process.  That kinda
+sucks, and would also mean that when we want to actually smp_idle, we'd have to
+be in userspace (and probably not cpu_halt()ing).  Making it possible to process
+the messages from within the kernel seemed much more flexible and better.
 
 Architecture Dependence:
 --------------------------------

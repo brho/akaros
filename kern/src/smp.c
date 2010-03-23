@@ -43,7 +43,7 @@ void smp_idle(void)
 	if (!management_core()) {
 		enable_irq();
 		while (1) {
-			process_workqueue();
+			process_routine_kmsg();
 			// consider races with work added after we started leaving the last func
 			cpu_halt();
 		}

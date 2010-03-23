@@ -202,6 +202,45 @@ void handle_ipi(trapframe_t* tf)
 	env_pop_tf(tf);
 }
 
+/* Same as in x86.  Might be diff in the future if there is no way to check for
+ * immediate messages or there is the ability to selectively mask IPI vectors.*/
+void process_routine_kmsg(void)
+{
+	per_cpu_info_t *myinfo = &per_cpu_info[core_id()];
+	kernel_message_t msg_cp, *k_msg;
+	int8_t irq_state = 0;
+
+	disable_irqsave(&irq_state);
+	while (1) {
+		/* normally, we want ints disabled, so we don't have an empty self-ipi
+		 * for every routine message. (imagine a long list of routines).  But we
+		 * do want immediates to run ahead of routines.  This enabling should
+		 * work (might not in some shitty VMs).  Also note we can receive an
+		 * extra self-ipi for routine messages before we turn off irqs again.
+		 * Not a big deal, since we will process it right away. */
+		if (!STAILQ_EMPTY(&myinfo->immed_amsgs)) {
+			enable_irq();
+			cpu_relax();
+			disable_irq();
+		}
+		k_msg = get_next_amsg(&myinfo->routine_amsgs,
+		                      &myinfo->routine_amsg_lock);
+		if (!k_msg) {
+			enable_irqsave(&irq_state);
+			return;
+		}
+		/* copy in, and then free, in case we don't return */
+		msg_cp = *k_msg;
+		kmem_cache_free(kernel_msg_cache, (void*)k_msg);
+		/* make sure an IPI is pending if we have more work */
+		if (!STAILQ_EMPTY(&myinfo->routine_amsgs))
+			send_ipi(core_id());
+		/* Execute the kernel message */
+		assert(msg_cp.pc);
+		msg_cp.pc(0, msg_cp.srcid, msg_cp.arg0, msg_cp.arg1, msg_cp.arg2);
+	}
+}
+
 void
 unhandled_trap(trapframe_t* state)
 {

@@ -73,5 +73,6 @@ typedef struct kernel_message NTPTV(a0t) NTPTV(a1t) NTPTV(a2t) kernel_message_t;
 
 uint32_t send_kernel_message(uint32_t dst, amr_t pc, TV(a0t) arg0, TV(a1t) arg1,
                              TV(a2t) arg2, int type);
+void process_routine_kmsg(void);
 
 #endif /* ROS_KERN_TRAP_H */
