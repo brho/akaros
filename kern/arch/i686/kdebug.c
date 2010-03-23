@@ -253,3 +253,45 @@ debuginfo_eip(uintptr_t addr, eipdebuginfo_t *NONNULL info)
 	
 	return 0;
 }
+
+/* Returns a function pointer for a function name matching the given string. */
+void *debug_get_fn_addr(char *fn_name)
+{
+	const struct stab *SNT stab_end = __STAB_END__;
+	const struct stab *BND(__this,stab_end) stabs = __STAB_BEGIN__;
+	const char *SNT stabstr_end = __STABSTR_END__;
+	const char *NT BND(__this,stabstr_end) stabstr = __STABSTR_BEGIN__;
+
+	static int first_fn_idx = 0;
+	int i = first_fn_idx;
+	int len;
+	const char *stab_fn_name = 0;
+	void *retval = 0;
+
+	// String table validity checks (from above)
+	{
+		int stabstrsz = stabstr_end - stabstr;
+		if (stabstr_end <= stabstr || stabstr[stabstrsz-1] != 0)
+			return 0;
+	}
+
+	for (/* i set */; &stabs[i] < stab_end; i++) {
+		if (stabs[i].n_type != N_FUN)
+			continue;
+		first_fn_idx = first_fn_idx ? first_fn_idx : i;
+		/* broken stab, just keep going */
+		if (!(stabs[i].n_strx < stabstr_end - stabstr))
+			continue;
+		stab_fn_name = stabstr + stabs[i].n_strx;
+		len = strfind(stab_fn_name, ':') - stab_fn_name;
+		if (!len)
+			continue;
+		/* we have a match. */
+		if (!strncmp(stab_fn_name, fn_name, len)) {
+			printd("FN name: %s, Addr: %p\n", stab_fn_name, stabs[i].n_value);
+			retval = (void*)stabs[i].n_value;
+			break;
+		}
+	}
+	return retval;
+}

@@ -16,5 +16,6 @@ typedef struct Eipdebuginfo {
 } eipdebuginfo_t;
 
 int debuginfo_eip(uintptr_t eip, eipdebuginfo_t *NONNULL info);
+void *debug_get_fn_addr(char *fn_name);
 
 #endif

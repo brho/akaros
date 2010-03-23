@@ -25,5 +25,6 @@ int mon_kfs_cat(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
 int mon_manager(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
 int mon_procinfo(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
 int mon_exit(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
+int mon_kfunc(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
 
 #endif	// !ROS_KERN_MONITOR_H

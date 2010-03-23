@@ -22,6 +22,7 @@
 #include <manager.h>
 #include <schedule.h>
 #include <resource.h>
+#include <kdebug.h>
 
 #include <ros/memlayout.h>
 
@@ -50,6 +51,7 @@ static command_t (RO commands)[] = {
 	{ "manager", "Run the manager", mon_manager},
 	{ "procinfo", "Show information about processes", mon_procinfo},
 	{ "exit", "Leave the monitor", mon_exit},
+	{ "kfunc", "Run a kernel function directly (!!!)", mon_kfunc},
 };
 #define NCOMMANDS (sizeof(commands)/sizeof(commands[0]))
 
@@ -352,6 +354,71 @@ int mon_procinfo(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 int mon_exit(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 {
 	return -1;
+}
+
+int mon_kfunc(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
+{
+	#ifndef __i386__
+	printk("Only supported on x86 for now.  =(\n");
+	return -1;
+	#endif
+
+	void (*func)(void *arg, ...);
+
+	if (argc < 2) {
+		printk("Usage: kfunc FUNCTION [arg1] [arg2] [etc]\n");
+		printk("Arguments must be in hex.  Can take 6 args.\n");
+		return 1;
+	}
+	func = debug_get_fn_addr(argv[1]);
+	if (!func) {
+		printk("Function not found.\n");
+		return 1;
+	}
+	/* Not elegant, but whatever.  maybe there's a better syntax, or we can do
+	 * it with asm magic. */
+	switch (argc) {
+		case 2: /* have to fake one arg */
+			func((void*)0);
+			break;
+		case 3: /* the real first arg */
+			func((void*)strtol(argv[2], 0, 16));
+			break;
+		case 4:
+			func((void*)strtol(argv[2], 0, 16),
+			            strtol(argv[3], 0, 16));
+			break;
+		case 5:
+			func((void*)strtol(argv[2], 0, 16),
+			            strtol(argv[3], 0, 16),
+			            strtol(argv[4], 0, 16));
+			break;
+		case 6:
+			func((void*)strtol(argv[2], 0, 16),
+			            strtol(argv[3], 0, 16),
+			            strtol(argv[4], 0, 16),
+			            strtol(argv[5], 0, 16));
+			break;
+		case 7:
+			func((void*)strtol(argv[2], 0, 16),
+			            strtol(argv[3], 0, 16),
+			            strtol(argv[4], 0, 16),
+			            strtol(argv[5], 0, 16),
+			            strtol(argv[6], 0, 16));
+			break;
+		case 8:
+			func((void*)strtol(argv[2], 0, 16),
+			            strtol(argv[3], 0, 16),
+			            strtol(argv[4], 0, 16),
+			            strtol(argv[5], 0, 16),
+			            strtol(argv[6], 0, 16),
+			            strtol(argv[7], 0, 16));
+			break;
+		default:
+			printk("Bad number of arguments.\n");
+			return -1;
+	}
+	return 0;
 }
 
 /***** Kernel monitor command interpreter *****/
