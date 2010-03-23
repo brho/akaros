@@ -21,7 +21,6 @@
 #include <manager.h>
 #include <process.h>
 #include <schedule.h>
-#include <workqueue.h>
 #include <syscall.h>
 #include <testing.h>
 #include <kfs.h>
@@ -121,28 +120,6 @@ void manager_brho(void)
 			break;
 			#endif
 		case 2:
-			#if 0
-			panic("Do not panic");
-			envs[0] = kfs_proc_create(kfs_lookup_path("parlib_channel_test_client"));
-			envs[1] = kfs_proc_create(kfs_lookup_path("parlib_channel_test_server"));
-			smp_call_function_single(1, run_env_handler, envs[0], 0);
-			smp_call_function_single(2, run_env_handler, envs[1], 0);
-			break;
-			#endif
-		case 3:
-		#if 0
-		case 4:
-			printk("Beginning Tests\n");
-			test_run_measurements(progress-1);  // should never return
-			break;
-		case 5:
-			envs[0] = kfs_proc_create(kfs_lookup_path("parlib_channel_test_client"));
-			envs[1] = kfs_proc_create(kfs_lookup_path("parlib_channel_test_server"));
-			smp_call_function_single(1, run_env_handler, envs[0], 0);
-			smp_call_function_single(2, run_env_handler, envs[1], 0);
-		case 6:
-		#endif
-		case 4:
 			/*
 			test_smp_call_functions();
 			test_checklists();
@@ -152,17 +129,6 @@ void manager_brho(void)
 			test_ipi_sending();
 			test_pit();
 			*/
-		case 5:
-		case 6:
-		case 7:
-		case 8:
-		case 9:
-		case 10:
-		case 11:
-		case 12:
-		case 13:
-		case 14:
-			//test_run_measurements(progress-1);
 		default:
 			printk("Manager Progress: %d\n", progress);
 			// delay if you want to test rescheduling an MCP that yielded

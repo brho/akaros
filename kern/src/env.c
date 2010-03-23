@@ -267,35 +267,6 @@ type SLOCKED(name##_lock) *\
 	}\
 }
 
-/* This is the top-half of an interrupt handler, where the bottom half is
- * proc_run (which never returns).  Just add it to the delayed work queue,
- * which (incidentally) can only hold one item at this point.
- *
- * Note this is rather old, and meant to run a RUNNABLE_S on a worker core.
- */
-#ifdef __IVY__
-void run_env_handler(trapframe_t *tf, env_t * data)
-#else
-void run_env_handler(trapframe_t *tf, void * data)
-#endif
-{
-	assert(data);
-	struct work TP(env_t *) job;
-	struct workqueue TP(env_t *) *CT(1) workqueue =
-	    TC(&per_cpu_info[core_id()].workqueue);
-	// this doesn't work, and making it a TP(env_t) is wrong
-	// zra: When you want to use other types, let me know, and I can help
-    // make something that Ivy is happy with. 
-#ifdef __IVY__
-	job.func = proc_run;
-#else
-	job.func = (func_t)proc_run;
-#endif
-	job.data = data;
-	if (enqueue_work(workqueue, &job))
-		panic("Failed to enqueue work!");
-}
-
 /* Frees (decrefs) all memory mapped in the given range */
 void env_user_mem_free(env_t* e, void* start, size_t len)
 {

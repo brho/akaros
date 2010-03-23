@@ -15,7 +15,6 @@
 #include <trap.h>
 #include <atomic.h>
 #include <process.h>
-#include <workqueue.h>
 
 #ifdef __SHARC__
 typedef sharC_env_t;
@@ -26,7 +25,6 @@ struct per_cpu_info {
 	struct proc *cur_proc;
 	trapframe_t *cur_tf;
 	bool preempt_pending;
-	struct workqueue NTPTV(t) workqueue;
 
 #ifdef __SHARC__
 	// held spin-locks. this will have to go elsewhere if multiple kernel

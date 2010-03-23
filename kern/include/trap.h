@@ -42,10 +42,11 @@ extern void sysenter_handler();
  *
  * These are different (for now) than the smp_calls in smp.h, since
  * they will be executed immediately (for urgent messages), and in the order in
- * which they are sent.  smp_calls are currently not run in order, and if they
- * put things on the workqueue, they don't get run until smp_idle (for now).
+ * which they are sent.  smp_calls are currently not run in order, and they must
+ * return (possibly passing the work to a workqueue, which is really just a
+ * routine message, so they really need to just return).
  *
- * Eventually, smp_call and the workqueue will be replaced by these.
+ * Eventually, smp_call will be replaced by these.
  *
  * Also, a big difference is that smp_calls can use the same message (registered
  * in the interrupt_handlers[] for x86) for every recipient, but the kernel

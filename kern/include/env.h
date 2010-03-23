@@ -83,12 +83,4 @@ int		env_user_mem_walk(env_t* e, void* start, size_t len, mem_walk_callback_t ca
 // The following three functions do not return
 void	env_pop_tf(trapframe_t *tf) __attribute__((noreturn));
 
-
-/* Helper handler for smp_call to dispatch jobs to other cores */
-#ifdef __IVY__
-void run_env_handler(trapframe_t *tf, env_t * data);
-#else
-void run_env_handler(trapframe_t *tf, void * data);
-#endif
-
 #endif // !ROS_KERN_ENV_H
