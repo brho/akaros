@@ -687,27 +687,27 @@ void test_kernel_messages(void)
 	printk("sending 5 IMMED to core 1, sending (#,deadbeef,0)\n");
 	for (int i = 0; i < 5; i++)
 		send_kernel_message(1, test_km_handler, (void*)i, (void*)0xdeadbeef,
-		                    (void*)0, AMSG_IMMEDIATE);
+		                    (void*)0, KMSG_IMMEDIATE);
 	udelay(5000000);
 	printk("sending 5 routine to core 1, sending (#,cafebabe,0)\n");
 	for (int i = 0; i < 5; i++)
 		send_kernel_message(1, test_km_handler, (void*)i, (void*)0xcafebabe,
-		                    (void*)0, AMSG_ROUTINE);
+		                    (void*)0, KMSG_ROUTINE);
 	udelay(5000000);
 	printk("sending 10 routine and 3 immediate to core 2\n");
 	for (int i = 0; i < 10; i++)
 		send_kernel_message(2, test_km_handler, (void*)i, (void*)0xcafebabe,
-		                    (void*)0, AMSG_ROUTINE);
+		                    (void*)0, KMSG_ROUTINE);
 	for (int i = 0; i < 3; i++)
 		send_kernel_message(2, test_km_handler, (void*)i, (void*)0xdeadbeef,
-		                    (void*)0, AMSG_IMMEDIATE);
+		                    (void*)0, KMSG_IMMEDIATE);
 	udelay(5000000);
 	printk("sending 5 ea alternating to core 2\n");
 	for (int i = 0; i < 5; i++) {
 		send_kernel_message(2, test_km_handler, (void*)i, (void*)0xdeadbeef,
-		                    (void*)0, AMSG_IMMEDIATE);
+		                    (void*)0, KMSG_IMMEDIATE);
 		send_kernel_message(2, test_km_handler, (void*)i, (void*)0xcafebabe,
-		                    (void*)0, AMSG_ROUTINE);
+		                    (void*)0, KMSG_ROUTINE);
 	}
 	udelay(5000000);
 	return;

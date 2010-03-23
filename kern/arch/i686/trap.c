@@ -406,12 +406,12 @@ uint32_t send_kernel_message(uint32_t dst, amr_t pc, TV(a0t) arg0, TV(a1t) arg1,
 	k_msg->arg1 = arg1;
 	k_msg->arg2 = arg2;
 	switch (type) {
-		case AMSG_IMMEDIATE:
+		case KMSG_IMMEDIATE:
 			spin_lock_irqsave(&per_cpu_info[dst].immed_amsg_lock);
 			STAILQ_INSERT_TAIL(&per_cpu_info[dst].immed_amsgs, k_msg, link);
 			spin_unlock_irqsave(&per_cpu_info[dst].immed_amsg_lock);
 			break;
-		case AMSG_ROUTINE:
+		case KMSG_ROUTINE:
 			spin_lock_irqsave(&per_cpu_info[dst].routine_amsg_lock);
 			STAILQ_INSERT_TAIL(&per_cpu_info[dst].routine_amsgs, k_msg, link);
 			spin_unlock_irqsave(&per_cpu_info[dst].routine_amsg_lock);

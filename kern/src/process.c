@@ -51,7 +51,6 @@ static uint32_t get_free_vcoreid(struct proc *SAFE p, uint32_t prev);
 static uint32_t get_busy_vcoreid(struct proc *SAFE p, uint32_t prev);
 static bool is_mapped_vcore(struct proc *p, uint32_t pcoreid);
 static uint32_t get_vcoreid(struct proc *SAFE p, uint32_t pcoreid);
-static inline void __wait_for_ipi(const char *fnname);
 
 /* PID management. */
 #define PID_MAX 32767 // goes from 0 to 32767, with 0 reserved
@@ -393,7 +392,7 @@ void proc_run(struct proc *p)
 			__seq_end_write(&p->procinfo->coremap_seqctr);
 			p->env_refcnt++; // TODO: (REF) use incref
 			p->procinfo->vcoremap[0].tf_to_run = &p->env_tf;
-			send_kernel_message(core_id(), __startcore, p, 0, 0, AMSG_IMMEDIATE);
+			send_kernel_message(core_id(), __startcore, p, 0, 0, KMSG_ROUTINE);
 			__proc_unlock_ipi_pending(p, TRUE);
 			break;
 		case (PROC_RUNNABLE_M):
@@ -423,7 +422,7 @@ void proc_run(struct proc *p)
 				for (int i = 0; i < p->procinfo->num_vcores; i++)
 					send_kernel_message(p->procinfo->vcoremap[i].pcoreid,
 					                    (void *)__startcore, (void *)p, 0, 0,
-					                    AMSG_IMMEDIATE);
+					                    KMSG_ROUTINE);
 			} else {
 				warn("Tried to proc_run() an _M with no vcores!");
 			}
@@ -562,7 +561,7 @@ void proc_destroy(struct proc *p)
 			#endif
 			send_kernel_message(p->procinfo->vcoremap[0].pcoreid, __death,
 			                   (void *SNT)0, (void *SNT)0, (void *SNT)0,
-			                   AMSG_IMMEDIATE);
+			                   KMSG_ROUTINE);
 			__seq_start_write(&p->procinfo->coremap_seqctr);
 			// TODO: might need to sort num_vcores too later (VC#)
 			/* vcore is unmapped on the receive side */
@@ -639,20 +638,6 @@ static uint32_t get_vcoreid(struct proc *SAFE p, uint32_t pcoreid)
 {
 	assert(is_mapped_vcore(p, pcoreid));
 	return p->procinfo->pcoremap[pcoreid].vcoreid;
-}
-
-/* Use this when you are waiting for an IPI that you sent yourself.  In most
- * cases, interrupts should already be on (like after a spin_unlock_irqsave from
- * process context), but aren't always, like in proc_destroy().  We might be
- * able to remove the enable_irq in the future.  Think about this (TODO).
- *
- * Note this means all non-proc management interrupt handlers must return (which
- * they need to do anyway), so that we get back to this point.  */
-static inline void __wait_for_ipi(const char *fnname)
-{
-	enable_irq();
-	udelay(1000000);
-	panic("Waiting too long on core %d for an IPI in %s()!", core_id(), fnname);
 }
 
 /* Yields the calling core.  Must be called locally (not async) for now.
@@ -797,7 +782,7 @@ bool __proc_give_cores(struct proc *SAFE p, uint32_t *pcorelist, size_t num)
 				/* should be a fresh core */
 				assert(!p->procinfo->vcoremap[i].tf_to_run);
 				send_kernel_message(pcorelist[i], __startcore, p, 0, 0,
-				                    AMSG_IMMEDIATE);
+				                    KMSG_ROUTINE);
 				if (pcorelist[i] == core_id())
 					self_ipi_pending = TRUE;
 			}
@@ -864,7 +849,7 @@ bool __proc_take_cores(struct proc *SAFE p, uint32_t *pcorelist,
 			if (pcoreid == core_id())
 				self_ipi_pending = TRUE;
 			send_kernel_message(pcoreid, message, arg0, arg1, arg2,
-			                    AMSG_IMMEDIATE);
+			                    KMSG_ROUTINE);
 		} else {
 			/* if there was a msg, the vcore is unmapped on the receive side.
 			 * o/w, we need to do it here. */
@@ -913,7 +898,7 @@ bool __proc_take_allcores(struct proc *SAFE p, amr_t message,
 			if (pcoreid == core_id())
 				self_ipi_pending = TRUE;
 			send_kernel_message(pcoreid, message, arg0, arg1, arg2,
-			                    AMSG_IMMEDIATE);
+			                    KMSG_ROUTINE);
 		} else {
 			/* if there was a msg, the vcore is unmapped on the receive side.
 			 * o/w, we need to do it here. */
@@ -930,14 +915,20 @@ bool __proc_take_allcores(struct proc *SAFE p, amr_t message,
 }
 
 /* Helper, to be used when unlocking after calling the above functions that
- * might cause an IPI to be sent.  TODO inline this, so the __FUNCTION__ works.
- * Will require an overhaul of core_request (break it up, etc) */
+ * might cause an IPI to be sent.  There should already be a kmsg waiting for
+ * us, since when we checked state to see a message was coming, the message had
+ * already been sent before unlocking.  Note we do not need interrupts enabled
+ * for this to work (you can receive a message before its IPI by polling).
+ *
+ * TODO: consider inlining this, so __FUNCTION__ works (will require effort in
+ * core_request(). */
 void __proc_unlock_ipi_pending(struct proc *p, bool ipi_pending)
 {
 	if (ipi_pending) {
 		p->env_refcnt--; // TODO: (REF) (atomics)
 		spin_unlock_irqsave(&p->proc_lock);
-		__wait_for_ipi(__FUNCTION__);
+		process_routine_kmsg();
+		panic("stack-killing kmsg not found in %s!!!", __FUNCTION__);
 	} else {
 		spin_unlock_irqsave(&p->proc_lock);
 	}

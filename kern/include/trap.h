@@ -53,8 +53,8 @@ extern void sysenter_handler();
  * messages require a unique message.  Also for now, but it might be like that
  * for a while on x86 (til we have a broadcast). */
 
-#define AMSG_IMMEDIATE 			1
-#define AMSG_ROUTINE 			2
+#define KMSG_IMMEDIATE 			1
+#define KMSG_ROUTINE 			2
 void kernel_msg_init(void);
 typedef void (*amr_t)(trapframe_t* tf, uint32_t srcid,
                       TV(a0t) a0, TV(a1t) a1, TV(a2t) a2);
