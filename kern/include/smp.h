@@ -24,7 +24,6 @@ struct per_cpu_info {
 	spinlock_t lock;
 	struct proc *cur_proc;
 	trapframe_t *cur_tf;
-	bool preempt_pending;
 
 #ifdef __SHARC__
 	// held spin-locks. this will have to go elsewhere if multiple kernel

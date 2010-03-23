@@ -246,7 +246,7 @@ trap(trapframe_t *tf)
 	trap_dispatch(tf);
 
 	// Return to the current process, which should be runnable.
-	proc_startcore(current, tf); // Note the comment in syscall.c
+	proc_restartcore(current, tf); // Note the comment in syscall.c
 }
 
 void
@@ -383,7 +383,7 @@ void sysenter_callwrapper(struct trapframe *tf)
 	 * restore the proper value in current before returning to here.
 	 * likewise, tf could be pointing to random gibberish.
 	 */
-	proc_startcore(current, tf);
+	proc_restartcore(current, tf);
 }
 
 struct kmem_cache *kernel_msg_cache;

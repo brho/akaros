@@ -78,8 +78,7 @@ int __proc_set_state(struct proc *p, uint32_t state) WRITES(p->state);
 struct proc *pid2proc(pid_t pid);
 bool proc_controls(struct proc *SAFE actor, struct proc *SAFE target);
 void proc_run(struct proc *SAFE p);
-void proc_startcore(struct proc *SAFE p, trapframe_t *SAFE tf)
-     __attribute__((noreturn));
+void proc_restartcore(struct proc *SAFE p, trapframe_t *SAFE tf);
 void proc_destroy(struct proc *SAFE p);
 void proc_yield(struct proc *SAFE p);
 /* Exposed for sys_getvcoreid(), til it's unnecessary */

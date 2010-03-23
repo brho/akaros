@@ -55,7 +55,7 @@ segdesc_t gdt[] =
 	// 0x28 - tss, initialized in idt_init()
 	[GD_TSS >> 3] = SEG_NULL,
 
-	// 0x30 - LDT, set per-process in proc_startcore()
+	// 0x30 - LDT, set per-process
 	[GD_LDT >> 3] = SEG_NULL
 };
 

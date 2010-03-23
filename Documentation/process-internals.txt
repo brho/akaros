@@ -90,7 +90,7 @@ stores or makes a copy of the reference.
 1.5 Functions That Don't or Might Not Return:
 ---------------------------
 Refcnting and especially decreffing gets tricky when there are functions that
-MAY not return.  proc_startcore() does not return (it pops into userspace).
+MAY not return.  proc_restartcore() does not return (it pops into userspace).
 proc_run() might not return, if the core it was called on will pop into
 userspace (if it was a _S, or if the core is part of the vcoremap for a _M).
 
@@ -120,10 +120,11 @@ proc_run(pid2proc(55)) works, since pid2proc() increfs for you.  But you cannot
 proc_run(current), unless you incref current in advance.  Incidentally,
 proc_running current doesn't make a lot of sense.
 
-As another example, proc_startcore() will take your reference and store it
+As another example, __proc_startcore() will take your reference and store it
 in current.  Since it is used by both the __startcore and the interrupt return
-paths, we're currently going with the model of "caller makes sure there is a ref
-for current".  Check its comments for details.
+paths (proc_restartcore() now, formerly called proc_startcore()), we're
+currently going with the model of "caller makes sure there is a ref for
+current".  Check its comments for details.
 
 1.6 Runnable List:
 ---------------------------
@@ -147,7 +148,7 @@ Also note that while proc_run() consumes your reference, it's not actually
 decreffing, so there's no danger within proc_run() of the process dying /
 __proc_free()ing.
 
-proc_startcore(): assumes all references to p are sorted.  *p is already
+__proc_startcore(): assumes all references to p are sorted.  *p is already
 accounted for as if it was current on the core startcore runs on. (there is only
 one refcnt for both *p and current, not 2 separate ones).
 
@@ -255,13 +256,13 @@ specifically talking about when a process's cr3 is loaded on a core.  Usually,
 current is also set (the exception for now is when processing ARSCs).
 
 There are a couple different ways to do this.  One is to never unload a context
-until something new is being run there (handled solely in proc_startcore()).
+until something new is being run there (handled solely in __proc_startcore()).
 Another way is to always explicitly leave the core, like by abandon_core()ing.
 
 The issue with the former is that you could have contexts sitting around for a
 while, and also would have a bit of extra latency when __proc_free()ing during
-someone *else's* proc_startcore() (though that could be avoided if it becomes a
-real issue, via some form of reaping).  You'll also probably have excessive
+someone *else's* __proc_startcore() (though that could be avoided if it becomes
+a real issue, via some form of reaping).  You'll also probably have excessive
 decrefs (based on the interactions between proc_run() and __startcore()).
 
 The issue with the latter is excessive TLB shootdowns and corner cases.  There
@@ -275,7 +276,7 @@ process's context is loaded.
 2.2 Here's how it is done now:
 ---------------------------
 We try to proactively leave, but have the ability to stay in context til
-proc_startcore() to handle the corner cases (and to maybe cut down the TLB
+__proc_startcore() to handle the corner cases (and to maybe cut down the TLB
 flushes later).  To stop proactively leaving, just change abandon_core() to not
 do anything with current/cr3.  You'll see weird things like processes that won't
 die until their old cores are reused.  The reason we proactively leave context
@@ -283,9 +284,9 @@ is to help with sanity for these issues, and also to avoid decref's in
 __startcore().
 
 A couple other details: __startcore() sorts the extra increfs, and
-proc_startcore() sorts leaving the old context.  Anytime a __startcore kernel
+__proc_startcore() sorts leaving the old context.  Anytime a __startcore kernel
 message is sent, the sender increfs in advance for the current refcnt.  If that
-was in error, __startcore decrefs.  proc_startcore(), which the last moment
+was in error, __startcore decrefs.  __proc_startcore(), which the last moment
 before we *must* have the cr3/current issues sorted, does the actual check if
 there was an old process there or not, while it handles the lcr3 (if necessary).
 In general, lcr3's ought to have refcnts near them, or else comments explaining
@@ -310,7 +311,7 @@ Note that dealing with interrupting processes that are in the kernel is tricky.
 There is no true process context, so we can't leave a core until the kernel is
 in a "safe place", i.e. it's state is bundled enough that it can be recontinued
 later.  Calls of this type are routine kernel messages, executed at a convenient
-time (specifically, before we return to userspace in proc_startcore().
+time (specifically, before we return to userspace in proc_restartcore().
 
 This same thing applies to __death messages.  Even though a process is dying, it
 doesn't mean we can just drop whatever the kernel was doing on its behalf.  For
@@ -331,9 +332,31 @@ the old "active messages" into a generic work execution message (a kernel
 message) that can be delayed or shipped to another core.  These types of
 messages will not be executed immediately on the receiving pcore - instead they
 are on the queue for "when there's nothing else to do in the kernel", which is
-checked in smp_idle() and before returning to userspace in proc_startcore().
+checked in smp_idle() and before returning to userspace in proc_restartcore().
 Additionally, these kernel messages can also be queued on an alarm queue,
 delaying their activation as part of a generic kernel alarm facility.
+
+One subtlety is that __proc_startcore() shouldn't check for messages, since it
+is called by __startcore (a message).  Checking there would run the messages out
+of order, which is exactly what we are trying to avoid (total chaos).  No one
+should call __proc_startcore, other than proc_restartcore() or __startcore().
+If we ever have functions that do so, if they are not called from a message,
+they must check for outstanding messages.
+
+This last subtlety is why we needed to change proc_run()'s _S case to use a
+local message instead of calling proc_starcore (and why no one should ever call
+proc_startcore()).  We could unlock, thereby freeing another core to change the
+proc state and send a message to us, then try to proc_startcore, and then
+reading the message before we had installed current or had a userspace TF to
+preempt, and probably a few other things.  Treating _S as a local message is
+cleaner, begs to be merged in the code with _M's code, and uses the messaging
+infrastructure to avoid all the races that it was created to handle.
+
+Incidentally, we don't need to worry about missing messages while trying to pop
+back to userspace from __proc_startcore, since an IPI will be on the way
+(possibly a self-ipi caused by the __kernel_message() handler).  This is also
+why we needed to make process_routine_kmsg() keep interrupts disabled when it
+stops (there's a race between checking the queue and disabling ints).
 
 4. Preemption and Notification Issues:
 ===========================

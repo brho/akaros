@@ -386,7 +386,7 @@ handle_syscall(trapframe_t* state)
 	state->gpr[8] = syscall(current,num,a1,a2,a3,a4,a5);
 	proc_decref(current, 1);
 
-	env_pop_tf(state);
+	proc_restartcore(current,state);
 }
 
 void

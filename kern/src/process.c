@@ -381,6 +381,7 @@ void proc_run(struct proc *p)
 				smp_idle(); // this never returns
 			return;
 		case (PROC_RUNNABLE_S):
+			assert(current != p);
 			__proc_set_state(p, PROC_RUNNING_S);
 			/* We will want to know where this process is running, even if it is
 			 * only in RUNNING_S.  can use the vcoremap, which makes death easy.
@@ -390,13 +391,10 @@ void proc_run(struct proc *p)
 			p->procinfo->num_vcores = 0;
 			__map_vcore(p, 0, core_id()); // sort of.  this needs work.
 			__seq_end_write(&p->procinfo->coremap_seqctr);
-			spin_unlock_irqsave(&p->proc_lock);
-			/* Transferring our reference to startcore, where p will become
-			 * current.  If it already is, decref in advance.  This is similar
-			 * to __startcore(), in that it sorts out the refcnt accounting.  */
-			if (current == p)
-				proc_decref(p, 1);
-			proc_startcore(p, &p->env_tf);
+			p->env_refcnt++; // TODO: (REF) use incref
+			p->procinfo->vcoremap[0].tf_to_run = &p->env_tf;
+			send_kernel_message(core_id(), __startcore, p, 0, 0, AMSG_IMMEDIATE);
+			__proc_unlock_ipi_pending(p, TRUE);
 			break;
 		case (PROC_RUNNABLE_M):
 			/* vcoremap[i] holds the coreid of the physical core allocated to
@@ -432,8 +430,8 @@ void proc_run(struct proc *p)
 			/* Unlock and decref/wait for the IPI if one is pending.  This will
 			 * eat the reference if we aren't returning. 
 			 *
-			 * There a subtle race avoidance here.  proc_startcore can handle a
-			 * death message, but we can't have the startcore come after the
+			 * There a subtle race avoidance here.  __proc_startcore can handle
+			 * a death message, but we can't have the startcore come after the
 			 * death message.  Otherwise, it would look like a new process.  So
 			 * we hold the lock til after we send our message, which prevents a
 			 * possible death message.
@@ -451,35 +449,10 @@ void proc_run(struct proc *p)
 	}
 }
 
-/* Runs the given context (trapframe) of process p on the core this code
- * executes on.
- *
- * Given we are RUNNING_*, an IPI for death or preemption could come in:
- * 1. death attempt (IPI to kill whatever is on your core):
- * 		we don't need to worry about protecting the stack, since we're
- * 		abandoning ship - just need to get a good cr3 and decref current, which
- * 		the death handler will do.
- * 		If a death IPI comes in, we immediately stop this function and will
- * 		never come back.
- * 2. preempt attempt (IPI to package state and maybe run something else):
- * 		- if a preempt attempt comes in while we're in the kernel, it'll
- * 		just set a flag.  we could attempt to bundle the kernel state
- * 		and rerun it later, but it's really messy (and possibly given
- * 		back to userspace).  we'll disable ints, check this flag, and if
- * 		so, handle the preemption using the same funcs as the normal
- * 		preemption handler.  nonblocking kernel calls will just slow
- * 		down the preemption while they work.  blocking kernel calls will
- * 		need to package their state properly anyway.
- *
- * TODO: in general, think about when we no longer need the stack, in case we
- * are preempted and expected to run again from somewhere else.  we can't
- * expect to have the kernel stack around anymore.  the nice thing about being
- * at this point is that we are just about ready to give up the stack anyways.
- *
- * I think we need to make it such that the kernel in "process context" never
- * gets removed from the core (displaced from its stack) without going through
- * some "bundling" code.
- *
+/* Actually runs the given context (trapframe) of process p on the core this
+ * code executes on.  This is called directly by __startcore, which needs to
+ * bypass the routine_kmsg check.  Interrupts should be off when you call this.
+ * 
  * A note on refcnting: this function will not return, and your proc reference
  * will end up stored in current.  This will make no changes to p's refcnt, so
  * do your accounting such that there is only the +1 for current.  This means if
@@ -489,17 +462,9 @@ void proc_run(struct proc *p)
  * in current and you have one reference, like proc_run(non_current_p), then
  * also do nothing.  The refcnt for your *p will count for the reference stored
  * in current. */
-void proc_startcore(struct proc *p, trapframe_t *tf) {
-	// it's possible to be DYING, but it's a rare race.
-	//if (p->state & (PROC_RUNNING_S | PROC_RUNNING_M))
-	//	printk("dying before (re)startcore on core %d\n", core_id());
-	// sucks to have ints disabled when doing env_decref and possibly freeing
-	disable_irq();
-	if (per_cpu_info[core_id()].preempt_pending) {
-		// TODO: handle preemption
-		// the functions will need to consider deal with current like down below
-		panic("Preemption not supported!");
-	}
+static void __proc_startcore(struct proc *p, trapframe_t *tf)
+{
+	assert(!irq_is_enabled());
 	/* If the process wasn't here, then we need to load its address space. */
 	if (p != current) {
 		/* Do not incref here.  We were given the reference to current,
@@ -523,6 +488,25 @@ void proc_startcore(struct proc *p, trapframe_t *tf) {
 	 */
 	env_pop_ancillary_state(p);
 	env_pop_tf(tf);
+}
+
+/* Restarts the given context (trapframe) of process p on the core this code
+ * executes on.  Calls an internal function to do the work.
+ * 
+ * In case there are pending routine messages, like __death, __preempt, or
+ * __notify, we need to run them.  Alternatively, if there are any, we could
+ * self_ipi, and run the messages immediately after popping back to userspace,
+ * but that would have crappy overhead.
+ *
+ * Refcnting: this will not return, and it assumes that you've accounted for
+ * your reference as if it was the ref for "current" (which is what happens when
+ * returning from local traps and such. */
+void proc_restartcore(struct proc *p, trapframe_t *tf)
+{
+	/* Need ints disabled when we return from processing (race) */
+	disable_irq();
+	process_routine_kmsg();
+	__proc_startcore(p, tf);
 }
 
 /*
@@ -1016,7 +1000,7 @@ void proc_decref(struct proc *p, size_t count)
 }
 
 /* Kernel message handler to start a process's context on this core.  Tightly
- * coupled with proc_run() */
+ * coupled with proc_run().  Interrupts are disabled. */
 void __startcore(trapframe_t *tf, uint32_t srcid, void *a0, void *a1, void *a2)
 {
 	uint32_t pcoreid = core_id(), vcoreid;
@@ -1042,7 +1026,7 @@ void __startcore(trapframe_t *tf, uint32_t srcid, void *a0, void *a1, void *a2)
 	/* the sender of the amsg increfed, thinking we weren't running current. */
 	if (p_to_run == current)
 		proc_decref(p_to_run, 1);
-	proc_startcore(p_to_run, tf_to_pop);
+	__proc_startcore(p_to_run, tf_to_pop);
 }
 
 /* Stop running whatever context is on this core, load a known-good cr3, and
@@ -1058,7 +1042,7 @@ void abandon_core(void)
 /* Kernel message handler to clean up the core when a process is dying.
  * Note this leaves no trace of what was running.
  * It's okay if death comes to a core that's already idling and has no current.
- * It could happen if a process decref'd before proc_startcore could incref. */
+ * It could happen if a process decref'd before __proc_startcore could incref. */
 void __death(trapframe_t *tf, uint32_t srcid, void *SNT a0, void *SNT a1,
              void *SNT a2)
 {
