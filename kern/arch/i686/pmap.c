@@ -632,6 +632,23 @@ int get_va_perms(pde_t *pgdir, const void *SNT va)
 
 void *get_free_va_range(pde_t *pgdir, uintptr_t addr, size_t len)
 {
+	addr = ROUNDUP(MAX(addr,UMMAP_START),PGSIZE);
+	len = ROUNDUP(len,PGSIZE);
+
+	for(char* a = (char*)addr; a < (char*)USTACKBOT; a += PGSIZE)
+	{
+		for(char* b = a; b < a+len; b += PGSIZE)
+		{
+			pte_t* pte = pgdir_walk(pgdir,b,0);
+			if(pte && (*pte & PTE_P))
+			{
+				a = b;
+				break;
+			}
+			if(b+PGSIZE == a+len)
+				return a;
+		}
+	}
 	return NULL;
 }
 
