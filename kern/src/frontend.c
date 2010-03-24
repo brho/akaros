@@ -16,6 +16,23 @@
 
 volatile int magic_mem[10];
 
+void
+frontend_proc_init(struct proc *SAFE p)
+{
+	pid_t parent_id = p->ppid, id = p->pid;
+	int32_t errno;
+	if(frontend_syscall(parent_id,APPSERVER_SYSCALL_proc_init,id,0,0,0,&errno))
+		panic("Front-end server couldn't initialize new process!");
+}
+
+void
+frontend_proc_free(struct proc *SAFE p)
+{
+	int32_t errno;
+	if(frontend_syscall(0,APPSERVER_SYSCALL_proc_free,p->pid,0,0,0,&errno))
+		panic("Front-end server couldn't free process!");
+}
+
 void* user_memdup(struct proc* p, const void* va, int len)
 {
 	void* kva = NULL;

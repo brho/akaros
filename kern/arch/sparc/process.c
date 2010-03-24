@@ -13,25 +13,6 @@
 #pragma nosharc
 #endif
 
-// architecture-specific process initialization code
-void
-proc_init_arch(struct proc *SAFE p)
-{
-	pid_t parent_id = p->ppid, id = p->pid;
-	int32_t errno;
-	if(frontend_syscall(parent_id,APPSERVER_SYSCALL_proc_init,id,0,0,0,&errno))
-		panic("Front-end server couldn't initialize new process!");
-}
-
-// architecture-specific process termination code
-void
-proc_free_arch(struct proc *SAFE p)
-{
-	int32_t errno;
-	if(frontend_syscall(0,APPSERVER_SYSCALL_proc_free,p->pid,0,0,0,&errno))
-		panic("Front-end server couldn't free process!");
-}
-
 void
 proc_init_trapframe(trapframe_t *tf, uint32_t vcoreid,
                     uint32_t entryp, uint32_t stack_top)

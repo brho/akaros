@@ -23,6 +23,7 @@
 #include <hashtable.h>
 #include <slab.h>
 #include <sys/queue.h>
+#include <frontend.h>
 
 /* Process Lists */
 struct proc_list proc_runnablelist = TAILQ_HEAD_INITIALIZER(proc_runnablelist);
@@ -270,7 +271,7 @@ static error_t proc_alloc(struct proc *SAFE*SAFE pp, pid_t parent_id)
 	*pp = p;
 	atomic_inc(&num_envs);
 
-	proc_init_arch(p);
+	frontend_proc_init(p);
 
 	printd("[%08x] new process %08x\n", current ? current->pid : 0, p->pid);
 	} // INIT_STRUCT
@@ -301,11 +302,11 @@ static void __proc_free(struct proc *p)
 {
 	physaddr_t pa;
 
-	printd("[PID %d] freeing proc: %d\n", current ? current->pid : 0, p->pid);
+	printk("[PID %d] freeing proc: %d\n", current ? current->pid : 0, p->pid);
 	// All parts of the kernel should have decref'd before __proc_free is called
 	assert(p->env_refcnt == 0);
 
-	proc_free_arch(p);
+	frontend_proc_free(p);
 
 	// Free any colors allocated to this process
 	if(p->cache_colors_map != global_cache_colors_map) {

@@ -8,16 +8,6 @@
 #include <assert.h>
 #include <stdio.h>
 
-// architecture-specific process initialization code
-void proc_init_arch(struct proc *SAFE p)
-{
-}
-
-// architecture-specific process termination code
-void proc_free_arch(struct proc *SAFE p)
-{
-}
-
 void proc_init_trapframe(trapframe_t *tf, uint32_t vcoreid,
                          uint32_t entryp, uint32_t stack_top)
 {
@@ -29,7 +19,7 @@ void proc_init_trapframe(trapframe_t *tf, uint32_t vcoreid,
 	tf->tf_ds = GD_UD | 3;
 	tf->tf_es = GD_UD | 3;
 	tf->tf_ss = GD_UD | 3;
-	tf->tf_esp = stack_top;
+	tf->tf_esp = stack_top-64;
 	tf->tf_cs = GD_UT | 3;
 	/* set the env's EFLAGSs to have interrupts enabled */
 	tf->tf_eflags |= 0x00000200; // bit 9 is the interrupts-enabled

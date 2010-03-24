@@ -13,6 +13,9 @@
 #define APPSERVER_ETH_TYPE 0x8888
 #endif
 
+void frontend_proc_init(struct proc* p);
+void frontend_proc_free(struct proc* p);
+
 int32_t frontend_syscall_from_user(env_t* p, int32_t syscall_num, 
                                    uint32_t arg0, uint32_t arg1, 
                                    uint32_t arg2, uint32_t translate_args);
