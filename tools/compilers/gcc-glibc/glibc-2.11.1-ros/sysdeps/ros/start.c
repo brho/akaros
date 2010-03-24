@@ -5,6 +5,7 @@
 #include <ros/syscall.h>
 #include <ros/procinfo.h>
 #include <unistd.h>
+#include <tls.h>
 
 void** __hart_thread_control_blocks = NULL;
 weak_alias(__hart_thread_control_blocks,hart_thread_control_blocks)
@@ -28,10 +29,19 @@ weak_alias(__hart_yield,hart_yield)
 void
 _start(void)
 {
-	// threads besides thread 0 must acquire a TCB.
 	// WARNING: __hart_self_on_entry must be read before
 	// anything is register-allocated!
 	int id = __hart_self_on_entry;
+	static int init = 0;
+	// For dynamically-linked programs, the first time through,
+	// __hart_self_on_entry could be clobbered (on x86), because
+	// the linker will have overwritten eax.  Happily, the first
+	// time through, we know we are vcore 0.  Subsequent entries
+	// into this routine do not have this problem.
+	if(init == 0)
+		id = 0;
+	
+	// threads besides thread 0 must acquire a TCB.
 	if(id != 0)
 	{
 		TLS_INIT_TP(__hart_thread_control_blocks[id],0);
@@ -41,7 +51,6 @@ _start(void)
 		goto diediedie;
 	}
 
-	static int init = 0;
 	if(init)
 	{
 		failmsg("why did thread 0 re-enter _start?");
@@ -71,6 +80,9 @@ _start(void)
 	while(argv[argc])
 		argc++;
 
+	extern char** _environ;
+	_environ = argv+argc+1;
+
 	__libc_start_main(&main,argc,argv,&__libc_csu_init,&__libc_csu_fini,0,0);
 
 	failmsg("why did main() return?");
@@ -82,4 +94,3 @@ diediedie:
 	#endif
 	while(1);
 }
-

@@ -20,6 +20,7 @@
 #include <unistd.h>
 #include <stddef.h>
 #include <ros/syscall.h>
+#include <ros/memlayout.h>
 
 /* Get the pathname of the current working directory,
    and put it in SIZE bytes of BUF.  Returns NULL if the
@@ -34,6 +35,11 @@ __getcwd (char *buf, size_t size)
   int allocated = 0;
   if(buf == NULL)
   {
+    // Linux ABI requires we allocate a buffer if NULL is passed.
+    // If size is passed as 0, it means "as big as necessary"
+    if(size == 0)
+      size = PGSIZE;
+
     buf = (char*)malloc(size);
     if(buf == NULL)
     {

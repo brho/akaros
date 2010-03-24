@@ -43,7 +43,6 @@ char **__libc_argv attribute_hidden;
 
 struct timeval __t0;
 
-
 void
 __libc_init_first (int argc, char **argv, char **envp)
 {
@@ -80,19 +79,7 @@ _init (int argc, char **argv, char **envp)
   __environ = envp;
 
 #ifndef SHARED
-  // hack until TLS works right
-  __libc_tsd_LOCALE = &_nl_global_locale;
-  _nl_current_LC_MONETARY = &_nl_global_locale.__locales[LC_MONETARY];
-  _nl_current_LC_CTYPE = &_nl_global_locale.__locales[LC_CTYPE];
-  _nl_current_LC_TELEPHONE = &_nl_global_locale.__locales[LC_TELEPHONE];
-  _nl_current_LC_ADDRESS = &_nl_global_locale.__locales[LC_ADDRESS];
-  _nl_current_LC_NUMERIC = &_nl_global_locale.__locales[LC_NUMERIC];
-  _nl_current_LC_PAPER = &_nl_global_locale.__locales[LC_PAPER];
-  _nl_current_LC_MESSAGES = &_nl_global_locale.__locales[LC_MESSAGES];
-  _nl_current_LC_IDENTIFICATION = &_nl_global_locale.__locales[LC_IDENTIFICATION];
-  _nl_current_LC_COLLATE = &_nl_global_locale.__locales[LC_COLLATE];
-  _nl_current_LC_TIME = &_nl_global_locale.__locales[LC_TIME];
-  _nl_current_LC_MEASUREMENT = &_nl_global_locale.__locales[LC_MEASUREMENT];
+  __libc_setup_tls (TLS_INIT_TCB_SIZE, TLS_INIT_TCB_ALIGN);
 
   __libc_init_secure ();
 

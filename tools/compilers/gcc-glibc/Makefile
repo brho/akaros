@@ -144,7 +144,7 @@ glibc-$(GLIBC_VERSION):
 	$(MAKE) .glibc-patch
 
 .glibc-patch: glibc-$(GLIBC_VERSION)
-	cd glibc-$(GLIBC_VERSION); \
+	-cd glibc-$(GLIBC_VERSION); \
 	diff -ruB --unidirectional-new-file \
 	     ../glibc-$(GLIBC_VERSION) \
 	     ../glibc-$(GLIBC_VERSION)-ros \
