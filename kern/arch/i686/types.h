@@ -29,10 +29,8 @@ typedef long ssize_t;
 typedef int pid_t;
 
 // Pointers and addresses are 32 bits long.
-// We use pointer types to represent virtual addresses,
-// uintptr_t to represent the numerical values of virtual addresses,
-// and physaddr_t to represent physical addresses.
-typedef int32_t intptr_t;
+// We use pointer types to represent virtual addresses and
+// uintptr_t to represent the numerical values of virtual addresses.
 typedef uint32_t uintptr_t;
 
 #endif /* !ROS_INC_TYPES_H */
