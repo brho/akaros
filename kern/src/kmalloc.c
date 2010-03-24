@@ -136,7 +136,8 @@ void *krealloc(void* buf, size_t size, int flags) {
 
 void kfree(void *addr)
 {
-	assert(addr);
+	if(addr == NULL)
+		return;
 	struct kmalloc_tag *tag = (struct kmalloc_tag*)(addr - KMALLOC_OFFSET);
 	assert(tag->canary == KMALLOC_CANARY);
 	if (tag->flags & KMALLOC_TAG_CACHE)
