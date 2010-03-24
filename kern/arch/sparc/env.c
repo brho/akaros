@@ -97,7 +97,7 @@ env_user_mem_walk(env_t* e, void* start, size_t len,
 {
 	pte_t *l1pt = e->env_pgdir;
 
-	assert((intptr_t)start % PGSIZE == 0 && len % PGSIZE == 0);
+	assert((uintptr_t)start % PGSIZE == 0 && len % PGSIZE == 0);
 	void* end = (char*)start+len;
 
 	int l1x_start = L1X(start);

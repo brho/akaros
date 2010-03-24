@@ -21,7 +21,7 @@ typedef struct procdata {
 	segdesc_t *ldt;
 #endif
 
-	intptr_t stack_pointers[MAX_NUM_CPUS];
+	uintptr_t stack_pointers[MAX_NUM_CPUS];
 } procdata_t;
 #define PROCDATA_NUM_PAGES  ((sizeof(procdata_t)-1)/PGSIZE + 1)
 

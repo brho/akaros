@@ -47,7 +47,7 @@ breakpoint(void)
 static __inline void 
 invlpg(void *addr)
 { 
-	store_alternate(((intptr_t)addr) & ~0xFFF,3,0);
+	store_alternate(((uintptr_t)addr) & ~0xFFF,3,0);
 }  
 
 static __inline void
@@ -115,7 +115,7 @@ static __inline uint64_t
 read_perfctr(uint32_t cpu, uint32_t which)
 {
 	register uint32_t hi asm("o0"), lo asm("o1");
-	intptr_t addr = cpu<<10 | which<<3;
+	uintptr_t addr = cpu<<10 | which<<3;
 
 	#ifdef ROS_KERNEL
 		int8_t state = 0;

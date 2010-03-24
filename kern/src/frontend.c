@@ -74,7 +74,7 @@ char* user_strdup(struct proc* p, const char* va0, int max)
 	const char* va = va0;
 	while(max > 0 && len == 0)
 	{
-		int thislen = MIN(PGSIZE-(intptr_t)va%PGSIZE,max);
+		int thislen = MIN(PGSIZE-(uintptr_t)va%PGSIZE,max);
 		if(memcpy_from_user(p,kbuf,va,thislen))
 		{
 			kfree(kbuf);

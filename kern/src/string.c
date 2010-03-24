@@ -141,7 +141,7 @@ memset16(uint32_t *COUNT(n/sizeof(uint32_t)) _v, uint32_t c, size_t n)
 	v = _v;
 	c = c | c<<8 | c<<16 | c<<24;
 
-	if(n >= 64 && ((intptr_t)v) % 8 == 0)
+	if(n >= 64 && ((uintptr_t)v) % 8 == 0)
 	{
 		uint64_t* v64 = (uint64_t*)v;
 		uint64_t c64 = c | ((uint64_t)c)<<32;

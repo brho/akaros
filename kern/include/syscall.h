@@ -7,9 +7,9 @@
 #include <ros/syscall.h>
 #include <process.h>
 
-#define ERR_PTR(err)  ((void *)((intptr_t)(err)))
-#define PTR_ERR(ptr)  ((intptr_t)(ptr))
-#define IS_ERR(ptr)   ((uintptr_t)-(intptr_t)(ptr) < 512)
+#define ERR_PTR(err)  ((void *)((uintptr_t)(err)))
+#define PTR_ERR(ptr)  ((uintptr_t)(ptr))
+#define IS_ERR(ptr)   ((uintptr_t)-(uintptr_t)(ptr) < 512)
 
 
 intreg_t syscall(struct proc *p, uintreg_t num, uintreg_t a1, uintreg_t a2,

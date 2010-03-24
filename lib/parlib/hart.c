@@ -46,7 +46,7 @@ static int hart_allocate_stack(int id)
 	if(__procdata.stack_pointers[id])
 		return 0; // reuse old stack
 
-	if(!(__procdata.stack_pointers[id] = (intptr_t)malloc(HART_STACK_SIZE)))
+	if(!(__procdata.stack_pointers[id] = (uintptr_t)malloc(HART_STACK_SIZE)))
 	{
 		errno = ENOMEM;
 		return -1;

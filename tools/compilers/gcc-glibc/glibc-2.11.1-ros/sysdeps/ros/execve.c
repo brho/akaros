@@ -47,6 +47,6 @@ __execve (path, argv, envp)
     return -1;
   }
 
-  return syscall(SYS_exec,(intptr_t)name,(intptr_t)&pi,0,0,0);
+  return syscall(SYS_exec,(uintptr_t)name,(uintptr_t)&pi,0,0,0);
 }
 weak_alias (__execve, execve)

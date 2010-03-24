@@ -16,14 +16,8 @@
 void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
            int fd, size_t offset)
 {
-	printd("mmap(addr %x, len %x, prot %x, flags %x, fd %x, off %x)\n", addr,
+	printk("mmap(addr %x, len %x, prot %x, flags %x, fd %x, off %x)\n", addr,
 	       len, prot, flags, fd, offset);
-	#ifdef __i386__
-	if (fd >= 0 || offset || !(flags & MAP_ANON)) {
-		printk("[kernel] mmap() does not support files yet.\n");
-		return (void*SAFE)TC(-1);
-	}
-	#endif
 	if (fd >= 0 && (flags & MAP_SHARED)) {
 		printk("[kernel] mmap() for files requires !MAP_SHARED.\n");
 		return (void*)-1;
@@ -66,7 +60,6 @@ void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 		if (upage_alloc(p, &a_page, 1))
 			goto mmap_abort;
 
-		#ifndef __i386__
 		// This is dumb--should not read until faulted in.
 		// This is just to get it correct at first
 		if(!(flags & MAP_ANON))
@@ -78,7 +71,6 @@ void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 			if(len % PGSIZE && i == num_pages-1)
 				memset(page2kva(a_page)+len%PGSIZE,0,PGSIZE-len%PGSIZE);
 		}
-		#endif
 
 		// TODO: TLB shootdown if replacing an old mapping
 		// TODO: handle all PROT flags
@@ -91,6 +83,7 @@ void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 
 	// TODO: release the appropriate mm_lock
 	spin_unlock_irqsave(&p->proc_lock);
+	printk("mmap returned %p\n",addr);
 	return (void*SAFE)TC(addr);
 
 	// TODO: if there's a failure, we should go back through the addr+len range
@@ -108,7 +101,7 @@ void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 int mprotect(struct proc* p, void* addr, size_t len, int prot)
 {
 	printd("mprotect(addr %x, len %x, prot %x)\n",addr,len,prot);
-	if((intptr_t)addr % PGSIZE || (len == 0 && (prot & PROT_UNMAP)))
+	if((uintptr_t)addr % PGSIZE || (len == 0 && (prot & PROT_UNMAP)))
 	{
 		set_errno(current_tf,EINVAL);
 		return -1;

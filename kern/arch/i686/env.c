@@ -93,7 +93,7 @@ int env_user_mem_walk(env_t* e, void* start, size_t len,
 	uint32_t pdeno, pteno;
 	physaddr_t pa;
 
-	assert((intptr_t)start % PGSIZE == 0 && len % PGSIZE == 0);
+	assert((uintptr_t)start % PGSIZE == 0 && len % PGSIZE == 0);
 	void* end = (char*)start+len;
 	uint32_t pdeno_start = PDX(start);
 	uint32_t pdeno_end = PDX(ROUNDUP(end,PTSIZE));
