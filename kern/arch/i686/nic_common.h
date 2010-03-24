@@ -38,7 +38,7 @@ static inline uint16_t htons(uint16_t x)
 
 static inline uint32_t htonl(uint32_t x)
 {
-	__asm__ ("bswapl %0" : "=r" (x) : "r" (x));
+	__asm__ ("bswapl %0" : "=r" (x) : "0" (x));
 	return x;
 }
 #define ntohs htons

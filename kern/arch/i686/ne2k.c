@@ -382,11 +382,13 @@ void ne2k_handle_rx_packet() {
 		return;
 	}
 
+
 	// Treat as a syscall frontend response packet if eth_type says so
 	// Will eventually go away, so not too worried about elegance here...
 	#include <frontend.h>
 	#include <arch/frontend.h>
-	if((uint16_t)(rx_buffer[13]) == APPSERVER_ETH_TYPE) {
+	uint16_t eth_type = htons(*(uint16_t*)(rx_buffer + 12));
+	if(eth_type == APPSERVER_ETH_TYPE) {
 		handle_appserver_packet(rx_buffer, packet_len);
 		kfree(rx_buffer);
 		return;
@@ -478,7 +480,7 @@ int ne2k_send_frame(const char *data, size_t len) {
 
 	for (int i = 0; i<len; i = i + 1) {
 		outb(ne2k_io_base_addr + 0x10, *(uint8_t*)(data + i));
-		//printk("sent: %x\n", *(uint8_t*)(data + i));
+		//ne2k_debug("sent: %x\n", *(uint8_t*)(data + i));
 	}
 	
 	while(( inb(ne2k_io_base_addr + NE2K_PG0_RW_ISR) & 0x40) == 0);
