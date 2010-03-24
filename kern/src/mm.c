@@ -16,7 +16,7 @@
 void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
            int fd, size_t offset)
 {
-	printk("mmap(addr %x, len %x, prot %x, flags %x, fd %x, off %x)\n", addr,
+	printd("mmap(addr %x, len %x, prot %x, flags %x, fd %x, off %x)\n", addr,
 	       len, prot, flags, fd, offset);
 	if (fd >= 0 && (flags & MAP_SHARED)) {
 		printk("[kernel] mmap() for files requires !MAP_SHARED.\n");
@@ -83,7 +83,6 @@ void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 
 	// TODO: release the appropriate mm_lock
 	spin_unlock_irqsave(&p->proc_lock);
-	printk("mmap returned %p\n",addr);
 	return (void*SAFE)TC(addr);
 
 	// TODO: if there's a failure, we should go back through the addr+len range
