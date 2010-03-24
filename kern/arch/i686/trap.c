@@ -184,11 +184,17 @@ trap_dispatch(trapframe_t *tf)
 		case T_SYSCALL:
 			// check for userspace, for now
 			assert(tf->tf_cs != GD_KT);
+
+			// default return value is 0 if syscall doesn't return
+			// e.g. for fork or yield
+			intreg_t syscallno = tf->tf_regs.reg_eax;
+			tf->tf_regs.reg_eax = 0;
+			set_errno(tf,0);
+
 			// syscall code wants an edible reference for current
 			proc_incref(current, 1);
-print_trapframe(tf);
 			tf->tf_regs.reg_eax =
-				syscall(current, tf->tf_regs.reg_eax, tf->tf_regs.reg_edx,
+				syscall(current, syscallno, tf->tf_regs.reg_edx,
 				        tf->tf_regs.reg_ecx, tf->tf_regs.reg_ebx,
 				        tf->tf_regs.reg_edi, tf->tf_regs.reg_esi);
 			proc_decref(current, 1);
@@ -359,10 +365,16 @@ void sysenter_callwrapper(struct Trapframe *tf)
 	// save a per-core reference to the tf
 	set_current_tf(tf);
 
+	// default return value is 0 if syscall doesn't return
+	// e.g. for fork or yield
+	intreg_t syscallno = tf->tf_regs.reg_eax;
+	tf->tf_regs.reg_eax = 0;
+	set_errno(tf,0);
+
 	// syscall code wants an edible reference for current
 	proc_incref(current, 1);
 	tf->tf_regs.reg_eax = (intreg_t) syscall(current,
-	                                         tf->tf_regs.reg_eax,
+	                                         syscallno,
 	                                         tf->tf_regs.reg_edx,
 	                                         tf->tf_regs.reg_ecx,
 	                                         tf->tf_regs.reg_ebx,
