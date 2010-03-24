@@ -419,7 +419,7 @@ error_t memcpy_from_user(env_t* env, void* COUNT(len) dest,
 	start = ROUNDDOWN(va, PGSIZE);
 	end = ROUNDUP(va + len, PGSIZE);
 
-	if(start >= (void*SNT)ULIM || end >= (void*SNT)ULIM)
+	if(start >= (void*SNT)ULIM || end > (void*SNT)ULIM)
 		return -EFAULT;
 
 	num_pages = LA2PPN(end - start);
@@ -474,7 +474,7 @@ error_t memcpy_to_user(env_t* env, void*DANGEROUS va,
 	start = ROUNDDOWN(va, PGSIZE);
 	end = ROUNDUP(va + len, PGSIZE);
 
-	if(start >= (void*SNT)ULIM || end >= (void*SNT)ULIM)
+	if(start >= (void*SNT)ULIM || end > (void*SNT)ULIM)
 		return -EFAULT;
 
 	num_pages = LA2PPN(end - start);
