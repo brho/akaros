@@ -11,6 +11,8 @@
 void proc_init_trapframe(trapframe_t *tf, uint32_t vcoreid,
                          uint32_t entryp, uint32_t stack_top)
 {
+	memset(tf,0,sizeof(*tf));
+
 	/* Set up appropriate initial values for the segment registers.
 	 * GD_UD is the user data segment selector in the GDT, and
 	 * GD_UT is the user text segment selector (see inc/memlayout.h).
