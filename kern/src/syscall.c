@@ -12,6 +12,7 @@
 #include <ros/timer.h>
 #include <ros/error.h>
 
+#include <elf.h>
 #include <string.h>
 #include <assert.h>
 #include <process.h>
@@ -337,7 +338,14 @@ static ssize_t sys_fork(env_t* e)
 		return 0;
 	}
 
-	if(env_user_mem_walk(e,0,UTOP,&copy_page,env))
+	// copy procdata and procinfo
+	memcpy(env->env_procdata,e->env_procdata,sizeof(struct procdata));
+	memcpy(env->env_procinfo,e->env_procinfo,sizeof(struct procinfo));
+	env->env_procinfo->pid = env->pid;
+	env->env_procinfo->ppid = env->ppid;
+
+	// copy all memory below procdata
+	if(env_user_mem_walk(e,0,UDATA,&copy_page,env))
 	{
 		proc_decref(env,2);
 		set_errno(current_tf,ENOMEM);
@@ -353,6 +361,42 @@ static ssize_t sys_fork(env_t* e)
 	printd("[PID %d] fork PID %d\n",e->pid,env->pid);
 
 	return env->pid;
+}
+
+intreg_t sys_exec(struct proc* p, const char fn[MAX_PATH_LEN], procinfo_t* pi)
+{
+	if(p->state != PROC_RUNNING_S)
+		return -1;
+
+	int ret = -1;
+	char* kfn = kmalloc(MAX_PATH_LEN,0);
+	if(kfn == NULL)
+		goto out;
+	if(memcpy_from_user(p,kfn,fn,MAX_PATH_LEN))
+		goto out;
+
+	if(memcpy_from_user(p,p->env_procinfo,pi,sizeof(procinfo_t)))
+	{
+		proc_destroy(p);
+		goto out;
+	}
+	proc_init_procinfo(p);
+
+	env_segment_free(p,0,USTACKTOP);
+
+	if(load_elf(p,kfn))
+	{
+		proc_destroy(p);
+		goto out;
+	}
+	*current_tf = p->env_tf;
+	ret = 0;
+
+	printd("[PID %d] exec %s\n",p->pid,kfn);
+
+out:
+	kfree(kfn);
+	return ret;
 }
 
 static ssize_t sys_trywait(env_t* e, pid_t pid, int* status)
@@ -733,40 +777,43 @@ intreg_t sys_close(struct proc* p, int fd)
 #define NEWLIB_STAT_SIZE 64
 intreg_t sys_fstat(struct proc* p, int fd, void* buf)
 {
-	int kbuf[NEWLIB_STAT_SIZE/sizeof(int)];
+	int *kbuf = kmalloc(NEWLIB_STAT_SIZE, 0);
 	int ret = ufe(fstat,fd,PADDR(kbuf),0,0);
 	if(ret != -1 && memcpy_to_user_errno(p,buf,kbuf,NEWLIB_STAT_SIZE))
 		ret = -1;
+	kfree(kbuf);
 	return ret;
 }
 
 intreg_t sys_stat(struct proc* p, const char* path, void* buf)
 {
-	int kbuf[NEWLIB_STAT_SIZE/sizeof(int)];
 	char* fn = user_strdup_errno(p,path,PGSIZE);
 	if(fn == NULL)
 		return -1;
 
+	int *kbuf = kmalloc(NEWLIB_STAT_SIZE, 0);
 	int ret = ufe(stat,PADDR(fn),PADDR(kbuf),0,0);
 	if(ret != -1 && memcpy_to_user_errno(p,buf,kbuf,NEWLIB_STAT_SIZE))
 		ret = -1;
 
 	user_memdup_free(p,fn);
+	kfree(kbuf);
 	return ret;
 }
 
 intreg_t sys_lstat(struct proc* p, const char* path, void* buf)
 {
-	int kbuf[NEWLIB_STAT_SIZE/sizeof(int)];
 	char* fn = user_strdup_errno(p,path,PGSIZE);
 	if(fn == NULL)
 		return -1;
 
+	int *kbuf = kmalloc(NEWLIB_STAT_SIZE, 0);
 	int ret = ufe(lstat,PADDR(fn),PADDR(kbuf),0,0);
 	if(ret != -1 && memcpy_to_user_errno(p,buf,kbuf,NEWLIB_STAT_SIZE))
 		ret = -1;
 
 	user_memdup_free(p,fn);
+	kfree(kbuf);
 	return ret;
 }
 
@@ -876,10 +923,11 @@ intreg_t sys_gettimeofday(struct proc* p, int* buf)
 #define SIZEOF_STRUCT_TERMIOS 60
 intreg_t sys_tcgetattr(struct proc* p, int fd, void* termios_p)
 {
-	int kbuf[SIZEOF_STRUCT_TERMIOS/sizeof(int)];
+	int* kbuf = kmalloc(SIZEOF_STRUCT_TERMIOS,0);
 	int ret = ufe(tcgetattr,fd,PADDR(kbuf),0,0);
 	if(ret != -1 && memcpy_to_user_errno(p,termios_p,kbuf,SIZEOF_STRUCT_TERMIOS))
 		ret = -1;
+	kfree(kbuf);
 	return ret;
 }
 

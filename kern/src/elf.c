@@ -1,4 +1,5 @@
 #include <mm.h>
+#include <string.h>
 #include <ros/mman.h>
 #include <kmalloc.h>
 #include <syscall.h>
@@ -104,7 +105,14 @@ int load_elf(struct proc* p, const char* fn)
 
 	if(ei.dynamic)
 	{
-		int fd2 = open_file(p,ei.interp,0,0);
+		// plzplzplz let us use the stack and PADDR()
+		char* str = kmalloc(sizeof(ei.interp),0);
+		if(!str)
+			return -1;
+		memcpy(str,ei.interp,sizeof(ei.interp));
+		int fd2 = open_file(p,str,0,0);
+		kfree(str);
+
 		if(fd2 == -1 || load_one_elf(p,fd2,1,&interp_ei))
 			return -1;
 		close_file(p,fd2);
@@ -128,7 +136,7 @@ int load_elf(struct proc* p, const char* fn)
 		memcpy(p->env_procinfo->argp+auxp_pos,auxp,sizeof(auxp));
 	}
 
-	intptr_t core0_entry = ei.dynamic ? interp_ei.entry : ei.entry;
+	uintptr_t core0_entry = ei.dynamic ? interp_ei.entry : ei.entry;
 	proc_init_trapframe(&p->env_tf,0,core0_entry,USTACKTOP);
 	p->env_entry = ei.entry;
 
@@ -141,34 +149,6 @@ int load_elf(struct proc* p, const char* fn)
 	// region has been loaded
 	p->heap_bottom = (void*)ei.highest_addr;
 	p->heap_top = p->heap_bottom;
-
-	return 0;
-}
-
-intreg_t sys_exec(struct proc* p, const char fn[MAX_PATH_LEN], procinfo_t* pi)
-{
-	if(p->state != PROC_RUNNING_S)
-		return -1;
-
-	char kfn[MAX_PATH_LEN];
-	if(memcpy_from_user(p,kfn,fn,MAX_PATH_LEN))
-		return -1;
-
-	if(memcpy_from_user(p,p->env_procinfo,pi,sizeof(procinfo_t)))
-	{
-		proc_destroy(p);
-		return -1;
-	}
-	proc_init_procinfo(p);
-
-	env_segment_free(p,0,USTACKTOP);
-
-	if(load_elf(p,kfn))
-	{
-		proc_destroy(p);
-		return -1;
-	}
-	*current_tf = p->env_tf;
 
 	return 0;
 }
