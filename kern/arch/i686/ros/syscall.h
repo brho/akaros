@@ -14,19 +14,22 @@ static inline intreg_t syscall_sysenter(uint16_t num, intreg_t a1,
                                  intreg_t a2, intreg_t a3,
                                  intreg_t a4, intreg_t a5)
 {
-	// TODO: Maybe think about this a little more.
-	// We just added code to push and pop 'ebx' because 
-	// when compiling glibc we were getting register allocation 
-	// errors.  Not happy with this, but it works.
+	// The kernel clobbers ecx and edx => put them in clobber list.
+	// ebx is handled specially because of a glibc register
+	// allocation problem (not enough registers).
 	intreg_t ret;
 	asm volatile ("  pushl %%ebp;        "
 	              "  pushl %%esi;        "
 	              "  pushl %%ebx;        "
+	              "  pushl %%ecx;        "
+	              "  pushl %%edx;        "
 	              "  movl %%esp, %%ebp;  "
 	              "  movl %4, %%ebx;     "
 	              "  leal 1f, %%esi;     "
 	              "  sysenter;           "
 	              "1:                    "
+	              "  popl %%edx;         "
+	              "  popl %%ecx;         "
 	              "  popl %%ebx;         "
 	              "  popl %%esi;         "
 	              "  popl %%ebp;         "
