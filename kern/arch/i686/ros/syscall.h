@@ -8,46 +8,61 @@
 #include <sys/types.h>
 #include <stdint.h>
 #include <ros/common.h>
+#include <errno.h>
 
 // TODO: fix sysenter to take all 5 params
-static inline intreg_t syscall_sysenter(uint16_t num, intreg_t a1,
-                                 intreg_t a2, intreg_t a3,
-                                 intreg_t a4, intreg_t a5)
+static inline intreg_t __syscall_sysenter(uint16_t num, intreg_t a1,
+                                    intreg_t a2, intreg_t a3,
+                                    intreg_t a4, intreg_t a5, intreg_t* err_loc)
 {
 	// The kernel clobbers ecx and edx => put them in clobber list.
 	// ebx is handled specially because of a glibc register
 	// allocation problem (not enough registers).
-	intreg_t ret;
-	asm volatile ("  pushl %%ebp;        "
-	              "  pushl %%esi;        "
+	intreg_t ret = 0;
+	intreg_t err = 0;
+	asm volatile (""
 	              "  pushl %%ebx;        "
+	              "  movl %5, %%ebx;     "
 	              "  pushl %%ecx;        "
 	              "  pushl %%edx;        "
+	              "  pushl %%esi;        "
+	              "  pushl %%ebp;        "
 	              "  movl %%esp, %%ebp;  "
-	              "  movl %4, %%ebx;     "
-	              "  leal 1f, %%esi;     "
+	              "  leal 1f, %%edx;     "
 	              "  sysenter;           "
 	              "1:                    "
+	              "  popl %%ebp;         "
+	              "  movl %%esi, %1;     "
+	              "  popl %%esi;         "
 	              "  popl %%edx;         "
 	              "  popl %%ecx;         "
 	              "  popl %%ebx;         "
-	              "  popl %%esi;         "
-	              "  popl %%ebp;         "
-	              : "=a" (ret)
+	              : "=a" (ret),
+	                "=m" (err)
 	              : "a" (num),
-	                "d" (a1),
+	                "S" (a1),
 	                "c" (a2),
 	                "r" (a3),
 	                "D" (a4)
 	              : "cc", "memory");
+	if(err != 0 && err_loc != NULL)
+		*err_loc = err;
 	return ret;
 }
 
-static inline intreg_t syscall_trap(uint16_t num, intreg_t a1,
-                             intreg_t a2, intreg_t a3,
-                             intreg_t a4, intreg_t a5)
+static inline intreg_t syscall_sysenter(uint16_t num, intreg_t a1,
+                                  intreg_t a2, intreg_t a3,
+                                  intreg_t a4, intreg_t a5)
 {
-	uint32_t ret;
+	return __syscall_sysenter(num, a1, a2, a3, a4, a5, &errno);
+}
+
+static inline intreg_t __syscall_trap(uint16_t num, intreg_t a1,
+                             intreg_t a2, intreg_t a3,
+                             intreg_t a4, intreg_t a5, intreg_t* err_loc)
+{
+	intreg_t ret;
+	intreg_t err;
 
 	// Generic system call: pass system call number in AX,
 	// up to five parameters in DX, CX, BX, DI, SI.
@@ -61,8 +76,10 @@ static inline intreg_t syscall_trap(uint16_t num, intreg_t a1,
 	// potentially change the condition codes and arbitrary
 	// memory locations.
 
-	asm volatile("int %1"
-	             : "=a" (ret)
+	asm volatile(""
+	             " int %1"
+	             : "=a" (ret),
+	               "=S" (err)
 	             : "i" (T_SYSCALL),
 	               "a" (num),
 	               "d" (a1),
@@ -71,7 +88,16 @@ static inline intreg_t syscall_trap(uint16_t num, intreg_t a1,
 	               "D" (a4),
 	               "S" (a5)
 	             : "cc", "memory");
+	if(err != 0 && err_loc != NULL)
+		*err_loc = err;
 	return ret;
+}
+
+static inline intreg_t syscall_trap(uint16_t num, intreg_t a1,
+                                  intreg_t a2, intreg_t a3,
+                                  intreg_t a4, intreg_t a5)
+{
+	return __syscall_trap(num, a1, a2, a3, a4, a5, &errno);
 }
 
 static inline long __attribute__((always_inline))

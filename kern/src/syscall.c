@@ -922,6 +922,10 @@ intreg_t sys_tcsetattr(struct proc* p, int fd, int optional_actions, const void*
 intreg_t syscall(struct proc *p, uintreg_t syscallno, uintreg_t a1,
                  uintreg_t a2, uintreg_t a3, uintreg_t a4, uintreg_t a5)
 {
+	// Initialize the return value and error code returned to 0
+	proc_set_syscall_retval(current_tf, 0);
+	set_errno(current_tf,0);
+
 	typedef intreg_t (*syscall_t)(struct proc*,uintreg_t,uintreg_t,
 	                              uintreg_t,uintreg_t,uintreg_t);
 

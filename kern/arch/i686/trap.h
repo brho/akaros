@@ -102,10 +102,9 @@ typedef struct AncillaryState {
 	uint32_t silly; // remove this when you actually use this struct
 } ancillary_state_t;
 
-// TODO: WE MUST DECIDE HOW TO HANDLE THIS.
 static inline void set_errno(trapframe_t* tf, uint32_t errno)
 {
-	return;
+	tf->tf_regs.reg_esi = errno;
 }
 
 #endif /* !__ASSEMBLER__ */

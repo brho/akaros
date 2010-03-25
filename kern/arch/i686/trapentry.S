@@ -235,15 +235,17 @@ _allirqs:
 
 .globl sysenter_handler;
 .type sysenter_handler, @function;
+# All of the pushl zeros are to keep the trap frame looking the same as when we
+# receive a trap or an interrupt
 sysenter_handler:
 	sti						# enable interrupts (things are sane here)
 	cld
-	pushl $0				# esp
 	pushl $0				# ss
-	pushfl					# save the eflags
-	pushl $0				# these zeros keep the trapframe looking the same
-	pushl $0				# as when we receive a trap or interrupt
-	pushl $0				# and CS == 0 lets the kernel know it was a sysenter
+	pushl $0				# esp
+	pushfl					# eflags
+	pushl $0				# CS == 0 lets the kernel know it was a sysenter	
+	pushl $0				# eip
+	pushl $0				# err 
 	pushl $T_SYSCALL		# helps with print_trapframe
 	pushl %ds
 	pushl %es
@@ -265,6 +267,5 @@ sysenter_handler:
 	addl $0x10, %esp		# pop T_SYSCALL and the three zeros
 	popfl					# restore EFLAGS (and usually enables interrupts!)
 	movl %ebp, %ecx
-	movl %esi, %edx
 	sti						# interrupts are turned off when starting a core
 	sysexit

@@ -74,7 +74,6 @@ void env_pop_tf(trapframe_t *tf)
 		              "addl $0x10,%%esp;        "
 		              "popfl;                   "
 		              "movl %%ebp,%%ecx;        "
-		              "movl %%esi,%%edx;        "
 		              "popl %%esp;              "
 		              "sti;                     "
 		              "sysexit                  "

@@ -9,21 +9,23 @@
 
 const char* tls_init_tp(void* thrdescr)
 {
-  int core_id = __hart_self();
+  int core_id = __syscall_sysenter(SYS_getvcoreid,0,0,0,0,0,NULL);
 
   static int initialized = 0;
   if(!initialized)
   {
-    assert(core_id == 0);
     initialized = 1;
 
     size_t sz= (sizeof(segdesc_t)*__procinfo.max_harts+PGSIZE-1)/PGSIZE*PGSIZE;
-    __procdata.ldt = mmap((void*)USTACKBOT - LDT_SIZE, sz,
-                          PROT_READ | PROT_WRITE,
-                          MAP_ANONYMOUS | MAP_FIXED, -1, 0);
+    
+    intreg_t params[3] = { MAP_ANONYMOUS | MAP_FIXED, -1, 0 };
+    __procdata.ldt  = (void*) __syscall_sysenter(SYS_mmap,
+                                                 (void*)USTACKBOT - LDT_SIZE, 
+                                                 sz, PROT_READ | PROT_WRITE, 
+                                                 params, 0, NULL);
 
     // force kernel crossing
-    ros_syscall(SYS_getpid,0,0,0,0,0);
+    __syscall_sysenter(SYS_getpid,0,0,0,0,0,NULL);
     if(__procdata.ldt == MAP_FAILED)
       return "tls couldn't allocate memory\n";
   }
