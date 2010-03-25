@@ -16,19 +16,12 @@
 void frontend_proc_init(struct proc* p);
 void frontend_proc_free(struct proc* p);
 
-int32_t frontend_syscall_from_user(env_t* p, int32_t syscall_num, 
-                                   uint32_t arg0, uint32_t arg1, 
-                                   uint32_t arg2, uint32_t translate_args);
-
 int32_t frontend_syscall(pid_t pid, int32_t syscall_num, 
                          uint32_t arg0, uint32_t arg1, uint32_t arg2, 
                          uint32_t arg3, int32_t* errno);
 
-int user_frontend_syscall(struct proc* p, int n, int a0, 
-                          int a1, int a2, int a3);
-
-int32_t frontend_nbputch(char ch);
-int32_t frontend_nbgetch();
+int frontend_syscall_errno(struct proc* p, int n, int a0, 
+                           int a1, int a2, int a3);
 
 void* user_memdup(struct proc* p, const void* va, int len);
 void* user_memdup_errno(struct proc* p, const void* va, int len);

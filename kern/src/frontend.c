@@ -148,7 +148,7 @@ error_t close_file(struct proc* p, int fd)
 	return frontend_syscall(p->pid,APPSERVER_SYSCALL_close,fd,0,0,0,&errno);
 }
 
-int user_frontend_syscall(struct proc* p, int n, int a0, int a1, int a2, int a3)
+int frontend_syscall_errno(struct proc* p, int n, int a0, int a1, int a2, int a3)
 {
 	int errno, ret = frontend_syscall(p->pid,n,a0,a1,a2,a3,&errno);
 	if(errno && p)
@@ -188,38 +188,6 @@ int32_t frontend_syscall(pid_t pid, int32_t syscall_num,
 	spin_unlock_irqsave(&lock);
 
 	return ret;
-}
-
-int32_t frontend_nbputch(char ch)
-{
-	static spinlock_t putch_lock = SPINLOCK_INITIALIZER;
-	spin_lock_irqsave(&putch_lock);
-
-	int ret = -1;
-	if(magic_mem[8] == 0)
-	{
-		magic_mem[8] = (unsigned int)(unsigned char)ch;
-		ret = 0;
-	}
-
-	spin_unlock_irqsave(&putch_lock);
-	return ret;
-}
-
-int32_t frontend_nbgetch()
-{
-	static spinlock_t getch_lock = SPINLOCK_INITIALIZER;
-	spin_lock_irqsave(&getch_lock);
-
-	int result = -1;
-	if(magic_mem[9]) 
-	{
-		result = magic_mem[9];
-		magic_mem[9] = 0;
-	}
-
-	spin_unlock_irqsave(&getch_lock);
-	return result;
 }
 
 void __diediedie(trapframe_t* tf, uint32_t srcid, uint32_t code, uint32_t a1, uint32_t a2)

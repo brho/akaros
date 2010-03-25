@@ -681,40 +681,8 @@ static int sys_eth_recv_check(env_t* e)
 
 // Syscalls below here are serviced by the appserver for now.
 #define ufe(which,a0,a1,a2,a3) \
-	user_frontend_syscall(p,APPSERVER_SYSCALL_##which,\
+	frontend_syscall_errno(p,APPSERVER_SYSCALL_##which,\
 	                   (int)(a0),(int)(a1),(int)(a2),(int)(a3))
-
-int32_t sys_frontend(env_t* p, int32_t syscall_num, 
-                     uint32_t arg0, uint32_t arg1, 
-                     uint32_t arg2, uint32_t translate_args)
-{
-	// really, we just want to pin pages, but irqdisable works
-	static spinlock_t lock = SPINLOCK_INITIALIZER;
-	spin_lock_irqsave(&lock);
-
-	uint32_t arg[3] = {arg0,arg1,arg2};
-	for(int i = 0; i < 3; i++)
-	{
-		int flags = (translate_args & (1 << (i+3))) ? PTE_USER_RW :
-		           ((translate_args & (1 << i)) ? PTE_USER_RO : 0);
-		if(flags)
-		{
-			pte_t* pte = pgdir_walk(p->env_pgdir,(void*)arg[i],0);
-			if(pte == NULL || !(*pte & flags))
-			{
-				spin_unlock_irqsave(&lock);
-				return -1;
-			}
-			arg[i] = PTE_ADDR(*pte) | PGOFF(arg[i]);
-		}
-	}
-
-	int32_t ret = user_frontend_syscall(p,syscall_num,arg[0],arg[1],arg[2],0);
-
-	spin_unlock_irqsave(&lock);
-	return ret;
-}
-
 
 intreg_t sys_write(struct proc* p, int fd, const void* buf, int len)
 {
@@ -993,7 +961,6 @@ intreg_t syscall(struct proc *p, uintreg_t syscallno, uintreg_t a1,
 		[SYS_eth_recv_check] = (syscall_t)sys_eth_recv_check,
 	#endif
 		// Syscalls serviced by the appserver for now.
-		[SYS_frontend] = (syscall_t)sys_frontend,
 		[SYS_read] = (syscall_t)sys_read,
 		[SYS_write] = (syscall_t)sys_write,
 		[SYS_open] = (syscall_t)sys_open,
