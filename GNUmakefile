@@ -1,20 +1,45 @@
-#
-# This makefile system follows the structuring conventions
-# recommended by Peter Miller in his excellent paper:
-#
-#	Recursive Make Considered Harmful
-#	http://aegis.sourceforge.net/auug97.pdf
-#
-
-OBJDIR := obj
-
+# The ROS Top level Makefile
 # Make sure that 'all' is the first target
-all:
 
-# User defined constants passed on the command line 
-TARGET_ARCH := i686
+############################################################################# 
+########## Initial Setup so that we can build for different TARGETS #########
+############################################################################# 
+
+ARCH_LINK := $(shell readlink kern/include/arch)
+ifneq ($(ARCH_LINK),)
+	ARCH_LINK := $(shell basename $(ARCH_LINK))
+	TARGET_ARCH ?= $(ARCH_LINK)
+endif
+ifeq ($(TARGET_ARCH),)
+busted:
+	@echo "You must initially specify your target in the form TARGET_ARCH=<target>"
+	@echo "Current valid values for TARGET_ARCH are 'i686' and 'sparc'"
+	@echo "Subsequent calls for the same target can be made by simply invoking 'make'"
+endif
+
+$(TARGET_ARCH):
+	@if [ "$(ARCH_LINK)" != "$@" ];\
+	then\
+	  $(MAKE) realclean;\
+	  $(MAKE) all -j;\
+	else\
+	  $(MAKE) real-all -j;\
+	fi
+
+############################################################################# 
+########## Beginning of the guts of the real Makefile #######################
+############################################################################# 
+
+# Default values for configurable Make system variables
 COMPILER := GCC
+OBJDIR := obj
+V := @
 
+# Make sure that 'all' is the first target when not erroring out
+all: symlinks
+
+# Then grab the users Makelocal file to let them override Make system variables
+# and set up other Make targets
 -include Makelocal
 
 TOP_DIR := .
@@ -23,25 +48,35 @@ INCLUDE_DIR := $(TOP_DIR)/kern/include
 DOXYGEN_DIR := $(TOP_DIR)/Documentation/doxygen
 
 UNAME=$(shell uname -m)
-V = @
 
 # Cross-compiler ros toolchain
 #
 # This Makefile will automatically use the cross-compiler toolchain
-# installed as 'i686-ros-*', if one exists.  If the host tools ('gcc',
-# 'objdump', and so forth) compile for a 32-bit x86 ELF target, that will
+# installed as '$(TARGET_ARCH)-ros-*', if one exists.  If the host tools ('gcc',
+# 'objdump', and so forth) compile for a 32-bit ELF target, that will
 # be detected as well.  If you have the right compiler toolchain installed
 # using a different name, set GCCPREFIX explicitly in your Makelocal file
 
-# try to infer the correct GCCPREFIX
+# Try to infer the correct GCCPREFIX
+ifneq ($(TARGET_ARCH),)
 ifndef GCCPREFIX
-GCCPREFIX := $(shell if $(TARGET_ARCH)-ros-objdump -i 2>&1 >/dev/null 2>&1; \
-	then echo '$(TARGET_ARCH)-ros-'; \
-	elif objdump -i 2>&1 | grep 'elf32-$(TARGET_ARCH)' >/dev/null 2>&1; \
-	then echo ''; \
-	else echo "***" 1>&2; \
-	echo "*** Error: Couldn't find $(TARGET_ARCH)-*-ros version of GCC/binutils." 1>&2; \
-	echo "***" 1>&2; exit 1; fi)
+TEST_PREFIX := $(TARGET_ARCH)-ros-
+else
+TEST_PREFIX := $(GCCPREFIX)
+endif
+GCC_EXISTS = $(shell which $(TEST_PREFIX)gcc)
+ifneq ($(GCC_EXISTS),)
+	GCCPREFIX := $(TEST_PREFIX)
+else
+	ERROR := "*** Error: Couldn't find $(TEST_PREFIX) version of GCC/binutils." 
+endif
+ifdef ERROR
+error: 
+	@echo $(ERROR)
+	@exit 1
+else
+error:
+endif
 endif
 
 # Default programs for compilation
@@ -71,7 +106,7 @@ PERL    := perl
 EXTRAARGS ?= -std=gnu99 -Wno-attributes -fno-stack-protector -fgnu89-inline
 
 # GCC Library path
-ifneq ($(shell which $(CC)),)
+ifneq ($(GCC_EXISTS),)
 GCC_LIB := $(shell $(CC) -print-libgcc-file-name)
 endif
 
@@ -91,14 +126,15 @@ OBJDIRS :=
 
 ROS_ARCH_DIR ?= $(TARGET_ARCH)
 
-kern/include/arch:
-	@ln -s ../arch/$(ROS_ARCH_DIR)/ kern/include/arch
-kern/boot:
-	@ln -s arch/$(ROS_ARCH_DIR)/boot/ kern/boot
-DEPENDS := kern/boot kern/include/arch
+symlinks: error
+	ln -fs ../arch/$(ROS_ARCH_DIR) kern/include/arch
+	ln -fs arch/$(ROS_ARCH_DIR)/boot kern/boot
+	@$(MAKE) -j real-all
 
 # Include Makefrags for subdirectories
+ifneq ($(TARGET_ARCH),)
 include kern/Makefrag
+endif
 
 # Eliminate default suffix rules
 .SUFFIXES:
@@ -129,15 +165,14 @@ docs:
 doxyclean:
 	rm -rf $(DOXYGEN_DIR)/rosdoc
 
-augment-gcc: symlinks
-	scripts/augment-gcc $(dir $(shell which $(CC))).. $(TARGET_ARCH)
-
 # For deleting the build
 clean:
 	@rm -rf $(OBJDIR)
+	@echo All clean and pretty!
+
+realclean: clean
 	@rm -f kern/boot
 	@rm -f kern/include/arch
-	@echo All clean and pretty!
 
 always:
 	@:

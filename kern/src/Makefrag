@@ -88,12 +88,12 @@ KERN_LDLIBS    := -livykern
 
 KERN_GCC_LIB   ?= $(GCC_LIB)
 
-$(OBJDIR)/$(KERN_DIR)/%.o: $(KERN_DIR)/%.c $(DEPENDS)
+$(OBJDIR)/$(KERN_DIR)/%.o: $(KERN_DIR)/%.c
 	@echo + cc [KERN] $<
 	@mkdir -p $(@D)
 	$(V)$(CC) $(KERN_CFLAGS) -c -o $@ $<
 
-$(OBJDIR)/$(KERN_DIR)/%.o: $(KERN_DIR)/%.S $(DEPENDS)
+$(OBJDIR)/$(KERN_DIR)/%.o: $(KERN_DIR)/%.S
 	@echo + as [KERN] $<
 	@mkdir -p $(@D)
 	$(V)$(CC) $(KERN_CFLAGS) -D__ASSEMBLER__ -c -o $@ $<
@@ -105,15 +105,5 @@ $(OBJDIR)/$(KERN_DIR)/kernel: $(KERN_LDDEPENDS)
 	$(V)$(OBJDUMP) -S $@ > $@.asm
 	$(V)$(NM) -n $@ > $@.sym
 
-all: $(OBJDIR)/$(KERN_DIR)/kernel
+real-all: $(OBJDIR)/$(KERN_DIR)/kernel
 
-#$(OBJDIR)/$(KERN_DIR)/bochs.img: $(OBJDIR)/$(KERN_DIR)/kernel $(OBJDIR)/$(KERN_DIR)/boot
-#	@echo + mk [KERN] $@
-#	$(V)dd if=/dev/zero of=$(OBJDIR)/$(KERN_DIR)/bochs.img~ count=10080 2>/dev/null
-#	$(V)dd if=$(OBJDIR)/$(KERN_DIR)/boot of=$(OBJDIR)/$(KERN_DIR)/bochs.img~ conv=notrunc 2>/dev/null
-#	$(V)dd if=$(OBJDIR)/$(KERN_DIR)/kernel of=$(OBJDIR)/$(KERN_DIR)/bochs.img~ seek=1 conv=notrunc 2>/dev/null
-#	$(V)mv $(OBJDIR)/kern/bochs.img~ $(OBJDIR)/kern/bochs.img
-
-ifeq ($(AUGMENT_GCC),TRUE)
-all: augment-gcc
-endif
