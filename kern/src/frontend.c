@@ -126,9 +126,8 @@ void* kmalloc_errno(int len)
 
 error_t read_page(struct proc* p, int fd, physaddr_t pa, int pgoff)
 {
-	int errno;
-	int ret = frontend_syscall(p->pid,APPSERVER_SYSCALL_pread,fd,
-	                        pa,PGSIZE,pgoff*PGSIZE,&errno);
+	int ret = frontend_syscall(p ? p->pid : 0,APPSERVER_SYSCALL_pread,fd,
+	                        pa,PGSIZE,pgoff*PGSIZE,NULL);
 
 	if(ret >= 0)
 		memset(KADDR(pa)+ret,0,PGSIZE-ret);
@@ -137,15 +136,13 @@ error_t read_page(struct proc* p, int fd, physaddr_t pa, int pgoff)
 
 error_t open_file(struct proc* p, const char* path, int oflag, int mode)
 {
-	int errno;
 	return frontend_syscall(p->pid,APPSERVER_SYSCALL_open,PADDR(path),
-	                        oflag,mode,0,&errno);
+	                        oflag,mode,0,NULL);
 }
 
 error_t close_file(struct proc* p, int fd)
 {
-	int errno;
-	return frontend_syscall(p->pid,APPSERVER_SYSCALL_close,fd,0,0,0,&errno);
+	return frontend_syscall(p->pid,APPSERVER_SYSCALL_close,fd,0,0,0,NULL);
 }
 
 int frontend_syscall_errno(struct proc* p, int n, int a0, int a1, int a2, int a3)
@@ -183,7 +180,8 @@ int32_t frontend_syscall(pid_t pid, int32_t syscall_num,
 		;
 
 	ret = magic_mem[1];
-	*errno = magic_mem[2];
+	if(errno)
+		*errno = magic_mem[2];
 
 	spin_unlock_irqsave(&lock);
 

@@ -11,8 +11,7 @@ cons_init(void)
 void
 cputbuf(const char*COUNT(len) buf, int len)
 {
-	int32_t errno;
-	frontend_syscall(0,APPSERVER_SYSCALL_write,1,PADDR((int32_t)buf),len,0,&errno);
+	frontend_syscall(0,APPSERVER_SYSCALL_write,1,PADDR((int32_t)buf),len,0,0);
 }
 
 // Low-level console I/O
@@ -43,8 +42,8 @@ int
 cons_getc()
 {
 	char ch;
-	int32_t errno;
-	int32_t ret = frontend_syscall(0,APPSERVER_SYSCALL_read,0,PADDR((int32_t)&ch),1,0,&errno);
+	uintptr_t paddr = PADDR((uintptr_t)&ch);
+	int32_t ret = frontend_syscall(0,APPSERVER_SYSCALL_read,0,paddr,1,0,0);
 	if(ch == 0x7F)
 		ch = '\b';
 	return ret <= 0 ? 0 : ch;
