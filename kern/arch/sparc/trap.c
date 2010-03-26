@@ -126,7 +126,10 @@ get_trapname(uint8_t tt, char buf[TRAPNAME_MAX])
 	else if(tt >= sizeof(trapnames)/sizeof(trapnames[0]) || !trapnames[tt])
 		snprintf(buf,TRAPNAME_MAX,"(unknown trap 0x%02x)",tt);
 	else
-		strncpy(buf,trapnames[tt],sizeof(trapnames) + 1);
+	{
+		strncpy(buf,trapnames[tt],TRAPNAME_MAX);
+		buf[TRAPNAME_MAX-1] = 0;
+	}
 
 	return buf;
 }
@@ -213,7 +216,7 @@ address_unaligned(trapframe_t* state)
 void
 instruction_access_exception(trapframe_t* state)
 {
-	if(handle_page_fault(current,state->fault_addr,PROT_EXEC))
+	if(handle_page_fault(current,state->pc,PROT_EXEC))
 		unhandled_trap(state);
 	else
 		env_pop_tf(state);
@@ -222,8 +225,7 @@ instruction_access_exception(trapframe_t* state)
 void
 data_access_exception(trapframe_t* state)
 {
-	int store = ((state->fault_status >> 5) & 7) > 4;
-	int prot = store ? PROT_WRITE : PROT_READ;
+	int prot = (state->fault_status & MMU_FSR_WR) ? PROT_WRITE : PROT_READ;
 
 	if(handle_page_fault(current,state->fault_addr,prot))
 		unhandled_trap(state);
