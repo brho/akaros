@@ -30,7 +30,7 @@ typedef struct
 	uint32_t fsr;
 } ancillary_state_t;
 
-void access_exception(trapframe_t* state);
+void data_access_exception(trapframe_t* state);
 void real_fp_exception(trapframe_t* state, ancillary_state_t* astate);
 void address_unaligned(trapframe_t* state);
 void illegal_instruction(trapframe_t* state);

@@ -17,7 +17,7 @@ void fp_access_exception(trapframe_t* state, void* addr)
 {
 	state->fault_status = 1;
 	state->fault_addr = (uint32_t)addr;
-	access_exception(state);
+	data_access_exception(state);
 }
 
 static inline uint32_t fp_load_word(trapframe_t* state, uint32_t* addr)

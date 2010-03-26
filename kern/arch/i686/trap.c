@@ -15,6 +15,7 @@
 #include <trap.h>
 #include <monitor.h>
 #include <process.h>
+#include <mm.h>
 #include <stdio.h>
 #include <slab.h>
 #include <syscall.h>
@@ -338,12 +339,16 @@ page_fault_handler(trapframe_t *tf)
 
 	// LAB 4: Your code here.
 
-	// Destroy the environment that caused the fault.
-	cprintf("[%08x] user fault va %08x ip %08x from core %d\n",
-		current->pid, fault_va, tf->tf_eip, core_id());
-	print_trapframe(tf);
-	proc_incref(current, 1);
-	proc_destroy(current);
+	// TODO: compute correct access type
+	if(handle_page_fault(current,fault_va,PROT_READ))
+	{
+		// Destroy the environment that caused the fault.
+		cprintf("[%08x] user fault va %08x ip %08x from core %d\n",
+		        current->pid, fault_va, tf->tf_eip, core_id());
+		print_trapframe(tf);
+		proc_incref(current, 1);
+		proc_destroy(current);
+	}
 }
 
 void sysenter_init(void)

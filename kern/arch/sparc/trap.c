@@ -9,6 +9,8 @@
 #include <stdio.h>
 #include <smp.h>
 #include <slab.h>
+#include <mm.h>
+#include <ros/mman.h>
 
 #ifdef __SHARC__
 #pragma nosharc
@@ -209,9 +211,24 @@ address_unaligned(trapframe_t* state)
 }
 
 void
-access_exception(trapframe_t* state)
+instruction_access_exception(trapframe_t* state)
 {
-	unhandled_trap(state);
+	if(handle_page_fault(current,state->fault_addr,PROT_EXEC))
+		unhandled_trap(state);
+	else
+		env_pop_tf(state);
+}
+
+void
+data_access_exception(trapframe_t* state)
+{
+	int store = ((state->fault_status >> 5) & 7) > 4;
+	int prot = store ? PROT_WRITE : PROT_READ;
+
+	if(handle_page_fault(current,state->fault_addr,prot))
+		unhandled_trap(state);
+	else
+		env_pop_tf(state);
 }
 
 void

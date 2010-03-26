@@ -80,4 +80,6 @@ error_t open_file(struct proc* p, const char* fn, int flag, int mode);
 error_t close_file(struct proc* p, int fd);
 error_t read_page(struct proc* p, int fd, physaddr_t pa, int pgoff);
 
+int handle_page_fault(struct proc* p, uintptr_t va, int prot);
+
 #endif // !ROS_KERN_MM_H

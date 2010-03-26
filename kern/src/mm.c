@@ -5,6 +5,7 @@
  *
  */
 
+#include <frontend.h>
 #include <ros/common.h>
 #include <ros/mman.h>
 #include <pmap.h>
@@ -108,11 +109,13 @@ int mprotect(struct proc* p, void* addr, size_t len, int prot)
 
 	// overflow of end is handled in the for loop's parameters
 	char* end = ROUNDUP((char*)addr+len,PGSIZE);
-	if(addr >= (void*)UTOP || end >= (char*)UTOP)
+	if(addr >= (void*)UTOP || end > (char*)UTOP)
 	{
 		set_errno(current_tf, (prot & PROT_UNMAP) ? EINVAL : ENOMEM);
 		return -1;
 	}
+
+	spin_lock_irqsave(&p->proc_lock);
 
 	int newperm = (prot & PROT_WRITE) ? PTE_USER_RW :
 	              (prot & (PROT_READ|PROT_EXEC)) ? PTE_USER_RO : 0;
@@ -139,6 +142,8 @@ int mprotect(struct proc* p, void* addr, size_t len, int prot)
 		}
 	}
 
+	spin_unlock_irqsave(&p->proc_lock);
+
 	//TODO: TLB shootdown - needs to be process wide
 	tlbflush();
 	return 0;
@@ -148,3 +153,17 @@ int munmap(struct proc* p, void* addr, size_t len)
 {
 	return mprotect(p, addr, len, PROT_UNMAP);
 }
+
+int handle_page_fault(struct proc* p, uintptr_t va, int prot)
+{
+	int ret = -1;
+	va = ROUNDDOWN(va,PGSIZE);
+
+	spin_lock_irqsave(&p->proc_lock);
+
+
+out:
+	spin_unlock_irqsave(&p->proc_lock);
+	return ret;
+}
+
