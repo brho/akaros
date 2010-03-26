@@ -10,6 +10,7 @@
 
 #include <ros/memlayout.h>
 #include <ros/common.h>
+#include <ros/bcq.h>
 
 #include <atomic.h>
 #include <stdio.h>
@@ -871,3 +872,64 @@ void test_hashtable(void)
 	hashtable_destroy(h);
 }
 
+/* Ghetto test, only tests one prod or consumer at a time */
+void test_bcq(void)
+{
+	struct my_struct {
+		int x;
+		int y;
+	};
+	struct my_struct in_struct, out_struct;
+	
+	DEFINE_BCQ_TYPES(test, struct my_struct, 16);
+	struct test_bcq t_bcq;
+	bcq_init(&t_bcq, struct my_struct, 16);
+	
+	in_struct.x = 4;
+	in_struct.y = 5;
+	out_struct.x = 1;
+	out_struct.y = 2;
+	
+	bcq_enqueue(&t_bcq, &in_struct, 16, 5);
+	bcq_dequeue(&t_bcq, &out_struct, 16);
+	printk("out x %d. out y %d\n", out_struct.x, out_struct.y);
+	
+	DEFINE_BCQ_TYPES(my, int, 8);
+	struct my_bcq a_bcq;
+	bcq_init(&a_bcq, int, 8);
+	
+	int y = 2;
+	int output[100];
+	int retval[100];
+	
+	for (int i = 0; i < 15; i++) {
+		y = i;
+		retval[i] = bcq_enqueue(&a_bcq, &y, 8, 10);
+		printk("enqueued: %d, had retval %d \n", y, retval[i]);
+	}
+	
+	for (int i = 0; i < 15; i++) {
+		retval[i] = bcq_dequeue(&a_bcq, &output[i], 8);
+		printk("dequeued: %d with retval %d\n", output[i], retval[i]);
+	}
+	
+	for (int i = 0; i < 3; i++) {
+		y = i;
+		retval[i] = bcq_enqueue(&a_bcq, &y, 8, 10);
+		printk("enqueued: %d, had retval %d \n", y, retval[i]);
+	}
+	
+	for (int i = 0; i < 5; i++) {
+		retval[i] = bcq_dequeue(&a_bcq, &output[i], 8);
+		printk("dequeued: %d with retval %d\n", output[i], retval[i]);
+	}
+	
+	for (int i = 0; i < 5; i++) {
+		y = i;
+		retval[i] = bcq_enqueue(&a_bcq, &y, 8, 10);
+		printk("enqueued: %d, had retval %d \n", y, retval[i]);
+		retval[i] = bcq_dequeue(&a_bcq, &output[i], 8);
+		printk("dequeued: %d with retval %d\n", output[i], retval[i]);
+	}
+	
+}
