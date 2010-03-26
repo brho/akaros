@@ -105,5 +105,5 @@ $(OBJDIR)/$(KERN_DIR)/kernel: $(KERN_LDDEPENDS)
 	$(V)$(OBJDUMP) -S $@ > $@.asm
 	$(V)$(NM) -n $@ > $@.sym
 
-real-all: $(OBJDIR)/$(KERN_DIR)/kernel
+all: $(OBJDIR)/$(KERN_DIR)/kernel
 

@@ -21,9 +21,9 @@ $(TARGET_ARCH):
 	@if [ "$(ARCH_LINK)" != "$@" ];\
 	then\
 	  $(MAKE) realclean;\
-	  $(MAKE) all -j;\
+	  $(MAKE) realall -j;\
 	else\
-	  $(MAKE) real-all -j;\
+	  $(MAKE) all -j;\
 	fi
 
 ############################################################################# 
@@ -36,7 +36,7 @@ OBJDIR := obj
 V := @
 
 # Make sure that 'all' is the first target when not erroring out
-all: symlinks
+realall: symlinks
 
 # Then grab the users Makelocal file to let them override Make system variables
 # and set up other Make targets
@@ -129,7 +129,7 @@ ROS_ARCH_DIR ?= $(TARGET_ARCH)
 symlinks: error
 	ln -fs ../arch/$(ROS_ARCH_DIR) kern/include/arch
 	ln -fs arch/$(ROS_ARCH_DIR)/boot kern/boot
-	@$(MAKE) -j real-all
+	@$(MAKE) -j all
 
 # Include Makefrags for subdirectories
 ifneq ($(TARGET_ARCH),)
