@@ -9,6 +9,14 @@ typedef struct
 	volatile uint32_t rlock;
 } spinlock_t;
 
+/* This needs to be declared over here so that comp_and_swap down below can use
+ * it.  Remove this when RAMP has a proper atomic compare and swap.  (TODO) */
+static inline void
+(SLOCK(0) spin_lock_irqsave)(spinlock_t RACY*SAFE lock);
+static inline void
+(SUNLOCK(0) spin_unlock_irqsave)(spinlock_t RACY*SAFE lock);
+static inline bool spin_lock_irq_enabled(spinlock_t *SAFE lock);
+
 #define SPINLOCK_INITIALIZER {0}
 
 // atomic_t is void*, so we can't accidentally dereference it
@@ -21,6 +29,8 @@ static inline void atomic_add(atomic_t* number, int32_t inc);
 static inline void atomic_inc(atomic_t* number);
 static inline void atomic_dec(atomic_t* number);
 static inline uint32_t atomic_swap(uint32_t* addr, uint32_t val);
+static inline bool atomic_comp_swap(uint32_t *addr, uint32_t exp_val,
+                                    uint32_t new_val);
 static inline uint32_t spin_trylock(spinlock_t*SAFE lock);
 static inline uint32_t spin_locked(spinlock_t*SAFE lock);
 static inline void spin_lock(spinlock_t*SAFE lock);
@@ -75,6 +85,25 @@ static inline uint32_t atomic_swap(uint32_t* addr, uint32_t val)
 {
 	__asm__ __volatile__ ("swap [%2],%0" : "=r"(val) : "0"(val),"r"(addr) : "memory");
 	return val;
+}
+
+// TODO: make this better! (no global locks, etc)
+static inline bool atomic_comp_swap(uint32_t *addr, uint32_t exp_val,
+                                    uint32_t new_val)
+{
+	bool retval = 0;
+	uint32_t temp;
+	static spinlock_t cas_lock = SPINLOCK_INITIALIZER;
+
+	if (*addr != exp_val)
+		return 0;
+	spin_lock_irqsave(&cas_lock);
+	if (*addr == exp_val) {
+		atomic_swap(addr, new_val);
+		retval = 1;
+	}
+	spin_unlock_irqsave(&cas_lock);
+	return retval;
 }
 
 static inline uint32_t spin_trylock(spinlock_t*SAFE lock)
