@@ -126,6 +126,9 @@ OBJDIRS :=
 
 ROS_ARCH_DIR ?= $(TARGET_ARCH)
 
+arch:
+	@echo "TARGET_ARCH=$(TARGET_ARCH)"
+
 symlinks: error
 	ln -fs ../arch/$(ROS_ARCH_DIR) kern/include/arch
 	ln -fs arch/$(ROS_ARCH_DIR)/boot kern/boot
