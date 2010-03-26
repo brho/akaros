@@ -1,0 +1,53 @@
+# Makefile fragment for ROS kernel.
+# This is NOT a complete makefile;
+# you must run GNU make in the top-level directory
+# where the GNUmakefile is located.
+#
+
+USER_PARLIB_DIR = $(USER_DIR)/parlib
+USER_PARLIB_CFLAGS += $(USER_CFLAGS)
+OBJDIRS += $(USER_PARLIB_DIR)
+
+# entry.S must be first, so that it's the first code in the text segment!!!
+#
+# We also snatch the use of a couple handy source files
+# from the lib directory, to avoid gratuitous code duplication.
+USER_PARLIB_SRCFILES := \
+                 $(USER_PARLIB_DIR)/hart.c \
+                 $(USER_PARLIB_DIR)/pthread.c \
+                 $(USER_PARLIB_DIR)/syscall.c
+
+# Only build files if they exist.
+PARLIB_SRCFILES := $(wildcard $(PARLIB_SRCFILES))
+
+USER_PARLIB_OBJFILES  := $(patsubst $(USER_PARLIB_DIR)/%.c, \
+                             $(OBJDIR)/$(USER_PARLIB_DIR)/%.o, \
+                             $(USER_PARLIB_SRCFILES))
+USER_PARLIB_OBJFILES  := $(patsubst $(USER_PARLIB_DIR)/%.S, \
+                             $(OBJDIR)/$(USER_PARLIB_DIR)/%.o, \
+                             $(USER_PARLIB_OBJFILES))
+
+USER_PARLIB_LDDEPENDS := $(PARLIB_OBJFILES) 
+
+$(OBJDIR)/$(USER_PARLIB_DIR)/%.o: $(USER_PARLIB_DIR)/%.c
+	@echo + cc [USER PARLIB] $<
+	@mkdir -p $(@D)
+	$(V)$(CC) $(USER_PARLIB_CFLAGS) -c -o $@ $<
+
+$(OBJDIR)/$(USER_PARLIB_DIR)/%.o: $(USER_PARLIB_DIR)/%.S
+	@echo + as [USER PARLIB] $<
+	@mkdir -p $(@D)
+	$(V)$(CC) $(USER_PARLIB_CFLAGS) -D__ASSEMBLER__ -c -o $@ $<
+
+$(OBJDIR)/$(USER_PARLIB_DIR)/libparlib.a: $(USER_PARLIB_OBJFILES)
+	@echo + ar [USER PARLIB.A] $@
+	@mkdir -p $(@D)
+	$(V)$(AR) r $@ $(USER_PARLIB_SRC_OBJFILES) 2>/dev/null
+
+$(OBJDIR)/$(USER_PARLIB_DIR)/libparlib.so: $(USER_PARLIB_OBJFILES)
+	@echo + gcc [USER PARLIB.SO] $@
+	@mkdir -p $(@D)
+	$(V)$(CC) -shared -Wl,-soname,$(@F) -o $@ $(USER_PARLIB_OBJFILES) 2>/dev/null
+
+pthreads:
+	@echo $(OBJDIR)/$(USER_PARLIB_DIR)/libparlib.a	

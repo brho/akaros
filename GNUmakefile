@@ -134,7 +134,13 @@ symlinks: error
 # Include Makefrags for subdirectories
 ifneq ($(TARGET_ARCH),)
 include kern/Makefrag
+include user/Makefrag
+include tests/Makefrag
 endif
+
+tests: $(TESTS_EXECS)
+	@mkdir -p fs/$(TARGET_ARCH)/tests
+	cp -R $(OBJDIR)/$(TESTS_DIR)/* fs/$(TARGET_ARCH)/tests
 
 # Eliminate default suffix rules
 .SUFFIXES:
