@@ -9,7 +9,11 @@
 #ifndef ROS_INC_BCQ_H
 #define ROS_INC_BCQ_H
 
-#include <atomic.h>
+#include <ros/common.h>
+#include <ros/bcq_struct.h>
+/* Each arch has some basic atomic ops.  We need comp_and_swap for now. */
+#include <arch/atomic.h>
+#include <string.h>
 
 /* Bounded Concurrent Queues, untrusted consumer
  *
@@ -85,26 +89,19 @@
  * Using uint32_t for now, since that's the comp_and_swap we have.  We'll
  * probably get other sizes once we're sure we like the current one.  */
 
+#if 0 // Defined in the included header
+
 struct bcq_header {
 	uint32_t prod_idx;		/* next to be produced in */
 	uint32_t cons_pub_idx;	/* last completely consumed */
 	uint32_t cons_pvt_idx;	/* last a consumer has dibs on */
 };
 
-#define DEFINE_BCQ_TYPES(__name, __elem_t, __num_elems)                        \
-                                                                               \
-/* Wrapper, per element, with the consumption bool */                          \
-struct __name##_bcq_wrap {                                                     \
-	__elem_t elem;                                                             \
-	bool rdy_for_cons;	/* elem is ready for consumption */                    \
-};                                                                             \
-                                                                               \
-/* The actual BC queue */                                                      \
-struct __name##_bcq {                                                          \
-	struct bcq_header hdr;                                                     \
-	struct __name##_bcq_wrap wraps[__num_elems];                               \
-};                                                                             
-                                                                               
+// This is there too:
+#define DEFINE_BCQ_TYPES(__name, __elem_t, __num_elems)
+
+#endif
+
 /* Functions */                                                                
 #define bcq_init(_bcq, _ele_type, _num_elems)                                  \
 	memset((_bcq), 0, sizeof( _ele_type ) * (_num_elems))                                 

@@ -9,8 +9,8 @@
 
 #include <ros/common.h>
 #include <ros/atomic.h>
+#include <ros/bcq_struct.h>
 #include <ros/arch/trapframe.h>
-// TODO: #include some one-way queue macros for the notif_event queue
 
 /* How/If a process wants to be notified about an event */
 struct notif_method {
@@ -56,21 +56,19 @@ struct notif_event {
 
 #define NR_PERCORE_EVENTS 10 // whatever
 
+DEFINE_BCQ_TYPES(notif_evt, struct notif_event, NR_PERCORE_EVENTS);
+
 /* Per-core data about preemptions and notifications */
 struct preempt_data {
 	struct user_trapframe	preempt_tf;
 	struct ancillary_state	preempt_anc;
 	struct user_trapframe	notif_tf;
 	void					*transition_stack;	/* advertised by the user */
-	// TODO: move to procinfo!
-	uint64_t				preempt_pending;
 	bool					notif_enabled;		/* vcore is willing to receive*/
 	bool					notif_pending;		/* notif k_msg on the way */
 	seq_ctr_t				preempt_tf_valid;
-	uint8_t					notif_bmask[(NR_PERCORE_EVENTS - 1) / 8 + 1];
-	struct notif_event		notif_events[NR_PERCORE_EVENTS];
-	unsigned int			prod_idx;
-	unsigned int			cons_idx;
+	uint8_t					notif_bmask[(MAX_NR_NOTIF - 1) / 8 + 1];
+	struct notif_evt_bcq 	notif_evts;
 	unsigned int			event_overflows;
 };
 
