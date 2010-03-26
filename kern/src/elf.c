@@ -141,10 +141,10 @@ int load_elf(struct proc* p, const char* fn)
 	proc_init_trapframe(&p->env_tf,0,core0_entry,USTACKTOP);
 	p->env_entry = ei.entry;
 
+	// don't use mmap for the stacks because the register spill
+	// code in sparc requires the stack to be faulted-in already
 	uintptr_t stacksz = USTACK_NUM_PAGES*PGSIZE;
-	if(mmap(p,USTACKTOP-stacksz,stacksz,PROT_READ|PROT_WRITE,
-	        MAP_FIXED|MAP_ANON,-1,0) == MAP_FAILED)
-		return -1;
+	env_segment_alloc(p, (char*)USTACKTOP - stacksz, stacksz);
 
 	// Set the heap bottom and top to just past where the text 
 	// region has been loaded
