@@ -24,7 +24,7 @@
 #include <mm.h>
 
 #include <ros/syscall.h>
-#include <ros/error.h>
+#include <error.h>
 
 atomic_t num_envs;
 

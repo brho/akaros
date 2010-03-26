@@ -9,7 +9,7 @@
 #define ROS_KERN_COLORED_CACHES_H
 
 #include <ros/common.h>
-#include <ros/error.h>
+#include <error.h>
 #include <atomic.h>
 
 /****************** Cache Structures ********************/

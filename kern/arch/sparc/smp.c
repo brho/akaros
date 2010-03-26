@@ -3,7 +3,7 @@
 #include <arch/smp.h>
 #include <stdio.h>
 #include <string.h>
-#include <ros/error.h>
+#include <error.h>
 #include <assert.h>
 #include <atomic.h>
 

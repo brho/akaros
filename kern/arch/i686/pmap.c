@@ -9,7 +9,7 @@
 #include <arch/mmu.h>
 #include <arch/apic.h>
 
-#include <ros/error.h>
+#include <error.h>
 #include <sys/queue.h>
 
 #include <atomic.h>

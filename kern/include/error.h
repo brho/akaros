@@ -17,5 +17,6 @@ static const char *const error_string[] =
 {
 	#include <errstrings.h>
 };
+#define NUMERRORS (sizeof(error_string)/sizeof(error_string[0]))
 
 #endif	// !ROS_INC_ERROR_H */

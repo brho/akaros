@@ -11,7 +11,7 @@
 #include <arch/arch.h>
 #include <atomic.h>
 #include <smp.h>
-#include <ros/error.h>
+#include <error.h>
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>

@@ -10,7 +10,7 @@
 #define SINIT(x) x
 #endif
 
-#include <ros/error.h>
+#include <error.h>
 #include <arch/bitmask.h>
 #include <colored_caches.h>
 #include <process.h>

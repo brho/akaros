@@ -10,7 +10,7 @@
 #include <arch/mmu.h>
 #include <arch/console.h>
 #include <ros/timer.h>
-#include <ros/error.h>
+#include <error.h>
 
 #include <elf.h>
 #include <string.h>
@@ -251,11 +251,14 @@ static error_t sys_proc_destroy(struct proc *p, pid_t pid, int exitcode)
 	error_t r;
 	struct proc *p_to_die = pid2proc(pid);
 
-	if (!p_to_die)
-		return -EBADPROC;
+	if (!p_to_die) {
+		set_errno(current_tf, ESRCH);
+		return -1;
+	}
 	if (!proc_controls(p, p_to_die)) {
 		proc_decref(p_to_die, 1);
-		return -EPERM;
+		set_errno(current_tf, EPERM);
+		return -1;
 	}
 	if (p_to_die == p) {
 		// syscall code and pid2proc both have edible references, only need 1.
@@ -388,12 +391,12 @@ intreg_t sys_exec(struct proc* p, int fd, procinfo_t* pi)
 
 	int ret = -1;
 	struct file* f = file_open_from_fd(p,fd);
-	if(f == NULL)
+	if(f == NULL) {
+		set_errno(current_tf, EBADF);
 		goto out;
+	}
 
-
-	if(memcpy_from_user(p,p->env_procinfo,pi,sizeof(procinfo_t)))
-	{
+	if(memcpy_from_user(p,p->env_procinfo,pi,sizeof(procinfo_t))) {
 		proc_destroy(p);
 		goto out;
 	}

@@ -1,6 +1,7 @@
 #ifndef ROS_INC_STDIO_H
 #define ROS_INC_STDIO_H
 
+#include <ros/common.h>
 #include <stdarg.h>
 
 #ifndef NULL

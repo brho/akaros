@@ -2,7 +2,7 @@
 #pragma nosharc
 #endif
 
-#include <ros/error.h>
+#include <error.h>
 #include <stdio.h>
 
 #define BUFLEN 1024

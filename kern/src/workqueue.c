@@ -11,7 +11,7 @@
 #include <atomic.h>
 #include <smp.h>
 
-#include <ros/error.h>
+#include <error.h>
 
 #include <atomic.h>
 #include <stdio.h>

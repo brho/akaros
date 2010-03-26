@@ -6,7 +6,7 @@
 #include <arch/bitmask.h>
 
 #include <atomic.h>
-#include <ros/error.h>
+#include <error.h>
 #include <string.h>
 #include <assert.h>
 

@@ -10,7 +10,7 @@
 
 #include <atomic.h>
 #include <sys/queue.h>
-#include <ros/error.h>
+#include <error.h>
 #include <arch/mmu.h>
 #include <colored_page_alloc.h>
 #include <process.h>

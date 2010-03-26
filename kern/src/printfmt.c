@@ -7,7 +7,7 @@
 #endif
 
 #include <ros/common.h>
-#include <ros/error.h>
+#include <error.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>

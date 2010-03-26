@@ -22,7 +22,7 @@
 #include <arch/arch.h>
 #include <arch/mmu.h>
 
-#include <ros/error.h>
+#include <error.h>
 
 #include <kmalloc.h>
 #include <atomic.h>

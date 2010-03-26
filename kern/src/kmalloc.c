@@ -15,7 +15,7 @@
 #endif
 
 #include <ros/common.h>
-#include <ros/error.h>
+#include <error.h>
 #include <pmap.h>
 #include <kmalloc.h>
 #include <stdio.h>

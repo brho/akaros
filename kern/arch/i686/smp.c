@@ -13,7 +13,7 @@
 #include <smp.h>
 
 #include <atomic.h>
-#include <ros/error.h>
+#include <error.h>
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>

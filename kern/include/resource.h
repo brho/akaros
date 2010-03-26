@@ -10,7 +10,7 @@
 #define ROS_KERN_RESOURCE_H
 
 #include <ros/resource.h>
-#include <ros/error.h>
+#include <error.h>
 #include <ros/common.h>
 #include <arch/trap.h>
 #include <process.h>

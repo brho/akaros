@@ -15,7 +15,7 @@
 #include <kfs.h>
 #include <string.h>
 #include <assert.h>
-#include <ros/error.h>
+#include <error.h>
 
 #define DECL_PROG(x) \
     extern uint8_t (COUNT(sizeof(size_t)) _binary_obj_user_apps_##x##_size)[],\

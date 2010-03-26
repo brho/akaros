@@ -7,7 +7,7 @@
 #include <ros/memlayout.h>
 #include <ros/syscall.h>
 #include <ros/sysevent.h>
-#include <ros/error.h>
+#include <error.h>
 #include <ros/procdata.h>
 #include <ros/resource.h>
 #include <arch/trap.h>
