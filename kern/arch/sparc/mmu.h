@@ -120,4 +120,16 @@
 #define MMU_REG_FSR	0x00000300	// MMU Fault Status Register
 #define MMU_REG_FAR	0x00000400	// MMU Fault Address Register
 
+// we must guarantee that for any PTE, exactly one of the following is true
+#define PAGE_PRESENT(pte) ((pte) & PTE_P)
+#define PAGE_UNMAPPED(pte) ((pte) == 0)
+#define PAGE_PAGED_OUT(pte) (!PAGE_PRESENT(pte) && !PAGE_UNMAPPED(pte))
+
+// get the pfault_info pointer stored in this PTE.
+// useless unless PAGE_PAGED_OUT(pte).
+#define PTE2PFAULT_INFO(pte) ((struct pfault_info*)pte)
+// convert a pfault_info pointer to a PTE.
+// assumes the pointer is 4-byte aligned.
+#define PFAULT_INFO2PTE(ptr) ((pte_t)ptr)
+
 #endif /* !ROS_INC_MMU_H */

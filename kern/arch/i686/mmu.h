@@ -384,6 +384,18 @@ typedef struct Pseudodesc {
 extern segdesc_t (COUNT(SEG_COUNT) RO gdt)[];
 extern pseudodesc_t gdt_pd;
 
+// we must guarantee that for any PTE, exactly one of the following is true
+#define PAGE_PRESENT(pte) ((pte) & PTE_P)
+#define PAGE_UNMAPPED(pte) ((pte) == 0)
+#define PAGE_PAGED_OUT(pte) (!PAGE_PRESENT(pte) && !PAGE_UNMAPPED(pte))
+
+// get the pfault_info pointer stored in this PTE.
+// useless unless PAGE_PAGED_OUT(pte).
+#define PTE2PFAULT_INFO(pte) ((struct pfault_info*)pte)
+// convert a pfault_info pointer to a PTE.
+// assumes the pointer is 4-byte aligned.
+#define PFAULT_INFO2PTE(ptr) ((pte_t)ptr)
+
 #endif /* !__ASSEMBLER__ */
 
 #endif /* !ROS_INC_MMU_H */
