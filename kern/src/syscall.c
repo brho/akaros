@@ -363,17 +363,16 @@ static ssize_t sys_fork(env_t* e)
 	return env->pid;
 }
 
-intreg_t sys_exec(struct proc* p, const char fn[MAX_PATH_LEN], procinfo_t* pi)
+intreg_t sys_exec(struct proc* p, int fd, procinfo_t* pi)
 {
 	if(p->state != PROC_RUNNING_S)
 		return -1;
 
 	int ret = -1;
-	char* kfn = kmalloc(MAX_PATH_LEN,0);
-	if(kfn == NULL)
+	struct file* f = file_open_from_fd(p,fd);
+	if(f == NULL)
 		goto out;
-	if(memcpy_from_user(p,kfn,fn,MAX_PATH_LEN))
-		goto out;
+
 
 	if(memcpy_from_user(p,p->env_procinfo,pi,sizeof(procinfo_t)))
 	{
@@ -384,18 +383,18 @@ intreg_t sys_exec(struct proc* p, const char fn[MAX_PATH_LEN], procinfo_t* pi)
 
 	env_segment_free(p,0,USTACKTOP);
 
-	if(load_elf(p,kfn))
+	if(load_elf(p,f))
 	{
 		proc_destroy(p);
 		goto out;
 	}
+	file_decref(f);
 	*current_tf = p->env_tf;
 	ret = 0;
 
-	printd("[PID %d] exec %s\n",p->pid,kfn);
+	printd("[PID %d] exec fd %d\n",p->pid,fd);
 
 out:
-	kfree(kfn);
 	return ret;
 }
 

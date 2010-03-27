@@ -13,6 +13,7 @@
 #include <arch/init.h>
 #include <mm.h>
 #include <elf.h>
+#include <frontend.h>
 
 #include <kmalloc.h>
 #include <assert.h>
@@ -217,7 +218,10 @@ void manager_waterman()
 		procinfo_pack_args(p->env_procinfo,argv,envp);
 
 		printk("loading busybox\n");
-		assert(load_elf(p,"/bin/busybox") == 0);
+		struct file* f = file_open("/bin/busybox",0,0);
+		assert(f != NULL);
+		assert(load_elf(p,f) == 0);
+		file_decref(f);
 		printk("loaded busybox\n");
 
 		__proc_set_state(p, PROC_RUNNABLE_S);

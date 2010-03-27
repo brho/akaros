@@ -24,6 +24,7 @@
 #include <fcntl.h>
 #include <elf/elf.h>
 #include <ros/procinfo.h>
+#include <assert.h>
 
 /* Replace the current process, executing PATH with arguments ARGV and
    environment ENVP.  ARGV and ENVP are terminated by NULL pointers.  */
@@ -40,13 +41,20 @@ __execve (path, argv, envp)
     return -1;
   }
 
-  char name[MAX_PATH_LEN];
-  if(strncpy(name,path,MAX_PATH_LEN) == MAX_PATH_LEN)
-  {
-    errno = ENAMETOOLONG;
-    return -1;
-  }
+  int fd = __libc_open(path,O_RDONLY);
+  if(fd == -1)
+		return -1; // errno already set by open
 
-  return syscall(SYS_exec,(uintptr_t)name,(uintptr_t)&pi,0,0,0);
+  int ret = ros_syscall(SYS_exec,fd,(uintptr_t)&pi,0,0,0);
+
+  // if we got here, then exec better have failed...
+  assert(ret == -1);
+
+  // close the file, but keep exec's errno
+  int exec_errno = errno;
+  close(fd);
+  errno = exec_errno;
+
+  return ret;
 }
 weak_alias (__execve, execve)

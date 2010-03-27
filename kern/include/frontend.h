@@ -8,6 +8,13 @@
 #include <env.h>
 #include <process.h>
 
+// for now, this is where struct file lives
+struct file {
+	int fd; // all it contains is an appserver fd (for pid 0, aka kernel)
+	int refcnt;
+	spinlock_t lock;
+};
+
 // Default APPSERVER_ETH_TYPE if not defined externally
 #ifndef APPSERVER_ETH_TYPE
 #define APPSERVER_ETH_TYPE 0x8888
@@ -31,9 +38,11 @@ char* user_strdup_errno(struct proc* p, const char* va, int max);
 int memcpy_to_user_errno(struct proc* p, void* dst, const void* src, int len);
 void* kmalloc_errno(int len);
 
-error_t read_page(struct proc* p, int fd, physaddr_t pa, int pgoff);
-error_t open_file(struct proc* p, const char* path, int oflag, int mode);
-error_t close_file(struct proc* p, int fd);
+error_t file_read_page(struct file* f, physaddr_t pa, size_t pgoff);
+struct file* file_open(const char* path, int oflag, int mode);
+struct file* file_open_from_fd(struct proc* p, int fd);
+void file_incref(struct file* f);
+void file_decref(struct file* f);
 
 #endif
 
@@ -57,6 +66,7 @@ error_t close_file(struct proc* p, int fd);
 #define APPSERVER_SYSCALL_dup          41
 #define APPSERVER_SYSCALL_umask        60
 #define APPSERVER_SYSCALL_fcntl        62
+#define APPSERVER_SYSCALL_kdup         87
 #define APPSERVER_SYSCALL_lstat        88
 #define APPSERVER_SYSCALL_tcgetattr    89
 #define APPSERVER_SYSCALL_tcsetattr    90

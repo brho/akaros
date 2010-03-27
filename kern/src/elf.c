@@ -7,7 +7,7 @@
 #include <elf.h>
 #include <pmap.h>
 
-struct elf_info
+typedef struct
 {
 	long entry;
 	long highest_addr;
@@ -15,9 +15,10 @@ struct elf_info
 	int phnum;
 	int dynamic;
 	char interp[256];
-};
+} elf_info_t;
 
-int load_one_elf(struct proc* p, int fd, int pgoffset, struct elf_info* ei)
+static int
+load_one_elf(struct proc* p, struct file* f, int pgoffset, elf_info_t* ei)
 {
 	int ret = -1;
 	ei->phdr = -1;
@@ -25,7 +26,7 @@ int load_one_elf(struct proc* p, int fd, int pgoffset, struct elf_info* ei)
 	ei->highest_addr = 0;
 
 	char* elf = (char*)kmalloc(PGSIZE,0);
-	if(!elf || read_page(p,fd,PADDR(elf),0) == -1)
+	if(!elf || file_read_page(f,PADDR(elf),0) == -1)
 		goto fail;
 
 	elf_t* elfhdr = (elf_t*)elf;
@@ -73,16 +74,16 @@ int load_one_elf(struct proc* p, int fd, int pgoffset, struct elf_info* ei)
 			// mmap will zero the rest of the page if filesz % PGSIZE != 0
 			if(filesz)
 				// TODO: waterman, figure out proper permissions
-				if(mmap(p, memstart+pgoffset*PGSIZE, filesz,
-				        PROT_READ|PROT_WRITE|PROT_EXEC, MAP_FIXED,
-				        fd, filestart/PGSIZE) == MAP_FAILED)
+				if(do_mmap(p, memstart+pgoffset*PGSIZE, filesz,
+				           PROT_READ|PROT_WRITE|PROT_EXEC, MAP_FIXED,
+				           f, filestart/PGSIZE) == MAP_FAILED)
 					goto fail;
 
 			filesz = ROUNDUP(filesz,PGSIZE);
 			if(filesz < memsz)
-				if(mmap(p, memstart+filesz+pgoffset*PGSIZE, memsz-filesz,
-				        PROT_READ|PROT_WRITE|PROT_EXEC, MAP_FIXED|MAP_ANON,
-				        -1, 0) == MAP_FAILED)
+				if(do_mmap(p, memstart+filesz+pgoffset*PGSIZE, memsz-filesz,
+				           PROT_READ|PROT_WRITE|PROT_EXEC, MAP_FIXED|MAP_ANON,
+				           NULL, 0) == MAP_FAILED)
 					goto fail;
 		}
 	}
@@ -96,27 +97,18 @@ fail:
 	return ret;
 }
 
-int load_elf(struct proc* p, const char* fn)
+int load_elf(struct proc* p, struct file* f)
 {
-	struct elf_info ei,interp_ei;
-	int fd = open_file(p,fn,0,0);
-	if(fd == -1 || load_one_elf(p,fd,0,&ei))
+	elf_info_t ei,interp_ei;
+	if(load_one_elf(p,f,0,&ei))
 		return -1;
-	close_file(p,fd);
 
 	if(ei.dynamic)
 	{
-		// plzplzplz let us use the stack and PADDR()
-		char* str = kmalloc(sizeof(ei.interp),0);
-		if(!str)
+		struct file* interp = file_open(ei.interp,0,0);
+		if(interp == NULL || load_one_elf(p,interp,1,&interp_ei))
 			return -1;
-		memcpy(str,ei.interp,sizeof(ei.interp));
-		int fd2 = open_file(p,str,0,0);
-		kfree(str);
-
-		if(fd2 == -1 || load_one_elf(p,fd2,1,&interp_ei))
-			return -1;
-		close_file(p,fd2);
+		file_decref(interp);
 
 		// fill in info for dynamic linker
 		elf_aux_t auxp[] = {{ELF_AUX_PHDR,ei.phdr},

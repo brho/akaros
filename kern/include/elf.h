@@ -81,6 +81,7 @@ typedef long elf_aux_t[2];
 #define ELF_AUX_PHNUM		5
 #define ELF_AUX_ENTRY		9
 
-int load_elf(struct proc* p, const char* fn);
+struct file;
+int load_elf(struct proc* p, struct file* f);
 
 #endif /* !ROS_INC_ELF_H */

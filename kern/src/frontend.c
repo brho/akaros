@@ -124,25 +124,77 @@ void* kmalloc_errno(int len)
 	return kva;
 }
 
-error_t read_page(struct proc* p, int fd, physaddr_t pa, int pgoff)
+error_t file_read_page(struct file* f, physaddr_t pa, size_t pgoff)
 {
-	int ret = frontend_syscall(p ? p->pid : 0,APPSERVER_SYSCALL_pread,fd,
-	                        pa,PGSIZE,pgoff*PGSIZE,NULL);
-
+	int ret = frontend_syscall(0,APPSERVER_SYSCALL_pread,f->fd,pa,PGSIZE,
+	                           pgoff*PGSIZE,NULL);
 	if(ret >= 0)
 		memset(KADDR(pa)+ret,0,PGSIZE-ret);
 	return ret;
 }
 
-error_t open_file(struct proc* p, const char* path, int oflag, int mode)
+struct file* file_open_from_fd(struct proc* p, int fd)
 {
-	return frontend_syscall(p->pid,APPSERVER_SYSCALL_open,PADDR(path),
-	                        oflag,mode,0,NULL);
+	struct file* f = NULL;
+	if(!(f = kmalloc(sizeof(struct file),0)))
+		goto out;
+
+	f->fd = frontend_syscall(p->pid,APPSERVER_SYSCALL_kdup,fd,0,0,0,NULL);
+	spinlock_init(&f->lock);
+	f->refcnt = 1;
+
+out:
+	return f;
 }
 
-error_t close_file(struct proc* p, int fd)
+struct file* file_open(const char* path, int oflag, int mode)
 {
-	return frontend_syscall(p->pid,APPSERVER_SYSCALL_close,fd,0,0,0,NULL);
+	struct file* f = NULL;
+	// although path is a kernel pointer, it may be below KERNBASE.
+	// fix that if so.
+	char* malloced = NULL;
+	if((uintptr_t)path < KERNBASE)
+	{
+		size_t len = strlen(path)+1;
+		malloced = kmalloc(len,0);
+		if(!malloced)
+			goto out;
+		path = memcpy(malloced,path,len);
+	}
+
+	if(!(f = kmalloc(sizeof(struct file),0)))
+		goto out;
+
+	f->fd = frontend_syscall(0,APPSERVER_SYSCALL_open,PADDR(path),
+	                         oflag,mode,0,NULL);
+	spinlock_init(&f->lock);
+	f->refcnt = 1;
+
+out:
+	if(malloced)
+		kfree(malloced);
+	return f;
+}
+
+void file_incref(struct file* f)
+{
+	spin_lock(&f->lock);
+	f->refcnt++;
+	spin_unlock(&f->lock);
+}
+
+void file_decref(struct file* f)
+{
+	// if you decref too many times, you'll clobber memory :(
+	spin_lock(&f->lock);
+	if(--f->refcnt == 0)
+	{
+		int ret = frontend_syscall(0,APPSERVER_SYSCALL_close,f->fd,0,0,0,NULL);
+		assert(ret == 0);
+		kfree(f);
+	}
+	else
+		spin_unlock(&f->lock);
 }
 
 int frontend_syscall_errno(struct proc* p, int n, int a0, int a1, int a2, int a3)

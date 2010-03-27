@@ -28,6 +28,16 @@ void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 		return (void*)-1;
 	}
 
+	struct file* file = file_open_from_fd(p,fd);
+	if(!file)
+		return (void*)-1;
+
+	return do_mmap(p,addr,len,prot,flags,file,offset);
+}
+
+void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
+              struct file* file, size_t offset)
+{
 	/* TODO: make this work, instead of a ghetto hack
 	 * Find a valid range, make sure it doesn't run into the kernel
 	 * make sure there's enough memory (not exceeding quotas)
@@ -65,7 +75,7 @@ void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 		// This is just to get it correct at first
 		if(!(flags & MAP_ANON))
 		{
-			if(read_page(p,fd,page2pa(a_page),offset+i) < 0)
+			if(file_read_page(file,page2pa(a_page),offset+i) < 0)
 				goto mmap_abort;
 
 			// zero-fill end of last page

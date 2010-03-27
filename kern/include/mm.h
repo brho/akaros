@@ -72,13 +72,11 @@ struct mm {
 // would rather this be a mm struct
 void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
            int fd, size_t offset);
+struct file;
+void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
+             struct file* f, size_t offset);
 int mprotect(struct proc* p, void* addr, size_t len, int prot);
 int munmap(struct proc* p, void* addr, size_t len);
-
-// not sure where to put this (asw)
-error_t open_file(struct proc* p, const char* fn, int flag, int mode);
-error_t close_file(struct proc* p, int fd);
-error_t read_page(struct proc* p, int fd, physaddr_t pa, int pgoff);
 
 int handle_page_fault(struct proc* p, uintptr_t va, int prot);
 
