@@ -16,9 +16,13 @@
 #define L1PGSHIFT   (12+6+6)
 #define L1PGSIZE    (1<<L1PGSHIFT)
 
-
 #define PGSHIFT L3PGSHIFT
 #define PGSIZE (1 << PGSHIFT)
 #define PTSIZE L1PGSIZE
+
+#ifndef __ASSEMBLER__
+typedef unsigned long pte_t;
+typedef unsigned long pde_t;
+#endif
 
 #endif

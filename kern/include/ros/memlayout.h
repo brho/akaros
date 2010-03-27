@@ -164,8 +164,6 @@
  * will always be available at virtual address (VPT + (VPT >> PGSHIFT)), to
  * which vpd is set in entry.S.
  */
-typedef uint32_t pte_t;
-typedef uint32_t pde_t;
 
 #ifdef __IVY__
 #pragma cilnoremove("vpt_lock", "vpd_lock")

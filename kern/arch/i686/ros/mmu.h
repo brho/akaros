@@ -1,6 +1,11 @@
 #ifndef _ROS_ARCH_MMU_H
 #define _ROS_ARCH_MMU_H
 
+#ifndef __ASSEMBLER__
+typedef unsigned long pte_t;
+typedef unsigned long pde_t;
+#endif
+
 // All physical memory mapped at this address
 #define KERNBASE        0xC0000000
 
