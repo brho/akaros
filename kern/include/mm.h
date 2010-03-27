@@ -68,7 +68,7 @@ typedef struct pfault_info {
 	struct file* file; // or NULL for zero-fill
 	size_t pgoff; // offset into file
 	size_t read_len; // amount of file to read into this page (zero-fill rest)
-	int perm;
+	int prot;
 } pfault_info_t;
 
 void mmap_init(void);

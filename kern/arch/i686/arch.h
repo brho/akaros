@@ -13,6 +13,7 @@
 static __inline void breakpoint(void) __attribute__((always_inline));
 static __inline void invlpg(void *SNT addr) __attribute__((always_inline));
 static __inline void tlbflush(void) __attribute__((always_inline));
+static __inline void icache_flush_page(void* va, void* kva) __attribute__((always_inline));
 static __inline uint64_t read_tsc(void) __attribute__((always_inline));
 static __inline uint64_t read_tsc_serialized(void) __attribute__((always_inline));
 static __inline void enable_irq(void) __attribute__((always_inline));
@@ -56,6 +57,12 @@ tlbflush(void)
 	uint32_t cr3;
 	__asm __volatile("movl %%cr3,%0" : "=r" (cr3));
 	__asm __volatile("movl %0,%%cr3" : : "r" (cr3));
+}
+
+static __inline void
+icache_flush_page(void* va, void* kva)
+{
+	// x86 handles self-modifying code (mostly) without SW support
 }
 
 static __inline uint64_t

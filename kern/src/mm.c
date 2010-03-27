@@ -109,8 +109,6 @@ void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 	}
 
 	// make the lazy mapping finally
-	int perm = (prot & PROT_WRITE) ? PTE_USER_RW :
-	           (prot & (PROT_READ|PROT_EXEC))  ? PTE_USER_RO : 0;
 	for(int i = 0; i < num_pages; i++)
 	{
 		// free an old page that was present here
@@ -126,7 +124,7 @@ void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 		// zero-fill end of last page
 		if(i == num_pages-1 && len % PGSIZE)
 			pfis[i]->read_len = len % PGSIZE;
-		pfis[i]->perm = perm;
+		pfis[i]->prot = prot;
 		*ptes[i] = PFAULT_INFO2PTE(pfis[i]);
 
 		// uncomment the line below to simulate aggressive loading
@@ -208,7 +206,7 @@ int mprotect(struct proc* p, void* addr, size_t len, int prot)
 				*pte = 0;
 			}
 			else
-				PTE2PFAULT_INFO(*pte)->perm = newperm;
+				PTE2PFAULT_INFO(*pte)->prot = prot;
 		}
 	}
 
@@ -289,10 +287,17 @@ int handle_page_fault(struct proc* p, uintptr_t va, int prot)
 		// if we read too much, zero that part out
 		if(info->read_len < read_len)
 			memset(page2kva(a_page)+info->read_len,0,read_len-info->read_len);
+
+		// if this is an executable page, we might have to flush
+		// the instruction cache if our HW requires it
+		if(info->prot & PROT_EXEC)
+			icache_flush_page((void*)va,page2kva(a_page));
 	}
 
+	int perm = (info->prot & PROT_WRITE) ? PTE_USER_RW :
+	           (info->prot & (PROT_READ|PROT_EXEC))  ? PTE_USER_RO : 0;
 	// update the page table
-	if(page_insert(p->env_pgdir, a_page, (void*)va, info->perm))
+	if(page_insert(p->env_pgdir, a_page, (void*)va, perm))
 	{
 		page_free(a_page);
 		goto out;

@@ -18,7 +18,7 @@ typedef struct
 	uint32_t tbr;
 	uint32_t y;
 	uint32_t asr13;
-	uint32_t pad;
+	uint32_t pc_insn;
 	uint32_t fault_status;
 	uint32_t fault_addr;
 	uint64_t timestamp;

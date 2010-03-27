@@ -24,6 +24,8 @@ static __inline void enable_irqsave(int8_t* state) __attribute__((always_inline)
 static __inline void disable_irqsave(int8_t* state) __attribute__((always_inline));
 static __inline void cpu_relax(void) __attribute__((always_inline));
 static __inline void cpu_halt(void) __attribute__((always_inline));
+static __inline void tlbflush(void) __attribute__((always_inline));
+static __inline void icache_flush_page(void* va, void* pa)__attribute__((always_inline));
 static __inline void clflush(uintptr_t* addr) __attribute__((always_inline));
 static __inline int irq_is_enabled(void) __attribute__((always_inline));
 static __inline uint32_t core_id(void) __attribute__((always_inline));
@@ -53,9 +55,14 @@ invlpg(void *addr)
 static __inline void
 tlbflush(void)
 {
-	// unsure if we'll support this yet...
-	// may have to just do invlpg() in a loop
 	store_alternate(0x400,3,0);
+}
+
+static __inline void
+icache_flush_page(void* va, void* kva)
+{
+	for(int i = 0; i < PGSIZE; i+=32) // functional pipeline line size
+		clflush((uintptr_t*)((char*)kva+i));
 }
 
 static __inline uint64_t

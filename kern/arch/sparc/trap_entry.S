@@ -110,6 +110,15 @@ env_save_tf:
 	lda	[%o5] 2,%o5
 	std	%o4,[%o0+168]
 
+	# try to read out the faulting insn (in no-fault mode)
+	andn	%o1,3,%o1
+	lda	[%g0] 4,%o2
+	or	%o2,2,%o3
+	sta	%o3,[%g0] 4
+	ld	[%o1],%o1
+	st	%o1,[%o0+156]
+	sta	%o2,[%g0] 4
+
 	std	%g0,[%o0+ 0]
 	std	%g2,[%o0+ 8]
 	std	%g4,[%o0+16]
@@ -140,7 +149,6 @@ env_save_tf:
 	// a fault
 	.global	env_pop_tf
 env_pop_tf:
-
 	mov	%psr,%o1
 	wr	%o1,PSR_ET,%psr
 

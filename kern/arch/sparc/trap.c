@@ -11,6 +11,7 @@
 #include <slab.h>
 #include <mm.h>
 #include <ros/mman.h>
+#include <pmap.h>
 
 #ifdef __SHARC__
 #pragma nosharc
@@ -83,8 +84,8 @@ void
 	                "  psr  0x%08x  pc   0x%08x  npc  0x%08x  wim  0x%08x\n",
 	                tf->psr,tf->pc,tf->npc,tf->wim);
 	len += snprintf(buf+len,sizeof(buf)-len,
-	                "  y    0x%08x  fsr  0x%08x  far  0x%08x\n",
-	                tf->y,tf->fault_status,tf->fault_addr);
+	                "  y    0x%08x  insn 0x%08x  fsr  0x%08x  far  0x%08x\n",
+	                tf->y,tf->pc_insn,tf->fault_status,tf->fault_addr);
 	len += snprintf(buf+len,sizeof(buf)-len,
 	                "  timestamp  %21lld\n",tf->timestamp);
 
@@ -185,8 +186,7 @@ stack_fucked(trapframe_t* state)
 	{
 		// the trap happened while flushing out windows.
 		// hope this happened in the user, or else we're hosed...
-		extern char bootstacktop;
-		state = (trapframe_t*)(&bootstacktop-SIZEOF_TRAPFRAME_T-core_id()*KSTKSIZE);
+		state = (trapframe_t*)(bootstacktop-SIZEOF_TRAPFRAME_T-core_id()*KSTKSIZE);
 	}
 
 	warn("You just got stack fucked!");
