@@ -14,6 +14,7 @@
 #include <process.h>
 #include <atomic.h>
 #include <sys/queue.h>
+#include <slab.h>
 
 /* Memory region for a process, consisting of linear(virtual) addresses.  This
  * is what the kernel allocates a process, and the physical mapping can be done
@@ -59,6 +60,21 @@ struct vm_region {
 	int perm;
 };
 TAILQ_HEAD(vm_region_list, vm_region); // Declares 'struct memregion_list'
+
+// at least for now, we aren't using vm regions. we're storing pointers
+// to pfault_info_t inside the PTEs in an arch-specific way.
+struct file;
+typedef struct pfault_info {
+	struct file* file; // or NULL for zero-fill
+	size_t pgoff; // offset into file
+	size_t read_len; // amount of file to read into this page (zero-fill rest)
+	int perm;
+} pfault_info_t;
+
+void mmap_init(void);
+
+pfault_info_t* pfault_info_alloc(struct file* file);
+void pfault_info_free(pfault_info_t* pfi);
 
 struct mm {
 	spinlock_t mm_lock;

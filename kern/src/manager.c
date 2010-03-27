@@ -217,12 +217,10 @@ void manager_waterman()
 		char* envp[] = {"LD_LIBRARY_PATH=/lib",0};
 		procinfo_pack_args(p->env_procinfo,argv,envp);
 
-		printk("loading busybox\n");
 		struct file* f = file_open("/bin/busybox",0,0);
 		assert(f != NULL);
 		assert(load_elf(p,f) == 0);
 		file_decref(f);
-		printk("loaded busybox\n");
 
 		__proc_set_state(p, PROC_RUNNABLE_S);
 		proc_run(p);

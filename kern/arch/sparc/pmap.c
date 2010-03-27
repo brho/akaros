@@ -131,7 +131,7 @@ void *get_free_va_range(pde_t *pgdir, uintptr_t addr, size_t len)
 		for(char* b = a; b < a+len; b += PGSIZE)
 		{
 			pte_t* pte = pgdir_walk(pgdir,b,0);
-			if(pte && (*pte & PTE_P))
+			if(pte && !PAGE_UNMAPPED(*pte))
 			{
 				a = b;
 				break;

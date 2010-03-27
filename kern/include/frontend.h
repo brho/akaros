@@ -38,6 +38,7 @@ char* user_strdup_errno(struct proc* p, const char* va, int max);
 int memcpy_to_user_errno(struct proc* p, void* dst, const void* src, int len);
 void* kmalloc_errno(int len);
 
+void file_init(void);
 error_t file_read_page(struct file* f, physaddr_t pa, size_t pgoff);
 struct file* file_open(const char* path, int oflag, int mode);
 struct file* file_open_from_fd(struct proc* p, int fd);

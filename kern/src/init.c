@@ -28,6 +28,8 @@
 #include <testing.h>
 #include <kmalloc.h>
 #include <hashtable.h>
+#include <mm.h>
+#include <frontend.h>
 
 #include <arch/init.h>
 #include <arch/bitmask.h>
@@ -71,6 +73,8 @@ void kernel_init(multiboot_info_t *mboot_info)
 	hashtable_init();
 	cache_color_alloc_init();       // Inits data structs
 	colored_page_alloc_init();      // Allocates colors for agnostic processes
+	mmap_init();
+	file_init();
 	page_check();
 
 	idt_init();

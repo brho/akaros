@@ -32,6 +32,7 @@
 #include <kclock.h>
 #include <process.h>
 #include <stdio.h>
+#include <mm.h>
 
 /**
  * @brief Global variable used to store erroneous virtual addresses as the
@@ -426,8 +427,13 @@ error_t memcpy_from_user(env_t* env, void* COUNT(len) dest,
 	for(i = 0; i < num_pages; i++)
 	{
 		pte = pgdir_walk(env->env_pgdir, start+i*PGSIZE, 0);
-		if(!pte || (*pte & perm) != perm)
+		if(!pte)
 			return -EFAULT;
+		if((*pte & PTE_P) && (*pte & PTE_USER_RO) != PTE_USER_RO)
+			return -EFAULT;
+		if(!(*pte & PTE_P))
+			if(handle_page_fault(env,(uintptr_t)start+i*PGSIZE,PROT_READ))
+				return -EFAULT;
 
 		void*COUNT(PGSIZE) kpage = KADDR(PTE_ADDR(*pte));
 		const void* src_start = i > 0 ? kpage : kpage+(va-start);
@@ -481,8 +487,13 @@ error_t memcpy_to_user(env_t* env, void*DANGEROUS va,
 	for(i = 0; i < num_pages; i++)
 	{
 		pte = pgdir_walk(env->env_pgdir, start+i*PGSIZE, 0);
-		if(!pte || (*pte & perm) != perm)
+		if(!pte)
 			return -EFAULT;
+		if((*pte & PTE_P) && (*pte & PTE_USER_RW) != PTE_USER_RW)
+			return -EFAULT;
+		if(!(*pte & PTE_P))
+			if(handle_page_fault(env,(uintptr_t)start+i*PGSIZE,PROT_WRITE))
+				return -EFAULT;
 
 		void*COUNT(PGSIZE) kpage = KADDR(PTE_ADDR(*pte));
 		void* dst_start = i > 0 ? kpage : kpage+(va-start);

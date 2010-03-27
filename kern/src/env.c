@@ -21,6 +21,7 @@
 #include <stdio.h>
 #include <schedule.h>
 #include <kmalloc.h>
+#include <mm.h>
 
 #include <ros/syscall.h>
 #include <ros/error.h>
@@ -348,9 +349,17 @@ void env_user_mem_free(env_t* e, void* start, size_t len)
 	assert((uintptr_t)start + len <= UVPT); //since this keeps fucking happening
 	int user_page_free(env_t* e, pte_t* pte, void* va, void* arg)
 	{
-		page_t* page = ppn2page(PTE2PPN(*pte));
-		*pte = 0;
-		page_decref(page);
+		if(PAGE_PRESENT(*pte))
+		{
+			page_t* page = ppn2page(PTE2PPN(*pte));
+			*pte = 0;
+			page_decref(page);
+		}
+		else // PAGE_PAGED_OUT(*pte)
+		{
+			pfault_info_free(PTE2PFAULT_INFO(*pte));
+			*pte = 0;
+		}
 		return 0;
 	}
 

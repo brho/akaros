@@ -13,6 +13,7 @@
 #include <frontend.h>
 #include <syscall.h>
 #include <smp.h>
+#include <slab.h>
 
 volatile int magic_mem[10];
 
@@ -124,6 +125,13 @@ void* kmalloc_errno(int len)
 	return kva;
 }
 
+struct kmem_cache* struct_file_cache;
+void file_init()
+{
+	struct_file_cache = kmem_cache_create("struct_file",
+	                                      sizeof(struct file), 8, 0, 0, 0);
+}
+
 error_t file_read_page(struct file* f, physaddr_t pa, size_t pgoff)
 {
 	int ret = frontend_syscall(0,APPSERVER_SYSCALL_pread,f->fd,pa,PGSIZE,
@@ -136,10 +144,16 @@ error_t file_read_page(struct file* f, physaddr_t pa, size_t pgoff)
 struct file* file_open_from_fd(struct proc* p, int fd)
 {
 	struct file* f = NULL;
-	if(!(f = kmalloc(sizeof(struct file),0)))
+	if(!(f = kmem_cache_alloc(struct_file_cache,0)))
 		goto out;
 
 	f->fd = frontend_syscall(p->pid,APPSERVER_SYSCALL_kdup,fd,0,0,0,NULL);
+	if(f->fd == -1)
+	{
+		kmem_cache_free(struct_file_cache,f);
+		f = NULL;
+		goto out;
+	}
 	spinlock_init(&f->lock);
 	f->refcnt = 1;
 
@@ -162,11 +176,17 @@ struct file* file_open(const char* path, int oflag, int mode)
 		path = memcpy(malloced,path,len);
 	}
 
-	if(!(f = kmalloc(sizeof(struct file),0)))
+	if(!(f = kmem_cache_alloc(struct_file_cache,0)))
 		goto out;
 
 	f->fd = frontend_syscall(0,APPSERVER_SYSCALL_open,PADDR(path),
 	                         oflag,mode,0,NULL);
+	if(f->fd == -1)
+	{
+		kmem_cache_free(struct_file_cache,f);
+		f = NULL;
+		goto out;
+	}
 	spinlock_init(&f->lock);
 	f->refcnt = 1;
 
@@ -191,7 +211,7 @@ void file_decref(struct file* f)
 	{
 		int ret = frontend_syscall(0,APPSERVER_SYSCALL_close,f->fd,0,0,0,NULL);
 		assert(ret == 0);
-		kfree(f);
+		kmem_cache_free(struct_file_cache,f);
 	}
 	else
 		spin_unlock(&f->lock);

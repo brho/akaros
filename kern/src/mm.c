@@ -13,6 +13,8 @@
 #include <process.h>
 #include <stdio.h>
 #include <syscall.h>
+#include <slab.h>
+#include <kmalloc.h>
 
 void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
            int fd, size_t offset)
@@ -28,11 +30,20 @@ void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 		return (void*)-1;
 	}
 
-	struct file* file = file_open_from_fd(p,fd);
-	if(!file)
-		return (void*)-1;
+	struct file* file = NULL;
+	if(fd != -1)
+	{
+		file = file_open_from_fd(p,fd);
+		if(!file)
+			return (void*)-1;
+	}
 
-	return do_mmap(p,addr,len,prot,flags,file,offset);
+	void* result = do_mmap(p,addr,len,prot,flags,file,offset);
+
+	if(file)
+		file_decref(file);
+
+	return result;
 }
 
 void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
@@ -66,31 +77,64 @@ void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 		assert(addr + num_pages*PGSIZE <= USTACKBOT);
 	}
 
-	page_t *a_page;
-	for (int i = 0; i < num_pages; i++) {
-		if (upage_alloc(p, &a_page, 1))
-			goto mmap_abort;
+	// get a list of pfault_info_t's and pte's a priori,
+	// because if their allocation fails, we could end up
+	// in an inconsistent state
 
-		// This is dumb--should not read until faulted in.
-		// This is just to get it correct at first
-		if(!(flags & MAP_ANON))
+	pfault_info_t** pfis = kmalloc(sizeof(pfault_info_t*)*num_pages,0);
+	pte_t** ptes = kmalloc(sizeof(pte_t*)*num_pages,0);
+	if(!pfis || !ptes)
+	{
+		kfree(ptes);
+		kfree(pfis);
+		goto mmap_abort;
+	}
+
+	for(int i = 0; i < num_pages; i++)
+	{
+		pfis[i] = pfault_info_alloc(file);
+		ptes[i] = pgdir_walk(p->env_pgdir,(char*)addr+i*PGSIZE,1);
+
+		// cleanup allocated pfault_info_t's on allocation failure
+		if(!pfis[i] || !ptes[i])
 		{
-			if(file_read_page(file,page2pa(a_page),offset+i) < 0)
-				goto mmap_abort;
+			int free_until = pfis[i] ? i+1 : i;
+			for(int j = 0; j < free_until; j++)
+				pfault_info_free(pfis[j]);
 
-			// zero-fill end of last page
-			if(len % PGSIZE && i == num_pages-1)
-				memset(page2kva(a_page)+len%PGSIZE,0,PGSIZE-len%PGSIZE);
-		}
-
-		// TODO: TLB shootdown if replacing an old mapping
-		// TODO: handle all PROT flags
-		if (page_insert(p->env_pgdir, a_page, (void*SNT)(addr + i*PGSIZE),
-		                (prot & PROT_WRITE) ? PTE_USER_RW : PTE_USER_RO)) {
-			page_free(a_page);
+			kfree(ptes);
+			kfree(pfis);
 			goto mmap_abort;
 		}
 	}
+
+	// make the lazy mapping finally
+	int perm = (prot & PROT_WRITE) ? PTE_USER_RW :
+	           (prot & (PROT_READ|PROT_EXEC))  ? PTE_USER_RO : 0;
+	for(int i = 0; i < num_pages; i++)
+	{
+		// free an old page that was present here
+		if(PAGE_PRESENT(*ptes[i]))
+			page_decref(ppn2page(PTE2PPN(*ptes[i])));
+		// free the pfault_info for a page that wasn't faulted-in yet
+		else if(PAGE_PAGED_OUT(*ptes[i]))
+			pfault_info_free(PTE2PFAULT_INFO(*ptes[i]));
+
+		pfis[i]->file = file;
+		pfis[i]->pgoff = offset+i;
+		pfis[i]->read_len = PGSIZE;
+		// zero-fill end of last page
+		if(i == num_pages-1 && len % PGSIZE)
+			pfis[i]->read_len = len % PGSIZE;
+		pfis[i]->perm = perm;
+		*ptes[i] = PFAULT_INFO2PTE(pfis[i]);
+
+		// uncomment the line below to simulate aggressive loading
+		//assert(handle_page_fault(p,(char*)addr+i*PGSIZE,PROT_READ) == 0);
+	}
+
+	kfree(ptes);
+	kfree(pfis);
 
 	// TODO: release the appropriate mm_lock
 	spin_unlock_irqsave(&p->proc_lock);
@@ -133,7 +177,15 @@ int mprotect(struct proc* p, void* addr, size_t len, int prot)
 	for(char* a = (char*)addr; a < end; a += PGSIZE)
 	{
 		pte_t* pte = pgdir_walk(p->env_pgdir,a,0);
-		if(pte && *pte & PTE_P)
+
+		// unmapped page? error out, behavior undefined (per POSIX)
+		if(!pte || PAGE_UNMAPPED(*pte))
+		{
+			set_errno(current_tf,ENOMEM);
+			return -1;
+		}
+		// common case: the page is present
+		else if(PAGE_PRESENT(*pte))
 		{
 			// TODO: do munmap() in munmap(), instead of mprotect()
 			if(prot & PROT_UNMAP)
@@ -143,12 +195,20 @@ int mprotect(struct proc* p, void* addr, size_t len, int prot)
 				page_decref(page);
 			}
 			else
+			{
 				*pte = (*pte & ~PTE_PERM) | newperm;
+			}
 		}
-		else
+		// or, the page might be mapped, but not yet faulted-in
+		else // PAGE_PAGED_OUT(*pte)
 		{
-			set_errno(current_tf,ENOMEM);
-			return -1;
+			if(prot & PROT_UNMAP)
+			{
+				pfault_info_free(PTE2PFAULT_INFO(*pte));
+				*pte = 0;
+			}
+			else
+				PTE2PFAULT_INFO(*pte)->perm = newperm;
 		}
 	}
 
@@ -169,11 +229,102 @@ int handle_page_fault(struct proc* p, uintptr_t va, int prot)
 	int ret = -1;
 	va = ROUNDDOWN(va,PGSIZE);
 
-	spin_lock_irqsave(&p->proc_lock);
+	if(prot != PROT_READ && prot != PROT_WRITE && prot != PROT_EXEC)
+		panic("bad prot!");
 
+	//spin_lock_irqsave(&p->proc_lock);
+
+	/// find offending PTE
+	pte_t* ppte = pgdir_walk(p->env_pgdir,(void*)va,0);
+	// if PTE is NULL, this is a fault that should kill the process
+	if(!ppte)
+		goto out;
+
+	pte_t pte = *ppte;
+
+	// if PTE is present, why did we fault?
+	if(PAGE_PRESENT(pte))
+	{
+		// a race is possible: the page might have been faulted in by
+		// another core already, in which case we should just return.
+		// otherwise, it's a fault that should kill the user
+		switch(prot)
+		{
+			case PROT_READ:
+			case PROT_EXEC:
+				if(pte == PTE_USER_RO || pte == PTE_USER_RW)
+					ret = 0;
+				goto out;
+			case PROT_WRITE:
+				if(pte == PTE_USER_RW)
+					ret = 0;
+				goto out;
+		}
+		// can't get here
+	}
+
+	// if the page isn't present, kill the user
+	if(PAGE_UNMAPPED(pte))
+		goto out;
+
+	// now, we know that PAGE_PAGED_OUT(pte) is true
+	pfault_info_t* info = PTE2PFAULT_INFO(pte);
+
+	// allocate a page; maybe zero-fill it
+	int zerofill = info->file == NULL;
+	page_t* a_page;
+	if(upage_alloc(p, &a_page, zerofill))
+		goto out;
+
+	// if this isn't a zero-filled page, read it in from file
+	if(!zerofill)
+	{
+		int read_len = file_read_page(info->file,page2pa(a_page),info->pgoff);
+		if(read_len < 0)
+		{
+			page_free(a_page);
+			goto out;
+		}
+
+		// if we read too much, zero that part out
+		if(info->read_len < read_len)
+			memset(page2kva(a_page)+info->read_len,0,read_len-info->read_len);
+	}
+
+	// update the page table
+	if(page_insert(p->env_pgdir, a_page, (void*)va, info->perm))
+	{
+		page_free(a_page);
+		goto out;
+	}
+
+	pfault_info_free(info);
+	ret = 0;
 
 out:
-	spin_unlock_irqsave(&p->proc_lock);
+	//spin_unlock_irqsave(&p->proc_lock);
+	tlbflush();
 	return ret;
+}
+
+struct kmem_cache* pfault_info_cache;
+void mmap_init(void)
+{
+	pfault_info_cache = kmem_cache_create("pfault_info",
+	                                      sizeof(pfault_info_t), 8, 0, 0, 0);
+}
+
+pfault_info_t* pfault_info_alloc(struct file* file)
+{
+	if(file)
+		file_incref(file);
+	return kmem_cache_alloc(pfault_info_cache,0);
+}
+
+void pfault_info_free(pfault_info_t* pfi)
+{
+	if(pfi->file)
+		file_decref(pfi->file);
+	kmem_cache_free(pfault_info_cache,pfi);
 }
 

@@ -126,7 +126,7 @@ env_user_mem_walk(env_t* e, void* start, size_t len,
 			int l3x_end = l1x == l1x_end-1 && l2x == l2x_end-1 && L3X(end) ?
 			              L3X(end) : NL3ENTRIES;
 			for(int l3x = l3x_start, ret; l3x < l3x_end; l3x++)
-				if(l3pt[l3x] & PTE_PTE)
+				if(!PAGE_UNMAPPED(l3pt[l3x]))
 					if((ret = callback(e,&l3pt[l3x],PGADDR(l1x,l2x,l3x,0),arg)))
 						return ret;
 		}

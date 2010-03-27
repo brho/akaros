@@ -302,7 +302,7 @@ static void __proc_free(struct proc *p)
 {
 	physaddr_t pa;
 
-	printk("[PID %d] freeing proc: %d\n", current ? current->pid : 0, p->pid);
+	printd("[PID %d] freeing proc: %d\n", current ? current->pid : 0, p->pid);
 	// All parts of the kernel should have decref'd before __proc_free is called
 	assert(p->env_refcnt == 0);
 

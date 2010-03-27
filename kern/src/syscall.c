@@ -325,16 +325,34 @@ static ssize_t sys_fork(env_t* e)
 	{
 		env_t* env = (env_t*)arg;
 
-		page_t* pp;
-		if(upage_alloc(env,&pp,0))
-			return -1;
-		if(page_insert(env->env_pgdir,pp,va,*pte & PTE_PERM))
+		if(PAGE_PRESENT(*pte))
 		{
-			page_decref(pp);
-			return -1;
+			page_t* pp;
+			if(upage_alloc(env,&pp,0))
+				return -1;
+			if(page_insert(env->env_pgdir,pp,va,*pte & PTE_PERM))
+			{
+				page_decref(pp);
+				return -1;
+			}
+
+			pagecopy(page2kva(pp),ppn2kva(PTE2PPN(*pte)));
+		}
+		else // PAGE_PAGED_OUT(*pte)
+		{
+			pte_t* newpte = pgdir_walk(env->env_pgdir,va,1);
+			if(!newpte)
+				return -1;
+
+			struct file* file = PTE2PFAULT_INFO(*pte)->file;
+			pfault_info_t* newpfi = pfault_info_alloc(file);
+			if(!newpfi)
+				return -1;
+
+			*newpfi = *PTE2PFAULT_INFO(*pte);
+			*newpte = PFAULT_INFO2PTE(newpfi);
 		}
 
-		pagecopy(page2kva(pp),ppn2kva(PTE2PPN(*pte)));
 		return 0;
 	}
 
