@@ -309,6 +309,8 @@ In procdata there is an array of per-vcore data, holding some
 preempt/notification information and space for two trapframes: one for
 notification and one for preemption.
 
+4.2.1: Overall
+-----------------------------
 When a notification arrives to a process under normal circumstances, the
 kernel places the previous running context in the notification trapframe, and
 returns to userspace at the program entry point (the elf entry point) on the
@@ -326,23 +328,21 @@ turning interrupts on in hardware).  When a core starts up, this flag is off,
 meaning that notifications are disabled by default.  It is the process's
 responsibility to turn on notifications for a given vcore.
 
+4.2.2: Notif Event Details
+-----------------------------
 When the process runs the handler, it is actually starting up at the same
-location in code as it always does, so the kernel will pass it a parameter in
-a register to let it know that it is in a notification.  Additionally, the
-kernel will mask notifications (much like an x86 interrupt gate).  The process
-must check its per-core event queue to see why it was called, and deal with
-all of the events on the queue.  In the case where the event queue overflows,
-the kernel will up a counter so the process can at least be aware things are
-missed.
-
-For missed events, and for events that do not need messages (they have no
-parameters and multiple notifications are irrelevant), the kernel will toggle
-that event's bit in a bitmask.  For the events that don't want messages, we may
-have a flag that userspace sets, meaning they just want to know it happened.
-This might be too much of a pain, so we'll see.  For notification events that
-overflowed the queue, the parameters will be lost, but hopefully the application
-can sort it out.  Again, we'll see.  A specific notif_event should not appear in
-both the event buffers and in the bitmask.
+location in code as it always does.  To determine if it was a notification or
+not, simply check the queue and bitmask.  This has the added benefit of allowing
+a process to notice notifications that it missed previously, or notifs it wanted
+without active notification (IPI).  If we want to bypass this check by having a
+magic register signal, we can add that later.  Additionally, the kernel will
+mask notifications (much like an x86 interrupt gate).  It will also mask
+notifications when starting a core with a fresh trapframe, since the process
+will be executing on its transition stack.  The process must check its per-core
+event queue to see why it was called, and deal with all of the events on the
+queue.  In the case where the event queue overflows, the kernel will up a
+counter so the process can at least be aware things are missed.  At the very
+least, the process will see the notification marked in a bitmask.
 
 These notification events include things such as: an IO is complete, a
 preemption is pending to this core, the process just returned from a
@@ -357,6 +357,47 @@ masked, the process will simply be killed.    It is up to the process to make
 sure the appropriate pages are pinned, which it should do before entering _M
 mode.
 
+4.2.3: Event Overflow and Non-Messages
+-----------------------------
+For missed/overflowed events, and for events that do not need messages (they
+have no parameters and multiple notifications are irrelevant), the kernel will
+toggle that event's bit in a bitmask.  For the events that don't want messages,
+we may have a flag that userspace sets, meaning they just want to know it
+happened.  This might be too much of a pain, so we'll see.  For notification
+events that overflowed the queue, the parameters will be lost, but hopefully the
+application can sort it out.  Again, we'll see.  A specific notif_event should
+not appear in both the event buffers and in the bitmask.
+
+It does not make sense for all events to have messages.  Others, it does not
+make sense to specify a different core on which to run the handler (e.g. page
+faults).  The notification methods that the process expresses via procdata are
+suggestions to the kernel.  When they don't make sense, they will be ignored.
+Some notifications might be unserviceable without messages.  A process needs to
+have a fallback mechanism.  For example, they can read the vcoremap to see who
+was lost, or they can restart a thread to cause it to page fault again.
+
+Event overflow sucks - it leads to a bunch of complications.  Ultimately, what
+we really want is a limitless amount of notification messages (per core), as
+well as a limitless amount of notification types.  And we want these to be
+relayed to userspace without trapping into the kernel. 
+
+We could do this if we had a way to dynamically manage memory in procdata, with
+a distrusted process on one side of the relationship.  We could imagine growing
+procdata dynamically (we plan to, mostly to grow the preempt_data struct as we
+request more vcores), and then run some sort of heap manager / malloc.  Things
+get very tricky since the kernel should never follow pointers that userspace can
+touch.  Additionally, whatever memory management we use becomes a part of the
+kernel interface.  
+
+Even if we had that, dynamic notification *types* is tricky - they are
+identified by a number, not by a specific (list) element.
+
+For now, this all seems like an unnecessary pain in the ass.  We might adjust it
+in the future if we come up with clean, clever ways to deal with the problem,
+which we aren't even sure is a problem yet.
+
+4.2.4: How to Use and Leave a Transition Stack
+-----------------------------
 We considered having the kernel be aware of a process's transition stacks and
 sizes so that it can detect if a vcore is in a notification handler based on
 the stack pointer in the trapframe when a trap or interrupt fires.  While
@@ -381,6 +422,19 @@ thread) periodically checking for a pending preemption, and making sure the
 notification queue/list is empty before moving back to real code.  Then it
 should jump back to a real stack, unmask notifications, and jump to the newly
 scheduled thread.
+
+This can be really tricky.  When userspace is changing threads, it will need to
+unmask notifs as well as jump to the new thread.  There is a slight race here,
+but it is okay.  The race is that an IPI can arrive after notifs are unmasked,
+but before returning to the real user thread.  Then the code will think the
+notif_tf represents the new user thread, even though it hasn't started (and the
+PC is wrong).  The trick is to make sure that all state required to start the
+new thread, as well as future instructions, are all saved within the "stuff"
+that gets saved in the notif_tf.  When these threading packages change contexts,
+they ought to push the PC on the stack of the new thread, (then enable notifs)
+and then execute a return.  If an IPI arrives before the "function return", then
+when that context gets restarted, it will run the "return" with the appropriate
+value on the stack still.
 
 4.3: Preemption Specifics
 -------------------------------

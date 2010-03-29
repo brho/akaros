@@ -8,6 +8,7 @@
 #pragma nosharc
 #endif
 
+#include <ros/bcq.h>
 #include <arch/arch.h>
 #include <arch/bitmask.h>
 #include <process.h>
@@ -690,6 +691,63 @@ void proc_yield(struct proc *SAFE p)
 	abandon_core();
 }
 
+/* If you expect to notify yourself, cleanup state and process_routine_kmsg() */
+void do_notify(struct proc *p, uint32_t vcoreid, unsigned int notif,
+               struct notif_event *ne)
+{
+	assert(notif < MAX_NR_NOTIF);
+	struct notif_method *nm = &p->procdata->notif_methods[notif];
+	struct preempt_data *vcpd = &p->procdata->vcore_preempt_data[vcoreid];
+
+	/* enqueue notif message or toggle bits */
+	if (ne && nm->flags & NOTIF_MSG) {
+		if (bcq_enqueue(&vcpd->notif_evts, ne, NR_PERCORE_EVENTS, 4)) {
+			atomic_inc((atomic_t)&vcpd->event_overflows); // careful here
+			SET_BITMASK_BIT_ATOMIC(vcpd->notif_bmask, notif);
+		}
+	} else {
+		SET_BITMASK_BIT_ATOMIC(vcpd->notif_bmask, notif);
+	}
+
+	/* Active notification */
+	/* TODO: Currently, there is a race for notif_pending, and multiple senders
+	 * can send an IPI.  Worst thing is that the process gets interrupted
+	 * briefly and the kernel immediately returns back once it realizes notifs
+	 * are masked.  To fix it, we'll need atomic_swapb() (right answer), or not
+	 * use a bool. (wrong answer). */
+	if (nm->flags & NOTIF_IPI && vcpd->notif_enabled && !vcpd->notif_pending) {
+		vcpd->notif_pending = TRUE;
+		spin_lock_irqsave(&p->proc_lock);
+			if ((p->state & PROC_RUNNING_M) && // TODO: (VC#) (_S state)
+			              (p->procinfo->vcoremap[vcoreid].valid)) {
+				printk("[kernel] sending notif to vcore %d\n", vcoreid);
+				send_kernel_message(p->procinfo->vcoremap[vcoreid].pcoreid,
+				                    __notify, p, 0, 0, KMSG_ROUTINE);
+			} else { // TODO: think about this, fallback, etc
+				warn("Vcore unmapped, not receiving an active notif");
+			}
+		spin_unlock_irqsave(&p->proc_lock);
+	}
+}
+
+/* Sends notification number notif to proc p.  Meant for generic notifications /
+ * reference implementation.  do_notify does the real work.  This one mostly
+ * just determines where the notif should be sent, other checks, etc.
+ * Specifically, it handles the parameters of notif_methods.  If you happen to
+ * notify yourself, make sure you process routine kmsgs. */
+void proc_notify(struct proc *p, unsigned int notif)
+{
+	assert(notif < MAX_NR_NOTIF); // notifs start at 0
+	struct notif_method *nm = &p->procdata->notif_methods[notif];
+	struct notif_event ne;
+	
+	ne.ne_type = notif;
+
+	if (!(nm->flags & NOTIF_WANTED))
+		return;
+	do_notify(p, nm->vcoreid, notif, &ne);
+}
+
 /* Global version of the helper, for sys_get_vcoreid (might phase that syscall
  * out). */
 uint32_t proc_get_vcoreid(struct proc *SAFE p, uint32_t pcoreid)
@@ -997,6 +1055,7 @@ void __startcore(trapframe_t *tf, uint32_t srcid, void *a0, void *a1, void *a2)
 	uint32_t pcoreid = core_id(), vcoreid;
 	struct proc *p_to_run = (struct proc *CT(1))a0;
 	struct trapframe local_tf, *tf_to_pop;
+	struct preempt_data *vcpd;
 
 	assert(p_to_run);
 	vcoreid = get_vcoreid(p_to_run, pcoreid);
@@ -1009,6 +1068,9 @@ void __startcore(trapframe_t *tf, uint32_t srcid, void *a0, void *a1, void *a2)
 		memset(tf_to_pop, 0, sizeof(*tf_to_pop));
 		proc_init_trapframe(tf_to_pop, vcoreid, p_to_run->env_entry,
 		                    p_to_run->procdata->stack_pointers[vcoreid]);
+		/* Disable/mask active notifications for fresh vcores */
+		vcpd = &p_to_run->procdata->vcore_preempt_data[vcoreid];
+		vcpd->notif_enabled = FALSE;
 	} else {
 		/* Don't want to accidentally reuse this tf (saves on a for loop in
 		 * proc_run, though we check there to be safe for now). */
@@ -1018,6 +1080,42 @@ void __startcore(trapframe_t *tf, uint32_t srcid, void *a0, void *a1, void *a2)
 	if (p_to_run == current)
 		proc_decref(p_to_run, 1);
 	__proc_startcore(p_to_run, tf_to_pop);
+}
+
+/* Bail out if it's the wrong process, or if they no longer want a notif */
+// TODO: think about what TF this is: make sure it's the user one, and not a
+// kernel one (was it interrupted, or proc_kmsgs())
+void __notify(trapframe_t *tf, uint32_t srcid, void *a0, void *a1, void *a2)
+{
+	struct user_trapframe local_tf;
+	struct preempt_data *vcpd;
+	uint32_t vcoreid;
+	struct proc *p = (struct proc*)a0;
+
+	if (p != current)
+		return;
+	// TODO: think about locking here.  document why we don't need this
+	vcoreid = p->procinfo->pcoremap[core_id()].vcoreid;
+	vcpd = &p->procdata->vcore_preempt_data[vcoreid];
+
+	printd("received active notification for proc %d's vcore %d on pcore %d\n",
+	       p->procinfo->pid, vcoreid, core_id());
+
+	/* sort signals.  notifs are now masked, like an interrupt gate */
+	if (!vcpd->notif_enabled)
+		return;
+	vcpd->notif_enabled = FALSE;
+	vcpd->notif_pending = FALSE; // no longer pending - it made it here
+	
+	/* save the old tf in the notify slot, build and pop a new one.  Note that
+	 * silly state isn't our business for a notification. */	
+	// TODO: this is assuming the struct user_tf is the same as a regular TF
+	vcpd->notif_tf = *tf;
+	memset(&local_tf, 0, sizeof(local_tf));
+	proc_init_trapframe(&local_tf, vcoreid, p->env_entry,
+	                    p->procdata->stack_pointers[vcoreid]);
+	__proc_startcore(p, &local_tf);
+
 }
 
 /* Stop running whatever context is on this core, load a known-good cr3, and

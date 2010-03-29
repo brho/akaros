@@ -528,12 +528,17 @@ preempt-critical locks.
 It is possible that notifications will mix with preemptions or come while a
 process is not running.  Ultimately, the process wants to be notified on a
 given vcore.  Whenever we send an active notification, we set a flag in
-procdata.  If the vcore is offline or is in a preempt-phase, we don't bother
-sending the IPI/notif message.  The kernel will make sure it runs the
-notification handler (as well as restoring the preempt_tf) the next time that
-vcore is restarted.  Note that userspace can toggle this, so they can handle
-the notifications from a different core if it likes, or they can independently
-send a notification.
+procdata (notif_pending).  If the vcore is offline, we don't bother sending the IPI/notif message.  The kernel will make sure it runs
+the notification handler (as well as restoring the preempt_tf) the next time
+that vcore is restarted.  Note that userspace can toggle this, so they can
+handle the notifications from a different core if it likes, or they can
+independently send a notification.
+
+If a vcore has a preempt_pending, we will still send the active notification
+(IPI).  The core ought to get a notification for the preemption anyway, so we
+need to be able to send one.  Additionally, once the vcore is handling that
+preemption notification, it will have notifs disabled, which will prevent us
+from sending any extra notifications anyways.
  
 4.7: Notifs While a Preempt Message is Served
 ---------------------------
@@ -548,10 +553,10 @@ k_msgs work), the IPI will fire and push us right back into the kernel to
 execute the preemption, and the notif handler's context will be saved in the
 preempt_tf (ready to go when the vcore gets started again).
 
-We could try to just set the notif_pending flag and ignore the message, but
-that would involve inspecting the queue for the preempt k_msg.  Additionally,
-a preempt k_msg can arrive anyway.  Finally, it's possible to have another
-message in the queue between the notif and the preempt, and it gets ugly
+We could try to just leave the notif_pending flag set and ignore the message,
+but that would involve inspecting the queue for the preempt k_msg.
+Additionally, a preempt k_msg can arrive anyway.  Finally, it's possible to have
+another message in the queue between the notif and the preempt, and it gets ugly
 quickly trying to determine what to do.
 
 4.8: When a Pcore is "Free"

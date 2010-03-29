@@ -20,8 +20,8 @@ struct notif_method {
 
 /* Notification Flags.  vcore0 stuff might be implemented. */
 #define NOTIF_WANTED			0x001	/* wanted, process-wide */
-#define NOTIF_NO_IPI			0x002	/* do not IPI the core */
-#define NOTIF_NO_MSG			0x004	/* no message, just flip the bit */
+#define NOTIF_IPI				0x002	/* IPI the core */
+#define NOTIF_MSG				0x004	/* send a message (notif event) */
 #define NOTIF_VCORE0_IPI		0x008	/* fall back to vcore0 for an IPI */
 #define NOTIF_VCORE0_EVENT		0x010	/* fall back to vcore0 for an event */
 

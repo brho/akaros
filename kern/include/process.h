@@ -81,6 +81,7 @@ void proc_run(struct proc *SAFE p);
 void proc_restartcore(struct proc *SAFE p, trapframe_t *SAFE tf);
 void proc_destroy(struct proc *SAFE p);
 void proc_yield(struct proc *SAFE p);
+
 /* Exposed for sys_getvcoreid(), til it's unnecessary */
 uint32_t proc_get_vcoreid(struct proc *SAFE p, uint32_t pcoreid);
 
@@ -143,10 +144,9 @@ void __startcore(trapframe_t *tf, uint32_t srcid, struct proc *CT(1) a0,
 void __death(trapframe_t *tf, uint32_t srcid, void *SNT a0, void *SNT a1,
              void *SNT a2);
 #else
-void __startcore(trapframe_t *tf, uint32_t srcid, void * a0, void * a1,
-                 void * a2);
-void __death(trapframe_t *tf, uint32_t srcid, void * a0, void * a1,
-             void * a2);
+void __startcore(trapframe_t *tf, uint32_t srcid, void *a0, void *a1, void *a2);
+void __death(trapframe_t *tf, uint32_t srcid, void *a0, void *a1, void *a2);
+void __notify(trapframe_t *tf, uint32_t srcid, void *a0, void *a1, void *a2);
 #endif
 
 /* Arch Specific */
