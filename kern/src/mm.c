@@ -126,9 +126,6 @@ void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 			pfis[i]->read_len = len % PGSIZE;
 		pfis[i]->prot = prot;
 		*ptes[i] = PFAULT_INFO2PTE(pfis[i]);
-
-		// uncomment the line below to simulate aggressive loading
-		//assert(handle_page_fault(p,(char*)addr+i*PGSIZE,PROT_READ) == 0);
 	}
 
 	kfree(ptes);
@@ -136,6 +133,13 @@ void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 
 	// TODO: release the appropriate mm_lock
 	spin_unlock_irqsave(&p->proc_lock);
+
+	// fault in pages now if MAP_POPULATE.  die on failure.
+	if(flags & MAP_POPULATE)
+		for(int i = 0; i < num_pages; i++)
+			if(handle_page_fault(p,addr+i*PGSIZE,PROT_READ))
+				proc_destroy(p);
+
 	return (void*SAFE)TC(addr);
 
 	// TODO: if there's a failure, we should go back through the addr+len range
@@ -230,7 +234,7 @@ int handle_page_fault(struct proc* p, uintptr_t va, int prot)
 	if(prot != PROT_READ && prot != PROT_WRITE && prot != PROT_EXEC)
 		panic("bad prot!");
 
-	//spin_lock_irqsave(&p->proc_lock);
+	spin_lock_irqsave(&p->proc_lock);
 
 	/// find offending PTE
 	pte_t* ppte = pgdir_walk(p->env_pgdir,(void*)va,0);
@@ -243,6 +247,7 @@ int handle_page_fault(struct proc* p, uintptr_t va, int prot)
 	// if PTE is present, why did we fault?
 	if(PAGE_PRESENT(pte))
 	{
+		int perm = pte & PTE_PERM;
 		// a race is possible: the page might have been faulted in by
 		// another core already, in which case we should just return.
 		// otherwise, it's a fault that should kill the user
@@ -250,11 +255,11 @@ int handle_page_fault(struct proc* p, uintptr_t va, int prot)
 		{
 			case PROT_READ:
 			case PROT_EXEC:
-				if(pte == PTE_USER_RO || pte == PTE_USER_RW)
+				if(perm == PTE_USER_RO || perm == PTE_USER_RW)
 					ret = 0;
 				goto out;
 			case PROT_WRITE:
-				if(pte == PTE_USER_RW)
+				if(perm == PTE_USER_RW)
 					ret = 0;
 				goto out;
 		}
@@ -296,18 +301,16 @@ int handle_page_fault(struct proc* p, uintptr_t va, int prot)
 
 	int perm = (info->prot & PROT_WRITE) ? PTE_USER_RW :
 	           (info->prot & (PROT_READ|PROT_EXEC))  ? PTE_USER_RO : 0;
+
 	// update the page table
-	if(page_insert(p->env_pgdir, a_page, (void*)va, perm))
-	{
-		page_free(a_page);
-		goto out;
-	}
+	page_incref(a_page);
+	*ppte = PTE(page2ppn(a_page),PTE_P | perm);
 
 	pfault_info_free(info);
 	ret = 0;
 
 out:
-	//spin_unlock_irqsave(&p->proc_lock);
+	spin_unlock_irqsave(&p->proc_lock);
 	tlbflush();
 	return ret;
 }
