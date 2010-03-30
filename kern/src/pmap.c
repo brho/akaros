@@ -117,9 +117,8 @@ int page_insert(pde_t *pgdir, page_t *pp, void *va, int perm)
 	// and we don't want to page_remove (which could free pp) and then 
 	// continue as if pp wasn't freed.  moral = up the ref asap
 	page_incref(pp);
-	if (*pte & PTE_P) {
+	if (!PAGE_UNMAPPED(*pte))
 		page_remove(pgdir, va);
-	}
 	*pte = PTE(page2ppn(pp), PTE_P | perm);
 	return 0;
 }
@@ -160,7 +159,7 @@ void* page_insert_in_range(pde_t *pgdir, page_t *pp,
 	
 	for(new_va = vab; new_va <= vae; new_va+= PGSIZE) {
 		pte = pgdir_walk(pgdir, new_va, 1);
-		if(pte != NULL && !(*pte & PTE_P)) break;
+		if(pte != NULL && PAGE_UNMAPPED(*pte)) break;
 		else pte = NULL;
 	}
 	if (!pte) return NULL;
@@ -183,12 +182,12 @@ void* page_insert_in_range(pde_t *pgdir, page_t *pp,
  * @param[out] pte_store the address of the page table entry for the returned page
  *
  * @return PAGE the page mapped at virtual address 'va'
- * @return NULL No mapping exists at virtual address 'va'   
+ * @return NULL No mapping exists at virtual address 'va', or it's paged out
  */
 page_t *page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
 {
 	pte_t* pte = pgdir_walk(pgdir, va, 0);
-	if (!pte || !(*pte & PTE_P))
+	if (!pte || !PAGE_PRESENT(*pte))
 		return 0;
 	if (pte_store)
 		*pte_store = pte;
@@ -219,12 +218,20 @@ void page_remove(pde_t *pgdir, void *va)
 {
 	pte_t* pte;
 	page_t *page;
-	page = page_lookup(pgdir, va, &pte);
-	if (!page)
+
+	pte = pgdir_walk(pgdir,va,0);
+	if(!pte || PAGE_UNMAPPED(*pte))
 		return;
+
+	if(PAGE_PAGED_OUT(*pte))
+		pfault_info_free(PTE2PFAULT_INFO(*pte));
+	else // PAGE_PRESENT
+	{
+		tlb_invalidate(pgdir, va);
+		page_decref(ppn2page(PTE2PPN(*pte)));
+	}
+
 	*pte = 0;
-	tlb_invalidate(pgdir, va);
-	page_decref(page);
 }
 
 /**
