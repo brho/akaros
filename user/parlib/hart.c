@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <sys/mman.h>
+#include <debug.h>
 
 // Only need in this file because _dl_allocate and friends are
 //  internal functions in glibc

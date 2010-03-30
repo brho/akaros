@@ -401,6 +401,7 @@ intreg_t sys_exec(struct proc* p, int fd, procinfo_t* pi)
 		goto out;
 	}
 	proc_init_procinfo(p);
+	memset(p->env_procdata, 0, sizeof(procdata_t));
 
 	env_user_mem_free(p,0,USTACKTOP);
 

@@ -9,6 +9,7 @@
 #include <ros/sysevent.h>
 #include <error.h>
 #include <ros/procdata.h>
+#include <ros/procinfo.h>
 #include <ros/resource.h>
 #include <arch/trap.h>
 #include <ros/common.h>

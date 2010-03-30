@@ -4,12 +4,9 @@
 #define ROS_PROCDATA_H
 
 #include <ros/memlayout.h>
-#include <ros/syscall.h>
 #include <ros/ring_syscall.h>
-#include <ros/common.h>
-#include <ros/procinfo.h>
 #include <arch/mmu.h>
-#include <arch/arch.h>
+#include <ros/arch/arch.h>
 
 typedef struct procdata {
 	// The actual ring buffers for communicating with user space

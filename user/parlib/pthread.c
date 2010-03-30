@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <errno.h>
 
+#include <debug.h>
 int threads_active = 1;
 hart_lock_t work_queue_lock = HART_LOCK_INIT;
 pthread_t work_queue_head = 0;
@@ -79,7 +80,6 @@ int pthread_create(pthread_t* thread, const pthread_attr_t* attr,
   (*thread)->next = 0;
   (*thread)->finished = 0;
   (*thread)->detached = 0;
-
   hart_lock_lock(&work_queue_lock);
   {
     threads_active++;

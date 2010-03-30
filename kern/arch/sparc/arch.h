@@ -1,8 +1,9 @@
 #ifndef ROS_INC_ARCH_H
 #define ROS_INC_ARCH_H
 
+#include <ros/arch/arch.h>
+
 /* Arch Constants */
-#define MAX_NUM_CPUS		64
 #define HW_CACHE_ALIGN		64
 #define IOAPIC_BASE		0xFEC00000 // max virtual address
 

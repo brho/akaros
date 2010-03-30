@@ -29,6 +29,13 @@
 //# include <list.h>
 # include <sysdep.h>
 # include <kernel-features.h>
+#include <sys/mman.h>
+#include <ros/bits/syscall.h>
+#include <ros/arch/bits/syscall.h>
+#include <ros/procinfo.h>
+#include <ros/procdata.h>
+#include <arch/mmu.h>
+
 
 /* Type for the dtv.  */
 typedef union dtv
@@ -201,7 +208,6 @@ union user_desc_init
 /* Code to initially initialize the thread pointer.  This might need
    special attention since 'errno' is not yet available and if the
    operation can cause a failure 'errno' must not be touched.  */
-const char* tls_init_tp(void* thrdescr);
 # define TLS_INIT_TP(thrdescr, secondcall) tls_init_tp(thrdescr)
 
 /* Return the address of the dtv for the current thread.  */
@@ -424,6 +430,41 @@ const char* tls_init_tp(void* thrdescr);
   THREAD_SETMEM (THREAD_SELF, header.gscope_flag, THREAD_GSCOPE_FLAG_USED)
 #define THREAD_GSCOPE_WAIT() \
   GL(dl_wait_lookup_done) ()
+
+static const char* tls_init_tp(void* thrdescr)
+{
+  int core_id = __syscall_sysenter(SYS_getvcoreid,0,0,0,0,0,NULL);
+
+  if(__procdata.ldt == NULL)
+  {
+    size_t sz= (sizeof(segdesc_t)*__procinfo.max_harts+PGSIZE-1)/PGSIZE*PGSIZE;
+    
+    intreg_t params[3] = { MAP_ANONYMOUS | MAP_POPULATE, -1, 0 };
+    void* ldt = (void*) __syscall_sysenter(SYS_mmap, 0,
+                                           sz, PROT_READ | PROT_WRITE, 
+                                           (intreg_t)params, 0, NULL);
+    if(ldt == MAP_FAILED)
+      return "tls couldn't allocate memory\n";
+
+    __procdata.ldt = ldt;
+    // force kernel crossing
+    __syscall_sysenter(SYS_getpid,0,0,0,0,0,NULL);
+  }
+
+  // Build the segment
+  segdesc_t tmp = SEG(STA_W, (uint32_t)thrdescr, (uint32_t)thrdescr + 4, 3);
+
+  // Setup the correct LDT entry for this hart
+  __procdata.ldt[core_id] = tmp;
+
+  // Create the GS register.
+  uint32_t gs = (core_id << 3) | 0x07;
+
+  // Set the GS register.
+  asm volatile("movl %0,%%gs" : : "r" (gs));
+
+  return NULL;
+}
 
 #endif /* __ASSEMBLER__ */
 

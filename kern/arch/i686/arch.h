@@ -1,13 +1,13 @@
 #ifndef ROS_INC_ARCH_H
 #define ROS_INC_ARCH_H
 
+#include <ros/arch/arch.h>
 #include <ros/common.h>
 #include <arch/x86.h>
 #include <arch/trap.h>
 #include <arch/apic.h>
 
 /* Arch Constants */
-#define MAX_NUM_CPUS				255
 #define HW_CACHE_ALIGN				 64
 
 static __inline void breakpoint(void) __attribute__((always_inline));
