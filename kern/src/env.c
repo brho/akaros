@@ -128,66 +128,6 @@ env_setup_vm_error_i:
 	return -ENOMEM;
 }
 
-// Allocate len bytes of physical memory for environment env,
-// and map it at virtual address va in the environment's address space.
-// Pages are zeroed by upage_alloc.
-// Pages should be writable by user and kernel.
-// Panic if any allocation attempt fails.
-//
-void
-env_segment_alloc(env_t *e, void *SNT va, size_t len)
-{
-	void *SNT start, *SNT end;
-	size_t num_pages;
-	int i, r;
-	page_t *page;
-	pte_t *pte;
-
-	start = ROUNDDOWN(va, PGSIZE);
-	end = ROUNDUP(va + len, PGSIZE);
-	if (start >= end)
-		panic("Wrap-around in memory allocation addresses!");
-	if ((uintptr_t)end > UTOP)
-		panic("Attempting to map above UTOP!");
-	num_pages = LA2PPN(end - start);
-
-	for (i = 0; i < num_pages; i++, start += PGSIZE) {
-		// skip if a page is already mapped.  yes, page_insert will page_remove
-		// whatever page was already there, but if we are seg allocing adjacent
-		// regions, we don't want to destroy that old mapping/page
-		// though later on we are told we can ignore this...
-		pte = pgdir_walk(e->env_pgdir, start, 0);
-		if (pte && *pte & PTE_P)
-			continue;
-		if ((r = upage_alloc(e, &page, 1)) < 0)
-			panic("env_segment_alloc: %e", r);
-		page_insert(e->env_pgdir, page, start, PTE_USER_RW);
-	}
-}
-
-void
-env_segment_free(env_t *e, void *SNT va, size_t len)
-{
-	void *SNT start, *SNT end;
-	size_t num_pages;
-	page_t *page;
-	pte_t *pte;
-
-	// Round this up this time so we don't free the page that va is actually on
-	start = ROUNDUP(va, PGSIZE);
-	end = ROUNDUP(va + len, PGSIZE);
-	if (start >= end)
-		panic("Wrap-around in memory free addresses!");
-	if ((uintptr_t)end > UTOP)
-		panic("Attempting to unmap above UTOP!");
-	// page_insert/pgdir_walk alloc a page and read/write to it via its address
-	// starting from pgdir (e's), so we need to be using e's pgdir
-	assert(e->env_cr3 == rcr3());
-	num_pages = LA2PPN(end - start);
-
-	env_user_mem_free(e,start,(char*)end-(char*)start);
-}
-
 // this helper function handles all cases of copying to/from user/kernel
 // or between two users.
 static error_t load_icode_memcpy(struct proc *dest_p, struct proc *src_p,
@@ -276,7 +216,18 @@ static void* load_icode(env_t *SAFE e, env_t* binary_env,
 		// seg alloc creates PTE_U|PTE_W pages.  if you ever want to change
 		// this, there will be issues with overlapping sections
 		_end = MAX(_end, (void*)(phdr.p_va + phdr.p_memsz));
-		env_segment_alloc(e, (void*SNT)phdr.p_va, phdr.p_memsz);
+
+		// use mmap to allocate memory.  don't clobber other sections.
+		// this is ugly but will go away once we stop using load_icode
+		uintptr_t pgstart = ROUNDDOWN((uintptr_t)phdr.p_va,PGSIZE);
+		uintptr_t pgend = ROUNDUP((uintptr_t)phdr.p_va+phdr.p_memsz,PGSIZE);
+		for(uintptr_t addr = pgstart; addr < pgend; addr += PGSIZE)
+		{
+			pte_t* pte = pgdir_walk(e->env_pgdir, (void*)addr, 0);
+			if(!pte || PAGE_UNMAPPED(*pte))
+				assert(do_mmap(e,addr,PGSIZE,PROT_READ|PROT_WRITE|PROT_EXEC,
+			                   MAP_ANONYMOUS|MAP_FIXED,NULL,0) != MAP_FAILED);
+		}
 
 		// copy section to user mem
 		assert(load_icode_memcpy(e,binary_env,(void*)phdr.p_va, binary + phdr.p_offset, phdr.p_filesz) == ESUCCESS);
@@ -290,8 +241,10 @@ static void* load_icode(env_t *SAFE e, env_t* binary_env,
 
 	// Now map USTACK_NUM_PAGES pages for the program's initial stack
 	// starting at virtual address USTACKTOP - USTACK_NUM_PAGES*PGSIZE.
-	env_segment_alloc(e, (void*SNT)(USTACKTOP - USTACK_NUM_PAGES*PGSIZE), 
-	                  USTACK_NUM_PAGES*PGSIZE);
+	uintptr_t stacksz = USTACK_NUM_PAGES*PGSIZE;
+	assert(do_mmap(e, USTACKTOP-stacksz, stacksz, PROT_READ | PROT_WRITE,
+	               MAP_FIXED | MAP_ANONYMOUS | MAP_POPULATE, NULL, 0)
+	       != MAP_FAILED);
 	
 	return _end;
 }

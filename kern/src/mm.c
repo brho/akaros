@@ -29,6 +29,10 @@ void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 		printk("[kernel] mmap() with MAP_ANONYMOUS requires fd == -1.\n");
 		return (void*)-1;
 	}
+	if((flags & MAP_FIXED) && PGOFF(addr)) {
+		printk("[kernel] mmap() page align your addr.\n");
+		return (void*SAFE)TC(-1);
+	}
 
 	struct file* file = NULL;
 	if(fd != -1)
@@ -49,22 +53,16 @@ void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
               struct file* file, size_t offset)
 {
-	/* TODO: make this work, instead of a ghetto hack
-	 * Find a valid range, make sure it doesn't run into the kernel
-	 * make sure there's enough memory (not exceeding quotas)
-	 * allocate and map the pages, update appropriate structures (vm_region)
-	 * return appropriate pointer
-	 * Right now, all we can do is give them the range they ask for.
-	 * (or try to find one on sparc) */
-
-	if((flags & MAP_FIXED) && PGOFF(addr)) {
-		printk("[kernel] mmap() page align your addr.\n");
-		return (void*SAFE)TC(-1);
-	}
-
 	// TODO: grab the appropriate mm_lock
 	spin_lock_irqsave(&p->proc_lock);
+	void* ret = __do_mmap(p,addr,len,prot,flags,file,offset);
+	spin_unlock_irqsave(&p->proc_lock);
+	return ret;
+}
 
+void *__do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
+                struct file* file, size_t offset)
+{
 	int num_pages = ROUNDUP(len, PGSIZE) / PGSIZE;
 
 	if(!(flags & MAP_FIXED))
@@ -131,13 +129,10 @@ void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 	kfree(ptes);
 	kfree(pfis);
 
-	// TODO: release the appropriate mm_lock
-	spin_unlock_irqsave(&p->proc_lock);
-
 	// fault in pages now if MAP_POPULATE.  die on failure.
 	if(flags & MAP_POPULATE)
 		for(int i = 0; i < num_pages; i++)
-			if(handle_page_fault(p,addr+i*PGSIZE,PROT_READ))
+			if(__handle_page_fault(p,addr+i*PGSIZE,PROT_READ))
 				proc_destroy(p);
 
 	return (void*SAFE)TC(addr);
@@ -146,8 +141,6 @@ void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 	// and dealloc everything.  or at least define what we want to do if we run
 	// out of memory.
 	mmap_abort:
-		// TODO: release the appropriate mm_lock
-		spin_unlock_irqsave(&p->proc_lock);
 		// not a kernel problem, like if they ask to mmap a mapped location.
 		printk("[kernel] mmap() aborted!\n");
 		// mmap's semantics.  we need a better error propagation system
@@ -172,10 +165,18 @@ int mprotect(struct proc* p, void* addr, size_t len, int prot)
 	}
 
 	spin_lock_irqsave(&p->proc_lock);
+	int ret = __mprotect(p,addr,len,prot);
+	spin_unlock_irqsave(&p->proc_lock);
 
+	return ret;
+}
+
+int __mprotect(struct proc* p, void* addr, size_t len, int prot)
+{
 	int newperm = (prot & PROT_WRITE) ? PTE_USER_RW :
 	              (prot & (PROT_READ|PROT_EXEC)) ? PTE_USER_RO : 0;
 
+	char* end = ROUNDUP((char*)addr+len,PGSIZE);
 	for(char* a = (char*)addr; a < end; a += PGSIZE)
 	{
 		pte_t* pte = pgdir_walk(p->env_pgdir,a,0);
@@ -214,8 +215,6 @@ int mprotect(struct proc* p, void* addr, size_t len, int prot)
 		}
 	}
 
-	spin_unlock_irqsave(&p->proc_lock);
-
 	//TODO: TLB shootdown - needs to be process wide
 	tlbflush();
 	return 0;
@@ -226,17 +225,28 @@ int munmap(struct proc* p, void* addr, size_t len)
 	return mprotect(p, addr, len, PROT_UNMAP);
 }
 
+int __munmap(struct proc* p, void* addr, size_t len)
+{
+	return __mprotect(p, addr, len, PROT_UNMAP);
+}
+
 int handle_page_fault(struct proc* p, uintptr_t va, int prot)
 {
-	int ret = -1;
 	va = ROUNDDOWN(va,PGSIZE);
 
 	if(prot != PROT_READ && prot != PROT_WRITE && prot != PROT_EXEC)
 		panic("bad prot!");
 
 	spin_lock_irqsave(&p->proc_lock);
-
-	/// find offending PTE
+	int ret = __handle_page_fault(p,va,prot);
+	spin_unlock_irqsave(&p->proc_lock);
+	return ret;
+}
+	
+int __handle_page_fault(struct proc* p, uintptr_t va, int prot)
+{
+	int ret = -1;
+	// find offending PTE
 	pte_t* ppte = pgdir_walk(p->env_pgdir,(void*)va,0);
 	// if PTE is NULL, this is a fault that should kill the process
 	if(!ppte)
@@ -310,7 +320,6 @@ int handle_page_fault(struct proc* p, uintptr_t va, int prot)
 	ret = 0;
 
 out:
-	spin_unlock_irqsave(&p->proc_lock);
 	tlbflush();
 	return ret;
 }

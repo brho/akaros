@@ -399,7 +399,7 @@ intreg_t sys_exec(struct proc* p, int fd, procinfo_t* pi)
 	}
 	proc_init_procinfo(p);
 
-	env_segment_free(p,0,USTACKTOP);
+	env_user_mem_free(p,0,USTACKTOP);
 
 	if(load_elf(p,f))
 	{
@@ -482,20 +482,25 @@ static intreg_t sys_munmap(struct proc* p, void* addr, size_t len)
 }
 
 static void* sys_brk(struct proc *p, void* addr) {
-	size_t range;
+	ssize_t range;
 
 	spin_lock_irqsave(&p->proc_lock);
 
 	if((addr < p->heap_bottom) || (addr >= (void*)USTACKBOT))
 		goto out;
 
-	if (addr > p->heap_top) {
-		range = addr - p->heap_top;
-		env_segment_alloc(p, p->heap_top, range);
+	uintptr_t real_heap_top = ROUNDUP((uintptr_t)p->heap_top,PGSIZE);
+	uintptr_t real_new_heap_top = ROUNDUP((uintptr_t)addr,PGSIZE);
+	range = real_new_heap_top - real_heap_top;
+
+	if (range > 0) {
+		if(__do_mmap(p, real_heap_top, range, PROT_READ | PROT_WRITE,
+		             MAP_FIXED | MAP_ANONYMOUS, NULL, 0))
+			goto out;
 	}
-	else if (addr < p->heap_top) {
-		range = p->heap_top - addr;
-		env_segment_free(p, addr, range);
+	else if (range < 0) {
+		if(__munmap(p, (void*)real_new_heap_top, -range))
+			goto out;
 	}
 	p->heap_top = addr;
 

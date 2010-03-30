@@ -93,7 +93,13 @@ void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
              struct file* f, size_t offset);
 int mprotect(struct proc* p, void* addr, size_t len, int prot);
 int munmap(struct proc* p, void* addr, size_t len);
-
 int handle_page_fault(struct proc* p, uintptr_t va, int prot);
+
+// assumes proc_lock is held already
+void *__do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
+               struct file* f, size_t offset);
+int __mprotect(struct proc* p, void* addr, size_t len, int prot);
+int __munmap(struct proc* p, void* addr, size_t len);
+int __handle_page_fault(struct proc* p, uintptr_t va, int prot);
 
 #endif // !ROS_KERN_MM_H
