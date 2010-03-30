@@ -5,6 +5,14 @@
 #include <unistd.h>
 #include <stdlib.h>
 
+// Only need in this file because _dl_allocate and friends are
+//  internal functions in glibc
+# ifdef __i386__
+#  define internal_function   __attribute ((regparm (3), stdcall))
+# else
+#  define internal_function
+# endif
+
 static size_t _current_harts = 1;
 static hart_lock_t _hart_lock = HART_LOCK_INIT;
 
@@ -12,7 +20,7 @@ extern void** hart_thread_control_blocks;
 
 static void hart_free_tls(int id)
 {
-	extern void _dl_deallocate_tls (void *tcb, bool dealloc_tcb);
+	extern void _dl_deallocate_tls (void *tcb, bool dealloc_tcb) internal_function;
 	if(hart_thread_control_blocks[id])
 	{
 		_dl_deallocate_tls(hart_thread_control_blocks[id],true);
@@ -22,11 +30,16 @@ static void hart_free_tls(int id)
 
 static int hart_allocate_tls(int id)
 {
-	extern void *_dl_allocate_tls (void *mem);
+	#include <stdio.h>
+	extern void *_dl_allocate_tls (void *mem) internal_function;
 	// instead of freeing any old tls that may be present, and then
 	// reallocating it, we could instead just reinitialize it.
 	hart_free_tls(id);
-	if((hart_thread_control_blocks[id] = _dl_allocate_tls(NULL)) == NULL)
+
+	printf("About to allocate tls\n");
+	void* tls = _dl_allocate_tls(NULL);
+	printf("Allocated tls: %p\n", tls);
+	if((hart_thread_control_blocks[id] = tls) == NULL)
 	{
 		errno = ENOMEM;
 		return -1;
@@ -54,7 +67,7 @@ static int hart_allocate_stack(int id)
 	return 0;
 }
 
-static int hart_init()
+int hart_init()
 {
 	static int initialized = 0;
 	if(initialized)
@@ -95,7 +108,7 @@ int hart_request(size_t k)
 			goto fail;
 	}
 
-	if((ret = sys_resource_req(0,_current_harts+k,0)) == 0)
+	if((ret = sys_resource_req(0,_current_harts+k,0,0)) == 0)
 	{
 		_current_harts += k;
 		goto out;

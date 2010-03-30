@@ -1,0 +1,43 @@
+# Makefile fragment for ROS kernel.
+# This is NOT a complete makefile;
+# you must run GNU make in the top-level directory
+# where the GNUmakefile is located.
+#
+
+USER_PTHREAD_DIR = $(USER_DIR)/pthread
+USER_PTHREAD_CFLAGS += $(USER_CFLAGS)
+OBJDIRS += $(USER_PTHREAD_DIR)
+ROS_USER_LIBS += $(OBJDIR)/$(USER_PTHREAD_DIR)/libpthread.a
+
+USER_PTHREAD_SRCFILES := \
+                 $(USER_PARLIB_DIR)/pthread.c \
+                 $(USER_PARLIB_DIR)/hart.c \
+                 $(USER_PARLIB_DIR)/syscall.c 
+
+# Only build files if they exist.
+USER_PTHREAD_SRCFILES := $(wildcard $(USER_PTHREAD_SRCFILES))
+
+USER_PTHREAD_OBJFILES  := $(patsubst $(USER_PARLIB_DIR)/%.c, \
+                             $(OBJDIR)/$(USER_PTHREAD_DIR)/%.o, \
+                             $(USER_PTHREAD_SRCFILES))
+USER_PTHREAD_OBJFILES  := $(patsubst $(USER_PARLIB_DIR)/%.S, \
+                             $(OBJDIR)/$(USER_PTHREAD_DIR)/%.o, \
+                             $(USER_PTHREAD_OBJFILES))
+
+USER_PTHREAD_LDDEPENDS := $(USER_PTHREAD_OBJFILES)
+
+$(OBJDIR)/$(USER_PTHREAD_DIR)/%.o: $(USER_PARLIB_DIR)/%.c
+	@echo + cc [USER PTHREAD] $<
+	@mkdir -p $(@D)
+	$(V)$(CC) $(USER_PTHREAD_CFLAGS) -c -o $@ $<
+
+$(OBJDIR)/$(USER_PTHREAD_DIR)/%.o: $(USER_PTHREAD_DIR)/%.S
+	@echo + as [USER PTHREAD] $<
+	@mkdir -p $(@D)
+	$(V)$(CC) $(USER_PTHREAD_CFLAGS) -D__ASSEMBLER__ -c -o $@ $<
+
+$(OBJDIR)/$(USER_PTHREAD_DIR)/libpthread.a: $(USER_PTHREAD_LDDEPENDS)
+	@echo + ar [USER PTHREAD] $@
+	@mkdir -p $(@D)
+	$(V)$(AR) r $@ $(USER_PTHREAD_OBJFILES) 2>/dev/null
+

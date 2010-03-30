@@ -32,6 +32,11 @@ uint16_t sys_cgetc(void)
     return ros_syscall(SYS_cgetc, 0, 0, 0, 0, 0);
 }
 
+int sys_null(void)
+{
+    return ros_syscall(SYS_null, 0, 0, 0, 0, 0);
+}
+
 ssize_t sys_shared_page_alloc(void** addr, pid_t p2, 
                               int p1_flags, int p2_flags
                              ) 
@@ -84,9 +89,9 @@ ssize_t sys_eth_read(void* buf, size_t len)
 }
 
 /* Request resources from the kernel.  Flags in ros/resource.h. */
-ssize_t sys_resource_req(int type, size_t amount, uint32_t flags)
+ssize_t sys_resource_req(int type, size_t amt_max, size_t amt_min, uint32_t flags)
 {
-	return ros_syscall(SYS_resource_req, type, amount, flags, 0, 0);
+	return ros_syscall(SYS_resource_req, type, amt_max, amt_min, flags, 0);
 }
 
 void sys_reboot()
@@ -97,6 +102,16 @@ void sys_reboot()
 void sys_yield()
 {
 	ros_syscall(SYS_yield,0,0,0,0,0);
+}
+
+int sys_proc_create(char* path)
+{
+	return ros_syscall(SYS_proc_create, (uintreg_t)path, 0, 0, 0, 0);
+}
+
+int sys_proc_run(int pid)
+{
+	return ros_syscall(SYS_proc_run, pid, 0, 0, 0, 0);
 }
 
 /* We need to do some hackery to pass 6 arguments.  Arg4 pts to the real arg4,

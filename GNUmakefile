@@ -124,6 +124,9 @@ LDFLAGS := -nostdlib
 # List of directories that the */Makefrag makefile fragments will add to
 OBJDIRS :=
 
+# List of directories that the */Makefrag makefile fragments will add to
+ROS_USER_LIBS :=
+
 ROS_ARCH_DIR ?= $(TARGET_ARCH)
 
 arch:
@@ -141,9 +144,20 @@ include user/Makefrag
 include tests/Makefrag
 endif
 
-tests: $(TESTS_EXECS)
+ifeq ($(GCCPREFIX),$(TARGET_ARCH)-ros-)
+GCC_ROOT := $(shell which $(GCCPREFIX)gcc | xargs dirname)/../
+tests/: realtests
+tests:
+	@$(MAKE) -j realtests
+realtests: $(TESTS_EXECS)
 	@mkdir -p fs/$(TARGET_ARCH)/tests
-	cp -R $(OBJDIR)/$(TESTS_DIR)/* fs/$(TARGET_ARCH)/tests
+	cp -R $(OBJDIR)/$(TESTS_DIR)/* $(TOP_DIR)/fs/$(TARGET_ARCH)/tests
+
+install-libs: $(ROS_USER_LIBS)
+	cp $(ROS_USER_LIBS) $(GCC_ROOT)/$(TARGET_ARCH)-ros/lib
+	cp $(ROS_USER_LIBS) $(TOP_DIR)/fs/$(TARGET_ARCH)/lib
+	cp -R $(USER_DIR)/include/* $(GCC_ROOT)/$(TARGET_ARCH)-ros/include
+endif
 
 # Eliminate default suffix rules
 .SUFFIXES:
@@ -175,6 +189,9 @@ doxyclean:
 	rm -rf $(DOXYGEN_DIR)/rosdoc
 
 # For deleting the build
+userclean:
+	@rm -rf $(OBJDIR)/user
+	
 clean:
 	@rm -rf $(OBJDIR)
 	@echo All clean and pretty!

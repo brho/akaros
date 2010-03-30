@@ -57,6 +57,7 @@ int hart_self();
 void hart_relax();
 int hart_swap(int* addr, int val);
 
+int hart_init();
 int hart_request(size_t k);
 void hart_yield();
 size_t hart_max_harts();
