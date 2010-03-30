@@ -1,8 +1,9 @@
 // program to cause a breakpoint trap
+#include <arch/arch.h>
 
 int main(int argc, char** argv)
 {
-	asm volatile("int $3");
+	breakpoint();
 	return 0;
 }
 
