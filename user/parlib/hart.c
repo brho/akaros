@@ -4,6 +4,7 @@
 #include <parlib.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <sys/mman.h>
 
 // Only need in this file because _dl_allocate and friends are
 //  internal functions in glibc
@@ -47,7 +48,8 @@ static int hart_allocate_tls(int id)
 	return 0;
 }
 
-#define HART_STACK_SIZE (32*1024)
+#define HART_STACK_PAGES 8
+#define HART_STACK_SIZE (HART_STACK_PAGES*PGSIZE)
 
 static void hart_free_stack(int id)
 {
@@ -59,11 +61,15 @@ static int hart_allocate_stack(int id)
 	if(__procdata.stack_pointers[id])
 		return 0; // reuse old stack
 
-	if(!(__procdata.stack_pointers[id] = (uintptr_t)malloc(HART_STACK_SIZE)))
-	{
-		errno = ENOMEM;
-		return -1;
-	}
+	void* stackbot = mmap(0, HART_STACK_SIZE,
+	                      PROT_READ|PROT_WRITE|PROT_EXEC,
+	                      MAP_POPULATE|MAP_ANONYMOUS, -1, 0);
+
+	if(stackbot == MAP_FAILED)
+		return -1; // errno set by mmap
+
+	__procdata.stack_pointers[id] = (uintptr_t)stackbot + HART_STACK_SIZE;
+
 	return 0;
 }
 
