@@ -52,6 +52,7 @@ handle_trap:
 	mov	%l6,%sp
 	mov	%l1,%o1
 	mov	%l2,%o2
+	mov	%l0,%psr			! restore condition codes before saving trapframe
 	call	env_save_tf
 	 add	%sp,64,%o0
 
