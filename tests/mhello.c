@@ -20,12 +20,16 @@ void udelay(uint64_t usec, uint64_t tsc_freq)
 	return;
 }
 
+hart_barrier_t b;
+
 __thread int temp;
 
 int main(int argc, char** argv)
 {
 	uint32_t vcoreid;
 	int retval;
+
+	hart_barrier_init(&b,hart_max_harts()-1);
 
 	if ((vcoreid = hart_self())) {
 		printf("Should never see me! (from vcore %d)\n", vcoreid);
@@ -35,11 +39,14 @@ int main(int argc, char** argv)
 		       vcoreid, &temp, temp);
 		printf("Multi-Goodbye, world, from PID: %d!\n", sys_getpid());
 		//retval = sys_resource_req(RES_CORES, 2, 0);
-		retval = hart_request(2);
+		retval = hart_request(hart_max_harts()-2);
 		//debug("retval = %d\n", retval);
 	}
 	printf("Vcore %d Done!\n", vcoreid);
-	while (1);
+
+	hart_barrier_wait(&b,hart_self());
+
+	printf("All Cores Done!\n", vcoreid);
 	return 0;
 }
 
@@ -49,5 +56,6 @@ void hart_entry(void)
 	temp = 0xcafebabe;
 	printf("Hello from hart_entry in vcore %d with temp addr %p and temp %p\n",
 	       vcoreid, &temp, temp);
+	hart_barrier_wait(&b,hart_self());
 	while(1);
 }

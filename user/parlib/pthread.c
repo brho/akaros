@@ -4,6 +4,7 @@
 #include <string.h>
 #include <assert.h>
 #include <stdio.h>
+#include <errno.h>
 
 int threads_active = 1;
 hart_lock_t work_queue_lock = HART_LOCK_INIT;
