@@ -199,7 +199,7 @@ void ne2k_setup_interrupts() {
 	// Kernel based interrupt stuff
 	register_interrupt_handler(interrupt_handlers, KERNEL_IRQ_OFFSET + ne2k_irq, ne2k_interrupt_handler, (void *)0);
 	
-	ioapic_route_irq(ne2k_irq, 6);	
+	ioapic_route_irq(ne2k_irq, 1);	
 	
 	SET_PAGE_0();
 

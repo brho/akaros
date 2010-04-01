@@ -182,11 +182,12 @@ void proc_init(void)
 	pid_hash = create_hashtable(100, __generic_hash, __generic_eq);
 	spin_unlock(&pid_hash_lock);
 	schedule_init();
-	/* Init idle cores.  core 0 is not idle, all others are (for now) */
+	/* Init idle cores. Core 0 is the management core, and core 1 is
+     * dedicated to the NIC currently */
 	spin_lock(&idle_lock);
-	num_idlecores = num_cpus - 1;
+	num_idlecores = num_cpus - 2;
 	for (int i = 0; i < num_idlecores; i++)
-		idlecoremap[i] = i + 1;
+		idlecoremap[i] = i + 2;
 	spin_unlock(&idle_lock);
 	atomic_init(&num_envs, 0);
 }
