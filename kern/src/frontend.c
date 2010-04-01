@@ -235,7 +235,7 @@ int32_t frontend_syscall(pid_t pid, int32_t syscall_num,
 	// only one frontend request at a time.
 	// interrupts could try to do frontend requests,
 	// which would deadlock, so disable them
-	spin_lock_irqsave(&lock);
+	spin_lock(&lock);
 
 	// write syscall into magic memory
 	magic_mem[7] = 0;
@@ -255,7 +255,7 @@ int32_t frontend_syscall(pid_t pid, int32_t syscall_num,
 	if(errno)
 		*errno = magic_mem[2];
 
-	spin_unlock_irqsave(&lock);
+	spin_unlock(&lock);
 
 	return ret;
 }
