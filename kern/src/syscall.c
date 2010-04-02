@@ -499,7 +499,7 @@ static void* sys_brk(struct proc *p, void* addr) {
 
 	if (range > 0) {
 		if(__do_mmap(p, real_heap_top, range, PROT_READ | PROT_WRITE,
-		             MAP_FIXED | MAP_ANONYMOUS, NULL, 0))
+		             MAP_FIXED | MAP_ANONYMOUS, NULL, 0) == MAP_FAILED)
 			goto out;
 	}
 	else if (range < 0) {

@@ -38,11 +38,8 @@ static int hart_allocate_tls(int id)
 	// reallocating it, we could instead just reinitialize it.
 	hart_free_tls(id);
 
-	printf("About to allocate tls\n");
 	void* tls = _dl_allocate_tls(NULL);
-	printf("Allocated tls: %p\n", tls);
-	if((hart_thread_control_blocks[id] = tls) == NULL)
-	{
+	if((hart_thread_control_blocks[id] = tls) == NULL) {
 		errno = ENOMEM;
 		return -1;
 	}
