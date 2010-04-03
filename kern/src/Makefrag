@@ -49,6 +49,7 @@ KERN_APPFILES := \
 
 
 ifneq ($(findstring CONFIG_KFS,$(KERN_CFLAGS)),)
+all: tests
 $(OBJDIR)/$(KERN_DIR)/kernel: tests
 
 KERN_APPFILES += \

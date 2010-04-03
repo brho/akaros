@@ -433,6 +433,12 @@ union user_desc_init
 
 static const char* tls_init_tp(void* thrdescr)
 {
+  // TCB lives at thrdescr.
+  // The TCB's head pointer points to itself :-)
+  tcbhead_t* head = (tcbhead_t*)thrdescr;
+  head->tcb = thrdescr;
+  head->self = thrdescr;
+
   int core_id = __syscall_sysenter(SYS_getvcoreid,0,0,0,0,0,NULL);
 
   if(__procdata.ldt == NULL)
