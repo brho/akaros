@@ -904,7 +904,12 @@ intreg_t sys_gettimeofday(struct proc* p, int* buf)
 
 	spin_lock(&gtod_lock);
 	if(t0 == 0)
+#ifdef __CONFIG_APPSERVER__
 		t0 = ufe(time,0,0,0,0);
+#else
+		// Nanwan's birthday, bitches!!
+		t0 = 1242129600;
+#endif 
 	spin_unlock(&gtod_lock);
 
 	long long dt = read_tsc();

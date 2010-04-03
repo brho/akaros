@@ -13,7 +13,9 @@ USER_PARLIB_SRCFILES := \
                  $(USER_PARLIB_DIR)/pthread.c \
                  $(USER_PARLIB_DIR)/hart.c \
                  $(USER_PARLIB_DIR)/panic.c \
-                 $(USER_PARLIB_DIR)/syscall.c 
+                 $(USER_PARLIB_DIR)/syscall.c \
+                 $(USER_PARLIB_DIR)/debugfmt.c \
+                 $(USER_PARLIB_DIR)/debug.c
 
 # Only build files if they exist.
 USER_PARLIB_SRCFILES := $(wildcard $(USER_PARLIB_SRCFILES))

@@ -18,10 +18,10 @@
 #include <error.h>
 
 #define DECL_PROG(x) \
-    extern uint8_t (COUNT(sizeof(size_t)) _binary_obj_user_apps_##x##_size)[],\
-        (COUNT(_binary_obj_user_apps_##x##_size)_binary_obj_user_apps_##x##_start)[];
+    extern uint8_t (COUNT(sizeof(size_t)) _binary_obj_tests_##x##_size)[],\
+        (COUNT(_binary_obj_user_apps_##x##_size)_binary_obj_tests_##x##_start)[];
 
-#define KFS_ENTRY(x) {#x, _binary_obj_user_apps_##x##_start, (size_t) _binary_obj_user_apps_##x##_size},
+#define KFS_ENTRY(x) {#x, _binary_obj_tests_##x##_start, (size_t) _binary_obj_tests_##x##_size},
 
 /*
  * Hardcode the files included in the KFS.  This needs to be in sync with the
@@ -29,44 +29,30 @@
  * Make sure to declare it, and add an entry.  Keep MAX_KFS_FILES big enough too
  */
 #ifdef __CONFIG_KFS__
-DECL_PROG(parlib_matrix);
-DECL_PROG(roslib_proctests);
-DECL_PROG(roslib_fptest);
-DECL_PROG(roslib_null);
-DECL_PROG(roslib_spawn);
-DECL_PROG(roslib_hello);
-DECL_PROG(roslib_mhello);
-DECL_PROG(roslib_mproctests);
-DECL_PROG(roslib_measurements);
-DECL_PROG(parlib_draw_nanwan_standalone);
-DECL_PROG(parlib_channel_test_client);
-DECL_PROG(parlib_channel_test_server);
-DECL_PROG(parlib_hello);
-DECL_PROG(parlib_mhello);
-DECL_PROG(parlib_httpserver);
-DECL_PROG(parlib_manycore_test);
-DECL_PROG(parlib_lock_test);
+DECL_PROG(tlstest);
+DECL_PROG(proctests);
+DECL_PROG(fp_test);
+DECL_PROG(null);
+DECL_PROG(spawn);
+DECL_PROG(mproctests);
+DECL_PROG(draw_nanwan);
+DECL_PROG(hello);
+DECL_PROG(mhello);
+DECL_PROG(manycore_test);
 #endif
 
 struct kfs_entry kfs[MAX_KFS_FILES] = {
 #ifdef __CONFIG_KFS__
-	KFS_ENTRY(parlib_matrix)
-	KFS_ENTRY(roslib_proctests)
-	KFS_ENTRY(roslib_fptest)
-	KFS_ENTRY(roslib_null)
-	KFS_ENTRY(roslib_spawn)
-	KFS_ENTRY(roslib_hello)
-	KFS_ENTRY(roslib_mhello)
-	KFS_ENTRY(roslib_mproctests)
-	KFS_ENTRY(roslib_measurements)
-	KFS_ENTRY(parlib_draw_nanwan_standalone)
-	KFS_ENTRY(parlib_channel_test_client)
-	KFS_ENTRY(parlib_channel_test_server)
-	KFS_ENTRY(parlib_hello)
-	KFS_ENTRY(parlib_mhello)
-	KFS_ENTRY(parlib_httpserver)
-	KFS_ENTRY(parlib_manycore_test)
-	KFS_ENTRY(parlib_lock_test)
+	KFS_ENTRY(tlstest)
+	KFS_ENTRY(proctests)
+	KFS_ENTRY(fp_test)
+	KFS_ENTRY(null)
+	KFS_ENTRY(spawn)
+	KFS_ENTRY(mproctests)
+	KFS_ENTRY(draw_nanwan)
+	KFS_ENTRY(hello)
+	KFS_ENTRY(mhello)
+	KFS_ENTRY(manycore_test)
 #endif
 };
 

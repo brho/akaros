@@ -22,9 +22,9 @@ void arch_init()
 	// __CONFIG_NETWORKING__ inits to not need multiple cores running.
 	// this returns when all other cores are done and ready to receive IPIs
 	#ifdef __CONFIG_SINGLE_CORE__
-		smp_boot();
-	#else
 		smp_percpu_init();
+	#else
+		smp_boot();
 	#endif
 	proc_init();
 
@@ -40,7 +40,12 @@ void arch_init()
 	 * Additionally, you should have a look at the syscall server in the tools directory
 	 */
 	#ifdef __CONFIG_NETWORKING__
-	rl8168_init();		
-	ne2k_init();
+	#ifdef __CONFIG_SINGLE_CORE__
+		warn("You currently can't have networking if you boot into single core mode!!\n");
+	#else
+		rl8168_init();		
+		ne2k_init();
+	#endif // __CONFIG_SINGLE_CORE__
 	#endif // __CONFIG_NETWORKING__
 }
+

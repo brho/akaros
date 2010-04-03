@@ -1,3 +1,9 @@
+# General Purpose configuration parameters
+# By default, each of these options will be turned off
+# To enable any of these options, add a line like the following to your Makelocal
+# CFLAGS += $(CONFIG_APPSERVER)
+CONFIG_APPSERVER:=                 -D__CONFIG_APPSERVER__
+
 # Kernel configuration parameters
 # By default, each of these options will be turned off
 # To enable any of these options, add a line like the following to your Makelocal
@@ -9,7 +15,6 @@ CONFIG_SERIAL_IO:=                 -D__CONFIG_SERIAL_IO__
 CONFIG_BSD_ON_CORE0:=              -D__CONFIG_BSD_ON_CORE0__
 CONFIG_SPINLOCK_DEBUG:=            -D__CONFIG_SPINLOCK_DEBUG__
 CONFIG_PAGE_COLORING:=             -D__CONFIG_PAGE_COLORING__
-CONFIG_APPSERVER:=                 -D__CONFIG_APPSERVER__
 CONFIG_DEMAND_PAGING:=             -D__CONFIG_DEMAND_PAGING__
 
 # Userspace configuration parameters
@@ -23,3 +28,4 @@ CONFIG_SYSCALL_TRAP:=              -D__CONFIG_SYSCALL_TRAP__
 # To enable any of these options, add a line like the following to your Makelocal
 # TESTS_CFLAGS += $(CONFIG_STATIC_APPS)
 CONFIG_STATIC_APPS:=               -static
+

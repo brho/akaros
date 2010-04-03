@@ -47,26 +47,21 @@ KERN_SRCFILES := $(wildcard $(KERN_SRCFILES))
 
 KERN_APPFILES := \
 
-ifeq ($(TARGET_ARCH),i386)
+
+ifneq ($(findstring CONFIG_KFS,$(KERN_CFLAGS)),)
+$(OBJDIR)/$(KERN_DIR)/kernel: tests
+
 KERN_APPFILES += \
-                 $(USER_APPS_PARLIB_DIR)/matrix \
-                 $(USER_APPS_ROSLIB_DIR)/proctests \
-                 $(USER_APPS_ROSLIB_DIR)/fptest \
-                 $(USER_APPS_ROSLIB_DIR)/null \
-                 $(USER_APPS_ROSLIB_DIR)/spawn \
-                 $(USER_APPS_ROSLIB_DIR)/hello \
-                 $(USER_APPS_ROSLIB_DIR)/mhello \
-                 $(USER_APPS_ROSLIB_DIR)/mproctests \
-                 $(USER_APPS_ROSLIB_DIR)/measurements \
-                 $(USER_APPS_PARLIB_DIR)/draw_nanwan_standalone \
-                 $(USER_APPS_PARLIB_DIR)/channel_test_client \
-                 $(USER_APPS_PARLIB_DIR)/channel_test_server \
-                 $(USER_APPS_PARLIB_DIR)/hello \
-                 $(USER_APPS_PARLIB_DIR)/mhello \
-                 $(USER_APPS_PARLIB_DIR)/httpserver \
-                 $(USER_APPS_PARLIB_DIR)/manycore_test \
-                 $(USER_APPS_PARLIB_DIR)/lock_test 
-		
+                 $(TESTS_DIR)/tlstest \
+                 $(TESTS_DIR)/proctests \
+                 $(TESTS_DIR)/fp_test \
+                 $(TESTS_DIR)/null \
+                 $(TESTS_DIR)/spawn \
+                 $(TESTS_DIR)/mproctests \
+                 $(TESTS_DIR)/draw_nanwan \
+                 $(TESTS_DIR)/hello \
+                 $(TESTS_DIR)/mhello \
+                 $(TESTS_DIR)/manycore_test
 endif
 
 KERN_LDFLAGS   := $(KERN_LDFLAGS) -L$(OBJDIR)/$(KERN_DIR) \

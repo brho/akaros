@@ -1,3 +1,6 @@
+# General Purpose configuration parameters
+#CFLAGS += $(CONFIG_APPSERVER)
+
 # Kernel configuration parameters
 #KERN_CFLAGS += $(CONFIG_KFS)
 #KERN_CFLAGS += $(CONFIG_SINGLE_CORE)
