@@ -458,7 +458,7 @@ static const char* tls_init_tp(void* thrdescr)
   }
 
   // Build the segment
-  segdesc_t tmp = SEG(STA_W, (uint32_t)thrdescr, (uint32_t)thrdescr + 4, 3);
+  segdesc_t tmp = SEG(STA_W, (uint32_t)thrdescr, 0xffffffff, 3);
 
   // Setup the correct LDT entry for this hart
   __procdata.ldt[core_id] = tmp;
