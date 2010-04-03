@@ -526,7 +526,7 @@ cons_getc(void)
 	// poll for any pending input characters,
 	// so that this function works even when interrupts are disabled
 	// (e.g., when called from the kernel monitor).
-	#ifndef SERIAL_IO
+	#ifndef __CONFIG_SERIAL_IO__
 		serial_intr();
 	#endif
 	kbd_intr();
@@ -550,7 +550,7 @@ cons_putc(int c)
 {
 	//static uint32_t lock; zra: moving up for sharC annotations
 	spin_lock_irqsave(&lock);
-	#ifndef SERIAL_IO
+	#ifndef __CONFIG_SERIAL_IO__
 		serial_putc(c);
 	#endif
 	//lpt_putc(c);

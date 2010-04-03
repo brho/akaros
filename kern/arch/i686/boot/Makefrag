@@ -8,7 +8,7 @@
 KERN_BOOT_DIR := $(KERN_DIR)/boot
 OBJDIRS += $(KERN_BOOT_DIR)
 
-KERN_BOOT_CFLAGS  := $(KERN_CFLAGS) -Os
+KERN_BOOT_CFLAGS  += $(KERN_CFLAGS) -Os
 KERN_BOOT_LDFLAGS := $(KERN_LDFLAGS) -N -e start -Ttext 0x7C00
 KERN_BOOT_OBJS    := $(OBJDIR)/$(KERN_BOOT_DIR)/boot.o \
                      $(OBJDIR)/$(KERN_BOOT_DIR)/main.o

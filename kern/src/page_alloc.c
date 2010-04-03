@@ -27,6 +27,7 @@ static error_t __page_free(page_t *CT(1) page);
 
 // Global list of colors allocated to the general purpose memory allocator
 uint8_t* global_cache_colors_map;
+size_t global_next_color = 0;
 
 void colored_page_alloc_init()
 {
@@ -114,6 +115,7 @@ static error_t __page_alloc_specific(page_t** page, size_t ppn)
  * @return ESUCCESS on success
  * @return -ENOMEM  otherwise
  */
+#ifdef __CONFIG_PAGE_COLORING__
 error_t upage_alloc(struct proc* p, page_t** page, int zero)
 {
 	spin_lock_irqsave(&colored_page_free_list_lock);
@@ -130,18 +132,35 @@ error_t upage_alloc(struct proc* p, page_t** page, int zero)
 	}
 	return ret;
 }
+#else 
+error_t upage_alloc(struct proc* p, page_t** page, int zero)
+{
+	ssize_t ret;
+	spin_lock_irqsave(&colored_page_free_list_lock);
+	if((ret = __page_alloc_from_color_range(page, global_next_color, 
+	                            llc_cache->num_colors - global_next_color)) < 0)
+		ret = __page_alloc_from_color_range(page, 0, global_next_color);
+
+	if(ret >= 0) {
+		global_next_color = ret;        
+		ret = ESUCCESS;
+	}
+	spin_unlock_irqsave(&colored_page_free_list_lock);
+	
+	return ret;
+}
+#endif
 
 error_t kpage_alloc(page_t** page) 
 {
-	static size_t next_color = 0;
 	ssize_t ret;
 	spin_lock_irqsave(&colored_page_free_list_lock);
-	if((ret = __page_alloc_from_color_range(page, next_color, 
-	                            llc_cache->num_colors - next_color)) < 0)
-		ret = __page_alloc_from_color_range(page, 0, next_color);
+	if((ret = __page_alloc_from_color_range(page, global_next_color, 
+	                            llc_cache->num_colors - global_next_color)) < 0)
+		ret = __page_alloc_from_color_range(page, 0, global_next_color);
 
 	if(ret >= 0) {
-		next_color = ret;        
+		global_next_color = ret;        
 		page_incref(*page);
 		ret = ESUCCESS;
 	}

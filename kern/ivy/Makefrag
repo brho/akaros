@@ -1,7 +1,7 @@
 KERN_IVY_DIR = $(KERN_DIR)/ivy
 OBJDIRS += $(KERN_IVY_DIR)
 
-KERN_IVY_CFLAGS   := $(KERN_CFLAGS)
+KERN_IVY_CFLAGS   += $(KERN_CFLAGS)
 ifeq ($(COMPILER),IVY)
 KERN_IVY_CFLAGS   += --nodeputy --nosharc
 endif

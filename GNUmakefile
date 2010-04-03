@@ -40,6 +40,7 @@ realall: symlinks
 
 # Then grab the users Makelocal file to let them override Make system variables
 # and set up other Make targets
+include Makeconfig
 -include Makelocal
 
 TOP_DIR := .
@@ -81,15 +82,15 @@ endif
 
 # Default programs for compilation
 ifeq ($(COMPILER),IVY)
-KERN_CFLAGS := --deputy \
-                  --no-rc-sharc \
-                  --sc-dynamic-is-error \
-                  --sc-ops=$(INCLUDE_DIR)/ivy/sharc.h \
-                  --sc-all-in-thread \
-                  --enable-precompile \
-#                  --enable-error-db \
+KERN_CFLAGS += --deputy \
+               --no-rc-sharc \
+               --sc-dynamic-is-error \
+               --sc-ops=$(INCLUDE_DIR)/ivy/sharc.h \
+               --sc-all-in-thread \
+               --enable-precompile \
+#               --enable-error-db \
 
-USER_CFLAGS := --deputy --enable-error-db
+USER_CFLAGS += --deputy --enable-error-db
 CC	    := ivycc --gcc=$(GCCPREFIX)gcc
 else
 CC	    := $(GCCPREFIX)gcc 
@@ -113,7 +114,7 @@ endif
 # Universal compiler flags
 # -fno-builtin is required to avoid refs to undefined functions in the kernel.
 # Only optimize to -O1 to discourage inlining, which complicates backtraces.
-CFLAGS := $(CFLAGS) -D$(TARGET_ARCH) $(EXTRAARGS)
+CFLAGS += -D$(TARGET_ARCH) $(EXTRAARGS)
 CFLAGS += -O2 -pipe -MD -fno-builtin -gstabs
 CFLAGS += -Wall -Wno-format -Wno-unused -fno-strict-aliasing
 CFLAGS += -nostdinc -I$(dir $(GCC_LIB))/include
@@ -139,14 +140,14 @@ symlinks: error
 
 # Include Makefrags for subdirectories
 ifneq ($(TARGET_ARCH),)
-include kern/Makefrag
 include user/Makefrag
 include tests/Makefrag
+include kern/Makefrag
 endif
 
 ifeq ($(GCCPREFIX),$(TARGET_ARCH)-ros-)
 GCC_ROOT := $(shell which $(GCCPREFIX)gcc | xargs dirname)/../
-tests/: realtests
+tests/: tests
 tests:
 	@$(MAKE) -j realtests
 realtests: $(TESTS_EXECS)
@@ -157,6 +158,7 @@ install-libs: $(ROS_USER_LIBS)
 	cp $(ROS_USER_LIBS) $(GCC_ROOT)/$(TARGET_ARCH)-ros/lib
 	cp $(ROS_USER_LIBS) $(TOP_DIR)/fs/$(TARGET_ARCH)/lib
 	cp -R $(USER_DIR)/include/* $(GCC_ROOT)/$(TARGET_ARCH)-ros/include
+.PHONY: tests
 endif
 
 # Eliminate default suffix rules

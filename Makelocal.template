@@ -1,0 +1,31 @@
+# Kernel configuration parameters
+#KERN_CFLAGS += $(CONFIG_KFS)
+#KERN_CFLAGS += $(CONFIG_SINGLE_CORE)
+#KERN_CFLAGS += $(CONFIG_NETWORKING)
+#KERN_CFLAGS += $(CONFIG_SERIAL_IO)
+#KERN_CFLAGS += $(CONFIG_BSD_ON_CORE0)
+#KERN_CFLAGS += $(CONFIG_SPINLOCK_DEBUG)
+#KERN_CFLAGS += $(CONFIG_PAGE_COLORING)
+#KERN_CFLAGS += $(CONFIG_APPSERVER)
+#KERN_CFLAGS += $(CONFIG_DEMAND_PAGING)
+#KERN_CFLAGS += -DDEVELOPER_NAME=waterman
+#KERN_CFLAGS += -DDEVELOPER_NAME=brho
+
+# Userspace configuration parameters
+#USER_CFLAGS += $(CONFIG_SYSCALL_TRAP)
+
+# User tests configuration parameters
+#TESTS_CFLAGS += $(CONFIG_STATIC_APPS)
+
+# Default for sparc (i.e. needs an appserver)
+ifeq ($(TARGET_ARCH),sparc)
+KERN_CFLAGS += $(CONFIG_APPSERVER)
+KERN_CFLAGS += -DDEVELOPER_NAME=waterman
+endif
+
+x86:
+	$(MAKE) TARGET_ARCH=i686
+
+ramp:
+	$(MAKE) TARGET_ARCH=sparc
+

@@ -4,8 +4,8 @@
 #pragma nosharc
 #endif
 
-#ifdef __BSD_ON_CORE_0__
-#include Everything For Free -- It just works!!
+#ifdef __CONFIG_BSD_ON_CORE0__
+#error "Yeah, it's not possible to build ROS with BSD on Core 0, sorry......"
 #else
 
 #include <arch/arch.h>

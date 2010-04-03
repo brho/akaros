@@ -38,7 +38,7 @@
  * This is a function rl8168 driver, that uses some really ugly hacks to achieve
  * UDP communication with a remote syscall server, without a network stack.
  *
- * To enable use, define __NETWORK__ in your Makelocal
+ * To enable use, define __CONFIG_NETWORKING__ in your Makelocal
  *
  * @author Paul Pearce <pearce@eecs.berkeley.edu>
  *

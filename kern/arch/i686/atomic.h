@@ -1,9 +1,6 @@
 #ifndef ROS_INCLUDE_ATOMIC_H
 #define ROS_INCLUDE_ATOMIC_H
 
-/* This enables tracking who last locked a spinlock. */
-#define SPINLOCK_DEBUG
-
 #include <ros/common.h>
 #include <arch/x86.h>
 #include <arch/arch.h>
@@ -12,7 +9,7 @@
 typedef void * RACY atomic_t;
 struct spinlock {
 	volatile uint32_t RACY rlock;
-#ifdef SPINLOCK_DEBUG
+#ifdef __CONFIG_SPINLOCK_DEBUG__
 	void *call_site;	
 	uint32_t calling_core;
 #endif
@@ -98,7 +95,7 @@ static inline void __spin_lock(volatile uint32_t *rlock)
 static inline void spin_lock(spinlock_t *lock)
 {
 	__spin_lock(&lock->rlock);
-#ifdef SPINLOCK_DEBUG
+#ifdef __CONFIG_SPINLOCK_DEBUG__
 	lock->call_site = (void RACY*CT(1))TC(read_eip());
 	lock->calling_core = core_id();
 #endif
@@ -110,14 +107,14 @@ static inline void spin_unlock(spinlock_t *lock)
 }
 
 static inline void spinlock_init(spinlock_t *lock)
-#ifdef SPINLOCK_DEBUG
+#ifdef __CONFIG_SPINLOCK_DEBUG__
 WRITES(lock->rlock,lock->call_site,lock->calling_core)
 #else
 WRITES(lock->rlock)
 #endif
 {
 	lock->rlock = 0;
-#ifdef SPINLOCK_DEBUG
+#ifdef __CONFIG_SPINLOCK_DEBUG__
 	lock->call_site = 0;
 	lock->calling_core = 0;
 #endif

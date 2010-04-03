@@ -24,10 +24,10 @@ static inline intreg_t syscall_trap(uint16_t num, intreg_t a1,
 static inline long __attribute__((always_inline))
 __ros_syscall(long _num, long _a0, long _a1, long _a2, long _a3, long _a4)
 {
-	#ifndef SYSCALL_TRAP
-		return syscall_sysenter(_num, _a0, _a1, _a2, _a3, _a4);
-	#else
+	#ifdef __CONFIG_SYSCALL_TRAP__
 		return syscall_trap(_num, _a0, _a1, _a2, _a3, _a4);
+	#else
+		return syscall_sysenter(_num, _a0, _a1, _a2, _a3, _a4);
 	#endif
 }
 

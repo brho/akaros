@@ -30,7 +30,7 @@
 #include <kfs.h> // eventually replace this with vfs.h
 
 
-#ifdef __NETWORK__
+#ifdef __CONFIG_NETWORKING__
 #include <arch/nic_common.h>
 extern int (*send_frame)(const char *CT(len) data, size_t len);
 extern char device_mac[6];
@@ -573,7 +573,7 @@ static ssize_t sys_serial_read(env_t* e, char *DANGEROUS _buf, size_t len)
 	if (len == 0)
 		return 0;
 
-	#ifdef SERIAL_IO
+	#ifdef __CONFIG_SERIAL_IO__
 	    char *COUNT(len) buf = user_mem_assert(e, _buf, len, PTE_USER_RO);
 		size_t bytes_read = 0;
 		int c;
@@ -592,7 +592,7 @@ static ssize_t sys_serial_write(env_t* e, const char *DANGEROUS buf, size_t len)
 {
 	if (len == 0)
 		return 0;
-	#ifdef SERIAL_IO
+	#ifdef __CONFIG_SERIAL_IO__
 		char *COUNT(len) _buf = user_mem_assert(e, buf, len, PTE_USER_RO);
 		for(int i =0; i<len; i++)
 			serial_send_byte(buf[i]);
@@ -602,7 +602,7 @@ static ssize_t sys_serial_write(env_t* e, const char *DANGEROUS buf, size_t len)
 	#endif
 }
 
-#ifdef __NETWORK__
+#ifdef __CONFIG_NETWORKING__
 // This is not a syscall we want. Its hacky. Here just for syscall stuff until get a stack.
 static ssize_t sys_eth_read(env_t* e, char *DANGEROUS buf)
 {
@@ -980,11 +980,11 @@ intreg_t syscall(struct proc *p, uintreg_t syscallno, uintreg_t a1,
 		[SYS_shared_page_alloc] = (syscall_t)sys_shared_page_alloc,
 		[SYS_shared_page_free] = (syscall_t)sys_shared_page_free,
 		[SYS_resource_req] = (syscall_t)resource_req,
-	#ifdef __i386__
+	#ifdef __CONFIG_SERIAL_IO__
 		[SYS_serial_read] = (syscall_t)sys_serial_read,
 		[SYS_serial_write] = (syscall_t)sys_serial_write,
 	#endif
-	#ifdef __NETWORK__
+	#ifdef __CONFIG_NETWORKING__
 		[SYS_eth_read] = (syscall_t)sys_eth_read,
 		[SYS_eth_write] = (syscall_t)sys_eth_write,
 		[SYS_eth_get_mac_addr] = (syscall_t)sys_eth_get_mac_addr,

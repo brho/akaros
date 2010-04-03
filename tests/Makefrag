@@ -1,10 +1,8 @@
 TESTS_DIR = tests
-TESTS_CFLAGS += $(USER_CFLAGS)
 OBJDIRS += $(TESTS_DIR)
 
-TESTS_CFLAGS := $(USER_CFLAGS)  \
-                -I$(USER_DIR)/include \
-#                -static
+TESTS_CFLAGS += $(USER_CFLAGS)  \
+                -I$(USER_DIR)/include
 
 ALL_TEST_FILES = $(shell ls $(TESTS_DIR)/*.c)
 

@@ -65,6 +65,10 @@ void *__do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 {
 	int num_pages = ROUNDUP(len, PGSIZE) / PGSIZE;
 
+#ifndef __CONFIG_DEMAND_PAGING__
+	flags |= MAP_POPULATE;
+#endif
+	
 	if(!(flags & MAP_FIXED))
 	{
 		addr = (uintptr_t)get_free_va_range(p->env_pgdir,addr,len);
