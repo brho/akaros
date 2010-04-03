@@ -19,11 +19,13 @@ TESTS_EXECS  := $(patsubst $(TESTS_DIR)/%.c, \
 TESTS_LDDEPENDS := $(TESTS_DIR)/%.c \
                    $(OBJDIR)/$(USER_PARLIB_DIR)/libparlib.a
 
+STATIC := $(findstring static,$(TESTS_CFLAGS))
 $(OBJDIR)/$(TESTS_DIR)/%: $(TESTS_LDDEPENDS)
 	@echo + cc [TESTS] $<
 	@mkdir -p $(@D)
 	$(V)$(CC) $(TESTS_CFLAGS) -o $@ $(TESTS_LDFLAGS) \
 	          $(TESTS_LDDIRS) $< $(TESTS_LDLIBS)
-	$(V)$(OBJDUMP) -S $@ > $@.asm
-	$(V)$(NM) -n $@ > $@.sym
-
+	@if [ "$(STATIC)" != "static" ]; then \
+		$(OBJDUMP) -S $@ > $@.asm; \
+		$(NM) -n $@ > $@.sym; \
+	fi
