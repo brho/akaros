@@ -4,7 +4,9 @@
 ifndef RAMP_INSTDIR
 ifndef X86_INSTDIR
 busted: 
-	@echo "You need to setup either a RAMP_INSTDIR or X86_INSTDIR to point to where you want the tools installed. The best way to do this is to create a 'Makelocal' file in the current directory and put it in there."
+	@echo "You need to setup either a RAMP_INSTDIR or X86_INSTDIR to point to where you want the tools installed. The best way to do this is to create a 'Makelocal' file in the current directory and put it in there."; false
+ramp: busted
+x86: busted
 endif
 endif 
 
