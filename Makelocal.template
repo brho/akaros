@@ -32,3 +32,13 @@ x86:
 ramp:
 	$(MAKE) TARGET_ARCH=sparc
 
+# various sparc functional simulator configurations
+NP ?= 1
+fs:
+	sparc_app -p$(NP) -fappserver_ros.conf fs obj/kern/kernel none
+fsd:
+	sparc_app_debug -p$(NP) -fappserver_ros.conf fs obj/kern/kernel none
+hw:
+	sparc_app -p$(NP) -fappserver_ros.conf hw obj/kern/kernel none
+
+.PHONY: fs fsd hw
