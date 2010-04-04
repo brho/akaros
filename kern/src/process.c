@@ -185,9 +185,15 @@ void proc_init(void)
 	/* Init idle cores. Core 0 is the management core, and core 1 is
      * dedicated to the NIC currently */
 	spin_lock(&idle_lock);
-	num_idlecores = num_cpus - 2;
+	#ifdef __CONFIG_NETWORKING__
+	assert(num_cpus >= 2);
+	int reserved_cores = 2;
+	#else
+	int reserved_cores = 1;
+	#endif
+	num_idlecores = num_cpus - reserved_cores;
 	for (int i = 0; i < num_idlecores; i++)
-		idlecoremap[i] = i + 2;
+		idlecoremap[i] = i + reserved_cores;
 	spin_unlock(&idle_lock);
 	atomic_init(&num_envs, 0);
 }
