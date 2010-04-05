@@ -709,10 +709,22 @@ static int sys_eth_recv_check(env_t* e)
 
 intreg_t sys_write(struct proc* p, int fd, const void* buf, int len)
 {
+	int ret = 0;
 	void* kbuf = user_memdup_errno(p,buf,len);
 	if(kbuf == NULL)
 		return -1;
-	int ret = ufe(write,fd,PADDR(kbuf),len,0);
+#ifndef __CONFIG_APPSERVER__
+	/* Catch a common usage of stderr */
+	if (fd == 2) {
+		((char*)kbuf)[len-1] = 0;
+		printk("[stderr]: %s\n", kbuf);
+		ret = len;
+	} else { // but warn/panic otherwise in ufe()
+		ret = ufe(write, fd, PADDR(kbuf), len, 0);
+	}
+#else
+	ret = ufe(write, fd, PADDR(kbuf), len, 0);
+#endif
 	user_memdup_free(p,kbuf);
 	return ret;
 }

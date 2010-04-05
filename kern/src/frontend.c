@@ -234,8 +234,8 @@ int32_t frontend_syscall(pid_t pid, int32_t syscall_num,
                          uint32_t arg2, uint32_t arg3, int32_t* errno)
 {
 #ifndef __CONFIG_APPSERVER__
-	warn("No appserver support: either "
-	     "don't make this syscall or enable the appserver!\n");
+	warn("No appserver support, requested syscall %d for proc %d", syscall_num,
+	     pid);
 	if(errno)
 		*errno = ENOSYS;
 	return -1;
