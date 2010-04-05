@@ -218,11 +218,13 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 	cp bits/stdio_lim.h $(INSTDIR)/$(ARCH)-ros/include/bits/
 
 .$(BINARY_PREFIX)ros-headers-install: $(ROSDIR)
-	mkdir -p $(INSTDIR)/$(ARCH)-ros/sys-include/arch
+	rm -rf $(INSTDIR)/$(ARCH)-ros/sys-include/ros/*
 	cp -r $(ROSDIR)/kern/include/ros \
 	   $(INSTDIR)/$(ARCH)-ros/sys-include/
-	cp -r $(ROSDIR)/kern/arch/$(ROS_ARCH_DIR)/* \
-	   $(INSTDIR)/$(ARCH)-ros/sys-include/arch/
+	rm -f $(INSTDIR)/$(ARCH)-ros/sys-include/ros/arch
+	mkdir $(INSTDIR)/$(ARCH)-ros/sys-include/ros/arch
+	cp -r $(ROSDIR)/kern/arch/$(ROS_ARCH_DIR)/ros/* \
+	   $(INSTDIR)/$(ARCH)-ros/sys-include/ros/arch/
 
 .$(BINARY_PREFIX)gcc-stage1-configure: 
 	$(MAKE) $(BINARY_PREFIX)gcc-stage1-builddir

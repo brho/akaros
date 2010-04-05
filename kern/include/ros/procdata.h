@@ -10,7 +10,6 @@
 #include <ros/common.h>
 #include <ros/procinfo.h>
 #include <ros/notification.h>
-#include <arch/mmu.h>
 
 typedef struct procdata {
 	syscall_sring_t			syscallring;
@@ -18,7 +17,7 @@ typedef struct procdata {
 	sysevent_sring_t		syseventring;
 	char					pad2[SYSEVENTRINGSIZE - sizeof(sysevent_sring_t)];
 #ifdef __i386__
-	segdesc_t				*ldt; // TODO: bug with this.  needs to go
+	segdesc_t				*ldt; // TODO: bug with this. (TLSV)
 #endif
 	// TODO: will replace these in a later commit
 	uintptr_t stack_pointers[MAX_NUM_CPUS];

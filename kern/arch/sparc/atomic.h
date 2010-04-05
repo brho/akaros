@@ -2,7 +2,7 @@
 #define ROS_INCLUDE_ATOMIC_H
 
 #include <ros/common.h>
-#include <arch/membar.h>
+#include <ros/arch/membar.h>
 
 typedef struct
 {

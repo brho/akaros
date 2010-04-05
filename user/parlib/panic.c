@@ -1,9 +1,24 @@
 
-#include <arch/arch.h>
+#include <ros/arch/arch.h>
 #include <stdio.h>
 #include <stdarg.h>
 
 char *argv0;
+
+// TODO: have arch specific user includes
+#ifdef __i386__
+static __inline void
+breakpoint(void)
+{
+	__asm __volatile("int3");
+}
+#else
+static __inline void
+breakpoint(void)
+{
+	asm volatile ("ta 0x7f");
+}
+#endif
 
 /*
  * Panic is called on unresolvable fatal errors.

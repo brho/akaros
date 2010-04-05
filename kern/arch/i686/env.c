@@ -15,6 +15,7 @@
 //
 void env_pop_tf(trapframe_t *tf)
 {
+	/* Bug with this whole idea (TODO: (TLSV))*/
 	/* Load the LDT for this process.  Slightly ghetto doing it here. */
 	segdesc_t *my_gdt = per_cpu_info[core_id()].gdt;
 	/* copy-in and check the LDT location.  the segmentation hardware write the

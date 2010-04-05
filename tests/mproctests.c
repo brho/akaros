@@ -5,8 +5,37 @@
 #include <ros/resource.h>
 #include <stdio.h>
 
+#ifdef __i386__ // TODO: fix me with per-arch user includes
+static __inline uint64_t
+read_tsc(void)
+{
+	uint64_t tsc;
+	__asm __volatile("rdtsc" : "=A" (tsc));
+	return tsc;
+}
+
+static __inline void
+cpu_relax(void)
+{
+	asm volatile("pause" : : : "memory");
+}
+#else
+static __inline uint64_t
+read_tsc(void)
+{
+	return read_perfctr(0,0);
+}
+
+static __inline void
+cpu_relax(void)
+{
+	int ctr = 8;
+	asm volatile("1: deccc %0; bne 1b; nop" :
+	             "=r"(ctr) : "0"(ctr) : "cc","memory");
+}
+#endif
+
 // ghetto udelay, put in a lib somewhere and export the tsc freq
-#include <arch/arch.h>
 void udelay(uint64_t usec, uint64_t tsc_freq)
 {
 	uint64_t start, end, now;

@@ -34,7 +34,7 @@
 #include <ros/arch/bits/syscall.h>
 #include <ros/procinfo.h>
 #include <ros/procdata.h>
-#include <arch/mmu.h>
+#include <ros/arch/mmu.h>
 
 
 /* Type for the dtv.  */
@@ -441,6 +441,7 @@ static const char* tls_init_tp(void* thrdescr)
 
   int core_id = __syscall_sysenter(SYS_getvcoreid,0,0,0,0,0,NULL);
 
+  /* Bug with this whole idea (TODO: (TLSV))*/
   if(__procdata.ldt == NULL)
   {
     size_t sz= (sizeof(segdesc_t)*__procinfo.max_harts+PGSIZE-1)/PGSIZE*PGSIZE;

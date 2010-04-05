@@ -4,7 +4,6 @@
 #include <ros/common.h>
 #include <arch/x86.h>
 #include <arch/arch.h>
-#include <arch/membar.h>
 
 typedef void * RACY atomic_t;
 struct spinlock {
