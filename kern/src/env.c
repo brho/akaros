@@ -253,8 +253,8 @@ void env_load_icode(env_t* e, env_t* binary_env, uint8_t* binary, size_t size)
 {
 	/* Load the binary and set the current locations of the elf segments.
 	 * All end-of-segment pointers are page aligned (invariant) */
-	e->heap_bottom = load_icode(e, binary_env, binary, size);
-	e->heap_top = e->heap_bottom;
+	e->heap_top = load_icode(e, binary_env, binary, size);
+	e->env_procinfo->heap_bottom = e->heap_top;
 }
 
 #define PER_CPU_THING(type,name)\

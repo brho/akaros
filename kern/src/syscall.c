@@ -314,7 +314,6 @@ static ssize_t sys_fork(env_t* e)
 	env_t* env = proc_create(NULL,0);
 	assert(env != NULL);
 
-	env->heap_bottom = e->heap_bottom;
 	env->heap_top = e->heap_top;
 	env->ppid = e->pid;
 	env->env_tf = *current_tf;
@@ -490,7 +489,7 @@ static void* sys_brk(struct proc *p, void* addr) {
 
 	spin_lock_irqsave(&p->proc_lock);
 
-	if((addr < p->heap_bottom) || (addr >= (void*)USTACKBOT))
+	if((addr < p->env_procinfo->heap_bottom) || (addr >= (void*)BRK_END))
 		goto out;
 
 	uintptr_t real_heap_top = ROUNDUP((uintptr_t)p->heap_top,PGSIZE);

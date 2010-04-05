@@ -14,6 +14,7 @@ typedef struct procinfo {
 	pid_t ppid;
 	size_t max_harts;
 	uint64_t tsc_freq;
+	void* heap_bottom;
 
 	char* argp[PROCINFO_MAX_ARGP];
 	char argbuf[PROCINFO_ARGBUF_SIZE];

@@ -133,8 +133,9 @@
 // Maximum bottom of normal user stack
 #define USTACKBOT	(USTACKTOP - (USTACK_NUM_PAGES+1)*PGSIZE)
 
-#define UMMAP_NUM_PAGES	131072
-#define UMMAP_START	(USTACKBOT - UMMAP_NUM_PAGES*PGSIZE)
+// Arbitrary boundary between the break and the start of
+// memory returned by calls to mmap with addr = 0
+#define BRK_END 0x20000000
 
 // Where user programs generally begin
 #define UTEXT		(2*PTSIZE)

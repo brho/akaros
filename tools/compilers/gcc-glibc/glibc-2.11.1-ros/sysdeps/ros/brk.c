@@ -16,29 +16,5 @@
    Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
    02111-1307 USA.  */
 
-#include <errno.h>
-#include <unistd.h>
-#include <bits/libc-lock.h>
-#include <ros/syscall.h>
+/* definition of __brk lives in sbrk.c */
 
-/* sbrk.c expects this.  */
-void *__curbrk;
-
-/* Set the end of the process's data space to ADDR.
-   Return 0 if successful, -1 if not.   */
-int
-__brk (void* addr)
-{
-  __libc_lock_define(static,sbrk_lock);
-  __libc_lock_lock(sbrk_lock);
-
-  int ret = 0;
-  __curbrk = (void*)ros_syscall(SYS_brk,addr,0,0,0,0);
-  if(addr != 0 && __curbrk != addr)
-    ret = -1;
-
-  __libc_lock_unlock(sbrk_lock);
-
-  return ret;
-}
-weak_alias (__brk, brk)

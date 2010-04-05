@@ -251,7 +251,7 @@ static error_t proc_alloc(struct proc *SAFE*SAFE pp, pid_t parent_id)
 	p->env_flags = 0;
 	p->env_entry = 0; // cheating.  this really gets set in load_icode
 	p->num_vcores = 0;
-	p->heap_bottom = (void*)UTEXT;
+	p->env_procinfo->heap_bottom = (void*)UTEXT;
 	p->heap_top = (void*)UTEXT;
 	memset(&p->vcoremap, -1, sizeof(p->vcoremap));
 	memset(&p->resources, 0, sizeof(p->resources));

@@ -141,8 +141,8 @@ int load_elf(struct proc* p, struct file* f)
 
 	// Set the heap bottom and top to just past where the text 
 	// region has been loaded
-	p->heap_bottom = (void*)ei.highest_addr;
-	p->heap_top = p->heap_bottom;
+	p->heap_top = (void*)ei.highest_addr;
+	p->env_procinfo->heap_bottom = p->heap_top;
 
 	return 0;
 }

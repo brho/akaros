@@ -49,7 +49,6 @@ struct Env {
 
 	/* Keeps track of this process's current memory allocation 
      * (i.e. its heap pointer) */
-	void* heap_bottom;
 	void* heap_top;
 
 	// Address space
