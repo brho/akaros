@@ -41,8 +41,9 @@ _start(void)
 	if(init == 0)
 		id = 0;
 	
-	// threads besides thread 0 must acquire a TCB.
-	if(id != 0)
+	// vcore0 when it comes up again, and all threads besides thread 0 must
+	// acquire a TCB.
+	if(init || (id != 0))
 	{
 		TLS_INIT_TP(__hart_thread_control_blocks[id],0);
 		hart_entry();
@@ -51,11 +52,6 @@ _start(void)
 		goto diediedie;
 	}
 
-	if(init)
-	{
-		failmsg("why did thread 0 re-enter _start?");
-		goto diediedie;
-	}
 	init = 1;
 
 	extern int main(int,char**,char**);

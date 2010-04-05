@@ -20,6 +20,8 @@ int main(int argc, char** argv)
 	hart_barrier_init(&b,hart_max_harts()-1);
 
 /* begin: stuff userspace needs to do before switching to multi-mode */
+	if (hart_init())
+		printf("Harts failed, we're fucked!\n");
 
 	/* tell the kernel where and how we want to receive notifications */
 	struct notif_method *nm;

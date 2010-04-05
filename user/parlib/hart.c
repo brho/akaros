@@ -80,14 +80,24 @@ int hart_init()
 	hart_thread_control_blocks = (void**)calloc(hart_max_harts(),sizeof(void*));
 
 	if(!hart_thread_control_blocks)
-	{
-		free(hart_thread_control_blocks);
-		errno = ENOMEM;
-		return -1;
-	}
+		goto hart_tcb_fail;
+
+	if (hart_allocate_stack(0))
+		goto hart_stack_fail;
+	
+	if (hart_allocate_tls(0))
+		goto hart_tls_fail;
 
 	initialized = 1;
 	return 0;
+
+hart_tls_fail:
+	hart_free_stack(0);
+hart_stack_fail:
+	free(hart_thread_control_blocks);
+hart_tcb_fail:
+	errno = ENOMEM;
+	return -1;
 }
 
 int hart_request(size_t k)
