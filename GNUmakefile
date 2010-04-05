@@ -136,6 +136,7 @@ arch:
 symlinks: error
 	ln -fs ../arch/$(ROS_ARCH_DIR) kern/include/arch
 	ln -fs arch/$(ROS_ARCH_DIR)/boot kern/boot
+	ln -fs $(ROS_ARCH_DIR) user/include/arch
 	@$(MAKE) -j all
 
 # Include Makefrags for subdirectories
@@ -201,6 +202,7 @@ clean:
 realclean: clean
 	@rm -f kern/boot
 	@rm -f kern/include/arch
+	@rm -f user/include/arch
 
 always:
 	@:

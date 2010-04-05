@@ -1,39 +1,11 @@
+#include <arch/arch.h>
 #include <parlib.h>
+#include <rassert.h>
 #include <stdlib.h>
 #include <hart.h>
 #include <ros/mman.h>
 #include <ros/resource.h>
 #include <stdio.h>
-
-#ifdef __i386__ // TODO: fix me with per-arch user includes
-static __inline uint64_t
-read_tsc(void)
-{
-	uint64_t tsc;
-	__asm __volatile("rdtsc" : "=A" (tsc));
-	return tsc;
-}
-
-static __inline void
-cpu_relax(void)
-{
-	asm volatile("pause" : : : "memory");
-}
-#else
-static __inline uint64_t
-read_tsc(void)
-{
-	return read_perfctr(0,0);
-}
-
-static __inline void
-cpu_relax(void)
-{
-	int ctr = 8;
-	asm volatile("1: deccc %0; bne 1b; nop" :
-	             "=r"(ctr) : "0"(ctr) : "cc","memory");
-}
-#endif
 
 // ghetto udelay, put in a lib somewhere and export the tsc freq
 void udelay(uint64_t usec, uint64_t tsc_freq)
@@ -108,8 +80,10 @@ int main(int argc, char** argv)
 				retval = hart_request(4);
 				break;
 			default:
-				retval = hart_request(7);
+				retval = hart_request(5);
 		}
+		if (retval)
+			panic("failed to allocate cores!");
 		printf("Should see me if you want to relocate core0's context "
 		        "when moving from RUNNING_S\n");
 	}
@@ -119,7 +93,7 @@ int main(int argc, char** argv)
 		case TEST_YIELD_OUT_OF_ORDER:
 			udelay(10000000, 1995014570);
 			printf("Core 2 should have yielded, asking for another\n");
-			retval = hart_request(7);
+			retval = hart_request(5);
 			break;
 		case TEST_YIELD_0_OUT_OF_ORDER:
 			udelay(5000000, 1995014570);
@@ -155,7 +129,7 @@ void hart_entry(void)
 				// Testing getting more while running
 				printf("Asking for more while running:\n");
 				udelay(1000000, 1995014570);
-				retval = hart_request(7);
+				retval = hart_request(5);
 				printf("core2's retval: %d\n", retval);
 				break;
 			case TEST_YIELD_OUT_OF_ORDER:
@@ -165,7 +139,7 @@ void hart_entry(void)
 			case TEST_YIELD_0_OUT_OF_ORDER:
 				udelay(7500000, 1995014570);
 				printf("Core 0 should have yielded, asking for another\n");
-				retval = hart_request(7);
+				retval = hart_request(5);
 		}
 	}
 	global_tests(vcoreid);
@@ -194,7 +168,7 @@ static void global_tests(uint32_t vcoreid)
 			while(1);
 		case TEST_CRAZY_YIELDS:
 			udelay(300000*vcoreid, 1995014570);
-			hart_request(7);
+			hart_request(5);
 			sys_yield();
 			printf("should  never see me, unless you slip into *_S\n");
 			break;
