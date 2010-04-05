@@ -142,6 +142,8 @@ error_t upage_alloc(struct proc* p, page_t** page, int zero)
 		ret = __page_alloc_from_color_range(page, 0, global_next_color);
 
 	if(ret >= 0) {
+		if(zero)
+			memset(page2kva(*page),0,PGSIZE);
 		global_next_color = ret;        
 		ret = ESUCCESS;
 	}
