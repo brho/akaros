@@ -1,3 +1,6 @@
+# Number of make jobs to spawn.  Define it in Makelocal
+MAKE_JOBS := 
+
 # Defines where to install the toolchain
 -include Makelocal
 
@@ -187,11 +190,11 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 
 .$(BINARY_PREFIX)binutils-make: .$(BINARY_PREFIX)binutils-configure
 	cd $(BINARY_PREFIX)binutils-builddir; \
-	make -j
+	make -j $(MAKE_JOBS)
 
 .$(BINARY_PREFIX)binutils-install:
 	cd $(BINARY_PREFIX)binutils-builddir; \
-	make -j install
+	make -j $(MAKE_JOBS) install
 
 .$(BINARY_PREFIX)glibc-headers-configure:
 	$(MAKE) $(BINARY_PREFIX)glibc-headers-builddir
@@ -212,7 +215,7 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 
 .$(BINARY_PREFIX)glibc-headers-install: .$(BINARY_PREFIX)glibc-headers-configure
 	cd $(BINARY_PREFIX)glibc-headers-builddir; \
-	make -j install-headers; \
+	make -j $(MAKE_JOBS) install-headers; \
 	mkdir -p $(INSTDIR)/$(ARCH)-ros/include/gnu; \
 	echo > $(INSTDIR)/$(ARCH)-ros/include/gnu/stubs.h; \
 	cp bits/stdio_lim.h $(INSTDIR)/$(ARCH)-ros/include/bits/
@@ -252,11 +255,11 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 	# It appears to still work though since this is just stage 1 of compiling
 	# Should really look into fixing this though...
 	-cd $(BINARY_PREFIX)gcc-stage1-builddir; \
-	make -j inhibit_libc=true cross-compiling=yes
+	make -j $(MAKE_JOBS) inhibit_libc=true cross-compiling=yes
 
 .$(BINARY_PREFIX)gcc-stage1-install: 
 	cd $(BINARY_PREFIX)gcc-stage1-builddir; \
-	make -j install
+	make -j $(MAKE_JOBS) install
 	#-ln -vs libgcc.a `$(BINARY_PREFIX)gcc -print-libgcc-file-name | \
 	#                 sed 's/libgcc/&_eh/'`
 
@@ -280,11 +283,11 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 
 .$(BINARY_PREFIX)glibc-make: .$(BINARY_PREFIX)glibc-configure
 	cd $(BINARY_PREFIX)glibc-builddir; \
-	make -j
+	make -j $(MAKE_JOBS)
 
 .$(BINARY_PREFIX)glibc-install: 
 	cd $(BINARY_PREFIX)glibc-builddir; \
-	make -j install
+	make -j $(MAKE_JOBS) install
 
 .$(BINARY_PREFIX)gcc-stage2-configure:
 	$(MAKE) $(BINARY_PREFIX)gcc-stage2-builddir
@@ -306,11 +309,11 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 
 .$(BINARY_PREFIX)gcc-stage2-make: .$(BINARY_PREFIX)gcc-stage2-configure
 	cd $(BINARY_PREFIX)gcc-stage2-builddir; \
-	make -j
+	make -j $(MAKE_JOBS)
 
 .$(BINARY_PREFIX)gcc-stage2-install:
 	cd $(BINARY_PREFIX)gcc-stage2-builddir; \
-	make -j install
+	make -j $(MAKE_JOBS) install
 
 patches:
 	mv gcc-$(GCC_VERSION)/gmp .

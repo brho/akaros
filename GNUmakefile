@@ -21,9 +21,9 @@ $(TARGET_ARCH):
 	@if [ "$(ARCH_LINK)" != "$@" ];\
 	then\
 	  $(MAKE) realclean;\
-	  $(MAKE) realall -j;\
+	  $(MAKE) realall -j $(MAKE_JOBS);\
 	else\
-	  $(MAKE) all -j;\
+	  $(MAKE) all -j $(MAKE_JOBS);\
 	fi
 
 ############################################################################# 
@@ -37,6 +37,9 @@ V := @
 
 # Make sure that 'all' is the first target when not erroring out
 realall: symlinks
+
+# Number of make jobs to spawn.  Define it in Makelocal
+MAKE_JOBS := 
 
 # Then grab the users Makelocal file to let them override Make system variables
 # and set up other Make targets
@@ -137,7 +140,7 @@ symlinks: error
 	ln -fs ../arch/$(ROS_ARCH_DIR) kern/include/arch
 	ln -fs arch/$(ROS_ARCH_DIR)/boot kern/boot
 	ln -fs $(ROS_ARCH_DIR) user/include/arch
-	@$(MAKE) -j all
+	@$(MAKE) -j $(MAKE_JOBS) all
 
 # Include Makefrags for subdirectories
 ifneq ($(TARGET_ARCH),)
@@ -150,7 +153,7 @@ ifeq ($(GCCPREFIX),$(TARGET_ARCH)-ros-)
 GCC_ROOT := $(shell which $(GCCPREFIX)gcc | xargs dirname)/../
 tests/: tests
 tests:
-	@$(MAKE) -j realtests
+	@$(MAKE) -j $(MAKE_JOBS) realtests
 realtests: $(TESTS_EXECS)
 	@mkdir -p fs/$(TARGET_ARCH)/tests
 	cp -R $(OBJDIR)/$(TESTS_DIR)/* $(TOP_DIR)/fs/$(TARGET_ARCH)/tests
