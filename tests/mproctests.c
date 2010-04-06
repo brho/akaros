@@ -6,21 +6,7 @@
 #include <ros/mman.h>
 #include <ros/resource.h>
 #include <stdio.h>
-
-// ghetto udelay, put in a lib somewhere and export the tsc freq
-void udelay(uint64_t usec, uint64_t tsc_freq)
-{
-	uint64_t start, end, now;
-
-	start = read_tsc();
-    end = start + (tsc_freq * usec) / 1000000;
-	if (end == 0) printf("This is terribly wrong \n");
-	do {
-        cpu_relax();
-        now = read_tsc();
-	} while (now < end || (now > start && end < start));
-	return;
-}
+#include <timing.h>
 
 #define TEST_MMAP					 1
 #define TEST_ONE_CORE				 2
@@ -91,12 +77,12 @@ int main(int argc, char** argv)
 	// vcore0 only below here
 	switch (test) {
 		case TEST_YIELD_OUT_OF_ORDER:
-			udelay(10000000, 1995014570);
+			udelay(10000000);
 			printf("Core 2 should have yielded, asking for another\n");
 			retval = hart_request(5);
 			break;
 		case TEST_YIELD_0_OUT_OF_ORDER:
-			udelay(5000000, 1995014570);
+			udelay(5000000);
 			printf("Core %d yielding\n", vcoreid);
 			sys_yield();
 			printf("Core 0 came back where it left off in RUNNING_M!!!\n");
@@ -122,13 +108,13 @@ void hart_entry(void)
 		switch (test) {
 			case TEST_INCREMENTAL_CHANGES:
 				// Testing asking for less than we already have
-				udelay(1000000, 1995014570); // KVM's freq.  Whatever.
+				udelay(1000000);
 				printf("Asking for too few:\n");
 				retval = hart_request(2);
 				printf("Should be -EINVAL(7): %d\n", retval);
 				// Testing getting more while running
 				printf("Asking for more while running:\n");
-				udelay(1000000, 1995014570);
+				udelay(1000000);
 				retval = hart_request(5);
 				printf("core2's retval: %d\n", retval);
 				break;
@@ -137,7 +123,7 @@ void hart_entry(void)
 				sys_yield();
 				break;
 			case TEST_YIELD_0_OUT_OF_ORDER:
-				udelay(7500000, 1995014570);
+				udelay(7500000);
 				printf("Core 0 should have yielded, asking for another\n");
 				retval = hart_request(5);
 		}
@@ -158,7 +144,7 @@ static void global_tests(uint32_t vcoreid)
 		case TEST_SWITCH_TO_RUNNABLE_S:
 			if (vcoreid == 2) {
 				printf("Core %d trying to request 0/ switch to _S\n", vcoreid);
-				udelay(3000000, 1995014570);
+				udelay(3000000);
 				retval = hart_request(0);
 				// will only see this if we are scheduled()
 				printf("Core %d back up! (retval:%d)\n", vcoreid, retval);
@@ -167,7 +153,7 @@ static void global_tests(uint32_t vcoreid)
 			} 
 			while(1);
 		case TEST_CRAZY_YIELDS:
-			udelay(300000*vcoreid, 1995014570);
+			udelay(300000*vcoreid);
 			hart_request(5);
 			sys_yield();
 			printf("should  never see me, unless you slip into *_S\n");
