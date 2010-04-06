@@ -127,7 +127,7 @@ int pthread_mutexattr_gettype(const pthread_mutexattr_t* attr, int* type)
 int pthread_mutexattr_settype(pthread_mutexattr_t* attr, int type)
 {
   if(type != PTHREAD_MUTEX_NORMAL)
-    return -EINVAL;
+    return EINVAL;
   attr->type = type;
   return 0;
 }
@@ -148,7 +148,7 @@ int pthread_mutex_lock(pthread_mutex_t* m)
 
 int pthread_mutex_trylock(pthread_mutex_t* m)
 {
-  return hart_swap(&m->lock,1) == 0 ? 0 : -EBUSY;
+  return hart_swap(&m->lock,1) == 0 ? 0 : EBUSY;
 }
 
 int pthread_mutex_unlock(pthread_mutex_t* m)
