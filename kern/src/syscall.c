@@ -765,10 +765,15 @@ intreg_t sys_pread(struct proc* p, int fd, void* buf, int len, int offset)
 
 intreg_t sys_open(struct proc* p, const char* path, int oflag, int mode)
 {
+	printd("File Open, p: %p, path: %s, oflag: %d, mode: 0x%x\n", p, path, oflag, mode);
 	char* fn = user_strdup_errno(p,path,PGSIZE);
-	if(fn == NULL)
+	if(fn == NULL) {
+		printd("File Open, user_strdup_errno failed\n");
 		return -1;
+	}
+	printd("File Open, About to open\n");
 	int ret = ufe(open,PADDR(fn),oflag,mode,0);
+	printd("File Open, res=%d\n", ret);
 	user_memdup_free(p,fn);
 	return ret;
 }

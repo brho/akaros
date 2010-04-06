@@ -31,17 +31,18 @@
 #define	O_RDONLY	0	/* Open read-only.  */
 #define	O_WRONLY	1	/* Open write-only.  */
 #define	O_RDWR		2	/* Open read/write.  */
-
+#define O_ACCMODE   3
 
 /* Bits OR'd into the second argument to open.  */
-#define	O_CREAT		0x0200	/* Create file if it doesn't exist.  */
-#define	O_EXCL		0x0800	/* Fail if file already exists.  */
-#define	O_TRUNC		0x0400	/* Truncate file to zero length.  */
-#define	O_NOCTTY	0x0100	/* Don't assign a controlling terminal.  */
-
-/* File status flags for `open' and `fcntl'.  */
-#define	O_APPEND	0x0008	/* Writes append to the file.  */
-#define	O_NONBLOCK	0x0004	/* Non-blocking I/O.  */
+#define O_CREAT        0100 /* not fcntl */
+#define O_EXCL         0200 /* not fcntl */
+#define O_NOCTTY       0400 /* not fcntl */
+#define O_TRUNC       01000 /* not fcntl */
+#define O_APPEND      02000
+#define O_NONBLOCK    04000
+#define O_SYNC       010000
+#define O_FSYNC      O_SYNC
+#define O_ASYNC      020000
 
 #ifdef __USE_BSD
 # define O_NDELAY	O_NONBLOCK
