@@ -7,6 +7,15 @@
   extern "C" {
 #endif
 
+/* Detach state.  */
+enum
+{
+  PTHREAD_CREATE_JOINABLE,
+#define PTHREAD_CREATE_JOINABLE	PTHREAD_CREATE_JOINABLE
+  PTHREAD_CREATE_DETACHED
+#define PTHREAD_CREATE_DETACHED	PTHREAD_CREATE_DETACHED
+};
+
 struct pthread_wqt
 {
   void* (*start_routine)(void*);
@@ -67,6 +76,8 @@ int pthread_attr_destroy(pthread_attr_t *);
 int pthread_create(pthread_t *, const pthread_attr_t *,
                    void *(*)(void *), void *);
 int pthread_join(pthread_t, void **);
+
+int pthread_attr_setdetachstate(pthread_attr_t *__attr,int __detachstate);
 
 int pthread_mutex_destroy(pthread_mutex_t *);
 int pthread_mutex_init(pthread_mutex_t *, const pthread_mutexattr_t *);

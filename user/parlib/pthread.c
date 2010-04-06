@@ -112,6 +112,12 @@ int pthread_mutexattr_destroy(pthread_mutexattr_t* attr)
   return 0;
 }
 
+
+int pthread_attr_setdetachstate(pthread_attr_t *__attr,int __detachstate) {
+	*__attr = __detachstate;
+	return 0;
+}
+
 int pthread_mutexattr_gettype(const pthread_mutexattr_t* attr, int* type)
 {
   *type = attr ? attr->type : PTHREAD_MUTEX_DEFAULT;
