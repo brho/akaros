@@ -6,6 +6,7 @@ extern "C" {
 #endif
 
 #include <ros/arch/hart.h>
+#include <arch/hart.h>
 #include <string.h>
 
 #define HART_LOG2_MAX_MAX_HARTS 6

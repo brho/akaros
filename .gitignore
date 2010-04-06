@@ -20,6 +20,7 @@ ros-project.tmproj
 kern/boot
 kern/include/arch
 kern/src/arch
+user/include/arch
 Documentation/doxygen/rosdoc
 sim/
 sim

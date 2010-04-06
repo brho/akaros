@@ -7,6 +7,8 @@
 #include <arch/arch.h>
 #include <stdio.h>
 #include <hart.h>
+#include <timing.h>
+#include <rassert.h>
 
 hart_barrier_t b;
 
@@ -51,6 +53,14 @@ int main(int argc, char** argv)
 		//debug("retval = %d\n", retval);
 	}
 	printf("Vcore %d Done!\n", vcoreid);
+	/* test loop for restarting a notif_tf */
+	if (vcoreid == 0) {
+		int ctr = 0;
+		while(1) {
+			printf("Vcore %d Spinning (%d)!\n", vcoreid, ctr++);
+			udelay(5000000);
+		}
+	}
 
 	hart_barrier_wait(&b,hart_self());
 
@@ -79,9 +89,18 @@ void hart_entry(void)
 	/* can see how many messages had to be sent as bits */
 	printf("Number of event overflows: %d\n", vcpd->event_overflows);
 
+	/* Lets try to restart vcore0's context.  Note this doesn't do anything to
+	 * set the appropriate TLS.  On x86, this will involve changing the LDT
+	 * entry for this vcore to point to the TCB of the new user-thread. */
+	if (vcoreid == 0) {
+		printf("restarting vcore0 from userspace\n");
+		pop_ros_tf(&vcpd->notif_tf, &vcpd->notif_enabled);
+		panic("should never see me!");
+	}	
 	/* unmask notifications once you can let go of the notif_tf and it is okay
 	 * to clobber the transition stack.
-	 * Check Documentation/processes.txt: 4.2.4 */
+	 * Check Documentation/processes.txt: 4.2.4.  In real code, you should be
+	 * popping the tf of whatever user process you want (get off the x-stack) */
 	vcpd->notif_enabled = TRUE;
 	
 /* end: stuff userspace needs to do to handle notifications */
