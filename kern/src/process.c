@@ -25,6 +25,7 @@
 #include <slab.h>
 #include <sys/queue.h>
 #include <frontend.h>
+#include <monitor.h>
 
 /* Process Lists */
 struct proc_list proc_runnablelist = TAILQ_HEAD_INITIALIZER(proc_runnablelist);
@@ -182,15 +183,20 @@ void proc_init(void)
 	pid_hash = create_hashtable(100, __generic_hash, __generic_eq);
 	spin_unlock(&pid_hash_lock);
 	schedule_init();
-	/* Init idle cores. Core 0 is the management core, and core 1 is
-     * dedicated to the NIC currently */
+	/* Init idle cores. Core 0 is the management core. */
 	spin_lock(&idle_lock);
-	#ifdef __CONFIG_NETWORKING__
-	assert(num_cpus >= 2);
-	int reserved_cores = 2;
-	#else
 	int reserved_cores = 1;
+	#ifdef __CONFIG_NETWORKING__
+	reserved_cores++; // Next core is dedicated to the NIC
 	#endif
+	#ifdef __CONFIG_APPSERVER__
+	#ifdef __CONFIG_DEDICATED_MONITOR__
+	reserved_cores++; // Next core dedicated to running the kernel monitor
+	// Need to subtract 1 from the reserved_cores # to get the cores index
+	send_kernel_message(reserved_cores-1, (amr_t)monitor, 0,0,0, KMSG_ROUTINE);
+	#endif
+	#endif
+	assert(num_cpus >= reserved_cores);
 	num_idlecores = num_cpus - reserved_cores;
 	for (int i = 0; i < num_idlecores; i++)
 		idlecoremap[i] = i + reserved_cores;
