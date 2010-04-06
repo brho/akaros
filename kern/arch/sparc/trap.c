@@ -198,8 +198,6 @@ void handle_ipi(trapframe_t* tf)
 			msg_cp.pc(tf, msg_cp.srcid, msg_cp.arg0, msg_cp.arg1, msg_cp.arg2);
 		}
 	}
-	/* slightly different than x86 - returns from the handler directly */
-	env_pop_tf(tf);
 }
 
 /* Same as in x86.  Might be diff in the future if there is no way to check for
@@ -248,7 +246,7 @@ unhandled_trap(trapframe_t* state)
 	uint32_t trap_type = (state->tbr >> 4) & 0xFF;
 	get_trapname(trap_type,buf);
 
-	if(state->psr & PSR_PS)
+	if(in_kernel(state))
 	{
 		print_trapframe(state);
 		panic("Unhandled trap in kernel!\nTrap type: %s",buf);
@@ -307,10 +305,8 @@ address_unaligned(trapframe_t* state)
 void
 instruction_access_exception(trapframe_t* state)
 {
-	if(handle_page_fault(current,state->pc,PROT_EXEC))
+	if(in_kernel(state) || handle_page_fault(current,state->pc,PROT_EXEC))
 		unhandled_trap(state);
-	else
-		env_pop_tf(state);
 }
 
 void
@@ -318,10 +314,8 @@ data_access_exception(trapframe_t* state)
 {
 	int prot = (state->fault_status & MMU_FSR_WR) ? PROT_WRITE : PROT_READ;
 
-	if(handle_page_fault(current,state->fault_addr,prot))
+	if(in_kernel(state) || handle_page_fault(current,state->fault_addr,prot))
 		unhandled_trap(state);
-	else
-		env_pop_tf(state);
 }
 
 void
@@ -348,18 +342,15 @@ fp_exception(trapframe_t* state)
 	emulate_fpu(state,&sillystate);
 
 	restore_fp_state(&sillystate);
-
-	env_pop_tf(state);
 }
 
 void
 fp_disabled(trapframe_t* state)
 {
-	if(state->psr & PSR_PS)
+	if(in_kernel(state))
 		panic("kernel executed an FP instruction!");
 
 	state->psr |= PSR_EF;
-	env_pop_tf(state);
 }
 
 void
@@ -413,7 +404,6 @@ handle_flushw(trapframe_t* state)
 	// don't actually need to do anything here.
 	// trap_entry flushes user windows to the stack.
 	advance_pc(state);
-	env_pop_tf(state);
 }
 
 void
@@ -421,5 +411,4 @@ handle_breakpoint(trapframe_t* state)
 {
 	advance_pc(state);
 	monitor(state);
-	env_pop_tf(state);
 }

@@ -57,24 +57,20 @@ handle_trap:
 	 add	%sp,64,%o0
 
 	// enable traps (but not interrupts)
-	or	%l0,PSR_PIL,%l3
-	wr	%l3,0,%psr
-	wr	%l3,PSR_ET,%psr
+	or	%l0,PSR_PIL,%g3
+	wr	%g3,0,%psr
+	wr	%g3,PSR_ET,%psr
 
 	// spill all trapper's windows out to the stack.
 	// the 'save' may trap (triggering the spill),
 	// and if the stack is corrupted, the process may die
-	mov	%l0,%g3
 	mov	%sp,%g4
-
 	set	NWINDOWS,%g1
 	ld	[%g1],%g1
 	sub	%g1,1,%g2
 5:	deccc	%g2
 	bne,a	5b
 tflush:	 save	%sp,0,%sp
-
-	// restore interrupt level
 	mov	%g4,%sp	
 	wr	%g3,PSR_ET,%psr
 
@@ -82,8 +78,56 @@ tflush:	 save	%sp,0,%sp
 	call	%l5
 	 add	%sp,64,%o0
 
-	// should never get here
-	unimp
+	// fallthrough to env_pop_tf, which is right below this function
+	add	%sp,64,%o0
+
+	// this routine only works for returning to userspace.
+	// right now, there's no mechanism to resume kernel operation after
+	// a fault
+	.global	env_pop_tf
+env_pop_tf:
+	mov	%psr,%o1
+	wr	%o1,PSR_ET,%psr
+
+	// CWP = 0 (therefore 1 after rett), so set window 2 invalid
+	mov	1<<2,%wim
+	ld	[%o0+128],%o1
+	mov	%o0,%g2
+	andn	%o1,PSR_CWP,%o1
+	mov	%o1,%psr
+	nop; nop; nop
+	mov	%g2,%o0
+
+4:	// restore user context
+	restore
+	ldd	[%g2+32],%o0
+	ldd	[%g2+40],%o2
+	ldd	[%g2+48],%o4
+	ldd	[%g2+56],%o6
+	ldd	[%g2+64],%l0
+	ldd	[%g2+72],%l2
+	ldd	[%g2+80],%l4
+	ldd	[%g2+88],%l6
+	ldd	[%g2+96],%i0
+	ldd	[%g2+104],%i2
+	ldd	[%g2+112],%i4
+	ldd	[%g2+120],%i6
+	save
+
+	ld	[%o0+ 4],%g1
+	ldd	[%o0+ 8],%g2
+	ldd	[%o0+16],%g4
+	ldd	[%o0+24],%g6
+
+	ld	[%o0+132],%l1
+	ld	[%o0+136],%l2
+	ld	[%o0+148],%l5
+	mov	%l5,%y
+	ld	[%o0+152],%l5
+	mov	%l5,%asr13
+
+	jmp	%l1
+	rett	%l2
 
 // void env_save_tf(trapframe_t* tf, uint32_t trap_pc, uint32_t trap_npc)
 	.global env_save_tf
@@ -144,54 +188,6 @@ env_save_tf:
 
 	retl
 	 nop
-
-	// this routine only works for returning to userspace.
-	// right now, there's no mechanism to resume kernel operation after
-	// a fault
-	.global	env_pop_tf
-env_pop_tf:
-	mov	%psr,%o1
-	wr	%o1,PSR_ET,%psr
-
-	// CWP = 0 (therefore 1 after rett), so set window 2 invalid
-	mov	1<<2,%wim
-	ld	[%o0+128],%o1
-	mov	%o0,%g2
-	andn	%o1,PSR_CWP,%o1
-	mov	%o1,%psr
-	nop; nop; nop
-	mov	%g2,%o0
-
-4:	// restore user context
-	restore
-	ldd	[%g2+32],%o0
-	ldd	[%g2+40],%o2
-	ldd	[%g2+48],%o4
-	ldd	[%g2+56],%o6
-	ldd	[%g2+64],%l0
-	ldd	[%g2+72],%l2
-	ldd	[%g2+80],%l4
-	ldd	[%g2+88],%l6
-	ldd	[%g2+96],%i0
-	ldd	[%g2+104],%i2
-	ldd	[%g2+112],%i4
-	ldd	[%g2+120],%i6
-	save
-
-	ld	[%o0+ 4],%g1
-	ldd	[%o0+ 8],%g2
-	ldd	[%o0+16],%g4
-	ldd	[%o0+24],%g6
-
-	ld	[%o0+132],%l1
-	ld	[%o0+136],%l2
-	ld	[%o0+148],%l5
-	mov	%l5,%y
-	ld	[%o0+152],%l5
-	mov	%l5,%asr13
-
-	jmp	%l1
-	rett	%l2
 
 	.global handle_perfctr
 handle_perfctr:

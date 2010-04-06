@@ -23,6 +23,8 @@ smp_boot(void)
 	printd("Cores, report in!\n");
 	time_for_smp_init = 1;
 
+	smp_percpu_init();
+
 	while(*(volatile uint32_t*)&num_cpus < num_cores());
 
 	printd("%d cores reporting!\n",num_cpus);

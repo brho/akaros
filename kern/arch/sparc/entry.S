@@ -36,7 +36,7 @@ _start:
 	// compute NWINDOWS
 
 	mov	0,%wim				! mark all windows valid
-	mov (PSR_S|PSR_PS),%psr	! CWP = 0
+	mov (PSR_PIL|PSR_S|PSR_PS),%psr	! CWP = 0
 	nop; nop; nop			! 3 insns between write -> read state reg
 	save					! CWP = (CWP-1) % NWINDOWS = NWINDOWS-1
 	mov	%psr,%g2
