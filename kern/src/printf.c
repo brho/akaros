@@ -71,6 +71,9 @@ int cprintf(const char *fmt, ...)
 	va_list ap;
 	int cnt;
 
+	if (!fmt)
+		return 0;
+
 	va_start(ap, fmt);
 	cnt = vcprintf(fmt, ap);
 	va_end(ap);
