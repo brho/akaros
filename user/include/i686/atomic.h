@@ -68,12 +68,12 @@ static inline bool atomic_comp_swap(uint32_t *addr, uint32_t exp_val,
 
 static inline void atomic_andb(volatile uint8_t RACY*number, uint8_t mask)
 {
-	asm volatile("lock andb %1,%0" : "=m"(*number) : "r"(mask) : "cc");
+	asm volatile("lock andb %1,%0" : "=m"(*number) : "q"(mask) : "cc");
 }
 
 static inline void atomic_orb(volatile uint8_t RACY*number, uint8_t mask)
 {
-	asm volatile("lock orb %1,%0" : "=m"(*number) : "r"(mask) : "cc");
+	asm volatile("lock orb %1,%0" : "=m"(*number) : "q"(mask) : "cc");
 }
 
 #endif /* !PARLIB_ATOMIC_H */

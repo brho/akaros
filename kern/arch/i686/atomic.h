@@ -83,14 +83,18 @@ static inline bool atomic_comp_swap(uint32_t *addr, uint32_t exp_val,
 	return exp_val;
 }
 
+/* Be sure to use "q" for byte operations (compared to longs), since this
+ * constrains the asm to use e{a,b,c,d}x instead of esi and edi.  32 bit x86
+ * cannot access the lower parts of esi or edi (will get warnings like "no such
+ * register %sil or %dil." */
 static inline void atomic_andb(volatile uint8_t RACY*number, uint8_t mask)
 {
-	asm volatile("lock andb %1,%0" : "=m"(*number) : "r"(mask) : "cc");
+	asm volatile("lock andb %1,%0" : "=m"(*number) : "q"(mask) : "cc");
 }
 
 static inline void atomic_orb(volatile uint8_t RACY*number, uint8_t mask)
 {
-	asm volatile("lock orb %1,%0" : "=m"(*number) : "r"(mask) : "cc");
+	asm volatile("lock orb %1,%0" : "=m"(*number) : "q"(mask) : "cc");
 }
 
 static inline uint32_t spin_locked(spinlock_t *SAFE lock)
