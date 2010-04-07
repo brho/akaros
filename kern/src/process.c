@@ -702,6 +702,9 @@ void do_notify(struct proc *p, uint32_t vcoreid, unsigned int notif,
                struct notif_event *ne)
 {
 	assert(notif < MAX_NR_NOTIF);
+	if (ne)
+		assert(notif == ne->ne_type);
+
 	struct notif_method *nm = &p->procdata->notif_methods[notif];
 	struct preempt_data *vcpd = &p->procdata->vcore_preempt_data[vcoreid];
 
@@ -741,17 +744,21 @@ void do_notify(struct proc *p, uint32_t vcoreid, unsigned int notif,
  * just determines where the notif should be sent, other checks, etc.
  * Specifically, it handles the parameters of notif_methods.  If you happen to
  * notify yourself, make sure you process routine kmsgs. */
-void proc_notify(struct proc *p, unsigned int notif)
+void proc_notify(struct proc *p, unsigned int notif, struct notif_event *ne)
 {
 	assert(notif < MAX_NR_NOTIF); // notifs start at 0
 	struct notif_method *nm = &p->procdata->notif_methods[notif];
-	struct notif_event ne;
+	struct notif_event local_ne;
 	
-	ne.ne_type = notif;
+	/* Caller can opt to not send an NE, in which case we use the notif */
+	if (!ne) {
+		ne = &local_ne;
+		ne->ne_type = notif;
+	}
 
 	if (!(nm->flags & NOTIF_WANTED))
 		return;
-	do_notify(p, nm->vcoreid, notif, &ne);
+	do_notify(p, nm->vcoreid, ne->ne_type, ne);
 }
 
 /* Global version of the helper, for sys_get_vcoreid (might phase that syscall

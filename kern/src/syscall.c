@@ -5,6 +5,7 @@
 #endif
 
 #include <ros/common.h>
+#include <ros/notification.h>
 #include <arch/types.h>
 #include <arch/arch.h>
 #include <arch/mmu.h>
@@ -558,9 +559,59 @@ static int sys_shared_page_free(env_t* p1, void*DANGEROUS addr, pid_t p2)
 }
 
 
-/************** Resource Request Syscalls **************/
-
 /* sys_resource_req(): called directly from dispatch table. */
+
+/* Will notify the target on the given vcore, if the caller controls the target.
+ * Will honor the target's wanted/vcoreid.  u_ne can be NULL. */
+static int sys_notify(struct proc *p, int target_pid, unsigned int notif,
+                      struct notif_event *u_ne)
+{
+	struct notif_event local_ne;
+	struct proc *target = pid2proc(target_pid);
+
+	if (!target) {
+		set_errno(current_tf, EBADPROC);
+		return -1;
+	}
+	if (!proc_controls(p, target)) {
+		proc_decref(target, 1);
+		set_errno(current_tf, EPERM);
+		return -1;
+	}
+	/* if the user provided a notif_event, copy it in and use that */
+	if (u_ne) {
+		if (memcpy_from_user(p, &local_ne, u_ne, sizeof(struct notif_event))) {
+			proc_decref(target, 1);
+			set_errno(current_tf, EINVAL);
+			return -1;
+		}
+		proc_notify(target, local_ne.ne_type, &local_ne);
+	} else {
+		proc_notify(target, notif, 0);
+	}
+	proc_decref(target, 1);
+	return 0;
+}
+
+/* Will notify the calling process on the given vcore, independently of WANTED
+ * or advertised vcoreid. */
+static int sys_self_notify(struct proc *p, uint32_t vcoreid, unsigned int notif,
+                           struct notif_event *u_ne)
+{
+	struct notif_event local_ne;
+
+	/* if the user provided a notif_event, copy it in and use that */
+	if (u_ne) {
+		if (memcpy_from_user(p, &local_ne, u_ne, sizeof(struct notif_event))) {
+			set_errno(current_tf, EINVAL);
+			return -1;
+		}
+		do_notify(p, vcoreid, local_ne.ne_type, &local_ne);
+	} else {
+		do_notify(p, vcoreid, notif, 0);
+	}
+	return 0;
+}
 
 /************** Platform Specific Syscalls **************/
 
@@ -999,6 +1050,8 @@ intreg_t syscall(struct proc *p, uintreg_t syscallno, uintreg_t a1,
 		[SYS_shared_page_alloc] = (syscall_t)sys_shared_page_alloc,
 		[SYS_shared_page_free] = (syscall_t)sys_shared_page_free,
 		[SYS_resource_req] = (syscall_t)resource_req,
+		[SYS_notify] = (syscall_t)sys_notify,
+		[SYS_self_notify] = (syscall_t)sys_self_notify,
 	#ifdef __CONFIG_SERIAL_IO__
 		[SYS_serial_read] = (syscall_t)sys_serial_read,
 		[SYS_serial_write] = (syscall_t)sys_serial_write,

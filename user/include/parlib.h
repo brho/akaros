@@ -46,6 +46,9 @@ void        sys_reboot();
 int         gettimeofday(struct timeval* tp, void* tzp);
 void *COUNT(length) sys_mmap(void *SNT addr, size_t length, int prot, int flags,
                              int fd, size_t offset);
+int         sys_notify(int pid, unsigned int notif, struct notif_event *ne);
+int         sys_self_notify(uint32_t vcoreid, unsigned int notif,
+                            struct notif_event *ne);
 
 #endif	// !ASSEMBLER
 

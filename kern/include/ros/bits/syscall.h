@@ -32,13 +32,16 @@
 #define SYS_shared_page_alloc		22
 #define SYS_shared_page_free		23
 #define SYS_resource_req			24
+#define SYS_notify					25
+#define SYS_self_notify				26
+
 /* Platform specific syscalls */
-#define SYS_serial_read				25
-#define SYS_serial_write			26
-#define SYS_eth_read				27
-#define SYS_eth_write				28
-#define SYS_eth_get_mac_addr			29
-#define SYS_eth_recv_check			30
+#define SYS_serial_read				75
+#define SYS_serial_write			76
+#define SYS_eth_read				77
+#define SYS_eth_write				78
+#define SYS_eth_get_mac_addr		79
+#define SYS_eth_recv_check			80
 
 #define SYS_read				100
 #define SYS_write				101

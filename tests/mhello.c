@@ -52,7 +52,19 @@ int main(int argc, char** argv)
 		retval = hart_request(2); // doesn't do what you think.  this gives 3.
 		//debug("retval = %d\n", retval);
 	}
-	printf("Vcore %d Done!\n", vcoreid);
+
+	/* test notifying my vcore2 */
+	udelay(5000000);
+	printf("Vcore 0 self-notifying vcore 2 with notif 4!\n");
+	struct notif_event ne;
+	ne.ne_type = 4;
+	sys_self_notify(2, 4, &ne);
+	udelay(5000000);
+	printf("Vcore 0 notifying itself with notif 3!\n");
+	ne.ne_type = 3;
+	sys_notify(sys_getpid(), 3, &ne);
+	udelay(1000000);
+
 	/* test loop for restarting a notif_tf */
 	if (vcoreid == 0) {
 		int ctr = 0;
@@ -62,6 +74,7 @@ int main(int argc, char** argv)
 		}
 	}
 
+	printf("Vcore %d Done!\n", vcoreid);
 	hart_barrier_wait(&b,hart_self());
 
 	printf("All Cores Done!\n", vcoreid);

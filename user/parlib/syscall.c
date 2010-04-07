@@ -134,3 +134,13 @@ void *CT(length) sys_mmap(void *SNT addr, size_t length, int prot, int flags,
 	                                       prot, &extra_args, 0));
 }
 
+int sys_notify(int pid, unsigned int notif, struct notif_event *ne)
+{
+	return ros_syscall(SYS_notify, pid, notif, ne, 0, 0);
+}
+
+int sys_self_notify(uint32_t vcoreid, unsigned int notif,
+                    struct notif_event *ne)
+{
+	return ros_syscall(SYS_self_notify, vcoreid, notif, ne, 0, 0);
+}
