@@ -222,6 +222,7 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 
 .$(BINARY_PREFIX)ros-headers-install: $(ROSDIR)
 	rm -rf $(INSTDIR)/$(ARCH)-ros/sys-include/ros/*
+	mkdir -p $(INSTDIR)/$(ARCH)-ros/sys-include
 	cp -r $(ROSDIR)/kern/include/ros \
 	   $(INSTDIR)/$(ARCH)-ros/sys-include/
 	rm -f $(INSTDIR)/$(ARCH)-ros/sys-include/ros/arch
