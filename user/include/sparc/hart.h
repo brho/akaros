@@ -24,4 +24,17 @@ static inline void pop_ros_tf(struct user_trapframe *tf, bool *notif_en_loc)
 	// TODO: whatever sparc needs.
 }
 
+/* Feel free to ignore vcoreid.  It helps x86 to avoid a call to
+ * sys_getvcoreid() if we pass it in. */
+static inline void *get_tls_desc(uint32_t vcoreid)
+{
+	void *tmp;
+	asm volatile ("mov %%g7,%0" : "=r"(tmp));
+	return tmp;
+}
+
+static inline void set_tls_desc(void *tls_desc, uint32_t vcoreid)
+{
+	asm volatile ("mov %0,%%g7" : : "r"(tls_desc) : "memory");
+}
 #endif /* PARLIB_ARCH_HART_H */

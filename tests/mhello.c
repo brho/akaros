@@ -13,6 +13,7 @@
 hart_barrier_t b;
 
 __thread int temp;
+void *core0_tls = 0;
 
 int main(int argc, char** argv)
 {
@@ -32,6 +33,10 @@ int main(int argc, char** argv)
 		nm->flags |= NOTIF_WANTED | NOTIF_MSG | NOTIF_IPI;
 		nm->vcoreid = i % 2; // vcore0 or 1, keepin' it fresh.
 	}
+
+	/* Need to save this somewhere that you can find it again when restarting
+	 * core0 */
+	core0_tls = get_tls_desc(0);
 
 	/* don't forget to enable notifs on vcore0 at some point */
 	struct preempt_data *vcpd;
@@ -53,6 +58,7 @@ int main(int argc, char** argv)
 		//debug("retval = %d\n", retval);
 	}
 
+#if 0
 	/* test notifying my vcore2 */
 	udelay(5000000);
 	printf("Vcore 0 self-notifying vcore 2 with notif 4!\n");
@@ -64,12 +70,13 @@ int main(int argc, char** argv)
 	ne.ne_type = 3;
 	sys_notify(sys_getpid(), 3, &ne);
 	udelay(1000000);
+#endif
 
 	/* test loop for restarting a notif_tf */
 	if (vcoreid == 0) {
 		int ctr = 0;
 		while(1) {
-			printf("Vcore %d Spinning (%d)!\n", vcoreid, ctr++);
+			printf("Vcore %d Spinning (%d), temp = %08x!\n", vcoreid, ctr++, temp);
 			udelay(5000000);
 		}
 	}
@@ -86,6 +93,7 @@ void hart_entry(void)
 {
 	uint32_t vcoreid = hart_self();
 
+	temp = 0xcafebabe;
 /* begin: stuff userspace needs to do to handle notifications */
 
 	struct preempt_data *vcpd;
@@ -107,6 +115,7 @@ void hart_entry(void)
 	 * entry for this vcore to point to the TCB of the new user-thread. */
 	if (vcoreid == 0) {
 		printf("restarting vcore0 from userspace\n");
+		set_tls_desc(core0_tls, 0);
 		pop_ros_tf(&vcpd->notif_tf, &vcpd->notif_enabled);
 		panic("should never see me!");
 	}	
@@ -118,7 +127,6 @@ void hart_entry(void)
 	
 /* end: stuff userspace needs to do to handle notifications */
 
-	temp = 0xcafebabe;
 	printf("Hello from hart_entry in vcore %d with temp addr %p and temp %p\n",
 	       vcoreid, &temp, temp);
 	hart_barrier_wait(&b,hart_self());
