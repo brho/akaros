@@ -46,16 +46,28 @@ __internal_setbrk (uintptr_t addr)
     if(real_new_brk > BRK_END)
       return -1;
 
-    return mmap((void*)real_brk, real_new_brk-real_brk,
-                PROT_READ | PROT_WRITE | PROT_EXEC,
-                MAP_FIXED | MAP_ANONYMOUS, -1, 0) == (void*)real_brk ? 0 : -1;
+	/* Set the new curbrk on success, return -1 o/w */
+    if (mmap((void*)real_brk, real_new_brk-real_brk,
+             PROT_READ | PROT_WRITE | PROT_EXEC,
+             MAP_FIXED | MAP_ANONYMOUS, -1, 0) == (void*)real_brk) {
+		curbrk = real_new_brk;
+		return 0;
+	} else {
+		return -1;
+	}
   }
   else if(real_new_brk < real_brk)
   {
     if(real_new_brk < (uintptr_t)__procinfo.heap_bottom)
       return -1;
 
-    return munmap((void*)real_new_brk, real_brk - real_new_brk);
+	/* Set the new curbrk on success, return -1 o/w */
+    if (!munmap((void*)real_new_brk, real_brk - real_new_brk)) {
+		curbrk = real_new_brk;
+		return 0;
+	} else {
+		return -1;
+	}
   }
 
   curbrk = addr;
