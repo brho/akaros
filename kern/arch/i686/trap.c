@@ -235,7 +235,8 @@ trap(trapframe_t *tf)
 	 * In general, only save the tf and any silly state once you know it
 	 * is necessary (blocking).  And only save it in env_tf when you know you
 	 * are single core (PROC_RUNNING_S) */
-	set_current_tf(tf);
+	if (!in_kernel(tf))
+		set_current_tf(tf);
 
 	if ((tf->tf_cs & ~3) != GD_UT && (tf->tf_cs & ~3) != GD_KT) {
 		print_trapframe(tf);
@@ -252,8 +253,8 @@ trap(trapframe_t *tf)
 void
 irq_handler(trapframe_t *tf)
 {
-	// save a per-core reference to the tf
-	set_current_tf(tf);
+	if (!in_kernel(tf))
+		set_current_tf(tf);
 	//if (core_id())
 	//	cprintf("Incoming IRQ, ISR: %d on core %d\n", tf->tf_trapno, core_id());
 	// merge this with alltraps?  other than the EOI... or do the same in all traps
@@ -364,8 +365,8 @@ void sysenter_init(void)
 /* This is called from sysenter's asm, with the tf on the kernel stack. */
 void sysenter_callwrapper(struct trapframe *tf)
 {
-	// save a per-core reference to the tf
-	set_current_tf(tf);
+	if (!in_kernel(tf))
+		set_current_tf(tf);
 
 	// syscall code wants an edible reference for current
 	proc_incref(current, 1);

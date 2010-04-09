@@ -384,7 +384,8 @@ handle_syscall(trapframe_t* state)
 	 * In general, only save the tf and any silly state once you know it
 	 * is necessary (blocking).  And only save it in env_tf when you know you
 	 * are single core (PROC_RUNNING_S) */
-	set_current_tf(state);
+	if (!in_kernel(state))
+		set_current_tf(state);
 
 	// syscall code wants an edible reference for current
 	proc_incref(current, 1);

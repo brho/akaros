@@ -132,10 +132,13 @@ void proc_decref(struct proc *SAFE p, size_t count);
 #define current per_cpu_info[core_id()].cur_proc
 #define set_current_proc(p) per_cpu_info[core_id()].cur_proc = (p)
 
-/* Allows the kernel to figure out what tf is on this core's stack.  Can be used
+/* Allows the kernel to figure out what *user* tf is on this core's stack.  Can be used
  * just like a pointer to a struct Trapframe.  Need these to be macros due to
  * some circular dependencies with smp.h.  This is done here instead of
- * elsewhere (like trap.h) for other elliptical reasons. */
+ * elsewhere (like trap.h) for other elliptical reasons.  Note the distinction
+ * between kernel and user contexts.  The kernel always returns to its nested,
+ * interrupted contexts via iret/etc.  We don't always do that for user
+ * contexts. */
 #define current_tf per_cpu_info[core_id()].cur_tf
 #define set_current_tf(tf) per_cpu_info[core_id()].cur_tf = (tf)
 

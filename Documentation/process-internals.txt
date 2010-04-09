@@ -9,9 +9,10 @@ they muck with how processes work.
 Contents:
 1. Reference Counting
 2. When Do We Really Leave "Process Context"?
-3. Leaving the Kernel Stack:
-4. Preemption and Notification Issues:
-5. TBD
+3. Leaving the Kernel Stack
+4. Preemption and Notification Issues
+5. Current_tf
+6. TBD
 
 1. Reference Counting
 ===========================
@@ -650,5 +651,28 @@ We also considered using the transition stack as a signal that a process is in
 a notification handler.  The kernel can inspect the stack pointer to determine
 this.  It's possible, but unnecessary.
 
-5. TBD
+5. current_tf
+===========================
+current_tf is a per-core macro that returns a struct trapframe * that points
+back on the kernel stack to the user context that was running on the given core
+when an interrupt or trap happened.  Saving the reference to the TF helps
+simplify code that needs to do something with the TF (like save it and pop
+another TF).  This way, we don't need to pass the context all over the place,
+especially through code that might not care.
+
+current_tf should go along with current.  It's the current_tf of the current
+process.  Withouth 'current', it has no meaning.
+
+It does not point to kernel trapframes, which is important when we receive an
+interrupt in the kernel.  At one point, we were (hypothetically) clobbering the
+reference to the user trapframe, and were unable to recover.  We can get away
+with this because the kernel always returns to its previous context from a
+nested handler (via iret on x86).  
+
+In the future, we may need to save kernel contexts and may not always return via
+iret.  At which point, if the code path is deep enough that we don't want to
+carry the TF pointer, we may revisit this.  Until then, current_tf is just for
+userspace contexts, and is simply stored in per_cpu_info.
+
+6. TBD
 ===========================
