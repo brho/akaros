@@ -19,7 +19,6 @@ struct vcore {
 	bool				valid;
 	bool				preempt_served;
 	uint64_t			preempt_pending;
-	struct trapframe	*tf_to_run;
 };
 
 struct pcore {

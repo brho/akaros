@@ -49,6 +49,7 @@ static void put_idle_core(uint32_t coreid)
 }
 
 /* Other helpers, implemented later. */
+static void __proc_startcore(struct proc *p, trapframe_t *tf);
 static uint32_t get_free_vcoreid(struct proc *SAFE p, uint32_t prev);
 static uint32_t get_busy_vcoreid(struct proc *SAFE p, uint32_t prev);
 static bool is_mapped_vcore(struct proc *p, uint32_t pcoreid);
@@ -398,10 +399,17 @@ void proc_run(struct proc *p)
 			p->procinfo->num_vcores = 0;
 			__map_vcore(p, 0, core_id()); // sort of.  this needs work.
 			__seq_end_write(&p->procinfo->coremap_seqctr);
-			p->env_refcnt++; // TODO: (REF) use incref
-			p->procinfo->vcoremap[0].tf_to_run = &p->env_tf;
-			send_kernel_message(core_id(), __startcore, p, 0, 0, KMSG_ROUTINE);
-			__proc_unlock_ipi_pending(p, TRUE);
+			/* __proc_startcore assumes the reference we give it is for current.
+			 * Decref if current is already properly set. */
+			if (p == current)
+				p->env_refcnt--; // TODO: (REF) use incref
+			/* We don't want to process routine messages here, since it's a bit
+			 * different than when we perform a syscall in this process's
+			 * context.  We keep interrupts disabled so that if there was a
+			 * routine message on the way, we'll get the interrupt once we pop
+			 * back to userspace.  Note the use of a regular unlock. */
+			spin_unlock(&p->proc_lock);
+			__proc_startcore(p, &p->env_tf);
 			break;
 		case (PROC_RUNNABLE_M):
 			/* vcoremap[i] holds the coreid of the physical core allocated to
@@ -416,11 +424,6 @@ void proc_run(struct proc *p)
 				 * an IPI (once we reenable interrupts) and never return. */
 				if (is_mapped_vcore(p, core_id()))
 					self_ipi_pending = TRUE;
-				// TODO: handle silly state (HSS)
-				/* others should be zeroed after a previous use too. */
-				// TODO: remove me
-				for (int i = 0; i < p->procinfo->num_vcores; i++)
-					assert(!p->procinfo->vcoremap[i].tf_to_run);
 				for (int i = 0; i < p->procinfo->num_vcores; i++)
 					send_kernel_message(p->procinfo->vcoremap[i].pcoreid,
 					                    (void *)__startcore, (void *)p, 0, 0,
@@ -845,8 +848,6 @@ bool __proc_give_cores(struct proc *SAFE p, uint32_t *pcorelist, size_t num)
 				       pcorelist[i]);
 				__map_vcore(p, free_vcoreid, pcorelist[i]);
 				p->procinfo->num_vcores++;
-				/* should be a fresh core */
-				assert(!p->procinfo->vcoremap[i].tf_to_run);
 				send_kernel_message(pcorelist[i], __startcore, p, 0, 0,
 				                    KMSG_ROUTINE);
 				if (pcorelist[i] == core_id())
@@ -1062,32 +1063,23 @@ void __startcore(trapframe_t *tf, uint32_t srcid, void *a0, void *a1, void *a2)
 {
 	uint32_t pcoreid = core_id(), vcoreid;
 	struct proc *p_to_run = (struct proc *CT(1))a0;
-	struct trapframe local_tf, *tf_to_pop;
+	struct trapframe local_tf;
 	struct preempt_data *vcpd;
 
 	assert(p_to_run);
 	vcoreid = get_vcoreid(p_to_run, pcoreid);
-	tf_to_pop = p_to_run->procinfo->vcoremap[vcoreid].tf_to_run;
 	printd("[kernel] startcore on physical core %d for process %d's vcore %d\n",
 	       pcoreid, p_to_run->pid, vcoreid);
-	// TODO: handle silly state (HSS)
-	if (!tf_to_pop) {
-		tf_to_pop = &local_tf;
-		memset(tf_to_pop, 0, sizeof(*tf_to_pop));
-		proc_init_trapframe(tf_to_pop, vcoreid, p_to_run->env_entry,
-		                    p_to_run->procdata->stack_pointers[vcoreid]);
-		/* Disable/mask active notifications for fresh vcores */
-		vcpd = &p_to_run->procdata->vcore_preempt_data[vcoreid];
-		vcpd->notif_enabled = FALSE;
-	} else {
-		/* Don't want to accidentally reuse this tf (saves on a for loop in
-		 * proc_run, though we check there to be safe for now). */
-		p_to_run->procinfo->vcoremap[vcoreid].tf_to_run = 0;
-	}
+	memset(&local_tf, 0, sizeof(local_tf));
+	proc_init_trapframe(&local_tf, vcoreid, p_to_run->env_entry,
+	                    p_to_run->procdata->stack_pointers[vcoreid]);
+	/* Disable/mask active notifications for fresh vcores */
+	vcpd = &p_to_run->procdata->vcore_preempt_data[vcoreid];
+	vcpd->notif_enabled = FALSE;
 	/* the sender of the amsg increfed, thinking we weren't running current. */
 	if (p_to_run == current)
 		proc_decref(p_to_run, 1);
-	__proc_startcore(p_to_run, tf_to_pop);
+	__proc_startcore(p_to_run, &local_tf);
 }
 
 /* Bail out if it's the wrong process, or if they no longer want a notif */
