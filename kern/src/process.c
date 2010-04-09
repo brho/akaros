@@ -417,15 +417,9 @@ void proc_run(struct proc *p)
 				if (is_mapped_vcore(p, core_id()))
 					self_ipi_pending = TRUE;
 				// TODO: handle silly state (HSS)
-				// set virtual core 0 to run the main context on transition
-				if (p->env_flags & PROC_TRANSITION_TO_M) {
-					p->env_flags &= !PROC_TRANSITION_TO_M;
-					p->procinfo->vcoremap[0].tf_to_run = &p->env_tf;
-				} else {
-					assert(!p->procinfo->vcoremap[0].tf_to_run);
-				}
 				/* others should be zeroed after a previous use too. */
-				for (int i = 1; i < p->procinfo->num_vcores; i++)
+				// TODO: remove me
+				for (int i = 0; i < p->procinfo->num_vcores; i++)
 					assert(!p->procinfo->vcoremap[i].tf_to_run);
 				for (int i = 0; i < p->procinfo->num_vcores; i++)
 					send_kernel_message(p->procinfo->vcoremap[i].pcoreid,

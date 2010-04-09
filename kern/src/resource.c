@@ -100,13 +100,9 @@ ssize_t core_request(struct proc *p)
 				// TODO: relies on vcore0 being the caller (VC#)
 				if ((current != p) || (p->procinfo->vcoremap[0].pcoreid != core_id()))
 					panic("We don't handle async RUNNING_S core requests yet.");
-				/* save the tf to be restarted on another core (in proc_run) */
-				p->env_tf = *current_tf;
-				env_push_ancillary_state(p);
-				/* set the return code to 0. since we're transitioning, vcore0
-				 * will start up with the tf manually, and not get the return
-				 * value through the regular syscall return path */
-				proc_set_syscall_retval(&p->env_tf, ESUCCESS);
+				/* save the tf so userspace can restart it.  Like in __notify,
+				 * this assumes a user tf is the same as a kernel tf. */
+				p->procdata->vcore_preempt_data[0].notif_tf = *current_tf;
 				/* in the async case, we'll need to remotely stop and bundle
 				 * vcore0's TF.  this is already done for the sync case (local
 				 * syscall). */
@@ -121,8 +117,6 @@ ssize_t core_request(struct proc *p)
 				need_to_idle = TRUE;
 				// change to runnable_m (it's TF is already saved)
 				__proc_set_state(p, PROC_RUNNABLE_M);
-				// signals to proc_run that this is a _S to _M transition
-				p->env_flags |= PROC_TRANSITION_TO_M;
 				break;
 			case (PROC_RUNNABLE_S):
 				/* Issues: being on the runnable_list, proc_set_state not liking

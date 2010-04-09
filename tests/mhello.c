@@ -37,6 +37,8 @@ int main(int argc, char** argv)
 	/* Need to save this somewhere that you can find it again when restarting
 	 * core0 */
 	core0_tls = get_tls_desc(0);
+	/* Need to save our floating point state somewhere (like in the
+	 * user_thread_tcb so it can be restarted too */
 
 	/* don't forget to enable notifs on vcore0 at some point */
 	struct preempt_data *vcpd;
@@ -55,7 +57,8 @@ int main(int argc, char** argv)
 		//retval = sys_resource_req(RES_CORES, 2, 0);
 		//retval = hart_request(hart_max_harts()-2);
 		retval = hart_request(2); // doesn't do what you think.  this gives 3.
-		//debug("retval = %d\n", retval);
+		//printf("retval = %d\n", retval);
+		printf("This is vcore0, right after hart_request\n");
 	}
 
 #if 0
@@ -116,6 +119,7 @@ void hart_entry(void)
 	if (vcoreid == 0) {
 		printf("restarting vcore0 from userspace\n");
 		set_tls_desc(core0_tls, 0);
+		/* Load silly state (Floating point) too */
 		pop_ros_tf(&vcpd->notif_tf, &vcpd->notif_enabled);
 		panic("should never see me!");
 	}	
