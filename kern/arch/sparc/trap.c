@@ -283,6 +283,20 @@ stack_fucked(trapframe_t* state)
 }
 
 void
+fill_misaligned(trapframe_t* state)
+{
+	state->tbr = (state->tbr & ~0xFFF) | 0x070;
+	stack_fucked(state);
+}
+
+void
+fill_pagefault(trapframe_t* state)
+{
+	state->tbr = (state->tbr & ~0xFFF) | 0x090;
+	stack_fucked(state);
+}
+
+void
 stack_misaligned(trapframe_t* state)
 {
 	state->tbr = (state->tbr & ~0xFFF) | 0x070;

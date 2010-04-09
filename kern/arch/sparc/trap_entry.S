@@ -160,9 +160,12 @@ env_save_tf:
 	lda	[%g0] 4,%o2
 	or	%o2,2,%o3
 	sta	%o3,[%g0] 4
-	ld	[%o1],%o1
-	st	%o1,[%o0+156]
+	mov	-1,%o3
+	ld	[%o1],%o3
+	st	%o3,[%o0+156]
 	sta	%o2,[%g0] 4
+	mov	0x300,%o4
+	lda	[%o4] 4,%g0
 
 	std	%g0,[%o0+ 0]
 	std	%g2,[%o0+ 8]

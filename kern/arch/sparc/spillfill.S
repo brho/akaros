@@ -63,15 +63,15 @@ handle_window_overflow:
 	jmp	%l1
 	rett	%l2
 
-	.global handle_window_underflow
+/*	.global handle_window_underflow
 handle_window_underflow:
 	sethi	%hi(fill),%l7
 	jmpl	%l7+%lo(fill),%l7
 	 nop
 	jmp	%l1
-	rett	%l2
+	rett	%l2*/
 
-! after handling a window trap, spill/fill will return to window_rett+8,
+! after handling a window trap, spill will return to window_rett+8,
 ! so these two nops are necessary!
 	.global	window_rett
 window_rett:
@@ -125,30 +125,27 @@ spill_patchme:
 2:	restore
 	RETHROW_TRAP(stack_pagefault)
 
-! preconditions:
-! WIM & (1<<((CWP+2)%NWINDOWS)) != 0
-! link address in %l7
-! postconditions:
-! CWP same, but (CWP+2)%NWINDOWS now valid
-! %l0, %l1, %l2, %l5, %l6 have not changed
-.global fill 
-fill:
-	mov	%g1,%l4
+.global handle_window_underflow
+handle_window_underflow:
 	mov	%wim,%l3
+	mov	%g1,%l4
+	mov	%psr,%l5
 	mov	%g0,%wim
 
-	! this will be patched at runtime; 0 is really NWINDOWS-1
 .global fill_patchme
 fill_patchme:
-	srl	%l3,0,%g1
-
-	and	%g1,1,%g1
-	sll	%l3,1,%l3
-	or	%g1,%l3,%g1
+	srl	%l3,0,%l7		! srl %l3,NWINDOWS-1,%l3
+	and	%l7,1,%l7
+	sll	%l3,1,%l6
+	or	%l7,%l6,%l6
 
 	restore
 	restore
-	VALIDATE_STACK(%l0,%l1,3f,4f)
+	btst	7,%sp
+	bne	2f
+	 lda	[%g0] 4,%g1		! do the fill in no-fault mode
+	or	%g1,2,%g1		! NF = 1
+	sta	%g1,[%g0] 4
 	ldd	[%sp+ 0],%l0
 	ldd	[%sp+ 8],%l2
 	ldd	[%sp+16],%l4
@@ -159,17 +156,34 @@ fill_patchme:
 	ldd	[%sp+56],%i6
 	save
 	save
-	mov	%g1,%wim
-	nop
 
-	jmp	%l7+8
+	xor	%g1,2,%g1
+	sta	%g1,[%g0] 4		! NF = 0
+	mov	0x300,%g1
+	lda	[%g1] 4,%g1
+	btst	0x1C,%g1		! FT != 0 ?
+	bne	1f
+	 mov	%l4,%g1
+
+	// success!
+	mov	%l5,%psr
+	mov	%l6,%wim
+	jmp	%l1
+	 rett	%l2
+
+1:	// page fault
+	mov	%l3,%wim
+	mov	%l5,%psr
+	set	trap_table_pagefault,%l6
+	jmp	%l6
+	 nop
+
+2:	// fill misaligned
+	save
+	save
 	mov	%l4,%g1
-
-
-// spill failed!
-3:	save
-	save
-	RETHROW_TRAP(stack_misaligned)
-4:	save
-	save
-	RETHROW_TRAP(stack_pagefault)
+	mov	%l3,%wim
+	mov	%l5,%psr
+	set	trap_table_misaligned,%l6
+	jmp	%l6
+	 nop

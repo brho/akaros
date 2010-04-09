@@ -15,8 +15,12 @@ trap_table:
 
 #ifndef TINY_MEM
 
+.global trap_table_misaligned
+trap_table_misaligned:
 	TRAP_TABLE_ENTRY(address_unaligned)	! 0x07
 	JMP(fast_fp_exception)			! 0x08
+.global trap_table_pagefault
+trap_table_pagefault:
 	TRAP_TABLE_ENTRY(data_access_exception)	! 0x09
 	UNHANDLED_TRAP				! 0x0A
 	UNHANDLED_TRAP				! 0x0B
