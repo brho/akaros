@@ -35,6 +35,7 @@ smp_init(void)
 {
 	static spinlock_t report_in_lock = SPINLOCK_INITIALIZER;
 
+	smp_percpu_init();
 	spin_lock(&report_in_lock);
 	num_cpus++;
 	spin_unlock(&report_in_lock);

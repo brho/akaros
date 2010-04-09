@@ -188,15 +188,16 @@ void proc_init(void)
 	int reserved_cores = 1;
 	#ifdef __CONFIG_NETWORKING__
 	reserved_cores++; // Next core is dedicated to the NIC
+	assert(num_cpus >= reserved_cores);
 	#endif
 	#ifdef __CONFIG_APPSERVER__
 	#ifdef __CONFIG_DEDICATED_MONITOR__
 	reserved_cores++; // Next core dedicated to running the kernel monitor
+	assert(num_cpus >= reserved_cores);
 	// Need to subtract 1 from the reserved_cores # to get the cores index
 	send_kernel_message(reserved_cores-1, (amr_t)monitor, 0,0,0, KMSG_ROUTINE);
 	#endif
 	#endif
-	assert(num_cpus >= reserved_cores);
 	num_idlecores = num_cpus - reserved_cores;
 	for (int i = 0; i < num_idlecores; i++)
 		idlecoremap[i] = i + reserved_cores;
