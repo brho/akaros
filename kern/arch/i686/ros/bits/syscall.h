@@ -69,7 +69,7 @@ static inline intreg_t __syscall_trap(uint16_t num, intreg_t a1,
 	// memory locations.
 
 	asm volatile(""
-	             " int %1"
+	             " int %2"
 	             : "=a" (ret),
 	               "=S" (err)
 	             : "i" (T_SYSCALL),
