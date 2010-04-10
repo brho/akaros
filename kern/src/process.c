@@ -1082,9 +1082,9 @@ void __startcore(trapframe_t *tf, uint32_t srcid, void *a0, void *a1, void *a2)
 	__proc_startcore(p_to_run, &local_tf);
 }
 
-/* Bail out if it's the wrong process, or if they no longer want a notif */
-// TODO: think about what TF this is: make sure it's the user one, and not a
-// kernel one (was it interrupted, or proc_kmsgs())
+/* Bail out if it's the wrong process, or if they no longer want a notif.  Make
+ * sure that you are passing in a user tf (otherwise, it's a bug).  Try not to
+ * grab locks or write access to anything that isn't per-core in here. */
 void __notify(trapframe_t *tf, uint32_t srcid, void *a0, void *a1, void *a2)
 {
 	struct user_trapframe local_tf;
@@ -1094,19 +1094,19 @@ void __notify(trapframe_t *tf, uint32_t srcid, void *a0, void *a1, void *a2)
 
 	if (p != current)
 		return;
-	// TODO: think about locking here.  document why we don't need this
+	assert(!in_kernel(tf));
+	/* We shouldn't need to lock here, since unmapping happens on the pcore and
+	 * mapping would only happen if the vcore was free, which it isn't until
+	 * after we unmap. */
 	vcoreid = p->procinfo->pcoremap[core_id()].vcoreid;
 	vcpd = &p->procdata->vcore_preempt_data[vcoreid];
-
 	printd("received active notification for proc %d's vcore %d on pcore %d\n",
 	       p->procinfo->pid, vcoreid, core_id());
-
 	/* sort signals.  notifs are now masked, like an interrupt gate */
 	if (!vcpd->notif_enabled)
 		return;
 	vcpd->notif_enabled = FALSE;
 	vcpd->notif_pending = FALSE; // no longer pending - it made it here
-	
 	/* save the old tf in the notify slot, build and pop a new one.  Note that
 	 * silly state isn't our business for a notification. */	
 	// TODO: this is assuming the struct user_tf is the same as a regular TF
@@ -1115,7 +1115,6 @@ void __notify(trapframe_t *tf, uint32_t srcid, void *a0, void *a1, void *a2)
 	proc_init_trapframe(&local_tf, vcoreid, p->env_entry,
 	                    p->procdata->stack_pointers[vcoreid]);
 	__proc_startcore(p, &local_tf);
-
 }
 
 /* Stop running whatever context is on this core, load a known-good cr3, and

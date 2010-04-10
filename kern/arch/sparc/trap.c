@@ -235,7 +235,8 @@ void process_routine_kmsg(void)
 			send_ipi(core_id());
 		/* Execute the kernel message */
 		assert(msg_cp.pc);
-		msg_cp.pc(0, msg_cp.srcid, msg_cp.arg0, msg_cp.arg1, msg_cp.arg2);
+		msg_cp.pc(current_tf, msg_cp.srcid, msg_cp.arg0, msg_cp.arg1,
+		          msg_cp.arg2);
 	}
 }
 
