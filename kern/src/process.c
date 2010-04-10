@@ -1068,13 +1068,13 @@ void __startcore(trapframe_t *tf, uint32_t srcid, void *a0, void *a1, void *a2)
 
 	assert(p_to_run);
 	vcoreid = get_vcoreid(p_to_run, pcoreid);
+	vcpd = &p_to_run->procdata->vcore_preempt_data[vcoreid];
 	printd("[kernel] startcore on physical core %d for process %d's vcore %d\n",
 	       pcoreid, p_to_run->pid, vcoreid);
 	memset(&local_tf, 0, sizeof(local_tf));
 	proc_init_trapframe(&local_tf, vcoreid, p_to_run->env_entry,
-	                    p_to_run->procdata->stack_pointers[vcoreid]);
+	                    vcpd->transition_stack);
 	/* Disable/mask active notifications for fresh vcores */
-	vcpd = &p_to_run->procdata->vcore_preempt_data[vcoreid];
 	vcpd->notif_enabled = FALSE;
 	/* the sender of the amsg increfed, thinking we weren't running current. */
 	if (p_to_run == current)
@@ -1113,7 +1113,7 @@ void __notify(trapframe_t *tf, uint32_t srcid, void *a0, void *a1, void *a2)
 	vcpd->notif_tf = *tf;
 	memset(&local_tf, 0, sizeof(local_tf));
 	proc_init_trapframe(&local_tf, vcoreid, p->env_entry,
-	                    p->procdata->stack_pointers[vcoreid]);
+	                    vcpd->transition_stack);
 	__proc_startcore(p, &local_tf);
 }
 

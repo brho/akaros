@@ -56,7 +56,8 @@ static void hart_free_stack(int id)
 
 static int hart_allocate_stack(int id)
 {
-	if(__procdata.stack_pointers[id])
+	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[id];
+	if (vcpd->transition_stack)
 		return 0; // reuse old stack
 
 	void* stackbot = mmap(0, HART_STACK_SIZE,
@@ -66,7 +67,7 @@ static int hart_allocate_stack(int id)
 	if(stackbot == MAP_FAILED)
 		return -1; // errno set by mmap
 
-	__procdata.stack_pointers[id] = (uintptr_t)stackbot + HART_STACK_SIZE;
+	vcpd->transition_stack = (uintptr_t)stackbot + HART_STACK_SIZE;
 
 	return 0;
 }

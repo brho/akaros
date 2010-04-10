@@ -19,8 +19,6 @@ typedef struct procdata {
 #ifdef __i386__
 	segdesc_t				*ldt; // TODO: bug with this. (TLSV)
 #endif
-	// TODO: will replace these in a later commit
-	uintptr_t stack_pointers[MAX_NUM_CPUS];
 	/* glibc relies on stuff above this point.  if you change it, you need to
 	 * rebuild glibc. */
 	struct notif_method		notif_methods[MAX_NR_NOTIF];

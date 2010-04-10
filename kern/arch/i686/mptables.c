@@ -172,7 +172,7 @@ void mptables_parse() {
 		panic("MPTABLES Not found. IOAPIC and interrupts will not function properly. <Insert whale held up by smaller birds here>");
 	}
 	
-	mptables_info("-->MPTables Floating Pointer Structure found @ KVA 0x%p.\n", mpfps);
+	mptables_info("-->MPTables Floating Pointer Structure found @ KVA %08p.\n", mpfps);
 	
 	mptables_info("-->Current Interrupt Mode: ");
 	// Identify our interrupt mode
