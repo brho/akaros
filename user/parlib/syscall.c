@@ -91,11 +91,7 @@ ssize_t sys_eth_read(void* buf, size_t len)
 /* Request resources from the kernel.  Flags in ros/resource.h. */
 ssize_t sys_resource_req(int type, size_t amt_max, size_t amt_min, uint32_t flags)
 {
-#ifdef __i386__
-	return syscall_trap(SYS_resource_req, type, amt_max, amt_min, flags, 0);
-#else
 	return ros_syscall(SYS_resource_req, type, amt_max, amt_min, flags, 0);
-#endif
 }
 
 void sys_reboot()

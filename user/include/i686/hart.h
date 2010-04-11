@@ -22,11 +22,16 @@
  * running. */
 static inline void pop_ros_tf(struct user_trapframe *tf, bool *notif_en_loc)
 {
+	if (!tf->tf_cs) { /* sysenter TF.  esp and eip are in other regs. */
+		tf->tf_esp = tf->tf_regs.reg_ebp;
+		tf->tf_eip = tf->tf_regs.reg_edx;
+	}
 	asm volatile ("movl %2,-4(%1);          " /* push the PC */
 	              "movl %3,-12(%1);         " /* leave room for eax, push loc */
 	              "movl %0,%%esp;           " /* pop the real tf */
 	              "popal;                   "
-	              "addl $0x24,%%esp;        " /* move to the %esp in the tf */
+	              "addl $0x20,%%esp;        " /* move to the eflags in the tf */
+	              "popfl;                   " /* restore eflags */
 	              "popl %%esp;              " /* change to the new %esp */
 	              "subl $0x4,%%esp;         " /* move esp to the slot for eax */
 	              "pushl %%eax;             " /* save eax, will clobber soon */
