@@ -68,6 +68,7 @@ static inline intreg_t __syscall_trap(uint16_t num, intreg_t a1,
 	// potentially change the condition codes and arbitrary
 	// memory locations.
 
+	/* If you change this, change pop_ros_tf() */
 	asm volatile(""
 	             " int %2"
 	             : "=a" (ret),

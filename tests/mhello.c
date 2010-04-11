@@ -28,7 +28,7 @@ int main(int argc, char** argv)
 
 	/* tell the kernel where and how we want to receive notifications */
 	struct notif_method *nm;
-	for (int i = 1; i < MAX_NR_NOTIF; i++) {
+	for (int i = 0; i < MAX_NR_NOTIF; i++) {
 		nm = &__procdata.notif_methods[i];
 		nm->flags |= NOTIF_WANTED | NOTIF_MSG | NOTIF_IPI;
 		nm->vcoreid = i % 2; // vcore0 or 1, keepin' it fresh.
@@ -95,6 +95,7 @@ int main(int argc, char** argv)
 void hart_entry(void)
 {
 	uint32_t vcoreid = hart_self();
+	static bool first_time = TRUE;
 
 	temp = 0xcafebabe;
 /* begin: stuff userspace needs to do to handle notifications */
@@ -118,9 +119,16 @@ void hart_entry(void)
 	 * entry for this vcore to point to the TCB of the new user-thread. */
 	if (vcoreid == 0) {
 		printf("restarting vcore0 from userspace\n");
+		/* Do one last check for notifs before clearing pending */
+		vcpd->notif_pending = 0;
+		if (first_time) { // testing for missing a notif
+			first_time = FALSE;
+			printf("setting pending, trying to renotify etc\n");
+			vcpd->notif_pending = 1;
+		}
 		set_tls_desc(core0_tls, 0);
 		/* Load silly state (Floating point) too */
-		pop_ros_tf(&vcpd->notif_tf, &vcpd->notif_enabled);
+		pop_ros_tf(&vcpd->notif_tf, vcoreid);
 		panic("should never see me!");
 	}	
 	/* unmask notifications once you can let go of the notif_tf and it is okay

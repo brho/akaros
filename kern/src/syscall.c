@@ -594,12 +594,14 @@ static int sys_notify(struct proc *p, int target_pid, unsigned int notif,
 }
 
 /* Will notify the calling process on the given vcore, independently of WANTED
- * or advertised vcoreid. */
+ * or advertised vcoreid.  If you change the parameters, change pop_ros_tf() */
 static int sys_self_notify(struct proc *p, uint32_t vcoreid, unsigned int notif,
                            struct notif_event *u_ne)
 {
 	struct notif_event local_ne;
 
+	printd("[kernel] received self notify for vcoreid %d, notif %d, ne %08p\n",
+	       vcoreid, notif, u_ne);
 	/* if the user provided a notif_event, copy it in and use that */
 	if (u_ne) {
 		if (memcpy_from_user(p, &local_ne, u_ne, sizeof(struct notif_event))) {

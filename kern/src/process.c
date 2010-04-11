@@ -722,18 +722,20 @@ void do_notify(struct proc *p, uint32_t vcoreid, unsigned int notif,
 	 * briefly and the kernel immediately returns back once it realizes notifs
 	 * are masked.  To fix it, we'll need atomic_swapb() (right answer), or not
 	 * use a bool. (wrong answer). */
-	if (nm->flags & NOTIF_IPI && vcpd->notif_enabled && !vcpd->notif_pending) {
+	if (nm->flags & NOTIF_IPI && !vcpd->notif_pending) {
 		vcpd->notif_pending = TRUE;
-		spin_lock_irqsave(&p->proc_lock);
-			if ((p->state & PROC_RUNNING_M) && // TODO: (VC#) (_S state)
-			              (p->procinfo->vcoremap[vcoreid].valid)) {
-				printk("[kernel] sending notif to vcore %d\n", vcoreid);
-				send_kernel_message(p->procinfo->vcoremap[vcoreid].pcoreid,
-				                    __notify, p, 0, 0, KMSG_ROUTINE);
-			} else { // TODO: think about this, fallback, etc
-				warn("Vcore unmapped, not receiving an active notif");
-			}
-		spin_unlock_irqsave(&p->proc_lock);
+		if (vcpd->notif_enabled) {
+			spin_lock_irqsave(&p->proc_lock);
+				if ((p->state & PROC_RUNNING_M) && // TODO: (VC#) (_S state)
+				              (p->procinfo->vcoremap[vcoreid].valid)) {
+					printk("[kernel] sending notif to vcore %d\n", vcoreid);
+					send_kernel_message(p->procinfo->vcoremap[vcoreid].pcoreid,
+					                    __notify, p, 0, 0, KMSG_ROUTINE);
+				} else { // TODO: think about this, fallback, etc
+					warn("Vcore unmapped, not receiving an active notif");
+				}
+			spin_unlock_irqsave(&p->proc_lock);
+		}
 	}
 }
 

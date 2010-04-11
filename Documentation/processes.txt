@@ -447,6 +447,22 @@ and then execute a return.  If an IPI arrives before the "function return", then
 when that context gets restarted, it will run the "return" with the appropriate
 value on the stack still.
 
+There is a further complication.  The kernel can send an IPI that the process
+wanted, but the vcore did not get truly interrupted since its notifs were
+disabled.  There is a race between checking the queue/bitmask and then enabling
+notifications.  The way we deal with it is that the kernel posts the
+message/bit, then sets notif_pending.  Then it sends the IPI, which may or may
+not be received (based on notif_enabled).  (Actually, the kernel only ought to
+send the IPI if notif_pending was 0 (atomically) and notif_enabled is 1).  When
+leaving the transition stack, userspace should clear the notif_pending, then
+check the queue do whatever, and then try to pop the tf.  When popping the tf,
+after enabling notifications, check notif_pending.  If it is still clear, return
+without fear of missing a notif.  If it is not clear, it needs to manually
+notify itself (sys_self_notify) so that it can process the notification that it
+missed and for which it wanted to receive an IPI.  Before it does this, it needs
+to clear notif_pending, so the kernel will send it an IPI.  These last parts are
+handled in pop_ros_tf().
+
 4.3: Preemption Specifics
 -------------------------------
 When a vcore is preempted, the kernel takes whatever context was running (which
