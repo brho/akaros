@@ -477,15 +477,16 @@ trapframe.  The reason is that a preemption can come in at any time (such as
 right after returning from a preemption).
 
 To maintain this invariant, when the kernel starts a vcore, it will run the
-context that is in the preempt trapframe if the "preempt_tf_sorted" (name will
-change) flag is not set.  A process needs to be careful of a race here.  If
-they are trying to deal with a preempt trapframe (must be from another vcore,
-btw), the kernel could start to run that trapframe (in case it is granting a
-core request / proc_startcore()ing).  When the kernel prepares to use the
-trapframe (which it will do regardless of userspace activities), it will up
-the flag/counter.  If the process notices a change in that flag, it ought to
-abort its operation.  It can up the counter on its own when it no longer wants
-the kernel to run that context (this means it can get clobbered).
+context that is in the preempt trapframe if the "preempt_tf_valid" seq_ctr is
+not set.  A process needs to be careful of a race here.  If they are trying to
+deal with a preempt trapframe (must be from another vcore, btw), the kernel
+could start to run that trapframe (in case it is granting a core request /
+proc_startcore()ing).  When the kernel prepares to use the trapframe (which it
+will do regardless of userspace activities), it will up the seq_ctr.  We use a
+seq_ctr (mostly just a counter) to avoid ABA-related issues.  If the process
+notices a change in that flag, it ought to abort its operation.  It can up the
+counter on its own when it no longer wants the kernel to run that context (this
+means the preempt_tf can get clobbered).
 
 4.4: Other trickiness
 -------------------------------
@@ -542,17 +543,17 @@ hardware interrupts (on x86, at least).
 There will be cases where the trapframe in the preempt_tf slot is actually a
 notification handler, which was running on the transition stack of that
 particular vcore.  Userspace needs to be careful about restarting contexts
-that were on those cores.  They can tell by examining the stack pointer to see
-if it was on a transition stack.  Alternatively, if notifications are masked,
-it is also likely they in a notification handler.  The real concern is the
-transition stack.  If a vcore is processing on the transition stack of another
-vcore, there is a risk that the vcore comes back up and starts clobbering the
-transition stack.
+that were on those cores on different cores.  They can tell by examining the
+stack pointer to see if it was on a transition stack.  Alternatively, if
+notifications are masked, it is also likely they in a notification handler.  The
+real concern is the transition stack.  If a vcore is processing on the
+transition stack of another vcore, there is a risk that the vcore comes back up
+and starts clobbering the transition stack.
 
-To avoid this, userspace should allocate a new transition stack and switch the
+To avoid this, userspace could allocate a new transition stack and switch the
 target vcore to use that new stack (in procdata).  The only time (for now)
 that the kernel cares about a transition stack is when it is popping a tf on a
-new or freshly notified vcore.
+new or freshly notified vcore.  Something similar will need to be done with TLS.
 
 This all should be a rare occurance, since the vcore should see the
 preempt_pending when it starts its notification and yield, instead of being
@@ -564,6 +565,10 @@ notif handler when it gets preempted, that deadlock will not happen (and we
 also may need only one trapframe slot).  Userspace probably cannot guarantee
 that, so we'll have to deal with it.  Avoiding the deadlock on a spinlock is
 much more reasonable (and we can provide the locking function).
+
+Another thing to keep in mind is that userspace probably won't want to restart a
+notification handler on a different core.  It's conceivable that they want to
+take a regular user thread and context and restart it, not a transition context.
 
 4.4.4: Userspace Yield Races
 -------------------------------
@@ -579,9 +584,9 @@ yield and simply return to userspace.
 4.4.5: Userspace m_yield
 -------------------------------
 There are a variety of ways to implement an m_yield (yield the entire MCP).
-We could have a "no niceness" yield - just immediately preempt, but there is a danger of the
-locking business.  We could do the usual delay game, though if userspace is
-requesting its yield, arguably we don't need to give warning. 
+We could have a "no niceness" yield - just immediately preempt, but there is a
+danger of the locking business.  We could do the usual delay game, though if
+userspace is requesting its yield, arguably we don't need to give warning. 
 
 Another approach would be to not have an explicit m_yield call.  Instead, we
 can provide a notify_all call, where the notification sent to every vcore is

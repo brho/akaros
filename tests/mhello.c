@@ -118,14 +118,21 @@ void hart_entry(void)
 	 * set the appropriate TLS.  On x86, this will involve changing the LDT
 	 * entry for this vcore to point to the TCB of the new user-thread. */
 	if (vcoreid == 0) {
+		/* // test for preempting a notif_handler.  do it from the monitor
+		int ctr = 0;
+		while(ctr < 3) {
+			printf("Vcore %d Spinning (%d), temp = %08x!\n", vcoreid, ctr++, temp);
+			udelay(5000000);
+		} */
 		printf("restarting vcore0 from userspace\n");
 		/* Do one last check for notifs before clearing pending */
 		vcpd->notif_pending = 0;
-		if (first_time) { // testing for missing a notif
+		/* // testing for missing a notif
+		if (first_time) {
 			first_time = FALSE;
 			printf("setting pending, trying to renotify etc\n");
 			vcpd->notif_pending = 1;
-		}
+		} */
 		set_tls_desc(core0_tls, 0);
 		/* Load silly state (Floating point) too */
 		pop_ros_tf(&vcpd->notif_tf, vcoreid);

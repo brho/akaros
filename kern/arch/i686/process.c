@@ -33,6 +33,22 @@ void proc_init_trapframe(trapframe_t *tf, uint32_t vcoreid,
 	tf->tf_regs.reg_eax = vcoreid;
 }
 
+void proc_secure_trapframe(struct trapframe *tf)
+{
+	/* we normally don't need to set the non-CS regs, but they could be
+	 * gibberish and cause a GPF.  gs can still be gibberish, but we don't
+	 * necessarily know what it ought to be (we could check, but that's a pain).
+	 * the code protecting the kernel from TLS related things ought to be able
+	 * to handle GPFs on popping gs. TODO: (TLSV) */
+	tf->tf_ds = GD_UD | 3;
+	tf->tf_es = GD_UD | 3;
+	tf->tf_fs = 0;
+	//tf->tf_gs = whatevs.  ignoring this.
+	tf->tf_ss = GD_UD | 3;
+	tf->tf_cs = GD_UT | 3;
+	tf->tf_eflags |= 0x00000200; // bit 9 is the interrupts-enabled
+}
+
 /* For cases that we won't return from a syscall via the normal path, and need
  * to set the syscall return value in the registers manually.  Like in a syscall
  * moving to RUNNING_M */

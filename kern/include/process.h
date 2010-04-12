@@ -145,20 +145,15 @@ void proc_decref(struct proc *SAFE p, size_t count);
 void abandon_core(void);
 
 /* Kernel message handlers for process management */
-#ifdef __IVY__
-void __startcore(trapframe_t *tf, uint32_t srcid, struct proc *CT(1) a0,
-                 trapframe_t *CT(1) a1, void *SNT a2);
-void __death(trapframe_t *tf, uint32_t srcid, void *SNT a0, void *SNT a1,
-             void *SNT a2);
-#else
 void __startcore(trapframe_t *tf, uint32_t srcid, void *a0, void *a1, void *a2);
-void __death(trapframe_t *tf, uint32_t srcid, void *a0, void *a1, void *a2);
 void __notify(trapframe_t *tf, uint32_t srcid, void *a0, void *a1, void *a2);
-#endif
+void __preempt(trapframe_t *tf, uint32_t srcid, void *a0, void *a1, void *a2);
+void __death(trapframe_t *tf, uint32_t srcid, void *a0, void *a1, void *a2);
 
 /* Arch Specific */
 void proc_init_trapframe(trapframe_t *SAFE tf, uint32_t vcoreid,
                          uint32_t entryp, uint32_t stack_top);
+void proc_secure_trapframe(struct trapframe *tf);
 void proc_set_syscall_retval(trapframe_t *SAFE tf, intreg_t value);
 void __abandon_core(void);
 

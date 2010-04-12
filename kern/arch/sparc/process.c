@@ -27,6 +27,11 @@ proc_init_trapframe(trapframe_t *tf, uint32_t vcoreid,
 	tf->npc = entryp+4;
 }
 
+void proc_secure_trapframe(struct trapframe *tf)
+{
+	tf->psr = PSR_S; // but PS = 0
+}
+
 /* For cases that we won't return from a syscall via the normal path, and need
  * to set the syscall return value in the registers manually.  Like in a syscall
  * moving to RUNNING_M */

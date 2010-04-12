@@ -785,9 +785,9 @@ uint32_t proc_get_vcoreid(struct proc *SAFE p, uint32_t pcoreid)
 
 /* Gives process p the additional num cores listed in pcorelist.  You must be
  * RUNNABLE_M or RUNNING_M before calling this.  If you're RUNNING_M, this will
- * startup your new cores at the entry point with their virtual IDs.  If you're
- * RUNNABLE_M, you should call proc_run after this so that the process can start
- * to use its cores.
+ * startup your new cores at the entry point with their virtual IDs (or restore
+ * a preemption).  If you're RUNNABLE_M, you should call proc_run after this so
+ * that the process can start to use its cores.
  *
  * If you're *_S, make sure your core0's TF is set (which is done when coming in
  * via arch/trap.c and we are RUNNING_S), change your state, then call this.
@@ -1069,19 +1069,38 @@ void __startcore(trapframe_t *tf, uint32_t srcid, void *a0, void *a1, void *a2)
 	struct preempt_data *vcpd;
 
 	assert(p_to_run);
+	/* the sender of the amsg increfed, thinking we weren't running current. */
+	if (p_to_run == current)
+		proc_decref(p_to_run, 1);
 	vcoreid = get_vcoreid(p_to_run, pcoreid);
 	vcpd = &p_to_run->procdata->vcore_preempt_data[vcoreid];
 	printd("[kernel] startcore on physical core %d for process %d's vcore %d\n",
 	       pcoreid, p_to_run->pid, vcoreid);
-	memset(&local_tf, 0, sizeof(local_tf));
-	proc_init_trapframe(&local_tf, vcoreid, p_to_run->env_entry,
-	                    vcpd->transition_stack);
-	/* Disable/mask active notifications for fresh vcores */
-	vcpd->notif_enabled = FALSE;
-	/* the sender of the amsg increfed, thinking we weren't running current. */
-	if (p_to_run == current)
-		proc_decref(p_to_run, 1);
-	__proc_startcore(p_to_run, &local_tf);
+
+	if (seq_is_locked(vcpd->preempt_tf_valid)) {
+		__seq_end_write(&vcpd->preempt_tf_valid); /* mark tf as invalid */
+		restore_fp_state(&vcpd->preempt_anc);
+		/* notif_pending and enabled means the proc wants to receive the IPI,
+		 * but might have missed it.  copy over the tf so they can restart it
+		 * later, and give them a fresh vcore. */
+		if (vcpd->notif_pending && vcpd->notif_enabled) {
+			vcpd->notif_tf = vcpd->preempt_tf; // could memset
+			proc_init_trapframe(&local_tf, vcoreid, p_to_run->env_entry,
+			                    vcpd->transition_stack);
+			vcpd->notif_enabled = FALSE;
+			vcpd->notif_pending = FALSE;
+		} else {
+			/* copy-in the tf we'll pop, then set all security-related fields */
+			local_tf = vcpd->preempt_tf;
+			proc_secure_trapframe(&local_tf);
+		}
+	} else { /* not restarting from a preemption, use a fresh vcore */
+		proc_init_trapframe(&local_tf, vcoreid, p_to_run->env_entry,
+		                    vcpd->transition_stack);
+		/* Disable/mask active notifications for fresh vcores */
+		vcpd->notif_enabled = FALSE;
+	}
+	__proc_startcore(p_to_run, &local_tf); // TODO: (HSS) pass silly state *?
 }
 
 /* Bail out if it's the wrong process, or if they no longer want a notif.  Make
@@ -1127,6 +1146,35 @@ void abandon_core(void)
 	if (current)
 		__abandon_core();
 	smp_idle();
+}
+
+void __preempt(trapframe_t *tf, uint32_t srcid, void *a0, void *a1, void *a2)
+{
+	struct preempt_data *vcpd;
+	uint32_t vcoreid, coreid = core_id();
+	struct proc *p = (struct proc*)a0;
+
+	if (p != current)
+		warn("__preempt arrived for a process that was not current!");
+	assert(!in_kernel(tf));
+	/* We shouldn't need to lock here, since unmapping happens on the pcore and
+	 * mapping would only happen if the vcore was free, which it isn't until
+	 * after we unmap. */
+	vcoreid = get_vcoreid(p, coreid);
+	vcpd = &p->procdata->vcore_preempt_data[vcoreid];
+	printk("[kernel] received __preempt for proc %d's vcore %d on pcore %d\n",
+	       p->procinfo->pid, vcoreid, core_id());
+
+	/* save the old tf in the preempt slot, save the silly state, and signal the
+	 * state is a valid tf.  when it is 'written,' it is valid.  Using the
+	 * seq_ctrs so userspace can tell between different valid versions.  If the
+	 * TF was already valid, it will panic (if CONFIGed that way). */
+	// TODO: this is assuming the struct user_tf is the same as a regular TF
+	vcpd->preempt_tf = *tf;
+	save_fp_state(&vcpd->preempt_anc);
+	__seq_start_write(&vcpd->preempt_tf_valid);
+	__unmap_vcore(p, vcoreid);
+	abandon_core();
 }
 
 /* Kernel message handler to clean up the core when a process is dying.

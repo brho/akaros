@@ -36,6 +36,9 @@ void ( page_fault_handler)(trapframe_t *tf);
 void sysenter_init(void);
 extern void sysenter_handler();
 
+void save_fp_state(struct ancillary_state *silly);
+void restore_fp_state(struct ancillary_state *silly);
+
 /* Kernel messages.  Each arch implements them in their own way.  Both should be
  * guaranteeing in-order delivery.  Kept here in trap.h, since sparc is using
  * trap.h for KMs.  Eventually, both arches will use the same implementation.
