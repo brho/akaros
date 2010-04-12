@@ -8,8 +8,6 @@
 #include <arch/arch.h>
 #include <assert.h>
 
-#define SEQLOCK_DEBUG
-
 static inline void
 (SLOCK(0) spin_lock_irqsave)(spinlock_t RACY*SAFE lock);
 static inline void
@@ -127,7 +125,7 @@ static inline bool spin_lock_irq_enabled(spinlock_t *SAFE lock)
  * concurrent write. */
 static inline void __seq_start_write(seq_ctr_t *seq_ctr)
 {
-#ifdef SEQLOCK_DEBUG
+#ifdef _CONFIG_SEQLOCK_DEBUG_
 	assert(*seq_ctr % 2 == 0);
 #endif
 	(*seq_ctr)++;
@@ -135,7 +133,7 @@ static inline void __seq_start_write(seq_ctr_t *seq_ctr)
 
 static inline void __seq_end_write(seq_ctr_t *seq_ctr)
 {
-#ifdef SEQLOCK_DEBUG
+#ifdef _CONFIG_SEQLOCK_DEBUG_
 	assert(*seq_ctr % 2 == 1);
 #endif
 	(*seq_ctr)++;
