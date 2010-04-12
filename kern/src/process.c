@@ -1100,7 +1100,7 @@ void __notify(trapframe_t *tf, uint32_t srcid, void *a0, void *a1, void *a2)
 	/* We shouldn't need to lock here, since unmapping happens on the pcore and
 	 * mapping would only happen if the vcore was free, which it isn't until
 	 * after we unmap. */
-	vcoreid = p->procinfo->pcoremap[core_id()].vcoreid;
+	vcoreid = get_vcoreid(p, core_id());
 	vcpd = &p->procdata->vcore_preempt_data[vcoreid];
 	printd("received active notification for proc %d's vcore %d on pcore %d\n",
 	       p->procinfo->pid, vcoreid, core_id());
@@ -1136,11 +1136,12 @@ void abandon_core(void)
 void __death(trapframe_t *tf, uint32_t srcid, void *SNT a0, void *SNT a1,
              void *SNT a2)
 {
-	uint32_t coreid = core_id();
+	uint32_t vcoreid, coreid = core_id();
 	if (current) {
+		vcoreid = get_vcoreid(current, coreid);
 		printd("[kernel] death on physical core %d for process %d's vcore %d\n",
-		       coreid, current->pid, get_vcoreid(current, coreid));
-		__unmap_vcore(current, coreid);
+		       coreid, current->pid, vcoreid);
+		__unmap_vcore(current, vcoreid);
 	}
 	abandon_core();
 }
