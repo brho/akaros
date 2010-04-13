@@ -766,7 +766,7 @@ void proc_notify(struct proc *p, unsigned int notif, struct notif_event *ne)
 uint32_t proc_get_vcoreid(struct proc *SAFE p, uint32_t pcoreid)
 {
 	uint32_t vcoreid;
-	// TODO: the code currently doesn't track the vcoreid properly for _S
+	// TODO: the code currently doesn't track the vcoreid properly for _S (VC#)
 	spin_lock_irqsave(&p->proc_lock);
 	switch (p->state) {
 		case PROC_RUNNING_S:
@@ -776,6 +776,9 @@ uint32_t proc_get_vcoreid(struct proc *SAFE p, uint32_t pcoreid)
 			vcoreid = get_vcoreid(p, pcoreid);
 			spin_unlock_irqsave(&p->proc_lock);
 			return vcoreid;
+		case PROC_DYING: // death message is on the way
+			spin_unlock_irqsave(&p->proc_lock);
+			return 0;
 		default:
 			spin_unlock_irqsave(&p->proc_lock);
 			panic("Weird state(%s) in %s()", procstate2str(p->state),
