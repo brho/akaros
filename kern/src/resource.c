@@ -92,7 +92,6 @@ ssize_t core_request(struct proc *p)
 	spin_unlock(&idle_lock);
 	// Now, actually give them out
 	if (num_granted) {
-		p->resources[RES_CORES].amt_granted += num_granted;
 		switch (p->state) {
 			case (PROC_RUNNING_S):
 				// issue with if we're async or not (need to preempt it)

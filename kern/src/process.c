@@ -888,6 +888,7 @@ bool __proc_give_cores(struct proc *SAFE p, uint32_t *pcorelist, size_t num)
 			panic("Weird state(%s) in %s()", procstate2str(p->state),
 			      __FUNCTION__);
 	}
+	p->resources[RES_CORES].amt_granted += num;
 	return self_ipi_pending;
 }
 
