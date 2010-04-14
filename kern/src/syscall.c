@@ -34,7 +34,7 @@
 #ifdef __CONFIG_NETWORKING__
 #include <arch/nic_common.h>
 extern int (*send_frame)(const char *CT(len) data, size_t len);
-extern char device_mac[6];
+extern unsigned char device_mac[6];
 #endif
 
 /************** Utility Syscalls **************/
@@ -392,12 +392,16 @@ intreg_t sys_exec(struct proc* p, int fd, procinfo_t* pi)
 		goto out;
 	}
 
-	// TODO: don't copy procinfo from the user (PC)
-	if(memcpy_from_user(p,p->procinfo,pi,sizeof(procinfo_t))) {
+	// Set the argument stuff needed by glibc
+	if(memcpy_from_user(p,p->procinfo->argp,pi->argp,sizeof(pi->argp))) {
 		proc_destroy(p);
 		goto out;
 	}
-	proc_init_procinfo(p);
+	if(memcpy_from_user(p,p->procinfo->argbuf,pi->argbuf,sizeof(pi->argbuf))) {
+		proc_destroy(p);
+		goto out;
+	}
+
 	// TODO: don't do this either (PC)
 	memset(p->procdata, 0, sizeof(procdata_t));
 
