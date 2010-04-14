@@ -99,6 +99,9 @@ void rl8168_init() {
 
 	if (rl8168_scan_pci() < 0) return;
 	rl8168_read_mac();
+	printk("Network Card MAC Address: %02x:%02x:%02x:%02x:%02x:%02x\n", 
+	   device_mac[0],device_mac[1],device_mac[2],
+	   device_mac[3],device_mac[4],device_mac[5]);
 	rl8168_setup_descriptors();
 	rl8168_configure();
 	rl8168_setup_interrupts();
@@ -336,7 +339,7 @@ void rl8168_setup_interrupts() {
 #else
 	register_interrupt_handler(interrupt_handlers, KERNEL_IRQ_OFFSET + rl8168_irq, rl8168_interrupt_handler, 0);
 #endif
-	ioapic_route_irq(rl8168_irq, NE2K_IRQ_CPU);	
+	ioapic_route_irq(rl8168_irq, 1);	
 	
 	return;
 }
@@ -506,13 +509,26 @@ void rl8168_handle_rx_packet() {
 		rx_des_loop_cur = (rx_des_loop_cur + 1) % NUM_RX_DESCRIPTORS;
 		
 	} while (!(current_command & DES_LS_MASK));
-	
+
+	// Treat as a syscall frontend response packet if eth_type says so
+	// Will eventually go away, so not too worried about elegance here...
+	#include <frontend.h>
+	#include <arch/frontend.h>
+	uint16_t eth_type = htons(*(uint16_t*)(rx_buffer + 12));
+	if(eth_type == APPSERVER_ETH_TYPE) {
+		rx_des_cur = rx_des_loop_cur;
+		rl8168_process_frame(rx_buffer, frame_size, current_command);
+		handle_appserver_packet(rx_buffer, frame_size);
+		kfree(rx_buffer);
+		return;
+	}
 
 	spin_lock(&packet_buffers_lock);
 
 	if (num_packet_buffers >= MAX_PACKET_BUFFERS) {
-		printk("WARNING: DROPPING PACKET!\n");
+		//printk("WARNING: DROPPING PACKET!\n");
 		spin_unlock(&packet_buffers_lock);
+		rx_des_cur = rx_des_loop_cur;
 		kfree(rx_buffer);
 		return;
 	}
@@ -526,7 +542,7 @@ void rl8168_handle_rx_packet() {
 	spin_unlock(&packet_buffers_lock);
 				
 	rx_des_cur = rx_des_loop_cur;
-				
+
 	// Chew on the frame data. Command bits should be the same for all frags.
 	rl8168_process_frame(rx_buffer, frame_size, current_command);
 	
@@ -627,7 +643,11 @@ int rl8168_send_frame(const char *data, size_t len) {
 
 	tx_des_cur = (tx_des_cur + 1) % NUM_TX_DESCRIPTORS;
 	
-	//rl8168_frame_debug("-->Sent packet.\n");
+	rl8168_frame_debug("--> Sending Packet\n");
+	for(int i=0; i<len; i++)
+		rl8168_frame_debug("%x ", (unsigned int)(unsigned char)(data[i]));
+	rl8168_frame_debug("\n");
+	rl8168_frame_debug("--> Sent packet.\n");
 	
 	outb(rl8168_io_base_addr + RL_TX_CTRL_REG, RL_TX_SEND_MASK);
 	

@@ -22,7 +22,7 @@ int (*send_frame)(const char *data, size_t len);
 // Global variables for managing ethernet packets over a nic
 // Again, since these are global for all network cards we are 
 // limited to only one for now
-char device_mac[6];
+unsigned char device_mac[6];
 uint8_t eth_up = 0; 
 uint32_t num_packet_buffers = 0;
 char* packet_buffers[MAX_PACKET_BUFFERS];

@@ -11,7 +11,7 @@
 #define MIN_FRAME_SIZE   60 // See the spec...
 
 // Maximum packet buffers we can handle at any given time
-#define MAX_PACKET_BUFFERS    1024
+#define MAX_PACKET_BUFFERS    32 //1024
  
 // Global send_frame function pointer
 // Means we can only have one network card per system right now...
@@ -20,7 +20,7 @@ extern int (*send_frame)(const char *data, size_t len);
 // Global variables for managing ethernet packets over a nic
 // Again, since these are global for all network cards we are 
 // limited to only one for now
-extern char device_mac[6];
+extern unsigned char device_mac[6];
 extern uint8_t eth_up;
 extern uint32_t num_packet_buffers;
 extern char* packet_buffers[MAX_PACKET_BUFFERS];

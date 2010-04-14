@@ -65,6 +65,7 @@ int handle_appserver_packet(const char* p, size_t size)
 	// fire the response
 	if(send_frame((char*)response_packet,response_size) != response_size)
 		panic("couldn't send appserver packet!");
+	kfree(response_packet);
 
 	return 0;
 	

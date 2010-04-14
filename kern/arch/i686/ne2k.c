@@ -85,6 +85,9 @@ void ne2k_init() {
 	ne2k_mem_alloc();
 	ne2k_configure_nic();
 	ne2k_read_mac();
+	printk("Network Card MAC Address: %02x:%02x:%02x:%02x:%02x:%02x\n", 
+	   device_mac[0],device_mac[1],device_mac[2],
+	   device_mac[3],device_mac[4],device_mac[5]);
 	//ne2k_test_interrupts();
 	send_frame = &ne2k_send_frame;
 
