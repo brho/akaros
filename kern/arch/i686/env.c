@@ -17,14 +17,17 @@ void env_pop_tf(trapframe_t *tf)
 {
 	/* Bug with this whole idea (TODO: (TLSV))*/
 	/* Load the LDT for this process.  Slightly ghetto doing it here. */
-	segdesc_t *my_gdt = per_cpu_info[core_id()].gdt;
 	/* copy-in and check the LDT location.  the segmentation hardware write the
 	 * accessed bit, so we want the memory to be in the user-writeable area. */
 	segdesc_t *ldt = current->procdata->ldt;
 	ldt = (segdesc_t*)MIN((uintptr_t)ldt, UTOP - LDT_SIZE);
-	segdesc_t ldt_temp = SEG_SYS(STS_LDT, (uint32_t)ldt, LDT_SIZE, 3);
-	my_gdt[GD_LDT >> 3] = ldt_temp;
-	asm volatile("lldt %%ax" :: "a"(GD_LDT));
+	/* Only set up the ldt if a pointer to the ldt actually exists */
+	if(ldt != NULL) {
+		segdesc_t *my_gdt = per_cpu_info[core_id()].gdt;
+		segdesc_t ldt_temp = SEG_SYS(STS_LDT, (uint32_t)ldt, LDT_SIZE, 3);
+		my_gdt[GD_LDT >> 3] = ldt_temp;
+		asm volatile("lldt %%ax" :: "a"(GD_LDT));
+	}
 
 	/* In case they are enabled elsewhere.  We can't take an interrupt in these
 	 * routines, due to how they play with the kernel stack pointer. */
