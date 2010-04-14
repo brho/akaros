@@ -41,14 +41,14 @@
 #define PROC_RUNNABLE_M			0x20
 #define PROC_RUNNING_M			0x40
 
-#define procstate2str(state) ((state)==PROC_CREATED    ? "CREATED   " : \
+#define procstate2str(state) ((state)==PROC_CREATED    ? "CREATED"    : \
                               (state)==PROC_RUNNABLE_S ? "RUNNABLE_S" : \
-                              (state)==PROC_RUNNING_S  ? "RUNNING_S " : \
-                              (state)==PROC_WAITING    ? "WAITING   " : \
-                              (state)==PROC_DYING      ? "DYING     " : \
+                              (state)==PROC_RUNNING_S  ? "RUNNING_S"  : \
+                              (state)==PROC_WAITING    ? "WAITING"    : \
+                              (state)==PROC_DYING      ? "DYING"      : \
                               (state)==PROC_RUNNABLE_M ? "RUNNABLE_M" : \
-                              (state)==PROC_RUNNING_M  ? "RUNNING_M " : \
-                                                         "UNKNOWN   ")
+                              (state)==PROC_RUNNING_M  ? "RUNNING_M"  : \
+                                                         "UNKNOWN")
 
 #include <env.h>
 
@@ -81,7 +81,7 @@ bool proc_controls(struct proc *SAFE actor, struct proc *SAFE target);
 void proc_run(struct proc *SAFE p);
 void proc_restartcore(struct proc *SAFE p, trapframe_t *SAFE tf);
 void proc_destroy(struct proc *SAFE p);
-void proc_yield(struct proc *SAFE p);
+void proc_yield(struct proc *SAFE p, bool being_nice);
 void do_notify(struct proc *p, uint32_t vcoreid, unsigned int notif,
                struct notif_event *ne);
 void proc_notify(struct proc *p, unsigned int notif, struct notif_event *ne);

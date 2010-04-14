@@ -655,10 +655,34 @@ static uint32_t get_vcoreid(struct proc *SAFE p, uint32_t pcoreid)
  * - RES_CORES amt_wanted will be the amount running after taking away the
  *   yielder, unless there are none left, in which case it will be 1.
  *
- * This does not return (abandon_core()), so it will eat your reference.  */
-void proc_yield(struct proc *SAFE p)
+ * If the call is being nice, it means that it is in response to a preemption
+ * (which needs to be checked).  If there is no preemption pending, just return.
+ * No matter what, don't adjust the number of cores wanted.
+ *
+ * This usually does not return (abandon_core()), so it will eat your reference.
+ * */
+void proc_yield(struct proc *SAFE p, bool being_nice)
 {
-	spin_lock_irqsave(&p->proc_lock);
+	uint32_t vcoreid = get_vcoreid(p, core_id());
+	struct vcore *vc = &p->procinfo->vcoremap[vcoreid];
+
+	/* no reason to be nice, return */
+	if (being_nice && !vc->preempt_pending)
+		return;
+
+	spin_lock_irqsave(&p->proc_lock); /* horrible scalability.  =( */
+
+	/* fate is sealed, return and take the preempt message on the way out.
+	 * we're making this check while holding the lock, since the preemptor
+	 * should hold the lock when sending messages. */
+	if (vc->preempt_served) {
+		spin_unlock_irqsave(&p->proc_lock);
+		return;
+	}
+	/* no need to preempt later, since we are yielding (nice or otherwise) */
+	if (vc->preempt_pending)
+		vc->preempt_pending = 0;
+
 	switch (p->state) {
 		case (PROC_RUNNING_S):
 			p->env_tf= *current_tf;
@@ -671,13 +695,13 @@ void proc_yield(struct proc *SAFE p)
 			// give up core
 			__unmap_vcore(p, get_vcoreid(p, core_id()));
 			p->resources[RES_CORES].amt_granted = --(p->procinfo->num_vcores);
-			p->resources[RES_CORES].amt_wanted = p->procinfo->num_vcores;
+			if (!being_nice)
+				p->resources[RES_CORES].amt_wanted = p->procinfo->num_vcores;
 			__seq_end_write(&p->procinfo->coremap_seqctr);
 			// add to idle list
 			put_idle_core(core_id());
 			// last vcore?  then we really want 1, and to yield the gang
 			if (p->procinfo->num_vcores == 0) {
-				// might replace this with m_yield, if we have it directly
 				p->resources[RES_CORES].amt_wanted = 1;
 				__proc_set_state(p, PROC_RUNNABLE_M);
 				schedule_proc(p);
@@ -689,7 +713,7 @@ void proc_yield(struct proc *SAFE p)
 			      __FUNCTION__);
 	}
 	spin_unlock_irqsave(&p->proc_lock);
-	proc_decref(p, 1);
+	proc_decref(p, 1); // need to eat the ref passed in.
 	/* Clean up the core and idle.  For mgmt cores, they will ultimately call
 	 * manager, which will call schedule() and will repick the yielding proc. */
 	abandon_core();
@@ -1164,6 +1188,9 @@ void __preempt(trapframe_t *tf, uint32_t srcid, void *a0, void *a1, void *a2)
 	 * mapping would only happen if the vcore was free, which it isn't until
 	 * after we unmap. */
 	vcoreid = get_vcoreid(p, coreid);
+	p->procinfo->vcoremap[vcoreid].preempt_served = FALSE;
+	/* either __preempt or proc_yield() ends the preempt phase. */
+	p->procinfo->vcoremap[vcoreid].preempt_pending = 0;
 	vcpd = &p->procdata->vcore_preempt_data[vcoreid];
 	printk("[kernel] received __preempt for proc %d's vcore %d on pcore %d\n",
 	       p->procinfo->pid, vcoreid, core_id());

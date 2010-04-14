@@ -219,29 +219,40 @@ from _S to _M: at the entry point.
 
 2.4.4: Yielding
 --------------
-This will get revised soon, to account for different types of yields.
+sys_yield()/proc_yield() will give up the calling core, and may or may not
+adjust the desired number of cores, subject to its parameters.  Yield is
+performing two tasks, both of which result in giving up the core.  One is for
+not wanting the core anymore.  The other is in response to a preemption.  Yield
+may not be called remotely (ARSC).
 
-Yielding gives up a core.  In _S mode, it will transition from RUNNING_S to
-RUNNABLE_S.  The context is saved in env_tf.  A yield will *not* transition
-from _M to _S.
+In _S mode, it will transition from RUNNING_S to RUNNABLE_S.  The context is
+saved in env_tf.
 
-In _M mode, this yields the calling core.  The kernel will rip it out of your
-vcore list.  A process can yield its cores in any order.  The kernel will
-"fill in the holes of the vcoremap" when for any future newcores (e.g., proc A
-has 4 vcores, yields vcore2, and then asks for another vcore.  The new one
-will be vcore2).
+In _M mode, this yields the calling core.  A yield will *not* transition from _M
+to _S.  The kernel will rip it out of your vcore list.  A process can yield its
+cores in any order.  The kernel will "fill in the holes of the vcoremap" for any
+future new cores requested (e.g., proc A has 4 vcores, yields vcore2, and then
+asks for another vcore.  The new one will be vcore2).  When any core starts in
+_M mode, even after a yield, it will come back at the hart_entry()/_start point.
 
-When you are in _M and yield your last core, it is an m_yield.  This
-completely suspends all cores, like a voluntary preemption.  When the process
-is run again, all cores will come up at the entry point (including vcore0 and
-the calling core).  This isn't implemented yet, and will wait on some work
-with preemption.
+Yield will normally adjust your desired amount of vcores to the amount after the
+calling core is taken.  This is the way a process gives its cores back.
 
-We also need a type of yield (or a flag) that says the process is just giving
-up the core temporarily, but actually wants the core and does not want
-resource requests to be readjusted.  For example, in the event of a preemption
+Yield can also be used to say the process is just giving up the core in response
+to a pending preemption, but actually wants the core and does not want resource
+requests to be readjusted.  For example, in the event of a preemption
 notification, a process may yield (ought to!) so that the kernel does not need
-to waste effort with full preemption.
+to waste effort with full preemption.  This is done by passing in a bool
+(being_nice), which signals the kernel that it is in response to a preemption.
+The kernel will not readjust the amt_wanted, and if there is no preemption
+pending, the kernel will ignore the yield.
+
+There may be an m_yield(), which will yield all or some of the cores of an MPC,
+remotely.  This is discussed farther down a bit.  It's not clear what exactly
+it's purpose would be.
+
+We also haven't addressed other reasons to yield, or more specifically to wait,
+such as for an interrupt or an event of some sort.
 
 2.4.5: Others
 --------------

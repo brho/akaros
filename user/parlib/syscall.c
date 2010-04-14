@@ -94,14 +94,14 @@ ssize_t sys_resource_req(int type, size_t amt_max, size_t amt_min, uint32_t flag
 	return ros_syscall(SYS_resource_req, type, amt_max, amt_min, flags, 0);
 }
 
-void sys_reboot()
+void sys_reboot(void)
 {
 	ros_syscall(SYS_reboot,0,0,0,0,0);
 }
 
-void sys_yield()
+void sys_yield(bool being_nice)
 {
-	ros_syscall(SYS_yield,0,0,0,0,0);
+	ros_syscall(SYS_yield, being_nice, 0, 0, 0, 0);
 }
 
 int sys_proc_create(char* path)

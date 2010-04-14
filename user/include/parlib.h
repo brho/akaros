@@ -35,7 +35,7 @@ void *      sys_brk(void* addr);
 /* Process Management */
 int         sys_getpid(void);
 int         sys_proc_destroy(int pid, int exitcode);
-void        sys_yield(void);
+void        sys_yield(bool being_nice);
 int         sys_proc_create(char* path);
 int         sys_proc_run(int pid);
 ssize_t     sys_shared_page_alloc(void *COUNT(PGSIZE) *addr, pid_t p2, 

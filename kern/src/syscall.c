@@ -267,9 +267,9 @@ static error_t sys_proc_destroy(struct proc *p, pid_t pid, int exitcode)
 	return ESUCCESS;
 }
 
-static int sys_proc_yield(struct proc *p)
+static int sys_proc_yield(struct proc *p, bool being_nice)
 {
-	proc_yield(p);
+	proc_yield(p, being_nice);
 	return 0;
 }
 
@@ -294,7 +294,7 @@ static ssize_t sys_run_binary(env_t* e, void *DANGEROUS binary_buf, size_t len,
 			cache_color_alloc(llc_cache, env->cache_colors_map);
 	}
 	proc_decref(env, 1);
-	proc_yield(e);
+	proc_yield(e, 0);
 	return 0;
 }
 

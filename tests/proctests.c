@@ -21,11 +21,11 @@ int main(int argc, char** argv)
 		}
 	}
 	printf("Process %x, Started and yielding.\n", pid);
-	sys_yield();
+	sys_yield(0);
 	printf("Process %x, Return from yield1, starting yield2.\n", pid);
-	sys_yield();
+	sys_yield(0);
 	printf("Process %x, Return from yield2, starting yield3.\n", pid);
-	sys_yield();
+	sys_yield(0);
 	printf("Process %x, Return from yield3, exiting.\n", pid);
 	return 0;
 }

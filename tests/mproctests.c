@@ -84,7 +84,7 @@ int main(int argc, char** argv)
 		case TEST_YIELD_0_OUT_OF_ORDER:
 			udelay(5000000);
 			printf("Core %d yielding\n", vcoreid);
-			sys_yield();
+			sys_yield(0);
 			printf("Core 0 came back where it left off in RUNNING_M!!!\n");
 			break;
 	}
@@ -120,7 +120,7 @@ void hart_entry(void)
 				break;
 			case TEST_YIELD_OUT_OF_ORDER:
 				printf("Core %d yielding\n", vcoreid);
-				sys_yield();
+				sys_yield(0);
 				break;
 			case TEST_YIELD_0_OUT_OF_ORDER:
 				udelay(7500000);
@@ -138,7 +138,7 @@ static void global_tests(uint32_t vcoreid)
 	switch (test) {
 		case TEST_YIELD_ALL:
 			printf("Core %d yielding\n", vcoreid);
-			sys_yield();
+			sys_yield(0);
 			// should be RUNNABLE_M now, amt_wanted == 1
 			while(1);
 		case TEST_SWITCH_TO_RUNNABLE_S:
@@ -155,7 +155,7 @@ static void global_tests(uint32_t vcoreid)
 		case TEST_CRAZY_YIELDS:
 			udelay(300000*vcoreid);
 			hart_request(5);
-			sys_yield();
+			sys_yield(0);
 			printf("should  never see me, unless you slip into *_S\n");
 			break;
 		case TEST_CONCURRENT_SYSCALLS:
