@@ -1,6 +1,7 @@
 #include <ros/common.h>
 #include <ros/errno.h>
-#include <debug.h>
+#include <string.h>
+#include <rstdio.h>
 
 /*
  * Print a number (base <= 16) in reverse order,

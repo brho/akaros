@@ -3,6 +3,14 @@
 
 #include <ros/common.h>
 
+#define ARCH_CL_SIZE 64
+
+static __inline void
+set_stack_pointer(void* sp)
+{
+	asm volatile ("mov %0,%%esp" : : "r"(sp) : "memory","esp");
+}
+
 static __inline void
 breakpoint(void)
 {
@@ -22,4 +30,5 @@ cpu_relax(void)
 {
 	asm volatile("pause" : : : "memory");
 }
+
 #endif /* PARLIB_ARCH_H */

@@ -1,18 +1,19 @@
 #include <pthread.h>
-#include <hart.h>
+#include <vcore.h>
+#include <mcs.h>
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
-#include <stdio.h>
+#include <rstdio.h>
 #include <errno.h>
+#include <arch/atomic.h>
 
-#include <debug.h>
 int threads_active = 1;
-hart_lock_t work_queue_lock = HART_LOCK_INIT;
+mcs_lock_t work_queue_lock = MCS_LOCK_INIT;
 pthread_t work_queue_head = 0;
 pthread_t work_queue_tail = 0;
 pthread_once_t init_once = PTHREAD_ONCE_INIT;
-pthread_t active_threads[HART_MAX_MAX_HARTS] = {0};
+pthread_t active_threads[MAX_VCORES] = {0};
 
 void queue_insert(pthread_t* head, pthread_t* tail, pthread_t node)
 {
@@ -34,22 +35,22 @@ pthread_t queue_remove(pthread_t* head, pthread_t* tail)
   return node;
 }
 
-void hart_entry()
+void vcore_entry()
 {
   pthread_t node = NULL;
   while(1)
   {
-    hart_lock_lock(&work_queue_lock);
+    mcs_lock_lock(&work_queue_lock);
     if(work_queue_head)
       node = queue_remove(&work_queue_head,&work_queue_tail);
-    hart_lock_unlock(&work_queue_lock);
+    mcs_lock_unlock(&work_queue_lock);
 
     if(node)
       break;
-    hart_relax();
+    cpu_relax();
   }
 
-  active_threads[hart_self()] = node;
+  active_threads[vcore_id()] = node;
 
   pthread_exit(node->start_routine(node->arg));
 }
@@ -80,14 +81,14 @@ int pthread_create(pthread_t* thread, const pthread_attr_t* attr,
   (*thread)->next = 0;
   (*thread)->finished = 0;
   (*thread)->detached = 0;
-  hart_lock_lock(&work_queue_lock);
+  mcs_lock_lock(&work_queue_lock);
   {
     threads_active++;
     queue_insert(&work_queue_head,&work_queue_tail,*thread);
-    // don't return until we get a hart
-    while(threads_active > hart_current_harts() && hart_request(1));
+    // don't return until we get a vcore
+    while(threads_active > num_vcores() && vcore_request(1));
   }
-  hart_lock_unlock(&work_queue_lock);
+  mcs_lock_unlock(&work_queue_lock);
 
   return 0;
 }
@@ -148,7 +149,7 @@ int pthread_mutex_lock(pthread_mutex_t* m)
 
 int pthread_mutex_trylock(pthread_mutex_t* m)
 {
-  return hart_swap(&m->lock,1) == 0 ? 0 : EBUSY;
+  return atomic_swap(&m->lock,1) == 0 ? 0 : EBUSY;
 }
 
 int pthread_mutex_unlock(pthread_mutex_t* m)
@@ -183,7 +184,7 @@ int pthread_cond_broadcast(pthread_cond_t *c)
 int pthread_cond_signal(pthread_cond_t *c)
 {
   int i;
-  for(i = 0; i < hart_max_harts(); i++)
+  for(i = 0; i < max_vcores(); i++)
   {
     if(c->waiters[i])
     {
@@ -196,10 +197,10 @@ int pthread_cond_signal(pthread_cond_t *c)
 
 int pthread_cond_wait(pthread_cond_t *c, pthread_mutex_t *m)
 {
-  c->waiters[hart_self()] = 1;
+  c->waiters[vcore_id()] = 1;
   pthread_mutex_unlock(m);
 
-  volatile int* poll = &c->waiters[hart_self()];
+  volatile int* poll = &c->waiters[vcore_id()];
   while(*poll);
 
   pthread_mutex_lock(m);
@@ -232,7 +233,7 @@ int pthread_condattr_getpshared(pthread_condattr_t *a, int *s)
 
 pthread_t pthread_self()
 {
-  return active_threads[hart_self()];
+  return active_threads[vcore_id()];
 }
 
 int pthread_equal(pthread_t t1, pthread_t t2)
@@ -246,11 +247,11 @@ void pthread_exit(void* ret)
 
   pthread_t t = pthread_self();
 
-  hart_lock_lock(&work_queue_lock);
+  mcs_lock_lock(&work_queue_lock);
   threads_active--;
   if(threads_active == 0)
     exit(0);
-  hart_lock_unlock(&work_queue_lock);
+  mcs_lock_unlock(&work_queue_lock);
 
   if(t)
   {
@@ -260,12 +261,12 @@ void pthread_exit(void* ret)
       free(t);
   }
 
-  hart_entry();
+  vcore_entry();
 }
 
 int pthread_once(pthread_once_t* once_control, void (*init_routine)(void))
 {
-  if(hart_swap(once_control,1) == 0)
+  if(atomic_swap(once_control,1) == 0)
     init_routine();
   return 0;
 }
@@ -276,18 +277,18 @@ int pthread_barrier_init(pthread_barrier_t* b, const pthread_barrierattr_t* a, i
 
   b->sense = 0;
   b->nprocs = b->count = count;
-  hart_lock_init(&b->lock);
+  mcs_lock_init(&b->lock);
   return 0;
 }
 
 int pthread_barrier_wait(pthread_barrier_t* b)
 {
-  int id = hart_self();
+  int id = vcore_id();
   int ls = b->local_sense[32*id] = 1 - b->local_sense[32*id];
 
-  hart_lock_lock(&b->lock);
+  mcs_lock_lock(&b->lock);
   int count = --b->count;
-  hart_lock_unlock(&b->lock);
+  mcs_lock_unlock(&b->lock);
 
   if(count == 0)
   {

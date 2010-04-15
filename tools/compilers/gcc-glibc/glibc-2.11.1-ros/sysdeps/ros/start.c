@@ -1,40 +1,34 @@
 #include <abort-instr.h>
 #include <string.h>
-#include <ros/arch/hart.h>
+#include <vcore.h>
 #include <stdio.h>
 #include <ros/syscall.h>
 #include <ros/procinfo.h>
 #include <unistd.h>
 #include <tls.h>
 
-void** __hart_thread_control_blocks = NULL;
-weak_alias(__hart_thread_control_blocks,hart_thread_control_blocks)
+void** __vcore_thread_control_blocks = NULL;
+weak_alias(__vcore_thread_control_blocks,vcore_thread_control_blocks)
 
 void
-__hart_entry(void)
+__vcore_entry(void)
 {
-	fputs("define a hart_entry() function, foo!",stderr);
+	fputs("define a vcore_entry() function, foo!",stderr);
 	abort();
 }
-weak_alias(__hart_entry,hart_entry)
-
-void
-__hart_yield(void)
-{
-}
-weak_alias(__hart_yield,hart_yield)
+weak_alias(__vcore_entry,vcore_entry)
 
 #define failmsg(str) write(2,str"\n",sizeof(str"\n")-1)
 
 void
 _start(void)
 {
-	// WARNING: __hart_self_on_entry must be read before
+	// WARNING: __vcore_self_on_entry must be read before
 	// anything is register-allocated!
-	int id = __hart_self_on_entry;
+	int id = __vcore_id_on_entry;
 	static int init = 0;
 	// For dynamically-linked programs, the first time through,
-	// __hart_self_on_entry could be clobbered (on x86), because
+	// __vcore_self_on_entry could be clobbered (on x86), because
 	// the linker will have overwritten eax.  Happily, the first
 	// time through, we know we are vcore 0.  Subsequent entries
 	// into this routine do not have this problem.
@@ -45,10 +39,9 @@ _start(void)
 	// acquire a TCB.
 	if(init || (id != 0))
 	{
-		TLS_INIT_TP(__hart_thread_control_blocks[id],0);
-		hart_entry();
-		hart_yield();
-		failmsg("why did hart_yield() return?");
+		TLS_INIT_TP(__vcore_thread_control_blocks[id],0);
+		vcore_entry();
+		failmsg("why did vcore_entry() return?");
 		goto diediedie;
 	}
 

@@ -1,5 +1,5 @@
 #include <parlib.h>
-#include <stdio.h>
+#include <rstdio.h>
 
 /* This runs a variety of process tests.  For now, it just tests single-core
  * yielding among a bunch of processes (which it creates).  It needs the

@@ -14,6 +14,7 @@
 #include <ros/syscall.h>
 #include <ros/procinfo.h>
 #include <ros/procdata.h>
+#include <ros/resource.h>
 #include <stdint.h>
 
 enum {

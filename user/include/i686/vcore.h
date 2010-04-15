@@ -1,9 +1,10 @@
-#ifndef PARLIB_ARCH_HART_H
-#define PARLIB_ARCH_HART_H
+#ifndef PARLIB_ARCH_VCORE_H
+#define PARLIB_ARCH_VCORE_H
 
 #include <ros/common.h>
 #include <ros/arch/trapframe.h>
 #include <ros/procdata.h>
+#include <ros/syscall.h>
 #include <ros/arch/mmu.h>
 
 /* Pops an ROS kernel-provided TF, reanabling notifications at the same time.
@@ -111,4 +112,19 @@ static inline void set_tls_desc(void *tls_desc, uint32_t vcoreid)
   asm volatile("movl %0,%%gs" : : "r" (gs));
 }
 
-#endif /* PARLIB_ARCH_HART_H */
+// this is how we get our thread id on entry.
+#define __vcore_id_on_entry \
+({ \
+	register int temp asm ("eax"); \
+	temp; \
+})
+
+// The actual vcore_self() function is a global symbol that invokes this routine.
+static inline int
+__vcore_id()
+{
+	// TODO: use some kind of thread-local storage to speed this up!
+	return (int)ros_syscall(SYS_getvcoreid,0,0,0,0,0);
+}
+
+#endif /* PARLIB_ARCH_VCORE_H */

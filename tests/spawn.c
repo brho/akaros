@@ -1,5 +1,5 @@
 
-#include <stdio.h>
+#include <rstdio.h>
 #include <parlib.h>
 
 int main(int argc, char** argv)

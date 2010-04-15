@@ -439,13 +439,18 @@ static const char* tls_init_tp(void* thrdescr)
   head->tcb = thrdescr;
   head->self = thrdescr;
 
+  //TODO: think about how to avoid this. Probably add a field to the 
+  // rthreads struct that we manually fill in in _start(). 
   int core_id = __syscall_sysenter(SYS_getvcoreid,0,0,0,0,0,NULL);
 
   /* Bug with this whole idea (TODO: (TLSV))*/
   if(__procdata.ldt == NULL)
   {
-    size_t sz= (sizeof(segdesc_t)*__procinfo.max_harts+PGSIZE-1)/PGSIZE*PGSIZE;
+    size_t sz= (sizeof(segdesc_t)*__procinfo.max_vcores+PGSIZE-1)/PGSIZE*PGSIZE;
     
+    // Can't directly call mmap because it tries to set errno, and errno doesn't
+    // exist yet (it relies on tls, and we are currently in the process of setting 
+    // it up...)
     intreg_t params[3] = { MAP_ANONYMOUS | MAP_POPULATE, -1, 0 };
     void* ldt = (void*) __syscall_sysenter(SYS_mmap, 0,
                                            sz, PROT_READ | PROT_WRITE, 
@@ -461,7 +466,7 @@ static const char* tls_init_tp(void* thrdescr)
   // Build the segment
   segdesc_t tmp = SEG(STA_W, (uint32_t)thrdescr, 0xffffffff, 3);
 
-  // Setup the correct LDT entry for this hart
+  // Setup the correct LDT entry for this vcore
   __procdata.ldt[core_id] = tmp;
 
   // Create the GS register.

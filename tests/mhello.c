@@ -5,12 +5,13 @@
 #include <ros/notification.h>
 #include <ros/bcq.h>
 #include <arch/arch.h>
-#include <stdio.h>
-#include <hart.h>
+#include <rstdio.h>
+#include <vcore.h>
+#include <mcs.h>
 #include <timing.h>
 #include <rassert.h>
 
-hart_barrier_t b;
+mcs_barrier_t b;
 
 __thread int temp;
 void *core0_tls = 0;
@@ -20,11 +21,11 @@ int main(int argc, char** argv)
 	uint32_t vcoreid;
 	int retval;
 
-	hart_barrier_init(&b,hart_max_harts()-1);
+	mcs_barrier_init(&b, max_vcores() - 1);
 
 /* begin: stuff userspace needs to do before switching to multi-mode */
-	if (hart_init())
-		printf("Harts failed, we're fucked!\n");
+	if (vcore_init())
+		printf("vcore_init() failed, we're fucked!\n");
 
 	/* tell the kernel where and how we want to receive notifications */
 	struct notif_method *nm;
@@ -47,7 +48,7 @@ int main(int argc, char** argv)
 	
 /* end: stuff userspace needs to do before switching to multi-mode */
 
-	if ((vcoreid = hart_self())) {
+	if ((vcoreid = vcore_id())) {
 		printf("Should never see me! (from vcore %d)\n", vcoreid);
 	} else { // core 0
 		temp = 0xdeadbeef;
@@ -55,10 +56,9 @@ int main(int argc, char** argv)
 		       vcoreid, &temp, temp);
 		printf("Multi-Goodbye, world, from PID: %d!\n", sys_getpid());
 		//retval = sys_resource_req(RES_CORES, 2, 0);
-		//retval = hart_request(hart_max_harts()-2);
-		retval = hart_request(2); // doesn't do what you think.  this gives 3.
-		//printf("retval = %d\n", retval);
-		printf("This is vcore0, right after hart_request\n");
+		//retval = vcore_request(vcore_max_vcores()-2);
+		retval = vcore_request(3);
+		printf("This is vcore0, right after vcore_request, retval=%d\n", retval);
 	}
 
 #if 0
@@ -85,16 +85,16 @@ int main(int argc, char** argv)
 	}
 
 	printf("Vcore %d Done!\n", vcoreid);
-	hart_barrier_wait(&b,hart_self());
+	mcs_barrier_wait(&b,vcore_id());
 
 	printf("All Cores Done!\n", vcoreid);
 	while(1); // manually kill from the monitor
 	return 0;
 }
 
-void hart_entry(void)
+void vcore_entry(void)
 {
-	uint32_t vcoreid = hart_self();
+	uint32_t vcoreid = vcore_id();
 	static bool first_time = TRUE;
 
 	temp = 0xcafebabe;
@@ -146,8 +146,8 @@ void hart_entry(void)
 	
 /* end: stuff userspace needs to do to handle notifications */
 
-	printf("Hello from hart_entry in vcore %d with temp addr %p and temp %p\n",
+	printf("Hello from vcore_entry in vcore %d with temp addr %p and temp %p\n",
 	       vcoreid, &temp, temp);
-	hart_barrier_wait(&b,hart_self());
+	mcs_barrier_wait(&b,vcore_id());
 	while(1);
 }

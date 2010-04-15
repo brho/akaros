@@ -8,6 +8,7 @@
 #define NULL	((void *) 0)
 #endif /* !NULL */
 
+//#define DEBUG
 #ifdef DEBUG
 #define printd(args...) cprintf(args)
 #else

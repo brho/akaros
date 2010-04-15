@@ -1,6 +1,6 @@
 // buggy program - faults with a read from location zero
 
-#include <stdio.h>
+#include <rstdio.h>
 
 int main(int argc, char** argv)
 { 

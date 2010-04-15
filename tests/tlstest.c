@@ -1,4 +1,4 @@
-#include <stdio.h>
+#include <rstdio.h>
 
 volatile __thread int foo;
 volatile __thread int bar;

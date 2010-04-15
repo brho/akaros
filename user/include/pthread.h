@@ -1,7 +1,8 @@
 #ifndef _PTHREAD_H
 #define _PTHREAD_H
 
-#include <hart.h>
+#include <vcore.h>
+#include <mcs.h>
 
 #ifdef __cplusplus
   extern "C" {
@@ -38,11 +39,11 @@ typedef struct
 
 typedef struct
 {
-  int local_sense[32*HART_MAX_MAX_HARTS];
+  int local_sense[32*MAX_VCORES];
   volatile int sense;
   int count;
   int nprocs;
-  hart_lock_t lock;
+  mcs_lock_t lock;
 } pthread_barrier_t;
 
 typedef struct
@@ -53,7 +54,7 @@ typedef struct
 typedef struct
 {
   const pthread_condattr_t* attr;
-  int waiters[HART_MAX_MAX_HARTS];
+  int waiters[MAX_VCORES];
 } pthread_cond_t;
 
 typedef struct pthread_wqt work_queue_t;

@@ -7,7 +7,7 @@
 
 #include <ros/common.h>
 #include <parlib.h>
-#include <debug.h>
+#include <rstdio.h>
 
 // Collect up to BUF_SIZE characters into a buffer
 // and perform ONE system call to print all of them,

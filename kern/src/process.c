@@ -218,7 +218,7 @@ proc_init_procinfo(struct proc* p)
 	p->procinfo->ppid = p->ppid;
 	p->procinfo->tsc_freq = system_timing.tsc_freq;
 	// TODO: maybe do something smarter here
-	p->procinfo->max_harts = MAX(1,num_cpus-1);
+	p->procinfo->max_vcores = MAX(1,num_cpus-1);
 }
 
 /* Allocates and initializes a process, with the given parent.  Currently
@@ -1283,3 +1283,52 @@ void print_proc_info(pid_t pid)
 	spin_unlock_irqsave(&p->proc_lock);
 	proc_decref(p, 1); /* decref for the pid2proc reference */
 }
+
+void proc_preempt_core(struct proc *p, uint32_t vcoreid)
+{
+    uint32_t pcoreid;
+    bool self_ipi_pending = FALSE;
+    spin_lock_irqsave(&p->proc_lock);
+    p->procinfo->vcoremap[vcoreid].preempt_served = TRUE;
+    pcoreid = p->procinfo->vcoremap[vcoreid].pcoreid;
+    // expects a pcorelist.  assumes pcore is mapped and running_m
+    self_ipi_pending = __proc_take_cores(p, &pcoreid, 1, __preempt, p, 0, 0);
+    __proc_unlock_ipi_pending(p, self_ipi_pending);
+}
+
+void proc_give(struct proc *p, uint32_t pcoreid)
+{
+    bool self_ipi_pending = FALSE;
+    spin_lock_irqsave(&p->proc_lock);
+    // expects a vcorelist.  assumes vcore is mapped and running_m
+    self_ipi_pending = __proc_give_cores(p, &pcoreid, 1);
+    __proc_unlock_ipi_pending(p, self_ipi_pending);
+}
+
+void do_it(void)
+{
+    struct proc *p = 0xfe500000;
+    proc_preempt_core(p, 0);
+    //print_proc_info(1);
+    udelay(2000000);
+    p->procdata->vcore_preempt_data[0].notif_pending = 1;
+    proc_give(p, 4);
+    //print_proc_info(1);
+}
+
+void do_it2(void)
+{
+    struct proc *p = 0xfe500000;
+    bool self_ipi_pending = FALSE;
+    uint32_t pcorelist[4] = {7, 6, 5, 4};
+
+    spin_lock_irqsave(&p->proc_lock);
+    self_ipi_pending = __proc_take_allcores(p, __preempt, p, 0, 0);
+    __proc_unlock_ipi_pending(p, self_ipi_pending);
+    udelay(2000000);
+
+    print_proc_info(1);
+    udelay(5000000);
+
+}
+

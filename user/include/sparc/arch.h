@@ -3,6 +3,20 @@
 
 #include <ros/common.h>
 
+#define __RAMP__
+#define ARCH_CL_SIZE 128
+
+double do_fdiv(double,double);
+double do_fsqrt(double);
+double do_recip(double);
+double do_rsqrt(double);
+
+static __inline void
+set_stack_pointer(void* sp)
+{
+	__asm__ __volatile__ ("mov %0,%%sp" : : "r"(sp));
+}
+
 static __inline void
 breakpoint(void)
 {

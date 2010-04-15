@@ -2,10 +2,10 @@
 #include <parlib.h>
 #include <rassert.h>
 #include <stdlib.h>
-#include <hart.h>
+#include <vcore.h>
 #include <ros/mman.h>
 #include <ros/resource.h>
-#include <stdio.h>
+#include <rstdio.h>
 #include <timing.h>
 
 #define TEST_MMAP					 1
@@ -27,9 +27,9 @@ int main(int argc, char** argv)
 {
 	uint32_t vcoreid;
 	int retval;
-	hart_init();
+	vcore_init();
 
-	if ((vcoreid = hart_self())) {
+	if ((vcoreid = vcore_id())) {
 		printf("Should never see me! (from vcore %d)\n", vcoreid);
 	} else { // core 0
 		printf("Hello from else vcore 0\n");
@@ -54,19 +54,19 @@ int main(int argc, char** argv)
 				printf("Should not see me!!!!!!!!!!!!!!!!!!\n");
 				while(1);
 			case TEST_ONE_CORE:
-				retval = hart_request(1);
+				retval = vcore_request(1);
 				printf("One core test's core0's retval: %d\n", retval);
 				printf("Check to see it's on a worker core.\n");
 				while(1);
 			case TEST_ASK_FOR_TOO_MANY_CORES:
-				retval = hart_request(12);
+				retval = vcore_request(12);
 				printf("Asked for too many, retval: %d\n", retval);
 				return 0;
 			case TEST_INCREMENTAL_CHANGES:
-				retval = hart_request(4);
+				retval = vcore_request(4);
 				break;
 			default:
-				retval = hart_request(5);
+				retval = vcore_request(5);
 		}
 		if (retval)
 			panic("failed to allocate cores!");
@@ -79,7 +79,7 @@ int main(int argc, char** argv)
 		case TEST_YIELD_OUT_OF_ORDER:
 			udelay(10000000);
 			printf("Core 2 should have yielded, asking for another\n");
-			retval = hart_request(5);
+			retval = vcore_request(5);
 			break;
 		case TEST_YIELD_0_OUT_OF_ORDER:
 			udelay(5000000);
@@ -94,14 +94,14 @@ int main(int argc, char** argv)
 	return 0;
 }
 
-void hart_entry(void)
+void vcore_entry(void)
 {
 	uint32_t vcoreid;
 	static int first_time = 1; // used by vcore2
 	int retval;
 
-	vcoreid = hart_self();
-	printf("Hello from hart_entry in vcore %d\n", vcoreid);
+	vcoreid = vcore_id();
+	printf("Hello from vcore_entry in vcore %d\n", vcoreid);
 
 	if ((vcoreid == 2) && first_time) {
 		first_time = 0;
@@ -110,12 +110,12 @@ void hart_entry(void)
 				// Testing asking for less than we already have
 				udelay(1000000);
 				printf("Asking for too few:\n");
-				retval = hart_request(2);
+				retval = vcore_request(2);
 				printf("Should be -EINVAL(7): %d\n", retval);
 				// Testing getting more while running
 				printf("Asking for more while running:\n");
 				udelay(1000000);
-				retval = hart_request(5);
+				retval = vcore_request(5);
 				printf("core2's retval: %d\n", retval);
 				break;
 			case TEST_YIELD_OUT_OF_ORDER:
@@ -125,7 +125,7 @@ void hart_entry(void)
 			case TEST_YIELD_0_OUT_OF_ORDER:
 				udelay(7500000);
 				printf("Core 0 should have yielded, asking for another\n");
-				retval = hart_request(5);
+				retval = vcore_request(5);
 		}
 	}
 	global_tests(vcoreid);
@@ -145,7 +145,7 @@ static void global_tests(uint32_t vcoreid)
 			if (vcoreid == 2) {
 				printf("Core %d trying to request 0/ switch to _S\n", vcoreid);
 				udelay(3000000);
-				retval = hart_request(0);
+				retval = vcore_request(0);
 				// will only see this if we are scheduled()
 				printf("Core %d back up! (retval:%d)\n", vcoreid, retval);
 				printf("And exiting\n");
@@ -154,7 +154,7 @@ static void global_tests(uint32_t vcoreid)
 			while(1);
 		case TEST_CRAZY_YIELDS:
 			udelay(300000*vcoreid);
-			hart_request(5);
+			vcore_request(5);
 			sys_yield(0);
 			printf("should  never see me, unless you slip into *_S\n");
 			break;

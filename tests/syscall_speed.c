@@ -1,4 +1,4 @@
-#include <stdio.h>
+#include <rstdio.h>
 #include <parlib.h>
 #include <arch/arch.h>
 

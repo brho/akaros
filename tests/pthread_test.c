@@ -1,4 +1,4 @@
-#include <stdio.h>
+#include <rstdio.h>
 #include <pthread.h>
 
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;

@@ -170,7 +170,7 @@ TLS/TCB descriptor and the floating point/silly state (if applicable) in the
 user-thread control block, and do whatever is needed to signal vcore0 to run the
 _S context when it starts up.  One way would be to mark vcore0's "active thread"
 variable to point to the _S thread.  When vcore0 starts up at
-_start/hart_entry() (like all vcores), it will see a thread was running there
+_start/vcore_entry() (like all vcores), it will see a thread was running there
 and restart it.  This will need to have some special casing for the FP/silly
 state.
 
@@ -233,7 +233,7 @@ to _S.  The kernel will rip it out of your vcore list.  A process can yield its
 cores in any order.  The kernel will "fill in the holes of the vcoremap" for any
 future new cores requested (e.g., proc A has 4 vcores, yields vcore2, and then
 asks for another vcore.  The new one will be vcore2).  When any core starts in
-_M mode, even after a yield, it will come back at the hart_entry()/_start point.
+_M mode, even after a yield, it will come back at the vcore_entry()/_start point.
 
 Yield will normally adjust your desired amount of vcores to the amount after the
 calling core is taken.  This is the way a process gives its cores back.

@@ -1,5 +1,5 @@
-#ifndef PARLIB_ARCH_HART_H
-#define PARLIB_ARCH_HART_H
+#ifndef PARLIB_ARCH_VCORE_H
+#define PARLIB_ARCH_VCORE_H
 
 #include <ros/common.h>
 #include <ros/arch/trapframe.h>
@@ -35,4 +35,15 @@ static inline void set_tls_desc(void *tls_desc, uint32_t vcoreid)
 {
 	asm volatile ("mov %0,%%g7" : : "r"(tls_desc) : "memory");
 }
-#endif /* PARLIB_ARCH_HART_H */
+
+#define __vcore_id_on_entry (__vcore_id())
+
+static inline int
+__vcore_id()
+{
+	int id;
+	asm ("mov %%asr13,%0" : "=r"(id));
+	return id;
+}
+
+#endif /* PARLIB_ARCH_VCORE_H */
