@@ -36,11 +36,11 @@ ramp:
 
 # various sparc functional simulator configurations
 NP ?= 1
-fs:
+fs: all
 	sparc_app -p$(NP) -fappserver_ros.conf fs obj/kern/kernel none
-fsd:
+fsd: all
 	sparc_app_debug -p$(NP) -fappserver_ros.conf fs obj/kern/kernel none
-hw:
+hw: all
 	sparc_app -p$(NP) -fappserver_ros.conf hw obj/kern/kernel none
 
 .PHONY: fs fsd hw
