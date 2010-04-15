@@ -27,7 +27,7 @@ struct notif_method {
 
 /* Notification Event Types */
 #define NE_NONE					 0
-#define NE_PREMPT_PENDING		 1
+#define NE_PREEMPT_PENDING		 1
 #define NE_GANG_PREMPT_PENDING	 2
 #define NE_VCORE_REVOKE			 3
 #define NE_GANG_RETURN			 4

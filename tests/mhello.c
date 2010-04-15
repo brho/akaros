@@ -100,6 +100,7 @@ void vcore_entry(void)
 	temp = 0xcafebabe;
 /* begin: stuff userspace needs to do to handle notifications */
 
+	struct vcore *vc = &__procinfo.vcoremap[vcoreid];
 	struct preempt_data *vcpd;
 	vcpd = &__procdata.vcore_preempt_data[vcoreid];
 	
@@ -114,6 +115,12 @@ void vcore_entry(void)
 	/* can see how many messages had to be sent as bits */
 	printf("Number of event overflows: %d\n", vcpd->event_overflows);
 
+	if (vc->preempt_pending) {
+		printf("Oh crap, vcore %d is being preempted!  Yielding\n", vcoreid);
+		sys_yield(TRUE);
+		printf("After yield on vcore %d. I wasn't being preempted.\n", vcoreid);
+	}
+		
 	/* Lets try to restart vcore0's context.  Note this doesn't do anything to
 	 * set the appropriate TLS.  On x86, this will involve changing the LDT
 	 * entry for this vcore to point to the TCB of the new user-thread. */
