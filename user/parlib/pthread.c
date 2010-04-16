@@ -6,6 +6,7 @@
 #include <assert.h>
 #include <rstdio.h>
 #include <errno.h>
+#include <parlib.h>
 #include <ros/notification.h>
 #include <arch/atomic.h>
 #include <sys/queue.h>

@@ -45,7 +45,7 @@ void proc_secure_trapframe(struct trapframe *tf)
 	tf->tf_fs = 0;
 	//tf->tf_gs = whatevs.  ignoring this.
 	tf->tf_ss = GD_UD | 3;
-	tf->tf_cs = GD_UT | 3;
+	tf->tf_cs ? GD_UT | 3 : 0; // can be 0 for sysenter TFs.
 	tf->tf_eflags |= 0x00000200; // bit 9 is the interrupts-enabled
 }
 

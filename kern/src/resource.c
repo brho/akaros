@@ -100,8 +100,15 @@ ssize_t core_request(struct proc *p)
 				if ((current != p) || (p->procinfo->vcoremap[0].pcoreid != core_id()))
 					panic("We don't handle async RUNNING_S core requests yet.");
 				/* save the tf so userspace can restart it.  Like in __notify,
-				 * this assumes a user tf is the same as a kernel tf. */
-				p->procdata->vcore_preempt_data[0].notif_tf = *current_tf;
+				 * this assumes a user tf is the same as a kernel tf.  We save
+				 * it in the preempt slot so that we can also save the silly
+				 * state. */
+				struct preempt_data *vcpd = &p->procdata->vcore_preempt_data[0];
+				vcpd->preempt_tf = *current_tf;
+				save_fp_state(&vcpd->preempt_anc);
+				__seq_start_write(&vcpd->preempt_tf_valid);
+				/* If we remove this, vcore0 will start where the _S left off */
+				vcpd->notif_pending = TRUE;
 				/* in the async case, we'll need to remotely stop and bundle
 				 * vcore0's TF.  this is already done for the sync case (local
 				 * syscall). */

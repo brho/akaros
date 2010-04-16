@@ -171,8 +171,10 @@ user-thread control block, and do whatever is needed to signal vcore0 to run the
 _S context when it starts up.  One way would be to mark vcore0's "active thread"
 variable to point to the _S thread.  When vcore0 starts up at
 _start/vcore_entry() (like all vcores), it will see a thread was running there
-and restart it.  This will need to have some special casing for the FP/silly
-state.
+and restart it.  The kernel will migrate the _S thread's silly state (FP) to the
+new pcore, so that it looks like the process was simply running the _S thread
+and got notified.  Odds are, it will want to just restart that thread, but the
+kernel won't assume that (hence the notification).
 
 In general, all cores (and all subsequently allocated cores) start at the elf
 entry point, with vcoreid in eax or a suitable arch-specific manner.  There is
