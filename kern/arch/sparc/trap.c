@@ -169,6 +169,11 @@ static kernel_message_t *get_next_amsg(struct kernel_msg_list *list_head,
  * you can send yourself an IPI, and that IPIs can get squashed like on x86. */
 void handle_ipi(trapframe_t* tf)
 {
+	if (!in_kernel(tf))
+		set_current_tf(tf);
+	else if((void*)tf->pc == &cpu_halt) // break out of the cpu_halt loop
+		advance_pc(tf);
+
 	per_cpu_info_t *myinfo = &per_cpu_info[core_id()];
 	kernel_message_t msg_cp, *k_msg;
 

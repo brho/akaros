@@ -24,7 +24,6 @@ static __inline void disable_irq(void) __attribute__((always_inline));
 static __inline void enable_irqsave(int8_t* state) __attribute__((always_inline));
 static __inline void disable_irqsave(int8_t* state) __attribute__((always_inline));
 static __inline void cpu_relax(void) __attribute__((always_inline));
-static __inline void cpu_halt(void) __attribute__((always_inline));
 static __inline void tlbflush(void) __attribute__((always_inline));
 static __inline void icache_flush_page(void* va, void* pa)__attribute__((always_inline));
 static __inline void clflush(uintptr_t* addr) __attribute__((always_inline));
@@ -38,6 +37,7 @@ static __inline uint32_t rcr3(void) __attribute__((always_inline));
 void print_cpuinfo(void);
 void show_mapping(uintptr_t start, size_t size);
 void backtrace(void);
+void cpu_halt(void);
 
 extern uintptr_t mmu_context_tables[MAX_NUM_CPUS][NCONTEXTS+CONTEXT_TABLE_PAD];
 
@@ -145,12 +145,6 @@ cpu_relax(void)
 	int ctr = 8;
 	asm volatile("1: deccc %0; bne 1b; nop" :
 	             "=r"(ctr) : "0"(ctr) : "cc","memory");
-}
-
-static __inline void
-cpu_halt(void)
-{
-	asm volatile("1: ba 1b; nop" : : : "memory");
 }
 
 static __inline void

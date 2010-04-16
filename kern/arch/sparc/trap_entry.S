@@ -200,3 +200,11 @@ handle_perfctr:
 	lda	[%i1] 2,%i1
 	jmp	%l2
 	 rett	%l2+4
+
+	// we make cpu_halt a linker symbol so we know if we were halted.
+	// if we were halted, we should return to PC+4, not PC.
+	.global cpu_halt
+cpu_halt:
+	ba,a cpu_halt
+	retl
+	 nop
