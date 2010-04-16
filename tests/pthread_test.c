@@ -24,15 +24,18 @@ int main(int argc, char** argv)
 	thread_num = 0;
 	printf_safe("About to create thread 0\n");
 	pthread_create(&t0, NULL, &thread, NULL);
-	printf_safe("About to create thread 1\n");
-	pthread_create(&t1, NULL, &thread, NULL);
-	printf_safe("About to create thread 2\n");
-	pthread_create(&t2, NULL, &thread, NULL);
+	printf("returned from creating him, spinning\n");
+	while(1);
+
+//	printf_safe("About to create thread 1\n");
+//	pthread_create(&t1, NULL, &thread, NULL);
+//	printf_safe("About to create thread 2\n");
+//	pthread_create(&t2, NULL, &thread, NULL);
 
 	printf_safe("About to join on thread 0\n");
 	pthread_join(t0, NULL);
-	printf_safe("About to join on thread 1\n");
-	pthread_join(t1, NULL);
-	printf_safe("About to join on thread 2\n");
-	pthread_join(t2, NULL);
+//	printf_safe("About to join on thread 1\n");
+//	pthread_join(t1, NULL);
+//	printf_safe("About to join on thread 2\n");
+//	pthread_join(t2, NULL);
 } 

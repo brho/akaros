@@ -1,6 +1,7 @@
 #ifndef _PTHREAD_H
 #define _PTHREAD_H
 
+#include <sys/queue.h>
 #include <vcore.h>
 #include <mcs.h>
 
@@ -8,7 +9,25 @@
   extern "C" {
 #endif
 
-/* Detach state.  */
+/* Our internal types for pthread management */
+struct pthread_tcb {
+	TAILQ_ENTRY(pthread_tcb) next;
+	void* (*start_routine)(void*);
+	void* arg;
+
+	struct user_trapframe utf;
+	struct ancillary_state as;
+	void *tls_desc;
+	uint32_t vcoreid;
+	uint32_t pthreadid;
+
+	int finished;
+	int detached;
+};
+typedef struct pthread_tcb* pthread_t;
+TAILQ_HEAD(pthread_queue, pthread_tcb);
+
+/* For compatibility with the existing pthread library */
 enum
 {
   PTHREAD_CREATE_JOINABLE,
@@ -17,14 +36,13 @@ enum
 #define PTHREAD_CREATE_DETACHED	PTHREAD_CREATE_DETACHED
 };
 
-struct pthread_wqt
-{
-  void* (*start_routine)(void*);
-  void* arg;
-  int finished;
-  int detached;
-  struct pthread_wqt* next;
-};
+#define PTHREAD_ONCE_INIT 0
+#define PTHREAD_BARRIER_SERIAL_THREAD 12345
+#define PTHREAD_MUTEX_INITIALIZER {0}
+#define PTHREAD_MUTEX_NORMAL 0
+#define PTHREAD_MUTEX_DEFAULT PTHREAD_MUTEX_NORMAL
+#define PTHREAD_COND_INITIALIZER {0}
+#define PTHREAD_PROCESS_PRIVATE 0
 
 typedef struct
 {
@@ -57,21 +75,12 @@ typedef struct
   int waiters[MAX_VCORES];
 } pthread_cond_t;
 
-typedef struct pthread_wqt work_queue_t;
-typedef work_queue_t* pthread_t;
 typedef int pthread_attr_t;
 typedef int pthread_barrierattr_t;
 typedef int pthread_once_t;
 typedef void** pthread_key_t;
 
-#define PTHREAD_ONCE_INIT 0
-#define PTHREAD_BARRIER_SERIAL_THREAD 12345
-#define PTHREAD_MUTEX_INITIALIZER {0}
-#define PTHREAD_MUTEX_NORMAL 0
-#define PTHREAD_MUTEX_DEFAULT PTHREAD_MUTEX_NORMAL
-#define PTHREAD_COND_INITIALIZER {0}
-#define PTHREAD_PROCESS_PRIVATE 0
-
+/* The pthreads API */
 int pthread_attr_init(pthread_attr_t *);
 int pthread_attr_destroy(pthread_attr_t *);
 int pthread_create(pthread_t *, const pthread_attr_t *,

@@ -61,7 +61,8 @@ KERN_APPFILES += \
                  $(TESTS_DIR)/draw_nanwan \
                  $(TESTS_DIR)/hello \
                  $(TESTS_DIR)/mhello \
-                 $(TESTS_DIR)/manycore_test
+                 $(TESTS_DIR)/manycore_test \
+                 $(TESTS_DIR)/pthread_test
 endif
 
 KERN_LDFLAGS   := $(KERN_LDFLAGS) -L$(OBJDIR)/$(KERN_DIR) \

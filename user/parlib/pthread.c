@@ -6,58 +6,98 @@
 #include <assert.h>
 #include <rstdio.h>
 #include <errno.h>
+#include <ros/notification.h>
 #include <arch/atomic.h>
+#include <sys/queue.h>
+#include <assert.h>
 
-int threads_active = 1;
-mcs_lock_t work_queue_lock = MCS_LOCK_INIT;
-pthread_t work_queue_head = 0;
-pthread_t work_queue_tail = 0;
+struct pthread_queue ready_queue = TAILQ_HEAD_INITIALIZER(ready_queue);
+struct pthread_queue active_queue = TAILQ_HEAD_INITIALIZER(active_queue);
+mcs_lock_t queue_lock = MCS_LOCK_INIT;
 pthread_once_t init_once = PTHREAD_ONCE_INIT;
-pthread_t active_threads[MAX_VCORES] = {0};
+int threads_ready = 0;
 
-void queue_insert(pthread_t* head, pthread_t* tail, pthread_t node)
-{
-  node->next = 0;
-  if(*head == 0)
-    *head = node;
-  else
-    (*tail)->next = node;
-  *tail = node;
-}
+__thread struct pthread_tcb *current_thread = 0;
 
-pthread_t queue_remove(pthread_t* head, pthread_t* tail)
+void _pthread_init()
 {
-  pthread_t node = *head;
-  *head = (*head)->next;
-  if(*head == 0)
-    *tail = 0;
-  node->next = 0;
-  return node;
+	if (vcore_init())
+		printf("vcore_init() failed, we're fucked!\n");
+	
+	assert(vcore_id() == 0);
+
+	/* tell the kernel where and how we want to receive notifications */
+	struct notif_method *nm;
+	for (int i = 0; i < MAX_NR_NOTIF; i++) {
+		nm = &__procdata.notif_methods[i];
+		nm->flags |= NOTIF_WANTED | NOTIF_MSG | NOTIF_IPI;
+		nm->vcoreid = i % 2; // vcore0 or 1, keepin' it fresh.
+	}
+
+	/* Create a pthread_tcb for the main thread */
+	pthread_t t = (pthread_t)calloc(sizeof(struct pthread_tcb), 1);
+	t->pthreadid = 0; // The main thread gets id 0
+	
+	/* Save a pointer to the newly created threads tls region into its tcb */
+	t->tls_desc = get_tls_desc(0);
+
+	/* Change temporarily to vcore0s tls region so we can save the newly created
+	 * tcb into its current_thread variable and then restore it.  One minor
+	 * issue is that vcore0's transition-TLS isn't TLS_INITed yet.  Until it is
+	 * (right before vcore_entry(), don't try and take the address of any of
+	 * its TLS vars. */
+	extern void** vcore_thread_control_blocks;
+	set_tls_desc(vcore_thread_control_blocks[0], 0);
+	current_thread = t;
+	set_tls_desc(t->tls_desc, 0);
+
+	// TODO: consider replacing this when we have an interface allowing
+	// requesting absolute num vcores, and moving it to pthread_create and
+	// asking for 2
+	vcore_request(1);
 }
 
 void vcore_entry()
 {
-  pthread_t node = NULL;
-  while(1)
-  {
-    mcs_lock_lock(&work_queue_lock);
-    if(work_queue_head)
-      node = queue_remove(&work_queue_head,&work_queue_tail);
-    mcs_lock_unlock(&work_queue_lock);
+	uint32_t vcoreid = vcore_id();
+	printf("Hi entering vcore entry on vcore %d!!\n", vcoreid);
 
-    if(node)
-      break;
-    cpu_relax();
-  }
+	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
+	struct vcore *vc = &__procinfo.vcoremap[vcoreid];
 
-  active_threads[vcore_id()] = node;
+	/* Put this in the loop that deals with notifications.  It will return if
+	 * there is no preempt pending. */ 
+	if (vc->preempt_pending)
+		sys_yield(TRUE);
 
-  pthread_exit(node->start_routine(node->arg));
-}
+	if (current_thread) {
+		/* Do one last check for notifs before clearing pending */
+		vcpd->notif_pending = 0;
+		set_tls_desc(current_thread->tls_desc, 0);
 
-void _pthread_init()
-{
-  // if we allocated active_threads dynamically, we'd do so here
+		/* Load silly state (Floating point) too, though not for a restart -
+		 * only for a fresh pthread */
+	
+		/* Pop the user trap frame */
+		pop_ros_tf(&vcpd->notif_tf, vcoreid);
+		assert(0);
+	}
+	while(1);
+
+#if 0
+	pthread_t node = NULL;
+	mcs_lock_lock(&queue_lock);
+	if(ready_queue)
+		node = queue_remove(&work_queue_head,&work_queue_tail);
+mcs_lock_unlock(&work_queue_lock);
+
+if(node)
+  break;
+cpu_relax();
+active_threads[vcore_id()] = node;
+
+pthread_exit(node->start_routine(node->arg));
+#endif
 }
 
 int pthread_attr_init(pthread_attr_t *a)
@@ -70,27 +110,36 @@ int pthread_attr_destroy(pthread_attr_t *a)
   return 0;
 }
 
+void __pthread_create(pthread_t* thread, const pthread_attr_t* attr,
+                   void *(*start_routine)(void *), void* arg) 
+{
+}
+
 int pthread_create(pthread_t* thread, const pthread_attr_t* attr,
                    void *(*start_routine)(void *), void* arg)
 {
-  pthread_once(&init_once,&_pthread_init);
+	pthread_once(&init_once,&_pthread_init);
+	// Most fields already zeroed out by the calloc below...
+	*thread = (pthread_t)calloc(sizeof(struct pthread_tcb), 1);
+	(*thread)->start_routine = start_routine;
+	(*thread)->arg = arg;
+	(*thread)->pthreadid = 3413; // TODO
+	
+	// TODO: Allocate pthread tls regions and stacks
+	
+	// Insert the newly created thread into the ready queue of threads.
+	// It will be removed from this queue later when vcore_entry() comes up
+	mcs_lock_lock(&queue_lock);
+	{
+		TAILQ_INSERT_TAIL(&ready_queue, *thread, next);
+		threads_ready++;
+	}
+	mcs_lock_unlock(&queue_lock);
 
-  *thread = (pthread_t)malloc(sizeof(work_queue_t));
-  (*thread)->start_routine = start_routine;
-  (*thread)->arg = arg;
-  (*thread)->next = 0;
-  (*thread)->finished = 0;
-  (*thread)->detached = 0;
-  mcs_lock_lock(&work_queue_lock);
-  {
-    threads_active++;
-    queue_insert(&work_queue_head,&work_queue_tail,*thread);
-    // don't return until we get a vcore
-    while(threads_active > num_vcores() && vcore_request(1));
-  }
-  mcs_lock_unlock(&work_queue_lock);
-
-  return 0;
+	// Attempt to request a new core, may or may not get it...
+	vcore_request(1);
+	
+	return 0;
 }
 
 int pthread_join(pthread_t t, void** arg)
@@ -233,7 +282,8 @@ int pthread_condattr_getpshared(pthread_condattr_t *a, int *s)
 
 pthread_t pthread_self()
 {
-  return active_threads[vcore_id()];
+  //return active_threads[vcore_id()];
+  return 0; // TODO
 }
 
 int pthread_equal(pthread_t t1, pthread_t t2)
@@ -243,15 +293,14 @@ int pthread_equal(pthread_t t1, pthread_t t2)
 
 void pthread_exit(void* ret)
 {
-  pthread_once(&init_once,&_pthread_init);
-
   pthread_t t = pthread_self();
 
-  mcs_lock_lock(&work_queue_lock);
+#if 0
+  mcs_lock_lock(&queue_lock);
   threads_active--;
   if(threads_active == 0)
     exit(0);
-  mcs_lock_unlock(&work_queue_lock);
+  mcs_lock_unlock(&queue_lock);
 
   if(t)
   {
@@ -262,6 +311,7 @@ void pthread_exit(void* ret)
   }
 
   vcore_entry();
+#endif
 }
 
 int pthread_once(pthread_once_t* once_control, void (*init_routine)(void))

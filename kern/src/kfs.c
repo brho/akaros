@@ -49,6 +49,7 @@ DECL_PROG(draw_nanwan);
 DECL_PROG(hello);
 DECL_PROG(mhello);
 DECL_PROG(manycore_test);
+DECL_PROG(pthread_test);
 DECL_FILE(kfs_test_txt);
 DECL_FILE(hello_txt);
 #endif
@@ -65,6 +66,7 @@ struct kfs_entry kfs[MAX_KFS_FILES] = {
 	KFS_PENTRY(hello)
 	KFS_PENTRY(mhello)
 	KFS_PENTRY(manycore_test)
+	KFS_PENTRY(pthread_test)
 	KFS_FENTRY(kfs_test_txt)
 	KFS_FENTRY(hello_txt)
 #endif

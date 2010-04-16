@@ -17,7 +17,8 @@
 #  define internal_function
 # endif
 
-static size_t _max_vcores_ever_wanted = 0;
+/* starting with 1 since we alloc vcore0's stacks and TLS in vcore_init(). */
+static size_t _max_vcores_ever_wanted = 1;
 static mcs_lock_t _vcore_lock = MCS_LOCK_INIT;
 
 extern void** vcore_thread_control_blocks;
@@ -84,9 +85,17 @@ int vcore_init()
 	if(!vcore_thread_control_blocks)
 		goto vcore_init_fail;
 
+	/* Need to alloc vcore0's transition stuff here (technically, just the TLS)
+	 * so that schedulers can use vcore0's transition TLS before it comes up in
+	 * vcore_entry() */
+	if(allocate_transition_stack(0) || allocate_transition_tls(0))
+		goto vcore_init_tls_fail;
+
 	initialized = 1;
 	return 0;
 
+vcore_init_tls_fail:
+	free(vcore_thread_control_blocks);
 vcore_init_fail:
 	errno = ENOMEM;
 	return -1;

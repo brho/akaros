@@ -65,7 +65,8 @@ void manager_brho(void)
 	switch (progress++) {
 		case 0:
 			// TODO: need to store the pid for future manager runs, not the *p
-			p = kfs_proc_create(kfs_lookup_path("mhello"));
+			p = kfs_proc_create(kfs_lookup_path("pthread_test"));
+			//p = kfs_proc_create(kfs_lookup_path("mhello"));
 			//p = kfs_proc_create(kfs_lookup_path("roslib_mhello"));
 			//p = kfs_proc_create(kfs_lookup_path("roslib_mproctests"));
 			//p = kfs_proc_create(kfs_lookup_path("roslib_spawn"));

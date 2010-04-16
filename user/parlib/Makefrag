@@ -11,6 +11,7 @@ ROS_USER_LIBS += $(OBJDIR)/$(USER_PARLIB_DIR)/libparlib.a
 
 USER_PARLIB_SRCFILES := \
                  $(USER_PARLIB_DIR)/pthread.c \
+                 $(USER_PARLIB_DIR)/bthread.c \
                  $(USER_PARLIB_DIR)/vcore.c \
                  $(USER_PARLIB_DIR)/mcs.c \
                  $(USER_PARLIB_DIR)/panic.c \
