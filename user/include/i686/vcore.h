@@ -109,7 +109,7 @@ static inline void set_tls_desc(void *tls_desc, uint32_t vcoreid)
   /* GS is still the same (should be!), but it needs to be reloaded to force a
    * re-read of the LDT. */
   uint32_t gs = (vcoreid << 3) | 0x07;
-  asm volatile("movl %0,%%gs" : : "r" (gs));
+  asm volatile("movl %0,%%gs" : : "r" (gs) : "memory");
 }
 
 // this is how we get our thread id on entry.

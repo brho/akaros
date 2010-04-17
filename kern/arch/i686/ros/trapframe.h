@@ -3,6 +3,8 @@
 #ifndef ROS_INCLUDE_ARCH_TRAPFRAME_H
 #define ROS_INCLUDE_ARCH_TRAPFRAME_H
 
+#include <ros/common.h>
+
 typedef struct pushregs {
 	/* registers as pushed by pusha */
 	uint32_t reg_edi;

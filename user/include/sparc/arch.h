@@ -3,6 +3,8 @@
 
 #include <ros/common.h>
 
+#define internal_function
+
 #define __RAMP__
 #define ARCH_CL_SIZE 128
 
@@ -47,4 +49,15 @@ cpu_relax(void)
 	asm volatile("1: deccc %0; bne 1b; nop" :
 	             "=r"(ctr) : "0"(ctr) : "cc","memory");
 }
+
+// This assumes a user_tf looks like a regular kernel trapframe
+static __inline void
+init_user_tf(struct user_trapframe *u_tf, uint32_t entry_pt, uint32_t stack_top)
+{
+	memset(u_tf, 0, sizeof(struct user_trapframe));
+	u_tf->gpr[14] = stack_top - 96;
+	u_tf->pc = entry_pt;
+	u_tf->npc = entry_pt + 4;
+}
+
 #endif /* PARLIB_ARCH_H */

@@ -11,6 +11,9 @@ extern "C" {
 #define LOG2_MAX_VCORES 6
 #define MAX_VCORES (1 << LOG2_MAX_VCORES)
 
+#define TRANSITION_STACK_PAGES 2
+#define TRANSITION_STACK_SIZE (TRANSITION_STACK_PAGES*PGSIZE)
+
 /* Defined by glibc; Must be implemented by a user level threading library */
 extern void vcore_entry();
 

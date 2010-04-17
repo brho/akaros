@@ -18,11 +18,14 @@ struct pthread_tcb {
 	struct user_trapframe utf;
 	struct ancillary_state as;
 	void *tls_desc;
-	uint32_t vcoreid;
-	uint32_t pthreadid;
+	void *stacktop;
+	uint32_t id;
 
 	int finished;
+	void *retval;
 	int detached;
+	// whether or not the scheduler can migrate you from your vcore
+	bool dont_migrate;
 };
 typedef struct pthread_tcb* pthread_t;
 TAILQ_HEAD(pthread_queue, pthread_tcb);

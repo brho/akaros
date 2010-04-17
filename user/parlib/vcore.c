@@ -1,3 +1,4 @@
+#include <arch/arch.h>
 #include <stdbool.h>
 #include <errno.h>
 #include <vcore.h>
@@ -8,14 +9,6 @@
 #include <stdlib.h>
 #include <sys/mman.h>
 #include <rstdio.h>
-
-// Only need in this file because _dl_allocate and friends are
-//  internal functions in glibc
-# ifdef __i386__
-#  define internal_function   __attribute ((regparm (3), stdcall))
-# else
-#  define internal_function
-# endif
 
 /* starting with 1 since we alloc vcore0's stacks and TLS in vcore_init(). */
 static size_t _max_vcores_ever_wanted = 1;
@@ -47,9 +40,6 @@ static int allocate_transition_tls(int id)
 	}
 	return 0;
 }
-
-#define TRANSITION_STACK_PAGES 2
-#define TRANSITION_STACK_SIZE (TRANSITION_STACK_PAGES*PGSIZE)
 
 static void free_transition_stack(int id)
 {
