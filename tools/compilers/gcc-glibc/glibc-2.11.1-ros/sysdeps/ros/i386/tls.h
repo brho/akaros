@@ -473,7 +473,7 @@ static const char* tls_init_tp(void* thrdescr)
   uint32_t gs = (core_id << 3) | 0x07;
 
   // Set the GS register.
-  asm volatile("movl %0,%%gs" : : "r" (gs));
+  asm volatile("movl %0,%%gs" : : "r" (gs) : "memory");
 
   return NULL;
 }
