@@ -56,7 +56,7 @@ __internal_setbrk (uintptr_t addr)
     if(real_new_brk < (uintptr_t)__procinfo.heap_bottom)
       return -1;
 
-    if (!munmap((void*)real_new_brk, real_brk - real_new_brk))
+    if (munmap((void*)real_new_brk, real_brk - real_new_brk))
       return -1;
   }
 
