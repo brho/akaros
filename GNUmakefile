@@ -84,6 +84,7 @@ endif
 endif
 
 # Default programs for compilation
+USER_CFLAGS := -O2
 ifeq ($(COMPILER),IVY)
 KERN_CFLAGS += --deputy \
                --no-rc-sharc \

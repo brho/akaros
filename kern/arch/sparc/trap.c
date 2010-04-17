@@ -374,6 +374,17 @@ fp_disabled(trapframe_t* state)
 }
 
 void
+handle_pop_tf(trapframe_t* state)
+{
+	trapframe_t tf;
+	if(memcpy_from_user(current,&tf,(void*)state->gpr[8],sizeof(tf)))
+		proc_destroy(current);
+
+	proc_secure_trapframe(&tf);
+	proc_restartcore(current,&tf);
+}
+
+void
 handle_syscall(trapframe_t* state)
 {
 	uint32_t num = state->gpr[1];

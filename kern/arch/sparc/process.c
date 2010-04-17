@@ -29,7 +29,8 @@ proc_init_trapframe(trapframe_t *tf, uint32_t vcoreid,
 
 void proc_secure_trapframe(struct trapframe *tf)
 {
-	tf->psr = PSR_S; // but PS = 0
+	// only take the condition codes from the user.  we set S=1, PS=0
+	tf->psr = (tf->psr & PSR_ICC) | PSR_S;
 }
 
 /* For cases that we won't return from a syscall via the normal path, and need

@@ -21,7 +21,7 @@ int main(int argc, char** argv)
 	uint32_t vcoreid;
 	int retval;
 
-	mcs_barrier_init(&b, max_vcores() - 1);
+	mcs_barrier_init(&b, max_vcores());
 
 /* begin: stuff userspace needs to do before switching to multi-mode */
 	if (vcore_init())
@@ -56,8 +56,9 @@ int main(int argc, char** argv)
 		       vcoreid, &temp, temp);
 		printf("Multi-Goodbye, world, from PID: %d!\n", sys_getpid());
 		//retval = sys_resource_req(RES_CORES, 2, 0);
-		//retval = vcore_request(vcore_max_vcores()-2);
-		retval = vcore_request(3);
+		printf("Requesting %d vcores\n",max_vcores());
+		retval = vcore_request(max_vcores());
+		//retval = vcore_request(3);
 		printf("This is vcore0, right after vcore_request, retval=%d\n", retval);
 	}
 

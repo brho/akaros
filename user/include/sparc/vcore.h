@@ -3,6 +3,9 @@
 
 #include <ros/common.h>
 #include <ros/arch/trapframe.h>
+#include <arch/arch.h>
+#include <ros/syscall.h>
+#include <ros/procdata.h>
 
 /* Pops an ROS kernel-provided TF, reanabling notifications at the same time.
  * A Userspace scheduler can call this when transitioning off the transition
@@ -19,7 +22,22 @@
  * running. */
 static inline void pop_ros_tf(struct user_trapframe *tf, uint32_t vcoreid)
 {
-	// TODO: whatever sparc needs.
+	// since we're changing the stack, move stuff into regs for now
+	register uint32_t _vcoreid = _vcoreid;
+	register struct user_trapframe* _tf = tf;
+
+	set_stack_pointer((void*)tf->gpr[14]);
+
+	tf = _tf;
+	vcoreid = _vcoreid;
+	struct preempt_data* vcpd = &__procdata.vcore_preempt_data[vcoreid];
+
+	vcpd->notif_enabled = true;
+	if(vcpd->notif_pending)
+		ros_syscall(SYS_self_notify,vcoreid,0,0,0,0);
+
+	// tell the kernel to load the new trapframe
+	asm volatile ("mov %0, %%o0; ta 4" : : "r"(tf) : "memory");
 }
 
 /* Feel free to ignore vcoreid.  It helps x86 to avoid a call to

@@ -144,7 +144,7 @@ trap_table_pagefault:
 	UNHANDLED_TRAP				! 0x81
 	UNHANDLED_TRAP				! 0x82
 	TRAP_TABLE_ENTRY(handle_flushw)		! 0x83
-	UNHANDLED_TRAP				! 0x84
+	TRAP_TABLE_ENTRY(handle_pop_tf)		! 0x84
 	UNHANDLED_TRAP				! 0x85
 	UNHANDLED_TRAP				! 0x86
 	UNHANDLED_TRAP				! 0x87
