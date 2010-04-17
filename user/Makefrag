@@ -1,5 +1,5 @@
 USER_DIR := $(TOP_DIR)/user
-USER_CFLAGS += $(CFLAGS) -std=gnu99 -I$(USER_DIR)/include
+USER_CFLAGS += $(CFLAGS) -g -std=gnu99 -I$(USER_DIR)/include
 
 include $(USER_DIR)/parlib/Makefrag
 include $(USER_DIR)/pthread/Makefrag

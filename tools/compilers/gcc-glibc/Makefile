@@ -277,13 +277,13 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 	          --enable-shared \
 	          --with-elf \
 	          --with-tls \
-        	  --disable-nls \
+	          --disable-nls \
 	          --with-__thread \
 	          --with-headers=$(INSTDIR)/$(ARCH)-ros/sys-include \
 	          --prefix=$(INSTDIR)/$(ARCH)-ros \
 	          libc_cv_forced_unwind=yes \
 	          libc_cv_c_cleanup=yes \
-	          CFLAGS="$(ARCH_CFLAGS) -fpermissive -O2 -pipe";
+	          CFLAGS="$(ARCH_CFLAGS) -g -fpermissive -O2 -pipe";
 	touch $@
 
 .$(BINARY_PREFIX)glibc-make: .$(BINARY_PREFIX)glibc-configure
