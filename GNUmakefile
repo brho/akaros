@@ -84,7 +84,7 @@ endif
 endif
 
 # Default programs for compilation
-USER_CFLAGS := -O2
+USER_CFLAGS += -O2
 ifeq ($(COMPILER),IVY)
 KERN_CFLAGS += --deputy \
                --no-rc-sharc \
@@ -106,6 +106,7 @@ LD	    := $(GCCPREFIX)ld
 OBJCOPY	:= $(GCCPREFIX)objcopy
 OBJDUMP	:= $(GCCPREFIX)objdump
 NM	    := $(GCCPREFIX)nm
+STRIP   := $(GCCPREFIX)strip
 PERL    := perl
 
 EXTRAARGS ?= -std=gnu99 -Wno-attributes -fno-stack-protector -fgnu89-inline

@@ -77,7 +77,7 @@ KERN_OBJFILES  := $(patsubst $(KERN_DIR)/%.S, \
 
 KERN_APPFILES  := $(patsubst %, $(OBJDIR)/%, $(KERN_APPFILES))
 
-KERN_APPFILES  += $(KERN_DIR)/kfs/*
+KERN_RAWAPPFILES  := $(KERN_DIR)/kfs/*
 
 KERN_LDDEPENDS := $(KERN_OBJFILES) $(KERN_APPFILES) $(ARCH_DIR)/$(TARGET_ARCH)/kernel.ld \
                   $(OBJDIR)/$(KERN_DIR)/libivykern.a
@@ -96,10 +96,14 @@ $(OBJDIR)/$(KERN_DIR)/%.o: $(KERN_DIR)/%.S
 	@mkdir -p $(@D)
 	$(V)$(CC) $(KERN_CFLAGS) -D__ASSEMBLER__ -c -o $@ $<
 
+UDEBUG := $(findstring -g,$(USER_CFLAGS))
 $(OBJDIR)/$(KERN_DIR)/kernel: $(KERN_LDDEPENDS)
 	@echo + ld [KERN] $@
+	@if [ "$(UDEBUG)" != "-g" ]; then \
+		$(STRIP) -s $(KERN_APPFILES) ; \
+	fi
 	$(V)$(LD) -o $@ $(KERN_LDFLAGS) $(KERN_OBJFILES) $(KERN_LDLIBS) \
-	                $(KERN_GCC_LIB) -b binary $(KERN_APPFILES)
+	                $(KERN_GCC_LIB) -b binary $(KERN_APPFILES) $(KERN_RAWAPPFILES)
 	$(V)$(OBJDUMP) -S $@ > $@.asm
 	$(V)$(NM) -n $@ > $@.sym
 

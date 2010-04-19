@@ -23,6 +23,7 @@ CONFIG_DEMAND_PAGING:=             -D__CONFIG_DEMAND_PAGING__
 # To enable any of these options, add a line like the following to your Makelocal
 # USER_CFLAGS += $(CONFIG_SYSCALL_TRAP)
 CONFIG_SYSCALL_TRAP:=              -D__CONFIG_SYSCALL_TRAP__
+CONFIG_USER_DEBUGINFO:=            -g
 
 # User tests configuration parameters
 # By default, each of these options will be turned off

@@ -18,6 +18,7 @@
 
 # Userspace configuration parameters
 #USER_CFLAGS += $(CONFIG_SYSCALL_TRAP)
+#USER_CFLAGS += $(CONFIG_USER_DEBUGINFO)
 
 # User tests configuration parameters
 #TESTS_CFLAGS += $(CONFIG_STATIC_APPS)
