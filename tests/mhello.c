@@ -133,8 +133,8 @@ void vcore_entry(void)
 			udelay(5000000);
 		} */
 		printf("restarting vcore0 from userspace\n");
-		/* Do one last check for notifs before clearing pending */
 		vcpd->notif_pending = 0;
+		/* Do one last check for notifs after clearing pending */
 		/* // testing for missing a notif
 		if (first_time) {
 			first_time = FALSE;

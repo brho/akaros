@@ -182,13 +182,13 @@ also a syscall to get the vcoreid, but this will save an extra trap at vcore
 start time.
 
 Future proc_runs(), like from RUNNABLE_M to RUNNING_M start all cores at the
-entry point, including vcore0.  The saving of a _S context to vcore0's notif_tf only happens on
-the transition from _S to _M (which the process needs to be aware of for a
-variety of reasons).  This also means that userspace needs to handle vcore0
-coming up at the entry point again (and not starting the program over).  This is
-currently done in sysdeps-ros/start.c, via the static variable init.  Note there
-are some tricky things involving dynamically linked programs, but it all works
-currently.
+entry point, including vcore0.  The saving of a _S context to vcore0's notif_tf
+only happens on the transition from _S to _M (which the process needs to be
+aware of for a variety of reasons).  This also means that userspace needs to
+handle vcore0 coming up at the entry point again (and not starting the program
+over).  This is currently done in sysdeps-ros/start.c, via the static variable
+init.  Note there are some tricky things involving dynamically linked programs,
+but it all works currently.
 
 When coming in to the entry point, whether as the result of a startcore or a
 notification, the kernel will set the stack pointer to whatever is requested

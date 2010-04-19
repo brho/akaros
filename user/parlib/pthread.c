@@ -46,6 +46,11 @@ void _pthread_init()
 	pthread_t t = (pthread_t)calloc(sizeof(struct pthread_tcb), 1);
 	t->id = get_next_pid();
 	assert(t->id == 0);
+	/* Put the new pthread on the active queue */
+	mcs_lock_lock(&queue_lock);
+	threads_active++;
+	TAILQ_INSERT_TAIL(&active_queue, t, next);
+	mcs_lock_unlock(&queue_lock);
 	
 	/* Save a pointer to the newly created threads tls region into its tcb */
 	t->tls_desc = get_tls_desc(0);
@@ -86,9 +91,10 @@ void __attribute__((noreturn)) vcore_entry()
 	// TODO: consider making this restart path work for restarting as well as
 	// freshly starting
 	if (current_thread) {
-		/* Do one last check for notifs before clearing pending */
-		// TODO: call the handle_notif() here (first)
 		vcpd->notif_pending = 0;
+		/* Do one last check for notifs after clearing pending */
+		// TODO: call the handle_notif() here (first)
+
 		set_tls_desc(current_thread->tls_desc, vcoreid);
 		/* Pop the user trap frame */
 		pop_ros_tf(&vcpd->notif_tf, vcoreid);
@@ -113,9 +119,9 @@ void __attribute__((noreturn)) vcore_entry()
 	current_thread = new_thread;
 	printd("[P] Vcore %d is starting pthread %d\n", vcoreid, new_thread->id);
 
-	/* Do one last check for notifs before clearing pending */
-	// TODO: call the handle_notif() here (first)
 	vcpd->notif_pending = 0;
+	/* Do one last check for notifs after clearing pending */
+	// TODO: call the handle_notif() here (first)
 	set_tls_desc(new_thread->tls_desc, vcoreid);
 
 	/* Load silly state (Floating point) too.  For real */
