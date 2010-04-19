@@ -40,6 +40,24 @@ static inline void pop_ros_tf(struct user_trapframe *tf, uint32_t vcoreid)
 	asm volatile ("mov %0, %%o0; ta 4" : : "r"(tf) : "memory");
 }
 
+/* Save the current context/registers into the given tf, setting the pc of the
+ * tf to the end of this function.  You only need to save that which you later
+ * restore with pop_ros_tf(). */
+static inline void save_ros_tf(struct user_trapframe *tf)
+{
+	// TODO!!
+}
+
+/* This assumes a user_tf looks like a regular kernel trapframe */
+static __inline void
+init_user_tf(struct user_trapframe *u_tf, uint32_t entry_pt, uint32_t stack_top)
+{
+	memset(u_tf, 0, sizeof(struct user_trapframe));
+	u_tf->gpr[14] = stack_top - 96;
+	u_tf->pc = entry_pt;
+	u_tf->npc = entry_pt + 4;
+}
+
 /* Feel free to ignore vcoreid.  It helps x86 to avoid a call to
  * sys_getvcoreid() if we pass it in. */
 static inline void *get_tls_desc(uint32_t vcoreid)

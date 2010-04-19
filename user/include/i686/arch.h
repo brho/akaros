@@ -39,14 +39,4 @@ cpu_relax(void)
 	asm volatile("pause" : : : "memory");
 }
 
-// This assumes a user_tf looks like a regular kernel trapframe
-static __inline void
-init_user_tf(struct user_trapframe *u_tf, uint32_t entry_pt, uint32_t stack_top)
-{
-	memset(u_tf, 0, sizeof(struct user_trapframe));
-	u_tf->tf_eip = entry_pt;
-	u_tf->tf_cs = GD_UT | 3;
-	u_tf->tf_esp = stack_top;
-}
-
 #endif /* PARLIB_ARCH_H */

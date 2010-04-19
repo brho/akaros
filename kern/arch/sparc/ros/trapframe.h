@@ -1,6 +1,8 @@
 #ifndef ROS_INCLUDE_ARCH_TRAPFRAME_H
 #define ROS_INCLUDE_ARCH_TRAPFRAME_H
 
+#include <ros/common.h>
+
 typedef struct trapframe
 {
 	uint32_t gpr[32] __attribute__((aligned (8)));

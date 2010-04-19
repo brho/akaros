@@ -87,6 +87,42 @@ static inline void pop_ros_tf(struct user_trapframe *tf, uint32_t vcoreid)
 	              : "memory");
 }
 
+/* Save the current context/registers into the given tf, setting the pc of the
+ * tf to the end of this function.  You only need to save that which you later
+ * restore with pop_ros_tf(). */
+static inline void save_ros_tf(struct user_trapframe *tf)
+{
+	memset(tf, 0, sizeof(struct user_trapframe)); /* sanity */
+	/* set CS and make sure eflags is okay */
+	tf->tf_cs = GD_UT | 3;
+	tf->tf_eflags = 0x00000200; /* interrupts enabled.  bare minimum eflags. */
+	/* Save the regs and the future esp. */
+	asm volatile("movl %%esp,(%0);       " /* save esp in it's slot*/
+	             "pushl %%eax;           " /* temp save eax */
+	             "leal 1f,%%eax;         " /* get future eip */
+	             "movl %%eax,(%1);       " /* store future eip */
+	             "popl %%eax;            " /* restore eax */
+	             "movl %2,%%esp;         " /* move to the beginning of the tf */
+	             "addl $0x20,%%esp;      " /* move to after the push_regs */
+	             "pushal;                " /* save regs */
+	             "addl $0x44,%%esp;      " /* move to esp slot */
+	             "popl %%esp;            " /* restore esp */
+	             "1:                     " /* where this tf will restart */
+	             : 
+	             : "g"(&tf->tf_esp), "g"(&tf->tf_eip), "g"(tf)
+	             : "eax", "memory", "cc");
+}
+
+/* This assumes a user_tf looks like a regular kernel trapframe */
+static __inline void
+init_user_tf(struct user_trapframe *u_tf, uint32_t entry_pt, uint32_t stack_top)
+{
+	memset(u_tf, 0, sizeof(struct user_trapframe));
+	u_tf->tf_eip = entry_pt;
+	u_tf->tf_cs = GD_UT | 3;
+	u_tf->tf_esp = stack_top;
+}
+
 /* Reading from the LDT.  Could also use %gs, but that would require including
  * half of libc's TLS header.  Sparc will probably ignore the vcoreid, so don't
  * rely on it too much.  The intent of it is vcoreid is the caller's vcoreid,
@@ -125,6 +161,32 @@ __vcore_id()
 {
 	// TODO: use some kind of thread-local storage to speed this up!
 	return (int)ros_syscall(SYS_getvcoreid,0,0,0,0,0);
+}
+
+/* For debugging. */
+#include <rstdio.h>
+static __inline void print_trapframe(struct user_trapframe *tf)
+{
+	printf("[user] TRAP frame\n");
+	printf("  edi  0x%08x\n", tf->tf_regs.reg_edi);
+	printf("  esi  0x%08x\n", tf->tf_regs.reg_esi);
+	printf("  ebp  0x%08x\n", tf->tf_regs.reg_ebp);
+	printf("  oesp 0x%08x\n", tf->tf_regs.reg_oesp);
+	printf("  ebx  0x%08x\n", tf->tf_regs.reg_ebx);
+	printf("  edx  0x%08x\n", tf->tf_regs.reg_edx);
+	printf("  ecx  0x%08x\n", tf->tf_regs.reg_ecx);
+	printf("  eax  0x%08x\n", tf->tf_regs.reg_eax);
+	printf("  gs   0x----%04x\n", tf->tf_gs);
+	printf("  fs   0x----%04x\n", tf->tf_fs);
+	printf("  es   0x----%04x\n", tf->tf_es);
+	printf("  ds   0x----%04x\n", tf->tf_ds);
+	printf("  trap 0x%08x\n", tf->tf_trapno);
+	printf("  err  0x%08x\n", tf->tf_err);
+	printf("  eip  0x%08x\n", tf->tf_eip);
+	printf("  cs   0x----%04x\n", tf->tf_cs);
+	printf("  flag 0x%08x\n", tf->tf_eflags);
+	printf("  esp  0x%08x\n", tf->tf_esp);
+	printf("  ss   0x----%04x\n", tf->tf_ss);
 }
 
 #endif /* PARLIB_ARCH_VCORE_H */

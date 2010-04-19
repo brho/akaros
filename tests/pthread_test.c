@@ -17,7 +17,12 @@ void *my_retvals[10];
 __thread int my_id;
 void *thread(void* arg)
 {	
-	printf_safe("[A] pthread %d on vcore %d\n", pthread_self()->id, vcore_id());
+	for (int i = 0; i < 10; i++) {
+		printf_safe("[A] pthread %d on vcore %d\n", pthread_self()->id, vcore_id());
+		pthread_yield();
+		printf_safe("[A] pthread %d returned from yield on vcore %d\n",
+		            pthread_self()->id, vcore_id());
+	}
 	return (void*)(pthread_self()->id);
 }
 
@@ -25,6 +30,14 @@ int main(int argc, char** argv)
 {
 	void *retval1 = 0;
 	void *retval2 = 0;
+
+	printf_safe("[A] About to create thread 1\n");
+	pthread_create(&t1, NULL, &thread, NULL);
+	printf_safe("[A] About to create thread 2\n");
+	pthread_create(&t2, NULL, &thread, NULL);
+	printf_safe("About to create thread 3\n");
+	pthread_create(&t3, NULL, &thread, NULL);
+	while(1);
 
 	while (1) {
 		for (int i = 1; i < 10; i++) {

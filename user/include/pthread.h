@@ -25,6 +25,8 @@ struct pthread_tcb {
 	void *retval;
 	int detached;
 	// whether or not the scheduler can migrate you from your vcore
+	// will be slightly difficult to see this when given just a vcoreid and
+	// notif_tf ptr
 	bool dont_migrate;
 };
 typedef struct pthread_tcb* pthread_t;
@@ -89,6 +91,7 @@ int pthread_attr_destroy(pthread_attr_t *);
 int pthread_create(pthread_t *, const pthread_attr_t *,
                    void *(*)(void *), void *);
 int pthread_join(pthread_t, void **);
+int pthread_yield(void);
 
 int pthread_attr_setdetachstate(pthread_attr_t *__attr,int __detachstate);
 
