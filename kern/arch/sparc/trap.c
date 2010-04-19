@@ -385,6 +385,14 @@ handle_pop_tf(trapframe_t* state)
 }
 
 void
+handle_set_tf(trapframe_t* state)
+{
+	advance_pc(state);
+	if(memcpy_to_user(current,(void*)state->gpr[8],state,sizeof(*state)))
+		proc_destroy(current);
+}
+
+void
 handle_syscall(trapframe_t* state)
 {
 	uint32_t num = state->gpr[1];

@@ -3,6 +3,9 @@
 #ifndef ROS_INC_ASSERT_H
 #define ROS_INC_ASSERT_H
 
+#include <assert.h>
+#undef assert
+
 void _warn(const char*, int, const char*, ...);
 void _panic(const char*, int, const char*, ...) __attribute__((noreturn));
 

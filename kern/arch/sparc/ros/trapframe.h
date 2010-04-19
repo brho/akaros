@@ -2,6 +2,7 @@
 #define ROS_INCLUDE_ARCH_TRAPFRAME_H
 
 #include <ros/common.h>
+#include <stdint.h>
 
 typedef struct trapframe
 {

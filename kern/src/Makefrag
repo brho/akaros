@@ -99,7 +99,7 @@ $(OBJDIR)/$(KERN_DIR)/%.o: $(KERN_DIR)/%.S
 UDEBUG := $(findstring -g,$(USER_CFLAGS))
 $(OBJDIR)/$(KERN_DIR)/kernel: $(KERN_LDDEPENDS)
 	@echo + ld [KERN] $@
-	@if [ "$(UDEBUG)" != "-g" ]; then \
+	@if [ "$(UDEBUG)" != "-g" ] && [ "$(KERN_APPFILES)" != "" ]; then \
 		$(STRIP) -s $(KERN_APPFILES) ; \
 	fi
 	$(V)$(LD) -o $@ $(KERN_LDFLAGS) $(KERN_OBJFILES) $(KERN_LDLIBS) \
