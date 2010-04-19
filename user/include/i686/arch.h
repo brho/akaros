@@ -10,6 +10,9 @@
 
 #define ARCH_CL_SIZE 64
 
+/* Make sure you subtract off/save enough space at the top of the stack for
+ * whatever you compiler might want to use when calling a noreturn function or
+ * to handle a HW spill or whatever. */
 static __inline void __attribute__((always_inline))
 set_stack_pointer(void* sp)
 {

@@ -68,7 +68,7 @@ void _pthread_init()
 	vcore_request(1);
 }
 
-void vcore_entry()
+void __attribute__((noreturn)) vcore_entry()
 {
 	uint32_t vcoreid = vcore_id();
 
@@ -399,7 +399,7 @@ int pthread_equal(pthread_t t1, pthread_t t2)
 /* Need to have this as a separate, non-inlined function since we clobber the
  * stack pointer before calling it, and don't want the compiler to play games
  * with my hart. */
-static void __attribute__((noinline)) internal_function
+static void __attribute__((noinline, noreturn)) 
 __pthread_exit(struct pthread_tcb *t)
 {
 	__pthread_free_tls(t);
@@ -446,11 +446,13 @@ void pthread_exit(void* ret)
 	set_tls_desc(vcore_thread_control_blocks[vcoreid], vcoreid);
 	assert(current_thread == t);	
 	/* After this, make sure you don't use local variables.  Also, make sure the
-	 * compiler doesn't use them without telling you (TODO).  We take some space
-	 * off the top of the stack since the compiler is going to assume it has a
-	 * stack frame setup when it pushes (actually moves) the current_thread onto
-	 * the stack before calling __pthread_cleanup(). */
-	set_stack_pointer((void*)vcpd->transition_stack - 32);
+	 * compiler doesn't use them without telling you (TODO).
+	 *
+	 * In each arch's set_stack_pointer, make sure you subtract off as much room
+	 * as you need to any local vars that might be pushed before calling the
+	 * next function, or for whatever other reason the compiler/hardware might
+	 * walk up the stack a bit when calling a noreturn function. */
+	set_stack_pointer((void*)vcpd->transition_stack);
 	/* Finish exiting in another function.  Ugh. */
 	__pthread_exit(current_thread);
 }
