@@ -24,6 +24,7 @@ int threads_active = 0;
 
 /* Helper / local functions */
 static int get_next_pid(void);
+static inline void spin_to_sleep(unsigned int spins, unsigned int *spun);
 
 __thread struct pthread_tcb *current_thread = 0;
 
@@ -246,9 +247,8 @@ int pthread_join(pthread_t thread, void** retval)
 		printf("[pthread] trying to join on a detached pthread");
 		return -1;
 	}
-	// TODO: something smarter than spinning (deschedule, etc)
-	while(!thread->finished)
-		cpu_relax(); // has a memory clobber
+	while (!thread->finished)
+		pthread_yield();
 	if (retval)
 		*retval = thread->retval;
 	free(thread);
@@ -362,11 +362,25 @@ int pthread_mutex_init(pthread_mutex_t* m, const pthread_mutexattr_t* attr)
   return 0;
 }
 
+/* Set *spun to 0 when calling this the first time.  It will yield after 'spins'
+ * calls.  Use this for adaptive mutexes and such. */
+static inline void spin_to_sleep(unsigned int spins, unsigned int *spun)
+{
+	if ((*spun)++ == spins) {
+		pthread_yield();
+		*spun = 0;
+	}
+}
+
 int pthread_mutex_lock(pthread_mutex_t* m)
 {
-  while(pthread_mutex_trylock(m))
-    while(*(volatile size_t*)&m->lock);
-  return 0;
+	unsigned int spinner = 0;
+	while(pthread_mutex_trylock(m))
+		while(*(volatile size_t*)&m->lock) {
+			cpu_relax();
+			spin_to_sleep(PTHREAD_MUTEX_SPINS, &spinner);
+		}
+	return 0;
 }
 
 int pthread_mutex_trylock(pthread_mutex_t* m)
@@ -536,18 +550,19 @@ int pthread_barrier_init(pthread_barrier_t* b, const pthread_barrierattr_t* a, i
 
   b->sense = 0;
   b->nprocs = b->count = count;
-  mcs_lock_init(&b->lock);
+  pthread_mutex_init(&b->pmutex, 0);
   return 0;
 }
 
 int pthread_barrier_wait(pthread_barrier_t* b)
 {
+  unsigned int spinner = 0;
   int id = vcore_id();
   int ls = b->local_sense[32*id] = 1 - b->local_sense[32*id];
 
-  mcs_lock_lock(&b->lock);
+  pthread_mutex_lock(&b->pmutex);
   int count = --b->count;
-  mcs_lock_unlock(&b->lock);
+  pthread_mutex_unlock(&b->pmutex);
 
   if(count == 0)
   {
@@ -557,12 +572,16 @@ int pthread_barrier_wait(pthread_barrier_t* b)
   }
   else
   {
-    while(b->sense != ls);
+    while(b->sense != ls) {
+      cpu_relax();
+      spin_to_sleep(PTHREAD_BARRIER_SPINS, &spinner);
+    }
     return 0;
   }
 }
 
 int pthread_barrier_destroy(pthread_barrier_t* b)
 {
+  pthread_mutex_destroy(&b->pmutex);
   return 0;
 }

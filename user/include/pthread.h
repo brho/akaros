@@ -46,6 +46,8 @@ enum
 #define PTHREAD_MUTEX_INITIALIZER {0}
 #define PTHREAD_MUTEX_NORMAL 0
 #define PTHREAD_MUTEX_DEFAULT PTHREAD_MUTEX_NORMAL
+#define PTHREAD_MUTEX_SPINS 100 // totally arbitrary
+#define PTHREAD_BARRIER_SPINS 100 // totally arbitrary
 #define PTHREAD_COND_INITIALIZER {0}
 #define PTHREAD_PROCESS_PRIVATE 0
 
@@ -66,7 +68,7 @@ typedef struct
   volatile int sense;
   int count;
   int nprocs;
-  mcs_lock_t lock;
+  pthread_mutex_t pmutex;
 } pthread_barrier_t;
 
 typedef struct
