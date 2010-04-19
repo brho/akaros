@@ -16,4 +16,11 @@ int	vdebug(const char *fmt, va_list);
 #define printf(...) debug(__VA_ARGS__)
 #endif /* __CONFIG_APPSERVER__ */
 
+//#define PRINTD_DEBUG
+#ifdef PRINTD_DEBUG
+#define printd(args...) printf(args)
+#else
+#define printd(args...) {}
+#endif
+
 #endif /* !PARLIB_INC_DEBUG_H */
