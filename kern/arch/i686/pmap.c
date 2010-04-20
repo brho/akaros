@@ -203,6 +203,7 @@ void setup_default_mtrrs(barrier_t* smp_barrier)
 	// flush tlb
 	tlb_flush_global();
 	// disable MTRRs, and sets default type to WB (06)
+#ifdef __CONFIG_NOMTRRS__ 
 	write_msr(IA32_MTRR_DEF_TYPE, 0x00000006);
 
 	// Now we can actually safely adjust the MTRRs
@@ -228,6 +229,7 @@ void setup_default_mtrrs(barrier_t* smp_barrier)
 
 	// keeps default type to WB (06), turns MTRRs on, and turns off fixed ranges
 	write_msr(IA32_MTRR_DEF_TYPE, 0x00000806);
+#endif	
 	// reflush caches and TLB
 	cache_flush();
 	tlb_flush_global();
@@ -363,6 +365,12 @@ vm_init(void)
 	// Local APIC
 	boot_map_segment(pgdir, (uintptr_t)LAPIC_BASE, PGSIZE, LAPIC_BASE,
 	                 PTE_PCD | PTE_PWT | PTE_W | PTE_G);
+
+#ifdef __CONFIG_E1000_MMIO_HACK__
+	// MMIO HACK
+	boot_map_segment(pgdir, (uintptr_t)LAPIC_BASE + PGSIZE, 0x20000, 
+	                 E1000_MMIO_ADDR, PTE_PCD | PTE_PWT | PTE_W | PTE_G);
+#endif
 
 	// Check that the initial page directory has been set up correctly.
 	check_boot_pgdir(pse);

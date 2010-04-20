@@ -8,6 +8,7 @@
 
 #include <arch/rl8168.h>
 #include <arch/ne2k.h>
+#include <arch/e1000.h>
 #include <arch/mptables.h>
 #include <arch/pci.h>
 #include <arch/ioapic.h>
@@ -45,6 +46,7 @@ void arch_init()
 	#else
 		rl8168_init();		
 		ne2k_init();
+		e1000_init();
 	#endif // __CONFIG_SINGLE_CORE__
 	#endif // __CONFIG_NETWORKING__
 }

@@ -17,6 +17,10 @@ CONFIG_BSD_ON_CORE0:=              -D__CONFIG_BSD_ON_CORE0__
 CONFIG_SPINLOCK_DEBUG:=            -D__CONFIG_SPINLOCK_DEBUG__
 CONFIG_PAGE_COLORING:=             -D__CONFIG_PAGE_COLORING__
 CONFIG_DEMAND_PAGING:=             -D__CONFIG_DEMAND_PAGING__
+CONFIG_NOMTRRS:=                   -D__CONFIG_NOMTRRS__
+CONFIG_E1000_MMIO_HACK:=           -D__CONFIG_E1000_MMIO_HACK__
+CONFIG_E1000_ON_S142:=             -D__CONFIG_E1000_ON_S142__
+CONFIG_E1000_ON_BOXBORO:=          -D__CONFIG_E1000_ON_BOXBORO__
 
 # Userspace configuration parameters
 # By default, each of these options will be turned off
