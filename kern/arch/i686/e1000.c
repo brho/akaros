@@ -212,14 +212,16 @@ int e1000_scan_pci() {
 							result = result & PCI_MEM_MASK;
 							result = (result ^ 0xFFFFFFFF) + 1;
 							e1000_addr_size = result;
-
-							// Map the page in.
-							printk("HACK FIX\n");
-							e1000_mmio_base_addr = 0xfbee0000;
+                                                        e1000_debug("-->MMIO Size %x\n", e1000_addr_size);
 							outl(PCI_CONFIG_DATA, e1000_mmio_base_addr);
-							e1000_mmio_base_addr = 0xfee00000 + 0x20000;
-							e1000_debug("-->MMIO Size %x\n", e1000_addr_size);
-
+				
+#ifdef __CONFIG_E1000_MMIO_HACK__
+							// Map the page in.
+							printd("HACK FOR BROKEN MMIO\n");
+							e1000_mmio_base_addr = E1000_MMIO_ADDR;
+							outl(PCI_CONFIG_DATA, e1000_mmio_base_addr);
+							e1000_mmio_base_addr = 0xfee00000 + 0x1000;
+#endif
 						}
 					}						
 				}

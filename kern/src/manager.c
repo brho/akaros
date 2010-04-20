@@ -203,7 +203,7 @@ void manager_pearce()
 
 	if (progress == 0) {
 		progress++;
-		envs[0] = kfs_proc_create(kfs_lookup_path("parlib_httpserver"));
+		envs[0] = kfs_proc_create(kfs_lookup_path("parlib_httpserver_integrated"));
 		//envs[0] = kfs_proc_create(kfs_lookup_path("parlib_lock_test"));
 		__proc_set_state(envs[0], PROC_RUNNABLE_S);
 		proc_run(envs[0]);
