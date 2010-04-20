@@ -12,6 +12,9 @@ ROS_USER_LIBS += $(OBJDIR)/$(USER_PTHREAD_DIR)/libpthread.a
 USER_PTHREAD_SRCFILES := \
                  $(USER_PARLIB_DIR)/pthread.c \
                  $(USER_PARLIB_DIR)/vcore.c \
+                 $(USER_PARLIB_DIR)/mcs.c \
+                 $(USER_PARLIB_DIR)/debug.c \
+                 $(USER_PARLIB_DIR)/debugfmt.c \
                  $(USER_PARLIB_DIR)/syscall.c 
 
 # Only build files if they exist.
