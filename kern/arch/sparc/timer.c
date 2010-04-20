@@ -12,11 +12,6 @@
 system_timing_t system_timing = {0};
 
 void
-timer_interrupt(void)
-{
-}
-
-void
 timer_init(void)
 {	
 	system_timing.tsc_freq = TSC_HZ;

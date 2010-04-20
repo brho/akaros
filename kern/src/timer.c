@@ -7,6 +7,8 @@
 
 #include <arch/arch.h>
 #include <ros/timer.h>
+#include <stdio.h>
+#include <schedule.h>
 
 /* timing_overhead
  * Any user space process that links to this file will get its own copy.  
@@ -73,4 +75,14 @@ void train_timing()
 		training_overhead = MIN(training_overhead, diff);
 	}
 	timing_overhead = training_overhead;
+}
+
+/* Typical per-core timer interrupt handler.  Note that sparc's timer is
+ * periodic by nature, so if you want it to not be periodic, turn off the alarm
+ * in here. */
+void timer_interrupt(struct trapframe *tf, void *data)
+{
+#ifdef __CONFIG_EXPER_TRADPROC__
+	local_schedule();
+#endif /* __CONFIG_EXPER_TRADPROC__ */
 }

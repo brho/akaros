@@ -157,4 +157,10 @@ void smp_percpu_init(void)
 	STAILQ_INIT(&per_cpu_info[coreid].immed_amsgs);
 	spinlock_init(&per_cpu_info[coreid].routine_amsg_lock);
 	STAILQ_INIT(&per_cpu_info[coreid].routine_amsgs);
+#ifdef __CONFIG_EXPER_TRADPROC__
+	spinlock_init(&per_cpu_info[coreid].runqueue_lock);
+	TAILQ_INIT(&per_cpu_info[coreid].runqueue);
+	/* set a per-core periodic timer interrupt to go off every TIMER_uSEC usec*/
+	set_timer(TIMER_uSEC);
+#endif
 }

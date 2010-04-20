@@ -39,6 +39,10 @@ struct per_cpu_info {
 	struct kernel_msg_list NTPTV(a0t) NTPTV(a1t) NTPTV(a2t) immed_amsgs;
 	spinlock_t routine_amsg_lock;
 	struct kernel_msg_list NTPTV(a0t) NTPTV(a1t) NTPTV(a2t) routine_amsgs;
+#ifdef __CONFIG_EXPER_TRADPROC__
+	spinlock_t runqueue_lock;
+	struct proc_list runqueue;
+#endif
 }__attribute__((aligned(HW_CACHE_ALIGN)));
 
 typedef struct per_cpu_info NTPTV(t) NTPTV(a0t) NTPTV(a1t) NTPTV(a2t) per_cpu_info_t;
@@ -59,5 +63,12 @@ int smp_call_function_all(poly_isr_t handler, TV(t) data,
 int smp_call_function_single(uint32_t dest, poly_isr_t handler, TV(t) data,
                              handler_wrapper_t** wait_wrapper);
 int smp_call_wait(handler_wrapper_t*SAFE wrapper);
+
+#ifdef __CONFIG_EXPER_TRADPROC__
+
+#define TIMER_uSEC 10000
+void local_schedule(void);
+
+#endif
 
 #endif /* !ROS_INC_SMP_H */

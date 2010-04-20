@@ -134,6 +134,9 @@ idt_init(void)
 	mask_lapic_lvt(LAPIC_LVT_LINT0);
 	// and turn it on
 	lapic_enable();
+	/* register the generic timer_interrupt() handler for the per-core timers */
+	register_interrupt_handler(interrupt_handlers, LAPIC_TIMER_DEFAULT_VECTOR,
+	                           timer_interrupt, NULL);
 }
 
 void

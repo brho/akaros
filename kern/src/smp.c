@@ -62,3 +62,24 @@ void smp_idle(void)
 	}
 	assert(0);
 }
+#ifdef __CONFIG_EXPER_TRADPROC__
+/* For experiments with per-core schedulers (traditional).  This checks the
+ * runqueue, and if there is something there, it runs in.  */
+void local_schedule(void)
+{
+	struct per_cpu_info *my_info = &per_cpu_info[core_id()];
+	struct proc *next_to_run;
+
+	printd("Core %d trying to schedule a _S process\n", core_id());
+	spin_lock_irqsave(&my_info->runqueue_lock);
+	next_to_run = TAILQ_FIRST(&my_info->runqueue);
+	if (next_to_run)
+		TAILQ_REMOVE(&my_info->runqueue, next_to_run, proc_link);
+	spin_unlock_irqsave(&my_info->runqueue_lock);
+	if (!next_to_run)
+		return;
+	assert(next_to_run->state = PROC_RUNNABLE_S);
+	proc_run(next_to_run);
+	assert(0); // don't reach this
+}
+#endif

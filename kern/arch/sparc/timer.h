@@ -14,5 +14,6 @@ typedef struct system_timing {
 extern system_timing_t system_timing;
 
 void timer_init(void);
+void set_timer(uint32_t usec);
 
 #endif /* !ROS_ARCH_TIMER_H */
