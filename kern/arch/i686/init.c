@@ -15,12 +15,13 @@
 
 void arch_init()
 {
-	mptables_parse();
 	pci_init();
+#ifndef __CONFIG_DISABLE_MPTABLES__
+	mptables_parse();
 	ioapic_init(); // MUST BE AFTER PCI/ISA INIT!
-		
 	// TODO: move these back to regular init.  requires fixing the 
 	// __CONFIG_NETWORKING__ inits to not need multiple cores running.
+#endif
 	// this returns when all other cores are done and ready to receive IPIs
 	#ifdef __CONFIG_SINGLE_CORE__
 		smp_percpu_init();

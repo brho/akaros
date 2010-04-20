@@ -284,16 +284,16 @@ irq_handler(trapframe_t *tf)
 	// All others are LAPIC (timer, IPIs, perf, non-ExtINT LINTS, etc)
 	// For now, only 235-255 are available
 	assert(tf->tf_trapno >= 32); // slows us down, but we should never have this
-	
+
+#ifndef __CONFIG_DISABLE_MPTABLES__
 	lapic_send_eoi();
-	
-	/*
+#else
 	//Old PIC relatd code. Should be gone for good, but leaving it just incase.
 	if (tf->tf_trapno < 48)
 		pic_send_eoi(tf->tf_trapno - PIC1_OFFSET);
 	else
 		lapic_send_eoi();
-	*/
+#endif
 
 }
 

@@ -208,7 +208,6 @@ int e1000_scan_pci() {
 							// write all 1's denotes the size
 							outl(PCI_CONFIG_DATA, 0xFFFFFFFF);
 							result = inl(PCI_CONFIG_DATA);
-							printk("Result of writing all 1's: %x\n", result);
 							result = result & PCI_MEM_MASK;
 							result = (result ^ 0xFFFFFFFF) + 1;
 							e1000_addr_size = result;
@@ -472,9 +471,7 @@ void e1000_configure() {
         // Set RX Ring Size
         // This is the number of desc's, divided by 8. It starts
         // at bit 7.
-	printk("rdlen: %x\n", e1000_rr32(E1000_RDLEN));
         e1000_wr32(E1000_RDLEN, NUM_RX_DESCRIPTORS * 16);
-	printk("rdlen: %x\n", e1000_rr32(E1000_RDLEN));
         
 	e1000_wr32(0x0280C, 0x00);
 
@@ -557,9 +554,14 @@ void e1000_setup_interrupts() {
 
 	// Kernel based interrupt stuff
 	register_interrupt_handler(interrupt_handlers, KERNEL_IRQ_OFFSET + e1000_irq, e1000_interrupt_handler, 0);
-	
+
+#ifdef __CONFIG_DISABLE_MPTABLES__
+	pic_unmask_irq(e1000_irq);
+	unmask_lapic_lvt(LAPIC_LVT_LINT0);
+	enable_irq();
+#else	
 	ioapic_route_irq(e1000_irq, E1000_IRQ_CPU);	
-	
+#endif	
 	return;
 }
 
