@@ -81,13 +81,13 @@ read_tsc_serialized(void)
 static __inline void
 enable_irq(void)
 {
-	write_psr(read_psr() & ~0xF00);
+	write_psr(read_psr() & ~PSR_PIL);
 }
 
 static __inline void
 disable_irq(void)
 {
-	write_psr(read_psr() | 0xF00);
+	write_psr(read_psr() | PSR_PIL);
 }
 
 static __inline void

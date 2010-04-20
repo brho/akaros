@@ -38,7 +38,7 @@ trap_table_pagefault:
 	UNHANDLED_TRAP				! 0x17
 	UNHANDLED_TRAP				! 0x18
 	UNHANDLED_TRAP				! 0x19
-	JMP(handle_timer_interrupt)		! 0x1A
+	TRAP_TABLE_ENTRY(timer_interrupt)		! 0x1A
 	UNHANDLED_TRAP				! 0x1B
 	UNHANDLED_TRAP				! 0x1C
 	UNHANDLED_TRAP				! 0x1D

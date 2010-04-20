@@ -23,6 +23,7 @@
 #define XSTR(arg) STR(arg)
 
 #include <ros/common.h>
+#include <arch/timer.h>
 
 static __inline uint32_t read_psr(void) __attribute__((always_inline));
 static __inline uint32_t read_wim(void) __attribute__((always_inline));
@@ -186,7 +187,7 @@ send_ipi(uint32_t dst)
 static __inline void
 sparc_set_timer(uint32_t clocks, uint32_t enable)
 {
-	store_iobus(1,0,enable << 24 | (clocks-1));
+	store_iobus(1,0,enable << TIMER_PERIOD_BITS | (clocks-1));
 }
 
 #endif /* !__ASSEMBLER__ */
