@@ -29,6 +29,8 @@
 #include <kmalloc.h>
 
 #include <pmap.h>
+#include <frontend.h>
+#include <arch/frontend.h>
 
 #define NUM_TX_DESCRIPTORS E1000_NUM_TX_DESCRIPTORS
 #define NUM_RX_DESCRIPTORS E1000_NUM_RX_DESCRIPTORS
@@ -120,8 +122,11 @@ void e1000_init() {
 	if (e1000_scan_pci() < 0) return;
 
 	e1000_setup_descriptors();
-
 	e1000_configure();
+	printk("Network Card MAC Address: %02x:%02x:%02x:%02x:%02x:%02x\n", 
+	   device_mac[0],device_mac[1],device_mac[2],
+	   device_mac[3],device_mac[4],device_mac[5]);
+
 	//e1000_dump_rx();
 	e1000_setup_interrupts();
 
@@ -534,6 +539,13 @@ void e1000_reset() {
 	return;
 }
 
+void enable_e1000_irq(struct trapframe *tf, uint32_t src_id, 
+                                void* a0, void* a1, void* a2)
+{
+	pic_unmask_irq(e1000_irq);
+	unmask_lapic_lvt(LAPIC_LVT_LINT0);
+	enable_irq();
+}
 
 void e1000_setup_interrupts() {
 	
@@ -555,17 +567,36 @@ void e1000_setup_interrupts() {
 	// Kernel based interrupt stuff
 	register_interrupt_handler(interrupt_handlers, KERNEL_IRQ_OFFSET + e1000_irq, e1000_interrupt_handler, 0);
 
+	// Enable irqs for the e1000
 #ifdef __CONFIG_DISABLE_MPTABLES__
-	pic_unmask_irq(e1000_irq);
-	unmask_lapic_lvt(LAPIC_LVT_LINT0);
-	enable_irq();
-#else	
+	send_kernel_message(E1000_IRQ_CPU, enable_e1000_irq, 0,0,0, KMSG_IMMEDIATE);
+#else 
 	ioapic_route_irq(e1000_irq, E1000_IRQ_CPU);	
-#endif	
+#endif
+
 	return;
 }
 
 void e1000_interrupt_handler(trapframe_t *tf, void* data) {
+
+//	printk("About to spam to mac addr: 00:14:4F:D1:EC:6C\n");
+//	while(1) {
+//		appserver_packet_t p;
+//		p.header.dst_mac[0] = 0x00;
+//		p.header.dst_mac[1] = 0x14;
+//		p.header.dst_mac[2] = 0x4f;
+//		p.header.dst_mac[3] = 0xd1;
+//		p.header.dst_mac[4] = 0xec;
+//		p.header.dst_mac[5] = 0x6c;
+//		p.header.src_mac[0] = 0x00;
+//		p.header.src_mac[1] = 0x23;
+//		p.header.src_mac[2] = 0x8b;
+//		p.header.src_mac[3] = 0x42;
+//		p.header.src_mac[4] = 0x80;
+//		p.header.src_mac[5] = 0xb8;
+//		p.header.ethertype = 0x8888;
+//		send_frame((char*)&p,0);
+//	}
 
 	e1000_interrupt_debug("\nNic interrupt on core %u!\n", lapic_get_id());
 				
@@ -620,7 +651,8 @@ void e1000_handle_rx_packet() {
 		status =  rx_des_kva[rx_des_loop_cur].status;
 
 		if (status == 0x0) {
-			panic("ERROR: E1000: Packet owned by hardware has 0 status value\n");
+			//panic("ERROR: E1000: Packet owned by hardware has 0 status value\n");
+			warn("ERROR: E1000: Packet owned by hardware has 0 status value\n");
 		}
 	
 		fragment_size = rx_des_kva[rx_des_loop_cur].length;
@@ -662,12 +694,29 @@ void e1000_handle_rx_packet() {
 
 	} while ((status & E1000_RXD_STAT_EOP) == 0);
 
+	// Treat as a syscall frontend response packet if eth_type says so
+	// Will eventually go away, so not too worried about elegance here...
+	uint16_t eth_type = htons(*(uint16_t*)(rx_buffer + 12));
+	if(eth_type == APPSERVER_ETH_TYPE) {
+		handle_appserver_packet(rx_buffer, frame_size);
+		kfree(rx_buffer);
+
+		// Advance the tail pointer				
+		e1000_rx_index = rx_des_loop_cur;
+		e1000_wr32(E1000_RDT, e1000_rx_index);
+		return;
+	}
+
 	spin_lock(&packet_buffers_lock);
 
 	if (num_packet_buffers >= MAX_PACKET_BUFFERS) {
-		printk("WARNING: DROPPING PACKET!\n");
+		printd("WARNING: DROPPING PACKET!\n");
 		spin_unlock(&packet_buffers_lock);
 		kfree(rx_buffer);
+	
+		// Advance the tail pointer				
+		e1000_rx_index = rx_des_loop_cur;
+		e1000_wr32(E1000_RDT, e1000_rx_index);
 		return;
 	}
 
