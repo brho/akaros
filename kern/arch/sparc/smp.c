@@ -160,7 +160,6 @@ void smp_percpu_init(void)
 #ifdef __CONFIG_EXPER_TRADPROC__
 	spinlock_init(&per_cpu_info[coreid].runqueue_lock);
 	TAILQ_INIT(&per_cpu_info[coreid].runqueue);
-	/* set a per-core periodic timer interrupt to go off every TIMER_uSEC usec*/
-	set_timer(TIMER_uSEC);
+	set_core_timer(TIMER_uSEC);
 #endif
 }

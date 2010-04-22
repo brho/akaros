@@ -50,6 +50,7 @@ void *COUNT(length) sys_mmap(void *SNT addr, size_t length, int prot, int flags,
 int         sys_notify(int pid, unsigned int notif, struct notif_event *ne);
 int         sys_self_notify(uint32_t vcoreid, unsigned int notif,
                             struct notif_event *ne);
+int         sys_halt_core(unsigned int usec);
 
 #endif	// !ASSEMBLER
 

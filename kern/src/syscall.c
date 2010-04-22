@@ -619,6 +619,19 @@ static int sys_self_notify(struct proc *p, uint32_t vcoreid, unsigned int notif,
 	return 0;
 }
 
+/* This will set a local timer for usec, then shut down the core */
+static int sys_halt_core(struct proc *p, unsigned int usec)
+{
+	/* TODO: ought to check and see if a timer was already active, etc, esp so
+	 * userspace can't turn off timers.  also note we will also call whatever
+	 * timer_interrupt() will do, though all we care about is just
+	 * self_ipi/interrupting. */
+	set_core_timer(usec);
+	cpu_halt();
+
+	return 0;
+}
+
 /************** Platform Specific Syscalls **************/
 
 //Read a buffer over the serial port
@@ -1058,6 +1071,7 @@ intreg_t syscall(struct proc *p, uintreg_t syscallno, uintreg_t a1,
 		[SYS_resource_req] = (syscall_t)resource_req,
 		[SYS_notify] = (syscall_t)sys_notify,
 		[SYS_self_notify] = (syscall_t)sys_self_notify,
+		[SYS_halt_core] = (syscall_t)sys_halt_core,
 	#ifdef __CONFIG_SERIAL_IO__
 		[SYS_serial_read] = (syscall_t)sys_serial_read,
 		[SYS_serial_write] = (syscall_t)sys_serial_write,

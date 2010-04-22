@@ -19,6 +19,12 @@ timer_init(void)
 }
 
 void
+set_core_timer(uint32_t usec)
+{
+	set_timer(usec);
+}
+
+void
 set_timer(uint32_t usec)
 {
 	uint32_t clocks =  (uint64_t)usec*TSC_HZ/1000000;

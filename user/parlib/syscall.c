@@ -144,3 +144,8 @@ int sys_self_notify(uint32_t vcoreid, unsigned int notif,
 {
 	return ros_syscall(SYS_self_notify, vcoreid, notif, ne, 0, 0);
 }
+
+int sys_halt_core(unsigned int usec)
+{
+	return ros_syscall(SYS_halt_core, usec, 0, 0, 0, 0);
+}

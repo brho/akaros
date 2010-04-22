@@ -32,7 +32,9 @@ register_interrupt_handler(handler_t SSOMELOCK (CT(NUM_INTERRUPT_HANDLERS)table)
                            poly_isr_t handler, TV(t) data);
 void print_trapframe(trapframe_t *tf);
 void page_fault_handler(trapframe_t *tf);
-/* Generic per-core timer interrupt handler */
+/* Generic per-core timer interrupt handler.  set_percore_timer() will fire the
+ * timer_interrupt(). */
+void set_core_timer(uint32_t usec);
 void timer_interrupt(struct trapframe *tf, void *data);
 
 void sysenter_init(void);

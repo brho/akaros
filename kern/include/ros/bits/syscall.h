@@ -34,6 +34,7 @@
 #define SYS_resource_req			24
 #define SYS_notify					25
 #define SYS_self_notify				26
+#define SYS_halt_core				27
 
 /* Platform specific syscalls */
 #define SYS_serial_read				75
