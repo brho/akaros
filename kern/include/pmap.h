@@ -78,6 +78,7 @@ void tlb_flush_global(void);
 /* Arch specific implementations for these */
 pte_t *pgdir_walk(pde_t *COUNT(NPDENTRIES) pgdir, const void *SNT va, int create);
 int get_va_perms(pde_t *COUNT(NPDENTRIES) pgdir, const void *SNT va);
+void* mmio_alloc(physaddr_t pa, size_t size);
 
 static inline page_t *SAFE ppn2page(size_t ppn)
 {

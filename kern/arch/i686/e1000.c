@@ -195,15 +195,12 @@ int e1000_scan_pci() {
 					e1000_addr_size = result;
                     e1000_debug("-->MMIO Size %x\n", e1000_addr_size);
 					outl(PCI_CONFIG_DATA, e1000_mmio_base_addr);
+					e1000_mmio_base_addr = (uint32_t) mmio_alloc(e1000_mmio_base_addr,
+																e1000_addr_size);
+					if (e1000_mmio_base_addr == 0x00) {
+						panic("Could not map in E1000 MMIO space\n");
+					}
 		
-					#ifdef __CONFIG_E1000_MMIO_HACK__
-					/* TODO: WARNING - EXTREMELY GHETTO */
-					// Map the page in.
-					e1000_debug("HACK FOR BROKEN MMIO\n");
-					e1000_mmio_base_addr = E1000_MMIO_ADDR;
-					outl(PCI_CONFIG_DATA, e1000_mmio_base_addr);
-					e1000_mmio_base_addr = 0xfee00000 + 0x1000;
-					#endif
 				}
 			}						
 		}
@@ -592,7 +589,7 @@ void e1000_interrupt_handler(trapframe_t *tf, void* data) {
 		//printk("Interrupt status: %x\n", interrupt_status);
 
 		if ((interrupt_status & E1000_ICR_INT_ASSERTED) && (interrupt_status & E1000_ICR_RXT0)) {
-			e1000_debug("---->Packet Received\n");
+			e1000_interrupt_debug("---->Packet Received\n");
 			e1000_handle_rx_packet();
 		}	
 		// Clear interrupts	

@@ -125,3 +125,9 @@ void
 page_check(void)
 {
 }
+
+void* mmio_alloc(physaddr_t pa, size_t size) {
+
+	return NULL;
+
+}

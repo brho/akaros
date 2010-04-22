@@ -29,6 +29,9 @@ physaddr_t RO boot_cr3;		// Physical address of boot time page directory
 // Global variables
 page_t *RO pages = NULL;          // Virtual address of physical page array
 
+// Base of unalloced MMIO space
+void* mmio_base = (void*)LAPIC_BASE + PGSIZE;
+
 // Global descriptor table.
 //
 // The kernel and user segments are identical (except for the DPL).
@@ -365,12 +368,6 @@ vm_init(void)
 	// Local APIC
 	boot_map_segment(pgdir, (uintptr_t)LAPIC_BASE, PGSIZE, LAPIC_BASE,
 	                 PTE_PCD | PTE_PWT | PTE_W | PTE_G);
-
-#ifdef __CONFIG_E1000_MMIO_HACK__
-	// MMIO HACK
-	boot_map_segment(pgdir, (uintptr_t)LAPIC_BASE + PGSIZE, 0x20000, 
-	                 E1000_MMIO_ADDR, PTE_PCD | PTE_PWT | PTE_W | PTE_G);
-#endif
 
 	// Check that the initial page directory has been set up correctly.
 	check_boot_pgdir(pse);
@@ -800,6 +797,67 @@ page_check(void)
 	assert(!kref_refcnt(&pp2->pg_kref));
 
 	cprintf("page_check() succeeded!\n");
+}
+
+// Allocate size bytes from the MMIO region of virtual memory,
+//  then map it in. Note: We allocate size bytes starting
+//  from a size alligned address. This may introduce holes,
+//  which we arent worrying about.
+void* mmio_alloc(physaddr_t pa, size_t size) {
+
+	printd("MMIO_ALLOC: Asking for %x bytes for pa %x\n", size, pa);
+
+	extern int booting;
+
+	// Ensure the PA is on a page bound
+	if (ROUNDUP(pa, PGSIZE) != pa) {
+		warn("MMIO_ALLOC: PA is not page aligned!\n");
+		return NULL;
+	}
+
+	if (booting == 0) {
+		warn("MMIO_ALLOC: Can only request MMIO space while booting.\n");
+		return NULL;
+	}
+
+	printd("MMIO_ALLOC: mmio_base was: %x\n", mmio_base);
+
+	void* curr_addr = mmio_base;
+	void* old_mmio_base = mmio_base;
+
+	printd("MMIO_ALLOC: Starting allocation at %x\n", curr_addr);
+
+	// Check if we are out of (32bit) virtual memory.
+	if ((mmio_base + size) < mmio_base) {
+		// Crap...
+		warn("MMIO_ALLOC: No more MMIO space\n");
+		return NULL;
+	}
+
+	for ( ; curr_addr < (mmio_base + size); pa = pa + PGSIZE, curr_addr = curr_addr + PGSIZE) {
+
+		printd("MMIO_ALLOC: Mapping PA %x @ VA %x\n", pa, curr_addr);
+
+		pte_t* pte = pgdir_walk(boot_pgdir, curr_addr, 1);
+		
+		// Check for a mapping error
+		if (!pte || (*pte != 0)) {
+			// We couldnt map the page. Adjust the mmio_base to exlude the 
+			//  ernoniously inserted pages, and fail.
+			warn("MMIO_ALLOC: Bad pgdir walk. Some memory may be lost.\n");
+			mmio_base = curr_addr;
+			return NULL;
+		}		
+
+		*pte = PTE(pa >> PGSHIFT, PTE_P | PTE_KERN_RW);
+	}	
+
+	mmio_base = curr_addr;
+
+	printd("MMIO_ALLOC: New mmio_base: %x\n", mmio_base);
+	printd("MMIO_ALLOC: Returning VA %x\n", old_mmio_base);
+
+	return old_mmio_base;
 }
 
 /* 
