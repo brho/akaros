@@ -12,6 +12,8 @@
 #include <arch/mptables.h>
 #include <arch/pci.h>
 #include <arch/ioapic.h>
+#include <arch/console.h>
+#include <monitor.h>
 
 void arch_init()
 {
@@ -50,5 +52,31 @@ void arch_init()
 		e1000_init();
 	#endif // __CONFIG_SINGLE_CORE__
 	#endif // __CONFIG_NETWORKING__
-}
 
+#ifdef __CONFIG_MONITOR_ON_INT__
+	/* Handler to read a char from the interrupt source and call the monitor.
+	 * Need to read the character so the device will send another interrupt.
+	 * Note this will read from both the serial and the keyboard, and throw away
+	 * the result.  We condition, since we don't want to trigger on a keyboard
+	 * up interrupt */
+	void mon_int(struct trapframe *tf, void *data)
+	{
+		if (cons_getc())
+			monitor(0);
+	}
+	register_interrupt_handler(interrupt_handlers, 1 + PIC1_OFFSET, mon_int, 0);
+	register_interrupt_handler(interrupt_handlers, 3 + PIC1_OFFSET, mon_int, 0);
+	register_interrupt_handler(interrupt_handlers, 4 + PIC1_OFFSET, mon_int, 0);
+# ifdef __CONFIG_DISABLE_MPTABLES__
+	pic_unmask_irq(1);	/* keyboard */
+	pic_unmask_irq(3);	/* serial 2 or 4 */
+	pic_unmask_irq(4);	/* serial 1 or 3 */
+	unmask_lapic_lvt(LAPIC_LVT_LINT0);
+# else 
+	ioapic_route_irq(1, 0);
+	ioapic_route_irq(3, 0);
+	ioapic_route_irq(4, 0);
+# endif /* __CONFIG_DISABLE_MPTABLES__ */
+	enable_irq(); /* we want these interrupts to work in the kernel. */
+#endif /* __CONFIG_MONITOR_ON_INT__ */
+}

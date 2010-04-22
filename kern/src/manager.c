@@ -89,7 +89,7 @@ void manager_brho(void)
 			#endif
 			break;
 		case 1:
-			monitor(0);
+			//monitor(0);
 			#if 0
 			udelay(10000000);
 			// this is a ghetto way to test restarting an _M
@@ -131,7 +131,7 @@ void manager_brho(void)
 			test_pit();
 			*/
 		default:
-			printk("Manager Progress: %d\n", progress);
+			printd("Manager Progress: %d\n", progress);
 			// delay if you want to test rescheduling an MCP that yielded
 			//udelay(15000000);
 			schedule();

@@ -23,6 +23,7 @@ CONFIG_E1000_ON_BOXBORO:=          -DE1000_MMIO_ADDR=0x9bb20000
 CONFIG_E1000_ON_S142:=             -DE1000_MMIO_ADDR=0xfbee0000
 CONFIG_DISABLE_MPTABLES:=          -D__CONFIG_DISABLE_MPTABLES__
 CONFIG_EXPER_TRADPROC:=            -D__CONFIG_EXPER_TRADPROC__
+CONFIG_MONITOR_ON_INT:=            -D__CONFIG_MONITOR_ON_INT__
 
 # Userspace configuration parameters
 # By default, each of these options will be turned off

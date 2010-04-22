@@ -239,7 +239,7 @@ env_pop_ancillary_state(env_t* e)
 void
 trap(trapframe_t *tf)
 {
-	//printk("Incoming TRAP frame on core %d at %p\n", core_id(), tf);
+	printd("Incoming TRAP frame on core %d at %p\n", core_id(), tf);
 
 	/* Note we are not preemptively saving the TF in the env_tf.  We do maintain
 	 * a reference to it in current_tf (a per-cpu pointer).
@@ -267,8 +267,7 @@ irq_handler(trapframe_t *tf)
 	if (!in_kernel(tf))
 		set_current_tf(tf);
 	//if (core_id())
-	//	cprintf("Incoming IRQ, ISR: %d on core %d\n", tf->tf_trapno, core_id());
-	// merge this with alltraps?  other than the EOI... or do the same in all traps
+		printd("Incoming IRQ, ISR: %d on core %d\n", tf->tf_trapno, core_id());
 
 	extern handler_wrapper_t (RO handler_wrappers)[NUM_HANDLER_WRAPPERS];
 
