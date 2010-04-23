@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include <atomic.h>
 #include <kmalloc.h>
+#include <page_alloc.h>
 
 #define l1 (available_caches.l1)
 #define l2 (available_caches.l2)
@@ -30,9 +31,13 @@ inline void init_cache_properties(cache_t *c, size_t sz_k, size_t wa, size_t cls
 	c->sz_k = SINIT(sz_k);
 	c->clsz = SINIT(clsz);
 
+#ifdef __CONFIG_PAGE_COLORING__
 	//Added as optimization (derived from above);
 	size_t nc = get_cache_num_page_colors(c);
 	c->num_colors = SINIT(nc);
+#else
+	c->num_colors = 1;
+#endif
 }
 
 inline void init_free_cache_colors_map(cache_t* c) 
@@ -237,14 +242,20 @@ static inline void __cache_color_free(cache_t* c, uint8_t* colors_map)
 }
 
 uint8_t* cache_colors_map_alloc() {
+#ifdef __CONFIG_PAGE_COLORING__
 	uint8_t* colors_map = kmalloc(llc_cache->num_colors, 0);
 	if(colors_map)
 		CLR_BITMASK(colors_map, llc_cache->num_colors);
 	return colors_map;
+#else
+	return global_cache_colors_map;
+#endif
 }
 
 void cache_colors_map_free(uint8_t* colors_map) {
+#ifdef __CONFIG_PAGE_COLORING__
 	kfree(colors_map);
+#endif
 }
 
 error_t cache_color_alloc(cache_t* c, uint8_t* colors_map) 
