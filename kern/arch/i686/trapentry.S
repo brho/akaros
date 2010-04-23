@@ -78,6 +78,9 @@
 	pushl %fs;                                                                 \
 	pushl %gs;                                                                 \
 	pushal;                                                                    \
+	movw $0, %ax;                                                              \
+	movw %ax, %gs;                                                             \
+	movw %ax, %fs;                                                             \
 	movw $GD_KD, %ax;                                                          \
 	movw %ax, %ds;                                                             \
 	movw %ax, %es;                                                             \
@@ -193,6 +196,9 @@ _alltraps:
 	pushl %fs
 	pushl %gs
 	pushal
+	movw $0, %ax;
+	movw %ax, %gs;
+	movw %ax, %fs;
 	movw $GD_KD, %ax		# data segments aren't accessible by default
 	movw %ax, %ds
 	movw %ax, %es
@@ -218,6 +224,9 @@ _allirqs:
 	pushl %fs
 	pushl %gs
 	pushal
+	movw $0, %ax;
+	movw %ax, %gs;
+	movw %ax, %fs;
 	movw $GD_KD, %ax		# data segments aren't accessible by default
 	movw %ax, %ds
 	movw %ax, %es
@@ -252,6 +261,9 @@ sysenter_handler:
 	pushl %fs
 	pushl %gs
 	pushal
+	movw $0, %ax;
+	movw %ax, %gs;
+	movw %ax, %fs;
 	movw $GD_KD, %ax
 	movw %ax, %ds
 	movw %ax, %es
