@@ -37,6 +37,7 @@ struct kmem_cache *proc_cache;
 spinlock_t idle_lock = SPINLOCK_INITIALIZER;
 uint32_t LCKD(&idle_lock) (RO idlecoremap)[MAX_NUM_CPUS];
 uint32_t LCKD(&idle_lock) num_idlecores = 0;
+uint32_t num_mgmtcores = 1;
 
 /* Helper function to return a core to the idlemap.  It causes some more lock
  * acquisitions (like in a for loop), but it's a little easier.  Plus, one day
@@ -186,22 +187,21 @@ void proc_init(void)
 	schedule_init();
 	/* Init idle cores. Core 0 is the management core. */
 	spin_lock(&idle_lock);
-	int reserved_cores = 1;
 	#ifdef __CONFIG_NETWORKING__
-	reserved_cores++; // Next core is dedicated to the NIC
-	assert(num_cpus >= reserved_cores);
+	num_mgmtcores++; // Next core is dedicated to the NIC
+	assert(num_cpus >= num_mgmtcores);
 	#endif
 	#ifdef __CONFIG_APPSERVER__
 	#ifdef __CONFIG_DEDICATED_MONITOR__
-	reserved_cores++; // Next core dedicated to running the kernel monitor
-	assert(num_cpus >= reserved_cores);
-	// Need to subtract 1 from the reserved_cores # to get the cores index
-	send_kernel_message(reserved_cores-1, (amr_t)monitor, 0,0,0, KMSG_ROUTINE);
+	num_mgmtcores++; // Next core dedicated to running the kernel monitor
+	assert(num_cpus >= num_mgmtcores);
+	// Need to subtract 1 from the num_mgmtcores # to get the cores index
+	send_kernel_message(num_mgmtcores-1, (amr_t)monitor, 0,0,0, KMSG_ROUTINE);
 	#endif
 	#endif
-	num_idlecores = num_cpus - reserved_cores;
+	num_idlecores = num_cpus - num_mgmtcores;
 	for (int i = 0; i < num_idlecores; i++)
-		idlecoremap[i] = i + reserved_cores;
+		idlecoremap[i] = i + num_mgmtcores;
 	spin_unlock(&idle_lock);
 	atomic_init(&num_envs, 0);
 }
@@ -218,7 +218,7 @@ proc_init_procinfo(struct proc* p)
 	p->procinfo->ppid = p->ppid;
 	p->procinfo->tsc_freq = system_timing.tsc_freq;
 	// TODO: maybe do something smarter here
-	p->procinfo->max_vcores = MAX(1,num_cpus-1);
+	p->procinfo->max_vcores = MAX(1,num_cpus-num_mgmtcores);
 }
 
 /* Allocates and initializes a process, with the given parent.  Currently
@@ -691,6 +691,14 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 			schedule_proc(p);
 			break;
 		case (PROC_RUNNING_M):
+#ifdef __CONFIG_OSDI__
+			/* Ghetto, for OSDI: */
+			printk("[K] Process %d is yielding on vcore %d\n", p->pid, get_vcoreid(p, core_id()));
+			if (p->procinfo->num_vcores == 1) {
+				spin_unlock_irqsave(&p->proc_lock);
+				return;
+			}
+#endif /* __CONFIG_OSDI__ */
 			__seq_start_write(&p->procinfo->coremap_seqctr);
 			// give up core
 			__unmap_vcore(p, get_vcoreid(p, core_id()));
