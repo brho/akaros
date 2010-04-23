@@ -261,11 +261,11 @@ int32_t frontend_syscall(pid_t pid, int32_t syscall_num,
 	magic_mem[0] = 0x80;
 
 	// wait for front-end response
-	//int8_t irqsave = 0;
-	//enable_irqsave(&irqsave);
+	int8_t irqsave = 0;
+	enable_irqsave(&irqsave);
 	while(magic_mem[7] == 0)
 		;
-	//disable_irqsave(&irqsave);
+	disable_irqsave(&irqsave);
 
 	ret = magic_mem[1];
 	if(errno)
