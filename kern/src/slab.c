@@ -246,7 +246,7 @@ void kmem_cache_grow(struct kmem_cache *cp)
 		// Just get a single page for small slabs
 		page_t *a_page;
 		if (kpage_alloc(&a_page))
-			panic("[German Accent]: OOM!!!");
+			panic("[German Accent]: OOM for a small slab growth!!!");
 		// the slab struct is stored at the end of the page
 		a_slab = (struct kmem_slab*)(page2kva(a_page) + PGSIZE -
 		                             sizeof(struct kmem_slab));
@@ -277,6 +277,8 @@ void kmem_cache_grow(struct kmem_cache *cp)
 		                           PGSIZE;
 		// round up for the contiguous page allocator
 		void *buf = get_cont_pages(LOG2_UP(num_pgs), 0);
+		if (!buf)
+			panic("[German Accent]: OOM for a large slab growth!!!");
 		a_slab->num_busy_obj = 0;
 		a_slab->num_total_obj = ROUNDUPPWR2(num_pgs)*PGSIZE / a_slab->obj_size;
 		TAILQ_INIT(&a_slab->bufctl_freelist);
