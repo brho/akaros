@@ -569,7 +569,9 @@ void e1000_setup_interrupts() {
 
 	// Enable irqs for the e1000
 #ifdef __CONFIG_DISABLE_MPTABLES__
-	send_kernel_message(E1000_IRQ_CPU, enable_e1000_irq, 0,0,0, KMSG_IMMEDIATE);
+	// This will route the interrupts automatically to CORE 0
+	// Call send_kernel_message if you want to route them somewhere else
+	enable_e1000_irq(NULL,0,0,0,0);
 #else 
 	ioapic_route_irq(e1000_irq, E1000_IRQ_CPU);	
 #endif

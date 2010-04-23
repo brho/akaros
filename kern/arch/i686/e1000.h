@@ -10,7 +10,7 @@
 #define e1000_interrupt_debug(...)	//printk(__VA_ARGS__)  
 #define e1000_frame_debug(...)		//printk(__VA_ARGS__)  
 
-#define E1000_IRQ_CPU		1
+#define E1000_IRQ_CPU		0
 
 #define INTEL_VENDOR_ID		0x8086
 #define INTEL_DEV_ID0		0x100E	// Real E1000
