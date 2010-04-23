@@ -61,6 +61,9 @@ void arch_init()
 	 * up interrupt */
 	void mon_int(struct trapframe *tf, void *data)
 	{
+		// Enable interrupts here so that we can receive 
+		// other interrupts (e.g. from the NIC)
+		enable_irq();
 		if (cons_getc())
 			monitor(0);
 	}
