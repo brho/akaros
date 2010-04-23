@@ -181,8 +181,10 @@ error_t resource_req(struct proc *p, int type, size_t amt_wanted,
 		case RES_CORES:
 			retval = core_request(p);
 			// i don't like this retval hackery
-			if (retval < 0)
-				return retval;
+			if (retval < 0) {
+				set_errno(current_tf, -retval);
+				return -1;
+			}
 			else
 				return 0;
 			break;
