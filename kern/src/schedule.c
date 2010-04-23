@@ -76,6 +76,9 @@ void schedule(void)
 		proc_decref(p, 1);
 	} else {
 		spin_unlock_irqsave(&runnablelist_lock);
+		/* while this is problematic, we really don't have anything to
+         * do and could run off the end of the kernel stack if we just
+         * smp_idle -> manager -> schedule -> smp_idle. */
 		printk("No processes to schedule, enjoy the Monitor!\n");
 		while (1)
 			monitor(NULL);
