@@ -121,7 +121,7 @@ int mon_backtrace(int argc, char **argv, trapframe_t *tf)
 
 int mon_reboot(int argc, char **argv, trapframe_t *tf)
 {
-	cprintf("[Irish Accent]: She's goin' down, Cap'n!\n");
+	cprintf("[Scottish Accent]: She's goin' down, Cap'n!\n");
 	reboot();
 
 	// really, should never see this
