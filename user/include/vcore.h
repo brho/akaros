@@ -8,6 +8,18 @@ extern "C" {
 #include <arch/vcore.h>
 #include <string.h>
 
+/*****************************************************************************/
+/* TODO: This is a complete hack, but necessary for vcore stuff tow ork for now
+ * The issue is that exit sometimes calls sys_yield(), and we can't recover from
+ * that properly under our vcore model (we shouldn't though).  We really need to
+ * rethink what sys_yield 'should' do when in multicore mode, or else come up 
+ * with a different syscall entirely. */
+#include <stdlib.h>
+#include <unistd.h>
+#undef exit
+#define exit(status) ros_syscall(SYS_proc_destroy,getpid(),status,0,0,0)
+/*****************************************************************************/
+
 #define LOG2_MAX_VCORES 6
 #define MAX_VCORES (1 << LOG2_MAX_VCORES)
 
