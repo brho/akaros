@@ -334,12 +334,14 @@ void rl8168_setup_interrupts() {
 	outw(rl8168_io_base_addr + RL_IS_REG, RL_INTRRUPT_CLEAR);
 	
 	// Kernel based interrupt stuff
-#ifdef __IVY__
-	register_interrupt_handler(interrupt_handlers, KERNEL_IRQ_OFFSET + rl8168_irq, rl8168_interrupt_handler, (void *)0);
-#else
 	register_interrupt_handler(interrupt_handlers, KERNEL_IRQ_OFFSET + rl8168_irq, rl8168_interrupt_handler, 0);
-#endif
+#ifdef __CONFIG_DISABLE_MPTABLES__
+	pic_unmask_irq(rl8168_irq);
+	unmask_lapic_lvt(LAPIC_LVT_LINT0);
+	enable_irq();
+#else
 	ioapic_route_irq(rl8168_irq, 1);	
+#endif
 	
 	return;
 }
