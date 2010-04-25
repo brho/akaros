@@ -110,18 +110,8 @@ void _panic(const char *file, int line, const char *fmt,...)
 	va_end(ap);
 
 dead:
-	/* break into the kernel monitor, if we're core 0 */
-#ifdef __CONFIG_DEDICATED_MONITOR__
-	if (core_id() != 2) {
-#else
-	if (core_id()) {
-#endif
-		smp_idle();
-		panic("should never see me");
-	}
-
-	while (1)
-		monitor(NULL);
+	monitor(NULL);
+	smp_idle();
 }
 
 /* like panic, but don't */

@@ -466,6 +466,9 @@ static int runcmd(char *NTS real_buf, trapframe_t *tf) {
 }
 
 void monitor(trapframe_t *tf) {
+	static spinlock_t monitor_lock = SPINLOCK_INITIALIZER;
+	spin_lock(&monitor_lock);
+
 	char *buf;
 
 	printk("Welcome to the ROS kernel monitor on core %d!\n", core_id());
@@ -480,4 +483,6 @@ void monitor(trapframe_t *tf) {
 			if (runcmd(buf, tf) < 0)
 				break;
 	}
+
+	spin_unlock(&monitor_lock);
 }
