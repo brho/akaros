@@ -52,7 +52,7 @@ extern volatile uint32_t RO num_cpus;
 
 /* SMP bootup functions */
 void smp_boot(void);
-void smp_idle(void);
+void smp_idle(void) __attribute__((noreturn));
 void smp_percpu_init(void); // this must be called by each core individually
 
 /* SMP utility functions */

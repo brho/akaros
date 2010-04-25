@@ -1024,10 +1024,10 @@ intreg_t sys_tcsetattr(struct proc* p, int fd, int optional_actions, const void*
 	return ret;
 }
 
-#ifdef __CONFIG_OSDI__
 intreg_t sys_fillmeup(struct proc *p, uint8_t *bufs, 
                       uint16_t num_bufs, int16_t *last_written)
 {
+#if defined(__CONFIG_OSDI__) && defined(__CONFIG_NETWORKING__)
 	extern struct fillmeup fillmeup_data;
 	fillmeup_data.proc = p;
 	fillmeup_data.bufs = bufs;
@@ -1035,8 +1035,10 @@ intreg_t sys_fillmeup(struct proc *p, uint8_t *bufs,
 	fillmeup_data.last_written = last_written;
 	*last_written = -1;
 	return 0;
-}
+#else
+	return -1;
 #endif
+}
 
 /************** Syscall Invokation **************/
 
