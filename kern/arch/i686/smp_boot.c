@@ -305,6 +305,7 @@ void smp_percpu_init(void)
 	asm volatile ("fninit");
 
 	/* core 0 sets up via the global gdt symbol */
+	asm volatile ("fninit");
 	if (!coreid)
 		per_cpu_info[0].gdt = gdt;
 	else
