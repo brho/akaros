@@ -379,10 +379,10 @@ bool proc_controls(struct proc *actor, struct proc *target)
 void proc_run(struct proc *p)
 {
 	bool self_ipi_pending = FALSE;
-	spin_lock_irqsave(&p->proc_lock);
+	spin_lock(&p->proc_lock);
 	switch (p->state) {
 		case (PROC_DYING):
-			spin_unlock_irqsave(&p->proc_lock);
+			spin_unlock(&p->proc_lock);
 			printk("Process %d not starting due to async death\n", p->pid);
 			// if we're a worker core, smp_idle, o/w return
 			if (!management_core())
@@ -405,10 +405,11 @@ void proc_run(struct proc *p)
 				p->env_refcnt--; // TODO: (REF) use incref
 			/* We don't want to process routine messages here, since it's a bit
 			 * different than when we perform a syscall in this process's
-			 * context.  We keep interrupts disabled so that if there was a
+			 * context.  We want interrupts disabled so that if there was a
 			 * routine message on the way, we'll get the interrupt once we pop
-			 * back to userspace.  Note the use of a regular unlock. */
+			 * back to userspace.  */
 			spin_unlock(&p->proc_lock);
+			disable_irq();
 			__proc_startcore(p, &p->env_tf);
 			break;
 		case (PROC_RUNNABLE_M):
@@ -439,16 +440,12 @@ void proc_run(struct proc *p)
 			 * death message.  Otherwise, it would look like a new process.  So
 			 * we hold the lock til after we send our message, which prevents a
 			 * possible death message.
-			 * - Likewise, we need interrupts to be disabled, in case one of the
-			 *   messages was for us, and reenable them after letting go of the
-			 *   lock.  This is done by spin_lock_irqsave, so be careful if you
-			 *   change this.
 			 * - Note there is no guarantee this core's interrupts were on, so
 			 *   it may not get the message for a while... */
 			__proc_unlock_ipi_pending(p, self_ipi_pending);
 			break;
 		default:
-			spin_unlock_irqsave(&p->proc_lock);
+			spin_unlock(&p->proc_lock);
 			panic("Invalid process state %p in proc_run()!!", p->state);
 	}
 }
@@ -536,7 +533,7 @@ void proc_restartcore(struct proc *p, trapframe_t *tf)
 void proc_destroy(struct proc *p)
 {
 	bool self_ipi_pending = FALSE;
-	spin_lock_irqsave(&p->proc_lock);
+	spin_lock(&p->proc_lock);
 
 	/* TODO: (DEATH) look at this again when we sort the __death IPI */
 	if (current == p)
@@ -670,13 +667,13 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 	if (being_nice && !vc->preempt_pending)
 		return;
 
-	spin_lock_irqsave(&p->proc_lock); /* horrible scalability.  =( */
+	spin_lock(&p->proc_lock); /* horrible scalability.  =( */
 
 	/* fate is sealed, return and take the preempt message on the way out.
 	 * we're making this check while holding the lock, since the preemptor
 	 * should hold the lock when sending messages. */
 	if (vc->preempt_served) {
-		spin_unlock_irqsave(&p->proc_lock);
+		spin_unlock(&p->proc_lock);
 		return;
 	}
 	/* no need to preempt later, since we are yielding (nice or otherwise) */
@@ -695,7 +692,7 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 			/* Ghetto, for OSDI: */
 			printk("[K] Process %d is yielding on vcore %d\n", p->pid, get_vcoreid(p, core_id()));
 			if (p->procinfo->num_vcores == 1) {
-				spin_unlock_irqsave(&p->proc_lock);
+				spin_unlock(&p->proc_lock);
 				return;
 			}
 #endif /* __CONFIG_OSDI__ */
@@ -720,7 +717,7 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 			panic("Weird state(%s) in %s()", procstate2str(p->state),
 			      __FUNCTION__);
 	}
-	spin_unlock_irqsave(&p->proc_lock);
+	spin_unlock(&p->proc_lock);
 	proc_decref(p, 1); // need to eat the ref passed in.
 	/* Clean up the core and idle.  For mgmt cores, they will ultimately call
 	 * manager, which will call schedule() and will repick the yielding proc. */
@@ -757,16 +754,18 @@ void do_notify(struct proc *p, uint32_t vcoreid, unsigned int notif,
 	if (nm->flags & NOTIF_IPI && !vcpd->notif_pending) {
 		vcpd->notif_pending = TRUE;
 		if (vcpd->notif_enabled) {
-			spin_lock_irqsave(&p->proc_lock);
-				if ((p->state & PROC_RUNNING_M) && // TODO: (VC#) (_S state)
-				              (p->procinfo->vcoremap[vcoreid].valid)) {
-					printk("[kernel] sending notif to vcore %d\n", vcoreid);
-					send_kernel_message(p->procinfo->vcoremap[vcoreid].pcoreid,
-					                    __notify, p, 0, 0, KMSG_ROUTINE);
-				} else { // TODO: think about this, fallback, etc
-					warn("Vcore unmapped, not receiving an active notif");
-				}
-			spin_unlock_irqsave(&p->proc_lock);
+			/* GIANT WARNING: we aren't using the proc-lock to protect the
+			 * vcoremap.  We want to be able to use this from interrupt context,
+			 * and don't want the proc_lock to be an irqsave.
+			 */
+			if ((p->state & PROC_RUNNING_M) && // TODO: (VC#) (_S state)
+			              (p->procinfo->vcoremap[vcoreid].valid)) {
+				printk("[kernel] sending notif to vcore %d\n", vcoreid);
+				send_kernel_message(p->procinfo->vcoremap[vcoreid].pcoreid,
+				                    __notify, p, 0, 0, KMSG_ROUTINE);
+			} else { // TODO: think about this, fallback, etc
+				warn("Vcore unmapped, not receiving an active notif");
+			}
 		}
 	}
 }
@@ -799,20 +798,20 @@ uint32_t proc_get_vcoreid(struct proc *SAFE p, uint32_t pcoreid)
 {
 	uint32_t vcoreid;
 	// TODO: the code currently doesn't track the vcoreid properly for _S (VC#)
-	spin_lock_irqsave(&p->proc_lock);
+	spin_lock(&p->proc_lock);
 	switch (p->state) {
 		case PROC_RUNNING_S:
-			spin_unlock_irqsave(&p->proc_lock);
+			spin_unlock(&p->proc_lock);
 			return 0; // TODO: here's the ugly part
 		case PROC_RUNNING_M:
 			vcoreid = get_vcoreid(p, pcoreid);
-			spin_unlock_irqsave(&p->proc_lock);
+			spin_unlock(&p->proc_lock);
 			return vcoreid;
 		case PROC_DYING: // death message is on the way
-			spin_unlock_irqsave(&p->proc_lock);
+			spin_unlock(&p->proc_lock);
 			return 0;
 		default:
-			spin_unlock_irqsave(&p->proc_lock);
+			spin_unlock(&p->proc_lock);
 			panic("Weird state(%s) in %s()", procstate2str(p->state),
 			      __FUNCTION__);
 	}
@@ -1023,7 +1022,11 @@ bool __proc_take_allcores(struct proc *SAFE p, amr_t message,
  * might cause an IPI to be sent.  There should already be a kmsg waiting for
  * us, since when we checked state to see a message was coming, the message had
  * already been sent before unlocking.  Note we do not need interrupts enabled
- * for this to work (you can receive a message before its IPI by polling).
+ * for this to work (you can receive a message before its IPI by polling).  Also
+ * note that the actual interrupt will have often arrived earlier, since
+ * interrupts are usually enabled in process code.  This function is not as
+ * necessary as it once was, but still represents a useful thing.  It'll get
+ * changed soon.
  *
  * TODO: consider inlining this, so __FUNCTION__ works (will require effort in
  * core_request(). */
@@ -1031,11 +1034,11 @@ void __proc_unlock_ipi_pending(struct proc *p, bool ipi_pending)
 {
 	if (ipi_pending) {
 		p->env_refcnt--; // TODO: (REF) (atomics)
-		spin_unlock_irqsave(&p->proc_lock);
+		spin_unlock(&p->proc_lock);
 		process_routine_kmsg();
 		panic("stack-killing kmsg not found in %s!!!", __FUNCTION__);
 	} else {
-		spin_unlock_irqsave(&p->proc_lock);
+		spin_unlock(&p->proc_lock);
 	}
 }
 
@@ -1067,12 +1070,12 @@ void __unmap_vcore(struct proc *p, uint32_t vcoreid)
  * TODO: (REF) change to use CAS / atomics. */
 void proc_incref(struct proc *p, size_t count)
 {
-	spin_lock_irqsave(&p->proc_lock);
+	spin_lock(&p->proc_lock);
 	if (p->env_refcnt)
 		p->env_refcnt += count;
 	else
 		panic("Tried to incref a proc with no existing refernces!");
-	spin_unlock_irqsave(&p->proc_lock);
+	spin_unlock(&p->proc_lock);
 }
 
 /* When the kernel is done with a process, it decrements its reference count.
@@ -1081,13 +1084,15 @@ void proc_incref(struct proc *p, size_t count)
  * with the previous function (incref)
  *
  * TODO: (REF) change to use CAS.  Note that when we do so, we may be holding
- * the process lock when calling __proc_free(). */
+ * the process lock when calling __proc_free().  Think about what order to do
+ * those calls in (unlock, then decref?), and the race with someone unlocking
+ * while someone else is __proc_free()ing. */
 void proc_decref(struct proc *p, size_t count)
 {
-	spin_lock_irqsave(&p->proc_lock);
+	spin_lock(&p->proc_lock);
 	p->env_refcnt -= count;
 	size_t refcnt = p->env_refcnt; // need to copy this in so it's not reloaded
-	spin_unlock_irqsave(&p->proc_lock);
+	spin_unlock(&p->proc_lock);
 	// if we hit 0, no one else will increment and we can check outside the lock
 	if (!refcnt)
 		__proc_free(p);
@@ -1268,7 +1273,7 @@ void print_proc_info(pid_t pid)
 		return;
 	}
 	spinlock_debug(&p->proc_lock);
-	spin_lock_irqsave(&p->proc_lock);
+	spin_lock(&p->proc_lock);
 	printk("struct proc: %p\n", p);
 	printk("PID: %d\n", p->pid);
 	printk("PPID: %d\n", p->ppid);
@@ -1289,6 +1294,6 @@ void print_proc_info(pid_t pid)
 		       p->resources[i].amt_wanted, p->resources[i].amt_granted);
 	printk("Vcore 0's Last Trapframe:\n");
 	print_trapframe(&p->env_tf);
-	spin_unlock_irqsave(&p->proc_lock);
+	spin_unlock(&p->proc_lock);
 	proc_decref(p, 1); /* decref for the pid2proc reference */
 }

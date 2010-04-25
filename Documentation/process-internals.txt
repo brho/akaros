@@ -12,7 +12,8 @@ Contents:
 3. Leaving the Kernel Stack
 4. Preemption and Notification Issues
 5. Current_tf
-6. TBD
+6. Locking!
+7. TBD
 
 1. Reference Counting
 ===========================
@@ -683,5 +684,60 @@ iret.  At which point, if the code path is deep enough that we don't want to
 carry the TF pointer, we may revisit this.  Until then, current_tf is just for
 userspace contexts, and is simply stored in per_cpu_info.
 
-6. TBD
+6. Locking!
+===========================
+6.1: proc_lock
+---------------------------
+Currently, all locking is done on the proc_lock.  It's main goal is to protect
+the vcore mapping (vcore->pcore and vice versa).  As of Apr 2010, it's also used
+to protect changes to the address space and the refcnt.  Eventually the refcnt
+will be handled with atomics, and the address space will have it's own MM lock.  
+
+We grab the proc_lock all over the place, but we try to avoid it whereever
+possible - especially in kernel messages or other places that will be executed
+in parallel.  One place we do grab it but would like to not is in proc_yield().  
+We don't always need to grab the proc lock.  Here are some examples:
+
+6.1.1: Lockless Notifications:
+-------------
+We don't lock when sending a notification.  We want the proc_lock to not be an
+irqsave lock (discussed below).  Since we might want to send a notification from
+interrupt context, we can't grab the proc_lock if it's a regular lock.  
+
+This is okay, since the proc_lock is only protecting the vcoremapping.  We could
+accidentally send the notification to the wrong pcore.  The __notif handler
+checks to make sure it is the right process, and all _M processes should be able
+to handle spurious notifications.  This assumes they are still _M.
+
+If we send it to the wrong pcore, there is a danger of losing the notif, since
+it didn't go to the correct vcore.  That would happen anyway, (the vcore is
+unmapped, or in the process of mapping).  The notif_pending flag will be caught
+when the vcore is started up next time (and that flag was set before reading the
+vcoremap).
+
+6.1.2: Local get_vcoreid():
+-------------
+It's not necessary to lock while checking the vcoremap if you are checking for
+the core you are running on (e.g. pcoreid == core_id()).  This is because all
+unmappings of a vcore are done on the receive side of a routine kmsg, and that
+code cannot run concurrently with the code you are running.  
+
+6.2: irqsave
+---------------------------
+The proc_lock used to be an irqsave lock (meaning it disables interrupts and can
+be grabbed from interrupt context).  We made it a regular lock for a couple
+reasons.  The immediate one was it was causing deadlocks due to some other
+ghetto things (blocking on the frontend server, for instance).  More generally,
+we don't want to disable interrupts for long periods of time, so it was
+something worth doing anyway.  
+
+This means that we cannot grab the proc_lock from interrupt context.  This
+includes having schedule called from an interrupt handler (like the
+timer_interrupt() handler), since it will call proc_run.  Right now, we actually
+do this, which we shouldn't, and that will eventually get fixed.  The right
+answer is that the actual work of running the scheduler should be a routine
+kmsg, similar to how Linux sets a bit in the kernel that it checks on the way
+out to see if it should run the scheduler or not.
+
+7. TBD
 ===========================

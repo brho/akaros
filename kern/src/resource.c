@@ -42,7 +42,7 @@ ssize_t core_request(struct proc *p)
 	bool need_to_idle = FALSE;
 	bool self_ipi_pending = FALSE;
 
-	spin_lock_irqsave(&p->proc_lock);
+	spin_lock(&p->proc_lock);
 	/* check to see if this is a full deallocation.  for cores, it's a
 	 * transition from _M to _S.  Will be issues with handling this async. */
 	if (!p->resources[RES_CORES].amt_wanted) {
@@ -65,10 +65,10 @@ ssize_t core_request(struct proc *p)
 	          p->resources[RES_CORES].amt_granted;
 	if (amt_new < 0) {
 		p->resources[RES_CORES].amt_wanted = p->resources[RES_CORES].amt_granted;
-		spin_unlock_irqsave(&p->proc_lock);
+		spin_unlock(&p->proc_lock);
 		return -EINVAL;
 	} else if (amt_new == 0) {
-		spin_unlock_irqsave(&p->proc_lock);
+		spin_unlock(&p->proc_lock);
 		return 0;
 	}
 	// else, we try to handle the request
@@ -150,7 +150,7 @@ ssize_t core_request(struct proc *p)
 			abandon_core();
 		}
 	} else { // nothing granted, just return
-		spin_unlock_irqsave(&p->proc_lock);
+		spin_unlock(&p->proc_lock);
 	}
 	return num_granted;
 }
@@ -166,12 +166,12 @@ error_t resource_req(struct proc *p, int type, size_t amt_wanted,
 		printk("[kernel] Async requests treated synchronously for now.\n");
 
 	/* set the desired resource amount in the process's resource list. */
-	spin_lock_irqsave(&p->proc_lock);
+	spin_lock(&p->proc_lock);
 	size_t old_amount = p->resources[type].amt_wanted;
 	p->resources[type].amt_wanted = amt_wanted;
 	p->resources[type].amt_wanted_min = MIN(amt_wanted_min, amt_wanted);
 	p->resources[type].flags = flags;
-	spin_unlock_irqsave(&p->proc_lock);
+	spin_unlock(&p->proc_lock);
 
 	// no change in the amt_wanted
 	if (old_amount == amt_wanted)

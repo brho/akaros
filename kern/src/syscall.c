@@ -219,7 +219,7 @@ static error_t sys_proc_run(struct proc *p, unsigned pid)
 	if (!target)
 		return -EBADPROC;
  	// note we can get interrupted here. it's not bad.
-	spin_lock_irqsave(&p->proc_lock);
+	spin_lock(&p->proc_lock);
 	// make sure we have access and it's in the right state to be activated
 	if (!proc_controls(p, target)) {
 		proc_decref(target, 1);
@@ -231,7 +231,7 @@ static error_t sys_proc_run(struct proc *p, unsigned pid)
 		__proc_set_state(target, PROC_RUNNABLE_S);
 		schedule_proc(target);
 	}
-	spin_unlock_irqsave(&p->proc_lock);
+	spin_unlock(&p->proc_lock);
 	proc_decref(target, 1);
 	return retval;
 }
@@ -490,7 +490,7 @@ static intreg_t sys_munmap(struct proc* p, void* addr, size_t len)
 static void* sys_brk(struct proc *p, void* addr) {
 	ssize_t range;
 
-	spin_lock_irqsave(&p->proc_lock);
+	spin_lock(&p->proc_lock);
 
 	if((addr < p->procinfo->heap_bottom) || (addr >= (void*)BRK_END))
 		goto out;
@@ -511,7 +511,7 @@ static void* sys_brk(struct proc *p, void* addr) {
 	p->heap_top = addr;
 
 out:
-	spin_unlock_irqsave(&p->proc_lock);
+	spin_unlock(&p->proc_lock);
 	return p->heap_top;
 }
 

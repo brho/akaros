@@ -54,9 +54,9 @@ void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
               struct file* file, size_t offset)
 {
 	// TODO: grab the appropriate mm_lock
-	spin_lock_irqsave(&p->proc_lock);
+	spin_lock(&p->proc_lock);
 	void* ret = __do_mmap(p,addr,len,prot,flags,file,offset);
-	spin_unlock_irqsave(&p->proc_lock);
+	spin_unlock(&p->proc_lock);
 	return ret;
 }
 
@@ -168,9 +168,9 @@ int mprotect(struct proc* p, void* addr, size_t len, int prot)
 		return -1;
 	}
 
-	spin_lock_irqsave(&p->proc_lock);
+	spin_lock(&p->proc_lock);
 	int ret = __mprotect(p,addr,len,prot);
-	spin_unlock_irqsave(&p->proc_lock);
+	spin_unlock(&p->proc_lock);
 
 	return ret;
 }
@@ -241,9 +241,9 @@ int handle_page_fault(struct proc* p, uintptr_t va, int prot)
 	if(prot != PROT_READ && prot != PROT_WRITE && prot != PROT_EXEC)
 		panic("bad prot!");
 
-	spin_lock_irqsave(&p->proc_lock);
+	spin_lock(&p->proc_lock);
 	int ret = __handle_page_fault(p,va,prot);
-	spin_unlock_irqsave(&p->proc_lock);
+	spin_unlock(&p->proc_lock);
 	return ret;
 }
 	

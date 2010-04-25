@@ -71,10 +71,10 @@ void manager_brho(void)
 			//p = kfs_proc_create(kfs_lookup_path("roslib_mproctests"));
 			//p = kfs_proc_create(kfs_lookup_path("roslib_spawn"));
 			// being proper and all:
-			spin_lock_irqsave(&p->proc_lock);
+			spin_lock(&p->proc_lock);
 			__proc_set_state(p, PROC_RUNNABLE_S);
 			// normal single-cored way
-			spin_unlock_irqsave(&p->proc_lock);
+			spin_unlock(&p->proc_lock);
 			proc_run(p);
 			proc_decref(p, 1);
 			#if 0
@@ -83,7 +83,7 @@ void manager_brho(void)
 			__proc_set_state(p, PROC_RUNNING_S);
 			__proc_set_state(p, PROC_RUNNABLE_M);
 			p->resources[RES_CORES].amt_wanted = 5;
-			spin_unlock_irqsave(&p->proc_lock);
+			spin_unlock(&p->proc_lock);
 			core_request(p);
 			panic("This is okay");
 			#endif
@@ -94,10 +94,10 @@ void manager_brho(void)
 			udelay(10000000);
 			// this is a ghetto way to test restarting an _M
 				printk("\nattempting to ghetto preempt...\n");
-				spin_lock_irqsave(&p->proc_lock);
+				spin_lock(&p->proc_lock);
 				proc_take_allcores(p, __death);
 				__proc_set_state(p, PROC_RUNNABLE_M);
-				spin_unlock_irqsave(&p->proc_lock);
+				spin_unlock(&p->proc_lock);
 				udelay(5000000);
 				printk("\nattempting to restart...\n");
 				core_request(p); // proc still wants the cores
@@ -106,9 +106,9 @@ void manager_brho(void)
 				printk("taking 3 cores from p\n");
 				for (int i = 0; i < num; i++)
 					corelist[i] = 7-i; // 7, 6, and 5
-				spin_lock_irqsave(&p->proc_lock);
+				spin_lock(&p->proc_lock);
 				proc_take_cores(p, corelist, &num, __death);
-				spin_unlock_irqsave(&p->proc_lock);
+				spin_unlock(&p->proc_lock);
 				udelay(5000000);
 				printk("Killing p\n");
 				proc_destroy(p);

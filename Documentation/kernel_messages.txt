@@ -32,6 +32,17 @@ get processed next, at the latest.  Even if the routine function doesn't return,
 once interrupts are reenabled (like when popping to userspace), the
 __kernel_message() handler will fire again.
 
+Immediate kernel messages are executed in interrupt context.  Routine messages
+may technically be done in interrupt context (it's a nebulous term) because they
+are executed because of an interrupt handler, but from the kernel's perspective
+they are like executing in regular context (like when a process makes a syscall,
+aka real "process context").  This is because there are no concerns about the
+kernel holding locks or otherwise "interrupting" its own execution.  Routine
+messages are a little different than just trapping into the kernel, since the
+functions don't have to return and may result in clobbering the kernel stack.
+Also note that this behavior is dependent on where we call
+process_routine_kmsg().  Don't call it somewhere you need to return to.
+
 History:
 --------------------------------
 A bit of history: we used to use "immediate" messages (when all messages were
