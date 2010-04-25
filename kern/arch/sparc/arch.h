@@ -156,7 +156,7 @@ clflush(uintptr_t* addr)
 static __inline int
 irq_is_enabled(void)
 {
-	return (read_psr() & 0xF00) == 0;
+	return (read_psr() & PSR_PIL) == 0;
 }
 
 static __inline uint32_t

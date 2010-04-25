@@ -58,6 +58,13 @@ _start:
 	st	%g3,[%g1]
 	flush	%g1
 
+	// and patch the trap entry point.
+	set	RELOC(trap_patchme),%g1
+	ld	[%g1],%g3
+	or	%g2,%g3,%g3
+	st	%g3,[%g1]
+	flush	%g1
+
 	// store NWINDOWS away for safekeeping
 	set	RELOC(NWINDOWS),%g1
 	inc	%g2

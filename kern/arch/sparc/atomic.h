@@ -129,7 +129,7 @@ static inline void spin_lock(spinlock_t*SAFE lock)
 static inline void spin_unlock(spinlock_t*SAFE lock)
 {
 	wmb();
-	__asm__ __volatile__ ("stub %%g0,[%0+3]" : : "r"(&lock->rlock) : "memory");
+	lock->rlock = 0;
 }
 
 static inline void spinlock_init(spinlock_t* lock)

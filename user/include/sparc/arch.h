@@ -16,6 +16,7 @@ double do_rsqrt(double);
 static __inline void
 set_stack_pointer(void* sp)
 {
+	sp = (char*)sp - 96;
 	__asm__ __volatile__ ("mov %0,%%sp" : : "r"(sp));
 }
 

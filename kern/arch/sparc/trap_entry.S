@@ -7,75 +7,88 @@
 	.section	".text"!,#alloc,#execinstr,#progbits
 	.align		4
 
-	.global tflush
+	.global	tflush1
+	.global	tflush2
+	.global trap_patchme
 
 	.global handle_trap
 handle_trap:
 
-	// At this point, %l1 = pc, %l2 = npc, and %l0/3/4/5
-	// might contain an active message.  so we only get %l6/%l7
+	// First, make sure we have a valid register window.
+	// The restore won't trap, but the save might.
+	// The spill handler won't overwrite l0/l5/l6, so stash l1 (pc) and l2 (npc)
+	// in there, since the hardware will overwrite them if save traps
+	mov	%psr,%l7
+	wr	%l7,PSR_PIL,%psr
+	wr	%l7,PSR_PIL|PSR_ET,%psr
 
-	// calculate stack pointer (-64 is space for window spill).
-	// sp = bootstacktop - core_id*KSTKSIZE - 64 - sizeof(trapframe_t).
-	// should you change this, make sure to change stack_fucked()
-	set	bootstacktop-64-SIZEOF_TRAPFRAME_T,%l6
-	mov	CORE_ID_REG,%l7
-	sll	%l7,KSTKSHIFT,%l7
-	sub	%l6,%l7,%l6
+	// Are we user or kernel?
+	btst	PSR_PS,%l7
+	mov	%l2,%l6
+	be	1f
+	 mov	%l1,%l5
 
-	// see if trap came from kernel; if so, use that stack
-	// also preserve the psr, since we'll screw with the condition codes
-	mov	%psr,%l0
-	btst	PSR_PS,%l0
-	bne,a	1f
-	 sub	%fp,64+SIZEOF_TRAPFRAME_T,%l6
+	// Trap came from kernel.  Spill a window if necessary.
+	restore
+	save
 
-	// here is where we might do something with an active message
-
-	// At this point we may use %l3/4/5/7 as temporary regs
-1:
-	// is CWP valid?
-	and	%l0,PSR_CWP,%l4	! %l4 = cwp
-	mov	1,%l7
-	sll	%l7,%l4,%l4	! %l4 = 1 << cwp
-	mov	%wim,%l3
-	btst	%l3,%l4		! (%wim & %l4) == 0?
-	be	2f
-	 sethi	%hi(spill),%l7
-	jmpl	%lo(spill)+%l7,%l7	!no, spill a window
-	 nop
-
-	// At this point we may use %o0-7, %l3/4/5/7 as temporary regs
-	// save the whole user context to a trapframe_t
-
-2:
-	mov	%l6,%sp
-	mov	%l1,%o1
-	mov	%l2,%o2
-	mov	%l0,%psr			! restore condition codes before saving trapframe
+	// Save TF then call handler
+	sub	%fp,64+SIZEOF_TRAPFRAME_T,%sp
 	call	env_save_tf
 	 add	%sp,64,%o0
+	call	%l0
+	 add	%sp,64,%o0
 
-	// enable traps (but not interrupts)
-	or	%l0,PSR_PIL,%g3
-	wr	%g3,0,%psr
-	wr	%g3,PSR_ET,%psr
+#define FINISH_POP_TF(tf) \
+	ld	[tf+132],%l1 ;\
+	ld	[tf+136],%l2 ;\
+	ld	[tf+148],%l5 ;\
+	mov	%l5,%y ;\
+	jmp	%l1 ;\
+	rett	%l2
+
+	// Get outta here! Fill a window if necessary.
+	restore
+	save
+	mov	%l7,%psr
+	add	%sp,64,%o0
+	FINISH_POP_TF(%o0)
+
+	// Trap came from user.  Spill a window if necessary.
+1:	restore
+tflush1:
+	save
+
+	mov	CORE_ID_REG,%l1
+	sll	%l1,KSTKSHIFT,%l1
+	set	bootstacktop-64-SIZEOF_TRAPFRAME_T,%sp
+	sub	%sp,%l1,%sp
+
+	call	env_save_tf
+	 add	%sp,64,%o0
 
 	// spill all trapper's windows out to the stack.
 	// the 'save' may trap (triggering the spill),
 	// and if the stack is corrupted, the process may die
+	mov	%l7,%g3
 	mov	%sp,%g4
-	set	NWINDOWS,%g1
-	ld	[%g1],%g1
-	sub	%g1,1,%g2
+	mov %l0,%g5
+trap_patchme:
+	mov	0,%g2						// 0 will become NWINDOWS-1
 5:	deccc	%g2
 	bne,a	5b
-tflush:	 save	%sp,0,%sp
-	mov	%g4,%sp	
-	wr	%g3,PSR_ET,%psr
+tflush2:
+	 save
 
-	// call the handler and pass in the tf and handler address
-	call	%l5
+	mov	%g0,%wim
+	andn	%g3,PSR_CWP,%g3
+	wr	%g3,PSR_PIL|PSR_ET,%psr
+	nop; nop; nop
+	mov	1<<1,%wim
+	mov	%g4,%sp
+
+	// Call the handler
+	call	%g5
 	 add	%sp,64,%o0
 
 	// fallthrough to env_pop_tf, which is right below this function
@@ -119,24 +132,22 @@ env_pop_tf:
 	ldd	[%o0+16],%g4
 	ldd	[%o0+24],%g6
 
-	ld	[%o0+132],%l1
-	ld	[%o0+136],%l2
-	ld	[%o0+148],%l5
-	mov	%l5,%y
 	ld	[%o0+152],%l5
 	mov	%l5,%asr13
+	FINISH_POP_TF(%o0)
 
-	jmp	%l1
-	rett	%l2
-
-// void env_save_tf(trapframe_t* tf, uint32_t trap_pc, uint32_t trap_npc)
+	// env_save_tf has a non-standard calling convention.
+	// o0: destination trapframe_t*
+	// l5: PC
+	// l6: nPC
+	// l7: PSR
 	.global env_save_tf
 env_save_tf:
 
 	mov	%psr,%o4
-	st	%o4,[%o0+128]
-	st	%o1,[%o0+132]
-	st	%o2,[%o0+136]
+	st	%l7,[%o0+128]
+	st	%l5,[%o0+132]
+	st	%l6,[%o0+136]
 	mov	%wim,%o4
 	st	%o4,[%o0+140]
 	mov	%tbr,%o4
@@ -156,7 +167,7 @@ env_save_tf:
 	std	%o4,[%o0+168]
 
 	# try to read out the faulting insn (in no-fault mode)
-	andn	%o1,3,%o1
+	andn	%l5,3,%o1
 	lda	[%g0] 4,%o2
 	or	%o2,2,%o3
 	sta	%o3,[%g0] 4

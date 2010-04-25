@@ -29,14 +29,12 @@ static __inline uint32_t read_psr(void) __attribute__((always_inline));
 static __inline uint32_t read_wim(void) __attribute__((always_inline));
 static __inline uint32_t read_tbr(void) __attribute__((always_inline));
 static __inline uint32_t read_mmu_reg(uint32_t which) __attribute__((always_inline));
-static __inline uint32_t read_y(void) __attribute__((always_inline));
 static __inline uint32_t read_fsr(void) __attribute__((always_inline));
 static __inline uint64_t read_perfctr(uint32_t core, uint32_t which) __attribute__((always_inline));
 static __inline void write_psr(uint32_t val) __attribute__((always_inline));
 static __inline void write_wim(uint32_t val) __attribute__((always_inline));
 static __inline void write_tbr(uint32_t val) __attribute__((always_inline));
 static __inline void write_mmu_reg(uint32_t which, uint32_t val) __attribute__((always_inline));
-static __inline void write_y(uint32_t val) __attribute__((always_inline));
 static __inline void write_fsr(uint32_t val) __attribute__((always_inline));
 static __inline uint32_t memsize_mb(void) __attribute__((always_inline));
 static __inline uint32_t mmu_probe(uint32_t va) __attribute__((always_inline));
@@ -51,7 +49,7 @@ static __inline uint32_t
 read_psr(void)
 {
 	uint32_t reg;
-	asm volatile ("mov %%psr,%0" : "=r"(reg));
+	asm volatile ("mov %%psr,%0" : "=r"(reg) : : "memory");
 	return reg;
 }
 
@@ -59,7 +57,7 @@ static __inline uint32_t
 read_wim(void)
 {
 	uint32_t reg;
-	asm volatile ("mov %%wim,%0" : "=r"(reg));
+	asm volatile ("mov %%wim,%0" : "=r"(reg) : : "memory");
 	return reg;
 }
 
@@ -67,7 +65,7 @@ static __inline uint32_t
 read_tbr(void)
 {
 	uint32_t reg;
-	asm volatile ("mov %%tbr,%0" : "=r"(reg));
+	asm volatile ("mov %%tbr,%0" : "=r"(reg) : : "memory");
 	return reg;
 }
 
@@ -78,18 +76,10 @@ read_mmu_reg(uint32_t which)
 }
 
 static __inline uint32_t
-read_y(void)
-{
-	uint32_t reg;
-	asm volatile ("mov %%y,%0" : "=r"(reg));
-	return reg;
-}
-
-static __inline uint32_t
 read_fsr(void)
 {
 	uint32_t reg;
-	asm volatile ("st %%fsr,%0" : "=m"(reg));
+	asm volatile ("st %%fsr,%0" : "=m"(reg) : : "memory");
 	return reg;
 }
 
@@ -115,12 +105,6 @@ static __inline void
 write_mmu_reg(uint32_t which, uint32_t val)
 {
 	store_alternate(which,4,val);
-}
-
-static __inline void
-write_y(uint32_t val)
-{
-	asm volatile ("mov %0,%%y; nop;nop;nop" : : "r"(val) : "memory");
 }
 
 static __inline void

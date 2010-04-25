@@ -252,6 +252,9 @@ unhandled_trap(trapframe_t* state)
 	uint32_t trap_type = (state->tbr >> 4) & 0xFF;
 	get_trapname(trap_type,buf);
 
+	static spinlock_t screwup_lock = SPINLOCK_INITIALIZER;
+	spin_lock(&screwup_lock);
+
 	if(in_kernel(state))
 	{
 		print_trapframe(state);
@@ -262,6 +265,7 @@ unhandled_trap(trapframe_t* state)
 		warn("Unhandled trap in user!\nTrap type: %s",buf);
 		print_trapframe(state);
 		backtrace();
+		spin_unlock(&screwup_lock);
 
 		assert(current);
 		proc_incref(current, 1);
@@ -271,49 +275,43 @@ unhandled_trap(trapframe_t* state)
 	}
 }
 
-static void
+static trapframe_t*
 stack_fucked(trapframe_t* state)
 {
-	// see if the problem arose when flushing out
-	// windows during handle_trap
-	extern uint32_t tflush;
-	if(state->pc == (uint32_t)&tflush)
-	{
-		// the trap happened while flushing out windows.
-		// hope this happened in the user, or else we're hosed...
-		state = (trapframe_t*)(bootstacktop-SIZEOF_TRAPFRAME_T-core_id()*KSTKSIZE);
-	}
-
 	warn("You just got stack fucked!");
-	unhandled_trap(state);
+	extern char tflush1, tflush2;
+	if(state->pc == (uint32_t)&tflush1 || state->pc == (uint32_t)&tflush2)
+		return (trapframe_t*)(bootstacktop - core_id()*KSTKSIZE
+		                                   - sizeof(trapframe_t));
+	return state;
 }
 
 void
 fill_misaligned(trapframe_t* state)
 {
+	state = stack_fucked(state);
 	state->tbr = (state->tbr & ~0xFFF) | 0x070;
-	stack_fucked(state);
+	address_unaligned(state);
 }
 
 void
 fill_pagefault(trapframe_t* state)
 {
+	state = stack_fucked(state);
 	state->tbr = (state->tbr & ~0xFFF) | 0x090;
-	stack_fucked(state);
+	data_access_exception(state);
 }
 
 void
-stack_misaligned(trapframe_t* state)
+spill_misaligned(trapframe_t* state)
 {
-	state->tbr = (state->tbr & ~0xFFF) | 0x070;
-	stack_fucked(state);
+	fill_misaligned(state);
 }
 
 void
-stack_pagefault(trapframe_t* state)
+spill_pagefault(trapframe_t* state)
 {
-	state->tbr = (state->tbr & ~0xFFF) | 0x090;
-	stack_fucked(state);
+	fill_pagefault(state);
 }
 
 void
@@ -403,6 +401,7 @@ handle_syscall(trapframe_t* state)
 	uint32_t a5 = state->gpr[12];
 
 	advance_pc(state);
+	enable_irq();
 
 	/* Note we are not preemptively saving the TF in the env_tf.  We do maintain
 	 * a reference to it in current_tf (a per-cpu pointer).

@@ -2,92 +2,22 @@
 #include <arch/sparc.h>
 #include <arch/trap.h>
 #include <ros/memlayout.h>
+#include <arch/trap_table.h>
 
-// before spilling a window, we must be certain
-// that %sp is 8-byte aligned and the range [%sp,%sp+64)
-// is validly mapped in
-#define VALIDATE_STACK(reg1,reg2,misaligned,pagefault)	\
-	mov	%psr,reg1		;\
-	btst	7,%sp			;\
-	bne	misaligned		;\
-	 mov	reg1,%psr		;\
-	andn	%sp,0xFFF,reg1		;\
-	or	reg1,0x400,reg1		;\
-	lda	[reg1] 3,reg2		;\
-	add	%sp,56,reg1		;\
-	andn	reg1,0xFFF,reg1		;\
-	or	reg1,0x400,reg1		;\
-	lda	[reg1] 3,reg1		;\
-	and	reg2,reg1,reg2		;\
-	mov	%psr,reg1		;\
-	btst	PTE_PTE,reg2		;\
-	be	pagefault		;\
-	 mov	reg1,%psr
-
-#define RETHROW_TRAP(func)		\
-	mov	%psr,%l7		;\
-	and	%l7,PSR_CWP,%l4		;\
-	set	NWINDOWS,%l3		;\
-	ld	[%l3],%l3		;\
-	dec	%l3			;\
-	cmp	%l3,%l4			;\
-	inc	%l4			;\
-	be,a	7f			;\
-	 mov	0,%l4			;\
-7:	mov	1,%l3			;\
-	sll	%l3,%l4,%l4		;\
-	mov	%g0,%wim		;\
-	set     bootstacktop-64-SIZEOF_TRAPFRAME_T,%sp	;\
-	mov     CORE_ID_REG,%l5		;\
-	sll     %l5,KSTKSHIFT,%l5	;\
-	sub     %sp,%l5,%sp		;\
-	btst	PSR_PS,%l7		;\
-	bne,a	8f			;\
-	 sub	%fp,64+SIZEOF_TRAPFRAME_T,%sp ;\
-8:	mov	%l7,%psr		;\
-	mov	%l1,%o1			;\
-	mov	%l2,%o2			;\
-	call	env_save_tf		;\
-	 add	%sp,64,%o0		;\
-	mov	%l4,%wim		;\
-	mov	%psr,%o0		;\
-	wr	%o0,PSR_ET,%psr		;\
-	call	func			;\
-	 add	%sp,64,%o0
-
-	.global handle_window_overflow
-handle_window_overflow:
-	sethi	%hi(spill),%l7
-	jmpl	%l7+%lo(spill),%l7
-	 nop
-	jmp	%l1
-	rett	%l2
-
-/*	.global handle_window_underflow
-handle_window_underflow:
-	sethi	%hi(fill),%l7
-	jmpl	%l7+%lo(fill),%l7
-	 nop
-	jmp	%l1
-	rett	%l2*/
-
-! after handling a window trap, spill will return to window_rett+8,
-! so these two nops are necessary!
-	.global	window_rett
-window_rett:
-	nop
-	nop
-	jmp	%l1
-	rett	%l2
+#define MAKE_STACK \
+	set	bootstacktop - SIZEOF_TRAPFRAME_T - 64,%fp; \
+	mov	CORE_ID_REG,%l0; \
+	sll	%l0,KSTKSHIFT,%l0; \
+	sub	%fp,%l0,%fp
 
 ! preconditions:
 ! WIM & (1<<CWP) != 0
 ! link address in %l7
 ! postconditions:
 ! CWP same, but is now valid
-! %l0, %l1, %l2, %l5, %l6 have not changed 
-.global spill
-spill:
+! %l0, %l1, %l2, %l5, %l6, %l7 have not changed 
+.global handle_window_overflow
+handle_window_overflow:
 	mov	%g1,%l4
 	mov	%wim,%l3
 	mov	%g0,%wim
@@ -100,11 +30,15 @@ spill_patchme:
 
 	srl	%l3,1,%l3
 	or	%g1,%l3,%g1
-	mov	%g2,%l3
+	mov	%psr,%l3
 
 	save
 	mov	%g1,%wim
-	VALIDATE_STACK(%g1,%g2,1f,2f)
+	btst	7,%sp
+	bne	2f
+	 lda	[%g0] 4,%g1		! do the fill in no-fault mode
+	or	%g1,2,%g1		! NF = 1
+	sta	%g1,[%g0] 4
 	std	%l0,[%sp+ 0]
 	std	%l2,[%sp+ 8]
 	std	%l4,[%sp+16]
@@ -115,15 +49,30 @@ spill_patchme:
 	std	%i6,[%sp+56]
 	restore
 
-	mov	%l3,%g2
-	jmp	%l7+8
-	mov	%l4,%g1
+	xor	%g1,2,%g1
+	sta	%g1,[%g0] 4		! NF = 0
+	mov	0x300,%g1
+	lda	[%g1] 4,%g1
+	btst	0x1C,%g1		! FT != 0 ?
+	bne	1f
+	 mov	%l4,%g1
 
-// spill failed!
-1:	restore
-	RETHROW_TRAP(stack_misaligned)
-2:	restore
-	RETHROW_TRAP(stack_pagefault)
+	// success!
+	mov	%l3,%psr
+	jmp	%l1
+	 rett	%l2
+
+1:	// page fault
+	mov	%l3,%psr
+	MAKE_STACK
+	TRAP_TABLE_ENTRY(spill_pagefault)
+
+2:	// spill misaligned
+	restore
+	mov	%l3,%psr
+	mov	%l4,%g1
+	MAKE_STACK
+	TRAP_TABLE_ENTRY(spill_misaligned)
 
 .global handle_window_underflow
 handle_window_underflow:
@@ -174,9 +123,8 @@ fill_patchme:
 1:	// page fault
 	mov	%l3,%wim
 	mov	%l5,%psr
-	set	trap_table_pagefault,%l6
-	jmp	%l6
-	 nop
+	MAKE_STACK
+	TRAP_TABLE_ENTRY(fill_pagefault)
 
 2:	// fill misaligned
 	save
@@ -184,6 +132,5 @@ fill_patchme:
 	mov	%l4,%g1
 	mov	%l3,%wim
 	mov	%l5,%psr
-	set	trap_table_misaligned,%l6
-	jmp	%l6
-	 nop
+	MAKE_STACK
+	TRAP_TABLE_ENTRY(fill_misaligned)
