@@ -63,7 +63,8 @@ KERN_APPFILES += \
                  $(TESTS_DIR)/mhello \
                  $(TESTS_DIR)/manycore_test \
                  $(TESTS_DIR)/pthread_test \
-                 $(TESTS_DIR)/idle
+                 $(TESTS_DIR)/idle \
+                 $(TESTS_DIR)/fillmeup
 endif
 
 KERN_LDFLAGS   := $(KERN_LDFLAGS) -L$(OBJDIR)/$(KERN_DIR) \

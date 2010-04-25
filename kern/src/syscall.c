@@ -1023,6 +1023,21 @@ intreg_t sys_tcsetattr(struct proc* p, int fd, int optional_actions, const void*
 	user_memdup_free(p,kbuf);
 	return ret;
 }
+
+#ifdef __CONFIG_OSDI__
+intreg_t sys_fillmeup(struct proc *p, uint8_t *bufs, 
+                      uint16_t num_bufs, int16_t *last_written)
+{
+	extern struct fillmeup fillmeup_data;
+	fillmeup_data.proc = p;
+	fillmeup_data.bufs = bufs;
+	fillmeup_data.num_bufs = num_bufs;
+	fillmeup_data.last_written = last_written;
+	*last_written = -1;
+	return 0;
+}
+#endif
+
 /************** Syscall Invokation **************/
 
 /* Executes the given syscall.
@@ -1081,6 +1096,9 @@ intreg_t syscall(struct proc *p, uintreg_t syscallno, uintreg_t a1,
 		[SYS_eth_write] = (syscall_t)sys_eth_write,
 		[SYS_eth_get_mac_addr] = (syscall_t)sys_eth_get_mac_addr,
 		[SYS_eth_recv_check] = (syscall_t)sys_eth_recv_check,
+	#endif
+	#ifdef __CONFIG_OSDI__
+		[SYS_fillmeup] = (syscall_t)sys_fillmeup,
 	#endif
 		// Syscalls serviced by the appserver for now.
 		[SYS_read] = (syscall_t)sys_read,

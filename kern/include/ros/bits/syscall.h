@@ -3,7 +3,6 @@
 
 /* system call numbers.  need to #def them for use in assembly. */
 #define SYS_null					 1
-#define SYS_cache_buster			 2
 #define SYS_cache_invalidate		 3
 #define SYS_reboot					 4
 #define SYS_cputs					 5
@@ -63,6 +62,10 @@
 #define SYS_gettimeofday		116
 #define SYS_tcgetattr			117
 #define SYS_tcsetattr			118
+
+/* Syscalls we plan to remove someday */
+#define SYS_cache_buster        200 
+#define SYS_fillmeup            201
 
 /* For Buster Measurement Flags */
 #define BUSTER_SHARED			0x0001

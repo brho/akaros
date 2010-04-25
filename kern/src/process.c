@@ -731,6 +731,7 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 void do_notify(struct proc *p, uint32_t vcoreid, unsigned int notif,
                struct notif_event *ne)
 {
+	printd("sending notif %d to proc %p\n", notif, p);
 	assert(notif < MAX_NR_NOTIF);
 	if (ne)
 		assert(notif == ne->ne_type);
@@ -738,6 +739,7 @@ void do_notify(struct proc *p, uint32_t vcoreid, unsigned int notif,
 	struct notif_method *nm = &p->procdata->notif_methods[notif];
 	struct preempt_data *vcpd = &p->procdata->vcore_preempt_data[vcoreid];
 
+	printd("nm = %p, vcpd = %p\n", nm, vcpd);
 	/* enqueue notif message or toggle bits */
 	if (ne && nm->flags & NOTIF_MSG) {
 		if (bcq_enqueue(&vcpd->notif_evts, ne, NR_PERCORE_EVENTS, 4)) {
@@ -763,7 +765,7 @@ void do_notify(struct proc *p, uint32_t vcoreid, unsigned int notif,
 			 */
 			if ((p->state & PROC_RUNNING_M) && // TODO: (VC#) (_S state)
 			              (p->procinfo->vcoremap[vcoreid].valid)) {
-				printk("[kernel] sending notif to vcore %d\n", vcoreid);
+				printd("[kernel] sending notif to vcore %d\n", vcoreid);
 				send_kernel_message(p->procinfo->vcoremap[vcoreid].pcoreid,
 				                    __notify, p, 0, 0, KMSG_ROUTINE);
 			} else { // TODO: think about this, fallback, etc

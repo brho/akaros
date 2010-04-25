@@ -15,6 +15,10 @@
 #include <kmalloc.h>
 #include <stdio.h>
 
+#ifdef __CONFIG_OSDI__
+struct fillmeup fillmeup_data;
+#endif
+
 // Global send_frame function pointer
 // Means we can only have one network card per system right now...
 int (*send_frame)(const char *data, size_t len);

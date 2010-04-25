@@ -155,7 +155,7 @@ void manager_klueska()
 
 	if (progress == 0) {
 		progress++;
-		envs[0] = kfs_proc_create(kfs_lookup_path("parlib_matrix"));
+		envs[0] = kfs_proc_create(kfs_lookup_path("fillmeup"));
 		__proc_set_state(envs[0], PROC_RUNNABLE_S);
 		proc_run(envs[0]);
 	}
