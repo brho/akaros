@@ -301,6 +301,9 @@ void smp_percpu_init(void)
 {
 	uint32_t coreid = core_id();
 
+	/* Ensure the FPU units are initialized */
+	asm volatile ("fninit");
+
 	/* core 0 sets up via the global gdt symbol */
 	if (!coreid)
 		per_cpu_info[0].gdt = gdt;

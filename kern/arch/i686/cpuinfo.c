@@ -79,6 +79,29 @@ void print_cpuinfo(void)
 	} else { 
 		printk("Hardware virtualization not supported\n");
 	}
+	/* FP and SSE Checks */
+	if (edx & 0x00000001)
+		printk("FPU Detected\n");
+	else
+		panic("FPU Not Detected!!\n");
+	printk("SSE support: ");
+	if (edx & (1 << 25))
+		printk("sse ");
+	if (edx & (1 << 26))
+		printk("sse2 ");
+	if (ecx & (1 << 0))
+		printk("sse3 ");
+	if (ecx & (1 << 9))
+		printk("ssse3 ");
+	if (ecx & (1 << 19))
+		printk("sse4.1 ");
+	if (ecx & (1 << 20))
+		printk("sse4.2 ");
+	if (edx & (1 << 23))
+		printk("mmx ");
+	if ((edx & (1 << 25)) && (!(edx & (1 << 24))))
+		panic("SSE support, but no FXSAVE!");
+	printk("\n");
 	cpuid(0x80000008, &eax, &ebx, &ecx, &edx);
 	cprintf("Physical Address Bits: %d\n", eax & 0x000000FF);
 	cprintf("Cores per Die: %d\n", (ecx & 0x000000FF) + 1);
