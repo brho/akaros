@@ -66,9 +66,11 @@ static inline void pop_ros_tf(struct user_trapframe *tf, uint32_t vcoreid)
 	              "pushl %%ecx;          " /* save ecx, syscall arg2 */
 	              "pushl %%ebx;          " /* save ebx, syscall arg3 */
 	              "pushl %%esi;          " /* will be clobbered for errno */
+	              "addl $0x10,%%esp;     " /* move back over the 4 push's */
 	              "popl %%edx;           " /* vcoreid, arg1 */
+	              "subl $0x14,%%esp;     " /* jump back to after the 4 push's */
 	              "movl $0x0,%%ecx;      " /* send the null notif, arg2 */
-	              "movl $0x0,%%ecx;      " /* no u_ne message, arg3 */
+	              "movl $0x0,%%ebx;      " /* no u_ne message, arg3 */
 	              "movl %6,%%eax;        " /* syscall num */
 	              "int %7;               " /* fire the syscall */
 	              "popl %%esi;           " /* restore regs after syscall */
@@ -77,8 +79,8 @@ static inline void pop_ros_tf(struct user_trapframe *tf, uint32_t vcoreid)
 	              "popl %%edx;           "
 	              "jmp 2f;               " /* skip 1:, already popped */
 	              "1: popfl;             " /* restore eflags */
-	              "popl %%eax;           " /* discard vcoreid */
-	              "2: popl %%eax;        " /* restore tf's %eax */
+	              "2: popl %%eax;        " /* discard vcoreid */
+	              "popl %%eax;           " /* restore tf's %eax */
 	              "ret;                  " /* return to the new PC */
 	              :
 	              : "g"(tf), "r"(tf->tf_esp), "r"(tf->tf_eip), "r"(vcoreid),
