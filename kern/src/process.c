@@ -442,7 +442,8 @@ void proc_run(struct proc *p)
 			 * possible death message.
 			 * - Note there is no guarantee this core's interrupts were on, so
 			 *   it may not get the message for a while... */
-			__proc_unlock_ipi_pending(p, self_ipi_pending);
+			spin_unlock(&p->proc_lock);
+			__proc_kmsg_pending(p, self_ipi_pending);
 			break;
 		default:
 			spin_unlock(&p->proc_lock);
@@ -541,7 +542,8 @@ void proc_destroy(struct proc *p)
 
 	switch (p->state) {
 		case PROC_DYING: // someone else killed this already.
-			__proc_unlock_ipi_pending(p, self_ipi_pending);
+			spin_unlock(&p->proc_lock);
+			__proc_kmsg_pending(p, self_ipi_pending);
 			return;
 		case PROC_RUNNABLE_M:
 			/* Need to reclaim any cores this proc might have, even though it's
@@ -595,7 +597,8 @@ void proc_destroy(struct proc *p)
 	 * either from the RUNNING_S one, or from proc_take_cores with a __death.
 	 * in general, interrupts should be on when you call proc_destroy locally,
 	 * but currently aren't for all things (like traphandlers). */
-	__proc_unlock_ipi_pending(p, self_ipi_pending);
+	spin_unlock(&p->proc_lock);
+	__proc_kmsg_pending(p, self_ipi_pending);
 	return;
 }
 
@@ -1018,27 +1021,26 @@ bool __proc_take_allcores(struct proc *SAFE p, amr_t message,
 	return self_ipi_pending;
 }
 
-/* Helper, to be used when unlocking after calling the above functions that
- * might cause an IPI to be sent.  There should already be a kmsg waiting for
- * us, since when we checked state to see a message was coming, the message had
- * already been sent before unlocking.  Note we do not need interrupts enabled
- * for this to work (you can receive a message before its IPI by polling).  Also
- * note that the actual interrupt will have often arrived earlier, since
- * interrupts are usually enabled in process code.  This function is not as
- * necessary as it once was, but still represents a useful thing.  It'll get
- * changed soon.
+/* Helper, to be used when a proc management kmsg should be on its way.  This
+ * used to also unlock and then handle the message, back when the proc_lock was
+ * an irqsave, and we had an IPI pending.  Now we use routine kmsgs.  If a msg
+ * is pending, this needs to decref (to eat the reference of the caller) and
+ * then process the message.  Unlock before calling this, since you might not
+ * return.
+ *
+ * There should already be a kmsg waiting for us, since when we checked state to
+ * see a message was coming, the message had already been sent before unlocking.
+ * Note we do not need interrupts enabled for this to work (you can receive a
+ * message before its IPI by polling), though in most cases they will be. 
  *
  * TODO: consider inlining this, so __FUNCTION__ works (will require effort in
  * core_request(). */
-void __proc_unlock_ipi_pending(struct proc *p, bool ipi_pending)
+void __proc_kmsg_pending(struct proc *p, bool ipi_pending)
 {
 	if (ipi_pending) {
-		p->env_refcnt--; // TODO: (REF) (atomics)
-		spin_unlock(&p->proc_lock);
+		proc_decref(p, 1);
 		process_routine_kmsg();
 		panic("stack-killing kmsg not found in %s!!!", __FUNCTION__);
-	} else {
-		spin_unlock(&p->proc_lock);
 	}
 }
 

@@ -116,7 +116,7 @@ bool __proc_take_cores(struct proc *SAFE p, uint32_t *pcorelist,
                        TV(a1t) arg1, TV(a2t) arg2);
 bool __proc_take_allcores(struct proc *SAFE p, amr_t message, TV(a0t) arg0,
                           TV(a1t) arg1, TV(a2t) arg2);
-void __proc_unlock_ipi_pending(struct proc *p, bool ipi_pending);
+void __proc_kmsg_pending(struct proc *p, bool ipi_pending);
 /* Exposed for kern/src/resource.c for now */
 void __map_vcore(struct proc *p, uint32_t vcoreid, uint32_t pcoreid);
 void __unmap_vcore(struct proc *p, uint32_t vcoreid);

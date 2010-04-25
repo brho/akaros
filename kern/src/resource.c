@@ -57,7 +57,8 @@ ssize_t core_request(struct proc *p)
 		self_ipi_pending = __proc_take_allcores(p, __death, 0, 0, 0);
 		__proc_set_state(p, PROC_RUNNABLE_S);
 		schedule_proc(p);
-		__proc_unlock_ipi_pending(p, self_ipi_pending);
+		spin_unlock(&p->proc_lock);
+		__proc_kmsg_pending(p, self_ipi_pending);
 		return 0;
 	}
 	/* otherwise, see how many new cores are wanted */
@@ -136,7 +137,8 @@ ssize_t core_request(struct proc *p)
 		}
 		/* give them the cores.  this will start up the extras if RUNNING_M. */
 		self_ipi_pending = __proc_give_cores(p, corelist, num_granted);
-		__proc_unlock_ipi_pending(p, self_ipi_pending);
+		spin_unlock(&p->proc_lock);
+		__proc_kmsg_pending(p, self_ipi_pending);
 		/* if there's a race on state (like DEATH), it'll get handled by
 		 * proc_run or proc_destroy */
 		if (p->state == PROC_RUNNABLE_M)
