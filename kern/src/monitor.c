@@ -467,7 +467,7 @@ static int runcmd(char *NTS real_buf, trapframe_t *tf) {
 
 void monitor(trapframe_t *tf) {
 	static spinlock_t monitor_lock = SPINLOCK_INITIALIZER;
-	spin_lock(&monitor_lock);
+	spin_lock_irqsave(&monitor_lock);
 
 	char *buf;
 
@@ -477,12 +477,14 @@ void monitor(trapframe_t *tf) {
 	if (tf != NULL)
 		print_trapframe(tf);
 
+	spin_unlock_irqsave(&monitor_lock);
 	while (1) {
+		spin_lock_irqsave(&monitor_lock);
 		buf = readline("K> ");
-		if (buf != NULL)
+		if (buf != NULL) {
+			spin_unlock_irqsave(&monitor_lock);
 			if (runcmd(buf, tf) < 0)
 				break;
+		}
 	}
-
-	spin_unlock(&monitor_lock);
 }
