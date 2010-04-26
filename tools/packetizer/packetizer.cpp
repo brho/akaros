@@ -6,6 +6,7 @@
 #include <sys/ioctl.h>
 #include <sys/time.h>
 #include <stdio.h>
+#include <assert.h>
 #include <packetizer.h>
 #include <stdexcept>
 #include <fstream>
@@ -86,115 +87,34 @@ int packetizer::start()
 
 int main(int argc, char** argv)
 {
-	char target_mac[] = {0x00, 0x24, 0x1d, 0x10, 0xa2, 0xb5};
-	char eth_device[] = "ros-tap1";
-	char filename[] = "test_file";
+	char target_mac[6];
+	char eth_device[256];
+	char filename[256];
+	if(argc == 1) {
+		target_mac[0] = 0x00;
+		target_mac[1] = 0x24;
+		target_mac[2] = 0x1d;
+		target_mac[3] = 0x10;
+		target_mac[4] = 0xa2;
+		target_mac[5] = 0xb5;
+		strcpy(eth_device, "eth0");
+		strcpy(filename, "../../fs/i686/tests/e.y4m");
+	}
+	if(argc > 1) {
+		assert(argc == 4);
+		assert(strlen(argv[1]) == 17);
+		sscanf(argv[1], "%2x:%2x:%2x:%2x:%2x:%2x", (unsigned int *)&target_mac[0],
+		                                           (unsigned int *)&target_mac[1],
+		                                           (unsigned int *)&target_mac[2],
+		                                           (unsigned int *)&target_mac[3],
+		                                           (unsigned int *)&target_mac[4],
+		                                           (unsigned int *)&target_mac[5]);
+		strcpy(eth_device, argv[2]);
+		strcpy(filename, argv[3]);
+		
+	}
 	packetizer p(target_mac, eth_device, filename);
 	p.start();
 	return 0;
 }
-
-/*
-memif_t::error memif_x86_dma_t::read_chunk(uint32_t addr, uint32_t len, uint8_t* bytes, uint8_t asi, uint16_t pid)
-{
-	if(!htif->running)
-	  return memif_t::Invalid;
-
-	x86_packet p(ros_mac,appsvr_mac,X86_CMD_LOAD,next_seqno(),0,addr,0);
-	p.header.payload_size = htonl(len);
-	for(int i=0; i<p.size(); i++) {
-	  debug("%02x ", (unsigned char)*((char *)&p + i));
-	}
-	debug("\n\n");
-	send_packet(&p);
-	if(p.size() - sizeof(x86_packet_header) != len)
-	  throw std::runtime_error("bad packet size");
-
-	memcpy(bytes,p.payload,len);
-
-	return memif_t::OK;
-}
-
-memif_t::error memif_x86_dma_t::write_chunk(uint32_t addr, uint32_t len, const uint8_t* bytes, uint8_t asi, uint16_t pid)
-{
-	if(!htif->running)
-	  return memif_t::Invalid;
-
-	x86_packet p(ros_mac,appsvr_mac,X86_CMD_STORE,next_seqno(),len,addr,bytes);
-	send_packet(&p);
-	if(p.size() != sizeof(x86_packet_header))
-	  throw std::runtime_error("bad packet size");
-
-	return memif_t::OK;
-}
-
-void memif_x86_dma_t::send_packet(x86_packet* packet)
-{
-	x86_packet response;
-
-	while(1)
-	//for(int i = 0; i < 10; i++)
-	{
-	  int ret = ::sendto(sock,(char*)packet,packet->size(),0,
-	                     (sockaddr*)&myaddr,sizeof(myaddr));
-	  if(ret != packet->size())
-	    continue;
-	  
-	  debug("wait for response \n");
-	  while(1)
-	  {
-	    ret = ::read(sock,(char*)&response,X86_MAX_PACKET_SIZE);
-	    if(ret == -1)
-	    {
-	      debug("timeout\n");
-	      break;
-	    }
-	    if(response.header.ethertype != htons(RAMP_ETHERTYPE) || 
-	       memcmp(response.header.src_mac,packet->header.dst_mac,6) != 0)
-	      continue;
-	    else
-	      break;
-	  }
-	  if(ret == -1)
-	    continue;
-	  
-	if(ret == 60)
-		ret = sizeof(response.header) + ntohl(response.header.payload_size);
-
-	  if(ntohl(response.header.payload_size) != ret-sizeof(response.header))
-	  {
-	  debug("ntohl(response.header.payload_size) != ret-sizeof(response.header)\n");
-	    for(int i = 0; i < ret; i++)
-	      debug("%02x ",(unsigned int)(unsigned char)((char*)&response)[i]);
-	    debug("\n");
-	    debug("packet size wrong\n");
-	    continue;
-	  }
-	  response.packet_size = ret;
-
-	  debug("got %d bytes: \n",ret);
-	  for(int i = 0; i < ret; i++)
-	    debug("%02x ",(unsigned int)(unsigned char)((char*)&response)[i]);
-	  debug("\n");
-
-	  // if we didn't send a broadcast packet, verify sender's mac
-	  if(response.header.cmd != X86_CMD_ACK) {
-	  debug("response.header.cmd != X86_CMD_ACK\n");
-	    for(int i = 0; i < ret; i++)
-	      debug("%02x ",(unsigned int)(unsigned char)((char*)&response)[i]);
-	    debug("\n");
-	    debug("packet type wrong\n");
-	    continue;
-	 }
-	  if(response.header.seqno != packet->header.seqno) 
-	    continue;
-	  debug("got something good\n");
-
-	  *packet = response;
-	  return;
-	}
-
-	throw std::runtime_error("memif_sparc_dma_t::send_packet(): timeout");
-}
-*/
 
