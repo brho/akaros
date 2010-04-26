@@ -40,7 +40,7 @@ static command_t (RO commands)[] = {
 	{ "kerninfo", "Display information about the kernel", mon_kerninfo },
 	{ "backtrace", "Dump a backtrace", mon_backtrace },
 	{ "reboot", "Take a ride to the South Bay", mon_reboot },
-	{ "showmapping", "Shows VA->PA mappings between two virtual addresses (parameters)", mon_showmapping},
+	{ "showmapping", "Shows VA->PA mappings", mon_showmapping},
 	{ "setmapperm", "Sets permissions on a VA->PA mapping", mon_setmapperm},
 	{ "cpuinfo", "Prints CPU diagnostics", mon_cpuinfo},
 	{ "ps", "Prints process list", mon_ps},
@@ -52,6 +52,7 @@ static command_t (RO commands)[] = {
 	{ "procinfo", "Show information about processes", mon_procinfo},
 	{ "exit", "Leave the monitor", mon_exit},
 	{ "kfunc", "Run a kernel function directly (!!!)", mon_kfunc},
+	{ "notify", "Notify a process.  Vcoreid will skip their prefs", mon_notify},
 };
 #define NCOMMANDS (sizeof(commands)/sizeof(commands[0]))
 
@@ -421,6 +422,31 @@ int mon_kfunc(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 	return 0;
 }
 
+int mon_notify(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
+{
+	struct proc *p;
+	unsigned int num;
+	uint32_t vcoreid;
+
+	if (argc < 3) {
+		printk("Usage: notify PID NUM [VCOREID]\n");
+		return 1;
+	}
+	p = pid2proc(strtol(argv[1], 0, 0));
+	if (!p) {
+		printk("No such proc\n");
+		return 1;
+	}
+	num = strtol(argv[2], 0, 0);
+	if (argc == 4) {
+		vcoreid = strtol(argv[3], 0, 0);
+		do_notify(p, vcoreid, num, 0);
+	} else {
+		proc_notify(p, num, 0);
+	}
+	proc_decref(p, 1);
+	return 0;
+}
 /***** Kernel monitor command interpreter *****/
 
 #define WHITESPACE "\t\r\n "

@@ -7,7 +7,7 @@
 // Activate the kernel monitor,
 // optionally providing a trap frame indicating the current state
 // (NULL if none).
-void ( monitor)(trapframe_t *tf);
+void monitor(trapframe_t *tf);
 
 // Functions implementing monitor commands.
 int mon_help(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
@@ -26,5 +26,6 @@ int mon_manager(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
 int mon_procinfo(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
 int mon_exit(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
 int mon_kfunc(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
+int mon_notify(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
 
 #endif	// !ROS_KERN_MONITOR_H
