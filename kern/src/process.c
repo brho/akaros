@@ -192,6 +192,15 @@ void proc_init(void)
 	schedule_init();
 	/* Init idle cores. Core 0 is the management core. */
 	spin_lock(&idle_lock);
+#ifdef __CONFIG_DISABLE_SMT__
+	/* assumes core0 is the only management core (NIC and monitor functionality
+	 * are run there too.  it just adds the odd cores to the idlecoremap */
+	assert(!(num_cpus & 0x1));
+	// TODO: consider checking x86 for machines that actually hyperthread
+	num_idlecores = num_cpus / 2;
+	for (int i = 0; i < num_idlecores; i++)
+		idlecoremap[i] = (i * 2) + 1;
+#else
 	#ifdef __CONFIG_NETWORKING__
 	num_mgmtcores++; // Next core is dedicated to the NIC
 	assert(num_cpus >= num_mgmtcores);
@@ -207,6 +216,7 @@ void proc_init(void)
 	num_idlecores = num_cpus - num_mgmtcores;
 	for (int i = 0; i < num_idlecores; i++)
 		idlecoremap[i] = i + num_mgmtcores;
+#endif /* __CONFIG_DISABLE_SMT__ */
 	spin_unlock(&idle_lock);
 	atomic_init(&num_envs, 0);
 }
