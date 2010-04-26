@@ -42,7 +42,7 @@ struct per_cpu_info {
 #ifdef __CONFIG_EXPER_TRADPROC__
 	spinlock_t runqueue_lock;
 	struct proc_list runqueue;
-#endif
+#endif /* __CONFIG_EXPER_TRADPROC__ */
 }__attribute__((aligned(HW_CACHE_ALIGN)));
 
 typedef struct per_cpu_info NTPTV(t) NTPTV(a0t) NTPTV(a1t) NTPTV(a2t) per_cpu_info_t;
@@ -67,8 +67,10 @@ int smp_call_wait(handler_wrapper_t*SAFE wrapper);
 #ifdef __CONFIG_EXPER_TRADPROC__
 
 #define TIMER_uSEC 10000
-void local_schedule(void);
 
-#endif
+void local_schedule(void);
+void local_schedule_proc(uint32_t core, struct proc *p);
+
+#endif /* __CONFIG_EXPER_TRADPROC__ */
 
 #endif /* !ROS_INC_SMP_H */

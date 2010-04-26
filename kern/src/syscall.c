@@ -249,21 +249,25 @@ static error_t sys_proc_destroy(struct proc *p, pid_t pid, int exitcode)
 		set_errno(current_tf, ESRCH);
 		return -1;
 	}
+#ifndef __CONFIG_EXPER_TRADPROC__
 	if (!proc_controls(p, p_to_die)) {
 		proc_decref(p_to_die, 1);
 		set_errno(current_tf, EPERM);
 		return -1;
 	}
 	if (p_to_die == p) {
+#else
+	if ((p_to_die == p) || (p_to_die == p->true_proc)) {
+#endif /* __CONFIG_EXPER_TRADPROC__ */
 		// syscall code and pid2proc both have edible references, only need 1.
 		p->exitcode = exitcode;
 		proc_decref(p, 1);
 		printd("[PID %d] proc exiting gracefully (code %d)\n", p->pid,exitcode);
 	} else {
-		panic("Destroying other processes is not supported yet.");
-		//printk("[%d] destroying proc %d\n", p->pid, p_to_die->pid);
+		printd("[%d] destroying proc %d\n", p->pid, p_to_die->pid);
 	}
 	proc_destroy(p_to_die);
+	proc_decref(p_to_die, 1);
 	return ESUCCESS;
 }
 
@@ -489,6 +493,11 @@ static intreg_t sys_munmap(struct proc* p, void* addr, size_t len)
 
 static void* sys_brk(struct proc *p, void* addr) {
 	ssize_t range;
+
+#ifdef __CONFIG_EXPER_TRADPROC__
+	printk("[kernel] don't use brk, unsupported.\n");
+	return (void*)-1;
+#endif /* __CONFIG_EXPER_TRADPROC__ */
 
 	spin_lock(&p->proc_lock);
 

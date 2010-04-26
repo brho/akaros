@@ -107,6 +107,11 @@ ssize_t core_request(struct proc *p)
 				struct preempt_data *vcpd = &p->procdata->vcore_preempt_data[0];
 				vcpd->preempt_tf = *current_tf;
 				save_fp_state(&vcpd->preempt_anc);
+#ifdef __CONFIG_EXPER_TRADPROC__
+				vcpd->notif_tf = *current_tf;
+				proc_init_trapframe(&p->env_tf, 0, p->env_entry,
+				                    vcpd->transition_stack);
+#endif /* __CONFIG_EXPER_TRADPROC__ */
 				__seq_start_write(&vcpd->preempt_tf_valid);
 				/* If we remove this, vcore0 will start where the _S left off */
 				vcpd->notif_pending = TRUE;
@@ -167,6 +172,15 @@ error_t resource_req(struct proc *p, int type, size_t amt_wanted,
 		// We have no sense of time yet, or of half-filling requests
 		printk("[kernel] Async requests treated synchronously for now.\n");
 
+#ifdef __CONFIG_EXPER_TRADPROC__
+	/* this might be fucking with refcnts */
+	struct proc *tp;
+	if (!is_real_proc(p)) {
+		tp = p->true_proc;
+		assert(tp && !tp->true_proc);
+		return resource_req(tp, type, amt_wanted, amt_wanted_min, flags);
+	}
+#endif /* __CONFIG_EXPER_TRADPROC__ */
 	/* set the desired resource amount in the process's resource list. */
 	spin_lock(&p->proc_lock);
 	size_t old_amount = p->resources[type].amt_wanted;

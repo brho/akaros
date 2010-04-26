@@ -57,8 +57,8 @@ int main(int argc, char** argv)
 		printf("Multi-Goodbye, world, from PID: %d!\n", sys_getpid());
 		//retval = sys_resource_req(RES_CORES, 2, 0);
 		printf("Requesting %d vcores\n",max_vcores());
-		retval = vcore_request(max_vcores());
-		//retval = vcore_request(3);
+		//retval = vcore_request(max_vcores());
+		retval = vcore_request(5);
 		printf("This is vcore0, right after vcore_request, retval=%d\n", retval);
 	}
 
@@ -82,11 +82,12 @@ int main(int argc, char** argv)
 		while(1) {
 			printf("Vcore %d Spinning (%d), temp = %08x!\n", vcoreid, ctr++, temp);
 			udelay(5000000);
+			//exit(0);
 		}
 	}
 
 	printf("Vcore %d Done!\n", vcoreid);
-	mcs_barrier_wait(&b,vcore_id());
+	//mcs_barrier_wait(&b,vcore_id());
 
 	printf("All Cores Done!\n", vcoreid);
 	while(1); // manually kill from the monitor
@@ -156,6 +157,9 @@ void vcore_entry(void)
 
 	printf("Hello from vcore_entry in vcore %d with temp addr %p and temp %p\n",
 	       vcoreid, &temp, temp);
-	mcs_barrier_wait(&b,vcore_id());
+	vcore_request(1);
+	//mcs_barrier_wait(&b,vcore_id());
+	udelay(vcoreid * 10000000);
+	exit(0);
 	while(1);
 }

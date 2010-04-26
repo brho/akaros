@@ -45,6 +45,11 @@ uint32_t num_mgmtcores = 1;
 static void put_idle_core(uint32_t coreid)
 {
 	spin_lock(&idle_lock);
+#ifdef __CONFIG_EXPER_TRADPROC__ /* often a good check, but hurts performance */
+	for (int i = 0; i < num_idlecores; i++)
+		if (idlecoremap[i] == coreid)
+			warn("Core %d added to the freelist twice!", coreid);
+#endif /* __CONFIG_EXPER_TRADPROC__ */
 	idlecoremap[num_idlecores++] = coreid;
 	spin_unlock(&idle_lock);
 }
@@ -126,32 +131,32 @@ int __proc_set_state(struct proc *p, uint32_t state)
 	switch (curstate) {
 		case PROC_CREATED:
 			if (state != PROC_RUNNABLE_S)
-				panic("Invalid State Transition! PROC_CREATED to %d", state);
+				panic("Invalid State Transition! PROC_CREATED to %02x", state);
 			break;
 		case PROC_RUNNABLE_S:
 			if (!(state & (PROC_RUNNING_S | PROC_DYING)))
-				panic("Invalid State Transition! PROC_RUNNABLE_S to %d", state);
+				panic("Invalid State Transition! PROC_RUNNABLE_S to %02x", state);
 			break;
 		case PROC_RUNNING_S:
 			if (!(state & (PROC_RUNNABLE_S | PROC_RUNNABLE_M | PROC_WAITING |
 			               PROC_DYING)))
-				panic("Invalid State Transition! PROC_RUNNING_S to %d", state);
+				panic("Invalid State Transition! PROC_RUNNING_S to %02x", state);
 			break;
 		case PROC_WAITING:
 			if (state != PROC_RUNNABLE_S)
-				panic("Invalid State Transition! PROC_WAITING to %d", state);
+				panic("Invalid State Transition! PROC_WAITING to %02x", state);
 			break;
 		case PROC_DYING:
 			if (state != PROC_CREATED) // when it is reused (TODO)
-				panic("Invalid State Transition! PROC_DYING to %d", state);
+				panic("Invalid State Transition! PROC_DYING to %02x", state);
 			break;
 		case PROC_RUNNABLE_M:
 			if (!(state & (PROC_RUNNING_M | PROC_DYING)))
-				panic("Invalid State Transition! PROC_RUNNABLE_M to %d", state);
+				panic("Invalid State Transition! PROC_RUNNABLE_M to %02x", state);
 			break;
 		case PROC_RUNNING_M:
 			if (!(state & (PROC_RUNNABLE_S | PROC_RUNNABLE_M | PROC_DYING)))
-				panic("Invalid State Transition! PROC_RUNNING_M to %d", state);
+				panic("Invalid State Transition! PROC_RUNNING_M to %02x", state);
 			break;
 	}
 	#endif
@@ -221,6 +226,68 @@ proc_init_procinfo(struct proc* p)
 	p->procinfo->max_vcores = MAX(1,num_cpus-num_mgmtcores);
 }
 
+#ifdef __CONFIG_EXPER_TRADPROC__
+bool is_real_proc(struct proc *p)
+{
+	// the real proc has no true proc pointer
+	return !p->true_proc;
+}
+
+/* Make a _S process to represent a vcore in a traditional threading/scheduling
+ * model.  Should be able to proc_run this once it's done.  Hold the parent's
+ * lock when you call this. */
+int fake_proc_alloc(struct proc **pp, struct proc *parent, uint32_t vcoreid)
+{
+	error_t r;
+	struct proc *p;
+
+	/* So we can call this anytime we want to run a vcore, including vcore0,
+	 * which is the true_proc / parent.  Probably horribly broken. */
+	if (!vcoreid) {
+		*pp = parent;
+		return 0;
+	}
+
+	if (!(p = kmem_cache_alloc(proc_cache, 0)))
+		return -ENOMEM;
+
+	spinlock_init(&p->proc_lock);
+	p->pid = parent->pid;
+	p->ppid = parent->ppid;
+	p->exitcode = 0;
+	p->state = PROC_RUNNING_M;
+	p->env_refcnt = 2;
+	p->env_entry = parent->env_entry;
+	p->cache_colors_map = parent->cache_colors_map;
+	p->next_cache_color = parent->next_cache_color;
+	p->heap_top = (void*)0xdeadbeef; // shouldn't use this.  poisoning.
+	p->env_pgdir = parent->env_pgdir;
+	p->env_cr3 = parent->env_cr3;
+	p->procinfo = parent->procinfo;
+	p->procdata = parent->procdata;
+	/* Don't use ARSCs, they aren't turned on */
+	// p->syscallbackring = not happening
+	p->true_proc = parent;
+	p->vcoreid = vcoreid;
+	/* map us to the true parent vcoremap */
+	assert(!parent->vcore_procs[vcoreid]);
+	parent->vcore_procs[vcoreid] = p;
+	parent->env_refcnt++;
+
+	memset(&p->env_ancillary_state, 0, sizeof(p->env_ancillary_state));
+	/* env_tf is 0'd in init_trapframe */
+	struct preempt_data *vcpd = &p->procdata->vcore_preempt_data[vcoreid];
+	proc_init_trapframe(&p->env_tf, vcoreid, p->env_entry,
+	                    vcpd->transition_stack);
+
+	*pp = p;
+	atomic_inc(&num_envs);
+
+	printd("[%08x] fake process %08x\n", current ? current->pid : 0, p->pid);
+	return 0;
+}
+#endif /* __CONFIG_EXPER_TRADPROC__ */
+
 /* Allocates and initializes a process, with the given parent.  Currently
  * writes the *p into **pp, and returns 0 on success, < 0 for an error.
  * Errors include:
@@ -289,6 +356,12 @@ static error_t proc_alloc(struct proc *SAFE*SAFE pp, pid_t parent_id)
 	*pp = p;
 	atomic_inc(&num_envs);
 
+#ifdef __CONFIG_EXPER_TRADPROC__
+	p->true_proc = 0;
+	p->vcoreid = 0;
+	memset(p->vcore_procs, 0, sizeof(p->vcore_procs));
+#endif /* __CONFIG_EXPER_TRADPROC__ */
+
 	frontend_proc_init(p);
 
 	printd("[%08x] new process %08x\n", current ? current->pid : 0, p->pid);
@@ -323,6 +396,35 @@ static void __proc_free(struct proc *p)
 	printd("[PID %d] freeing proc: %d\n", current ? current->pid : 0, p->pid);
 	// All parts of the kernel should have decref'd before __proc_free is called
 	assert(p->env_refcnt == 0);
+
+#ifdef __CONFIG_EXPER_TRADPROC__
+	if (!is_real_proc(p)) {
+		printd("Fake proc on core %d unmapping from parent\n", core_id());
+		p->true_proc->vcore_procs[p->vcoreid] = 0; /* unmap self */
+		proc_decref(p->true_proc, 1); // might deadlock
+		kmem_cache_free(proc_cache, p);
+		return;
+	} else {
+		/* make sure the kids are dead before spinning */
+		if (current && !is_real_proc(current)) {
+			__abandon_core();
+		}
+		/* spin til my peeps are dead */
+		for (int i = 0; i < MAX_NUM_CPUS; i++) {
+			for (int j = 0; p->vcore_procs[i]; j++) {
+				cpu_relax();
+				if (j == 10000) {
+					printd("Core %d stalled while waiting on peep %d\n",
+					       core_id(), i);
+					//send_kernel_message(p->procinfo->vcoremap[i].pcoreid,
+					//                    __death, 0, 0, 0, KMSG_ROUTINE);
+				}
+			}
+		}
+	}
+	assert(is_real_proc(p));
+	printd("Core %d really trying to free proc %d (%p)\n", core_id(), p->pid, p);
+#endif /* __CONFIG_EXPER_TRADPROC__ */
 
 	frontend_proc_free(p);
 
@@ -380,6 +482,41 @@ void proc_run(struct proc *p)
 {
 	bool self_ipi_pending = FALSE;
 	spin_lock(&p->proc_lock);
+
+#ifdef __CONFIG_EXPER_TRADPROC__
+	/* this filth is so the state won't affect how it's run.  whenever we call
+	 * proc_run, we think we are RUNNABLE_S.  prob issues with DYING. */
+	switch (p->state) {
+		case (PROC_DYING):
+			spin_unlock(&p->proc_lock);
+			printk("Process %d not starting due to async death\n", p->pid);
+			if (!management_core())
+				smp_idle(); // this never returns
+			return;
+		case (PROC_RUNNABLE_S):
+			assert(current != p);
+			__proc_set_state(p, PROC_RUNNING_S);
+			__seq_start_write(&p->procinfo->coremap_seqctr);
+			p->procinfo->num_vcores = 0;
+			__map_vcore(p, p->vcoreid, core_id());
+			__seq_end_write(&p->procinfo->coremap_seqctr);
+			// fallthru
+		case (PROC_RUNNING_M):
+			if (p == current)
+				p->env_refcnt--; // TODO: (REF) use incref
+			spin_unlock(&p->proc_lock);
+			// TODO: HSS!!
+			// restore fp state from the preempt slot?
+			disable_irq();
+			__proc_startcore(p, &p->env_tf);
+			break;
+		default:
+			panic("Weird state(%s) in %s()", procstate2str(p->state),
+			      __FUNCTION__);
+	}
+	return;
+#endif /* __CONFIG_EXPER_TRADPROC__ */
+
 	switch (p->state) {
 		case (PROC_DYING):
 			spin_unlock(&p->proc_lock);
@@ -433,7 +570,7 @@ void proc_run(struct proc *p)
 				warn("Tried to proc_run() an _M with no vcores!");
 			}
 			/* Unlock and decref/wait for the IPI if one is pending.  This will
-			 * eat the reference if we aren't returning. 
+			 * eat the reference if we aren't returning.
 			 *
 			 * There a subtle race avoidance here.  __proc_startcore can handle
 			 * a death message, but we can't have the startcore come after the
@@ -454,7 +591,7 @@ void proc_run(struct proc *p)
 /* Actually runs the given context (trapframe) of process p on the core this
  * code executes on.  This is called directly by __startcore, which needs to
  * bypass the routine_kmsg check.  Interrupts should be off when you call this.
- * 
+ *
  * A note on refcnting: this function will not return, and your proc reference
  * will end up stored in current.  This will make no changes to p's refcnt, so
  * do your accounting such that there is only the +1 for current.  This means if
@@ -494,7 +631,7 @@ static void __proc_startcore(struct proc *p, trapframe_t *tf)
 
 /* Restarts the given context (trapframe) of process p on the core this code
  * executes on.  Calls an internal function to do the work.
- * 
+ *
  * In case there are pending routine messages, like __death, __preempt, or
  * __notify, we need to run them.  Alternatively, if there are any, we could
  * self_ipi, and run the messages immediately after popping back to userspace,
@@ -534,12 +671,26 @@ void proc_restartcore(struct proc *p, trapframe_t *tf)
 void proc_destroy(struct proc *p)
 {
 	bool self_ipi_pending = FALSE;
+
+#ifdef __CONFIG_EXPER_TRADPROC__
+	/* in case a fake proc tries to kill themselves directly */
+	if (!is_real_proc(p)) {
+		printd("Trying to destroy a fake proc, will kill true proc\n");
+		proc_destroy(p->true_proc);
+		return;
+	}
+#endif /* __CONFIG_EXPER_TRADPROC__ */
+
 	spin_lock(&p->proc_lock);
 
 	/* TODO: (DEATH) look at this again when we sort the __death IPI */
+#ifdef __CONFIG_EXPER_TRADPROC__
+	if ((current == p) || (current && (current->true_proc == p)))
+#else
 	if (current == p)
+#endif /* __CONFIG_EXPER_TRADPROC__ */
 		self_ipi_pending = TRUE;
-
+	
 	switch (p->state) {
 		case PROC_DYING: // someone else killed this already.
 			spin_unlock(&p->proc_lock);
@@ -670,6 +821,11 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 	if (being_nice && !vc->preempt_pending)
 		return;
 
+#ifdef __CONFIG_EXPER_TRADPROC__
+	if (p->state == (PROC_RUNNING_M | PROC_DYING))
+		return;
+#endif /* __CONFIG_EXPER_TRADPROC__ */
+
 	spin_lock(&p->proc_lock); /* horrible scalability.  =( */
 
 	/* fate is sealed, return and take the preempt message on the way out.
@@ -693,7 +849,8 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 		case (PROC_RUNNING_M):
 #ifdef __CONFIG_OSDI__
 			/* Ghetto, for OSDI: */
-			printk("[K] Process %d is yielding on vcore %d\n", p->pid, get_vcoreid(p, core_id()));
+			printk("[K] Process %d (%p) is yielding on vcore %d\n", p->pid, p,
+			       get_vcoreid(p, core_id()));
 			if (p->procinfo->num_vcores == 1) {
 				spin_unlock(&p->proc_lock);
 				return;
@@ -785,7 +942,7 @@ void proc_notify(struct proc *p, unsigned int notif, struct notif_event *ne)
 	assert(notif < MAX_NR_NOTIF); // notifs start at 0
 	struct notif_method *nm = &p->procdata->notif_methods[notif];
 	struct notif_event local_ne;
-	
+
 	/* Caller can opt to not send an NE, in which case we use the notif */
 	if (!ne) {
 		ne = &local_ne;
@@ -844,6 +1001,9 @@ uint32_t proc_get_vcoreid(struct proc *SAFE p, uint32_t pcoreid)
  * WARNING: You must hold the proc_lock before calling this! */
 bool __proc_give_cores(struct proc *SAFE p, uint32_t *pcorelist, size_t num)
 { TRUSTEDBLOCK
+#ifdef __CONFIG_EXPER_TRADPROC__
+	assert(is_real_proc(p));
+#endif /* __CONFIG_EXPER_TRADPROC__ */
 	bool self_ipi_pending = FALSE;
 	uint32_t free_vcoreid = 0;
 	switch (p->state) {
@@ -866,6 +1026,11 @@ bool __proc_give_cores(struct proc *SAFE p, uint32_t *pcorelist, size_t num)
 					assert(p->procinfo->vcoremap[i].valid);
 			}
 			// add new items to the vcoremap
+#ifdef __CONFIG_EXPER_TRADPROC__
+			__proc_set_state(p, PROC_RUNNING_M);
+			// want an extra one since res_req jacked on on our transition
+			p->env_refcnt++;
+#endif /* __CONFIG_EXPER_TRADPROC__ */
 			__seq_start_write(&p->procinfo->coremap_seqctr);
 			for (int i = 0; i < num; i++) {
 				// find the next free slot, which should be the next one
@@ -874,6 +1039,12 @@ bool __proc_give_cores(struct proc *SAFE p, uint32_t *pcorelist, size_t num)
 				       pcorelist[i]);
 				__map_vcore(p, free_vcoreid, pcorelist[i]);
 				p->procinfo->num_vcores++;
+#ifdef __CONFIG_EXPER_TRADPROC__
+				struct proc *fake_proc;
+				/* every vcore is a fake proc */
+				fake_proc_alloc(&fake_proc, p, free_vcoreid);
+				local_schedule_proc(pcorelist[i], fake_proc);
+#endif /* __CONFIG_EXPER_TRADPROC__ */
 			}
 			__seq_end_write(&p->procinfo->coremap_seqctr);
 			break;
@@ -881,7 +1052,9 @@ bool __proc_give_cores(struct proc *SAFE p, uint32_t *pcorelist, size_t num)
 			/* Up the refcnt, since num cores are going to start using this
 			 * process and have it loaded in their 'current'. */
 			// TODO: (REF) use proc_incref once we have atomics
+#ifndef __CONFIG_EXPER_TRADPROC__ // the refcnt is done in fake_proc_alloc
 			p->env_refcnt += num;
+#endif /* __CONFIG_EXPER_TRADPROC__ */
 			__seq_start_write(&p->procinfo->coremap_seqctr);
 			for (int i = 0; i < num; i++) {
 				free_vcoreid = get_free_vcoreid(p, free_vcoreid);
@@ -889,8 +1062,14 @@ bool __proc_give_cores(struct proc *SAFE p, uint32_t *pcorelist, size_t num)
 				       pcorelist[i]);
 				__map_vcore(p, free_vcoreid, pcorelist[i]);
 				p->procinfo->num_vcores++;
+#ifdef __CONFIG_EXPER_TRADPROC__
+				struct proc *fake_proc;
+				fake_proc_alloc(&fake_proc, p, free_vcoreid);
+				local_schedule_proc(pcorelist[i], fake_proc);
+#else
 				send_kernel_message(pcorelist[i], __startcore, p, 0, 0,
 				                    KMSG_ROUTINE);
+#endif /* __CONFIG_EXPER_TRADPROC__ */
 				if (pcorelist[i] == core_id())
 					self_ipi_pending = TRUE;
 			}
@@ -931,6 +1110,10 @@ bool __proc_take_cores(struct proc *SAFE p, uint32_t *pcorelist,
                        size_t num, amr_t message, TV(a0t) arg0,
                        TV(a1t) arg1, TV(a2t) arg2)
 { TRUSTEDBLOCK
+#ifdef __CONFIG_EXPER_TRADPROC__
+	assert(is_real_proc(p));
+	assert(0);
+#endif /* __CONFIG_EXPER_TRADPROC__ */
 	uint32_t vcoreid, pcoreid;
 	bool self_ipi_pending = FALSE;
 	switch (p->state) {
@@ -982,6 +1165,9 @@ bool __proc_take_cores(struct proc *SAFE p, uint32_t *pcorelist,
 bool __proc_take_allcores(struct proc *SAFE p, amr_t message,
                           TV(a0t) arg0, TV(a1t) arg1, TV(a2t) arg2)
 {
+#ifdef __CONFIG_EXPER_TRADPROC__
+	assert(is_real_proc(p));
+#endif /* __CONFIG_EXPER_TRADPROC__ */
 	uint32_t active_vcoreid = 0, pcoreid;
 	bool self_ipi_pending = FALSE;
 	switch (p->state) {
@@ -999,6 +1185,13 @@ bool __proc_take_allcores(struct proc *SAFE p, amr_t message,
 	assert(num_idlecores + p->procinfo->num_vcores <= num_cpus); // sanity
 	spin_unlock(&idle_lock);
 	__seq_start_write(&p->procinfo->coremap_seqctr);
+#ifdef __CONFIG_EXPER_TRADPROC__
+	/* Decref each child, so they will free themselves when they unmap */
+	for (int i = 1; i < MAX_NUM_CPUS; i++) {
+		if (p->vcore_procs[i])
+			proc_decref(p->vcore_procs[i], 1);
+	}
+#endif /* __CONFIG_EXPER_TRADPROC__ */
 	for (int i = 0; i < p->procinfo->num_vcores; i++) {
 		// find next active vcore
 		active_vcoreid = get_busy_vcoreid(p, active_vcoreid);
@@ -1078,7 +1271,7 @@ void proc_incref(struct proc *p, size_t count)
 	if (p->env_refcnt)
 		p->env_refcnt += count;
 	else
-		panic("Tried to incref a proc with no existing refernces!");
+		panic("Tried to incref a proc with no existing references!");
 	spin_unlock(&p->proc_lock);
 }
 
@@ -1174,7 +1367,7 @@ void __notify(trapframe_t *tf, uint32_t srcid, void *a0, void *a1, void *a2)
 	vcpd->notif_enabled = FALSE;
 	vcpd->notif_pending = FALSE; // no longer pending - it made it here
 	/* save the old tf in the notify slot, build and pop a new one.  Note that
-	 * silly state isn't our business for a notification. */	
+	 * silly state isn't our business for a notification. */
 	// TODO: this is assuming the struct user_tf is the same as a regular TF
 	vcpd->notif_tf = *tf;
 	memset(&local_tf, 0, sizeof(local_tf));

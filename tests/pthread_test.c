@@ -5,6 +5,7 @@
 #include <unistd.h>
 
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+//#define printf_safe(...) {}
 #define printf_safe(...) \
 	pthread_mutex_lock(&lock); \
 	printf(__VA_ARGS__); \
@@ -62,6 +63,7 @@ int main(int argc, char** argv)
 	printf_safe("[A] Successfully joined on thread 3 (retval: %p)\n", retval3);
 
 	/* create and join on hellos */
+	while (1) {
 		for (int i = 1; i < NUM_TEST_THREADS; i++) {
 			printf_safe("[A] About to create thread %d\n", i);
 			pthread_create(&my_threads[i], NULL, &hello_thread, NULL);
@@ -72,8 +74,5 @@ int main(int argc, char** argv)
 			printf_safe("[A] Successfully joined on thread %d (retval: %p)\n", i,
 			            my_retvals[i]);
 		}
-	// Hack for now to make this process exit cleanly
-	// For some reason, libc decided to call sys_yield() while we 
-	// are exiting, which breaks our model in multicore mode...
-	sys_proc_destroy(getpid(),0);
+	}
 } 
