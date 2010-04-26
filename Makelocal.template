@@ -1,5 +1,6 @@
 # General Purpose configuration parameters
 #CFLAGS += $(CONFIG_APPSERVER)
+#CFLAGS += $(CONFIG_OSDI)
 
 # Kernel configuration parameters
 #KERN_CFLAGS += $(CONFIG_KFS)
