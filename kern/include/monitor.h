@@ -27,5 +27,7 @@ int mon_procinfo(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
 int mon_exit(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
 int mon_kfunc(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
 int mon_notify(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
+int mon_measure(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
+int mon_trace(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
 
 #endif	// !ROS_KERN_MONITOR_H

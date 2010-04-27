@@ -37,6 +37,23 @@ extern int (*send_frame)(const char *CT(len) data, size_t len);
 extern unsigned char device_mac[6];
 #endif
 
+/* Tracing Globals */
+int systrace_flags = 0;
+struct systrace_record *systrace_buffer = 0;
+unsigned int systrace_bufidx = 0;
+size_t systrace_bufsize = 0;
+struct proc *systrace_procs[MAX_NUM_TRACED] = {0};
+spinlock_t systrace_lock = SPINLOCK_INITIALIZER;
+
+/* Not enforcing the packing of systrace_procs yet, but don't rely on that */
+static bool proc_is_traced(struct proc *p)
+{
+	for (int i = 0; i < MAX_NUM_TRACED; i++)
+		if (systrace_procs[i] == p)
+			return true;
+	return false;
+}
+
 /************** Utility Syscalls **************/
 
 static int sys_null(void)
@@ -1137,6 +1154,30 @@ intreg_t syscall(struct proc *p, uintreg_t syscallno, uintreg_t a1,
 
 	const int max_syscall = sizeof(syscall_table)/sizeof(syscall_table[0]);
 
+	uint32_t coreid, vcoreid;
+	if (systrace_flags & SYSTRACE_ON) {
+		if ((systrace_flags & SYSTRACE_ALLPROC) || (proc_is_traced(p))) {
+			coreid = core_id();
+			vcoreid = proc_get_vcoreid(p, core_id());
+			if (systrace_flags & SYSTRACE_LOUD) {
+				printk("[%16llu] Syscall %d for proc %d on core %d, vcore %d\n",
+				       read_tsc(), syscallno, p->pid, coreid, vcoreid);
+			} else {
+				struct systrace_record *trace;
+				unsigned int idx, new_idx;
+				do {
+					idx = systrace_bufidx;
+					new_idx = (idx + 1) % systrace_bufsize;
+				} while (!atomic_comp_swap(&systrace_bufidx, idx, new_idx));
+				trace = &systrace_buffer[idx];
+				trace->timestamp = read_tsc();
+				trace->syscallno = syscallno;
+				trace->pid = p->pid;
+				trace->coreid = coreid;
+				trace->vcoreid = vcoreid;
+			}
+		}
+	}
 	//printk("Incoming syscall on core: %d number: %d\n    a1: %x\n   "
 	//       " a2: %x\n    a3: %x\n    a4: %x\n    a5: %x\n", core_id(),
 	//       syscallno, a1, a2, a3, a4, a5);
@@ -1199,3 +1240,102 @@ intreg_t process_generic_syscalls(struct proc *p, size_t max)
 	return (intreg_t)count;
 }
 
+/* Syscall tracing */
+static void __init_systrace(void)
+{
+	systrace_buffer = kmalloc(MAX_SYSTRACES*sizeof(struct systrace_record), 0);
+	if (!systrace_buffer)
+		panic("Unable to alloc a trace buffer\n");
+	systrace_bufidx = 0;
+	systrace_bufsize = MAX_SYSTRACES;
+	/* Note we never free the buffer - it's around forever.  Feel free to change
+	 * this if you want to change the size or something dynamically. */
+}
+
+/* If you call this while it is running, it will change the mode */
+void systrace_start(bool silent)
+{
+	static bool init = FALSE;
+	spin_lock_irqsave(&systrace_lock);
+	if (!init) {
+		__init_systrace();
+		init = TRUE;
+	}
+	systrace_flags = silent ? SYSTRACE_ON : SYSTRACE_ON | SYSTRACE_LOUD; 
+	spin_unlock_irqsave(&systrace_lock);
+}
+
+int systrace_reg(bool all, struct proc *p)
+{
+	int retval = 0;
+	spin_lock_irqsave(&systrace_lock);
+	if (all) {
+		printk("Tracing syscalls for all processes\n");
+		systrace_flags |= SYSTRACE_ALLPROC;
+		retval = 0;
+	} else {
+		for (int i = 0; i < MAX_NUM_TRACED; i++) {
+			if (!systrace_procs[i]) {
+				printk("Tracing syscalls for process %d\n", p->pid);
+				systrace_procs[i] = p;
+				retval = 0;
+				break;
+			}
+		}
+	}
+	spin_unlock_irqsave(&systrace_lock);
+	return retval;
+}
+
+void systrace_stop(void)
+{
+	spin_lock_irqsave(&systrace_lock);
+	systrace_flags = 0;
+	for (int i = 0; i < MAX_NUM_TRACED; i++)
+		systrace_procs[i] = 0;
+	spin_unlock_irqsave(&systrace_lock);
+}
+
+/* If you registered a process specifically, then you need to dereg it
+ * specifically.  Or just fully stop, which will do it for all. */
+int systrace_dereg(bool all, struct proc *p)
+{
+	spin_lock_irqsave(&systrace_lock);
+	if (all) {
+		printk("No longer tracing syscalls for all processes.\n");
+		systrace_flags &= ~SYSTRACE_ALLPROC;
+	} else {
+		for (int i = 0; i < MAX_NUM_TRACED; i++) {
+			if (systrace_procs[i] == p) {
+				systrace_procs[i] = 0;
+				printk("No longer tracing syscalls for process %d\n", p->pid);
+			}
+		}
+	}
+	spin_unlock_irqsave(&systrace_lock);
+	return 0;
+}
+
+/* Regardless of locking, someone could be writing into the buffer */
+void systrace_print(bool all, struct proc *p)
+{
+	spin_lock_irqsave(&systrace_lock);
+	/* if you want to be clever, you could make this start from the earliest
+	 * timestamp and loop around.  Careful of concurrent writes. */
+	for (int i = 0; i < systrace_bufsize; i++)
+		if (systrace_buffer[i].timestamp)
+			printk("[%16llu] Syscall %d for proc %d on core %d, vcore %d\n",
+			       systrace_buffer[i].timestamp,
+			       systrace_buffer[i].syscallno,
+			       systrace_buffer[i].pid,
+			       systrace_buffer[i].coreid,
+			       systrace_buffer[i].vcoreid);
+	spin_unlock_irqsave(&systrace_lock);
+}
+
+void systrace_clear_buffer(void)
+{
+	spin_lock_irqsave(&systrace_lock);
+	memset(systrace_buffer, 0, sizeof(struct systrace_record)*MAX_NUM_TRACED);
+	spin_unlock_irqsave(&systrace_lock);
+}

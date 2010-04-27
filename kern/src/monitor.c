@@ -23,6 +23,8 @@
 #include <schedule.h>
 #include <resource.h>
 #include <kdebug.h>
+#include <syscall.h>
+#include <kmalloc.h>
 
 #include <ros/memlayout.h>
 
@@ -53,6 +55,8 @@ static command_t (RO commands)[] = {
 	{ "exit", "Leave the monitor", mon_exit},
 	{ "kfunc", "Run a kernel function directly (!!!)", mon_kfunc},
 	{ "notify", "Notify a process.  Vcoreid will skip their prefs", mon_notify},
+	{ "measure", "Run a specific measurement", mon_measure},
+	{ "trace", "Run a specific measurement", mon_trace},
 };
 #define NCOMMANDS (sizeof(commands)/sizeof(commands[0]))
 
@@ -447,6 +451,80 @@ int mon_notify(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 	proc_decref(p, 1);
 	return 0;
 }
+
+/* Micro-benchmarky Measurements */
+int mon_measure(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
+{
+	if (argc < 2) {
+		printk("Usage: measure OPTION\n");
+		printk("\topt1: whatever\n");
+		return 1;
+	}
+	if (!strcmp(argv[1], "opt1")) {
+		print_idlecoremap();
+	} else if (!strcmp(argv[1], "opt2")) {
+		if (argc != 3) {
+			printk("ERRRRRRRRRR.\n");
+			return 1;
+		}
+		print_proc_info(strtol(argv[2], 0, 0));
+	} else {
+		printk("Bad option\n");
+		return 1;
+	}
+	return 0;
+}
+
+int mon_trace(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
+{
+	if (argc < 2) {
+		printk("Usage: trace OPTION\n");
+		printk("\tsyscall start [silent] [pid]: starts tracing\n");
+		printk("\tsyscall stop: stops tracing, prints if it was silent\n");
+		return 1;
+	}
+	if (!strcmp(argv[1], "syscall")) {
+		if (argc < 3) {
+			printk("Need a start or stop.\n");
+			return 1;
+		}
+		if (!strcmp(argv[2], "start")) {
+			bool all = TRUE;
+			bool silent = FALSE;
+			struct proc *p = NULL;
+			if (argc >= 4) {
+				silent = (bool)strtol(argv[3], 0, 0);
+			}
+			if (argc >= 5) {
+				all = FALSE;
+				p = pid2proc(strtol(argv[4], 0, 0));
+				if (!p) {
+					printk("No such process\n");
+					return 1;
+				}
+			}
+			systrace_start(silent);
+			if (systrace_reg(all, p))
+				printk("No room to trace more processes\n");
+		} else if (!strcmp(argv[2], "stop")) {
+			/* Stop and print for all processes */
+			systrace_stop();
+			systrace_print(TRUE, 0);
+			systrace_clear_buffer();
+		}
+	} else if (!strcmp(argv[1], "opt2")) {
+		if (argc != 3) {
+			printk("ERRRRRRRRRR.\n");
+			return 1;
+		}
+		print_proc_info(strtol(argv[2], 0, 0));
+	} else {
+		printk("Bad option\n");
+		return 1;
+	}
+	return 0;
+}
+
 /***** Kernel monitor command interpreter *****/
 
 #define WHITESPACE "\t\r\n "
