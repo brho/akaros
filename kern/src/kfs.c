@@ -40,18 +40,14 @@
  */
 #ifdef __CONFIG_KFS__
 DECL_PROG(tlstest);
-DECL_PROG(proctests);
 DECL_PROG(fp_test);
-DECL_PROG(null);
-DECL_PROG(spawn);
 DECL_PROG(mproctests);
-DECL_PROG(draw_nanwan);
 DECL_PROG(hello);
 DECL_PROG(mhello);
-DECL_PROG(manycore_test);
 DECL_PROG(pthread_test);
 DECL_PROG(idle);
 DECL_PROG(fillmeup);
+DECL_PROG(msr_get_cores);
 DECL_FILE(kfs_test_txt);
 DECL_FILE(hello_txt);
 #endif
@@ -59,18 +55,14 @@ DECL_FILE(hello_txt);
 struct kfs_entry kfs[MAX_KFS_FILES] = {
 #ifdef __CONFIG_KFS__
 	KFS_PENTRY(tlstest)
-	KFS_PENTRY(proctests)
 	KFS_PENTRY(fp_test)
-	KFS_PENTRY(null)
-	KFS_PENTRY(spawn)
 	KFS_PENTRY(mproctests)
-	KFS_PENTRY(draw_nanwan)
 	KFS_PENTRY(hello)
 	KFS_PENTRY(mhello)
-	KFS_PENTRY(manycore_test)
 	KFS_PENTRY(pthread_test)
 	KFS_PENTRY(idle)
 	KFS_PENTRY(fillmeup)
+	KFS_PENTRY(msr_get_cores)
 	KFS_FENTRY(kfs_test_txt)
 	KFS_FENTRY(hello_txt)
 #endif

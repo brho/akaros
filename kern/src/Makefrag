@@ -53,18 +53,14 @@ $(OBJDIR)/$(KERN_DIR)/kernel: tests
 
 KERN_APPFILES += \
                  $(TESTS_DIR)/tlstest \
-                 $(TESTS_DIR)/proctests \
                  $(TESTS_DIR)/fp_test \
-                 $(TESTS_DIR)/null \
-                 $(TESTS_DIR)/spawn \
                  $(TESTS_DIR)/mproctests \
-                 $(TESTS_DIR)/draw_nanwan \
                  $(TESTS_DIR)/hello \
                  $(TESTS_DIR)/mhello \
-                 $(TESTS_DIR)/manycore_test \
                  $(TESTS_DIR)/pthread_test \
                  $(TESTS_DIR)/idle \
-                 $(TESTS_DIR)/fillmeup
+                 $(TESTS_DIR)/fillmeup \
+                 $(TESTS_DIR)/msr_get_cores
 endif
 
 KERN_LDFLAGS   := $(KERN_LDFLAGS) -L$(OBJDIR)/$(KERN_DIR) \
