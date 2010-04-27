@@ -160,7 +160,11 @@ void smp_boot(void)
 	// mapping pulled out from under them.  Now, if a core loses, it will spin
 	// on the trampoline (which we must be careful to not deallocate)
 	__spin_lock(get_smp_bootlock());
-	cprintf("Num_Cpus Detected: %d\n", num_cpus);
+	printk("Number of Cores Detected: %d\n", num_cpus);
+#ifdef __CONFIG_DISABLE_SMT__
+	assert(!(num_cpus % 2));
+	printk("Using only %d Idlecores (SMT Disabled)\n", num_cpus >> 1);
+#endif /* __CONFIG_DISABLE_SMT__ */
 	smp_remap_coreids();
 
 	// Remove the mapping of the page used by the trampoline

@@ -195,9 +195,9 @@ void proc_init(void)
 #ifdef __CONFIG_DISABLE_SMT__
 	/* assumes core0 is the only management core (NIC and monitor functionality
 	 * are run there too.  it just adds the odd cores to the idlecoremap */
-	assert(!(num_cpus & 0x1));
+	assert(!(num_cpus % 2));
 	// TODO: consider checking x86 for machines that actually hyperthread
-	num_idlecores = num_cpus / 2;
+	num_idlecores = num_cpus >> 1;
 	for (int i = 0; i < num_idlecores; i++)
 		idlecoremap[i] = (i * 2) + 1;
 #else
@@ -233,7 +233,11 @@ proc_init_procinfo(struct proc* p)
 	p->procinfo->ppid = p->ppid;
 	p->procinfo->tsc_freq = system_timing.tsc_freq;
 	// TODO: maybe do something smarter here
+#ifdef __CONFIG_DISABLE_SMT__
+	p->procinfo->max_vcores = num_cpus >> 1;
+#else
 	p->procinfo->max_vcores = MAX(1,num_cpus-num_mgmtcores);
+#endif /* __CONFIG_DISABLE_SMT__ */
 }
 
 #ifdef __CONFIG_EXPER_TRADPROC__
