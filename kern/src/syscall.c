@@ -1053,7 +1053,7 @@ intreg_t sys_tcsetattr(struct proc* p, int fd, int optional_actions, const void*
 }
 
 intreg_t sys_fillmeup(struct proc *p, uint8_t *bufs, 
-                      uint16_t num_bufs, int16_t *last_written)
+                      uint16_t num_bufs, int32_t *last_written)
 {
 #if defined(__CONFIG_OSDI__) && defined(__CONFIG_NETWORKING__)
 	extern struct fillmeup fillmeup_data;

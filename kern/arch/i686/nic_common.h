@@ -51,7 +51,7 @@ struct fillmeup {
 	struct proc *proc;
 	uint8_t *bufs;
 	uint16_t num_bufs;
-	int16_t *last_written;
+	int32_t *last_written;
 };
 extern struct fillmeup fillmeup_data;
 #endif
