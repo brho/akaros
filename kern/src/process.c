@@ -859,7 +859,7 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 		case (PROC_RUNNING_M):
 #ifdef __CONFIG_OSDI__
 			/* Ghetto, for OSDI: */
-			printk("[K] Process %d (%p) is yielding on vcore %d\n", p->pid, p,
+			printd("[K] Process %d (%p) is yielding on vcore %d\n", p->pid, p,
 			       get_vcoreid(p, core_id()));
 			if (p->procinfo->num_vcores == 1) {
 				spin_unlock(&p->proc_lock);
@@ -1277,12 +1277,12 @@ void __unmap_vcore(struct proc *p, uint32_t vcoreid)
  * TODO: (REF) change to use CAS / atomics. */
 void proc_incref(struct proc *p, size_t count)
 {
-	spin_lock(&p->proc_lock);
+	spin_lock_irqsave(&p->proc_lock);
 	if (p->env_refcnt)
 		p->env_refcnt += count;
 	else
 		panic("Tried to incref a proc with no existing references!");
-	spin_unlock(&p->proc_lock);
+	spin_unlock_irqsave(&p->proc_lock);
 }
 
 /* When the kernel is done with a process, it decrements its reference count.
@@ -1296,10 +1296,10 @@ void proc_incref(struct proc *p, size_t count)
  * while someone else is __proc_free()ing. */
 void proc_decref(struct proc *p, size_t count)
 {
-	spin_lock(&p->proc_lock);
+	spin_lock_irqsave(&p->proc_lock);
 	p->env_refcnt -= count;
 	size_t refcnt = p->env_refcnt; // need to copy this in so it's not reloaded
-	spin_unlock(&p->proc_lock);
+	spin_unlock_irqsave(&p->proc_lock);
 	// if we hit 0, no one else will increment and we can check outside the lock
 	if (!refcnt)
 		__proc_free(p);
