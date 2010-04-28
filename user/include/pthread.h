@@ -81,7 +81,7 @@ typedef struct
 typedef struct
 {
   const pthread_condattr_t* attr;
-  int waiters[MAX_VCORES];
+  int waiters[MAX_PTHREADS];
 } pthread_cond_t;
 
 typedef int pthread_attr_t;
