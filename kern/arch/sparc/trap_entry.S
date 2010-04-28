@@ -4,6 +4,34 @@
 #include <arch/trap_table.h>
 #include <ros/memlayout.h>
 
+
+// Macro to save a minimal part of the trap frame, i.e., what's necessary
+// to safely return from interrupt.  Global registers, y, pc, npc.
+#define SAVE_MINIMAL_TF(tf) \
+	std	%g0,[tf+  0] ;\
+	std	%g2,[tf+  8] ;\
+	std	%g4,[tf+ 16] ;\
+	std	%g6,[tf+ 24] ;\
+	st	%l7,[tf+128] ;\
+	st	%l5,[tf+132] ;\
+	st	%l6,[tf+136] ;\
+	mov	%y,%g1       ;\
+	st	%g1,[tf+148]
+
+// Macro to restore same.
+#define RESTORE_MINIMAL_TF(tf) \
+	ld	[tf+  4],%g1 ;\
+	ldd	[tf+  8],%g2 ;\
+	ldd	[tf+ 16],%g4 ;\
+	ldd	[tf+ 24],%g6 ;\
+	ld	[tf+148],%l0 ;\
+	mov	%l0,%y           ;\
+	ld	[tf+132],%l5 ;\
+	ld	[tf+136],%l6 ;\
+	jmp	%l5 ;\
+	 rett	%l6
+
+
 	.section	".text"!,#alloc,#execinstr,#progbits
 	.align		4
 
@@ -32,38 +60,33 @@ handle_trap:
 	restore
 	save
 
-	// Save TF then call handler
+	// Set up stack, save state, call handler
 	sub	%fp,64+SIZEOF_TRAPFRAME_T,%sp
-	call	env_save_tf
-	 add	%sp,64,%o0
+	SAVE_MINIMAL_TF(%sp+64)
 	call	%l0
 	 add	%sp,64,%o0
 
-#define FINISH_POP_TF(tf) \
-	ld	[tf+132],%l1 ;\
-	ld	[tf+136],%l2 ;\
-	ld	[tf+148],%l5 ;\
-	mov	%l5,%y ;\
-	jmp	%l1 ;\
-	rett	%l2
-
-	// Get outta here! Fill a window if necessary.
+	// Fill a window if necessary.
 	restore
 	save
+
+	// Restore PSR, then GTFO
+	ld	[%sp+64+128],%l7
 	mov	%l7,%psr
-	add	%sp,64,%o0
-	FINISH_POP_TF(%o0)
+	RESTORE_MINIMAL_TF(%sp+64)
 
 	// Trap came from user.  Spill a window if necessary.
 1:	restore
 tflush1:
 	save
 
+	// Set up stack.
 	mov	CORE_ID_REG,%l1
 	sll	%l1,KSTKSHIFT,%l1
 	set	bootstacktop-64-SIZEOF_TRAPFRAME_T,%sp
 	sub	%sp,%l1,%sp
 
+	// Save a full trap frame, since we might not return through this path
 	call	env_save_tf
 	 add	%sp,64,%o0
 
@@ -80,6 +103,7 @@ trap_patchme:
 tflush2:
 	 save
 
+	// With windows flushed, now just set ourselves up as the first window
 	mov	%g0,%wim
 	andn	%g3,PSR_CWP,%g3
 	wr	%g3,PSR_PIL|PSR_ET,%psr
@@ -127,14 +151,10 @@ env_pop_tf:
 	ldd	[%g2+120],%i6
 	save
 
-	ld	[%o0+ 4],%g1
-	ldd	[%o0+ 8],%g2
-	ldd	[%o0+16],%g4
-	ldd	[%o0+24],%g6
+	ld	[%o0+152],%l6
+	mov	%l6,%asr13
 
-	ld	[%o0+152],%l5
-	mov	%l5,%asr13
-	FINISH_POP_TF(%o0)
+	RESTORE_MINIMAL_TF(%o0)
 
 	// env_save_tf has a non-standard calling convention.
 	// o0: destination trapframe_t*
@@ -144,15 +164,12 @@ env_pop_tf:
 	.global env_save_tf
 env_save_tf:
 
-	mov	%psr,%o4
-	st	%l7,[%o0+128]
-	st	%l5,[%o0+132]
-	st	%l6,[%o0+136]
+	SAVE_MINIMAL_TF(%o0)
+
 	mov	%wim,%o4
 	st	%o4,[%o0+140]
 	mov	%tbr,%o4
-	mov	%y,%o5
-	std	%o4,[%o0+144]
+	st	%o4,[%o0+144]
 	mov	%asr13,%o5
 	st	%o5,[%o0+152]
 
@@ -177,11 +194,6 @@ env_save_tf:
 	sta	%o2,[%g0] 4
 	mov	0x300,%o4
 	lda	[%o4] 4,%g0
-
-	std	%g0,[%o0+ 0]
-	std	%g2,[%o0+ 8]
-	std	%g4,[%o0+16]
-	std	%g6,[%o0+24]
 
 	mov	%o0,%g2
 
