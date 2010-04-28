@@ -482,12 +482,22 @@ int mon_measure(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 			return 1;
 		}
 		begin = start_timing();
+#ifdef __CONFIG_APPSERVER__
+		printk("Warning: this will be inaccurate due to the appserver.\n");
+		end_refcnt = p->env_refcnt - p->procinfo->num_vcores - 1;
+#endif /* __CONFIG_APPSERVER__ */
 		proc_destroy(p);
 		proc_decref(p, 1);
+#ifdef __CONFIG_APPSERVER__
+		/* Won't be that accurate, since it's not actually going through the
+		 * __proc_free() path. */
+		spin_on(p->env_refcnt != end_refcnt);	
+#else
 		/* this is a little ghetto. it's not fully free yet, but we are also
 		 * slowing it down by messing with it, esp with the busy waiting on a
 		 * hyperthreaded core. */
 		spin_on(p->env_cr3);
+#endif /* __CONFIG_APPSERVER__ */
 		/* No noticeable difference using stop_timing instead of read_tsc() */
 		diff = stop_timing(begin);
 	} else if (!strcmp(argv[1], "preempt")) {
