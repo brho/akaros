@@ -28,6 +28,18 @@ static inline void write_sequnlock(seqlock_t *lock);
 static inline seq_ctr_t read_seqbegin(seqlock_t *lock);
 static inline bool read_seqretry(seqlock_t *lock, seq_ctr_t ctr);
 
+#define MAX_SPINS 1000000000
+
+/* Will spin for a little while, but not deadlock if it never happens */
+#define spin_on(x)                                                             \
+	for (int i = 0; (x); i++) {                                                \
+		cpu_relax();                                                           \
+		if (i == MAX_SPINS) {                                                  \
+			printk("Probably timed out/failed.\n");                            \
+			break;                                                             \
+		}                                                                      \
+	}
+
 /*********************** Checklist stuff **********************/
 typedef struct checklist_mask {
 	// only need an uint8_t, but we need the bits[] to be word aligned
