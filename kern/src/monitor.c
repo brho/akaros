@@ -26,6 +26,7 @@
 #include <syscall.h>
 #include <kmalloc.h>
 
+#include <ros/timer.h>
 #include <ros/memlayout.h>
 
 #define CMDBUF_SIZE	80	// enough for one VGA text line
@@ -455,23 +456,149 @@ int mon_notify(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 /* Micro-benchmarky Measurements */
 int mon_measure(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 {
+	uint64_t begin = 0, diff = 0;
+	bool self_ipi_pending = FALSE;
+	uint32_t end_refcnt = 0;
+
 	if (argc < 2) {
 		printk("Usage: measure OPTION\n");
-		printk("\topt1: whatever\n");
+		printk("\tkill PID : kill proc PID\n");
+		printk("\tpreempt PID : preempt proc PID (no delay)\n");
+		printk("\tpreempt PID [pcore] : preempt PID's pcore (no delay)\n");
+		printk("\tpreempt-warn PID : warn-preempt proc PID (pending)\n");
+		printk("\tpreempt-warn PID [pcore] : warn-preempt proc PID's pcore\n");
+		printk("\tpreempt-raw PID : raw-preempt proc PID\n");
+		printk("\tpreempt-raw PID [pcore] : raw-preempt proc PID's pcore\n");
 		return 1;
 	}
-	if (!strcmp(argv[1], "opt1")) {
-		print_idlecoremap();
-	} else if (!strcmp(argv[1], "opt2")) {
-		if (argc != 3) {
-			printk("ERRRRRRRRRR.\n");
+	if (!strcmp(argv[1], "kill")) {
+		if (argc < 3) {
+			printk("Give me a pid number.\n");
 			return 1;
 		}
-		print_proc_info(strtol(argv[2], 0, 0));
+		struct proc *p = pid2proc(strtol(argv[2], 0, 0));
+		if (!p) {
+			printk("No such proc\n");
+			return 1;
+		}
+		begin = start_timing();
+		proc_destroy(p);
+		proc_decref(p, 1);
+		/* this is a little ghetto. it's not fully free yet, but we are also
+		 * slowing it down by messing with it, esp with the busy waiting on a
+		 * hyperthreaded core. */
+		spin_on(p->env_cr3);
+		/* No noticeable difference using stop_timing instead of read_tsc() */
+		diff = stop_timing(begin);
+	} else if (!strcmp(argv[1], "preempt")) {
+		if (argc < 3) {
+			printk("Give me a pid number.\n");
+			return 1;
+		}
+		struct proc *p = pid2proc(strtol(argv[2], 0, 0));
+		if (!p) {
+			printk("No such proc\n");
+			return 1;
+		}
+		if (argc == 4) { /* single core being preempted, warned but no delay */
+			uint32_t pcoreid = strtol(argv[3], 0, 0);
+			begin = start_timing();
+			proc_preempt_core(p, pcoreid, 1000000); // 1 sec warning
+			/* done when unmapped (right before abandoning) */
+			spin_on(p->procinfo->pcoremap[pcoreid].valid);
+			diff = stop_timing(begin);
+		} else { /* preempt all cores, warned but no delay */
+			end_refcnt = p->env_refcnt - p->procinfo->num_vcores;
+			begin = start_timing();
+			proc_preempt_all(p, 1000000);
+			/* a little ghetto, implies no one is using p */
+			spin_on(p->env_refcnt != end_refcnt);
+			diff = stop_timing(begin);
+		}
+		proc_decref(p, 1);
+	} else if (!strcmp(argv[1], "preempt-warn")) {
+		if (argc < 3) {
+			printk("Give me a pid number.\n");
+			return 1;
+		}
+		struct proc *p = pid2proc(strtol(argv[2], 0, 0));
+		if (!p) {
+			printk("No such proc\n");
+			return 1;
+		}
+		if (argc == 4) { /* single core being preempted-warned */
+			uint32_t pcoreid = strtol(argv[3], 0, 0);
+			spin_lock(&p->proc_lock);
+			uint32_t vcoreid = p->procinfo->pcoremap[pcoreid].vcoreid;
+			if (!p->procinfo->pcoremap[pcoreid].valid) {
+				printk("Pick a mapped pcore\n");
+				spin_unlock(&p->proc_lock);
+				return 1;
+			}
+			begin = start_timing();
+			__proc_preempt_warn(p, vcoreid, 1000000); // 1 sec
+			spin_unlock(&p->proc_lock);
+			/* done when unmapped (right before abandoning) */
+			spin_on(p->procinfo->pcoremap[pcoreid].valid);
+			diff = stop_timing(begin);
+		} else { /* preempt-warn all cores */
+			printk("Warning, this won't work if they can't yield their "
+			       "last vcore, will stop at 1!\n");
+			spin_lock(&p->proc_lock);
+			begin = start_timing();
+			__proc_preempt_warnall(p, 1000000);
+			spin_unlock(&p->proc_lock);
+			/* target cores do the unmapping / changing of the num_vcores */
+			spin_on(p->procinfo->num_vcores > 1);
+			diff = stop_timing(begin);
+		}
+		proc_decref(p, 1);
+	} else if (!strcmp(argv[1], "preempt-raw")) {
+		if (argc < 3) {
+			printk("Give me a pid number.\n");
+			return 1;
+		}
+		struct proc *p = pid2proc(strtol(argv[2], 0, 0));
+		if (!p) {
+			printk("No such proc\n");
+			return 1;
+		}
+		if (argc == 4) { /* single core preempted, no warning or waiting */
+			uint32_t pcoreid = strtol(argv[3], 0, 0);
+			spin_lock(&p->proc_lock);
+			if (!p->procinfo->pcoremap[pcoreid].valid) {
+				printk("Pick a mapped pcore\n");
+				spin_unlock(&p->proc_lock);
+				return 1;
+			}
+			begin = start_timing();
+			self_ipi_pending = __proc_preempt_core(p, pcoreid);
+			spin_unlock(&p->proc_lock);
+			__proc_kmsg_pending(p, self_ipi_pending);
+			/* done when unmapped (right before abandoning) */
+			spin_on(p->procinfo->pcoremap[pcoreid].valid);
+			diff = stop_timing(begin);
+			/* TODO: (RMS), if num_vcores == 0, RUNNABLE_M, schedule */
+		} else { /* preempt all cores, no warning or waiting */
+			spin_lock(&p->proc_lock);
+			end_refcnt = p->env_refcnt - p->procinfo->num_vcores;
+			begin = start_timing();
+			self_ipi_pending = __proc_preempt_all(p);
+			/* TODO: (RMS), RUNNABLE_M, schedule */
+			spin_unlock(&p->proc_lock);
+			__proc_kmsg_pending(p, self_ipi_pending);
+			/* a little ghetto, implies no one else is using p */
+			spin_on(p->env_refcnt != end_refcnt);
+			diff = stop_timing(begin);
+		}
+		proc_decref(p, 1);
 	} else {
 		printk("Bad option\n");
 		return 1;
 	}
+	printk("[Tired Giraffe Accent] Took %llu usec (%llu nsec) to finish.\n",
+	       diff * 1000000 / system_timing.tsc_freq,
+	       diff * 1000000000 / system_timing.tsc_freq);
 	return 0;
 }
 

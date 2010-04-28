@@ -66,7 +66,8 @@ void manager_brho(void)
 		case 0:
 			// TODO: need to store the pid for future manager runs, not the *p
 			//p = kfs_proc_create(kfs_lookup_path("pthread_test"));
-			p = kfs_proc_create(kfs_lookup_path("mhello"));
+			//p = kfs_proc_create(kfs_lookup_path("mhello"));
+			p = kfs_proc_create(kfs_lookup_path("msr_dumb_while"));
 			// being proper and all:
 			spin_lock(&p->proc_lock);
 			__proc_set_state(p, PROC_RUNNABLE_S);

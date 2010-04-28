@@ -42,7 +42,7 @@ uint32_t num_mgmtcores = 1;
 /* Helper function to return a core to the idlemap.  It causes some more lock
  * acquisitions (like in a for loop), but it's a little easier.  Plus, one day
  * we might be able to do this without locks (for the putting). */
-static void put_idle_core(uint32_t coreid)
+void put_idle_core(uint32_t coreid)
 {
 	spin_lock(&idle_lock);
 #ifdef __CONFIG_EXPER_TRADPROC__ /* often a good check, but hurts performance */
@@ -704,7 +704,7 @@ void proc_destroy(struct proc *p)
 	if (current == p)
 #endif /* __CONFIG_EXPER_TRADPROC__ */
 		self_ipi_pending = TRUE;
-	
+
 	switch (p->state) {
 		case PROC_DYING: // someone else killed this already.
 			spin_unlock(&p->proc_lock);
@@ -861,15 +861,15 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 			schedule_proc(p);
 			break;
 		case (PROC_RUNNING_M):
-#ifdef __CONFIG_OSDI__
-			/* Ghetto, for OSDI: */
 			printd("[K] Process %d (%p) is yielding on vcore %d\n", p->pid, p,
 			       get_vcoreid(p, core_id()));
+			/* TODO: (RMS) the Scheduler cannot handle the Runnable Ms (RMS), so
+			 * don't yield the last vcore.  It's ghetto and for OSDI, but it
+			 * needs to be fixed for all builds, not just CONFIG_OSDI. */
 			if (p->procinfo->num_vcores == 1) {
 				spin_unlock(&p->proc_lock);
 				return;
 			}
-#endif /* __CONFIG_OSDI__ */
 			__seq_start_write(&p->procinfo->coremap_seqctr);
 			// give up core
 			__unmap_vcore(p, get_vcoreid(p, core_id()));
@@ -880,6 +880,7 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 			// add to idle list
 			put_idle_core(core_id());
 			// last vcore?  then we really want 1, and to yield the gang
+			// TODO: (RMS) will actually do this.
 			if (p->procinfo->num_vcores == 0) {
 				p->resources[RES_CORES].amt_wanted = 1;
 				__proc_set_state(p, PROC_RUNNABLE_M);
@@ -966,6 +967,152 @@ void proc_notify(struct proc *p, unsigned int notif, struct notif_event *ne)
 	if (!(nm->flags & NOTIF_WANTED))
 		return;
 	do_notify(p, nm->vcoreid, ne->ne_type, ne);
+}
+
+/************************  Preemption Functions  ******************************
+ * Don't rely on these much - I'll be sure to change them up a bit.
+ *
+ * Careful about what takes a vcoreid and what takes a pcoreid.  Also, there may
+ * be weird glitches with setting the state to RUNNABLE_M.  It is somewhat in
+ * flux.  The num_vcores is changed after take_cores, but some of the messages
+ * (or local traps) may not yet be ready to handle seeing their future state.
+ * But they should be, so fix those when they pop up.
+ *
+ * TODO: (RMS) we need to actually make the scheduler handle RUNNABLE_Ms and
+ * then schedule these, or change proc_destroy to not assume they need to be
+ * descheduled.
+ *
+ * Another thing to do would be to make the _core functions take a pcorelist,
+ * and not just one pcoreid. */
+
+/* Sets a preempt_pending warning for p's vcore, to go off 'when'.  If you care
+ * about locking, do it before calling.  Takes a vcoreid! */
+void __proc_preempt_warn(struct proc *p, uint32_t vcoreid, uint64_t when)
+{
+	/* danger with doing this unlocked: preempt_pending is set, but never 0'd,
+	 * since it is unmapped and not dealt with (TODO)*/
+	p->procinfo->vcoremap[vcoreid].preempt_pending = when;
+	/* notify, if they want to hear about this event.  regardless of how they
+	 * want it, we can send this as a bit.  Subject to change. */
+	if (p->procdata->notif_methods[NE_PREEMPT_PENDING].flags | NOTIF_WANTED)
+		do_notify(p, vcoreid, NE_PREEMPT_PENDING, 0);
+	/* TODO: consider putting in some lookup place for the alarm to find it.
+	 * til then, it'll have to scan the vcoremap (O(n) instead of O(m)) */
+}
+
+/* Warns all active vcores of an impending preemption.  Hold the lock if you
+ * care about the mapping (and you should). */
+void __proc_preempt_warnall(struct proc *p, uint64_t when)
+{
+	uint32_t active_vcoreid = 0;
+	for (int i = 0; i < p->procinfo->num_vcores; i++) {
+		active_vcoreid = get_busy_vcoreid(p, active_vcoreid);
+		__proc_preempt_warn(p, active_vcoreid, when);
+		active_vcoreid++;
+	}
+	/* TODO: consider putting in some lookup place for the alarm to find it.
+	 * til then, it'll have to scan the vcoremap (O(n) instead of O(m)) */
+}
+
+// TODO: function to set an alarm, if none is outstanding
+
+/* Raw function to preempt a single core.  Returns TRUE if the calling core will
+ * get a kmsg.  If you care about locking, do it before calling. */
+bool __proc_preempt_core(struct proc *p, uint32_t pcoreid)
+{
+	uint32_t vcoreid = get_vcoreid(p, pcoreid);
+
+	p->procinfo->vcoremap[vcoreid].preempt_served = TRUE;
+	// expects a pcorelist.  assumes pcore is mapped and running_m
+	return __proc_take_cores(p, &pcoreid, 1, __preempt, p, 0, 0);
+}
+
+/* Raw function to preempt every vcore.  Returns TRUE if the calling core will
+ * get a kmsg.  If you care about locking, do it before calling. */
+bool __proc_preempt_all(struct proc *p)
+{
+	/* instead of doing this, we could just preempt_served all possible vcores,
+	 * and not just the active ones.  We would need to sort out a way to deal
+	 * with stale preempt_serveds first.  This might be just as fast anyways. */
+	uint32_t active_vcoreid = 0;
+	for (int i = 0; i < p->procinfo->num_vcores; i++) {
+		active_vcoreid = get_busy_vcoreid(p, active_vcoreid);
+		p->procinfo->vcoremap[active_vcoreid].preempt_served = TRUE;
+		active_vcoreid++;
+	}
+	return __proc_take_allcores(p, __preempt, p, 0, 0);
+}
+
+/* Warns and preempts a vcore from p.  No delaying / alarming, or anything.  The
+ * warning will be for u usec from now. */
+void proc_preempt_core(struct proc *p, uint32_t pcoreid, uint64_t usec)
+{
+	bool self_ipi_pending = FALSE;
+	uint64_t warn_time = read_tsc() + usec * 1000000 / system_timing.tsc_freq;
+
+	/* DYING could be okay */
+	if (p->state != PROC_RUNNING_M) {
+		warn("Tried to preempt from a non RUNNING_M proc!");
+		return;
+	}
+	spin_lock(&p->proc_lock);
+	if (is_mapped_vcore(p, pcoreid)) {
+		__proc_preempt_warn(p, get_vcoreid(p, pcoreid), warn_time);
+		self_ipi_pending = __proc_preempt_core(p, pcoreid);
+	} else {
+		warn("Pcore doesn't belong to the process!!");
+	}
+	/* TODO: (RMS) do this once a scheduler can handle RUNNABLE_M, and make sure
+	 * to schedule it */
+	#if 0
+	if (!p->procinfo->num_vcores) {
+		__proc_set_state(p, PROC_RUNNABLE_M);
+		schedule_proc(p);
+	}
+	#endif
+	spin_unlock(&p->proc_lock);
+	__proc_kmsg_pending(p, self_ipi_pending);
+}
+
+/* Warns and preempts all from p.  No delaying / alarming, or anything.  The
+ * warning will be for u usec from now. */
+void proc_preempt_all(struct proc *p, uint64_t usec)
+{
+	bool self_ipi_pending = FALSE;
+	uint64_t warn_time = read_tsc() + usec * 1000000 / system_timing.tsc_freq;
+
+	spin_lock(&p->proc_lock);
+	/* DYING could be okay */
+	if (p->state != PROC_RUNNING_M) {
+		warn("Tried to preempt from a non RUNNING_M proc!");
+		spin_unlock(&p->proc_lock);
+		return;
+	}
+	__proc_preempt_warnall(p, warn_time);
+	self_ipi_pending = __proc_preempt_all(p);
+	assert(!p->procinfo->num_vcores);
+	/* TODO: (RMS) do this once a scheduler can handle RUNNABLE_M, and make sure
+	 * to schedule it */
+	#if 0
+	__proc_set_state(p, PROC_RUNNABLE_M);
+	schedule_proc(p);
+	#endif
+	spin_unlock(&p->proc_lock);
+	__proc_kmsg_pending(p, self_ipi_pending);
+}
+
+/* Give the specific pcore to proc p.  Lots of assumptions, so don't really use
+ * this.  The proc needs to be _M and prepared for it.  the pcore needs to be
+ * free, etc. */
+void proc_give(struct proc *p, uint32_t pcoreid)
+{
+	bool self_ipi_pending = FALSE;
+
+	spin_lock(&p->proc_lock);
+	// expects a pcorelist, we give it a list of one
+	self_ipi_pending = __proc_give_cores(p, &pcoreid, 1);
+	spin_unlock(&p->proc_lock);
+	__proc_kmsg_pending(p, self_ipi_pending);
 }
 
 /* Global version of the helper, for sys_get_vcoreid (might phase that syscall
@@ -1240,7 +1387,7 @@ bool __proc_take_allcores(struct proc *SAFE p, amr_t message,
  * There should already be a kmsg waiting for us, since when we checked state to
  * see a message was coming, the message had already been sent before unlocking.
  * Note we do not need interrupts enabled for this to work (you can receive a
- * message before its IPI by polling), though in most cases they will be. 
+ * message before its IPI by polling), though in most cases they will be.
  *
  * TODO: consider inlining this, so __FUNCTION__ works (will require effort in
  * core_request(). */
@@ -1407,7 +1554,8 @@ void __preempt(trapframe_t *tf, uint32_t srcid, void *a0, void *a1, void *a2)
 	struct proc *p = (struct proc*)a0;
 
 	if (p != current)
-		warn("__preempt arrived for a process that was not current!");
+		panic("__preempt arrived for a process (%p) that was not current (%p)!",
+		      p, current);
 	assert(!in_kernel(tf));
 	/* We shouldn't need to lock here, since unmapping happens on the pcore and
 	 * mapping would only happen if the vcore was free, which it isn't until
@@ -1417,7 +1565,7 @@ void __preempt(trapframe_t *tf, uint32_t srcid, void *a0, void *a1, void *a2)
 	/* either __preempt or proc_yield() ends the preempt phase. */
 	p->procinfo->vcoremap[vcoreid].preempt_pending = 0;
 	vcpd = &p->procdata->vcore_preempt_data[vcoreid];
-	printk("[kernel] received __preempt for proc %d's vcore %d on pcore %d\n",
+	printd("[kernel] received __preempt for proc %d's vcore %d on pcore %d\n",
 	       p->procinfo->pid, vcoreid, core_id());
 
 	/* save the old tf in the preempt slot, save the silly state, and signal the
@@ -1503,8 +1651,9 @@ void print_proc_info(pid_t pid)
 	for (int i = 0; i < MAX_NUM_RESOURCES; i++)
 		printk("\tRes type: %02d, amt wanted: %08d, amt granted: %08d\n", i,
 		       p->resources[i].amt_wanted, p->resources[i].amt_granted);
-	printk("Vcore 0's Last Trapframe:\n");
-	print_trapframe(&p->env_tf);
+	/* No one cares, and it clutters the terminal */
+	//printk("Vcore 0's Last Trapframe:\n");
+	//print_trapframe(&p->env_tf);
 	spin_unlock(&p->proc_lock);
 	proc_decref(p, 1); /* decref for the pid2proc reference */
 }

@@ -8,6 +8,7 @@
 #error "Yeah, it's not possible to build ROS with BSD on Core 0, sorry......"
 #else
 
+#include <ros/timer.h>
 #include <arch/arch.h>
 #include <arch/console.h>
 #include <multiboot.h>
@@ -81,6 +82,7 @@ void kernel_init(multiboot_info_t *mboot_info)
 	kernel_msg_init();
 	sysenter_init();
 	timer_init();
+	train_timing();
 	
 	// At this point our boot paths diverge based on arch. 
 	arch_init();

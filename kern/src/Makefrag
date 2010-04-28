@@ -60,7 +60,10 @@ KERN_APPFILES += \
                  $(TESTS_DIR)/pthread_test \
                  $(TESTS_DIR)/idle \
                  $(TESTS_DIR)/fillmeup \
-                 $(TESTS_DIR)/msr_get_cores
+                 $(TESTS_DIR)/msr_get_cores \
+                 $(TESTS_DIR)/msr_dumb_while \
+                 $(TESTS_DIR)/msr_nice_while \
+                 $(TESTS_DIR)/msr_single_while
 endif
 
 KERN_LDFLAGS   := $(KERN_LDFLAGS) -L$(OBJDIR)/$(KERN_DIR) \

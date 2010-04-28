@@ -121,6 +121,14 @@ void __proc_kmsg_pending(struct proc *p, bool ipi_pending);
 void __map_vcore(struct proc *p, uint32_t vcoreid, uint32_t pcoreid);
 void __unmap_vcore(struct proc *p, uint32_t vcoreid);
 
+/* Preemption management.  Some of these will change */
+void __proc_preempt_warn(struct proc *p, uint32_t vcoreid, uint64_t when);
+void __proc_preempt_warnall(struct proc *p, uint64_t when);
+bool __proc_preempt_core(struct proc *p, uint32_t pcoreid);
+bool __proc_preempt_all(struct proc *p);
+void proc_preempt_core(struct proc *p, uint32_t pcoreid, uint64_t usec);
+void proc_preempt_all(struct proc *p, uint64_t usec);
+
 /* Will probably have generic versions of these later. */
 void proc_incref(struct proc *SAFE p, size_t count);
 void proc_decref(struct proc *SAFE p, size_t count);
