@@ -243,7 +243,8 @@ int32_t frontend_syscall(pid_t pid, int32_t syscall_num,
 #endif
 
 #ifdef __i386__
-	assert(irq_is_enabled());
+	if (!irq_is_enabled())
+		warn("IRQ is disabled in frontend_syscall %d for proc %d\n", syscall_num, pid);
 #endif
 
 	static spinlock_t lock = SPINLOCK_INITIALIZER;
