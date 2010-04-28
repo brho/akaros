@@ -62,9 +62,11 @@ typedef struct
   int lock;
 } pthread_mutex_t;
 
+//TODO: MAX_PTHREADS is arbitrarily defined for now.
+#define MAX_PTHREADS 128
 typedef struct
 {
-  int local_sense[32*MAX_VCORES];
+  int local_sense[32*MAX_PTHREADS];
   volatile int sense;
   int count;
   int nprocs;

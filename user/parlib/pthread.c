@@ -569,7 +569,9 @@ int pthread_barrier_init(pthread_barrier_t* b, const pthread_barrierattr_t* a, i
 int pthread_barrier_wait(pthread_barrier_t* b)
 {
   unsigned int spinner = 0;
-  int id = vcore_id();
+  struct pthread_tcb *t = pthread_self();
+
+  int id = t->id;
   int ls = b->local_sense[32*id] = 1 - b->local_sense[32*id];
 
   pthread_mutex_lock(&b->pmutex);
