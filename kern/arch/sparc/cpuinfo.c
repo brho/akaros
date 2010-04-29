@@ -93,7 +93,7 @@ backtrace(void)
 
 	// hack: assumes (correctly) we aren't a leaf routine
 	void *sp, *pc, *newsp;
-	__asm__ __volatile__ ("mov %%sp,%0; mov %%i7,%1" : "=r"(sp),"=r"(pc));
+	__asm__ __volatile__ ("mov %%sp,%0" : "=r"(sp));
 
 	assert(sp >= (void*)KERNBASE);
 
@@ -130,9 +130,6 @@ backtrace(void)
 			}
 		}
 		else
-		{
-			warn("Can't backtrace from user with current == NULL!");
 			break;
-		}
 	}
 }

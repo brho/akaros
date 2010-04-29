@@ -6,7 +6,7 @@
 
 
 // Macro to save a minimal part of the trap frame, i.e., what's necessary
-// to safely return from interrupt.  Global registers, y, pc, npc.
+// to safely return from interrupt.  Global registers, y, pc, npc, far, fsr.
 #define SAVE_MINIMAL_TF(tf) \
 	std	%g0,[tf+  0] ;\
 	std	%g2,[tf+  8] ;\
@@ -15,8 +15,14 @@
 	st	%l7,[tf+128] ;\
 	st	%l5,[tf+132] ;\
 	st	%l6,[tf+136] ;\
-	mov	%y,%g1       ;\
-	st	%g1,[tf+148]
+	mov	%tbr,%g2     ;\
+	mov	%y,%g3       ;\
+	std	%g2,[tf+144] ;\
+	set	0x300,%g2    ;\
+	set	0x400,%g3    ;\
+	lda	[%g2] 4,%g2  ;\
+	lda	[%g3] 4,%g3  ;\
+	std	%g2,[tf+160]
 
 // Macro to restore same.
 #define RESTORE_MINIMAL_TF(tf) \
@@ -57,13 +63,24 @@ handle_trap:
 	 mov	%l1,%l5
 
 	// Trap came from kernel.  Spill a window if necessary.
+	SAVE_MINIMAL_TF(%fp-SIZEOF_TRAPFRAME_T)
+	mov	%tbr,%g1
 	restore
 	save
 
 	// Set up stack, save state, call handler
 	sub	%fp,64+SIZEOF_TRAPFRAME_T,%sp
-	SAVE_MINIMAL_TF(%sp+64)
-	call	%l0
+
+	// Save full trap frame if this was a synchronous exception (=> bug!!)
+	and	%g1,0xF00,%g1
+	cmp	%g1,0x100
+	be	2f
+	 nop
+
+	call	save_rest_of_tf
+	 add	%sp,64,%o0
+
+2:	call	%l0
 	 add	%sp,64,%o0
 
 	// Fill a window if necessary.
@@ -76,43 +93,40 @@ handle_trap:
 	RESTORE_MINIMAL_TF(%sp+64)
 
 	// Trap came from user.  Spill a window if necessary.
-1:	restore
+1:	mov	CORE_ID_REG,%l1
+	sll	%l1,KSTKSHIFT,%l1
+	set	bootstacktop-SIZEOF_TRAPFRAME_T,%l2
+	sub	%l2,%l1,%l1
+	SAVE_MINIMAL_TF(%l1)
+	sub	%l1,64,%g1
+	restore
 tflush1:
 	save
 
 	// Set up stack.
-	mov	CORE_ID_REG,%l1
-	sll	%l1,KSTKSHIFT,%l1
-	set	bootstacktop-64-SIZEOF_TRAPFRAME_T,%sp
-	sub	%sp,%l1,%sp
-
 	// Save a full trap frame, since we might not return through this path
-	call	env_save_tf
+	mov	%g1,%sp
+	call	save_rest_of_tf
 	 add	%sp,64,%o0
 
 	// spill all trapper's windows out to the stack.
 	// the 'save' may trap (triggering the spill),
 	// and if the stack is corrupted, the process may die
-	mov	%l7,%g3
-	mov	%sp,%g4
-	mov %l0,%g5
 trap_patchme:
 	mov	0,%g2						// 0 will become NWINDOWS-1
+	mov	%g2,%g3
 5:	deccc	%g2
 	bne,a	5b
 tflush2:
 	 save
 
-	// With windows flushed, now just set ourselves up as the first window
-	mov	%g0,%wim
-	andn	%g3,PSR_CWP,%g3
-	wr	%g3,PSR_PIL|PSR_ET,%psr
-	nop; nop; nop
-	mov	1<<1,%wim
-	mov	%g4,%sp
+	// get our old window back
+5:	deccc	%g3
+	bne,a	5b
+	 restore
 
 	// Call the handler
-	call	%g5
+	call	%l0
 	 add	%sp,64,%o0
 
 	// fallthrough to env_pop_tf, which is right below this function
@@ -156,44 +170,19 @@ env_pop_tf:
 
 	RESTORE_MINIMAL_TF(%o0)
 
-	// env_save_tf has a non-standard calling convention.
+	// save_rest_of_tf saves what SAVE_MINIMAL_TF doesn't.
 	// o0: destination trapframe_t*
-	// l5: PC
-	// l6: nPC
-	// l7: PSR
-	.global env_save_tf
-env_save_tf:
-
-	SAVE_MINIMAL_TF(%o0)
+save_rest_of_tf:
 
 	mov	%wim,%o4
 	st	%o4,[%o0+140]
-	mov	%tbr,%o4
-	st	%o4,[%o0+144]
 	mov	%asr13,%o5
 	st	%o5,[%o0+152]
 
-	set	0x300,%o4
-	set	0x400,%o5
-	lda	[%o4] 4,%o4
-	lda	[%o5] 4,%o5
-	std	%o4,[%o0+160]
 	lda	[%g0] 2,%o4
 	mov	4,%o5
 	lda	[%o5] 2,%o5
 	std	%o4,[%o0+168]
-
-	# try to read out the faulting insn (in no-fault mode)
-	andn	%l5,3,%o1
-	lda	[%g0] 4,%o2
-	or	%o2,2,%o3
-	sta	%o3,[%g0] 4
-	mov	-1,%o3
-	ld	[%o1],%o3
-	st	%o3,[%o0+156]
-	sta	%o2,[%g0] 4
-	mov	0x300,%o4
-	lda	[%o4] 4,%g0
 
 	mov	%o0,%g2
 
