@@ -26,6 +26,7 @@
 #include <sys/queue.h>
 #include <frontend.h>
 #include <monitor.h>
+#include <resource.h>
 
 /* Process Lists */
 struct proc_list proc_runnablelist = TAILQ_HEAD_INITIALIZER(proc_runnablelist);
@@ -831,6 +832,10 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 	uint32_t vcoreid = get_vcoreid(p, core_id());
 	struct vcore *vc = &p->procinfo->vcoremap[vcoreid];
 
+#ifdef __CONFIG_OSDI__
+	bool new_idle_core = FALSE;
+#endif /* __CONFIG_OSDI__ */
+
 	/* no reason to be nice, return */
 	if (being_nice && !vc->preempt_pending)
 		return;
@@ -879,6 +884,9 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 			__seq_end_write(&p->procinfo->coremap_seqctr);
 			// add to idle list
 			put_idle_core(core_id());
+#ifdef __CONFIG_OSDI__
+			new_idle_core = TRUE;
+#endif /* __CONFIG_OSDI__ */
 			// last vcore?  then we really want 1, and to yield the gang
 			// TODO: (RMS) will actually do this.
 			if (p->procinfo->num_vcores == 0) {
@@ -894,6 +902,21 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 	}
 	spin_unlock(&p->proc_lock);
 	proc_decref(p, 1); // need to eat the ref passed in.
+#ifdef __CONFIG_OSDI__
+	/* If there was a change to the idle cores, try and give our core to someone who was
+	 * preempted.  core_request likely won't return.  if that happens, p's
+	 * context ought to be cleaned up in the proc_startcore of the new guy. (if
+	 * we actually yielded)
+	 * TODO: (RMS) do this more intelligently e.g.: kick_scheduler(); */
+	extern struct proc *victim;
+	if (new_idle_core && victim) {
+		/* this ghetto victim pointer is not an edible reference, and core
+		 * request will eat it when it doesn't return. */
+		proc_incref(victim, 1);
+		core_request(victim);
+		proc_decref(victim, 1);
+	}
+#endif /* __CONFIG_OSDI__ */
 	/* Clean up the core and idle.  For mgmt cores, they will ultimately call
 	 * manager, which will call schedule() and will repick the yielding proc. */
 	abandon_core();

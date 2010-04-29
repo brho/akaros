@@ -51,6 +51,7 @@ DECL_PROG(msr_get_cores);
 DECL_PROG(msr_dumb_while);
 DECL_PROG(msr_nice_while);
 DECL_PROG(msr_single_while);
+DECL_PROG(msr_cycling_vcores);
 DECL_FILE(kfs_test_txt);
 DECL_FILE(hello_txt);
 #endif
@@ -69,6 +70,7 @@ struct kfs_entry kfs[MAX_KFS_FILES] = {
 	KFS_PENTRY(msr_dumb_while)
 	KFS_PENTRY(msr_nice_while)
 	KFS_PENTRY(msr_single_while)
+	KFS_PENTRY(msr_cycling_vcores)
 	KFS_FENTRY(kfs_test_txt)
 	KFS_FENTRY(hello_txt)
 #endif

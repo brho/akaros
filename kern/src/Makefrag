@@ -63,7 +63,8 @@ KERN_APPFILES += \
                  $(TESTS_DIR)/msr_get_cores \
                  $(TESTS_DIR)/msr_dumb_while \
                  $(TESTS_DIR)/msr_nice_while \
-                 $(TESTS_DIR)/msr_single_while
+                 $(TESTS_DIR)/msr_single_while \
+                 $(TESTS_DIR)/msr_cycling_vcores
 endif
 
 KERN_LDFLAGS   := $(KERN_LDFLAGS) -L$(OBJDIR)/$(KERN_DIR) \

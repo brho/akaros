@@ -17,6 +17,13 @@
 #include <schedule.h>
 #include <hashtable.h>
 
+#ifdef __CONFIG_OSDI__
+/* Whoever was preempted from.  Ghetto hacks in yield will use this to give the
+ * core back.  Assumes only one proc is getting preempted, which is true for
+ * OSDI. */
+struct proc *victim = NULL;
+#endif
+
 /* This deals with a request for more cores.  The request is already stored in
  * the proc's amt_wanted (it is compared to amt_granted). 
  *
@@ -61,6 +68,12 @@ ssize_t core_request(struct proc *p)
 		__proc_kmsg_pending(p, self_ipi_pending);
 		return 0;
 	}
+	/* Fail if we can never handle this amount (based on how many we told the
+	 * process it can get). */
+	if (p->resources[RES_CORES].amt_wanted > p->procinfo->max_vcores) {
+		spin_unlock(&p->proc_lock);
+		return -EFAIL;
+	}
 	/* otherwise, see how many new cores are wanted */
 	amt_new = p->resources[RES_CORES].amt_wanted -
 	          p->resources[RES_CORES].amt_granted;
@@ -88,9 +101,66 @@ ssize_t core_request(struct proc *p)
 		}
 		num_granted = amt_new;
 	} else {
+#ifdef __CONFIG_OSDI__
+		/* take what we can from the idlecoremap, then if enough aren't
+		 * available, take what we can now. */	
+		num_granted = num_idlecores;
+		for (int i = 0; i < num_granted; i++) {
+			corelist[i] = idlecoremap[num_idlecores-1];
+			num_idlecores--;
+		}
+#else
 		num_granted = 0;
+#endif /* __CONFIG_OSDI__ */
 	}
 	spin_unlock(&idle_lock);
+#ifdef __CONFIG_OSDI__
+	/* Ghetto, using the SOFT flag to mean "take this from someone else" */
+	if (p->resources[RES_CORES].flags & REQ_SOFT) {
+		/* And take whatever else we can from whoever is using other cores */
+		size_t num_to_preempt = amt_new - num_granted;
+		size_t num_preempted = 0;
+		
+		printd("Attempted to preempt %d cores for proc %d (%p)\n",
+		       num_to_preempt, p->pid, p);
+		/* Find and preempt some cores.  Note the skipping of core 0.  Also note
+		 * this is a horrible way to do it.  A reasonably smart scheduler can
+		 * check its pcoremap. */
+		for (int i = 1; i < num_cpus; i++) {
+			victim = per_cpu_info[i].cur_proc;
+			/* victim is a core with a current proc that isn't us */
+			if (victim && victim != p) {
+				printd("Preempting pcore %d from proc %d (%p)\n", i, 
+				       victim->pid, victim);
+				/* preempt_core technically needs an edible reference, though
+				 * currently we always return since the victim isn't current */
+				proc_incref(victim, 1);
+				/* no waiting or anything, just take it.  telling them 1 sec */
+				proc_preempt_core(victim, i, 1000000);
+				proc_decref(victim, 1);
+				num_preempted++;
+			}
+			if (num_preempted == num_to_preempt)
+				break;
+		}
+		assert(num_preempted == num_to_preempt);
+		printd("Trying to get the idlecores recently preempted.\n");
+		/* Then take the idlecores for ourself.  Cannot handle a concurrent
+		 * core_request.  If this fails, things will be fucked. */
+		spin_on(num_idlecores < num_to_preempt);
+		spin_lock(&idle_lock);
+		for (int i = num_granted; i < amt_new; i++) {
+			// grab the last one on the list
+			corelist[i] = idlecoremap[num_idlecores-1];
+			num_idlecores--;
+		}
+		assert(num_idlecores >= 0);
+		spin_unlock(&idle_lock);
+		num_granted += num_preempted;
+		assert(num_granted == amt_new);
+	}
+#endif /* __CONFIG_OSDI__ */
+
 	// Now, actually give them out
 	if (num_granted) {
 		switch (p->state) {
@@ -115,6 +185,7 @@ ssize_t core_request(struct proc *p)
 				__seq_start_write(&vcpd->preempt_tf_valid);
 				/* If we remove this, vcore0 will start where the _S left off */
 				vcpd->notif_pending = TRUE;
+				assert(vcpd->notif_enabled);
 				/* in the async case, we'll need to remotely stop and bundle
 				 * vcore0's TF.  this is already done for the sync case (local
 				 * syscall). */
@@ -143,6 +214,7 @@ ssize_t core_request(struct proc *p)
 		/* give them the cores.  this will start up the extras if RUNNING_M. */
 		self_ipi_pending = __proc_give_cores(p, corelist, num_granted);
 		spin_unlock(&p->proc_lock);
+		// TODO: (RMS) think about this, esp when its called from a scheduler
 		__proc_kmsg_pending(p, self_ipi_pending);
 		/* if there's a race on state (like DEATH), it'll get handled by
 		 * proc_run or proc_destroy */
@@ -188,10 +260,6 @@ error_t resource_req(struct proc *p, int type, size_t amt_wanted,
 	p->resources[type].amt_wanted_min = MIN(amt_wanted_min, amt_wanted);
 	p->resources[type].flags = flags;
 	spin_unlock(&p->proc_lock);
-
-	// no change in the amt_wanted
-	if (old_amount == amt_wanted)
-		return 0;
 
 	switch (type) {
 		case RES_CORES:
