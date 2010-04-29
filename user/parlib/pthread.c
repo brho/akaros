@@ -42,6 +42,10 @@ void _pthread_init()
 		nm->flags |= NOTIF_WANTED | NOTIF_MSG | NOTIF_IPI;
 		nm->vcoreid = i % 2; // vcore0 or 1, keepin' it fresh.
 	}
+	/* don't forget to enable notifs on vcore0.  if you don't, the kernel will
+	 * restart your _S with notifs disabled, which is a path to confusion. */
+	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[0];
+	vcpd->notif_enabled = TRUE;
 
 	/* Create a pthread_tcb for the main thread */
 	pthread_t t = (pthread_t)calloc(sizeof(struct pthread_tcb), 1);
