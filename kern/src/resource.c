@@ -177,15 +177,20 @@ ssize_t core_request(struct proc *p)
 				struct preempt_data *vcpd = &p->procdata->vcore_preempt_data[0];
 				vcpd->preempt_tf = *current_tf;
 				save_fp_state(&vcpd->preempt_anc);
-#ifdef __CONFIG_EXPER_TRADPROC__
-				vcpd->notif_tf = *current_tf;
-				proc_init_trapframe(&p->env_tf, 0, p->env_entry,
-				                    vcpd->transition_stack);
-#endif /* __CONFIG_EXPER_TRADPROC__ */
 				__seq_start_write(&vcpd->preempt_tf_valid);
 				/* If we remove this, vcore0 will start where the _S left off */
 				vcpd->notif_pending = TRUE;
 				assert(vcpd->notif_enabled);
+#ifdef __CONFIG_EXPER_TRADPROC__
+				/* the proc that represents vcore0 will start at the entry
+				 * point, as if it was a notification handler, so we'll mimic
+				 * what __startcore would have done for a vcore0 restart. */
+				vcpd->notif_tf = *current_tf;
+				proc_init_trapframe(&p->env_tf, 0, p->env_entry,
+				                    vcpd->transition_stack);
+				vcpd->notif_pending = FALSE;
+				vcpd->notif_enabled = FALSE;
+#endif /* __CONFIG_EXPER_TRADPROC__ */
 				/* in the async case, we'll need to remotely stop and bundle
 				 * vcore0's TF.  this is already done for the sync case (local
 				 * syscall). */
