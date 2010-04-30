@@ -73,6 +73,17 @@ static inline bool in_kernel(struct trapframe *tf)
 	return (tf->tf_cs & ~3) == GD_KT;
 }
 
+/* TODO: (HSS) */
+static inline void save_fp_state(struct ancillary_state *silly)
+{
+	asm volatile("fxsave %0" : : "m"(*silly));
+}
+
+static inline void restore_fp_state(struct ancillary_state *silly)
+{
+	asm volatile("fxrstor %0" : : "m"(*silly));
+}
+
 #endif /* !__ASSEMBLER__ */
 
 #endif /* !ROS_INC_ARCH_TRAP_H */

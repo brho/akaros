@@ -215,14 +215,6 @@ trap_dispatch(trapframe_t *tf)
 	return;
 }
 
-void save_fp_state(struct ancillary_state *silly)
-{
-}
-
-void restore_fp_state(struct ancillary_state *silly)
-{
-}
-
 void
 env_push_ancillary_state(env_t* e)
 {

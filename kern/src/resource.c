@@ -56,7 +56,7 @@ ssize_t core_request(struct proc *p)
 		assert(p->state == PROC_RUNNING_M); // TODO: (ACR) async core req
 		// save the context, to be restarted in _S mode
 		p->env_tf = *current_tf;
-		env_push_ancillary_state(p);
+		env_push_ancillary_state(p); // TODO: (HSS)
 		proc_set_syscall_retval(&p->env_tf, ESUCCESS);
 		/* sending death, since it's not our job to save contexts or anything in
 		 * this case.  also, if this returns true, we will not return down

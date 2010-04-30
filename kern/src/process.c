@@ -645,8 +645,10 @@ static void __proc_startcore(struct proc *p, trapframe_t *tf)
 	 * different context.
 	 * for now, we load this silly state here. (TODO) (HSS)
 	 * We also need this to be per trapframe, and not per process...
-	 */
-	env_pop_ancillary_state(p);
+	 * For now / OSDI, only load it when in _S mode.  _M mode was handled in
+	 * __startcore.  */
+	if (p->state == PROC_RUNNING_S)
+		env_pop_ancillary_state(p);
 	env_pop_tf(tf);
 }
 
@@ -867,7 +869,7 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 	switch (p->state) {
 		case (PROC_RUNNING_S):
 			p->env_tf= *current_tf;
-			env_push_ancillary_state(p);
+			env_push_ancillary_state(p); // TODO: (HSS)
 			__proc_set_state(p, PROC_RUNNABLE_S);
 			schedule_proc(p);
 			break;
