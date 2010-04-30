@@ -378,16 +378,18 @@ void e1000_setup_descriptors() {
 
 void e1000_set_rx_descriptor(uint32_t des_num, uint8_t reset_buffer) {
 	
-	memset(&rx_des_kva[des_num], 0x00, sizeof(struct e1000_rx_desc));
+	//memset(&rx_des_kva[des_num], 0x00, sizeof(struct e1000_rx_desc));
+	rx_des_kva[des_num].length = 0;
+	rx_des_kva[des_num].csum = 0;
+	rx_des_kva[des_num].status = 0;
+	rx_des_kva[des_num].errors = 0;
+	rx_des_kva[des_num].special = 0;
 	
 	if (reset_buffer) {
 		char *rx_buffer = kmalloc(E1000_RX_MAX_BUFFER_SIZE, 0);
-		char *hdr_buffer = kmalloc(E1000_RX_MAX_BUFFER_SIZE, 0);	
 		if (rx_buffer == NULL) panic ("Can't allocate page for RX Buffer");
-		if (rx_buffer == NULL) panic ("Can't allocate page for HDR Buffer");
 
 		rx_des_kva[des_num].buffer_addr = PADDR(rx_buffer);
-		*(((uint64_t*)&rx_des_kva[des_num].buffer_addr) + 1) = PADDR(rx_buffer);
 	}
 
 	return;
