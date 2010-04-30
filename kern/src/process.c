@@ -284,8 +284,14 @@ int fake_proc_alloc(struct proc **pp, struct proc *parent, uint32_t vcoreid)
 	// p->syscallbackring = not happening
 	p->true_proc = parent;
 	p->vcoreid = vcoreid;
-	/* map us to the true parent vcoremap */
+	/* there is a slight race on the old vcore mapping.  for a brief period, it
+	 * is unmapped, but still tracked by the parent.  it's between the unmapping
+	 * and the freeing (where the vcore_procs[i] is cleared, which we need to
+	 * hold on to until the fake_proc has abandoned core.  a brief spin should
+	 * be okay. */
+	spin_on(parent->vcore_procs[vcoreid]);
 	assert(!parent->vcore_procs[vcoreid]);
+	/* map us to the true parent vcoremap */
 	parent->vcore_procs[vcoreid] = p;
 	parent->env_refcnt++;
 
