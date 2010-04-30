@@ -19,6 +19,11 @@
 void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
            int fd, size_t offset)
 {
+#ifdef __CONFIG_EXPER_TRADPROC__
+if (!is_real_proc(p))
+	p = p->true_proc;
+#endif /* __CONFIG_EXPER_TRADPROC__ */
+
 	printd("mmap(addr %x, len %x, prot %x, flags %x, fd %x, off %x)\n", addr,
 	       len, prot, flags, fd, offset);
 	if (fd >= 0 && (flags & MAP_SHARED)) {
@@ -53,6 +58,11 @@ void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
               struct file* file, size_t offset)
 {
+#ifdef __CONFIG_EXPER_TRADPROC__
+if (!is_real_proc(p))
+	p = p->true_proc;
+#endif /* __CONFIG_EXPER_TRADPROC__ */
+
 	// TODO: grab the appropriate mm_lock
 	spin_lock(&p->proc_lock);
 	void* ret = __do_mmap(p,addr,len,prot,flags,file,offset);
@@ -63,6 +73,11 @@ void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 void *__do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
                 struct file* file, size_t offset)
 {
+#ifdef __CONFIG_EXPER_TRADPROC__
+if (!is_real_proc(p))
+	p = p->true_proc;
+#endif /* __CONFIG_EXPER_TRADPROC__ */
+
 	int num_pages = ROUNDUP(len, PGSIZE) / PGSIZE;
 
 #ifndef __CONFIG_DEMAND_PAGING__
@@ -153,6 +168,11 @@ void *__do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 
 int mprotect(struct proc* p, void* addr, size_t len, int prot)
 {
+#ifdef __CONFIG_EXPER_TRADPROC__
+if (!is_real_proc(p))
+	p = p->true_proc;
+#endif /* __CONFIG_EXPER_TRADPROC__ */
+
 	printd("mprotect(addr %x, len %x, prot %x)\n",addr,len,prot);
 	if((uintptr_t)addr % PGSIZE || (len == 0 && (prot & PROT_UNMAP)))
 	{
@@ -177,6 +197,11 @@ int mprotect(struct proc* p, void* addr, size_t len, int prot)
 
 int __mprotect(struct proc* p, void* addr, size_t len, int prot)
 {
+#ifdef __CONFIG_EXPER_TRADPROC__
+if (!is_real_proc(p))
+	p = p->true_proc;
+#endif /* __CONFIG_EXPER_TRADPROC__ */
+
 	int newperm = (prot & PROT_WRITE) ? PTE_USER_RW :
 	              (prot & (PROT_READ|PROT_EXEC)) ? PTE_USER_RO : 0;
 
@@ -228,16 +253,31 @@ int __mprotect(struct proc* p, void* addr, size_t len, int prot)
 
 int munmap(struct proc* p, void* addr, size_t len)
 {
+#ifdef __CONFIG_EXPER_TRADPROC__
+if (!is_real_proc(p))
+	p = p->true_proc;
+#endif /* __CONFIG_EXPER_TRADPROC__ */
+
 	return mprotect(p, addr, len, PROT_UNMAP);
 }
 
 int __munmap(struct proc* p, void* addr, size_t len)
 {
+#ifdef __CONFIG_EXPER_TRADPROC__
+if (!is_real_proc(p))
+	p = p->true_proc;
+#endif /* __CONFIG_EXPER_TRADPROC__ */
+
 	return __mprotect(p, addr, len, PROT_UNMAP);
 }
 
 int handle_page_fault(struct proc* p, uintptr_t va, int prot)
 {
+#ifdef __CONFIG_EXPER_TRADPROC__
+if (!is_real_proc(p))
+	p = p->true_proc;
+#endif /* __CONFIG_EXPER_TRADPROC__ */
+
 	va = ROUNDDOWN(va,PGSIZE);
 
 	if(prot != PROT_READ && prot != PROT_WRITE && prot != PROT_EXEC)
@@ -251,6 +291,11 @@ int handle_page_fault(struct proc* p, uintptr_t va, int prot)
 	
 int __handle_page_fault(struct proc* p, uintptr_t va, int prot)
 {
+#ifdef __CONFIG_EXPER_TRADPROC__
+if (!is_real_proc(p))
+	p = p->true_proc;
+#endif /* __CONFIG_EXPER_TRADPROC__ */
+
 	int ret = -1;
 	// find offending PTE
 	pte_t* ppte = pgdir_walk(p->env_pgdir,(void*)va,0);
