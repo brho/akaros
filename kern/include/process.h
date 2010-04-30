@@ -140,9 +140,9 @@ void proc_decref(struct proc *SAFE p, size_t count);
 #define current per_cpu_info[core_id()].cur_proc
 #define set_current_proc(p) per_cpu_info[core_id()].cur_proc = (p)
 
-/* Allows the kernel to figure out what *user* tf is on this core's stack.  Can be used
- * just like a pointer to a struct Trapframe.  Need these to be macros due to
- * some circular dependencies with smp.h.  This is done here instead of
+/* Allows the kernel to figure out what *user* tf is on this core's stack.  Can
+ * be used just like a pointer to a struct Trapframe.  Need these to be macros
+ * due to some circular dependencies with smp.h.  This is done here instead of
  * elsewhere (like trap.h) for other elliptical reasons.  Note the distinction
  * between kernel and user contexts.  The kernel always returns to its nested,
  * interrupted contexts via iret/etc.  We don't always do that for user
@@ -151,12 +151,17 @@ void proc_decref(struct proc *SAFE p, size_t count);
 #define set_current_tf(tf) per_cpu_info[core_id()].cur_tf = (tf)
 
 void abandon_core(void);
+/* Hold the proc_lock, since it'll use the vcoremapping to send an unmapping
+ * message for the region from start to end.  */
+void __proc_tlbshootdown(struct proc *p, uintptr_t start, uintptr_t end);
 
 /* Kernel message handlers for process management */
 void __startcore(trapframe_t *tf, uint32_t srcid, void *a0, void *a1, void *a2);
 void __notify(trapframe_t *tf, uint32_t srcid, void *a0, void *a1, void *a2);
 void __preempt(trapframe_t *tf, uint32_t srcid, void *a0, void *a1, void *a2);
 void __death(trapframe_t *tf, uint32_t srcid, void *a0, void *a1, void *a2);
+void __tlbshootdown(struct trapframe *tf, uint32_t srcid, void *a0, void *a1,
+                    void *a2);
 
 /* Arch Specific */
 void proc_init_trapframe(trapframe_t *SAFE tf, uint32_t vcoreid,

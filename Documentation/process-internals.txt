@@ -13,7 +13,8 @@ Contents:
 4. Preemption and Notification Issues
 5. Current_tf
 6. Locking!
-7. TBD
+7. TLB Coherency
+8. TBD
 
 1. Reference Counting
 ===========================
@@ -739,5 +740,121 @@ answer is that the actual work of running the scheduler should be a routine
 kmsg, similar to how Linux sets a bit in the kernel that it checks on the way
 out to see if it should run the scheduler or not.
 
-7. TBD
+7. TLB Coherency
+===========================
+When changing or removing memory mappings, we need to do some form of a TLB
+shootdown.  Normally, this will require sending an IPI (immediate kmsg) to
+every vcore of a process to unmap the affected page.  Before allocating that
+page back out, we need to make sure that every TLB has been flushed.  
+
+One reason to use a kmsg over a simple handler is that we often want to pass a
+virtual address to flush for those architectures (like x86) that can
+invalidate a specific page.  Ideally, we'd use a broadcast kmsg (doesn't exist
+yet), though we already have simple broadcast IPIs.
+
+7.1 Initial Stuff
+---------------------------
+One big issue is whether or not to wait for a response from the other vcores
+that they have unmapped.  There are two concerns: 1) Page reuse and 2) User
+semantics.  We cannot give out the physical page while it may still be in a
+TLB (even to the same process.  Ask us about the pthread_test bug).
+
+The second case is a little more detailed.  The application may not like it if
+it thinks a page is unmapped or protected, and it does not generate a fault.
+I am less concerned about this, especially since we know that even if we don't
+wait to hear from every vcore, we know that the message was delivered and the
+IPI sent.  Any cores that are in userspace will have trapped and eventually
+handle the shootdown before having a chance to execute other user code.  The
+delays in the shootdown response are due to being in the kernel with
+interrupts disabled (it was an IMMEDIATE kmsg).
+
+7.2 RCU
+---------------------------
+One approach is similar to RCU.  Unmap the page, but don't put it on the free
+list.  Instead, don't reallocate it until we are sure every core (possibly
+just affected cores) had a chance to run its kmsg handlers.  This time is
+similar to the RCU grace periods.  Once the period is over, we can then truly
+free the page.
+
+This would require some sort of RCU-like mechanism and probably a per-core
+variable that has the timestamp of the last quiescent period.  Code caring
+about when this page (or pages) can be freed would have to check on all of the
+cores (probably in a bitmask for what needs to be freed).  It would make sense
+to amortize this over several RCU-like operations.
+
+7.3 Checklist
+---------------------------
+It might not suck that much to wait for a response if you already sent an IPI,
+though it incurs some more cache misses.  If you wanted to ensure all vcores
+ran the shootdown handler, you'd have them all toggle their bit in a checklist
+(unused for a while, check smp.c).  The only one who waits would be the
+caller, but there still are a bunch of cache misses in the handlers.  Maybe
+this isn't that big of a deal, and the RCU thing is an unnecessary
+optimization.
+
+7.4 Just Wait til a Context Switch
+---------------------------
+Another option is to not bother freeing the page until the entire process is
+descheduled.  This could be a very long time, and also will mess with
+userspace's semantics.  They would be running user code that could still
+access the old page, so in essence this is a lazy munmap/mprotect.  The
+process basically has the page in pergatory: it can't be reallocated, and it
+might be accessible, but can't be guaranteed to work.
+
+The main benefit of this is that you don't need to send the TLB shootdown IPI
+at all - so you don't interfere with the app.  Though in return, they have
+possibly weird semantics.  One aspect of these weird semantics is that the
+same virtual address could map to two different pages - that seems like a
+disaster waiting to happen.  We could also block that range of the virtual
+address space from being reallocated, but that gets even more tricky.
+
+One issue with just waiting and RCU is memory pressure.  If we actually need
+the page, we will need to enforce an unmapping, which sucks a little.
+
+7.5 Bulk vs Single
+---------------------------
+If there are a lot of pages being shot down, it'd be best to amortize the cost
+of the kernel messages, as well as the invlpg calls (single page shootdowns).
+One option would be for the kmsg to take a range, and not just a single
+address.  This would help with bulk munmap/mprotects.  Based on the number of
+these, perhaps a raw tlbflush (the entire TLB) would be worth while, instead
+of n single shots.  Odds are, that number is arch and possibly workload
+specific.
+
+For now, the plan will be to send a range and have them individually shot
+down.
+
+7.6 Don't do it
+---------------------------
+Either way, munmap/mprotect sucks in an MCP.  I recommend not doing it, and
+doing the appropriate mmap/munmap/mprotects in _S mode.  Unfortunately, even
+our crap pthread library munmaps on demand as threads are created and
+destroyed.  The vcore code probably does in the bowels of glibc's TLS code
+too, though at least that isn't on every user context switch.
+
+7.7 Local memory
+---------------------------
+Private local memory would help with this too.  If each vcore has its own
+range, we won't need to send TLB shootdowns for those areas, and we won't have
+to worry about weird application semantics.  The downside is we would need to
+do these mmaps in certain ranges in advance, and might not easily be able to
+do them remotely.  More on this when we actually design and build it.
+
+7.8 Future Hardware Support
+---------------------------
+It would be cool and interesting if we had the ability to remotely shootdown
+TLBs.  For instance, all cores with cr3 == X, shootdown range Y..Z.  It's
+basically what we'll do with the kernel message and the vcoremap, but with
+magic hardware.
+
+7.9 Current Status
+---------------------------
+For now, we just send a kernel message to all vcores to do a full TLB flush,
+and not to worry about checklists, waiting, or anything.  This is due to being
+short on time and not wanting to sort out the issue with ranges.  The way
+it'll get changed to is to send the kmsg with the range to the appropriate
+cores, and then maybe put the page on the end of the freelist (instead of the
+head).  More to come.
+
+8. TBD
 ===========================

@@ -1481,6 +1481,42 @@ void proc_decref(struct proc *p, size_t count)
 		panic("Too many decrefs!");
 }
 
+/* Stop running whatever context is on this core, load a known-good cr3, and
+ * 'idle'.  Note this leaves no trace of what was running. This "leaves the
+ * process's context. */
+void abandon_core(void)
+{
+	if (current)
+		__abandon_core();
+	smp_idle();
+}
+
+/* Will send a TLB shootdown message to every vcore in the main address space
+ * (aka, all vcores for now).  The message will take the start and end virtual
+ * addresses as well, in case we want to be more clever about how much we
+ * shootdown and batching our messages.  Should do the sanity about rounding up
+ * and down in this function too.
+ *
+ * Hold the proc_lock before calling this.
+ *
+ * Would be nice to have a broadcast kmsg at this point.  Note this may send a
+ * message to the calling core (interrupting it, possibly while holding the
+ * proc_lock).  We don't need to process routine messages since it's an
+ * immediate message. */
+void __proc_tlbshootdown(struct proc *p, uintptr_t start, uintptr_t end)
+{
+	uint32_t active_vcoreid = 0, pcoreid;
+	/* TODO: (TLB) sanity checks and rounding on the ranges */
+	for (int i = 0; i < p->procinfo->num_vcores; i++) {
+		/* find next active vcore */
+		active_vcoreid = get_busy_vcoreid(p, active_vcoreid);
+		pcoreid = p->procinfo->vcoremap[active_vcoreid].pcoreid;
+		send_kernel_message(pcoreid, __tlbshootdown, (void*)start, (void*)end,
+		                    (void*)0, KMSG_IMMEDIATE);
+		active_vcoreid++; /* for the next loop, skip the one we just used */
+	}
+}
+
 /* Kernel message handler to start a process's context on this core.  Tightly
  * coupled with proc_run().  Interrupts are disabled. */
 void __startcore(trapframe_t *tf, uint32_t srcid, void *a0, void *a1, void *a2)
@@ -1560,16 +1596,6 @@ void __notify(trapframe_t *tf, uint32_t srcid, void *a0, void *a1, void *a2)
 	__proc_startcore(p, &local_tf);
 }
 
-/* Stop running whatever context is on this core, load a known-good cr3, and
- * 'idle'.  Note this leaves no trace of what was running. This "leaves the
- * process's context. */
-void abandon_core(void)
-{
-	if (current)
-		__abandon_core();
-	smp_idle();
-}
-
 void __preempt(trapframe_t *tf, uint32_t srcid, void *a0, void *a1, void *a2)
 {
 	struct preempt_data *vcpd;
@@ -1618,6 +1644,15 @@ void __death(trapframe_t *tf, uint32_t srcid, void *SNT a0, void *SNT a1,
 		__unmap_vcore(current, vcoreid);
 	}
 	abandon_core();
+}
+
+/* Kernel message handler, usually sent IMMEDIATE, to shoot down virtual
+ * addresses from a0 to a1. */
+void __tlbshootdown(struct trapframe *tf, uint32_t srcid, void *a0, void *a1,
+                    void *a2)
+{
+	/* TODO: (TLB) something more intelligent with the range */
+	tlbflush();
 }
 
 void print_idlecoremap(void)

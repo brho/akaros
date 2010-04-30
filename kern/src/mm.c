@@ -219,8 +219,10 @@ int __mprotect(struct proc* p, void* addr, size_t len, int prot)
 		}
 	}
 
-	//TODO: TLB shootdown - needs to be process wide
-	tlbflush();
+	/* TODO: (TLB) make this take a sensible range.  For now, it doesn't matter
+	 * since we ignore it in the process code.  Also, make sure you are holding
+	 * the proc_lock when calling this. */
+	__proc_tlbshootdown(p, 0, 0xffffffff);
 	return 0;
 }
 
