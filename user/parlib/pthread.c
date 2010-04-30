@@ -48,7 +48,7 @@ void _pthread_init()
 	vcpd->notif_enabled = TRUE;
 
 	/* Create a pthread_tcb for the main thread */
-	pthread_t t = (pthread_t)calloc(sizeof(struct pthread_tcb), 1);
+	pthread_t t = (pthread_t)calloc(1, sizeof(struct pthread_tcb));
 	t->id = get_next_pid();
 	assert(t->id == 0);
 	/* Put the new pthread on the active queue */
@@ -222,12 +222,12 @@ int pthread_create(pthread_t* thread, const pthread_attr_t* attr,
 	pthread_once(&init_once,&_pthread_init);
 
 	struct pthread_tcb *t = pthread_self();
-	assert(t);
+	assert(t); /* TODO/FYI: doesn't prevent this from being in vcore context */
 	/* Don't migrate this thread to anothe vcore, since it depends on being on
 	 * the same vcore throughout. */
 	t->dont_migrate = TRUE;
 	uint32_t vcoreid = vcore_id();
-	*thread = (pthread_t)calloc(sizeof(struct pthread_tcb), 1);
+	*thread = (pthread_t)calloc(1, sizeof(struct pthread_tcb));
 	(*thread)->start_routine = start_routine;
 	(*thread)->arg = arg;
 	(*thread)->id = get_next_pid();
