@@ -140,7 +140,6 @@ size_t num_vcores()
 
 int vcore_id()
 {
-	// defined in ros/arch/vcore.h
-	return __vcore_id();
+	return __vcoreid;
 }
 

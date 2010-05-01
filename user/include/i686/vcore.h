@@ -7,6 +7,8 @@
 #include <ros/syscall.h>
 #include <ros/arch/mmu.h>
 
+extern __thread int __vcoreid;
+
 /* Pops an ROS kernel-provided TF, reanabling notifications at the same time.
  * A Userspace scheduler can call this when transitioning off the transition
  * stack.
@@ -140,14 +142,16 @@ static inline void *get_tls_desc(uint32_t vcoreid)
 /* passing in the vcoreid, since it'll be in TLS of the caller */
 static inline void set_tls_desc(void *tls_desc, uint32_t vcoreid)
 {
-  /* Keep this technique in sync with sysdeps/ros/i386/tls.h */
-  segdesc_t tmp = SEG(STA_W, (uint32_t)tls_desc, 0xffffffff, 3);
-  __procdata.ldt[vcoreid] = tmp;
+	/* Keep this technique in sync with sysdeps/ros/i386/tls.h */
+	segdesc_t tmp = SEG(STA_W, (uint32_t)tls_desc, 0xffffffff, 3);
+	__procdata.ldt[vcoreid] = tmp;
 
-  /* GS is still the same (should be!), but it needs to be reloaded to force a
-   * re-read of the LDT. */
-  uint32_t gs = (vcoreid << 3) | 0x07;
-  asm volatile("movl %0,%%gs" : : "r" (gs) : "memory");
+	/* GS is still the same (should be!), but it needs to be reloaded to force a
+	 * re-read of the LDT. */
+	uint32_t gs = (vcoreid << 3) | 0x07;
+	asm volatile("movl %0,%%gs" : : "r" (gs) : "memory");
+
+	__vcoreid = vcoreid;
 }
 
 // this is how we get our thread id on entry.
@@ -156,14 +160,6 @@ static inline void set_tls_desc(void *tls_desc, uint32_t vcoreid)
 	register int temp asm ("eax"); \
 	temp; \
 })
-
-// The actual vcore_self() function is a global symbol that invokes this routine.
-static inline int
-__vcore_id()
-{
-	// TODO: use some kind of thread-local storage to speed this up!
-	return (int)ros_syscall(SYS_getvcoreid,0,0,0,0,0);
-}
 
 /* For debugging. */
 #include <rstdio.h>

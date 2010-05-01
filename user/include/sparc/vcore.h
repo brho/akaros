@@ -8,6 +8,8 @@
 #include <ros/procdata.h>
 #include <assert.h>
 
+extern __thread int __vcoreid;
+
 /* Feel free to ignore vcoreid.  It helps x86 to avoid a call to
  * sys_getvcoreid() if we pass it in. */
 static inline void *get_tls_desc(uint32_t vcoreid)
@@ -20,6 +22,7 @@ static inline void *get_tls_desc(uint32_t vcoreid)
 static inline void set_tls_desc(void *tls_desc, uint32_t vcoreid)
 {
 	asm volatile ("mov %0,%%g7" : : "r"(tls_desc) : "memory");
+	__vcoreid = vcoreid;
 }
 
 /* Pops an ROS kernel-provided TF, reanabling notifications at the same time.
@@ -53,9 +56,6 @@ static inline void pop_ros_tf(struct user_trapframe *tf, uint32_t vcoreid)
 	else
 		assert(tf->gpr[7] == (uint32_t)get_tls_desc(vcoreid));
 
-	// don't clobber the vcore id!
-	tf->asr13 = vcoreid;
-
 	vcpd->notif_enabled = true;
 	if(vcpd->notif_pending)
 		ros_syscall(SYS_self_notify,vcoreid,0,0,0,0);
@@ -71,7 +71,7 @@ static inline void save_ros_tf(struct user_trapframe *tf)
 {
 	// just do it in the kernel.  since we need to flush windows anyway,
 	// this isn't an egregious overhead.
-	asm volatile ("mov %0, %%o0; ta 5" : : "r"(tf) : "o0");
+	asm volatile ("mov %0, %%o0; ta 5" : : "r"(tf) : "o0","memory");
 }
 
 /* This assumes a user_tf looks like a regular kernel trapframe */
@@ -84,14 +84,10 @@ init_user_tf(struct user_trapframe *u_tf, uint32_t entry_pt, uint32_t stack_top)
 	u_tf->npc = entry_pt + 4;
 }
 
-#define __vcore_id_on_entry (__vcore_id())
-
-static inline int
-__vcore_id()
-{
-	int id;
-	asm ("mov %%asr13,%0" : "=r"(id));
-	return id;
-}
+#define __vcore_id_on_entry \
+({ \
+	register int temp asm ("g6"); \
+	temp; \
+})
 
 #endif /* PARLIB_ARCH_VCORE_H */

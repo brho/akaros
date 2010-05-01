@@ -10,6 +10,8 @@
 void** __vcore_thread_control_blocks = NULL;
 weak_alias(__vcore_thread_control_blocks,vcore_thread_control_blocks)
 
+__thread int __vcoreid = 0;
+
 void
 __vcore_entry(void)
 {
@@ -39,7 +41,8 @@ _start(void)
 	// acquire a TCB.
 	if(init || (id != 0))
 	{
-		TLS_INIT_TP(__vcore_thread_control_blocks[id],0);
+		set_tls_desc(__vcore_thread_control_blocks[id],id);
+		__vcoreid = id;
 		vcore_entry();
 		failmsg("why did vcore_entry() return?");
 		goto diediedie;

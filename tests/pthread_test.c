@@ -5,8 +5,8 @@
 #include <unistd.h>
 
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
-//#define printf_safe(...) {}
-#define printf_safe(...) \
+#define printf_safe(...) {}
+//#define printf_safe(...) \
 	pthread_mutex_lock(&lock); \
 	printf(__VA_ARGS__); \
 	pthread_mutex_unlock(&lock);
@@ -15,7 +15,7 @@ pthread_t t1;
 pthread_t t2;
 pthread_t t3;
 
-#define NUM_TEST_THREADS 10
+#define NUM_TEST_THREADS 1000
 
 pthread_t my_threads[NUM_TEST_THREADS];
 void *my_retvals[NUM_TEST_THREADS];
@@ -74,5 +74,6 @@ int main(int argc, char** argv)
 			printf_safe("[A] Successfully joined on thread %d (retval: %p)\n", i,
 			            my_retvals[i]);
 		}
+		break;
 	}
 } 

@@ -21,10 +21,11 @@ proc_init_trapframe(trapframe_t *tf, uint32_t vcoreid,
 
 	tf->psr = PSR_S; // but PS = 0
 	tf->gpr[14] = stack_top-96;
-	tf->asr13 = vcoreid;
 
 	tf->pc = entryp;
 	tf->npc = entryp+4;
+
+	tf->gpr[6] = vcoreid;
 }
 
 void proc_secure_trapframe(struct trapframe *tf)

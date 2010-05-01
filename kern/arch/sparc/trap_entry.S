@@ -22,7 +22,7 @@
 	set	0x400,%g3    ;\
 	lda	[%g2] 4,%g2  ;\
 	lda	[%g3] 4,%g3  ;\
-	std	%g2,[tf+160]
+	std	%g2,[tf+152]
 
 // Macro to restore same.
 #define RESTORE_MINIMAL_TF(tf) \
@@ -165,9 +165,6 @@ env_pop_tf:
 	ldd	[%g2+120],%i6
 	save
 
-	ld	[%o0+152],%l6
-	mov	%l6,%asr13
-
 	RESTORE_MINIMAL_TF(%o0)
 
 	// save_rest_of_tf saves what SAVE_MINIMAL_TF doesn't.
@@ -176,13 +173,11 @@ save_rest_of_tf:
 
 	mov	%wim,%o4
 	st	%o4,[%o0+140]
-	mov	%asr13,%o5
-	st	%o5,[%o0+152]
 
 	lda	[%g0] 2,%o4
 	mov	4,%o5
 	lda	[%o5] 2,%o5
-	std	%o4,[%o0+168]
+	std	%o4,[%o0+160]
 
 	mov	%o0,%g2
 
