@@ -10,12 +10,15 @@
 static char RACY (RO NT buf)[BUFLEN];
 
 char *
-readline(const char *prompt)
+readline(const char *prompt, ...)
 {
 	int i, c, echoing;
+	va_list ap;
 
+	va_start(ap, prompt);
 	if (prompt != NULL)
-		cprintf("%s", prompt);
+		vcprintf(prompt, ap);
+	va_end(ap);
 
 	i = 0;
 	echoing = iscons(0);

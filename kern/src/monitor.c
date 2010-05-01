@@ -58,6 +58,7 @@ static command_t (RO commands)[] = {
 	{ "notify", "Notify a process.  Vcoreid will skip their prefs", mon_notify},
 	{ "measure", "Run a specific measurement", mon_measure},
 	{ "trace", "Run a specific measurement", mon_trace},
+	{ "monitor", "Run the monitor on another core", mon_monitor},
 };
 #define NCOMMANDS (sizeof(commands)/sizeof(commands[0]))
 
@@ -662,6 +663,26 @@ int mon_trace(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 	return 0;
 }
 
+int mon_monitor(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
+{
+	if (argc < 2) {
+		printk("Usage: monitor COREID\n");
+		return 1;
+	}
+	uint32_t core = strtol(argv[1], 0, 0);
+	if (core >= num_cpus) {
+		printk("No such core!  Maybe it's in another cell...\n");
+		return 1;
+	}
+	void run_mon(struct trapframe *tf, uint32_t srcid, void *a0, void *a1,
+	             void *a2)
+	{
+		monitor(0); // TODO consider passing the tf
+	}
+	send_kernel_message(core, run_mon, 0, 0, 0, KMSG_ROUTINE);
+	return 0;
+}
+
 /***** Kernel monitor command interpreter *****/
 
 #define WHITESPACE "\t\r\n "
@@ -712,7 +733,11 @@ void monitor(trapframe_t *tf) {
 
 	char *buf;
 
-	printk("Welcome to the ROS kernel monitor on core %d!\n", core_id());
+	/* they are always disabled, since we have this irqsave lock */
+	if (irq_is_enabled())
+		printk("Entering Nanwan's Dungeon on Core %d (Ints on):\n", core_id());
+	else
+		printk("Entering Nanwan's Dungeon on Core %d (Ints off):\n", core_id());
 	printk("Type 'help' for a list of commands.\n");
 
 	if (tf != NULL)
@@ -721,7 +746,7 @@ void monitor(trapframe_t *tf) {
 	spin_unlock_irqsave(&monitor_lock);
 	while (1) {
 		spin_lock_irqsave(&monitor_lock);
-		buf = readline("K> ");
+		buf = readline("ROS(Core %d)> ", core_id());
 		if (buf != NULL) {
 			spin_unlock_irqsave(&monitor_lock);
 			if (runcmd(buf, tf) < 0)
