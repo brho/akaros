@@ -309,7 +309,7 @@ int mon_procinfo(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 		printk("\trunnable: show proc_runnablelist\n");
 		printk("\tresources: show resources wanted/granted for all procs\n");
 		printk("\tpid NUM: show a lot of info for proc NUM\n");
-		printk("\tunlock NUM: unlock the lock for proc NUM (OMG!!!)\n");
+		printk("\tunlock: unlock the lock for the ADDR (OMG!!!)\n");
 		printk("\tkill NUM: destroy proc NUM\n");
 		return 1;
 	}
@@ -329,16 +329,15 @@ int mon_procinfo(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 		print_proc_info(strtol(argv[2], 0, 0));
 	} else if (!strcmp(argv[1], "unlock")) {
 		if (argc != 3) {
-			printk("Give me a pid number.\n");
+			printk("Gimme lock address!  Me want lock address!.\n");
 			return 1;
 		}
-		struct proc *p = pid2proc(strtol(argv[2], 0, 0));
-		if (!p) {
-			printk("No such proc\n");
+		spinlock_t *lock = (spinlock_t*)strtol(argv[2], 0, 16);
+		if (!lock) {
+			printk("Null address...\n");
 			return 1;
 		}
-		spin_unlock(&p->proc_lock);
-		proc_decref(p, 1);
+		spin_unlock(lock);
 	} else if (!strcmp(argv[1], "kill")) {
 		if (argc != 3) {
 			printk("Give me a pid number.\n");

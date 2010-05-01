@@ -1691,14 +1691,18 @@ void print_allpids(void)
 void print_proc_info(pid_t pid)
 {
 	int j = 0;
-	struct proc *p = pid2proc(pid);
+	/* Doing this without the incref! careful! (avoiding deadlocks) TODO (REF)*/
+	//struct proc *p = pid2proc(pid);
+	spin_lock(&pid_hash_lock);
+	struct proc *p = hashtable_search(pid_hash, (void*)pid);
+	spin_unlock(&pid_hash_lock);
 	// not concerned with a race on the state...
 	if (!p) {
 		printk("Bad PID.\n");
 		return;
 	}
 	spinlock_debug(&p->proc_lock);
-	spin_lock(&p->proc_lock);
+	//spin_lock(&p->proc_lock); // No locking!!
 	printk("struct proc: %p\n", p);
 	printk("PID: %d\n", p->pid);
 	printk("PPID: %d\n", p->ppid);
@@ -1720,6 +1724,7 @@ void print_proc_info(pid_t pid)
 	/* No one cares, and it clutters the terminal */
 	//printk("Vcore 0's Last Trapframe:\n");
 	//print_trapframe(&p->env_tf);
-	spin_unlock(&p->proc_lock);
-	proc_decref(p, 1); /* decref for the pid2proc reference */
+	/* no locking / unlocking or refcnting */
+	// spin_unlock(&p->proc_lock);
+	// proc_decref(p, 1); /* decref for the pid2proc reference */
 }
