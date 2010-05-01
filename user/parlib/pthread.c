@@ -419,6 +419,8 @@ int pthread_cond_init(pthread_cond_t *c, const pthread_condattr_t *a)
 {
   c->attr = a;
   memset(c->waiters,0,sizeof(c->waiters));
+  memset(c->in_use,0,sizeof(c->in_use));
+  c->next_waiter = 0;
   return 0;
 }
 
@@ -436,7 +438,7 @@ int pthread_cond_broadcast(pthread_cond_t *c)
 int pthread_cond_signal(pthread_cond_t *c)
 {
   int i;
-  for(i = 0; i < max_vcores(); i++)
+  for(i = 0; i < MAX_PTHREADS; i++)
   {
     if(c->waiters[i])
     {
@@ -449,12 +451,23 @@ int pthread_cond_signal(pthread_cond_t *c)
 
 int pthread_cond_wait(pthread_cond_t *c, pthread_mutex_t *m)
 {
-  c->waiters[vcore_id()] = 1;
+  int old_waiter = c->next_waiter;
+  int my_waiter = c->next_waiter;
+  
+  //allocate a slot
+  while (atomic_swap (& (c->in_use[my_waiter]), SLOT_IN_USE) == SLOT_IN_USE)
+  {
+    my_waiter = (my_waiter + 1) % MAX_PTHREADS;
+	assert (old_waiter != my_waiter);  // do not want to wrap around
+  }
+  c->waiters[my_waiter] = WAITER_WAITING;
+  c->next_waiter = (my_waiter+1) % MAX_PTHREADS;  // race on next_waiter but ok, because it is advisary
+
   pthread_mutex_unlock(m);
 
-  volatile int* poll = &c->waiters[vcore_id()];
+  volatile int* poll = &c->waiters[my_waiter];
   while(*poll);
-
+  c->in_use[my_waiter] = SLOT_FREE;
   pthread_mutex_lock(m);
 
   return 0;
@@ -563,6 +576,7 @@ int pthread_once(pthread_once_t* once_control, void (*init_routine)(void))
 int pthread_barrier_init(pthread_barrier_t* b, const pthread_barrierattr_t* a, int count)
 {
   memset(b->local_sense,0,sizeof(b->local_sense));
+  memset(b->in_use,0,sizeof(b->in_use));
 
   b->sense = 0;
   b->nprocs = b->count = count;
@@ -573,9 +587,17 @@ int pthread_barrier_init(pthread_barrier_t* b, const pthread_barrierattr_t* a, i
 int pthread_barrier_wait(pthread_barrier_t* b)
 {
   unsigned int spinner = 0;
-  struct pthread_tcb *t = pthread_self();
+  int id = b->next_slot;
+  int old_id = b->next_slot;
 
-  int id = t->id;
+  //allocate a slot
+
+  while (atomic_swap (& (b->in_use[id]), SLOT_IN_USE) == SLOT_IN_USE)
+  {
+    id = (id + 1) % MAX_PTHREADS;
+	assert (old_id != id);  // do not want to wrap around
+  }
+  b->next_slot = (id + 1) % MAX_PTHREADS;
   int ls = b->local_sense[32*id] = 1 - b->local_sense[32*id];
 
   pthread_mutex_lock(&b->pmutex);

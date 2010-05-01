@@ -62,26 +62,38 @@ typedef struct
   int lock;
 } pthread_mutex_t;
 
-//TODO: MAX_PTHREADS is arbitrarily defined for now.
-#define MAX_PTHREADS 128
+/* TODO: MAX_PTHREADS is arbitrarily defined for now.
+ * It indicates the maximum number of threads that can wait on  
+   the same cond var/ barrier concurrently. */
+
+#define MAX_PTHREADS 32
 typedef struct
 {
   int local_sense[32*MAX_PTHREADS];
+  int in_use[MAX_PTHREADS];
   volatile int sense;
   int count;
   int nprocs;
+  int next_slot;
   pthread_mutex_t pmutex;
 } pthread_barrier_t;
 
+#define WAITER_CLEARED 0
+#define WAITER_WAITING 1
+#define SLOT_FREE 0
+#define SLOT_IN_USE 1
 typedef struct
 {
   int pshared;
 } pthread_condattr_t;
 
+
 typedef struct
 {
   const pthread_condattr_t* attr;
   int waiters[MAX_PTHREADS];
+  int in_use[MAX_PTHREADS];
+  int next_waiter; //start the search for an available waiter at this spot
 } pthread_cond_t;
 
 typedef int pthread_attr_t;
