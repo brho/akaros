@@ -101,4 +101,20 @@ void local_schedule_proc(uint32_t core, struct proc *p)
 	printd("SCHED: inserting proc %p on core %d\n", p, core);
 	spin_unlock_irqsave(&my_info->runqueue_lock);
 }
+
+/* ghetto func to act like a load balancer.  for now, it just looks at the head
+ * of every other cpu's queue. */
+void load_balance(void)
+{
+	struct per_cpu_info *other_info;
+	struct proc *dummy;
+
+	for (int i = 0; i < num_cpus; i++) {
+		other_info = &per_cpu_info[i];
+		spin_lock_irqsave(&other_info->runqueue_lock);
+		dummy = TAILQ_FIRST(&other_info->runqueue);
+		spin_unlock_irqsave(&other_info->runqueue_lock);
+	}
+}
+
 #endif /* __CONFIG_EXPER_TRADPROC__ */

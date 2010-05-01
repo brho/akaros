@@ -40,6 +40,7 @@ struct per_cpu_info {
 	spinlock_t routine_amsg_lock;
 	struct kernel_msg_list NTPTV(a0t) NTPTV(a1t) NTPTV(a2t) routine_amsgs;
 #ifdef __CONFIG_EXPER_TRADPROC__
+	unsigned int ticks; /* how many times the tick went off.  can roll over */
 	spinlock_t runqueue_lock;
 	struct proc_list runqueue;
 #endif /* __CONFIG_EXPER_TRADPROC__ */
@@ -70,6 +71,7 @@ int smp_call_wait(handler_wrapper_t*SAFE wrapper);
 
 void local_schedule(void);
 void local_schedule_proc(uint32_t core, struct proc *p);
+void load_balance(void);
 
 #endif /* __CONFIG_EXPER_TRADPROC__ */
 

@@ -83,6 +83,10 @@ void train_timing()
 void timer_interrupt(struct trapframe *tf, void *data)
 {
 #ifdef __CONFIG_EXPER_TRADPROC__
+	/* about every 10 ticks (100ms) run the load balancer.  Offset by coreid so
+	 * it's not as horrible.  */
+	if (per_cpu_info[core_id()].ticks % 10 == core_id())
+		load_balance();
 	local_schedule();
 #endif /* __CONFIG_EXPER_TRADPROC__ */
 }
