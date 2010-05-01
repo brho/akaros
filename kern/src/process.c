@@ -256,13 +256,6 @@ int fake_proc_alloc(struct proc **pp, struct proc *parent, uint32_t vcoreid)
 	error_t r;
 	struct proc *p;
 
-	/* So we can call this anytime we want to run a vcore, including vcore0,
-	 * which is the true_proc / parent.  Probably horribly broken. */
-	if (!vcoreid) {
-		*pp = parent;
-		return 0;
-	}
-
 	if (!(p = kmem_cache_alloc(proc_cache, 0)))
 		return -ENOMEM;
 
@@ -435,7 +428,7 @@ static void __proc_free(struct proc *p)
 			for (int j = 0; p->vcore_procs[i]; j++) {
 				cpu_relax();
 				if (j == 10000) {
-					printd("Core %d stalled while waiting on peep %d\n",
+					printk("Core %d stalled while waiting on peep %d\n",
 					       core_id(), i);
 					//send_kernel_message(p->procinfo->vcoremap[i].pcoreid,
 					//                    __death, 0, 0, 0, KMSG_ROUTINE);
@@ -849,7 +842,7 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 		return;
 
 #ifdef __CONFIG_EXPER_TRADPROC__
-	if (p->state == (PROC_RUNNING_M | PROC_DYING))
+	if (p->state & (PROC_RUNNING_M | PROC_DYING))
 		return;
 #endif /* __CONFIG_EXPER_TRADPROC__ */
 
@@ -1220,8 +1213,6 @@ bool __proc_give_cores(struct proc *SAFE p, uint32_t *pcorelist, size_t num)
 			// add new items to the vcoremap
 #ifdef __CONFIG_EXPER_TRADPROC__
 			__proc_set_state(p, PROC_RUNNING_M);
-			// want an extra one since res_req jacked on on our transition
-			p->env_refcnt++;
 #endif /* __CONFIG_EXPER_TRADPROC__ */
 			__seq_start_write(&p->procinfo->coremap_seqctr);
 			for (int i = 0; i < num; i++) {
@@ -1379,7 +1370,7 @@ bool __proc_take_allcores(struct proc *SAFE p, amr_t message,
 	__seq_start_write(&p->procinfo->coremap_seqctr);
 #ifdef __CONFIG_EXPER_TRADPROC__
 	/* Decref each child, so they will free themselves when they unmap */
-	for (int i = 1; i < MAX_NUM_CPUS; i++) {
+	for (int i = 0; i < MAX_NUM_CPUS; i++) {
 		if (p->vcore_procs[i])
 			proc_decref(p->vcore_procs[i], 1);
 	}
@@ -1707,7 +1698,7 @@ void print_proc_info(pid_t pid)
 	printk("PID: %d\n", p->pid);
 	printk("PPID: %d\n", p->ppid);
 	printk("State: 0x%08x\n", p->state);
-	printk("Refcnt: %d\n", p->env_refcnt - 1); // don't report our ref
+	printk("Refcnt: %d\n", p->env_refcnt);
 	printk("Flags: 0x%08x\n", p->env_flags);
 	printk("CR3(phys): 0x%08x\n", p->env_cr3);
 	printk("Num Vcores: %d\n", p->procinfo->num_vcores);
@@ -1721,6 +1712,27 @@ void print_proc_info(pid_t pid)
 	for (int i = 0; i < MAX_NUM_RESOURCES; i++)
 		printk("\tRes type: %02d, amt wanted: %08d, amt granted: %08d\n", i,
 		       p->resources[i].amt_wanted, p->resources[i].amt_granted);
+#ifdef __CONFIG_EXPER_TRADPROC__
+	void print_chain(struct proc *p)
+	{
+		if (!is_real_proc(p)) {
+			printk("P is not a true_proc, parent is %p\n", p->true_proc);
+			print_chain(p);
+		} else {
+			printk("P is a true_proc\n");
+			for (int i = 0; i < p->procinfo->num_vcores; i++) {
+				printk("%p's child %d is %p\n", p, i, p->vcore_procs[i]);
+				if (p->vcore_procs[i])
+					for (int j = 0; j < MAX_NUM_CPUS; j++)
+						if (p->vcore_procs[i]->vcore_procs[j])
+							printk("Crap, child %p has its own child %p!!\n",
+							       p->vcore_procs[i],
+							       p->vcore_procs[i]->vcore_procs[j]);
+			}
+		}
+	}
+	print_chain(p);
+#endif /* __CONFIG_EXPER_TRADPROC__ */
 	/* No one cares, and it clutters the terminal */
 	//printk("Vcore 0's Last Trapframe:\n");
 	//print_trapframe(&p->env_tf);
