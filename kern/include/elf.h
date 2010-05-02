@@ -80,6 +80,10 @@ typedef long elf_aux_t[2];
 #define ELF_AUX_PHENT		4
 #define ELF_AUX_PHNUM		5
 #define ELF_AUX_ENTRY		9
+#define ELF_AUX_HWCAP		16
+
+// Hardware capabilities (for use with ELF_AUX_HWCAP)
+#define ELF_HWCAP_SPARC_FLUSH	1
 
 struct file;
 int load_elf(struct proc* p, struct file* f);

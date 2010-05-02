@@ -115,6 +115,9 @@ int load_elf(struct proc* p, struct file* f)
 		                    {ELF_AUX_PHENT,sizeof(proghdr_t)},
 		                    {ELF_AUX_PHNUM,ei.phnum},
 		                    {ELF_AUX_ENTRY,ei.entry},
+		                    #ifdef __sparc_v8__
+		                    {ELF_AUX_HWCAP,ELF_HWCAP_SPARC_FLUSH},
+		                    #endif
 		                    {0,0}};
 
 		// put auxp after argv, envp in procinfo

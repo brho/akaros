@@ -152,6 +152,11 @@ elf_machine_runtime_setup (struct link_map *l, int lazy, int profile)
       plt[1] = 0x85c0a000 | (rfunc & 0x3ff);
       plt[2] = OPCODE_NOP;	/* Fill call delay slot.  */
       plt[3] = (Elf32_Addr) l;
+
+      if(GLRO(dl_hwcap) & HWCAP_SPARC_FLUSH)
+        for(int i = 0; i < 4; i++)
+          asm volatile("flush %0" : : "r"(&plt[i]));
+
       if (__builtin_expect (l->l_info[VALIDX(DT_GNU_PRELINKED)] != NULL, 0)
 	  || __builtin_expect (l->l_info [VALIDX (DT_GNU_LIBLISTSZ)] != NULL, 0))
 	{

@@ -69,7 +69,7 @@ handle_trap:
 	save
 
 	// Set up stack, save state, call handler
-	sub	%fp,64+SIZEOF_TRAPFRAME_T,%sp
+	sub	%fp,96+SIZEOF_TRAPFRAME_T,%sp
 
 	// Save full trap frame if this was a synchronous exception (=> bug!!)
 	and	%g1,0xF00,%g1
@@ -78,19 +78,19 @@ handle_trap:
 	 nop
 
 	call	save_rest_of_tf
-	 add	%sp,64,%o0
+	 add	%sp,96,%o0
 
 2:	call	%l0
-	 add	%sp,64,%o0
+	 add	%sp,96,%o0
 
 	// Fill a window if necessary.
 	restore
 	save
 
 	// Restore PSR, then GTFO
-	ld	[%sp+64+128],%l7
+	ld	[%sp+96+128],%l7
 	mov	%l7,%psr
-	RESTORE_MINIMAL_TF(%sp+64)
+	RESTORE_MINIMAL_TF(%sp+96)
 
 	// Trap came from user.  Spill a window if necessary.
 1:	mov	CORE_ID_REG,%l1
@@ -98,7 +98,7 @@ handle_trap:
 	set	bootstacktop-SIZEOF_TRAPFRAME_T,%l2
 	sub	%l2,%l1,%l1
 	SAVE_MINIMAL_TF(%l1)
-	sub	%l1,64,%g1
+	sub	%l1,96,%g1
 	restore
 tflush1:
 	save
@@ -107,7 +107,7 @@ tflush1:
 	// Save a full trap frame, since we might not return through this path
 	mov	%g1,%sp
 	call	save_rest_of_tf
-	 add	%sp,64,%o0
+	 add	%sp,96,%o0
 
 	// spill all trapper's windows out to the stack.
 	// the 'save' may trap (triggering the spill),
@@ -127,10 +127,10 @@ tflush2:
 
 	// Call the handler
 	call	%l0
-	 add	%sp,64,%o0
+	 add	%sp,96,%o0
 
 	// fallthrough to env_pop_tf, which is right below this function
-	add	%sp,64,%o0
+	add	%sp,96,%o0
 
 	// this routine only works for returning to userspace.
 	// right now, there's no mechanism to resume kernel operation after

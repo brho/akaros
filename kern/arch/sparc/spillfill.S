@@ -18,6 +18,10 @@
 ! %l0, %l1, %l2, %l5, %l6, %l7 have not changed 
 .global handle_window_overflow
 handle_window_overflow:
+	! clear out MMU faults (workaround for HW bug :()
+	mov	0x300,%l3
+	lda	[%l3] 4,%g0
+
 	mov	%g1,%l4
 	mov	%wim,%l3
 	mov	%g0,%wim
@@ -76,6 +80,10 @@ spill_patchme:
 
 .global handle_window_underflow
 handle_window_underflow:
+	! clear out MMU faults (workaround for HW bug :()
+	mov	0x300,%l3
+	lda	[%l3] 4,%g0
+
 	mov	%wim,%l3
 	mov	%g1,%l4
 	mov	%psr,%l5
