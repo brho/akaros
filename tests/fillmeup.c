@@ -8,7 +8,7 @@
 #define BUF_SIZE 1024
 #define NUM_BUFS 1024
 uint8_t bufs[BUF_SIZE * NUM_BUFS];
-int16_t last_written;
+int32_t last_written;
 
 void *mytls_desc = NULL;
 
