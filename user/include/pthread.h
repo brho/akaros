@@ -69,12 +69,11 @@ typedef struct
 #define MAX_PTHREADS 32
 typedef struct
 {
-  int local_sense[32*MAX_PTHREADS];
   int in_use[MAX_PTHREADS];
+  int next_slot;
   volatile int sense;
   int count;
   int nprocs;
-  int next_slot;
   pthread_mutex_t pmutex;
 } pthread_barrier_t;
 
