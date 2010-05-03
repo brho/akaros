@@ -11,6 +11,10 @@
 #include <timing.h>
 #include <mcs.h>
 
+#ifdef __sparc_v8__
+# define udelay(x) udelay((x)/500)
+#endif
+
 mcs_barrier_t b;
 uint64_t begin = 0, end = 0;
 

@@ -11,6 +11,10 @@
 #include <timing.h>
 #include <rassert.h>
 
+#ifdef __sparc_v8__
+# define udelay(x) udelay((x)/500)
+#endif
+
 mcs_barrier_t b;
 
 __thread int temp;
