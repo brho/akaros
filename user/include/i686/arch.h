@@ -39,4 +39,14 @@ cpu_relax(void)
 	asm volatile("pause" : : : "memory");
 }
 
+static __inline uint64_t                                                                             
+read_pmc(uint32_t index)
+{                                                                                                    
+    uint64_t pmc;
+
+    __asm __volatile("rdpmc" : "=A" (pmc) : "c" (index)); 
+    return pmc;                                                                                      
+}
+
+
 #endif /* PARLIB_ARCH_H */

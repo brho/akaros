@@ -35,5 +35,6 @@ KERN_ARCH_SRCFILES := $(KERN_ARCH_SRC_DIR)/entry.S \
                       $(KERN_ARCH_SRC_DIR)/nic_common.c \
                       $(KERN_ARCH_SRC_DIR)/init.c \
                       $(KERN_ARCH_SRC_DIR)/env.c \
-                      $(KERN_ARCH_SRC_DIR)/frontend.c
+                      $(KERN_ARCH_SRC_DIR)/frontend.c \
+                      $(KERN_ARCH_SRC_DIR)/perfmon.c
 

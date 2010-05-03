@@ -13,6 +13,8 @@
 #include <arch/pci.h>
 #include <arch/ioapic.h>
 #include <arch/console.h>
+#include <arch/perfmon.h>
+
 #include <monitor.h>
 
 void arch_init()
@@ -53,6 +55,8 @@ void arch_init()
 	#endif // __CONFIG_SINGLE_CORE__
 	#endif // __CONFIG_NETWORKING__
 
+	perfmon_init();
+		
 #ifdef __CONFIG_MONITOR_ON_INT__
 	/* Handler to read a char from the interrupt source and call the monitor.
 	 * Need to read the character so the device will send another interrupt.

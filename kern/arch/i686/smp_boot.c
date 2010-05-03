@@ -15,6 +15,7 @@
 #include <arch/console.h>
 #include <arch/apic.h>
 #include <arch/bitmask.h>
+#include <arch/perfmon.h>
 #include <timing.h>
 
 #include <atomic.h>
@@ -327,4 +328,6 @@ void smp_percpu_init(void)
 	 * EXPER_TRADPROC, in line with what sparc does. */
 	set_core_timer(TIMER_uSEC);
 #endif
+
+  perfmon_init();
 }
