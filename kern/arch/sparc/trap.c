@@ -79,34 +79,45 @@ sysenter_init(void)
 {
 }
 
-void
-( print_trapframe)(trapframe_t *tf)
+static int
+format_trapframe(trapframe_t *tf, char* buf, int bufsz)
 {
-	int i, len;
-	char buf[1024];
+	// slightly hackish way to read out the instruction that faulted.
+	// not guaranteed to be right 100% of the time
+	uint32_t insn;
+	if(!(current && !memcpy_from_user(current,&insn,(void*)tf->pc,4)))
+		insn = -1;
 
-	len = snprintf(buf,sizeof(buf),"TRAP frame at %p on core %d\n",
-	               tf, core_id());
+	int len = snprintf(buf,bufsz,"TRAP frame at %p on core %d\n",
+	                   tf, core_id());
 
-	for(i = 0; i < 8; i++)
+	for(int i = 0; i < 8; i++)
 	{
-		len += snprintf(buf+len,sizeof(buf)-len,
+		len += snprintf(buf+len,bufsz-len,
 		                "  g%d   0x%08x  o%d   0x%08x"
-		                "  l%d   0x%08x  i%d 0x%08x\n",
+		                "  l%d   0x%08x  i%d   0x%08x\n",
 		                i,tf->gpr[i],i,tf->gpr[i+8],
 		                i,tf->gpr[i+16],i,tf->gpr[i+24]);
 	}
 
-	len += snprintf(buf+len,sizeof(buf)-len,
-	                "  psr  0x%08x  pc   0x%08x  npc  0x%08x  wim  0x%08x\n",
-	                tf->psr,tf->pc,tf->npc,tf->wim);
-	len += snprintf(buf+len,sizeof(buf)-len,
+	len += snprintf(buf+len,bufsz-len,
+	                "  psr  0x%08x  pc   0x%08x  npc  0x%08x  insn 0x%08x\n",
+	                tf->psr,tf->pc,tf->npc,insn);
+	len += snprintf(buf+len,bufsz-len,
 	                "  y    0x%08x  fsr  0x%08x  far  0x%08x  tbr  0x%08x\n",
 	                tf->y,tf->fault_status,tf->fault_addr,tf->tbr);
-	len += snprintf(buf+len,sizeof(buf)-len,
+	len += snprintf(buf+len,bufsz-len,
 	                "  timestamp  %21lld\n",tf->timestamp);
 
-	cprintf("%s",buf);
+	return len;
+}
+
+void
+print_trapframe(trapframe_t* tf)
+{
+	char buf[1024];
+	int len = format_trapframe(tf,buf,sizeof(buf));
+	cputbuf(buf,len);
 }
 
 #define TRAPNAME_MAX	32
@@ -262,8 +273,10 @@ unhandled_trap(trapframe_t* state)
 	}
 	else
 	{
-		warn("Unhandled trap in user!\nTrap type: %s",buf);
-		print_trapframe(state);
+		char tf_buf[1024];
+		int tf_len = format_trapframe(state,tf_buf,sizeof(tf_buf));
+
+		warn("Unhandled trap in user!\nTrap type: %s\n%s",buf,tf_buf);
 		backtrace();
 		spin_unlock(&screwup_lock);
 

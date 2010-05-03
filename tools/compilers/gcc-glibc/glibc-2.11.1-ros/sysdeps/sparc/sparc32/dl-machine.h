@@ -416,7 +416,10 @@ elf_machine_rela (struct link_map *map, const Elf32_Rela *reloc,
 # if !defined RTLD_BOOTSTRAP && !defined HAVE_Z_COMBRELOC
       if (map != &GL(dl_rtld_map)) /* Already done in rtld itself. */
 # endif
+      {
 	*reloc_addr += map->l_addr + reloc->r_addend;
+        asm volatile("flush %0" : : "r"(reloc_addr));
+      }
       return;
     }
 #endif
@@ -567,6 +570,7 @@ elf_machine_rela (struct link_map *map, const Elf32_Rela *reloc,
       break;
 #endif
     }
+  asm volatile("flush %0" : : "r"(reloc_addr));
 }
 
 auto inline void
