@@ -141,6 +141,9 @@ static inline void __seq_start_write(seq_ctr_t *seq_ctr)
 	assert(*seq_ctr % 2 == 0);
 #endif
 	(*seq_ctr)++;
+	/* We're the only writer, so we need to prevent the compiler (and some
+	 * arches) from reordering writes before this point. */
+	wmb();
 }
 
 static inline void __seq_end_write(seq_ctr_t *seq_ctr)
@@ -148,6 +151,9 @@ static inline void __seq_end_write(seq_ctr_t *seq_ctr)
 #ifdef _CONFIG_SEQLOCK_DEBUG_
 	assert(*seq_ctr % 2 == 1);
 #endif
+	/* Need to prevent the compiler (and some arches) from reordering older
+	 * stores */
+	wmb();
 	(*seq_ctr)++;
 }
 

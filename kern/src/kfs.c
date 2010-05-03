@@ -45,6 +45,7 @@ DECL_PROG(mproctests);
 DECL_PROG(hello);
 DECL_PROG(mhello);
 DECL_PROG(pthread_test);
+DECL_PROG(pthread_barrier_test);
 DECL_PROG(idle);
 DECL_PROG(fillmeup);
 DECL_PROG(msr_get_cores);
@@ -64,6 +65,7 @@ struct kfs_entry kfs[MAX_KFS_FILES] = {
 	KFS_PENTRY(hello)
 	KFS_PENTRY(mhello)
 	KFS_PENTRY(pthread_test)
+	KFS_PENTRY(pthread_barrier_test)
 	KFS_PENTRY(idle)
 	KFS_PENTRY(fillmeup)
 	KFS_PENTRY(msr_get_cores)

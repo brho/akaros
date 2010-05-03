@@ -139,7 +139,7 @@ void waiton_barrier(barrier_t* barrier)
 	} else {
 		spin_unlock_irqsave(&barrier->lock);
 		reset_barrier(barrier);
-		// if we need to wmb(), it'll be here
+		wmb();
 		barrier->ready++;
 	}
 }

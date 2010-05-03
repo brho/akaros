@@ -406,8 +406,9 @@ int pthread_mutex_trylock(pthread_mutex_t* m)
 
 int pthread_mutex_unlock(pthread_mutex_t* m)
 {
-  // Need a memory barrier here to serialize all memory writes before unlocking
-  mb(); 
+  /* Need to prevent the compiler (and some arches) from reordering older
+   * stores */
+  wmb();
   m->lock = 0;
   return 0;
 }
@@ -577,9 +578,7 @@ int pthread_once(pthread_once_t* once_control, void (*init_routine)(void))
 
 int pthread_barrier_init(pthread_barrier_t* b, const pthread_barrierattr_t* a, int count)
 {
-  memset(b->in_use,0,sizeof(b->in_use));
   b->nprocs = b->count = count;
-  b->next_slot = 0;
   b->sense = 0;
   pthread_mutex_init(&b->pmutex, 0);
   return 0;
@@ -588,17 +587,6 @@ int pthread_barrier_init(pthread_barrier_t* b, const pthread_barrierattr_t* a, i
 int pthread_barrier_wait(pthread_barrier_t* b)
 {
   unsigned int spinner = 0;
-  int id = b->next_slot;
-  int old_id = b->next_slot;
-
-  //allocate a slot
-
-  while (atomic_swap (& (b->in_use[id]), SLOT_IN_USE) == SLOT_IN_USE)
-  {
-    id = (id + 1) % MAX_PTHREADS;
-	assert (old_id != id);  // do not want to wrap around
-  }
-  b->next_slot = (id + 1) % MAX_PTHREADS;
   int ls = !b->sense;
 
   pthread_mutex_lock(&b->pmutex);
@@ -608,9 +596,8 @@ int pthread_barrier_wait(pthread_barrier_t* b)
   if(count == 0)
   {
     printd("Thread %d is last to hit the barrier, resetting...\n", pthread_self()->id);
-    memset(b->in_use,0,sizeof(b->in_use));
     b->count = b->nprocs;
-    b->next_slot = 0;
+	wmb();
     b->sense = ls;
     return PTHREAD_BARRIER_SERIAL_THREAD;
   }

@@ -58,6 +58,7 @@ KERN_APPFILES += \
                  $(TESTS_DIR)/hello \
                  $(TESTS_DIR)/mhello \
                  $(TESTS_DIR)/pthread_test \
+                 $(TESTS_DIR)/pthread_barrier_test \
                  $(TESTS_DIR)/idle \
                  $(TESTS_DIR)/fillmeup \
                  $(TESTS_DIR)/msr_get_cores \

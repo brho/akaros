@@ -2,6 +2,7 @@
 #define ROS_INCLUDE_ATOMIC_H
 
 #include <ros/common.h>
+#include <ros/arch/membar.h>
 #include <arch/x86.h>
 #include <arch/arch.h>
 
@@ -130,6 +131,9 @@ static inline void spin_lock(spinlock_t *lock)
 
 static inline void spin_unlock(spinlock_t *lock)
 {
+	/* Need to prevent the compiler (and some arches) from reordering older
+	 * stores */
+	wmb();
 	lock->rlock = 0;
 }
 

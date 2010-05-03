@@ -69,8 +69,6 @@ typedef struct
 #define MAX_PTHREADS 32
 typedef struct
 {
-  int in_use[MAX_PTHREADS];
-  int next_slot;
   volatile int sense;
   int count;
   int nprocs;
