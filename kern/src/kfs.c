@@ -48,7 +48,9 @@ DECL_PROG(pthread_test);
 DECL_PROG(pthread_barrier_test);
 DECL_PROG(idle);
 DECL_PROG(fillmeup);
+DECL_PROG(tsc_spitter);
 DECL_PROG(msr_get_cores);
+DECL_PROG(msr_get_singlecore);
 DECL_PROG(msr_dumb_while);
 DECL_PROG(msr_nice_while);
 DECL_PROG(msr_single_while);
@@ -68,7 +70,9 @@ struct kfs_entry kfs[MAX_KFS_FILES] = {
 	KFS_PENTRY(pthread_barrier_test)
 	KFS_PENTRY(idle)
 	KFS_PENTRY(fillmeup)
+	KFS_PENTRY(tsc_spitter)
 	KFS_PENTRY(msr_get_cores)
+	KFS_PENTRY(msr_get_singlecore)
 	KFS_PENTRY(msr_dumb_while)
 	KFS_PENTRY(msr_nice_while)
 	KFS_PENTRY(msr_single_while)

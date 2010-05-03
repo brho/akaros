@@ -25,6 +25,8 @@
 
 #KERN_CFLAGS += -DDEVELOPER_NAME=waterman
 #KERN_CFLAGS += -DDEVELOPER_NAME=brho
+# This manager runs the OSDI microbenchmarks from KFS
+#KERN_CFLAGS += -DDEVELOPER_NAME=tests
 
 # Userspace configuration parameters
 #USER_CFLAGS += $(CONFIG_SYSCALL_TRAP)

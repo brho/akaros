@@ -61,7 +61,9 @@ KERN_APPFILES += \
                  $(TESTS_DIR)/pthread_barrier_test \
                  $(TESTS_DIR)/idle \
                  $(TESTS_DIR)/fillmeup \
+                 $(TESTS_DIR)/tsc_spitter \
                  $(TESTS_DIR)/msr_get_cores \
+                 $(TESTS_DIR)/msr_get_singlecore \
                  $(TESTS_DIR)/msr_dumb_while \
                  $(TESTS_DIR)/msr_nice_while \
                  $(TESTS_DIR)/msr_single_while \

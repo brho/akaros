@@ -55,6 +55,8 @@ void vcore_entry(void)
 			end = read_tsc();
 			printf("Took %llu usec (%llu nsec) to get my yielded cores back.\n",
 			       udiff(begin, end), ndiff(begin, end));
+			printf("[T]:010:%llu:%llu\n",
+			       udiff(begin, end), ndiff(begin, end));
 		}
 	}
 	printf("We're screwed!\n");

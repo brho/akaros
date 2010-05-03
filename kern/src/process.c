@@ -469,6 +469,16 @@ static void __proc_free(struct proc *p)
 
 	/* Dealloc the struct proc */
 	kmem_cache_free(proc_cache, p);
+
+#ifdef __CONFIG_OSDI__ /* for experiment coordination */
+	extern struct proc *mgr_p1, *mgr_p2;
+	/* Signal to the monitor we're done */
+	if (p == mgr_p1)
+		mgr_p1 = 0;
+	if (p == mgr_p2)
+		mgr_p2 = 0;
+	printk("[T]:004:E:%llu\n", read_tsc());
+#endif /* __CONFIG_EXPER_TRADPROC__ */
 }
 
 /* Whether or not actor can control target.  Note we currently don't need

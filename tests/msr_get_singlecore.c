@@ -1,14 +1,6 @@
-/* tests/msr_get_cores.c
+/* tests/msr_get_singlecore.c
  *
- * This measures the time it takes to request and receive the max_vcores() in
- * the system.  The clock starts before vcore_request(), which includes the time
- * it takes to allocate transition stacks and TLS.  The clock stops after
- * barriering in vcore_entry(), while vcore0 gets restarted and barriers.  You
- * really want to restart vcore0's context so it releases the lock in
- * vcore_request().
- *
- * This will measure both the hot and cold times, with the hot times not needing
- * to have stacks mmaped and other things. */
+ * Like msr_get_cores.c, but it only gets one core. */
 
 
 #include <parlib.h>
@@ -28,6 +20,7 @@ mcs_barrier_t b;
 
 void *core0_tls = 0;
 uint64_t begin = 0, end = 0;
+volatile bool core1_up = FALSE;
 
 int main(int argc, char** argv)
 {
@@ -57,29 +50,37 @@ int main(int argc, char** argv)
 	vcpd->notif_enabled = TRUE;
 /* end: stuff userspace needs to do before switching to multi-mode */
 
-	begin = read_tsc();
-	retval = vcore_request(max_vcores());
+	/* get into multi mode */
+	retval = vcore_request(1);
 	if (retval)
 		printf("Fucked!\n");
-	mcs_barrier_wait(&b, vcoreid);
-	end = read_tsc();
 
-	printf("Took %llu usec (%llu nsec) to receive %d cores (cold).\n",
-	       udiff(begin, end), ndiff(begin, end), max_vcores());
-	printf("[T]:001:%llu:%llu:%d:C.\n",
-	       udiff(begin, end), ndiff(begin, end), max_vcores());
-	udelay(5000000);
+	printf("Proc %d requesting another vcore\n", getpid());
 	begin = read_tsc();
-	retval = vcore_request(max_vcores() - 1);
+	retval = vcore_request(1);
 	if (retval)
 		printf("Fucked!\n");
-	mcs_barrier_wait(&b, vcoreid);
+	while (!core1_up)
+		cpu_relax;
 	end = read_tsc();
-	printf("Took %llu usec (%llu nsec) to receive %d cores (warm).\n",
-	       udiff(begin, end), ndiff(begin, end), max_vcores());
-	printf("[T]:001:%llu:%llu:%d:W.\n",
-	       udiff(begin, end), ndiff(begin, end), max_vcores());
-
+	printf("Took %llu usec (%llu nsec) to receive 1 core (cold).\n",
+	       udiff(begin, end), ndiff(begin, end));
+	printf("[T]:002:%llu:%llu:1:C.\n",
+	       udiff(begin, end), ndiff(begin, end));
+	core1_up = FALSE;
+	udelay(2000000);
+	printf("Proc %d requesting the vcore again\n", getpid());
+	begin = read_tsc();
+	retval = vcore_request(1);
+	if (retval)
+		printf("Fucked!\n");
+	while (!core1_up)
+		cpu_relax();
+	end = read_tsc();
+	printf("Took %llu usec (%llu nsec) to receive 1 core (warm).\n",
+	       udiff(begin, end), ndiff(begin, end));
+	printf("[T]:002:%llu:%llu:1:W.\n",
+	       udiff(begin, end), ndiff(begin, end));
 	return 0;
 }
 
@@ -105,11 +106,11 @@ void vcore_entry(void)
 /* end: stuff userspace needs to do to handle notifications */
 
 	/* all other vcores are down here */
-	mcs_barrier_wait(&b, vcoreid);
+	core1_up = TRUE;
 
-	udelay(1000000);
-	if (vcoreid == 1)
-		printf("Proc %d's vcores are yielding\n", getpid());
+	while (core1_up)
+		cpu_relax();
+	printf("Proc %d's vcore %d is yielding\n", getpid(), vcoreid);
 	sys_yield(0);
 
 	while(1);
