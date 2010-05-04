@@ -87,6 +87,8 @@ void print_cpuinfo(void)
 	printk("SSE support: ");
 	if (edx & (1 << 25))
 		printk("sse ");
+	else
+		panic("SSE Support Not Detected!!\n");
 	if (edx & (1 << 26))
 		printk("sse2 ");
 	if (ecx & (1 << 0))

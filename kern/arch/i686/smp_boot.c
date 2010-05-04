@@ -309,6 +309,11 @@ void smp_percpu_init(void)
 	/* Ensure the FPU units are initialized */
 	asm volatile ("fninit");
 
+	/* Enable SSE instructions.  We might have to do more, like masking certain
+	 * flags or exceptions in the MXCSR, or at least handle the SIMD exceptions.
+	 * We don't do it for FP yet either, so YMMV. */
+	lcr4(rcr4() | CR4_OSFXSR | CR4_OSXMME);
+
 	/* core 0 sets up via the global gdt symbol */
 	if (!coreid)
 		per_cpu_info[0].gdt = gdt;
