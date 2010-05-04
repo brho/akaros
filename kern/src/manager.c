@@ -63,6 +63,32 @@ void manager(void)
 	proc_run((p));                                                               \
 	proc_decref((p), 1);
 
+#define quick_proc_create(x, p)                                                  \
+	(p) = kfs_proc_create(kfs_lookup_path((x)));                                 \
+	spin_lock(&(p)->proc_lock);                                                  \
+	__proc_set_state((p), PROC_RUNNABLE_S);                                      \
+	spin_unlock(&(p)->proc_lock);
+
+#define quick_proc_color_run(x, p, c)                                            \
+	(p) = kfs_proc_create(kfs_lookup_path((x)));                                 \
+	spin_lock(&(p)->proc_lock);                                                  \
+	__proc_set_state((p), PROC_RUNNABLE_S);                                      \
+	spin_unlock(&(p)->proc_lock);                                                \
+	p->cache_colors_map = cache_colors_map_alloc();                              \
+	for (int i = 0; i < (c); i++)                                                \
+		cache_color_alloc(llc_cache, p->cache_colors_map);                       \
+	proc_run((p));                                                               \
+	proc_decref((p), 1);
+
+#define quick_proc_color_create(x, p, c)                                         \
+	(p) = kfs_proc_create(kfs_lookup_path((x)));                                 \
+	spin_lock(&(p)->proc_lock);                                                  \
+	__proc_set_state((p), PROC_RUNNABLE_S);                                      \
+	spin_unlock(&(p)->proc_lock);                                                \
+	p->cache_colors_map = cache_colors_map_alloc();                              \
+	for (int i = 0; i < (c); i++)                                                \
+		cache_color_alloc(llc_cache, p->cache_colors_map);
+
 void manager_brho(void)
 {
 	static uint8_t RACY progress = 0;
@@ -74,7 +100,10 @@ void manager_brho(void)
 
 	switch (progress++) {
 		case 0:
-			quick_proc_run("msr_dumb_while", p);
+			/* 124 is half of the available boxboro colors (with the kernel
+			 * getting 8) */
+			quick_proc_color_run("msr_dumb_while", p, 124);
+			//quick_proc_run("msr_dumb_while", p);
 			#if 0
 			// this is how you can transition to a parallel process manually
 			// make sure you don't proc run first

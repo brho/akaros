@@ -34,9 +34,16 @@ void cache_init()
 	available_caches.l2 = SINIT(&l2);
 	available_caches.l3 = SINIT(&l3);
 	llc_cache = &l3;
-	init_cache_properties(&l1,   32,  8, 64);
-	init_cache_properties(&l2,  256,  8, 64);
-	init_cache_properties(&l3, 8192, 16, 64);
+#ifdef __CONFIG_BOXBORO__
+	/* level (ignoring L1I), size, ways, CL size) */
+	init_cache_properties(&l1,   32,  8, 64);	/* 1 color */
+	init_cache_properties(&l2,  256,  8, 64);	/* 16 colors */
+	init_cache_properties(&l3, 24576, 24, 64);	/* 256 colors */
+#else /* Core i7 */
+	init_cache_properties(&l1,   32,  8, 64);	/* 1 color */
+	init_cache_properties(&l2,  256,  8, 64);	/* 16 colors */
+	init_cache_properties(&l3, 8192, 16, 64);	/* 128 colors */
+#endif /* __CONFIG_E1000_ON_BOXBORO__ */
 	printk("Cache init successful\n");
 }
 
