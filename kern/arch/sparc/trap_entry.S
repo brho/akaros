@@ -53,8 +53,9 @@ handle_trap:
 	// The spill handler won't overwrite l0/l5/l6, so stash l1 (pc) and l2 (npc)
 	// in there, since the hardware will overwrite them if save traps
 	mov	%psr,%l7
-	wr	%l7,PSR_PIL,%psr
-	wr	%l7,PSR_PIL|PSR_ET,%psr
+	andn	%l7,PSR_PIL,%l6
+	wr	%l6,PSR_PIL,%psr
+	wr	%l6,PSR_PIL|PSR_ET,%psr
 
 	// Are we user or kernel?
 	btst	PSR_PS,%l7
