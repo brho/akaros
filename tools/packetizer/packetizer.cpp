@@ -2,6 +2,7 @@
 #include <net/ethernet.h>
 #include <netinet/in.h>
 #include <unistd.h>
+#include <stdint.h>
 #include <netdb.h>
 #include <sys/ioctl.h>
 #include <sys/time.h>
@@ -16,6 +17,14 @@
 #else
 # define debug(...) do { } while(0)
 #endif
+
+static __inline uint64_t
+read_tsc(void)
+{
+    uint64_t tsc;
+    __asm __volatile("rdtsc" : "=A" (tsc));
+    return tsc;
+}
 
 packetizer::packetizer(const char *target_mac, const char *eth_device, 
 	                     const char *filename)
@@ -64,9 +73,12 @@ int packetizer::start()
 	printf("Starting to packetize the file: %s\n", filename);
 	file.read(p.payload, MAX_PAYLOAD_SIZE);
 	while(file) {
-		printf("Sending chunk %d\n", seqno);
+		//printf("Sending chunk %d\n", seqno);
 		ret = ::sendto(sock, (char*)&p, p.size(), 0,
 		               (sockaddr*)&myaddr,sizeof(myaddr));
+		
+		volatile uint64_t tsc = read_tsc();
+		while((read_tsc() - tsc) < 34800);
 		if (ret < 0)
 		  throw std::runtime_error("sending packet failed!");
 		p.header.seqno = htons(next_seqno());
@@ -80,7 +92,7 @@ int packetizer::start()
 		               (sockaddr*)&myaddr,sizeof(myaddr));
 		if (ret < 0)
 		  throw std::runtime_error("sending packet failed!");
-		printf("Sending chunk %d\n", seqno);
+		//printf("Sending chunk %d\n", seqno);
 	}
 	printf("Last chunk had %u bytes...\n", file.gcount());
 }
