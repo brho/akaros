@@ -148,7 +148,8 @@ void proc_decref(struct proc *SAFE p, size_t count);
  * interrupted contexts via iret/etc.  We don't always do that for user
  * contexts. */
 #define current_tf per_cpu_info[core_id()].cur_tf
-#define set_current_tf(tf) per_cpu_info[core_id()].cur_tf = (tf)
+#define set_current_tf(tf) ({ assert(!in_kernel(tf)); \
+                              per_cpu_info[core_id()].cur_tf = (tf); })
 
 void abandon_core(void);
 /* Hold the proc_lock, since it'll use the vcoremapping to send an unmapping

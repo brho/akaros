@@ -668,6 +668,10 @@ static void __proc_startcore(struct proc *p, trapframe_t *tf)
  * returning from local traps and such. */
 void proc_restartcore(struct proc *p, trapframe_t *tf)
 {
+	// TODO: proc_restartcore shouldn't ever be called with tf != current_tf,
+	// so the parameter should probably be removed outright.
+	assert(current_tf == tf);
+
 	/* Need ints disabled when we return from processing (race) */
 	disable_irq();
 	process_routine_kmsg();

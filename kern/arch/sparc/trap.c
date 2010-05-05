@@ -387,11 +387,14 @@ fp_disabled(trapframe_t* state)
 void
 handle_pop_tf(trapframe_t* state)
 {
+	set_current_tf(state);
+
 	trapframe_t tf;
 	if(memcpy_from_user(current,&tf,(void*)state->gpr[8],sizeof(tf)))
 		proc_destroy(current);
 
 	proc_secure_trapframe(&tf);
+	set_current_tf(&tf);
 	proc_restartcore(current,&tf);
 }
 
@@ -416,13 +419,7 @@ handle_syscall(trapframe_t* state)
 	advance_pc(state);
 	enable_irq();
 
-	/* Note we are not preemptively saving the TF in the env_tf.  We do maintain
-	 * a reference to it in current_tf (a per-cpu pointer).
-	 * In general, only save the tf and any silly state once you know it
-	 * is necessary (blocking).  And only save it in env_tf when you know you
-	 * are single core (PROC_RUNNING_S) */
-	if (!in_kernel(state))
-		set_current_tf(state);
+	set_current_tf(state);
 
 	// syscall code wants an edible reference for current
 	proc_incref(current, 1);
