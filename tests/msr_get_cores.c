@@ -25,7 +25,7 @@
 #include <rassert.h>
 
 #ifdef __sparc_v8__
-# define udelay(x) udelay((x)/500)
+# define udelay(x) udelay((x)/2000)
 #endif
 
 mcs_barrier_t b;
