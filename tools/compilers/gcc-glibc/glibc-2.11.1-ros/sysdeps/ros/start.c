@@ -64,9 +64,14 @@ _start(void)
 	char* argbuf = (char*)alloca(sizeof(__procinfo.argbuf));
 	memcpy(argbuf,__procinfo.argbuf,sizeof(__procinfo.argbuf));
 
-	for(int i = 0; i < PROCINFO_MAX_ARGP; i++)
+	// touch up pointers, but don't mess up auxp!
+	for(int i = 0, zeros = 0; i < PROCINFO_MAX_ARGP; i++)
+	{
 		if(argv[i])
 			argv[i] += argbuf - __procinfo.argbuf;
+		else if(++zeros == 2)
+			break;
+	}
 
 	int argc = 0;
 	while(argv[argc])

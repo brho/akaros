@@ -25,6 +25,8 @@ load_one_elf(struct proc* p, struct file* f, int pgoffset, elf_info_t* ei)
 	ei->dynamic = 0;
 	ei->highest_addr = 0;
 
+	// assume program headers fit in a page.
+	// if this isn't true, change the code below that maps in program headers
 	char* elf = (char*)kmalloc(PGSIZE,0);
 	if(!elf || file_read_page(f,PADDR(elf),0) == -1)
 		goto fail;
@@ -88,6 +90,16 @@ load_one_elf(struct proc* p, struct file* f, int pgoffset, elf_info_t* ei)
 		}
 	}
 
+	// map in program headers anyway if not present in binary.
+	// useful for TLS in static programs.
+	if(ei->phdr == -1)
+	{
+		void* phdr_addr = do_mmap(p, 0, PGSIZE, PROT_READ, 0, f, 0);
+		if(phdr_addr == MAP_FAILED)
+			goto fail;
+		ei->phdr = (long)phdr_addr + elfhdr->e_phoff;
+	}
+
 	ei->entry = elfhdr->e_entry + pgoffset*PGSIZE;
 	ei->phnum = elfhdr->e_phnum;
 
@@ -109,28 +121,28 @@ int load_elf(struct proc* p, struct file* f)
 		if(interp == NULL || load_one_elf(p,interp,1,&interp_ei))
 			return -1;
 		file_decref(interp);
-
-		// fill in info for dynamic linker
-		elf_aux_t auxp[] = {{ELF_AUX_PHDR,ei.phdr},
-		                    {ELF_AUX_PHENT,sizeof(proghdr_t)},
-		                    {ELF_AUX_PHNUM,ei.phnum},
-		                    {ELF_AUX_ENTRY,ei.entry},
-		                    #ifdef __sparc_v8__
-		                    {ELF_AUX_HWCAP,ELF_HWCAP_SPARC_FLUSH},
-		                    #endif
-		                    {0,0}};
-
-		// put auxp after argv, envp in procinfo
-		int auxp_pos = -1;
-		for(int i = 0, zeros = 0; i < PROCINFO_MAX_ARGP; i++)
-			if(p->procinfo->argp[i] == NULL)
-				if(++zeros == 2)
-					auxp_pos = i+1;
-		if(auxp_pos == -1 ||
-		   auxp_pos+sizeof(auxp)/sizeof(char*) >= PROCINFO_MAX_ARGP)
-			return -1;
-		memcpy(p->procinfo->argp+auxp_pos,auxp,sizeof(auxp));
 	}
+
+	// fill in auxiliary info for dynamic linker/runtime
+	elf_aux_t auxp[] = {{ELF_AUX_PHDR,ei.phdr},
+	                    {ELF_AUX_PHENT,sizeof(proghdr_t)},
+	                    {ELF_AUX_PHNUM,ei.phnum},
+	                    {ELF_AUX_ENTRY,ei.entry},
+	                    #ifdef __sparc_v8__
+	                    {ELF_AUX_HWCAP,ELF_HWCAP_SPARC_FLUSH},
+	                    #endif
+	                    {0,0}};
+
+	// put auxp after argv, envp in procinfo
+	int auxp_pos = -1;
+	for(int i = 0, zeros = 0; i < PROCINFO_MAX_ARGP; i++)
+		if(p->procinfo->argp[i] == NULL)
+			if(++zeros == 2)
+				auxp_pos = i+1;
+	if(auxp_pos == -1 ||
+	   auxp_pos+sizeof(auxp)/sizeof(char*) >= PROCINFO_MAX_ARGP)
+		return -1;
+	memcpy(p->procinfo->argp+auxp_pos,auxp,sizeof(auxp));
 
 	uintptr_t core0_entry = ei.dynamic ? interp_ei.entry : ei.entry;
 	proc_init_trapframe(&p->env_tf,0,core0_entry,USTACKTOP);

@@ -31,6 +31,7 @@
 #include <ldsodefs.h>
 #include <locale/localeinfo.h>
 #include <sys/time.h>
+#include <elf.h>
 
 /* Set nonzero if we have to be prepared for more then one libc being
    used in the process.  Safe assumption if initializer never runs.  */
@@ -79,6 +80,39 @@ _init (int argc, char **argv, char **envp)
   __environ = envp;
 
 #ifndef SHARED
+  extern ElfW(Phdr) *_dl_phdr;
+  extern size_t _dl_phnum;
+
+  void** auxp = envp;
+  while(*auxp)
+    auxp++;
+  ElfW(auxv_t) *av = (ElfW(auxv_t)*)(auxp+1);
+
+  for ( ; av->a_type != AT_NULL; av++)
+  {
+    switch (av->a_type)
+    {
+      case AT_PHDR:
+        _dl_phdr = (void *) av->a_un.a_val;
+        break;
+      case AT_PHNUM:
+        _dl_phnum = av->a_un.a_val;
+        break;
+      case AT_PAGESZ:
+        _dl_pagesize = av->a_un.a_val;
+        break;
+      case AT_ENTRY:
+        /* user_entry = av->a_un.a_val; */
+        break;
+      case AT_PLATFORM:
+        _dl_platform = (void *) av->a_un.a_val;
+        break;
+      case AT_HWCAP:
+        _dl_hwcap = (unsigned long int) av->a_un.a_val;
+        break;
+    }
+  }
+  
   __libc_setup_tls (TLS_INIT_TCB_SIZE, TLS_INIT_TCB_ALIGN);
 
   __libc_init_secure ();
