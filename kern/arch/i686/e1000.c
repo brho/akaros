@@ -655,8 +655,20 @@ void e1000_handle_rx_packet() {
 		status =  rx_des_kva[rx_des_loop_cur].status;
 
 		if (status == 0x0) {
-			//panic("ERROR: E1000: Packet owned by hardware has 0 status value\n");
+#ifndef __CONFIG_OSDI__
+			panic("ERROR: E1000: Packet owned by hardware has 0 status value\n");
+#else /* OSDI */
 			warn("ERROR: E1000: Packet owned by hardware has 0 status value\n");
+			/* It's possible we are processing a packet that is a fragment
+			 * before the entire packet arrives.  The code currently assumes
+			 * that all of the packets fragments are there, so it assumes the
+			 * next one is ready.  We'll spin until it shows up...  This could
+			 * deadlock, and sucks in general, but will help us diagnose the
+			 * driver's issues.  */
+			while(rx_des_kva[rx_des_loop_cur].status == 0x0)
+				cpu_relax();
+			status = rx_des_kva[rx_des_loop_cur].status;
+#endif /* __CONFIG_OSDI__ */
 		}
 	
 		fragment_size = rx_des_kva[rx_des_loop_cur].length;
