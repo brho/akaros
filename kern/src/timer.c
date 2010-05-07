@@ -9,6 +9,12 @@
 #include <ros/timer.h>
 #include <stdio.h>
 #include <schedule.h>
+<<<<<<< HEAD
+=======
+#include <multiboot.h>
+#include <pmap.h>
+#include <arch/perfmon.h>
+>>>>>>> 3611594... adding support for perfctr in trad_proc timer handler
 
 /* timing_overhead
  * Any user space process that links to this file will get its own copy.  
@@ -83,6 +89,28 @@ void train_timing()
 void timer_interrupt(struct trapframe *tf, void *data)
 {
 #ifdef __CONFIG_EXPER_TRADPROC__
+
+	#ifdef __sparc_v8__
+	# define num_misses read_perfctr(core_id(),22)
+	#else
+	# define num_misses (read_pmc(1))
+	#endif
+
+	// cause M misses and run for N usec
+	#define M 1000
+	#define N 10
+	unsigned int lfsr = 1+read_tsc()%7;
+
+	uint64_t t0 = read_tsc();
+	uint64_t misses0 = num_misses;
+	while(num_misses-misses0 < M)
+	{
+		int x;
+		x = *(volatile int*)KADDR((4*lfsr) % maxaddrpa);
+		lfsr = (lfsr >> 1) ^ (unsigned int)(0 - ((lfsr & 1u) & 0xd0000001u));
+	}
+	while((read_tsc()-t0)/(system_timing.tsc_freq/1000000) < N);
+
 	/* about every 10 ticks (100ms) run the load balancer.  Offset by coreid so
 	 * it's not as horrible.  */
 	if (per_cpu_info[core_id()].ticks % 10 == core_id())

@@ -14,11 +14,12 @@
 
 
 static __inline uint64_t
-read_pmc(void)
-{
+read_pmc(uint32_t index)
+{                                                                                                    
     uint64_t pmc;
-    __asm __volatile("rdpmc" : "=A" (pmc));
-    return pmc;
+
+    __asm __volatile("rdpmc" : "=A" (pmc) : "c" (index)); 
+    return pmc;                                                                                      
 }
 
 void perfmon_init();

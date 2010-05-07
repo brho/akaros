@@ -324,6 +324,10 @@ void smp_percpu_init(void)
 	STAILQ_INIT(&per_cpu_info[coreid].immed_amsgs);
 	spinlock_init(&per_cpu_info[coreid].routine_amsg_lock);
 	STAILQ_INIT(&per_cpu_info[coreid].routine_amsgs);
+	
+	/* need to init perfctr before potentiall using it in timer handler */
+	perfmon_init();
+
 #ifdef __CONFIG_EXPER_TRADPROC__
 	per_cpu_info[coreid].ticks = 0;
 	spinlock_init(&per_cpu_info[coreid].runqueue_lock);
@@ -334,5 +338,4 @@ void smp_percpu_init(void)
 	set_core_timer(TIMER_uSEC);
 #endif
 
-  perfmon_init();
 }
