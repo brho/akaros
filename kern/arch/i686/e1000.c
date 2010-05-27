@@ -655,20 +655,16 @@ void e1000_handle_rx_packet() {
 		status =  rx_des_kva[rx_des_loop_cur].status;
 
 		if (status == 0x0) {
-#ifndef __CONFIG_OSDI__
-			panic("ERROR: E1000: Packet owned by hardware has 0 status value\n");
-#else /* OSDI */
 			warn("ERROR: E1000: Packet owned by hardware has 0 status value\n");
 			/* It's possible we are processing a packet that is a fragment
 			 * before the entire packet arrives.  The code currently assumes
 			 * that all of the packets fragments are there, so it assumes the
 			 * next one is ready.  We'll spin until it shows up...  This could
 			 * deadlock, and sucks in general, but will help us diagnose the
-			 * driver's issues.  */
+			 * driver's issues.  TODO: determine root cause and fix this shit.*/
 			while(rx_des_kva[rx_des_loop_cur].status == 0x0)
 				cpu_relax();
 			status = rx_des_kva[rx_des_loop_cur].status;
-#endif /* __CONFIG_OSDI__ */
 		}
 	
 		fragment_size = rx_des_kva[rx_des_loop_cur].length;
@@ -709,36 +705,6 @@ void e1000_handle_rx_packet() {
 		rx_des_loop_cur = (rx_des_loop_cur + 1) % NUM_RX_DESCRIPTORS;
 
 	} while ((status & E1000_RXD_STAT_EOP) == 0);
-
-#ifdef __CONFIG_OSDI__
-	struct packetizer_packet *p = (struct packetizer_packet*)rx_buffer;
-	if(ntohs(p->ethertype) == PACKETIZER_ETH_TYPE) {
-		assert(fillmeup_data.proc != NULL);
-		assert(fillmeup_data.bufs != NULL);
-		struct proc *proc = fillmeup_data.proc;
-
-		int32_t lw;
-		uint32_t backupcr3;
-		memcpy_from_user(proc, &lw, fillmeup_data.last_written, sizeof(lw));
-		lw = (lw + 1) % (fillmeup_data.num_bufs);
-		memcpy_to_user(proc, &fillmeup_data.bufs[PACKETIZER_MAX_PAYLOAD * lw], 
-		               p->payload, ntohl(p->payload_size));
-			
-		// memcpy_to_user(proc, fillmeup_data.last_written, &lw, sizeof(lw));
-		backupcr3 = rcr3();
-		lcr3(proc->env_cr3);
-		*(fillmeup_data.last_written) = lw;
-		lcr3(backupcr3);
-		//print_packetizer_packet(p);
-		proc_notify(fillmeup_data.proc, NE_ETC_ETC_ETC, 0);
-
-		// Advance the tail pointer				
-		e1000_rx_index = rx_des_loop_cur;
-		e1000_wr32(E1000_RDT, e1000_rx_index);
-		kfree(rx_buffer);
-		return;
-	}
-#endif
 
 #ifdef __CONFIG_APPSERVER__
 	// Treat as a syscall frontend response packet if eth_type says so

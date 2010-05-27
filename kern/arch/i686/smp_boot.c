@@ -327,15 +327,4 @@ void smp_percpu_init(void)
 	
 	/* need to init perfctr before potentiall using it in timer handler */
 	perfmon_init();
-
-#ifdef __CONFIG_EXPER_TRADPROC__
-	per_cpu_info[coreid].ticks = 0;
-	spinlock_init(&per_cpu_info[coreid].runqueue_lock);
-	TAILQ_INIT(&per_cpu_info[coreid].runqueue);
-	/* set a per-core timer interrupt to go off and call local_schedule every
-	 * TIMER_uSEC microseconds.  The handler is registered independently of
-	 * EXPER_TRADPROC, in line with what sparc does. */
-	set_core_timer(TIMER_uSEC);
-#endif
-
 }

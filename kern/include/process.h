@@ -176,9 +176,4 @@ void print_idlecoremap(void);
 void print_allpids(void);
 void print_proc_info(pid_t pid);
 
-#ifdef __CONFIG_EXPER_TRADPROC__
-bool is_real_proc(struct proc *p);
-int fake_proc_alloc(struct proc **pp, struct proc *parent, uint32_t vcoreid);
-#endif
-
 #endif // !ROS_KERN_PROCESS_H

@@ -108,30 +108,20 @@ void __attribute__((noreturn)) vcore_entry()
 
 	/* no one currently running, so lets get someone from the ready queue */
 	struct pthread_tcb *new_thread = NULL;
-#ifdef __CONFIG_OSDI__
-	// Added so that we will return back to here if there is no new thread
-	// instead of at the top of this function.  Related to the fact that
-	// the kernel level scheduler can't yet handle scheduling manycore 
-	// processed yet when there are no more jobs left (i.e. sys_yield() will
-	// return instead of actually yielding...).
-	while(!new_thread) {
-#endif
-		mcs_lock_lock(&queue_lock);
-		new_thread = TAILQ_FIRST(&ready_queue);
-		if (new_thread) {
-			TAILQ_REMOVE(&ready_queue, new_thread, next);
-			TAILQ_INSERT_TAIL(&active_queue, new_thread, next);
-			threads_active++;
-			threads_ready--;
-		}
-		mcs_lock_unlock(&queue_lock);
-		if (!new_thread) {
-			printd("[P] No threads, vcore %d is yielding\n", vcoreid);
-			sys_yield(0);
-		}
-#ifdef __CONFIG_OSDI__
+	mcs_lock_lock(&queue_lock);
+	new_thread = TAILQ_FIRST(&ready_queue);
+	if (new_thread) {
+		TAILQ_REMOVE(&ready_queue, new_thread, next);
+		TAILQ_INSERT_TAIL(&active_queue, new_thread, next);
+		threads_active++;
+		threads_ready--;
 	}
-#endif
+	mcs_lock_unlock(&queue_lock);
+	if (!new_thread) {
+		/* TODO: consider doing something more intelligent here */
+		printd("[P] No threads, vcore %d is yielding\n", vcoreid);
+		sys_yield(0);
+	}
 	/* Save a ptr to the pthread running in the transition context's TLS */
 	current_thread = new_thread;
 	printd("[P] Vcore %d is starting pthread %d\n", vcoreid, new_thread->id);

@@ -46,11 +46,6 @@ uint32_t num_mgmtcores = 1;
 void put_idle_core(uint32_t coreid)
 {
 	spin_lock(&idle_lock);
-#ifdef __CONFIG_EXPER_TRADPROC__ /* often a good check, but hurts performance */
-	for (int i = 0; i < num_idlecores; i++)
-		if (idlecoremap[i] == coreid)
-			warn("Core %d added to the freelist twice!", coreid);
-#endif /* __CONFIG_EXPER_TRADPROC__ */
 	idlecoremap[num_idlecores++] = coreid;
 	spin_unlock(&idle_lock);
 }
@@ -241,67 +236,6 @@ proc_init_procinfo(struct proc* p)
 #endif /* __CONFIG_DISABLE_SMT__ */
 }
 
-#ifdef __CONFIG_EXPER_TRADPROC__
-bool is_real_proc(struct proc *p)
-{
-	// the real proc has no true proc pointer
-	return !p->true_proc;
-}
-
-/* Make a _S process to represent a vcore in a traditional threading/scheduling
- * model.  Should be able to proc_run this once it's done.  Hold the parent's
- * lock when you call this. */
-int fake_proc_alloc(struct proc **pp, struct proc *parent, uint32_t vcoreid)
-{
-	error_t r;
-	struct proc *p;
-
-	if (!(p = kmem_cache_alloc(proc_cache, 0)))
-		return -ENOMEM;
-
-	spinlock_init(&p->proc_lock);
-	p->pid = parent->pid;
-	p->ppid = parent->ppid;
-	p->exitcode = 0;
-	p->state = PROC_RUNNING_M;
-	p->env_refcnt = 2;
-	p->env_entry = parent->env_entry;
-	p->cache_colors_map = parent->cache_colors_map;
-	p->next_cache_color = parent->next_cache_color;
-	p->heap_top = (void*)0xdeadbeef; // shouldn't use this.  poisoning.
-	p->env_pgdir = parent->env_pgdir;
-	p->env_cr3 = parent->env_cr3;
-	p->procinfo = parent->procinfo;
-	p->procdata = parent->procdata;
-	/* Don't use ARSCs, they aren't turned on */
-	// p->syscallbackring = not happening
-	p->true_proc = parent;
-	p->vcoreid = vcoreid;
-	/* there is a slight race on the old vcore mapping.  for a brief period, it
-	 * is unmapped, but still tracked by the parent.  it's between the unmapping
-	 * and the freeing (where the vcore_procs[i] is cleared, which we need to
-	 * hold on to until the fake_proc has abandoned core.  a brief spin should
-	 * be okay. */
-	spin_on(parent->vcore_procs[vcoreid]);
-	assert(!parent->vcore_procs[vcoreid]);
-	/* map us to the true parent vcoremap */
-	parent->vcore_procs[vcoreid] = p;
-	parent->env_refcnt++;
-
-	memset(&p->env_ancillary_state, 0, sizeof(p->env_ancillary_state));
-	/* env_tf is 0'd in init_trapframe */
-	struct preempt_data *vcpd = &p->procdata->vcore_preempt_data[vcoreid];
-	proc_init_trapframe(&p->env_tf, vcoreid, p->env_entry,
-	                    vcpd->transition_stack);
-
-	*pp = p;
-	atomic_inc(&num_envs);
-
-	printd("[%08x] fake process %08x\n", current ? current->pid : 0, p->pid);
-	return 0;
-}
-#endif /* __CONFIG_EXPER_TRADPROC__ */
-
 /* Allocates and initializes a process, with the given parent.  Currently
  * writes the *p into **pp, and returns 0 on success, < 0 for an error.
  * Errors include:
@@ -370,12 +304,6 @@ static error_t proc_alloc(struct proc *SAFE*SAFE pp, pid_t parent_id)
 	*pp = p;
 	atomic_inc(&num_envs);
 
-#ifdef __CONFIG_EXPER_TRADPROC__
-	p->true_proc = 0;
-	p->vcoreid = 0;
-	memset(p->vcore_procs, 0, sizeof(p->vcore_procs));
-#endif /* __CONFIG_EXPER_TRADPROC__ */
-
 	frontend_proc_init(p);
 
 	printd("[%08x] new process %08x\n", current ? current->pid : 0, p->pid);
@@ -411,35 +339,6 @@ static void __proc_free(struct proc *p)
 	// All parts of the kernel should have decref'd before __proc_free is called
 	assert(p->env_refcnt == 0);
 
-#ifdef __CONFIG_EXPER_TRADPROC__
-	if (!is_real_proc(p)) {
-		printd("Fake proc on core %d unmapping from parent\n", core_id());
-		p->true_proc->vcore_procs[p->vcoreid] = 0; /* unmap self */
-		proc_decref(p->true_proc, 1); // might deadlock
-		kmem_cache_free(proc_cache, p);
-		return;
-	} else {
-		/* make sure the kids are dead before spinning */
-		if (current && !is_real_proc(current)) {
-			__abandon_core();
-		}
-		/* spin til my peeps are dead */
-		for (int i = 0; i < MAX_NUM_CPUS; i++) {
-			for (int j = 0; p->vcore_procs[i]; j++) {
-				cpu_relax();
-				if (j == 10000) {
-					printk("Core %d stalled while waiting on peep %d\n",
-					       core_id(), i);
-					//send_kernel_message(p->procinfo->vcoremap[i].pcoreid,
-					//                    __death, 0, 0, 0, KMSG_ROUTINE);
-				}
-			}
-		}
-	}
-	assert(is_real_proc(p));
-	printd("Core %d really trying to free proc %d (%p)\n", core_id(), p->pid, p);
-#endif /* __CONFIG_EXPER_TRADPROC__ */
-
 	frontend_proc_free(p);
 
 	// Free any colors allocated to this process
@@ -469,16 +368,6 @@ static void __proc_free(struct proc *p)
 
 	/* Dealloc the struct proc */
 	kmem_cache_free(proc_cache, p);
-
-#ifdef __CONFIG_OSDI__ /* for experiment coordination */
-	extern struct proc *mgr_p1, *mgr_p2;
-	/* Signal to the monitor we're done */
-	if (p == mgr_p1)
-		mgr_p1 = 0;
-	if (p == mgr_p2)
-		mgr_p2 = 0;
-	printk("[T]:004:E:%llu\n", read_tsc());
-#endif /* __CONFIG_EXPER_TRADPROC__ */
 }
 
 /* Whether or not actor can control target.  Note we currently don't need
@@ -506,40 +395,6 @@ void proc_run(struct proc *p)
 {
 	bool self_ipi_pending = FALSE;
 	spin_lock(&p->proc_lock);
-
-#ifdef __CONFIG_EXPER_TRADPROC__
-	/* this filth is so the state won't affect how it's run.  whenever we call
-	 * proc_run, we think we are RUNNABLE_S.  prob issues with DYING. */
-	switch (p->state) {
-		case (PROC_DYING):
-			spin_unlock(&p->proc_lock);
-			printk("Process %d not starting due to async death\n", p->pid);
-			if (!management_core())
-				smp_idle(); // this never returns
-			return;
-		case (PROC_RUNNABLE_S):
-			assert(current != p);
-			__proc_set_state(p, PROC_RUNNING_S);
-			__seq_start_write(&p->procinfo->coremap_seqctr);
-			p->procinfo->num_vcores = 0;
-			__map_vcore(p, p->vcoreid, core_id());
-			__seq_end_write(&p->procinfo->coremap_seqctr);
-			// fallthru
-		case (PROC_RUNNING_M):
-			if (p == current)
-				p->env_refcnt--; // TODO: (REF) use incref
-			spin_unlock(&p->proc_lock);
-			// TODO: HSS!!
-			// restore fp state from the preempt slot?
-			disable_irq();
-			__proc_startcore(p, &p->env_tf);
-			break;
-		default:
-			panic("Weird state(%s) in %s()", procstate2str(p->state),
-			      __FUNCTION__);
-	}
-	return;
-#endif /* __CONFIG_EXPER_TRADPROC__ */
 
 	switch (p->state) {
 		case (PROC_DYING):
@@ -702,23 +557,10 @@ void proc_destroy(struct proc *p)
 {
 	bool self_ipi_pending = FALSE;
 
-#ifdef __CONFIG_EXPER_TRADPROC__
-	/* in case a fake proc tries to kill themselves directly */
-	if (!is_real_proc(p)) {
-		printd("Trying to destroy a fake proc, will kill true proc\n");
-		proc_destroy(p->true_proc);
-		return;
-	}
-#endif /* __CONFIG_EXPER_TRADPROC__ */
-
 	spin_lock(&p->proc_lock);
 
 	/* TODO: (DEATH) look at this again when we sort the __death IPI */
-#ifdef __CONFIG_EXPER_TRADPROC__
-	if ((current == p) || (current && (current->true_proc == p)))
-#else
 	if (current == p)
-#endif /* __CONFIG_EXPER_TRADPROC__ */
 		self_ipi_pending = TRUE;
 
 	switch (p->state) {
@@ -847,18 +689,9 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 	uint32_t vcoreid = get_vcoreid(p, core_id());
 	struct vcore *vc = &p->procinfo->vcoremap[vcoreid];
 
-#ifdef __CONFIG_OSDI__
-	bool new_idle_core = FALSE;
-#endif /* __CONFIG_OSDI__ */
-
 	/* no reason to be nice, return */
 	if (being_nice && !vc->preempt_pending)
 		return;
-
-#ifdef __CONFIG_EXPER_TRADPROC__
-	if (p->state & (PROC_RUNNING_M | PROC_DYING))
-		return;
-#endif /* __CONFIG_EXPER_TRADPROC__ */
 
 	spin_lock(&p->proc_lock); /* horrible scalability.  =( */
 
@@ -884,8 +717,7 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 			printd("[K] Process %d (%p) is yielding on vcore %d\n", p->pid, p,
 			       get_vcoreid(p, core_id()));
 			/* TODO: (RMS) the Scheduler cannot handle the Runnable Ms (RMS), so
-			 * don't yield the last vcore.  It's ghetto and for OSDI, but it
-			 * needs to be fixed for all builds, not just CONFIG_OSDI. */
+			 * don't yield the last vcore. */
 			if (p->procinfo->num_vcores == 1) {
 				spin_unlock(&p->proc_lock);
 				return;
@@ -899,9 +731,6 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 			__seq_end_write(&p->procinfo->coremap_seqctr);
 			// add to idle list
 			put_idle_core(core_id());
-#ifdef __CONFIG_OSDI__
-			new_idle_core = TRUE;
-#endif /* __CONFIG_OSDI__ */
 			// last vcore?  then we really want 1, and to yield the gang
 			// TODO: (RMS) will actually do this.
 			if (p->procinfo->num_vcores == 0) {
@@ -917,21 +746,8 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 	}
 	spin_unlock(&p->proc_lock);
 	proc_decref(p, 1); // need to eat the ref passed in.
-#ifdef __CONFIG_OSDI__
-	/* If there was a change to the idle cores, try and give our core to someone who was
-	 * preempted.  core_request likely won't return.  if that happens, p's
-	 * context ought to be cleaned up in the proc_startcore of the new guy. (if
-	 * we actually yielded)
-	 * TODO: (RMS) do this more intelligently e.g.: kick_scheduler(); */
-	extern struct proc *victim;
-	if (new_idle_core && victim) {
-		/* this ghetto victim pointer is not an edible reference, and core
-		 * request will eat it when it doesn't return. */
-		proc_incref(victim, 1);
-		core_request(victim);
-		proc_decref(victim, 1);
-	}
-#endif /* __CONFIG_OSDI__ */
+	/* TODO: (RMS) If there was a change to the idle cores, try and give our
+	 * core to someone who was preempted. */
 	/* Clean up the core and idle.  For mgmt cores, they will ultimately call
 	 * manager, which will call schedule() and will repick the yielding proc. */
 	abandon_core();
@@ -1200,9 +1016,6 @@ uint32_t proc_get_vcoreid(struct proc *SAFE p, uint32_t pcoreid)
  * WARNING: You must hold the proc_lock before calling this! */
 bool __proc_give_cores(struct proc *SAFE p, uint32_t *pcorelist, size_t num)
 { TRUSTEDBLOCK
-#ifdef __CONFIG_EXPER_TRADPROC__
-	assert(is_real_proc(p));
-#endif /* __CONFIG_EXPER_TRADPROC__ */
 	bool self_ipi_pending = FALSE;
 	uint32_t free_vcoreid = 0;
 	switch (p->state) {
@@ -1225,9 +1038,6 @@ bool __proc_give_cores(struct proc *SAFE p, uint32_t *pcorelist, size_t num)
 					assert(p->procinfo->vcoremap[i].valid);
 			}
 			// add new items to the vcoremap
-#ifdef __CONFIG_EXPER_TRADPROC__
-			__proc_set_state(p, PROC_RUNNING_M);
-#endif /* __CONFIG_EXPER_TRADPROC__ */
 			__seq_start_write(&p->procinfo->coremap_seqctr);
 			for (int i = 0; i < num; i++) {
 				// find the next free slot, which should be the next one
@@ -1236,12 +1046,6 @@ bool __proc_give_cores(struct proc *SAFE p, uint32_t *pcorelist, size_t num)
 				       pcorelist[i]);
 				__map_vcore(p, free_vcoreid, pcorelist[i]);
 				p->procinfo->num_vcores++;
-#ifdef __CONFIG_EXPER_TRADPROC__
-				struct proc *fake_proc;
-				/* every vcore is a fake proc */
-				fake_proc_alloc(&fake_proc, p, free_vcoreid);
-				local_schedule_proc(pcorelist[i], fake_proc);
-#endif /* __CONFIG_EXPER_TRADPROC__ */
 			}
 			__seq_end_write(&p->procinfo->coremap_seqctr);
 			break;
@@ -1249,9 +1053,7 @@ bool __proc_give_cores(struct proc *SAFE p, uint32_t *pcorelist, size_t num)
 			/* Up the refcnt, since num cores are going to start using this
 			 * process and have it loaded in their 'current'. */
 			// TODO: (REF) use proc_incref once we have atomics
-#ifndef __CONFIG_EXPER_TRADPROC__ // the refcnt is done in fake_proc_alloc
 			p->env_refcnt += num;
-#endif /* __CONFIG_EXPER_TRADPROC__ */
 			__seq_start_write(&p->procinfo->coremap_seqctr);
 			for (int i = 0; i < num; i++) {
 				free_vcoreid = get_free_vcoreid(p, free_vcoreid);
@@ -1259,14 +1061,8 @@ bool __proc_give_cores(struct proc *SAFE p, uint32_t *pcorelist, size_t num)
 				       pcorelist[i]);
 				__map_vcore(p, free_vcoreid, pcorelist[i]);
 				p->procinfo->num_vcores++;
-#ifdef __CONFIG_EXPER_TRADPROC__
-				struct proc *fake_proc;
-				fake_proc_alloc(&fake_proc, p, free_vcoreid);
-				local_schedule_proc(pcorelist[i], fake_proc);
-#else
 				send_kernel_message(pcorelist[i], __startcore, p, 0, 0,
 				                    KMSG_ROUTINE);
-#endif /* __CONFIG_EXPER_TRADPROC__ */
 				if (pcorelist[i] == core_id())
 					self_ipi_pending = TRUE;
 			}
@@ -1307,10 +1103,6 @@ bool __proc_take_cores(struct proc *SAFE p, uint32_t *pcorelist,
                        size_t num, amr_t message, TV(a0t) arg0,
                        TV(a1t) arg1, TV(a2t) arg2)
 { TRUSTEDBLOCK
-#ifdef __CONFIG_EXPER_TRADPROC__
-	assert(is_real_proc(p));
-	assert(0);
-#endif /* __CONFIG_EXPER_TRADPROC__ */
 	uint32_t vcoreid, pcoreid;
 	bool self_ipi_pending = FALSE;
 	switch (p->state) {
@@ -1362,9 +1154,6 @@ bool __proc_take_cores(struct proc *SAFE p, uint32_t *pcorelist,
 bool __proc_take_allcores(struct proc *SAFE p, amr_t message,
                           TV(a0t) arg0, TV(a1t) arg1, TV(a2t) arg2)
 {
-#ifdef __CONFIG_EXPER_TRADPROC__
-	assert(is_real_proc(p));
-#endif /* __CONFIG_EXPER_TRADPROC__ */
 	uint32_t active_vcoreid = 0, pcoreid;
 	bool self_ipi_pending = FALSE;
 	switch (p->state) {
@@ -1382,13 +1171,6 @@ bool __proc_take_allcores(struct proc *SAFE p, amr_t message,
 	assert(num_idlecores + p->procinfo->num_vcores <= num_cpus); // sanity
 	spin_unlock(&idle_lock);
 	__seq_start_write(&p->procinfo->coremap_seqctr);
-#ifdef __CONFIG_EXPER_TRADPROC__
-	/* Decref each child, so they will free themselves when they unmap */
-	for (int i = 0; i < MAX_NUM_CPUS; i++) {
-		if (p->vcore_procs[i])
-			proc_decref(p->vcore_procs[i], 1);
-	}
-#endif /* __CONFIG_EXPER_TRADPROC__ */
 	for (int i = 0; i < p->procinfo->num_vcores; i++) {
 		// find next active vcore
 		active_vcoreid = get_busy_vcoreid(p, active_vcoreid);
@@ -1726,27 +1508,6 @@ void print_proc_info(pid_t pid)
 	for (int i = 0; i < MAX_NUM_RESOURCES; i++)
 		printk("\tRes type: %02d, amt wanted: %08d, amt granted: %08d\n", i,
 		       p->resources[i].amt_wanted, p->resources[i].amt_granted);
-#ifdef __CONFIG_EXPER_TRADPROC__
-	void print_chain(struct proc *p)
-	{
-		if (!is_real_proc(p)) {
-			printk("P is not a true_proc, parent is %p\n", p->true_proc);
-			print_chain(p);
-		} else {
-			printk("P is a true_proc\n");
-			for (int i = 0; i < p->procinfo->num_vcores; i++) {
-				printk("%p's child %d is %p\n", p, i, p->vcore_procs[i]);
-				if (p->vcore_procs[i])
-					for (int j = 0; j < MAX_NUM_CPUS; j++)
-						if (p->vcore_procs[i]->vcore_procs[j])
-							printk("Crap, child %p has its own child %p!!\n",
-							       p->vcore_procs[i],
-							       p->vcore_procs[i]->vcore_procs[j]);
-			}
-		}
-	}
-	print_chain(p);
-#endif /* __CONFIG_EXPER_TRADPROC__ */
 	/* No one cares, and it clutters the terminal */
 	//printk("Vcore 0's Last Trapframe:\n");
 	//print_trapframe(&p->env_tf);

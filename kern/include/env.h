@@ -63,13 +63,6 @@ struct Env {
 	// The front ring pointers for pushing asynchronous system events out to the user
 	// Note this is the actual frontring, not a pointer to it somewhere else
 	sysevent_front_ring_t syseventfrontring;
-
-#ifdef __CONFIG_EXPER_TRADPROC__
-	/* need to call them Envs due to circular crap */
-	struct Env *true_proc;					/* original "parent" proc */
-	uint32_t vcoreid;						/* vcore this proc represents */
-	struct Env *vcore_procs[MAX_NUM_CPUS];	/* only used by the parent */
-#endif /* __CONFIG_EXPER_TRADPROC__ */
 };
 
 /* Process Flags */

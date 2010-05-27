@@ -17,13 +17,6 @@
 #include <schedule.h>
 #include <hashtable.h>
 
-#ifdef __CONFIG_OSDI__
-/* Whoever was preempted from.  Ghetto hacks in yield will use this to give the
- * core back.  Assumes only one proc is getting preempted, which is true for
- * OSDI. */
-struct proc *victim = NULL;
-#endif
-
 /* This deals with a request for more cores.  The request is already stored in
  * the proc's amt_wanted (it is compared to amt_granted). 
  *
@@ -101,65 +94,10 @@ ssize_t core_request(struct proc *p)
 		}
 		num_granted = amt_new;
 	} else {
-#ifdef __CONFIG_OSDI__
-		/* take what we can from the idlecoremap, then if enough aren't
-		 * available, take what we can now. */	
-		num_granted = num_idlecores;
-		for (int i = 0; i < num_granted; i++) {
-			corelist[i] = idlecoremap[num_idlecores-1];
-			num_idlecores--;
-		}
-#else
+		/* In this case, you might want to preempt or do other fun things... */
 		num_granted = 0;
-#endif /* __CONFIG_OSDI__ */
 	}
 	spin_unlock(&idle_lock);
-#ifdef __CONFIG_OSDI__
-	/* Ghetto, using the SOFT flag to mean "take this from someone else" */
-	if (p->resources[RES_CORES].flags & REQ_SOFT) {
-		/* And take whatever else we can from whoever is using other cores */
-		size_t num_to_preempt = amt_new - num_granted;
-		size_t num_preempted = 0;
-		
-		printd("Attempted to preempt %d cores for proc %d (%p)\n",
-		       num_to_preempt, p->pid, p);
-		/* Find and preempt some cores.  Note the skipping of core 0.  Also note
-		 * this is a horrible way to do it.  A reasonably smart scheduler can
-		 * check its pcoremap. */
-		for (int i = 1; i < num_cpus; i++) {
-			victim = per_cpu_info[i].cur_proc;
-			/* victim is a core with a current proc that isn't us */
-			if (victim && victim != p) {
-				printd("Preempting pcore %d from proc %d (%p)\n", i, 
-				       victim->pid, victim);
-				/* preempt_core technically needs an edible reference, though
-				 * currently we always return since the victim isn't current */
-				proc_incref(victim, 1);
-				/* no waiting or anything, just take it.  telling them 1 sec */
-				proc_preempt_core(victim, i, 1000000);
-				proc_decref(victim, 1);
-				num_preempted++;
-			}
-			if (num_preempted == num_to_preempt)
-				break;
-		}
-		assert(num_preempted == num_to_preempt);
-		printd("Trying to get the idlecores recently preempted.\n");
-		/* Then take the idlecores for ourself.  Cannot handle a concurrent
-		 * core_request.  If this fails, things will be fucked. */
-		spin_on(num_idlecores < num_to_preempt);
-		spin_lock(&idle_lock);
-		for (int i = num_granted; i < amt_new; i++) {
-			// grab the last one on the list
-			corelist[i] = idlecoremap[num_idlecores-1];
-			num_idlecores--;
-		}
-		assert(num_idlecores >= 0);
-		spin_unlock(&idle_lock);
-		num_granted += num_preempted;
-		assert(num_granted == amt_new);
-	}
-#endif /* __CONFIG_OSDI__ */
 
 	// Now, actually give them out
 	if (num_granted) {
@@ -181,16 +119,6 @@ ssize_t core_request(struct proc *p)
 				/* If we remove this, vcore0 will start where the _S left off */
 				vcpd->notif_pending = TRUE;
 				assert(vcpd->notif_enabled);
-#ifdef __CONFIG_EXPER_TRADPROC__
-				/* the proc that represents vcore0 will start at the entry
-				 * point, as if it was a notification handler, so we'll mimic
-				 * what __startcore would have done for a vcore0 restart. */
-				vcpd->notif_tf = *current_tf;
-				proc_init_trapframe(&p->env_tf, 0, p->env_entry,
-				                    vcpd->transition_stack);
-				vcpd->notif_pending = FALSE;
-				vcpd->notif_enabled = FALSE;
-#endif /* __CONFIG_EXPER_TRADPROC__ */
 				/* in the async case, we'll need to remotely stop and bundle
 				 * vcore0's TF.  this is already done for the sync case (local
 				 * syscall). */
@@ -249,15 +177,6 @@ error_t resource_req(struct proc *p, int type, size_t amt_wanted,
 		// We have no sense of time yet, or of half-filling requests
 		printk("[kernel] Async requests treated synchronously for now.\n");
 
-#ifdef __CONFIG_EXPER_TRADPROC__
-	/* this might be fucking with refcnts */
-	struct proc *tp;
-	if (!is_real_proc(p)) {
-		tp = p->true_proc;
-		assert(tp && !tp->true_proc);
-		return resource_req(tp, type, amt_wanted, amt_wanted_min, flags);
-	}
-#endif /* __CONFIG_EXPER_TRADPROC__ */
 	/* set the desired resource amount in the process's resource list. */
 	spin_lock(&p->proc_lock);
 	size_t old_amount = p->resources[type].amt_wanted;

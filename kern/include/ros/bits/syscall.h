@@ -65,7 +65,6 @@
 
 /* Syscalls we plan to remove someday */
 #define SYS_cache_buster        200 
-#define SYS_fillmeup            201
 
 /* For Buster Measurement Flags */
 #define BUSTER_SHARED			0x0001

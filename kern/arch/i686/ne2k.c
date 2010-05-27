@@ -391,32 +391,6 @@ void ne2k_handle_rx_packet() {
 		return;
 	}
 
-#ifdef __CONFIG_OSDI__
-	struct packetizer_packet *p = (struct packetizer_packet*)rx_buffer;
-	if(ntohs(p->ethertype) == PACKETIZER_ETH_TYPE) {
-		assert(fillmeup_data.proc != NULL);
-		assert(fillmeup_data.bufs != NULL);
-		struct proc *proc = fillmeup_data.proc;
-
-		int32_t lw;
-		uint32_t backupcr3;
-		memcpy_from_user(proc, &lw, fillmeup_data.last_written, sizeof(lw));
-		lw = (lw + 1) % (fillmeup_data.num_bufs);
-		memcpy_to_user(proc, &fillmeup_data.bufs[PACKETIZER_MAX_PAYLOAD * lw], 
-		               p->payload, ntohl(p->payload_size));
-		// memcpy_to_user(proc, fillmeup_data.last_written, &lw, sizeof(lw));
-		backupcr3 = rcr3();
-		lcr3(proc->env_cr3);
-		*(fillmeup_data.last_written) = lw;
-		lcr3(backupcr3);
-		//print_packetizer_packet(p);
-		proc_notify(fillmeup_data.proc, NE_ETC_ETC_ETC, 0);
-
-		kfree(rx_buffer);
-		return;
-	}
-#endif
-
 #ifdef __CONFIG_APPSERVER__
 	// Treat as a syscall frontend response packet if eth_type says so
 	// Will eventually go away, so not too worried about elegance here...

@@ -266,16 +266,12 @@ static error_t sys_proc_destroy(struct proc *p, pid_t pid, int exitcode)
 		set_errno(current_tf, ESRCH);
 		return -1;
 	}
-#ifndef __CONFIG_EXPER_TRADPROC__
 	if (!proc_controls(p, p_to_die)) {
 		proc_decref(p_to_die, 1);
 		set_errno(current_tf, EPERM);
 		return -1;
 	}
 	if (p_to_die == p) {
-#else
-	if ((p_to_die == p) || (p_to_die == p->true_proc)) {
-#endif /* __CONFIG_EXPER_TRADPROC__ */
 		// syscall code and pid2proc both have edible references, only need 1.
 		p->exitcode = exitcode;
 		proc_decref(p, 1);
@@ -511,10 +507,8 @@ static intreg_t sys_munmap(struct proc* p, void* addr, size_t len)
 static void* sys_brk(struct proc *p, void* addr) {
 	ssize_t range;
 
-#ifdef __CONFIG_EXPER_TRADPROC__
-	printk("[kernel] don't use brk, unsupported.\n");
-	return (void*)-1;
-#endif /* __CONFIG_EXPER_TRADPROC__ */
+	// TODO: remove sys_brk
+	printk("[kernel] don't use brk, unsupported and will be removed soon.\n");
 
 	spin_lock(&p->proc_lock);
 
@@ -1015,8 +1009,7 @@ intreg_t sys_gettimeofday(struct proc* p, int* buf)
 	spin_lock(&gtod_lock);
 	if(t0 == 0)
 
-#if (defined __CONFIG_APPSERVER__) && (!defined __CONFIG_OSDI__)
-	// For OSDI, do not get time from appserver because it would lead to inaccurate measurements.
+#if (defined __CONFIG_APPSERVER__)
 	t0 = ufe(time,0,0,0,0);
 #else
 	// Nanwan's birthday, bitches!!
@@ -1050,22 +1043,6 @@ intreg_t sys_tcsetattr(struct proc* p, int fd, int optional_actions, const void*
 	int ret = ufe(tcsetattr,fd,optional_actions,PADDR(kbuf),0);
 	user_memdup_free(p,kbuf);
 	return ret;
-}
-
-intreg_t sys_fillmeup(struct proc *p, uint8_t *bufs, 
-                      uint16_t num_bufs, int32_t *last_written)
-{
-#if defined(__CONFIG_OSDI__) && defined(__CONFIG_NETWORKING__)
-	extern struct fillmeup fillmeup_data;
-	fillmeup_data.proc = p;
-	fillmeup_data.bufs = bufs;
-	fillmeup_data.num_bufs = num_bufs;
-	fillmeup_data.last_written = last_written;
-	*last_written = -1;
-	return 0;
-#else
-	return -1;
-#endif
 }
 
 /************** Syscall Invokation **************/
@@ -1126,9 +1103,6 @@ intreg_t syscall(struct proc *p, uintreg_t syscallno, uintreg_t a1,
 		[SYS_eth_write] = (syscall_t)sys_eth_write,
 		[SYS_eth_get_mac_addr] = (syscall_t)sys_eth_get_mac_addr,
 		[SYS_eth_recv_check] = (syscall_t)sys_eth_recv_check,
-	#endif
-	#ifdef __CONFIG_OSDI__
-		[SYS_fillmeup] = (syscall_t)sys_fillmeup,
 	#endif
 		// Syscalls serviced by the appserver for now.
 		[SYS_read] = (syscall_t)sys_read,
