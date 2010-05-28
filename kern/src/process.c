@@ -55,7 +55,8 @@ static void __proc_startcore(struct proc *p, trapframe_t *tf);
 static uint32_t get_free_vcoreid(struct proc *SAFE p, uint32_t prev);
 static uint32_t get_busy_vcoreid(struct proc *SAFE p, uint32_t prev);
 static bool is_mapped_vcore(struct proc *p, uint32_t pcoreid);
-static uint32_t get_vcoreid(struct proc *SAFE p, uint32_t pcoreid);
+static uint32_t get_vcoreid(struct proc *p, uint32_t pcoreid);
+static uint32_t get_pcoreid(struct proc *p, uint32_t vcoreid);
 
 /* PID management. */
 #define PID_MAX 32767 // goes from 0 to 32767, with 0 reserved
@@ -442,9 +443,8 @@ void proc_run(struct proc *p)
 				if (is_mapped_vcore(p, core_id()))
 					self_ipi_pending = TRUE;
 				for (int i = 0; i < p->procinfo->num_vcores; i++)
-					send_kernel_message(p->procinfo->vcoremap[i].pcoreid,
-					                    (void *)__startcore, (void *)p, 0, 0,
-					                    KMSG_ROUTINE);
+					send_kernel_message(get_pcoreid(p, i), __startcore, p, 0,
+					                    0, KMSG_ROUTINE);
 			} else {
 				warn("Tried to proc_run() an _M with no vcores!");
 			}
@@ -586,9 +586,8 @@ void proc_destroy(struct proc *p)
 				current = NULL;
 			}
 			#endif
-			send_kernel_message(p->procinfo->vcoremap[0].pcoreid, __death,
-			                   (void *SNT)0, (void *SNT)0, (void *SNT)0,
-			                   KMSG_ROUTINE);
+			send_kernel_message(get_pcoreid(p, 0), __death, 0, 0, 0,
+			                    KMSG_ROUTINE);
 			__seq_start_write(&p->procinfo->coremap_seqctr);
 			// TODO: might need to sort num_vcores too later (VC#)
 			/* vcore is unmapped on the receive side */
@@ -596,7 +595,7 @@ void proc_destroy(struct proc *p)
 			#if 0
 			/* right now, RUNNING_S only runs on a mgmt core (0), not cores
 			 * managed by the idlecoremap.  so don't do this yet. */
-			put_idle_core(p->procinfo->vcoremap[0].pcoreid);
+			put_idle_core(get_pcoreid(p, 0));
 			#endif
 			break;
 		case PROC_RUNNING_M:
@@ -653,19 +652,27 @@ static uint32_t get_busy_vcoreid(struct proc *SAFE p, uint32_t prev)
 	return i;
 }
 
-/* Helper function.  Is the given pcore a mapped vcore?  Hold the lock before
- * calling. */
+/* Helper function.  Is the given pcore a mapped vcore?  No locking involved, be
+ * careful. */
 static bool is_mapped_vcore(struct proc *p, uint32_t pcoreid)
 {
 	return p->procinfo->pcoremap[pcoreid].valid;
 }
 
 /* Helper function.  Find the vcoreid for a given physical core id for proc p.
- * You better hold the lock before calling this.  Panics on failure. */
-static uint32_t get_vcoreid(struct proc *SAFE p, uint32_t pcoreid)
+ * No locking involved, be careful.  Panics on failure. */
+static uint32_t get_vcoreid(struct proc *p, uint32_t pcoreid)
 {
 	assert(is_mapped_vcore(p, pcoreid));
 	return p->procinfo->pcoremap[pcoreid].vcoreid;
+}
+
+/* Helper function.  Find the pcoreid for a given virtual core id for proc p.
+ * No locking involved, be careful.  Panics on failure. */
+static uint32_t get_pcoreid(struct proc *p, uint32_t vcoreid)
+{
+	assert(p->procinfo->vcoremap[vcoreid].valid);
+	return p->procinfo->vcoremap[vcoreid].pcoreid;
 }
 
 /* Yields the calling core.  Must be called locally (not async) for now.
@@ -792,8 +799,8 @@ void do_notify(struct proc *p, uint32_t vcoreid, unsigned int notif,
 			if ((p->state & PROC_RUNNING_M) && // TODO: (VC#) (_S state)
 			              (p->procinfo->vcoremap[vcoreid].valid)) {
 				printd("[kernel] sending notif to vcore %d\n", vcoreid);
-				send_kernel_message(p->procinfo->vcoremap[vcoreid].pcoreid,
-				                    __notify, p, 0, 0, KMSG_ROUTINE);
+				send_kernel_message(get_pcoreid(p, vcoreid), __notify, p, 0, 0,
+				                    KMSG_ROUTINE);
 			} else { // TODO: think about this, fallback, etc
 				warn("Vcore unmapped, not receiving an active notif");
 			}
@@ -1124,7 +1131,7 @@ bool __proc_take_cores(struct proc *SAFE p, uint32_t *pcorelist,
 	for (int i = 0; i < num; i++) {
 		vcoreid = get_vcoreid(p, pcorelist[i]);
 		// while ugly, this is done to facilitate merging with take_all_cores
-		pcoreid = p->procinfo->vcoremap[vcoreid].pcoreid;
+		pcoreid = get_pcoreid(p, vcoreid);
 		assert(pcoreid == pcorelist[i]);
 		if (message) {
 			if (pcoreid == core_id())
@@ -1174,7 +1181,7 @@ bool __proc_take_allcores(struct proc *SAFE p, amr_t message,
 	for (int i = 0; i < p->procinfo->num_vcores; i++) {
 		// find next active vcore
 		active_vcoreid = get_busy_vcoreid(p, active_vcoreid);
-		pcoreid = p->procinfo->vcoremap[active_vcoreid].pcoreid;
+		pcoreid = get_pcoreid(p, active_vcoreid);
 		if (message) {
 			if (pcoreid == core_id())
 				self_ipi_pending = TRUE;
@@ -1300,14 +1307,13 @@ void abandon_core(void)
  * immediate message. */
 void __proc_tlbshootdown(struct proc *p, uintptr_t start, uintptr_t end)
 {
-	uint32_t active_vcoreid = 0, pcoreid;
+	uint32_t active_vcoreid = 0;
 	/* TODO: (TLB) sanity checks and rounding on the ranges */
 	for (int i = 0; i < p->procinfo->num_vcores; i++) {
 		/* find next active vcore */
 		active_vcoreid = get_busy_vcoreid(p, active_vcoreid);
-		pcoreid = p->procinfo->vcoremap[active_vcoreid].pcoreid;
-		send_kernel_message(pcoreid, __tlbshootdown, (void*)start, (void*)end,
-		                    (void*)0, KMSG_IMMEDIATE);
+		send_kernel_message(get_pcoreid(p, active_vcoreid), __tlbshootdown,
+		                    (void*)start, (void*)end, 0, KMSG_IMMEDIATE);
 		active_vcoreid++; /* for the next loop, skip the one we just used */
 	}
 }
@@ -1501,7 +1507,7 @@ void print_proc_info(pid_t pid)
 	printk("Vcoremap:\n");
 	for (int i = 0; i < p->procinfo->num_vcores; i++) {
 		j = get_busy_vcoreid(p, j);
-		printk("\tVcore %d: Pcore %d\n", j, p->procinfo->vcoremap[j].pcoreid);
+		printk("\tVcore %d: Pcore %d\n", j, get_pcoreid(p, j));
 		j++;
 	}
 	printk("Resources:\n");

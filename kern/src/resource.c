@@ -106,6 +106,8 @@ ssize_t core_request(struct proc *p)
 				// issue with if we're async or not (need to preempt it)
 				// either of these should trip it. TODO: (ACR) async core req
 				// TODO: relies on vcore0 being the caller (VC#)
+				// TODO: do this in process.c and use this line:
+				//if ((current != p) || (get_pcoreid(p, 0) != core_id()))
 				if ((current != p) || (p->procinfo->vcoremap[0].pcoreid != core_id()))
 					panic("We don't handle async RUNNING_S core requests yet.");
 				/* save the tf so userspace can restart it.  Like in __notify,
