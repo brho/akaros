@@ -1,14 +1,14 @@
 /* Barret Rhoden <brho@cs.berkeley.edu>
  *
- * VFS, based on the Linux VFS as described in LKD 2nd Ed (Robert Love), which
- * was probably written by Linus.  A lot of it was changed (reduced) to handle
- * what ROS will need, at least initially.  Hopefully it'll be similar enough
- * to interface with ext2 and other Linux FSs.
+ * VFS, based on the Linux VFS as described in LKD 2nd Ed (Robert Love) and in
+ * UTLK (Bovet/Cesati) , which was probably written by Linus.  A lot of it was
+ * changed (reduced) to handle what ROS will need, at least initially.
+ * Hopefully it'll be similar enough to interface with ext2 and other Linux
+ * FSs.
  *
  * struct qstr came directly from Linux.
  * Lawyers can sort out the copyrights and whatnot with these interfaces and
- * structures.
- */
+ * structures. */
 
 #ifndef ROS_KERN_VFS_H
 #define ROS_KERN_VFS_H
@@ -18,6 +18,7 @@
 #include <arch/bitmask.h>
 #include <atomic.h>
 #include <timing.h>
+#include <page_alloc.h>
 
 // TODO: temp typedefs, etc.  remove when we support this stuff.
 typedef int dev_t;
@@ -38,18 +39,18 @@ struct inode;
 struct inode_operations;
 struct file;
 struct file_operations;
-struct file_system_type;
+struct fs_type;
 struct vm_area_struct;
 struct vfsmount;
 
 /* part of the kernel interface, ripped from man pages, ought to work. */
 // TODO: eventually move this to ros/fs.h or something.
-#define MAX_FILENAME 255
+#define MAX_FILENAME_SZ 255
 struct dirent { // or maybe something else to not conflict with userspace
 	ino_t          d_ino;       /* inode number */
 	off_t          d_off;       /* offset to the next dirent */
 	unsigned short d_reclen;    /* length of this record */
-	char           d_name[MAX_FILENAME + 1]; /* filename */
+	char           d_name[MAX_FILENAME_SZ + 1]; /* filename */
 };
 
 struct iovec {
@@ -67,28 +68,42 @@ TAILQ_HEAD(file_tailq, file);
 TAILQ_HEAD(io_wb_tailq, io_writeback);
 TAILQ_HEAD(event_poll_tailq, event_poll);
 TAILQ_HEAD(vfsmount_tailq, vfsmount);
+TAILQ_HEAD(fs_type_tailq, fs_type);
 
 /* Linux's quickstring - saves recomputing the hash and length. */
 struct qstr {
     unsigned int hash;
     unsigned int len;
-    const unsigned char *name;
+    const char *name;
 };
 
+/* Helpful structure to pass around during lookup operations.  At each point,
+ * it tracks the the answer, the name of the previous, how deep the symlink
+ * following has gone, and the symlink pathnames.  *dentry and *mnt up the
+ * refcnt of those objects too, so whoever receives this will need to decref.
+ * We'll see how this works out... */
+#define MAX_SYMLINK_DEPTH 6 // arbitrary.
+struct nameidata {
+	struct dentry				*dentry;		/* dentry of the obj */
+	struct vfsmount				*mnt;			/* its mount pt */
+	struct qstr					last;			/* last component in search */
+	int							flags;			/* lookup flags */
+	int							last_type;		/* type fo last component */
+	unsigned int				depth;			/* search's symlink depth */
+	char						*saved_names[MAX_SYMLINK_DEPTH];
+	int							intent;			/* access type for the file */
+};
 
 /* Superblock: Specific instance of a mounted filesystem.  All synchronization
  * is done with the one spinlock. */
 
-extern struct sb_tailq super_blocks;			/* list of all sbs */
-extern spinlock_t super_blocks_lock;
-
 struct super_block {
-	TAILQ_ENTRY(superblock)		s_list;			/* list of all sbs */
+	TAILQ_ENTRY(super_block)	s_list;			/* list of all sbs */
 	dev_t						s_dev;			/* id */
 	unsigned long				s_blocksize;
 	bool						s_dirty;
 	unsigned long long			s_maxbytes;		/* max file size */
-	struct file_system_type		*s_type;
+	struct fs_type				*s_type;
 	struct super_operations		*s_op;
 	unsigned long				s_flags;
 	unsigned long				s_magic;
@@ -96,12 +111,13 @@ struct super_block {
 	spinlock_t					s_lock;			/* used for all sync */
 	atomic_t					s_refcnt;
 	bool						s_syncing;		/* currently syncing metadata */
+	struct inode_tailq			s_inodes;		/* all inodes */
 	struct inode_tailq			s_dirty_i;		/* dirty inodes */
 	struct io_wb_tailq			s_io_wb;		/* writebacks */
 	struct dentry_slist			s_anon_d;		/* anonymous dentries */
 	struct file_tailq			s_files;		/* assigned files */
 	struct block_device			*s_bdev;
-	TAILQ_ENTRY(superblock)		s_instances;	/* list of sbs of this fs type*/
+	TAILQ_ENTRY(super_block)	s_instances;	/* list of sbs of this fs type*/
 	char						s_name[32];
 	void						*s_fs_info;
 };
@@ -111,22 +127,22 @@ struct super_operations {
 	void (*destroy_inode) (struct inode *);		/* dealloc.  might need more */
 	void (*read_inode) (struct inode *);
 	void (*dirty_inode) (struct inode *);
-	void (*write_inode) (struct inode *, int);
+	void (*write_inode) (struct inode *, bool);
+	void (*put_inode) (struct inode *);			/* when decreffed */
+	void (*drop_inode) (struct inode *);		/* when about to destroy */
 	void (*delete_inode) (struct inode *);		/* deleted from disk */
 	void (*put_super) (struct super_block *);	/* releases sb */
 	void (*write_super) (struct super_block *);	/* sync with sb on disk */
-	int (*sync_fs) (struct super_block *, int);
-	int (*remount_fs) (struct super_block *, int *, char *);
+	int (*sync_fs) (struct super_block *, bool);
+	int (*remount_fs) (struct super_block *, int, char *);
 	void (*umount_begin) (struct super_block *);/* called by NFS */
 };
-
-/* this will create/init a SB for a FS */
-void alloc_super(void);
 
 /* Inode: represents a specific file */
 struct inode {
 	SLIST_ENTRY(inode)			i_hash;			/* inclusion in a hash table */
-	TAILQ_ENTRY(inode)			i_list;			/* all inodes in the FS */
+	TAILQ_ENTRY(inode)			i_sb_list;		/* all inodes in the FS */
+	TAILQ_ENTRY(inode)			i_list;			/* describes state (dirty) */
 	struct dentry_tailq			i_dentry;		/* all dentries pointing here*/
 	unsigned long				i_ino;
 	atomic_t					i_refcnt;
@@ -142,7 +158,7 @@ struct inode {
 	unsigned long				i_blksize;
 	unsigned long				i_blocks;		/* filesize in blocks */
 	spinlock_t					i_lock;
-	struct inode_operations		*i_ops;
+	struct inode_operations		*i_op;
 	struct file_operations		*i_fop;
 	struct super_block			*i_sb;
 	//struct address_space		*i_mapping;		/* linux mapping structs */
@@ -161,8 +177,9 @@ struct inode {
 };
 
 struct inode_operations {
-	int (*create) (struct inode *, struct dentry *, int);
-	struct dentry *(*lookup) (struct inode *, struct dentry *);
+	int (*create) (struct inode *, struct dentry *, int, struct nameidata *);
+	struct dentry *(*lookup) (struct inode *, struct dentry *,
+	                          struct nameidata *);
 	int (*link) (struct dentry *, struct inode *, struct dentry *);
 	int (*unlink) (struct inode *, struct dentry *);
 	int (*symlink) (struct inode *, struct dentry *, const char *);
@@ -171,15 +188,12 @@ struct inode_operations {
 	int (*mknod) (struct inode *, struct dentry *, int, dev_t);
 	int (*rename) (struct inode *, struct dentry *,
 	               struct inode *, struct dentry *);
-	int (*readlink) (struct dentry *, char *, int);
+	int (*readlink) (struct dentry *, char *, size_t);
+	int (*follow_link) (struct dentry *, struct nameidata *);
+	int (*put_link) (struct dentry *, struct nameidata *);
 	void (*truncate) (struct inode *);			/* set i_size before calling */
-	int (*permission) (struct inode *, int);
+	int (*permission) (struct inode *, int, struct nameidata *);
 };
-
-// TODO: might want a static dentry for /, though processes can get to their
-// root via their fs_struct or even the default namespace.
-// TODO: should have a dentry_htable or something.  we have the structs built
-// in to the dentry right now (linux style).  Need some form of locking too
 
 #define DNAME_INLINE_LEN 32
 /* Dentry: in memory object, corresponding to an element of a path.  E.g. /,
@@ -191,32 +205,34 @@ struct inode_operations {
  * Unused and negatives go in the LRU list. */
 struct dentry {
 	atomic_t					d_refcnt;		/* don't discard when 0 */
-	unsigned long				d_vfs_flags;	/* dentry cache flags */
+	unsigned long				d_flags;		/* dentry cache flags */
 	spinlock_t					d_lock;
 	struct inode				*d_inode;
 	TAILQ_ENTRY(dentry)			d_lru;			/* unused list */
-	struct dentry_tailq			d_child;
+	TAILQ_ENTRY(dentry)			d_child;		/* linkage for i_dentry */
 	struct dentry_tailq			d_subdirs;
+	TAILQ_ENTRY(dentry)			d_subdirs_link;
 	unsigned long				d_time;			/* revalidate time (jiffies)*/
 	struct dentry_operations	*d_op;
 	struct super_block			*d_sb;
-	unsigned int				d_flags;
-	bool						d_mount_point;
-	void						*d_fs_info;
+	bool						d_mount_point;	/* is an FS mounted over here */
+	struct vfsmount				*d_mounted_fs;	/* fs mounted here */
 	struct dentry				*d_parent;
 	struct qstr					d_name;			/* pts to iname and holds hash*/
 	SLIST_ENTRY(dentry)			d_hash;			/* link for the dcache */
-	struct dentry_slist			*d_bucket;		/* hash bucket of this dentry */
-	unsigned char				d_iname[DNAME_INLINE_LEN];
+	struct dentry_slist			d_bucket;		/* hash bucket of this dentry */
+	char						d_iname[DNAME_INLINE_LEN];
+	void						*d_fs_info;
 };
 
 /* not sure yet if we want to call delete when refcnt == 0 (move it to LRU) or
  * when its time to remove it from the dcache. */
 struct dentry_operations {
-	int (*d_revalidate) (struct dentry *, int);	/* usually a noop */
+	int (*d_revalidate) (struct dentry *, struct nameidata *);
 	int (*d_hash) (struct dentry *, struct qstr *);
 	int (*d_compare) (struct dentry *, struct qstr *, struct qstr *);
 	int (*d_delete) (struct dentry *);
+	int (*d_release) (struct dentry *);
 	void (*d_iput) (struct dentry *, struct inode *);
 };
 
@@ -237,10 +253,14 @@ struct file {
 	spinlock_t					f_ep_lock;
 	void						*f_fs_info;		/* tty driver hook */
 	//struct address_space		*f_mapping;		/* page cache mapping */
+
+	/* Ghetto appserver support */
+	int fd; // all it contains is an appserver fd (for pid 0, aka kernel)
+	int refcnt;
+	spinlock_t lock;
 };
 
 struct file_operations {
-	struct module *owner;
 	off_t (*llseek) (struct file *, off_t, int);
 	ssize_t (*read) (struct file *, char *, size_t, off_t *);
 	ssize_t (*write) (struct file *, const char *, size_t, off_t *);
@@ -255,27 +275,28 @@ struct file_operations {
 	                  off_t *);
 	ssize_t (*writev) (struct file *, const struct iovec *, unsigned long,
 	                  off_t *);
+	ssize_t (*sendpage) (struct file *, struct page *, int, size_t, off_t, int);
 	int (*check_flags) (int flags);				/* most FS's ignore this */
 };
 
 /* FS structs.  One of these per FS (e.g., ext2) */
-struct file_system_type {
+struct fs_type {
 	const char					*name;
 	int							fs_flags;
-	struct superblock			*(*get_sb) (struct file_system_type *, int,
-	                                        char *, void *);
+	struct super_block			*(*get_sb) (struct fs_type *, int,
+	                                        char *, struct vfsmount *);
 	void						(*kill_sb) (struct super_block *);
-	struct file_system_type		*next;			/* next FS */
+	TAILQ_ENTRY(fs_type)		list;
 	struct sb_tailq				fs_supers;		/* all of this FS's sbs */
 };
 
 /* A mount point: more focused on the mounting, and solely in memory, compared
  * to the SB which is focused on FS definitions (and exists on disc). */
 struct vfsmount {
-	TAILQ_ENTRY(vfsmount)		mnt_list;		/* might want a hash instead */
+	TAILQ_ENTRY(vfsmount)		mnt_list;
 	struct vfsmount				*mnt_parent;
-	struct dentry				*mnt_mountpoint;/* do we need both of them? */
-	struct dentry				*mnt_root;		/* do we need both of them? */
+	struct dentry				*mnt_mountpoint;/* parent dentry where mnted */
+	struct dentry				*mnt_root;		/* dentry of root of this fs */
 	struct super_block			*mnt_sb;
 	struct vfsmount_tailq		mnt_child_mounts;
 	TAILQ_ENTRY(vfsmount)		mnt_child_link;
@@ -323,7 +344,7 @@ struct fs_struct {
 	struct dentry				*pwd;
 };
 
-/* Each process can have it's own (eventually), but default to the same NS */
+/* Each process can have its own (eventually), but default to the same NS */
 struct namespace {
 	atomic_t					refcnt;
 	spinlock_t					lock;
@@ -331,6 +352,28 @@ struct namespace {
 	struct vfsmount_tailq		vfsmounts;	/* all vfsmounts in this ns */
 };
 
+/* Global Structs */
+extern struct sb_tailq super_blocks;			/* list of all sbs */
+extern spinlock_t super_blocks_lock;
+extern struct fs_type_tailq file_systems;		/* lock this if it's dynamic */
 extern struct namespace default_ns;
+// TODO: should have a dentry_htable or something.  we have the structs built
+// in to the dentry right now (linux style).
+extern struct dentry_slist dcache;
+extern spinlock_t dcache_lock;
+
+/* Slab caches for common objects */
+extern struct kmem_cache *dentry_kcache;
+extern struct kmem_cache *inode_kcache;
+extern struct kmem_cache *file_kcache;
+
+/* VFS Functions */
+void vfs_init(void);
+void qstr_builder(struct dentry *dentry, char *l_name);
+struct super_block *get_sb(void);
+void init_sb(struct super_block *sb, struct vfsmount *vmnt,
+             struct dentry_operations *d_op, unsigned long root_ino);
+struct dentry *get_dentry(struct super_block *sb);
+void dcache_put(struct dentry *dentry);
 
 #endif /* ROS_KERN_VFS_H */

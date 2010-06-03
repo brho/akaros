@@ -1,0 +1,89 @@
+Unorganized Notes on the Virtual File System
+-------------------------------------
+Our VFS is built similarly to Linux's, mostly because I'd like to have somewhat
+easy integration with ext2 (or at the very least have our own FS that can
+integrate into Linux easily).
+
+There are four main objects in a filesystem: superblock, inode, dentry, and a
+file.  
+	- Superblock: Specific instance of a mounted filesystem.  All
+	  synchronization is done with the one spinlock.
+	- Inode: represents a specific file
+	- Dentry: in memory object, corresponding to an element of a path.  E.g. /,
+	  usr, bin, and vim are all dentries.  All have inodes.  Vim happens to be a
+	  file instead of a directory.
+	- File: represents a file opened by a process.
+
+So far, dentries are the most complicated, so here are some notes about them.
+These are probably self-consistent, but may be a bit old (or just wrong) because
+I wrote them as I put the VFS together:
+
+A dentry is just a connection between a part of a path and an inode.  We just
+want to walk from dentry to dentry, asking each to find the next part in the
+path.  When you hit a dentry that's not the end of the desired path, you ask its
+inode for the next dentry by using it's operation (lookup).
+
+lookup() takes the inode of the directory (or 0 for the root) and a dentry
+(already allocated, with the d_name and i_name filled in), and it will find the
+correct inode for the given dentry, as well as filling out any specific FS
+things in the dentry (like d_ops).  It will return 0 on failure, or the dentry
+pointer passed in on success.  Somehow the nameidata bit will be used too.  This
+will probably change a bit...  Note that lookup() needs to read the actual
+directory file and also lookup the inode off the disc, which means it will
+block.
+
+When the next dentry is a mountpoint, (e.g. /mnt/cdrom), when you ask mnt for
+cdrom, lookup() will parse it's file (a directory) and see 'cdrom' there as a child
+entry.  Then it will return cdrom's dentry, like always.
+
+But since cdrom was a mountpoint, (which you can see from the d_mount_point),
+you need to walk through the structures a bit to get the dentry of the FS rooted
+at that mountpoint to keep walking.  The VFS can handle that, so lookup()
+doesn't need to worry about it.
+
+Why are there two dentries associated with a vfsmount?  Normally, a dentry for a
+directory points to an inode that contains its members.  When a FS is mounted
+over it, we don't want to destroy that.  Instead, we mark it as a mountpoint,
+and when following, we walk into the next FS.  The mountpoint is the dentry in
+the parent mount (using the parent mount's FS superblock), and the root is the
+dentry of the mounted FS, using the FS superblock of the mounted FS.
+
+Sometimes lookup() will not be called at all.  We want to look for present
+dentries first (ones that exist in memory already, including all of those with a
+refcnt).  So we can look in the cache (currently just an SLIST, but will
+eventually be a hash table).  When hitting in the cache (hashed by dentry name,
+and probably the parent dir), we need to verify that the dentry's parent is our
+own (handled by the VFS code).  All vfsmount dentries will be in the cache,
+since they all have a refcnt (the vfsmount struct points to them).
+
+Dentries for / and pwd and whatnot have a refcnt (pointed to by fs_struct,
+vfsmounts, etc).  Anything with a pointer to it has a refcnt, so it never goes
+away.  So if we have an inode in memory, it's entire dentry path is cached,
+(just follow the parent pointers back).  Note that when a dentry's refcnt hits
+0, we do *not* deallocate (like we do with many other structures).  It will just
+be on the LRU list in the dcache system.  Likewise, every dentry points to its
+inode, which pins that inode in memory.
+
+Other refcnts: just about everything has a refcnt, and we need to be careful
+about when we want to use them and dealloc.  Some things would be a pain in the
+ass, like with the super_block refcnt.  Every dentry has a ref to the SB, but
+changing that ref every time we add or remove a dentry will probably be an
+unnecessary penalty if we can ensure all dentries of that FS are gone before
+removing the superblock through another mechanism.  We'll see.  Mostly, this
+just means we need to think about what we really want from a refcnt, and whether
+or not we want the kref / process style refcnting.
+
+Mounting:
+
+When you mount, you need to read in the super block and connect the relevant
+data structures together.  The SB is connected to the vfsmount, which is
+connected to the dentry of the mount point and the dentry of the root of the FS.
+This means when mounting the FS, we need to create the dentry for "/", which
+means we also need the inode, which needs to be read_inode()'d in.  Actually, we
+might not need to read the inode in right away - we might be able to get away
+with reading them in on-demand.
+
+All of this means that for every mount point, the SB, vfsmount, dentry, and
+inode are in memory.  Due to the way dentries link, every dentry and inode back
+up to the real root are all in memory too.  Having a mount point is like having
+a process working in that directory - the chain back up is pinned.

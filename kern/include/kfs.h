@@ -1,5 +1,4 @@
-/*
- * Copyright (c) 2009 The Regents of the University of California
+/* Copyright (c) 2009, 2010 The Regents of the University of California
  * Barret Rhoden <brho@cs.berkeley.edu>
  * See LICENSE for details.
  *
@@ -9,14 +8,17 @@
  * linked at the end of the kernel.  Extremely rudimentary.
  * Also allows for process creation from file (can consider moving this).
  *
- * Add the files you want in KFS in kfs.c.
- */
+ * Add the files you want in KFS in kfs.c. */
 
 #ifndef ROS_KERN_KFS_H
 #define ROS_KERN_KFS_H
 
 #include <ros/common.h>
+#include <vfs.h>
 #include <process.h>
+
+/* Every FS must extern it's type, and be included in vfs_init() */
+extern struct fs_type kfs_fs_type;
 
 struct kfs_entry {
 	char (NT name)[256];

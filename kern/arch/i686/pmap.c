@@ -279,9 +279,9 @@ vm_init(void)
 	 * PSE status: 
 	 * - can walk and set up boot_map_segments with jumbos but can't
 	 *   insert yet.  need to look at the page_dir and friends.
-	 * - anything related to a single struct Page still can't handle 
+	 * - anything related to a single struct page still can't handle 
 	 *   jumbos.  will need to think about and adjust Page functions
-	 * - do we want to store info like this in the struct Page?  or just check
+	 * - do we want to store info like this in the struct page?  or just check
 	 *   by walking the PTE
 	 * - when we alloc a page, and we want it to be 4MB, we'll need
 	 *   to have contiguous memory, etc

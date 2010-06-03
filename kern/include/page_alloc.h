@@ -16,16 +16,16 @@
 #include <process.h>
 
 /****************** Page Structures *********************/
-struct Page;
+struct page;
 typedef size_t ppn_t;
-typedef struct Page page_t;
-typedef LIST_HEAD(PageList, Page) page_list_t;
-typedef LIST_ENTRY(Page) page_list_entry_t;
+typedef struct page page_t;
+typedef LIST_HEAD(PageList, page) page_list_t;
+typedef LIST_ENTRY(page) page_list_entry_t;
 
 /* TODO: this struct is not protected from concurrent operations in any
  * function.  We may want a lock, but a better thing would be a good use of
  * reference counting and atomic operations. */
-struct Page {
+struct page {
 	page_list_entry_t LCKD(&colored_page_free_list_lock)page_link;
     size_t page_ref;
 };

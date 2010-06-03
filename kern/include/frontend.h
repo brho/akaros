@@ -6,14 +6,8 @@
 #ifdef ROS_KERNEL
 
 #include <env.h>
+#include <vfs.h>
 #include <process.h>
-
-// for now, this is where struct file lives
-struct file {
-	int fd; // all it contains is an appserver fd (for pid 0, aka kernel)
-	int refcnt;
-	spinlock_t lock;
-};
 
 // Default APPSERVER_ETH_TYPE if not defined externally
 #ifndef APPSERVER_ETH_TYPE

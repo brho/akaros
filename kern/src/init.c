@@ -78,7 +78,7 @@ void kernel_init(multiboot_info_t *mboot_info)
 	mmap_init();
 	file_init();
 	page_check();
-
+	vfs_init();
 	idt_init();
 	kernel_msg_init();
 	sysenter_init();

@@ -100,6 +100,7 @@ void manager_brho(void)
 
 	switch (progress++) {
 		case 0:
+			monitor(0);
 			/* 124 is half of the available boxboro colors (with the kernel
 			 * getting 8) */
 			//quick_proc_color_run("msr_dumb_while", p, 124);
