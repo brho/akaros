@@ -112,6 +112,9 @@ void kfs_destroy_inode(struct inode *inode)
  * basically, it's a "make this inode the one for i_ino (i number)" */
 void kfs_read_inode(struct inode *inode)
 {
+	/* need to do something to link this inode/file to the actual "blocks" on
+	 * "disk". */
+
 	/* TODO: what does it mean to ask for an inode->i_ino that doesn't exist?
 	 * 	possibly a bug, since these inos come from directories */
 	if (inode->i_ino == 1) {
@@ -402,15 +405,36 @@ int kfs_mmap(struct file *file, struct vm_area_struct *vma)
 	return -1;
 }
 
-/* Opens the file specified by the inode, linking it with file */
+/* Opens the file specified by the inode, creating and filling in the file */
+/* TODO: fill out the other // entries, sort vmnt refcnting */
 int kfs_open(struct inode *inode, struct file *file)
 {
-	return -1;
+	/* This is mostly FS-agnostic, consider a helper */
+	file = kmem_cache_alloc(file_kcache, 0);
+	/* Add to the list of all files of this SB */
+	TAILQ_INSERT_TAIL(&inode->i_sb->s_files, file, f_list);
+	file->f_inode = inode;
+	atomic_inc(&inode->i_refcnt);
+	file->f_vfsmnt = inode->i_sb->s_mount;		/* saving a ref to the vmnt...*/
+	file->f_op = &kfs_f_op;
+	atomic_set(&file->f_refcnt, 1);				/* ref passed out */
+	file->f_flags = inode->i_flags;				/* just taking the inode vals */
+	file->f_mode = inode->i_mode;
+	file->f_pos = 0;
+	file->f_uid = inode->i_uid;
+	file->f_gid = inode->i_gid;
+	file->f_error = 0;
+//	struct event_poll_tailq		f_ep_links;
+	spinlock_init(&file->f_ep_lock);
+	file->f_fs_info = 0;
+//	struct address_space		*f_mapping;		/* page cache mapping */
+	return 0;
 }
 
 /* Called when a file descriptor is closed. */
 int kfs_flush(struct file *file)
 {
+	kmem_cache_free(file_kcache, file);
 	return -1;
 }
 

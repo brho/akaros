@@ -239,7 +239,7 @@ struct dentry_operations {
 /* File: represents a file opened by a process. */
 struct file {
 	TAILQ_ENTRY(file)			f_list;			/* list of all files */
-	struct dentry				*f_dentry;
+	struct inode				*f_inode;		/* was dentry.  i prefer this */
 	struct vfsmount				*f_vfsmnt;
 	struct file_operations		*f_op;
 	atomic_t					f_refcnt;
