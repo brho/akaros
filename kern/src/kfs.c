@@ -22,6 +22,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include <error.h>
+#include <cpio.h>
 
 #define KFS_MAX_FILE_SIZE 1024*1024*128
 #define KFS_MAGIC 0xdead0001
@@ -59,10 +60,18 @@ struct super_block *kfs_get_sb(struct fs_type *fs, int flags,
 	sb->s_syncing = FALSE;
 	sb->s_bdev = 0;
 	strlcpy(sb->s_name, "KFS", 32);
-	//sb->s_fs_info = 0; /* nothing to override with for KFS */
+	/* store the location of the CPIO archive.  make this more generic later. */
+	extern uint8_t _binary_obj_kern_initramfs_cpio_size[];
+	extern uint8_t _binary_obj_kern_initramfs_cpio_start[];
+	sb->s_fs_info = (void*)_binary_obj_kern_initramfs_cpio_start;
+
 	/* Final stages of initializing the sb, mostly FS-independent */
 	init_sb(sb, vmnt, &kfs_d_op, 1); /* 1 is the KFS root ino (inode number) */
 	printk("KFS superblock loaded\n");
+
+	/* Or whatever.  For now, just check to see the archive worked. */
+	print_cpio_entries(sb->s_fs_info);
+
 	return sb;
 }
 
@@ -640,4 +649,40 @@ void kfs_cat(int kfs_inode)
 	uint8_t *end = kfs[kfs_inode].start + kfs[kfs_inode].size;
 	for (uint8_t *ptr = kfs[kfs_inode].start; ptr < end; ptr++)
 		cputchar(*ptr);
+}
+
+void print_cpio_entries(void *cpio_b)
+{
+	struct cpio_newc_header *c_hdr = (struct cpio_newc_header*)cpio_b;
+
+	char buf[9] = {0};	/* temp space for strol conversions */
+	int size = 0;
+	int offset = 0;		/* offset in the cpio archive */
+
+	/* read all files and paths */
+	for (; ; c_hdr = (struct cpio_newc_header*)(cpio_b + offset)) {
+		offset += sizeof(*c_hdr);
+		printk("magic: %.6s\n", c_hdr->c_magic);
+		printk("namesize: %.8s\n", c_hdr->c_namesize);
+		printk("filesize: %.8s\n", c_hdr->c_filesize);
+		memcpy(buf, c_hdr->c_namesize, 8);
+		buf[8] = '\0';
+		size = strtol(buf, 0, 16);
+		printk("Namesize: %d\n", size);
+		printk("Filename: %s\n", (char*)c_hdr + sizeof(*c_hdr));
+		if (!strcmp((char*)c_hdr + sizeof(*c_hdr), "TRAILER!!!"))
+			break;
+		offset += size;
+		/* header + name will be padded out to 4-byte alignment */
+		offset = ROUNDUP(offset, 4);
+		memcpy(buf, c_hdr->c_filesize, 8);
+		buf[8] = '\0';
+		size = strtol(buf, 0, 16);
+		printk("Filesize: %d\n", size);
+		offset += size;
+		offset = ROUNDUP(offset, 4);
+		//printk("offset is %d bytes\n", offset);
+		c_hdr = (struct cpio_newc_header*)(cpio_b + offset);
+		printk("\n");
+	}
 }

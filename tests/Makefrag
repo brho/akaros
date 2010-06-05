@@ -8,7 +8,7 @@ ALL_TEST_FILES = $(shell ls $(TESTS_DIR)/*.c)
 
 TESTS_LDDIRS := -L$(OBJDIR)/$(USER_PARLIB_DIR)
 
-TESTS_LDLIBS := -lparlib 
+TESTS_LDLIBS := -lparlib
 
 TESTS_SRCS := $(ALL_TEST_FILES)
 

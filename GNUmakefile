@@ -46,7 +46,7 @@ MAKE_JOBS :=
 include Makeconfig
 -include Makelocal
 
-TOP_DIR := .
+TOP_DIR := $(shell pwd)
 ARCH_DIR := $(TOP_DIR)/kern/arch
 INCLUDE_DIR := $(TOP_DIR)/kern/include
 DOXYGEN_DIR := $(TOP_DIR)/Documentation/doxygen

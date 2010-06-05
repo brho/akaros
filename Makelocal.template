@@ -24,6 +24,12 @@
 #KERN_CFLAGS += -DDEVELOPER_NAME=waterman
 #KERN_CFLAGS += -DDEVELOPER_NAME=brho
 
+
+# Paths for the initramfs (need to be directories)
+#INITRAMFS_PATHS = kern/kfs obj/tests
+# Program to execute before building the initramfs
+#INITRAMFS_BIN = tools/whatever.sh
+
 # Userspace configuration parameters
 #USER_CFLAGS += $(CONFIG_SYSCALL_TRAP)
 #USER_CFLAGS += $(CONFIG_USER_DEBUGINFO)

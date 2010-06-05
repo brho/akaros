@@ -6,6 +6,7 @@
 
 KERN_SRC_DIR = $(KERN_DIR)/src
 OBJDIRS += $(KERN_SRC_DIR)
+KERN_CPIO = initramfs.cpio
 
 # entry.S must be first, so that it's the first code in the text segment!!!
 #
@@ -85,11 +86,25 @@ KERN_APPFILES  := $(patsubst %, $(OBJDIR)/%, $(KERN_APPFILES))
 KERN_RAWAPPFILES  := $(KERN_DIR)/kfs/*
 
 KERN_LDDEPENDS := $(KERN_OBJFILES) $(KERN_APPFILES) $(ARCH_DIR)/$(TARGET_ARCH)/kernel.ld \
-                  $(OBJDIR)/$(KERN_DIR)/libivykern.a
+                  $(OBJDIR)/$(KERN_DIR)/libivykern.a $(OBJDIR)/$(KERN_DIR)/$(KERN_CPIO)
 
 KERN_LDLIBS    := -livykern
 
 KERN_GCC_LIB   ?= $(GCC_LIB)
+
+KERN_INITRAMFS_FILES := $(shell mkdir -p $(INITRAMFS_PATHS); find $(INITRAMFS_PATHS))
+
+$(OBJDIR)/$(KERN_DIR)/$(KERN_CPIO) initramfs: $(KERN_INITRAMFS_FILES)
+	@echo Building initramfs:
+	@if [ "$(INITRAMFS_BIN)" != "" ]; then \
+        sh $(INITRAMFS_BIN); \
+    fi
+	$(V)for i in $(INITRAMFS_PATHS); do cd $$i; \
+        echo Adding $$i to initramfs...; \
+        find -L . -depth | cpio --quiet -oH newc > \
+             $(TOP_DIR)/$(OBJDIR)/$(KERN_DIR)/$(KERN_CPIO); \
+        cd $$OLDPWD; \
+    done;
 
 $(OBJDIR)/$(KERN_DIR)/%.o: $(KERN_DIR)/%.c
 	@echo + cc [KERN] $<
@@ -108,7 +123,8 @@ $(OBJDIR)/$(KERN_DIR)/kernel: $(KERN_LDDEPENDS)
 		$(STRIP) -s $(KERN_APPFILES) ; \
 	fi
 	$(V)$(LD) -o $@ $(KERN_LDFLAGS) $(KERN_OBJFILES) $(KERN_LDLIBS) \
-	                $(KERN_GCC_LIB) -b binary $(KERN_APPFILES) $(KERN_RAWAPPFILES)
+	                $(KERN_GCC_LIB) -b binary $(KERN_APPFILES) $(KERN_RAWAPPFILES) \
+	                $(OBJDIR)/$(KERN_DIR)/$(KERN_CPIO)
 	$(V)$(OBJDUMP) -S $@ > $@.asm
 	$(V)$(NM) -n $@ > $@.sym
 
