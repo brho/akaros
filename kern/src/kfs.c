@@ -564,13 +564,6 @@ struct file_operations kfs_f_op = {
 
 #define KFS_PENTRY(x) {#x, _binary_obj_tests_##x##_start, (size_t) _binary_obj_tests_##x##_size},
 
-/* For generic files in kern/kfs */
-#define DECL_FILE(x) \
-    extern uint8_t (COUNT(sizeof(size_t)) _binary_kern_kfs_##x##_size)[],\
-        (COUNT(_binary_kern_kfs_##x##_size)_binary_kern_kfs_##x##_start)[];
-
-#define KFS_FENTRY(x) {#x, _binary_kern_kfs_##x##_start, (size_t) _binary_kern_kfs_##x##_size},
-
 /*
  * Hardcode the files included in the KFS.  PROGs need to be in sync with the
  * userapps in kern/src/Makefrag.  Files need to be in kern/kfs/
@@ -593,8 +586,6 @@ DECL_PROG(msr_dumb_while);
 DECL_PROG(msr_nice_while);
 DECL_PROG(msr_single_while);
 DECL_PROG(msr_cycling_vcores);
-DECL_FILE(kfs_test_txt);
-DECL_FILE(hello_txt);
 #endif
 
 struct kfs_entry kfs[MAX_KFS_FILES] = {
@@ -614,8 +605,6 @@ struct kfs_entry kfs[MAX_KFS_FILES] = {
 	KFS_PENTRY(msr_nice_while)
 	KFS_PENTRY(msr_single_while)
 	KFS_PENTRY(msr_cycling_vcores)
-	KFS_FENTRY(kfs_test_txt)
-	KFS_FENTRY(hello_txt)
 #endif
 };
 
@@ -662,27 +651,29 @@ void print_cpio_entries(void *cpio_b)
 	/* read all files and paths */
 	for (; ; c_hdr = (struct cpio_newc_header*)(cpio_b + offset)) {
 		offset += sizeof(*c_hdr);
-		printk("magic: %.6s\n", c_hdr->c_magic);
-		printk("namesize: %.8s\n", c_hdr->c_namesize);
-		printk("filesize: %.8s\n", c_hdr->c_filesize);
+		if (strncmp(c_hdr->c_magic, "070701", 6)) {
+			printk("Invalid magic number in CPIO header, aborting.\n");
+			return;
+		}
+		printd("namesize: %.8s\n", c_hdr->c_namesize);
+		printd("filesize: %.8s\n", c_hdr->c_filesize);
 		memcpy(buf, c_hdr->c_namesize, 8);
 		buf[8] = '\0';
 		size = strtol(buf, 0, 16);
-		printk("Namesize: %d\n", size);
-		printk("Filename: %s\n", (char*)c_hdr + sizeof(*c_hdr));
+		printd("Namesize: %d\n", size);
 		if (!strcmp((char*)c_hdr + sizeof(*c_hdr), "TRAILER!!!"))
 			break;
+		printk("File: %s: ", (char*)c_hdr + sizeof(*c_hdr));
 		offset += size;
 		/* header + name will be padded out to 4-byte alignment */
 		offset = ROUNDUP(offset, 4);
 		memcpy(buf, c_hdr->c_filesize, 8);
 		buf[8] = '\0';
 		size = strtol(buf, 0, 16);
-		printk("Filesize: %d\n", size);
+		printk("%d Bytes\n", size);
 		offset += size;
 		offset = ROUNDUP(offset, 4);
 		//printk("offset is %d bytes\n", offset);
 		c_hdr = (struct cpio_newc_header*)(cpio_b + offset);
-		printk("\n");
 	}
 }
