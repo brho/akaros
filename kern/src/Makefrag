@@ -99,7 +99,7 @@ $(OBJDIR)/$(KERN_DIR)/$(KERN_CPIO) initramfs: $(KERN_INITRAMFS_FILES)
     fi
 	$(V)for i in $(INITRAMFS_PATHS); do cd $$i; \
         echo Adding $$i to initramfs...; \
-        find -L . -depth | cpio --quiet -oH newc > \
+        find -L . | cpio --quiet -oH newc > \
              $(TOP_DIR)/$(OBJDIR)/$(KERN_DIR)/$(KERN_CPIO); \
         cd $$OLDPWD; \
     done;

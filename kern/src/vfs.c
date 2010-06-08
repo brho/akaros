@@ -147,21 +147,24 @@ struct super_block *get_sb(void)
  * FS-specific, but otherwise it's FS-independent, tricky, and not worth having
  * around multiple times.
  *
- * Not the world's best interface, so it's subject to change. */
+ * Not the world's best interface, so it's subject to change, esp since we're
+ * passing (now 3) FS-specific things. */
 void init_sb(struct super_block *sb, struct vfsmount *vmnt,
-             struct dentry_operations *d_op, unsigned long root_ino)
+             struct dentry_operations *d_op, unsigned long root_ino,
+             void *d_fs_info)
 {
-	/* Build and init the first dentry / inode */
-	struct dentry *d_root = get_dentry(sb);	/* ref held by vfsmount's mnt_root*/
-	strlcpy(d_root->d_iname, "/", MAX_FILENAME_SZ); /* probably right */
-	qstr_builder(d_root, 0);				/* sets d_name */
+	/* Build and init the first dentry / inode.  The dentry ref is stored later
+	 * by vfsmount's mnt_root.  The parent is dealt with later. */
+	struct dentry *d_root = get_dentry(sb, 0,  "/");	/* probably right */
+
 	/* a lot of here on down is normally done in lookup() */
 	d_root->d_op = d_op;
+	d_root->d_fs_info = d_fs_info;
 	struct inode *inode = sb->s_op->alloc_inode(sb);
 	if (!inode)
 		panic("This FS sucks!");
 	d_root->d_inode = inode;
-	TAILQ_INSERT_TAIL(&inode->i_dentry, d_root, d_child);
+	TAILQ_INSERT_TAIL(&inode->i_dentry, d_root, d_alias);
 	atomic_inc(&d_root->d_refcnt);			/* held by the inode */
 	inode->i_ino = root_ino;
 	/* TODO: add the inode to the appropriate list (off i_list) */
@@ -180,25 +183,38 @@ void init_sb(struct super_block *sb, struct vfsmount *vmnt,
 	/* insert the dentry into the dentry cache.  when's the earliest we can?
 	 * when's the earliest we should?  what about concurrent accesses to the
 	 * same dentry?  should be locking the dentry... */
-	dcache_put(d_root);
+	dcache_put(d_root); // TODO: should set a d_flag too
 }
 
-/* Helper to alloc and initialize a generic dentry */
-struct dentry *get_dentry(struct super_block *sb)
+/* Helper to alloc and initialize a generic dentry.  Note that this may store
+ * the char *name inside the dentry (if it was longer than the inline length).
+ * That might turn out to suck.  */
+struct dentry *get_dentry(struct super_block *sb, struct dentry *parent,
+                          char *name)
 {
+	assert(name);
+	size_t name_len = strnlen(name, MAX_FILENAME_SZ);
 	struct dentry *dentry = kmem_cache_alloc(dentry_kcache, 0);
 	//memset(dentry, 0, sizeof(struct dentry));
-	atomic_set(&dentry->d_refcnt, 1); // this ref is returned
+	atomic_set(&dentry->d_refcnt, 1);	/* this ref is returned */
 	spinlock_init(&dentry->d_lock);
 	TAILQ_INIT(&dentry->d_subdirs);
 	dentry->d_time = 0;
-	dentry->d_sb = sb; // storing a ref here...
+	dentry->d_sb = sb;					/* storing a ref here... */
 	dentry->d_mount_point = FALSE;
 	dentry->d_mounted_fs = 0;
-	dentry->d_parent = 0;
-	dentry->d_flags = 0; // related to its dcache state
+	dentry->d_parent = parent;
+	if (parent)							/* no parent for rootfs mount */
+		atomic_inc(&parent->d_refcnt);
+	dentry->d_flags = 0;				/* related to its dcache state */
 	dentry->d_fs_info = 0;
 	SLIST_INIT(&dentry->d_bucket);
+	if (name_len <= DNAME_INLINE_LEN) {
+		strncpy(dentry->d_iname, name, name_len);
+		qstr_builder(dentry, 0);
+	} else {
+		qstr_builder(dentry, name);		/* storing the incoming *name */
+	}
 	return dentry;
 }
 

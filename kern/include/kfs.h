@@ -20,6 +20,14 @@
 /* Every FS must extern it's type, and be included in vfs_init() */
 extern struct fs_type kfs_fs_type;
 
+/* KFS-specific inode info.  Could use a union, but I want to init filestart to
+ * 0 to catch bugs. */
+struct kfs_i_info {
+	struct dentry_tailq		children;		/* our childrens */
+	void					*filestart;		/* or our file location */
+};
+
+/* Old KFS below here */
 struct kfs_entry {
 	char (NT name)[256];
 	uint8_t *COUNT(size) start;

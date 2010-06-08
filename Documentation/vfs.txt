@@ -87,3 +87,13 @@ All of this means that for every mount point, the SB, vfsmount, dentry, and
 inode are in memory.  Due to the way dentries link, every dentry and inode back
 up to the real root are all in memory too.  Having a mount point is like having
 a process working in that directory - the chain back up is pinned.
+
+d_subdirs:
+
+Tracking the links between objects can be tricky.  One pain is d_subdirs. Linux
+only tracks subdirectories.  We also do this.  I think the reason they do it is
+since you should be using the dcache to cache lookups, and not scan the linked
+list of children of a dentry for a specific file.  Though it is handy to know
+all of your *directory* children.  In KFS, we also track all children in a list.
+This is to make our lookups work - instead of having an actual directory file
+with name->ino mappings.

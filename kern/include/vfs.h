@@ -138,6 +138,9 @@ struct super_operations {
 	void (*umount_begin) (struct super_block *);/* called by NFS */
 };
 
+#define FS_I_FILE				0x01
+#define FS_I_DIR				0x02
+
 /* Inode: represents a specific file */
 struct inode {
 	SLIST_ENTRY(inode)			i_hash;			/* inclusion in a hash table */
@@ -209,7 +212,7 @@ struct dentry {
 	spinlock_t					d_lock;
 	struct inode				*d_inode;
 	TAILQ_ENTRY(dentry)			d_lru;			/* unused list */
-	TAILQ_ENTRY(dentry)			d_child;		/* linkage for i_dentry */
+	TAILQ_ENTRY(dentry)			d_alias;		/* linkage for i_dentry */
 	struct dentry_tailq			d_subdirs;
 	TAILQ_ENTRY(dentry)			d_subdirs_link;
 	unsigned long				d_time;			/* revalidate time (jiffies)*/
@@ -372,8 +375,10 @@ void vfs_init(void);
 void qstr_builder(struct dentry *dentry, char *l_name);
 struct super_block *get_sb(void);
 void init_sb(struct super_block *sb, struct vfsmount *vmnt,
-             struct dentry_operations *d_op, unsigned long root_ino);
-struct dentry *get_dentry(struct super_block *sb);
+             struct dentry_operations *d_op, unsigned long root_ino,
+             void *d_fs_info);
+struct dentry *get_dentry(struct super_block *sb, struct dentry *parent,
+                          char *name);
 void dcache_put(struct dentry *dentry);
 
 #endif /* ROS_KERN_VFS_H */

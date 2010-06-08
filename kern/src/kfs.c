@@ -34,6 +34,27 @@ struct inode_operations kfs_i_op;
 struct dentry_operations kfs_d_op;
 struct file_operations kfs_f_op;
 
+/* TODO: something more better.  Prob something like the vmem cache, for this,
+ * pids, etc.  Good enough for now.  This also means we can only have one
+ * KFS instance, and we also aren't synchronizing access. */
+static unsigned long kfs_get_free_ino(void)
+{
+	static unsigned long last_ino = 1;	 /* 1 is reserved for the root */
+	last_ino++;
+	if (!last_ino)
+		panic("Out of inos in KFS!");
+	return last_ino;
+}
+
+/* Slabs for KFS specific info chunks */
+struct kmem_cache *kfs_i_kcache;
+
+static void kfs_init(void)
+{
+	kfs_i_kcache = kmem_cache_create("kfs_ino_info", sizeof(struct kfs_i_info),
+	                                 __alignof__(struct kfs_i_info), 0, 0, 0);
+}
+
 /* Creates the SB (normally would read in from disc and create).  Ups the refcnt
  * for whoever consumes this.  Returns 0 on failure.
  * TODO: consider pulling out more of the FS-independent stuff, if possible.
@@ -46,11 +67,16 @@ struct super_block *kfs_get_sb(struct fs_type *fs, int flags,
 	 * irrelevant. */
 	//if (something_bad)
 	//	return 0;
+	static bool ran_once = FALSE;
+	if (!ran_once) {
+		ran_once = TRUE;
+		kfs_init();
+	}
 
 	/* Build and init the SB.  No need to read off disc. */
 	struct super_block *sb = get_sb();
 	sb->s_dev = 0;
-	sb->s_blocksize = 4096; /* or 512.  haven't thought this through */
+	sb->s_blocksize = 1;
 	sb->s_maxbytes = KFS_MAX_FILE_SIZE;
 	sb->s_type = &kfs_fs_type;
 	sb->s_op = &kfs_s_op;
@@ -66,12 +92,11 @@ struct super_block *kfs_get_sb(struct fs_type *fs, int flags,
 	sb->s_fs_info = (void*)_binary_obj_kern_initramfs_cpio_start;
 
 	/* Final stages of initializing the sb, mostly FS-independent */
-	init_sb(sb, vmnt, &kfs_d_op, 1); /* 1 is the KFS root ino (inode number) */
+	/* 1 is the KFS root ino (inode number) */
+	init_sb(sb, vmnt, &kfs_d_op, 1, 0);
+	/* Parses the CPIO entries and builds the in-memory KFS tree. */
+	parse_cpio_entries(sb, sb->s_fs_info);
 	printk("KFS superblock loaded\n");
-
-	/* Or whatever.  For now, just check to see the archive worked. */
-	print_cpio_entries(sb->s_fs_info);
-
 	return sb;
 }
 
@@ -98,7 +123,7 @@ struct inode *kfs_alloc_inode(struct super_block *sb)
 	TAILQ_INIT(&inode->i_dentry);
 	inode->i_ino = 0;					/* set by caller later */
 	atomic_set(&inode->i_refcnt, 1);
-	inode->i_blksize = 4096;			/* keep in sync with get_sb() */
+	inode->i_blksize = 1;				/* keep in sync with get_sb() */
 	spinlock_init(&inode->i_lock);
 	inode->i_op = &kfs_i_op;
 	inode->i_fop = &kfs_f_op;
@@ -106,7 +131,9 @@ struct inode *kfs_alloc_inode(struct super_block *sb)
 	inode->i_state = 0;					/* need real states, want I_NEW */
 	inode->dirtied_when = 0;
 	atomic_set(&inode->i_writecount, 0);
-	inode->i_fs_info = 0;
+	inode->i_fs_info = kmem_cache_alloc(kfs_i_kcache, 0);
+	TAILQ_INIT(&((struct kfs_i_info*)inode->i_fs_info)->children);
+	((struct kfs_i_info*)inode->i_fs_info)->filestart = 0;
 	return inode;
 	/* caller sets i_ino, i_list set when applicable */
 }
@@ -114,6 +141,7 @@ struct inode *kfs_alloc_inode(struct super_block *sb)
 /* deallocs and cleans up after an inode. */
 void kfs_destroy_inode(struct inode *inode)
 {
+	kmem_cache_free(kfs_i_kcache, inode->i_fs_info);
 	kmem_cache_free(inode_kcache, inode);
 }
 
@@ -139,11 +167,9 @@ void kfs_read_inode(struct inode *inode)
 		inode->i_mtime.tv_nsec = 0;
 		inode->i_ctime.tv_sec = 0;
 		inode->i_ctime.tv_nsec = 0;
-		inode->i_blksize = 0;
 		inode->i_blocks = 0;
 		inode->i_bdev = 0;				/* assuming blockdev? */
-		inode->dirtied_when = 0;
-		inode->i_flags = 0;
+		inode->i_flags = FS_I_DIR;
 		inode->i_socket = FALSE;
 	} else {
 		panic("Not implemented");
@@ -216,31 +242,51 @@ void kfs_umount_begin(struct super_block *sb)
 
 /* inode_operations */
 
+/* Helper op, used when creating regular files (kfs_create()) and when making
+ * directories (kfs_mkdir()).  References are a bit ugly.  We're passing out a
+ * ref that is already stored/accounted for.  Might change that...  Also, this
+ * needs to handle having nd == 0. */
+struct inode *kfs_create_generic(struct inode *dir, struct dentry *dentry,
+                                 int mode, struct nameidata *nd)
+{
+	/* note it is the i_ino that uniquely identifies a file in the system.
+	 * there's a diff between creating an inode (even for an in-use ino) and
+	 * then filling it in, and vs creating a brand new one */
+	struct inode *inode = kfs_alloc_inode(dentry->d_sb);
+	dentry->d_inode = inode;		/* inode ref stored here */
+	TAILQ_INSERT_TAIL(&inode->i_dentry, dentry, d_alias); /* stored dentry ref*/
+	inode->i_mode = mode;
+	inode->i_ino = kfs_get_free_ino();
+	inode->i_nlink = 1;
+	inode->i_atime.tv_sec = 0;		/* TODO: now! */
+	inode->i_ctime.tv_sec = 0;		/* TODO: now! */
+	inode->i_mtime.tv_sec = 0;		/* TODO: now! */
+	inode->i_atime.tv_nsec = 0;		/* are these supposed to be the extra ns? */
+	inode->i_ctime.tv_nsec = 0;
+	inode->i_mtime.tv_nsec = 0;
+	return inode;
+}
+
 /* Create a new disk inode in dir associated with dentry, with the given mode.
- * called when creating or opening a regular file  (TODO probably not open) */
+ * called when creating a regular file.  dir is the directory/parent.  dentry is
+ * the dentry of the inode we are creating. */
 int kfs_create(struct inode *dir, struct dentry *dentry, int mode,
                struct nameidata *nd)
 {
-	// TODO: how exactly does this work when we open a file?  and what about
-	// when we need an inode to fill in a dentry structure?
-	// seems like we can use this to fill it in, instead of having the inode
-	// filled in at dentry creation
-	// 	- diff between dentry creation for an existing path and a new one (open
-	// 	vs create)
-	// 	- this might just be for a brand new one (find a free inode, give it to
-	// 	me, etc)
-	//
-	// 	note it is the i_ino that uniquely identifies a file in the system.
-	// 		there's a diff between creating an inode (even for an in-use ino)
-	// 		and then filling it in, and vs creating a brand new one
-	//
-	//dentry with d_inode == NULL -> ENOENT (negative entry?)
-	// 	linux now has a nameidata for this
-	//
-	//presence of a lookup op (in linux) shows it is a directory... np
-	//same with symlink
-	//their link depth is tied to the task_struct (for max, not for one path)
-	return -1;
+	struct inode *inode = kfs_create_generic(dir, dentry, mode, nd);	
+	if (!inode)
+		return -1;
+	inode->i_flags = FS_I_FILE;
+	/* our parent dentry's inode tracks our dentry info.  We do this
+	 * since it's all in memory and we aren't using the dcache yet.
+	 * We're reusing the subdirs link, which is used by the VFS when
+	 * we're a directory.  But since we're a file, it's okay to reuse
+	 * it. */
+	TAILQ_INSERT_TAIL(&((struct kfs_i_info*)dir->i_fs_info)->children,
+	                  dentry, d_subdirs_link);
+	/* fs_info->filestart is set by the caller, or else when first written (for
+	 * new files.  it was set to 0 in alloc_inode(). */
+	return 0;
 }
 
 /* Searches the directory for the filename in the dentry, filling in the dentry
@@ -279,10 +325,24 @@ int kfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
 }
 
 /* Creates a new inode for a directory associated with dentry in dir with the
- * given mode */
+ * given mode.  Note, we might (later) need to track subdirs within the parent
+ * inode, like we do with regular files.  I'd rather not, so we'll see if we
+ * need it. */
 int kfs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 {
-	return -1;
+	struct inode *inode = kfs_create_generic(dir, dentry, mode, 0);	
+	if (!inode)
+		return -1;
+	struct dentry *parent = TAILQ_FIRST(&dir->i_dentry);
+	assert(parent && parent == TAILQ_LAST(&dir->i_dentry, dentry_tailq));
+	inode->i_flags = FS_I_DIR;
+	/* parent dentry tracks dentry as a subdir */
+	TAILQ_INSERT_TAIL(&parent->d_subdirs, dentry, d_subdirs_link);
+	atomic_inc(&dentry->d_refcnt);
+	/* get ready to have our own kids */
+	TAILQ_INIT(&((struct kfs_i_info*)inode->i_fs_info)->children);
+	((struct kfs_i_info*)inode->i_fs_info)->filestart = 0;
+	return 0;
 }
 
 /* Removes from dir the directory specified by the name in dentry. */
@@ -640,13 +700,95 @@ void kfs_cat(int kfs_inode)
 		cputchar(*ptr);
 }
 
-void print_cpio_entries(void *cpio_b)
+/* Need to pass path separately, since we'll recurse on it */
+static int __add_kfs_entry(struct dentry *parent, char *path,
+                           struct cpio_bin_hdr *c_bhdr)
+{
+	char *first_slash = strchr(path, '/');	
+	char dir[MAX_FILENAME_SZ + 1];	/* room for the \0 */
+	size_t dirname_sz;				/* not counting the \0 */
+	struct dentry *dentry;
+	struct inode *inode;
+
+	if (first_slash) {
+		/* get the first part, find that dentry, pass in the second part,
+		 * recurse.  this isn't being smart about extra slashes, dots, or
+		 * anything like that. */
+		dirname_sz = first_slash - path;
+		assert(dirname_sz <= MAX_FILENAME_SZ);
+		strncpy(dir, path, dirname_sz);
+		dir[dirname_sz] = '\0';
+		printk("Finding DIR %s in dentry %s (start: %p, size %d)\n", dir,
+		       parent->d_name.name, c_bhdr->c_filestart, c_bhdr->c_filesize);
+		// send to the real dentry
+		__add_kfs_entry(parent, first_slash + 1, c_bhdr);
+
+	} else {
+		/* no directories left in the path.  add the 'file' to the dentry */
+		printk("Adding file/dir %s to dentry %s (start: %p, size %d)\n", path,
+		       parent->d_name.name, c_bhdr->c_filestart, c_bhdr->c_filesize);
+
+		/* Init the dentry for this path */
+		dentry = get_dentry(parent->d_sb, parent, path);
+		dentry->d_op = &kfs_d_op;
+		dcache_put(dentry); 			/* TODO: should set a d_flag too */
+		/* build the inode */
+		if (!c_bhdr->c_filesize) {
+			/* we are a directory.  Note that fifos might look like dirs... */
+			kfs_mkdir(parent->d_inode, dentry, c_bhdr->c_mode);
+			inode = dentry->d_inode;
+		} else {
+			/* we are a file */
+			kfs_create(parent->d_inode, dentry, c_bhdr->c_mode, 0);
+			inode = dentry->d_inode;
+			((struct kfs_i_info*)inode->i_fs_info)->filestart =
+			                                        c_bhdr->c_filestart;
+		}
+		/* Set other info from the CPIO entry */
+		inode->i_uid = c_bhdr->c_uid;
+		inode->i_gid = c_bhdr->c_gid;
+		inode->i_atime.tv_sec = c_bhdr->c_mtime;
+		inode->i_ctime.tv_sec = c_bhdr->c_mtime;
+		inode->i_mtime.tv_sec = c_bhdr->c_mtime;
+		inode->i_size = c_bhdr->c_filesize;
+		//inode->i_XXX = c_bhdr->c_dev;			/* and friends */
+		inode->i_bdev = 0;						/* assuming blockdev? */
+		inode->i_socket = FALSE;
+		inode->i_blocks = c_bhdr->c_filesize;	/* blocksize == 1 */
+	}
+	return 0;
+}
+
+/* Adds an entry (from a CPIO archive) to KFS.  This will put all the FS
+ * metadata in memory, instead of having to reparse the entire archive each time
+ * we need to traverse.
+ *
+ * The other option is to just maintain a LL of {FN, FS}, and O(n) scan it.
+ *
+ * The path is a complete path, interpreted from the root of the mount point.
+ * Directories have a size of 0.  so do symlinks, but we don't handle those yet.
+ *
+ * If a directory does not exist for a file, this will return an error.  Don't
+ * use the -depth flag to find when building the CPIO archive, and this won't be
+ * a problem.  (Maybe) */
+static int add_kfs_entry(struct super_block *sb, struct cpio_bin_hdr *c_bhdr)
+{
+	char *path = c_bhdr->c_filename;
+	/* Root of the FS, already part of KFS */
+	if (!strcmp(path, "."))
+		return 0;
+	return __add_kfs_entry(sb->s_mount->mnt_root, path, c_bhdr);
+}
+
+void parse_cpio_entries(struct super_block *sb, void *cpio_b)
 {
 	struct cpio_newc_header *c_hdr = (struct cpio_newc_header*)cpio_b;
 
 	char buf[9] = {0};	/* temp space for strol conversions */
-	int size = 0;
+	size_t namesize = 0;
 	int offset = 0;		/* offset in the cpio archive */
+	struct cpio_bin_hdr *c_bhdr = kmalloc(sizeof(*c_bhdr), 0);
+	memset(c_bhdr, 0, sizeof(*c_bhdr));
 
 	/* read all files and paths */
 	for (; ; c_hdr = (struct cpio_newc_header*)(cpio_b + offset)) {
@@ -655,25 +797,57 @@ void print_cpio_entries(void *cpio_b)
 			printk("Invalid magic number in CPIO header, aborting.\n");
 			return;
 		}
-		printd("namesize: %.8s\n", c_hdr->c_namesize);
-		printd("filesize: %.8s\n", c_hdr->c_filesize);
-		memcpy(buf, c_hdr->c_namesize, 8);
-		buf[8] = '\0';
-		size = strtol(buf, 0, 16);
+		c_bhdr->c_filename = (char*)c_hdr + sizeof(*c_hdr);
+		namesize = cpio_strntol(buf, c_hdr->c_namesize, 8);
 		printd("Namesize: %d\n", size);
-		if (!strcmp((char*)c_hdr + sizeof(*c_hdr), "TRAILER!!!"))
+		if (!strcmp(c_bhdr->c_filename, "TRAILER!!!"))
 			break;
-		printk("File: %s: ", (char*)c_hdr + sizeof(*c_hdr));
-		offset += size;
+		c_bhdr->c_ino = cpio_strntol(buf, c_hdr->c_ino, 8);
+		c_bhdr->c_mode = (int)cpio_strntol(buf, c_hdr->c_mode, 8);
+		c_bhdr->c_uid = cpio_strntol(buf, c_hdr->c_uid, 8);
+		c_bhdr->c_gid = cpio_strntol(buf, c_hdr->c_gid, 8);
+		c_bhdr->c_nlink = (unsigned int)cpio_strntol(buf, c_hdr->c_nlink, 8);
+		c_bhdr->c_mtime = cpio_strntol(buf, c_hdr->c_mtime, 8);
+		c_bhdr->c_filesize = cpio_strntol(buf, c_hdr->c_filesize, 8);
+		c_bhdr->c_dev_maj = cpio_strntol(buf, c_hdr->c_dev_maj, 8);
+		c_bhdr->c_dev_min = cpio_strntol(buf, c_hdr->c_dev_min, 8);
+		c_bhdr->c_rdev_maj = cpio_strntol(buf, c_hdr->c_rdev_maj, 8);
+		c_bhdr->c_rdev_min = cpio_strntol(buf, c_hdr->c_rdev_min, 8);
+		printk("File: %s: %d Bytes\n", c_bhdr->c_filename, c_bhdr->c_filesize);
+		offset += namesize;
 		/* header + name will be padded out to 4-byte alignment */
 		offset = ROUNDUP(offset, 4);
-		memcpy(buf, c_hdr->c_filesize, 8);
-		buf[8] = '\0';
-		size = strtol(buf, 0, 16);
-		printk("%d Bytes\n", size);
-		offset += size;
+		/* make this a function pointer or something */
+		if (add_kfs_entry(sb, c_bhdr)) {
+			printk("Failed to add an entry to KFS!\n");
+			break;
+		}
+		offset += c_bhdr->c_filesize;
 		offset = ROUNDUP(offset, 4);
 		//printk("offset is %d bytes\n", offset);
 		c_hdr = (struct cpio_newc_header*)(cpio_b + offset);
 	}
+	kfree(c_bhdr);
+}
+
+/* Debugging */
+void print_dir_tree(struct dentry *dentry, int depth)
+{
+	struct inode *inode = dentry->d_inode;
+	struct kfs_i_info *k_i_info = (struct kfs_i_info*)inode->i_fs_info;
+	struct dentry *d_i;
+	assert(dentry && inode && inode->i_flags & FS_I_DIR);
+	char buf[32] = {0};
+
+	for (int i = 0; i < depth; i++)
+		buf[i] = '\t';
+
+	TAILQ_FOREACH(d_i, &dentry->d_subdirs, d_subdirs_link) {
+		printk("%sDir %s has child dir: %s\n", buf, dentry->d_name.name,
+		       d_i->d_name.name);
+		print_dir_tree(d_i, depth + 1);
+	}
+	TAILQ_FOREACH(d_i, &k_i_info->children, d_subdirs_link)
+		printk("%sDir %s has child file: %s\n", buf, dentry->d_name.name,
+		       d_i->d_name.name);
 }
