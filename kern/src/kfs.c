@@ -23,6 +23,7 @@
 #include <assert.h>
 #include <error.h>
 #include <cpio.h>
+#include <pmap.h>
 
 #define KFS_MAX_FILE_SIZE 1024*1024*128
 #define KFS_MAGIC 0xdead0001
@@ -298,13 +299,14 @@ int kfs_create(struct inode *dir, struct dentry *dentry, int mode,
  * Callers, make sure you alloc and fill out the name parts of the dentry, and
  * an initialized nameidata.
  *
- * Doesn't yet handle symlinks, . or .., so don't fuck it up.  Some of the other
+ * Doesn't yet handle symlinks, . or .., so don't fuck it up.  It might not need
+ * to handle the . or .., which could be handled by the VFS.  Some of the other
  * ugliness is because KFS is exclusively using dentries to track subdirs,
  * instead of putting it all in the inode/dir file.
  *
  * Because of the way KFS currently works, if there is ever a dentry, it's
  * already in memory, along with its inode (all path's pinned).  So we just find
- * it and return it. */
+ * it and return it, freeing the one that came in. */
 struct dentry *kfs_lookup(struct inode *dir, struct dentry *dentry,
                           struct nameidata *nd)
 {
@@ -480,17 +482,66 @@ void kfs_d_iput(struct dentry *dentry, struct inode *inode)
 
 /* file_operations */
 
-/* Updates the file pointer */
+/* Updates the file pointer.  KFS doesn't let you go past the end of a file
+ * yet, so it won't let you seek past either.  TODO: think about locking. */
 off_t kfs_llseek(struct file *file, off_t offset, int whence)
 {
-	return -1;
+	off_t temp_off = 0;
+	switch (whence) {
+		case SEEK_SET:
+			temp_off = offset;
+			break;
+		case SEEK_CUR:
+			temp_off = file->f_pos + offset;
+			break;
+		case SEEK_END:
+			temp_off = file->f_inode->i_size + offset;
+			break;
+		default:
+			warn("Unknown 'whence' in llseek()!\n");
+	}
+	/* make sure the f_pos isn't outside the limits of the existing file */
+	temp_off = MAX(MIN(temp_off, file->f_inode->i_size), 0);
+	file->f_pos = temp_off;
+	return temp_off;
 }
 
-/* Read cound bytes from the file into buf, starting at *offset, which is increased
- * accordingly */
+/* Read count bytes from the file into buf, starting at *offset, which is increased
+ * accordingly. */
 ssize_t kfs_read(struct file *file, char *buf, size_t count, off_t *offset)
 {
-	return -1;
+	struct kfs_i_info *k_i_info = (struct kfs_i_info*)file->f_inode->i_fs_info;
+	void *begin, *end;
+
+	/* TODO: handle this higher up in the VFS */
+	if (!count)
+		return 0;
+	if (*offset == file->f_inode->i_size)
+		return 0; /* EOF */
+
+	/* Make sure we don't go past the end of the file */
+	if (*offset + count > file->f_inode->i_size) {
+		count = file->f_inode->i_size - *offset;
+	}
+	begin = k_i_info->filestart + *offset;
+	end = begin + count;
+	if ((begin < k_i_info->filestart) ||
+	    (end > k_i_info->filestart + file->f_inode->i_size) ||
+	    (end < begin)) {
+		set_errno(current_tf, EINVAL);
+		return -1;
+	}
+
+	/* TODO: think about this.  if it's a user buffer, we're relying on current
+	 * to detect whose it is (which should work for async calls).  Consider
+	 * pushing this up the VFS stack. */
+	if (current) {
+		memcpy_to_user(current, buf, begin, count);
+	} else {
+		memcpy(buf, begin, count);
+	}
+	*offset += count;
+	return count;
 }
 
 /* Writes count bytes from buf to the file, starting at *offset, which is
@@ -498,13 +549,85 @@ ssize_t kfs_read(struct file *file, char *buf, size_t count, off_t *offset)
 ssize_t kfs_write(struct file *file, const char *buf, size_t count,
                   off_t *offset)
 {
-	return -1;
+	struct kfs_i_info *k_i_info = (struct kfs_i_info*)file->f_inode->i_fs_info;
+	void *begin, *end;
+
+	/* TODO: handle this higher up in the VFS */
+	if (!count)
+		return 0;
+	if (*offset == file->f_inode->i_size)
+		return 0; /* EOF */
+
+	/* Make sure we don't go past the end of the file */
+	if (*offset + count > file->f_inode->i_size) {
+		count = file->f_inode->i_size - *offset;
+	}
+	begin = k_i_info->filestart + *offset;
+	end = begin + count;
+	if ((begin < k_i_info->filestart) ||
+	    (end > k_i_info->filestart + file->f_inode->i_size) ||
+	    (end < begin)) {
+		set_errno(current_tf, EINVAL);
+		return -1;
+	}
+
+	/* TODO: think about this.  if it's a user buffer, we're relying on current
+	 * to detect whose it is (which should work for async calls).  Consider
+	 * pushing this up the VFS stack. */
+	if (current) {
+		memcpy_from_user(current, begin, buf, count);
+	} else {
+		memcpy(begin, buf, count);
+	}
+	*offset += count;
+	return count;
 }
 
-/* Fills in the next directory entry (dirent), starting with d_off */
+/* Fills in the next directory entry (dirent), starting with d_off.  Like with
+ * read and write, there will be issues with userspace and the *dirent buf.
+ * TODO: we don't really do anything with userspace concerns here, in part
+ * because memcpy_to doesn't work well.  When we fix how we want to handle the
+ * userbuffers, we can write this accordingly.  */
 int kfs_readdir(struct file *dir, struct dirent *dirent)
 {
-	return -1;
+	int count = 0;
+	bool found = FALSE;
+	struct dentry *subent;
+	struct dentry *dir_d = TAILQ_FIRST(&dir->f_inode->i_dentry);
+	struct kfs_i_info *k_i_info = (struct kfs_i_info*)dir->f_inode->i_fs_info;
+
+	/* how we check inside the for loops below.  moderately ghetto. */
+	void check_entry(void)
+	{
+		if (count++ == dirent->d_off) {
+			dirent->d_ino = subent->d_inode->i_ino;
+			dirent->d_reclen = subent->d_name.len;
+			/* d_name.name is null terminated, the byte after d_name.len */
+			assert(subent->d_name.len <= MAX_FILENAME_SZ);
+			strncpy(dirent->d_name, subent->d_name.name, subent->d_name.len +1);
+			found = TRUE;
+		}
+	}
+	/* some of this error handling can be done by the VFS.  The syscall should
+	 * handle EBADF, EFAULT, and EINVAL (TODO, memory related). */
+	if (!(dir->f_inode->i_flags & FS_I_DIR)) {
+		set_errno(current_tf, ENOTDIR);
+		return -1;
+	}
+
+	/* need to check the sub-dirs as well as the sub-"files" */
+	TAILQ_FOREACH(subent, &dir_d->d_subdirs, d_subdirs_link)
+		check_entry();
+	TAILQ_FOREACH(subent, &k_i_info->children, d_subdirs_link)
+		check_entry();
+
+	if (!found) {
+		set_errno(current_tf, ENOENT);
+		return -1;
+	}
+	if (count - 1 == dirent->d_off)		/* found the last dir in the list */
+		return 0;
+	return 1;							/* normal success for readdir */
 }
 
 /* Memory maps the file into the virtual memory area */
@@ -518,7 +641,7 @@ int kfs_mmap(struct file *file, struct vm_area_struct *vma)
 int kfs_open(struct inode *inode, struct file *file)
 {
 	/* This is mostly FS-agnostic, consider a helper */
-	file = kmem_cache_alloc(file_kcache, 0);
+	//file = kmem_cache_alloc(file_kcache, 0); /* done in the VFS */
 	/* Add to the list of all files of this SB */
 	TAILQ_INSERT_TAIL(&inode->i_sb->s_files, file, f_list);
 	file->f_inode = inode;
@@ -542,13 +665,13 @@ int kfs_open(struct inode *inode, struct file *file)
 /* Called when a file descriptor is closed. */
 int kfs_flush(struct file *file)
 {
-	kmem_cache_free(file_kcache, file);
 	return -1;
 }
 
 /* Called when the file refcnt == 0 */
 int kfs_release(struct inode *inode, struct file *file)
 {
+	kmem_cache_free(file_kcache, file);
 	return -1;
 }
 
@@ -871,6 +994,7 @@ void parse_cpio_entries(struct super_block *sb, void *cpio_b)
 		offset += namesize;
 		/* header + name will be padded out to 4-byte alignment */
 		offset = ROUNDUP(offset, 4);
+		c_bhdr->c_filestart = cpio_b + offset;
 		/* make this a function pointer or something */
 		if (add_kfs_entry(sb, c_bhdr)) {
 			printk("Failed to add an entry to KFS!\n");
@@ -901,7 +1025,10 @@ void print_dir_tree(struct dentry *dentry, int depth)
 		       d_i->d_name.name);
 		print_dir_tree(d_i, depth + 1);
 	}
-	TAILQ_FOREACH(d_i, &k_i_info->children, d_subdirs_link)
-		printk("%sDir %s has child file: %s\n", buf, dentry->d_name.name,
+	TAILQ_FOREACH(d_i, &k_i_info->children, d_subdirs_link) {
+		printk("%sDir %s has child file: %s", buf, dentry->d_name.name,
 		       d_i->d_name.name);
+		printk("file starts at: %p\n",
+		       ((struct kfs_i_info*)d_i->d_inode->i_fs_info)->filestart);
+	}
 }

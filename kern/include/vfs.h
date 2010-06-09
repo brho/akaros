@@ -239,6 +239,11 @@ struct dentry_operations {
 	void (*d_iput) (struct dentry *, struct inode *);
 };
 
+/* Yanked from glibc-2.11.1/posix/unistd.h */
+#define SEEK_SET   0   /* Seek from beginning of file.  */
+#define SEEK_CUR   1   /* Seek from current position.  */
+#define SEEK_END   2   /* Seek from end of file.  */
+
 /* File: represents a file opened by a process. */
 struct file {
 	TAILQ_ENTRY(file)			f_list;			/* list of all files */
