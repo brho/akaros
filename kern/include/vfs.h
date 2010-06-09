@@ -88,7 +88,7 @@ struct nameidata {
 	struct vfsmount				*mnt;			/* its mount pt */
 	struct qstr					last;			/* last component in search */
 	int							flags;			/* lookup flags */
-	int							last_type;		/* type fo last component */
+	int							last_type;		/* type of last component */
 	unsigned int				depth;			/* search's symlink depth */
 	char						*saved_names[MAX_SYMLINK_DEPTH];
 	int							intent;			/* access type for the file */

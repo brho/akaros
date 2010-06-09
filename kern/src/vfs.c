@@ -186,15 +186,18 @@ void init_sb(struct super_block *sb, struct vfsmount *vmnt,
 	dcache_put(d_root); // TODO: should set a d_flag too
 }
 
-/* Helper to alloc and initialize a generic dentry.  Note that this may store
- * the char *name inside the dentry (if it was longer than the inline length).
- * That might turn out to suck.  */
+/* Helper to alloc and initialize a generic dentry.
+ *
+ * If the name is longer than the inline name, it will kmalloc a buffer, so
+ * don't worry about the storage for *name after calling this. */
 struct dentry *get_dentry(struct super_block *sb, struct dentry *parent,
                           char *name)
 {
 	assert(name);
-	size_t name_len = strnlen(name, MAX_FILENAME_SZ);
+	size_t name_len = strnlen(name, MAX_FILENAME_SZ);	/* not including \0! */
 	struct dentry *dentry = kmem_cache_alloc(dentry_kcache, 0);
+	char *l_name = 0;
+
 	//memset(dentry, 0, sizeof(struct dentry));
 	atomic_set(&dentry->d_refcnt, 1);	/* this ref is returned */
 	spinlock_init(&dentry->d_lock);
@@ -209,11 +212,16 @@ struct dentry *get_dentry(struct super_block *sb, struct dentry *parent,
 	dentry->d_flags = 0;				/* related to its dcache state */
 	dentry->d_fs_info = 0;
 	SLIST_INIT(&dentry->d_bucket);
-	if (name_len <= DNAME_INLINE_LEN) {
+	if (name_len < DNAME_INLINE_LEN) {
 		strncpy(dentry->d_iname, name, name_len);
+		dentry->d_iname[name_len] = '\0';
 		qstr_builder(dentry, 0);
 	} else {
-		qstr_builder(dentry, name);		/* storing the incoming *name */
+		l_name = kmalloc(name_len + 1, 0);
+		assert(l_name);
+		strncpy(l_name, name, name_len);
+		l_name[name_len] = '\0';
+		qstr_builder(dentry, l_name);
 	}
 	return dentry;
 }

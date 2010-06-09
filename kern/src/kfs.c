@@ -290,16 +290,52 @@ int kfs_create(struct inode *dir, struct dentry *dentry, int mode,
 }
 
 /* Searches the directory for the filename in the dentry, filling in the dentry
- * with the FS specific info of this file */
+ * with the FS specific info of this file.  If it succeeds, it will pass back
+ * the *dentry you should use.  If this fails, it will return 0 and will take
+ * the ref to the dentry for you.  Either way, you shouldn't use the ref you
+ * passed in anymore.
+ *
+ * Callers, make sure you alloc and fill out the name parts of the dentry, and
+ * an initialized nameidata.
+ *
+ * Doesn't yet handle symlinks, . or .., so don't fuck it up.  Some of the other
+ * ugliness is because KFS is exclusively using dentries to track subdirs,
+ * instead of putting it all in the inode/dir file.
+ *
+ * Because of the way KFS currently works, if there is ever a dentry, it's
+ * already in memory, along with its inode (all path's pinned).  So we just find
+ * it and return it. */
 struct dentry *kfs_lookup(struct inode *dir, struct dentry *dentry,
                           struct nameidata *nd)
 {
-	// TODO: does this mean the inode too?
-	// what the hell are we returning?  the passed in dentry?  an error code?
-	// this will have to read the directory, then find the ino, then creates a
-	// dentry for it
-	//
-	// linux now has a nameidata for this
+	struct kfs_i_info *k_i_info = (struct kfs_i_info*)dir->i_fs_info;
+	struct dentry *dir_dent = TAILQ_FIRST(&dir->i_dentry);
+	struct dentry *d_i;
+
+	assert(dir_dent && dir_dent == TAILQ_LAST(&dir->i_dentry, dentry_tailq));
+	assert(dir->i_flags & FS_I_DIR);
+
+	TAILQ_FOREACH(d_i, &dir_dent->d_subdirs, d_subdirs_link) {
+		if (!strcmp(d_i->d_name.name, dentry->d_name.name)) {
+			/* since this dentry is already in memory (that's how KFS works), we
+			 * can free the one that came in and return the real one */
+			kmem_cache_free(dentry_kcache, dentry);
+			return d_i;
+		}
+	}
+	TAILQ_FOREACH(d_i, &k_i_info->children, d_subdirs_link) {
+		if (!strcmp(d_i->d_name.name, dentry->d_name.name)) {
+			/* since this dentry is already in memory (that's how KFS works), we
+			 * can free the one that came in and return the real one */
+			kmem_cache_free(dentry_kcache, dentry);
+			return d_i;
+		}
+	}
+	/* no match, consider caching the negative result, freeing the
+	 * dentry, etc */
+	printk("Not Found %s!!\n", dentry->d_name.name);
+	/* TODO: Cache, negatively... */
+	//dcache_put(dentry); 			/* TODO: should set a d_flag too */
 	return 0;
 }
 
@@ -429,7 +465,10 @@ int kfs_d_delete(struct dentry *dentry)
 
 /* Called when it's about to be slab-freed */
 int kfs_d_release(struct dentry *dentry)
-{ // default, nothin
+{
+	/* TODO: check the boundaries on this. */
+	if (dentry->d_name.len > DNAME_INLINE_LEN)
+		kfree((void*)dentry->d_name.name);
 	return -1;
 }
 
@@ -700,14 +739,18 @@ void kfs_cat(int kfs_inode)
 		cputchar(*ptr);
 }
 
-/* Need to pass path separately, since we'll recurse on it */
+/* Need to pass path separately, since we'll recurse on it.  TODO: this recurses,
+ * and takes up a lot of stack space (~270 bytes).  Core 0's KSTACK is 8 pages,
+ * which can handle about 120 levels deep...  Other cores are not so fortunate.
+ * Can rework this if it becomes an issue. */
 static int __add_kfs_entry(struct dentry *parent, char *path,
                            struct cpio_bin_hdr *c_bhdr)
 {
 	char *first_slash = strchr(path, '/');	
 	char dir[MAX_FILENAME_SZ + 1];	/* room for the \0 */
 	size_t dirname_sz;				/* not counting the \0 */
-	struct dentry *dentry;
+	struct dentry *dentry = 0;
+	struct nameidata nd = {0};
 	struct inode *inode;
 
 	if (first_slash) {
@@ -718,16 +761,27 @@ static int __add_kfs_entry(struct dentry *parent, char *path,
 		assert(dirname_sz <= MAX_FILENAME_SZ);
 		strncpy(dir, path, dirname_sz);
 		dir[dirname_sz] = '\0';
-		printk("Finding DIR %s in dentry %s (start: %p, size %d)\n", dir,
+		printd("Finding DIR %s in dentry %s (start: %p, size %d)\n", dir,
 		       parent->d_name.name, c_bhdr->c_filestart, c_bhdr->c_filesize);
-		// send to the real dentry
-		__add_kfs_entry(parent, first_slash + 1, c_bhdr);
-
+		/* Need to create a dentry for the lookup, and fill in the basic nd */
+		dentry = get_dentry(parent->d_sb, parent, dir);
+		nd.dentry = dentry;
+		nd.mnt = dentry->d_sb->s_mount;
+		//nd.flags = 0;			/* TODO: once we have lookup flags */
+		//nd.last_type = 0;		/* TODO: should be a DIR */
+		//nd.intent = 0; 		/* TODO: RW, prob irrelevant*/
+		/* TODO: use a VFS lookup instead, to use the dcache, thought its not a
+		 * big deal since KFS currently pins all metadata. */
+		dentry = kfs_lookup(parent->d_inode, dentry, &nd);
+		if (!dentry) {
+			printk("Missing dir in CPIO archive or something, aborting.\n");
+			return -1;
+		}
+		return __add_kfs_entry(dentry, first_slash + 1, c_bhdr);
 	} else {
 		/* no directories left in the path.  add the 'file' to the dentry */
-		printk("Adding file/dir %s to dentry %s (start: %p, size %d)\n", path,
+		printd("Adding file/dir %s to dentry %s (start: %p, size %d)\n", path,
 		       parent->d_name.name, c_bhdr->c_filestart, c_bhdr->c_filesize);
-
 		/* Init the dentry for this path */
 		dentry = get_dentry(parent->d_sb, parent, path);
 		dentry->d_op = &kfs_d_op;
@@ -813,7 +867,7 @@ void parse_cpio_entries(struct super_block *sb, void *cpio_b)
 		c_bhdr->c_dev_min = cpio_strntol(buf, c_hdr->c_dev_min, 8);
 		c_bhdr->c_rdev_maj = cpio_strntol(buf, c_hdr->c_rdev_maj, 8);
 		c_bhdr->c_rdev_min = cpio_strntol(buf, c_hdr->c_rdev_min, 8);
-		printk("File: %s: %d Bytes\n", c_bhdr->c_filename, c_bhdr->c_filesize);
+		printd("File: %s: %d Bytes\n", c_bhdr->c_filename, c_bhdr->c_filesize);
 		offset += namesize;
 		/* header + name will be padded out to 4-byte alignment */
 		offset = ROUNDUP(offset, 4);
