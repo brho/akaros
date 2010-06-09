@@ -64,7 +64,8 @@ extern taskstate_t ts;
 
 static inline void set_errno(trapframe_t* tf, uint32_t errno)
 {
-	tf->tf_regs.reg_esi = errno;
+	if (tf)
+		tf->tf_regs.reg_esi = errno;
 }
 
 /* Determines if the given TF was in the kernel or not. */

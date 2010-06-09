@@ -23,7 +23,8 @@ void emulate_fpu(trapframe_t* state, ancillary_state_t* astate);
 
 static inline void set_errno(trapframe_t* tf, uint32_t errno)
 {
-	tf->gpr[9] = errno;
+	if (tf)
+		tf->gpr[9] = errno;
 }
 
 static inline bool in_kernel(struct trapframe *tf)
