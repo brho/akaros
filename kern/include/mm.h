@@ -11,7 +11,6 @@
 #define ROS_KERN_MM_H
 
 #include <ros/common.h>
-#include <process.h>
 #include <atomic.h>
 #include <sys/queue.h>
 #include <slab.h>
@@ -53,17 +52,40 @@
  * will also affect get_free_va_range
  * 	- also, do we want a separate brk per?  or just support mmap on private mem?
  */
+struct file;
+struct proc;								/* preprocessor games */
+
+/* Basic structure defining a region of a process's virtual memory */
 struct vm_region {
-	TAILQ_ENTRY(vm_region) link; // actually, i'd like a sorted tree of these
-	uintptr_t base;
-	size_t len;
-	int perm;
+	TAILQ_ENTRY(vm_region)		vm_link;
+	struct proc					*vm_proc;	/* owning process, for now */
+	//struct mm 					*vm_mm;		/* owning address space */
+	uintptr_t					vm_base;
+	uintptr_t					vm_end;
+	int							vm_perm;	
+	int							vm_flags;	
+	struct file					*vm_file;
+	size_t						vm_foff;
 };
-TAILQ_HEAD(vm_region_list, vm_region); // Declares 'struct memregion_list'
+TAILQ_HEAD(vmr_tailq, vm_region);			/* Declares 'struct vmr_tailq' */
+
+#include <process.h>						/* preprocessor games */
+
+/* VM Region Management Functions.  For now, these just maintain themselves -
+ * anything related to mapping needs to be done by the caller. */
+void vmr_init(void);
+struct vm_region *create_vmr(struct proc *p, uintptr_t va, size_t len);
+struct vm_region *split_vmr(struct vm_region *vmr, uintptr_t va);
+int merge_vmr(struct vm_region *first, struct vm_region *second);
+int grow_vmr(struct vm_region *vmr, uintptr_t va);
+int shrink_vmr(struct vm_region *vmr, uintptr_t va);
+void destroy_vmr(struct vm_region *vmr);
+struct vm_region *find_vmr(struct proc *p, uintptr_t va);
+struct vm_region *find_first_vmr(struct proc *p, uintptr_t va);
+void print_vmrs(struct proc *p);
 
 // at least for now, we aren't using vm regions. we're storing pointers
 // to pfault_info_t inside the PTEs in an arch-specific way.
-struct file;
 typedef struct pfault_info {
 	struct file* file; // or NULL for zero-fill
 	size_t pgoff; // offset into file
@@ -83,6 +105,8 @@ struct mm {
 	// lists of vm_regions for all contexts
 	// base cr3 for all contexts
 	// previous brk, last checked vm_region
+	// should also track the num of vm_regions, or think about perverse things
+	// processes can do to gobble up kernel memory
 
 };
 // would rather this be a mm struct

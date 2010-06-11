@@ -52,9 +52,6 @@
 
 #include <env.h>
 
-// Till we remove the old struct Env
-#define proc Env
-
 TAILQ_HEAD(proc_list, proc);		// Declares 'struct proc_list'
 
 extern spinlock_t runnablelist_lock;

@@ -19,6 +19,7 @@
 #include <atomic.h>
 #include <timing.h>
 #include <page_alloc.h>
+#include <mm.h>
 
 // TODO: temp typedefs, etc.  remove when we support this stuff.
 typedef int dev_t;
@@ -40,7 +41,6 @@ struct inode_operations;
 struct file;
 struct file_operations;
 struct fs_type;
-struct vm_area_struct;
 struct vfsmount;
 
 /* part of the kernel interface, ripped from man pages, ought to work. */
@@ -273,7 +273,7 @@ struct file_operations {
 	ssize_t (*read) (struct file *, char *, size_t, off_t *);
 	ssize_t (*write) (struct file *, const char *, size_t, off_t *);
 	int (*readdir) (struct file *, struct dirent *);
-	int (*mmap) (struct file *, struct vm_area_struct *);
+	int (*mmap) (struct file *, struct vm_region *);
 	int (*open) (struct inode *, struct file *);
 	int (*flush) (struct file *);
 	int (*release) (struct inode *, struct file *);

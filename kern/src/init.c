@@ -75,7 +75,7 @@ void kernel_init(multiboot_info_t *mboot_info)
 	hashtable_init();
 	cache_color_alloc_init();       // Inits data structs
 	colored_page_alloc_init();      // Allocates colors for agnostic processes
-	mmap_init();
+	vmr_init();
 	file_init();
 	page_check();
 	vfs_init();

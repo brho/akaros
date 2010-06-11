@@ -17,13 +17,11 @@
 #include <arch/arch.h>
 #include <sys/queue.h>
 #include <atomic.h>
-
-struct Env;
-typedef struct Env env_t;
+#include <mm.h>
 
 // TODO: clean this up.
-struct Env {
-	TAILQ_ENTRY(Env) proc_link NOINIT;	// Free list link pointers
+struct proc {
+	TAILQ_ENTRY(proc) proc_link NOINIT;	// Free list link pointers
 	spinlock_t proc_lock;
 	trapframe_t env_tf; 						// Saved registers
 	ancillary_state_t env_ancillary_state; 	// State saved when descheduled
@@ -50,7 +48,7 @@ struct Env {
 	// Address space
 	pde_t *COUNT(NPDENTRIES) env_pgdir;			// Kernel virtual address of page dir
 	physaddr_t env_cr3;			// Physical address of page dir
-//	struct memregion_list memregions;
+	struct vmr_tailq vm_regions;
 
 	// Per process info and data pages
  	procinfo_t *SAFE procinfo;       // KVA of per-process shared info table (RO)
@@ -64,6 +62,10 @@ struct Env {
 	// Note this is the actual frontring, not a pointer to it somewhere else
 	sysevent_front_ring_t syseventfrontring;
 };
+
+/* Til we remove all Env references */
+#define Env proc
+typedef struct proc env_t;
 
 /* Process Flags */
 #define PROC_TRANSITION_TO_M			0x0001

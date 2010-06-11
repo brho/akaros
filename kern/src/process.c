@@ -284,6 +284,7 @@ static error_t proc_alloc(struct proc *SAFE*SAFE pp, pid_t parent_id)
 	memset(&p->resources, 0, sizeof(p->resources));
 	memset(&p->env_ancillary_state, 0, sizeof(p->env_ancillary_state));
 	memset(&p->env_tf, 0, sizeof(p->env_tf));
+	TAILQ_INIT(&p->vm_regions); /* could init this in the slab */
 
 	/* Initialize the contents of the e->procinfo structure */
 	proc_init_procinfo(p);

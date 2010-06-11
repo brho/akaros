@@ -933,3 +933,119 @@ void test_bcq(void)
 	}
 	
 }
+
+/* rudimentary tests.  does the basics, create, merge, split, etc.  Feel free to
+ * add more, esp for the error conditions and finding free slots.  This is also
+ * a bit lazy with setting the caller's fields (perm, flags, etc). */
+void test_vm_regions(void)
+{
+	#define MAX_VMR_TESTS 10
+	struct proc pr, *p = &pr;	/* too lazy to even create one */
+	int n = 0;
+	TAILQ_INIT(&p->vm_regions);
+
+	struct vmr_summary {
+		uintptr_t base; 
+		uintptr_t end; 
+	};
+	int check_vmrs(struct proc *p, struct vmr_summary *results, int len, int n)
+	{
+		int count = 0;
+		struct vm_region *vmr;
+		TAILQ_FOREACH(vmr, &p->vm_regions, vm_link) {
+			if (count >= len) {
+				printk("More vm_regions than expected\n");
+				break;
+			}
+			if ((vmr->vm_base != results[count].base) ||
+			    (vmr->vm_end != results[count].end)) {
+				printk("VM test case %d failed!\n", n);
+				print_vmrs(p);
+				return -1;
+			}
+			count++;
+		}
+		return count;
+	}
+	struct vm_region *vmrs[MAX_VMR_TESTS];
+	struct vmr_summary results[MAX_VMR_TESTS];
+
+	memset(results, 0, sizeof(results));
+	/* Make one */
+	vmrs[0] = create_vmr(p, 0x2000, 0x1000);
+	results[0].base = 0x2000;
+	results[0].end = 0x3000;
+	check_vmrs(p, results, 1, n++);
+	/* Grow it */
+	grow_vmr(vmrs[0], 0x4000);
+	results[0].base = 0x2000;
+	results[0].end = 0x4000;
+	check_vmrs(p, results, 1, n++);
+	/* Grow it poorly */
+	if (-1 != grow_vmr(vmrs[0], 0x3000))
+		printk("Bad grow test failed\n");
+	check_vmrs(p, results, 1, n++);
+	/* Make another right next to it */
+	vmrs[1] = create_vmr(p, 0x4000, 0x1000);
+	results[1].base = 0x4000;
+	results[1].end = 0x5000;
+	check_vmrs(p, results, 2, n++);
+	/* try to grow through it */
+	if (-1 != grow_vmr(vmrs[0], 0x5000))
+		printk("Bad grow test failed\n");
+	check_vmrs(p, results, 2, n++);
+	/* Merge them */
+	merge_vmr(vmrs[0], vmrs[1]);
+	results[0].end = 0x5000;
+	results[1].base = 0;
+	results[1].end = 0;
+	check_vmrs(p, results, 1, n++);
+	vmrs[1]= create_vmr(p, 0x6000, 0x4000);
+	results[1].base = 0x6000;
+	results[1].end = 0xa000;
+	check_vmrs(p, results, 2, n++);
+	/* try to merge unmergables (just testing ranges) */
+	if (-1 != merge_vmr(vmrs[0], vmrs[1]))
+		printk("Bad merge test failed\n");
+	check_vmrs(p, results, 2, n++);
+	vmrs[2] = split_vmr(vmrs[1], 0x8000);
+	results[1].end = 0x8000;
+	results[2].base = 0x8000;
+	results[2].end = 0xa000;
+	check_vmrs(p, results, 3, n++);
+	/* destroy one */
+	destroy_vmr(vmrs[1]);
+	results[1].base = 0x8000;
+	results[1].end = 0xa000;
+	check_vmrs(p, results, 2, n++);
+	/* shrink */
+	shrink_vmr(vmrs[2], 0x9000);
+	results[1].base = 0x8000;
+	results[1].end = 0x9000;
+	check_vmrs(p, results, 2, n++);
+	if (vmrs[2] != find_vmr(p, 0x8500))
+		printk("Failed to find the right vmr!");
+	if (vmrs[2] != find_first_vmr(p, 0x8500))
+		printk("Failed to find the right vmr!");
+	if (vmrs[2] != find_first_vmr(p, 0x7500))
+		printk("Failed to find the right vmr!");
+	if (find_first_vmr(p, 0x9500))
+		printk("Found a vmr when we shouldn't!\n");
+	/* grow up to another */
+	grow_vmr(vmrs[0], 0x8000);
+	results[0].end = 0x8000;
+	check_vmrs(p, results, 2, n++);
+	vmrs[0]->vm_perm = 88;
+	vmrs[2]->vm_perm = 77;
+	/* should be unmergeable due to perms */
+	if (-1 != merge_vmr(vmrs[0], vmrs[2]))
+		printk("Bad merge test failed\n");
+	check_vmrs(p, results, 2, n++);
+	/* should merge now */
+	vmrs[2]->vm_perm = 88;
+	merge_vmr(vmrs[0], vmrs[2]);
+	results[0].end = 0x9000;
+	check_vmrs(p, results, 1, n++);
+
+	printk("Finished vm_regions test!\n");
+}

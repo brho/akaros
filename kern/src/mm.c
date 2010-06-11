@@ -15,6 +15,194 @@
 #include <syscall.h>
 #include <slab.h>
 #include <kmalloc.h>
+#include <vfs.h>
+
+struct kmem_cache *vmr_kcache;
+struct kmem_cache *pfault_info_cache;
+
+void vmr_init(void)
+{
+	vmr_kcache = kmem_cache_create("vm_regions", sizeof(struct vm_region),
+	                               __alignof__(struct dentry), 0, 0, 0);
+	pfault_info_cache = kmem_cache_create("pfault_info",
+	                                      sizeof(pfault_info_t), 8, 0, 0, 0);
+}
+
+/* For now, the caller will set the prot, flags, file, and offset.  In the
+ * future, we may put those in here, to do clever things with merging vm_regions
+ * that are the same.
+ *
+ * TODO: take a look at solari's vmem alloc.  And consider keeping these in a
+ * tree of some sort for easier lookups. */
+struct vm_region *create_vmr(struct proc *p, uintptr_t va, size_t len)
+{
+	struct vm_region *vmr = 0, *vm_i, *vm_link;
+	uintptr_t gap_end;
+
+	/* Don't allow a vm region into the 0'th page (null ptr issues) */
+	if (va == 0)
+		va = 1 * PGSIZE;
+
+	assert(!PGOFF(va));
+	assert(!PGOFF(len));
+	assert(va + len <= USTACKBOT);
+
+	/* Is there room before the first one: */
+	vm_i = TAILQ_FIRST(&p->vm_regions);
+	if (!vm_i || (va + len < vm_i->vm_base)) {
+		vmr = kmem_cache_alloc(vmr_kcache, 0);
+		vmr->vm_base = va;
+		TAILQ_INSERT_HEAD(&p->vm_regions, vmr, vm_link);
+	} else {
+		TAILQ_FOREACH(vm_i, &p->vm_regions, vm_link) {
+			vm_link = TAILQ_NEXT(vm_i, vm_link); 
+			gap_end = vm_link ? vm_link->vm_base : USTACKBOT;
+			/* skip til we get past the 'hint' va */
+			if (va >= gap_end)
+				continue;
+			/* Found a gap that is big enough */
+			if (gap_end - vm_i->vm_end >= len) {
+				vmr = kmem_cache_alloc(vmr_kcache, 0);
+				/* if we can put it at va, let's do that.  o/w, put it so it
+				 * fits */
+				if (gap_end >= va + len)
+					vmr->vm_base = va;
+				else
+					vmr->vm_base = vm_i->vm_end;
+				TAILQ_INSERT_AFTER(&p->vm_regions, vm_i, vmr, vm_link);
+				break;
+			}
+		}
+	}
+	/* Finalize the creation, if we got one */
+	if (vmr) {
+		vmr->vm_proc = p;
+		vmr->vm_end = vmr->vm_base + len;
+	}
+	return vmr;
+}
+
+/* Split a VMR at va, returning the new VMR.  It is set up the same way, with
+ * file offsets fixed accordingly.  'va' is the beginning of the new one, and
+ * must be page aligned. */
+struct vm_region *split_vmr(struct vm_region *old_vmr, uintptr_t va)
+{
+	struct vm_region *new_vmr;
+
+	assert(!PGOFF(va));
+	if ((old_vmr->vm_base >= va) || (old_vmr->vm_end <= va))
+		return 0;
+	new_vmr = kmem_cache_alloc(vmr_kcache, 0);
+	TAILQ_INSERT_AFTER(&old_vmr->vm_proc->vm_regions, old_vmr, new_vmr,
+	                   vm_link);
+	new_vmr->vm_proc = old_vmr->vm_proc;
+	new_vmr->vm_base = va;
+	new_vmr->vm_end = old_vmr->vm_end;
+	old_vmr->vm_end = va;
+	new_vmr->vm_perm = old_vmr->vm_perm;
+	new_vmr->vm_flags = old_vmr->vm_flags;
+	if (old_vmr->vm_file) {
+		new_vmr->vm_file = old_vmr->vm_file;
+		atomic_inc(&new_vmr->vm_file->f_refcnt);
+		new_vmr->vm_foff = old_vmr->vm_foff +
+		                      old_vmr->vm_end - old_vmr->vm_base;
+	} else {
+		new_vmr->vm_file = 0;
+		new_vmr->vm_foff = 0;
+	}
+	return new_vmr;
+}
+
+/* Merges two vm regions.  For now, it will check to make sure they are the
+ * same.  The second one will be destroyed. */
+int merge_vmr(struct vm_region *first, struct vm_region *second)
+{
+	assert(first->vm_proc == second->vm_proc);
+	if ((first->vm_end != second->vm_base) ||
+	    (first->vm_perm != second->vm_perm) ||
+	    (first->vm_flags != second->vm_flags) ||
+	    (first->vm_file != second->vm_file))
+		return -1;
+	if ((first->vm_file) && (second->vm_foff != first->vm_foff +
+	                         first->vm_end - first->vm_base))
+		return -1;
+	first->vm_end = second->vm_end;
+	destroy_vmr(second);
+	return 0;
+}
+
+/* Grows the vm region up to (and not including) va.  Fails if another is in the
+ * way, etc. */
+int grow_vmr(struct vm_region *vmr, uintptr_t va)
+{
+	assert(!PGOFF(va));
+	struct vm_region *next = TAILQ_NEXT(vmr, vm_link);
+	if (next && next->vm_base < va)
+		return -1;
+	if (va <= vmr->vm_end)
+		return -1;
+	vmr->vm_end = va;
+	return 0;
+}
+
+/* Shrinks the vm region down to (and not including) va.  Whoever calls this
+ * will need to sort out the page table entries. */
+int shrink_vmr(struct vm_region *vmr, uintptr_t va)
+{
+	assert(!PGOFF(va));
+	if ((va < vmr->vm_base) || (va > vmr->vm_end))
+		return -1;
+	vmr->vm_end = va;
+	return 0;
+}
+
+/* Called by the unmapper, just cleans up.  Whoever calls this will need to sort
+ * out the page table entries. */
+void destroy_vmr(struct vm_region *vmr)
+{
+	if (vmr->vm_file)
+		atomic_dec(&vmr->vm_file->f_refcnt);
+	TAILQ_REMOVE(&vmr->vm_proc->vm_regions, vmr, vm_link);
+	kmem_cache_free(vmr_kcache, vmr);
+}
+
+/* Given a va and a proc (later an mm, possibly), returns the owning vmr, or 0
+ * if there is none. */
+struct vm_region *find_vmr(struct proc *p, uintptr_t va)
+{
+	struct vm_region *vmr;
+	/* ugly linear seach */
+	TAILQ_FOREACH(vmr, &p->vm_regions, vm_link) {
+		if ((vmr->vm_base <= va) && (vmr->vm_end > va))
+			return vmr;
+	}
+	return 0;
+}
+
+/* Finds the first vmr after va (including the one holding va), or 0 if there is
+ * none. */
+struct vm_region *find_first_vmr(struct proc *p, uintptr_t va)
+{
+	struct vm_region *vmr;
+	/* ugly linear seach */
+	TAILQ_FOREACH(vmr, &p->vm_regions, vm_link) {
+		if ((vmr->vm_base <= va) && (vmr->vm_end > va))
+			return vmr;
+		if (vmr->vm_base > va)
+			return vmr;
+	}
+	return 0;
+}
+
+void print_vmrs(struct proc *p)
+{
+	int count = 0;
+	struct vm_region *vmr;
+	printk("VM Regions for proc %d\n", p->pid);
+	TAILQ_FOREACH(vmr, &p->vm_regions, vm_link)
+		printk("%02d: (0x%08x - 0x%08x)\n", count++, vmr->vm_base, vmr->vm_end);
+}
+
 
 void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
            int fd, size_t offset)
@@ -60,6 +248,7 @@ void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 	return ret;
 }
 
+/* Consider moving the top half of this to another function, like mmap(). */
 void *__do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
                 struct file* file, size_t offset)
 {
@@ -69,8 +258,11 @@ void *__do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 	flags |= MAP_POPULATE;
 #endif
 	
+	/* TODO: if FIXED, need to handle overlap on another region */
 	if(!(flags & MAP_FIXED))
 	{
+		/* this should be arch indep, and once we add the new region to the
+		 * list, this won't think the region is free */
 		addr = (uintptr_t)get_free_va_range(p->env_pgdir,addr,len);
 		if(!addr)
 			goto mmap_abort;
@@ -78,6 +270,13 @@ void *__do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 		assert(!PGOFF(addr));
 		assert(addr + num_pages*PGSIZE <= USTACKBOT);
 	}
+	#if 0
+	struct vm_region *vmr = create_vmr(p, addr, len);
+	vmr->vm_perm = prot;
+	vmr->vm_flags = flags;
+	vmr->vm_file = file;
+	vmr->vm_foff = offset;
+	#endif
 
 	// get a list of pfault_info_t's and pte's a priori,
 	// because if their allocation fails, we could end up
@@ -330,13 +529,6 @@ out:
 	return ret;
 }
 
-struct kmem_cache* pfault_info_cache;
-void mmap_init(void)
-{
-	pfault_info_cache = kmem_cache_create("pfault_info",
-	                                      sizeof(pfault_info_t), 8, 0, 0, 0);
-}
-
 pfault_info_t* pfault_info_alloc(struct file* file)
 {
 	if(file)
@@ -350,4 +542,3 @@ void pfault_info_free(pfault_info_t* pfi)
 		file_decref(pfi->file);
 	kmem_cache_free(pfault_info_cache,pfi);
 }
-

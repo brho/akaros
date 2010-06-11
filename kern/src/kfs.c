@@ -630,9 +630,15 @@ int kfs_readdir(struct file *dir, struct dirent *dirent)
 	return 1;							/* normal success for readdir */
 }
 
-/* Memory maps the file into the virtual memory area */
-int kfs_mmap(struct file *file, struct vm_area_struct *vma)
+/* Sets up a memory mapping of the file into the vm_region, based on the
+ * parameters in the vmr. */
+int kfs_mmap(struct file *file, struct vm_region *vmr)
 {
+	/* the file is not page-aligned yet, so we need to copy it to fresh pages.
+	 * this should only be done once per SHARED file (inode), so only make fresh
+	 * copies if people want new ones.  Also note that MAP_PRIVATE does not get
+	 * carried through to the underlying file. */
+
 	return -1;
 }
 
