@@ -124,6 +124,8 @@
 
 // Top of one-page user exception stack
 #define UXSTACKTOP	UGDATA
+/* Limit of what is mmap()/munmap()-able */
+#define UMAPTOP UXSTACKTOP
 // Next page left invalid to guard against exception stack overflow; then:
 // Top of normal user stack
 #define USTACKTOP	(UXSTACKTOP - 2*PGSIZE)

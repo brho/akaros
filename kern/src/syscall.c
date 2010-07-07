@@ -496,12 +496,12 @@ static void *sys_mmap(struct proc* p, uintreg_t a1, uintreg_t a2, uintreg_t a3,
 
 static intreg_t sys_mprotect(struct proc* p, void* addr, size_t len, int prot)
 {
-	return mprotect(p, addr, len, prot);
+	return mprotect(p, (uintptr_t)addr, len, prot);
 }
 
 static intreg_t sys_munmap(struct proc* p, void* addr, size_t len)
 {
-	return munmap(p, addr, len);
+	return munmap(p, (uintptr_t)addr, len);
 }
 
 static void* sys_brk(struct proc *p, void* addr) {
@@ -525,7 +525,7 @@ static void* sys_brk(struct proc *p, void* addr) {
 			goto out;
 	}
 	else if (range < 0) {
-		if(__munmap(p, (void*)real_new_heap_top, -range))
+		if(__do_munmap(p, real_new_heap_top, -range))
 			goto out;
 	}
 	p->heap_top = addr;

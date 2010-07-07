@@ -1,11 +1,9 @@
-/*
- * Copyright (c) 2009 The Regents of the University of California
+/* Copyright (c) 2009, 2010 The Regents of the University of California
  * Barret Rhoden <brho@cs.berkeley.edu>
  * See LICENSE for details.
  *
  * Memory management for processes: syscall related functions, virtual memory
- * regions, etc.
- */
+ * regions, etc. */
 
 #ifndef ROS_KERN_MM_H
 #define ROS_KERN_MM_H
@@ -55,6 +53,14 @@
 struct file;
 struct proc;								/* preprocessor games */
 
+/* This might turn into a per-process mem management structure.  For now, we're
+ * using the proc struct.  This would have things like the vmr list/tree, cr3,
+ * mem usage stats, something with private memory, etc.  Not sure if we'll ever
+ * need this. */
+struct mm {
+	spinlock_t mm_lock;
+};
+
 /* Basic structure defining a region of a process's virtual memory */
 struct vm_region {
 	TAILQ_ENTRY(vm_region)		vm_link;
@@ -82,6 +88,7 @@ int shrink_vmr(struct vm_region *vmr, uintptr_t va);
 void destroy_vmr(struct vm_region *vmr);
 struct vm_region *find_vmr(struct proc *p, uintptr_t va);
 struct vm_region *find_first_vmr(struct proc *p, uintptr_t va);
+void isolate_vmrs(struct proc *p, uintptr_t va, size_t len);
 void print_vmrs(struct proc *p);
 
 // at least for now, we aren't using vm regions. we're storing pointers
@@ -98,32 +105,22 @@ void mmap_init(void);
 pfault_info_t* pfault_info_alloc(struct file* file);
 void pfault_info_free(pfault_info_t* pfi);
 
-struct mm {
-	spinlock_t mm_lock;
-	// per-process memory management stuff
-	// cr3(s), accounting, possibly handler methods for certain types of faults
-	// lists of vm_regions for all contexts
-	// base cr3 for all contexts
-	// previous brk, last checked vm_region
-	// should also track the num of vm_regions, or think about perverse things
-	// processes can do to gobble up kernel memory
 
-};
-// would rather this be a mm struct
+/* mmap() related functions.  These manipulate VMRs and change the hardware page
+ * tables. */
 void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
            int fd, size_t offset);
-struct file;
 void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
-             struct file* f, size_t offset);
-int mprotect(struct proc* p, void* addr, size_t len, int prot);
-int munmap(struct proc* p, void* addr, size_t len);
-int handle_page_fault(struct proc* p, uintptr_t va, int prot);
+             struct file *f, size_t offset);
+int mprotect(struct proc *p, uintptr_t addr, size_t len, int prot);
+int munmap(struct proc *p, uintptr_t addr, size_t len);
+int handle_page_fault(struct proc *p, uintptr_t va, int prot);
 
-// assumes proc_lock is held already
+/* These assume the memory/proc_lock is held already */
 void *__do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
-               struct file* f, size_t offset);
-int __mprotect(struct proc* p, void* addr, size_t len, int prot);
-int __munmap(struct proc* p, void* addr, size_t len);
+               struct file *f, size_t offset);
+int __do_mprotect(struct proc *p, uintptr_t addr, size_t len, int prot);
+int __do_munmap(struct proc *p, uintptr_t addr, size_t len);
 int __handle_page_fault(struct proc* p, uintptr_t va, int prot);
 
-#endif // !ROS_KERN_MM_H
+#endif /* !ROS_KERN_MM_H */

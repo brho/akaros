@@ -137,6 +137,7 @@ void file_init()
 	                                      sizeof(struct file), 8, 0, 0, 0);
 }
 
+/* will zero anything in the page after the EOF */
 error_t file_read_page(struct file* f, physaddr_t pa, size_t pgoff)
 {
 	int ret = frontend_syscall(0,APPSERVER_SYSCALL_pread,f->fd,pa,PGSIZE,
