@@ -213,25 +213,30 @@ page_t *page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
  * @param pgdir the page directory from with the page sholuld be removed
  * @param va    the virtual address at which the page we are trying to 
  *              remove is mapped
+ * TODO: consider deprecating this, esp given issues with TLB management.  might
+ * want to have the caller need to manage the TLB.  Also note it is used in
+ * env_user_mem_free, minus the walk.
  */
 void page_remove(pde_t *pgdir, void *va)
 {
-	pte_t* pte;
+	pte_t *pte;
 	page_t *page;
 
 	pte = pgdir_walk(pgdir,va,0);
-	if(!pte || PAGE_UNMAPPED(*pte))
+	if (!pte || PAGE_UNMAPPED(*pte))
 		return;
 
-	if(PAGE_PAGED_OUT(*pte))
-		pfault_info_free(PTE2PFAULT_INFO(*pte));
-	else // PAGE_PRESENT
-	{
+	if (PAGE_PRESENT(*pte)) {
+		/* TODO: (TLB) race here, where the page can be given out before
+		 * the shootdown happened.  Need to put it on a temp list. */
+		page = ppn2page(PTE2PPN(*pte));
+		*pte = 0;
+		page_decref(page);
 		tlb_invalidate(pgdir, va);
-		page_decref(ppn2page(PTE2PPN(*pte)));
+	} else if (PAGE_PAGED_OUT(*pte)) {
+		/* TODO: (SWAP) need to free this from the swap */
+		*pte = 0;
 	}
-
-	*pte = 0;
 }
 
 /**

@@ -336,6 +336,8 @@ static ssize_t sys_fork(env_t* e)
 		if(GET_BITMASK_BIT(e->cache_colors_map,i))
 			cache_color_alloc(llc_cache, env->cache_colors_map);
 
+	duplicate_vmrs(e, env);
+
 	int copy_page(env_t* e, pte_t* pte, void* va, void* arg)
 	{
 		env_t* env = (env_t*)arg;
@@ -352,22 +354,16 @@ static ssize_t sys_fork(env_t* e)
 			}
 
 			pagecopy(page2kva(pp),ppn2kva(PTE2PPN(*pte)));
-		}
-		else // PAGE_PAGED_OUT(*pte)
-		{
+		} else {
+			assert(PAGE_PAGED_OUT(*pte));
+			/* TODO: (SWAP) will need to either make a copy or CoW/refcnt the
+			 * backend store.  For now, this PTE will be the same as the
+			 * original PTE */
 			pte_t* newpte = pgdir_walk(env->env_pgdir,va,1);
 			if(!newpte)
 				return -1;
-
-			struct file* file = PTE2PFAULT_INFO(*pte)->file;
-			pfault_info_t* newpfi = pfault_info_alloc(file);
-			if(!newpfi)
-				return -1;
-
-			*newpfi = *PTE2PFAULT_INFO(*pte);
-			*newpte = PFAULT_INFO2PTE(newpfi);
+			*newpte = *pte;
 		}
-
 		return 0;
 	}
 
@@ -378,9 +374,9 @@ static ssize_t sys_fork(env_t* e)
 	env->procinfo->pid = env->pid;
 	env->procinfo->ppid = env->ppid;
 
-	// copy all memory below procdata
-	if(env_user_mem_walk(e,0,UDATA,&copy_page,env))
-	{
+	/* for now, just copy the contents of every present page in the entire
+	 * address space. */
+	if (env_user_mem_walk(e, 0, UMAPTOP, &copy_page, env)) {
 		proc_decref(env,2);
 		set_errno(current_tf,ENOMEM);
 		return -1;

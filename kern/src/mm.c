@@ -23,14 +23,11 @@
 #include <vfs.h>
 
 struct kmem_cache *vmr_kcache;
-struct kmem_cache *pfault_info_cache;
 
 void vmr_init(void)
 {
 	vmr_kcache = kmem_cache_create("vm_regions", sizeof(struct vm_region),
 	                               __alignof__(struct dentry), 0, 0, 0);
-	pfault_info_cache = kmem_cache_create("pfault_info",
-	                                      sizeof(pfault_info_t), 8, 0, 0, 0);
 }
 
 /* For now, the caller will set the prot, flags, file, and offset.  In the
@@ -56,6 +53,8 @@ struct vm_region *create_vmr(struct proc *p, uintptr_t va, size_t len)
 	vm_i = TAILQ_FIRST(&p->vm_regions);
 	if (!vm_i || (va + len < vm_i->vm_base)) {
 		vmr = kmem_cache_alloc(vmr_kcache, 0);
+		if (!vmr)
+			panic("EOM!");
 		vmr->vm_base = va;
 		TAILQ_INSERT_HEAD(&p->vm_regions, vmr, vm_link);
 	} else {
@@ -211,6 +210,32 @@ void isolate_vmrs(struct proc *p, uintptr_t va, size_t len)
 	/* TODO: don't want to do another find (linear search) */
 	if ((vmr = find_vmr(p, va + len)))
 		split_vmr(vmr, va + len);
+}
+
+/* This will make new_p have the same VMRs as p, though it does nothing to
+ * ensure the physical pages or whatever are shared/mapped/copied/whatever.
+ * This is used by fork().
+ *
+ * Note that if you are working on a VMR that is a file, you'll want to be
+ * careful about how it is mapped (SHARED, PRIVATE, etc). */
+void duplicate_vmrs(struct proc *p, struct proc *new_p)
+{
+	struct vm_region *vmr, *vm_i;
+	TAILQ_FOREACH(vm_i, &p->vm_regions, vm_link) {
+		vmr = kmem_cache_alloc(vmr_kcache, 0);
+		if (!vmr)
+			panic("EOM!");
+		vmr->vm_proc = new_p;
+		vmr->vm_base = vm_i->vm_base;
+		vmr->vm_end = vm_i->vm_end;
+		vmr->vm_perm = vm_i->vm_perm;	
+		vmr->vm_flags = vm_i->vm_flags;	
+		vmr->vm_file = vm_i->vm_file;
+		if (vmr->vm_file)
+			atomic_inc(&vmr->vm_file->f_refcnt);
+		vmr->vm_foff = vm_i->vm_foff;
+		TAILQ_INSERT_TAIL(&new_p->vm_regions, vmr, vm_link);
+	}
 }
 
 void print_vmrs(struct proc *p)
@@ -415,6 +440,7 @@ int __do_munmap(struct proc *p, uintptr_t addr, size_t len)
 				 * PAGED_OUT is also being used to mean "hasn't been mapped
 				 * yet".  Note we now allow PAGE_UNMAPPED, unlike older
 				 * versions of mmap(). */
+				*pte = 0;
 			}
 		}
 		next_vmr = TAILQ_NEXT(vmr, vm_link);
@@ -505,18 +531,4 @@ int __handle_page_fault(struct proc* p, uintptr_t va, int prot)
 	page_incref(a_page);
 	*ppte = PTE(page2ppn(a_page), PTE_P | pte_perm);
 	return 0;
-}
-
-pfault_info_t* pfault_info_alloc(struct file* file)
-{
-	if(file)
-		file_incref(file);
-	return kmem_cache_alloc(pfault_info_cache,0);
-}
-
-void pfault_info_free(pfault_info_t* pfi)
-{
-	if(pfi->file)
-		file_decref(pfi->file);
-	kmem_cache_free(pfault_info_cache,pfi);
 }

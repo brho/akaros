@@ -43,7 +43,7 @@
  *                     |                              | RW/RW            PTSIZE
  *                     |     Per-Process R/W Data     |                   |
  *    UDATA     ---->  +------------------------------+ 0xbec00000      --+
- *                     |    Global Shared R/W Data    | RW/RW  PGSIZE
+ *    UMAPTOP,         |    Global Shared R/W Data    | RW/RW  PGSIZE
  * UXSTACKTOP,UGDATA ->+------------------------------+ 0xbebff000
  *                     |     User Exception Stack     | RW/RW  PGSIZE
  *                     +------------------------------+ 0xbebfe000

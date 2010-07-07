@@ -278,10 +278,9 @@ void env_user_mem_free(env_t* e, void* start, size_t len)
 			page_t* page = ppn2page(PTE2PPN(*pte));
 			*pte = 0;
 			page_decref(page);
-		}
-		else // PAGE_PAGED_OUT(*pte)
-		{
-			pfault_info_free(PTE2PFAULT_INFO(*pte));
+		} else {
+			assert(PAGE_PAGED_OUT(*pte));
+			/* TODO: (SWAP) deal with this */
 			*pte = 0;
 		}
 		return 0;

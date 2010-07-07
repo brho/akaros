@@ -89,22 +89,8 @@ void destroy_vmr(struct vm_region *vmr);
 struct vm_region *find_vmr(struct proc *p, uintptr_t va);
 struct vm_region *find_first_vmr(struct proc *p, uintptr_t va);
 void isolate_vmrs(struct proc *p, uintptr_t va, size_t len);
+void duplicate_vmrs(struct proc *p, struct proc *new_p);
 void print_vmrs(struct proc *p);
-
-// at least for now, we aren't using vm regions. we're storing pointers
-// to pfault_info_t inside the PTEs in an arch-specific way.
-typedef struct pfault_info {
-	struct file* file; // or NULL for zero-fill
-	size_t pgoff; // offset into file
-	size_t read_len; // amount of file to read into this page (zero-fill rest)
-	int prot;
-} pfault_info_t;
-
-void mmap_init(void);
-
-pfault_info_t* pfault_info_alloc(struct file* file);
-void pfault_info_free(pfault_info_t* pfi);
-
 
 /* mmap() related functions.  These manipulate VMRs and change the hardware page
  * tables. */
