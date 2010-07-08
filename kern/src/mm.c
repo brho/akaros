@@ -38,12 +38,8 @@ void vmr_init(void)
  * tree of some sort for easier lookups. */
 struct vm_region *create_vmr(struct proc *p, uintptr_t va, size_t len)
 {
-	struct vm_region *vmr = 0, *vm_i, *vm_link;
+	struct vm_region *vmr = 0, *vm_i, *vm_next;
 	uintptr_t gap_end;
-
-	/* Don't allow a vm region into the 0'th page (null ptr issues) */
-	if (va == 0)
-		va = 1 * PGSIZE;
 
 	assert(!PGOFF(va));
 	assert(!PGOFF(len));
@@ -59,17 +55,17 @@ struct vm_region *create_vmr(struct proc *p, uintptr_t va, size_t len)
 		TAILQ_INSERT_HEAD(&p->vm_regions, vmr, vm_link);
 	} else {
 		TAILQ_FOREACH(vm_i, &p->vm_regions, vm_link) {
-			vm_link = TAILQ_NEXT(vm_i, vm_link);
-			gap_end = vm_link ? vm_link->vm_base : UMAPTOP;
+			vm_next = TAILQ_NEXT(vm_i, vm_link);
+			gap_end = vm_next ? vm_next->vm_base : UMAPTOP;
 			/* skip til we get past the 'hint' va */
 			if (va >= gap_end)
 				continue;
-			/* Found a gap that is big enough */
+			/* Find a gap that is big enough */
 			if (gap_end - vm_i->vm_end >= len) {
 				vmr = kmem_cache_alloc(vmr_kcache, 0);
 				/* if we can put it at va, let's do that.  o/w, put it so it
 				 * fits */
-				if (gap_end >= va + len)
+				if ((gap_end >= va + len) && (va >= vm_i->vm_end))
 					vmr->vm_base = va;
 				else
 					vmr->vm_base = vm_i->vm_end;
@@ -135,6 +131,24 @@ int merge_vmr(struct vm_region *first, struct vm_region *second)
 	first->vm_end = second->vm_end;
 	destroy_vmr(second);
 	return 0;
+}
+
+/* Attempts to merge vmr with adjacent VMRs, returning a ptr to be used for vmr.
+ * It could be the same struct vmr, or possibly another one (usually lower in
+ * the address space. */
+struct vm_region *merge_me(struct vm_region *vmr)
+{
+	struct vm_region *vmr_temp;
+	/* Merge will fail if it cannot do it.  If it succeeds, the second VMR is
+	 * destroyed, so we need to be a bit careful. */
+	vmr_temp = TAILQ_PREV(vmr, vmr_tailq, vm_link);
+	if (vmr_temp)
+		if (!merge_vmr(vmr_temp, vmr))
+			vmr = vmr_temp;
+	vmr_temp = TAILQ_NEXT(vmr, vm_link);
+	if (vmr_temp)
+		merge_vmr(vmr, vmr_temp);
+	return vmr;
 }
 
 /* Grows the vm region up to (and not including) va.  Fails if another is in the
@@ -244,7 +258,9 @@ void print_vmrs(struct proc *p)
 	struct vm_region *vmr;
 	printk("VM Regions for proc %d\n", p->pid);
 	TAILQ_FOREACH(vmr, &p->vm_regions, vm_link)
-		printk("%02d: (0x%08x - 0x%08x)\n", count++, vmr->vm_base, vmr->vm_end);
+		printk("%02d: (0x%08x - 0x%08x): %08p, %08p, %08p\n", count++,
+		       vmr->vm_base, vmr->vm_end, vmr->vm_prot, vmr->vm_flags,
+		       vmr->vm_file);
 }
 
 
@@ -277,6 +293,7 @@ void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 		if (!file)
 			return MAP_FAILED;
 	}
+	addr = MAX(addr, MMAP_LOWEST_VA);
 	void *result = do_mmap(p, addr, len, prot, flags, file, offset);
 	if (file)
 		file_decref(file);
@@ -299,7 +316,7 @@ void *__do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 	len = ROUNDUP(len, PGSIZE);
 	int num_pages = len / PGSIZE;
 
-	struct vm_region *vmr;
+	struct vm_region *vmr, *vmr_temp;
 
 #ifndef __CONFIG_DEMAND_PAGING__
 	flags |= MAP_POPULATE;
@@ -318,19 +335,19 @@ void *__do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 	vmr->vm_flags = flags;
 	vmr->vm_file = file;
 	vmr->vm_foff = offset;
-	/* TODO: consider checking to see if we can merge vmrs */
-
+	addr = vmr->vm_base;		/* so we know which pages to populate later */
+	vmr = merge_me(vmr);		/* attempts to merge with neighbors */
 	/* Fault in pages now if MAP_POPULATE - die on failure.  We want to populate
-	 * the region requested, but we ought to be careful and only populate the
-	 * requested length and not any merged regions.  doing this by page for now,
-	 * though some form of a helper would be nice. */
+	 * the region requested, but we need to be careful and only populate the
+	 * requested length and not any merged regions, which is why we set addr
+	 * above and use it here. */
 	if (flags & MAP_POPULATE)
 		for (int i = 0; i < num_pages; i++)
-			if (__handle_page_fault(p, vmr->vm_base + i*PGSIZE, vmr->vm_prot)) {
+			if (__handle_page_fault(p, addr + i*PGSIZE, vmr->vm_prot)) {
 				spin_unlock(&p->proc_lock);
 				proc_destroy(p);
 			}
-	return (void*SAFE)TC(vmr->vm_base);
+	return (void*SAFE)TC(addr);
 }
 
 int mprotect(struct proc *p, uintptr_t addr, size_t len, int prot)
@@ -338,7 +355,7 @@ int mprotect(struct proc *p, uintptr_t addr, size_t len, int prot)
 	printd("mprotect(addr %x, len %x, prot %x)\n", addr, len, prot);
 	if (!len)
 		return 0;
-	if (addr % PGSIZE) {
+	if ((addr % PGSIZE) || (addr < MMAP_LOWEST_VA)) {
 		set_errno(current_tf, EINVAL);
 		return -1;
 	}
@@ -402,7 +419,7 @@ int munmap(struct proc *p, uintptr_t addr, size_t len)
 	printd("munmap(addr %x, len %x, prot %x)\n", addr, len, prot);
 	if (!len)
 		return 0;
-	if (addr % PGSIZE) {
+	if ((addr % PGSIZE) || (addr < MMAP_LOWEST_VA)) {
 		set_errno(current_tf, EINVAL);
 		return -1;
 	}

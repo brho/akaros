@@ -1022,13 +1022,13 @@ void test_vm_regions(void)
 	shrink_vmr(vmrs[2], 0x9000);
 	results[1].base = 0x8000;
 	results[1].end = 0x9000;
-	check_vmrs(p, results, 2, n++);
+	check_vmrs(p, results, 2, n++);	/* 10 */
 	if (vmrs[2] != find_vmr(p, 0x8500))
-		printk("Failed to find the right vmr!");
+		printk("Failed to find the right vmr!\n");
 	if (vmrs[2] != find_first_vmr(p, 0x8500))
-		printk("Failed to find the right vmr!");
+		printk("Failed to find the right vmr!\n");
 	if (vmrs[2] != find_first_vmr(p, 0x7500))
-		printk("Failed to find the right vmr!");
+		printk("Failed to find the right vmr!\n");
 	if (find_first_vmr(p, 0x9500))
 		printk("Found a vmr when we shouldn't!\n");
 	/* grow up to another */
@@ -1046,6 +1046,34 @@ void test_vm_regions(void)
 	merge_vmr(vmrs[0], vmrs[2]);
 	results[0].end = 0x9000;
 	check_vmrs(p, results, 1, n++);
+	destroy_vmr(vmrs[0]);
+	check_vmrs(p, results, 0, n++);
+	/* Check the automerge function */
+	vmrs[0] = create_vmr(p, 0x2000, 0x1000);
+	vmrs[1] = create_vmr(p, 0x3000, 0x1000);
+	vmrs[2] = create_vmr(p, 0x4000, 0x1000);
+	for (int i = 0; i < 3; i++) {
+		vmrs[i]->vm_prot = PROT_READ;
+		vmrs[i]->vm_flags = 0;
+		vmrs[i]->vm_file = 0; /* would like to test this, it's a pain for now */
+	}
+	vmrs[0] = merge_me(vmrs[1]);
+	results[0].base = 0x2000;
+	results[0].end = 0x5000;
+	check_vmrs(p, results, 1, n++);
+	destroy_vmr(vmrs[0]);
+	check_vmrs(p, results, 0, n++);
+	/* Check unfixed creation requests */
+	vmrs[0] = create_vmr(p, 0x0000, 0x1000);
+	vmrs[1] = create_vmr(p, 0x0000, 0x1000);
+	vmrs[2] = create_vmr(p, 0x0000, 0x1000);
+	results[0].base = 0x0000;
+	results[0].end  = 0x1000;
+	results[1].base = 0x1000;
+	results[1].end  = 0x2000;
+	results[2].base = 0x2000;
+	results[2].end  = 0x3000;
+	check_vmrs(p, results, 3, n++);
 
 	printk("Finished vm_regions test!\n");
 }

@@ -50,6 +50,7 @@ void vmr_init(void);
 struct vm_region *create_vmr(struct proc *p, uintptr_t va, size_t len);
 struct vm_region *split_vmr(struct vm_region *vmr, uintptr_t va);
 int merge_vmr(struct vm_region *first, struct vm_region *second);
+struct vm_region *merge_me(struct vm_region *vmr);
 int grow_vmr(struct vm_region *vmr, uintptr_t va);
 int shrink_vmr(struct vm_region *vmr, uintptr_t va);
 void destroy_vmr(struct vm_region *vmr);
@@ -60,7 +61,9 @@ void duplicate_vmrs(struct proc *p, struct proc *new_p);
 void print_vmrs(struct proc *p);
 
 /* mmap() related functions.  These manipulate VMRs and change the hardware page
- * tables. */
+ * tables.  Any requests below the LOWEST_VA will silently be upped.  This may
+ * be a dynamic proc-specific variable later. */
+#define MMAP_LOWEST_VA 0x00001000
 void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
            int fd, size_t offset);
 void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
