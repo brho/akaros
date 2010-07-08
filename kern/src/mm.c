@@ -105,7 +105,7 @@ struct vm_region *split_vmr(struct vm_region *old_vmr, uintptr_t va)
 	new_vmr->vm_base = va;
 	new_vmr->vm_end = old_vmr->vm_end;
 	old_vmr->vm_end = va;
-	new_vmr->vm_perm = old_vmr->vm_perm;
+	new_vmr->vm_prot = old_vmr->vm_prot;
 	new_vmr->vm_flags = old_vmr->vm_flags;
 	if (old_vmr->vm_file) {
 		new_vmr->vm_file = old_vmr->vm_file;
@@ -125,7 +125,7 @@ int merge_vmr(struct vm_region *first, struct vm_region *second)
 {
 	assert(first->vm_proc == second->vm_proc);
 	if ((first->vm_end != second->vm_base) ||
-	    (first->vm_perm != second->vm_perm) ||
+	    (first->vm_prot != second->vm_prot) ||
 	    (first->vm_flags != second->vm_flags) ||
 	    (first->vm_file != second->vm_file))
 		return -1;
@@ -228,7 +228,7 @@ void duplicate_vmrs(struct proc *p, struct proc *new_p)
 		vmr->vm_proc = new_p;
 		vmr->vm_base = vm_i->vm_base;
 		vmr->vm_end = vm_i->vm_end;
-		vmr->vm_perm = vm_i->vm_perm;	
+		vmr->vm_prot = vm_i->vm_prot;	
 		vmr->vm_flags = vm_i->vm_flags;	
 		vmr->vm_file = vm_i->vm_file;
 		if (vmr->vm_file)
@@ -314,7 +314,7 @@ void *__do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 		printk("[kernel] do_mmap() aborted for %08p + %d!\n", addr, len);
 		return MAP_FAILED;		/* TODO: error propagation for mmap() */
 	}
-	vmr->vm_perm = prot;
+	vmr->vm_prot = prot;
 	vmr->vm_flags = flags;
 	vmr->vm_file = file;
 	vmr->vm_foff = offset;
@@ -326,7 +326,7 @@ void *__do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 	 * though some form of a helper would be nice. */
 	if (flags & MAP_POPULATE)
 		for (int i = 0; i < num_pages; i++)
-			if (__handle_page_fault(p, vmr->vm_base + i*PGSIZE, vmr->vm_perm)) {
+			if (__handle_page_fault(p, vmr->vm_base + i*PGSIZE, vmr->vm_prot)) {
 				spin_unlock(&p->proc_lock);
 				proc_destroy(p);
 			}
@@ -361,17 +361,17 @@ int __do_mprotect(struct proc *p, uintptr_t addr, size_t len, int prot)
 	struct vm_region *vmr, *next_vmr;
 	pte_t *pte;
 	bool shootdown_needed = FALSE;
-	int pte_perm = (prot & PROT_WRITE) ? PTE_USER_RW :
+	int pte_prot = (prot & PROT_WRITE) ? PTE_USER_RW :
 	               (prot & (PROT_READ|PROT_EXEC)) ? PTE_USER_RO : 0;
 	/* TODO: this is aggressively splitting, when we might not need to if the
-	 * perms are the same as the previous.  Plus, there are three excessive
+	 * prots are the same as the previous.  Plus, there are three excessive
 	 * scans.  Finally, we might be able to merge when we are done. */
 	isolate_vmrs(p, addr, addr + len);
 	vmr = find_first_vmr(p, addr);
 	while (vmr && vmr->vm_base < addr + len) {
-		if (vmr->vm_perm == prot)
+		if (vmr->vm_prot == prot)
 			continue;
-		/* if vmr maps a file, then we need to make sure the permission change
+		/* if vmr maps a file, then we need to make sure the protection change
 		 * is in compliance with the open mode of the file.  At least for any
 		 * mapping that is write-backed to a file.  For now, we just do it for
 		 * all file mappings.  And this hasn't been tested */
@@ -381,11 +381,11 @@ int __do_mprotect(struct proc *p, uintptr_t addr, size_t len, int prot)
 				return -1;
 			}
 		}
-		vmr->vm_perm = prot;
+		vmr->vm_prot = prot;
 		for (uintptr_t va = vmr->vm_base; va < vmr->vm_end; va += PGSIZE) { 
 			pte = pgdir_walk(p->env_pgdir, (void*)va, 0);
 			if (pte && PAGE_PRESENT(*pte)) {
-				*pte = (*pte & ~PTE_PERM) | pte_perm;
+				*pte = (*pte & ~PTE_PERM) | pte_prot;
 				shootdown_needed = TRUE;
 			}
 		}
@@ -487,11 +487,11 @@ int handle_page_fault(struct proc* p, uintptr_t va, int prot)
 int __handle_page_fault(struct proc* p, uintptr_t va, int prot)
 {
 	struct vm_region *vmr;
-	/* Check the vmr's permissions */
+	/* Check the vmr's protection */
 	vmr = find_vmr(p, va);
 	if (!vmr)							/* not mapped at all */
 		return -EFAULT;
-	if (!(vmr->vm_perm & prot))			/* wrong perms for this vmr */
+	if (!(vmr->vm_prot & prot))			/* wrong prots for this vmr */
 		return -EFAULT;
 	/* find offending PTE (prob don't read this in).  This might alloc an
 	 * intermediate page table page. */
@@ -530,13 +530,13 @@ int __handle_page_fault(struct proc* p, uintptr_t va, int prot)
 		}
 		/* if this is an executable page, we might have to flush the instruction
 		 * cache if our HW requires it. */
-		if (vmr->vm_perm & PROT_EXEC)
+		if (vmr->vm_prot & PROT_EXEC)
 			icache_flush_page((void*)va, page2kva(a_page));
 	}
 	/* update the page table */
-	int pte_perm = (vmr->vm_perm & PROT_WRITE) ? PTE_USER_RW :
-	               (vmr->vm_perm & (PROT_READ|PROT_EXEC)) ? PTE_USER_RO : 0;
+	int pte_prot = (vmr->vm_prot & PROT_WRITE) ? PTE_USER_RW :
+	               (vmr->vm_prot & (PROT_READ|PROT_EXEC)) ? PTE_USER_RO : 0;
 	page_incref(a_page);
-	*pte = PTE(page2ppn(a_page), PTE_P | pte_perm);
+	*pte = PTE(page2ppn(a_page), PTE_P | pte_prot);
 	return 0;
 }

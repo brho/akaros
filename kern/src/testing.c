@@ -1035,14 +1035,14 @@ void test_vm_regions(void)
 	grow_vmr(vmrs[0], 0x8000);
 	results[0].end = 0x8000;
 	check_vmrs(p, results, 2, n++);
-	vmrs[0]->vm_perm = 88;
-	vmrs[2]->vm_perm = 77;
+	vmrs[0]->vm_prot = 88;
+	vmrs[2]->vm_prot = 77;
 	/* should be unmergeable due to perms */
 	if (-1 != merge_vmr(vmrs[0], vmrs[2]))
 		printk("Bad merge test failed\n");
 	check_vmrs(p, results, 2, n++);
 	/* should merge now */
-	vmrs[2]->vm_perm = 88;
+	vmrs[2]->vm_prot = 88;
 	merge_vmr(vmrs[0], vmrs[2]);
 	results[0].end = 0x9000;
 	check_vmrs(p, results, 1, n++);
