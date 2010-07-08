@@ -268,6 +268,10 @@ void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 	}
 	if (!len)
 		return 0;
+	if (addr + len > UMAPTOP) {
+		printk("[kernel] mmap() tried to map above UMAPTOP.\n");
+		return MAP_FAILED;
+	}
 	if (fd != -1) {
 		file = file_open_from_fd(p, fd);
 		if (!file)
@@ -289,12 +293,12 @@ void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 	return ret;
 }
 
-/* Consider moving the top half of this to another function, like mmap(). */
 void *__do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
                 struct file *file, size_t offset)
 {
 	len = ROUNDUP(len, PGSIZE);
 	int num_pages = len / PGSIZE;
+
 	struct vm_region *vmr;
 
 #ifndef __CONFIG_DEMAND_PAGING__
@@ -307,8 +311,7 @@ void *__do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 		__do_munmap(p, addr, len);
 	vmr = create_vmr(p, addr, len);
 	if (!vmr) {
-		/* not a kernel problem, but i want to know about it */
-		printk("[kernel] mmap() aborted for %08p + %d!\n", addr, len);
+		printk("[kernel] do_mmap() aborted for %08p + %d!\n", addr, len);
 		return MAP_FAILED;		/* TODO: error propagation for mmap() */
 	}
 	vmr->vm_perm = prot;
@@ -317,15 +320,16 @@ void *__do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 	vmr->vm_foff = offset;
 	/* TODO: consider checking to see if we can merge vmrs */
 
-	/* fault in pages now if MAP_POPULATE.  die on failure.  TODO: don't call
-	 * destroy like this - you will deadlock.  Also, we want to populate the
-	 * region requested, but we ought to be careful and only populate the
+	/* Fault in pages now if MAP_POPULATE - die on failure.  We want to populate
+	 * the region requested, but we ought to be careful and only populate the
 	 * requested length and not any merged regions.  doing this by page for now,
 	 * though some form of a helper would be nice. */
 	if (flags & MAP_POPULATE)
 		for (int i = 0; i < num_pages; i++)
-			if (__handle_page_fault(p, vmr->vm_base + i*PGSIZE, vmr->vm_perm))
+			if (__handle_page_fault(p, vmr->vm_base + i*PGSIZE, vmr->vm_perm)) {
+				spin_unlock(&p->proc_lock);
 				proc_destroy(p);
+			}
 	return (void*SAFE)TC(vmr->vm_base);
 }
 
