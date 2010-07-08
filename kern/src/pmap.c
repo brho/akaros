@@ -117,6 +117,7 @@ int page_insert(pde_t *pgdir, page_t *pp, void *va, int perm)
 	// and we don't want to page_remove (which could free pp) and then 
 	// continue as if pp wasn't freed.  moral = up the ref asap
 	page_incref(pp);
+	/* Careful, page remove handles the cases where the page is PAGED_OUT. */
 	if (!PAGE_UNMAPPED(*pte))
 		page_remove(pgdir, va);
 	*pte = PTE(page2ppn(pp), PTE_P | perm);
@@ -124,6 +125,8 @@ int page_insert(pde_t *pgdir, page_t *pp, void *va, int perm)
 }
 
 /**
+ * DEPRECATED - this conflicts with VM regions.
+ *
  * @brief Map the physical page 'pp' at the first virtual address that is free 
  * in the range 'vab' to 'vae' in page directory 'pgdir'.
  *
@@ -213,10 +216,9 @@ page_t *page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
  * @param pgdir the page directory from with the page sholuld be removed
  * @param va    the virtual address at which the page we are trying to 
  *              remove is mapped
- * TODO: consider deprecating this, esp given issues with TLB management.  might
- * want to have the caller need to manage the TLB.  Also note it is used in
- * env_user_mem_free, minus the walk.
- */
+ * TODO: consider deprecating this, or at least changing how it works with TLBs.
+ * Might want to have the caller need to manage the TLB.  Also note it is used
+ * in env_user_mem_free, minus the walk. */
 void page_remove(pde_t *pgdir, void *va)
 {
 	pte_t *pte;
@@ -227,14 +229,16 @@ void page_remove(pde_t *pgdir, void *va)
 		return;
 
 	if (PAGE_PRESENT(*pte)) {
-		/* TODO: (TLB) race here, where the page can be given out before
-		 * the shootdown happened.  Need to put it on a temp list. */
+		/* TODO: (TLB) need to do a shootdown, inval sucks.  And might want to
+		 * manage the TLB / free pages differently. (like by the caller).
+		 * Careful about the proc/memory lock here. */
 		page = ppn2page(PTE2PPN(*pte));
 		*pte = 0;
-		page_decref(page);
 		tlb_invalidate(pgdir, va);
+		page_decref(page);
 	} else if (PAGE_PAGED_OUT(*pte)) {
 		/* TODO: (SWAP) need to free this from the swap */
+		panic("Swapping not supported!");
 		*pte = 0;
 	}
 }
@@ -243,7 +247,7 @@ void page_remove(pde_t *pgdir, void *va)
  * @brief Invalidate a TLB entry, but only if the page tables being
  * edited are the ones currently in use by the processor.
  *
- * TODO: Need to sort this for cross core lovin'
+ * TODO: (TLB) Need to sort this for cross core lovin'
  *
  * @param pgdir the page directory assocaited with the tlb entry 
  *              we are trying to invalidate

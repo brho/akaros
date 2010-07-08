@@ -13,43 +13,6 @@
 #include <sys/queue.h>
 #include <slab.h>
 
-/* Memory region for a process, consisting of linear(virtual) addresses.  This
- * is what the kernel allocates a process, and the physical mapping can be done
- * lazily (or not).  This way, if a page is swapped out, and the PTE says it
- * isn't present, we still have a way to account for how the whole region ought
- * to be dealt with.
- * Some things are per-region:
- * - probably something with shared memory
- * - mmaping files: we can have a logical connection to something other than
- *   anonymous memory
- * - on a fault, was this memory supposed to be there? (swap, lazy, etc), or is
- *   the region free?
- * Others are per-page:
- * - was this page supposed to be protected somehow(guard)? could be per-region
- * - where is this page in the swap?
- * If we try to store this info in the PTE, we only have 31 bits, and it's more
- * arch dependent.  Handling jumbos is a pain.  And it's replicated across all
- * pages for a coarse granularity things.  And we can't add things easily.
- *
- * so a process has a (sorted) list of these for it's VA space, hanging off it's
- * struct proc.  or off it's mm?
- * - we don't share an mm between processes anymore (tasks/threads)
- *   - though we share most everything with vpm.
- *   - want to be able to do all the same things with vpm as with regular mem
- *     (file back mmap, etc)
- *   - contexts or whatever share lots of mem things, like accounting, limits,
- *   overall process stuff, the rest of the page tables.
- *   	- so there should be some overall mm, and probably directly in the
- *   	struct proc (or just one other struct directly embedded, not a pointer
- *   	to one where a bunch of processes use it)
- *   		- if we embed, mm.h doesn't need to know about process.h
- *   so an mm can have a bunch of "address spaces" - or at least different
- *   contexts
- *
- * how does this change or where does this belong with virtual private memory?
- * will also affect get_free_va_range
- * 	- also, do we want a separate brk per?  or just support mmap on private mem?
- */
 struct file;
 struct proc;								/* preprocessor games */
 
@@ -61,7 +24,11 @@ struct mm {
 	spinlock_t mm_lock;
 };
 
-/* Basic structure defining a region of a process's virtual memory */
+/* Basic structure defining a region of a process's virtual memory.  Note we
+ * don't refcnt these.  Either they are in the TAILQ/tree, or they should be
+ * freed.  There should be no other references floating around.  We still need
+ * to sort out how we share memory and how we'll do private memory with these
+ * VMRs. */
 struct vm_region {
 	TAILQ_ENTRY(vm_region)		vm_link;
 	struct proc					*vm_proc;	/* owning process, for now */

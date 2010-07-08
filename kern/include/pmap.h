@@ -100,9 +100,6 @@ memcpy_to_user(env_t* env, void*DANGEROUS va,
 /* Arch specific implementations for these */
 pte_t *pgdir_walk(pde_t *COUNT(NPDENTRIES) pgdir, const void *SNT va, int create);
 int get_va_perms(pde_t *COUNT(NPDENTRIES) pgdir, const void *SNT va);
-// TODO: should this be per process, per mm, per pgdir, etc?
-// - can't ask this question without knowing the "context"
-void *get_free_va_range(pde_t *pgdir, uintptr_t addr, size_t len);
 
 static inline page_t *SAFE ppn2page(size_t ppn)
 {

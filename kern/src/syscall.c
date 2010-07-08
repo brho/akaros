@@ -359,6 +359,7 @@ static ssize_t sys_fork(env_t* e)
 			/* TODO: (SWAP) will need to either make a copy or CoW/refcnt the
 			 * backend store.  For now, this PTE will be the same as the
 			 * original PTE */
+			panic("Swapping not supported!");
 			pte_t* newpte = pgdir_walk(env->env_pgdir,va,1);
 			if(!newpte)
 				return -1;
@@ -536,6 +537,8 @@ static ssize_t sys_shared_page_alloc(env_t* p1,
                                      int p1_flags, int p2_flags
                                     )
 {
+	/* When we remove/change this, also get rid of page_insert_in_range() */
+	printk("[kernel] the current shared page alloc is deprecated.\n");
 	//if (!VALID_USER_PERMS(p1_flags)) return -EPERM;
 	//if (!VALID_USER_PERMS(p2_flags)) return -EPERM;
 

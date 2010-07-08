@@ -121,28 +121,6 @@ int get_va_perms(pde_t *pgdir, const void *SNT va)
 	return pte == NULL ? 0 : (*pte & (PTE_ACC | PTE_PTE));
 }
 
-void *get_free_va_range(pde_t *pgdir, uintptr_t addr, size_t len)
-{
-	addr = ROUNDUP(MAX(addr,BRK_END),PGSIZE);
-	len = ROUNDUP(len,PGSIZE);
-
-	for(char* a = (char*)addr; a < (char*)USTACKBOT; a += PGSIZE)
-	{
-		for(char* b = a; b < a+len; b += PGSIZE)
-		{
-			pte_t* pte = pgdir_walk(pgdir,b,0);
-			if(pte && !PAGE_UNMAPPED(*pte))
-			{
-				a = b;
-				break;
-			}
-			if(b+PGSIZE == a+len)
-				return a;
-		}
-	}
-	return NULL;
-}
-
 void
 page_check(void)
 {

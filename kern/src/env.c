@@ -281,6 +281,7 @@ void env_user_mem_free(env_t* e, void* start, size_t len)
 		} else {
 			assert(PAGE_PAGED_OUT(*pte));
 			/* TODO: (SWAP) deal with this */
+			panic("Swapping not supported!");
 			*pte = 0;
 		}
 		return 0;

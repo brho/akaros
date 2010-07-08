@@ -440,6 +440,7 @@ int __do_munmap(struct proc *p, uintptr_t addr, size_t len)
 				 * PAGED_OUT is also being used to mean "hasn't been mapped
 				 * yet".  Note we now allow PAGE_UNMAPPED, unlike older
 				 * versions of mmap(). */
+				panic("Swapping not supported!");
 				*pte = 0;
 			}
 		}
@@ -490,16 +491,19 @@ int __handle_page_fault(struct proc* p, uintptr_t va, int prot)
 		return -EFAULT;
 	/* find offending PTE (prob don't read this in).  This might alloc an
 	 * intermediate page table page. */
-	pte_t* ppte = pgdir_walk(p->env_pgdir, (void*)va, 1);
-	if (!ppte)
+	pte_t *pte = pgdir_walk(p->env_pgdir, (void*)va, 1);
+	if (!pte)
 		return -ENOMEM;
-	pte_t pte = *ppte;
-	assert(PAGE_UNMAPPED(pte));			/* should be munmapped already */
 	/* a spurious, valid PF is possible due to a legit race: the page might have
 	 * been faulted in by another core already (and raced on the memory lock),
 	 * in which case we should just return. */
-	if (PAGE_PRESENT(pte))
+	if (PAGE_PRESENT(*pte)) {
 		return 0;
+	} else if (PAGE_PAGED_OUT(*pte)) {
+		/* TODO: (SWAP) bring in the paged out frame. (BLK) */
+		panic("Swapping not supported!");
+		return 0;
+	}
 	/* allocate a page; maybe zero-fill it */
 	bool zerofill = (vmr->vm_file == NULL);
 	page_t *a_page;
@@ -529,6 +533,6 @@ int __handle_page_fault(struct proc* p, uintptr_t va, int prot)
 	int pte_perm = (vmr->vm_perm & PROT_WRITE) ? PTE_USER_RW :
 	               (vmr->vm_perm & (PROT_READ|PROT_EXEC)) ? PTE_USER_RO : 0;
 	page_incref(a_page);
-	*ppte = PTE(page2ppn(a_page), PTE_P | pte_perm);
+	*pte = PTE(page2ppn(a_page), PTE_P | pte_perm);
 	return 0;
 }

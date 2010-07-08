@@ -638,28 +638,6 @@ int get_va_perms(pde_t *pgdir, const void *SNT va)
 	return the_pte & the_pde & (PTE_U | PTE_W | PTE_P);
 }
 
-void *get_free_va_range(pde_t *pgdir, uintptr_t addr, size_t len)
-{
-	addr = ROUNDUP(MAX(addr,BRK_END),PGSIZE);
-	len = ROUNDUP(len,PGSIZE);
-
-	for(char* a = (char*)addr; a < (char*)USTACKBOT; a += PGSIZE)
-	{
-		for(char* b = a; b < a+len; b += PGSIZE)
-		{
-			pte_t* pte = pgdir_walk(pgdir,b,0);
-			if(pte && !PAGE_UNMAPPED(*pte))
-			{
-				a = b;
-				break;
-			}
-			if(b+PGSIZE == a+len)
-				return a;
-		}
-	}
-	return NULL;
-}
-
 /* Flushes a TLB, including global pages.  We should always have the CR4_PGE
  * flag set, but just in case, we'll check.  Toggling this bit flushes the TLB.
  */
