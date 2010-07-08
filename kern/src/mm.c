@@ -264,6 +264,8 @@ void print_vmrs(struct proc *p)
 }
 
 
+/* Error values aren't quite comprehensive - check man mmap() once we do better
+ * with the FS */
 void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
            int fd, size_t offset)
 {
@@ -272,26 +274,27 @@ void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 	       len, prot, flags, fd, offset);
 	if (fd >= 0 && (flags & MAP_SHARED)) {
 		printk("[kernel] mmap() for files requires !MAP_SHARED.\n");
+		set_errno(current_tf, EACCES);
 		return MAP_FAILED;
 	}
 	if (fd >= 0 && (flags & MAP_ANON)) {
-		printk("[kernel] mmap() with MAP_ANONYMOUS requires fd == -1.\n");
+		set_errno(current_tf, EBADF);
 		return MAP_FAILED;
 	}
-	if ((flags & MAP_FIXED) && PGOFF(addr)) {
-		printk("[kernel] mmap() page align your addr.\n");
+	if ((addr + len > UMAPTOP) || (PGOFF(addr))) {
+		set_errno(current_tf, EINVAL);
 		return MAP_FAILED;
 	}
-	if (!len)
-		return 0;
-	if (addr + len > UMAPTOP) {
-		printk("[kernel] mmap() tried to map above UMAPTOP.\n");
+	if (!len) {
+		set_errno(current_tf, EINVAL);
 		return MAP_FAILED;
 	}
 	if (fd != -1) {
 		file = file_open_from_fd(p, fd);
-		if (!file)
+		if (!file) {
+			set_errno(current_tf, EBADF);
 			return MAP_FAILED;
+		}
 	}
 	addr = MAX(addr, MMAP_LOWEST_VA);
 	void *result = do_mmap(p, addr, len, prot, flags, file, offset);
@@ -329,6 +332,7 @@ void *__do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 	vmr = create_vmr(p, addr, len);
 	if (!vmr) {
 		printk("[kernel] do_mmap() aborted for %08p + %d!\n", addr, len);
+		set_errno(current_tf, ENOMEM);
 		return MAP_FAILED;		/* TODO: error propagation for mmap() */
 	}
 	vmr->vm_prot = prot;
