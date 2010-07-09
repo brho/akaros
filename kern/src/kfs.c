@@ -630,8 +630,11 @@ int kfs_readdir(struct file *dir, struct dirent *dirent)
 	return 1;							/* normal success for readdir */
 }
 
-/* Sets up a memory mapping of the file into the vm_region, based on the
- * parameters in the vmr. */
+/* This is called when a VMR is mapping a particular file.  The FS needs to do
+ * whatever it needs so that faults can be handled by read_page(), and handle all
+ * of the cases of MAP_SHARED, MAP_PRIVATE, whatever.  It also needs to ensure
+ * the file is not being mmaped in a way that conflicts with the manner in which
+ * the file was opened. */
 int kfs_mmap(struct file *file, struct vm_region *vmr)
 {
 	/* the file is not page-aligned yet, so we need to copy it to fresh pages.
@@ -664,7 +667,7 @@ int kfs_open(struct inode *inode, struct file *file)
 //	struct event_poll_tailq		f_ep_links;
 	spinlock_init(&file->f_ep_lock);
 	file->f_fs_info = 0;
-//	struct address_space		*f_mapping;		/* page cache mapping */
+//	struct page_map				*f_mapping;		/* page cache mapping */
 	return 0;
 }
 
@@ -1032,7 +1035,7 @@ void print_dir_tree(struct dentry *dentry, int depth)
 		print_dir_tree(d_i, depth + 1);
 	}
 	TAILQ_FOREACH(d_i, &k_i_info->children, d_subdirs_link) {
-		printk("%sDir %s has child file: %s", buf, dentry->d_name.name,
+		printk("%sDir %s has child file: %s ", buf, dentry->d_name.name,
 		       d_i->d_name.name);
 		printk("file starts at: %p\n",
 		       ((struct kfs_i_info*)d_i->d_inode->i_fs_info)->filestart);

@@ -30,8 +30,11 @@ struct block_device	{int x;};
 struct io_writeback	{int x;};
 struct event_poll {int x;};
 struct poll_table_struct {int x;};
+struct radix_tree;
 // end temp typedefs
 
+struct page_map;	/* analagous to linux's address_space object */
+struct page_map_operations;
 struct super_block;
 struct super_operations;
 struct dentry;
@@ -92,6 +95,37 @@ struct nameidata {
 	unsigned int				depth;			/* search's symlink depth */
 	char						*saved_names[MAX_SYMLINK_DEPTH];
 	int							intent;			/* access type for the file */
+};
+
+/* Every object that has pages, like an inode or the swap (or even direct block
+ * devices) has a page_map, tracking which of its pages are currently in memory.
+ * It is a map, per object, from index to physical page frame. */
+struct page_map {
+	struct inode				*pm_host;		/* inode of the owner, if any */
+	struct radix_tree			*pm_tree_root;	/* tracks present pages */
+	spinlock_t					pm_tree_lock;
+	unsigned long				pm_num_pages;	/* how many pages are present */
+	struct page_map_operations	*pm_op;
+	unsigned int				pm_flags;
+	/*... and private lists, backing block dev info, other mappings, etc. */
+};
+
+/* Operations performed on a page_map.  These are usually FS specific, which
+ * get assigned when the inode is created.
+ * Will fill these in as they are created/needed/used. */
+struct page_map_operations {
+	int (*readpage) (struct file *, struct page *);	/* read from backing store*/
+/*	readpages: read a list of pages
+	writepage: write from a page to its backing store
+	writepages: write a list of pages
+	sync_page: start the IO of already scheduled ops
+	set_page_dirty: mark the given page dirty
+	prepare_write: prepare to write (disk backed pages)
+	commit_write: complete a write (disk backed pages)
+	bmap: get a logical block number from a file block index
+	invalidate page: invalidate, part of truncating
+	release page: prepare to release 
+	direct_io: bypass the page cache */
 };
 
 /* Superblock: Specific instance of a mounted filesystem.  All synchronization
@@ -164,8 +198,8 @@ struct inode {
 	struct inode_operations		*i_op;
 	struct file_operations		*i_fop;
 	struct super_block			*i_sb;
-	//struct address_space		*i_mapping;		/* linux mapping structs */
-	//struct address_space		i_data;			/* rel page caches */
+	struct page_map				*i_mapping;		/* usually points to i_data */
+	struct page_map				i_data;			/* this inode's page cache */
 	union {
 		struct pipe_inode_info		*i_pipe;
 		struct block_device			*i_bdev;
@@ -260,7 +294,7 @@ struct file {
 	struct event_poll_tailq		f_ep_links;
 	spinlock_t					f_ep_lock;
 	void						*f_fs_info;		/* tty driver hook */
-	//struct address_space		*f_mapping;		/* page cache mapping */
+	struct page_map				*f_mapping;		/* page cache mapping */
 
 	/* Ghetto appserver support */
 	int fd; // all it contains is an appserver fd (for pid 0, aka kernel)

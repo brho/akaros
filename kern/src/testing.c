@@ -137,7 +137,7 @@ void test_page_coloring(void)
 	cprintf("Contents of the page free list:\n");
 	for(int i=0; i<llc_cache->num_colors; i++) {
 		cprintf("  COLOR %d:\n", i);
-		LIST_FOREACH(page, &colored_page_free_list[i], page_link) {
+		LIST_FOREACH(page, &colored_page_free_list[i], pg_link) {
 			cprintf("    Page: %d\n", page2ppn(page));
 		}
 	}

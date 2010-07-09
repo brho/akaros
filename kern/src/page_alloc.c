@@ -1,9 +1,9 @@
-/* Copyright (c) 2009 The Regents of the University  of California. 
+/* Copyright (c) 2009, 2010 The Regents of the University  of California. 
  * See the COPYRIGHT files at the top of this source tree for full 
  * license information.
  * 
  * Kevin Klues <klueska@cs.berkeley.edu>    
- */
+ * Barret Rhoden <brho@cs.berkeley.edu> */
 
 #ifdef __SHARC__
 #pragma nosharc
@@ -67,7 +67,7 @@ static void __page_clear(page_t *SAFE page)
 	/* Allocate a page from that color */                                   \
 	if(i < (base_color+range)) {                                            \
 		*page = LIST_FIRST(&colored_page_free_list[i]);                     \
-		LIST_REMOVE(*page, page_link);                                      \
+		LIST_REMOVE(*page, pg_link);                                      \
 		__page_clear(*page);                                                \
 		return i;                                                           \
 	}                                                                       \
@@ -102,10 +102,10 @@ static ssize_t __colored_page_alloc(uint8_t* map, page_t** page,
 static error_t __page_alloc_specific(page_t** page, size_t ppn)
 {
 	page_t* sp_page = ppn2page(ppn);
-	if( sp_page->page_ref != 0 )
+	if (atomic_read(&sp_page->pg_refcnt) != 0)
 		return -ENOMEM;
 	*page = sp_page;
-	LIST_REMOVE(*page, page_link);
+	LIST_REMOVE(*page, pg_link);
 
 	__page_clear(*page);
 	return 0;
@@ -245,7 +245,7 @@ error_t kpage_alloc_specific(page_t** page, size_t ppn)
 
 /*
  * Return a page to the free list.
- * (This function should only be called when pp->page_ref reaches 0.)
+ * (This function should only be called when pp->pg_refcnt reaches 0.)
  * You must hold the page_free list lock before calling this.
  */
 static error_t __page_free(page_t* page) 
@@ -255,7 +255,7 @@ static error_t __page_free(page_t* page)
 	LIST_INSERT_HEAD(
 	   &(colored_page_free_list[get_page_color(page2ppn(page), llc_cache)]),
 	   page,
-	   page_link
+	   pg_link
 	);
 
 	return ESUCCESS;
@@ -275,7 +275,7 @@ error_t page_free(page_t *SAFE page)
  */
 int page_is_free(size_t ppn) {
 	page_t* page = ppn2page(ppn);
-	if( page->page_ref == 0 )
+	if (atomic_read(&page->pg_refcnt) == 0)
 		return TRUE;
 	return FALSE;
 }
@@ -288,9 +288,10 @@ void page_incref(page_t *page)
 	__page_incref(page);
 }
 
+/* TODO: (REF) poor refcnting */
 void __page_incref(page_t *page)
 {
-	page->page_ref++;
+	atomic_inc(&page->pg_refcnt);
 }
 
 /*
@@ -307,14 +308,17 @@ void page_decref(page_t *page)
 /*
  * Decrement the reference count on a page,
  * freeing it if there are no more refs.
+ *
+ * TODO: (REF) this is insufficient protection (poor use of atomics, etc).
  */
 static void __page_decref(page_t *page)
 {
-	if (page->page_ref == 0) {
+	if (atomic_read(&page->pg_refcnt) == 0) {
 		panic("Trying to Free already freed page: %d...\n", page2ppn(page));
 		return;
 	}
-	if (--page->page_ref == 0)
+	atomic_dec(&page->pg_refcnt);
+	if (atomic_read(&page->pg_refcnt) == 0)
 		__page_free(page);
 }
 
@@ -323,7 +327,7 @@ static void __page_decref(page_t *page)
  */
 void page_setref(page_t *page, size_t val)
 {
-	page->page_ref = val;
+	atomic_set(&page->pg_refcnt, val);
 }
 
 /*
@@ -331,6 +335,6 @@ void page_setref(page_t *page, size_t val)
  */
 size_t page_getref(page_t *page)
 {
-	return page->page_ref;
+	return atomic_read(&page->pg_refcnt);
 }
 

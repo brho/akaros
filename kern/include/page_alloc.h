@@ -1,9 +1,9 @@
-/* Copyright (c) 2009 The Regents of the University  of California. 
+/* Copyright (c) 2009, 2010 The Regents of the University  of California. 
  * See the COPYRIGHT files at the top of this source tree for full 
  * license information.
  * 
  * Kevin Klues <klueska@cs.berkeley.edu>    
- */
+ * Barret Rhoden <brho@cs.berkeley.edu> */
  
 #ifndef PAGE_ALLOC_H
 #define PAGE_ALLOC_H
@@ -15,6 +15,8 @@
 #include <colored_page_alloc.h>
 #include <process.h>
 
+struct page_map;		/* preprocessor games */
+
 /****************** Page Structures *********************/
 struct page;
 typedef size_t ppn_t;
@@ -22,14 +24,21 @@ typedef struct page page_t;
 typedef LIST_HEAD(PageList, page) page_list_t;
 typedef LIST_ENTRY(page) page_list_entry_t;
 
+/* Per-page flag bits related to their state in the page cache */
+#define PG_LOCKED		0x01
+#define PG_VALID		0x02
+#define PG_DIRTY		0x04
+
 /* TODO: this struct is not protected from concurrent operations in any
  * function.  We may want a lock, but a better thing would be a good use of
  * reference counting and atomic operations. */
 struct page {
-	page_list_entry_t LCKD(&colored_page_free_list_lock)page_link;
-    size_t page_ref;
+	LIST_ENTRY(page)			pg_link;	/* membership in various lists */
+	atomic_t					pg_refcnt;
+	unsigned int				pg_flags;
+	struct page_map				*pg_mapping;
+	unsigned long				pg_index;
 };
-
 
 /******** Externally visible global variables ************/
 extern uint8_t* global_cache_colors_map;

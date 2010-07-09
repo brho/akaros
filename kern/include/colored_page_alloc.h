@@ -15,7 +15,7 @@
 #include <stdio.h>
 	
 #define DECLARE_CACHE_COLORED_PAGE_LINK(_cache)                               \
-	page_list_entry_t _cache##_cache_colored_page_link;
+	page_list_entry_t _cache##_cache_colored_pg_link;
 	
 #define DECLARE_CACHE_COLORED_PAGE_FREE_LIST(_cache)                          \
 	uint8_t _cache##_num_colors = 0;                                          \
@@ -55,7 +55,7 @@ error_t _cache##_page_alloc(page_t** page, size_t color)                      \
 
 #define REMOVE_CACHE_COLORING_PAGE_FROM_FREE_LIST(_page, _cache)              \
 	if(available_caches._cache == TRUE)                                       \
-		LIST_REMOVE(*(_page), _cache##_cache_colored_page_link);
+		LIST_REMOVE(*(_page), _cache##_cache_colored_pg_link);
 
 
 #define INSERT_CACHE_COLORING_PAGE_ONTO_FREE_LIST(_page, _cache)              \
@@ -64,7 +64,7 @@ error_t _cache##_page_alloc(page_t** page, size_t color)                      \
 		   &(_cache##_cache_colored_page_list                                 \
 		         [get_page_color(page2ppn((_page)), &(_cache))]),             \
 		   (_page),                                                           \
-		   _cache##_cache_colored_page_link                                   \
+		   _cache##_cache_colored_pg_link                                   \
 		);                                                                    \
 	}
 

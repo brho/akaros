@@ -106,3 +106,38 @@ memory from creation time.   Yeah, this means we have chunks of metadata for
 files we aren't using sitting around in RAM.  We also have the *files* sitting
 around in RAM too.  Not that concerned, for now.  Plus, I don't want to reparse
 the CPIO backing store to figure out inode fields, directory names, etc.
+
+Page Cache:
+-------------------------------------------
+Every object that has pages, like an inode or the swap (or even direct block
+devices) has a page_map tracking which of its pages are currently in memory.
+This is called a struct address_space in linux, which is a confusing name.  We
+don't have all of the same fields yet, and may be doing things slightly
+differently, but the basics are the same.  Together, the page_maps and the
+functions to manipulate them make up the Page Cache.  Every page frame that is
+in a page mapping can be traced back to its page_map, via pointers in the struct
+page.
+
+As a side note, Linux's "address_space" has a great example of the power of
+their linked lists.  Their struct has a private_list head.  Due to their list
+implementation, they are able to have a generic list head for a list of any
+type (it's a struct list_head), and don't need to declare in a generic object
+(like the page_map) a specific list type (that would get used by specific
+FS's).
+
+Just because a page is in a page_map, it doesn't mean it actually has the
+data from the disc in it.  It just means that there is a physical frame
+dedicated/mapped to be a page_map's holder for a specific page of an object
+(usually a file on disc).  readpage() is called to fill that page in with what
+it is supposed to have from its backing store.
+
+This interpretation makes the meaning of "address space" make more sense.  It's
+the "address space" of the device, mapping from (file,index) -> page_frame.
+Still, calling it an address space just confuses things with the virtual memory
+address space.
+
+One of the reasons pages can be in the map without valid data is due to
+concurrency issues and outstanding I/O requests.  When the page is first being
+filled up, the mapping exists but the data hasn't been brought in yet.  Other
+processes can be trying to access the same block/page/byte, and they need to
+block but to not try and schedule the operation.  

@@ -2,8 +2,8 @@
  * See the COPYRIGHT files at the top of this source tree for full 
  * license information.
  * 
- * Kevin Klues <klueska@cs.berkeley.edu>    
- */
+ * Barret Rhoden <brho@cs.berkeley.edu>
+ * Kevin Klues <klueska@cs.berkeley.edu> */
 
 #ifdef __SHARC__
 #pragma nosharc
@@ -61,38 +61,38 @@ void page_alloc_init()
 	extern char (SNT RO end)[];
 	physaddr_t physaddr_after_kernel = PADDR(PTRROUNDUP(boot_freemem, PGSIZE));
 
-	pages[0].page_ref = 1;
+	atomic_set(&pages[0].pg_refcnt, 1);
 	// alloc the second page, since we will need it later to init the other cores
 	// probably need to be smarter about what page we use (make this dynamic) TODO
-	pages[1].page_ref = 1;
+	atomic_set(&pages[1].pg_refcnt, 1);
 	for (i = 2; i < LA2PPN(IOPHYSMEM); i++) {
-		pages[i].page_ref = 0;
+		pages[i].pg_refcnt = 0;
 		LIST_INSERT_HEAD(
 		   &(colored_page_free_list[get_page_color(page2ppn(&pages[i]), 
 			                                       llc_cache)]),
 		   &pages[i],
-		   page_link
+		   pg_link
 		);
 	}
 	for (i = LA2PPN(IOPHYSMEM); i < LA2PPN(EXTPHYSMEM); i++) {
-		pages[i].page_ref = 1;
+		atomic_set(&pages[i].pg_refcnt, 1);
 	}
 	for (i = LA2PPN(EXTPHYSMEM); i < LA2PPN(physaddr_after_kernel); i++) {
-		pages[i].page_ref = 1;
+		atomic_set(&pages[i].pg_refcnt, 1);
 	}
 	for (i = LA2PPN(physaddr_after_kernel); i < LA2PPN(maxaddrpa); i++) {
-		pages[i].page_ref = 0;
+		atomic_set(&pages[i].pg_refcnt, 0);
 		LIST_INSERT_HEAD(
 		   &(colored_page_free_list[get_page_color(page2ppn(&pages[i]), 
 			                                       llc_cache)]),
 		   &pages[i],
-		   page_link
+		   pg_link
 		);
 	}
 	// this block out all memory above maxaddrpa.  will need another mechanism
 	// to allocate and map these into the kernel address space
 	for (i = LA2PPN(maxaddrpa); i < npages; i++) {
-		pages[i].page_ref = 1;
+		atomic_set(&pages[i].pg_refcnt, 1);
 	}
 	printk("Page alloc init successful\n");
 }
