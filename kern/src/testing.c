@@ -30,6 +30,7 @@
 #include <slab.h>
 #include <kmalloc.h>
 #include <hashtable.h>
+#include <radix.h>
 
 #define l1 (available_caches.l1)
 #define l2 (available_caches.l2)
@@ -1076,4 +1077,31 @@ void test_vm_regions(void)
 	check_vmrs(p, results, 3, n++);
 
 	printk("Finished vm_regions test!\n");
+}
+
+void test_radix_tree(void)
+{
+	struct radix_tree real_tree = RADIX_INITIALIZER;
+	struct radix_tree *tree = &real_tree;
+	
+	if (radix_insert(tree, 3, (void*)0xdeadbeef))
+		printk("Failed to insert first!\n");
+	radix_insert(tree, 4, (void*)0x04040404);
+	assert((void*)0xdeadbeef == radix_lookup(tree, 3));
+	if (radix_insert(tree, 65, (void*)0xcafebabe))
+		printk("Failed to insert a two-tier!\n");
+	if (!radix_insert(tree, 4, (void*)0x03030303))
+		printk("Should not let us reinsert\n");
+	if (radix_insert(tree, 4095, (void*)0x4095))
+		printk("Failed to insert a two-tier boundary!\n");
+	if (radix_insert(tree, 4096, (void*)0x4096))
+		printk("Failed to insert a three-tier!\n");
+	//print_radix_tree(tree);
+	radix_delete(tree, 65);
+	radix_delete(tree, 3);
+	radix_delete(tree, 4);
+	radix_delete(tree, 4095);
+	radix_delete(tree, 4096);
+	//print_radix_tree(tree);
+	printk("Finished radix tree tests!\n");
 }

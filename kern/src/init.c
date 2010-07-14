@@ -29,6 +29,7 @@
 #include <testing.h>
 #include <kmalloc.h>
 #include <hashtable.h>
+#include <radix.h>
 #include <mm.h>
 #include <frontend.h>
 
@@ -73,6 +74,7 @@ void kernel_init(multiboot_info_t *mboot_info)
 	kmem_cache_init();              // Sets up slab allocator
 	kmalloc_init();
 	hashtable_init();
+	radix_init();
 	cache_color_alloc_init();       // Inits data structs
 	colored_page_alloc_init();      // Allocates colors for agnostic processes
 	vmr_init();

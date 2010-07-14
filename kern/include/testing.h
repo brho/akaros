@@ -29,6 +29,7 @@ void test_kmalloc(void);
 void test_hashtable(void);
 void test_bcq(void);
 void test_vm_regions(void);
+void test_radix_tree(void);
 
 struct trapframe_t;
 
