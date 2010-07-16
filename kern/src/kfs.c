@@ -535,44 +535,6 @@ off_t kfs_llseek(struct file *file, off_t offset, int whence)
 	return temp_off;
 }
 
-/* Read count bytes from the file into buf, starting at *offset, which is increased
- * accordingly. */
-ssize_t kfs_read(struct file *file, char *buf, size_t count, off_t *offset)
-{
-	struct kfs_i_info *k_i_info = (struct kfs_i_info*)file->f_inode->i_fs_info;
-	void *begin, *end;
-
-	/* TODO: handle this higher up in the VFS */
-	if (!count)
-		return 0;
-	if (*offset == file->f_inode->i_size)
-		return 0; /* EOF */
-
-	/* Make sure we don't go past the end of the file */
-	if (*offset + count > file->f_inode->i_size) {
-		count = file->f_inode->i_size - *offset;
-	}
-	begin = k_i_info->filestart + *offset;
-	end = begin + count;
-	if ((begin < k_i_info->filestart) ||
-	    (end > k_i_info->filestart + file->f_inode->i_size) ||
-	    (end < begin)) {
-		set_errno(current_tf, EINVAL);
-		return -1;
-	}
-
-	/* TODO: think about this.  if it's a user buffer, we're relying on current
-	 * to detect whose it is (which should work for async calls).  Consider
-	 * pushing this up the VFS stack. */
-	if (current) {
-		memcpy_to_user(current, buf, begin, count);
-	} else {
-		memcpy(buf, begin, count);
-	}
-	*offset += count;
-	return count;
-}
-
 /* Writes count bytes from buf to the file, starting at *offset, which is
  * increased accordingly */
 ssize_t kfs_write(struct file *file, const char *buf, size_t count,
@@ -804,7 +766,7 @@ struct dentry_operations kfs_d_op = {
 
 struct file_operations kfs_f_op = {
 	kfs_llseek,
-	kfs_read,
+	generic_file_read,
 	kfs_write,
 	kfs_readdir,
 	kfs_mmap,

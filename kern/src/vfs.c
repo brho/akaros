@@ -12,6 +12,7 @@
 #include <slab.h>
 #include <kmalloc.h>
 #include <kfs.h>
+#include <pmap.h>
 
 struct sb_tailq super_blocks = TAILQ_HEAD_INITIALIZER(super_blocks);
 spinlock_t super_blocks_lock = SPINLOCK_INITIALIZER;
@@ -124,6 +125,8 @@ void qstr_builder(struct dentry *dentry, char *l_name)
 	dentry->d_name.len = strnlen(dentry->d_name.name, MAX_FILENAME_SZ);
 }
 
+/* Superblock functions */
+
 /* Helper to alloc and initialize a generic superblock.  This handles all the
  * VFS related things, like lists.  Each FS will need to handle its own things
  * in it's *_get_sb(), usually involving reading off the disc. */
@@ -186,6 +189,8 @@ void init_sb(struct super_block *sb, struct vfsmount *vmnt,
 	dcache_put(d_root); // TODO: should set a d_flag too
 }
 
+/* Dentry Functions */
+
 /* Helper to alloc and initialize a generic dentry.
  *
  * If the name is longer than the inline name, it will kmalloc a buffer, so
@@ -234,6 +239,58 @@ void dcache_put(struct dentry *dentry)
 	SLIST_INSERT_HEAD(&dcache, dentry, d_hash);
 	spin_unlock(&dcache_lock);
 }
+
+/* File functions */
+
+/* Read count bytes from the file into buf, starting at *offset, which is increased
+ * accordingly, returning the number of bytes transfered.  Most filesystems will
+ * use this function for their f_op->read.  Note, this uses the page cache. */
+ssize_t generic_file_read(struct file *file, char *buf, size_t count,
+                          off_t *offset)
+{
+	struct page *page;
+	int error;
+	off_t page_off;
+	unsigned long first_idx, last_idx;
+	size_t copy_amt;
+	char *buf_end;
+
+	/* Consider pushing some error checking higher in the VFS */
+	if (!count)
+		return 0;
+	if (*offset == file->f_inode->i_size)
+		return 0; /* EOF */
+	/* Make sure we don't go past the end of the file */
+	if (*offset + count > file->f_inode->i_size) {
+		count = file->f_inode->i_size - *offset;
+	}
+	page_off = *offset & (PGSIZE - 1);
+	first_idx = *offset >> PGSHIFT;
+	last_idx = (*offset + count) >> PGSHIFT;
+	buf_end = buf + count;
+	/* For each file page, make sure it's in the page cache, then copy it out.
+	 * TODO: will probably need to consider concurrently truncated files here */
+	for (int i = first_idx; i <= last_idx; i++) {
+		error = file_load_page(file, i, &page);
+		assert(!error);	/* TODO: handle ENOMEM and friends */
+		copy_amt = MIN(PGSIZE - page_off, buf_end - buf);
+		/* TODO: think about this.  if it's a user buffer, we're relying on
+		 * current to detect whose it is (which should work for async calls). */
+		if (current) {
+			memcpy_to_user(current, buf, page2kva(page) + page_off, copy_amt);
+		} else {
+			memcpy(buf, page2kva(page) + page_off, copy_amt);
+		}
+		buf += copy_amt;
+		page_off = 0;
+		page_decref(page);	/* it's still in the cache, we just don't need it */
+	}
+	assert(buf == buf_end);
+	*offset += count;
+	return count;
+}
+
+/* Page cache functions */
 
 /* Looks up the index'th page in the page map, returning an incref'd reference,
  * or 0 if it was not in the map. */
