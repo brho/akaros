@@ -116,7 +116,9 @@ don't have all of the same fields yet, and may be doing things slightly
 differently, but the basics are the same.  Together, the page_maps and the
 functions to manipulate them make up the Page Cache.  Every page frame that is
 in a page mapping can be traced back to its page_map, via pointers in the struct
-page.
+page.  Note the page_mapping is tracked twice for a file, the f_mapping and the
+i_mapping.  We really only need the i_mapping, but this saves a couple cache
+misses.  Might go away later.
 
 As a side note, Linux's "address_space" has a great example of the power of
 their linked lists.  Their struct has a private_list head.  Due to their list
@@ -136,8 +138,57 @@ the "address space" of the device, mapping from (file,index) -> page_frame.
 Still, calling it an address space just confuses things with the virtual memory
 address space.
 
-One of the reasons pages can be in the map without valid data is due to
+One of the reasons pages can be in the map without up-to-date data is due to
 concurrency issues and outstanding I/O requests.  When the page is first being
 filled up, the mapping exists but the data hasn't been brought in yet.  Other
 processes can be trying to access the same block/page/byte, and they need to
 block but to not try and schedule the operation.  
+
+So here's how a typical page fault (__handle_page_fault(), either on demand or
+populated) works on an mmap'd file at a high level.
+1. PF is on a virt address -> translated by the vm_region to a file/offset (page).
+1b. Weird permission issues?  See below!
+2. Look it up in the page_map.
+3. If the page is already there, and up-to-date, then great.  Skip to 6.  If
+there is one, but it's not up to date, skip to 5.
+4. If there is no page, get a free page, tie it (bidirectionally) to the inode
+in the page_map.
+5. Now there is a page, but it is not up to date, so call readpage().  This will
+usually block.
+6. Map that page (which has the current contents) into the address space of the
+calling process (with the appropriate permissions, RO (MAP_PRIVATE, CoW), or
+RW (MAP_SHARED).
+Below: Now if in step 1 you had a permissions issue, such as a RW fault on a CoW
+MAP_PRIVATE, you'll have to notice the type of error and the type of memory
+region, then go through a separate path: get a new page, copy the contents, and
+change the mapping.  Note, the page backing that mapping is not backed by the
+file - it's just sitting around in the virtual memory of the process.
+
+Also, if we want to use the PG_DIRTY flag, we'll need mark the regions as RO
+until we write fault, at which point we dirty the page and change it to RW.
+
+We could have multiple threads trying to fill a page in the page cache at once.
+This is handled in file_load_page().  All threads check the page cache.  If two
+threads try to add it to the page cache, only one will succeed, and the page
+will be locked (PG_LOCKED).  The one who succeeds will readpage().  The one that
+didn't will be like any other thread that is checking the page cache - it will
+see a page is there, and will check it the page is up to date.  If it isn't, it
+will try to lock the page so it can do the IO, with a few extra checks in case
+the page had been removed or was filled in while it slept.
+
+A big aspect of this is the use of lock_page() to block.  If the page is locked,
+you block until it is unlocked.  (implementation and other issues still
+pending).  Even the caller of readpage will lock after submitting the IO
+request.  This will cause the caller to sleep until the IO is done.  When the IO
+is done, that interrupt handler/thread will mark the page as up-to-date, and
+unlock the page, which will wake up any of the waiters.  The caller of
+readpage() may not be the first to wake up either.  This all means the IO system
+needs to know about marking pages as up-to-date and unlocking them.  This
+currently (Jul10) is just sitting in KFS, but can be done later either directly
+or with a callback made by
+whoever starts the IO.
+
+A note on refcnting.  When a page is added to the page cache, that's a stored
+reference.  When you lookup a page in the page cache, you get a refcnt'd
+reference back.  When you pull a page from the page cache, you also get a
+refcnt'd reference back - specifically it is the ref that was in the page map.

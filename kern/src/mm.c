@@ -499,15 +499,13 @@ int handle_page_fault(struct proc* p, uintptr_t va, int prot)
  * faulted for a different reason (was mprotected on another core), and the
  * shootdown is on its way.  Userspace should have waited for the mprotect to
  * return before trying to write (or whatever), so we don't care and will fault
- * them.
- *
- * We did away with mmapping too much of a file, and will map an entire page, if
- * that file is big enough.  The alternative is to zerofill the last bit if the
- * vmr had a lesser length.  This makes shared mappings and mappings backed by
- * the FS problematic. */
+ * them. */
 int __handle_page_fault(struct proc* p, uintptr_t va, int prot)
 {
 	struct vm_region *vmr;
+	struct page *a_page;
+	unsigned int f_idx;	/* index of the missing page in the file */
+	int retval = 0;
 	/* Check the vmr's protection */
 	vmr = find_vmr(p, va);
 	if (!vmr)							/* not mapped at all */
@@ -529,35 +527,29 @@ int __handle_page_fault(struct proc* p, uintptr_t va, int prot)
 		panic("Swapping not supported!");
 		return 0;
 	}
-	/* allocate a page; maybe zero-fill it */
-	bool zerofill = (vmr->vm_file == NULL);
-	page_t *a_page;
-	if (upage_alloc(p, &a_page, zerofill))
-		return -ENOMEM;
-	/* if this isn't a zero-filled page, read it in from file.  it is the FS's
-	 * responsibility to zero out the end of the last page if the EOF is not at
-	 * the end of the page.
-	 *
-	 * TODO: (BLK) doing this while holding the mem lock!  prob want to block
-	 * and return to userspace if it's not in the buffer cache.  will want to
-	 * set a flag in the vmr so that subsequent faults will know the work is in
-	 * progress. */
-	if (!zerofill) {
-		int foffset = ROUNDDOWN(va, PGSIZE) - vmr->vm_base + vmr->vm_foff;
-		int read_len = file_read_page(vmr->vm_file, page2pa(a_page), foffset);
-		if (read_len < 0) {
-			page_free(a_page);
-			return read_len;			/* pass out the error code, for now */
-		}
+	if (!vmr->vm_file) {
+		/* No file - just want anonymous memory */
+		if (upage_alloc(p, &a_page, TRUE))
+			return -ENOMEM;
+	} else {
+		/* Load the file's page in the page cache.
+		 * TODO: (BLK) Note, we are holding the mem lock!  We need to rewrite
+		 * this stuff so we aren't hold the lock as excessively as we are, and
+		 * such that we can block and resume later. */
+		f_idx = (va - vmr->vm_base + vmr->vm_foff) >> PGSHIFT;
+		retval = file_load_page(vmr->vm_file, f_idx, &a_page);
+		if (retval)
+			return retval;
 		/* if this is an executable page, we might have to flush the instruction
 		 * cache if our HW requires it. */
 		if (vmr->vm_prot & PROT_EXEC)
 			icache_flush_page((void*)va, page2kva(a_page));
 	}
-	/* update the page table */
+	/* update the page table TODO: careful with MAP_PRIVATE etc.  might do this
+	 * separately (file, no file) */
 	int pte_prot = (vmr->vm_prot & PROT_WRITE) ? PTE_USER_RW :
 	               (vmr->vm_prot & (PROT_READ|PROT_EXEC)) ? PTE_USER_RO : 0;
-	page_incref(a_page);
+	page_incref(a_page);	/* incref, since we manually insert in the pgdir */
 	*pte = PTE(page2ppn(a_page), PTE_P | pte_prot);
 	return 0;
 }

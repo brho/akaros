@@ -30,6 +30,7 @@
 
 /* VFS required Functions */
 /* These structs are declared again and initialized farther down */
+struct page_map_operations kfs_pm_op;
 struct super_operations kfs_s_op;
 struct inode_operations kfs_i_op;
 struct dentry_operations kfs_d_op;
@@ -110,6 +111,28 @@ void kfs_kill_sb(struct super_block *sb)
 struct fs_type kfs_fs_type = {"KFS", 0, kfs_get_sb, kfs_kill_sb, {0, 0},
                TAILQ_HEAD_INITIALIZER(kfs_fs_type.fs_supers)};
 
+/* Page Map Operations */
+
+/* Fills page with its contents from its backing store file.  Note that we do
+ * the zero padding here, instead of higher in the VFS.  Might change in the
+ * future. */
+int kfs_readpage(struct file *file, struct page *page)
+{
+	struct kfs_i_info *k_i_info = (struct kfs_i_info*)file->f_inode->i_fs_info;
+	uintptr_t begin = (size_t)k_i_info->filestart + page->pg_index * PGSIZE;
+	/* Need to be careful we don't copy beyond the EOF, and that we zero out
+	 * whatever is left over.  The memset is a noop when copy_amt == PGSIZE. */
+	size_t copy_amt = MIN(PGSIZE, file->f_inode->i_size - begin);
+	memcpy(page2kva(page), (void*)begin, copy_amt);
+	memset(page2kva(page) + copy_amt, 0, PGSIZE - copy_amt);
+	/* This is supposed to be done in the IO system when the operation is
+	 * complete.  Since we aren't doing a real IO request, and it is already
+	 * done, we can do it here. */
+	page->pg_flags |= PG_UPTODATE;
+	unlock_page(page);
+	return 0;
+}
+
 /* Super Operations */
 
 /* creates and initializes a new inode.  generic fields are filled in.  specific
@@ -135,6 +158,13 @@ struct inode *kfs_alloc_inode(struct super_block *sb)
 	inode->i_fs_info = kmem_cache_alloc(kfs_i_kcache, 0);
 	TAILQ_INIT(&((struct kfs_i_info*)inode->i_fs_info)->children);
 	((struct kfs_i_info*)inode->i_fs_info)->filestart = 0;
+	/* Set up the page_map structures.  Default is to use the embedded one. */
+	inode->i_mapping = &inode->i_pm;
+	inode->i_mapping->pm_host = inode;
+	radix_tree_init(&inode->i_mapping->pm_tree);
+	spinlock_init(&inode->i_mapping->pm_tree_lock);
+	inode->i_mapping->pm_op = &kfs_pm_op;
+	inode->i_mapping->pm_flags = 0;
 	return inode;
 	/* caller sets i_ino, i_list set when applicable */
 }
@@ -175,8 +205,7 @@ void kfs_read_inode(struct inode *inode)
 	} else {
 		panic("Not implemented");
 	}
-	/* TODO: unused: inode->i_hash add to hash (saves on disc reading)
-	 * i_mapping, i_data, when they mean something */
+	/* TODO: unused: inode->i_hash add to hash (saves on disc reading) */
 }
 
 /* called when an inode in memory is modified (journalling FS's care) */
@@ -667,7 +696,7 @@ int kfs_open(struct inode *inode, struct file *file)
 //	struct event_poll_tailq		f_ep_links;
 	spinlock_init(&file->f_ep_lock);
 	file->f_fs_info = 0;
-//	struct page_map				*f_mapping;		/* page cache mapping */
+	file->f_mapping = inode->i_mapping;
 	return 0;
 }
 
@@ -727,6 +756,10 @@ int kfs_check_flags(int flags)
 }
 
 /* Redeclaration and initialization of the FS ops structures */
+struct page_map_operations kfs_pm_op = {
+	kfs_readpage,
+};
+
 struct super_operations kfs_s_op = {
 	kfs_alloc_inode,
 	kfs_destroy_inode,

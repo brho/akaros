@@ -338,3 +338,22 @@ size_t page_getref(page_t *page)
 	return atomic_read(&page->pg_refcnt);
 }
 
+/* Attempts to get a lock on the page for IO operations.  If it is already
+ * locked, it will block the thread until it is unlocked. */
+void lock_page(struct page *page)
+{
+	/* TODO: (BLK) actually do something!  And this has a race!  Not a big deal
+	 * right now, since the only users of this are serialized, but once we have
+	 * any sort of real IO, this will be an issue. */
+	assert(!(page->pg_flags & PG_LOCKED));
+	page->pg_flags |= PG_LOCKED;
+}
+
+/* Unlocks the page, and wakes up whoever is waiting on the lock */
+void unlock_page(struct page *page)
+{
+	/* TODO: (BLK) actually do something!  However this unlock works, it will
+	 * need to know who to unlock, and it will have to be called in response to
+	 * a basic interrupt...  */
+	page->pg_flags &= ~PG_LOCKED;
+}

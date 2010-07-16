@@ -20,6 +20,7 @@
 #include <timing.h>
 #include <page_alloc.h>
 #include <mm.h>
+#include <radix.h>
 
 // TODO: temp typedefs, etc.  remove when we support this stuff.
 typedef int dev_t;
@@ -30,7 +31,6 @@ struct block_device	{int x;};
 struct io_writeback	{int x;};
 struct event_poll {int x;};
 struct poll_table_struct {int x;};
-struct radix_tree;
 // end temp typedefs
 
 struct page_map;	/* analagous to linux's address_space object */
@@ -102,8 +102,8 @@ struct nameidata {
  * It is a map, per object, from index to physical page frame. */
 struct page_map {
 	struct inode				*pm_host;		/* inode of the owner, if any */
-	struct radix_tree			*pm_tree_root;	/* tracks present pages */
-	spinlock_t					pm_tree_lock;
+	struct radix_tree			pm_tree;		/* tracks present pages */
+	spinlock_t					pm_tree_lock;	/* spinlock => we can't block */
 	unsigned long				pm_num_pages;	/* how many pages are present */
 	struct page_map_operations	*pm_op;
 	unsigned int				pm_flags;
@@ -199,7 +199,7 @@ struct inode {
 	struct file_operations		*i_fop;
 	struct super_block			*i_sb;
 	struct page_map				*i_mapping;		/* usually points to i_data */
-	struct page_map				i_data;			/* this inode's page cache */
+	struct page_map				i_pm;			/* this inode's page cache */
 	union {
 		struct pipe_inode_info		*i_pipe;
 		struct block_device			*i_bdev;
@@ -409,15 +409,25 @@ extern struct kmem_cache *dentry_kcache;
 extern struct kmem_cache *inode_kcache;
 extern struct kmem_cache *file_kcache;
 
-/* VFS Functions */
+/* Misc VFS functions */
 void vfs_init(void);
 void qstr_builder(struct dentry *dentry, char *l_name);
+
+/* Superblock functions */
 struct super_block *get_sb(void);
 void init_sb(struct super_block *sb, struct vfsmount *vmnt,
              struct dentry_operations *d_op, unsigned long root_ino,
              void *d_fs_info);
+
+/* Dentry Functions */
 struct dentry *get_dentry(struct super_block *sb, struct dentry *parent,
                           char *name);
 void dcache_put(struct dentry *dentry);
+
+/* Page cache functions */
+struct page *pm_find_page(struct page_map *pm, unsigned long index);
+int pm_insert_page(struct page_map *pm, unsigned long index, struct page *page);
+int pm_remove_page(struct page_map *pm, struct page *page);
+int file_load_page(struct file *file, unsigned long index, struct page **pp);
 
 #endif /* ROS_KERN_VFS_H */

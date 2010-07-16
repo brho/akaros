@@ -25,9 +25,9 @@ typedef LIST_HEAD(PageList, page) page_list_t;
 typedef LIST_ENTRY(page) page_list_entry_t;
 
 /* Per-page flag bits related to their state in the page cache */
-#define PG_LOCKED		0x01
-#define PG_VALID		0x02
-#define PG_DIRTY		0x04
+#define PG_LOCKED		0x001	/* involved in an IO op */
+#define PG_UPTODATE		0x002	/* page map, filled with file data */
+#define PG_DIRTY		0x004	/* page map, data is dirty */
 
 /* TODO: this struct is not protected from concurrent operations in any
  * function.  We may want a lock, but a better thing would be a good use of
@@ -66,6 +66,8 @@ size_t page_getref(page_t *SAFE page);
 void page_setref(page_t *SAFE page, size_t val);
 
 int page_is_free(size_t ppn);
+void lock_page(struct page *page);
+void unlock_page(struct page *page);
 
 #endif //PAGE_ALLOC_H
 
