@@ -339,6 +339,13 @@ void *__do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 	vmr->vm_flags = flags;
 	vmr->vm_file = file;
 	vmr->vm_foff = offset;
+	/* Prep the FS to make sure it can mmap the file.  Slightly weird semantics:
+	 * they will have a hole in their VM now. */
+	if (file && file->f_op->mmap(file, vmr)) {
+		destroy_vmr(vmr);
+		set_errno(current_tf, EACCES);	/* not quite */
+		return MAP_FAILED;
+	}
 	addr = vmr->vm_base;		/* so we know which pages to populate later */
 	vmr = merge_me(vmr);		/* attempts to merge with neighbors */
 	/* Fault in pages now if MAP_POPULATE - die on failure.  We want to populate

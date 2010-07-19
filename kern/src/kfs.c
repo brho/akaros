@@ -593,14 +593,11 @@ int kfs_readdir(struct file *dir, struct dirent *dirent)
  * whatever it needs so that faults can be handled by read_page(), and handle all
  * of the cases of MAP_SHARED, MAP_PRIVATE, whatever.  It also needs to ensure
  * the file is not being mmaped in a way that conflicts with the manner in which
- * the file was opened. */
+ * the file was opened or the file type. */
 int kfs_mmap(struct file *file, struct vm_region *vmr)
 {
-	/* the file is not page-aligned yet, so we need to copy it to fresh pages.
-	 * this should only be done once per SHARED file (inode), so only make fresh
-	 * copies if people want new ones.  Also note that MAP_PRIVATE does not get
-	 * carried through to the underlying file. */
-
+	if (file->f_inode->i_flags & FS_I_FILE)
+		return 0;
 	return -1;
 }
 
