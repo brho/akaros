@@ -183,7 +183,8 @@ struct inode {
 	struct dentry_tailq			i_dentry;		/* all dentries pointing here*/
 	unsigned long				i_ino;
 	atomic_t					i_refcnt;
-	int							i_mode;
+	int							i_mode;			/* access mode */
+	unsigned short				i_type;			/* file type */
 	unsigned int				i_nlink;		/* hard links */
 	uid_t						i_uid;
 	gid_t						i_gid;
@@ -207,7 +208,7 @@ struct inode {
 	};
 	unsigned long				i_state;
 	unsigned long				dirtied_when;	/* in jiffies */
-	unsigned int				i_flags;		/* filesystem flags */
+	unsigned int				i_flags;		/* filesystem mount flags */
 	bool						i_socket;
 	atomic_t					i_writecount;	/* number of writers */
 	void						*i_fs_info;

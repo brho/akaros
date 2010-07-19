@@ -194,6 +194,7 @@ void kfs_read_inode(struct inode *inode)
 	 * 	possibly a bug, since these inos come from directories */
 	if (inode->i_ino == 1) {
 		inode->i_mode = 0x777;			/* TODO: use something appropriate */
+		inode->i_type = FS_I_DIR;
 		inode->i_nlink = 1;				/* assuming only one hardlink */
 		inode->i_uid = 0;
 		inode->i_gid = 0;
@@ -207,7 +208,7 @@ void kfs_read_inode(struct inode *inode)
 		inode->i_ctime.tv_nsec = 0;
 		inode->i_blocks = 0;
 		inode->i_bdev = 0;				/* assuming blockdev? */
-		inode->i_flags = FS_I_DIR;
+		inode->i_flags = 0;
 		inode->i_socket = FALSE;
 	} else {
 		panic("Not implemented");
@@ -282,7 +283,8 @@ void kfs_umount_begin(struct super_block *sb)
 /* Helper op, used when creating regular files (kfs_create()) and when making
  * directories (kfs_mkdir()).  References are a bit ugly.  We're passing out a
  * ref that is already stored/accounted for.  Might change that...  Also, this
- * needs to handle having nd == 0. */
+ * needs to handle having nd == 0.  Note we make a distinction between the mode
+ * and the file type (for now).  The caller of this should set the filetype. */
 struct inode *kfs_create_generic(struct inode *dir, struct dentry *dentry,
                                  int mode, struct nameidata *nd)
 {
@@ -301,6 +303,7 @@ struct inode *kfs_create_generic(struct inode *dir, struct dentry *dentry,
 	inode->i_atime.tv_nsec = 0;		/* are these supposed to be the extra ns? */
 	inode->i_ctime.tv_nsec = 0;
 	inode->i_mtime.tv_nsec = 0;
+	inode->i_flags = 0;;
 	return inode;
 }
 
@@ -313,7 +316,7 @@ int kfs_create(struct inode *dir, struct dentry *dentry, int mode,
 	struct inode *inode = kfs_create_generic(dir, dentry, mode, nd);	
 	if (!inode)
 		return -1;
-	inode->i_flags = FS_I_FILE;
+	inode->i_type = FS_I_FILE;
 	/* our parent dentry's inode tracks our dentry info.  We do this
 	 * since it's all in memory and we aren't using the dcache yet.
 	 * We're reusing the subdirs link, which is used by the VFS when
@@ -351,7 +354,7 @@ struct dentry *kfs_lookup(struct inode *dir, struct dentry *dentry,
 	struct dentry *d_i;
 
 	assert(dir_dent && dir_dent == TAILQ_LAST(&dir->i_dentry, dentry_tailq));
-	assert(dir->i_flags & FS_I_DIR);
+	assert(dir->i_type & FS_I_DIR);
 
 	TAILQ_FOREACH(d_i, &dir_dent->d_subdirs, d_subdirs_link) {
 		if (!strcmp(d_i->d_name.name, dentry->d_name.name)) {
@@ -409,7 +412,7 @@ int kfs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 		return -1;
 	struct dentry *parent = TAILQ_FIRST(&dir->i_dentry);
 	assert(parent && parent == TAILQ_LAST(&dir->i_dentry, dentry_tailq));
-	inode->i_flags = FS_I_DIR;
+	inode->i_type = FS_I_DIR;
 	/* parent dentry tracks dentry as a subdir */
 	TAILQ_INSERT_TAIL(&parent->d_subdirs, dentry, d_subdirs_link);
 	atomic_inc(&dentry->d_refcnt);
@@ -569,7 +572,7 @@ int kfs_readdir(struct file *dir, struct dirent *dirent)
 	}
 	/* some of this error handling can be done by the VFS.  The syscall should
 	 * handle EBADF, EFAULT, and EINVAL (TODO, memory related). */
-	if (!(dir->f_inode->i_flags & FS_I_DIR)) {
+	if (!(dir->f_inode->i_type & FS_I_DIR)) {
 		set_errno(current_tf, ENOTDIR);
 		return -1;
 	}
@@ -596,7 +599,7 @@ int kfs_readdir(struct file *dir, struct dirent *dirent)
  * the file was opened or the file type. */
 int kfs_mmap(struct file *file, struct vm_region *vmr)
 {
-	if (file->f_inode->i_flags & FS_I_FILE)
+	if (file->f_inode->i_type & FS_I_FILE)
 		return 0;
 	return -1;
 }
@@ -985,7 +988,7 @@ void print_dir_tree(struct dentry *dentry, int depth)
 	struct inode *inode = dentry->d_inode;
 	struct kfs_i_info *k_i_info = (struct kfs_i_info*)inode->i_fs_info;
 	struct dentry *d_i;
-	assert(dentry && inode && inode->i_flags & FS_I_DIR);
+	assert(dentry && inode && inode->i_type & FS_I_DIR);
 	char buf[32] = {0};
 
 	for (int i = 0; i < depth; i++)
