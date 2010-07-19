@@ -18,9 +18,11 @@
 #include <arch/bitmask.h>
 #include <atomic.h>
 #include <timing.h>
-#include <page_alloc.h>
-#include <mm.h>
 #include <radix.h>
+
+/* ghetto preprocessor hacks (since proc includes vfs) */
+struct page;
+struct vm_region;
 
 // TODO: temp typedefs, etc.  remove when we support this stuff.
 typedef int dev_t;
@@ -367,7 +369,6 @@ struct small_fd_set {
 
 /* All open files for a process */
 struct files_struct {
-	atomic_t					refcnt;
 	spinlock_t					lock;
 	int							max_files;		/* max files ptd to by fd */
 	int							max_fdset;		/* max of the current fd_set */
@@ -380,7 +381,6 @@ struct files_struct {
 
 /* Process specific filesysten info */
 struct fs_struct {
-	atomic_t 					refcnt;
 	spinlock_t					lock;
 	int							umask;
 	struct dentry				*root;

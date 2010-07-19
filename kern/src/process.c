@@ -242,7 +242,7 @@ proc_init_procinfo(struct proc* p)
  * Errors include:
  *  - ENOFREEPID if it can't get a PID
  *  - ENOMEM on memory exhaustion */
-static error_t proc_alloc(struct proc *SAFE*SAFE pp, pid_t parent_id)
+static error_t proc_alloc(struct proc *SAFE*SAFE pp, struct proc *parent)
 {
 	error_t r;
 	struct proc *p;
@@ -274,7 +274,7 @@ static error_t proc_alloc(struct proc *SAFE*SAFE pp, pid_t parent_id)
 	/* Set the basic status variables. */
 	spinlock_init(&p->proc_lock);
 	p->exitcode = 0;
-	p->ppid = parent_id;
+	p->ppid = parent ? parent->pid : 0;
 	p->state = PROC_CREATED; // shouldn't go through state machine for init
 	p->env_refcnt = 2; // one for the object, one for the ref we pass back
 	p->env_flags = 0;
@@ -303,6 +303,26 @@ static error_t proc_alloc(struct proc *SAFE*SAFE pp, pid_t parent_id)
 	FRONT_RING_INIT(&p->syseventfrontring,
 	                &p->procdata->syseventring,
 	                SYSEVENTRINGSIZE);
+
+	/* Init FS structures TODO: cleanup (might pull this out) */
+	atomic_inc(&default_ns.refcnt);
+	p->ns = &default_ns;
+	spinlock_init(&p->fs_env.lock);
+	p->fs_env.umask = parent ? parent->fs_env.umask : 0002;
+	p->fs_env.root = p->ns->root->mnt_root;
+	atomic_inc(&p->fs_env.root->d_refcnt);
+	p->fs_env.pwd = parent ? parent->fs_env.pwd : p->fs_env.root;
+	atomic_inc(&p->fs_env.pwd->d_refcnt);
+	spinlock_init(&p->open_files.lock);
+	p->open_files.max_files = NR_OPEN_FILES_DEFAULT;
+	p->open_files.max_fdset = NR_FILE_DESC_DEFAULT;
+	p->open_files.fd = p->open_files.fd_array;
+	p->open_files.open_fds = (struct fd_set*)&p->open_files.open_fds_init;
+	/* 0, 1, and 2 are reserved, but prob shouldn't do it this way */
+	p->open_files.next_fd = 3;
+	for (int i = 0; i < 3; i++)
+		SET_BITMASK_BIT(p->open_files.open_fds->fds_bits, i);
+
 	*pp = p;
 	atomic_inc(&num_envs);
 
@@ -320,10 +340,8 @@ struct proc *proc_create(uint8_t *binary, size_t size)
 {
 	struct proc *p;
 	error_t r;
-	pid_t curid;
 
-	curid = (current ? current->pid : 0);
-	if ((r = proc_alloc(&p, curid)) < 0)
+	if ((r = proc_alloc(&p, current)) < 0)
 		panic("proc_create: %e", r); // one of 3 quaint usages of %e.
 	if(binary != NULL)
 		env_load_icode(p, NULL, binary, size);

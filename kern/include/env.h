@@ -18,6 +18,7 @@
 #include <sys/queue.h>
 #include <atomic.h>
 #include <mm.h>
+#include <vfs.h>
 
 // TODO: clean this up.
 struct proc {
@@ -61,6 +62,11 @@ struct proc {
 	// The front ring pointers for pushing asynchronous system events out to the user
 	// Note this is the actual frontring, not a pointer to it somewhere else
 	sysevent_front_ring_t syseventfrontring;
+
+	/* Filesystem info */
+	struct namespace			*ns;
+	struct fs_struct			fs_env;
+	struct files_struct			open_files;
 };
 
 /* Til we remove all Env references */
