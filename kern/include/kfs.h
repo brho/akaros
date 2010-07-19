@@ -25,6 +25,7 @@ extern struct fs_type kfs_fs_type;
 struct kfs_i_info {
 	struct dentry_tailq		children;		/* our childrens */
 	void					*filestart;		/* or our file location */
+	size_t					init_size;		/* file size on the backing store */
 };
 
 /* Old KFS below here */
@@ -41,4 +42,4 @@ ssize_t kfs_lookup_path(char*NTS path);
 struct proc *kfs_proc_create(int kfs_inode);
 void kfs_cat(int kfs_inode);
 
-#endif // !ROS_KERN_KFS_H
+#endif /* !ROS_KERN_KFS_H */

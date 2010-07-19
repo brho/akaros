@@ -118,13 +118,20 @@ struct fs_type kfs_fs_type = {"KFS", 0, kfs_get_sb, kfs_kill_sb, {0, 0},
  * future. */
 int kfs_readpage(struct file *file, struct page *page)
 {
+	size_t pg_idx_byte = page->pg_index * PGSIZE;
 	struct kfs_i_info *k_i_info = (struct kfs_i_info*)file->f_inode->i_fs_info;
-	uintptr_t begin = (size_t)k_i_info->filestart + page->pg_index * PGSIZE;
-	/* Need to be careful we don't copy beyond the EOF, and that we zero out
-	 * whatever is left over.  The memset is a noop when copy_amt == PGSIZE. */
-	size_t copy_amt = MIN(PGSIZE, file->f_inode->i_size - begin);
-	memcpy(page2kva(page), (void*)begin, copy_amt);
-	memset(page2kva(page) + copy_amt, 0, PGSIZE - copy_amt);
+	uintptr_t begin = (size_t)k_i_info->filestart + pg_idx_byte;
+	/* If we're beyond the initial start point, we just need a zero page.  This
+	 * is for a hole or for extending a file (even though it won't be saved).
+	 * Otherwise, we want the data from KFS, being careful to not copy from
+	 * beyond the original EOF (and zero padding anything extra). */
+	if (pg_idx_byte >= k_i_info->init_size) {
+		memset(page2kva(page), 0, PGSIZE);
+	} else {
+		size_t copy_amt = MIN(PGSIZE, k_i_info->init_size - pg_idx_byte);
+		memcpy(page2kva(page), (void*)begin, copy_amt);
+		memset(page2kva(page) + copy_amt, 0, PGSIZE - copy_amt);
+	}
 	/* This is supposed to be done in the IO system when the operation is
 	 * complete.  Since we aren't doing a real IO request, and it is already
 	 * done, we can do it here. */
@@ -535,45 +542,6 @@ off_t kfs_llseek(struct file *file, off_t offset, int whence)
 	return temp_off;
 }
 
-/* Writes count bytes from buf to the file, starting at *offset, which is
- * increased accordingly */
-ssize_t kfs_write(struct file *file, const char *buf, size_t count,
-                  off_t *offset)
-{
-	struct kfs_i_info *k_i_info = (struct kfs_i_info*)file->f_inode->i_fs_info;
-	void *begin, *end;
-
-	/* TODO: handle this higher up in the VFS */
-	if (!count)
-		return 0;
-	if (*offset == file->f_inode->i_size)
-		return 0; /* EOF */
-
-	/* Make sure we don't go past the end of the file */
-	if (*offset + count > file->f_inode->i_size) {
-		count = file->f_inode->i_size - *offset;
-	}
-	begin = k_i_info->filestart + *offset;
-	end = begin + count;
-	if ((begin < k_i_info->filestart) ||
-	    (end > k_i_info->filestart + file->f_inode->i_size) ||
-	    (end < begin)) {
-		set_errno(current_tf, EINVAL);
-		return -1;
-	}
-
-	/* TODO: think about this.  if it's a user buffer, we're relying on current
-	 * to detect whose it is (which should work for async calls).  Consider
-	 * pushing this up the VFS stack. */
-	if (current) {
-		memcpy_from_user(current, begin, buf, count);
-	} else {
-		memcpy(begin, buf, count);
-	}
-	*offset += count;
-	return count;
-}
-
 /* Fills in the next directory entry (dirent), starting with d_off.  Like with
  * read and write, there will be issues with userspace and the *dirent buf.
  * TODO: we don't really do anything with userspace concerns here, in part
@@ -767,7 +735,7 @@ struct dentry_operations kfs_d_op = {
 struct file_operations kfs_f_op = {
 	kfs_llseek,
 	generic_file_read,
-	kfs_write,
+	generic_file_write,
 	kfs_readdir,
 	kfs_mmap,
 	kfs_open,
@@ -924,6 +892,8 @@ static int __add_kfs_entry(struct dentry *parent, char *path,
 			inode = dentry->d_inode;
 			((struct kfs_i_info*)inode->i_fs_info)->filestart =
 			                                        c_bhdr->c_filestart;
+			((struct kfs_i_info*)inode->i_fs_info)->init_size =
+			                                        c_bhdr->c_filesize;
 		}
 		/* Set other info from the CPIO entry */
 		inode->i_uid = c_bhdr->c_uid;

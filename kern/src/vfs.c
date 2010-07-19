@@ -244,7 +244,8 @@ void dcache_put(struct dentry *dentry)
 
 /* Read count bytes from the file into buf, starting at *offset, which is increased
  * accordingly, returning the number of bytes transfered.  Most filesystems will
- * use this function for their f_op->read.  Note, this uses the page cache. */
+ * use this function for their f_op->read.  Note, this uses the page cache.
+ * Want to try out page remapping later on... */
 ssize_t generic_file_read(struct file *file, char *buf, size_t count,
                           off_t *offset)
 {
@@ -269,7 +270,7 @@ ssize_t generic_file_read(struct file *file, char *buf, size_t count,
 	last_idx = (*offset + count) >> PGSHIFT;
 	buf_end = buf + count;
 	/* For each file page, make sure it's in the page cache, then copy it out.
-	 * TODO: will probably need to consider concurrently truncated files here */
+	 * TODO: will probably need to consider concurrently truncated files here.*/
 	for (int i = first_idx; i <= last_idx; i++) {
 		error = file_load_page(file, i, &page);
 		assert(!error);	/* TODO: handle ENOMEM and friends */
@@ -280,6 +281,53 @@ ssize_t generic_file_read(struct file *file, char *buf, size_t count,
 			memcpy_to_user(current, buf, page2kva(page) + page_off, copy_amt);
 		} else {
 			memcpy(buf, page2kva(page) + page_off, copy_amt);
+		}
+		buf += copy_amt;
+		page_off = 0;
+		page_decref(page);	/* it's still in the cache, we just don't need it */
+	}
+	assert(buf == buf_end);
+	*offset += count;
+	return count;
+}
+
+/* Write count bytes from buf to the file, starting at *offset, which is increased
+ * accordingly, returning the number of bytes transfered.  Most filesystems will
+ * use this function for their f_op->write.  Note, this uses the page cache.
+ * Changes don't get flushed to disc til there is an fsync, page cache eviction,
+ * or other means of trying to writeback the pages. */
+ssize_t generic_file_write(struct file *file, const char *buf, size_t count,
+                           off_t *offset)
+{
+	struct page *page;
+	int error;
+	off_t page_off;
+	unsigned long first_idx, last_idx;
+	size_t copy_amt;
+	const char *buf_end;
+
+	/* Consider pushing some error checking higher in the VFS */
+	if (!count)
+		return 0;
+	/* Extend the file.  Should put more checks in here, and maybe do this per
+	 * page in the for loop below. */
+	if (*offset + count > file->f_inode->i_size)
+		file->f_inode->i_size = *offset + count;
+	page_off = *offset & (PGSIZE - 1);
+	first_idx = *offset >> PGSHIFT;
+	last_idx = (*offset + count) >> PGSHIFT;
+	buf_end = buf + count;
+	/* For each file page, make sure it's in the page cache, then write it.*/
+	for (int i = first_idx; i <= last_idx; i++) {
+		error = file_load_page(file, i, &page);
+		assert(!error);	/* TODO: handle ENOMEM and friends */
+		copy_amt = MIN(PGSIZE - page_off, buf_end - buf);
+		/* TODO: think about this.  if it's a user buffer, we're relying on
+		 * current to detect whose it is (which should work for async calls). */
+		if (current) {
+			memcpy_to_user(current, page2kva(page) + page_off, buf, copy_amt);
+		} else {
+			memcpy(page2kva(page) + page_off, buf, copy_amt);
 		}
 		buf += copy_amt;
 		page_off = 0;

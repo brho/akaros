@@ -427,6 +427,8 @@ void dcache_put(struct dentry *dentry);
 /* File functions */
 ssize_t generic_file_read(struct file *file, char *buf, size_t count,
                           off_t *offset);
+ssize_t generic_file_write(struct file *file, const char *buf, size_t count,
+                           off_t *offset);
 
 /* Page cache functions */
 struct page *pm_find_page(struct page_map *pm, unsigned long index);

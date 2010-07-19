@@ -192,3 +192,16 @@ A note on refcnting.  When a page is added to the page cache, that's a stored
 reference.  When you lookup a page in the page cache, you get a refcnt'd
 reference back.  When you pull a page from the page cache, you also get a
 refcnt'd reference back - specifically it is the ref that was in the page map.
+
+Files with Holes
+--------------------------
+If a file has a hole, we'll still try to look up the page in the page cache.
+When that doesn't happen, we'll create and add a page, then call readpage().
+Readpage will realize there is no page on disk/backing store for that part of
+the file (since it was a hole) and just memset the page to 0.  In the future, we
+can consider getting a CoW 0-page, but that's a bit premature and a bookkeeping
+pain.
+
+This also applies to trying to write to a block beyond the EOF.  If the request
+hits the page cache and readpage(), it's because it was already checked and
+cleared in another part of the VFS, such as in generic_file_write().
