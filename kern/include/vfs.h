@@ -437,4 +437,9 @@ int pm_insert_page(struct page_map *pm, unsigned long index, struct page *page);
 int pm_remove_page(struct page_map *pm, struct page *page);
 int file_load_page(struct file *file, unsigned long index, struct page **pp);
 
+/* Process-related File management functions */
+struct file *get_file_from_fd(struct files_struct *open_files, int fd);
+struct file *put_file_from_fd(struct files_struct *open_files, int file_desc);
+int insert_file(struct files_struct *open_files, struct file *file);
+
 #endif /* ROS_KERN_VFS_H */

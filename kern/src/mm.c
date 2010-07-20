@@ -272,11 +272,6 @@ void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 	struct file *file = NULL;
 	printd("mmap(addr %x, len %x, prot %x, flags %x, fd %x, off %x)\n", addr,
 	       len, prot, flags, fd, offset);
-	if (fd >= 0 && (flags & MAP_SHARED)) {
-		printk("[kernel] mmap() for files requires !MAP_SHARED.\n");
-		set_errno(current_tf, EACCES);
-		return MAP_FAILED;
-	}
 	if (fd >= 0 && (flags & MAP_ANON)) {
 		set_errno(current_tf, EBADF);
 		return MAP_FAILED;
@@ -290,7 +285,7 @@ void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 		return MAP_FAILED;
 	}
 	if (fd != -1) {
-		file = file_open_from_fd(p, fd);
+		file = get_file_from_fd(&p->open_files, fd);
 		if (!file) {
 			set_errno(current_tf, EBADF);
 			return MAP_FAILED;

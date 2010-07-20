@@ -456,3 +456,73 @@ int file_load_page(struct file *file, unsigned long index, struct page **pp)
 	assert(page->pg_flags & PG_UPTODATE);
 	return 0;
 }
+
+/* Process-related File management functions */
+
+/* Given any FD, get the appropriate file, 0 o/w */
+struct file *get_file_from_fd(struct files_struct *open_files, int file_desc)
+{
+	struct file *retval = 0;
+	spin_lock(&open_files->lock);
+	if (file_desc < open_files->max_fdset) {
+		if (GET_BITMASK_BIT(open_files->open_fds->fds_bits, file_desc)) {
+			/* while max_files and max_fdset might not line up, we should never
+			 * have a valid fdset higher than files */
+			assert(file_desc < open_files->max_files);
+			retval = open_files->fd[file_desc];
+			assert(retval);
+			atomic_inc(&retval->f_refcnt);
+		}
+	}
+	spin_unlock(&open_files->lock);
+	return retval;
+}
+
+/* Remove FD from the open files, if it was there, and return f.  Currently,
+ * this decref's f, so the return value is not consumable or even usable.  This
+ * hasn't been thought through yet. */
+struct file *put_file_from_fd(struct files_struct *open_files, int file_desc)
+{
+	struct file *f = 0;
+	spin_lock(&open_files->lock);
+	if (file_desc < open_files->max_fdset) {
+		if (GET_BITMASK_BIT(open_files->open_fds->fds_bits, file_desc)) {
+			/* while max_files and max_fdset might not line up, we should never
+			 * have a valid fdset higher than files */
+			assert(file_desc < open_files->max_files);
+			f = open_files->fd[file_desc];
+			open_files->fd[file_desc] = 0;
+			/* TODO: (REF) need to make sure we free if we hit 0 (might do this
+			 * in the caller */
+			if (f)
+				atomic_dec(&f->f_refcnt);
+			// if 0, drop, decref from higher, sync, whatever
+		}
+	}
+	spin_unlock(&open_files->lock);
+	return f;
+}
+
+/* Inserts the file in the files_struct, returning the corresponding new file
+ * descriptor, or an error code.  We currently grab the first open FD. */
+int insert_file(struct files_struct *open_files, struct file *file)
+{
+	int slot = -1;
+	spin_lock(&open_files->lock);
+	for (int i = 0; i < open_files->max_fdset; i++) {
+		if (GET_BITMASK_BIT(open_files->open_fds->fds_bits, i))
+			continue;
+		slot = i;
+		SET_BITMASK_BIT(open_files->open_fds->fds_bits, slot);
+		assert(slot < open_files->max_files && open_files->fd[slot] == 0);
+		open_files->fd[slot] = file;
+		atomic_inc(&file->f_refcnt);
+		if (slot >= open_files->next_fd)
+			open_files->next_fd = slot + 1;
+		break;
+	}
+	if (slot == -1)	/* should expand the FD array and fd_set */
+		warn("Ran out of file descriptors, deal with me!");
+	spin_unlock(&open_files->lock);
+	return slot;
+}
