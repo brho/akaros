@@ -333,15 +333,11 @@ int kfs_create(struct inode *dir, struct dentry *dentry, int mode,
  * with the FS specific info of this file.  If it succeeds, it will pass back
  * the *dentry you should use.  If this fails, it will return 0 and will take
  * the ref to the dentry for you.  Either way, you shouldn't use the ref you
- * passed in anymore.
+ * passed in anymore.  Still, there are issues with refcnting with this.
  *
  * Callers, make sure you alloc and fill out the name parts of the dentry, and
- * an initialized nameidata.
- *
- * Doesn't yet handle symlinks, . or .., so don't fuck it up.  It might not need
- * to handle the . or .., which could be handled by the VFS.  Some of the other
- * ugliness is because KFS is exclusively using dentries to track subdirs,
- * instead of putting it all in the inode/dir file.
+ * an initialized nameidata. TODO: not sure why we need an ND.  Don't use it in
+ * a fs_lookup for now!
  *
  * Because of the way KFS currently works, if there is ever a dentry, it's
  * already in memory, along with its inode (all path's pinned).  So we just find
@@ -374,9 +370,11 @@ struct dentry *kfs_lookup(struct inode *dir, struct dentry *dentry,
 	}
 	/* no match, consider caching the negative result, freeing the
 	 * dentry, etc */
-	printk("Not Found %s!!\n", dentry->d_name.name);
+	printd("Not Found %s!!\n", dentry->d_name.name);
 	/* TODO: Cache, negatively... */
 	//dcache_put(dentry); 			/* TODO: should set a d_flag too */
+	/* if we're not caching it, we should free it */
+	kmem_cache_free(dentry_kcache, dentry);
 	return 0;
 }
 

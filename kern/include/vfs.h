@@ -85,8 +85,11 @@ struct qstr {
 /* Helpful structure to pass around during lookup operations.  At each point,
  * it tracks the the answer, the name of the previous, how deep the symlink
  * following has gone, and the symlink pathnames.  *dentry and *mnt up the
- * refcnt of those objects too, so whoever receives this will need to decref.
- * We'll see how this works out... */
+ * refcnt of those objects too, so whoever 'receives; this will need to decref.
+ * This is meant to be pinning only the 'answer' to a path_lookup, and not the
+ * intermediate steps.  The intermediates get pinned due to the existence of
+ * their children in memory.  Internally, the VFS will refcnt any item whenever
+ * it is in this struct. */
 #define MAX_SYMLINK_DEPTH 6 // arbitrary.
 struct nameidata {
 	struct dentry				*dentry;		/* dentry of the obj */
@@ -98,6 +101,15 @@ struct nameidata {
 	char						*saved_names[MAX_SYMLINK_DEPTH];
 	int							intent;			/* access type for the file */
 };
+
+/* nameidata lookup flags and access type fields */
+#define LOOKUP_FOLLOW 		0x01	/* if the last is a symlink, follow */
+#define LOOKUP_DIRECTORY 	0x02	/* last component must be a directory */
+#define LOOKUP_CONTINUE 	0x04	/* still filenames to go */
+#define LOOKUP_PARENT 		0x08	/* lookup the dir that includes the item */
+#define LOOKUP_OPEN 		0x10	/* intent is to open a file */
+#define LOOKUP_CREATE 		0x11	/* create a file if it doesn't exist */
+#define LOOKUP_ACCESS 		0x12	/* access / check user permissions */
 
 /* Every object that has pages, like an inode or the swap (or even direct block
  * devices) has a page_map, tracking which of its pages are currently in memory.
@@ -413,6 +425,8 @@ extern struct kmem_cache *file_kcache;
 /* Misc VFS functions */
 void vfs_init(void);
 void qstr_builder(struct dentry *dentry, char *l_name);
+int path_lookup(char *path, int flags, struct nameidata *nd);
+void path_release(struct nameidata *nd);
 
 /* Superblock functions */
 struct super_block *get_sb(void);
@@ -424,6 +438,9 @@ void init_sb(struct super_block *sb, struct vfsmount *vmnt,
 struct dentry *get_dentry(struct super_block *sb, struct dentry *parent,
                           char *name);
 void dcache_put(struct dentry *dentry);
+
+/* Inode Functions */
+int check_perms(struct inode *inode, int access_mode);
 
 /* File functions */
 ssize_t generic_file_read(struct file *file, char *buf, size_t count,

@@ -125,6 +125,183 @@ void qstr_builder(struct dentry *dentry, char *l_name)
 	dentry->d_name.len = strnlen(dentry->d_name.name, MAX_FILENAME_SZ);
 }
 
+/* Some issues with this, coupled closely to fs_lookup.  This assumes that
+ * negative dentries are not returned (might differ from linux) */
+static struct dentry *do_lookup(struct dentry *parent, char *name)
+{
+	struct dentry *dentry;
+	/* TODO: look up in the dentry cache first */
+	dentry = get_dentry(parent->d_sb, parent, name);
+	dentry = parent->d_inode->i_op->lookup(parent->d_inode, dentry, 0);
+	/* insert in dentry cache */
+	/* TODO: if the following are done by us, how do we know the i_ino?
+	 * also need to handle inodes that are already read in!  For now, we're
+	 * going to have the FS handle it in it's lookup() method: 
+	 * - get a new inode
+	 * - read in the inode
+	 * - put in the inode cache */
+	return dentry;
+}
+
+/* Walk up one directory, being careful of mountpoints, namespaces, and the top
+ * of the FS */
+static int climb_up(struct nameidata *nd)
+{
+	// TODO
+	warn("Climbing up (../) in path lookup not supported yet!");
+	return 0;
+}
+
+/* Update ND such that it represents having followed dentry.  IAW the nd
+ * refcnting rules, we need to decref any references that were in there before
+ * they get clobbered. */
+static int next_link(struct dentry *dentry, struct nameidata *nd)
+{
+	assert(nd->dentry && nd->mnt);
+	atomic_dec(&nd->dentry->d_refcnt);
+	atomic_dec(&nd->mnt->mnt_refcnt);
+   	nd->dentry = dentry;
+   	nd->mnt = dentry->d_sb->s_mount;
+	return 0;
+}
+
+static int follow_mount(struct nameidata *nd)
+{
+	/* Detect mount, follow, etc... (TODO!) */
+	return 0;
+}
+
+static int follow_symlink(struct nameidata *nd)
+{
+	/* Detect symlink, LOOKUP_FOLLOW, follow it, etc... (TODO!) */
+	return 0;
+}
+
+/* Resolves the links in a basic path walk.  0 for success, -EWHATEVER
+ * otherwise.  The final lookup is returned via nd. */
+static int link_path_walk(char *path, struct nameidata *nd)
+{
+	struct dentry *link_dentry;
+	struct inode *link_inode, *nd_inode;
+	char *next_slash;
+	char *link = path;
+	int error;
+
+	/* skip all leading /'s */
+	while (*link == '/')
+		link++;
+	/* if there's nothing left (null terminated), we're done */
+	if (*link == '\0')
+		return 0;
+	/* TODO: deal with depth and LOOKUP_FOLLOW, important for symlinks */
+
+	/* iterate through each intermediate link of the path.  in general, nd
+	 * tracks where we are in the path, as far as dentries go.  once we have the
+	 * next dentry, we try to update nd based on that dentry.  link is the part
+	 * of the path string that we are looking up */
+	while (1) {
+		nd_inode = nd->dentry->d_inode;
+		if ((error = check_perms(nd_inode, nd->intent)))
+			return error;
+		/* find the next link, break out if it is the end */
+		next_slash = strchr(link, '/');
+		if (!next_slash)
+			break;
+		else
+			if (*(next_slash + 1) == '\0') {
+				/* trailing slash on the path meant the target is a dir */
+				nd->flags |= LOOKUP_DIRECTORY;
+				*next_slash = '\0';
+				break;
+			}
+		/* skip over any interim ./ */
+		if (!strncmp("./", link, 2)) {
+			link = next_slash + 1;
+			continue;
+		}
+		/* Check for "../", walk up */
+		if (!strncmp("../", link, 3)) {
+			climb_up(nd);
+			link = next_slash + 2;
+			continue;
+		}
+		*next_slash = '\0';
+		link_dentry = do_lookup(nd->dentry, link);
+		*next_slash = '/';
+		if (!link_dentry)
+			return -ENOENT;
+		/* make link_dentry the current step/answer */
+		next_link(link_dentry, nd);
+		/* we could be on a mountpoint or a symlink - need to follow them */
+		follow_mount(nd);
+		follow_symlink(nd);
+		if (!(nd->dentry->d_inode->i_type & FS_I_DIR))
+			return -ENOTDIR;
+		/* move through the path string to the next entry */
+		link = next_slash + 1;
+	}
+	/* now, we're on the last link of the path */
+	/* if we just want the parent, leave now.  linux does some stuff with saving
+	 * the name of the link (last) and the type (last_type), which we'll do once
+	 * i see the need for it. */
+	if (nd->flags & LOOKUP_PARENT)
+		return 0;
+	/* deal with some weird cases with . and .. (completely untested) */
+	if (!strcmp(".", link))
+		return 0;
+	if (!strcmp("..", link))
+		return climb_up(nd);
+	link_dentry = do_lookup(nd->dentry, link);
+	if (!link_dentry)
+		return -ENOENT;
+	next_link(link_dentry, nd);
+	follow_mount(nd);
+	follow_symlink(nd);
+	/* If we wanted a directory, but didn't get one, error out */
+	if ((nd->flags & LOOKUP_DIRECTORY) &&
+	   !(nd->dentry->d_inode->i_type & FS_I_DIR))
+		return -ENOTDIR;
+	return 0;
+}
+
+/* Given path, return the inode for the final dentry.  The ND should be
+ * initialized for the first call - specifically, we need the intent and
+ * potentially a LOOKUP_PARENT.
+ *
+ * Need to be careful too.  While the path has been copied-in to the kernel,
+ * it's still user input.  */
+int path_lookup(char *path, int flags, struct nameidata *nd)
+{
+	/* we allow absolute lookups with no process context */
+	if (path[0] == '/') {			/* absolute lookup */
+		if (!current)
+			nd->dentry = default_ns.root->mnt_root;
+		else
+			nd->dentry = current->fs_env.root;	
+	} else {						/* relative lookup */
+		assert(current);
+		/* Don't need to lock on the fs_env since we're reading one item */
+		nd->dentry = current->fs_env.pwd;	
+	}
+	nd->mnt = nd->dentry->d_sb->s_mount;
+	/* Whenever references get put in the nd, incref them.  Whenever they are
+	 * removed, decref them. */
+	atomic_inc(&nd->mnt->mnt_refcnt);
+	atomic_inc(&nd->dentry->d_refcnt);
+	nd->flags = flags;
+	nd->depth = 0;					/* used in symlink following */
+	return link_path_walk(path, nd);	
+}
+
+/* Call this after any use of path_lookup when you are done with its results,
+ * regardless of whether it succeeded or not.  It will free any references */
+void path_release(struct nameidata *nd)
+{
+	/* TODO: (REF), do something when we hit 0, etc... */
+	atomic_dec(&nd->dentry->d_refcnt);
+	atomic_dec(&nd->mnt->mnt_refcnt);
+}
+
 /* Superblock functions */
 
 /* Helper to alloc and initialize a generic superblock.  This handles all the
@@ -238,6 +415,16 @@ void dcache_put(struct dentry *dentry)
 	spin_lock(&dcache_lock);
 	SLIST_INSERT_HEAD(&dcache, dentry, d_hash);
 	spin_unlock(&dcache_lock);
+}
+
+/* Inode Functions */
+
+/* Returns 0 if the given mode is acceptable for the inode, and an appropriate
+ * error code if not.  Needs to be writen, based on some sensible rules, and
+ * will also probably use 'current' */
+int check_perms(struct inode *inode, int access_mode)
+{
+	return 0;	/* anything goes! */
 }
 
 /* File functions */
