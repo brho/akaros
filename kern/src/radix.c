@@ -72,7 +72,7 @@ int radix_insert(struct radix_tree *tree, unsigned long key, void *item)
 	 * it, etc */
 	r_node = __radix_lookup_node(tree, key, TRUE);
 	assert(r_node);		/* we want an ENOMEM actually, but i want to see this */
-	slot = &r_node->items[key & (LOG_RNODE_SLOTS - 1)];
+	slot = &r_node->items[key & (NR_RNODE_SLOTS - 1)];
 	if (*slot)
 		return -EEXIST;
 	*slot = item;
@@ -107,7 +107,7 @@ void *radix_delete(struct radix_tree *tree, unsigned long key)
 	struct radix_node *r_node = __radix_lookup_node(tree, key, 0);
 	if (!r_node)
 		return 0;
-	slot = &r_node->items[key & (LOG_RNODE_SLOTS - 1)];
+	slot = &r_node->items[key & (NR_RNODE_SLOTS - 1)];
 	retval = *slot;
 	if (retval) {
 		__radix_remove_slot(r_node, (struct radix_node**)slot);	
@@ -144,7 +144,7 @@ static struct radix_node *__radix_lookup_node(struct radix_tree *tree,
 	if (key	>= tree->upper_bound)
 		return 0;
 	for (int i = tree->depth; i > 1; i--) {	 /* i = ..., 4, 3, 2 */
-		idx = (key >> (LOG_RNODE_SLOTS * (i - 1))) & (LOG_RNODE_SLOTS - 1);
+		idx = (key >> (LOG_RNODE_SLOTS * (i - 1))) & (NR_RNODE_SLOTS - 1);
 		/* There might not be a node at this part of the tree */
 		if (!r_node->items[idx]) {
 			if (!extend) {
@@ -178,7 +178,7 @@ void **radix_lookup_slot(struct radix_tree *tree, unsigned long key)
 	struct radix_node *r_node = __radix_lookup_node(tree, key, FALSE);
 	if (!r_node)
 		return 0;
-	key = key & (LOG_RNODE_SLOTS - 1);
+	key = key & (NR_RNODE_SLOTS - 1);
 	return &r_node->items[key];
 }
 

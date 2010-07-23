@@ -31,6 +31,7 @@
 #include <kmalloc.h>
 #include <hashtable.h>
 #include <radix.h>
+#include <monitor.h>
 
 #define l1 (available_caches.l1)
 #define l2 (available_caches.l2)
@@ -1083,11 +1084,19 @@ void test_radix_tree(void)
 {
 	struct radix_tree real_tree = RADIX_INITIALIZER;
 	struct radix_tree *tree = &real_tree;
+	void *retval;
 	
 	if (radix_insert(tree, 3, (void*)0xdeadbeef))
 		printk("Failed to insert first!\n");
 	radix_insert(tree, 4, (void*)0x04040404);
 	assert((void*)0xdeadbeef == radix_lookup(tree, 3));
+	for (int i = 5; i < 100; i++)
+		if ((retval = radix_lookup(tree, i))) {
+			printk("Extra item %08p at slot %d in tree %08p\n", retval, i,
+			       tree);
+			print_radix_tree(tree);
+			monitor(0);
+		}
 	if (radix_insert(tree, 65, (void*)0xcafebabe))
 		printk("Failed to insert a two-tier!\n");
 	if (!radix_insert(tree, 4, (void*)0x03030303))
