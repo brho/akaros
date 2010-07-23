@@ -278,33 +278,6 @@ static int sys_proc_yield(struct proc *p, bool being_nice)
 	return 0;
 }
 
-static ssize_t sys_run_binary(env_t* e, void *DANGEROUS binary_buf, size_t len,
-                              procinfo_t*DANGEROUS procinfo, size_t num_colors)
-{
-	printk("sys_run_binary() is deprecated and does nothing, pending removal.");
-#if 0
-	env_t* env = proc_create(NULL,0);
-	assert(env != NULL);
-
-	// let me know if you use this.  we need to sort process creation better.
-	if(memcpy_from_user(e,e->procinfo,procinfo,sizeof(*procinfo)))
-		return -1;
-	proc_init_procinfo(e);
-
-	env_load_icode(env,e,binary_buf,len);
-	__proc_set_state(env, PROC_RUNNABLE_S);
-	schedule_proc(env);
-	if(num_colors > 0) {
-		env->cache_colors_map = cache_colors_map_alloc();
-		for(int i=0; i<num_colors; i++)
-			cache_color_alloc(llc_cache, env->cache_colors_map);
-	}
-	proc_decref(env, 1);
-	proc_yield(e, 0);
-#endif
-	return 0;
-}
-
 static ssize_t sys_fork(env_t* e)
 {
 	// TODO: right now we only support fork for single-core processes
@@ -1070,7 +1043,6 @@ intreg_t syscall(struct proc *p, uintreg_t syscallno, uintreg_t a1,
 		[SYS_proc_run] = (syscall_t)sys_proc_run,
 		[SYS_proc_destroy] = (syscall_t)sys_proc_destroy,
 		[SYS_yield] = (syscall_t)sys_proc_yield,
-		[SYS_run_binary] = (syscall_t)sys_run_binary,
 		[SYS_fork] = (syscall_t)sys_fork,
 		[SYS_exec] = (syscall_t)sys_exec,
 		[SYS_trywait] = (syscall_t)sys_trywait,

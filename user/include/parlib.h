@@ -29,8 +29,6 @@ ssize_t     sys_serial_write(void* buf, size_t len);
 ssize_t     sys_serial_read(void* buf, size_t len);
 ssize_t     sys_eth_write(void *COUNT(len) buf, size_t len); 
 ssize_t     sys_eth_read(void *COUNT(len) buf, size_t len);
-ssize_t     sys_run_binary(void* binary_buf, size_t len,
-                           const procinfo_t* pi, size_t num_colors);
 size_t      sys_getcpuid(void);
 void *      sys_brk(void* addr);
 /* Process Management */

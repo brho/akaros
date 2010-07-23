@@ -62,14 +62,6 @@ ssize_t sys_serial_read(void* buf, size_t len)
 	return ros_syscall(SYS_serial_read, buf, len, 0, 0, 0);
 }
 
-//Run a binary loaded at the specificed address with the specified arguments
-ssize_t sys_run_binary(void* binary_buf, size_t len,
-                       const procinfo_t* pi, size_t num_colors) 
-{
-	return ros_syscall(SYS_run_binary, binary_buf, len,
-                                       pi,num_colors,0);
-}
-
 //Write a buffer over ethernet
 ssize_t sys_eth_write(void* buf, size_t len) 
 {

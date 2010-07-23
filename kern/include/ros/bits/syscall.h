@@ -1,8 +1,11 @@
 #ifndef ROS_INCLUDE_BITS_SYSCALL_H
 #define ROS_INCLUDE_BITS_SYSCALL_H
 
-/* system call numbers.  need to #def them for use in assembly. */
+/* system call numbers.  need to #def them for use in assembly.  Removing
+ * useless ones is okay, but if we change a number, we'll need to rebuild
+ * userspace (which is why we have holes). */
 #define SYS_null					 1
+/* buster renumbered */
 #define SYS_cache_invalidate		 3
 #define SYS_reboot					 4
 #define SYS_cputs					 5
@@ -14,7 +17,7 @@
 #define SYS_proc_run				11
 #define SYS_proc_destroy			12
 #define SYS_yield					13
-#define SYS_run_binary				14
+/* sys_run_binary removed */
 #define SYS_fork					15
 #define SYS_exec					16
 #define SYS_trywait					17
