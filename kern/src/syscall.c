@@ -207,7 +207,7 @@ static int sys_proc_create(struct proc *p, const char *DANGEROUS path)
 	user_mem_strlcpy(p, t_path, path, MAX_PATH_LEN, PTE_USER_RO);
 	program = path_to_file(t_path);
 	if (!program)
-		return -1;
+		return -1;			/* presumably, errno is already set */
 	new_p = proc_create(program, 0, 0);
 	pid = new_p->pid;
 	proc_decref(new_p, 1);	/* give up the reference created in proc_create() */
@@ -352,6 +352,8 @@ static ssize_t sys_fork(env_t* e)
 
 	// don't decref the new process.
 	// that will happen when the parent waits for it.
+	// TODO: if the parent doesn't wait, we need to change the child's parent
+	// when the parent dies, or at least decref it
 
 	printd("[PID %d] fork PID %d\n",e->pid,env->pid);
 

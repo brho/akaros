@@ -53,24 +53,33 @@ void manager(void)
 	MANAGER_FUNC(DEVELOPER_NAME)();
 }
 
-/* Helper macro for quickly running something out of KFS.  Pass it a string and
- * a proc pointer. */
-#define quick_proc_run(x, p)                                                     \
-	(p) = kfs_proc_create(kfs_lookup_path((x)));                                 \
+/* Helper macro for quickly running a process.  Pass it a string, *file, and a
+ * *proc. */
+#define quick_proc_run(x, p, f)                                                  \
+	(f) = path_to_file((x));                                                     \
+	assert((f));                                                                 \
+	(p) = proc_create(f, 0, 0);                                                  \
+	atomic_dec(&(f)->f_refcnt);                                                  \
 	spin_lock(&(p)->proc_lock);                                                  \
 	__proc_set_state((p), PROC_RUNNABLE_S);                                      \
 	spin_unlock(&(p)->proc_lock);                                                \
 	proc_run((p));                                                               \
 	proc_decref((p), 1);
 
-#define quick_proc_create(x, p)                                                  \
-	(p) = kfs_proc_create(kfs_lookup_path((x)));                                 \
+#define quick_proc_create(x, p, f)                                               \
+	(f) = path_to_file((x));                                                     \
+	assert((f));                                                                 \
+	(p) = proc_create(f, 0, 0);                                                  \
+	atomic_dec(&(f)->f_refcnt);                                                  \
 	spin_lock(&(p)->proc_lock);                                                  \
 	__proc_set_state((p), PROC_RUNNABLE_S);                                      \
 	spin_unlock(&(p)->proc_lock);
 
-#define quick_proc_color_run(x, p, c)                                            \
-	(p) = kfs_proc_create(kfs_lookup_path((x)));                                 \
+#define quick_proc_color_run(x, p, c, f)                                         \
+	(f) = path_to_file((x));                                                     \
+	assert((f));                                                                 \
+	(p) = proc_create(f, 0, 0);                                                  \
+	atomic_dec(&(f)->f_refcnt);                                                  \
 	spin_lock(&(p)->proc_lock);                                                  \
 	__proc_set_state((p), PROC_RUNNABLE_S);                                      \
 	spin_unlock(&(p)->proc_lock);                                                \
@@ -80,8 +89,11 @@ void manager(void)
 	proc_run((p));                                                               \
 	proc_decref((p), 1);
 
-#define quick_proc_color_create(x, p, c)                                         \
-	(p) = kfs_proc_create(kfs_lookup_path((x)));                                 \
+#define quick_proc_color_create(x, p, c, f)                                      \
+	(f) = path_to_file((x));                                                     \
+	assert((f));                                                                 \
+	(p) = proc_create(f, 0, 0);                                                  \
+	atomic_dec(&(f)->f_refcnt);                                                  \
 	spin_lock(&(p)->proc_lock);                                                  \
 	__proc_set_state((p), PROC_RUNNABLE_S);                                      \
 	spin_unlock(&(p)->proc_lock);                                                \
@@ -93,6 +105,7 @@ void manager_brho(void)
 {
 	static uint8_t RACY progress = 0;
 	static struct proc *p;
+	struct file *temp_f;
 
 	// for testing taking cores, check in case 1 for usage
 	uint32_t corelist[MAX_NUM_CPUS];
@@ -100,11 +113,10 @@ void manager_brho(void)
 
 	switch (progress++) {
 		case 0:
-			monitor(0);
 			/* 124 is half of the available boxboro colors (with the kernel
 			 * getting 8) */
-			//quick_proc_color_run("msr_dumb_while", p, 124);
-			//quick_proc_run("mhello", p);
+			//quick_proc_color_run("msr_dumb_while", p, 124, temp_f);
+			quick_proc_run("/bin/hello", p, temp_f);
 			#if 0
 			// this is how you can transition to a parallel process manually
 			// make sure you don't proc run first
