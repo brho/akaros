@@ -29,10 +29,10 @@ int main(int argc, char** argv)
 	}
 	#endif
 	printf("U: attempting to create and run hello\n");
-	child_pid[0] = sys_proc_create("roslib_hello");
+	child_pid[0] = sys_proc_create("/bin/hello");
 	sys_proc_run(child_pid[0]);
-	printf("U: attempting to create and run mhello\n");
-	child_pid[1] = sys_proc_create("roslib_mhello");
+	printf("U: attempting to create and run another hello\n");
+	child_pid[1] = sys_proc_create("/bin/hello");
 	sys_proc_run(child_pid[1]);
 	return 0;
 }

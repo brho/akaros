@@ -290,13 +290,10 @@ int mon_bin_run(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 		printk("No such program!\n");
 		return 1;
 	}
-	/* TODO: push this into proc_create */
-	struct proc *p = proc_create(NULL, 0);
-	char* p_argv[] = {0, 0, 0};
-	char* p_envp[] = {"LD_LIBRARY_PATH=/lib",0};
+	char *p_argv[] = {0, 0, 0};
+	char *p_envp[] = {"LD_LIBRARY_PATH=/lib", 0};	/* for /bin/sh, i think */
 	p_argv[0] = file_name(program);
-	procinfo_pack_args(p->procinfo, p_argv, p_envp);
-	assert(load_elf(p, program) == 0);
+	struct proc *p = proc_create(program, p_argv, p_envp);
 
 	spin_lock(&p->proc_lock);
 	__proc_set_state(p, PROC_RUNNABLE_S);

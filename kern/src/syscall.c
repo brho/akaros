@@ -193,40 +193,25 @@ static pid_t sys_getpid(struct proc *p)
 	return p->pid;
 }
 
-/*
- * Creates a process found at the user string 'path'.  Currently uses KFS.
- * Not runnable by default, so it needs it's status to be changed so that the
- * next call to schedule() will try to run it.
- * TODO: once we have a decent VFS, consider splitting this up
- * and once there's an mmap, can have most of this in process.c
- */
+/* Creates a process from the file 'path'.  The process is not runnable by
+ * default, so it needs it's status to be changed so that the next call to
+ * schedule() will try to run it.  TODO: take args/envs from userspace. */
 static int sys_proc_create(struct proc *p, const char *DANGEROUS path)
 {
 	int pid = 0;
-	char tpath[MAX_PATH_LEN];
-	/*
-	 * There's a bunch of issues with reading in the path, which we'll
-	 * need to sort properly in the VFS.  Main concerns are TOCTOU (copy-in),
-	 * whether or not it's a big deal that the pointer could be into kernel
-	 * space, and resolving both of these without knowing the length of the
-	 * string. (TODO)
-	 * Change this so that all syscalls with a pointer take a length.
-	 *
-	 * zra: I've added this user_mem_strlcpy, which I think eliminates the
-     * the TOCTOU issue. Adding a length arg to this call would allow a more
-	 * efficient implementation, though, since only one call to user_mem_check
-	 * would be required.
-	 */
-	int ret = user_mem_strlcpy(p,tpath, path, MAX_PATH_LEN, PTE_USER_RO);
-	return 0;
-#if 0
-	int kfs_inode = kfs_lookup_path(tpath);
-	if (kfs_inode < 0)
-		return -EINVAL;
-	struct proc *new_p = kfs_proc_create(kfs_inode);
+	char t_path[MAX_PATH_LEN];
+	struct file *program;
+	struct proc *new_p;
+
+	/* Copy in.  TODO: make syscalls come with a length */
+	user_mem_strlcpy(p, t_path, path, MAX_PATH_LEN, PTE_USER_RO);
+	program = path_to_file(t_path);
+	if (!program)
+		return -1;
+	new_p = proc_create(program, 0, 0);
 	pid = new_p->pid;
-	proc_decref(new_p, 1); // let go of the reference created in proc_create()
-#endif
+	proc_decref(new_p, 1);	/* give up the reference created in proc_create() */
+	atomic_dec(&program->f_refcnt);		/* TODO: REF / KREF */
 	return pid;
 }
 
@@ -296,11 +281,12 @@ static int sys_proc_yield(struct proc *p, bool being_nice)
 static ssize_t sys_run_binary(env_t* e, void *DANGEROUS binary_buf, size_t len,
                               procinfo_t*DANGEROUS procinfo, size_t num_colors)
 {
+	printk("sys_run_binary() is deprecated and does nothing, pending removal.");
+#if 0
 	env_t* env = proc_create(NULL,0);
 	assert(env != NULL);
 
 	// let me know if you use this.  we need to sort process creation better.
-	printk("sys_run_binary() is deprecated.  Use at your own risk.");
 	if(memcpy_from_user(e,e->procinfo,procinfo,sizeof(*procinfo)))
 		return -1;
 	proc_init_procinfo(e);
@@ -315,6 +301,7 @@ static ssize_t sys_run_binary(env_t* e, void *DANGEROUS binary_buf, size_t len,
 	}
 	proc_decref(env, 1);
 	proc_yield(e, 0);
+#endif
 	return 0;
 }
 
@@ -327,7 +314,8 @@ static ssize_t sys_fork(env_t* e)
 		return -1;
 	}
 
-	env_t* env = proc_create(NULL,0);
+	env_t* env;
+	assert(!proc_alloc(&env, current));
 	assert(env != NULL);
 
 	env->heap_top = e->heap_top;

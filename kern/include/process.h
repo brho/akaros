@@ -1,11 +1,9 @@
-/*
- * Copyright (c) 2009 The Regents of the University of California
+/* Copyright (c) 2009, 2010 The Regents of the University of California
  * Barret Rhoden <brho@cs.berkeley.edu>
  * See LICENSE for details.
  *
  * All things processes!  As we move away from the old envs to processes,
- * we'll move things into here that are designed for multicore processes.
- */
+ * we'll move things into here that are designed for multicore processes. */
 
 #ifndef ROS_KERN_PROCESS_H
 #define ROS_KERN_PROCESS_H
@@ -71,7 +69,8 @@ void proc_init(void);
 void proc_init_procinfo(struct proc *p);
 
 /* Process management: */
-struct proc *proc_create(uint8_t *COUNT(size) binary, size_t size);
+error_t proc_alloc(struct proc **pp, struct proc *parent);
+struct proc *proc_create(struct file *prog, char **argv, char **envp);
 int __proc_set_state(struct proc *p, uint32_t state) WRITES(p->state);
 struct proc *pid2proc(pid_t pid);
 bool proc_controls(struct proc *SAFE actor, struct proc *SAFE target);

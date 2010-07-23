@@ -207,8 +207,10 @@ void manager_waterman()
 	static int init = 0;
 	if(!init)
 	{
+		warn("Old file creation might not work");
 		init = 1;
-		struct proc* p = proc_create(NULL,0);
+		struct proc *p;
+		proc_alloc(&p, 0);
 
 		char* argv[] = {"/bin/sh","-l",0};
 		char* envp[] = {"LD_LIBRARY_PATH=/lib",0};

@@ -1,8 +1,6 @@
-/*
- * Copyright (c) 2009 The Regents of the University of California
+/* Copyright (c) 2009, 2010 The Regents of the University of California
  * Barret Rhoden <brho@cs.berkeley.edu>
- * See LICENSE for details.
- */
+ * See LICENSE for details. */
 
 #ifdef __SHARC__
 #pragma nosharc
@@ -27,6 +25,7 @@
 #include <frontend.h>
 #include <monitor.h>
 #include <resource.h>
+#include <elf.h>
 
 /* Process Lists */
 struct proc_list proc_runnablelist = TAILQ_HEAD_INITIALIZER(proc_runnablelist);
@@ -242,7 +241,7 @@ proc_init_procinfo(struct proc* p)
  * Errors include:
  *  - ENOFREEPID if it can't get a PID
  *  - ENOMEM on memory exhaustion */
-static error_t proc_alloc(struct proc *SAFE*SAFE pp, struct proc *parent)
+error_t proc_alloc(struct proc **pp, struct proc *parent)
 {
 	error_t r;
 	struct proc *p;
@@ -278,7 +277,7 @@ static error_t proc_alloc(struct proc *SAFE*SAFE pp, struct proc *parent)
 	p->state = PROC_CREATED; // shouldn't go through state machine for init
 	p->env_refcnt = 2; // one for the object, one for the ref we pass back
 	p->env_flags = 0;
-	p->env_entry = 0; // cheating.  this really gets set in load_icode
+	p->env_entry = 0; // cheating.  this really gets set later
 	p->procinfo->heap_bottom = (void*)UTEXT;
 	p->heap_top = (void*)UTEXT;
 	memset(&p->resources, 0, sizeof(p->resources));
@@ -333,18 +332,16 @@ static error_t proc_alloc(struct proc *SAFE*SAFE pp, struct proc *parent)
 	return 0;
 }
 
-/* Creates a process from the specified binary, which is of size size.
- * Currently, the binary must be a contiguous block of memory, which needs to
- * change.  On any failure, it just panics, which ought to be sorted. */
-struct proc *proc_create(uint8_t *binary, size_t size)
+/* Creates a process from the specified file, argvs, and envps.  Tempted to get
+ * rid of proc_alloc's style, but it is so quaint... */
+struct proc *proc_create(struct file *prog, char **argv, char **envp)
 {
 	struct proc *p;
 	error_t r;
-
 	if ((r = proc_alloc(&p, current)) < 0)
-		panic("proc_create: %e", r); // one of 3 quaint usages of %e.
-	if(binary != NULL)
-		env_load_icode(p, NULL, binary, size);
+		panic("proc_create: %e", r);	/* one of 3 quaint usages of %e */
+	procinfo_pack_args(p->procinfo, argv, envp);
+	assert(load_elf(p, prog) == 0);
 	return p;
 }
 
