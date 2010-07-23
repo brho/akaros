@@ -25,6 +25,7 @@
 #include <kdebug.h>
 #include <syscall.h>
 #include <kmalloc.h>
+#include <elf.h>
 
 #include <ros/timer.h>
 #include <ros/memlayout.h>
@@ -48,8 +49,8 @@ static command_t (RO commands)[] = {
 	{ "cpuinfo", "Prints CPU diagnostics", mon_cpuinfo},
 	{ "ps", "Prints process list", mon_ps},
 	{ "nanwan", "Meet Nanwan!!", mon_nanwan},
-	{ "kfs_ls", "List files in KFS", mon_kfs_ls},
-	{ "kfs_run", "Create and run a program from KFS", mon_kfs_run},
+	{ "bin_ls", "List files in /bin", mon_bin_ls},
+	{ "bin_run", "Create and run a program from /bin", mon_bin_run},
 	{ "kfs_cat", "Dumps text from a file from KFS", mon_kfs_cat},
 	{ "manager", "Run the manager", mon_manager},
 	{ "procinfo", "Show information about processes", mon_procinfo},
@@ -251,36 +252,63 @@ int mon_nanwan(int argc, char **argv, trapframe_t *tf)
 	return 0;
 }
 
-int mon_kfs_ls(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
+int mon_bin_ls(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 {
-	printk("Files in KFS:\n-------------------------------\n");
-	for (int i = 0; i < MAX_KFS_FILES; i++)
-		if (kfs[i].name[0])
-			printk("%s\n", kfs[i].name);
+	struct dirent dir = {0};
+	struct file *bin_dir;
+	int retval = 0;
+
+	bin_dir = path_to_file("/bin");
+	if (!bin_dir) {
+		printk("No /bin directory!\n");
+		return 1;
+	}
+	printk("Files in KFS /bin:\n-------------------------------\n");
+	do {
+		retval = bin_dir->f_op->readdir(bin_dir, &dir);	
+		printk("%s\n", dir.d_name);
+		dir.d_off++;
+	} while (retval == 1);
+	/* TODO: (REF) need to dealloc when this hits 0, atomic/concurrent/etc */
+	atomic_dec(&bin_dir->f_refcnt);
+	assert(!bin_dir->f_refcnt);
+	bin_dir->f_op->release(bin_dir->f_inode, bin_dir);
 	return 0;
 }
 
-int mon_kfs_run(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
+int mon_bin_run(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 {
 	if (argc != 2) {
 		printk("Usage: kfs_run FILENAME\n");
 		return 1;
 	}
-	int kfs_inode = kfs_lookup_path(argv[1]);
-	if (kfs_inode < 0) {
-		printk("Bad filename!\n");
+	struct file *program;
+	int retval = 0;
+	char buf[6 + MAX_FILENAME_SZ] = "/bin/";	/* /bin/ + max + \0 */
+	strncpy(buf + 5, argv[1], MAX_FILENAME_SZ);
+	program = path_to_file(buf);
+	if (!program) {
+		printk("No such program!\n");
 		return 1;
 	}
-	struct proc *p = kfs_proc_create(kfs_inode);
-	// go from PROC_CREATED->PROC_RUNNABLE_S
-	spin_lock(&p->proc_lock); // might not be necessary for a mon function
+	/* TODO: push this into proc_create */
+	struct proc *p = proc_create(NULL, 0);
+	char* p_argv[] = {0, 0, 0};
+	char* p_envp[] = {"LD_LIBRARY_PATH=/lib",0};
+	p_argv[0] = file_name(program);
+	procinfo_pack_args(p->procinfo, p_argv, p_envp);
+	assert(load_elf(p, program) == 0);
+
+	spin_lock(&p->proc_lock);
 	__proc_set_state(p, PROC_RUNNABLE_S);
 	schedule_proc(p);
 	spin_unlock(&p->proc_lock);
-	proc_decref(p, 1); // let go of the reference created in proc_create()
-	// Should never return from schedule (env_pop in there)
-	// also note you may not get the process you created, in the event there
-	// are others floating around that are runnable
+	proc_decref(p, 1); /* let go of the reference created in proc_create() */
+	/* TODO: (REF) need to dealloc when this hits 0, atomic/concurrent/etc */
+	atomic_dec(&program->f_refcnt);
+	/* Should never return from schedule (env_pop in there) also note you may
+	 * not get the process you created, in the event there are others floating
+	 * around that are runnable */
 	schedule();
 	return 0;
 }

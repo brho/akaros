@@ -637,8 +637,13 @@ int kfs_flush(struct file *file)
 /* Called when the file refcnt == 0 */
 int kfs_release(struct inode *inode, struct file *file)
 {
+	TAILQ_REMOVE(&inode->i_sb->s_files, file, f_list);
+	/* TODO: (REF) need to dealloc when this hits 0, atomic/concurrent/etc */
+	atomic_dec(&inode->i_refcnt);
+	/* TODO: clean up the inode if it was the last and we don't want it around
+	 */
 	kmem_cache_free(file_kcache, file);
-	return -1;
+	return 0;
 }
 
 /* Flushes the file's dirty contents to disc */

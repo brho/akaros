@@ -425,8 +425,10 @@ extern struct kmem_cache *file_kcache;
 /* Misc VFS functions */
 void vfs_init(void);
 void qstr_builder(struct dentry *dentry, char *l_name);
+char *file_name(struct file *file);
 int path_lookup(char *path, int flags, struct nameidata *nd);
 void path_release(struct nameidata *nd);
+struct file *path_to_file(char *path);
 
 /* Superblock functions */
 struct super_block *get_sb(void);

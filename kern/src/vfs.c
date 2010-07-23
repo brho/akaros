@@ -125,6 +125,12 @@ void qstr_builder(struct dentry *dentry, char *l_name)
 	dentry->d_name.len = strnlen(dentry->d_name.name, MAX_FILENAME_SZ);
 }
 
+/* Useful little helper - return the string ptr for a given file */
+char *file_name(struct file *file)
+{
+	return (char*)TAILQ_FIRST(&file->f_inode->i_dentry)->d_name.name;
+}
+
 /* Some issues with this, coupled closely to fs_lookup.  This assumes that
  * negative dentries are not returned (might differ from linux) */
 static struct dentry *do_lookup(struct dentry *parent, char *name)
@@ -300,6 +306,28 @@ void path_release(struct nameidata *nd)
 	/* TODO: (REF), do something when we hit 0, etc... */
 	atomic_dec(&nd->dentry->d_refcnt);
 	atomic_dec(&nd->mnt->mnt_refcnt);
+}
+
+/* Seems convenient: Given a path, return the appropriate file.  The reference
+ * returned is refcounted (which is done by open()). */
+struct file *path_to_file(char *path)
+{
+	struct file *f = 0;
+	struct nameidata nd = {0};
+	if (path_lookup(path, 0, &nd))
+		return 0;
+	f = kmem_cache_alloc(file_kcache, 0);
+	if (!f) {
+		path_release(&nd);
+		return 0;
+	}
+	if (nd.dentry->d_inode->i_fop->open(nd.dentry->d_inode, f)) {
+		path_release(&nd);
+		kmem_cache_free(file_kcache, f);
+		return 0;
+	}
+	path_release(&nd);
+	return f;
 }
 
 /* Superblock functions */
