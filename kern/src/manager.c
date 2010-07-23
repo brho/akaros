@@ -104,7 +104,7 @@ void manager_brho(void)
 			/* 124 is half of the available boxboro colors (with the kernel
 			 * getting 8) */
 			//quick_proc_color_run("msr_dumb_while", p, 124);
-			quick_proc_run("mhello", p);
+			//quick_proc_run("mhello", p);
 			#if 0
 			// this is how you can transition to a parallel process manually
 			// make sure you don't proc run first
@@ -183,7 +183,8 @@ void manager_klueska()
 
 	if (progress == 0) {
 		progress++;
-		envs[0] = kfs_proc_create(kfs_lookup_path("fillmeup"));
+		panic("what do you want to do?");
+		//envs[0] = kfs_proc_create(kfs_lookup_path("fillmeup"));
 		__proc_set_state(envs[0], PROC_RUNNABLE_S);
 		proc_run(envs[0]);
 	}
@@ -231,7 +232,8 @@ void manager_pearce()
 
 	if (progress == 0) {
 		progress++;
-		envs[0] = kfs_proc_create(kfs_lookup_path("parlib_httpserver_integrated"));
+		panic("what do you want to do?");
+		//envs[0] = kfs_proc_create(kfs_lookup_path("parlib_httpserver_integrated"));
 		//envs[0] = kfs_proc_create(kfs_lookup_path("parlib_lock_test"));
 		__proc_set_state(envs[0], PROC_RUNNABLE_S);
 		proc_run(envs[0]);

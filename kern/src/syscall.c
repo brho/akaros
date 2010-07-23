@@ -218,12 +218,15 @@ static int sys_proc_create(struct proc *p, const char *DANGEROUS path)
 	 * would be required.
 	 */
 	int ret = user_mem_strlcpy(p,tpath, path, MAX_PATH_LEN, PTE_USER_RO);
+	return 0;
+#if 0
 	int kfs_inode = kfs_lookup_path(tpath);
 	if (kfs_inode < 0)
 		return -EINVAL;
 	struct proc *new_p = kfs_proc_create(kfs_inode);
 	pid = new_p->pid;
 	proc_decref(new_p, 1); // let go of the reference created in proc_create()
+#endif
 	return pid;
 }
 

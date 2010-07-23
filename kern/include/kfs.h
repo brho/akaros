@@ -4,18 +4,14 @@
  *
  * KFS (Kernel File System)
  *
- * This gives runtime access to the binary blobs (usually userspace programs)
- * linked at the end of the kernel.  Extremely rudimentary.
- * Also allows for process creation from file (can consider moving this).
- *
- * Add the files you want in KFS in kfs.c. */
+ * This is a cheap FS that is based off of a CPIO archive appended to the end of
+ * the kernel binary image. */
 
 #ifndef ROS_KERN_KFS_H
 #define ROS_KERN_KFS_H
 
 #include <ros/common.h>
 #include <vfs.h>
-#include <process.h>
 
 /* Every FS must extern it's type, and be included in vfs_init() */
 extern struct fs_type kfs_fs_type;
@@ -27,19 +23,5 @@ struct kfs_i_info {
 	void					*filestart;		/* or our file location */
 	size_t					init_size;		/* file size on the backing store */
 };
-
-/* Old KFS below here */
-struct kfs_entry {
-	char (NT name)[256];
-	uint8_t *COUNT(size) start;
-	size_t size;
-};
-
-#define MAX_KFS_FILES 64
-extern struct kfs_entry (RO kfs)[MAX_KFS_FILES];
-
-ssize_t kfs_lookup_path(char*NTS path);
-struct proc *kfs_proc_create(int kfs_inode);
-void kfs_cat(int kfs_inode);
 
 #endif /* !ROS_KERN_KFS_H */

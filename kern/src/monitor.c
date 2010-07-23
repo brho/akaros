@@ -51,7 +51,6 @@ static command_t (RO commands)[] = {
 	{ "nanwan", "Meet Nanwan!!", mon_nanwan},
 	{ "bin_ls", "List files in /bin", mon_bin_ls},
 	{ "bin_run", "Create and run a program from /bin", mon_bin_run},
-	{ "kfs_cat", "Dumps text from a file from KFS", mon_kfs_cat},
 	{ "manager", "Run the manager", mon_manager},
 	{ "procinfo", "Show information about processes", mon_procinfo},
 	{ "exit", "Leave the monitor", mon_exit},
@@ -263,7 +262,7 @@ int mon_bin_ls(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 		printk("No /bin directory!\n");
 		return 1;
 	}
-	printk("Files in KFS /bin:\n-------------------------------\n");
+	printk("Files in /bin:\n-------------------------------\n");
 	do {
 		retval = bin_dir->f_op->readdir(bin_dir, &dir);	
 		printk("%s\n", dir.d_name);
@@ -310,21 +309,6 @@ int mon_bin_run(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 	 * not get the process you created, in the event there are others floating
 	 * around that are runnable */
 	schedule();
-	return 0;
-}
-
-int mon_kfs_cat(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
-{
-	if (argc != 2) {
-		printk("Usage: kfs_cat FILENAME\n");
-		return 1;
-	}
-	int kfs_inode = kfs_lookup_path(argv[1]);
-	if (kfs_inode < 0) {
-		printk("Bad filename!\n");
-		return 1;
-	}
-	kfs_cat(kfs_inode);
 	return 0;
 }
 
