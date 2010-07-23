@@ -258,9 +258,9 @@ void print_vmrs(struct proc *p)
 	struct vm_region *vmr;
 	printk("VM Regions for proc %d\n", p->pid);
 	TAILQ_FOREACH(vmr, &p->vm_regions, vm_link)
-		printk("%02d: (0x%08x - 0x%08x): %08p, %08p, %08p\n", count++,
+		printk("%02d: (0x%08x - 0x%08x): %08p, %08p, %08p, %08p\n", count++,
 		       vmr->vm_base, vmr->vm_end, vmr->vm_prot, vmr->vm_flags,
-		       vmr->vm_file);
+		       vmr->vm_file, vmr->vm_foff);
 }
 
 
@@ -542,6 +542,15 @@ int __handle_page_fault(struct proc* p, uintptr_t va, int prot)
 		retval = file_load_page(vmr->vm_file, f_idx, &a_page);
 		if (retval)
 			return retval;
+		/* If we want a private map that is writable, we'll preemptively give
+		 * you a new page.  In the future, we want to CoW this, but the kernel
+		 * needs to be able to handle its own page faults first. */
+		if ((vmr->vm_flags |= MAP_PRIVATE) && (vmr->vm_prot |= PROT_WRITE)) {
+			struct page *cache_page = a_page;
+			if (upage_alloc(p, &a_page, FALSE))
+				return -ENOMEM;
+			memcpy(page2kva(a_page), page2kva(cache_page), PGSIZE);
+		}
 		/* if this is an executable page, we might have to flush the instruction
 		 * cache if our HW requires it. */
 		if (vmr->vm_prot & PROT_EXEC)
