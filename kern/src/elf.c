@@ -24,11 +24,17 @@ load_one_elf(struct proc* p, struct file* f, int pgoffset, elf_info_t* ei)
 	ei->phdr = -1;
 	ei->dynamic = 0;
 	ei->highest_addr = 0;
+	off_t f_off = 0;
+	physaddr_t old_cr3 = rcr3();
+
+	/* Load the proc's address space, in case we need to directly write to its
+	 * pages (like when we zero some of the BSS) */
+	lcr3(p->env_cr3);
 
 	// assume program headers fit in a page.
 	// if this isn't true, change the code below that maps in program headers
 	char* elf = (char*)kmalloc(PGSIZE,0);
-	if(!elf || file_read_page(f,PADDR(elf),0) == -1)
+	if(!elf || f->f_op->read(f, elf, PGSIZE, &f_off) == -1)
 		goto fail;
 
 	elf_t* elfhdr = (elf_t*)elf;
@@ -73,17 +79,24 @@ load_one_elf(struct proc* p, struct file* f, int pgoffset, elf_info_t* ei)
 			if(memend > ei->highest_addr)
 				ei->highest_addr = memend;
 
-			// mmap will zero the rest of the page if filesz % PGSIZE != 0
-			if(filesz)
-				// TODO: waterman, figure out proper permissions
-				if(do_mmap(p, memstart+pgoffset*PGSIZE, filesz,
-				           PROT_READ|PROT_WRITE|PROT_EXEC, MAP_FIXED,
-				           f, filestart/PGSIZE) == MAP_FAILED)
+			/* This needs to be a PRIVATE mapping, and the stuff after the file
+			 * needs to be zeroed. */
+			if (filesz) {
+				/* TODO: figure out proper permissions from the elf */
+				if (do_mmap(p, memstart + pgoffset * PGSIZE, filesz,
+				           PROT_READ|PROT_WRITE|PROT_EXEC, MAP_FIXED|MAP_PRIVATE,
+				           f, filestart) == MAP_FAILED)
 					goto fail;
-
-			filesz = ROUNDUP(filesz,PGSIZE);
-			if(filesz < memsz)
-				if(do_mmap(p, memstart+filesz+pgoffset*PGSIZE, memsz-filesz,
+				/* Due to elf-ghetto-ness, we need to zero the first part of the
+				 * BSS from the last page of the data segment */
+				uintptr_t z_s = memstart + pgoffset * PGSIZE + filesz;
+				uintptr_t z_e = ROUNDUP(z_s, PGSIZE);
+				memset((void*)z_s, 0, z_e - z_s);
+				filesz = ROUNDUP(filesz, PGSIZE);
+			}
+			/* Any extra pages are mapped anonymously... (a bit weird) */
+			if (filesz < memsz)
+				if (do_mmap(p, memstart + filesz + pgoffset*PGSIZE, memsz-filesz,
 				           PROT_READ|PROT_WRITE|PROT_EXEC, MAP_FIXED|MAP_ANON,
 				           NULL, 0) == MAP_FAILED)
 					goto fail;
@@ -94,7 +107,8 @@ load_one_elf(struct proc* p, struct file* f, int pgoffset, elf_info_t* ei)
 	// useful for TLS in static programs.
 	if(ei->phdr == -1)
 	{
-		void* phdr_addr = do_mmap(p, 0, PGSIZE, PROT_READ, 0, f, 0);
+		void *phdr_addr = do_mmap(p, MMAP_LOWEST_VA, PGSIZE, PROT_READ, 0, f,
+		                          0);
 		if(phdr_addr == MAP_FAILED)
 			goto fail;
 		ei->phdr = (long)phdr_addr + elfhdr->e_phoff;
@@ -106,6 +120,7 @@ load_one_elf(struct proc* p, struct file* f, int pgoffset, elf_info_t* ei)
 	ret = 0;
 fail:
 	kfree(elf);
+	lcr3(old_cr3);
 	return ret;
 }
 
@@ -117,7 +132,9 @@ int load_elf(struct proc* p, struct file* f)
 
 	if(ei.dynamic)
 	{
+		warn("Convert me to use the filesystem!");
 		struct file* interp = file_open(ei.interp,0,0);
+		/* this will probably conflict with the mmap from the TLS up above */
 		if(interp == NULL || load_one_elf(p,interp,1,&interp_ei))
 			return -1;
 		file_decref(interp);
