@@ -48,7 +48,7 @@ int radix_insert(struct radix_tree *tree, unsigned long key, void *item)
 	void **slot;
 	/* Is the tree tall enough?  if not, it needs to grow a level.  This will
 	 * also create the initial node (upper bound starts at 0). */
-	if (key >= tree->upper_bound) {
+	while (key >= tree->upper_bound) {
 		r_node = kmem_cache_alloc(radix_kcache, 0);
 		if (!r_node)
 			return -ENOMEM;
@@ -141,8 +141,11 @@ static struct radix_node *__radix_lookup_node(struct radix_tree *tree,
 {
 	unsigned long idx;
 	struct radix_node *child_node, *r_node = tree->root;
-	if (key	>= tree->upper_bound)
+	if (key	>= tree->upper_bound) {
+		if (extend)
+			warn("Bound (%d) not set for key %d!\n", tree->upper_bound, key);
 		return 0;
+	}
 	for (int i = tree->depth; i > 1; i--) {	 /* i = ..., 4, 3, 2 */
 		idx = (key >> (LOG_RNODE_SLOTS * (i - 1))) & (NR_RNODE_SLOTS - 1);
 		/* There might not be a node at this part of the tree */
