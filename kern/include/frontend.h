@@ -24,14 +24,6 @@ int32_t frontend_syscall(pid_t pid, int32_t syscall_num,
 int frontend_syscall_errno(struct proc* p, int n, int a0, 
                            int a1, int a2, int a3);
 
-void* user_memdup(struct proc* p, const void* va, int len);
-void* user_memdup_errno(struct proc* p, const void* va, int len);
-void user_memdup_free(struct proc* p, void* va);
-char* user_strdup(struct proc* p, const char* va0, int max);
-char* user_strdup_errno(struct proc* p, const char* va, int max);
-int memcpy_to_user_errno(struct proc* p, void* dst, const void* src, int len);
-void* kmalloc_errno(int len);
-
 void file_init(void);
 error_t file_read_page(struct file* f, physaddr_t pa, size_t pgoff);
 struct file* file_open(const char* path, int oflag, int mode);

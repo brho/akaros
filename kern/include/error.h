@@ -7,6 +7,10 @@
 
 typedef int error_t;
 
+#define ERR_PTR(err)  ((void *)((uintptr_t)(err)))
+#define PTR_ERR(ptr)  ((uintptr_t)(ptr))
+#define IS_ERR(ptr)   ((uintptr_t)-(uintptr_t)(ptr) < 512)
+
 /* The special format for printk %e takes an integer
  * error code and prints a string describing the error.
  * The integer may be positive or negative,

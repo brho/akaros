@@ -7,10 +7,6 @@
 #include <ros/syscall.h>
 #include <process.h>
 
-#define ERR_PTR(err)  ((void *)((uintptr_t)(err)))
-#define PTR_ERR(ptr)  ((uintptr_t)(ptr))
-#define IS_ERR(ptr)   ((uintptr_t)-(uintptr_t)(ptr) < 512)
-
 #define SYSTRACE_ON					0x01
 #define SYSTRACE_LOUD				0x02
 #define SYSTRACE_ALLPROC			0x04
