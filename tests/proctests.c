@@ -11,10 +11,11 @@ int main(int argc, char** argv)
 	/* first instance.  this is ghetto, since it relies on being the first proc
 	 * ever.  fix this when we can pass arguments.  (TODO) */
 	#define NUM_KIDS 5
+	#define FILENAME "/bin/proctests"
 	int child_pid[NUM_KIDS];
 	if (pid == 0x1000) {
 		for (int i = 0; i < NUM_KIDS; i++)
-			child_pid[i] = sys_proc_create("roslib_proctests");
+			child_pid[i] = sys_proc_create(FILENAME, strlen(FILENAME), 0, 0);
 		for (int i = 0; i < NUM_KIDS; i++) {
 			printf("U: attempting to spawn yielders (pid: %d)\n", child_pid[i]);
 			sys_proc_run(child_pid[i]);

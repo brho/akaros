@@ -196,19 +196,44 @@ static pid_t sys_getpid(struct proc *p)
 /* Creates a process from the file 'path'.  The process is not runnable by
  * default, so it needs it's status to be changed so that the next call to
  * schedule() will try to run it.  TODO: take args/envs from userspace. */
-static int sys_proc_create(struct proc *p, const char *DANGEROUS path)
+static int sys_proc_create(struct proc *p, char *path, size_t path_l,
+                           struct procinfo *pi)
 {
 	int pid = 0;
-	char t_path[MAX_PATH_LEN];
+	char *t_path;
 	struct file *program;
 	struct proc *new_p;
 
-	/* Copy in.  TODO: make syscalls come with a length */
-	user_mem_strlcpy(p, t_path, path, MAX_PATH_LEN, PTE_USER_RO);
+	/* Copy in the path.  Consider putting an upper bound. */
+	t_path = kmalloc(path_l, 0);
+	if (!t_path) {
+		set_errno(current_tf, ENOMEM);
+		return -1;
+	}
+	if (memcpy_from_user(p, t_path, path, path_l)) {
+		kfree(t_path);
+		set_errno(current_tf, EINVAL);
+		return -1;
+	}
 	program = path_to_file(t_path);
+	kfree(t_path);
 	if (!program)
 		return -1;			/* presumably, errno is already set */
 	new_p = proc_create(program, 0, 0);
+	/* Set the argument stuff needed by glibc */
+	if (memcpy_from_user(p, new_p->procinfo->argp, pi->argp, sizeof(pi->argp))){
+		atomic_dec(&program->f_refcnt);	/* TODO: REF */
+		proc_destroy(new_p);
+		set_errno(current_tf, EINVAL);
+		return -1;
+	}
+	if (memcpy_from_user(p, new_p->procinfo->argbuf, pi->argbuf,
+	                     sizeof(pi->argbuf))) {
+		atomic_dec(&program->f_refcnt);	/* TODO: REF */
+		proc_destroy(new_p);
+		set_errno(current_tf, EINVAL);
+		return -1;
+	}
 	pid = new_p->pid;
 	proc_decref(new_p, 1);	/* give up the reference created in proc_create() */
 	atomic_dec(&program->f_refcnt);		/* TODO: REF / KREF */
@@ -360,46 +385,61 @@ static ssize_t sys_fork(env_t* e)
 	return env->pid;
 }
 
-intreg_t sys_exec(struct proc* p, int fd, procinfo_t* pi)
+/* Load the binary "path" into the current process, and start executing it.
+ * argv and envp are magically bundled in procinfo for now.  Keep in sync with
+ * glibc's sysdeps/ros/execve.c */
+static int sys_exec(struct proc *p, char *path, size_t path_l,
+                    struct procinfo *pi)
 {
+	int ret = -1;
+	char *t_path;
+	struct file *program;
+
+	/* We probably want it to never be allowed to exec if it ever was _M */
 	if(p->state != PROC_RUNNING_S)
 		return -1;
-
-	int ret = -1;
-	struct file* f = file_open_from_fd(p,fd);
-	if(f == NULL) {
-		set_errno(current_tf, EBADF);
-		goto out;
+	/* Copy in the path.  Consider putting an upper bound. */
+	t_path = kmalloc(path_l, 0);
+	if (!t_path) {
+		set_errno(current_tf, ENOMEM);
+		return -1;
 	}
-
-	// Set the argument stuff needed by glibc
-	if(memcpy_from_user(p,p->procinfo->argp,pi->argp,sizeof(pi->argp))) {
-		proc_destroy(p);
-		goto out;
+	if (memcpy_from_user(p, t_path, path, path_l)) {
+		kfree(t_path);
+		set_errno(current_tf, EINVAL);
+		return -1;
 	}
-	if(memcpy_from_user(p,p->procinfo->argbuf,pi->argbuf,sizeof(pi->argbuf))) {
-		proc_destroy(p);
-		goto out;
+	program = path_to_file(t_path);
+	kfree(t_path);
+	if (!program)
+		return -1;			/* presumably, errno is already set */
+	/* Set the argument stuff needed by glibc */
+	if (memcpy_from_user(p, p->procinfo->argp, pi->argp, sizeof(pi->argp))) {
+		atomic_dec(&program->f_refcnt);	/* TODO: REF */
+		set_errno(current_tf, EINVAL);
+		return -1;
 	}
-
-	// TODO: don't do this either (PC)
+	if (memcpy_from_user(p, p->procinfo->argbuf, pi->argbuf,
+	                     sizeof(pi->argbuf))) {
+		atomic_dec(&program->f_refcnt);	/* TODO: REF */
+		set_errno(current_tf, EINVAL);
+		return -1;
+	}
+	/* This is the point of no return for the process. */
+	/* TODO: issues with this: Need to also assert there are no outstanding
+	 * users of the sysrings.  the ldt page will get freed shortly, so that's
+	 * okay.  Potentially issues with the nm and vcpd if we were in _M before
+	 * and someone is trying to notify. */
 	memset(p->procdata, 0, sizeof(procdata_t));
-
-	env_user_mem_free(p,0,USTACKTOP);
-
-	if(load_elf(p,f))
-	{
+	env_user_mem_free(p, 0, UMAPTOP);
+	if (load_elf(p, program)) {
 		proc_destroy(p);
-		goto out;
+		smp_idle();		/* syscall can't return on failure now */
 	}
-	file_decref(f);
+	printk("[PID %d] exec %s\n", p->pid, file_name(program));
+	atomic_dec(&program->f_refcnt);		/* TODO: (REF) / KREF */
 	*current_tf = p->env_tf;
-	ret = 0;
-
-	printd("[PID %d] exec fd %d\n",p->pid,fd);
-
-out:
-	return ret;
+	return 0;
 }
 
 static ssize_t sys_trywait(env_t* e, pid_t pid, int* status)

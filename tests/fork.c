@@ -14,6 +14,8 @@ int main(int argc, char** argv)
 		waitpid(pid, &status, 0);
 	} else {
 		printf("Hello world from child!!\n");
+		printf("Child trying to exec Hello...\n");
+		execv("/bin/hello", argv);
 	}
 	return 0;
 }

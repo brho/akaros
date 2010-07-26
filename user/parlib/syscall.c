@@ -96,9 +96,14 @@ void sys_yield(bool being_nice)
 	ros_syscall(SYS_yield, being_nice, 0, 0, 0, 0);
 }
 
-int sys_proc_create(char* path)
+int sys_proc_create(char *path, size_t path_l, char *argv[], char *envp[])
 {
-	return ros_syscall(SYS_proc_create, (uintreg_t)path, 0, 0, 0, 0);
+	struct procinfo pi;
+	if (procinfo_pack_args(&pi, argv, envp)) {
+		errno = ENOMEM;
+		return -1;
+	}
+	return ros_syscall(SYS_proc_create, path, path_l, &pi, 0, 0);
 }
 
 int sys_proc_run(int pid)

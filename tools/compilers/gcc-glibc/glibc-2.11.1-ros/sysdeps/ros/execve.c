@@ -41,19 +41,10 @@ __execve (path, argv, envp)
     return -1;
   }
 
-  int fd = __libc_open(path,O_RDONLY);
-  if(fd == -1)
-		return -1; // errno already set by open
-
-  int ret = ros_syscall(SYS_exec,fd,(uintptr_t)&pi,0,0,0);
+  int ret = ros_syscall(SYS_exec, path, strlen(path), (uintptr_t)&pi, 0, 0);
 
   // if we got here, then exec better have failed...
   assert(ret == -1);
-
-  // close the file, but keep exec's errno
-  int exec_errno = errno;
-  close(fd);
-  errno = exec_errno;
 
   return ret;
 }

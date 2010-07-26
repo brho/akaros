@@ -4,6 +4,7 @@
 
 int main(int argc, char** argv)
 {
+	#define FILENAME "/bin/hello"
 	#if 0
 	/* try some bad combos */
 	int pid = sys_proc_create("garbagexxx");
@@ -29,10 +30,10 @@ int main(int argc, char** argv)
 	}
 	#endif
 	printf("U: attempting to create and run hello\n");
-	child_pid[0] = sys_proc_create("/bin/hello");
+	child_pid[0] = sys_proc_create(FILENAME, strlen(FILENAME), 0, 0);
 	sys_proc_run(child_pid[0]);
 	printf("U: attempting to create and run another hello\n");
-	child_pid[1] = sys_proc_create("/bin/hello");
+	child_pid[1] = sys_proc_create(FILENAME, strlen(FILENAME), 0, 0);
 	sys_proc_run(child_pid[1]);
 	return 0;
 }
