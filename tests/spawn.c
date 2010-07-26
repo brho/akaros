@@ -2,7 +2,7 @@
 #include <rstdio.h>
 #include <parlib.h>
 
-int main(int argc, char** argv)
+int main(int argc, char **argv, char **envp)
 {
 	#define FILENAME "/bin/hello"
 	#if 0
@@ -36,6 +36,7 @@ int main(int argc, char** argv)
 	else
 		if (sys_proc_run(child_pid[0]) < 0)
 			perror("");
+	#if 0
 	printf("U: attempting to create and run another hello\n");
 	child_pid[1] = sys_proc_create(FILENAME, strlen(FILENAME), 0, 0);
 	if (child_pid[1] <= 0)
@@ -43,5 +44,6 @@ int main(int argc, char** argv)
 	else
 		if (sys_proc_run(child_pid[1]) < 0)
 			perror("");
+	#endif
 	return 0;
 }

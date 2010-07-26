@@ -23,6 +23,7 @@ int memcpy_from_user(struct proc *p, void *dest, const void *DANGEROUS va,
 int memcpy_to_user(struct proc *p, void *DANGEROUS va, const void *src,
                    size_t len);
 /* Same as above, but sets errno */
+int memcpy_from_user_errno(struct proc *p, void *dst, const void *src, int len);
 int memcpy_to_user_errno(struct proc *p, void *dst, const void *src, int len);
                  
 /* Creates a buffer (kmalloc) and safely copies into it from va.  Can return an

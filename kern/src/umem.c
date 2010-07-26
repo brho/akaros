@@ -186,6 +186,16 @@ int memcpy_from_user(struct proc *p, void *dest, const void *DANGEROUS va,
 	return 0;
 }
 
+/* Same as above, but sets errno */
+int memcpy_from_user_errno(struct proc *p, void *dst, const void *src, int len)
+{
+	if (memcpy_from_user(p, dst, src, len)) {
+		set_errno(current_tf, EINVAL);
+		return -1;
+	}
+	return 0;
+}
+
 /**
  * @brief Copies data to a user buffer from a kernel buffer.
  * 
@@ -240,6 +250,7 @@ int memcpy_to_user(struct proc *p, void *va, const void *src, size_t len)
 	return 0;
 }
 
+/* Same as above, but sets errno */
 int memcpy_to_user_errno(struct proc *p, void *dst, const void *src, int len)
 {
 	if (memcpy_to_user(p, dst, src, len)) {

@@ -206,33 +206,33 @@ static int sys_proc_create(struct proc *p, char *path, size_t path_l,
 	struct proc *new_p;
 
 	/* Copy in the path.  Consider putting an upper bound. */
-	t_path = kmalloc(path_l, 0);
-	if (!t_path) {
-		set_errno(current_tf, ENOMEM);
+	t_path = user_strdup_errno(p, path, path_l);
+	if (IS_ERR(t_path))
 		return -1;
-	}
-	if (memcpy_from_user(p, t_path, path, path_l)) {
-		kfree(t_path);
-		set_errno(current_tf, EINVAL);
-		return -1;
-	}
 	program = path_to_file(t_path);
-	kfree(t_path);
+	user_memdup_free(p, t_path);
 	if (!program)
 		return -1;			/* presumably, errno is already set */
-	new_p = proc_create(program, 0, 0);
+	/* TODO: need to split the proc creation, since you must load after setting
+	 * args/env, since auxp gets set up there. */
+	//new_p = proc_create(program, 0, 0);
+	if (proc_alloc(&new_p, current))
+		return -1;
 	/* Set the argument stuff needed by glibc */
-	if (memcpy_from_user(p, new_p->procinfo->argp, pi->argp, sizeof(pi->argp))){
+	if (memcpy_from_user_errno(p, new_p->procinfo->argp, pi->argp,
+	                           sizeof(pi->argp))) {
 		atomic_dec(&program->f_refcnt);	/* TODO: REF */
 		proc_destroy(new_p);
-		set_errno(current_tf, EINVAL);
 		return -1;
 	}
-	if (memcpy_from_user(p, new_p->procinfo->argbuf, pi->argbuf,
-	                     sizeof(pi->argbuf))) {
+	if (memcpy_from_user_errno(p, new_p->procinfo->argbuf, pi->argbuf,
+	                           sizeof(pi->argbuf))) {
 		atomic_dec(&program->f_refcnt);	/* TODO: REF */
 		proc_destroy(new_p);
-		set_errno(current_tf, EINVAL);
+		return -1;
+	}
+	if (load_elf(new_p, program)) {
+		proc_destroy(new_p);
 		return -1;
 	}
 	pid = new_p->pid;
@@ -400,30 +400,22 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	if(p->state != PROC_RUNNING_S)
 		return -1;
 	/* Copy in the path.  Consider putting an upper bound. */
-	t_path = kmalloc(path_l, 0);
-	if (!t_path) {
-		set_errno(current_tf, ENOMEM);
+	t_path = user_strdup_errno(p, path, path_l);
+	if (IS_ERR(t_path))
 		return -1;
-	}
-	if (memcpy_from_user(p, t_path, path, path_l)) {
-		kfree(t_path);
-		set_errno(current_tf, EINVAL);
-		return -1;
-	}
 	program = path_to_file(t_path);
-	kfree(t_path);
+	user_memdup_free(p, t_path);
 	if (!program)
 		return -1;			/* presumably, errno is already set */
 	/* Set the argument stuff needed by glibc */
-	if (memcpy_from_user(p, p->procinfo->argp, pi->argp, sizeof(pi->argp))) {
+	if (memcpy_from_user_errno(p, p->procinfo->argp, pi->argp,
+	                           sizeof(pi->argp))) {
 		atomic_dec(&program->f_refcnt);	/* TODO: REF */
-		set_errno(current_tf, EINVAL);
 		return -1;
 	}
-	if (memcpy_from_user(p, p->procinfo->argbuf, pi->argbuf,
-	                     sizeof(pi->argbuf))) {
+	if (memcpy_from_user_errno(p, p->procinfo->argbuf, pi->argbuf,
+	                           sizeof(pi->argbuf))) {
 		atomic_dec(&program->f_refcnt);	/* TODO: REF */
-		set_errno(current_tf, EINVAL);
 		return -1;
 	}
 	/* This is the point of no return for the process. */
