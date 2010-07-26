@@ -132,12 +132,12 @@ int load_elf(struct proc* p, struct file* f)
 
 	if(ei.dynamic)
 	{
-		warn("Convert me to use the filesystem!");
-		struct file* interp = file_open(ei.interp,0,0);
+		/* this won't work til we convert some more syscalls to use the FS */
+		struct file *interp = path_to_file(ei.interp);
 		/* this will probably conflict with the mmap from the TLS up above */
-		if(interp == NULL || load_one_elf(p,interp,1,&interp_ei))
+		if (interp == NULL || load_one_elf(p, interp, 2, &interp_ei))
 			return -1;
-		file_decref(interp);
+		atomic_dec(&interp->f_refcnt);	/* TODO: REF */
 	}
 
 	// fill in auxiliary info for dynamic linker/runtime
