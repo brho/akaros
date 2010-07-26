@@ -437,7 +437,7 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 		proc_destroy(p);
 		smp_idle();		/* syscall can't return on failure now */
 	}
-	printk("[PID %d] exec %s\n", p->pid, file_name(program));
+	printd("[PID %d] exec %s\n", p->pid, file_name(program));
 	atomic_dec(&program->f_refcnt);		/* TODO: (REF) / KREF */
 	*current_tf = p->env_tf;
 	return 0;

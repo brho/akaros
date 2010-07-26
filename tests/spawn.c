@@ -31,9 +31,17 @@ int main(int argc, char** argv)
 	#endif
 	printf("U: attempting to create and run hello\n");
 	child_pid[0] = sys_proc_create(FILENAME, strlen(FILENAME), 0, 0);
-	sys_proc_run(child_pid[0]);
+	if (child_pid[0] <= 0)
+		perror("");
+	else
+		if (sys_proc_run(child_pid[0]) < 0)
+			perror("");
 	printf("U: attempting to create and run another hello\n");
 	child_pid[1] = sys_proc_create(FILENAME, strlen(FILENAME), 0, 0);
-	sys_proc_run(child_pid[1]);
+	if (child_pid[1] <= 0)
+		perror("");
+	else
+		if (sys_proc_run(child_pid[1]) < 0)
+			perror("");
 	return 0;
 }

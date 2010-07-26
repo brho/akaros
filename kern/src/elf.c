@@ -34,8 +34,14 @@ load_one_elf(struct proc* p, struct file* f, int pgoffset, elf_info_t* ei)
 	// assume program headers fit in a page.
 	// if this isn't true, change the code below that maps in program headers
 	char* elf = (char*)kmalloc(PGSIZE,0);
+	
+	/* When reading on behalf of the kernel, we need to make sure no proc is
+	 * "current".  This is a bit ghetto (TODO: KFOP) */
+	struct proc *cur_proc = current;
+	current = 0;
 	if(!elf || f->f_op->read(f, elf, PGSIZE, &f_off) == -1)
 		goto fail;
+	current = cur_proc;
 
 	elf_t* elfhdr = (elf_t*)elf;
 	proghdr_t* proghdrs = (proghdr_t*)(elf+elfhdr->e_phoff);
