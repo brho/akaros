@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include <smp.h>
+#include <umem.h>
 #include <pmap.h>
 
 #ifdef __SHARC__

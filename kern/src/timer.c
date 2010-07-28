@@ -11,7 +11,6 @@
 #include <schedule.h>
 #include <multiboot.h>
 #include <pmap.h>
-#include <arch/perfmon.h>
 
 /* timing_overhead
  * Any user space process that links to this file will get its own copy.  

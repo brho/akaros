@@ -64,7 +64,7 @@ void page_alloc_init()
 
 	// mark [0, physaddr_after_kernel) as in-use
 	for(i = 0; i < LA2PPN(physaddr_after_kernel); i++)
-		pages[i].pg_refcnt = 1;
+		atomic_init(&pages[i].pg_refcnt, 1);
 
 	// mark [physaddr_after_kernel, maxaddrpa) as free
 	for(i = LA2PPN(physaddr_after_kernel); i < LA2PPN(maxaddrpa); i++)
@@ -79,5 +79,5 @@ void page_alloc_init()
 
 	// mark [maxaddrpa, ...) as in-use (as they are invalid)
 	for(i = LA2PPN(maxaddrpa); i < npages; i++)
-		pages[i].pg_refcnt = 1;
+		atomic_init(&pages[i].pg_refcnt, 1);
 }

@@ -1,6 +1,7 @@
 #include <arch/sparcfpu.h>
 #include <arch/arch.h>
 #include <arch/trap.h>
+#include <umem.h>
 #include <pmap.h>
 
 static inline uint32_t* effective_address(trapframe_t* state, uint32_t insn)

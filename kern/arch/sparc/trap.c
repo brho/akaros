@@ -11,6 +11,7 @@
 #include <slab.h>
 #include <mm.h>
 #include <ros/mman.h>
+#include <umem.h>
 #include <pmap.h>
 
 #ifdef __SHARC__
