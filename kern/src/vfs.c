@@ -107,11 +107,6 @@ void vfs_init(void)
 	default_ns.root = mount_fs(&kfs_fs_type, "RAM", NULL, 0, &default_ns);
 
 	printk("vfs_init() completed\n");
-	/*
-	put structs and friends in struct proc, and init in proc init
-	*/
-	// LOOKUP: follow_mount, follow_link, etc
-	// pains in the ass for having .. or . in the middle of the path
 }
 
 /* Builds / populates the qstr of a dentry based on its d_iname.  If there is an
@@ -248,11 +243,16 @@ static int link_path_walk(char *path, struct nameidata *nd)
 		link = next_slash + 1;
 	}
 	/* now, we're on the last link of the path */
-	/* if we just want the parent, leave now.  linux does some stuff with saving
-	 * the name of the link (last) and the type (last_type), which we'll do once
-	 * i see the need for it. */
-	if (nd->flags & LOOKUP_PARENT)
+	/* if we just want the parent, leave now.  and save the name of the link
+	 * (last) and the type (last_type).  Note that using the qstr in this manner
+	 * only allows us to use the qstr as long as the path is a valid string. */
+	if (nd->flags & LOOKUP_PARENT) {
+		/* consider using a slimmer qstr_builder for this */
+		nd->last.name = link;
+		nd->last.len = strlen(link);
+		nd->last.hash = nd->dentry->d_op->d_hash(nd->dentry, &nd->last);
 		return 0;
+	}
 	/* deal with some weird cases with . and .. (completely untested) */
 	if (!strcmp(".", link))
 		return 0;
@@ -272,8 +272,11 @@ static int link_path_walk(char *path, struct nameidata *nd)
 }
 
 /* Given path, return the inode for the final dentry.  The ND should be
- * initialized for the first call - specifically, we need the intent and
- * potentially a LOOKUP_PARENT.
+ * initialized for the first call - specifically, we need the intent. 
+ * LOOKUP_PARENT and friends go in this flags var.
+ *
+ * TODO: this should consider the intent.  Note that creating requires writing
+ * to the last directory.
  *
  * Need to be careful too.  While the path has been copied-in to the kernel,
  * it's still user input.  */
@@ -310,7 +313,8 @@ void path_release(struct nameidata *nd)
 }
 
 /* Seems convenient: Given a path, return the appropriate file.  The reference
- * returned is refcounted (which is done by open()). */
+ * returned is refcounted (which is done by open()).  TODO: make sure the called
+ * functions do error checking and propagate errno. */
 struct file *path_to_file(char *path)
 {
 	struct file *f = 0;
@@ -397,7 +401,10 @@ void init_sb(struct super_block *sb, struct vfsmount *vmnt,
 
 /* Dentry Functions */
 
-/* Helper to alloc and initialize a generic dentry.
+/* Helper to alloc and initialize a generic dentry.  The following needs to be
+ * set still: d_op, d_fs_info (opt), d_inode, connect the inode to the dentry
+ * (and up the d_refcnt), maybe dcache_put().  The FS related things need to be
+ * done in fs_create and fs_mkdir.
  *
  * If the name is longer than the inline name, it will kmalloc a buffer, so
  * don't worry about the storage for *name after calling this. */
@@ -440,10 +447,23 @@ struct dentry *get_dentry(struct super_block *sb, struct dentry *parent,
 /* Adds a dentry to the dcache. */
 void dcache_put(struct dentry *dentry)
 {
-	// TODO: prob should do something with the dentry flags
+	/* TODO: should set a d_flag too */
 	spin_lock(&dcache_lock);
 	SLIST_INSERT_HEAD(&dcache, dentry, d_hash);
 	spin_unlock(&dcache_lock);
+}
+
+/* Free the dentry (after ref == 0 and we no longer want it).  Pairs with
+ * get_dentry(), mostly. */
+void free_dentry(struct dentry *dentry)
+{
+	/* Might not have a d_op, if it was involved in a failed operation */
+	if (dentry->d_op && dentry->d_op->d_release)
+		dentry->d_op->d_release(dentry);
+	/* TODO: check/test the boundaries on this. */
+	if (dentry->d_name.len > DNAME_INLINE_LEN)
+		kfree((void*)dentry->d_name.name);
+	kmem_cache_free(dentry_kcache, dentry);
 }
 
 /* Inode Functions */
@@ -555,6 +575,94 @@ ssize_t generic_file_write(struct file *file, const char *buf, size_t count,
 	assert(buf == buf_end);
 	*offset += count;
 	return count;
+}
+
+/* Opens the file, using permissions from current for lack of a better option.
+ * Called by sys_open.  This will return 0 on failure, and set errno.
+ * There's a lot of stuff that we don't do, esp related to permission checking
+ * and file truncating.
+ * TODO: open and create should set errno and propagate it up. */
+struct file *do_file_open(char *path, int flags, int mode)
+{
+	struct file *file = 0;
+	struct dentry *file_d;
+	struct inode *parent_i;
+	struct nameidata nd_r = {0}, *nd = &nd_r;
+	int lookup_flags = LOOKUP_PARENT;
+	int error = 0;
+
+	/* lookup the parent */
+	nd->intent = flags & (O_RDONLY|O_WRONLY|O_RDWR);
+	if (flags & O_CREAT)
+		lookup_flags |= LOOKUP_CREATE;
+	error = path_lookup(path, lookup_flags, nd);
+	if (error) {
+		set_errno(current_tf, -error);
+		return 0;
+	}
+	/* see if the target is there, handle accordingly */
+	file_d = do_lookup(nd->dentry, nd->last.name); 
+	if (!file_d) {
+		if (!(flags & O_CREAT)) {
+			path_release(nd);
+			set_errno(current_tf, EACCES);
+			return 0;
+		}
+		/* Create the inode/file.  get a fresh dentry too: */
+		file_d = get_dentry(nd->dentry->d_sb, nd->dentry, nd->last.name);
+		parent_i = nd->dentry->d_inode;
+		/* TODO: mode should be & ~umask.  Note that mode only applies to future
+		 * opens. */
+		if (parent_i->i_op->create(parent_i, file_d, mode, nd)) {
+			atomic_dec(&file_d->d_refcnt);
+			free_dentry(file_d); /* TODO: REF trigger off a decref */
+			set_errno(current_tf, EFAULT);
+			path_release(nd);
+			return 0;
+		}
+		/* when we have notions of users, do something here: */
+		file_d->d_inode->i_uid = 0;
+		file_d->d_inode->i_gid = 0;
+		file_d->d_inode->i_flags = flags & ~(O_CREAT|O_TRUNC|O_EXCL|O_NOCTTY);
+		dcache_put(file_d);
+		atomic_dec(&file_d->d_refcnt);	/* TODO: REF / KREF */
+	} else {	/* the file exists */
+		if ((flags & O_CREAT) && (flags & O_EXCL)) {
+			/* wanted to create, not open */
+			path_release(nd);
+			set_errno(current_tf, EACCES);
+			return 0;
+		}
+	}
+	/* now open the file (freshly created or if it already existed) */
+	file = kmem_cache_alloc(file_kcache, 0);
+	if (!file) {
+		set_errno(current_tf, ENOMEM);
+		path_release(nd);
+		return 0;
+	}
+	if (flags & O_TRUNC)
+		warn("File truncation not supported yet.");
+	if (file_d->d_inode->i_fop->open(file_d->d_inode, file)) {
+		set_errno(current_tf, ENOENT);
+		path_release(nd);
+		kmem_cache_free(file_kcache, file);
+		return 0;
+	}
+	/* TODO: check the inode's mode (S_XXX) against the flags O_RDWR */
+	/* f_mode stores how the FILE is open, regardless of the mode */
+	file->f_mode = flags & (O_RDONLY|O_WRONLY|O_RDWR);
+	path_release(nd);
+	return file;
+}
+
+/* Closes a file, fsync, whatever else is necessary */
+int do_file_close(struct file *file)
+{
+	assert(!file->f_refcnt);
+	/* TODO: fsync */
+	file->f_op->release(file->f_inode, file);
+	return 0;
 }
 
 /* Page cache functions */
@@ -702,24 +810,28 @@ struct file *get_file_from_fd(struct files_struct *open_files, int file_desc)
  * hasn't been thought through yet. */
 struct file *put_file_from_fd(struct files_struct *open_files, int file_desc)
 {
-	struct file *f = 0;
+	struct file *file = 0;
 	spin_lock(&open_files->lock);
 	if (file_desc < open_files->max_fdset) {
 		if (GET_BITMASK_BIT(open_files->open_fds->fds_bits, file_desc)) {
 			/* while max_files and max_fdset might not line up, we should never
 			 * have a valid fdset higher than files */
 			assert(file_desc < open_files->max_files);
-			f = open_files->fd[file_desc];
+			file = open_files->fd[file_desc];
 			open_files->fd[file_desc] = 0;
+			CLR_BITMASK_BIT(open_files->open_fds->fds_bits, file_desc);
 			/* TODO: (REF) need to make sure we free if we hit 0 (might do this
 			 * in the caller */
-			if (f)
-				atomic_dec(&f->f_refcnt);
-			// if 0, drop, decref from higher, sync, whatever
+			if (file) {
+				atomic_dec(&file->f_refcnt);
+				if (!file->f_refcnt)
+					assert(!do_file_close(file));
+			}
+			/* the if case is due to files (stdin) without a *file yet */
 		}
 	}
 	spin_unlock(&open_files->lock);
-	return f;
+	return file;
 }
 
 /* Inserts the file in the files_struct, returning the corresponding new file
@@ -744,4 +856,30 @@ int insert_file(struct files_struct *open_files, struct file *file)
 		warn("Ran out of file descriptors, deal with me!");
 	spin_unlock(&open_files->lock);
 	return slot;
+}
+
+/* Closes all open files.  Sort of a "put" plus do_file_close(), for all. */
+void close_all_files(struct files_struct *open_files)
+{
+	struct file *file;
+	spin_lock(&open_files->lock);
+	for (int i = 0; i < open_files->max_fdset; i++) {
+		if (GET_BITMASK_BIT(open_files->open_fds->fds_bits, i)) {
+			/* while max_files and max_fdset might not line up, we should never
+			 * have a valid fdset higher than files */
+			assert(i < open_files->max_files);
+			file = open_files->fd[i];
+			open_files->fd[i] = 0;
+			/* TODO: we may want to parallelize the blocking... */
+			if (file) {
+				/* TODO: REF/KREF */
+				atomic_dec(&file->f_refcnt);
+				if (!file->f_refcnt)
+					do_file_close(file);
+			}
+			/* the if case is due to files (stdin) without a *file yet */
+			CLR_BITMASK_BIT(open_files->open_fds->fds_bits, i);
+		}
+	}
+	spin_unlock(&open_files->lock);
 }

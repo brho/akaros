@@ -75,11 +75,12 @@ TAILQ_HEAD(event_poll_tailq, event_poll);
 TAILQ_HEAD(vfsmount_tailq, vfsmount);
 TAILQ_HEAD(fs_type_tailq, fs_type);
 
-/* Linux's quickstring - saves recomputing the hash and length. */
+/* Linux's quickstring - saves recomputing the hash and length.  Note the length
+ * is the non-null-terminated length, as you'd get from strlen(). (for now) */
 struct qstr {
     unsigned int hash;
     unsigned int len;
-    const char *name;
+    char *name;
 };
 
 /* Helpful structure to pass around during lookup operations.  At each point,
@@ -110,6 +111,24 @@ struct nameidata {
 #define LOOKUP_OPEN 		0x10	/* intent is to open a file */
 #define LOOKUP_CREATE 		0x11	/* create a file if it doesn't exist */
 #define LOOKUP_ACCESS 		0x12	/* access / check user permissions */
+
+/* TODO: make our own versions (fucking octal) and put it in fcntl.h */
+/* File access modes for `open' and `fcntl'.  */
+#define O_RDONLY    0   /* Open read-only.  */
+#define O_WRONLY    1   /* Open write-only.  */
+#define O_RDWR      2   /* Open read/write.  */
+#define O_ACCMODE   3
+
+/* Bits OR'd into the second argument to open.  */
+#define O_CREAT        0100 /* not fcntl */
+#define O_EXCL         0200 /* not fcntl */
+#define O_NOCTTY       0400 /* not fcntl */
+#define O_TRUNC       01000 /* not fcntl */
+#define O_APPEND      02000
+#define O_NONBLOCK    04000
+#define O_SYNC       010000
+#define O_FSYNC      O_SYNC
+#define O_ASYNC      020000
 
 /* Every object that has pages, like an inode or the swap (or even direct block
  * devices) has a page_map, tracking which of its pages are currently in memory.
@@ -204,11 +223,11 @@ struct inode {
 	gid_t						i_gid;
 	kdev_t						i_rdev;			/* real device node */
 	size_t						i_size;
+	unsigned long				i_blksize;
+	unsigned long				i_blocks;		/* filesize in blocks */
 	struct timespec				i_atime;
 	struct timespec				i_mtime;
 	struct timespec				i_ctime;
-	unsigned long				i_blksize;
-	unsigned long				i_blocks;		/* filesize in blocks */
 	spinlock_t					i_lock;
 	struct inode_operations		*i_op;
 	struct file_operations		*i_fop;
@@ -300,8 +319,8 @@ struct file {
 	struct vfsmount				*f_vfsmnt;
 	struct file_operations		*f_op;
 	atomic_t					f_refcnt;
-	unsigned int				f_flags;
-	int							f_mode;
+	unsigned int				f_flags;		/* O_APPEND, etc */
+	int							f_mode;			/* O_RDONLY, etc */
 	off_t						f_pos;			/* offset / file pointer */
 	unsigned int				f_uid;
 	unsigned int				f_gid;
@@ -440,6 +459,7 @@ void init_sb(struct super_block *sb, struct vfsmount *vmnt,
 struct dentry *get_dentry(struct super_block *sb, struct dentry *parent,
                           char *name);
 void dcache_put(struct dentry *dentry);
+void free_dentry(struct dentry *dentry);
 
 /* Inode Functions */
 int check_perms(struct inode *inode, int access_mode);
@@ -449,6 +469,8 @@ ssize_t generic_file_read(struct file *file, char *buf, size_t count,
                           off_t *offset);
 ssize_t generic_file_write(struct file *file, const char *buf, size_t count,
                            off_t *offset);
+struct file *do_file_open(char *path, int flags, int mode);
+int do_file_close(struct file *file);
 
 /* Page cache functions */
 struct page *pm_find_page(struct page_map *pm, unsigned long index);
@@ -460,5 +482,6 @@ int file_load_page(struct file *file, unsigned long index, struct page **pp);
 struct file *get_file_from_fd(struct files_struct *open_files, int fd);
 struct file *put_file_from_fd(struct files_struct *open_files, int file_desc);
 int insert_file(struct files_struct *open_files, struct file *file);
+void close_all_files(struct files_struct *open_files);
 
 #endif /* ROS_KERN_VFS_H */

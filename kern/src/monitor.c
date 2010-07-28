@@ -18,7 +18,6 @@
 #include <pmap.h>
 #include <kdebug.h>
 #include <testing.h>
-#include <kfs.h>
 #include <manager.h>
 #include <schedule.h>
 #include <resource.h>
@@ -59,6 +58,7 @@ static command_t (RO commands)[] = {
 	{ "measure", "Run a specific measurement", mon_measure},
 	{ "trace", "Run a specific measurement", mon_trace},
 	{ "monitor", "Run the monitor on another core", mon_monitor},
+	{ "fs", "Filesystem Diagnostics", mon_fs},
 };
 #define NCOMMANDS (sizeof(commands)/sizeof(commands[0]))
 
@@ -278,7 +278,7 @@ int mon_bin_ls(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 int mon_bin_run(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 {
 	if (argc != 2) {
-		printk("Usage: kfs_run FILENAME\n");
+		printk("Usage: bin_run FILENAME\n");
 		return 1;
 	}
 	struct file *program;
@@ -761,4 +761,32 @@ void monitor(trapframe_t *tf) {
 				break;
 		}
 	}
+}
+
+int mon_fs(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
+{
+	/* this assumes one mounted FS at the NS root */
+	struct super_block *sb = default_ns.root->mnt_root->d_inode->i_sb;
+	struct file *i;
+	if (argc < 2) {
+		printk("Usage: fs OPTION\n");
+		printk("\topen: show all open files\n");
+		printk("\tpid: proc PID's fs crap placeholder\n");
+		return 1;
+	}
+	if (!strcmp(argv[1], "open")) {
+		printk("Open Files:\n----------------------------\n");
+		TAILQ_FOREACH(i, &sb->s_files, f_list)
+			printk("File: %08p, %s, Refs: %d\n", i, file_name(i), i->f_refcnt);
+	} else if (!strcmp(argv[1], "pid")) {
+		if (argc != 3) {
+			printk("Give me a pid number.\n");
+			return 1;
+		}
+		/* whatever.  placeholder. */
+	} else {
+		printk("Bad option\n");
+		return 1;
+	}
+	return 0;
 }

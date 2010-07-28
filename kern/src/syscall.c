@@ -372,6 +372,8 @@ static ssize_t sys_fork(env_t* e)
 		set_errno(current_tf,ENOMEM);
 		return -1;
 	}
+	
+	/* TODO: copy all open files, except O_CLOEXEC */
 
 	__proc_set_state(env, PROC_RUNNABLE_S);
 	schedule_proc(env);
@@ -851,23 +853,42 @@ intreg_t sys_pread(struct proc* p, int fd, void* buf, int len, int offset)
 	return ret;
 }
 
-intreg_t sys_open(struct proc* p, const char* path, int oflag, int mode)
+/* Checks args/reads in the path, opens the file, and inserts it into the
+ * process's open file list. 
+ *
+ * TODO: take the path length */
+intreg_t sys_open(struct proc *p, const char *path, int oflag, int mode)
 {
-	printd("File Open, p: %p, path: %s, oflag: %d, mode: 0x%x\n", p, path, oflag, mode);
-	char* fn = user_strdup_errno(p,path,PGSIZE);
-	if(fn == NULL) {
-		printd("File Open, user_strdup_errno failed\n");
+	int fd = 0;
+	struct file *file;
+
+	char *t_path = user_strdup_errno(p, path, PGSIZE);
+	if (t_path == NULL)
+		return -1;
+	file = do_file_open(t_path, oflag, mode);
+	user_memdup_free(p, t_path);
+	if (!file)
+		return -1;
+	fd = insert_file(&p->open_files, file);	/* stores the ref to file */
+	atomic_dec(&file->f_refcnt);	/* TODO: REF / KREF */
+	if (fd < 0) {
+		warn("File insertion failed");
 		return -1;
 	}
-	printd("File Open, About to open\n");
-	int ret = ufe(open,PADDR(fn),oflag,mode,0);
-	printd("File Open, res=%d\n", ret);
-	user_memdup_free(p,fn);
-	return ret;
+	printd("File Open, res=%d\n", fd);
+	return fd;
 }
-intreg_t sys_close(struct proc* p, int fd)
+
+intreg_t sys_close(struct proc *p, int fd)
 {
-	return ufe(close,fd,0,0,0);
+	struct file *file = put_file_from_fd(&p->open_files, fd);
+	if (!file) {
+		set_errno(current_tf, EBADF);
+		return -1;
+	}
+	/* TEMP TEST */
+	assert(!file->f_refcnt);
+	return 0;
 }
 
 #define NEWLIB_STAT_SIZE 64

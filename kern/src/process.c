@@ -312,6 +312,7 @@ error_t proc_alloc(struct proc **pp, struct proc *parent)
 	atomic_inc(&p->fs_env.root->d_refcnt);
 	p->fs_env.pwd = parent ? parent->fs_env.pwd : p->fs_env.root;
 	atomic_inc(&p->fs_env.pwd->d_refcnt);
+	memset(&p->open_files, 0, sizeof(p->open_files));	/* slightly ghetto */
 	spinlock_init(&p->open_files.lock);
 	p->open_files.max_files = NR_OPEN_FILES_DEFAULT;
 	p->open_files.max_fdset = NR_FILE_DESC_DEFAULT;
@@ -356,16 +357,16 @@ static void __proc_free(struct proc *p)
 	// All parts of the kernel should have decref'd before __proc_free is called
 	assert(p->env_refcnt == 0);
 
-	frontend_proc_free(p);
-
-	// Free any colors allocated to this process
+	close_all_files(&p->open_files);
+	frontend_proc_free(p);	/* TODO: please remove me one day */
+	/* Free any colors allocated to this process */
 	if(p->cache_colors_map != global_cache_colors_map) {
 		for(int i=0; i<llc_cache->num_colors; i++)
 			cache_color_free(llc_cache, p->cache_colors_map);
 		cache_colors_map_free(p->cache_colors_map);
 	}
 
-	// Flush all mapped pages in the user portion of the address space
+	/* Flush all mapped pages in the user portion of the address space */
 	env_user_mem_free(p, 0, UVPT);
 	/* These need to be free again, since they were allocated with a refcnt. */
 	free_cont_pages(p->procinfo, LOG2_UP(PROCINFO_NUM_PAGES));
@@ -1530,6 +1531,15 @@ void print_proc_info(pid_t pid)
 	for (int i = 0; i < MAX_NUM_RESOURCES; i++)
 		printk("\tRes type: %02d, amt wanted: %08d, amt granted: %08d\n", i,
 		       p->resources[i].amt_wanted, p->resources[i].amt_granted);
+	printk("Open Files:\n");
+	struct files_struct *files = &p->open_files;
+	spin_lock(&files->lock);
+	for (int i = 0; i < files->max_files; i++)
+		if (files->fd_array[i]) {
+			printk("\tFD: %02d, File: %08p, File name: %s\n", i,
+			       files->fd_array[i], file_name(files->fd_array[i]));
+		}
+	spin_unlock(&files->lock);
 	/* No one cares, and it clutters the terminal */
 	//printk("Vcore 0's Last Trapframe:\n");
 	//print_trapframe(&p->env_tf);

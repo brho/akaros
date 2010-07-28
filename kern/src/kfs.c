@@ -144,7 +144,8 @@ int kfs_readpage(struct file *file, struct page *page)
 
 /* creates and initializes a new inode.  generic fields are filled in.  specific
  * fields are filled in in read_inode() based on what's on the disk for a given
- * i_no.  i_no is set by the caller. */
+ * i_no.  i_no is set by the caller.  Note that this means this inode can be for
+ * an inode that is already on disk, or it can be used when creating. */
 struct inode *kfs_alloc_inode(struct super_block *sb)
 {
 	/* arguably, we can avoid some of this init by using the slab/cache */
@@ -294,16 +295,22 @@ struct inode *kfs_create_generic(struct inode *dir, struct dentry *dentry,
 	struct inode *inode = kfs_alloc_inode(dentry->d_sb);
 	dentry->d_inode = inode;		/* inode ref stored here */
 	TAILQ_INSERT_TAIL(&inode->i_dentry, dentry, d_alias); /* stored dentry ref*/
+	atomic_inc(&dentry->d_refcnt);	/* TODO: REF/KREF */
+	/* Need to finish the dentry */
+	dentry->d_op = &kfs_d_op;
+	dentry->d_fs_info = 0;
 	inode->i_mode = mode;
 	inode->i_ino = kfs_get_free_ino();
 	inode->i_nlink = 1;
+	inode->i_size = 0;
+	inode->i_blocks = 0;
 	inode->i_atime.tv_sec = 0;		/* TODO: now! */
 	inode->i_ctime.tv_sec = 0;		/* TODO: now! */
 	inode->i_mtime.tv_sec = 0;		/* TODO: now! */
 	inode->i_atime.tv_nsec = 0;		/* are these supposed to be the extra ns? */
 	inode->i_ctime.tv_nsec = 0;
 	inode->i_mtime.tv_nsec = 0;
-	inode->i_flags = 0;;
+	inode->i_bdev = inode->i_sb->s_bdev;
 	return inode;
 }
 
@@ -371,10 +378,7 @@ struct dentry *kfs_lookup(struct inode *dir, struct dentry *dentry,
 	/* no match, consider caching the negative result, freeing the
 	 * dentry, etc */
 	printd("Not Found %s!!\n", dentry->d_name.name);
-	/* TODO: Cache, negatively... */
-	//dcache_put(dentry); 			/* TODO: should set a d_flag too */
-	/* if we're not caching it, we should free it */
-	kmem_cache_free(dentry_kcache, dentry);
+	free_dentry(dentry);
 	return 0;
 }
 
@@ -505,9 +509,6 @@ int kfs_d_delete(struct dentry *dentry)
 /* Called when it's about to be slab-freed */
 int kfs_d_release(struct dentry *dentry)
 {
-	/* TODO: check the boundaries on this. */
-	if (dentry->d_name.len > DNAME_INLINE_LEN)
-		kfree((void*)dentry->d_name.name);
 	return -1;
 }
 
@@ -799,9 +800,9 @@ static int __add_kfs_entry(struct dentry *parent, char *path,
 		       parent->d_name.name, c_bhdr->c_filestart, c_bhdr->c_filesize);
 		/* Init the dentry for this path */
 		dentry = get_dentry(parent->d_sb, parent, path);
-		dentry->d_op = &kfs_d_op;
 		dcache_put(dentry); 			/* TODO: should set a d_flag too */
 		/* build the inode */
+		/* XXX: note we use an unrefcnt'd inode here (grabbing the dentry's) */
 		if (!c_bhdr->c_filesize) {
 			/* we are a directory.  Note that fifos might look like dirs... */
 			kfs_mkdir(parent->d_inode, dentry, c_bhdr->c_mode);
