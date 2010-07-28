@@ -28,6 +28,8 @@ static inline void atomic_set(atomic_t* number, int32_t val);
 static inline void atomic_add(atomic_t* number, int32_t inc);
 static inline void atomic_inc(atomic_t* number);
 static inline void atomic_dec(atomic_t* number);
+static inline long atomic_fetch_and_add(atomic_t *number, long val);
+static inline bool atomic_sub_and_test(atomic_t *number, long val);
 static inline uint32_t atomic_swap(uint32_t* addr, uint32_t val);
 static inline bool atomic_comp_swap(uint32_t *addr, uint32_t exp_val,
                                     uint32_t new_val);
@@ -53,15 +55,7 @@ static inline int32_t atomic_read(atomic_t* number)
 
 static inline void atomic_add(atomic_t* number, int32_t inc)
 {
-	// this is pretty clever.  the lower 8 bits (i.e byte 3)
-	// of the atomic_t serve as a spinlock.  let's acquire it.
-	{ TRUSTEDBLOCK spin_lock((spinlock_t*)number); }
-
-	// compute new counter value.
-	inc += atomic_read(number);
-
-	// set the new counter value.  the lock is cleared (for free)
-	atomic_init(number,inc);
+	atomic_fetch_and_add(number, inc);
 }
 
 static inline void atomic_set(atomic_t* number, int32_t val)
@@ -79,6 +73,31 @@ static inline void atomic_inc(atomic_t* number)
 static inline void atomic_dec(atomic_t* number)
 {
 	atomic_add(number,-1);
+}
+
+/* Adds val to number, returning number's original value */
+static inline long atomic_fetch_and_add(atomic_t *number, long val)
+{
+	long retval;
+	/* this is pretty clever.  the lower 8 bits (i.e byte 3)
+	 * of the atomic_t serve as a spinlock.  let's acquire it. */
+	spin_lock((spinlock_t*)number);
+	retval = atomic_read(number);
+	/* compute new counter value. */
+	val += retval;
+	/* set the new counter value.  the lock is cleared (for free) */
+	atomic_init(number, val);
+	return retval;
+}
+
+/* Subtraces val from number, returning True if the new value is 0. */
+static inline bool atomic_sub_and_test(atomic_t *number, long val)
+{
+	long retval = atomic_fetch_and_add(number, -val);
+	if (retval)
+		return FALSE;
+	else
+		return TRUE;
 }
 
 static inline uint32_t atomic_swap(uint32_t* addr, uint32_t val)

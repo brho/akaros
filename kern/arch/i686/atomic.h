@@ -20,8 +20,11 @@ typedef struct spinlock RACY spinlock_t;
 static inline void atomic_init(atomic_t *number, int32_t val);
 static inline int32_t atomic_read(atomic_t *number);
 static inline void atomic_set(atomic_t *number, int32_t val);
+static inline void atomic_add(atomic_t* number, long val);
 static inline void atomic_inc(atomic_t *number);
 static inline void atomic_dec(atomic_t *number);
+static inline long atomic_fetch_and_add(atomic_t *number, long val);
+static inline bool atomic_sub_and_test(atomic_t *number, long val);
 static inline uint32_t atomic_swap(uint32_t *addr, uint32_t val);
 static inline bool atomic_comp_swap(uint32_t *addr, uint32_t exp_val,
                                     uint32_t new_val);
@@ -52,6 +55,11 @@ static inline void atomic_set(atomic_t *number, int32_t val)
 	asm volatile("movl %1,%0" : "=m"(*number) : "r"(val));
 }
 
+static inline void atomic_add(atomic_t* number, long val)
+{
+	asm volatile("lock addl %1,%0" : "=m"(*number) : "r"(val));
+}
+
 // need to do this with pointers and deref.  %0 needs to be the memory address
 static inline void atomic_inc(atomic_t *number)
 {
@@ -63,6 +71,25 @@ static inline void atomic_dec(atomic_t *number)
 	// for instance, this doesn't work:
 	//asm volatile("lock decl (%0)" : "=r"(number) : : "cc");
 	asm volatile("lock decl %0" : "=m"(*number) : : "cc");
+}
+
+/* Adds val to number, returning number's original value */
+static inline long atomic_fetch_and_add(atomic_t *number, long val)
+{
+	asm volatile("lock xadd %0,%1" : "=r"(val), "=m"(*number)
+	                               : "0"(val), "m"(*number)
+	                               : "cc" );
+	return val;
+}
+
+/* Subtraces val from number, returning True if the new value is 0. */
+static inline bool atomic_sub_and_test(atomic_t *number, long val)
+{
+	bool b;
+	asm volatile("lock sub %2,%1; setz %0" : "=r"(b), "=m"(*number)
+	                                       : "r"(val), "m"(*number)
+	                                       : "cc" );
+	return b;
 }
 
 static inline uint32_t atomic_swap(uint32_t *addr, uint32_t val)
