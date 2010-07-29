@@ -66,6 +66,6 @@ void __abandon_core(void)
 {
 	asm volatile ("movw %%ax,%%gs; lldt %%ax" :: "a"(0));
 	lcr3(boot_cr3);
-	proc_decref(current, 1);
+	kref_put(&current->kref);
 	set_current_proc(NULL);
 }

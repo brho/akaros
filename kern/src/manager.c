@@ -64,7 +64,7 @@ void manager(void)
 	__proc_set_state((p), PROC_RUNNABLE_S);                                      \
 	spin_unlock(&(p)->proc_lock);                                                \
 	proc_run((p));                                                               \
-	proc_decref((p), 1);
+	kref_put(&(p)->kref);
 
 #define quick_proc_create(x, p, f)                                               \
 	(f) = path_to_file((x));                                                     \
@@ -87,7 +87,7 @@ void manager(void)
 	for (int i = 0; i < (c); i++)                                                \
 		cache_color_alloc(llc_cache, p->cache_colors_map);                       \
 	proc_run((p));                                                               \
-	proc_decref((p), 1);
+	kref_put(&(p)->kref);
 
 #define quick_proc_color_create(x, p, c, f)                                      \
 	(f) = path_to_file((x));                                                     \

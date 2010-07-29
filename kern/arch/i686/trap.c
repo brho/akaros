@@ -193,12 +193,12 @@ trap_dispatch(trapframe_t *tf)
 			assert(tf->tf_cs != GD_KT);
 
 			// syscall code wants an edible reference for current
-			proc_incref(current, 1);
+			kref_get(&current->kref, 1);
 			tf->tf_regs.reg_eax =
 				syscall(current, tf->tf_regs.reg_eax, tf->tf_regs.reg_edx,
 				        tf->tf_regs.reg_ecx, tf->tf_regs.reg_ebx,
 				        tf->tf_regs.reg_edi, tf->tf_regs.reg_esi);
-			proc_decref(current, 1);
+			kref_put(&current->kref);
 			break;
 		default:
 			// Unexpected trap: The user process or the kernel has a bug.
@@ -207,7 +207,7 @@ trap_dispatch(trapframe_t *tf)
 				panic("Damn Damn!  Unhandled trap in the kernel!");
 			else {
 				warn("Unexpected trap from userspace");
-				proc_incref(current, 1);
+				kref_get(&current->kref, 1);
 				proc_destroy(current);
 				return;
 			}
@@ -352,7 +352,7 @@ page_fault_handler(trapframe_t *tf)
 		cprintf("[%08x] user fault va %08x ip %08x from core %d\n",
 		        current->pid, fault_va, tf->tf_eip, core_id());
 		print_trapframe(tf);
-		proc_incref(current, 1);
+		kref_get(&current->kref, 1);
 		proc_destroy(current);
 	}
 }
@@ -371,7 +371,7 @@ void sysenter_callwrapper(struct trapframe *tf)
 		set_current_tf(tf);
 
 	// syscall code wants an edible reference for current
-	proc_incref(current, 1);
+	kref_get(&current->kref, 1);
 	tf->tf_regs.reg_eax = (intreg_t) syscall(current,
 	                                         tf->tf_regs.reg_eax,
 	                                         tf->tf_regs.reg_esi,
@@ -379,7 +379,7 @@ void sysenter_callwrapper(struct trapframe *tf)
 	                                         tf->tf_regs.reg_ebx,
 	                                         tf->tf_regs.reg_edi,
 	                                         0);
-	proc_decref(current, 1);
+	kref_put(&current->kref);
 	/*
 	 * careful here - we need to make sure that this current is the right
 	 * process, which could be weird if the syscall blocked.  it would need to

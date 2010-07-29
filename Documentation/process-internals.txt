@@ -20,23 +20,21 @@ Contents:
 ===========================
 1.1 Basics:
 ---------------------------
-Reference counts (proc_refcnt) exist to keep a process alive.  Eventually, this
-will probably turn into a regular "kernel design pattern", like it is in Linux
-(http://lwn.net/Articles/336224/).  The style of reference counting we use for
-processes is similar to a kref:
+Reference counts exist to keep a process alive.  We use krefs for this, similar
+to Linux's kref:
 - Can only incref if the current value is greater than 0, meaning there is
   already a reference to it.  It is a bug to try to incref on something that has
   no references, so always make sure you incref something that you know has a
-  reference.  If you don't know, you need to get it manually (CAREFULLY!) or use
-  pid2proc (which is a careful way of doing this).  If you incref and there are
-  0 references, the kernel will panic.  Fix your bug / don't incref random
-  pointers.
+  reference.  If you don't know, you need to get it from pid2proc (which is a
+  careful way of doing this).  pid2proc kref_get()s on the reference that is
+  stored inside it.  If you incref and there are 0 references, the kernel will
+  panic.  Fix your bug / don't incref random pointers.
 - Can always decref.
 - When the decref returns 0, perform some operation.  This does some final
   cleanup on the object.
-
-For a process, proc_destroy() decrefs, and other codes using the proc also
-decref.  The last one to decref calls proc_free to do the final cleanup.
+- Process code is trickier since we frequently make references from 'current'
+  (which isn't too bad), but also because we often do not return and need to be
+  careful about the references we passed in to a no-return function.
 
 1.2 Brief History of the Refcnt:
 ---------------------------
@@ -60,7 +58,12 @@ protected by a refcnt.
 ---------------------------
 +1 for existing.
 - The fact that the process is supposed to exist is worth +1.  When it is time
-  to die, we decref, and it will eventually be cleaned up.
+  to die, we decref, and it will eventually be cleaned up.  This existence is
+  based on it's presence in the hash table, which is a stored reference.
+- The hash table is a bit tricky.  We need to kref_get() when it is locked, so
+  we know we have a valid kref to get.  We don't need to lock the list to
+  kref_put the process, since once it is removed from the hash, we now own that
+  reference.  
 
 +1 for someone using it or planning to use it.
 - This includes simply having a pointer to the proc, since presumably you will

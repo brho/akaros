@@ -282,7 +282,7 @@ unhandled_trap(trapframe_t* state)
 		spin_unlock(&screwup_lock);
 
 		assert(current);
-		proc_incref(current, 1);
+		kref_get(&current->kref, 1);
 		proc_destroy(current);
 
 		panic("I shouldn't have gotten here!");
@@ -423,9 +423,9 @@ handle_syscall(trapframe_t* state)
 	set_current_tf(state);
 
 	// syscall code wants an edible reference for current
-	proc_incref(current, 1);
+	kref_get(&current->kref, 1);
 	state->gpr[8] = syscall(current,num,a1,a2,a3,a4,a5);
-	proc_decref(current, 1);
+	kref_put(&current->kref);
 
 	proc_restartcore(current,state);
 }

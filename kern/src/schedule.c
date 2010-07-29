@@ -32,8 +32,8 @@ void schedule_init(void)
 
 void schedule_proc(struct proc *p)
 {
-	p->env_refcnt++; // TODO (REF) (usually is called while locked)
-	//proc_incref(p, 1); /* up the refcnt since we are storing the reference */
+	/* up the refcnt since we are storing the reference */
+	kref_get(&p->kref, 1);
 	spin_lock_irqsave(&runnablelist_lock);
 	printd("Scheduling PID: %d\n", p->pid);
 	TAILQ_INSERT_TAIL(&proc_runnablelist, p, proc_link);
@@ -44,15 +44,15 @@ void schedule_proc(struct proc *p)
 /* TODO: race here.  it's possible that p was already removed from the
  * list (by schedule()), while proc_destroy is trying to remove it from the
  * list.  schedule()'s proc_run() won't actually run it (since it's DYING), but
- * this code will probably fuck up. */
+ * this code will probably fuck up.  Having TAILQ_REMOVE not hurt will help. */
 void deschedule_proc(struct proc *p)
 {
 	spin_lock_irqsave(&runnablelist_lock);
 	printd("Descheduling PID: %d\n", p->pid);
 	TAILQ_REMOVE(&proc_runnablelist, p, proc_link);
 	spin_unlock_irqsave(&runnablelist_lock);
-	p->env_refcnt--; // TODO (REF) (usually is called while locked)
-	//proc_decref(p, 1); /* down the refcnt, since its no longer stored */
+	/* down the refcnt, since its no longer stored */
+	kref_put(&p->kref);
 	return;
 }
 
@@ -73,7 +73,7 @@ void schedule(void)
 		printd("PID of proc i'm running: %d\n", p->pid);
 		/* proc_run will either eat the ref, or we'll decref manually. */
 		proc_run(p);
-		proc_decref(p, 1);
+		kref_put(&p->kref);
 	} else {
 		spin_unlock_irqsave(&runnablelist_lock);
 		/* while this is problematic, we really don't have anything to

@@ -49,6 +49,6 @@ void proc_set_syscall_retval(trapframe_t *SAFE tf, intreg_t value)
 void __abandon_core(void)
 {
 	lcr3(boot_cr3);
-	proc_decref(current, 1);
+	kref_put(&current->kref);
 	set_current_proc(NULL);
 }

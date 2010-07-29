@@ -236,7 +236,7 @@ static int sys_proc_create(struct proc *p, char *path, size_t path_l,
 		return -1;
 	}
 	pid = new_p->pid;
-	proc_decref(new_p, 1);	/* give up the reference created in proc_create() */
+	kref_put(&new_p->kref);	/* give up the reference created in proc_create() */
 	atomic_dec(&program->f_refcnt);		/* TODO: REF / KREF */
 	return pid;
 }
@@ -253,17 +253,17 @@ static error_t sys_proc_run(struct proc *p, unsigned pid)
 	spin_lock(&p->proc_lock);
 	// make sure we have access and it's in the right state to be activated
 	if (!proc_controls(p, target)) {
-		proc_decref(target, 1);
+		kref_put(&target->kref);
 		retval = -EPERM;
 	} else if (target->state != PROC_CREATED) {
-		proc_decref(target, 1);
+		kref_put(&target->kref);
 		retval = -EINVAL;
 	} else {
 		__proc_set_state(target, PROC_RUNNABLE_S);
 		schedule_proc(target);
 	}
 	spin_unlock(&p->proc_lock);
-	proc_decref(target, 1);
+	kref_put(&target->kref);
 	return retval;
 }
 
@@ -281,20 +281,20 @@ static error_t sys_proc_destroy(struct proc *p, pid_t pid, int exitcode)
 		return -1;
 	}
 	if (!proc_controls(p, p_to_die)) {
-		proc_decref(p_to_die, 1);
+		kref_put(&p_to_die->kref);
 		set_errno(current_tf, EPERM);
 		return -1;
 	}
 	if (p_to_die == p) {
 		// syscall code and pid2proc both have edible references, only need 1.
 		p->exitcode = exitcode;
-		proc_decref(p, 1);
+		kref_put(&p_to_die->kref);
 		printd("[PID %d] proc exiting gracefully (code %d)\n", p->pid,exitcode);
 	} else {
 		printd("[%d] destroying proc %d\n", p->pid, p_to_die->pid);
 	}
 	proc_destroy(p_to_die);
-	proc_decref(p_to_die, 1);
+	kref_put(&p_to_die->kref);
 	return ESUCCESS;
 }
 
@@ -368,7 +368,7 @@ static ssize_t sys_fork(env_t* e)
 	/* for now, just copy the contents of every present page in the entire
 	 * address space. */
 	if (env_user_mem_walk(e, 0, UMAPTOP, &copy_page, env)) {
-		proc_decref(env,2);
+		proc_destroy(env);	/* this is prob what you want, not decref by 2 */
 		set_errno(current_tf,ENOMEM);
 		return -1;
 	}
@@ -473,7 +473,9 @@ static ssize_t sys_trywait(env_t* e, pid_t pid, int* status)
 		}
 
 		// if the wait succeeded, decref twice
-		proc_decref(p,1 + (ret == 0));
+		if (ret == 0)
+			kref_put(&p->kref);
+		kref_put(&p->kref);
 		return ret;
 	}
 
@@ -552,7 +554,7 @@ static ssize_t sys_shared_page_alloc(env_t* p1,
 	page_t* page;
 	error_t e = upage_alloc(p1, &page,1);
 	if (e < 0) {
-		proc_decref(p2, 1);
+		kref_put(&p2->kref);
 		return e;
 	}
 
@@ -560,7 +562,7 @@ static ssize_t sys_shared_page_alloc(env_t* p1,
 	                (void*SNT)UTEXT, (void*SNT)UTOP, p2_flags);
 	if (p2_addr == NULL) {
 		page_free(page);
-		proc_decref(p2, 1);
+		kref_put(&p2->kref);
 		return -EFAIL;
 	}
 
@@ -569,11 +571,11 @@ static ssize_t sys_shared_page_alloc(env_t* p1,
 	if(p1_addr == NULL) {
 		page_remove(p2->env_pgdir, p2_addr);
 		page_free(page);
-		proc_decref(p2, 1);
+		kref_put(&p2->kref);
 		return -EFAIL;
 	}
 	*addr = p1_addr;
-	proc_decref(p2, 1);
+	kref_put(&p2->kref);
 	return ESUCCESS;
 }
 
@@ -598,14 +600,14 @@ static int sys_notify(struct proc *p, int target_pid, unsigned int notif,
 		return -1;
 	}
 	if (!proc_controls(p, target)) {
-		proc_decref(target, 1);
+		kref_put(&target->kref);
 		set_errno(current_tf, EPERM);
 		return -1;
 	}
 	/* if the user provided a notif_event, copy it in and use that */
 	if (u_ne) {
 		if (memcpy_from_user(p, &local_ne, u_ne, sizeof(struct notif_event))) {
-			proc_decref(target, 1);
+			kref_put(&target->kref);
 			set_errno(current_tf, EINVAL);
 			return -1;
 		}
@@ -613,7 +615,7 @@ static int sys_notify(struct proc *p, int target_pid, unsigned int notif,
 	} else {
 		proc_notify(target, notif, 0);
 	}
-	proc_decref(target, 1);
+	kref_put(&target->kref);
 	return 0;
 }
 
@@ -1198,7 +1200,7 @@ intreg_t process_generic_syscalls(struct proc *p, size_t max)
 	 * the *p). */
 	// TODO: ought to be unnecessary, if you called this right, kept here for
 	// now in case anyone actually uses the ARSCs.
-	proc_incref(p, 1);
+	kref_get(&p->kref, 1);
 
 	// max is the most we'll process.  max = 0 means do as many as possible
 	while (RING_HAS_UNCONSUMED_REQUESTS(sysbr) && ((!max)||(count < max)) ) {
@@ -1228,7 +1230,7 @@ intreg_t process_generic_syscalls(struct proc *p, size_t max)
 	}
 	// load sane page tables (and don't rely on decref to do it for you).
 	lcr3(boot_cr3);
-	proc_decref(p, 1);
+	kref_put(&p->kref);
 	return (intreg_t)count;
 }
 

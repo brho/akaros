@@ -12,6 +12,7 @@
 #include <ros/notification.h>
 #include <trap.h>
 #include <atomic.h>
+#include <kref.h>
 
 /* Process States.  Not 100% on the names yet.  RUNNABLE_* are waiting to go to
  * RUNNING_*.  For instance, RUNNABLE_M is expecting to go to RUNNING_M.  It
@@ -125,10 +126,6 @@ bool __proc_preempt_all(struct proc *p);
 void proc_preempt_core(struct proc *p, uint32_t pcoreid, uint64_t usec);
 void proc_preempt_all(struct proc *p, uint64_t usec);
 
-/* Will probably have generic versions of these later. */
-void proc_incref(struct proc *SAFE p, size_t count);
-void proc_decref(struct proc *SAFE p, size_t count);
- 
 /* Allows the kernel to figure out what process is running on this core.  Can be
  * used just like a pointer to a struct proc.  Need these to be macros due to
  * some circular dependencies with smp.h. */

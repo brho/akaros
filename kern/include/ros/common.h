@@ -102,6 +102,11 @@ static inline uint32_t ROUNDUPPWR2(uint32_t value)
 #define offsetof(type, member)  ((size_t) (&((type*)0)->member))
 #endif
 
+/* Return the container/struct holding the object 'ptr' points to */
+#define container_of(ptr, type, member) ({                                     \
+	(type*)((char*)ptr - offsetof(type, member));                             \
+})
+
 // Ivy currently can only handle 63 bits (OCaml thing), so use this to make
 // a uint64_t programatically
 #define UINT64(upper, lower) ( (((uint64_t)(upper)) << 32) | (lower) )
