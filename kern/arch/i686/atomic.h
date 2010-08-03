@@ -24,6 +24,7 @@ static inline void atomic_add(atomic_t* number, long val);
 static inline void atomic_inc(atomic_t *number);
 static inline void atomic_dec(atomic_t *number);
 static inline long atomic_fetch_and_add(atomic_t *number, long val);
+static inline bool atomic_add_not_zero(atomic_t *number, long val);
 static inline bool atomic_sub_and_test(atomic_t *number, long val);
 static inline uint32_t atomic_swap(uint32_t *addr, uint32_t val);
 static inline bool atomic_comp_swap(uint32_t *addr, uint32_t exp_val,
@@ -82,6 +83,20 @@ static inline long atomic_fetch_and_add(atomic_t *number, long val)
 	return val;
 }
 
+/* Adds val to number, so long as number was not zero.  Returns TRUE if the
+ * operation succeeded (added, not zero), returns FALSE if number is zero. */
+static inline bool atomic_add_not_zero(atomic_t *number, long val)
+{
+	long old_num, new_num;
+	do {
+		old_num = atomic_read(number);
+		if (!old_num)
+			return FALSE;
+		new_num = old_num + val;
+	} while (!atomic_comp_swap((uint32_t*)number, old_num, new_num));
+	return TRUE;
+}
+
 /* Subtraces val from number, returning True if the new value is 0. */
 static inline bool atomic_sub_and_test(atomic_t *number, long val)
 {
@@ -100,7 +115,7 @@ static inline uint32_t atomic_swap(uint32_t *addr, uint32_t val)
 	return val;
 }
 
-/* reusing exp_val for the bool return */
+/* reusing exp_val for the bool return.  1 (TRUE) for success (like test). */
 static inline bool atomic_comp_swap(uint32_t *addr, uint32_t exp_val,
                                     uint32_t new_val)
 {

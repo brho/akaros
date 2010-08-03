@@ -29,6 +29,7 @@ static inline void atomic_add(atomic_t* number, int32_t inc);
 static inline void atomic_inc(atomic_t* number);
 static inline void atomic_dec(atomic_t* number);
 static inline long atomic_fetch_and_add(atomic_t *number, long val);
+static inline bool atomic_add_not_zero(atomic_t *number, long val);
 static inline bool atomic_sub_and_test(atomic_t *number, long val);
 static inline uint32_t atomic_swap(uint32_t* addr, uint32_t val);
 static inline bool atomic_comp_swap(uint32_t *addr, uint32_t exp_val,
@@ -87,6 +88,25 @@ static inline long atomic_fetch_and_add(atomic_t *number, long val)
 	val += retval;
 	/* set the new counter value.  the lock is cleared (for free) */
 	atomic_init(number, val);
+	return retval;
+}
+
+/* Adds val to number, so long as number was not zero.  Returns TRUE if the
+ * operation succeeded (added, not zero), returns FALSE if number is zero. */
+static inline bool atomic_add_not_zero(atomic_t *number, long val)
+{
+	long num;
+	bool retval = FALSE;
+	/* this is pretty clever.  the lower 8 bits (i.e byte 3)
+	 * of the atomic_t serve as a spinlock.  let's acquire it. */
+	spin_lock((spinlock_t*)number);
+	num = atomic_read(number);
+	if (num) {
+		num += val;
+		retval = TRUE;
+	}
+	/* set the new (maybe old) counter value.  the lock is cleared (for free) */
+	atomic_init(number, num);
 	return retval;
 }
 

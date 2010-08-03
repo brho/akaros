@@ -1,0 +1,256 @@
+Krefs and Topics on Refcounting:
+----------------------------
+We do reference counting of our objects in much the same way as Linux.  The
+stuff we do is based on the Linux way, discussed/described here:
+- http://www.kroah.com/linux/talks/ols_2004_kref_paper/
+         Reprint-Kroah-Hartman-OLS2004.pdf
+- http://lwn.net/Articles/336224/
+- Linux's Documentation/kref.txt
+
+To best understand krefs, keep in mind this quote (from their kref.txt): "the
+kref is appropriate when the object doesn't outlive its last external
+reference."  What we want is to know when all "external" references to an object
+are gone.  At which point we can do something (cleanup, free, etc) and be sure
+that no other code can get a reference.  This is similar to what we used to do
+with proc_decref() and a handful of other custom refcounting mechanisms.  We
+want to do this without locks, if possible, so we make use of a variety of
+helpful atomics (though RAMP uses a lock-per-atomic).
+
+This document will ramble about the details and other stuff.
+Here are things to keep in mind, which differ in some of the use cases:
+- we want to do something when the refcount hits 0.
+- we don't always know when that is.
+- we might not have a function to call to explicitly remove the object.
+- we might want to bring an object "back to life."  This is outliving your last
+  external reference, but it is something we want.  And so does Linux.
+
+kref rules (adaptation of the linux ones):
+1. If you pass a pointer somewhere or store it (a non-temporary copy),
+kref_get() it first.  You can do this with no locking if you have a valid
+external reference.
+2. When you are done, kref_put() it.
+3. If you do not have a valid *external* reference, you can try
+kref_get_not_zero().  You must have an internal reference for this.  And to
+protect that *internal* reference, you often need to lock or otherwise sync
+around the source of that internal reference (usually a list-like structure
+(LLS)), unless that ref is otherwise protected from concurrent freeing.
+4. If you plan to reincarnate an object (make its refcnt go from 0 to 1), you
+need to use some other form of sync between the final freeing and the
+reincarnation.
+
+We differ from Linux in a few of ways.  We have a kref_get_not_zero(), which
+they talk about in some of their documents, to be a bit more clear about getting
+refs when objects might be at 0.  Some of the differences is just semantics and
+usage.  We also allow incrementing by more than one, which helps in some cases.
+We don't allow decrementing by more than one to catch bugs (for now).  We also
+put the release function in the kref, which is what Linux used to do.  We do it
+to cut down on the number of places the function pointer is writen, since I
+expect those to change a lot as subsystems use krefs.  Finally, we only use
+krefs to trigger an object's release function, which might not free them
+forever.  They can be "reincarnated" back to having an external reference.  You
+can do similar things in Linux, but it's not clear (to me) how separate that
+idea is from a kref.
+
+External (strong) vs internal (weak) references:
+----------------------------
+I want something to happen (like for the obj to die) when its refcnt hits 0.  I
+don't know when this will happen, or who will be the one who makes the final
+decref.  So we have the kref - it automatically executes a callback when the
+refcnt hits 0.  However, there are cases when we have "references" (possibly
+uncounted pointers) to an object that we do not want to consider in this
+calculation.  A good example is the superblock's list of all files.  If that
+reference is counted, the file will never be freed - it's just a list for
+managing the existing files.  There's a chicken-egg issue, since removing the
+pointer to the file from the list is what should happen in the cleanup after the
+refcount hits 0.  This is the nature of an internal (weak) reference.  External
+(strong) references are those that count towards when an object should be
+freed/called-back/whatever.
+
+So now we have lists and other sources of a "reference" / pointer (and it
+doesn't matter if is counted in some variable other than refcount).  We need to
+be able to get valid external references for this.  Just about any time that you
+want to use the object, you'll need to do this - or otherwise prevent it from
+dying/being clean-up.  We can't simply kref_get(), since we don't already have a
+valid external reference.  Instead we use kref_get_not_zero(), which uses
+atomic_inc_not_zero() (or something similar).  Using this guarantees that if it
+succeeded, there was *an* external reference - we just didn't have it.  It is
+possible that this fails, and it's a bit slower, so only use it when going from
+an internal reference to an external one.  For lists like the SB's file
+list/tailq, this won't be too hard, since once we hit 0, we remove it from the
+list and free it.  Things are more complicated if we want to do other things
+when we hit 0 - specifically if we want to "come back from the dead" and go from
+0 back to 1 or more.
+
+However, things aren't quite this easy.  Short version: lock your list.  Long
+version: kref_get_not_zero() only works when we have a valid internal reference.
+It works based on the assumption that its pointer is still the object (and not
+some freed memory).  You need to do something like: "lock the LLS, get your
+pointer from the LLS, get_not_zero, unlock."  The lock protects your internal
+reference.  Later on we talk about some other schemes, but ultimately you need
+to sync or otherwise guarantee your internal reference is valid.
+
+This is probably why we want to either lock outside our list-solution, or
+integrate the list/hash structure into the owning subsystem.  (mentioned in more
+detail below).  Also note, with locking you need to be careful of deadlocking.
+kref_put() will return 1 if the refcnt hit 0, so you can unlock and do some
+other cleanup without holding a list's lock.  This effectively allows you to
+split the release between what kref_put() does automatically with whatever else
+you want done.
+
+What about an 'internal' kref?  Much like with the pid2proc hash, if we refcnt
+the refs on lists, we still have the same issue of syncing between a list reader
+and a list writer.  The reader needs to atomically read and kref_get (not_zero
+or otherwise).  Otherwise, someone can remove, put, free, and do whatever to the
+item between the read and the kref_get (in theory).
+
+The reason for this is the same reason we have trouble with lists and internal
+references in the first place: both the list reader and the writer are sharing
+the same reference.  One is trying to kref_get() it, while another is trying to
+kref_put() it.  If the freeing happens in between getting the pointer from the
+list and the kref_getting, we'll have a bug.  (unless we do some tricks related
+to seq counters and grace periods, discussed below).  This is the same issue,
+regardless of whether the internal reference is using another kref or if it uses
+some other scheme (like lock the object and check its state).
+
+Reincarnating an object after it hit 0
+----------------------------
+So when we hit 0, we might not be completely done with the object.  This is part
+of the "kcref" (c == cached) design pattern the Linux guys talk about.  The main
+example they use (and we will too) is the dentry - you want to cache them, even
+if their refcnt is 0.  Once their refcount is 0, you still want to do things -
+just not free them.  Specifically, we'll set their state to show they are unused
+(and thus freeable when there is pressure).  The tricky thing is that when a
+cache lookup finds the dentry, whose refcount is still 0, we need to be able to
+get it and set its external refcount to 1 (bring it "back to life").  We can use
+kref_init() or some other function for this - the important thing is that it
+cannot happen while the object is being freed for real (when it is removed from
+the cache).  One way or another, we need to synchronize.
+
+The way Linux handles this is that there is a lock for the dentry object and one
+overall one for the dentry cache.  You can't convert an internal reference to an
+external reference without hold this lock.  Just locking on the object could
+result in issues where an object is freed and reused as a *different* object,
+which then the cache reader gets instead of failing at trying to get the
+original object.  The kref refcount only helps when the refcount goes from 1 to
+0, and on triggering the followup/release action.
+
+For now, we'll do the same thing in those situations, but may do something else
+that is similar (spinlock and seq-ctr per object), but first more digressions...
+
+Trickiness with lockless data structures:
+----------------------------
+Ideally, we want concurrent access to the dentry cache (or whatever cache has
+krefd objects that we want to reincarnate).  Perhaps this is with CAS on linked
+lists, or locks per hash bucket.  Since we need to prevent the reincarnation of
+objects from proceeding while another thread could be trying to remove them, we
+need some sync between readers and writers.  Both threads in the scenario we've
+been talking about are going to be writers for the object, though from the
+perspective of the list-like-structure, only one is a writer - the one who makes
+it such that we cannot create an external ref from an internal one, because the
+object is dying.
+
+Simply doing this: "lookup, object lock, muck with state" will result in bugs,
+since the state change changes the lookup, but the locking happens after the
+lookup.  We could be manipulating a newly slab-allocated object (or anything,
+really), that has an unlocked byte where we expect it (and thus our spin_lock()
+succeeded).
+
+At this point, there are two options: Handle it in the list-like-structure, or
+play more clever games:
+
+1: Push it into the list-like structure (LLS)
+----------------
+In the first case, the state changing needs to be pushed into the data structure
+managing the objects for these types of scenarios.  For example, a
+spinlock-per-hashbucket scenario would need to know to execute a certain
+function on the object if it finds it before unlocking the bucket.  Sync systems
+based on RCU will need to be careful with the final delete function.  I think
+this is part of the reason why Linux doesn't have a built-in solution for a hash
+table - subsystems roll their own using tools (instead of solutions), since the
+removal is coupled with how the subsystem works.
+
+2: Seq-ctrs and Reused objects
+----------------
+The other way, and one we may look into, is to push a seq-ctr into the object.
+The plan is then: "{lookup, object lock} (while seq changed), muck with state"
+(being careful to unlock, etc).  The idea is that the seq-ctr gets incremented
+when the object is freed / given back to the slab allocator (which is done by
+the removal thread).  If the seq-ctr changed, that means we are no longer
+looking at the same object, and we need to retry the lookup (start over).  The
+seq-ctr exists for the memory region dedicated to the object, not for a specific
+object.
+
+This approach needs a little more help: it assumes that any freed object will
+continue to be an object of that type for a little while.  We are dealing with
+slab-allocated objects, so that is a bit more true than when dealing with
+kmalloc().  However, it is possible that there was memory pressure and the slab
+subsystem freed those pages.  We need to be sure that this event has not
+happened before we try to lock the object.  It's okay to lock and unlock an
+'unrelated' dentry.  It's not okay to try and lock a random spot in memory.  We
+could have a variety of read-mostly globals to perhaps signal slab-pressure,
+dentry-slab-pressure, or something like that, depending on who else needs to
+know about that event.  These seem tricky, and probably require some form of
+locking, which leads to the most likely candidate: RCU-style grace periods.
+
+The thing we really care about is that the pages are not allocated to some other
+use.  For unrelated (TLB) reasons, we may build an RCU-like mechanism for
+dealing with free pages, and we could consider using this - though if the slab
+allocator is asked for memory, it is because we are running out, and we don't
+want to wait for grace periods.  Anyway, we'll probably never do any of this, at
+least until it becomse a problem.
+
+FYI: the whole lock on possibly the next incarnation of the object will only
+work if we unlock it at some point - might be a while, if it doesn't get
+unlocked until it's spinlock_init()ed as the new object.  If we do this, we
+ought to unlock before slab-freeing.
+
+Final Notes
+----------------------------
+There is a difference between removing references to you from all over the place
+and cleaning up references that you know about (like when you know you are in a
+TAILQ all the time vs. being in a process's file list).
+
+Process management is a bit different, since it does not want to destroy or free
+you until there was some explicit action (calling proc_destroy()).  We still use
+krefs, since we don't know who is the "last one out" to do the freeing, so we
+layer proc_destroy() on top of kref/__proc_free().  This makes it easier for us
+to hack something together that works with the pid2proc hash.  Specifically, we
+can kref items in that LLS, as well as the runnable_list.  We know when to take
+them out.  This is similar to the dentry, except that when there is no other
+reference than the LLS, we don't want to do anything in particular (at least not
+yet).  The dentry needs to have a lot of state changed, and maybe freed.
+
+Remember: the reason for why we have trouble with lists and (internal)
+references: both the list reader and the writer are sharing the same
+reference/pointer.  We need to either make sure that a reader can use the
+pointer (pinned, kref_get(), a flag, whatever while preventing access to the
+pointer from another thread (lock the list)), or that it can *safely* find out
+it needs to try again.  "Safe" means not accessing freed memory - hence the
+grace periods on slab-freed pages.
+
+Kreffing works because we have a known, synchronous initialization point where
+we kref_init() the refcount to 1.  We can't do that easily when reincarnating or
+even kref_get_not_zero() because another thread may be trying to permanently
+free the object.
+
+The difference between kref_get_not_zero() and reincarnation is that
+get_not_zero() is trying to get an external reference and the object's release
+method has not been called.  Reincarnation is when we've already hit 0,
+release()d, and now want to reuse that object.  For concrete examples:
+get_not_zero() works when getting a file off the superblock file list - it only
+should work if the file is still in the system and not about to be removed from
+the list.  Reincarnation is for objects that don't get freed when they lose
+their external references, such as dentries (they get put on the dentry cache).
+On a cache hit for an unreferenced dentry, we'll need to change its state and
+reinit its refcount.  Next time it is kref_put()d to 0, it'll rerun its
+release() method.
+
+Deadlocking is still an issue, and might be what forces us to more lock-free
+lists.  Here's an example of what not to do: grab the SB's tailq lock, for each
+file, kref_put it, then unlock.  That code might be trying to force all files to
+close, which is just fundamentally flawed anyways (since you're decreffing an
+internal reference, instead of an external one).  But you'll deadlock too, since
+the file's kref release() method will try and grab the same lock to rip the item
+off the list.  So this is a contrived example, but it goes to show that you need
+to be careful about where you are locking and what functions your kref_put()
+might trigger.
