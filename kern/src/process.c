@@ -366,6 +366,7 @@ static void __proc_free(struct kref *kref)
 	assert(atomic_read(&p->kref.refcount) == 0);
 
 	close_all_files(&p->open_files);
+	destroy_vmrs(p);
 	frontend_proc_free(p);	/* TODO: please remove me one day */
 	/* Free any colors allocated to this process */
 	if(p->cache_colors_map != global_cache_colors_map) {

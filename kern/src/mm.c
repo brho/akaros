@@ -226,6 +226,15 @@ void isolate_vmrs(struct proc *p, uintptr_t va, size_t len)
 		split_vmr(vmr, va + len);
 }
 
+/* Destroys all vmrs of a process - important for when files are mmap()d and
+ * probably later when we share memory regions */
+void destroy_vmrs(struct proc *p)
+{
+	struct vm_region *vm_i;
+	TAILQ_FOREACH(vm_i, &p->vm_regions, vm_link)
+		destroy_vmr(vm_i);
+}
+
 /* This will make new_p have the same VMRs as p, though it does nothing to
  * ensure the physical pages or whatever are shared/mapped/copied/whatever.
  * This is used by fork().
