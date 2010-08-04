@@ -28,8 +28,10 @@
 #include <resource.h>
 #include <frontend.h>
 #include <colored_caches.h>
+#include <hashtable.h>
 #include <arch/bitmask.h>
 #include <kfs.h> // eventually replace this with vfs.h
+#include <arsc_server.h>
 
 
 #ifdef __CONFIG_NETWORKING__
@@ -1071,16 +1073,21 @@ intreg_t sys_tcsetattr(struct proc *p, int fd, int optional_actions,
  * Note tf is passed in, which points to the tf of the context on the kernel
  * stack.  If any syscall needs to block, it needs to save this info, as well as
  * any silly state.
+ * 
+ * This syscall function is used by both local syscall and arsc, and should
+ * remain oblivious of the caller.
  *
- * TODO: Build a dispatch table instead of switching on the syscallno
- * Dispatches to the correct kernel function, passing the arguments.
+ * TODO: Keep in mind that not every syscall has a user trapframe. 
+ * e.g. ARSC
  */
 intreg_t syscall(struct proc *p, uintreg_t syscallno, uintreg_t a1,
                  uintreg_t a2, uintreg_t a3, uintreg_t a4, uintreg_t a5)
 {
 	// Initialize the return value and error code returned to 0
-	proc_set_syscall_retval(current_tf, 0);
-	set_errno(current_tf,0);
+	if(current_tf != NULL){
+		proc_set_syscall_retval(&p->env_tf, ESUCCESS);
+		set_errno(current_tf,0);
+	}
 
 	typedef intreg_t (*syscall_t)(struct proc*,uintreg_t,uintreg_t,
 	                              uintreg_t,uintreg_t,uintreg_t);
@@ -1121,6 +1128,10 @@ intreg_t syscall(struct proc *p, uintreg_t syscallno, uintreg_t a1,
 		[SYS_eth_get_mac_addr] = (syscall_t)sys_eth_get_mac_addr,
 		[SYS_eth_recv_check] = (syscall_t)sys_eth_recv_check,
 	#endif
+	#ifdef __CONFIG_ARSC_SERVER__
+		[SYS_init_arsc] = (syscall_t)sys_init_arsc,
+	#endif
+		// Syscalls serviced by the appserver for now.
 		[SYS_read] = (syscall_t)sys_read,
 		[SYS_write] = (syscall_t)sys_write,
 		[SYS_open] = (syscall_t)sys_open,
@@ -1176,58 +1187,6 @@ intreg_t syscall(struct proc *p, uintreg_t syscallno, uintreg_t a1,
 		panic("Invalid syscall number %d for proc %x!", syscallno, *p);
 
 	return syscall_table[syscallno](p,a1,a2,a3,a4,a5);
-}
-
-intreg_t syscall_async(struct proc *p, syscall_req_t *call)
-{
-	return syscall(p, call->num, call->args[0], call->args[1],
-	               call->args[2], call->args[3], call->args[4]);
-}
-
-/* You should already have a refcnt'd ref to p before calling this */
-intreg_t process_generic_syscalls(struct proc *p, size_t max)
-{
-	size_t count = 0;
-	syscall_back_ring_t* sysbr = &p->syscallbackring;
-
-	/* make sure the proc is still alive, and keep it from dying from under us
-	 * incref will return ESUCCESS on success.  This might need some thought
-	 * regarding when the incref should have happened (like by whoever passed us
-	 * the *p). */
-	// TODO: ought to be unnecessary, if you called this right, kept here for
-	// now in case anyone actually uses the ARSCs.
-	kref_get(&p->kref, 1);
-
-	// max is the most we'll process.  max = 0 means do as many as possible
-	while (RING_HAS_UNCONSUMED_REQUESTS(sysbr) && ((!max)||(count < max)) ) {
-		if (!count) {
-			// ASSUME: one queue per process
-			// only switch cr3 for the very first request for this queue
-			// need to switch to the right context, so we can handle the user pointer
-			// that points to a data payload of the syscall
-			lcr3(p->env_cr3);
-		}
-		count++;
-		//printk("DEBUG PRE: sring->req_prod: %d, sring->rsp_prod: %d\n",
-		//	   sysbr->sring->req_prod, sysbr->sring->rsp_prod);
-		// might want to think about 0-ing this out, if we aren't
-		// going to explicitly fill in all fields
-		syscall_rsp_t rsp;
-		// this assumes we get our answer immediately for the syscall.
-		syscall_req_t* req = RING_GET_REQUEST(sysbr, ++(sysbr->req_cons));
-		rsp.retval = syscall_async(p, req);
-		// write response into the slot it came from
-		memcpy(req, &rsp, sizeof(syscall_rsp_t));
-		// update our counter for what we've produced (assumes we went in order!)
-		(sysbr->rsp_prod_pvt)++;
-		RING_PUSH_RESPONSES(sysbr);
-		//printk("DEBUG POST: sring->req_prod: %d, sring->rsp_prod: %d\n",
-		//	   sysbr->sring->req_prod, sysbr->sring->rsp_prod);
-	}
-	// load sane page tables (and don't rely on decref to do it for you).
-	lcr3(boot_cr3);
-	kref_put(&p->kref);
-	return (intreg_t)count;
 }
 
 /* Syscall tracing */

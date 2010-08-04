@@ -265,6 +265,24 @@ void manager_pearce()
 
 }
 
+void manager_yuzhu()
+{
+	
+	static uint8_t RACY progress = 0;
+	static struct proc *p;
+
+	// for testing taking cores, check in case 1 for usage
+	uint32_t corelist[MAX_NUM_CPUS];
+	uint32_t num = 3;
+
+	//create_server(init_num_cores, loop);
+
+	monitor(0);
+
+	// quick_proc_run("hello", p);
+
+}
+
 #ifdef __sparc_v8__
 
 static char*

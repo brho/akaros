@@ -49,6 +49,9 @@ int         sys_self_notify(uint32_t vcoreid, unsigned int notif,
                             struct notif_event *ne);
 int         sys_halt_core(unsigned int usec);
 
+/* ARSC */
+int			sys_init_arsc();
+
 #endif	// !ASSEMBLER
 
 #endif	// !ROS_INC_PARLIB_H

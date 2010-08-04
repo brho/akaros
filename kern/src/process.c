@@ -26,6 +26,7 @@
 #include <monitor.h>
 #include <resource.h>
 #include <elf.h>
+#include <arsc_server.h>
 
 /* Process Lists */
 struct proc_list proc_runnablelist = TAILQ_HEAD_INITIALIZER(proc_runnablelist);
@@ -200,9 +201,16 @@ void proc_init(void)
 	assert(!(num_cpus % 2));
 	// TODO: consider checking x86 for machines that actually hyperthread
 	num_idlecores = num_cpus >> 1;
+#ifdef __CONFIG_ARSC_SERVER__
+	// Dedicate one core (core 2) to sysserver, might be able to share wit NIC
+	num_mgmtcores++;
+	assert(num_cpus >= num_mgmtcores);
+	send_kernel_message(2, (amr_t)arsc_server, 0,0,0, KMSG_ROUTINE);
+#endif
 	for (int i = 0; i < num_idlecores; i++)
 		idlecoremap[i] = (i * 2) + 1;
 #else
+	// __CONFIG_DISABLE_SMT__
 	#ifdef __CONFIG_NETWORKING__
 	num_mgmtcores++; // Next core is dedicated to the NIC
 	assert(num_cpus >= num_mgmtcores);
@@ -215,10 +223,17 @@ void proc_init(void)
 	send_kernel_message(num_mgmtcores-1, (amr_t)monitor, 0,0,0, KMSG_ROUTINE);
 	#endif
 	#endif
+#ifdef __CONFIG_ARSC_SERVER__
+	// Dedicate one core (core 2) to sysserver, might be able to share wit NIC
+	num_mgmtcores++;
+	assert(num_cpus >= num_mgmtcores);
+	send_kernel_message(num_mgmtcores-1, (amr_t)arsc_server, 0,0,0, KMSG_ROUTINE);
+#endif
 	num_idlecores = num_cpus - num_mgmtcores;
 	for (int i = 0; i < num_idlecores; i++)
 		idlecoremap[i] = i + num_mgmtcores;
 #endif /* __CONFIG_DISABLE_SMT__ */
+
 	spin_unlock(&idle_lock);
 	atomic_init(&num_envs, 0);
 }
@@ -271,9 +286,6 @@ error_t proc_alloc(struct proc **pp, struct proc *parent)
 		kmem_cache_free(proc_cache, p);
 		return -ENOFREEPID;
 	}
-	spin_lock(&pid_hash_lock);
-	hashtable_insert(pid_hash, (void*)p->pid, p);
-	spin_unlock(&pid_hash_lock);
 	/* Set the basic status variables. */
 	spinlock_init(&p->proc_lock);
 	p->exitcode = 0;
@@ -348,6 +360,11 @@ struct proc *proc_create(struct file *prog, char **argv, char **envp)
 		panic("proc_create: %e", r);	/* one of 3 quaint usages of %e */
 	procinfo_pack_args(p->procinfo, argv, envp);
 	assert(load_elf(p, prog) == 0);
+	
+	// only insert into the global hashtable after all thei initialization is done
+	spin_lock(&pid_hash_lock);
+	hashtable_insert(pid_hash, (void*)p->pid, p);
+	spin_unlock(&pid_hash_lock);
 	return p;
 }
 
@@ -450,6 +467,7 @@ void proc_run(struct proc *p)
 			 * back to userspace.  */
 			spin_unlock(&p->proc_lock);
 			disable_irq();
+
 			__proc_startcore(p, &p->env_tf);
 			break;
 		case (PROC_RUNNABLE_M):
@@ -530,6 +548,7 @@ static void __proc_startcore(struct proc *p, trapframe_t *tf)
 	 * __startcore.  */
 	if (p->state == PROC_RUNNING_S)
 		env_pop_ancillary_state(p);
+	
 	env_pop_tf(tf);
 }
 
@@ -579,8 +598,16 @@ void proc_restartcore(struct proc *p, trapframe_t *tf)
 void proc_destroy(struct proc *p)
 {
 	bool self_ipi_pending = FALSE;
+	
+#ifdef __CONFIG_ARSC_SERVER__
+	spin_lock_irqsave(&arsc_proc_lock);
 
+	// remove from ARSC list
+	TAILQ_REMOVE(&arsc_proc_list, p, proc_arsc_link);
+	spin_unlock_irqsave(&arsc_proc_lock);
+#endif 
 	spin_lock(&p->proc_lock);
+	
 
 	/* TODO: (DEATH) look at this again when we sort the __death IPI */
 	if (current == p)

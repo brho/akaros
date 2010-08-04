@@ -1,5 +1,8 @@
 # General Purpose configuration parameters
 #CFLAGS += $(CONFIG_APPSERVER)
+#CFLAGS += $(CONFIG_OSDI)
+#CFLAGS += $(CONFIG_CACHEEFFECT)
+#CFLAGS += $(CONFIG_NOPTHREAD_YIELD)
 
 # Kernel configuration parameters
 #KERN_CFLAGS += $(CONFIG_KFS)
@@ -20,6 +23,8 @@
 #KERN_CFLAGS += $(CONFIG_MONITOR_ON_INT)
 #KERN_CFLAGS += $(CONFIG_DISABLE_SMT)
 #KERN_CFLAGS += $(CONFIG_BOXBORO)
+# Enable this to set up ARSC server
+#KERN_CFLAGS += $(CONFIG_ARSC_SERVER)
 
 #KERN_CFLAGS += -DDEVELOPER_NAME=waterman
 #KERN_CFLAGS += -DDEVELOPER_NAME=brho

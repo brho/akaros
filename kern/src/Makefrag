@@ -43,7 +43,8 @@ KERN_SRCFILES := $(KERN_ARCH_SRCFILES) \
                  $(KERN_SRC_DIR)/vfs.c \
                  $(KERN_SRC_DIR)/radix.c \
                  $(KERN_SRC_DIR)/umem.c \
-                 $(KERN_SRC_DIR)/testing.c
+                 $(KERN_SRC_DIR)/testing.c \
+                 $(KERN_SRC_DIR)/arsc.c
 
 # Only build files if they exist.
 KERN_SRCFILES := $(wildcard $(KERN_SRCFILES))

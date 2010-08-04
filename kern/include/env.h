@@ -23,6 +23,7 @@
 // TODO: clean this up.
 struct proc {
 	TAILQ_ENTRY(proc) proc_link NOINIT;	// Free list link pointers
+	TAILQ_ENTRY(proc) proc_arsc_link NOINIT; // Free list link pointers for the arsc list
 	spinlock_t proc_lock;
 	trapframe_t env_tf; 						// Saved registers
 	ancillary_state_t env_ancillary_state; 	// State saved when descheduled

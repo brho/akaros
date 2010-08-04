@@ -6,6 +6,7 @@
 
 #include <ros/memlayout.h>
 #include <ros/ring_syscall.h>
+#include <ros/sysevent.h>
 #include <ros/arch/arch.h>
 #include <ros/common.h>
 #include <ros/procinfo.h>

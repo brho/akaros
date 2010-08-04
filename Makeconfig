@@ -25,6 +25,7 @@ CONFIG_DISABLE_MPTABLES:=          -D__CONFIG_DISABLE_MPTABLES__
 CONFIG_MONITOR_ON_INT:=            -D__CONFIG_MONITOR_ON_INT__
 CONFIG_DISABLE_SMT:=               -D__CONFIG_DISABLE_SMT__
 CONFIG_BOXBORO:=                   -D__CONFIG_BOXBORO__
+CONFIG_ARSC_SERVER:=               -D__CONFIG_ARSC_SERVER__
 
 # Userspace configuration parameters
 # By default, each of these options will be turned off

@@ -14,6 +14,8 @@
 #define MAX_NUM_TRACED				10
 #define MAX_SYSTRACES				1024
 
+#define MAX_ASRC_BATCH				10
+
 /* Consider cache aligning this */
 struct systrace_record {
 	uint64_t		timestamp;
@@ -23,10 +25,9 @@ struct systrace_record {
 	uint32_t		vcoreid;
 };
 
+
 intreg_t syscall(struct proc *p, uintreg_t num, uintreg_t a1, uintreg_t a2,
                  uintreg_t a3, uintreg_t a4, uintreg_t a5);
-intreg_t syscall_async(env_t* e, syscall_req_t *syscall);
-intreg_t process_generic_syscalls(env_t* e, size_t max);
 
 /* Tracing functions */
 void systrace_start(bool silent);

@@ -3,7 +3,6 @@
 
 #include <ros/common.h>
 #include <ros/ring_buffer.h>
-#include <ros/sysevent.h>
 
 #define NUM_SYSCALL_ARGS 6
 typedef struct syscall_req {
