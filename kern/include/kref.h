@@ -25,6 +25,12 @@ struct kref {
 	void (*release)(struct kref *kref);
 };
 
+/* Helper for some debugging situations */
+static long kref_refcnt(struct kref *kref)
+{
+	return atomic_read(&kref->refcount);
+}
+
 static void kref_init(struct kref *kref, void (*release)(struct kref *kref),
                       unsigned int init)
 {
@@ -51,12 +57,19 @@ static struct kref *kref_get_not_zero(struct kref *kref, unsigned int inc)
 /* Returns True if we hit 0 and executed 'release', False otherwise */
 static bool kref_put(struct kref *kref)
 {
-	assert(atomic_read(&kref->refcount) > 0);		/* catch some bugs */
+	assert(kref_refcnt(kref) > 0);		/* catch some bugs */
 	if (atomic_sub_and_test(&kref->refcount, 1)) {
 		kref->release(kref);
 		return TRUE;
 	}
 	return FALSE;
+}
+
+/* Dev / debugging function to catch the attempted freeing of objects we don't
+ * know how to free yet. */
+static void fake_release(struct kref *kref)
+{
+	panic("Cleaning up this object is not supported!\n");
 }
 
 #endif /* ROS_KERN_KREF_H */

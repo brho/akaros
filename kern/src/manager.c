@@ -53,13 +53,16 @@ void manager(void)
 	MANAGER_FUNC(DEVELOPER_NAME)();
 }
 
+char *p_argv[] = {0, 0, 0};
+char *p_envp[] = {"LD_LIBRARY_PATH=/lib", 0};
 /* Helper macro for quickly running a process.  Pass it a string, *file, and a
  * *proc. */
 #define quick_proc_run(x, p, f)                                                  \
 	(f) = path_to_file((x));                                                     \
 	assert((f));                                                                 \
-	(p) = proc_create(f, 0, 0);                                                  \
-	atomic_dec(&(f)->f_refcnt);                                                  \
+	p_argv[0] = file_name((f));                                               \
+	(p) = proc_create((f), p_argv, p_envp);                                      \
+	kref_put(&(f)->f_kref);                                                      \
 	spin_lock(&(p)->proc_lock);                                                  \
 	__proc_set_state((p), PROC_RUNNABLE_S);                                      \
 	spin_unlock(&(p)->proc_lock);                                                \
@@ -69,8 +72,9 @@ void manager(void)
 #define quick_proc_create(x, p, f)                                               \
 	(f) = path_to_file((x));                                                     \
 	assert((f));                                                                 \
-	(p) = proc_create(f, 0, 0);                                                  \
-	atomic_dec(&(f)->f_refcnt);                                                  \
+	p_argv[0] = file_name((f));                                               \
+	(p) = proc_create((f), p_argv, p_envp);                                      \
+	kref_put(&(f)->f_kref);                                                      \
 	spin_lock(&(p)->proc_lock);                                                  \
 	__proc_set_state((p), PROC_RUNNABLE_S);                                      \
 	spin_unlock(&(p)->proc_lock);
@@ -78,8 +82,9 @@ void manager(void)
 #define quick_proc_color_run(x, p, c, f)                                         \
 	(f) = path_to_file((x));                                                     \
 	assert((f));                                                                 \
-	(p) = proc_create(f, 0, 0);                                                  \
-	atomic_dec(&(f)->f_refcnt);                                                  \
+	p_argv[0] = file_name((f));                                               \
+	(p) = proc_create((f), p_argv, p_envp);                                      \
+	kref_put(&(f)->f_kref);                                                      \
 	spin_lock(&(p)->proc_lock);                                                  \
 	__proc_set_state((p), PROC_RUNNABLE_S);                                      \
 	spin_unlock(&(p)->proc_lock);                                                \
@@ -92,8 +97,9 @@ void manager(void)
 #define quick_proc_color_create(x, p, c, f)                                      \
 	(f) = path_to_file((x));                                                     \
 	assert((f));                                                                 \
-	(p) = proc_create(f, 0, 0);                                                  \
-	atomic_dec(&(f)->f_refcnt);                                                  \
+	p_argv[0] = file_name((f));                                               \
+	(p) = proc_create((f), p_argv, p_envp);                                      \
+	kref_put(&(f)->f_kref);                                                      \
 	spin_lock(&(p)->proc_lock);                                                  \
 	__proc_set_state((p), PROC_RUNNABLE_S);                                      \
 	spin_unlock(&(p)->proc_lock);                                                \

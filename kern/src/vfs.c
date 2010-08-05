@@ -39,6 +39,8 @@ struct vfsmount *mount_fs(struct fs_type *fs, char *dev_name,
 	struct super_block *sb;
 	struct vfsmount *vmnt = kmalloc(sizeof(struct vfsmount), 0);
 
+	/* this first ref is stored in the NS tailq below */
+	kref_init(&vmnt->mnt_kref, fake_release, 1);
 	/* Build the vfsmount, if there is no mnt_pt, mnt is the root vfsmount (for now).
 	 * fields related to the actual FS, like the sb and the mnt_root are set in
 	 * the fs-specific get_sb() call. */
@@ -48,7 +50,7 @@ struct vfsmount *mount_fs(struct fs_type *fs, char *dev_name,
 	} else { /* common case, but won't be tested til we try to mount another FS */
 		mnt_pt->d_mount_point = TRUE;
 		mnt_pt->d_mounted_fs = vmnt;
-		atomic_inc(&vmnt->mnt_refcnt); /* held by mnt_pt */
+		kref_get(&vmnt->mnt_kref, 1); /* held by mnt_pt */
 		vmnt->mnt_parent = mnt_pt->d_sb->s_mount;
 		vmnt->mnt_mountpoint = mnt_pt;
 	}
@@ -56,8 +58,7 @@ struct vfsmount *mount_fs(struct fs_type *fs, char *dev_name,
 	vmnt->mnt_flags = flags;
 	vmnt->mnt_devname = dev_name;
 	vmnt->mnt_namespace = ns;
-	atomic_inc(&ns->refcnt); /* held by vmnt */
-	atomic_set(&vmnt->mnt_refcnt, 1); /* for the ref in the NS tailq below */
+	kref_get(&ns->kref, 1); /* held by vmnt */
 
 	/* Read in / create the SB */
 	sb = fs->get_sb(fs, flags, dev_name, vmnt);
@@ -90,8 +91,8 @@ void vfs_init(void)
 	                                 __alignof__(struct inode), 0, 0, 0);
 	file_kcache = kmem_cache_create("file", sizeof(struct file),
 	                                __alignof__(struct file), 0, 0, 0);
-
-	atomic_set(&default_ns.refcnt, 1); // default NS never dies, +1 to exist
+	/* default NS never dies, +1 to exist */
+	kref_init(&default_ns.kref, fake_release, 1);
 	spinlock_init(&default_ns.lock);
 	default_ns.root = NULL;
 	TAILQ_INIT(&default_ns.vfsmounts);
@@ -124,7 +125,7 @@ void qstr_builder(struct dentry *dentry, char *l_name)
 /* Useful little helper - return the string ptr for a given file */
 char *file_name(struct file *file)
 {
-	return (char*)TAILQ_FIRST(&file->f_inode->i_dentry)->d_name.name;
+	return file->f_dentry->d_name.name;
 }
 
 /* Some issues with this, coupled closely to fs_lookup.  This assumes that
@@ -160,10 +161,16 @@ static int climb_up(struct nameidata *nd)
 static int next_link(struct dentry *dentry, struct nameidata *nd)
 {
 	assert(nd->dentry && nd->mnt);
-	atomic_dec(&nd->dentry->d_refcnt);
-	atomic_dec(&nd->mnt->mnt_refcnt);
+	/* update the dentry */
+	kref_get(&dentry->d_kref, 1);
+	kref_put(&nd->dentry->d_kref);
    	nd->dentry = dentry;
-   	nd->mnt = dentry->d_sb->s_mount;
+	/* update the mount, if we need to */
+	if (dentry->d_sb->s_mount != nd->mnt) {
+		kref_get(&dentry->d_sb->s_mount->mnt_kref, 1);
+		kref_put(&nd->mnt->mnt_kref);
+   		nd->mnt = dentry->d_sb->s_mount;
+	}
 	return 0;
 }
 
@@ -234,6 +241,7 @@ static int link_path_walk(char *path, struct nameidata *nd)
 			return -ENOENT;
 		/* make link_dentry the current step/answer */
 		next_link(link_dentry, nd);
+		kref_put(&link_dentry->d_kref);	/* do_lookup gave us a refcnt dentry */
 		/* we could be on a mountpoint or a symlink - need to follow them */
 		follow_mount(nd);
 		follow_symlink(nd);
@@ -262,6 +270,7 @@ static int link_path_walk(char *path, struct nameidata *nd)
 	if (!link_dentry)
 		return -ENOENT;
 	next_link(link_dentry, nd);
+	kref_put(&link_dentry->d_kref);	/* do_lookup gave us a refcnt dentry */
 	follow_mount(nd);
 	follow_symlink(nd);
 	/* If we wanted a directory, but didn't get one, error out */
@@ -282,6 +291,7 @@ static int link_path_walk(char *path, struct nameidata *nd)
  * it's still user input.  */
 int path_lookup(char *path, int flags, struct nameidata *nd)
 {
+	printd("Path lookup for %s\n", path);
 	/* we allow absolute lookups with no process context */
 	if (path[0] == '/') {			/* absolute lookup */
 		if (!current)
@@ -296,8 +306,8 @@ int path_lookup(char *path, int flags, struct nameidata *nd)
 	nd->mnt = nd->dentry->d_sb->s_mount;
 	/* Whenever references get put in the nd, incref them.  Whenever they are
 	 * removed, decref them. */
-	atomic_inc(&nd->mnt->mnt_refcnt);
-	atomic_inc(&nd->dentry->d_refcnt);
+	kref_get(&nd->mnt->mnt_kref, 1);
+	kref_get(&nd->dentry->d_kref, 1);
 	nd->flags = flags;
 	nd->depth = 0;					/* used in symlink following */
 	return link_path_walk(path, nd);	
@@ -307,9 +317,8 @@ int path_lookup(char *path, int flags, struct nameidata *nd)
  * regardless of whether it succeeded or not.  It will free any references */
 void path_release(struct nameidata *nd)
 {
-	/* TODO: (REF), do something when we hit 0, etc... */
-	atomic_dec(&nd->dentry->d_refcnt);
-	atomic_dec(&nd->mnt->mnt_refcnt);
+	kref_put(&nd->dentry->d_kref);
+	kref_put(&nd->mnt->mnt_kref);
 }
 
 /* Seems convenient: Given a path, return the appropriate file.  The reference
@@ -332,6 +341,7 @@ struct file *path_to_file(char *path)
 		return 0;
 	}
 	path_release(&nd);
+	assert(kref_refcnt(&f->f_kref) == 1);
 	return f;
 }
 
@@ -345,7 +355,7 @@ struct super_block *get_sb(void)
 	struct super_block *sb = kmalloc(sizeof(struct super_block), 0);
 	sb->s_dirty = FALSE;
 	spinlock_init(&sb->s_lock);
-	atomic_set(&sb->s_refcnt, 1); // for the ref passed out
+	kref_init(&sb->s_kref, fake_release, 1); /* for the ref passed out */
 	TAILQ_INIT(&sb->s_inodes);
 	TAILQ_INIT(&sb->s_dirty_i);
 	TAILQ_INIT(&sb->s_io_wb);
@@ -376,22 +386,21 @@ void init_sb(struct super_block *sb, struct vfsmount *vmnt,
 	struct inode *inode = sb->s_op->alloc_inode(sb);
 	if (!inode)
 		panic("This FS sucks!");
-	d_root->d_inode = inode;
-	TAILQ_INSERT_TAIL(&inode->i_dentry, d_root, d_alias);
-	atomic_inc(&d_root->d_refcnt);			/* held by the inode */
+	d_root->d_inode = inode;				/* storing the inode's kref here */
+	TAILQ_INSERT_TAIL(&inode->i_dentry, d_root, d_alias);	/* weak ref */
 	inode->i_ino = root_ino;
 	/* TODO: add the inode to the appropriate list (off i_list) */
 	/* TODO: do we need to read in the inode?  can we do this on demand? */
 	/* if this FS is already mounted, we'll need to do something different. */
 	sb->s_op->read_inode(inode);
 	/* Link the dentry and SB to the VFS mount */
-	vmnt->mnt_root = d_root;				/* refcnt'd above */
+	vmnt->mnt_root = d_root;				/* ref comes from get_dentry */
 	vmnt->mnt_sb = sb;
 	/* If there is no mount point, there is no parent.  This is true only for
 	 * the rootfs. */
 	if (vmnt->mnt_mountpoint) {
+		kref_get(&vmnt->mnt_mountpoint->d_kref, 1);	/* held by d_root */
 		d_root->d_parent = vmnt->mnt_mountpoint;	/* dentry of the root */
-		atomic_inc(&vmnt->mnt_mountpoint->d_refcnt);/* held by d_root */
 	}
 	/* insert the dentry into the dentry cache.  when's the earliest we can?
 	 * when's the earliest we should?  what about concurrent accesses to the
@@ -403,8 +412,8 @@ void init_sb(struct super_block *sb, struct vfsmount *vmnt,
 
 /* Helper to alloc and initialize a generic dentry.  The following needs to be
  * set still: d_op, d_fs_info (opt), d_inode, connect the inode to the dentry
- * (and up the d_refcnt), maybe dcache_put().  The FS related things need to be
- * done in fs_create and fs_mkdir.
+ * (and up the d_kref again), maybe dcache_put().  The FS related things need to
+ * be done in fs_create and fs_mkdir.
  *
  * If the name is longer than the inline name, it will kmalloc a buffer, so
  * don't worry about the storage for *name after calling this. */
@@ -417,16 +426,17 @@ struct dentry *get_dentry(struct super_block *sb, struct dentry *parent,
 	char *l_name = 0;
 
 	//memset(dentry, 0, sizeof(struct dentry));
-	atomic_set(&dentry->d_refcnt, 1);	/* this ref is returned */
+	kref_init(&dentry->d_kref, dentry_release, 1);	/* this ref is returned */
 	spinlock_init(&dentry->d_lock);
 	TAILQ_INIT(&dentry->d_subdirs);
 	dentry->d_time = 0;
+	kref_get(&sb->s_kref, 1);
 	dentry->d_sb = sb;					/* storing a ref here... */
 	dentry->d_mount_point = FALSE;
 	dentry->d_mounted_fs = 0;
-	dentry->d_parent = parent;
 	if (parent)							/* no parent for rootfs mount */
-		atomic_inc(&parent->d_refcnt);
+		kref_get(&parent->d_kref, 1);
+	dentry->d_parent = parent;
 	dentry->d_flags = 0;				/* related to its dcache state */
 	dentry->d_fs_info = 0;
 	SLIST_INIT(&dentry->d_bucket);
@@ -441,28 +451,52 @@ struct dentry *get_dentry(struct super_block *sb, struct dentry *parent,
 		l_name[name_len] = '\0';
 		qstr_builder(dentry, l_name);
 	}
+	/* Catch bugs by aggressively zeroing this (o/w we use old stuff) */
+	dentry->d_op = 0;
+	dentry->d_fs_info = 0;
+	dentry->d_inode = 0;
 	return dentry;
 }
 
 /* Adds a dentry to the dcache. */
 void dcache_put(struct dentry *dentry)
 {
+#if 0 /* pending a more thorough review of the dcache */
 	/* TODO: should set a d_flag too */
 	spin_lock(&dcache_lock);
 	SLIST_INSERT_HEAD(&dcache, dentry, d_hash);
 	spin_unlock(&dcache_lock);
+#endif
 }
 
-/* Free the dentry (after ref == 0 and we no longer want it).  Pairs with
- * get_dentry(), mostly. */
-void free_dentry(struct dentry *dentry)
+/* Cleans up the dentry (after ref == 0).  We still may want it, and this is
+ * where we should add it to the dentry cache.  (TODO).  For now, we do nothing,
+ * since we don't have a dcache.
+ * 
+ * This has to handle two types of dentries: full ones (ones that had been used)
+ * and ones that had been just for lookups - hence the checks for d_op and
+ * d_inode.
+ *
+ * Note that dentries pin and kref their inodes.  When all the dentries are
+ * gone, we want the inode to be released via kref.  The inode has internal /
+ * weak references to the dentry, which are not refcounted. */
+void dentry_release(struct kref *kref)
 {
+	struct dentry *dentry = container_of(kref, struct dentry, d_kref);
+	printd("Freeing dentry %08p: %s\n", dentry, dentry->d_name.name);
 	/* Might not have a d_op, if it was involved in a failed operation */
 	if (dentry->d_op && dentry->d_op->d_release)
 		dentry->d_op->d_release(dentry);
 	/* TODO: check/test the boundaries on this. */
 	if (dentry->d_name.len > DNAME_INLINE_LEN)
 		kfree((void*)dentry->d_name.name);
+	kref_put(&dentry->d_sb->s_kref);
+	if (dentry->d_mounted_fs)
+		kref_put(&dentry->d_mounted_fs->mnt_kref);
+	if (dentry->d_inode) {
+		TAILQ_REMOVE(&dentry->d_inode->i_dentry, dentry, d_alias);
+		kref_put(&dentry->d_inode->i_kref);	/* but dentries kref inodes */
+	}
 	kmem_cache_free(dentry_kcache, dentry);
 }
 
@@ -474,6 +508,19 @@ void free_dentry(struct dentry *dentry)
 int check_perms(struct inode *inode, int access_mode)
 {
 	return 0;	/* anything goes! */
+}
+
+/* Called after all external refs are gone to clean up the inode.  Once this is
+ * called, all dentries pointing here are already done (one of them triggered
+ * this via kref_put(). */
+void inode_release(struct kref *kref)
+{
+	struct inode *inode = container_of(kref, struct inode, i_kref);
+	inode->i_sb->s_op->destroy_inode(inode);
+	kref_put(&inode->i_sb->s_kref);
+	assert(inode->i_mapping == &inode->i_pm);
+	/* TODO: (BDEV) */
+	// kref_put(inode->i_bdev->kref); /* assuming it's a bdev */
 }
 
 /* File functions */
@@ -495,11 +542,11 @@ ssize_t generic_file_read(struct file *file, char *buf, size_t count,
 	/* Consider pushing some error checking higher in the VFS */
 	if (!count)
 		return 0;
-	if (*offset == file->f_inode->i_size)
+	if (*offset == file->f_dentry->d_inode->i_size)
 		return 0; /* EOF */
 	/* Make sure we don't go past the end of the file */
-	if (*offset + count > file->f_inode->i_size) {
-		count = file->f_inode->i_size - *offset;
+	if (*offset + count > file->f_dentry->d_inode->i_size) {
+		count = file->f_dentry->d_inode->i_size - *offset;
 	}
 	page_off = *offset & (PGSIZE - 1);
 	first_idx = *offset >> PGSHIFT;
@@ -550,8 +597,8 @@ ssize_t generic_file_write(struct file *file, const char *buf, size_t count,
 		return 0;
 	/* Extend the file.  Should put more checks in here, and maybe do this per
 	 * page in the for loop below. */
-	if (*offset + count > file->f_inode->i_size)
-		file->f_inode->i_size = *offset + count;
+	if (*offset + count > file->f_dentry->d_inode->i_size)
+		file->f_dentry->d_inode->i_size = *offset + count;
 	page_off = *offset & (PGSIZE - 1);
 	first_idx = *offset >> PGSHIFT;
 	last_idx = (*offset + count) >> PGSHIFT;
@@ -614,10 +661,9 @@ struct file *do_file_open(char *path, int flags, int mode)
 		/* TODO: mode should be & ~umask.  Note that mode only applies to future
 		 * opens. */
 		if (parent_i->i_op->create(parent_i, file_d, mode, nd)) {
-			atomic_dec(&file_d->d_refcnt);
-			free_dentry(file_d); /* TODO: REF trigger off a decref */
-			set_errno(current_tf, EFAULT);
+			kref_put(&file_d->d_kref);
 			path_release(nd);
+			set_errno(current_tf, EFAULT);
 			return 0;
 		}
 		/* when we have notions of users, do something here: */
@@ -625,44 +671,60 @@ struct file *do_file_open(char *path, int flags, int mode)
 		file_d->d_inode->i_gid = 0;
 		file_d->d_inode->i_flags = flags & ~(O_CREAT|O_TRUNC|O_EXCL|O_NOCTTY);
 		dcache_put(file_d);
-		atomic_dec(&file_d->d_refcnt);	/* TODO: REF / KREF */
 	} else {	/* the file exists */
 		if ((flags & O_CREAT) && (flags & O_EXCL)) {
-			/* wanted to create, not open */
+			/* wanted to create, not open, bail out */
+			kref_put(&file_d->d_kref);
 			path_release(nd);
 			set_errno(current_tf, EACCES);
 			return 0;
 		}
 	}
-	/* now open the file (freshly created or if it already existed) */
+	/* now open the file (freshly created or if it already existed).  At this
+	 * point, file_d is a refcnt'd dentry, regardless of which branch we took.*/
 	file = kmem_cache_alloc(file_kcache, 0);
 	if (!file) {
-		set_errno(current_tf, ENOMEM);
+		kref_put(&file_d->d_kref);
 		path_release(nd);
+		set_errno(current_tf, ENOMEM);
 		return 0;
 	}
 	if (flags & O_TRUNC)
 		warn("File truncation not supported yet.");
 	if (file_d->d_inode->i_fop->open(file_d->d_inode, file)) {
-		set_errno(current_tf, ENOENT);
+		kref_put(&file_d->d_kref);
 		path_release(nd);
 		kmem_cache_free(file_kcache, file);
+		set_errno(current_tf, ENOENT);
 		return 0;
 	}
 	/* TODO: check the inode's mode (S_XXX) against the flags O_RDWR */
 	/* f_mode stores how the FILE is open, regardless of the mode */
 	file->f_mode = flags & (O_RDONLY|O_WRONLY|O_RDWR);
+	kref_put(&file_d->d_kref);
 	path_release(nd);
 	return file;
 }
 
-/* Closes a file, fsync, whatever else is necessary */
-int do_file_close(struct file *file)
+/* Closes a file, fsync, whatever else is necessary.  Called when the kref hits
+ * 0.  Note that the file is not refcounted on the s_files list, nor is the
+ * f_mapping refcounted (it is pinned by the i_mapping). */
+void file_release(struct kref *kref)
 {
-	assert(!file->f_refcnt);
-	/* TODO: fsync */
-	file->f_op->release(file->f_inode, file);
-	return 0;
+	struct file *file = container_of(kref, struct file, f_kref);
+
+	struct super_block *sb = file->f_dentry->d_sb;
+	spin_lock(&sb->s_lock);
+	TAILQ_REMOVE(&sb->s_files, file, f_list);
+	spin_unlock(&sb->s_lock);
+
+	/* TODO: fsync (BLK).  also, we may want to parallelize the blocking that
+	 * could happen in here (spawn kernel threads)... */
+	file->f_op->release(file->f_dentry->d_inode, file);
+	/* Clean up the other refs we hold */
+	kref_put(&file->f_dentry->d_kref);
+	kref_put(&file->f_vfsmnt->mnt_kref);
+	kmem_cache_free(file_kcache, file);
 }
 
 /* Page cache functions */
@@ -798,7 +860,7 @@ struct file *get_file_from_fd(struct files_struct *open_files, int file_desc)
 			assert(file_desc < open_files->max_files);
 			retval = open_files->fd[file_desc];
 			assert(retval);
-			atomic_inc(&retval->f_refcnt);
+			kref_get(&retval->f_kref, 1);
 		}
 	}
 	spin_unlock(&open_files->lock);
@@ -820,14 +882,9 @@ struct file *put_file_from_fd(struct files_struct *open_files, int file_desc)
 			file = open_files->fd[file_desc];
 			open_files->fd[file_desc] = 0;
 			CLR_BITMASK_BIT(open_files->open_fds->fds_bits, file_desc);
-			/* TODO: (REF) need to make sure we free if we hit 0 (might do this
-			 * in the caller */
-			if (file) {
-				atomic_dec(&file->f_refcnt);
-				if (!file->f_refcnt)
-					assert(!do_file_close(file));
-			}
 			/* the if case is due to files (stdin) without a *file yet */
+			if (file)
+				kref_put(&file->f_kref);
 		}
 	}
 	spin_unlock(&open_files->lock);
@@ -846,8 +903,8 @@ int insert_file(struct files_struct *open_files, struct file *file)
 		slot = i;
 		SET_BITMASK_BIT(open_files->open_fds->fds_bits, slot);
 		assert(slot < open_files->max_files && open_files->fd[slot] == 0);
+		kref_get(&file->f_kref, 1);
 		open_files->fd[slot] = file;
-		atomic_inc(&file->f_refcnt);
 		if (slot >= open_files->next_fd)
 			open_files->next_fd = slot + 1;
 		break;
@@ -858,7 +915,7 @@ int insert_file(struct files_struct *open_files, struct file *file)
 	return slot;
 }
 
-/* Closes all open files.  Sort of a "put" plus do_file_close(), for all. */
+/* Closes all open files.  Mostly just a "put" for all files. */
 void close_all_files(struct files_struct *open_files)
 {
 	struct file *file;
@@ -870,14 +927,9 @@ void close_all_files(struct files_struct *open_files)
 			assert(i < open_files->max_files);
 			file = open_files->fd[i];
 			open_files->fd[i] = 0;
-			/* TODO: we may want to parallelize the blocking... */
-			if (file) {
-				/* TODO: REF/KREF */
-				atomic_dec(&file->f_refcnt);
-				if (!file->f_refcnt)
-					do_file_close(file);
-			}
 			/* the if case is due to files (stdin) without a *file yet */
+			if (file)
+				kref_put(&file->f_kref);
 			CLR_BITMASK_BIT(open_files->open_fds->fds_bits, i);
 		}
 	}

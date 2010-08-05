@@ -16,7 +16,7 @@
 #include <ros/common.h>
 #include <sys/queue.h>
 #include <arch/bitmask.h>
-#include <atomic.h>
+#include <kref.h>
 #include <timing.h>
 #include <radix.h>
 
@@ -176,7 +176,7 @@ struct super_block {
 	unsigned long				s_magic;
 	struct vfsmount				*s_mount;		/* vfsmount point */
 	spinlock_t					s_lock;			/* used for all sync */
-	atomic_t					s_refcnt;
+	struct kref					s_kref;
 	bool						s_syncing;		/* currently syncing metadata */
 	struct inode_tailq			s_inodes;		/* all inodes */
 	struct inode_tailq			s_dirty_i;		/* dirty inodes */
@@ -215,7 +215,7 @@ struct inode {
 	TAILQ_ENTRY(inode)			i_list;			/* describes state (dirty) */
 	struct dentry_tailq			i_dentry;		/* all dentries pointing here*/
 	unsigned long				i_ino;
-	atomic_t					i_refcnt;
+	struct kref					i_kref;
 	int							i_mode;			/* access mode */
 	unsigned short				i_type;			/* file type */
 	unsigned int				i_nlink;		/* hard links */
@@ -275,7 +275,7 @@ struct inode_operations {
  * requests quickly.  If none of these, dealloc it back to the slab cache.
  * Unused and negatives go in the LRU list. */
 struct dentry {
-	atomic_t					d_refcnt;		/* don't discard when 0 */
+	struct kref					d_kref;			/* don't discard when 0 */
 	unsigned long				d_flags;		/* dentry cache flags */
 	spinlock_t					d_lock;
 	struct inode				*d_inode;
@@ -315,10 +315,10 @@ struct dentry_operations {
 /* File: represents a file opened by a process. */
 struct file {
 	TAILQ_ENTRY(file)			f_list;			/* list of all files */
-	struct inode				*f_inode;		/* was dentry.  i prefer this */
+	struct dentry				*f_dentry;		/* definitely not inode.  =( */
 	struct vfsmount				*f_vfsmnt;
 	struct file_operations		*f_op;
-	atomic_t					f_refcnt;
+	struct kref					f_kref;
 	unsigned int				f_flags;		/* O_APPEND, etc */
 	int							f_mode;			/* O_RDONLY, etc */
 	off_t						f_pos;			/* offset / file pointer */
@@ -376,7 +376,7 @@ struct vfsmount {
 	struct super_block			*mnt_sb;
 	struct vfsmount_tailq		mnt_child_mounts;
 	TAILQ_ENTRY(vfsmount)		mnt_child_link;
-	atomic_t					mnt_refcnt;
+	struct kref					mnt_kref;
 	int							mnt_flags;
 	char						*mnt_devname;
 	struct namespace			*mnt_namespace;
@@ -420,7 +420,7 @@ struct fs_struct {
 
 /* Each process can have its own (eventually), but default to the same NS */
 struct namespace {
-	atomic_t					refcnt;
+	struct kref					kref;
 	spinlock_t					lock;
 	struct vfsmount				*root;
 	struct vfsmount_tailq		vfsmounts;	/* all vfsmounts in this ns */
@@ -459,10 +459,11 @@ void init_sb(struct super_block *sb, struct vfsmount *vmnt,
 struct dentry *get_dentry(struct super_block *sb, struct dentry *parent,
                           char *name);
 void dcache_put(struct dentry *dentry);
-void free_dentry(struct dentry *dentry);
+void dentry_release(struct kref *kref);
 
 /* Inode Functions */
 int check_perms(struct inode *inode, int access_mode);
+void inode_release(struct kref *kref);
 
 /* File functions */
 ssize_t generic_file_read(struct file *file, char *buf, size_t count,
@@ -470,7 +471,7 @@ ssize_t generic_file_read(struct file *file, char *buf, size_t count,
 ssize_t generic_file_write(struct file *file, const char *buf, size_t count,
                            off_t *offset);
 struct file *do_file_open(char *path, int flags, int mode);
-int do_file_close(struct file *file);
+void file_release(struct kref *kref);
 
 /* Page cache functions */
 struct page *pm_find_page(struct page_map *pm, unsigned long index);

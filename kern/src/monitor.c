@@ -268,10 +268,7 @@ int mon_bin_ls(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 		printk("%s\n", dir.d_name);
 		dir.d_off++;
 	} while (retval == 1);
-	/* TODO: (REF) need to dealloc when this hits 0, atomic/concurrent/etc */
-	atomic_dec(&bin_dir->f_refcnt);
-	assert(!bin_dir->f_refcnt);
-	bin_dir->f_op->release(bin_dir->f_inode, bin_dir);
+	kref_put(&bin_dir->f_kref);
 	return 0;
 }
 
@@ -291,7 +288,7 @@ int mon_bin_run(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 		return 1;
 	}
 	char *p_argv[] = {0, 0, 0};
-	char *p_envp[] = {"LD_LIBRARY_PATH=/lib", 0};	/* for /bin/sh, i think */
+	char *p_envp[] = {"LD_LIBRARY_PATH=/lib", 0};
 	p_argv[0] = file_name(program);
 	struct proc *p = proc_create(program, p_argv, p_envp);
 
@@ -300,8 +297,7 @@ int mon_bin_run(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 	schedule_proc(p);
 	spin_unlock(&p->proc_lock);
 	kref_put(&p->kref); /* let go of the reference created in proc_create() */
-	/* TODO: (REF) need to dealloc when this hits 0, atomic/concurrent/etc */
-	atomic_dec(&program->f_refcnt);
+	kref_put(&program->f_kref);
 	/* Should never return from schedule (env_pop in there) also note you may
 	 * not get the process you created, in the event there are others floating
 	 * around that are runnable */
@@ -494,15 +490,14 @@ int mon_measure(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 		begin = start_timing();
 #ifdef __CONFIG_APPSERVER__
 		printk("Warning: this will be inaccurate due to the appserver.\n");
-		end_refcnt = atomic_read(&p->kref.refcount) -
-		             p->procinfo->num_vcores - 1;
+		end_refcnt = kref_refcnt(&p->kref) - p->procinfo->num_vcores - 1;
 #endif /* __CONFIG_APPSERVER__ */
 		proc_destroy(p);
 		kref_put(&p->kref);
 #ifdef __CONFIG_APPSERVER__
 		/* Won't be that accurate, since it's not actually going through the
 		 * __proc_free() path. */
-		spin_on(atomic_read(&p->kref.refcount) != end_refcnt);	
+		spin_on(kref_refcnt(&p->kref) != end_refcnt);	
 #else
 		/* this is a little ghetto. it's not fully free yet, but we are also
 		 * slowing it down by messing with it, esp with the busy waiting on a
@@ -529,12 +524,11 @@ int mon_measure(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 			spin_on(p->procinfo->pcoremap[pcoreid].valid);
 			diff = stop_timing(begin);
 		} else { /* preempt all cores, warned but no delay */
-			end_refcnt = atomic_read(&p->kref.refcount)
-			             - p->procinfo->num_vcores;
+			end_refcnt = kref_refcnt(&p->kref) - p->procinfo->num_vcores;
 			begin = start_timing();
 			proc_preempt_all(p, 1000000);
 			/* a little ghetto, implies no one is using p */
-			spin_on(atomic_read(&p->kref.refcount) != end_refcnt);
+			spin_on(kref_refcnt(&p->kref) != end_refcnt);
 			diff = stop_timing(begin);
 		}
 		kref_put(&p->kref);
@@ -603,15 +597,14 @@ int mon_measure(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 			/* TODO: (RMS), if num_vcores == 0, RUNNABLE_M, schedule */
 		} else { /* preempt all cores, no warning or waiting */
 			spin_lock(&p->proc_lock);
-			end_refcnt = atomic_read(&p->kref.refcount)
-			             - p->procinfo->num_vcores;
+			end_refcnt = kref_refcnt(&p->kref) - p->procinfo->num_vcores;
 			begin = start_timing();
 			self_ipi_pending = __proc_preempt_all(p);
 			/* TODO: (RMS), RUNNABLE_M, schedule */
 			spin_unlock(&p->proc_lock);
 			__proc_kmsg_pending(p, self_ipi_pending);
 			/* a little ghetto, implies no one else is using p */
-			spin_on(atomic_read(&p->kref.refcount) != end_refcnt);
+			spin_on(kref_refcnt(&p->kref) != end_refcnt);
 			diff = stop_timing(begin);
 		}
 		kref_put(&p->kref);
@@ -781,7 +774,10 @@ int mon_fs(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 	if (!strcmp(argv[1], "open")) {
 		printk("Open Files:\n----------------------------\n");
 		TAILQ_FOREACH(i, &sb->s_files, f_list)
-			printk("File: %08p, %s, Refs: %d\n", i, file_name(i), i->f_refcnt);
+			printk("File: %08p, %s, Refs: %d, Drefs: %d, Irefs: %d\n", i,
+			       file_name(i), kref_refcnt(&i->f_kref),
+				   kref_refcnt(&i->f_dentry->d_kref),
+				   kref_refcnt(&i->f_dentry->d_inode->i_kref));
 	} else if (!strcmp(argv[1], "pid")) {
 		if (argc != 3) {
 			printk("Give me a pid number.\n");

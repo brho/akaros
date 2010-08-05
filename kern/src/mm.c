@@ -104,8 +104,8 @@ struct vm_region *split_vmr(struct vm_region *old_vmr, uintptr_t va)
 	new_vmr->vm_prot = old_vmr->vm_prot;
 	new_vmr->vm_flags = old_vmr->vm_flags;
 	if (old_vmr->vm_file) {
+		kref_get(&old_vmr->vm_file->f_kref, 1);
 		new_vmr->vm_file = old_vmr->vm_file;
-		atomic_inc(&new_vmr->vm_file->f_refcnt);
 		new_vmr->vm_foff = old_vmr->vm_foff +
 		                      old_vmr->vm_end - old_vmr->vm_base;
 	} else {
@@ -181,7 +181,7 @@ int shrink_vmr(struct vm_region *vmr, uintptr_t va)
 void destroy_vmr(struct vm_region *vmr)
 {
 	if (vmr->vm_file)
-		atomic_dec(&vmr->vm_file->f_refcnt);
+		kref_put(&vmr->vm_file->f_kref);
 	TAILQ_REMOVE(&vmr->vm_proc->vm_regions, vmr, vm_link);
 	kmem_cache_free(vmr_kcache, vmr);
 }
@@ -253,9 +253,9 @@ void duplicate_vmrs(struct proc *p, struct proc *new_p)
 		vmr->vm_end = vm_i->vm_end;
 		vmr->vm_prot = vm_i->vm_prot;	
 		vmr->vm_flags = vm_i->vm_flags;	
+		if (vm_i->vm_file)
+			kref_get(&vm_i->vm_file->f_kref, 1);
 		vmr->vm_file = vm_i->vm_file;
-		if (vmr->vm_file)
-			atomic_inc(&vmr->vm_file->f_refcnt);
 		vmr->vm_foff = vm_i->vm_foff;
 		TAILQ_INSERT_TAIL(&new_p->vm_regions, vmr, vm_link);
 	}
@@ -303,7 +303,7 @@ void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 	addr = MAX(addr, MMAP_LOWEST_VA);
 	void *result = do_mmap(p, addr, len, prot, flags, file, offset);
 	if (file)
-		file_decref(file);
+		kref_put(&file->f_kref);
 	return result;
 }
 
@@ -341,6 +341,8 @@ void *__do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 	}
 	vmr->vm_prot = prot;
 	vmr->vm_flags = flags;
+	if (file)
+		kref_get(&file->f_kref, 1);
 	vmr->vm_file = file;
 	vmr->vm_foff = offset;
 	/* Prep the FS to make sure it can mmap the file.  Slightly weird semantics:

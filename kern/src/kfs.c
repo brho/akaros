@@ -57,8 +57,8 @@ static void kfs_init(void)
 	                                 __alignof__(struct kfs_i_info), 0, 0, 0);
 }
 
-/* Creates the SB (normally would read in from disc and create).  Ups the refcnt
- * for whoever consumes this.  Returns 0 on failure.
+/* Creates the SB (normally would read in from disc and create).  Passes it's
+ * ref out to whoever consumes this.  Returns 0 on failure.
  * TODO: consider pulling out more of the FS-independent stuff, if possible.
  * There are only two things, but the pain in the ass is that you'd need to read
  * the disc to get that first inode, and it's a FS-specific thing. */
@@ -119,7 +119,8 @@ struct fs_type kfs_fs_type = {"KFS", 0, kfs_get_sb, kfs_kill_sb, {0, 0},
 int kfs_readpage(struct file *file, struct page *page)
 {
 	size_t pg_idx_byte = page->pg_index * PGSIZE;
-	struct kfs_i_info *k_i_info = (struct kfs_i_info*)file->f_inode->i_fs_info;
+	struct kfs_i_info *k_i_info = (struct kfs_i_info*)
+	                              file->f_dentry->d_inode->i_fs_info;
 	uintptr_t begin = (size_t)k_i_info->filestart + pg_idx_byte;
 	/* If we're beyond the initial start point, we just need a zero page.  This
 	 * is for a hole or for extending a file (even though it won't be saved).
@@ -154,7 +155,7 @@ struct inode *kfs_alloc_inode(struct super_block *sb)
 	TAILQ_INSERT_HEAD(&sb->s_inodes, inode, i_sb_list);
 	TAILQ_INIT(&inode->i_dentry);
 	inode->i_ino = 0;					/* set by caller later */
-	atomic_set(&inode->i_refcnt, 1);
+	kref_init(&inode->i_kref, inode_release, 1);
 	inode->i_blksize = 1;				/* keep in sync with get_sb() */
 	spinlock_init(&inode->i_lock);
 	inode->i_op = &kfs_i_op;
@@ -282,20 +283,20 @@ void kfs_umount_begin(struct super_block *sb)
 /* inode_operations */
 
 /* Helper op, used when creating regular files (kfs_create()) and when making
- * directories (kfs_mkdir()).  References are a bit ugly.  We're passing out a
- * ref that is already stored/accounted for.  Might change that...  Also, this
- * needs to handle having nd == 0.  Note we make a distinction between the mode
- * and the file type (for now).  The caller of this should set the filetype. */
-struct inode *kfs_create_generic(struct inode *dir, struct dentry *dentry,
-                                 int mode, struct nameidata *nd)
+ * directories (kfs_mkdir()).  
+ * This needs to handle having nd == 0.  Note we make a distinction between the
+ * mode and the file type (for now).  The caller of this should set the
+ * filetype. */
+static struct inode *kfs_create_generic(struct dentry *dentry,
+                                        int mode, struct nameidata *nd)
 {
 	/* note it is the i_ino that uniquely identifies a file in the system.
 	 * there's a diff between creating an inode (even for an in-use ino) and
 	 * then filling it in, and vs creating a brand new one */
 	struct inode *inode = kfs_alloc_inode(dentry->d_sb);
-	dentry->d_inode = inode;		/* inode ref stored here */
-	TAILQ_INSERT_TAIL(&inode->i_dentry, dentry, d_alias); /* stored dentry ref*/
-	atomic_inc(&dentry->d_refcnt);	/* TODO: REF/KREF */
+	kref_get(&dentry->d_kref, 1);	/* to pin the dentry in RAM, KFS-style... */
+	dentry->d_inode = inode;		/* inode ref from alloc() stored here */
+	TAILQ_INSERT_TAIL(&inode->i_dentry, dentry, d_alias); /* weak dentry ref*/
 	/* Need to finish the dentry */
 	dentry->d_op = &kfs_d_op;
 	dentry->d_fs_info = 0;
@@ -320,7 +321,7 @@ struct inode *kfs_create_generic(struct inode *dir, struct dentry *dentry,
 int kfs_create(struct inode *dir, struct dentry *dentry, int mode,
                struct nameidata *nd)
 {
-	struct inode *inode = kfs_create_generic(dir, dentry, mode, nd);	
+	struct inode *inode = kfs_create_generic(dentry, mode, nd);	
 	if (!inode)
 		return -1;
 	inode->i_type = FS_I_FILE;
@@ -358,12 +359,13 @@ struct dentry *kfs_lookup(struct inode *dir, struct dentry *dentry,
 
 	assert(dir_dent && dir_dent == TAILQ_LAST(&dir->i_dentry, dentry_tailq));
 	assert(dir->i_type & FS_I_DIR);
-
+	assert(kref_refcnt(&dentry->d_kref) == 1);
 	TAILQ_FOREACH(d_i, &dir_dent->d_subdirs, d_subdirs_link) {
 		if (!strcmp(d_i->d_name.name, dentry->d_name.name)) {
 			/* since this dentry is already in memory (that's how KFS works), we
 			 * can free the one that came in and return the real one */
-			kmem_cache_free(dentry_kcache, dentry);
+			kref_put(&dentry->d_kref);
+			kref_get(&d_i->d_kref, 1);
 			return d_i;
 		}
 	}
@@ -371,14 +373,15 @@ struct dentry *kfs_lookup(struct inode *dir, struct dentry *dentry,
 		if (!strcmp(d_i->d_name.name, dentry->d_name.name)) {
 			/* since this dentry is already in memory (that's how KFS works), we
 			 * can free the one that came in and return the real one */
-			kmem_cache_free(dentry_kcache, dentry);
+			kref_put(&dentry->d_kref);
+			kref_get(&d_i->d_kref, 1);
 			return d_i;
 		}
 	}
 	/* no match, consider caching the negative result, freeing the
 	 * dentry, etc */
 	printd("Not Found %s!!\n", dentry->d_name.name);
-	free_dentry(dentry);
+	kref_put(&dentry->d_kref);
 	return 0;
 }
 
@@ -409,15 +412,15 @@ int kfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
  * need it. */
 int kfs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 {
-	struct inode *inode = kfs_create_generic(dir, dentry, mode, 0);	
+	struct inode *inode = kfs_create_generic(dentry, mode, 0);	
 	if (!inode)
 		return -1;
+	/* this is okay, since no directory (dir) can have more than one dentry */
 	struct dentry *parent = TAILQ_FIRST(&dir->i_dentry);
 	assert(parent && parent == TAILQ_LAST(&dir->i_dentry, dentry_tailq));
 	inode->i_type = FS_I_DIR;
-	/* parent dentry tracks dentry as a subdir */
+	/* parent dentry tracks dentry as a subdir, weak reference */
 	TAILQ_INSERT_TAIL(&parent->d_subdirs, dentry, d_subdirs_link);
-	atomic_inc(&dentry->d_refcnt);
 	/* get ready to have our own kids */
 	TAILQ_INIT(&((struct kfs_i_info*)inode->i_fs_info)->children);
 	((struct kfs_i_info*)inode->i_fs_info)->filestart = 0;
@@ -533,13 +536,13 @@ off_t kfs_llseek(struct file *file, off_t offset, int whence)
 			temp_off = file->f_pos + offset;
 			break;
 		case SEEK_END:
-			temp_off = file->f_inode->i_size + offset;
+			temp_off = file->f_dentry->d_inode->i_size + offset;
 			break;
 		default:
 			warn("Unknown 'whence' in llseek()!\n");
 	}
 	/* make sure the f_pos isn't outside the limits of the existing file */
-	temp_off = MAX(MIN(temp_off, file->f_inode->i_size), 0);
+	temp_off = MAX(MIN(temp_off, file->f_dentry->d_inode->i_size), 0);
 	file->f_pos = temp_off;
 	return temp_off;
 }
@@ -554,8 +557,8 @@ int kfs_readdir(struct file *dir, struct dirent *dirent)
 	int count = 0;
 	bool found = FALSE;
 	struct dentry *subent;
-	struct dentry *dir_d = TAILQ_FIRST(&dir->f_inode->i_dentry);
-	struct kfs_i_info *k_i_info = (struct kfs_i_info*)dir->f_inode->i_fs_info;
+	struct dentry *dir_d = dir->f_dentry;
+	struct kfs_i_info *k_i_info = (struct kfs_i_info*)dir_d->d_inode->i_fs_info;
 
 	/* how we check inside the for loops below.  moderately ghetto. */
 	void check_entry(void)
@@ -571,7 +574,7 @@ int kfs_readdir(struct file *dir, struct dirent *dirent)
 	}
 	/* some of this error handling can be done by the VFS.  The syscall should
 	 * handle EBADF, EFAULT, and EINVAL (TODO, memory related). */
-	if (!(dir->f_inode->i_type & FS_I_DIR)) {
+	if (!(dir_d->d_inode->i_type & FS_I_DIR)) {
 		set_errno(current_tf, ENOTDIR);
 		return -1;
 	}
@@ -598,24 +601,32 @@ int kfs_readdir(struct file *dir, struct dirent *dirent)
  * the file was opened or the file type. */
 int kfs_mmap(struct file *file, struct vm_region *vmr)
 {
-	if (file->f_inode->i_type & FS_I_FILE)
+	if (file->f_dentry->d_inode->i_type & FS_I_FILE)
 		return 0;
 	return -1;
 }
 
 /* Opens the file specified by the inode, creating and filling in the file */
-/* TODO: fill out the other // entries, sort vmnt refcnting */
+/* TODO: fill out the other // entries */
 int kfs_open(struct inode *inode, struct file *file)
 {
-	/* This is mostly FS-agnostic, consider a helper */
+	/* This is mostly FS-agnostic, consider a get_file() helper (TODO) */
 	//file = kmem_cache_alloc(file_kcache, 0); /* done in the VFS */
+
+	/* one for the ref passed out, and *none* for the sb TAILQ */
+	kref_init(&file->f_kref, file_release, 1);
 	/* Add to the list of all files of this SB */
 	TAILQ_INSERT_TAIL(&inode->i_sb->s_files, file, f_list);
-	file->f_inode = inode;
-	atomic_inc(&inode->i_refcnt);
+
+	/* TODO: when we pull this out to the VFS, the function will take the dentry
+	 * instead, and then call the fs_open(dentry->d_inode) */
+	struct dentry *my_d = TAILQ_FIRST(&inode->i_dentry);
+	kref_get(&my_d->d_kref, 1);
+	file->f_dentry = my_d;
+
+	kref_get(&inode->i_sb->s_mount->mnt_kref, 1);
 	file->f_vfsmnt = inode->i_sb->s_mount;		/* saving a ref to the vmnt...*/
-	file->f_op = &kfs_f_op;
-	atomic_set(&file->f_refcnt, 1);				/* ref passed out */
+	file->f_op = &kfs_f_op;		/* TODO: set me == to i_fop */
 	file->f_flags = inode->i_flags;				/* just taking the inode vals */
 	file->f_mode = inode->i_mode;
 	file->f_pos = 0;
@@ -635,15 +646,9 @@ int kfs_flush(struct file *file)
 	return -1;
 }
 
-/* Called when the file refcnt == 0 */
+/* Called when the file is about to be closed (file obj freed) */
 int kfs_release(struct inode *inode, struct file *file)
 {
-	TAILQ_REMOVE(&inode->i_sb->s_files, file, f_list);
-	/* TODO: (REF) need to dealloc when this hits 0, atomic/concurrent/etc */
-	atomic_dec(&inode->i_refcnt);
-	/* TODO: clean up the inode if it was the last and we don't want it around
-	 */
-	kmem_cache_free(file_kcache, file);
 	return 0;
 }
 

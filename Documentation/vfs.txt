@@ -205,3 +205,40 @@ pain.
 This also applies to trying to write to a block beyond the EOF.  If the request
 hits the page cache and readpage(), it's because it was already checked and
 cleared in another part of the VFS, such as in generic_file_write().
+
+Kref, Dentries, Inodes, and Files (or "I don't see why it's like X, but..."
+--------------------------
+There are multiple dentries pointing to an inode.  The dentries are (or will be)
+cached too, but that is irrelevant.  The dentries pin the inodes in memory.
+However, files pin inodes in memory (or they did) briefly.  After running around
+in circles a bit, I asked, why doesn't the file pin the dentry instead of the
+inode?  The answer: it is supposed to.  Linux does that, and I didn't because
+pinning the inode made more sense at the time.
+
+The heart of the issue is about understanding what files are and how they
+relate to the rest of the VFS.  A 'file' in the OS is a structure to track an
+open FS-disk-file, which is managed by the inode.  Given this, it makes sense
+that a dentry (which is a name on a path) would be pinned by the corresponding
+inode, and the file would pin the inode.  It doesn't, but it is believable.  In
+reality, there are many names (dentries) for a given disk file, and the OS file
+that you open corresponds to *one* of those names, and thus a dentry, and not to
+the inode/specific file.  You need to go through the dentry to pin the inode.
+
+In short, it's not: file -> inode -> dentry -> parent_dentry -> ...
+It's file -> dentry -> parent_dentry ->
+             |-> inode      |-> parent_inode
+Another dentry and file (both OS and disk) can point to the same inode.  If you
+don't do it this way, you can't pin up past the multi-dentry-point in the inode,
+and your system doesn't really make sense.
+
+So here is how it works: files pin dentries.  Dentries can pin other dentries,
+on up the directory hierarchy.  Independently of the files, dentries pin their
+inode.  There are many dentries per inode (or can be).  Since each dentry
+doesn't know if it is the last dentry to decref the inode, we use a kref on
+i_kref.  The inodes are storing references to the dentries, but they are the
+kref "internal" / weak references.  Even if we did decref them, we don't trigger
+anything with it.
+
+The moral of the story is that if you don't fully understand something, you are
+not in as good of a position to recommend changes or criticize as if you did
+your homework.  Not that you can't, just that you should 'do your homework.'

@@ -311,14 +311,14 @@ error_t proc_alloc(struct proc **pp, struct proc *parent)
 	                SYSEVENTRINGSIZE);
 
 	/* Init FS structures TODO: cleanup (might pull this out) */
-	atomic_inc(&default_ns.refcnt);
+	kref_get(&default_ns.kref, 1);
 	p->ns = &default_ns;
 	spinlock_init(&p->fs_env.lock);
 	p->fs_env.umask = parent ? parent->fs_env.umask : 0002;
 	p->fs_env.root = p->ns->root->mnt_root;
-	atomic_inc(&p->fs_env.root->d_refcnt);
+	kref_get(&p->fs_env.root->d_kref, 1);
 	p->fs_env.pwd = parent ? parent->fs_env.pwd : p->fs_env.root;
-	atomic_inc(&p->fs_env.pwd->d_refcnt);
+	kref_get(&p->fs_env.pwd->d_kref, 1);
 	memset(&p->open_files, 0, sizeof(p->open_files));	/* slightly ghetto */
 	spinlock_init(&p->open_files.lock);
 	p->open_files.max_files = NR_OPEN_FILES_DEFAULT;
@@ -363,7 +363,7 @@ static void __proc_free(struct kref *kref)
 
 	printd("[PID %d] freeing proc: %d\n", current ? current->pid : 0, p->pid);
 	// All parts of the kernel should have decref'd before __proc_free is called
-	assert(atomic_read(&p->kref.refcount) == 0);
+	assert(kref_refcnt(&p->kref) == 0);
 
 	close_all_files(&p->open_files);
 	destroy_vmrs(p);

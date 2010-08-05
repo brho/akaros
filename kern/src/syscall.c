@@ -217,28 +217,25 @@ static int sys_proc_create(struct proc *p, char *path, size_t path_l,
 	 * args/env, since auxp gets set up there. */
 	//new_p = proc_create(program, 0, 0);
 	if (proc_alloc(&new_p, current))
-		return -1;
+		goto mid_error;
 	/* Set the argument stuff needed by glibc */
 	if (memcpy_from_user_errno(p, new_p->procinfo->argp, pi->argp,
-	                           sizeof(pi->argp))) {
-		atomic_dec(&program->f_refcnt);	/* TODO: REF */
-		proc_destroy(new_p);
-		return -1;
-	}
+	                           sizeof(pi->argp)))
+		goto late_error;
 	if (memcpy_from_user_errno(p, new_p->procinfo->argbuf, pi->argbuf,
-	                           sizeof(pi->argbuf))) {
-		atomic_dec(&program->f_refcnt);	/* TODO: REF */
-		proc_destroy(new_p);
-		return -1;
-	}
-	if (load_elf(new_p, program)) {
-		proc_destroy(new_p);
-		return -1;
-	}
+	                           sizeof(pi->argbuf)))
+		goto late_error;
+	if (load_elf(new_p, program))
+		goto late_error;
+	kref_put(&program->f_kref);
 	pid = new_p->pid;
 	kref_put(&new_p->kref);	/* give up the reference created in proc_create() */
-	atomic_dec(&program->f_refcnt);		/* TODO: REF / KREF */
 	return pid;
+late_error:
+	proc_destroy(new_p);
+mid_error:
+	kref_put(&program->f_kref);
+	return -1;
 }
 
 /* Makes process PID runnable.  Consider moving the functionality to process.c */
@@ -411,15 +408,11 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 		return -1;			/* presumably, errno is already set */
 	/* Set the argument stuff needed by glibc */
 	if (memcpy_from_user_errno(p, p->procinfo->argp, pi->argp,
-	                           sizeof(pi->argp))) {
-		atomic_dec(&program->f_refcnt);	/* TODO: REF */
-		return -1;
-	}
+	                           sizeof(pi->argp)))
+		goto mid_error;
 	if (memcpy_from_user_errno(p, p->procinfo->argbuf, pi->argbuf,
-	                           sizeof(pi->argbuf))) {
-		atomic_dec(&program->f_refcnt);	/* TODO: REF */
-		return -1;
-	}
+	                           sizeof(pi->argbuf)))
+		goto mid_error;
 	/* This is the point of no return for the process. */
 	/* TODO: issues with this: Need to also assert there are no outstanding
 	 * users of the sysrings.  the ldt page will get freed shortly, so that's
@@ -428,13 +421,17 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	memset(p->procdata, 0, sizeof(procdata_t));
 	env_user_mem_free(p, 0, UMAPTOP);
 	if (load_elf(p, program)) {
+		kref_put(&program->f_kref);
 		proc_destroy(p);
 		smp_idle();		/* syscall can't return on failure now */
 	}
 	printd("[PID %d] exec %s\n", p->pid, file_name(program));
-	atomic_dec(&program->f_refcnt);		/* TODO: (REF) / KREF */
+	kref_put(&program->f_kref);
 	*current_tf = p->env_tf;
 	return 0;
+mid_error:
+	kref_put(&program->f_kref);
+	return -1;
 }
 
 static ssize_t sys_trywait(env_t* e, pid_t pid, int* status)
@@ -872,7 +869,7 @@ intreg_t sys_open(struct proc *p, const char *path, int oflag, int mode)
 	if (!file)
 		return -1;
 	fd = insert_file(&p->open_files, file);	/* stores the ref to file */
-	atomic_dec(&file->f_refcnt);	/* TODO: REF / KREF */
+	kref_put(&file->f_kref);
 	if (fd < 0) {
 		warn("File insertion failed");
 		return -1;
@@ -889,7 +886,11 @@ intreg_t sys_close(struct proc *p, int fd)
 		return -1;
 	}
 	/* TEMP TEST */
-	assert(!file->f_refcnt);
+	if (kref_refcnt(&file->f_kref)) {
+		printk("sys_close: Detected positive refcnt %d for file %s\n",
+		       kref_refcnt(&file->f_kref), file_name(file));
+		panic("Idiot.");
+	}
 	return 0;
 }
 

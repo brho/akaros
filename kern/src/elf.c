@@ -84,7 +84,6 @@ load_one_elf(struct proc* p, struct file* f, int pgoffset, elf_info_t* ei)
 			uintptr_t memsz = memend-memstart;
 			if(memend > ei->highest_addr)
 				ei->highest_addr = memend;
-
 			/* This needs to be a PRIVATE mapping, and the stuff after the file
 			 * needs to be zeroed. */
 			if (filesz) {
@@ -136,14 +135,15 @@ int load_elf(struct proc* p, struct file* f)
 	if(load_one_elf(p,f,0,&ei))
 		return -1;
 
-	if(ei.dynamic)
-	{
-		/* this won't work til we convert some more syscalls to use the FS */
+	if (ei.dynamic) {
 		struct file *interp = path_to_file(ei.interp);
-		/* this will probably conflict with the mmap from the TLS up above */
-		if (interp == NULL || load_one_elf(p, interp, 2, &interp_ei))
+		if (!interp)
 			return -1;
-		atomic_dec(&interp->f_refcnt);	/* TODO: REF */
+		/* careful, this could conflict with the mmap from the TLS up above */
+ 		int error = load_one_elf(p, interp, 2, &interp_ei);
+		kref_put(&interp->f_kref);
+		if (error)
+			return -1;
 	}
 
 	// fill in auxiliary info for dynamic linker/runtime
