@@ -39,7 +39,10 @@ V := @
 realall: symlinks
 
 # Number of make jobs to spawn.  Define it in Makelocal
-MAKE_JOBS := 
+MAKE_JOBS :=
+
+# Give it a reasonable default path for initramfs to avoid build breakage
+INITRAMFS_PATHS = kern/kfs obj/tests
 
 # Then grab the users Makelocal file to let them override Make system variables
 # and set up other Make targets
