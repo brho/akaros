@@ -48,7 +48,6 @@ void arsc_server(trapframe_t *tf)
 		while (TAILQ_EMPTY(&arsc_proc_list))
 			cpu_relax();
 
-		printd ("detected process\n");
 		TAILQ_FOREACH(p, &arsc_proc_list, proc_link)
 		{
 			// TODO: we may need an atomic swap to inc ref count
@@ -77,7 +76,6 @@ static intreg_t process_generic_syscalls(struct proc *p, size_t max)
 	// max is the most we'll process.  max = 0 means do as many as possible
 	// TODO: check for initialization of the ring. 
 	while (RING_HAS_UNCONSUMED_REQUESTS(sysbr) && ((!max)||(count < max)) ) {
-		printd ("start processing req %d\n", count);
 		if (!count) {
 			// ASSUME: one queue per process
 			// only switch cr3 for the very first request for this queue
