@@ -34,6 +34,6 @@ void *user_memdup(struct proc *p, const void *va, int len);
 void *user_memdup_errno(struct proc *p, const void *va, int len);
 void user_memdup_free(struct proc *p, void *va);
 /* Same as memdup, but just does strings.  still needs memdup_freed */
-char *user_strdup(struct proc *p, const char *va0, int max);
-char *user_strdup_errno(struct proc *p, const char *va, int max);
+char *user_strdup(struct proc *p, const char *u_string, size_t strlen);
+char *user_strdup_errno(struct proc *p, const char *u_string, size_t strlen);
 void *kmalloc_errno(int len);

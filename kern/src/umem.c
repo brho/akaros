@@ -290,40 +290,28 @@ void user_memdup_free(struct proc *p, void *va)
 	kfree(va);
 }
 
-/* Same as memdup, but just does strings.  still needs memdup_freed */
-char *user_strdup(struct proc *p, const char *va0, int max)
+/* Same as memdup, but just does strings, and needs to know the actual strlen.
+ * Still needs memdup_free()d.  This will enforce that the string is null
+ * terminated.  The parameter strlen does not include the \0, though it can if
+ * someone else is playing it safe.  Since strlen() doesn't count the \0, we'll
+ * play it safe here. */
+char *user_strdup(struct proc *p, const char *u_string, size_t strlen)
 {
-	max++;
-	char* kbuf = (char*)kmalloc(PGSIZE, 0);
-	if (kbuf == NULL)
-		return ERR_PTR(-ENOMEM);
-	int pos = 0, len = 0;
-	const char* va = va0;
-	while (max > 0 && len == 0) {
-		int thislen = MIN(PGSIZE - (uintptr_t)va % PGSIZE, max);
-		if (memcpy_from_user(p, kbuf, va, thislen)) {
-			kfree(kbuf);
-			return ERR_PTR(-EINVAL);
-		}
-		const char *nullterm = memchr(kbuf, 0, thislen);
-		if (nullterm)
-			len = pos + (nullterm - kbuf) + 1;
-		pos += thislen;
-		va += thislen;
-		max -= thislen;
-	}
-	kfree(kbuf);
-	return len ? user_memdup(p, va0, len) : ERR_PTR(-EINVAL);
+	char *k_string = user_memdup(p, u_string, strlen + 1);
+	if (!IS_ERR(k_string))
+		k_string[strlen] = '\0';
+	return k_string;
 }
 
-char *user_strdup_errno(struct proc *p, const char *va, int max)
+/* user_strdup, but this handles the errno.  0 on failure, ptr on success */
+char *user_strdup_errno(struct proc *p, const char *u_string, size_t strlen)
 {
-	void *kva = user_strdup(p, va, max);
-	if (IS_ERR(kva)) {
-		set_errno(current_tf, -PTR_ERR(kva));
+	void *k_string = user_strdup(p, u_string, strlen);
+	if (IS_ERR(k_string)) {
+		set_errno(current_tf, -PTR_ERR(k_string));
 		return NULL;
 	}
-	return kva;
+	return k_string;
 }
 
 void *kmalloc_errno(int len)

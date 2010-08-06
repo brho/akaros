@@ -205,9 +205,9 @@ static int sys_proc_create(struct proc *p, char *path, size_t path_l,
 	struct file *program;
 	struct proc *new_p;
 
-	/* Copy in the path.  Consider putting an upper bound. */
+	/* Copy in the path.  Consider putting an upper bound on path_l. */
 	t_path = user_strdup_errno(p, path, path_l);
-	if (IS_ERR(t_path))
+	if (!t_path)
 		return -1;
 	program = do_file_open(t_path, 0, 0);
 	user_memdup_free(p, t_path);
@@ -396,9 +396,10 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	/* We probably want it to never be allowed to exec if it ever was _M */
 	if(p->state != PROC_RUNNING_S)
 		return -1;
-	/* Copy in the path.  Consider putting an upper bound. */
+
+	/* Copy in the path.  Consider putting an upper bound on path_l. */
 	t_path = user_strdup_errno(p, path, path_l);
-	if (IS_ERR(t_path))
+	if (!t_path)
 		return -1;
 	program = do_file_open(t_path, 0, 0);
 	user_memdup_free(p, t_path);
