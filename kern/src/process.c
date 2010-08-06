@@ -325,7 +325,9 @@ error_t proc_alloc(struct proc **pp, struct proc *parent)
 	p->open_files.max_fdset = NR_FILE_DESC_DEFAULT;
 	p->open_files.fd = p->open_files.fd_array;
 	p->open_files.open_fds = (struct fd_set*)&p->open_files.open_fds_init;
-	/* 0, 1, and 2 are reserved, but prob shouldn't do it this way */
+	/* TODO: 0, 1, and 2 are reserved, but prob shouldn't do it this way.
+	 * Whatever we do for stdin/out/err, we need to keep it in sync for created
+	 * processes and forked processes (clone_files). */
 	p->open_files.next_fd = 3;
 	for (int i = 0; i < 3; i++)
 		SET_BITMASK_BIT(p->open_files.open_fds->fds_bits, i);
@@ -365,7 +367,7 @@ static void __proc_free(struct kref *kref)
 	// All parts of the kernel should have decref'd before __proc_free is called
 	assert(kref_refcnt(&p->kref) == 0);
 
-	close_all_files(&p->open_files);
+	close_all_files(&p->open_files, FALSE);
 	destroy_vmrs(p);
 	frontend_proc_free(p);	/* TODO: please remove me one day */
 	/* Free any colors allocated to this process */
@@ -651,6 +653,8 @@ void proc_destroy(struct proc *p)
 	 * but currently aren't for all things (like traphandlers). */
 	spin_unlock(&p->proc_lock);
 	kref_put(&p->kref);		/* for the hashtable ref */
+	/* at this point, we normally have one ref to be eaten in kmsg_pending and
+	 * one for every 'current'.  and maybe one for a parent */
 	__proc_kmsg_pending(p, self_ipi_pending);
 	return;
 }

@@ -109,7 +109,7 @@ char *p_envp[] = {"LD_LIBRARY_PATH=/lib", 0};
 
 void manager_brho(void)
 {
-	static uint8_t RACY progress = 0;
+	static uint8_t RACY progress = 0;	/* this will wrap around. */
 	static struct proc *p;
 	struct file *temp_f;
 
@@ -119,6 +119,7 @@ void manager_brho(void)
 
 	switch (progress++) {
 		case 0:
+			printk("Top of the manager to ya!\n");
 			/* 124 is half of the available boxboro colors (with the kernel
 			 * getting 8) */
 			//quick_proc_color_run("msr_dumb_while", p, 124, temp_f);

@@ -369,9 +369,7 @@ static ssize_t sys_fork(env_t* e)
 		set_errno(current_tf,ENOMEM);
 		return -1;
 	}
-	
-	/* TODO: copy all open files, except O_CLOEXEC */
-
+	clone_files(&e->open_files, &env->open_files);
 	__proc_set_state(env, PROC_RUNNABLE_S);
 	schedule_proc(env);
 
@@ -419,6 +417,8 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	 * okay.  Potentially issues with the nm and vcpd if we were in _M before
 	 * and someone is trying to notify. */
 	memset(p->procdata, 0, sizeof(procdata_t));
+	destroy_vmrs(p);
+	close_all_files(&p->open_files, TRUE);
 	env_user_mem_free(p, 0, UMAPTOP);
 	if (load_elf(p, program)) {
 		kref_put(&program->f_kref);

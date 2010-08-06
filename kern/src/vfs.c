@@ -1020,8 +1020,9 @@ int insert_file(struct files_struct *open_files, struct file *file)
 	return slot;
 }
 
-/* Closes all open files.  Mostly just a "put" for all files. */
-void close_all_files(struct files_struct *open_files)
+/* Closes all open files.  Mostly just a "put" for all files.  If cloexec, it
+ * will only close files that are opened with O_CLOEXEC. */
+void close_all_files(struct files_struct *open_files, bool cloexec)
 {
 	struct file *file;
 	spin_lock(&open_files->lock);
@@ -1031,6 +1032,8 @@ void close_all_files(struct files_struct *open_files)
 			 * have a valid fdset higher than files */
 			assert(i < open_files->max_files);
 			file = open_files->fd[i];
+			if (cloexec && !(file->f_flags | O_CLOEXEC))
+				continue;
 			open_files->fd[i] = 0;
 			/* the if case is due to files (stdin) without a *file yet */
 			if (file)
@@ -1039,4 +1042,28 @@ void close_all_files(struct files_struct *open_files)
 		}
 	}
 	spin_unlock(&open_files->lock);
+}
+
+/* Inserts all of the files from src into dst, used by sys_fork(). */
+void clone_files(struct files_struct *src, struct files_struct *dst)
+{
+	struct file *file;
+	spin_lock(&src->lock);
+	spin_lock(&dst->lock);
+	for (int i = 0; i < src->max_fdset; i++) {
+		if (GET_BITMASK_BIT(src->open_fds->fds_bits, i)) {
+			/* while max_files and max_fdset might not line up, we should never
+			 * have a valid fdset higher than files */
+			assert(i < src->max_files);
+			file = src->fd[i];
+			SET_BITMASK_BIT(dst->open_fds->fds_bits, i);
+			assert(i < dst->max_files && dst->fd[i] == 0);
+			dst->fd[i] = file;
+			/* the if case is due to files (stdin) without a *file yet */
+			if (file)
+				kref_get(&file->f_kref, 1);
+		}
+	}
+	spin_unlock(&dst->lock);
+	spin_unlock(&src->lock);
 }

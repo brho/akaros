@@ -113,22 +113,27 @@ struct nameidata {
 #define LOOKUP_ACCESS 		0x12	/* access / check user permissions */
 
 /* TODO: make our own versions (fucking octal) and put it in fcntl.h */
-/* File access modes for `open' and `fcntl'.  */
-#define O_RDONLY    0   /* Open read-only.  */
-#define O_WRONLY    1   /* Open write-only.  */
-#define O_RDWR      2   /* Open read/write.  */
-#define O_ACCMODE   3
+/* File access modes for open and fcntl. */
+#define O_RDONLY		0			/* Open read-only. */
+#define O_WRONLY		1			/* Open write-only. */
+#define O_RDWR			2			/* Open read/write. */
+#define O_ACCMODE		3
 
-/* Bits OR'd into the second argument to open.  */
-#define O_CREAT        0100 /* not fcntl */
-#define O_EXCL         0200 /* not fcntl */
-#define O_NOCTTY       0400 /* not fcntl */
-#define O_TRUNC       01000 /* not fcntl */
-#define O_APPEND      02000
-#define O_NONBLOCK    04000
-#define O_SYNC       010000
-#define O_FSYNC      O_SYNC
-#define O_ASYNC      020000
+/* Bits OR'd into the second argument to open. */
+#define O_CREAT			00000100	/* not fcntl */
+#define O_EXCL			00000200	/* not fcntl */
+#define O_NOCTTY		00000400	/* not fcntl */
+#define O_TRUNC			00001000	/* not fcntl */
+#define O_APPEND		00002000
+#define O_NONBLOCK		00004000
+#define O_SYNC			00010000
+#define O_FSYNC			O_SYNC
+#define O_ASYNC			00020000
+#define O_DIRECT		00040000	/* Direct disk access. */
+#define O_DIRECTORY		00200000	/* Must be a directory. */
+#define O_NOFOLLOW		00400000	/* Do not follow links. */
+#define O_NOATIME		01000000	/* Do not set atime. */
+#define O_CLOEXEC		02000000	/* Set close_on_exec. */
 
 /* Every object that has pages, like an inode or the swap (or even direct block
  * devices) has a page_map, tracking which of its pages are currently in memory.
@@ -486,6 +491,7 @@ int file_load_page(struct file *file, unsigned long index, struct page **pp);
 struct file *get_file_from_fd(struct files_struct *open_files, int fd);
 struct file *put_file_from_fd(struct files_struct *open_files, int file_desc);
 int insert_file(struct files_struct *open_files, struct file *file);
-void close_all_files(struct files_struct *open_files);
+void close_all_files(struct files_struct *open_files, bool cloexec);
+void clone_files(struct files_struct *src, struct files_struct *dst);
 
 #endif /* ROS_KERN_VFS_H */
