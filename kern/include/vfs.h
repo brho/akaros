@@ -462,6 +462,8 @@ void dentry_release(struct kref *kref);
 
 /* Inode Functions */
 struct inode *get_inode(struct dentry *dentry);
+int create_file(struct inode *dir, struct dentry *dentry, int flags, int mode);
+int create_dir(struct inode *dir, struct dentry *dentry, int mode);
 int check_perms(struct inode *inode, int access_mode);
 void inode_release(struct kref *kref);
 

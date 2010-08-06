@@ -492,8 +492,10 @@ struct inode *get_inode(struct dentry *dentry)
 	/* FS allocs and sets the following: i_op, i_fop, i_pm.pm_op, and any FS
 	 * specific stuff. */
 	struct inode *inode = sb->s_op->alloc_inode(sb);
-	if (!inode)
+	if (!inode) {
+		set_errno(current_tf, ENOMEM);
 		return 0;
+	}
 	TAILQ_INSERT_HEAD(&sb->s_inodes, inode, i_sb_list);		/* weak inode ref */
 	TAILQ_INIT(&inode->i_dentry);
 	TAILQ_INSERT_TAIL(&inode->i_dentry, dentry, d_alias);	/* weak dentry ref*/
@@ -517,6 +519,71 @@ struct inode *get_inode(struct dentry *dentry)
 	spinlock_init(&inode->i_mapping->pm_tree_lock);
 	inode->i_mapping->pm_flags = 0;
 	return inode;
+}
+
+/* Helper op, used when creating regular files and directories.  Note we make a
+ * distinction between the mode and the file type (for now).  After calling
+ * this, call the FS specific version (create or mkdir), which will set the
+ * i_ino, the filetype, and do any other FS-specific stuff.  Also note that a
+ * lot of inode stuff was initialized in get_inode/alloc_inode.  The stuff here
+ * is pertinent to the specific creator (user), mode, and time.  Also note we
+ * don't pass this an nd, like Linux does... */
+static struct inode *create_inode(struct dentry *dentry, int mode)
+{
+	/* note it is the i_ino that uniquely identifies a file in the system.
+	 * there's a diff between creating an inode (even for an in-use ino) and
+	 * then filling it in, and vs creating a brand new one */
+	struct inode *inode = get_inode(dentry);
+	if (!inode)
+		return 0;
+	inode->i_mode = mode;
+	inode->i_nlink = 1;
+	inode->i_size = 0;
+	inode->i_blocks = 0;
+	inode->i_atime.tv_sec = 0;		/* TODO: now! */
+	inode->i_ctime.tv_sec = 0;
+	inode->i_mtime.tv_sec = 0;
+	inode->i_atime.tv_nsec = 0;		/* are these supposed to be the extra ns? */
+	inode->i_ctime.tv_nsec = 0;
+	inode->i_mtime.tv_nsec = 0;
+	inode->i_bdev = inode->i_sb->s_bdev;
+	return inode;
+}
+
+/* Create a new disk inode in dir associated with dentry, with the given mode.
+ * called when creating a regular file.  dir is the directory/parent.  dentry is
+ * the dentry of the inode we are creating.  Note the lack of the nd... */
+int create_file(struct inode *dir, struct dentry *dentry, int flags, int mode)
+{
+	struct inode *new_file = create_inode(dentry, mode);
+	if (!new_file)
+		return -1;
+	dir->i_op->create(dir, dentry, mode, 0);
+	/* when we have notions of users, do something here: */
+	new_file->i_uid = 0;
+	new_file->i_gid = 0;
+	/* Not supposed to keep these creation flags */
+	new_file->i_flags = flags & ~(O_CREAT|O_TRUNC|O_EXCL|O_NOCTTY);
+	kref_put(&new_file->i_kref);
+	return 0;
+}
+
+/* Creates a new inode for a directory associated with dentry in dir with the
+ * given mode. */
+int create_dir(struct inode *dir, struct dentry *dentry, int mode)
+{
+	struct inode *new_dir = create_inode(dentry, mode);
+	if (!new_dir)
+		return -1;
+	dir->i_op->mkdir(dir, dentry, mode);
+	/* Make sure my parent tracks me.  This is okay, since no directory (dir)
+	 * can have more than one dentry */
+	struct dentry *parent = TAILQ_FIRST(&dir->i_dentry);
+	assert(parent && parent == TAILQ_LAST(&dir->i_dentry, dentry_tailq));
+	/* parent dentry tracks dentry as a subdir, weak reference */
+	TAILQ_INSERT_TAIL(&parent->d_subdirs, dentry, d_subdirs_link);
+	kref_put(&new_dir->i_kref);
+	return 0;
 }
 
 /* Returns 0 if the given mode is acceptable for the inode, and an appropriate
@@ -678,16 +745,11 @@ struct file *do_file_open(char *path, int flags, int mode)
 		parent_i = nd->dentry->d_inode;
 		/* TODO: mode should be & ~umask.  Note that mode only applies to future
 		 * opens. */
-		if (parent_i->i_op->create(parent_i, file_d, mode, nd)) {
+		if (create_file(parent_i, file_d, flags, mode)) {
 			kref_put(&file_d->d_kref);
 			path_release(nd);
-			set_errno(current_tf, EFAULT);
 			return 0;
 		}
-		/* when we have notions of users, do something here: */
-		file_d->d_inode->i_uid = 0;
-		file_d->d_inode->i_gid = 0;
-		file_d->d_inode->i_flags = flags & ~(O_CREAT|O_TRUNC|O_EXCL|O_NOCTTY);
 		dcache_put(file_d);
 	} else {	/* the file exists */
 		if ((flags & O_CREAT) && (flags & O_EXCL)) {

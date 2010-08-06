@@ -263,45 +263,14 @@ void kfs_umount_begin(struct super_block *sb)
 
 /* inode_operations */
 
-/* Helper op, used when creating regular files (kfs_create()) and when making
- * directories (kfs_mkdir()).  
- * This needs to handle having nd == 0.  Note we make a distinction between the
- * mode and the file type (for now).  The caller of this should set the
- * filetype. */
-static struct inode *kfs_create_generic(struct dentry *dentry,
-                                        int mode, struct nameidata *nd)
-{
-	/* note it is the i_ino that uniquely identifies a file in the system.
-	 * there's a diff between creating an inode (even for an in-use ino) and
-	 * then filling it in, and vs creating a brand new one */
-	struct inode *inode = get_inode(dentry);
-	if (!inode)
-		return 0;
-	kref_get(&dentry->d_kref, 1);	/* to pin the dentry in RAM, KFS-style... */
-	inode->i_mode = mode;
-	inode->i_ino = kfs_get_free_ino();
-	inode->i_nlink = 1;
-	inode->i_size = 0;
-	inode->i_blocks = 0;
-	inode->i_atime.tv_sec = 0;		/* TODO: now! */
-	inode->i_ctime.tv_sec = 0;		/* TODO: now! */
-	inode->i_mtime.tv_sec = 0;		/* TODO: now! */
-	inode->i_atime.tv_nsec = 0;		/* are these supposed to be the extra ns? */
-	inode->i_ctime.tv_nsec = 0;
-	inode->i_mtime.tv_nsec = 0;
-	inode->i_bdev = inode->i_sb->s_bdev;
-	return inode;
-}
-
-/* Create a new disk inode in dir associated with dentry, with the given mode.
- * called when creating a regular file.  dir is the directory/parent.  dentry is
- * the dentry of the inode we are creating. */
+/* Called when creating a new disk inode in dir associated with dentry.  We need
+ * to fill out the i_ino, set the type, and do whatever else we need */
 int kfs_create(struct inode *dir, struct dentry *dentry, int mode,
                struct nameidata *nd)
 {
-	struct inode *inode = kfs_create_generic(dentry, mode, nd);	
-	if (!inode)
-		return -1;
+	struct inode *inode = dentry->d_inode;
+	kref_get(&dentry->d_kref, 1);	/* to pin the dentry in RAM, KFS-style... */
+	inode->i_ino = kfs_get_free_ino();
 	inode->i_type = FS_I_FILE;
 	/* our parent dentry's inode tracks our dentry info.  We do this
 	 * since it's all in memory and we aren't using the dcache yet.
@@ -312,7 +281,6 @@ int kfs_create(struct inode *dir, struct dentry *dentry, int mode,
 	                  dentry, d_subdirs_link);
 	/* fs_info->filestart is set by the caller, or else when first written (for
 	 * new files.  it was set to 0 in alloc_inode(). */
-	kref_put(&inode->i_kref);
 	return 0;
 }
 
@@ -385,26 +353,19 @@ int kfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
 	return -1;
 }
 
-/* Creates a new inode for a directory associated with dentry in dir with the
- * given mode.  Note, we might (later) need to track subdirs within the parent
- * inode, like we do with regular files.  I'd rather not, so we'll see if we
- * need it. */
+/* Called when creating a new inode for a directory associated with dentry in
+ * dir with the given mode.  Note, we might (later) need to track subdirs within
+ * the parent inode, like we do with regular files.  I'd rather not, so we'll
+ * see if we need it. */
 int kfs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 {
-	struct inode *inode = kfs_create_generic(dentry, mode, 0);	
-	if (!inode)
-		return -1;
-	/* this is okay, since no directory (dir) can have more than one dentry */
-	struct dentry *parent = TAILQ_FIRST(&dir->i_dentry);
-	assert(parent && parent == TAILQ_LAST(&dir->i_dentry, dentry_tailq));
-	inode->i_type = FS_I_DIR;
-	/* parent dentry tracks dentry as a subdir, weak reference */
-	TAILQ_INSERT_TAIL(&parent->d_subdirs, dentry, d_subdirs_link);
-
+	struct inode *inode = dentry->d_inode;
+	kref_get(&dentry->d_kref, 1);	/* to pin the dentry in RAM, KFS-style... */
+	inode->i_ino = kfs_get_free_ino();
+	inode->i_type = FS_I_DIR;		/* this might be FS specific in the future */
 	/* get ready to have our own kids */
 	TAILQ_INIT(&((struct kfs_i_info*)inode->i_fs_info)->children);
 	((struct kfs_i_info*)inode->i_fs_info)->filestart = 0;
-	kref_put(&inode->i_kref);
 	return 0;
 }
 
@@ -764,11 +725,11 @@ static int __add_kfs_entry(struct dentry *parent, char *path,
 		/* XXX: note we use an unrefcnt'd inode here (grabbing the dentry's) */
 		if (!c_bhdr->c_filesize) {
 			/* we are a directory.  Note that fifos might look like dirs... */
-			kfs_mkdir(parent->d_inode, dentry, c_bhdr->c_mode);
+			create_dir(parent->d_inode, dentry, c_bhdr->c_mode);
 			inode = dentry->d_inode;
 		} else {
 			/* we are a file */
-			kfs_create(parent->d_inode, dentry, c_bhdr->c_mode, 0);
+			create_file(parent->d_inode, dentry, O_RDWR, c_bhdr->c_mode);
 			inode = dentry->d_inode;
 			((struct kfs_i_info*)inode->i_fs_info)->filestart =
 			                                        c_bhdr->c_filestart;
