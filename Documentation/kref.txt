@@ -97,11 +97,11 @@ other cleanup without holding a list's lock.  This effectively allows you to
 split the release between what kref_put() does automatically with whatever else
 you want done.
 
-What about an 'internal' kref?  Much like with the pid2proc hash, if we refcnt
-the refs on lists, we still have the same issue of syncing between a list reader
-and a list writer.  The reader needs to atomically read and kref_get (not_zero
-or otherwise).  Otherwise, someone can remove, put, free, and do whatever to the
-item between the read and the kref_get (in theory).
+What about an 'internal' kref?  If we refcnt the refs on lists, we still have
+the same issue of syncing between a list reader and a list writer.  The reader
+needs to atomically read and kref_get (not_zero or otherwise).  Otherwise,
+someone can remove, put, free, and do whatever to the item between the read and
+the kref_get (in theory).
 
 The reason for this is the same reason we have trouble with lists and internal
 references in the first place: both the list reader and the writer are sharing
@@ -213,12 +213,12 @@ TAILQ all the time vs. being in a process's file list).
 Process management is a bit different, since it does not want to destroy or free
 you until there was some explicit action (calling proc_destroy()).  We still use
 krefs, since we don't know who is the "last one out" to do the freeing, so we
-layer proc_destroy() on top of kref/__proc_free().  This makes it easier for us
-to hack something together that works with the pid2proc hash.  Specifically, we
-can kref items in that LLS, as well as the runnable_list.  We know when to take
-them out.  This is similar to the dentry, except that when there is no other
-reference than the LLS, we don't want to do anything in particular (at least not
-yet).  The dentry needs to have a lot of state changed, and maybe freed.
+layer proc_destroy() on top of kref/__proc_free().  This is why we have the "one
+ref to keep the object alive."  For a little while, this ref was stored in the
+pid2proc hash, but that is now holds an internal reference (we have the tech, it
+keeps things in sync with other usage models, and it makes proc_destroy and
+sys_trywait easier).  Note the runnable_list has external references, in part
+because it is a different subsystem (scheduler).
 
 Remember: the reason for why we have trouble with lists and (internal)
 references: both the list reader and the writer are sharing the same

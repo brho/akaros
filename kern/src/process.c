@@ -162,17 +162,18 @@ int __proc_set_state(struct proc *p, uint32_t state)
 }
 
 /* Returns a pointer to the proc with the given pid, or 0 if there is none.
- * Note this makes a copy of the reference stored in the hash table (which is
- * the proc existing).  Need to do this while locking the table, in case someone
- * else subsequently removes it from the table, then kref_put()s it to 0 before
- * we can get it.  Don't push the locking into the hashtable without dealing
- * with this. */
+ * This uses get_not_zero, since it is possible the refcnt is 0, which means the
+ * process is dying and we should not have the ref (and thus return 0).  We need
+ * to lock to protect us from getting p, (someone else removes and frees p),
+ * then get_not_zero() on p.
+ * Don't push the locking into the hashtable without dealing with this. */
 struct proc *pid2proc(pid_t pid)
 {
 	spin_lock(&pid_hash_lock);
 	struct proc *p = hashtable_search(pid_hash, (void*)pid);
 	if (p)
-		kref_get(&p->kref, 1);
+		if (!kref_get_not_zero(&p->kref, 1))
+			p = 0;
 	spin_unlock(&pid_hash_lock);
 	return p;
 }
@@ -256,28 +257,23 @@ error_t proc_alloc(struct proc **pp, struct proc *parent)
 
 	{ INITSTRUCT(*p)
 
+	/* one reference for the proc existing, and one for the ref we pass back. */
+	kref_init(&p->kref, __proc_free, 2);
 	// Setup the default map of where to get cache colors from
 	p->cache_colors_map = global_cache_colors_map;
 	p->next_cache_color = 0;
-
 	/* Initialize the address space */
 	if ((r = env_setup_vm(p)) < 0) {
 		kmem_cache_free(proc_cache, p);
 		return r;
 	}
-
-	/* Get a pid, then store a reference in the pid_hash */
 	if (!(p->pid = get_free_pid())) {
 		kmem_cache_free(proc_cache, p);
 		return -ENOFREEPID;
 	}
-	/* one reference for the proc existing (in the hash table),
-	 * and one for the ref we pass back */
-	kref_init(&p->kref, __proc_free, 2);
 	spin_lock(&pid_hash_lock);
 	hashtable_insert(pid_hash, (void*)p->pid, p);
 	spin_unlock(&pid_hash_lock);
-
 	/* Set the basic status variables. */
 	spinlock_init(&p->proc_lock);
 	p->exitcode = 0;
@@ -376,7 +372,11 @@ static void __proc_free(struct kref *kref)
 			cache_color_free(llc_cache, p->cache_colors_map);
 		cache_colors_map_free(p->cache_colors_map);
 	}
-	/* Give our PID back */
+	/* Remove us from the pid_hash and give our PID back (in that order). */
+	spin_lock(&pid_hash_lock);
+	if (!hashtable_remove(pid_hash, (void*)p->pid))
+		panic("Proc not in the pid table in %s", __FUNCTION__);
+	spin_unlock(&pid_hash_lock);
 	put_free_pid(p->pid);
 	/* Flush all mapped pages in the user portion of the address space */
 	env_user_mem_free(p, 0, UVPT);
@@ -634,25 +634,13 @@ void proc_destroy(struct proc *p)
 			      __FUNCTION__);
 	}
 	__proc_set_state(p, PROC_DYING);
-	/* This kref_put() is for the process in general (its existence in the hash
-	 * table).  Note we do it after unlocking the hash table, since once it is
-	 * gone, no one can get it to kref_get() it.  We also do it after unlocking,
-	 * since it is possible that we are the releaser (though not when a
-	 * self_ipi is pending, so only when death was remote (we're not current)).
-	 *
-	 * Also note that we don't give the PID back until __proc_free().  This is
-	 * because not everyone is done with the process yet, although you won't
-	 * find the proc in any lists, nor will it get reused anytime soon. */
-	spin_lock(&pid_hash_lock);
-	if (!hashtable_remove(pid_hash, (void*)p->pid))
-		panic("Proc not in the pid table in %s", __FUNCTION__);
-	spin_unlock(&pid_hash_lock);
+	/* This kref_put() is for the process's existence. */
+	kref_put(&p->kref);
 	/* Unlock and possible decref and wait.  A death IPI should be on its way,
 	 * either from the RUNNING_S one, or from proc_take_cores with a __death.
 	 * in general, interrupts should be on when you call proc_destroy locally,
 	 * but currently aren't for all things (like traphandlers). */
 	spin_unlock(&p->proc_lock);
-	kref_put(&p->kref);		/* for the hashtable ref */
 	/* at this point, we normally have one ref to be eaten in kmsg_pending and
 	 * one for every 'current'.  and maybe one for a parent */
 	__proc_kmsg_pending(p, self_ipi_pending);
