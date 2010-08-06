@@ -356,10 +356,13 @@ void init_sb(struct super_block *sb, struct vfsmount *vmnt,
 	 * by vfsmount's mnt_root.  The parent is dealt with later. */
 	struct dentry *d_root = get_dentry(sb, 0,  "/");	/* probably right */
 
-	/* a lot of here on down is normally done in lookup() */
+	/* a lot of here on down is normally done in lookup() or create, since
+	 * get_dentry isn't a fully usable dentry.  The two FS-specific settings are
+	 * normally inherited from a parent within the same FS in get_dentry, but we
+	 * have none here. */
 	d_root->d_op = d_op;
 	d_root->d_fs_info = d_fs_info;
-	struct inode *inode = sb->s_op->alloc_inode(sb);
+	struct inode *inode = get_inode(d_root);
 	if (!inode)
 		panic("This FS sucks!");
 	d_root->d_inode = inode;				/* storing the inode's kref here */
@@ -387,9 +390,9 @@ void init_sb(struct super_block *sb, struct vfsmount *vmnt,
 /* Dentry Functions */
 
 /* Helper to alloc and initialize a generic dentry.  The following needs to be
- * set still: d_op, d_fs_info (opt), d_inode, connect the inode to the dentry
- * (and up the d_kref again), maybe dcache_put().  The FS related things need to
- * be done in fs_create and fs_mkdir.
+ * set still: d_op (if no parent), d_fs_info (opt), d_inode, connect the inode
+ * to the dentry (and up the d_kref again), maybe dcache_put().  The inode
+ * stitching is done in get_inode() or lookup (depending on the FS).
  *
  * If the name is longer than the inline name, it will kmalloc a buffer, so
  * don't worry about the storage for *name after calling this. */
@@ -410,8 +413,10 @@ struct dentry *get_dentry(struct super_block *sb, struct dentry *parent,
 	dentry->d_sb = sb;					/* storing a ref here... */
 	dentry->d_mount_point = FALSE;
 	dentry->d_mounted_fs = 0;
-	if (parent)							/* no parent for rootfs mount */
+	if (parent)	{						/* no parent for rootfs mount */
 		kref_get(&parent->d_kref, 1);
+		dentry->d_op = parent->d_op;	/* d_op set in init_sb for parentless */
+	}
 	dentry->d_parent = parent;
 	dentry->d_flags = 0;				/* related to its dcache state */
 	dentry->d_fs_info = 0;
@@ -428,8 +433,6 @@ struct dentry *get_dentry(struct super_block *sb, struct dentry *parent,
 		qstr_builder(dentry, l_name);
 	}
 	/* Catch bugs by aggressively zeroing this (o/w we use old stuff) */
-	dentry->d_op = 0;
-	dentry->d_fs_info = 0;
 	dentry->d_inode = 0;
 	return dentry;
 }
@@ -450,8 +453,7 @@ void dcache_put(struct dentry *dentry)
  * since we don't have a dcache.
  * 
  * This has to handle two types of dentries: full ones (ones that had been used)
- * and ones that had been just for lookups - hence the checks for d_op and
- * d_inode.
+ * and ones that had been just for lookups - hence the check for d_inode.
  *
  * Note that dentries pin and kref their inodes.  When all the dentries are
  * gone, we want the inode to be released via kref.  The inode has internal /
@@ -460,9 +462,8 @@ void dentry_release(struct kref *kref)
 {
 	struct dentry *dentry = container_of(kref, struct dentry, d_kref);
 	printd("Freeing dentry %08p: %s\n", dentry, dentry->d_name.name);
-	/* Might not have a d_op, if it was involved in a failed operation */
-	if (dentry->d_op && dentry->d_op->d_release)
-		dentry->d_op->d_release(dentry);
+	assert(dentry->d_op);	/* catch bugs.  a while back, some lacked d_op */
+	dentry->d_op->d_release(dentry);
 	/* TODO: check/test the boundaries on this. */
 	if (dentry->d_name.len > DNAME_INLINE_LEN)
 		kfree((void*)dentry->d_name.name);
@@ -477,6 +478,46 @@ void dentry_release(struct kref *kref)
 }
 
 /* Inode Functions */
+
+/* Creates and initializes a new inode.  Generic fields are filled in.
+ * FS-specific fields are filled in by the callout.  Specific fields are filled
+ * in in read_inode() based on what's on the disk for a given i_no, or when the
+ * inode is created (for new objects).
+ *
+ * i_no is set by the caller.  Note that this means this inode can be for an
+ * inode that is already on disk, or it can be used when creating. */
+struct inode *get_inode(struct dentry *dentry)
+{
+	struct super_block *sb = dentry->d_sb;
+	/* FS allocs and sets the following: i_op, i_fop, i_pm.pm_op, and any FS
+	 * specific stuff. */
+	struct inode *inode = sb->s_op->alloc_inode(sb);
+	if (!inode)
+		return 0;
+	TAILQ_INSERT_HEAD(&sb->s_inodes, inode, i_sb_list);		/* weak inode ref */
+	TAILQ_INIT(&inode->i_dentry);
+	TAILQ_INSERT_TAIL(&inode->i_dentry, dentry, d_alias);	/* weak dentry ref*/
+	/* one for the dentry->d_inode, one passed out */
+	kref_init(&inode->i_kref, inode_release, 2);
+	dentry->d_inode = inode;
+	inode->i_ino = 0;					/* set by caller later */
+	inode->i_blksize = sb->s_blocksize;
+	spinlock_init(&inode->i_lock);
+	inode->i_sb = sb;
+	inode->i_state = 0;					/* need real states, like I_NEW */
+	inode->dirtied_when = 0;
+	atomic_set(&inode->i_writecount, 0);
+	/* Set up the page_map structures.  Default is to use the embedded one.
+	 * Might push some of this back into specific FSs.  For now, the FS tells us
+	 * what pm_op they want via i_pm.pm_op, which we use when we point i_mapping
+	 * to i_pm. */
+	inode->i_mapping = &inode->i_pm;
+	inode->i_mapping->pm_host = inode;
+	radix_tree_init(&inode->i_mapping->pm_tree);
+	spinlock_init(&inode->i_mapping->pm_tree_lock);
+	inode->i_mapping->pm_flags = 0;
+	return inode;
+}
 
 /* Returns 0 if the given mode is acceptable for the inode, and an appropriate
  * error code if not.  Needs to be writen, based on some sensible rules, and
@@ -495,6 +536,7 @@ void inode_release(struct kref *kref)
 	inode->i_sb->s_op->destroy_inode(inode);
 	kref_put(&inode->i_sb->s_kref);
 	assert(inode->i_mapping == &inode->i_pm);
+	kmem_cache_free(inode_kcache, inode);
 	/* TODO: (BDEV) */
 	// kref_put(inode->i_bdev->kref); /* assuming it's a bdev */
 }

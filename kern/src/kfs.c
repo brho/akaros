@@ -149,40 +149,21 @@ int kfs_readpage(struct file *file, struct page *page)
  * an inode that is already on disk, or it can be used when creating. */
 struct inode *kfs_alloc_inode(struct super_block *sb)
 {
-	/* arguably, we can avoid some of this init by using the slab/cache */
 	struct inode *inode = kmem_cache_alloc(inode_kcache, 0);
 	memset(inode, 0, sizeof(struct inode));
-	TAILQ_INSERT_HEAD(&sb->s_inodes, inode, i_sb_list);
-	TAILQ_INIT(&inode->i_dentry);
-	inode->i_ino = 0;					/* set by caller later */
-	kref_init(&inode->i_kref, inode_release, 1);
-	inode->i_blksize = 1;				/* keep in sync with get_sb() */
-	spinlock_init(&inode->i_lock);
 	inode->i_op = &kfs_i_op;
 	inode->i_fop = &kfs_f_op;
-	inode->i_sb = sb;
-	inode->i_state = 0;					/* need real states, want I_NEW */
-	inode->dirtied_when = 0;
-	atomic_set(&inode->i_writecount, 0);
+	inode->i_pm.pm_op = &kfs_pm_op;
 	inode->i_fs_info = kmem_cache_alloc(kfs_i_kcache, 0);
 	TAILQ_INIT(&((struct kfs_i_info*)inode->i_fs_info)->children);
 	((struct kfs_i_info*)inode->i_fs_info)->filestart = 0;
-	/* Set up the page_map structures.  Default is to use the embedded one. */
-	inode->i_mapping = &inode->i_pm;
-	inode->i_mapping->pm_host = inode;
-	radix_tree_init(&inode->i_mapping->pm_tree);
-	spinlock_init(&inode->i_mapping->pm_tree_lock);
-	inode->i_mapping->pm_op = &kfs_pm_op;
-	inode->i_mapping->pm_flags = 0;
 	return inode;
-	/* caller sets i_ino, i_list set when applicable */
 }
 
 /* deallocs and cleans up after an inode. */
 void kfs_destroy_inode(struct inode *inode)
 {
 	kmem_cache_free(kfs_i_kcache, inode->i_fs_info);
-	kmem_cache_free(inode_kcache, inode);
 }
 
 /* reads the inode data on disk specified by inode->i_ino into the inode.
@@ -293,13 +274,10 @@ static struct inode *kfs_create_generic(struct dentry *dentry,
 	/* note it is the i_ino that uniquely identifies a file in the system.
 	 * there's a diff between creating an inode (even for an in-use ino) and
 	 * then filling it in, and vs creating a brand new one */
-	struct inode *inode = kfs_alloc_inode(dentry->d_sb);
+	struct inode *inode = get_inode(dentry);
+	if (!inode)
+		return 0;
 	kref_get(&dentry->d_kref, 1);	/* to pin the dentry in RAM, KFS-style... */
-	dentry->d_inode = inode;		/* inode ref from alloc() stored here */
-	TAILQ_INSERT_TAIL(&inode->i_dentry, dentry, d_alias); /* weak dentry ref*/
-	/* Need to finish the dentry */
-	dentry->d_op = &kfs_d_op;
-	dentry->d_fs_info = 0;
 	inode->i_mode = mode;
 	inode->i_ino = kfs_get_free_ino();
 	inode->i_nlink = 1;
@@ -334,6 +312,7 @@ int kfs_create(struct inode *dir, struct dentry *dentry, int mode,
 	                  dentry, d_subdirs_link);
 	/* fs_info->filestart is set by the caller, or else when first written (for
 	 * new files.  it was set to 0 in alloc_inode(). */
+	kref_put(&inode->i_kref);
 	return 0;
 }
 
@@ -421,9 +400,11 @@ int kfs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 	inode->i_type = FS_I_DIR;
 	/* parent dentry tracks dentry as a subdir, weak reference */
 	TAILQ_INSERT_TAIL(&parent->d_subdirs, dentry, d_subdirs_link);
+
 	/* get ready to have our own kids */
 	TAILQ_INIT(&((struct kfs_i_info*)inode->i_fs_info)->children);
 	((struct kfs_i_info*)inode->i_fs_info)->filestart = 0;
+	kref_put(&inode->i_kref);
 	return 0;
 }
 

@@ -461,6 +461,7 @@ void dcache_put(struct dentry *dentry);
 void dentry_release(struct kref *kref);
 
 /* Inode Functions */
+struct inode *get_inode(struct dentry *dentry);
 int check_perms(struct inode *inode, int access_mode);
 void inode_release(struct kref *kref);
 
