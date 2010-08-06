@@ -447,7 +447,6 @@ void qstr_builder(struct dentry *dentry, char *l_name);
 char *file_name(struct file *file);
 int path_lookup(char *path, int flags, struct nameidata *nd);
 void path_release(struct nameidata *nd);
-struct file *path_to_file(char *path);
 
 /* Superblock functions */
 struct super_block *get_sb(void);
@@ -471,6 +470,7 @@ ssize_t generic_file_read(struct file *file, char *buf, size_t count,
 ssize_t generic_file_write(struct file *file, const char *buf, size_t count,
                            off_t *offset);
 struct file *do_file_open(char *path, int flags, int mode);
+struct file *dentry_open(struct dentry *dentry);
 void file_release(struct kref *kref);
 
 /* Page cache functions */

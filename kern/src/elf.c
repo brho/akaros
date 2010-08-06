@@ -136,7 +136,7 @@ int load_elf(struct proc* p, struct file* f)
 		return -1;
 
 	if (ei.dynamic) {
-		struct file *interp = path_to_file(ei.interp);
+		struct file *interp = do_file_open(ei.interp, 0, 0);
 		if (!interp)
 			return -1;
 		/* careful, this could conflict with the mmap from the TLS up above */

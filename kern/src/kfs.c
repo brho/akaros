@@ -606,37 +606,10 @@ int kfs_mmap(struct file *file, struct vm_region *vmr)
 	return -1;
 }
 
-/* Opens the file specified by the inode, creating and filling in the file */
-/* TODO: fill out the other // entries */
+/* Called by the VFS while opening the file, which corresponds to inode,  for
+ * the FS to do whatever it needs. */
 int kfs_open(struct inode *inode, struct file *file)
 {
-	/* This is mostly FS-agnostic, consider a get_file() helper (TODO) */
-	//file = kmem_cache_alloc(file_kcache, 0); /* done in the VFS */
-
-	/* one for the ref passed out, and *none* for the sb TAILQ */
-	kref_init(&file->f_kref, file_release, 1);
-	/* Add to the list of all files of this SB */
-	TAILQ_INSERT_TAIL(&inode->i_sb->s_files, file, f_list);
-
-	/* TODO: when we pull this out to the VFS, the function will take the dentry
-	 * instead, and then call the fs_open(dentry->d_inode) */
-	struct dentry *my_d = TAILQ_FIRST(&inode->i_dentry);
-	kref_get(&my_d->d_kref, 1);
-	file->f_dentry = my_d;
-
-	kref_get(&inode->i_sb->s_mount->mnt_kref, 1);
-	file->f_vfsmnt = inode->i_sb->s_mount;		/* saving a ref to the vmnt...*/
-	file->f_op = &kfs_f_op;		/* TODO: set me == to i_fop */
-	file->f_flags = inode->i_flags;				/* just taking the inode vals */
-	file->f_mode = inode->i_mode;
-	file->f_pos = 0;
-	file->f_uid = inode->i_uid;
-	file->f_gid = inode->i_gid;
-	file->f_error = 0;
-//	struct event_poll_tailq		f_ep_links;
-	spinlock_init(&file->f_ep_lock);
-	file->f_fs_info = 0;
-	file->f_mapping = inode->i_mapping;
 	return 0;
 }
 

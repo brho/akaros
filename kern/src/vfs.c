@@ -321,30 +321,6 @@ void path_release(struct nameidata *nd)
 	kref_put(&nd->mnt->mnt_kref);
 }
 
-/* Seems convenient: Given a path, return the appropriate file.  The reference
- * returned is refcounted (which is done by open()).  TODO: make sure the called
- * functions do error checking and propagate errno. */
-struct file *path_to_file(char *path)
-{
-	struct file *f = 0;
-	struct nameidata nd = {0};
-	if (path_lookup(path, 0, &nd))
-		return 0;
-	f = kmem_cache_alloc(file_kcache, 0);
-	if (!f) {
-		path_release(&nd);
-		return 0;
-	}
-	if (nd.dentry->d_inode->i_fop->open(nd.dentry->d_inode, f)) {
-		path_release(&nd);
-		kmem_cache_free(file_kcache, f);
-		return 0;
-	}
-	path_release(&nd);
-	assert(kref_refcnt(&f->f_kref) == 1);
-	return f;
-}
-
 /* Superblock functions */
 
 /* Helper to alloc and initialize a generic superblock.  This handles all the
@@ -625,10 +601,10 @@ ssize_t generic_file_write(struct file *file, const char *buf, size_t count,
 }
 
 /* Opens the file, using permissions from current for lack of a better option.
- * Called by sys_open.  This will return 0 on failure, and set errno.
- * There's a lot of stuff that we don't do, esp related to permission checking
- * and file truncating.
- * TODO: open and create should set errno and propagate it up. */
+ * It will attempt to create the file if it does not exist and O_CREAT is
+ * specified.  This will return 0 on failure, and set errno.
+ * TODO: There's a lot of stuff that we don't do, esp related to permission
+ * checking and file truncating.  Create should set errno and propagate it up.*/
 struct file *do_file_open(char *path, int flags, int mode)
 {
 	struct file *file = 0;
@@ -652,7 +628,7 @@ struct file *do_file_open(char *path, int flags, int mode)
 	if (!file_d) {
 		if (!(flags & O_CREAT)) {
 			path_release(nd);
-			set_errno(current_tf, EACCES);
+			set_errno(current_tf, ENOENT);
 			return 0;
 		}
 		/* Create the inode/file.  get a fresh dentry too: */
@@ -682,20 +658,12 @@ struct file *do_file_open(char *path, int flags, int mode)
 	}
 	/* now open the file (freshly created or if it already existed).  At this
 	 * point, file_d is a refcnt'd dentry, regardless of which branch we took.*/
-	file = kmem_cache_alloc(file_kcache, 0);
+	if (flags & O_TRUNC)
+		warn("File truncation not supported yet.");
+	file = dentry_open(file_d);		/* sets errno */
 	if (!file) {
 		kref_put(&file_d->d_kref);
 		path_release(nd);
-		set_errno(current_tf, ENOMEM);
-		return 0;
-	}
-	if (flags & O_TRUNC)
-		warn("File truncation not supported yet.");
-	if (file_d->d_inode->i_fop->open(file_d->d_inode, file)) {
-		kref_put(&file_d->d_kref);
-		path_release(nd);
-		kmem_cache_free(file_kcache, file);
-		set_errno(current_tf, ENOENT);
 		return 0;
 	}
 	/* TODO: check the inode's mode (S_XXX) against the flags O_RDWR */
@@ -703,6 +671,39 @@ struct file *do_file_open(char *path, int flags, int mode)
 	file->f_mode = flags & (O_RDONLY|O_WRONLY|O_RDWR);
 	kref_put(&file_d->d_kref);
 	path_release(nd);
+	return file;
+}
+
+/* Opens and returns the file specified by dentry */
+struct file *dentry_open(struct dentry *dentry)
+{
+	struct inode *inode;
+	struct file *file = kmem_cache_alloc(file_kcache, 0);
+	if (!file) {
+		set_errno(current_tf, ENOMEM);
+		return 0;
+	}
+	inode = dentry->d_inode;
+	/* one for the ref passed out, and *none* for the sb TAILQ */
+	kref_init(&file->f_kref, file_release, 1);
+	/* Add to the list of all files of this SB */
+	TAILQ_INSERT_TAIL(&inode->i_sb->s_files, file, f_list);
+	kref_get(&dentry->d_kref, 1);
+	file->f_dentry = dentry;
+	kref_get(&inode->i_sb->s_mount->mnt_kref, 1);
+	file->f_vfsmnt = inode->i_sb->s_mount;		/* saving a ref to the vmnt...*/
+	file->f_op = inode->i_fop;
+	file->f_flags = inode->i_flags;				/* just taking the inode vals */
+	file->f_mode = inode->i_mode;
+	file->f_pos = 0;
+	file->f_uid = inode->i_uid;
+	file->f_gid = inode->i_gid;
+	file->f_error = 0;
+//	struct event_poll_tailq		f_ep_links;
+	spinlock_init(&file->f_ep_lock);
+	file->f_fs_info = 0;						/* prob overriden by the fs */
+	file->f_mapping = inode->i_mapping;
+	file->f_op->open(inode, file);
 	return file;
 }
 

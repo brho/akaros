@@ -257,7 +257,7 @@ int mon_bin_ls(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 	struct file *bin_dir;
 	int retval = 0;
 
-	bin_dir = path_to_file("/bin");
+	bin_dir = do_file_open("/bin", 0, 0);
 	if (!bin_dir) {
 		printk("No /bin directory!\n");
 		return 1;
@@ -282,7 +282,7 @@ int mon_bin_run(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 	int retval = 0;
 	char buf[6 + MAX_FILENAME_SZ] = "/bin/";	/* /bin/ + max + \0 */
 	strncpy(buf + 5, argv[1], MAX_FILENAME_SZ);
-	program = path_to_file(buf);
+	program = do_file_open(buf, 0, 0);
 	if (!program) {
 		printk("No such program!\n");
 		return 1;

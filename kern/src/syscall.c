@@ -209,7 +209,7 @@ static int sys_proc_create(struct proc *p, char *path, size_t path_l,
 	t_path = user_strdup_errno(p, path, path_l);
 	if (IS_ERR(t_path))
 		return -1;
-	program = path_to_file(t_path);
+	program = do_file_open(t_path, 0, 0);
 	user_memdup_free(p, t_path);
 	if (!program)
 		return -1;			/* presumably, errno is already set */
@@ -402,7 +402,7 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	t_path = user_strdup_errno(p, path, path_l);
 	if (IS_ERR(t_path))
 		return -1;
-	program = path_to_file(t_path);
+	program = do_file_open(t_path, 0, 0);
 	user_memdup_free(p, t_path);
 	if (!program)
 		return -1;			/* presumably, errno is already set */
