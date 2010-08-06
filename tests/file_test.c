@@ -1,8 +1,9 @@
-#include <stdio.h> 
+#include <rstdio.h> 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <arch/arch.h>
+#include <unistd.h>
 
 int main() 
 { 
@@ -14,5 +15,17 @@ int main()
 	fclose(file); 
 
 	int fd = open("/bin/test.txt", O_RDWR | O_CREAT );
+	char rbuf[256] = {0}, wbuf[256] = {0};
+	int retval;
+	retval = read(fd, rbuf, 16);
+	printf("Tried to read, got %d bytes of buf: %s\n", retval, rbuf);
+	strcpy(wbuf, "paul <3's the new 61c");
+	retval = write(fd, wbuf, 22);
+	printf("Tried to write, wrote %d bytes\n", retval);
+	printf("Trying to seek to 0\n");
+	lseek(fd, 0, SEEK_SET);
+	retval = read(fd, rbuf, 64);
+	printf("Tried to read again, got %d bytes of buf: %s\n", retval, rbuf);
+
 	breakpoint();
 }

@@ -792,64 +792,42 @@ static int sys_eth_recv_check(env_t* e)
 
 #endif // Network
 
-// Syscalls below here are serviced by the appserver for now.
-#define ufe(which,a0,a1,a2,a3) \
-	frontend_syscall_errno(p,APPSERVER_SYSCALL_##which,\
-	                   (int)(a0),(int)(a1),(int)(a2),(int)(a3))
-
-intreg_t sys_write(struct proc* p, int fd, const void* buf, int len)
+static intreg_t sys_read(struct proc* p, int fd, void* buf, int len)
 {
-	int ret = 0;
-	void* kbuf = user_memdup_errno(p,buf,len);
-	if(kbuf == NULL)
+	ssize_t ret;
+	struct file *file = get_file_from_fd(&p->open_files, fd);
+	if (!file) {
+		set_errno(current_tf, EBADF);
 		return -1;
-#ifndef __CONFIG_APPSERVER__
-	/* Catch a common usage of stderr */
-	if (fd == 2) {
-		((char*)kbuf)[len-1] = 0;
-		printk("[stderr]: %s\n", kbuf);
-		ret = len;
-	} else { // but warn/panic otherwise in ufe()
-		ret = ufe(write, fd, PADDR(kbuf), len, 0);
 	}
-#else
-	ret = ufe(write, fd, PADDR(kbuf), len, 0);
-#endif
-	user_memdup_free(p,kbuf);
+	/* TODO: (UMEM) currently, read() handles user memcpy issues, but we
+	 * probably should user_mem_check and pin the region here, so read doesn't
+	 * worry about it */
+	ret = file->f_op->read(file, buf, len, &file->f_pos);
+	kref_put(&file->f_kref);
 	return ret;
 }
 
-intreg_t sys_read(struct proc* p, int fd, void* buf, int len)
+static intreg_t sys_write(struct proc* p, int fd, const void* buf, int len)
 {
-	void* kbuf = kmalloc_errno(len);
-	if(kbuf == NULL)
+	/* Catch common usage of stdout and stderr.  No protections or anything. */
+	if (fd == 1) {
+		printk("[stdout]: %s\n", buf);
+		return len;
+	} else if (fd == 2) {
+		printk("[stderr]: %s\n", buf);
+		return len;
+	}
+	/* the real sys_write: */
+	ssize_t ret;
+	struct file *file = get_file_from_fd(&p->open_files, fd);
+	if (!file) {
+		set_errno(current_tf, EBADF);
 		return -1;
-	int ret = ufe(read,fd,PADDR(kbuf),len,0);
-	if(ret != -1 && memcpy_to_user_errno(p,buf,kbuf,len))
-		ret = -1;
-	user_memdup_free(p,kbuf);
-	return ret;
-}
-
-intreg_t sys_pwrite(struct proc* p, int fd, const void* buf, int len, int offset)
-{
-	void* kbuf = user_memdup_errno(p,buf,len);
-	if(kbuf == NULL)
-		return -1;
-	int ret = ufe(pwrite,fd,PADDR(kbuf),len,offset);
-	user_memdup_free(p,kbuf);
-	return ret;
-}
-
-intreg_t sys_pread(struct proc* p, int fd, void* buf, int len, int offset)
-{
-	void* kbuf = kmalloc_errno(len);
-	if(kbuf == NULL)
-		return -1;
-	int ret = ufe(pread,fd,PADDR(kbuf),len,offset);
-	if(ret != -1 && memcpy_to_user_errno(p,buf,kbuf,len))
-		ret = -1;
-	user_memdup_free(p,kbuf);
+	}
+	/* TODO: (UMEM) */
+	ret = file->f_op->write(file, buf, len, &file->f_pos);
+	kref_put(&file->f_kref);
 	return ret;
 }
 
@@ -857,7 +835,7 @@ intreg_t sys_pread(struct proc* p, int fd, void* buf, int len, int offset)
  * process's open file list. 
  *
  * TODO: take the path length */
-intreg_t sys_open(struct proc *p, const char *path, int oflag, int mode)
+static intreg_t sys_open(struct proc *p, const char *path, int oflag, int mode)
 {
 	int fd = 0;
 	struct file *file;
@@ -879,7 +857,7 @@ intreg_t sys_open(struct proc *p, const char *path, int oflag, int mode)
 	return fd;
 }
 
-intreg_t sys_close(struct proc *p, int fd)
+static intreg_t sys_close(struct proc *p, int fd)
 {
 	struct file *file = put_file_from_fd(&p->open_files, fd);
 	if (!file) {
@@ -894,6 +872,11 @@ intreg_t sys_close(struct proc *p, int fd)
 	}
 	return 0;
 }
+
+/* kept around til we remove the last ufe */
+#define ufe(which,a0,a1,a2,a3) \
+	frontend_syscall_errno(p,APPSERVER_SYSCALL_##which,\
+	                   (int)(a0),(int)(a1),(int)(a2),(int)(a3))
 
 #define NEWLIB_STAT_SIZE 64
 intreg_t sys_fstat(struct proc* p, int fd, void* buf)
@@ -968,9 +951,17 @@ intreg_t sys_chmod(struct proc* p, const char* path, int mode)
 	return ret;
 }
 
-intreg_t sys_lseek(struct proc* p, int fd, int offset, int whence)
+static intreg_t sys_lseek(struct proc *p, int fd, off_t offset, int whence)
 {
-	return ufe(lseek,fd,offset,whence,0);
+	off_t ret;
+	struct file *file = get_file_from_fd(&p->open_files, fd);
+	if (!file) {
+		set_errno(current_tf, EBADF);
+		return -1;
+	}
+	ret = file->f_op->llseek(file, offset, whence);
+	kref_put(&file->f_kref);
+	return ret;
 }
 
 intreg_t sys_link(struct proc* p, const char* _old, const char* _new)
@@ -1126,7 +1117,6 @@ intreg_t syscall(struct proc *p, uintreg_t syscallno, uintreg_t a1,
 		[SYS_eth_get_mac_addr] = (syscall_t)sys_eth_get_mac_addr,
 		[SYS_eth_recv_check] = (syscall_t)sys_eth_recv_check,
 	#endif
-		// Syscalls serviced by the appserver for now.
 		[SYS_read] = (syscall_t)sys_read,
 		[SYS_write] = (syscall_t)sys_write,
 		[SYS_open] = (syscall_t)sys_open,

@@ -481,9 +481,12 @@ off_t kfs_llseek(struct file *file, off_t offset, int whence)
 			temp_off = file->f_dentry->d_inode->i_size + offset;
 			break;
 		default:
+			set_errno(current_tf, EINVAL);
 			warn("Unknown 'whence' in llseek()!\n");
+			return -1;
 	}
-	/* make sure the f_pos isn't outside the limits of the existing file */
+	/* make sure the f_pos isn't outside the limits of the existing file.
+	 * techincally, if they go too far, we should return EINVAL */
 	temp_off = MAX(MIN(temp_off, file->f_dentry->d_inode->i_size), 0);
 	file->f_pos = temp_off;
 	return temp_off;

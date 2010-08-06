@@ -643,8 +643,8 @@ ssize_t generic_file_read(struct file *file, char *buf, size_t count,
 		error = file_load_page(file, i, &page);
 		assert(!error);	/* TODO: handle ENOMEM and friends */
 		copy_amt = MIN(PGSIZE - page_off, buf_end - buf);
-		/* TODO: think about this.  if it's a user buffer, we're relying on
-		 * current to detect whose it is (which should work for async calls).
+		/* TODO: (UMEM) think about this.  if it's a user buffer, we're relying
+		 * on current to detect whose it is (which should work for async calls).
 		 * Also, need to propagate errors properly...  Probably should do a
 		 * user_mem_check, then free, and also to make a distinction between
 		 * when the kernel wants a read/write (TODO: KFOP) */
@@ -693,10 +693,11 @@ ssize_t generic_file_write(struct file *file, const char *buf, size_t count,
 		error = file_load_page(file, i, &page);
 		assert(!error);	/* TODO: handle ENOMEM and friends */
 		copy_amt = MIN(PGSIZE - page_off, buf_end - buf);
-		/* TODO: think about this.  if it's a user buffer, we're relying on
-		 * current to detect whose it is (which should work for async calls). */
+		/* TODO: (UMEM) (KFOP) think about this.  if it's a user buffer, we're
+		 * relying on current to detect whose it is (which should work for async
+		 * calls). */
 		if (current) {
-			memcpy_to_user(current, page2kva(page) + page_off, buf, copy_amt);
+			memcpy_from_user(current, page2kva(page) + page_off, buf, copy_amt);
 		} else {
 			memcpy(page2kva(page) + page_off, buf, copy_amt);
 		}
