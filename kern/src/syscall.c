@@ -502,37 +502,6 @@ static intreg_t sys_munmap(struct proc* p, void* addr, size_t len)
 	return munmap(p, (uintptr_t)addr, len);
 }
 
-static void* sys_brk(struct proc *p, void* addr) {
-	ssize_t range;
-
-	// TODO: remove sys_brk
-	printk("[kernel] don't use brk, unsupported and will be removed soon.\n");
-
-	spin_lock(&p->proc_lock);
-
-	if((addr < p->procinfo->heap_bottom) || (addr >= (void*)BRK_END))
-		goto out;
-
-	uintptr_t real_heap_top = ROUNDUP((uintptr_t)p->heap_top,PGSIZE);
-	uintptr_t real_new_heap_top = ROUNDUP((uintptr_t)addr,PGSIZE);
-	range = real_new_heap_top - real_heap_top;
-
-	if (range > 0) {
-		if(__do_mmap(p, real_heap_top, range, PROT_READ | PROT_WRITE,
-		             MAP_FIXED | MAP_ANONYMOUS, NULL, 0) == MAP_FAILED)
-			goto out;
-	}
-	else if (range < 0) {
-		if(__do_munmap(p, real_new_heap_top, -range))
-			goto out;
-	}
-	p->heap_top = addr;
-
-out:
-	spin_unlock(&p->proc_lock);
-	return p->heap_top;
-}
-
 static ssize_t sys_shared_page_alloc(env_t* p1,
                                      void**DANGEROUS _addr, pid_t p2_id,
                                      int p1_flags, int p2_flags
@@ -1100,7 +1069,6 @@ intreg_t syscall(struct proc *p, uintreg_t syscallno, uintreg_t a1,
 		[SYS_mmap] = (syscall_t)sys_mmap,
 		[SYS_munmap] = (syscall_t)sys_munmap,
 		[SYS_mprotect] = (syscall_t)sys_mprotect,
-		[SYS_brk] = (syscall_t)sys_brk,
 		[SYS_shared_page_alloc] = (syscall_t)sys_shared_page_alloc,
 		[SYS_shared_page_free] = (syscall_t)sys_shared_page_free,
 		[SYS_resource_req] = (syscall_t)resource_req,

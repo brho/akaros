@@ -30,7 +30,7 @@
 #define SYS_mlock
 #define SYS_msync
 */
-#define SYS_brk						21
+/* sys_brk removed */
 #define SYS_shared_page_alloc		22
 #define SYS_shared_page_free		23
 #define SYS_resource_req			24
