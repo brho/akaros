@@ -478,6 +478,7 @@ ssize_t generic_file_read(struct file *file, char *buf, size_t count,
 ssize_t generic_file_write(struct file *file, const char *buf, size_t count,
                            off_t *offset);
 struct file *do_file_open(char *path, int flags, int mode);
+int do_file_access(char *path, int mode);
 struct file *dentry_open(struct dentry *dentry);
 void file_release(struct kref *kref);
 

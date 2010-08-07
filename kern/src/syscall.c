@@ -895,14 +895,21 @@ intreg_t sys_fcntl(struct proc* p, int fd, int cmd, int arg)
 	return ufe(fcntl,fd,cmd,arg,0);
 }
 
-intreg_t sys_access(struct proc* p, const char* path, int type)
+static intreg_t sys_access(struct proc *p, const char *path, int mode)
 {
-	char* fn = user_strdup_errno(p,path,PGSIZE);
-	if(fn == NULL)
+	int retval;
+
+	char *t_path = user_strdup_errno(p, path, PGSIZE);
+	if (t_path == NULL)
 		return -1;
-	int ret = ufe(access,PADDR(fn),type,0,0);
-	user_memdup_free(p,fn);
-	return ret;
+	retval = do_file_access(t_path, mode);
+	user_memdup_free(p, t_path);
+	printd("Access for path: %s retval: %d\n", path, retval);
+	if (retval < 0) {
+		set_errno(current_tf, -retval);
+		return -1;
+	}
+	return retval;
 }
 
 intreg_t sys_umask(struct proc* p, int mask)

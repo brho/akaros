@@ -779,6 +779,22 @@ struct file *do_file_open(char *path, int flags, int mode)
 	return file;
 }
 
+/* Checks to see if path can be accessed via mode.  Doesn't do much now.  This
+ * is an example of decent error propagation from the lower levels via int
+ * retvals. */
+int do_file_access(char *path, int mode)
+{
+	struct nameidata nd_r = {0}, *nd = &nd_r;
+	int retval = 0;
+	/* TODO: when we care about access, do stuff here.  Need to be a bit careful
+	 * about how intent works with access (F_OK, R_OK, etc) and open (O_RDONLY)
+	 */
+	nd->intent = mode;
+	retval = path_lookup(path, 0, nd);
+	path_release(nd);	
+	return retval;
+}
+
 /* Opens and returns the file specified by dentry */
 struct file *dentry_open(struct dentry *dentry)
 {

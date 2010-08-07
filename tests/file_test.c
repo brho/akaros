@@ -4,6 +4,7 @@
 #include <fcntl.h>
 #include <arch/arch.h>
 #include <unistd.h>
+#include <errno.h>
 
 int main() 
 { 
@@ -27,5 +28,10 @@ int main()
 	retval = read(fd, rbuf, 64);
 	printf("Tried to read again, got %d bytes of buf: %s\n", retval, rbuf);
 
-	breakpoint();
+	retval = access("/bin/laden", X_OK);
+	if (errno != ENOENT)
+		printf("WARNING! Access error for Osama!\n");
+	retval = access("/dir1/f1.txt", R_OK);
+	if (retval < 0)
+		printf("WARNING! Access error for f1.txt!\n");
 }
