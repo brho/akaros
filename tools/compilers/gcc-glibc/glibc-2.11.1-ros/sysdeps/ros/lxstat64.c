@@ -22,15 +22,12 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <ros/syscall.h>
-#include "ros_stat.h"
 
 /* Get file information about FILE in BUF.  */
 int
 __lxstat64 (int vers, const char *file, struct stat64 *buf)
 {
-  struct stat st;
-  int ret = __lxstat(vers,file,&st);
-  __convert_stat64(&st,buf);
+  int ret = __lxstat(vers, file, (struct stat*)buf);
   return ret;
 }
 hidden_def (__lxstat64)

@@ -23,7 +23,6 @@
 #include <fcntl.h>
 #include <string.h>
 #include <ros/syscall.h>
-#include "ros_stat.h"
 
 /* Get file information about FILE in BUF.  */
 int
@@ -35,9 +34,7 @@ __xstat (int vers, const char *file, struct stat *buf)
     return -1;
   }
 
-  struct ros_stat nst;
-  int ret = (int)ros_syscall(SYS_stat, file, strlen(file), &nst, 0, 0);
-  __convert_stat(&nst,buf);
+  int ret = (int)ros_syscall(SYS_stat, file, strlen(file), buf, 0, 0);
   return ret;
 }
 hidden_def (__xstat)

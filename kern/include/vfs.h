@@ -33,7 +33,9 @@ struct block_device	{int x;};
 struct io_writeback	{int x;};
 struct event_poll {int x;};
 struct poll_table_struct {int x;};
-// end temp typedefs
+// end temp typedefs.  note ino and off_t are needed in the next include
+
+#include <ros/fs.h>
 
 struct page_map;	/* analagous to linux's address_space object */
 struct page_map_operations;
@@ -47,16 +49,6 @@ struct file;
 struct file_operations;
 struct fs_type;
 struct vfsmount;
-
-/* part of the kernel interface, ripped from man pages, ought to work. */
-// TODO: eventually move this to ros/fs.h or something.
-#define MAX_FILENAME_SZ 255
-struct dirent { // or maybe something else to not conflict with userspace
-	ino_t          d_ino;       /* inode number */
-	off_t          d_off;       /* offset to the next dirent */
-	unsigned short d_reclen;    /* length of this record */
-	char           d_name[MAX_FILENAME_SZ + 1]; /* filename */
-};
 
 struct iovec {
     void *iov_base;
@@ -73,7 +65,7 @@ TAILQ_HEAD(file_tailq, file);
 TAILQ_HEAD(io_wb_tailq, io_writeback);
 TAILQ_HEAD(event_poll_tailq, event_poll);
 TAILQ_HEAD(vfsmount_tailq, vfsmount);
-TAILQ_HEAD(fs_type_tailq, fs_type);
+TAILQ_HEAD(fs_type_tailq, fs_type); 
 
 /* Linux's quickstring - saves recomputing the hash and length.  Note the length
  * is the non-null-terminated length, as you'd get from strlen(). (for now) */
@@ -390,6 +382,7 @@ struct vfsmount {
 /* Per-process structs */
 #define NR_OPEN_FILES_DEFAULT 32
 #define NR_FILE_DESC_DEFAULT 32
+/* keep this in sync with glibc's fd_setsize */
 #define NR_FILE_DESC_MAX 1024
 
 /* Bitmask for file descriptors, big for when we exceed the initial small.  We

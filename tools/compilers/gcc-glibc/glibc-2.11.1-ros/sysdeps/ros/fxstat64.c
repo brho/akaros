@@ -22,15 +22,12 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <ros/syscall.h>
-#include "ros_stat.h"
 
 /* Get information about the file descriptor FD in BUF.  */
 int
 __fxstat64 (int vers, int fd, struct stat64 *buf)
 {
-  struct stat st;
-  int ret = __fxstat(vers,fd,&st);
-  __convert_stat64(&st,buf);
+  int ret = __fxstat(vers, fd, (struct stat*)buf);
   return ret;
 }
 hidden_def (__fxstat64)
