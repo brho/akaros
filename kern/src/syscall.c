@@ -145,23 +145,22 @@ static int sys_cache_invalidate(void)
 
 /* sys_reboot(): called directly from dispatch table. */
 
-// Print a string to the system console.
-// The string is exactly 'len' characters long.
-// Destroys the environment on memory errors.
-static ssize_t sys_cputs(env_t* e, const char *DANGEROUS s, size_t len)
+/* Print a string to the system console. */
+static ssize_t sys_cputs(struct proc *p, const char *DANGEROUS string,
+                         size_t strlen)
 {
-	// Check that the user has permission to read memory [s, s+len).
-	// Destroy the environment if not.
-	char *COUNT(len) _s = user_mem_assert(e, s, len, PTE_USER_RO);
-
-	// Print the string supplied by the user.
-	printk("%.*s", len, _s);
-	return (ssize_t)len;
+	char *t_string;
+	t_string = user_strdup_errno(p, string, strlen);
+	if (!t_string)
+		return -1;
+	printk("%.*s", strlen, t_string);
+	user_memdup_free(p, t_string);
+	return (ssize_t)strlen;
 }
 
 // Read a character from the system console.
 // Returns the character.
-static uint16_t sys_cgetc(env_t* e)
+static uint16_t sys_cgetc(struct proc *p)
 {
 	uint16_t c;
 
@@ -483,21 +482,21 @@ static ssize_t sys_trywait(env_t* e, pid_t pid, int* status)
 
 /************** Memory Management Syscalls **************/
 
-static void *sys_mmap(struct proc* p, uintreg_t a1, uintreg_t a2, uintreg_t a3,
-                      uintreg_t* a456)
+static void *sys_mmap(struct proc *p, uintreg_t a1, uintreg_t a2, uintreg_t a3,
+                      uintreg_t *a456)
 {
 	uintreg_t _a456[3];
-	if(memcpy_from_user(p,_a456,a456,3*sizeof(uintreg_t)))
-		sys_proc_destroy(p,p->pid,-1);
-	return mmap(p,a1,a2,a3,_a456[0],_a456[1],_a456[2]);
+	if (memcpy_from_user(p, _a456, a456, 3 * sizeof(uintreg_t)))
+		sys_proc_destroy(p, p->pid, -1);
+	return mmap(p, a1, a2, a3, _a456[0], _a456[1], _a456[2]);
 }
 
-static intreg_t sys_mprotect(struct proc* p, void* addr, size_t len, int prot)
+static intreg_t sys_mprotect(struct proc *p, void *addr, size_t len, int prot)
 {
 	return mprotect(p, (uintptr_t)addr, len, prot);
 }
 
-static intreg_t sys_munmap(struct proc* p, void* addr, size_t len)
+static intreg_t sys_munmap(struct proc *p, void *addr, size_t len)
 {
 	return munmap(p, (uintptr_t)addr, len);
 }
@@ -626,6 +625,7 @@ static int sys_halt_core(struct proc *p, unsigned int usec)
 //Read a buffer over the serial port
 static ssize_t sys_serial_read(env_t* e, char *DANGEROUS _buf, size_t len)
 {
+	printk("[kernel] serial reading is deprecated.\n");
 	if (len == 0)
 		return 0;
 
@@ -646,6 +646,7 @@ static ssize_t sys_serial_read(env_t* e, char *DANGEROUS _buf, size_t len)
 //Write a buffer over the serial port
 static ssize_t sys_serial_write(env_t* e, const char *DANGEROUS buf, size_t len)
 {
+	printk("[kernel] serial writing is deprecated.\n");
 	if (len == 0)
 		return 0;
 	#ifdef __CONFIG_SERIAL_IO__
@@ -761,7 +762,7 @@ static int sys_eth_recv_check(env_t* e)
 
 #endif // Network
 
-static intreg_t sys_read(struct proc* p, int fd, void* buf, int len)
+static intreg_t sys_read(struct proc *p, int fd, void *buf, int len)
 {
 	ssize_t ret;
 	struct file *file = get_file_from_fd(&p->open_files, fd);
@@ -777,7 +778,7 @@ static intreg_t sys_read(struct proc* p, int fd, void* buf, int len)
 	return ret;
 }
 
-static intreg_t sys_write(struct proc* p, int fd, const void* buf, int len)
+static intreg_t sys_write(struct proc *p, int fd, const void *buf, int len)
 {
 	/* Catch common usage of stdout and stderr.  No protections or anything. */
 	if (fd == 1) {
@@ -804,13 +805,14 @@ static intreg_t sys_write(struct proc* p, int fd, const void* buf, int len)
  * process's open file list. 
  *
  * TODO: take the path length */
-static intreg_t sys_open(struct proc *p, const char *path, int oflag, int mode)
+static intreg_t sys_open(struct proc *p, const char *path, size_t path_l,
+                         int oflag, int mode)
 {
 	int fd = 0;
 	struct file *file;
 
-	char *t_path = user_strdup_errno(p, path, PGSIZE);
-	if (t_path == NULL)
+	char *t_path = user_strdup_errno(p, path, path_l);
+	if (!t_path)
 		return -1;
 	file = do_file_open(t_path, oflag, mode);
 	user_memdup_free(p, t_path);
@@ -848,7 +850,7 @@ static intreg_t sys_close(struct proc *p, int fd)
 	                   (int)(a0),(int)(a1),(int)(a2),(int)(a3))
 
 #define NEWLIB_STAT_SIZE 64
-intreg_t sys_fstat(struct proc* p, int fd, void* buf)
+intreg_t sys_fstat(struct proc *p, int fd, void *buf)
 {
 	int *kbuf = kmalloc(NEWLIB_STAT_SIZE, 0);
 	int ret = ufe(fstat,fd,PADDR(kbuf),0,0);
@@ -858,7 +860,7 @@ intreg_t sys_fstat(struct proc* p, int fd, void* buf)
 	return ret;
 }
 
-intreg_t sys_stat(struct proc* p, const char* path, void* buf)
+intreg_t sys_stat(struct proc *p, const char *path, size_t path_l, void *buf)
 {
 	char* fn = user_strdup_errno(p,path,PGSIZE);
 	if(fn == NULL)
@@ -874,7 +876,7 @@ intreg_t sys_stat(struct proc* p, const char* path, void* buf)
 	return ret;
 }
 
-intreg_t sys_lstat(struct proc* p, const char* path, void* buf)
+intreg_t sys_lstat(struct proc *p, const char *path, size_t path_l, void *buf)
 {
 	char* fn = user_strdup_errno(p,path,PGSIZE);
 	if(fn == NULL)
@@ -890,17 +892,18 @@ intreg_t sys_lstat(struct proc* p, const char* path, void* buf)
 	return ret;
 }
 
-intreg_t sys_fcntl(struct proc* p, int fd, int cmd, int arg)
+intreg_t sys_fcntl(struct proc *p, int fd, int cmd, int arg)
 {
 	return ufe(fcntl,fd,cmd,arg,0);
 }
 
-static intreg_t sys_access(struct proc *p, const char *path, int mode)
+static intreg_t sys_access(struct proc *p, const char *path, size_t path_l,
+                           int mode)
 {
 	int retval;
 
-	char *t_path = user_strdup_errno(p, path, PGSIZE);
-	if (t_path == NULL)
+	char *t_path = user_strdup_errno(p, path, path_l);
+	if (!t_path)
 		return -1;
 	retval = do_file_access(t_path, mode);
 	user_memdup_free(p, t_path);
@@ -912,12 +915,12 @@ static intreg_t sys_access(struct proc *p, const char *path, int mode)
 	return retval;
 }
 
-intreg_t sys_umask(struct proc* p, int mask)
+intreg_t sys_umask(struct proc *p, int mask)
 {
 	return ufe(umask,mask,0,0,0);
 }
 
-intreg_t sys_chmod(struct proc* p, const char* path, int mode)
+intreg_t sys_chmod(struct proc *p, const char *path, size_t path_l, int mode)
 {
 	char* fn = user_strdup_errno(p,path,PGSIZE);
 	if(fn == NULL)
@@ -940,7 +943,8 @@ static intreg_t sys_lseek(struct proc *p, int fd, off_t offset, int whence)
 	return ret;
 }
 
-intreg_t sys_link(struct proc* p, const char* _old, const char* _new)
+intreg_t sys_link(struct proc *p, const char *_old, size_t old_l,
+                  const char *_new, size_t new_l)
 {
 	char* oldpath = user_strdup_errno(p,_old,PGSIZE);
 	if(oldpath == NULL)
@@ -959,7 +963,7 @@ intreg_t sys_link(struct proc* p, const char* _old, const char* _new)
 	return ret;
 }
 
-intreg_t sys_unlink(struct proc* p, const char* path)
+intreg_t sys_unlink(struct proc *p, const char *path, size_t path_l)
 {
 	char* fn = user_strdup_errno(p,path,PGSIZE);
 	if(fn == NULL)
@@ -969,7 +973,7 @@ intreg_t sys_unlink(struct proc* p, const char* path)
 	return ret;
 }
 
-intreg_t sys_chdir(struct proc* p, const char* path)
+intreg_t sys_chdir(struct proc *p, const char *path, size_t path_l)
 {
 	char* fn = user_strdup_errno(p,path,PGSIZE);
 	if(fn == NULL)
@@ -979,7 +983,7 @@ intreg_t sys_chdir(struct proc* p, const char* path)
 	return ret;
 }
 
-intreg_t sys_getcwd(struct proc* p, char* pwd, int size)
+intreg_t sys_getcwd(struct proc *p, char *pwd, int size)
 {
 	void* kbuf = kmalloc_errno(size);
 	if(kbuf == NULL)
@@ -991,7 +995,7 @@ intreg_t sys_getcwd(struct proc* p, char* pwd, int size)
 	return ret;
 }
 
-intreg_t sys_gettimeofday(struct proc* p, int* buf)
+intreg_t sys_gettimeofday(struct proc *p, int *buf)
 {
 	static spinlock_t gtod_lock = SPINLOCK_INITIALIZER;
 	static int t0 = 0;
@@ -1015,7 +1019,7 @@ intreg_t sys_gettimeofday(struct proc* p, int* buf)
 }
 
 #define SIZEOF_STRUCT_TERMIOS 60
-intreg_t sys_tcgetattr(struct proc* p, int fd, void* termios_p)
+intreg_t sys_tcgetattr(struct proc *p, int fd, void *termios_p)
 {
 	int* kbuf = kmalloc(SIZEOF_STRUCT_TERMIOS,0);
 	int ret = ufe(tcgetattr,fd,PADDR(kbuf),0,0);
@@ -1025,7 +1029,8 @@ intreg_t sys_tcgetattr(struct proc* p, int fd, void* termios_p)
 	return ret;
 }
 
-intreg_t sys_tcsetattr(struct proc* p, int fd, int optional_actions, const void* termios_p)
+intreg_t sys_tcsetattr(struct proc *p, int fd, int optional_actions,
+                       const void *termios_p)
 {
 	void* kbuf = user_memdup_errno(p,termios_p,SIZEOF_STRUCT_TERMIOS);
 	if(kbuf == NULL)

@@ -19,6 +19,7 @@
 #include <errno.h>
 #include <stddef.h>
 #include <unistd.h>
+#include <string.h>
 #include <ros/syscall.h>
 
 /* Remove the link named NAME.  */
@@ -32,6 +33,6 @@ __unlink (name)
     return -1;
   }
 
-  return ros_syscall(SYS_unlink,name,0,0,0,0);
+  return ros_syscall(SYS_unlink, name, strlen(name), 0, 0, 0);
 }
 weak_alias (__unlink, unlink)

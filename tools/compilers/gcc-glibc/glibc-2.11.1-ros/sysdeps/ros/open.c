@@ -21,6 +21,7 @@
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <string.h>
 #include <ros/syscall.h>
 
 /* Open FILE with access OFLAG.  If OFLAG includes O_CREAT,
@@ -44,7 +45,7 @@ __libc_open (const char* file, int oflag, ...)
       va_end(arg);
     }
 
-  return ros_syscall(SYS_open,file,oflag,mode,0,0);
+  return ros_syscall(SYS_open, file, strlen(file), oflag, mode, 0);
 }
 libc_hidden_def (__libc_open)
 weak_alias (__libc_open, __open)

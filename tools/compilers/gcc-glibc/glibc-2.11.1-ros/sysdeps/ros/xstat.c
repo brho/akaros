@@ -21,6 +21,7 @@
 #include <stddef.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <string.h>
 #include <ros/syscall.h>
 #include "ros_stat.h"
 
@@ -35,7 +36,7 @@ __xstat (int vers, const char *file, struct stat *buf)
   }
 
   struct ros_stat nst;
-  int ret = (int)ros_syscall(SYS_stat,file,&nst,0,0,0);
+  int ret = (int)ros_syscall(SYS_stat, file, strlen(file), &nst, 0, 0);
   __convert_stat(&nst,buf);
   return ret;
 }

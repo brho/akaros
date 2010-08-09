@@ -19,6 +19,7 @@
 #include <errno.h>
 #include <stddef.h>
 #include <unistd.h>
+#include <string.h>
 #include <ros/syscall.h>
 
 /* Test for access to FILE.  */
@@ -31,6 +32,6 @@ __access (const char* file, int type)
     return -1;
   }
 
-  return ros_syscall(SYS_access,file,type,0,0,0);
+  return ros_syscall(SYS_access, file, strlen(file), type, 0, 0);
 }
 weak_alias (__access, access)
