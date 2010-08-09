@@ -8,12 +8,14 @@
 #include <sys/types.h>
 #include <stdint.h>
 #include <ros/common.h>
+#include <assert.h>
 
 // TODO: fix sysenter to take all 5 params
 static inline intreg_t __syscall_sysenter(uint16_t num, intreg_t a1,
                                     intreg_t a2, intreg_t a3,
                                     intreg_t a4, intreg_t a5, intreg_t* err_loc)
 {
+	assert(!a5);	/* sysenter doesn't handle 5 arguments yet */
 	// The kernel clobbers ecx and edx => put them in clobber list.
 	// ebx is handled specially because of a glibc register
 	// allocation problem (not enough registers).
