@@ -974,6 +974,8 @@ int file_load_page(struct file *file, unsigned long index, struct page **pp)
 struct file *get_file_from_fd(struct files_struct *open_files, int file_desc)
 {
 	struct file *retval = 0;
+	if (file_desc < 0)
+		return 0;
 	spin_lock(&open_files->lock);
 	if (file_desc < open_files->max_fdset) {
 		if (GET_BITMASK_BIT(open_files->open_fds->fds_bits, file_desc)) {
@@ -995,6 +997,8 @@ struct file *get_file_from_fd(struct files_struct *open_files, int file_desc)
 struct file *put_file_from_fd(struct files_struct *open_files, int file_desc)
 {
 	struct file *file = 0;
+	if (file_desc < 0)
+		return 0;
 	spin_lock(&open_files->lock);
 	if (file_desc < open_files->max_fdset) {
 		if (GET_BITMASK_BIT(open_files->open_fds->fds_bits, file_desc)) {
