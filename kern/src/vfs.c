@@ -608,6 +608,45 @@ void inode_release(struct kref *kref)
 	// kref_put(inode->i_bdev->kref); /* assuming it's a bdev */
 }
 
+/* Looks up the inode for the given path, returning a refcnt'd inode (or 0).
+ * Permissions are applied for the current user, which is quite a broken system
+ * at the moment.  Flags are lookup flags. */
+struct inode *lookup_inode(char *path, int flags)
+{
+	struct inode *inode;
+	struct nameidata nd_r = {0}, *nd = &nd_r;
+	int error;
+
+	error = path_lookup(path, flags, nd);
+	if (error) {
+		path_release(nd);
+		set_errno(current_tf, -error);
+		return 0;
+	}
+	inode = nd->dentry->d_inode;
+	kref_get(&inode->i_kref, 1);
+	path_release(nd);
+	return inode;
+}
+
+/* Fills in kstat with the stat information for the inode */
+void stat_inode(struct inode *inode, struct kstat *kstat)
+{
+	kstat->st_dev = inode->i_sb->s_dev;
+	kstat->st_ino = inode->i_ino;
+	kstat->st_mode = inode->i_mode;
+	kstat->st_nlink = inode->i_nlink;
+	kstat->st_uid = inode->i_uid;
+	kstat->st_gid = inode->i_gid;
+	kstat->st_rdev = inode->i_rdev;
+	kstat->st_size = inode->i_size;
+	kstat->st_blksize = inode->i_blksize;
+	kstat->st_blocks = inode->i_blocks;
+	kstat->st_atime = inode->i_atime;
+	kstat->st_mtime = inode->i_mtime;
+	kstat->st_ctime = inode->i_ctime;
+}
+
 /* File functions */
 
 /* Read count bytes from the file into buf, starting at *offset, which is increased
@@ -722,7 +761,7 @@ struct file *do_file_open(char *path, int flags, int mode)
 	struct inode *parent_i;
 	struct nameidata nd_r = {0}, *nd = &nd_r;
 	int lookup_flags = LOOKUP_PARENT;
-	int error = 0;
+	int error;
 
 	/* lookup the parent */
 	nd->intent = flags & (O_RDONLY|O_WRONLY|O_RDWR);
@@ -730,6 +769,7 @@ struct file *do_file_open(char *path, int flags, int mode)
 		lookup_flags |= LOOKUP_CREATE;
 	error = path_lookup(path, lookup_flags, nd);
 	if (error) {
+		path_release(nd);
 		set_errno(current_tf, -error);
 		return 0;
 	}

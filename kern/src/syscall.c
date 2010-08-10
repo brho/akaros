@@ -824,7 +824,7 @@ static intreg_t sys_open(struct proc *p, const char *path, size_t path_l,
 		warn("File insertion failed");
 		return -1;
 	}
-	printd("File Open, res=%d\n", fd);
+	printd("File %s Open, res=%d\n", path, fd);
 	return fd;
 }
 
@@ -835,12 +835,6 @@ static intreg_t sys_close(struct proc *p, int fd)
 		set_errno(current_tf, EBADF);
 		return -1;
 	}
-	/* TEMP TEST */
-	if (kref_refcnt(&file->f_kref)) {
-		printk("sys_close: Detected positive refcnt %d for file %s\n",
-		       kref_refcnt(&file->f_kref), file_name(file));
-		panic("Idiot.");
-	}
 	return 0;
 }
 
@@ -849,47 +843,77 @@ static intreg_t sys_close(struct proc *p, int fd)
 	frontend_syscall_errno(p,APPSERVER_SYSCALL_##which,\
 	                   (int)(a0),(int)(a1),(int)(a2),(int)(a3))
 
-#define NEWLIB_STAT_SIZE 64
-intreg_t sys_fstat(struct proc *p, int fd, void *buf)
+static intreg_t sys_fstat(struct proc *p, int fd, struct kstat *u_stat)
 {
-	int *kbuf = kmalloc(NEWLIB_STAT_SIZE, 0);
-	int ret = ufe(fstat,fd,PADDR(kbuf),0,0);
-	if(ret != -1 && memcpy_to_user_errno(p,buf,kbuf,NEWLIB_STAT_SIZE))
-		ret = -1;
+	struct kstat *kbuf;
+	struct file *file = get_file_from_fd(&p->open_files, fd);
+	if (!file) {
+		set_errno(current_tf, EBADF);
+		return -1;
+	}
+	kbuf = kmalloc(sizeof(struct kstat), 0);
+	if (!kbuf) {
+		kref_put(&file->f_kref);
+		set_errno(current_tf, ENOMEM);
+		return -1;
+	}
+	stat_inode(file->f_dentry->d_inode, kbuf);
+	kref_put(&file->f_kref);
+	/* TODO: UMEM: pin the memory, copy directly, and skip the kernel buffer */
+	if (memcpy_to_user_errno(p, u_stat, kbuf, sizeof(struct kstat))) {
+		kfree(kbuf);
+		set_errno(current_tf, EINVAL);
+		return -1;
+	}
 	kfree(kbuf);
-	return ret;
+	return 0;
 }
 
-intreg_t sys_stat(struct proc *p, const char *path, size_t path_l, void *buf)
+/* sys_stat() and sys_lstat() do nearly the same thing, differing in how they
+ * treat a symlink for the final item, which (probably) will be controlled by
+ * the lookup flags */
+static intreg_t stat_helper(struct proc *p, const char *path, size_t path_l,
+                            struct kstat *u_stat, int flags)
 {
-	char* fn = user_strdup_errno(p,path,PGSIZE);
-	if(fn == NULL)
+	struct kstat *kbuf;
+	struct inode *path_i;
+	char *t_path = user_strdup_errno(p, path, path_l);
+	if (!t_path)
 		return -1;
-
-	int *kbuf = kmalloc(NEWLIB_STAT_SIZE, 0);
-	int ret = ufe(stat,PADDR(fn),PADDR(kbuf),0,0);
-	if(ret != -1 && memcpy_to_user_errno(p,buf,kbuf,NEWLIB_STAT_SIZE))
-		ret = -1;
-
-	user_memdup_free(p,fn);
+	path_i = lookup_inode(t_path, flags);
+	user_memdup_free(p, t_path);
+	if (!path_i)
+		return -1;
+	kbuf = kmalloc(sizeof(struct kstat), 0);
+	if (!kbuf) {
+		set_errno(current_tf, ENOMEM);
+		kref_put(&path_i->i_kref);
+		return -1;
+	}
+	stat_inode(path_i, kbuf);
+	kref_put(&path_i->i_kref);
+	/* TODO: UMEM: pin the memory, copy directly, and skip the kernel buffer */
+	if (memcpy_to_user_errno(p, u_stat, kbuf, sizeof(struct kstat))) {
+		kfree(kbuf);
+		set_errno(current_tf, EINVAL);
+		return -1;
+	}
 	kfree(kbuf);
-	return ret;
+	return 0;
 }
 
-intreg_t sys_lstat(struct proc *p, const char *path, size_t path_l, void *buf)
+/* Follow a final symlink */
+static intreg_t sys_stat(struct proc *p, const char *path, size_t path_l,
+                         struct kstat *u_stat)
 {
-	char* fn = user_strdup_errno(p,path,PGSIZE);
-	if(fn == NULL)
-		return -1;
+	return stat_helper(p, path, path_l, u_stat, LOOKUP_FOLLOW);
+}
 
-	int *kbuf = kmalloc(NEWLIB_STAT_SIZE, 0);
-	int ret = ufe(lstat,PADDR(fn),PADDR(kbuf),0,0);
-	if(ret != -1 && memcpy_to_user_errno(p,buf,kbuf,NEWLIB_STAT_SIZE))
-		ret = -1;
-
-	user_memdup_free(p,fn);
-	kfree(kbuf);
-	return ret;
+/* Don't follow a final symlink */
+static intreg_t sys_lstat(struct proc *p, const char *path, size_t path_l,
+                          struct kstat *u_stat)
+{
+	return stat_helper(p, path, path_l, u_stat, 0);
 }
 
 intreg_t sys_fcntl(struct proc *p, int fd, int cmd, int arg)

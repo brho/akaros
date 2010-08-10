@@ -34,4 +34,25 @@ int main()
 	retval = access("/dir1/f1.txt", R_OK);
 	if (retval < 0)
 		printf("WARNING! Access error for f1.txt!\n");
+
+	struct stat st = {0};
+	//retval = stat("/bin/mhello", &st);
+	retval = fstat(fd, &st);
+	printf("Tried to stat, was told %d\n", retval);
+	printf("STAT RESULTS\n---------------------\n");
+	printf("dev       : %d\n", st.st_dev);
+	printf("ino       : %d\n", st.st_ino);
+	printf("mode      : %d\n", st.st_mode);
+	printf("nlink     : %d\n", st.st_nlink);
+	printf("uid       : %d\n", st.st_uid);
+	printf("gid       : %d\n", st.st_gid);
+	printf("rdev      : %d\n", st.st_rdev);
+	printf("size      : %d\n", st.st_size);
+	printf("blksize   : %d\n", st.st_blksize);
+	printf("blocks    : %d\n", st.st_blocks);
+	printf("atime     : %d\n", st.st_atime);
+	printf("mtime     : %d\n", st.st_mtime);
+	printf("ctime     : %d\n", st.st_ctime);
+	breakpoint();
+
 }

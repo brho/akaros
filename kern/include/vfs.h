@@ -464,6 +464,8 @@ int create_file(struct inode *dir, struct dentry *dentry, int flags, int mode);
 int create_dir(struct inode *dir, struct dentry *dentry, int mode);
 int check_perms(struct inode *inode, int access_mode);
 void inode_release(struct kref *kref);
+struct inode *lookup_inode(char *path, int flags);
+void stat_inode(struct inode *inode, struct kstat *kstat);
 
 /* File functions */
 ssize_t generic_file_read(struct file *file, char *buf, size_t count,
