@@ -146,15 +146,6 @@ static struct dentry *do_lookup(struct dentry *parent, char *name)
 	return dentry;
 }
 
-/* Walk up one directory, being careful of mountpoints, namespaces, and the top
- * of the FS */
-static int climb_up(struct nameidata *nd)
-{
-	// TODO
-	warn("Climbing up (../) in path lookup not supported yet!");
-	return 0;
-}
-
 /* Update ND such that it represents having followed dentry.  IAW the nd
  * refcnting rules, we need to decref any references that were in there before
  * they get clobbered. */
@@ -174,6 +165,32 @@ static int next_link(struct dentry *dentry, struct nameidata *nd)
 	return 0;
 }
 
+/* Walk up one directory, being careful of mountpoints, namespaces, and the top
+ * of the FS */
+static int climb_up(struct nameidata *nd)
+{
+	printd("CLIMB_UP, from %s\n", nd->dentry->d_name.name);
+	/* Top of the world, just return.  Should also check for being at the top of
+	 * the current process's namespace (TODO) */
+	if (!nd->dentry->d_parent)
+		return -1;
+	/* Check if we are at the top of a mount, if so, we need to follow
+	 * backwards, and then climb_up from that one.  We might need to climb
+	 * multiple times if we mount multiple FSs at the same spot (highly
+	 * unlikely).  This is completely untested.  Might recurse instead. */
+	while (nd->mnt->mnt_root == nd->dentry) {
+		if (!nd->mnt->mnt_parent) {
+			warn("Might have expected a parent vfsmount (dentry had a parent)");
+			return -1;
+		}
+		next_link(nd->mnt->mnt_mountpoint, nd);
+	}
+	/* Backwards walk (no mounts or any other issues now). */
+	next_link(nd->dentry->d_parent, nd);
+	printd("CLIMB_UP, to   %s\n", nd->dentry->d_name.name);
+	return 0;
+}
+
 static int follow_mount(struct nameidata *nd)
 {
 	/* Detect mount, follow, etc... (TODO!) */
@@ -184,6 +201,19 @@ static int follow_symlink(struct nameidata *nd)
 {
 	/* Detect symlink, LOOKUP_FOLLOW, follow it, etc... (TODO!) */
 	return 0;
+}
+
+/* Little helper, to make it easier to break out of the nested loops.  Will also
+ * '\0' out the first slash if it's slashes all the way down.  Or turtles. */
+static bool packed_trailing_slashes(char *first_slash)
+{
+	for (char *i = first_slash; *i == '/'; i++) {
+		if (*(i + 1) == '\0') {
+			*first_slash = '\0';
+			return TRUE;
+		}
+	}
+	return FALSE;
 }
 
 /* Resolves the links in a basic path walk.  0 for success, -EWHATEVER
@@ -214,25 +244,21 @@ static int link_path_walk(char *path, struct nameidata *nd)
 			return error;
 		/* find the next link, break out if it is the end */
 		next_slash = strchr(link, '/');
-		if (!next_slash)
+		if (!next_slash) {
 			break;
-		else
-			if (*(next_slash + 1) == '\0') {
-				/* trailing slash on the path meant the target is a dir */
+		} else {
+			if (packed_trailing_slashes(next_slash)) {
 				nd->flags |= LOOKUP_DIRECTORY;
-				*next_slash = '\0';
 				break;
 			}
-		/* skip over any interim ./ */
-		if (!strncmp("./", link, 2)) {
-			link = next_slash + 1;
-			continue;
 		}
+		/* skip over any interim ./ */
+		if (!strncmp("./", link, 2))
+			goto next_loop;
 		/* Check for "../", walk up */
 		if (!strncmp("../", link, 3)) {
 			climb_up(nd);
-			link = next_slash + 2;
-			continue;
+			goto next_loop;
 		}
 		*next_slash = '\0';
 		link_dentry = do_lookup(nd->dentry, link);
@@ -247,8 +273,13 @@ static int link_path_walk(char *path, struct nameidata *nd)
 		follow_symlink(nd);
 		if (!(nd->dentry->d_inode->i_type & FS_I_DIR))
 			return -ENOTDIR;
+next_loop:
 		/* move through the path string to the next entry */
 		link = next_slash + 1;
+		/* advance past any other interim slashes.  we know we won't hit the end
+		 * due to the for loop check above */
+		while (*link == '/')
+			link++;
 	}
 	/* now, we're on the last link of the path */
 	/* if we just want the parent, leave now.  and save the name of the link

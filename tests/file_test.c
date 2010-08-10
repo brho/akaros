@@ -15,7 +15,7 @@ int main()
 	fprintf(file,"%s","hello, world\n"); 
 	fclose(file); 
 
-	int fd = open("/bin/test.txt", O_RDWR | O_CREAT );
+	int fd = open("../../..//////dir1/test.txt", O_RDWR | O_CREAT );
 	char rbuf[256] = {0}, wbuf[256] = {0};
 	int retval;
 	retval = read(fd, rbuf, 16);
@@ -31,7 +31,7 @@ int main()
 	retval = access("/bin/laden", X_OK);
 	if (errno != ENOENT)
 		printf("WARNING! Access error for Osama!\n");
-	retval = access("/dir1/f1.txt", R_OK);
+	retval = access("////../../////dir1/f1.txt", R_OK);
 	if (retval < 0)
 		printf("WARNING! Access error for f1.txt!\n");
 
