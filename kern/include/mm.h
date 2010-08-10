@@ -68,14 +68,14 @@ void print_vmrs(struct proc *p);
 void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
            int fd, size_t offset);
 void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
-             struct file *f, size_t offset);
+              struct file *f, size_t offset);
 int mprotect(struct proc *p, uintptr_t addr, size_t len, int prot);
 int munmap(struct proc *p, uintptr_t addr, size_t len);
 int handle_page_fault(struct proc *p, uintptr_t va, int prot);
 
 /* These assume the memory/proc_lock is held already */
 void *__do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
-               struct file *f, size_t offset);
+                struct file *f, size_t offset);
 int __do_mprotect(struct proc *p, uintptr_t addr, size_t len, int prot);
 int __do_munmap(struct proc *p, uintptr_t addr, size_t len);
 int __handle_page_fault(struct proc* p, uintptr_t va, int prot);

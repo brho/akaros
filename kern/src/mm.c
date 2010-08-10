@@ -274,11 +274,20 @@ void print_vmrs(struct proc *p)
 
 
 /* Error values aren't quite comprehensive - check man mmap() once we do better
- * with the FS */
+ * with the FS.
+ *
+ * The mmap call's offset is in units of PGSIZE (like Linux's mmap2()), but
+ * internally, the offset is tracked in bytes.  The reason for the PGSIZE is for
+ * 32bit apps to enumerate large files, but a full 64bit system won't need that.
+ * We track things internally in bytes since that is how file pointers work, vmr
+ * bases and ends, and similar math.  While it's not a hard change, there's no
+ * need for it, and ideally we'll be a fully 64bit system before we deal with
+ * files that large. */
 void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
            int fd, size_t offset)
 {
 	struct file *file = NULL;
+	offset <<= PGSHIFT;
 	printd("mmap(addr %x, len %x, prot %x, flags %x, fd %x, off %x)\n", addr,
 	       len, prot, flags, fd, offset);
 	if (fd >= 0 && (flags & MAP_ANON)) {
