@@ -176,7 +176,7 @@ void kfs_read_inode(struct inode *inode)
 	/* TODO: what does it mean to ask for an inode->i_ino that doesn't exist?
 	 * 	possibly a bug, since these inos come from directories */
 	if (inode->i_ino == 1) {
-		inode->i_mode = 0x777;			/* TODO: use something appropriate */
+		inode->i_mode = S_IRWXU | S_IRWXG | S_IRWXO;
 		inode->i_type = FS_I_DIR;
 		inode->i_nlink = 1;				/* assuming only one hardlink */
 		inode->i_uid = 0;
@@ -732,7 +732,7 @@ static int __add_kfs_entry(struct dentry *parent, char *path,
 			inode = dentry->d_inode;
 		} else {
 			/* we are a file */
-			create_file(parent->d_inode, dentry, O_RDWR, c_bhdr->c_mode);
+			create_file(parent->d_inode, dentry, c_bhdr->c_mode);
 			inode = dentry->d_inode;
 			((struct kfs_i_info*)inode->i_fs_info)->filestart =
 			                                        c_bhdr->c_filestart;

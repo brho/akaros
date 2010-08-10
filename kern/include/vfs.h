@@ -126,6 +126,21 @@ struct nameidata {
 #define O_NOFOLLOW		00400000	/* Do not follow links. */
 #define O_NOATIME		01000000	/* Do not set atime. */
 #define O_CLOEXEC		02000000	/* Set close_on_exec. */
+#define O_CREAT_FLAGS (O_CREAT | O_EXCL | O_NOCTTY | O_TRUNC)
+
+/* File creation modes (access controls) */
+#define S_IRWXU 00700	/* user (file owner) has read, write and execute perms */
+#define S_IRUSR 00400	/* user has read permission */
+#define S_IWUSR 00200	/* user has write permission */
+#define S_IXUSR 00100	/* user has execute permission */
+#define S_IRWXG 00070	/* group has read, write and execute permission */
+#define S_IRGRP 00040	/* group has read permission */
+#define S_IWGRP 00020	/* group has write permission */
+#define S_IXGRP 00010	/* group has execute permission */
+#define S_IRWXO 00007	/* others have read, write and execute permission */
+#define S_IROTH 00004	/* others have read permission */
+#define S_IWOTH 00002	/* others have write permission */
+#define S_IXOTH 00001	/* others have execute permission */
 
 /* Every object that has pages, like an inode or the swap (or even direct block
  * devices) has a page_map, tracking which of its pages are currently in memory.
@@ -460,7 +475,7 @@ void dentry_release(struct kref *kref);
 
 /* Inode Functions */
 struct inode *get_inode(struct dentry *dentry);
-int create_file(struct inode *dir, struct dentry *dentry, int flags, int mode);
+int create_file(struct inode *dir, struct dentry *dentry, int mode);
 int create_dir(struct inode *dir, struct dentry *dentry, int mode);
 int check_perms(struct inode *inode, int access_mode);
 void inode_release(struct kref *kref);
@@ -474,7 +489,7 @@ ssize_t generic_file_write(struct file *file, const char *buf, size_t count,
                            off_t *offset);
 struct file *do_file_open(char *path, int flags, int mode);
 int do_file_access(char *path, int mode);
-struct file *dentry_open(struct dentry *dentry);
+struct file *dentry_open(struct dentry *dentry, int flags);
 void file_release(struct kref *kref);
 
 /* Page cache functions */

@@ -417,11 +417,18 @@ int __do_mprotect(struct proc *p, uintptr_t addr, size_t len, int prot)
 		/* if vmr maps a file, then we need to make sure the protection change
 		 * is in compliance with the open mode of the file.  At least for any
 		 * mapping that is write-backed to a file.  For now, we just do it for
-		 * all file mappings.  And this hasn't been tested */
+		 * all file mappings. */
 		if (vmr->vm_file && (prot & PROT_WRITE)) {
-			if (!(vmr->vm_file->f_mode & PROT_WRITE)) {
-				set_errno(current_tf, EACCES);
-				return -1;
+			if (!(vmr->vm_file->f_mode & S_IWUSR)) {
+				/* at this point, we have a file opened in the wrong mode, but
+				 * we may be allowed to access it still. */
+				if (check_perms(vmr->vm_file->f_dentry->d_inode, S_IWUSR)) {		
+					set_errno(current_tf, EACCES);
+					return -1;
+				} else {
+					/* it is okay, though we need to change the file mode. */
+					vmr->vm_file->f_mode |= S_IWUSR;
+				}
 			}
 		}
 		vmr->vm_prot = prot;

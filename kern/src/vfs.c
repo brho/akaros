@@ -508,6 +508,7 @@ struct inode *get_inode(struct dentry *dentry)
 	inode->i_sb = sb;
 	inode->i_state = 0;					/* need real states, like I_NEW */
 	inode->dirtied_when = 0;
+	inode->i_flags = 0;
 	atomic_set(&inode->i_writecount, 0);
 	/* Set up the page_map structures.  Default is to use the embedded one.
 	 * Might push some of this back into specific FSs.  For now, the FS tells us
@@ -553,7 +554,7 @@ static struct inode *create_inode(struct dentry *dentry, int mode)
 /* Create a new disk inode in dir associated with dentry, with the given mode.
  * called when creating a regular file.  dir is the directory/parent.  dentry is
  * the dentry of the inode we are creating.  Note the lack of the nd... */
-int create_file(struct inode *dir, struct dentry *dentry, int flags, int mode)
+int create_file(struct inode *dir, struct dentry *dentry, int mode)
 {
 	struct inode *new_file = create_inode(dentry, mode);
 	if (!new_file)
@@ -562,8 +563,6 @@ int create_file(struct inode *dir, struct dentry *dentry, int flags, int mode)
 	/* when we have notions of users, do something here: */
 	new_file->i_uid = 0;
 	new_file->i_gid = 0;
-	/* Not supposed to keep these creation flags */
-	new_file->i_flags = flags & ~(O_CREAT|O_TRUNC|O_EXCL|O_NOCTTY);
 	kref_put(&new_file->i_kref);
 	return 0;
 }
@@ -751,9 +750,10 @@ ssize_t generic_file_write(struct file *file, const char *buf, size_t count,
 
 /* Opens the file, using permissions from current for lack of a better option.
  * It will attempt to create the file if it does not exist and O_CREAT is
- * specified.  This will return 0 on failure, and set errno.
- * TODO: There's a lot of stuff that we don't do, esp related to permission
- * checking and file truncating.  Create should set errno and propagate it up.*/
+ * specified.  This will return 0 on failure, and set errno.  TODO: There's some
+ * stuff that we don't do, esp related file truncating/creation.  flags are for
+ * opening, the mode is for creating.  The flags related to how to create
+ * (O_CREAT_FLAGS) are handled in this function, not in create_file() */
 struct file *do_file_open(char *path, int flags, int mode)
 {
 	struct file *file = 0;
@@ -784,9 +784,9 @@ struct file *do_file_open(char *path, int flags, int mode)
 		/* Create the inode/file.  get a fresh dentry too: */
 		file_d = get_dentry(nd->dentry->d_sb, nd->dentry, nd->last.name);
 		parent_i = nd->dentry->d_inode;
-		/* TODO: mode should be & ~umask.  Note that mode only applies to future
-		 * opens. */
-		if (create_file(parent_i, file_d, flags, mode)) {
+		/* TODO: mode should be & ~umask.  Note that mode technically should
+		 * only apply to future opens, though we apply it immediately. */
+		if (create_file(parent_i, file_d, mode)) {
 			kref_put(&file_d->d_kref);
 			path_release(nd);
 			return 0;
@@ -805,15 +805,12 @@ struct file *do_file_open(char *path, int flags, int mode)
 	 * point, file_d is a refcnt'd dentry, regardless of which branch we took.*/
 	if (flags & O_TRUNC)
 		warn("File truncation not supported yet.");
-	file = dentry_open(file_d);		/* sets errno */
+	file = dentry_open(file_d, flags);		/* sets errno */
 	if (!file) {
 		kref_put(&file_d->d_kref);
 		path_release(nd);
 		return 0;
 	}
-	/* TODO: check the inode's mode (S_XXX) against the flags O_RDWR */
-	/* f_mode stores how the FILE is open, regardless of the mode */
-	file->f_mode = flags & (O_RDONLY|O_WRONLY|O_RDWR);
 	kref_put(&file_d->d_kref);
 	path_release(nd);
 	return file;
@@ -836,15 +833,34 @@ int do_file_access(char *path, int mode)
 }
 
 /* Opens and returns the file specified by dentry */
-struct file *dentry_open(struct dentry *dentry)
+struct file *dentry_open(struct dentry *dentry, int flags)
 {
 	struct inode *inode;
+	int desired_mode;
 	struct file *file = kmem_cache_alloc(file_kcache, 0);
 	if (!file) {
 		set_errno(current_tf, ENOMEM);
 		return 0;
 	}
 	inode = dentry->d_inode;
+	/* Do the mode first, since we can still error out.  f_mode stores how the
+	 * OS file is open, which can be more restrictive than the i_mode */
+	switch (flags & (O_RDONLY | O_WRONLY | O_RDWR)) {
+		case O_RDONLY:
+			desired_mode = S_IRUSR;
+			break;
+		case O_WRONLY:
+			desired_mode = S_IWUSR;
+			break;
+		case O_RDWR:
+			desired_mode = S_IRUSR | S_IWUSR;
+			break;
+		default:
+			goto error_access;
+	}
+	if (check_perms(inode, desired_mode))
+		goto error_access;
+	file->f_mode = desired_mode;
 	/* one for the ref passed out, and *none* for the sb TAILQ */
 	kref_init(&file->f_kref, file_release, 1);
 	/* Add to the list of all files of this SB */
@@ -854,8 +870,8 @@ struct file *dentry_open(struct dentry *dentry)
 	kref_get(&inode->i_sb->s_mount->mnt_kref, 1);
 	file->f_vfsmnt = inode->i_sb->s_mount;		/* saving a ref to the vmnt...*/
 	file->f_op = inode->i_fop;
-	file->f_flags = inode->i_flags;				/* just taking the inode vals */
-	file->f_mode = inode->i_mode;
+	/* Don't store open mode or creation flags */
+	file->f_flags = flags & ~(O_ACCMODE | O_CREAT_FLAGS);
 	file->f_pos = 0;
 	file->f_uid = inode->i_uid;
 	file->f_gid = inode->i_gid;
@@ -866,6 +882,10 @@ struct file *dentry_open(struct dentry *dentry)
 	file->f_mapping = inode->i_mapping;
 	file->f_op->open(inode, file);
 	return file;
+error_access:
+	set_errno(current_tf, EACCES);
+	kmem_cache_free(file_kcache, file);
+	return 0;
 }
 
 /* Closes a file, fsync, whatever else is necessary.  Called when the kref hits
