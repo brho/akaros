@@ -414,20 +414,36 @@ int __do_mprotect(struct proc *p, uintptr_t addr, size_t len, int prot)
 	while (vmr && vmr->vm_base < addr + len) {
 		if (vmr->vm_prot == prot)
 			continue;
-		/* if vmr maps a file, then we need to make sure the protection change
-		 * is in compliance with the open mode of the file.  At least for any
-		 * mapping that is write-backed to a file.  For now, we just do it for
-		 * all file mappings. */
 		if (vmr->vm_file && (prot & PROT_WRITE)) {
-			if (!(vmr->vm_file->f_mode & S_IWUSR)) {
-				/* at this point, we have a file opened in the wrong mode, but
-				 * we may be allowed to access it still. */
-				if (check_perms(vmr->vm_file->f_dentry->d_inode, S_IWUSR)) {		
+			/* if vmr maps a file as MAP_SHARED, then we need to make sure the
+			 * protection change is in compliance with the open mode of the
+			 * file. */
+		    if (vmr->vm_flags & MAP_SHARED) {
+				if (!(vmr->vm_file->f_mode & S_IWUSR)) {
+					/* at this point, we have a file opened in the wrong mode,
+					 * but we may be allowed to access it still. */
+					if (check_perms(vmr->vm_file->f_dentry->d_inode, S_IWUSR)) {
+						set_errno(current_tf, EACCES);
+						return -1;
+					} else {
+						/* it is okay, though we need to change the file mode.
+						 */
+						vmr->vm_file->f_mode |= S_IWUSR;
+					}
+				}
+			} else {	/* PRIVATE mapping */
+				/* TODO: we want a CoW mapping (like we want in handle_page_fault()),
+				 * since there is a concern of a process having the page already
+				 * mapped in to a file it does not have permissions to, and then
+				 * mprotecting it so it can access it.  So we can't just change
+				 * the prot, and we don't know yet if a page is mapped in.  To
+				 * handle this, we ought to sort out the CoW bit, and then this
+				 * will be easy.  Til then, just do a permissions check.  If we
+				 * start having weird issues with libc overwriting itself (since
+				 * procs mprotect that W), then change this. */
+				if (check_perms(vmr->vm_file->f_dentry->d_inode, S_IWUSR)) {
 					set_errno(current_tf, EACCES);
 					return -1;
-				} else {
-					/* it is okay, though we need to change the file mode. */
-					vmr->vm_file->f_mode |= S_IWUSR;
 				}
 			}
 		}
