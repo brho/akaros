@@ -505,4 +505,7 @@ int insert_file(struct files_struct *open_files, struct file *file);
 void close_all_files(struct files_struct *open_files, bool cloexec);
 void clone_files(struct files_struct *src, struct files_struct *dst);
 
+/* Debugging */
+int ls_dash_r(char *path);
+
 #endif /* ROS_KERN_VFS_H */

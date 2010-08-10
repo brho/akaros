@@ -1148,3 +1148,66 @@ void clone_files(struct files_struct *src, struct files_struct *dst)
 	spin_unlock(&dst->lock);
 	spin_unlock(&src->lock);
 }
+
+static void print_dir(struct dentry *dentry, char *buf, int depth)
+{
+	struct dentry *child_d;
+	struct dirent next;
+	struct file *dir;
+	int retval;
+	int child_num = 0;
+
+	if (!dentry->d_inode->i_type & FS_I_DIR) {
+		warn("Thought this was only directories!!");
+		return;
+	}
+	/* Print this dentry */
+	printk("%s%s/\n", buf, dentry->d_name.name);
+	if (depth >= 32)
+		return;
+	/* Set buffer for our kids */
+	buf[depth] = '\t';
+	dir = dentry_open(dentry, 0);
+	if (!dir)
+		panic("Filesystem seems inconsistent - unable to open a dir!");
+	/* Process every child, recursing on directories */
+	while (1) {
+		next.d_off = child_num++;
+		retval = dir->f_op->readdir(dir, &next);
+		if (retval >= 0) {
+			/* there is an entry, now get its dentry */
+			child_d = do_lookup(dentry, next.d_name);
+			if (!child_d)
+				panic("Inconsistent FS, dirent doesn't have a dentry!");
+			/* Recurse for directories, or just print the name for others */
+			if (child_d->d_inode->i_type & FS_I_DIR)
+				print_dir(child_d, buf, depth + 1);
+			else
+				printk("%s%s  size(B): %d\n", buf, next.d_name,
+				       child_d->d_inode->i_size);
+			kref_put(&child_d->d_kref);	
+		}
+		if (retval <= 0)
+			break;
+	}
+	/* Reset buffer to the way it was */
+	buf[depth] = '\0';
+	kref_put(&dir->f_kref);
+}
+
+/* Debugging */
+int ls_dash_r(char *path)
+{
+	struct nameidata nd_r = {0}, *nd = &nd_r;
+	int error;
+	char buf[32] = {0};
+
+	error = path_lookup(path, LOOKUP_ACCESS | LOOKUP_DIRECTORY, nd);
+	if (error) {
+		path_release(nd);
+		return error;
+	}
+	print_dir(nd->dentry, buf, 0);
+	path_release(nd);
+	return 0;
+}

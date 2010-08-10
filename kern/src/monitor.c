@@ -768,6 +768,7 @@ int mon_fs(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 	if (argc < 2) {
 		printk("Usage: fs OPTION\n");
 		printk("\topen: show all open files\n");
+		printk("\tls DIR: print the dir tree starting with DIR\n");
 		printk("\tpid: proc PID's fs crap placeholder\n");
 		return 1;
 	}
@@ -778,6 +779,17 @@ int mon_fs(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 			       file_name(i), kref_refcnt(&i->f_kref),
 				   kref_refcnt(&i->f_dentry->d_kref),
 				   kref_refcnt(&i->f_dentry->d_inode->i_kref));
+	} else if (!strcmp(argv[1], "ls")) {
+		if (argc != 3) {
+			printk("Give me a dir.\n");
+			return 1;
+		}
+		if (argv[2][0] != '/') {
+			printk("Dear fellow giraffe lover, Use absolute paths.\n");
+			return 1;
+		}
+		ls_dash_r(argv[2]);
+		/* whatever.  placeholder. */
 	} else if (!strcmp(argv[1], "pid")) {
 		if (argc != 3) {
 			printk("Give me a pid number.\n");

@@ -496,7 +496,7 @@ off_t kfs_llseek(struct file *file, off_t offset, int whence)
  * read and write, there will be issues with userspace and the *dirent buf.
  * TODO: we don't really do anything with userspace concerns here, in part
  * because memcpy_to doesn't work well.  When we fix how we want to handle the
- * userbuffers, we can write this accordingly.  */
+ * userbuffers, we can write this accordingly. (UMEM)  */
 int kfs_readdir(struct file *dir, struct dirent *dirent)
 {
 	int count = 0;
@@ -824,29 +824,4 @@ void parse_cpio_entries(struct super_block *sb, void *cpio_b)
 		c_hdr = (struct cpio_newc_header*)(cpio_b + offset);
 	}
 	kfree(c_bhdr);
-}
-
-/* Debugging */
-void print_dir_tree(struct dentry *dentry, int depth)
-{
-	struct inode *inode = dentry->d_inode;
-	struct kfs_i_info *k_i_info = (struct kfs_i_info*)inode->i_fs_info;
-	struct dentry *d_i;
-	assert(dentry && inode && inode->i_type & FS_I_DIR);
-	char buf[32] = {0};
-
-	for (int i = 0; i < depth; i++)
-		buf[i] = '\t';
-
-	TAILQ_FOREACH(d_i, &dentry->d_subdirs, d_subdirs_link) {
-		printk("%sDir %s has child dir: %s\n", buf, dentry->d_name.name,
-		       d_i->d_name.name);
-		print_dir_tree(d_i, depth + 1);
-	}
-	TAILQ_FOREACH(d_i, &k_i_info->children, d_subdirs_link) {
-		printk("%sDir %s has child file: %s ", buf, dentry->d_name.name,
-		       d_i->d_name.name);
-		printk("file starts at: %p\n",
-		       ((struct kfs_i_info*)d_i->d_inode->i_fs_info)->filestart);
-	}
 }
