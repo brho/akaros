@@ -54,19 +54,11 @@
 
 #include <ros/common.h>
 #include <arch/mmu.h>
-#include <ros/arch/trapframe.h>
+#include <arch/ros/trapframe.h>
 
 /* The kernel's interrupt descriptor table */
 extern gatedesc_t idt[];
 extern taskstate_t ts;
-
-/* the struct trapframe and friends are in ros/arch/trapframe.h */
-
-static inline void set_errno(trapframe_t* tf, uint32_t errno)
-{
-	if (tf)
-		tf->tf_regs.reg_esi = errno;
-}
 
 /* Determines if the given TF was in the kernel or not. */
 static inline bool in_kernel(struct trapframe *tf)

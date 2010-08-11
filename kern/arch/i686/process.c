@@ -49,14 +49,6 @@ void proc_secure_trapframe(struct trapframe *tf)
 	tf->tf_eflags |= 0x00000200; // bit 9 is the interrupts-enabled
 }
 
-/* For cases that we won't return from a syscall via the normal path, and need
- * to set the syscall return value in the registers manually.  Like in a syscall
- * moving to RUNNING_M */
-void proc_set_syscall_retval(trapframe_t *SAFE tf, intreg_t value)
-{
-	tf->tf_regs.reg_eax = value;
-}
-
 /* Called when we are currently running an address space on our core and want to
  * abandon it.  We need a known good pgdir before releasing the old one.  We
  * decref, since current no longer tracks the proc (and current no longer

@@ -276,12 +276,12 @@ static error_t sys_proc_destroy(struct proc *p, pid_t pid, int exitcode)
 	struct proc *p_to_die = pid2proc(pid);
 
 	if (!p_to_die) {
-		set_errno(current_tf, ESRCH);
+		set_errno(ESRCH);
 		return -1;
 	}
 	if (!proc_controls(p, p_to_die)) {
 		kref_put(&p_to_die->kref);
-		set_errno(current_tf, EPERM);
+		set_errno(EPERM);
 		return -1;
 	}
 	if (p_to_die == p) {
@@ -308,7 +308,7 @@ static ssize_t sys_fork(env_t* e)
 	// TODO: right now we only support fork for single-core processes
 	if(e->state != PROC_RUNNING_S)
 	{
-		set_errno(current_tf,EINVAL);
+		set_errno(EINVAL);
 		return -1;
 	}
 
@@ -368,7 +368,7 @@ static ssize_t sys_fork(env_t* e)
 	 * address space. */
 	if (env_user_mem_walk(e, 0, UMAPTOP, &copy_page, env)) {
 		proc_destroy(env);	/* this is prob what you want, not decref by 2 */
-		set_errno(current_tf,ENOMEM);
+		set_errno(ENOMEM);
 		return -1;
 	}
 	clone_files(&e->open_files, &env->open_files);
@@ -462,13 +462,13 @@ static ssize_t sys_trywait(env_t* e, pid_t pid, int* status)
 			}
 			else // not dead yet
 			{
-				set_errno(current_tf,0);
+				set_errno(ESUCCESS);
 				ret = -1;
 			}
 		}
 		else // not a child of the calling process
 		{
-			set_errno(current_tf,1);
+			set_errno(EPERM);
 			ret = -1;
 		}
 
@@ -479,7 +479,7 @@ static ssize_t sys_trywait(env_t* e, pid_t pid, int* status)
 		return ret;
 	}
 
-	set_errno(current_tf,1);
+	set_errno(EPERM);
 	return -1;
 }
 
@@ -565,19 +565,19 @@ static int sys_notify(struct proc *p, int target_pid, unsigned int notif,
 	struct proc *target = pid2proc(target_pid);
 
 	if (!target) {
-		set_errno(current_tf, EBADPROC);
+		set_errno(EBADPROC);
 		return -1;
 	}
 	if (!proc_controls(p, target)) {
 		kref_put(&target->kref);
-		set_errno(current_tf, EPERM);
+		set_errno(EPERM);
 		return -1;
 	}
 	/* if the user provided a notif_event, copy it in and use that */
 	if (u_ne) {
 		if (memcpy_from_user(p, &local_ne, u_ne, sizeof(struct notif_event))) {
 			kref_put(&target->kref);
-			set_errno(current_tf, EINVAL);
+			set_errno(EINVAL);
 			return -1;
 		}
 		proc_notify(target, local_ne.ne_type, &local_ne);
@@ -600,7 +600,7 @@ static int sys_self_notify(struct proc *p, uint32_t vcoreid, unsigned int notif,
 	/* if the user provided a notif_event, copy it in and use that */
 	if (u_ne) {
 		if (memcpy_from_user(p, &local_ne, u_ne, sizeof(struct notif_event))) {
-			set_errno(current_tf, EINVAL);
+			set_errno(EINVAL);
 			return -1;
 		}
 		do_notify(p, vcoreid, local_ne.ne_type, &local_ne);
@@ -770,7 +770,7 @@ static intreg_t sys_read(struct proc *p, int fd, void *buf, int len)
 	ssize_t ret;
 	struct file *file = get_file_from_fd(&p->open_files, fd);
 	if (!file) {
-		set_errno(current_tf, EBADF);
+		set_errno(EBADF);
 		return -1;
 	}
 	/* TODO: (UMEM) currently, read() handles user memcpy issues, but we
@@ -795,7 +795,7 @@ static intreg_t sys_write(struct proc *p, int fd, const void *buf, int len)
 	ssize_t ret;
 	struct file *file = get_file_from_fd(&p->open_files, fd);
 	if (!file) {
-		set_errno(current_tf, EBADF);
+		set_errno(EBADF);
 		return -1;
 	}
 	/* TODO: (UMEM) */
@@ -835,7 +835,7 @@ static intreg_t sys_close(struct proc *p, int fd)
 {
 	struct file *file = put_file_from_fd(&p->open_files, fd);
 	if (!file) {
-		set_errno(current_tf, EBADF);
+		set_errno(EBADF);
 		return -1;
 	}
 	return 0;
@@ -851,13 +851,13 @@ static intreg_t sys_fstat(struct proc *p, int fd, struct kstat *u_stat)
 	struct kstat *kbuf;
 	struct file *file = get_file_from_fd(&p->open_files, fd);
 	if (!file) {
-		set_errno(current_tf, EBADF);
+		set_errno(EBADF);
 		return -1;
 	}
 	kbuf = kmalloc(sizeof(struct kstat), 0);
 	if (!kbuf) {
 		kref_put(&file->f_kref);
-		set_errno(current_tf, ENOMEM);
+		set_errno(ENOMEM);
 		return -1;
 	}
 	stat_inode(file->f_dentry->d_inode, kbuf);
@@ -865,7 +865,7 @@ static intreg_t sys_fstat(struct proc *p, int fd, struct kstat *u_stat)
 	/* TODO: UMEM: pin the memory, copy directly, and skip the kernel buffer */
 	if (memcpy_to_user_errno(p, u_stat, kbuf, sizeof(struct kstat))) {
 		kfree(kbuf);
-		set_errno(current_tf, EINVAL);
+		set_errno(EINVAL);
 		return -1;
 	}
 	kfree(kbuf);
@@ -889,7 +889,7 @@ static intreg_t stat_helper(struct proc *p, const char *path, size_t path_l,
 		return -1;
 	kbuf = kmalloc(sizeof(struct kstat), 0);
 	if (!kbuf) {
-		set_errno(current_tf, ENOMEM);
+		set_errno(ENOMEM);
 		kref_put(&path_i->i_kref);
 		return -1;
 	}
@@ -898,7 +898,7 @@ static intreg_t stat_helper(struct proc *p, const char *path, size_t path_l,
 	/* TODO: UMEM: pin the memory, copy directly, and skip the kernel buffer */
 	if (memcpy_to_user_errno(p, u_stat, kbuf, sizeof(struct kstat))) {
 		kfree(kbuf);
-		set_errno(current_tf, EINVAL);
+		set_errno(EINVAL);
 		return -1;
 	}
 	kfree(kbuf);
@@ -936,7 +936,7 @@ static intreg_t sys_access(struct proc *p, const char *path, size_t path_l,
 	user_memdup_free(p, t_path);
 	printd("Access for path: %s retval: %d\n", path, retval);
 	if (retval < 0) {
-		set_errno(current_tf, -retval);
+		set_errno(-retval);
 		return -1;
 	}
 	return retval;
@@ -962,7 +962,7 @@ static intreg_t sys_lseek(struct proc *p, int fd, off_t offset, int whence)
 	off_t ret;
 	struct file *file = get_file_from_fd(&p->open_files, fd);
 	if (!file) {
-		set_errno(current_tf, EBADF);
+		set_errno(EBADF);
 		return -1;
 	}
 	ret = file->f_op->llseek(file, offset, whence);
@@ -1086,8 +1086,8 @@ intreg_t syscall(struct proc *p, uintreg_t syscallno, uintreg_t a1,
 {
 	// Initialize the return value and error code returned to 0
 	if(current_tf != NULL){
-		proc_set_syscall_retval(&p->env_tf, ESUCCESS);
-		set_errno(current_tf,0);
+		set_retval(ESUCCESS);
+		set_errno(ESUCCESS);
 	}
 
 	typedef intreg_t (*syscall_t)(struct proc*,uintreg_t,uintreg_t,
@@ -1288,4 +1288,15 @@ void systrace_clear_buffer(void)
 	spin_lock_irqsave(&systrace_lock);
 	memset(systrace_buffer, 0, sizeof(struct systrace_record)*MAX_NUM_TRACED);
 	spin_unlock_irqsave(&systrace_lock);
+}
+
+void set_retval(uint32_t retval)
+{
+	struct per_cpu_info* coreinfo = &per_cpu_info[core_id()];
+	*(coreinfo->cur_ret.returnloc) = retval;
+}
+void set_errno(uint32_t errno)
+{
+	struct per_cpu_info* coreinfo = &per_cpu_info[core_id()];
+	*(coreinfo->cur_ret.errno_loc) = errno;
 }

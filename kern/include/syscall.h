@@ -41,4 +41,7 @@ int systrace_dereg(bool all, struct proc *p);
 void systrace_print(bool all, struct proc *p);
 void systrace_clear_buffer(void);
 
+/* direct returnval and errno handling */
+void set_errno(uint32_t errno);
+void set_retval(uint32_t retval);
 #endif /* !ROS_KERN_SYSCALL_H */

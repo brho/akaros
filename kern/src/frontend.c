@@ -136,7 +136,7 @@ int frontend_syscall_errno(struct proc* p, int n, int a0, int a1, int a2, int a3
 {
 	int errno, ret = frontend_syscall(p->pid,n,a0,a1,a2,a3,&errno);
 	if(errno && p)
-		set_errno(current_tf,errno);
+		set_errno(errno);
 	return ret;
 }
 

@@ -51,7 +51,7 @@ ssize_t core_request(struct proc *p)
 		// save the context, to be restarted in _S mode
 		p->env_tf = *current_tf;
 		env_push_ancillary_state(p); // TODO: (HSS)
-		proc_set_syscall_retval(&p->env_tf, ESUCCESS);
+		set_retval(ESUCCESS);
 		/* sending death, since it's not our job to save contexts or anything in
 		 * this case.  also, if this returns true, we will not return down
 		 * below, and need to eat the reference to p */
@@ -193,7 +193,7 @@ error_t resource_req(struct proc *p, int type, size_t amt_wanted,
 			retval = core_request(p);
 			// i don't like this retval hackery
 			if (retval < 0) {
-				set_errno(current_tf, -retval);
+				set_errno(-retval);
 				return -1;
 			}
 			else

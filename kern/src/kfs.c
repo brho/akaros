@@ -482,7 +482,7 @@ off_t kfs_llseek(struct file *file, off_t offset, int whence)
 			temp_off = file->f_dentry->d_inode->i_size + offset;
 			break;
 		default:
-			set_errno(current_tf, EINVAL);
+			set_errno(EINVAL);
 			warn("Unknown 'whence' in llseek()!\n");
 			return -1;
 	}
@@ -521,7 +521,7 @@ int kfs_readdir(struct file *dir, struct dirent *dirent)
 	/* some of this error handling can be done by the VFS.  The syscall should
 	 * handle EBADF, EFAULT, and EINVAL (TODO, memory related). */
 	if (!(dir_d->d_inode->i_type & FS_I_DIR)) {
-		set_errno(current_tf, ENOTDIR);
+		set_errno(ENOTDIR);
 		return -1;
 	}
 
@@ -532,7 +532,7 @@ int kfs_readdir(struct file *dir, struct dirent *dirent)
 		check_entry();
 
 	if (!found) {
-		set_errno(current_tf, ENOENT);
+		set_errno(ENOENT);
 		return -1;
 	}
 	if (count - 1 == dirent->d_off)		/* found the last dir in the list */

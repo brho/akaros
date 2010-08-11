@@ -292,21 +292,21 @@ void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 	printd("mmap(addr %x, len %x, prot %x, flags %x, fd %x, off %x)\n", addr,
 	       len, prot, flags, fd, offset);
 	if (fd >= 0 && (flags & MAP_ANON)) {
-		set_errno(current_tf, EBADF);
+		set_errno(EBADF);
 		return MAP_FAILED;
 	}
 	if ((addr + len > UMAPTOP) || (PGOFF(addr))) {
-		set_errno(current_tf, EINVAL);
+		set_errno(EINVAL);
 		return MAP_FAILED;
 	}
 	if (!len) {
-		set_errno(current_tf, EINVAL);
+		set_errno(EINVAL);
 		return MAP_FAILED;
 	}
 	if (fd != -1) {
 		file = get_file_from_fd(&p->open_files, fd);
 		if (!file) {
-			set_errno(current_tf, EBADF);
+			set_errno(EBADF);
 			return MAP_FAILED;
 		}
 	}
@@ -346,7 +346,7 @@ void *__do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 	vmr = create_vmr(p, addr, len);
 	if (!vmr) {
 		printk("[kernel] do_mmap() aborted for %08p + %d!\n", addr, len);
-		set_errno(current_tf, ENOMEM);
+		set_errno(ENOMEM);
 		return MAP_FAILED;		/* TODO: error propagation for mmap() */
 	}
 	vmr->vm_prot = prot;
@@ -359,7 +359,7 @@ void *__do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 	 * they will have a hole in their VM now. */
 	if (file && file->f_op->mmap(file, vmr)) {
 		destroy_vmr(vmr);
-		set_errno(current_tf, EACCES);	/* not quite */
+		set_errno(EACCES);	/* not quite */
 		return MAP_FAILED;
 	}
 	addr = vmr->vm_base;		/* so we know which pages to populate later */
@@ -383,12 +383,12 @@ int mprotect(struct proc *p, uintptr_t addr, size_t len, int prot)
 	if (!len)
 		return 0;
 	if ((addr % PGSIZE) || (addr < MMAP_LOWEST_VA)) {
-		set_errno(current_tf, EINVAL);
+		set_errno(EINVAL);
 		return -1;
 	}
 	uintptr_t end = ROUNDUP(addr + len, PGSIZE);
 	if (end > UMAPTOP || addr > end) {
-		set_errno(current_tf, ENOMEM);
+		set_errno(ENOMEM);
 		return -1;
 	}
 	spin_lock(&p->proc_lock);
@@ -424,7 +424,7 @@ int __do_mprotect(struct proc *p, uintptr_t addr, size_t len, int prot)
 					/* at this point, we have a file opened in the wrong mode,
 					 * but we may be allowed to access it still. */
 					if (check_perms(vmr->vm_file->f_dentry->d_inode, S_IWUSR)) {
-						set_errno(current_tf, EACCES);
+						set_errno(EACCES);
 						return -1;
 					} else {
 						/* it is okay, though we need to change the file mode.
@@ -443,7 +443,7 @@ int __do_mprotect(struct proc *p, uintptr_t addr, size_t len, int prot)
 				 * start having weird issues with libc overwriting itself (since
 				 * procs mprotect that W), then change this. */
 				if (check_perms(vmr->vm_file->f_dentry->d_inode, S_IWUSR)) {
-					set_errno(current_tf, EACCES);
+					set_errno(EACCES);
 					return -1;
 				}
 			}
@@ -470,12 +470,12 @@ int munmap(struct proc *p, uintptr_t addr, size_t len)
 	if (!len)
 		return 0;
 	if ((addr % PGSIZE) || (addr < MMAP_LOWEST_VA)) {
-		set_errno(current_tf, EINVAL);
+		set_errno(EINVAL);
 		return -1;
 	}
 	uintptr_t end = ROUNDUP(addr + len, PGSIZE);
 	if (end > UMAPTOP || addr > end) {
-		set_errno(current_tf, EINVAL);
+		set_errno(EINVAL);
 		return -1;
 	}
 	spin_lock(&p->proc_lock);

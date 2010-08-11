@@ -525,7 +525,7 @@ struct inode *get_inode(struct dentry *dentry)
 	 * specific stuff. */
 	struct inode *inode = sb->s_op->alloc_inode(sb);
 	if (!inode) {
-		set_errno(current_tf, ENOMEM);
+		set_errno(ENOMEM);
 		return 0;
 	}
 	TAILQ_INSERT_HEAD(&sb->s_inodes, inode, i_sb_list);		/* weak inode ref */
@@ -651,7 +651,7 @@ struct inode *lookup_inode(char *path, int flags)
 	error = path_lookup(path, flags, nd);
 	if (error) {
 		path_release(nd);
-		set_errno(current_tf, -error);
+		set_errno(-error);
 		return 0;
 	}
 	inode = nd->dentry->d_inode;
@@ -802,7 +802,7 @@ struct file *do_file_open(char *path, int flags, int mode)
 	error = path_lookup(path, lookup_flags, nd);
 	if (error) {
 		path_release(nd);
-		set_errno(current_tf, -error);
+		set_errno(-error);
 		return 0;
 	}
 	/* see if the target is there, handle accordingly */
@@ -810,7 +810,7 @@ struct file *do_file_open(char *path, int flags, int mode)
 	if (!file_d) {
 		if (!(flags & O_CREAT)) {
 			path_release(nd);
-			set_errno(current_tf, ENOENT);
+			set_errno(ENOENT);
 			return 0;
 		}
 		/* Create the inode/file.  get a fresh dentry too: */
@@ -829,7 +829,7 @@ struct file *do_file_open(char *path, int flags, int mode)
 			/* wanted to create, not open, bail out */
 			kref_put(&file_d->d_kref);
 			path_release(nd);
-			set_errno(current_tf, EACCES);
+			set_errno(EACCES);
 			return 0;
 		}
 	}
@@ -871,7 +871,7 @@ struct file *dentry_open(struct dentry *dentry, int flags)
 	int desired_mode;
 	struct file *file = kmem_cache_alloc(file_kcache, 0);
 	if (!file) {
-		set_errno(current_tf, ENOMEM);
+		set_errno(ENOMEM);
 		return 0;
 	}
 	inode = dentry->d_inode;
@@ -915,7 +915,7 @@ struct file *dentry_open(struct dentry *dentry, int flags)
 	file->f_op->open(inode, file);
 	return file;
 error_access:
-	set_errno(current_tf, EACCES);
+	set_errno(EACCES);
 	kmem_cache_free(file_kcache, file);
 	return 0;
 }

@@ -191,7 +191,7 @@ int memcpy_from_user(struct proc *p, void *dest, const void *DANGEROUS va,
 int memcpy_from_user_errno(struct proc *p, void *dst, const void *src, int len)
 {
 	if (memcpy_from_user(p, dst, src, len)) {
-		set_errno(current_tf, EINVAL);
+		set_errno(EINVAL);
 		return -1;
 	}
 	return 0;
@@ -255,7 +255,7 @@ int memcpy_to_user(struct proc *p, void *va, const void *src, size_t len)
 int memcpy_to_user_errno(struct proc *p, void *dst, const void *src, int len)
 {
 	if (memcpy_to_user(p, dst, src, len)) {
-		set_errno(current_tf, EINVAL);
+		set_errno(EINVAL);
 		return -1;
 	}
 	return 0;
@@ -280,7 +280,7 @@ void *user_memdup_errno(struct proc *p, const void *va, int len)
 {
 	void *kva = user_memdup(p, va, len);
 	if (IS_ERR(kva)) {
-		set_errno(current_tf, -PTR_ERR(kva));
+		set_errno(-PTR_ERR(kva));
 		return NULL;
 	}
 	return kva;
@@ -309,7 +309,7 @@ char *user_strdup_errno(struct proc *p, const char *u_string, size_t strlen)
 {
 	void *k_string = user_strdup(p, u_string, strlen);
 	if (IS_ERR(k_string)) {
-		set_errno(current_tf, -PTR_ERR(k_string));
+		set_errno(-PTR_ERR(k_string));
 		return NULL;
 	}
 	return k_string;
@@ -319,6 +319,6 @@ void *kmalloc_errno(int len)
 {
 	void *kva = NULL;
 	if (len < 0 || (kva = kmalloc(len, 0)) == NULL)
-		set_errno(current_tf, ENOMEM);
+		set_errno(ENOMEM);
 	return kva;
 }
