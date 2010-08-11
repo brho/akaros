@@ -129,7 +129,6 @@ void proc_preempt_all(struct proc *p, uint64_t usec);
 /* Allows the kernel to figure out what process is running on this core.  Can be
  * used just like a pointer to a struct proc.  Need these to be macros due to
  * some circular dependencies with smp.h. */
-#include <smp.h>
 #define current per_cpu_info[core_id()].cur_proc
 #define set_current_proc(p) per_cpu_info[core_id()].cur_proc = (p)
 

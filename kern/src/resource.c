@@ -12,6 +12,7 @@
 
 #include <resource.h>
 #include <process.h>
+#include <smp.h>
 #include <stdio.h>
 #include <assert.h>
 #include <schedule.h>

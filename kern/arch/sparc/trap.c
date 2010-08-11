@@ -419,13 +419,17 @@ handle_syscall(trapframe_t* state)
 
 	advance_pc(state);
 	enable_irq();
+	struct per_cpu_info* coreinfo = per_cpu_info[core_id()];
 
 	set_current_tf(state);
 
+	coreinfo->cur_ret.returnloc = &(state->gpr[8]);
+	coreinfo->cur_ret.errno_loc = &(state->gpr[9]);
+
 	// syscall code wants an edible reference for current
-	kref_get(&current->kref, 1);
+	kref_get(&coreinfo->cur_proc->kref, 1);
 	state->gpr[8] = syscall(current,num,a1,a2,a3,a4,a5);
-	kref_put(&current->kref);
+	kref_put(&coreinfo->cur_proc->kref);
 
 	proc_restartcore(current,state);
 }

@@ -17,6 +17,7 @@
 #include <pmap.h>
 #include <stdio.h>
 #include <hashtable.h>
+#include <smp.h>
 #include <arsc_server.h>
 
 
@@ -24,7 +25,7 @@
 struct proc_list arsc_proc_list = TAILQ_HEAD_INITIALIZER(arsc_proc_list);
 spinlock_t arsc_proc_lock = SPINLOCK_INITIALIZER;
 
-intreg_t syscall_async(struct proc *p, syscall_req_t *call)
+intreg_t inline syscall_async(struct proc *p, syscall_req_t *call)
 {
 	return syscall(p, call->num, call->args[0], call->args[1],
 	               call->args[2], call->args[3], call->args[4]);
@@ -61,6 +62,7 @@ static intreg_t process_generic_syscalls(struct proc *p, size_t max)
 {
 	size_t count = 0;
 	syscall_back_ring_t* sysbr = &p->syscallbackring;
+	struct per_cpu_info* coreinfo = &per_cpu_info[core_id()];
 	// looking at a process not initialized to perform arsc. 
 	if (sysbr == NULL) 
 		return count;
@@ -93,6 +95,10 @@ static intreg_t process_generic_syscalls(struct proc *p, size_t max)
 		syscall_req_t* req = RING_GET_REQUEST(sysbr, ++(sysbr->req_cons));
 		// print req
 		printd("req no %d, req arg %c\n", req->num, *((char*)req->args[0]));
+		
+		coreinfo->cur_ret.returnloc = &(rsp.retval);
+		coreinfo->cur_ret.errno_loc = &(rsp.errno);
+		
 		rsp.retval = syscall_async(p, req);
 		// write response into the slot it came from
 		memcpy(req, &rsp, sizeof(syscall_rsp_t));

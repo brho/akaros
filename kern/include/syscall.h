@@ -4,7 +4,7 @@
 # error "This is ROS kernel header; user programs should not #include it"
 #endif
 
-#include <ros/syscall.h>
+#include <ros/common.h>
 #include <process.h>
 
 #define SYSTRACE_ON					0x01
@@ -25,6 +25,10 @@ struct systrace_record {
 	uint32_t		vcoreid;
 };
 
+struct sys_return {
+	uint32_t *returnloc;
+	uint32_t *errno_loc;
+};
 
 intreg_t syscall(struct proc *p, uintreg_t num, uintreg_t a1, uintreg_t a2,
                  uintreg_t a3, uintreg_t a4, uintreg_t a5);

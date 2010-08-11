@@ -13,6 +13,7 @@
 #include <kmalloc.h>
 #include <assert.h>
 #include <pmap.h>
+#include <smp.h>
 
 /**
  * @brief Global variable used to store erroneous virtual addresses as the

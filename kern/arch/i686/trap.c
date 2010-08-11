@@ -191,14 +191,16 @@ trap_dispatch(trapframe_t *tf)
 		case T_SYSCALL:
 			// check for userspace, for now
 			assert(tf->tf_cs != GD_KT);
-
+			struct per_cpu_info* coreinfo = &per_cpu_info[core_id()];
+			coreinfo->cur_ret.returnloc = &(tf->tf_regs.reg_eax);
+			coreinfo->cur_ret.errno_loc = &(tf->tf_regs.reg_esi);
 			// syscall code wants an edible reference for current
-			kref_get(&current->kref, 1);
+			kref_get(&coreinfo->cur_proc->kref, 1);
 			tf->tf_regs.reg_eax =
-				syscall(current, tf->tf_regs.reg_eax, tf->tf_regs.reg_edx,
+				syscall(coreinfo->cur_proc, tf->tf_regs.reg_eax, tf->tf_regs.reg_edx,
 				        tf->tf_regs.reg_ecx, tf->tf_regs.reg_ebx,
 				        tf->tf_regs.reg_edi, tf->tf_regs.reg_esi);
-			kref_put(&current->kref);
+			kref_put(&coreinfo->cur_proc->kref);
 			break;
 		default:
 			// Unexpected trap: The user process or the kernel has a bug.
@@ -367,8 +369,11 @@ void sysenter_init(void)
 /* This is called from sysenter's asm, with the tf on the kernel stack. */
 void sysenter_callwrapper(struct trapframe *tf)
 {
+	struct per_cpu_info* coreinfo = &per_cpu_info[core_id()];
 	if (!in_kernel(tf))
-		set_current_tf(tf);
+		coreinfo->cur_tf = tf;
+	coreinfo->cur_ret.returnloc = &(tf->tf_regs.reg_eax);
+	coreinfo->cur_ret.errno_loc = &(tf->tf_regs.reg_esi);
 
 	// syscall code wants an edible reference for current
 	kref_get(&current->kref, 1);

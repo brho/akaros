@@ -14,6 +14,7 @@
 #include <kfs.h>
 #include <pmap.h>
 #include <umem.h>
+#include <smp.h>
 
 struct sb_tailq super_blocks = TAILQ_HEAD_INITIALIZER(super_blocks);
 spinlock_t super_blocks_lock = SPINLOCK_INITIALIZER;

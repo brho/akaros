@@ -15,6 +15,7 @@
 #include <trap.h>
 #include <atomic.h>
 #include <process.h>
+#include <syscall.h>
 
 #ifdef __SHARC__
 typedef sharC_env_t;
@@ -22,8 +23,10 @@ typedef sharC_env_t;
 
 struct per_cpu_info {
 	spinlock_t lock;
+	// cur_proc should be valid on all cores that are not management cores.
 	struct proc *cur_proc;
 	trapframe_t *cur_tf;
+	struct sys_return cur_ret;
 
 #ifdef __SHARC__
 	// held spin-locks. this will have to go elsewhere if multiple kernel

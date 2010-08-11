@@ -21,6 +21,7 @@
 #include <slab.h>
 #include <kmalloc.h>
 #include <vfs.h>
+#include <smp.h>
 
 struct kmem_cache *vmr_kcache;
 

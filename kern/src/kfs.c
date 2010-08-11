@@ -24,6 +24,7 @@
 #include <error.h>
 #include <cpio.h>
 #include <pmap.h>
+#include <smp.h>
 
 #define KFS_MAX_FILE_SIZE 1024*1024*128
 #define KFS_MAGIC 0xdead0001

@@ -31,6 +31,7 @@
 #include <hashtable.h>
 #include <arch/bitmask.h>
 #include <kfs.h> // eventually replace this with vfs.h
+#include <smp.h>
 #include <arsc_server.h>
 
 

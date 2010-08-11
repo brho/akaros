@@ -7,6 +7,7 @@
 #include <env.h>
 #include <assert.h>
 #include <pmap.h>
+#include <smp.h>
 
 //
 // This exits the kernel and starts executing some environment's code.

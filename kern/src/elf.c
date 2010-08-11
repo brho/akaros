@@ -6,6 +6,7 @@
 #include <syscall.h>
 #include <elf.h>
 #include <pmap.h>
+#include <smp.h>
 
 typedef struct
 {
