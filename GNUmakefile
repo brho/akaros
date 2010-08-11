@@ -42,7 +42,7 @@ realall: symlinks
 MAKE_JOBS :=
 
 # Give it a reasonable default path for initramfs to avoid build breakage
-INITRAMFS_PATHS = kern/kfs obj/tests
+INITRAMFS_PATHS = kern/kfs
 
 # Then grab the users Makelocal file to let them override Make system variables
 # and set up other Make targets
@@ -160,8 +160,9 @@ tests/: tests
 tests:
 	@$(MAKE) -j $(MAKE_JOBS) realtests
 realtests: $(TESTS_EXECS)
-	@mkdir -p fs/$(TARGET_ARCH)/tests
-	cp -R $(OBJDIR)/$(TESTS_DIR)/* $(TOP_DIR)/fs/$(TARGET_ARCH)/tests
+# No longer automatically copying to the FS dir (deprecated)
+#	@mkdir -p fs/$(TARGET_ARCH)/tests
+#	cp -R $(OBJDIR)/$(TESTS_DIR)/* $(TOP_DIR)/fs/$(TARGET_ARCH)/tests
 
 install-libs: $(ROS_USER_LIBS)
 	cp $(ROS_USER_LIBS) $(GCC_ROOT)/$(TARGET_ARCH)-ros/lib
