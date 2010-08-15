@@ -264,15 +264,13 @@ void kfs_umount_begin(struct super_block *sb)
 
 /* inode_operations */
 
-/* Called when creating a new disk inode in dir associated with dentry.  We need
- * to fill out the i_ino, set the type, and do whatever else we need */
-int kfs_create(struct inode *dir, struct dentry *dentry, int mode,
-               struct nameidata *nd)
+/* Little helper, used for initializing new inodes for file-like objects (files,
+ * symlinks, etc).  We pass the dentry, since we need to up it. */
+static void kfs_init_inode(struct inode *dir, struct dentry *dentry)
 {
 	struct inode *inode = dentry->d_inode;
 	kref_get(&dentry->d_kref, 1);	/* to pin the dentry in RAM, KFS-style... */
 	inode->i_ino = kfs_get_free_ino();
-	inode->i_type = FS_I_FILE;
 	/* our parent dentry's inode tracks our dentry info.  We do this
 	 * since it's all in memory and we aren't using the dcache yet.
 	 * We're reusing the subdirs link, which is used by the VFS when
@@ -280,6 +278,16 @@ int kfs_create(struct inode *dir, struct dentry *dentry, int mode,
 	 * it. */
 	TAILQ_INSERT_TAIL(&((struct kfs_i_info*)dir->i_fs_info)->children,
 	                  dentry, d_subdirs_link);
+}
+
+/* Called when creating a new disk inode in dir associated with dentry.  We need
+ * to fill out the i_ino, set the type, and do whatever else we need */
+int kfs_create(struct inode *dir, struct dentry *dentry, int mode,
+               struct nameidata *nd)
+{
+	struct inode *inode = dentry->d_inode;
+	kfs_init_inode(dir, dentry);
+	inode->i_type = FS_I_FILE;
 	/* fs_info->filestart is set by the caller, or else when first written (for
 	 * new files.  it was set to 0 in alloc_inode(). */
 	return 0;
@@ -347,11 +355,21 @@ int kfs_unlink(struct inode *dir, struct dentry *dentry)
 	return -1;
 }
 
-/* Creates a new inode for a symlink named symname in dir, and links to dentry.
- * */
+/* Creates a new inode for a symlink dir, linking to / containing the name
+ * symname.  dentry is the controlling dentry of the inode. */
 int kfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
 {
-	return -1;
+	struct inode *inode = dentry->d_inode;
+	struct kfs_i_info *k_i_info = (struct kfs_i_info*)inode->i_fs_info;
+	size_t len = strlen(symname);
+	char *string = kmalloc(len + 1, 0);
+
+	kfs_init_inode(dir, dentry);
+	inode->i_type = FS_I_SYMLINK;
+	strncpy(string, symname, len);
+	string[len] = '\0';		/* symname should be \0d anyway, but just in case */
+	k_i_info->filestart = string;	/* reusing this void* to hold the char* */
+	return 0;
 }
 
 /* Called when creating a new inode for a directory associated with dentry in
@@ -394,23 +412,18 @@ int kfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	return -1;
 }
 
-/* Copies to the userspace buffer the file pathname corresponding to the symlink
- * specified by dentry. */
-int kfs_readlink(struct dentry *dentry, char *buffer, size_t buflen)
+/* Returns the char* for the symname for the given dentry.  The VFS code that
+ * calls this for real FS's might assume it's already read in, so if the char *
+ * isn't already in memory, we'd need to read it in here.  Regarding the char*
+ * storage, the char* only will last as long as the dentry and inode are in
+ * memory. */
+char *kfs_readlink(struct dentry *dentry)
 {
-	return -1;
-}
-
-/* Translates the symlink specified by sym and puts the result in nd. */
-int kfs_follow_link(struct dentry *sym, struct nameidata *nd)
-{
-	return -1;
-}
-
-/* Cleans up after follow_link (decrefs the nameidata business) */
-int kfs_put_link(struct dentry *sym, struct nameidata *nd)
-{
-	return -1;
+	struct inode *inode = dentry->d_inode;
+	struct kfs_i_info *k_i_info = (struct kfs_i_info*)inode->i_fs_info;
+	if (inode->i_type != FS_I_SYMLINK)
+		return 0;
+	return k_i_info->filestart;
 }
 
 /* Modifies the size of the file of inode to whatever its i_size is set to */
@@ -645,8 +658,6 @@ struct inode_operations kfs_i_op = {
 	kfs_mknod,
 	kfs_rename,
 	kfs_readlink,
-	kfs_follow_link,
-	kfs_put_link,
 	kfs_truncate,
 	kfs_permission,
 };

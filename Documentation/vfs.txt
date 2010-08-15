@@ -242,3 +242,28 @@ anything with it.
 The moral of the story is that if you don't fully understand something, you are
 not in as good of a position to recommend changes or criticize as if you did
 your homework.  Not that you can't, just that you should 'do your homework.'
+
+Musings on path_lookup()
+--------------------------
+Things can get tricky with path lookup, especially with ., .., and symlinks.
+When doing a LOOKUP_PARENT on a . or .., we give the parent of whatever the path
+would have resolved too.  So /dir1/dir2/dir3/.'s parent is dir2.
+/dir1/dir2/dir3/..'s parent is dir1.  I don't think Linux does this (note the
+parent lookup is for internal kernel stuff, like when you want to edit
+metadata).  When you try to make a . or .. file, you should get some sort of
+error anyways.  We'll see how this works out.
+
+Symlinks can be a bit tricky.  We handle ours a bit differently too, especially
+regarding PARENT lookups.  Ultimately, you can do the same things in ROS that
+you can do in Linux - if you try to create a file that is a dangling symlink,
+you'll correctly create the destination file.  We handle this in
+link_path_walk().  It will return the PARENT of whatever you would resolve to -
+instead of trying to handle this in do_file_open() (which I think linux does).
+
+Also, our handling of symlinks differs a bit from linux.  Eventually, it has
+become clear we're going to need to manually port ext2, and we do some things
+differently in our core VFS already.  Might as well do more thing differently -
+like getting rid of follow_link and put_link from the FS specific sections.  Our
+FSs just need to know how to return a char* for a symname - and not do any of
+the actual link following.  Or any of the other stuff they do.  We'll see if
+that turns out to be an issue or not...

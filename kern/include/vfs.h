@@ -82,7 +82,9 @@ struct qstr {
  * This is meant to be pinning only the 'answer' to a path_lookup, and not the
  * intermediate steps.  The intermediates get pinned due to the existence of
  * their children in memory.  Internally, the VFS will refcnt any item whenever
- * it is in this struct. */
+ * it is in this struct.  The last_sym is needed to pin the dentry (and thus the
+ * inode and char* storage for the symname) for the duration of a lookup.  When
+ * you resolve a pathname, you need to keep its string in memory. */
 #define MAX_SYMLINK_DEPTH 6 // arbitrary.
 struct nameidata {
 	struct dentry				*dentry;		/* dentry of the obj */
@@ -91,8 +93,8 @@ struct nameidata {
 	int							flags;			/* lookup flags */
 	int							last_type;		/* type of last component */
 	unsigned int				depth;			/* search's symlink depth */
-	char						*saved_names[MAX_SYMLINK_DEPTH];
 	int							intent;			/* access type for the file */
+	struct dentry				*last_sym;		/* pins the symname */
 };
 
 /* nameidata lookup flags and access type fields */
@@ -100,6 +102,7 @@ struct nameidata {
 #define LOOKUP_DIRECTORY 	0x02	/* last component must be a directory */
 #define LOOKUP_CONTINUE 	0x04	/* still filenames to go */
 #define LOOKUP_PARENT 		0x08	/* lookup the dir that includes the item */
+/* These are the nd's intent */
 #define LOOKUP_OPEN 		0x10	/* intent is to open a file */
 #define LOOKUP_CREATE 		0x11	/* create a file if it doesn't exist */
 #define LOOKUP_ACCESS 		0x12	/* access / check user permissions */
@@ -219,6 +222,7 @@ struct super_operations {
 
 #define FS_I_FILE				0x01
 #define FS_I_DIR				0x02
+#define FS_I_SYMLINK			0x03
 
 /* Inode: represents a specific file */
 struct inode {
@@ -271,9 +275,7 @@ struct inode_operations {
 	int (*mknod) (struct inode *, struct dentry *, int, dev_t);
 	int (*rename) (struct inode *, struct dentry *,
 	               struct inode *, struct dentry *);
-	int (*readlink) (struct dentry *, char *, size_t);
-	int (*follow_link) (struct dentry *, struct nameidata *);
-	int (*put_link) (struct dentry *, struct nameidata *);
+	char *(*readlink) (struct dentry *);
 	void (*truncate) (struct inode *);			/* set i_size before calling */
 	int (*permission) (struct inode *, int, struct nameidata *);
 };
@@ -477,17 +479,20 @@ void dentry_release(struct kref *kref);
 struct inode *get_inode(struct dentry *dentry);
 int create_file(struct inode *dir, struct dentry *dentry, int mode);
 int create_dir(struct inode *dir, struct dentry *dentry, int mode);
+int create_symlink(struct inode *dir, struct dentry *dentry,
+                   const char *symname, int mode);
 int check_perms(struct inode *inode, int access_mode);
 void inode_release(struct kref *kref);
 struct inode *lookup_inode(char *path, int flags);
 void stat_inode(struct inode *inode, struct kstat *kstat);
 
-/* File functions */
+/* File-ish functions */
 ssize_t generic_file_read(struct file *file, char *buf, size_t count,
                           off_t *offset);
 ssize_t generic_file_write(struct file *file, const char *buf, size_t count,
                            off_t *offset);
 struct file *do_file_open(char *path, int flags, int mode);
+int do_symlink(char *path, const char *symname, int mode);
 int do_file_access(char *path, int mode);
 struct file *dentry_open(struct dentry *dentry, int flags);
 void file_release(struct kref *kref);

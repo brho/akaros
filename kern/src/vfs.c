@@ -198,10 +198,48 @@ static int follow_mount(struct nameidata *nd)
 	return 0;
 }
 
+static int link_path_walk(char *path, struct nameidata *nd);
+
+/* When nd->dentry is for a symlink, this will recurse and follow that symlink,
+ * so that nd contains the results of following the symlink (dentry and mnt).
+ * Returns when it isn't a symlink, 1 on following a link, and < 0 on error. */
 static int follow_symlink(struct nameidata *nd)
 {
-	/* Detect symlink, LOOKUP_FOLLOW, follow it, etc... (TODO!) */
-	return 0;
+	int retval;
+	char *symname;
+	if (nd->dentry->d_inode->i_type != FS_I_SYMLINK)
+		return 0;
+	if (nd->depth > MAX_SYMLINK_DEPTH)
+		return -ELOOP;
+	printd("Following symlink for dentry %08p %s\n", nd->dentry,
+	       nd->dentry->d_name.name);
+	nd->depth++;
+	symname = nd->dentry->d_inode->i_op->readlink(nd->dentry);
+	/* We need to pin in nd->dentry (the dentry of the symlink), since we need
+	 * it's symname's storage to stay in memory throughout the upcoming
+	 * link_path_walk().  The last_sym gets decreffed when we path_release() or
+	 * follow another symlink. */
+	if (nd->last_sym)
+		kref_put(&nd->last_sym->d_kref);
+	kref_get(&nd->dentry->d_kref, 1);
+	nd->last_sym = nd->dentry;
+	/* If this an absolute path in the symlink, we need to free the old path and
+	 * start over, otherwise, we continue from the PARENT of nd (the symlink) */
+	if (symname[0] == '/') {
+		path_release(nd);
+		if (!current)
+			nd->dentry = default_ns.root->mnt_root;
+		else
+			nd->dentry = current->fs_env.root;	
+		nd->mnt = nd->dentry->d_sb->s_mount;
+		kref_get(&nd->mnt->mnt_kref, 1);
+		kref_get(&nd->dentry->d_kref, 1);
+	} else {
+		climb_up(nd);
+	}
+	/* either way, keep on walking in the free world! */
+	retval = link_path_walk(symname, nd);
+	return (retval == 0 ? 1 : retval);
 }
 
 /* Little helper, to make it easier to break out of the nested loops.  Will also
@@ -217,6 +255,18 @@ static bool packed_trailing_slashes(char *first_slash)
 	return FALSE;
 }
 
+/* Simple helper to set nd to track it's last name to be Name.  Also be careful
+ * with the storage of name.  Don't use and nd's name past the lifetime of the
+ * string used in the path_lookup()/link_path_walk/whatever.  Consider replacing
+ * parts of this with a qstr builder.  Note this uses the dentry's d_op, which
+ * might not be the dentry we care about. */
+static void stash_nd_name(struct nameidata *nd, char *name)
+{
+	nd->last.name = name;
+	nd->last.len = strlen(name);
+	nd->last.hash = nd->dentry->d_op->d_hash(nd->dentry, &nd->last);
+}
+
 /* Resolves the links in a basic path walk.  0 for success, -EWHATEVER
  * otherwise.  The final lookup is returned via nd. */
 static int link_path_walk(char *path, struct nameidata *nd)
@@ -227,14 +277,15 @@ static int link_path_walk(char *path, struct nameidata *nd)
 	char *link = path;
 	int error;
 
+	/* Prevent crazy recursion */
+	if (nd->depth > MAX_SYMLINK_DEPTH)
+		return -ELOOP;
 	/* skip all leading /'s */
 	while (*link == '/')
 		link++;
 	/* if there's nothing left (null terminated), we're done */
 	if (*link == '\0')
 		return 0;
-	/* TODO: deal with depth and LOOKUP_FOLLOW, important for symlinks */
-
 	/* iterate through each intermediate link of the path.  in general, nd
 	 * tracks where we are in the path, as far as dentries go.  once we have the
 	 * next dentry, we try to update nd based on that dentry.  link is the part
@@ -271,7 +322,12 @@ static int link_path_walk(char *path, struct nameidata *nd)
 		kref_put(&link_dentry->d_kref);	/* do_lookup gave us a refcnt dentry */
 		/* we could be on a mountpoint or a symlink - need to follow them */
 		follow_mount(nd);
-		follow_symlink(nd);
+		if ((error = follow_symlink(nd)) < 0)
+			return error;
+		/* Turn off a possible DIRECTORY lookup, which could have been set
+		 * during the follow_symlink (a symlink could have had a directory at
+		 * the end), though it was in the middle of the real path. */
+		nd->flags &= ~LOOKUP_DIRECTORY;
 		if (!(nd->dentry->d_inode->i_type & FS_I_DIR))
 			return -ENOTDIR;
 next_loop:
@@ -282,29 +338,59 @@ next_loop:
 		while (*link == '/')
 			link++;
 	}
-	/* now, we're on the last link of the path */
-	/* if we just want the parent, leave now.  and save the name of the link
-	 * (last) and the type (last_type).  Note that using the qstr in this manner
-	 * only allows us to use the qstr as long as the path is a valid string. */
-	if (nd->flags & LOOKUP_PARENT) {
-		/* consider using a slimmer qstr_builder for this */
-		nd->last.name = link;
-		nd->last.len = strlen(link);
-		nd->last.hash = nd->dentry->d_op->d_hash(nd->dentry, &nd->last);
+	/* Now, we're on the last link of the path.  We need to deal with with . and
+	 * .. .  This might be weird with PARENT lookups - not sure what semantics
+	 * we want exactly.  This will give the parent of whatever the PATH was
+	 * supposed to look like.  Note that ND currently points to the parent of
+	 * the last item (link). */
+	if (!strcmp(".", link)) {
+		if (nd->flags & LOOKUP_PARENT) {
+			stash_nd_name(nd, nd->dentry->d_name.name);
+			climb_up(nd);
+		}
 		return 0;
 	}
-	/* deal with some weird cases with . and .. (completely untested) */
-	if (!strcmp(".", link))
+	if (!strcmp("..", link)) {
+		climb_up(nd);
+		if (nd->flags & LOOKUP_PARENT) {
+			stash_nd_name(nd, nd->dentry->d_name.name);
+			climb_up(nd);
+		}
 		return 0;
-	if (!strcmp("..", link))
-		return climb_up(nd);
+	}
+	/* need to attempt to look it up, in case it's a symlink */
 	link_dentry = do_lookup(nd->dentry, link);
-	if (!link_dentry)
-		return -ENOENT;
+	if (!link_dentry) {
+		/* if there's no dentry, we are okay if we are looking for the parent */
+		if (nd->flags & LOOKUP_PARENT) {
+			stash_nd_name(nd, link);
+			return 0;
+		} else {
+			return -ENOENT;
+		}
+	}
 	next_link(link_dentry, nd);
-	kref_put(&link_dentry->d_kref);	/* do_lookup gave us a refcnt dentry */
+	kref_put(&link_dentry->d_kref);	/* do_lookup gave us a refcnt'd dentry */
+	/* at this point, nd is on the final link, but it might be a symlink */
+	if (nd->flags & LOOKUP_FOLLOW) {
+		error = follow_symlink(nd);
+		if (error < 0)
+			return error;
+		/* if we actually followed a symlink, then nd is set and we're done */
+		if (error > 0)
+			return 0;
+	}
+	/* One way or another, nd is on the last element of the path, symlinks and
+	 * all.  Now we need to climb up to set nd back on the parent, if that's
+	 * what we wanted */
+	if (nd->flags & LOOKUP_PARENT) {
+		stash_nd_name(nd, link_dentry->d_name.name);
+		climb_up(nd);
+		return 0;
+	}
+	/* now, we have the dentry set, and don't want the parent, but might be on a
+	 * mountpoint still.  FYI: this hasn't been thought through completely. */
 	follow_mount(nd);
-	follow_symlink(nd);
 	/* If we wanted a directory, but didn't get one, error out */
 	if ((nd->flags & LOOKUP_DIRECTORY) &&
 	   !(nd->dentry->d_inode->i_type & FS_I_DIR))
@@ -314,10 +400,7 @@ next_loop:
 
 /* Given path, return the inode for the final dentry.  The ND should be
  * initialized for the first call - specifically, we need the intent. 
- * LOOKUP_PARENT and friends go in this flags var.
- *
- * TODO: this should consider the intent.  Note that creating requires writing
- * to the last directory.
+ * LOOKUP_PARENT and friends go in the flags var, which is not the intent.
  *
  * Need to be careful too.  While the path has been copied-in to the kernel,
  * it's still user input.  */
@@ -351,6 +434,11 @@ void path_release(struct nameidata *nd)
 {
 	kref_put(&nd->dentry->d_kref);
 	kref_put(&nd->mnt->mnt_kref);
+	/* Free the last symlink dentry used, if there was one */
+	if (nd->last_sym) {
+		kref_put(&nd->last_sym->d_kref);
+		nd->last_sym = 0;			/* catch reuse bugs */
+	}
 }
 
 /* Superblock functions */
@@ -554,13 +642,13 @@ struct inode *get_inode(struct dentry *dentry)
 	return inode;
 }
 
-/* Helper op, used when creating regular files and directories.  Note we make a
- * distinction between the mode and the file type (for now).  After calling
- * this, call the FS specific version (create or mkdir), which will set the
- * i_ino, the filetype, and do any other FS-specific stuff.  Also note that a
- * lot of inode stuff was initialized in get_inode/alloc_inode.  The stuff here
- * is pertinent to the specific creator (user), mode, and time.  Also note we
- * don't pass this an nd, like Linux does... */
+/* Helper op, used when creating regular files, directories, symlinks, etc.
+ * Note we make a distinction between the mode and the file type (for now).
+ * After calling this, call the FS specific version (create or mkdir), which
+ * will set the i_ino, the filetype, and do any other FS-specific stuff.  Also
+ * note that a lot of inode stuff was initialized in get_inode/alloc_inode.  The
+ * stuff here is pertinent to the specific creator (user), mode, and time.  Also
+ * note we don't pass this an nd, like Linux does... */
 static struct inode *create_inode(struct dentry *dentry, int mode)
 {
 	/* note it is the i_ino that uniquely identifies a file in the system.
@@ -580,6 +668,9 @@ static struct inode *create_inode(struct dentry *dentry, int mode)
 	inode->i_ctime.tv_nsec = 0;
 	inode->i_mtime.tv_nsec = 0;
 	inode->i_bdev = inode->i_sb->s_bdev;
+	/* when we have notions of users, do something here: */
+	inode->i_uid = 0;
+	inode->i_gid = 0;
 	return inode;
 }
 
@@ -592,9 +683,6 @@ int create_file(struct inode *dir, struct dentry *dentry, int mode)
 	if (!new_file)
 		return -1;
 	dir->i_op->create(dir, dentry, mode, 0);
-	/* when we have notions of users, do something here: */
-	new_file->i_uid = 0;
-	new_file->i_gid = 0;
 	kref_put(&new_file->i_kref);
 	return 0;
 }
@@ -614,6 +702,19 @@ int create_dir(struct inode *dir, struct dentry *dentry, int mode)
 	/* parent dentry tracks dentry as a subdir, weak reference */
 	TAILQ_INSERT_TAIL(&parent->d_subdirs, dentry, d_subdirs_link);
 	kref_put(&new_dir->i_kref);
+	return 0;
+}
+
+/* Creates a new inode for a symlink associated with dentry in dir, containing
+ * the symlink symname */
+int create_symlink(struct inode *dir, struct dentry *dentry,
+                   const char *symname, int mode)
+{
+	struct inode *new_sym = create_inode(dentry, mode);
+	if (!new_sym)
+		return -1;
+	dir->i_op->symlink(dir, dentry, symname);
+	kref_put(&new_sym->i_kref);
 	return 0;
 }
 
@@ -785,21 +886,28 @@ ssize_t generic_file_write(struct file *file, const char *buf, size_t count,
  * specified.  This will return 0 on failure, and set errno.  TODO: There's some
  * stuff that we don't do, esp related file truncating/creation.  flags are for
  * opening, the mode is for creating.  The flags related to how to create
- * (O_CREAT_FLAGS) are handled in this function, not in create_file() */
+ * (O_CREAT_FLAGS) are handled in this function, not in create_file().
+ *
+ * It's tempting to split this into a do_file_create and a do_file_open, based
+ * on the O_CREAT flag, but the O_CREAT flag can be ignored if the file exists
+ * already and O_EXCL isn't specified.  We could have open call create if it
+ * fails, but for now we'll keep it as is. */
 struct file *do_file_open(char *path, int flags, int mode)
 {
 	struct file *file = 0;
 	struct dentry *file_d;
 	struct inode *parent_i;
 	struct nameidata nd_r = {0}, *nd = &nd_r;
-	int lookup_flags = LOOKUP_PARENT;
 	int error;
 
-	/* lookup the parent */
-	nd->intent = flags & (O_RDONLY|O_WRONLY|O_RDWR);
+	/* this isn't quite right, due to the nature of O_CREAT */
 	if (flags & O_CREAT)
-		lookup_flags |= LOOKUP_CREATE;
-	error = path_lookup(path, lookup_flags, nd);
+		nd->intent = LOOKUP_CREATE;
+	else
+		nd->intent = LOOKUP_OPEN;
+	/* get the parent, following links.  this means you get the parent of the
+	 * final link (which may not be in 'path' in the first place. */
+	error = path_lookup(path, LOOKUP_PARENT | LOOKUP_FOLLOW, nd);
 	if (error) {
 		path_release(nd);
 		set_errno(-error);
@@ -824,12 +932,18 @@ struct file *do_file_open(char *path, int flags, int mode)
 			return 0;
 		}
 		dcache_put(file_d);
-	} else {	/* the file exists */
+	} else {	/* something already exists (might be a dir) */
 		if ((flags & O_CREAT) && (flags & O_EXCL)) {
 			/* wanted to create, not open, bail out */
 			kref_put(&file_d->d_kref);
 			path_release(nd);
-			set_errno(EACCES);
+			set_errno(EEXIST);
+			return 0;
+		}
+		if (file_d->d_inode->i_type == FS_I_DIR) {
+			kref_put(&file_d->d_kref);
+			path_release(nd);
+			set_errno(EISDIR);
 			return 0;
 		}
 	}
@@ -848,6 +962,45 @@ struct file *do_file_open(char *path, int flags, int mode)
 	return file;
 }
 
+/* Path is the location of the symlink, symname is who we link to. */
+int do_symlink(char *path, const char *symname, int mode)
+{
+	struct dentry *sym_d;
+	struct inode *parent_i;
+	struct nameidata nd_r = {0}, *nd = &nd_r;
+	int error;
+
+	nd->intent = LOOKUP_CREATE;
+	/* get the parent, but don't follow links */
+	error = path_lookup(path, LOOKUP_PARENT, nd);
+	if (error) {
+		set_errno(-error);
+		path_release(nd);
+		return -1;
+	}
+	/* see if the target is already there, handle accordingly */
+	sym_d = do_lookup(nd->dentry, nd->last.name); 
+	if (sym_d) {
+		set_errno(EEXIST);
+		kref_put(&sym_d->d_kref);
+		path_release(nd);
+		return -1;
+	}
+	/* Doesn't already exist, let's try to make it: */
+	sym_d = get_dentry(nd->dentry->d_sb, nd->dentry, nd->last.name);
+	parent_i = nd->dentry->d_inode;
+	/* TODO: mode should be & ~umask. */
+	if (create_symlink(parent_i, sym_d, symname, mode)) {
+		kref_put(&sym_d->d_kref);
+		path_release(nd);
+		return -1;
+	}
+	dcache_put(sym_d);
+	kref_put(&sym_d->d_kref);
+	path_release(nd);
+	return 0;
+}
+
 /* Checks to see if path can be accessed via mode.  Doesn't do much now.  This
  * is an example of decent error propagation from the lower levels via int
  * retvals. */
@@ -855,10 +1008,7 @@ int do_file_access(char *path, int mode)
 {
 	struct nameidata nd_r = {0}, *nd = &nd_r;
 	int retval = 0;
-	/* TODO: when we care about access, do stuff here.  Need to be a bit careful
-	 * about how intent works with access (F_OK, R_OK, etc) and open (O_RDONLY)
-	 */
-	nd->intent = mode;
+	nd->intent = LOOKUP_ACCESS;
 	retval = path_lookup(path, 0, nd);
 	path_release(nd);	
 	return retval;
@@ -1212,11 +1362,21 @@ static void print_dir(struct dentry *dentry, char *buf, int depth)
 			if (!child_d)
 				panic("Inconsistent FS, dirent doesn't have a dentry!");
 			/* Recurse for directories, or just print the name for others */
-			if (child_d->d_inode->i_type & FS_I_DIR)
-				print_dir(child_d, buf, depth + 1);
-			else
-				printk("%s%s  size(B): %d\n", buf, next.d_name,
-				       child_d->d_inode->i_size);
+			switch (child_d->d_inode->i_type) {
+				case (FS_I_DIR):
+					print_dir(child_d, buf, depth + 1);
+					break;
+				case (FS_I_FILE):
+					printk("%s%s size(B): %d\n", buf, next.d_name,
+					       child_d->d_inode->i_size);
+					break;
+				case (FS_I_SYMLINK):
+					printk("%s%s -> %s\n", buf, next.d_name,
+					       child_d->d_inode->i_op->readlink(child_d));
+					break;
+				default:
+					warn("Look around you!  Unknown filetype!");
+			}
 			kref_put(&child_d->d_kref);	
 		}
 		if (retval <= 0)
