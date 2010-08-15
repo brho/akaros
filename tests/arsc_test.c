@@ -2,6 +2,7 @@
 #include <vcore.h>
 #include <ros/syscall.h>
 #include <arc.h>
+#include <stdio.h>
 
 int sys_cputs_async(const char *s, size_t len, syscall_desc_t* desc,                                              
                      void (*cleanup_handler)(void*), void* cleanup_data)

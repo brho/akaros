@@ -152,7 +152,11 @@ int waiton_syscall(syscall_desc_t* desc, syscall_rsp_t* rsp)
     // run a cleanup function for this desc, if available
     if (desc->cleanup)
     	desc->cleanup(desc->data);
-	return 0;
+	if (rsp->syserr){
+		errno = rsp->syserr;
+		return -1;
+	} else 
+		return 0;
 }
 
 

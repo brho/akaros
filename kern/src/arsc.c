@@ -97,7 +97,7 @@ static intreg_t process_generic_syscalls(struct proc *p, size_t max)
 		printd("req no %d, req arg %c\n", req->num, *((char*)req->args[0]));
 		
 		coreinfo->cur_ret.returnloc = &(rsp.retval);
-		coreinfo->cur_ret.errno_loc = &(rsp.errno);
+		coreinfo->cur_ret.errno_loc = &(rsp.syserr);
 		
 		rsp.retval = syscall_async(p, req);
 		// write response into the slot it came from

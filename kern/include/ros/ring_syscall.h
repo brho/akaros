@@ -13,7 +13,7 @@ typedef struct syscall_req {
 
 typedef struct syscall_rsp {
         uint32_t retval;
-		uint32_t errno;
+		uint32_t syserr;
 } syscall_rsp_t;
 
 // Generic Syscall Ring Buffer

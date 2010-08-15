@@ -419,7 +419,7 @@ handle_syscall(trapframe_t* state)
 
 	advance_pc(state);
 	enable_irq();
-	struct per_cpu_info* coreinfo = per_cpu_info[core_id()];
+	struct per_cpu_info* coreinfo = &per_cpu_info[core_id()];
 
 	set_current_tf(state);
 

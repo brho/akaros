@@ -9,6 +9,8 @@
 #define ROS_SYSEVENT_H
 
 #include <ros/ring_buffer.h>
+#include <ros/arch/mmu.h>
+
 
 typedef enum {
 	SYS_begofevents, //Should always be first

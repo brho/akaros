@@ -6,6 +6,7 @@
 #ifndef ROS_KERNEL
 
 #include <ros/arch/bits/syscall.h>
+#include <errno.h>
 
 static inline intreg_t syscall_sysenter(uint16_t num, intreg_t a1,
                                   intreg_t a2, intreg_t a3,
