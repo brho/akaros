@@ -701,8 +701,9 @@ static int __add_kfs_entry(struct dentry *parent, char *path,
 	char dir[MAX_FILENAME_SZ + 1];	/* room for the \0 */
 	size_t dirname_sz;				/* not counting the \0 */
 	struct dentry *dentry = 0;
-	struct nameidata nd = {0};
 	struct inode *inode;
+	int err;
+	char *symname, old_end;			/* for symlink manipulation */
 
 	if (first_slash) {
 		/* get the first part, find that dentry, pass in the second part,
@@ -716,14 +717,9 @@ static int __add_kfs_entry(struct dentry *parent, char *path,
 		       parent->d_name.name, c_bhdr->c_filestart, c_bhdr->c_filesize);
 		/* Need to create a dentry for the lookup, and fill in the basic nd */
 		dentry = get_dentry(parent->d_sb, parent, dir);
-		nd.dentry = dentry;
-		nd.mnt = dentry->d_sb->s_mount;
-		//nd.flags = 0;			/* TODO: once we have lookup flags */
-		//nd.last_type = 0;		/* TODO: should be a DIR */
-		//nd.intent = 0; 		/* TODO: RW, prob irrelevant*/
 		/* TODO: use a VFS lookup instead, to use the dcache, thought its not a
 		 * big deal since KFS currently pins all metadata. */
-		dentry = kfs_lookup(parent->d_inode, dentry, &nd);
+		dentry = kfs_lookup(parent->d_inode, dentry, 0);
 		if (!dentry) {
 			printk("Missing dir in CPIO archive or something, aborting.\n");
 			return -1;
@@ -737,20 +733,37 @@ static int __add_kfs_entry(struct dentry *parent, char *path,
 		dentry = get_dentry(parent->d_sb, parent, path);
 		dcache_put(dentry); 			/* TODO: should set a d_flag too */
 		/* build the inode */
-		/* XXX: note we use an unrefcnt'd inode here (grabbing the dentry's) */
-		if (!c_bhdr->c_filesize) {
-			/* we are a directory.  Note that fifos might look like dirs... */
-			create_dir(parent->d_inode, dentry, c_bhdr->c_mode);
-			inode = dentry->d_inode;
-		} else {
-			/* we are a file */
-			create_file(parent->d_inode, dentry, c_bhdr->c_mode);
-			inode = dentry->d_inode;
-			((struct kfs_i_info*)inode->i_fs_info)->filestart =
-			                                        c_bhdr->c_filestart;
-			((struct kfs_i_info*)inode->i_fs_info)->init_size =
-			                                        c_bhdr->c_filesize;
+		switch (c_bhdr->c_mode & CPIO_FILE_MASK) {
+			case (CPIO_DIRECTORY):
+				err = create_dir(parent->d_inode, dentry, c_bhdr->c_mode);
+				assert(!err);
+				break;
+			case (CPIO_SYMLINK):
+				/* writing the '\0' is safe since the next entry is always still
+				 * in the CPIO (and we are processing sequentially). */
+				symname = c_bhdr->c_filestart;
+				old_end = symname[c_bhdr->c_filesize];
+				symname[c_bhdr->c_filesize] = '\0';
+				err = create_symlink(parent->d_inode, dentry, symname,
+				                     c_bhdr->c_mode & CPIO_PERM_MASK);
+				assert(!err);
+				symname[c_bhdr->c_filesize] = old_end;
+				break;
+			case (CPIO_REG_FILE):
+				err = create_file(parent->d_inode, dentry,
+				                  c_bhdr->c_mode & CPIO_PERM_MASK);
+				assert(!err);
+				((struct kfs_i_info*)dentry->d_inode->i_fs_info)->filestart =
+														c_bhdr->c_filestart;
+				((struct kfs_i_info*)dentry->d_inode->i_fs_info)->init_size =
+														c_bhdr->c_filesize;
+				break;
+			default:
+				printk("Unknown file type %d in the CPIO!",
+				       c_bhdr->c_mode & CPIO_FILE_MASK);
+				return -1;
 		}
+		inode = dentry->d_inode;
 		/* Set other info from the CPIO entry */
 		inode->i_uid = c_bhdr->c_uid;
 		inode->i_gid = c_bhdr->c_gid;
