@@ -1298,5 +1298,6 @@ void set_retval(uint32_t retval)
 void set_errno(uint32_t errno)
 {
 	struct per_cpu_info* coreinfo = &per_cpu_info[core_id()];
-	*(coreinfo->cur_ret.errno_loc) = errno;
+	if (coreinfo && coreinfo->cur_ret.errno_loc)
+		*(coreinfo->cur_ret.errno_loc) = errno;
 }
