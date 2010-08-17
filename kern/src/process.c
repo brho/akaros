@@ -379,7 +379,7 @@ static void __proc_free(struct kref *kref)
 	struct proc *p = container_of(kref, struct proc, kref);
 	physaddr_t pa;
 
-	printk("[PID %d] freeing proc: %d\n", current ? current->pid : 0, p->pid);
+	printd("[PID %d] freeing proc: %d\n", current ? current->pid : 0, p->pid);
 	// All parts of the kernel should have decref'd before __proc_free is called
 	assert(kref_refcnt(&p->kref) == 0);
 
@@ -387,8 +387,8 @@ static void __proc_free(struct kref *kref)
 	destroy_vmrs(p);
 	frontend_proc_free(p);	/* TODO: please remove me one day */
 	/* Free any colors allocated to this process */
-	if(p->cache_colors_map != global_cache_colors_map) {
-		for(int i=0; i<llc_cache->num_colors; i++)
+	if (p->cache_colors_map != global_cache_colors_map) {
+		for(int i = 0; i < llc_cache->num_colors; i++)
 			cache_color_free(llc_cache, p->cache_colors_map);
 		cache_colors_map_free(p->cache_colors_map);
 	}
@@ -1313,13 +1313,24 @@ void abandon_core(void)
 void __proc_tlbshootdown(struct proc *p, uintptr_t start, uintptr_t end)
 {
 	uint32_t active_vcoreid = 0;
-	/* TODO: (TLB) sanity checks and rounding on the ranges */
-	for (int i = 0; i < p->procinfo->num_vcores; i++) {
-		/* find next active vcore */
-		active_vcoreid = get_busy_vcoreid(p, active_vcoreid);
-		send_kernel_message(get_pcoreid(p, active_vcoreid), __tlbshootdown,
-		                    (void*)start, (void*)end, 0, KMSG_IMMEDIATE);
-		active_vcoreid++; /* for the next loop, skip the one we just used */
+	switch (p->state) {
+		case (PROC_RUNNING_S):
+			tlbflush();
+			break;
+		case (PROC_RUNNING_M):
+			/* TODO: (TLB) sanity checks and rounding on the ranges */
+			for (int i = 0; i < p->procinfo->num_vcores; i++) {
+				/* find next active vcore */
+				active_vcoreid = get_busy_vcoreid(p, active_vcoreid);
+				send_kernel_message(get_pcoreid(p, active_vcoreid),
+				                    __tlbshootdown, (void*)start, (void*)end,
+				                    0, KMSG_IMMEDIATE);
+				active_vcoreid++; /* next loop, skip the one we just used */
+			}
+			break;
+		default:
+			/* will probably get this when we have the short handlers */
+			warn("Unexpected case in %s\n", __FUNCTION__);
 	}
 }
 
