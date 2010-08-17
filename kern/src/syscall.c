@@ -307,12 +307,15 @@ static int sys_proc_yield(struct proc *p, bool being_nice)
 static ssize_t sys_fork(env_t* e)
 {
 	// TODO: right now we only support fork for single-core processes
-	if(e->state != PROC_RUNNING_S)
-	{
+	if (e->state != PROC_RUNNING_S) {
 		set_errno(EINVAL);
 		return -1;
 	}
-
+	/* Can't really fork if we don't have a current_tf to fork */
+	if (!current_tf) {
+		set_errno(EINVAL);
+		return -1;
+	}
 	env_t* env;
 	assert(!proc_alloc(&env, current));
 	assert(env != NULL);
@@ -398,9 +401,15 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	struct file *program;
 
 	/* We probably want it to never be allowed to exec if it ever was _M */
-	if(p->state != PROC_RUNNING_S)
+	if (p->state != PROC_RUNNING_S) {
+		set_errno(EINVAL);
 		return -1;
-
+	}
+	/* Can't really exec if we don't have a current_tf to reset */
+	if (!current_tf) {
+		set_errno(EINVAL);
+		return -1;
+	}
 	/* Copy in the path.  Consider putting an upper bound on path_l. */
 	t_path = user_strdup_errno(p, path, path_l);
 	if (!t_path)
@@ -1078,19 +1087,13 @@ intreg_t sys_tcsetattr(struct proc *p, int fd, int optional_actions,
  * any silly state.
  * 
  * This syscall function is used by both local syscall and arsc, and should
- * remain oblivious of the caller.
- *
- * TODO: Keep in mind that not every syscall has a user trapframe. 
- * e.g. ARSC
- */
+ * remain oblivious of the caller. */
 intreg_t syscall(struct proc *p, uintreg_t syscallno, uintreg_t a1,
                  uintreg_t a2, uintreg_t a3, uintreg_t a4, uintreg_t a5)
 {
-	// Initialize the return value and error code returned to 0
-	if(current_tf != NULL){
-		set_retval(ESUCCESS);
-		set_errno(ESUCCESS);
-	}
+	/* Initialize the return value and error code returned to 0 */
+	set_retval(ESUCCESS);
+	set_errno(ESUCCESS);
 
 	typedef intreg_t (*syscall_t)(struct proc*,uintreg_t,uintreg_t,
 	                              uintreg_t,uintreg_t,uintreg_t);
