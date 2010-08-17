@@ -1,10 +1,15 @@
 
 #include <rstdio.h>
 #include <parlib.h>
+#include <unistd.h>
 
 int main(int argc, char **argv, char **envp)
 {
-	#define FILENAME "/bin/hello"
+	char *p_argv[] = {0, 0, 0};
+	char *p_envp[] = {"LD_LIBRARY_PATH=/lib", 0};
+	//#define FILENAME "/bin/hello"
+	#define FILENAME "/bin/hello-sym"
+	char filename[] = FILENAME;
 	#if 0
 	/* try some bad combos */
 	int pid = sys_proc_create("garbagexxx");
@@ -30,12 +35,15 @@ int main(int argc, char **argv, char **envp)
 	}
 	#endif
 	printf("U: attempting to create and run hello\n");
-	child_pid[0] = sys_proc_create(FILENAME, strlen(FILENAME), 0, 0);
+	p_argv[0] = filename;
+	printf("SPAWN, pid %d, filename %08p\n", getpid(), filename);
+	child_pid[0] = sys_proc_create(FILENAME, strlen(FILENAME), p_argv, p_envp);
 	if (child_pid[0] <= 0)
-		perror("");
+		printf("Failed to create the child\n");
 	else
 		if (sys_proc_run(child_pid[0]) < 0)
-			perror("");
+			printf("Failed to run the child\n");
+
 	#if 0
 	printf("U: attempting to create and run another hello\n");
 	child_pid[1] = sys_proc_create(FILENAME, strlen(FILENAME), 0, 0);

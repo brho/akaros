@@ -289,7 +289,7 @@ int mon_bin_run(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 	}
 	char *p_argv[] = {0, 0, 0};
 	char *p_envp[] = {"LD_LIBRARY_PATH=/lib", 0};
-	p_argv[0] = file_name(program);
+	p_argv[0] = argv[1];
 	struct proc *p = proc_create(program, p_argv, p_envp);
 
 	spin_lock(&p->proc_lock);
