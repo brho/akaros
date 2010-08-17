@@ -19,6 +19,7 @@
 #include <hashtable.h>
 #include <smp.h>
 #include <arsc_server.h>
+#include <kref.h>
 
 
 
@@ -31,29 +32,34 @@ intreg_t inline syscall_async(struct proc *p, syscall_req_t *call)
 	               call->args[2], call->args[3], call->args[4]);
 }
 
-intreg_t sys_init_arsc(struct proc* p)
+intreg_t sys_init_arsc(struct proc *p)
 {
+	kref_get(&p->kref, 1);		/* we're storing an external ref here */
 	spin_lock_irqsave(&arsc_proc_lock);
 	TAILQ_INSERT_TAIL(&arsc_proc_list, p, proc_arsc_link);
 	spin_unlock_irqsave(&arsc_proc_lock);
 	return ESUCCESS;
 }
 
-
-void arsc_server(trapframe_t *tf)
+void arsc_server(struct trapframe *tf)
 {
 	struct proc *p = NULL;
 	TAILQ_INIT(&arsc_proc_list);
-	while (true)
-	{
+	while (1) {
 		while (TAILQ_EMPTY(&arsc_proc_list))
 			cpu_relax();
 
-		TAILQ_FOREACH(p, &arsc_proc_list, proc_link)
-		{
-			// TODO: we may need an atomic swap to inc ref count
-			if (p->state != PROC_DYING)
-				process_generic_syscalls (p, MAX_ASRC_BATCH); 
+		TAILQ_FOREACH(p, &arsc_proc_list, proc_link) {
+			/* Probably want to try to process a dying process's syscalls.  If
+			 * not, just move it to an else case */
+			process_generic_syscalls (p, MAX_ASRC_BATCH); 
+			if (p->state == PROC_DYING) {
+				TAILQ_REMOVE(&arsc_proc_list, p, proc_arsc_link);
+				kref_put(&p->kref);
+				/* Need to break out, so the TAILQ_FOREACH doesn't flip out.
+				 * It's not fair, but we're not dealing with that yet anyway */
+				break;
+			}
 		}
 	}
 }
@@ -66,14 +72,6 @@ static intreg_t process_generic_syscalls(struct proc *p, size_t max)
 	// looking at a process not initialized to perform arsc. 
 	if (sysbr == NULL) 
 		return count;
-
-	/* make sure the proc is still alive, and keep it from dying from under us
-	 * incref will return ESUCCESS on success.  This might need some thought
-	 * regarding when the incref should have happened (like by whoever passed us
-	 * the *p). */
-	// TODO: ought to be unnecessary, if you called this right, kept here for
-	// now in case anyone actually uses the ARSCs.
-	kref_get(&p->kref, 1);
 
 	// max is the most we'll process.  max = 0 means do as many as possible
 	// TODO: check for initialization of the ring. 
@@ -110,7 +108,6 @@ static intreg_t process_generic_syscalls(struct proc *p, size_t max)
 	}
 	// load sane page tables (and don't rely on decref to do it for you).
 	lcr3(boot_cr3);
-	kref_put(&p->kref);
 	return (intreg_t)count;
 }
 

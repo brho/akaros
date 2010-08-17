@@ -604,16 +604,7 @@ void proc_destroy(struct proc *p)
 {
 	bool self_ipi_pending = FALSE;
 	
-#ifdef __CONFIG_ARSC_SERVER__
-	spin_lock_irqsave(&arsc_proc_lock);
-
-	// remove from ARSC list
-	TAILQ_REMOVE(&arsc_proc_list, p, proc_arsc_link);
-	spin_unlock_irqsave(&arsc_proc_lock);
-#endif 
 	spin_lock(&p->proc_lock);
-	
-
 	/* TODO: (DEATH) look at this again when we sort the __death IPI */
 	if (current == p)
 		self_ipi_pending = TRUE;
