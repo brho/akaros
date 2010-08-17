@@ -587,8 +587,7 @@ int __handle_page_fault(struct proc *p, uintptr_t va, int prot)
 		if (retval)
 			return retval;
 		/* If we want a private map that is writable, we'll preemptively give
-		 * you a new page.  In the future, we want to CoW this, but the kernel
-		 * needs to be able to handle its own page faults first. */
+		 * you a new page.  In the future, we want to CoW this. */
 		if ((vmr->vm_flags |= MAP_PRIVATE) && (vmr->vm_prot |= PROT_WRITE)) {
 			struct page *cache_page = a_page;
 			if (upage_alloc(p, &a_page, FALSE))
