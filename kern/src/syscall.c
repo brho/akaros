@@ -932,7 +932,38 @@ static intreg_t sys_lstat(struct proc *p, const char *path, size_t path_l,
 
 intreg_t sys_fcntl(struct proc *p, int fd, int cmd, int arg)
 {
-	return ufe(fcntl,fd,cmd,arg,0);
+	int retval = 0;
+	struct file *file = get_file_from_fd(&p->open_files, fd);
+	if (!file) {
+		set_errno(EBADF);
+		return -1;
+	}
+	switch (cmd) {
+		case (F_DUPFD):
+			printk("[kernel] dup not supported yet\n");
+			break;
+		case (F_GETFD):
+			/* GET and SETFD just care about CLOEXEC.  We don't have a separate
+			 * flag variable for the FD (we might need to, technically). */
+			if (file->f_flags & O_CLOEXEC)
+				retval = FD_CLOEXEC;
+			break;
+		case (F_SETFD):
+			if (arg == FD_CLOEXEC)
+				file->f_flags |= O_CLOEXEC;
+			break;
+		case (F_GETFL):
+			retval = file->f_flags;
+			break;
+		case (F_SETFL):
+			/* only allowed to set certain flags. */
+			arg &= O_APPEND | O_ASYNC | O_DIRECT | O_NOATIME | O_NONBLOCK;
+			break;
+		default:
+			warn("Unsupported fcntl cmd %d\n", cmd);
+	}
+	kref_put(&file->f_kref);
+	return 0;
 }
 
 static intreg_t sys_access(struct proc *p, const char *path, size_t path_l,

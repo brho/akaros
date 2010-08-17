@@ -145,6 +145,15 @@ struct nameidata {
 #define S_IWOTH 00002	/* others have write permission */
 #define S_IXOTH 00001	/* others have execute permission */
 
+/* fcntl flags that we support, keep in sync with glibc */
+#define F_DUPFD		0	/* Duplicate file descriptor */
+#define F_GETFD		1	/* Get file descriptor flags */
+#define F_SETFD		2	/* Set file descriptor flags */
+#define F_GETFL		3	/* Get file status flags */
+#define F_SETFL		4	/* Set file status flags */
+/* For F_[GET|SET]FD */
+#define FD_CLOEXEC	1
+
 /* Every object that has pages, like an inode or the swap (or even direct block
  * devices) has a page_map, tracking which of its pages are currently in memory.
  * It is a map, per object, from index to physical page frame. */
