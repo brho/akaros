@@ -305,16 +305,18 @@ void page_fault_handler(struct trapframe *tf)
 {
 	uint32_t fault_va = rcr2();
 	int prot = tf->tf_err & PF_ERROR_WRITE ? PROT_WRITE : PROT_READ;
+	int err;
 
 	/* TODO - handle kernel page faults */
 	if ((tf->tf_cs & 3) == 0) {
 		print_trapframe(tf);
 		panic("Page Fault in the Kernel at 0x%08x!", fault_va);
 	}
-	if (handle_page_fault(current, fault_va, prot)) {
+	if ((err = handle_page_fault(current, fault_va, prot))) {
 		/* Destroy the faulting process */
-		printk("[%08x] user fault va %08x ip %08x from core %d\n",
-		       current->pid, fault_va, tf->tf_eip, core_id());
+		printk("[%08x] user %s fault va %08x ip %08x on core %d with err %d\n",
+		       current->pid, prot & PROT_READ ? "READ" : "WRITE", fault_va,
+		       tf->tf_eip, core_id(), err);
 		print_trapframe(tf);
 		kref_get(&current->kref, 1);
 		proc_destroy(current);

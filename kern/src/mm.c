@@ -379,7 +379,7 @@ void *__do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 
 int mprotect(struct proc *p, uintptr_t addr, size_t len, int prot)
 {
-	printd("mprotect(addr %x, len %x, prot %x)\n", addr, len, prot);
+	printd("mprotect: (addr %08p, len %08p, prot %08p)\n", addr, len, prot);
 	if (!len)
 		return 0;
 	if ((addr % PGSIZE) || (addr < MMAP_LOWEST_VA)) {
@@ -410,7 +410,7 @@ int __do_mprotect(struct proc *p, uintptr_t addr, size_t len, int prot)
 	/* TODO: this is aggressively splitting, when we might not need to if the
 	 * prots are the same as the previous.  Plus, there are three excessive
 	 * scans.  Finally, we might be able to merge when we are done. */
-	isolate_vmrs(p, addr, addr + len);
+	isolate_vmrs(p, addr, len);
 	vmr = find_first_vmr(p, addr);
 	while (vmr && vmr->vm_base < addr + len) {
 		if (vmr->vm_prot == prot)
@@ -492,7 +492,7 @@ int __do_munmap(struct proc *p, uintptr_t addr, size_t len)
 
 	/* TODO: this will be a bit slow, since we end up doing three linear
 	 * searches (two in isolate, one in find_first). */
-	isolate_vmrs(p, addr, addr + len);
+	isolate_vmrs(p, addr, len);
 	vmr = find_first_vmr(p, addr);
 	while (vmr && vmr->vm_base < addr + len) {
 		for (uintptr_t va = vmr->vm_base; va < vmr->vm_end; va += PGSIZE) { 
