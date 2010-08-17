@@ -230,11 +230,10 @@ env_pop_ancillary_state(env_t* e)
 	// Here's where you'll restore FP/MMX/XMM regs
 }
 
-void
-trap(trapframe_t *tf)
+void trap(struct trapframe *tf)
 {
-	printd("Incoming TRAP frame on core %d at %p\n", core_id(), tf);
-
+	printd("Incoming TRAP %d on core %d, TF at %p\n", tf->tf_trapno, core_id(),
+	       tf);
 	/* Note we are not preemptively saving the TF in the env_tf.  We do maintain
 	 * a reference to it in current_tf (a per-cpu pointer).
 	 * In general, only save the tf and any silly state once you know it
@@ -242,21 +241,21 @@ trap(trapframe_t *tf)
 	 * are single core (PROC_RUNNING_S) */
 	if (!in_kernel(tf))
 		set_current_tf(tf);
-
 	if ((tf->tf_cs & ~3) != GD_UT && (tf->tf_cs & ~3) != GD_KT) {
 		print_trapframe(tf);
 		panic("Trapframe with invalid CS!");
 	}
-
-	// Dispatch based on what type of trap occurred
 	trap_dispatch(tf);
-
-	// Return to the current process, which should be runnable.
-	proc_restartcore(current, tf); // Note the comment in syscall.c
+	/* Return to the current process, which should be runnable.  If we're the
+	 * kernel, we should just return naturally.  Note that current and tf need
+	 * to still be okay (might not be after blocking) */
+	if (in_kernel(tf))
+		return;
+	proc_restartcore(current, tf);
+	assert(0);
 }
 
-void
-irq_handler(trapframe_t *tf)
+void irq_handler(struct trapframe *tf)
 {
 	if (!in_kernel(tf))
 		set_current_tf(tf);
