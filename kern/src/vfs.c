@@ -597,6 +597,27 @@ void dentry_release(struct kref *kref)
 	kmem_cache_free(dentry_kcache, dentry);
 }
 
+/* Looks up the dentry for the given path, returning a refcnt'd dentry (or 0).
+ * Permissions are applied for the current user, which is quite a broken system
+ * at the moment.  Flags are lookup flags. */
+struct dentry *lookup_dentry(char *path, int flags)
+{
+	struct dentry *dentry;
+	struct nameidata nd_r = {0}, *nd = &nd_r;
+	int error;
+
+	error = path_lookup(path, flags, nd);
+	if (error) {
+		path_release(nd);
+		set_errno(-error);
+		return 0;
+	}
+	dentry = nd->dentry;
+	kref_get(&dentry->d_kref, 1);
+	path_release(nd);
+	return dentry;
+}
+
 /* Inode Functions */
 
 /* Creates and initializes a new inode.  Generic fields are filled in.
@@ -738,27 +759,6 @@ void inode_release(struct kref *kref)
 	kmem_cache_free(inode_kcache, inode);
 	/* TODO: (BDEV) */
 	// kref_put(inode->i_bdev->kref); /* assuming it's a bdev */
-}
-
-/* Looks up the inode for the given path, returning a refcnt'd inode (or 0).
- * Permissions are applied for the current user, which is quite a broken system
- * at the moment.  Flags are lookup flags. */
-struct inode *lookup_inode(char *path, int flags)
-{
-	struct inode *inode;
-	struct nameidata nd_r = {0}, *nd = &nd_r;
-	int error;
-
-	error = path_lookup(path, flags, nd);
-	if (error) {
-		path_release(nd);
-		set_errno(-error);
-		return 0;
-	}
-	inode = nd->dentry->d_inode;
-	kref_get(&inode->i_kref, 1);
-	path_release(nd);
-	return inode;
 }
 
 /* Fills in kstat with the stat information for the inode */
@@ -962,7 +962,8 @@ struct file *do_file_open(char *path, int flags, int mode)
 	return file;
 }
 
-/* Path is the location of the symlink, symname is who we link to. */
+/* Path is the location of the symlink, sometimes called the "new path", and
+ * symname is who we link to, sometimes called the "old path". */
 int do_symlink(char *path, const char *symname, int mode)
 {
 	struct dentry *sym_d;

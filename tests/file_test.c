@@ -53,6 +53,15 @@ int main()
 	printf("atime     : %d\n", st.st_atime);
 	printf("mtime     : %d\n", st.st_mtime);
 	printf("ctime     : %d\n", st.st_ctime);
-	breakpoint();
 
+	retval = symlink("/dir1/random.txt", "/dir2/sym-test");
+	if (retval < 0)
+		printf("WARNING! Symlink creation failed!\n");
+	retval = readlink("/dir2/sym-test", rbuf, 256);
+	if (retval < 0)
+		printf("WARNING! Readlink failed!\n");
+	else
+		printf("Readlink read %d bytes\n", retval);
+
+	breakpoint();
 }

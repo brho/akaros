@@ -474,6 +474,7 @@ struct dentry *get_dentry(struct super_block *sb, struct dentry *parent,
                           char *name);
 void dcache_put(struct dentry *dentry);
 void dentry_release(struct kref *kref);
+struct dentry *lookup_dentry(char *path, int flags);
 
 /* Inode Functions */
 struct inode *get_inode(struct dentry *dentry);
@@ -483,7 +484,6 @@ int create_symlink(struct inode *dir, struct dentry *dentry,
                    const char *symname, int mode);
 int check_perms(struct inode *inode, int access_mode);
 void inode_release(struct kref *kref);
-struct inode *lookup_inode(char *path, int flags);
 void stat_inode(struct inode *inode, struct kstat *kstat);
 
 /* File-ish functions */

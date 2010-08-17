@@ -890,22 +890,22 @@ static intreg_t stat_helper(struct proc *p, const char *path, size_t path_l,
                             struct kstat *u_stat, int flags)
 {
 	struct kstat *kbuf;
-	struct inode *path_i;
+	struct dentry *path_d;
 	char *t_path = user_strdup_errno(p, path, path_l);
 	if (!t_path)
 		return -1;
-	path_i = lookup_inode(t_path, flags);
+	path_d = lookup_dentry(t_path, flags);
 	user_memdup_free(p, t_path);
-	if (!path_i)
+	if (!path_d)
 		return -1;
 	kbuf = kmalloc(sizeof(struct kstat), 0);
 	if (!kbuf) {
 		set_errno(ENOMEM);
-		kref_put(&path_i->i_kref);
+		kref_put(&path_d->d_kref);
 		return -1;
 	}
-	stat_inode(path_i, kbuf);
-	kref_put(&path_i->i_kref);
+	stat_inode(path_d->d_inode, kbuf);
+	kref_put(&path_d->d_kref);
 	/* TODO: UMEM: pin the memory, copy directly, and skip the kernel buffer */
 	if (memcpy_to_user_errno(p, u_stat, kbuf, sizeof(struct kstat))) {
 		kfree(kbuf);
@@ -1009,6 +1009,49 @@ intreg_t sys_unlink(struct proc *p, const char *path, size_t path_l)
 	int ret = ufe(unlink,PADDR(fn),0,0,0);
 	user_memdup_free(p,fn);
 	return ret;
+}
+
+intreg_t sys_symlink(struct proc *p, char *old_path, size_t old_l,
+                     char *new_path, size_t new_l)
+{
+	int ret;
+	char *t_oldpath = user_strdup_errno(p, old_path, old_l);
+	if (t_oldpath == NULL)
+		return -1;
+	char *t_newpath = user_strdup_errno(p, new_path, new_l);
+	if (t_newpath == NULL) {
+		user_memdup_free(p, t_oldpath);
+		return -1;
+	}
+	ret = do_symlink(new_path, old_path, S_IRWXU | S_IRWXG | S_IRWXO);
+	user_memdup_free(p, t_oldpath);
+	user_memdup_free(p, t_newpath);
+	return ret;
+}
+
+intreg_t sys_readlink(struct proc *p, char *path, size_t path_l,
+                      char *u_buf, size_t buf_l)
+{
+	char *symname;
+	ssize_t copy_amt;
+	struct dentry *path_d;
+	char *t_path = user_strdup_errno(p, path, path_l);
+	if (t_path == NULL)
+		return -1;
+	path_d = lookup_dentry(t_path, 0);
+	user_memdup_free(p, t_path);
+	if (!path_d)
+		return -1;
+	symname = path_d->d_inode->i_op->readlink(path_d);
+	copy_amt = strnlen(symname, buf_l - 1) + 1;
+	if (memcpy_to_user_errno(p, u_buf, symname, copy_amt)) {
+		kref_put(&path_d->d_kref);
+		set_errno(EINVAL);
+		return -1;
+	}
+	kref_put(&path_d->d_kref);
+	printd("READLINK returning %s\n", u_buf);
+	return copy_amt;
 }
 
 intreg_t sys_chdir(struct proc *p, const char *path, size_t path_l)
@@ -1152,6 +1195,8 @@ intreg_t syscall(struct proc *p, uintreg_t syscallno, uintreg_t a1,
 		[SYS_lseek] = (syscall_t)sys_lseek,
 		[SYS_link] = (syscall_t)sys_link,
 		[SYS_unlink] = (syscall_t)sys_unlink,
+		[SYS_symlink] = (syscall_t)sys_symlink,
+		[SYS_readlink] = (syscall_t)sys_readlink,
 		[SYS_chdir] = (syscall_t)sys_chdir,
 		[SYS_getcwd] = (syscall_t)sys_getcwd,
 		[SYS_gettimeofday] = (syscall_t)sys_gettimeofday,

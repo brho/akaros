@@ -63,11 +63,13 @@
 #define SYS_lseek				111
 #define SYS_link				112
 #define SYS_unlink				113
-#define SYS_chdir				114
-#define SYS_getcwd				115
-#define SYS_gettimeofday		116
-#define SYS_tcgetattr			117
-#define SYS_tcsetattr			118
+#define SYS_symlink				114
+#define SYS_readlink			115
+#define SYS_chdir				116
+#define SYS_getcwd				117
+#define SYS_gettimeofday		118
+#define SYS_tcgetattr			119
+#define SYS_tcsetattr			120
 
 /* Syscalls we plan to remove someday */
 #define SYS_cache_buster        200 
