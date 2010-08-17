@@ -290,7 +290,7 @@ error_t proc_alloc(struct proc **pp, struct proc *parent)
 	spinlock_init(&p->proc_lock);
 	p->exitcode = 0;
 	p->ppid = parent ? parent->pid : 0;
-	p->state = PROC_CREATED; // shouldn't go through state machine for init
+	p->state = PROC_CREATED; /* shouldn't go through state machine for init */
 	p->env_flags = 0;
 	p->env_entry = 0; // cheating.  this really gets set later
 	p->procinfo->heap_bottom = (void*)UTEXT;
@@ -340,14 +340,23 @@ error_t proc_alloc(struct proc **pp, struct proc *parent)
 	for (int i = 0; i < 3; i++)
 		SET_BITMASK_BIT(p->open_files.open_fds->fds_bits, i);
 
-	*pp = p;
 	atomic_inc(&num_envs);
-
 	frontend_proc_init(p);
-
 	printd("[%08x] new process %08x\n", current ? current->pid : 0, p->pid);
 	} // INIT_STRUCT
+	*pp = p;
 	return 0;
+}
+
+/* We have a bunch of different ways to make processes.  Call this once the
+ * process is ready to be used by the rest of the system.  For now, this just
+ * means when it is ready to be named via the pidhash.  In the future, we might
+ * push setting the state to CREATED into here. */
+void __proc_ready(struct proc *p)
+{
+	spin_lock(&pid_hash_lock);
+	hashtable_insert(pid_hash, (void*)p->pid, p);
+	spin_unlock(&pid_hash_lock);
 }
 
 /* Creates a process from the specified file, argvs, and envps.  Tempted to get
@@ -360,11 +369,7 @@ struct proc *proc_create(struct file *prog, char **argv, char **envp)
 		panic("proc_create: %e", r);	/* one of 3 quaint usages of %e */
 	procinfo_pack_args(p->procinfo, argv, envp);
 	assert(load_elf(p, prog) == 0);
-	
-	// only insert into the global hashtable after all thei initialization is done
-	spin_lock(&pid_hash_lock);
-	hashtable_insert(pid_hash, (void*)p->pid, p);
-	spin_unlock(&pid_hash_lock);
+	__proc_ready(p);
 	return p;
 }
 

@@ -71,6 +71,7 @@ void proc_init_procinfo(struct proc *p);
 
 /* Process management: */
 error_t proc_alloc(struct proc **pp, struct proc *parent);
+void __proc_ready(struct proc *p);
 struct proc *proc_create(struct file *prog, char **argv, char **envp);
 int __proc_set_state(struct proc *p, uint32_t state) WRITES(p->state);
 struct proc *pid2proc(pid_t pid);

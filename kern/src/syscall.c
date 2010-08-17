@@ -230,6 +230,7 @@ static int sys_proc_create(struct proc *p, char *path, size_t path_l,
 	if (load_elf(new_p, program))
 		goto late_error;
 	kref_put(&program->f_kref);
+	__proc_ready(new_p);
 	pid = new_p->pid;
 	kref_put(&new_p->kref);	/* give up the reference created in proc_create() */
 	return pid;
@@ -372,6 +373,7 @@ static ssize_t sys_fork(env_t* e)
 		return -1;
 	}
 	clone_files(&e->open_files, &env->open_files);
+	__proc_ready(env);
 	__proc_set_state(env, PROC_RUNNABLE_S);
 	schedule_proc(env);
 
