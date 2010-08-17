@@ -301,58 +301,20 @@ register_interrupt_handler(handler_t TP(TV(t)) table[],
 	table[int_num].data = data;
 }
 
-void
-page_fault_handler(trapframe_t *tf)
+void page_fault_handler(struct trapframe *tf)
 {
-	uint32_t fault_va;
+	uint32_t fault_va = rcr2();
+	int prot = tf->tf_err & PF_ERROR_WRITE ? PROT_WRITE : PROT_READ;
 
-	// Read processor's CR2 register to find the faulting address
-	fault_va = rcr2();
-
-	// Handle kernel-mode page faults.
-
-	// TODO - one day, we'll want to handle this.
+	/* TODO - handle kernel page faults */
 	if ((tf->tf_cs & 3) == 0) {
 		print_trapframe(tf);
 		panic("Page Fault in the Kernel at 0x%08x!", fault_va);
 	}
-
-	// We've already handled kernel-mode exceptions, so if we get here,
-	// the page fault happened in user mode.
-
-	// Call the environment's page fault upcall, if one exists.  Set up a
-	// page fault stack frame on the user exception stack (below
-	// UXSTACKTOP), then branch to current->env_pgfault_upcall.
-	//
-	// The page fault upcall might cause another page fault, in which case
-	// we branch to the page fault upcall recursively, pushing another
-	// page fault stack frame on top of the user exception stack.
-	//
-	// The trap handler needs one word of scratch space at the top of the
-	// trap-time stack in order to return.  In the non-recursive case, we
-	// don't have to worry about this because the top of the regular user
-	// stack is free.  In the recursive case, this means we have to leave
-	// an extra word between the current top of the exception stack and
-	// the new stack frame because the exception stack _is_ the trap-time
-	// stack.
-	//
-	// If there's no page fault upcall, the environment didn't allocate a
-	// page for its exception stack, or the exception stack overflows,
-	// then destroy the environment that caused the fault.
-	//
-	// Hints:
-	//   user_mem_assert() and env_run() are useful here.
-	//   To change what the user environment runs, modify 'current->env_tf'
-	//   (the 'tf' variable points at 'current->env_tf').
-
-	// LAB 4: Your code here.
-
-	// TODO: compute correct access type
-	if(handle_page_fault(current,fault_va,PROT_READ))
-	{
-		// Destroy the environment that caused the fault.
-		cprintf("[%08x] user fault va %08x ip %08x from core %d\n",
-		        current->pid, fault_va, tf->tf_eip, core_id());
+	if (handle_page_fault(current, fault_va, prot)) {
+		/* Destroy the faulting process */
+		printk("[%08x] user fault va %08x ip %08x from core %d\n",
+		       current->pid, fault_va, tf->tf_eip, core_id());
 		print_trapframe(tf);
 		kref_get(&current->kref, 1);
 		proc_destroy(current);

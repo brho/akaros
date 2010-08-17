@@ -530,7 +530,6 @@ int handle_page_fault(struct proc* p, uintptr_t va, int prot)
 
 	if (prot != PROT_READ && prot != PROT_WRITE && prot != PROT_EXEC)
 		panic("bad prot!");
-
 	spin_lock(&p->proc_lock);
 	int ret = __handle_page_fault(p, va, prot);
 	spin_unlock(&p->proc_lock);
@@ -546,12 +545,13 @@ int handle_page_fault(struct proc* p, uintptr_t va, int prot)
  * shootdown is on its way.  Userspace should have waited for the mprotect to
  * return before trying to write (or whatever), so we don't care and will fault
  * them. */
-int __handle_page_fault(struct proc* p, uintptr_t va, int prot)
+int __handle_page_fault(struct proc *p, uintptr_t va, int prot)
 {
 	struct vm_region *vmr;
 	struct page *a_page;
 	unsigned int f_idx;	/* index of the missing page in the file */
-	int retval = 0;
+	int retval;
+
 	/* Check the vmr's protection */
 	vmr = find_vmr(p, va);
 	if (!vmr)							/* not mapped at all */
@@ -571,7 +571,7 @@ int __handle_page_fault(struct proc* p, uintptr_t va, int prot)
 	} else if (PAGE_PAGED_OUT(*pte)) {
 		/* TODO: (SWAP) bring in the paged out frame. (BLK) */
 		panic("Swapping not supported!");
-		return 0;
+		return -1;
 	}
 	if (!vmr->vm_file) {
 		/* No file - just want anonymous memory */
