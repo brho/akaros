@@ -107,6 +107,7 @@ int __proc_set_state(struct proc *p, uint32_t state)
 	uint32_t curstate = p->state;
 	/* Valid transitions:
 	 * C   -> RBS
+	 * C   -> D
 	 * RBS -> RGS
 	 * RGS -> RBS
 	 * RGS -> W
@@ -121,14 +122,11 @@ int __proc_set_state(struct proc *p, uint32_t state)
 	 * These ought to be implemented later (allowed, not thought through yet).
 	 * RBS -> D
 	 * RBM -> D
-	 *
-	 * This isn't allowed yet, should be later.  Is definitely causable.
-	 * C   -> D
 	 */
 	#if 1 // some sort of correctness flag
 	switch (curstate) {
 		case PROC_CREATED:
-			if (state != PROC_RUNNABLE_S)
+			if (!(state & (PROC_RUNNABLE_S | PROC_DYING)))
 				panic("Invalid State Transition! PROC_CREATED to %02x", state);
 			break;
 		case PROC_RUNNABLE_S:
@@ -381,7 +379,7 @@ static void __proc_free(struct kref *kref)
 	struct proc *p = container_of(kref, struct proc, kref);
 	physaddr_t pa;
 
-	printd("[PID %d] freeing proc: %d\n", current ? current->pid : 0, p->pid);
+	printk("[PID %d] freeing proc: %d\n", current ? current->pid : 0, p->pid);
 	// All parts of the kernel should have decref'd before __proc_free is called
 	assert(kref_refcnt(&p->kref) == 0);
 
@@ -651,6 +649,8 @@ void proc_destroy(struct proc *p)
 			 * within proc_destroy */
 			__proc_take_allcores(p, __death, (void *SNT)0, (void *SNT)0,
 			                     (void *SNT)0);
+			break;
+		case PROC_CREATED:
 			break;
 		default:
 			panic("Weird state(%s) in %s()", procstate2str(p->state),
