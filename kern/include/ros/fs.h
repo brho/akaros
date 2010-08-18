@@ -4,16 +4,18 @@
 #include <sys/types.h>
 #include <timing.h>
 
+/* Keep this 255 to stay in sync with glibc (expects d_name[256]) */
 #define MAX_FILENAME_SZ 255
 /* This will change once we have a decent readdir / getdents syscall, and
  * send the strlen along with the d_name.  The sizes need rechecked too, since
  * they are probably wrong. */
 struct kdirent {
-	ino_t          				d_ino;       /* inode number */
-	off_t          				d_off;       /* offset to the next dirent */
-	unsigned short 				d_reclen;    /* length of this record */
-	char           				d_name[MAX_FILENAME_SZ + 1]; /* filename */
-};
+	__ino64_t					d_ino;		/* inode number */
+	__off64_t					d_off;		/* offset to the next dirent */
+	unsigned short				d_reclen;	/* length of this record */
+	unsigned char				d_type;
+	char						d_name[MAX_FILENAME_SZ + 1];	/* filename */
+} __attribute__((aligned(8)));
 
 /* These stat sizes should match the types in stat.h and types.h and the sizes
  * in typesizes in glibc (which we modified slightly).  While glibc has it's own

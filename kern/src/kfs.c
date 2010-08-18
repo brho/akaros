@@ -35,7 +35,9 @@ struct page_map_operations kfs_pm_op;
 struct super_operations kfs_s_op;
 struct inode_operations kfs_i_op;
 struct dentry_operations kfs_d_op;
-struct file_operations kfs_f_op;
+struct file_operations kfs_f_op_file;
+struct file_operations kfs_f_op_dir;
+struct file_operations kfs_f_op_sym;
 
 /* TODO: something more better.  Prob something like the vmem cache, for this,
  * pids, etc.  Good enough for now.  This also means we can only have one
@@ -146,14 +148,14 @@ int kfs_readpage(struct file *file, struct page *page)
 
 /* creates and initializes a new inode.  generic fields are filled in.  specific
  * fields are filled in in read_inode() based on what's on the disk for a given
- * i_no.  i_no is set by the caller.  Note that this means this inode can be for
- * an inode that is already on disk, or it can be used when creating. */
+ * i_no.  i_no and i_fop are set by the caller.  Note that this means this inode
+ * can be for an inode that is already on disk, or it can be used when creating.
+ * The i_fop depends on the type of file (file, directory, symlink, etc). */
 struct inode *kfs_alloc_inode(struct super_block *sb)
 {
 	struct inode *inode = kmem_cache_alloc(inode_kcache, 0);
 	memset(inode, 0, sizeof(struct inode));
 	inode->i_op = &kfs_i_op;
-	inode->i_fop = &kfs_f_op;
 	inode->i_pm.pm_op = &kfs_pm_op;
 	inode->i_fs_info = kmem_cache_alloc(kfs_i_kcache, 0);
 	TAILQ_INIT(&((struct kfs_i_info*)inode->i_fs_info)->children);
@@ -179,6 +181,7 @@ void kfs_read_inode(struct inode *inode)
 	if (inode->i_ino == 1) {
 		inode->i_mode = S_IRWXU | S_IRWXG | S_IRWXO;
 		inode->i_type = FS_I_DIR;
+		inode->i_fop = &kfs_f_op_dir;
 		inode->i_nlink = 1;				/* assuming only one hardlink */
 		inode->i_uid = 0;
 		inode->i_gid = 0;
@@ -288,6 +291,7 @@ int kfs_create(struct inode *dir, struct dentry *dentry, int mode,
 	struct inode *inode = dentry->d_inode;
 	kfs_init_inode(dir, dentry);
 	inode->i_type = FS_I_FILE;
+	inode->i_fop = &kfs_f_op_file;
 	/* fs_info->filestart is set by the caller, or else when first written (for
 	 * new files.  it was set to 0 in alloc_inode(). */
 	return 0;
@@ -366,6 +370,7 @@ int kfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
 
 	kfs_init_inode(dir, dentry);
 	inode->i_type = FS_I_SYMLINK;
+	inode->i_fop = &kfs_f_op_sym;
 	strncpy(string, symname, len);
 	string[len] = '\0';		/* symname should be \0d anyway, but just in case */
 	k_i_info->filestart = string;	/* reusing this void* to hold the char* */
@@ -381,7 +386,8 @@ int kfs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 	struct inode *inode = dentry->d_inode;
 	kref_get(&dentry->d_kref, 1);	/* to pin the dentry in RAM, KFS-style... */
 	inode->i_ino = kfs_get_free_ino();
-	inode->i_type = FS_I_DIR;		/* this might be FS specific in the future */
+	inode->i_type = FS_I_DIR;
+	inode->i_fop = &kfs_f_op_dir;
 	/* get ready to have our own kids */
 	TAILQ_INIT(&((struct kfs_i_info*)inode->i_fs_info)->children);
 	((struct kfs_i_info*)inode->i_fs_info)->filestart = 0;
@@ -671,7 +677,41 @@ struct dentry_operations kfs_d_op = {
 	kfs_d_iput,
 };
 
-struct file_operations kfs_f_op = {
+struct file_operations kfs_f_op_file = {
+	kfs_llseek,
+	generic_file_read,
+	generic_file_write,
+	kfs_readdir,
+	kfs_mmap,
+	kfs_open,
+	kfs_flush,
+	kfs_release,
+	kfs_fsync,
+	kfs_poll,
+	kfs_readv,
+	kfs_writev,
+	kfs_sendpage,
+	kfs_check_flags,
+};
+
+struct file_operations kfs_f_op_dir = {
+	kfs_llseek,
+	generic_dir_read,
+	0,
+	kfs_readdir,
+	kfs_mmap,
+	kfs_open,
+	kfs_flush,
+	kfs_release,
+	kfs_fsync,
+	kfs_poll,
+	kfs_readv,
+	kfs_writev,
+	kfs_sendpage,
+	kfs_check_flags,
+};
+
+struct file_operations kfs_f_op_sym = {
 	kfs_llseek,
 	generic_file_read,
 	generic_file_write,

@@ -5,6 +5,7 @@
 #include <arch/arch.h>
 #include <unistd.h>
 #include <errno.h>
+#include <dirent.h>
 
 int main() 
 { 
@@ -62,6 +63,36 @@ int main()
 		printf("WARNING! Readlink failed!\n");
 	else
 		printf("Readlink read %d bytes\n", retval);
+	
+	/* Readdir tests: two ways to do it: */
+	DIR *dir = opendir("/dir1/");
+	struct dirent dirent_r, *dirent, *result = 0;
+	#if 0
+	dirent = readdir(dir);
+	printf("Readdir: d_ino %lld, d_off: %lld, d_reclen: %d, d_name: %s\n",
+	       dirent->d_ino, dirent->d_off, dirent->d_reclen, dirent->d_name);
+	printf("TAKE TWO:\n-----------\n");
+	dirent = readdir(dir);
+	printf("Readdir: d_ino %lld, d_off: %lld, d_reclen: %d, d_name: %s\n",
+	       dirent->d_ino, dirent->d_off, dirent->d_reclen, dirent->d_name);
+	#endif
+
+	retval = readdir_r(dir, &dirent_r, &result);
+	if (retval > 0)
+		printf("WARNING! Readdir_r failed!, retval %d\n", retval);
+	if (!result)
+		printf("End of the directory\n");
+	else
+		printf("Dirent name: %s\n", result->d_name);
+	printf("TAKE TWO:\n-----------\n");
+	memset(&dirent_r, 0, sizeof(struct dirent));
+	retval = readdir_r(dir, &dirent_r, &result);
+	if (retval > 0)
+		printf("WARNING! Readdir_r failed!, retval %d\n", retval);
+	if (!result)
+		printf("End of the directory\n");
+	else
+		printf("Dirent name: %s\n", result->d_name);
 
 	breakpoint();
 }

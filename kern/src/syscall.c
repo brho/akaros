@@ -784,6 +784,7 @@ static intreg_t sys_read(struct proc *p, int fd, void *buf, int len)
 		set_errno(EBADF);
 		return -1;
 	}
+	assert(file->f_op->read);
 	/* TODO: (UMEM) currently, read() handles user memcpy issues, but we
 	 * probably should user_mem_check and pin the region here, so read doesn't
 	 * worry about it */
@@ -807,6 +808,11 @@ static intreg_t sys_write(struct proc *p, int fd, const void *buf, int len)
 	struct file *file = get_file_from_fd(&p->open_files, fd);
 	if (!file) {
 		set_errno(EBADF);
+		return -1;
+	}
+	if (!file->f_op->write) {
+		kref_put(&file->f_kref);
+		set_errno(EINVAL);
 		return -1;
 	}
 	/* TODO: (UMEM) */

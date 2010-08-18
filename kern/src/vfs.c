@@ -881,6 +881,46 @@ ssize_t generic_file_write(struct file *file, const char *buf, size_t count,
 	return count;
 }
 
+/* Directories usually use this for their read method, which is the way glibc
+ * currently expects us to do a readdir (short of doing linux's getdents).  Will
+ * probably need work, based on whatever real programs want. */
+ssize_t generic_dir_read(struct file *file, char *u_buf, size_t count,
+                         off_t *offset)
+{
+	struct kdirent dir_r = {0}, *dirent = &dir_r;
+	unsigned int num_dirents = count / sizeof(struct kdirent);
+	int retval = 1;
+	size_t amt_copied = 0;
+	char *buf_end = u_buf + count;
+
+	if (!count)
+		return 0;
+	if (*offset % sizeof(struct kdirent)) {
+		printk("[kernel] the f_pos for a directory should be dirent-aligned\n");
+		set_errno(EINVAL);
+		return -1;
+	}
+	/* for now, we need to tell readdir which dirent we want */
+	dirent->d_off = *offset / sizeof(struct kdirent);
+	for (; (u_buf < buf_end) && (retval == 1); u_buf += sizeof(struct kdirent)){
+		/* TODO: UMEM/KFOP (pin the u_buf in the syscall, ditch the local copy,
+		 * get rid of this memcpy and reliance on current, etc).  Might be
+		 * tricky with the dirent->d_off */
+		retval = file->f_op->readdir(file, dirent);
+		if (retval < 0)
+			break;
+		if (current) {
+			memcpy_to_user(current, u_buf, dirent, sizeof(struct dirent));
+		} else {
+			memcpy(u_buf, dirent, sizeof(struct dirent));
+		}
+		amt_copied += sizeof(struct dirent);
+		dirent->d_off++;
+	}
+	*offset += amt_copied;
+	return amt_copied;
+}
+
 /* Opens the file, using permissions from current for lack of a better option.
  * It will attempt to create the file if it does not exist and O_CREAT is
  * specified.  This will return 0 on failure, and set errno.  TODO: There's some
@@ -938,12 +978,6 @@ struct file *do_file_open(char *path, int flags, int mode)
 			kref_put(&file_d->d_kref);
 			path_release(nd);
 			set_errno(EEXIST);
-			return 0;
-		}
-		if (file_d->d_inode->i_type == FS_I_DIR) {
-			kref_put(&file_d->d_kref);
-			path_release(nd);
-			set_errno(EISDIR);
 			return 0;
 		}
 	}
