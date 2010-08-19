@@ -346,11 +346,16 @@ struct dentry *kfs_lookup(struct inode *dir, struct dentry *dentry,
 }
 
 /* Hard link to old_dentry in directory dir with a name specified by new_dentry.
- * TODO: should this also make the dentry linkage, or just discard everything?*/
+ * At the very least, set the new_dentry's FS-specific fields. */
 int kfs_link(struct dentry *old_dentry, struct inode *dir,
              struct dentry *new_dentry)
 {
-	return -1;
+	assert(new_dentry->d_op = &kfs_d_op);
+	kref_get(&new_dentry->d_kref, 1);		/* pin the dentry, KFS-style */
+	/* KFS-style directory-tracking-of-kids */
+	TAILQ_INSERT_TAIL(&((struct kfs_i_info*)dir->i_fs_info)->children,
+	                  new_dentry, d_subdirs_link);
+	return 0;
 }
 
 /* Removes the link from the dentry in the directory */

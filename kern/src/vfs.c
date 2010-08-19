@@ -513,6 +513,8 @@ void init_sb(struct super_block *sb, struct vfsmount *vmnt,
  * set still: d_op (if no parent), d_fs_info (opt), d_inode, connect the inode
  * to the dentry (and up the d_kref again), maybe dcache_put().  The inode
  * stitching is done in get_inode() or lookup (depending on the FS).
+ * The setting of the d_op might be problematic when dealing with mounts.  Just
+ * overwrite it.
  *
  * If the name is longer than the inline name, it will kmalloc a buffer, so
  * don't worry about the storage for *name after calling this. */
@@ -524,6 +526,8 @@ struct dentry *get_dentry(struct super_block *sb, struct dentry *parent,
 	struct dentry *dentry = kmem_cache_alloc(dentry_kcache, 0);
 	char *l_name = 0;
 
+	if (!dentry)
+		return 0;
 	//memset(dentry, 0, sizeof(struct dentry));
 	kref_init(&dentry->d_kref, dentry_release, 1);	/* this ref is returned */
 	spinlock_init(&dentry->d_lock);
@@ -1023,6 +1027,11 @@ int do_symlink(char *path, const char *symname, int mode)
 	}
 	/* Doesn't already exist, let's try to make it: */
 	sym_d = get_dentry(nd->dentry->d_sb, nd->dentry, nd->last.name);
+	if (!sym_d) {
+		set_errno(ENOMEM);
+		path_release(nd);
+		return -1;
+	}
 	parent_i = nd->dentry->d_inode;
 	/* TODO: mode should be & ~umask. */
 	if (create_symlink(parent_i, sym_d, symname, mode)) {
@@ -1034,6 +1043,74 @@ int do_symlink(char *path, const char *symname, int mode)
 	kref_put(&sym_d->d_kref);
 	path_release(nd);
 	return 0;
+}
+
+/* Makes a hard link for the file behind old_path to new_path */
+int do_link(char *old_path, char *new_path)
+{
+	struct dentry *link_d, *old_d;
+	struct inode *inode, *parent_dir;
+	struct nameidata nd_r = {0}, *nd = &nd_r;
+	int error;
+	int retval = -1;
+
+	nd->intent = LOOKUP_CREATE;
+	/* get the absolute parent of the new_path */
+	error = path_lookup(new_path, LOOKUP_PARENT | LOOKUP_FOLLOW, nd);
+	if (error) {
+		set_errno(-error);
+		goto out_path_only;
+	}
+	parent_dir = nd->dentry->d_inode;
+	/* see if the new target is already there, handle accordingly */
+	link_d = do_lookup(nd->dentry, nd->last.name); 
+	if (link_d) {
+		set_errno(EEXIST);
+		goto out_link_d;
+	}
+	/* Doesn't already exist, let's try to make it.  Still need to stitch it to
+	 * an inode and set its FS-specific stuff after this.*/
+	link_d = get_dentry(nd->dentry->d_sb, nd->dentry, nd->last.name);
+	if (!link_d) {
+		set_errno(ENOMEM);
+		goto out_path_only;
+	}
+	/* Now let's get the old_path target */
+	old_d = lookup_dentry(old_path, LOOKUP_FOLLOW);
+	if (!old_d)					/* errno set by lookup_dentry */
+		goto out_link_d;
+	/* For now, can only link to files */
+	if (old_d->d_inode->i_type != FS_I_FILE) {
+		set_errno(EPERM);
+		goto out_both_ds;
+	}
+	/* Must be on the same FS */
+	if (old_d->d_sb != link_d->d_sb) {
+		set_errno(EXDEV);
+		goto out_both_ds;
+	}
+	/* Do whatever FS specific stuff there is first (which is also a chance to
+	 * bail out). */
+	error = parent_dir->i_op->link(old_d, parent_dir, link_d);
+	if (error) {
+		set_errno(-error);
+		goto out_both_ds;
+	}
+	/* Finally stitch it up */
+	inode = old_d->d_inode;
+	kref_get(&inode->i_kref, 1);
+	link_d->d_inode = inode;
+	inode->i_nlink++;
+	TAILQ_INSERT_TAIL(&inode->i_dentry, link_d, d_alias);	/* weak ref */
+	dcache_put(link_d);
+	retval = 0;				/* Note the fall through to the exit paths */
+out_both_ds:
+	kref_put(&old_d->d_kref);
+out_link_d:
+	kref_put(&link_d->d_kref);
+out_path_only:
+	path_release(nd);
+	return retval;
 }
 
 /* Checks to see if path can be accessed via mode.  Doesn't do much now.  This

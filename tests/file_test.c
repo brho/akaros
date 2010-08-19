@@ -93,6 +93,12 @@ int main()
 		printf("End of the directory\n");
 	else
 		printf("Dirent name: %s\n", result->d_name);
+	
+	/* Hardlink tests */
+	printf("Linking to /bin/hello at /dir1/hardhello\n");
+	retval = link("/bin/hello", "/dir1/hardhello");
+	if (retval < 0)
+		printf("WARNING! Link failed!\n");
 
 	breakpoint();
 }

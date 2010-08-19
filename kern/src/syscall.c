@@ -1018,23 +1018,21 @@ static intreg_t sys_lseek(struct proc *p, int fd, off_t offset, int whence)
 	return ret;
 }
 
-intreg_t sys_link(struct proc *p, const char *_old, size_t old_l,
-                  const char *_new, size_t new_l)
+intreg_t sys_link(struct proc *p, char *old_path, size_t old_l,
+                  char *new_path, size_t new_l)
 {
-	char* oldpath = user_strdup_errno(p,_old,PGSIZE);
-	if(oldpath == NULL)
+	int ret;
+	char *t_oldpath = user_strdup_errno(p, old_path, old_l);
+	if (t_oldpath == NULL)
 		return -1;
-
-	char* newpath = user_strdup_errno(p,_new,PGSIZE);
-	if(newpath == NULL)
-	{
-		user_memdup_free(p,oldpath);
+	char *t_newpath = user_strdup_errno(p, new_path, new_l);
+	if (t_newpath == NULL) {
+		user_memdup_free(p, t_oldpath);
 		return -1;
 	}
-
-	int ret = ufe(link,PADDR(oldpath),PADDR(newpath),0,0);
-	user_memdup_free(p,oldpath);
-	user_memdup_free(p,newpath);
+	ret = do_link(t_oldpath, t_newpath);
+	user_memdup_free(p, t_oldpath);
+	user_memdup_free(p, t_newpath);
 	return ret;
 }
 
