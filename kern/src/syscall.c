@@ -1104,16 +1104,18 @@ intreg_t sys_chdir(struct proc *p, const char *path, size_t path_l)
 	return 0;
 }
 
-intreg_t sys_getcwd(struct proc *p, char *pwd, int size)
+/* Note cwd_l is not a strlen, it's an absolute size */
+intreg_t sys_getcwd(struct proc *p, char *u_cwd, size_t cwd_l)
 {
-	void* kbuf = kmalloc_errno(size);
-	if(kbuf == NULL)
-		return -1;
-	int ret = ufe(read,PADDR(kbuf),size,0,0);
-	if(ret != -1 && memcpy_to_user_errno(p,pwd,kbuf,strnlen(kbuf,size)))
-		ret = -1;
-	user_memdup_free(p,kbuf);
-	return ret;
+	int retval = 0;
+	char *kfree_this;
+	char *k_cwd = do_getcwd(&p->fs_env, &kfree_this, cwd_l);
+	if (!k_cwd)
+		return -1;		/* errno set by do_getcwd */
+	if (memcpy_to_user_errno(p, u_cwd, k_cwd, strnlen(k_cwd, cwd_l - 1) + 1))
+		retval = -1;
+	kfree(kfree_this);
+	return retval;
 }
 
 intreg_t sys_gettimeofday(struct proc *p, int *buf)

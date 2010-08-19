@@ -1514,6 +1514,50 @@ int do_chdir(struct fs_struct *fs_env, char *path)
 	return retval;
 }
 
+/* Returns a null-terminated string of up to length cwd_l containing the
+ * absolute path of fs_env, (up to fs_env's root).  Be sure to kfree the char*
+ * "kfree_this" when you are done with it.  We do this since it's easier to
+ * build this string going backwards.  Note cwd_l is not a strlen, it's an
+ * absolute size. */
+char *do_getcwd(struct fs_struct *fs_env, char **kfree_this, size_t cwd_l)
+{
+	struct dentry *dentry = fs_env->pwd;
+	size_t link_len;
+	char *path_start, *kbuf;
+
+	if (cwd_l < 2) {
+		set_errno(ERANGE);
+		return 0;
+	}
+	kbuf = kmalloc(cwd_l, 0);
+	if (!kbuf) {
+		set_errno(ENOMEM);
+		return 0;
+	}
+	*kfree_this = kbuf;
+	kbuf[cwd_l - 1] = '\0';
+	kbuf[cwd_l - 2] = '/';
+	/* for each dentry in the path, all the way back to the root of fs_env, we
+	 * grab the dentry name, push path_start back enough, and write in the name,
+	 * using /'s to terminate.  We skip the root, since we don't want it's
+	 * actual name, just "/", which is set before each loop. */
+	path_start = kbuf + cwd_l - 2;	/* the last byte written */
+	while (dentry != fs_env->root) {
+		link_len = dentry->d_name.len;		/* this does not count the \0 */
+		if (path_start - (link_len + 2) < kbuf) {
+			kfree(kbuf);
+			set_errno(ERANGE);
+			return 0;
+		}
+		path_start -= link_len + 1;	/* the 1 is for the \0 */
+		strncpy(path_start, dentry->d_name.name, link_len);
+		path_start--;
+		*path_start = '/';
+		dentry = dentry->d_parent;	
+	}
+	return path_start;
+}
+
 static void print_dir(struct dentry *dentry, char *buf, int depth)
 {
 	struct dentry *child_d;

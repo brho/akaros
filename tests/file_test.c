@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <dirent.h>
+#include <stdlib.h>
 
 int main() 
 { 
@@ -119,6 +120,13 @@ int main()
 	if (retval < 0)
 		printf("WARNING! Unlink failed!\n");
 
+	/* getcwd, on the root dir */
+	char *cwd = getcwd(0, 0);
+	if (!cwd)
+		printf("WARNING! Couldn't get a CWD!\n");
+	else
+		printf("Got CWD (/): %s\n", cwd);
+	free(cwd);
 	/* chdir() tests */
 	printf("Testing basic chdir\n");
 	retval = access("dir1/f1.txt", R_OK);
@@ -130,6 +138,22 @@ int main()
 	retval = access("f1.txt", R_OK);
 	if (retval < 0)
 		printf("WARNING! Access error for f1.txt!\n");
+	cwd = getcwd(0, 0);
+	if (!cwd)
+		printf("WARNING! Couldn't get a CWD!\n");
+	else
+		printf("Got CWD (/dir1/): %s\n", cwd);
+	free(cwd);
+	/* change to a weird directory, see if we can still getcwd() */
+	retval = chdir("../dir2/../dir1/dir1-1");
+	if (retval < 0)
+		printf("WARNING! Chdir failed for dir1-1!\n");
+	cwd = getcwd(0, 0);
+	if (!cwd)
+		printf("WARNING! Couldn't get a CWD!\n");
+	else
+		printf("Got CWD (/dir1/dir1-1/): %s\n", cwd);
+	free(cwd);
 
 	breakpoint();
 }
