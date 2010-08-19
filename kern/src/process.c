@@ -320,7 +320,7 @@ error_t proc_alloc(struct proc **pp, struct proc *parent)
 	kref_get(&default_ns.kref, 1);
 	p->ns = &default_ns;
 	spinlock_init(&p->fs_env.lock);
-	p->fs_env.umask = parent ? parent->fs_env.umask : 0002;
+	p->fs_env.umask = parent ? parent->fs_env.umask : S_IWGRP | S_IWOTH;
 	p->fs_env.root = p->ns->root->mnt_root;
 	kref_get(&p->fs_env.root->d_kref, 1);
 	p->fs_env.pwd = parent ? parent->fs_env.pwd : p->fs_env.root;

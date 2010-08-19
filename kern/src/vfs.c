@@ -974,8 +974,10 @@ struct file *do_file_open(char *path, int flags, int mode)
 		/* Create the inode/file.  get a fresh dentry too: */
 		file_d = get_dentry(nd->dentry->d_sb, nd->dentry, nd->last.name);
 		parent_i = nd->dentry->d_inode;
-		/* TODO: mode should be & ~umask.  Note that mode technically should
-		 * only apply to future opens, though we apply it immediately. */
+		/* Note that the mode technically should only apply to future opens,
+		 * but we apply it immediately. */
+		if (current)
+			mode &= ~current->fs_env.umask;
 		if (create_file(parent_i, file_d, mode)) {
 			kref_put(&file_d->d_kref);
 			path_release(nd);

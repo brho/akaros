@@ -991,7 +991,9 @@ static intreg_t sys_access(struct proc *p, const char *path, size_t path_l,
 
 intreg_t sys_umask(struct proc *p, int mask)
 {
-	return ufe(umask,mask,0,0,0);
+	int old_mask = p->fs_env.umask;
+	p->fs_env.umask = mask & 0777;
+	return old_mask;
 }
 
 intreg_t sys_chmod(struct proc *p, const char *path, size_t path_l, int mode)
