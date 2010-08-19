@@ -1114,3 +1114,67 @@ void test_radix_tree(void)
 	//print_radix_tree(tree);
 	printk("Finished radix tree tests!\n");
 }
+
+/* Assorted FS tests, which were hanging around in init.c */
+void test_random_fs(void)
+{
+	int retval = do_symlink("/dir1/sym", "/bin/hello", S_IRWXU);
+	if (retval)
+		printk("symlink1 creation failed\n");
+	retval = do_symlink("/symdir", "/dir1/dir1-1", S_IRWXU);
+	if (retval)
+		printk("symlink1 creation failed\n");
+	retval = do_symlink("/dir1/test.txt", "/dir2/test2.txt", S_IRWXU);
+	if (retval)
+		printk("symlink2 creation failed\n");
+	retval = do_symlink("/dir1/dir1-1/up", "../../", S_IRWXU);
+	if (retval)
+		printk("symlink3 creation failed\n");
+	retval = do_symlink("/bin/hello-sym", "hello", S_IRWXU);
+	if (retval)
+		printk("symlink4 creation failed\n");
+	
+	struct dentry *dentry;
+	struct nameidata nd_r = {0}, *nd = &nd_r;
+	retval = path_lookup("/dir1/sym", 0, nd);
+	if (retval)
+		printk("symlink lookup failed: %d\n", retval);
+	char *symname = nd->dentry->d_inode->i_op->readlink(nd->dentry);
+	printk("Pathlookup got %s (sym)\n", nd->dentry->d_name.name);
+	if (!symname)
+		printk("symlink reading failed\n");
+	else
+		printk("Symname: %s (/bin/hello)\n", symname);
+	path_release(nd);
+	/* try with follow */
+	memset(nd, 0, sizeof(struct nameidata));
+	retval = path_lookup("/dir1/sym", LOOKUP_FOLLOW, nd);
+	if (retval)
+		printk("symlink lookup failed: %d\n", retval);
+	printk("Pathlookup got %s (hello)\n", nd->dentry->d_name.name);
+	path_release(nd);
+	
+	/* try with a directory */
+	memset(nd, 0, sizeof(struct nameidata));
+	retval = path_lookup("/symdir/f1-1.txt", 0, nd);
+	if (retval)
+		printk("symlink lookup failed: %d\n", retval);
+	printk("Pathlookup got %s (f1-1.txt)\n", nd->dentry->d_name.name);
+	path_release(nd);
+	
+	/* try with a rel path */
+	printk("Try with a rel path\n");
+	memset(nd, 0, sizeof(struct nameidata));
+	retval = path_lookup("/symdir/up/hello.txt", 0, nd);
+	if (retval)
+		printk("symlink lookup failed: %d\n", retval);
+	printk("Pathlookup got %s (hello.txt)\n", nd->dentry->d_name.name);
+	path_release(nd);
+	
+	printk("Try for an ELOOP\n");
+	memset(nd, 0, sizeof(struct nameidata));
+	retval = path_lookup("/symdir/up/symdir/up/symdir/up/symdir/up/hello.txt", 0, nd);
+	if (retval)
+		printk("Symlink lookup failed (it should): %d (-40)\n", retval);
+	path_release(nd);
+}

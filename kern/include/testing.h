@@ -30,6 +30,7 @@ void test_hashtable(void);
 void test_bcq(void);
 void test_vm_regions(void);
 void test_radix_tree(void);
+void test_random_fs(void);
 
 struct trapframe_t;
 
