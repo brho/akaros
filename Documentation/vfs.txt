@@ -267,3 +267,15 @@ like getting rid of follow_link and put_link from the FS specific sections.  Our
 FSs just need to know how to return a char* for a symname - and not do any of
 the actual link following.  Or any of the other stuff they do.  We'll see if
 that turns out to be an issue or not...
+
+Unlinking
+-------------------------
+Unlinking is just disconnecting a dentry-inode pair from the directory tree, and
+decreasing the inode's i_nlink.  Nothing else happens yet, since we need to keep
+the FS-file (controlled by the dentry/inode) so long as any OS-files have it
+open.  They have it opened via open or mmap - any way that there is a reference
+to a file, which then pins the dentry and inode.  When the OS-files close,
+eventually the dentry's refcnt hits 0.  When it does, it normally would be up
+for caching, but we can check nlinks and just drop it.  When that happens, it
+releases the inode, which will see its nlinks is 0.  That will trigger the
+underlying FS to clear out the FS-file.

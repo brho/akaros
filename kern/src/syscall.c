@@ -976,7 +976,6 @@ static intreg_t sys_access(struct proc *p, const char *path, size_t path_l,
                            int mode)
 {
 	int retval;
-
 	char *t_path = user_strdup_errno(p, path, path_l);
 	if (!t_path)
 		return -1;
@@ -1038,12 +1037,13 @@ intreg_t sys_link(struct proc *p, char *old_path, size_t old_l,
 
 intreg_t sys_unlink(struct proc *p, const char *path, size_t path_l)
 {
-	char* fn = user_strdup_errno(p,path,PGSIZE);
-	if(fn == NULL)
+	int retval;
+	char *t_path = user_strdup_errno(p, path, path_l);
+	if (!t_path)
 		return -1;
-	int ret = ufe(unlink,PADDR(fn),0,0,0);
-	user_memdup_free(p,fn);
-	return ret;
+	retval = do_unlink(t_path);
+	user_memdup_free(p, t_path);
+	return retval;
 }
 
 intreg_t sys_symlink(struct proc *p, char *old_path, size_t old_l,

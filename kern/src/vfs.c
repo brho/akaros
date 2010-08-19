@@ -573,7 +573,7 @@ void dcache_put(struct dentry *dentry)
 
 /* Cleans up the dentry (after ref == 0).  We still may want it, and this is
  * where we should add it to the dentry cache.  (TODO).  For now, we do nothing,
- * since we don't have a dcache.
+ * since we don't have a dcache.  Also, if i_nlink == 0, never cache it.
  * 
  * This has to handle two types of dentries: full ones (ones that had been used)
  * and ones that had been just for lookups - hence the check for d_inode.
@@ -756,7 +756,12 @@ int check_perms(struct inode *inode, int access_mode)
 void inode_release(struct kref *kref)
 {
 	struct inode *inode = container_of(kref, struct inode, i_kref);
-	inode->i_sb->s_op->destroy_inode(inode);
+	/* If we still have links, just dealloc the in-memory inode.  if we have no
+	 * links, we need to delete it too (which calls destroy). */
+	if (inode->i_nlink)
+		inode->i_sb->s_op->dealloc_inode(inode);
+	else
+		inode->i_sb->s_op->delete_inode(inode);
 	kref_put(&inode->i_sb->s_kref);
 	assert(inode->i_mapping == &inode->i_pm);
 	kmem_cache_free(inode_kcache, inode);
@@ -1107,6 +1112,54 @@ out_both_ds:
 	kref_put(&old_d->d_kref);
 out_link_d:
 	kref_put(&link_d->d_kref);
+out_path_only:
+	path_release(nd);
+	return retval;
+}
+
+int do_unlink(char *path)
+{
+	struct dentry *dentry;
+	struct inode *parent_dir;
+	struct nameidata nd_r = {0}, *nd = &nd_r;
+	int error;
+	int retval = -1;
+
+	/* get the parent of the target, and don't follow a final link */
+	error = path_lookup(path, LOOKUP_PARENT, nd);
+	if (error) {
+		set_errno(-error);
+		goto out_path_only;
+	}
+	parent_dir = nd->dentry->d_inode;
+	/* make sure the target is there */
+	dentry = do_lookup(nd->dentry, nd->last.name); 
+	if (!dentry) {
+		set_errno(ENOENT);
+		goto out_path_only;
+	}
+	/* Make sure the target is not a directory */
+	if (dentry->d_inode->i_type == FS_I_DIR) {
+		set_errno(EISDIR);
+		goto out_dentry;
+	}
+	/* Remove the dentry from its parent */
+	error = parent_dir->i_op->unlink(parent_dir, dentry);
+	if (error) {
+		set_errno(-error);
+		goto out_dentry;
+	}
+	kref_put(&dentry->d_parent->d_kref);
+	dentry->d_parent = 0;		/* so we don't double-decref it later */
+	dentry->d_inode->i_nlink--;	/* TODO: race here */
+	/* At this point, the dentry is unlinked from the FS, and the inode has one
+	 * less link.  When the in-memory objects (dentry, inode) are going to be
+	 * released (after all open files are closed, and maybe after entries are
+	 * evicted from the cache), then nlinks will get checked and the FS-file
+	 * will get removed from the disk */
+	retval = 0;				/* Note the fall through to the exit paths */
+out_dentry:
+	kref_put(&dentry->d_kref);
 out_path_only:
 	path_release(nd);
 	return retval;

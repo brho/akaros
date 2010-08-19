@@ -215,7 +215,7 @@ struct super_block {
 
 struct super_operations {
 	struct inode *(*alloc_inode) (struct super_block *sb);
-	void (*destroy_inode) (struct inode *);		/* dealloc.  might need more */
+	void (*dealloc_inode) (struct inode *);
 	void (*read_inode) (struct inode *);
 	void (*dirty_inode) (struct inode *);
 	void (*write_inode) (struct inode *, bool);
@@ -505,6 +505,7 @@ ssize_t generic_dir_read(struct file *file, char *u_buf, size_t count,
 struct file *do_file_open(char *path, int flags, int mode);
 int do_symlink(char *path, const char *symname, int mode);
 int do_link(char *old_path, char *new_path);
+int do_unlink(char *path);
 int do_file_access(char *path, int mode);
 struct file *dentry_open(struct dentry *dentry, int flags);
 void file_release(struct kref *kref);

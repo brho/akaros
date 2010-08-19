@@ -99,6 +99,22 @@ int main()
 	retval = link("/bin/hello", "/dir1/hardhello");
 	if (retval < 0)
 		printf("WARNING! Link failed!\n");
-
+	//breakpoint();
+	printf("Now unlinking /dir1/hardhello\n");
+	retval = unlink("/dir1/hardhello");
+	if (retval < 0)
+		printf("WARNING! Unlink failed!\n");
+	printf("Linking to /bin/hello at /bin/hardhello2\n");
+	retval = link("/bin/hello", "/bin/hardhello2");
+	if (retval < 0)
+		printf("WARNING! Link failed!\n");
+	printf("Now unlinking symlink /dir1/test.txt\n");
+	retval = unlink("/dir1/test.txt");
+	if (retval < 0)
+		printf("WARNING! Unlink failed!\n");
+	printf("Now unlinking /dir2/test2.txt\n");
+	retval = unlink("/dir2/test2.txt");
+	if (retval < 0)
+		printf("WARNING! Unlink failed!\n");
 	breakpoint();
 }

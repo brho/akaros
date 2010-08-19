@@ -164,8 +164,11 @@ struct inode *kfs_alloc_inode(struct super_block *sb)
 }
 
 /* deallocs and cleans up after an inode. */
-void kfs_destroy_inode(struct inode *inode)
+void kfs_dealloc_inode(struct inode *inode)
 {
+	/* If we're a symlink, give up our storage for the symname */
+	if (inode->i_type == FS_I_SYMLINK)
+		kfree(((struct kfs_i_info*)inode->i_fs_info)->filestart);
 	kmem_cache_free(kfs_i_kcache, inode->i_fs_info);
 }
 
@@ -231,7 +234,8 @@ void kfs_drop_inode(struct inode *inode)
 void kfs_delete_inode(struct inode *inode)
 {
 	// would remove from "disk" here
-	kfs_destroy_inode(inode);
+	kfs_dealloc_inode(inode);
+	/* TODO: give up our i_ino */
 }
 
 /* unmount and release the super block */
@@ -361,7 +365,10 @@ int kfs_link(struct dentry *old_dentry, struct inode *dir,
 /* Removes the link from the dentry in the directory */
 int kfs_unlink(struct inode *dir, struct dentry *dentry)
 {
-	return -1;
+	/* Stop tracking our child */
+	TAILQ_REMOVE(&((struct kfs_i_info*)dir->i_fs_info)->children, dentry,
+	             d_subdirs_link);
+	return 0;
 }
 
 /* Creates a new inode for a symlink dir, linking to / containing the name
@@ -644,7 +651,7 @@ struct page_map_operations kfs_pm_op = {
 
 struct super_operations kfs_s_op = {
 	kfs_alloc_inode,
-	kfs_destroy_inode,
+	kfs_dealloc_inode,
 	kfs_read_inode,
 	kfs_dirty_inode,
 	kfs_write_inode,
