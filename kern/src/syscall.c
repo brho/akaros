@@ -1091,12 +1091,17 @@ intreg_t sys_readlink(struct proc *p, char *path, size_t path_l,
 
 intreg_t sys_chdir(struct proc *p, const char *path, size_t path_l)
 {
-	char* fn = user_strdup_errno(p,path,PGSIZE);
-	if(fn == NULL)
+	int retval;
+	char *t_path = user_strdup_errno(p, path, path_l);
+	if (!t_path)
 		return -1;
-	int ret = ufe(chdir,PADDR(fn),0,0,0);
-	user_memdup_free(p,fn);
-	return ret;
+	retval = do_chdir(&p->fs_env, t_path);
+	user_memdup_free(p, t_path);
+	if (retval) {
+		set_errno(-retval);
+		return -1;
+	}
+	return 0;
 }
 
 intreg_t sys_getcwd(struct proc *p, char *pwd, int size)

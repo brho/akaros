@@ -384,6 +384,8 @@ static void __proc_free(struct kref *kref)
 	assert(kref_refcnt(&p->kref) == 0);
 
 	close_all_files(&p->open_files, FALSE);
+	kref_put(&p->fs_env.root->d_kref);
+	kref_put(&p->fs_env.pwd->d_kref);
 	destroy_vmrs(p);
 	frontend_proc_free(p);	/* TODO: please remove me one day */
 	/* Free any colors allocated to this process */

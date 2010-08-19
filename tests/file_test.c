@@ -40,6 +40,7 @@ int main()
 	//retval = stat("/bin/mhello", &st);
 	retval = fstat(fd, &st);
 	printf("Tried to stat, was told %d\n", retval);
+	#if 0
 	printf("STAT RESULTS\n---------------------\n");
 	printf("dev       : %d\n", st.st_dev);
 	printf("ino       : %d\n", st.st_ino);
@@ -54,6 +55,7 @@ int main()
 	printf("atime     : %d\n", st.st_atime);
 	printf("mtime     : %d\n", st.st_mtime);
 	printf("ctime     : %d\n", st.st_ctime);
+	#endif
 
 	retval = symlink("/dir1/random.txt", "/dir2/sym-test");
 	if (retval < 0)
@@ -116,5 +118,18 @@ int main()
 	retval = unlink("/dir2/test2.txt");
 	if (retval < 0)
 		printf("WARNING! Unlink failed!\n");
+
+	/* chdir() tests */
+	printf("Testing basic chdir\n");
+	retval = access("dir1/f1.txt", R_OK);
+	if (retval < 0)
+		printf("WARNING! Access error for dir1/f1.txt!\n");
+	retval = chdir("/dir1");
+	if (retval < 0)
+		printf("WARNING! Chdir failed for /dir1!\n");
+	retval = access("f1.txt", R_OK);
+	if (retval < 0)
+		printf("WARNING! Access error for f1.txt!\n");
+
 	breakpoint();
 }

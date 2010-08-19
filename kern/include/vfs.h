@@ -522,6 +522,7 @@ struct file *put_file_from_fd(struct files_struct *open_files, int file_desc);
 int insert_file(struct files_struct *open_files, struct file *file);
 void close_all_files(struct files_struct *open_files, bool cloexec);
 void clone_files(struct files_struct *src, struct files_struct *dst);
+int do_chdir(struct fs_struct *fs_env, char *path);
 
 /* Debugging */
 int ls_dash_r(char *path);

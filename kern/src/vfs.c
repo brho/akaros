@@ -591,11 +591,13 @@ void dentry_release(struct kref *kref)
 	if (dentry->d_name.len > DNAME_INLINE_LEN)
 		kfree((void*)dentry->d_name.name);
 	kref_put(&dentry->d_sb->s_kref);
+	if (dentry->d_parent)
+		kref_put(&dentry->d_parent->d_kref);
 	if (dentry->d_mounted_fs)
 		kref_put(&dentry->d_mounted_fs->mnt_kref);
 	if (dentry->d_inode) {
 		TAILQ_REMOVE(&dentry->d_inode->i_dentry, dentry, d_alias);
-		kref_put(&dentry->d_inode->i_kref);	/* but dentries kref inodes */
+		kref_put(&dentry->d_inode->i_kref);	/* dentries kref inodes */
 	}
 	kmem_cache_free(dentry_kcache, dentry);
 }
@@ -1493,6 +1495,23 @@ void clone_files(struct files_struct *src, struct files_struct *dst)
 	}
 	spin_unlock(&dst->lock);
 	spin_unlock(&src->lock);
+}
+
+/* Change the working directory of the given fs env (one per process, at this
+ * point).  Returns 0 for success, -ERROR for whatever error. */
+int do_chdir(struct fs_struct *fs_env, char *path)
+{
+	struct nameidata nd_r = {0}, *nd = &nd_r;
+	int retval;
+	retval = path_lookup(path, LOOKUP_DIRECTORY, nd);
+	if (!retval) {
+		/* nd->dentry is the place we want our PWD to be */
+		kref_get(&nd->dentry->d_kref, 1);
+		kref_put(&fs_env->pwd->d_kref);
+		fs_env->pwd = nd->dentry;
+	}
+	path_release(nd);
+	return retval;
 }
 
 static void print_dir(struct dentry *dentry, char *buf, int depth)
