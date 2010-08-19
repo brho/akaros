@@ -485,8 +485,6 @@ void init_sb(struct super_block *sb, struct vfsmount *vmnt,
 	struct inode *inode = get_inode(d_root);
 	if (!inode)
 		panic("This FS sucks!");
-	d_root->d_inode = inode;				/* storing the inode's kref here */
-	TAILQ_INSERT_TAIL(&inode->i_dentry, d_root, d_alias);	/* weak ref */
 	inode->i_ino = root_ino;
 	/* TODO: add the inode to the appropriate list (off i_list) */
 	/* TODO: do we need to read in the inode?  can we do this on demand? */
@@ -505,6 +503,7 @@ void init_sb(struct super_block *sb, struct vfsmount *vmnt,
 	 * when's the earliest we should?  what about concurrent accesses to the
 	 * same dentry?  should be locking the dentry... */
 	dcache_put(d_root); // TODO: should set a d_flag too
+	kref_put(&inode->i_kref);		/* give up the ref from get_inode() */
 }
 
 /* Dentry Functions */
@@ -1479,8 +1478,8 @@ static void print_dir(struct dentry *dentry, char *buf, int depth)
 					print_dir(child_d, buf, depth + 1);
 					break;
 				case (FS_I_FILE):
-					printk("%s%s size(B): %d\n", buf, next.d_name,
-					       child_d->d_inode->i_size);
+					printk("%s%s size(B): %d nlink: %d\n", buf, next.d_name,
+					       child_d->d_inode->i_size, child_d->d_inode->i_nlink);
 					break;
 				case (FS_I_SYMLINK):
 					printk("%s%s -> %s\n", buf, next.d_name,

@@ -764,21 +764,33 @@ int mon_fs(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 {
 	/* this assumes one mounted FS at the NS root */
 	struct super_block *sb = default_ns.root->mnt_root->d_inode->i_sb;
-	struct file *i;
+	struct file *file;
+	struct inode *inode;
+	struct dentry *dentry;
 	if (argc < 2) {
 		printk("Usage: fs OPTION\n");
 		printk("\topen: show all open files\n");
+		printk("\tinodes: show all inodes\n");
 		printk("\tls DIR: print the dir tree starting with DIR\n");
 		printk("\tpid: proc PID's fs crap placeholder\n");
 		return 1;
 	}
 	if (!strcmp(argv[1], "open")) {
 		printk("Open Files:\n----------------------------\n");
-		TAILQ_FOREACH(i, &sb->s_files, f_list)
-			printk("File: %08p, %s, Refs: %d, Drefs: %d, Irefs: %d\n", i,
-			       file_name(i), kref_refcnt(&i->f_kref),
-				   kref_refcnt(&i->f_dentry->d_kref),
-				   kref_refcnt(&i->f_dentry->d_inode->i_kref));
+		TAILQ_FOREACH(file, &sb->s_files, f_list)
+			printk("File: %08p, %s, Refs: %d, Drefs: %d, Irefs: %d\n", file,
+			       file_name(file), kref_refcnt(&file->f_kref),
+				   kref_refcnt(&file->f_dentry->d_kref),
+				   kref_refcnt(&file->f_dentry->d_inode->i_kref));
+	} else if (!strcmp(argv[1], "inodes")) {
+		printk("Mounted FS Inodes:\n----------------------------\n");
+		TAILQ_FOREACH(inode, &sb->s_inodes, i_sb_list) {
+			printk("Inode: %08p, Refs: %d, Nlinks: %d, Size(B): %d\n", inode,
+			       kref_refcnt(&inode->i_kref), inode->i_nlink, inode->i_size);
+			TAILQ_FOREACH(dentry, &inode->i_dentry, d_alias)
+				printk("\t%s: Dentry: %08p, Refs: %d\n", dentry->d_name.name,
+				       dentry, kref_refcnt(&dentry->d_kref));
+		}
 	} else if (!strcmp(argv[1], "ls")) {
 		if (argc != 3) {
 			printk("Give me a dir.\n");
