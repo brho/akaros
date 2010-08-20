@@ -151,5 +151,11 @@ int main()
 		printf("Got CWD (/dir1/dir1-1/): %s\n", cwd);
 	free(cwd);
 
+	/* Try a chmod() */
+	printf("Trying a chmod\n");
+	retval = chmod("/dir1/dir1-1/f1-1.txt", S_IRWXO);
+	if (retval < 0)
+		printf("WARNING! chmod failed with %d!\n", retval);
+
 	breakpoint();
 }

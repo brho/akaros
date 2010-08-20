@@ -1169,15 +1169,33 @@ out_path_only:
 	return retval;
 }
 
-/* Checks to see if path can be accessed via mode.  Doesn't do much now.  This
- * is an example of decent error propagation from the lower levels via int
- * retvals. */
+/* Checks to see if path can be accessed via mode.  Need to actually send the
+ * mode along somehow, so this doesn't do much now.  This is an example of
+ * decent error propagation from the lower levels via int retvals. */
 int do_file_access(char *path, int mode)
 {
 	struct nameidata nd_r = {0}, *nd = &nd_r;
 	int retval = 0;
 	nd->intent = LOOKUP_ACCESS;
 	retval = path_lookup(path, 0, nd);
+	path_release(nd);	
+	return retval;
+}
+
+int do_file_chmod(char *path, int mode)
+{
+	struct nameidata nd_r = {0}, *nd = &nd_r;
+	int retval = 0;
+	retval = path_lookup(path, 0, nd);
+	if (!retval) {
+		#if 0
+		/* TODO: when we have notions of uid, check for the proc's uid */
+		if (nd->dentry->d_inode->i_uid != UID_OF_ME)
+			retval = -EPERM;
+		else
+		#endif
+			nd->dentry->d_inode->i_mode = mode & 0777;
+	}
 	path_release(nd);	
 	return retval;
 }

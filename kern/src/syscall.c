@@ -998,12 +998,17 @@ intreg_t sys_umask(struct proc *p, int mask)
 
 intreg_t sys_chmod(struct proc *p, const char *path, size_t path_l, int mode)
 {
-	char* fn = user_strdup_errno(p,path,PGSIZE);
-	if(fn == NULL)
+	int retval;
+	char *t_path = user_strdup_errno(p, path, path_l);
+	if (!t_path)
 		return -1;
-	int ret = ufe(chmod,PADDR(fn),mode,0,0);
-	user_memdup_free(p,fn);
-	return ret;
+	retval = do_file_chmod(t_path, mode);
+	user_memdup_free(p, t_path);
+	if (retval < 0) {
+		set_errno(-retval);
+		return -1;
+	}
+	return retval;
 }
 
 static intreg_t sys_lseek(struct proc *p, int fd, off_t offset, int whence)
