@@ -54,6 +54,16 @@ typedef struct Secthdr {
 	uint32_t sh_entsize;
 } secthdr_t;
 
+typedef struct
+{
+	long entry;
+	long highest_addr;
+	long phdr;
+	int phnum;
+	int dynamic;
+	char interp[256];
+} elf_info_t;
+
 typedef long elf_aux_t[2];
 
 // Values for Proghdr::p_type

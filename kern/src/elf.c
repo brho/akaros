@@ -8,15 +8,6 @@
 #include <pmap.h>
 #include <smp.h>
 
-typedef struct
-{
-	long entry;
-	long highest_addr;
-	long phdr;
-	int phnum;
-	int dynamic;
-	char interp[256];
-} elf_info_t;
 
 static int load_one_elf(struct proc *p, struct file *f, int pgoffset,
                         elf_info_t *ei)

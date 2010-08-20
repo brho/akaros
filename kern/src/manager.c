@@ -223,15 +223,6 @@ void manager_klueska()
 	panic("DON'T PANIC");
 }
 
-struct elf_info
-{
-	long entry;
-	long phdr;
-	int phnum;
-	int dynamic;
-	char interp[256];
-};
-
 void manager_waterman()
 {
 	static int init = 0;
