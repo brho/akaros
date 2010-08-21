@@ -155,7 +155,19 @@ int main()
 	printf("Trying a chmod\n");
 	retval = chmod("/dir1/dir1-1/f1-1.txt", S_IRWXO);
 	if (retval < 0)
-		printf("WARNING! chmod failed with %d!\n", retval);
+		printf("WARNING! chmod failed with %d!\n", errno);
 
+	/* Try adding a directory or two! */
+	printf("Add dir3 and dir4, then remove dir4\n");
+	retval = mkdir("/dir3", S_IRWXU | S_IRWXG | S_IRWXO);
+	if (retval < 0)
+		printf("WARNING! mkdir failed with %d!\n", errno);
+	retval = mkdir("/dir4", S_IRWXU | S_IRWXG | S_IRWXO);
+	if (retval < 0)
+		printf("WARNING! mkdir failed with %d!\n", errno);
+	retval = rmdir("/dir4");
+	if (retval < 0)
+		printf("WARNING! rmdir failed with %d!\n", errno);
 	breakpoint();
+
 }

@@ -406,13 +406,15 @@ int kfs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 	return 0;
 }
 
-/* Removes from dir the directory specified by the name in dentry. */
-// TODO: note this isn't necessarily the same dentry, just using it for the
-// naming (which seems to be a common way of doing things, like in lookup() -
-// can work either way.
+/* Removes from dir the directory 'dentry.'  KFS doesn't store anything in the
+ * inode for which children it has.  It probably should, but since everything is
+ * pinned, it just relies on the dentry connections. */
 int kfs_rmdir(struct inode *dir, struct dentry *dentry)
 {
-	return -1;
+	/* Bug check, make sure we don't have any kids in KFS */
+	struct kfs_i_info *data = (struct kfs_i_info*)dentry->d_inode->i_fs_info;
+	assert(TAILQ_EMPTY(&data->children));
+	return 0;
 }
 
 /* Used to make a generic file, based on the type and the major/minor numbers

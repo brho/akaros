@@ -506,8 +506,10 @@ struct file *do_file_open(char *path, int flags, int mode);
 int do_symlink(char *path, const char *symname, int mode);
 int do_link(char *old_path, char *new_path);
 int do_unlink(char *path);
-int do_file_access(char *path, int mode);
-int do_file_chmod(char *path, int mode);
+int do_access(char *path, int mode);
+int do_chmod(char *path, int mode);
+int do_mkdir(char *path, int mode);
+int do_rmdir(char *path);
 struct file *dentry_open(struct dentry *dentry, int flags);
 void file_release(struct kref *kref);
 

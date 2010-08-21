@@ -49,6 +49,7 @@
 #define SYS_eth_get_mac_addr		79
 #define SYS_eth_recv_check			80
 
+/* FS Syscalls */
 #define SYS_read				100
 #define SYS_write				101
 #define SYS_open				102
@@ -67,9 +68,13 @@
 #define SYS_readlink			115
 #define SYS_chdir				116
 #define SYS_getcwd				117
-#define SYS_gettimeofday		118
-#define SYS_tcgetattr			119
-#define SYS_tcsetattr			120
+#define SYS_mkdir				118
+#define SYS_rmdir				119
+
+/* Misc syscalls */
+#define SYS_gettimeofday		140
+#define SYS_tcgetattr			141
+#define SYS_tcsetattr			142
 
 /* Syscalls we plan to remove someday */
 #define SYS_cache_buster        200 

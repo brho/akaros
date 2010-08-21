@@ -834,6 +834,7 @@ static intreg_t sys_open(struct proc *p, const char *path, size_t path_l,
 	char *t_path = user_strdup_errno(p, path, path_l);
 	if (!t_path)
 		return -1;
+	mode &= ~p->fs_env.umask;
 	file = do_file_open(t_path, oflag, mode);
 	user_memdup_free(p, t_path);
 	if (!file)
@@ -979,7 +980,7 @@ static intreg_t sys_access(struct proc *p, const char *path, size_t path_l,
 	char *t_path = user_strdup_errno(p, path, path_l);
 	if (!t_path)
 		return -1;
-	retval = do_file_access(t_path, mode);
+	retval = do_access(t_path, mode);
 	user_memdup_free(p, t_path);
 	printd("Access for path: %s retval: %d\n", path, retval);
 	if (retval < 0) {
@@ -1002,7 +1003,7 @@ intreg_t sys_chmod(struct proc *p, const char *path, size_t path_l, int mode)
 	char *t_path = user_strdup_errno(p, path, path_l);
 	if (!t_path)
 		return -1;
-	retval = do_file_chmod(t_path, mode);
+	retval = do_chmod(t_path, mode);
 	user_memdup_free(p, t_path);
 	if (retval < 0) {
 		set_errno(-retval);
@@ -1122,6 +1123,29 @@ intreg_t sys_getcwd(struct proc *p, char *u_cwd, size_t cwd_l)
 	if (memcpy_to_user_errno(p, u_cwd, k_cwd, strnlen(k_cwd, cwd_l - 1) + 1))
 		retval = -1;
 	kfree(kfree_this);
+	return retval;
+}
+
+intreg_t sys_mkdir(struct proc *p, const char *path, size_t path_l, int mode)
+{
+	int retval;
+	char *t_path = user_strdup_errno(p, path, path_l);
+	if (!t_path)
+		return -1;
+	mode &= ~p->fs_env.umask;
+	retval = do_mkdir(t_path, mode);
+	user_memdup_free(p, t_path);
+	return retval;
+}
+
+intreg_t sys_rmdir(struct proc *p, const char *path, size_t path_l)
+{
+	int retval;
+	char *t_path = user_strdup_errno(p, path, path_l);
+	if (!t_path)
+		return -1;
+	retval = do_rmdir(t_path);
+	user_memdup_free(p, t_path);
 	return retval;
 }
 
@@ -1248,6 +1272,8 @@ intreg_t syscall(struct proc *p, uintreg_t syscallno, uintreg_t a1,
 		[SYS_readlink] = (syscall_t)sys_readlink,
 		[SYS_chdir] = (syscall_t)sys_chdir,
 		[SYS_getcwd] = (syscall_t)sys_getcwd,
+		[SYS_mkdir] = (syscall_t)sys_mkdir,
+		[SYS_rmdir] = (syscall_t)sys_rmdir,
 		[SYS_gettimeofday] = (syscall_t)sys_gettimeofday,
 		[SYS_tcgetattr] = (syscall_t)sys_tcgetattr,
 		[SYS_tcsetattr] = (syscall_t)sys_tcsetattr

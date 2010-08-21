@@ -677,9 +677,11 @@ struct inode *get_inode(struct dentry *dentry)
  * note we don't pass this an nd, like Linux does... */
 static struct inode *create_inode(struct dentry *dentry, int mode)
 {
-	/* note it is the i_ino that uniquely identifies a file in the system.
-	 * there's a diff between creating an inode (even for an in-use ino) and
-	 * then filling it in, and vs creating a brand new one */
+	/* note it is the i_ino that uniquely identifies a file in the specific
+	 * filesystem.  there's a diff between creating an inode (even for an in-use
+	 * ino) and then filling it in, and vs creating a brand new one.
+	 * get_inode() sets it to 0, and it should be filled in later in an
+	 * FS-specific manner. */
 	struct inode *inode = get_inode(dentry);
 	if (!inode)
 		return 0;
@@ -702,13 +704,16 @@ static struct inode *create_inode(struct dentry *dentry, int mode)
 
 /* Create a new disk inode in dir associated with dentry, with the given mode.
  * called when creating a regular file.  dir is the directory/parent.  dentry is
- * the dentry of the inode we are creating.  Note the lack of the nd... */
+ * the dentry of the inode we are creating.  Note the lack of the nd...
+ * Also, we do the nlink++ in here, since we want to give the FS's a chance to
+ * fail. */
 int create_file(struct inode *dir, struct dentry *dentry, int mode)
 {
 	struct inode *new_file = create_inode(dentry, mode);
 	if (!new_file)
 		return -1;
 	dir->i_op->create(dir, dentry, mode, 0);
+	dir->i_nlink++;
 	kref_put(&new_file->i_kref);
 	return 0;
 }
@@ -721,6 +726,7 @@ int create_dir(struct inode *dir, struct dentry *dentry, int mode)
 	if (!new_dir)
 		return -1;
 	dir->i_op->mkdir(dir, dentry, mode);
+	dir->i_nlink++;
 	/* Make sure my parent tracks me.  This is okay, since no directory (dir)
 	 * can have more than one dentry */
 	struct dentry *parent = TAILQ_FIRST(&dir->i_dentry);
@@ -740,6 +746,7 @@ int create_symlink(struct inode *dir, struct dentry *dentry,
 	if (!new_sym)
 		return -1;
 	dir->i_op->symlink(dir, dentry, symname);
+	dir->i_nlink++;			/* TODO: race with this, among other things */
 	kref_put(&new_sym->i_kref);
 	return 0;
 }
@@ -758,6 +765,7 @@ int check_perms(struct inode *inode, int access_mode)
 void inode_release(struct kref *kref)
 {
 	struct inode *inode = container_of(kref, struct inode, i_kref);
+	TAILQ_REMOVE(&inode->i_sb->s_inodes, inode, i_sb_list);
 	/* If we still have links, just dealloc the in-memory inode.  if we have no
 	 * links, we need to delete it too (which calls destroy). */
 	if (inode->i_nlink)
@@ -959,51 +967,41 @@ struct file *do_file_open(char *path, int flags, int mode)
 	 * final link (which may not be in 'path' in the first place. */
 	error = path_lookup(path, LOOKUP_PARENT | LOOKUP_FOLLOW, nd);
 	if (error) {
-		path_release(nd);
 		set_errno(-error);
-		return 0;
+		goto out_path_only;
 	}
 	/* see if the target is there, handle accordingly */
 	file_d = do_lookup(nd->dentry, nd->last.name); 
 	if (!file_d) {
 		if (!(flags & O_CREAT)) {
-			path_release(nd);
 			set_errno(ENOENT);
-			return 0;
+			goto out_path_only;
 		}
 		/* Create the inode/file.  get a fresh dentry too: */
 		file_d = get_dentry(nd->dentry->d_sb, nd->dentry, nd->last.name);
 		parent_i = nd->dentry->d_inode;
 		/* Note that the mode technically should only apply to future opens,
 		 * but we apply it immediately. */
-		if (current)
-			mode &= ~current->fs_env.umask;
-		if (create_file(parent_i, file_d, mode)) {
-			kref_put(&file_d->d_kref);
-			path_release(nd);
-			return 0;
-		}
+		if (create_file(parent_i, file_d, mode))	/* sets errno */
+			goto out_file_d;
 		dcache_put(file_d);
-	} else {	/* something already exists (might be a dir) */
+	} else {	/* something already exists */
 		if ((flags & O_CREAT) && (flags & O_EXCL)) {
 			/* wanted to create, not open, bail out */
-			kref_put(&file_d->d_kref);
-			path_release(nd);
 			set_errno(EEXIST);
-			return 0;
+			goto out_file_d;
 		}
 	}
 	/* now open the file (freshly created or if it already existed).  At this
 	 * point, file_d is a refcnt'd dentry, regardless of which branch we took.*/
 	if (flags & O_TRUNC)
 		warn("File truncation not supported yet.");
-	file = dentry_open(file_d, flags);		/* sets errno */
-	if (!file) {
-		kref_put(&file_d->d_kref);
-		path_release(nd);
-		return 0;
-	}
+	file = dentry_open(file_d, flags);				/* sets errno */
+	/* Note the fall through to the exit paths.  File is 0 by default and if
+	 * dentry_open fails. */
+out_file_d:
 	kref_put(&file_d->d_kref);
+out_path_only:
 	path_release(nd);
 	return file;
 }
@@ -1016,41 +1014,37 @@ int do_symlink(char *path, const char *symname, int mode)
 	struct inode *parent_i;
 	struct nameidata nd_r = {0}, *nd = &nd_r;
 	int error;
+	int retval = -1;
 
 	nd->intent = LOOKUP_CREATE;
 	/* get the parent, but don't follow links */
 	error = path_lookup(path, LOOKUP_PARENT, nd);
 	if (error) {
 		set_errno(-error);
-		path_release(nd);
-		return -1;
+		goto out_path_only;
 	}
 	/* see if the target is already there, handle accordingly */
 	sym_d = do_lookup(nd->dentry, nd->last.name); 
 	if (sym_d) {
 		set_errno(EEXIST);
-		kref_put(&sym_d->d_kref);
-		path_release(nd);
-		return -1;
+		goto out_sym_d;
 	}
 	/* Doesn't already exist, let's try to make it: */
 	sym_d = get_dentry(nd->dentry->d_sb, nd->dentry, nd->last.name);
 	if (!sym_d) {
 		set_errno(ENOMEM);
-		path_release(nd);
-		return -1;
+		goto out_path_only;
 	}
 	parent_i = nd->dentry->d_inode;
-	/* TODO: mode should be & ~umask. */
-	if (create_symlink(parent_i, sym_d, symname, mode)) {
-		kref_put(&sym_d->d_kref);
-		path_release(nd);
-		return -1;
-	}
+	if (create_symlink(parent_i, sym_d, symname, mode))
+		goto out_sym_d;
 	dcache_put(sym_d);
+	retval = 0;				/* Note the fall through to the exit paths */
+out_sym_d:
 	kref_put(&sym_d->d_kref);
+out_path_only:
 	path_release(nd);
-	return 0;
+	return retval;
 }
 
 /* Makes a hard link for the file behind old_path to new_path */
@@ -1109,6 +1103,7 @@ int do_link(char *old_path, char *new_path)
 	kref_get(&inode->i_kref, 1);
 	link_d->d_inode = inode;
 	inode->i_nlink++;
+	parent_dir->i_nlink++;
 	TAILQ_INSERT_TAIL(&inode->i_dentry, link_d, d_alias);	/* weak ref */
 	dcache_put(link_d);
 	retval = 0;				/* Note the fall through to the exit paths */
@@ -1121,6 +1116,8 @@ out_path_only:
 	return retval;
 }
 
+/* Unlinks path from the directory tree.  Read the Documentation for more info.
+ */
 int do_unlink(char *path)
 {
 	struct dentry *dentry;
@@ -1155,7 +1152,7 @@ int do_unlink(char *path)
 	}
 	kref_put(&dentry->d_parent->d_kref);
 	dentry->d_parent = 0;		/* so we don't double-decref it later */
-	dentry->d_inode->i_nlink--;	/* TODO: race here */
+	dentry->d_inode->i_nlink--;	/* TODO: race here, esp with a decref */
 	/* At this point, the dentry is unlinked from the FS, and the inode has one
 	 * less link.  When the in-memory objects (dentry, inode) are going to be
 	 * released (after all open files are closed, and maybe after entries are
@@ -1172,7 +1169,7 @@ out_path_only:
 /* Checks to see if path can be accessed via mode.  Need to actually send the
  * mode along somehow, so this doesn't do much now.  This is an example of
  * decent error propagation from the lower levels via int retvals. */
-int do_file_access(char *path, int mode)
+int do_access(char *path, int mode)
 {
 	struct nameidata nd_r = {0}, *nd = &nd_r;
 	int retval = 0;
@@ -1182,7 +1179,7 @@ int do_file_access(char *path, int mode)
 	return retval;
 }
 
-int do_file_chmod(char *path, int mode)
+int do_chmod(char *path, int mode)
 {
 	struct nameidata nd_r = {0}, *nd = &nd_r;
 	int retval = 0;
@@ -1197,6 +1194,102 @@ int do_file_chmod(char *path, int mode)
 			nd->dentry->d_inode->i_mode = mode & 0777;
 	}
 	path_release(nd);	
+	return retval;
+}
+
+/* Make a directory at path with mode.  Returns -1 and sets errno on errors */
+int do_mkdir(char *path, int mode)
+{
+	struct dentry *dentry;
+	struct inode *parent_i;
+	struct nameidata nd_r = {0}, *nd = &nd_r;
+	int error;
+	int retval = -1;
+
+	nd->intent = LOOKUP_CREATE;
+	/* get the parent, but don't follow links */
+	error = path_lookup(path, LOOKUP_PARENT, nd);
+	if (error) {
+		set_errno(-error);
+		goto out_path_only;
+	}
+	/* see if the target is already there, handle accordingly */
+	dentry = do_lookup(nd->dentry, nd->last.name); 
+	if (dentry) {
+		set_errno(EEXIST);
+		goto out_dentry;
+	}
+	/* Doesn't already exist, let's try to make it: */
+	dentry = get_dentry(nd->dentry->d_sb, nd->dentry, nd->last.name);
+	if (!dentry) {
+		set_errno(ENOMEM);
+		goto out_path_only;
+	}
+	parent_i = nd->dentry->d_inode;
+	if (create_dir(parent_i, dentry, mode))
+		goto out_dentry;
+	dcache_put(dentry);
+	retval = 0;				/* Note the fall through to the exit paths */
+out_dentry:
+	kref_put(&dentry->d_kref);
+out_path_only:
+	path_release(nd);
+	return retval;
+}
+
+int do_rmdir(char *path)
+{
+	struct dentry *dentry;
+	struct inode *parent_i;
+	struct nameidata nd_r = {0}, *nd = &nd_r;
+	int error;
+	int retval = -1;
+
+	/* get the parent, following links (probably want this), and we must get a
+	 * directory.  Note, current versions of path_lookup can't handle both
+	 * PARENT and DIRECTORY, at least, it doesn't check that *path is a
+	 * directory. */
+	error = path_lookup(path, LOOKUP_PARENT | LOOKUP_FOLLOW | LOOKUP_DIRECTORY,
+	                    nd);
+	if (error) {
+		set_errno(-error);
+		goto out_path_only;
+	}
+	/* make sure the target is already there, handle accordingly */
+	dentry = do_lookup(nd->dentry, nd->last.name); 
+	if (!dentry) {
+		set_errno(ENOENT);
+		goto out_path_only;
+	}
+	if (dentry->d_inode->i_type != FS_I_DIR) {
+		set_errno(ENOTDIR);
+		goto out_dentry;
+	}
+	/* TODO: make sure we aren't a mount or processes root (EBUSY) */
+	/* make sure we are empty.  TODO: Race with this, and anything touching
+	 * i_nlink! */
+	if (dentry->d_inode->i_nlink != 1) {
+		set_errno(ENOTEMPTY);
+		goto out_dentry;
+	}
+	/* now for the removal */
+	parent_i = nd->dentry->d_inode;
+	error = parent_i->i_op->rmdir(parent_i, dentry);
+	if (error < 0) {
+		set_errno(-error);
+		goto out_dentry;
+	}
+	/* Decref ourselves, so inode_release() knows we are done */
+	dentry->d_inode->i_nlink--;
+	TAILQ_REMOVE(&nd->dentry->d_subdirs, dentry, d_subdirs_link);
+	parent_i->i_nlink--;		/* TODO: race on this, esp since its a decref */
+	/* we still have d_parent and a kref on our parent, which will go away when
+	 * the in-memory dentry object goes away. */
+	retval = 0;				/* Note the fall through to the exit paths */
+out_dentry:
+	kref_put(&dentry->d_kref);
+out_path_only:
+	path_release(nd);
 	return retval;
 }
 
@@ -1591,7 +1684,8 @@ static void print_dir(struct dentry *dentry, char *buf, int depth)
 		return;
 	}
 	/* Print this dentry */
-	printk("%s%s/\n", buf, dentry->d_name.name);
+	printk("%s%s/ nlink: %d\n", buf, dentry->d_name.name,
+	       dentry->d_inode->i_nlink);
 	if (depth >= 32)
 		return;
 	/* Set buffer for our kids */
