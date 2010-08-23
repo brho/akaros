@@ -75,6 +75,8 @@
 #define SYS_gettimeofday		140
 #define SYS_tcgetattr			141
 #define SYS_tcsetattr			142
+#define SYS_setuid				143
+#define SYS_setgid				144
 
 /* Syscalls we plan to remove someday */
 #define SYS_cache_buster        200 

@@ -1194,6 +1194,20 @@ intreg_t sys_tcsetattr(struct proc *p, int fd, int optional_actions,
 	return ret;
 }
 
+/* TODO: we don't have any notion of UIDs or GIDs yet, but don't let that stop a
+ * process from thinking it can do these.  The other alternative is to have
+ * glibc return 0 right away, though someone might want to do something with
+ * these calls.  Someday. */
+intreg_t sys_setuid(struct proc *p, uid_t uid)
+{
+	return 0;
+}
+
+intreg_t sys_setgid(struct proc *p, gid_t gid)
+{
+	return 0;
+}
+
 /************** Syscall Invokation **************/
 
 /* Executes the given syscall.
@@ -1276,7 +1290,9 @@ intreg_t syscall(struct proc *p, uintreg_t syscallno, uintreg_t a1,
 		[SYS_rmdir] = (syscall_t)sys_rmdir,
 		[SYS_gettimeofday] = (syscall_t)sys_gettimeofday,
 		[SYS_tcgetattr] = (syscall_t)sys_tcgetattr,
-		[SYS_tcsetattr] = (syscall_t)sys_tcsetattr
+		[SYS_tcsetattr] = (syscall_t)sys_tcsetattr,
+		[SYS_setuid] = (syscall_t)sys_setuid,
+		[SYS_setgid] = (syscall_t)sys_setgid
 	};
 
 	const int max_syscall = sizeof(syscall_table)/sizeof(syscall_table[0]);
