@@ -1210,6 +1210,72 @@ intreg_t sys_setgid(struct proc *p, gid_t gid)
 
 /************** Syscall Invokation **************/
 
+const static struct sys_table_entry syscall_table[] = {
+	[SYS_null] = {(syscall_t)sys_null, "null"},
+	[SYS_cache_buster] = {(syscall_t)sys_cache_buster, "buster"},
+	[SYS_cache_invalidate] = {(syscall_t)sys_cache_invalidate, "wbinv"},
+	[SYS_reboot] = {(syscall_t)reboot, "reboot!"},
+	[SYS_cputs] = {(syscall_t)sys_cputs, "cputs"},
+	[SYS_cgetc] = {(syscall_t)sys_cgetc, "cgetc"},
+	[SYS_getcpuid] = {(syscall_t)sys_getcpuid, "getcpuid"},
+	[SYS_getvcoreid] = {(syscall_t)sys_getvcoreid, "getvcoreid"},
+	[SYS_getpid] = {(syscall_t)sys_getpid, "getpid"},
+	[SYS_proc_create] = {(syscall_t)sys_proc_create, "proc_create"},
+	[SYS_proc_run] = {(syscall_t)sys_proc_run, "proc_run"},
+	[SYS_proc_destroy] = {(syscall_t)sys_proc_destroy, "proc_destroy"},
+	[SYS_yield] = {(syscall_t)sys_proc_yield, "proc_yield"},
+	[SYS_fork] = {(syscall_t)sys_fork, "fork"},
+	[SYS_exec] = {(syscall_t)sys_exec, "exec"},
+	[SYS_trywait] = {(syscall_t)sys_trywait, "trywait"},
+	[SYS_mmap] = {(syscall_t)sys_mmap, "mmap"},
+	[SYS_munmap] = {(syscall_t)sys_munmap, "munmap"},
+	[SYS_mprotect] = {(syscall_t)sys_mprotect, "mprotect"},
+	[SYS_shared_page_alloc] = {(syscall_t)sys_shared_page_alloc, "pa"},
+	[SYS_shared_page_free] = {(syscall_t)sys_shared_page_free, "pf"},
+	[SYS_resource_req] = {(syscall_t)resource_req, "resource_req"},
+	[SYS_notify] = {(syscall_t)sys_notify, "notify"},
+	[SYS_self_notify] = {(syscall_t)sys_self_notify, "self_notify"},
+	[SYS_halt_core] = {(syscall_t)sys_halt_core, "halt_core"},
+#ifdef __CONFIG_SERIAL_IO__
+	[SYS_serial_read] = {(syscall_t)sys_serial_read, "ser_read"},
+	[SYS_serial_write] = {(syscall_t)sys_serial_write, "ser_write"},
+#endif
+#ifdef __CONFIG_NETWORKING__
+	[SYS_eth_read] = {(syscall_t)sys_eth_read, "eth_read"},
+	[SYS_eth_write] = {(syscall_t)sys_eth_write, "eth_write"},
+	[SYS_eth_get_mac_addr] = {(syscall_t)sys_eth_get_mac_addr, "get_mac"},
+	[SYS_eth_recv_check] = {(syscall_t)sys_eth_recv_check, "recv_check"},
+#endif
+#ifdef __CONFIG_ARSC_SERVER__
+	[SYS_init_arsc] = {(syscall_t)sys_init_arsc, "init_arsc"},
+#endif
+	[SYS_read] = {(syscall_t)sys_read, "read"},
+	[SYS_write] = {(syscall_t)sys_write, "write"},
+	[SYS_open] = {(syscall_t)sys_open, "open"},
+	[SYS_close] = {(syscall_t)sys_close, "close"},
+	[SYS_fstat] = {(syscall_t)sys_fstat, "fstat"},
+	[SYS_stat] = {(syscall_t)sys_stat, "stat"},
+	[SYS_lstat] = {(syscall_t)sys_lstat, "lstat"},
+	[SYS_fcntl] = {(syscall_t)sys_fcntl, "fcntl"},
+	[SYS_access] = {(syscall_t)sys_access, "access"},
+	[SYS_umask] = {(syscall_t)sys_umask, "umask"},
+	[SYS_chmod] = {(syscall_t)sys_chmod, "chmod"},
+	[SYS_lseek] = {(syscall_t)sys_lseek, "lseek"},
+	[SYS_link] = {(syscall_t)sys_link, "link"},
+	[SYS_unlink] = {(syscall_t)sys_unlink, "unlink"},
+	[SYS_symlink] = {(syscall_t)sys_symlink, "symlink"},
+	[SYS_readlink] = {(syscall_t)sys_readlink, "readlink"},
+	[SYS_chdir] = {(syscall_t)sys_chdir, "chdir"},
+	[SYS_getcwd] = {(syscall_t)sys_getcwd, "getcwd"},
+	[SYS_mkdir] = {(syscall_t)sys_mkdir, "mkdri"},
+	[SYS_rmdir] = {(syscall_t)sys_rmdir, "rmdir"},
+	[SYS_gettimeofday] = {(syscall_t)sys_gettimeofday, "gettime"},
+	[SYS_tcgetattr] = {(syscall_t)sys_tcgetattr, "tcgetattr"},
+	[SYS_tcsetattr] = {(syscall_t)sys_tcsetattr, "tcsetattr"},
+	[SYS_setuid] = {(syscall_t)sys_setuid, "setuid"},
+	[SYS_setgid] = {(syscall_t)sys_setgid, "setgid"}
+};
+
 /* Executes the given syscall.
  *
  * Note tf is passed in, which points to the tf of the context on the kernel
@@ -1225,86 +1291,18 @@ intreg_t syscall(struct proc *p, uintreg_t syscallno, uintreg_t a1,
 	set_retval(ESUCCESS);
 	set_errno(ESUCCESS);
 
-	typedef intreg_t (*syscall_t)(struct proc*,uintreg_t,uintreg_t,
-	                              uintreg_t,uintreg_t,uintreg_t);
-
-	const static syscall_t syscall_table[] = {
-		[SYS_null] = (syscall_t)sys_null,
-		[SYS_cache_buster] = (syscall_t)sys_cache_buster,
-		[SYS_cache_invalidate] = (syscall_t)sys_cache_invalidate,
-		[SYS_reboot] = (syscall_t)reboot,
-		[SYS_cputs] = (syscall_t)sys_cputs,
-		[SYS_cgetc] = (syscall_t)sys_cgetc,
-		[SYS_getcpuid] = (syscall_t)sys_getcpuid,
-		[SYS_getvcoreid] = (syscall_t)sys_getvcoreid,
-		[SYS_getpid] = (syscall_t)sys_getpid,
-		[SYS_proc_create] = (syscall_t)sys_proc_create,
-		[SYS_proc_run] = (syscall_t)sys_proc_run,
-		[SYS_proc_destroy] = (syscall_t)sys_proc_destroy,
-		[SYS_yield] = (syscall_t)sys_proc_yield,
-		[SYS_fork] = (syscall_t)sys_fork,
-		[SYS_exec] = (syscall_t)sys_exec,
-		[SYS_trywait] = (syscall_t)sys_trywait,
-		[SYS_mmap] = (syscall_t)sys_mmap,
-		[SYS_munmap] = (syscall_t)sys_munmap,
-		[SYS_mprotect] = (syscall_t)sys_mprotect,
-		[SYS_shared_page_alloc] = (syscall_t)sys_shared_page_alloc,
-		[SYS_shared_page_free] = (syscall_t)sys_shared_page_free,
-		[SYS_resource_req] = (syscall_t)resource_req,
-		[SYS_notify] = (syscall_t)sys_notify,
-		[SYS_self_notify] = (syscall_t)sys_self_notify,
-		[SYS_halt_core] = (syscall_t)sys_halt_core,
-	#ifdef __CONFIG_SERIAL_IO__
-		[SYS_serial_read] = (syscall_t)sys_serial_read,
-		[SYS_serial_write] = (syscall_t)sys_serial_write,
-	#endif
-	#ifdef __CONFIG_NETWORKING__
-		[SYS_eth_read] = (syscall_t)sys_eth_read,
-		[SYS_eth_write] = (syscall_t)sys_eth_write,
-		[SYS_eth_get_mac_addr] = (syscall_t)sys_eth_get_mac_addr,
-		[SYS_eth_recv_check] = (syscall_t)sys_eth_recv_check,
-	#endif
-	#ifdef __CONFIG_ARSC_SERVER__
-		[SYS_init_arsc] = (syscall_t)sys_init_arsc,
-	#endif
-		// Syscalls serviced by the appserver for now.
-		[SYS_read] = (syscall_t)sys_read,
-		[SYS_write] = (syscall_t)sys_write,
-		[SYS_open] = (syscall_t)sys_open,
-		[SYS_close] = (syscall_t)sys_close,
-		[SYS_fstat] = (syscall_t)sys_fstat,
-		[SYS_stat] = (syscall_t)sys_stat,
-		[SYS_lstat] = (syscall_t)sys_lstat,
-		[SYS_fcntl] = (syscall_t)sys_fcntl,
-		[SYS_access] = (syscall_t)sys_access,
-		[SYS_umask] = (syscall_t)sys_umask,
-		[SYS_chmod] = (syscall_t)sys_chmod,
-		[SYS_lseek] = (syscall_t)sys_lseek,
-		[SYS_link] = (syscall_t)sys_link,
-		[SYS_unlink] = (syscall_t)sys_unlink,
-		[SYS_symlink] = (syscall_t)sys_symlink,
-		[SYS_readlink] = (syscall_t)sys_readlink,
-		[SYS_chdir] = (syscall_t)sys_chdir,
-		[SYS_getcwd] = (syscall_t)sys_getcwd,
-		[SYS_mkdir] = (syscall_t)sys_mkdir,
-		[SYS_rmdir] = (syscall_t)sys_rmdir,
-		[SYS_gettimeofday] = (syscall_t)sys_gettimeofday,
-		[SYS_tcgetattr] = (syscall_t)sys_tcgetattr,
-		[SYS_tcsetattr] = (syscall_t)sys_tcsetattr,
-		[SYS_setuid] = (syscall_t)sys_setuid,
-		[SYS_setgid] = (syscall_t)sys_setgid
-	};
-
 	const int max_syscall = sizeof(syscall_table)/sizeof(syscall_table[0]);
 
 	uint32_t coreid, vcoreid;
 	if (systrace_flags & SYSTRACE_ON) {
 		if ((systrace_flags & SYSTRACE_ALLPROC) || (proc_is_traced(p))) {
 			coreid = core_id();
-			vcoreid = proc_get_vcoreid(p, core_id());
+			vcoreid = proc_get_vcoreid(p, coreid);
 			if (systrace_flags & SYSTRACE_LOUD) {
-				printk("[%16llu] Syscall %d for proc %d on core %d, vcore %d\n",
-				       read_tsc(), syscallno, p->pid, coreid, vcoreid);
+				printk("[%16llu] Syscall %3d (%12s):(%08p, %08p, %08p, %08p, "
+				       "%08p) proc: %d core: %d vcore: %d\n", read_tsc(),
+				       syscallno, syscall_table[syscallno].name, a1, a2, a3,
+				       a4, a5, p->pid, coreid, vcoreid);
 			} else {
 				struct systrace_record *trace;
 				unsigned int idx, new_idx;
@@ -1315,6 +1313,11 @@ intreg_t syscall(struct proc *p, uintreg_t syscallno, uintreg_t a1,
 				trace = &systrace_buffer[idx];
 				trace->timestamp = read_tsc();
 				trace->syscallno = syscallno;
+				trace->arg1 = a1;
+				trace->arg2 = a2;
+				trace->arg3 = a3;
+				trace->arg4 = a4;
+				trace->arg5 = a5;
 				trace->pid = p->pid;
 				trace->coreid = coreid;
 				trace->vcoreid = vcoreid;
@@ -1325,10 +1328,10 @@ intreg_t syscall(struct proc *p, uintreg_t syscallno, uintreg_t a1,
 	//       " a2: %x\n    a3: %x\n    a4: %x\n    a5: %x\n", core_id(),
 	//       syscallno, a1, a2, a3, a4, a5);
 
-	if(syscallno > max_syscall || syscall_table[syscallno] == NULL)
+	if (syscallno > max_syscall || syscall_table[syscallno].call == NULL)
 		panic("Invalid syscall number %d for proc %x!", syscallno, *p);
 
-	return syscall_table[syscallno](p,a1,a2,a3,a4,a5);
+	return syscall_table[syscallno].call(p, a1, a2, a3, a4, a5);
 }
 
 /* Syscall tracing */
@@ -1415,9 +1418,16 @@ void systrace_print(bool all, struct proc *p)
 	 * timestamp and loop around.  Careful of concurrent writes. */
 	for (int i = 0; i < systrace_bufsize; i++)
 		if (systrace_buffer[i].timestamp)
-			printk("[%16llu] Syscall %d for proc %d on core %d, vcore %d\n",
+			printk("[%16llu] Syscall %3d (%12s):(%08p, %08p, %08p, %08p, "
+			       "%08p) proc: %d core: %d vcore: %d\n",
 			       systrace_buffer[i].timestamp,
 			       systrace_buffer[i].syscallno,
+			       syscall_table[systrace_buffer[i].syscallno].name,
+			       systrace_buffer[i].arg1,
+			       systrace_buffer[i].arg2,
+			       systrace_buffer[i].arg3,
+			       systrace_buffer[i].arg4,
+			       systrace_buffer[i].arg5,
 			       systrace_buffer[i].pid,
 			       systrace_buffer[i].coreid,
 			       systrace_buffer[i].vcoreid);
@@ -1427,7 +1437,7 @@ void systrace_print(bool all, struct proc *p)
 void systrace_clear_buffer(void)
 {
 	spin_lock_irqsave(&systrace_lock);
-	memset(systrace_buffer, 0, sizeof(struct systrace_record)*MAX_NUM_TRACED);
+	memset(systrace_buffer, 0, sizeof(struct systrace_record) * MAX_SYSTRACES);
 	spin_unlock_irqsave(&systrace_lock);
 }
 

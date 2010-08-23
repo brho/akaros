@@ -20,6 +20,11 @@
 struct systrace_record {
 	uint64_t		timestamp;
 	uintreg_t		syscallno;
+	uintreg_t		arg1;
+	uintreg_t		arg2;
+	uintreg_t		arg3;
+	uintreg_t		arg4;
+	uintreg_t		arg5;
 	int				pid;
 	uint32_t		coreid;
 	uint32_t		vcoreid;
@@ -30,6 +35,15 @@ struct sys_return {
 	uint32_t *errno_loc;
 };
 
+/* Syscall table */
+typedef intreg_t (*syscall_t)(struct proc *, uintreg_t, uintreg_t, uintreg_t,
+                              uintreg_t, uintreg_t);
+struct sys_table_entry {
+	syscall_t call;
+	char *name;
+};
+const static struct sys_table_entry syscall_table[];
+/* Syscall invocation */
 intreg_t syscall(struct proc *p, uintreg_t num, uintreg_t a1, uintreg_t a2,
                  uintreg_t a3, uintreg_t a4, uintreg_t a5);
 
