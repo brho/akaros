@@ -7,6 +7,7 @@
 #include <arc.h>
 #include <errno.h>
 #include <arch/arch.h>
+#include <sys/param.h>
 
 syscall_front_ring_t syscallfrontring;
 sysevent_back_ring_t syseventbackring;

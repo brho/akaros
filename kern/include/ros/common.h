@@ -32,7 +32,7 @@ typedef size_t uintreg_t;
 	for (int _var = 0, var = (next); _var < (size); _var++, var = (var + 1) % (size))
 
 // Efficient min and max operations
-//#ifdef ROS_KERNEL
+#ifdef ROS_KERNEL /* Glibc has their own */
 #define MIN(_a, _b)						\
 ({								\
 	typeof(_a) __a = (_a);					\
@@ -45,7 +45,7 @@ typedef size_t uintreg_t;
 	typeof(_b) __b = (_b);					\
 	__a >= __b ? __a : __b;					\
 })
-//#endif
+#endif
 
 // Rounding operations (efficient when n is a power of 2)
 // Round down to the nearest multiple of n
