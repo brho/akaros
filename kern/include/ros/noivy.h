@@ -22,7 +22,9 @@
 #define SOMEREGION         
 #define SAMEREGION         
 #define DELETES_REGION(r)  
-#define GROUP(g)           
+#ifdef ROS_KERNEL
+# define GROUP(g)           
+#endif
 #define NOGROUP            
 #define SOMEGROUP          
 #define SAMEGROUP          

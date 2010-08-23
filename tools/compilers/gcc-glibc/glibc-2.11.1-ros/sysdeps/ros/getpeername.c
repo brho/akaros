@@ -17,20 +17,19 @@
    02111-1307 USA.  */
 
 #include <errno.h>
-#include <unistd.h>
-#include <paths.h>
-#include <stdlib.h>
-#include <stdarg.h>
-#include <string.h>
-#include <sys/stat.h>
-#include <ros/syscall.h>
+#include <sys/socket.h>
 
-/* Return 1 if FD is a terminal, 0 if not.  */
+/* Put the address of the peer connected to socket FD into *ADDR
+   (which is *LEN bytes long), and its actual length into *LEN.  */
 int
-__isatty (int fd)
+__getpeername (fd, addr, len)
+     int fd;
+     __SOCKADDR_ARG addr;
+     socklen_t *len;
 {
-  struct stat s;
-  int ret = fstat(fd,&s);
-  return ret < 0 ? -1 : ((s.st_mode & S_IFCHR) ? 1 : 0);
+  __set_errno (ENOSYS);
+  return -1;
 }
-weak_alias (__isatty, isatty)
+weak_alias (__getpeername, getpeername)
+stub_warning (getpeername)
+#include <stub-tag.h>

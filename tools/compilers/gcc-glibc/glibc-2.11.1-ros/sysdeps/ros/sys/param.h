@@ -7,7 +7,14 @@
 
 #include <limits.h>
 
+/* ROS note: similar to other sysdeps params.h, we pull what we need. */
+
 #define NBBY CHAR_BIT
+
+/* These seem like the linux defaults */
+#ifndef	NGROUPS
+# define NGROUPS	NGROUPS_MAX
+#endif
 
 /* Bit map related macros.  */
 #define setbit(a,i)     ((a)[(i)/NBBY] |= 1<<((i)%NBBY))

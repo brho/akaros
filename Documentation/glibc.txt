@@ -1,0 +1,135 @@
+glibc.txt:
+Barret Rhoden
+Last updated: 2010-08-22
+----------------------------------------------
+This document is an attempt to gather knowledge about how to work with the
+glibc port.  This is based on my half-assed struggling with the port done by
+kevin and andrew.
+
+When to recompile (other than when changing libc)
+--------------------------
+Whenever you change a kernel header (something in kern/include/ros),
+technically you should rebuild.  It isn't critical in all places, such as for
+files that aren't included by glibc, or for files that haven't changed
+something that glibc relies on.
+
+After any recompile, don't forget to rebuild userspace apps (make userclean,
+make install-libs) and to refresh your FS.
+
+How to recompile glibc
+--------------------------
+Normally, make x86 (or whatever) works fairly well.  However, sometimes you
+need to rebuild all of glibc.  This might be on a hunch, or to get rid of
+things that might have compiled, but are failing to link and don't seem to
+rebuild.
+
+In this event, the next step is to remove the build directories
+(i686-ros-glibc-*) and also the hidden files (.i686-ros-glibc*).  If you get
+errors from make very early on about not finding some targets (such as
+install-headers), you forgot to delete the hidden files.
+
+Then next step up would be to remove the glibc-XXX folder (whatever the
+version is).  Sometimes you aren't sure if old changes are sitting around in
+this folder that aren't getting overwritten by the real source of our changes,
+the -ros folder.  A lovely example of this is an old Makefile for the nss
+subdir.  It was altered to remove some things, notably the files service,
+which translates into libnss_files - which is needed by other things (nis,
+etc).  To fix this, I had to notice an -ros version of the Makefile (after I
+realized it was the problem), and that the Makefile was being included - it
+was just faulty.
+
+Finally, you can always make clean, but the overall XCC Makefile will clean
+everything - including gcc and binutils.
+
+Note that if you are making a trivial addition to a kernel header, you can get
+away with just copying it to its location in the XCC install directory
+(sys-include).
+
+The -ros folder
+--------------------------
+All changes to glibc must be made in the glibc-XXX-ros folder.  Any changes
+here will be copied over to the real glibc folder when it is made.  If you
+want to remove a file that was originally in the -ros folder, you need to
+manually remove it from the glibc-XXX folder as well.  The updating scripts
+will not remove a file.
+
+The sysdeps folder
+--------------------------
+Most of your changes will go here.  Every system that has a glibc port should
+have one of these folders, with its system-specific ports.  The files here are
+normally files expected elsewhere in libc, and the glibc build system knows to
+look in these places.
+
+Simply dropping a file in here will not get it built.  It will for many files,
+but some others that weren't expected will need to be manually added to a
+Makefile.  If you notice some files not getting compiled, (drop a #error in
+there), you'll need to add it to a Makefile.  In the main sysdeps/Makefile,
+add the filename (minus .c) to the sysdeps var.  Look at sa_len for an
+example.  Sometimes you'll need to be careful about adding it for some
+subdirectories and not others (you probably only want to add a C file for one
+subdir).  Check out Linux's port for help.
+
+Sometimes you have files that you want to change outside of the sysdeps
+folder.  These still go in the glibc-XXX-ros folder, but not in sysdeps.  The
+main example we have right now is features.h.  At one point, I wanted to
+change sys/socket.h.  Simply adding it to sysdeps/ros/sys/socket.h would not
+change the main sys/socket.h, nor would the sysdep version get included first.
+Putting it in the -ros/sys/ folder did it (though ultimately I didn't want the
+change).  The point is, sysdeps doesn't mirror and override the main tree for
+all files - it is behind some others in the search/include path.
+
+Subdirs
+--------------------------
+As a note, these 'subdirectories' are the "primary folders" (i.e. addons),
+such as inet, ncsd, libio, whatever.  These are the root folders in glibc,
+representing some major functionality.  They can be built with the
+--enable-addons switch, which by default builds all of them.  Sort of!
+
+To really get them to even be available for a port, you need to "include" them
+in a certain manner.  There are two ways.  One is the Subdirs file in the
+sysdeps/ros/ directory.  Putting a subdir name in here means glibc will try to
+build it; it is available to be an addon.  Careful with these, since a lot of
+the folders tend to need each other (like most all of the ones in unix/inet).
+
+If you want a massive subsystem, such as "unix/inet" or "posix", you can add
+it to the sysdeps/ros/Implies file.  You will get a bunch of these folders at
+once, plus some other unspecified stuff (necessary for the overall system,
+perhaps?).  If you add "unix/inet", you get more than just its Subdirs.
+
+Also note that these subdirs can depend on each other, noted in the "Depends"
+file.  Presumably this will cause them to get made...
+
+Unimplemented Stubs
+--------------------------
+There are a lot of things we haven't ported, but we have the stub functions so
+that we can at least compile things against it.  When you compile (including
+regular programs), you'll get warnings about this.  
+
+Linux ASM bits
+--------------------------
+We've included some header files from Linux's kernel.  For now, we just need
+something to keep glibc happy, even though ROS doesn't have any networking
+syscalls.  Don't rely on this stuff too much.  These files, and other future
+glibc compatibility kernel headers, are in kern/include/ros/glibc-asm.
+
+Tips, Questions, and Misc Notes
+--------------------------
+- Grep and find are your friend.
+- Watch what Linux does.
+- The kernel headers end up getting installed to the sys-include/ directory,
+  while the regular glib headers go to the include directory.
+- atomic_swap might have issues (warnings about signedness differences)
+- It's not always clear which files in the -ros folder actually need to be
+  there (presumably they all do), and in what manner they were modified and
+  from which original copy.  Ideally, the ROS-specific changes to large files
+  will be commented.
+- the SHARED flag is a bit of a mess - things get compiled differently for
+  shared vs static, and it can get complicated with start.c, tls.c, etc.
+- What things in one file rely heavily on another file?  Are there non-obvious
+  gotchas?  (yes, and no one documented them).
+
+Ghetto Things (Feel free to fix them):
+--------------------------
+- ptsname: we needed to have the sysdep (was being looked for by the login
+  subdir make process), but having the actual functions in it caused a link
+  error (multiple declarations).  So we have an empty file...

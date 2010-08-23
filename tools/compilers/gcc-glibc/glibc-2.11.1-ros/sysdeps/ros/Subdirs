@@ -1,0 +1,8 @@
+nss
+inet
+resolv
+sunrpc
+nis
+nscd
+streams
+login

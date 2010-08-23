@@ -1,5 +1,6 @@
-/* System-specific socket constants and types.  Generic/4.3 BSD version.
-   Copyright (C) 1991,92,1994-1999,2000,2001 Free Software Foundation, Inc.
+/* System-specific socket constants and types.  Linux version.
+   Copyright (C) 1991, 1992, 1994-2001, 2004, 2006, 2007, 2008, 2009
+   Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -18,28 +19,25 @@
    02111-1307 USA.  */
 
 #ifndef __BITS_SOCKET_H
-#define __BITS_SOCKET_H	1
+#define __BITS_SOCKET_H
 
-struct cmsghdr
-{
-};
-
-#if !defined _SYS_SOCKET_H && !defined _NETINET_IN_H
+#ifndef _SYS_SOCKET_H
 # error "Never include <bits/socket.h> directly; use <sys/socket.h> instead."
 #endif
 
-#include <limits.h>
-#include <bits/types.h>
+/* ROS note: we're including this file from the linux port.  We changed the asm
+ * include to ros/glibc-asm. */
 
 #define	__need_size_t
 #include <stddef.h>
+
+#include <sys/types.h>
 
 /* Type for length arguments in socket calls.  */
 #ifndef __socklen_t_defined
 typedef __socklen_t socklen_t;
 # define __socklen_t_defined
 #endif
-
 
 /* Types of sockets.  */
 enum __socket_type
@@ -54,43 +52,67 @@ enum __socket_type
 #define SOCK_RAW SOCK_RAW
   SOCK_RDM = 4,			/* Reliably-delivered messages.  */
 #define SOCK_RDM SOCK_RDM
-  SOCK_SEQPACKET = 5		/* Sequenced, reliable, connection-based,
+  SOCK_SEQPACKET = 5,		/* Sequenced, reliable, connection-based,
 				   datagrams of fixed maximum length.  */
 #define SOCK_SEQPACKET SOCK_SEQPACKET
+  SOCK_DCCP = 6,		/* Datagram Congestion Control Protocol.  */
+#define SOCK_DCCP SOCK_DCCP
+  SOCK_PACKET = 10,		/* Linux specific way of getting packets
+				   at the dev level.  For writing rarp and
+				   other similar things on the user level. */
+#define SOCK_PACKET SOCK_PACKET
+
+  /* Flags to be ORed into the type parameter of socket and socketpair and
+     used for the flags parameter of paccept.  */
+
+  SOCK_CLOEXEC = 02000000,	/* Atomically set close-on-exec flag for the
+				   new descriptor(s).  */
+#define SOCK_CLOEXEC SOCK_CLOEXEC
+  SOCK_NONBLOCK = 04000		/* Atomically mark descriptor(s) as
+				   non-blocking.  */
+#define SOCK_NONBLOCK SOCK_NONBLOCK
 };
 
 /* Protocol families.  */
 #define	PF_UNSPEC	0	/* Unspecified.  */
 #define	PF_LOCAL	1	/* Local to host (pipes and file-domain).  */
-#define	PF_UNIX		PF_LOCAL /* Old BSD name for PF_LOCAL.  */
-#define	PF_FILE		PF_LOCAL /* POSIX name for PF_LOCAL.  */
+#define	PF_UNIX		PF_LOCAL /* POSIX name for PF_LOCAL.  */
+#define	PF_FILE		PF_LOCAL /* Another non-standard name for PF_LOCAL.  */
 #define	PF_INET		2	/* IP protocol family.  */
-#define	PF_IMPLINK	3	/* ARPAnet IMP protocol.  */
-#define	PF_PUP		4	/* PUP protocols.  */
-#define	PF_CHAOS	5	/* MIT Chaos protocols.  */
-#define	PF_NS		6	/* Xerox NS protocols.  */
-#define	PF_ISO		7	/* ISO protocols.  */
-#define	PF_OSI		PF_ISO
-#define	PF_ECMA		8	/* ECMA protocols.  */
-#define	PF_DATAKIT	9	/* AT&T Datakit protocols.  */
-#define	PF_CCITT	10	/* CCITT protocols (X.25 et al).  */
-#define	PF_SNA		11	/* IBM SNA protocol.  */
-#define	PF_DECnet	12	/* DECnet protocols.  */
-#define	PF_DLI		13	/* Direct data link interface.  */
-#define	PF_LAT		14	/* DEC Local Area Transport protocol.  */
-#define	PF_HYLINK	15	/* NSC Hyperchannel protocol.  */
-#define	PF_APPLETALK	16	/* Don't use this.  */
-#define	PF_ROUTE	17	/* Internal Routing Protocol.  */
-#define	PF_LINK		18	/* Link layer interface.  */
-#define	PF_XTP		19	/* eXpress Transfer Protocol (no AF).  */
-#define	PF_COIP		20	/* Connection-oriented IP, aka ST II.  */
-#define	PF_CNT		21	/* Computer Network Technology.  */
-#define PF_RTIP		22	/* Help Identify RTIP packets.  **/
-#define	PF_IPX		23	/* Novell Internet Protocol.  */
-#define	PF_SIP		24	/* Simple Internet Protocol.  */
-#define PF_PIP		25	/* Help Identify PIP packets.  */
-#define PF_INET6	26	/* IP version 6.  */
-#define	PF_MAX		27
+#define	PF_AX25		3	/* Amateur Radio AX.25.  */
+#define	PF_IPX		4	/* Novell Internet Protocol.  */
+#define	PF_APPLETALK	5	/* Appletalk DDP.  */
+#define	PF_NETROM	6	/* Amateur radio NetROM.  */
+#define	PF_BRIDGE	7	/* Multiprotocol bridge.  */
+#define	PF_ATMPVC	8	/* ATM PVCs.  */
+#define	PF_X25		9	/* Reserved for X.25 project.  */
+#define	PF_INET6	10	/* IP version 6.  */
+#define	PF_ROSE		11	/* Amateur Radio X.25 PLP.  */
+#define	PF_DECnet	12	/* Reserved for DECnet project.  */
+#define	PF_NETBEUI	13	/* Reserved for 802.2LLC project.  */
+#define	PF_SECURITY	14	/* Security callback pseudo AF.  */
+#define	PF_KEY		15	/* PF_KEY key management API.  */
+#define	PF_NETLINK	16
+#define	PF_ROUTE	PF_NETLINK /* Alias to emulate 4.4BSD.  */
+#define	PF_PACKET	17	/* Packet family.  */
+#define	PF_ASH		18	/* Ash.  */
+#define	PF_ECONET	19	/* Acorn Econet.  */
+#define	PF_ATMSVC	20	/* ATM SVCs.  */
+#define PF_RDS		21	/* RDS sockets.  */
+#define	PF_SNA		22	/* Linux SNA Project */
+#define	PF_IRDA		23	/* IRDA sockets.  */
+#define	PF_PPPOX	24	/* PPPoX sockets.  */
+#define	PF_WANPIPE	25	/* Wanpipe API sockets.  */
+#define PF_LLC		26	/* Linux LLC.  */
+#define PF_CAN		29	/* Controller Area Network.  */
+#define PF_TIPC		30	/* TIPC sockets.  */
+#define	PF_BLUETOOTH	31	/* Bluetooth sockets.  */
+#define	PF_IUCV		32	/* IUCV sockets.  */
+#define PF_RXRPC	33	/* RxRPC sockets.  */
+#define PF_ISDN		34	/* mISDN sockets.  */
+#define PF_PHONET	35	/* Phonet sockets.  */
+#define PF_IEEE802154	36	/* IEEE 802.15.4 sockets.  */
+#define	PF_MAX		37	/* For now..  */
 
 /* Address families.  */
 #define	AF_UNSPEC	PF_UNSPEC
@@ -98,33 +120,55 @@ enum __socket_type
 #define	AF_UNIX		PF_UNIX
 #define	AF_FILE		PF_FILE
 #define	AF_INET		PF_INET
-#define	AF_IMPLINK	PF_IMPLINK
-#define	AF_PUP		PF_PUP
-#define	AF_CHAOS	PF_CHAOS
-#define	AF_NS		PF_NS
-#define	AF_ISO		PF_ISO
-#define	AF_OSI		PF_OSI
-#define	AF_ECMA		PF_ECMA
-#define	AF_DATAKIT	PF_DATAKIT
-#define	AF_CCITT	PF_CCITT
-#define	AF_SNA		PF_SNA
-#define	AF_DECnet	PF_DECnet
-#define	AF_DLI		PF_DLI
-#define	AF_LAT		PF_LAT
-#define	AF_HYLINK	PF_HYLINK
-#define	AF_APPLETALK	PF_APPLETALK
-#define	AF_ROUTE	PF_ROUTE
-#define	AF_LINK		PF_LINK
-#define	pseudo_AF_XTP	PF_XTP
-#define	AF_COIP		PF_COIP
-#define	AF_CNT		PF_CNT
-#define pseudo_AF_RTIP	PF_RTIP
+#define	AF_AX25		PF_AX25
 #define	AF_IPX		PF_IPX
-#define	AF_SIP		PF_SIP
-#define pseudo_AF_PIP	PF_PIP
-#define AF_INET6	PF_INET6
+#define	AF_APPLETALK	PF_APPLETALK
+#define	AF_NETROM	PF_NETROM
+#define	AF_BRIDGE	PF_BRIDGE
+#define	AF_ATMPVC	PF_ATMPVC
+#define	AF_X25		PF_X25
+#define	AF_INET6	PF_INET6
+#define	AF_ROSE		PF_ROSE
+#define	AF_DECnet	PF_DECnet
+#define	AF_NETBEUI	PF_NETBEUI
+#define	AF_SECURITY	PF_SECURITY
+#define	AF_KEY		PF_KEY
+#define	AF_NETLINK	PF_NETLINK
+#define	AF_ROUTE	PF_ROUTE
+#define	AF_PACKET	PF_PACKET
+#define	AF_ASH		PF_ASH
+#define	AF_ECONET	PF_ECONET
+#define	AF_ATMSVC	PF_ATMSVC
+#define AF_RDS		PF_RDS
+#define	AF_SNA		PF_SNA
+#define	AF_IRDA		PF_IRDA
+#define	AF_PPPOX	PF_PPPOX
+#define	AF_WANPIPE	PF_WANPIPE
+#define AF_LLC		PF_LLC
+#define AF_CAN		PF_CAN
+#define AF_TIPC		PF_TIPC
+#define	AF_BLUETOOTH	PF_BLUETOOTH
+#define	AF_IUCV		PF_IUCV
+#define AF_RXRPC	PF_RXRPC
+#define AF_ISDN		PF_ISDN
+#define AF_PHONET	PF_PHONET
+#define AF_IEEE802154	PF_IEEE802154
 #define	AF_MAX		PF_MAX
 
+/* Socket level values.  Others are defined in the appropriate headers.
+
+   XXX These definitions also should go into the appropriate headers as
+   far as they are available.  */
+#define SOL_RAW		255
+#define SOL_DECNET      261
+#define SOL_X25         262
+#define SOL_PACKET	263
+#define SOL_ATM		264	/* ATM layer (cell level).  */
+#define SOL_AAL		265	/* ATM Adaption Layer (packet level).  */
+#define SOL_IRDA	266
+
+/* Maximum queue length specifiable by listen.  */
+#define SOMAXCONN	128
 
 /* Get the definition of the macro to define the common sockaddr members.  */
 #include <bits/sockaddr.h>
@@ -139,11 +183,7 @@ struct sockaddr
 
 /* Structure large enough to hold any socket address (with the historical
    exception of AF_UNIX).  We reserve 128 bytes.  */
-#if ULONG_MAX > 0xffffffff
-# define __ss_aligntype	__uint64_t
-#else
-# define __ss_aligntype	__uint32_t
-#endif
+#define __ss_aligntype	unsigned long int
 #define _SS_SIZE	128
 #define _SS_PADSIZE	(_SS_SIZE - (2 * sizeof (__ss_aligntype)))
 
@@ -159,21 +199,47 @@ struct sockaddr_storage
 enum
   {
     MSG_OOB		= 0x01,	/* Process out-of-band data.  */
-#define MSG_OOB MSG_OOB
+#define MSG_OOB		MSG_OOB
     MSG_PEEK		= 0x02,	/* Peek at incoming messages.  */
-#define MSG_PEEK MSG_PEEK
+#define MSG_PEEK	MSG_PEEK
     MSG_DONTROUTE	= 0x04,	/* Don't use local routing.  */
-#define MSG_DONTROUTE MSG_DONTROUTE
-    MSG_EOR		= 0x08,	/* Data completes record.  */
-#define MSG_EOR MSG_EOR
-    MSG_TRUNC		= 0x10,	/* Data discarded before delivery.  */
-#define MSG_TRUNC MSG_TRUNC
-    MSG_CTRUNC		= 0x20,	/* Control data lost before delivery.  */
-#define MSG_CTRUNC MSG_CTRUNC
-    MSG_WAITALL		= 0x40,	/* Wait for full request or error.  */
-#define MSG_WAITALL MSG_WAITALL
-    MSG_DONTWAIT	= 0x80	/* This message should be nonblocking.  */
-#define MSG_DONTWAIT MSG_DONTWAIT
+#define MSG_DONTROUTE	MSG_DONTROUTE
+#ifdef __USE_GNU
+    /* DECnet uses a different name.  */
+    MSG_TRYHARD		= MSG_DONTROUTE,
+# define MSG_TRYHARD	MSG_DONTROUTE
+#endif
+    MSG_CTRUNC		= 0x08,	/* Control data lost before delivery.  */
+#define MSG_CTRUNC	MSG_CTRUNC
+    MSG_PROXY		= 0x10,	/* Supply or ask second address.  */
+#define MSG_PROXY	MSG_PROXY
+    MSG_TRUNC		= 0x20,
+#define	MSG_TRUNC	MSG_TRUNC
+    MSG_DONTWAIT	= 0x40, /* Nonblocking IO.  */
+#define	MSG_DONTWAIT	MSG_DONTWAIT
+    MSG_EOR		= 0x80, /* End of record.  */
+#define	MSG_EOR		MSG_EOR
+    MSG_WAITALL		= 0x100, /* Wait for a full request.  */
+#define	MSG_WAITALL	MSG_WAITALL
+    MSG_FIN		= 0x200,
+#define	MSG_FIN		MSG_FIN
+    MSG_SYN		= 0x400,
+#define	MSG_SYN		MSG_SYN
+    MSG_CONFIRM		= 0x800, /* Confirm path validity.  */
+#define	MSG_CONFIRM	MSG_CONFIRM
+    MSG_RST		= 0x1000,
+#define	MSG_RST		MSG_RST
+    MSG_ERRQUEUE	= 0x2000, /* Fetch message from error queue.  */
+#define	MSG_ERRQUEUE	MSG_ERRQUEUE
+    MSG_NOSIGNAL	= 0x4000, /* Do not generate SIGPIPE.  */
+#define	MSG_NOSIGNAL	MSG_NOSIGNAL
+    MSG_MORE		= 0x8000,  /* Sender will send more.  */
+#define	MSG_MORE	MSG_MORE
+
+    MSG_CMSG_CLOEXEC	= 0x40000000	/* Set close_on_exit for file
+                                           descriptor received through
+                                           SCM_RIGHTS.  */
+#define MSG_CMSG_CLOEXEC MSG_CMSG_CLOEXEC
   };
 
 
@@ -181,69 +247,157 @@ enum
    `sendmsg' and received by `recvmsg'.  */
 struct msghdr
   {
-    __ptr_t msg_name;		/* Address to send to/receive from.  */
+    void *msg_name;		/* Address to send to/receive from.  */
     socklen_t msg_namelen;	/* Length of address data.  */
 
     struct iovec *msg_iov;	/* Vector of data to send/receive into.  */
-    int msg_iovlen;		/* Number of elements in the vector.  */
+    size_t msg_iovlen;		/* Number of elements in the vector.  */
 
-    __ptr_t msg_accrights;	/* Access rights information.  */
-    socklen_t msg_accrightslen;	/* Length of access rights information.  */
+    void *msg_control;		/* Ancillary data (eg BSD filedesc passing). */
+    size_t msg_controllen;	/* Ancillary data buffer length.
+				   !! The type should be socklen_t but the
+				   definition of the kernel is incompatible
+				   with this.  */
 
-    int msg_flags;		/* Flags in received message.  */
+    int msg_flags;		/* Flags on received message.  */
   };
 
+/* Structure used for storage of ancillary data object information.  */
+struct cmsghdr
+  {
+    size_t cmsg_len;		/* Length of data in cmsg_data plus length
+				   of cmsghdr structure.
+				   !! The type should be socklen_t but the
+				   definition of the kernel is incompatible
+				   with this.  */
+    int cmsg_level;		/* Originating protocol.  */
+    int cmsg_type;		/* Protocol specific type.  */
+#if (!defined __STRICT_ANSI__ && __GNUC__ >= 2) || __STDC_VERSION__ >= 199901L
+    __extension__ unsigned char __cmsg_data __flexarr; /* Ancillary data.  */
+#endif
+  };
 
-/* Protocol number used to manipulate socket-level options
-   with `getsockopt' and `setsockopt'.  */
-#define	SOL_SOCKET	0xffff
+/* Ancillary data object manipulation macros.  */
+#if (!defined __STRICT_ANSI__ && __GNUC__ >= 2) || __STDC_VERSION__ >= 199901L
+# define CMSG_DATA(cmsg) ((cmsg)->__cmsg_data)
+#else
+# define CMSG_DATA(cmsg) ((unsigned char *) ((struct cmsghdr *) (cmsg) + 1))
+#endif
+#define CMSG_NXTHDR(mhdr, cmsg) __cmsg_nxthdr (mhdr, cmsg)
+#define CMSG_FIRSTHDR(mhdr) \
+  ((size_t) (mhdr)->msg_controllen >= sizeof (struct cmsghdr)		      \
+   ? (struct cmsghdr *) (mhdr)->msg_control : (struct cmsghdr *) 0)
+#define CMSG_ALIGN(len) (((len) + sizeof (size_t) - 1) \
+			 & (size_t) ~(sizeof (size_t) - 1))
+#define CMSG_SPACE(len) (CMSG_ALIGN (len) \
+			 + CMSG_ALIGN (sizeof (struct cmsghdr)))
+#define CMSG_LEN(len)   (CMSG_ALIGN (sizeof (struct cmsghdr)) + (len))
 
-/* Socket-level options for `getsockopt' and `setsockopt'.  */
+extern struct cmsghdr *__cmsg_nxthdr (struct msghdr *__mhdr,
+				      struct cmsghdr *__cmsg) __THROW;
+#ifdef __USE_EXTERN_INLINES
+# ifndef _EXTERN_INLINE
+#  define _EXTERN_INLINE __extern_inline
+# endif
+_EXTERN_INLINE struct cmsghdr *
+__NTH (__cmsg_nxthdr (struct msghdr *__mhdr, struct cmsghdr *__cmsg))
+{
+  if ((size_t) __cmsg->cmsg_len < sizeof (struct cmsghdr))
+    /* The kernel header does this so there may be a reason.  */
+    return 0;
+
+  __cmsg = (struct cmsghdr *) ((unsigned char *) __cmsg
+			       + CMSG_ALIGN (__cmsg->cmsg_len));
+  if ((unsigned char *) (__cmsg + 1) > ((unsigned char *) __mhdr->msg_control
+					+ __mhdr->msg_controllen)
+      || ((unsigned char *) __cmsg + CMSG_ALIGN (__cmsg->cmsg_len)
+	  > ((unsigned char *) __mhdr->msg_control + __mhdr->msg_controllen)))
+    /* No more entries.  */
+    return 0;
+  return __cmsg;
+}
+#endif	/* Use `extern inline'.  */
+
+/* Socket level message types.  This must match the definitions in
+   <linux/socket.h>.  */
 enum
   {
-    SO_DEBUG = 0x0001,		/* Record debugging information.  */
-#define SO_DEBUG SO_DEBUG
-    SO_ACCEPTCONN = 0x0002,	/* Accept connections on socket.  */
-#define SO_ACCEPTCONN SO_ACCEPTCONN
-    SO_REUSEADDR = 0x0004,	/* Allow reuse of local addresses.  */
-#define SO_REUSEADDR SO_REUSEADDR
-    SO_KEEPALIVE = 0x0008,	/* Keep connections alive and send
-				   SIGPIPE when they die.  */
-#define SO_KEEPALIVE SO_KEEPALIVE
-    SO_DONTROUTE = 0x0010,	/* Don't do local routing.  */
-#define SO_DONTROUTE SO_DONTROUTE
-    SO_BROADCAST = 0x0020,	/* Allow transmission of
-				   broadcast messages.  */
-#define SO_BROADCAST SO_BROADCAST
-    SO_USELOOPBACK = 0x0040,	/* Use the software loopback to avoid
-				   hardware use when possible.  */
-#define SO_USELOOPBACK SO_USELOOPBACK
-    SO_LINGER = 0x0080,		/* Block on close of a reliable
-				   socket to transmit pending data.  */
-#define SO_LINGER SO_LINGER
-    SO_OOBINLINE = 0x0100,	/* Receive out-of-band data in-band.  */
-#define SO_OOBINLINE SO_OOBINLINE
-    SO_REUSEPORT = 0x0200,	/* Allow local address and port reuse.  */
-#define SO_REUSEPORT SO_REUSEPORT
-    SO_SNDBUF = 0x1001,		/* Send buffer size.  */
-#define SO_SNDBUF SO_SNDBUF
-    SO_RCVBUF = 0x1002,		/* Receive buffer.  */
-#define SO_RCVBUF SO_RCVBUF
-    SO_SNDLOWAT = 0x1003,	/* Send low-water mark.  */
-#define SO_SNDLOWAT SO_SNDLOWAT
-    SO_RCVLOWAT = 0x1004,	/* Receive low-water mark.  */
-#define SO_RCVLOWAT SO_RCVLOWAT
-    SO_SNDTIMEO = 0x1005,	/* Send timeout.  */
-#define SO_SNDTIMEO SO_SNDTIMEO
-    SO_RCVTIMEO = 0x1006,	/* Receive timeout.  */
-#define SO_RCVTIMEO SO_RCVTIMEO
-    SO_ERROR = 0x1007,		/* Get and clear error status.  */
-#define SO_ERROR SO_ERROR
-    SO_STYLE = 0x1008,		/* Get socket connection style.  */
-#define SO_STYLE SO_STYLE
-    SO_TYPE = SO_STYLE		/* Compatible name for SO_STYLE.  */
-#define SO_TYPE SO_TYPE
+    SCM_RIGHTS = 0x01		/* Transfer file descriptors.  */
+#define SCM_RIGHTS SCM_RIGHTS
+#ifdef __USE_GNU
+    , SCM_CREDENTIALS = 0x02	/* Credentials passing.  */
+# define SCM_CREDENTIALS SCM_CREDENTIALS
+#endif
   };
+
+#ifdef __USE_GNU
+/* User visible structure for SCM_CREDENTIALS message */
+struct ucred
+{
+  pid_t pid;			/* PID of sending process.  */
+  uid_t uid;			/* UID of sending process.  */
+  gid_t gid;			/* GID of sending process.  */
+};
+#endif
+
+/* Ugly workaround for unclean kernel headers.  */
+#if !defined __USE_MISC && !defined __USE_GNU
+# ifndef FIOGETOWN
+#  define __SYS_SOCKET_H_undef_FIOGETOWN
+# endif
+# ifndef FIOSETOWN
+#  define __SYS_SOCKET_H_undef_FIOSETOWN
+# endif
+# ifndef SIOCATMARK
+#  define __SYS_SOCKET_H_undef_SIOCATMARK
+# endif
+# ifndef SIOCGPGRP
+#  define __SYS_SOCKET_H_undef_SIOCGPGRP
+# endif
+# ifndef SIOCGSTAMP
+#  define __SYS_SOCKET_H_undef_SIOCGSTAMP
+# endif
+# ifndef SIOCGSTAMPNS
+#  define __SYS_SOCKET_H_undef_SIOCGSTAMPNS
+# endif
+# ifndef SIOCSPGRP
+#  define __SYS_SOCKET_H_undef_SIOCSPGRP
+# endif
+#endif
+
+/* Get socket manipulation related informations from kernel headers.  */
+#include <ros/glibc-asm/socket.h>
+
+#if !defined __USE_MISC && !defined __USE_GNU
+# ifdef __SYS_SOCKET_H_undef_FIOGETOWN
+#  undef __SYS_SOCKET_H_undef_FIOGETOWN
+#  undef FIOGETOWN
+# endif
+# ifdef __SYS_SOCKET_H_undef_FIOSETOWN
+#  undef __SYS_SOCKET_H_undef_FIOSETOWN
+#  undef FIOSETOWN
+# endif
+# ifdef __SYS_SOCKET_H_undef_SIOCATMARK
+#  undef __SYS_SOCKET_H_undef_SIOCATMARK
+#  undef SIOCATMARK
+# endif
+# ifdef __SYS_SOCKET_H_undef_SIOCGPGRP
+#  undef __SYS_SOCKET_H_undef_SIOCGPGRP
+#  undef SIOCGPGRP
+# endif
+# ifdef __SYS_SOCKET_H_undef_SIOCGSTAMP
+#  undef __SYS_SOCKET_H_undef_SIOCGSTAMP
+#  undef SIOCGSTAMP
+# endif
+# ifdef __SYS_SOCKET_H_undef_SIOCGSTAMPNS
+#  undef __SYS_SOCKET_H_undef_SIOCGSTAMPNS
+#  undef SIOCGSTAMPNS
+# endif
+# ifdef __SYS_SOCKET_H_undef_SIOCSPGRP
+#  undef __SYS_SOCKET_H_undef_SIOCSPGRP
+#  undef SIOCSPGRP
+# endif
+#endif
 
 /* Structure used to manipulate the SO_LINGER option.  */
 struct linger
