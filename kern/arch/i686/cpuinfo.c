@@ -191,6 +191,10 @@ void spinlock_debug(spinlock_t *lock)
 	char buf[256];
 	uint32_t eip = (uint32_t)lock->call_site;
 
+	if (!eip) {
+		printk("Lock %p: never locked\n", lock);
+		return;
+	}
 	debuginfo_eip(eip, &debuginfo);
 	memset(buf, 0, 256);
 	strncpy(buf, debuginfo.eip_fn_name, MIN(debuginfo.eip_fn_namelen, 256));
