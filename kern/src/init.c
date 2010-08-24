@@ -38,6 +38,7 @@
 #include <slab.h>
 #include <kfs.h>
 #include <vfs.h>
+#include <devfs.h>
 
 // zra: flag for Ivy
 int booting = 1;
@@ -81,6 +82,7 @@ void kernel_init(multiboot_info_t *mboot_info)
 	file_init();
 	page_check();
 	vfs_init();
+	devfs_init();
 	idt_init();
 	kernel_msg_init();
 	sysenter_init();

@@ -1528,10 +1528,9 @@ struct file *put_file_from_fd(struct files_struct *open_files, int file_desc)
 			assert(file_desc < open_files->max_files);
 			file = open_files->fd[file_desc];
 			open_files->fd[file_desc] = 0;
+			assert(file);
+			kref_put(&file->f_kref);
 			CLR_BITMASK_BIT(open_files->open_fds->fds_bits, file_desc);
-			/* the if case is due to files (stdin) without a *file yet */
-			if (file)
-				kref_put(&file->f_kref);
 		}
 	}
 	spin_unlock(&open_files->lock);
@@ -1577,9 +1576,8 @@ void close_all_files(struct files_struct *open_files, bool cloexec)
 			if (cloexec && !(file->f_flags | O_CLOEXEC))
 				continue;
 			open_files->fd[i] = 0;
-			/* the if case is due to files (stdin) without a *file yet */
-			if (file)
-				kref_put(&file->f_kref);
+			assert(file);
+			kref_put(&file->f_kref);
 			CLR_BITMASK_BIT(open_files->open_fds->fds_bits, i);
 		}
 	}
@@ -1601,9 +1599,8 @@ void clone_files(struct files_struct *src, struct files_struct *dst)
 			SET_BITMASK_BIT(dst->open_fds->fds_bits, i);
 			assert(i < dst->max_files && dst->fd[i] == 0);
 			dst->fd[i] = file;
-			/* the if case is due to files (stdin) without a *file yet */
-			if (file)
-				kref_get(&file->f_kref, 1);
+			assert(file);
+			kref_get(&file->f_kref, 1);
 		}
 	}
 	spin_unlock(&dst->lock);

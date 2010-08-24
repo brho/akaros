@@ -27,6 +27,7 @@
 #include <resource.h>
 #include <elf.h>
 #include <arsc_server.h>
+#include <devfs.h>
 
 /* Process Lists */
 struct proc_list proc_runnablelist = TAILQ_HEAD_INITIALIZER(proc_runnablelist);
@@ -331,12 +332,10 @@ error_t proc_alloc(struct proc **pp, struct proc *parent)
 	p->open_files.max_fdset = NR_FILE_DESC_DEFAULT;
 	p->open_files.fd = p->open_files.fd_array;
 	p->open_files.open_fds = (struct fd_set*)&p->open_files.open_fds_init;
-	/* TODO: 0, 1, and 2 are reserved, but prob shouldn't do it this way.
-	 * Whatever we do for stdin/out/err, we need to keep it in sync for created
-	 * processes and forked processes (clone_files). */
-	p->open_files.next_fd = 3;
-	for (int i = 0; i < 3; i++)
-		SET_BITMASK_BIT(p->open_files.open_fds->fds_bits, i);
+	/* Connect to stdin, stdout, stderr */
+	assert(insert_file(&p->open_files, dev_stdin) == 0);
+	assert(insert_file(&p->open_files, dev_stdout) == 1);
+	assert(insert_file(&p->open_files, dev_stderr) == 2);
 
 	atomic_inc(&num_envs);
 	frontend_proc_init(p);
