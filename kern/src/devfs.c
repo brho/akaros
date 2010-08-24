@@ -13,6 +13,7 @@
 #include <process.h>
 #include <smp.h>
 #include <umem.h>
+#include <kmalloc.h>
 
 /* These structs are declared again and initialized farther down */
 struct file_operations dev_f_op_stdin;
@@ -66,8 +67,20 @@ off_t dev_c_llseek(struct file *file, off_t offset, int whence)
 ssize_t dev_stdin_read(struct file *file, char *buf, size_t count,
                        off_t *offset)
 {
-	printk("[kernel] Tried to read %d bytes from stdin\n", count);
-	return -1;
+	int read_amt;
+	char *kbuf = kmalloc(count, 0);
+	memset(kbuf, 0, count);// TODO REMOVE ME
+	read_amt = readline(kbuf, count, 0);
+	assert(read_amt <= count);
+	/* applications (ash) expect a \n instead of a \r */
+	if (kbuf[read_amt - 1] == '\r')
+		kbuf[read_amt - 1] = '\n';
+	/* TODO UMEM */
+	if (current)
+		memcpy_to_user_errno(current, buf, kbuf, read_amt);
+	else
+		memcpy(buf, kbuf, read_amt);
+	return read_amt;
 }
 
 ssize_t dev_stdout_write(struct file *file, const char *buf, size_t count,

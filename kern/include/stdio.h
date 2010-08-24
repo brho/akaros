@@ -48,6 +48,6 @@ int	fprintf(int fd, const char *NTS fmt, ...);
 int	vfprintf(int fd, const char *NTS fmt, va_list);
 
 // lib/readline.c
-char *NTS readline(const char *NTS prompt, ...);
+int readline(char *buf, size_t buf_l, const char *prompt, ...);
 
 #endif /* !ROS_INC_STDIO_H */

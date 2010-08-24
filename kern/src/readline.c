@@ -4,15 +4,13 @@
 
 #include <error.h>
 #include <stdio.h>
+#include <assert.h>
+#include <atomic.h>
 
-#define BUFLEN 1024
-// zra: used only by monitor.c.
-static char RACY (RO NT buf)[BUFLEN];
-
-char *
-readline(const char *prompt, ...)
+int readline(char *buf, size_t buf_l, const char *prompt, ...)
 {
-	int i, c, echoing;
+	static spinlock_t readline_lock = SPINLOCK_INITIALIZER;
+	int i, c, echoing, retval;
 	va_list ap;
 
 	va_start(ap, prompt);
@@ -21,13 +19,15 @@ readline(const char *prompt, ...)
 	va_end(ap);
 
 	i = 0;
+	spin_lock_irqsave(&readline_lock);
 	echoing = iscons(0);
 	while (1) {
 		c = getchar();
 		if (c < 0) {
-			cprintf("read error: %e\n", c);
-			return NULL;
-		} else if (c >= ' ' && i < BUFLEN-1) {
+			printk("read error: %e\n", c);	/* %e! */
+			retval = i;
+			break;
+		} else if (c >= ' ' && i < buf_l - 1) {
 			if (echoing)
 				cputchar(c);
 			buf[i++] = c;
@@ -38,9 +38,13 @@ readline(const char *prompt, ...)
 		} else if (c == '\n' || c == '\r') {
 			if (echoing)
 				cputchar(c);
-			buf[i] = 0;
-			return buf;
+			assert(i <= buf_l - 1);	/* never write to buf_l - 1 til the end */
+			buf[i++] = c;
+			retval =  i;
+			break;
 		}
 	}
+	spin_unlock_irqsave(&readline_lock);
+	return retval;
 }
 

@@ -735,11 +735,11 @@ static int runcmd(char *NTS real_buf, trapframe_t *tf) {
 	return 0;
 }
 
-void monitor(trapframe_t *tf) {
-	static spinlock_t monitor_lock = SPINLOCK_INITIALIZER;
-	spin_lock_irqsave(&monitor_lock);
-
-	char *buf;
+void monitor(struct trapframe *tf)
+{
+	#define MON_CMD_LENGTH 256
+	char buf[MON_CMD_LENGTH];
+	int cnt;
 
 	/* they are always disabled, since we have this irqsave lock */
 	if (irq_is_enabled())
@@ -751,12 +751,10 @@ void monitor(trapframe_t *tf) {
 	if (tf != NULL)
 		print_trapframe(tf);
 
-	spin_unlock_irqsave(&monitor_lock);
 	while (1) {
-		spin_lock_irqsave(&monitor_lock);
-		buf = readline("ROS(Core %d)> ", core_id());
-		if (buf != NULL) {
-			spin_unlock_irqsave(&monitor_lock);
+		cnt = readline(buf, MON_CMD_LENGTH, "ROS(Core %d)> ", core_id());
+		if (cnt > 0) {
+			buf[cnt] = 0;
 			if (runcmd(buf, tf) < 0)
 				break;
 		}
