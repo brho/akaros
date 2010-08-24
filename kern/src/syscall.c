@@ -835,7 +835,7 @@ static intreg_t sys_open(struct proc *p, const char *path, size_t path_l,
 	user_memdup_free(p, t_path);
 	if (!file)
 		return -1;
-	fd = insert_file(&p->open_files, file);	/* stores the ref to file */
+	fd = insert_file(&p->open_files, file, 0);	/* stores the ref to file */
 	kref_put(&file->f_kref);
 	if (fd < 0) {
 		warn("File insertion failed");
@@ -943,7 +943,11 @@ intreg_t sys_fcntl(struct proc *p, int fd, int cmd, int arg)
 	}
 	switch (cmd) {
 		case (F_DUPFD):
-			printk("[kernel] dup not supported yet\n");
+			retval = insert_file(&p->open_files, file, arg);
+			if (retval < 0) {
+				set_errno(-retval);
+				retval = -1;
+			}
 			break;
 		case (F_GETFD):
 			/* GET and SETFD just care about CLOEXEC.  We don't have a separate
@@ -960,13 +964,14 @@ intreg_t sys_fcntl(struct proc *p, int fd, int cmd, int arg)
 			break;
 		case (F_SETFL):
 			/* only allowed to set certain flags. */
-			arg &= O_APPEND | O_ASYNC | O_DIRECT | O_NOATIME | O_NONBLOCK;
+			arg &= O_FCNTL_FLAGS;
+			file->f_flags = (file->f_flags & ~O_FCNTL_FLAGS) | arg;
 			break;
 		default:
 			warn("Unsupported fcntl cmd %d\n", cmd);
 	}
 	kref_put(&file->f_kref);
-	return 0;
+	return retval;
 }
 
 static intreg_t sys_access(struct proc *p, const char *path, size_t path_l,

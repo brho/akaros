@@ -66,6 +66,7 @@ struct kstat {
 #define O_NOATIME		01000000	/* Do not set atime. */
 #define O_CLOEXEC		02000000	/* Set close_on_exec. */
 #define O_CREAT_FLAGS (O_CREAT | O_EXCL | O_NOCTTY | O_TRUNC)
+#define O_FCNTL_FLAGS (O_APPEND | O_ASYNC | O_DIRECT | O_NOATIME | O_NONBLOCK)
 
 /* File creation modes (access controls) */
 #define S_IRWXU 00700	/* user (file owner) has read, write and execute perms */

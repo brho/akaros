@@ -1577,12 +1577,14 @@ struct file *put_file_from_fd(struct files_struct *open_files, int file_desc)
 }
 
 /* Inserts the file in the files_struct, returning the corresponding new file
- * descriptor, or an error code.  We currently grab the first open FD. */
-int insert_file(struct files_struct *open_files, struct file *file)
+ * descriptor, or an error code.  We start looking for open fds from low_fd. */
+int insert_file(struct files_struct *open_files, struct file *file, int low_fd)
 {
 	int slot = -1;
+	if ((low_fd < 0) || (low_fd > NR_FILE_DESC_MAX))
+		return -EINVAL;
 	spin_lock(&open_files->lock);
-	for (int i = 0; i < open_files->max_fdset; i++) {
+	for (int i = low_fd; i < open_files->max_fdset; i++) {
 		if (GET_BITMASK_BIT(open_files->open_fds->fds_bits, i))
 			continue;
 		slot = i;

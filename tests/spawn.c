@@ -7,8 +7,8 @@ int main(int argc, char **argv, char **envp)
 {
 	char *p_argv[] = {0, 0, 0};
 	char *p_envp[] = {"LD_LIBRARY_PATH=/lib", 0};
-	//#define FILENAME "/bin/hello"
-	#define FILENAME "/bin/hello-sym"
+	#define FILENAME "/bin/hello"
+	//#define FILENAME "/bin/hello-sym"
 	char filename[] = FILENAME;
 	#if 0
 	/* try some bad combos */
