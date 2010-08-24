@@ -207,7 +207,7 @@ static int follow_symlink(struct nameidata *nd)
 {
 	int retval;
 	char *symname;
-	if (nd->dentry->d_inode->i_type != FS_I_SYMLINK)
+	if (!S_ISLNK(nd->dentry->d_inode->i_mode))
 		return 0;
 	if (nd->depth > MAX_SYMLINK_DEPTH)
 		return -ELOOP;
@@ -328,7 +328,7 @@ static int link_path_walk(char *path, struct nameidata *nd)
 		 * during the follow_symlink (a symlink could have had a directory at
 		 * the end), though it was in the middle of the real path. */
 		nd->flags &= ~LOOKUP_DIRECTORY;
-		if (!(nd->dentry->d_inode->i_type & FS_I_DIR))
+		if (!S_ISDIR(nd->dentry->d_inode->i_mode))
 			return -ENOTDIR;
 next_loop:
 		/* move through the path string to the next entry */
@@ -392,8 +392,7 @@ next_loop:
 	 * mountpoint still.  FYI: this hasn't been thought through completely. */
 	follow_mount(nd);
 	/* If we wanted a directory, but didn't get one, error out */
-	if ((nd->flags & LOOKUP_DIRECTORY) &&
-	   !(nd->dentry->d_inode->i_type & FS_I_DIR))
+	if ((nd->flags & LOOKUP_DIRECTORY) && !S_ISDIR(nd->dentry->d_inode->i_mode))
 		return -ENOTDIR;
 	return 0;
 }
@@ -685,7 +684,7 @@ static struct inode *create_inode(struct dentry *dentry, int mode)
 	struct inode *inode = get_inode(dentry);
 	if (!inode)
 		return 0;
-	inode->i_mode = mode;
+	inode->i_mode = mode & S_PMASK;	/* note that after this, we have no type */
 	inode->i_nlink = 1;
 	inode->i_size = 0;
 	inode->i_blocks = 0;
@@ -1082,7 +1081,7 @@ int do_link(char *old_path, char *new_path)
 	if (!old_d)					/* errno set by lookup_dentry */
 		goto out_link_d;
 	/* For now, can only link to files */
-	if (old_d->d_inode->i_type != FS_I_FILE) {
+	if (!S_ISREG(old_d->d_inode->i_mode)) {
 		set_errno(EPERM);
 		goto out_both_ds;
 	}
@@ -1140,7 +1139,7 @@ int do_unlink(char *path)
 		goto out_path_only;
 	}
 	/* Make sure the target is not a directory */
-	if (dentry->d_inode->i_type == FS_I_DIR) {
+	if (S_ISDIR(dentry->d_inode->i_mode)) {
 		set_errno(EISDIR);
 		goto out_dentry;
 	}
@@ -1191,7 +1190,7 @@ int do_chmod(char *path, int mode)
 			retval = -EPERM;
 		else
 		#endif
-			nd->dentry->d_inode->i_mode = mode & 0777;
+			nd->dentry->d_inode->i_mode |= mode & S_PMASK;
 	}
 	path_release(nd);	
 	return retval;
@@ -1261,7 +1260,7 @@ int do_rmdir(char *path)
 		set_errno(ENOENT);
 		goto out_path_only;
 	}
-	if (dentry->d_inode->i_type != FS_I_DIR) {
+	if (!S_ISDIR(dentry->d_inode->i_mode)) {
 		set_errno(ENOTDIR);
 		goto out_dentry;
 	}
@@ -1676,7 +1675,7 @@ static void print_dir(struct dentry *dentry, char *buf, int depth)
 	int retval;
 	int child_num = 0;
 
-	if (!dentry->d_inode->i_type & FS_I_DIR) {
+	if (!S_ISDIR(dentry->d_inode->i_mode)) {
 		warn("Thought this was only directories!!");
 		return;
 	}
@@ -1700,17 +1699,21 @@ static void print_dir(struct dentry *dentry, char *buf, int depth)
 			if (!child_d)
 				panic("Inconsistent FS, dirent doesn't have a dentry!");
 			/* Recurse for directories, or just print the name for others */
-			switch (child_d->d_inode->i_type) {
-				case (FS_I_DIR):
+			switch (child_d->d_inode->i_mode & __S_IFMT) {
+				case (__S_IFDIR):
 					print_dir(child_d, buf, depth + 1);
 					break;
-				case (FS_I_FILE):
+				case (__S_IFREG):
 					printk("%s%s size(B): %d nlink: %d\n", buf, next.d_name,
 					       child_d->d_inode->i_size, child_d->d_inode->i_nlink);
 					break;
-				case (FS_I_SYMLINK):
+				case (__S_IFLNK):
 					printk("%s%s -> %s\n", buf, next.d_name,
 					       child_d->d_inode->i_op->readlink(child_d));
+					break;
+				case (__S_IFCHR):
+					printk("%s%s (char device) nlink: %d\n", buf, next.d_name,
+					       child_d->d_inode->i_nlink);
 					break;
 				default:
 					warn("Look around you!  Unknown filetype!");

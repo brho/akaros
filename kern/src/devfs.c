@@ -29,6 +29,7 @@ static struct file *get_stdinout(char *name, int mode,
 	/* Overwrite the f_op with our own f_ops */
 	f_char_dev->f_dentry->d_inode->i_fop = fop;
 	f_char_dev->f_op = fop;
+	SET_FTYPE(f_char_dev->f_dentry->d_inode->i_mode, __S_IFCHR);
 	return f_char_dev;
 }
 

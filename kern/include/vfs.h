@@ -107,53 +107,6 @@ struct nameidata {
 #define LOOKUP_CREATE 		0x11	/* create a file if it doesn't exist */
 #define LOOKUP_ACCESS 		0x12	/* access / check user permissions */
 
-/* TODO: make our own versions (fucking octal) and put it in fcntl.h */
-/* File access modes for open and fcntl. */
-#define O_RDONLY		0			/* Open read-only. */
-#define O_WRONLY		1			/* Open write-only. */
-#define O_RDWR			2			/* Open read/write. */
-#define O_ACCMODE		3
-
-/* Bits OR'd into the second argument to open. */
-#define O_CREAT			00000100	/* not fcntl */
-#define O_EXCL			00000200	/* not fcntl */
-#define O_NOCTTY		00000400	/* not fcntl */
-#define O_TRUNC			00001000	/* not fcntl */
-#define O_APPEND		00002000
-#define O_NONBLOCK		00004000
-#define O_SYNC			00010000
-#define O_FSYNC			O_SYNC
-#define O_ASYNC			00020000
-#define O_DIRECT		00040000	/* Direct disk access. */
-#define O_DIRECTORY		00200000	/* Must be a directory. */
-#define O_NOFOLLOW		00400000	/* Do not follow links. */
-#define O_NOATIME		01000000	/* Do not set atime. */
-#define O_CLOEXEC		02000000	/* Set close_on_exec. */
-#define O_CREAT_FLAGS (O_CREAT | O_EXCL | O_NOCTTY | O_TRUNC)
-
-/* File creation modes (access controls) */
-#define S_IRWXU 00700	/* user (file owner) has read, write and execute perms */
-#define S_IRUSR 00400	/* user has read permission */
-#define S_IWUSR 00200	/* user has write permission */
-#define S_IXUSR 00100	/* user has execute permission */
-#define S_IRWXG 00070	/* group has read, write and execute permission */
-#define S_IRGRP 00040	/* group has read permission */
-#define S_IWGRP 00020	/* group has write permission */
-#define S_IXGRP 00010	/* group has execute permission */
-#define S_IRWXO 00007	/* others have read, write and execute permission */
-#define S_IROTH 00004	/* others have read permission */
-#define S_IWOTH 00002	/* others have write permission */
-#define S_IXOTH 00001	/* others have execute permission */
-
-/* fcntl flags that we support, keep in sync with glibc */
-#define F_DUPFD		0	/* Duplicate file descriptor */
-#define F_GETFD		1	/* Get file descriptor flags */
-#define F_SETFD		2	/* Set file descriptor flags */
-#define F_GETFL		3	/* Get file status flags */
-#define F_SETFL		4	/* Set file status flags */
-/* For F_[GET|SET]FD */
-#define FD_CLOEXEC	1
-
 /* Every object that has pages, like an inode or the swap (or even direct block
  * devices) has a page_map, tracking which of its pages are currently in memory.
  * It is a map, per object, from index to physical page frame. */
@@ -229,9 +182,8 @@ struct super_operations {
 	void (*umount_begin) (struct super_block *);/* called by NFS */
 };
 
-#define FS_I_FILE				0x01
-#define FS_I_DIR				0x02
-#define FS_I_SYMLINK			0x03
+/* Sets the type of file, IAW the bits in ros/fs.h */
+#define SET_FTYPE(mode, type) ((mode) = ((mode) & ~__S_IFMT) | (type))
 
 /* Inode: represents a specific file */
 struct inode {
@@ -241,8 +193,7 @@ struct inode {
 	struct dentry_tailq			i_dentry;		/* all dentries pointing here*/
 	unsigned long				i_ino;
 	struct kref					i_kref;
-	int							i_mode;			/* access mode */
-	unsigned short				i_type;			/* file type */
+	int							i_mode;			/* access mode and file type */
 	unsigned int				i_nlink;		/* hard links */
 	uid_t						i_uid;
 	gid_t						i_gid;

@@ -826,6 +826,7 @@ static intreg_t sys_open(struct proc *p, const char *path, size_t path_l,
 	int fd = 0;
 	struct file *file;
 
+	printd("File %s Open attempt\n", path);
 	char *t_path = user_strdup_errno(p, path, path_l);
 	if (!t_path)
 		return -1;
@@ -988,7 +989,7 @@ static intreg_t sys_access(struct proc *p, const char *path, size_t path_l,
 intreg_t sys_umask(struct proc *p, int mask)
 {
 	int old_mask = p->fs_env.umask;
-	p->fs_env.umask = mask & 0777;
+	p->fs_env.umask = mask & S_PMASK;
 	return old_mask;
 }
 

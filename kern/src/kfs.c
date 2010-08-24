@@ -167,7 +167,7 @@ struct inode *kfs_alloc_inode(struct super_block *sb)
 void kfs_dealloc_inode(struct inode *inode)
 {
 	/* If we're a symlink, give up our storage for the symname */
-	if (inode->i_type == FS_I_SYMLINK)
+	if (S_ISLNK(inode->i_mode))
 		kfree(((struct kfs_i_info*)inode->i_fs_info)->filestart);
 	kmem_cache_free(kfs_i_kcache, inode->i_fs_info);
 }
@@ -183,7 +183,7 @@ void kfs_read_inode(struct inode *inode)
 	 * 	possibly a bug, since these inos come from directories */
 	if (inode->i_ino == 1) {
 		inode->i_mode = S_IRWXU | S_IRWXG | S_IRWXO;
-		inode->i_type = FS_I_DIR;
+		SET_FTYPE(inode->i_mode, __S_IFDIR);
 		inode->i_fop = &kfs_f_op_dir;
 		inode->i_nlink = 1;				/* assuming only one hardlink */
 		inode->i_uid = 0;
@@ -294,7 +294,7 @@ int kfs_create(struct inode *dir, struct dentry *dentry, int mode,
 {
 	struct inode *inode = dentry->d_inode;
 	kfs_init_inode(dir, dentry);
-	inode->i_type = FS_I_FILE;
+	SET_FTYPE(inode->i_mode, __S_IFREG);
 	inode->i_fop = &kfs_f_op_file;
 	/* fs_info->filestart is set by the caller, or else when first written (for
 	 * new files.  it was set to 0 in alloc_inode(). */
@@ -322,7 +322,7 @@ struct dentry *kfs_lookup(struct inode *dir, struct dentry *dentry,
 	struct dentry *d_i;
 
 	assert(dir_dent && dir_dent == TAILQ_LAST(&dir->i_dentry, dentry_tailq));
-	assert(dir->i_type & FS_I_DIR);
+	assert(S_ISDIR(dir->i_mode));
 	assert(kref_refcnt(&dentry->d_kref) == 1);
 	TAILQ_FOREACH(d_i, &dir_dent->d_subdirs, d_subdirs_link) {
 		if (!strcmp(d_i->d_name.name, dentry->d_name.name)) {
@@ -381,7 +381,7 @@ int kfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
 	char *string = kmalloc(len + 1, 0);
 
 	kfs_init_inode(dir, dentry);
-	inode->i_type = FS_I_SYMLINK;
+	SET_FTYPE(inode->i_mode, __S_IFLNK);
 	inode->i_fop = &kfs_f_op_sym;
 	strncpy(string, symname, len);
 	string[len] = '\0';		/* symname should be \0d anyway, but just in case */
@@ -398,7 +398,7 @@ int kfs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 	struct inode *inode = dentry->d_inode;
 	kref_get(&dentry->d_kref, 1);	/* to pin the dentry in RAM, KFS-style... */
 	inode->i_ino = kfs_get_free_ino();
-	inode->i_type = FS_I_DIR;
+	SET_FTYPE(inode->i_mode, __S_IFDIR);
 	inode->i_fop = &kfs_f_op_dir;
 	/* get ready to have our own kids */
 	TAILQ_INIT(&((struct kfs_i_info*)inode->i_fs_info)->children);
@@ -441,7 +441,7 @@ char *kfs_readlink(struct dentry *dentry)
 {
 	struct inode *inode = dentry->d_inode;
 	struct kfs_i_info *k_i_info = (struct kfs_i_info*)inode->i_fs_info;
-	if (inode->i_type != FS_I_SYMLINK)
+	if (!S_ISLNK(inode->i_mode))
 		return 0;
 	return k_i_info->filestart;
 }
@@ -553,7 +553,7 @@ int kfs_readdir(struct file *dir, struct dirent *dirent)
 	}
 	/* some of this error handling can be done by the VFS.  The syscall should
 	 * handle EBADF, EFAULT, and EINVAL (TODO, memory related). */
-	if (!(dir_d->d_inode->i_type & FS_I_DIR)) {
+	if (!S_ISDIR(dir_d->d_inode->i_mode)) {
 		set_errno(ENOTDIR);
 		return -1;
 	}
@@ -580,7 +580,7 @@ int kfs_readdir(struct file *dir, struct dirent *dirent)
  * the file was opened or the file type. */
 int kfs_mmap(struct file *file, struct vm_region *vmr)
 {
-	if (file->f_dentry->d_inode->i_type & FS_I_FILE)
+	if (S_ISREG(file->f_dentry->d_inode->i_mode))
 		return 0;
 	return -1;
 }
