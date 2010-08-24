@@ -1614,8 +1614,9 @@ void close_all_files(struct files_struct *open_files, bool cloexec)
 			 * have a valid fdset higher than files */
 			assert(i < open_files->max_files);
 			file = open_files->fd[i];
-			if (cloexec && !(file->f_flags | O_CLOEXEC))
+			if (cloexec && !(file->f_flags & O_CLOEXEC))
 				continue;
+			/* Actually close the file */
 			open_files->fd[i] = 0;
 			assert(file);
 			kref_put(&file->f_kref);
