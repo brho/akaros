@@ -283,9 +283,17 @@ static int link_path_walk(char *path, struct nameidata *nd)
 	/* skip all leading /'s */
 	while (*link == '/')
 		link++;
-	/* if there's nothing left (null terminated), we're done */
-	if (*link == '\0')
+	/* if there's nothing left (null terminated), we're done.  This should only
+	 * happen for "/", which if we wanted a PARENT, should fail (there is no
+	 * parent). */
+	if (*link == '\0') {
+		if (nd->flags & LOOKUP_PARENT) {
+			set_errno(ENOENT);
+			return -1;
+		}
+		/* o/w, we're good */
 		return 0;
+	}
 	/* iterate through each intermediate link of the path.  in general, nd
 	 * tracks where we are in the path, as far as dentries go.  once we have the
 	 * next dentry, we try to update nd based on that dentry.  link is the part
@@ -345,6 +353,7 @@ next_loop:
 	 * the last item (link). */
 	if (!strcmp(".", link)) {
 		if (nd->flags & LOOKUP_PARENT) {
+			assert(nd->dentry->d_name.name);
 			stash_nd_name(nd, nd->dentry->d_name.name);
 			climb_up(nd);
 		}
@@ -353,6 +362,7 @@ next_loop:
 	if (!strcmp("..", link)) {
 		climb_up(nd);
 		if (nd->flags & LOOKUP_PARENT) {
+			assert(nd->dentry->d_name.name);
 			stash_nd_name(nd, nd->dentry->d_name.name);
 			climb_up(nd);
 		}
@@ -363,6 +373,7 @@ next_loop:
 	if (!link_dentry) {
 		/* if there's no dentry, we are okay if we are looking for the parent */
 		if (nd->flags & LOOKUP_PARENT) {
+			assert(strcmp(link, ""));
 			stash_nd_name(nd, link);
 			return 0;
 		} else {
@@ -384,6 +395,7 @@ next_loop:
 	 * all.  Now we need to climb up to set nd back on the parent, if that's
 	 * what we wanted */
 	if (nd->flags & LOOKUP_PARENT) {
+		assert(nd->dentry->d_name.name);
 		stash_nd_name(nd, link_dentry->d_name.name);
 		climb_up(nd);
 		return 0;
@@ -401,10 +413,18 @@ next_loop:
  * initialized for the first call - specifically, we need the intent. 
  * LOOKUP_PARENT and friends go in the flags var, which is not the intent.
  *
+ * If path_lookup wants a PARENT, but hits the top of the FS (root or
+ * otherwise), we want it to error out.  It's still unclear how we want to
+ * handle processes with roots that aren't root, but at the very least, we don't
+ * want to think we have the parent of /, but have / itself.  Due to the way
+ * link_path_walk works, if that happened, we probably don't have a
+ * nd->last.name.  This needs more thought (TODO).
+ *
  * Need to be careful too.  While the path has been copied-in to the kernel,
  * it's still user input.  */
 int path_lookup(char *path, int flags, struct nameidata *nd)
 {
+	int retval;
 	printd("Path lookup for %s\n", path);
 	/* we allow absolute lookups with no process context */
 	if (path[0] == '/') {			/* absolute lookup */
@@ -424,7 +444,11 @@ int path_lookup(char *path, int flags, struct nameidata *nd)
 	kref_get(&nd->dentry->d_kref, 1);
 	nd->flags = flags;
 	nd->depth = 0;					/* used in symlink following */
-	return link_path_walk(path, nd);	
+	retval =  link_path_walk(path, nd);	
+	/* make sure our PARENT lookup worked */
+	if (!retval && (flags & LOOKUP_PARENT))
+		assert(nd->last.name);
+	return retval;
 }
 
 /* Call this after any use of path_lookup when you are done with its results,
@@ -957,19 +981,31 @@ struct file *do_file_open(char *path, int flags, int mode)
 	struct nameidata nd_r = {0}, *nd = &nd_r;
 	int error;
 
-	/* this isn't quite right, due to the nature of O_CREAT */
-	if (flags & O_CREAT)
-		nd->intent = LOOKUP_CREATE;
-	else
-		nd->intent = LOOKUP_OPEN;
+	/* The file might exist, lets try to just open it right away */
+	nd->intent = LOOKUP_OPEN;
+	error = path_lookup(path, LOOKUP_FOLLOW, nd);
+	if (!error) {
+		/* Still need to make sure we didn't want to O_EXCL create */
+		if ((flags & O_CREAT) && (flags & O_EXCL)) {
+			set_errno(EEXIST);
+			goto out_path_only;
+		}
+		file_d = nd->dentry;
+		kref_get(&file_d->d_kref, 1);
+		goto open_the_file;
+	}
+	/* So it didn't already exist, release the path from the previous lookup,
+	 * and then we try to create it. */
+	path_release(nd);	
 	/* get the parent, following links.  this means you get the parent of the
 	 * final link (which may not be in 'path' in the first place. */
+	nd->intent = LOOKUP_CREATE;
 	error = path_lookup(path, LOOKUP_PARENT | LOOKUP_FOLLOW, nd);
 	if (error) {
 		set_errno(-error);
 		goto out_path_only;
 	}
-	/* see if the target is there, handle accordingly */
+	/* see if the target is there (shouldn't be), and handle accordingly */
 	file_d = do_lookup(nd->dentry, nd->last.name); 
 	if (!file_d) {
 		if (!(flags & O_CREAT)) {
@@ -985,12 +1021,16 @@ struct file *do_file_open(char *path, int flags, int mode)
 			goto out_file_d;
 		dcache_put(file_d);
 	} else {	/* something already exists */
+		/* this can happen due to concurrent access, but needs to be thought
+		 * through */
+		panic("File shouldn't be here!");
 		if ((flags & O_CREAT) && (flags & O_EXCL)) {
 			/* wanted to create, not open, bail out */
 			set_errno(EEXIST);
 			goto out_file_d;
 		}
 	}
+open_the_file:
 	/* now open the file (freshly created or if it already existed).  At this
 	 * point, file_d is a refcnt'd dentry, regardless of which branch we took.*/
 	if (flags & O_TRUNC)
