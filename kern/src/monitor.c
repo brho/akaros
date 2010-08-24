@@ -274,7 +274,7 @@ int mon_bin_ls(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 
 int mon_bin_run(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 {
-	if (argc != 2) {
+	if (argc < 2) {
 		printk("Usage: bin_run FILENAME\n");
 		return 1;
 	}
@@ -287,10 +287,13 @@ int mon_bin_run(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 		printk("No such program!\n");
 		return 1;
 	}
-	char *p_argv[] = {0, 0, 0};
+	char **p_argv = kmalloc(sizeof(char*) * argc, 0);	/* bin_run's argc */
+	for (int i = 0; i < argc - 1; i++)
+		p_argv[i] = argv[i + 1];
+	p_argv[argc - 1] = 0;
 	char *p_envp[] = {"LD_LIBRARY_PATH=/lib", 0};
-	p_argv[0] = argv[1];
 	struct proc *p = proc_create(program, p_argv, p_envp);
+	kfree(p_argv);
 
 	spin_lock(&p->proc_lock);
 	__proc_set_state(p, PROC_RUNNABLE_S);
