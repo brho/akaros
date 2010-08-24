@@ -30,7 +30,8 @@
 #include <colored_caches.h>
 #include <hashtable.h>
 #include <arch/bitmask.h>
-#include <kfs.h> // eventually replace this with vfs.h
+#include <vfs.h>
+#include <devfs.h>
 #include <smp.h>
 #include <arsc_server.h>
 
@@ -230,6 +231,10 @@ static int sys_proc_create(struct proc *p, char *path, size_t path_l,
 	if (load_elf(new_p, program))
 		goto late_error;
 	kref_put(&program->f_kref);
+	/* Connect to stdin, stdout, stderr (part of proc_create()) */
+	assert(insert_file(&new_p->open_files, dev_stdin,  0) == 0);
+	assert(insert_file(&new_p->open_files, dev_stdout, 0) == 1);
+	assert(insert_file(&new_p->open_files, dev_stderr, 0) == 2);
 	__proc_ready(new_p);
 	pid = new_p->pid;
 	kref_put(&new_p->kref);	/* give up the reference created in proc_create() */
@@ -386,7 +391,6 @@ static ssize_t sys_fork(env_t* e)
 	// when the parent dies, or at least decref it
 
 	printd("[PID %d] fork PID %d\n",e->pid,env->pid);
-
 	return env->pid;
 }
 

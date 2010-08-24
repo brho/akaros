@@ -332,10 +332,6 @@ error_t proc_alloc(struct proc **pp, struct proc *parent)
 	p->open_files.max_fdset = NR_FILE_DESC_DEFAULT;
 	p->open_files.fd = p->open_files.fd_array;
 	p->open_files.open_fds = (struct fd_set*)&p->open_files.open_fds_init;
-	/* Connect to stdin, stdout, stderr */
-	assert(insert_file(&p->open_files, dev_stdin,  0) == 0);
-	assert(insert_file(&p->open_files, dev_stdout, 0) == 1);
-	assert(insert_file(&p->open_files, dev_stderr, 0) == 2);
 
 	atomic_inc(&num_envs);
 	frontend_proc_init(p);
@@ -366,6 +362,10 @@ struct proc *proc_create(struct file *prog, char **argv, char **envp)
 		panic("proc_create: %e", r);	/* one of 3 quaint usages of %e */
 	procinfo_pack_args(p->procinfo, argv, envp);
 	assert(load_elf(p, prog) == 0);
+	/* Connect to stdin, stdout, stderr */
+	assert(insert_file(&p->open_files, dev_stdin,  0) == 0);
+	assert(insert_file(&p->open_files, dev_stdout, 0) == 1);
+	assert(insert_file(&p->open_files, dev_stderr, 0) == 2);
 	__proc_ready(p);
 	return p;
 }

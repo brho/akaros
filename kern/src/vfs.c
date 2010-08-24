@@ -1637,11 +1637,13 @@ void clone_files(struct files_struct *src, struct files_struct *dst)
 			 * have a valid fdset higher than files */
 			assert(i < src->max_files);
 			file = src->fd[i];
-			SET_BITMASK_BIT(dst->open_fds->fds_bits, i);
 			assert(i < dst->max_files && dst->fd[i] == 0);
+			SET_BITMASK_BIT(dst->open_fds->fds_bits, i);
 			dst->fd[i] = file;
 			assert(file);
 			kref_get(&file->f_kref, 1);
+			if (i >= dst->next_fd)
+				dst->next_fd = i + 1;
 		}
 	}
 	spin_unlock(&dst->lock);
