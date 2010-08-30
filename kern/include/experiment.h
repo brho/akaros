@@ -1,8 +1,0 @@
-#ifndef ROS_INC_EXPERIMENT_H
-#define ROS_INC_EXPERIMENT_H
-#define EXPERIMENT_NUM 11
-#define APP1_THREADS 5
-#define APP2_THREADS 5
-#define APP1_COLORS 50
-#define APP2_COLORS 50
-#endif
