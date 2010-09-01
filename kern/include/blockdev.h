@@ -16,7 +16,8 @@
  * be bigger than what the underlying hardware can handle, but it shouldn't be
  * smaller than any higher-level block (like an FS block, which are often 1 KB).
  */
-#define SECTOR_SIZE 512
+#define SECTOR_SZ_LOG 9
+#define SECTOR_SZ (1 << SECTOR_SZ_LOG)
 
 /* Every block device is represented by one of these, with custom methods, as
  * applicable for the type of device.  Subject to massive changes. */
@@ -55,6 +56,7 @@ struct kmem_cache *breq_kcache;	/* for the block requests */
 #define BREQ_WRITE 			0x002
 
 void block_init(void);
+struct block_device *get_bdev(char *path);
 /* This function will probably be the one that blocks */
 int make_request(struct block_device *bdev, struct block_request *req);
 

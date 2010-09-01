@@ -12,6 +12,7 @@
 #include <slab.h>
 #include <kmalloc.h>
 #include <kfs.h>
+#include <ext2fs.h>
 #include <pmap.h>
 #include <umem.h>
 #include <smp.h>
@@ -33,9 +34,9 @@ struct kmem_cache *file_kcache;
  * with multiple namespaces on the same FS yet.  Note if you mount the same FS
  * multiple times, you only have one FS still (and one SB).  If we ever support
  * that... */
-struct vfsmount *mount_fs(struct fs_type *fs, char *dev_name,
-                          struct dentry *mnt_pt, int flags,
-                          struct namespace *ns)
+struct vfsmount *__mount_fs(struct fs_type *fs, char *dev_name,
+                            struct dentry *mnt_pt, int flags,
+                            struct namespace *ns)
 {
 	struct super_block *sb;
 	struct vfsmount *vmnt = kmalloc(sizeof(struct vfsmount), 0);
@@ -101,12 +102,13 @@ void vfs_init(void)
 	/* build list of all FS's in the system.  put yours here.  if this is ever
 	 * done on the fly, we'll need to lock. */
 	TAILQ_INSERT_TAIL(&file_systems, &kfs_fs_type, list);
+	TAILQ_INSERT_TAIL(&file_systems, &ext2_fs_type, list);
 	TAILQ_FOREACH(fs, &file_systems, list)
 		printk("Supports the %s Filesystem\n", fs->name);
 
 	/* mounting KFS at the root (/), pending root= parameters */
 	// TODO: linux creates a temp root_fs, then mounts the real root onto that
-	default_ns.root = mount_fs(&kfs_fs_type, "RAM", NULL, 0, &default_ns);
+	default_ns.root = __mount_fs(&kfs_fs_type, "RAM", NULL, 0, &default_ns);
 
 	printk("vfs_init() completed\n");
 }
@@ -192,9 +194,13 @@ static int climb_up(struct nameidata *nd)
 	return 0;
 }
 
+/* nd->dentry might be on a mount point, so we need to move on to the child
+ * mount's root. */
 static int follow_mount(struct nameidata *nd)
 {
-	/* Detect mount, follow, etc... (TODO!) */
+	if (!nd->dentry->d_mount_point)
+		return 0;
+	next_link(nd->dentry->d_mounted_fs->mnt_root, nd);
 	return 0;
 }
 
@@ -462,6 +468,22 @@ void path_release(struct nameidata *nd)
 		kref_put(&nd->last_sym->d_kref);
 		nd->last_sym = 0;			/* catch reuse bugs */
 	}
+}
+
+/* External version of mount, only call this after having a / mount */
+int mount_fs(struct fs_type *fs, char *dev_name, char *path, int flags)
+{
+	struct nameidata nd_r = {0}, *nd = &nd_r;
+	int retval = 0;
+	retval = path_lookup(path, LOOKUP_DIRECTORY, nd);
+	if (retval)
+		goto out;
+	/* taking the namespace of the vfsmount of path */ 
+	if (!__mount_fs(fs, dev_name, nd->dentry, flags, nd->mnt->mnt_namespace))
+		retval = -EINVAL;
+out:
+	path_release(nd);
+	return retval;
 }
 
 /* Superblock functions */

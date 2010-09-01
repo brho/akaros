@@ -40,6 +40,7 @@
 #include <vfs.h>
 #include <devfs.h>
 #include <blockdev.h>
+#include <ext2fs.h>
 
 // zra: flag for Ivy
 int booting = 1;
@@ -90,14 +91,12 @@ void kernel_init(multiboot_info_t *mboot_info)
 	timer_init();
 	train_timing();
 	
-	// At this point our boot paths diverge based on arch. 
 	arch_init();
 	block_init();
+#ifdef __CONFIG_EXT2FS__
+	mount_fs(&ext2_fs_type, "/dev/ramdisk", "/mnt", 0);
+#endif
 		
-//	printk("Starting tests....\n");
-//	test_color_alloc();
-//	printk("Testing complete....\n");
-
 	// zra: let's Ivy know we're done booting
 	booting = 0;
 

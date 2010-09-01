@@ -422,6 +422,7 @@ void qstr_builder(struct dentry *dentry, char *l_name);
 char *file_name(struct file *file);
 int path_lookup(char *path, int flags, struct nameidata *nd);
 void path_release(struct nameidata *nd);
+int mount_fs(struct fs_type *fs, char *dev_name, char *path, int flags);
 
 /* Superblock functions */
 struct super_block *get_sb(void);

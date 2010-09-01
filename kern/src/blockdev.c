@@ -39,19 +39,38 @@ void block_init(void)
 	#endif /* __CONFIG_EXT2FS__ */
 }
 
+/* Generic helper, returns a kref'd reference out of principle. */
+struct block_device *get_bdev(char *path)
+{
+	struct block_device *bdev;
+	struct file *block_f;
+	block_f = do_file_open(path, O_RDWR, 0);
+	assert(block_f);
+	bdev = block_f->f_dentry->d_inode->i_bdev;
+	kref_get(&bdev->b_kref, 1);
+	kref_put(&block_f->f_kref);
+	return bdev;
+}
+
+/* This ultimately will handle the actual request processing, all the way down
+ * to the driver, and will deal with blocking.  For now, we just fulfill the
+ * request right away. */
 int make_request(struct block_device *bdev, struct block_request *req)
 {
+	void *src, *dst;
 	/* Sectors are indexed starting with 0, for now. */
 	if (req->first_sector + req->amount > bdev->b_num_sectors)
 		return -1;
-	if (req->flags & BREQ_READ)
-		memcpy(req->buffer, bdev->b_data + req->first_sector * SECTOR_SIZE,
-		       req->amount * SECTOR_SIZE);
-	else if (req->flags & BREQ_WRITE)
-		memcpy(bdev->b_data + req->first_sector * SECTOR_SIZE, req->buffer,
-		       req->amount * SECTOR_SIZE);
-	else
+	if (req->flags & BREQ_READ) {
+		dst = req->buffer;
+		src = bdev->b_data + (req->first_sector << SECTOR_SZ_LOG);
+	} else if (req->flags & BREQ_WRITE) {
+		dst = bdev->b_data + (req->first_sector << SECTOR_SZ_LOG);
+		src = req->buffer;
+	} else {
 		panic("Need a request type!\n");
+	}
+	memcpy(dst, src, req->amount << SECTOR_SZ_LOG);
 	return 0;
 }
 

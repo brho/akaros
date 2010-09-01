@@ -243,4 +243,7 @@ struct ext2_dirent {
 	uint8_t						dir_name[256];		/* might be < 255 on disc */
 };
 
+/* Every FS must extern it's type, and be included in vfs_init() */
+extern struct fs_type ext2_fs_type;
+
 #endif /* ROS_KERN_EXT2FS_H */
