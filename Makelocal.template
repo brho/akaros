@@ -3,6 +3,7 @@
 
 # Kernel configuration parameters
 #KERN_CFLAGS += $(CONFIG_KFS)
+#KERN_CFLAGS += $(CONFIG_EXT2FS)
 #KERN_CFLAGS += $(CONFIG_DEDICATED_MONITOR)
 #KERN_CFLAGS += $(CONFIG_SINGLE_CORE)
 #KERN_CFLAGS += $(CONFIG_NETWORKING)
@@ -32,6 +33,8 @@
 #INITRAMFS_PATHS = kern/kfs obj/tests
 # Program to execute before building the initramfs
 #INITRAMFS_BIN = tools/whatever.sh
+# Image for ext2 (RAM version) (only brho uses this )
+#EXT2_BDEV = mnt/ext2fs.img
 
 # Userspace configuration parameters
 #USER_CFLAGS += $(CONFIG_SYSCALL_TRAP)

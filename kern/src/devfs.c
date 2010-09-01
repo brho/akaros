@@ -21,19 +21,6 @@ struct file_operations dev_f_op_stdout;
 
 struct file *dev_stdin, *dev_stdout, *dev_stderr;
 
-/* Helper to build stdin, stdout, and stderr */
-static struct file *get_stdinout(char *name, int mode,
-                                 struct file_operations *fop)
-{
-	struct file *f_char_dev = do_file_open(name, O_CREAT, mode);
-	assert(f_char_dev);
-	/* Overwrite the f_op with our own f_ops */
-	f_char_dev->f_dentry->d_inode->i_fop = fop;
-	f_char_dev->f_op = fop;
-	SET_FTYPE(f_char_dev->f_dentry->d_inode->i_mode, __S_IFCHR);
-	return f_char_dev;
-}
-
 void devfs_init(void)
 {
 	int mode;
@@ -45,20 +32,40 @@ void devfs_init(void)
 		kref_put(&dentry->d_kref);
 	}
 	/* Notice we don't kref_put().  We're storing the refs globally */
-	dev_stdin = get_stdinout("/dev/stdin", S_IRUSR | S_IRGRP | S_IROTH,
-	                         &dev_f_op_stdin);
-	dev_stdout = get_stdinout("/dev/stdout", S_IWUSR | S_IWGRP | S_IWOTH,
-	                          &dev_f_op_stdout);
+	dev_stdin = make_device("/dev/stdin", S_IRUSR | S_IRGRP | S_IROTH,
+	                        __S_IFCHR, &dev_f_op_stdin);
+	dev_stdout = make_device("/dev/stdout", S_IWUSR | S_IWGRP | S_IWOTH,
+	                         __S_IFCHR, &dev_f_op_stdout);
 	/* Note stderr uses the same f_op as stdout */
-	dev_stderr = get_stdinout("/dev/stderr", S_IWUSR | S_IWGRP | S_IWOTH,
-	                          &dev_f_op_stdout);
+	dev_stderr = make_device("/dev/stderr", S_IWUSR | S_IWGRP | S_IWOTH,
+	                         __S_IFCHR, &dev_f_op_stdout);
 }
 
-/* We provide a separate set of f_ops and pm_ops for devices (char for now), and
- * this is the only thing that differs from the regular KFS.  We need to do some
+/* Creates a device node at a given location in the FS-tree */
+struct file *make_device(char *path, int mode, int type,
+                         struct file_operations *fop)
+{
+	struct file *f_dev = do_file_open(path, O_CREAT, mode);
+	assert(f_dev);
+	/* Overwrite the f_op with our own f_ops */
+	f_dev->f_dentry->d_inode->i_fop = fop;
+	f_dev->f_op = fop;
+	SET_FTYPE(f_dev->f_dentry->d_inode->i_mode, type);
+	return f_dev;
+}
+
+/* We provide a separate set of f_ops for devices (char and block), and the fops
+ * is the only thing that differs from the regular KFS.  We need to do some
  * ghetto-overriding of these ops after we create them. */
 
 off_t dev_c_llseek(struct file *file, off_t offset, int whence)
+{
+	set_errno(EINVAL);
+	return -1;
+}
+
+/* we don't allow mmapping of any device file */
+int dev_mmap(struct file *file, struct vm_region *vmr)
 {
 	set_errno(EINVAL);
 	return -1;
@@ -98,14 +105,7 @@ ssize_t dev_stdout_write(struct file *file, const char *buf, size_t count,
 	return count;
 }
 
-/* we don't allow mmapping of any device file */
-int dev_mmap(struct file *file, struct vm_region *vmr)
-{
-	set_errno(EINVAL);
-	return -1;
-}
-
-/* Character device file ops */
+/* stdin/stdout/stderr file ops */
 struct file_operations dev_f_op_stdin = {
 	dev_c_llseek,
 	dev_stdin_read,

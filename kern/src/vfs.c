@@ -1760,6 +1760,10 @@ static void print_dir(struct dentry *dentry, char *buf, int depth)
 					printk("%s%s (char device) nlink: %d\n", buf, next.d_name,
 					       child_d->d_inode->i_nlink);
 					break;
+				case (__S_IFBLK):
+					printk("%s%s (block device) nlink: %d\n", buf, next.d_name,
+					       child_d->d_inode->i_nlink);
+					break;
 				default:
 					warn("Look around you!  Unknown filetype!");
 			}

@@ -39,6 +39,7 @@
 #include <kfs.h>
 #include <vfs.h>
 #include <devfs.h>
+#include <blockdev.h>
 
 // zra: flag for Ivy
 int booting = 1;
@@ -91,6 +92,7 @@ void kernel_init(multiboot_info_t *mboot_info)
 	
 	// At this point our boot paths diverge based on arch. 
 	arch_init();
+	block_init();
 		
 //	printk("Starting tests....\n");
 //	test_color_alloc();

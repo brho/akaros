@@ -19,6 +19,7 @@
 #include <kref.h>
 #include <timing.h>
 #include <radix.h>
+#include <blockdev.h>
 
 /* ghetto preprocessor hacks (since proc includes vfs) */
 struct page;
@@ -29,7 +30,6 @@ typedef int dev_t;
 typedef int kdev_t;
 typedef int ino_t;
 typedef long off_t; // out there in other .h's, but not in the kernel yet
-struct block_device	{int x;};
 struct io_writeback	{int x;};
 struct event_poll {int x;};
 struct poll_table_struct {int x;};

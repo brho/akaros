@@ -9,10 +9,18 @@
 #define ROS_KERN_DEVFS_H
 
 #include <vfs.h>
+#include <kfs.h>
 
 void devfs_init(void);
+struct file *make_device(char *path, int mode, int type,
+                         struct file_operations *fop);
 
-/* Exporting these for convenience */
+/* Generic device (block or char) file ops.  Both of these are dummies that say
+ * the device can't support the operation. */
+int dev_mmap(struct file *file, struct vm_region *vmr);
+off_t dev_c_llseek(struct file *file, off_t offset, int whence);
+
+/* Exporting these for convenience (process creation) */
 extern struct file *dev_stdin, *dev_stdout, *dev_stderr;
 
 #endif /* !ROS_KERN_DEVFS_H */

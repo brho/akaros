@@ -44,6 +44,7 @@ KERN_SRCFILES := $(KERN_ARCH_SRCFILES) \
                  $(KERN_SRC_DIR)/radix.c \
                  $(KERN_SRC_DIR)/umem.c \
                  $(KERN_SRC_DIR)/devfs.c \
+                 $(KERN_SRC_DIR)/blockdev.c \
                  $(KERN_SRC_DIR)/testing.c \
                  $(KERN_SRC_DIR)/arsc.c
 
@@ -94,7 +95,8 @@ $(OBJDIR)/$(KERN_DIR)/%.o: $(KERN_DIR)/%.S
 $(OBJDIR)/$(KERN_DIR)/kernel: $(KERN_LDDEPENDS)
 	@echo + ld [KERN] $@
 	$(V)$(LD) -o $@ $(KERN_LDFLAGS) $(KERN_OBJFILES) $(KERN_LDLIBS) \
-	                $(KERN_GCC_LIB) -b binary $(OBJDIR)/$(KERN_DIR)/$(KERN_CPIO)
+	                $(KERN_GCC_LIB) -b binary $(OBJDIR)/$(KERN_DIR)/$(KERN_CPIO) \
+	                $(EXT2_BDEV)
 	$(V)$(OBJDUMP) -S $@ > $@.asm
 	$(V)$(NM) -n $@ > $@.sym
 
