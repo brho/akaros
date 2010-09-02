@@ -146,11 +146,13 @@ int kfs_readpage(struct file *file, struct page *page)
 
 /* Super Operations */
 
-/* creates and initializes a new inode.  generic fields are filled in.  specific
- * fields are filled in in read_inode() based on what's on the disk for a given
- * i_no.  i_no and i_fop are set by the caller.  Note that this means this inode
- * can be for an inode that is already on disk, or it can be used when creating.
- * The i_fop depends on the type of file (file, directory, symlink, etc). */
+/* Creates and initializes a new inode.  FS specific, yet inode-generic fields
+ * are filled in.  inode-specific fields are filled in in read_inode() based on
+ * what's on the disk for a given i_no.  i_no and i_fop are set by the caller.
+ *
+ * Note that this means this inode can be for an inode that is already on disk,
+ * or it can be used when creating.  The i_fop depends on the type of file
+ * (file, directory, symlink, etc). */
 struct inode *kfs_alloc_inode(struct super_block *sb)
 {
 	struct inode *inode = kmem_cache_alloc(inode_kcache, 0);
@@ -188,7 +190,6 @@ void kfs_read_inode(struct inode *inode)
 		inode->i_nlink = 1;				/* assuming only one hardlink */
 		inode->i_uid = 0;
 		inode->i_gid = 0;
-		inode->i_rdev = 0;
 		inode->i_size = 0;				/* make sense for KFS? */
 		inode->i_atime.tv_sec = 0;
 		inode->i_atime.tv_nsec = 0;
@@ -197,7 +198,6 @@ void kfs_read_inode(struct inode *inode)
 		inode->i_ctime.tv_sec = 0;
 		inode->i_ctime.tv_nsec = 0;
 		inode->i_blocks = 0;
-		inode->i_bdev = 0;				/* assuming blockdev? */
 		inode->i_flags = 0;
 		inode->i_socket = FALSE;
 	} else {

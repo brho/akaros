@@ -697,6 +697,8 @@ struct inode *get_inode(struct dentry *dentry)
 	inode->i_blksize = sb->s_blocksize;
 	spinlock_init(&inode->i_lock);
 	inode->i_sb = sb;
+	inode->i_rdev = 0;					/* this has no real meaning yet */
+	inode->i_bdev = sb->s_bdev;			/* storing an uncounted ref */
 	inode->i_state = 0;					/* need real states, like I_NEW */
 	inode->dirtied_when = 0;
 	inode->i_flags = 0;

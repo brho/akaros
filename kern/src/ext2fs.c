@@ -23,6 +23,22 @@ struct file_operations ext2_f_op_dir;
 struct file_operations ext2_f_op_sym;
 
 /* EXT2 Internal Functions */
+
+/* Useful helper functions. */
+
+/* This returns the block group containing the inode, BGs starting at 0.  Note
+ * the inodes are indexed starting at 1. */
+static unsigned int ext2_ino2bg(unsigned int inode_num, unsigned int ino_p_grp)
+{
+	return (inode_num - 1) / ino_p_grp;
+}
+
+/* This returns the 0-index within a block group */
+static unsigned int ext2_ino2idx(unsigned int inode_num, unsigned int ino_p_grp)
+{
+	return (inode_num - 1) % ino_p_grp;
+}
+
 /* Free whatever is returned with kfree(), pending proper buffer management.
  * Ext2's superblock is always in the same spot, starting at byte 1024 and is
  * 1024 bytes long. */
@@ -46,18 +62,22 @@ struct ext2_sb *ext2_read_sb(struct block_device *bdev)
 	return e2sb;
 }
 	
+/* Slabs for ext2 specific info chunks */
+struct kmem_cache *ext2_i_kcache;
+
 /* One-time init for all ext2 instances */
 void ext2_init(void)
 {
+	ext2_i_kcache = kmem_cache_create("ext2_i_info", sizeof(struct ext2_i_info),
+	                                  __alignof__(struct ext2_i_info), 0, 0, 0);
 }
 
 /* Helper op to read one ext2 block, 0-indexing the block numbers.  Kfree your
  * answer.
  *
  * TODO: consider taking a buffer_head, or having a generic block_dev function
- * for this.  Also, eventually we can track a lot of this with the VFS SB. */
-//int ext2_read_block(struct super_block *sb, unsigned int block_num) (TODO)
-void *ext2_read_block(struct block_device *bdev, int block_num, int blocksize)
+ * for this. */
+void *__ext2_read_block(struct block_device *bdev, int block_num, int blocksize)
 {
 	int retval;
 	void *buffer = kmalloc(blocksize, 0);
@@ -72,14 +92,19 @@ void *ext2_read_block(struct block_device *bdev, int block_num, int blocksize)
 	return buffer;
 }
 
+void *ext2_read_block(struct super_block *sb, unsigned int block_num)
+{
+	return __ext2_read_block(sb->s_bdev, block_num, sb->s_blocksize);
+}
+
 /* This checks an ext2 disc SB for consistency, optionally printing out its
  * stats.  It also will also read in a copy of the block group descriptor table
  * from its first location (right after the primary SB copy) */
-void ext2_check_sb(struct ext2_sb *e2sb, struct block_device *bdev, bool print)
+void ext2_check_sb(struct ext2_sb *e2sb, struct ext2_block_group *bg,
+                   bool print)
 {
 	int retval;
 	unsigned int blksize, blks_per_group, num_blk_group, num_blks;
-	struct ext2_block_group *bg;
 	unsigned int inodes_per_grp, blks_per_grp, inode_size;
 	unsigned int sum_blks = 0, sum_inodes = 0;
 
@@ -119,14 +144,11 @@ void ext2_check_sb(struct ext2_sb *e2sb, struct block_device *bdev, bool print)
 		printk("\nBlock Group Info:\n----------------------\n");
 	}
 	
-	/* which block the BG table is on depends on the blocksize */
-	bg = ext2_read_block(bdev, blksize == 1024 ? 2 : 1, blksize);
-	assert(bg);
 	for (int i = 0; i < num_blk_group; i++) {
 		sum_blks += le16_to_cpu(bg[i].bg_free_blocks_cnt);
 		sum_inodes += le16_to_cpu(bg[i].bg_free_inodes_cnt);
 		if (print) {
-			printk("*** BG %d at %08p\n", i, bg[i]);
+			printk("*** BG %d at %08p\n", i, &bg[i]);
 			printk("Block bitmap:%8d\n", le32_to_cpu(bg[i].bg_block_bitmap));
 			printk("Inode bitmap:%8d\n", le32_to_cpu(bg[i].bg_inode_bitmap));
 			printk("Inode table: %8d\n", le32_to_cpu(bg[i].bg_inode_table));
@@ -152,9 +174,6 @@ void ext2_check_sb(struct ext2_sb *e2sb, struct block_device *bdev, bool print)
 	assert(inode_size == 1 << LOG2_UP(inode_size));
 	assert(blksize * 8 >= inodes_per_grp);
 	assert(inodes_per_grp % (blksize / inode_size) == 0);
-	
-	/* Free the buffer used during the IO request */
-	kfree(bg);
 	if (print)
 		printk("Passed EXT2 Checks\n");
 }
@@ -168,6 +187,7 @@ struct super_block *ext2_get_sb(struct fs_type *fs, int flags,
 {
 	struct block_device *bdev;
 	struct ext2_sb *e2sb;
+	struct ext2_block_group *e2bg;
 
 	static bool ran_once = FALSE;
 	if (!ran_once) {
@@ -181,12 +201,17 @@ struct super_block *ext2_get_sb(struct fs_type *fs, int flags,
 		warn("EXT2 Not detected when it was expected!");
 		return 0;
 	}
-	ext2_check_sb(e2sb, bdev, FALSE);
+	/* Read in the block group descriptor table.  Which block the BG table is on
+	 * depends on the blocksize */
+	unsigned int blksize = 1024 << le32_to_cpu(e2sb->s_log_block_size);
+	e2bg = __ext2_read_block(bdev, blksize == 1024 ? 2 : 1, blksize);
+	assert(e2bg);
+	ext2_check_sb(e2sb, e2bg, FALSE);
 
 	/* Now we build and init the VFS SB */
 	struct super_block *sb = get_sb();
 	sb->s_dev = 0;			/* what do we really want here? */
-	sb->s_blocksize = 1024 << le32_to_cpu(e2sb->s_log_block_size);
+	sb->s_blocksize = blksize;
 	/* max file size for a 1024 blocksize FS.  good enough for now (TODO) */
 	sb->s_maxbytes = 17247252480;
 	sb->s_type = &ext2_fs_type;
@@ -198,7 +223,11 @@ struct super_block *ext2_get_sb(struct fs_type *fs, int flags,
 	kref_get(&bdev->b_kref, 1);
 	sb->s_bdev = bdev;
 	strlcpy(sb->s_name, "EXT2", 32);
-	sb->s_fs_info = e2sb;	/* store the in-memory copy of the disk SB */
+	sb->s_fs_info = kmalloc(sizeof(struct ext2_sb_info), 0);
+	assert(sb->s_fs_info);
+	/* store the in-memory copy of the disk SB and bg desc table */
+	((struct ext2_sb_info*)sb->s_fs_info)->e2sb = e2sb;
+	((struct ext2_sb_info*)sb->s_fs_info)->e2bg = e2bg;
 
 	/* Final stages of initializing the sb, mostly FS-independent */
 	init_sb(sb, vmnt, &ext2_d_op, EXT2_ROOT_INO, 0);
@@ -210,7 +239,7 @@ struct super_block *ext2_get_sb(struct fs_type *fs, int flags,
 
 void ext2_kill_sb(struct super_block *sb)
 {
-	kfree(sb->s_fs_info);	/* this is the e2sb we received from a disk read */
+	/* don't forget to kfree the s_fs_info and its two members */
 	panic("Killing an EXT2 SB is not supported!");
 }
 
@@ -253,23 +282,19 @@ int ext2_readpage(struct file *file, struct page *page)
 
 /* Super Operations */
 
-/* creates and initializes a new inode.  generic fields are filled in.  specific
- * fields are filled in in read_inode() based on what's on the disk for a given
- * i_no.  i_no and i_fop are set by the caller.  Note that this means this inode
- * can be for an inode that is already on disk, or it can be used when creating.
- * The i_fop depends on the type of file (file, directory, symlink, etc). */
+/* Creates and initializes a new inode.  FS specific, yet inode-generic fields
+ * are filled in.  inode-specific fields are filled in in read_inode() based on
+ * what's on the disk for a given i_no.  i_no and i_fop are set by the caller.
+ *
+ * Note that this means this inode can be for an inode that is already on disk,
+ * or it can be used when creating.  The i_fop depends on the type of file
+ * (file, directory, symlink, etc). */
 struct inode *ext2_alloc_inode(struct super_block *sb)
 {
-I_AM_HERE;
 	struct inode *inode = kmem_cache_alloc(inode_kcache, 0);
 	memset(inode, 0, sizeof(struct inode));
 	inode->i_op = &ext2_i_op;
 	inode->i_pm.pm_op = &ext2_pm_op;
-	#if 0
-	inode->i_fs_info = kmem_cache_alloc(ext2_i_kcache, 0);
-	TAILQ_INIT(&((struct ext2_i_info*)inode->i_fs_info)->children);
-	((struct ext2_i_info*)inode->i_fs_info)->filestart = 0;
-	#endif
 	return inode;
 }
 
@@ -289,36 +314,66 @@ I_AM_HERE;
  * basically, it's a "make this inode the one for i_ino (i number)" */
 void ext2_read_inode(struct inode *inode)
 {
-I_AM_HERE;
-	/* need to do something to link this inode/file to the actual "blocks" on
-	 * "disk". */
+	unsigned int bg_num, bg_idx, ino_per_blkgrp, ino_per_blk, my_ino_blk;
+	struct ext2_sb_info *e2sbi = (struct ext2_sb_info*)inode->i_sb->s_fs_info;
+	struct ext2_sb *e2sb = e2sbi->e2sb;
+	struct ext2_block_group *my_bg;
+	struct ext2_inode *ino_tbl_chunk, *my_ino;
 
-#if 0
+	/* Need to compute the blockgroup and index of the requested inode */
+	ino_per_blkgrp = le32_to_cpu(e2sb->s_inodes_per_group);
+	ino_per_blk = inode->i_sb->s_blocksize / le16_to_cpu(e2sb->s_inode_size);
+	bg_num = ext2_ino2bg(inode->i_ino, ino_per_blkgrp);
+	bg_idx = ext2_ino2idx(inode->i_ino, ino_per_blkgrp);
+	my_bg = &e2sbi->e2bg[bg_num];
+	/* Figure out which FS block of the inode table we want and read in that
+	 * chunk */
+	my_ino_blk = le32_to_cpu(my_bg->bg_inode_table) + bg_idx / ino_per_blk;
+	ino_tbl_chunk = ext2_read_block(inode->i_sb, my_ino_blk);
+	my_ino = &ino_tbl_chunk[bg_idx % ino_per_blk];
 
-	if (inode->i_ino == 1) {
-		inode->i_mode = S_IRWXU | S_IRWXG | S_IRWXO;
-		SET_FTYPE(inode->i_mode, __S_IFDIR);
-		inode->i_fop = &ext2_f_op_dir;
-		inode->i_nlink = 1;				/* assuming only one hardlink */
-		inode->i_uid = 0;
-		inode->i_gid = 0;
-		inode->i_rdev = 0;
-		inode->i_size = 0;				/* make sense for Ext2? */
-		inode->i_atime.tv_sec = 0;
-		inode->i_atime.tv_nsec = 0;
-		inode->i_mtime.tv_sec = 0;
-		inode->i_mtime.tv_nsec = 0;
-		inode->i_ctime.tv_sec = 0;
-		inode->i_ctime.tv_nsec = 0;
-		inode->i_blocks = 0;
-		inode->i_bdev = 0;				/* assuming blockdev? */
-		inode->i_flags = 0;
-		inode->i_socket = FALSE;
-	} else {
-		panic("Not implemented");
+	/* Have the disk inode now, let's put its info into the VFS inode: */
+	inode->i_mode = le16_to_cpu(my_ino->i_mode);
+	switch (inode->i_mode & __S_IFMT) {
+		case (__S_IFDIR):
+			inode->i_fop = &ext2_f_op_dir;
+			break;
+		case (__S_IFREG):
+			inode->i_fop = &ext2_f_op_file;
+			break;
+		case (__S_IFLNK):
+			inode->i_fop = &ext2_f_op_sym;
+			break;
+		case (__S_IFCHR):
+		case (__S_IFBLK):
+		default:
+			inode->i_fop = &ext2_f_op_file;
+			warn("[Calm British Accent] Look around you.  Unhandled filetype.");
 	}
-	/* TODO: unused: inode->i_hash add to hash (saves on disc reading) */
-#endif
+	inode->i_nlink = le16_to_cpu(my_ino->i_links_cnt);
+	inode->i_uid = le16_to_cpu(my_ino->i_uid);
+	inode->i_gid = le16_to_cpu(my_ino->i_gid);
+	/* technically, for large F_REG, we should | with i_dir_acl */
+	inode->i_size = le32_to_cpu(my_ino->i_size);
+	inode->i_atime.tv_sec = le32_to_cpu(my_ino->i_atime);
+	inode->i_atime.tv_nsec = 0;
+	inode->i_mtime.tv_sec = le32_to_cpu(my_ino->i_mtime);
+	inode->i_mtime.tv_nsec = 0;
+	inode->i_ctime.tv_sec = le32_to_cpu(my_ino->i_ctime);
+	inode->i_ctime.tv_nsec = 0;
+	inode->i_blocks = le32_to_cpu(my_ino->i_blocks);
+	inode->i_flags = le32_to_cpu(my_ino->i_flags);
+	inode->i_socket = FALSE;		/* for now */
+	/* Copy over the other inode stuff that isn't in the VFS inode.  For now,
+	 * it's just the block pointers */
+	inode->i_fs_info = kmem_cache_alloc(ext2_i_kcache, 0);
+	struct ext2_i_info *e2ii = (struct ext2_i_info*)inode->i_fs_info;
+	for (int i = 0; i < 15; i++)
+		e2ii->i_block[i] = le32_to_cpu(my_ino->i_block[i]);
+	/* TODO: (HASH) unused: inode->i_hash add to hash (saves on disc reading) */
+	/* TODO: (BUF) we could consider saving a pointer to the disk inode and
+	 * pinning its buffer in memory, but for now we'll just free it */
+	kfree(ino_tbl_chunk);
 }
 
 /* called when an inode in memory is modified (journalling FS's care) */

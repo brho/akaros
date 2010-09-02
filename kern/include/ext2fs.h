@@ -221,7 +221,7 @@ struct ext2_inode {
 	uint32_t					i_mtime;
 	uint32_t					i_dtime;			/* delete time */
 	uint16_t					i_gid;
-	uint16_t					i_links_cnt;		/* fs_ino->i_nlinks */
+	uint16_t					i_links_cnt;		/* fs_ino->i_nlink */
 	uint32_t					i_blocks;			/* num blocks reserved */
 	uint32_t					i_flags;			/* how to access data */
 	uint32_t					i_osd1;				/* OS dependent */
@@ -246,4 +246,17 @@ struct ext2_dirent {
 /* Every FS must extern it's type, and be included in vfs_init() */
 extern struct fs_type ext2_fs_type;
 
+/* This hangs off the VFS's SB, and tracks in-memory copies of the disc SB and
+ * the block group descriptor table.  For now, s_dirty (VFS) will track the
+ * dirtiness of all things hanging off the sb.  Both of the objects contained
+ * are kmalloc()d, as is this struct. */
+struct ext2_sb_info {
+	struct ext2_sb				*e2sb;
+	struct ext2_block_group		*e2bg;
+};
+
+/* Inode in-memory data.  This stuff is in cpu-native endianness */
+struct ext2_i_info {
+	uint32_t					i_block[15];		/* list of blocks reserved*/
+};
 #endif /* ROS_KERN_EXT2FS_H */
