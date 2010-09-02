@@ -25,12 +25,6 @@
 #include <sys/stat.h>
 #include <ros/syscall.h>
 
-/* ROS: this is a bit odd.  The makescripts want this file to exist (needed for
- * login/ptsname.o, but if we include the functions, somewhere else has a copy
- * that conflicts at link time.  This seems to work for now, though we're
- * missing something here... */
-
-#if 0
 /* Return the pathname of the pseudo terminal slave assoicated with
    the master FD is open on, or NULL on errors.
    The returned storage is good until the next call to this function.  */
@@ -79,4 +73,3 @@ __ptsname_r (int fd, char *buf, size_t buflen)
   return 0;
 }
 weak_alias (__ptsname_r, ptsname_r)
-#endif
