@@ -764,7 +764,7 @@ void monitor(struct trapframe *tf)
 int mon_fs(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 {
 	/* this assumes one mounted FS at the NS root */
-	struct super_block *sb = default_ns.root->mnt_root->d_inode->i_sb;
+	struct super_block *sb;
 	struct file *file;
 	struct inode *inode;
 	struct dentry *dentry;
@@ -778,19 +778,27 @@ int mon_fs(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 	}
 	if (!strcmp(argv[1], "open")) {
 		printk("Open Files:\n----------------------------\n");
-		TAILQ_FOREACH(file, &sb->s_files, f_list)
-			printk("File: %08p, %s, Refs: %d, Drefs: %d, Irefs: %d\n", file,
-			       file_name(file), kref_refcnt(&file->f_kref),
-				   kref_refcnt(&file->f_dentry->d_kref),
-				   kref_refcnt(&file->f_dentry->d_inode->i_kref));
+		TAILQ_FOREACH(sb, &super_blocks, s_list) {
+			printk("Superblock for %s\n", sb->s_name);
+			TAILQ_FOREACH(file, &sb->s_files, f_list)
+				printk("File: %08p, %s, Refs: %d, Drefs: %d, Irefs: %d\n", file,
+				       file_name(file), kref_refcnt(&file->f_kref),
+				       kref_refcnt(&file->f_dentry->d_kref),
+				       kref_refcnt(&file->f_dentry->d_inode->i_kref));
+		}
 	} else if (!strcmp(argv[1], "inodes")) {
 		printk("Mounted FS Inodes:\n----------------------------\n");
-		TAILQ_FOREACH(inode, &sb->s_inodes, i_sb_list) {
-			printk("Inode: %08p, Refs: %d, Nlinks: %d, Size(B): %d\n", inode,
-			       kref_refcnt(&inode->i_kref), inode->i_nlink, inode->i_size);
-			TAILQ_FOREACH(dentry, &inode->i_dentry, d_alias)
-				printk("\t%s: Dentry: %08p, Refs: %d\n", dentry->d_name.name,
-				       dentry, kref_refcnt(&dentry->d_kref));
+		TAILQ_FOREACH(sb, &super_blocks, s_list) {
+			printk("Superblock for %s\n", sb->s_name);
+			TAILQ_FOREACH(inode, &sb->s_inodes, i_sb_list) {
+				printk("Inode: %08p, Refs: %d, Nlinks: %d, Size(B): %d\n",
+				       inode, kref_refcnt(&inode->i_kref), inode->i_nlink,
+				       inode->i_size);
+				TAILQ_FOREACH(dentry, &inode->i_dentry, d_alias)
+					printk("\t%s: Dentry: %08p, Refs: %d\n",
+					       dentry->d_name.name, dentry,
+					       kref_refcnt(&dentry->d_kref));
+			}
 		}
 	} else if (!strcmp(argv[1], "ls")) {
 		if (argc != 3) {
