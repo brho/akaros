@@ -92,9 +92,77 @@ void *__ext2_read_block(struct block_device *bdev, int block_num, int blocksize)
 	return buffer;
 }
 
+/* Raw access to an FS block */
 void *ext2_read_block(struct super_block *sb, unsigned int block_num)
 {
 	return __ext2_read_block(sb->s_bdev, block_num, sb->s_blocksize);
+}
+
+/* Helper for read_ino_block(). 
+ *
+ * This walks a table stored at block 'blkid', returning which block you should
+ * walk next in 'blkid'.  rel_inoblk is where you are given the current level of
+ * indirection tables, and returns where you should be for the next one.  Reach
+ * is how many items the current table's *items* can index (so if we're on a
+ * 3x indir block, reach should be for the doubly-indirect entries, and
+ * rel_inoblk will tell you where within that double block you want).
+ * TODO: buffer/page cache this shit. */
+static void ext2_walk_inotable(struct inode *inode, unsigned int *blkid,
+                               unsigned int *rel_inoblk, unsigned int reach)
+{
+	uint32_t *blk_buf = ext2_read_block(inode->i_sb, *blkid);
+	assert(blk_buf);
+	*blkid = le32_to_cpu(blk_buf[*rel_inoblk / reach]);
+	*rel_inoblk = *rel_inoblk % reach;
+	kfree(blk_buf);
+}
+
+/* Reads a file's block, determined via walking the inode's tables.  The general
+ * idea is that if the ino_block num is above a threshold, we'll need to go into
+ * indirect tables (1x, 2x, or 3x (triply indirect) tables).  Block numbers
+ * start at 0.
+ *
+ * One thing that might suck with this: if there's a 0 in the array, we should
+ * stop.  This function isn't really checking if we "went too far."
+ *
+ * Horrendously untested, btw. */
+void *ext2_read_ino_block(struct inode *inode, unsigned int ino_block)
+{
+	struct ext2_i_info *e2ii = (struct ext2_i_info*)inode->i_fs_info;
+
+	unsigned int blkid;
+	void *blk;
+	/* The 'reach' is how many blocks a given table can 'address' */
+	int ptrs_per_blk = inode->i_sb->s_blocksize / sizeof(uint32_t);
+	int reach_1xblk = ptrs_per_blk;
+	int reach_2xblk = ptrs_per_blk * ptrs_per_blk;
+	/* thresholds are the first blocks that require a level of indirection */
+	int single_threshold = 12;
+	int double_threshold = single_threshold + reach_1xblk;
+	int triple_threshold = double_threshold + reach_2xblk;
+	/* this is the desired block num lookup within a level of indirection */
+	unsigned int rel_inoblk = ino_block;
+
+	if (ino_block >= triple_threshold) {
+		/* ino_block requires a triply-indirect lookup */
+		blkid = e2ii->i_block[14];
+		ext2_walk_inotable(inode, &blkid, &rel_inoblk, reach_2xblk);
+		ext2_walk_inotable(inode, &blkid, &rel_inoblk, reach_1xblk);
+		ext2_walk_inotable(inode, &blkid, &rel_inoblk, 1);
+	} else if (ino_block >= double_threshold) {
+		/* ino_block requires a doubly-indirect lookup  */
+		blkid = e2ii->i_block[13];
+		ext2_walk_inotable(inode, &blkid, &rel_inoblk, reach_1xblk);
+		ext2_walk_inotable(inode, &blkid, &rel_inoblk, 1);
+	} else if (ino_block >= single_threshold) {
+		/* ino_block requires a singly-indirect lookup */
+		blkid = e2ii->i_block[12];
+		ext2_walk_inotable(inode, &blkid, &rel_inoblk, 1);
+	} else {
+		/* Direct block, straight out of the inode */
+		blkid = e2ii->i_block[ino_block];
+	}
+	return ext2_read_block(inode->i_sb, blkid);
 }
 
 /* This checks an ext2 disc SB for consistency, optionally printing out its
@@ -478,19 +546,44 @@ I_AM_HERE;
  * with the FS specific info of this file.  If it succeeds, it will pass back
  * the *dentry you should use.  If this fails, it will return 0 and will take
  * the ref to the dentry for you.  Either way, you shouldn't use the ref you
- * passed in anymore.  Still, there are issues with refcnting with this.
+ * passed in anymore.
  *
- * Callers, make sure you alloc and fill out the name parts of the dentry, and
- * an initialized nameidata. TODO: not sure why we need an ND.  Don't use it in
- * a fs_lookup for now!
- *
- * Because of the way Ext2 currently works, if there is ever a dentry, it's
- * already in memory, along with its inode (all path's pinned).  So we just find
- * it and return it, freeing the one that came in. */
+ * Callers, make sure you alloc and fill out the name parts of the dentry.  We
+ * don't currently use the ND.  Might remove it in the future.  */
 struct dentry *ext2_lookup(struct inode *dir, struct dentry *dentry,
-                          struct nameidata *nd)
+                           struct nameidata *nd)
 {
-	I_AM_HERE;
+	assert(S_ISDIR(dir->i_mode));
+	struct ext2_dirent *dir_buf, *dir_i;
+	unsigned int dir_block = 0;
+	bool found = FALSE;
+	dir_buf = ext2_read_ino_block(dir, dir_block++);
+	dir_i = dir_buf;
+	/* now we have the first block worth of dirents.  We'll get another block if
+	 * dir_i hits a block boundary */
+	for (unsigned int bytes = 0; bytes < dir->i_size; ) {
+		/* On subsequent loops, we might need to advance to the next block */
+		if ((void*)dir_i >= (void*)dir_buf + dir->i_sb->s_blocksize) {
+			kfree(dir_buf);
+			dir_buf = ext2_read_ino_block(dir, dir_block++);
+			dir_i = dir_buf;
+			assert(dir_buf);
+		}
+		/* Test if we're the one (TODO: use d_compare) */
+		if (!strncmp((char*)dir_i->dir_name, dentry->d_name.name,
+		             dir_i->dir_namelen)){
+			load_inode(dentry, le32_to_cpu(dir_i->dir_inode));
+			/* TODO: (HASH) add dentry to dcache (maybe the caller should) */
+			kfree(dir_buf);
+			return dentry;
+		}
+		/* Get ready for the next loop */
+		bytes += dir_i->dir_reclen;
+		dir_i = (void*)dir_i + dir_i->dir_reclen;
+	}
+	printd("EXT2: Not Found, %s\n", dentry->d_name.name);	
+	kref_put(&dentry->d_kref);
+	kfree(dir_buf);
 	return 0;
 }
 

@@ -63,7 +63,8 @@ KERN_OBJFILES  := $(patsubst $(KERN_DIR)/%.S, \
                              $(KERN_OBJFILES))
 
 KERN_LDDEPENDS := $(KERN_OBJFILES) $(ARCH_DIR)/$(TARGET_ARCH)/kernel.ld \
-                  $(OBJDIR)/$(KERN_DIR)/libivykern.a $(OBJDIR)/$(KERN_DIR)/$(KERN_CPIO)
+                  $(OBJDIR)/$(KERN_DIR)/libivykern.a \
+                  $(OBJDIR)/$(KERN_DIR)/$(KERN_CPIO) $(EXT2_BDEV)
 
 KERN_LDLIBS    := -livykern
 

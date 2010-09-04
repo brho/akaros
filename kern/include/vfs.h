@@ -439,6 +439,7 @@ struct dentry *lookup_dentry(char *path, int flags);
 
 /* Inode Functions */
 struct inode *get_inode(struct dentry *dentry);
+void load_inode(struct dentry *dentry, unsigned int ino);
 int create_file(struct inode *dir, struct dentry *dentry, int mode);
 int create_dir(struct inode *dir, struct dentry *dentry, int mode);
 int create_symlink(struct inode *dir, struct dentry *dentry,

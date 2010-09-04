@@ -715,6 +715,15 @@ struct inode *get_inode(struct dentry *dentry)
 	return inode;
 }
 
+/* Helper: loads/ reads in the inode numbered ino and attaches it to dentry */
+void load_inode(struct dentry *dentry, unsigned int ino)
+{
+	struct inode *inode = get_inode(dentry);
+	inode->i_ino = ino;
+	dentry->d_sb->s_op->read_inode(inode);
+	kref_put(&inode->i_kref);
+}
+
 /* Helper op, used when creating regular files, directories, symlinks, etc.
  * Note we make a distinction between the mode and the file type (for now).
  * After calling this, call the FS specific version (create or mkdir), which
