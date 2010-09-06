@@ -411,9 +411,21 @@ int kfs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
  * pinned, it just relies on the dentry connections. */
 int kfs_rmdir(struct inode *dir, struct dentry *dentry)
 {
-	/* Bug check, make sure we don't have any kids in KFS */
-	struct kfs_i_info *data = (struct kfs_i_info*)dentry->d_inode->i_fs_info;
-	assert(TAILQ_EMPTY(&data->children));
+	struct kfs_i_info *d_info = (struct kfs_i_info*)dentry->d_inode->i_fs_info;
+	struct dentry *d_i;
+	bool empty = TRUE;
+	/* Check if we are empty.  If not, error out, need to check the sub-dirs as
+	 * well as the sub-"files" */
+	TAILQ_FOREACH(d_i, &dentry->d_subdirs, d_subdirs_link) {
+		empty = FALSE;
+		break;
+	}
+	TAILQ_FOREACH(d_i, &d_info->children, d_subdirs_link) {
+		empty = FALSE;
+		break;
+	}
+	if (!empty)
+		return -ENOTEMPTY;
 	return 0;
 }
 

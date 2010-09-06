@@ -1313,8 +1313,6 @@ int do_rmdir(char *path)
 	struct nameidata nd_r = {0}, *nd = &nd_r;
 	int error;
 	int retval = -1;
-	struct dirent empty_test = {0};
-	struct file *dir_check;
 
 	/* get the parent, following links (probably want this), and we must get a
 	 * directory.  Note, current versions of path_lookup can't handle both
@@ -1337,18 +1335,7 @@ int do_rmdir(char *path)
 		goto out_dentry;
 	}
 	/* TODO: make sure we aren't a mount or processes root (EBUSY) */
-	/* Make sure we are empty.  Opening the dir and readdir to check for the
-	 * first entry. */
-	dir_check = dentry_open(dentry, O_RDONLY);
-	assert(dir_check);
-	error = dir_check->f_op->readdir(dir_check, &empty_test);
-	kref_put(&dir_check->f_kref);
-	/* TODO: push this into rmdir */
-	if (error != -1) {			/* readdir would return -1 for an empty dir */
-		set_errno(ENOTEMPTY);
-		goto out_dentry;
-	}
-	/* now for the removal */
+	/* Now for the removal.  the FSs will check if they are empty */
 	parent_i = nd->dentry->d_inode;
 	error = parent_i->i_op->rmdir(parent_i, dentry);
 	if (error < 0) {
