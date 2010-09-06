@@ -175,7 +175,7 @@ static int climb_up(struct nameidata *nd)
 	printd("CLIMB_UP, from %s\n", nd->dentry->d_name.name);
 	/* Top of the world, just return.  Should also check for being at the top of
 	 * the current process's namespace (TODO) */
-	if (!nd->dentry->d_parent)
+	if (!nd->dentry->d_parent || (nd->dentry->d_parent == nd->dentry))
 		return -1;
 	/* Check if we are at the top of a mount, if so, we need to follow
 	 * backwards, and then climb_up from that one.  We might need to climb
@@ -543,6 +543,8 @@ void init_sb(struct super_block *sb, struct vfsmount *vmnt,
 	if (vmnt->mnt_mountpoint) {
 		kref_get(&vmnt->mnt_mountpoint->d_kref, 1);	/* held by d_root */
 		d_root->d_parent = vmnt->mnt_mountpoint;	/* dentry of the root */
+	} else {
+		d_root->d_parent = d_root;			/* set root as its own parent */
 	}
 	/* insert the dentry into the dentry cache.  when's the earliest we can?
 	 * when's the earliest we should?  what about concurrent accesses to the
@@ -1341,6 +1343,7 @@ int do_rmdir(char *path)
 	assert(dir_check);
 	error = dir_check->f_op->readdir(dir_check, &empty_test);
 	kref_put(&dir_check->f_kref);
+	/* TODO: push this into rmdir */
 	if (error != -1) {			/* readdir would return -1 for an empty dir */
 		set_errno(ENOTEMPTY);
 		goto out_dentry;

@@ -526,14 +526,17 @@ off_t kfs_llseek(struct file *file, off_t offset, int whence)
 	return temp_off;
 }
 
-/* Fills in the next directory entry (dirent), starting with d_off.  Like with
- * read and write, there will be issues with userspace and the *dirent buf.
- * TODO: we don't really do anything with userspace concerns here, in part
+/* Fills in the next directory entry (dirent), starting with d_off.  KFS treats
+ * the size of each dirent as one byte.
+ *
+ * Like with read and write, there will be issues with userspace and the *dirent
+ * buf.  TODO: we don't really do anything with userspace concerns here, in part
  * because memcpy_to doesn't work well.  When we fix how we want to handle the
  * userbuffers, we can write this accordingly. (UMEM)  */
 int kfs_readdir(struct file *dir, struct dirent *dirent)
 {
-	int count = 0;
+	int count = 2;	/* total num dirents, gets incremented in check_entry() */
+	off_t desired_off = dirent->d_off;
 	bool found = FALSE;
 	struct dentry *subent;
 	struct dentry *dir_d = dir->f_dentry;
@@ -542,8 +545,9 @@ int kfs_readdir(struct file *dir, struct dirent *dirent)
 	/* how we check inside the for loops below.  moderately ghetto. */
 	void check_entry(void)
 	{
-		if (count++ == dirent->d_off) {
+		if (count++ == desired_off) {
 			dirent->d_ino = subent->d_inode->i_ino;
+			dirent->d_off = count;
 			dirent->d_reclen = subent->d_name.len;
 			/* d_name.name is null terminated, the byte after d_name.len */
 			assert(subent->d_name.len <= MAX_FILENAME_SZ);
@@ -558,17 +562,31 @@ int kfs_readdir(struct file *dir, struct dirent *dirent)
 		return -1;
 	}
 
-	/* need to check the sub-dirs as well as the sub-"files" */
-	TAILQ_FOREACH(subent, &dir_d->d_subdirs, d_subdirs_link)
-		check_entry();
-	TAILQ_FOREACH(subent, &k_i_info->children, d_subdirs_link)
-		check_entry();
-
+	/* Handle . and .. (first two dirents) */
+	if (dirent->d_off == 0) {
+		dirent->d_ino = dir_d->d_inode->i_ino;
+		dirent->d_off = 1;
+		dirent->d_reclen = 1;
+		strncpy(dirent->d_name, ".", 1);
+		found = TRUE;
+	} else if (dirent->d_off == 1) {
+		dirent->d_ino = dir_d->d_parent->d_inode->i_ino;
+		dirent->d_off = 2;
+		dirent->d_reclen = 2;
+		strncpy(dirent->d_name, "..", 2);
+		found = TRUE;
+	} else {
+		/* need to check the sub-dirs as well as the sub-"files" */
+		TAILQ_FOREACH(subent, &dir_d->d_subdirs, d_subdirs_link)
+			check_entry();
+		TAILQ_FOREACH(subent, &k_i_info->children, d_subdirs_link)
+			check_entry();
+	}
 	if (!found) {
 		set_errno(ENOENT);
 		return -1;
 	}
-	if (count - 1 == dirent->d_off)		/* found the last dir in the list */
+	if (count == dirent->d_off)		/* found the last dir in the list */
 		return 0;
 	return 1;							/* normal success for readdir */
 }
