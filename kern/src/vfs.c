@@ -760,16 +760,13 @@ static struct inode *create_inode(struct dentry *dentry, int mode)
 
 /* Create a new disk inode in dir associated with dentry, with the given mode.
  * called when creating a regular file.  dir is the directory/parent.  dentry is
- * the dentry of the inode we are creating.  Note the lack of the nd...
- * Also, we do the nlink++ in here, since we want to give the FS's a chance to
- * fail. */
+ * the dentry of the inode we are creating.  Note the lack of the nd... */
 int create_file(struct inode *dir, struct dentry *dentry, int mode)
 {
 	struct inode *new_file = create_inode(dentry, mode);
 	if (!new_file)
 		return -1;
 	dir->i_op->create(dir, dentry, mode, 0);
-	dir->i_nlink++;
 	kref_put(&new_file->i_kref);
 	return 0;
 }
@@ -782,7 +779,7 @@ int create_dir(struct inode *dir, struct dentry *dentry, int mode)
 	if (!new_dir)
 		return -1;
 	dir->i_op->mkdir(dir, dentry, mode);
-	dir->i_nlink++;
+	dir->i_nlink++;		/* Directories get a hardlink for every child dir */
 	/* Make sure my parent tracks me.  This is okay, since no directory (dir)
 	 * can have more than one dentry */
 	struct dentry *parent = TAILQ_FIRST(&dir->i_dentry);
@@ -802,7 +799,6 @@ int create_symlink(struct inode *dir, struct dentry *dentry,
 	if (!new_sym)
 		return -1;
 	dir->i_op->symlink(dir, dentry, symname);
-	dir->i_nlink++;			/* TODO: race with this, among other things */
 	kref_put(&new_sym->i_kref);
 	return 0;
 }
@@ -1175,7 +1171,6 @@ int do_link(char *old_path, char *new_path)
 	kref_get(&inode->i_kref, 1);
 	link_d->d_inode = inode;
 	inode->i_nlink++;
-	parent_dir->i_nlink++;
 	TAILQ_INSERT_TAIL(&inode->i_dentry, link_d, d_alias);	/* weak ref */
 	dcache_put(link_d);
 	retval = 0;				/* Note the fall through to the exit paths */
@@ -1316,6 +1311,8 @@ int do_rmdir(char *path)
 	struct nameidata nd_r = {0}, *nd = &nd_r;
 	int error;
 	int retval = -1;
+	struct dirent empty_test = {0};
+	struct file *dir_check;
 
 	/* get the parent, following links (probably want this), and we must get a
 	 * directory.  Note, current versions of path_lookup can't handle both
@@ -1338,9 +1335,13 @@ int do_rmdir(char *path)
 		goto out_dentry;
 	}
 	/* TODO: make sure we aren't a mount or processes root (EBUSY) */
-	/* make sure we are empty.  TODO: Race with this, and anything touching
-	 * i_nlink! */
-	if (dentry->d_inode->i_nlink != 1) {
+	/* Make sure we are empty.  Opening the dir and readdir to check for the
+	 * first entry. */
+	dir_check = dentry_open(dentry, O_RDONLY);
+	assert(dir_check);
+	error = dir_check->f_op->readdir(dir_check, &empty_test);
+	kref_put(&dir_check->f_kref);
+	if (error != -1) {			/* readdir would return -1 for an empty dir */
 		set_errno(ENOTEMPTY);
 		goto out_dentry;
 	}
