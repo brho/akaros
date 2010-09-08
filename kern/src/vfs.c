@@ -698,6 +698,7 @@ struct inode *get_inode(struct dentry *dentry)
 	inode->i_ino = 0;					/* set by caller later */
 	inode->i_blksize = sb->s_blocksize;
 	spinlock_init(&inode->i_lock);
+	kref_get(&sb->s_kref, 1);			/* could allow the dentry to pin it */
 	inode->i_sb = sb;
 	inode->i_rdev = 0;					/* this has no real meaning yet */
 	inode->i_bdev = sb->s_bdev;			/* storing an uncounted ref */
@@ -960,36 +961,41 @@ ssize_t generic_dir_read(struct file *file, char *u_buf, size_t count,
                          off_t *offset)
 {
 	struct kdirent dir_r = {0}, *dirent = &dir_r;
-	unsigned int num_dirents = count / sizeof(struct kdirent);
 	int retval = 1;
 	size_t amt_copied = 0;
 	char *buf_end = u_buf + count;
 
-	if (!count)
-		return 0;
-	if (*offset % sizeof(struct kdirent)) {
-		printk("[kernel] the f_pos for a directory should be dirent-aligned\n");
-		set_errno(EINVAL);
+	if (!S_ISDIR(file->f_dentry->d_inode->i_mode)) {
+		set_errno(ENOTDIR);
 		return -1;
 	}
-	/* for now, we need to tell readdir which dirent we want */
-	dirent->d_off = *offset / sizeof(struct kdirent);
+	if (!count)
+		return 0;
+	/* start readdir from where it left off: */
+	dirent->d_off = *offset;
 	for (; (u_buf < buf_end) && (retval == 1); u_buf += sizeof(struct kdirent)){
 		/* TODO: UMEM/KFOP (pin the u_buf in the syscall, ditch the local copy,
 		 * get rid of this memcpy and reliance on current, etc).  Might be
-		 * tricky with the dirent->d_off */
+		 * tricky with the dirent->d_off and trust issues */
 		retval = file->f_op->readdir(file, dirent);
-		if (retval < 0)
+		if (retval < 0) {
+			set_errno(-retval);
 			break;
+		}
+		/* Slight info exposure: could be extra crap after the name in the
+		 * dirent (like the name of a deleted file) */
 		if (current) {
 			memcpy_to_user(current, u_buf, dirent, sizeof(struct dirent));
 		} else {
 			memcpy(u_buf, dirent, sizeof(struct dirent));
 		}
 		amt_copied += sizeof(struct dirent);
-		dirent->d_off++;
 	}
-	*offset += amt_copied;
+	/* Next time read is called, we pick up where we left off */
+	*offset = dirent->d_off;	/* UMEM */
+	/* important to tell them how much they got.  they often keep going til they
+	 * get 0 back (in the case of ls).  it's also how much has been read, but it
+	 * isn't how much the f_pos has moved (which is opaque to the VFS). */
 	return amt_copied;
 }
 
@@ -1739,10 +1745,9 @@ char *do_getcwd(struct fs_struct *fs_env, char **kfree_this, size_t cwd_l)
 static void print_dir(struct dentry *dentry, char *buf, int depth)
 {
 	struct dentry *child_d;
-	struct dirent next;
+	struct dirent next = {0};
 	struct file *dir;
 	int retval;
-	int child_num = 0;
 
 	if (!S_ISDIR(dentry->d_inode->i_mode)) {
 		warn("Thought this was only directories!!");
@@ -1751,6 +1756,9 @@ static void print_dir(struct dentry *dentry, char *buf, int depth)
 	/* Print this dentry */
 	printk("%s%s/ nlink: %d\n", buf, dentry->d_name.name,
 	       dentry->d_inode->i_nlink);
+	if (dentry->d_mount_point) {
+		dentry = dentry->d_mounted_fs->mnt_root;
+	}
 	if (depth >= 32)
 		return;
 	/* Set buffer for our kids */
@@ -1760,9 +1768,12 @@ static void print_dir(struct dentry *dentry, char *buf, int depth)
 		panic("Filesystem seems inconsistent - unable to open a dir!");
 	/* Process every child, recursing on directories */
 	while (1) {
-		next.d_off = child_num++;
 		retval = dir->f_op->readdir(dir, &next);
 		if (retval >= 0) {
+			/* Skip .., ., and empty entries */
+			if (!strcmp("..", next.d_name) || !strcmp(".", next.d_name) ||
+			    next.d_ino == 0)
+				goto loop_next;
 			/* there is an entry, now get its dentry */
 			child_d = do_lookup(dentry, next.d_name);
 			if (!child_d)
@@ -1793,6 +1804,7 @@ static void print_dir(struct dentry *dentry, char *buf, int depth)
 			}
 			kref_put(&child_d->d_kref);	
 		}
+loop_next:
 		if (retval <= 0)
 			break;
 	}

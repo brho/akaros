@@ -12,6 +12,7 @@
 #include <assert.h>
 #include <kref.h>
 #include <endian.h>
+#include <error.h>
 
 /* These structs are declared again and initialized farther down */
 struct page_map_operations ext2_pm_op;
@@ -369,7 +370,13 @@ struct inode *ext2_alloc_inode(struct super_block *sb)
 /* deallocs and cleans up after an inode. */
 void ext2_dealloc_inode(struct inode *inode)
 {
-I_AM_HERE;
+	static bool ran_once = FALSE;
+	if (!ran_once) {
+		ran_once = TRUE;
+		warn("Implement %s(), you're leaking memory!\n", __FUNCTION__);
+	}
+/* too verbose, but it's a TODO... */
+//I_AM_HERE;
 	#if 0
 	/* If we're a symlink, give up our storage for the symname */
 	if (S_ISLNK(inode->i_mode))
@@ -760,29 +767,39 @@ I_AM_HERE;
 
 /* Fills in the next directory entry (dirent), starting with d_off.  Like with
  * read and write, there will be issues with userspace and the *dirent buf.
- * TODO: we don't really do anything with userspace concerns here, in part
- * because memcpy_to doesn't work well.  When we fix how we want to handle the
- * userbuffers, we can write this accordingly. (UMEM)  */
+ * TODO: (UMEM) */
 int ext2_readdir(struct file *dir, struct dirent *dirent)
 {
-	I_AM_HERE;
-	#if 0
-	int count = 0;
-	/* some of this error handling can be done by the VFS.  The syscall should
-	 * handle EBADF, EFAULT, and EINVAL (TODO, memory related). */
-	if (!S_ISDIR(dir_d->d_inode->i_mode)) {
-		set_errno(ENOTDIR);
-		return -1;
-	}
-
-
-	if (!found) {
-		set_errno(ENOENT);
-		return -1;
-	}
-	if (count - 1 == dirent->d_off)		/* found the last dir in the list */
+	void *buffer;
+	/* Not enough data at the end of the directory */
+	if (dir->f_dentry->d_inode->i_size <
+	    dirent->d_off + sizeof(struct ext2_dirent))
+		return -ENOENT;
+	
+	/* Figure out which block we need to read in for dirent->d_off */
+	int block = dirent->d_off / dir->f_dentry->d_sb->s_blocksize;
+	buffer = ext2_read_ino_block(dir->f_dentry->d_inode, block);
+	assert(buffer);
+	off_t f_off = dirent->d_off % dir->f_dentry->d_sb->s_blocksize;
+	/* Copy out the dirent info */
+	struct ext2_dirent *e2dir = (struct ext2_dirent*)(buffer + f_off);
+	dirent->d_ino = le32_to_cpu(e2dir->dir_inode);
+	dirent->d_off += le16_to_cpu(e2dir->dir_reclen);
+	/* note, dir_namelen doesn't include the \0 */
+	dirent->d_reclen = e2dir->dir_namelen;
+	strncpy(dirent->d_name, (char*)e2dir->dir_name, e2dir->dir_namelen);
+	assert(e2dir->dir_namelen <= MAX_FILENAME_SZ);
+	dirent->d_name[e2dir->dir_namelen] = '\0';
+	kfree(buffer);
+	
+	/* At the end of the directory, sort of.  ext2 often preallocates blocks, so
+	 * this will cause us to walk along til the end, which isn't quite right. */
+	if (dir->f_dentry->d_inode->i_size == dirent->d_off)
 		return 0;
-	#endif
+	if (dir->f_dentry->d_inode->i_size < dirent->d_off) {
+		warn("Issues reaching the end of an ext2 directory!");
+		return 0;
+	}
 	return 1;							/* normal success for readdir */
 }
 
@@ -802,7 +819,8 @@ int ext2_mmap(struct file *file, struct vm_region *vmr)
  * the FS to do whatever it needs. */
 int ext2_open(struct inode *inode, struct file *file)
 {
-	I_AM_HERE;
+	/* TODO: check to make sure the file is openable, and maybe do some checks
+	 * for the open mode (like did we want to truncate, append, etc) */
 	return 0;
 }
 

@@ -539,7 +539,8 @@ off_t kfs_llseek(struct file *file, off_t offset, int whence)
 }
 
 /* Fills in the next directory entry (dirent), starting with d_off.  KFS treats
- * the size of each dirent as one byte.
+ * the size of each dirent as 1 byte, which we can get away with since the d_off
+ * is a way of communicating with future calls to readdir (FS-specific).
  *
  * Like with read and write, there will be issues with userspace and the *dirent
  * buf.  TODO: we don't really do anything with userspace concerns here, in part
@@ -548,7 +549,7 @@ off_t kfs_llseek(struct file *file, off_t offset, int whence)
 int kfs_readdir(struct file *dir, struct dirent *dirent)
 {
 	int count = 2;	/* total num dirents, gets incremented in check_entry() */
-	off_t desired_off = dirent->d_off;
+	int desired_file = dirent->d_off;
 	bool found = FALSE;
 	struct dentry *subent;
 	struct dentry *dir_d = dir->f_dentry;
@@ -557,7 +558,7 @@ int kfs_readdir(struct file *dir, struct dirent *dirent)
 	/* how we check inside the for loops below.  moderately ghetto. */
 	void check_entry(void)
 	{
-		if (count++ == desired_off) {
+		if (count++ == desired_file) {
 			dirent->d_ino = subent->d_inode->i_ino;
 			dirent->d_off = count;
 			dirent->d_reclen = subent->d_name.len;
@@ -567,38 +568,32 @@ int kfs_readdir(struct file *dir, struct dirent *dirent)
 			found = TRUE;
 		}
 	}
-	/* some of this error handling can be done by the VFS.  The syscall should
-	 * handle EBADF, EFAULT, and EINVAL (TODO, memory related). */
-	if (!S_ISDIR(dir_d->d_inode->i_mode)) {
-		set_errno(ENOTDIR);
-		return -1;
-	}
 
 	/* Handle . and .. (first two dirents) */
-	if (dirent->d_off == 0) {
+	if (desired_file == 0) {
 		dirent->d_ino = dir_d->d_inode->i_ino;
 		dirent->d_off = 1;
 		dirent->d_reclen = 1;
-		strncpy(dirent->d_name, ".", 1);
+		strncpy(dirent->d_name, ".", 2);	/* the extra is for the null term */
 		found = TRUE;
-	} else if (dirent->d_off == 1) {
+	} else if (desired_file == 1) {
 		dirent->d_ino = dir_d->d_parent->d_inode->i_ino;
 		dirent->d_off = 2;
 		dirent->d_reclen = 2;
-		strncpy(dirent->d_name, "..", 2);
+		strncpy(dirent->d_name, "..", 3);	/* the extra is for the null term */
 		found = TRUE;
-	} else {
-		/* need to check the sub-dirs as well as the sub-"files" */
-		TAILQ_FOREACH(subent, &dir_d->d_subdirs, d_subdirs_link)
-			check_entry();
-		TAILQ_FOREACH(subent, &k_i_info->children, d_subdirs_link)
-			check_entry();
 	}
-	if (!found) {
-		set_errno(ENOENT);
-		return -1;
-	}
-	if (count == dirent->d_off)		/* found the last dir in the list */
+	/* need to check the sub-dirs as well as the sub-"files".  The main
+	 * ghetto-ness with this is that we check even though we have our result,
+	 * simply to figure out how big our directory is.  It's just not worth
+	 * changing at this point. */
+	TAILQ_FOREACH(subent, &dir_d->d_subdirs, d_subdirs_link)
+		check_entry();
+	TAILQ_FOREACH(subent, &k_i_info->children, d_subdirs_link)
+		check_entry();
+	if (!found)
+		return -ENOENT;
+	if (count - 1 == desired_file)		/* found the last dir in the list */
 		return 0;
 	return 1;							/* normal success for readdir */
 }
