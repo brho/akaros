@@ -165,7 +165,9 @@ struct inode *kfs_alloc_inode(struct super_block *sb)
 	return inode;
 }
 
-/* deallocs and cleans up after an inode. */
+/* FS-specific clean up when an inode is dealloced.  this is just cleaning up
+ * the in-memory version, and only the FS-specific parts.  whether or not the
+ * inode is still on disc is irrelevant. */
 void kfs_dealloc_inode(struct inode *inode)
 {
 	/* If we're a symlink, give up our storage for the symname */
@@ -230,11 +232,10 @@ void kfs_drop_inode(struct inode *inode)
 	// remove from lists
 }
 
-/* delete the inode from disk (all data) and deallocs the in memory inode */
+/* delete the inode from disk (all data) */
 void kfs_delete_inode(struct inode *inode)
 {
 	// would remove from "disk" here
-	kfs_dealloc_inode(inode);
 	/* TODO: give up our i_ino */
 }
 

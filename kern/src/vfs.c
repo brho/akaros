@@ -821,12 +821,15 @@ void inode_release(struct kref *kref)
 {
 	struct inode *inode = container_of(kref, struct inode, i_kref);
 	TAILQ_REMOVE(&inode->i_sb->s_inodes, inode, i_sb_list);
-	/* If we still have links, just dealloc the in-memory inode.  if we have no
-	 * links, we need to delete it too (which calls destroy). */
-	if (inode->i_nlink)
-		inode->i_sb->s_op->dealloc_inode(inode);
-	else
+	/* Might need to write back or delete the file/inode */
+	if (inode->i_nlink) {
+		if (inode->i_state & I_STATE_DIRTY)
+			inode->i_sb->s_op->write_inode(inode, TRUE);
+	} else {
 		inode->i_sb->s_op->delete_inode(inode);
+	}
+	/* Either way, we dealloc the in-memory version */
+	inode->i_sb->s_op->dealloc_inode(inode);	/* FS-specific clean-up */
 	kref_put(&inode->i_sb->s_kref);
 	assert(inode->i_mapping == &inode->i_pm);
 	kmem_cache_free(inode_kcache, inode);
@@ -1225,6 +1228,7 @@ int do_unlink(char *path)
 		set_errno(-error);
 		goto out_dentry;
 	}
+	/* TODO: rip dentry from the inode cache */
 	kref_put(&dentry->d_parent->d_kref);
 	dentry->d_parent = 0;		/* so we don't double-decref it later */
 	dentry->d_inode->i_nlink--;	/* TODO: race here, esp with a decref */

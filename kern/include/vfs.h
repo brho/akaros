@@ -185,6 +185,9 @@ struct super_operations {
 /* Sets the type of file, IAW the bits in ros/fs.h */
 #define SET_FTYPE(mode, type) ((mode) = ((mode) & ~__S_IFMT) | (type))
 
+/* Will need a bunch of states/flags for an inode.  TBD */
+#define I_STATE_DIRTY			0x001
+
 /* Inode: represents a specific file */
 struct inode {
 	SLIST_ENTRY(inode)			i_hash;			/* inclusion in a hash table */

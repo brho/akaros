@@ -2,8 +2,8 @@
  * Barret Rhoden <brho@cs.berkeley.edu>
  * See LICENSE for details.
  *
- * For now, just a lot of debugging / bootstrapping functions for ext2.
- */
+ * Ext2, VFS required functions, internal functions, life, the universe, and
+ * everything! */
 
 #include <vfs.h>
 #include <ext2fs.h>
@@ -367,22 +367,12 @@ struct inode *ext2_alloc_inode(struct super_block *sb)
 	return inode;
 }
 
-/* deallocs and cleans up after an inode. */
+/* FS-specific clean up when an inode is dealloced.  this is just cleaning up
+ * the in-memory version, and only the FS-specific parts.  whether or not the
+ * inode is still on disc is irrelevant. */
 void ext2_dealloc_inode(struct inode *inode)
 {
-	static bool ran_once = FALSE;
-	if (!ran_once) {
-		ran_once = TRUE;
-		warn("Implement %s(), you're leaking memory!\n", __FUNCTION__);
-	}
-/* too verbose, but it's a TODO... */
-//I_AM_HERE;
-	#if 0
-	/* If we're a symlink, give up our storage for the symname */
-	if (S_ISLNK(inode->i_mode))
-		kfree(((struct ext2_i_info*)inode->i_fs_info)->filestart);
 	kmem_cache_free(ext2_i_kcache, inode->i_fs_info);
-	#endif
 }
 
 /* reads the inode data on disk specified by inode->i_ino into the inode.
@@ -469,21 +459,17 @@ void ext2_put_inode(struct inode *inode)
 I_AM_HERE;
 }
 
-/* called when an inode is about to be destroyed.  the generic version ought to
- * remove every reference to the inode from the VFS, and if the inode isn't in
- * any directory, calls delete_inode */
+/* Unused for now, will get rid of this if inode_release is sufficient */
 void ext2_drop_inode(struct inode *inode)
-{ // TODO: should call a generic one instead.  or at least do something...
-	// remove from lists
+{
 I_AM_HERE;
 }
 
-/* delete the inode from disk (all data) and deallocs the in memory inode */
+/* delete the inode from disk (all data) */
 void ext2_delete_inode(struct inode *inode)
 {
 I_AM_HERE;
 	// would remove from "disk" here
-	ext2_dealloc_inode(inode);
 	/* TODO: give up our i_ino */
 }
 

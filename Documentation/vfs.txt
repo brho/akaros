@@ -289,3 +289,41 @@ the in-memory objects.  A directory cannot be removed if nlinks > 1.  If it is
 1, then you can rmdir it, which will set its nlinks to 0.  Then its inode's
 storage space will get freed when it is deleted, like any other inode.  In
 theory.
+
+Inodes: drop? delete? dealloc?
+--------------------------
+Inodes exist both in memory and on disk, but in different manners.  When a file
+(F_WHATEVER, could be DIR) exists in an FS, it'll have an inode on disk.  When
+it is time to delete that file, we call _delete_inode().  When we want to free
+the memory associated with an in-memory (VFS) inode, we call _dealloc_inode().
+
+What about drop_inode?  For now, we don't use it.  We have inode_release() in
+the VFS.  If we need an FS specific one (like for ext2), or have FS-specific
+work that needs to be done in inode_release(), we'll use it later.
+
+Either way, inode_release() is called when we no longer use the in-memory inode.
+If there are no hard links, it will delete the inode.  Either way, it will just
+free the in-memory inode (after deleting the disc version).
+
+Example: I want to unlink (rm) a file.  There are two cases: the file is already
+open (with a dentry and the inode in memory) or the file is not.  Both cases are
+handled the same way!  In either case, we eventually call do_lookup on the item
+in question, getting both a dentry and its inode read in.  (We read it in for a
+couple reasons: convenient to check the type, and we need to manipulate the
+nlink).  If a process has the file open, or even if it is sitting in the cache,
+we will get the same inode (from the inode cache, might not be implemented yet).
+When we decref the dentry and it is done, it will decref the inode.  This
+dentry's final decref will be deferred until any open files are closed.  Note,
+this requires a working dentry/inode-cache - otherwise we'll have multiple
+copies of the same FS/disk-inode (and possibly dentry).  Anyway, when this is
+done, the release function will delete the inode, then dealloc it.
+
+Another example:  We simply close a file.  When that happens, we decref the
+dentry, which decrefs the inode.  It may remain cached for a bit - not a big
+deal.  When it is finally removed, nlinks is positive, so the inode's in memory
+copy is written back (if it was dirty) and the structure is deallocated.
+
+Side notes: dentry cached inodes should be removed after their lookup in unlink.
+Also, since multiple dentries point to the same inode, it's not enough to just
+cache dentries - we need to be able to find inodes too so that we get the one
+inode regardless of which dentry we use (which may be uncached).
