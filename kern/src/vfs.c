@@ -21,9 +21,6 @@ struct sb_tailq super_blocks = TAILQ_HEAD_INITIALIZER(super_blocks);
 spinlock_t super_blocks_lock = SPINLOCK_INITIALIZER;
 struct fs_type_tailq file_systems = TAILQ_HEAD_INITIALIZER(file_systems);
 struct namespace default_ns;
-// TODO: temp dcache, holds all dentries ever for now
-struct dentry_slist dcache = SLIST_HEAD_INITIALIZER(dcache);
-spinlock_t dcache_lock = SPINLOCK_INITIALIZER;
 
 struct kmem_cache *dentry_kcache; // not to be confused with the dcache
 struct kmem_cache *inode_kcache;
@@ -131,22 +128,46 @@ char *file_name(struct file *file)
 	return file->f_dentry->d_name.name;
 }
 
-/* Some issues with this, coupled closely to fs_lookup.  This assumes that
- * negative dentries are not returned (might differ from linux) */
+/* Some issues with this, coupled closely to fs_lookup.
+ *
+ * Note the use of __dentry_free, instead of kref_put.  In those cases, we don't
+ * want to treat it like a kref and we have the only reference to it, so it is
+ * okay to do this.  It makes dentry_release() easier too. */
 static struct dentry *do_lookup(struct dentry *parent, char *name)
 {
-	struct dentry *dentry;
-	/* TODO: look up in the dentry cache first */
-	dentry = get_dentry(parent->d_sb, parent, name);
-	dentry = parent->d_inode->i_op->lookup(parent->d_inode, dentry, 0);
-	/* insert in dentry cache */
+	struct dentry *result, *query;
+	query = get_dentry(parent->d_sb, parent, name);
+	result = dcache_get(parent->d_sb, query); 
+	if (result) {
+		__dentry_free(query);
+		return result;
+	}
+	/* No result, check for negative */
+	if (query->d_flags & DENTRY_NEGATIVE) {
+		__dentry_free(query);
+		return 0;
+	}
+	/* not in the dcache at all, need to consult the FS */
+	result = parent->d_inode->i_op->lookup(parent->d_inode, query, 0);
+	if (!result) {
+		query->d_flags |= DENTRY_NEGATIVE;
+		dcache_put(parent->d_sb, query);
+		kref_put(&query->d_kref);
+		return 0;
+	}
+	dcache_put(parent->d_sb, result);
+	/* This is because KFS doesn't return the same dentry, but ext2 does.  this
+	 * is ugly and needs to be fixed. (TODO) */
+	if (result != query)
+		__dentry_free(query);
+
 	/* TODO: if the following are done by us, how do we know the i_ino?
 	 * also need to handle inodes that are already read in!  For now, we're
 	 * going to have the FS handle it in it's lookup() method: 
 	 * - get a new inode
 	 * - read in the inode
 	 * - put in the inode cache */
-	return dentry;
+	return result;
 }
 
 /* Update ND such that it represents having followed dentry.  IAW the nd
@@ -488,6 +509,25 @@ out:
 
 /* Superblock functions */
 
+/* Dentry "hash" function for the hash table to use.  Since we already have the
+ * hash in the qstr, we don't need to rehash.  Also, note we'll be using the
+ * dentry in question as both the key and the value. */
+static size_t __dcache_hash(void *k)
+{
+	return (size_t)((struct dentry*)k)->d_name.hash;
+}
+
+/* Dentry cache hashtable equality function.  This means we need to pass in some
+ * minimal dentry when doing a lookup. */
+static ssize_t __dcache_eq(void *k1, void *k2)
+{
+	if (((struct dentry*)k1)->d_parent != ((struct dentry*)k2)->d_parent)
+		return 0;
+	/* TODO: use the FS-specific string comparison */
+	return !strcmp(((struct dentry*)k1)->d_name.name,
+	               ((struct dentry*)k2)->d_name.name);
+}
+
 /* Helper to alloc and initialize a generic superblock.  This handles all the
  * VFS related things, like lists.  Each FS will need to handle its own things
  * in it's *_get_sb(), usually involving reading off the disc. */
@@ -500,8 +540,13 @@ struct super_block *get_sb(void)
 	TAILQ_INIT(&sb->s_inodes);
 	TAILQ_INIT(&sb->s_dirty_i);
 	TAILQ_INIT(&sb->s_io_wb);
-	SLIST_INIT(&sb->s_anon_d);
+	TAILQ_INIT(&sb->s_lru_d);
 	TAILQ_INIT(&sb->s_files);
+	sb->s_dcache = create_hashtable(100, __dcache_hash, __dcache_eq);
+	sb->s_icache = create_hashtable(100, __generic_hash, __generic_eq);
+	spinlock_init(&sb->s_lru_lock);
+	spinlock_init(&sb->s_dcache_lock);
+	spinlock_init(&sb->s_icache_lock);
 	sb->s_fs_info = 0; // can override somewhere else
 	return sb;
 }
@@ -549,7 +594,7 @@ void init_sb(struct super_block *sb, struct vfsmount *vmnt,
 	/* insert the dentry into the dentry cache.  when's the earliest we can?
 	 * when's the earliest we should?  what about concurrent accesses to the
 	 * same dentry?  should be locking the dentry... */
-	dcache_put(d_root); // TODO: should set a d_flag too
+	dcache_put(sb, d_root);
 	kref_put(&inode->i_kref);		/* give up the ref from get_inode() */
 }
 
@@ -588,9 +633,8 @@ struct dentry *get_dentry(struct super_block *sb, struct dentry *parent,
 		dentry->d_op = parent->d_op;	/* d_op set in init_sb for parentless */
 	}
 	dentry->d_parent = parent;
-	dentry->d_flags = 0;				/* related to its dcache state */
+	dentry->d_flags = DENTRY_USED;
 	dentry->d_fs_info = 0;
-	SLIST_INIT(&dentry->d_bucket);
 	if (name_len < DNAME_INLINE_LEN) {
 		strncpy(dentry->d_iname, name, name_len);
 		dentry->d_iname[name_len] = '\0';
@@ -607,31 +651,56 @@ struct dentry *get_dentry(struct super_block *sb, struct dentry *parent,
 	return dentry;
 }
 
-/* Adds a dentry to the dcache. */
-void dcache_put(struct dentry *dentry)
+/* Called when the dentry is unreferenced (after kref == 0).  This works closely
+ * with the resurrection in dcache_get().
+ *
+ * The dentry is still in the dcache, but needs to be un-USED and added to the
+ * LRU dentry list.  Even dentries that were used in a failed lookup need to be
+ * cached - they ought to be the negative dentries.  Note that all dentries have
+ * parents, even negative ones (it is needed to find it in the dcache). */
+void dentry_release(struct kref *kref)
 {
-#if 0 /* pending a more thorough review of the dcache */
-	/* TODO: should set a d_flag too */
-	spin_lock(&dcache_lock);
-	SLIST_INSERT_HEAD(&dcache, dentry, d_hash);
-	spin_unlock(&dcache_lock);
-#endif
+	struct dentry *dentry = container_of(kref, struct dentry, d_kref);
+
+	printd("'Releasing' dentry %08p: %s\n", dentry, dentry->d_name.name);
+	/* DYING dentries (recently unlinked / rmdir'd) just get freed */
+	if (dentry->d_flags & DENTRY_DYING) {
+		__dentry_free(dentry);
+		return;
+	}
+	/* This lock ensures the USED state and the TAILQ membership is in sync.
+	 * Also used to check the refcnt, though that might not be necessary. */
+	spin_lock(&dentry->d_lock);
+	/* While locked, we need to double check the kref, in case someone already
+	 * reup'd it.  Re-up? you're crazy!  Reee-up, you're outta yo mind! */
+	if (!kref_refcnt(&dentry->d_kref)) {
+		/* and make sure it wasn't USED, then UNUSED again */
+		/* TODO: think about issues with this */
+		if (dentry->d_flags & DENTRY_USED) {
+			dentry->d_flags &= ~DENTRY_USED;
+			spin_lock(&dentry->d_sb->s_lru_lock);
+			TAILQ_INSERT_TAIL(&dentry->d_sb->s_lru_d, dentry, d_lru);
+			spin_unlock(&dentry->d_sb->s_lru_lock);
+		} else {
+			warn("This should be rare.  Tell brho this happened.");
+		}
+	}
+	spin_unlock(&dentry->d_lock);
 }
 
-/* Cleans up the dentry (after ref == 0).  We still may want it, and this is
- * where we should add it to the dentry cache.  (TODO).  For now, we do nothing,
- * since we don't have a dcache.  Also, if i_nlink == 0, never cache it.
- * 
+/* Called when we really dealloc and get rid of a dentry (like when it is
+ * removed from the dcache, either for memory or correctness reasons)
+ *
  * This has to handle two types of dentries: full ones (ones that had been used)
  * and ones that had been just for lookups - hence the check for d_inode.
  *
  * Note that dentries pin and kref their inodes.  When all the dentries are
  * gone, we want the inode to be released via kref.  The inode has internal /
  * weak references to the dentry, which are not refcounted. */
-void dentry_release(struct kref *kref)
+void __dentry_free(struct dentry *dentry)
 {
-	struct dentry *dentry = container_of(kref, struct dentry, d_kref);
-	printd("Freeing dentry %08p: %s\n", dentry, dentry->d_name.name);
+	if (dentry->d_inode)
+		printk("Freeing dentry %08p: %s\n", dentry, dentry->d_name.name);
 	assert(dentry->d_op);	/* catch bugs.  a while back, some lacked d_op */
 	dentry->d_op->d_release(dentry);
 	/* TODO: check/test the boundaries on this. */
@@ -668,6 +737,93 @@ struct dentry *lookup_dentry(char *path, int flags)
 	kref_get(&dentry->d_kref, 1);
 	path_release(nd);
 	return dentry;
+}
+
+/* Get a dentry from the dcache.  At a minimum, we need the name hash and parent
+ * in what_i_want, though most uses will probably be from a get_dentry() call.
+ * We pass in the SB in the off chance that we don't want to use a get'd dentry.
+ *
+ * The unusual variable name (instead of just "key" or something) is named after
+ * ex-SPC Castro's porn folder.  Caller deals with the memory for what_i_want.
+ *
+ * If the dentry is negative, we don't return the actual result - instead, we
+ * set the negative flag in 'what i want'.  The reason is we don't want to
+ * kref_get() and then immediately put (causing dentry_release()).  This also
+ * means that dentry_release() should never get someone who wasn't USED (barring
+ * the race, which it handles).  And we don't need to ever have a dentry set as
+ * USED and NEGATIVE (which is always wrong, but would be needed for a cleaner
+ * dentry_release()).
+ *
+ * This is where we do the "kref resurrection" - we are returning a kref'd
+ * object, even if it wasn't kref'd before.  This means the dcache does NOT hold
+ * krefs (it is a weak/internal ref), but it is a source of kref generation.  We
+ * sync up with the possible freeing of the dentry by locking the table.  See
+ * Doc/kref for more info. */
+struct dentry *dcache_get(struct super_block *sb, struct dentry *what_i_want)
+{
+	struct dentry *found;
+	/* This lock protects the hash, as well as ensures the returned object
+	 * doesn't get deleted/freed out from under us */
+	spin_lock(&sb->s_dcache_lock);
+	found = hashtable_search(sb->s_dcache, what_i_want);
+	if (found) {
+		if (found->d_flags & DENTRY_NEGATIVE) {
+			what_i_want->d_flags |= DENTRY_NEGATIVE;
+			spin_unlock(&sb->s_dcache_lock);
+			return 0;
+		}
+		spin_lock(&found->d_lock);
+		__kref_get(&found->d_kref, 1);	/* prob could be done outside the lock*/
+		/* If we're here (after kreffing) and it is not USED, we are the one who
+		 * should resurrect */
+		if (!(found->d_flags & DENTRY_USED)) {
+			found->d_flags |= DENTRY_USED;
+			spin_lock(&sb->s_lru_lock);
+			TAILQ_REMOVE(&sb->s_lru_d, found, d_lru);
+			spin_unlock(&sb->s_lru_lock);
+		}
+		spin_unlock(&found->d_lock);
+	}
+	spin_unlock(&sb->s_dcache_lock);
+	return found;
+}
+
+/* Adds a dentry to the dcache.  Note the *dentry is both the key and the value.
+ * If the value was already in there (which can happen iff it was negative), for
+ * now we'll remove it and put the new one in there. */
+void dcache_put(struct super_block *sb, struct dentry *key_val)
+{
+	struct dentry *old;
+	int retval;
+	spin_lock(&sb->s_dcache_lock);
+	old = hashtable_remove(sb->s_dcache, key_val);
+	if (old) {
+		assert(old->d_flags & DENTRY_NEGATIVE);
+		assert(!(old->d_flags & DENTRY_USED));
+		assert(!kref_refcnt(&old->d_kref));
+		spin_lock(&sb->s_lru_lock);
+		TAILQ_REMOVE(&sb->s_lru_d, old, d_lru);
+		spin_unlock(&sb->s_lru_lock);
+		__dentry_free(old);
+	}
+	/* this returns 0 on failure (TODO: Fix this ghetto shit) */
+ 	retval = hashtable_insert(sb->s_dcache, key_val, key_val);
+	assert(retval);
+	spin_unlock(&sb->s_dcache_lock);
+}
+
+/* Will remove and return the dentry.  Caller deallocs the key, but the retval
+ * won't have a reference.  * Returns 0 if it wasn't found.  Callers can't
+ * assume much - they should not use the reference they *get back*, (if they
+ * already had one for key, they can use that).  There may be other users out
+ * there. */
+struct dentry *dcache_remove(struct super_block *sb, struct dentry *key)
+{
+	struct dentry *retval;
+	spin_lock(&sb->s_dcache_lock);
+	retval = hashtable_remove(sb->s_dcache, key);
+	spin_unlock(&sb->s_dcache_lock);
+	return retval;
 }
 
 /* Inode Functions */
@@ -1059,7 +1215,7 @@ struct file *do_file_open(char *path, int flags, int mode)
 		 * but we apply it immediately. */
 		if (create_file(parent_i, file_d, mode))	/* sets errno */
 			goto out_file_d;
-		dcache_put(file_d);
+		dcache_put(file_d->d_sb, file_d);
 	} else {	/* something already exists */
 		/* this can happen due to concurrent access, but needs to be thought
 		 * through */
@@ -1117,7 +1273,7 @@ int do_symlink(char *path, const char *symname, int mode)
 	parent_i = nd->dentry->d_inode;
 	if (create_symlink(parent_i, sym_d, symname, mode))
 		goto out_sym_d;
-	dcache_put(sym_d);
+	dcache_put(sym_d->d_sb, sym_d);
 	retval = 0;				/* Note the fall through to the exit paths */
 out_sym_d:
 	kref_put(&sym_d->d_kref);
@@ -1183,7 +1339,7 @@ int do_link(char *old_path, char *new_path)
 	link_d->d_inode = inode;
 	inode->i_nlink++;
 	TAILQ_INSERT_TAIL(&inode->i_dentry, link_d, d_alias);	/* weak ref */
-	dcache_put(link_d);
+	dcache_put(link_d->d_sb, link_d);
 	retval = 0;				/* Note the fall through to the exit paths */
 out_both_ds:
 	kref_put(&old_d->d_kref);
@@ -1228,9 +1384,11 @@ int do_unlink(char *path)
 		set_errno(-error);
 		goto out_dentry;
 	}
-	/* TODO: rip dentry from the inode cache */
-	kref_put(&dentry->d_parent->d_kref);
-	dentry->d_parent = 0;		/* so we don't double-decref it later */
+	/* Now that our parent doesn't track us, we need to make sure we aren't
+	 * findable via the dentry cache.  DYING, so we will be freed in
+	 * dentry_release() */
+	dentry->d_flags |= DENTRY_DYING;
+	dcache_remove(dentry->d_sb, dentry);
 	dentry->d_inode->i_nlink--;	/* TODO: race here, esp with a decref */
 	/* At this point, the dentry is unlinked from the FS, and the inode has one
 	 * less link.  When the in-memory objects (dentry, inode) are going to be
@@ -1307,7 +1465,7 @@ int do_mkdir(char *path, int mode)
 	parent_i = nd->dentry->d_inode;
 	if (create_dir(parent_i, dentry, mode))
 		goto out_dentry;
-	dcache_put(dentry);
+	dcache_put(dentry->d_sb, dentry);
 	retval = 0;				/* Note the fall through to the exit paths */
 out_dentry:
 	kref_put(&dentry->d_kref);
@@ -1352,6 +1510,11 @@ int do_rmdir(char *path)
 		set_errno(-error);
 		goto out_dentry;
 	}
+	/* Now that our parent doesn't track us, we need to make sure we aren't
+	 * findable via the dentry cache.  DYING, so we will be freed in
+	 * dentry_release() */
+	dentry->d_flags |= DENTRY_DYING;
+	dcache_remove(dentry->d_sb, dentry);
 	/* Decref ourselves, so inode_release() knows we are done */
 	dentry->d_inode->i_nlink--;
 	TAILQ_REMOVE(&nd->dentry->d_subdirs, dentry, d_subdirs_link);

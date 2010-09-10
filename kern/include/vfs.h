@@ -19,6 +19,7 @@
 #include <kref.h>
 #include <timing.h>
 #include <radix.h>
+#include <hashtable.h>
 #include <blockdev.h>
 
 /* ghetto preprocessor hacks (since proc includes vfs) */
@@ -158,8 +159,13 @@ struct super_block {
 	struct inode_tailq			s_inodes;		/* all inodes */
 	struct inode_tailq			s_dirty_i;		/* dirty inodes */
 	struct io_wb_tailq			s_io_wb;		/* writebacks */
-	struct dentry_slist			s_anon_d;		/* anonymous dentries */
 	struct file_tailq			s_files;		/* assigned files */
+	struct dentry_tailq			s_lru_d;		/* unused dentries (in dcache)*/
+	spinlock_t					s_lru_lock;
+	struct hashtable			*s_dcache;		/* dentry cache */
+	spinlock_t					s_dcache_lock;
+	struct hashtable			*s_icache;		/* inode cache */
+	spinlock_t					s_icache_lock;
 	struct block_device			*s_bdev;
 	TAILQ_ENTRY(super_block)	s_instances;	/* list of sbs of this fs type*/
 	char						s_name[32];
@@ -244,6 +250,12 @@ struct inode_operations {
 };
 
 #define DNAME_INLINE_LEN 32
+
+/* Dentry flags.  All negatives are also unused. */
+#define DENTRY_USED			0x01 	/* has a kref > 0 */
+#define DENTRY_NEGATIVE		0x02	/* cache of a failed lookup */
+#define DENTRY_DYING		0x04	/* should be freed on release */
+
 /* Dentry: in memory object, corresponding to an element of a path.  E.g. /,
  * usr, bin, and vim are all dentries.  All have inodes.  Vim happens to be a
  * file instead of a directory.
@@ -267,8 +279,6 @@ struct dentry {
 	struct vfsmount				*d_mounted_fs;	/* fs mounted here */
 	struct dentry				*d_parent;
 	struct qstr					d_name;			/* pts to iname and holds hash*/
-	SLIST_ENTRY(dentry)			d_hash;			/* link for the dcache */
-	struct dentry_slist			d_bucket;		/* hash bucket of this dentry */
 	char						d_iname[DNAME_INLINE_LEN];
 	void						*d_fs_info;
 };
@@ -409,10 +419,6 @@ extern struct sb_tailq super_blocks;			/* list of all sbs */
 extern spinlock_t super_blocks_lock;
 extern struct fs_type_tailq file_systems;		/* lock this if it's dynamic */
 extern struct namespace default_ns;
-// TODO: should have a dentry_htable or something.  we have the structs built
-// in to the dentry right now (linux style).
-extern struct dentry_slist dcache;
-extern spinlock_t dcache_lock;
 
 /* Slab caches for common objects */
 extern struct kmem_cache *dentry_kcache;
@@ -436,9 +442,12 @@ void init_sb(struct super_block *sb, struct vfsmount *vmnt,
 /* Dentry Functions */
 struct dentry *get_dentry(struct super_block *sb, struct dentry *parent,
                           char *name);
-void dcache_put(struct dentry *dentry);
 void dentry_release(struct kref *kref);
+void __dentry_free(struct dentry *dentry);
 struct dentry *lookup_dentry(char *path, int flags);
+struct dentry *dcache_get(struct super_block *sb, struct dentry *what_i_want);
+void dcache_put(struct super_block *sb, struct dentry *key_val);
+struct dentry *dcache_remove(struct super_block *sb, struct dentry *key);
 
 /* Inode Functions */
 struct inode *get_inode(struct dentry *dentry);

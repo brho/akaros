@@ -39,9 +39,9 @@ static void kref_init(struct kref *kref, void (*release)(struct kref *kref),
 	kref->release = release;
 }
 
-static struct kref *kref_get(struct kref *kref, unsigned int inc)
+/* Will blindly incref */
+static struct kref *__kref_get(struct kref *kref, unsigned int inc)
 {
-	assert(atomic_read(&kref->refcount));
 	atomic_add(&kref->refcount, inc);
 	return kref;
 }
@@ -52,6 +52,14 @@ static struct kref *kref_get_not_zero(struct kref *kref, unsigned int inc)
 	if (atomic_add_not_zero(&kref->refcount, inc))
 		return kref;
 	else return 0;
+}
+
+/* Will panic on zero */
+static struct kref *kref_get(struct kref *kref, unsigned int inc)
+{
+	kref = kref_get_not_zero(kref, inc);
+	assert(kref);
+	return kref;
 }
 
 /* Returns True if we hit 0 and executed 'release', False otherwise */

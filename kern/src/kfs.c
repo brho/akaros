@@ -304,9 +304,9 @@ int kfs_create(struct inode *dir, struct dentry *dentry, int mode,
 
 /* Searches the directory for the filename in the dentry, filling in the dentry
  * with the FS specific info of this file.  If it succeeds, it will pass back
- * the *dentry you should use.  If this fails, it will return 0 and will take
- * the ref to the dentry for you.  Either way, you shouldn't use the ref you
- * passed in anymore.  Still, there are issues with refcnting with this.
+ * the *dentry you should use.  If this fails, it will return 0.  It will NOT
+ * take your dentry ref (it used to).  It probably will not be the same dentry
+ * you passed in.  This is ugly.
  *
  * Callers, make sure you alloc and fill out the name parts of the dentry, and
  * an initialized nameidata. TODO: not sure why we need an ND.  Don't use it in
@@ -328,8 +328,7 @@ struct dentry *kfs_lookup(struct inode *dir, struct dentry *dentry,
 	TAILQ_FOREACH(d_i, &dir_dent->d_subdirs, d_subdirs_link) {
 		if (!strcmp(d_i->d_name.name, dentry->d_name.name)) {
 			/* since this dentry is already in memory (that's how KFS works), we
-			 * can free the one that came in and return the real one */
-			kref_put(&dentry->d_kref);
+			 * just return the real one (with another refcnt) */
 			kref_get(&d_i->d_kref, 1);
 			return d_i;
 		}
@@ -337,16 +336,12 @@ struct dentry *kfs_lookup(struct inode *dir, struct dentry *dentry,
 	TAILQ_FOREACH(d_i, &k_i_info->children, d_subdirs_link) {
 		if (!strcmp(d_i->d_name.name, dentry->d_name.name)) {
 			/* since this dentry is already in memory (that's how KFS works), we
-			 * can free the one that came in and return the real one */
-			kref_put(&dentry->d_kref);
+			 * just return the real one (with another refcnt) */
 			kref_get(&d_i->d_kref, 1);
 			return d_i;
 		}
 	}
-	/* no match, consider caching the negative result, freeing the
-	 * dentry, etc */
 	printd("Not Found %s!!\n", dentry->d_name.name);
-	kref_put(&dentry->d_kref);
 	return 0;
 }
 
@@ -811,7 +806,8 @@ static int __add_kfs_entry(struct dentry *parent, char *path,
 		       parent->d_name.name, c_bhdr->c_filestart, c_bhdr->c_filesize);
 		/* Init the dentry for this path */
 		dentry = get_dentry(parent->d_sb, parent, path);
-		dcache_put(dentry); 			/* TODO: should set a d_flag too */
+		// want to test the regular/natural dentry caching paths
+		//dcache_put(dentry->d_sb, dentry);
 		/* build the inode */
 		switch (c_bhdr->c_mode & CPIO_FILE_MASK) {
 			case (CPIO_DIRECTORY):

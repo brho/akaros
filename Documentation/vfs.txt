@@ -327,3 +327,57 @@ Side notes: dentry cached inodes should be removed after their lookup in unlink.
 Also, since multiple dentries point to the same inode, it's not enough to just
 cache dentries - we need to be able to find inodes too so that we get the one
 inode regardless of which dentry we use (which may be uncached).
+
+Dentry and Inode Caches
+--------------------------
+The dentry caches dentry lookups - we need the parent and a hash of the name to
+do a lookup.  The dcache consists of a hash table for the lookups, as well as an
+extra list of entries that are unused (their kref is 0).  The dcache also caches
+negative entries - entries that were wrong.  This still speeds up future
+requests.  Most uses of the system just need to use dcache_get and dcache put.
+Not all of this is implemented yet.
+
+The inode cache is similar, though we can't just have the inodes hang off the
+dentry cache (more than one dentry points to the same inode).  We don't need to
+worry about unused lists or anything like that - once the kref hits 0, we're
+done and we can rip it out of the hash.
+
+Both hashes hang off the superblock, with concurrent access protected by locks
+in the SB.
+
+The dentry cache is the weirdest of them all - for normal entries, its key and
+value are the same thing.  The actual hashing of a dentry is done by the qstr
+value, and to determine equality, we need to compare parents (compared to the
+inode cache, where the only thing that matters is the i_ino).  Put another way,
+we need elements of the whole dentry to get a unique key (d_parent and d_name).
+
+As stated above, the dcache also caches negative entries.  This is to prevent a
+lookup on disk.  These negative entries are in the dcache and on the LRU list
+(their refcnt is 0, the are not USED).  When we dcache_get, we don't bother with
+returning the actual dentry (after increffing) and then decref it again.
+Instead, we just return the negative result (via the query dentry,
+incidentally).
+
+Freeing of dentries happens in one of two ways: call __dentry_free() directly,
+which is appropriate when you have the only copy (like in do_lookup()), or it
+will get freed when the dcache gets reaped (the LRU entries are freed).  When it
+is decref'd, it simply goes into a state where it is ready to be reaped, but
+kept around for future lookups - most usages throughout the vfs can just decref
+when they are done using it.
+
+One complication is cached negative dentries.  These are only referenced once
+(in the dcache), so they can get __dentry_free()d directly.  This gets tricky
+with rmdir and unlink.  Initially, those functions marked the dentry as negative
+and unused, and would let them stay in the dcache (returning negative results on
+future lookups).  The problem with this is that now the dcache could have a
+negative dentry that was a real, formerly used dentry - one with a refcnt that
+needs to be decref'd and released.  
+
+There are two solutions: one is to change the dcache to not assume that negative
+entries are unreferenced (which also means on the LRU).  The other is to just
+remove the dentry from the dcache on rmdir/unlink.  It won't be negative - and
+that won't matter, since it is un-lookup-able.  And it will die nicely when it
+gets decref'd.  All we'll do is add a DENTRY_DYING flag, and dentry_release()
+will avoid LRU and unusing it.  The dcache can continue to assume that negative
+entries are unused/LRU/dentry_freeable/ref==0, and not worry about calling
+kref_put().

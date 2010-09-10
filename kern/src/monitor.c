@@ -772,6 +772,7 @@ int mon_fs(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 		printk("Usage: fs OPTION\n");
 		printk("\topen: show all open files\n");
 		printk("\tinodes: show all inodes\n");
+		printk("\tdentries [LRU]: show all dentries (dcache), optional LRU\n");
 		printk("\tls DIR: print the dir tree starting with DIR\n");
 		printk("\tpid: proc PID's fs crap placeholder\n");
 		return 1;
@@ -798,6 +799,30 @@ int mon_fs(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 					printk("\t%s: Dentry: %08p, Refs: %d\n",
 					       dentry->d_name.name, dentry,
 					       kref_refcnt(&dentry->d_kref));
+			}
+		}
+	} else if (!strcmp(argv[1], "dentries")) {
+		printk("Dentry Cache:\n----------------------------\n");
+		TAILQ_FOREACH(sb, &super_blocks, s_list) {
+			printk("Superblock for %s\n", sb->s_name);
+			if (hashtable_count(sb->s_dcache)) {
+				hashtable_itr_t *dcache_i = hashtable_iterator(sb->s_dcache);
+				printk("DENTRY     FLAGS      REFCNT NAME\n");
+				printk("--------------------------------\n");
+				do {
+					struct dentry *d_i = hashtable_iterator_value(dcache_i);
+					printk("%08p %08p %02d     %s\n", d_i, d_i->d_flags,
+					       kref_refcnt(&d_i->d_kref), d_i->d_name.name);
+				} while (hashtable_iterator_advance(dcache_i));
+			}
+		}
+		if (argv[2]) {
+			printk("LRU lists:\n");
+			TAILQ_FOREACH(sb, &super_blocks, s_list) {
+				printk("Superblock for %s\n", sb->s_name);
+				TAILQ_FOREACH(dentry, &sb->s_lru_d, d_lru)
+					printk("Dentry: %08p, Name: %s\n", dentry,
+					       dentry->d_name.name);
 			}
 		}
 	} else if (!strcmp(argv[1], "ls")) {

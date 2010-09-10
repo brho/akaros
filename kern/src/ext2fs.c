@@ -537,9 +537,8 @@ I_AM_HERE;
 
 /* Searches the directory for the filename in the dentry, filling in the dentry
  * with the FS specific info of this file.  If it succeeds, it will pass back
- * the *dentry you should use.  If this fails, it will return 0 and will take
- * the ref to the dentry for you.  Either way, you shouldn't use the ref you
- * passed in anymore.
+ * the *dentry you should use (which might be the same as the one you passed in).
+ * If this fails, it will return 0, but not free the memory of "dentry."
  *
  * Callers, make sure you alloc and fill out the name parts of the dentry.  We
  * don't currently use the ND.  Might remove it in the future.  */
@@ -575,7 +574,6 @@ struct dentry *ext2_lookup(struct inode *dir, struct dentry *dentry,
 		dir_i = (void*)dir_i + dir_i->dir_reclen;
 	}
 	printd("EXT2: Not Found, %s\n", dentry->d_name.name);	
-	kref_put(&dentry->d_kref);
 	kfree(dir_buf);
 	return 0;
 }
