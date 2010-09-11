@@ -459,6 +459,9 @@ int create_symlink(struct inode *dir, struct dentry *dentry,
 int check_perms(struct inode *inode, int access_mode);
 void inode_release(struct kref *kref);
 void stat_inode(struct inode *inode, struct kstat *kstat);
+struct inode *icache_get(struct super_block *sb, unsigned int ino);
+void icache_put(struct super_block *sb, struct inode *inode);
+struct inode *icache_remove(struct super_block *sb, unsigned int ino);
 
 /* File-ish functions */
 ssize_t generic_file_read(struct file *file, char *buf, size_t count,

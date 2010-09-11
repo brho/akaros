@@ -580,6 +580,7 @@ void init_sb(struct super_block *sb, struct vfsmount *vmnt,
 	/* TODO: do we need to read in the inode?  can we do this on demand? */
 	/* if this FS is already mounted, we'll need to do something different. */
 	sb->s_op->read_inode(inode);
+	icache_put(sb, inode);
 	/* Link the dentry and SB to the VFS mount */
 	vmnt->mnt_root = d_root;				/* ref comes from get_dentry */
 	vmnt->mnt_sb = sb;
@@ -877,9 +878,24 @@ struct inode *get_inode(struct dentry *dentry)
 /* Helper: loads/ reads in the inode numbered ino and attaches it to dentry */
 void load_inode(struct dentry *dentry, unsigned int ino)
 {
-	struct inode *inode = get_inode(dentry);
+	struct inode *inode;
+
+	/* look it up in the inode cache first */
+	inode = icache_get(dentry->d_sb, ino);
+	if (inode) {
+		/* connect the dentry to its inode */
+		TAILQ_INSERT_TAIL(&inode->i_dentry, dentry, d_alias);
+		dentry->d_inode = inode;	/* storing the ref we got from icache_get */
+		return;
+	}
+	/* otherwise, we need to do it manually */
+	inode = get_inode(dentry);
 	inode->i_ino = ino;
 	dentry->d_sb->s_op->read_inode(inode);
+	/* TODO: race here, two creators could miss in the cache, and then get here.
+	 * need a way to sync across a blocking call.  needs to be either at this
+	 * point in the code or per the ino (dentries could be different) */
+	icache_put(dentry->d_sb, inode);
 	kref_put(&inode->i_kref);
 }
 
@@ -977,6 +993,7 @@ void inode_release(struct kref *kref)
 {
 	struct inode *inode = container_of(kref, struct inode, i_kref);
 	TAILQ_REMOVE(&inode->i_sb->s_inodes, inode, i_sb_list);
+	icache_remove(inode->i_sb, inode->i_ino);
 	/* Might need to write back or delete the file/inode */
 	if (inode->i_nlink) {
 		if (inode->i_state & I_STATE_DIRTY)
@@ -1009,6 +1026,43 @@ void stat_inode(struct inode *inode, struct kstat *kstat)
 	kstat->st_atime = inode->i_atime;
 	kstat->st_mtime = inode->i_mtime;
 	kstat->st_ctime = inode->i_ctime;
+}
+
+/* Inode Cache management.  In general, search on the ino, get a refcnt'd value
+ * back.  Remove does not give you a reference back - it should only be called
+ * in inode_release(). */
+struct inode *icache_get(struct super_block *sb, unsigned int ino)
+{
+	/* This is the same style as in pid2proc, it's the "safely create a strong
+	 * reference from a weak one, so long as other strong ones exist" pattern */
+	spin_lock(&sb->s_icache_lock);
+	struct inode *inode = hashtable_search(sb->s_icache, (void*)ino);
+	if (inode)
+		if (!kref_get_not_zero(&inode->i_kref, 1))
+			inode = 0;
+	spin_unlock(&sb->s_icache_lock);
+	return inode;
+}
+
+void icache_put(struct super_block *sb, struct inode *inode)
+{
+	spin_lock(&sb->s_icache_lock);
+	/* there's a race in load_ino() that could trigger this */
+	assert(!hashtable_search(sb->s_icache, (void*)inode->i_ino));
+	hashtable_insert(sb->s_icache, (void*)inode->i_ino, inode);
+	spin_unlock(&sb->s_icache_lock);
+}
+
+struct inode *icache_remove(struct super_block *sb, unsigned int ino)
+{
+	struct inode *inode;
+	/* Presumably these hashtable removals could be easier since callers
+	 * actually know who they are (same with the pid2proc hash) */
+	spin_lock(&sb->s_icache_lock);
+	inode = hashtable_remove(sb->s_icache, (void*)ino);
+	spin_unlock(&sb->s_icache_lock);
+	assert(inode && !kref_refcnt(&inode->i_kref));
+	return inode;
 }
 
 /* File functions */
