@@ -1556,6 +1556,10 @@ int do_rmdir(char *path)
 		set_errno(ENOTDIR);
 		goto out_dentry;
 	}
+	if (dentry->d_mount_point) {
+		set_errno(EBUSY);
+		goto out_dentry;
+	}
 	/* TODO: make sure we aren't a mount or processes root (EBUSY) */
 	/* Now for the removal.  the FSs will check if they are empty */
 	parent_i = nd->dentry->d_inode;

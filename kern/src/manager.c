@@ -113,6 +113,11 @@ void manager_brho(void)
 	static struct proc *p;
 	struct file *temp_f;
 
+	/* I usually want this */
+	schedule();
+	printk("No work to do (schedule returned)\n");
+	monitor(0);
+
 	// for testing taking cores, check in case 1 for usage
 	uint32_t corelist[MAX_NUM_CPUS];
 	uint32_t num = 3;
