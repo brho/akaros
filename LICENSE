@@ -1,3 +1,10 @@
+ROS is *NOT* licensed for any form of distribution.  We'll eventually license
+it, once we sort through the mess of contributions.
+
+
+The old JOS code came with the following:
+-----------------------------------------
+
 Most of the source files in this directory are derived from the Exokernel,
 which is:
 

@@ -1,0 +1,120 @@
+ROS Development Policies
+------------------------------------
+This document will talk about coding standards, version control, and
+contribution policies.
+
+Our coding standard is similar to the Linux kernel style (but with a tabstop of
+4), so when in doubt, do what they do.
+- No spaces after the name of a function in a call.  For example,
+  printk("hello") not printk ("hello").
+
+- Functions that take no arguments are declared f(void) not f().
+
+- Function names are all lower-case, separated by underscores.
+
+- One space after commas.  For example foo(x, y, z), not foo(x,y,z);
+
+- One space after keywords "if", "for", "while", "switch".  For example, if
+  (x) not if(x).
+
+- Space before braces.  For example, if (x) { not if (x){.
+
+- For if/while/etc, the opening brace is on the same line as the if.  If you
+  have just one line, no brace is necessary.  If you have an if / else clause,
+  and one of them has braces, put braces on both.  An else line should start
+  with a brace.
+
+- Beginning-of-line indentation via tabs, not spaces.  Use spaces for
+  additional formatting (such as lining up text when word wrapping).
+
+- Preprocessor macros are usually upper-case.  Try to avoid using macros
+  unless necessary (I prefer static inlines).
+
+- Pointer declarations have the * on the variable.  void *x, not void* x.
+
+- Multi-word names are lower_case_with_underscores.  Keep your names short,
+  especially for local variables.
+
+- 'Permanent' comments in are C /* ... */ comments.  Only use C++ style (//)
+  for temporary commenting-out, such as if you want to not call a function.
+  If you want to block out large chunks of code, use #if 0 ... #endif
+
+- In a function definition, the function name shoud NOT start a new line.  Old
+  code incorrectly does this, and should be changed over time.
+ 
+- Feel free to use gotos, especially in functions that have cleanup before
+  they exit, or in other places that enhance readability.
+
+- 80 characters per line.  When you wrap, try to line things up so they make
+  sense, such as space-indenting so function arguments line up vertically.
+
+- Do not typedef structs.  You can typedef function pointers when convenient.
+  Keep in mind that typedefs require people to look up the real type when they
+  analyze the code.
+
+- Try to avoid making lots of separate files or extravagant directory
+  hierarchies.  Keep in mind that people will need to work with and find these
+  files (even via tab completion, it can be a pain).
+
+Version Control: (git)
+- Git allows us to do a lot of cool things.  One of its primary purposes is to
+  provide a means for us to review each others code.
+
+- Do not merge.  You should rebase your commits on top of the latest branch,
+  then do a fast-forward merge.  You need to figure this out before working
+  with the main repo.  Merges can be appropriate, but ask brho first.  If you
+  are new to git, then odds are you should do the rebase/merge approach.
+
+- Do not commit crappy commits.  Hold on to your commits for a little while
+  before pushing, and if a problem appears in a branch that only you are using,
+  you should go back and amend those commits.  git rebase and git commit
+  --amend are your friend.
+
+- Do not commit to "share code."  If two people are working on the same code
+  and want to pass code from machine to machine, do not use a real branch from
+  the origin repo.  You can do whatever on your own machines (or even in a
+  temporary branch on the scm machine), but the version of the code submitted
+  to the mainline must not have those crappy commits.
+
+- Commit messages consist of one short line, followed by an empty line, and
+  then a descriptive message (word wrapped).  Most editors (like vi) will help
+  you with this.
+
+- Once you've pushed a branch to the origin, you normally should not reset it -
+  if the problem is minor, fix it later.  If you do it right away, it is
+  usually not a big deal.  If you broke the repo, fix it, and you should
+  probably send something to ros-kernel@.
+
+- You ought to use gitk --all, or a similar program, to help visualize what is
+  going on with the tree.
+
+- Your commits should be of a reasonable size.  Try to isolate your commits to
+  small, easily verifiable changes.  Each commit must compile, but you don't
+  want to change everything in one commit.  Put another way, one commit that
+  can be decoupled into smaller ones ought to be broken up.
+
+- Likewise, don't do a commit just to change irrelevant things, such as turning
+  off a printk or adjusting your manager() function (unless there's a good
+  reason).  You just pollute the commit stream.
+
+Contributing:
+- Currently, we are not accepting unsolicited, large contributions.  If you
+  have something in mind, contact us and we'll see how we can make it work.
+  If you want your work to be merged, you should check with us before starting
+  a project that may be incompatible with our system and goals.
+
+- We will accept bug fixes.  Until we sort out the copyrights, if you want us
+  to accept your patch, you'll need to assign your copyright to the Regeants of
+  the University of California, which shouldn't be an issue for an UC Berkeley
+  personnel.
+
+- Expect your code to be audited by the appropriate subsystem maintainer.
+  Basically, this means that if it is related to the sparc port, you need to
+  make Andrew happy.  Otherwise, you need to make Barret happy.
+
+- Despite being a research project, we make every effort to do things the
+  proper way.  We are extremely reluctant to allow "ghetto hacks", especially
+  the type that pop up near paper deadlines.  The appropriate way to deal with
+  this is to have a separate branch for all the shameful commits you have, and
+  after your deadlines have passed, you pick and choose which commits to apply
+  to the real branch in a way that does not violate our standards.
