@@ -144,7 +144,7 @@ int load_elf(struct proc* p, struct file* f)
 	                    {ELF_AUX_PHNUM, ei.phnum},
 	                    {ELF_AUX_ENTRY, ei.entry},
 	                    #ifdef __sparc_v8__
-	                    {ELF_AUX_HWCAP,E LF_HWCAP_SPARC_FLUSH},
+	                    {ELF_AUX_HWCAP, ELF_HWCAP_SPARC_FLUSH},
 	                    #endif
 	                    {0, 0}};
 
