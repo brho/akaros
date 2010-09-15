@@ -557,7 +557,7 @@ int __handle_page_fault(struct proc *p, uintptr_t va, int prot)
 	if (!vmr)							/* not mapped at all */
 		return -EFAULT;
 	if (!(vmr->vm_prot & prot))			/* wrong prots for this vmr */
-		return -EFAULT;
+		return -EPERM;
 	/* find offending PTE (prob don't read this in).  This might alloc an
 	 * intermediate page table page. */
 	pte_t *pte = pgdir_walk(p->env_pgdir, (void*)va, 1);

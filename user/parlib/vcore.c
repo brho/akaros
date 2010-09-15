@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <sys/mman.h>
 #include <rstdio.h>
+#include <glibc-tls.h>
 
 /* starting with 1 since we alloc vcore0's stacks and TLS in vcore_init(). */
 static size_t _max_vcores_ever_wanted = 1;
@@ -28,16 +29,24 @@ static void free_transition_tls(int id)
 
 static int allocate_transition_tls(int id)
 {
-	extern void *_dl_allocate_tls (void *mem) internal_function;
-	// We want to free and then reallocate the tls rather than simply 
-	// reinitializing it because its size may have changed
+	extern void *_dl_allocate_tls(void *mem) internal_function;
+	/* We want to free and then reallocate the tls rather than simply 
+	 * reinitializing it because its size may have changed */
 	free_transition_tls(id);
 
-	void* tls = _dl_allocate_tls(NULL);
-	if((vcore_thread_control_blocks[id] = tls) == NULL) {
+	void *tcb = _dl_allocate_tls(NULL);
+
+	if ((vcore_thread_control_blocks[id] = tcb) == NULL) {
 		errno = ENOMEM;
 		return -1;
 	}
+	/* Make sure the TLS is set up properly - its tcb pointer points to itself.
+	 * Keep this in sync with sysdeps/ros/XXX/tls.h.  For whatever reason,
+	 * dynamically linked programs do not need this to be redone, but statics
+	 * do. */
+	tcbhead_t *head = (tcbhead_t*)tcb;
+	head->tcb = tcb;
+	head->self = tcb;
 	return 0;
 }
 
