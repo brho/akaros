@@ -364,6 +364,7 @@ int kfs_unlink(struct inode *dir, struct dentry *dentry)
 	/* Stop tracking our child */
 	TAILQ_REMOVE(&((struct kfs_i_info*)dir->i_fs_info)->children, dentry,
 	             d_subdirs_link);
+	kref_put(&dentry->d_kref);				/* unpin the dentry, KFS-style */
 	return 0;
 }
 
@@ -422,6 +423,8 @@ int kfs_rmdir(struct inode *dir, struct dentry *dentry)
 	}
 	if (!empty)
 		return -ENOTEMPTY;
+	kref_put(&dentry->d_kref);				/* unpin the dentry, KFS-style */
+	printk("DENTRY %s REFCNT %d\n", dentry->d_name.name, kref_refcnt(&dentry->d_kref));
 	return 0;
 }
 
@@ -777,7 +780,7 @@ static int __add_kfs_entry(struct dentry *parent, char *path,
 	size_t dirname_sz;				/* not counting the \0 */
 	struct dentry *dentry = 0;
 	struct inode *inode;
-	int err;
+	int err, retval;
 	char *symname, old_end;			/* for symlink manipulation */
 
 	if (first_slash) {
@@ -799,7 +802,9 @@ static int __add_kfs_entry(struct dentry *parent, char *path,
 			printk("Missing dir in CPIO archive or something, aborting.\n");
 			return -1;
 		}
-		return __add_kfs_entry(dentry, first_slash + 1, c_bhdr);
+		retval = __add_kfs_entry(dentry, first_slash + 1, c_bhdr);
+		kref_put(&dentry->d_kref);
+		return retval;
 	} else {
 		/* no directories left in the path.  add the 'file' to the dentry */
 		printd("Adding file/dir %s to dentry %s (start: %p, size %d)\n", path,
@@ -837,6 +842,7 @@ static int __add_kfs_entry(struct dentry *parent, char *path,
 			default:
 				printk("Unknown file type %d in the CPIO!",
 				       c_bhdr->c_mode & CPIO_FILE_MASK);
+				kref_put(&dentry->d_kref);
 				return -1;
 		}
 		inode = dentry->d_inode;
@@ -851,6 +857,7 @@ static int __add_kfs_entry(struct dentry *parent, char *path,
 		inode->i_bdev = 0;						/* assuming blockdev? */
 		inode->i_socket = FALSE;
 		inode->i_blocks = c_bhdr->c_filesize;	/* blocksize == 1 */
+		kref_put(&dentry->d_kref);
 	}
 	return 0;
 }

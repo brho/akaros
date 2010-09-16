@@ -979,6 +979,7 @@ int create_file(struct inode *dir, struct dentry *dentry, int mode)
 	if (!new_file)
 		return -1;
 	dir->i_op->create(dir, dentry, mode, 0);
+	icache_put(new_file->i_sb, new_file);
 	kref_put(&new_file->i_kref);
 	return 0;
 }
@@ -998,6 +999,7 @@ int create_dir(struct inode *dir, struct dentry *dentry, int mode)
 	assert(parent && parent == TAILQ_LAST(&dir->i_dentry, dentry_tailq));
 	/* parent dentry tracks dentry as a subdir, weak reference */
 	TAILQ_INSERT_TAIL(&parent->d_subdirs, dentry, d_subdirs_link);
+	icache_put(new_dir->i_sb, new_dir);
 	kref_put(&new_dir->i_kref);
 	return 0;
 }
@@ -1011,6 +1013,7 @@ int create_symlink(struct inode *dir, struct dentry *dentry,
 	if (!new_sym)
 		return -1;
 	dir->i_op->symlink(dir, dentry, symname);
+	icache_put(new_sym->i_sb, new_sym);
 	kref_put(&new_sym->i_kref);
 	return 0;
 }
