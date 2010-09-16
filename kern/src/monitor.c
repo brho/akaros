@@ -772,7 +772,7 @@ int mon_fs(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 		printk("Usage: fs OPTION\n");
 		printk("\topen: show all open files\n");
 		printk("\tinodes: show all inodes\n");
-		printk("\tdentries [LRU]: show all dentries (dcache), optional LRU\n");
+		printk("\tdentries [lru|prune]: show all dentries, opt LRU/prune\n");
 		printk("\tls DIR: print the dir tree starting with DIR\n");
 		printk("\tpid: proc PID's fs crap placeholder\n");
 		return 1;
@@ -816,7 +816,9 @@ int mon_fs(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 				} while (hashtable_iterator_advance(dcache_i));
 			}
 		}
-		if (argv[2]) {
+		if (argc < 3)
+			return 0;
+		if (!strcmp(argv[2], "lru")) {
 			printk("LRU lists:\n");
 			TAILQ_FOREACH(sb, &super_blocks, s_list) {
 				printk("Superblock for %s\n", sb->s_name);
@@ -824,6 +826,10 @@ int mon_fs(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 					printk("Dentry: %08p, Name: %s\n", dentry,
 					       dentry->d_name.name);
 			}
+		} else if (!strcmp(argv[2], "prune")) {
+			printk("Pruning unused dentries\n");
+			TAILQ_FOREACH(sb, &super_blocks, s_list)
+				dcache_prune(sb, FALSE);
 		}
 	} else if (!strcmp(argv[1], "ls")) {
 		if (argc != 3) {

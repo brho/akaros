@@ -827,6 +827,43 @@ struct dentry *dcache_remove(struct super_block *sb, struct dentry *key)
 	return retval;
 }
 
+/* This will clean out the LRU list, which are the unused dentries of the dentry
+ * cache.  This will optionally only free the negative ones.  Note that we grab
+ * the hash lock for the time we traverse the LRU list - this prevents someone
+ * from getting a kref from the dcache, which could cause us trouble (we rip
+ * someone off the list, who isn't unused, and they try to rip them off the
+ * list). */
+void dcache_prune(struct super_block *sb, bool negative_only)
+{
+	struct dentry *d_i, *temp;
+	struct dentry_tailq victims = TAILQ_HEAD_INITIALIZER(victims);
+
+	spin_lock(&sb->s_dcache_lock);
+	spin_lock(&sb->s_lru_lock);
+	TAILQ_FOREACH_SAFE(d_i, &sb->s_lru_d, d_lru, temp) {
+		if (!(d_i->d_flags & DENTRY_USED)) {
+			if (negative_only && !(d_i->d_flags & DENTRY_NEGATIVE))
+				continue;
+			/* another place where we'd be better off with tools, not sol'ns */
+			hashtable_remove(sb->s_dcache, d_i);
+			TAILQ_REMOVE(&sb->s_lru_d, d_i, d_lru);
+			TAILQ_INSERT_HEAD(&victims, d_i, d_lru);
+		}
+	}
+	spin_unlock(&sb->s_lru_lock);
+	spin_unlock(&sb->s_dcache_lock);
+	/* Now do the actual freeing, outside of the hash/LRU list locks.  This is
+	 * necessary since __dentry_free() will decref its parent, which may get
+	 * released and try to add itself to the LRU. */
+	TAILQ_FOREACH_SAFE(d_i, &victims, d_lru, temp) {
+		TAILQ_REMOVE(&victims, d_i, d_lru);
+		assert(!kref_refcnt(&d_i->d_kref));
+		__dentry_free(d_i);
+	}
+	/* It is possible at this point that there are new items on the LRU.  We
+	 * could loop back until that list is empty, if we care about this. */
+}
+
 /* Inode Functions */
 
 /* Creates and initializes a new inode.  Generic fields are filled in.
