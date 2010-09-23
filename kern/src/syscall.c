@@ -111,6 +111,7 @@ static int sys_cache_buster(struct proc *p, uint32_t num_writes,
 			upage_alloc(p, &a_page[i],1);
 			page_insert(p->env_pgdir, a_page[i], (void*)INSERT_ADDR + PGSIZE*i,
 			            PTE_USER_RW);
+			page_decref(a_page[i]);
 		}
 		spin_unlock(&buster_lock);
 	}
@@ -350,8 +351,8 @@ static ssize_t sys_fork(env_t* e)
 				page_decref(pp);
 				return -1;
 			}
-
 			pagecopy(page2kva(pp),ppn2kva(PTE2PPN(*pte)));
+			page_decref(pp);
 		} else {
 			assert(PAGE_PAGED_OUT(*pte));
 			/* TODO: (SWAP) will need to either make a copy or CoW/refcnt the

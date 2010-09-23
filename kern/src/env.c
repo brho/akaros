@@ -44,12 +44,10 @@ WRITES(e->env_pgdir, e->env_cr3, e->procinfo, e->procdata)
 	page_t *pgdir = NULL;
 	static page_t * RO shared_page = 0;
 
-	/*
-	 * First, allocate a page for the pgdir of this process and up
-	 * its reference count since this will never be done elsewhere
-	 */
+	/* Get a page for the pgdir.  Storing the ref in pgdir/env_pgdir */
 	r = kpage_alloc(&pgdir);
-	if(r < 0) return r;
+	if (r < 0)
+		return r;
 
 	/*
 	 * Next, set up the e->env_pgdir and e->env_cr3 pointers to point
@@ -97,22 +95,17 @@ WRITES(e->env_pgdir, e->env_cr3, e->procinfo, e->procdata)
 	memset(e->procinfo, 0, sizeof(struct procinfo));
 	memset(e->procdata, 0, sizeof(struct procdata));
 
-	/* Finally, set up the Global Shared Data page for all processes.
-	 * Can't be trusted, but still very useful at this stage for us.
-	 * Consider removing when we have real processes.
-	 * (TODO).  Note the page is alloced only the first time through
-	 */
+	/* Finally, set up the Global Shared Data page for all processes.  Can't be
+	 * trusted, but still very useful at this stage for us.  Consider removing
+	 * when we have real processes (TODO). 
+	 *
+	 * Note the page is alloced only the first time through, and its ref is
+	 * stored in shared_page. */
 	if (!shared_page) {
-		if(upage_alloc(e, &shared_page,1) < 0)
+		if (upage_alloc(e, &shared_page, 1) < 0)
 			goto env_setup_vm_error;
-		// Up it, so it never goes away.  One per user, plus one from page_alloc
-		// This is necessary, since it's in the per-process range of memory that
-		// gets freed during page_free.
-		__kref_get(&shared_page->pg_kref, 1);
 	}
-
-	// Inserted into every process's address space at UGDATA
-	if(page_insert(e->env_pgdir, shared_page, (void*SNT)UGDATA, PTE_USER_RW) < 0)
+	if (page_insert(e->env_pgdir, shared_page, (void*)UGDATA, PTE_USER_RW) < 0)
 		goto env_setup_vm_error;
 
 	return 0;

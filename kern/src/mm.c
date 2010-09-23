@@ -590,9 +590,12 @@ int __handle_page_fault(struct proc *p, uintptr_t va, int prot)
 		 * you a new page.  In the future, we want to CoW this. */
 		if ((vmr->vm_flags |= MAP_PRIVATE) && (vmr->vm_prot |= PROT_WRITE)) {
 			struct page *cache_page = a_page;
-			if (upage_alloc(p, &a_page, FALSE))
+			if (upage_alloc(p, &a_page, FALSE)) {
+				page_decref(cache_page);	/* was the original a_page */
 				return -ENOMEM;
+			}
 			memcpy(page2kva(a_page), page2kva(cache_page), PGSIZE);
+			page_decref(cache_page);		/* was the original a_page */
 		}
 		/* if this is an executable page, we might have to flush the instruction
 		 * cache if our HW requires it. */
@@ -603,9 +606,7 @@ int __handle_page_fault(struct proc *p, uintptr_t va, int prot)
 	 * separately (file, no file) */
 	int pte_prot = (vmr->vm_prot & PROT_WRITE) ? PTE_USER_RW :
 	               (vmr->vm_prot & (PROT_READ|PROT_EXEC)) ? PTE_USER_RO : 0;
-	/* Need to incref, since we manually insert in the pgdir.  Internal version,
-	 * to go along with the upage_alloc from above. */
-	__kref_get(&a_page->pg_kref, 1);
+	/* We have a ref to a_page, which we are storing in the PTE */
 	*pte = PTE(page2ppn(a_page), PTE_P | pte_prot);
 	return 0;
 }

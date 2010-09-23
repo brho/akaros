@@ -614,8 +614,8 @@ pgdir_walk(pde_t *pgdir, const void *SNT va, int create)
 	}
 	if (kpage_alloc(&new_table))
 		return NULL;
-	page_setref(new_table,1);
 	memset(page2kva(new_table), 0, PGSIZE);
+	/* storing our ref to new_table in the PTE */
 	*the_pde = (pde_t)page2pa(new_table) | PTE_P | PTE_W | PTE_U;
 	return &((pde_t*COUNT(NPTENTRIES))KADDR(PTE_ADDR(*the_pde)))[PTX(va)];
 }
@@ -760,7 +760,7 @@ page_check(void)
 	assert(check_va2pa(boot_pgdir, PGSIZE) == ~0);
 	assert(kref_refcnt(&pp1->pg_kref) == 1);
 	assert(kref_refcnt(&pp2->pg_kref) == 1);
-	kref_put(&pp1->pg_kref);
+	page_decref(pp1);
 
 	// so it should be returned by page_alloc
 	assert(kpage_alloc(&pp) == 0 && pp == pp1);

@@ -21,7 +21,6 @@
 #define l3 (available_caches.l3)
 
 static void __page_decref(page_t *CT(1) page);
-static void __page_incref(page_t *CT(1) page);
 static error_t __page_alloc_specific(page_t** page, size_t ppn);
 
 #ifdef __CONFIG_PAGE_COLORING__
@@ -68,8 +67,7 @@ static void __page_clear(page_t *SAFE page)
 		*page = LIST_FIRST(&colored_page_free_list[i]);                     \
 		LIST_REMOVE(*page, pg_link);                                        \
 		__page_clear(*page);                                                \
-		/* Note the 0 initial value, due to how user pages are refcnt'd */  \
-		page_setref((*page), 0);                                            \
+		page_setref((*page), 1);                                            \
 		return i;                                                           \
 	}                                                                       \
 	return -ENOMEM;
@@ -108,14 +106,13 @@ static error_t __page_alloc_specific(page_t** page, size_t ppn)
 	*page = sp_page;
 	LIST_REMOVE(*page, pg_link);
 	__page_clear(*page);
-	/* Note the 0 initial value, due to how user pages are refcnt'd.  If you
-	 * have a page, you need to kref_get it before you *use* it. */
-	page_setref(*page, 0);
+	page_setref(*page, 1);
 	return 0;
 }
 
 /**
  * @brief Allocates a physical page from a pool of unused physical memory.
+ * Note, the page IS reference counted.
  *
  * Zeroes the page.
  *
@@ -141,6 +138,7 @@ error_t upage_alloc(struct proc* p, page_t** page, int zero)
 	return ret;
 }
 
+/* Allocates a refcounted page of memory for the kernel's use */
 error_t kpage_alloc(page_t** page) 
 {
 	ssize_t ret;
@@ -151,8 +149,6 @@ error_t kpage_alloc(page_t** page)
 
 	if (ret >= 0) {
 		global_next_color = ret;        
-		/* this is the "it's okay if it was 0" kref */
-		__kref_get(&(*page)->pg_kref, 1);
 		ret = ESUCCESS;
 	}
 	spin_unlock_irqsave(&colored_page_free_list_lock);
@@ -198,7 +194,6 @@ void *get_cont_pages(size_t order, int flags)
 	for(int i=0; i<npages; i++) {
 		page_t* page;
 		__page_alloc_specific(&page, first+i);
-		__kref_get(&page->pg_kref, 1);
 	}
 	spin_unlock_irqsave(&colored_page_free_list_lock);
 	return ppn2kva(first);
@@ -241,7 +236,6 @@ error_t kpage_alloc_specific(page_t** page, size_t ppn)
 {
 	spin_lock_irqsave(&colored_page_free_list_lock);
 	__page_alloc_specific(page, ppn);
-	page_incref(*page);
 	spin_unlock_irqsave(&colored_page_free_list_lock);
 	return 0;
 }
@@ -258,11 +252,6 @@ int page_is_free(size_t ppn) {
  * Increment the reference count on a page
  */
 void page_incref(page_t *page)
-{
-	__page_incref(page);
-}
-
-void __page_incref(page_t *page)
 {
 	kref_get(&page->pg_kref, 1);
 }
