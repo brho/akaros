@@ -63,7 +63,6 @@ void free_cont_pages(void *buf, size_t order);
 
 void page_incref(page_t *SAFE page);
 void page_decref(page_t *SAFE page);
-size_t page_getref(page_t *SAFE page);
 void page_setref(page_t *SAFE page, size_t val);
 
 int page_is_free(size_t ppn);

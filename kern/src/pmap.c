@@ -120,52 +120,6 @@ int page_insert(pde_t *pgdir, struct page *page, void *va, int perm)
 }
 
 /**
- * DEPRECATED - this conflicts with VM regions.
- *
- * @brief Map the physical page 'pp' at the first virtual address that is free 
- * in the range 'vab' to 'vae' in page directory 'pgdir'.
- *
- * The permissions (the low 12 bits) of the page table entry get set to 
- * 'perm|PTE_P'.
- *
- * Details:
- *   - If there is no free entry in the range 'vab' to 'vae' this 
- *     function returns NULL.
- *   - If necessary, on demand, this function will allocate a page table 
- *     and inserts it into 'pgdir'.
- *   - page_incref() will be called if the insertion succeeds.
- * 
- * @param[in] pgdir the page directory to insert the page into
- * @param[in] pp    a pointr to the page struct representing the
- *                  physical page that should be inserted.
- * @param[in] vab   the first virtual address in the range in which the 
- *                  page can be inserted.
- * @param[in] vae   the last virtual address in the range in which the 
- *                  page can be inserted.
- * @param[in] perm  the permition bits with which to set up the 
- *                  virtual mapping.
- *
- * @return VA   the virtual address where pp has been mapped in the 
- *              range (vab, vae)
- * @return NULL no free va in the range (vab, vae) could be found
- */
-void* page_insert_in_range(pde_t *pgdir, page_t *pp, 
-                           void *vab, void *vae, int perm) 
-{
-	pte_t* pte = NULL;
-	void*SNT new_va;
-	
-	for(new_va = vab; new_va <= vae; new_va+= PGSIZE) {
-		pte = pgdir_walk(pgdir, new_va, 1);
-		if(pte != NULL && PAGE_UNMAPPED(*pte)) break;
-		else pte = NULL;
-	}
-	if (!pte) return NULL;
-	*pte = page2pa(pp) | PTE_P | perm;
-	return TC(new_va); // trusted because mapping a page is like allocation
-}
-
-/**
  * @brief Return the page mapped at virtual address 'va' in 
  * page directory 'pgdir'.
  *

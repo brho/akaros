@@ -66,8 +66,6 @@ void	vm_init(void);
 void	page_init(void);
 void	page_check(void);
 int	    page_insert(pde_t *pgdir, struct page *page, void *SNT va, int perm);
-void*COUNT(PGSIZE) page_insert_in_range(pde_t *COUNT(NPDENTRIES) pgdir, page_t *pp, 
-                             void *SNT vab, void *SNT vae, int perm);
 void	page_remove(pde_t *COUNT(NPDENTRIES) pgdir, void *SNT va);
 page_t*COUNT(1) page_lookup(pde_t SSOMELOCK*COUNT(NPDENTRIES) pgdir, void *SNT va, pte_t **pte_store);
 error_t	pagetable_remove(pde_t *COUNT(NPDENTRIES) pgdir, void *SNT va);

@@ -524,43 +524,8 @@ static ssize_t sys_shared_page_alloc(env_t* p1,
                                      int p1_flags, int p2_flags
                                     )
 {
-	/* When we remove/change this, also get rid of page_insert_in_range() */
-	printk("[kernel] the current shared page alloc is deprecated.\n");
-	//if (!VALID_USER_PERMS(p1_flags)) return -EPERM;
-	//if (!VALID_USER_PERMS(p2_flags)) return -EPERM;
-
-	void * COUNT(1) * COUNT(1) addr = user_mem_assert(p1, _addr, sizeof(void *),
-                                                      PTE_USER_RW);
-	struct proc *p2 = pid2proc(p2_id);
-	if (!p2)
-		return -EBADPROC;
-
-	page_t* page;
-	error_t e = upage_alloc(p1, &page,1);
-	if (e < 0) {
-		kref_put(&p2->kref);
-		return e;
-	}
-
-	void* p2_addr = page_insert_in_range(p2->env_pgdir, page,
-	                (void*SNT)UTEXT, (void*SNT)UTOP, p2_flags);
-	if (p2_addr == NULL) {
-		page_free(page);
-		kref_put(&p2->kref);
-		return -EFAIL;
-	}
-
-	void* p1_addr = page_insert_in_range(p1->env_pgdir, page,
-	                (void*SNT)UTEXT, (void*SNT)UTOP, p1_flags);
-	if(p1_addr == NULL) {
-		page_remove(p2->env_pgdir, p2_addr);
-		page_free(page);
-		kref_put(&p2->kref);
-		return -EFAIL;
-	}
-	*addr = p1_addr;
-	kref_put(&p2->kref);
-	return ESUCCESS;
+	printk("[kernel] shared page alloc is deprecated/unimplemented.\n");
+	return -1;
 }
 
 static int sys_shared_page_free(env_t* p1, void*DANGEROUS addr, pid_t p2)

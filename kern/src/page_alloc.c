@@ -328,14 +328,6 @@ void page_setref(page_t *page, size_t val)
 	kref_init(&page->pg_kref, page_release, val); 
 }
 
-/*
- * Get the reference count on a page
- */
-size_t page_getref(page_t *page)
-{
-	return kref_refcnt(&page->pg_kref);
-}
-
 /* Attempts to get a lock on the page for IO operations.  If it is already
  * locked, it will block the thread until it is unlocked. */
 void lock_page(struct page *page)
