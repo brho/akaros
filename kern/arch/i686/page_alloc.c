@@ -38,15 +38,14 @@ void page_alloc_init()
 {
 	// First Bootstrap the page alloc process
 	static bool RO bootstrapped = FALSE;
-	if(!bootstrapped) {
+	if (!bootstrapped) {
 		bootstrapped = SINIT(TRUE);
 		page_alloc_bootstrap();
 	}
 
 	// Then, initialize the array required to manage the colored page free list
-	for(int i=0; i<llc_cache->num_colors; i++) {
+	for (int i = 0; i < llc_cache->num_colors; i++)
 		LIST_INIT(&(colored_page_free_list[i]));
-	}
 
 	//  Then, mark the pages already in use by the kernel. 
 	//  1) Mark page 0 as in use.
@@ -61,12 +60,13 @@ void page_alloc_init()
 	extern char (SNT RO end)[];
 	physaddr_t physaddr_after_kernel = PADDR(PTRROUNDUP(boot_freemem, PGSIZE));
 
-	atomic_set(&pages[0].pg_refcnt, 1);
+	page_setref(&pages[0], 1);
 	// alloc the second page, since we will need it later to init the other cores
 	// probably need to be smarter about what page we use (make this dynamic) TODO
-	atomic_set(&pages[1].pg_refcnt, 1);
+	page_setref(&pages[1], 1);
 	for (i = 2; i < LA2PPN(IOPHYSMEM); i++) {
-		pages[i].pg_refcnt = 0;
+		/* this ought to be unnecessary */
+		page_setref(&pages[i], 0);
 		LIST_INSERT_HEAD(
 		   &(colored_page_free_list[get_page_color(page2ppn(&pages[i]), 
 			                                       llc_cache)]),
@@ -74,14 +74,12 @@ void page_alloc_init()
 		   pg_link
 		);
 	}
-	for (i = LA2PPN(IOPHYSMEM); i < LA2PPN(EXTPHYSMEM); i++) {
-		atomic_set(&pages[i].pg_refcnt, 1);
-	}
-	for (i = LA2PPN(EXTPHYSMEM); i < LA2PPN(physaddr_after_kernel); i++) {
-		atomic_set(&pages[i].pg_refcnt, 1);
-	}
+	for (i = LA2PPN(IOPHYSMEM); i < LA2PPN(EXTPHYSMEM); i++)
+		page_setref(&pages[i], 1);
+	for (i = LA2PPN(EXTPHYSMEM); i < LA2PPN(physaddr_after_kernel); i++)
+		page_setref(&pages[i], 1);
 	for (i = LA2PPN(physaddr_after_kernel); i < LA2PPN(maxaddrpa); i++) {
-		atomic_set(&pages[i].pg_refcnt, 0);
+		page_setref(&pages[i], 0);
 		LIST_INSERT_HEAD(
 		   &(colored_page_free_list[get_page_color(page2ppn(&pages[i]), 
 			                                       llc_cache)]),
@@ -91,9 +89,8 @@ void page_alloc_init()
 	}
 	// this block out all memory above maxaddrpa.  will need another mechanism
 	// to allocate and map these into the kernel address space
-	for (i = LA2PPN(maxaddrpa); i < npages; i++) {
-		atomic_set(&pages[i].pg_refcnt, 1);
-	}
+	for (i = LA2PPN(maxaddrpa); i < npages; i++)
+		page_setref(&pages[i], 1);
 	printk("Page alloc init successful\n");
 }
 

@@ -603,7 +603,9 @@ int __handle_page_fault(struct proc *p, uintptr_t va, int prot)
 	 * separately (file, no file) */
 	int pte_prot = (vmr->vm_prot & PROT_WRITE) ? PTE_USER_RW :
 	               (vmr->vm_prot & (PROT_READ|PROT_EXEC)) ? PTE_USER_RO : 0;
-	page_incref(a_page);	/* incref, since we manually insert in the pgdir */
+	/* Need to incref, since we manually insert in the pgdir.  Internal version,
+	 * to go along with the upage_alloc from above. */
+	__kref_get(&a_page->pg_kref, 1);
 	*pte = PTE(page2ppn(a_page), PTE_P | pte_prot);
 	return 0;
 }

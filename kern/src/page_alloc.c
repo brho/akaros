@@ -67,8 +67,10 @@ static void __page_clear(page_t *SAFE page)
 	/* Allocate a page from that color */                                   \
 	if(i < (base_color+range)) {                                            \
 		*page = LIST_FIRST(&colored_page_free_list[i]);                     \
-		LIST_REMOVE(*page, pg_link);                                      \
+		LIST_REMOVE(*page, pg_link);                                        \
 		__page_clear(*page);                                                \
+		/* Note the 0 initial value, due to how user pages are refcnt'd */  \
+		page_setref((*page), 0);                                            \
 		return i;                                                           \
 	}                                                                       \
 	return -ENOMEM;
@@ -102,12 +104,14 @@ static ssize_t __colored_page_alloc(uint8_t* map, page_t** page,
 static error_t __page_alloc_specific(page_t** page, size_t ppn)
 {
 	page_t* sp_page = ppn2page(ppn);
-	if (atomic_read(&sp_page->pg_refcnt) != 0)
+	if (!page_is_free(ppn))
 		return -ENOMEM;
 	*page = sp_page;
 	LIST_REMOVE(*page, pg_link);
-
 	__page_clear(*page);
+	/* Note the 0 initial value, due to how user pages are refcnt'd.  If you
+	 * have a page, you need to kref_get it before you *use* it. */
+	page_setref(*page, 0);
 	return 0;
 }
 
@@ -129,8 +133,7 @@ error_t upage_alloc(struct proc* p, page_t** page, int zero)
 	                                     page, p->next_cache_color);
 	spin_unlock_irqsave(&colored_page_free_list_lock);
 
-	if(ret >= 0)
-	{
+	if (ret >= 0) {
 		if(zero)
 			memset(page2kva(*page),0,PGSIZE);
 		p->next_cache_color = (ret + 1) & (llc_cache->num_colors-1);
@@ -143,13 +146,14 @@ error_t kpage_alloc(page_t** page)
 {
 	ssize_t ret;
 	spin_lock_irqsave(&colored_page_free_list_lock);
-	if((ret = __page_alloc_from_color_range(page, global_next_color, 
+	if ((ret = __page_alloc_from_color_range(page, global_next_color, 
 	                            llc_cache->num_colors - global_next_color)) < 0)
 		ret = __page_alloc_from_color_range(page, 0, global_next_color);
 
-	if(ret >= 0) {
+	if (ret >= 0) {
 		global_next_color = ret;        
-		page_incref(*page);
+		/* this is the "it's okay if it was 0" kref */
+		__kref_get(&(*page)->pg_kref, 1);
 		ret = ESUCCESS;
 	}
 	spin_unlock_irqsave(&colored_page_free_list_lock);
@@ -195,7 +199,7 @@ void *get_cont_pages(size_t order, int flags)
 	for(int i=0; i<npages; i++) {
 		page_t* page;
 		__page_alloc_specific(&page, first+i);
-		page_incref(page); 
+		__kref_get(&page->pg_kref, 1);
 	}
 	spin_unlock_irqsave(&colored_page_free_list_lock);
 	return ppn2kva(first);
@@ -243,11 +247,13 @@ error_t kpage_alloc_specific(page_t** page, size_t ppn)
 	return 0;
 }
 
-/*
- * Return a page to the free list.
- * (This function should only be called when pp->pg_refcnt reaches 0.)
- * You must hold the page_free list lock before calling this.
- */
+/* Returns a page to the free list.
+ *
+ * This function should only be called when the refcnt reaches 0, meaning from
+ * page_release().
+ *
+ * You must hold the page_free list lock before calling this, which is
+ * accomplished via the page_decref locking hacks. */
 static error_t __page_free(page_t* page) 
 {
 	__page_clear(page);
@@ -270,14 +276,12 @@ error_t page_free(page_t *SAFE page)
 	return retval;
 }
 
-/*
- * Check if a page with the given physical page # is free
- */
+/* Check if a page with the given physical page # is free. */
 int page_is_free(size_t ppn) {
 	page_t* page = ppn2page(ppn);
-	if (atomic_read(&page->pg_refcnt) == 0)
-		return TRUE;
-	return FALSE;
+	if (kref_refcnt(&page->pg_kref))
+		return FALSE;
+	return TRUE;
 }
 
 /*
@@ -288,16 +292,13 @@ void page_incref(page_t *page)
 	__page_incref(page);
 }
 
-/* TODO: (REF) poor refcnting */
 void __page_incref(page_t *page)
 {
-	atomic_inc(&page->pg_refcnt);
+	kref_get(&page->pg_kref, 1);
 }
 
-/*
- * Decrement the reference count on a page,
- * freeing it if there are no more refs.
- */
+/* Decrement the reference count on a page, freeing it if there are no more
+ * refs. */
 void page_decref(page_t *page)
 {
 	spin_lock_irqsave(&colored_page_free_list_lock);
@@ -305,29 +306,26 @@ void page_decref(page_t *page)
 	spin_unlock_irqsave(&colored_page_free_list_lock);
 }
 
-/*
- * Decrement the reference count on a page,
- * freeing it if there are no more refs.
- *
- * TODO: (REF) this is insufficient protection (poor use of atomics, etc).
- */
+/* Decrement the reference count on a page, freeing it if there are no more
+ * refs. */
 static void __page_decref(page_t *page)
 {
-	if (atomic_read(&page->pg_refcnt) == 0) {
-		panic("Trying to Free already freed page: %d...\n", page2ppn(page));
-		return;
-	}
-	atomic_dec(&page->pg_refcnt);
-	if (atomic_read(&page->pg_refcnt) == 0)
-		__page_free(page);
+	kref_put(&page->pg_kref);
 }
 
-/*
- * Set the reference count on a page to a specific value
- */
+/* Kref release function. */
+static void page_release(struct kref *kref)
+{
+	struct page *page = container_of(kref, struct page, pg_kref);
+	__page_free(page);
+}
+
+/* Helper when initializing a page - just to prevent the proliferation of
+ * page_release references (and because this function is sitting around in the
+ * code).  Sets the reference count on a page to a specific value, usually 1. */
 void page_setref(page_t *page, size_t val)
 {
-	atomic_set(&page->pg_refcnt, val);
+	kref_init(&page->pg_kref, page_release, val); 
 }
 
 /*
@@ -335,7 +333,7 @@ void page_setref(page_t *page, size_t val)
  */
 size_t page_getref(page_t *page)
 {
-	return atomic_read(&page->pg_refcnt);
+	return kref_refcnt(&page->pg_kref);
 }
 
 /* Attempts to get a lock on the page for IO operations.  If it is already

@@ -99,19 +99,23 @@ void page_init(void)
  *                   into which the page should be inserted
  *
  */
-int page_insert(pde_t *pgdir, page_t *pp, void *va, int perm) 
+int page_insert(pde_t *pgdir, struct page *page, void *va, int perm) 
 {
 	pte_t* pte = pgdir_walk(pgdir, va, 1);
 	if (!pte)
 		return -ENOMEM;
-	// need to up the ref count in case pp is already mapped at va
-	// and we don't want to page_remove (which could free pp) and then 
-	// continue as if pp wasn't freed.  moral = up the ref asap
-	page_incref(pp);
+	/* Two things here:  First, we need to up the ref count of the page we want
+	 * to insert in case it is already mapped at va.  In that case we don't want
+	 * page_remove to ultimately free it, and then for us to continue as if pp
+	 * wasn't freed. (moral = up the ref asap)
+	 * Secondly, we need to use the __kref_get() since it is possible that pp
+	 * has a refcnt of 0 - which is what happens when you get a fresh page from
+	 * the free list (for now). */
+	__kref_get(&page->pg_kref, 1);
 	/* Careful, page remove handles the cases where the page is PAGED_OUT. */
 	if (!PAGE_UNMAPPED(*pte))
 		page_remove(pgdir, va);
-	*pte = PTE(page2ppn(pp), PTE_P | perm);
+	*pte = PTE(page2ppn(page), PTE_P | perm);
 	return 0;
 }
 

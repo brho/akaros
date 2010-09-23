@@ -14,6 +14,7 @@
 #include <arch/mmu.h>
 #include <colored_page_alloc.h>
 #include <process.h>
+#include <kref.h>
 
 struct page_map;		/* preprocessor games */
 
@@ -34,7 +35,7 @@ typedef LIST_ENTRY(page) page_list_entry_t;
  * reference counting and atomic operations. */
 struct page {
 	LIST_ENTRY(page)			pg_link;	/* membership in various lists */
-	atomic_t					pg_refcnt;
+	struct kref					pg_kref;
 	unsigned int				pg_flags;
 	struct page_map				*pg_mapping;
 	unsigned long				pg_index;

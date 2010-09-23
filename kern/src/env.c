@@ -108,7 +108,7 @@ WRITES(e->env_pgdir, e->env_cr3, e->procinfo, e->procdata)
 		// Up it, so it never goes away.  One per user, plus one from page_alloc
 		// This is necessary, since it's in the per-process range of memory that
 		// gets freed during page_free.
-		page_incref(shared_page);
+		__kref_get(&shared_page->pg_kref, 1);
 	}
 
 	// Inserted into every process's address space at UGDATA

@@ -64,12 +64,12 @@ void page_alloc_init()
 
 	// mark [0, physaddr_after_kernel) as in-use
 	for(i = 0; i < LA2PPN(physaddr_after_kernel); i++)
-		atomic_init(&pages[i].pg_refcnt, 1);
+		page_setref(&pages[i], 1);
 
 	// mark [physaddr_after_kernel, maxaddrpa) as free
 	for(i = LA2PPN(physaddr_after_kernel); i < LA2PPN(maxaddrpa); i++)
 	{
-		pages[i].pg_refcnt = 0;
+		page_setref(&pages[i], 0);
                 LIST_INSERT_HEAD(
                    &(colored_page_free_list[get_page_color(i,llc_cache)]),
                    &pages[i],
@@ -79,5 +79,5 @@ void page_alloc_init()
 
 	// mark [maxaddrpa, ...) as in-use (as they are invalid)
 	for(i = LA2PPN(maxaddrpa); i < npages; i++)
-		atomic_init(&pages[i].pg_refcnt, 1);
+		page_setref(&pages[i], 1);
 }

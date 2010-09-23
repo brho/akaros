@@ -700,13 +700,13 @@ page_check(void)
 	}
 	assert(PTE_ADDR(boot_pgdir[0]) == page2pa(pp0));
 	assert(check_va2pa(boot_pgdir, 0x0) == page2pa(pp1));
-	assert(atomic_read(&pp1->pg_refcnt) == 1);
-	assert(atomic_read(&pp0->pg_refcnt) == 1);
+	assert(kref_refcnt(&pp1->pg_kref) == 1);
+	assert(kref_refcnt(&pp0->pg_kref) == 1);
 
 	// should be able to map pp2 at PGSIZE because pp0 is already allocated for page table
 	assert(page_insert(boot_pgdir, pp2, (void*SNT) PGSIZE, 0) == 0);
 	assert(check_va2pa(boot_pgdir, PGSIZE) == page2pa(pp2));
-	assert(atomic_read(&pp2->pg_refcnt) == 1);
+	assert(kref_refcnt(&pp2->pg_kref) == 1);
 
 	// Make sure that pgdir_walk returns a pointer to the pte and
 	// not the table or some other garbage
@@ -721,7 +721,7 @@ page_check(void)
 	// should be able to map pp2 at PGSIZE because it's already there
 	assert(page_insert(boot_pgdir, pp2, (void*SNT) PGSIZE, PTE_U) == 0);
 	assert(check_va2pa(boot_pgdir, PGSIZE) == page2pa(pp2));
-	assert(atomic_read(&pp2->pg_refcnt) == 1);
+	assert(kref_refcnt(&pp2->pg_kref) == 1);
 
 	// Make sure that we actually changed the permission on pp2 when we re-mapped it
 	{
@@ -743,8 +743,8 @@ page_check(void)
 	assert(check_va2pa(boot_pgdir, 0) == page2pa(pp1));
 	assert(check_va2pa(boot_pgdir, PGSIZE) == page2pa(pp1));
 	// ... and ref counts should reflect this
-	assert(atomic_read(&pp1->pg_refcnt) == 2);
-	assert(atomic_read(&pp2->pg_refcnt) == 0);
+	assert(kref_refcnt(&pp1->pg_kref) == 2);
+	assert(kref_refcnt(&pp2->pg_kref) == 0);
 
 	// pp2 should be returned by page_alloc
 	assert(kpage_alloc(&pp) == 0 && pp == pp2);
@@ -754,15 +754,15 @@ page_check(void)
 	page_remove(boot_pgdir, 0x0);
 	assert(check_va2pa(boot_pgdir, 0x0) == ~0);
 	assert(check_va2pa(boot_pgdir, PGSIZE) == page2pa(pp1));
-	assert(atomic_read(&pp1->pg_refcnt) == 1);
-	assert(atomic_read(&pp2->pg_refcnt) == 0);
+	assert(kref_refcnt(&pp1->pg_kref) == 1);
+	assert(kref_refcnt(&pp2->pg_kref) == 0);
 
 	// unmapping pp1 at PGSIZE should free it
 	page_remove(boot_pgdir, (void*SNT) PGSIZE);
 	assert(check_va2pa(boot_pgdir, 0x0) == ~0);
 	assert(check_va2pa(boot_pgdir, PGSIZE) == ~0);
-	assert(atomic_read(&pp1->pg_refcnt) == 0);
-	assert(atomic_read(&pp2->pg_refcnt) == 0);
+	assert(kref_refcnt(&pp1->pg_kref) == 0);
+	assert(kref_refcnt(&pp2->pg_kref) == 0);
 
 	// so it should be returned by page_alloc
 	assert(kpage_alloc(&pp) == 0 && pp == pp1);
@@ -774,8 +774,8 @@ page_check(void)
 	// forcibly take pp0 back
 	assert(PTE_ADDR(boot_pgdir[0]) == page2pa(pp0));
 	boot_pgdir[0] = 0;
-	assert(atomic_read(&pp0->pg_refcnt) == 1);
-	atomic_set(&pp0->pg_refcnt, 0);
+	assert(kref_refcnt(&pp0->pg_kref) == 1);
+	page_setref(pp0, 0);
 
 	// Catch invalid pointer addition in pgdir_walk - i.e. pgdir + PDX(va)
 	{
@@ -789,7 +789,7 @@ page_check(void)
 
 	  // Clean up again
 	  boot_pgdir[PDX(va)] = 0;
-	  atomic_set(&pp0->pg_refcnt, 0);
+	  page_setref(pp0, 0);
 	}
 
 	// give free list back
