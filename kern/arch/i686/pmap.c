@@ -663,9 +663,6 @@ page_check(void)
 	assert(kpage_alloc(&pp0) == 0);
 	assert(kpage_alloc(&pp1) == 0);
 	assert(kpage_alloc(&pp2) == 0);
-	page_setref(pp0, 0);
-	page_setref(pp1, 0);
-	page_setref(pp2, 0);
 
 	assert(pp0);
 	assert(pp1 && pp1 != pp0);
@@ -690,7 +687,7 @@ page_check(void)
 	assert(page_insert(boot_pgdir, pp1, 0x0, 0) < 0);
 
 	// free pp0 and try again: pp0 should be used for page table
-	page_free(pp0);
+	page_decref(pp0);
 	assert(page_insert(boot_pgdir, pp1, 0x0, 0) == 0);
 	tlb_invalidate(boot_pgdir, 0x0);
 	// DEP Should have shot down invalid TLB entry - let's check
@@ -700,13 +697,13 @@ page_check(void)
 	}
 	assert(PTE_ADDR(boot_pgdir[0]) == page2pa(pp0));
 	assert(check_va2pa(boot_pgdir, 0x0) == page2pa(pp1));
-	assert(kref_refcnt(&pp1->pg_kref) == 1);
+	assert(kref_refcnt(&pp1->pg_kref) == 2);
 	assert(kref_refcnt(&pp0->pg_kref) == 1);
 
 	// should be able to map pp2 at PGSIZE because pp0 is already allocated for page table
 	assert(page_insert(boot_pgdir, pp2, (void*SNT) PGSIZE, 0) == 0);
 	assert(check_va2pa(boot_pgdir, PGSIZE) == page2pa(pp2));
-	assert(kref_refcnt(&pp2->pg_kref) == 1);
+	assert(kref_refcnt(&pp2->pg_kref) == 2);
 
 	// Make sure that pgdir_walk returns a pointer to the pte and
 	// not the table or some other garbage
@@ -721,7 +718,7 @@ page_check(void)
 	// should be able to map pp2 at PGSIZE because it's already there
 	assert(page_insert(boot_pgdir, pp2, (void*SNT) PGSIZE, PTE_U) == 0);
 	assert(check_va2pa(boot_pgdir, PGSIZE) == page2pa(pp2));
-	assert(kref_refcnt(&pp2->pg_kref) == 1);
+	assert(kref_refcnt(&pp2->pg_kref) == 2);
 
 	// Make sure that we actually changed the permission on pp2 when we re-mapped it
 	{
@@ -730,7 +727,7 @@ page_check(void)
 	}
 
 	// pp2 should NOT be on the free list
-	// could happen in ref counts are handled sloppily in page_insert
+	// could happen if ref counts are handled sloppily in page_insert
 	assert(kpage_alloc(&pp) == -ENOMEM);
 
 	// should not be able to map at PTSIZE because need free page for page table
@@ -743,30 +740,30 @@ page_check(void)
 	assert(check_va2pa(boot_pgdir, 0) == page2pa(pp1));
 	assert(check_va2pa(boot_pgdir, PGSIZE) == page2pa(pp1));
 	// ... and ref counts should reflect this
-	assert(kref_refcnt(&pp1->pg_kref) == 2);
-	assert(kref_refcnt(&pp2->pg_kref) == 0);
+	assert(kref_refcnt(&pp1->pg_kref) == 3);
+	assert(kref_refcnt(&pp2->pg_kref) == 1);
 
 	// pp2 should be returned by page_alloc
+	page_decref(pp2);	/* should free it */
 	assert(kpage_alloc(&pp) == 0 && pp == pp2);
-	page_setref(pp, 0);
 
 	// unmapping pp1 at 0 should keep pp1 at PGSIZE
 	page_remove(boot_pgdir, 0x0);
 	assert(check_va2pa(boot_pgdir, 0x0) == ~0);
 	assert(check_va2pa(boot_pgdir, PGSIZE) == page2pa(pp1));
-	assert(kref_refcnt(&pp1->pg_kref) == 1);
-	assert(kref_refcnt(&pp2->pg_kref) == 0);
+	assert(kref_refcnt(&pp1->pg_kref) == 2);
+	assert(kref_refcnt(&pp2->pg_kref) == 1);
 
 	// unmapping pp1 at PGSIZE should free it
 	page_remove(boot_pgdir, (void*SNT) PGSIZE);
 	assert(check_va2pa(boot_pgdir, 0x0) == ~0);
 	assert(check_va2pa(boot_pgdir, PGSIZE) == ~0);
-	assert(kref_refcnt(&pp1->pg_kref) == 0);
-	assert(kref_refcnt(&pp2->pg_kref) == 0);
+	assert(kref_refcnt(&pp1->pg_kref) == 1);
+	assert(kref_refcnt(&pp2->pg_kref) == 1);
+	kref_put(&pp1->pg_kref);
 
 	// so it should be returned by page_alloc
 	assert(kpage_alloc(&pp) == 0 && pp == pp1);
-	page_setref(pp, 0);
 
 	// should be no free memory
 	assert(kpage_alloc(&pp) == -ENOMEM);
@@ -775,12 +772,11 @@ page_check(void)
 	assert(PTE_ADDR(boot_pgdir[0]) == page2pa(pp0));
 	boot_pgdir[0] = 0;
 	assert(kref_refcnt(&pp0->pg_kref) == 1);
-	page_setref(pp0, 0);
 
 	// Catch invalid pointer addition in pgdir_walk - i.e. pgdir + PDX(va)
 	{
 	  // Give back pp0 for a bit
-	  page_free(pp0);
+	  page_decref(pp0);
 
 	  void *SNT va = (void *SNT)((PGSIZE * NPDENTRIES) + PGSIZE);
 	  pte_t *p2 = pgdir_walk(boot_pgdir, va, 1);
@@ -789,7 +785,6 @@ page_check(void)
 
 	  // Clean up again
 	  boot_pgdir[PDX(va)] = 0;
-	  page_setref(pp0, 0);
 	}
 
 	// give free list back
@@ -797,9 +792,12 @@ page_check(void)
 		colored_page_free_list[i] = fl[i];
 
 	// free the pages we took
-	page_free(pp0);
-	page_free(pp1);
-	page_free(pp2);
+	page_decref(pp0);
+	page_decref(pp1);
+	page_decref(pp2);
+	assert(!kref_refcnt(&pp0->pg_kref));
+	assert(!kref_refcnt(&pp1->pg_kref));
+	assert(!kref_refcnt(&pp2->pg_kref));
 
 	cprintf("page_check() succeeded!\n");
 }

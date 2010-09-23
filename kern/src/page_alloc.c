@@ -23,7 +23,6 @@
 static void __page_decref(page_t *CT(1) page);
 static void __page_incref(page_t *CT(1) page);
 static error_t __page_alloc_specific(page_t** page, size_t ppn);
-static error_t __page_free(page_t *CT(1) page);
 
 #ifdef __CONFIG_PAGE_COLORING__
 #define NUM_KERNEL_COLORS 8
@@ -247,35 +246,6 @@ error_t kpage_alloc_specific(page_t** page, size_t ppn)
 	return 0;
 }
 
-/* Returns a page to the free list.
- *
- * This function should only be called when the refcnt reaches 0, meaning from
- * page_release().
- *
- * You must hold the page_free list lock before calling this, which is
- * accomplished via the page_decref locking hacks. */
-static error_t __page_free(page_t* page) 
-{
-	__page_clear(page);
-
-	LIST_INSERT_HEAD(
-	   &(colored_page_free_list[get_page_color(page2ppn(page), llc_cache)]),
-	   page,
-	   pg_link
-	);
-
-	return ESUCCESS;
-}
-
-error_t page_free(page_t *SAFE page)
-{
-	error_t retval;
-	spin_lock_irqsave(&colored_page_free_list_lock);
-	retval = __page_free(page);
-	spin_unlock_irqsave(&colored_page_free_list_lock);
-	return retval;
-}
-
 /* Check if a page with the given physical page # is free. */
 int page_is_free(size_t ppn) {
 	page_t* page = ppn2page(ppn);
@@ -307,7 +277,7 @@ void page_decref(page_t *page)
 }
 
 /* Decrement the reference count on a page, freeing it if there are no more
- * refs. */
+ * refs.  Don't call this without holding the lock already. */
 static void __page_decref(page_t *page)
 {
 	kref_put(&page->pg_kref);
@@ -317,7 +287,16 @@ static void __page_decref(page_t *page)
 static void page_release(struct kref *kref)
 {
 	struct page *page = container_of(kref, struct page, pg_kref);
-	__page_free(page);
+
+	/* Probably issues with this, get rid of it on a future review */
+	__page_clear(page);
+	/* Give our page back to the free list.  The protections for this are that
+	 * the list lock is grabbed by page_decref. */
+	LIST_INSERT_HEAD(
+	   &(colored_page_free_list[get_page_color(page2ppn(page), llc_cache)]),
+	   page,
+	   pg_link
+	);
 }
 
 /* Helper when initializing a page - just to prevent the proliferation of

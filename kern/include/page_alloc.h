@@ -56,7 +56,6 @@ error_t kpage_alloc(page_t *SAFE *page);
 error_t upage_alloc_specific(struct proc* p, page_t *SAFE *page, size_t ppn);
 error_t kpage_alloc_specific(page_t *SAFE *page, size_t ppn);
 error_t colored_upage_alloc(uint8_t* map, page_t *SAFE *page, size_t color);
-error_t page_free(page_t *SAFE page);
 
 void *CT(1 << order) get_cont_pages(size_t order, int flags);
 void free_cont_pages(void *buf, size_t order);
