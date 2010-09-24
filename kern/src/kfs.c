@@ -136,6 +136,20 @@ int kfs_readpage(struct file *file, struct page *page)
 		memcpy(page2kva(page), (void*)begin, copy_amt);
 		memset(page2kva(page) + copy_amt, 0, PGSIZE - copy_amt);
 	}
+	struct buffer_head *bh = kmem_cache_alloc(bh_kcache, 0);
+	if (!bh) {
+		unlock_page(page);
+		return -1;			/* untested, un-thought-through */
+	}
+	/* KFS does a 1:1 BH to page mapping */
+	bh->bh_page = page;								/* weak ref */
+	bh->bh_buffer = page2kva(page);
+	bh->bh_flags = 0;								/* whatever... */
+	bh->bh_next = 0;								/* only one BH needed */
+	bh->bh_bdev = file->f_dentry->d_sb->s_bdev;		/* uncounted */
+	bh->bh_blocknum = page->pg_index;
+	bh->bh_numblock = 1;
+	page->pg_private = bh;
 	/* This is supposed to be done in the IO system when the operation is
 	 * complete.  Since we aren't doing a real IO request, and it is already
 	 * done, we can do it here. */

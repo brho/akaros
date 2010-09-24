@@ -381,3 +381,214 @@ gets decref'd.  All we'll do is add a DENTRY_DYING flag, and dentry_release()
 will avoid LRU and unusing it.  The dcache can continue to assume that negative
 entries are unused/LRU/dentry_freeable/ref==0, and not worry about calling
 kref_put().
+
+X: Buffer Cache, Page Cache, Buffer Heads, WTH?
+-------------------------------
+X.1: Page vs Buffer Cache
+--------------------
+So we discussed the page cache, but as described, it does not satisfy all of
+our disk caching needs.  Traditionally, there would also be a 'buffer cache.'
+Buffers usually refer to memory used to hold data from the disk (or network).
+I can think of a couple different ways someone could think of the buffer
+cache, and to understand them, we first need to understand what we need to be
+caching.
+
+There are two main types of FS data: file data and metadata.  This metadata
+is FS-specific data accessed by the VFS to get to a file's contents.  For
+example, the superblock, inodes, inode indirect blocks, and to a certain
+extent the directory's contents are all metadata.  There isn't an FS file (not
+to be confused with an OS file) that corresponds to this data, but it needs to
+be read in and cached.  Furthermore, this cache needs to be managed and
+written back when dirty.
+
+A very simple buffer cache would include anything *ever* read from disk.  It
+would then get copied into the page cache in PGSIZE chunks for the page cache.
+This would suck, since we now have two or three copies.
+
+Another buffer cache would be to cache only the disk blocks needed for
+metadata.  I think this is what Linux did before it unified its buffer and
+page caches (implied in UTLK).  The main issue with this is that you have two
+different systems for managing essentially similar data - we only want to deal
+with flushing, syncing, and writebacks of one subsystem, not in multiple
+different systems.
+
+The solution is to use the page cache to cache the metadata block operations.
+We do this by having the block device be mapped in PGSIZE chunks through its
+own struct page_mapping (a.k.a. struct address_space in Linux).  This way,
+both files and the block device are mapped in PGSIZE chunks via the same
+page_mapping structure, and will be managed by the same code.
+
+X.2: Mapping Blockdev Data vs File Data
+--------------------
+An important distinction between file data (as managed by an inode) and the
+bdev is that PGSIZE chunks of data for the bdev *must* be made of contiguous
+disk blocks.  Ideally, file data is also contiguous/sequential, but that is
+not always the case - hence the need for the inode's block pointers.  This
+means that the chunk at the bottom of the page_mapping radix tree is a page,
+and on that page there may be several buffers, holding the data of
+nonsequential disk blocks - but that not all pages are like this.  The bdev
+pages are made up of sequential blocks due to the very nature of what we are
+mapping; there's no inode abstraction in between.
+
+There are a couple ways we could handle this.  We adopt the Linux approach of
+using something called a buffer head (BH), which describes the mapping from
+in-memory buffer to block device / block number.  These are slab-allocated,
+and exist for each buffer of a page.  The page itself points to the first of
+its BHs, all of which exist in a circular LL.  The maximum number of them is
+determined by PGSIZE / blocksize.  Whenever there is a page in the page cache
+(meaning, in a page_mapping), that is up to date, it will have a BH.
+
+Another way would be to not have BHs at all, and just figure out (at
+operation-time) what the n blocks on disk are for any given page, and submit
+the IO operations for those blocks.  The BHs serve as a cache of that info.
+They also serve as a location to store data about the mapping, such as whether
+it is dirty or not, whether the data is up to date or not (has it been read
+in), etc.  The caching ought to be rather beneficial, since it means we do not
+need to access the disk-inode and indirect blocks whenever we want to perform
+an operation (which may be frequent - imagine the periodic writeback of an
+mmap'd file undergoing writes).  The per-buffer dirty tracking will also help:
+no need to write unrelated blocks if only one is edited (though this will not
+help with mmap(), since we don't usually know which part of the page is
+written).
+
+X.4: Do we always need BHs?
+------------------
+But what about those pages made up of contiguous blocks?  We don't have a
+bunch of independent, non-sequential blocks that we need to map.  Do we need a
+bunch of BHs for that?  Do we need any?  It really seems excessive to break it
+up into separate buffers for no reason.  At the other extreme, we could get by
+without having a BH at all, though this gets back to the other issue of
+caching.  What we do (or will do) is have one BH for the entire page of
+contiguous blocks.  If the page is a "buffer page," in Linux terms (meaning it
+has separate buffers), it will have n BHs in a circular LL.  Either way, we'll
+always have the mapping handy.  We wouldn't need to re-verify the contiguous
+nature of the blocks anyways, since the fact that the page was up to date and
+didn't need a BH would mean it was contiguous.  Further benefits to using the
+one BH include: 1) we are likely to make BHs be the unit of IO *submission*,
+and having one handy will simplify that code. 2) some code paths within the
+VFS may get BHs as a return value, which they can then dirty.  Always having a
+BH makes this easier (no need to find out if it's a buffer page, then decide
+how to dirty it).
+
+Another compliation with this is certain code will want a block in the middle
+of a page (very common for metadata).  That code will get the BH for the
+entire page back.  It will need to determine the starting block and then the
+offset of the block it wants.  Note, this usage of the BHs is finding the
+buffer corresponding to a block number.  The BH is a bidirectional mapping
+between buffers and blockdev:blocknum.  These calculations are a minor
+complication, but easy enough to do, and will probably be worth it.  The
+tradeoff is against having multiple BHs, which would mean multiple block IO
+requests for writing a single page (and writing the whole page may be a common
+operation).
+
+X.3: What about opening a blockdev?
+--------------------
+All of this means we are using the page cache to cache metadata blocks from
+the block device.  But what about the other blocks?  Those are "file" blocks,
+which are in the page mapping of the inode.  But what about when the block
+device is opened as if it was a file?  And then if we were to access the file
+blocks in this manner?  Yeah, that would screw things up - you will get
+inconsistencies, under the current plan.  There is one easy way to avoid this:
+don't open a bdev file if a file system is mounted on top of it.  If you do,
+don't be surprised about inconsistencies.  Ideally, the FS will never leave
+the actual disk in an inconsistent state, but the bdev's page cache could read
+things at different times and get some weird results.  Just don't do this (for
+now - not like I plan to make this possible any time soon).
+
+Could we use the same buffers for both the blockdev-file page mapping and the
+inode-file page mapping?  No - because the inode-file has the inode
+indirection in between, which means a PGSIZE chunk of the file might not be
+contiguous (as mentioned above).
+
+We could have tried to avoid this bdev file problem by having the page mapping
+radix trees point to a set of BHs that describes that page worth of buffers,
+so that the bdev and an inode pointing to the same data will use the same
+buffers and BHs.  That won't work, since the files buffers/blocks aren't in
+the same order as they are on disk within a page.  Instead, we'd need to have
+the page mapping go down to the FS's blocksize granularity, not to PGSIZE, so
+that we could have independent leaves point to wherever they want.  This would
+push the specific block device's blocksize into the VFS (which I don't like).
+
+But the blocksize-infecting-the-VFS alone isn't too bad.  The real issue is
+what is at the end of the page mapping.  Is it a page or a buffer/BH?  We want
+pages for two related reasons: higher levels of the kernel's IO systems deal
+with pages:
+1. mmap().  Good old mmap() requires at least a page of contiguous block
+buffers, so that the physical page frame can be mapped directly into a
+process's address space.
+2. Fast IO.  We want to use page remapping for fast IO.  This means that IO
+has to be in PGSIZE chunks - not blocksize chunks.
+
+x.4: Managing Dirty Buffers
+--------------------
+Many (some/all?) of the block functions will return a BH to describe the
+mapping.  One reason for doing this (mentioned above) is to allow the caller
+to manage if a buffer is dirty or not.  The tracking of dirty pages is done by
+the page cache.  The dirtying is done by the caller; it can simply mark the BH
+dirty and forget about it.  The writeback is handled usually by the page cache
+or is triggered by an FS event.  Eventually, we'll have a kernel thread that
+periodically writes dirty buffers back to disk.  Processes can also do this by
+calling fsync.  FSs themselves will trigger syncs of metadata.  This will come
+from having dirty SBs and inodes in the VFS.
+
+Note, the issue of whether or not we pin metadata blocks, such as the inode's
+indirect blocks (or other related blocks), in the page cache is independent of
+all these issues.  If they are not cached / pinned, we would just have to
+block and reread the inode's structures back into memory and proceed (for
+instance, we'd do this when identifying blocks for a page mapping on a file
+read).  The reason we wouldn't want to pin them is to save memory.
+
+x.5: Reference Counting BHs and Pages
+--------------------
+So we talk about passing around BHs, both when submitting IO ops and when
+returning from things like read_block() (note: this may return pages, not
+BHs).  However, we do not kref or reference count BHs in any way.  Instead, we
+kref pages.  We do this (for now) for a couple reasons:
+1) Pages are the unit of memory management in the kernel.  Higher levels of
+the kernel will pin/incref the page (such as in an mmap()).
+2) BHs hang off of a page, but exist only to be expressive about the
+management of the buffers on the page.  It's not like how a file hangs off a
+dentry, where the dentry doesn't know (or care) about the file.
+3) We already refcount pages.  While we could do the same for the BHs, it is a
+bit redundant.  Any place that would be kreffing the BH can just kref the
+whole page.
+
+When a page is in the page cache, we give it one kref.  Whenever a function or
+subsystem is using one of these pages (IO, using the data, etc), there needs
+to be a kref.  When it is time to remove the page from the page mapping, the
+code needs to remove it from the radix tree, then kref_put it.  When the final
+user is done with it (ideally, there is none, but we need to handle the case)
+the release function will clean up the page - including freeing its BHs.
+
+This does suck in that we could be removing an item from the page cache while
+it is being used, violating some LRU policy.  The actual decision to remove it
+should use those policies (when possible); the kreffing is simply to avoid
+issues from race conditions.  (A reader starts using a page right before it is
+ripped from the mapping).
+
+One issue with this is that dirty pages/buffers will need to be written back.
+If someone tries to read while the page is removed from the page_mapping, but
+before it is written back, they could get an old version if the read happens
+before the write.  This is only an issue if the page is dirty.  One option
+would be to writeback the page/buffer, then later remove it from the page
+cache when it is read.  There's issues with concurrent writers, though if that
+happens, we probably don't really want to remove it (it was LRU).  Note this
+is an issue regardless of whether or not BHs are refcounted.
+
+Also note that writeback of pages will happen regardless of eviction plans
+(fsync, every n sec, etc).
+
+This refcounting pattern is very similar to unlinking, where you can continue
+to access a file once it is removed from the directory.  The difference here
+is that future requests will get the same object (the page), unlike in the FS,
+where you get ENOENT.  The page mapping is a cache, and you need to get the
+same old data that was in there before the eviction.
+
+A final issue is when the VFS aggressively pins blockdev (metadata)
+pages/buffers.  Ideally, we'd like to be able to expel pages/buffers even if
+they are refcnt'd.  The subsystems will always want to keep stuff in RAM.
+This also/especially applies to mmap().  One solution would be to keep them in
+RAM, but have the BH keep track of who is holding its reference.  Then we
+could unmap the page, which would need to get read back in on its next access.
+We'd need (or ought to have) some sort of callbacks.  This will get solved
+later when we deal with unmapping mmap'd files.

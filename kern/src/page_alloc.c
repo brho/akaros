@@ -15,6 +15,7 @@
 #include <pmap.h>
 #include <string.h>
 #include <kmalloc.h>
+#include <blockdev.h>
 
 #define l1 (available_caches.l1)
 #define l2 (available_caches.l2)
@@ -277,6 +278,8 @@ static void page_release(struct kref *kref)
 {
 	struct page *page = container_of(kref, struct page, pg_kref);
 
+	if (page->pg_flags & PG_BUFFER)
+		free_bhs(page);
 	/* Probably issues with this, get rid of it on a future review */
 	__page_clear(page);
 	/* Give our page back to the free list.  The protections for this are that

@@ -25,7 +25,7 @@
 struct block_device {
 	int							b_id;
 	unsigned int				b_sector_size;		/* HW sector size */
-	unsigned int				b_num_sectors;		/* Total sectors on dev */
+	unsigned long				b_num_sectors;		/* Total sectors on dev */
 	struct kref					b_kref;
 	void						*b_data;			/* dev-specific use */
 	char						b_name[BDEV_INLINE_NAME];
@@ -34,6 +34,24 @@ struct block_device {
 	// io scheduler
 	// callbacks for completion
 };
+
+/* Not sure which of these we'll need, if any */
+#define BH_LOCKED		0x001	/* involved in an IO op */
+#define BH_UPTODATE		0x002	/* buffer is filled with file data */
+#define BH_DIRTY		0x004	/* buffer is dirty */
+
+/* This maps to and from a buffer within a page to a block(s) on a bdev.  Some
+ * of it might not be needed later, etc (page, numblock). */
+struct buffer_head {
+	struct page					*bh_page;			/* redundant with buffer */
+	void						*bh_buffer;
+	unsigned int				bh_flags;
+	struct buffer_head			*bh_next;			/* circular LL of BHs */
+	struct block_device			*bh_bdev;
+	unsigned long				bh_blocknum;
+	unsigned int				bh_numblock;		/* length (in blocks) */
+};
+struct kmem_cache *bh_kcache;
 
 /* This encapsulates the work of a request (instead of having a variety of
  * slightly-different functions for things like read/write and scatter-gather
@@ -57,6 +75,7 @@ struct kmem_cache *breq_kcache;	/* for the block requests */
 
 void block_init(void);
 struct block_device *get_bdev(char *path);
+void free_bhs(struct page *page);
 /* This function will probably be the one that blocks */
 int make_request(struct block_device *bdev, struct block_request *req);
 

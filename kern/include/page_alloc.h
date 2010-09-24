@@ -29,6 +29,7 @@ typedef LIST_ENTRY(page) page_list_entry_t;
 #define PG_LOCKED		0x001	/* involved in an IO op */
 #define PG_UPTODATE		0x002	/* page map, filled with file data */
 #define PG_DIRTY		0x004	/* page map, data is dirty */
+#define PG_BUFFER		0x008	/* is a buffer page, has BHs */
 
 /* TODO: this struct is not protected from concurrent operations in any
  * function.  We may want a lock, but a better thing would be a good use of
@@ -39,6 +40,7 @@ struct page {
 	unsigned int				pg_flags;
 	struct page_map				*pg_mapping;
 	unsigned long				pg_index;
+	void						*pg_private;	/* type depends on page usage */
 };
 
 /******** Externally visible global variables ************/

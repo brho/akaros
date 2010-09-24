@@ -1044,6 +1044,7 @@ void inode_release(struct kref *kref)
 	/* Either way, we dealloc the in-memory version */
 	inode->i_sb->s_op->dealloc_inode(inode);	/* FS-specific clean-up */
 	kref_put(&inode->i_sb->s_kref);
+	/* TODO: clean this up */
 	assert(inode->i_mapping == &inode->i_pm);
 	kmem_cache_free(inode_kcache, inode);
 	/* TODO: (BDEV) */
@@ -1729,7 +1730,7 @@ int pm_insert_page(struct page_map *pm, unsigned long index, struct page *page)
 	error = radix_insert(&pm->pm_tree, index, page);
 	if (!error) {
 		page_incref(page);
-		page->pg_flags |= PG_LOCKED;
+		page->pg_flags |= PG_LOCKED | PG_BUFFER;
 		page->pg_mapping = pm;
 		page->pg_index = index;
 		pm->pm_num_pages++;
@@ -1746,13 +1747,13 @@ int pm_remove_page(struct page_map *pm, struct page *page)
 {
 	void *retval;
 	warn("pm_remove_page() hasn't been thought through or tested.");
+	/* TODO: check for dirty pages, don't let them be removed right away.  Need
+	 * to schedule them for writeback, and then remove them later (callback). */
 	spin_lock(&pm->pm_tree_lock);
 	retval = radix_delete(&pm->pm_tree, page->pg_index);
 	spin_unlock(&pm->pm_tree_lock);
 	assert(retval == (void*)page);
 	page_decref(page);
-	page->pg_mapping = 0;
-	page->pg_index = 0;
 	pm->pm_num_pages--;
 	return 0;
 }
@@ -1792,6 +1793,9 @@ int file_load_page(struct file *file, unsigned long index, struct page **pp)
 				return error;
 		}
 	}
+	/* At this point, page is a refcnt'd page, and we return the reference.
+	 * Also, there's an unlikely race where we're not in the page cache anymore,
+	 * and this all is useless work. */
 	*pp = page;
 	/* if the page was in the map, we need to do some checks, and might have to
 	 * read in the page later.  If the page was freshly inserted to the pm by

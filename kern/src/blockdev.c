@@ -8,6 +8,7 @@
 #include <blockdev.h>
 #include <kmalloc.h>
 #include <slab.h>
+#include <page_alloc.h>
 
 struct file_operations block_f_op;
 struct kmem_cache *breq_kcache;
@@ -16,6 +17,8 @@ void block_init(void)
 {
 	breq_kcache = kmem_cache_create("block_reqs", sizeof(struct block_request),
 	                                __alignof__(struct block_request), 0, 0, 0);
+	bh_kcache = kmem_cache_create("buffer_heads", sizeof(struct buffer_head),
+	                              __alignof__(struct buffer_head), 0, 0, 0);
 
 	#ifdef __CONFIG_EXT2FS__
 	/* Now probe for and init the block device for the ext2 ram disk */
@@ -50,6 +53,22 @@ struct block_device *get_bdev(char *path)
 	kref_get(&bdev->b_kref, 1);
 	kref_put(&block_f->f_kref);
 	return bdev;
+}
+
+/* Frees all the BHs associated with page.  There could be 0, to deal with one
+ * that wasn't UPTODATE.  Don't call this on a page that isn't a PG_BUFFER */
+void free_bhs(struct page *page)
+{
+	struct buffer_head *bh, *next;
+	assert(page->pg_flags & PG_BUFFER);
+	bh = (struct buffer_head*)page->pg_private;
+	while (bh) {
+		next = bh->bh_next;
+		bh->bh_next = 0;
+		kmem_cache_free(bh_kcache, bh);
+		bh = next;
+	}
+	page->pg_private = 0;		/* catch bugs */
 }
 
 /* This ultimately will handle the actual request processing, all the way down
