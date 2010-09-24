@@ -1085,7 +1085,13 @@ void test_radix_tree(void)
 	struct radix_tree real_tree = RADIX_INITIALIZER;
 	struct radix_tree *tree = &real_tree;
 	void *retval;
-	
+
+	if (radix_insert(tree, 0, (void*)0xdeadbeef))
+		printk("Failed to insert at 0!\n");
+	radix_delete(tree, 0);
+	if (radix_insert(tree, 0, (void*)0xdeadbeef))
+		printk("Failed to re-insert at 0!\n");
+
 	if (radix_insert(tree, 3, (void*)0xdeadbeef))
 		printk("Failed to insert first!\n");
 	radix_insert(tree, 4, (void*)0x04040404);

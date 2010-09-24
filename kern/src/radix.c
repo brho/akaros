@@ -37,6 +37,8 @@ void radix_tree_init(struct radix_tree *tree)
  * slot. */
 void radix_tree_destroy(struct radix_tree *tree)
 {
+	/* Currently, we may have a root node, even if all the elements were removed
+	 */
 	panic("Not implemented");
 }
 
@@ -44,6 +46,7 @@ void radix_tree_destroy(struct radix_tree *tree)
  * out of memory, EEXIST if an item is already in the tree. */
 int radix_insert(struct radix_tree *tree, unsigned long key, void *item)
 {
+	printd("RADIX: insert %08p at %d\n", item, key);
 	struct radix_node *r_node;
 	void **slot;
 	/* Is the tree tall enough?  if not, it needs to grow a level.  This will
@@ -62,12 +65,14 @@ int radix_insert(struct radix_tree *tree, unsigned long key, void *item)
 		} else {
 			/* if there was no root before, we're both the root and a leaf */
 			r_node->leaf = TRUE;
+			r_node->parent = 0;
 		}
 		tree->root = r_node;
 		r_node->my_slot = &tree->root;
 		tree->depth++;
 		tree->upper_bound = 1 << (LOG_RNODE_SLOTS * tree->depth);
 	}
+	assert(tree->root);
 	/* the tree now thinks it is tall enough, so find the last node, insert in
 	 * it, etc */
 	r_node = __radix_lookup_node(tree, key, TRUE);
@@ -87,7 +92,10 @@ static void __radix_remove_slot(struct radix_node *r_node, struct radix_node **s
 	assert(*slot);		/* make sure there is something there */
 	*slot = 0;
 	r_node->num_items--;
-	if (!r_node->num_items) {
+	/* this check excludes the root, but the if else handles it.  For now, once
+	 * we have a root, we'll always keep it (will need some changing in
+	 * radix_insert() */
+	if (!r_node->num_items && r_node->parent) {
 		if (r_node->parent)
 			__radix_remove_slot(r_node->parent, r_node->my_slot);
 		else			/* we're the last node, attached to the actual tree */
@@ -102,6 +110,7 @@ static void __radix_remove_slot(struct radix_node *r_node, struct radix_node **s
  * won't "shrink". */
 void *radix_delete(struct radix_tree *tree, unsigned long key)
 {
+	printd("RADIX: delete %d\n", key);
 	void **slot;
 	void *retval;
 	struct radix_node *r_node = __radix_lookup_node(tree, key, 0);
@@ -121,6 +130,7 @@ void *radix_delete(struct radix_tree *tree, unsigned long key)
 /* Returns the item for a given key.  0 means no item, etc. */
 void *radix_lookup(struct radix_tree *tree, unsigned long key)
 {
+	printd("RADIX: lookup %d\n", key);
 	void **slot = radix_lookup_slot(tree, key);
 	if (!slot)
 		return 0;
@@ -139,6 +149,7 @@ void *radix_lookup(struct radix_tree *tree, unsigned long key)
 static struct radix_node *__radix_lookup_node(struct radix_tree *tree,
                                               unsigned long key, bool extend)
 {
+	printd("RADIX: lookup_node %d, %d\n", key, extend);
 	unsigned long idx;
 	struct radix_node *child_node, *r_node = tree->root;
 	if (key	>= tree->upper_bound) {
@@ -178,6 +189,7 @@ static struct radix_node *__radix_lookup_node(struct radix_tree *tree,
  * etc */
 void **radix_lookup_slot(struct radix_tree *tree, unsigned long key)
 {
+	printd("RADIX: lookup slot %d\n", key);
 	struct radix_node *r_node = __radix_lookup_node(tree, key, FALSE);
 	if (!r_node)
 		return 0;
