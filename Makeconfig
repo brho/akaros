@@ -9,7 +9,7 @@ CONFIG_APPSERVER:=                 -D__CONFIG_APPSERVER__
 # To enable any of these options, add a line like the following to your Makelocal
 # KERN_CFLAGS += $(CONFIG_KFS) $(CONFIG_BSD_ON_CORE0)
 CONFIG_KFS:=                       -D__CONFIG_KFS__
-CONFIG_KFS:=                       -D__CONFIG_EXT2FS__
+CONFIG_EXT2FS:=                    -D__CONFIG_EXT2FS__
 CONFIG_DEDICATED_MONITOR:=         -D__CONFIG_DEDICATED_MONITOR__
 CONFIG_SINGLE_CORE:=               -D__CONFIG_SINGLE_CORE__
 CONFIG_NETWORKING:=                -D__CONFIG_NETWORKING__
