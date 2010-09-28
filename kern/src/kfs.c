@@ -119,11 +119,11 @@ struct fs_type kfs_fs_type = {"KFS", 0, kfs_get_sb, kfs_kill_sb, {0, 0},
 /* Fills page with its contents from its backing store file.  Note that we do
  * the zero padding here, instead of higher in the VFS.  Might change in the
  * future. */
-int kfs_readpage(struct file *file, struct page *page)
+int kfs_readpage(struct page_map *pm, struct page *page)
 {
 	size_t pg_idx_byte = page->pg_index * PGSIZE;
 	struct kfs_i_info *k_i_info = (struct kfs_i_info*)
-	                              file->f_dentry->d_inode->i_fs_info;
+	                              pm->pm_host->i_fs_info;
 	uintptr_t begin = (size_t)k_i_info->filestart + pg_idx_byte;
 	/* If we're beyond the initial start point, we just need a zero page.  This
 	 * is for a hole or for extending a file (even though it won't be saved).
@@ -146,7 +146,7 @@ int kfs_readpage(struct file *file, struct page *page)
 	bh->bh_buffer = page2kva(page);
 	bh->bh_flags = 0;								/* whatever... */
 	bh->bh_next = 0;								/* only one BH needed */
-	bh->bh_bdev = file->f_dentry->d_sb->s_bdev;		/* uncounted */
+	bh->bh_bdev = pm->pm_host->i_sb->s_bdev;		/* uncounted */
 	bh->bh_blocknum = page->pg_index;
 	bh->bh_numblock = 1;
 	page->pg_private = bh;

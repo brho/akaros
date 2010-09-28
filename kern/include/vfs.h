@@ -125,7 +125,7 @@ struct page_map {
  * get assigned when the inode is created.
  * Will fill these in as they are created/needed/used. */
 struct page_map_operations {
-	int (*readpage) (struct file *, struct page *);	/* read from backing store*/
+	int (*readpage) (struct page_map *, struct page *);
 /*	readpages: read a list of pages
 	writepage: write from a page to its backing store
 	writepages: write a list of pages

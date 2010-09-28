@@ -1818,7 +1818,7 @@ int file_load_page(struct file *file, unsigned long index, struct page **pp)
 	}
 	/* if we're here, the page is locked by us, and it needs to be read in */
 	assert(page->pg_mapping == pm);
-	error = pm->pm_op->readpage(file, page);
+	error = pm->pm_op->readpage(pm, page);
 	assert(!error);
 	/* Try to sleep on the IO.  The page will be unlocked when the IO is done */
 	lock_page(page);

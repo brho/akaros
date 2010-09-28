@@ -29,7 +29,7 @@ struct super_block *kfs_get_sb(struct fs_type *fs, int flags,
                                char *dev_name, struct vfsmount *vmnt);
 void kfs_kill_sb(struct super_block *sb);
 /* Page Map Operations */
-int kfs_readpage(struct file *file, struct page *page);
+int kfs_readpage(struct page_map *pm, struct page *page);
 /* Super Operations */
 struct inode *kfs_alloc_inode(struct super_block *sb);
 void kfs_dealloc_inode(struct inode *inode);

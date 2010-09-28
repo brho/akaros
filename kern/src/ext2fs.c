@@ -321,7 +321,7 @@ struct fs_type ext2_fs_type = {"EXT2", 0, ext2_get_sb, ext2_kill_sb, {0, 0},
 /* Fills page with its contents from its backing store file.  Note that we do
  * the zero padding here, instead of higher in the VFS.  Might change in the
  * future. */
-int ext2_readpage(struct file *file, struct page *page)
+int ext2_readpage(struct page_map *pm, struct page *page)
 {
 	I_AM_HERE;
 	#if 0
