@@ -20,6 +20,7 @@
 #include <timing.h>
 #include <radix.h>
 #include <hashtable.h>
+#include <pagemap.h>
 #include <blockdev.h>
 
 /* ghetto preprocessor hacks (since proc includes vfs) */
@@ -38,8 +39,6 @@ struct poll_table_struct {int x;};
 
 #include <ros/fs.h>
 
-struct page_map;	/* analagous to linux's address_space object */
-struct page_map_operations;
 struct super_block;
 struct super_operations;
 struct dentry;
@@ -107,37 +106,6 @@ struct nameidata {
 #define LOOKUP_OPEN 		0x10	/* intent is to open a file */
 #define LOOKUP_CREATE 		0x11	/* create a file if it doesn't exist */
 #define LOOKUP_ACCESS 		0x12	/* access / check user permissions */
-
-/* Every object that has pages, like an inode or the swap (or even direct block
- * devices) has a page_map, tracking which of its pages are currently in memory.
- * It is a map, per object, from index to physical page frame. */
-struct page_map {
-	struct inode				*pm_host;		/* inode of the owner, if any */
-	struct radix_tree			pm_tree;		/* tracks present pages */
-	spinlock_t					pm_tree_lock;	/* spinlock => we can't block */
-	unsigned long				pm_num_pages;	/* how many pages are present */
-	struct page_map_operations	*pm_op;
-	unsigned int				pm_flags;
-	/*... and private lists, backing block dev info, other mappings, etc. */
-};
-
-/* Operations performed on a page_map.  These are usually FS specific, which
- * get assigned when the inode is created.
- * Will fill these in as they are created/needed/used. */
-struct page_map_operations {
-	int (*readpage) (struct page_map *, struct page *);
-/*	readpages: read a list of pages
-	writepage: write from a page to its backing store
-	writepages: write a list of pages
-	sync_page: start the IO of already scheduled ops
-	set_page_dirty: mark the given page dirty
-	prepare_write: prepare to write (disk backed pages)
-	commit_write: complete a write (disk backed pages)
-	bmap: get a logical block number from a file block index
-	invalidate page: invalidate, part of truncating
-	release page: prepare to release 
-	direct_io: bypass the page cache */
-};
 
 /* Superblock: Specific instance of a mounted filesystem.  All synchronization
  * is done with the one spinlock. */
@@ -217,7 +185,7 @@ struct inode {
 	struct inode_operations		*i_op;
 	struct file_operations		*i_fop;
 	struct super_block			*i_sb;
-	struct page_map				*i_mapping;		/* usually points to i_data */
+	struct page_map				*i_mapping;		/* usually points to i_pm */
 	struct page_map				i_pm;			/* this inode's page cache */
 	union {
 		struct pipe_inode_info		*i_pipe;
@@ -481,11 +449,6 @@ int do_mkdir(char *path, int mode);
 int do_rmdir(char *path);
 struct file *dentry_open(struct dentry *dentry, int flags);
 void file_release(struct kref *kref);
-
-/* Page cache functions */
-struct page *pm_find_page(struct page_map *pm, unsigned long index);
-int pm_insert_page(struct page_map *pm, unsigned long index, struct page *page);
-int pm_remove_page(struct page_map *pm, struct page *page);
 int file_load_page(struct file *file, unsigned long index, struct page **pp);
 
 /* Process-related File management functions */

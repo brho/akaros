@@ -9,8 +9,10 @@
 #include <kmalloc.h>
 #include <slab.h>
 #include <page_alloc.h>
+#include <pmap.h>
 
 struct file_operations block_f_op;
+struct page_map_operations block_pm_op;
 struct kmem_cache *breq_kcache;
 
 void block_init(void)
@@ -31,12 +33,15 @@ void block_init(void)
 	ram_bd->b_sector_size = 512;
 	ram_bd->b_num_sectors = (unsigned int)_binary_mnt_ext2fs_img_size / 512;
 	kref_init(&ram_bd->b_kref, fake_release, 1);
+	pm_init(&ram_bd->b_pm, &block_pm_op, ram_bd);
 	ram_bd->b_data = _binary_mnt_ext2fs_img_start;
 	strncpy(ram_bd->b_name, "RAMDISK", BDEV_INLINE_NAME);
 	ram_bd->b_name[BDEV_INLINE_NAME - 1] = '\0';
 	/* Connect it to the file system */
 	struct file *ram_bf = make_device("/dev/ramdisk", S_IRUSR | S_IWUSR,
 	                                  __S_IFBLK, &block_f_op);
+	/* make sure the inode tracks the right pm (not it's internal one) */
+	ram_bf->f_dentry->d_inode->i_mapping = &ram_bd->b_pm;
 	ram_bf->f_dentry->d_inode->i_bdev = ram_bd;	/* this holds the bd kref */
 	kref_put(&ram_bf->f_kref);
 	#endif /* __CONFIG_EXT2FS__ */
@@ -92,6 +97,54 @@ int make_request(struct block_device *bdev, struct block_request *req)
 	memcpy(dst, src, req->amount << SECTOR_SZ_LOG);
 	return 0;
 }
+
+/* Fills page with the appropriate data from the block device.  There is only
+ * one BH, since bdev pages must be made of contiguous blocks.  Ideally, this
+ * will work for a bdev file that reads the pm via generic_file_read(), though
+ * that is a ways away still. */
+int block_readpage(struct page_map *pm, struct page *page)
+{
+	int retval;
+	unsigned long first_byte = page->pg_index * PGSIZE;
+	struct block_device *bdev = pm->pm_bdev;
+	struct block_request *breq = kmem_cache_alloc(breq_kcache, 0);
+	struct buffer_head *bh = kmem_cache_alloc(bh_kcache, 0);
+
+	assert(breq && bh);		/* should unlock_page and return -1 */
+	assert(pm == page->pg_mapping);
+
+	/* TODO: move this BH stuff to a helper.  Check for existing BH.  Check for
+	 * exceeding the size, sort out block size */
+
+	/* Set up the BH.  bdevs do a 1:1 BH to page mapping */
+	bh->bh_page = page;								/* weak ref */
+	bh->bh_buffer = page2kva(page);
+	bh->bh_flags = 0;								/* whatever... */
+	bh->bh_next = 0;								/* only one BH needed */
+	bh->bh_bdev = bdev;								/* uncounted ref */
+	bh->bh_blocknum = page->pg_index * PGSIZE / bdev->b_sector_size;
+	bh->bh_numblock = PGSIZE / bdev->b_sector_size;
+	page->pg_private = bh;
+
+	/* Build the request.  TODO: think about the overlap btw this and the BH */
+	breq->flags = BREQ_READ;
+	breq->buffer = page2kva(page);
+	breq->first_sector = first_byte >> SECTOR_SZ_LOG;
+	breq->amount = PGSIZE >> SECTOR_SZ_LOG; // TODO: change amount to num_sect
+	retval = make_request(bdev, breq);				 /* This blocks */
+	assert(!retval);
+
+	/* after the data is read, we mark it up to date and unlock the page: */
+	page->pg_flags |= PG_UPTODATE;
+	unlock_page(page);
+	kmem_cache_free(breq_kcache, breq);
+	return 0;
+}
+
+/* Block device page map ops: */
+struct page_map_operations block_pm_op = {
+	block_readpage,
+};
 
 /* Block device file ops: for now, we don't let you do much of anything */
 struct file_operations block_f_op = {

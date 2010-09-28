@@ -10,6 +10,7 @@
 #include <ros/common.h>
 #include <kref.h>
 #include <slab.h>
+#include <pagemap.h>
 
 /* All block IO is done assuming a certain size sector, which is the smallest
  * possible unit of transfer between the kernel and the block layer.  This can
@@ -27,6 +28,7 @@ struct block_device {
 	unsigned int				b_sector_size;		/* HW sector size */
 	unsigned long				b_num_sectors;		/* Total sectors on dev */
 	struct kref					b_kref;
+	struct page_map				b_pm;
 	void						*b_data;			/* dev-specific use */
 	char						b_name[BDEV_INLINE_NAME];
 	// TODO: list or something of buffer heads (?)
