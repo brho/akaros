@@ -30,8 +30,8 @@ void block_init(void)
 	struct block_device *ram_bd = kmalloc(sizeof(struct block_device), 0);
 	memset(ram_bd, 0, sizeof(struct block_device));
 	ram_bd->b_id = 31337;
-	ram_bd->b_sector_size = 512;
-	ram_bd->b_num_sectors = (unsigned int)_binary_mnt_ext2fs_img_size / 512;
+	ram_bd->b_sector_sz = 512;
+	ram_bd->b_nr_sector = (unsigned int)_binary_mnt_ext2fs_img_size / 512;
 	kref_init(&ram_bd->b_kref, fake_release, 1);
 	pm_init(&ram_bd->b_pm, &block_pm_op, ram_bd);
 	ram_bd->b_data = _binary_mnt_ext2fs_img_start;
@@ -78,63 +78,97 @@ void free_bhs(struct page *page)
 
 /* This ultimately will handle the actual request processing, all the way down
  * to the driver, and will deal with blocking.  For now, we just fulfill the
- * request right away. */
+ * request right away (RAM based block devs). */
 int make_request(struct block_device *bdev, struct block_request *req)
 {
 	void *src, *dst;
+
+	/* Only handles one for now (TODO) */
+	assert(req->nr_bhs == 1);
+	unsigned long first_sector = req->bhs[0]->bh_sector;
+	unsigned int nr_sector = req->bhs[0]->bh_nr_sector;
 	/* Sectors are indexed starting with 0, for now. */
-	if (req->first_sector + req->amount > bdev->b_num_sectors)
+	if (first_sector + nr_sector > bdev->b_nr_sector) {
+		warn("Exceeding the num sectors!");
 		return -1;
+	}
 	if (req->flags & BREQ_READ) {
-		dst = req->buffer;
-		src = bdev->b_data + (req->first_sector << SECTOR_SZ_LOG);
+		dst = req->bhs[0]->bh_buffer;
+		src = bdev->b_data + (first_sector << SECTOR_SZ_LOG);
 	} else if (req->flags & BREQ_WRITE) {
-		dst = bdev->b_data + (req->first_sector << SECTOR_SZ_LOG);
-		src = req->buffer;
+		dst = bdev->b_data + (first_sector << SECTOR_SZ_LOG);
+		src = req->bhs[0]->bh_buffer;
 	} else {
 		panic("Need a request type!\n");
 	}
-	memcpy(dst, src, req->amount << SECTOR_SZ_LOG);
+	memcpy(dst, src, nr_sector << SECTOR_SZ_LOG);
 	return 0;
 }
 
-/* Fills page with the appropriate data from the block device.  There is only
- * one BH, since bdev pages must be made of contiguous blocks.  Ideally, this
- * will work for a bdev file that reads the pm via generic_file_read(), though
- * that is a ways away still. */
-int block_readpage(struct page_map *pm, struct page *page)
+/* Sets up the bidirectional mapping between the page and its buffer heads.
+ * Note that for a block device, this is 1:1.  We have the helper in the off
+ * chance we want to decouple the mapping from readpage (which we may want to
+ * do for writepage, esp on FSs), and to keep readpage simple. */
+static int block_mappage(struct block_device *bdev, struct page *page)
 {
-	int retval;
-	unsigned long first_byte = page->pg_index * PGSIZE;
-	struct block_device *bdev = pm->pm_bdev;
-	struct block_request *breq = kmem_cache_alloc(breq_kcache, 0);
-	struct buffer_head *bh = kmem_cache_alloc(bh_kcache, 0);
-
-	assert(breq && bh);		/* should unlock_page and return -1 */
-	assert(pm == page->pg_mapping);
-
-	/* TODO: move this BH stuff to a helper.  Check for existing BH.  Check for
-	 * exceeding the size, sort out block size */
-
+	struct buffer_head *bh;
+	assert(!page->pg_private);		/* double check that we aren't bh-mapped */
+	bh = kmem_cache_alloc(bh_kcache, 0);
+	if (!bh)
+		return -ENOMEM;
 	/* Set up the BH.  bdevs do a 1:1 BH to page mapping */
 	bh->bh_page = page;								/* weak ref */
 	bh->bh_buffer = page2kva(page);
 	bh->bh_flags = 0;								/* whatever... */
 	bh->bh_next = 0;								/* only one BH needed */
 	bh->bh_bdev = bdev;								/* uncounted ref */
-	bh->bh_blocknum = page->pg_index * PGSIZE / bdev->b_sector_size;
-	bh->bh_numblock = PGSIZE / bdev->b_sector_size;
+	bh->bh_sector = page->pg_index * PGSIZE / bdev->b_sector_sz;
+	bh->bh_nr_sector = PGSIZE / bdev->b_sector_sz;
 	page->pg_private = bh;
+	return 0;
+}
 
-	/* Build the request.  TODO: think about the overlap btw this and the BH */
+/* Fills page with the appropriate data from the block device.  There is only
+ * one BH, since bdev pages must be made of contiguous blocks.  Ideally, this
+ * will work for a bdev file that reads the pm via generic_file_read(), though
+ * that is a ways away still.  Techincally, you could get an ENOMEM for breq and
+ * have this called again with a BH already set up, but I want to see it (hence
+ * the assert). */
+int block_readpage(struct page_map *pm, struct page *page)
+{
+	int retval;
+	unsigned long first_byte = page->pg_index * PGSIZE;
+	struct block_device *bdev = pm->pm_bdev;
+	struct block_request *breq;
+
+	assert(pm == page->pg_mapping);		/* Should be part of a page map */
+	assert(page->pg_flags & PG_BUFFER);	/* Should be part of a page map */
+	assert(!page->pg_private);			/* Should be no BH for this page yet */
+	/* Don't read beyond the device.  There might be an issue when using
+	 * generic_file_read() with this readpage(). */
+	if (first_byte + PGSIZE > bdev->b_nr_sector * bdev->b_sector_sz) {
+		unlock_page(page);
+		return -EFBIG;
+	}
+	retval = block_mappage(bdev, page);
+	if (retval) {
+		unlock_page(page);
+		return retval;
+	}
+	/* Build and submit the request */
+	breq = kmem_cache_alloc(breq_kcache, 0);
+	if (!breq) {
+		unlock_page(page);
+		return -ENOMEM;
+	}
 	breq->flags = BREQ_READ;
-	breq->buffer = page2kva(page);
-	breq->first_sector = first_byte >> SECTOR_SZ_LOG;
-	breq->amount = PGSIZE >> SECTOR_SZ_LOG; // TODO: change amount to num_sect
-	retval = make_request(bdev, breq);				 /* This blocks */
+	breq->bhs = breq->local_bhs;
+	/* There's only one BH for a bdev page */
+	breq->bhs[0] = (struct buffer_head*)page->pg_private;
+	breq->nr_bhs = 1;
+	retval = make_request(bdev, breq);
 	assert(!retval);
-
-	/* after the data is read, we mark it up to date and unlock the page: */
+	/* after the data is read, we mark it up to date and unlock the page. */
 	page->pg_flags |= PG_UPTODATE;
 	unlock_page(page);
 	kmem_cache_free(breq_kcache, breq);

@@ -147,8 +147,8 @@ int kfs_readpage(struct page_map *pm, struct page *page)
 	bh->bh_flags = 0;								/* whatever... */
 	bh->bh_next = 0;								/* only one BH needed */
 	bh->bh_bdev = pm->pm_host->i_sb->s_bdev;		/* uncounted */
-	bh->bh_blocknum = page->pg_index;
-	bh->bh_numblock = 1;							/* sector size = PGSIZE */
+	bh->bh_sector = page->pg_index;
+	bh->bh_nr_sector = 1;							/* sector size = PGSIZE */
 	page->pg_private = bh;
 	/* This is supposed to be done in the IO system when the operation is
 	 * complete.  Since we aren't doing a real IO request, and it is already

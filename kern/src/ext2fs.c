@@ -40,29 +40,6 @@ static unsigned int ext2_ino2idx(unsigned int inode_num, unsigned int ino_p_grp)
 	return (inode_num - 1) % ino_p_grp;
 }
 
-/* Free whatever is returned with kfree(), pending proper buffer management.
- * Ext2's superblock is always in the same spot, starting at byte 1024 and is
- * 1024 bytes long. */
-struct ext2_sb *ext2_read_sb(struct block_device *bdev)
-{
-	struct ext2_sb *e2sb;
-	struct block_request *breq;
-	int retval;
-
-	e2sb = kmalloc(sizeof(struct ext2_sb), 0);
-	assert(e2sb);
-	breq = kmem_cache_alloc(breq_kcache, 0);
-	assert(breq);
-	breq->flags = BREQ_READ;
-	breq->buffer = e2sb;
-	breq->first_sector = 1024 >> SECTOR_SZ_LOG;
-	breq->amount = 1024 >> SECTOR_SZ_LOG;
-	retval = make_request(bdev, breq);
-	assert(!retval);
-	kmem_cache_free(breq_kcache, breq);
-	return e2sb;
-}
-	
 /* Slabs for ext2 specific info chunks */
 struct kmem_cache *ext2_i_kcache;
 
@@ -77,22 +54,40 @@ void ext2_init(void)
  * answer.
  *
  * TODO: consider taking a buffer_head, or having a generic block_dev function
- * for this. */
+ * for this.  Currently this is just using the BH to talk to breq, need to make
+ * it use the page mapping. */
 void *__ext2_read_block(struct block_device *bdev, int block_num, int blocksize)
 {
 	int retval;
 	void *buffer = kmalloc(blocksize, 0);
 	struct block_request *breq = kmem_cache_alloc(breq_kcache, 0);
+	struct buffer_head *bh = kmem_cache_alloc(bh_kcache, 0);
+	assert(buffer && breq && bh);
+
+	/* Build the BH describing the mapping we want */
+	bh->bh_buffer = buffer; // TODO: have a real page
+	bh->bh_sector = block_num * (blocksize >> SECTOR_SZ_LOG);
+	bh->bh_nr_sector = blocksize >> SECTOR_SZ_LOG;
+	/* Build and submit the request */
 	breq->flags = BREQ_READ;
-	breq->buffer = buffer;
-	breq->first_sector = block_num * (blocksize >> SECTOR_SZ_LOG);
-	breq->amount = blocksize >> SECTOR_SZ_LOG;
+	breq->bhs = breq->local_bhs;
+	breq->bhs[0] = bh;
+	breq->nr_bhs = 1;
 	retval = make_request(bdev, breq);
 	assert(!retval);
 	kmem_cache_free(breq_kcache, breq);
+	kmem_cache_free(bh_kcache, bh);	/* TODO: shouldn't disconnect this */
 	return buffer;
 }
 
+/* Free whatever is returned with kfree(), pending proper buffer management.
+ * Ext2's superblock is always in the same spot, starting at byte 1024 and is
+ * 1024 bytes long. */
+struct ext2_sb *ext2_read_sb(struct block_device *bdev)
+{
+	return (struct ext2_sb*)__ext2_read_block(bdev, 1, 1024);
+}
+	
 /* Raw access to an FS block */
 void *ext2_read_block(struct super_block *sb, unsigned int block_num)
 {

@@ -25,8 +25,8 @@
 #define BDEV_INLINE_NAME 10
 struct block_device {
 	int							b_id;
-	unsigned int				b_sector_size;		/* HW sector size */
-	unsigned long				b_num_sectors;		/* Total sectors on dev */
+	unsigned int				b_sector_sz;		/* HW sector size */
+	unsigned long				b_nr_sector;		/* Total sectors on dev */
 	struct kref					b_kref;
 	struct page_map				b_pm;
 	void						*b_data;			/* dev-specific use */
@@ -50,8 +50,8 @@ struct buffer_head {
 	unsigned int				bh_flags;
 	struct buffer_head			*bh_next;			/* circular LL of BHs */
 	struct block_device			*bh_bdev;
-	unsigned long				bh_blocknum;
-	unsigned int				bh_numblock;		/* length (in blocks) */
+	unsigned long				bh_sector;
+	unsigned int				bh_nr_sector;		/* length (in sectors) */
 };
 struct kmem_cache *bh_kcache;
 
@@ -62,12 +62,15 @@ struct kmem_cache *bh_kcache;
  * block request throughout its servicing.  This is analagous to Linux's struct
  * bio.
  *
- * For now, this just holds the stuff to do some simple sector reading. */
+ * bhs normally points to the inline version (enough for a page).  kmalloc
+ * another array of BH pointers if you want more.  The BHs do not need to be
+ * linked or otherwise associated with a page mapping. */
+#define NR_INLINE_BH (PGSIZE >> SECTOR_SZ_LOG)
 struct block_request {
-	int							flags;
-	void						*buffer;
-	unsigned int				first_sector;
-	unsigned int				amount;
+	unsigned int				flags;
+	struct buffer_head			**bhs;				/* BHs describing the IOs */
+	unsigned int				nr_bhs;
+	struct buffer_head			*local_bhs[NR_INLINE_BH];
 };
 struct kmem_cache *breq_kcache;	/* for the block requests */
 
