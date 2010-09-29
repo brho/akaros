@@ -1134,7 +1134,7 @@ ssize_t generic_file_read(struct file *file, char *buf, size_t count,
 	/* For each file page, make sure it's in the page cache, then copy it out.
 	 * TODO: will probably need to consider concurrently truncated files here.*/
 	for (int i = first_idx; i <= last_idx; i++) {
-		error = file_load_page(file, i, &page);
+		error = pm_load_page(file->f_mapping, i, &page);
 		assert(!error);	/* TODO: handle ENOMEM and friends */
 		copy_amt = MIN(PGSIZE - page_off, buf_end - buf);
 		/* TODO: (UMEM) think about this.  if it's a user buffer, we're relying
@@ -1184,7 +1184,7 @@ ssize_t generic_file_write(struct file *file, const char *buf, size_t count,
 	buf_end = buf + count;
 	/* For each file page, make sure it's in the page cache, then write it.*/
 	for (int i = first_idx; i <= last_idx; i++) {
-		error = file_load_page(file, i, &page);
+		error = pm_load_page(file->f_mapping, i, &page);
 		assert(!error);	/* TODO: handle ENOMEM and friends */
 		copy_amt = MIN(PGSIZE - page_off, buf_end - buf);
 		/* TODO: (UMEM) (KFOP) think about this.  if it's a user buffer, we're
@@ -1699,75 +1699,6 @@ void file_release(struct kref *kref)
 	kref_put(&file->f_dentry->d_kref);
 	kref_put(&file->f_vfsmnt->mnt_kref);
 	kmem_cache_free(file_kcache, file);
-}
-
-/* Makes sure the index'th page from file is loaded in the page cache and
- * returns its location via **pp.  Note this will give you a refcnt'd reference.
- * This may block! TODO: (BLK) */
-int file_load_page(struct file *file, unsigned long index, struct page **pp)
-{
-	struct page_map *pm = file->f_mapping;
-	struct page *page;
-	int error;
-	bool page_was_mapped = TRUE;
-
-	page = pm_find_page(pm, index);
-	while (!page) {
-		/* kpage_alloc, since we want the page to persist after the proc
-		 * dies (can be used by others, until the inode shuts down). */
-		if (kpage_alloc(&page))
-			return -ENOMEM;
-		/* might want to initialize other things, perhaps in page_alloc() */
-		page->pg_flags = 0;
-		error = pm_insert_page(pm, index, page);
-		switch (error) {
-			case 0:
-				page_was_mapped = FALSE;
-				break;
-			case -EEXIST:
-				/* the page was mapped already (benign race), just get rid of
-				 * our page and try again (the only case that uses the while) */
-				page_decref(page);
-				page = pm_find_page(pm, index);
-				break;
-			default:
-				/* something is wrong, bail out! */
-				page_decref(page);
-				return error;
-		}
-	}
-	/* At this point, page is a refcnt'd page, and we return the reference.
-	 * Also, there's an unlikely race where we're not in the page cache anymore,
-	 * and this all is useless work. */
-	*pp = page;
-	/* if the page was in the map, we need to do some checks, and might have to
-	 * read in the page later.  If the page was freshly inserted to the pm by
-	 * us, we skip this since we are the one doing the readpage(). */
-	if (page_was_mapped) {
-		/* is it already here and up to date?  if so, we're done */
-		if (page->pg_flags & PG_UPTODATE)
-			return 0;
-		/* if not, try to lock the page (could BLOCK) */
-		lock_page(page);
-		/* we got it, is our page still in the cache?  check the mapping.  if
-		 * not, start over, perhaps with EAGAIN and outside support */
-		if (!page->pg_mapping)
-			panic("Page is not in the mapping!  Haven't implemented this!");
-		/* double check, are we up to date?  if so, we're done */
-		if (page->pg_flags & PG_UPTODATE) {
-			unlock_page(page);
-			return 0;
-		}
-	}
-	/* if we're here, the page is locked by us, and it needs to be read in */
-	assert(page->pg_mapping == pm);
-	error = pm->pm_op->readpage(pm, page);
-	assert(!error);
-	/* Try to sleep on the IO.  The page will be unlocked when the IO is done */
-	lock_page(page);
-	unlock_page(page);
-	assert(page->pg_flags & PG_UPTODATE);
-	return 0;
 }
 
 /* Process-related File management functions */

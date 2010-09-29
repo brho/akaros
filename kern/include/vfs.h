@@ -449,7 +449,6 @@ int do_mkdir(char *path, int mode);
 int do_rmdir(char *path);
 struct file *dentry_open(struct dentry *dentry, int flags);
 void file_release(struct kref *kref);
-int file_load_page(struct file *file, unsigned long index, struct page **pp);
 
 /* Process-related File management functions */
 struct file *get_file_from_fd(struct files_struct *open_files, int fd);

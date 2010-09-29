@@ -13,6 +13,7 @@
 #include <kref.h>
 #include <endian.h>
 #include <error.h>
+#include <pmap.h>
 
 /* These structs are declared again and initialized farther down */
 struct page_map_operations ext2_pm_op;
@@ -80,17 +81,55 @@ void *__ext2_read_block(struct block_device *bdev, int block_num, int blocksize)
 	return buffer;
 }
 
-/* Free whatever is returned with kfree(), pending proper buffer management.
- * Ext2's superblock is always in the same spot, starting at byte 1024 and is
- * 1024 bytes long. */
-struct ext2_sb *ext2_read_sb(struct block_device *bdev)
+/* TODO: pull these metablock functions out of ext2 */
+/* Makes sure the FS block of metadata is in memory.  This returns a pointer to
+ * the beginning of the requested block.  Release it with put_metablock().
+ * Internally, the kreffing is done on the page. */
+void *__ext2_get_metablock(struct block_device *bdev, unsigned long blk_num,
+                           unsigned int blk_sz)
 {
-	return (struct ext2_sb*)__ext2_read_block(bdev, 1, 1024);
+	struct page *page;
+	struct page_map *pm = &bdev->b_pm;
+	unsigned int blk_per_pg = PGSIZE / blk_sz;
+	unsigned int blk_offset = (blk_num % blk_per_pg) * blk_sz;
+	int error;
+	assert(blk_offset < PGSIZE);
+	error = pm_load_page(pm, blk_num / blk_per_pg, &page); 
+	if (error) {
+		warn("Failed to read metablock! (%d)", error);
+		return 0;
+	}
+	/* return where we are within the page for the given block */
+	return page2kva(page) + blk_offset;
 }
-	
-/* Raw access to an FS block */
-void *ext2_read_block(struct super_block *sb, unsigned int block_num)
+
+/* Convenience wrapper */
+void *ext2_get_metablock(struct super_block *sb, unsigned long block_num)
 {
+	return __ext2_get_metablock(sb->s_bdev, block_num, sb->s_blocksize);
+}
+
+/* Decrefs the buffer from get_metablock().  Call this when you no longer
+ * reference your metadata block/buffer */
+void ext2_put_metablock(void *buffer)
+{
+	page_decref(kva2page(buffer));
+}
+
+/* Will dirty the block/BH/page for the given metadata block/buffer.  Will have
+ * to be careful with the page reclaimer - if someone holds a reference, they
+ * can still dirty it. */
+void ext2_dirty_metablock(void *buffer)
+{
+	struct page *page = kva2page(buffer);
+	/* TODO: race on flag modification, and consider dirtying the BH. */
+	page->pg_flags |= PG_DIRTY;
+}
+
+/* Reads a block of file data.  TODO: Function name and guts will change soon */
+void *ext2_read_fileblock(struct super_block *sb, unsigned int block_num)
+{
+	/* note, we might get rid of this read block, if all files use pages */
 	return __ext2_read_block(sb->s_bdev, block_num, sb->s_blocksize);
 }
 
@@ -101,16 +140,15 @@ void *ext2_read_block(struct super_block *sb, unsigned int block_num)
  * indirection tables, and returns where you should be for the next one.  Reach
  * is how many items the current table's *items* can index (so if we're on a
  * 3x indir block, reach should be for the doubly-indirect entries, and
- * rel_inoblk will tell you where within that double block you want).
- * TODO: buffer/page cache this shit. */
+ * rel_inoblk will tell you where within that double block you want). */
 static void ext2_walk_inotable(struct inode *inode, unsigned int *blkid,
                                unsigned int *rel_inoblk, unsigned int reach)
 {
-	uint32_t *blk_buf = ext2_read_block(inode->i_sb, *blkid);
+	uint32_t *blk_buf = ext2_get_metablock(inode->i_sb, *blkid);
 	assert(blk_buf);
 	*blkid = le32_to_cpu(blk_buf[*rel_inoblk / reach]);
 	*rel_inoblk = *rel_inoblk % reach;
-	kfree(blk_buf);
+	ext2_put_metablock(blk_buf);
 }
 
 /* Reads a file's block, determined via walking the inode's tables.  The general
@@ -158,7 +196,7 @@ void *ext2_read_ino_block(struct inode *inode, unsigned int ino_block)
 		/* Direct block, straight out of the inode */
 		blkid = e2ii->i_block[ino_block];
 	}
-	return ext2_read_block(inode->i_sb, blkid);
+	return ext2_read_fileblock(inode->i_sb, blkid);
 }
 
 /* This checks an ext2 disc SB for consistency, optionally printing out its
@@ -260,7 +298,9 @@ struct super_block *ext2_get_sb(struct fs_type *fs, int flags,
 	}
 	bdev = get_bdev(dev_name);
 	assert(bdev);
-	e2sb = ext2_read_sb(bdev);
+	/* Read the SB.  It's always at byte 1024 and 1024 bytes long.  Note we do
+	 * not put the metablock (we pin it off the sb later).  Same with e2bg. */
+	e2sb = (struct ext2_sb*)__ext2_get_metablock(bdev, 1, 1024);
 	if (!(le16_to_cpu(e2sb->s_magic) == EXT2_SUPER_MAGIC)) {
 		warn("EXT2 Not detected when it was expected!");
 		return 0;
@@ -268,7 +308,7 @@ struct super_block *ext2_get_sb(struct fs_type *fs, int flags,
 	/* Read in the block group descriptor table.  Which block the BG table is on
 	 * depends on the blocksize */
 	unsigned int blksize = 1024 << le32_to_cpu(e2sb->s_log_block_size);
-	e2bg = __ext2_read_block(bdev, blksize == 1024 ? 2 : 1, blksize);
+	e2bg = __ext2_get_metablock(bdev, blksize == 1024 ? 2 : 1, blksize);
 	assert(e2bg);
 	ext2_check_sb(e2sb, e2bg, FALSE);
 
@@ -389,7 +429,7 @@ void ext2_read_inode(struct inode *inode)
 	/* Figure out which FS block of the inode table we want and read in that
 	 * chunk */
 	my_ino_blk = le32_to_cpu(my_bg->bg_inode_table) + bg_idx / ino_per_blk;
-	ino_tbl_chunk = ext2_read_block(inode->i_sb, my_ino_blk);
+	ino_tbl_chunk = ext2_get_metablock(inode->i_sb, my_ino_blk);
 	my_ino = &ino_tbl_chunk[bg_idx % ino_per_blk];
 
 	/* Have the disk inode now, let's put its info into the VFS inode: */
@@ -431,14 +471,15 @@ void ext2_read_inode(struct inode *inode)
 	for (int i = 0; i < 15; i++)
 		e2ii->i_block[i] = le32_to_cpu(my_ino->i_block[i]);
 	/* TODO: (HASH) unused: inode->i_hash add to hash (saves on disc reading) */
-	/* TODO: (BUF) we could consider saving a pointer to the disk inode and
-	 * pinning its buffer in memory, but for now we'll just free it */
-	kfree(ino_tbl_chunk);
+	/* TODO: we could consider saving a pointer to the disk inode and pinning
+	 * its buffer in memory, but for now we'll just free it. */
+	ext2_put_metablock(ino_tbl_chunk);
 }
 
 /* called when an inode in memory is modified (journalling FS's care) */
 void ext2_dirty_inode(struct inode *inode)
 {
+	// presumably we'll ext2_dirty_metablock(void *buffer) here
 }
 
 /* write the inode to disk (specifically, to inode inode->i_ino), synchronously

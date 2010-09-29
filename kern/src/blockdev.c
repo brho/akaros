@@ -167,6 +167,7 @@ int block_readpage(struct page_map *pm, struct page *page)
 	breq->bhs[0] = (struct buffer_head*)page->pg_private;
 	breq->nr_bhs = 1;
 	retval = make_request(bdev, breq);
+	/* TODO: (BLK) this assumes we slept til the request was done */
 	assert(!retval);
 	/* after the data is read, we mark it up to date and unlock the page. */
 	page->pg_flags |= PG_UPTODATE;

@@ -65,12 +65,84 @@ int pm_remove_page(struct page_map *pm, struct page *page)
 	void *retval;
 	warn("pm_remove_page() hasn't been thought through or tested.");
 	/* TODO: check for dirty pages, don't let them be removed right away.  Need
-	 * to schedule them for writeback, and then remove them later (callback). */
+	 * to schedule them for writeback, and then remove them later (callback).
+	 * Also, need to be careful - anyone holding a reference to a page can dirty
+	 * it concurrently. */
 	spin_lock(&pm->pm_tree_lock);
 	retval = radix_delete(&pm->pm_tree, page->pg_index);
 	spin_unlock(&pm->pm_tree_lock);
 	assert(retval == (void*)page);
 	page_decref(page);
 	pm->pm_num_pages--;
+	return 0;
+}
+
+/* Makes sure the index'th page of the mapped object is loaded in the page cache
+ * and returns its location via **pp.  Note this will give you a refcnt'd
+ * reference to the page.  This may block! TODO: (BLK) */
+int pm_load_page(struct page_map *pm, unsigned long index, struct page **pp)
+{
+	struct page *page;
+	int error;
+	bool page_was_mapped = TRUE;
+
+	page = pm_find_page(pm, index);
+	while (!page) {
+		/* kpage_alloc, since we want the page to persist after the proc
+		 * dies (can be used by others, until the inode shuts down). */
+		if (kpage_alloc(&page))
+			return -ENOMEM;
+		/* might want to initialize other things, perhaps in page_alloc() */
+		page->pg_flags = 0;
+		error = pm_insert_page(pm, index, page);
+		switch (error) {
+			case 0:
+				page_was_mapped = FALSE;
+				break;
+			case -EEXIST:
+				/* the page was mapped already (benign race), just get rid of
+				 * our page and try again (the only case that uses the while) */
+				page_decref(page);
+				page = pm_find_page(pm, index);
+				break;
+			default:
+				/* something is wrong, bail out! */
+				page_decref(page);
+				return error;
+		}
+	}
+	assert(page && kref_refcnt(&page->pg_kref));
+	/* At this point, page is a refcnt'd page, and we return the reference.
+	 * Also, there's an unlikely race where we're not in the page cache anymore,
+	 * and this all is useless work. */
+	*pp = page;
+	/* if the page was in the map, we need to do some checks, and might have to
+	 * read in the page later.  If the page was freshly inserted to the pm by
+	 * us, we skip this since we are the one doing the readpage(). */
+	if (page_was_mapped) {
+		/* is it already here and up to date?  if so, we're done */
+		if (page->pg_flags & PG_UPTODATE)
+			return 0;
+		/* if not, try to lock the page (could BLOCK) */
+		lock_page(page);
+		/* we got it, is our page still in the cache?  check the mapping.  if
+		 * not, start over, perhaps with EAGAIN and outside support */
+		if (!page->pg_mapping)
+			panic("Page is not in the mapping!  Haven't implemented this!");
+		/* double check, are we up to date?  if so, we're done */
+		if (page->pg_flags & PG_UPTODATE) {
+			unlock_page(page);
+			return 0;
+		}
+	}
+	/* if we're here, the page is locked by us, and it needs to be read in */
+	assert(page->pg_mapping == pm);
+	error = pm->pm_op->readpage(pm, page);
+	assert(!error);
+	/* Try to sleep on the IO.  The page will be unlocked when the IO is done */
+	/* TODO: (BLK) this assumes we never slept til we got here */
+	lock_page(page);
+	unlock_page(page);
+	assert(page->pg_flags & PG_UPTODATE);
 	return 0;
 }

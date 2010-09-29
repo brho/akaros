@@ -583,7 +583,7 @@ int __handle_page_fault(struct proc *p, uintptr_t va, int prot)
 		 * this stuff so we aren't hold the lock as excessively as we are, and
 		 * such that we can block and resume later. */
 		f_idx = (va - vmr->vm_base + vmr->vm_foff) >> PGSHIFT;
-		retval = file_load_page(vmr->vm_file, f_idx, &a_page);
+		retval = pm_load_page(vmr->vm_file->f_mapping, f_idx, &a_page);
 		if (retval)
 			return retval;
 		/* If we want a private map that is writable, we'll preemptively give
