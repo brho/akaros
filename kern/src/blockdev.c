@@ -61,7 +61,8 @@ struct block_device *get_bdev(char *path)
 }
 
 /* Frees all the BHs associated with page.  There could be 0, to deal with one
- * that wasn't UPTODATE.  Don't call this on a page that isn't a PG_BUFFER */
+ * that wasn't UPTODATE.  Don't call this on a page that isn't a PG_BUFFER.
+ * Note, these are not a circular LL (for now). */
 void free_bhs(struct page *page)
 {
 	struct buffer_head *bh, *next;
@@ -82,26 +83,28 @@ void free_bhs(struct page *page)
 int make_request(struct block_device *bdev, struct block_request *req)
 {
 	void *src, *dst;
+	unsigned long first_sector;
+	unsigned int nr_sector;
 
-	/* Only handles one for now (TODO) */
-	assert(req->nr_bhs == 1);
-	unsigned long first_sector = req->bhs[0]->bh_sector;
-	unsigned int nr_sector = req->bhs[0]->bh_nr_sector;
-	/* Sectors are indexed starting with 0, for now. */
-	if (first_sector + nr_sector > bdev->b_nr_sector) {
-		warn("Exceeding the num sectors!");
-		return -1;
+	for (int i = 0; i < req->nr_bhs; i++) {
+		first_sector = req->bhs[i]->bh_sector;
+		nr_sector = req->bhs[i]->bh_nr_sector;
+		/* Sectors are indexed starting with 0, for now. */
+		if (first_sector + nr_sector > bdev->b_nr_sector) {
+			warn("Exceeding the num sectors!");
+			return -1;
+		}
+		if (req->flags & BREQ_READ) {
+			dst = req->bhs[i]->bh_buffer;
+			src = bdev->b_data + (first_sector << SECTOR_SZ_LOG);
+		} else if (req->flags & BREQ_WRITE) {
+			dst = bdev->b_data + (first_sector << SECTOR_SZ_LOG);
+			src = req->bhs[i]->bh_buffer;
+		} else {
+			panic("Need a request type!\n");
+		}
+		memcpy(dst, src, nr_sector << SECTOR_SZ_LOG);
 	}
-	if (req->flags & BREQ_READ) {
-		dst = req->bhs[0]->bh_buffer;
-		src = bdev->b_data + (first_sector << SECTOR_SZ_LOG);
-	} else if (req->flags & BREQ_WRITE) {
-		dst = bdev->b_data + (first_sector << SECTOR_SZ_LOG);
-		src = req->bhs[0]->bh_buffer;
-	} else {
-		panic("Need a request type!\n");
-	}
-	memcpy(dst, src, nr_sector << SECTOR_SZ_LOG);
 	return 0;
 }
 

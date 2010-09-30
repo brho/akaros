@@ -318,3 +318,32 @@ void unlock_page(struct page *page)
 	 * a basic interrupt...  */
 	page->pg_flags &= ~PG_LOCKED;
 }
+
+void print_pageinfo(struct page *page)
+{
+	int i;
+	if (!page) {
+		printk("Null page\n");
+		return;
+	}
+	printk("Page %d (%08p), Flags: %08p Refcnt: %d\n", page2ppn(page), page2kva(page),
+	       page->pg_flags, kref_refcnt(&page->pg_kref));
+	if (page->pg_mapping) {
+		printk("\tMapped into object %08p at index %d\n",
+		       page->pg_mapping->pm_host, page->pg_index);
+	}
+	if (page->pg_flags & PG_BUFFER) {
+		struct buffer_head *bh = (struct buffer_head*)page->pg_private;
+		i = 0;
+		while (bh) {
+			printk("\tBH %d: buffer: %08p, sector: %d, nr_sector: %d\n", i,
+			       bh->bh_buffer, bh->bh_sector, bh->bh_nr_sector);
+			i++;
+			bh = bh->bh_next;
+		}
+		printk("\tPage is %sup to date\n",
+		       page->pg_flags & PG_UPTODATE ? "" : "not ");
+	}
+	printk("\tPage is %slocked\n", page->pg_flags & PG_LOCKED ? "" : "un");
+	printk("\tPage is %s\n", page->pg_flags & PG_DIRTY ? "dirty" : "clean");
+}

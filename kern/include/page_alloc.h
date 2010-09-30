@@ -68,6 +68,7 @@ void page_setref(page_t *SAFE page, size_t val);
 int page_is_free(size_t ppn);
 void lock_page(struct page *page);
 void unlock_page(struct page *page);
+void print_pageinfo(struct page *page);
 
 #endif //PAGE_ALLOC_H
 

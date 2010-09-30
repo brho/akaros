@@ -434,9 +434,9 @@ There are a couple ways we could handle this.  We adopt the Linux approach of
 using something called a buffer head (BH), which describes the mapping from
 in-memory buffer to block device / block number.  These are slab-allocated,
 and exist for each buffer of a page.  The page itself points to the first of
-its BHs, all of which exist in a circular LL.  The maximum number of them is
-determined by PGSIZE / blocksize.  Whenever there is a page in the page cache
-(meaning, in a page_mapping), that is up to date, it will have a BH.
+its BHs, all of which exist in a LL.  The maximum number of them is determined
+by PGSIZE / blocksize.  Whenever there is a page in the page cache (meaning, in
+a page_mapping), that is up to date, it will have a BH.
 
 Another way would be to not have BHs at all, and just figure out (at
 operation-time) what the n blocks on disk are for any given page, and submit
@@ -460,15 +460,14 @@ up into separate buffers for no reason.  At the other extreme, we could get by
 without having a BH at all, though this gets back to the other issue of
 caching.  What we do (or will do) is have one BH for the entire page of
 contiguous blocks.  If the page is a "buffer page," in Linux terms (meaning it
-has separate buffers), it will have n BHs in a circular LL.  Either way, we'll
-always have the mapping handy.  We wouldn't need to re-verify the contiguous
-nature of the blocks anyways, since the fact that the page was up to date and
-didn't need a BH would mean it was contiguous.  Further benefits to using the
-one BH include: 1) we are likely to make BHs be the unit of IO *submission*,
-and having one handy will simplify that code. 2) some code paths within the
-VFS may get BHs as a return value, which they can then dirty.  Always having a
-BH makes this easier (no need to find out if it's a buffer page, then decide
-how to dirty it).
+has separate buffers), it will have n BHs in a LL.  Either way, we'll always
+have the mapping handy.  We wouldn't need to re-verify the contiguous nature of
+the blocks anyways, since the fact that the page was up to date and didn't need
+a BH would mean it was contiguous.  Further benefits to using the one BH
+include: 1) we are likely to make BHs be the unit of IO *submission*, and having
+one handy will simplify that code. 2) some code paths within the VFS may get BHs
+as a return value, which they can then dirty.  Always having a BH makes this
+easier (no need to find out if it's a buffer page, then decide how to dirty it).
 
 Another compliation with this is certain code will want a block in the middle
 of a page (very common for metadata).  That code will get the BH for the

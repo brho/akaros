@@ -133,7 +133,7 @@ void *ext2_read_fileblock(struct super_block *sb, unsigned int block_num)
 	return __ext2_read_block(sb->s_bdev, block_num, sb->s_blocksize);
 }
 
-/* Helper for read_ino_block(). 
+/* Helper for find_inoblock(). 
  *
  * This walks a table stored at block 'blkid', returning which block you should
  * walk next in 'blkid'.  rel_inoblk is where you are given the current level of
@@ -141,7 +141,7 @@ void *ext2_read_fileblock(struct super_block *sb, unsigned int block_num)
  * is how many items the current table's *items* can index (so if we're on a
  * 3x indir block, reach should be for the doubly-indirect entries, and
  * rel_inoblk will tell you where within that double block you want). */
-static void ext2_walk_inotable(struct inode *inode, unsigned int *blkid,
+static void ext2_walk_inotable(struct inode *inode, unsigned long *blkid,
                                unsigned int *rel_inoblk, unsigned int reach)
 {
 	uint32_t *blk_buf = ext2_get_metablock(inode->i_sb, *blkid);
@@ -151,21 +151,21 @@ static void ext2_walk_inotable(struct inode *inode, unsigned int *blkid,
 	ext2_put_metablock(blk_buf);
 }
 
-/* Reads a file's block, determined via walking the inode's tables.  The general
- * idea is that if the ino_block num is above a threshold, we'll need to go into
- * indirect tables (1x, 2x, or 3x (triply indirect) tables).  Block numbers
- * start at 0.
+/* Determines the FS block corresponding to a specific block number of an inode.
+ * It does this by walking the inode's tables.  The general idea is that if the
+ * ino_block num is above a threshold, we'll need to go into indirect tables
+ * (1x, 2x, or 3x (triply indirect) tables).  Block numbers start at 0.
  *
  * One thing that might suck with this: if there's a 0 in the array, we should
- * stop.  This function isn't really checking if we "went too far."
+ * stop.  This function isn't really checking if we "went too far."  This will
+ * most definitely suck, and expect a null ptr deref in walk_inotable().
  *
  * Horrendously untested, btw. */
-void *ext2_read_ino_block(struct inode *inode, unsigned int ino_block)
+unsigned long ext2_find_inoblock(struct inode *inode, unsigned int ino_block)
 {
 	struct ext2_i_info *e2ii = (struct ext2_i_info*)inode->i_fs_info;
 
-	unsigned int blkid;
-	void *blk;
+	unsigned long blkid;
 	/* The 'reach' is how many blocks a given table can 'address' */
 	int ptrs_per_blk = inode->i_sb->s_blocksize / sizeof(uint32_t);
 	int reach_1xblk = ptrs_per_blk;
@@ -174,29 +174,53 @@ void *ext2_read_ino_block(struct inode *inode, unsigned int ino_block)
 	int single_threshold = 12;
 	int double_threshold = single_threshold + reach_1xblk;
 	int triple_threshold = double_threshold + reach_2xblk;
-	/* this is the desired block num lookup within a level of indirection */
-	unsigned int rel_inoblk = ino_block;
+	/* this is the desired block num lookup within a level of indirection.  It
+	 * will need to be offset based on what level of lookups we want (try it in
+	 * your head with 12 first). */
+	unsigned int rel_inoblk;
 
 	if (ino_block >= triple_threshold) {
 		/* ino_block requires a triply-indirect lookup */
+		rel_inoblk = ino_block - triple_threshold;
 		blkid = e2ii->i_block[14];
 		ext2_walk_inotable(inode, &blkid, &rel_inoblk, reach_2xblk);
 		ext2_walk_inotable(inode, &blkid, &rel_inoblk, reach_1xblk);
 		ext2_walk_inotable(inode, &blkid, &rel_inoblk, 1);
 	} else if (ino_block >= double_threshold) {
 		/* ino_block requires a doubly-indirect lookup  */
+		rel_inoblk = ino_block - double_threshold;
 		blkid = e2ii->i_block[13];
 		ext2_walk_inotable(inode, &blkid, &rel_inoblk, reach_1xblk);
 		ext2_walk_inotable(inode, &blkid, &rel_inoblk, 1);
 	} else if (ino_block >= single_threshold) {
 		/* ino_block requires a singly-indirect lookup */
+		rel_inoblk = ino_block - single_threshold;
 		blkid = e2ii->i_block[12];
 		ext2_walk_inotable(inode, &blkid, &rel_inoblk, 1);
 	} else {
 		/* Direct block, straight out of the inode */
 		blkid = e2ii->i_block[ino_block];
 	}
+	return blkid;
+}
+
+/* Returns a kmalloc'd block for the contents of the ino block.  Kept around for
+ * a couple commits, will prob go away soon */
+void *ext2_read_ino_block(struct inode *inode, unsigned int ino_block)
+{
+	unsigned long blkid = ext2_find_inoblock(inode, ino_block);
 	return ext2_read_fileblock(inode->i_sb, blkid);
+}
+
+/* This should help with degubbing.  In read_inode(), print out the i_block, and
+ * consider manually (via memory inspection) examining those blocks.  Odds are,
+ * the 2x and 3x walks are jacked up. */
+void ext2_print_ino_blocks(struct inode *inode)
+{
+	printk("Inode %08p, Size: %d, 512B 'blocks;: %d\n-------------\n", inode,
+	       inode->i_size, inode->i_blocks);
+	for (int i = 0; i < inode->i_blocks; i++)
+		printk("# %03d, Block %03d\n", i, ext2_find_inoblock(inode, i));
 }
 
 /* This checks an ext2 disc SB for consistency, optionally printing out its
@@ -353,34 +377,105 @@ struct fs_type ext2_fs_type = {"EXT2", 0, ext2_get_sb, ext2_kill_sb, {0, 0},
 
 /* Page Map Operations */
 
+/* Sets up the bidirectional mapping between the page and its buffer heads.  As
+ * a future optimization, we could try and detect if all of the blocks are
+ * contiguous (either before or after making them) and compact them to one BH.
+ * Note there is an assumption that the file has at least one block in it. */
+int ext2_mappage(struct page_map *pm, struct page *page)
+{
+	struct buffer_head *bh;
+	struct inode *inode = (struct inode*)pm->pm_host;
+	assert(!page->pg_private);		/* double check that we aren't bh-mapped */
+	assert(inode->i_mapping == pm);	/* double check we are the inode for pm */
+	struct block_device *bdev = inode->i_sb->s_bdev;
+	unsigned int blk_per_pg = PGSIZE / inode->i_sb->s_blocksize;
+	unsigned int sct_per_blk = inode->i_sb->s_blocksize / bdev->b_sector_sz;
+	unsigned long ino_blk_num;
+	/* Can't use i_blocks for this.  We could have a file hole, so it's not
+	 * about how many blocks there are, but about how many FS blocks there ought
+	 * to be for this object/file.  Also note that i_blocks is measured in 512B
+	 * chunks. */
+	unsigned long last_ino_blk_num = inode->i_size / inode->i_sb->s_blocksize;
+
+	bh = kmem_cache_alloc(bh_kcache, 0);
+	page->pg_private = bh;
+	for (int i = 0; i < blk_per_pg; i++) {
+		/* free_bh() can handle having a halfway aborted mappage() */
+		if (!bh)
+			return -ENOMEM;
+		bh->bh_page = page;							/* weak ref */
+		bh->bh_buffer = page2kva(page) + i * inode->i_sb->s_blocksize;
+		bh->bh_flags = 0;							/* whatever... */
+		bh->bh_bdev = bdev;							/* uncounted ref */
+		/* compute the first sector of the FS block for the ith buf in the pg */
+		ino_blk_num = page->pg_index * blk_per_pg + i;
+		/* TODO: find_inoblock can return 0 if there is no block, and since we
+		 * aren't at the EOF, we'll need to alloc a new block. */
+		bh->bh_sector = ext2_find_inoblock(inode, ino_blk_num) * sct_per_blk;
+		assert(bh->bh_sector);
+		bh->bh_nr_sector = sct_per_blk;
+		/* Stop if we're the last block in the inode or the last in the page */
+		if ((ino_blk_num == last_ino_blk_num) || (i == blk_per_pg - 1)) {
+			bh->bh_next = 0;
+			break;
+		} else {
+			/* get and link to the next BH. */
+			bh->bh_next = kmem_cache_alloc(bh_kcache, 0);
+			bh = bh->bh_next;
+		}
+	}
+	return 0;
+}
+
 /* Fills page with its contents from its backing store file.  Note that we do
  * the zero padding here, instead of higher in the VFS.  Might change in the
- * future. */
+ * future.  TODO: make this a block FS generic call. */
 int ext2_readpage(struct page_map *pm, struct page *page)
 {
-	I_AM_HERE;
-	#if 0
-	size_t pg_idx_byte = page->pg_index * PGSIZE;
-	struct ext2_i_info *k_i_info = (struct ext2_i_info*)
-	                              file->f_dentry->d_inode->i_fs_info;
-	uintptr_t begin = (size_t)k_i_info->filestart + pg_idx_byte;
-	/* If we're beyond the initial start point, we just need a zero page.  This
-	 * is for a hole or for extending a file (even though it won't be saved).
-	 * Otherwise, we want the data from Ext2, being careful to not copy from
-	 * beyond the original EOF (and zero padding anything extra). */
-	if (pg_idx_byte >= k_i_info->init_size) {
-		memset(page2kva(page), 0, PGSIZE);
-	} else {
-		size_t copy_amt = MIN(PGSIZE, k_i_info->init_size - pg_idx_byte);
-		memcpy(page2kva(page), (void*)begin, copy_amt);
-		memset(page2kva(page) + copy_amt, 0, PGSIZE - copy_amt);
+	int retval, i;
+	struct block_device *bdev = pm->pm_host->i_sb->s_bdev;
+	struct buffer_head *bh;
+	struct block_request *breq;
+	void *eobh;
+
+	assert(page->pg_flags & PG_BUFFER);
+	retval = ext2_mappage(pm, page);
+	if (retval) {
+		unlock_page(page);
+		return retval;
 	}
-	/* This is supposed to be done in the IO system when the operation is
-	 * complete.  Since we aren't doing a real IO request, and it is already
-	 * done, we can do it here. */
+	/* Build and submit the request */
+	breq = kmem_cache_alloc(breq_kcache, 0);
+	if (!breq) {
+		unlock_page(page);
+		return -ENOMEM;
+	}
+	breq->flags = BREQ_READ;
+	breq->bhs = breq->local_bhs;
+	/* Pack the BH pointers in the block request */
+	bh = (struct buffer_head*)page->pg_private;
+	assert(bh);
+	for (i = 0; bh; i++, bh = bh->bh_next)
+		breq->bhs[i] = bh;
+	breq->nr_bhs = i;
+	/* TODO: (BLK) this assumes we slept til the request was done */
+	retval = make_request(bdev, breq);
+	assert(!retval);
+	/* zero out whatever is beyond the EOF.  we could do this by figuring out
+	 * where the BHs end and zeroing from there, but I'd rather zero from where
+	 * the file ends (which could be in the middle of an FS block */
+	uintptr_t eof_off;
+	eof_off = (pm->pm_host->i_size - page->pg_index * PGSIZE);
+	eof_off = MIN(eof_off, PGSIZE) % PGSIZE;
+	/* at this point, eof_off is the offset into the page of the EOF, or 0 */
+	if (eof_off)
+		memset(eof_off + page2kva(page), 0, PGSIZE - eof_off);
+	/* after the data is read, we mark it up to date and unlock the page. */
 	page->pg_flags |= PG_UPTODATE;
 	unlock_page(page);
-	#endif
+	kmem_cache_free(breq_kcache, breq);
+	/* Useful debugging.  Put one higher up if the page is not getting mapped */
+	//print_pageinfo(page);
 	return 0;
 }
 
