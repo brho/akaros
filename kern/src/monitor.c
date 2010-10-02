@@ -59,6 +59,7 @@ static command_t (RO commands)[] = {
 	{ "trace", "Run a specific measurement", mon_trace},
 	{ "monitor", "Run the monitor on another core", mon_monitor},
 	{ "fs", "Filesystem Diagnostics", mon_fs},
+	{ "bb", "Try to run busybox (ash)", mon_bb},
 };
 #define NCOMMANDS (sizeof(commands)/sizeof(commands[0]))
 
@@ -853,4 +854,10 @@ int mon_fs(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 		return 1;
 	}
 	return 0;
+}
+
+int mon_bb(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
+{
+	char *l_argv[3] = {"", "busybox", "ash"};
+	return mon_bin_run(3, l_argv, tf);
 }

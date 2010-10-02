@@ -30,5 +30,6 @@ int mon_measure(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
 int mon_trace(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
 int mon_monitor(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
 int mon_fs(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
+int mon_bb(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
 
 #endif	// !ROS_KERN_MONITOR_H
