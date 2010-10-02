@@ -14,6 +14,7 @@
 #include <endian.h>
 #include <error.h>
 #include <pmap.h>
+#include <arch/bitmask.h>
 
 /* These structs are declared again and initialized farther down */
 struct page_map_operations ext2_pm_op;
@@ -28,17 +29,56 @@ struct file_operations ext2_f_op_sym;
 
 /* Useful helper functions. */
 
-/* This returns the block group containing the inode, BGs starting at 0.  Note
- * the inodes are indexed starting at 1. */
-static unsigned int ext2_ino2bg(unsigned int inode_num, unsigned int ino_p_grp)
+/* Returns the block group ID of the BG containing the inode.  BGs start with 0,
+ * inodes are indexed starting at 1. */
+static struct ext2_block_group *ext2_inode2bg(struct inode *inode)
 {
-	return (inode_num - 1) / ino_p_grp;
+	struct ext2_sb_info *e2sbi = (struct ext2_sb_info*)inode->i_sb->s_fs_info;
+	unsigned int bg_num = (inode->i_ino - 1) /
+	                      le32_to_cpu(e2sbi->e2sb->s_inodes_per_group);
+	return &e2sbi->e2bg[bg_num];
 }
 
-/* This returns the 0-index within a block group */
-static unsigned int ext2_ino2idx(unsigned int inode_num, unsigned int ino_p_grp)
+/* This returns the inode's 0-index within a block group */
+static unsigned int ext2_inode2bgidx(struct inode *inode)
 {
-	return (inode_num - 1) % ino_p_grp;
+	struct ext2_sb_info *e2sbi = (struct ext2_sb_info*)inode->i_sb->s_fs_info;
+	return (inode->i_ino - 1) % le32_to_cpu(e2sbi->e2sb->s_inodes_per_group);
+}
+
+/* Returns an uncounted reference to the BG in the BG table, which is pinned,
+ * hanging off the sb.  Note, the BGs cover the blocks starting from the first
+ * data block, not from 0.  So if the FDB is 1, BG 0 covers 1 through 1024, and
+ * not 0 through 1023. */
+static struct ext2_block_group *ext2_block2bg(struct super_block *sb,
+                                              uint32_t blk_num)
+{
+	struct ext2_sb_info *e2sbi = (struct ext2_sb_info*)sb->s_fs_info;
+	unsigned int bg_num;
+	bg_num = (blk_num - le32_to_cpu(e2sbi->e2sb->s_first_data_block)) /
+	         le32_to_cpu(e2sbi->e2sb->s_blocks_per_group);
+	return &e2sbi->e2bg[bg_num];
+}
+
+/* This returns the block's 0-index within a block group.  Note all blocks are
+ * offset by FDB when dealing with BG membership. */
+static unsigned int ext2_block2bgidx(struct super_block *sb, uint32_t blk_num)
+{
+	struct ext2_sb_info *e2sbi = (struct ext2_sb_info*)sb->s_fs_info;
+	return (blk_num - le32_to_cpu(e2sbi->e2sb->s_first_data_block)) %
+	       le32_to_cpu(e2sbi->e2sb->s_blocks_per_group);
+}
+
+/* Returns the FS block for the given BG's idx block */
+static uint32_t ext2_bgidx2block(struct super_block *sb,
+                                 struct ext2_block_group *bg,
+                                 unsigned int blk_idx)
+{
+	struct ext2_sb_info *e2sbi = (struct ext2_sb_info*)sb->s_fs_info;
+	struct ext2_sb *e2sb = e2sbi->e2sb;
+	struct ext2_block_group *e2bg = e2sbi->e2bg;
+	return (bg - e2bg) * le32_to_cpu(e2sb->s_blocks_per_group) + blk_idx +
+	       le32_to_cpu(e2sb->s_first_data_block);
 }
 
 /* Slabs for ext2 specific info chunks */
@@ -204,6 +244,82 @@ unsigned long ext2_find_inoblock(struct inode *inode, unsigned int ino_block)
 	return blkid;
 }
 
+/* Helper for alloc_block.  It will try to alloc a block from the BG, starting
+ * with blk_idx (relative number within the BG).   If successful, it will return
+ * the FS block number via *block_num.  TODO: concurrency protection */
+static bool ext2_tryalloc(struct super_block *sb, struct ext2_block_group *bg,
+                          unsigned int blk_idx, uint32_t *block_num)
+{
+	uint8_t *blk_bitmap;
+	struct ext2_sb_info *e2sbi = (struct ext2_sb_info*)sb->s_fs_info;
+	unsigned int blks_per_bg = le32_to_cpu(e2sbi->e2sb->s_blocks_per_group);
+	bool found = FALSE;
+
+	/* Check to see if there are any free blocks */
+	if (!le32_to_cpu(bg->bg_free_blocks_cnt))
+		return FALSE;
+	/* Check the bitmap for your desired block.  We'll loop through the whole
+	 * BG, starting with the one we want first. */
+	blk_bitmap = ext2_get_metablock(sb, bg->bg_block_bitmap);
+	for (int i = 0; i < blks_per_bg; i++) {
+		if (!(GET_BITMASK_BIT(blk_bitmap, blk_idx))) {
+			SET_BITMASK_BIT(blk_bitmap, blk_idx);
+			bg->bg_free_blocks_cnt--;
+			ext2_dirty_metablock(blk_bitmap);
+			found = TRUE;
+			break;
+		}
+		/* Note: the wrap-around hasn't been tested yet */
+		blk_idx = (blk_idx + 1) % blks_per_bg;
+	}
+	ext2_put_metablock(blk_bitmap);
+	if (found)
+		*block_num = ext2_bgidx2block(sb, bg, blk_idx);
+	return found;
+}
+
+/* This allocates a fresh block for the inode, preferably 'fetish' (name
+ * courtesy of L.F.), returning the FS block number that's been allocated.
+ * Note, Linux does some block preallocation here.  Consider doing the same (off
+ * the in-memory inode).  Note the lack of concurrency protections here. */
+uint32_t ext2_alloc_block(struct inode *inode, uint32_t fetish)
+{
+	struct ext2_sb_info *e2sbi = (struct ext2_sb_info*)inode->i_sb->s_fs_info;
+	struct ext2_block_group *fetish_bg, *bg_i = e2sbi->e2bg;
+	unsigned int blk_idx;
+	uint8_t *blk_bitmap;
+	bool found = FALSE;
+	uint32_t retval = 0;
+
+	/* Get our ideal starting point */
+	fetish_bg = ext2_block2bg(inode->i_sb, fetish);
+	blk_idx = ext2_block2bgidx(inode->i_sb, fetish);
+	/* Try to find a free block in the BG of the one we desire */
+	found = ext2_tryalloc(inode->i_sb, fetish_bg, blk_idx, &retval);
+	if (found)
+		return retval;
+
+	warn("This part hasn't been tested yet.");
+	/* Find a block anywhere else (perhaps using the log trick, but for now just
+	 * linearly scanning). */
+	for (int i = 0; i < e2sbi->nr_bgs; i++, bg_i++) {
+		if (bg_i == fetish_bg)
+			continue;
+		found = ext2_tryalloc(inode->i_sb, bg_i, 0, &retval);
+		if (found)
+			break;
+	}
+	if (!found)
+		panic("Ran out of blocks! (probably a bug)");
+	return retval;
+}
+
+/* This inserts block into the inode at ino_block, dirtying the appropriate
+ * buffers and the inode. */
+void ext2_insert_block(struct inode *inode, uint32_t ino_block, uint32_t block)
+{
+}
+
 /* Returns a kmalloc'd block for the contents of the ino block.  Kept around for
  * a couple commits, will prob go away soon */
 void *ext2_read_ino_block(struct inode *inode, unsigned int ino_block)
@@ -231,11 +347,11 @@ void ext2_check_sb(struct ext2_sb *e2sb, struct ext2_block_group *bg,
 {
 	int retval;
 	unsigned int blksize, blks_per_group, num_blk_group, num_blks;
-	unsigned int inodes_per_grp, blks_per_grp, inode_size;
+	unsigned int inodes_per_grp, inode_size;
 	unsigned int sum_blks = 0, sum_inodes = 0;
 
 	assert(le16_to_cpu(e2sb->s_magic) == EXT2_SUPER_MAGIC);
-	num_blks = le32_to_cpu(e2sb->s_free_blocks_cnt);
+	num_blks = le32_to_cpu(e2sb->s_blocks_cnt);
 	blksize = 1024 << le32_to_cpu(e2sb->s_log_block_size);
 	blks_per_group = le32_to_cpu(e2sb->s_blocks_per_group);
 	num_blk_group = num_blks / blks_per_group + (num_blks % blks_per_group ? 1 : 0);
@@ -314,6 +430,7 @@ struct super_block *ext2_get_sb(struct fs_type *fs, int flags,
 	struct block_device *bdev;
 	struct ext2_sb *e2sb;
 	struct ext2_block_group *e2bg;
+	unsigned int blks_per_group, num_blk_group, num_blks;
 
 	static bool ran_once = FALSE;
 	if (!ran_once) {
@@ -356,6 +473,11 @@ struct super_block *ext2_get_sb(struct fs_type *fs, int flags,
 	/* store the in-memory copy of the disk SB and bg desc table */
 	((struct ext2_sb_info*)sb->s_fs_info)->e2sb = e2sb;
 	((struct ext2_sb_info*)sb->s_fs_info)->e2bg = e2bg;
+	/* Precompute the number of BGs */
+	num_blks = le32_to_cpu(e2sb->s_blocks_cnt);
+	blks_per_group = le32_to_cpu(e2sb->s_blocks_per_group);
+	((struct ext2_sb_info*)sb->s_fs_info)->nr_bgs = num_blks / blks_per_group +
+	                                       (num_blks % blks_per_group ? 1 : 0);
 
 	/* Final stages of initializing the sb, mostly FS-independent */
 	init_sb(sb, vmnt, &ext2_d_op, EXT2_ROOT_INO, 0);
@@ -390,7 +512,7 @@ int ext2_mappage(struct page_map *pm, struct page *page)
 	struct block_device *bdev = inode->i_sb->s_bdev;
 	unsigned int blk_per_pg = PGSIZE / inode->i_sb->s_blocksize;
 	unsigned int sct_per_blk = inode->i_sb->s_blocksize / bdev->b_sector_sz;
-	unsigned long ino_blk_num;
+	unsigned long ino_blk_num, fs_blk_num;
 	/* Can't use i_blocks for this.  We could have a file hole, so it's not
 	 * about how many blocks there are, but about how many FS blocks there ought
 	 * to be for this object/file.  Also note that i_blocks is measured in 512B
@@ -411,8 +533,9 @@ int ext2_mappage(struct page_map *pm, struct page *page)
 		ino_blk_num = page->pg_index * blk_per_pg + i;
 		/* TODO: find_inoblock can return 0 if there is no block, and since we
 		 * aren't at the EOF, we'll need to alloc a new block. */
-		bh->bh_sector = ext2_find_inoblock(inode, ino_blk_num) * sct_per_blk;
-		assert(bh->bh_sector);
+		fs_blk_num = ext2_find_inoblock(inode, ino_blk_num);
+		assert(fs_blk_num);
+		bh->bh_sector = fs_blk_num * sct_per_blk;
 		bh->bh_nr_sector = sct_per_blk;
 		/* Stop if we're the last block in the inode or the last in the page */
 		if ((ino_blk_num == last_ino_blk_num) || (i == blk_per_pg - 1)) {
@@ -509,18 +632,16 @@ void ext2_dealloc_inode(struct inode *inode)
  * basically, it's a "make this inode the one for i_ino (i number)" */
 void ext2_read_inode(struct inode *inode)
 {
-	unsigned int bg_num, bg_idx, ino_per_blkgrp, ino_per_blk, my_ino_blk;
+	unsigned int bg_idx, ino_per_blk, my_ino_blk;
 	struct ext2_sb_info *e2sbi = (struct ext2_sb_info*)inode->i_sb->s_fs_info;
-	struct ext2_sb *e2sb = e2sbi->e2sb;
 	struct ext2_block_group *my_bg;
 	struct ext2_inode *ino_tbl_chunk, *my_ino;
 
 	/* Need to compute the blockgroup and index of the requested inode */
-	ino_per_blkgrp = le32_to_cpu(e2sb->s_inodes_per_group);
-	ino_per_blk = inode->i_sb->s_blocksize / le16_to_cpu(e2sb->s_inode_size);
-	bg_num = ext2_ino2bg(inode->i_ino, ino_per_blkgrp);
-	bg_idx = ext2_ino2idx(inode->i_ino, ino_per_blkgrp);
-	my_bg = &e2sbi->e2bg[bg_num];
+	ino_per_blk = inode->i_sb->s_blocksize /
+	              le16_to_cpu(e2sbi->e2sb->s_inode_size);
+	bg_idx = ext2_inode2bgidx(inode);
+	my_bg = ext2_inode2bg(inode);
 	/* Figure out which FS block of the inode table we want and read in that
 	 * chunk */
 	my_ino_blk = le32_to_cpu(my_bg->bg_inode_table) + bg_idx / ino_per_blk;

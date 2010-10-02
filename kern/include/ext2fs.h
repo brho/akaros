@@ -253,6 +253,7 @@ extern struct fs_type ext2_fs_type;
 struct ext2_sb_info {
 	struct ext2_sb				*e2sb;
 	struct ext2_block_group		*e2bg;
+	unsigned int				nr_bgs;
 };
 
 /* Inode in-memory data.  This stuff is in cpu-native endianness */
