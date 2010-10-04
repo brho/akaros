@@ -91,6 +91,8 @@ void ext2_init(void)
 	                                  __alignof__(struct ext2_i_info), 0, 0, 0);
 }
 
+/* Block management */
+
 /* Helper op to read one ext2 block, 0-indexing the block numbers.  Kfree your
  * answer.
  *
@@ -173,77 +175,6 @@ void *ext2_read_fileblock(struct super_block *sb, unsigned int block_num)
 	return __ext2_read_block(sb->s_bdev, block_num, sb->s_blocksize);
 }
 
-/* Helper for find_inoblock(). 
- *
- * This walks a table stored at block 'blkid', returning which block you should
- * walk next in 'blkid'.  rel_inoblk is where you are given the current level of
- * indirection tables, and returns where you should be for the next one.  Reach
- * is how many items the current table's *items* can index (so if we're on a
- * 3x indir block, reach should be for the doubly-indirect entries, and
- * rel_inoblk will tell you where within that double block you want). */
-static void ext2_walk_inotable(struct inode *inode, unsigned long *blkid,
-                               unsigned int *rel_inoblk, unsigned int reach)
-{
-	uint32_t *blk_buf = ext2_get_metablock(inode->i_sb, *blkid);
-	assert(blk_buf);
-	*blkid = le32_to_cpu(blk_buf[*rel_inoblk / reach]);
-	*rel_inoblk = *rel_inoblk % reach;
-	ext2_put_metablock(blk_buf);
-}
-
-/* Determines the FS block corresponding to a specific block number of an inode.
- * It does this by walking the inode's tables.  The general idea is that if the
- * ino_block num is above a threshold, we'll need to go into indirect tables
- * (1x, 2x, or 3x (triply indirect) tables).  Block numbers start at 0.
- *
- * One thing that might suck with this: if there's a 0 in the array, we should
- * stop.  This function isn't really checking if we "went too far."  This will
- * most definitely suck, and expect a null ptr deref in walk_inotable().
- *
- * Horrendously untested, btw. */
-unsigned long ext2_find_inoblock(struct inode *inode, unsigned int ino_block)
-{
-	struct ext2_i_info *e2ii = (struct ext2_i_info*)inode->i_fs_info;
-
-	unsigned long blkid;
-	/* The 'reach' is how many blocks a given table can 'address' */
-	int ptrs_per_blk = inode->i_sb->s_blocksize / sizeof(uint32_t);
-	int reach_1xblk = ptrs_per_blk;
-	int reach_2xblk = ptrs_per_blk * ptrs_per_blk;
-	/* thresholds are the first blocks that require a level of indirection */
-	int single_threshold = 12;
-	int double_threshold = single_threshold + reach_1xblk;
-	int triple_threshold = double_threshold + reach_2xblk;
-	/* this is the desired block num lookup within a level of indirection.  It
-	 * will need to be offset based on what level of lookups we want (try it in
-	 * your head with 12 first). */
-	unsigned int rel_inoblk;
-
-	if (ino_block >= triple_threshold) {
-		/* ino_block requires a triply-indirect lookup */
-		rel_inoblk = ino_block - triple_threshold;
-		blkid = e2ii->i_block[14];
-		ext2_walk_inotable(inode, &blkid, &rel_inoblk, reach_2xblk);
-		ext2_walk_inotable(inode, &blkid, &rel_inoblk, reach_1xblk);
-		ext2_walk_inotable(inode, &blkid, &rel_inoblk, 1);
-	} else if (ino_block >= double_threshold) {
-		/* ino_block requires a doubly-indirect lookup  */
-		rel_inoblk = ino_block - double_threshold;
-		blkid = e2ii->i_block[13];
-		ext2_walk_inotable(inode, &blkid, &rel_inoblk, reach_1xblk);
-		ext2_walk_inotable(inode, &blkid, &rel_inoblk, 1);
-	} else if (ino_block >= single_threshold) {
-		/* ino_block requires a singly-indirect lookup */
-		rel_inoblk = ino_block - single_threshold;
-		blkid = e2ii->i_block[12];
-		ext2_walk_inotable(inode, &blkid, &rel_inoblk, 1);
-	} else {
-		/* Direct block, straight out of the inode */
-		blkid = e2ii->i_block[ino_block];
-	}
-	return blkid;
-}
-
 /* Helper for alloc_block.  It will try to alloc a block from the BG, starting
  * with blk_idx (relative number within the BG).   If successful, it will return
  * the FS block number via *block_num.  TODO: concurrency protection */
@@ -314,10 +245,135 @@ uint32_t ext2_alloc_block(struct inode *inode, uint32_t fetish)
 	return retval;
 }
 
-/* This inserts block into the inode at ino_block, dirtying the appropriate
- * buffers and the inode. */
-void ext2_insert_block(struct inode *inode, uint32_t ino_block, uint32_t block)
+/* Inode Table Management */
+
+/* Helper for ino table management.  blkid is the inode table block we are
+ * looking in, rel_blkid is the block we want, relative to the current
+ * threshhold for a level of indirection, and reach is how many items a given
+ * slot indexes.  Returns a pointer to the slot for the given block. */
+static uint32_t *ext2_find_inotable_slot(struct inode *inode, uint32_t blkid,
+                                         uint32_t rel_blkid,
+                                         unsigned int reach)
 {
+	uint32_t *blk_buf = ext2_get_metablock(inode->i_sb, blkid);
+	assert(blk_buf);
+	return &blk_buf[rel_blkid / reach];
+}
+
+/* If blk_slot is empty (no block mapped there) it will alloc and link a new
+ * block.  This is only used for allocating a block to be an indirect table
+ * (it's grabbing a metablock, we have no hint, and it handles the buffer
+ * differently than for a file page/buffer). */
+static void ext2_fill_inotable_slot(struct inode *inode, uint32_t *blk_slot)
+{
+	uint32_t new_blkid, hint_blk;
+	void *new_blk;
+
+	if (le32_to_cpu(*blk_slot))
+		return;
+	/* Use any block in our inode's BG as a hint for the indirect block */
+	hint_blk = ext2_bgidx2block(inode->i_sb, ext2_inode2bg(inode), 0);
+	new_blkid = ext2_alloc_block(inode, hint_blk);
+	/* Actually read in the block we alloc'd */
+	new_blk = ext2_get_metablock(inode->i_sb, new_blkid);
+	memset(new_blk, 0, inode->i_sb->s_blocksize);
+	ext2_dirty_metablock(new_blk);
+	/* We put it, despite it getting relooked up in the next walk */
+	ext2_put_metablock(new_blk);
+	/* Now write the new block into its slot */
+	*blk_slot = cpu_to_le32(new_blkid);
+	ext2_dirty_metablock(blk_slot);
+}
+
+/* This walks a table stored at block 'blkid', returning which block you should
+ * walk next in 'blkid'.  rel_inoblk is where you are given the current level of
+ * indirection tables, and returns where you should be for the next one.  Reach
+ * is how many items the current table's *items* can index (so if we're on a
+ * 3x indir block, reach should be for the doubly-indirect entries, and
+ * rel_inoblk will tell you where within that double block you want).
+ *
+ * This will also alloc intermediate tables if there isn't one already (TODO:
+ * concurrency protection on modifying the table). */
+static void ext2_walk_inotable(struct inode *inode, uint32_t *blkid,
+                               uint32_t *rel_inoblk, unsigned int reach)
+{
+	uint32_t *blk_slot;
+	blk_slot = ext2_find_inotable_slot(inode, *blkid, *rel_inoblk, reach);
+	/* We could only do this based on a bool, but if we're trying to walk it,
+	 * we ought to want to alloc if there is no block. */
+	ext2_fill_inotable_slot(inode, blk_slot);
+	*blkid = le32_to_cpu(*blk_slot);
+	*rel_inoblk = *rel_inoblk % reach;
+	ext2_put_metablock(blk_slot);	/* the ref for the block we looked in */
+}
+
+/* Finds the slot of the FS block corresponding to a specific block number of an
+ * inode.  It does this by walking the inode's tables.  The general idea is that
+ * if the ino_block num is above a threshold, we'll need to go into indirect
+ * tables (1x, 2x, or 3x (triply indirect) tables).  Block numbers start at 0.
+ *
+ * This returns a pointer within a metablock, which needs to be decref'd (and
+ * possibly dirtied) when you are done.
+ *
+ * Horrendously untested, btw. */
+uint32_t *ext2_lookup_inotable_slot(struct inode *inode, uint32_t ino_block)
+{
+	struct ext2_i_info *e2ii = (struct ext2_i_info*)inode->i_fs_info;
+
+	uint32_t blkid, *blk_slot;
+	/* The 'reach' is how many blocks a given table can 'address' */
+	int ptrs_per_blk = inode->i_sb->s_blocksize / sizeof(uint32_t);
+	int reach_1xblk = ptrs_per_blk;
+	int reach_2xblk = ptrs_per_blk * ptrs_per_blk;
+	/* thresholds are the first blocks that require a level of indirection */
+	int single_threshold = 12;
+	int double_threshold = single_threshold + reach_1xblk;
+	int triple_threshold = double_threshold + reach_2xblk;
+	/* this is the desired block num lookup within a level of indirection.  It
+	 * will need to be offset based on what level of lookups we want (try it in
+	 * your head with 12 first). */
+	uint32_t rel_inoblk;
+
+	if (ino_block >= triple_threshold) {
+		/* ino_block requires a triply-indirect lookup */
+		rel_inoblk = ino_block - triple_threshold;
+		/* Make sure a 14 block (3x indirect) is there */
+		ext2_fill_inotable_slot(inode, &e2ii->i_block[14]);
+		blkid = e2ii->i_block[14];
+		ext2_walk_inotable(inode, &blkid, &rel_inoblk, reach_2xblk);
+		ext2_walk_inotable(inode, &blkid, &rel_inoblk, reach_1xblk);
+		blk_slot = ext2_find_inotable_slot(inode, blkid, rel_inoblk, 1);
+	} else if (ino_block >= double_threshold) {
+		/* ino_block requires a doubly-indirect lookup  */
+		rel_inoblk = ino_block - double_threshold;
+		ext2_fill_inotable_slot(inode, &e2ii->i_block[13]);
+		blkid = e2ii->i_block[13];
+		ext2_walk_inotable(inode, &blkid, &rel_inoblk, reach_1xblk);
+		blk_slot = ext2_find_inotable_slot(inode, blkid, rel_inoblk, 1);
+	} else if (ino_block >= single_threshold) {
+		/* ino_block requires a singly-indirect lookup */
+		rel_inoblk = ino_block - single_threshold;
+		ext2_fill_inotable_slot(inode, &e2ii->i_block[12]);
+		blkid = e2ii->i_block[12];
+		blk_slot = ext2_find_inotable_slot(inode, blkid, rel_inoblk, 1);
+	} else {
+		/* Direct block, straight out of the inode */
+		blk_slot = &e2ii->i_block[ino_block];
+		/* need to incref, since the i_block isn't a real metablock (it's just a
+		 * random page!), and the caller is going to end up decreffing it */
+		page_incref(kva2page(blk_slot));
+	}
+	return blk_slot;
+}
+
+/* Determines the FS block id for a given inode block id.  Convenience wrapper
+ * that may go away soon. */
+uint32_t ext2_find_inoblock(struct inode *inode, unsigned int ino_block)
+{
+	uint32_t retval, *buf = ext2_lookup_inotable_slot(inode, ino_block);
+	retval = *buf;
+	ext2_put_metablock(buf);
+	return retval;
 }
 
 /* Returns a kmalloc'd block for the contents of the ino block.  Kept around for
@@ -338,6 +394,8 @@ void ext2_print_ino_blocks(struct inode *inode)
 	for (int i = 0; i < inode->i_blocks; i++)
 		printk("# %03d, Block %03d\n", i, ext2_find_inoblock(inode, i));
 }
+
+/* Misc Functions */
 
 /* This checks an ext2 disc SB for consistency, optionally printing out its
  * stats.  It also will also read in a copy of the block group descriptor table
@@ -512,12 +570,12 @@ int ext2_mappage(struct page_map *pm, struct page *page)
 	struct block_device *bdev = inode->i_sb->s_bdev;
 	unsigned int blk_per_pg = PGSIZE / inode->i_sb->s_blocksize;
 	unsigned int sct_per_blk = inode->i_sb->s_blocksize / bdev->b_sector_sz;
-	unsigned long ino_blk_num, fs_blk_num;
+	uint32_t ino_blk_num, fs_blk_num = 0, *fs_blk_slot;
 	/* Can't use i_blocks for this.  We could have a file hole, so it's not
 	 * about how many blocks there are, but about how many FS blocks there ought
 	 * to be for this object/file.  Also note that i_blocks is measured in 512B
 	 * chunks. */
-	unsigned long last_ino_blk_num = inode->i_size / inode->i_sb->s_blocksize;
+	uint32_t last_ino_blk_num = inode->i_size / inode->i_sb->s_blocksize;
 
 	bh = kmem_cache_alloc(bh_kcache, 0);
 	page->pg_private = bh;
@@ -531,10 +589,24 @@ int ext2_mappage(struct page_map *pm, struct page *page)
 		bh->bh_bdev = bdev;							/* uncounted ref */
 		/* compute the first sector of the FS block for the ith buf in the pg */
 		ino_blk_num = page->pg_index * blk_per_pg + i;
-		/* TODO: find_inoblock can return 0 if there is no block, and since we
-		 * aren't at the EOF, we'll need to alloc a new block. */
-		fs_blk_num = ext2_find_inoblock(inode, ino_blk_num);
-		assert(fs_blk_num);
+		fs_blk_slot = ext2_lookup_inotable_slot(inode, ino_blk_num);
+		/* If there isn't a block there, lets get one.  The previous fs_blk_num
+		 * is our hint (or we have to compute one). */
+		if (!*fs_blk_slot) {
+			if (!fs_blk_num) {
+				fs_blk_num = ext2_bgidx2block(inode->i_sb,
+				                              ext2_inode2bg(inode), 0);
+			}
+			fs_blk_num = ext2_alloc_block(inode, fs_blk_num + 1);
+			/* Link it, and dirty the inode indirect block */
+			*fs_blk_slot = cpu_to_le32(fs_blk_num);
+			ext2_dirty_metablock(fs_blk_slot);
+			/* the block is still on disk, and we don't want its contents */
+			bh->bh_flags = BH_NEEDS_ZEROED;			/* talking to readpage */
+		} else {	/* there is a block there already */
+			fs_blk_num = *fs_blk_slot;
+		}
+		ext2_put_metablock(fs_blk_slot);
 		bh->bh_sector = fs_blk_num * sct_per_blk;
 		bh->bh_nr_sector = sct_per_blk;
 		/* Stop if we're the last block in the inode or the last in the page */
@@ -555,7 +627,7 @@ int ext2_mappage(struct page_map *pm, struct page *page)
  * future.  TODO: make this a block FS generic call. */
 int ext2_readpage(struct page_map *pm, struct page *page)
 {
-	int retval, i;
+	int retval;
 	struct block_device *bdev = pm->pm_host->i_sb->s_bdev;
 	struct buffer_head *bh;
 	struct block_request *breq;
@@ -575,12 +647,23 @@ int ext2_readpage(struct page_map *pm, struct page *page)
 	}
 	breq->flags = BREQ_READ;
 	breq->bhs = breq->local_bhs;
+	breq->nr_bhs = 0;
 	/* Pack the BH pointers in the block request */
 	bh = (struct buffer_head*)page->pg_private;
 	assert(bh);
-	for (i = 0; bh; i++, bh = bh->bh_next)
-		breq->bhs[i] = bh;
-	breq->nr_bhs = i;
+	/* Either read the block in, or zero the buffer.  If we wanted to ensure no
+	 * data is leaked after a crash, we'd write a 0 block too. */
+	for (int i = 0; bh; bh = bh->bh_next) {
+		if (!(bh->bh_flags & BH_NEEDS_ZEROED)) {
+			breq->bhs[i] = bh;
+			breq->nr_bhs++;
+			i++;
+		} else {
+			memset(bh->bh_buffer, 0, pm->pm_host->i_sb->s_blocksize);
+			bh->bh_flags |= BH_DIRTY;
+			bh->bh_page->pg_flags |= PG_DIRTY;
+		}
+	}
 	/* TODO: (BLK) this assumes we slept til the request was done */
 	retval = make_request(bdev, breq);
 	assert(!retval);

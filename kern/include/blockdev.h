@@ -37,10 +37,11 @@ struct block_device {
 	// callbacks for completion
 };
 
-/* Not sure which of these we'll need, if any */
+/* So far, only NEEDS_ZEROED is used */
 #define BH_LOCKED		0x001	/* involved in an IO op */
 #define BH_UPTODATE		0x002	/* buffer is filled with file data */
 #define BH_DIRTY		0x004	/* buffer is dirty */
+#define BH_NEEDS_ZEROED	0x008	/* buffer should be 0'd, not read in */
 
 /* This maps to and from a buffer within a page to a block(s) on a bdev.  Some
  * of it might not be needed later, etc (page, numblock). */
