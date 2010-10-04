@@ -971,13 +971,12 @@ void ext2_d_iput(struct dentry *dentry, struct inode *inode)
 
 /* file_operations */
 
-/* Updates the file pointer.  Ext2 doesn't let you go past the end of a file
- * yet, so it won't let you seek past either.  TODO: think about locking. */
+/* Updates the file pointer.  TODO: think about locking, and putting this in the
+ * VFS. */
+#include <syscall.h>	/* just for set_errno, may go away later */
 off_t ext2_llseek(struct file *file, off_t offset, int whence)
 {
-I_AM_HERE;
 	off_t temp_off = 0;
-	#if 0
 	switch (whence) {
 		case SEEK_SET:
 			temp_off = offset;
@@ -993,11 +992,7 @@ I_AM_HERE;
 			warn("Unknown 'whence' in llseek()!\n");
 			return -1;
 	}
-	/* make sure the f_pos isn't outside the limits of the existing file.
-	 * techincally, if they go too far, we should return EINVAL */
-	temp_off = MAX(MIN(temp_off, file->f_dentry->d_inode->i_size), 0);
 	file->f_pos = temp_off;
-	#endif
 	return temp_off;
 }
 
