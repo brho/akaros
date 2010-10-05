@@ -206,6 +206,26 @@ This also applies to trying to write to a block beyond the EOF.  If the request
 hits the page cache and readpage(), it's because it was already checked and
 cleared in another part of the VFS, such as in generic_file_write().
 
+Files That End Before a Page Boundary
+--------------------------
+So what if we have a file that is only 1024 bytes.  When we read it in, we'll
+have a whole page added to the page cache, with the extra 3K 0'd.  When we go to
+write it back, it will write back the 1K, and ignore the rest.  But what if we
+extend the file later?  That page is already in the page cache, but the buffer
+heads aren't tracking the new 3K.  When that page gets evicted, only the 1K will
+write back.
+
+There are two ways to deal with this: 1) When we extend the file, check and see
+if it is in the middle of a page, and if so, alloc the blocks (all FS
+specific!), and adjust the BHs to map the new data.  2) Preallocate the
+remaining blocks and stitch up the BH mapping at readpage (which is in the
+specific FS).  This way, we reserve the blocks (but don't have to actually read
+them in - we just mark the buffer as dirty).  When we grow a file, we don't need
+to worry about any of these details.  We just make sure the page map has the
+page, and not whether or not it's a half-page that needs a FS-specific solution.
+I'm going with #2 for now.  Note that while the blocks are allocated, the file's
+size is still 1024B.
+
 Kref, Dentries, Inodes, and Files (or "I don't see why it's like X, but..."
 --------------------------
 There are multiple dentries pointing to an inode.  The dentries are (or will be)

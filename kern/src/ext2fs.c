@@ -571,11 +571,6 @@ int ext2_mappage(struct page_map *pm, struct page *page)
 	unsigned int blk_per_pg = PGSIZE / inode->i_sb->s_blocksize;
 	unsigned int sct_per_blk = inode->i_sb->s_blocksize / bdev->b_sector_sz;
 	uint32_t ino_blk_num, fs_blk_num = 0, *fs_blk_slot;
-	/* Can't use i_blocks for this.  We could have a file hole, so it's not
-	 * about how many blocks there are, but about how many FS blocks there ought
-	 * to be for this object/file.  Also note that i_blocks is measured in 512B
-	 * chunks. */
-	uint32_t last_ino_blk_num = inode->i_size / inode->i_sb->s_blocksize;
 
 	bh = kmem_cache_alloc(bh_kcache, 0);
 	page->pg_private = bh;
@@ -603,14 +598,17 @@ int ext2_mappage(struct page_map *pm, struct page *page)
 			ext2_dirty_metablock(fs_blk_slot);
 			/* the block is still on disk, and we don't want its contents */
 			bh->bh_flags = BH_NEEDS_ZEROED;			/* talking to readpage */
+			/* update our num blocks, with 512B each "block" (ext2-style) */
+			inode->i_blocks += inode->i_sb->s_blocksize >> 9;
 		} else {	/* there is a block there already */
 			fs_blk_num = *fs_blk_slot;
 		}
 		ext2_put_metablock(fs_blk_slot);
 		bh->bh_sector = fs_blk_num * sct_per_blk;
 		bh->bh_nr_sector = sct_per_blk;
-		/* Stop if we're the last block in the inode or the last in the page */
-		if ((ino_blk_num == last_ino_blk_num) || (i == blk_per_pg - 1)) {
+		/* Stop if we're the last block in the page.  We could be going beyond
+		 * the end of the file, in which case the next BHs will be zeroed. */
+		if (i == blk_per_pg - 1) {
 			bh->bh_next = 0;
 			break;
 		} else {
