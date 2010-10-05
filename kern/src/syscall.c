@@ -920,10 +920,7 @@ intreg_t sys_fcntl(struct proc *p, int fd, int cmd, int arg)
 			}
 			break;
 		case (F_GETFD):
-			/* GET and SETFD just care about CLOEXEC.  We don't have a separate
-			 * flag variable for the FD (we might need to, technically). */
-			if (file->f_flags & O_CLOEXEC)
-				retval = FD_CLOEXEC;
+			retval = p->open_files.fd[fd].fd_flags;
 			break;
 		case (F_SETFD):
 			if (arg == FD_CLOEXEC)

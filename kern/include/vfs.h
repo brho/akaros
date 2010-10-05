@@ -354,16 +354,23 @@ struct small_fd_set {
     uint8_t fds_bits[BYTES_FOR_BITMASK(NR_FILE_DESC_DEFAULT)];
 };
 
+/* Describes an open file.  We need this, since the FD flags are supposed to be
+ * per file descriptor, not per file (like the file status flags). */
+struct file_desc {
+	struct file					*fd_file;
+	unsigned int				fd_flags;
+};
+
 /* All open files for a process */
 struct files_struct {
 	spinlock_t					lock;
 	int							max_files;		/* max files ptd to by fd */
 	int							max_fdset;		/* max of the current fd_set */
 	int							next_fd;		/* next number available */
-	struct file					**fd;			/* initially pts to fd_array */
+	struct file_desc			*fd;			/* initially pts to fd_array */
 	struct fd_set				*open_fds;		/* init, pts to open_fds_init */
 	struct small_fd_set			open_fds_init;
-	struct file					*fd_array[NR_OPEN_FILES_DEFAULT];
+	struct file_desc			fd_array[NR_OPEN_FILES_DEFAULT];
 };
 
 /* Process specific filesysten info */

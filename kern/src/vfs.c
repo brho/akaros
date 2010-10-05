@@ -1715,7 +1715,7 @@ struct file *get_file_from_fd(struct files_struct *open_files, int file_desc)
 			/* while max_files and max_fdset might not line up, we should never
 			 * have a valid fdset higher than files */
 			assert(file_desc < open_files->max_files);
-			retval = open_files->fd[file_desc];
+			retval = open_files->fd[file_desc].fd_file;
 			assert(retval);
 			kref_get(&retval->f_kref, 1);
 		}
@@ -1738,8 +1738,8 @@ struct file *put_file_from_fd(struct files_struct *open_files, int file_desc)
 			/* while max_files and max_fdset might not line up, we should never
 			 * have a valid fdset higher than files */
 			assert(file_desc < open_files->max_files);
-			file = open_files->fd[file_desc];
-			open_files->fd[file_desc] = 0;
+			file = open_files->fd[file_desc].fd_file;
+			open_files->fd[file_desc].fd_file = 0;
 			assert(file);
 			kref_put(&file->f_kref);
 			CLR_BITMASK_BIT(open_files->open_fds->fds_bits, file_desc);
@@ -1762,9 +1762,11 @@ int insert_file(struct files_struct *open_files, struct file *file, int low_fd)
 			continue;
 		slot = i;
 		SET_BITMASK_BIT(open_files->open_fds->fds_bits, slot);
-		assert(slot < open_files->max_files && open_files->fd[slot] == 0);
+		assert(slot < open_files->max_files &&
+		       open_files->fd[slot].fd_file == 0);
 		kref_get(&file->f_kref, 1);
-		open_files->fd[slot] = file;
+		open_files->fd[slot].fd_file = file;
+		open_files->fd[slot].fd_flags = 0;
 		if (slot >= open_files->next_fd)
 			open_files->next_fd = slot + 1;
 		break;
@@ -1786,11 +1788,11 @@ void close_all_files(struct files_struct *open_files, bool cloexec)
 			/* while max_files and max_fdset might not line up, we should never
 			 * have a valid fdset higher than files */
 			assert(i < open_files->max_files);
-			file = open_files->fd[i];
-			if (cloexec && !(file->f_flags & O_CLOEXEC))
+			file = open_files->fd[i].fd_file;
+			if (cloexec && !(open_files->fd[i].fd_flags & O_CLOEXEC))
 				continue;
 			/* Actually close the file */
-			open_files->fd[i] = 0;
+			open_files->fd[i].fd_file = 0;
 			assert(file);
 			kref_put(&file->f_kref);
 			CLR_BITMASK_BIT(open_files->open_fds->fds_bits, i);
@@ -1810,10 +1812,10 @@ void clone_files(struct files_struct *src, struct files_struct *dst)
 			/* while max_files and max_fdset might not line up, we should never
 			 * have a valid fdset higher than files */
 			assert(i < src->max_files);
-			file = src->fd[i];
-			assert(i < dst->max_files && dst->fd[i] == 0);
+			file = src->fd[i].fd_file;
+			assert(i < dst->max_files && dst->fd[i].fd_file == 0);
 			SET_BITMASK_BIT(dst->open_fds->fds_bits, i);
-			dst->fd[i] = file;
+			dst->fd[i].fd_file = file;
 			assert(file);
 			kref_get(&file->f_kref, 1);
 			if (i >= dst->next_fd)
