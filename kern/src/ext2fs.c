@@ -858,9 +858,11 @@ struct dentry *ext2_lookup(struct inode *dir, struct dentry *dentry,
 			dir_i = dir_buf;
 			assert(dir_buf);
 		}
-		/* Test if we're the one (TODO: use d_compare) */
+		/* Test if we're the one (TODO: use d_compare).  Note, dir_name is not
+		 * null terminated, hence the && test. */
 		if (!strncmp((char*)dir_i->dir_name, dentry->d_name.name,
-		             dir_i->dir_namelen)){
+		             dir_i->dir_namelen) &&
+		            (dentry->d_name.name[dir_i->dir_namelen] == '\0')) {
 			load_inode(dentry, le32_to_cpu(dir_i->dir_inode));
 			/* TODO: (HASH) add dentry to dcache (maybe the caller should) */
 			ext2_put_metablock(dir_buf);
