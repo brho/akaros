@@ -611,3 +611,25 @@ RAM, but have the BH keep track of who is holding its reference.  Then we
 could unmap the page, which would need to get read back in on its next access.
 We'd need (or ought to have) some sort of callbacks.  This will get solved
 later when we deal with unmapping mmap'd files.
+
+x.6: What about Directories?  Inodes or metadata?
+--------------------
+Directories have inodes that have blocks scattered around the disk.  The blocks
+making up the body of a directory are not sequential, like when you read blocks
+from a bdev.  If you wanted a "page" of a directory, then you'd need to use the
+i_mapping (page cache of a file) to access it, like any other file.
+
+However, we don't want a page of a directory - at least not yet.  The main
+reason we can get away with this is due to the lack of a mmap() or a desire to
+page-remap for directory-contents IO.  It's all for the kernel's internal use.
+At no point does anyone call generic_file_read() or _write() on it.
+
+That being said, we treat the blocks of a directory as metadata blocks.  We do
+figure out which blocks they are by walking the inode (also made of metadata
+blocks), but don't bother to set up a page map for the directory itself.  We
+just use the inode to figure out which metadata blocks we want, then read them
+in (out of the blockdev's page cache).
+
+Note that userspace issues reads on the directory.  This is mostly a convenience
+thing (or an inconvenience thing), which just ends up being a wrapper around
+readdir() (via generic_dir_read()).

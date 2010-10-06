@@ -93,36 +93,6 @@ void ext2_init(void)
 
 /* Block management */
 
-/* Helper op to read one ext2 block, 0-indexing the block numbers.  Kfree your
- * answer.
- *
- * TODO: consider taking a buffer_head, or having a generic block_dev function
- * for this.  Currently this is just using the BH to talk to breq, need to make
- * it use the page mapping. */
-void *__ext2_read_block(struct block_device *bdev, int block_num, int blocksize)
-{
-	int retval;
-	void *buffer = kmalloc(blocksize, 0);
-	struct block_request *breq = kmem_cache_alloc(breq_kcache, 0);
-	struct buffer_head *bh = kmem_cache_alloc(bh_kcache, 0);
-	assert(buffer && breq && bh);
-
-	/* Build the BH describing the mapping we want */
-	bh->bh_buffer = buffer; // TODO: have a real page
-	bh->bh_sector = block_num * (blocksize >> SECTOR_SZ_LOG);
-	bh->bh_nr_sector = blocksize >> SECTOR_SZ_LOG;
-	/* Build and submit the request */
-	breq->flags = BREQ_READ;
-	breq->bhs = breq->local_bhs;
-	breq->bhs[0] = bh;
-	breq->nr_bhs = 1;
-	retval = make_request(bdev, breq);
-	assert(!retval);
-	kmem_cache_free(breq_kcache, breq);
-	kmem_cache_free(bh_kcache, bh);	/* TODO: shouldn't disconnect this */
-	return buffer;
-}
-
 /* TODO: pull these metablock functions out of ext2 */
 /* Makes sure the FS block of metadata is in memory.  This returns a pointer to
  * the beginning of the requested block.  Release it with put_metablock().
@@ -166,13 +136,6 @@ void ext2_dirty_metablock(void *buffer)
 	struct page *page = kva2page(buffer);
 	/* TODO: race on flag modification, and consider dirtying the BH. */
 	page->pg_flags |= PG_DIRTY;
-}
-
-/* Reads a block of file data.  TODO: Function name and guts will change soon */
-void *ext2_read_fileblock(struct super_block *sb, unsigned int block_num)
-{
-	/* note, we might get rid of this read block, if all files use pages */
-	return __ext2_read_block(sb->s_bdev, block_num, sb->s_blocksize);
 }
 
 /* Helper for alloc_block.  It will try to alloc a block from the BG, starting
@@ -376,12 +339,12 @@ uint32_t ext2_find_inoblock(struct inode *inode, unsigned int ino_block)
 	return retval;
 }
 
-/* Returns a kmalloc'd block for the contents of the ino block.  Kept around for
- * a couple commits, will prob go away soon */
-void *ext2_read_ino_block(struct inode *inode, unsigned int ino_block)
+/* Returns an incref'd metadata block for the contents of the ino block.  Don't
+ * use this for regular files - use their inode's page cache instead. */
+void *ext2_get_ino_metablock(struct inode *inode, unsigned long ino_block)
 {
-	unsigned long blkid = ext2_find_inoblock(inode, ino_block);
-	return ext2_read_fileblock(inode->i_sb, blkid);
+	uint32_t blkid = ext2_find_inoblock(inode, ino_block);
+	return ext2_get_metablock(inode->i_sb, blkid);
 }
 
 /* This should help with degubbing.  In read_inode(), print out the i_block, and
@@ -882,15 +845,16 @@ struct dentry *ext2_lookup(struct inode *dir, struct dentry *dentry,
 	struct ext2_dirent *dir_buf, *dir_i;
 	unsigned int dir_block = 0;
 	bool found = FALSE;
-	dir_buf = ext2_read_ino_block(dir, dir_block++);
+	dir_buf = ext2_get_ino_metablock(dir, dir_block++);
 	dir_i = dir_buf;
 	/* now we have the first block worth of dirents.  We'll get another block if
 	 * dir_i hits a block boundary */
 	for (unsigned int bytes = 0; bytes < dir->i_size; ) {
-		/* On subsequent loops, we might need to advance to the next block */
+		/* On subsequent loops, we might need to advance to the next block.
+		 * This is where a file abstraction for a dir might be easier. */
 		if ((void*)dir_i >= (void*)dir_buf + dir->i_sb->s_blocksize) {
-			kfree(dir_buf);
-			dir_buf = ext2_read_ino_block(dir, dir_block++);
+			ext2_put_metablock(dir_buf);
+			dir_buf = ext2_get_ino_metablock(dir, dir_block++);
 			dir_i = dir_buf;
 			assert(dir_buf);
 		}
@@ -899,7 +863,7 @@ struct dentry *ext2_lookup(struct inode *dir, struct dentry *dentry,
 		             dir_i->dir_namelen)){
 			load_inode(dentry, le32_to_cpu(dir_i->dir_inode));
 			/* TODO: (HASH) add dentry to dcache (maybe the caller should) */
-			kfree(dir_buf);
+			ext2_put_metablock(dir_buf);
 			return dentry;
 		}
 		/* Get ready for the next loop */
@@ -907,7 +871,7 @@ struct dentry *ext2_lookup(struct inode *dir, struct dentry *dentry,
 		dir_i = (void*)dir_i + dir_i->dir_reclen;
 	}
 	printd("EXT2: Not Found, %s\n", dentry->d_name.name);	
-	kfree(dir_buf);
+	ext2_put_metablock(dir_buf);
 	return 0;
 }
 
@@ -1082,7 +1046,7 @@ off_t ext2_llseek(struct file *file, off_t offset, int whence)
  * TODO: (UMEM) */
 int ext2_readdir(struct file *dir, struct dirent *dirent)
 {
-	void *buffer;
+	void *blk_buf;
 	/* Not enough data at the end of the directory */
 	if (dir->f_dentry->d_inode->i_size <
 	    dirent->d_off + sizeof(struct ext2_dirent))
@@ -1090,11 +1054,11 @@ int ext2_readdir(struct file *dir, struct dirent *dirent)
 	
 	/* Figure out which block we need to read in for dirent->d_off */
 	int block = dirent->d_off / dir->f_dentry->d_sb->s_blocksize;
-	buffer = ext2_read_ino_block(dir->f_dentry->d_inode, block);
-	assert(buffer);
+	blk_buf = ext2_get_ino_metablock(dir->f_dentry->d_inode, block);
+	assert(blk_buf);
 	off_t f_off = dirent->d_off % dir->f_dentry->d_sb->s_blocksize;
 	/* Copy out the dirent info */
-	struct ext2_dirent *e2dir = (struct ext2_dirent*)(buffer + f_off);
+	struct ext2_dirent *e2dir = (struct ext2_dirent*)(blk_buf + f_off);
 	dirent->d_ino = le32_to_cpu(e2dir->dir_inode);
 	dirent->d_off += le16_to_cpu(e2dir->dir_reclen);
 	/* note, dir_namelen doesn't include the \0 */
@@ -1102,7 +1066,7 @@ int ext2_readdir(struct file *dir, struct dirent *dirent)
 	strncpy(dirent->d_name, (char*)e2dir->dir_name, e2dir->dir_namelen);
 	assert(e2dir->dir_namelen <= MAX_FILENAME_SZ);
 	dirent->d_name[e2dir->dir_namelen] = '\0';
-	kfree(buffer);
+	ext2_put_metablock(blk_buf);
 	
 	/* At the end of the directory, sort of.  ext2 often preallocates blocks, so
 	 * this will cause us to walk along til the end, which isn't quite right. */
