@@ -100,19 +100,7 @@ void ext2_init(void)
 void *__ext2_get_metablock(struct block_device *bdev, unsigned long blk_num,
                            unsigned int blk_sz)
 {
-	struct page *page;
-	struct page_map *pm = &bdev->b_pm;
-	unsigned int blk_per_pg = PGSIZE / blk_sz;
-	unsigned int blk_offset = (blk_num % blk_per_pg) * blk_sz;
-	int error;
-	assert(blk_offset < PGSIZE);
-	error = pm_load_page(pm, blk_num / blk_per_pg, &page); 
-	if (error) {
-		warn("Failed to read metablock! (%d)", error);
-		return 0;
-	}
-	/* return where we are within the page for the given block */
-	return page2kva(page) + blk_offset;
+	return get_buffer(bdev, blk_num, blk_sz)->bh_buffer;
 }
 
 /* Convenience wrapper */
@@ -121,21 +109,41 @@ void *ext2_get_metablock(struct super_block *sb, unsigned long block_num)
 	return __ext2_get_metablock(sb->s_bdev, block_num, sb->s_blocksize);
 }
 
-/* Decrefs the buffer from get_metablock().  Call this when you no longer
- * reference your metadata block/buffer */
-void ext2_put_metablock(void *buffer)
+/* Helper to figure out the BH for any address within it's buffer */
+static struct buffer_head *ext2_my_bh(struct super_block *sb, void *addr)
 {
-	page_decref(kva2page(buffer));
+	struct page *page = kva2page(addr);
+	struct buffer_head *bh = (struct buffer_head*)page->pg_private;
+	/* This case is for when we try do decref a non-BH'd 'metablock'.  It's tied
+	 * to e2ii->i_block[]. */
+	if (!bh)
+		return 0;
+	void *my_buf = (void*)ROUNDDOWN((uintptr_t)addr, sb->s_blocksize);
+	while (bh) {
+		if (bh->bh_buffer == my_buf)
+			break;
+		bh = bh->bh_next;
+	}
+	assert(bh && bh->bh_buffer == my_buf);
+	return bh;
 }
 
-/* Will dirty the block/BH/page for the given metadata block/buffer.  Will have
- * to be careful with the page reclaimer - if someone holds a reference, they
- * can still dirty it. */
-void ext2_dirty_metablock(void *buffer)
+/* Decrefs the buffer from get_metablock().  Call this when you no longer
+ * reference your metadata block/buffer.  Yes, we could just decref the page,
+ * but this will work if we end up changing how put_buffer() works. */
+void ext2_put_metablock(struct super_block *sb, void *buffer)
 {
-	struct page *page = kva2page(buffer);
-	/* TODO: race on flag modification, and consider dirtying the BH. */
-	page->pg_flags |= PG_DIRTY;
+	struct buffer_head *bh = ext2_my_bh(sb, buffer);
+	if (bh)
+		put_buffer(bh);
+}
+
+/* Will dirty the block/BH/page for the given metadata block/buffer. */
+void ext2_dirty_metablock(struct super_block *sb, void *buffer)
+{
+	struct buffer_head *bh = ext2_my_bh(sb, buffer);
+	if (bh)
+		dirty_buffer(bh);
 }
 
 /* Helper for alloc_block.  It will try to alloc a block from the BG, starting
@@ -159,14 +167,14 @@ static bool ext2_tryalloc(struct super_block *sb, struct ext2_block_group *bg,
 		if (!(GET_BITMASK_BIT(blk_bitmap, blk_idx))) {
 			SET_BITMASK_BIT(blk_bitmap, blk_idx);
 			bg->bg_free_blocks_cnt--;
-			ext2_dirty_metablock(blk_bitmap);
+			ext2_dirty_metablock(sb, blk_bitmap);
 			found = TRUE;
 			break;
 		}
 		/* Note: the wrap-around hasn't been tested yet */
 		blk_idx = (blk_idx + 1) % blks_per_bg;
 	}
-	ext2_put_metablock(blk_bitmap);
+	ext2_put_metablock(sb, blk_bitmap);
 	if (found)
 		*block_num = ext2_bgidx2block(sb, bg, blk_idx);
 	return found;
@@ -240,12 +248,12 @@ static void ext2_fill_inotable_slot(struct inode *inode, uint32_t *blk_slot)
 	/* Actually read in the block we alloc'd */
 	new_blk = ext2_get_metablock(inode->i_sb, new_blkid);
 	memset(new_blk, 0, inode->i_sb->s_blocksize);
-	ext2_dirty_metablock(new_blk);
+	ext2_dirty_metablock(inode->i_sb, new_blk);
 	/* We put it, despite it getting relooked up in the next walk */
-	ext2_put_metablock(new_blk);
+	ext2_put_metablock(inode->i_sb, new_blk);
 	/* Now write the new block into its slot */
 	*blk_slot = cpu_to_le32(new_blkid);
-	ext2_dirty_metablock(blk_slot);
+	ext2_dirty_metablock(inode->i_sb, blk_slot);
 }
 
 /* This walks a table stored at block 'blkid', returning which block you should
@@ -267,7 +275,7 @@ static void ext2_walk_inotable(struct inode *inode, uint32_t *blkid,
 	ext2_fill_inotable_slot(inode, blk_slot);
 	*blkid = le32_to_cpu(*blk_slot);
 	*rel_inoblk = *rel_inoblk % reach;
-	ext2_put_metablock(blk_slot);	/* the ref for the block we looked in */
+	ext2_put_metablock(inode->i_sb, blk_slot);	/* ref for the one looked in */
 }
 
 /* Finds the slot of the FS block corresponding to a specific block number of an
@@ -276,7 +284,9 @@ static void ext2_walk_inotable(struct inode *inode, uint32_t *blkid,
  * tables (1x, 2x, or 3x (triply indirect) tables).  Block numbers start at 0.
  *
  * This returns a pointer within a metablock, which needs to be decref'd (and
- * possibly dirtied) when you are done.
+ * possibly dirtied) when you are done.  Note, it can return a pointer to
+ * something that is NOT in a metablock (e2ii->i_block[]), but put_metablock can
+ * handle it for now.
  *
  * Horrendously untested, btw. */
 uint32_t *ext2_lookup_inotable_slot(struct inode *inode, uint32_t ino_block)
@@ -322,9 +332,6 @@ uint32_t *ext2_lookup_inotable_slot(struct inode *inode, uint32_t ino_block)
 	} else {
 		/* Direct block, straight out of the inode */
 		blk_slot = &e2ii->i_block[ino_block];
-		/* need to incref, since the i_block isn't a real metablock (it's just a
-		 * random page!), and the caller is going to end up decreffing it */
-		page_incref(kva2page(blk_slot));
 	}
 	return blk_slot;
 }
@@ -335,7 +342,7 @@ uint32_t ext2_find_inoblock(struct inode *inode, unsigned int ino_block)
 {
 	uint32_t retval, *buf = ext2_lookup_inotable_slot(inode, ino_block);
 	retval = *buf;
-	ext2_put_metablock(buf);
+	ext2_put_metablock(inode->i_sb, buf);
 	return retval;
 }
 
@@ -558,7 +565,7 @@ int ext2_mappage(struct page_map *pm, struct page *page)
 			fs_blk_num = ext2_alloc_block(inode, fs_blk_num + 1);
 			/* Link it, and dirty the inode indirect block */
 			*fs_blk_slot = cpu_to_le32(fs_blk_num);
-			ext2_dirty_metablock(fs_blk_slot);
+			ext2_dirty_metablock(inode->i_sb, fs_blk_slot);
 			/* the block is still on disk, and we don't want its contents */
 			bh->bh_flags = BH_NEEDS_ZEROED;			/* talking to readpage */
 			/* update our num blocks, with 512B each "block" (ext2-style) */
@@ -566,7 +573,7 @@ int ext2_mappage(struct page_map *pm, struct page *page)
 		} else {	/* there is a block there already */
 			fs_blk_num = *fs_blk_slot;
 		}
-		ext2_put_metablock(fs_blk_slot);
+		ext2_put_metablock(inode->i_sb, fs_blk_slot);
 		bh->bh_sector = fs_blk_num * sct_per_blk;
 		bh->bh_nr_sector = sct_per_blk;
 		/* Stop if we're the last block in the page.  We could be going beyond
@@ -733,7 +740,7 @@ void ext2_read_inode(struct inode *inode)
 	/* TODO: (HASH) unused: inode->i_hash add to hash (saves on disc reading) */
 	/* TODO: we could consider saving a pointer to the disk inode and pinning
 	 * its buffer in memory, but for now we'll just free it. */
-	ext2_put_metablock(ino_tbl_chunk);
+	ext2_put_metablock(inode->i_sb, ino_tbl_chunk);
 }
 
 /* called when an inode in memory is modified (journalling FS's care) */
@@ -853,7 +860,7 @@ struct dentry *ext2_lookup(struct inode *dir, struct dentry *dentry,
 		/* On subsequent loops, we might need to advance to the next block.
 		 * This is where a file abstraction for a dir might be easier. */
 		if ((void*)dir_i >= (void*)dir_buf + dir->i_sb->s_blocksize) {
-			ext2_put_metablock(dir_buf);
+			ext2_put_metablock(dir->i_sb, dir_buf);
 			dir_buf = ext2_get_ino_metablock(dir, dir_block++);
 			dir_i = dir_buf;
 			assert(dir_buf);
@@ -865,7 +872,7 @@ struct dentry *ext2_lookup(struct inode *dir, struct dentry *dentry,
 		            (dentry->d_name.name[dir_i->dir_namelen] == '\0')) {
 			load_inode(dentry, le32_to_cpu(dir_i->dir_inode));
 			/* TODO: (HASH) add dentry to dcache (maybe the caller should) */
-			ext2_put_metablock(dir_buf);
+			ext2_put_metablock(dir->i_sb, dir_buf);
 			return dentry;
 		}
 		/* Get ready for the next loop */
@@ -873,7 +880,7 @@ struct dentry *ext2_lookup(struct inode *dir, struct dentry *dentry,
 		dir_i = (void*)dir_i + dir_i->dir_reclen;
 	}
 	printd("EXT2: Not Found, %s\n", dentry->d_name.name);	
-	ext2_put_metablock(dir_buf);
+	ext2_put_metablock(dir->i_sb, dir_buf);
 	return 0;
 }
 
@@ -1068,7 +1075,7 @@ int ext2_readdir(struct file *dir, struct dirent *dirent)
 	strncpy(dirent->d_name, (char*)e2dir->dir_name, e2dir->dir_namelen);
 	assert(e2dir->dir_namelen <= MAX_FILENAME_SZ);
 	dirent->d_name[e2dir->dir_namelen] = '\0';
-	ext2_put_metablock(blk_buf);
+	ext2_put_metablock(dir->f_dentry->d_sb, blk_buf);
 	
 	/* At the end of the directory, sort of.  ext2 often preallocates blocks, so
 	 * this will cause us to walk along til the end, which isn't quite right. */

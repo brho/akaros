@@ -419,24 +419,41 @@ example, the superblock, inodes, inode indirect blocks, and to a certain
 extent the directory's contents are all metadata.  There isn't an FS file (not
 to be confused with an OS file) that corresponds to this data, but it needs to
 be read in and cached.  Furthermore, this cache needs to be managed and
-written back when dirty.
+written back when dirty.  Note that file data can be broken up into two
+different types: read()/write() data and mmap'd data.  When people talk about
+buffer caches versus page caches, they are talking about these two different
+types of file data (at least NetBSD did
+http://www.usenix.org/event/usenix2000/freenix/full_papers/silvers/silvers_html/).
 
 A very simple buffer cache would include anything *ever* read from disk.  It
 would then get copied into the page cache in PGSIZE chunks for the page cache.
-This would suck, since we now have two or three copies.
+This would suck, since we now have two or three copies.  We obviously want to
+use the page cache for both mmap() and read/write().  It's not clear about the
+metadata.
 
-Another buffer cache would be to cache only the disk blocks needed for
-metadata.  I think this is what Linux did before it unified its buffer and
+Another usage of a buffer cache would be to cache only the disk blocks needed
+for metadata.  I think this is what Linux did before it unified its buffer and
 page caches (implied in UTLK).  The main issue with this is that you have two
 different systems for managing essentially similar data - we only want to deal
 with flushing, syncing, and writebacks of one subsystem, not in multiple
-different systems.
+different subsystems.
 
-The solution is to use the page cache to cache the metadata block operations.
-We do this by having the block device be mapped in PGSIZE chunks through its
-own struct page_mapping (a.k.a. struct address_space in Linux).  This way,
-both files and the block device are mapped in PGSIZE chunks via the same
-page_mapping structure, and will be managed by the same code.
+The solution is to use the page cache to cache the metadata blocks' buffers.
+We do this by having the block device be 'mapped' (but not read) in PGSIZE
+chunks through its own struct page_mapping (a.k.a. struct address_space in
+Linux).  This way, both files and the block device are mapped in PGSIZE chunks
+via the same page_mapping structure, and will be managed by the same code.
+
+Sort of.  We don't actually read in PGSIZE chunks for the block buffer cache.
+If blocks will be in the bdev's cache, then they will be adjacent and on the
+same page.  It is possible some adjacent blocks (which would be on the same
+page) are not both metadata.
+
+A more accurate way to describe what we do is that metadata blocks are copied
+into a 'buffer cache' that is mapped and managed similarly to the page cache.
+Pages are made of buffer heads, which hold data, and the reclaiming of pages of
+memory from either the page cache or the buffer cache will use the same code -
+since they are both just made of buffer pages.
 
 X.2: Mapping Blockdev Data vs File Data
 --------------------
@@ -500,19 +517,25 @@ tradeoff is against having multiple BHs, which would mean multiple block IO
 requests for writing a single page (and writing the whole page may be a common
 operation).
 
-X.3: What about opening a blockdev?
+X.3: What about opening a blockdev as a file?
 --------------------
-All of this means we are using the page cache to cache metadata blocks from
-the block device.  But what about the other blocks?  Those are "file" blocks,
-which are in the page mapping of the inode.  But what about when the block
-device is opened as if it was a file?  And then if we were to access the file
-blocks in this manner?  Yeah, that would screw things up - you will get
-inconsistencies, under the current plan.  There is one easy way to avoid this:
-don't open a bdev file if a file system is mounted on top of it.  If you do,
-don't be surprised about inconsistencies.  Ideally, the FS will never leave
-the actual disk in an inconsistent state, but the bdev's page cache could read
-things at different times and get some weird results.  Just don't do this (for
-now - not like I plan to make this possible any time soon).
+Basically, don't do it for now.  The way we actually do things is a buffer cache
+page is "up to date", but has no BHs or data until a specific block is
+requested.  This is because we don't always know if all the blocks mapped by a
+page are actually metadata blocks.  If they aren't we'll have issues where we
+read in extra blocks that exist in both a file's page cache and the block
+device's buffer cache.
+
+A safe invariant is that a given block will only ever be in one cache: either a
+file's page mapping or the buffer cache's page mapping.  When these blocks are
+freed, we'll need to rip them out of their mapping (and possibly flush them).
+
+There is one easy way to avoid this: don't open a bdev file if a file system is
+mounted on top of it.  If you do, don't be surprised about inconsistencies.
+Ideally, the FS will never leave the actual disk in an inconsistent state, but
+the bdev's page cache could read things at different times and get some weird
+results.  Just don't do this (for now - not like I plan to make this possible
+any time soon).
 
 Could we use the same buffers for both the blockdev-file page mapping and the
 inode-file page mapping?  No - because the inode-file has the inode
@@ -559,6 +582,8 @@ read).  The reason we wouldn't want to pin them is to save memory.
 
 x.5: Reference Counting BHs and Pages
 --------------------
+TODO: this will change, since we are likely to need to refcnt actual BHs.
+
 So we talk about passing around BHs, both when submitting IO ops and when
 returning from things like read_block() (note: this may return pages, not
 BHs).  However, we do not kref or reference count BHs in any way.  Instead, we

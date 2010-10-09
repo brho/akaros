@@ -256,7 +256,9 @@ struct ext2_sb_info {
 	unsigned int				nr_bgs;
 };
 
-/* Inode in-memory data.  This stuff is in cpu-native endianness */
+/* Inode in-memory data.  This stuff is in cpu-native endianness.  If we start
+ * using the data in the actual inode and in the buffer cache, change
+ * ext2_my_bh() and its two callers.  Assume this data is dirty. */
 struct ext2_i_info {
 	uint32_t					i_block[15];		/* list of blocks reserved*/
 };

@@ -108,75 +108,125 @@ int make_request(struct block_device *bdev, struct block_request *req)
 	return 0;
 }
 
-/* Sets up the bidirectional mapping between the page and its buffer heads.
- * Note that for a block device, this is 1:1.  We have the helper in the off
- * chance we want to decouple the mapping from readpage (which we may want to
- * do for writepage, esp on FSs), and to keep readpage simple. */
-static int block_mappage(struct block_device *bdev, struct page *page)
+/* This just tells the page cache that it is 'up to date'.  Due to the nature of
+ * the blocks in the page cache, we don't actually read the items in on
+ * readpage, we read them in when a specific block is there */
+int block_readpage(struct page_map *pm, struct page *page)
 {
-	struct buffer_head *bh;
-	assert(!page->pg_private);		/* double check that we aren't bh-mapped */
-	bh = kmem_cache_alloc(bh_kcache, 0);
-	if (!bh)
-		return -ENOMEM;
-	/* Set up the BH.  bdevs do a 1:1 BH to page mapping */
-	bh->bh_page = page;								/* weak ref */
-	bh->bh_buffer = page2kva(page);
-	bh->bh_flags = 0;								/* whatever... */
-	bh->bh_next = 0;								/* only one BH needed */
-	bh->bh_bdev = bdev;								/* uncounted ref */
-	bh->bh_sector = page->pg_index * PGSIZE / bdev->b_sector_sz;
-	bh->bh_nr_sector = PGSIZE / bdev->b_sector_sz;
-	page->pg_private = bh;
+	page->pg_flags |= PG_UPTODATE;
+	unlock_page(page);
 	return 0;
 }
 
-/* Fills page with the appropriate data from the block device.  There is only
- * one BH, since bdev pages must be made of contiguous blocks.  Ideally, this
- * will work for a bdev file that reads the pm via generic_file_read(), though
- * that is a ways away still.  Techincally, you could get an ENOMEM for breq and
- * have this called again with a BH already set up, but I want to see it (hence
- * the assert). */
-int block_readpage(struct page_map *pm, struct page *page)
+/* Returns a BH pointing to the buffer where blk_num from bdev is located (given
+ * blocks of size blk_sz).  This uses the page cache for the page allocations
+ * and evictions, but only caches blocks that are requested.  Check the docs for
+ * more info.  The BH isn't refcounted, but a page refcnt is returned.  Call
+ * put_block (nand/xor dirty block).
+ *
+ * Note we're using the lock_page() to sync (which is what we do with the page
+ * cache too.  It's not ideal, but keeps things simpler for now.
+ *
+ * Also note we're a little inconsistent with the use of sector sizes in certain
+ * files.  We'll sort it eventually. */
+struct buffer_head *get_buffer(struct block_device *bdev, unsigned long blk_num,
+                               unsigned int blk_sz)
 {
-	int retval;
-	unsigned long first_byte = page->pg_index * PGSIZE;
-	struct block_device *bdev = pm->pm_bdev;
+	struct page *page;
+	struct page_map *pm = &bdev->b_pm;
+	struct buffer_head *bh, *new, *prev, **next_loc;
 	struct block_request *breq;
-
-	assert(pm == page->pg_mapping);		/* Should be part of a page map */
-	assert(page->pg_flags & PG_BUFFER);	/* Should be part of a page map */
-	assert(!page->pg_private);			/* Should be no BH for this page yet */
-	/* Don't read beyond the device.  There might be an issue when using
-	 * generic_file_read() with this readpage(). */
-	if (first_byte + PGSIZE > bdev->b_nr_sector * bdev->b_sector_sz) {
-		unlock_page(page);
-		return -EFBIG;
+	int error;
+	unsigned int blk_per_pg = PGSIZE / blk_sz;
+	unsigned int sct_per_blk = blk_sz / bdev->b_sector_sz;
+	unsigned int blk_offset = (blk_num % blk_per_pg) * blk_sz;
+	assert(blk_offset < PGSIZE);
+	void *my_buf;
+	/* Make sure there's a page in the page cache.  Should always be one. */
+	error = pm_load_page(pm, blk_num / blk_per_pg, &page); 
+	if (error)
+		panic("Failed to load page! (%d)", error);
+	my_buf = page2kva(page) + blk_offset;
+	assert(page->pg_flags & PG_BUFFER);		/* Should be part of a page map */
+retry:
+	bh = (struct buffer_head*)page->pg_private;
+	prev = 0;
+	/* look through all the BHs for ours, stopping if we go too far. */
+	while (bh) {
+		if (bh->bh_buffer == my_buf) {
+			goto found;
+		} else if (bh->bh_buffer > my_buf) {
+			break;
+		}
+		prev = bh;
+		bh = bh->bh_next;
 	}
-	retval = block_mappage(bdev, page);
-	if (retval) {
-		unlock_page(page);
-		return retval;
+	/* At this point, bh points to the one beyond our space (or 0), and prev is
+	 * either the one before us or 0.  We make a BH, and try to insert */
+	new = kmem_cache_alloc(bh_kcache, 0);
+	assert(new);
+	new->bh_page = page;					/* weak ref */
+	new->bh_buffer = my_buf;
+	new->bh_flags = 0;
+	new->bh_next = bh;
+	new->bh_bdev = bdev;					/* uncounted ref */
+	new->bh_sector = blk_num * sct_per_blk;
+	new->bh_nr_sector = sct_per_blk;
+	/* Try to insert the new one in place.  If it fails, retry the whole "find
+	 * the bh" process.  This should be rare, so no sense optimizing it. */
+	next_loc = prev ? &prev->bh_next : (struct buffer_head**)&page->pg_private;
+	if (!atomic_comp_swap((uint32_t*)next_loc, (uint32_t)bh, (uint32_t)new)) {
+		kmem_cache_free(bh_kcache, new);
+		goto retry;
 	}
-	/* Build and submit the request */
+	bh = new;
+found:
+	/* At this point, we have the BH for our buf, but it might not be up to
+	 * date, and there might be someone else trying to update it. */
+	/* is it already here and up to date?  if so, we're done */
+	if (bh->bh_flags & BH_UPTODATE)
+		return bh;
+	/* if not, try to lock the page (could BLOCK).  Using this for syncing. */
+	lock_page(page);
+	/* double check, are we up to date?  if so, we're done */
+	if (bh->bh_flags & BH_UPTODATE) {
+		unlock_page(page);
+		return bh;
+	}
+	/* if we're here, the page is locked by us, we need to read the block */
 	breq = kmem_cache_alloc(breq_kcache, 0);
-	if (!breq) {
-		unlock_page(page);
-		return -ENOMEM;
-	}
+	assert(breq);
 	breq->flags = BREQ_READ;
 	breq->bhs = breq->local_bhs;
-	/* There's only one BH for a bdev page */
-	breq->bhs[0] = (struct buffer_head*)page->pg_private;
+	breq->bhs[0] = bh;
 	breq->nr_bhs = 1;
-	retval = make_request(bdev, breq);
+	error = make_request(bdev, breq);
 	/* TODO: (BLK) this assumes we slept til the request was done */
-	assert(!retval);
-	/* after the data is read, we mark it up to date and unlock the page. */
-	page->pg_flags |= PG_UPTODATE;
-	unlock_page(page);
+	assert(!error);
 	kmem_cache_free(breq_kcache, breq);
-	return 0;
+	/* after the data is read, we mark it up to date and unlock the page. */
+	bh->bh_flags |= BH_UPTODATE;
+	unlock_page(page);
+	return bh;
+}
+
+/* Will dirty the block/BH/page for the given block/buffer.  Will have to be
+ * careful with the page reclaimer - if someone holds a reference, they can
+ * still dirty it. */
+void dirty_buffer(struct buffer_head *bh)
+{
+	struct page *page = bh->bh_page;
+	/* TODO: race on flag modification */
+	bh->bh_flags |= BH_DIRTY;
+	page->pg_flags |= PG_DIRTY;
+}
+
+/* Decrefs the buffer from get_buffer().  Call this when you no longer reference
+ * your block/buffer.  For now, we do refcnting on the page, since the
+ * reclaiming will be in page sized chunks from the page cache. */
+void put_buffer(struct buffer_head *bh)
+{
+	page_decref(bh->bh_page);
 }
 
 /* Block device page map ops: */
