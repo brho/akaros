@@ -582,12 +582,15 @@ read).  The reason we wouldn't want to pin them is to save memory.
 
 x.5: Reference Counting BHs and Pages
 --------------------
-TODO: this will change, since we are likely to need to refcnt actual BHs.
+There are a lot of complications with this, and if there is a good reason,
+we'll change this later.
 
+x.5.1: Basics
+-----------
 So we talk about passing around BHs, both when submitting IO ops and when
-returning from things like read_block() (note: this may return pages, not
-BHs).  However, we do not kref or reference count BHs in any way.  Instead, we
-kref pages.  We do this (for now) for a couple reasons:
+returning from things like get_buffer().  However, currently, we do not kref
+or reference count BHs in any way.  Instead, we kref pages.  We do this (for
+now) for a couple reasons:
 1) Pages are the unit of memory management in the kernel.  Higher levels of
 the kernel will pin/incref the page (such as in an mmap()).
 2) BHs hang off of a page, but exist only to be expressive about the
@@ -595,8 +598,11 @@ management of the buffers on the page.  It's not like how a file hangs off a
 dentry, where the dentry doesn't know (or care) about the file.
 3) We already refcount pages.  While we could do the same for the BHs, it is a
 bit redundant.  Any place that would be kreffing the BH can just kref the
-whole page.
+whole page.  Code that receives a BH as a return value is actually getting a
+page under the covers (though should use put_buffer() to drop its reference).
 
+x.5.2: How we refcnt pages in a page mapping
+-----------
 When a page is in the page cache, we give it one kref.  Whenever a function or
 subsystem is using one of these pages (IO, using the data, etc), there needs
 to be a kref.  When it is time to remove the page from the page mapping, the
@@ -610,6 +616,8 @@ should use those policies (when possible); the kreffing is simply to avoid
 issues from race conditions.  (A reader starts using a page right before it is
 ripped from the mapping).
 
+x.5.3: More issues with Evictions
+-----------
 One issue with this is that dirty pages/buffers will need to be written back.
 If someone tries to read while the page is removed from the page_mapping, but
 before it is written back, they could get an old version if the read happens
@@ -617,7 +625,11 @@ before the write.  This is only an issue if the page is dirty.  One option
 would be to writeback the page/buffer, then later remove it from the page
 cache when it is read.  There's issues with concurrent writers, though if that
 happens, we probably don't really want to remove it (it was LRU).  Note this
-is an issue regardless of whether or not BHs are refcounted.
+is an issue regardless of whether or not BHs are refcounted.  Also, this is
+not an issue for when we kick a dentry/inode out of the cache - there should
+be no one else trying to use it (since their refcnt was 0).  This is just a
+concern when the system runs low on memory and wants to reclaim potentially
+memory held by caches.
 
 Also note that writeback of pages will happen regardless of eviction plans
 (fsync, every n sec, etc).
@@ -628,14 +640,74 @@ is that future requests will get the same object (the page), unlike in the FS,
 where you get ENOENT.  The page mapping is a cache, and you need to get the
 same old data that was in there before the eviction.
 
-A final issue is when the VFS aggressively pins blockdev (metadata)
-pages/buffers.  Ideally, we'd like to be able to expel pages/buffers even if
-they are refcnt'd.  The subsystems will always want to keep stuff in RAM.
-This also/especially applies to mmap().  One solution would be to keep them in
-RAM, but have the BH keep track of who is holding its reference.  Then we
-could unmap the page, which would need to get read back in on its next access.
-We'd need (or ought to have) some sort of callbacks.  This will get solved
-later when we deal with unmapping mmap'd files.
+A final issue is when the VFS aggressively pins blockdev (metadata) buffers.
+Ideally, we'd like to be able to expel pages/buffers even if they are
+refcnt'd.  The subsystems will always want to keep stuff in RAM.  This
+also/especially applies to mmap().  One solution would be to keep them in RAM,
+but have the BH keep track of who is holding its reference.  Then we could
+unmap the page, which would need to get read back in on its next access.  We'd
+need (or ought to have) some sort of callbacks.  This will get solved later
+when we deal with unmapping mmap'd files, since it is the same problem - just
+with different code and actors.
+
+x.5.4: What about buffers inside pages?
+-----------
+For a while, I thought about refcounting BHs/buffers.  The issue that drives
+it is the buffer cache (block dev page mapping holding metadata blocks of a
+FS).  We had been operating on the cache in page-sized chunks, which
+erroneously was reading in blocks adjacent to metadata blocks.  This would
+have been an issue when we write back pages that have dirty blocks; blocks
+were erroneously in the metadata cache and would overwrite potentially
+file-realted blocks that were in an incoherent cache (the file/inode's page
+mapping).
+
+We broke the bdev's buffer cache up into smaller BHs, so that only metadata
+blocks get read in, but we eventually will have to get rid of a metadata block
+(and not the entire page from the cache) (ex: an inode is removed from the
+disk - its indirect blocks need to go, and they could be next to anything on
+disk).  The desire for the BH refcnt came from wanting to rip the BHs out of
+the list when it was time to evict them from the cache (in case they became
+file blocks later).  It isn't clear what the best way to do this is.  Probably
+we'd have all users refcnt the BHs, which refcnt the pages.  However, some
+users (like mmap and the file page cache) operate in page chunks - so this
+would require them to incref and decref the BHs.  Triggering the page reclaim
+might also be tricky.  One option would be to just rip a page from the cache,
+callback to whoever has it loaded so they fault it back in later, and
+sleep-block everyone who interferes with the operation.  Yikes.
+
+Another option was to forget about the BH <-> page crap for the buffer cache,
+and just have a standalone buffer cache with BHs as its unit of operation
+(instead of a page), and replicate the algorithms/code for the buffer cache.
+There is still a notion of BHs in a page, and page_release() / page_free()
+would probably have to be a little different since its page isn't really a
+PG_BUFFER (but it really is).
+
+Instead, here's what we do: we refcnt at page granularity, since all users can
+be considered users of a page.  While it's not fine-grained, it does represent
+the idea that someone doesn't want the page to be freed.  It's similar to
+having a dentry be the refcnt source when someone really wants the inode/file.
+When we want to remove a page from the block buffer cache, all we do is mark
+it as not dirty and not up-to-date.  Now, whenever the page gets evicted from
+the cache, we only write back those block buffers that are dirty, so the
+recently evicted block will not be written back.  If we attempt to read the
+block in the future (perhaps it is reallocated as a metablock), then the BH is
+still there for the mapping, but is simply not up to date.  The code already
+knows how to handle this (since it could happen during a race condition), and
+it will simply read the buffer back in.  This new reading is necessary, since
+it is possible that the block was used for file IO in between the uses of it
+as a metablock.
+
+If there are more than one thread operating on a block buffer in the page
+cache, then at the level of the cache, there is a race.  One could be marking
+it as not dirty while another is dirtying it, etc.  However, no one should be
+removing a buffer (aka, deallocating a block) while it is in use.  This sort
+of concurrency problem should be sorted higher in the software stack (like at
+the inode).
+
+On a similar note, no one should ever remove a block's buffer from the
+metadata buffer cache if it is dirty.  When those removals happen, it means
+the block should be dealloced on the block device - meaning no one cares what
+happens to it.  It's not meant to have data preserved.
 
 x.6: What about Directories?  Inodes or metadata?
 --------------------
