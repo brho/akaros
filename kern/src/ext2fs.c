@@ -347,11 +347,31 @@ uint32_t ext2_find_inoblock(struct inode *inode, unsigned int ino_block)
 }
 
 /* Returns an incref'd metadata block for the contents of the ino block.  Don't
- * use this for regular files - use their inode's page cache instead. */
+ * use this for regular files - use their inode's page cache instead (used for
+ * directories for now).  If there isn't a block allocated yet, it will provide
+ * a zeroed one. */
 void *ext2_get_ino_metablock(struct inode *inode, unsigned long ino_block)
 {
-	uint32_t blkid = ext2_find_inoblock(inode, ino_block);
-	return ext2_get_metablock(inode->i_sb, blkid);
+	uint32_t blkid, *retval, *blk_slot;
+	blk_slot = ext2_lookup_inotable_slot(inode, ino_block);
+	blkid = le32_to_cpu(*blk_slot);
+	if (blkid) {
+		ext2_put_metablock(inode->i_sb, blk_slot);
+		return ext2_get_metablock(inode->i_sb, blkid);
+	}
+	/* If there isn't a block there, alloc and insert one.  This block will be
+	 * the next big chunk of "file" data for this inode. */
+	blkid = ext2_alloc_block(inode, ext2_bgidx2block(inode->i_sb,
+	                                                 ext2_inode2bg(inode),
+	                                                 0));
+	*blk_slot = cpu_to_le32(blkid);
+	ext2_dirty_metablock(inode->i_sb, blk_slot);
+	ext2_put_metablock(inode->i_sb, blk_slot);
+	inode->i_blocks += inode->i_sb->s_blocksize >> 9;	/* inc by 1 FS block */
+	inode->i_size += inode->i_sb->s_blocksize;
+	retval = ext2_get_metablock(inode->i_sb, blkid);
+	memset(retval, 0, inode->i_sb->s_blocksize);		/* 0 the new block */
+	return retval;
 }
 
 /* This should help with degubbing.  In read_inode(), print out the i_block, and
@@ -359,9 +379,9 @@ void *ext2_get_ino_metablock(struct inode *inode, unsigned long ino_block)
  * the 2x and 3x walks are jacked up. */
 void ext2_print_ino_blocks(struct inode *inode)
 {
-	printk("Inode %08p, Size: %d, 512B 'blocks;: %d\n-------------\n", inode,
+	printk("Inode %08p, Size: %d, 512B 'blocks': %d\n-------------\n", inode,
 	       inode->i_size, inode->i_blocks);
-	for (int i = 0; i < inode->i_blocks; i++)
+	for (int i = 0; i < inode->i_blocks * (inode->i_sb->s_blocksize / 512); i++)
 		printk("# %03d, Block %03d\n", i, ext2_find_inoblock(inode, i));
 }
 
