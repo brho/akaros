@@ -46,6 +46,17 @@ static unsigned int ext2_inode2bgidx(struct inode *inode)
 	return (inode->i_ino - 1) % le32_to_cpu(e2sbi->e2sb->s_inodes_per_group);
 }
 
+/* Returns the inode number given a 0-index of an inode within a block group */
+static unsigned long ext2_bgidx2ino(struct super_block *sb,
+                                    struct ext2_block_group *bg,
+                                    unsigned int ino_idx)
+{
+	struct ext2_sb_info *e2sbi = (struct ext2_sb_info*)sb->s_fs_info;
+	struct ext2_sb *e2sb = e2sbi->e2sb;
+	struct ext2_block_group *e2bg = e2sbi->e2bg;
+	return (bg - e2bg) * le32_to_cpu(e2sb->s_inodes_per_group) + ino_idx + 1;
+}
+
 /* Returns an uncounted reference to the BG in the BG table, which is pinned,
  * hanging off the sb.  Note, the BGs cover the blocks starting from the first
  * data block, not from 0.  So if the FDB is 1, BG 0 covers 1 through 1024, and
@@ -189,7 +200,6 @@ uint32_t ext2_alloc_block(struct inode *inode, uint32_t fetish)
 	struct ext2_sb_info *e2sbi = (struct ext2_sb_info*)inode->i_sb->s_fs_info;
 	struct ext2_block_group *fetish_bg, *bg_i = e2sbi->e2bg;
 	unsigned int blk_idx;
-	uint8_t *blk_bitmap;
 	bool found = FALSE;
 	uint32_t retval = 0;
 
@@ -216,7 +226,80 @@ uint32_t ext2_alloc_block(struct inode *inode, uint32_t fetish)
 	return retval;
 }
 
-/* Inode Table Management */
+/* Inode Management */
+
+/* Helper for alloc_diskinode.  It will try to alloc a disk inode from the BG.
+ * If successful, it will return the inode number in *ino_num.  TODO:
+ * concurrency protection */
+static bool ext2_tryalloc_diskinode(struct super_block *sb,
+                                    struct ext2_block_group *bg,
+                                    unsigned long *ino_num)
+{
+	uint8_t *ino_bitmap;
+	struct ext2_sb_info *e2sbi = (struct ext2_sb_info*)sb->s_fs_info;
+	unsigned int i, ino_per_bg = le32_to_cpu(e2sbi->e2sb->s_inodes_per_group);
+	bool found = FALSE;
+
+	/* Check to see if there are any free inodes */
+	if (!le32_to_cpu(bg->bg_free_inodes_cnt))
+		return FALSE;
+	/* Check the bitmap for the free inode */
+	ino_bitmap = ext2_get_metablock(sb, bg->bg_inode_bitmap);
+	for (i = 0; i < ino_per_bg; i++) {
+		if (!(GET_BITMASK_BIT(ino_bitmap, i))) {
+			SET_BITMASK_BIT(ino_bitmap, i);
+			bg->bg_free_inodes_cnt--;
+			ext2_dirty_metablock(sb, ino_bitmap);
+			found = TRUE;
+			break;
+		}
+	}
+	ext2_put_metablock(sb, ino_bitmap);
+	/* Convert the i (a 0-index bit)  within the BG to a real inode number. */
+	if (found)
+		*ino_num = ext2_bgidx2ino(sb, bg, i);
+	return found;
+}
+
+/* This allocates a fresh ino number for inode, given the parent's BG.  Make
+ * sure you set the inode's type before calling this, since it matters if we a
+ * making a directory or not.  This disk inode is reserved on disk in the bitmap
+ * (at least the bitmap is changed and dirtied).  Note the lack of concurrency
+ * protections here.  Consider returning the BG too. */
+unsigned long ext2_alloc_diskinode(struct inode *inode,
+                                   struct ext2_block_group *dir_bg)
+{
+	struct ext2_sb_info *e2sbi = (struct ext2_sb_info*)inode->i_sb->s_fs_info;
+	struct ext2_block_group *bg = dir_bg;
+	struct ext2_block_group *bg_i = e2sbi->e2bg;
+	bool found = FALSE;
+	unsigned long retval = 0;
+
+	if (S_ISDIR(inode->i_mode)) {
+		/* TODO: intelligently pick a different bg to use than the current one.
+		 * Right now, we just jump to the next one, though you should do things
+		 * like take into account the ratio of directories to files. */
+		bg += 1;
+	}
+	/* Try to find a free inode in the chosen BG */
+	found = ext2_tryalloc_diskinode(inode->i_sb, bg, &retval);
+	if (found)
+		return retval;
+
+	warn("This part hasn't been tested yet.");
+	/* Find an inode anywhere else (perhaps using the log trick, but for now just
+	 * linearly scanning). */
+	for (int i = 0; i < e2sbi->nr_bgs; i++, bg_i++) {
+		if (bg_i == bg)
+			continue;
+		found = ext2_tryalloc_diskinode(inode->i_sb, bg_i, &retval);
+		if (found)
+			break;
+	}
+	if (!found)
+		panic("Ran out of inodes! (probably a bug)");
+	return retval;
+}
 
 /* Helper for ino table management.  blkid is the inode table block we are
  * looking in, rel_blkid is the block we want, relative to the current
@@ -699,25 +782,34 @@ void ext2_dealloc_inode(struct inode *inode)
 	kmem_cache_free(ext2_i_kcache, inode->i_fs_info);
 }
 
+/* Returns a pointer within a metablock for the disk inode specified by inode.
+ * Be sure to 'put' your reference (and/or dirty it). */
+struct ext2_inode *ext2_get_diskinode(struct inode *inode)
+{
+	uint32_t my_bg_idx, ino_per_blk, my_ino_blk;
+	struct ext2_sb_info *e2sbi = (struct ext2_sb_info*)inode->i_sb->s_fs_info;
+	struct ext2_block_group *my_bg;
+	struct ext2_inode *ino_tbl_chunk;
+
+	assert(inode->i_ino);					/* ino == 0 is a bug */
+	/* Need to compute the blockgroup and index of the requested inode */
+	ino_per_blk = inode->i_sb->s_blocksize /
+	              le16_to_cpu(e2sbi->e2sb->s_inode_size);
+	my_bg_idx = ext2_inode2bgidx(inode);
+	my_bg = ext2_inode2bg(inode);
+	/* Figure out which FS block of the inode table we want and read in that
+	 * chunk */
+	my_ino_blk = le32_to_cpu(my_bg->bg_inode_table) + my_bg_idx / ino_per_blk;
+	ino_tbl_chunk = ext2_get_metablock(inode->i_sb, my_ino_blk);
+	return &ino_tbl_chunk[my_bg_idx % ino_per_blk];
+}
+
 /* reads the inode data on disk specified by inode->i_ino into the inode.
  * basically, it's a "make this inode the one for i_ino (i number)" */
 void ext2_read_inode(struct inode *inode)
 {
-	unsigned int bg_idx, ino_per_blk, my_ino_blk;
-	struct ext2_sb_info *e2sbi = (struct ext2_sb_info*)inode->i_sb->s_fs_info;
-	struct ext2_block_group *my_bg;
-	struct ext2_inode *ino_tbl_chunk, *my_ino;
-
-	/* Need to compute the blockgroup and index of the requested inode */
-	ino_per_blk = inode->i_sb->s_blocksize /
-	              le16_to_cpu(e2sbi->e2sb->s_inode_size);
-	bg_idx = ext2_inode2bgidx(inode);
-	my_bg = ext2_inode2bg(inode);
-	/* Figure out which FS block of the inode table we want and read in that
-	 * chunk */
-	my_ino_blk = le32_to_cpu(my_bg->bg_inode_table) + bg_idx / ino_per_blk;
-	ino_tbl_chunk = ext2_get_metablock(inode->i_sb, my_ino_blk);
-	my_ino = &ino_tbl_chunk[bg_idx % ino_per_blk];
+	struct ext2_inode *my_ino;
+	my_ino = ext2_get_diskinode(inode);
 
 	/* Have the disk inode now, let's put its info into the VFS inode: */
 	inode->i_mode = le16_to_cpu(my_ino->i_mode);
@@ -760,7 +852,7 @@ void ext2_read_inode(struct inode *inode)
 	/* TODO: (HASH) unused: inode->i_hash add to hash (saves on disc reading) */
 	/* TODO: we could consider saving a pointer to the disk inode and pinning
 	 * its buffer in memory, but for now we'll just free it. */
-	ext2_put_metablock(inode->i_sb, ino_tbl_chunk);
+	ext2_put_metablock(inode->i_sb, my_ino);
 }
 
 /* called when an inode in memory is modified (journalling FS's care) */
@@ -841,21 +933,219 @@ static void ext2_init_inode(struct inode *dir, struct dentry *dentry)
 #endif
 }
 
+/* Initializes a new/empty disk inode, according to inode.  If you end up not
+ * zeroing this stuff, be careful of endianness. */
+static void ext2_init_diskinode(struct ext2_inode *e2i, struct inode *inode)
+{
+	assert(inode->i_size == 0);
+	e2i->i_mode = cpu_to_le16(inode->i_mode);
+	e2i->i_uid = cpu_to_le16(inode->i_uid);
+	e2i->i_size = 0;
+	e2i->i_atime = cpu_to_le32(inode->i_atime.tv_sec);
+	e2i->i_ctime = cpu_to_le32(inode->i_ctime.tv_sec);
+	e2i->i_mtime = cpu_to_le32(inode->i_mtime.tv_sec);
+	e2i->i_dtime = 0;
+	e2i->i_gid = cpu_to_le16(inode->i_gid);
+	e2i->i_links_cnt = cpu_to_le16(inode->i_nlink);
+	e2i->i_blocks = 0;
+	e2i->i_flags = cpu_to_le32(inode->i_flags);
+	e2i->i_osd1 = 0;
+	e2i->i_generation = 0;
+	e2i->i_file_acl = 0;
+	e2i->i_dir_acl = 0;
+	e2i->i_faddr = 0;
+	for (int i = 0; i < 15; i++)
+		e2i->i_block[i] = 0;
+	for (int i = 0; i < 12; i++)
+		e2i->i_osd2[i] = 0;
+}
+
+/* These should return true if foreach_dirent should stop working on the
+ * dirents. */
+typedef bool (*each_func_t) (struct ext2_dirent *dir_i, void *a1, void *a2,
+                             void *a3);
+
+/* Loads the buffer and performs my_work on each dirent, stopping and returning
+ * 0 if one of the calls succeeded, or returning the dir block num of what would
+ * be the next dir block otherwise (aka, how many blocks we went through). */
+static uint32_t ext2_foreach_dirent(struct inode *dir, each_func_t my_work,
+                                    void *a1, void *a2, void *a3)
+{
+	struct ext2_dirent *dir_buf, *dir_i;
+	uint32_t dir_block = 0;
+	dir_buf = ext2_get_ino_metablock(dir, dir_block++);
+	dir_i = dir_buf;
+	/* now we have the first block worth of dirents.  We'll get another block if
+	 * dir_i hits a block boundary */
+	for (unsigned int bytes = 0; bytes < dir->i_size; ) {
+		/* On subsequent loops, we might need to advance to the next block.
+		 * This is where a file abstraction for a dir might be easier. */
+		if ((void*)dir_i >= (void*)dir_buf + dir->i_sb->s_blocksize) {
+			ext2_put_metablock(dir->i_sb, dir_buf);
+			dir_buf = ext2_get_ino_metablock(dir, dir_block++);
+			dir_i = dir_buf;
+			assert(dir_buf);
+		}
+		if (my_work(dir_i, a1, a2, a3)) {
+			ext2_put_metablock(dir->i_sb, dir_buf);
+			return 0;
+		}
+		/* Get ready for the next loop */
+		bytes += dir_i->dir_reclen;
+		dir_i = (void*)dir_i + dir_i->dir_reclen;
+	}
+	ext2_put_metablock(dir->i_sb, dir_buf);
+	return dir_block;
+}
+
+/* Returns the actual length of a dirent, not just how far to the next entry.
+ * If there is no inode, the entry is unused, and it has no length (as far as
+ * users of this should care). */
+static unsigned int ext2_dirent_len(struct ext2_dirent *e2dir)
+{
+	/* arguably, we don't need the le32_to_cpu */
+	if (le32_to_cpu(e2dir->dir_inode))
+		return ROUNDUP(e2dir->dir_namelen + 8, 4);		/* no such le8_to_cpu */
+	else
+		return 0;
+}
+
+/* Helper for writing the contents of a dentry to a disk dirent */
+static void ext2_write_dirent(struct ext2_dirent *e2dir, struct dentry *dentry,
+                              unsigned int rec_len)
+{
+	e2dir->dir_inode = cpu_to_le32(dentry->d_inode->i_ino);
+	e2dir->dir_reclen = cpu_to_le16(rec_len);
+	e2dir->dir_namelen = dentry->d_name.len;
+	switch (dentry->d_inode->i_mode & __S_IFMT) {
+		case (__S_IFDIR):
+			e2dir->dir_filetype = EXT2_FT_DIR;
+			break;
+		case (__S_IFREG):
+			e2dir->dir_filetype = EXT2_FT_REG_FILE;
+			break;
+		case (__S_IFLNK):
+			e2dir->dir_filetype = EXT2_FT_SYMLINK;
+			break;
+		case (__S_IFCHR):
+			e2dir->dir_filetype = EXT2_FT_CHRDEV;
+			break;
+		case (__S_IFBLK):
+			e2dir->dir_filetype = EXT2_FT_BLKDEV;
+			break;
+		case (__S_IFSOCK):
+			e2dir->dir_filetype = EXT2_FT_SOCK;
+			break;
+		default:
+			warn("[Calm British Accent] Look around you: Unknown filetype.");
+			e2dir->dir_filetype = EXT2_FT_UNKNOWN;
+	}
+	assert(dentry->d_name.len <= 255);
+	strncpy((char*)e2dir->dir_name, dentry->d_name.name, dentry->d_name.len);
+}
+
+/* Helper for ext2_create().  This tries to squeeze a dirent in the slack space
+ * after an existing dirent, returning TRUE if it succeeded (to break out). */
+static bool create_each_func(struct ext2_dirent *dir_i, void *a1, void *a2,
+                             void *a3)
+{
+	struct dentry *dentry = (struct dentry*)a1;
+	unsigned int our_rec_len = (unsigned int)a2;
+	unsigned int mode = (unsigned int)a3;
+	struct ext2_dirent *dir_new;
+	unsigned int real_len = ext2_dirent_len(dir_i);
+	/* How much room is available after this dir_i before the next one */
+	unsigned int record_slack = le16_to_cpu(dir_i->dir_reclen) - real_len;
+	/* TODO: Note that this technique will clobber any directory indexing.  They
+	 * exist after the .. entry with an inode of 0.  Check the docs for
+	 * specifics and think up a nice way to tell the diff between a reserved
+	 * entry and an unused one, when inode == 0. */
+	if (record_slack < our_rec_len)
+		return FALSE;
+	/* At this point, there is enough room for us.  Stick our new one in right
+	 * after the real len, making sure our reclen goes to the old end.  Note
+	 * that it is possible to have a real_len of 0 (an unused entry).  In this
+	 * case, we just end up taking over the spot in the dir_blk.  Be sure to set
+	 * dir_i's reclen before dir_new's (in case they are the same). */
+	dir_new = ((void*)dir_i + real_len);
+	dir_i->dir_reclen = cpu_to_le16(real_len);
+	ext2_write_dirent(dir_new, dentry, record_slack);
+	ext2_dirty_metablock(dentry->d_sb, dir_new);
+	return TRUE;
+}
+
 /* Called when creating a new disk inode in dir associated with dentry.  We need
  * to fill out the i_ino, set the type, and do whatever else we need */
 int ext2_create(struct inode *dir, struct dentry *dentry, int mode,
                struct nameidata *nd)
 {
-I_AM_HERE;
-	#if 0
 	struct inode *inode = dentry->d_inode;
-	ext2_init_inode(dir, dentry);
+	struct ext2_block_group *dir_bg = ext2_inode2bg(dir);
+	struct ext2_inode *disk_inode;
+	struct ext2_i_info *e2ii;
+	uint32_t dir_block;
+	unsigned int our_rec_len;
+	/* TODO: figure out the real time!  (Nanwan's birthday, bitches!) */
+	time_t now = 1242129600;
+	struct ext2_dirent *new_dirent;
+	/* Set basic inode stuff for files, get a disk inode, etc */
 	SET_FTYPE(inode->i_mode, __S_IFREG);
 	inode->i_fop = &ext2_f_op_file;
-	/* fs_info->filestart is set by the caller, or else when first written (for
-	 * new files.  it was set to 0 in alloc_inode(). */
-	#endif
+	inode->i_ino = ext2_alloc_diskinode(inode, dir_bg);
+	inode->i_atime.tv_sec = now;
+	inode->i_atime.tv_nsec = 0;
+	inode->i_ctime.tv_sec = now;
+	inode->i_ctime.tv_nsec = 0;
+	inode->i_mtime.tv_sec = now;
+	inode->i_mtime.tv_nsec = 0;
+	/* Initialize disk inode (this will be different for short symlinks) */
+	disk_inode = ext2_get_diskinode(inode);
+	ext2_init_diskinode(disk_inode, inode);
+	/* Initialize the e2ii (might get rid of this cache of block info) */
+	inode->i_fs_info = kmem_cache_alloc(ext2_i_kcache, 0);
+	e2ii = (struct ext2_i_info*)inode->i_fs_info;
+	for (int i = 0; i < 15; i++)
+		e2ii->i_block[i] = le32_to_cpu(disk_inode->i_block[i]);
+	/* Dirty and put the disk inode */
+	ext2_dirty_metablock(dentry->d_sb, disk_inode);
+	ext2_put_metablock(dentry->d_sb, disk_inode);
+	/* Insert it in the directory (make a dirent, might expand the dir too) */
+	/* Note the disk dir_name is not null terminated */
+	our_rec_len = ROUNDUP(8 + dentry->d_name.len, 4);
+	assert(our_rec_len <= 8 + 256);
+	/* Consider caching the start point for future dirent ops.  Or even using
+	 * the indexed directory.... */
+	dir_block = ext2_foreach_dirent(dir, create_each_func, dentry,
+	                                (void*)our_rec_len, (void*)mode);
+	/* If this returned a block number, we didn't find room in any of the
+	 * existing directory blocks, so we need to make a new one, stick it in the
+	 * dir inode, and stick our dirent at the beginning.  The reclen is the
+	 * whole blocksize (since it's the last entry in this block) */
+	if (dir_block) {
+		new_dirent = ext2_get_ino_metablock(dir, dir_block);
+		ext2_write_dirent(new_dirent, dentry, dentry->d_sb->s_blocksize);
+		ext2_dirty_metablock(dentry->d_sb, new_dirent);
+		ext2_put_metablock(dentry->d_sb, new_dirent);
+	}
 	return 0;
+}
+
+/* If we match, this loads the inode for the dentry and returns true (so we
+ * break out) */
+static bool lookup_each_func(struct ext2_dirent *dir_i, void *a1, void *a2,
+                             void *a3)
+{
+	struct dentry *dentry = (struct dentry*)a1;
+	/* Test if we're the one (TODO: use d_compare).  Note, dir_name is not
+	 * null terminated, hence the && test. */
+	if (!strncmp((char*)dir_i->dir_name, dentry->d_name.name,
+	             dir_i->dir_namelen) &&
+	            (dentry->d_name.name[dir_i->dir_namelen] == '\0')) {
+		load_inode(dentry, le32_to_cpu(dir_i->dir_inode));
+		/* TODO: (HASH) add dentry to dcache (maybe the caller should) */
+		return TRUE;
+	}
+	return FALSE;
 }
 
 /* Searches the directory for the filename in the dentry, filling in the dentry
@@ -870,37 +1160,9 @@ struct dentry *ext2_lookup(struct inode *dir, struct dentry *dentry,
 {
 	assert(S_ISDIR(dir->i_mode));
 	struct ext2_dirent *dir_buf, *dir_i;
-	unsigned int dir_block = 0;
-	bool found = FALSE;
-	dir_buf = ext2_get_ino_metablock(dir, dir_block++);
-	dir_i = dir_buf;
-	/* now we have the first block worth of dirents.  We'll get another block if
-	 * dir_i hits a block boundary */
-	for (unsigned int bytes = 0; bytes < dir->i_size; ) {
-		/* On subsequent loops, we might need to advance to the next block.
-		 * This is where a file abstraction for a dir might be easier. */
-		if ((void*)dir_i >= (void*)dir_buf + dir->i_sb->s_blocksize) {
-			ext2_put_metablock(dir->i_sb, dir_buf);
-			dir_buf = ext2_get_ino_metablock(dir, dir_block++);
-			dir_i = dir_buf;
-			assert(dir_buf);
-		}
-		/* Test if we're the one (TODO: use d_compare).  Note, dir_name is not
-		 * null terminated, hence the && test. */
-		if (!strncmp((char*)dir_i->dir_name, dentry->d_name.name,
-		             dir_i->dir_namelen) &&
-		            (dentry->d_name.name[dir_i->dir_namelen] == '\0')) {
-			load_inode(dentry, le32_to_cpu(dir_i->dir_inode));
-			/* TODO: (HASH) add dentry to dcache (maybe the caller should) */
-			ext2_put_metablock(dir->i_sb, dir_buf);
-			return dentry;
-		}
-		/* Get ready for the next loop */
-		bytes += dir_i->dir_reclen;
-		dir_i = (void*)dir_i + dir_i->dir_reclen;
-	}
+	if (!ext2_foreach_dirent(dir, lookup_each_func, dentry, 0, 0))
+		return dentry;
 	printd("EXT2: Not Found, %s\n", dentry->d_name.name);	
-	ext2_put_metablock(dir->i_sb, dir_buf);
 	return 0;
 }
 
