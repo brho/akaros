@@ -1057,10 +1057,8 @@ int ext2_readdir(struct file *dir, struct dirent *dirent)
 {
 	void *blk_buf;
 	/* Not enough data at the end of the directory */
-	if (dir->f_dentry->d_inode->i_size <
-	    dirent->d_off + sizeof(struct ext2_dirent))
+	if (dir->f_dentry->d_inode->i_size < dirent->d_off + 8)
 		return -ENOENT;
-	
 	/* Figure out which block we need to read in for dirent->d_off */
 	int block = dirent->d_off / dir->f_dentry->d_sb->s_blocksize;
 	blk_buf = ext2_get_ino_metablock(dir->f_dentry->d_inode, block);
@@ -1070,6 +1068,8 @@ int ext2_readdir(struct file *dir, struct dirent *dirent)
 	struct ext2_dirent *e2dir = (struct ext2_dirent*)(blk_buf + f_off);
 	dirent->d_ino = le32_to_cpu(e2dir->dir_inode);
 	dirent->d_off += le16_to_cpu(e2dir->dir_reclen);
+	if (dir->f_dentry->d_inode->i_size < dirent->d_off)
+		panic("Something is jacked with the dirent going beyond the dir/file");
 	/* note, dir_namelen doesn't include the \0 */
 	dirent->d_reclen = e2dir->dir_namelen;
 	strncpy(dirent->d_name, (char*)e2dir->dir_name, e2dir->dir_namelen);

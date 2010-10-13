@@ -238,7 +238,7 @@ struct ext2_inode {
 struct ext2_dirent {
 	uint32_t					dir_inode;			/* inode */
 	uint16_t					dir_reclen;			/* len, including padding */
-	uint8_t						dir_namelen;		/* len of dir_name */
+	uint8_t						dir_namelen;		/* len of dir_name w/o \0 */
 	uint8_t						dir_filetype;
 	uint8_t						dir_name[256];		/* might be < 255 on disc */
 };
