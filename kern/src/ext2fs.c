@@ -111,7 +111,7 @@ void ext2_init(void)
 void *__ext2_get_metablock(struct block_device *bdev, unsigned long blk_num,
                            unsigned int blk_sz)
 {
-	return get_buffer(bdev, blk_num, blk_sz)->bh_buffer;
+	return bdev_get_buffer(bdev, blk_num, blk_sz)->bh_buffer;
 }
 
 /* Convenience wrapper */
@@ -141,12 +141,12 @@ static struct buffer_head *ext2_my_bh(struct super_block *sb, void *addr)
 
 /* Decrefs the buffer from get_metablock().  Call this when you no longer
  * reference your metadata block/buffer.  Yes, we could just decref the page,
- * but this will work if we end up changing how put_buffer() works. */
+ * but this will work if we end up changing how bdev_put_buffer() works. */
 void ext2_put_metablock(struct super_block *sb, void *buffer)
 {
 	struct buffer_head *bh = ext2_my_bh(sb, buffer);
 	if (bh)
-		put_buffer(bh);
+		bdev_put_buffer(bh);
 }
 
 /* Will dirty the block/BH/page for the given metadata block/buffer. */
@@ -154,7 +154,7 @@ void ext2_dirty_metablock(struct super_block *sb, void *buffer)
 {
 	struct buffer_head *bh = ext2_my_bh(sb, buffer);
 	if (bh)
-		dirty_buffer(bh);
+		bdev_dirty_buffer(bh);
 }
 
 /* Helper for alloc_block.  It will try to alloc a block from the BG, starting
@@ -736,7 +736,7 @@ int ext2_readpage(struct page_map *pm, struct page *page)
 		}
 	}
 	/* TODO: (BLK) this assumes we slept til the request was done */
-	retval = make_request(bdev, breq);
+	retval = bdev_submit_request(bdev, breq);
 	assert(!retval);
 	/* zero out whatever is beyond the EOF.  we could do this by figuring out
 	 * where the BHs end and zeroing from there, but I'd rather zero from where

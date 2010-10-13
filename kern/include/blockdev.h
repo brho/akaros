@@ -58,10 +58,10 @@ struct kmem_cache *bh_kcache;
 
 /* Buffer Head Requests.  For now, just use these for dealing with non-file IO
  * on a block device.  Tell it what size you think blocks are. */
-struct buffer_head *get_buffer(struct block_device *bdev, unsigned long blk_num,
-                               unsigned int blk_sz);
-void dirty_buffer(struct buffer_head *bh);
-void put_buffer(struct buffer_head *bh);
+struct buffer_head *bdev_get_buffer(struct block_device *bdev,
+                                    unsigned long blk_num, unsigned int blk_sz);
+void bdev_dirty_buffer(struct buffer_head *bh);
+void bdev_put_buffer(struct buffer_head *bh);
 
 /* This encapsulates the work of a request (instead of having a variety of
  * slightly-different functions for things like read/write and scatter-gather
@@ -90,6 +90,6 @@ void block_init(void);
 struct block_device *get_bdev(char *path);
 void free_bhs(struct page *page);
 /* This function will probably be the one that blocks */
-int make_request(struct block_device *bdev, struct block_request *req);
+int bdev_submit_request(struct block_device *bdev, struct block_request *req);
 
 #endif /* ROS_KERN_BLOCKDEV_H */

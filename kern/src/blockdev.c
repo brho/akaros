@@ -80,7 +80,7 @@ void free_bhs(struct page *page)
 /* This ultimately will handle the actual request processing, all the way down
  * to the driver, and will deal with blocking.  For now, we just fulfill the
  * request right away (RAM based block devs). */
-int make_request(struct block_device *bdev, struct block_request *req)
+int bdev_submit_request(struct block_device *bdev, struct block_request *req)
 {
 	void *src, *dst;
 	unsigned long first_sector;
@@ -129,8 +129,8 @@ int block_readpage(struct page_map *pm, struct page *page)
  *
  * Also note we're a little inconsistent with the use of sector sizes in certain
  * files.  We'll sort it eventually. */
-struct buffer_head *get_buffer(struct block_device *bdev, unsigned long blk_num,
-                               unsigned int blk_sz)
+struct buffer_head *bdev_get_buffer(struct block_device *bdev,
+                                    unsigned long blk_num, unsigned int blk_sz)
 {
 	struct page *page;
 	struct page_map *pm = &bdev->b_pm;
@@ -140,8 +140,10 @@ struct buffer_head *get_buffer(struct block_device *bdev, unsigned long blk_num,
 	unsigned int blk_per_pg = PGSIZE / blk_sz;
 	unsigned int sct_per_blk = blk_sz / bdev->b_sector_sz;
 	unsigned int blk_offset = (blk_num % blk_per_pg) * blk_sz;
-	assert(blk_offset < PGSIZE);
 	void *my_buf;
+	assert(blk_offset < PGSIZE);
+	if (!blk_num)
+		warn("Asking for the 0th block of a bdev...");
 	/* Make sure there's a page in the page cache.  Should always be one. */
 	error = pm_load_page(pm, blk_num / blk_per_pg, &page); 
 	if (error)
@@ -200,7 +202,7 @@ found:
 	breq->bhs = breq->local_bhs;
 	breq->bhs[0] = bh;
 	breq->nr_bhs = 1;
-	error = make_request(bdev, breq);
+	error = bdev_submit_request(bdev, breq);
 	/* TODO: (BLK) this assumes we slept til the request was done */
 	assert(!error);
 	kmem_cache_free(breq_kcache, breq);
@@ -213,7 +215,7 @@ found:
 /* Will dirty the block/BH/page for the given block/buffer.  Will have to be
  * careful with the page reclaimer - if someone holds a reference, they can
  * still dirty it. */
-void dirty_buffer(struct buffer_head *bh)
+void bdev_dirty_buffer(struct buffer_head *bh)
 {
 	struct page *page = bh->bh_page;
 	/* TODO: race on flag modification */
@@ -221,10 +223,10 @@ void dirty_buffer(struct buffer_head *bh)
 	page->pg_flags |= PG_DIRTY;
 }
 
-/* Decrefs the buffer from get_buffer().  Call this when you no longer reference
- * your block/buffer.  For now, we do refcnting on the page, since the
+/* Decrefs the buffer from bdev_get_buffer().  Call this when you no longer
+ * reference your block/buffer.  For now, we do refcnting on the page, since the
  * reclaiming will be in page sized chunks from the page cache. */
-void put_buffer(struct buffer_head *bh)
+void bdev_put_buffer(struct buffer_head *bh)
 {
 	page_decref(bh->bh_page);
 }
