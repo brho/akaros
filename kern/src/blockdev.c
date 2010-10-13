@@ -79,33 +79,52 @@ void free_bhs(struct page *page)
 
 /* This ultimately will handle the actual request processing, all the way down
  * to the driver, and will deal with blocking.  For now, we just fulfill the
- * request right away (RAM based block devs). */
-int bdev_submit_request(struct block_device *bdev, struct block_request *req)
+ * request right away (RAM based block devs).  Note this calls the callback
+ * before it returns.  This race is possible, so callers should be able to
+ * handle it. */
+int bdev_submit_request(struct block_device *bdev, struct block_request *breq)
 {
 	void *src, *dst;
 	unsigned long first_sector;
 	unsigned int nr_sector;
 
-	for (int i = 0; i < req->nr_bhs; i++) {
-		first_sector = req->bhs[i]->bh_sector;
-		nr_sector = req->bhs[i]->bh_nr_sector;
+	for (int i = 0; i < breq->nr_bhs; i++) {
+		first_sector = breq->bhs[i]->bh_sector;
+		nr_sector = breq->bhs[i]->bh_nr_sector;
 		/* Sectors are indexed starting with 0, for now. */
 		if (first_sector + nr_sector > bdev->b_nr_sector) {
 			warn("Exceeding the num sectors!");
 			return -1;
 		}
-		if (req->flags & BREQ_READ) {
-			dst = req->bhs[i]->bh_buffer;
+		if (breq->flags & BREQ_READ) {
+			dst = breq->bhs[i]->bh_buffer;
 			src = bdev->b_data + (first_sector << SECTOR_SZ_LOG);
-		} else if (req->flags & BREQ_WRITE) {
+		} else if (breq->flags & BREQ_WRITE) {
 			dst = bdev->b_data + (first_sector << SECTOR_SZ_LOG);
-			src = req->bhs[i]->bh_buffer;
+			src = breq->bhs[i]->bh_buffer;
 		} else {
 			panic("Need a request type!\n");
 		}
 		memcpy(dst, src, nr_sector << SECTOR_SZ_LOG);
 	}
+	if (breq->callback)
+		breq->callback(breq);
 	return 0;
+}
+
+/* Helper method, unblocks someone blocked on sleep_on_breq(). */
+void generic_breq_done(struct block_request *breq)
+{
+	/* TODO: BLK - unblock the kthread sleeping on this request */
+	breq->data = (void*)1;
+}
+
+/* Helper, pairs with generic_breq_done() */
+void sleep_on_breq(struct block_request *breq)
+{
+	/* TODO: BLK Block til we are done: data gets toggled in the completion.
+	 * This only works if the completion happened first (for now) */
+	assert(breq->data);
 }
 
 /* This just tells the page cache that it is 'up to date'.  Due to the nature of
@@ -199,12 +218,14 @@ found:
 	breq = kmem_cache_alloc(breq_kcache, 0);
 	assert(breq);
 	breq->flags = BREQ_READ;
+	breq->callback = generic_breq_done;
+	breq->data = 0;
 	breq->bhs = breq->local_bhs;
 	breq->bhs[0] = bh;
 	breq->nr_bhs = 1;
 	error = bdev_submit_request(bdev, breq);
-	/* TODO: (BLK) this assumes we slept til the request was done */
 	assert(!error);
+	sleep_on_breq(breq);
 	kmem_cache_free(breq_kcache, breq);
 	/* after the data is read, we mark it up to date and unlock the page. */
 	bh->bh_flags |= BH_UPTODATE;

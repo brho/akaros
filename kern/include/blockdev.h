@@ -74,8 +74,11 @@ void bdev_put_buffer(struct buffer_head *bh);
  * another array of BH pointers if you want more.  The BHs do not need to be
  * linked or otherwise associated with a page mapping. */
 #define NR_INLINE_BH (PGSIZE >> SECTOR_SZ_LOG)
+struct block_request;
 struct block_request {
 	unsigned int				flags;
+	void						(*callback)(struct block_request *breq);
+	void						*data;
 	struct buffer_head			**bhs;				/* BHs describing the IOs */
 	unsigned int				nr_bhs;
 	struct buffer_head			*local_bhs[NR_INLINE_BH];
@@ -89,7 +92,8 @@ struct kmem_cache *breq_kcache;	/* for the block requests */
 void block_init(void);
 struct block_device *get_bdev(char *path);
 void free_bhs(struct page *page);
-/* This function will probably be the one that blocks */
-int bdev_submit_request(struct block_device *bdev, struct block_request *req);
+int bdev_submit_request(struct block_device *bdev, struct block_request *breq);
+void generic_breq_done(struct block_request *breq);
+void sleep_on_breq(struct block_request *breq);
 
 #endif /* ROS_KERN_BLOCKDEV_H */

@@ -300,7 +300,9 @@ void page_setref(page_t *page, size_t val)
 }
 
 /* Attempts to get a lock on the page for IO operations.  If it is already
- * locked, it will block the thread until it is unlocked. */
+ * locked, it will block the thread until it is unlocked.  Note that this is
+ * really a "sleep on some event", not necessarily the IO, but it is "the page
+ * is ready". */
 void lock_page(struct page *page)
 {
 	/* TODO: (BLK) actually do something!  And this has a race!  Not a big deal

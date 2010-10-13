@@ -137,11 +137,10 @@ int pm_load_page(struct page_map *pm, unsigned long index, struct page **pp)
 	}
 	/* if we're here, the page is locked by us, and it needs to be read in */
 	assert(page->pg_mapping == pm);
+	/* Readpage will block internally, returning when it is done */
 	error = pm->pm_op->readpage(pm, page);
 	assert(!error);
-	/* Try to sleep on the IO.  The page will be unlocked when the IO is done */
-	/* TODO: (BLK) this assumes we never slept til we got here */
-	lock_page(page);
+	/* Unlock, since we're done with the page and it is up to date */
 	unlock_page(page);
 	assert(page->pg_flags & PG_UPTODATE);
 	return 0;

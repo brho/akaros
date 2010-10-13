@@ -717,6 +717,8 @@ int ext2_readpage(struct page_map *pm, struct page *page)
 		return -ENOMEM;
 	}
 	breq->flags = BREQ_READ;
+	breq->callback = generic_breq_done;
+	breq->data = 0;
 	breq->bhs = breq->local_bhs;
 	breq->nr_bhs = 0;
 	/* Pack the BH pointers in the block request */
@@ -735,9 +737,10 @@ int ext2_readpage(struct page_map *pm, struct page *page)
 			bh->bh_page->pg_flags |= PG_DIRTY;
 		}
 	}
-	/* TODO: (BLK) this assumes we slept til the request was done */
 	retval = bdev_submit_request(bdev, breq);
 	assert(!retval);
+	sleep_on_breq(breq);
+	kmem_cache_free(breq_kcache, breq);
 	/* zero out whatever is beyond the EOF.  we could do this by figuring out
 	 * where the BHs end and zeroing from there, but I'd rather zero from where
 	 * the file ends (which could be in the middle of an FS block */
@@ -747,10 +750,8 @@ int ext2_readpage(struct page_map *pm, struct page *page)
 	/* at this point, eof_off is the offset into the page of the EOF, or 0 */
 	if (eof_off)
 		memset(eof_off + page2kva(page), 0, PGSIZE - eof_off);
-	/* after the data is read, we mark it up to date and unlock the page. */
+	/* Now the page is up to date */
 	page->pg_flags |= PG_UPTODATE;
-	unlock_page(page);
-	kmem_cache_free(breq_kcache, breq);
 	/* Useful debugging.  Put one higher up if the page is not getting mapped */
 	//print_pageinfo(page);
 	return 0;
