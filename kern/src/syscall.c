@@ -600,6 +600,7 @@ static int sys_halt_core(struct proc *p, unsigned int usec)
 	 * self_ipi/interrupting. */
 	set_core_timer(usec);
 	cpu_halt();
+	set_core_timer(0);		/* Disable the timer (we don't have a 0-shot yet) */
 
 	return 0;
 }
