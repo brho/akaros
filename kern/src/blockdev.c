@@ -79,9 +79,7 @@ void free_bhs(struct page *page)
 
 /* This ultimately will handle the actual request processing, all the way down
  * to the driver, and will deal with blocking.  For now, we just fulfill the
- * request right away (RAM based block devs).  Note this calls the callback
- * before it returns.  This race is possible, so callers should be able to
- * handle it. */
+ * request right away (RAM based block devs). */
 int bdev_submit_request(struct block_device *bdev, struct block_request *breq)
 {
 	void *src, *dst;
@@ -107,8 +105,27 @@ int bdev_submit_request(struct block_device *bdev, struct block_request *breq)
 		}
 		memcpy(dst, src, nr_sector << SECTOR_SZ_LOG);
 	}
+#ifdef __i386__ 	/* Sparc can't register interrupt handlers yet */
+	/* Faking an interrupt.  The handler runs in interrupt context btw */
+	void x86_breq_handler(struct trapframe *tf, void *data)
+	{
+		/* Re-register the old dumb handler */
+		register_interrupt_handler(interrupt_handlers,
+		                           LAPIC_TIMER_DEFAULT_VECTOR, timer_interrupt,
+		                           NULL);
+		struct block_request *breq = (struct block_request*)data;
+		if (breq->callback)
+			breq->callback(breq);
+	}
+	register_interrupt_handler(interrupt_handlers, LAPIC_TIMER_DEFAULT_VECTOR,
+	                           x86_breq_handler, breq);
+	/* Fake a 5ms delay */
+	set_core_timer(5000);
+#else
 	if (breq->callback)
 		breq->callback(breq);
+#endif
+
 	return 0;
 }
 
@@ -124,7 +141,13 @@ void sleep_on_breq(struct block_request *breq)
 {
 	/* TODO: BLK Block til we are done: data gets toggled in the completion.
 	 * This only works if the completion happened first (for now) */
+	assert(irq_is_enabled());
+#ifdef __i386__ 	/* Sparc isn't interrupt driven yet */
+	while (!breq->data)
+		cpu_relax();
+#else
 	assert(breq->data);
+#endif
 }
 
 /* This just tells the page cache that it is 'up to date'.  Due to the nature of
