@@ -27,6 +27,7 @@
 #include <env.h>
 #include <trap.h>
 #include <timing.h>
+#include <kmalloc.h>
 
 extern handler_wrapper_t (RO handler_wrappers)[NUM_HANDLER_WRAPPERS];
 volatile uint32_t num_cpus = 0xee;
@@ -192,29 +193,6 @@ void smp_boot(void)
 	// temp mappings that were removed.  TODO
 }
 
-/* zra: sometimes Deputy needs some hints */
-static inline void *COUNT(sizeof(pseudodesc_t))
-get_my_gdt_pd(page_t *my_stack)
-{
-	return page2kva(my_stack) + (PGSIZE - sizeof(pseudodesc_t) -
-                                     sizeof(segdesc_t)*SEG_COUNT);
-}
-
-//static inline void *COUNT(sizeof(segdesc_t)*SEG_COUNT)
-static inline segdesc_t *COUNT(SEG_COUNT)
-get_my_gdt(page_t *my_stack)
-{
-	return TC(page2kva(my_stack) + PGSIZE - sizeof(segdesc_t)*SEG_COUNT);
-}
-
-static inline void *COUNT(sizeof(taskstate_t))
-get_my_ts(page_t *my_stack)
-{
-	return page2kva(my_stack) + PGSIZE -
-		sizeof(pseudodesc_t) - sizeof(segdesc_t)*SEG_COUNT -
-		sizeof(taskstate_t);
-}
-
 /* This is called from smp_entry by each core to finish the core bootstrapping.
  * There is a spinlock around this entire function in smp_entry, for a few
  * reasons, the most important being that all cores use the same stack when
@@ -245,19 +223,21 @@ uint32_t smp_main(void)
 	if (kpage_alloc(&my_stack))
 		panic("Unable to alloc a per-core stack!");
 	memset(page2kva(my_stack), 0, PGSIZE);
+	uintptr_t my_stack_top = (uintptr_t)page2kva(my_stack) + PGSIZE;
 
-	// Set up a gdt / gdt_pd for this core, stored at the top of the stack
-	// This is necessary, eagle-eyed readers know why
-	// GDT should be 4-byte aligned.  TS isn't aligned.  Not sure if it matters.
-	pseudodesc_t *my_gdt_pd = get_my_gdt_pd(my_stack);
-	segdesc_t *COUNT(SEG_COUNT) my_gdt = get_my_gdt(my_stack);
-	// TS also needs to be permanent
-	taskstate_t *my_ts = get_my_ts(my_stack);
-	// Usable portion of the KSTACK grows down from here
-	// Won't actually start using this stack til our first interrupt
-	// (issues with changing the stack pointer and then trying to "return")
-	uintptr_t my_stack_top = (uintptr_t)my_ts;
-	
+	/* This blob is the GDT, the GDT PD, and the TSS. */
+	unsigned int blob_size = sizeof(segdesc_t) * SEG_COUNT +
+	                         sizeof(pseudodesc_t) + sizeof(taskstate_t);
+	void *gdt_etc = kmalloc(blob_size, 0);		/* we'll never free this btw */
+	taskstate_t *my_ts = gdt_etc;
+	pseudodesc_t *my_gdt_pd = (void*)my_ts + sizeof(taskstate_t);
+	segdesc_t *my_gdt = (void*)my_gdt_pd + sizeof(pseudodesc_t);
+	/* This is a bit ghetto: we need to communicate our GDT and TSS's location
+	 * to smp_percpu_init(), but we can't trust our coreid (since they haven't
+	 * been remapped yet (so we can't write it directly to per_cpu_info)).  So
+	 * we use the bottom of the stack page... */
+	*(uintptr_t*)page2kva(my_stack) = (uintptr_t)gdt_etc;
+
 	// Set up MSR for SYSENTER 
 	write_msr(MSR_IA32_SYSENTER_CS, GD_KT);
 	write_msr(MSR_IA32_SYSENTER_ESP, my_stack_top);
@@ -305,6 +285,7 @@ uint32_t smp_main(void)
 void smp_percpu_init(void)
 {
 	uint32_t coreid = core_id();
+	uintptr_t my_stack_bot;
 
 	/* Ensure the FPU units are initialized */
 	asm volatile ("fninit");
@@ -315,11 +296,15 @@ void smp_percpu_init(void)
 	lcr4(rcr4() | CR4_OSFXSR | CR4_OSXMME);
 
 	/* core 0 sets up via the global gdt symbol */
-	if (!coreid)
+	if (!coreid) {
+		per_cpu_info[0].tss = &ts;
 		per_cpu_info[0].gdt = gdt;
-	else
-		per_cpu_info[coreid].gdt = (segdesc_t*)(ROUNDUP(read_esp(), PGSIZE)
-		                           - sizeof(segdesc_t)*SEG_COUNT);
+	} else {
+		my_stack_bot = ROUNDDOWN(read_esp(), PGSIZE);
+		per_cpu_info[coreid].tss = (taskstate_t*)(*(uintptr_t*)my_stack_bot);
+		per_cpu_info[coreid].gdt = (segdesc_t*)(*(uintptr_t*)my_stack_bot +
+		                           sizeof(taskstate_t) + sizeof(pseudodesc_t));
+	}
 	spinlock_init(&per_cpu_info[coreid].immed_amsg_lock);
 	STAILQ_INIT(&per_cpu_info[coreid].immed_amsgs);
 	spinlock_init(&per_cpu_info[coreid].routine_amsg_lock);

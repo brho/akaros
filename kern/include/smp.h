@@ -35,6 +35,7 @@ struct per_cpu_info {
 	sharC_env_t sharC_env;
 #endif
 #ifdef __i386__
+	taskstate_t *tss;
 	segdesc_t *gdt;
 #endif
 
