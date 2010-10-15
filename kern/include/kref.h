@@ -51,7 +51,8 @@ static struct kref *kref_get_not_zero(struct kref *kref, unsigned int inc)
 {
 	if (atomic_add_not_zero(&kref->refcount, inc))
 		return kref;
-	else return 0;
+	else
+		return 0;
 }
 
 /* Will panic on zero */

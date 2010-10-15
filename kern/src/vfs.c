@@ -150,6 +150,9 @@ static struct dentry *do_lookup(struct dentry *parent, char *name)
 	/* not in the dcache at all, need to consult the FS */
 	result = parent->d_inode->i_op->lookup(parent->d_inode, query, 0);
 	if (!result) {
+		/* Note the USED flag will get turned off when this gets added to the
+		 * LRU in dentry_release().  There's a slight race here that we'll panic
+		 * on, but I want to catch it (in dcache_put()) for now. */
 		query->d_flags |= DENTRY_NEGATIVE;
 		dcache_put(parent->d_sb, query);
 		kref_put(&query->d_kref);
@@ -675,14 +678,15 @@ void dentry_release(struct kref *kref)
 	/* While locked, we need to double check the kref, in case someone already
 	 * reup'd it.  Re-up? you're crazy!  Reee-up, you're outta yo mind! */
 	if (!kref_refcnt(&dentry->d_kref)) {
-		/* and make sure it wasn't USED, then UNUSED again */
-		/* TODO: think about issues with this */
+		/* Note this is where negative dentries get set UNUSED */
 		if (dentry->d_flags & DENTRY_USED) {
 			dentry->d_flags &= ~DENTRY_USED;
 			spin_lock(&dentry->d_sb->s_lru_lock);
 			TAILQ_INSERT_TAIL(&dentry->d_sb->s_lru_d, dentry, d_lru);
 			spin_unlock(&dentry->d_sb->s_lru_lock);
 		} else {
+			/* and make sure it wasn't USED, then UNUSED again */
+			/* TODO: think about issues with this */
 			warn("This should be rare.  Tell brho this happened.");
 		}
 	}
@@ -800,6 +804,7 @@ void dcache_put(struct super_block *sb, struct dentry *key_val)
 	old = hashtable_remove(sb->s_dcache, key_val);
 	if (old) {
 		assert(old->d_flags & DENTRY_NEGATIVE);
+		/* This is possible, but rare for now (about to be put on the LRU) */
 		assert(!(old->d_flags & DENTRY_USED));
 		assert(!kref_refcnt(&old->d_kref));
 		spin_lock(&sb->s_lru_lock);

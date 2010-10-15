@@ -113,11 +113,17 @@ static inline bool atomic_add_not_zero(atomic_t *number, long val)
 /* Subtraces val from number, returning True if the new value is 0. */
 static inline bool atomic_sub_and_test(atomic_t *number, long val)
 {
-	long retval = atomic_fetch_and_add(number, -val);
-	if (retval)
-		return FALSE;
-	else
-		return TRUE;
+	long num;
+	bool retval = FALSE;
+	/* this is pretty clever.  the lower 8 bits (i.e byte 3)
+	 * of the atomic_t serve as a spinlock.  let's acquire it. */
+	spin_lock((spinlock_t*)number);
+	num = atomic_read(number);
+	num -= val;
+	retval = num ? FALSE : TRUE;
+	/* set the new counter value.  the lock is cleared (for free) */
+	atomic_init(number, num);
+	return retval;
 }
 
 static inline uint32_t atomic_swap(uint32_t* addr, uint32_t val)
