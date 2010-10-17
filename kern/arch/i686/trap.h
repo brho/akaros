@@ -82,6 +82,11 @@ static inline void restore_fp_state(struct ancillary_state *silly)
 	asm volatile("fxrstor %0" : : "m"(*silly));
 }
 
+static inline void set_stack_pointer(uintptr_t sp)
+{
+	asm volatile("mov %0,%%esp" : : "r"(sp));
+}
+
 #endif /* !__ASSEMBLER__ */
 
 #endif /* !ROS_INC_ARCH_TRAP_H */

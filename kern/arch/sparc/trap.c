@@ -22,6 +22,17 @@
 #pragma nodeputy
 #endif
 
+/* These are the stacks the kernel will load when it receives a trap from user
+ * space.  The deal is that they get set right away in entry.S, and can always
+ * be used for finding the top of the stack (from which you should subtract the
+ * sizeof the trapframe.  Note, we need to have a junk value in the array so
+ * that this is NOT part of the BSS.  If it is in the BSS, it will get 0'd in
+ * kernel_init(), which is after these values get set.
+ *
+ * TODO: if these end up becoming contended cache lines, move this to
+ * per_cpu_info. */
+uintptr_t core_stacktops[MAX_NUM_CPUS] = {0xcafebabe, 0};
+
 struct kmem_cache *kernel_msg_cache;
 void kernel_msg_init(void)
 {
@@ -68,6 +79,23 @@ advance_pc(trapframe_t* state)
 {
 	state->pc = state->npc;
 	state->npc += 4;
+}
+
+/* Set stacktop for the current core to be the stack the kernel will start on
+ * when trapping/interrupting from userspace */
+void set_stack_top(uintptr_t stacktop)
+{
+	core_stacktops[core_id()] = stacktop;
+}
+
+/* Note the assertion assumes we are in the top page of the stack. */
+uintptr_t get_stack_top(void)
+{
+	uintptr_t sp, stacktop;
+	stacktop = core_stacktops[core_id()];
+	asm volatile("mov %%sp,%0" : "=r"(sp));
+	assert(ROUNDUP(sp, PGSIZE) == stacktop);
+	return stacktop;
 }
 
 void

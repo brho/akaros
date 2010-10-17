@@ -94,10 +94,14 @@ handle_trap:
 	RESTORE_MINIMAL_TF(%sp+96)
 
 	// Trap came from user.  Spill a window if necessary.
+	// Set %l1 to be the stacktop for the current core
 1:	mov	CORE_ID_REG,%l1
-	sll	%l1,KSTKSHIFT,%l1
-	set	bootstacktop-SIZEOF_TRAPFRAME_T,%l2
-	sub	%l2,%l1,%l1
+	sll	%l1,2,%l1
+	set	core_stacktops,%l2
+	ld	[%l2 + %l1],%l1
+	set	SIZEOF_TRAPFRAME_T,%l2
+	sub	%l1,%l2,%l1
+
 	SAVE_MINIMAL_TF(%l1)
 	sub	%l1,96,%g1
 	restore

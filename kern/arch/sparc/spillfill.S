@@ -5,10 +5,12 @@
 #include <arch/trap_table.h>
 
 #define MAKE_STACK \
-	set	bootstacktop - SIZEOF_TRAPFRAME_T - 64,%fp; \
-	mov	CORE_ID_REG,%l0; \
-	sll	%l0,KSTKSHIFT,%l0; \
-	sub	%fp,%l0,%fp
+	mov	CORE_ID_REG,%l1; \
+	sll	%l1,2,%l1; \
+	set	core_stacktops,%l2; \
+	ld	[%l2 + %l1],%l1; \
+	set	SIZEOF_TRAPFRAME_T + 64,%l2; \
+	sub	%l1,%l2,%fp
 
 ! preconditions:
 ! WIM & (1<<CWP) != 0

@@ -8,7 +8,12 @@
 
 #include <ros/common.h>
 #include <ros/arch/trapframe.h>
+#include <arch/ros/arch.h>
 #include <arch/sparc.h>
+
+/* These are the stacks the kernel will load when it receives a trap from user
+ * space. */
+uintptr_t core_stacktops[MAX_NUM_CPUS];
 
 /* the struct trapframe and friends are in ros/arch/trapframe.h */
 
@@ -24,6 +29,13 @@ void emulate_fpu(trapframe_t* state, ancillary_state_t* astate);
 static inline bool in_kernel(struct trapframe *tf)
 {
 	return tf->psr & PSR_PS;
+}
+
+/* Needs to leave room for a trapframe at the top of the stack. */
+static inline void set_stack_pointer(uintptr_t sp)
+{
+	sp = sp - SIZEOF_TRAPFRAME_T;
+	asm volatile("mov %0,%%sp" : : "r"(sp));
 }
 
 #endif /* !__ASSEMBLER__ */

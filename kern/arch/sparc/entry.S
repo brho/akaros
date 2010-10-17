@@ -135,6 +135,16 @@ wait_for_reloc:
 	bl	wait_for_reloc
 	 nop
 
+	// Set our stacktop so we can find it on a trap or spill/fill
+	mov	CORE_ID_REG,%l1
+	sll	%l1,KSTKSHIFT,%l1
+	set	bootstacktop,%l2
+	sub	%l2,%l1,%l1 		// %l1 now holds our current stacktop
+	mov	CORE_ID_REG,%l0
+	sll	%l0,2,%l0
+	set	core_stacktops,%l2
+	st	%l1,[%l2 + %l0]		// store the stacktop in its slot
+
 	// now it's safe to enable traps
 	mov	%psr,%g1
 	wr	%g1,PSR_ET,%psr
@@ -161,6 +171,10 @@ wait_for_reloc:
 	// use a stack in the data section (as opposed to bss) here,
 	// since kernel_init will zero the stack
 	set	core0_bootstacktop-64,%sp
+	// reset core0's stacktop to core0_bootstacktop
+	set	core0_bootstacktop,%l1
+	set	core_stacktops,%l2
+	st	%l1,[%l2]		// store the stacktop in its slot
 
 	sub	%sp,64,%sp		! 64 >= sizeof(multiboot_header_t)
 	call	build_multiboot_info

@@ -74,6 +74,24 @@ static const char *NTS trapname(int trapno)
 	return "(unknown trap)";
 }
 
+/* Set stacktop for the current core to be the stack the kernel will start on
+ * when trapping/interrupting from userspace.  Don't use this til after
+ * smp_percpu_init().  We can probably get the TSS by reading the task register
+ * and then the GDT.  Still, it's a pain. */
+void set_stack_top(uintptr_t stacktop)
+{
+	struct per_cpu_info *pcpu = &per_cpu_info[core_id()];
+	/* No need to reload the task register, this takes effect immediately */
+	pcpu->tss->ts_esp0 = stacktop;
+}
+
+/* Note the check implies we only are on a one page stack (or the first page) */
+uintptr_t get_stack_top(void)
+{
+	uintptr_t stacktop = per_cpu_info[core_id()].tss->ts_esp0;
+	assert(stacktop == ROUNDUP(read_esp(), PGSIZE));
+	return stacktop;
+}
 
 void
 idt_init(void)

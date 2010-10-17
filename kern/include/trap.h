@@ -42,6 +42,10 @@ extern void sysenter_handler();
 
 void save_fp_state(struct ancillary_state *silly);
 void restore_fp_state(struct ancillary_state *silly);
+/* Set stacktop for the current core to be the stack the kernel will start on
+ * when trapping/interrupting from userspace */
+void set_stack_top(uintptr_t stacktop);
+uintptr_t get_stack_top(void);
 
 /* Kernel messages.  Each arch implements them in their own way.  Both should be
  * guaranteeing in-order delivery.  Kept here in trap.h, since sparc is using
