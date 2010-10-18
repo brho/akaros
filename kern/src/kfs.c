@@ -137,10 +137,8 @@ int kfs_readpage(struct page_map *pm, struct page *page)
 		memset(page2kva(page) + copy_amt, 0, PGSIZE - copy_amt);
 	}
 	struct buffer_head *bh = kmem_cache_alloc(bh_kcache, 0);
-	if (!bh) {
-		unlock_page(page);
+	if (!bh)
 		return -1;			/* untested, un-thought-through */
-	}
 	/* KFS does a 1:1 BH to page mapping */
 	bh->bh_page = page;								/* weak ref */
 	bh->bh_buffer = page2kva(page);
@@ -154,7 +152,6 @@ int kfs_readpage(struct page_map *pm, struct page *page)
 	 * complete.  Since we aren't doing a real IO request, and it is already
 	 * done, we can do it here. */
 	page->pg_flags |= PG_UPTODATE;
-	unlock_page(page);
 	return 0;
 }
 

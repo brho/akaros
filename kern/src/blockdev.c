@@ -156,7 +156,6 @@ void sleep_on_breq(struct block_request *breq)
 int block_readpage(struct page_map *pm, struct page *page)
 {
 	page->pg_flags |= PG_UPTODATE;
-	unlock_page(page);
 	return 0;
 }
 

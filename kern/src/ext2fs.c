@@ -706,16 +706,12 @@ int ext2_readpage(struct page_map *pm, struct page *page)
 
 	assert(page->pg_flags & PG_BUFFER);
 	retval = ext2_mappage(pm, page);
-	if (retval) {
-		unlock_page(page);
+	if (retval)
 		return retval;
-	}
 	/* Build and submit the request */
 	breq = kmem_cache_alloc(breq_kcache, 0);
-	if (!breq) {
-		unlock_page(page);
+	if (!breq)
 		return -ENOMEM;
-	}
 	breq->flags = BREQ_READ;
 	breq->callback = generic_breq_done;
 	breq->data = 0;
