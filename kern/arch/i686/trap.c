@@ -83,18 +83,39 @@ void set_stack_top(uintptr_t stacktop)
 	struct per_cpu_info *pcpu = &per_cpu_info[core_id()];
 	/* No need to reload the task register, this takes effect immediately */
 	pcpu->tss->ts_esp0 = stacktop;
+	/* Also need to make sure sysenters come in correctly */
+	write_msr(MSR_IA32_SYSENTER_ESP, stacktop);
 }
 
 /* Note the check implies we only are on a one page stack (or the first page) */
 uintptr_t get_stack_top(void)
 {
 	uintptr_t stacktop = per_cpu_info[core_id()].tss->ts_esp0;
-	assert(stacktop == ROUNDUP(read_esp(), PGSIZE));
+	if (stacktop != ROUNDUP(read_esp(), PGSIZE))
+		panic("Bad stacktop: %08p esp one is %08p\n", stacktop,
+		      ROUNDUP(read_esp(), PGSIZE));
 	return stacktop;
 }
 
-void
-idt_init(void)
+/* Starts running the current TF, just using ret. */
+void pop_kernel_tf(struct trapframe *tf)
+{
+	asm volatile ("movl %1,%%esp;           " /* move to future stack */
+	              "pushl %2;                " /* push cs */
+	              "movl %0,%%esp;           " /* move to TF */
+	              "addl $0x20,%%esp;        " /* move to tf_gs slot */
+	              "movl %1,(%%esp);         " /* write future esp */
+	              "subl $0x20,%%esp;        " /* move back to tf start */
+	              "popal;                   " /* restore regs */
+	              "popl %%esp;              " /* set stack ptr */
+	              "subl $0x4,%%esp;         " /* jump down past CS */
+	              "ret                      " /* return to the EIP */
+	              :
+	              : "g"(tf), "r"(tf->tf_esp), "r"(tf->tf_eip) : "memory");
+	panic("ret failed");				/* mostly to placate your mom */
+}
+
+void idt_init(void)
 {
 	extern segdesc_t (RO gdt)[];
 

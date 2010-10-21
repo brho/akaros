@@ -41,6 +41,7 @@
 #include <devfs.h>
 #include <blockdev.h>
 #include <ext2fs.h>
+#include <kthread.h>
 
 // zra: flag for Ivy
 int booting = 1;
@@ -80,6 +81,7 @@ void kernel_init(multiboot_info_t *mboot_info)
 	radix_init();
 	cache_color_alloc_init();       // Inits data structs
 	colored_page_alloc_init();      // Allocates colors for agnostic processes
+	kthread_init();					/* might need to tweak when this happens */
 	vmr_init();
 	file_init();
 	page_check();

@@ -47,6 +47,11 @@ void restore_fp_state(struct ancillary_state *silly);
 void set_stack_top(uintptr_t stacktop);
 uintptr_t get_stack_top(void);
 
+/* It's important that this is inline and that tf is not a stack variable */
+static inline void save_kernel_tf(struct trapframe *tf)
+                   __attribute__((always_inline));
+void pop_kernel_tf(struct trapframe *tf) __attribute__((noreturn));
+
 /* Kernel messages.  Each arch implements them in their own way.  Both should be
  * guaranteeing in-order delivery.  Kept here in trap.h, since sparc is using
  * trap.h for KMs.  Eventually, both arches will use the same implementation.

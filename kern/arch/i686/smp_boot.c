@@ -305,6 +305,7 @@ void smp_percpu_init(void)
 		per_cpu_info[coreid].gdt = (segdesc_t*)(*(uintptr_t*)my_stack_bot +
 		                           sizeof(taskstate_t) + sizeof(pseudodesc_t));
 	}
+	per_cpu_info[coreid].spare = 0;
 	spinlock_init(&per_cpu_info[coreid].immed_amsg_lock);
 	STAILQ_INIT(&per_cpu_info[coreid].immed_amsgs);
 	spinlock_init(&per_cpu_info[coreid].routine_amsg_lock);

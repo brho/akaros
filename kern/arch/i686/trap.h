@@ -82,9 +82,31 @@ static inline void restore_fp_state(struct ancillary_state *silly)
 	asm volatile("fxrstor %0" : : "m"(*silly));
 }
 
-static inline void set_stack_pointer(uintptr_t sp)
+static inline void __attribute__((always_inline))
+set_stack_pointer(uintptr_t sp)
 {
-	asm volatile("mov %0,%%esp" : : "r"(sp));
+	asm volatile("mov %0,%%esp" : : "r"(sp) : "memory","esp");
+}
+
+/* Save's the current kernel context into tf, setting the PC to the end of this
+ * function.  Note the kernel doesn't need to save a lot. */
+static inline void save_kernel_tf(struct trapframe *tf)
+{
+	/* Save the regs and the future esp. */
+	asm volatile("movl %%esp,(%0);       " /* save esp in it's slot*/
+	             "pushl %%eax;           " /* temp save eax */
+	             "leal 1f,%%eax;         " /* get future eip */
+	             "movl %%eax,(%1);       " /* store future eip */
+	             "popl %%eax;            " /* restore eax */
+	             "movl %2,%%esp;         " /* move to the beginning of the tf */
+	             "addl $0x20,%%esp;      " /* move to after the push_regs */
+	             "pushal;                " /* save regs */
+	             "addl $0x44,%%esp;      " /* move to esp slot */
+	             "popl %%esp;            " /* restore esp */
+	             "1:                     " /* where this tf will restart */
+	             : 
+	             : "g"(&tf->tf_esp), "g"(&tf->tf_eip), "g"(tf)
+	             : "eax", "memory", "cc");
 }
 
 #endif /* !__ASSEMBLER__ */

@@ -27,6 +27,7 @@ struct per_cpu_info {
 	struct proc *cur_proc;
 	trapframe_t *cur_tf;
 	struct sys_return cur_ret;
+	struct kthread *spare;		/* useful when restarting */
 
 #ifdef __SHARC__
 	// held spin-locks. this will have to go elsewhere if multiple kernel

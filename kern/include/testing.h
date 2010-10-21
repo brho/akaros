@@ -31,6 +31,7 @@ void test_bcq(void);
 void test_vm_regions(void);
 void test_radix_tree(void);
 void test_random_fs(void);
+void test_kthreads(void);
 
 struct trapframe_t;
 

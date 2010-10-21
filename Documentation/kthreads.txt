@@ -1,0 +1,232 @@
+kthreads.txt
+Barret Rhoden
+
+What Are They, And Why?
+-------------------------------
+Eventually a thread of execution in the kernel will want to block.  This means
+that the thread is unable to make forward progress and something else ought
+to run - the common case for this is when we wait on an IO operation.  This gets
+trickier when a function does not know if a function it calls will block or not.
+Sometimes they do, sometimes they don't.
+
+The critical feature is not that we want to save the registers, but that we want
+to preserve the stack and be able to use it independently of whatever else we do
+on that core in the interim time.  If we knew we would be done with and return
+from whatever_else() before we needed to continue the current thread of
+execution, we could simply call the function.  Instead, we want to be able to
+run the old context independently of what else is running (which may be a
+process). 
+
+We call this suspended context and the associated information a kthread, managed
+by a struct kthread.  It's the bare minimum needed for the kernel to stop and
+restart a thread of execution.  It holds the registers, stack pointer, PC,
+struct proc* if applicable, stacktop, and little else.  There is no silly_state
+/ floating point state, or anything else.  Its address space is determined from
+which process context (possibly none) that was running.
+
+We also get a few other benefits, such as the ability to pick and choose which
+kthreads to run where and when.  Users of kthreads should not assume that the
+core_id() stayed the same across function calls.  
+
+We can also use this infrastructure of other cases where we might want to start
+on a new stack.  One example is when we deal with low memory.  We may have to do
+a lot of work, but only need to do a little to allow the original thread (that
+might have failed on a page_alloc) to keep running, while we want the memory
+freer to keep running too (or later) from where it left off.  In essence, we
+want to fork, work, and yield or run on another core.  The kthread is just a
+means of suspending a call stack and a context for a little while.
+
+Side Note:
+-----------
+Right now, blocking a kthread is an explicit action.  Some function realizes it
+can't make progress (like waiting on a block device), so it sleeps on something
+(for now a semaphore), and gets woken up when it receives its signal.  This
+differs from processes, which can be stopped and suspended at any moment
+(pagefault is the classic example).  In the future, we could make kthreads be
+preemptable (timer interrupt goes off, and we choose to suspend a kthread), but
+even then kthreads still have the ability to turn off interrupts for tricky
+situations (like suspending the kthread).  The analog in the process code is
+disabling notifications, which dramatically complicates its functions (compare
+the save and pop functions for _ros_tf and _kernel_tf).  Furthermore, when a
+process disables notifications, it still doesn't mean it is running without
+interruptions (it looks like that to the vcore).  When the kernel disables
+interrupts, it really is running.
+
+What About Events?
+-------------------------------
+Why not just be event driven for all IO?  Why do we need these kernel threads?
+In short, IO isn't as simple as "I just want a block and when it's done, run a
+function."  While that is what the block device driver will do, the subsystems
+actually needing the IO are much simpler if they are threaded.  Consider the
+potentially numerous blocking IO calls involved in opening a file.  Having a
+continuation for each one of those points in the call graph seems like a real
+pain to code.  Perhaps I'm not seeing it, but if you're looking for a simple,
+light mechanism for keeping track of what work you need to do, just use a stack.
+Programming is much simpler, and it costs a page plus a small data structure.
+
+Note that this doesn't mean that all IO needs to use kthreads, just that some
+will really benefit from it.  I plan to make the "last part" of some IO calls
+more event driven.  Basically, it's all just a toolbox, and you should use what
+you need.
+
+Freeing Stacks and Structs
+-------------------------------
+When we restart a kthread, we have to be careful about freeing the old stack and
+the struct kthread.  We need to delay the freeing of both of these until after
+we pop_kernel_tf().  We can't free the kthread before popping it, and we are on
+the stack we need to free (until we pop to the new stack).
+
+To deal with this, we have a "spare" kthread per core, which gets assigned as
+the spare when we restart a previous kthread.  When making/suspending a kthread,
+we'll use this spare.  When restarting one, we'll free the old spare if it
+exists and put ours there.  One drawback is that we potentially waste a chunk of
+memory (1 page + a bit per core, worst case), but it is a nice, simple solution.
+Also, it will cut down on contention for free pages and the kthread_kcache,
+though this won't help with serious contention issues (which we'll deal with
+eventually).
+
+What To Run Next?
+-------------------------------
+When a kthread suspends, what do we run next?  And how do we know what to run
+next?  For now, we call smp_idle() - it is what you do when you have nothing
+else to do, or don't know what to do.  We could consider having sleep_on() take
+a function pointer, but when we start hopping stacks, passing that info gets
+tricky.  And we need to make a decision about which function to call quickly (in
+the code.  I don't trust the compiler much).  We can store the function pointer
+at the bottom of the future stack and extract it from there.  Or we could put it
+in per_cpu_info.  Or we can send ourselves a routine kernel message.
+
+Regardless of where we put it, we ought to call smp_idle() (or something
+similar) before calling it, since we need to make sure that whatever we call
+right after jumping stacks never returns.  It's more flexible to allow a
+function that returns for the func *, so we'll use smp_idle() as a level of
+indirection.
+
+Semaphore Stuff
+-------------------------------
+We use the semaphore (defined in kthread.h) for kthreads to sleep on and wait
+for a signal.  It is possible that the signal wins the race and beats the call
+to sleep_on().  The semaphore handles this by "returning false."  You'll notice
+that we don't actually call __down_sem(), but instead "build it in" to
+sleep_on().  I didn't want to deal with returning a bool (even if it was an
+inline), because I want to minimize the amount of stuff we do with potential
+stack variables (I don't trust the register variable).  As soon as we unlock,
+the kthread could be restarted (in theory), and it could start to clobber the
+stack in later function calls.
+
+So it is possible that we lose the semaphore race and shouldn't sleep.  We unwind the
+sleep prep work.  An alternative was to only do the prep work if we won the
+race, but that would mean we have to do a lot of work in that delicate period of
+"I'm on the queue but it is unlocked" - work that requires touching the stack.
+Or we could just hold the lock for a longer period of time, which I don't care
+to do.
+
+Note that a lot of this is probably needless worry - we have interrupts disabled
+for most of sleep_on(), though arguably we can be a little more careful with
+pcpui->spare and move the disable_irq() down to right before save_kernel_tf().
+
+What's the Deal with Stacks/Stacktops?
+-------------------------------
+When the kernel traps from userspace, it needs to know what to set the kernel
+stack pointer to.  In x86, it looks in the TSS.  In sparc, we have a data
+structure tracking that info (core_stacktops).  One thing I considered was
+migrating the kernel from its boot stacks (x86, just core0, sparc, all the cores
+have one).  Instead, we just make sure the tables/TSS are up to date right away
+(before interrupts or traps can come in for x86, and right away for sparc).
+These boot stacks aren't particularly special, just note they are in the program
+data/bss sections and were never originally added to a free list.  But they can
+be freed later on.  This might be an issue in some places, but those places
+ought to be fixed.
+
+There is also some implications about PGSIZE stacks (specifically in the
+asserts, how we alloc only one page, etc).  The bootstacks are bigger than a
+page (for now), but in general we don't want to have giant stacks (and shouldn't
+need them - note linux runs with 4KB stacks).  In the future (long range, when
+we're 64 bit), I'd like to put all kernel stacks high in the address space, with
+guard pages after them.  This would require a certain "quiet migration" to the
+new locations for the bootstacks (though not a new page - just a different
+virtual address for the stacks (not their page-alloced KVA).  A bunch of minor
+things would need to change for that, so don't hold your breath.
+
+So what about stacktop?  It's just the top of the stack, but sometimes it is the
+stack we were on (when suspending the kthread), other times kthread->stacktop
+is just a scrap page's top.
+
+What's important when suspending is that the current stack is not
+used in future traps - that it doesn't get clobbered.  That's why we need to
+find a new stack and set it as the current stacktop.  We also need to 'save'
+the stack page of the old kthread - we don't want it to be freed, since we
+need it later. When starting a kthread, I don't particularly care about which
+stack is now the default stack.  The sleep_on() assumes it was the kthread's,
+so unless we always have a default one that is only used very briefly and
+never blocked on, (which requires a stack jump), we ought to just have a
+kthread run with its stack as the default stacktop.
+
+When restarting a kthread, we eventually will use its stack, instead of the
+current one, but we can't free the current stack until after we actually
+pop_kernel_tf().  this is the same problem as with the struct kthread dealloc.
+So we can have the kthread (which we want to free later) hold on to the page we
+wanted to dealloc.  Likewise, when we would need a fresh kthread, we also need a
+page to use as the default stacktop.  So if we had a cached kthread, we then use
+the page that kthread was pointing to.  NOTE: the spare kthread struct is not
+holding the stack it was originally saved with.  Instead, it is saving the page
+of the stack that was running when that kthread was reactivated.  It's spare
+storage for both the struct and the page, but they aren't linked in any
+meaningful way (like it is the stack of the page).  That linkage is only true
+when a kthread is being used (like in a semaphore queue).
+
+Current and Process Contexts
+-------------------------------
+When a kthread is suspended, should the core stay in process context (if it was
+before)?  Short answer: yes.
+
+For vcore local calls (process context, trapped on the calling core), we're
+giving the core back, so we can avoid TLB shootdowns.  Though we do have to
+incref (which writes a cache line in the proc struct), since we are storing a
+reference to the proc (and will try to load its cr3 later).  While this sucks,
+keep in mind this is for a blocking IO call (where we couldn't find the page in
+any cache, etc).  It might be a scalability bottleneck, but it also might not
+matter in any real case.
+
+For async calls, it is less clear.  We might want to keep processing that
+process's syscalls, so it'd be easier to keep its cr3 loaded.  Though it's not
+as clear how we get from smp_idle() to a workable function and if it is useful
+to be in process context until we start processing those functions again.  Keep
+in mind that normally, smp_idle() shouldn't be in any process's context.  I'll
+probably write something later that abandons any context before halting to make
+sure processes die appropriately.  But there are still some unresolved issues
+that depend on what exactly we want to do.
+
+While it is tempting to say that we stay in process context if it was local, but
+not if it is async, there is an added complication.  The function calling
+sleep_on() doesn't care about whether it is on a process-allocated core or not.
+This is solvable by using per_cpu_info(), and will probably work its way into a
+future patch, regardless of whether or not we stay in process context for async
+calls.
+	
+As a final case, what will we do for processes that were interrupted by
+something that wants to block, but wasn't servicing a syscall?  We probably
+shouldn't have these (I don't have a good example of when we'd want it, and a
+bunch of reasons why we wouldn't), but if we do, then it might be okay anyway -
+the kthread is just holding that proc alive for a bit.
+
+Kmsgs and Kthreads
+-------------------------------
+Is there a way to mix kernel messages and kthreads?  What's the difference, and
+can one do the other?  A kthread is a suspended call-stack and context (thread),
+stopped in the middle of its work.  Kernel messages are about starting fresh -
+"hey core X, run this function."  A kmsg can very easily be a tool used to
+restart a kthread (either locally or on another core).  We do this in the test
+code, if you're curious how it could work.
+
+Note we use the semaphore to deal with races.  In test_kthreads(), we're
+actually using the kmsg to up the semaphore.  You just as easily could up the
+semaphore in one core (possibly in response to a kmsg, though more likely due to
+an interrupt), and then send the kthread to another core to restart via a kmsg.
+
+There's no reason you can't separate the __up_sem() and the running of the
+kthread - the semaphore just protects you from missing the signal.  Perhaps
+you'll want to rerun the kthread on the physical core it was suspended on!
+(cache locality, and it might be a legit option to allow processes to say it's
+okay to take their vcore).  Note this may require more bookkeeping in the struct
+kthread.

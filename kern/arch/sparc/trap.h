@@ -32,10 +32,18 @@ static inline bool in_kernel(struct trapframe *tf)
 }
 
 /* Needs to leave room for a trapframe at the top of the stack. */
-static inline void set_stack_pointer(uintptr_t sp)
+static inline void __attribute__((always_inline))
+set_stack_pointer(uintptr_t sp)
 {
 	sp = sp - SIZEOF_TRAPFRAME_T;
 	asm volatile("mov %0,%%sp" : : "r"(sp));
+}
+
+/* Save's the current kernel context into tf, setting the PC to the end of this
+ * function. */
+static inline void save_kernel_tf(struct trapframe *tf)
+{
+	/* TODO: save the registers, stack pointer, and have the PC pt to the end */
 }
 
 #endif /* !__ASSEMBLER__ */

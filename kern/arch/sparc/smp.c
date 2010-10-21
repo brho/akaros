@@ -153,6 +153,7 @@ int smp_call_wait(handler_wrapper_t* wrapper)
 void smp_percpu_init(void)
 {
 	uint32_t coreid = core_id();
+	per_cpu_info[coreid].spare = 0;
 	spinlock_init(&per_cpu_info[coreid].immed_amsg_lock);
 	STAILQ_INIT(&per_cpu_info[coreid].immed_amsgs);
 	spinlock_init(&per_cpu_info[coreid].routine_amsg_lock);

@@ -32,6 +32,7 @@
 #include <hashtable.h>
 #include <radix.h>
 #include <monitor.h>
+#include <kthread.h>
 
 #define l1 (available_caches.l1)
 #define l2 (available_caches.l2)
@@ -1183,4 +1184,45 @@ void test_random_fs(void)
 	if (retval)
 		printk("Symlink lookup failed (it should): %d (-40)\n", retval);
 	path_release(nd);
+}
+
+/* simple test - start one, do something else, and resume it.  For lack of a
+ * better infrastructure, we send ourselves a kmsg to run the kthread, which
+ * we'll handle in smp_idle (which you may have to manually call).  Note this
+ * doesn't test things like memory being leaked, or dealing with processes. */
+void test_kthreads(void)
+{
+	/* Kernel message to restart our kthread */
+	void test_up_sem(struct trapframe *tf, uint32_t srcid, void *a0, void *a1,
+	                 void *a2)
+	{
+		struct semaphore *sem = (struct semaphore*)a0;
+		struct kthread *kthread;
+		printk("[kmsg] Upping the sem to start the kthread, stacktop is %08p\n",
+		       get_stack_top());
+		kthread = __up_sem(sem);
+		if (!kthread) {
+			printk("[kmsg] Crap, the sem didn't have a kthread waiting!\n");
+			return;
+		}
+		printk("[kmsg] Restarting the kthread...\n");
+		restart_kthread(kthread);
+		panic("[kmsg] Damnit...");
+	}
+	struct semaphore sem;
+	init_sem(&sem, 1);		/* set to 1 to test the unwind */
+	printk("We're a kthread!  Stacktop is %08p.  Testing suspend, etc...\n",
+	       get_stack_top());
+	/* So we have something that will wake us up.  Routine messages won't get
+	 * serviced in the kernel right away. */
+	send_kernel_message(core_id(), test_up_sem, (void*)&sem, 0, 0,
+	                    KMSG_ROUTINE);
+	/* Actually block (or try to) */
+	/* This one shouldn't block - but will test the unwind (if 1 above) */
+	printk("About to sleep, but should unwind (signal beat us)\n");
+	sleep_on(&sem);
+	/* This one is for real, yo.  Run and tell that. */
+	printk("About to sleep for real\n");
+	sleep_on(&sem);
+	printk("Kthread restarted!, Stacktop is %08p.\n", get_stack_top());
 }
