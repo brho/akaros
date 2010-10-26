@@ -10,6 +10,7 @@
 #include <page_alloc.h>
 #include <pmap.h>
 #include <smp.h>
+#include <schedule.h>
 
 struct kmem_cache *kthread_kcache;
 
@@ -86,7 +87,7 @@ unwind_sleep_prep:
 	/* We get here if we should not sleep on sem (the signal beat the sleep).
 	 * Note we are not optimizing for cases where the signal won. */
 	spin_unlock(&sem->lock);
-	printk("Didn't sleep, unwinding...\n");
+	printd("Didn't sleep, unwinding...\n");
 	/* Restore the core's current and default stacktop */
 	current = kthread->proc;			/* arguably unnecessary */
 	if (kthread->proc)
@@ -137,6 +138,39 @@ void restart_kthread(struct kthread *kthread)
 	if (current)
 		kref_put(&current->kref);
 	current = kthread->proc;
+	if (kthread->proc_tf)
+		set_current_tf(kthread->proc_tf);
 	/* Finally, restart our thread */
 	pop_kernel_tf(&kthread->context);
+}
+
+/* Kmsg handler to launch/run a kthread.  This must be a routine message, since
+ * it does not return.  Furthermore, like all routine kmsgs that don't return,
+ * this needs to handle the fact that it won't return to the given TF (which is
+ * a proc's TF, since this was routine). */
+void __launch_kthread(struct trapframe *tf, uint32_t srcid, void *a0, void *a1,
+	                  void *a2)
+{
+	struct kthread *kthread = (struct kthread*)a0;
+	struct proc *cur_proc = current;
+	/* If there is no proc running, don't worry about not returning. */
+	if (cur_proc) {
+		if (cur_proc != kthread->proc) {
+			/* we're running the kthread from a different proc.  For now, we
+			 * can't be _M, since that would be taking away someone's vcore to
+			 * process another process's work. */
+			assert(cur_proc->state == PROC_RUNNING_S);
+			spin_lock(&cur_proc->proc_lock);
+			/* Wrap up / yield the current _S proc, which calls schedule_proc */
+			__proc_yield_s(cur_proc, tf);
+			spin_unlock(&cur_proc->proc_lock);
+		} else {
+			assert(cur_proc->state == PROC_RUNNING_M);
+			/* TODO: might need to do something here, though it will depend on
+			 * how we handle async local calls. */
+		}
+
+	}
+	restart_kthread(kthread);
+	assert(0);
 }

@@ -569,9 +569,10 @@ static void __proc_startcore(struct proc *p, trapframe_t *tf)
  * returning from local traps and such. */
 void proc_restartcore(struct proc *p, trapframe_t *tf)
 {
-	// TODO: proc_restartcore shouldn't ever be called with tf != current_tf,
-	// so the parameter should probably be removed outright.
-	assert(current_tf == tf);
+	if (current_tf != tf) {
+		printk("Current_tf: %08p, tf: %08p\n", current_tf, tf);
+		panic("Current TF is jacked...");
+	}
 
 	/* Need ints disabled when we return from processing (race) */
 	disable_irq();
@@ -722,6 +723,16 @@ static uint32_t get_pcoreid(struct proc *p, uint32_t vcoreid)
 	return p->procinfo->vcoremap[vcoreid].pcoreid;
 }
 
+/* Helper function: yields / wraps up current_tf and schedules the _S */
+void __proc_yield_s(struct proc *p, struct trapframe *tf)
+{
+	assert(p->state == PROC_RUNNING_S);
+	p->env_tf= *tf;
+	env_push_ancillary_state(p);			/* TODO: (HSS) */
+	__proc_set_state(p, PROC_RUNNABLE_S);
+	schedule_proc(p);
+}
+
 /* Yields the calling core.  Must be called locally (not async) for now.
  * - If RUNNING_S, you just give up your time slice and will eventually return.
  * - If RUNNING_M, you give up the current vcore (which never returns), and
@@ -762,10 +773,7 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 
 	switch (p->state) {
 		case (PROC_RUNNING_S):
-			p->env_tf= *current_tf;
-			env_push_ancillary_state(p); // TODO: (HSS)
-			__proc_set_state(p, PROC_RUNNABLE_S);
-			schedule_proc(p);
+			__proc_yield_s(p, current_tf);
 			break;
 		case (PROC_RUNNING_M):
 			printd("[K] Process %d (%p) is yielding on vcore %d\n", p->pid, p,

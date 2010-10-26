@@ -50,12 +50,12 @@ void smp_idle(void)
 			cpu_halt();
 		}
 	} else {
-		/* techincally, this check is arch dependent.  i want to know if it
-		 * happens.  the enabling/disabling could be interesting. */
 		enable_irqsave(&state);
-		if (!STAILQ_EMPTY(&myinfo->immed_amsgs) ||
-		        !STAILQ_EMPTY(&myinfo->routine_amsgs)) 
-			printk("[kernel] kmsgs in smp_idle() on a management core.\n");
+		/* this makes us wait to enter the manager til any IO is done (totally
+		 * arbitrary 10ms), so we can handle the routine message that we
+		 * currently use to do the completion.  Note this also causes us to wait
+		 * 10ms regardless of how long the IO takes.  This all needs work. */
+		//udelay(10000); /* done in the manager for now */
 		process_routine_kmsg();
 		disable_irqsave(&state);
 		manager();

@@ -11,6 +11,7 @@
 #include <kref.h>
 #include <slab.h>
 #include <pagemap.h>
+#include <kthread.h>
 
 /* All block IO is done assuming a certain size sector, which is the smallest
  * possible unit of transfer between the kernel and the block layer.  This can
@@ -79,6 +80,7 @@ struct block_request {
 	unsigned int				flags;
 	void						(*callback)(struct block_request *breq);
 	void						*data;
+	struct semaphore			sem;
 	struct buffer_head			**bhs;				/* BHs describing the IOs */
 	unsigned int				nr_bhs;
 	struct buffer_head			*local_bhs[NR_INLINE_BH];

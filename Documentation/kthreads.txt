@@ -230,3 +230,25 @@ you'll want to rerun the kthread on the physical core it was suspended on!
 (cache locality, and it might be a legit option to allow processes to say it's
 okay to take their vcore).  Note this may require more bookkeeping in the struct
 kthread.
+
+There is another complication: the way we've been talking about kmsgs (starting
+fresh), we are talking about *routine* messages.  One requirement for routine
+messages that do not return is that they handle process state.  The current
+kmsgs, such as __death and __preempt are built so they can handle acting on
+whichever process is currently running.  Likewise, __launch_kthread() needs to
+handle the cases that arise when it runs on a core that was about to run a
+process (as can often happen with proc_restartcore(), which calls
+process_routine_kmsg()).  Basically, if it was a _S, it just yields the process,
+similar to what happens in Linux (call schedule() on the way out, from what I
+recall).  If it was a _M, things are a bit more complicated, since this should
+only happen if the kthread is for that process (and probably a bunch of other
+things - like they said it was okay to interrupt their vcore to finish the
+syscall).
+
+To a certain extent, routine kmsgs don't seem like a nice fit, when we really
+want to be calling schedule().  Though if you think of it as the enactment of a
+previous scheduling decision (like other kmsgs (__death())), then it makes more
+sense.  The scheduling decision (as of now) was made in the interrupt handler
+when it decided to send the kernel msg.  In the future, we could split this into
+having the handler make the kthread active, and have the scheduler called to
+decide where and when to run the kthread.

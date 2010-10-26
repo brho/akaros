@@ -87,5 +87,9 @@ static inline struct kthread *__up_sem(struct semaphore *sem)
 void kthread_init(void);
 void sleep_on(struct semaphore *sem);
 void restart_kthread(struct kthread *kthread);
+/* Kmsg handler to launch/run a kthread.  This must be a routine message, since
+ * it does not return. */
+void __launch_kthread(struct trapframe *tf, uint32_t srcid, void *a0, void *a1,
+	                  void *a2);
 
 #endif /* ROS_KERN_KTHREAD_H */

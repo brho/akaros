@@ -109,18 +109,23 @@ int bdev_submit_request(struct block_device *bdev, struct block_request *breq)
 	/* Faking an interrupt.  The handler runs in interrupt context btw */
 	void x86_breq_handler(struct trapframe *tf, void *data)
 	{
-		/* Re-register the old dumb handler */
+		/* Turn off the interrupt, Re-register the old dumb handler */
+		set_core_timer(0);
 		register_interrupt_handler(interrupt_handlers,
 		                           LAPIC_TIMER_DEFAULT_VECTOR, timer_interrupt,
 		                           NULL);
+		/* In the future, we'll need to figure out which breq this was in
+		 * response to */
 		struct block_request *breq = (struct block_request*)data;
 		if (breq->callback)
 			breq->callback(breq);
 	}
 	register_interrupt_handler(interrupt_handlers, LAPIC_TIMER_DEFAULT_VECTOR,
 	                           x86_breq_handler, breq);
-	/* Fake a 5ms delay */
-	set_core_timer(5000);
+	/* Fake a 5ms delay.  or 50... TODO for some reason, KVM needs a much larger
+	 * wait time so that we can get to sleep before the interrupt arrives.  Set
+	 * this to 5000 for "real" use (this is just faking anyway...) */
+	set_core_timer(50000);
 #else
 	if (breq->callback)
 		breq->callback(breq);
@@ -132,20 +137,34 @@ int bdev_submit_request(struct block_device *bdev, struct block_request *breq)
 /* Helper method, unblocks someone blocked on sleep_on_breq(). */
 void generic_breq_done(struct block_request *breq)
 {
-	/* TODO: BLK - unblock the kthread sleeping on this request */
+#ifdef __i386__ 	/* Sparc can't restart kthreads yet */
+	struct kthread *sleeper = __up_sem(&breq->sem);
+	if (!sleeper) {
+		/* this is odd, but happened a lot with kvm */
+		printk("[kernel] no one waiting on breq %08p\n", breq);
+		return;
+	}
+	/* For lack of anything better, send it to ourselves (so we handle it out of
+	 * interrupt context, which we're still in). */
+	send_kernel_message(core_id(), __launch_kthread, (void*)sleeper, 0, 0,
+	                    KMSG_ROUTINE);
+	assert(TAILQ_EMPTY(&breq->sem.waiters));
+#else
 	breq->data = (void*)1;
+#endif
 }
 
 /* Helper, pairs with generic_breq_done() */
 void sleep_on_breq(struct block_request *breq)
 {
-	/* TODO: BLK Block til we are done: data gets toggled in the completion.
-	 * This only works if the completion happened first (for now) */
+	/* Since printk takes a while, this may make you lose the race */
+	printd("Sleeping on breq %08p\n", breq);
 	assert(irq_is_enabled());
 #ifdef __i386__ 	/* Sparc isn't interrupt driven yet */
-	while (!breq->data)
-		cpu_relax();
+	sleep_on(&breq->sem);
 #else
+	/* Sparc can't block yet (TODO).  This only works if the completion happened
+	 * first (for now) */
 	assert(breq->data);
 #endif
 }
@@ -242,6 +261,7 @@ found:
 	breq->flags = BREQ_READ;
 	breq->callback = generic_breq_done;
 	breq->data = 0;
+	init_sem(&breq->sem, 0);
 	breq->bhs = breq->local_bhs;
 	breq->bhs[0] = bh;
 	breq->nr_bhs = 1;
