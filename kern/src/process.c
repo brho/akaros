@@ -460,19 +460,16 @@ void proc_run(struct proc *p)
 			p->procinfo->num_vcores = 0;
 			__map_vcore(p, 0, core_id()); // sort of.  this needs work.
 			__seq_end_write(&p->procinfo->coremap_seqctr);
-			/* __proc_startcore assumes the reference we give it is for current.
-			 * Decref if current is already properly set. */
+			/* proc_restartcore assumes the reference we give it is for current.
+			 * Decref if current is already properly set, otherwise ensure
+			 * current is set. */
 			if (p == current)
 				kref_put(&p->kref);
-			/* We don't want to process routine messages here, since it's a bit
-			 * different than when we perform a syscall in this process's
-			 * context.  We want interrupts disabled so that if there was a
-			 * routine message on the way, we'll get the interrupt once we pop
-			 * back to userspace.  */
+			/* We restartcore, instead of startcore, since startcore is a bit
+			 * lower level and we want a chance to process kmsgs before starting
+			 * the process. */
 			spin_unlock(&p->proc_lock);
-			disable_irq();
-
-			__proc_startcore(p, &p->env_tf);
+			proc_restartcore(p, &p->env_tf);
 			break;
 		case (PROC_RUNNABLE_M):
 			/* vcoremap[i] holds the coreid of the physical core allocated to
@@ -512,6 +509,28 @@ void proc_run(struct proc *p)
 	}
 }
 
+/* Helper, makes p the 'current' process, dropping the old current/cr3.  Don't
+ * incref - this assumes the passed in reference already counted 'current'. */
+static void __set_proc_current(struct proc *p)
+{
+	/* We use the pcpui to access 'current' to cut down on the core_id() calls,
+	 * though who know how expensive/painful they are. */
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	/* If the process wasn't here, then we need to load its address space. */
+	if (p != pcpui->cur_proc) {
+		/* Do not incref here.  We were given the reference to current,
+		 * pre-upped. */
+		lcr3(p->env_cr3);
+		/* This is "leaving the process context" of the previous proc.  The
+		 * previous lcr3 unloaded the previous proc's context.  This should
+		 * rarely happen, since we usually proactively leave process context,
+		 * but this is the fallback. */
+		if (pcpui->cur_proc)
+			kref_put(&pcpui->cur_proc->kref);
+		pcpui->cur_proc = p;
+	}
+}
+
 /* Actually runs the given context (trapframe) of process p on the core this
  * code executes on.  This is called directly by __startcore, which needs to
  * bypass the routine_kmsg check.  Interrupts should be off when you call this.
@@ -528,19 +547,7 @@ void proc_run(struct proc *p)
 static void __proc_startcore(struct proc *p, trapframe_t *tf)
 {
 	assert(!irq_is_enabled());
-	/* If the process wasn't here, then we need to load its address space. */
-	if (p != current) {
-		/* Do not incref here.  We were given the reference to current,
-		 * pre-upped. */
-		lcr3(p->env_cr3);
-		/* This is "leaving the process context" of the previous proc.  The
-		 * previous lcr3 unloaded the previous proc's context.  This should
-		 * rarely happen, since we usually proactively leave process context,
-		 * but is the fallback. */
-		if (current)
-			kref_put(&current->kref);
-		set_current_proc(p);
-	}
+	__set_proc_current(p);
 	/* need to load our silly state, preferably somewhere other than here so we
 	 * can avoid the case where the context was just running here.  it's not
 	 * sufficient to do it in the "new process" if-block above (could be things
@@ -552,12 +559,11 @@ static void __proc_startcore(struct proc *p, trapframe_t *tf)
 	 * __startcore.  */
 	if (p->state == PROC_RUNNING_S)
 		env_pop_ancillary_state(p);
-	
 	env_pop_tf(tf);
 }
 
-/* Restarts the given context (trapframe) of process p on the core this code
- * executes on.  Calls an internal function to do the work.
+/* Restarts/runs the given context (trapframe) of process p on the core this
+ * code executes on.  Calls an internal function to do the work.
  *
  * In case there are pending routine messages, like __death, __preempt, or
  * __notify, we need to run them.  Alternatively, if there are any, we could
@@ -569,14 +575,17 @@ static void __proc_startcore(struct proc *p, trapframe_t *tf)
  * returning from local traps and such. */
 void proc_restartcore(struct proc *p, trapframe_t *tf)
 {
-	if (current_tf != tf) {
-		printk("Current_tf: %08p, tf: %08p\n", current_tf, tf);
+	if ((tf != &p->env_tf) && (tf != current_tf)) {
+		printk("tf: %08p, Current_tf: %08p, env_tf: %08p\n", tf, current_tf,
+		       &p->env_tf);
 		panic("Current TF is jacked...");
 	}
-
 	/* Need ints disabled when we return from processing (race) */
 	disable_irq();
-	process_routine_kmsg();
+	/* Need to be current, in case a kmsg is there that tries to clobber us.
+	 * Yes, this gets called again in __proc_startcore(). */
+	__set_proc_current(p);
+	process_routine_kmsg(tf);
 	__proc_startcore(p, tf);
 }
 
@@ -1274,7 +1283,7 @@ void __proc_kmsg_pending(struct proc *p, bool ipi_pending)
 {
 	if (ipi_pending) {
 		kref_put(&p->kref);
-		process_routine_kmsg();
+		process_routine_kmsg(0);
 		panic("stack-killing kmsg not found in %s!!!", __FUNCTION__);
 	}
 }

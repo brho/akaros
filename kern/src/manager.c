@@ -115,12 +115,12 @@ void manager_brho(void)
 
 	/* I usually want this */
 	schedule();
-	process_routine_kmsg();	/* maybe do this before schedule() */
+	process_routine_kmsg(0);	/* maybe do this before schedule() */
 
 	enable_irq();
 	/* this ghetto hack really wants to wait for an interrupt, but time out */
 	udelay(60000);	/* wait for IO when there really is nothing to do */
-	process_routine_kmsg();
+	process_routine_kmsg(0);
 	printd("No work to do (schedule returned)\n");
 	monitor(0);
 

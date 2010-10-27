@@ -500,13 +500,15 @@ void __kernel_message(struct trapframe *tf)
  * make sure immediates still run first (or when they arrive, if processing a
  * bunch of these messages).  This will disable interrupts, and restore them to
  * whatever state you left them. */
-void process_routine_kmsg(void)
+void process_routine_kmsg(struct trapframe *tf)
 {
 	per_cpu_info_t *myinfo = &per_cpu_info[core_id()];
 	kernel_message_t msg_cp, *k_msg;
 	int8_t irq_state = 0;
 
 	disable_irqsave(&irq_state);
+	/* If we were told what our TF was, use that.  o/w, go with current_tf. */
+	tf = tf ? tf : current_tf;
 	while (1) {
 		/* normally, we want ints disabled, so we don't have an empty self-ipi
 		 * for every routine message. (imagine a long list of routines).  But we
@@ -535,7 +537,6 @@ void process_routine_kmsg(void)
 			send_self_ipi(I_KERNEL_MSG);
 		/* Execute the kernel message */
 		assert(msg_cp.pc);
-		msg_cp.pc(current_tf, msg_cp.srcid, msg_cp.arg0, msg_cp.arg1,
-		          msg_cp.arg2);
+		msg_cp.pc(tf, msg_cp.srcid, msg_cp.arg0, msg_cp.arg1, msg_cp.arg2);
 	}
 }
