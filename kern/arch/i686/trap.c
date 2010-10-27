@@ -331,7 +331,13 @@ void irq_handler(struct trapframe *tf)
 	else
 		lapic_send_eoi();
 #endif
-
+	/* Return to the current process, which should be runnable.  If we're the
+	 * kernel, we should just return naturally.  Note that current and tf need
+	 * to still be okay (might not be after blocking) */
+	if (in_kernel(tf))
+		return;
+	proc_restartcore(current, tf);
+	assert(0);
 }
 
 void
