@@ -9,28 +9,29 @@
 #include <arch/arch.h>
 #include <sys/param.h>
 
-syscall_front_ring_t syscallfrontring;
-sysevent_back_ring_t syseventbackring;
 syscall_desc_pool_t syscall_desc_pool;
 async_desc_pool_t async_desc_pool;
 async_desc_t* current_async_desc;
 
-// use globals for now
-void init_arc()
+struct arsc_channel global_ac;
+
+void init_arc(struct arsc_channel* ac)
 {
 	// Set up the front ring for the general syscall ring
 	// and the back ring for the general sysevent ring
-	// TODO: Reorganize these global variables
-	FRONT_RING_INIT(&syscallfrontring, &(__procdata.syscallring), SYSCALLRINGSIZE);
-	BACK_RING_INIT(&syseventbackring, &(__procdata.syseventring), SYSEVENTRINGSIZE);
+	mcs_lock_init(&ac->aclock);
+	ac->ring_page = (syscall_sring_t*)sys_init_arsc();
+
+	FRONT_RING_INIT(&ac->sysfr, ac->ring_page, SYSCALLRINGSIZE);
+	//BACK_RING_INIT(&syseventbackring, &(__procdata.syseventring), SYSEVENTRINGSIZE);
+	//TODO: eventually rethink about desc pools, they are here but no longer necessary
 	POOL_INIT(&syscall_desc_pool, MAX_SYSCALLS);
 	POOL_INIT(&async_desc_pool, MAX_ASYNCCALLS);
-	sys_init_arsc();
-
-
 }
+
 // Wait on all syscalls within this async call.  TODO - timeout or something?
-int waiton_async_call(async_desc_t* desc, async_rsp_t* rsp)
+
+int waiton_group_call(async_desc_t* desc, async_rsp_t* rsp)
 {
 	syscall_rsp_t syscall_rsp;
 	syscall_desc_t* d;
@@ -108,27 +109,36 @@ int get_all_desc(async_desc_t** a_desc, syscall_desc_t** s_desc)
 }
 
 // This runs one syscall instead of a group. 
-int async_syscall(syscall_req_t* req, syscall_desc_t* desc)
+int async_syscall(syscall_req_t* req, syscall_desc_t** desc_ptr2)
 {
 	// Note that this assumes one global frontring (TODO)
 	// abort if there is no room for our request.  ring size is currently 64.
 	// we could spin til it's free, but that could deadlock if this same thread
 	// is supposed to consume the requests it is waiting on later.
-	if (RING_FULL(&syscallfrontring)) {
+	syscall_desc_t* desc = *desc_ptr2 = malloc(sizeof (syscall_desc_t));
+	desc->channel = &SYS_CHANNEL;
+	syscall_front_ring_t *fr = &(desc->channel->sysfr);
+	mcs_lock_lock(&desc->channel->aclock);
+	if (RING_FULL(fr)) {
 		errno = EBUSY;
 		return -1;
 	}
 	// req_prod_pvt comes in as the previously produced item.  need to
 	// increment to the next available spot, which is the one we'll work on.
 	// at some point, we need to listen for the responses.
-	desc->idx = ++(syscallfrontring.req_prod_pvt);
-	desc->sysfr = &syscallfrontring;
-	syscall_req_t* r = RING_GET_REQUEST(&syscallfrontring, desc->idx);
+	desc->idx = ++(fr->req_prod_pvt);
+	syscall_req_t* r = RING_GET_REQUEST(fr, desc->idx);
+	assert (r->status == RES_free);
+	req->status = REQ_alloc;
+	
 	memcpy(r, req, sizeof(syscall_req_t));
+	r->status = REQ_ready;
 	// push our updates to syscallfrontring.req_prod_pvt
-	RING_PUSH_REQUESTS(&syscallfrontring);
+	// note: it is ok to push without protection since it is atomic and kernel
+	// won't process any requests until they are marked REQ_ready (also atomic)
+	RING_PUSH_REQUESTS(fr);
 	//cprintf("DEBUG: sring->req_prod: %d, sring->rsp_prod: %d\n", 
-	//   syscallfrontring.sring->req_prod, syscallfrontring.sring->rsp_prod);
+	mcs_lock_unlock(&desc->channel->aclock);
 	return 0;
 }
 
@@ -137,22 +147,24 @@ int waiton_syscall(syscall_desc_t* desc, syscall_rsp_t* rsp)
 {
 	// Make sure we were given a desc with a non-NULL frontring.  This could
 	// happen if someone forgot to check the error code on the paired syscall.
-	if (!desc->sysfr){
+	syscall_front_ring_t *fr =  &desc->channel->sysfr;
+	
+	if (!fr){
 		errno = EFAIL;
 		return -1;
 	}
 	// this forces us to call wait in the order in which the syscalls are made.
-	if (desc->idx != desc->sysfr->rsp_cons + 1){
+	if (desc->idx != fr->rsp_cons + 1){
 		errno = EDEADLOCK;
 		return -1;
 	}
-	while (!(RING_HAS_UNCONSUMED_RESPONSES(desc->sysfr)))
+	while (!(RING_HAS_UNCONSUMED_RESPONSES(fr)))
 		cpu_relax();
-	memcpy(rsp, RING_GET_RESPONSE(desc->sysfr, desc->idx), sizeof(*rsp));
-	desc->sysfr->rsp_cons++;
+	memcpy(rsp, RING_GET_RESPONSE(fr, desc->idx), sizeof(*rsp));
+	fr->rsp_cons++;
     // run a cleanup function for this desc, if available
-    if (desc->cleanup)
-    	desc->cleanup(desc->data);
+    if (rsp->cleanup)
+    	rsp->cleanup(rsp->data);
 	if (rsp->syserr){
 		errno = rsp->syserr;
 		return -1;

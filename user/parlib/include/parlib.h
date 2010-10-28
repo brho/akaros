@@ -48,9 +48,8 @@ int         sys_notify(int pid, unsigned int ev_type, struct event_msg *u_msg);
 int         sys_self_notify(uint32_t vcoreid, unsigned int ev_type,
                             struct event_msg *u_msg);
 int         sys_halt_core(unsigned int usec);
+void*		sys_init_arsc();
 
-/* ARSC */
-int			sys_init_arsc();
 
 #endif	// !ASSEMBLER
 

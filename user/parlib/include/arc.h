@@ -12,7 +12,19 @@
 #include <assert.h>
 #include <sys/queue.h>
 #include <ros/ring_syscall.h>
+#include <mcs.h>
 
+struct arsc_channel {
+	mcs_lock_t aclock;
+	syscall_sring_t* ring_page;
+	syscall_front_ring_t sysfr;
+	// struct channel_ops* ops;
+}; 
+
+typedef struct arsc_channel arsc_channel_t;
+
+#define SYS_CHANNEL (global_ac)
+extern arsc_channel_t global_ac;
 extern syscall_front_ring_t syscallfrontring;
 extern sysevent_back_ring_t syseventbackring;
 
@@ -24,11 +36,8 @@ extern sysevent_back_ring_t syseventbackring;
 typedef struct syscall_desc syscall_desc_t;
 struct syscall_desc {
 	TAILQ_ENTRY(syscall_desc) next;
-	syscall_front_ring_t* sysfr;
+	struct arsc_channel* channel;
 	uint32_t idx;
-	// cleanup
-	void (*cleanup)(void* data);
-	void* data;
 };
 TAILQ_HEAD(syscall_desc_list, syscall_desc);
 typedef struct syscall_desc_list syscall_desc_list_t;
@@ -66,15 +75,15 @@ extern syscall_desc_pool_t syscall_desc_pool;
 extern async_desc_pool_t async_desc_pool;
 
 /* Initialize front and back rings of syscall/event ring */
-void init_arc();
+void init_arc(struct arsc_channel* ac);
+
+int async_syscall(syscall_req_t* req, syscall_desc_t** desc_ptr2);
 
 /* Generic Async Call */
 int waiton_syscall(syscall_desc_t* desc, syscall_rsp_t* rsp);
 
 /* Async group call */
-int waiton_async_call(async_desc_t* desc, async_rsp_t* rsp);
-
-int async_syscall(syscall_req_t* req, syscall_desc_t* desc);
+int waiton_group_call(async_desc_t* desc, async_rsp_t* rsp);
 
 async_desc_t* get_async_desc(void);
 syscall_desc_t* get_sys_desc(async_desc_t* desc);

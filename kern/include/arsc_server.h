@@ -17,7 +17,7 @@
 extern struct proc_list arsc_proc_list;
 extern spinlock_t arsc_proc_lock;
 
-intreg_t sys_init_arsc(struct proc* p);
+syscall_sring_t* sys_init_arsc(struct proc* p);
 intreg_t syscall_async(struct proc* p, syscall_req_t *syscall);
 void arsc_server(trapframe_t *tf);
 

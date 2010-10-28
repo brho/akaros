@@ -48,7 +48,6 @@ struct vm_region *create_vmr(struct proc *p, uintptr_t va, size_t len)
 	assert(!PGOFF(va));
 	assert(!PGOFF(len));
 	assert(va + len <= UMAPTOP);
-
 	/* Is there room before the first one: */
 	vm_i = TAILQ_FIRST(&p->vm_regions);
 	/* This works for now, but if all we have is BRK_END ones, we'll start

@@ -32,13 +32,30 @@ intreg_t inline syscall_async(struct proc *p, syscall_req_t *call)
 	               call->args[2], call->args[3], call->args[4], call->args[5]);
 }
 
-intreg_t sys_init_arsc(struct proc *p)
+syscall_sring_t* sys_init_arsc(struct proc *p)
 {
-	proc_incref(p, 1);		/* we're storing an external ref here */
+	kref_get(&p->kref, 1);		/* we're storing an external ref here */
+	syscall_sring_t* sring;
+	void * va;
+	// TODO: need to pin this page in the future when swapping happens
+	va = do_mmap(p,MMAP_LOWEST_VA, SYSCALLRINGSIZE, PROT_READ|PROT_WRITE, MAP_ANON|MAP_POPULATE, NULL, 0);
+	pte_t *pte = pgdir_walk(p->env_pgdir, (void*)va, 0);
+	assert(pte);
+	sring = (syscall_sring_t*) (ppn2kva(PTE2PPN(*pte)));
+	/*make sure we are able to allocate the shared ring */
+	assert(sring != NULL);
+ 	p->procdata->syscallring = sring;
+	/* Initialize the generic syscall ring buffer */
+	SHARED_RING_INIT(sring);
+
+	BACK_RING_INIT(&p->syscallbackring,
+	               sring,
+	               SYSCALLRINGSIZE);
+
 	spin_lock_irqsave(&arsc_proc_lock);
 	TAILQ_INSERT_TAIL(&arsc_proc_list, p, proc_arsc_link);
 	spin_unlock_irqsave(&arsc_proc_lock);
-	return ESUCCESS;
+	return (syscall_sring_t*)va;
 }
 
 void arsc_server(struct trapframe *tf)
@@ -48,7 +65,7 @@ void arsc_server(struct trapframe *tf)
 	while (1) {
 		while (TAILQ_EMPTY(&arsc_proc_list))
 			cpu_relax();
-
+		
 		TAILQ_FOREACH(p, &arsc_proc_list, proc_link) {
 			/* Probably want to try to process a dying process's syscalls.  If
 			 * not, just move it to an else case */
@@ -72,7 +89,7 @@ static intreg_t process_generic_syscalls(struct proc *p, size_t max)
 	// looking at a process not initialized to perform arsc. 
 	if (sysbr == NULL) 
 		return count;
-
+	
 	// max is the most we'll process.  max = 0 means do as many as possible
 	// TODO: check for initialization of the ring. 
 	while (RING_HAS_UNCONSUMED_REQUESTS(sysbr) && ((!max)||(count < max)) ) {
@@ -90,7 +107,7 @@ static intreg_t process_generic_syscalls(struct proc *p, size_t max)
 		// going to explicitly fill in all fields
 		syscall_rsp_t rsp;
 		// this assumes we get our answer immediately for the syscall.
-		syscall_req_t* req = RING_GET_REQUEST(sysbr, ++(sysbr->req_cons));
+		syscall_req_t* req = RING_GET_REQUEST(sysbr, ++sysbr->req_cons);
 		// print req
 		printd("req no %d, req arg %c\n", req->num, *((char*)req->args[0]));
 		
@@ -102,11 +119,14 @@ static intreg_t process_generic_syscalls(struct proc *p, size_t max)
 		
 		rsp.retval = syscall_async(p, req);
 		rsp.syserr = sysc.err;
+		rsp.cleanup = req->cleanup;
+		rsp.data = req->data;
+		rsp.status = RES_ready;
 		// write response into the slot it came from
 		memcpy(req, &rsp, sizeof(syscall_rsp_t));
-		// update our counter for what we've produced (assumes we went in order!)
 		(sysbr->rsp_prod_pvt)++;
 		RING_PUSH_RESPONSES(sysbr);
+
 		//printk("DEBUG POST: sring->req_prod: %d, sring->rsp_prod: %d\n",
 		//	   sysbr->sring->req_prod, sysbr->sring->rsp_prod);
 	}

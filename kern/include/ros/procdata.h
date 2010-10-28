@@ -13,8 +13,11 @@
 #include <ros/event.h>
 
 typedef struct procdata {
+	/*
 	syscall_sring_t			syscallring;
 	char					pad1[SYSCALLRINGSIZE - sizeof(syscall_sring_t)];
+	*/
+	syscall_sring_t			*syscallring;
 	sysevent_sring_t		syseventring;
 	char					pad2[SYSEVENTRINGSIZE - sizeof(sysevent_sring_t)];
 #ifdef __i386__

@@ -5,7 +5,6 @@
 #include <ros/arch/membar.h>
 #include <arch/x86.h>
 #include <arch/arch.h>
-
 typedef void * RACY atomic_t;
 struct spinlock {
 	volatile uint32_t RACY rlock;
@@ -14,7 +13,7 @@ struct spinlock {
 	uint32_t calling_core;
 #endif
 };
-typedef struct spinlock RACY spinlock_t;
+typedef struct spinlock spinlock_t;
 #define SPINLOCK_INITIALIZER {0}
 
 static inline void atomic_init(atomic_t *number, int32_t val);

@@ -304,13 +304,6 @@ error_t proc_alloc(struct proc **pp, struct proc *parent)
 	proc_init_procinfo(p);
 	/* Initialize the contents of the e->procdata structure */
 
-	/* Initialize the generic syscall ring buffer */
-	SHARED_RING_INIT(&p->procdata->syscallring);
-	/* Initialize the backend of the syscall ring buffer */
-	BACK_RING_INIT(&p->syscallbackring,
-	               &p->procdata->syscallring,
-	               SYSCALLRINGSIZE);
-
 	/* Initialize the generic sysevent ring buffer */
 	SHARED_RING_INIT(&p->procdata->syseventring);
 	/* Initialize the frontend of the sysevent ring buffer */
