@@ -34,6 +34,16 @@ void sleep_on(struct semaphore *sem)
 
 	/* interrups would be messy here */
 	disable_irqsave(&irq_state);
+	/* Try to down the semaphore.  If there is a signal there, we can skip all
+	 * of the sleep prep and just return. */
+	spin_lock(&sem->lock);	/* no need for irqsave, since we disabled ints */
+	if (sem->nr_signals > 0) {
+		sem->nr_signals--;
+		spin_unlock(&sem->lock);
+		goto block_return_path;
+	}
+	/* we're probably going to sleep, so get ready.  We'll check again later. */
+	spin_unlock(&sem->lock);
 	/* Try to get the spare first.  If there is one, we'll use it (o/w, we'll
 	 * get a fresh kthread.  Why we need this is more clear when we try to
 	 * restart kthreads.  Having them also ought to cut down on contention.
