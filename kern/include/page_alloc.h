@@ -15,6 +15,7 @@
 #include <colored_page_alloc.h>
 #include <process.h>
 #include <kref.h>
+#include <kthread.h>
 
 struct page_map;		/* preprocessor games */
 
@@ -31,9 +32,11 @@ typedef LIST_ENTRY(page) page_list_entry_t;
 #define PG_DIRTY		0x004	/* page map, data is dirty */
 #define PG_BUFFER		0x008	/* is a buffer page, has BHs */
 
-/* TODO: this struct is not protected from concurrent operations in any
- * function.  We may want a lock, but a better thing would be a good use of
- * reference counting and atomic operations. */
+/* TODO: this struct is not protected from concurrent operations in some
+ * functions.  If you want to lock on it, use the spinlock in the semaphore.
+ * This structure is getting pretty big (and we're wasting RAM).  If it becomes
+ * an issue, we can dynamically allocate some of these things when we're a
+ * buffer page (in a page mapping) */
 struct page {
 	LIST_ENTRY(page)			pg_link;	/* membership in various lists */
 	struct kref					pg_kref;
@@ -41,6 +44,7 @@ struct page {
 	struct page_map				*pg_mapping;
 	unsigned long				pg_index;
 	void						*pg_private;	/* type depends on page usage */
+	struct semaphore 			pg_sem;		/* for blocking on IO */
 };
 
 /******** Externally visible global variables ************/

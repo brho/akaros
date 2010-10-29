@@ -145,7 +145,7 @@ void generic_breq_done(struct block_request *breq)
 		return;
 	}
 	/* For lack of anything better, send it to ourselves (so we handle it out of
-	 * interrupt context, which we're still in). */
+	 * interrupt context, which we're still in). (TODO: KSCHED). */
 	send_kernel_message(core_id(), __launch_kthread, (void*)sleeper, 0, 0,
 	                    KMSG_ROUTINE);
 	assert(TAILQ_EMPTY(&breq->sem.waiters));

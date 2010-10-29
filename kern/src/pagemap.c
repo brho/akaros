@@ -48,6 +48,7 @@ int pm_insert_page(struct page_map *pm, unsigned long index, struct page *page)
 	if (!error) {
 		page_incref(page);
 		page->pg_flags |= PG_LOCKED | PG_BUFFER;
+		page->pg_sem.nr_signals = 0;		/* ensure others will block */
 		page->pg_mapping = pm;
 		page->pg_index = index;
 		pm->pm_num_pages++;

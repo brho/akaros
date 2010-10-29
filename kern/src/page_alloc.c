@@ -44,15 +44,13 @@ void colored_page_alloc_init()
 		cache_color_alloc(llc_cache, global_cache_colors_map);
 }
 
-/**
- * @brief Clear a Page structure.
- *
- * The result has null links and 0 refcount.
- * Note that the corresponding physical page is NOT initialized!
- */
-static void __page_clear(page_t *SAFE page)
+/* Initializes a page.  We can optimize this a bit since 0 usually works to init
+ * most structures, but we'll hold off on that til it is a problem. */
+static void __page_init(struct page *page)
 {
 	memset(page, 0, sizeof(page_t));
+	page_setref(page, 1);
+	init_sem(&page->pg_sem, 0);
 }
 
 #define __PAGE_ALLOC_FROM_RANGE_GENERIC(page, base_color, range, predicate) \
@@ -67,8 +65,7 @@ static void __page_clear(page_t *SAFE page)
 	if(i < (base_color+range)) {                                            \
 		*page = LIST_FIRST(&colored_page_free_list[i]);                     \
 		LIST_REMOVE(*page, pg_link);                                        \
-		__page_clear(*page);                                                \
-		page_setref((*page), 1);                                            \
+		__page_init(*page);                                                 \
 		return i;                                                           \
 	}                                                                       \
 	return -ENOMEM;
@@ -106,8 +103,7 @@ static error_t __page_alloc_specific(page_t** page, size_t ppn)
 		return -ENOMEM;
 	*page = sp_page;
 	LIST_REMOVE(*page, pg_link);
-	__page_clear(*page);
-	page_setref(*page, 1);
+	__page_init(*page);
 	return 0;
 }
 
@@ -280,8 +276,6 @@ static void page_release(struct kref *kref)
 
 	if (page->pg_flags & PG_BUFFER)
 		free_bhs(page);
-	/* Probably issues with this, get rid of it on a future review */
-	__page_clear(page);
 	/* Give our page back to the free list.  The protections for this are that
 	 * the list lock is grabbed by page_decref. */
 	LIST_INSERT_HEAD(
@@ -300,14 +294,13 @@ void page_setref(page_t *page, size_t val)
 }
 
 /* Attempts to get a lock on the page for IO operations.  If it is already
- * locked, it will block the thread until it is unlocked.  Note that this is
+ * locked, it will block the kthread until it is unlocked.  Note that this is
  * really a "sleep on some event", not necessarily the IO, but it is "the page
  * is ready". */
 void lock_page(struct page *page)
 {
-	/* TODO: (BLK) actually do something!  And this has a race!  Not a big deal
-	 * right now, since the only users of this are serialized, but once we have
-	 * any sort of real IO, this will be an issue. */
+	/* when this returns, we have are the ones to have locked the page */
+	sleep_on(&page->pg_sem);
 	assert(!(page->pg_flags & PG_LOCKED));
 	page->pg_flags |= PG_LOCKED;
 }
@@ -315,10 +308,15 @@ void lock_page(struct page *page)
 /* Unlocks the page, and wakes up whoever is waiting on the lock */
 void unlock_page(struct page *page)
 {
-	/* TODO: (BLK) actually do something!  However this unlock works, it will
-	 * need to know who to unlock, and it will have to be called in response to
-	 * a basic interrupt...  */
+	struct kthread *sleeper;
 	page->pg_flags &= ~PG_LOCKED;
+	sleeper = __up_sem(&page->pg_sem);
+	if (sleeper) {
+		printk("Unexpected sleeper on a page!");	/* til we test this */
+		/* For lack of anything better, send it to ourselves. (TODO: KSCHED) */
+		send_kernel_message(core_id(), __launch_kthread, (void*)sleeper, 0, 0,
+		                    KMSG_ROUTINE);
+	}
 }
 
 void print_pageinfo(struct page *page)
