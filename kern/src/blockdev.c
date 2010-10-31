@@ -144,10 +144,7 @@ void generic_breq_done(struct block_request *breq)
 		printk("[kernel] no one waiting on breq %08p\n", breq);
 		return;
 	}
-	/* For lack of anything better, send it to ourselves (so we handle it out of
-	 * interrupt context, which we're still in). (TODO: KSCHED). */
-	send_kernel_message(core_id(), __launch_kthread, (void*)sleeper, 0, 0,
-	                    KMSG_ROUTINE);
+	kthread_runnable(sleeper);
 	assert(TAILQ_EMPTY(&breq->sem.waiters));
 #else
 	breq->data = (void*)1;

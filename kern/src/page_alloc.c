@@ -313,9 +313,7 @@ void unlock_page(struct page *page)
 	sleeper = __up_sem(&page->pg_sem);
 	if (sleeper) {
 		printk("Unexpected sleeper on a page!");	/* til we test this */
-		/* For lack of anything better, send it to ourselves. (TODO: KSCHED) */
-		send_kernel_message(core_id(), __launch_kthread, (void*)sleeper, 0, 0,
-		                    KMSG_ROUTINE);
+		kthread_runnable(sleeper);
 	}
 }
 

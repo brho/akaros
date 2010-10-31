@@ -154,6 +154,15 @@ void restart_kthread(struct kthread *kthread)
 	pop_kernel_tf(&kthread->context);
 }
 
+/* Call this when a kthread becomes runnable/unblocked.  We don't do anything
+ * particularly smart yet, but when we do, we can put it here. */
+void kthread_runnable(struct kthread *kthread)
+{
+	/* For lack of anything better, send it to ourselves. (TODO: KSCHED) */
+	send_kernel_message(core_id(), __launch_kthread, (void*)kthread, 0, 0,
+	                    KMSG_ROUTINE);
+}
+
 /* Kmsg handler to launch/run a kthread.  This must be a routine message, since
  * it does not return.  Furthermore, like all routine kmsgs that don't return,
  * this needs to handle the fact that it won't return to the given TF (which is
@@ -165,6 +174,15 @@ void __launch_kthread(struct trapframe *tf, uint32_t srcid, void *a0, void *a1,
 	struct proc *cur_proc = current;
 	/* If there is no proc running, don't worry about not returning. */
 	if (cur_proc) {
+		/* If we're dying, we have a message incoming that we need to deal with,
+		 * so we send this message to ourselves (at the end of the queue).  This
+		 * is a bit ghetto, and a lot of this will need work. */
+		if (cur_proc->state == PROC_DYING) {
+			/* We could fake it and send it manually, but this is fine */
+			send_kernel_message(core_id(), __launch_kthread, (void*)kthread,
+			                    0, 0, KMSG_ROUTINE);
+			return;
+		}
 		if (cur_proc != kthread->proc) {
 			/* we're running the kthread from a different proc.  For now, we
 			 * can't be _M, since that would be taking away someone's vcore to
@@ -175,7 +193,8 @@ void __launch_kthread(struct trapframe *tf, uint32_t srcid, void *a0, void *a1,
 			__proc_yield_s(cur_proc, tf);
 			spin_unlock(&cur_proc->proc_lock);
 		} else {
-			assert(cur_proc->state == PROC_RUNNING_M);
+			/* possible to get here if there is only one _S proc that blocked */
+			//assert(cur_proc->state == PROC_RUNNING_M);
 			/* TODO: might need to do something here, though it will depend on
 			 * how we handle async local calls. */
 		}
