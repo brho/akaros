@@ -559,6 +559,8 @@ static void __proc_startcore(struct proc *p, trapframe_t *tf)
 	 * __startcore.  */
 	if (p->state == PROC_RUNNING_S)
 		env_pop_ancillary_state(p);
+	/* Clear the current_tf, since it is no longer used */
+	current_tf = 0;
 	env_pop_tf(tf);
 }
 
@@ -782,7 +784,7 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 
 	switch (p->state) {
 		case (PROC_RUNNING_S):
-			__proc_yield_s(p, current_tf);
+			__proc_yield_s(p, current_tf);	/* current_tf 0'd in abandon core */
 			break;
 		case (PROC_RUNNING_M):
 			printd("[K] Process %d (%p) is yielding on vcore %d\n", p->pid, p,
@@ -822,6 +824,7 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 	/* Clean up the core and idle.  For mgmt cores, they will ultimately call
 	 * manager, which will call schedule() and will repick the yielding proc. */
 	abandon_core();
+	smp_idle();
 }
 
 /* If you expect to notify yourself, cleanup state and process_routine_kmsg() */
@@ -1311,9 +1314,10 @@ void __unmap_vcore(struct proc *p, uint32_t vcoreid)
  * process's context. */
 void abandon_core(void)
 {
-	if (current)
+	if (current) {
+		current_tf = 0;
 		__abandon_core();
-	smp_idle();
+	}
 }
 
 /* Will send a TLB shootdown message to every vcore in the main address space
@@ -1462,6 +1466,7 @@ void __preempt(trapframe_t *tf, uint32_t srcid, void *a0, void *a1, void *a2)
 	__seq_start_write(&vcpd->preempt_tf_valid);
 	__unmap_vcore(p, vcoreid);
 	abandon_core();
+	smp_idle();
 }
 
 /* Kernel message handler to clean up the core when a process is dying.
@@ -1479,6 +1484,7 @@ void __death(trapframe_t *tf, uint32_t srcid, void *SNT a0, void *SNT a1,
 		__unmap_vcore(current, vcoreid);
 	}
 	abandon_core();
+	smp_idle();
 }
 
 /* Kernel message handler, usually sent IMMEDIATE, to shoot down virtual

@@ -48,8 +48,9 @@ ssize_t core_request(struct proc *p)
 	 * transition from _M to _S.  Will be issues with handling this async. */
 	if (!p->resources[RES_CORES].amt_wanted) {
 		assert(p->state == PROC_RUNNING_M); // TODO: (ACR) async core req
-		// save the context, to be restarted in _S mode
+		/* save the context, to be restarted in _S mode */
 		p->env_tf = *current_tf;
+		current_tf = 0;			/* Make sure it isn't used in the future */
 		env_push_ancillary_state(p); // TODO: (HSS)
 		set_retval(ESUCCESS);
 		/* sending death, since it's not our job to save contexts or anything in
@@ -163,6 +164,7 @@ ssize_t core_request(struct proc *p)
 		if (need_to_idle) {
 			kref_put(&p->kref);
 			abandon_core();
+			smp_idle();
 		}
 	} else { // nothing granted, just return
 		spin_unlock(&p->proc_lock);

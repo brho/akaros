@@ -43,6 +43,9 @@ void smp_idle(void)
 	int8_t state = 0;
 	per_cpu_info_t *myinfo = &per_cpu_info[core_id()];
 
+	/* TODO: this is only for a couple commits, to make sure we aren't keeping
+	 * this around */
+	assert(!current_tf);
 	/* in the future, we may need to proactively leave process context here.
 	 * for now, it is possible to have a current loaded, even if we are idle
 	 * (and presumably about to execute a kmsg or fire up a vcore). */

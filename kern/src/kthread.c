@@ -69,7 +69,9 @@ void sleep_on(struct semaphore *sem)
 	 * we want to leave, we'll need to do that in smp_idle() or elsewhere in the
 	 * code. */
 	kthread->proc = current;
+	/* TODO: this will change in a commit or two */
 	kthread->proc_tf = current_tf;
+	current_tf = 0;	/* don't want this *pointer* to persist past the block */
 	if (kthread->proc)
 		kref_get(&kthread->proc->kref, 1);
 	/* Save the context, toggle blocking for the reactivation */
@@ -100,6 +102,7 @@ unwind_sleep_prep:
 	printd("Didn't sleep, unwinding...\n");
 	/* Restore the core's current and default stacktop */
 	current = kthread->proc;			/* arguably unnecessary */
+	set_current_tf(kthread->proc_tf);
 	if (kthread->proc)
 		kref_put(&kthread->proc->kref);
 	set_stack_top(kthread->stacktop);
@@ -137,17 +140,19 @@ void restart_kthread(struct kthread *kthread)
 	/* Set the spare stuff (current kthread, current (not kthread) stacktop) */
 	pcpui->spare = kthread;
 	kthread->stacktop = current_stacktop;
-	/* We need to load the new cr3 if we want another new (or no) process */
-	if (current != kthread->proc) {
+	if (current) {
+		/* __launch_kthread() should have abandoned if it was diff */
+		assert(current == kthread->proc);
+		/* no longer need this ref, current holds it */
+		kref_put(&kthread->proc->kref);
+
+	} else {
+		/* ref gets transfered (or it was 0 (no ref held)) */
+		current = kthread->proc;
 		if (kthread->proc)
 			lcr3(kthread->proc->env_cr3);
-		else
-			lcr3(boot_cr3);
 	}
-	/* If there's a proc current already, we'll lose that ref no matter what. */
-	if (current)
-		kref_put(&current->kref);
-	current = kthread->proc;
+	/* TODO: (CTF) change me when we use async syscalls */
 	if (kthread->proc_tf)
 		set_current_tf(kthread->proc_tf);
 	/* Finally, restart our thread */
@@ -192,6 +197,7 @@ void __launch_kthread(struct trapframe *tf, uint32_t srcid, void *a0, void *a1,
 			/* Wrap up / yield the current _S proc, which calls schedule_proc */
 			__proc_yield_s(cur_proc, tf);
 			spin_unlock(&cur_proc->proc_lock);
+			abandon_core();
 		} else {
 			/* possible to get here if there is only one _S proc that blocked */
 			//assert(cur_proc->state == PROC_RUNNING_M);
