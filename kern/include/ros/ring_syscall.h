@@ -5,6 +5,8 @@
 #include <ros/ring_buffer.h>
 
 #define NUM_SYSCALL_ARGS 6
+/* This will need to change to represent sending pointers to syscalls, not the
+ * syscalls themselves */
 typedef struct syscall_req {
         uint32_t num;
         uint32_t flags;

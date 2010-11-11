@@ -459,13 +459,11 @@ handle_syscall(trapframe_t* state)
 
 	set_current_tf(state);
 
-	coreinfo->cur_ret.returnloc = &(state->gpr[8]);
-	coreinfo->cur_ret.errno_loc = &(state->gpr[9]);
+	coreinfo->tf_retval_loc = &(state->gpr[8]);
 
-	// syscall code wants an edible reference for current
-	kref_get(&coreinfo->cur_proc->kref, 1);
-	state->gpr[8] = syscall(current,num,a1,a2,a3,a4,a5);
-	kref_put(&coreinfo->cur_proc->kref);
+	prep_syscalls(current, (struct syscall*)a1, a2);
+	run_local_syscall();
+	warn("No syscalls on a trap!");
 
 	proc_restartcore(current,state);
 }

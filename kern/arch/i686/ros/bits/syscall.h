@@ -46,6 +46,7 @@ static inline intreg_t __syscall_sysenter(uint16_t num, intreg_t a1,
 	                "r" (a3),
 	                "D" (a4)
 	              : "cc", "memory");
+	// TODO: gut errno 
 	if(err != 0 && err_loc != NULL)
 		*err_loc = err;
 	return ret;
@@ -83,6 +84,7 @@ static inline intreg_t __syscall_trap(uint16_t num, intreg_t a1,
 	               "D" (a4),
 	               "S" (a5)
 	             : "cc", "memory");
+	// TODO: gut errno 
 	if(err != 0 && err_loc != NULL)
 		*err_loc = err;
 	return ret;

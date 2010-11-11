@@ -59,6 +59,39 @@ static bool proc_is_traced(struct proc *p)
 	return false;
 }
 
+/* Helper that "finishes" the current async syscall.  This should be used when
+ * we are calling a function in a syscall that might not return and won't be
+ * able to use the normal syscall return path, such as proc_yield() and
+ * resource_req().  Call this from within syscall.c (I don't want it global).
+ *
+ * It is possible for another user thread to see the syscall being done early -
+ * they just need to be careful with the weird proc management calls (as in,
+ * don't trust an async fork).
+ *
+ * *sysc is in user memory, and should be pinned (TODO: UMEM).  There may be
+ * issues with unpinning this if we never return.
+ *
+ * Note, this is currently tied to how cores execute syscall batches: pcpui
+ * telling them what to do *next*, which should be advanced one past the call we
+ * are currently working on.  If this sucks too much in the future, we can have
+ * two separate struct syscall *s. */
+static void signal_current_sc(int retval)
+{
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	struct syscall *sysc = pcpui->syscalls - 1;	/* it was already advanced */
+	sysc->retval = retval;
+	sysc->flags |= SC_DONE;
+}
+
+/* Callable by any function while executing a syscall (or otherwise, actually).
+ * Prep this by setting the errno_loc in advance. */
+void set_errno(int errno)
+{
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	if (pcpui->errno_loc)
+		*(pcpui->errno_loc) = errno;
+}
+
 /************** Utility Syscalls **************/
 
 static int sys_null(void)
@@ -306,8 +339,10 @@ static error_t sys_proc_destroy(struct proc *p, pid_t pid, int exitcode)
 
 static int sys_proc_yield(struct proc *p, bool being_nice)
 {
+	/* proc_yield() doesn't return - we need to set the syscall retval early */
+	signal_current_sc(0);
 	proc_yield(p, being_nice);
-	return 0;
+	assert(0);
 }
 
 static ssize_t sys_fork(env_t* e)
@@ -329,6 +364,12 @@ static ssize_t sys_fork(env_t* e)
 	env->heap_top = e->heap_top;
 	env->ppid = e->pid;
 	env->env_tf = *current_tf;
+
+	/* We need to speculatively say the syscall worked before copying the memory
+	 * out, since the 'forked' process's call never actually goes through the
+	 * syscall return path, and will never think it is done.  This violates a
+	 * few things.  Just be careful with fork. */
+	signal_current_sc(0);
 
 	env->cache_colors_map = cache_colors_map_alloc();
 	for(int i=0; i < llc_cache->num_colors; i++)
@@ -404,14 +445,16 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	int ret = -1;
 	char *t_path;
 	struct file *program;
+	struct trapframe *old_cur_tf = current_tf;
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 
 	/* We probably want it to never be allowed to exec if it ever was _M */
 	if (p->state != PROC_RUNNING_S) {
 		set_errno(EINVAL);
 		return -1;
 	}
-	/* Can't really exec if we don't have a current_tf to reset */
-	if (!current_tf) {
+	/* Can't exec if we don't have a current_tf to restart (if we fail). */
+	if (!old_cur_tf) {
 		set_errno(EINVAL);
 		return -1;
 	}
@@ -419,10 +462,16 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	t_path = user_strdup_errno(p, path, path_l);
 	if (!t_path)
 		return -1;
+	/* Clear the current_tf.  We won't be returning the 'normal' way.  Even if
+	 * we want to return with an error, we need to go back differently in case
+	 * we succeed.  This needs to be done before we could possibly block, but
+	 * unfortunately happens before the point of no return. */
+	current_tf = 0;
+	/* This could block: */
 	program = do_file_open(t_path, 0, 0);
 	user_memdup_free(p, t_path);
 	if (!program)
-		return -1;			/* presumably, errno is already set */
+		goto early_error;
 	/* Set the argument stuff needed by glibc */
 	if (memcpy_from_user_errno(p, p->procinfo->argp, pi->argp,
 	                           sizeof(pi->argp)))
@@ -442,15 +491,41 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	if (load_elf(p, program)) {
 		kref_put(&program->f_kref);
 		proc_destroy(p);
-		smp_idle();		/* syscall can't return on failure now */
+		/* We don't want to do anything else - we just need to not accidentally
+		 * return to the user (hence the all_out) */
+		goto all_out;
 	}
 	printd("[PID %d] exec %s\n", p->pid, file_name(program));
 	kref_put(&program->f_kref);
-	*current_tf = p->env_tf;
-	return 0;
+	goto success;
+	/* These error and out paths are so we can handle the async interface, both
+	 * for when we want to error/return to the proc, as well as when we succeed
+	 * and want to start the newly exec'd _S */
 mid_error:
+	/* These two error paths are for when we want to restart the process with an
+	 * error value (errno is already set). */
 	kref_put(&program->f_kref);
-	return -1;
+early_error:
+	p->env_tf = *old_cur_tf;
+	signal_current_sc(-1);
+success:
+	/* Here's how we'll restart the new (or old) process: */
+	spin_lock(&p->proc_lock);
+	__proc_set_state(p, PROC_RUNNABLE_S);
+	schedule_proc(p);
+	spin_unlock(&p->proc_lock);
+all_out:
+	/* When we idle, we don't want to try executing other syscalls.  If exec
+	 * succeeded (or the proc was destroyed) it'd just be wrong. */
+	pcpui->syscalls = 0;
+	pcpui->nr_calls = 0;
+	/* we can't return, since we'd write retvals to the old location of the
+	 * sycall struct (which has been freed and is in the old userspace) (or has
+	 * already been written to).*/
+	/* TODO: remove this when we remove the one in local_syscall() */
+	kref_put(&current->kref);
+	smp_idle();
+	assert(0);
 }
 
 static ssize_t sys_trywait(env_t* e, pid_t pid, int* status)
@@ -535,7 +610,13 @@ static int sys_shared_page_free(env_t* p1, void*DANGEROUS addr, pid_t p2)
 }
 
 
-/* sys_resource_req(): called directly from dispatch table. */
+static int sys_resource_req(struct proc *p, int type, unsigned int amt_wanted,
+                            unsigned int amt_wanted_min, int flags)
+{
+	signal_current_sc(0);
+	/* this might not return (if it's a _S -> _M transition) */
+	return resource_req(p, type, amt_wanted, amt_wanted_min, flags);
+}
 
 /* Will notify the target on the given vcore, if the caller controls the target.
  * Will honor the target's wanted/vcoreid.  u_ne can be NULL. */
@@ -1201,7 +1282,7 @@ const static struct sys_table_entry syscall_table[] = {
 	[SYS_mprotect] = {(syscall_t)sys_mprotect, "mprotect"},
 	[SYS_shared_page_alloc] = {(syscall_t)sys_shared_page_alloc, "pa"},
 	[SYS_shared_page_free] = {(syscall_t)sys_shared_page_free, "pf"},
-	[SYS_resource_req] = {(syscall_t)resource_req, "resource_req"},
+	[SYS_resource_req] = {(syscall_t)sys_resource_req, "resource_req"},
 	[SYS_notify] = {(syscall_t)sys_notify, "notify"},
 	[SYS_self_notify] = {(syscall_t)sys_self_notify, "self_notify"},
 	[SYS_halt_core] = {(syscall_t)sys_halt_core, "halt_core"},
@@ -1256,10 +1337,6 @@ const static struct sys_table_entry syscall_table[] = {
 intreg_t syscall(struct proc *p, uintreg_t syscallno, uintreg_t a1,
                  uintreg_t a2, uintreg_t a3, uintreg_t a4, uintreg_t a5)
 {
-	/* Initialize the return value and error code returned to 0 */
-	set_retval(ESUCCESS);
-	set_errno(ESUCCESS);
-
 	const int max_syscall = sizeof(syscall_table)/sizeof(syscall_table[0]);
 
 	uint32_t coreid, vcoreid;
@@ -1301,6 +1378,57 @@ intreg_t syscall(struct proc *p, uintreg_t syscallno, uintreg_t a1,
 		panic("Invalid syscall number %d for proc %x!", syscallno, *p);
 
 	return syscall_table[syscallno].call(p, a1, a2, a3, a4, a5);
+}
+
+/* A process can trap and call this function, which will set up the core to
+ * handle all the syscalls.  a.k.a. "sys_debutante(needs, wants)" */
+void prep_syscalls(struct proc *p, struct syscall *sysc, unsigned int nr_calls)
+{
+	int retval;
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	/* TODO: (UMEM) assert / pin the memory range sysc for nr_calls.  Not sure
+	 * how we'll know it is done to unpin it. (might need to handle it in
+	 * abandon_core() or smp_idle(). */
+	user_mem_assert(p, sysc, nr_calls * sizeof(struct syscall), PTE_USER_RW);
+	/* TEMP! */
+	if (nr_calls != 1)
+		warn("Debutante calls: %d\n", nr_calls);
+	/* Set up this core to process the local call */
+	*pcpui->tf_retval_loc = 0;	/* current_tf's retval says how many are done */
+	pcpui->syscalls = sysc;
+	pcpui->nr_calls = nr_calls;
+}
+
+/* This returns if there are no syscalls to do, o/w it always calls smp_idle()
+ * afterwards. */
+void run_local_syscall(void)
+{
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	struct syscall *sysc;
+
+	if (!pcpui->nr_calls) {
+		/* TODO: UMEM - stop pinning their memory.  Note, we may need to do this
+		 * in other places.  This also will be tricky with exec, which doesn't
+		 * have the same memory map anymore */
+		return;
+	}
+	sysc = pcpui->syscalls++;		/* get the next */
+	pcpui->nr_calls--;				/* one less to do */
+	(*pcpui->tf_retval_loc)++;		/* one more started */
+	pcpui->errno_loc = &sysc->err;
+	// TODO: push this deeper into the syscalls */
+	kref_get(&current->kref, 1);
+	/* TODO: arg5 */
+	sysc->retval = syscall(pcpui->cur_proc, sysc->num, sysc->arg0, sysc->arg1,
+	                       sysc->arg2, sysc->arg3, sysc->arg4);
+	/* TODO: when we remove this, remove it from sys_exec() too */
+	kref_put(&current->kref);
+	sysc->flags |= SC_DONE;
+	/* regardless of whether the call blocked or not, we smp_idle().  If it was
+	 * the last call, it'll return to the process.  If there are more, it will
+	 * do them. */
+	smp_idle();
+	assert(0);
 }
 
 /* Syscall tracing */
@@ -1408,16 +1536,4 @@ void systrace_clear_buffer(void)
 	spin_lock_irqsave(&systrace_lock);
 	memset(systrace_buffer, 0, sizeof(struct systrace_record) * MAX_SYSTRACES);
 	spin_unlock_irqsave(&systrace_lock);
-}
-
-void set_retval(uint32_t retval)
-{
-	struct per_cpu_info* coreinfo = &per_cpu_info[core_id()];
-	*(coreinfo->cur_ret.returnloc) = retval;
-}
-void set_errno(uint32_t errno)
-{
-	struct per_cpu_info* coreinfo = &per_cpu_info[core_id()];
-	if (coreinfo && coreinfo->cur_ret.errno_loc)
-		*(coreinfo->cur_ret.errno_loc) = errno;
 }

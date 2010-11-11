@@ -41,11 +41,19 @@ atomic_t outstanding_calls = 0;
 void smp_idle(void)
 {
 	int8_t state = 0;
-	per_cpu_info_t *myinfo = &per_cpu_info[core_id()];
+	per_cpu_info_t *pcpui = &per_cpu_info[core_id()];
 
-	/* TODO: this is only for a couple commits, to make sure we aren't keeping
-	 * this around */
-	assert(!current_tf);
+	/* There was a process running here, and we should return to it */
+	if (pcpui->cur_tf) {			/* aka, current_tf */
+		assert(pcpui->cur_proc);	/* aka, current */
+		/* We also check in run_local_syscall().  This is for sys_exec() */
+		if (pcpui->nr_calls)
+			run_local_syscall();
+		/* Now we're done, so return */
+		proc_restartcore(pcpui->cur_proc, pcpui->cur_tf);
+		assert(0);
+	}
+	/* if we made it here, we truly want to idle */
 	/* in the future, we may need to proactively leave process context here.
 	 * for now, it is possible to have a current loaded, even if we are idle
 	 * (and presumably about to execute a kmsg or fire up a vcore). */

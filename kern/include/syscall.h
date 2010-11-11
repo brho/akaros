@@ -30,11 +30,6 @@ struct systrace_record {
 	uint32_t		vcoreid;
 };
 
-struct sys_return {
-	uint32_t *returnloc;
-	uint32_t *errno_loc;
-};
-
 /* Syscall table */
 typedef intreg_t (*syscall_t)(struct proc *, uintreg_t, uintreg_t, uintreg_t,
                               uintreg_t, uintreg_t);
@@ -44,8 +39,11 @@ struct sys_table_entry {
 };
 const static struct sys_table_entry syscall_table[];
 /* Syscall invocation */
+void prep_syscalls(struct proc *p, struct syscall *sysc, unsigned int nr_calls);
 intreg_t syscall(struct proc *p, uintreg_t num, uintreg_t a1, uintreg_t a2,
                  uintreg_t a3, uintreg_t a4, uintreg_t a5);
+void run_local_syscall(void);
+void set_errno(int errno);
 
 /* Tracing functions */
 void systrace_start(bool silent);
@@ -55,7 +53,4 @@ int systrace_dereg(bool all, struct proc *p);
 void systrace_print(bool all, struct proc *p);
 void systrace_clear_buffer(void);
 
-/* direct returnval and errno handling */
-void set_errno(uint32_t errno);
-void set_retval(uint32_t retval);
 #endif /* !ROS_KERN_SYSCALL_H */

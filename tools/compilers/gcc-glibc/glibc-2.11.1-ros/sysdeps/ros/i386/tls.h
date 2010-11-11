@@ -30,8 +30,7 @@
 # include <sysdep.h>
 # include <kernel-features.h>
 #include <sys/mman.h>
-#include <ros/bits/syscall.h>
-#include <ros/arch/bits/syscall.h>
+#include <ros/syscall.h>
 #include <ros/procinfo.h>
 #include <ros/procdata.h>
 #include <ros/arch/mmu.h>
@@ -441,7 +440,7 @@ static const char* tls_init_tp(void* thrdescr)
 
   //TODO: think about how to avoid this. Probably add a field to the 
   // rthreads struct that we manually fill in in _start(). 
-  int core_id = __syscall_sysenter(SYS_getvcoreid,0,0,0,0,0,NULL);
+  int core_id = __ros_syscall(SYS_getvcoreid, 0, 0, 0, 0, 0, NULL);
 
   /* Bug with this whole idea (TODO: (TLSV))*/
   if(__procdata.ldt == NULL)
@@ -452,15 +451,14 @@ static const char* tls_init_tp(void* thrdescr)
     // exist yet (it relies on tls, and we are currently in the process of setting 
     // it up...)
     intreg_t params[3] = { MAP_ANONYMOUS | MAP_POPULATE, -1, 0 };
-    void* ldt = (void*) __syscall_sysenter(SYS_mmap, 0,
-                                           sz, PROT_READ | PROT_WRITE, 
-                                           (intreg_t)params, 0, NULL);
-    if(ldt == MAP_FAILED)
+	void *ldt = (void*)__ros_syscall(SYS_mmap, 0, sz, PROT_READ | PROT_WRITE,
+	                                 (long)params, 0, NULL);
+    if (ldt == MAP_FAILED)
       return "tls couldn't allocate memory\n";
 
     __procdata.ldt = ldt;
     // force kernel crossing
-    __syscall_sysenter(SYS_getpid,0,0,0,0,0,NULL);
+	__ros_syscall(SYS_getpid, 0, 0, 0, 0, 0, NULL);
   }
 
   // Build the segment

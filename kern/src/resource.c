@@ -52,7 +52,6 @@ ssize_t core_request(struct proc *p)
 		p->env_tf = *current_tf;
 		current_tf = 0;			/* Make sure it isn't used in the future */
 		env_push_ancillary_state(p); // TODO: (HSS)
-		set_retval(ESUCCESS);
 		/* sending death, since it's not our job to save contexts or anything in
 		 * this case.  also, if this returns true, we will not return down
 		 * below, and need to eat the reference to p */

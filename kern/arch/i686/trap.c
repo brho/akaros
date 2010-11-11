@@ -234,15 +234,12 @@ trap_dispatch(trapframe_t *tf)
 			// check for userspace, for now
 			assert(tf->tf_cs != GD_KT);
 			struct per_cpu_info* coreinfo = &per_cpu_info[core_id()];
-			coreinfo->cur_ret.returnloc = &(tf->tf_regs.reg_eax);
-			coreinfo->cur_ret.errno_loc = &(tf->tf_regs.reg_esi);
-			// syscall code wants an edible reference for current
-			kref_get(&coreinfo->cur_proc->kref, 1);
-			tf->tf_regs.reg_eax =
-				syscall(coreinfo->cur_proc, tf->tf_regs.reg_eax, tf->tf_regs.reg_edx,
-				        tf->tf_regs.reg_ecx, tf->tf_regs.reg_ebx,
-				        tf->tf_regs.reg_edi, tf->tf_regs.reg_esi);
-			kref_put(&coreinfo->cur_proc->kref);
+			coreinfo->tf_retval_loc = &(tf->tf_regs.reg_eax);
+			/* Set up and run the async calls */
+			prep_syscalls(current, (struct syscall*)tf->tf_regs.reg_eax,
+			              tf->tf_regs.reg_edx);
+			run_local_syscall();
+			warn("No syscalls on a trap!");
 			break;
 		default:
 			// Unexpected trap: The user process or the kernel has a bug.
@@ -381,27 +378,19 @@ void sysenter_init(void)
 void sysenter_callwrapper(struct trapframe *tf)
 {
 	struct per_cpu_info* coreinfo = &per_cpu_info[core_id()];
-	if (!in_kernel(tf))
-		coreinfo->cur_tf = tf;
-	coreinfo->cur_ret.returnloc = &(tf->tf_regs.reg_eax);
-	coreinfo->cur_ret.errno_loc = &(tf->tf_regs.reg_esi);
-
-	// syscall code wants an edible reference for current
-	kref_get(&current->kref, 1);
-	tf->tf_regs.reg_eax = (intreg_t) syscall(current,
-	                                         tf->tf_regs.reg_eax,
-	                                         tf->tf_regs.reg_esi,
-	                                         tf->tf_regs.reg_ecx,
-	                                         tf->tf_regs.reg_ebx,
-	                                         tf->tf_regs.reg_edi,
-	                                         0);
-	kref_put(&current->kref);
-	/*
-	 * careful here - we need to make sure that this current is the right
+	if (in_kernel(tf))
+		panic("sysenter from a kernel TF!!");
+	coreinfo->cur_tf = tf;
+	coreinfo->tf_retval_loc = &(tf->tf_regs.reg_eax);
+	/* Set up and run the async calls */
+	prep_syscalls(current, (struct syscall*)tf->tf_regs.reg_eax,
+	              tf->tf_regs.reg_esi);
+	run_local_syscall();		/* alternatively, we can call smp_idle() */
+	warn("No syscalls on a sysenter!");
+	/* careful here - we need to make sure that this current is the right
 	 * process, which could be weird if the syscall blocked.  it would need to
 	 * restore the proper value in current before returning to here.
-	 * likewise, tf could be pointing to random gibberish.
-	 */
+	 * likewise, tf could be pointing to random gibberish. */
 	proc_restartcore(current, tf);
 }
 

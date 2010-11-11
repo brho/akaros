@@ -23,11 +23,16 @@ typedef sharC_env_t;
 
 struct per_cpu_info {
 	spinlock_t lock;
+	/* Process management */
 	// cur_proc should be valid on all cores that are not management cores.
 	struct proc *cur_proc;
 	trapframe_t *cur_tf;
-	struct sys_return cur_ret;
 	struct kthread *spare;		/* useful when restarting */
+	/* Syscall management */
+	struct syscall *syscalls;	/* ptr is into cur_proc's address space */
+	unsigned int nr_calls;
+	int *errno_loc;
+	uintreg_t *tf_retval_loc;
 
 #ifdef __SHARC__
 	// held spin-locks. this will have to go elsewhere if multiple kernel
@@ -39,7 +44,7 @@ struct per_cpu_info {
 	taskstate_t *tss;
 	segdesc_t *gdt;
 #endif
-
+	/* KMSGs */
 	spinlock_t immed_amsg_lock;
 	struct kernel_msg_list NTPTV(a0t) NTPTV(a1t) NTPTV(a2t) immed_amsgs;
 	spinlock_t routine_amsg_lock;
