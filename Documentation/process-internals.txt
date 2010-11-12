@@ -79,7 +79,11 @@ protected by a refcnt.
 
 +1 for current.
 - current counts as someone using it (expressing interest in the core), but is
-  also a source of the pointer, so its a bit different.
+  also a source of the pointer, so its a bit different.  Note that all kref's
+  are sources of a pointer.  Technically, to even use 'current', we should kref
+  it and pass it around as a proc.  We don't for performance reasons.  When we
+  are running on a core that has current loaded, the ref is both for its usage
+  as well as for being the current process.
 - You have a reference from current and can use it without refcnting, but
   anything that needs to eat a reference or store/use it needs an incref first.
   To be clear, your reference is *NOT* edible.  It protects the cr3, guarantees
@@ -88,8 +92,9 @@ protected by a refcnt.
   an IO continuation request), then clearly you must incref, since it's both
   current and stored/used.
 - If you don't know what might be downstream from your function, then incref
-  before passing the reference, and decref when it returns.  Like when handling
-  syscalls, for example.
+  before passing the reference, and decref when it returns.  We used to do this
+  for all syscalls, but now only do it for calls that might not return and
+  expect to receive reference (like proc_yield).
 
 All functions that take a *proc have a refcnt'd reference, though it may not be
 edible (it could be current).  It is the callers responsibility to make sure
@@ -107,6 +112,11 @@ Functions that MAY not return will "eat" your reference *IF* they do not return.
 This means that you must have a reference when you call them (like always), and
 that reference will be consumed / decref'd for you if the function doesn't
 return.  Or something similarly appropriate.
+
+Arguably, for functions that MAY not return, but will always be called with
+current's reference (proc_yield()), we could get away without giving it an
+edible reference, and then never eating the ref.  Yield needs to be reworked
+anyway, so it's not a bit deal yet.
 
 We do this because when the function does not return, you will not have the
 chance to decref (your decref code will never run).  We need the reference when

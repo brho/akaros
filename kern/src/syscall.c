@@ -325,24 +325,27 @@ static error_t sys_proc_destroy(struct proc *p, pid_t pid, int exitcode)
 		return -1;
 	}
 	if (p_to_die == p) {
-		// syscall code and pid2proc both have edible references, only need 1.
 		p->exitcode = exitcode;
-		kref_put(&p_to_die->kref);
 		printd("[PID %d] proc exiting gracefully (code %d)\n", p->pid,exitcode);
 	} else {
 		printd("[%d] destroying proc %d\n", p->pid, p_to_die->pid);
 	}
 	proc_destroy(p_to_die);
+	/* we only get here if we weren't the one to die */
 	kref_put(&p_to_die->kref);
 	return ESUCCESS;
 }
 
 static int sys_proc_yield(struct proc *p, bool being_nice)
 {
-	/* proc_yield() doesn't return - we need to set the syscall retval early */
+	/* proc_yield() often doesn't return - we need to set the syscall retval
+	 * early.  If it doesn't return, it expects to eat our reference (for now).
+	 */
 	signal_current_sc(0);
+	kref_get(&p->kref, 1);
 	proc_yield(p, being_nice);
-	assert(0);
+	kref_put(&p->kref);
+	return 0;
 }
 
 static ssize_t sys_fork(env_t* e)
@@ -438,7 +441,9 @@ static ssize_t sys_fork(env_t* e)
 
 /* Load the binary "path" into the current process, and start executing it.
  * argv and envp are magically bundled in procinfo for now.  Keep in sync with
- * glibc's sysdeps/ros/execve.c */
+ * glibc's sysdeps/ros/execve.c.  Once past a certain point, this function won't
+ * return.  It assumes (and checks) that it is current.  Don't give it an extra
+ * refcnt'd *p (syscall won't do that). */
 static int sys_exec(struct proc *p, char *path, size_t path_l,
                     struct procinfo *pi)
 {
@@ -450,6 +455,10 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 
 	/* We probably want it to never be allowed to exec if it ever was _M */
 	if (p->state != PROC_RUNNING_S) {
+		set_errno(EINVAL);
+		return -1;
+	}
+	if (p != current) {
 		set_errno(EINVAL);
 		return -1;
 	}
@@ -522,8 +531,7 @@ all_out:
 	/* we can't return, since we'd write retvals to the old location of the
 	 * sycall struct (which has been freed and is in the old userspace) (or has
 	 * already been written to).*/
-	/* TODO: remove this when we remove the one in local_syscall() */
-	kref_put(&current->kref);
+	abandon_core();
 	smp_idle();
 	assert(0);
 }
@@ -613,9 +621,13 @@ static int sys_shared_page_free(env_t* p1, void*DANGEROUS addr, pid_t p2)
 static int sys_resource_req(struct proc *p, int type, unsigned int amt_wanted,
                             unsigned int amt_wanted_min, int flags)
 {
+	int retval;
 	signal_current_sc(0);
 	/* this might not return (if it's a _S -> _M transition) */
-	return resource_req(p, type, amt_wanted, amt_wanted_min, flags);
+	kref_get(&p->kref, 1);
+	retval = resource_req(p, type, amt_wanted, amt_wanted_min, flags);
+	kref_put(&p->kref);
+	return retval;
 }
 
 /* Will notify the target on the given vcore, if the caller controls the target.
@@ -1416,13 +1428,9 @@ void run_local_syscall(void)
 	pcpui->nr_calls--;				/* one less to do */
 	(*pcpui->tf_retval_loc)++;		/* one more started */
 	pcpui->errno_loc = &sysc->err;
-	// TODO: push this deeper into the syscalls */
-	kref_get(&current->kref, 1);
 	/* TODO: arg5 */
 	sysc->retval = syscall(pcpui->cur_proc, sysc->num, sysc->arg0, sysc->arg1,
 	                       sysc->arg2, sysc->arg3, sysc->arg4);
-	/* TODO: when we remove this, remove it from sys_exec() too */
-	kref_put(&current->kref);
 	sysc->flags |= SC_DONE;
 	/* regardless of whether the call blocked or not, we smp_idle().  If it was
 	 * the last call, it'll return to the process.  If there are more, it will
