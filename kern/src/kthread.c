@@ -70,10 +70,8 @@ void sleep_on(struct semaphore *sem)
 	 * code. */
 	kthread->proc = current;
 	/* kthread tracks the syscall it is working on, which implies errno */
-	if (pcpui->syscalls)
-		kthread->sysc = pcpui->syscalls - 1;	// TODO: 2 sysc
-	else
-		kthread->sysc = 0;
+	kthread->sysc = pcpui->cur_sysc;
+	pcpui->cur_sysc = 0;				/* catch bugs */
 	if (kthread->proc)
 		kref_get(&kthread->proc->kref, 1);
 	/* Save the context, toggle blocking for the reactivation */
@@ -146,16 +144,14 @@ void restart_kthread(struct kthread *kthread)
 		assert(current == kthread->proc);
 		/* no longer need this ref, current holds it */
 		kref_put(&kthread->proc->kref);
-
 	} else {
 		/* ref gets transfered (or it was 0 (no ref held)) */
 		current = kthread->proc;
 		if (kthread->proc)
 			lcr3(kthread->proc->env_cr3);
 	}
-	// TODO: 2 sysc (set the syscall in progress to kthread->sysc */
-	if (kthread->sysc)
-		pcpui->errno_loc = &kthread->sysc->err;
+	/* Tell the core which syscall we are running (if any) */
+	pcpui->cur_sysc = kthread->sysc;
 	/* Finally, restart our thread */
 	pop_kernel_tf(&kthread->context);
 }

@@ -94,9 +94,14 @@ static intreg_t process_generic_syscalls(struct proc *p, size_t max)
 		// print req
 		printd("req no %d, req arg %c\n", req->num, *((char*)req->args[0]));
 		
-		coreinfo->errno_loc = (int*)&(rsp.syserr);
+		/* TODO: when the remote syscall stuff can handle the new async
+		 * syscalls, they need to use a real sysc.  This might at least stop it
+		 * from crashing. */
+		struct syscall sysc = {0};
+		coreinfo->cur_sysc = &sysc;
 		
 		rsp.retval = syscall_async(p, req);
+		rsp.syserr = sysc.err;
 		// write response into the slot it came from
 		memcpy(req, &rsp, sizeof(syscall_rsp_t));
 		// update our counter for what we've produced (assumes we went in order!)

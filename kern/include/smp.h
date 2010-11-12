@@ -29,10 +29,9 @@ struct per_cpu_info {
 	trapframe_t *cur_tf;
 	struct kthread *spare;		/* useful when restarting */
 	/* Syscall management */
-	// TODO: 2 sysc
-	struct syscall *syscalls;	/* ptr is into cur_proc's address space */
-	unsigned int nr_calls;
-	int *errno_loc;
+	struct syscall *cur_sysc;	/* ptr is into cur_proc's address space */
+	struct syscall *next_syscs;	/* other batched ones to do next */
+	unsigned int nr_syscs;
 	uintreg_t *tf_retval_loc;
 
 #ifdef __SHARC__

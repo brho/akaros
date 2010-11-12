@@ -69,28 +69,21 @@ static bool proc_is_traced(struct proc *p)
  * don't trust an async fork).
  *
  * *sysc is in user memory, and should be pinned (TODO: UMEM).  There may be
- * issues with unpinning this if we never return.
- *
- * Note, this is currently tied to how cores execute syscall batches: pcpui
- * telling them what to do *next*, which should be advanced one past the call we
- * are currently working on.  If this sucks too much in the future, we can have
- * two separate struct syscall *s. */
+ * issues with unpinning this if we never return. */
 static void signal_current_sc(int retval)
 {
-	// TODO 2 sysc
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	struct syscall *sysc = pcpui->syscalls - 1;	/* it was already advanced */
-	sysc->retval = retval;
-	sysc->flags |= SC_DONE;
+	pcpui->cur_sysc->retval = retval;
+	pcpui->cur_sysc->flags |= SC_DONE;
 }
 
 /* Callable by any function while executing a syscall (or otherwise, actually).
- * Prep this by setting the errno_loc in advance. */
+ */
 void set_errno(int errno)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	if (pcpui->errno_loc)
-		*(pcpui->errno_loc) = errno;
+	if (pcpui->cur_sysc)
+		pcpui->cur_sysc->err = errno;
 }
 
 /************** Utility Syscalls **************/
@@ -527,8 +520,8 @@ success:
 all_out:
 	/* When we idle, we don't want to try executing other syscalls.  If exec
 	 * succeeded (or the proc was destroyed) it'd just be wrong. */
-	pcpui->syscalls = 0;
-	pcpui->nr_calls = 0;
+	pcpui->next_syscs = 0;
+	pcpui->nr_syscs = 0;
 	/* we can't return, since we'd write retvals to the old location of the
 	 * sycall struct (which has been freed and is in the old userspace) (or has
 	 * already been written to).*/
@@ -1389,22 +1382,21 @@ intreg_t syscall(struct proc *p, uintreg_t sc_num, uintreg_t a0, uintreg_t a1,
 
 /* A process can trap and call this function, which will set up the core to
  * handle all the syscalls.  a.k.a. "sys_debutante(needs, wants)" */
-void prep_syscalls(struct proc *p, struct syscall *sysc, unsigned int nr_calls)
+void prep_syscalls(struct proc *p, struct syscall *sysc, unsigned int nr_syscs)
 {
 	int retval;
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	/* TODO: (UMEM) assert / pin the memory range sysc for nr_calls.  Not sure
+	/* TODO: (UMEM) assert / pin the memory range sysc for nr_syscs.  Not sure
 	 * how we'll know it is done to unpin it. (might need to handle it in
 	 * abandon_core() or smp_idle(). */
-	user_mem_assert(p, sysc, nr_calls * sizeof(struct syscall), PTE_USER_RW);
+	user_mem_assert(p, sysc, nr_syscs * sizeof(struct syscall), PTE_USER_RW);
 	/* TEMP! */
-	if (nr_calls != 1)
-		warn("Debutante calls: %d\n", nr_calls);
+	if (nr_syscs != 1)
+		warn("Debutante calls: %d\n", nr_syscs);
 	/* Set up this core to process the local call */
 	*pcpui->tf_retval_loc = 0;	/* current_tf's retval says how many are done */
-	// TODO: 2 sysc
-	pcpui->syscalls = sysc;
-	pcpui->nr_calls = nr_calls;
+	pcpui->next_syscs = sysc;
+	pcpui->nr_syscs = nr_syscs;
 }
 
 /* This returns if there are no syscalls to do, o/w it always calls smp_idle()
@@ -1414,17 +1406,16 @@ void run_local_syscall(void)
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	struct syscall *sysc;
 
-	if (!pcpui->nr_calls) {
+	if (!pcpui->nr_syscs) {
 		/* TODO: UMEM - stop pinning their memory.  Note, we may need to do this
 		 * in other places.  This also will be tricky with exec, which doesn't
 		 * have the same memory map anymore */
 		return;
 	}
-	// TODO 2 sysc
-	sysc = pcpui->syscalls++;		/* get the next */
-	pcpui->nr_calls--;				/* one less to do */
+	sysc = pcpui->next_syscs++;		/* get the next */
+	pcpui->cur_sysc = sysc;			/* let the core know which sysc it is */
+	pcpui->nr_syscs--;				/* one less to do */
 	(*pcpui->tf_retval_loc)++;		/* one more started */
-	pcpui->errno_loc = &sysc->err;
 	sysc->retval = syscall(pcpui->cur_proc, sysc->num, sysc->arg0, sysc->arg1,
 	                       sysc->arg2, sysc->arg3, sysc->arg4, sysc->arg5);
 	sysc->flags |= SC_DONE;

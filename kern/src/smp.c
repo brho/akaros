@@ -47,7 +47,7 @@ void smp_idle(void)
 	if (pcpui->cur_tf) {			/* aka, current_tf */
 		assert(pcpui->cur_proc);	/* aka, current */
 		/* We also check in run_local_syscall().  This is for sys_exec() */
-		if (pcpui->nr_calls)
+		if (pcpui->nr_syscs)
 			run_local_syscall();
 		/* Now we're done, so return */
 		proc_restartcore(pcpui->cur_proc, pcpui->cur_tf);
