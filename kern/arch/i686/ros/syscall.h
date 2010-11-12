@@ -7,14 +7,13 @@
 
 #include <ros/arch/bits/syscall.h>
 
-/* Traditional interface, though this should only be used for *syscalls */
-static inline long __ros_arch_syscall(long _num, long _a0, long _a1, long _a2,
-                                      long _a3, long _a4)
+static inline long __ros_arch_syscall(long _a0, long _a1, long _a2, long _a3,
+                                      long _a4, long _a5)
 {
 	#ifdef __CONFIG_SYSCALL_TRAP__
-		return __syscall_trap(_num, _a0, _a1, _a2, _a3, _a4, 0);
+		return __syscall_trap(_a0, _a1);
 	#else
-		return __syscall_sysenter(_num, _a0, _a1, _a2, _a3, _a4, 0);
+		return __syscall_sysenter(_a0, _a1);
 	#endif
 }
 

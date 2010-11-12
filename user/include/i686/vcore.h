@@ -29,7 +29,7 @@ extern __thread int __vcoreid;
  * Target ESP -> |   u_thread's old stuff   |
  *               |   new eip                |
  *               |   eax save space         |
- *               |   vcoreid                |
+ *               |   &sysc (async syscall)  |
  *               |   notif_pending_loc      |
  *               |   notif_enabled_loc      |
  *
@@ -37,15 +37,21 @@ extern __thread int __vcoreid;
  * notifications, and when it gets resumed it can ultimately run the new
  * context.  Enough state is saved in the running context and stack to continue
  * running. */
+#include <stdio.h>
 static inline void pop_ros_tf(struct user_trapframe *tf, uint32_t vcoreid)
 {
+	struct syscall sysc = {0};
 	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
+	/* need to prep the async sysc in case we need to notify ourselves */
+	sysc.num = SYS_self_notify;
+	sysc.arg0 = vcoreid;	/* arg1 and 2 already = 0 (null notif, no u_ne) */
 	if (!tf->tf_cs) { /* sysenter TF.  esp and eip are in other regs. */
 		tf->tf_esp = tf->tf_regs.reg_ebp;
 		tf->tf_eip = tf->tf_regs.reg_edx;
 	}
+
 	asm volatile ("movl %2,-0x04(%1);    " /* push the PC */
-	              "movl %3,-0x0c(%1);    " /* room for eax, push vcoreid */
+	              "movl %3,-0x0c(%1);    " /* room for eax, push &sysc */
 	              "movl %4,-0x10(%1);    " /* push notif_pending loc */
 	              "movl %5,-0x14(%1);    " /* push notif_enabled loc */
 	              "movl %0,%%esp;        " /* pop the real tf */
@@ -64,30 +70,21 @@ static inline void pop_ros_tf(struct user_trapframe *tf, uint32_t vcoreid)
 	              "jz 1f;                " /* if not pending, skip syscall */
 	              "popfl;                " /* restore eflags */
 	              "movb $0x00,(%%eax);   " /* clear pending */
-	              "pushl %%edx;          " /* save edx, syscall arg1 */
-	              "pushl %%ecx;          " /* save ecx, syscall arg2 */
-	              "pushl %%ebx;          " /* save ebx, syscall arg3 */
-	              "pushl %%esi;          " /* will be clobbered for errno */
-	              "addl $0x10,%%esp;     " /* move back over the 4 push's */
-	              "popl %%edx;           " /* vcoreid, arg1 */
-	              "subl $0x14,%%esp;     " /* jump back to after the 4 push's */
-	              "movl $0x0,%%ecx;      " /* send the null notif, arg2 */
-	              "movl $0x0,%%ebx;      " /* no u_ne message, arg3 */
-	              "movl %6,%%eax;        " /* syscall num */
-	              "int %7;               " /* fire the syscall */
-	              "popl %%esi;           " /* restore regs after syscall */
-	              "popl %%ebx;           "
-	              "popl %%ecx;           "
-	              "popl %%edx;           "
+				  /* Actual syscall.  Note we don't wait on the async call */
+	              "popl %%eax;           " /* &sysc, trap arg0 */
+	              "pushl %%edx;          " /* save edx, will be trap arg1 */
+	              "movl $0x1,%%edx;      " /* sending one async syscall: arg1 */
+	              "int %6;               " /* fire the syscall */
+	              "popl %%edx;           " /* restore regs after syscall */
 	              "jmp 2f;               " /* skip 1:, already popped */
-	              "1: popfl;             " /* restore eflags */
-	              "2: popl %%eax;        " /* discard vcoreid */
-	              "popl %%eax;           " /* restore tf's %eax */
+	              "1: popfl;             " /* restore eflags (on non-sc path) */
+				  "popl %%eax;           " /* discard &sysc (on non-sc path) */
+	              "2: popl %%eax;        " /* restore tf's %eax (both paths) */
 	              "ret;                  " /* return to the new PC */
 	              :
-	              : "g"(tf), "r"(tf->tf_esp), "r"(tf->tf_eip), "r"(vcoreid),
+	              : "g"(tf), "r"(tf->tf_esp), "r"(tf->tf_eip), "r"(&sysc),
 	                "r"(&vcpd->notif_pending), "r"(&vcpd->notif_enabled),
-	                "i"(SYS_self_notify), "i"(T_SYSCALL)
+	                "i"(T_SYSCALL)
 	              : "memory");
 }
 
