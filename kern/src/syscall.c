@@ -584,13 +584,10 @@ static ssize_t sys_trywait(env_t* e, pid_t pid, int* status)
 
 /************** Memory Management Syscalls **************/
 
-static void *sys_mmap(struct proc *p, uintreg_t a1, uintreg_t a2, uintreg_t a3,
-                      uintreg_t *a456)
+static void *sys_mmap(struct proc *p, uintptr_t addr, size_t len, int prot,
+                      int flags, int fd, off_t offset)
 {
-	uintreg_t _a456[3];
-	if (memcpy_from_user(p, _a456, a456, 3 * sizeof(uintreg_t)))
-		sys_proc_destroy(p, p->pid, -1);
-	return mmap(p, a1, a2, a3, _a456[0], _a456[1], _a456[2]);
+	return mmap(p, addr, len, prot, flags, fd, offset);
 }
 
 static intreg_t sys_mprotect(struct proc *p, void *addr, size_t len, int prot)

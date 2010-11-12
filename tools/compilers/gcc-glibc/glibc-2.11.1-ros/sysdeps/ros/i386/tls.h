@@ -447,12 +447,11 @@ static const char* tls_init_tp(void* thrdescr)
   {
     size_t sz= (sizeof(segdesc_t)*__procinfo.max_vcores+PGSIZE-1)/PGSIZE*PGSIZE;
     
-    // Can't directly call mmap because it tries to set errno, and errno doesn't
-    // exist yet (it relies on tls, and we are currently in the process of setting 
-    // it up...)
-    intreg_t params[3] = { MAP_ANONYMOUS | MAP_POPULATE, -1, 0 };
+	/* Can't directly call mmap because it tries to set errno, and errno doesn't
+	 * exist yet (it relies on tls, and we are currently in the process of
+	 * setting it up...) */
 	void *ldt = (void*)__ros_syscall(SYS_mmap, 0, sz, PROT_READ | PROT_WRITE,
-	                                 (long)params, 0, 0, NULL);
+	                                 MAP_ANONYMOUS | MAP_POPULATE, -1, 0, NULL);
     if (ldt == MAP_FAILED)
       return "tls couldn't allocate memory\n";
 

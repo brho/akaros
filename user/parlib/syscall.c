@@ -106,24 +106,10 @@ int sys_proc_run(int pid)
 	return ros_syscall(SYS_proc_run, pid, 0, 0, 0, 0, 0);
 }
 
-/* We need to do some hackery to pass 6 arguments.  Arg4 pts to the real arg4,
- * arg5, and arg6.  Keep this in sync with kern/src/syscall.c.
- * TODO: consider a syscall_multi that can take more args, and keep it in sync
- * with the kernel.  Maybe wait til we fix sysenter to have 5 or 6 args. */
 void *CT(length) sys_mmap(void *SNT addr, size_t length, int prot, int flags,
                           int fd, size_t offset)
 {
-	struct args {
-		int _flags;
-		int _fd;
-		size_t _offset;
-	} extra_args;
-	extra_args._flags = flags;
-	extra_args._fd = fd;
-	extra_args._offset = offset;
-	// TODO: deputy bitches about this
-	return (void*CT(length))TC(ros_syscall(SYS_mmap, addr, length,
-	                                       prot, &extra_args, 0, 0));
+	return (void*)ros_syscall(SYS_mmap, addr, length, prot, flags, fd, offset);
 }
 
 int sys_notify(int pid, unsigned int notif, struct notif_event *ne)
