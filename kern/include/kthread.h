@@ -25,8 +25,7 @@ struct kthread {
 	struct trapframe			context;
 	uintptr_t					stacktop;
 	struct proc					*proc;
-	struct trapframe			*proc_tf;			/* TODO: change this? */
-	/* TODO: put in the sys_return, if we decide to keep this shit */
+	struct syscall				*sysc;
 	TAILQ_ENTRY(kthread)		link;
 	/* ID, other shit, etc */
 };

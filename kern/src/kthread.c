@@ -69,9 +69,11 @@ void sleep_on(struct semaphore *sem)
 	 * we want to leave, we'll need to do that in smp_idle() or elsewhere in the
 	 * code. */
 	kthread->proc = current;
-	/* TODO: this will change in a commit or two */
-	kthread->proc_tf = current_tf;
-	current_tf = 0;	/* don't want this *pointer* to persist past the block */
+	/* kthread tracks the syscall it is working on, which implies errno */
+	if (pcpui->syscalls)
+		kthread->sysc = pcpui->syscalls - 1;	// TODO: 2 sysc
+	else
+		kthread->sysc = 0;
 	if (kthread->proc)
 		kref_get(&kthread->proc->kref, 1);
 	/* Save the context, toggle blocking for the reactivation */
@@ -102,7 +104,6 @@ unwind_sleep_prep:
 	printd("Didn't sleep, unwinding...\n");
 	/* Restore the core's current and default stacktop */
 	current = kthread->proc;			/* arguably unnecessary */
-	set_current_tf(kthread->proc_tf);
 	if (kthread->proc)
 		kref_put(&kthread->proc->kref);
 	set_stack_top(kthread->stacktop);
@@ -152,9 +153,9 @@ void restart_kthread(struct kthread *kthread)
 		if (kthread->proc)
 			lcr3(kthread->proc->env_cr3);
 	}
-	/* TODO: (CTF) change me when we use async syscalls */
-	if (kthread->proc_tf)
-		set_current_tf(kthread->proc_tf);
+	// TODO: 2 sysc (set the syscall in progress to kthread->sysc */
+	if (kthread->sysc)
+		pcpui->errno_loc = &kthread->sysc->err;
 	/* Finally, restart our thread */
 	pop_kernel_tf(&kthread->context);
 }

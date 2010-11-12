@@ -77,6 +77,7 @@ static bool proc_is_traced(struct proc *p)
  * two separate struct syscall *s. */
 static void signal_current_sc(int retval)
 {
+	// TODO 2 sysc
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	struct syscall *sysc = pcpui->syscalls - 1;	/* it was already advanced */
 	sysc->retval = retval;
@@ -1401,6 +1402,7 @@ void prep_syscalls(struct proc *p, struct syscall *sysc, unsigned int nr_calls)
 		warn("Debutante calls: %d\n", nr_calls);
 	/* Set up this core to process the local call */
 	*pcpui->tf_retval_loc = 0;	/* current_tf's retval says how many are done */
+	// TODO: 2 sysc
 	pcpui->syscalls = sysc;
 	pcpui->nr_calls = nr_calls;
 }
@@ -1418,6 +1420,7 @@ void run_local_syscall(void)
 		 * have the same memory map anymore */
 		return;
 	}
+	// TODO 2 sysc
 	sysc = pcpui->syscalls++;		/* get the next */
 	pcpui->nr_calls--;				/* one less to do */
 	(*pcpui->tf_retval_loc)++;		/* one more started */
