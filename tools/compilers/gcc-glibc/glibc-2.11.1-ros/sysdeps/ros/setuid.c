@@ -29,6 +29,6 @@ int
 __setuid (uid)
      uid_t uid;
 {
-  return ros_syscall(SYS_setuid, uid, 0, 0, 0, 0);
+  return ros_syscall(SYS_setuid, uid, 0, 0, 0, 0, 0);
 }
 weak_alias (__setuid, setuid)

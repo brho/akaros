@@ -28,6 +28,6 @@
 int
 __mprotect (__ptr_t addr, size_t len, int prot)
 {
-  return ros_syscall(SYS_mprotect,addr,len,prot,0,0);
+  return ros_syscall(SYS_mprotect, addr, len, prot, 0, 0, 0);
 }
 weak_alias (__mprotect, mprotect)

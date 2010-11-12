@@ -25,6 +25,6 @@
 int
 tcsetattr (int fd, int optional_actions, const struct termios *termios_p)
 {
-  return ros_syscall(SYS_tcsetattr,fd,optional_actions,termios_p,0,0);
+  return ros_syscall(SYS_tcsetattr, fd, optional_actions, termios_p, 0, 0, 0);
 }
 libc_hidden_def (tcsetattr)

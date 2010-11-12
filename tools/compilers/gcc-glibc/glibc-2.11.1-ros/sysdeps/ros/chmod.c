@@ -33,6 +33,6 @@ __chmod (const char* file, mode_t mode)
     return -1;
   }
 
-  return ros_syscall(SYS_chmod, file, strlen(file), mode, 0, 0);
+  return ros_syscall(SYS_chmod, file, strlen(file), mode, 0, 0, 0);
 }
 weak_alias (__chmod, chmod)

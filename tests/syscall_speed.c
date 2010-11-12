@@ -8,7 +8,7 @@ int main()
 
 	long long tsc0 = read_tsc();
 	for(int i = 0; i < N; i++)
-		ros_syscall(SYS_null,0,0,0,0,0);
+		ros_syscall(SYS_null, 0, 0, 0, 0, 0, 0);
 	long long tsc1 = read_tsc();
 
 	printf("tsc0 = %lld\n",tsc0);

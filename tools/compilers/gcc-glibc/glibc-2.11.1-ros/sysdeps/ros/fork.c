@@ -46,7 +46,7 @@ __fork ()
     child_list = tmp;
   }
 
-  ret = ros_syscall(SYS_fork,0,0,0,0,0);
+  ret = ros_syscall(SYS_fork, 0, 0, 0, 0, 0, 0);
   if(ret > 0)
     child_list[child_list_size++] = ret;
 

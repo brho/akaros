@@ -29,6 +29,6 @@ int
 __setgid (gid)
      gid_t gid;
 {
-  return ros_syscall(SYS_setgid, gid, 0, 0, 0, 0);
+  return ros_syscall(SYS_setgid, gid, 0, 0, 0, 0, 0);
 }
 weak_alias (__setgid, setgid)

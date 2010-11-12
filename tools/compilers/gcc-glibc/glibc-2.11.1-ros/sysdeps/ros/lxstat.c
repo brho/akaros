@@ -35,7 +35,7 @@ __lxstat (int vers, const char *file, struct stat *buf)
     return -1;
   }
 
-  int ret = (int)ros_syscall(SYS_lstat, file, strlen(file), buf, 0, 0);
+  int ret = (int)ros_syscall(SYS_lstat, file, strlen(file), buf, 0, 0, 0);
   return ret;
 }
 hidden_def (__lxstat)

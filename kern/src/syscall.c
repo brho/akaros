@@ -1346,7 +1346,7 @@ const static struct sys_table_entry syscall_table[] = {
  * 
  * This syscall function is used by both local syscall and arsc, and should
  * remain oblivious of the caller. */
-intreg_t syscall(struct proc *p, uintreg_t syscallno, uintreg_t a1,
+intreg_t syscall(struct proc *p, uintreg_t sc_num, uintreg_t a0, uintreg_t a1,
                  uintreg_t a2, uintreg_t a3, uintreg_t a4, uintreg_t a5)
 {
 	const int max_syscall = sizeof(syscall_table)/sizeof(syscall_table[0]);
@@ -1358,8 +1358,8 @@ intreg_t syscall(struct proc *p, uintreg_t syscallno, uintreg_t a1,
 			vcoreid = proc_get_vcoreid(p, coreid);
 			if (systrace_flags & SYSTRACE_LOUD) {
 				printk("[%16llu] Syscall %3d (%12s):(%08p, %08p, %08p, %08p, "
-				       "%08p) proc: %d core: %d vcore: %d\n", read_tsc(),
-				       syscallno, syscall_table[syscallno].name, a1, a2, a3,
+				       "%08p, %08p) proc: %d core: %d vcore: %d\n", read_tsc(),
+				       sc_num, syscall_table[sc_num].name, a0, a1, a2, a3,
 				       a4, a5, p->pid, coreid, vcoreid);
 			} else {
 				struct systrace_record *trace;
@@ -1370,7 +1370,8 @@ intreg_t syscall(struct proc *p, uintreg_t syscallno, uintreg_t a1,
 				} while (!atomic_comp_swap(&systrace_bufidx, idx, new_idx));
 				trace = &systrace_buffer[idx];
 				trace->timestamp = read_tsc();
-				trace->syscallno = syscallno;
+				trace->syscallno = sc_num;
+				trace->arg0 = a0;
 				trace->arg1 = a1;
 				trace->arg2 = a2;
 				trace->arg3 = a3;
@@ -1382,14 +1383,10 @@ intreg_t syscall(struct proc *p, uintreg_t syscallno, uintreg_t a1,
 			}
 		}
 	}
-	//printk("Incoming syscall on core: %d number: %d\n    a1: %x\n   "
-	//       " a2: %x\n    a3: %x\n    a4: %x\n    a5: %x\n", core_id(),
-	//       syscallno, a1, a2, a3, a4, a5);
+	if (sc_num > max_syscall || syscall_table[sc_num].call == NULL)
+		panic("Invalid syscall number %d for proc %x!", sc_num, *p);
 
-	if (syscallno > max_syscall || syscall_table[syscallno].call == NULL)
-		panic("Invalid syscall number %d for proc %x!", syscallno, *p);
-
-	return syscall_table[syscallno].call(p, a1, a2, a3, a4, a5);
+	return syscall_table[sc_num].call(p, a0, a1, a2, a3, a4, a5);
 }
 
 /* A process can trap and call this function, which will set up the core to
@@ -1428,9 +1425,8 @@ void run_local_syscall(void)
 	pcpui->nr_calls--;				/* one less to do */
 	(*pcpui->tf_retval_loc)++;		/* one more started */
 	pcpui->errno_loc = &sysc->err;
-	/* TODO: arg5 */
 	sysc->retval = syscall(pcpui->cur_proc, sysc->num, sysc->arg0, sysc->arg1,
-	                       sysc->arg2, sysc->arg3, sysc->arg4);
+	                       sysc->arg2, sysc->arg3, sysc->arg4, sysc->arg5);
 	sysc->flags |= SC_DONE;
 	/* regardless of whether the call blocked or not, we smp_idle().  If it was
 	 * the last call, it'll return to the process.  If there are more, it will
@@ -1523,11 +1519,12 @@ void systrace_print(bool all, struct proc *p)
 	 * timestamp and loop around.  Careful of concurrent writes. */
 	for (int i = 0; i < systrace_bufsize; i++)
 		if (systrace_buffer[i].timestamp)
-			printk("[%16llu] Syscall %3d (%12s):(%08p, %08p, %08p, %08p, "
+			printk("[%16llu] Syscall %3d (%12s):(%08p, %08p, %08p, %08p, %08p,"
 			       "%08p) proc: %d core: %d vcore: %d\n",
 			       systrace_buffer[i].timestamp,
 			       systrace_buffer[i].syscallno,
 			       syscall_table[systrace_buffer[i].syscallno].name,
+			       systrace_buffer[i].arg0,
 			       systrace_buffer[i].arg1,
 			       systrace_buffer[i].arg2,
 			       systrace_buffer[i].arg3,

@@ -32,6 +32,6 @@ __access (const char* file, int type)
     return -1;
   }
 
-  return ros_syscall(SYS_access, file, strlen(file), type, 0, 0);
+  return ros_syscall(SYS_access, file, strlen(file), type, 0, 0, 0);
 }
 weak_alias (__access, access)

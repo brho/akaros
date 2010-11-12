@@ -45,7 +45,7 @@ __libc_open (const char* file, int oflag, ...)
       va_end(arg);
     }
 
-  return ros_syscall(SYS_open, file, strlen(file), oflag, mode, 0);
+  return ros_syscall(SYS_open, file, strlen(file), oflag, mode, 0, 0);
 }
 libc_hidden_def (__libc_open)
 weak_alias (__libc_open, __open)

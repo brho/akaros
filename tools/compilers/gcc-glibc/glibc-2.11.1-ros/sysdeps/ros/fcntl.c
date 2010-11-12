@@ -38,7 +38,7 @@ __fcntl(int fd, int cmd, ...)
     case F_SETFD:
     case F_GETFL:
     case F_SETFL:
-      return ros_syscall(SYS_fcntl,fd,cmd,arg,0,0);
+      return ros_syscall(SYS_fcntl, fd, cmd, arg, 0, 0, 0);
     default:
       errno = ENOSYS;
       return -1;

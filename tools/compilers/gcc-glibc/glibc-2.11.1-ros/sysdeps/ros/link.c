@@ -34,6 +34,6 @@ __link (from, to)
     return -1;
   }
 
-  return ros_syscall(SYS_link, from, strlen(from), to, strlen(to), 0);
+  return ros_syscall(SYS_link, from, strlen(from), to, strlen(to), 0, 0);
 }
 weak_alias (__link, link)

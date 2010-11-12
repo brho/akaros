@@ -34,6 +34,6 @@ __mkdir (path, mode)
       __set_errno (EINVAL);
       return -1;
     }
-  return ros_syscall(SYS_mkdir, path, strlen(path), mode, 0, 0);
+  return ros_syscall(SYS_mkdir, path, strlen(path), mode, 0, 0, 0);
 }
 weak_alias (__mkdir, mkdir)

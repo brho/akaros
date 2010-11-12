@@ -25,6 +25,6 @@
 int
 __tcgetattr (int fd, struct termios* termios_p)
 {
-  return ros_syscall(SYS_tcgetattr,fd,termios_p,0,0,0);
+  return ros_syscall(SYS_tcgetattr, fd, termios_p, 0, 0, 0, 0);
 }
 weak_alias (__tcgetattr, tcgetattr)

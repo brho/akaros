@@ -49,7 +49,7 @@ __getcwd (char *buf, size_t size)
     allocated = 1;
   }
 
-  int ret = ros_syscall(SYS_getcwd,buf,size,0,0,0);
+  int ret = ros_syscall(SYS_getcwd, buf, size, 0, 0, 0, 0);
 
   if(ret == -1 && allocated)
   {

@@ -33,6 +33,6 @@ __unlink (name)
     return -1;
   }
 
-  return ros_syscall(SYS_unlink, name, strlen(name), 0, 0, 0);
+  return ros_syscall(SYS_unlink, name, strlen(name), 0, 0, 0, 0);
 }
 weak_alias (__unlink, unlink)

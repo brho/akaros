@@ -33,6 +33,6 @@ __symlink (from, to)
       __set_errno (EINVAL);
       return -1;
     }
-  return ros_syscall(SYS_symlink, from, strlen(from), to, strlen(to), 0);
+  return ros_syscall(SYS_symlink, from, strlen(from), to, strlen(to), 0, 0);
 }
 weak_alias (__symlink, symlink)

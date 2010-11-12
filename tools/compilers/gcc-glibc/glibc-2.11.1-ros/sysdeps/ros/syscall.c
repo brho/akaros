@@ -32,8 +32,9 @@ syscall(long int num, ...)
   long int a2 = va_arg(vl,long int);
   long int a3 = va_arg(vl,long int);
   long int a4 = va_arg(vl,long int);
+  long int a5 = va_arg(vl,long int);
   va_end(vl);
 
-  return ros_syscall(num,a0,a1,a2,a3,a4);
+  return ros_syscall(num, a0, a1, a2, a3, a4, a5);
 }
 

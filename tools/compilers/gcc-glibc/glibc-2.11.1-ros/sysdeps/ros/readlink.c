@@ -30,6 +30,6 @@ __readlink (path, buf, len)
      char *buf;
      size_t len;
 {
-  return ros_syscall(SYS_readlink, path, strlen(path), buf, len, 0);
+  return ros_syscall(SYS_readlink, path, strlen(path), buf, len, 0, 0);
 }
 weak_alias (__readlink, readlink)

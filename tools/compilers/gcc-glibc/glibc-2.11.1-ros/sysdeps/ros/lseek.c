@@ -6,7 +6,7 @@
 off_t
 __libc_lseek (int fd, off_t offset, int whence)
 {
-  return ros_syscall(SYS_lseek,fd,offset,whence,0,0);
+  return ros_syscall(SYS_lseek, fd, offset, whence, 0, 0, 0);
 }
 
 weak_alias (__libc_lseek, __lseek)

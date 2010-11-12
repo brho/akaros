@@ -33,6 +33,6 @@ __rmdir (path)
       return -1;
     }
 
-  return ros_syscall(SYS_rmdir, path, strlen(path), 0, 0, 0);
+  return ros_syscall(SYS_rmdir, path, strlen(path), 0, 0, 0, 0);
 }
 weak_alias (__rmdir, rmdir)

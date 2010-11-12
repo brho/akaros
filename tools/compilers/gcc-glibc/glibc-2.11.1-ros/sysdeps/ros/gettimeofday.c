@@ -30,7 +30,7 @@ __gettimeofday (tv, tz)
      struct timeval *tv;
      struct timezone *tz;
 {
-  return ros_syscall(SYS_gettimeofday,tv,0,0,0,0);
+  return ros_syscall(SYS_gettimeofday, tv, 0, 0, 0, 0, 0);
 }
 INTDEF(__gettimeofday)
 weak_alias (__gettimeofday, gettimeofday)

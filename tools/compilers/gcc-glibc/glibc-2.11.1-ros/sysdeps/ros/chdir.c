@@ -33,6 +33,6 @@ __chdir (path)
     return -1;
   }
 
-  return ros_syscall(SYS_chdir, path, strlen(path), 0, 0, 0);
+  return ros_syscall(SYS_chdir, path, strlen(path), 0, 0, 0, 0);
 }
 weak_alias (__chdir, chdir)

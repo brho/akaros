@@ -27,7 +27,7 @@ void
 _exit (status)
      int status;
 {
-  ros_syscall(SYS_proc_destroy,getpid(),0,0,0,0);
+  ros_syscall(SYS_proc_destroy,getpid(),0,0,0,0,0);
   #ifdef ABORT_INSTRUCTION
   ABORT_INSTRUCTION;
   #endif

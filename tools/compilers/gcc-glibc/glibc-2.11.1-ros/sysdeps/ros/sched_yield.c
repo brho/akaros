@@ -24,7 +24,7 @@
 int
 __sched_yield (void)
 {
-  return ros_syscall(SYS_yield,0,0,0,0,0);
+  return ros_syscall(SYS_yield, 0, 0, 0, 0, 0, 0);
 }
 libc_hidden_def (__sched_yield)
 weak_alias (__sched_yield, sched_yield)

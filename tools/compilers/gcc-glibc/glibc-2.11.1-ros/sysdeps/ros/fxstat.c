@@ -45,7 +45,7 @@ __fxstat (int vers, int fd, struct stat *buf)
     }
 
   
-  int ret = (int)ros_syscall(SYS_fstat, fd, buf, 0, 0, 0);
+  int ret = (int)ros_syscall(SYS_fstat, fd, buf, 0, 0, 0, 0);
   return ret;
 }
 stub_warning (fstat)

@@ -26,7 +26,7 @@
 int
 __close (int fd)
 {
-  return ros_syscall(SYS_close,fd,0,0,0,0);
+  return ros_syscall(SYS_close, fd, 0, 0, 0, 0, 0);
 }
 libc_hidden_def (__close)
 weak_alias (__close, close)

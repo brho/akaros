@@ -27,6 +27,6 @@
 int
 __munmap (__ptr_t addr, size_t len)
 {
-  return ros_syscall(SYS_munmap,addr,len,0,0,0);
+  return ros_syscall(SYS_munmap, addr, len, 0, 0, 0, 0);
 }
 weak_alias (__munmap, munmap)

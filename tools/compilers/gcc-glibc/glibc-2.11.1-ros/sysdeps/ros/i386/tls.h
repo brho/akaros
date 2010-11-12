@@ -440,7 +440,7 @@ static const char* tls_init_tp(void* thrdescr)
 
   //TODO: think about how to avoid this. Probably add a field to the 
   // rthreads struct that we manually fill in in _start(). 
-  int core_id = __ros_syscall(SYS_getvcoreid, 0, 0, 0, 0, 0, NULL);
+  int core_id = __ros_syscall(SYS_getvcoreid, 0, 0, 0, 0, 0, 0, NULL);
 
   /* Bug with this whole idea (TODO: (TLSV))*/
   if(__procdata.ldt == NULL)
@@ -452,13 +452,13 @@ static const char* tls_init_tp(void* thrdescr)
     // it up...)
     intreg_t params[3] = { MAP_ANONYMOUS | MAP_POPULATE, -1, 0 };
 	void *ldt = (void*)__ros_syscall(SYS_mmap, 0, sz, PROT_READ | PROT_WRITE,
-	                                 (long)params, 0, NULL);
+	                                 (long)params, 0, 0, NULL);
     if (ldt == MAP_FAILED)
       return "tls couldn't allocate memory\n";
 
     __procdata.ldt = ldt;
     // force kernel crossing
-	__ros_syscall(SYS_getpid, 0, 0, 0, 0, 0, NULL);
+	__ros_syscall(SYS_getpid, 0, 0, 0, 0, 0, 0, NULL);
   }
 
   // Build the segment

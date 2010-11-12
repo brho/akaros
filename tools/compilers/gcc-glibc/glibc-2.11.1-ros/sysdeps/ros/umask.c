@@ -25,6 +25,6 @@
 mode_t
 __umask (mode_t mask)
 {
-  return ros_syscall(SYS_umask,mask,0,0,0,0);
+  return ros_syscall(SYS_umask, mask, 0, 0, 0, 0, 0);
 }
 weak_alias (__umask, umask)

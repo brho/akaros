@@ -41,7 +41,7 @@ __execve (path, argv, envp)
     return -1;
   }
 
-  int ret = ros_syscall(SYS_exec, path, strlen(path), (uintptr_t)&pi, 0, 0);
+  int ret = ros_syscall(SYS_exec, path, strlen(path), (uintptr_t)&pi, 0, 0, 0);
 
   // if we got here, then exec better have failed...
   assert(ret == -1);

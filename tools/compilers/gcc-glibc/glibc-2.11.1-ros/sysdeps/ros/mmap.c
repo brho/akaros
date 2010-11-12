@@ -42,7 +42,7 @@ __mmap (__ptr_t addr, size_t len, int prot, int flags, int fd, off_t offset)
   offset /= PGSIZE;
 
   volatile int args[3] = {flags,fd,offset};
-  return (__ptr_t)ros_syscall(SYS_mmap,addr,len,prot,args,0);
+  return (__ptr_t)ros_syscall(SYS_mmap, addr, len, prot, args, 0, 0);
 }
 
 weak_alias (__mmap, mmap)

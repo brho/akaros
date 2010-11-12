@@ -60,7 +60,7 @@ __libc_waitpid (pid_t pid, int *stat_loc, int options)
     {
       if(pid == -1 || child_list[i] == pid)
       {
-        ret = ros_syscall(SYS_trywait,child_list[i],stat_loc,0,0,0);
+        ret = ros_syscall(SYS_trywait, child_list[i], stat_loc, 0, 0, 0, 0);
         if(ret == 0)
         {
           ret = child_list[i];

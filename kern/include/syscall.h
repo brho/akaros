@@ -20,6 +20,7 @@
 struct systrace_record {
 	uint64_t		timestamp;
 	uintreg_t		syscallno;
+	uintreg_t		arg0;
 	uintreg_t		arg1;
 	uintreg_t		arg2;
 	uintreg_t		arg3;
@@ -32,7 +33,7 @@ struct systrace_record {
 
 /* Syscall table */
 typedef intreg_t (*syscall_t)(struct proc *, uintreg_t, uintreg_t, uintreg_t,
-                              uintreg_t, uintreg_t);
+                              uintreg_t, uintreg_t, uintreg_t);
 struct sys_table_entry {
 	syscall_t call;
 	char *name;
@@ -40,8 +41,8 @@ struct sys_table_entry {
 const static struct sys_table_entry syscall_table[];
 /* Syscall invocation */
 void prep_syscalls(struct proc *p, struct syscall *sysc, unsigned int nr_calls);
-intreg_t syscall(struct proc *p, uintreg_t num, uintreg_t a1, uintreg_t a2,
-                 uintreg_t a3, uintreg_t a4, uintreg_t a5);
+intreg_t syscall(struct proc *p, uintreg_t sc_num, uintreg_t a0, uintreg_t a1,
+                 uintreg_t a2, uintreg_t a3, uintreg_t a4, uintreg_t a5);
 void run_local_syscall(void);
 void set_errno(int errno);
 

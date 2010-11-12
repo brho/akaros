@@ -58,7 +58,7 @@ static inline void pop_ros_tf(struct user_trapframe *tf, uint32_t vcoreid)
 
 	vcpd->notif_enabled = true;
 	if(vcpd->notif_pending)
-		ros_syscall(SYS_self_notify,vcoreid,0,0,0,0);
+		ros_syscall(SYS_self_notify, vcoreid, 0, 0, 0, 0, 0);
 
 	// tell the kernel to load the new trapframe
 	asm volatile ("mov %0, %%o0; ta 4" : : "r"(tf) : "memory");

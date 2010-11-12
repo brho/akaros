@@ -29,7 +29,7 @@ spinlock_t arsc_proc_lock = SPINLOCK_INITIALIZER;
 intreg_t inline syscall_async(struct proc *p, syscall_req_t *call)
 {
 	return syscall(p, call->num, call->args[0], call->args[1],
-	               call->args[2], call->args[3], call->args[4]);
+	               call->args[2], call->args[3], call->args[4], call->args[5]);
 }
 
 intreg_t sys_init_arsc(struct proc *p)

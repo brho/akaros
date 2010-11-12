@@ -31,6 +31,6 @@ __kill (int pid, int sig)
     errno = ENOSYS;
     return -1;
   }
-  return ros_syscall(SYS_proc_destroy,pid,0,0,0,0);
+  return ros_syscall(SYS_proc_destroy, pid, 0, 0, 0, 0, 0);
 }
 weak_alias (__kill, kill)
