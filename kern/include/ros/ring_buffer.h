@@ -26,7 +26,6 @@
 
 #ifndef ROS_INC_RING_BUFFER_H
 #define ROS_INC_RING_BUFFER_H
-
 #include <string.h>
 #include <ros/arch/membar.h>
 
@@ -36,9 +35,6 @@
 
 typedef unsigned int RING_IDX;
 
-// zra: smp.c is v. slow to build because these RDn() things cause expressions
-//      to grow exponentially.
-
 /* Round a 32-bit unsigned constant down to the nearest power of two. */
 #define __RD2(_x)  (((_x) & 0x00000002UL) ? 0x2                  : ((_x) & 0x1))
 #define __RD4(_x)  (((_x) & 0x0000000cUL) ? __RD2((_x)>>2)<<2    : __RD2(_x))
@@ -46,39 +42,20 @@ typedef unsigned int RING_IDX;
 #define __RD16(_x) (((_x) & 0x0000ff00UL) ? __RD8((_x)>>8)<<8    : __RD8(_x))
 #define __RD32(_x) (((_x) & 0xffff0000UL) ? __RD16((_x)>>16)<<16 : __RD16(_x))
 
-/* Statically assert that two values are in fact equal.
- * It works by enducing a compil error from a duplicate case in a switch 
- * statement if the assertion is false.
- */
-#define __ASSERT_EQUAL(x, y) \
-	switch ((x) == (y)) case 0: case ((x) == (y)):
-
 /*
  * Calculate size of a shared ring, given the total available space for the
  * ring and indexes (_sz), and the name tag of the request/response structure.
  * A ring contains as many entries as will fit, rounded down to the nearest 
  * power of two (so we can mask with (size-1) to loop around).
- * This tells us how many elements the ring _s can contain, given _sz space.
+ */
+#define __CONST_RING_SIZE(_s, _sz) \
+    (__RD32(((_sz) - offsetof(struct _s##_sring, ring)) / \
+	    sizeof(((struct _s##_sring *)0)->ring[0])))
+/*
+ * The same for passing in an actual pointer instead of a name tag.
  */
 #define __RING_SIZE(_s, _sz) \
-    __RING_SIZE_BYTES(_s, _sz) / sizeof((_s)->ring[0])
-
-/*
- * This is the same as above, except in terms of bytes instead of elements
- */
-#define __RING_SIZE_BYTES(_s, _sz) \
-    (__RD32((_sz) - (long)(_s)->ring + (long)(_s)))
-
-/*
- * These two are the same as above except that they rely on type information
- * to determine the sizes statically, rather than the runtime instantiation
- * of the ring buffer variable
- */
-#define __RING_SIZE_STATIC(__name, _sz) \
-    (__RING_SIZE_BYTES_STATIC(_sz) / sizeof(union __name##_sring_entry))
-
-#define __RING_SIZE_BYTES_STATIC(_sz) \
-    (__RD32((_sz) - __RING_HEADER_SIZE()))
+    (__RD32(((_sz) - (long)(_s)->ring + (long)(_s)) / sizeof((_s)->ring[0])))
 
 /*
  * Macros to make the correct C datatypes for a new kind of ring.
@@ -89,24 +66,13 @@ typedef unsigned int RING_IDX;
  * In a header where you want the ring datatype declared, you then do:
  *
  *     DEFINE_RING_TYPES(mytag, request_t, response_t);
- * or
- *     DEFINE_RING_TYPES_WITH_SIZE(mytag, request_t, response_t, size);
  *
- * Both macros expand out to give you a set of types, as you can see below.
+ * These expand out to give you a set of types, as you can see below.
  * The most important of these are:
  * 
  *     mytag_sring_t      - The shared ring.
  *     mytag_front_ring_t - The 'front' half of the ring.
  *     mytag_back_ring_t  - The 'back' half of the ring.
- *
- * The first of these macros will only declare a single element array to 
- * represent the ring buffer in the shared ring struct that is ultimately
- * created.  
- *
- * The second macro actually statically declares space of size (size) inside
- * the shared ring struct. This size is rounded down to the nearest power of 2
- * and space is subtracted off to account for holding any necessary ring 
- * buffer headers.
  *
  * To initialize a ring in your code you need to know the location and size
  * of the shared memory area (PAGE_SIZE, for instance). To initialise
@@ -121,41 +87,31 @@ typedef unsigned int RING_IDX;
  *
  *     mytag_back_ring_t back_ring;
  *     BACK_RING_INIT(&back_ring, (mytag_sring_t *)shared_page, PAGE_SIZE);
- *
- * If you use the second of the two macros when first defining your ring 
- * structures, then the size you use when initializing your front and back 
- * rings *should* match the size you passed into this macro (e.g. PAGE_SIZE
- * in this example).
  */
 
-#define __RING_HEADER()                                                 \
-    RING_IDX req_prod, req_event;                                       \
-    RING_IDX rsp_prod, rsp_event;                                       \
-    uint8_t  pad[48];
-    
-struct rhs_struct {
-	__RING_HEADER()
-};
-
-#define __RING_HEADER_SIZE() \
-    (sizeof(struct rhs_struct))
-
 #define DEFINE_RING_TYPES(__name, __req_t, __rsp_t)                     \
-	DEFINE_RING_TYPES_WITH_SIZE(__name, __req_t, __rsp_t,               \
-	                            __RING_HEADER_SIZE() + 1)
-
-#define DEFINE_RING_TYPES_WITH_SIZE(__name, __req_t, __rsp_t, __size)   \
                                                                         \
 /* Shared ring entry */                                                 \
 union __name##_sring_entry {                                            \
     __req_t req;                                                        \
     __rsp_t rsp;                                                        \
-} TRUSTED;                                                              \
+};                                                                      \
                                                                         \
 /* Shared ring page */                                                  \
 struct __name##_sring {                                                 \
-	__RING_HEADER()                                                     \
-    union __name##_sring_entry ring[__RING_SIZE_STATIC(__name, __size)];\
+    RING_IDX req_prod, req_event;                                       \
+    RING_IDX rsp_prod, rsp_event;                                       \
+    union {                                                             \
+        struct {                                                        \
+            uint8_t smartpoll_active;                                   \
+        } netif;                                                        \
+        struct {                                                        \
+            uint8_t msg;                                                \
+        } tapif_user;                                                   \
+        uint8_t pvt_pad[4];                                             \
+    } private;                                                          \
+    uint8_t __pad[44];                                                  \
+    union __name##_sring_entry ring[1]; /* variable-length */           \
 };                                                                      \
                                                                         \
 /* "Front" end's private variables */                                   \
@@ -177,21 +133,7 @@ struct __name##_back_ring {                                             \
 /* Syntactic sugar */                                                   \
 typedef struct __name##_sring __name##_sring_t;                         \
 typedef struct __name##_front_ring __name##_front_ring_t;               \
-typedef struct __name##_back_ring __name##_back_ring_t;                 \
-/* This is a dummy function just used to statically assert that         \
- * there are no weird padding issues associated with our sring structs  \
- */                                                                     \
-static void __name##_assert_sring_size() __attribute__((used));         \
-static void __name##_assert_sring_size() {                              \
-	__ASSERT_EQUAL( sizeof(__name##_sring_t),                           \
-	                ( __RING_HEADER_SIZE()  +                           \
-	                  ( __RING_SIZE_STATIC(__name, __size) *            \
-	                    sizeof(union __name##_sring_entry)              \
-	                  )                                                 \
-	                )                                                   \
-	              );                                                    \
-}              
-
+typedef struct __name##_back_ring __name##_back_ring_t
 
 /*
  * Macros for manipulating rings.
@@ -212,7 +154,8 @@ static void __name##_assert_sring_size() {                              \
 #define SHARED_RING_INIT(_s) do {                                       \
     (_s)->req_prod  = (_s)->rsp_prod  = 0;                              \
     (_s)->req_event = (_s)->rsp_event = 1;                              \
-    (void)memset((_s)->pad, 0, sizeof((_s)->pad));                      \
+    (void)memset((_s)->private.pvt_pad, 0, sizeof((_s)->private.pvt_pad)); \
+    (void)memset((_s)->__pad, 0, sizeof((_s)->__pad));                  \
 } while(0)
 
 #define FRONT_RING_INIT(_r, _s, __size) do {                            \
@@ -376,4 +319,3 @@ static void __name##_assert_sring_size() {                              \
  * indent-tabs-mode: nil
  * End:
  */
-

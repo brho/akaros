@@ -121,10 +121,10 @@ static intreg_t process_generic_syscalls(struct proc *p, size_t max)
 		rsp.syserr = sysc.err;
 		rsp.cleanup = req->cleanup;
 		rsp.data = req->data;
-		rsp.status = RES_ready;
 		// write response into the slot it came from
 		memcpy(req, &rsp, sizeof(syscall_rsp_t));
 		(sysbr->rsp_prod_pvt)++;
+		req->status = RES_ready;
 		RING_PUSH_RESPONSES(sysbr);
 
 		//printk("DEBUG POST: sring->req_prod: %d, sring->rsp_prod: %d\n",

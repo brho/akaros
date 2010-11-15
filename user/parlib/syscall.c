@@ -131,5 +131,4 @@ int sys_halt_core(unsigned int usec)
 void* sys_init_arsc()
 {
 	return (void*)ros_syscall(SYS_init_arsc, 0, 0, 0, 0, 0, 0);
-	return (void*)ros_syscall(SYS_init_arsc, 0, 0, 0, 0, 0);
 }

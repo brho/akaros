@@ -8,6 +8,9 @@
 #include <errno.h>
 #include <arch/arch.h>
 #include <sys/param.h>
+#include <arch/atomic.h>
+
+#include <pthread.h>
 
 syscall_desc_pool_t syscall_desc_pool;
 async_desc_pool_t async_desc_pool;
@@ -115,9 +118,10 @@ int async_syscall(syscall_req_t* req, syscall_desc_t** desc_ptr2)
 	// abort if there is no room for our request.  ring size is currently 64.
 	// we could spin til it's free, but that could deadlock if this same thread
 	// is supposed to consume the requests it is waiting on later.
-	syscall_desc_t* desc = *desc_ptr2 = malloc(sizeof (syscall_desc_t));
+	syscall_desc_t* desc = malloc(sizeof (syscall_desc_t));
 	desc->channel = &SYS_CHANNEL;
 	syscall_front_ring_t *fr = &(desc->channel->sysfr);
+	//TODO: can do it locklessly using CAS, but could change with local async calls
 	mcs_lock_lock(&desc->channel->aclock);
 	if (RING_FULL(fr)) {
 		errno = EBUSY;
@@ -128,9 +132,9 @@ int async_syscall(syscall_req_t* req, syscall_desc_t** desc_ptr2)
 	// at some point, we need to listen for the responses.
 	desc->idx = ++(fr->req_prod_pvt);
 	syscall_req_t* r = RING_GET_REQUEST(fr, desc->idx);
-	assert (r->status == RES_free);
+	// CAS on the req->status perhaps
 	req->status = REQ_alloc;
-	
+
 	memcpy(r, req, sizeof(syscall_req_t));
 	r->status = REQ_ready;
 	// push our updates to syscallfrontring.req_prod_pvt
@@ -139,34 +143,38 @@ int async_syscall(syscall_req_t* req, syscall_desc_t** desc_ptr2)
 	RING_PUSH_REQUESTS(fr);
 	//cprintf("DEBUG: sring->req_prod: %d, sring->rsp_prod: %d\n", 
 	mcs_lock_unlock(&desc->channel->aclock);
+	*desc_ptr2 = desc;
 	return 0;
 }
 
 // consider a timeout too
 int waiton_syscall(syscall_desc_t* desc, syscall_rsp_t* rsp)
 {
+	if (desc == NULL || desc->channel == NULL){
+		//errno = EFAIL;
+		return -1;
+	}
 	// Make sure we were given a desc with a non-NULL frontring.  This could
 	// happen if someone forgot to check the error code on the paired syscall.
 	syscall_front_ring_t *fr =  &desc->channel->sysfr;
 	
 	if (!fr){
-		errno = EFAIL;
+		//errno = EFAIL;
 		return -1;
 	}
-	// this forces us to call wait in the order in which the syscalls are made.
-	if (desc->idx != fr->rsp_cons + 1){
-		errno = EDEADLOCK;
-		return -1;
-	}
-	while (!(RING_HAS_UNCONSUMED_RESPONSES(fr)))
+	syscall_rsp_t* rsp_inring = RING_GET_RESPONSE(fr, desc->idx);
+
+	// ignoring the ring push response from the kernel side now
+	while (rsp_inring->status != RES_ready)
 		cpu_relax();
-	memcpy(rsp, RING_GET_RESPONSE(fr, desc->idx), sizeof(*rsp));
-	fr->rsp_cons++;
+	memcpy(rsp, rsp_inring, sizeof(*rsp));
+	
+	atomic_inc((atomic_t*) &(fr->rsp_cons));
     // run a cleanup function for this desc, if available
-    if (rsp->cleanup)
-    	rsp->cleanup(rsp->data);
+    //if (rsp->cleanup)
+    //	rsp->cleanup(rsp->data);
 	if (rsp->syserr){
-		errno = rsp->syserr;
+		//	errno = rsp->syserr;
 		return -1;
 	} else 
 		return 0;

@@ -33,7 +33,7 @@ typedef struct sysevent_rsp {
 
 // Generic Sysevent Ring Buffer
 #define SYSEVENTRINGSIZE    PGSIZE
-DEFINE_RING_TYPES_WITH_SIZE(sysevent, sysevent_t, sysevent_rsp_t, SYSEVENTRINGSIZE);
+DEFINE_RING_TYPES(sysevent, sysevent_t, sysevent_rsp_t);
 
 #endif //ROS_SYSEVENT_H
 
