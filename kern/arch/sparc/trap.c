@@ -444,7 +444,7 @@ handle_pop_tf(trapframe_t* state)
 
 	proc_secure_trapframe(&tf);
 	set_current_tf(pcpui, &tf_p);
-	proc_restartcore(current,&tf);
+	proc_restartcore();
 }
 
 void
@@ -478,7 +478,7 @@ handle_syscall(trapframe_t* state)
 	run_local_syscall();
 	warn("No syscalls on a trap!");
 
-	proc_restartcore(current,state);
+	proc_restartcore();
 }
 
 void

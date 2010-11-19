@@ -302,7 +302,7 @@ void trap(struct trapframe *tf)
 	 * to still be okay (might not be after blocking) */
 	if (in_kernel(tf))
 		return;	/* TODO: think about this, might want a helper instead. */
-	proc_restartcore(current, tf);
+	proc_restartcore();
 	assert(0);
 }
 
@@ -348,7 +348,7 @@ void irq_handler(struct trapframe *tf)
 	 * to still be okay (might not be after blocking) */
 	if (in_kernel(tf))
 		return;	/* TODO: think about this, might want a helper instead. */
-	proc_restartcore(current, tf);
+	proc_restartcore();
 	assert(0);
 }
 
@@ -409,7 +409,7 @@ void sysenter_callwrapper(struct trapframe *tf)
 	 * process, which could be weird if the syscall blocked.  it would need to
 	 * restore the proper value in current before returning to here.
 	 * likewise, tf could be pointing to random gibberish. */
-	proc_restartcore(current, tf);
+	proc_restartcore();
 }
 
 struct kmem_cache *kernel_msg_cache;

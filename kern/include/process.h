@@ -77,7 +77,7 @@ int __proc_set_state(struct proc *p, uint32_t state) WRITES(p->state);
 struct proc *pid2proc(pid_t pid);
 bool proc_controls(struct proc *SAFE actor, struct proc *SAFE target);
 void proc_run(struct proc *SAFE p);
-void proc_restartcore(struct proc *SAFE p, trapframe_t *SAFE tf);
+void proc_restartcore(void);
 void proc_destroy(struct proc *SAFE p);
 void __proc_yield_s(struct proc *p, struct trapframe *tf);
 void proc_yield(struct proc *SAFE p, bool being_nice);
