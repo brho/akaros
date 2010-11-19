@@ -128,20 +128,6 @@ bool __proc_preempt_all(struct proc *p);
 void proc_preempt_core(struct proc *p, uint32_t pcoreid, uint64_t usec);
 void proc_preempt_all(struct proc *p, uint64_t usec);
 
-/* Allows the kernel to figure out what process is running on this core.  Can be
- * used just like a pointer to a struct proc.  Need these to be macros due to
- * some circular dependencies with smp.h. */
-#define current per_cpu_info[core_id()].cur_proc
-#define set_current_proc(p) per_cpu_info[core_id()].cur_proc = (p)
-
-/* Allows the kernel to figure out what *user* tf is on this core's stack.  Can
- * be used just like a pointer to a struct Trapframe.  Need these to be macros
- * due to some circular dependencies with smp.h.  This is done here instead of
- * elsewhere (like trap.h) for other elliptical reasons.  Note the distinction
- * between kernel and user contexts.  The kernel always returns to its nested,
- * interrupted contexts via iret/etc.  We never do that for user contexts. */
-#define current_tf per_cpu_info[core_id()].cur_tf
-
 void abandon_core(void);
 /* Hold the proc_lock, since it'll use the vcoremapping to send an unmapping
  * message for the region from start to end.  */

@@ -40,7 +40,8 @@ void proc_secure_trapframe(struct trapframe *tf)
  * protects the cr3). */
 void __abandon_core(void)
 {
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	lcr3(boot_cr3);
-	kref_put(&current->kref);
-	set_current_proc(NULL);
+	kref_put(&pcpui->cur_proc->kref);
+	pcpui->cur_proc = 0;
 }

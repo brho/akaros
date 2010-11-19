@@ -28,8 +28,8 @@ struct per_cpu_info {
 	struct proc *cur_proc;
 	struct trapframe *cur_tf;	/* user tf we came in on (can be 0) */
 	struct trapframe actual_tf;	/* storage for cur_tf */
-	struct kthread *spare;		/* useful when restarting */
 	struct syscall *cur_sysc;	/* ptr is into cur_proc's address space */
+	struct kthread *spare;		/* useful when restarting */
 
 #ifdef __SHARC__
 	// held spin-locks. this will have to go elsewhere if multiple kernel
@@ -47,6 +47,15 @@ struct per_cpu_info {
 	spinlock_t routine_amsg_lock;
 	struct kernel_msg_list NTPTV(a0t) NTPTV(a1t) NTPTV(a2t) routine_amsgs;
 }__attribute__((aligned(HW_CACHE_ALIGN)));
+
+/* Allows the kernel to figure out what process is running on this core.  Can be
+ * used just like a pointer to a struct proc. */
+#define current per_cpu_info[core_id()].cur_proc
+/* Allows the kernel to figure out what *user* tf is on this core's stack.  Can
+ * be used just like a pointer to a struct Trapframe.  Note the distinction
+ * between kernel and user contexts.  The kernel always returns to its nested,
+ * interrupted contexts via iret/etc.  We never do that for user contexts. */
+#define current_tf per_cpu_info[core_id()].cur_tf
 
 typedef struct per_cpu_info NTPTV(t) NTPTV(a0t) NTPTV(a1t) NTPTV(a2t) per_cpu_info_t;
 
