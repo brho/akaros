@@ -434,9 +434,11 @@ uint32_t send_kernel_message(uint32_t dst, amr_t pc, TV(a0t) arg0, TV(a1t) arg1,
 		default:
 			panic("Unknown type of kernel message!");
 	}
-	// since we touched memory the other core will touch (the lock), we don't
-	// need an wmb_f()
-	send_ipi(get_hw_coreid(dst), I_KERNEL_MSG);
+	/* since we touched memory the other core will touch (the lock), we don't
+	 * need an wmb_f() */
+	/* if we're sending a routine message locally, we don't want/need an IPI */
+	if ((dst != k_msg->srcid) || (type == KMSG_IMMEDIATE))
+		send_ipi(get_hw_coreid(dst), I_KERNEL_MSG);
 	return 0;
 }
 

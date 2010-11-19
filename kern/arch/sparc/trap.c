@@ -70,7 +70,9 @@ uint32_t send_kernel_message(uint32_t dst, amr_t pc,
 		default:
 			panic("Unknown type of kernel message!");
 	}
-	send_ipi(dst);
+	/* if we're sending a routine message locally, we don't want/need an IPI */
+	if ((dst != k_msg->srcid) || (type == KMSG_IMMEDIATE))
+		send_ipi(dst);
 	return 0;
 }
 
