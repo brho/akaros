@@ -31,14 +31,11 @@ atomic_t outstanding_calls = 0;
  * - Management cores (core 0 for now) call manager, which should never return.
  * - Worker cores halt and wake up when interrupted, do any work on their work
  *   queue, then halt again.
- *
- * TODO: think about resetting the stack pointer at the beginning for worker
- * cores. (keeps the stack from growing if we never go back to userspace).
  * TODO: think about unifying the manager into a workqueue function, so we don't
  * need to check mgmt_core in here.  it gets a little ugly, since there are
  * other places where we check for mgmt and might not smp_idle / call manager.
  */
-void smp_idle(void)
+static void __smp_idle(void)
 {
 	int8_t state = 0;
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
@@ -70,5 +67,14 @@ void smp_idle(void)
 		disable_irqsave(&state);
 		manager();
 	}
+	assert(0);
+}
+
+void smp_idle(void)
+{
+	#ifdef __CONFIG_RESET_STACKS__
+	set_stack_pointer(get_stack_top());
+	#endif /* __CONFIG_RESET_STACKS__ */
+	__smp_idle();
 	assert(0);
 }
