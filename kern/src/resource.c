@@ -43,6 +43,8 @@ ssize_t core_request(struct proc *p)
 	bool need_to_idle = FALSE;
 	bool self_ipi_pending = FALSE;
 
+	/* There are a few things broken for now if you don't have a current_tf */
+	assert(current_tf);
 	spin_lock(&p->proc_lock);
 	/* check to see if this is a full deallocation.  for cores, it's a
 	 * transition from _M to _S.  Will be issues with handling this async. */

@@ -349,17 +349,17 @@ static ssize_t sys_fork(env_t* e)
 		set_errno(EINVAL);
 		return -1;
 	}
-	/* Can't really fork if we don't have a current_tf to fork */
-	if (!current_tf) {
-		set_errno(EINVAL);
-		return -1;
-	}
 	env_t* env;
 	assert(!proc_alloc(&env, current));
 	assert(env != NULL);
 
 	env->heap_top = e->heap_top;
 	env->ppid = e->pid;
+	/* Can't really fork if we don't have a current_tf to fork */
+	if (!current_tf) {
+		set_errno(EINVAL);
+		return -1;
+	}
 	env->env_tf = *current_tf;
 
 	/* We need to speculatively say the syscall worked before copying the memory
@@ -446,19 +446,20 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	int ret = -1;
 	char *t_path;
 	struct file *program;
-	struct trapframe *old_cur_tf = current_tf;
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	struct trapframe *old_cur_tf = pcpui->cur_tf;
 
 	/* We probably want it to never be allowed to exec if it ever was _M */
 	if (p->state != PROC_RUNNING_S) {
 		set_errno(EINVAL);
 		return -1;
 	}
-	if (p != current) {
+	if (p != pcpui->cur_proc) {
 		set_errno(EINVAL);
 		return -1;
 	}
-	/* Can't exec if we don't have a current_tf to restart (if we fail). */
+	/* Can't exec if we don't have a current_tf to restart (if we fail).  This
+	 * isn't 100% true, but I'm okay with it. */
 	if (!old_cur_tf) {
 		set_errno(EINVAL);
 		return -1;
@@ -471,7 +472,7 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	 * we want to return with an error, we need to go back differently in case
 	 * we succeed.  This needs to be done before we could possibly block, but
 	 * unfortunately happens before the point of no return. */
-	current_tf = 0;
+	pcpui->cur_tf = 0;
 	/* This could block: */
 	program = do_file_open(t_path, 0, 0);
 	user_memdup_free(p, t_path);
