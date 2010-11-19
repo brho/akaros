@@ -437,7 +437,9 @@ static ssize_t sys_fork(env_t* e)
  * argv and envp are magically bundled in procinfo for now.  Keep in sync with
  * glibc's sysdeps/ros/execve.c.  Once past a certain point, this function won't
  * return.  It assumes (and checks) that it is current.  Don't give it an extra
- * refcnt'd *p (syscall won't do that). */
+ * refcnt'd *p (syscall won't do that). 
+ * Note: if someone batched syscalls with this call, they could clobber their
+ * old memory (and will likely PF and die).  Don't do it... */
 static int sys_exec(struct proc *p, char *path, size_t path_l,
                     struct procinfo *pi)
 {
@@ -518,10 +520,6 @@ success:
 	schedule_proc(p);
 	spin_unlock(&p->proc_lock);
 all_out:
-	/* When we idle, we don't want to try executing other syscalls.  If exec
-	 * succeeded (or the proc was destroyed) it'd just be wrong. */
-	pcpui->next_syscs = 0;
-	pcpui->nr_syscs = 0;
 	/* we can't return, since we'd write retvals to the old location of the
 	 * sycall struct (which has been freed and is in the old userspace) (or has
 	 * already been written to).*/
@@ -1380,50 +1378,35 @@ intreg_t syscall(struct proc *p, uintreg_t sc_num, uintreg_t a0, uintreg_t a1,
 	return syscall_table[sc_num].call(p, a0, a1, a2, a3, a4, a5);
 }
 
+/* Execute the syscall on the local core */
+static void run_local_syscall(struct syscall *sysc)
+{
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+
+	/* TODO: (UMEM) assert / pin the memory for the sysc */
+	user_mem_assert(pcpui->cur_proc, sysc, sizeof(struct syscall), PTE_USER_RW);
+	pcpui->cur_sysc = sysc;			/* let the core know which sysc it is */
+	sysc->retval = syscall(pcpui->cur_proc, sysc->num, sysc->arg0, sysc->arg1,
+	                       sysc->arg2, sysc->arg3, sysc->arg4, sysc->arg5);
+	sysc->flags |= SC_DONE;
+	/* Can unpin at this point */
+}
+
 /* A process can trap and call this function, which will set up the core to
- * handle all the syscalls.  a.k.a. "sys_debutante(needs, wants)" */
+ * handle all the syscalls.  a.k.a. "sys_debutante(needs, wants)".  If there is
+ * at least one, it will run it directly. */
 void prep_syscalls(struct proc *p, struct syscall *sysc, unsigned int nr_syscs)
 {
 	int retval;
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	/* TODO: (UMEM) assert / pin the memory range sysc for nr_syscs.  Not sure
-	 * how we'll know it is done to unpin it. (might need to handle it in
-	 * abandon_core() or smp_idle(). */
-	user_mem_assert(p, sysc, nr_syscs * sizeof(struct syscall), PTE_USER_RW);
-	/* TEMP! */
-	if (nr_syscs != 1)
-		warn("Debutante calls: %d\n", nr_syscs);
-	/* Set up this core to process the local call */
-	*pcpui->tf_retval_loc = 0;	/* current_tf's retval says how many are done */
-	pcpui->next_syscs = sysc;
-	pcpui->nr_syscs = nr_syscs;
-}
-
-/* This returns if there are no syscalls to do, o/w it always calls smp_idle()
- * afterwards. */
-void run_local_syscall(void)
-{
-	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	struct syscall *sysc;
-
-	if (!pcpui->nr_syscs) {
-		/* TODO: UMEM - stop pinning their memory.  Note, we may need to do this
-		 * in other places.  This also will be tricky with exec, which doesn't
-		 * have the same memory map anymore */
+	if (!nr_syscs)
 		return;
-	}
-	sysc = pcpui->next_syscs++;		/* get the next */
-	pcpui->cur_sysc = sysc;			/* let the core know which sysc it is */
-	pcpui->nr_syscs--;				/* one less to do */
-	(*pcpui->tf_retval_loc)++;		/* one more started */
-	sysc->retval = syscall(pcpui->cur_proc, sysc->num, sysc->arg0, sysc->arg1,
-	                       sysc->arg2, sysc->arg3, sysc->arg4, sysc->arg5);
-	sysc->flags |= SC_DONE;
-	/* regardless of whether the call blocked or not, we smp_idle().  If it was
-	 * the last call, it'll return to the process.  If there are more, it will
-	 * do them. */
-	smp_idle();
-	assert(0);
+	/* For all after the first call, send ourselves a KMSG (TODO). */
+	if (nr_syscs != 1)
+		warn("Only one supported (Debutante calls: %d)\n", nr_syscs);
+	/* Call the first one directly.  (we already checked to make sure there is
+	 * 1) */
+	run_local_syscall(sysc);
 }
 
 /* Syscall tracing */

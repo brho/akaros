@@ -472,11 +472,7 @@ handle_syscall(trapframe_t* state)
 
 	set_current_tf(pcpui, &state);
 
-	coreinfo->tf_retval_loc = &(state->gpr[8]);
-
 	prep_syscalls(current, (struct syscall*)a1, a2);
-	run_local_syscall();
-	warn("No syscalls on a trap!");
 
 	proc_restartcore();
 }

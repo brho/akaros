@@ -238,13 +238,9 @@ trap_dispatch(trapframe_t *tf)
 		case T_SYSCALL:
 			// check for userspace, for now
 			assert(tf->tf_cs != GD_KT);
-			struct per_cpu_info* coreinfo = &per_cpu_info[core_id()];
-			coreinfo->tf_retval_loc = &(tf->tf_regs.reg_eax);
 			/* Set up and run the async calls */
 			prep_syscalls(current, (struct syscall*)tf->tf_regs.reg_eax,
 			              tf->tf_regs.reg_edx);
-			run_local_syscall();
-			warn("No syscalls on a trap!");
 			break;
 		default:
 			// Unexpected trap: The user process or the kernel has a bug.
@@ -399,16 +395,9 @@ void sysenter_callwrapper(struct trapframe *tf)
 
 	if (in_kernel(tf))
 		panic("sysenter from a kernel TF!!");
-	pcpui->tf_retval_loc = &(tf->tf_regs.reg_eax);
 	/* Set up and run the async calls */
 	prep_syscalls(current, (struct syscall*)tf->tf_regs.reg_eax,
 	              tf->tf_regs.reg_esi);
-	run_local_syscall();		/* alternatively, we can call smp_idle() */
-	warn("No syscalls on a sysenter!");
-	/* careful here - we need to make sure that this current is the right
-	 * process, which could be weird if the syscall blocked.  it would need to
-	 * restore the proper value in current before returning to here.
-	 * likewise, tf could be pointing to random gibberish. */
 	proc_restartcore();
 }
 
@@ -508,6 +497,7 @@ void __kernel_message(struct trapframe *tf)
 				send_self_ipi(I_KERNEL_MSG);
 			/* Execute the kernel message */
 			assert(msg_cp.pc);
+			/* TODO: when batching syscalls, this should be reread from cur_tf*/
 			msg_cp.pc(tf, msg_cp.srcid, msg_cp.arg0, msg_cp.arg1, msg_cp.arg2);
 		}
 	}

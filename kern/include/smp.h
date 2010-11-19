@@ -29,12 +29,7 @@ struct per_cpu_info {
 	struct trapframe *cur_tf;	/* user tf we came in on (can be 0) */
 	struct trapframe actual_tf;	/* storage for cur_tf */
 	struct kthread *spare;		/* useful when restarting */
-
-	/* Syscall management */
 	struct syscall *cur_sysc;	/* ptr is into cur_proc's address space */
-	struct syscall *next_syscs;	/* other batched ones to do next */
-	unsigned int nr_syscs;
-	uintreg_t *tf_retval_loc;
 
 #ifdef __SHARC__
 	// held spin-locks. this will have to go elsewhere if multiple kernel

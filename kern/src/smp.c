@@ -41,16 +41,11 @@ atomic_t outstanding_calls = 0;
 void smp_idle(void)
 {
 	int8_t state = 0;
-	per_cpu_info_t *pcpui = &per_cpu_info[core_id()];
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 
 	/* There was a process running here, and we should return to it */
-	/* TODO: gut this */
 	if (pcpui->cur_tf) {			/* aka, current_tf */
 		assert(pcpui->cur_proc);	/* aka, current */
-		/* We also check in run_local_syscall().  This is for sys_exec() */
-		if (pcpui->nr_syscs)
-			run_local_syscall();
-		/* Now we're done, so return */
 		proc_restartcore();
 		assert(0);
 	}
