@@ -26,9 +26,9 @@ which process context (possibly none) that was running.
 
 We also get a few other benefits, such as the ability to pick and choose which
 kthreads to run where and when.  Users of kthreads should not assume that the
-core_id() stayed the same across function calls.  
+core_id() stayed the same across blocking calls.  
 
-We can also use this infrastructure of other cases where we might want to start
+We can also use this infrastructure in other cases where we might want to start
 on a new stack.  One example is when we deal with low memory.  We may have to do
 a lot of work, but only need to do a little to allow the original thread (that
 might have failed on a page_alloc) to keep running, while we want the memory
@@ -114,12 +114,14 @@ stack variables (I don't trust the register variable).  As soon as we unlock,
 the kthread could be restarted (in theory), and it could start to clobber the
 stack in later function calls.
 
-So it is possible that we lose the semaphore race and shouldn't sleep.  We unwind the
-sleep prep work.  An alternative was to only do the prep work if we won the
-race, but that would mean we have to do a lot of work in that delicate period of
-"I'm on the queue but it is unlocked" - work that requires touching the stack.
-Or we could just hold the lock for a longer period of time, which I don't care
-to do.
+So it is possible that we lose the semaphore race and shouldn't sleep.  We
+unwind the sleep prep work.  An alternative was to only do the prep work if we
+won the race, but that would mean we have to do a lot of work in that delicate
+period of "I'm on the queue but it is unlocked" - work that requires touching
+the stack.  Or we could just hold the lock for a longer period of time, which
+I don't care to do.  What we do now is try and down the semaphore early (the
+early bailout), and if it fails then try to sleep (unlocked).  If it then
+loses the race (unlikely), it can manually unwind.
 
 Note that a lot of this is probably needless worry - we have interrupts disabled
 for most of sleep_on(), though arguably we can be a little more careful with
@@ -208,7 +210,9 @@ As a final case, what will we do for processes that were interrupted by
 something that wants to block, but wasn't servicing a syscall?  We probably
 shouldn't have these (I don't have a good example of when we'd want it, and a
 bunch of reasons why we wouldn't), but if we do, then it might be okay anyway -
-the kthread is just holding that proc alive for a bit.
+the kthread is just holding that proc alive for a bit.  Page faults are a bit
+different - they are something the process wants at least.  I was thinking more
+about unrelated async events.  Still, shouldn't be a big deal.
 
 Kmsgs and Kthreads
 -------------------------------
@@ -243,7 +247,8 @@ similar to what happens in Linux (call schedule() on the way out, from what I
 recall).  If it was a _M, things are a bit more complicated, since this should
 only happen if the kthread is for that process (and probably a bunch of other
 things - like they said it was okay to interrupt their vcore to finish the
-syscall).
+syscall).  Note - this might not be accurate anymore (see discussions on
+current_tf).
 
 To a certain extent, routine kmsgs don't seem like a nice fit, when we really
 want to be calling schedule().  Though if you think of it as the enactment of a
@@ -252,3 +257,125 @@ sense.  The scheduling decision (as of now) was made in the interrupt handler
 when it decided to send the kernel msg.  In the future, we could split this into
 having the handler make the kthread active, and have the scheduler called to
 decide where and when to run the kthread.
+
+Current_tf, Returning Twice, and Blocking
+--------------------------------
+One of the reasons for decoupling kthreads from a vcore or the notion of a
+kernel thread per user processs/task is so that when the kernel blocks (on a
+syscall or wherever), it can return to the process.  This is the essence of the
+asynchronous kernel/syscall interface (though it's not limited to syscalls
+(pagefaults!!)).  Here is what we want it to be able to handle:
+- When a process traps (syscall, trap, or actual interrupt), the process regains
+  control when the kernel is done or when it blocks.
+- Any kernel path can block at any time.
+- Kernel control paths need to not "return twice", but we don't want to have to
+  go through acrobatics in the code to prevent this.
+
+There are a couple of approaches I considered, and it involves the nature of
+"current_tf", and a brutal bug.  Current_tf is a pointer to the trapframe of the
+process that was interrupted/trapped, and is what user context ought to be
+running on this core if we return.  Current_tf is 'made' when the kernel saves
+the context at the top of the interrupt stack (aka 'stacktop').  Then the
+kernel's call path proceeds down the same stack.  This call path may get blocked
+in a kthread.  When we block, we want to restart the current_tf.  There is a
+coupling between the kthread's stack and the storage of current_tf (contents,
+not the pointer (which is in pcpui)).
+
+This coupling presents a problem when we are in userspace and get interrupted,
+and that interrupt wants to restart a kthread.  In this case, current_tf points
+to the interrupt stack, but then we want to switch to the kthread's stack.  This
+is okay.  When that kthread wants to block again, it needs to switch back to
+another stack.  Up until this commit, it was jumping to the top of the old stack
+it was on, clobbering current_tf (took about 8-10 hours to figure this out).
+While we could just make sure to save space for current_tf, it doesn't solve the
+problem: namely that the current_tf concept is not bound to a specific kernel
+stack (kthread or otherwise).  We could have cases where more than one kthread
+starts up on a core and we end up freeing the page that holds current_tf (since
+it is a stack we no longer need).  We don't want to bother keeping stacks around
+just to hold the current_tf.  Part of the nature of this weird coupling is that
+a given kthread might or might not have the current_tf at the top of its stack.
+What a pain in the ass...
+
+The right answer is to decouple current_tf from kthread stacks.  There are two
+ways to do this.  In both ways, current_tf retains its role of the context the
+kernel restarts (or saves) when it goes back to a process, and is independent of
+blocking kthreads.  SPOILER: solution 1 is not the one I picked
+
+1) All traps/interrupts come in on one stack per core.  That stack never changes
+(regardless of blocking), and current_tf is stored at the top.  Kthreads sort of
+'dispatch' / turn into threads from this event-like handling code.  This
+actually sounds really cool!
+
+2) The contents of current_tf get stored in per-cpu-info (pcpui), thereby
+clearly decoupling it from any execution context.  Any thread of execution can
+block without any special treatment (though interrupt handlers shouldn't do
+this).  We handle the "returning twice" problem at the point of return.
+
+One nice thing about 1) is that it might make stack management easier (we
+wouldn't need to keep a spare page, since it's the default core stack).  2) is
+also tricky since we need to change some entry point code to write the TF to
+pcpui (or at least copy-out for now).
+
+The main problem with 1) is that you need to know and have code to handle when
+you "become" a kthread and are allowed to block.  It also prevents us making
+changes such that all executing contexts are kthreads (which sort of is what is
+going on, even if they don't have a struct yet).
+
+While considering 1), here's something I wanted to say: "every thread of
+execution, including a KMSG, needs to always return (and thus not block), or
+never return (and be allowed to block)."  To "become" a kthread, we'd need to
+have code that jumps stacks, and once it jumps it can never return.  It would
+have to go back to some place such as smp_idle().
+
+The jumping stacks isn't a problem, and whatever we jump to would just have to
+have smp_idle() at the end.  The problem is that this is a pain in the ass to
+work with in reality.  But wait!  Don't we do that with batched syscalls right
+now?  Yes (though we should be using kmsgs instead of the hacked together
+workqueue spread across smp_idle() and syscall.c), and it is a pain in the ass.
+It is doable with syscalls because we have that clearly defined point
+(submitting vs processing).  But what about other handlers, such as the page
+fault handler?  It could block, and lots of other handlers could block too.  All
+of those would need to have a jump point (in trap.c).  We aren't even handling
+events anymore, we are immediately jumping to other stacks, using our "event
+handler" to hold current_tf and handle how we return to current_tf.  Don't
+forget about other code (like the boot code) that wants to block.  Simply put,
+option 1 creates a layer that is a pain to work with, cuts down on the
+flexibility of the kernel to block when it wants, and doesn't handle the issue
+at its source.
+
+The issue about having a defined point in the code that you can't return back
+across (which is where 1 would jump stacks) is about "returning twice."  Imagine
+a syscall that doesn't block.  It traps into the kernel, does its work, then
+returns.  Now imagine a syscall that blocks.  Most of these calls are going to
+block on occasion, but not always (imagine the read was filled from the page
+cache).  These calls really need to handle both situations.  So in one instance,
+the call blocks.  Since we're async, we return to userspace early (pop the
+current_tf).  Now, when that kthread unblocks, its code is going to want to
+finish and unroll its stack, then pop back to userspace.  This is the 'returning
+twice' problem.  Note that a *kthread* never returns twice.  This is what makes
+the idea of magic jumping points we can't return back across (and tying that to
+how we block in the kernel) painful.
+
+The way I initially dealt with this was by always calling smp_idle(), and having
+smp_idle decide what to do.  I also used it as a place to dispatch batched
+syscalls, which is what made smp_idle() more attractive.  However, after a bit,
+I realized the real nature of returning twice: current_tf.  If we forget about
+the batching for a second, all we really need to do is not return twice.  The
+best place to do that is at the place where we consider returning to userspace:
+proc_restartcore().  Instead of calling smp_idle() all the time (which was in
+essence a "you can now block" point), and checking for current_tf to return,
+just check in restartcore to see if there is a tf to restart.  If there isn't,
+then we smp_idle().  And don't forget to handle the cases where we want to start
+and env_tf (which we ought to point current_tf to in proc_run()).
+
+As a side note, we ought to use kmsgs for batched syscalls - it will help with
+preemption latencies.  At least for all but the first syscall (which can be
+called directly).  Instead of sending a retval via current_tf about how many
+started, just put that info in the syscall struct's flags (which might help the
+remote syscall case - no need for a response message, though there are still a
+few differences (no failure model other than death)).
+
+Note that page faults will still be tricky, but at least now we don't have to
+worry about points of no return.  We just check if there is a current_tf to
+restart.  The tricky part is communicating that the PF was sorted when there
+wasn't an explicit syscall made.

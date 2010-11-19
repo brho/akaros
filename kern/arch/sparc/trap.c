@@ -115,6 +115,16 @@ sysenter_init(void)
 {
 }
 
+/* Helper.  For now, this copies out the TF to pcpui, and sets the tf to use it.
+ * Eventually, we ought to do this in trap_entry.S.  Honestly, do whatever you
+ * want with this.  The **tf is for convenience in x86. */
+static void set_current_tf(struct per_cpu_info *pcpui, struct trapframe **tf)
+{
+	pcpui->actual_tf = **tf;
+	pcpui->cur_tf = &pcpui->actual_tf;
+	*tf = &pcpui->actual_tf;
+}
+
 static int
 format_trapframe(trapframe_t *tf, char* buf, int bufsz)
 {
@@ -216,8 +226,9 @@ static kernel_message_t *get_next_amsg(struct kernel_msg_list *list_head,
  * you can send yourself an IPI, and that IPIs can get squashed like on x86. */
 void handle_ipi(trapframe_t* tf)
 {
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	if (!in_kernel(tf))
-		set_current_tf(tf);
+		set_current_tf(pcpui, &tf);
 	else if((void*)tf->pc == &cpu_halt) // break out of the cpu_halt loop
 		advance_pc(tf);
 
@@ -424,14 +435,15 @@ fp_disabled(trapframe_t* state)
 void
 handle_pop_tf(trapframe_t* state)
 {
-	set_current_tf(state);
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	set_current_tf(pcpui, &state);
 
-	trapframe_t tf;
+	trapframe_t tf, *tf_p = &tf;
 	if(memcpy_from_user(current,&tf,(void*)state->gpr[8],sizeof(tf)))
 		proc_destroy(current);
 
 	proc_secure_trapframe(&tf);
-	set_current_tf(&tf);
+	set_current_tf(pcpui, &tf_p);
 	proc_restartcore(current,&tf);
 }
 
@@ -446,6 +458,7 @@ handle_set_tf(trapframe_t* state)
 void
 handle_syscall(trapframe_t* state)
 {
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	uint32_t num = state->gpr[1];
 	uint32_t a1 = state->gpr[8];
 	uint32_t a2 = state->gpr[9];
@@ -457,7 +470,7 @@ handle_syscall(trapframe_t* state)
 	enable_irq();
 	struct per_cpu_info* coreinfo = &per_cpu_info[core_id()];
 
-	set_current_tf(state);
+	set_current_tf(pcpui, &state);
 
 	coreinfo->tf_retval_loc = &(state->gpr[8]);
 

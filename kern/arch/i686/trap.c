@@ -90,7 +90,12 @@ void set_stack_top(uintptr_t stacktop)
 /* Note the check implies we only are on a one page stack (or the first page) */
 uintptr_t get_stack_top(void)
 {
-	uintptr_t stacktop = per_cpu_info[core_id()].tss->ts_esp0;
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	uintptr_t stacktop;
+	/* so we can check this in interrupt handlers (before smp_boot()) */
+	if (!pcpui->tss)
+		return ROUNDUP(read_esp(), PGSIZE);
+	stacktop = pcpui->tss->ts_esp0;
 	if (stacktop != ROUNDUP(read_esp(), PGSIZE))
 		panic("Bad stacktop: %08p esp one is %08p\n", stacktop,
 		      ROUNDUP(read_esp(), PGSIZE));
@@ -269,17 +274,24 @@ env_pop_ancillary_state(env_t* e)
 	// Here's where you'll restore FP/MMX/XMM regs
 }
 
+/* Helper.  For now, this copies out the TF to pcpui, and sets the tf to use it.
+ * Eventually, we ought to do this in trapentry.S */
+static void set_current_tf(struct per_cpu_info *pcpui, struct trapframe **tf)
+{
+	pcpui->actual_tf = **tf;
+	pcpui->cur_tf = &pcpui->actual_tf;
+	*tf = &pcpui->actual_tf;
+}
+
 void trap(struct trapframe *tf)
 {
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	/* Copy out the TF for now, set tf to point to it.  */
+	if (!in_kernel(tf))
+		set_current_tf(pcpui, &tf);
+
 	printd("Incoming TRAP %d on core %d, TF at %p\n", tf->tf_trapno, core_id(),
 	       tf);
-	/* Note we are not preemptively saving the TF in the env_tf.  We do maintain
-	 * a reference to it in current_tf (a per-cpu pointer).
-	 * In general, only save the tf and any silly state once you know it
-	 * is necessary (blocking).  And only save it in env_tf when you know you
-	 * are single core (PROC_RUNNING_S) */
-	if (!in_kernel(tf))
-		set_current_tf(tf);
 	if ((tf->tf_cs & ~3) != GD_UT && (tf->tf_cs & ~3) != GD_KT) {
 		print_trapframe(tf);
 		panic("Trapframe with invalid CS!");
@@ -289,15 +301,18 @@ void trap(struct trapframe *tf)
 	 * kernel, we should just return naturally.  Note that current and tf need
 	 * to still be okay (might not be after blocking) */
 	if (in_kernel(tf))
-		return;
+		return;	/* TODO: think about this, might want a helper instead. */
 	proc_restartcore(current, tf);
 	assert(0);
 }
 
 void irq_handler(struct trapframe *tf)
 {
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	/* Copy out the TF for now, set tf to point to it. */
 	if (!in_kernel(tf))
-		set_current_tf(tf);
+		set_current_tf(pcpui, &tf);
+
 	//if (core_id())
 		printd("Incoming IRQ, ISR: %d on core %d\n", tf->tf_trapno, core_id());
 
@@ -332,7 +347,7 @@ void irq_handler(struct trapframe *tf)
 	 * kernel, we should just return naturally.  Note that current and tf need
 	 * to still be okay (might not be after blocking) */
 	if (in_kernel(tf))
-		return;
+		return;	/* TODO: think about this, might want a helper instead. */
 	proc_restartcore(current, tf);
 	assert(0);
 }
@@ -377,11 +392,14 @@ void sysenter_init(void)
 /* This is called from sysenter's asm, with the tf on the kernel stack. */
 void sysenter_callwrapper(struct trapframe *tf)
 {
-	struct per_cpu_info* coreinfo = &per_cpu_info[core_id()];
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	/* Copy out the TF for now, set tf to point to it. */
+	if (!in_kernel(tf))
+		set_current_tf(pcpui, &tf);
+
 	if (in_kernel(tf))
 		panic("sysenter from a kernel TF!!");
-	coreinfo->cur_tf = tf;
-	coreinfo->tf_retval_loc = &(tf->tf_regs.reg_eax);
+	pcpui->tf_retval_loc = &(tf->tf_regs.reg_eax);
 	/* Set up and run the async calls */
 	prep_syscalls(current, (struct syscall*)tf->tf_regs.reg_eax,
 	              tf->tf_regs.reg_esi);
@@ -460,6 +478,10 @@ void __kernel_message(struct trapframe *tf)
 {
 	per_cpu_info_t *myinfo = &per_cpu_info[core_id()];
 	kernel_message_t msg_cp, *k_msg;
+
+	/* Copy out the TF for now, set tf to point to it. */
+	if (!in_kernel(tf))
+		set_current_tf(myinfo, &tf);
 
 	lapic_send_eoi();
 	while (1) { // will break out when there are no more messages

@@ -26,8 +26,10 @@ struct per_cpu_info {
 	/* Process management */
 	// cur_proc should be valid on all cores that are not management cores.
 	struct proc *cur_proc;
-	trapframe_t *cur_tf;
+	struct trapframe *cur_tf;	/* user tf we came in on (can be 0) */
+	struct trapframe actual_tf;	/* storage for cur_tf */
 	struct kthread *spare;		/* useful when restarting */
+
 	/* Syscall management */
 	struct syscall *cur_sysc;	/* ptr is into cur_proc's address space */
 	struct syscall *next_syscs;	/* other batched ones to do next */

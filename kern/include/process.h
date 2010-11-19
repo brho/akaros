@@ -139,11 +139,8 @@ void proc_preempt_all(struct proc *p, uint64_t usec);
  * due to some circular dependencies with smp.h.  This is done here instead of
  * elsewhere (like trap.h) for other elliptical reasons.  Note the distinction
  * between kernel and user contexts.  The kernel always returns to its nested,
- * interrupted contexts via iret/etc.  We don't always do that for user
- * contexts. */
+ * interrupted contexts via iret/etc.  We never do that for user contexts. */
 #define current_tf per_cpu_info[core_id()].cur_tf
-#define set_current_tf(tf) ({ assert(!in_kernel(tf)); \
-                              per_cpu_info[core_id()].cur_tf = (tf); })
 
 void abandon_core(void);
 /* Hold the proc_lock, since it'll use the vcoremapping to send an unmapping

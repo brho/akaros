@@ -40,7 +40,7 @@ void sleep_on(struct semaphore *sem)
 	if (sem->nr_signals > 0) {
 		sem->nr_signals--;
 		spin_unlock(&sem->lock);
-		goto block_return_path;
+		goto block_return_path_np;
 	}
 	/* we're probably going to sleep, so get ready.  We'll check again later. */
 	spin_unlock(&sem->lock);
@@ -91,6 +91,9 @@ void sleep_on(struct semaphore *sem)
 	/* Switch to the core's default stack.  After this, don't use local
 	 * variables.  TODO: we shouldn't be using new_stacktop either, can't always
 	 * trust the register keyword (AFAIK). */
+	/* TODO: we shouldn't do this if new_stacktop is on the same page as cur_tf */
+	assert(ROUNDDOWN((uintptr_t)current_tf, PGSIZE) !=
+	       kthread->stacktop - PGSIZE);
 	set_stack_pointer(new_stacktop);
 	smp_idle();
 	/* smp_idle never returns */
@@ -111,7 +114,8 @@ unwind_sleep_prep:
 	/* save the "freshly alloc'd" stack/page, not the one we came in on */
 	kthread->stacktop = new_stacktop;
 block_return_path:
-	printd("Returning from being 'blocked'!\n");
+	printd("Returning from being 'blocked'! at %llu\n", read_tsc());
+block_return_path_np:
 	enable_irqsave(&irq_state);
 	return;
 }
@@ -130,6 +134,10 @@ void restart_kthread(struct kthread *kthread)
 	 * free our current kthread *before* popping it, nor can we free the current
 	 * stack until we pop to the kthread's stack). */
 	if (pcpui->spare) {
+		/* TODO: we shouldn't free a page holding current_tf */
+		assert(ROUNDDOWN((uintptr_t)current_tf, PGSIZE) !=
+		       kthread->stacktop - PGSIZE);
+		/* this should probably have a rounddown, since it's not always the top */
 		page_decref(kva2page((void*)kthread->stacktop - PGSIZE));
 		kmem_cache_free(kthread_kcache, pcpui->spare);
 	}
