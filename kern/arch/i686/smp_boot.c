@@ -187,10 +187,8 @@ void smp_boot(void)
 	/* Final core initialization */
 	barrier_t generic_barrier;
 	init_barrier(&generic_barrier, num_cpus);
+	/* This will break the cores out of their hlt in smp_entry.S */
 	smp_call_function_all(smp_final_core_init, &generic_barrier, 0);
-
-	// Should probably flush everyone's TLB at this point, to get rid of
-	// temp mappings that were removed.  TODO
 }
 
 /* This is called from smp_entry by each core to finish the core bootstrapping.
@@ -287,6 +285,9 @@ void smp_percpu_init(void)
 	uint32_t coreid = core_id();
 	uintptr_t my_stack_bot;
 
+	/* Flushes any potentially old mappings from smp_boot() (note the page table
+	 * removal) */
+	tlbflush();
 	/* Ensure the FPU units are initialized */
 	asm volatile ("fninit");
 
