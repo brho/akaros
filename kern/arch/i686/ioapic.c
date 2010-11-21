@@ -51,7 +51,6 @@ void ioapic_init() {
 											 	//  mptables and the pci bus.
 	
 	// Pull in all the stuff we need from mptables and the pci parsing. These are all stack allocated (cant be null)
-	extern pci_irq_entry_t irq_pci_map[NUM_IRQS];
 	extern pci_int_device_t pci_int_devices[PCI_MAX_BUS][PCI_MAX_DEV];
 	extern ioapic_entry_t ioapic_entries[IOAPIC_MAX_ID];
 	extern isa_int_entry_t isa_int_entries[NUM_IRQS];
@@ -60,14 +59,15 @@ void ioapic_init() {
 	for (int i = 0; i < NUM_IRQS; i++) {
 		// Bus is 16 bits as we use a sential BUS value (INVALID_BUS) to denote an invalid bus
 		//  and this valid is out of the range 0->2^8-1
-		uint16_t bus = irq_pci_map[i].bus;
-		uint8_t dev = irq_pci_map[i].dev;
-		uint8_t line = irq_pci_map[i].line;
+		uint16_t bus = irq_pci_map[i]->bus;
+		uint8_t dev = irq_pci_map[i]->dev;
+		uint8_t line = irq_pci_map[i]->irqpin;	// Paul's line, not the irqline
 		
 		if (bus == INVALID_BUS)
 			continue;
 
 		// We do the same trick with the dest apic ID as we do with the PCI Bus, so its wider.
+		/* might be issues with the 'line' for INTA being 0x01 now */
 		uint16_t dst_apic_id = pci_int_devices[bus][dev].line[line].dst_apic_id;
 		uint8_t	dst_apic_int = pci_int_devices[bus][dev].line[line].dst_apic_int;
 		
@@ -109,7 +109,8 @@ void ioapic_init() {
 		}
 		
 		// Code to check if this isa irq entry claims to be pci
-		uint16_t pci_bus = irq_pci_map[i].bus;
+		uint16_t pci_bus = irq_pci_map[i]->bus;
+		/* TODO: this stuff probably doesn't work right anymore */
 		if (pci_bus != INVALID_BUS) {
 			// PCI bus had an entry for this irq, but we didn't set it during our pci run
 			//  This means it is likely a broken mptable implimentation. this happens on bochs and kvm

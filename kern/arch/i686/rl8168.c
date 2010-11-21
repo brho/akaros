@@ -121,68 +121,41 @@ void rl8168_init() {
 
 
 int rl8168_scan_pci() {
-	
-	extern pci_dev_entry_t pci_dev_map[PCI_MAX_BUS][PCI_MAX_DEV][PCI_MAX_FUNC];
-	extern uint16_t pci_irq_map[PCI_MAX_BUS][PCI_MAX_DEV][PCI_MAX_FUNC];
-
-	cprintf("Searching for RealTek 8168 Network device...");
-
-	for (int i = 0; i < PCI_MAX_BUS; i++)
-		for (int j = 0; j < PCI_MAX_DEV; j++)
-			for (int k = 0; k < PCI_MAX_FUNC; k++) {
-				uint32_t address;
-				uint32_t bus = i;
-				uint32_t dev = j;
-				uint32_t func = k;
-				uint32_t reg = 0; 
-				uint32_t result  = 0;
-	
-				uint16_t dev_id = pci_dev_map[i][j][k].dev_id;
-				uint16_t ven_id = pci_dev_map[i][j][k].ven_id;
-
-				// Vender DNE
-				if (ven_id == INVALID_VENDOR_ID) 
-					continue;
-
-				// Ignore non RealTek 8168 Devices
-				if (ven_id != REALTEK_VENDOR_ID || dev_id != REALTEK_DEV_ID)
-					continue;
-				cprintf(" found on BUS %x DEV %x\n", i, j);
-
-				// Find the IRQ
-				rl8168_irq = pci_irq_map[i][j][k];
-				rl8168_debug("-->IRQ: %u\n", rl8168_irq);
-
-				// Loop over the BARs
-				for (int k = 0; k <= 5; k++) {
-					reg = 4 + k;
-					address = MK_CONFIG_ADDR(bus, dev, func, reg << 2);	
-			        outl(PCI_CONFIG_ADDR, address);
-			        result = inl(PCI_CONFIG_DATA);
-					
-					if (result == 0) // (0 denotes no valid data)
-						continue;
-
-					// Read the bottom bit of the BAR. 
-					if (result & PCI_BAR_IO_MASK) {
-						result = result & PCI_IO_MASK;
-						rl8168_debug("-->BAR%u: %s --> %x\n", k, "IO", result);
-					} else {
-						result = result & PCI_MEM_MASK;
-						rl8168_debug("-->BAR%u: %s --> %x\n", k, "MEM", result);
-					}
-			
-					// TODO Switch to memory mapped instead of IO?
-					if (k == 0) // BAR0 denotes the IO Addr for the device
-						rl8168_io_base_addr = result;						
-				}
-		
-		rl8168_debug("-->hwrev: %x\n", inl(rl8168_io_base_addr + RL_HWREV_REG) & RL_HWREV_MASK);
-		
+	struct pci_device *pcidev;
+	uint32_t result;
+	printk("Searching for RealTek 8168 Network device...");
+	STAILQ_FOREACH(pcidev, &pci_devices, all_dev) {
+		/* Ignore non RealTek 8168 Devices */
+		if ((pcidev->ven_id != REALTEK_VENDOR_ID) ||
+		   (pcidev->dev_id != REALTEK_DEV_ID))
+			continue;
+		printk(" found on BUS %x DEV %x\n", pcidev->bus, pcidev->dev);
+		/* Find the IRQ */
+		rl8168_irq = pcidev->irqline;
+		rl8168_debug("-->IRQ: %u\n", rl8168_irq);
+		/* Loop over the BARs */
+		for (int k = 0; k <= 5; k++) {
+			int reg = 4 + k;
+	        result = pcidev_read32(pcidev, reg << 2);	// SHAME!
+			if (result == 0) // (0 denotes no valid data)
+				continue;
+			// Read the bottom bit of the BAR. 
+			if (result & PCI_BAR_IO_MASK) {
+				result = result & PCI_IO_MASK;
+				rl8168_debug("-->BAR%u: %s --> %x\n", k, "IO", result);
+			} else {
+				result = result & PCI_MEM_MASK;
+				rl8168_debug("-->BAR%u: %s --> %x\n", k, "MEM", result);
+			}
+			// TODO Switch to memory mapped instead of IO?
+			if (k == 0) // BAR0 denotes the IO Addr for the device
+				rl8168_io_base_addr = result;						
+		}
+		rl8168_debug("-->hwrev: %x\n",
+		             inl(rl8168_io_base_addr + RL_HWREV_REG) & RL_HWREV_MASK);
 		return 0;
 	}
-	cprintf(" not found. No device configured.\n");
-	
+	printk(" not found. No device configured.\n");
 	return -1;
 }
 

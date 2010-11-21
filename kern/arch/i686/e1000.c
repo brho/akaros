@@ -138,103 +138,73 @@ void e1000_init() {
 }
 
 int e1000_scan_pci() {
-	
-	extern pci_dev_entry_t pci_dev_map[PCI_MAX_BUS][PCI_MAX_DEV][PCI_MAX_FUNC];
-	extern uint16_t pci_irq_map[PCI_MAX_BUS][PCI_MAX_DEV][PCI_MAX_FUNC];
-
+	struct pci_device *pcidev;
+	uint32_t result;
+	unsigned int once = 0;
 	printk("Searching for Intel E1000 Network device...");
-
-	for (int i = 0; i < PCI_MAX_BUS; i++) {
-		for (int j = 0; j < PCI_MAX_DEV; j++) {
-			for (int k = 0; k < PCI_MAX_FUNC; k++) {
-				uint32_t address;
-				uint32_t bus = i;
-				uint32_t dev = j;
-				uint32_t func = k;
-				uint32_t reg = 0; 
-				uint32_t result  = 0;
-	
-				uint16_t curr_dev_id = pci_dev_map[i][j][k].dev_id;
-				uint16_t curr_ven_id = pci_dev_map[i][j][k].ven_id;
-
-				// Vender DNE
-				if (curr_ven_id == INVALID_VENDOR_ID) 
-					continue;
-
-				// Ignore non Intel E1000 Devices
-				if (curr_ven_id != INTEL_VENDOR_ID)
-					continue;
-
-				// Ignore non E1000 devices
-				if ((curr_dev_id != INTEL_DEV_ID0) && 
-				    (curr_dev_id != INTEL_DEV_ID1) &&
-				    (curr_dev_id != INTEL_DEV_ID2))
-					continue;
-				printk(" found on BUS %x DEV %x FUNC %x\n", i, j, k);
-				
-				// Skip the management nic on the 16 core box
-				if ((curr_dev_id == INTEL_DEV_ID1) && (k == 0)) 
-					continue;
-
-				device_id = curr_dev_id;
-
-				// Find the IRQ
-				e1000_irq = pci_irq_map[i][j][k];
-				e1000_debug("-->IRQ: %u\n", e1000_irq);
-
-				// Loop over the BARs
-				for (int k = 0; k <= 5; k++) {
-					reg = 4 + k;
-					address = MK_CONFIG_ADDR(bus, dev, func, reg << 2);	
-					outl(PCI_CONFIG_ADDR, address);
-					result = inl(PCI_CONFIG_DATA);
-
-					if (result == 0) // (0 denotes no valid data)
-						continue;
-
-					// Read the bottom bit of the BAR. 
-					if (result & PCI_BAR_IO_MASK) {
-						result = result & PCI_IO_MASK;
-						e1000_debug("-->BAR%u: %s --> %x\n", k, "IO", result);
-					} else {
-						result = result & PCI_MEM_MASK;
-						e1000_debug("-->BAR%u: %s --> %x\n", k, "MEM", result);
-					}
-			
-					if (k == 0) { // BAR0 denotes the IO Addr for the device
-						if (result & PCI_BAR_IO_MASK) {
-							e1000_debug("-->IO PORT MODE\n");
-							panic("IO PORT MODE NOT SUPPORTED\n");
-						} else {
-							e1000_debug("-->MMIO Mode\n");
-							e1000_mmio_base_addr = result;
-							// Now we do magic to find the size
-							// The first non zero bit after we
-							// write all 1's denotes the size
-							outl(PCI_CONFIG_DATA, 0xFFFFFFFF);
-							result = inl(PCI_CONFIG_DATA);
-							result = result & PCI_MEM_MASK;
-							result = (result ^ 0xFFFFFFFF) + 1;
-							e1000_addr_size = result;
-                                                        e1000_debug("-->MMIO Size %x\n", e1000_addr_size);
-							outl(PCI_CONFIG_DATA, e1000_mmio_base_addr);
-				
-#ifdef __CONFIG_E1000_MMIO_HACK__
-							// Map the page in.
-							printd("HACK FOR BROKEN MMIO\n");
-							e1000_mmio_base_addr = E1000_MMIO_ADDR;
-							outl(PCI_CONFIG_DATA, e1000_mmio_base_addr);
-							e1000_mmio_base_addr = 0xfee00000 + 0x1000;
-#endif
-						}
-					}						
-				}
-				return 0;
+	STAILQ_FOREACH(pcidev, &pci_devices, all_dev) {
+		/* Ignore non Intel Devices */
+		if (pcidev->ven_id != INTEL_VENDOR_ID)
+			continue;
+		/* Ignore non E1000 devices */
+		if ((pcidev->dev_id != INTEL_DEV_ID0) && 
+		    (pcidev->dev_id != INTEL_DEV_ID1) &&
+		    (pcidev->dev_id != INTEL_DEV_ID2))
+			continue;
+		printk(" found on BUS %x DEV %x FUNC %x\n", pcidev->bus, pcidev->dev,
+		       pcidev->func);
+		/* TODO: (ghetto) Skip the management nic on the 16 core box.  It is
+		 * probably the first one found (check this) */
+		if ((pcidev->dev_id == INTEL_DEV_ID1) && (once++ == 0)) 
+			continue;
+		/* Find the IRQ */
+		e1000_irq = pcidev->irqline;
+		e1000_debug("-->IRQ: %u\n", e1000_irq);
+		/* Loop over the BARs */
+		for (int k = 0; k <= 5; k++) {
+			int reg = 4 + k;
+	        result = pcidev_read32(pcidev, reg << 2);	// SHAME!
+			if (result == 0) // (0 denotes no valid data)
+				continue;
+			// Read the bottom bit of the BAR. 
+			if (result & PCI_BAR_IO_MASK) {
+				result = result & PCI_IO_MASK;
+				e1000_debug("-->BAR%u: %s --> %x\n", k, "IO", result);
+			} else {
+				result = result & PCI_MEM_MASK;
+				e1000_debug("-->BAR%u: %s --> %x\n", k, "MEM", result);
 			}
+			if (k == 0) { // BAR0 denotes the IO Addr for the device
+				if (result & PCI_BAR_IO_MASK) {
+					e1000_debug("-->IO PORT MODE\n");
+					panic("IO PORT MODE NOT SUPPORTED\n");
+				} else {
+					e1000_debug("-->MMIO Mode\n");
+					e1000_mmio_base_addr = result;
+					// Now we do magic to find the size
+					// The first non zero bit after we
+					// write all 1's denotes the size
+					outl(PCI_CONFIG_DATA, 0xFFFFFFFF);
+					result = inl(PCI_CONFIG_DATA);
+					result = result & PCI_MEM_MASK;
+					result = (result ^ 0xFFFFFFFF) + 1;
+					e1000_addr_size = result;
+                    e1000_debug("-->MMIO Size %x\n", e1000_addr_size);
+					outl(PCI_CONFIG_DATA, e1000_mmio_base_addr);
+		
+					#ifdef __CONFIG_E1000_MMIO_HACK__
+					// Map the page in.
+					printd("HACK FOR BROKEN MMIO\n");
+					e1000_mmio_base_addr = E1000_MMIO_ADDR;
+					outl(PCI_CONFIG_DATA, e1000_mmio_base_addr);
+					e1000_mmio_base_addr = 0xfee00000 + 0x1000;
+					#endif
+				}
+			}						
 		}
+		return 0;
 	}
-	cprintf(" not found. No device configured.\n");
-	
+	printk(" not found. No device configured.\n");
 	return -1;
 }
 

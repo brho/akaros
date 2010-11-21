@@ -4,6 +4,7 @@
 #include <ros/common.h>
 #include <trap.h>
 #include <pmap.h>
+#include <arch/pci.h>
 #include <arch/nic_common.h>
 
 #define ne2k_debug(...)  //cprintf(__VA_ARGS__)  
@@ -12,10 +13,6 @@
 
 #define NIC_IRQ_CPU			5
 
-// Macro for formatting PCI Configuration Address queries
-#define MK_CONFIG_ADDR(BUS, DEV, FUNC, REG) (unsigned long)( (BUS << 16) | (DEV << 11) | \
-                                                             (FUNC << 8) | REG  | \
-                                                             ((uint32_t)0x80000000))
 #define NE2K_VENDOR_ID 0x10EC
 #define NE2K_DEV_ID 0x8029
 

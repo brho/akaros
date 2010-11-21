@@ -100,66 +100,39 @@ void ne2k_init() {
 
 
 int ne2k_scan_pci() {
-	
-	extern pci_dev_entry_t pci_dev_map[PCI_MAX_BUS][PCI_MAX_DEV][PCI_MAX_FUNC];
-	extern uint16_t pci_irq_map[PCI_MAX_BUS][PCI_MAX_DEV][PCI_MAX_FUNC];
-
-	cprintf("Searching for NE2000 Network device...");
-
-	for (int i = 0; i < PCI_MAX_BUS; i++)
-		for (int j = 0; j < PCI_MAX_DEV; j++)
-			for (int k = 0; k < PCI_MAX_FUNC; k++) {
-				uint32_t address;
-				uint32_t lbus = i;
-				uint32_t ldev = j;
-				uint32_t lfunc = k;
-				uint32_t lreg = 0; 
-				uint32_t result  = 0;
-	
-				uint16_t dev_id = pci_dev_map[i][j][k].dev_id;
-				uint16_t ven_id = pci_dev_map[i][j][k].ven_id;
-
-				// Vender DNE
-				if (ven_id == INVALID_VENDOR_ID) 
-					continue;
-
-				// Ignore non RealTek 8168 Devices
-				if (ven_id != NE2K_VENDOR_ID || dev_id != NE2K_DEV_ID)
-					continue;
-				cprintf(" found on BUS %x DEV %x\n", i, j);
-
-				// Find the IRQ
-				ne2k_irq = pci_irq_map[i][j][k];
-				ne2k_debug("-->IRQ: %u\n", ne2k_irq);
-
-				// Loop over the BARs
-				for (int k = 0; k <= 5; k++) {
-					lreg = 4 + k;
-					address = MK_CONFIG_ADDR(lbus, ldev, lfunc, lreg << 2);	
-			        outl(PCI_CONFIG_ADDR, address);
-			        result = inl(PCI_CONFIG_DATA);
-					
-					if (result == 0) // (0 denotes no valid data)
-						continue;
-
-					// Read the bottom bit of the BAR. 
-					if (result & PCI_BAR_IO_MASK) {
-						result = result & PCI_IO_MASK;
-						ne2k_debug("-->BAR%u: %s --> %x\n", k, "IO", result);
-					} else {
-						result = result & PCI_MEM_MASK;
-						ne2k_debug("-->BAR%u: %s --> %x\n", k, "MEM", result);
-					}
-			
-					// TODO Switch to memory mapped instead of IO?
-					if (k == 0) // BAR0 denotes the IO Addr for the device
-						ne2k_io_base_addr = result;						
-				}
-				
+	struct pci_device *pcidev;
+	uint32_t result;
+	printk("Searching for NE2000 Network device...");
+	STAILQ_FOREACH(pcidev, &pci_devices, all_dev) {
+		/* Ignore non NE2K Devices */
+		if ((pcidev->ven_id != NE2K_VENDOR_ID) ||
+		   (pcidev->dev_id != NE2K_DEV_ID))
+			continue;
+		printk(" found on BUS %x DEV %x\n", pcidev->bus, pcidev->dev);
+		/* Find the IRQ */
+		ne2k_irq = pcidev->irqline;
+		ne2k_debug("-->IRQ: %u\n", ne2k_irq);
+		/* Loop over the BARs */
+		for (int k = 0; k <= 5; k++) {
+			int reg = 4 + k;
+	        result = pcidev_read32(pcidev, reg << 2);	// SHAME!
+			if (result == 0) // (0 denotes no valid data)
+				continue;
+			// Read the bottom bit of the BAR. 
+			if (result & PCI_BAR_IO_MASK) {
+				result = result & PCI_IO_MASK;
+				ne2k_debug("-->BAR%u: %s --> %x\n", k, "IO", result);
+			} else {
+				result = result & PCI_MEM_MASK;
+				ne2k_debug("-->BAR%u: %s --> %x\n", k, "MEM", result);
+			}
+			// TODO Switch to memory mapped instead of IO?
+			if (k == 0) // BAR0 denotes the IO Addr for the device
+				ne2k_io_base_addr = result;						
+		}
 		return 0;
 	}
-	cprintf(" not found. No device configured.\n");
-	
+	printk(" not found. No device configured.\n");
 	return -1;
 }
 
