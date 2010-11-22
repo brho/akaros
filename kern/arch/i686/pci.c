@@ -10,6 +10,7 @@
 #include <string.h>
 #include <assert.h>
 #include <kmalloc.h>
+#include <arch/pci_defs.h>
 
 /* Which pci devices hang off of which irqs */
 /* TODO: make this an array of SLISTs (pain from ioapic.c, etc...) */
@@ -24,7 +25,7 @@ void pci_init(void) {
 	uint32_t result = 0;
 	uint16_t dev_id, ven_id;
 	struct pci_device *pcidev;
-	for (int i = 0; i < PCI_MAX_BUS; i++)
+	for (int i = 0; i < PCI_MAX_BUS - 1; i++)	/* phantoms at 0xff */
 		for (int j = 0; j < PCI_MAX_DEV; j++)
 			for (int k = 0; k < PCI_MAX_FUNC; k++) {
 				result = pci_read32(i, j, k, PCI_DEV_VEND_REG);
@@ -43,20 +44,22 @@ void pci_init(void) {
 				result = pcidev_read32(pcidev, PCI_CLASS_REG);
 				pcidev->class = result >> 24;
 				pcidev->subclass = (result >> 16) & 0xff;
+				pcidev->progif = (result >> 8) & 0xff;
 				/* All device types (0, 1, 2) have the IRQ in the same place */
 				result = pcidev_read32(pcidev, PCI_IRQ_STD);
 				/* This is the PIC IRQ the device is wired to */
 				pcidev->irqline = result & PCI_IRQLINE_MASK;
 				/* This is the interrupt pin the device uses (INTA# - INTD#) */
 				pcidev->irqpin = (result & PCI_IRQPIN_MASK) >> PCI_IRQPIN_SHFT;
-				printk("PCI: %d:%d:%d Vend/Dev: %04p/%04p Class/Sub: %02p/%02p "
-				       "IRQ: %d Pin: %p\n", pcidev->bus, pcidev->dev,
-				       pcidev->func, pcidev->ven_id, pcidev->dev_id,
-				       pcidev->class, pcidev->subclass, pcidev->irqline,
-				       pcidev->irqpin);
+				#ifdef __CONFIG_PCI_VERBOSE__
+				pcidev_print_info(pcidev, 4);
+				#else
+				pcidev_print_info(pcidev, 0);
+				#endif /* __CONFIG_PCI_VERBOSE__ */
 				if (pcidev->irqpin != PCI_NOINT) {
-					/* TODO: use a list (check for collisions for now) */
-					assert(!irq_pci_map[pcidev->irqline]);
+					/* TODO: use a list (check for collisions for now) (massive
+					 * collisions on a desktop with bridge IRQs. */
+					//assert(!irq_pci_map[pcidev->irqline]);
 					irq_pci_map[pcidev->irqline] = pcidev;
 				}
 				/* Loop over the BARs Right now we don't do anything useful with
@@ -167,3 +170,80 @@ uint32_t pci_getiobar32(uint32_t bar)
 	return bar & 0xfffffffc;
 }
 
+/* Helper to get the class description strings.  Adapted from
+ * http://www.pcidatabase.com/reports.php?type=c-header */
+static void pcidev_get_cldesc(struct pci_device *pcidev, char **class,
+                              char **subclass, char **progif)
+{
+	int	i ;
+	*class = *subclass = *progif = "";
+
+	for (i = 0; i < PCI_CLASSCODETABLE_LEN; i++) {
+		if (PciClassCodeTable[i].BaseClass == pcidev->class) {
+			if (!(**class))
+				*class = PciClassCodeTable[i].BaseDesc;
+			if (PciClassCodeTable[i].SubClass == pcidev->subclass) {
+				if (!(**subclass))
+					*subclass = PciClassCodeTable[i].SubDesc;
+				if (PciClassCodeTable[i].ProgIf == pcidev->progif) {
+					*progif = PciClassCodeTable[i].ProgDesc;
+					break ;
+				}
+			}
+		}
+	}
+}
+
+/* Helper to get the vendor and device description strings */
+static void pcidev_get_devdesc(struct pci_device *pcidev, char **vend_short,
+                               char **vend_full, char **chip, char **chip_desc)
+{
+	int	i ;
+	*vend_short = *vend_full = *chip = *chip_desc = "";
+
+	for (i = 0; i < PCI_VENTABLE_LEN; i++) {
+		if (PciVenTable[i].VenId == pcidev->ven_id) {
+			*vend_short = PciVenTable[i].VenShort;
+			*vend_full = PciVenTable[i].VenFull;
+			break ;
+		}
+	}
+	for (i = 0; i < PCI_DEVTABLE_LEN; i++) {
+		if ((PciDevTable[i].VenId == pcidev->ven_id) &&
+		   (PciDevTable[i].DevId == pcidev->dev_id)) {
+			*chip = PciDevTable[i].Chip;
+			*chip_desc = PciDevTable[i].ChipDesc;
+			break ;
+		}
+	}
+}
+
+/* Prints info (like lspci) for a device */
+void pcidev_print_info(struct pci_device *pcidev, int verbosity)
+{
+	char *ven_sht, *ven_fl, *chip, *chip_txt, *class, *subcl, *progif;
+	pcidev_get_cldesc(pcidev, &class, &subcl, &progif);
+	pcidev_get_devdesc(pcidev, &ven_sht, &ven_fl, &chip, &chip_txt);
+
+	printk("%02x:%02x.%x %s: %s %s %s\n",
+	       pcidev->bus,
+	       pcidev->dev,
+	       pcidev->func,
+	       subcl,
+	       ven_sht,
+	       chip,
+	       chip_txt);
+	if (verbosity > 1)
+		printk("        IRQ: %02d IRQ pin: %02p\n",
+		       pcidev->irqline,
+		       pcidev->irqpin);
+	if (verbosity > 2)
+		printk("        Vendor Id: %04p Device Id: %04p\n",
+		       pcidev->ven_id,
+		       pcidev->dev_id);
+	if (verbosity > 3)
+		printk("        %s %s %s\n",
+		       class,
+		       progif,
+		       ven_fl);
+}

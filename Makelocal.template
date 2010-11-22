@@ -26,6 +26,7 @@
 #KERN_CFLAGS += $(CONFIG_ARSC_SERVER)
 # Resets stacks in smp_idle(), at the expense of backtrace
 #KERN_CFLAGS += $(CONFIG_RESET_STACKS)
+#KERN_CFLAGS += $(CONFIG_PCI_VERBOSE)
 
 #KERN_CFLAGS += -DDEVELOPER_NAME=waterman
 #KERN_CFLAGS += -DDEVELOPER_NAME=brho
