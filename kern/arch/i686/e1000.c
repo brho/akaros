@@ -157,6 +157,8 @@ int e1000_scan_pci() {
 		 * probably the first one found (check this) */
 		if ((pcidev->dev_id == INTEL_DEV_ID1) && (once++ == 0)) 
 			continue;
+		/* TODO: WARNING - EXTREMELY GHETTO */
+		device_id = pcidev->dev_id;
 		/* Find the IRQ */
 		e1000_irq = pcidev->irqline;
 		e1000_debug("-->IRQ: %u\n", e1000_irq);
@@ -179,7 +181,7 @@ int e1000_scan_pci() {
 					e1000_debug("-->IO PORT MODE\n");
 					panic("IO PORT MODE NOT SUPPORTED\n");
 				} else {
-					e1000_debug("-->MMIO Mode\n");
+					e1000_debug("-->MMIO Mode, Base: %08p\n", result);
 					e1000_mmio_base_addr = result;
 					// Now we do magic to find the size
 					// The first non zero bit after we
@@ -193,8 +195,9 @@ int e1000_scan_pci() {
 					outl(PCI_CONFIG_DATA, e1000_mmio_base_addr);
 		
 					#ifdef __CONFIG_E1000_MMIO_HACK__
+					/* TODO: WARNING - EXTREMELY GHETTO */
 					// Map the page in.
-					printd("HACK FOR BROKEN MMIO\n");
+					e1000_debug("HACK FOR BROKEN MMIO\n");
 					e1000_mmio_base_addr = E1000_MMIO_ADDR;
 					outl(PCI_CONFIG_DATA, e1000_mmio_base_addr);
 					e1000_mmio_base_addr = 0xfee00000 + 0x1000;
@@ -253,6 +256,7 @@ void e1000_setup_mac() {
 	uint16_t eeprom_data = 0;
         uint32_t mmio_data = 0;
 
+	/* TODO: WARNING - EXTREMELY GHETTO */
 	if (device_id == INTEL_DEV_ID0) {
 
 		for (int i = 0; i < 3; i++) {
@@ -313,9 +317,10 @@ void e1000_setup_mac() {
 		e1000_wr32(E1000_MTA + 4 * i, 0x0);
 	}
 
-	e1000_debug("-->DEVICE MAC: %02x:%02x:%02x:%02x:%02x:%02x\n", 0xFF & device_mac[0], 0xFF & device_mac[1],
-	                                                              0xFF & device_mac[2], 0xFF & device_mac[3],
-	                                                              0xFF & device_mac[4], 0xFF & device_mac[5]);
+	e1000_debug("-->DEVICE MAC: %02x:%02x:%02x:%02x:%02x:%02x\n",
+	            0xFF & device_mac[0], 0xFF & device_mac[1],
+	            0xFF & device_mac[2], 0xFF & device_mac[3],
+	            0xFF & device_mac[4], 0xFF & device_mac[5]);
 	return;
 }
 

@@ -40,7 +40,6 @@ void e1000_init(void);
 void e1000_reset(void);
 void e1000_interrupt_handler(trapframe_t* tf, void* data);
 int  e1000_scan_pci(void);
-void e1000_read_mac(void);
 void e1000_setup_interrupts(void);
 void e1000_setup_descriptors(void);
 void e1000_configure(void);
