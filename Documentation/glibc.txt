@@ -99,6 +99,20 @@ perhaps?).  If you add "unix/inet", you get more than just its Subdirs.
 Also note that these subdirs can depend on each other, noted in the "Depends"
 file.  Presumably this will cause them to get made...
 
+Errno & TLS
+--------------------------
+errno is a macro that may point to different locations depending on where you
+are in Glibc. errno_location is simply one of the options. 
+During dynamic linking, the linker points errno to a different location, so it
+is usable and can be referenced before TLS is fully set up in TLS_INIT_TP. 
+Because errno is valid when the linker runs, regular syscalls can be made.
+
+However for statically linked apps, several syscalls cannot use the ros_syscall
+macro, because there is no valid errno set up. 
+
+
+
+
 Unimplemented Stubs
 --------------------------
 There are a lot of things we haven't ported, but we have the stub functions so
