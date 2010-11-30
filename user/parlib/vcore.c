@@ -17,6 +17,25 @@ static mcs_lock_t _vcore_lock = MCS_LOCK_INIT;
 
 extern void** vcore_thread_control_blocks;
 
+/* Get a TLS, returns 0 on failure.  Vcores have their own TLS, and any thread
+ * created by a user-level scheduler needs to create a TLS as well. */
+void *allocate_tls(void)
+{
+	extern void *_dl_allocate_tls(void *mem) internal_function;
+	void *tcb = _dl_allocate_tls(NULL);
+	if (!tcb)
+		return 0;
+	/* Make sure the TLS is set up properly - its tcb pointer points to itself.
+	 * Keep this in sync with sysdeps/ros/XXX/tls.h.  For whatever reason,
+	 * dynamically linked programs do not need this to be redone, but statics
+	 * do. */
+	tcbhead_t *head = (tcbhead_t*)tcb;
+	head->tcb = tcb;
+	head->self = tcb;
+	return tcb;
+}
+
+/* TODO: probably don't want to dealloc.  Considering caching */
 static void free_transition_tls(int id)
 {
 	extern void _dl_deallocate_tls (void *tcb, bool dealloc_tcb) internal_function;
@@ -29,24 +48,19 @@ static void free_transition_tls(int id)
 
 static int allocate_transition_tls(int id)
 {
-	extern void *_dl_allocate_tls(void *mem) internal_function;
 	/* We want to free and then reallocate the tls rather than simply 
-	 * reinitializing it because its size may have changed */
+	 * reinitializing it because its size may have changed.  TODO: not sure if
+	 * this is right.  0-ing is one thing, but freeing and reallocating can be
+	 * expensive, esp if syscalls are involved.  Check out glibc's
+	 * allocatestack.c for what might work. */
 	free_transition_tls(id);
 
-	void *tcb = _dl_allocate_tls(NULL);
+	void *tcb = allocate_tls();
 
 	if ((vcore_thread_control_blocks[id] = tcb) == NULL) {
 		errno = ENOMEM;
 		return -1;
 	}
-	/* Make sure the TLS is set up properly - its tcb pointer points to itself.
-	 * Keep this in sync with sysdeps/ros/XXX/tls.h.  For whatever reason,
-	 * dynamically linked programs do not need this to be redone, but statics
-	 * do. */
-	tcbhead_t *head = (tcbhead_t*)tcb;
-	head->tcb = tcb;
-	head->self = tcb;
 	return 0;
 }
 

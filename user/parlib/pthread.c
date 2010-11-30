@@ -149,6 +149,7 @@ int pthread_attr_destroy(pthread_attr_t *a)
   return 0;
 }
 
+/* TODO: probably don't want to dealloc.  Considering caching */
 static void __pthread_free_tls(struct pthread_tcb *pt)
 {
 	extern void _dl_deallocate_tls (void *tcb, bool dealloc_tcb) internal_function;
@@ -160,10 +161,8 @@ static void __pthread_free_tls(struct pthread_tcb *pt)
 
 static int __pthread_allocate_tls(struct pthread_tcb *pt)
 {
-	extern void *_dl_allocate_tls (void *mem) internal_function;
-
 	assert(!pt->tls_desc);
-	pt->tls_desc = _dl_allocate_tls(NULL);
+	pt->tls_desc = allocate_tls();
 	if (!pt->tls_desc) {
 		errno = ENOMEM;
 		return -1;

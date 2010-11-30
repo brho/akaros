@@ -29,6 +29,9 @@ extern "C" {
 /* Defined by glibc; Must be implemented by a user level threading library */
 extern void vcore_entry();
 
+/* Utility Functions */
+void *allocate_tls(void);
+
 /* Vcore API functions */
 int vcore_init(void);
 int vcore_id(void);
