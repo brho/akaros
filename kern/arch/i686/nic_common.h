@@ -3,22 +3,8 @@
 
 #include <ros/common.h>
 #include <trap.h>
+#include <net.h>
 #include <pmap.h>
-
-// Host to network format conversions and vice-versa
-static inline uint16_t htons(uint16_t x)
-{
-	__asm__ ("xchgb %%al,%%ah" : "=a" (x) : "a" (x));
-	return x;
-}
-
-static inline uint32_t htonl(uint32_t x)
-{
-	__asm__ ("bswapl %0" : "=r" (x) : "0" (x));
-	return x;
-}
-#define ntohs htons
-#define ntohl htonl
 
 // Packet sizes
 #define MTU              1500
