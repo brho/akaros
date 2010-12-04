@@ -8,7 +8,9 @@
 
 // Packet sizes
 #define MTU              1500
-#define MAX_FRAME_SIZE   (MTU + 14)
+/* 14 for the header, 4 for something else.  It's either the CRC at the end
+ * (which seems to be 0'd), or for the optional 802.1q tag. */
+#define MAX_FRAME_SIZE   (MTU + 18)
 #define MIN_FRAME_SIZE   60 // See the spec...
 
 // Maximum packet buffers we can handle at any given time

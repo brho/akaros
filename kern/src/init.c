@@ -42,6 +42,8 @@
 #include <blockdev.h>
 #include <ext2fs.h>
 #include <kthread.h>
+#include <net.h>
+#include <eth_audio.h>
 
 // zra: flag for Ivy
 int booting = 1;
@@ -98,7 +100,10 @@ void kernel_init(multiboot_info_t *mboot_info)
 	enable_irq();
 #ifdef __CONFIG_EXT2FS__
 	mount_fs(&ext2_fs_type, "/dev/ramdisk", "/mnt", 0);
-#endif
+#endif /* __CONFIG_EXT2FS__ */
+#ifdef __CONFIG_ETH_AUDIO__
+	eth_audio_init();
+#endif /* __CONFIG_ETH_AUDIO__ */
 		
 	// zra: let's Ivy know we're done booting
 	booting = 0;

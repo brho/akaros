@@ -3,7 +3,8 @@
  * See LICENSE for details.
  *
  * Devfs: filesystem interfaces to devices.  For now, we just create the
- * needed/discovered devices in KFS in its /dev/ folder. */
+ * needed/discovered devices in KFS in its /dev/ folder.  In the future, we
+ * might want to do something like nodes like other Unixes. */
 
 #ifndef ROS_KERN_DEVFS_H
 #define ROS_KERN_DEVFS_H

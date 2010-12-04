@@ -32,6 +32,8 @@
 #include <frontend.h>
 #include <arch/frontend.h>
 
+#include <eth_audio.h>
+
 #define NUM_TX_DESCRIPTORS E1000_NUM_TX_DESCRIPTORS
 #define NUM_RX_DESCRIPTORS E1000_NUM_RX_DESCRIPTORS
 
@@ -623,7 +625,7 @@ void e1000_handle_rx_packet() {
 	uint32_t num_frags = 0;
 	
 	char *rx_buffer = kmalloc(MAX_FRAME_SIZE, 0);
-	
+
 	if (rx_buffer == NULL) panic ("Can't allocate page for incoming packet.");
 	
 	do {
@@ -695,6 +697,22 @@ void e1000_handle_rx_packet() {
 		return;
 	}
 #endif
+
+#ifdef __CONFIG_ETH_AUDIO__
+	/* TODO: move this, and all packet processing, out of this driver (including
+	 * the ghetto buffer).  Note we don't handle IP fragment reassembly (though
+	 * this isn't an issue for the eth_audio). */
+	struct ethaud_udp_packet *packet = (struct ethaud_udp_packet*)rx_buffer;
+	uint8_t protocol = packet->ip_hdr.protocol;
+	uint16_t udp_port = ntohs(packet->udp_hdr.dst_port);
+	if (protocol == IPPROTO_UDP && udp_port == ETH_AUDIO_RCV_PORT) {
+		eth_audio_newpacket(packet);
+		// Advance the tail pointer				
+		e1000_rx_index = rx_des_loop_cur;
+		e1000_wr32(E1000_RDT, e1000_rx_index);
+		return;
+	}
+#endif /* __CONFIG_ETH_AUDIO__ */
 
 	spin_lock(&packet_buffers_lock);
 

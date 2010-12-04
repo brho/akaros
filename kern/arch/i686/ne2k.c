@@ -397,34 +397,6 @@ void ne2k_handle_rx_packet() {
 	return;
 }
 
-// copied with love (and modification) from tcp/ip illistrated vl 2 1995 pg 236
-// bsd licenced
-uint16_t cksum(char *CT(len) ip, int len) {
-	
-	uint32_t sum = 0;
-	// Next two lines for ivy. Grr.
-	char *curr_ip = ip;
-	int curr_len = len;
-
-	while(curr_len > 1) {
-		sum += *((uint16_t*) curr_ip);
-		curr_ip = curr_ip + 2;
-		
-		if(sum & 0x80000000)	/* if high order bit set, fold */
-			sum = (sum & 0xFFFF) + (sum >> 16);
-			curr_len -= 2;
-		}
-
-		if(curr_len)		 /* take care of left over byte */
-			sum += *curr_ip;
-		  
-		while(sum>>16)
-			sum = (sum & 0xFFFF) + (sum >> 16);
-
-		return ~sum;
-}
-
-
 // Main routine to send a frame. May be completely broken.
 int ne2k_send_frame(const char *data, size_t len) {
 

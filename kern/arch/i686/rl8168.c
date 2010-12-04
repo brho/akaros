@@ -30,6 +30,8 @@
 
 #include <pmap.h>
 
+#include <eth_audio.h>
+
 /** @file
  * @brief Realtek RL8168 Driver
  *
@@ -499,6 +501,20 @@ void rl8168_handle_rx_packet() {
 		return;
 	}
 #endif
+#ifdef __CONFIG_ETH_AUDIO__
+	/* TODO: move this, and all packet processing, out of this driver (including
+	 * the ghetto buffer).  Note we don't handle IP fragment reassembly (though
+	 * this isn't an issue for the eth_audio). */
+	struct ethaud_udp_packet *packet = (struct ethaud_udp_packet*)rx_buffer;
+	uint8_t protocol = packet->ip_hdr.protocol;
+	uint16_t udp_port = ntohs(packet->udp_hdr.dst_port);
+	if (protocol == IPPROTO_UDP && udp_port == ETH_AUDIO_RCV_PORT) {
+		rx_des_cur = rx_des_loop_cur;
+		eth_audio_newpacket(packet);
+		kfree(rx_buffer);
+		return;
+	}
+#endif /* __CONFIG_ETH_AUDIO__ */
 
 	spin_lock(&packet_buffers_lock);
 

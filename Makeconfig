@@ -30,6 +30,7 @@ CONFIG_BOXBORO:=                   -D__CONFIG_BOXBORO__
 CONFIG_ARSC_SERVER:=               -D__CONFIG_ARSC_SERVER__
 CONFIG_RESET_STACKS:=              -D__CONFIG_RESET_STACKS__
 CONFIG_PCI_VERBOSE:=               -D__CONFIG_PCI_VERBOSE__
+CONFIG_ETH_AUDIO:=                 -D__CONFIG_ETH_AUDIO__
 
 # Userspace configuration parameters
 # By default, each of these options will be turned off
