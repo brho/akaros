@@ -382,7 +382,6 @@ static void __proc_free(struct kref *kref)
 	// All parts of the kernel should have decref'd before __proc_free is called
 	assert(kref_refcnt(&p->kref) == 0);
 
-	close_all_files(&p->open_files, FALSE);
 	kref_put(&p->fs_env.root->d_kref);
 	kref_put(&p->fs_env.pwd->d_kref);
 	destroy_vmrs(p);
@@ -676,6 +675,10 @@ void proc_destroy(struct proc *p)
 			      __FUNCTION__);
 	}
 	__proc_set_state(p, PROC_DYING);
+	/* This prevents processes from accessing their old files while dying, and
+	 * will help if these files (or similar objects in the future) hold
+	 * references to p (preventing a __proc_free()). */
+	close_all_files(&p->open_files, FALSE);
 	/* This kref_put() is for the process's existence. */
 	kref_put(&p->kref);
 	/* Unlock and possible decref and wait.  A death IPI should be on its way,
