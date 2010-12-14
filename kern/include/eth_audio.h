@@ -10,11 +10,15 @@
 #include <devfs.h>
 #include <net.h>
 
-#define ETH_AUDIO_RCV_PORT 1792
-#define ETH_AUDIO_SEND_PORT 1792
-/* 10 channels * 4 bytes/channel * 32 samples/packet = 1280.  + 2 bytes for a
- * sequence ID */
-#define ETH_AUDIO_PAYLOAD_SZ 1282
+#define ETH_AUDIO_RCV_PORT 1792				/* where we listen */
+#define ETH_AUDIO_SRC_PORT 1792				/* where we send from */
+#define ETH_AUDIO_DST_PORT 1793				/* where we send to */
+/* 10 channels * 4 bytes/channel * 32 samples/packet = 1280.  On inbound
+ * packets, we have + 2 bytes for a * sequence ID.  On outbound packets, we have
+ * 4 bytes for control messages.  For now, we'll use the greater of the two,
+ * though this does mean we copy 2 extra bytes (that should be 0) into the
+ * mmap'd region.  Just don't read them. */
+#define ETH_AUDIO_PAYLOAD_SZ 1284
 #define ETH_AUDIO_IP_HDR_SZ 20
 #define ETH_AUDIO_HEADER_OFF (ETH_HDR_SZ + ETH_AUDIO_IP_HDR_SZ + UDP_HDR_SZ)
 #define ETH_AUDIO_FRAME_SZ (ETH_AUDIO_PAYLOAD_SZ + ETH_AUDIO_HEADER_OFF)
@@ -29,10 +33,6 @@ struct ethaud_udp_packet {
 	struct udp_hdr				udp_hdr;
 	char						payload[ETH_AUDIO_PAYLOAD_SZ];
 } __attribute__((packed));
-
-/* These two files are always open, like other device nodes.  Processes can open
- * and mmap them.  Don't do shit like unlinking them. */
-struct file *ethaud_in, *ethaud_out;
 
 void eth_audio_init(void);
 /* This is called by net subsys when it detects an ethernet audio packet */

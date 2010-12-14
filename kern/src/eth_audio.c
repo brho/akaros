@@ -10,6 +10,8 @@
 #include <page_alloc.h>
 #include <pmap.h>
 #include <arch/nic_common.h>
+#include <process.h>
+#include <smp.h>
 
 struct file_operations ethaud_in_f_op;
 struct file_operations ethaud_out_f_op;
@@ -19,24 +21,39 @@ struct page_map_operations ethaud_pm_op;
  * that we build and submit to send_frame() (which does another memcpy). */
 struct ethaud_udp_packet eth_udp_out;
 
+/* Consider a lock to protect this */
+struct proc *active_proc = 0;
+
+/* Nodes/inodes representing the device */
+struct inode *ethaud_in, *ethaud_out;
+
 /* Builds the device nodes in /dev */
 void eth_audio_init(void)
 {
 	struct page *page;
-	ethaud_in = make_device("/dev/eth_audio_in", S_IRUSR, __S_IFBLK,
-	                        &ethaud_in_f_op);
-	ethaud_out = make_device("/dev/eth_audio_out", S_IRUSR | S_IWUSR, __S_IFBLK,
-	                         &ethaud_out_f_op);
-	/* make sure the inode tracks the right pm (not it's internal one) */
-	ethaud_in->f_dentry->d_inode->i_mapping->pm_op = &ethaud_pm_op;
-	ethaud_out->f_dentry->d_inode->i_mapping->pm_op = &ethaud_pm_op;
+	struct file *in_f, *out_f;
+	in_f = make_device("/dev/eth_audio_in", S_IRUSR, __S_IFBLK,
+	                   &ethaud_in_f_op);
+	out_f = make_device("/dev/eth_audio_out", S_IRUSR | S_IWUSR, __S_IFBLK,
+	                    &ethaud_out_f_op);
+	/* Grab and save the inodes (might change if we change make_device) */
+	ethaud_in = in_f->f_dentry->d_inode;
+	kref_get(&ethaud_in->i_kref, 1);
+	ethaud_out = out_f->f_dentry->d_inode;
+	kref_get(&ethaud_out->i_kref, 1);
+	/* Let go of the files (mostly used to get the dentry in the right place) */
+	kref_put(&in_f->f_kref);
+	kref_put(&out_f->f_kref);
+	/* make sure the inode tracks the right pm op */
+	ethaud_in->i_mapping->pm_op = &ethaud_pm_op;
+	ethaud_out->i_mapping->pm_op = &ethaud_pm_op;
 	/* zalloc pages and associate them with the devices' inodes */
 	assert(!kpage_alloc(&page));
 	memset(page2kva(page), 0, PGSIZE);
-	ethaud_in->f_dentry->d_inode->i_fs_info = page;
+	ethaud_in->i_fs_info = page;
 	assert(!kpage_alloc(&page));
 	memset(page2kva(page), 0, PGSIZE);
-	ethaud_out->f_dentry->d_inode->i_fs_info = page;
+	ethaud_out->i_fs_info = page;
 }
 
 /* Lots of unnecessary copies.  For now, we need to build the ethernet frame,
@@ -82,10 +99,24 @@ static void eth_audio_prep_response(struct ethaud_udp_packet *incoming,
 	outgoing->ip_hdr.dst_addr = incoming->ip_hdr.src_addr;
 	/* Since the IP header is set already, we can compute the checksum. */
 	outgoing->ip_hdr.checksum = htons(ip_checksum(&outgoing->ip_hdr));
-	outgoing->udp_hdr.src_port = htons(ETH_AUDIO_SEND_PORT);
-	outgoing->udp_hdr.dst_port = incoming->udp_hdr.src_port;
+	outgoing->udp_hdr.src_port = htons(ETH_AUDIO_SRC_PORT);
+	outgoing->udp_hdr.dst_port = htons(ETH_AUDIO_DST_PORT);
 	outgoing->udp_hdr.length = htons(ETH_AUDIO_PAYLOAD_SZ + UDP_HDR_SZ);
 	outgoing->udp_hdr.checksum = htons(0);
+
+	/* Debugging */
+	static int once = 0;
+	if (!once++)
+		printd("I will send %d bytes from %08p:%d to %08p:%d, iplen %04p, "
+		       "udplen %04p\n",
+		       ntohs(outgoing->udp_hdr.length),
+		       ntohl(outgoing->ip_hdr.src_addr),
+		       ntohs(outgoing->udp_hdr.src_port), 
+		       ntohl(outgoing->ip_hdr.dst_addr),
+		       ntohs(outgoing->udp_hdr.dst_port),
+		       ntohs(outgoing->ip_hdr.packet_len),
+		       ntohs(outgoing->udp_hdr.length)
+			   ); 
 }
 
 /* This is called by net subsys when it detects an ethernet audio packet.  Make
@@ -93,14 +124,19 @@ static void eth_audio_prep_response(struct ethaud_udp_packet *incoming,
 void eth_audio_newpacket(void *buf)
 {
 	struct page *in_page, *out_page;
+	/* Bail out if these two haven't been initialized yet */
+	if (!ethaud_in || !ethaud_out)
+		return;
 	/* Put info from the packet into the outgoing packet */
 	eth_audio_prep_response((struct ethaud_udp_packet*)buf, &eth_udp_out);
-	in_page = (struct page*)ethaud_in->f_dentry->d_inode->i_fs_info;
-	out_page = (struct page*)ethaud_out->f_dentry->d_inode->i_fs_info;
+	in_page = (struct page*)ethaud_in->i_fs_info;
+	out_page = (struct page*)ethaud_out->i_fs_info;
 	/* third copy (1st being the NIC to RAM). */
 	memcpy(page2kva(in_page), buf + ETH_AUDIO_HEADER_OFF, ETH_AUDIO_PAYLOAD_SZ);
 	/* Send the current outbound packet (can consider doing this by fsync) */
 	eth_audio_sendpacket(page2kva(out_page));
+	if (active_proc)
+		proc_notify(active_proc, NE_FREE_APPLE_PIE, 0);
 }
 
 /* mmap() calls this to do any FS specific mmap() work.  Since our files are
@@ -123,6 +159,15 @@ int eth_audio_mmap(struct file *file, struct vm_region *vmr)
 	/* No private mappings (would be ignored anyway) */
 	if (vmr->vm_flags & MAP_PRIVATE)
 		return -1;
+	/* Only one proc can use it at a time (we need to know who to notify, since
+	 * we don't have any sockets or other abstractions to work with).  Note we
+	 * are storing a reference. */
+	if (active_proc && active_proc != vmr->vm_proc)
+		return -1;
+	if (!active_proc) {
+		kref_get(&vmr->vm_proc->kref, 1);
+		active_proc = vmr->vm_proc;
+	}
 	assert(page);
 	/* Get the PTE for the page this VMR represents */
 	pte_t *pte = pgdir_walk(vmr->vm_proc->env_pgdir, (void*)vmr->vm_base, 1);
@@ -149,6 +194,24 @@ int eth_audio_readpage(struct page_map *pm, struct page *page)
 	return -1;
 }
 
+/* Called when the file is about to be closed (file obj freed).  This is the
+ * least intrusive way to find out when the device is unmapped and closed, so we
+ * can let go of the proc.  TODO: Note that currently, the kernel will not be
+ * able to unmap the file by itself, due to the circular dependence of the kref,
+ * proc_free, and destroy_vmr.  Programs have to unmap it themselves.  Since
+ * this device is a bit of a hack anyway, I'm okay with not making big changes
+ * to the kernel to support this yet. */
+int eth_audio_release(struct inode *inode, struct file *file)
+{
+	/* Disconnect the proc from the device, decref. */
+	if (active_proc && current) {
+		assert(active_proc == current);
+		kref_put(&active_proc->kref);
+		active_proc = 0;
+	}
+	return 0;
+}
+
 /* File operations */
 struct file_operations ethaud_in_f_op = {
 	dev_c_llseek,	/* Errors out, can't llseek */
@@ -158,7 +221,7 @@ struct file_operations ethaud_in_f_op = {
 	eth_audio_mmap,
 	kfs_open,
 	kfs_flush,
-	kfs_release,
+	eth_audio_release,
 	0,				/* fsync - makes no sense */
 	kfs_poll,
 	0,	/* readv */
@@ -175,7 +238,7 @@ struct file_operations ethaud_out_f_op = {
 	eth_audio_mmap,
 	kfs_open,
 	kfs_flush,
-	kfs_release,
+	eth_audio_release,
 	0,				/* fsync - TODO: make this send the packet */
 	kfs_poll,
 	0,	/* readv */

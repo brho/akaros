@@ -42,6 +42,7 @@ void devfs_init(void)
 }
 
 /* Creates a device node at a given location in the FS-tree */
+/* TODO: consider making this only deal with the inode */
 struct file *make_device(char *path, int mode, int type,
                          struct file_operations *fop)
 {
