@@ -330,7 +330,8 @@ void irq_handler(struct trapframe *tf)
 	// For now, only 235-255 are available
 	assert(tf->tf_trapno >= 32); // slows us down, but we should never have this
 
-#ifndef __CONFIG_DISABLE_MPTABLES__
+#ifdef __CONFIG_ENABLE_MPTABLES__
+	/* TODO: this should be for any IOAPIC EOI, not just MPTABLES */
 	lapic_send_eoi();
 #else
 	//Old PIC relatd code. Should be gone for good, but leaving it just incase.

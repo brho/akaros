@@ -310,12 +310,12 @@ void rl8168_setup_interrupts() {
 	
 	// Kernel based interrupt stuff
 	register_interrupt_handler(interrupt_handlers, KERNEL_IRQ_OFFSET + rl8168_irq, rl8168_interrupt_handler, 0);
-#ifdef __CONFIG_DISABLE_MPTABLES__
+#ifdef __CONFIG_ENABLE_MPTABLES__
+	ioapic_route_irq(rl8168_irq, 1);	
+#else
 	pic_unmask_irq(rl8168_irq);
 	unmask_lapic_lvt(LAPIC_LVT_LINT0);
 	enable_irq();
-#else
-	ioapic_route_irq(rl8168_irq, 1);	
 #endif
 	
 	return;

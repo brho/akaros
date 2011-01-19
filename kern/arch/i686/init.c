@@ -20,7 +20,7 @@
 void arch_init()
 {
 	pci_init();
-#ifndef __CONFIG_DISABLE_MPTABLES__
+#ifdef __CONFIG_ENABLE_MPTABLES__
 	mptables_parse();
 	ioapic_init(); // MUST BE AFTER PCI/ISA INIT!
 	// TODO: move these back to regular init.  requires fixing the 
@@ -74,16 +74,16 @@ void arch_init()
 	register_interrupt_handler(interrupt_handlers, 1 + PIC1_OFFSET, mon_int, 0);
 	register_interrupt_handler(interrupt_handlers, 3 + PIC1_OFFSET, mon_int, 0);
 	register_interrupt_handler(interrupt_handlers, 4 + PIC1_OFFSET, mon_int, 0);
-# ifdef __CONFIG_DISABLE_MPTABLES__
+# ifdef __CONFIG_ENABLE_MPTABLES__
+	ioapic_route_irq(1, 0);
+	ioapic_route_irq(3, 0);
+	ioapic_route_irq(4, 0);
+# else 
 	pic_unmask_irq(1);	/* keyboard */
 	pic_unmask_irq(3);	/* serial 2 or 4 */
 	pic_unmask_irq(4);	/* serial 1 or 3 */
 	unmask_lapic_lvt(LAPIC_LVT_LINT0);
-# else 
-	ioapic_route_irq(1, 0);
-	ioapic_route_irq(3, 0);
-	ioapic_route_irq(4, 0);
-# endif /* __CONFIG_DISABLE_MPTABLES__ */
+# endif /* __CONFIG_ENABLE_MPTABLES__ */
 	enable_irq(); /* we want these interrupts to work in the kernel. */
 #endif /* __CONFIG_MONITOR_ON_INT__ */
 }

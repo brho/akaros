@@ -547,12 +547,13 @@ void e1000_setup_interrupts() {
 	register_interrupt_handler(interrupt_handlers, KERNEL_IRQ_OFFSET + e1000_irq, e1000_interrupt_handler, 0);
 
 	// Enable irqs for the e1000
-#ifdef __CONFIG_DISABLE_MPTABLES__
+#ifdef __CONFIG_ENABLE_MPTABLES__
+	/* TODO: this should be for any IOAPIC EOI, not just MPTABLES */
+	ioapic_route_irq(e1000_irq, E1000_IRQ_CPU);	
+#else 
 	// This will route the interrupts automatically to CORE 0
 	// Call send_kernel_message if you want to route them somewhere else
 	enable_e1000_irq(NULL,0,0,0,0);
-#else 
-	ioapic_route_irq(e1000_irq, E1000_IRQ_CPU);	
 #endif
 
 	return;
