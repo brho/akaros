@@ -18,7 +18,7 @@ __ros_arch_syscall(long _num, long _a0)
 	asm volatile("ta 8" : "=r"(a0),"=r"(a1)
 	             : "r"(num),"0"(a0),"1"(a1),"r"(a2),"r"(a3),"r"(a4));
 
-	return ret;
+	return a0;
 }
 
 #endif /* ifndef ROS_KERNEL */
