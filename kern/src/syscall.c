@@ -1427,7 +1427,7 @@ intreg_t syscall(struct proc *p, uintreg_t sc_num, uintreg_t a0, uintreg_t a1,
 }
 
 /* Execute the syscall on the local core */
-static void run_local_syscall(struct syscall *sysc)
+void run_local_syscall(struct syscall *sysc)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 

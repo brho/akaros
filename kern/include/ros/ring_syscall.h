@@ -7,7 +7,7 @@
 #define NUM_SYSCALL_ARGS 6
 /* This will need to change to represent sending pointers to syscalls, not the
  * syscalls themselves */
-
+struct syscall;
 typedef enum {
 	RES_free,  // The response has been digested by the user space, can be reallocated
 	REQ_alloc, // Space fo request is allocated
@@ -17,23 +17,16 @@ typedef enum {
 
 	RES_ready // The response is ready to be picked up
 } syscall_status_t;
+
 typedef struct syscall_req {
-    syscall_status_t status;
+    syscall_status_t status; // TODO:rethink this
 	void (*cleanup)(void* data);
 	void *data;
-    uint32_t num;
-    uint32_t args[NUM_SYSCALL_ARGS];
-} syscall_req_t;
+	struct syscall* sc;
+} syscall_req_t, syscall_rsp_t;
 
-typedef struct syscall_rsp {
-	syscall_status_t status;
-	void (*cleanup)(void* data);
-	void *data;
-	uint32_t retval;
-	uint32_t syserr;
-} syscall_rsp_t;
-
-
+#define RSP_ERRNO(rsp) (rsp->sc->err)
+#define RSP_RESULT(rsp) (rsp->sc->retval)
 
 // Generic Syscall Ring Buffer
 #define SYSCALLRINGSIZE    PGSIZE

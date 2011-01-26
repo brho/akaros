@@ -41,6 +41,7 @@ struct sys_table_entry {
 const static struct sys_table_entry syscall_table[];
 /* Syscall invocation */
 void prep_syscalls(struct proc *p, struct syscall *sysc, unsigned int nr_calls);
+void run_local_syscall(struct syscall *sysc);
 intreg_t syscall(struct proc *p, uintreg_t sc_num, uintreg_t a0, uintreg_t a1,
                  uintreg_t a2, uintreg_t a3, uintreg_t a4, uintreg_t a5);
 void set_errno(int errno);

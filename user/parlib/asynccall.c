@@ -33,11 +33,11 @@ void init_arc(struct arsc_channel* ac)
 }
 
 // Wait on all syscalls within this async call.  TODO - timeout or something?
-
 int waiton_group_call(async_desc_t* desc, async_rsp_t* rsp)
 {
 	syscall_rsp_t syscall_rsp;
 	syscall_desc_t* d;
+	int retval = 0;
 	int err = 0;
 	if (!desc) {
 		errno = EINVAL;
@@ -46,14 +46,14 @@ int waiton_group_call(async_desc_t* desc, async_rsp_t* rsp)
 
 	while (!(TAILQ_EMPTY(&desc->syslist))) {
 		d = TAILQ_FIRST(&desc->syslist);
-		err = waiton_syscall(d, &syscall_rsp);
+		err = waiton_syscall(d);
 		// TODO: processing the retval out of rsp here.  might be specific to
 		// the async call.  do we want to accumulate?  return any negative
 		// values?  depends what we want from the return value, so we might
 		// have to pass in a function that is used to do the processing and
 		// pass the answer back out in rsp.
 		//rsp->retval += syscall_rsp.retval; // For example
-		rsp->retval = MIN(rsp->retval, syscall_rsp.retval);
+		retval = MIN(retval, err);
 		// remove from the list and free the syscall desc
 		TAILQ_REMOVE(&desc->syslist, d, next);
 		POOL_PUT(&syscall_desc_pool, d);
@@ -112,17 +112,22 @@ int get_all_desc(async_desc_t** a_desc, syscall_desc_t** s_desc)
 }
 
 // This runs one syscall instead of a group. 
-int async_syscall(syscall_req_t* req, syscall_desc_t** desc_ptr2)
+
+// TODO: right now there is one channel (remote), in the future, the caller
+// may specify local which will cause it to give up the core to do the work.
+// creation of additional remote channel also allows the caller to prioritize
+// work, because the default policy for the kernel is to roundrobin between them.
+int async_syscall(arsc_channel_t* chan, syscall_req_t* req, syscall_desc_t** desc_ptr2)
 {
 	// Note that this assumes one global frontring (TODO)
 	// abort if there is no room for our request.  ring size is currently 64.
 	// we could spin til it's free, but that could deadlock if this same thread
 	// is supposed to consume the requests it is waiting on later.
 	syscall_desc_t* desc = malloc(sizeof (syscall_desc_t));
-	desc->channel = &SYS_CHANNEL;
+	desc->channel = chan;
 	syscall_front_ring_t *fr = &(desc->channel->sysfr);
 	//TODO: can do it locklessly using CAS, but could change with local async calls
-	mcs_lock_lock(&desc->channel->aclock);
+	mcs_lock_lock(&(chan->aclock));
 	if (RING_FULL(fr)) {
 		errno = EBUSY;
 		return -1;
@@ -146,12 +151,42 @@ int async_syscall(syscall_req_t* req, syscall_desc_t** desc_ptr2)
 	*desc_ptr2 = desc;
 	return 0;
 }
+// Default convinence wrapper before other method of posting calls are available
+
+syscall_desc_t* arc_call(long int num, ...)
+{
+  	va_list vl;
+  	va_start(vl,num);
+	struct syscall *p_sysc = malloc(sizeof (struct syscall));
+	syscall_desc_t* desc;
+	if (p_sysc == NULL) {
+		errno = ENOMEM;
+		return 0;
+	}
+	p_sysc->num = num;
+  	p_sysc->arg0 = va_arg(vl,long int);
+  	p_sysc->arg1 = va_arg(vl,long int);
+  	p_sysc->arg2 = va_arg(vl,long int);
+  	p_sysc->arg3 = va_arg(vl,long int);
+  	p_sysc->arg4 = va_arg(vl,long int);
+  	p_sysc->arg5 = va_arg(vl,long int);
+  	va_end(vl);
+	syscall_req_t arc = {REQ_alloc,NULL, NULL, p_sysc};
+	async_syscall(&SYS_CHANNEL, &arc, &desc);
+	printf ( "%d pushed at %p \n", desc);
+	return desc;
+}
 
 // consider a timeout too
-int waiton_syscall(syscall_desc_t* desc, syscall_rsp_t* rsp)
+// Wait until arsc returns, caller provides rsp buffer.
+// eventually change this to return ret_val, set errno
+
+// What if someone calls waiton the same desc several times?
+int waiton_syscall(syscall_desc_t* desc)
 {
+	int retval = 0;
 	if (desc == NULL || desc->channel == NULL){
-		//errno = EFAIL;
+		errno = EFAIL;
 		return -1;
 	}
 	// Make sure we were given a desc with a non-NULL frontring.  This could
@@ -159,25 +194,27 @@ int waiton_syscall(syscall_desc_t* desc, syscall_rsp_t* rsp)
 	syscall_front_ring_t *fr =  &desc->channel->sysfr;
 	
 	if (!fr){
-		//errno = EFAIL;
+		errno = EFAIL;
 		return -1;
 	}
-	syscall_rsp_t* rsp_inring = RING_GET_RESPONSE(fr, desc->idx);
+	printf ("waiting %d\n", pthread_self()->id);
+	syscall_rsp_t* rsp = RING_GET_RESPONSE(fr, desc->idx);
 
 	// ignoring the ring push response from the kernel side now
-	while (rsp_inring->status != RES_ready)
+	while (rsp->sc->flags != SC_DONE)
 		cpu_relax();
-	memcpy(rsp, rsp_inring, sizeof(*rsp));
+	// memcpy(rsp, rsp_inring, sizeof(*rsp));
 	
-	atomic_inc((atomic_t*) &(fr->rsp_cons));
     // run a cleanup function for this desc, if available
-    //if (rsp->cleanup)
-    //	rsp->cleanup(rsp->data);
-	if (rsp->syserr){
-		//	errno = rsp->syserr;
-		return -1;
+    if (rsp->cleanup)
+    	rsp->cleanup(rsp->data);
+	if (RSP_ERRNO(rsp)){
+		errno = RSP_ERRNO(rsp);
+		retval = -1;
 	} else 
-		return 0;
+		retval =  RSP_RESULT(rsp); 
+	atomic_inc((atomic_t*) &(fr->rsp_cons));
+	return retval;
 }
 
 

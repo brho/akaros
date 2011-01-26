@@ -28,8 +28,9 @@ spinlock_t arsc_proc_lock = SPINLOCK_INITIALIZER;
 
 intreg_t inline syscall_async(struct proc *p, syscall_req_t *call)
 {
-	return syscall(p, call->num, call->args[0], call->args[1],
-	               call->args[2], call->args[3], call->args[4], call->args[5]);
+	struct syscall* sc = call->sc;
+	return syscall(p, sc->num, sc->arg0, sc->arg1,
+	               sc->arg2, sc->arg3, sc->arg4, sc->arg5);
 }
 
 syscall_sring_t* sys_init_arsc(struct proc *p)
@@ -85,7 +86,7 @@ static intreg_t process_generic_syscalls(struct proc *p, size_t max)
 {
 	size_t count = 0;
 	syscall_back_ring_t* sysbr = &p->syscallbackring;
-	struct per_cpu_info* coreinfo = &per_cpu_info[core_id()];
+	struct per_cpu_info* pcpui = &per_cpu_info[core_id()];
 	// looking at a process not initialized to perform arsc. 
 	if (sysbr == NULL) 
 		return count;
@@ -99,6 +100,7 @@ static intreg_t process_generic_syscalls(struct proc *p, size_t max)
 			// need to switch to the right context, so we can handle the user pointer
 			// that points to a data payload of the syscall
 			lcr3(p->env_cr3);
+			pcpui->cur_proc = p;
 		}
 		count++;
 		//printk("DEBUG PRE: sring->req_prod: %d, sring->rsp_prod: %d\n",
@@ -111,18 +113,10 @@ static intreg_t process_generic_syscalls(struct proc *p, size_t max)
 		// print req
 		printd("req no %d, req arg %c\n", req->num, *((char*)req->args[0]));
 		
-		/* TODO: when the remote syscall stuff can handle the new async
-		 * syscalls, they need to use a real sysc.  This might at least stop it
-		 * from crashing. */
-		struct syscall sysc = {0};
-		coreinfo->cur_sysc = &sysc;
+		pcpui->cur_sysc = req->sc;
+		run_local_syscall(req->sc); // TODO: blocking call will block arcs as well.
 		
-		rsp.retval = syscall_async(p, req);
-		rsp.syserr = sysc.err;
-		rsp.cleanup = req->cleanup;
-		rsp.data = req->data;
-		// write response into the slot it came from
-		memcpy(req, &rsp, sizeof(syscall_rsp_t));
+		// need to keep the slot in the ring buffer if it is blocked
 		(sysbr->rsp_prod_pvt)++;
 		req->status = RES_ready;
 		RING_PUSH_RESPONSES(sysbr);

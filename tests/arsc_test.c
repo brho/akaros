@@ -7,14 +7,15 @@
 syscall_desc_t* sys_cputs_async(const char *s, size_t len,                                             
                      void (*cleanup_handler)(void*), void* cleanup_data)
 {                                                                                                                     
-    // could just hardcode 4 0's, will eventually wrap this marshaller anyway                                         
+    /*// could just hardcode 4 0's, will eventually wrap this marshaller anyway                                         
 	syscall_desc_t* desc;
     syscall_req_t syscall = {REQ_alloc, cleanup_handler, cleanup_data,
 							SYS_cputs,{(uint32_t)s, len, [2 ... (NUM_SYSCALL_ARGS-1)] 0} };                          
     syscall.cleanup = cleanup_handler;                                                                                  
-    syscall.data = cleanup_data;                                                                                        
+    syscall.data = cleanup_data;
     async_syscall(&syscall, &desc);
-	return desc;
+	*/
+	return arc_call(SYS_cputs, s, len);
 }
 
 int main(int argc, char** argv){
@@ -31,7 +32,8 @@ int main(int argc, char** argv){
 	sysdesc[1] = sys_cputs_async(&testme, 1, NULL, NULL);
 
 	printf ("single thread - call placed \n");
-	waiton_syscall(sysdesc[0], &sysrsp);
-	waiton_syscall(sysdesc[1], &sysrsp);
+	//ignore return value
+	assert(-1 != waiton_syscall(sysdesc[0]));
+	assert(-1 != waiton_syscall(sysdesc[1]));
 	printf ("single thread - dummy call \n");	
 }
