@@ -141,12 +141,17 @@ void __attribute__((noreturn)) vcore_entry()
 
 int pthread_attr_init(pthread_attr_t *a)
 {
-  return 0;
+	a = malloc(sizeof (pthread_attr_t));
+	if (!a) return -1;
+ 	a->stacksize = PTHREAD_STACK_SIZE;
+	a->detached = PTHREAD_CREATE_JOINABLE;
+  	return 0;
 }
 
 int pthread_attr_destroy(pthread_attr_t *a)
 {
-  return 0;
+	free(a);
+	return 0;
 }
 
 /* TODO: probably don't want to dealloc.  Considering caching */
@@ -170,10 +175,6 @@ static int __pthread_allocate_tls(struct pthread_tcb *pt)
 	return 0;
 }
 
-// TODO: how big do we want these?  ideally, we want to be able to guard and map
-// more space if we go too far.
-#define PTHREAD_STACK_PAGES 4
-#define PTHREAD_STACK_SIZE (PTHREAD_STACK_PAGES*PGSIZE)
 
 static void __pthread_free_stack(struct pthread_tcb *pt)
 {
@@ -182,12 +183,12 @@ static void __pthread_free_stack(struct pthread_tcb *pt)
 
 static int __pthread_allocate_stack(struct pthread_tcb *pt)
 {
-	void* stackbot = mmap(0, PTHREAD_STACK_SIZE,
+	void* stackbot = mmap(0, pt->stacksize,
 	                      PROT_READ|PROT_WRITE|PROT_EXEC,
 	                      MAP_POPULATE|MAP_ANONYMOUS, -1, 0);
 	if (stackbot == MAP_FAILED)
 		return -1; // errno set by mmap
-	pt->stacktop = stackbot + PTHREAD_STACK_SIZE;
+	pt->stacktop = stackbot + pt->stacksize;
 	return 0;
 }
 
@@ -202,6 +203,17 @@ static int get_next_pid(void)
 {
 	static uint32_t next_pid = 0;
 	return next_pid++;
+}
+
+
+int pthread_attr_setstacksize(pthread_attr_t *attr, size_t stacksize)
+{
+	attr->stacksize = stacksize;
+}
+int pthread_attr_getstacksize(const pthread_attr_t *attr, 
+    size_t *stacksize)
+{
+	*stacksize = attr->stacksize;
 }
 
 int pthread_create(pthread_t* thread, const pthread_attr_t* attr,
@@ -220,6 +232,15 @@ int pthread_create(pthread_t* thread, const pthread_attr_t* attr,
 	(*thread)->start_routine = start_routine;
 	(*thread)->arg = arg;
 	(*thread)->id = get_next_pid();
+	/* Respect the attributes*/
+	if (attr){
+		if (attr->stacksize)
+			(*thread)->stacksize = attr->stacksize;
+		else 
+			(*thread)->stacksize = PTHREAD_STACK_SIZE;
+		(*thread)->detached = attr->detached;
+	}
+
 	if (__pthread_allocate_stack(*thread) ||  __pthread_allocate_tls(*thread))
 		printf("We're fucked\n");
 	/* Save the ptr to the new pthread in that pthread's TLS */
@@ -341,8 +362,7 @@ int pthread_mutexattr_destroy(pthread_mutexattr_t* attr)
 
 
 int pthread_attr_setdetachstate(pthread_attr_t *__attr,int __detachstate) {
-	*__attr = __detachstate;
-	// TODO: the right thing
+	__attr->detached = __detachstate;
 	return 0;
 }
 
@@ -604,4 +624,8 @@ int pthread_barrier_destroy(pthread_barrier_t* b)
 {
   pthread_mutex_destroy(&b->pmutex);
   return 0;
+}
+
+int pthread_detach (pthread_t thread){
+	thread->detached = 1;
 }

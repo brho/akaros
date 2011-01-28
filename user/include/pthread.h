@@ -19,6 +19,7 @@ struct pthread_tcb {
 	struct ancillary_state as;
 	void *tls_desc;
 	void *stacktop;
+	uint32_t stacksize;
 	uint32_t id;
 
 	int finished;
@@ -31,15 +32,6 @@ struct pthread_tcb {
 };
 typedef struct pthread_tcb* pthread_t;
 TAILQ_HEAD(pthread_queue, pthread_tcb);
-
-/* For compatibility with the existing pthread library */
-enum
-{
-  PTHREAD_CREATE_JOINABLE,
-#define PTHREAD_CREATE_JOINABLE	PTHREAD_CREATE_JOINABLE
-  PTHREAD_CREATE_DETACHED
-#define PTHREAD_CREATE_DETACHED	PTHREAD_CREATE_DETACHED
-};
 
 #define PTHREAD_ONCE_INIT 0
 #define PTHREAD_BARRIER_SERIAL_THREAD 12345
@@ -79,6 +71,21 @@ typedef struct
 #define WAITER_WAITING 1
 #define SLOT_FREE 0
 #define SLOT_IN_USE 1
+
+/* Detach state.  */
+enum
+{
+  PTHREAD_CREATE_JOINABLE,
+#define PTHREAD_CREATE_JOINABLE	PTHREAD_CREATE_JOINABLE
+  PTHREAD_CREATE_DETACHED
+#define PTHREAD_CREATE_DETACHED	PTHREAD_CREATE_DETACHED
+};
+
+// TODO: how big do we want these?  ideally, we want to be able to guard and map
+// more space if we go too far.
+#define PTHREAD_STACK_PAGES 4
+#define PTHREAD_STACK_SIZE (PTHREAD_STACK_PAGES*PGSIZE)
+
 typedef struct
 {
   int pshared;
@@ -92,8 +99,11 @@ typedef struct
   int in_use[MAX_PTHREADS];
   int next_waiter; //start the search for an available waiter at this spot
 } pthread_cond_t;
-
-typedef int pthread_attr_t;
+typedef struct 
+{
+	size_t stacksize;
+	int detached;
+} pthread_attr_t;
 typedef int pthread_barrierattr_t;
 typedef int pthread_once_t;
 typedef void** pthread_key_t;
@@ -149,6 +159,12 @@ int pthread_once(pthread_once_t* once_control, void (*init_routine)(void));
 int pthread_barrier_init(pthread_barrier_t* b, const pthread_barrierattr_t* a, int count);
 int pthread_barrier_wait(pthread_barrier_t* b);
 int pthread_barrier_destroy(pthread_barrier_t* b);
+
+//added for redis compile
+int pthread_detach (pthread_t __th);
+int pthread_attr_setstacksize(pthread_attr_t *attr, size_t stacksize);
+int pthread_attr_getstacksize(const pthread_attr_t *attr, 
+    size_t *stacksize);
 
 #ifdef __cplusplus
   }
