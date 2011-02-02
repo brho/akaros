@@ -141,16 +141,13 @@ void __attribute__((noreturn)) vcore_entry()
 
 int pthread_attr_init(pthread_attr_t *a)
 {
-	a = malloc(sizeof (pthread_attr_t));
-	if (!a) return -1;
  	a->stacksize = PTHREAD_STACK_SIZE;
-	a->detached = PTHREAD_CREATE_JOINABLE;
+	a->detachstate = PTHREAD_CREATE_JOINABLE;
   	return 0;
 }
 
 int pthread_attr_destroy(pthread_attr_t *a)
 {
-	free(a);
 	return 0;
 }
 
@@ -183,6 +180,7 @@ static void __pthread_free_stack(struct pthread_tcb *pt)
 
 static int __pthread_allocate_stack(struct pthread_tcb *pt)
 {
+	assert(pt->stacksize);
 	void* stackbot = mmap(0, pt->stacksize,
 	                      PROT_READ|PROT_WRITE|PROT_EXEC,
 	                      MAP_POPULATE|MAP_ANONYMOUS, -1, 0);
@@ -209,11 +207,12 @@ static int get_next_pid(void)
 int pthread_attr_setstacksize(pthread_attr_t *attr, size_t stacksize)
 {
 	attr->stacksize = stacksize;
+	return 0;
 }
-int pthread_attr_getstacksize(const pthread_attr_t *attr, 
-    size_t *stacksize)
+int pthread_attr_getstacksize(const pthread_attr_t *attr, size_t *stacksize)
 {
 	*stacksize = attr->stacksize;
+	return 0;
 }
 
 int pthread_create(pthread_t* thread, const pthread_attr_t* attr,
@@ -231,16 +230,16 @@ int pthread_create(pthread_t* thread, const pthread_attr_t* attr,
 	*thread = (pthread_t)calloc(1, sizeof(struct pthread_tcb));
 	(*thread)->start_routine = start_routine;
 	(*thread)->arg = arg;
+	(*thread)->stacksize = PTHREAD_STACK_SIZE;	/* default */
 	(*thread)->id = get_next_pid();
+	(*thread)->detached = FALSE;				/* default */
 	/* Respect the attributes*/
-	if (attr){
-		if (attr->stacksize)
+	if (attr) {
+		if (attr->stacksize)					/* don't set a 0 stacksize */
 			(*thread)->stacksize = attr->stacksize;
-		else 
-			(*thread)->stacksize = PTHREAD_STACK_SIZE;
-		(*thread)->detached = attr->detached;
+		if (attr->detachstate == PTHREAD_CREATE_DETACHED)
+			(*thread)->detached = TRUE;
 	}
-
 	if (__pthread_allocate_stack(*thread) ||  __pthread_allocate_tls(*thread))
 		printf("We're fucked\n");
 	/* Save the ptr to the new pthread in that pthread's TLS */
@@ -361,8 +360,9 @@ int pthread_mutexattr_destroy(pthread_mutexattr_t* attr)
 }
 
 
-int pthread_attr_setdetachstate(pthread_attr_t *__attr,int __detachstate) {
-	__attr->detached = __detachstate;
+int pthread_attr_setdetachstate(pthread_attr_t *__attr, int __detachstate)
+{
+	__attr->detachstate = __detachstate;
 	return 0;
 }
 
@@ -526,6 +526,7 @@ __pthread_exit(struct pthread_tcb *t)
 {
 	__pthread_free_tls(t);
 	__pthread_free_stack(t);
+	/* TODO: race on detach state */
 	if (t->detached)
 		free(t);
 	/* Once we do this, our joiner can free us.  He won't free us if we're
@@ -626,6 +627,8 @@ int pthread_barrier_destroy(pthread_barrier_t* b)
   return 0;
 }
 
-int pthread_detach (pthread_t thread){
-	thread->detached = 1;
+int pthread_detach(pthread_t thread)
+{
+	thread->detached = TRUE;
+	return 0;
 }

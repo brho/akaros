@@ -24,7 +24,7 @@ struct pthread_tcb {
 
 	int finished;
 	void *retval;
-	int detached;
+	bool detached;
 	// whether or not the scheduler can migrate you from your vcore
 	// will be slightly difficult to see this when given just a vcoreid and
 	// notif_tf ptr
@@ -102,7 +102,7 @@ typedef struct
 typedef struct 
 {
 	size_t stacksize;
-	int detached;
+	int detachstate;
 } pthread_attr_t;
 typedef int pthread_barrierattr_t;
 typedef int pthread_once_t;
@@ -161,10 +161,9 @@ int pthread_barrier_wait(pthread_barrier_t* b);
 int pthread_barrier_destroy(pthread_barrier_t* b);
 
 //added for redis compile
-int pthread_detach (pthread_t __th);
+int pthread_detach(pthread_t __th);
 int pthread_attr_setstacksize(pthread_attr_t *attr, size_t stacksize);
-int pthread_attr_getstacksize(const pthread_attr_t *attr, 
-    size_t *stacksize);
+int pthread_attr_getstacksize(const pthread_attr_t *attr, size_t *stacksize);
 
 #ifdef __cplusplus
   }
