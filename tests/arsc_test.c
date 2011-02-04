@@ -1,3 +1,4 @@
+#ifdef __CONFIG_ARSC_SERVER__
 #include <parlib.h>
 #include <vcore.h>
 #include <ros/syscall.h>
@@ -37,3 +38,7 @@ int main(int argc, char** argv){
 	assert(-1 != waiton_syscall(sysdesc[1]));
 	printf ("single thread - dummy call \n");	
 }
+
+#else
+int main(){};
+#endif

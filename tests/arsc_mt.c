@@ -1,3 +1,4 @@
+#ifdef __CONFIG_ARSC_SERVER__
 #include <rstdio.h>
 #include <stdlib.h>
 #include <pthread.h>
@@ -46,4 +47,6 @@ int main(int argc, char** argv){
 
 	printf("multi thread - end\n");
 }
-
+#else
+int main(){};
+#endif
