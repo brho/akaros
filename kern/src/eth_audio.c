@@ -4,6 +4,8 @@
  *
  * Rimas's Ethernet-Audio device */
 
+#ifdef __CONFIG_ETH_AUDIO__
+
 #include <eth_audio.h>
 #include <string.h>
 #include <devfs.h>
@@ -252,3 +254,4 @@ struct page_map_operations ethaud_pm_op = {
 	eth_audio_readpage,
 };
 
+#endif /* __CONFIG_ETH_AUDIO__ */
