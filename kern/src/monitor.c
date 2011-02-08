@@ -267,7 +267,6 @@ int mon_bin_ls(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 	do {
 		retval = bin_dir->f_op->readdir(bin_dir, &dir);	
 		printk("%s\n", dir.d_name);
-		dir.d_off++;
 	} while (retval == 1);
 	kref_put(&bin_dir->f_kref);
 	return 0;
