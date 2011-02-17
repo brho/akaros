@@ -1,6 +1,6 @@
 #include <ros/resource.h>
 #include <ros/procdata.h>
-#include <ros/notification.h>
+#include <ros/event.h>
 #include <ros/bcq.h>
 #include <parlib.h>
 #include <vcore.h>
@@ -52,17 +52,13 @@ int main()
 	if (vcore_init())
 		printf("vcore_init() failed, we're fucked!\n");
 
-	/* tell the kernel where and how we want to receive notifications */
-	struct notif_method *nm;
-	/* ETHAUD Turn off all notifs */
-	for (int i = 0; i < MAX_NR_NOTIF; i++) {
-		nm = &__procdata.notif_methods[i];
-		nm->flags = 0;
-	}
 	/* ETHAUD Turn on Free apple pie (which is the network packet) */
-	nm = &__procdata.notif_methods[NE_FREE_APPLE_PIE];
-	nm->flags |= NOTIF_WANTED | NOTIF_MSG | NOTIF_IPI;
-	nm->vcoreid = 0;	/* get it on vcore 0 */
+	struct event_queue *ev_q = malloc(sizeof(struct event_queue));
+	ev_q->ev_mbox = &__procdata.vcore_preempt_data[0].ev_mbox;
+	ev_q->ev_flags = EVENT_IPI;
+	ev_q->ev_vcore = 0;	
+	ev_q->ev_handler = 0;
+	__procdata.kernel_evts[EV_FREE_APPLE_PIE] = ev_q;
 
 	/* Need to save this somewhere that you can find it again when restarting
 	 * core0 */
@@ -106,23 +102,18 @@ void vcore_entry(void)
 	uint32_t vcoreid = vcore_id();
 	static bool first_time = TRUE;
 
-/* begin: stuff userspace needs to do to handle notifications */
+/* begin: stuff userspace needs to do to handle events/notifications */
 
 	struct vcore *vc = &__procinfo.vcoremap[vcoreid];
 	struct preempt_data *vcpd;
 	vcpd = &__procdata.vcore_preempt_data[vcoreid];
 	
-	/* here is how you receive a notif_event */
-	struct notif_event ne = {0};
-	bcq_dequeue(&vcpd->notif_evts, &ne, NR_PERCORE_EVENTS);
-	/* it might be in bitmask form too: */
-	//printf("and the bitmask looks like: ");
-	//PRINT_BITMASK(__procdata.vcore_preempt_data[vcoreid].notif_bmask, MAX_NR_NOTIF);
-	/* can see how many messages had to be sent as bits */
-	//printf("Number of event overflows: %d\n", vcpd->event_overflows);
+	/* here is how you receive an event message (ought to check overflow) */
+	struct event_msg ev_msg = {0};
+	bcq_dequeue(&vcpd->ev_mbox.ev_msgs, &ev_msg, NR_BCQ_EVENTS);
 
 	/* ETHAUD app: process the packet if we got a notif */
-	if (ne.ne_type == NE_FREE_APPLE_PIE)
+	if (ev_msg.ev_type == EV_FREE_APPLE_PIE)
 		process_packet();
 
 	if (vc->preempt_pending) {

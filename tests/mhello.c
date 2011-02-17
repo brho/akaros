@@ -2,7 +2,7 @@
 #include <ros/mman.h>
 #include <ros/resource.h>
 #include <ros/procdata.h>
-#include <ros/notification.h>
+#include <ros/event.h>
 #include <ros/bcq.h>
 #include <arch/arch.h>
 #include <rstdio.h>
@@ -20,6 +20,8 @@ mcs_barrier_t b;
 __thread int temp;
 void *core0_tls = 0;
 
+struct event_queue_big *indirect_q;
+
 int main(int argc, char** argv)
 {
 	uint32_t vcoreid;
@@ -27,17 +29,32 @@ int main(int argc, char** argv)
 
 	mcs_barrier_init(&b, max_vcores());
 
+	/* prep indirect ev_q (TODO PIN).  Note we grab a big one */
+	indirect_q = malloc(sizeof(struct event_queue_big));
+	indirect_q->ev_mbox = &indirect_q->ev_imbox;
+	indirect_q->ev_flags = EVENT_IPI;
+	indirect_q->ev_vcore = 1;			/* IPI core 1 */
+	indirect_q->ev_handler = 0;
+	printf("Registering %08p for event type %d\n", indirect_q,
+	       EV_FREE_APPLE_PIE);
+	__procdata.kernel_evts[EV_FREE_APPLE_PIE] = (struct event_queue*)indirect_q;
+
 /* begin: stuff userspace needs to do before switching to multi-mode */
 	if (vcore_init())
 		printf("vcore_init() failed, we're fucked!\n");
 
-	/* tell the kernel where and how we want to receive notifications */
-	struct notif_method *nm;
-	for (int i = 0; i < MAX_NR_NOTIF; i++) {
-		nm = &__procdata.notif_methods[i];
-		nm->flags |= NOTIF_WANTED | NOTIF_MSG | NOTIF_IPI;
-		nm->vcoreid = i % 2; // vcore0 or 1, keepin' it fresh.
-	}
+	/* Tell the kernel where and how we want to receive events.  This is just an
+	 * example of what to do to have a notification turned on.  We're turning on
+	 * USER_IPIs, posting events to vcore 0's vcpd, and telling the kernel to
+	 * send to vcore 0.
+	 * TODO: (PIN) this ev_q needs to be pinned */
+	struct event_queue *ev_q = malloc(sizeof(struct event_queue));
+	ev_q->ev_mbox = &__procdata.vcore_preempt_data[0].ev_mbox;
+	ev_q->ev_flags = EVENT_IPI;	/* we want an IPI */
+	ev_q->ev_vcore = 0;			/* IPI core 0 */
+	ev_q->ev_handler = 0;
+	/* Now tell the kernel about it */
+	__procdata.kernel_evts[EV_USER_IPI] = ev_q;
 
 	/* Need to save this somewhere that you can find it again when restarting
 	 * core0 */
@@ -66,19 +83,17 @@ int main(int argc, char** argv)
 		printf("This is vcore0, right after vcore_request, retval=%d\n", retval);
 	}
 
-#if 0
 	/* test notifying my vcore2 */
 	udelay(5000000);
 	printf("Vcore 0 self-notifying vcore 2 with notif 4!\n");
-	struct notif_event ne;
-	ne.ne_type = 4;
-	sys_self_notify(2, 4, &ne);
+	struct event_msg msg;
+	msg.ev_type = 4;
+	sys_self_notify(2, 4, &msg);
 	udelay(5000000);
 	printf("Vcore 0 notifying itself with notif 3!\n");
-	ne.ne_type = 3;
-	sys_notify(sys_getpid(), 3, &ne);
+	msg.ev_type = 3;
+	sys_notify(sys_getpid(), 3, &msg);
 	udelay(1000000);
-#endif
 
 	/* test loop for restarting a notif_tf */
 	if (vcoreid == 0) {
@@ -110,17 +125,28 @@ void vcore_entry(void)
 	struct preempt_data *vcpd;
 	vcpd = &__procdata.vcore_preempt_data[vcoreid];
 	
-	/* here is how you receive a notif_event */
-	struct notif_event ne = {0};
-	bcq_dequeue(&vcpd->notif_evts, &ne, NR_PERCORE_EVENTS);
+	/* here is how you receive an event (ought to check for overflow, etc) */
+	struct event_msg ev_msg = {0};
+	bcq_dequeue(&vcpd->ev_mbox.ev_msgs, &ev_msg, NR_BCQ_EVENTS);
 	printf("the queue is on vcore %d and has a ne with type %d\n", vcoreid,
-	       ne.ne_type);
+	       ev_msg.ev_type);
 	/* it might be in bitmask form too: */
 	//printf("and the bitmask looks like: ");
 	//PRINT_BITMASK(__procdata.vcore_preempt_data[vcoreid].notif_bmask, MAX_NR_NOTIF);
 	/* can see how many messages had to be sent as bits */
-	printf("Number of event overflows: %d\n", vcpd->event_overflows);
+	printf("Number of event overflows: %d\n", vcpd->ev_mbox.ev_overflows);
 
+	/* How we handle indirection events: */
+	struct event_queue_big *ev_q;
+	struct event_msg indir_msg = {0};
+	if (ev_msg.ev_type == EV_EVENT) {
+		ev_q = ev_msg.ev_arg3;	/* convention */
+		printf("Detected EV_EVENT, ev_q is %08p (%08p)\n", ev_q, indirect_q);
+		bcq_dequeue(&ev_q->ev_mbox->ev_msgs, &indir_msg, NR_BCQ_EVENTS);
+		printf("Message of type: %d (%d)\n", indir_msg.ev_type,
+		       EV_FREE_APPLE_PIE);
+	}
+	/* how we tell a preemption is pending (regardless of notif/events) */
 	if (vc->preempt_pending) {
 		printf("Oh crap, vcore %d is being preempted!  Yielding\n", vcoreid);
 		sys_yield(TRUE);
@@ -164,6 +190,6 @@ void vcore_entry(void)
 	vcore_request(1);
 	//mcs_barrier_wait(&b,vcore_id());
 	udelay(vcoreid * 10000000);
-	exit(0);
+	//exit(0);
 	while(1);
 }

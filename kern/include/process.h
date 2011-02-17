@@ -9,7 +9,7 @@
 #define ROS_KERN_PROCESS_H
 
 #include <ros/common.h>
-#include <ros/notification.h>
+#include <ros/event.h>
 #include <trap.h>
 #include <atomic.h>
 #include <kref.h>
@@ -81,9 +81,7 @@ void proc_restartcore(void);
 void proc_destroy(struct proc *SAFE p);
 void __proc_yield_s(struct proc *p, struct trapframe *tf);
 void proc_yield(struct proc *SAFE p, bool being_nice);
-void do_notify(struct proc *p, uint32_t vcoreid, unsigned int notif,
-               struct notif_event *ne);
-void proc_notify(struct proc *p, unsigned int notif, struct notif_event *ne);
+void proc_notify(struct proc *p, uint32_t vcoreid);
 
 /* Exposed for sys_getvcoreid(), til it's unnecessary */
 uint32_t proc_get_vcoreid(struct proc *SAFE p, uint32_t pcoreid);
@@ -152,4 +150,4 @@ void print_idlecoremap(void);
 void print_allpids(void);
 void print_proc_info(pid_t pid);
 
-#endif // !ROS_KERN_PROCESS_H
+#endif /* !ROS_KERN_PROCESS_H */

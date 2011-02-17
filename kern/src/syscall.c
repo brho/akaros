@@ -5,7 +5,6 @@
 #endif
 
 #include <ros/common.h>
-#include <ros/notification.h>
 #include <arch/types.h>
 #include <arch/arch.h>
 #include <arch/mmu.h>
@@ -34,6 +33,7 @@
 #include <devfs.h>
 #include <smp.h>
 #include <arsc_server.h>
+#include <event.h>
 
 
 #ifdef __CONFIG_NETWORKING__
@@ -620,14 +620,13 @@ static int sys_resource_req(struct proc *p, int type, unsigned int amt_wanted,
 	return retval;
 }
 
-/* Will notify the target on the given vcore, if the caller controls the target.
- * Will honor the target's wanted/vcoreid.  u_ne can be NULL. */
-static int sys_notify(struct proc *p, int target_pid, unsigned int notif,
-                      struct notif_event *u_ne)
+/* Untested.  Will notify the target on the given vcore, if the caller controls
+ * the target.  Will honor the target's wanted/vcoreid.  u_ne can be NULL. */
+static int sys_notify(struct proc *p, int target_pid, unsigned int ev_type,
+                      struct event_msg *u_msg)
 {
-	struct notif_event local_ne;
+	struct event_msg local_msg = {0};
 	struct proc *target = pid2proc(target_pid);
-
 	if (!target) {
 		set_errno(EBADPROC);
 		return -1;
@@ -637,40 +636,38 @@ static int sys_notify(struct proc *p, int target_pid, unsigned int notif,
 		set_errno(EPERM);
 		return -1;
 	}
-	/* if the user provided a notif_event, copy it in and use that */
-	if (u_ne) {
-		if (memcpy_from_user(p, &local_ne, u_ne, sizeof(struct notif_event))) {
+	/* if the user provided an ev_msg, copy it in and use that */
+	if (u_msg) {
+		if (memcpy_from_user(p, &local_msg, u_msg, sizeof(struct event_msg))) {
 			kref_put(&target->kref);
 			set_errno(EINVAL);
 			return -1;
 		}
-		proc_notify(target, local_ne.ne_type, &local_ne);
-	} else {
-		proc_notify(target, notif, 0);
 	}
+	send_kernel_event(target, &local_msg, 0);
 	kref_put(&target->kref);
 	return 0;
 }
 
 /* Will notify the calling process on the given vcore, independently of WANTED
  * or advertised vcoreid.  If you change the parameters, change pop_ros_tf() */
-static int sys_self_notify(struct proc *p, uint32_t vcoreid, unsigned int notif,
-                           struct notif_event *u_ne)
+static int sys_self_notify(struct proc *p, uint32_t vcoreid,
+                           unsigned int ev_type, struct event_msg *u_msg)
 {
-	struct notif_event local_ne;
+	struct event_msg local_msg = {0};
 
-	printd("[kernel] received self notify for vcoreid %d, notif %d, ne %08p\n",
-	       vcoreid, notif, u_ne);
-	/* if the user provided a notif_event, copy it in and use that */
-	if (u_ne) {
-		if (memcpy_from_user(p, &local_ne, u_ne, sizeof(struct notif_event))) {
+	printd("[kernel] received self notify for vcoreid %d, type %d, msg %08p\n",
+	       vcoreid, ev_type, u_msg);
+	/* if the user provided an ev_msg, copy it in and use that */
+	if (u_msg) {
+		if (memcpy_from_user(p, &local_msg, u_msg, sizeof(struct event_msg))) {
 			set_errno(EINVAL);
 			return -1;
 		}
-		do_notify(p, vcoreid, local_ne.ne_type, &local_ne);
-	} else {
-		do_notify(p, vcoreid, notif, 0);
 	}
+	/* this will post a message and IPI, regardless of wants/needs/debutantes.*/
+	post_vcore_event(p, &local_msg, vcoreid);
+	proc_notify(p, vcoreid);
 	return 0;
 }
 

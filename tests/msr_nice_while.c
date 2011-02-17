@@ -4,7 +4,7 @@
  * userthread.  The pthread code will nicely yield if it detects an incoming
  * preemption. */
 
-#include <ros/notification.h>
+#include <ros/event.h>
 #include <stdlib.h>
 #include <vcore.h>
 #include <pthread.h>
@@ -19,10 +19,15 @@ int main(int argc, char** argv)
 {
 	pthread_t *my_threads = malloc(sizeof(pthread_t) * max_vcores());
 
-	/* set up to receive the PREEMPT_PENDING notif */
-	struct notif_method *nm;
-	nm = &__procdata.notif_methods[NE_PREEMPT_PENDING];
-	nm->flags |= NOTIF_WANTED | NOTIF_IPI;
+	/* set up to receive the PREEMPT_PENDING event.  EVENT_VCORE_APPRO tells the
+	 * kernel to send the msg to whichever vcore is appropriate. 
+	 * TODO: (PIN) this ev_q needs to be pinned */
+	struct event_queue *ev_q = malloc(sizeof(struct event_queue));
+	ev_q->ev_mbox = &__procdata.vcore_preempt_data[0].ev_mbox;
+	ev_q->ev_flags = EVENT_IPI | EVENT_NOMSG | EVENT_VCORE_APPRO;
+	ev_q->ev_vcore = 0;
+	ev_q->ev_handler = 0;
+	__procdata.kernel_evts[EV_PREEMPT_PENDING] = ev_q;
 
 	/* actually only need one less, since the _S will be pthread 0 */
 	for (int i = 0; i < max_vcores() - 1; i++)

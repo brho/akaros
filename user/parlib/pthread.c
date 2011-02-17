@@ -8,7 +8,7 @@
 #include <rstdio.h>
 #include <errno.h>
 #include <parlib.h>
-#include <ros/notification.h>
+#include <ros/event.h>
 #include <arch/atomic.h>
 #include <arch/arch.h>
 #include <sys/queue.h>
@@ -35,13 +35,19 @@ void _pthread_init()
 	
 	assert(vcore_id() == 0);
 
-	/* tell the kernel where and how we want to receive notifications */
-	struct notif_method *nm;
-	for (int i = 0; i < MAX_NR_NOTIF; i++) {
-		nm = &__procdata.notif_methods[i];
-		nm->flags |= NOTIF_WANTED | NOTIF_MSG | NOTIF_IPI;
-		nm->vcoreid = i % 2; // vcore0 or 1, keepin' it fresh.
-	}
+	/* Tell the kernel where and how we want to receive events.  This is just an
+	 * example of what to do to have a notification turned on.  We're turning on
+	 * USER_IPIs, posting events to vcore 0's vcpd, and telling the kernel to
+	 * send to vcore 0.
+	 * TODO: (PIN) this ev_q needs to be pinned */
+	struct event_queue *ev_q = malloc(sizeof(struct event_queue));
+	ev_q->ev_mbox = &__procdata.vcore_preempt_data[0].ev_mbox;
+	ev_q->ev_flags = EVENT_IPI;	/* we want an IPI */
+	ev_q->ev_vcore = 0;			/* IPI core 0 */
+	ev_q->ev_handler = 0;
+	/* Now tell the kernel about it */
+	__procdata.kernel_evts[EV_USER_IPI] = ev_q;
+
 	/* don't forget to enable notifs on vcore0.  if you don't, the kernel will
 	 * restart your _S with notifs disabled, which is a path to confusion. */
 	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[0];

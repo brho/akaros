@@ -7,7 +7,6 @@
 #include <ros/mman.h>
 #include <ros/resource.h>
 #include <ros/procdata.h>
-#include <ros/notification.h>
 #include <ros/bcq.h>
 #include <arch/arch.h>
 #include <rstdio.h>
@@ -36,6 +35,7 @@ int main(int argc, char** argv)
 /* begin: stuff userspace needs to do before switching to multi-mode */
 	if (vcore_init())
 		printf("vcore_init() failed, we're fucked!\n");
+	#if 0
 	/* tell the kernel where and how we want to receive notifications */
 	struct notif_method *nm;
 	for (int i = 0; i < MAX_NR_NOTIF; i++) {
@@ -43,6 +43,7 @@ int main(int argc, char** argv)
 		nm->flags |= NOTIF_WANTED | NOTIF_MSG | NOTIF_IPI;
 		nm->vcoreid = i % 2; // vcore0 or 1, keepin' it fresh.
 	}
+	#endif
 	/* Need to save this somewhere that you can find it again when restarting
 	 * core0 */
 	core0_tls = get_tls_desc(0);

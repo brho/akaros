@@ -8,6 +8,11 @@
 #include <ros/common.h>
 #include <process.h>
 
+/* Is this a valid user pointer for read/write?  It doesn't care if the address
+ * is paged out or even an unmapped region: simply if it is in part of the
+ * address space that could be RW user */
+static inline bool is_user_rwaddr(void *addr);
+
 /* Can they use the area in the manner of perm? */
 void *user_mem_check(struct proc *p, const void *DANGEROUS va, size_t len,
                      int perm);
@@ -37,3 +42,10 @@ void user_memdup_free(struct proc *p, void *va);
 char *user_strdup(struct proc *p, const char *u_string, size_t strlen);
 char *user_strdup_errno(struct proc *p, const char *u_string, size_t strlen);
 void *kmalloc_errno(int len);
+bool uva_is_kva(struct proc *p, void *uva, void *kva);
+
+/* UTOP is defined as virtual address below which a process can write */
+static inline bool is_user_rwaddr(void *addr)
+{
+	return ((uintptr_t)addr < UTOP) ? TRUE : FALSE;
+}

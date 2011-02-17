@@ -25,6 +25,7 @@
 #include <syscall.h>
 #include <kmalloc.h>
 #include <elf.h>
+#include <event.h>
 
 #include <ros/timer.h>
 #include <ros/memlayout.h>
@@ -435,11 +436,12 @@ int mon_kfunc(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 	return 0;
 }
 
+/* Sending a vcoreid forces an event and an IPI/notification */
 int mon_notify(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 {
 	struct proc *p;
-	unsigned int num;
 	uint32_t vcoreid;
+	struct event_msg msg = {0};
 
 	if (argc < 3) {
 		printk("Usage: notify PID NUM [VCOREID]\n");
@@ -450,12 +452,14 @@ int mon_notify(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 		printk("No such proc\n");
 		return 1;
 	}
-	num = strtol(argv[2], 0, 0);
+	msg.ev_type = strtol(argv[2], 0, 0);
 	if (argc == 4) {
 		vcoreid = strtol(argv[3], 0, 0);
-		do_notify(p, vcoreid, num, 0);
+		post_vcore_event(p, &msg, vcoreid);
+		proc_notify(p, vcoreid);
 	} else {
-		proc_notify(p, num, 0);
+		/* o/w, try and do what they want */
+		send_kernel_event(p, &msg, 0);
 	}
 	kref_put(&p->kref);
 	return 0;

@@ -1,0 +1,352 @@
+async_events.txt
+Barret Rhoden
+
+1. Overview
+2. Async Syscalls and I/O
+3. Event Delivery / Notification
+4. Misc Things That Aren't Sorted Completely:
+
+1. Overview
+====================
+1.1 Event Handling / Notifications / Async IO Issues:
+------------------------------------------------------------------
+Basically, syscalls use the ROS event delivery mechanisms, redefined and
+described below.  Syscalls use the event delivery just like any other
+subsystem would that wants to deliver messages to a process.  The only other
+example we have right now are the "kernel notifications", which are the
+one-sided, kernel-initiated messages that the kernel sends to a process.
+
+Overall, there are several analogies from how vcores work to how the OS
+handles interrupts.  This is a result of trying to make vcores run like
+virtual multiprocessors, in control of their resources and aware of the lower
+levels of the system.  This analogy has guided much of how the vcore layer
+works.  Whenever we have issues with the 2-lsched, realize the amount of
+control they want means using solutions that the OS must do too.
+
+Note that there is some pointer chasing going on, though we try to keep it to
+a minimum.  Any time the kernel chases a pointer, it needs to make sure it is
+in the R/W section of userspace, though it doesn't need to check if the page
+is present.  There's more info in the Page Fault sections of the
+documentation.  (Briefly, if the kernel PFs on a user address, it will either
+block and handle the PF, or if the address was unmapped, it will kill the
+process).
+
+1.2 Some Definitions:
+---------------------------------------
+ev_q, event_queue, event_q: all terms used interchangeably with each other.
+They are the endpoint for communicating messages to a process, encapsulating
+the method of delivery (such as IPI or not) with where to save the message.
+
+Vcore context: the execution context of the virtual core on the "trampoline"
+stack.  All executions start from the top of this stack, and no stack state is
+saved between vcore_entry() calls.  All executions on here are non-blocking,
+notifications (IPIs) are disabled, and there is a specific TLS loaded.  Vcore
+context is used for running the second level scheduler (2LS), swapping between
+threads, and handling notifications.  It is analagous to "interrupt context"
+in the OS.  Any functions called from here should be brief.  Any memory
+touched must be pinned.  In Lithe terms, vcore context might be called the
+Hart / hard thread.  People often wonder if they can run out of vcore context
+directly.  Technically, you can, but you lose the ability to take any fault
+(page fault) or to get IPIs for notification.  In essence, you lose control,
+analgous to running an application in the kernel with preemption/interrupts
+disabled.  See the process documentation for more info.
+
+2LS: is the second level scheduler/framework.  This code executes in vcore
+context, and is Lithe / plugs in to Lithe (eventually).  Often used
+interchangeably with "vcore context", usually when I want to emphasize the
+scheduling nature of the code.
+
+VCPD: "virtual core preemption data".  In procdata, there is an array of
+struct preempt_data, one per vcore.  This is the default location to look for
+all things related to the management of vcores, such as its event_mbox (queue
+of incoming messages/notifications/events).  Both the kernel and the vcore
+code know to look here for a variety of things.
+
+Notif_table: This is a list of event_q*s that correspond to certain
+unexpected/"one-sided" events the kernel sends to the process.  It is similar
+to an IRQ table in the kernel.  Each event_q tells the kernel how the process
+wants to be told about the specific event type.
+
+Notifications: used to be a generic event, but now used in terms of the verb
+'notify' (do_notify()).  In older docs, passive notification is just writing a
+message somewhere.  Active notification is an IPI delivered to a vcore.  I use
+that term interchangeably with an IPI, and usually you can tell by context
+that I'm talking about an IPI going to a process (and not just the kernel).
+The details of it make it more complicated than just an IPI, but it's
+analagous.  I've start referring to notification as the IPI, and "passive
+notification" as just events, though older documentation has both meanings.
+
+BCQ: "bounded concurrent queue".  It is a fixed size array of messages
+(structs of notification events, or whatever).  It is non-blocking, supporting
+multiple producers and consumers, where the producers do not trust the
+consumers.  It is the primary mechanism for the kernel delivering message
+payloads into a process's address space.  Note that producers don't trust each
+other either (in the event of weirdness, the producers give up and say the
+buffer is full).  This means that a process can produce for one of its ev_qs
+(which is what they need to do to send message to itself).
+
+2. Async Syscalls and I/O
+====================
+The syscall struct is the contract for work with the kernel, including async
+I/O.  Lots of current OS async packages use epoll or other polling systems.
+Note the distinction between Polling and Async I/O.  Polling is about finding
+out if a call will block.  It is primarily used for sockets and pipes.  It
+does relatively nothing for disk I/O, which requires a separate async I/O
+system.  By having all syscalls be async, we can make polling a bit easier and
+more unified with the generic event code that we use for all syscalls.
+
+For instance, we can have a sys_poll syscall, which is async just like any
+other syscall.  The call can be a "one shot / non-blocking", like the current
+systems polling code, or it can also notify on change (not requiring future
+polls) via the event_q mechanisms.  If you don't want to be IPId, you can
+"poll" the syscall struct - not requiring another kernel crossing/syscall.
+
+Note that we do not tie syscalls and polling to FDs.  We do events on
+syscalls, which can be used to check FDs.  I think a bunch of polling cases
+will not be needed once we have async syscalls, but for those that remain,
+we'll have sys_poll() (or whatever).
+
+To receive an event on a syscall completion or status change, just fill in the
+event_q pointer.  If it is 0, the kernel will assume you poll the actual
+syscall struct.
+
+	struct syscall {
+		current stuff 			/* arguments, retvals */
+		struct ev_queue * 		/* struct used for messaging, including IPIs*/
+		void * 					/* used by 2LS, usually a struct u_thread * */
+	}
+
+One issue with async syscalls is that there can be too many outstanding IOs
+(normally sync calls provide feedback / don't allow you to over-request).
+Eventually, processes can exhaust kernel memory (the kthreads, specifically).
+We need a way to limit the kthreads per proc, etc.  Shouldn't be a big deal.
+
+Normally, we talk about changing the flag in a syscall to SC_DONE.  Async
+syscalls can be SC_PROGRESS (new stuff happened on it), which can trigger a
+notification event.  Some calls, like AIO or bulk accept, exist for a while
+and slowly get filled in / completed.  In the future, we'll also want a way to
+abort the in-progress syscalls (possibly any syscall!).
+
+3. Event Delivery / Notification
+====================
+3.1 Basics
+----------------------------------------------
+The mbox (mailbox) is where the actual messages go, or the overflow of a
+message is tracked.
+
+	struct ev_mbox {
+		bcq of notif_events 	/* bounded buffer, multi-consumer/producer */
+		overflow_count
+		msg_bitmap
+	}
+	struct ev_queue {			/* aka, event_q, ev_q, etc. */
+		struct ev_mbox * 
+		void handler(struct event_q *)
+		vcore_to_be_told
+		flags 					/* IPI_WANTED, RR, 2L-handle-it, etc */
+	}
+	struct ev_queue_big {
+		struct ev_mbox *		/* pointing to the internal storage */
+		vcore_to_be_told
+		flags 					/* IPI_WANTED, RR, 2L-handle-it, etc */
+		struct ev_mbox { }		/* never access this directly */
+	}
+
+The purpose of the big one is to simply embed some storage.  Still, only
+access the mbox via the pointer.  The big one can be casted (and stored as)
+the regular, so long as you know to dealloc a big one (free() knows, custom
+styles or slabs would need some help).
+
+The ev_mbox says where to put the actual message, and the flags handle things
+such as whether or not an IPI is wanted.
+
+Using pointers for the ev_q like this allows multiple event queues to use the
+same mbox.  For example, we could use the vcpd queue for both kernel-generated
+events as well as async syscall responses.  The notification table is actually
+a bunch of ev_qs, many of which could be pointing to the same vcore/vcpd-mbox,
+albeit with different flags.
+
+3.2 Kernel Notification Using Event Queues
+----------------------------------------------
+The notif_tbl/notif_methods (kernel-generated 'one-sided' events) is just an
+array of struct ev_queue*s.  Handling a notification is like any other time
+when we want to send an event.  Follow a pointer, send a message, etc.  As
+with all ev_qs, ev_mbox* points to where you want the message for the event,
+which usually is the vcpd's mbox.  If the ev_q pointer is 0, then we know the
+process doesn't want the event (equivalent to the older 'NOTIF_WANTED' flag).
+Theoretically, we can send kernel notifs to user threads.  While it isn't
+clear that anyone will ever want this, it is possible (barring other issues),
+since they are just events.
+
+Also note the flag EVENT_VCORE_APPRO.  Processes should set this for certain
+types of events where they want the kernel to send the event/IPI to the
+'appropriate' vcore.  For example, when sending a message about a preemption
+coming in, it makes sense for the kernel to send it to the vcore that is going
+to get preempted, but the application could choose to ignore the notification.
+
+There are also interfaces in the kernel to put a message in an ev_mbox
+regardless of the process's wishes (post_vcore_event()), and can send an IPI
+at any time (proc_notify()).
+
+3.3 IPIs and Indirection Events
+----------------------------------------------
+When an ev_q calls for an IPI, the kernel finds out what vcore the process
+wants.  The code already sent the message to the ev_q's mbox.  If the vcore's
+vcpd mbox is the same as the ev_q's mbox (pointer check), then just send the
+IPI.  If it is different, we need to put a message in the vcpd's mbox telling
+them "ev_q*", so the vcore knows why it got an IPI.  This level of indirection
+is only necessary when the ev_q requests an IPI and it is not the vcore using
+its vcpd mbox.  The vcore needs to know why it received an IPI.  The IPI
+(active notifcation) is merely a prodding, and the vcore needs a known place
+to look for why it was woken up.  This is a little different when dealing with
+non-specific IPIs (like Round-Robin).
+
+If the vcore gets an indirection message, it will be of type NE_EVENT (or
+whatever), with an ev_q* as the payload.
+
+In the event there are issues with this, we can introduce a flag that says we
+don't need a separate notif_event explaining the IPI: prodding the vcore was
+enough.  Either way, we can deliver event messages directly to the vcore's
+mbox / bcq.
+
+There's a slight race on changing the mbox* and the vcore number within the
+event_q.  The message could have gone to the wrong (old) vcore, but not the
+IPI.  Not a big deal - IPIs can be spurious, and the other vcore will
+eventually get it.  The real way around this is create a new ev_q and change
+the pointer (thus atomically changing the entire ev_q's contents), though this
+can be a bit tricky if you have multiple places pointing to the same ev_q
+(can't change them all at once).
+
+If you want to receive an event when a syscall completes or has a change in
+status, simply allocate an event_q, and point the syscall at it.  syscall:
+ev_q* -> "vcore for IPI, syscall message in the ev_q mbox", etc.  You can also
+point it to an existing ev_q.
+
+3.4 Application-specific Event Handling
+---------------------------------------
+So what happens when the vcore/2LS isn't handling an event queue, but has been
+"told" about it?  This "telling" is in the form of an IPI.  The vcore was
+prodded, but is not supposed to handle the event.  This is actually what
+happens now in Linux when you send signals for AIO.  It's all about who (which
+thread, in their world) is being interrupted to process the work in an
+application specific way.  The app sets the handler, with the option to have a
+thread spawned (instead of a sighandler), etc.
+
+This is not exactly the same as the case above where the ev_mbox* pointed to
+the vcore's default mbox.  That issue was just about avoiding extra messages
+(and messages in weird orders).  A vcore won't handle an ev_q if the
+message/contents of the queue aren't meant for the vcore/2LS.  For example, a
+thread can want to run its own handler, perhaps because it performs its own
+asynchronous I/O (compared to relying on the 2LS to schedule synchronous
+blocking u_threads).
+
+There are a couple ways to handle this.  Ultimately, the application is
+supposed to handle the event.  If it asked for an IPI, it is because something
+ought to be done, which really means running a handler.  If the application
+sets EV_THREAD in the ev_q's flags, the 2LS ought to spawn a thread to run the
+ev_q's handler.  If EV_JUSTHANDLEIT is set, the vcore will execute the handler
+itself.  Careful with this, since the only memory it touches must be pinned,
+the function must not block (this is only true for the handlers called
+directly out of vcore context), and it should return quickly.
+
+Note that in either case, vcore-written code (library code) does not look at
+the contents of the notification event.  Also Note the handler takes the whole
+event_queue, and not a specific message.  It is more flexible, can handle
+multiple specific events, and doesn't require the vcore code to dequeue and
+event and either pass by value or allocate more memory.
+
+Continuing the analogy between vcores getting IPIs and the OS getting HW
+interrupts, what goes on in vcore context is like what goes on in interrupt
+context, and the threaded handler is like running a threaded interrupt handler
+(in Linux).  In the ROS world, it is like having the interrupt handler kick
+off a kernel message to defer the work out of interrupt context.
+
+If neither of the application-specific handling flags are set, the vcore will
+respond to the IPI by attempting to handle the event on its own (lookup table
+based on the type of event (like "syscall complete")).  If you didn't want the
+vcore to handle it, then you shouldn't have asked for an IPI.  Those flags are
+the means by which the vcore can distinguish between its event_qs and the
+applications.  It does not make sense otherwise to send the vcore an IPI and
+an event_q, but not tell give the code the info it needs to handle it.
+
+In the future, we might have the ability to block a u_thread on an event_q, so
+we'll have other EV_ flags to express this, and probably a void*.  This may
+end up being redudant, since u_threads will be able to block on syscalls (and
+not necessarily IPIs sent to vcores).
+
+As a side note, a vcore can turn off the IPI wanted flag at any time.  For
+instance, when it spawns a thread to handle an ev_q, the vcore can turn off
+IPI wanted on that event_q, and the thread handler can turn it back on when it
+is done processing and wants to be re-IPId.  The reason for this is to avoid
+taking future IPIs (once we leave vcore context, IPIs are enabled) to let us
+know about an event for which a handler is already running.
+
+3.5 Overflowed/Missed Messages in the VCPD 
+---------------------------------------
+All event_q's requesting IPIs ought to register with the 2LS.  This is for
+recovering in case the vcpd's mbox overflowed, and the vcore knows it missed a
+NE_EVENT type message.  At that point, it would have to check all of its
+IPI-based queues.  To do so, it could check to see if the mbox has any
+messages, though in all likelihood, we'll just act as if there was a message
+on each of the queues (all such handlers should be able to handle spurious
+IPIs anyways).  This is analagous to how the OS's block drivers don't solely
+rely on receiving an interrupt (they deal with it via timeouts).  Any user
+code requiring an IPI must do this.  Any code that runs better due to getting
+the IPI ought to do this.
+
+We could imagine having a thread spawned to handle an ev_q, and the vcore
+never has to touch the ev_q (which might make it easier for memory
+allocation).  This isn't a great idea, but I'll still explain it.  In the
+notif_ev message sent to the vcore, it has the event_q*.  We could also send a
+flag with the same info as in the event_q's flags, and also send the handler.
+The problem with this is that it isn't resilient to failure.  If there was a
+message overflow, it would have the check the event_q (which was registered
+before) anyway, and could potentially page fault there.  Also the kernel would
+have faulted on it (and read it in) back when it tried to read those values.
+It's somewhat moot, since we're going to have an allocator that pins event_qs.
+
+3.6 Round-Robin or Other IPI-delivery styles
+---------------------------------------
+In the same way that the IOAPIC can deliver interrupts to a group of cores,
+round-robinning between them, so can we imagine processes wanting to
+distribute the IPI/active notification of events across its vcores.  This is
+only meaningful is the NOTIF_IPI_WANTED flag is set.
+
+Eventually we'll support this, via a flag in the event_q.  When
+NE_ROUND_ROBIN, or whatever, is set a couple things will happen.  First, the
+vcore field will be used in a "delivery-specific" manner.  In the case of RR,
+it will probably be the most recent destination.  Perhaps it will be a bitmask
+of vcores available to receive.  More important is the event_mbox*.  If it is
+set, then the event message will be sent there.  Whichever vcore gets selected
+will receive an IPI, and its vcpd mbox will get a NE_EVENT message.  If the
+event_mbox* is 0, then the actual message will get delivered to the vcore's
+vcpd mbox (the default location).
+
+3.7 Event_q-less Notifications
+---------------------------------------
+Some events needs to be delivered directly to the vcore, regardless of any
+event_qs.  This happens currently when we bypass the notification table (e.g.,
+sys_self_notify(), preemptions, etc).  These notifs will just use the vcore's
+default mbox.  In essence, the ev_q is being generated/sent with the call.
+The implied/fake ev_q points to the vcpd's mbox, with the given vcore set, and
+with IPI_WANTED set.  It is tempting to make those functions take a
+dynamically generated ev_q, though more likely we'll just use the lower level
+functions in the kernel, much like the Round Robin set will need to do.  No
+need to force things to fit just for the sake of using a 'solution'.  We want
+tools to make solutions, not packaged solutions.
+
+4. Misc Things That Aren't Sorted Completely:
+====================
+4.1 What about short handlers?
+---------------------------------------
+Once we sort the other issues, we can ask for them via a flag in the event_q,
+and run the handler in the event_q struct.
+
+4.2 What about blocking on a syscall?
+---------------------------------------
+The current plan is to set a flag, and let the kernel go from there.  The
+kernel knows which process it is, since that info is saved in the kthread that
+blocked.  One issue is that the process could muck with that flag and then go
+to sleep forever.  To deal with that, maybe we'd have a long running timer to
+reap those.  Arguably, it's like having a process while(1).  You can screw
+yourself, etc.  Killing the process would still work.

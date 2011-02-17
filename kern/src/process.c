@@ -7,6 +7,7 @@
 #endif
 
 #include <ros/bcq.h>
+#include <event.h>
 #include <arch/arch.h>
 #include <arch/bitmask.h>
 #include <process.h>
@@ -836,42 +837,26 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 	smp_idle();
 }
 
-/* If you expect to notify yourself, cleanup state and process_routine_kmsg() */
-void do_notify(struct proc *p, uint32_t vcoreid, unsigned int notif,
-               struct notif_event *ne)
+/* Sends a notification (aka active notification, aka IPI) to p's vcore.  We
+ * only send a notification if one isn't already pending and they are enabled.
+ * There's a bunch of weird cases with this, and how pending / enabled are
+ * signals between the user and kernel - check the documentation.
+ *
+ * If you expect to notify yourself, cleanup state and process_routine_kmsg() */
+void proc_notify(struct proc *p, uint32_t vcoreid)
 {
-	printd("sending notif %d to proc %p\n", notif, p);
-	assert(notif < MAX_NR_NOTIF);
-	if (ne)
-		assert(notif == ne->ne_type);
-
-	struct notif_method *nm = &p->procdata->notif_methods[notif];
 	struct preempt_data *vcpd = &p->procdata->vcore_preempt_data[vcoreid];
-
-	printd("nm = %p, vcpd = %p\n", nm, vcpd);
-	/* enqueue notif message or toggle bits */
-	if (ne && nm->flags & NOTIF_MSG) {
-		if (bcq_enqueue(&vcpd->notif_evts, ne, NR_PERCORE_EVENTS, 4)) {
-			atomic_inc((atomic_t)&vcpd->event_overflows); // careful here
-			SET_BITMASK_BIT_ATOMIC(vcpd->notif_bmask, notif);
-		}
-	} else {
-		SET_BITMASK_BIT_ATOMIC(vcpd->notif_bmask, notif);
-	}
-
-	/* Active notification */
 	/* TODO: Currently, there is a race for notif_pending, and multiple senders
 	 * can send an IPI.  Worst thing is that the process gets interrupted
 	 * briefly and the kernel immediately returns back once it realizes notifs
 	 * are masked.  To fix it, we'll need atomic_swapb() (right answer), or not
 	 * use a bool. (wrong answer). */
-	if (nm->flags & NOTIF_IPI && !vcpd->notif_pending) {
+	if (!vcpd->notif_pending) {
 		vcpd->notif_pending = TRUE;
 		if (vcpd->notif_enabled) {
 			/* GIANT WARNING: we aren't using the proc-lock to protect the
 			 * vcoremap.  We want to be able to use this from interrupt context,
-			 * and don't want the proc_lock to be an irqsave.
-			 */
+			 * and don't want the proc_lock to be an irqsave. */
 			if ((p->state & PROC_RUNNING_M) && // TODO: (VC#) (_S state)
 			              (p->procinfo->vcoremap[vcoreid].valid)) {
 				printd("[kernel] sending notif to vcore %d\n", vcoreid);
@@ -882,28 +867,6 @@ void do_notify(struct proc *p, uint32_t vcoreid, unsigned int notif,
 			}
 		}
 	}
-}
-
-/* Sends notification number notif to proc p.  Meant for generic notifications /
- * reference implementation.  do_notify does the real work.  This one mostly
- * just determines where the notif should be sent, other checks, etc.
- * Specifically, it handles the parameters of notif_methods.  If you happen to
- * notify yourself, make sure you process routine kmsgs. */
-void proc_notify(struct proc *p, unsigned int notif, struct notif_event *ne)
-{
-	assert(notif < MAX_NR_NOTIF); // notifs start at 0
-	struct notif_method *nm = &p->procdata->notif_methods[notif];
-	struct notif_event local_ne;
-
-	/* Caller can opt to not send an NE, in which case we use the notif */
-	if (!ne) {
-		ne = &local_ne;
-		ne->ne_type = notif;
-	}
-
-	if (!(nm->flags & NOTIF_WANTED))
-		return;
-	do_notify(p, nm->vcoreid, ne->ne_type, ne);
 }
 
 /************************  Preemption Functions  ******************************
@@ -926,13 +889,16 @@ void proc_notify(struct proc *p, unsigned int notif, struct notif_event *ne)
  * about locking, do it before calling.  Takes a vcoreid! */
 void __proc_preempt_warn(struct proc *p, uint32_t vcoreid, uint64_t when)
 {
+	struct event_msg local_msg = {0};
 	/* danger with doing this unlocked: preempt_pending is set, but never 0'd,
 	 * since it is unmapped and not dealt with (TODO)*/
 	p->procinfo->vcoremap[vcoreid].preempt_pending = when;
-	/* notify, if they want to hear about this event.  regardless of how they
-	 * want it, we can send this as a bit.  Subject to change. */
-	if (p->procdata->notif_methods[NE_PREEMPT_PENDING].flags | NOTIF_WANTED)
-		do_notify(p, vcoreid, NE_PREEMPT_PENDING, 0);
+
+	/* Send the event (which internally checks to see how they want it) */
+	local_msg.ev_type = EV_PREEMPT_PENDING;
+	local_msg.ev_arg1 = vcoreid;
+	send_kernel_event(p, &local_msg, vcoreid);
+
 	/* TODO: consider putting in some lookup place for the alarm to find it.
 	 * til then, it'll have to scan the vcoremap (O(n) instead of O(m)) */
 }

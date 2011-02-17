@@ -322,3 +322,20 @@ void *kmalloc_errno(int len)
 		set_errno(ENOMEM);
 	return kva;
 }
+
+/* Returns true if uva and kva both resolve to the same phys addr.  If uva is
+ * unmapped, it will return FALSE.  This is probably what you want, since after
+ * all uva isn't kva. */
+bool uva_is_kva(struct proc *p, void *uva, void *kva)
+{
+	struct page *u_page;
+	assert(kva);				/* catch bugs */
+	/* Check offsets first */
+	if (PGOFF(uva) != PGOFF(kva))
+		return FALSE;
+	/* Check to see if it is the same physical page */
+	u_page = page_lookup(p->env_pgdir, uva, 0);
+	if (!u_page)
+		return FALSE;
+	return (kva2page(kva) == u_page) ? TRUE : FALSE;
+}

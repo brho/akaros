@@ -16,6 +16,15 @@ int main(int argc, char** argv)
 	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[0];
 	vcpd->notif_enabled = TRUE;
 
+	/* Get EV_ALARM on vcore 1, with IPI.
+	 * TODO: (PIN) this ev_q needs to be pinned */
+	struct event_queue *ev_q = malloc(sizeof(struct event_queue));
+	ev_q->ev_mbox = &__procdata.vcore_preempt_data[1].ev_mbox;
+	ev_q->ev_flags = EVENT_IPI;
+	ev_q->ev_vcore = 1;
+	ev_q->ev_handler = 0;
+	__procdata.kernel_evts[EV_ALARM] = ev_q;
+
 	vcore_request(max_vcores());
 
 	/* should never make it here */
@@ -27,13 +36,9 @@ void vcore_entry(void)
 	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[0];
 	vcpd->notif_enabled = TRUE;
 
-	struct notif_method *nm = &__procdata.notif_methods[NE_ALARM];
-	nm->flags = NOTIF_WANTED | NOTIF_MSG | NOTIF_IPI;
-	nm->vcoreid = 1;
-
-	struct notif_event ne = {0};
-	bcq_dequeue(&vcpd->notif_evts, &ne, NR_PERCORE_EVENTS);
-	if (ne.ne_type == NE_ALARM)
+	struct event_msg ev_msg = {0};
+	bcq_dequeue(&vcpd->ev_mbox.ev_msgs, &ev_msg, NR_BCQ_EVENTS);
+	if (ev_msg.ev_type == EV_ALARM)
 		printf("[T]:009:E:%llu\n", read_tsc());
 	while(1);
 }

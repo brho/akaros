@@ -10,7 +10,7 @@
 #include <ros/arch/arch.h>
 #include <ros/common.h>
 #include <ros/procinfo.h>
-#include <ros/notification.h>
+#include <ros/event.h>
 
 typedef struct procdata {
 	syscall_sring_t			syscallring;
@@ -22,7 +22,7 @@ typedef struct procdata {
 #endif
 	/* glibc relies on stuff above this point.  if you change it, you need to
 	 * rebuild glibc. */
-	struct notif_method		notif_methods[MAX_NR_NOTIF];
+	struct event_queue		*kernel_evts[MAX_NR_EVENT];
 	/* Long range, would like these to be mapped in lazily, as the vcores are
 	 * requested.  Sharing MAX_NUM_CPUS is a bit weird too. */
 	struct preempt_data		vcore_preempt_data[MAX_NUM_CPUS];
