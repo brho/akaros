@@ -10,6 +10,7 @@
 #include <mcs.h>
 #include <timing.h>
 #include <rassert.h>
+#include <event.h>
 
 #ifdef __sparc_v8__
 # define udelay(x) udelay((x)/2000)
@@ -20,7 +21,7 @@ mcs_barrier_t b;
 __thread int temp;
 void *core0_tls = 0;
 
-struct event_queue_big *indirect_q;
+struct event_queue *indirect_q;
 
 int main(int argc, char** argv)
 {
@@ -29,32 +30,22 @@ int main(int argc, char** argv)
 
 	mcs_barrier_init(&b, max_vcores());
 
-	/* prep indirect ev_q (TODO PIN).  Note we grab a big one */
-	indirect_q = malloc(sizeof(struct event_queue_big));
-	indirect_q->ev_mbox = &indirect_q->ev_imbox;
+	/* prep indirect ev_q.  Note we grab a big one */
+	indirect_q = get_big_event_q();
 	indirect_q->ev_flags = EVENT_IPI;
 	indirect_q->ev_vcore = 1;			/* IPI core 1 */
 	indirect_q->ev_handler = 0;
 	printf("Registering %08p for event type %d\n", indirect_q,
 	       EV_FREE_APPLE_PIE);
-	__procdata.kernel_evts[EV_FREE_APPLE_PIE] = (struct event_queue*)indirect_q;
+	register_kevent_q(indirect_q, EV_FREE_APPLE_PIE);
 
 /* begin: stuff userspace needs to do before switching to multi-mode */
 	if (vcore_init())
 		printf("vcore_init() failed, we're fucked!\n");
 
-	/* Tell the kernel where and how we want to receive events.  This is just an
-	 * example of what to do to have a notification turned on.  We're turning on
-	 * USER_IPIs, posting events to vcore 0's vcpd, and telling the kernel to
-	 * send to vcore 0.
-	 * TODO: (PIN) this ev_q needs to be pinned */
-	struct event_queue *ev_q = malloc(sizeof(struct event_queue));
-	ev_q->ev_mbox = &__procdata.vcore_preempt_data[0].ev_mbox;
-	ev_q->ev_flags = EVENT_IPI;	/* we want an IPI */
-	ev_q->ev_vcore = 0;			/* IPI core 0 */
-	ev_q->ev_handler = 0;
-	/* Now tell the kernel about it */
-	__procdata.kernel_evts[EV_USER_IPI] = ev_q;
+	/* Set up event reception.  For example, this will allow us to receive an
+	 * event and IPI for USER_IPIs on vcore 0.  Check event.c for more stuff. */
+	enable_kevent(EV_USER_IPI, 0, TRUE);
 
 	/* Need to save this somewhere that you can find it again when restarting
 	 * core0 */
@@ -125,16 +116,18 @@ void vcore_entry(void)
 	struct preempt_data *vcpd;
 	vcpd = &__procdata.vcore_preempt_data[vcoreid];
 	
-	/* here is how you receive an event (ought to check for overflow, etc) */
+	/* here is how you receive an event */
 	struct event_msg ev_msg = {0};
-	bcq_dequeue(&vcpd->ev_mbox.ev_msgs, &ev_msg, NR_BCQ_EVENTS);
-	printf("the queue is on vcore %d and has a ne with type %d\n", vcoreid,
-	       ev_msg.ev_type);
+	if (event_activity(&vcpd->ev_mbox, 0)) {
+		/* Ought to while loop/dequeue, processing as they come in. */
+		bcq_dequeue(&vcpd->ev_mbox.ev_msgs, &ev_msg, NR_BCQ_EVENTS);
+		printf("the queue is on vcore %d and has a ne with type %d\n", vcoreid,
+		       ev_msg.ev_type);
+		printf("Number of event overflows: %d\n", vcpd->ev_mbox.ev_overflows);
+	}
 	/* it might be in bitmask form too: */
 	//printf("and the bitmask looks like: ");
 	//PRINT_BITMASK(__procdata.vcore_preempt_data[vcoreid].notif_bmask, MAX_NR_NOTIF);
-	/* can see how many messages had to be sent as bits */
-	printf("Number of event overflows: %d\n", vcpd->ev_mbox.ev_overflows);
 
 	/* How we handle indirection events: */
 	struct event_queue_big *ev_q;
@@ -142,6 +135,7 @@ void vcore_entry(void)
 	if (ev_msg.ev_type == EV_EVENT) {
 		ev_q = ev_msg.ev_arg3;	/* convention */
 		printf("Detected EV_EVENT, ev_q is %08p (%08p)\n", ev_q, indirect_q);
+		/* Ought to loop/dequeue, processing as they come in. */
 		bcq_dequeue(&ev_q->ev_mbox->ev_msgs, &indir_msg, NR_BCQ_EVENTS);
 		printf("Message of type: %d (%d)\n", indir_msg.ev_type,
 		       EV_FREE_APPLE_PIE);

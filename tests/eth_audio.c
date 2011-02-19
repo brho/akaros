@@ -17,6 +17,7 @@
 #include <sys/mman.h>
 #include <timing.h>
 #include <assert.h>
+#include <event.h>
 
 void *core0_tls = 0;
 void *in_buf, *out_buf;
@@ -53,12 +54,7 @@ int main()
 		printf("vcore_init() failed, we're fucked!\n");
 
 	/* ETHAUD Turn on Free apple pie (which is the network packet) */
-	struct event_queue *ev_q = malloc(sizeof(struct event_queue));
-	ev_q->ev_mbox = &__procdata.vcore_preempt_data[0].ev_mbox;
-	ev_q->ev_flags = EVENT_IPI;
-	ev_q->ev_vcore = 0;	
-	ev_q->ev_handler = 0;
-	__procdata.kernel_evts[EV_FREE_APPLE_PIE] = ev_q;
+	enable_kevent(EV_FREE_APPLE_PIE, 0, TRUE);
 
 	/* Need to save this somewhere that you can find it again when restarting
 	 * core0 */
@@ -108,12 +104,11 @@ void vcore_entry(void)
 	struct preempt_data *vcpd;
 	vcpd = &__procdata.vcore_preempt_data[vcoreid];
 	
-	/* here is how you receive an event message (ought to check overflow) */
-	struct event_msg ev_msg = {0};
-	bcq_dequeue(&vcpd->ev_mbox.ev_msgs, &ev_msg, NR_BCQ_EVENTS);
+	/* Ghetto way to get just an event number */
+	unsigned int ev_type = get_event_type(&vcpd->ev_mbox);
 
 	/* ETHAUD app: process the packet if we got a notif */
-	if (ev_msg.ev_type == EV_FREE_APPLE_PIE)
+	if (ev_type == EV_FREE_APPLE_PIE)
 		process_packet();
 
 	if (vc->preempt_pending) {

@@ -19,6 +19,7 @@ USER_PARLIB_SRCFILES := \
                  $(USER_PARLIB_DIR)/debugfmt.c \
                  $(USER_PARLIB_DIR)/timing.c \
                  $(USER_PARLIB_DIR)/debug.c \
+                 $(USER_PARLIB_DIR)/event.c \
                  $(USER_PARLIB_DIR)/asynccall.c
 
 # Only build files if they exist.

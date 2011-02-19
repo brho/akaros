@@ -177,6 +177,10 @@ struct bcq_header {
 	__retval;                                                                  \
 })
 
+/* Checks of a bcq is empty (meaning no work), instead of trying to dequeue */
+#define bcq_empty(_bcq)                                                        \
+	BCQ_NO_WORK((_bcq)->hdr.prod_idx, (_bcq)->hdr.cons_pvt_idx)
+
 #if 0
 /* Original C Code, for posterity / debugging */
 static inline int enqueue(struct __name_bcq *bcq, __elem_t *elem,

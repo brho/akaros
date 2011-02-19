@@ -14,6 +14,7 @@
 #include <sys/queue.h>
 #include <sys/mman.h>
 #include <assert.h>
+#include <event.h>
 
 struct pthread_queue ready_queue = TAILQ_HEAD_INITIALIZER(ready_queue);
 struct pthread_queue active_queue = TAILQ_HEAD_INITIALIZER(active_queue);
@@ -38,15 +39,10 @@ void _pthread_init()
 	/* Tell the kernel where and how we want to receive events.  This is just an
 	 * example of what to do to have a notification turned on.  We're turning on
 	 * USER_IPIs, posting events to vcore 0's vcpd, and telling the kernel to
-	 * send to vcore 0.
-	 * TODO: (PIN) this ev_q needs to be pinned */
-	struct event_queue *ev_q = malloc(sizeof(struct event_queue));
-	ev_q->ev_mbox = &__procdata.vcore_preempt_data[0].ev_mbox;
-	ev_q->ev_flags = EVENT_IPI;	/* we want an IPI */
-	ev_q->ev_vcore = 0;			/* IPI core 0 */
-	ev_q->ev_handler = 0;
-	/* Now tell the kernel about it */
-	__procdata.kernel_evts[EV_USER_IPI] = ev_q;
+	 * send to vcore 0.  Note sys_self_notify will ignore the vcoreid pref.
+	 * Also note that enable_kevent() is just an example, and you probably want
+	 * to use parts of event.c to do what you want. */
+	enable_kevent(EV_USER_IPI, 0, EVENT_IPI);
 
 	/* don't forget to enable notifs on vcore0.  if you don't, the kernel will
 	 * restart your _S with notifs disabled, which is a path to confusion. */

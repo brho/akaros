@@ -6,7 +6,7 @@
 #include <rstdio.h>
 #include <vcore.h>
 #include <arch/arch.h>
-#include <ros/bcq.h>
+#include <event.h>
 
 int main(int argc, char** argv)
 {
@@ -16,14 +16,8 @@ int main(int argc, char** argv)
 	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[0];
 	vcpd->notif_enabled = TRUE;
 
-	/* Get EV_ALARM on vcore 1, with IPI.
-	 * TODO: (PIN) this ev_q needs to be pinned */
-	struct event_queue *ev_q = malloc(sizeof(struct event_queue));
-	ev_q->ev_mbox = &__procdata.vcore_preempt_data[1].ev_mbox;
-	ev_q->ev_flags = EVENT_IPI;
-	ev_q->ev_vcore = 1;
-	ev_q->ev_handler = 0;
-	__procdata.kernel_evts[EV_ALARM] = ev_q;
+	/* Get EV_ALARM on vcore 1, with IPI. */
+	enable_kevent(EV_ALARM, 1, EVENT_IPI);
 
 	vcore_request(max_vcores());
 
@@ -36,9 +30,8 @@ void vcore_entry(void)
 	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[0];
 	vcpd->notif_enabled = TRUE;
 
-	struct event_msg ev_msg = {0};
-	bcq_dequeue(&vcpd->ev_mbox.ev_msgs, &ev_msg, NR_BCQ_EVENTS);
-	if (ev_msg.ev_type == EV_ALARM)
+	unsigned int ev_type = get_event_type(&vcpd->ev_mbox);
+	if (ev_type == EV_ALARM)
 		printf("[T]:009:E:%llu\n", read_tsc());
 	while(1);
 }
