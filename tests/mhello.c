@@ -40,9 +40,7 @@ int main(int argc, char** argv)
 	register_kevent_q(indirect_q, EV_FREE_APPLE_PIE);
 
 /* begin: stuff userspace needs to do before switching to multi-mode */
-	if (vcore_init())
-		printf("vcore_init() failed, we're fucked!\n");
-
+	/* vcore_init() done in vcore_request() now. */
 	/* Set up event reception.  For example, this will allow us to receive an
 	 * event and IPI for USER_IPIs on vcore 0.  Check event.c for more stuff. */
 	enable_kevent(EV_USER_IPI, 0, TRUE);

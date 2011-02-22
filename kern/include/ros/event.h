@@ -29,7 +29,8 @@
 #define EV_ALARM				 7
 #define EV_EVENT				 8
 #define EV_FREE_APPLE_PIE		 9
-#define NR_EVENT_TYPES			10 /* keep me last */
+#define EV_SYSCALL				10
+#define NR_EVENT_TYPES			11 /* keep me last */
 
 /* Will probably have dynamic notifications later */
 #define MAX_NR_DYN_EVENT		25

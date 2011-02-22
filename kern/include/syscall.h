@@ -44,6 +44,7 @@ void prep_syscalls(struct proc *p, struct syscall *sysc, unsigned int nr_calls);
 intreg_t syscall(struct proc *p, uintreg_t sc_num, uintreg_t a0, uintreg_t a1,
                  uintreg_t a2, uintreg_t a3, uintreg_t a4, uintreg_t a5);
 void set_errno(int errno);
+void signal_syscall(struct syscall *sysc, struct proc *p);
 
 /* Tracing functions */
 void systrace_start(bool silent);

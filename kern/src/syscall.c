@@ -93,6 +93,47 @@ static int sys_null(void)
 	return 0;
 }
 
+/* Diagnostic function: blocks the kthread/syscall, to help userspace test its
+ * async I/O handling.  Don't mix this with things that mess with the interrupt
+ * handler, like other sys_blocks or the current blockdev crap. */
+static int sys_block(void)
+{
+	struct semaphore local_sem, *sem = &local_sem;
+	init_sem(sem, 0);
+#ifdef __i386__ 	/* Sparc can't register interrupt handlers yet */
+	/* Faking an interrupt.  The handler runs in interrupt context btw */
+	void x86_unblock_handler(struct trapframe *tf, void *data)
+	{
+		/* Turn off the interrupt, Re-register the old dumb handler */
+		set_core_timer(0);
+		register_interrupt_handler(interrupt_handlers,
+		                           LAPIC_TIMER_DEFAULT_VECTOR, timer_interrupt,
+		                           NULL);
+		struct semaphore *sem = (struct semaphore*)data;
+		struct kthread *sleeper = __up_sem(sem);
+		if (!sleeper) {
+			warn("No one sleeping!");
+			return;
+		}
+		kthread_runnable(sleeper);
+		assert(TAILQ_EMPTY(&sem->waiters));
+	}
+
+	register_interrupt_handler(interrupt_handlers, LAPIC_TIMER_DEFAULT_VECTOR,
+	                           x86_unblock_handler, sem);
+	/* This fakes a 100ms delay.  Though it might be less, esp in _M mode.  TODO
+	 * KVM-timing. */
+	set_core_timer(100000);	/* in microseconds */
+	printk("[kernel] sys_block(), sleeping at %llu\n", read_tsc());
+	sleep_on(sem);
+	printk("[kernel] sys_block(), waking up at %llu\n", read_tsc());
+	return 0;
+#else /* sparc */
+	set_errno(ENOSYS);
+	return -1;
+#endif
+}
+
 // Writes 'val' to 'num_writes' entries of the well-known array in the kernel
 // address space.  It's just #defined to be some random 4MB chunk (which ought
 // to be boot_alloced or something).  Meant to grab exclusive access to cache
@@ -1261,6 +1302,7 @@ intreg_t sys_setgid(struct proc *p, gid_t gid)
 
 const static struct sys_table_entry syscall_table[] = {
 	[SYS_null] = {(syscall_t)sys_null, "null"},
+	[SYS_block] = {(syscall_t)sys_block, "block"},
 	[SYS_cache_buster] = {(syscall_t)sys_cache_buster, "buster"},
 	[SYS_cache_invalidate] = {(syscall_t)sys_cache_invalidate, "wbinv"},
 	[SYS_reboot] = {(syscall_t)reboot, "reboot!"},
@@ -1387,6 +1429,7 @@ static void run_local_syscall(struct syscall *sysc)
 	sysc->retval = syscall(pcpui->cur_proc, sysc->num, sysc->arg0, sysc->arg1,
 	                       sysc->arg2, sysc->arg3, sysc->arg4, sysc->arg5);
 	sysc->flags |= SC_DONE;
+	signal_syscall(sysc, pcpui->cur_proc);
 	/* Can unpin at this point */
 }
 
@@ -1405,6 +1448,22 @@ void prep_syscalls(struct proc *p, struct syscall *sysc, unsigned int nr_syscs)
 	/* Call the first one directly.  (we already checked to make sure there is
 	 * 1) */
 	run_local_syscall(sysc);
+}
+
+/* Call this when something happens on the syscall where userspace might want to
+ * get signaled.  Passing p, since the caller should know who the syscall
+ * belongs to (probably is current). */
+void signal_syscall(struct syscall *sysc, struct proc *p)
+{
+	struct event_queue *ev_q;
+	struct event_msg local_msg;
+	ev_q = sysc->ev_q;
+	if (ev_q) {
+		memset(&local_msg, 0, sizeof(struct event_msg));
+		local_msg.ev_type = EV_SYSCALL;
+		local_msg.ev_arg3 = sysc;
+		send_event(p, ev_q, &local_msg, 0);
+	}
 }
 
 /* Syscall tracing */

@@ -5,7 +5,7 @@
  * useless ones is okay, but if we change a number, we'll need to rebuild
  * userspace (which is why we have holes). */
 #define SYS_null					 1
-/* buster renumbered */
+#define SYS_block					 2
 #define SYS_cache_invalidate		 3
 #define SYS_reboot					 4
 #define SYS_cputs					 5

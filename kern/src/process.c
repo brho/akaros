@@ -1359,6 +1359,8 @@ void __startcore(trapframe_t *tf, uint32_t srcid, void *a0, void *a1, void *a2)
 			vcpd->notif_tf = vcpd->preempt_tf; // could memset
 			proc_init_trapframe(&local_tf, vcoreid, p_to_run->env_entry,
 			                    vcpd->transition_stack);
+			if (!vcpd->transition_stack)
+				warn("No transition stack!");
 			vcpd->notif_enabled = FALSE;
 			vcpd->notif_pending = FALSE;
 		} else {

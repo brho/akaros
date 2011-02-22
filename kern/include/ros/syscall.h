@@ -4,6 +4,7 @@
 #include <arch/arch.h>
 #include <ros/bits/syscall.h>
 #include <ros/arch/syscall.h>
+#include <ros/event.h>
 
 /* Flags for an individual syscall */
 #define SC_DONE					0x0001
@@ -13,6 +14,8 @@ struct syscall {
 	long						retval;
 	int							err;			/* errno */
 	int							flags;
+	struct event_queue			*ev_q;
+	void						*u_data;
 	long						arg0;
 	long						arg1;
 	long						arg2;
@@ -33,6 +36,7 @@ static inline long __ros_syscall(unsigned int _num, long _a0, long _a1, long _a2
 	int num_started;
 	struct syscall sysc = {0};
 	sysc.num = _num;
+	sysc.ev_q = 0;
 	sysc.arg0 = _a0;
 	sysc.arg1 = _a1;
 	sysc.arg2 = _a2;

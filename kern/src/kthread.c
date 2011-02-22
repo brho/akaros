@@ -102,7 +102,7 @@ unwind_sleep_prep:
 	/* We get here if we should not sleep on sem (the signal beat the sleep).
 	 * Note we are not optimizing for cases where the signal won. */
 	spin_unlock(&sem->lock);
-	printd("Didn't sleep, unwinding...\n");
+	printd("[kernel] Didn't sleep, unwinding...\n");
 	/* Restore the core's current and default stacktop */
 	current = kthread->proc;			/* arguably unnecessary */
 	if (kthread->proc)
@@ -114,7 +114,7 @@ unwind_sleep_prep:
 	/* save the "freshly alloc'd" stack/page, not the one we came in on */
 	kthread->stacktop = new_stacktop;
 block_return_path:
-	printd("Returning from being 'blocked'! at %llu\n", read_tsc());
+	printd("[kernel] Returning from being 'blocked'! at %llu\n", read_tsc());
 block_return_path_np:
 	enable_irqsave(&irq_state);
 	return;
