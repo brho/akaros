@@ -15,7 +15,7 @@ TESTS_EXECS  += $(patsubst $(C3PO_TESTS_DIR)/%.c, \
 
 C3PO_TESTS_LDDEPENDS := $(C3PO_TESTS_DIR)/%.c 
 
-STATIC := static #$(findstring static,$(C3PO_TESTS_CFLAGS))
+STATIC := $(findstring static,$(C3PO_TESTS_CFLAGS))
 $(OBJDIR)/$(C3PO_TESTS_DIR)/%: $(C3PO_TESTS_LDDEPENDS)
 	@echo + cc [C3PO_TESTS] $<
 	@mkdir -p $(@D)
