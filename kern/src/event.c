@@ -58,9 +58,10 @@ void send_event(struct proc *p, struct event_queue *ev_q, struct event_msg *msg,
                 uint32_t vcoreid)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	struct proc *old_proc = 0;
+	struct proc *old_proc = pcpui->cur_proc;	/* uncounted ref */
 	struct event_mbox *ev_mbox, *vcore_mbox;
 	struct event_msg local_msg = {0};
+	assert(p);
 	if (!ev_q) {
 		warn("[kernel] Null ev_q - kernel code should check before sending!");
 		return;
@@ -72,8 +73,7 @@ void send_event(struct proc *p, struct event_queue *ev_q, struct event_msg *msg,
 	}
 	/* ev_q can be a user pointer (not in procdata), so we need to make sure
 	 * we're in the right address space */
-	if (pcpui->cur_proc != p) {
-		old_proc = pcpui->cur_proc;
+	if (old_proc != p) {
 		/* Technically, we're storing a ref here, but our current ref on p is
 		 * sufficient (so long as we don't decref below) */
 		pcpui->cur_proc = p;
