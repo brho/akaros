@@ -161,6 +161,8 @@ realtests: $(TESTS_EXECS)
 #	cp -R $(OBJDIR)/$(TESTS_DIR)/* $(TOP_DIR)/fs/$(TARGET_ARCH)/tests
 
 install-libs: 
+	@rm -rf $(firstword $(INITRAMFS_PATHS))/lib
+	@cp -R $(GCC_ROOT)/$(TARGET_ARCH)-ros/lib $(firstword $(INITRAMFS_PATHS))
 	@cd user/parlib; $(MAKE); $(MAKE) install
 	@cd user/pthread; $(MAKE); $(MAKE) install
 	@cd user/c3po; $(MAKE); $(MAKE) install
