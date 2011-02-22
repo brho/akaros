@@ -5,6 +5,8 @@
 #define mb() ({ asm volatile("mfence" ::: "memory"); })
 #define rmb() ({ asm volatile("lfence" ::: "memory"); })
 #define wmb() ({ asm volatile("" ::: "memory"); })
+/* Compiler memory barrier */
+#define cmb() ({ asm volatile("" ::: "memory"); })
 /* Force a wmb, used in cases where an IPI could beat a write, even though
  *  * write-orderings are respected. TODO: this probably do what you want. */
 #define wmb_f() ({ asm volatile("sfence"); })
