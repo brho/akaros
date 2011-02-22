@@ -37,54 +37,35 @@
 #define NUM_TX_DESCRIPTORS E1000_NUM_TX_DESCRIPTORS
 #define NUM_RX_DESCRIPTORS E1000_NUM_RX_DESCRIPTORS
 
-/** @file
- * @brief Intel E1000 Driver
- *
- * EXPERIMENTAL. DO NOT USE IF YOU DONT KNOW WHAT YOU ARE DOING
- *
- * To enable use, define __NETWORK__ in your Makelocal
- *
- * @author Paul Pearce <pearce@eecs.berkeley.edu>
- *
- * @todo Move documention below into doxygen format.
- * @todo See list in code
- */
 
-// TODO REWRITE THIS 
-/* RealTek 8168d (8111d) NIC Driver
- *
- * Written by Paul Pearce.
- *
- * This is a really rough "driver". Really, its not a driver, just a kernel hack to give
- * the kernel a way to receive and send packets. The basis of the init code is the OSDEV
- * page on the 8169 chipset, which is a varient of this chipset (most 8169 drivers work 
- * on the 8168d). http://wiki.osdev.org/RTL8169
- * 
- * Basic ideas (although no direct code) were gleamed from the OpenBSD re(4) driver,
- * which can be found in sys/dev/ic/re.c. sys/dev/ic/rtl81x9reg.h is needed to make
- * sense of the constants used in re.c.
- *
- * This is an ongoing work in progress. Main thing is we need a kernel interface for PCI
- * devices and network devices, that we can hook into, instead of providing arbitary functions
- * 
- */
-
+// Global variables for the device
 uint32_t e1000_mmio_base_addr = 0;
 uint32_t e1000_io_base_addr = 0;
 uint32_t e1000_irq = 0;
 uint32_t e1000_addr_size = 0;
+
+// The device's MAC address (read from the device)
 unsigned char device_mac[6];
 
+// Vars relating to the receive descriptor ring
 struct e1000_rx_desc *rx_des_kva;
 unsigned long rx_des_pa;
+uint32_t e1000_rx_index = 0;
 
+
+// Vars relating to the transmit descriptor ring
 struct e1000_tx_desc *tx_des_kva;
 unsigned long tx_des_pa;
-
-uint32_t e1000_rx_index = 0;
 uint32_t e1000_tx_index = 0;
 
 extern uint8_t eth_up;
+
+// The PCI device ID we detect
+// This is used for quark behavior
+uint16_t device_id;
+
+
+// Hacky variables relating to delivering packets
 extern uint32_t packet_buffer_count;
 extern char* packet_buffers[MAX_PACKET_BUFFERS];
 extern uint32_t packet_buffers_sizes[MAX_PACKET_BUFFERS];
@@ -92,8 +73,7 @@ extern uint32_t packet_buffers_head;
 extern uint32_t packet_buffers_tail;
 spinlock_t packet_buffers_lock;
 
-uint16_t device_id;
-
+// Allow us to register our send_frame as the global send_frameuint16_t device_id;
 extern int (*send_frame)(const char *CT(len) data, size_t len);
 
 void e1000_dump_rx() {
@@ -119,26 +99,69 @@ void e1000_dump_stats() {
 	}
 }
 
+// Main init sequence. This is whats called to configure the device
+// This includes detection of the device.
 void e1000_init() {
 
+	// Detect if the device is present
 	if (e1000_scan_pci() < 0) return;
 
+	// Allocate and program the descriptors for the ring
+	// Note: Does not tell the device to use them, yet.
 	e1000_setup_descriptors();
 	e1000_configure();
 	printk("Network Card MAC Address: %02x:%02x:%02x:%02x:%02x:%02x\n", 
 	   device_mac[0],device_mac[1],device_mac[2],
 	   device_mac[3],device_mac[4],device_mac[5]);
 
-	//e1000_dump_rx();
 	e1000_setup_interrupts();
 
+	// "Register" our send_frame with the global system
 	send_frame = &e1000_send_frame;
 
+	// sudo /sbin/ifconfig eth0 up
 	eth_up = 1;
 	
 	return;
 }
 
+/* Given a addr read from bar0, determine the IO mode,
+ * determine the addr range, and map the MMIO region in.
+ *
+ * Note: This must be called from a scan_pci() context, as it
+ * relies on the state of the PCI_CONFIG_ADDR register.
+ */
+void e1000_handle_bar0(uint32_t addr) {
+
+	if (addr & PCI_BAR_IO_MASK) {
+		e1000_debug("-->IO PORT MODE\n");
+		panic("IO PORT MODE NOT SUPPORTED\n");
+	} else {
+		e1000_debug("-->MMIO Mode\n");
+		
+		// Now we do magic to find the size
+		// The first non zero bit after we
+                // write all 1's denotes the size
+		outl(PCI_CONFIG_DATA, 0xFFFFFFFF);
+		uint32_t result = inl(PCI_CONFIG_DATA);
+		result = result & PCI_MEM_MASK;
+		result = (result ^ 0xFFFFFFFF) + 1;
+		e1000_addr_size = result;
+		e1000_debug("-->MMIO Size %x\n", e1000_addr_size);
+                
+		// Restore the MMIO addr to the device (unchanged)
+		outl(PCI_CONFIG_DATA, addr);
+
+		// Map the page in.
+		e1000_mmio_base_addr = (uint32_t)mmio_alloc(addr, e1000_addr_size);
+		if (e1000_mmio_base_addr == 0x00) {
+			panic("Could not map in E1000 MMIO space\n");
+		}
+	}
+	return;
+}
+
+// Scan the PCI data structures for our device.
 int e1000_scan_pci() {
 	struct pci_device *pcidev;
 	uint32_t result;
@@ -184,32 +207,25 @@ int e1000_scan_pci() {
 					panic("IO PORT MODE NOT SUPPORTED\n");
 				} else {
 					e1000_debug("-->MMIO Mode, Base: %08p\n", result);
-					e1000_mmio_base_addr = result;
-					// Now we do magic to find the size
-					// The first non zero bit after we
-					// write all 1's denotes the size
-					outl(PCI_CONFIG_DATA, 0xFFFFFFFF);
-					result = inl(PCI_CONFIG_DATA);
-					result = result & PCI_MEM_MASK;
-					result = (result ^ 0xFFFFFFFF) + 1;
-					e1000_addr_size = result;
-                    e1000_debug("-->MMIO Size %x\n", e1000_addr_size);
-					outl(PCI_CONFIG_DATA, e1000_mmio_base_addr);
-					e1000_mmio_base_addr = (uint32_t) mmio_alloc(e1000_mmio_base_addr,
-																e1000_addr_size);
-					if (e1000_mmio_base_addr == 0x00) {
-						panic("Could not map in E1000 MMIO space\n");
-					}
-		
-				}
-			}						
+					// Deal with the MMIO base, mapping, and size.
+					e1000_handle_bar0(result);
+				}						
+			}
+				
+			// We found the device and configured it (if we get here). Return OK
+			return 0;
 		}
-		return 0;
 	}
 	printk(" not found. No device configured.\n");
 	return -1;
 }
 
+/* E1000 Read Register 32bit
+ * Read a 32 bit value from a register at the given offset in the 
+ * E1000 MMIO range.
+ *
+ * This function has IOPORT support, but is not used.
+ */
 uint32_t e1000_rr32(uint32_t offset) {
 
 	if (e1000_mmio_base_addr) {
@@ -219,6 +235,13 @@ uint32_t e1000_rr32(uint32_t offset) {
 	}
 }
 
+
+/* E1000 Write Register 32bit
+ * Write a 32 bit value from a register at the given offset in the 
+ * E1000 MMIO range.
+ *
+ * This function has IOPORT support, but is not used.
+ */
 void e1000_wr32(uint32_t offset, uint32_t val) {
 
 	if (e1000_mmio_base_addr) {
@@ -229,35 +252,52 @@ void e1000_wr32(uint32_t offset, uint32_t val) {
 }
 
 
+/* E1000 Read From EEPROM
+ * Read a 16 bit value from the EEPROM at the given offset 
+ * in the EEPROM.
+ *
+ * WARNING: USE CAREFULLY. THIS HAS A WHILE LOOP IN IT.
+ * if MMIO is not configured correctly, this will lock the kernel.
+ */
 uint16_t e1000_read_eeprom(uint32_t offset) {
 
 	uint16_t eeprom_data;
 	uint32_t eeprom_reg_val = e1000_rr32(E1000_EECD);
 
+	// Request access to the EEPROM, then wait for access
 	eeprom_reg_val = eeprom_reg_val | E1000_EECD_REQ;
 	e1000_wr32(E1000_EECD, eeprom_reg_val);
         while((e1000_rr32(E1000_EECD) & E1000_EECD_GNT) == 0);
 
+	// We now have access, write what value we want to read, then wait for access
 	eeprom_reg_val = E1000_EERD_START | (offset << E1000_EERD_ADDR_SHIFT);
 	e1000_wr32(E1000_EERD, eeprom_reg_val);
 	while(((eeprom_reg_val = e1000_rr32(E1000_EERD)) & E1000_EERD_DONE) == 0);
 	eeprom_data = (eeprom_reg_val & E1000_EERD_DATA_MASK) >> E1000_EERD_DATA_SHIFT;
 	
+	// Read the value (finally)
 	eeprom_reg_val = e1000_rr32(E1000_EECD);
+
+	// Tell the EEPROM we are done.
 	e1000_wr32(E1000_EECD, eeprom_reg_val & ~E1000_EECD_REQ);
 
 	return eeprom_data;
 
 }
 
+// Discover and record the MAC address for this device.
 void e1000_setup_mac() {
 
 	uint16_t eeprom_data = 0;
         uint32_t mmio_data = 0;
 
 	/* TODO: WARNING - EXTREMELY GHETTO */
+	e1000_debug("-->Setting up MAC addr\n");
+
+	// Quark: For ID0 type, we read from the EEPROm. Else we read from RAL/RAH.
 	if (device_id == INTEL_DEV_ID0) {
 
+		// This is ungodly slow. Like, person perceivable time slow.
 		for (int i = 0; i < 3; i++) {
 
 			eeprom_data = e1000_read_eeprom(i);
@@ -267,31 +307,41 @@ void e1000_setup_mac() {
 		}
 
 	} else {
-
+		
+		// Get the data from RAL
 	        mmio_data = e1000_rr32(E1000_RAL);
+
+		// Do the big magic rain dance
 	        device_mac[0] = mmio_data & 0xFF;
        		device_mac[1] = (mmio_data >> 8) & 0xFF;
         	device_mac[2] = (mmio_data >> 16) & 0xFF;
         	device_mac[3] = (mmio_data >> 24) & 0xFF;
+
+		// Get the rest of the MAC data from RAH.
         	mmio_data = e1000_rr32(E1000_RAH);
+		
+		// Continue magic dance.
         	device_mac[4] = mmio_data & 0xFF;
         	device_mac[5] = (mmio_data >> 8) & 0xFF;
 	}
 
 	// Check if we need to invert the higher order bits (some E1000's)
+	// Got this behavior from Barrelfish.
+	// It's worth noting that if MMIO is screwed up, this is generally
+	// the first warning sign.
 	mmio_data = e1000_rr32(E1000_STATUS);
-
 	if (mmio_data & E1000_STATUS_FUNC_MASK) {
 		printk("UNTESTED LANB FUNCTIONALITY! MAY BE BREAKING MAC\n");
 		device_mac[5] ^= 0x0100;
 	}	
 
-	// Program the device to use this mac
+	// Program the device to use this mac (really only needed for ID0 type)
 	e1000_wr32(E1000_RAH, 0x00000); // Set MAC invalid
 	e1000_wr32(E1000_RAL, *(uint32_t*)device_mac);
 	e1000_wr32(E1000_RAH, *(uint16_t*)(device_mac + 4) | 0x80000000);
 	
 	// Now make sure it read back out.
+	// This is done to make sure everything is working correctly with the NIC
 	mmio_data = e1000_rr32(E1000_RAL);
 	device_mac[0] = mmio_data & 0xFF;
 	device_mac[1] = (mmio_data >> 8) & 0xFF;
@@ -303,7 +353,9 @@ void e1000_setup_mac() {
 
 	// Clear the MAC's from all the other filters
 	// Must clear high to low.
-	// TODO: Get the right number of filters
+	// TODO: Get the right number of filters. Not sure how.
+	//       however they SHOULD all default to all 0's, so
+	//       this shouldnt be needed.
 	for (int i = 1; i < 16; i++) {
 		e1000_wr32(E1000_RAH + 8 * i, 0x0);
 		e1000_wr32(E1000_RAL + 8 * i, 0x0);
@@ -311,7 +363,7 @@ void e1000_setup_mac() {
 
 
 	// Clear MTA Table
-	// TODO: Get the right number of filters
+	// TODO: Get the right number of filters. See above.
 	for (int i = 0; i < 0x7F; i++) {
 		e1000_wr32(E1000_MTA + 4 * i, 0x0);
 	}
@@ -323,33 +375,42 @@ void e1000_setup_mac() {
 	return;
 }
 
+// Allocate and configure all the transmit and receive descriptors.
 void e1000_setup_descriptors() {
 
 	e1000_debug("-->Setting up tx/rx descriptors.\n");
 
 	// Allocate room for the buffers. 
 	// Must be 16 byte aligned
+
+	// How many pages do we need?
         uint32_t num_rx_pages = ROUNDUP(NUM_RX_DESCRIPTORS * sizeof(struct e1000_rx_desc), PGSIZE) / PGSIZE;
         uint32_t num_tx_pages = ROUNDUP(NUM_TX_DESCRIPTORS * sizeof(struct e1000_tx_desc), PGSIZE) / PGSIZE;
 	
+	// Get the pages
 	rx_des_kva = get_cont_pages(LOG2_UP(num_rx_pages), 0);
 	tx_des_kva = get_cont_pages(LOG2_UP(num_tx_pages), 0);
 
+	// +1 point for checking malloc result
 	if (rx_des_kva == NULL) panic("Can't allocate page for RX Ring");
 	if (tx_des_kva == NULL) panic("Can't allocate page for TX Ring");
 	
+	// Get the phys addr
 	rx_des_pa = PADDR(rx_des_kva);
 	tx_des_pa = PADDR(tx_des_kva);
 	
+	// Configure each descriptor.
 	for (int i = 0; i < NUM_RX_DESCRIPTORS; i++) 
-		e1000_set_rx_descriptor(i, TRUE); // Allocate memory for the descriptor
+		e1000_set_rx_descriptor(i, TRUE); // True == Allocate memory for the descriptor
 		
 	for (int i = 0; i < NUM_TX_DESCRIPTORS; i++) 
 		e1000_set_tx_descriptor(i);
+
 	return;
 }
 
-
+// Configure a specific RX descriptor.
+// Serves as a reset, too (with reset_buffer set to FALSE).
 void e1000_set_rx_descriptor(uint32_t des_num, uint8_t reset_buffer) {
 	
 	//memset(&rx_des_kva[des_num], 0x00, sizeof(struct e1000_rx_desc));
@@ -359,31 +420,49 @@ void e1000_set_rx_descriptor(uint32_t des_num, uint8_t reset_buffer) {
 	rx_des_kva[des_num].errors = 0;
 	rx_des_kva[des_num].special = 0;
 	
+	// Check if we are allocating a buffer.
+	// Note: setting this to TRUE not at boot time results in a memory leak.
 	if (reset_buffer) {
+		
+		// Alloc a buffer
 		char *rx_buffer = kmalloc(E1000_RX_MAX_BUFFER_SIZE, 0);
 		if (rx_buffer == NULL) panic ("Can't allocate page for RX Buffer");
-
+		
+		// Set the buffer addr
 		rx_des_kva[des_num].buffer_addr = PADDR(rx_buffer);
 	}
 
 	return;
 }
 
+// Configure a specific TX descriptor.
+// Calling not at boot results in a memory leak.
 void e1000_set_tx_descriptor(uint32_t des_num) {
 	
 	// Clear the bits.
 	memset(&tx_des_kva[des_num], 0x00, sizeof(struct e1000_tx_desc));
 	
+	// Alloc space for the buffer
 	char *tx_buffer = kmalloc(E1000_TX_MAX_BUFFER_SIZE, 0);
-
 	if (tx_buffer == NULL) panic ("Can't allocate page for TX Buffer");
 
+	// Set it.
 	tx_des_kva[des_num].buffer_addr = PADDR(tx_buffer);
 	return;
 }
 
-// This startup sequence is taken with love from BarrelFish.
-// <3 the multikernel.
+/* Actually configure the device.
+ * This goes through the painstaking process of actually configuring the device
+ * and preparing it for use. After this function, the device is turned on
+ * in a good and functioning state (except interrupts are off).
+ *
+ * I give a brief description of what each bit of code does, but
+ * the details of the bits are in most cases from the spec sheet
+ * and exact details are a bit obfuscated. 
+ *
+ * This startup sequence is taken with love from BarrelFish.
+ * <3 the multikernel.
+ */
 void e1000_configure() {
 	
 	uint32_t data;
@@ -397,7 +476,7 @@ void e1000_configure() {
 	e1000_wr32(E1000_RCTL, 0x00);
 	e1000_wr32(E1000_TCTL, 0x00);
 
-	// Reset
+	// Reset the device
 	e1000_reset();	
 
 	// Clear interrupts
@@ -440,8 +519,6 @@ void e1000_configure() {
 	e1000_wr32(E1000_FCAH, 0x00);
 	e1000_wr32(E1000_FCT,  0x00);
 
-	// Set stat counters
-
 	// Setup MAC address
 	e1000_setup_mac();	
 
@@ -450,19 +527,20 @@ void e1000_configure() {
         e1000_wr32(E1000_RDBAH, 0x00);
 
         // Set RX Ring Size
-        // This is the number of desc's, divided by 8. It starts
-        // at bit 7.
-        e1000_wr32(E1000_RDLEN, NUM_RX_DESCRIPTORS * 16);
-        
-	e1000_wr32(0x0280C, 0x00);
+        // Size in bytes.
+        e1000_wr32(E1000_RDLEN, (NUM_RX_DESCRIPTORS / 8) << 7);
+       
+	// Disablie the split and replication control queue 
+	e1000_wr32(E1000_SRRCTRL, 0x00);
 
 	// Set head and tail pointers.
         e1000_wr32(E1000_RDH, 0x00);
         e1000_wr32(E1000_RDT, 0x00);
 
         // Receive descriptor control
-	e1000_wr32(E1000_RXDCTL, 0x02000000 | 0x01010000);
+	e1000_wr32(E1000_RXDCTL, E1000_RXDCTL_ENABLE | E1000_RXDCTL_WBT | E1000_RXDCTL_MAGIC);
 
+	// Disable packet splitting.
         data = e1000_rr32(E1000_RFCTL);
         data = data & ~E1000_RFCTL_EXTEN;
         e1000_wr32(E1000_RFCTL, data);
@@ -472,13 +550,16 @@ void e1000_configure() {
 	data = data | E1000_RCTL_EN | E1000_RCTL_BAM;
 	e1000_wr32(E1000_RCTL, data);
 
+	// Bump the tail pointer. This MUST be done at this point 
+	// _AFTER_ packet receiption is enabled. See 85276 spec sheet.
         e1000_wr32(E1000_RDT, NUM_RX_DESCRIPTORS - 1);
 
 	// Set TX Ring
 	e1000_wr32(E1000_TDBAL, tx_des_pa);
 	e1000_wr32(E1000_TDBAH, 0x00);
 
-	// Set TX Des Size
+	// Set TX Des Size.
+	// This is the number of 8 descriptor sets, it starts at the 7th bit.
 	e1000_wr32(E1000_TDLEN, ((NUM_TX_DESCRIPTORS / 8) << 7));
 
         // Transmit inter packet gap register
@@ -490,24 +571,27 @@ void e1000_configure() {
 	e1000_wr32(E1000_TDT, 0x00);
 
         // Tansmit desc control
-        e1000_wr32(E1000_TXDCTL, 0x01000000 | 0x02000000);
-
-        e1000_wr32(E1000_TDT, NUM_TX_DESCRIPTORS - 1);
+        e1000_wr32(E1000_TXDCTL, E1000_TXDCTL_MAGIC | E1000_TXDCTL_ENABLE);
 
 	// Enable transmit
-	// XXX: MAGIC (not really paul just hasn't enumerated yet)
-	e1000_wr32(E1000_TCTL, 0x0F01A);
+	// Enable + pad short packets + Back off time + Collision thresh
+	// The 0x0F000 is the back off time, and 0x0010 is the collision thresh.
+	e1000_wr32(E1000_TCTL, E1000_TCTL_EN | E1000_TCTL_PSP | 0x0F010);
 
 	return;
 }
 
+// Reset the device.
 void e1000_reset() {
 	e1000_debug("-->Resetting device..... ");
 
+	// Get control
 	uint32_t ctrl = e1000_rr32(E1000_CTRL);
 
+	// Set the reset bit
 	ctrl = ctrl & E1000_CTRL_RST;
 
+	// Write the reset bit
 	e1000_wr32(E1000_CTRL, ctrl);
 
 	e1000_debug(" done.\n");
@@ -523,6 +607,7 @@ void enable_e1000_irq(struct trapframe *tf, uint32_t src_id,
 	enable_irq();
 }
 
+// Configure and enable interrupts
 void e1000_setup_interrupts() {
 	
 	extern handler_t interrupt_handlers[];
@@ -556,6 +641,7 @@ void e1000_setup_interrupts() {
 	return;
 }
 
+// Code that is executed when an interrupt comes in on IRQ e1000_irq
 void e1000_interrupt_handler(trapframe_t *tf, void* data) {
 
 //	printk("About to spam to mac addr: 00:14:4F:D1:EC:6C\n");
@@ -588,6 +674,7 @@ void e1000_interrupt_handler(trapframe_t *tf, void* data) {
 
 		//printk("Interrupt status: %x\n", interrupt_status);
 
+		// Check to see if the interrupt was packet based.
 		if ((interrupt_status & E1000_ICR_INT_ASSERTED) && (interrupt_status & E1000_ICR_RXT0)) {
 			e1000_interrupt_debug("---->Packet Received\n");
 			e1000_handle_rx_packet();
@@ -603,6 +690,7 @@ void e1000_interrupt_handler(trapframe_t *tf, void* data) {
 	return;
 }
 
+// Check to see if a packet arrived, and process the packet.
 void e1000_handle_rx_packet() {
 	
 	uint16_t packet_size;
@@ -612,23 +700,29 @@ void e1000_handle_rx_packet() {
 	//printk("Current head is: %x\n", e1000_rr32(E1000_RDH));
 	//printk("Current tail is: %x\n", e1000_rr32(E1000_RDT));
 	
+	// If the HEAD is where we last processed, no new packets.
 	if (head == e1000_rx_index) {
 		e1000_frame_debug("-->Nothing to process. Returning.");
 		return;
 	}
 	
+	// Set our current descriptor to where we last left off.
 	uint32_t rx_des_loop_cur = e1000_rx_index;
 	uint32_t frame_size = 0;
 	uint32_t fragment_size = 0;
 	uint32_t num_frags = 0;
 	
+	// Grab a buffer for this packet.
 	char *rx_buffer = kmalloc(MAX_FRAME_SIZE, 0);
-
 	if (rx_buffer == NULL) panic ("Can't allocate page for incoming packet.");
 	
+	
 	do {
-		status =  rx_des_kva[rx_des_loop_cur].status;
+		// Get the descriptor status
+		status = rx_des_kva[rx_des_loop_cur].status;
 
+		// If the status is 0x00, it means we are somehow trying to process 
+		//  a packet that hasnt been written by the NIC yet.
 		if (status == 0x0) {
 			warn("ERROR: E1000: Packet owned by hardware has 0 status value\n");
 			/* It's possible we are processing a packet that is a fragment
@@ -642,6 +736,7 @@ void e1000_handle_rx_packet() {
 			status = rx_des_kva[rx_des_loop_cur].status;
 		}
 	
+		// See how big this fragment? is.
 		fragment_size = rx_des_kva[rx_des_loop_cur].length;
 		
 		// If we've looped through the entire ring and not found a terminating packet, bad nic state.
@@ -651,9 +746,11 @@ void e1000_handle_rx_packet() {
 			panic("RX Descriptor Ring out of sync.");
 		}
 		
+		// Denote that we have at least 1 fragment.
 		num_frags++;
 		
-		// Make sure we own the current packet. Kernel ownership is denoted by a 0. Nic by a 1.
+		// Make sure ownership is correct. Packet owned by the NIC (ready for kernel reading)
+		//  is denoted by a 1. Packet owned by the kernel (ready for NIC use) is denoted by 0.
 		if ((status & E1000_RXD_STAT_DD) == 0x0) {
 			e1000_frame_debug("-->ERR: Current RX descriptor not owned by software. Panic!");
 			panic("RX Descriptor Ring OWN out of sync");
@@ -668,10 +765,10 @@ void e1000_handle_rx_packet() {
 		// Move the fragment data into the buffer
 		memcpy(rx_buffer + frame_size, KADDR(rx_des_kva[rx_des_loop_cur].buffer_addr), fragment_size);
 		
-		// Reset the descriptor. No reuse buffer.
+		// Reset the descriptor. Reuse current buffer (False means don't realloc).
 		e1000_set_rx_descriptor(rx_des_loop_cur, FALSE);
 		
-		// Note: We mask out fragment sizes at 0x3FFFF. There can be at most 1024 of them.
+		// Note: We mask out fragment sizes at 0x3FFFF. There can be at most 2048 of them.
 		// This can not overflow the uint32_t we allocated for frame size, so
 		// we dont need to worry about mallocing too little then overflowing when we read.
 		frame_size = frame_size + fragment_size;
@@ -679,7 +776,7 @@ void e1000_handle_rx_packet() {
 		// Advance to the next descriptor
 		rx_des_loop_cur = (rx_des_loop_cur + 1) % NUM_RX_DESCRIPTORS;
 
-	} while ((status & E1000_RXD_STAT_EOP) == 0);
+	} while ((status & E1000_RXD_STAT_EOP) == 0); // Check to see if we are at the final fragment
 
 #ifdef __CONFIG_APPSERVER__
 	// Treat as a syscall frontend response packet if eth_type says so
@@ -712,6 +809,8 @@ void e1000_handle_rx_packet() {
 	}
 #endif /* __CONFIG_ETH_AUDIO__ */
 
+	// Paul:Mildly hacky stuff for LWIP
+	// TODO: Why was this necessary for LWIP?
 	spin_lock(&packet_buffers_lock);
 
 	if (num_packet_buffers >= MAX_PACKET_BUFFERS) {
@@ -721,7 +820,7 @@ void e1000_handle_rx_packet() {
 	
 		// Advance the tail pointer				
 		e1000_rx_index = rx_des_loop_cur;
-		e1000_wr32(E1000_RDT, e1000_rx_index);
+        e1000_wr32(E1000_RDT, (e1000_rx_index -1) % NUM_RX_DESCRIPTORS);
 		return;
 	}
 
@@ -732,10 +831,13 @@ void e1000_handle_rx_packet() {
 	num_packet_buffers++;
 
 	spin_unlock(&packet_buffers_lock);
+	// End mildy hacky stuff for LWIP
 
-	// Advance the tail pointer				
+	//Log where we should start reading from next time we trap				
 	e1000_rx_index = rx_des_loop_cur;
-	e1000_wr32(E1000_RDT, e1000_rx_index);
+	
+	// Bump the tail pointer. It should be 1 behind where we start reading from.
+	e1000_wr32(E1000_RDT, (e1000_rx_index -1) % NUM_RX_DESCRIPTORS);
 				
 	// Chew on the frame data. Command bits should be the same for all frags.
 	//e1000_process_frame(rx_buffer, frame_size, current_command);
@@ -744,7 +846,7 @@ void e1000_handle_rx_packet() {
 }
 
 // Main routine to send a frame. Just sends it and goes.
-// Card supports sending across multiple fragments.
+// Card supports sending across multiple fragments, we don't.
 // Would we want to write a function that takes a larger packet and generates fragments?
 // This seems like the stacks responsibility. Leave this for now. may in future
 // Remove the max size cap and generate multiple packets.
@@ -755,24 +857,35 @@ int e1000_send_frame(const char *data, size_t len) {
 	if (len == 0)
 		return 0;
 
+	// Find where we want to write
 	uint32_t head = e1000_rr32(E1000_TDH);
 
+	
+	// Fail if we are out of space
 	if (((e1000_tx_index + 1) % NUM_TX_DESCRIPTORS) == head) {
 		e1000_frame_debug("-->TX Ring Buffer Full!\n");
 		return -1;
 	}
 	
+	// Fail if we are too large
 	if (len > MAX_FRAME_SIZE) {
 		e1000_frame_debug("-->Frame Too Large!\n");
 		return -1;
 	}
 	
+	// Move the data
 	memcpy(KADDR(tx_des_kva[e1000_tx_index].buffer_addr), data, len);
 
+	// Set the length
 	tx_des_kva[e1000_tx_index].lower.flags.length = len;
+	
+	// Magic that means send 1 fragment and report.
 	tx_des_kva[e1000_tx_index].lower.flags.cmd = 0x0B;
 
+	// Track our location
 	e1000_tx_index = (e1000_tx_index + 1) % NUM_TX_DESCRIPTORS;
+	
+	// Bump the tail.
 	e1000_wr32(E1000_TDT, e1000_tx_index);
 
 	e1000_frame_debug("-->Sent packet.\n");

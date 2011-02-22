@@ -170,6 +170,7 @@
 #define E1000_RDBAL    0x02800  /* RX Descriptor Base Address Low - RW */
 #define E1000_RDBAH    0x02804  /* RX Descriptor Base Address High - RW */
 #define E1000_RDLEN    0x02808  /* RX Descriptor Length - RW */
+#define E1000_SRRCTRL  0x0280C  /* RX Split and Replication Recieve Control Register - RW */
 #define E1000_RDH      0x02810  /* RX Descriptor Head - RW */
 #define E1000_RDT      0x02818  /* RX Descriptor Tail - RW */
 #define E1000_RDTR     0x02820  /* RX Delay Timer - RW */
@@ -512,6 +513,11 @@
 #define E1000_RCTL_FLXBUF_MASK    0x78000000    /* Flexible buffer size */
 #define E1000_RCTL_FLXBUF_SHIFT   27            /* Flexible buffer shift */
 
+/* Receive Descriptor Control */
+#define E1000_RXDCTL_ENABLE       0x02000000    /* Enable the descriptor ring */
+#define E1000_RXDCTL_WBT          0x00010000    /* Write back threshold */
+#define E1000_RXDCTL_MAGIC        0x01000000    /* No idea what this does. */
+
 /* EEPROM Read */
 #define E1000_EERD_START      0x00000001	/* Start Read */
 #define E1000_EERD_DONE       0x00000010	/* Read Done */
@@ -795,6 +801,10 @@ struct e1000_tx_desc {
 #define E1000_TCTL_RTLC   0x01000000    /* Re-transmit on late collision */
 #define E1000_TCTL_NRTU   0x02000000    /* No Re-transmit on underrun */
 #define E1000_TCTL_MULR   0x10000000    /* Multiple request support */
+
+/* Transmit Descriptor Control */
+#define E1000_TXDCTL_ENABLE  0x02000000     /* Enable the TX queue */
+#define E1000_TXDCTL_MAGIC   0x01000000     /* No idea what this does. */
 
 /* Receive Descriptor */
 struct e1000_rx_desc {
