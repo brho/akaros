@@ -138,7 +138,7 @@ void eth_audio_newpacket(void *buf)
 	/* Send the current outbound packet (can consider doing this by fsync) */
 	eth_audio_sendpacket(page2kva(out_page));
 	if (active_proc)
-		proc_notify(active_proc, NE_FREE_APPLE_PIE, 0);
+		proc_notify(active_proc, 0);
 }
 
 /* mmap() calls this to do any FS specific mmap() work.  Since our files are
