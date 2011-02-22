@@ -1,0 +1,25 @@
+CORO_NAME    := coro
+CORO_UCNAME  := $(call uc, $(CORO_NAME))
+CORO_CFLAGS  := $(CFLAGS)
+CORO_HEADERS := $(wildcard $(CORODIR)/*.h)
+CORO_CFILES  := $(wildcard $(CORODIR)/*.c)
+CORO_OBJDIR  := $(OBJDIR)/$(CORO_NAME)
+CORO_OBJS    := $(patsubst %.c, %.o, $(CORO_CFILES))
+CORO_OBJS    := $(foreach x, $(CORO_OBJS), $(CORO_OBJDIR)/$(call filename,$(x)))
+
+LIBCORO = $(CORO_OBJDIR)/lib$(CORO_NAME).a
+
+$(CORO_NAME)-clean:
+	@echo + clean [$(LIBUCNAME) $(CORO_UCNAME)]
+	$(V)rm -rf $(CORO_OBJS) $(LIBCORO)
+	$(V)rm -rf $(CORO_OBJDIR)
+
+$(LIBCORO): $(CORO_OBJS)
+	@echo + ar [$(LIBUCNAME) $(CORO_UCNAME)] $@
+	$(V)$(AR) rc $@ $^
+
+$(CORO_OBJDIR)/%.o: $(CORODIR)/%.c $(CORO_HEADERS)
+	@echo + cc [$(LIBUCNAME) $(CORO_UCNAME)] $<
+	@mkdir -p $(@D)
+	$(V)$(CC) $(CORO_CFLAGS) $(INCS) -o $@ -c $<
+

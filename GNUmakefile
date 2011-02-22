@@ -33,7 +33,7 @@ $(TARGET_ARCH):
 # Default values for configurable Make system variables
 COMPILER := GCC
 OBJDIR := obj
-V := @
+V ?= @
 
 # Make sure that 'all' is the first target when not erroring out
 realall: symlinks
@@ -87,7 +87,7 @@ endif
 endif
 
 # Default programs for compilation
-USER_CFLAGS += -O2
+USER_CFLAGS += -O2 -std=gnu99
 ifeq ($(COMPILER),IVY)
 KERN_CFLAGS += --deputy \
                --no-rc-sharc \
@@ -133,9 +133,6 @@ LDFLAGS := -nostdlib
 # List of directories that the */Makefrag makefile fragments will add to
 OBJDIRS :=
 
-# List of directories that the */Makefrag makefile fragments will add to
-ROS_USER_LIBS :=
-
 ROS_ARCH_DIR ?= $(TARGET_ARCH)
 
 arch:
@@ -149,7 +146,6 @@ symlinks: error
 
 # Include Makefrags for subdirectories
 ifneq ($(TARGET_ARCH),)
-include user/Makefrag
 include tests/Makefrag
 include kern/Makefrag
 endif
@@ -164,10 +160,16 @@ realtests: $(TESTS_EXECS)
 #	@mkdir -p fs/$(TARGET_ARCH)/tests
 #	cp -R $(OBJDIR)/$(TESTS_DIR)/* $(TOP_DIR)/fs/$(TARGET_ARCH)/tests
 
-install-libs: $(ROS_USER_LIBS)
-	cp $(ROS_USER_LIBS) $(GCC_ROOT)/$(TARGET_ARCH)-ros/lib
-	cp $(ROS_USER_LIBS) $(TOP_DIR)/fs/$(TARGET_ARCH)/lib
-	cp -R $(USER_DIR)/include/* $(GCC_ROOT)/$(TARGET_ARCH)-ros/include
+install-libs: 
+	@cd user/parlib; $(MAKE); $(MAKE) install
+	@cd user/pthread; $(MAKE); $(MAKE) install
+	@cd user/c3po; $(MAKE); $(MAKE) install
+
+userclean:
+	@cd user/parlib; $(MAKE) clean;
+	@cd user/pthread; $(MAKE) clean;
+	@cd user/c3po; $(MAKE) clean;
+	@rm -rf $(OBJDIR)/$(TESTS_DIR)
 .PHONY: tests
 endif
 
@@ -200,10 +202,6 @@ docs:
 doxyclean:
 	rm -rf $(DOXYGEN_DIR)/rosdoc
 
-# For deleting the build
-userclean:
-	@rm -rf $(OBJDIR)/user
-	
 clean:
 	@rm -rf $(OBJDIR)
 	@echo All clean and pretty!

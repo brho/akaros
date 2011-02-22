@@ -1,0 +1,85 @@
+#!/usr/bin/perl
+######################################################################
+#
+#  Do a sanity check on a source code file, to make sure it makes
+#  system calls via syscall(), rather directly.  This prevents stupid
+#  mistakes due to looping in the io routines
+#
+#  USAGE: check_syscall FILENAME
+#
+#  add special cases that are _not_ bugs to the @special_cases array
+#
+######################################################################
+use strict;
+
+
+# NOTE: keep this in sync w/ blocking_io.h
+my @syscalls = qw(open creat close read write
+                  lseek fcntl connect accept dup dup2);
+
+# files to skip entirely
+my @skipfiles = qw(aiotest.c pthread_diskio.c);
+
+# special cases, for various files
+my %special_cases =
+(
+ 'blocking_io.c' => 
+ [
+  ' SYSCALL\(.*\)\s*$',          # the definition of our version of the system call
+  'open\(pathname, O_CREAT',   # creat() calls open()
+ ],
+);
+
+
+my $syscall_re = "\\b\(" . join("|", @syscalls) . "\)\\b";
+my $skipfiles_re = "\(" . join("|", @skipfiles) . "\)\$";
+my $exitcode = 0;
+
+foreach my $file (@ARGV) {
+    next if($file =~ m!$skipfiles_re!);
+
+    #open(FILE,"<$file") || die "can't read from file '$file'";
+
+    my $syscall;
+    my $lineno=0;
+ LINE: while (my $line=<FILE>) {
+        $lineno++;
+
+        # strip comments
+        $line =~ s!//.*$!!;
+        next if $line =~ /^ \* /;
+
+        # strip strings
+        $line =~ s!\\"!!g;
+        $line =~ s!\\'!!g;
+        $line =~ s!".*?"!!g;
+        $line =~ s!'.*?'!!g;
+
+        # check for syscalls
+        ($syscall) = ($line =~ m!$syscall_re!);
+        next if $syscall eq "";
+        
+        # special cases
+        foreach my $f (keys %special_cases) {
+            my $l = $special_cases{$f};
+            if ($file =~ /$f$/) {
+                foreach my $re (@$l) {
+                    my $temp = $re;
+                    $temp =~ s!SYSCALL!$syscall!g;
+                    next LINE if($line =~ m!$temp!);
+                }
+            }
+        }
+
+        # warn
+        print STDERR "$file:$lineno  BAD SYSCALL: $syscall() - Line follows:\n";
+        chomp($line); 
+        print $line, "\n";
+        $exitcode = 1;
+    }
+
+}
+
+
+exit $exitcode;
+

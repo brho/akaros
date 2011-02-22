@@ -1,0 +1,25 @@
+AIO_NAME    := aio
+AIO_UCNAME  := $(call uc, $(AIO_NAME))
+AIO_CFLAGS  := $(CFLAGS)
+AIO_HEADERS := $(wildcard $(AIODIR)/*.h)
+AIO_CFILES  := $(wildcard $(AIODIR)/*.c)
+AIO_OBJDIR  := $(OBJDIR)/$(AIO_NAME)
+AIO_OBJS    := $(patsubst %.c, %.o, $(AIO_CFILES))
+AIO_OBJS    := $(foreach x, $(AIO_OBJS), $(AIO_OBJDIR)/$(call filename,$(x)))
+
+LIBAIO = $(AIO_OBJDIR)/lib$(AIO_NAME).a
+
+$(AIO_NAME)-clean:
+	@echo + clean [$(LIBUCNAME) $(AIO_UCNAME)]
+	$(V)rm -rf $(AIO_OBJS) $(LIBAIO)
+	$(V)rm -rf $(AIO_OBJDIR)
+
+$(LIBAIO): $(AIO_OBJS)
+	@echo + ar [$(LIBUCNAME) $(AIO_UCNAME)] $@
+	$(V)$(AR) rc $@ $^
+
+$(AIO_OBJDIR)/%.o: $(AIODIR)/%.c $(AIO_HEADERS)
+	@echo + cc [$(LIBUCNAME) $(AIO_UCNAME)] $<
+	@mkdir -p $(@D)
+	$(V)$(CC) $(AIO_CFLAGS) $(INCS) -o $@ -c $<
+

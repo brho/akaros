@@ -1,0 +1,25 @@
+UTIL_NAME    := util
+UTIL_UCNAME  := $(call uc, $(UTIL_NAME))
+UTIL_CFLAGS  := $(CFLAGS)
+UTIL_HEADERS := $(wildcard $(UTILDIR)/*.h)
+UTIL_CFILES  := $(wildcard $(UTILDIR)/*.c)
+UTIL_OBJDIR  := $(OBJDIR)/$(UTIL_NAME)
+UTIL_OBJS    := $(patsubst %.c, %.o, $(UTIL_CFILES))
+UTIL_OBJS    := $(foreach x, $(UTIL_OBJS), $(UTIL_OBJDIR)/$(call filename,$(x)))
+
+LIBUTIL = $(UTIL_OBJDIR)/lib$(UTIL_NAME).a
+
+$(UTIL_NAME)-clean:
+	@echo + clean [$(LIBUCNAME) $(UTIL_UCNAME)]
+	$(V)rm -rf $(UTIL_OBJS) $(LIBUTIL)
+	$(V)rm -rf $(UTIL_OBJDIR)
+
+$(LIBUTIL): $(UTIL_OBJS)
+	@echo + ar [$(LIBUCNAME) $(UTIL_UCNAME)] $@
+	$(V)$(AR) rc $@ $^
+
+$(UTIL_OBJDIR)/%.o: $(UTILDIR)/%.c $(UTIL_HEADERS)
+	@echo + cc [$(LIBUCNAME) $(UTIL_UCNAME)] $<
+	@mkdir -p $(@D)
+	$(V)$(CC) $(UTIL_CFLAGS) $(INCS) -o $@ -c $<
+

@@ -1,31 +1,36 @@
 TESTS_DIR = tests
+
 OBJDIRS += $(TESTS_DIR)
 
-TESTS_CFLAGS += $(USER_CFLAGS)  \
-                -I$(USER_DIR)/include
+TESTS_CFLAGS += $(USER_CFLAGS)
 
 ALL_TEST_FILES = $(shell ls $(TESTS_DIR)/*.c)
 
-TESTS_LDDIRS := -L$(OBJDIR)/$(USER_PARLIB_DIR)
-
-TESTS_LDLIBS := -lparlib
+TESTS_LDLIBS := -lpthread -lparlib
 
 TESTS_SRCS := $(ALL_TEST_FILES)
 
-TESTS_EXECS  := $(patsubst $(TESTS_DIR)/%.c, \
+TESTS_EXECS  = $(patsubst $(TESTS_DIR)/%.c, \
                            $(OBJDIR)/$(TESTS_DIR)/%, \
                            $(TESTS_SRCS))
 
-TESTS_LDDEPENDS := $(TESTS_DIR)/%.c \
-                   $(OBJDIR)/$(USER_PARLIB_DIR)/libparlib.a
+TESTS_LDDEPENDS := $(TESTS_DIR)/%.c 
 
+include $(TESTS_DIR)/c3po/Makefrag
 STATIC := $(findstring static,$(TESTS_CFLAGS))
 $(OBJDIR)/$(TESTS_DIR)/%: $(TESTS_LDDEPENDS)
 	@echo + cc [TESTS] $<
 	@mkdir -p $(@D)
 	$(V)$(CC) $(TESTS_CFLAGS) -o $@ $(TESTS_LDFLAGS) \
-	          $(TESTS_LDDIRS) $< $(TESTS_LDLIBS)
+	          $< $(TESTS_LDLIBS)
 	@if [ "$(STATIC)" != "static" ]; then \
 		$(OBJDUMP) -S $@ > $@.asm; \
 		$(NM) -n $@ > $@.sym; \
 	fi
+
+install-tests: $(TESTS_EXECS)
+	@echo + install [TESTS] $(firstword $(INITRAMFS_PATHS))/bin/
+	$(V)for i in "$(TESTS_EXECS)"; \
+	do \
+	  cp $$i $(firstword $(INITRAMFS_PATHS))/bin/; \
+	done;

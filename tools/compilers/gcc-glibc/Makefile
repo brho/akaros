@@ -230,7 +230,9 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 	mkdir $(INSTDIR)/$(ARCH)-ros/sys-include/ros/arch
 	cp -r $(ROSDIR)/kern/arch/$(ROS_ARCH_DIR)/ros/* \
 	   $(INSTDIR)/$(ARCH)-ros/sys-include/ros/arch/
-	cp -r $(ROSDIR)/user/include/* \
+	cp -r $(ROSDIR)/user/parlib/include/* \
+	   $(INSTDIR)/$(ARCH)-ros/sys-include/
+	cp -r $(ROSDIR)/user/pthread/*.h \
 	   $(INSTDIR)/$(ARCH)-ros/sys-include/
 	rm -rf $(INSTDIR)/$(ARCH)-ros/sys-include/arch
 	ln -s $(ARCH) $(INSTDIR)/$(ARCH)-ros/sys-include/arch 

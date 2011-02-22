@@ -1,0 +1,25 @@
+THREADS_NAME    := threads
+THREADS_UCNAME  := $(call uc, $(THREADS_NAME))
+THREADS_CFLAGS  := $(CFLAGS)
+THREADS_HEADERS := $(wildcard $(THREADSDIR)/*.h)
+THREADS_CFILES  := $(wildcard $(THREADSDIR)/*.c)
+THREADS_OBJDIR  := $(OBJDIR)/$(THREADS_NAME)
+THREADS_OBJS    := $(patsubst %.c, %.o, $(THREADS_CFILES))
+THREADS_OBJS    := $(foreach x, $(THREADS_OBJS), $(THREADS_OBJDIR)/$(call filename,$(x)))
+
+LIBTHREADS = $(THREADS_OBJDIR)/lib$(THREADS_NAME).a
+
+$(THREADS_NAME)-clean:
+	@echo + clean [$(LIBUCNAME) $(THREADS_UCNAME)]
+	$(V)rm -rf $(THREADS_OBJS) $(LIBTHREADS)
+	$(V)rm -rf $(THREADS_OBJDIR)
+
+$(LIBTHREADS): $(THREADS_OBJS)
+	@echo + ar [$(LIBUCNAME) $(THREADS_UCNAME)] $@
+	$(V)$(AR) rc $@ $^
+
+$(THREADS_OBJDIR)/%.o: $(THREADSDIR)/%.c $(THREADS_HEADERS)
+	@echo + cc [$(LIBUCNAME) $(THREADS_UCNAME)] $<
+	@mkdir -p $(@D)
+	$(V)$(CC) $(THREADS_CFLAGS) $(INCS) -o $@ -c $<
+
