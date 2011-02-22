@@ -8,6 +8,7 @@
 #define ROS_KERN_NET_H
 
 #include <bits/netinet.h>
+#include <stdio.h>
 
 /* A few other useful standard defines.  Note the IP header can change size. */
 #define ETH_HDR_SZ 14
@@ -54,4 +55,6 @@ uint16_t __ip_checksum(void *buf, unsigned int len, uint32_t sum);
 uint16_t ip_checksum(struct ip_hdr *ip_hdr);
 uint16_t udp_checksum(struct ip_hdr *ip_hdr, struct udp_hdr *udp_hdr);
 
+// TODO: Move this to a better location
+void dumppacket(unsigned char *buff, size_t len);
 #endif /* ROS_KERN_NET_H */

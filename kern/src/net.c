@@ -64,3 +64,18 @@ uint16_t udp_checksum(struct ip_hdr *ip_hdr, struct udp_hdr *udp_hdr)
 	udp_pseudosum += udp_len;
 	return __ip_checksum(udp_hdr, udp_len, udp_pseudosum);
 }
+/* Print out a network packet in the same format as tcpdump, making it easier 
+ * to compare */
+void dumppacket(unsigned char *buff, size_t len)
+{
+	int i;
+	for (i=0; i<len; i++) {
+		if (i%16 == 0)
+			printk("0x%x\t", i/16);
+		printk("%02x", buff[i]);
+		if (i%2 != 0)
+			printk(" ");
+		if ((i+1)%16 == 0)
+			printk("\n");
+	}
+}
