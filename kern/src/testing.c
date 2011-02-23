@@ -5,7 +5,7 @@
 
 #include <arch/mmu.h>
 #include <arch/arch.h>
-#include <arch/bitmask.h>
+#include <bitmask.h>
 #include <smp.h>
 
 #include <ros/memlayout.h>

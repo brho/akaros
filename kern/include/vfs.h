@@ -15,7 +15,7 @@
 
 #include <ros/common.h>
 #include <sys/queue.h>
-#include <arch/bitmask.h>
+#include <bitmask.h>
 #include <kref.h>
 #include <timing.h>
 #include <radix.h>

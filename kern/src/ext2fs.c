@@ -14,7 +14,7 @@
 #include <endian.h>
 #include <error.h>
 #include <pmap.h>
-#include <arch/bitmask.h>
+#include <bitmask.h>
 
 /* These structs are declared again and initialized farther down */
 struct page_map_operations ext2_pm_op;

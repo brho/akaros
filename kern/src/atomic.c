@@ -3,8 +3,8 @@
 #endif
 
 #include <arch/arch.h>
-#include <arch/bitmask.h>
 
+#include <bitmask.h>
 #include <atomic.h>
 #include <error.h>
 #include <string.h>

@@ -9,7 +9,7 @@
 #include <ros/bcq.h>
 #include <event.h>
 #include <arch/arch.h>
-#include <arch/bitmask.h>
+#include <bitmask.h>
 #include <process.h>
 #include <atomic.h>
 #include <smp.h>

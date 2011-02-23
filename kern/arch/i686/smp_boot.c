@@ -14,10 +14,10 @@
 #include <smp.h>
 #include <arch/console.h>
 #include <arch/apic.h>
-#include <arch/bitmask.h>
 #include <arch/perfmon.h>
 #include <timing.h>
 
+#include <bitmask.h>
 #include <atomic.h>
 #include <error.h>
 #include <stdio.h>

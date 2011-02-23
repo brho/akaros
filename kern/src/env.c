@@ -6,10 +6,9 @@
 
 #include <arch/arch.h>
 #include <arch/mmu.h>
-#include <arch/bitmask.h>
+#include <bitmask.h>
 #include <elf.h>
 #include <smp.h>
-
 #include <atomic.h>
 #include <string.h>
 #include <assert.h>

@@ -10,7 +10,7 @@
 #endif
 
 #include <sys/queue.h>
-#include <arch/bitmask.h>
+#include <bitmask.h>
 #include <page_alloc.h>
 #include <pmap.h>
 #include <string.h>

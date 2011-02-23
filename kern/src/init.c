@@ -34,7 +34,7 @@
 #include <frontend.h>
 
 #include <arch/init.h>
-#include <arch/bitmask.h>
+#include <bitmask.h>
 #include <slab.h>
 #include <kfs.h>
 #include <vfs.h>

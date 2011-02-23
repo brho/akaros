@@ -28,7 +28,7 @@
 #include <frontend.h>
 #include <colored_caches.h>
 #include <hashtable.h>
-#include <arch/bitmask.h>
+#include <bitmask.h>
 #include <vfs.h>
 #include <devfs.h>
 #include <smp.h>

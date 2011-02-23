@@ -12,7 +12,7 @@
 
 #include <ros/common.h>
 #include <arch/mmu.h>
-#include <arch/bitmask.h>
+#include <bitmask.h>
 #include <colored_caches.h>
 #include <stdio.h>
 #include <atomic.h>

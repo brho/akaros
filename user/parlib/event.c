@@ -8,7 +8,7 @@
 #include <ros/event.h>
 #include <ros/procdata.h>
 #include <ros/bcq.h>
-#include <arch/bitmask.h>
+#include <bitmask.h>
 #include <vcore.h>
 #include <stdlib.h>
 #include <string.h>

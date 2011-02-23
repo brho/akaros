@@ -6,7 +6,7 @@
  * processes. */
 
 #include <ros/bcq.h>
-#include <arch/bitmask.h>
+#include <bitmask.h>
 #include <event.h>
 #include <atomic.h>
 #include <process.h>
