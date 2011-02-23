@@ -22,6 +22,7 @@ __thread int temp;
 void *core0_tls = 0;
 
 struct event_queue *indirect_q;
+static void handle_generic(struct event_msg *ev_msg, bool overflow);
 
 int main(int argc, char** argv)
 {
@@ -40,9 +41,17 @@ int main(int argc, char** argv)
 	register_kevent_q(indirect_q, EV_FREE_APPLE_PIE);
 
 /* begin: stuff userspace needs to do before switching to multi-mode */
+	/* handle events: just want to print out what we get.  This is just a
+	 * quick set of handlers, not a registration for a kevent. */
+	for (int i = 0; i < MAX_NR_EVENT; i++)
+		ev_handlers[i] = handle_generic;
+	/* Want to use the default ev_ev (which we just overwrote) */
+	ev_handlers[EV_EVENT] = handle_ev_ev;
 	/* vcore_init() done in vcore_request() now. */
 	/* Set up event reception.  For example, this will allow us to receive an
-	 * event and IPI for USER_IPIs on vcore 0.  Check event.c for more stuff. */
+	 * event and IPI for USER_IPIs on vcore 0.  Check event.c for more stuff.
+	 * Note you don't have to register for USER_IPIs to receive ones you send
+	 * yourself with sys_self_notify(). */
 	enable_kevent(EV_USER_IPI, 0, TRUE);
 
 	/* Need to save this somewhere that you can find it again when restarting
@@ -100,6 +109,12 @@ int main(int argc, char** argv)
 	return 0;
 }
 
+static void handle_generic(struct event_msg *ev_msg, bool overflow)
+{
+	printf("Got event type %d on vcore %d, with%s overflow\n", ev_msg->ev_type,
+	       vcore_id(), overflow ? "" : "out");
+}
+
 void vcore_entry(void)
 {
 	uint32_t vcoreid = vcore_id();
@@ -113,29 +128,8 @@ void vcore_entry(void)
 	vcpd = &__procdata.vcore_preempt_data[vcoreid];
 	
 	/* here is how you receive an event */
-	struct event_msg ev_msg = {0};
-	if (event_activity(&vcpd->ev_mbox, 0)) {
-		/* Ought to while loop/dequeue, processing as they come in. */
-		bcq_dequeue(&vcpd->ev_mbox.ev_msgs, &ev_msg, NR_BCQ_EVENTS);
-		printf("the queue is on vcore %d and has a ne with type %d\n", vcoreid,
-		       ev_msg.ev_type);
-		printf("Number of event overflows: %d\n", vcpd->ev_mbox.ev_overflows);
-	}
-	/* it might be in bitmask form too: */
-	//printf("and the bitmask looks like: ");
-	//PRINT_BITMASK(__procdata.vcore_preempt_data[vcoreid].notif_bmask, MAX_NR_NOTIF);
+	handle_events(vcoreid);
 
-	/* How we handle indirection events: */
-	struct event_queue_big *ev_q;
-	struct event_msg indir_msg = {0};
-	if (ev_msg.ev_type == EV_EVENT) {
-		ev_q = ev_msg.ev_arg3;	/* convention */
-		printf("Detected EV_EVENT, ev_q is %08p (%08p)\n", ev_q, indirect_q);
-		/* Ought to loop/dequeue, processing as they come in. */
-		bcq_dequeue(&ev_q->ev_mbox->ev_msgs, &indir_msg, NR_BCQ_EVENTS);
-		printf("Message of type: %d (%d)\n", indir_msg.ev_type,
-		       EV_FREE_APPLE_PIE);
-	}
 	/* how we tell a preemption is pending (regardless of notif/events) */
 	if (vc->preempt_pending) {
 		printf("Oh crap, vcore %d is being preempted!  Yielding\n", vcoreid);

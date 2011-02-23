@@ -91,7 +91,7 @@ void __attribute__((noreturn)) vcore_entry()
 
 	/* Put this in the loop that deals with notifications.  It will return if
 	 * there is no preempt pending. */ 
-	// TODO: prob make a handle_notif() function
+	handle_events(vcoreid);
 	if (vc->preempt_pending)
 		sys_yield(TRUE);
 	// TODO: consider making this restart path work for restarting as well as

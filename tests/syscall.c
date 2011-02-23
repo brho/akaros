@@ -6,6 +6,7 @@
 #include <rassert.h>
 #include <ros/bcq.h>
 
+static void handle_syscall(struct event_msg *ev_msg, bool overflow);
 struct syscall sysc = {0};
 struct event_queue *ev_q;
 void *core0_tls = 0;
@@ -14,6 +15,10 @@ int main(int argc, char** argv)
 {
 	int num_started, retval;
 	unsigned int ev_type;
+
+	/* register our syscall handler (2LS does this) */
+	ev_handlers[EV_SYSCALL] = handle_syscall;
+
 	printf("Trying to block\n");
 	/* Not doing anything else to it: no EVENT_IPI yet, etc. */
 	ev_q = get_big_event_q();
@@ -29,23 +34,20 @@ int main(int argc, char** argv)
 	while (!(sysc.flags & SC_DONE))
 		cpu_relax();
 	#endif
-	/* But let's check on events... */
-	while (!event_activity(ev_q->ev_mbox, ev_q->ev_flags))
+	/* But let's check on events...  Handle event_q returns how many events it
+	 * handled.  Want to spin in this testing code. */
+	while(!handle_event_q(ev_q))
 		cpu_relax();
-	ev_type = get_event_type(ev_q->ev_mbox);
-	if (ev_type = EV_SYSCALL) {
-		/* our syscall should be done (we ought to check the msg pointer) */
-		if (sysc.flags & SC_DONE) 
-			printf("Syscall is done, retval: %d\n", sysc.retval);
-		else
-			printf("BUG! Syscall wasn't done!\n");
-	} else {
-		printf("Whoa, got an unexpected event type %d!\n", ev_type);
-	}
-
+	/* by now, we should have run our handler */
+	/********************************************************/
 	/* Start MCP / IPI test */
 	printf("Switching to _M mode and testing an IPI-d ev_q\n");
+	printf("Our indirect ev_q is %08p\n", ev_q);
+
 /* begin: stuff userspace needs to do before switching to multi-mode */
+	/* Note we don't need to set up event reception for any particular kevent.
+	 * The ev_q in the syscall said to send an IPI to vcore 0 which means an
+	 * EV_EVENT will be sent straight to vcore0. */
 	/* Need to save this somewhere that you can find it again when restarting
 	 * core0 */
 	core0_tls = get_tls_desc(0);
@@ -61,7 +63,7 @@ int main(int argc, char** argv)
 	ev_q->ev_flags = EVENT_IPI;
 	ev_q->ev_vcore = 0;
 	sysc.u_data = (void*)1;	/* using this to loop on */
-	/* issue the diagnostic block syscall */
+	/* issue the diagnostic blocking syscall */
 	sysc.num = SYS_block;
 	sysc.ev_q = ev_q;
 	num_started = __ros_arch_syscall((long)&sysc, 1);
@@ -79,6 +81,22 @@ int main(int argc, char** argv)
 	return 0;
 }
 
+static void handle_syscall(struct event_msg *ev_msg, bool overflow)
+{
+	struct syscall *my_sysc;
+	my_sysc = ev_msg->ev_arg3;
+	printf("Handling syscall event for sysc %08p (%08p)\n",
+	       my_sysc, &sysc);
+	/* our syscall should be done (we ought to check the msg pointer) */
+	if (sysc.flags & SC_DONE) 
+		printf("Syscall is done, retval: %d\n", sysc.retval);
+	else
+		printf("BUG! Syscall wasn't done!\n");
+	/* signal to thread 0 that the sysc is done, just to show this
+	 * is getting done in vcore context. */
+	my_sysc->u_data = 0;
+}
+
 void vcore_entry(void)
 {
 	uint32_t vcoreid = vcore_id();
@@ -90,35 +108,9 @@ void vcore_entry(void)
 	struct preempt_data *vcpd;
 	vcpd = &__procdata.vcore_preempt_data[vcoreid];
 	
-	/* here is how you receive an event */
-	struct event_msg ev_msg = {0};
-	struct event_queue_big *indir_q;
-	struct syscall *my_sysc;
-	if (event_activity(&vcpd->ev_mbox, 0)) {
-		/* Ought to while loop/dequeue, processing as they come in. */
-		bcq_dequeue(&vcpd->ev_mbox.ev_msgs, &ev_msg, NR_BCQ_EVENTS);
-		if (vcpd->ev_mbox.ev_overflows)
-			printf("Had an overflow...\n");
-		/* should do generic handling.  this is customized for the syscalls */
-		if (ev_msg.ev_type == EV_EVENT) {
-			indir_q = ev_msg.ev_arg3;	/* convention */
-			printf("Detected EV_EVENT, ev_q is %08p (%08p)\n", indir_q, ev_q);
-			assert(indir_q);
-			/* Ought to loop/dequeue, processing as they come in. */
-			bcq_dequeue(&indir_q->ev_mbox->ev_msgs, &ev_msg, NR_BCQ_EVENTS);
-			/* should have received a syscall off the indirect ev_q */
-			if (ev_msg.ev_type == EV_SYSCALL) {
-				my_sysc = ev_msg.ev_arg3;
-				printf("Handling syscall event for sysc %08p (%08p)\n",
-				       my_sysc, &sysc);
-				/* signal to thread 0 that the sysc is done, just to show this
-				 * is getting done in vcore context. */
-				my_sysc->u_data = 0;
-			} else {
-				printf("Got a different event, type %d\n", ev_msg.ev_type);
-			}
-		}
-	}
+	/* here is how you receive an event (remember to register the syscall
+	 * handler, and whatever other handlers you want). */
+	handle_events(vcoreid);
 
 	/* how we tell a preemption is pending (regardless of notif/events) */
 	if (vc->preempt_pending) {
