@@ -1,5 +1,5 @@
 TARGET_ARCH ?= i686
-CFLAGS = -O2 -static -fomit-frame-pointer -DOPTIMIZE=2 -DNO_TIMING
+CFLAGS = -O2 -static -std=gnu99 -fomit-frame-pointer -DOPTIMIZE=2 -DNO_TIMING
 LIBNAME = c3po
 SUBDIRS = util stack coro threads #aio 
 V ?= @

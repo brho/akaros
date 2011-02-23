@@ -75,7 +75,7 @@ static inline bg_node_t* bg_newnode(bg_node_type_t type)
 
   node->type = type;
   node->node_num = bg_num_nodes++;
-  node->latch = LATCH_INITIALIZER_UNLOCKED;
+  node->latch = (latch_t)LATCH_INITIALIZER_UNLOCKED;
 
   // set the system call
   node->system_call = (cap_current_syscall ? cap_current_syscall : "unknown");
@@ -281,7 +281,7 @@ void bg_update_stats()
       bzero(edge, sizeof(bg_edge_t));
       edge->src  = prev_node;
       edge->dest = this_node;
-      edge->latch = LATCH_INITIALIZER_UNLOCKED;
+      edge->latch = (latch_t)LATCH_INITIALIZER_UNLOCKED;
       PL_HashTableAdd(prev_node->edgehash, this_node, edge);
     }
     thread_unlatch( prev_node->latch );

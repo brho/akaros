@@ -147,7 +147,7 @@ extern void dump_thread_state();
 extern long long total_stack_in_use;
 
 // process all pending signals.  returns 1 is any actually handled, 0 otherwise
-extern inline int sig_process_pending();
+extern int sig_process_pending();
 
 extern thread_t *scheduler_thread;
 

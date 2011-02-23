@@ -28,16 +28,16 @@ typedef struct thread_resources_st {
 } thread_stats_t;
 
 
-extern inline void thread_stats_open_socket();
-extern inline void thread_stats_close_socket(cpu_tick_t lifetime);
-extern inline void thread_stats_open_file();
-extern inline void thread_stats_close_file(cpu_tick_t lifetime);
+extern void thread_stats_open_socket();
+extern void thread_stats_close_socket(cpu_tick_t lifetime);
+extern void thread_stats_open_file();
+extern void thread_stats_close_file(cpu_tick_t lifetime);
 
-extern inline int check_admission_control(struct bg_node_st *node);
+extern int check_admission_control(struct bg_node_st *node);
 
 
 #define OVERLOAD_CHECK_INTERVAL (200*ticks_per_millisecond)
-extern inline void check_overload( cpu_tick_t now );
+extern void check_overload( cpu_tick_t now );
 
 
 /**

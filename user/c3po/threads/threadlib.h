@@ -90,11 +90,11 @@ int thread_suspend_self(unsigned long long timeout);
 
 // resume is made idempotent - resuming an already runnable thread does nothing
 void thread_resume(thread_t* t);
-inline char* thread_name(thread_t *t);
+char* thread_name(thread_t *t);
 int thread_join(thread_t *t, void **val);
 void thread_set_daemon(thread_t *t);
 
-extern thread_t *current_thread;
+extern __thread thread_t *current_thread;
 static inline thread_t* thread_self() { return current_thread; }
 
 // Key-based thread specific storage
@@ -109,10 +109,10 @@ void *thread_key_getdata(thread_key_t key);
 void thread_usleep(unsigned long long timeout);
 
 // Mutex - return TRUE on success
-inline int thread_mutex_init(mutex_t *m, char *name);
-inline int thread_mutex_lock(mutex_t *m);
-inline int thread_mutex_trylock(mutex_t *m);    // do not block, return FALSE when mutex held but others
-inline int thread_mutex_unlock(mutex_t *m);
+int thread_mutex_init(mutex_t *m, char *name);
+int thread_mutex_lock(mutex_t *m);
+int thread_mutex_trylock(mutex_t *m);    // do not block, return FALSE when mutex held but others
+int thread_mutex_unlock(mutex_t *m);
 
 // Rwlocks
 enum rwlock_op {
@@ -146,8 +146,8 @@ int thread_kill(thread_t* t, int sig);
 int thread_kill_all(int sig);
 int thread_sigwait(const sigset_t *set, int *sig);
 
-extern inline void thread_stats_add_heap(long size);
-extern inline void thread_stats_add_fds(int num);
+extern void thread_stats_add_heap(long size);
+extern void thread_stats_add_fds(int num);
 
 
 typedef struct {
@@ -216,8 +216,8 @@ do { \
 #define thread_latch_init(latch) do {(void)(latch);} while(0)
 #endif
 
-#define LATCH_INITIALIZER_UNLOCKED ((latch_t) { LATCH_UNLOCKED })
-#define LATCH_INITIALIZER_LOCKED   ((latch_t) { LATCH_UNKNOWN })
+#define LATCH_INITIALIZER_UNLOCKED { LATCH_UNLOCKED }
+#define LATCH_INITIALIZER_LOCKED   { LATCH_UNKNOWN }
 
 #endif /* THREADLIB_H */
 
