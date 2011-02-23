@@ -46,8 +46,7 @@ void _pthread_init()
 
 	/* don't forget to enable notifs on vcore0.  if you don't, the kernel will
 	 * restart your _S with notifs disabled, which is a path to confusion. */
-	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[0];
-	vcpd->notif_enabled = TRUE;
+	enable_notifs(0);
 
 	/* Create a pthread_tcb for the main thread */
 	pthread_t t = (pthread_t)calloc(1, sizeof(struct pthread_tcb));
@@ -325,7 +324,7 @@ int pthread_yield(void)
 	/* once we do this, we might miss a notif_pending, so we need to enter vcore
 	 * entry later.  Need to disable notifs so we don't get in weird loops with
 	 * save_ros_tf() and pop_ros_tf(). */
-	vcpd->notif_enabled = FALSE;
+	disable_notifs(vcoreid);
 	/* take the current state and save it into t->utf when this pthread
 	 * restarts, it will continue from right after this, see yielding is false,
 	 * and short ciruit the function. */
@@ -563,7 +562,7 @@ void pthread_exit(void* ret)
 	
 	/* once we do this, we might miss a notif_pending, so we need to enter vcore
 	 * entry later. */
-	vcpd->notif_enabled = FALSE;
+	disable_notifs(vcoreid);
 
 	/* Change to the transition context (both TLS and stack). */
 	extern void** vcore_thread_control_blocks;

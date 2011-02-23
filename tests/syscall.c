@@ -51,10 +51,7 @@ int main(int argc, char** argv)
 	core0_tls = get_tls_desc(0);
 	/* Need to save our floating point state somewhere (like in the
 	 * user_thread_tcb so it can be restarted too */
-	/* don't forget to enable notifs on vcore0 at some point */
-	struct preempt_data *vcpd;
-	vcpd = &__procdata.vcore_preempt_data[0];
-	vcpd->notif_enabled = TRUE;
+	enable_notifs(0);
 /* end: stuff userspace needs to do before switching to multi-mode */
 
 	retval = vcore_request(1);

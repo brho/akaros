@@ -40,6 +40,16 @@ void vcore_yield(void);
 size_t max_vcores(void);
 size_t num_vcores(void);
 
+static inline void enable_notifs(uint32_t vcoreid)
+{
+	__procdata.vcore_preempt_data[vcoreid].notif_enabled = TRUE;
+}
+
+static inline void disable_notifs(uint32_t vcoreid)
+{
+	__procdata.vcore_preempt_data[vcoreid].notif_enabled = FALSE;
+}
+
 #ifdef __cplusplus
 }
 #endif
