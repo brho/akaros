@@ -14,6 +14,7 @@
 #include <umem.h>
 #include <stdio.h>
 #include <assert.h>
+#include <pmap.h>
 
 /* Note this returns the KVA of the mbox, not the user one. */
 static struct event_mbox *get_proc_ev_mbox(struct proc *p, uint32_t vcoreid)
@@ -134,6 +135,8 @@ out:
 		pcpui->cur_proc = old_proc;
 		if (old_proc)
 			lcr3(old_proc->env_cr3);
+		else
+			lcr3(boot_cr3);
 	}
 }
 
