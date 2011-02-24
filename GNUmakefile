@@ -43,6 +43,7 @@ MAKE_JOBS :=
 
 # Give it a reasonable default path for initramfs to avoid build breakage
 INITRAMFS_PATHS = kern/kfs
+FIRST_INITRAMFS_PATH = $(firstword $(INITRAMFS_PATHS))
 
 # Then grab the users Makelocal file to let them override Make system variables
 # and set up other Make targets
@@ -153,24 +154,32 @@ endif
 ifeq ($(GCCPREFIX),$(TARGET_ARCH)-ros-)
 GCC_ROOT := $(shell which $(GCCPREFIX)gcc | xargs dirname)/../
 tests/: tests
-tests:
+tests: install-libs
 	@$(MAKE) -j $(MAKE_JOBS) realtests
 realtests: $(TESTS_EXECS)
 # No longer automatically copying to the FS dir (deprecated)
 #	@mkdir -p fs/$(TARGET_ARCH)/tests
 #	cp -R $(OBJDIR)/$(TESTS_DIR)/* $(TOP_DIR)/fs/$(TARGET_ARCH)/tests
 
+USER_LIBS = parlib pthread c3po
 install-libs: 
-	@rm -rf $(firstword $(INITRAMFS_PATHS))/lib
-	@cp -R $(GCC_ROOT)/$(TARGET_ARCH)-ros/lib $(firstword $(INITRAMFS_PATHS))
-	@cd user/parlib; $(MAKE); $(MAKE) install
-	@cd user/pthread; $(MAKE); $(MAKE) install
-	@cd user/c3po; $(MAKE); $(MAKE) install
+	@for i in $(USER_LIBS) ; do \
+		cd user/$$i;            \
+		$(MAKE);                \
+		$(MAKE) install;        \
+		cd ../..;               \
+	done
+
+fill-kfs: install-libs
+	@rm -rf $(FIRST_INITRAMFS_PATH))/lib
+	@cp -R $(GCC_ROOT)/$(TARGET_ARCH)-ros/lib $(FIRST_INITRAMFS_PATH))
 
 userclean:
-	@cd user/parlib; $(MAKE) clean;
-	@cd user/pthread; $(MAKE) clean;
-	@cd user/c3po; $(MAKE) clean;
+	@for i in $(USER_LIBS) ; do \
+		cd user/$$i;            \
+		$(MAKE) clean;          \
+		cd ../..;               \
+	done
 	@rm -rf $(OBJDIR)/$(TESTS_DIR)
 .PHONY: tests
 endif

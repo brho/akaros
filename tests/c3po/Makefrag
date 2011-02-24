@@ -9,11 +9,11 @@ C3PO_TESTS_LDLIBS := -lc3po -lparlib -lm
 
 C3PO_TESTS_SRCS := $(ALL_C3PO_TEST_FILES)
 
+C3PO_TESTS_LDDEPENDS := $(C3PO_TESTS_DIR)/%.c 
+
 TESTS_EXECS  += $(patsubst $(C3PO_TESTS_DIR)/%.c, \
                       $(OBJDIR)/$(C3PO_TESTS_DIR)/%, \
                       $(C3PO_TESTS_SRCS))
-
-C3PO_TESTS_LDDEPENDS := $(C3PO_TESTS_DIR)/%.c 
 
 STATIC := $(findstring static,$(C3PO_TESTS_CFLAGS))
 $(OBJDIR)/$(C3PO_TESTS_DIR)/%: $(C3PO_TESTS_LDDEPENDS)

@@ -10,13 +10,14 @@ TESTS_LDLIBS := -lpthread -lparlib
 
 TESTS_SRCS := $(ALL_TEST_FILES)
 
+TESTS_LDDEPENDS := $(TESTS_DIR)/%.c 
+
 TESTS_EXECS  = $(patsubst $(TESTS_DIR)/%.c, \
                            $(OBJDIR)/$(TESTS_DIR)/%, \
                            $(TESTS_SRCS))
 
-TESTS_LDDEPENDS := $(TESTS_DIR)/%.c 
-
 include $(TESTS_DIR)/c3po/Makefrag
+
 STATIC := $(findstring static,$(TESTS_CFLAGS))
 $(OBJDIR)/$(TESTS_DIR)/%: $(TESTS_LDDEPENDS)
 	@echo + cc [TESTS] $<
@@ -29,8 +30,8 @@ $(OBJDIR)/$(TESTS_DIR)/%: $(TESTS_LDDEPENDS)
 	fi
 
 install-tests: $(TESTS_EXECS)
-	@echo + install [TESTS] $(firstword $(INITRAMFS_PATHS))/bin/
+	@echo + install [TESTS] $(FIRST_INITRAMFS_PATH))/bin/
 	$(V)for i in "$(TESTS_EXECS)"; \
 	do \
-	  cp $$i $(firstword $(INITRAMFS_PATHS))/bin/; \
+	  cp $$i $(FIRST_INITRAMFS_PATH))/bin/; \
 	done;
