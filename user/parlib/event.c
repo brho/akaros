@@ -176,7 +176,7 @@ static int handle_mbox(struct event_mbox *ev_mbox, unsigned int flags)
 		ev_type = local_msg.ev_type;
 		printd("BCQ: ev_type: %d\n", ev_type);
 		if (ev_handlers[ev_type])
-			ev_handlers[ev_type](&local_msg, overflow);
+			ev_handlers[ev_type](&local_msg, ev_type, overflow);
 		check_preempt_pending(vcoreid);
 		retval++;
 	}
@@ -192,9 +192,9 @@ static int handle_mbox(struct event_mbox *ev_mbox, unsigned int flags)
 	 * thread safe (tested on some code in mhello, asm looks like it knows to
 	 * have the function use addresses relative to the frame pointer). */
 	void bit_handler(unsigned int bit) {
-		printd("Bit: ev_type: %d\n", ev_type);
+		printd("Bit: ev_type: %d\n", bit);
 		if (ev_handlers[bit])
-			ev_handlers[bit](0, overflow);
+			ev_handlers[bit](0, bit, overflow);
 		retval++;
 		check_preempt_pending(vcoreid);
 		/* Consider checking the queue for incoming messages while we're here */
@@ -206,7 +206,7 @@ static int handle_mbox(struct event_mbox *ev_mbox, unsigned int flags)
 /* The EV_EVENT handler - extract the ev_q from the message.  If you want this
  * to catch overflows, you'll need to register your event_queues (TODO).  Might
  * be issues with per-core handling (register globally, or just per vcore). */
-void handle_ev_ev(struct event_msg *ev_msg, bool overflow)
+void handle_ev_ev(struct event_msg *ev_msg, unsigned int ev_type, bool overflow)
 {
 	struct event_queue *ev_q;
 	/* TODO: handle overflow (register, etc) */

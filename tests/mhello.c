@@ -22,7 +22,8 @@ __thread int temp;
 void *core0_tls = 0;
 
 struct event_queue *indirect_q;
-static void handle_generic(struct event_msg *ev_msg, bool overflow);
+static void handle_generic(struct event_msg *ev_msg, unsigned int ev_type,
+                           bool overflow);
 
 int main(int argc, char** argv)
 {
@@ -113,14 +114,11 @@ int main(int argc, char** argv)
 	return 0;
 }
 
-static void handle_generic(struct event_msg *ev_msg, bool overflow)
+static void handle_generic(struct event_msg *ev_msg, unsigned int ev_type,
+                           bool overflow)
 {
-	if (ev_msg)
-		printf("Got event type %d on vcore %d, with%s overflow\n",
-		       ev_msg->ev_type, vcore_id(), overflow ? "" : "out");
-	else
-		printf("Got event type UNK on vcore %d, with%s overflow\n",
-		       vcore_id(), overflow ? "" : "out");
+	printf("Got event type %d on vcore %d, with%s overflow\n",
+	       ev_type, vcore_id(), overflow ? "" : "out");
 }
 
 void vcore_entry(void)

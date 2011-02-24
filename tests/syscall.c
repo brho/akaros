@@ -6,7 +6,8 @@
 #include <rassert.h>
 #include <ros/bcq.h>
 
-static void handle_syscall(struct event_msg *ev_msg, bool overflow);
+static void handle_syscall(struct event_msg *ev_msg, unsigned int ev_type,
+                           bool overflow);
 struct syscall sysc = {0};
 struct event_queue *ev_q;
 void *core0_tls = 0;
@@ -81,9 +82,12 @@ int main(int argc, char** argv)
 	return 0;
 }
 
-static void handle_syscall(struct event_msg *ev_msg, bool overflow)
+static void handle_syscall(struct event_msg *ev_msg, unsigned int ev_type,
+                           bool overflow)
 {
 	struct syscall *my_sysc;
+	if (!ev_msg)
+		return;
 	my_sysc = ev_msg->ev_arg3;
 	printf("Handling syscall event for sysc %08p (%08p)\n",
 	       my_sysc, &sysc);
