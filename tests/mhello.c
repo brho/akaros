@@ -62,7 +62,7 @@ int main(int argc, char** argv)
 
 	/* don't forget to enable notifs on vcore0 at some point */
 	enable_notifs(0);
-	
+
 /* end: stuff userspace needs to do before switching to multi-mode */
 
 	if ((vcoreid = vcore_id())) {
@@ -123,20 +123,15 @@ void vcore_entry(void)
 	temp = 0xcafebabe;
 /* begin: stuff userspace needs to do to handle notifications */
 
-	struct vcore *vc = &__procinfo.vcoremap[vcoreid];
 	struct preempt_data *vcpd;
 	vcpd = &__procdata.vcore_preempt_data[vcoreid];
-	
+
+	/* checks if a preempt is pending, yields if so */
+	check_preempt_pending(vcoreid);
+
 	/* here is how you receive an event */
 	handle_events(vcoreid);
 
-	/* how we tell a preemption is pending (regardless of notif/events) */
-	if (vc->preempt_pending) {
-		printf("Oh crap, vcore %d is being preempted!  Yielding\n", vcoreid);
-		sys_yield(TRUE);
-		printf("After yield on vcore %d. I wasn't being preempted.\n", vcoreid);
-	}
-		
 	/* Lets try to restart vcore0's context.  Note this doesn't do anything to
 	 * set the appropriate TLS.  On x86, this will involve changing the LDT
 	 * entry for this vcore to point to the TCB of the new user-thread. */
@@ -160,13 +155,13 @@ void vcore_entry(void)
 		/* Load silly state (Floating point) too */
 		pop_ros_tf(&vcpd->notif_tf, vcoreid);
 		panic("should never see me!");
-	}	
+	}
 	/* unmask notifications once you can let go of the notif_tf and it is okay
 	 * to clobber the transition stack.
 	 * Check Documentation/processes.txt: 4.2.4.  In real code, you should be
 	 * popping the tf of whatever user process you want (get off the x-stack) */
 	enable_notifs(vcoreid);
-	
+
 /* end: stuff userspace needs to do to handle notifications */
 
 	printf("Hello from vcore_entry in vcore %d with temp addr %p and temp %p\n",

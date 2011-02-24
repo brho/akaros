@@ -158,13 +158,16 @@ unsigned int get_event_type(struct event_mbox *ev_mbox)
 handle_event_t ev_handlers[MAX_NR_EVENT] = {[EV_EVENT] handle_ev_ev, 0};
 
 /* Handle an mbox.  This is the receive-side processing of an event_queue.  It
- * takes an ev_mbox, since the vcpd mbox isn't a regular ev_q. */
+ * takes an ev_mbox, since the vcpd mbox isn't a regular ev_q.  For now, we
+ * check for preemptions between each event handler. */
 static int handle_mbox(struct event_mbox *ev_mbox, unsigned int flags)
 {
 	struct event_msg local_msg;
 	unsigned int ev_type;
 	bool overflow = FALSE;
 	int retval = 0;
+	uint32_t vcoreid = vcore_id();
+
 	if (!event_activity(ev_mbox, flags))
 		return retval;
 	/* Try to dequeue, dispatch whatever you get.  TODO consider checking for
@@ -173,7 +176,7 @@ static int handle_mbox(struct event_mbox *ev_mbox, unsigned int flags)
 		ev_type = local_msg.ev_type;
 		if (ev_handlers[ev_type])
 			ev_handlers[ev_type](&local_msg, overflow);
-		/* TODO: check for preemption here */
+		check_preempt_pending(vcoreid);
 		retval++;
 	}
 	/* Race here with another core clearing overflows/bits.  Don't have more
@@ -191,7 +194,7 @@ static int handle_mbox(struct event_mbox *ev_mbox, unsigned int flags)
 		if (ev_handlers[bit])
 			ev_handlers[bit](0, overflow);
 		retval++;
-		/* TODO: check for preemption here */
+		check_preempt_pending(vcoreid);
 		/* Consider checking the queue for incoming messages while we're here */
 	}
 	BITMASK_FOREACH_SET(ev_mbox->ev_bitmap, MAX_NR_EVENT, bit_handler, TRUE);

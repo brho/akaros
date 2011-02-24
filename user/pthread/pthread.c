@@ -84,16 +84,12 @@ void __attribute__((noreturn)) vcore_entry()
 	uint32_t vcoreid = vcore_id();
 
 	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
-	struct vcore *vc = &__procinfo.vcoremap[vcoreid];
 
 	/* Should always have notifications disabled when coming in here. */
 	assert(vcpd->notif_enabled == FALSE);
 
-	/* Put this in the loop that deals with notifications.  It will return if
-	 * there is no preempt pending. */ 
+	check_preempt_pending(vcoreid);
 	handle_events(vcoreid);
-	if (vc->preempt_pending)
-		sys_yield(TRUE);
 	// TODO: consider making this restart path work for restarting as well as
 	// freshly starting
 	if (current_thread) {

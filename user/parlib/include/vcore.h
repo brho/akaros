@@ -26,6 +26,12 @@ extern "C" {
 #define TRANSITION_STACK_PAGES 2
 #define TRANSITION_STACK_SIZE (TRANSITION_STACK_PAGES*PGSIZE)
 
+/* 2L-Scheduler operations.  Can be 0. */
+struct schedule_ops {
+	void (*preempt_pending)(void);
+};
+extern struct schedule_ops *sched_ops;
+
 /* Defined by glibc; Must be implemented by a user level threading library */
 extern void vcore_entry();
 
@@ -39,6 +45,7 @@ int vcore_request(size_t k);
 void vcore_yield(void);
 size_t max_vcores(void);
 size_t num_vcores(void);
+bool check_preempt_pending(uint32_t vcoreid);
 
 static inline void enable_notifs(uint32_t vcoreid)
 {

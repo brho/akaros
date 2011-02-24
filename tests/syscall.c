@@ -104,21 +104,16 @@ void vcore_entry(void)
 
 /* begin: stuff userspace needs to do to handle notifications */
 
-	struct vcore *vc = &__procinfo.vcoremap[vcoreid];
 	struct preempt_data *vcpd;
 	vcpd = &__procdata.vcore_preempt_data[vcoreid];
 	
+	/* checks if a preempt is pending, yields if so */
+	check_preempt_pending(vcoreid);
+		
 	/* here is how you receive an event (remember to register the syscall
 	 * handler, and whatever other handlers you want). */
 	handle_events(vcoreid);
 
-	/* how we tell a preemption is pending (regardless of notif/events) */
-	if (vc->preempt_pending) {
-		printf("Oh crap, vcore %d is being preempted!  Yielding\n", vcoreid);
-		sys_yield(TRUE);
-		printf("After yield on vcore %d. I wasn't being preempted.\n", vcoreid);
-	}
-		
 	/* Restart vcore0's context. */
 	if (vcoreid == 0) {
 		vcpd->notif_pending = 0;

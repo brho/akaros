@@ -15,6 +15,11 @@
 static size_t _max_vcores_ever_wanted = 1;
 static mcs_lock_t _vcore_lock = MCS_LOCK_INIT;
 
+/* Which operations we'll call for the 2LS.  Will change a bit with Lithe.  For
+ * now, there are no defaults. */
+struct schedule_ops default_2ls_ops = {0};
+struct schedule_ops *sched_ops = &default_2ls_ops;
+
 extern void** vcore_thread_control_blocks;
 
 /* Get a TLS, returns 0 on failure.  Vcores have their own TLS, and any thread
@@ -166,3 +171,20 @@ int vcore_id()
 	return __vcoreid;
 }
 
+/* Deals with a pending preemption (checks, responds).  If the 2LS registered a
+ * function, it will get run.  Returns true if you got preempted.  Called
+ * 'check' instead of 'handle', since this isn't an event handler.  It's the "Oh
+ * shit a preempt is on its way ASAP". */
+bool check_preempt_pending(uint32_t vcoreid)
+{
+	bool retval = FALSE;
+	if (__procinfo.vcoremap[vcoreid].preempt_pending) {
+		retval = TRUE;
+		if (sched_ops->preempt_pending)
+			sched_ops->preempt_pending();
+		/* this tries to yield, but will pop back up if this was a spurious
+		 * preempt_pending. */
+		sys_yield(TRUE);
+	}
+	return retval;
+}
