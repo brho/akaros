@@ -53,6 +53,10 @@ int main(int argc, char** argv)
 	 * Note you don't have to register for USER_IPIs to receive ones you send
 	 * yourself with sys_self_notify(). */
 	enable_kevent(EV_USER_IPI, 0, TRUE);
+	/* Receive pending preemption events.  Can also get a MSG if you want. */
+	struct event_queue *ev_q = get_event_q();
+	ev_q->ev_flags = EVENT_IPI | EVENT_NOMSG | EVENT_VCORE_APPRO;
+	register_kevent_q(ev_q, EV_PREEMPT_PENDING);
 
 	/* Need to save this somewhere that you can find it again when restarting
 	 * core0 */
@@ -111,8 +115,12 @@ int main(int argc, char** argv)
 
 static void handle_generic(struct event_msg *ev_msg, bool overflow)
 {
-	printf("Got event type %d on vcore %d, with%s overflow\n", ev_msg->ev_type,
-	       vcore_id(), overflow ? "" : "out");
+	if (ev_msg)
+		printf("Got event type %d on vcore %d, with%s overflow\n",
+		       ev_msg->ev_type, vcore_id(), overflow ? "" : "out");
+	else
+		printf("Got event type UNK on vcore %d, with%s overflow\n",
+		       vcore_id(), overflow ? "" : "out");
 }
 
 void vcore_entry(void)

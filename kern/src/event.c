@@ -60,7 +60,7 @@ void send_event(struct proc *p, struct event_queue *ev_q, struct event_msg *msg,
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	struct proc *old_proc = pcpui->cur_proc;	/* uncounted ref */
-	struct event_mbox *ev_mbox, *vcore_mbox;
+	struct event_mbox *ev_mbox = 0, *vcore_mbox;
 	struct event_msg local_msg = {0};
 	assert(p);
 	if (!ev_q) {
@@ -80,11 +80,15 @@ void send_event(struct proc *p, struct event_queue *ev_q, struct event_msg *msg,
 		pcpui->cur_proc = p;
 		lcr3(p->env_cr3);
 	}
-	/* If we don't follow the kernel's advice, do what the process wants */
-	if (!(ev_q->ev_flags & EVENT_VCORE_APPRO))
+	/* Get the mbox and vcoreid */
+	/* If we're going with APPRO, we use the kernel's suggested vcore's ev_mbox.
+	 * vcoreid is already what the kernel suggests. */
+	if (ev_q->ev_flags & EVENT_VCORE_APPRO) {
+		ev_mbox = get_proc_ev_mbox(p, vcoreid);
+	} else {	/* common case */
+		ev_mbox = ev_q->ev_mbox;
 		vcoreid = ev_q->ev_vcore;
-	/* Post the event.  Need to get the initial mbox (might be 0). */
-	ev_mbox = ev_q->ev_mbox;
+	}
 	/* Check on the style, which could affect our mbox selection.  Other styles
 	 * would go here (or in similar functions we call to).  Important thing is
 	 * we come out knowing which vcore to send to in the event of an IPI, and we
@@ -99,13 +103,17 @@ void send_event(struct proc *p, struct event_queue *ev_q, struct event_msg *msg,
 			ev_mbox = get_proc_ev_mbox(p, vcoreid);
 	}
 	/* At this point, we ought to have the right mbox to send the msg to, and
-	 * which vcore to send an IPI to (if we send one). */
+	 * which vcore to send an IPI to (if we send one).  The mbox could be the
+	 * vcore's vcpd ev_mbox. */
 	if (!ev_mbox) {
 		/* this is a process error */
 		warn("[kernel] ought to have an mbox by now!");
 		goto out;
 	}
-	if (!is_user_rwaddr(ev_mbox)) {
+	vcore_mbox = get_proc_ev_mbox(p, vcoreid);
+	/* Allows the mbox to be the right vcoreid mbox (a KVA in procdata), or any
+	 * other user RW location. */
+	if ((ev_mbox != vcore_mbox) && (!is_user_rwaddr(ev_mbox))) {
 		/* Ought to kill them, just warn for now */
 		warn("[kernel] Illegal addr for ev_mbox");
 		goto out;
@@ -117,8 +125,7 @@ void send_event(struct proc *p, struct event_queue *ev_q, struct event_msg *msg,
 	if (ev_q->ev_flags & EVENT_IPI) {
 		/* if the mbox we sent to isn't the default one, we need to send the
 		 * vcore an ev_q indirection event */
-		vcore_mbox = get_proc_ev_mbox(p, vcoreid);
-		if (!uva_is_kva(p, ev_mbox, vcore_mbox)) {
+		if ((ev_mbox != vcore_mbox) && (!uva_is_kva(p, ev_mbox, vcore_mbox))) {
 			/* it is tempting to send_kernel_event(), using the ev_q for that
 			 * event, but that is inappropriate here, since we are sending to a
 			 * specific vcore */

@@ -174,6 +174,7 @@ static int handle_mbox(struct event_mbox *ev_mbox, unsigned int flags)
 	 * overflow first */
 	while (!bcq_dequeue(&ev_mbox->ev_msgs, &local_msg, NR_BCQ_EVENTS)) {
 		ev_type = local_msg.ev_type;
+		printd("BCQ: ev_type: %d\n", ev_type);
 		if (ev_handlers[ev_type])
 			ev_handlers[ev_type](&local_msg, overflow);
 		check_preempt_pending(vcoreid);
@@ -191,6 +192,7 @@ static int handle_mbox(struct event_mbox *ev_mbox, unsigned int flags)
 	 * thread safe (tested on some code in mhello, asm looks like it knows to
 	 * have the function use addresses relative to the frame pointer). */
 	void bit_handler(unsigned int bit) {
+		printd("Bit: ev_type: %d\n", ev_type);
 		if (ev_handlers[bit])
 			ev_handlers[bit](0, overflow);
 		retval++;

@@ -183,6 +183,9 @@ types of events where they want the kernel to send the event/IPI to the
 'appropriate' vcore.  For example, when sending a message about a preemption
 coming in, it makes sense for the kernel to send it to the vcore that is going
 to get preempted, but the application could choose to ignore the notification.
+When this flag is set, the kernel will also use the vcore's ev_mbox, ignoring
+the process's choice.  We can change this later, but it doesn't really make
+sense for a process to pick an mbox and also say VCORE_APPRO.
 
 There are also interfaces in the kernel to put a message in an ev_mbox
 regardless of the process's wishes (post_vcore_event()), and can send an IPI

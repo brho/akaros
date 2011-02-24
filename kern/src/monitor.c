@@ -549,6 +549,7 @@ int mon_measure(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 			printk("No such proc\n");
 			return 1;
 		}
+		printk("Careful: if this hangs, then the process isn't responding.\n");
 		if (argc == 4) { /* single core being preempted-warned */
 			uint32_t pcoreid = strtol(argv[3], 0, 0);
 			spin_lock(&p->proc_lock);
