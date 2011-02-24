@@ -84,10 +84,10 @@ struct event_queue *clear_kevent_q(unsigned int ev_type)
  * if you want one or not.  This is the simplest thing applications may want,
  * and shows how you can put the other event functions together to get similar
  * things done. */
-void enable_kevent(unsigned int ev_type, uint32_t vcoreid, bool ipi)
+void enable_kevent(unsigned int ev_type, uint32_t vcoreid, int ev_flags)
 {
 	struct event_queue *ev_q = get_event_q_vcpd(vcoreid);
-	ev_q->ev_flags = ipi ? EVENT_IPI : 0;
+	ev_q->ev_flags = ev_flags;
 	ev_q->ev_vcore = vcoreid;
 	ev_q->ev_handler = 0;
 	register_kevent_q(ev_q, ev_type);

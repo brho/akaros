@@ -54,7 +54,7 @@ int main()
 		printf("vcore_init() failed, we're fucked!\n");
 
 	/* ETHAUD Turn on Free apple pie (which is the network packet) */
-	enable_kevent(EV_FREE_APPLE_PIE, 0, TRUE);
+	enable_kevent(EV_FREE_APPLE_PIE, 0, EVENT_IPI);
 
 	/* Need to save this somewhere that you can find it again when restarting
 	 * core0 */

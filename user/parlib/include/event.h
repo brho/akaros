@@ -19,7 +19,7 @@ struct event_queue *get_event_q_vcpd(uint32_t vcoreid);
 void put_event_q(struct event_queue *ev_q);
 void register_kevent_q(struct event_queue *ev_q, unsigned int ev_type);
 struct event_queue *clear_kevent_q(unsigned int ev_type);
-void enable_kevent(unsigned int ev_type, uint32_t vcoreid, bool ipi);
+void enable_kevent(unsigned int ev_type, uint32_t vcoreid, int ev_flags);
 void disable_kevent(unsigned int ev_type);
 
 /********* Event Handling / Reception ***********/
