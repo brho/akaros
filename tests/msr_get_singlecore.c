@@ -102,7 +102,7 @@ void vcore_entry(void)
 	 * set the appropriate TLS.  On x86, this will involve changing the LDT
 	 * entry for this vcore to point to the TCB of the new user-thread. */
 	if (vcoreid == 0) {
-		vcpd->notif_pending = 0;
+		clear_notif_pending(vcoreid);
 		set_tls_desc(core0_tls, 0);
 		/* Load silly state (Floating point) too */
 		pop_ros_tf(&vcpd->notif_tf, vcoreid);

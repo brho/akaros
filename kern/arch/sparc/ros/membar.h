@@ -7,7 +7,7 @@
 /* Compiler memory barrier */
 #define cmb() ({ asm volatile("" ::: "memory"); })
 /* Force a wmb, used in cases where an IPI could beat a write, even though
- *  * write-orderings are respected.  (Used by x86) */
+ * write-orderings are respected.  (Used by x86) */
 #define wmb_f() wmb()
 
 #endif

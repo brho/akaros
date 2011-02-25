@@ -120,8 +120,7 @@ void vcore_entry(void)
 
 	/* Restart vcore0's context. */
 	if (vcoreid == 0) {
-		vcpd->notif_pending = 0;
-		/* TODO: Do one last check for notifs after clearing pending */
+		clear_notif_pending(vcoreid);
 		set_tls_desc(core0_tls, 0);
 		/* Load silly state (Floating point) too */
 		pop_ros_tf(&vcpd->notif_tf, vcoreid);

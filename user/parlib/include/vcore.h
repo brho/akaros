@@ -46,6 +46,7 @@ void vcore_yield(void);
 size_t max_vcores(void);
 size_t num_vcores(void);
 bool check_preempt_pending(uint32_t vcoreid);
+void clear_notif_pending(uint32_t vcoreid);
 
 static inline void enable_notifs(uint32_t vcoreid)
 {

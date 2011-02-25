@@ -93,10 +93,7 @@ void __attribute__((noreturn)) vcore_entry()
 	// TODO: consider making this restart path work for restarting as well as
 	// freshly starting
 	if (current_thread) {
-		vcpd->notif_pending = 0;
-		/* Do one last check for notifs after clearing pending */
-		// TODO: call the handle_notif() here (first)
-
+		clear_notif_pending(vcoreid);
 		set_tls_desc(current_thread->tls_desc, vcoreid);
 		/* Pop the user trap frame */
 		pop_ros_tf(&vcpd->notif_tf, vcoreid);
@@ -123,9 +120,7 @@ void __attribute__((noreturn)) vcore_entry()
 	current_thread = new_thread;
 	printd("[P] Vcore %d is starting pthread %d\n", vcoreid, new_thread->id);
 
-	vcpd->notif_pending = 0;
-	/* Do one last check for notifs after clearing pending */
-	// TODO: call the handle_notif() here (first)
+	clear_notif_pending(vcoreid);
 	set_tls_desc(new_thread->tls_desc, vcoreid);
 
 	/* Load silly state (Floating point) too.  For real */

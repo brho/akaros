@@ -10,6 +10,8 @@
 #include <sys/mman.h>
 #include <rstdio.h>
 #include <glibc-tls.h>
+#include <event.h>
+#include <ros/arch/membar.h>
 
 /* starting with 1 since we alloc vcore0's stacks and TLS in vcore_init(). */
 static size_t _max_vcores_ever_wanted = 1;
@@ -187,4 +189,19 @@ bool check_preempt_pending(uint32_t vcoreid)
 		sys_yield(TRUE);
 	}
 	return retval;
+}
+
+/* Clear pending, and try to handle events that came in between a previous call
+ * to handle_events() and the clearing of pending.  While it's not a big deal,
+ * we'll loop in case we catch any.  Will break out of this once there are no
+ * events, and we will have send pending to 0. 
+ *
+ * Note that this won't catch every race/case of an incoming event.  Future
+ * events will get caught in pop_ros_tf() */
+void clear_notif_pending(uint32_t vcoreid)
+{
+	do {
+		cmb();
+		__procdata.vcore_preempt_data[vcoreid].notif_pending = 0;
+	} while (handle_events(vcoreid));
 }
