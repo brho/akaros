@@ -243,20 +243,26 @@ thread can want to run its own handler, perhaps because it performs its own
 asynchronous I/O (compared to relying on the 2LS to schedule synchronous
 blocking u_threads).
 
-There are a couple ways to handle this.  Ultimately, the application is
-supposed to handle the event.  If it asked for an IPI, it is because something
-ought to be done, which really means running a handler.  If the application
-sets EV_THREAD in the ev_q's flags, the 2LS ought to spawn a thread to run the
-ev_q's handler.  If EV_JUSTHANDLEIT is set, the vcore will execute the handler
-itself.  Careful with this, since the only memory it touches must be pinned,
-the function must not block (this is only true for the handlers called
+There are a couple ways to handle this.  Ultimately, the application is supposed
+to handle the event.  If it asked for an IPI, it is because something ought to
+be done, which really means running a handler.  If the application sets
+EVENT_THREAD in the ev_q's flags, the 2LS ought to spawn a thread to run the
+ev_q's handler.  If EVENT_JUSTHANDLEIT is set, the vcore will execute the
+handler itself.  Careful with this, since the only memory it touches must be
+pinned, the function must not block (this is only true for the handlers called
 directly out of vcore context), and it should return quickly.
 
 Note that in either case, vcore-written code (library code) does not look at
-the contents of the notification event.  Also Note the handler takes the whole
+the contents of the notification event.  Also note the handler takes the whole
 event_queue, and not a specific message.  It is more flexible, can handle
-multiple specific events, and doesn't require the vcore code to dequeue and
+multiple specific events, and doesn't require the vcore code to dequeue the
 event and either pass by value or allocate more memory.
+
+These ev_q handlers are different than ev_handlers.  The former handles an
+event_queue.  The latter is the 2LS's way to handle specific types of messages.
+If an app wants to process specific messages, have them sent to an ev_q under
+its control; don't mess with ev_handlers unless you're the 2LS (or example
+code).
 
 Continuing the analogy between vcores getting IPIs and the OS getting HW
 interrupts, what goes on in vcore context is like what goes on in interrupt

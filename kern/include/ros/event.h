@@ -12,11 +12,14 @@
 #include <ros/bcq_struct.h>
 #include <ros/arch/trapframe.h>
 
-/* Event Delivery Flags. */
+/* Event Delivery Flags from the process to the kernel */
 #define EVENT_IPI				0x001	/* IPI the core */
 #define EVENT_NOMSG				0x002	/* just send the bit, not the msg */
 #define EVENT_ROUNDROBIN		0x004	/* pick a vcore, RR style */
 #define EVENT_VCORE_APPRO		0x008	/* send to where the kernel wants */
+/* Flags from the program to the 2LS */
+#define EVENT_JUSTHANDLEIT		0x00c	/* 2LS should handle the ev_q */
+#define EVENT_THREAD			0x010	/* spawn thread to handle ev_q */
 
 /* Event Message Types */
 #define EV_NONE					 0

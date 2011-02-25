@@ -35,10 +35,11 @@ int main(int argc, char** argv)
 	while (!(sysc.flags & SC_DONE))
 		cpu_relax();
 	#endif
-	/* But let's check on events...  Handle event_q returns how many events it
-	 * handled.  Want to spin in this testing code. */
-	while(!handle_event_q(ev_q))
+	/* But let's check on events...  Spin til something happened, then handle
+	 * events.  This method is just used for this testing code. */
+	while (!event_activity(ev_q->ev_mbox, ev_q->ev_flags))
 		cpu_relax();
+	handle_event_q(ev_q);
 	/* by now, we should have run our handler */
 	/********************************************************/
 	/* Start MCP / IPI test */

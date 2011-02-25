@@ -35,6 +35,6 @@ extern handle_event_t ev_handlers[];
 void handle_ev_ev(struct event_msg *ev_msg, unsigned int ev_type,
                   bool overflow);
 int handle_events(uint32_t vcoreid);
-int handle_event_q(struct event_queue *ev_q);
+void handle_event_q(struct event_queue *ev_q);
 
 #endif /* _EVENT_H */

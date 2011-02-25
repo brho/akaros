@@ -29,6 +29,7 @@ extern "C" {
 /* 2L-Scheduler operations.  Can be 0. */
 struct schedule_ops {
 	void (*preempt_pending)(void);
+	void (*spawn_thread)(uintptr_t pc_start, void *data);	/* don't run yet */
 };
 extern struct schedule_ops *sched_ops;
 

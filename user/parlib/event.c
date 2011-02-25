@@ -215,9 +215,8 @@ void handle_ev_ev(struct event_msg *ev_msg, unsigned int ev_type, bool overflow)
 	if (!ev_msg)
 		return;
 	ev_q = ev_msg->ev_arg3;
-	if (!ev_q)
-		return;
-	handle_mbox(ev_q->ev_mbox, ev_q->ev_flags);
+	if (ev_q)
+		handle_event_q(ev_q);
 }
 
 /* 2LS will probably call this in vcore_entry and places where it wants to check
@@ -231,12 +230,30 @@ int handle_events(uint32_t vcoreid)
 	 * whether or not the 2LS has a NOMSG ev_q pointing to its vcpd, or have the
 	 * kernel set another flag for "bits" */
 	return handle_mbox(&vcpd->ev_mbox, EVENT_NOMSG);
-
 }
 
-/* Handles the events on ev_q IAW the event_handlers[].  Returns the number of
- * events handled. */
-int handle_event_q(struct event_queue *ev_q)
+/* Handles the events on ev_q IAW the event_handlers[].  If the ev_q is
+ * application specific, then this will dispatch/handle based on its flags. */
+void handle_event_q(struct event_queue *ev_q)
 {
-	return handle_mbox(ev_q->ev_mbox, ev_q->ev_flags);
+	/* If the program wants to handle the ev_q on its own: */
+	if (ev_q->ev_flags & (EVENT_JUSTHANDLEIT | EVENT_THREAD)) {
+		if (!ev_q->ev_handler) {
+			printf("No ev_handler installed for ev_q %08p, aborting!\n", ev_q);
+			return;
+		}
+		if (ev_q->ev_flags & EVENT_JUSTHANDLEIT) {
+			/* Remember this can't block or page fault */
+			ev_q->ev_handler(ev_q);
+		} else if (ev_q->ev_flags & EVENT_THREAD) {
+			/* 2LS sched op.  The 2LS can use an existing thread if it wants,
+			 * but do so inside spawn_thread() */
+			if (sched_ops->spawn_thread)
+				sched_ops->spawn_thread((uintptr_t)ev_q->ev_handler, ev_q);
+			else
+				printf("2LS can't spawn a thread for ev_q %08p\n", ev_q);
+		}
+		return;
+	}
+	handle_mbox(ev_q->ev_mbox, ev_q->ev_flags);
 }
