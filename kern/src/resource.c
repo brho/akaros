@@ -46,6 +46,10 @@ ssize_t core_request(struct proc *p)
 	/* There are a few things broken for now if you don't have a current_tf */
 	assert(current_tf);
 	spin_lock(&p->proc_lock);
+	if (p->state == PROC_DYING) {
+		return -EFAIL;
+		spin_unlock(&p->proc_lock);
+	}
 	/* check to see if this is a full deallocation.  for cores, it's a
 	 * transition from _M to _S.  Will be issues with handling this async. */
 	if (!p->resources[RES_CORES].amt_wanted) {
@@ -146,6 +150,8 @@ ssize_t core_request(struct proc *p)
 				 * descheduled? */
 				panic("Not supporting RUNNABLE_S -> RUNNABLE_M yet.\n");
 				break;
+			case (PROC_DYING):
+				warn("Dying, core request coming from %d\n", core_id());
 			default:
 				break;
 		}

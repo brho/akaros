@@ -822,6 +822,10 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 				schedule_proc(p);
 			}
 			break;
+		case (PROC_DYING):
+			/* just return and take the death message (which should be otw) */
+			spin_unlock(&p->proc_lock);
+			return;
 		default:
 			// there are races that can lead to this (async death, preempt, etc)
 			panic("Weird state(%s) in %s()", procstate2str(p->state),
@@ -1325,9 +1329,14 @@ void __proc_tlbshootdown(struct proc *p, uintptr_t start, uintptr_t end)
 				active_vcoreid++; /* next loop, skip the one we just used */
 			}
 			break;
+		case (PROC_DYING):
+			/* if it is dying, death messages are already on the way to all
+			 * cores, including ours, which will clear the TLB. */
+			break;
 		default:
 			/* will probably get this when we have the short handlers */
-			warn("Unexpected case in %s\n", __FUNCTION__);
+			warn("Unexpected case %s in %s", procstate2str(p->state),
+			     __FUNCTION__);
 	}
 }
 
