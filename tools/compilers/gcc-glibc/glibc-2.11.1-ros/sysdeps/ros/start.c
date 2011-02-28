@@ -11,6 +11,7 @@ void** __vcore_thread_control_blocks = NULL;
 weak_alias(__vcore_thread_control_blocks,vcore_thread_control_blocks)
 
 __thread int __vcoreid = 0;
+__thread bool __vcore_context = FALSE;
 
 void
 __vcore_entry(void)
@@ -43,6 +44,7 @@ _start(void)
 	{
 		set_tls_desc(__vcore_thread_control_blocks[id],id);
 		__vcoreid = id;
+		__vcore_context = TRUE;
 		vcore_entry();
 		failmsg("why did vcore_entry() return?");
 		goto diediedie;

@@ -6,6 +6,7 @@ extern "C" {
 #endif
 
 #include <arch/vcore.h>
+#include <sys/param.h>
 #include <string.h>
 
 /*****************************************************************************/
@@ -35,19 +36,45 @@ extern struct schedule_ops *sched_ops;
 
 /* Defined by glibc; Must be implemented by a user level threading library */
 extern void vcore_entry();
+/* Declared in glibc's start.c */
+extern __thread bool __vcore_context;
 
 /* Utility Functions */
 void *allocate_tls(void);
 
 /* Vcore API functions */
+static inline size_t max_vcores(void);
+static inline size_t num_vcores(void);
+static inline int vcore_id(void);
+static inline bool in_vcore_context(void);
+static inline void enable_notifs(uint32_t vcoreid);
+static inline void disable_notifs(uint32_t vcoreid);
 int vcore_init(void);
-int vcore_id(void);
 int vcore_request(size_t k);
 void vcore_yield(void);
-size_t max_vcores(void);
-size_t num_vcores(void);
 bool check_preempt_pending(uint32_t vcoreid);
 void clear_notif_pending(uint32_t vcoreid);
+
+/* Inlines */
+static inline size_t max_vcores(void)
+{
+	return MIN(__procinfo.max_vcores, MAX_VCORES);
+}
+
+static inline size_t num_vcores(void)
+{
+	return __procinfo.num_vcores;
+}
+
+static inline int vcore_id(void)
+{
+	return __vcoreid;
+}
+
+static inline bool in_vcore_context(void)
+{
+	return __vcore_context;
+}
 
 static inline void enable_notifs(uint32_t vcoreid)
 {

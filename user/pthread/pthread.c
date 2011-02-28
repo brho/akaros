@@ -87,6 +87,7 @@ void __attribute__((noreturn)) vcore_entry()
 
 	/* Should always have notifications disabled when coming in here. */
 	assert(vcpd->notif_enabled == FALSE);
+	assert(in_vcore_context());
 
 	check_preempt_pending(vcoreid);
 	handle_events(vcoreid);

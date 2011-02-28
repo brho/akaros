@@ -158,20 +158,6 @@ void vcore_yield()
 	sys_yield(0);
 }
 
-size_t max_vcores()
-{
-	return MIN(__procinfo.max_vcores, MAX_VCORES);
-}
-
-size_t num_vcores()
-{
-	return __procinfo.num_vcores;
-}
-
-int vcore_id()
-{
-	return __vcoreid;
-}
 
 /* Deals with a pending preemption (checks, responds).  If the 2LS registered a
  * function, it will get run.  Returns true if you got preempted.  Called

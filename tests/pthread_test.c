@@ -23,6 +23,7 @@ void *my_retvals[NUM_TEST_THREADS];
 __thread int my_id;
 void *yield_thread(void* arg)
 {	
+	assert(!in_vcore_context());
 	for (int i = 0; i < 10; i++) {
 		printf_safe("[A] pthread %d on vcore %d\n", pthread_self()->id, vcore_id());
 		pthread_yield();

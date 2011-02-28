@@ -32,6 +32,9 @@ int main(int argc, char** argv)
 
 	mcs_barrier_init(&b, max_vcores());
 
+	/* vcore_context test */
+	assert(!in_vcore_context());
+	
 	/* prep indirect ev_q.  Note we grab a big one */
 	indirect_q = get_big_event_q();
 	indirect_q->ev_flags = EVENT_IPI;
@@ -82,6 +85,8 @@ int main(int argc, char** argv)
 		retval = vcore_request(max_vcores());
 		//retval = vcore_request(5);
 		printf("This is vcore0, right after vcore_request, retval=%d\n", retval);
+		/* vcore_context test */
+		assert(!in_vcore_context());
 	}
 
 	/* test notifying my vcore2 */
@@ -127,6 +132,9 @@ void vcore_entry(void)
 	static bool first_time = TRUE;
 
 	temp = 0xcafebabe;
+	/* vcore_context test (don't need to do this anywhere) */
+	assert(in_vcore_context());
+
 /* begin: stuff userspace needs to do to handle notifications */
 
 	struct preempt_data *vcpd;
