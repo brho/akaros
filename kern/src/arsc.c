@@ -34,7 +34,7 @@ intreg_t inline syscall_async(struct proc *p, syscall_req_t *call)
 
 intreg_t sys_init_arsc(struct proc *p)
 {
-	kref_get(&p->kref, 1);		/* we're storing an external ref here */
+	proc_incref(p, 1);		/* we're storing an external ref here */
 	spin_lock_irqsave(&arsc_proc_lock);
 	TAILQ_INSERT_TAIL(&arsc_proc_list, p, proc_arsc_link);
 	spin_unlock_irqsave(&arsc_proc_lock);
@@ -55,7 +55,7 @@ void arsc_server(struct trapframe *tf)
 			process_generic_syscalls (p, MAX_ASRC_BATCH); 
 			if (p->state == PROC_DYING) {
 				TAILQ_REMOVE(&arsc_proc_list, p, proc_arsc_link);
-				kref_put(&p->kref);
+				proc_decref(p);
 				/* Need to break out, so the TAILQ_FOREACH doesn't flip out.
 				 * It's not fair, but we're not dealing with that yet anyway */
 				break;

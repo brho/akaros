@@ -306,7 +306,7 @@ static int sys_proc_create(struct proc *p, char *path, size_t path_l,
 	assert(insert_file(&new_p->open_files, dev_stderr, 0) == 2);
 	__proc_ready(new_p);
 	pid = new_p->pid;
-	kref_put(&new_p->kref);	/* give up the reference created in proc_create() */
+	proc_decref(new_p);	/* give up the reference created in proc_create() */
 	return pid;
 late_error:
 	proc_destroy(new_p);
@@ -327,17 +327,17 @@ static error_t sys_proc_run(struct proc *p, unsigned pid)
 	spin_lock(&p->proc_lock);
 	// make sure we have access and it's in the right state to be activated
 	if (!proc_controls(p, target)) {
-		kref_put(&target->kref);
+		proc_decref(target);
 		retval = -EPERM;
 	} else if (target->state != PROC_CREATED) {
-		kref_put(&target->kref);
+		proc_decref(target);
 		retval = -EINVAL;
 	} else {
 		__proc_set_state(target, PROC_RUNNABLE_S);
 		schedule_proc(target);
 	}
 	spin_unlock(&p->proc_lock);
-	kref_put(&target->kref);
+	proc_decref(target);
 	return retval;
 }
 
@@ -355,7 +355,7 @@ static error_t sys_proc_destroy(struct proc *p, pid_t pid, int exitcode)
 		return -1;
 	}
 	if (!proc_controls(p, p_to_die)) {
-		kref_put(&p_to_die->kref);
+		proc_decref(p_to_die);
 		set_errno(EPERM);
 		return -1;
 	}
@@ -367,7 +367,7 @@ static error_t sys_proc_destroy(struct proc *p, pid_t pid, int exitcode)
 	}
 	proc_destroy(p_to_die);
 	/* we only get here if we weren't the one to die */
-	kref_put(&p_to_die->kref);
+	proc_decref(p_to_die);
 	return ESUCCESS;
 }
 
@@ -377,9 +377,9 @@ static int sys_proc_yield(struct proc *p, bool being_nice)
 	 * early.  If it doesn't return, it expects to eat our reference (for now).
 	 */
 	signal_current_sc(0);
-	kref_get(&p->kref, 1);
+	proc_incref(p, 1);
 	proc_yield(p, being_nice);
-	kref_put(&p->kref);
+	proc_decref(p);
 	return 0;
 }
 
@@ -607,8 +607,8 @@ static ssize_t sys_trywait(env_t* e, pid_t pid, int* status)
 
 		// if the wait succeeded, decref twice
 		if (ret == 0)
-			kref_put(&p->kref);
-		kref_put(&p->kref);
+			proc_decref(p);
+		proc_decref(p);
 		return ret;
 	}
 
@@ -655,9 +655,9 @@ static int sys_resource_req(struct proc *p, int type, unsigned int amt_wanted,
 	int retval;
 	signal_current_sc(0);
 	/* this might not return (if it's a _S -> _M transition) */
-	kref_get(&p->kref, 1);
+	proc_incref(p, 1);
 	retval = resource_req(p, type, amt_wanted, amt_wanted_min, flags);
-	kref_put(&p->kref);
+	proc_decref(p);
 	return retval;
 }
 
@@ -673,20 +673,20 @@ static int sys_notify(struct proc *p, int target_pid, unsigned int ev_type,
 		return -1;
 	}
 	if (!proc_controls(p, target)) {
-		kref_put(&target->kref);
+		proc_decref(target);
 		set_errno(EPERM);
 		return -1;
 	}
 	/* if the user provided an ev_msg, copy it in and use that */
 	if (u_msg) {
 		if (memcpy_from_user(p, &local_msg, u_msg, sizeof(struct event_msg))) {
-			kref_put(&target->kref);
+			proc_decref(target);
 			set_errno(EINVAL);
 			return -1;
 		}
 	}
 	send_kernel_event(target, &local_msg, 0);
-	kref_put(&target->kref);
+	proc_decref(target);
 	return 0;
 }
 

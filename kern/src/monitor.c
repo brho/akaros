@@ -300,7 +300,7 @@ int mon_bin_run(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 	__proc_set_state(p, PROC_RUNNABLE_S);
 	schedule_proc(p);
 	spin_unlock(&p->proc_lock);
-	kref_put(&p->kref); /* let go of the reference created in proc_create() */
+	proc_decref(p); /* let go of the reference created in proc_create() */
 	kref_put(&program->f_kref);
 	/* Should never return from schedule (env_pop in there) also note you may
 	 * not get the process you created, in the event there are others floating
@@ -358,7 +358,7 @@ int mon_procinfo(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 			return 1;
 		}
 		proc_destroy(p);
-		kref_put(&p->kref);
+		proc_decref(p);
 	} else {
 		printk("Bad option\n");
 		return 1;
@@ -461,7 +461,7 @@ int mon_notify(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 		/* o/w, try and do what they want */
 		send_kernel_event(p, &msg, 0);
 	}
-	kref_put(&p->kref);
+	proc_decref(p);
 	return 0;
 }
 
@@ -497,14 +497,14 @@ int mon_measure(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 		begin = start_timing();
 #ifdef __CONFIG_APPSERVER__
 		printk("Warning: this will be inaccurate due to the appserver.\n");
-		end_refcnt = kref_refcnt(&p->kref) - p->procinfo->num_vcores - 1;
+		end_refcnt = kref_refcnt(&p->p_kref) - p->procinfo->num_vcores - 1;
 #endif /* __CONFIG_APPSERVER__ */
 		proc_destroy(p);
-		kref_put(&p->kref);
+		proc_decref(p);
 #ifdef __CONFIG_APPSERVER__
 		/* Won't be that accurate, since it's not actually going through the
 		 * __proc_free() path. */
-		spin_on(kref_refcnt(&p->kref) != end_refcnt);	
+		spin_on(kref_refcnt(&p->p_kref) != end_refcnt);	
 #else
 		/* this is a little ghetto. it's not fully free yet, but we are also
 		 * slowing it down by messing with it, esp with the busy waiting on a
@@ -531,14 +531,14 @@ int mon_measure(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 			spin_on(p->procinfo->pcoremap[pcoreid].valid);
 			diff = stop_timing(begin);
 		} else { /* preempt all cores, warned but no delay */
-			end_refcnt = kref_refcnt(&p->kref) - p->procinfo->num_vcores;
+			end_refcnt = kref_refcnt(&p->p_kref) - p->procinfo->num_vcores;
 			begin = start_timing();
 			proc_preempt_all(p, 1000000);
 			/* a little ghetto, implies no one is using p */
-			spin_on(kref_refcnt(&p->kref) != end_refcnt);
+			spin_on(kref_refcnt(&p->p_kref) != end_refcnt);
 			diff = stop_timing(begin);
 		}
-		kref_put(&p->kref);
+		proc_decref(p);
 	} else if (!strcmp(argv[1], "preempt-warn")) {
 		if (argc < 3) {
 			printk("Give me a pid number.\n");
@@ -576,7 +576,7 @@ int mon_measure(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 			spin_on(p->procinfo->num_vcores > 1);
 			diff = stop_timing(begin);
 		}
-		kref_put(&p->kref);
+		proc_decref(p);
 	} else if (!strcmp(argv[1], "preempt-raw")) {
 		if (argc < 3) {
 			printk("Give me a pid number.\n");
@@ -605,17 +605,17 @@ int mon_measure(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 			/* TODO: (RMS), if num_vcores == 0, RUNNABLE_M, schedule */
 		} else { /* preempt all cores, no warning or waiting */
 			spin_lock(&p->proc_lock);
-			end_refcnt = kref_refcnt(&p->kref) - p->procinfo->num_vcores;
+			end_refcnt = kref_refcnt(&p->p_kref) - p->procinfo->num_vcores;
 			begin = start_timing();
 			self_ipi_pending = __proc_preempt_all(p);
 			/* TODO: (RMS), RUNNABLE_M, schedule */
 			spin_unlock(&p->proc_lock);
 			__proc_kmsg_pending(p, self_ipi_pending);
 			/* a little ghetto, implies no one else is using p */
-			spin_on(kref_refcnt(&p->kref) != end_refcnt);
+			spin_on(kref_refcnt(&p->p_kref) != end_refcnt);
 			diff = stop_timing(begin);
 		}
-		kref_put(&p->kref);
+		proc_decref(p);
 	} else {
 		printk("Bad option\n");
 		return 1;

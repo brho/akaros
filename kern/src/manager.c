@@ -67,7 +67,7 @@ char *p_envp[] = {"LD_LIBRARY_PATH=/lib", 0};
 	__proc_set_state((p), PROC_RUNNABLE_S);                                      \
 	spin_unlock(&(p)->proc_lock);                                                \
 	proc_run((p));                                                               \
-	kref_put(&(p)->kref);
+	proc_decref((p));
 
 #define quick_proc_create(x, p, f)                                               \
 	(f) = do_file_open((x), 0, 0);                                               \
@@ -92,7 +92,7 @@ char *p_envp[] = {"LD_LIBRARY_PATH=/lib", 0};
 	for (int i = 0; i < (c); i++)                                                \
 		cache_color_alloc(llc_cache, p->cache_colors_map);                       \
 	proc_run((p));                                                               \
-	kref_put(&(p)->kref);
+	proc_decref((p));
 
 #define quick_proc_color_create(x, p, c, f)                                      \
 	(f) = do_file_open((x), 0, 0);                                               \

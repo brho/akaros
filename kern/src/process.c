@@ -173,7 +173,7 @@ struct proc *pid2proc(pid_t pid)
 	spin_lock(&pid_hash_lock);
 	struct proc *p = hashtable_search(pid_hash, (void*)pid);
 	if (p)
-		if (!kref_get_not_zero(&p->kref, 1))
+		if (!kref_get_not_zero(&p->p_kref, 1))
 			p = 0;
 	spin_unlock(&pid_hash_lock);
 	return p;
@@ -273,7 +273,7 @@ error_t proc_alloc(struct proc **pp, struct proc *parent)
 	{ INITSTRUCT(*p)
 
 	/* one reference for the proc existing, and one for the ref we pass back. */
-	kref_init(&p->kref, __proc_free, 2);
+	kref_init(&p->p_kref, __proc_free, 2);
 	// Setup the default map of where to get cache colors from
 	p->cache_colors_map = global_cache_colors_map;
 	p->next_cache_color = 0;
@@ -376,12 +376,12 @@ struct proc *proc_create(struct file *prog, char **argv, char **envp)
  * address space and deallocate any other used memory. */
 static void __proc_free(struct kref *kref)
 {
-	struct proc *p = container_of(kref, struct proc, kref);
+	struct proc *p = container_of(kref, struct proc, p_kref);
 	physaddr_t pa;
 
 	printd("[PID %d] freeing proc: %d\n", current ? current->pid : 0, p->pid);
 	// All parts of the kernel should have decref'd before __proc_free is called
-	assert(kref_refcnt(&p->kref) == 0);
+	assert(kref_refcnt(&p->p_kref) == 0);
 
 	kref_put(&p->fs_env.root->d_kref);
 	kref_put(&p->fs_env.pwd->d_kref);
@@ -422,6 +422,19 @@ bool proc_controls(struct proc *actor, struct proc *target)
 	return ((actor == target) || (target->ppid == actor->pid));
 }
 
+/* Helper to incref by val.  Using the helper to help debug/interpose on proc
+ * ref counting.  Note that pid2proc doesn't use this interface. */
+void proc_incref(struct proc *p, unsigned int val)
+{
+	kref_get(&p->p_kref, val);
+}
+
+/* Helper to decref for debugging.  Don't directly kref_put() for now. */
+void proc_decref(struct proc *p)
+{
+	kref_put(&p->p_kref);
+}
+
 /* Helper, makes p the 'current' process, dropping the old current/cr3.  Don't
  * incref - this assumes the passed in reference already counted 'current'. */
 static void __set_proc_current(struct proc *p)
@@ -439,7 +452,7 @@ static void __set_proc_current(struct proc *p)
 		 * rarely happen, since we usually proactively leave process context,
 		 * but this is the fallback. */
 		if (pcpui->cur_proc)
-			kref_put(&pcpui->cur_proc->kref);
+			proc_decref(pcpui->cur_proc);
 		pcpui->cur_proc = p;
 	}
 }
@@ -486,7 +499,7 @@ void proc_run(struct proc *p)
 			 * current.  Decref if current is already properly set, otherwise
 			 * ensure current is set. */
 			if (p == current)
-				kref_put(&p->kref);
+				proc_decref(p);
 			else
 				__set_proc_current(p);
 			/* We restartcore, instead of startcore, since startcore is a bit
@@ -504,7 +517,7 @@ void proc_run(struct proc *p)
 				__proc_set_state(p, PROC_RUNNING_M);
 				/* Up the refcnt, since num_vcores are going to start using this
 				 * process and have it loaded in their 'current'. */
-				kref_get(&p->kref, p->procinfo->num_vcores);
+				proc_incref(p, p->procinfo->num_vcores);
 				/* If the core we are running on is in the vcoremap, we will get
 				 * an IPI (once we reenable interrupts) and never return. */
 				if (is_mapped_vcore(p, core_id()))
@@ -645,7 +658,7 @@ void proc_destroy(struct proc *p)
 			// here's how to do it manually
 			if (current == p) {
 				lcr3(boot_cr3);
-				kref_put(&p->kref);		/* this decref is for the cr3 */
+				proc_decref(p);		/* this decref is for the cr3 */
 				current = NULL;
 			}
 			#endif
@@ -680,8 +693,8 @@ void proc_destroy(struct proc *p)
 	 * will help if these files (or similar objects in the future) hold
 	 * references to p (preventing a __proc_free()). */
 	close_all_files(&p->open_files, FALSE);
-	/* This kref_put() is for the process's existence. */
-	kref_put(&p->kref);
+	/* This decref is for the process's existence. */
+	proc_decref(p);
 	/* Unlock and possible decref and wait.  A death IPI should be on its way,
 	 * either from the RUNNING_S one, or from proc_take_cores with a __death.
 	 * in general, interrupts should be on when you call proc_destroy locally,
@@ -832,7 +845,7 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 			      __FUNCTION__);
 	}
 	spin_unlock(&p->proc_lock);
-	kref_put(&p->kref);			/* need to eat the ref passed in */
+	proc_decref(p);			/* need to eat the ref passed in */
 	/* TODO: (RMS) If there was a change to the idle cores, try and give our
 	 * core to someone who was preempted. */
 	/* Clean up the core and idle.  For mgmt cores, they will ultimately call
@@ -1105,7 +1118,7 @@ bool __proc_give_cores(struct proc *SAFE p, uint32_t *pcorelist, size_t num)
 		case (PROC_RUNNING_M):
 			/* Up the refcnt, since num cores are going to start using this
 			 * process and have it loaded in their 'current'. */
-			kref_get(&p->kref, num);
+			proc_incref(p, num);
 			__seq_start_write(&p->procinfo->coremap_seqctr);
 			for (int i = 0; i < num; i++) {
 				free_vcoreid = get_free_vcoreid(p, free_vcoreid);
@@ -1264,7 +1277,7 @@ bool __proc_take_allcores(struct proc *SAFE p, amr_t message,
 void __proc_kmsg_pending(struct proc *p, bool ipi_pending)
 {
 	if (ipi_pending) {
-		kref_put(&p->kref);
+		proc_decref(p);
 		process_routine_kmsg(0);
 		panic("stack-killing kmsg not found in %s!!!", __FUNCTION__);
 	}
@@ -1352,7 +1365,7 @@ void __startcore(trapframe_t *tf, uint32_t srcid, void *a0, void *a1, void *a2)
 	assert(p_to_run);
 	/* the sender of the amsg increfed, thinking we weren't running current. */
 	if (p_to_run == current)
-		kref_put(&p_to_run->kref);
+		proc_decref(p_to_run);
 	vcoreid = get_vcoreid(p_to_run, pcoreid);
 	vcpd = &p_to_run->procdata->vcore_preempt_data[vcoreid];
 	printd("[kernel] startcore on physical core %d for process %d's vcore %d\n",
@@ -1521,7 +1534,7 @@ void print_proc_info(pid_t pid)
 	printk("PID: %d\n", p->pid);
 	printk("PPID: %d\n", p->ppid);
 	printk("State: 0x%08x\n", p->state);
-	printk("Refcnt: %d\n", atomic_read(&p->kref.refcount) - 1);
+	printk("Refcnt: %d\n", atomic_read(&p->p_kref.refcount) - 1);
 	printk("Flags: 0x%08x\n", p->env_flags);
 	printk("CR3(phys): 0x%08x\n", p->env_cr3);
 	printk("Num Vcores: %d\n", p->procinfo->num_vcores);
@@ -1550,5 +1563,5 @@ void print_proc_info(pid_t pid)
 	//print_trapframe(&p->env_tf);
 	/* no locking / unlocking or refcnting */
 	// spin_unlock(&p->proc_lock);
-	kref_put(&p->kref);
+	proc_decref(p);
 }

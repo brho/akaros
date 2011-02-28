@@ -33,7 +33,7 @@ void schedule_init(void)
 void schedule_proc(struct proc *p)
 {
 	/* up the refcnt since we are storing the reference */
-	kref_get(&p->kref, 1);
+	proc_incref(p, 1);
 	spin_lock_irqsave(&runnablelist_lock);
 	printd("Scheduling PID: %d\n", p->pid);
 	TAILQ_INSERT_TAIL(&proc_runnablelist, p, proc_link);
@@ -52,7 +52,7 @@ void deschedule_proc(struct proc *p)
 	TAILQ_REMOVE(&proc_runnablelist, p, proc_link);
 	spin_unlock_irqsave(&runnablelist_lock);
 	/* down the refcnt, since its no longer stored */
-	kref_put(&p->kref);
+	proc_decref(p);
 	return;
 }
 
@@ -73,7 +73,7 @@ void schedule(void)
 		printd("PID of proc i'm running: %d\n", p->pid);
 		/* proc_run will either eat the ref, or we'll decref manually. */
 		proc_run(p);
-		kref_put(&p->kref);
+		proc_decref(p);
 	} else {
 		spin_unlock_irqsave(&runnablelist_lock);
 	}

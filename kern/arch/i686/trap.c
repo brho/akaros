@@ -249,7 +249,7 @@ trap_dispatch(trapframe_t *tf)
 				panic("Damn Damn!  Unhandled trap in the kernel!");
 			else {
 				warn("Unexpected trap from userspace");
-				kref_get(&current->kref, 1);
+				proc_incref(current, 1);
 				proc_destroy(current);
 				return;
 			}
@@ -374,7 +374,7 @@ void page_fault_handler(struct trapframe *tf)
 		       current->pid, prot & PROT_READ ? "READ" : "WRITE", fault_va,
 		       tf->tf_eip, core_id(), err);
 		print_trapframe(tf);
-		kref_get(&current->kref, 1);
+		proc_incref(current, 1);
 		proc_destroy(current);
 	}
 }

@@ -73,7 +73,7 @@ void sleep_on(struct semaphore *sem)
 	kthread->sysc = pcpui->cur_sysc;
 	pcpui->cur_sysc = 0;				/* catch bugs */
 	if (kthread->proc)
-		kref_get(&kthread->proc->kref, 1);
+		proc_incref(kthread->proc, 1);
 	/* Save the context, toggle blocking for the reactivation */
 	save_kernel_tf(&kthread->context);
 	if (!blocking)
@@ -106,7 +106,7 @@ unwind_sleep_prep:
 	/* Restore the core's current and default stacktop */
 	current = kthread->proc;			/* arguably unnecessary */
 	if (kthread->proc)
-		kref_put(&kthread->proc->kref);
+		proc_decref(kthread->proc);
 	set_stack_top(kthread->stacktop);
 	/* Save the allocs as the spare */
 	assert(!pcpui->spare);
@@ -151,7 +151,7 @@ void restart_kthread(struct kthread *kthread)
 		/* __launch_kthread() should have abandoned if it was diff */
 		assert(current == kthread->proc);
 		/* no longer need this ref, current holds it */
-		kref_put(&kthread->proc->kref);
+		proc_decref(kthread->proc);
 	} else {
 		/* ref gets transfered (or it was 0 (no ref held)) */
 		current = kthread->proc;

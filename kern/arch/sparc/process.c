@@ -42,6 +42,6 @@ void __abandon_core(void)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	lcr3(boot_cr3);
-	kref_put(&pcpui->cur_proc->kref);
+	proc_decref(pcpui->cur_proc);
 	pcpui->cur_proc = 0;
 }

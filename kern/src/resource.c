@@ -169,7 +169,7 @@ ssize_t core_request(struct proc *p)
 		 * (just like in proc_destroy).  it also needs to decref, to consume the
 		 * reference that came into this function (since we don't return).  */
 		if (need_to_idle) {
-			kref_put(&p->kref);
+			proc_decref(p);
 			abandon_core();
 			smp_idle();
 		}

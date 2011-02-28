@@ -331,7 +331,7 @@ unhandled_trap(trapframe_t* state)
 		spin_unlock(&screwup_lock);
 
 		assert(current);
-		kref_get(&current->kref, 1);
+		proc_incref(current, 1);
 		proc_destroy(current);
 
 		panic("I shouldn't have gotten here!");
