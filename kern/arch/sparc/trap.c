@@ -441,8 +441,11 @@ handle_pop_tf(trapframe_t* state)
 	set_current_tf(pcpui, &state);
 
 	trapframe_t tf, *tf_p = &tf;
-	if(memcpy_from_user(current,&tf,(void*)state->gpr[8],sizeof(tf)))
+	if (memcpy_from_user(current,&tf,(void*)state->gpr[8],sizeof(tf))) {
+		proc_incref(current, 1);
 		proc_destroy(current);
+		assert(0);
+	}
 
 	proc_secure_trapframe(&tf);
 	set_current_tf(pcpui, &tf_p);
@@ -453,8 +456,11 @@ void
 handle_set_tf(trapframe_t* state)
 {
 	advance_pc(state);
-	if(memcpy_to_user(current,(void*)state->gpr[8],state,sizeof(*state)))
+	if (memcpy_to_user(current,(void*)state->gpr[8],state,sizeof(*state))) {
+		proc_incref(current, 1);
 		proc_destroy(current);
+		assert(0);
+	}
 }
 
 void

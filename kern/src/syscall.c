@@ -537,7 +537,11 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	env_user_mem_free(p, 0, UMAPTOP);
 	if (load_elf(p, program)) {
 		kref_put(&program->f_kref);
+		/* Need an edible reference for proc_destroy in case it doesn't return.
+		 * sys_exec was given current's ref (counted once just for current) */
+		proc_incref(p, 1);
 		proc_destroy(p);
+		proc_decref(p);
 		/* We don't want to do anything else - we just need to not accidentally
 		 * return to the user (hence the all_out) */
 		goto all_out;

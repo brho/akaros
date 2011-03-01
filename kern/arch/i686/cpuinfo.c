@@ -164,7 +164,7 @@ void backtrace(void)
 	eip = *(ebp + 1) - 1;
 	// jump back a frame (out of backtrace)
 	ebp = (uint32_t*)(*ebp);
-	cprintf("Stack Backtrace:\n");
+	printk("Stack Backtrace on Core %d:\n", core_id());
 	// on each iteration, ebp holds the stack frame and eip an addr in that func
 	while (ebp != 0) {
 		debuginfo_eip(eip, &debuginfo);

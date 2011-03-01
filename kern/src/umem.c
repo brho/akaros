@@ -111,7 +111,9 @@ void *user_mem_check(struct proc *p, const void *DANGEROUS va, size_t len,
  * @return VA a pointer of type COUNT(len) to the address range
  * @return NULL trying to access this range of virtual addresses is not allowed
  *              process 'p' is destroyed
- */
+ *
+ * GIANT WARNING: this could fuck up your refcnting for p if p was an
+ * edible/refcounted reference.  (fix is to return, or just not use this) */
 void *user_mem_assert(struct proc *p, const void *DANGEROUS va, size_t len,
                        int perm)
 {
@@ -124,7 +126,10 @@ void *user_mem_assert(struct proc *p, const void *DANGEROUS va, size_t len,
 	if (!res) {
 		cprintf("[%08x] user_mem_check assertion failure for "
 			"va %08x\n", p->pid, user_mem_check_addr);
+		/* assuming this is used with an inedible reference */
+		proc_incref(p, 1);
 		proc_destroy(p);	// may not return
+		assert(0);
         return NULL;
 	}
     return res;

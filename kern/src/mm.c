@@ -8,7 +8,10 @@
  * In general, error checking / bounds checks are done in the main function
  * (e.g. mmap()), and the work is done in a do_ function (e.g. do_mmap()).
  * Versions of those functions that are called when the memory lock (proc_lock
- * for now) is already held begin with __ (e.g. __do_munmap()).  */
+ * for now) is already held begin with __ (e.g. __do_munmap()).
+ *
+ * Note that if we were called from kern/src/syscall.c, we probably don't have
+ * an edible reference to p. */
 
 #include <frontend.h>
 #include <ros/common.h>
@@ -332,6 +335,7 @@ void *__do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 {
 	len = ROUNDUP(len, PGSIZE);
 	int num_pages = len / PGSIZE;
+	int retval;
 
 	struct vm_region *vmr, *vmr_temp;
 
@@ -364,16 +368,25 @@ void *__do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 	}
 	addr = vmr->vm_base;		/* so we know which pages to populate later */
 	vmr = merge_me(vmr);		/* attempts to merge with neighbors */
-	/* Fault in pages now if MAP_POPULATE - die on failure.  We want to populate
-	 * the region requested, but we need to be careful and only populate the
-	 * requested length and not any merged regions, which is why we set addr
-	 * above and use it here. */
+	/* Fault in pages now if MAP_POPULATE.  We want to populate the region
+	 * requested, but we need to be careful and only populate the requested
+	 * length and not any merged regions, which is why we set addr above and use
+	 * it here.
+	 *
+	 * If HPF errors out, we'll warn for now, since it is likely a bug in
+	 * userspace, though since POPULATE is an opportunistic thing, we don't need
+	 * to actually kill the process.  If we do kill them, make sure to
+	 * incref/decref around proc_destroy, since we likely don't have an edible
+	 * reference to p. */
 	if (flags & MAP_POPULATE)
-		for (int i = 0; i < num_pages; i++)
-			if (__handle_page_fault(p, addr + i*PGSIZE, vmr->vm_prot)) {
-				spin_unlock(&p->proc_lock);
-				proc_destroy(p);
+		for (int i = 0; i < num_pages; i++) {
+			retval = __handle_page_fault(p, addr + i * PGSIZE, vmr->vm_prot);
+			if (retval) {
+				warn("do_mmap() failing (%d) on addr %08p with prot %p\n",
+				     retval, addr + i * PGSIZE,  vmr->vm_prot);
+				break;
 			}
+		}
 	return (void*SAFE)TC(addr);
 }
 

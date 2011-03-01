@@ -251,6 +251,7 @@ trap_dispatch(trapframe_t *tf)
 				warn("Unexpected trap from userspace");
 				proc_incref(current, 1);
 				proc_destroy(current);
+				assert(0);
 				return;
 			}
 	}
@@ -376,6 +377,7 @@ void page_fault_handler(struct trapframe *tf)
 		print_trapframe(tf);
 		proc_incref(current, 1);
 		proc_destroy(current);
+		assert(0);
 	}
 }
 
