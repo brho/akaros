@@ -171,8 +171,8 @@ install-libs:
 	done
 
 fill-kfs: install-libs
-	@rm -rf $(FIRST_INITRAMFS_PATH))/lib
-	@cp -R $(GCC_ROOT)/$(TARGET_ARCH)-ros/lib $(FIRST_INITRAMFS_PATH))
+	@rm -rf $(FIRST_INITRAMFS_PATH)/lib
+	@cp -R $(GCC_ROOT)/$(TARGET_ARCH)-ros/lib $(FIRST_INITRAMFS_PATH)
 
 userclean:
 	@for i in $(USER_LIBS) ; do \

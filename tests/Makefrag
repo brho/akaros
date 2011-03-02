@@ -30,8 +30,8 @@ $(OBJDIR)/$(TESTS_DIR)/%: $(TESTS_LDDEPENDS)
 	fi
 
 install-tests: $(TESTS_EXECS)
-	@echo + install [TESTS] $(FIRST_INITRAMFS_PATH))/bin/
+	@echo + install [TESTS] $(FIRST_INITRAMFS_PATH)/bin/
 	$(V)for i in "$(TESTS_EXECS)"; \
 	do \
-	  cp $$i $(FIRST_INITRAMFS_PATH))/bin/; \
+	  cp $$i $(FIRST_INITRAMFS_PATH)/bin/; \
 	done;
