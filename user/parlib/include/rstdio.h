@@ -5,15 +5,15 @@
 #include <stdio.h>
 #include <stdarg.h>
 
-void debugfmt(void (*putch)(int, void**), void **putdat, const char *fmt, ...);
-void vdebugfmt(void (*putch)(int, void**), void **putdat, const char *fmt, va_list);
+void ros_debugfmt(void (*putch)(int, void**), void **putdat, const char *fmt, ...);
+void ros_vdebugfmt(void (*putch)(int, void**), void **putdat, const char *fmt, va_list);
 
-int	debug(const char *fmt, ...);
-int	vdebug(const char *fmt, va_list);
+int	ros_debug(const char *fmt, ...);
+int	ros_vdebug(const char *fmt, va_list);
 
 #ifndef __CONFIG_APPSERVER__
 #undef printf
-#define printf(...) debug(__VA_ARGS__)
+#define printf(...) ros_debug(__VA_ARGS__)
 #endif /* __CONFIG_APPSERVER__ */
 
 //#define PRINTD_DEBUG

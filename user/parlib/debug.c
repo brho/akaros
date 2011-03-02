@@ -32,26 +32,26 @@ static void putch(int ch, debugbuf_t **b)
 	(*b)->cnt++;
 }
 
-int vdebug(const char *fmt, va_list ap)
+int ros_vdebug(const char *fmt, va_list ap)
 {
 	debugbuf_t b;
 	debugbuf_t *COUNT(1) bp = &b;
 
 	b.idx = 0;
 	b.cnt = 0;
-	vdebugfmt((void*)putch, (void*)&bp, fmt, ap);
+	ros_vdebugfmt((void*)putch, (void*)&bp, fmt, ap);
 	sys_cputs(b.buf, b.idx);
 
 	return b.cnt;
 }
 
-int debug(const char *fmt, ...)
+int ros_debug(const char *fmt, ...)
 {
 	va_list ap;
 	int cnt;
 
 	va_start(ap, fmt);
-	cnt = vdebug(fmt, ap);
+	cnt = ros_vdebug(fmt, ap);
 	va_end(ap);
 
 	return cnt;

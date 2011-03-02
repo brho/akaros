@@ -55,11 +55,11 @@ static long long getint(va_list *ap, int lflag)
 
 // Main function to format and print a string.
 #ifdef __DEPUTY__
-void debugfmt(void (*putch)(int, TV(t)), TV(t) putdat, const char *fmt, ...);
-void vdebugfmt(void (*putch)(int, TV(t)), TV(t) putdat, const char *fmt, va_list ap)
+void ros_debugfmt(void (*putch)(int, TV(t)), TV(t) putdat, const char *fmt, ...);
+void ros_vdebugfmt(void (*putch)(int, TV(t)), TV(t) putdat, const char *fmt, va_list ap)
 #else
-void debugfmt(void (*putch)(int, void**), void **putdat, const char *fmt, ...);
-void vdebugfmt(void (*putch)(int, void**), void **putdat, const char *fmt, va_list ap)
+void ros_debugfmt(void (*putch)(int, void**), void **putdat, const char *fmt, ...);
+void ros_vdebugfmt(void (*putch)(int, void**), void **putdat, const char *fmt, va_list ap)
 #endif
 {
 	register const char *NTS p;
@@ -220,15 +220,15 @@ void vdebugfmt(void (*putch)(int, void**), void **putdat, const char *fmt, va_li
 }
 
 #ifdef __DEPUTY__
-void debugfmt(void (*putch)(int, TV(t)), TV(t) putdat, const char *fmt, ...)
+void ros_debugfmt(void (*putch)(int, TV(t)), TV(t) putdat, const char *fmt, ...)
 #else
-void debugfmt(void (*putch)(int, void**), void **putdat, const char *fmt, ...)
+void ros_debugfmt(void (*putch)(int, void**), void **putdat, const char *fmt, ...)
 #endif
 {
 	va_list ap;
 
 	va_start(ap, fmt);
-	vdebugfmt(putch, putdat, fmt, ap);
+	ros_vdebugfmt(putch, putdat, fmt, ap);
 	va_end(ap);
 }
 
