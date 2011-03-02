@@ -47,8 +47,8 @@ ssize_t core_request(struct proc *p)
 	assert(current_tf);
 	spin_lock(&p->proc_lock);
 	if (p->state == PROC_DYING) {
-		return -EFAIL;
 		spin_unlock(&p->proc_lock);
+		return -EFAIL;
 	}
 	/* check to see if this is a full deallocation.  for cores, it's a
 	 * transition from _M to _S.  Will be issues with handling this async. */
