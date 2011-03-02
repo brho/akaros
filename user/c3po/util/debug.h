@@ -4,6 +4,7 @@
 
 #include <stdlib.h>
 #include <sys/syscall.h>
+#include <assert.h>
 #include <stdarg.h>
 #include <errno.h>
 #include <string.h>
@@ -39,17 +40,6 @@ do { \
   warning("%s: %s\n",str,strerror(errno)); \
 } while(0)
 */
-
-#undef assert
-#if OPTIMIZE < 2
-void assert_failed(char *file, unsigned int line, const char *func, char *expr);
-#define assert(expr) \
-if( !(expr) ) { \
-  assert_failed(__FILE__, __LINE__, __FUNCTION__, __STRING(expr)); \
-}
-#else
-#define assert(expr) do { } while(0)
-#endif
 
 void real_debug(const char *func, const char *fmt, ...) __attribute__ ((format (printf,2,3)));
 void real_toutput(int tid, const char *func, const char *fmt, ...) __attribute__ ((format (printf,3,4)));

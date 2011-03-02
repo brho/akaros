@@ -14,6 +14,7 @@
 #include "debug.h"
 #include "clock.h"
 #include "config.h"
+#include <vcore.h>
 
 
 #define DBG_NO_TIMING -12312
@@ -26,7 +27,7 @@ cpu_tick_t ticks_rdiff = 0;
 static cpu_tick_t vnow_prev = 0;
 static cpu_tick_t vrnow_prev = 0;
 
-void init_debug() __attribute__((constructor));
+//void init_debug() __attribute__((constructor));
 void init_debug() {
   init_cycle_clock();
   vnow_prev  = virtual_start_ticks;
@@ -65,6 +66,13 @@ static inline void output_aux(int tid, const char *func, const char *fmt, va_lis
                    (vrnow-real_start_ticks)/ticks_per_microsecond, 
                    vrnow - vrnow_prev);
 #endif
+    assert(ret > 0);
+    len += ret;
+  }
+
+  // add the vcore number
+  if( func ) {
+    ret = snprintf(str+len, sizeof(str)-1-len, "vcore %d - ", vcore_id());
     assert(ret > 0);
     len += ret;
   }

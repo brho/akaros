@@ -1,7 +1,7 @@
 TARGET_ARCH ?= i686
 CFLAGS = -O2 -static -std=gnu99 -fomit-frame-pointer -DOPTIMIZE=2 -DNO_TIMING
 LIBNAME = c3po
-SUBDIRS = util stack coro threads #aio 
+SUBDIRS = util stack threads #aio 
 V ?= @
 
 GCCPREFIX ?= $(TARGET_ARCH)-ros-
@@ -13,11 +13,10 @@ OBJDIR := $(SRCDIR)obj
 INCDIR = $(SRCDIR)include
 UTILDIR = $(SRCDIR)util
 STACKDIR = $(SRCDIR)stack
-CORODIR = $(SRCDIR)coro
 THREADSDIR = $(SRCDIR)threads
 AIODIR = $(SRCDIR)aio
 
-INCS = -I$(INCDIR) -I$(UTILDIR) -I$(THREADSDIR) -I$(STACKDIR) -I$(CORODIR) -I.
+INCS = -I$(INCDIR) -I$(UTILDIR) -I$(THREADSDIR) -I$(STACKDIR) -I.
 FINALLIB = $(OBJDIR)/lib$(LIBNAME).a
 
 uc = $(shell echo $(1) | tr a-z A-Z)

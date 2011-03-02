@@ -1,20 +1,31 @@
-#include "coro.h"
+// ROS Specific headers
+#include <vcore.h>
+#include <mcs.h>
+#include <ros/syscall.h>
+
+// Capriccio Specific headers
+#include "ucontext.h"
 #include "threadlib_internal.h"
 #include "util.h"
 #include "config.h"
 #include "blocking_graph.h"
 #include "stacklink.h"
 
+// Glibc Specific headers
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <execinfo.h>
 #include <sys/time.h>
 #include <unistd.h>
-#include <ros/syscall.h>
+#include <syscall.h>
 #include <sys/syscall.h>
 
-// comment out, to enable debugging in this file
+/******************************************************************************/
+/******************************* Configuration ********************************/
+/******************************************************************************/
+
+// Comment out, to enable debugging in this file
 #ifndef DEBUG_threadlib_c
 #undef debug
 #define debug(...)
@@ -22,383 +33,445 @@
 #define tdebug(...)
 #endif
 
-// FIXME: this doesn't work properly yet in all cases at program exit.
-// The performance does seem slightly better, however.
-//#define NO_SCHEDULER_THREAD 1
-
-
-// sanity check THREAD_KEY_MAX and size of key_data_count
-//#if THREAD_KEY_MAX >> (sizeof(thread_t.key_data_count)-1) != 1
-//#error not enough space in thread_t.key_data_count
-//#endif
-
-
-// The PID of the main process.  This is useful to prevent errors when
-// forked children call exit_func().
-//
-// FIXME: unfortunately, this still doesn't seem to work, as AIO gets
-// hosed if a forked child exits before the main thread.  This may be
-// a bug w/ AIO, however.
-static pid_t capriccio_main_pid;
-
-// flag to indicate whether or not to override syscalls.  We don't
-// override durring initialization, in order to avoid loops w/
-// libraries such as perfctr that must do IO.  We also don't override
-// syscalls after SIG_ABRT, so we can get proper core dumps.
-int cap_override_rw = 1;
-
-// flag so the signal stuff knows that the current thread is running in the scheduler
-int in_scheduler = 0;
-
-void **start_node_addrs = NULL;
-int *start_node_stacks = NULL;
-
+// Chose the size of the scheduler threads stack in the case of using
+// NIO vs. AIO
 #ifdef USE_NIO
 #define SCHEDULER_STACK_SIZE 1024*128
 #else
 #define SCHEDULER_STACK_SIZE 1024
 #endif
 
+/******************************************************************************/
+/***************************** Global Variables *******************************/
+/******************************************************************************/
+
+// The PID of the main process.  This is useful to prevent errors when
+// forked children call exit_func().
+static pid_t main_pid;
+
+// Variable used to hold the time when the program first started executing
+static unsigned long long start_usec;
+
+// Variables used to store the amount of time spent in different parts of 
+// the application code: the scheduler, main thread, all other threads
+static struct {
+  cap_timer_t scheduler;
+  cap_timer_t main;
+  cap_timer_t app;
+} timers;
+
+// Pointer to the main thread
 static thread_t* main_thread=NULL;
-#ifndef NO_SCHEDULER_THREAD
-thread_t* scheduler_thread=NULL;
-#endif
-thread_t* current_thread=NULL;
-static int current_thread_exited = 0;
 
-// a list of all threads, used by sig_handler()
-pointer_list_t *threadlist = NULL;
+// Lock used to restrict access to all thread lists, thread state changes,
+// and the count of threads in different states
+static mcs_lock_t thread_lock = MCS_LOCK_INIT;
 
-static int num_daemon_threads = 0;
-static int num_suspended_threads = 0;
-int num_runnable_threads = 0;
-static int num_zombie_threads = 0;
-#if OPTIMIZE < 1
-#define sanity_check_threadcounts() {\
-   assert(num_daemon_threads >= 0); \
-   assert(num_suspended_threads >= 0); \
-   assert(num_runnable_threads >= 0); \
-   assert(num_zombie_threads >= 0); \
-   assert(num_runnable_threads + num_suspended_threads + num_zombie_threads == pl_size(threadlist)); \
-}
-#define sanity_check_io_stats() {\
-   assert(sockio_stats.requests == sockio_stats.active + sockio_stats.completions + sockio_stats.errors); \
-   assert(diskio_stats.requests == diskio_stats.active + diskio_stats.completions + diskio_stats.errors); \
-}
-#else
-#define sanity_check_threadcounts()
-#define sanity_check_io_stats()
-#endif
+// A list of all threads in the system (i.e. spawned, but not exited yet)
+static pointer_list_t *threadlist = NULL;
 
-// modular scheduling functions
+// Variable used to maintain global counts of how 
+// many threads are in a given state (used only for bookkeeping)
+static struct {
+  int running;
+  int runnable;
+  int suspended;
+  int detached;
+  int zombie;
+  int total;
+} num_threads = {0, 0, 0, 0};
+
+// Set of global flags
+static struct {
+  // Flag to indicate whether or not to override syscalls.  We don't
+  // override during initialization, in order to avoid loops w/
+  // libraries such as perfctr that must do IO.  We also don't override
+  // syscalls after SIG_ABRT, so we can get proper core dumps.
+  // Only really necessary for linux, as ROS does all IO asyncronously.
+  volatile unsigned int override_syscalls: 1;
+
+  // Flags regarding the state of the main_thread
+  volatile unsigned int main_exited: 1;
+  volatile unsigned int exit_func_done: 1;
+} gflags = {1, 0, 0};
+
+// Set of thread local flags (only useful in scheduler or vcore context)
+static __thread struct {
+  // Flag indicating whether we are currently running scheduler code 
+  // on the core or not
+  int in_scheduler: 1;
+} lflags = {0};
+
+// Function pointers for plugging in modular scheduling algorithms
+// Run queues are maintained locally in each algorithm
 static void (*sched_init)(void); 
 static void (*sched_add_thread)(thread_t *t); 
 static thread_t* (*sched_next_thread)(void); 
 
-// flags regarding the state of main_thread
-int exit_whole_program = 0;
-static int exit_func_done = 0;
-static int main_exited = 0;
-
-
-// sleep queue, points to thread_t that's sleeping
+// Sleep queue, containing any sleeping threads
 static pointer_list_t *sleepq = NULL;
-static unsigned long long last_check_time = 0;       // when is the sleep time calculated from
-static unsigned long long max_sleep_time=0;          // length of the whole sleep queue, in microseconds
-static unsigned long long first_wake_usecs=0;        // wall clock time of the wake time of the first sleeping thread
 
-inline static void free_thread( thread_t *t );
-inline static void sleepq_check();
-inline static void sleepq_add_thread(thread_t *t, unsigned long long timeout);
-inline static void sleepq_remove_thread(thread_t *t);
+// Variables used to regulate sleep times of sleeping threads
+static struct {
+  // When is the sleep time calculated from
+  unsigned long long last_check;   
+  // Wall clock time of the wake time of the first sleeping thread
+  unsigned long long first_wake;
+  // Length of the whole sleep queue, in microseconds
+  unsigned long long max;    
+} sleep_times = {0, 0, 0};
 
-
-/**
- * set the IO polling function.  Used by the aio routines.  Shouldn't
- * be used elsewhere.
- **/
-// FIXME: it's ugly to break the namespaces up like this, but it is
-// still nice to be able to test the threads package independant of
-// the IO overriding stuff.
+// Function pointer to the io polling function being used
+// Only really makes sense in Linux, as ROS uses all async IO and
+// event queues for IO
 static void (*io_polling_func)(long long usecs);
 
-void set_io_polling_func(void (*func)(long long))
-{
-  assert( !io_polling_func );
-  io_polling_func = func;
-}
+// Variables set by CIL when executing using linked stacks
+void **start_node_addrs = NULL;
+int *start_node_stacks = NULL;
 
-unsigned long long start_usec;
+/******************************************************************************/
+/************************** Function Declarations *****************************/
+/******************************************************************************/
 
-static cap_timer_t scheduler_timer;
-static cap_timer_t main_timer;
-static cap_timer_t app_timer;
+// Vcore functions
+inline static bool __query_vcore_request();
+inline static bool __query_vcore_yield();
+
+// Sleep queue functions
+inline static void sleepq_add_thread(thread_t *t, unsigned long long timeout);
+inline static void sleepq_remove_thread(thread_t *t);
+inline static void sleepq_check_wakeup();
+
+// Thread related functions
+void run_next_thread();
+inline static void __thread_resume(thread_t *t);
+inline static void __thread_make_runnable(thread_t *t);
+inline static void __free_thread_prep(thread_t *t);
+inline static void free_thread(thread_t *t);
+
+// Helper Functions 
+static void exit_func(void);
+static void pick_scheduler();
+static int get_stack_size_kb_log2(void *func);
+
+/******************************************************************************/
+/********************************** Macros ************************************/
+/******************************************************************************/
+
+// Sanity check THREAD_KEY_MAX and size of key_data_count
+//#if THREAD_KEY_MAX >> (sizeof(thread_t.key_data_count)-1) != 1
+//#error not enough space in thread_t.key_data_count
+//#endif
+
+/******************************************************************************/
+/*************************** Function Definitions *****************************/
+/******************************************************************************/
 
 /**
- * Main scheduling loop
+ * This will be called as part of the initialization sequence
  **/
-static void* do_scheduler(void *arg)
+void main_thread_init() 
 {
-  static cpu_tick_t next_poll=0, next_overload_check=0, next_info_dump=0, next_graph_stats=0, now=0;
-  static int pollcount=1000;
+  tdebug("Enter\n");
   static int init_done = 0;
+  if(init_done) 
+    return;
+  init_done = 1;
 
-  (void) arg;  // suppress GCC "unused parameter" warning
+  // Make sure the clock init is already done, so we don't wind up w/
+  // a dependancy loop b/w perfctr and the rest of the code.
+//  init_cycle_clock();
+//  init_debug();
 
-  in_scheduler = 1;
+  // Initialize and Register all timers
+//  init_timer(&timers.main);
+//  init_timer(&timers.scheduler);
+//  init_timer(&timers.app);
+//  register_timer("total", &timers.main);
+//  register_timer("sheduler", &timers.scheduler);
+//  register_timer("app", &timers.app);
 
-  // make sure we start out by saving edge stats for a while
-  if( !init_done ) {
-    init_done = 1;
-    if (conf_no_statcollect) 
-      bg_save_stats = 0;
-    else
-      bg_save_stats = 1;
-    
-    GET_REAL_CPU_TICKS( now );
-    next_graph_stats = now + 1 * ticks_per_second;
-    
-    start_timer(&scheduler_timer);
-  }
+  // Start the main timer
+//  start_timer(&timers.main);
 
-  while( 1 ) {
+  // Init the scheduler function pointers
+  pick_scheduler();
 
-    //current_thread = scheduler_thread;
-    sanity_check_threadcounts();
-    sanity_check_io_stats();
+  // Init the scheduler code
+  sched_init();
 
-    // wake up threads that have timeouts
-    sleepq_check(0);   
-    sanity_check_threadcounts();
+  // Create the main thread
+  main_thread = malloc(sizeof(thread_t));  
+  assert(main_thread);
+  bzero(main_thread, sizeof(thread_t));
+  main_thread->context = create_context(main_thread, NULL, NULL);
+  main_thread->name = "main_thread";
+  main_thread->initial_arg = NULL;
+  main_thread->initial_func = NULL;
+  main_thread->tid = 0;   // fixed value
+  main_thread->joinable = 0;
+  main_thread->sleep = -1;
 
-    // break out if there are only daemon threads
-    if(unlikely (num_suspended_threads == 0  &&  num_runnable_threads == num_daemon_threads)) {
-      // dump the blocking graph
-      if( exit_func_done && conf_dump_blocking_graph ) {
-        tdebug("dumping blocking graph from do_scheduler()\n");
-        dump_blocking_graph(); 
-      }
-        
-      // go back to mainthread, which should now be in exit_func()
-      current_thread = main_thread;
-      in_scheduler = 0;
-      co_call(main_thread->coro, NULL);
-      in_scheduler = 1;
+  // Create global thread list
+  threadlist = new_pointer_list("thread_list");
 
-      if( unlikely(current_thread_exited) ) {     // free memory from deleted threads
-        current_thread_exited=0;
-        if (current_thread != main_thread) // main_thread is needed for whole program exit
-          free_thread( current_thread );
-      }
-        
-      return NULL;
-    }
+  // Create sleep queue
+  sleepq = new_pointer_list("sleep_queue");
+  sleep_times.max = 0;
+  sleep_times.last_check = 0;
+  sleep_times.first_wake = 0;
 
+  // Add main thread to the global list of threads
+  mcs_lock_lock(&thread_lock);
+  pl_add_tail(threadlist, main_thread);
+  num_threads.total++;
+  // Update number of running threads
+  main_thread->state = RUNNING;
+  num_threads.running++;
+  num_threads.detached++;
+  mcs_lock_unlock(&thread_lock);
 
-    // cheesy way of handling things with timing requirements
-    {
-      GET_REAL_CPU_TICKS( now );
-        
-      // toggle stats collection
-      if( conf_no_statcollect == 0 && next_graph_stats < now ) {
-        bg_save_stats = 1 - bg_save_stats;
+  tdebug("running: %d, runnable: %d, suspended: %d, detached: %d\n", 
+         num_threads.running, num_threads.runnable, 
+         num_threads.suspended, num_threads.detached);
+  
+  // intialize blocking graph functions
+//  init_blocking_graph();
 
-        if( bg_save_stats ) { 
-          // record stats for 100 ms
-          next_graph_stats = now + 100 * ticks_per_millisecond;
-            
-          // update the stats epoch, to allow proper handling of the first data items
-          bg_stats_epoch++;
-        }            
-        else {
-          // avoid stats for 2000 ms
-          next_graph_stats = now + 2000 * ticks_per_millisecond;
-        }
-        //output(" *********************** graph stats %s\n", bg_save_stats ? "ON" : "OFF" );
-      }
-        
-      // resource utalization
-      //if( unlikely (next_overload_check < now) ) {
-      //  check_overload( now );
-      //  next_overload_check = now + OVERLOAD_CHECK_INTERVAL;
-      //}
+//  // Set stats for the main thread
+//  {
+//    bg_dummy_node->num_here++;
+//    current_thread->curr_stats.node = bg_dummy_node;
+//    current_thread->curr_stats.files = 0;
+//    current_thread->curr_stats.sockets = 0;
+//    current_thread->curr_stats.heap = 0;
+//    bg_set_current_stats( &current_thread->curr_stats );
+//
+//    current_thread->prev_stats = current_thread->curr_stats;
+//  }
 
-      // poll
-      if( likely( (int)io_polling_func) ) {
-        if( num_runnable_threads==0  ||  --pollcount <= 0  ||  next_poll < now ) {
-          //if( num_runnable_threads==0 ) {
-          // poll
-          long long timeout = 0;
+  // Setup custom exit function called by glibc when exit() called
+  // Don't exit when main exits - wait for threads to die
+  atexit(exit_func);
 
-          if( num_runnable_threads==0 ) {
-            if (first_wake_usecs == 0) {
-              timeout = -1;
-            } else {
-              // there are threads in the sleep queue
-              // so poll for i/o till at most that time
-              unsigned long long now;
-              now = current_usecs();
-	      tdebug ("first_wake: %lld, now: %lld\n", first_wake_usecs, now);
-              if (first_wake_usecs > now)
-                timeout = first_wake_usecs - now;
-            }
-          }
+  // Mark the time the program starts running
+//  start_usec = current_usecs();
 
-          stop_timer(&scheduler_timer);
-          //if( timeout != -1 )  output("timeout is not zero\n");
-          io_polling_func( timeout ); // allow blocking
-          start_timer(&scheduler_timer);
-          sanity_check_threadcounts();
-
-
-#ifndef USE_NIO
-          // sleep for a bit, if there was nothing to do
-          // FIXME: let the IO functions block instead??
-          if( num_runnable_threads == 0 ) {
-            syscall(SYS_yield);
-          }
-#endif
-
-          // vary the poll rate depending on the workload
-#if 0
-          if( num_runnable_threads < 5 ) {
-            next_poll = now + (10*ticks_per_millisecond);
-            pollcount = 1000;
-          } else if( num_runnable_threads < 10 ) {
-            next_poll = now + (50*ticks_per_millisecond);
-            pollcount = 2000;
-          } else {
-            next_poll = now + (100*ticks_per_millisecond);
-            pollcount = 3000;
-          }
-#else
-          next_poll = now + (ticks_per_millisecond << 13);
-	  pollcount = 10000;
-
-#endif
-        }
-      }
-
-      // debug stats
-      if( 0 && next_info_dump < now ) {
-        dump_debug_info();
-        next_info_dump = now + 5 * ticks_per_second;
-      }
-
-    }
-
-    // get the head of the run list
-    current_thread = sched_next_thread();
-
-    // scheduler gave an invlid even though there are runnable
-    // threads.  This indicates that every runnable thead is likely to
-    // require use of an overloaded resource. 
-    if( !valid_thread(current_thread) ) {
-      pollcount = 0;
-      continue;
-    }
-
-    // barf, if the returned thread is still on the sleep queue
-    assert( current_thread->sleep == -1 );
-
-    tdebug("running TID %d (%s)\n", current_thread->tid, current_thread->name ? current_thread->name : "no name");
-
-    sanity_check_threadcounts();
-
-
-    // call thread
-    stop_timer(&scheduler_timer);
-    start_timer(&app_timer);
-    in_scheduler = 0;
-    co_call(current_thread->coro, NULL);
-    in_scheduler = 1;
-    stop_timer(&app_timer);
-    start_timer(&scheduler_timer);
-
-    if( unlikely(current_thread_exited) ) {     // free memory from deleted threads
-      current_thread_exited=0;
-      if (current_thread != main_thread) // main_thread is needed for whole program exit
-        free_thread( current_thread );
-    }
-
-#ifdef NO_SCHEDULER_THREAD
-    return NULL;
-#endif
-  }
-
-  return NULL;
+  // Things are all set up, so now turn on the syscall overrides
+  // Only really required by the linux port.
+//  gflags.override_syscalls = 1;
+  tdebug("Exit\n");
 }
 
-
-
-static int get_stack_size_kb_log2(void *func)
+/**
+ * Function to select and launch the next thread with the selected scheduler.
+ * Only called from within vcore context.  Keep this in mind when reasoning
+ * about how thread local variables, etc. are used.
+ **/
+void run_next_thread()
 {
-  int result = conf_new_stack_kb_log2;
-  if (start_node_addrs != NULL) {
-    int i = 0;
-    while (start_node_addrs[i] != NULL && start_node_addrs[i] != func) {
-      i++;
-    }
-    if (start_node_addrs[i] == func) {
-      result = start_node_stacks[i];
-    } else {
-      fatal("Couldn't find stack size for thread entry point %p\n", func);
-    }
-  }
-  return result;
-}
+  tdebug("Enter\n");
+  // Make sure we start out by saving edge stats
+//  static int init_done = 0;
+//  static cpu_tick_t next_info_dump = 0, next_graph_stats = 0, now = 0;
+//  if( !init_done ) {
+//    init_done = 1;
+//    if (conf_no_statcollect) 
+//      bg_save_stats = 0;
+//    else
+//      bg_save_stats = 1;
+//    
+//    GET_REAL_CPU_TICKS( now );
+//    next_graph_stats = now + 1 * ticks_per_second;
+//    
+//    start_timer(&timers.scheduler);
+//  }
+ 
+//  // Cheesy way of handling things with timing requirements
+//  {
+//    GET_REAL_CPU_TICKS( now );
+//      
+//    // toggle stats collection
+//    if( conf_no_statcollect == 0 && next_graph_stats < now ) {
+//      bg_save_stats = 1 - bg_save_stats;
+// 
+//      if( bg_save_stats ) { 
+//        // record stats for 100 ms
+//        next_graph_stats = now + 100 * ticks_per_millisecond;
+//          
+//        // update the stats epoch, to allow proper handling of the first data items
+//        bg_stats_epoch++;
+//      }            
+//      else {
+//        // avoid stats for 2000 ms
+//        next_graph_stats = now + 2000 * ticks_per_millisecond;
+//      }
+//      //output(" *********************** graph stats %s\n", bg_save_stats ? "ON" : "OFF" );
+//    }
+//      
+//    // Poll for I/O
+//    static cpu_tick_t next_poll = 0;
+//    static int pollcount = 1000;
+//    if( likely( (int)io_polling_func) ) {
+//      if( num_threads.runnable == 0  ||  --pollcount <= 0  ||  next_poll < now ) {
+//        long long timeout = 0;
+// 
+//        if( num_threads.runnable == 0 ) {
+//          if (sleep_times.first_wake == 0) {
+//            timeout = -1;
+//          } else {
+//            // there are threads in the sleep queue
+//            // so poll for i/o till at most that time
+//            unsigned long long now;
+//            now = current_usecs();
+//            tdebug ("first_wake: %lld, now: %lld\n", sleep_times.first_wake, now);
+//            if (sleep_times.first_wake > now)
+//              timeout = sleep_times.first_wake - now;
+//          }
+//        }
+// 
+//        stop_timer(&timers.scheduler);
+//        //if( timeout != -1 )  output("timeout is not zero\n");
+//        io_polling_func( timeout ); // allow blocking
+//        start_timer(&timers.scheduler);
+// 
+//        next_poll = now + (ticks_per_millisecond << 13);
+//        pollcount = 10000;
+//      }
+//    }
+//
+//    // Gather debug stats
+//    if( 0 && next_info_dump < now ) {
+//      dump_debug_info();
+//      next_info_dump = now + 5 * ticks_per_second;
+//    }
+//  }
 
+  // Wake up threads that are asleep who's timeouts have expired
+  sleepq_check_wakeup(FALSE);   
+ 
+  // Keep trying to get a thread off of the scheduler queue
+  thread_t *t; 
+  while(1) {
+    mcs_lock_lock(&thread_lock);
+	// Check to see if we are in the processes of exiting the entire program.
+	// If we are, then go ahead and yield this vcore. We are dying, afterall..
+	if(gflags.exit_func_done) {
+      bool yieldcore = __query_vcore_yield();
+      mcs_lock_unlock(&thread_lock);
+      if(yieldcore) vcore_yield();
+    }
+		
+    // Otherwise, grab a thread from the scheduler queue 
+    t = sched_next_thread();
+
+	// If there aren't any, if there aren't any, go ahead and yield the core
+	// back to the kernel.  This can only really happen when there are only
+	// running and suspended threads in the system, but no runnable ones. When
+	// a suspended thread is woken up, it will try and request a new vcore from
+	// the system if appropriate.
+    if(t == NULL) {
+      bool yieldcore = __query_vcore_yield();
+      mcs_lock_unlock(&thread_lock);
+      if(yieldcore) vcore_yield();
+    }
+	// Otherwise, if the thread is in the ZOMBIE state, then it must have been
+	// detached and added back to the queue for the scheduler to reap.  
+    // Reap it now, then go and grab the next thread.
+    else if(t->state == ZOMBIE) {
+      __free_thread_prep(t);
+      mcs_lock_unlock(&thread_lock);
+      free_thread(t);
+    }
+    // Otherwise, we've found a thread to run, so continue.
+    else
+      break;
+  }
+  // Update the num_threads variables and the thread state
+  num_threads.runnable--;
+  num_threads.running++;
+  t->state = RUNNING;
+  mcs_lock_unlock(&thread_lock);
+ 
+  tdebug("running: %d, runnable: %d, suspended: %d, detached: %d\n", 
+         num_threads.running, num_threads.runnable, 
+         num_threads.suspended, num_threads.detached);
+ 
+  tdebug("About to run TID %d (%s)\n", t->tid, t->name ? t->name : "no name");
+ 
+  // Run the thread
+//  stop_timer(&timers.scheduler);
+//  start_timer(&timers.app);
+  tdebug("Exit\n");
+  assert(!current_thread);
+  restore_context(t->context);
+}
 
 /**
  * Wrapper function for new threads.  This allows us to clean up
  * correctly if a thread exits without calling thread_exit().
  **/
-static void* new_thread_wrapper(void *arg)
+static void* __attribute__((noreturn)) new_thread_wrapper(void *arg)
 {
-  void *ret;
-  (void) arg;
-
+  tdebug("Enter\n");
   // set up initial stats
-  current_thread->curr_stats.files = 0;
-  current_thread->curr_stats.sockets = 0;
-  current_thread->curr_stats.heap = 0;
-  bg_set_current_stats( &current_thread->curr_stats );
-  current_thread->prev_stats = current_thread->curr_stats;
-
-  // set up stack limit for new thread
-  stack_bottom = current_thread->stack_bottom;
-  stack_fingerprint = current_thread->stack_fingerprint;
+//  current_thread->curr_stats.files = 0;
+//  current_thread->curr_stats.sockets = 0;
+//  current_thread->curr_stats.heap = 0;
+//  bg_set_current_stats( &current_thread->curr_stats );
+//  current_thread->prev_stats = current_thread->curr_stats;
+//
+//  // set up stack limit for new thread
+//  stack_bottom = current_thread->stack_bottom;
+//  stack_fingerprint = current_thread->stack_fingerprint;
 
   // start the thread
   tdebug("Initial arg = %p\n", current_thread->initial_arg);
-  ret = current_thread->initial_func(current_thread->initial_arg);
+  void *ret = current_thread->initial_func(current_thread->initial_arg);
   
   // call thread_exit() to do the cleanup
   thread_exit(ret);
-  
-  return NULL;
+  assert(0);
 }
 
+inline static bool __query_vcore_request()
+{
+  return FALSE;
+  //return TRUE;
+  //return (num_vcores() < 2);
+  //return ((num_threads.total-num_threads.zombie) > num_vcores());
+  //return ((num_threads.total-num_threads.zombie) > num_vcores());
+}
+
+inline static bool __query_vcore_yield()
+{
+  return FALSE;
+  //return TRUE;
+}
+
+/* Create a new thread and add it to the scheduler queue */
 static thread_t* new_thread(char *name, void* (*func)(void *), void *arg, thread_attr_t attr)
 {
+  tdebug("Enter\n");
   static unsigned max_tid = 1;
   thread_t *t = malloc( sizeof(thread_t) );
-  int stack_size_kb_log2 = get_stack_size_kb_log2(func);
-  void *stack = stack_get_chunk( stack_size_kb_log2 );
+  int stack_size_kb_log2 = 10;//get_stack_size_kb_log2(func);
   int stack_size = 1 << (stack_size_kb_log2 + 10);
+  void *stack = malloc(stack_size);//stack_get_chunk( stack_size_kb_log2 );
 
   if( !t || !stack ) {
     if (t) free(t);
-    if (stack) stack_return_chunk(stack_size_kb_log2, stack);
+    if (stack) free(stack);//stack_return_chunk(stack_size_kb_log2, stack);
+    printf("Uh Oh!\n");
     return NULL;
   }
 
   bzero(t, sizeof(thread_t));
-
-  t->coro = co_create(new_thread_wrapper, stack - stack_size, stack_size);
+  t->context = create_context(t, new_thread_wrapper, stack+stack_size);
   t->stack = stack;
   t->stack_size_kb_log2 = stack_size_kb_log2;
-  t->stack_bottom = stack - stack_size;
+  t->stack_bottom = stack;
   t->stack_fingerprint = 0;
   t->name = (name ? name : "noname"); 
   t->initial_func = func;
@@ -407,101 +480,121 @@ static thread_t* new_thread(char *name, void* (*func)(void *), void *arg, thread
   t->tid = max_tid++;
   t->sleep = -1;
 
+  // Make sure the thread has a valid node before we add it to the scheduling list
+//  bg_dummy_node->num_here++;
+//  t->curr_stats.node = bg_dummy_node;
+
+  mcs_lock_lock(&thread_lock);
+  // Up the count of detached threads if this thread should be detached
   if( attr ) {
     t->joinable = attr->joinable;
-    t->daemon = attr->daemon;
-    if(t->daemon)
-      num_daemon_threads++;
+    if(!t->joinable) {
+      num_threads.detached++;
+    }
   }
-
-  // FIXME: somehow track the parent thread, for stats creation?
-
-  // make sure the thread has a valid node before we add it to the scheduling list
-  bg_dummy_node->num_here++;
-  t->curr_stats.node = bg_dummy_node;
-
+  // Add the thread to the global list of all threads
   pl_add_tail(threadlist, t);
-
-  num_runnable_threads++;
+  num_threads.total++;
+  // Add the thread to the scheduler to make it runnable
   sched_add_thread(t);
-  sanity_check_threadcounts();
+  t->state = RUNNABLE;
+  num_threads.runnable++;
+  bool requestcore = __query_vcore_request();
+  mcs_lock_unlock(&thread_lock);
 
+  tdebug("running: %d, runnable: %d, suspended: %d, detached: %d\n", 
+         num_threads.running, num_threads.runnable, 
+         num_threads.suspended, num_threads.detached);
+
+  /* Possibly request a new vcore.  In the best case, we have 1 core per thread
+   * that we launch.  If not, it never hurts to ask for another one.  The
+   * system will simply deny us and the scheduler will multiplex all threads on
+   * the available vcores. */
+  if(requestcore) vcore_request(1);
+
+  tdebug("Exit\n");
+  // Return the newly created thread.
   return t;
 }
 
-
 /**
  * Free the memory associated with the given thread.
+ * Needs to be protected by the thread_lock.
  **/
-inline static void free_thread( thread_t *t )
+inline static void __free_thread_prep(thread_t *t)
 {
-  static int iter = -1;
-  iter++;
-  pl_remove_pointer(threadlist, t);
-
+  // Make sure we should actually be freeing this thread
   assert(t->state == ZOMBIE);
-  t->state = GHOST;  // just for good measure
-  num_zombie_threads--;
+  // Make this zombie a ghost!
+  t->state = GHOST;
+  // Drop the count of zombie threads in the system
+  num_threads.zombie--;
+  // Remove this thread from the global list of all threads
+  pl_remove_pointer(threadlist, t);
+  num_threads.total--;
 
-  if( t != main_thread ) {
-    co_delete( t->coro );
-    stack_return_chunk( t->stack_size_kb_log2, t->stack );
-    free( t );
-  }
+  tdebug("running: %d, runnable: %d, suspended: %d, detached: %d\n", 
+         num_threads.running, num_threads.runnable, 
+         num_threads.suspended, num_threads.detached);
 }
 
-/*
-
-void exit(int code) {
-	fprintf (stderr, "exit called!");
-	exit_whole_program = 1;
-    syscall(SYS_exit, code);
-faint: goto faint;
-}
-*/
-
-#ifndef NO_ATEXIT
 /**
- * give control back to the scheduler after main() exits.  This allows
+ * Actually free the memory associated with a thread.  Should only be called
+ * after first calling __free_thread_prep while holding the thread_lock.  Make
+ * sure to NOT call this function while holding the thread_lock though.
+ **/
+inline static void free_thread(thread_t *t)
+{
+  // Free the thread memory
+  if( t != main_thread ) {
+    free(t->stack);//stack_return_chunk(t->stack_size_kb_log2, t->stack);
+  }
+  destroy_context(t->context);
+  free(t);
+}
+
+/**
+ * Give control back to the scheduler after main() exits.  This allows
  * remaining threads to continue running.
- * FIXME: we don't know whether user explicit calls exit() or main() normally returns
- * in the previous case, we should exit immediately, while in the later, we should 
+ * FIXME: we don't know whether user explicitly calls exit() or main() normally returns
+ * in the previous case, we should exit immediately, while in the latter, we should 
  * join other threads.
  * Overriding exit() does not work because normal returning from
  * main() also calls exit().
  **/
 static void exit_func(void)
 {
-  // don't do anything if we're in a forked child process
-  if( getpid() != capriccio_main_pid )
+  tdebug("Enter\n");
+  // Don't do anything if we're in a forked child process
+  if(current_thread != main_thread)
     return;
 
-  exit_func_done = 1;
-  main_exited = 1;
-  if( !exit_whole_program )
+  tdebug("current=%s, gflags.main_exited=%d\n", 
+          current_thread?current_thread->name : "NULL", gflags.main_exited);
+
+  gflags.main_exited = TRUE;
+//  if( !gflags.exit_whole_program )
   	// this will block until all other threads finish
     thread_exit(NULL);
 
-  // dump the blocking graph before we exit
-  if( conf_dump_blocking_graph ) {
-    tdebug("dumping blocking graph from exit_func()\n");
-    dump_blocking_graph(); 
-  }
-
-  // FIXME: make sure to kill cloned children
-
-  if( conf_dump_timing_info ) {
-    if( main_timer.running )   stop_timer(&main_timer);
-    if( scheduler_timer.running )   stop_timer(&scheduler_timer);
-    if( app_timer.running )   stop_timer(&app_timer);
-    print_timers();
-  }
+//  // dump the blocking graph before we exit
+//  if( conf_dump_blocking_graph ) {
+//    tdebug("dumping blocking graph from exit_func()\n");
+//    dump_blocking_graph(); 
+//  }
+//
+//  // FIXME: make sure to kill cloned children
+//
+//  if( conf_dump_timing_info ) {
+//    if( timers.main.running )   stop_timer(&timers.main);
+//    if( timers.scheduler.running )   stop_timer(&timers.scheduler);
+//    if( timers.app.running )   stop_timer(&timers.app);
+//    print_timers();
+//  }
+  tdebug("Exit\n");
 }
-#endif
 
-static char *THREAD_STATES[] = {"RUNNABLE", "SUSPENDED", "ZOMBIE", "GHOST"};
-
-
+static char *THREAD_STATES[] = {"RUNNING", "RUNNABLE", "SUSPENDED", "ZOMBIE", "GHOST"};
 
 // dump status to stderr 
 void dump_debug_info()
@@ -510,8 +603,8 @@ void dump_debug_info()
   output("Current thread %d  (%s)\n", 
          current_thread ? (int)thread_tid(current_thread) : -1,
          (current_thread && current_thread->name) ? current_thread->name : "noname");
-  output("threads:    %d runnable    %d suspended    %d daemon\n", 
-         num_runnable_threads, num_suspended_threads, num_daemon_threads);
+  output("threads:    %d runnable    %d suspended    %d detached\n", 
+         num_threads.runnable, num_threads.suspended, num_threads.detached);
 
   print_resource_stats();
 
@@ -552,34 +645,7 @@ void dump_thread_state()
            t->curr_stats.heap / 1024,
            //(long)-1, // FIXME: add total stack numbers after incorporating Jeremy's code
            t->joinable ? "joinable  " : "",
-           t->daemon ? "daemon  " : "",
            t->sleep > 0 ? (sprintf(sleepstr,"sleep=%lld  ",t->sleep), sleepstr) : "");
-
-    if( conf_show_thread_stacks ) {
-      count = co_backtrace(t->coro, bt, 100);
-      if (count == 100)
-        output("WARN: only output first 100 stack frames.\n");
-      
-#if (0)
-      {
-        void **frame;
-        frame = bt;
-        while( count-- )
-          output("    %p\n",*(frame++));
-      }
-#else
-      {
-        // NOTE: backtrace_symbols_fd causes a loop w/ our IO functions.
-        char **p = backtrace_symbols(bt, count);
-        for (i = 0; i < count; i++)
-          output("   %s\n", *(p+i));
-        free(p);
-      }
-#endif
-      
-      output("\n");
-    }
-      
     e = ll_view_next(threadlist, e);
   }
 
@@ -628,243 +694,181 @@ static void pick_scheduler()
 }
 
 /**
- * perform necessary management to yield the current thread
- * if suspended == TRUE && timeout != 0 -> the thread is added 
- * to the sleep queue and later waken up when the clock times out
- * returns FALSE if time-out actually happens, TRUE if waken up
- * by other threads, INTERRUPTED if interrupted by a signal
+ * Perform necessary management to yield the current thread
+ * if suspend == TRUE && timeout != 0 -> the thread is added 
+ * to the sleep queue and later woken up when the clock times out.
+ * Returns FALSE if time-out actually happens, TRUE if woken up
+ * by other threads, INTERRUPTED if interrupted by a signal.
  **/
-static int thread_yield_internal(int suspended, unsigned long long timeout)
+static int __thread_yield(int suspend, unsigned long long timeout)
 {
-// now we use a per-thread errno stored in thread_t
-   int savederrno;
-  int rv = OK;
+  tdebug("Enter\n");
+  // Now we use a per-thread errno stored in thread_t
+  int savederrno;
+  savederrno = errno;
 
   tdebug("current_thread=%p\n",current_thread);
 
-  savederrno = errno;
+//  {
+//#ifdef SHOW_EDGE_TIMES
+//    cpu_tick_t start, end, rstart, rend;
+//    GET_CPU_TICKS(start);
+//    GET_REAL_CPU_TICKS(rstart);
+//#endif
+//
+//    // Figure out the current node in the graph
+//    if( !conf_no_stacktrace )
+//      bg_backtrace_set_node();
+//    // FIXME: fake out what cil would do...  current_thread->curr_stats.node = bg_dummy_node;
+//
+//    // We should already have been told the node by CIL or directly by the programmer
+//    assert( current_thread->curr_stats.node != NULL );
+//    
+//    // Update node counts
+//    current_thread->prev_stats.node->num_here--;
+//    current_thread->curr_stats.node->num_here++;
+//    
+//    // Update the blocking graph info
+//    if( bg_save_stats )
+//      bg_update_stats();
+//  
+//#ifdef SHOW_EDGE_TIMES
+//    GET_CPU_TICKS(end);
+//    GET_REAL_CPU_TICKS(rend);
+//    {
+//      thread_stats_t *curr = &current_thread->curr_stats;
+//      thread_stats_t *prev = &current_thread->prev_stats;
+//      output(" %3d -> %-3d     %7lld ticks  (%lld ms)   %7lld rticks (%lld ms)    ", 
+//             prev->node->node_num,  curr->node->node_num, 
+//             curr->cpu_ticks - prev->cpu_ticks,
+//             (curr->cpu_ticks - prev->cpu_ticks) / ticks_per_millisecond,
+//# ifdef USE_PERFCTR
+//             curr->real_ticks - prev->real_ticks,
+//             (curr->real_ticks - prev->real_ticks) / ticks_per_millisecond
+//# else
+//             curr->cpu_ticks - prev->cpu_ticks,
+//             (curr->cpu_ticks - prev->cpu_ticks) / ticks_per_millisecond
+//# endif
+//             );
+//
+//      output("update bg node %d:   %lld   (%lld ms)   real: %lld (%lld ms)\n", 
+//             current_thread->curr_stats.node->node_num, 
+//             (end-start), (end-start)/ticks_per_millisecond, 
+//             (rend-rstart), (rend-rstart)/ticks_per_millisecond);
+//    }
+//#endif
+//  }
 
-  // decide what to do with the thread
-  if( !suspended ) // just add it to the runlist
-    sched_add_thread( current_thread );
-  else if( timeout ) // add to the sleep list
-    sleepq_add_thread( current_thread, timeout);
+  // Decide what to do with the thread
+  mcs_lock_lock(&thread_lock);
+  // Drop the count of running threads
+  num_threads.running--;
+  // If we should suspend it, do so for the specified timeout
+  if(suspend) { 
+    current_thread->state = SUSPENDED;
+    num_threads.suspended++;
+	// Add the thread to the sleep queue if a timeout was given
+    // If no timeout was given, that means we should sleep forever
+	// or until some other thread wakes us up (i.e. on a join) 	
+    if(timeout)
+      sleepq_add_thread(current_thread, timeout);
+  }
+  else {
+    current_thread->state = RUNNABLE;
+    num_threads.runnable++;
+    sched_add_thread(current_thread);
+  }
+  mcs_lock_unlock(&thread_lock);
 
-  {
-#ifdef SHOW_EDGE_TIMES
-    cpu_tick_t start, end, rstart, rend;
-    GET_CPU_TICKS(start);
-    GET_REAL_CPU_TICKS(rstart);
-#endif
+  tdebug("running: %d, runnable: %d, suspended: %d, detached: %d\n", 
+         num_threads.running, num_threads.runnable, 
+         num_threads.suspended, num_threads.detached);
 
-    // figure out the current node in the graph
-    if( !conf_no_stacktrace )
-      bg_backtrace_set_node();
-    // FIXME: fake out what cil would do...  current_thread->curr_stats.node = bg_dummy_node;
+//  // squirrel away the stack limit for next time
+//  current_thread->stack_bottom = stack_bottom;
+//  current_thread->stack_fingerprint = stack_fingerprint;
 
-    // we should already have been told the node by CIL or directly by the programmer
-    assert( current_thread->curr_stats.node != NULL );
-    
-    // update node counts
-    current_thread->prev_stats.node->num_here--;
-    current_thread->curr_stats.node->num_here++;
-    
-    // update the blocking graph info
-    if( bg_save_stats )
-      bg_update_stats();
+  // Save the context of the currently running thread.
+  // When it is restored it will start up again right here
+  save_context(current_thread->context);
+
+  // We only want to call switch_to_vcore() when running through
+  // this function at the time of the yield() call.  Since our 
+  // context is restored right here though, we need a way to jump around
+  // the call to switch_to_vcore() once the thread is woken back up.
+  volatile bool yielding = TRUE;
+  if (yielding) {
+    yielding = FALSE; /* for when it starts back up */
+    // Switch back to vcore context to run the scheduler
+    switch_to_vcore();
+  }
+  // Thread context restored...
   
-#ifdef SHOW_EDGE_TIMES
-    GET_CPU_TICKS(end);
-    GET_REAL_CPU_TICKS(rend);
-    {
-      thread_stats_t *curr = &current_thread->curr_stats;
-      thread_stats_t *prev = &current_thread->prev_stats;
-      output(" %3d -> %-3d     %7lld ticks  (%lld ms)   %7lld rticks (%lld ms)    ", 
-             prev->node->node_num,  curr->node->node_num, 
-             curr->cpu_ticks - prev->cpu_ticks,
-             (curr->cpu_ticks - prev->cpu_ticks) / ticks_per_millisecond,
-# ifdef USE_PERFCTR
-             curr->real_ticks - prev->real_ticks,
-             (curr->real_ticks - prev->real_ticks) / ticks_per_millisecond
-# else
-             curr->cpu_ticks - prev->cpu_ticks,
-             (curr->cpu_ticks - prev->cpu_ticks) / ticks_per_millisecond
-# endif
-             );
-
-      output("update bg node %d:   %lld   (%lld ms)   real: %lld (%lld ms)\n", 
-             current_thread->curr_stats.node->node_num, 
-             (end-start), (end-start)/ticks_per_millisecond, 
-             (rend-rstart), (rend-rstart)/ticks_per_millisecond);
-    }
-#endif
-  }
-
-  // squirrel away the stack limit for next time
-  current_thread->stack_bottom = stack_bottom;
-  current_thread->stack_fingerprint = stack_fingerprint;
-
-  // switch to the scheduler thread
-#ifdef NO_SCHEDULER_THREAD
-  do_scheduler(NULL);
-#else
-  co_call(scheduler_thread->coro, NULL);
-#endif
-  
-  // set up stack limit for new thread
-  stack_bottom = current_thread->stack_bottom;
-  stack_fingerprint = current_thread->stack_fingerprint;
-
-  // rotate the stats
-  if( bg_save_stats ) {
-    current_thread->prev_stats = current_thread->curr_stats;
-    
-    // update thread time, to skip time asleep
-    GET_CPU_TICKS( current_thread->prev_stats.cpu_ticks );
-    current_thread->prev_stats.cpu_ticks -= ticks_diff;  // FIXME: subtract out time to do debug output
-#ifdef USE_PERFCTR
-    GET_REAL_CPU_TICKS( current_thread->prev_stats.real_ticks );
-    current_thread->prev_stats.real_ticks -= ticks_rdiff;  // FIXME: subtract out time to do debug output
-#endif    
-  } else {
-    current_thread->prev_stats.node = current_thread->curr_stats.node;
-  }
-  
-  // check whether time-out happens
-  if (suspended && timeout && current_thread->timeout) {
-    rv = TIMEDOUT;
-    current_thread->timeout = 0;
-  }
-
-  // check for and process pending signals
-  if ( likely(!current_thread->sig_waiting) ) {
-  	//if (sig_process_pending())
-		rv = INTERRUPTED;
-  } else {
-	// if sig_waiting is 1, sigwait() itself will handle the remaining	
-	rv = INTERRUPTED;
-  }
+//  // Set up stack limit for new thread
+//  stack_bottom = current_thread->stack_bottom;
+//  stack_fingerprint = current_thread->stack_fingerprint;
+//
+//  // rotate the stats
+//  if( bg_save_stats ) {
+//    current_thread->prev_stats = current_thread->curr_stats;
+//    
+//    // update thread time, to skip time asleep
+//    GET_CPU_TICKS( current_thread->prev_stats.cpu_ticks );
+//    current_thread->prev_stats.cpu_ticks -= ticks_diff;  // FIXME: subtract out time to do debug output
+//#ifdef USE_PERFCTR
+//    GET_REAL_CPU_TICKS( current_thread->prev_stats.real_ticks );
+//    current_thread->prev_stats.real_ticks -= ticks_rdiff;  // FIXME: subtract out time to do debug output
+//#endif    
+//  } else {
+//    current_thread->prev_stats.node = current_thread->curr_stats.node;
+//  }
+//  
+//  // Check whether time-out happened already or not
+  int rv = OK;
+//  if (suspend && timeout && current_thread->timeout) {
+//    rv = TIMEDOUT;
+//    current_thread->timeout = 0;
+//  }
+//
+//  // Check for and process pending signals
+//  if ( likely(!current_thread->sig_waiting) ) {
+//    if (sig_process_pending())
+//		rv = INTERRUPTED;
+//  } else {
+//	  // If sig_waiting is 1, sigwait() itself will handle the remaining	
+//	  rv = INTERRUPTED;
+//  }
   
   errno = savederrno;
+  tdebug("Exit\n");
   return rv;
 }
 
+void thread_yield()
+{
+  CAP_SET_SYSCALL();
+  __thread_yield(FALSE,0);
+  CAP_CLEAR_SYSCALL();
+}
+
+int sched_yield(void)
+{
+  thread_yield();
+  return 0;
+}
+strong_alias(sched_yield,__sched_yield);
+
+// Timeout == 0 means infinite time
+int thread_suspend_self(unsigned long long timeout)
+{
+  return __thread_yield(TRUE, timeout);
+}
 
 //////////////////////////////////////////////////////////////////////
 // 
 //  External functions
 // 
 //////////////////////////////////////////////////////////////////////
-
-/**
- * This will be called automatically, either by routines here, or by
- * the AIO routines
- **/
-static void thread_init()  __attribute__ ((constructor));
-static void thread_init() 
-{
-  static int init_done = 0;
-
-  capriccio_main_pid = getpid();
-
-  // read config info from the environemtn
-  read_config();
-
-  //assert(0);
-  if(init_done) 
-    return;
-  init_done = 1;
-
-  // make sure the clock init is already done, so we don't wind up w/
-  // a dependancy loop b/w perfctr and the rest of the code.
-  init_cycle_clock();
-  init_debug();
-
-  // start main timer
-  init_timer(&main_timer);
-  register_timer("total", &main_timer);
-  start_timer(&main_timer);
-
-  init_timer(&scheduler_timer);
-  register_timer("sheduler", &scheduler_timer);
-
-  init_timer(&app_timer);
-  register_timer("app", &app_timer);
-
-  // init scheduler function pointers
-  pick_scheduler();
-
-  // init the scheduler code
-  sched_init();
-
-  // create the main thread
-  main_thread = malloc(sizeof(thread_t));  
-  assert(main_thread);
-  bzero(main_thread, sizeof(thread_t));
-  main_thread->name = "main_thread";
-  main_thread->coro = co_main;
-  main_thread->initial_arg = NULL;
-  main_thread->initial_func = NULL;
-  main_thread->tid = 0;   // fixed value
-  main_thread->sleep = -1;
-  current_thread = main_thread;
-
-  // create the scheduler thread
-#ifndef NO_SCHEDULER_THREAD
-  scheduler_thread = (thread_t*) malloc( sizeof(thread_t) ); 
-  assert(scheduler_thread);
-  bzero(scheduler_thread, sizeof(thread_t));
-  scheduler_thread->name = "scheduler";
-  scheduler_thread->coro = co_create(do_scheduler, 0, SCHEDULER_STACK_SIZE);
-  scheduler_thread->tid = -1;
-#endif
-
-  // don't exit when main exits - wait for threads to die
-#ifndef NO_ATEXIT
-  atexit(exit_func);
-#endif
-
-  // intialize blocking graph functions
-  init_blocking_graph();
-
-  // set stats for the main thread
-  {
-    bg_dummy_node->num_here++;
-    current_thread->curr_stats.node = bg_dummy_node;
-    current_thread->curr_stats.files = 0;
-    current_thread->curr_stats.sockets = 0;
-    current_thread->curr_stats.heap = 0;
-    bg_set_current_stats( &current_thread->curr_stats );
-
-    current_thread->prev_stats = current_thread->curr_stats;
-  }
-
-  // create thread list
-  threadlist = new_pointer_list("thread_list");
-  // add main thread to the list
-  pl_add_tail(threadlist, main_thread);
-  num_runnable_threads++;
-  
-  // create sleep queue
-  sleepq = new_pointer_list("sleep_queue");
-  max_sleep_time = 0;
-  last_check_time = 0;
-  first_wake_usecs = 0;
- 
-  start_usec = current_usecs();
-  
-  // make sure the scheduler runs.  NOTE: this is actually very
-  // important, as it prevents a degenerate case in which the main
-  // thread exits before the scheduler is ever called.  This will
-  // actually cause a core dump, b/c the current_thead_exited flag
-  // will be set, and incorrectly flag the first user thread for
-  // deletion, rather than the main thread.
-  thread_yield_internal(FALSE, 0);
-
-  // things are all set up, so now turn on the syscall overrides
-  cap_override_rw = 1;
-}
-
 
 inline thread_t *thread_spawn_with_attr(char *name, void* (*func)(void *), 
                                  void *arg, thread_attr_t attr)
@@ -877,145 +881,213 @@ inline thread_t *thread_spawn(char *name, void* (*func)(void *), void *arg)
   return new_thread(name, func, arg, NULL);
 }
 
-
-void thread_yield()
-{
-  CAP_SET_SYSCALL();
-  thread_yield_internal( FALSE, 0 );
-  CAP_CLEAR_SYSCALL();
+static inline bool time_to_die() {
+return ((gflags.main_exited == TRUE) &&
+        ((num_threads.total-num_threads.zombie) == num_threads.detached)
+       );
 }
 
 void thread_exit(void *ret)
 {
+  tdebug("Enter\n");
   thread_t *t = current_thread;
 
-  sanity_check_threadcounts();
-  tdebug("current=%s\n", current_thread?current_thread->name : "NULL");
+  //printf("current=%s, gflags.main_exited=%d\n", 
+  //        current_thread?current_thread->name : "NULL", gflags.main_exited);
 
-  if (current_thread == main_thread && main_exited == 0) {
-	// the case when the user calls thread_exit() in main thread is complicated
+  if (current_thread == main_thread && gflags.main_exited == FALSE) {
+	// The case when the user calls thread_exit() in main thread is complicated
 	// we cannot simply terminate the main thread, because we need that stack to terminate the
 	// whole program normally.  so we call exit() to make the c runtime help us get the stack
 	// context where we can just return to terminate the whole program
 	// this will call exit_func() and in turn call thread_exit() again
-    main_exited = 1;
-  	exit (0);		
+    gflags.main_exited = TRUE;
+  	exit(0);		
   }
 
-  // note the thread exit in the blocking graph
-  t->curr_stats.node = bg_exit_node;
-  current_thread->prev_stats.node->num_here--;
-  current_thread->curr_stats.node->num_here++;
-  if( bg_save_stats ) {
-    bg_update_stats();
-  }
+//  // Note the thread exit in the blocking graph
+//  current_thread->curr_stats.node = bg_exit_node;
+//  current_thread->prev_stats.node->num_here--;
+//  current_thread->curr_stats.node->num_here++;
+//  if( bg_save_stats ) {
+//    bg_update_stats();
+//  }
     
-  // update thread counts
-  num_runnable_threads--;
-  if( t->daemon ) num_daemon_threads--;
+  // If we are the main thread...
+  while(unlikely(t == main_thread)) {
+    // Check if we really can exit the program now.
+    // If so, end of program!
+    if(time_to_die()) {
+      //// Dump the blocking graph
+      //if( gflags.exit_func_done && conf_dump_blocking_graph ) {
+      //  tdebug("dumping blocking graph from run_next_thread()\n");
+      //  dump_blocking_graph(); 
+      //}
 
+      // Return back to glibc and exit the program!
+	  // First set a global flag so no other vcores try to pull new threads off
+	  // of any lists (these lists are about to be deallocated...)
+      mcs_lock_lock(&thread_lock);
+      gflags.exit_func_done = TRUE;
+      mcs_lock_unlock(&thread_lock);
+
+      printf("Dying with %d vcores\n", num_vcores());
+      printf("Program exiting normally!\n");
+      return;
+    }
+    // Otherwise, suspend ourselves to be woken up when it is time to die
+    else {
+      // Suspend myself
+      thread_suspend_self(0);
+    }
+  }
+  // Otherwise...
+  // Update thread counts and resume blocked threads
+  mcs_lock_lock(&thread_lock);
+  num_threads.running--;
+  num_threads.zombie++;
   t->state = ZOMBIE;
-  num_zombie_threads++;
 
-  // deallocate the TCB
-  // keep the thread, if the thread is Joinable, and we want the return value for something
-  if ( !( t->joinable ) ) {
-    // tell the scheduler thread to delete the current one
-    current_thread_exited = 1;
-  } else {
+  // Check if it's time to die now. If it is, wakeup the main thread so we can
+  // exit the program
+  if(unlikely(time_to_die()))
+      __thread_resume(main_thread);
+
+  // Otherwise, if the thread is joinable, resume the thread that joined on it.
+  // If no one has joined on it yet, we have alreadu set its thread state to
+  // ZOMBIE so that the thread that eventually tries to join on it can see
+  // this, and free it.
+  else if(likely(t->joinable)) {
     t->ret = ret;
-    if (t->join_thread)
-      thread_resume(t->join_thread);
+    if (t->join_thread) {
+      __thread_resume(t->join_thread);
+    }
   }
 
-  sanity_check_threadcounts();
+  // Otherwise, update the count of detached threads and put the thread back on
+  // the scheduler queue. The thread will be freed by the scheduler the next
+  // time it attempts to run.
+  else {
+    num_threads.detached--;
+    sched_add_thread(t);
+  }
 
-  // squirrel away the stack limit--not that we'll need it again
-  current_thread->stack_bottom = stack_bottom;
-  current_thread->stack_fingerprint = stack_fingerprint;
+  // Check to see if we now have less threads than we have vcores.  If so,
+  // prepare to yield the current core back to the system.
+  bool yieldcore = __query_vcore_yield();
+  mcs_lock_unlock(&thread_lock);
 
-  // give control back to the scheduler
-#ifdef NO_SCHEDULER_THREAD
-  do_scheduler(NULL);
-#else
-  co_call(scheduler_thread->coro, NULL);
-#endif
+  tdebug("running: %d, runnable: %d, suspended: %d, detached: %d\n", 
+         num_threads.running, num_threads.runnable, 
+         num_threads.suspended, num_threads.detached);
+
+  /* If we were told to yield the vcore, do it! */
+  if(yieldcore)
+    vcore_yield();
+	  
+  /* Otherwise switch back to vcore context to schedule the next thread. */
+  switch_to_vcore();
+  assert(0);
 }
 
 int thread_join(thread_t *t, void **ret)
 {
-  if (t == NULL)
+  tdebug("Enter\n");
+  // Return errors if the argument is bogus
+  if(t == NULL)
     return_errno(FALSE, EINVAL);
-  if ( !( t->joinable ) )
+  if(!t->joinable)
     return_errno(FALSE, EINVAL);
-
-  assert(t->state != GHOST);
 
   // A thread can be joined only once
-  if (t->join_thread)   
+  if(t->join_thread)   
     return_errno(FALSE, EACCES);   
-  t->join_thread = current_thread;
 
   // Wait for the thread to complete
-  tdebug( "**** thread state: %d\n" ,t->state);
-  if (t->state != ZOMBIE) {
+  tdebug( "thread state: %d\n" ,t->state);
+  mcs_lock_lock(&thread_lock);
+  if(t->state != ZOMBIE) {
+    t->join_thread = current_thread;
+    mcs_lock_unlock(&thread_lock);
   	CAP_SET_SYSCALL();
     thread_suspend_self(0);
     CAP_CLEAR_SYSCALL();
+    mcs_lock_lock(&thread_lock);
   }
 
-  // clean up the dead thread
-  if (ret != NULL) 
+  // Set the return value
+  if(ret != NULL) 
     *ret = t->ret;
-  free_thread( t );
 
+  // Free the memory associated with the joined thread. 
+  __free_thread_prep(t);
+  mcs_lock_unlock(&thread_lock);
+  free_thread(t);
+
+  tdebug("Exit\n");
   return TRUE;
 }
 
-// timeout == 0 means infinite time
-int thread_suspend_self(unsigned long long timeout)
+// Only resume the thread internally
+// Don't touch the timeout flag and the sleep queue
+// Call to this needs to be protected by the thread_lock
+static void __thread_make_runnable(thread_t *t)
 {
-  num_suspended_threads++;
-  num_runnable_threads--;
-  sanity_check_threadcounts();
-  current_thread->state = SUSPENDED;
-  return thread_yield_internal(TRUE, timeout);
-}
-
-// only resume the thread internally
-// don't touch the timeout flag and the sleep queue
-static void _thread_resume(thread_t *t)
-{
+  tdebug("Enter\n");
   tdebug("t=%p\n",t);
   if (t->state != SUSPENDED)
     return;
-  num_suspended_threads--;
-  num_runnable_threads++;
-  sanity_check_threadcounts();
-  assert(t->state == SUSPENDED);
-  t->state = RUNNABLE;
 
+  assert(t->state == SUSPENDED);
   assert( t->sleep == -1 );
+  t->state = RUNNABLE;
+  num_threads.suspended--;
+  num_threads.runnable++;
   sched_add_thread(t);
+
+  tdebug("running: %d, runnable: %d, suspended: %d, detached: %d\n", 
+         num_threads.running, num_threads.runnable, 
+         num_threads.suspended, num_threads.detached);
+
+  tdebug("Exit\n");
+}
+
+// Resume a sleeping thread
+// Call to this needs to be protected by the thread_lock
+static void __thread_resume(thread_t *t)
+{
+  // Remove the thread from the sleep queue
+  if (t->sleep != -1)
+    sleepq_remove_thread(t);
+
+  // Make the thread runnable
+  __thread_make_runnable(t);
 }
 
 void thread_resume(thread_t *t)
 {
-  // clear timer
-  if (t->sleep != -1)
-    sleepq_remove_thread(t);
+  mcs_lock_lock(&thread_lock);
+  __thread_resume(t);
+  bool requestcore = __query_vcore_request();
+  mcs_lock_unlock(&thread_lock);
 
-  // make the thread runnable
-  _thread_resume(t);
+  // Maybe request a new vcore if we are running low
+  if(requestcore) vcore_request(1);
 }
 
-void thread_set_daemon(thread_t *t)
+void thread_set_detached(thread_t *t)
 {
-  if( t->daemon )
+  if(!t->joinable)
     return;
   
-  t->daemon = 1;
-  num_daemon_threads++;
+  mcs_lock_lock(&thread_lock);
+  t->joinable = 0;
+  num_threads.detached++;
+  mcs_lock_unlock(&thread_lock);
+
+  tdebug("running: %d, runnable: %d, suspended: %d, detached: %d\n", 
+         num_threads.running, num_threads.runnable, 
+         num_threads.suspended, num_threads.detached);
 }
 
 inline char* thread_name(thread_t *t)
@@ -1025,11 +1097,9 @@ inline char* thread_name(thread_t *t)
 
 void thread_exit_program(int exitcode)
 {
-  exit_whole_program = 1;
   raise( SIGINT );
   syscall(SYS_proc_destroy, exitcode);
 }
-
 
 // Thread attribute handling
 thread_attr_t thread_attr_of(thread_t *t) {
@@ -1214,50 +1284,12 @@ void thread_key_destroydata(thread_t *t)
     return;
 }
 
-// for finding the location of the current errno variable
-/*
-int __global_errno = 0;
-int *__errno_location (void)
-{
-	if (likely((int)current_thread))
-		return &current_thread->__errno;
-	else
-		return &__global_errno;
-}
-*/
-
 unsigned thread_tid(thread_t *t)
 {
   return t ? t->tid : 0xffffffff;
 }
 
-#if 1
-#define sleepq_sanity_check() \
-	assert ((max_sleep_time > 0 && sleepq->num_entries > 0) \
-		|| (max_sleep_time == 0 && sleepq->num_entries == 0) )
-#else
-#define sleepq_sanity_check() \
-do { \
-  assert ((max_sleep_time > 0 && sleepq->num_entries > 0) \
-	| (max_sleep_time == 0 && sleepq->num_entries == 0) ); \
- { \
-  linked_list_entry_t *e; \
-  unsigned long long _total = 0; \
-  e = ll_view_head(sleepq);\
-  while (e) {\
-    thread_t *tt = (thread_t *)pl_get_pointer(e);\
-    assert( tt->sleep >= 0 );\
-    _total += tt->sleep;\
-    e = ll_view_next(sleepq, e);\
-  }\
-  assert( _total == max_sleep_time );\
- }\
-} while( 0 );
-#endif
-
-
-int print_sleep_queue(void) __attribute__((unused));
-int print_sleep_queue(void)
+int __attribute__((unused)) print_sleep_queue(void)
 {
   linked_list_entry_t *e; 
   unsigned long long _total = 0; 
@@ -1272,41 +1304,54 @@ int print_sleep_queue(void)
   return 1;
 }
 
-// check sleep queue to wake up all timed-out threads
-// sync == TRUE -> synchronize last_check_time
-static void sleepq_check(int sync)
+/**
+ * Put a thread to sleep for the specified timeout 
+ **/
+void thread_usleep(unsigned long long timeout)
 {
-  unsigned long long now;
-  long long interval;
-  linked_list_entry_t *e;
+  thread_suspend_self(timeout);
+}
 
-  if (!sync && max_sleep_time == 0) {  // shortcut to return
-    first_wake_usecs = 0; 	// FIXME: don't write to it every time
+/**
+ * Check sleep queue to wake up all timed-out threads
+ * sync == TRUE -> force synchronization of last_check_time
+ **/
+static void sleepq_check_wakeup(int sync)
+{
+  // Shortcut to return if no threads sleeping
+  if (!sync && sleep_times.max == 0) {  
+    sleep_times.first_wake = 0;
     return;
   }
 
-  sleepq_sanity_check();
-
+  // Get interval since last check time and update 
+  // last check time to now
+  unsigned long long now;
+  long long interval;
   now = current_usecs();
-  if( now > last_check_time ) 
-    interval = now-last_check_time;
+  if( now > sleep_times.last_check ) 
+    interval = now-sleep_times.last_check;
   else 
     interval = 0;
-  last_check_time = now;
+  sleep_times.last_check = now;
 
-
-  // adjust max_sleep_time
-  if (max_sleep_time < (unsigned long long)interval)
-    max_sleep_time = 0;
+  // Adjust max_sleep_time based on the interval just computed
+  if (sleep_times.max < (unsigned long long)interval)
+    sleep_times.max = 0;
   else
-    max_sleep_time -= interval;
+    sleep_times.max -= interval;
   
+  // Walk through the sleepq and pull off and resume all threads
+  // whose remaining sleep time is less than the interval since 
+  // the last check. If it's greater, update the remaining sleep time
+  // and set first_wake to now + the new sleep time.
+  linked_list_entry_t *e;
   while (interval > 0 && (e = ll_view_head(sleepq))) {
     thread_t *t = (thread_t *)pl_get_pointer(e);
 
     if (t->sleep > interval) {
       t->sleep -= interval;
-      first_wake_usecs = now + t->sleep;
+      sleep_times.first_wake = now + t->sleep;
       break;
     }
 
@@ -1314,50 +1359,55 @@ static void sleepq_check(int sync)
     t->sleep = -1;
     t->timeout = 1;
 
-    //output("  %10llu: thread %d timeout\n", current_usecs(), t->tid);
-    
-    _thread_resume(t);    // this doesn't deal with sleep queue
+    mcs_lock_lock(&thread_lock);
     ll_free_entry(sleepq, ll_remove_head(sleepq));
+    __thread_make_runnable(t);
+    mcs_lock_unlock(&thread_lock);
   }
 
   if (ll_size(sleepq) == 0) {
      // the sleepq is empty again
-     first_wake_usecs = 0;
+     sleep_times.first_wake = 0;
   }
-
-  sleepq_sanity_check();
 }
 
-
-// set a timer on a thread that will wake the thread up after timeout
-// microseconds.  this is used to implement thread_suspend_self(timeout)
+/**
+ * Set a timer on a thread that will wake up after timeout
+ * microseconds.  This is used to implement thread_suspend_self(timeout)
+ **/
 static void sleepq_add_thread(thread_t *t, unsigned long long timeout)
 {
-  linked_list_entry_t *e;
-  long long total_time;
-  sleepq_check(1); // make sure: last_check_time == now
-
+  // Make sure the current thread doesn't already have a sleep time set
   assert(t->sleep == -1);
-  sleepq_sanity_check();
 
-  if (timeout >= max_sleep_time) {
-    // set first_wake_usecs if this is the first item
+  // No need to grab the sleepq_lock before making the following function
+  // call, as calls to this function should already be protected by it.
+  sleepq_check_wakeup(TRUE); // make sure: last_check_time == now
+  
+  // If the tieout is greater than the maximum sleep time of the 
+  // longest sleeping thread, update the maximum, set the sleep
+  // time of the thread (relative to all inserted before it), and
+  // update the max sleep time
+  if (timeout >= sleep_times.max) {
+    // Set sleep_times.first_wake if this is the first item
     if( pl_view_head(sleepq) == NULL )
-      first_wake_usecs = current_usecs() + timeout;
+      sleep_times.first_wake = current_usecs() + timeout;
 
-    // just append the thread to the end of sleep queue
+    // Just append the thread to the end of sleep queue
     pl_add_tail(sleepq, t);
-    t->sleep = timeout - max_sleep_time;
+    t->sleep = timeout - sleep_times.max;
     assert( t->sleep >= 0 );
-    max_sleep_time = timeout;
-    sleepq_sanity_check();
+    sleep_times.max = timeout;
     return;
   }
 
-  // let's find a place in the queue to insert the thread
-  // we go backwards
+  // Otherwise we need to find the proper place to insert the thread in
+  // the sleep queue, given its timeout length. 
+  // We search the list backwards.
+  linked_list_entry_t *e;
+  long long total_time;
   e = ll_view_tail(sleepq);
-  total_time = max_sleep_time;
+  total_time = sleep_times.max;
   while (e) {
     thread_t *tt = (thread_t *)pl_get_pointer(e);
     assert(tt->sleep >= 0);
@@ -1371,88 +1421,91 @@ static void sleepq_add_thread(thread_t *t, unsigned long long timeout)
       t->sleep = timeout - total_time;
       assert( t->sleep > 0 );
 
-      // set first_wake_usecs if this is the first item
+      // set sleep_times.first_wake if this is the first item
       if( total_time == 0 )
-        first_wake_usecs = current_usecs() + timeout;
+        sleep_times.first_wake = current_usecs() + timeout;
 
       // update the sleep time of the thread right after t
       tt->sleep -= t->sleep;
       assert( tt->sleep > 0 );
       break;
     }
-    
     e = ll_view_prev(sleepq, e);
   }
 
-  assert (e != NULL);   // we're sure to find such an e
-  sleepq_sanity_check();
-  
-  return;
+  // We're sure to find such an e
+  assert (e != NULL);
 }
 
-// remove the timer associated with the thread
+/**
+ * Remove a sleeping thread from the sleep queue before
+ * its timer expires.
+ **/
 inline static void sleepq_remove_thread(thread_t *t)
 {
-  linked_list_entry_t *e;
-
-  assert(t->sleep >= 0);  // the thread must be in the sleep queue
-  sleepq_sanity_check();
+  // The thread must be in the sleep queue
+  assert(t->sleep >= 0);  
   
-  // let's find the thread in the queue
+  // Let's find the thread in the queue
+  linked_list_entry_t *e;
   e = ll_view_head(sleepq);
   while (e) {
     thread_t *tt = (thread_t *)pl_get_pointer(e);
     if (tt == t) {
       linked_list_entry_t *nexte = ll_view_next(sleepq, e);
       if (nexte) {
-	// e is not the last thread in the queue
-	// we need to lengthen the time the next thread will sleep
-	thread_t *nextt = (thread_t *)pl_get_pointer(nexte);
-	nextt->sleep += t->sleep;
+	    // e is not the last thread in the queue
+	    // we need to lengthen the time the next thread will sleep
+	    thread_t *nextt = (thread_t *)pl_get_pointer(nexte);
+	    nextt->sleep += t->sleep;
       } else {
-	// e is the last thread, so we need to adjust max_sleep_time
-	max_sleep_time -= t->sleep;
+	    // e is the last thread, so we need to adjust max_sleep_time
+	    sleep_times.max -= t->sleep;
       }
       // remove t
       ll_remove_entry(sleepq, e);
       ll_free_entry(sleepq, e);
       t->sleep = -1;
-      assert (!t->timeout);    // if this fails, someone must has 
-                               // forgot to reset timeout some time ago
+      assert (!t->timeout);    // if this fails, someone must have
+                               // forgotten to reset timeout some time ago
       break;
     }
     e = ll_view_next(sleepq, e);
   }
-
   assert( t->sleep == -1);
   assert (e != NULL);   // we must find t in sleep queue
-  sleepq_sanity_check();
 }
 
-
-void thread_usleep(unsigned long long timeout)
+/**
+ * Set the IO polling function.  Used by the aio routines.  Shouldn't
+ * be used elsewhere.
+ **/
+void set_io_polling_func(void (*func)(long long))
 {
-  thread_suspend_self(timeout);
+  assert( !io_polling_func );
+  io_polling_func = func;
 }
 
 
-// NOTE: dynamic linking craps out w/o these.  There may be a better way.
-//static int capriccio_errno=0;
-//int* __errno_location()
-//{
-//  return &capriccio_errno;
-//}
+/******************************************************************************/
+/****************************** Helper Functions ******************************/
+/******************************************************************************/
 
-//extern pid_t __libc_fork();
-//pid_t fork() {
-//  return __libc_fork();
-//}
-//strong_alias(fork,__fork);
-
-
-int sched_yield(void)
+static int get_stack_size_kb_log2(void *func)
 {
-  thread_yield();
-  return 0;
+  int result = conf_new_stack_kb_log2;
+  if (start_node_addrs != NULL) {
+    int i = 0;
+    while (start_node_addrs[i] != NULL && start_node_addrs[i] != func) {
+      i++;
+    }
+    if (start_node_addrs[i] == func) {
+      result = start_node_stacks[i];
+    } else {
+      fatal("Couldn't find stack size for thread entry point %p\n", func);
+    }
+  }
+  return result;
 }
-strong_alias(sched_yield,__sched_yield);
+
+

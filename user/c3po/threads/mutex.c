@@ -7,6 +7,7 @@
 #include "threadlib.h"
 
 #include "util.h"
+#include <assert.h>
 #include <error.h>
 #include <stdlib.h>
 #include <sys/time.h>

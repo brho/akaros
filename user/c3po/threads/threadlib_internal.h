@@ -2,12 +2,11 @@
 #ifndef THREADLIB_INTERNAL_H
 #define THREADLIB_INTERNAL_H
 
-#include "pthread.h"
-#include "coro.h"
 #include "threadlib.h"
 #include "util.h"
 #include "blocking_graph.h"
 #include "signal.h"
+#include "ucontext.h"
 #ifdef USE_NIO
 #include <libaio.h>
 #endif
@@ -32,7 +31,8 @@ struct _thread_attr {
 
 struct thread_st {
   unsigned tid;   // thread id, mainly for readability of debug output
-  struct coroutine *coro;
+  struct thread_st *self; // pointer to itself 
+  struct ucontext *context;
   void *stack;
   void *stack_bottom;
   int stack_fingerprint;
@@ -40,14 +40,14 @@ struct thread_st {
 
   // misc. short fields, grouped to save space
   enum {
-    RUNNABLE=0,
+	RUNNING=0,
+    RUNNABLE,
     SUSPENDED,
-    ZOMBIE,        // not yet reaped, for joinable threads
-    GHOST          // already freed, no valid thread should be in this state
+    ZOMBIE,          // not yet reaped, for joinable threads
+    GHOST            // already freed, no valid thread should be in this state
   } state:3;
 
   unsigned int joinable:1;
-  unsigned int daemon:1;
   unsigned int key_data_count:8;  // big enough for THREAD_KEY_MAX
   unsigned int timeout:1;         // whether it is waken up because of timeout
   unsigned int sig_waiting:1;	// the thread is waiting for a signal (any not blocked in sig_mask). 
@@ -148,7 +148,5 @@ extern long long total_stack_in_use;
 
 // process all pending signals.  returns 1 is any actually handled, 0 otherwise
 extern int sig_process_pending();
-
-extern thread_t *scheduler_thread;
 
 #endif /* THREADLIB_INTERNAL_H */

@@ -4,6 +4,7 @@
 
 #include "pthread.h"
 #include "resource_stats.h"
+#include <stdbool.h>
 #include <time.h>
 #include <signal.h>
 
@@ -76,6 +77,8 @@ enum {
 
 typedef struct _thread_attr *thread_attr_t;
 
+extern void switch_to_vcore();
+extern void run_next_thread();
 void thread_exit(void *ret);
 void thread_exit_program(int exitcode);
 void thread_yield();
@@ -171,9 +174,6 @@ extern iostats_t diskio_stats;
   if( (success) ) type##_stats.completions++; \
   else            type##_stats.errors++; \
 }
-
-extern int cap_override_rw;
-
 
 extern const char *cap_current_syscall;  // used to inform the BG routines how they got there...
 #define CAP_SET_SYSCALL()   if(!cap_current_syscall) cap_current_syscall = __FUNCTION__

@@ -159,7 +159,7 @@ static long long timing_loop()
 }
 
 
-void init_cycle_clock() __attribute__((constructor));
+//void init_cycle_clock() __attribute__((constructor));
 void init_cycle_clock(void)
 {
   static int init_done = 0;

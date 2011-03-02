@@ -6,12 +6,13 @@
 
 #include "threadlib_internal.h"
 #include "util.h"
+#include <stdio.h>
 
 #ifndef DEBUG_sched_global_rr_c
 #undef debug
 #define debug(...)
-#undef tdebug
-#define tdebug(...)
+//#undef tdebug
+//#define tdebug(...)
 #endif
 
 

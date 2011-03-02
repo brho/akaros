@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "threadlib.h"
 #include "debug.h"
 #include "config.h"
 
@@ -49,7 +50,6 @@ static inline int bool_value(char *str)
 
 
 // for now, just read from env vars.  Add config file option later.
-void read_config(void) __attribute__((constructor));
 void read_config(void) {
   static int read_config_done = 0;
   
