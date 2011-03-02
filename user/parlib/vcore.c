@@ -121,6 +121,12 @@ vcore_init_fail:
 	return -1;
 }
 
+/* Returns -1 with errno set on error, or 0 on success.  This does not return
+ * the number of cores actually granted (though some parts of the kernel do
+ * internally).
+ *
+ * Note the doesn't block or anything (despite the min number requested is
+ * 1), since the kernel won't block the call. */
 int vcore_request(size_t k)
 {
 	int ret = -1;

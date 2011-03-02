@@ -35,6 +35,7 @@ void _pthread_init()
 		printf("vcore_init() failed, we're fucked!\n");
 	
 	assert(vcore_id() == 0);
+	assert(!in_vcore_context());
 
 	/* Tell the kernel where and how we want to receive events.  This is just an
 	 * example of what to do to have a notification turned on.  We're turning on
@@ -72,11 +73,7 @@ void _pthread_init()
 	set_tls_desc(vcore_thread_control_blocks[0], 0);
 	current_thread = t;
 	set_tls_desc(t->tls_desc, 0);
-
-	// TODO: consider replacing this when we have an interface allowing
-	// requesting absolute num vcores, and moving it to pthread_create and
-	// asking for 2
-	vcore_request(1);
+	assert(!in_vcore_context());
 }
 
 void __attribute__((noreturn)) vcore_entry()
@@ -91,6 +88,7 @@ void __attribute__((noreturn)) vcore_entry()
 
 	check_preempt_pending(vcoreid);
 	handle_events(vcoreid);
+	assert(in_vcore_context());	/* double check, in case and event changed it */
 	// TODO: consider making this restart path work for restarting as well as
 	// freshly starting
 	if (current_thread) {
@@ -212,13 +210,16 @@ int pthread_create(pthread_t* thread, const pthread_attr_t* attr,
                    void *(*start_routine)(void *), void* arg)
 {
 	/* After this init, we are an MCP and the caller is a pthread */
-	pthread_once(&init_once,&_pthread_init);
+	pthread_once(&init_once, &_pthread_init);
 
 	struct pthread_tcb *t = pthread_self();
-	assert(t); /* TODO/FYI: doesn't prevent this from being in vcore context */
-	/* Don't migrate this thread to anothe vcore, since it depends on being on
+	assert(t);
+	assert(!in_vcore_context());
+	/* Don't migrate this thread to another vcore, since it depends on being on
 	 * the same vcore throughout. */
 	t->dont_migrate = TRUE;
+	wmb();
+	/* Note the first time we call this, we technically aren't on a vcore */
 	uint32_t vcoreid = vcore_id();
 	*thread = (pthread_t)calloc(1, sizeof(struct pthread_tcb));
 	(*thread)->start_routine = start_routine;
@@ -250,9 +251,36 @@ int pthread_create(pthread_t* thread, const pthread_attr_t* attr,
 	threads_ready++;
 	mcs_lock_unlock(&queue_lock);
 	/* Okay to migrate now. */
+	wmb();
 	t->dont_migrate = FALSE;
-	/* Attempt to request a new core, may or may not get it... */
-	vcore_request(1);
+
+	/* Need to get some vcores.  If this is the first time, we'd like to get
+	 * two: one for the main thread (aka thread0), and another for the pthread
+	 * we are creating.  Can rework this if we get another vcore interface that
+	 * deals with absolute core counts.
+	 *
+	 * Need to get at least one core to put us in _M mode so we can run the 2LS,
+	 * etc, so for now we'll just spin until we get at least one (might be none
+	 * available).
+	 *
+	 * TODO: do something smarter regarding asking for cores (paired with
+	 * yielding), and block or something until one core is available (will need
+	 * kernel support). */
+	static bool first_time = TRUE;
+	if (first_time) {
+		first_time = FALSE;
+		/* Try for two, don't settle for less than 1 */
+		while (num_vcores() < 1) {
+			vcore_request(2);
+			cpu_relax();
+		}
+	} else {	/* common case */
+		/* Try to get another for the new thread, but doesn't matter if we get
+		 * one or not, so long as we still have at least 1. */
+		vcore_request(1);
+	}
+	assert(num_vcores() > 0);
+	assert(!in_vcore_context());	/* still are the calling u_thread */
 	return 0;
 }
 
@@ -276,6 +304,7 @@ int pthread_join(pthread_t thread, void** retval)
 static void __attribute__((noinline, noreturn)) 
 __pthread_yield(struct pthread_tcb *t)
 {
+	assert(in_vcore_context());
 	/* TODO: want to set this to FALSE once we no longer depend on being on this
 	 * vcore.  Though if we are using TLS, we are depending on the vcore.  Since
 	 * notifs are disabled and we are in a transition context, we probably
@@ -307,9 +336,11 @@ int pthread_yield(void)
 	/* TODO: (HSS) Save silly state */
 	// save_fp_state(&t->as);
 
+	assert(!in_vcore_context());
 	/* Don't migrate this thread to another vcore, since it depends on being on
 	 * the same vcore throughout (once it disables notifs). */
 	t->dont_migrate = TRUE;
+	wmb();
 	uint32_t vcoreid = vcore_id();
 	printd("[P] Pthread id %d is yielding on vcore %d\n", t->id, vcoreid);
 	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
@@ -328,6 +359,7 @@ int pthread_yield(void)
 	extern void** vcore_thread_control_blocks;
 	set_tls_desc(vcore_thread_control_blocks[vcoreid], vcoreid);
 	assert(current_thread == t);	
+	assert(in_vcore_context());	/* technically, we aren't fully in vcore context */
 	/* After this, make sure you don't use local variables.  Note the warning in
 	 * pthread_exit() */
 	set_stack_pointer((void*)vcpd->transition_stack);
@@ -517,6 +549,7 @@ int pthread_equal(pthread_t t1, pthread_t t2)
 static void __attribute__((noinline, noreturn)) 
 __pthread_exit(struct pthread_tcb *t)
 {
+	assert(in_vcore_context());
 	__pthread_free_tls(t);
 	__pthread_free_stack(t);
 	/* TODO: race on detach state */
@@ -536,10 +569,12 @@ __pthread_exit(struct pthread_tcb *t)
  * scheduler.  Will need to sort that shit out.  */
 void pthread_exit(void* ret)
 {
+	assert(!in_vcore_context());
 	struct pthread_tcb *t = pthread_self();
 	/* Don't migrate this thread to anothe vcore, since it depends on being on
 	 * the same vcore throughout. */
 	t->dont_migrate = TRUE; // won't set this to false later, since he is dying
+	wmb();
 
 	uint32_t vcoreid = vcore_id();
 	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
