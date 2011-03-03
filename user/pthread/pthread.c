@@ -30,7 +30,7 @@ static inline void spin_to_sleep(unsigned int spins, unsigned int *spun);
 /* Pthread 2LS operations */
 struct uthread *pth_init(void);
 void pth_sched_entry(void);
-struct uthread *pth_thread_create(void *udata);
+struct uthread *pth_thread_create(void (*func)(void), void *udata);
 void pth_thread_runnable(struct uthread *uthread);
 void pth_thread_yield(struct uthread *uthread);
 void pth_thread_exit(struct uthread *uthread);
@@ -111,7 +111,15 @@ void pth_sched_entry(void)
 	assert(0);
 }
 
-struct uthread *pth_thread_create(void *udata)
+/* Could move this, along with start_routine and arg, into the 2LSs */
+static void __pthread_run(void)
+{
+	struct pthread_tcb *me = pthread_self();
+	pthread_exit(me->start_routine(me->arg));
+}
+
+/* Responible for creating the uthread and initializing its user trap frame */
+struct uthread *pth_thread_create(void (*func)(void), void *udata)
 {
 	struct pthread_tcb *pthread;
 	pthread_attr_t *attr = (pthread_attr_t*)udata;
@@ -129,6 +137,11 @@ struct uthread *pth_thread_create(void *udata)
 	/* allocate a stack */
 	if (__pthread_allocate_stack(pthread))
 		printf("We're fucked\n");
+	/* Set the u_tf to start up in __pthread_run, which will call the real
+	 * start_routine and pass it the arg.  Note those aren't set until later in
+	 * pthread_create(). */
+	init_user_tf(&pthread->uthread.utf, (uint32_t)__pthread_run, 
+                 (uint32_t)(pthread->stacktop));
 	return (struct uthread*)pthread;
 }
 
@@ -205,7 +218,7 @@ int pthread_attr_destroy(pthread_attr_t *a)
 
 static void __pthread_free_stack(struct pthread_tcb *pt)
 {
-	assert(!munmap(pt->uthread.stacktop - PTHREAD_STACK_SIZE, PTHREAD_STACK_SIZE));
+	assert(!munmap(pt->stacktop - PTHREAD_STACK_SIZE, PTHREAD_STACK_SIZE));
 }
 
 static int __pthread_allocate_stack(struct pthread_tcb *pt)
@@ -216,7 +229,7 @@ static int __pthread_allocate_stack(struct pthread_tcb *pt)
 	                      MAP_POPULATE|MAP_ANONYMOUS, -1, 0);
 	if (stackbot == MAP_FAILED)
 		return -1; // errno set by mmap
-	pt->uthread.stacktop = stackbot + pt->stacksize;
+	pt->stacktop = stackbot + pt->stacksize;
 	return 0;
 }
 
@@ -241,10 +254,14 @@ int pthread_attr_getstacksize(const pthread_attr_t *attr, size_t *stacksize)
 int pthread_create(pthread_t* thread, const pthread_attr_t* attr,
                    void *(*start_routine)(void *), void* arg)
 {
-	struct uthread *uthread = uthread_create(start_routine, arg, (void*)attr);
-	if (!uthread)
+	struct pthread_tcb *pthread =
+	       (struct pthread_tcb*)uthread_create(__pthread_run, (void*)attr);
+	if (!pthread)
 		return -1;
-	*thread = (struct pthread_tcb*)uthread;
+	pthread->start_routine = start_routine;
+	pthread->arg = arg;
+	uthread_runnable((struct uthread*)pthread);
+	*thread = pthread;
 	return 0;
 }
 
@@ -260,7 +277,7 @@ int pthread_join(pthread_t thread, void** retval)
 	while (!thread->finished)
 		pthread_yield();
 	if (retval)
-		*retval = thread->uthread.retval;
+		*retval = thread->retval;
 	free(thread);
 	return 0;
 }
@@ -444,7 +461,9 @@ int pthread_equal(pthread_t t1, pthread_t t2)
  * scheduler.  Will need to sort that shit out. */
 void pthread_exit(void *ret)
 {
-	uthread_exit(ret);
+	struct pthread_tcb *pthread = pthread_self();
+	pthread->retval = ret;
+	uthread_exit();
 }
 
 int pthread_once(pthread_once_t* once_control, void (*init_routine)(void))

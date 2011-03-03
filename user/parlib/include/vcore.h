@@ -55,12 +55,6 @@ struct uthread {
 	struct user_trapframe utf;
 	struct ancillary_state as;
 	void *tls_desc;
-	/* these four could be put in the 2LSs, but since their main use is by
-	 * init_user_tf, which mucks with utf, we'll keep it in vcore code for now*/
-	void *(*start_routine)(void*);
-	void *arg;
-	void *stacktop;
-	void *retval;	/* tied to join, which isn't as clean as i'd like */
 	/* whether or not the scheduler can migrate you from your vcore */
 	bool dont_migrate;
 };
@@ -71,7 +65,7 @@ struct schedule_ops {
 	/* Functions supporting thread ops */
 	struct uthread *(*sched_init)(void);
 	void (*sched_entry)(void);
-	struct uthread *(*thread_create)(void *);
+	struct uthread *(*thread_create)(void (*func)(void), void *);
 	void (*thread_runnable)(struct uthread *);
 	void (*thread_yield)(struct uthread *);
 	void (*thread_exit)(struct uthread *);
@@ -85,13 +79,12 @@ extern struct schedule_ops *sched_ops;
  * pthread_create(), which can wrap these with their own stuff (like attrs,
  * retvals, etc). */
 
-/* Creates a uthread.  Will pass udata to sched_ops's thread_create.  For now,
- * the vcore/default 2ls code handles start routines and args.  Mostly because
- * this is used when initing a utf, which is vcore specific for now. */
-struct uthread *uthread_create(void *(*start_routine)(void *), void *arg,
-                               void *udata);
+/* Creates a uthread.  Will pass udata to sched_ops's thread_create.  Func is
+ * what gets run, and if you want args, wrap it (like pthread) */
+struct uthread *uthread_create(void (*func)(void), void *udata);
+void uthread_runnable(struct uthread *uthread);
 void uthread_yield(void);
-void uthread_exit(void *retval);
+void uthread_exit(void);
 
 /* Helpers, which sched_entry() can call */
 void run_current_uthread(void);

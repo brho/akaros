@@ -257,18 +257,10 @@ void __attribute__((noreturn)) vcore_entry()
 	assert(0);
 }
 
-/* Could move this, along with start_routine and arg, into the 2LSs */
-static void __uthread_run(void)
-{
-	struct uthread *me = current_thread;
-	uthread_exit(me->start_routine(me->arg));
-}
-
 /* Creates a uthread.  Will pass udata to sched_ops's thread_create.  For now,
  * the vcore/default 2ls code handles start routines and args.  Mostly because
  * this is used when initing a utf, which is vcore specific for now. */
-struct uthread *uthread_create(void *(*start_routine)(void *), void *arg,
-                               void *udata)
+struct uthread *uthread_create(void (*func)(void), void *udata)
 {
 	/* First time through, init the vcore code (which makes a uthread out of
 	 * thread0 / the current code.  Could move this to a ctor. */
@@ -280,14 +272,7 @@ struct uthread *uthread_create(void *(*start_routine)(void *), void *arg,
 	}
 	assert(!in_vcore_context());
 	assert(sched_ops->thread_create);
-	struct uthread *new_thread = sched_ops->thread_create(udata);
-	assert(new_thread->stacktop);
-	new_thread->start_routine = start_routine;
-	new_thread->arg = arg;
-	/* Set the u_tf to start up in __pthread_run, which will call the real
-	 * start_routine and pass it the arg. */
-	init_user_tf(&new_thread->utf, (uint32_t)__uthread_run, 
-                 (uint32_t)(new_thread->stacktop));
+	struct uthread *new_thread = sched_ops->thread_create(func, udata);
 	/* Get a TLS */
 	assert(!__uthread_allocate_tls(new_thread));
 	/* Switch into the new guys TLS and let it know who it is */
@@ -307,9 +292,14 @@ struct uthread *uthread_create(void *(*start_routine)(void *), void *arg,
 	/* Okay to migrate now. */
 	wmb();
 	caller->dont_migrate = FALSE;
+	return new_thread;
+}
+
+void uthread_runnable(struct uthread *uthread)
+{
 	/* Allow the 2LS to make the thread runnable, and do whatever. */
 	assert(sched_ops->thread_runnable);
-	sched_ops->thread_runnable(new_thread);
+	sched_ops->thread_runnable(uthread);
 	/* This is where we'll call out to a smarter 2LS function to see if we want
 	 * to get more cores (and how many). */
 	/* Need to get some vcores.  If this is the first time, we'd like to get
@@ -337,7 +327,6 @@ struct uthread *uthread_create(void *(*start_routine)(void *), void *arg,
 		 * one or not, so long as we still have at least 1. */
 		vcore_request(1);
 	}
-	return new_thread;
 }
 
 /* Need to have this as a separate, non-inlined function since we clobber the
@@ -430,11 +419,10 @@ __uthread_exit(struct uthread *uthread)
 }
 
 /* Exits from the uthread */
-void uthread_exit(void *retval)
+void uthread_exit(void)
 {
 	assert(!in_vcore_context());
 	struct uthread *uthread = current_thread;
-	uthread->retval = retval;
 	/* Don't migrate this thread to anothe vcore, since it depends on being on
 	 * the same vcore throughout. */
 	uthread->dont_migrate = TRUE; // won't set to false later, since he is dying
