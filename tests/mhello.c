@@ -25,6 +25,24 @@ struct event_queue *indirect_q;
 static void handle_generic(struct event_msg *ev_msg, unsigned int ev_type,
                            bool overflow);
 
+void ghetto_vcore_entry(void);
+struct uthread *ghetto_init(void)
+{
+	return malloc(sizeof(struct uthread));
+}
+
+struct schedule_ops ghetto_sched_ops = {
+	ghetto_init,
+	ghetto_vcore_entry,
+	0, /* thread_create, */
+	0, /* thread_runnable, */
+	0, /* thread_yield, */
+	0, /* thread_exit, */
+	0, /* preempt_pending, */
+	0, /* spawn_thread, */
+};
+struct schedule_ops *sched_ops = &ghetto_sched_ops;
+
 int main(int argc, char** argv)
 {
 	uint32_t vcoreid;
@@ -126,7 +144,7 @@ static void handle_generic(struct event_msg *ev_msg, unsigned int ev_type,
 	       ev_type, vcore_id(), overflow ? "" : "out");
 }
 
-void vcore_entry(void)
+void ghetto_vcore_entry(void)
 {
 	uint32_t vcoreid = vcore_id();
 	static bool first_time = TRUE;
@@ -135,39 +153,10 @@ void vcore_entry(void)
 	/* vcore_context test (don't need to do this anywhere) */
 	assert(in_vcore_context());
 
-/* begin: stuff userspace needs to do to handle notifications */
-
-	struct preempt_data *vcpd;
-	vcpd = &__procdata.vcore_preempt_data[vcoreid];
-
-	/* checks if a preempt is pending, yields if so */
-	check_preempt_pending(vcoreid);
-
-	/* here is how you receive an event */
-	handle_events(vcoreid);
-
-	/* Lets try to restart vcore0's context.  Note this doesn't do anything to
-	 * set the appropriate TLS.  On x86, this will involve changing the LDT
-	 * entry for this vcore to point to the TCB of the new user-thread. */
-	if (vcoreid == 0) {
-		/* // test for preempting a notif_handler.  do it from the monitor
-		int ctr = 0;
-		while(ctr < 3) {
-			printf("Vcore %d Spinning (%d), temp = %08x!\n", vcoreid, ctr++, temp);
-			udelay(5000000);
-		} */
-		printf("restarting vcore0 from userspace\n");
-		clear_notif_pending(vcoreid);
-		/* // testing for missing a notif
-		if (first_time) {
-			first_time = FALSE;
-			printf("setting pending, trying to renotify etc\n");
-			vcpd->notif_pending = 1;
-		} */
-		set_tls_desc(core0_tls, 0);
-		/* Load silly state (Floating point) too */
-		pop_ros_tf(&vcpd->notif_tf, vcoreid);
-		panic("should never see me!");
+	/* old logic was moved to parlib code */
+	if (current_thread) {
+		assert(vcoreid == 0);
+		run_current_uthread();
 	}
 	/* unmask notifications once you can let go of the notif_tf and it is okay
 	 * to clobber the transition stack.

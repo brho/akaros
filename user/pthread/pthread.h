@@ -9,26 +9,15 @@
   extern "C" {
 #endif
 
-/* Our internal types for pthread management */
+/* Pthread struct.  First has to be the uthread struct, which the vcore code
+ * will access directly (as if pthread_tcb is a struct uthread). */
 struct pthread_tcb {
+	struct uthread uthread;
 	TAILQ_ENTRY(pthread_tcb) next;
-	void* (*start_routine)(void*);
-	void* arg;
-
-	struct user_trapframe utf;
-	struct ancillary_state as;
-	void *tls_desc;
-	void *stacktop;
-	uint32_t stacksize;
-	uint32_t id;
-
 	int finished;
-	void *retval;
 	bool detached;
-	// whether or not the scheduler can migrate you from your vcore
-	// will be slightly difficult to see this when given just a vcoreid and
-	// notif_tf ptr
-	bool dont_migrate;
+	uint32_t id;
+	uint32_t stacksize;
 };
 typedef struct pthread_tcb* pthread_t;
 TAILQ_HEAD(pthread_queue, pthread_tcb);

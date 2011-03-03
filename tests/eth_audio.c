@@ -22,6 +22,18 @@
 void *core0_tls = 0;
 void *in_buf, *out_buf;
 
+void ghetto_vcore_entry(void);
+struct schedule_ops ghetto_sched_ops = {
+	0, /* init, */
+	ghetto_vcore_entry,
+	0, /* thread_create, */
+	0, /* thread_runnable, */
+	0, /* thread_yield, */
+	0, /* thread_exit, */
+	0, /* preempt_pending, */
+	0, /* spawn_thread, */
+};
+struct schedule_ops *sched_ops = &ghetto_sched_ops;
 /* Test program for the audio device.  mmap()s the stuff, sets up a notif
  * handler, and switches to multi_mode.
  *
@@ -93,11 +105,12 @@ void process_packet(void)
 	//printf("contents of out_buf %s\n", out_buf);
 }
 
-void vcore_entry(void)
+void ghetto_vcore_entry(void)
 {
 	uint32_t vcoreid = vcore_id();
 	static bool first_time = TRUE;
 
+	printf("GIANT WARNING: this is ancient shit\n");
 /* begin: stuff userspace needs to do to handle events/notifications */
 
 	struct vcore *vc = &__procinfo.vcoremap[vcoreid];

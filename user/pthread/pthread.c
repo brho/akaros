@@ -27,16 +27,38 @@ int threads_active = 0;
 static int get_next_pid(void);
 static inline void spin_to_sleep(unsigned int spins, unsigned int *spun);
 
-__thread struct pthread_tcb *current_thread = 0;
+/* Pthread 2LS operations */
+struct uthread *pth_init(void);
+void pth_sched_entry(void);
+struct uthread *pth_thread_create(void *udata);
+void pth_thread_runnable(struct uthread *uthread);
+void pth_thread_yield(struct uthread *uthread);
+void pth_thread_exit(struct uthread *uthread);
+void pth_preempt_pending(void);
+void pth_spawn_thread(uintptr_t pc_start, void *data);
 
-void _pthread_init()
+struct schedule_ops pthread_sched_ops = {
+	pth_init,
+	pth_sched_entry,
+	pth_thread_create,
+	pth_thread_runnable,
+	pth_thread_yield,
+	pth_thread_exit,
+	0, /* pth_preempt_pending, */
+	0, /* pth_spawn_thread, */
+};
+
+/* Publish our sched_ops, overriding the weak defaults */
+struct schedule_ops *sched_ops = &pthread_sched_ops;
+
+/* Static helpers */
+static void __pthread_free_stack(struct pthread_tcb *pt);
+static int __pthread_allocate_stack(struct pthread_tcb *pt);
+
+/* Do whatever init you want.  Return a uthread representing thread0 (int
+ * main()) */
+struct uthread *pth_init(void)
 {
-	if (vcore_init())
-		printf("vcore_init() failed, we're fucked!\n");
-	
-	assert(vcore_id() == 0);
-	assert(!in_vcore_context());
-
 	/* Tell the kernel where and how we want to receive events.  This is just an
 	 * example of what to do to have a notification turned on.  We're turning on
 	 * USER_IPIs, posting events to vcore 0's vcpd, and telling the kernel to
@@ -45,60 +67,28 @@ void _pthread_init()
 	 * to use parts of event.c to do what you want. */
 	enable_kevent(EV_USER_IPI, 0, EVENT_IPI);
 
-	/* don't forget to enable notifs on vcore0.  if you don't, the kernel will
-	 * restart your _S with notifs disabled, which is a path to confusion. */
-	enable_notifs(0);
-
 	/* Create a pthread_tcb for the main thread */
 	pthread_t t = (pthread_t)calloc(1, sizeof(struct pthread_tcb));
 	t->id = get_next_pid();
 	assert(t->id == 0);
+
 	/* Put the new pthread on the active queue */
 	mcs_lock_lock(&queue_lock);
 	threads_active++;
 	TAILQ_INSERT_TAIL(&active_queue, t, next);
 	mcs_lock_unlock(&queue_lock);
-	
-	/* Save a pointer to the newly created threads tls region into its tcb */
-	t->tls_desc = get_tls_desc(0);
-	/* Save a pointer to the pthread in its own TLS */
-	current_thread = t;
-
-	/* Change temporarily to vcore0s tls region so we can save the newly created
-	 * tcb into its current_thread variable and then restore it.  One minor
-	 * issue is that vcore0's transition-TLS isn't TLS_INITed yet.  Until it is
-	 * (right before vcore_entry(), don't try and take the address of any of
-	 * its TLS vars. */
-	extern void** vcore_thread_control_blocks;
-	set_tls_desc(vcore_thread_control_blocks[0], 0);
-	current_thread = t;
-	set_tls_desc(t->tls_desc, 0);
-	assert(!in_vcore_context());
+	return (struct uthread*)t;
 }
 
-void __attribute__((noreturn)) vcore_entry()
+/* Called from vcore entry.  Options usually include restarting whoever was
+ * running there before or running a new thread.  Events are handled out of
+ * event.c (table of function pointers, stuff like that). */
+void pth_sched_entry(void)
 {
-	uint32_t vcoreid = vcore_id();
-
-	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
-
-	/* Should always have notifications disabled when coming in here. */
-	assert(vcpd->notif_enabled == FALSE);
-	assert(in_vcore_context());
-
-	check_preempt_pending(vcoreid);
-	handle_events(vcoreid);
-	assert(in_vcore_context());	/* double check, in case and event changed it */
-	// TODO: consider making this restart path work for restarting as well as
-	// freshly starting
 	if (current_thread) {
-		clear_notif_pending(vcoreid);
-		set_tls_desc(current_thread->tls_desc, vcoreid);
-		/* Pop the user trap frame */
-		pop_ros_tf(&vcpd->notif_tf, vcoreid);
+		run_current_uthread();
 		assert(0);
 	}
-
 	/* no one currently running, so lets get someone from the ready queue */
 	struct pthread_tcb *new_thread = NULL;
 	mcs_lock_lock(&queue_lock);
@@ -110,25 +100,96 @@ void __attribute__((noreturn)) vcore_entry()
 		threads_ready--;
 	}
 	mcs_lock_unlock(&queue_lock);
+	/* For now, this dumb logic is done here */
 	if (!new_thread) {
 		/* TODO: consider doing something more intelligent here */
-		printd("[P] No threads, vcore %d is yielding\n", vcoreid);
+		printd("[P] No threads, vcore %d is yielding\n", vcore_id());
 		sys_yield(0);
+		assert(0);
 	}
-	/* Save a ptr to the pthread running in the transition context's TLS */
-	current_thread = new_thread;
-	printd("[P] Vcore %d is starting pthread %d\n", vcoreid, new_thread->id);
-
-	clear_notif_pending(vcoreid);
-	set_tls_desc(new_thread->tls_desc, vcoreid);
-
-	/* Load silly state (Floating point) too.  For real */
-	// TODO: (HSS)
-
-	/* Pop the user trap frame */
-	pop_ros_tf(&new_thread->utf, vcoreid);
+	run_uthread((struct uthread*)new_thread);
 	assert(0);
 }
+
+struct uthread *pth_thread_create(void *udata)
+{
+	struct pthread_tcb *pthread;
+	pthread_attr_t *attr = (pthread_attr_t*)udata;
+	pthread = (pthread_t)calloc(1, sizeof(struct pthread_tcb));
+	pthread->stacksize = PTHREAD_STACK_SIZE;	/* default */
+	pthread->id = get_next_pid();
+	pthread->detached = FALSE;				/* default */
+	/* Respect the attributes */
+	if (attr) {
+		if (attr->stacksize)					/* don't set a 0 stacksize */
+			pthread->stacksize = attr->stacksize;
+		if (attr->detachstate == PTHREAD_CREATE_DETACHED)
+			pthread->detached = TRUE;
+	}
+	/* allocate a stack */
+	if (__pthread_allocate_stack(pthread))
+		printf("We're fucked\n");
+	return (struct uthread*)pthread;
+}
+
+void pth_thread_runnable(struct uthread *uthread)
+{
+	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
+	/* Insert the newly created thread into the ready queue of threads.
+	 * It will be removed from this queue later when vcore_entry() comes up */
+	mcs_lock_lock(&queue_lock);
+	TAILQ_INSERT_TAIL(&ready_queue, pthread, next);
+	threads_ready++;
+	mcs_lock_unlock(&queue_lock);
+}
+
+/* The calling thread is yielding.  Do what you need to do to restart (like put
+ * yourself on a runqueue), or do some accounting.  Eventually, this might be a
+ * little more generic than just yield. */
+void pth_thread_yield(struct uthread *uthread)
+{
+	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
+	/* Take from the active list, and put on the ready list (tail).  Don't do
+	 * this until we are done completely with the thread, since it can be
+	 * restarted somewhere else. */
+	mcs_lock_lock(&queue_lock);
+	threads_active--;
+	TAILQ_REMOVE(&active_queue, pthread, next);
+	threads_ready++;
+	TAILQ_INSERT_TAIL(&ready_queue, pthread, next);
+	mcs_lock_unlock(&queue_lock);
+}
+
+/* Thread is exiting, do your 2LS specific stuff.  You're in vcore context.
+ * Don't use the thread's TLS or stack or anything. */
+void pth_thread_exit(struct uthread *uthread)
+{
+	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
+	/* Remove from the active runqueue */
+	mcs_lock_lock(&queue_lock);
+	threads_active--;
+	TAILQ_REMOVE(&active_queue, pthread, next);
+	mcs_lock_unlock(&queue_lock);
+	/* Cleanup, mirroring pth_thread_create() */
+	__pthread_free_stack(pthread);
+	/* TODO: race on detach state */
+	if (pthread->detached)
+		free(pthread);
+	/* Once we do this, our joiner can free us.  He won't free us if we're
+	 * detached, but there is still a potential race there (since he's accessing
+	 * someone who is freed. */
+	pthread->finished = 1;
+}
+
+void pth_preempt_pending(void)
+{
+}
+
+void pth_spawn_thread(uintptr_t pc_start, void *data)
+{
+}
+
+/* Pthread interface stuff and helpers */
 
 int pthread_attr_init(pthread_attr_t *a)
 {
@@ -142,31 +203,9 @@ int pthread_attr_destroy(pthread_attr_t *a)
 	return 0;
 }
 
-/* TODO: probably don't want to dealloc.  Considering caching */
-static void __pthread_free_tls(struct pthread_tcb *pt)
-{
-	extern void _dl_deallocate_tls (void *tcb, bool dealloc_tcb) internal_function;
-
-	assert(pt->tls_desc);
-	_dl_deallocate_tls(pt->tls_desc, TRUE);
-	pt->tls_desc = NULL;
-}
-
-static int __pthread_allocate_tls(struct pthread_tcb *pt)
-{
-	assert(!pt->tls_desc);
-	pt->tls_desc = allocate_tls();
-	if (!pt->tls_desc) {
-		errno = ENOMEM;
-		return -1;
-	}
-	return 0;
-}
-
-
 static void __pthread_free_stack(struct pthread_tcb *pt)
 {
-	assert(!munmap(pt->stacktop - PTHREAD_STACK_SIZE, PTHREAD_STACK_SIZE));
+	assert(!munmap(pt->uthread.stacktop - PTHREAD_STACK_SIZE, PTHREAD_STACK_SIZE));
 }
 
 static int __pthread_allocate_stack(struct pthread_tcb *pt)
@@ -177,14 +216,8 @@ static int __pthread_allocate_stack(struct pthread_tcb *pt)
 	                      MAP_POPULATE|MAP_ANONYMOUS, -1, 0);
 	if (stackbot == MAP_FAILED)
 		return -1; // errno set by mmap
-	pt->stacktop = stackbot + pt->stacksize;
+	pt->uthread.stacktop = stackbot + pt->stacksize;
 	return 0;
-}
-
-void __pthread_run(void)
-{
-	struct pthread_tcb *me = current_thread;
-	pthread_exit(me->start_routine(me->arg));
 }
 
 // Warning, this will reuse numbers eventually
@@ -193,7 +226,6 @@ static int get_next_pid(void)
 	static uint32_t next_pid = 0;
 	return next_pid++;
 }
-
 
 int pthread_attr_setstacksize(pthread_attr_t *attr, size_t stacksize)
 {
@@ -209,78 +241,10 @@ int pthread_attr_getstacksize(const pthread_attr_t *attr, size_t *stacksize)
 int pthread_create(pthread_t* thread, const pthread_attr_t* attr,
                    void *(*start_routine)(void *), void* arg)
 {
-	/* After this init, we are an MCP and the caller is a pthread */
-	pthread_once(&init_once, &_pthread_init);
-
-	struct pthread_tcb *t = pthread_self();
-	assert(t);
-	assert(!in_vcore_context());
-	/* Don't migrate this thread to another vcore, since it depends on being on
-	 * the same vcore throughout. */
-	t->dont_migrate = TRUE;
-	wmb();
-	/* Note the first time we call this, we technically aren't on a vcore */
-	uint32_t vcoreid = vcore_id();
-	*thread = (pthread_t)calloc(1, sizeof(struct pthread_tcb));
-	(*thread)->start_routine = start_routine;
-	(*thread)->arg = arg;
-	(*thread)->stacksize = PTHREAD_STACK_SIZE;	/* default */
-	(*thread)->id = get_next_pid();
-	(*thread)->detached = FALSE;				/* default */
-	/* Respect the attributes*/
-	if (attr) {
-		if (attr->stacksize)					/* don't set a 0 stacksize */
-			(*thread)->stacksize = attr->stacksize;
-		if (attr->detachstate == PTHREAD_CREATE_DETACHED)
-			(*thread)->detached = TRUE;
-	}
-	if (__pthread_allocate_stack(*thread) ||  __pthread_allocate_tls(*thread))
-		printf("We're fucked\n");
-	/* Save the ptr to the new pthread in that pthread's TLS */
-	set_tls_desc((*thread)->tls_desc, vcoreid);
-	current_thread = *thread;
-	set_tls_desc(t->tls_desc, vcoreid);
-	/* Set the u_tf to start up in __pthread_run, which will call the real
-	 * start_routine and pass it the arg. */
-	init_user_tf(&(*thread)->utf, (uint32_t)__pthread_run, 
-                 (uint32_t)((*thread)->stacktop));
-	/* Insert the newly created thread into the ready queue of threads.
-	 * It will be removed from this queue later when vcore_entry() comes up */
-	mcs_lock_lock(&queue_lock);
-	TAILQ_INSERT_TAIL(&ready_queue, *thread, next);
-	threads_ready++;
-	mcs_lock_unlock(&queue_lock);
-	/* Okay to migrate now. */
-	wmb();
-	t->dont_migrate = FALSE;
-
-	/* Need to get some vcores.  If this is the first time, we'd like to get
-	 * two: one for the main thread (aka thread0), and another for the pthread
-	 * we are creating.  Can rework this if we get another vcore interface that
-	 * deals with absolute core counts.
-	 *
-	 * Need to get at least one core to put us in _M mode so we can run the 2LS,
-	 * etc, so for now we'll just spin until we get at least one (might be none
-	 * available).
-	 *
-	 * TODO: do something smarter regarding asking for cores (paired with
-	 * yielding), and block or something until one core is available (will need
-	 * kernel support). */
-	static bool first_time = TRUE;
-	if (first_time) {
-		first_time = FALSE;
-		/* Try for two, don't settle for less than 1 */
-		while (num_vcores() < 1) {
-			vcore_request(2);
-			cpu_relax();
-		}
-	} else {	/* common case */
-		/* Try to get another for the new thread, but doesn't matter if we get
-		 * one or not, so long as we still have at least 1. */
-		vcore_request(1);
-	}
-	assert(num_vcores() > 0);
-	assert(!in_vcore_context());	/* still are the calling u_thread */
+	struct uthread *uthread = uthread_create(start_routine, arg, (void*)attr);
+	if (!uthread)
+		return -1;
+	*thread = (struct pthread_tcb*)uthread;
 	return 0;
 }
 
@@ -296,80 +260,14 @@ int pthread_join(pthread_t thread, void** retval)
 	while (!thread->finished)
 		pthread_yield();
 	if (retval)
-		*retval = thread->retval;
+		*retval = thread->uthread.retval;
 	free(thread);
 	return 0;
 }
 
-static void __attribute__((noinline, noreturn)) 
-__pthread_yield(struct pthread_tcb *t)
-{
-	assert(in_vcore_context());
-	/* TODO: want to set this to FALSE once we no longer depend on being on this
-	 * vcore.  Though if we are using TLS, we are depending on the vcore.  Since
-	 * notifs are disabled and we are in a transition context, we probably
-	 * shouldn't be moved anyway.  It does mean that a pthread could get jammed.
-	 * If we do this after putting it on the active list, we'll have a race on
-	 * dont_migrate. */
-	t->dont_migrate = FALSE;
-	/* Take from the active list, and put on the ready list (tail).  Don't do
-	 * this until we are done completely with the thread, since it can be
-	 * restarted somewhere else. */
-	mcs_lock_lock(&queue_lock);
-	threads_active--;
-	TAILQ_REMOVE(&active_queue, t, next);
-	threads_ready++;
-	TAILQ_INSERT_TAIL(&ready_queue, t, next);
-	mcs_lock_unlock(&queue_lock);
-	/* Leave the current vcore completely */
-	current_thread = NULL; // this might be okay, even with a migration
-	/* Go back to the entry point, where we can handle notifications or
-	 * reschedule someone. */
-	vcore_entry();
-}
-
 int pthread_yield(void)
 {
-	struct pthread_tcb *t = pthread_self();
-	volatile bool yielding = TRUE; /* signal to short circuit when restarting */
-
-	/* TODO: (HSS) Save silly state */
-	// save_fp_state(&t->as);
-
-	assert(!in_vcore_context());
-	/* Don't migrate this thread to another vcore, since it depends on being on
-	 * the same vcore throughout (once it disables notifs). */
-	t->dont_migrate = TRUE;
-	wmb();
-	uint32_t vcoreid = vcore_id();
-	printd("[P] Pthread id %d is yielding on vcore %d\n", t->id, vcoreid);
-	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
-	/* once we do this, we might miss a notif_pending, so we need to enter vcore
-	 * entry later.  Need to disable notifs so we don't get in weird loops with
-	 * save_ros_tf() and pop_ros_tf(). */
-	disable_notifs(vcoreid);
-	/* take the current state and save it into t->utf when this pthread
-	 * restarts, it will continue from right after this, see yielding is false,
-	 * and short ciruit the function. */
-	save_ros_tf(&t->utf);
-	if (!yielding)
-		goto yield_return_path;
-	yielding = FALSE; /* for when it starts back up */
-	/* Change to the transition context (both TLS and stack). */
-	extern void** vcore_thread_control_blocks;
-	set_tls_desc(vcore_thread_control_blocks[vcoreid], vcoreid);
-	assert(current_thread == t);	
-	assert(in_vcore_context());	/* technically, we aren't fully in vcore context */
-	/* After this, make sure you don't use local variables.  Note the warning in
-	 * pthread_exit() */
-	set_stack_pointer((void*)vcpd->transition_stack);
-	/* Finish exiting in another function. */
-	__pthread_yield(current_thread);
-	/* Should never get here */
-	assert(0);
-	/* Will jump here when the pthread's trapframe is restarted/popped. */
-yield_return_path:
-	printd("[P] pthread %d returning from a yield!\n", t->id);
+	uthread_yield();
 	return 0;
 }
 
@@ -383,7 +281,6 @@ int pthread_mutexattr_destroy(pthread_mutexattr_t* attr)
 {
   return 0;
 }
-
 
 int pthread_attr_setdetachstate(pthread_attr_t *__attr, int __detachstate)
 {
@@ -535,7 +432,7 @@ int pthread_condattr_getpshared(pthread_condattr_t *a, int *s)
 
 pthread_t pthread_self()
 {
-  return current_thread;
+  return (struct pthread_tcb*)current_thread;
 }
 
 int pthread_equal(pthread_t t1, pthread_t t2)
@@ -543,68 +440,11 @@ int pthread_equal(pthread_t t1, pthread_t t2)
   return t1 == t2;
 }
 
-/* Need to have this as a separate, non-inlined function since we clobber the
- * stack pointer before calling it, and don't want the compiler to play games
- * with my hart. */
-static void __attribute__((noinline, noreturn)) 
-__pthread_exit(struct pthread_tcb *t)
-{
-	assert(in_vcore_context());
-	__pthread_free_tls(t);
-	__pthread_free_stack(t);
-	/* TODO: race on detach state */
-	if (t->detached)
-		free(t);
-	/* Once we do this, our joiner can free us.  He won't free us if we're
-	 * detached, but there is still a potential race there (since he's accessing
-	 * someone who is freed. */
-	t->finished = 1;
-	current_thread = NULL;
-	/* Go back to the entry point, where we can handle notifications or
-	 * reschedule someone. */
-	vcore_entry();
-}
-
 /* This function cannot be migrated to a different vcore by the userspace
- * scheduler.  Will need to sort that shit out.  */
-void pthread_exit(void* ret)
+ * scheduler.  Will need to sort that shit out. */
+void pthread_exit(void *ret)
 {
-	assert(!in_vcore_context());
-	struct pthread_tcb *t = pthread_self();
-	/* Don't migrate this thread to anothe vcore, since it depends on being on
-	 * the same vcore throughout. */
-	t->dont_migrate = TRUE; // won't set this to false later, since he is dying
-	wmb();
-
-	uint32_t vcoreid = vcore_id();
-	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
-
-	t->retval = ret;
-	mcs_lock_lock(&queue_lock);
-	threads_active--;
-	TAILQ_REMOVE(&active_queue, t, next);
-	mcs_lock_unlock(&queue_lock);
-
-	printd("[P] Pthread id %d is exiting on vcore %d\n", t->id, vcoreid);
-	
-	/* once we do this, we might miss a notif_pending, so we need to enter vcore
-	 * entry later. */
-	disable_notifs(vcoreid);
-
-	/* Change to the transition context (both TLS and stack). */
-	extern void** vcore_thread_control_blocks;
-	set_tls_desc(vcore_thread_control_blocks[vcoreid], vcoreid);
-	assert(current_thread == t);	
-	/* After this, make sure you don't use local variables.  Also, make sure the
-	 * compiler doesn't use them without telling you (TODO).
-	 *
-	 * In each arch's set_stack_pointer, make sure you subtract off as much room
-	 * as you need to any local vars that might be pushed before calling the
-	 * next function, or for whatever other reason the compiler/hardware might
-	 * walk up the stack a bit when calling a noreturn function. */
-	set_stack_pointer((void*)vcpd->transition_stack);
-	/* Finish exiting in another function.  Ugh. */
-	__pthread_exit(current_thread);
+	uthread_exit(ret);
 }
 
 int pthread_once(pthread_once_t* once_control, void (*init_routine)(void))

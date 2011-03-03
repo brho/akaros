@@ -8,6 +8,19 @@
 #include <arch/arch.h>
 #include <event.h>
 
+void ghetto_vcore_entry(void);
+struct schedule_ops ghetto_sched_ops = {
+	0, /* init, */
+	ghetto_vcore_entry,
+	0, /* thread_create, */
+	0, /* thread_runnable, */
+	0, /* thread_yield, */
+	0, /* thread_exit, */
+	0, /* preempt_pending, */
+	0, /* spawn_thread, */
+};
+struct schedule_ops *sched_ops = &ghetto_sched_ops;
+
 int main(int argc, char** argv)
 {
 
@@ -25,7 +38,7 @@ int main(int argc, char** argv)
 	return -1;
 }
 
-void vcore_entry(void)
+void ghetto_vcore_entry(void)
 {
 	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[0];
 	vcpd->notif_enabled = TRUE;
