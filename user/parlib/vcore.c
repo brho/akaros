@@ -24,7 +24,7 @@ struct schedule_ops *sched_ops __attribute__((weak)) = &default_2ls_ops;
 
 extern void** vcore_thread_control_blocks;
 
-__thread struct uthread *current_thread = 0;
+__thread struct uthread *current_uthread = 0;
 
 /* Get a TLS, returns 0 on failure.  Vcores have their own TLS, and any thread
  * created by a user-level scheduler needs to create a TLS as well. */
@@ -44,13 +44,20 @@ void *allocate_tls(void)
 	return tcb;
 }
 
+/* Free a previously allocated TLS region */
+void free_tls(void *tcb)
+{
+	extern void _dl_deallocate_tls (void *tcb, bool dealloc_tcb) internal_function;
+	assert(tcb);
+	_dl_deallocate_tls(tcb, TRUE);
+}
+
 /* TODO: probably don't want to dealloc.  Considering caching */
 static void free_transition_tls(int id)
 {
-	extern void _dl_deallocate_tls (void *tcb, bool dealloc_tcb) internal_function;
 	if(vcore_thread_control_blocks[id])
 	{
-		_dl_deallocate_tls(vcore_thread_control_blocks[id],true);
+		free_tls(vcore_thread_control_blocks[id]);
 		vcore_thread_control_blocks[id] = NULL;
 	}
 }
@@ -123,16 +130,16 @@ int vcore_init()
 	/* Save a pointer to thread0's tls region (the glibc one) into its tcb */
 	uthread->tls_desc = get_tls_desc(0);
 	/* Save a pointer to the uthread in its own TLS */
-	current_thread = uthread;
+	current_uthread = uthread;
 
 	/* Change temporarily to vcore0s tls region so we can save the newly created
-	 * tcb into its current_thread variable and then restore it.  One minor
+	 * tcb into its current_uthread variable and then restore it.  One minor
 	 * issue is that vcore0's transition-TLS isn't TLS_INITed yet.  Until it is
 	 * (right before vcore_entry(), don't try and take the address of any of
 	 * its TLS vars. */
 	extern void** vcore_thread_control_blocks;
 	set_tls_desc(vcore_thread_control_blocks[0], 0);
-	current_thread = uthread;
+	current_uthread = uthread;
 	set_tls_desc(uthread->tls_desc, 0);
 	assert(!in_vcore_context());
 
@@ -276,7 +283,7 @@ struct uthread *uthread_create(void (*func)(void), void *udata)
 	/* Get a TLS */
 	assert(!__uthread_allocate_tls(new_thread));
 	/* Switch into the new guys TLS and let it know who it is */
-	struct uthread *caller = current_thread;
+	struct uthread *caller = current_uthread;
 	assert(caller);
 	/* Don't migrate this thread to another vcore, since it depends on being on
 	 * the same vcore throughout. */
@@ -286,7 +293,7 @@ struct uthread *uthread_create(void (*func)(void), void *udata)
 	uint32_t vcoreid = vcore_id();
 	/* Save the new_thread to the new uthread in that uthread's TLS */
 	set_tls_desc(new_thread->tls_desc, vcoreid);
-	current_thread = new_thread;
+	current_uthread = new_thread;
 	/* Switch back to the caller */
 	set_tls_desc(caller->tls_desc, vcoreid);
 	/* Okay to migrate now. */
@@ -350,7 +357,7 @@ __uthread_yield(struct uthread *uthread)
 	 * probably have a generic function for all sorts of waiting. */
 	sched_ops->thread_yield(uthread);
 	/* Leave the current vcore completely */
-	current_thread = NULL; // this might be okay, even with a migration
+	current_uthread = NULL; // this might be okay, even with a migration
 	/* Go back to the entry point, where we can handle notifications or
 	 * reschedule someone. */
 	vcore_entry();
@@ -360,7 +367,7 @@ __uthread_yield(struct uthread *uthread)
  * like this to ease the transition to the 2LS-ops */
 void uthread_yield(void)
 {
-	struct uthread *uthread = current_thread;
+	struct uthread *uthread = current_uthread;
 	volatile bool yielding = TRUE; /* signal to short circuit when restarting */
 	/* TODO: (HSS) Save silly state */
 	// save_fp_state(&t->as);
@@ -386,13 +393,13 @@ void uthread_yield(void)
 	/* Change to the transition context (both TLS and stack). */
 	extern void** vcore_thread_control_blocks;
 	set_tls_desc(vcore_thread_control_blocks[vcoreid], vcoreid);
-	assert(current_thread == uthread);	
+	assert(current_uthread == uthread);	
 	assert(in_vcore_context());	/* technically, we aren't fully in vcore context */
 	/* After this, make sure you don't use local variables.  Note the warning in
 	 * pthread_exit() */
 	set_stack_pointer((void*)vcpd->transition_stack);
 	/* Finish exiting in another function. */
-	__uthread_yield(current_thread);
+	__uthread_yield(current_uthread);
 	/* Should never get here */
 	assert(0);
 	/* Will jump here when the pthread's trapframe is restarted/popped. */
@@ -412,7 +419,7 @@ __uthread_exit(struct uthread *uthread)
 	/* 2LS specific cleanup */
 	assert(sched_ops->thread_exit);
 	sched_ops->thread_exit(uthread);
-	current_thread = NULL;
+	current_uthread = NULL;
 	/* Go back to the entry point, where we can handle notifications or
 	 * reschedule someone. */
 	vcore_entry();
@@ -422,7 +429,7 @@ __uthread_exit(struct uthread *uthread)
 void uthread_exit(void)
 {
 	assert(!in_vcore_context());
-	struct uthread *uthread = current_thread;
+	struct uthread *uthread = current_uthread;
 	/* Don't migrate this thread to anothe vcore, since it depends on being on
 	 * the same vcore throughout. */
 	uthread->dont_migrate = TRUE; // won't set to false later, since he is dying
@@ -436,7 +443,7 @@ void uthread_exit(void)
 	/* Change to the transition context (both TLS and stack). */
 	extern void** vcore_thread_control_blocks;
 	set_tls_desc(vcore_thread_control_blocks[vcoreid], vcoreid);
-	assert(current_thread == uthread);	
+	assert(current_uthread == uthread);	
 	/* After this, make sure you don't use local variables.  Also, make sure the
 	 * compiler doesn't use them without telling you (TODO).
 	 *
@@ -446,18 +453,18 @@ void uthread_exit(void)
 	 * walk up the stack a bit when calling a noreturn function. */
 	set_stack_pointer((void*)vcpd->transition_stack);
 	/* Finish exiting in another function.  Ugh. */
-	__uthread_exit(current_thread);
+	__uthread_exit(current_uthread);
 }
 
-/* Runs whatever thread is vcore's current_thread */
+/* Runs whatever thread is vcore's current_uthread */
 void run_current_uthread(void)
 {
 	uint32_t vcoreid = vcore_id();
 	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
-	assert(current_thread);
+	assert(current_uthread);
 	printd("[U] Vcore %d is restarting uthread %d\n", vcoreid, uthread->id);
 	clear_notif_pending(vcoreid);
-	set_tls_desc(current_thread->tls_desc, vcoreid);
+	set_tls_desc(current_uthread->tls_desc, vcoreid);
 	/* Pop the user trap frame */
 	pop_ros_tf(&vcpd->notif_tf, vcoreid);
 	assert(0);
@@ -470,7 +477,7 @@ void run_uthread(struct uthread *uthread)
 	uint32_t vcoreid = vcore_id();
 	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
 	printd("[U] Vcore %d is starting uthread %d\n", vcoreid, uthread->id);
-	current_thread = uthread;
+	current_uthread = uthread;
 	clear_notif_pending(vcoreid);
 	set_tls_desc(uthread->tls_desc, vcoreid);
 	/* Load silly state (Floating point) too.  For real */

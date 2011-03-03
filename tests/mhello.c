@@ -154,7 +154,7 @@ void ghetto_vcore_entry(void)
 	assert(in_vcore_context());
 
 	/* old logic was moved to parlib code */
-	if (current_thread) {
+	if (current_uthread) {
 		assert(vcoreid == 0);
 		run_current_uthread();
 	}

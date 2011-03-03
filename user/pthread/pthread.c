@@ -85,7 +85,7 @@ struct uthread *pth_init(void)
  * event.c (table of function pointers, stuff like that). */
 void pth_sched_entry(void)
 {
-	if (current_thread) {
+	if (current_uthread) {
 		run_current_uthread();
 		assert(0);
 	}
@@ -449,7 +449,7 @@ int pthread_condattr_getpshared(pthread_condattr_t *a, int *s)
 
 pthread_t pthread_self()
 {
-  return (struct pthread_tcb*)current_thread;
+  return (struct pthread_tcb*)current_uthread;
 }
 
 int pthread_equal(pthread_t t1, pthread_t t2)

@@ -34,6 +34,7 @@ extern __thread bool __vcore_context;
 
 /* Utility Functions */
 void *allocate_tls(void);
+void free_tls(void *tcb);
 
 /* Vcore API functions */
 static inline size_t max_vcores(void);
@@ -58,7 +59,7 @@ struct uthread {
 	/* whether or not the scheduler can migrate you from your vcore */
 	bool dont_migrate;
 };
-extern __thread struct uthread *current_thread;
+extern __thread struct uthread *current_uthread;
 
 /* 2L-Scheduler operations.  Can be 0.  Examples in pthread.c. */
 struct schedule_ops {

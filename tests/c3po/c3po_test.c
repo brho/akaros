@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <parlib.h>
 #include <unistd.h>
+#include <vcore.h>
 
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 #define printf_safe(...) {}
@@ -24,17 +25,17 @@ __thread int my_id;
 void *yield_thread(void* arg)
 {	
 	for (int i = 0; i < 100; i++) {
-		printf_safe("[A] pthread %d on vcore %d\n", pthread_self(), vcore_id());
+		printf_safe("[A] pthread %p on vcore %d, itr: %d\n", pthread_self(), vcore_id(), i);
 		pthread_yield();
-		printf_safe("[A] pthread %d returned from yield on vcore %d\n",
-		            pthread_self(), vcore_id());
+		printf_safe("[A] pthread %p returned from yield on vcore %d, itr: %d\n",
+		            pthread_self(), vcore_id(), i);
 	}
 	return (void*)(pthread_self());
 }
 
 void *hello_thread(void* arg)
 {	
-	printf_safe("[A] pthread %d on vcore %d\n", pthread_self(), vcore_id());
+	printf_safe("[A] pthread %p on vcore %d\n", pthread_self(), vcore_id());
 	return (void*)(pthread_self());
 }
 
@@ -72,14 +73,15 @@ int main(int argc, char** argv)
 	printf_safe("[A] Successfully joined on thread 3 (retval: %p)\n", retval3);
 
 	/* create and join on hellos */
-	for (int i = 1; i < NUM_TEST_THREADS; i++) {
+	for (int i = 0; i < NUM_TEST_THREADS; i++) {
 		printf_safe("[A] About to create thread %d\n", i);
 		pthread_create(&my_threads[i], NULL, &yield_thread, NULL);
 	}
-	for (int i = 1; i < NUM_TEST_THREADS; i++) {
+	for (int i = 0; i < NUM_TEST_THREADS; i++) {
 		printf_safe("[A] About to join on thread %d\n", i);
 		pthread_join(my_threads[i], &my_retvals[i]);
 		printf_safe("[A] Successfully joined on thread %d (retval: %p)\n", i,
 		            my_retvals[i]);
 	}
+	printf("Exiting cleanly!\n");
 } 
