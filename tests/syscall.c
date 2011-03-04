@@ -20,14 +20,8 @@ struct uthread *ghetto_init(void)
 }
 
 struct schedule_ops ghetto_sched_ops = {
-	ghetto_init,
-	ghetto_vcore_entry,
-	0, /* thread_create, */
-	0, /* thread_runnable, */
-	0, /* thread_yield, */
-	0, /* thread_exit, */
-	0, /* preempt_pending, */
-	0, /* spawn_thread, */
+	.sched_init = ghetto_init,
+	.sched_entry = ghetto_vcore_entry,
 };
 struct schedule_ops *sched_ops = &ghetto_sched_ops;
 

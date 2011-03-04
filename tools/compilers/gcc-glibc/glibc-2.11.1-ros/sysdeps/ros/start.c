@@ -13,13 +13,18 @@ weak_alias(__vcore_thread_control_blocks,vcore_thread_control_blocks)
 __thread int __vcoreid = 0;
 __thread bool __vcore_context = FALSE;
 
-void
-__vcore_entry(void)
+void __uthread_vcore_entry(void)
 {
-	fputs("define a vcore_entry() function, foo!",stderr);
+	fputs("Define a uthread_vcore_entry() or a vcore_entry(), foo!\n", stderr);
 	abort();
 }
-weak_alias(__vcore_entry,vcore_entry)
+weak_alias(__uthread_vcore_entry, uthread_vcore_entry)
+
+void __vcore_entry(void)
+{
+	uthread_vcore_entry();
+}
+weak_alias(__vcore_entry, vcore_entry)
 
 #define failmsg(str) write(2,str"\n",sizeof(str"\n")-1)
 

@@ -28,19 +28,6 @@ int test = TEST_SWITCH_TO_RUNNABLE_S;
 
 static void global_tests(uint32_t vcoreid);
 
-void ghetto_vcore_entry(void);
-struct schedule_ops ghetto_sched_ops = {
-	0, /* init, */
-	ghetto_vcore_entry,
-	0, /* thread_create, */
-	0, /* thread_runnable, */
-	0, /* thread_yield, */
-	0, /* thread_exit, */
-	0, /* preempt_pending, */
-	0, /* spawn_thread, */
-};
-struct schedule_ops *sched_ops = &ghetto_sched_ops;
-
 int main(int argc, char** argv)
 {
 	uint32_t vcoreid;
@@ -112,7 +99,7 @@ int main(int argc, char** argv)
 	return 0;
 }
 
-void ghetto_vcore_entry(void)
+void vcore_entry(void)
 {
 	uint32_t vcoreid;
 	static int first_time = 1; // used by vcore2

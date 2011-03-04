@@ -44,8 +44,8 @@ static int uthread_init(void)
 	return 0;
 }
 
-/* 2LSs shouldn't call vcore_entry() directly */
-void __attribute__((noreturn)) vcore_entry()
+/* 2LSs shouldn't call uthread_vcore_entry directly */
+void __attribute__((noreturn)) uthread_vcore_entry(void)
 {
 	uint32_t vcoreid = vcore_id();
 
@@ -164,7 +164,7 @@ __uthread_yield(struct uthread *uthread)
 	current_uthread = NULL; // this might be okay, even with a migration
 	/* Go back to the entry point, where we can handle notifications or
 	 * reschedule someone. */
-	vcore_entry();
+	uthread_vcore_entry();
 }
 
 /* Calling thread yields.  TODO: combine similar code with uthread_exit() (done
@@ -226,7 +226,7 @@ __uthread_exit(struct uthread *uthread)
 	current_uthread = NULL;
 	/* Go back to the entry point, where we can handle notifications or
 	 * reschedule someone. */
-	vcore_entry();
+	uthread_vcore_entry();
 }
 
 /* Exits from the uthread */
