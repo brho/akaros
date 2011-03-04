@@ -282,7 +282,7 @@ struct file {
 	int							f_error;
 	struct event_poll_tailq		f_ep_links;
 	spinlock_t					f_ep_lock;
-	void						*f_fs_info;		/* tty driver hook */
+	void						*f_privdata;	/* tty/socket driver hook */
 	struct page_map				*f_mapping;		/* page cache mapping */
 
 	/* Ghetto appserver support */
@@ -446,6 +446,7 @@ ssize_t generic_file_write(struct file *file, const char *buf, size_t count,
                            off_t *offset);
 ssize_t generic_dir_read(struct file *file, char *u_buf, size_t count,
                          off_t *offset);
+struct file* alloc_file();
 struct file *do_file_open(char *path, int flags, int mode);
 int do_symlink(char *path, const char *symname, int mode);
 int do_link(char *old_path, char *new_path);

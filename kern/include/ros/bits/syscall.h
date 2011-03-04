@@ -41,6 +41,10 @@
 #define SYS_change_to_m				29
 #define SYS_poke_ksched				30
 
+/* Socket Syscalls */
+#define SYS_socket					40
+
+
 /* Platform specific syscalls */
 #define SYS_serial_read				75
 #define SYS_serial_write			76

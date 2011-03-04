@@ -1631,16 +1631,23 @@ out_path_only:
 	return retval;
 }
 
-/* Opens and returns the file specified by dentry */
-struct file *dentry_open(struct dentry *dentry, int flags)
+struct file *alloc_file()
 {
-	struct inode *inode;
-	int desired_mode;
 	struct file *file = kmem_cache_alloc(file_kcache, 0);
 	if (!file) {
 		set_errno(ENOMEM);
 		return 0;
 	}
+	/* one for the ref passed out*/
+	kref_init(&file->f_kref, file_release, 1);
+	return file;
+}
+
+/* Opens and returns the file specified by dentry */
+struct file *dentry_open(struct dentry *dentry, int flags)
+{
+	struct inode *inode;
+	int desired_mode;
 	inode = dentry->d_inode;
 	/* Do the mode first, since we can still error out.  f_mode stores how the
 	 * OS file is open, which can be more restrictive than the i_mode */
@@ -1659,9 +1666,11 @@ struct file *dentry_open(struct dentry *dentry, int flags)
 	}
 	if (check_perms(inode, desired_mode))
 		goto error_access;
+	// Check permission before we allocate file struct	
+	struct file *file = alloc_file();
+	if (!file) return 0;
+
 	file->f_mode = desired_mode;
-	/* one for the ref passed out, and *none* for the sb TAILQ */
-	kref_init(&file->f_kref, file_release, 1);
 	/* Add to the list of all files of this SB */
 	TAILQ_INSERT_TAIL(&inode->i_sb->s_files, file, f_list);
 	kref_get(&dentry->d_kref, 1);
@@ -1677,13 +1686,12 @@ struct file *dentry_open(struct dentry *dentry, int flags)
 	file->f_error = 0;
 //	struct event_poll_tailq		f_ep_links;
 	spinlock_init(&file->f_ep_lock);
-	file->f_fs_info = 0;						/* prob overriden by the fs */
+	file->f_privdata = 0;						/* prob overriden by the fs */
 	file->f_mapping = inode->i_mapping;
 	file->f_op->open(inode, file);
 	return file;
 error_access:
 	set_errno(EACCES);
-	kmem_cache_free(file_kcache, file);
 	return 0;
 }
 
@@ -1755,7 +1763,6 @@ struct file *put_file_from_fd(struct files_struct *open_files, int file_desc)
 	spin_unlock(&open_files->lock);
 	return file;
 }
-
 /* Inserts the file in the files_struct, returning the corresponding new file
  * descriptor, or an error code.  We start looking for open fds from low_fd. */
 int insert_file(struct files_struct *open_files, struct file *file, int low_fd)

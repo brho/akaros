@@ -33,6 +33,7 @@
 #include <smp.h>
 #include <arsc_server.h>
 #include <event.h>
+#include <socket.h>
 
 
 #ifdef __CONFIG_NETWORKING__
@@ -1382,6 +1383,8 @@ const static struct sys_table_entry syscall_table[] = {
 #endif
 	[SYS_change_to_m] = {(syscall_t)sys_change_to_m, "change_to_m"},
 	[SYS_poke_ksched] = {(syscall_t)sys_poke_ksched, "poke_ksched"},
+	[SYS_socket] ={(syscall_t)sys_socket, "socket"},
+
 	[SYS_read] = {(syscall_t)sys_read, "read"},
 	[SYS_write] = {(syscall_t)sys_write, "write"},
 	[SYS_open] = {(syscall_t)sys_open, "open"},
