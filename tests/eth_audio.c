@@ -18,6 +18,7 @@
 #include <timing.h>
 #include <assert.h>
 #include <event.h>
+#include <uthread.h>
 
 void *core0_tls = 0;
 void *in_buf, *out_buf;

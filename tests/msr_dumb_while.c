@@ -7,6 +7,7 @@
 #include <vcore.h>
 #include <arch/arch.h>
 #include <event.h>
+#include <uthread.h>
 
 void ghetto_vcore_entry(void);
 struct schedule_ops ghetto_sched_ops = {

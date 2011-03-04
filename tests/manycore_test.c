@@ -3,6 +3,7 @@
 #include <vcore.h>
 #include <parlib.h>
 #include <mcs.h>
+#include <uthread.h>
 
 mcs_barrier_t b;
 

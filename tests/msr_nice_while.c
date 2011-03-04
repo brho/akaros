@@ -9,6 +9,7 @@
 #include <pthread.h>
 #include <rassert.h>
 #include <event.h>
+#include <uthread.h>
 
 void *while_thread(void *arg)
 {

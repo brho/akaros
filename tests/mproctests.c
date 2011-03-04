@@ -7,6 +7,7 @@
 #include <ros/resource.h>
 #include <rstdio.h>
 #include <timing.h>
+#include <uthread.h>
 
 #ifdef __sparc_v8__
 # define udelay(x) udelay((x)/2000)

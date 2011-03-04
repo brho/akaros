@@ -10,6 +10,7 @@
 #include <vcore.h>
 #include <timing.h>
 #include <mcs.h>
+#include <uthread.h>
 
 #ifdef __sparc_v8__
 # define udelay(x) udelay((x)/2000)

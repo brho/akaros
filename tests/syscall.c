@@ -5,6 +5,7 @@
 #include <vcore.h>
 #include <rassert.h>
 #include <ros/bcq.h>
+#include <uthread.h>
 
 static void handle_syscall(struct event_msg *ev_msg, unsigned int ev_type,
                            bool overflow);

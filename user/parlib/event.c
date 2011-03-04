@@ -16,6 +16,7 @@
 #include <errno.h>
 #include <parlib.h>
 #include <event.h>
+#include <uthread.h>
 
 /********* Event_q Setup / Registration  ***********/
 

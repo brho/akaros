@@ -3,6 +3,7 @@
 
 #include <sys/queue.h>
 #include <vcore.h>
+#include <uthread.h>
 #include <mcs.h>
 
 #ifdef __cplusplus
