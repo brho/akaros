@@ -1,6 +1,9 @@
 # The ROS Top level Makefile
 # Make sure that 'all' is the first target
 
+# Keep make quiet.  Make sure you call make via $(MAKE), and not directly
+MAKE += -s 
+
 ############################################################################# 
 ########## Initial Setup so that we can build for different TARGETS #########
 ############################################################################# 
