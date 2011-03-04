@@ -37,13 +37,14 @@ bthread_t queue_remove(bthread_t* head, bthread_t* tail)
 
 void vcore_entry()
 {
+  struct mcs_lock_qnode local_qn = {0};
   bthread_t node = NULL;
   while(1)
   {
-    mcs_lock_lock(&work_queue_lock);
+    mcs_lock_lock(&work_queue_lock, &local_qn);
     if(work_queue_head)
       node = queue_remove(&work_queue_head,&work_queue_tail);
-    mcs_lock_unlock(&work_queue_lock);
+    mcs_lock_unlock(&work_queue_lock, &local_qn);
 
     if(node)
       break;
@@ -73,6 +74,7 @@ int bthread_attr_destroy(bthread_attr_t *a)
 int bthread_create(bthread_t* thread, const bthread_attr_t* attr,
                    void *(*start_routine)(void *), void* arg)
 {
+  struct mcs_lock_qnode local_qn = {0};
   bthread_once(&init_once,&_bthread_init);
 
   *thread = (bthread_t)malloc(sizeof(work_queue_t));
@@ -81,14 +83,14 @@ int bthread_create(bthread_t* thread, const bthread_attr_t* attr,
   (*thread)->next = 0;
   (*thread)->finished = 0;
   (*thread)->detached = 0;
-  mcs_lock_lock(&work_queue_lock);
+  mcs_lock_lock(&work_queue_lock, &local_qn);
   {
     threads_active++;
     queue_insert(&work_queue_head,&work_queue_tail,*thread);
     // don't return until we get a vcore
     while(threads_active > num_vcores() && vcore_request(1));
   }
-  mcs_lock_unlock(&work_queue_lock);
+  mcs_lock_unlock(&work_queue_lock, &local_qn);
 
   return 0;
 }
@@ -243,15 +245,16 @@ int bthread_equal(bthread_t t1, bthread_t t2)
 
 void bthread_exit(void* ret)
 {
+  struct mcs_lock_qnode local_qn = {0};
   bthread_once(&init_once,&_bthread_init);
 
   bthread_t t = bthread_self();
 
-  mcs_lock_lock(&work_queue_lock);
+  mcs_lock_lock(&work_queue_lock, &local_qn);
   threads_active--;
   if(threads_active == 0)
     exit(0);
-  mcs_lock_unlock(&work_queue_lock);
+  mcs_lock_unlock(&work_queue_lock, &local_qn);
 
   if(t)
   {
@@ -273,6 +276,7 @@ int bthread_once(bthread_once_t* once_control, void (*init_routine)(void))
 
 int bthread_barrier_init(bthread_barrier_t* b, const bthread_barrierattr_t* a, int count)
 {
+  struct mcs_lock_qnode local_qn = {0};
   memset(b->local_sense,0,sizeof(b->local_sense));
 
   b->sense = 0;
@@ -283,12 +287,13 @@ int bthread_barrier_init(bthread_barrier_t* b, const bthread_barrierattr_t* a, i
 
 int bthread_barrier_wait(bthread_barrier_t* b)
 {
+  struct mcs_lock_qnode local_qn = {0};
   int id = vcore_id();
   int ls = b->local_sense[32*id] = 1 - b->local_sense[32*id];
 
-  mcs_lock_lock(&b->lock);
+  mcs_lock_lock(&b->lock, &local_qn);
   int count = --b->count;
-  mcs_lock_unlock(&b->lock);
+  mcs_lock_unlock(&b->lock, &local_qn);
 
   if(count == 0)
   {

@@ -14,14 +14,11 @@ typedef struct mcs_lock_qnode
 {
 	volatile struct mcs_lock_qnode* volatile next;
 	volatile int locked;
-	char pad[ARCH_CL_SIZE-sizeof(void*)-sizeof(int)];
 } mcs_lock_qnode_t;
 
-typedef struct
+typedef struct mcs_lock
 {
 	mcs_lock_qnode_t* lock;
-	char pad[ARCH_CL_SIZE-sizeof(mcs_lock_qnode_t*)];
-	mcs_lock_qnode_t qnode[MAX_VCORES] __attribute__((aligned(8)));
 } mcs_lock_t;
 
 typedef struct
@@ -43,9 +40,12 @@ typedef struct
 int mcs_barrier_init(mcs_barrier_t* b, size_t nprocs);
 void mcs_barrier_wait(mcs_barrier_t* b, size_t vcoreid);
 
-void mcs_lock_init(mcs_lock_t* lock);
-void mcs_lock_unlock(mcs_lock_t* lock);
-void mcs_lock_lock(mcs_lock_t* l);
+void mcs_lock_init(struct mcs_lock *lock);
+/* Caller needs to alloc (and zero) their own qnode to spin on.  The memory
+ * should be on a cacheline that is 'per-thread'.  This could be on the stack,
+ * in a thread control block, etc. */
+void mcs_lock_lock(struct mcs_lock *lock, struct mcs_lock_qnode *qnode);
+void mcs_lock_unlock(struct mcs_lock *lock, struct mcs_lock_qnode *qnode);
 
 #ifdef __cplusplus
 }

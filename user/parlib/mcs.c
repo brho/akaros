@@ -5,32 +5,32 @@
 #include <stdlib.h>
 
 // MCS locks
-void mcs_lock_init(mcs_lock_t* lock)
+void mcs_lock_init(struct mcs_lock *lock)
 {
 	memset(lock,0,sizeof(mcs_lock_t));
 }
 
-static inline mcs_lock_qnode_t* mcs_qnode_swap(mcs_lock_qnode_t** addr, mcs_lock_qnode_t* val)
+static inline mcs_lock_qnode_t *mcs_qnode_swap(mcs_lock_qnode_t **addr,
+                                               mcs_lock_qnode_t *val)
 {
 	return (mcs_lock_qnode_t*)atomic_swap((int*)addr,(int)val);
 }
 
-void mcs_lock_lock(mcs_lock_t* lock)
+void mcs_lock_lock(struct mcs_lock *lock, struct mcs_lock_qnode *qnode)
 {
-	mcs_lock_qnode_t* qnode = &lock->qnode[vcore_id()];
 	qnode->next = 0;
 	mcs_lock_qnode_t* predecessor = mcs_qnode_swap(&lock->lock,qnode);
 	if(predecessor)
 	{
 		qnode->locked = 1;
 		predecessor->next = qnode;
-		while(qnode->locked);
+		while(qnode->locked)
+			cpu_relax();
 	}
 }
 
-void mcs_lock_unlock(mcs_lock_t* lock)
+void mcs_lock_unlock(struct mcs_lock *lock, struct mcs_lock_qnode *qnode)
 {
-	mcs_lock_qnode_t* qnode = &lock->qnode[vcore_id()];
 	if(qnode->next == 0)
 	{
 		mcs_lock_qnode_t* old_tail = mcs_qnode_swap(&lock->lock,0);

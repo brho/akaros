@@ -223,14 +223,15 @@ void main_thread_init()
   sleep_times.first_wake = 0;
 
   // Add main thread to the global list of threads
-  mcs_lock_lock(&thread_lock);
+  struct mcs_lock_qnode local_qn = {0};
+  mcs_lock_lock(&thread_lock, &local_qn);
   pl_add_tail(threadlist, main_thread);
   num_threads.total++;
   // Update number of running threads
   main_thread->state = RUNNING;
   num_threads.running++;
   num_threads.detached++;
-  mcs_lock_unlock(&thread_lock);
+  mcs_lock_unlock(&thread_lock, &local_qn);
 
   tdebug("running: %d, runnable: %d, suspended: %d, detached: %d\n", 
          num_threads.running, num_threads.runnable, 
@@ -353,13 +354,14 @@ void run_next_thread()
  
   // Keep trying to get a thread off of the scheduler queue
   thread_t *t; 
+  struct mcs_lock_qnode local_qn = {0};
   while(1) {
-    mcs_lock_lock(&thread_lock);
+    mcs_lock_lock(&thread_lock, &local_qn);
 	// Check to see if we are in the processes of exiting the entire program.
 	// If we are, then go ahead and yield this vcore. We are dying, afterall..
 	if(gflags.exit_func_done) {
       bool yieldcore = __query_vcore_yield();
-      mcs_lock_unlock(&thread_lock);
+      mcs_lock_unlock(&thread_lock, &local_qn);
       if(yieldcore) vcore_yield();
     }
 		
@@ -373,7 +375,7 @@ void run_next_thread()
 	// the system if appropriate.
     if(t == NULL) {
       bool yieldcore = __query_vcore_yield();
-      mcs_lock_unlock(&thread_lock);
+      mcs_lock_unlock(&thread_lock, &local_qn);
       if(yieldcore) vcore_yield();
     }
 	// Otherwise, if the thread is in the ZOMBIE state, then it must have been
@@ -381,7 +383,7 @@ void run_next_thread()
     // Reap it now, then go and grab the next thread.
     else if(t->state == ZOMBIE) {
       __free_thread_prep(t);
-      mcs_lock_unlock(&thread_lock);
+      mcs_lock_unlock(&thread_lock, &local_qn);
       free_thread(t);
     }
     // Otherwise, we've found a thread to run, so continue.
@@ -392,7 +394,7 @@ void run_next_thread()
   num_threads.runnable--;
   num_threads.running++;
   t->state = RUNNING;
-  mcs_lock_unlock(&thread_lock);
+  mcs_lock_unlock(&thread_lock, &local_qn);
  
   tdebug("running: %d, runnable: %d, suspended: %d, detached: %d\n", 
          num_threads.running, num_threads.runnable, 
@@ -484,7 +486,8 @@ static thread_t* new_thread(char *name, void* (*func)(void *), void *arg, thread
 //  bg_dummy_node->num_here++;
 //  t->curr_stats.node = bg_dummy_node;
 
-  mcs_lock_lock(&thread_lock);
+  struct mcs_lock_qnode local_qn = {0};
+  mcs_lock_lock(&thread_lock, &local_qn);
   // Up the count of detached threads if this thread should be detached
   if( attr ) {
     t->joinable = attr->joinable;
@@ -500,7 +503,7 @@ static thread_t* new_thread(char *name, void* (*func)(void *), void *arg, thread
   t->state = RUNNABLE;
   num_threads.runnable++;
   bool requestcore = __query_vcore_request();
-  mcs_lock_unlock(&thread_lock);
+  mcs_lock_unlock(&thread_lock, &local_qn);
 
   tdebug("running: %d, runnable: %d, suspended: %d, detached: %d\n", 
          num_threads.running, num_threads.runnable, 
@@ -760,7 +763,8 @@ static int __thread_yield(int suspend, unsigned long long timeout)
 //  }
 
   // Decide what to do with the thread
-  mcs_lock_lock(&thread_lock);
+  struct mcs_lock_qnode local_qn = {0};
+  mcs_lock_lock(&thread_lock, &local_qn);
   // Drop the count of running threads
   num_threads.running--;
   // If we should suspend it, do so for the specified timeout
@@ -778,7 +782,7 @@ static int __thread_yield(int suspend, unsigned long long timeout)
     num_threads.runnable++;
     sched_add_thread(current_thread);
   }
-  mcs_lock_unlock(&thread_lock);
+  mcs_lock_unlock(&thread_lock, &local_qn);
 
   tdebug("running: %d, runnable: %d, suspended: %d, detached: %d\n", 
          num_threads.running, num_threads.runnable, 
@@ -914,6 +918,7 @@ void thread_exit(void *ret)
 //  }
     
   // If we are the main thread...
+  struct mcs_lock_qnode local_qn = {0};
   while(unlikely(t == main_thread)) {
     // Check if we really can exit the program now.
     // If so, end of program!
@@ -927,9 +932,9 @@ void thread_exit(void *ret)
       // Return back to glibc and exit the program!
 	  // First set a global flag so no other vcores try to pull new threads off
 	  // of any lists (these lists are about to be deallocated...)
-      mcs_lock_lock(&thread_lock);
+      mcs_lock_lock(&thread_lock, &local_qn);
       gflags.exit_func_done = TRUE;
-      mcs_lock_unlock(&thread_lock);
+      mcs_lock_unlock(&thread_lock, &local_qn);
 
       printf("Dying with %d vcores\n", num_vcores());
       printf("Program exiting normally!\n");
@@ -943,7 +948,7 @@ void thread_exit(void *ret)
   }
   // Otherwise...
   // Update thread counts and resume blocked threads
-  mcs_lock_lock(&thread_lock);
+  mcs_lock_lock(&thread_lock, &local_qn);
   num_threads.running--;
   num_threads.zombie++;
   t->state = ZOMBIE;
@@ -975,7 +980,7 @@ void thread_exit(void *ret)
   // Check to see if we now have less threads than we have vcores.  If so,
   // prepare to yield the current core back to the system.
   bool yieldcore = __query_vcore_yield();
-  mcs_lock_unlock(&thread_lock);
+  mcs_lock_unlock(&thread_lock, &local_qn);
 
   tdebug("running: %d, runnable: %d, suspended: %d, detached: %d\n", 
          num_threads.running, num_threads.runnable, 
@@ -1005,14 +1010,15 @@ int thread_join(thread_t *t, void **ret)
 
   // Wait for the thread to complete
   tdebug( "thread state: %d\n" ,t->state);
-  mcs_lock_lock(&thread_lock);
+  struct mcs_lock_qnode local_qn = {0};
+  mcs_lock_lock(&thread_lock, &local_qn);
   if(t->state != ZOMBIE) {
     t->join_thread = current_thread;
-    mcs_lock_unlock(&thread_lock);
+    mcs_lock_unlock(&thread_lock, &local_qn);
   	CAP_SET_SYSCALL();
     thread_suspend_self(0);
     CAP_CLEAR_SYSCALL();
-    mcs_lock_lock(&thread_lock);
+    mcs_lock_lock(&thread_lock, &local_qn);
   }
 
   // Set the return value
@@ -1021,7 +1027,7 @@ int thread_join(thread_t *t, void **ret)
 
   // Free the memory associated with the joined thread. 
   __free_thread_prep(t);
-  mcs_lock_unlock(&thread_lock);
+  mcs_lock_unlock(&thread_lock, &local_qn);
   free_thread(t);
 
   tdebug("Exit\n");
@@ -1066,10 +1072,11 @@ static void __thread_resume(thread_t *t)
 
 void thread_resume(thread_t *t)
 {
-  mcs_lock_lock(&thread_lock);
+  struct mcs_lock_qnode local_qn = {0};
+  mcs_lock_lock(&thread_lock, &local_qn);
   __thread_resume(t);
   bool requestcore = __query_vcore_request();
-  mcs_lock_unlock(&thread_lock);
+  mcs_lock_unlock(&thread_lock, &local_qn);
 
   // Maybe request a new vcore if we are running low
   if(requestcore) vcore_request(1);
@@ -1080,10 +1087,11 @@ void thread_set_detached(thread_t *t)
   if(!t->joinable)
     return;
   
-  mcs_lock_lock(&thread_lock);
+  struct mcs_lock_qnode local_qn = {0};
+  mcs_lock_lock(&thread_lock, &local_qn);
   t->joinable = 0;
   num_threads.detached++;
-  mcs_lock_unlock(&thread_lock);
+  mcs_lock_unlock(&thread_lock, &local_qn);
 
   tdebug("running: %d, runnable: %d, suspended: %d, detached: %d\n", 
          num_threads.running, num_threads.runnable, 
@@ -1346,6 +1354,7 @@ static void sleepq_check_wakeup(int sync)
   // the last check. If it's greater, update the remaining sleep time
   // and set first_wake to now + the new sleep time.
   linked_list_entry_t *e;
+  struct mcs_lock_qnode local_qn = {0};
   while (interval > 0 && (e = ll_view_head(sleepq))) {
     thread_t *t = (thread_t *)pl_get_pointer(e);
 
@@ -1359,10 +1368,10 @@ static void sleepq_check_wakeup(int sync)
     t->sleep = -1;
     t->timeout = 1;
 
-    mcs_lock_lock(&thread_lock);
+    mcs_lock_lock(&thread_lock, &local_qn);
     ll_free_entry(sleepq, ll_remove_head(sleepq));
     __thread_make_runnable(t);
-    mcs_lock_unlock(&thread_lock);
+    mcs_lock_unlock(&thread_lock, &local_qn);
   }
 
   if (ll_size(sleepq) == 0) {

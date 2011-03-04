@@ -132,6 +132,7 @@ vcore_init_fail:
  * 1), since the kernel won't block the call. */
 int vcore_request(size_t k)
 {
+	struct mcs_lock_qnode local_qn = {0};
 	int ret = -1;
 	size_t i,j;
 
@@ -140,7 +141,7 @@ int vcore_request(size_t k)
 
 	// TODO: could do this function without a lock once we 
 	// have atomic fetch and add in user space
-	mcs_lock_lock(&_vcore_lock);
+	mcs_lock_lock(&_vcore_lock, &local_qn);
 
 	size_t vcores_wanted = num_vcores() + k;
 	if(k < 0 || vcores_wanted > max_vcores())
@@ -158,7 +159,7 @@ int vcore_request(size_t k)
 	ret = sys_resource_req(RES_CORES, vcores_wanted, 1, 0);
 
 fail:
-	mcs_lock_unlock(&_vcore_lock);
+	mcs_lock_unlock(&_vcore_lock, &local_qn);
 	return ret;
 }
 

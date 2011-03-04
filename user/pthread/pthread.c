@@ -59,6 +59,7 @@ static int __pthread_allocate_stack(struct pthread_tcb *pt);
  * main()) */
 struct uthread *pth_init(void)
 {
+	struct mcs_lock_qnode local_qn = {0};
 	/* Tell the kernel where and how we want to receive events.  This is just an
 	 * example of what to do to have a notification turned on.  We're turning on
 	 * USER_IPIs, posting events to vcore 0's vcpd, and telling the kernel to
@@ -73,10 +74,10 @@ struct uthread *pth_init(void)
 	assert(t->id == 0);
 
 	/* Put the new pthread on the active queue */
-	mcs_lock_lock(&queue_lock);
+	mcs_lock_lock(&queue_lock, &local_qn);
 	threads_active++;
 	TAILQ_INSERT_TAIL(&active_queue, t, next);
-	mcs_lock_unlock(&queue_lock);
+	mcs_lock_unlock(&queue_lock, &local_qn);
 	return (struct uthread*)t;
 }
 
@@ -91,7 +92,8 @@ void pth_sched_entry(void)
 	}
 	/* no one currently running, so lets get someone from the ready queue */
 	struct pthread_tcb *new_thread = NULL;
-	mcs_lock_lock(&queue_lock);
+	struct mcs_lock_qnode local_qn = {0};
+	mcs_lock_lock(&queue_lock, &local_qn);
 	new_thread = TAILQ_FIRST(&ready_queue);
 	if (new_thread) {
 		TAILQ_REMOVE(&ready_queue, new_thread, next);
@@ -99,7 +101,7 @@ void pth_sched_entry(void)
 		threads_active++;
 		threads_ready--;
 	}
-	mcs_lock_unlock(&queue_lock);
+	mcs_lock_unlock(&queue_lock, &local_qn);
 	/* For now, this dumb logic is done here */
 	if (!new_thread) {
 		/* TODO: consider doing something more intelligent here */
@@ -148,12 +150,13 @@ struct uthread *pth_thread_create(void (*func)(void), void *udata)
 void pth_thread_runnable(struct uthread *uthread)
 {
 	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
+	struct mcs_lock_qnode local_qn = {0};
 	/* Insert the newly created thread into the ready queue of threads.
 	 * It will be removed from this queue later when vcore_entry() comes up */
-	mcs_lock_lock(&queue_lock);
+	mcs_lock_lock(&queue_lock, &local_qn);
 	TAILQ_INSERT_TAIL(&ready_queue, pthread, next);
 	threads_ready++;
-	mcs_lock_unlock(&queue_lock);
+	mcs_lock_unlock(&queue_lock, &local_qn);
 }
 
 /* The calling thread is yielding.  Do what you need to do to restart (like put
@@ -162,15 +165,16 @@ void pth_thread_runnable(struct uthread *uthread)
 void pth_thread_yield(struct uthread *uthread)
 {
 	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
+	struct mcs_lock_qnode local_qn = {0};
 	/* Take from the active list, and put on the ready list (tail).  Don't do
 	 * this until we are done completely with the thread, since it can be
 	 * restarted somewhere else. */
-	mcs_lock_lock(&queue_lock);
+	mcs_lock_lock(&queue_lock, &local_qn);
 	threads_active--;
 	TAILQ_REMOVE(&active_queue, pthread, next);
 	threads_ready++;
 	TAILQ_INSERT_TAIL(&ready_queue, pthread, next);
-	mcs_lock_unlock(&queue_lock);
+	mcs_lock_unlock(&queue_lock, &local_qn);
 }
 
 /* Thread is exiting, do your 2LS specific stuff.  You're in vcore context.
@@ -178,11 +182,12 @@ void pth_thread_yield(struct uthread *uthread)
 void pth_thread_exit(struct uthread *uthread)
 {
 	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
+	struct mcs_lock_qnode local_qn = {0};
 	/* Remove from the active runqueue */
-	mcs_lock_lock(&queue_lock);
+	mcs_lock_lock(&queue_lock, &local_qn);
 	threads_active--;
 	TAILQ_REMOVE(&active_queue, pthread, next);
-	mcs_lock_unlock(&queue_lock);
+	mcs_lock_unlock(&queue_lock, &local_qn);
 	/* Cleanup, mirroring pth_thread_create() */
 	__pthread_free_stack(pthread);
 	/* TODO: race on detach state */
