@@ -40,7 +40,7 @@ static int uthread_init(void)
 	assert(!in_vcore_context());
 	/* don't forget to enable notifs on vcore0.  if you don't, the kernel will
 	 * restart your _S with notifs disabled, which is a path to confusion. */
-	enable_notifs(0);
+	__enable_notifs(0);
 	/* Get ourselves into _M mode */
 	while (num_vcores() < 1) {
 		vcore_request(1);

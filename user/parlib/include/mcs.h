@@ -46,6 +46,9 @@ void mcs_lock_init(struct mcs_lock *lock);
  * in a thread control block, etc. */
 void mcs_lock_lock(struct mcs_lock *lock, struct mcs_lock_qnode *qnode);
 void mcs_lock_unlock(struct mcs_lock *lock, struct mcs_lock_qnode *qnode);
+/* If you lock the lock from vcore context, you must use these. */
+void mcs_lock_notifsafe(struct mcs_lock *lock, struct mcs_lock_qnode *qnode);
+void mcs_unlock_notifsafe(struct mcs_lock *lock, struct mcs_lock_qnode *qnode);
 
 #ifdef __cplusplus
 }

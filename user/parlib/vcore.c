@@ -141,7 +141,7 @@ int vcore_request(size_t k)
 
 	// TODO: could do this function without a lock once we 
 	// have atomic fetch and add in user space
-	mcs_lock_lock(&_vcore_lock, &local_qn);
+	mcs_lock_notifsafe(&_vcore_lock, &local_qn);
 
 	size_t vcores_wanted = num_vcores() + k;
 	if(k < 0 || vcores_wanted > max_vcores())
@@ -156,10 +156,13 @@ int vcore_request(size_t k)
 			goto fail; // errno set by the call that failed
 		_max_vcores_ever_wanted++;
 	}
+	/* Ugly hack, but we need to be able to transition to _M mode */
+	if (num_vcores() == 0)
+		__enable_notifs(vcore_id());
 	ret = sys_resource_req(RES_CORES, vcores_wanted, 1, 0);
 
 fail:
-	mcs_lock_unlock(&_vcore_lock, &local_qn);
+	mcs_unlock_notifsafe(&_vcore_lock, &local_qn);
 	return ret;
 }
 
@@ -181,4 +184,13 @@ void clear_notif_pending(uint32_t vcoreid)
 		cmb();
 		__procdata.vcore_preempt_data[vcoreid].notif_pending = 0;
 	} while (handle_events(vcoreid));
+}
+
+/* Enables notifs, and deals with missed notifs by self notifying.  This should
+ * be rare, so the syscall overhead isn't a big deal. */
+void enable_notifs(uint32_t vcoreid)
+{
+	__enable_notifs(vcoreid);
+	if (__procdata.vcore_preempt_data[vcoreid].notif_pending)
+		sys_self_notify(vcoreid, EV_NONE, 0);
 }

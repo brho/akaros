@@ -41,12 +41,13 @@ static inline size_t max_vcores(void);
 static inline size_t num_vcores(void);
 static inline int vcore_id(void);
 static inline bool in_vcore_context(void);
-static inline void enable_notifs(uint32_t vcoreid);
+static inline void __enable_notifs(uint32_t vcoreid);
 static inline void disable_notifs(uint32_t vcoreid);
 int vcore_init(void);
 int vcore_request(size_t k);
 void vcore_yield(void);
 void clear_notif_pending(uint32_t vcoreid);
+void enable_notifs(uint32_t vcoreid);
 
 /* Static inlines */
 static inline size_t max_vcores(void)
@@ -69,7 +70,8 @@ static inline bool in_vcore_context(void)
 	return __vcore_context;
 }
 
-static inline void enable_notifs(uint32_t vcoreid)
+/* Only call this if you know what you are doing. */
+static inline void __enable_notifs(uint32_t vcoreid)
 {
 	__procdata.vcore_preempt_data[vcoreid].notif_enabled = TRUE;
 }

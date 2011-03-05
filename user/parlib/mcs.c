@@ -48,6 +48,24 @@ void mcs_lock_unlock(struct mcs_lock *lock, struct mcs_lock_qnode *qnode)
 		qnode->next->locked = 0;
 }
 
+/* We don't bother saving the state, like we do with irqsave, since we can use
+ * whether or not we are in vcore context to determine that.  This means you
+ * shouldn't call this from those moments when you fake being in vcore context
+ * (when switching into the TLS, etc). */
+void mcs_lock_notifsafe(struct mcs_lock *lock, struct mcs_lock_qnode *qnode)
+{
+	if (!in_vcore_context())
+		disable_notifs(vcore_id());
+	mcs_lock_lock(lock, qnode);
+}
+
+void mcs_unlock_notifsafe(struct mcs_lock *lock, struct mcs_lock_qnode *qnode)
+{
+	mcs_lock_unlock(lock, qnode);
+	if (!in_vcore_context())
+		enable_notifs(vcore_id());
+}
+
 // MCS dissemination barrier!
 int mcs_barrier_init(mcs_barrier_t* b, size_t np)
 {
