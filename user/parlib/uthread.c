@@ -41,6 +41,12 @@ static int uthread_init(void)
 	/* don't forget to enable notifs on vcore0.  if you don't, the kernel will
 	 * restart your _S with notifs disabled, which is a path to confusion. */
 	enable_notifs(0);
+	/* Get ourselves into _M mode */
+	while (num_vcores() < 1) {
+		vcore_request(1);
+		/* TODO: consider blocking */
+		cpu_relax();
+	}
 	return 0;
 }
 
@@ -60,12 +66,7 @@ void __attribute__((noreturn)) uthread_vcore_entry(void)
 	assert(in_vcore_context());	/* double check, in case and event changed it */
 	assert(sched_ops->sched_entry);
 	sched_ops->sched_entry();
-	/* If we get here, the 2LS entry returned.  We can call out to the 2LS for
-	 * guidance about whether or not to yield, etc.  Or the 2LS can do it and
-	 * just not return.  Whatever we do, it ought to parallel what we do for
-	 * requesting more cores in uthread_create(). */
-	printd("Vcore %d is yielding\n", vcoreid);
-	sys_yield(0);
+	/* 2LS sched_entry should never return */
 	assert(0);
 }
 
@@ -111,33 +112,9 @@ void uthread_runnable(struct uthread *uthread)
 	/* Allow the 2LS to make the thread runnable, and do whatever. */
 	assert(sched_ops->thread_runnable);
 	sched_ops->thread_runnable(uthread);
-	/* This is where we'll call out to a smarter 2LS function to see if we want
-	 * to get more cores (and how many). */
-	/* Need to get some vcores.  If this is the first time, we'd like to get
-	 * two: one for the main thread (aka thread0), and another for the pthread
-	 * we are creating.  Can rework this if we get another vcore interface that
-	 * deals with absolute core counts.
-	 *
-	 * Need to get at least one core to put us in _M mode so we can run the 2LS,
-	 * etc, so for now we'll just spin until we get at least one (might be none
-	 * available).
-	 *
-	 * TODO: do something smarter regarding asking for cores (paired with
-	 * yielding), and block or something until one core is available (will need
-	 * kernel support). */
-	static bool first_time = TRUE;
-	if (first_time) {
-		first_time = FALSE;
-		/* Try for two, don't settle for less than 1 */
-		while (num_vcores() < 1) {
-			vcore_request(2);
-			cpu_relax();
-		}
-	} else {	/* common case */
-		/* Try to get another for the new thread, but doesn't matter if we get
-		 * one or not, so long as we still have at least 1. */
-		vcore_request(1);
-	}
+	/* Ask the 2LS how many vcores it wants, and put in the request. */
+	assert(sched_ops->vcores_wanted);
+	vcore_request(sched_ops->vcores_wanted());
 }
 
 /* Need to have this as a separate, non-inlined function since we clobber the
@@ -274,9 +251,10 @@ void run_current_uthread(void)
 	assert(0);
 }
 
-/* Launches the uthread on the vcore */
+/* Launches the uthread on the vcore.  Don't call this on current_uthread. */
 void run_uthread(struct uthread *uthread)
 {
+	assert(uthread != current_uthread);
 	/* Save a ptr to the pthread running in the transition context's TLS */
 	uint32_t vcoreid = vcore_id();
 	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];

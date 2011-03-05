@@ -34,6 +34,7 @@ struct uthread *pth_thread_create(void (*func)(void), void *udata);
 void pth_thread_runnable(struct uthread *uthread);
 void pth_thread_yield(struct uthread *uthread);
 void pth_thread_exit(struct uthread *uthread);
+unsigned int pth_vcores_wanted(void);
 void pth_preempt_pending(void);
 void pth_spawn_thread(uintptr_t pc_start, void *data);
 
@@ -44,6 +45,7 @@ struct schedule_ops pthread_sched_ops = {
 	pth_thread_runnable,
 	pth_thread_yield,
 	pth_thread_exit,
+	pth_vcores_wanted,
 	0, /* pth_preempt_pending, */
 	0, /* pth_spawn_thread, */
 };
@@ -84,7 +86,7 @@ struct uthread *pth_init(void)
 /* Called from vcore entry.  Options usually include restarting whoever was
  * running there before or running a new thread.  Events are handled out of
  * event.c (table of function pointers, stuff like that). */
-void pth_sched_entry(void)
+void __attribute__((noreturn)) pth_sched_entry(void)
 {
 	if (current_uthread) {
 		run_current_uthread();
@@ -102,7 +104,9 @@ void pth_sched_entry(void)
 		threads_ready--;
 	}
 	mcs_lock_unlock(&queue_lock, &local_qn);
-	/* For now, this dumb logic is done here */
+	/* Instead of yielding, you could spin, turn off the core, set an alarm,
+	 * whatever.  You want some logic to decide this.  Uthread code wil have
+	 * helpers for this (like how we provide run_uthread()) */
 	if (!new_thread) {
 		/* TODO: consider doing something more intelligent here */
 		printd("[P] No threads, vcore %d is yielding\n", vcore_id());
@@ -197,6 +201,13 @@ void pth_thread_exit(struct uthread *uthread)
 	 * detached, but there is still a potential race there (since he's accessing
 	 * someone who is freed. */
 	pthread->finished = 1;
+}
+
+/* Returns how many *more* vcores we want.  Smarter schedulers should look at
+ * the num_vcores() and how much work is going on to make this decision. */
+unsigned int pth_vcores_wanted(void)
+{
+	return 1;
 }
 
 void pth_preempt_pending(void)
