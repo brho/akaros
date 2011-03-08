@@ -3,6 +3,9 @@
 
 #include <vcore.h>
 
+#define UTHREAD_DONT_MIGRATE		0x001 /* don't move to another vcore */
+#define UTHREAD_DYING				0x002 /* uthread is exiting */
+
 /* Bare necessities of a user thread.  2LSs should allocate a bigger struct and
  * cast their threads to uthreads when talking with vcore code.  Vcore/default
  * 2LS code won't touch udata or beyond. */
@@ -10,8 +13,7 @@ struct uthread {
 	struct user_trapframe utf;
 	struct ancillary_state as;
 	void *tls_desc;
-	/* whether or not the scheduler can migrate you from your vcore */
-	bool dont_migrate;
+	int flags;
 };
 extern __thread struct uthread *current_uthread;
 

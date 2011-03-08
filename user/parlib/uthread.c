@@ -92,7 +92,7 @@ struct uthread *uthread_create(void (*func)(void), void *udata)
 	assert(caller);
 	/* Don't migrate this thread to another vcore, since it depends on being on
 	 * the same vcore throughout. */
-	caller->dont_migrate = TRUE;
+	caller->flags |= UTHREAD_DONT_MIGRATE;
 	wmb();
 	/* Note the first time we call this, we technically aren't on a vcore */
 	uint32_t vcoreid = vcore_id();
@@ -103,7 +103,7 @@ struct uthread *uthread_create(void (*func)(void), void *udata)
 	set_tls_desc(caller->tls_desc, vcoreid);
 	/* Okay to migrate now. */
 	wmb();
-	caller->dont_migrate = FALSE;
+	caller->flags &= ~UTHREAD_DONT_MIGRATE;
 	return new_thread;
 }
 
@@ -119,43 +119,46 @@ void uthread_runnable(struct uthread *uthread)
 
 /* Need to have this as a separate, non-inlined function since we clobber the
  * stack pointer before calling it, and don't want the compiler to play games
- * with my hart.
- *
- * TODO: combine this 2-step logic with uthread_exit() */
+ * with my hart. */
 static void __attribute__((noinline, noreturn)) 
 __uthread_yield(struct uthread *uthread)
 {
 	assert(in_vcore_context());
-	/* TODO: want to set this to FALSE once we no longer depend on being on this
-	 * vcore.  Though if we are using TLS, we are depending on the vcore.  Since
-	 * notifs are disabled and we are in a transition context, we probably
-	 * shouldn't be moved anyway.  It does mean that a pthread could get jammed.
-	 * If we do this after putting it on the active list, we'll have a race on
-	 * dont_migrate. */
-	uthread->dont_migrate = FALSE;
-	assert(sched_ops->thread_yield);
-	/* 2LS will save the thread somewhere for restarting.  Later on, we'll
-	 * probably have a generic function for all sorts of waiting. */
-	sched_ops->thread_yield(uthread);
+	/* Do slightly different things depending on whether or not we're exiting */
+	if (!(uthread->flags & UTHREAD_DYING)) {
+		uthread->flags &= ~UTHREAD_DONT_MIGRATE;
+		assert(sched_ops->thread_yield);
+		/* 2LS will save the thread somewhere for restarting.  Later on, we'll
+		 * probably have a generic function for all sorts of waiting. */
+		sched_ops->thread_yield(uthread);
+	} else { /* DYING */
+		/* we alloc and manage the TLS, so lets get rid of it */
+		__uthread_free_tls(uthread);
+		/* 2LS specific cleanup */
+		assert(sched_ops->thread_exit);
+		sched_ops->thread_exit(uthread);
+	}
 	/* Leave the current vcore completely */
-	current_uthread = NULL; // this might be okay, even with a migration
+	current_uthread = NULL;
 	/* Go back to the entry point, where we can handle notifications or
 	 * reschedule someone. */
 	uthread_vcore_entry();
 }
 
-/* Calling thread yields.  TODO: combine similar code with uthread_exit() (done
- * like this to ease the transition to the 2LS-ops */
+/* Calling thread yields.  Both exiting and yielding calls this, the difference
+ * is the thread's state (in the flags). */
 void uthread_yield(void)
 {
 	struct uthread *uthread = current_uthread;
 	volatile bool yielding = TRUE; /* signal to short circuit when restarting */
 	/* TODO: (HSS) Save silly state */
-	// save_fp_state(&t->as);
+	// if (!(uthread->flags & UTHREAD_DYING))
+	// 	save_fp_state(&t->as);
 	assert(!in_vcore_context());
 	/* Don't migrate this thread to another vcore, since it depends on being on
-	 * the same vcore throughout (once it disables notifs). */
-	uthread->dont_migrate = TRUE;
+	 * the same vcore throughout (once it disables notifs).  The race is that we
+	 * read vcoreid, then get interrupted / migrated before disabling notifs. */
+	uthread->flags |= UTHREAD_DONT_MIGRATE;
 	wmb();
 	uint32_t vcoreid = vcore_id();
 	printd("[U] Uthread %08p is yielding on vcore %d\n", uthread, vcoreid);
@@ -166,8 +169,10 @@ void uthread_yield(void)
 	disable_notifs(vcoreid);
 	/* take the current state and save it into t->utf when this pthread
 	 * restarts, it will continue from right after this, see yielding is false,
-	 * and short ciruit the function. */
-	save_ros_tf(&uthread->utf);
+	 * and short ciruit the function.  Don't do this if we're dying. */
+	if (!(uthread->flags & UTHREAD_DYING))
+		save_ros_tf(&uthread->utf);
+	/* Restart path doesn't matter if we're dying */
 	if (!yielding)
 		goto yield_return_path;
 	yielding = FALSE; /* for when it starts back up */
@@ -176,8 +181,13 @@ void uthread_yield(void)
 	set_tls_desc(vcore_thread_control_blocks[vcoreid], vcoreid);
 	assert(current_uthread == uthread);	
 	assert(in_vcore_context());	/* technically, we aren't fully in vcore context */
-	/* After this, make sure you don't use local variables.  Note the warning in
-	 * pthread_exit() */
+	/* After this, make sure you don't use local variables.  Also, make sure the
+	 * compiler doesn't use them without telling you (TODO).
+	 *
+	 * In each arch's set_stack_pointer, make sure you subtract off as much room
+	 * as you need to any local vars that might be pushed before calling the
+	 * next function, or for whatever other reason the compiler/hardware might
+	 * walk up the stack a bit when calling a noreturn function. */
 	set_stack_pointer((void*)vcpd->transition_stack);
 	/* Finish exiting in another function. */
 	__uthread_yield(current_uthread);
@@ -188,53 +198,12 @@ yield_return_path:
 	printd("[U] Uthread %08p returning from a yield!\n", uthread);
 }
 
-/* Need to have this as a separate, non-inlined function since we clobber the
- * stack pointer before calling it, and don't want the compiler to play games
- * with my hart. */
-static void __attribute__((noinline, noreturn)) 
-__uthread_exit(struct uthread *uthread)
-{
-	assert(in_vcore_context());
-	/* we alloc and manage the TLS, so lets get rid of it */
-	__uthread_free_tls(uthread);
-	/* 2LS specific cleanup */
-	assert(sched_ops->thread_exit);
-	sched_ops->thread_exit(uthread);
-	current_uthread = NULL;
-	/* Go back to the entry point, where we can handle notifications or
-	 * reschedule someone. */
-	uthread_vcore_entry();
-}
-
-/* Exits from the uthread */
+/* Exits from the uthread.  Tempting to get rid of this function, but we need to
+ * manage the flags so we know to clean up the TLS and stuff later. */
 void uthread_exit(void)
 {
-	assert(!in_vcore_context());
-	struct uthread *uthread = current_uthread;
-	/* Don't migrate this thread to anothe vcore, since it depends on being on
-	 * the same vcore throughout. */
-	uthread->dont_migrate = TRUE; // won't set to false later, since he is dying
-	wmb();
-	uint32_t vcoreid = vcore_id();
-	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
-	printd("[U] Uthread %08p is exiting on vcore %d\n", uthread, vcoreid);
-	/* once we do this, we might miss a notif_pending, so we need to enter vcore
-	 * entry later. */
-	disable_notifs(vcoreid);
-	/* Change to the transition context (both TLS and stack). */
-	extern void** vcore_thread_control_blocks;
-	set_tls_desc(vcore_thread_control_blocks[vcoreid], vcoreid);
-	assert(current_uthread == uthread);	
-	/* After this, make sure you don't use local variables.  Also, make sure the
-	 * compiler doesn't use them without telling you (TODO).
-	 *
-	 * In each arch's set_stack_pointer, make sure you subtract off as much room
-	 * as you need to any local vars that might be pushed before calling the
-	 * next function, or for whatever other reason the compiler/hardware might
-	 * walk up the stack a bit when calling a noreturn function. */
-	set_stack_pointer((void*)vcpd->transition_stack);
-	/* Finish exiting in another function.  Ugh. */
-	__uthread_exit(current_uthread);
+	current_uthread->flags |= UTHREAD_DYING;
+	uthread_yield();
 }
 
 /* Attempts to block on sysc, returning when it is done or progress has been
