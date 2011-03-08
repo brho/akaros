@@ -24,6 +24,7 @@ struct schedule_ops {
 	void (*thread_runnable)(struct uthread *);
 	void (*thread_yield)(struct uthread *);
 	void (*thread_exit)(struct uthread *);
+	void (*thread_blockon_sysc)(struct syscall *);
 	unsigned int (*vcores_wanted)(void);
 	/* Functions event handling wants */
 	void (*preempt_pending)(void);
@@ -41,6 +42,8 @@ struct uthread *uthread_create(void (*func)(void), void *udata);
 void uthread_runnable(struct uthread *uthread);
 void uthread_yield(void);
 void uthread_exit(void);
+/* Block the calling uthread on sysc until it makes progress or is done */
+void ros_syscall_blockon(struct syscall *sysc);
 
 /* Utility function.  Event code also calls this. */
 bool check_preempt_pending(uint32_t vcoreid);

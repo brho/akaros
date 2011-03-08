@@ -37,6 +37,7 @@ void pth_thread_exit(struct uthread *uthread);
 unsigned int pth_vcores_wanted(void);
 void pth_preempt_pending(void);
 void pth_spawn_thread(uintptr_t pc_start, void *data);
+void pth_blockon_sysc(struct syscall *sysc);
 
 struct schedule_ops pthread_sched_ops = {
 	pth_init,
@@ -45,6 +46,7 @@ struct schedule_ops pthread_sched_ops = {
 	pth_thread_runnable,
 	pth_thread_yield,
 	pth_thread_exit,
+	pth_blockon_sysc,
 	pth_vcores_wanted,
 	0, /* pth_preempt_pending, */
 	0, /* pth_spawn_thread, */
@@ -216,6 +218,35 @@ void pth_preempt_pending(void)
 
 void pth_spawn_thread(uintptr_t pc_start, void *data)
 {
+}
+
+/* Eventually, this will be called from vcore context, after the current thread
+ * has yielded and is trying to block on sysc. */
+void pth_blockon_sysc(struct syscall *sysc)
+{
+	printf("We tried to block on a syscall!\n");	
+	/* for now, just spin.  2LS stuff in later commits */
+	__ros_syscall_blockon(sysc);
+
+	#if 0
+	// testing shit.  should dont_migrate for this
+	uint32_t vcoreid = vcore_id();
+	struct event_queue local_ev_q = {0}, *ev_q = &local_ev_q;
+	ev_q->ev_mbox = &__procdata.vcore_preempt_data[vcoreid].ev_mbox;
+	ev_q->ev_flags = EVENT_IPI;
+	ev_q->ev_vcore = vcoreid;
+	sysc->u_data = current_uthread;
+	wmb();
+	sysc->ev_q = ev_q;
+	if (sysc->flags & (SC_DONE | SC_PROGRESS)) {
+		// try and atomically swap out our u_data.  if we got it, we restart/
+		// handle it.  o/w, the receiver of the message restarts.  we can't just
+		// let them do it, since the kernel might have checked the ev_q before
+		// we wrote it (but after it wrote the flags).
+	} else {
+		//we're done
+	}
+	#endif
 }
 
 /* Pthread interface stuff and helpers */

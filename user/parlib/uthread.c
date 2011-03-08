@@ -237,6 +237,27 @@ void uthread_exit(void)
 	__uthread_exit(current_uthread);
 }
 
+/* Attempts to block on sysc, returning when it is done or progress has been
+ * made. */
+void ros_syscall_blockon(struct syscall *sysc)
+{
+	if (in_vcore_context()) {
+		/* vcore's don't know what to do yet, so do the default (spin) */
+		__ros_syscall_blockon(sysc);
+		return;
+	}
+	if (!sched_ops->thread_blockon_sysc || !current_uthread) {
+		/* There isn't a 2LS op for blocking.  Spin for now. */
+		__ros_syscall_blockon(sysc);
+		return;
+	}
+	/* double check before doing all this crap */
+	if (sysc->flags & (SC_DONE | SC_PROGRESS))
+		return;
+	/* TODO: switch to vcore context, then do shit */
+	sched_ops->thread_blockon_sysc(sysc);
+}
+
 /* Runs whatever thread is vcore's current_uthread */
 void run_current_uthread(void)
 {
