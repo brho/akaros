@@ -598,7 +598,9 @@ void proc_restartcore(void)
 	 * (and we weren't interrupting another one to finish).  In which case, we
 	 * should just smp_idle() */
 	if (!pcpui->cur_tf) {
-		assert(!current);	/* might be wrong, but i want to know if it is */
+		/* It is possible for us to have current loaded if a kthread restarted
+		 * after the process yielded the core. */
+		abandon_core();
 		smp_idle();
 	}
 	/* TODO: this is where we can decide to smp_idle() if there is no cur_tf */

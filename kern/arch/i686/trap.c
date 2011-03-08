@@ -506,6 +506,9 @@ void __kernel_message(struct trapframe *tf)
 			msg_cp.pc(tf, msg_cp.srcid, msg_cp.arg0, msg_cp.arg1, msg_cp.arg2);
 		}
 	}
+	/* TODO: should this proc_restartcore, like the irq/trap paths?  Or at least
+	 * take some things from __proc_startcore() (since we don't want to re-run
+	 * kmsgs). */
 }
 
 /* Runs any outstanding routine kernel messages from within the kernel.  Will
