@@ -55,6 +55,7 @@ struct vm_region *create_vmr(struct proc *p, uintptr_t va, size_t len)
 		vmr = kmem_cache_alloc(vmr_kcache, 0);
 		if (!vmr)
 			panic("EOM!");
+		memset(vmr, 0, sizeof(struct vm_region));
 		vmr->vm_base = va;
 		TAILQ_INSERT_HEAD(&p->vm_regions, vmr, vm_link);
 	} else {
@@ -67,6 +68,9 @@ struct vm_region *create_vmr(struct proc *p, uintptr_t va, size_t len)
 			/* Find a gap that is big enough */
 			if (gap_end - vm_i->vm_end >= len) {
 				vmr = kmem_cache_alloc(vmr_kcache, 0);
+				if (!vmr)
+					panic("EOM!");
+				memset(vmr, 0, sizeof(struct vm_region));
 				/* if we can put it at va, let's do that.  o/w, put it so it
 				 * fits */
 				if ((gap_end >= va + len) && (va >= vm_i->vm_end))
