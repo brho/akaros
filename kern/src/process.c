@@ -288,7 +288,7 @@ error_t proc_alloc(struct proc **pp, struct proc *parent)
 	}
 	/* Set the basic status variables. */
 	spinlock_init(&p->proc_lock);
-	p->exitcode = 0;
+	p->exitcode = 1337;	/* so we can see processes killed by the kernel */
 	p->ppid = parent ? parent->pid : 0;
 	p->state = PROC_CREATED; /* shouldn't go through state machine for init */
 	p->env_flags = 0;

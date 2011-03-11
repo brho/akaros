@@ -363,6 +363,7 @@ static error_t sys_proc_destroy(struct proc *p, pid_t pid, int exitcode)
 		p->exitcode = exitcode;
 		printd("[PID %d] proc exiting gracefully (code %d)\n", p->pid,exitcode);
 	} else {
+		p_to_die->exitcode = exitcode; 	/* so its parent has some clue */
 		printd("[%d] destroying proc %d\n", p->pid, p_to_die->pid);
 	}
 	proc_destroy(p_to_die);
