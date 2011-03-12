@@ -93,7 +93,7 @@ void e1000_dump_stats() {
 	while (offset <= 0x040FC) {
 		if ((offset % 16) == 0)
 			printk("\n");
-                printk("%x:%d ", offset,e1000_rr32(offset));
+		printk("%x:%d ", offset,e1000_rr32(offset));
 
 		offset = offset + 4;
 	}
@@ -118,6 +118,7 @@ void e1000_init() {
 
 	// "Register" our send_frame with the global system
 	send_frame = &e1000_send_frame;
+	send_pbuf = &e1000_send_pbuf;
 
 	// sudo /sbin/ifconfig eth0 up
 	eth_up = 1;
@@ -848,6 +849,52 @@ void e1000_handle_rx_packet() {
 	return;
 }
 
+int e1000_send_pbuf(struct pbuf *p) {
+	int len = p->tot_len;
+	// print_pbuf(p);
+	if (p == NULL) 
+		return -1;
+	if (len == 0)
+		return 0;
+	
+	// Find where we want to write
+	uint32_t head = e1000_rr32(E1000_TDH);
+
+	
+	// Fail if we are out of space
+	if (((e1000_tx_index + 1) % NUM_TX_DESCRIPTORS) == head) {
+		e1000_frame_debug("-->TX Ring Buffer Full!\n");
+		return -1;
+	}
+	
+	// Fail if we are too large
+	if (len > MAX_FRAME_SIZE) {
+		e1000_frame_debug("-->Frame Too Large!\n");
+		return -1;
+	}
+	
+	// Move the data
+	int cplen = pbuf_copy_out(p, KADDR(tx_des_kva[e1000_tx_index].buffer_addr), len, 0);
+
+	for(int i = 0; i< cplen; i++){
+		printd("%x", ((uint8_t*)KADDR(tx_des_kva[e1000_tx_index].buffer_addr))[i]);
+	}
+	// Set the length
+	tx_des_kva[e1000_tx_index].lower.flags.length = len;
+	
+	// Magic that means send 1 fragment and report.
+	tx_des_kva[e1000_tx_index].lower.flags.cmd = 0x0B;
+
+	// Track our location
+	e1000_tx_index = (e1000_tx_index + 1) % NUM_TX_DESCRIPTORS;
+	
+	// Bump the tail.
+	e1000_wr32(E1000_TDT, e1000_tx_index);
+
+	e1000_frame_debug("-->Sent packet.\n");
+	
+	return len;
+}
 // Main routine to send a frame. Just sends it and goes.
 // Card supports sending across multiple fragments, we don't.
 // Would we want to write a function that takes a larger packet and generates fragments?

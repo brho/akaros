@@ -47,6 +47,7 @@ typedef size_t uintreg_t;
 })
 #endif
 
+#define ROS_MEM_ALIGN 4
 // Rounding operations (efficient when n is a power of 2)
 // Round down to the nearest multiple of n
 #define ROUNDDOWN(a, n)						\
@@ -60,6 +61,8 @@ typedef size_t uintreg_t;
 	uintptr_t __n = (uintptr_t) (n);				\
 	(typeof(a)) (ROUNDDOWN((uintptr_t) (a) + __n - 1, __n));	\
 })
+
+#define MEM_ALIGN_SIZE(size) ROUNDUP(size, ROS_MEM_ALIGN)
 
 // Round down to the nearest multiple of n
 #define PTRROUNDDOWN(a, n)						\

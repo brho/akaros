@@ -18,6 +18,9 @@
 // Global send_frame function pointer
 // Means we can only have one network card per system right now...
 int (*send_frame)(const char *data, size_t len);
+int (*send_pbuf)(struct pbuf *p);
+
+
 
 // Global variables for managing ethernet packets over a nic
 // Again, since these are global for all network cards we are 

@@ -43,6 +43,8 @@
 
 /* Socket Syscalls */
 #define SYS_socket					40
+#define SYS_sendto					41
+#define SYS_recvfrom				42
 
 
 /* Platform specific syscalls */

@@ -31,6 +31,8 @@
 #include <pmap.h>
 
 #include <eth_audio.h>
+#include <net/pbuf.h>
+
 
 /** @file
  * @brief Realtek RL8168 Driver
@@ -108,6 +110,7 @@ void rl8168_init() {
 	rl8168_configure();
 	rl8168_setup_interrupts();
 	send_frame = &rl8168_send_frame;
+	send_pbuf = &rl8168_send_pbuf;
 
 	eth_up = 1;
 	
@@ -179,9 +182,8 @@ void rl8168_setup_descriptors() {
 	// Allocate room for the buffers. 
 	// Buffers need to be on 256 byte boundries.
 	// Note: We use get_cont_pages to force page alignment, and thus 256 byte aligned
-
-        uint32_t num_rx_pages = ROUNDUP(NUM_RX_DESCRIPTORS * sizeof(struct Descriptor), PGSIZE) / PGSIZE;
-        uint32_t num_tx_pages = ROUNDUP(NUM_TX_DESCRIPTORS * sizeof(struct Descriptor), PGSIZE) / PGSIZE;
+	uint32_t num_rx_pages = ROUNDUP(NUM_RX_DESCRIPTORS * sizeof(struct Descriptor), PGSIZE) / PGSIZE;
+	uint32_t num_tx_pages = ROUNDUP(NUM_TX_DESCRIPTORS * sizeof(struct Descriptor), PGSIZE) / PGSIZE;
 	
 	rx_des_kva = get_cont_pages(LOG2_UP(num_rx_pages), 0);
 	tx_des_kva = get_cont_pages(LOG2_UP(num_tx_pages), 0);
@@ -600,6 +602,41 @@ void rl8168_process_frame(char *frame_buffer, uint32_t frame_size, uint32_t comm
 	return;
 }
 
+/* Look into how bsd does send mbuf ? */
+int rl8168_send_pbuf(struct pbuf *p) {
+	int len = p->tot_len;
+	if (p == NULL)
+		return -1;
+	if (len == 0)
+		return 0;
+
+	if (tx_des_kva[tx_des_cur].command & DES_OWN_MASK) {
+		rl8168_frame_debug("-->TX Ring Buffer Full!\n");
+		return -1;
+	}
+	if (len > MAX_FRAME_SIZE){
+		return -1;
+	}
+	/* Copy everything out of pbuf to network buffer to be sent */
+	/* One copy! */
+	pbuf_copy_out(p, KADDR(tx_des_kva[tx_des_cur].low_buf), len, 0);
+	tx_des_kva[tx_des_cur].command = tx_des_kva[tx_des_cur].command | len | DES_OWN_MASK | DES_FS_MASK | DES_LS_MASK;
+	
+	tx_des_kva[tx_des_cur].vlan = 0;
+
+
+	tx_des_cur = (tx_des_cur + 1) % NUM_TX_DESCRIPTORS;
+	
+	rl8168_frame_debug("--> Sending Packet\n");
+	for(int i=0; i<len; i++)
+		rl8168_frame_debug("%x ", (unsigned int)(unsigned char)(data[i]));
+	rl8168_frame_debug("\n");
+	rl8168_frame_debug("--> Sent packet.\n");
+	
+	outb(rl8168_io_base_addr + RL_TX_CTRL_REG, RL_TX_SEND_MASK);
+	
+	return len;
+}
 // Main routine to send a frame. Just sends it and goes.
 // Card supports sending across multiple fragments.
 // Would we want to write a function that takes a larger packet and generates fragments?

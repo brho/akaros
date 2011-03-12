@@ -9,11 +9,11 @@
 #include <string.h>
 #include <stdlib.h>
 //single fragment for now
-#define BUF_SIZE 512
+#define BUF_SIZE 16
 
 int main(int argc, char* argv[]) {
 	struct sockaddr_in server;
-	char buf[BUF_SIZE];
+	char buf[BUF_SIZE] = "hello world";
 	int sockfd, n;
 	struct  hostent* host;
 	if (argc != 1) {
@@ -29,16 +29,15 @@ int main(int argc, char* argv[]) {
 	server.sin_addr.s_addr = inet_addr("10.0.0.1"); //hardcoded server
 	//server.sin_addr = *((struct in_addr *)host->h_addr);
 
-	if (sockfd = socket(AF_INET, SOCK_DGRAM, 0) ==-1) {
+	if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) ==-1) {
 		printf("socket error\n");
 		return -1;
 	}
+	printf ("udp_test: sockfd %d \n", sockfd);
 
-	if (sendto(sockfd, buf, BUF_SIZE, 0, (struct sockaddr*) &server, sizeof(server)) != BUF_SIZE) {
-		printf("send failed\n");
-		return -1;
-	}
-
+	int sendsize = sendto(sockfd, buf, BUF_SIZE, 0, (struct sockaddr*) &server, sizeof(server));
+	printf ("sendto returns %d, errno %d\n", sendsize, errno);
+/*
 	if ((n = recvfrom(sockfd, buf, BUF_SIZE, 0, NULL, NULL)< 2)){
 		printf ("recv failed\n");
 		return -1;
@@ -46,5 +45,5 @@ int main(int argc, char* argv[]) {
 
 	buf[n-2] = 0; //null terminate
 	printf("%s\n", buf);
-	
+*/	
 }

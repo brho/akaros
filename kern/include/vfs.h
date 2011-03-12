@@ -15,6 +15,7 @@
 
 #include <ros/common.h>
 #include <sys/queue.h>
+#include <sys/uio.h>
 #include <bitmask.h>
 #include <kref.h>
 #include <time.h>
@@ -31,7 +32,6 @@ struct vm_region;
 typedef int dev_t;
 typedef int kdev_t;
 typedef int ino_t;
-typedef long off_t; // out there in other .h's, but not in the kernel yet
 struct io_writeback	{int x;};
 struct event_poll {int x;};
 struct poll_table_struct {int x;};
@@ -49,11 +49,6 @@ struct file;
 struct file_operations;
 struct fs_type;
 struct vfsmount;
-
-struct iovec {
-    void *iov_base;
-    size_t iov_len;
-};
 
 /* List def's we need */
 TAILQ_HEAD(sb_tailq, super_block);

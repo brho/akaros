@@ -5,6 +5,7 @@
 #include <trap.h>
 #include <net.h>
 #include <pmap.h>
+#include <net/pbuf.h>
 
 // Packet sizes
 #define MTU              1500
@@ -19,6 +20,7 @@
 // Global send_frame function pointer
 // Means we can only have one network card per system right now...
 extern int (*send_frame)(const char *data, size_t len);
+extern int (*send_pbuf)(struct pbuf *p);
 
 // Global variables for managing ethernet packets over a nic
 // Again, since these are global for all network cards we are 

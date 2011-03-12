@@ -5,6 +5,7 @@
 #include <trap.h>
 #include <pmap.h>
 #include <arch/nic_common.h>
+#include <net/pbuf.h>
 
 #define e1000_debug(...) 		//printk(__VA_ARGS__)  
 #define e1000_interrupt_debug(...)	//printk(__VA_ARGS__)  
@@ -47,5 +48,6 @@ void e1000_handle_rx_packet(void);
 void e1000_set_rx_descriptor(uint32_t des_num, uint8_t reset_buffer);
 void e1000_set_tx_descriptor(uint32_t des_num);
 int  e1000_send_frame(const char* data, size_t len);
+int e1000_send_pbuf(struct pbuf *p);
 
 #endif /* !ROS_INC_E1000_H */
