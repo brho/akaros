@@ -194,3 +194,15 @@ void enable_notifs(uint32_t vcoreid)
 	if (__procdata.vcore_preempt_data[vcoreid].notif_pending)
 		sys_self_notify(vcoreid, EV_NONE, 0);
 }
+
+/* Like smp_idle(), this will put the core in a state that it can only be woken
+ * up by an IPI.  In the future, we may halt or something. */
+void __attribute__((noreturn)) vcore_idle(void)
+{
+	uint32_t vcoreid = vcore_id();
+	clear_notif_pending(vcoreid);
+	enable_notifs(vcoreid);
+	while (1) {
+		cpu_relax();
+	}
+}

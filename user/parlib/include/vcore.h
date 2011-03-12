@@ -48,6 +48,7 @@ int vcore_request(size_t k);
 void vcore_yield(void);
 void clear_notif_pending(uint32_t vcoreid);
 void enable_notifs(uint32_t vcoreid);
+void vcore_idle(void);
 
 /* Static inlines */
 static inline size_t max_vcores(void)
