@@ -119,11 +119,6 @@ void uthread_runnable(struct uthread *uthread)
 	assert(sched_ops->thread_runnable);
 	uthread->state = UT_RUNNABLE;
 	sched_ops->thread_runnable(uthread);
-
-	/* TODO: consider moving this to the 2LS */
-	/* Ask the 2LS how many vcores it wants, and put in the request. */
-	assert(sched_ops->vcores_wanted);
-	vcore_request(sched_ops->vcores_wanted());
 }
 
 /* Need to have this as a separate, non-inlined function since we clobber the

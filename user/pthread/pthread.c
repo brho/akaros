@@ -37,7 +37,6 @@ struct uthread *pth_thread_create(void (*func)(void), void *udata);
 void pth_thread_runnable(struct uthread *uthread);
 void pth_thread_yield(struct uthread *uthread);
 void pth_thread_exit(struct uthread *uthread);
-unsigned int pth_vcores_wanted(void);
 void pth_preempt_pending(void);
 void pth_spawn_thread(uintptr_t pc_start, void *data);
 void pth_blockon_sysc(struct syscall *sysc);
@@ -54,7 +53,6 @@ struct schedule_ops pthread_sched_ops = {
 	pth_thread_yield,
 	pth_thread_exit,
 	pth_blockon_sysc,
-	pth_vcores_wanted,
 	0, /* pth_preempt_pending, */
 	0, /* pth_spawn_thread, */
 };
@@ -187,6 +185,9 @@ void pth_thread_runnable(struct uthread *uthread)
 	TAILQ_INSERT_TAIL(&ready_queue, pthread, next);
 	threads_ready++;
 	mcs_unlock_notifsafe(&queue_lock, &local_qn);
+	/* Smarter schedulers should look at the num_vcores() and how much work is
+	 * going on to make a decision about how many vcores to request. */
+	vcore_request(threads_ready);
 }
 
 /* The calling thread is yielding.  Do what you need to do to restart (like put
@@ -225,13 +226,6 @@ void pth_thread_exit(struct uthread *uthread)
 		free(pthread);
 	else
 		pthread->finished = 1;
-}
-
-/* Returns how many *more* vcores we want.  Smarter schedulers should look at
- * the num_vcores() and how much work is going on to make this decision. */
-unsigned int pth_vcores_wanted(void)
-{
-	return 1;
 }
 
 void pth_preempt_pending(void)
