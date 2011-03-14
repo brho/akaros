@@ -23,6 +23,9 @@ pthread_once_t init_once = PTHREAD_ONCE_INIT;
 int threads_ready = 0;
 int threads_active = 0;
 
+/* Array of syscall event queues, one per vcore, alloced in pth_init() */
+struct event_queue *sysc_evq;
+
 /* Helper / local functions */
 static int get_next_pid(void);
 static inline void spin_to_sleep(unsigned int spins, unsigned int *spun);
@@ -38,6 +41,10 @@ unsigned int pth_vcores_wanted(void);
 void pth_preempt_pending(void);
 void pth_spawn_thread(uintptr_t pc_start, void *data);
 void pth_blockon_sysc(struct syscall *sysc);
+
+/* Event Handlers */
+static void pth_handle_syscall(struct event_msg *ev_msg, unsigned int ev_type,
+                               bool overflow);
 
 struct schedule_ops pthread_sched_ops = {
 	pth_init,
@@ -72,6 +79,18 @@ struct uthread *pth_init(void)
 	 * to use parts of event.c to do what you want. */
 	enable_kevent(EV_USER_IPI, 0, EVENT_IPI);
 
+	/* Handle syscall events.  Using small ev_qs, with no internal ev_mbox. */
+	ev_handlers[EV_SYSCALL] = pth_handle_syscall;
+	sysc_evq = malloc(sizeof(struct event_queue) * max_vcores());
+	assert(sysc_evq);
+	/* Set up each of the per-vcore syscall event queues so that they point to
+	 * the VCPD/default vcore mailbox (for now)  Note you'll need the vcore to
+	 * be online to get the events (for now). */
+	for (int i = 0; i < max_vcores(); i++) {
+		sysc_evq[i].ev_mbox =  &__procdata.vcore_preempt_data[i].ev_mbox;
+		sysc_evq[i].ev_flags = EVENT_IPI;		/* totally up to you */
+		sysc_evq[i].ev_vcore = i;
+	}
 	/* Create a pthread_tcb for the main thread */
 	pthread_t t = (pthread_t)calloc(1, sizeof(struct pthread_tcb));
 	t->id = get_next_pid();
@@ -90,6 +109,7 @@ struct uthread *pth_init(void)
  * event.c (table of function pointers, stuff like that). */
 void __attribute__((noreturn)) pth_sched_entry(void)
 {
+	uint32_t vcoreid = vcore_id();
 	if (current_uthread) {
 		run_current_uthread();
 		assert(0);
@@ -112,9 +132,13 @@ void __attribute__((noreturn)) pth_sched_entry(void)
 	if (!new_thread) {
 		/* TODO: consider doing something more intelligent here */
 		printd("[P] No threads, vcore %d is yielding\n", vcore_id());
-		sys_yield(0);
+		/* Not actually yielding - just spin for now, so we can get syscall
+		 * unblocking events */
+		vcore_idle();
+		//sys_yield(0);
 		assert(0);
 	}
+	assert(((struct uthread*)new_thread)->state != UT_RUNNING);
 	run_uthread((struct uthread*)new_thread);
 	assert(0);
 }
@@ -220,33 +244,69 @@ void pth_spawn_thread(uintptr_t pc_start, void *data)
 {
 }
 
-/* Eventually, this will be called from vcore context, after the current thread
- * has yielded and is trying to block on sysc. */
+/* Restarts a uthread hanging off a syscall.  For the simple pthread case, we
+ * just make it runnable and let the main scheduler code handle it.
+ *
+ * TODO: ought to have a queue of waiters on syscalls, and this should remove it
+ * from the list.  The list is needed in case we miss syscall events. */
+static void restart_thread(struct syscall *sysc)
+{
+	struct uthread *restartee = (struct uthread*)sysc->u_data;
+	assert(restartee);
+	assert(restartee->state == UT_BLOCKED);
+	assert(restartee->sysc == sysc);
+	restartee->sysc = 0;	/* so we don't 'reblock' on this later */
+	uthread_runnable(restartee);
+}
+
+/* This handler is usually run in vcore context, though I can imagine it being
+ * called by a uthread in some other threading library. */
+static void pth_handle_syscall(struct event_msg *ev_msg, unsigned int ev_type,
+                               bool overflow)
+{
+	struct syscall *sysc;
+	assert(in_vcore_context());
+	/* TODO: handle overflow!! */
+	if (overflow)
+		printf("FUUUUUUUUUUUUUUUUCK, OVERFLOW!!!!!!!\n");
+	if (!ev_msg) /* just as bad as overflow */
+		return;
+	sysc = ev_msg->ev_arg3;
+	assert(sysc);
+	restart_thread(sysc);
+}
+
+/* This will be called from vcore context, after the current thread has yielded
+ * and is trying to block on sysc.  Need to put it somewhere were we can wake it
+ * up when the sysc is done.  For now, we'll have the kernel send us an event
+ * when the syscall is done. */
 void pth_blockon_sysc(struct syscall *sysc)
 {
-	printf("We tried to block on a syscall!\n");	
-	/* for now, just spin.  2LS stuff in later commits */
-	__ros_syscall_blockon(sysc);
+	int old_flags;
+	bool need_to_restart = FALSE;
 
-	#if 0
-	// testing shit.  should dont_migrate for this
-	uint32_t vcoreid = vcore_id();
-	struct event_queue local_ev_q = {0}, *ev_q = &local_ev_q;
-	ev_q->ev_mbox = &__procdata.vcore_preempt_data[vcoreid].ev_mbox;
-	ev_q->ev_flags = EVENT_IPI;
-	ev_q->ev_vcore = vcoreid;
+	assert(current_uthread->state == UT_BLOCKED);
+	/* rip from the active queue */
+	struct mcs_lock_qnode local_qn = {0};
+	struct pthread_tcb *pthread = (struct pthread_tcb*)current_uthread;
+	mcs_lock_notifsafe(&queue_lock, &local_qn);
+	threads_active--;
+	TAILQ_REMOVE(&active_queue, pthread, next);
+	mcs_unlock_notifsafe(&queue_lock, &local_qn);
+
+	/* TODO: need to register the sysc or uthread in case we lose the
+	 * message.  can put it on a (per-core) tailq or something and rip it
+	 * out when it unblocks. */
+
+	/* Set things up so we can wake this thread up later */
 	sysc->u_data = current_uthread;
-	wmb();
-	sysc->ev_q = ev_q;
-	if (sysc->flags & (SC_DONE | SC_PROGRESS)) {
-		// try and atomically swap out our u_data.  if we got it, we restart/
-		// handle it.  o/w, the receiver of the message restarts.  we can't just
-		// let them do it, since the kernel might have checked the ev_q before
-		// we wrote it (but after it wrote the flags).
-	} else {
-		//we're done
+	/* Register our vcore's syscall ev_q to hear about this syscall. */
+	if (!register_evq(sysc, &sysc_evq[vcore_id()])) {
+		/* Lost the race with the call being done.  The kernel won't send the
+		 * event.  Just restart him. */
+		restart_thread(sysc);
 	}
-	#endif
+	/* GIANT WARNING: do not touch the thread after this point. */
 }
 
 /* Pthread interface stuff and helpers */
@@ -331,6 +391,7 @@ int pthread_join(pthread_t thread, void** retval)
 
 int pthread_yield(void)
 {
+	assert(!in_vcore_context());	/* try and catch the yield bug */
 	uthread_yield();
 	return 0;
 }

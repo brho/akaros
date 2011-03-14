@@ -1,4 +1,5 @@
 #include <ros/arch/membar.h>
+#include <arch/atomic.h>
 #include <parlib.h>
 #include <vcore.h>
 #include <uthread.h>
@@ -28,6 +29,8 @@ static int uthread_init(void)
 	uthread->tls_desc = get_tls_desc(0);
 	/* Save a pointer to the uthread in its own TLS */
 	current_uthread = uthread;
+	/* Thread is currently running (it is 'us') */
+	uthread->state = UT_RUNNING;
 	/* Change temporarily to vcore0s tls region so we can save the newly created
 	 * tcb into its current_uthread variable and then restore it.  One minor
 	 * issue is that vcore0's transition-TLS isn't TLS_INITed yet.  Until it is
@@ -85,6 +88,9 @@ struct uthread *uthread_create(void (*func)(void), void *udata)
 	assert(!in_vcore_context());
 	assert(sched_ops->thread_create);
 	struct uthread *new_thread = sched_ops->thread_create(func, udata);
+	new_thread->state = UT_CREATED;
+	/* They should have zero'd the uthread.  Let's check critical things: */
+	assert(!new_thread->flags && !new_thread->sysc);
 	/* Get a TLS */
 	assert(!__uthread_allocate_tls(new_thread));
 	/* Switch into the new guys TLS and let it know who it is */
@@ -111,7 +117,10 @@ void uthread_runnable(struct uthread *uthread)
 {
 	/* Allow the 2LS to make the thread runnable, and do whatever. */
 	assert(sched_ops->thread_runnable);
+	uthread->state = UT_RUNNABLE;
 	sched_ops->thread_runnable(uthread);
+
+	/* TODO: consider moving this to the 2LS */
 	/* Ask the 2LS how many vcores it wants, and put in the request. */
 	assert(sched_ops->vcores_wanted);
 	vcore_request(sched_ops->vcores_wanted());
@@ -124,14 +133,31 @@ static void __attribute__((noinline, noreturn))
 __uthread_yield(struct uthread *uthread)
 {
 	assert(in_vcore_context());
-	/* Do slightly different things depending on whether or not we're exiting */
+	assert(uthread->state == UT_RUNNING);
+	assert(uthread == current_uthread);
+	/* Do slightly different things depending on whether or not we're exiting.
+	 * While it is tempting to get rid of the UTHREAD_DYING flag and have
+	 * callers just set the thread state, we'd lose the ability to assert
+	 * UT_RUNNING, which helps catch bugs. */
 	if (!(uthread->flags & UTHREAD_DYING)) {
 		uthread->flags &= ~UTHREAD_DONT_MIGRATE;
-		assert(sched_ops->thread_yield);
-		/* 2LS will save the thread somewhere for restarting.  Later on, we'll
-		 * probably have a generic function for all sorts of waiting. */
-		sched_ops->thread_yield(uthread);
+		/* Determine if we're blocking on a syscall or just yielding.  Might end
+		 * up doing this differently when/if we have more ways to yield. */
+		if (uthread->sysc) {
+			uthread->state = UT_BLOCKED;
+			assert(sched_ops->thread_blockon_sysc);
+			sched_ops->thread_blockon_sysc(uthread->sysc);
+		} else { /* generic yield */
+			uthread->state = UT_RUNNABLE;
+			assert(sched_ops->thread_yield);
+			/* 2LS will save the thread somewhere for restarting.  Later on,
+			 * we'll probably have a generic function for all sorts of waiting.
+			 */
+			sched_ops->thread_yield(uthread);
+		}
 	} else { /* DYING */
+		printd("[U] thread %08p on vcore %d is DYING!\n", uthread, vcore_id());
+		uthread->state = UT_DYING;
 		/* we alloc and manage the TLS, so lets get rid of it */
 		__uthread_free_tls(uthread);
 		/* 2LS specific cleanup */
@@ -193,7 +219,7 @@ void uthread_yield(void)
 	__uthread_yield(current_uthread);
 	/* Should never get here */
 	assert(0);
-	/* Will jump here when the pthread's trapframe is restarted/popped. */
+	/* Will jump here when the uthread's trapframe is restarted/popped. */
 yield_return_path:
 	printd("[U] Uthread %08p returning from a yield!\n", uthread);
 }
@@ -203,6 +229,7 @@ yield_return_path:
 void uthread_exit(void)
 {
 	current_uthread->flags |= UTHREAD_DYING;
+	assert(!in_vcore_context());	/* try and catch the yield bug */
 	uthread_yield();
 }
 
@@ -223,8 +250,10 @@ void ros_syscall_blockon(struct syscall *sysc)
 	/* double check before doing all this crap */
 	if (sysc->flags & (SC_DONE | SC_PROGRESS))
 		return;
-	/* TODO: switch to vcore context, then do shit */
-	sched_ops->thread_blockon_sysc(sysc);
+	/* So yield knows we are blocking on something */
+	current_uthread->sysc = sysc;
+	assert(!in_vcore_context());	/* try and catch the yield bug */
+	uthread_yield();
 }
 
 /* Runs whatever thread is vcore's current_uthread */
@@ -233,6 +262,7 @@ void run_current_uthread(void)
 	uint32_t vcoreid = vcore_id();
 	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
 	assert(current_uthread);
+	assert(current_uthread->state == UT_RUNNING);
 	printd("[U] Vcore %d is restarting uthread %d\n", vcoreid, uthread->id);
 	clear_notif_pending(vcoreid);
 	set_tls_desc(current_uthread->tls_desc, vcoreid);
@@ -245,10 +275,17 @@ void run_current_uthread(void)
 void run_uthread(struct uthread *uthread)
 {
 	assert(uthread != current_uthread);
+	if (uthread->state != UT_RUNNABLE) {
+		/* had vcore3 throw this, when the UT blocked on vcore1 and didn't come
+		 * back up yet (kernel didn't wake up, didn't send IPI) */
+		printf("Uthread %08p not runnable (was %d) in run_uthread on vcore %d!\n",
+		       uthread, uthread->state, vcore_id());
+	}
+	assert(uthread->state == UT_RUNNABLE);
+	uthread->state = UT_RUNNING;
 	/* Save a ptr to the pthread running in the transition context's TLS */
 	uint32_t vcoreid = vcore_id();
 	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
-	printd("[U] Vcore %d is starting uthread %d\n", vcoreid, uthread->id);
 	current_uthread = uthread;
 	clear_notif_pending(vcoreid);
 	set_tls_desc(uthread->tls_desc, vcoreid);
@@ -276,6 +313,26 @@ bool check_preempt_pending(uint32_t vcoreid)
 		sys_yield(TRUE);
 	}
 	return retval;
+}
+
+/* Attempts to register ev_q with sysc, so long as sysc is not done/progress.
+ * Returns true if it succeeded, and false otherwise. */
+bool register_evq(struct syscall *sysc, struct event_queue *ev_q)
+{
+	int old_flags;
+	sysc->ev_q = ev_q;
+	wmb();
+	/* Try and set the SC_UEVENT flag (so the kernel knows to look at ev_q) */
+	do {
+		old_flags = sysc->flags;
+		/* If the kernel finishes while we are trying to sign up for an event,
+		 * we need to bail out */
+		if (old_flags & (SC_DONE | SC_PROGRESS)) {
+			sysc->ev_q = 0;		/* not necessary, but might help with bugs */
+			return FALSE;
+		}
+	} while (!atomic_comp_swap(&sysc->flags, old_flags, old_flags | SC_UEVENT));
+	return TRUE;
 }
 
 /* TLS helpers */

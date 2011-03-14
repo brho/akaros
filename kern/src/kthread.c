@@ -197,6 +197,14 @@ void __launch_kthread(struct trapframe *tf, uint32_t srcid, void *a0, void *a1,
 			/* we're running the kthread from a different proc.  For now, we
 			 * can't be _M, since that would be taking away someone's vcore to
 			 * process another process's work. */
+			/* Keep in mind this can happen if you yield your core after
+			 * submitting work (like sys_block()) that will complete on the
+			 * current core, and then someone else gets it.  TODO: might be
+			 * other cases. */
+			if (cur_proc->state != PROC_RUNNING_S) {
+				printk("cur_proc: %08p, kthread->proc: %08p\n", cur_proc,
+				       kthread->proc);
+			}
 			assert(cur_proc->state == PROC_RUNNING_S);
 			spin_lock(&cur_proc->proc_lock);
 			/* Wrap up / yield the current _S proc, which calls schedule_proc */

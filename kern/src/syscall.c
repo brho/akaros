@@ -121,8 +121,8 @@ static int sys_block(void)
 
 	register_interrupt_handler(interrupt_handlers, LAPIC_TIMER_DEFAULT_VECTOR,
 	                           x86_unblock_handler, sem);
-	/* This fakes a 100ms delay.  Though it might be less, esp in _M mode.  TODO
-	 * KVM-timing. */
+	/* This fakes a 100ms delay.  Though it might be less, esp in _M mode.
+	 * TODO KVM-timing. */
 	set_core_timer(100000);	/* in microseconds */
 	printk("[kernel] sys_block(), sleeping at %llu\n", read_tsc());
 	sleep_on(sem);
@@ -1418,7 +1418,7 @@ intreg_t syscall(struct proc *p, uintreg_t sc_num, uintreg_t a0, uintreg_t a1,
 		}
 	}
 	if (sc_num > max_syscall || syscall_table[sc_num].call == NULL)
-		panic("Invalid syscall number %d for proc %x!", sc_num, *p);
+		panic("Invalid syscall number %d for proc %x!", sc_num, p);
 
 	return syscall_table[sc_num].call(p, a0, a1, a2, a3, a4, a5);
 }
@@ -1433,7 +1433,9 @@ static void run_local_syscall(struct syscall *sysc)
 	pcpui->cur_sysc = sysc;			/* let the core know which sysc it is */
 	sysc->retval = syscall(pcpui->cur_proc, sysc->num, sysc->arg0, sysc->arg1,
 	                       sysc->arg2, sysc->arg3, sysc->arg4, sysc->arg5);
-	sysc->flags |= SC_DONE;
+	/* Atomically turn on the SC_DONE flag.  Need the atomics since we're racing
+	 * with userspace for the event_queue registration. */
+	atomic_or_int(&sysc->flags, SC_DONE); 
 	signal_syscall(sysc, pcpui->cur_proc);
 	/* Can unpin at this point */
 }
@@ -1462,12 +1464,16 @@ void signal_syscall(struct syscall *sysc, struct proc *p)
 {
 	struct event_queue *ev_q;
 	struct event_msg local_msg;
-	ev_q = sysc->ev_q;
-	if (ev_q) {
-		memset(&local_msg, 0, sizeof(struct event_msg));
-		local_msg.ev_type = EV_SYSCALL;
-		local_msg.ev_arg3 = sysc;
-		send_event(p, ev_q, &local_msg, 0);
+	/* User sets the ev_q then atomically sets the flag (races with SC_DONE) */
+	if (sysc->flags & SC_UEVENT) {
+		rmb();
+		ev_q = sysc->ev_q;
+		if (ev_q) {
+			memset(&local_msg, 0, sizeof(struct event_msg));
+			local_msg.ev_type = EV_SYSCALL;
+			local_msg.ev_arg3 = sysc;
+			send_event(p, ev_q, &local_msg, 0);
+		}
 	}
 }
 

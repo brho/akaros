@@ -2,9 +2,17 @@
 #define _UTHREAD_H
 
 #include <vcore.h>
+#include <ros/syscall.h>
 
 #define UTHREAD_DONT_MIGRATE		0x001 /* don't move to another vcore */
 #define UTHREAD_DYING				0x002 /* uthread is exiting */
+
+/* Thread States */
+#define UT_CREATED	1
+#define UT_RUNNABLE	2
+#define UT_RUNNING	3
+#define UT_BLOCKED	4
+#define UT_DYING	5
 
 /* Bare necessities of a user thread.  2LSs should allocate a bigger struct and
  * cast their threads to uthreads when talking with vcore code.  Vcore/default
@@ -14,6 +22,8 @@ struct uthread {
 	struct ancillary_state as;
 	void *tls_desc;
 	int flags;
+	struct syscall *sysc;	/* syscall we're blocking on, if any */
+	int state;
 };
 extern __thread struct uthread *current_uthread;
 
@@ -49,6 +59,7 @@ void ros_syscall_blockon(struct syscall *sysc);
 
 /* Utility function.  Event code also calls this. */
 bool check_preempt_pending(uint32_t vcoreid);
+bool register_evq(struct syscall *sysc, struct event_queue *ev_q);
 
 /* Helpers, which sched_entry() can call */
 void run_current_uthread(void);

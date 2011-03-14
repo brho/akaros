@@ -62,7 +62,7 @@ void mcs_lock_notifsafe(struct mcs_lock *lock, struct mcs_lock_qnode *qnode)
 void mcs_unlock_notifsafe(struct mcs_lock *lock, struct mcs_lock_qnode *qnode)
 {
 	mcs_lock_unlock(lock, qnode);
-	if (!in_vcore_context())
+	if (!in_vcore_context() && num_vcores() > 0)
 		enable_notifs(vcore_id());
 }
 
