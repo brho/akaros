@@ -225,6 +225,14 @@ intreg_t sys_sendto(struct proc *p_proc, int fd, const void *buffer, size_t leng
 }
 
 intreg_t sys_recvfrom(struct proc *p, int socket, void *restrict buffer, size_t length, int flags, struct sockaddr *restrict address, socklen_t *restrict address_len){
-	warn("not implemented yet\n");
+	struct socket* sock = getsocket(p, socket);	
+	if (sock == NULL) {
+		set_errno(EBADF);
+		return -1;
+	}
+	if (sock->so_type == SOCK_DGRAM){
+
+	}
+
 	return -1;
 }

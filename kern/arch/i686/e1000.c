@@ -18,6 +18,7 @@
 #include <arch/smp.h>
 #include <arch/apic.h>
 #include <arch/pci.h>
+#include <arch/nic_common.h>
 #include <arch/e1000.h>
 
 #include <ros/memlayout.h>
@@ -31,7 +32,6 @@
 #include <pmap.h>
 #include <frontend.h>
 #include <arch/frontend.h>
-
 #include <eth_audio.h>
 
 #define NUM_TX_DESCRIPTORS E1000_NUM_TX_DESCRIPTORS
@@ -73,7 +73,8 @@ extern uint32_t packet_buffers_head;
 extern uint32_t packet_buffers_tail;
 spinlock_t packet_buffers_lock;
 
-// Allow us to register our send_frame as the global send_frameuint16_t device_id;
+// Allow us to register our send_frame as the global send_frame
+uint16_t device_id;
 extern int (*send_frame)(const char *CT(len) data, size_t len);
 
 void e1000_dump_rx() {
@@ -119,6 +120,7 @@ void e1000_init() {
 	// "Register" our send_frame with the global system
 	send_frame = &e1000_send_frame;
 	send_pbuf = &e1000_send_pbuf;
+	recv_pbuf = &e1000_recv_pbuf;
 
 	// sudo /sbin/ifconfig eth0 up
 	eth_up = 1;
@@ -192,9 +194,12 @@ int e1000_scan_pci() {
 		e1000_irq = pcidev->irqline;
 		e1000_debug("-->IRQ: %u\n", e1000_irq);
 		/* Loop over the BARs */
+		/* yz: pci layer should scan these things and put them in a pci_dev struct */
 		for (int k = 0; k <= 5; k++) {
 			int reg = 4 + k;
-	        result = pcidev_read32(pcidev, reg << 2);	// SHAME!
+	    // resource len?
+					result = pcidev_read32(pcidev, reg << 2);	// SHAME! why? 
+
 			if (result == 0) // (0 denotes no valid data)
 				continue;
 			// Read the bottom bit of the BAR. 
@@ -293,7 +298,7 @@ uint16_t e1000_read_eeprom(uint32_t offset) {
 void e1000_setup_mac() {
 
 	uint16_t eeprom_data = 0;
-        uint32_t mmio_data = 0;
+	uint32_t mmio_data = 0;
 
 	/* TODO: WARNING - EXTREMELY GHETTO */
 	e1000_debug("-->Setting up MAC addr\n");
@@ -679,9 +684,14 @@ void e1000_interrupt_handler(trapframe_t *tf, void* data) {
 		//printk("Interrupt status: %x\n", interrupt_status);
 
 		// Check to see if the interrupt was packet based.
+		// TODO: what other kind of interrupts are there? 
 		if ((interrupt_status & E1000_ICR_INT_ASSERTED) && (interrupt_status & E1000_ICR_RXT0)) {
 			e1000_interrupt_debug("---->Packet Received\n");
+#ifdef __CONFIG_SOCKET__
+			e1000_recv_pbuf();
+#else
 			e1000_handle_rx_packet();
+#endif
 		}	
 		// Clear interrupts	
 		interrupt_status = e1000_rr32(E1000_ICR);
@@ -689,7 +699,12 @@ void e1000_interrupt_handler(trapframe_t *tf, void* data) {
 	
 	// In the event that we got really unlucky and more data arrived after we set 
 	//  set the bit last, try one more check
-	e1000_handle_rx_packet();
+	/* What happens if handle_rx_packet is called too many times? */
+#ifdef __CONFIG_SOCKET__
+			e1000_recv_pbuf();
+#else
+			e1000_handle_rx_packet();
+#endif
 
 	return;
 }
@@ -847,6 +862,115 @@ void e1000_handle_rx_packet() {
 	//e1000_process_frame(rx_buffer, frame_size, current_command);
 	
 	return;
+}
+
+struct pbuf* e1000_recv_pbuf(void) {
+	uint16_t packet_size;
+	uint32_t status;
+	uint32_t head = e1000_rr32(E1000_RDH);
+
+	//printk("Current head is: %x\n", e1000_rr32(E1000_RDH));
+	//printk("Current tail is: %x\n", e1000_rr32(E1000_RDT));
+	
+	// If the HEAD is where we last processed, no new packets.
+	if (head == e1000_rx_index) {
+		e1000_frame_debug("-->Nothing to process. Returning.");
+		return NULL;
+	}
+	
+	// Set our current descriptor to where we last left off.
+	uint32_t rx_des_loop_cur = e1000_rx_index;
+	uint32_t frame_size = 0;
+	uint32_t fragment_size = 0;
+	uint32_t num_frags = 0;
+
+	uint32_t top_fragment = rx_des_loop_cur; 
+	struct e1000_rx_desc rx_desc = rx_des_kva[rx_des_loop_cur];
+	// the parent function verifies STAT_DD
+	struct pbuf* pb = pbuf_alloc(PBUF_RAW, 0, PBUF_MTU);
+	if (!pb){
+		warn("pbuf allocation failed\n");
+		return NULL;
+	}
+
+	do {
+		// Get the descriptor status
+		status = rx_des_kva[rx_des_loop_cur].status;
+
+		// If the status is 0x00, it means we are somehow trying to process 
+		// a packet that hasnt been written by the NIC yet.
+		if (status == 0x0) {
+			warn("ERROR: E1000: Packet owned by hardware has 0 status value\n");
+			/* It's possible we are processing a packet that is a fragment
+			 * before the entire packet arrives.  The code currently assumes
+			 * that all of the packets fragments are there, so it assumes the
+			 * next one is ready.  We'll spin until it shows up...  This could
+			 * deadlock, and sucks in general, but will help us diagnose the
+			 * driver's issues.  TODO: determine root cause and fix this shit.*/
+			while(rx_des_kva[rx_des_loop_cur].status == 0x0)
+				cpu_relax();
+			status = rx_des_kva[rx_des_loop_cur].status;
+		}
+	
+		// See how big this fragment is.
+		fragment_size = rx_des_kva[rx_des_loop_cur].length;
+		
+		// If we've looped through the entire ring and not found a terminating packet, bad nic state.
+		// Panic or clear all descriptors? This is a nic hardware error. 
+		if (num_frags && (rx_des_loop_cur == head)) {
+			e1000_frame_debug("-->ERR: No ending segment found in RX buffer.\n");
+			panic("RX Descriptor Ring out of sync.");
+		}
+		// Denote that we have at least 1 fragment.
+		num_frags++;
+		// Make sure ownership is correct. Packet owned by the NIC (ready for kernel reading)
+		// is denoted by a 1. Packet owned by the kernel (ready for NIC use) is denoted by 0.
+		if ((status & E1000_RXD_STAT_DD) == 0x0) {
+			e1000_frame_debug("-->ERR: Current RX descriptor not owned by software. Panic!");
+			panic("RX Descriptor Ring OWN out of sync");
+		}
+		
+		// Deal with packets too large
+		if ((frame_size + fragment_size) > MAX_FRAME_SIZE) {
+			e1000_frame_debug("-->ERR: Nic sent %u byte packet. Max is %u\n", frame_size, MAX_FRAME_SIZE);
+			panic("NIC Sent packets larger than configured.");
+		}
+		// Copy into pbuf allocated for this	 
+		// TODO: reuse the pbuf later
+		// real driver uses a pbuf allocated (MTU sized) per descriptor and recycles that
+		// real driver also does not handle fragments.. simply drops them
+		// Reset the descriptor. Reuse current buffer (False means don't realloc).
+		e1000_set_rx_descriptor(rx_des_loop_cur, FALSE);
+		
+		// Note: We mask out fragment sizes at 0x3FFFF. There can be at most 2048 of them.
+		// This can not overflow the uint32_t we allocated for frame size, so
+		// we dont need to worry about mallocing too little then overflowing when we read.
+		frame_size = frame_size + fragment_size;
+		
+		// Advance to the next descriptor
+		rx_des_loop_cur = (rx_des_loop_cur + 1) % NUM_RX_DESCRIPTORS;
+
+	} while ((status & E1000_RXD_STAT_EOP) == 0); // Check to see if we are at the final fragment
+
+	uint32_t copied = 0;
+#if ETH_PAD_SIZE
+	pbuf_header(pb, -ETH_PAD_SIZE); /* drop the padding word */
+	copied += ETH_PAD_SIZE;
+#endif
+
+	void* rx_buffer = pb->payload;
+	
+
+	// rx_des_loop_cur has gone past the top_fragment
+	while (top_fragment != rx_des_loop_cur) {
+		// TODO: if we convert the pbufs to MTU sized pbuf, don't forget to convert this copy to a pbuf copy
+		memcpy(rx_buffer, KADDR(rx_des_kva[rx_des_loop_cur].buffer_addr), fragment_size);
+		copied += fragment_size;
+		top_fragment = (top_fragment + 1) % NUM_RX_DESCRIPTORS;
+	}
+	pb->len += copied;
+	pb->tot_len += copied;
+	return pb;
 }
 
 int e1000_send_pbuf(struct pbuf *p) {

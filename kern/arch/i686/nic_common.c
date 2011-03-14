@@ -19,6 +19,7 @@
 // Means we can only have one network card per system right now...
 int (*send_frame)(const char *data, size_t len);
 int (*send_pbuf)(struct pbuf *p);
+struct pbuf*  (*recv_pbuf)(void);
 
 
 

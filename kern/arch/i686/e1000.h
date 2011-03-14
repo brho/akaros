@@ -14,7 +14,11 @@
 #define E1000_IRQ_CPU		0
 
 #define INTEL_VENDOR_ID		0x8086
-#define INTEL_DEV_ID0		0x100E	// Real E1000
+#define INTEL_DEV_ID0		0x100E	// Real E1000 QEMU emulates this. Linux device driver e1000
+
+/* 
+ * These two are technically supported by the igb driver in linux, since they support more advanced feature set 
+ */
 #define INTEL_DEV_ID1		0x10c9	// 82576
 #define INTEL_DEV_ID2		0x150a	// 82576 NS
 
@@ -49,5 +53,7 @@ void e1000_set_rx_descriptor(uint32_t des_num, uint8_t reset_buffer);
 void e1000_set_tx_descriptor(uint32_t des_num);
 int  e1000_send_frame(const char* data, size_t len);
 int e1000_send_pbuf(struct pbuf *p);
+/* returns a chain of pbuf from the driver */
+struct pbuf* e1000_recv_pbuf();
 
 #endif /* !ROS_INC_E1000_H */

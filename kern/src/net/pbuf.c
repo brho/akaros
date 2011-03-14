@@ -6,21 +6,30 @@
 #include <slab.h>
 #include <assert.h>
 #include <net/pbuf.h>
+#include <arch/nic_common.h>
 
 
 #define SIZEOF_STRUCT_PBUF (ROUNDUP(sizeof(struct pbuf), ROS_MEM_ALIGN))
+#define SIZEOF_STRUCT_MTU_PBUF SIZEOF_STRUCT_PBUF + ROUNDUP(sizeof(MAX_FRAME_SIZE), ROS_MEM_ALIGN)
 
-// may need checksum later
 struct kmem_cache *pbuf_kcache;
+struct kmem_cache *mtupbuf_kcache;
+
 
 void pbuf_init(void){
+	printk("size of struct pbuf%d, %d \n", SIZEOF_STRUCT_PBUF, sizeof(struct pbuf));
+	printk("alignment %d\n", __alignof__(struct pbuf));
 	pbuf_kcache = kmem_cache_create("pbuf", sizeof(struct pbuf),
 									__alignof__(struct pbuf), 0, 0, 0);
+  mtupbuf_kcache = kmem_cache_create("mtupbuf_kcache", SIZEOF_STRUCT_MTU_PBUF, 
+										__alignof__(struct pbuf), 0, 0, 0);
 }
 
 // not sure about this structure..
 static void pbuf_free_auto(struct kref *kref){
     struct pbuf *p = container_of(kref, struct pbuf, bufref);
+		printd("deleting p %p of type %d\n", p, p->type);
+		
     switch (p->type){
         case PBUF_REF:
             kmem_cache_free(pbuf_kcache, p);
@@ -28,10 +37,13 @@ static void pbuf_free_auto(struct kref *kref){
         case PBUF_RAM:
             kfree(p);
             break;
+				case PBUF_MTU:
+						kmem_cache_free(mtupbuf_kcache,p);
         default:
             panic("Invalid pbuf type");
     }
 }
+
 /**
  * Allocates a pbuf of the given type (possibly a chain for PBUF_POOL type).
  *
@@ -57,6 +69,8 @@ static void pbuf_free_auto(struct kref *kref){
  *             protocol headers. It is assumed that the pbuf is only
  *             being used in a single thread. If the pbuf gets queued,
  *             then pbuf_take should be called to copy the buffer.
+ * - PBUF_MTU: specific to ROS, additional type that comes out of a 
+ *             slab dedicated for the most common size (MTU sized) pbuf.
  *
  * @return the allocated pbuf. If multiple pbufs where allocated, this
  * is the first pbuf of a pbuf chain.
@@ -91,13 +105,25 @@ struct pbuf *pbuf_alloc(pbuf_layer layer, uint16_t length, pbuf_type type)
   }
 	
   switch (type) {
-  case PBUF_RAM:
-    /* If pbuf is to be allocated in RAM, allocate memory for it. */
+	case PBUF_MTU:
+		/* special case PBUFs that are of a common size, notice the length has to be 0 in this case */
+		assert(length==0); // TODO: reconsider this
+    /* only allocate memory for the pbuf structure */
+    p = (struct pbuf *)kmem_cache_alloc(mtupbuf_kcache, 0);
+    if (p == NULL) {
+      return NULL;
+    }
+		buf_size = SIZEOF_STRUCT_MTU_PBUF;
+    p->payload = PTRROUNDUP(((void *)((uint8_t *)p + SIZEOF_STRUCT_PBUF + offset)), ROS_MEM_ALIGN);
+		p->next = NULL;
+		p->type = type;
+		p->len = p->tot_len = ROUNDUP(sizeof(MAX_FRAME_SIZE), ROS_MEM_ALIGN);
+		break;
 
-    // why does it have to be aligned? oh so payload is aligned
+	case PBUF_RAM:
+    /* If pbuf is to be allocated in RAM, allocate memory for it. */
 		buf_size =  (SIZEOF_STRUCT_PBUF + offset) + MEM_ALIGN_SIZE(length);
     p = (struct pbuf*)kmalloc(buf_size, 0);
-     // p = (struct pbuf*)kmalloc(
 
     if (p == NULL) {
       return NULL;
@@ -119,6 +145,9 @@ struct pbuf *pbuf_alloc(pbuf_layer layer, uint16_t length, pbuf_type type)
     p->next = NULL;
     p->type = type;
     break;
+	case PBUF_POOL:
+		
+		break;	
   default:
     warn("pbuf_alloc: wrong type", 0);
     return NULL;

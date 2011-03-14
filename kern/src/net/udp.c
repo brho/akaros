@@ -9,7 +9,7 @@
 #include <socket.h>
 #include <net.h>
 #include <sys/queue.h> //TODO: use sys/queue.h rather than implementing
-#include <arch/atomic.h>
+#include <atomic.h>
 
 #include <bits/netinet.h>
 #include <net/ip.h>

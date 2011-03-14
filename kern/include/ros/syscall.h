@@ -33,7 +33,6 @@ struct syscall {
 
 /* Temp hack, til the rest of glibc/userspace uses sys/syscall.h */
 #include <sys/syscall.h>
-
 #endif /* ifndef ROS_KERNEL */
 
 #endif /* ROS_INC_SYSCALL_H */
