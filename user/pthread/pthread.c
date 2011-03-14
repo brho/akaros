@@ -223,10 +223,8 @@ void pth_thread_exit(struct uthread *uthread)
 	/* TODO: race on detach state */
 	if (pthread->detached)
 		free(pthread);
-	/* Once we do this, our joiner can free us.  He won't free us if we're
-	 * detached, but there is still a potential race there (since he's accessing
-	 * someone who is freed. */
-	pthread->finished = 1;
+	else
+		pthread->finished = 1;
 }
 
 /* Returns how many *more* vcores we want.  Smarter schedulers should look at
@@ -624,6 +622,7 @@ int pthread_barrier_destroy(pthread_barrier_t* b)
 
 int pthread_detach(pthread_t thread)
 {
+	/* TODO: race on this state.  Someone could be trying to join now */
 	thread->detached = TRUE;
 	return 0;
 }
