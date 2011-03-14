@@ -125,8 +125,9 @@ void uthread_runnable(struct uthread *uthread)
  * stack pointer before calling it, and don't want the compiler to play games
  * with my hart. */
 static void __attribute__((noinline, noreturn)) 
-__uthread_yield(struct uthread *uthread)
+__uthread_yield(void)
 {
+	struct uthread *uthread = current_uthread;
 	assert(in_vcore_context());
 	assert(uthread->state == UT_RUNNING);
 	assert(uthread == current_uthread);
@@ -211,7 +212,7 @@ void uthread_yield(void)
 	 * walk up the stack a bit when calling a noreturn function. */
 	set_stack_pointer((void*)vcpd->transition_stack);
 	/* Finish exiting in another function. */
-	__uthread_yield(current_uthread);
+	__uthread_yield();
 	/* Should never get here */
 	assert(0);
 	/* Will jump here when the uthread's trapframe is restarted/popped. */
