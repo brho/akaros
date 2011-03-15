@@ -118,15 +118,17 @@ static int sys_block(void)
 		kthread_runnable(sleeper);
 		assert(TAILQ_EMPTY(&sem->waiters));
 	}
-
+	void *prev_data = interrupt_handlers[LAPIC_TIMER_DEFAULT_VECTOR].data;
+	if (prev_data)
+		warn("Something (%08p) already waiting on the LAPIC timer!", prev_data);
 	register_interrupt_handler(interrupt_handlers, LAPIC_TIMER_DEFAULT_VECTOR,
 	                           x86_unblock_handler, sem);
-	/* This fakes a 100ms delay.  Though it might be less, esp in _M mode.
-	 * TODO KVM-timing. */
-	set_core_timer(100000);	/* in microseconds */
-	printk("[kernel] sys_block(), sleeping at %llu\n", read_tsc());
+	/* This fakes a 1ms delay.  Though it might be less, esp in _M mode on KVM.
+	 * TODO KVM-timing (adjust it up by a lot in a VM). */
+	set_core_timer(1000);	/* in microseconds */
+	printd("[kernel] sys_block(), sleeping at %llu\n", read_tsc());
 	sleep_on(sem);
-	printk("[kernel] sys_block(), waking up at %llu\n", read_tsc());
+	printd("[kernel] sys_block(), waking up at %llu\n", read_tsc());
 	return 0;
 #else /* sparc */
 	set_errno(ENOSYS);
