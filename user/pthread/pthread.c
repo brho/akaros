@@ -115,20 +115,27 @@ void __attribute__((noreturn)) pth_sched_entry(void)
 	/* no one currently running, so lets get someone from the ready queue */
 	struct pthread_tcb *new_thread = NULL;
 	struct mcs_lock_qnode local_qn = {0};
-	mcs_lock_notifsafe(&queue_lock, &local_qn);
-	new_thread = TAILQ_FIRST(&ready_queue);
-	if (new_thread) {
-		TAILQ_REMOVE(&ready_queue, new_thread, next);
-		TAILQ_INSERT_TAIL(&active_queue, new_thread, next);
-		threads_active++;
-		threads_ready--;
+	/* For now, let's spin and handle events til we get a thread to run.  This
+	 * will help catch races, instead of only having one core ever run a thread
+	 * (if there is just one, etc).  Also, we don't need the EVENT_IPIs for this
+	 * to work (since we poll handle_events() */
+	while (!new_thread) {
+		handle_events(vcoreid);
+		mcs_lock_notifsafe(&queue_lock, &local_qn);
+		new_thread = TAILQ_FIRST(&ready_queue);
+		if (new_thread) {
+			TAILQ_REMOVE(&ready_queue, new_thread, next);
+			TAILQ_INSERT_TAIL(&active_queue, new_thread, next);
+			threads_active++;
+			threads_ready--;
+		}
+		mcs_unlock_notifsafe(&queue_lock, &local_qn);
 	}
-	mcs_unlock_notifsafe(&queue_lock, &local_qn);
 	/* Instead of yielding, you could spin, turn off the core, set an alarm,
 	 * whatever.  You want some logic to decide this.  Uthread code wil have
 	 * helpers for this (like how we provide run_uthread()) */
 	if (!new_thread) {
-		/* TODO: consider doing something more intelligent here */
+		/* Note, we currently don't get here (due to the while loop) */
 		printd("[P] No threads, vcore %d is yielding\n", vcore_id());
 		/* Not actually yielding - just spin for now, so we can get syscall
 		 * unblocking events */
@@ -383,7 +390,6 @@ int pthread_join(pthread_t thread, void** retval)
 
 int pthread_yield(void)
 {
-	assert(!in_vcore_context());	/* try and catch the yield bug */
 	uthread_yield();
 	return 0;
 }

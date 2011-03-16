@@ -1417,6 +1417,7 @@ void __notify(trapframe_t *tf, uint32_t srcid, void *a0, void *a1, void *a2)
 	/* We shouldn't need to lock here, since unmapping happens on the pcore and
 	 * mapping would only happen if the vcore was free, which it isn't until
 	 * after we unmap. */
+	assert(tf == current_tf);
 	vcoreid = get_vcoreid(p, core_id());
 	vcpd = &p->procdata->vcore_preempt_data[vcoreid];
 	printd("received active notification for proc %d's vcore %d on pcore %d\n",

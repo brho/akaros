@@ -58,10 +58,8 @@ void __attribute__((noreturn)) uthread_vcore_entry(void)
 {
 	uint32_t vcoreid = vcore_id();
 
-	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
-
 	/* Should always have notifications disabled when coming in here. */
-	assert(vcpd->notif_enabled == FALSE);
+	assert(!notif_is_enabled(vcoreid));
 	assert(in_vcore_context());
 
 	check_preempt_pending(vcoreid);
@@ -129,8 +127,7 @@ __uthread_yield(void)
 {
 	struct uthread *uthread = current_uthread;
 	assert(in_vcore_context());
-	assert(uthread->state == UT_RUNNING);
-	assert(uthread == current_uthread);
+	assert(!notif_is_enabled(vcore_id()));
 	/* Do slightly different things depending on whether or not we're exiting.
 	 * While it is tempting to get rid of the UTHREAD_DYING flag and have
 	 * callers just set the thread state, we'd lose the ability to assert
@@ -177,6 +174,7 @@ void uthread_yield(void)
 	// if (!(uthread->flags & UTHREAD_DYING))
 	// 	save_fp_state(&t->as);
 	assert(!in_vcore_context());
+	assert(uthread->state == UT_RUNNING);
 	/* Don't migrate this thread to another vcore, since it depends on being on
 	 * the same vcore throughout (once it disables notifs).  The race is that we
 	 * read vcoreid, then get interrupted / migrated before disabling notifs. */
@@ -225,7 +223,6 @@ yield_return_path:
 void uthread_exit(void)
 {
 	current_uthread->flags |= UTHREAD_DYING;
-	assert(!in_vcore_context());	/* try and catch the yield bug */
 	uthread_yield();
 }
 
@@ -248,7 +245,6 @@ void ros_syscall_blockon(struct syscall *sysc)
 		return;
 	/* So yield knows we are blocking on something */
 	current_uthread->sysc = sysc;
-	assert(!in_vcore_context());	/* try and catch the yield bug */
 	uthread_yield();
 }
 
@@ -259,7 +255,8 @@ void run_current_uthread(void)
 	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
 	assert(current_uthread);
 	assert(current_uthread->state == UT_RUNNING);
-	printd("[U] Vcore %d is restarting uthread %d\n", vcoreid, uthread->id);
+	printd("[U] Vcore %d is restarting uthread %08p\n", vcoreid,
+	       current_uthread);
 	clear_notif_pending(vcoreid);
 	set_tls_desc(current_uthread->tls_desc, vcoreid);
 	/* Pop the user trap frame */

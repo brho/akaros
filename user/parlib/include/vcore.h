@@ -43,6 +43,7 @@ static inline int vcore_id(void);
 static inline bool in_vcore_context(void);
 static inline void __enable_notifs(uint32_t vcoreid);
 static inline void disable_notifs(uint32_t vcoreid);
+static inline bool notif_is_enabled(uint32_t vcoreid);
 int vcore_init(void);
 int vcore_request(size_t k);
 void vcore_yield(void);
@@ -80,6 +81,11 @@ static inline void __enable_notifs(uint32_t vcoreid)
 static inline void disable_notifs(uint32_t vcoreid)
 {
 	__procdata.vcore_preempt_data[vcoreid].notif_enabled = FALSE;
+}
+
+static inline bool notif_is_enabled(uint32_t vcoreid)
+{
+	return __procdata.vcore_preempt_data[vcoreid].notif_enabled;
 }
 
 #ifdef __cplusplus

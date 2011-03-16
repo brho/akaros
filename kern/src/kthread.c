@@ -199,8 +199,9 @@ void __launch_kthread(struct trapframe *tf, uint32_t srcid, void *a0, void *a1,
 			 * process another process's work. */
 			/* Keep in mind this can happen if you yield your core after
 			 * submitting work (like sys_block()) that will complete on the
-			 * current core, and then someone else gets it.  TODO: might be
-			 * other cases. */
+			 * current core, and then someone else gets it.
+			 * TODO: This can also happen if we started running another _M
+			 * here... */
 			if (cur_proc->state != PROC_RUNNING_S) {
 				printk("cur_proc: %08p, kthread->proc: %08p\n", cur_proc,
 				       kthread->proc);
@@ -214,10 +215,15 @@ void __launch_kthread(struct trapframe *tf, uint32_t srcid, void *a0, void *a1,
 		} else {
 			/* possible to get here if there is only one _S proc that blocked */
 			//assert(cur_proc->state == PROC_RUNNING_M);
-			/* TODO: might need to do something here, though it will depend on
-			 * how we handle async local calls. */
+			/* Our proc was current, but also wants an old kthread restarted.
+			 * This could happen if we are in the kernel servicing a call, and a
+			 * kthread tries to get restarted here on the way out.  cur_tf ought
+			 * to be the TF that needs to be restarted when the kernel is done
+			 * (regardless of whether or not we rerun kthreads). */
+			assert(tf == current_tf);
+			/* And just let the kthread restart, abandoning the call path via
+			 * proc_restartcore (or however we got here). */
 		}
-
 	}
 	restart_kthread(kthread);
 	assert(0);

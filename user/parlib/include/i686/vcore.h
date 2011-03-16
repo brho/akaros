@@ -26,65 +26,98 @@ extern __thread int __vcoreid;
  *
  * This is what the target notif_tf's stack will look like (growing down):
  *
- * Target ESP -> |   u_thread's old stuff   |
- *               |   new eip                |
- *               |   eax save space         |
- *               |   &sysc (async syscall)  |
- *               |   notif_pending_loc      |
- *               |   notif_enabled_loc      |
+ * Target ESP -> |   u_thread's old stuff   | the future %esp, tf->tf_esp
+ *               |   new eip                | 0x04 below %esp (one slot is 0x04)
+ *               |   eflags space           | 0x08 below
+ *               |   eax save space         | 0x0c below
+ *               |   actual syscall         | 0x10 below (0x30 space)
+ *               |   *sysc ptr to syscall   | 0x40 below (0x10 + 0x30)
+ *               |   notif_pending_loc      | 0x44 below (0x10 + 0x30)
+ *               |   notif_enabled_loc      | 0x48 below (0x10 + 0x30)
  *
  * The important thing is that it can handle a notification after it enables
  * notifications, and when it gets resumed it can ultimately run the new
  * context.  Enough state is saved in the running context and stack to continue
- * running. */
-#include <stdio.h>
+ * running.
+ *
+ * Related to that is whether or not our stack pointer is sufficiently far down
+ * so that restarting *this* code won't clobber shit we need later.  The way we
+ * do this is that we do any "stack jumping" after we enable interrupts/notifs.
+ * These jumps are when we directly modify esp, specifically in the down
+ * direction (subtracts).  Adds would be okay.
+ *
+ * Another related concern is the storage for sysc.  It used to be on the
+ * vcore's stack, but if an interrupt comes in before we use it, we trash the
+ * vcore's stack (and thus the storage for sysc!).  Instead, we put it on the
+ * stack of the user tf.  Moral: don't touch a vcore's stack with notifs
+ * enabled. */
+
+/* Helper for writing the info we need later to the u_tf's stack.  Note, this
+ * could get fucked if the struct syscall isn't a multiple of 4-bytes.  Also,
+ * note this goes backwards, since memory reads up the stack. */
+struct restart_helper {
+	uint32_t					notif_enab_loc;
+	uint32_t					notif_pend_loc;
+	struct syscall				*sysc;
+	struct syscall				local_sysc;
+	uint32_t					eax_save;
+	uint32_t					eflags;
+	uint32_t					eip;
+};
+
 static inline void pop_ros_tf(struct user_trapframe *tf, uint32_t vcoreid)
 {
-	struct syscall sysc = {0};
+	struct restart_helper *rst;
 	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
-	/* need to prep the async sysc in case we need to notify ourselves */
-	sysc.num = SYS_self_notify;
-	sysc.arg0 = vcoreid;	/* arg1 and 2 already = 0 (null notif, no u_ne) */
 	if (!tf->tf_cs) { /* sysenter TF.  esp and eip are in other regs. */
 		tf->tf_esp = tf->tf_regs.reg_ebp;
 		tf->tf_eip = tf->tf_regs.reg_edx;
 	}
+	/* The stuff we need to write will be below the current stack of the utf */
+	rst = (struct restart_helper*)((void*)tf->tf_esp -
+	                               sizeof(struct restart_helper));
+	/* Fill in the info we'll need later */
+	rst->notif_enab_loc = (uint32_t)&vcpd->notif_enabled;
+	rst->notif_pend_loc = (uint32_t)&vcpd->notif_pending;
+	rst->sysc = &rst->local_sysc;	/* point to the local one */
+	memset(rst->sysc, 0, sizeof(struct syscall));
+	/* Need to prep the async sysc in case we need to notify ourselves */
+	rst->sysc->num = SYS_self_notify;
+	rst->sysc->arg0 = vcoreid;	/* arg 1 & 2 already = 0 (null notif, no u_ne)*/
+	rst->eax_save = 0;			/* avoid bugs */
+	rst->eflags = tf->tf_eflags;
+	rst->eip = tf->tf_eip;
 
-	asm volatile ("movl %2,-0x04(%1);    " /* push the PC */
-	              "movl %3,-0x0c(%1);    " /* room for eax, push &sysc */
-	              "movl %4,-0x10(%1);    " /* push notif_pending loc */
-	              "movl %5,-0x14(%1);    " /* push notif_enabled loc */
-	              "movl %0,%%esp;        " /* pop the real tf */
+	asm volatile ("movl %0,%%esp;        " /* jump esp to the utf */
 	              "popal;                " /* restore normal registers */
-	              "addl $0x20,%%esp;     " /* move to the eflags in the tf */
-	              "popfl;                " /* restore eflags */
-	              "popl %%esp;           " /* change to the new %esp */
-	              "subl $0x4,%%esp;      " /* move esp to the slot for eax */
+	              "addl $0x24,%%esp;     " /* move to the esp slot in the tf */
+	              "popl %%esp;           " /* change to the utf's %esp */
+	              "subl $0x08,%%esp;     " /* move esp to below eax's slot */
 	              "pushl %%eax;          " /* save eax, will clobber soon */
-	              "subl $0xc,%%esp;      " /* move to notif_en_loc slot */
+				  "movl %2,%%eax;        " /* sizeof struct syscall */
+				  "addl $0x0c,%%eax;     " /* more offset btw eax/notif_en_loc*/
+	              "subl %%eax,%%esp;     " /* move to notif_en_loc slot */
 	              "popl %%eax;           " /* load notif_enabaled addr */
 	              "movb $0x01,(%%eax);   " /* enable notifications */
+				  /* From here down, we can get interrupted and restarted */
 	              "popl %%eax;           " /* get notif_pending status */
-	              "pushfl;               " /* save eflags */
 	              "testb $0x01,(%%eax);  " /* test if a notif is pending */
 	              "jz 1f;                " /* if not pending, skip syscall */
-	              "popfl;                " /* restore eflags */
 	              "movb $0x00,(%%eax);   " /* clear pending */
 				  /* Actual syscall.  Note we don't wait on the async call */
 	              "popl %%eax;           " /* &sysc, trap arg0 */
 	              "pushl %%edx;          " /* save edx, will be trap arg1 */
 	              "movl $0x1,%%edx;      " /* sending one async syscall: arg1 */
-	              "int %6;               " /* fire the syscall */
+	              "int %1;               " /* fire the syscall */
 	              "popl %%edx;           " /* restore regs after syscall */
 	              "jmp 2f;               " /* skip 1:, already popped */
-	              "1: popfl;             " /* restore eflags (on non-sc path) */
-				  "popl %%eax;           " /* discard &sysc (on non-sc path) */
-	              "2: popl %%eax;        " /* restore tf's %eax (both paths) */
+				  "1: popl %%eax;        " /* discard &sysc (on non-sc path) */
+	              "2: addl %2,%%esp;     " /* jump over the sysc (both paths) */
+	              "popl %%eax;           " /* restore tf's %eax */
+				  "popfl;                " /* restore utf's eflags */
 	              "ret;                  " /* return to the new PC */
 	              :
-	              : "g"(tf), "r"(tf->tf_esp), "r"(tf->tf_eip), "r"(&sysc),
-	                "r"(&vcpd->notif_pending), "r"(&vcpd->notif_enabled),
-	                "i"(T_SYSCALL)
+	              : "g"(tf), "i"(T_SYSCALL), "i"(sizeof(struct syscall))
 	              : "memory");
 }
 
