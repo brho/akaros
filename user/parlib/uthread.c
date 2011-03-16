@@ -44,7 +44,7 @@ static int uthread_init(void)
 	/* don't forget to enable notifs on vcore0.  if you don't, the kernel will
 	 * restart your _S with notifs disabled, which is a path to confusion. */
 	__enable_notifs(0);
-	/* Get ourselves into _M mode */
+	/* Get ourselves into _M mode.  Could consider doing this elsewhere... */
 	while (num_vcores() < 1) {
 		vcore_request(1);
 		/* TODO: consider blocking */

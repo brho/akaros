@@ -29,14 +29,27 @@ static void handle_generic(struct event_msg *ev_msg, unsigned int ev_type,
 void ghetto_vcore_entry(void);
 struct uthread *ghetto_init(void)
 {
-	return malloc(sizeof(struct uthread));
+	struct uthread *uthread = malloc(sizeof(struct uthread));
+	memset(uthread, 0, sizeof(struct uthread));
+	return uthread;
+}
+
+struct uthread *ghetto_create(void (*func)(void), void *data)
+{
+	return ghetto_init();
 }
 
 struct schedule_ops ghetto_sched_ops = {
 	.sched_init = ghetto_init,
 	.sched_entry = ghetto_vcore_entry,
+	.thread_create = ghetto_create,
 };
 struct schedule_ops *sched_ops = &ghetto_sched_ops;
+
+/* to trick uthread_create() */
+void dummy(void)
+{
+}
 
 int main(int argc, char** argv)
 {
@@ -57,7 +70,6 @@ int main(int argc, char** argv)
 	       EV_FREE_APPLE_PIE);
 	register_kevent_q(indirect_q, EV_FREE_APPLE_PIE);
 
-/* begin: stuff userspace needs to do before switching to multi-mode */
 	/* handle events: just want to print out what we get.  This is just a
 	 * quick set of handlers, not a registration for a kevent. */
 	for (int i = 0; i < MAX_NR_EVENT; i++)
@@ -75,16 +87,9 @@ int main(int argc, char** argv)
 	ev_q->ev_flags = EVENT_IPI | EVENT_NOMSG | EVENT_VCORE_APPRO;
 	register_kevent_q(ev_q, EV_PREEMPT_PENDING);
 
-	/* Need to save this somewhere that you can find it again when restarting
-	 * core0 */
-	core0_tls = get_tls_desc(0);
-	/* Need to save our floating point state somewhere (like in the
-	 * user_thread_tcb so it can be restarted too */
-
-	/* don't forget to enable notifs on vcore0 at some point */
-	enable_notifs(0);
-
-/* end: stuff userspace needs to do before switching to multi-mode */
+	/* Makes a thread for us, though we won't use it.  Just a hack to get into
+	 * _M mode.  Note this requests one vcore for us */
+	uthread_create(dummy, 0);
 
 	if ((vcoreid = vcore_id())) {
 		printf("Should never see me! (from vcore %d)\n", vcoreid);
@@ -94,8 +99,8 @@ int main(int argc, char** argv)
 		       vcoreid, &temp, temp);
 		printf("Multi-Goodbye, world, from PID: %d!\n", sys_getpid());
 		//retval = sys_resource_req(RES_CORES, 2, 0);
-		printf("Requesting %d vcores\n",max_vcores());
-		retval = vcore_request(max_vcores());
+		printf("Requesting %d vcores\n", max_vcores() - 1);
+		retval = vcore_request(max_vcores() - 1); /* since we already have 1 */
 		//retval = vcore_request(5);
 		printf("This is vcore0, right after vcore_request, retval=%d\n", retval);
 		/* vcore_context test */
