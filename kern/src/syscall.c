@@ -73,6 +73,7 @@ static bool proc_is_traced(struct proc *p)
 static void signal_current_sc(int retval)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	assert(pcpui->cur_sysc);
 	pcpui->cur_sysc->retval = retval;
 	pcpui->cur_sysc->flags |= SC_DONE;
 }
@@ -1439,7 +1440,8 @@ static void run_local_syscall(struct syscall *sysc)
 	 * with userspace for the event_queue registration. */
 	atomic_or_int(&sysc->flags, SC_DONE); 
 	signal_syscall(sysc, pcpui->cur_proc);
-	/* Can unpin at this point */
+	/* Can unpin (UMEM) at this point */
+	pcpui->cur_sysc = 0;	/* no longer working on sysc */
 }
 
 /* A process can trap and call this function, which will set up the core to

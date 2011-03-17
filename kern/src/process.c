@@ -1308,8 +1308,12 @@ void __unmap_vcore(struct proc *p, uint32_t vcoreid)
  * process's context. */
 void abandon_core(void)
 {
-	if (current) {
-		current_tf = 0;
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	/* Syscalls that don't return will ultimately call abadon_core(), so we need
+	 * to make sure we don't think we are still working on a syscall. */
+	pcpui->cur_sysc = 0;
+	if (pcpui->cur_proc) {
+		pcpui->cur_tf = 0;
 		__abandon_core();
 	}
 }
