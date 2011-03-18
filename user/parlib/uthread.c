@@ -45,7 +45,7 @@ static int uthread_init(void)
 	 * restart your _S with notifs disabled, which is a path to confusion. */
 	__enable_notifs(0);
 	/* Get ourselves into _M mode.  Could consider doing this elsewhere... */
-	while (num_vcores() < 1) {
+	while (!in_multi_mode()) {
 		vcore_request(1);
 		/* TODO: consider blocking */
 		cpu_relax();
@@ -235,8 +235,8 @@ void ros_syscall_blockon(struct syscall *sysc)
 		__ros_syscall_blockon(sysc);
 		return;
 	}
-	if (!sched_ops->thread_blockon_sysc || !current_uthread) {
-		/* There isn't a 2LS op for blocking.  Spin for now. */
+	if (!sched_ops->thread_blockon_sysc || !in_multi_mode()) {
+		/* There isn't a 2LS op for blocking, or we're _S.  Spin for now. */
 		__ros_syscall_blockon(sysc);
 		return;
 	}
@@ -244,6 +244,7 @@ void ros_syscall_blockon(struct syscall *sysc)
 	if (sysc->flags & (SC_DONE | SC_PROGRESS))
 		return;
 	/* So yield knows we are blocking on something */
+	assert(current_uthread);
 	current_uthread->sysc = sysc;
 	uthread_yield();
 }

@@ -41,6 +41,7 @@ static inline size_t max_vcores(void);
 static inline size_t num_vcores(void);
 static inline int vcore_id(void);
 static inline bool in_vcore_context(void);
+static inline bool in_multi_mode(void);
 static inline void __enable_notifs(uint32_t vcoreid);
 static inline void disable_notifs(uint32_t vcoreid);
 static inline bool notif_is_enabled(uint32_t vcoreid);
@@ -70,6 +71,11 @@ static inline int vcore_id(void)
 static inline bool in_vcore_context(void)
 {
 	return __vcore_context;
+}
+
+static inline bool in_multi_mode(void)
+{
+	return (num_vcores() > 0) ? TRUE : FALSE;
 }
 
 /* Only call this if you know what you are doing. */
