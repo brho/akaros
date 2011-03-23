@@ -6,7 +6,8 @@
  *   - Provides common hash and equality functions (meant for longs)
  *   - Uses the slab allocator for hash entry allocation.
  *   - Merges the iterator code with the main hash table code, mostly to avoid
- *   externing the hentry cache. */
+ *   externing the hentry cache.
+ *   - hash for each */
 
 #ifndef __ROS_KERN_HASHTABLE_H__
 #define __ROS_KERN_HASHTABLE_H__
@@ -294,6 +295,10 @@ ssize_t fnname (hashtable_itr_t *i, hashtable_t *h, keytype *k) \
     return (hashtable_iterator_search(i,h,k)); \
 }
 
+/* Runs func on each member of the hash table */
+void hash_for_each(struct hashtable *hash, void func(void*));
+/* Same, but removes the item too */
+void hash_for_each_remove(struct hashtable *hash, void func(void*));
 
 #endif /* __ROS_KERN_HASHTABLE_H__ */
 

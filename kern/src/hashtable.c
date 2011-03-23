@@ -424,6 +424,31 @@ hashtable_iterator_search(hashtable_itr_t *itr,
     return 0;
 }
 
+/* Runs func on each member of the hash table */
+void hash_for_each(struct hashtable *hash, void func(void*))
+{
+	if (hashtable_count(hash)) {
+		hashtable_itr_t *iter = hashtable_iterator(hash);
+		do {
+			void *item = hashtable_iterator_value(iter);
+			func(item);
+		} while (hashtable_iterator_advance(iter));
+	}
+}
+
+/* Runs func on each member of the hash table, removing the item after
+ * processing it.  Make sure func frees the item, o/w you'll leak. */
+void hash_for_each_remove(struct hashtable *hash, void func(void*))
+{
+	if (hashtable_count(hash)) {
+		hashtable_itr_t *iter = hashtable_iterator(hash);
+		do {
+			void *item = hashtable_iterator_value(iter);
+			func(item);
+		} while (hashtable_iterator_remove(iter));
+	}
+}
+
 /*
  * Copyright (c) 2002, 2004, Christopher Clark
  * All rights reserved.

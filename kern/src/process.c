@@ -1513,17 +1513,16 @@ void print_idlecoremap(void)
 
 void print_allpids(void)
 {
-	spin_lock(&pid_hash_lock);
-	if (hashtable_count(pid_hash)) {
-		hashtable_itr_t *phtable_i = hashtable_iterator(pid_hash);
-		printk("PID      STATE    \n");
-		printk("------------------\n");
-		do {
-			struct proc *p = hashtable_iterator_value(phtable_i);
-			printk("%8d %s\n", hashtable_iterator_key(phtable_i),
-			       p ? procstate2str(p->state) : "(null)");
-		} while (hashtable_iterator_advance(phtable_i));
+	void print_proc_state(void *item)
+	{
+		struct proc *p = (struct proc*)item;
+		assert(p);
+		printk("%8d %s\n", p->pid, procstate2str(p->state));
 	}
+	printk("PID      STATE    \n");
+	printk("------------------\n");
+	spin_lock(&pid_hash_lock);
+	hash_for_each(pid_hash, print_proc_state);
 	spin_unlock(&pid_hash_lock);
 }
 
