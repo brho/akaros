@@ -256,6 +256,7 @@ int udp_input(struct pbuf *p){
 		pbuf_free(p);
 		return -1;
 	}
+			printk("start of udp %p\n", p->payload);
 	udphdr = (struct udp_hdr *)p->payload;
 	/* convert the src port and dst port to host order */
 	src = ntohs(udphdr->src_port);

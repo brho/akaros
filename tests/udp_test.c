@@ -31,9 +31,7 @@ int main(int argc, char* argv[]) {
 	bzero(&server, sizeof(server));
 	server.sin_family = AF_INET;
 	server.sin_port = htons(atoi(argv[2]));
-	server.sin_addr.s_addr = inet_addr("10.0.0.1"); //hardcoded server
-
-	//memcpy(&server.sin_addr.s_addr, host->h_addr, host->h_length);
+	server.sin_addr.s_addr = inet_addr("10.0.0.1"); //hardcoded server 
 	
 	char* printbuf = (char*)&server.sin_addr.s_addr;
 	int size = sizeof(server.sin_addr.s_addr);	
@@ -55,12 +53,16 @@ int main(int argc, char* argv[]) {
 	int sendsize = sendto(sockfd, buf, strlen(buf), 0, (struct sockaddr*) &server, socklen);
 	printf("sendto returns %d, errno %d\n", sendsize, errno);
 	//assume BUF_SIZE is larger than the packet.. so we will get to see what actually comes back..
-	if ((n = recvfrom(sockfd, recv_buf, BUF_SIZE, 0, (struct sockaddr*) &server, &socklen)< 0)){
-		printf("recv failed\n");
+	int j=0;
+	for (j=0; j<1; j++){
+		strcpy(recv_buf, "DEADBEEFDEADBEE");
+		if (((n = recvfrom(sockfd, recv_buf, BUF_SIZE, 0, (struct sockaddr*) &server, &socklen))< 0)){
+			printf("recv failed\n");
+		}
+		recv_buf[n-2] = 0; //null terminate
+		printf("recv %d with length %d from result %s\n", j,n,  recv_buf);
 	}
 
-	buf[n-2] = 0; //null terminate
 
-	printf("recv from result %s\n", buf);
 	close(sockfd);
 }

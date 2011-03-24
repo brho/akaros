@@ -247,12 +247,15 @@ intreg_t sys_recvfrom(struct proc *p, int socket, void *restrict buffer, size_t 
 				copied = buf->len - sizeof(struct udp_hdr);
 				if (copied > length)
 					copied = length;
-				
-			pbuf_header(buf, -PBUF_TRANSPORT_HLEN);
+			pbuf_header(buf, -UDP_HDR_SZ);
+			printk("loc of payload %p\n", buf->payload);
 			// copy it to user space
 			returnval = memcpy_to_user_errno(p, buffer, buf->payload, copied);
 			}
 		}
 	}
-	return returnval;
+	if (returnval < 0) 
+		return -1;
+	else
+		return copied;
 }
