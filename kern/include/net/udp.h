@@ -9,6 +9,7 @@
 #define UDP_TTL 255
 
 struct udp_pcb {
+		/* ips are in network byte order */
     struct in_addr local_ip;
     struct in_addr remote_ip;
     /** ports are in host byte order */
@@ -17,12 +18,7 @@ struct udp_pcb {
     uint8_t flags;
     /* Protocol specific PCB members */
     struct udp_pcb *next;
-#if 0
-  /** receive callback function */
-  udp_recv_fn recv;
-  /** user-supplied argument for the recv callback */
-  void *recv_arg;  
-#endif
+		struct socket *pcbsock;
 };
 
 extern struct udp_pcb *udp_pcbs;
@@ -32,12 +28,14 @@ int udp_send(struct udp_pcb *pcb, struct pbuf *p);
 int udp_sendto(struct udp_pcb *pcb, struct pbuf *p,
                     struct in_addr *dst_ip, uint16_t dst_port);
 int udp_bind(struct udp_pcb *pcb, struct in_addr *ip, uint16_t port);
-#if 0
+int udp_input(struct pbuf *p);
+
 #define UDP_FLAGS_NOCHKSUM       0x01U
 #define UDP_FLAGS_UDPLITE        0x02U
 #define UDP_FLAGS_CONNECTED      0x04U
 #define UDP_FLAGS_MULTICAST_LOOP 0x08U
 
+#if 0
 
 /** Function prototype for udp pcb receive callback functions
  * addr and port are in same byte order as in the pcb

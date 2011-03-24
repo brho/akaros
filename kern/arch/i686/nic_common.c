@@ -22,7 +22,6 @@ int (*send_pbuf)(struct pbuf *p);
 struct pbuf*  (*recv_pbuf)(void);
 
 
-
 // Global variables for managing ethernet packets over a nic
 // Again, since these are global for all network cards we are 
 // limited to only one for now

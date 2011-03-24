@@ -6,11 +6,19 @@
 #include <slab.h>
 #include <assert.h>
 #include <net/pbuf.h>
+#include <sys/queue.h>
+#include <net.h>
 #include <arch/nic_common.h>
 
-
+/* TODO: before running
+ * 1. pbuf_free_auto currently decrefs the next one on the chain or queue
+ * 2. copy_out currently copies out the chain following the next pointer
+ *    could be dangerous if it runs on pbufs on a send/recv socket queue
+ * 3. Tot_len could be useless at some point, especially if the max len is only two...
+ * 4. pbuf_chain and pbuf_cat, pbuf_clen has no users yet
+ */
 #define SIZEOF_STRUCT_PBUF (ROUNDUP(sizeof(struct pbuf), ROS_MEM_ALIGN))
-#define SIZEOF_STRUCT_MTU_PBUF SIZEOF_STRUCT_PBUF + ROUNDUP(sizeof(MAX_FRAME_SIZE), ROS_MEM_ALIGN)
+#define MTU_PBUF_SIZE SIZEOF_STRUCT_PBUF + MAX_FRAME_SIZE + ETH_PAD_SIZE
 
 struct kmem_cache *pbuf_kcache;
 struct kmem_cache *mtupbuf_kcache;
@@ -21,15 +29,15 @@ void pbuf_init(void){
 	printk("alignment %d\n", __alignof__(struct pbuf));
 	pbuf_kcache = kmem_cache_create("pbuf", sizeof(struct pbuf),
 									__alignof__(struct pbuf), 0, 0, 0);
-  mtupbuf_kcache = kmem_cache_create("mtupbuf_kcache", SIZEOF_STRUCT_MTU_PBUF, 
+  mtupbuf_kcache = kmem_cache_create("mtupbuf_kcache", MTU_PBUF_SIZE, 
 										__alignof__(struct pbuf), 0, 0, 0);
 }
 
-// not sure about this structure..
 static void pbuf_free_auto(struct kref *kref){
     struct pbuf *p = container_of(kref, struct pbuf, bufref);
+		if (!p) return;
+		struct pbuf *q = STAILQ_NEXT(p, next);
 		printd("deleting p %p of type %d\n", p, p->type);
-		
     switch (p->type){
         case PBUF_REF:
             kmem_cache_free(pbuf_kcache, p);
@@ -39,9 +47,12 @@ static void pbuf_free_auto(struct kref *kref){
             break;
 				case PBUF_MTU:
 						kmem_cache_free(mtupbuf_kcache,p);
+						break;
         default:
             panic("Invalid pbuf type");
     }
+		if (q != NULL) 
+			pbuf_deref(q);
 }
 
 /**
@@ -113,11 +124,11 @@ struct pbuf *pbuf_alloc(pbuf_layer layer, uint16_t length, pbuf_type type)
     if (p == NULL) {
       return NULL;
     }
-		buf_size = SIZEOF_STRUCT_MTU_PBUF;
-    p->payload = PTRROUNDUP(((void *)((uint8_t *)p + SIZEOF_STRUCT_PBUF + offset)), ROS_MEM_ALIGN);
-		p->next = NULL;
+    p->payload = (void *)((uint8_t *)p + SIZEOF_STRUCT_PBUF + offset);
+		STAILQ_NEXT(p, next) = NULL;
 		p->type = type;
-		p->len = p->tot_len = ROUNDUP(sizeof(MAX_FRAME_SIZE), ROS_MEM_ALIGN);
+		p->alloc_len = MTU_PBUF_SIZE;
+		p->len = p->tot_len = 0;
 		break;
 
 	case PBUF_RAM:
@@ -129,9 +140,9 @@ struct pbuf *pbuf_alloc(pbuf_layer layer, uint16_t length, pbuf_type type)
       return NULL;
     }
     /* Set up internal structure of the pbuf. */
-    p->payload = PTRROUNDUP(((void *)((uint8_t *)p + SIZEOF_STRUCT_PBUF + offset)), ROS_MEM_ALIGN);
-    p->len = p->tot_len = length;
-    p->next = NULL;
+    p->payload = (void *)((uint8_t *)p + SIZEOF_STRUCT_PBUF + offset);
+    p->alloc_len = p->len = p->tot_len = length;
+		STAILQ_NEXT(p, next) = NULL;
     p->type = type;
     break;
   case PBUF_REF:
@@ -141,13 +152,13 @@ struct pbuf *pbuf_alloc(pbuf_layer layer, uint16_t length, pbuf_type type)
       return NULL;
     }
     p->payload = NULL;
-    p->len = p->tot_len = length;
-    p->next = NULL;
+    p->alloc_len = p->len = p->tot_len = length;
+		STAILQ_NEXT(p, next) = NULL;
     p->type = type;
     break;
 	case PBUF_POOL:
-		
-		break;	
+		warn("POOL type not supported!");	
+		return NULL;	
   default:
     warn("pbuf_alloc: wrong type", 0);
     return NULL;
@@ -160,9 +171,34 @@ struct pbuf *pbuf_alloc(pbuf_layer layer, uint16_t length, pbuf_type type)
 
 
 void pbuf_ref(struct pbuf *p){
-    kref_get(&p->bufref, 1);
+	kref_get(&p->bufref, 1);
 }
 
+/**
+ * true if the pbuf is deallocated as a result of pbuf_deref
+ * false means just a simple deref
+ */
+bool pbuf_deref(struct pbuf *p){
+	return kref_put(&p->bufref);
+}
+
+void attach_pbuf(struct pbuf *p, struct pbuf_head *ph){
+	spin_lock_irqsave(&ph->lock);
+	ph->qlen++;
+	STAILQ_INSERT_TAIL(&ph->pbuf_fifo, p, next);
+	spin_unlock_irqsave(&ph->lock);
+}
+
+struct pbuf* detach_pbuf(struct pbuf_head *ph){
+	struct pbuf* buf = NULL;
+	if (ph->qlen == 0) return NULL;
+	spin_lock_irqsave(&ph->lock);
+	ph->qlen--;
+	buf = STAILQ_FIRST(&ph->pbuf_fifo);
+	STAILQ_REMOVE_HEAD(&ph->pbuf_fifo, next);
+	spin_unlock_irqsave(&ph->lock);
+	return buf;
+}
 
 /**
  * Copy (part of) the contents of a packet buffer
@@ -188,7 +224,7 @@ int pbuf_copy_out(struct pbuf *buf, void *dataptr, size_t len, uint16_t offset)
 	}
 
   left = 0;
-  for(p = buf; len != 0 && p != NULL; p = p->next) {
+  for(p = buf; len != 0 && p != NULL; p = STAILQ_NEXT(p, next)) {
     if ((offset != 0) && (offset >= p->len)) {
       /* don't copy from this buffer -> on to the next */
       offset -= p->len;
@@ -237,14 +273,14 @@ pbuf_cat(struct pbuf *h, struct pbuf *t)
 {
   struct pbuf *p;
   /* proceed to last pbuf of chain */
-  for (p = h; p->next != NULL; p = p->next) {
+  for (p = h; STAILQ_NEXT(p, next) != NULL; p = STAILQ_NEXT(p, next)) {
     /* add total length of second chain to all totals of first chain */
     p->tot_len += t->tot_len;
   }
   /* add total length of second chain to last pbuf total of first chain */
   p->tot_len += t->tot_len;
   /* chain last pbuf of head (p) with first of tail (t) */
-  p->next = t;
+	STAILQ_NEXT(p,next) = t;
 }
 
 /**
@@ -272,22 +308,21 @@ pbuf_cat(struct pbuf *h, struct pbuf *t)
 int pbuf_header(struct pbuf *p, int delta){ // increase header size
 	uint8_t type = p->type;
 	void *payload = p->payload;
+	printk("delta %d \n", delta);
 	if (p == NULL || delta == 0)
 		return 0;
-	if (delta < 0) 
-		assert(-delta < p->len);
-	type = p->type;
-  /* remember current payload pointer */
-  payload = p->payload;
+	// This assertion used to apply when len meant allocated space..
+	// assert(-delta < p->len);
 
   /* pbuf types containing payloads? */
-  if (type == PBUF_RAM || type == PBUF_POOL) {
+  if (type == PBUF_RAM || type == PBUF_POOL || type == PBUF_MTU) {
     /* set new payload pointer */
     p->payload = (uint8_t *)p->payload - delta;
     /* boundary check fails? */
     if ((uint8_t *)p->payload < (uint8_t *)p + SIZEOF_STRUCT_PBUF) {
       /* restore old payload pointer */
       p->payload = payload;
+			warn("boundary failed \n");
       /* bail out unsuccesfully */
       return 1;
     }
@@ -316,14 +351,61 @@ int pbuf_header(struct pbuf *p, int delta){ // increase header size
 
 void print_pbuf(struct pbuf *p) {
 	struct pbuf *next = p;
-	while ( next != NULL) {
-		for(int i = 0; i< next->len; i++){
-			printk("%x", ((uint8_t*)next->payload)[i]);
-		}
+ 	//basically while pbuf is not on the socket queue yet, we can't use STAILQ_NEXT 
+
+	/*XXX: this is wrong.. */
+	while (next != NULL) {
+		printk("pbuf start \n");
+		dumppacket(next->payload, next->len);
 		printk("\n");
-		next = next->next;
+		next = STAILQ_NEXT(next, next);
 	}
 }
+
+
+/**
+ * Dereference a pbuf chain or queue and deallocate any no-longer-used
+ * pbufs at the head of this chain or queue.
+ *
+ * Decrements the pbuf reference count. If it reaches zero, the pbuf is
+ * deallocated.
+ *
+ * For a pbuf chain, this is repeated for each pbuf in the chain,
+ * up to the first pbuf which has a non-zero reference count after
+ * decrementing. So, when all reference counts are one, the whole
+ * chain is free'd.
+ *
+ * @param p The pbuf (chain) to be dereferenced.
+ *
+ * @return the number of pbufs that were de-allocated
+ * from the head of the chain.
+ *
+ *
+ */
+bool pbuf_free(struct pbuf *p) {
+	return pbuf_deref(p);
+}
+
+/**
+ * Count number of pbufs in a chain
+ *
+ * @param p first pbuf of chain
+ * @return the number of pbufs in a chain
+ */
+
+uint8_t pbuf_clen(struct pbuf *p)
+{
+  uint8_t len;
+
+  len = 0;
+  while (p != NULL) {
+    ++len;
+    p = STAILQ_NEXT(p, next);
+  }
+  return len;
+}
+
+
 #if 0
 #if LWIP_SUPPORT_CUSTOM_PBUF
 /** Initialize a custom pbuf (already allocated).
@@ -464,137 +546,6 @@ pbuf_realloc(struct pbuf *p, u16_t new_len)
 }
 
 
-/**
- * Dereference a pbuf chain or queue and deallocate any no-longer-used
- * pbufs at the head of this chain or queue.
- *
- * Decrements the pbuf reference count. If it reaches zero, the pbuf is
- * deallocated.
- *
- * For a pbuf chain, this is repeated for each pbuf in the chain,
- * up to the first pbuf which has a non-zero reference count after
- * decrementing. So, when all reference counts are one, the whole
- * chain is free'd.
- *
- * @param p The pbuf (chain) to be dereferenced.
- *
- * @return the number of pbufs that were de-allocated
- * from the head of the chain.
- *
- * @note MUST NOT be called on a packet queue (Not verified to work yet).
- * @note the reference counter of a pbuf equals the number of pointers
- * that refer to the pbuf (or into the pbuf).
- *
- * @internal examples:
- *
- * Assuming existing chains a->b->c with the following reference
- * counts, calling pbuf_free(a) results in:
- * 
- * 1->2->3 becomes ...1->3
- * 3->3->3 becomes 2->3->3
- * 1->1->2 becomes ......1
- * 2->1->1 becomes 1->1->1
- * 1->1->1 becomes .......
- *
- */
-u8_t
-pbuf_free(struct pbuf *p)
-{
-  u16_t type;
-  struct pbuf *q;
-  u8_t count;
-
-  if (p == NULL) {
-    LWIP_ASSERT("p != NULL", p != NULL);
-    /* if assertions are disabled, proceed with debug output */
-    LWIP_DEBUGF(PBUF_DEBUG | LWIP_DBG_LEVEL_SERIOUS,
-      ("pbuf_free(p == NULL) was called.\n"));
-    return 0;
-  }
-  LWIP_DEBUGF(PBUF_DEBUG | LWIP_DBG_TRACE, ("pbuf_free(%p)\n", (void *)p));
-
-  PERF_START;
-
-  LWIP_ASSERT("pbuf_free: sane type",
-    p->type == PBUF_RAM || p->type == PBUF_ROM ||
-    p->type == PBUF_REF || p->type == PBUF_POOL);
-
-  count = 0;
-  /* de-allocate all consecutive pbufs from the head of the chain that
-   * obtain a zero reference count after decrementing*/
-  while (p != NULL) {
-    u16_t ref;
-    SYS_ARCH_DECL_PROTECT(old_level);
-    /* Since decrementing ref cannot be guaranteed to be a single machine operation
-     * we must protect it. We put the new ref into a local variable to prevent
-     * further protection. */
-    SYS_ARCH_PROTECT(old_level);
-    /* all pbufs in a chain are referenced at least once */
-    LWIP_ASSERT("pbuf_free: p->ref > 0", p->ref > 0);
-    /* decrease reference count (number of pointers to pbuf) */
-    ref = --(p->ref);
-    SYS_ARCH_UNPROTECT(old_level);
-    /* this pbuf is no longer referenced to? */
-    if (ref == 0) {
-      /* remember next pbuf in chain for next iteration */
-      q = p->next;
-      LWIP_DEBUGF( PBUF_DEBUG | LWIP_DBG_TRACE, ("pbuf_free: deallocating %p\n", (void *)p));
-      type = p->type;
-#if LWIP_SUPPORT_CUSTOM_PBUF
-      /* is this a custom pbuf? */
-      if ((p->flags & PBUF_FLAG_IS_CUSTOM) != 0) {
-        struct pbuf_custom *pc = (struct pbuf_custom*)p;
-        LWIP_ASSERT("pc->custom_free_function != NULL", pc->custom_free_function != NULL);
-        pc->custom_free_function(p);
-      } else
-#endif /* LWIP_SUPPORT_CUSTOM_PBUF */
-      {
-        /* is this a pbuf from the pool? */
-        if (type == PBUF_POOL) {
-          memp_free(MEMP_PBUF_POOL, p);
-        /* is this a ROM or RAM referencing pbuf? */
-        } else if (type == PBUF_ROM || type == PBUF_REF) {
-          memp_free(MEMP_PBUF, p);
-        /* type == PBUF_RAM */
-        } else {
-          mem_free(p);
-        }
-      }
-      count++;
-      /* proceed to next pbuf */
-      p = q;
-    /* p->ref > 0, this pbuf is still referenced to */
-    /* (and so the remaining pbufs in chain as well) */
-    } else {
-      LWIP_DEBUGF( PBUF_DEBUG | LWIP_DBG_TRACE, ("pbuf_free: %p has ref %"U16_F", ending here.\n", (void *)p, ref));
-      /* stop walking through the chain */
-      p = NULL;
-    }
-  }
-  PERF_STOP("pbuf_free");
-  /* return number of de-allocated pbufs */
-  return count;
-}
-
-/**
- * Count number of pbufs in a chain
- *
- * @param p first pbuf of chain
- * @return the number of pbufs in a chain
- */
-
-u8_t
-pbuf_clen(struct pbuf *p)
-{
-  u8_t len;
-
-  len = 0;
-  while (p != NULL) {
-    ++len;
-    p = p->next;
-  }
-  return len;
-}
 
 /**
  * Increment the reference count of the pbuf.

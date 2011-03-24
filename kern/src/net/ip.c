@@ -19,6 +19,7 @@ struct in_addr global_ip = {IP_ADDR};
 /* TODO: build arp table, and look up */
 int eth_send(struct pbuf *p, struct in_addr *dest) {
 	uint32_t bytes_sent; 
+	printk("size of pbuf_header movement %d\n", sizeof(struct ethernet_hdr));
 	if (pbuf_header(p, sizeof(struct ethernet_hdr)) != 0){
 		warn("eth_send buffer ran out");
 		/* unsuccessful, needs to allocate */	
@@ -34,11 +35,7 @@ int eth_send(struct pbuf *p, struct in_addr *dest) {
 	 * is so that we can send from multi-buffer later.
 	 */
 	if (send_pbuf){
-	#if ETH_PAD_SIZE
-		pbuf_header(p, -ETH_PAD_SIZE); /* drop the padding word */
-	#endif
 		bytes_sent = send_pbuf(p);
-		pbuf_header(p, ETH_PAD_SIZE); /* when do we deallocate p? */
 		return bytes_sent;
 	}
 	else {
@@ -81,7 +78,7 @@ int ip_output(struct pbuf *p, struct in_addr *src, struct in_addr *dest, uint8_t
 	ip_id++;
 	iphdr->flags_frags = htons(0); // 4000  may fragment
 	iphdr->protocol = proto;
-	iphdr->ttl = htons(DEFAULT_TTL);
+	iphdr->ttl = DEFAULT_TTL;
 	/* Eventually if we support more than one device this may change */
 	printk("src ip %x, dest ip %x \n", src->s_addr, dest->s_addr);
 	iphdr->src_addr = htonl(src->s_addr);
@@ -91,11 +88,82 @@ int ip_output(struct pbuf *p, struct in_addr *src, struct in_addr *dest, uint8_t
 	 */
 	/* Since the IP header is set already, we can compute the checksum. */
 	/* TODO: Use the card to calculate the checksum */
-	iphdr->checksum = htons(ip_checksum(iphdr)); //7ab6
+	iphdr->checksum = 0;
+	iphdr->checksum = ip_checksum(iphdr); //7ab6
 	if (p->tot_len > DEFAULT_MTU) /*MAX MTU? header included */
 		return -1;//ip_frag(p, dest);
 	else
 		return eth_send(p, dest);
 }
 
+int ip_input(struct pbuf *p) {
+	uint32_t iphdr_hlen, iphdr_len;
+	struct ip_hdr *iphdr = (struct ip_hdr *)p->payload;
+	printk("start of ip %p \n", p->payload);
+	print_pbuf(p);
+	/* use that info to build arp table */
+  if (iphdr->version != 4) {
+		warn("ip version not 4!\n");
+    pbuf_free(p);
+		return -1;
+	}
+	iphdr_hlen = iphdr->hdr_len * 4;
+	iphdr_len = ntohs(iphdr->packet_len);
+	printk("ip input coming from %x of size %d", ntohs(iphdr->dst_addr), iphdr_len);
+  /* header length exceeds first pbuf length, or ip length exceeds total pbuf length? */
+  if ((iphdr_hlen > p->len) || (iphdr_len > p->tot_len)) {
+    if (iphdr_hlen > p->len) {
+        warn("IP header (len 0x%X) does not fit in first pbuf (len %X), IP packet dropped.\n",
+        iphdr_hlen, p->len);
+    }
+    if (iphdr_len > p->tot_len) {
+        warn("IP (len %X) is longer than pbuf (len %X), IP packet dropped.\n",
+        iphdr_len, p->tot_len);
+    }
+    /* free (drop) packet pbufs */
+    pbuf_free(p);
+    return -1;
+  }
+	if (ip_checksum(iphdr) != 0) {
+		warn("checksum failed \n");
+		pbuf_free(p);
+		return -1;
+	}
 
+	/* check if it is destined for me? */
+	/* XXX: IP address for the interface is IP_ANY */
+	if (ntohl(iphdr->dst_addr) != global_ip.s_addr){
+		printk("dest ip in network order%x\n", ntohl(iphdr->dst_addr));
+		printk("dest ip in network order%x\n", global_ip.s_addr);
+		warn("ip mismatch \n");
+		pbuf_free(p);
+		/* TODO:forward packets */
+		// ip_forward(p, iphdr, inp);
+	}
+
+	if ((ntohs(iphdr->flags_frags) & (IP_OFFMASK | IP_MF)) != 0){
+		panic ("ip fragment detected\n");
+		pbuf_free(p);
+	}
+
+	printk ("loc head %p, loc protocol %p\n", iphdr, &iphdr->protocol);
+	/* currently a noop, compared to the memory wasted, cutting out ipheader is not really saving much */
+	// pbuf_realloc(p, iphdr_len);
+	switch (iphdr->protocol) {
+		case IPPROTO_UDP:
+			return udp_input(p);
+		case IPPROTO_TCP:
+		default:
+			printk("IP protocol type %02x\n", iphdr->protocol);
+			warn("protocol not supported! \n");
+	}
+	return -1;
+}
+
+void print_ipheader(struct ip_hdr* iph){
+
+	
+}
+
+
+ 

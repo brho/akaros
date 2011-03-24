@@ -17,6 +17,7 @@
 #include <net.h>
 #include <net/udp.h>
 #include <net/pbuf.h>
+#include <umem.h>
 /*
  *TODO: Figure out which socket.h is used where
  *There are several socket.h in kern, and a couple more in glibc. Perhaps the glibc ones
@@ -68,8 +69,13 @@ struct socket* alloc_sock(int socket_family, int socket_type, int protocol){
 	newsock->so_type = socket_type;
 	newsock->so_protocol = protocol;
 	newsock->so_state = SS_ISDISCONNECTED;
-	if (socket_type == SOCK_DGRAM) 
+	pbuf_head_init(&newsock->recv_buff);
+	pbuf_head_init(&newsock->send_buff);
+	if (socket_type == SOCK_DGRAM){
 		newsock->so_pcb = udp_new();
+		/* back link */
+		((struct udp_pcb*) (newsock->so_pcb))->pcbsock = newsock;
+	}
 	return newsock;
 
 }
@@ -223,16 +229,30 @@ intreg_t sys_sendto(struct proc *p_proc, int fd, const void *buffer, size_t leng
     error = send_iov(soc, iov, flags);
 	#endif
 }
-
 intreg_t sys_recvfrom(struct proc *p, int socket, void *restrict buffer, size_t length, int flags, struct sockaddr *restrict address, socklen_t *restrict address_len){
 	struct socket* sock = getsocket(p, socket);	
+	int copied = 0;
+	int returnval = 0;
 	if (sock == NULL) {
 		set_errno(EBADF);
 		return -1;
 	}
 	if (sock->so_type == SOCK_DGRAM){
-
+		struct pbuf_head *ph = &(sock->recv_buff);
+		struct pbuf* buf = NULL;
+		/* TODO: busy poll the socket buffer for now */
+		while (buf == NULL){
+			buf = detach_pbuf(ph);
+			if (buf){
+				copied = buf->len - sizeof(struct udp_hdr);
+				if (copied > length)
+					copied = length;
+				
+			pbuf_header(buf, -PBUF_TRANSPORT_HLEN);
+			// copy it to user space
+			returnval = memcpy_to_user_errno(p, buffer, buf->payload, copied);
+			}
+		}
 	}
-
-	return -1;
+	return returnval;
 }

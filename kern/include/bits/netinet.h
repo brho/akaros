@@ -53,6 +53,11 @@
 #define	INADDR_ANY			(struct in_addr) {0x00000000}
 #define	INADDR_BROADCAST	(struct in_addr) {0xffffffff}	/* must be masked */
 
+/** 0.0.0.0 */
+#define IPADDR_ANY          ((uint32_t)0x00000000UL)
+/** 255.255.255.255 */
+#define IPADDR_BROADCAST    ((uint32_t)0xffffffffUL)
+
 #define	htonl(x) cpu_to_be32(x)
 #define	htons(x) cpu_to_be16(x)
 #define	ntohl(x) be32_to_cpu(x)

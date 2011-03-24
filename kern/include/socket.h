@@ -2,6 +2,9 @@
 #define ROS_SOCKET_H
 
 #include <ros/common.h>
+#include <sys/queue.h>
+#include <atomic.h>
+#include <net/pbuf.h>
 // Just a couple of AF types that we might support
 #define AF_UNSPEC	0
 #define AF_UNIX		1	/* Unix domain sockets 		*/
@@ -43,7 +46,6 @@ enum sock_type {
     SOCK_DCCP   = 6,
     SOCK_PACKET = 10,
 };
-
 struct socket{
   //int so_count;       /* (b) reference count */
   short   so_type;        /* (a) generic type, see socket.h */
@@ -54,6 +56,9 @@ struct socket{
   short   so_state;       /* (b) internal state flags SS_* */
 	//int so_qstate;      /* (e) internal state flags SQ_* */
 	void    *so_pcb;        /* protocol control block */
+	struct pbuf_head recv_buff;
+	struct pbuf_head send_buff;
+	
 	//struct  vnet *so_vnet;      /* network stack instance */
 	//struct  protosw *so_proto;  /* (a) protocol handle */
 };

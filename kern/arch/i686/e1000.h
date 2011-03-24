@@ -7,9 +7,9 @@
 #include <arch/nic_common.h>
 #include <net/pbuf.h>
 
-#define e1000_debug(...) 		//printk(__VA_ARGS__)  
-#define e1000_interrupt_debug(...)	//printk(__VA_ARGS__)  
-#define e1000_frame_debug(...)		//printk(__VA_ARGS__)  
+#define e1000_debug(...) 		printk(__VA_ARGS__)  
+#define e1000_interrupt_debug(...)	printk(__VA_ARGS__)  
+#define e1000_frame_debug(...)		printk(__VA_ARGS__)  
 
 #define E1000_IRQ_CPU		0
 
@@ -38,8 +38,10 @@
 #define E1000_RX_MAX_BUFFER_SIZE 2048
 #define E1000_TX_MAX_BUFFER_SIZE 2048
 
-uint32_t e1000_rr32(uint32_t offset);
-void e1000_wr32(uint32_t offset, uint32_t val);
+/* driver private functions */
+static uint32_t e1000_rr32(uint32_t offset);
+static void e1000_wr32(uint32_t offset, uint32_t val);
+#define E1000_WRITE_FLUSH() e1000_rr32(E1000_STATUS)
 
 void e1000_init(void);
 void e1000_reset(void);
@@ -55,5 +57,6 @@ int  e1000_send_frame(const char* data, size_t len);
 int e1000_send_pbuf(struct pbuf *p);
 /* returns a chain of pbuf from the driver */
 struct pbuf* e1000_recv_pbuf();
-
+void process_pbuf(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2);
+static void schedule_pb(struct pbuf* pb);
 #endif /* !ROS_INC_E1000_H */

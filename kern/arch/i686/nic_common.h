@@ -50,4 +50,10 @@ struct eth_frame {
 	char data[MTU];
 } __attribute__((packed));
 
+static inline void print_mac (uint8_t* mac_addr) {
+	printk("%02x:%02x:%02x:%02x:%02x:%02x\n", 0xFF & mac_addr[0], 0xFF & mac_addr[1],	
+	                                                         0xFF & mac_addr[2], 0xFF & mac_addr[3],	
+                                                           0xFF & mac_addr[4], 0xFF & mac_addr[5]);
+}
+
 #endif /* !ROS_INC_NIC_COMMON_H */
