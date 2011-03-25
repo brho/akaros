@@ -25,6 +25,7 @@ static int uthread_init(void)
 	assert(sched_ops->sched_init);
 	/* Get thread 0's thread struct (2LS allocs it) */
 	struct uthread *uthread = sched_ops->sched_init();
+	assert(uthread);
 	/* Save a pointer to thread0's tls region (the glibc one) into its tcb */
 	uthread->tls_desc = get_tls_desc(0);
 	/* Save a pointer to the uthread in its own TLS */
@@ -86,6 +87,7 @@ struct uthread *uthread_create(void (*func)(void), void *udata)
 	assert(!in_vcore_context());
 	assert(sched_ops->thread_create);
 	struct uthread *new_thread = sched_ops->thread_create(func, udata);
+	assert(new_thread);
 	new_thread->state = UT_CREATED;
 	/* They should have zero'd the uthread.  Let's check critical things: */
 	assert(!new_thread->flags && !new_thread->sysc);

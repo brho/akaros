@@ -1,5 +1,5 @@
 TARGET_ARCH ?= i686
-CFLAGS = -O2 -std=gnu99 -static -fomit-frame-pointer 
+CFLAGS = -O2 -std=gnu99 -static -fomit-frame-pointer -g
 LIBNAME = pthread
 V ?= @
 

@@ -91,6 +91,7 @@ struct uthread *pth_init(void)
 	}
 	/* Create a pthread_tcb for the main thread */
 	pthread_t t = (pthread_t)calloc(1, sizeof(struct pthread_tcb));
+	assert(t);
 	t->id = get_next_pid();
 	assert(t->id == 0);
 
@@ -161,6 +162,7 @@ struct uthread *pth_thread_create(void (*func)(void), void *udata)
 	struct pthread_tcb *pthread;
 	pthread_attr_t *attr = (pthread_attr_t*)udata;
 	pthread = (pthread_t)calloc(1, sizeof(struct pthread_tcb));
+	assert(pthread);
 	pthread->stacksize = PTHREAD_STACK_SIZE;	/* default */
 	pthread->id = get_next_pid();
 	pthread->detached = FALSE;				/* default */
@@ -324,7 +326,7 @@ int pthread_attr_destroy(pthread_attr_t *a)
 
 static void __pthread_free_stack(struct pthread_tcb *pt)
 {
-	assert(!munmap(pt->stacktop - PTHREAD_STACK_SIZE, PTHREAD_STACK_SIZE));
+	assert(!munmap(pt->stacktop - pt->stacksize, pt->stacksize));
 }
 
 static int __pthread_allocate_stack(struct pthread_tcb *pt)
