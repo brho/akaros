@@ -87,6 +87,7 @@ struct uthread *uthread_create(void (*func)(void), void *udata)
 	assert(!in_vcore_context());
 	assert(sched_ops->thread_create);
 	struct uthread *new_thread = sched_ops->thread_create(func, udata);
+	uint32_t vcoreid;
 	assert(new_thread);
 	new_thread->state = UT_CREATED;
 	/* They should have zero'd the uthread.  Let's check critical things: */
@@ -96,18 +97,25 @@ struct uthread *uthread_create(void (*func)(void), void *udata)
 	/* Switch into the new guys TLS and let it know who it is */
 	struct uthread *caller = current_uthread;
 	assert(caller);
-	/* Don't migrate this thread to another vcore, since it depends on being on
-	 * the same vcore throughout. */
+	/* We need to disable notifs here (in addition to not migrating), since we
+	 * could get interrupted when we're in the other guy's TLS, and when the
+	 * vcore restarts us, it will put us in our old TLS, not the one we were in
+	 * when we were interrupted.  We need to not migrate, since once we know the
+	 * vcoreid, we depend on being on the same vcore throughout. */
 	caller->flags |= UTHREAD_DONT_MIGRATE;
 	wmb();
 	/* Note the first time we call this, we technically aren't on a vcore */
-	uint32_t vcoreid = vcore_id();
+	vcoreid = vcore_id();
+	disable_notifs(vcoreid);
 	/* Save the new_thread to the new uthread in that uthread's TLS */
 	set_tls_desc(new_thread->tls_desc, vcoreid);
 	current_uthread = new_thread;
 	/* Switch back to the caller */
 	set_tls_desc(caller->tls_desc, vcoreid);
-	/* Okay to migrate now. */
+	/* Okay to migrate now, and enable interrupts/notifs.  This could be called
+	 * from vcore context, so only enable if we're in _M and in vcore context. */
+	if (!in_vcore_context() && num_vcores() > 0)
+		enable_notifs(vcoreid);
 	wmb();
 	caller->flags &= ~UTHREAD_DONT_MIGRATE;
 	return new_thread;
