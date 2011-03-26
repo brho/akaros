@@ -51,6 +51,8 @@ struct vm_region *create_vmr(struct proc *p, uintptr_t va, size_t len)
 
 	/* Is there room before the first one: */
 	vm_i = TAILQ_FIRST(&p->vm_regions);
+	/* This works for now, but if all we have is BRK_END ones, we'll start
+	 * growing backwards (TODO) */
 	if (!vm_i || (va + len < vm_i->vm_base)) {
 		vmr = kmem_cache_alloc(vmr_kcache, 0);
 		if (!vmr)
@@ -317,6 +319,13 @@ void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 			return MAP_FAILED;
 		}
 	}
+	/* If they don't care where to put it, we'll start looking after the break.
+	 * We could just have userspace handle this (in glibc's mmap), so we don't
+	 * need to know about BRK_END, but this will work for now (and may avoid
+	 * bugs).  Note that this limits mmap(0) a bit. */
+	if (addr == 0)
+		addr = BRK_END;
+	/* Still need to enforce this: */
 	addr = MAX(addr, MMAP_LOWEST_VA);
 	void *result = do_mmap(p, addr, len, prot, flags, file, offset);
 	if (file)
@@ -348,7 +357,8 @@ void *__do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 #endif
 	/* Need to make sure nothing is in our way when we want a FIXED location.
 	 * We just need to split on the end points (if they exist), and then remove
-	 * everything in between.  __do_munmap() will do this. */
+	 * everything in between.  __do_munmap() will do this.  Careful, this means
+	 * an mmap can be an implied munmap() (not my call...). */
 	if (flags & MAP_FIXED)
 		__do_munmap(p, addr, len);
 	vmr = create_vmr(p, addr, len);

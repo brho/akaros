@@ -137,7 +137,7 @@
 
 // Arbitrary boundary between the break and the start of
 // memory returned by calls to mmap with addr = 0
-#define BRK_END 0x20000000
+#define BRK_END 0x40000000
 
 // Where user programs generally begin
 #define UTEXT		(2*PTSIZE)
