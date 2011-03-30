@@ -217,6 +217,8 @@ doxyclean:
 	rm -rf $(DOXYGEN_DIR)/rosdoc
 
 clean:
+	@$(MAKE) userclean
+	@echo + clean [KERNEL/TESTS]
 	@rm -rf $(OBJDIR)
 	@echo All clean and pretty!
 
