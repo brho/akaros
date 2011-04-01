@@ -167,7 +167,7 @@ int eth_audio_mmap(struct file *file, struct vm_region *vmr)
 	if (active_proc && active_proc != vmr->vm_proc)
 		return -1;
 	if (!active_proc) {
-		kref_get(&vmr->vm_proc->kref, 1);
+		kref_get(&vmr->vm_proc->p_kref, 1);
 		active_proc = vmr->vm_proc;
 	}
 	assert(page);
@@ -208,7 +208,7 @@ int eth_audio_release(struct inode *inode, struct file *file)
 	/* Disconnect the proc from the device, decref. */
 	if (active_proc && current) {
 		assert(active_proc == current);
-		kref_put(&active_proc->kref);
+		kref_put(&active_proc->p_kref);
 		active_proc = 0;
 	}
 	return 0;

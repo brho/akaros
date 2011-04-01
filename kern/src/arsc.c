@@ -35,7 +35,7 @@ intreg_t inline syscall_async(struct proc *p, syscall_req_t *call)
 
 syscall_sring_t* sys_init_arsc(struct proc *p)
 {
-	kref_get(&p->kref, 1);		/* we're storing an external ref here */
+	kref_get(&p->p_kref, 1);		/* we're storing an external ref here */
 	syscall_sring_t* sring;
 	void * va;
 	// TODO: need to pin this page in the future when swapping happens
