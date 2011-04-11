@@ -9,8 +9,7 @@
 #include <arch/arch.h>
 #include <sys/param.h>
 #include <arch/atomic.h>
-
-#include <pthread.h>
+#include <vcore.h>
 
 syscall_desc_pool_t syscall_desc_pool;
 async_desc_pool_t async_desc_pool;
@@ -127,7 +126,8 @@ int async_syscall(arsc_channel_t* chan, syscall_req_t* req, syscall_desc_t** des
 	desc->channel = chan;
 	syscall_front_ring_t *fr = &(desc->channel->sysfr);
 	//TODO: can do it locklessly using CAS, but could change with local async calls
-	mcs_lock_lock(&(chan->aclock));
+	struct mcs_lock_qnode local_qn = {0};
+	mcs_lock_lock(&(chan->aclock), &local_qn);
 	if (RING_FULL(fr)) {
 		errno = EBUSY;
 		return -1;
@@ -147,7 +147,7 @@ int async_syscall(arsc_channel_t* chan, syscall_req_t* req, syscall_desc_t** des
 	// won't process any requests until they are marked REQ_ready (also atomic)
 	RING_PUSH_REQUESTS(fr);
 	//cprintf("DEBUG: sring->req_prod: %d, sring->rsp_prod: %d\n", 
-	mcs_lock_unlock(&desc->channel->aclock);
+	mcs_lock_unlock(&desc->channel->aclock, &local_qn);
 	*desc_ptr2 = desc;
 	return 0;
 }
@@ -197,7 +197,7 @@ int waiton_syscall(syscall_desc_t* desc)
 		errno = EFAIL;
 		return -1;
 	}
-	printf ("waiting %d\n", pthread_self()->id);
+	printf("waiting %d\n", vcore_id());
 	syscall_rsp_t* rsp = RING_GET_RESPONSE(fr, desc->idx);
 
 	// ignoring the ring push response from the kernel side now
