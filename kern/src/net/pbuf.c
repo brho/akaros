@@ -185,6 +185,7 @@ bool pbuf_deref(struct pbuf *p){
 void attach_pbuf(struct pbuf *p, struct pbuf_head *ph){
 	spin_lock_irqsave(&ph->lock);
 	ph->qlen++;
+	pbuf_ref(p);
 	STAILQ_INSERT_TAIL(&ph->pbuf_fifo, p, next);
 	spin_unlock_irqsave(&ph->lock);
 }
@@ -308,7 +309,6 @@ pbuf_cat(struct pbuf *h, struct pbuf *t)
 int pbuf_header(struct pbuf *p, int delta){ // increase header size
 	uint8_t type = p->type;
 	void *payload = p->payload;
-	printk("delta %d \n", delta);
 	if (p == NULL || delta == 0)
 		return 0;
 	// This assertion used to apply when len meant allocated space..

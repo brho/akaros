@@ -57,7 +57,7 @@ static inline bool __down_sem(struct semaphore *sem, struct kthread *kthread)
 {
 	bool retval = FALSE;
 	spin_lock(&sem->lock);
-	if (sem->nr_signals-- <= 0) {
+	if (sem->nr_signals-- <= 0 && kthread != NULL) {
 		/* Need to sleep */
 		retval = TRUE;
 		TAILQ_INSERT_TAIL(&sem->waiters, kthread, link);
@@ -75,6 +75,7 @@ static inline struct kthread *__up_sem(struct semaphore *sem, bool exactly_one)
 	if (sem->nr_signals++ < 0) {
 		/* could do something with 'priority' here */
 		kthread = TAILQ_FIRST(&sem->waiters);
+		if (kthread == NULL) warn ("kthread is null\n");
 		TAILQ_REMOVE(&sem->waiters, kthread, link);
 		if (exactly_one)
 			assert(TAILQ_EMPTY(&sem->waiters));

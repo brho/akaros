@@ -124,10 +124,6 @@ int udp_sendto(struct udp_pcb *pcb, struct pbuf *p,
 		printd("params src addr %x, dst addr %x, length %x \n", global_ip.s_addr, (dst_ip->s_addr), 
 					  q->tot_len);
 
-		uint32_t checksum = udp_sum_calc(q->tot_len, &(global_ip.s_addr), &(dst_ip->s_addr), false,
-												q->payload);
-		printd ("method theirs %x \n", checksum);
-		
     udphdr->checksum = inet_chksum_pseudo(q, htonl(global_ip.s_addr), dst_ip->s_addr,
 											 IPPROTO_UDP, q->tot_len);
 		printd ("method ours %x\n", udphdr->checksum);
@@ -242,6 +238,12 @@ int udp_attach(struct pbuf *p, struct sock *socket) {
 /** TODO: think about combining udp_input and ip_input together */
 // TODO: figure out if we even need a PCB? or just socket buff. 
 // TODO: test out looking up pcbs.. since matching function may fail
+
+void wrap_restart_kthread(struct trapframe *tf, uint32_t srcid,
+					long a0, long a1, long a2){
+	restart_kthread((struct kthread*) a0);
+}
+
 int udp_input(struct pbuf *p){
 	struct udp_hdr *udphdr;
 
@@ -256,7 +258,7 @@ int udp_input(struct pbuf *p){
 		pbuf_free(p);
 		return -1;
 	}
-			printk("start of udp %p\n", p->payload);
+	printk("start of udp %p\n", p->payload);
 	udphdr = (struct udp_hdr *)p->payload;
 	/* convert the src port and dst port to host order */
 	src = ntohs(udphdr->src_port);
@@ -285,11 +287,18 @@ int udp_input(struct pbuf *p){
 	}
   /* ignore SO_REUSE */
 	if (pcb != NULL && pcb->pcbsock != NULL){
-		printk("ready to attach \n");
 		/* For each in the pbuf chain, disconnect from the chain and add it to the
 		 * recv_buff of the correct socket 
 		 */ 
-		attach_pbuf(p, &pcb->pcbsock->recv_buff);
+		struct socket *sock = pcb->pcbsock;
+		attach_pbuf(p, &sock->recv_buff);
+		struct kthread *kthread;
+		// multiple people might be waiting on the socket here..
+		kthread = __up_sem(&(sock->sem), FALSE);
+		if (kthread) {
+			 send_kernel_message(core_id(), (amr_t)wrap_restart_kthread, (long)kthread, 0, 0,
+												  KMSG_ROUTINE);
+		}
 		// the attaching of pbuf should have increfed pbuf ref, so free is simply a decref
 		pbuf_free(p);
 	}

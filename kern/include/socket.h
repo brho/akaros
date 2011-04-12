@@ -5,6 +5,7 @@
 #include <sys/queue.h>
 #include <atomic.h>
 #include <net/pbuf.h>
+#include <kthread.h>
 // Just a couple of AF types that we might support
 #define AF_UNSPEC	0
 #define AF_UNIX		1	/* Unix domain sockets 		*/
@@ -58,6 +59,7 @@ struct socket{
 	void    *so_pcb;        /* protocol control block */
 	struct pbuf_head recv_buff;
 	struct pbuf_head send_buff;
+	struct semaphore sem;   /* semaphone to for a process to sleep on */
 	
 	//struct  vnet *so_vnet;      /* network stack instance */
 	//struct  protosw *so_proto;  /* (a) protocol handle */

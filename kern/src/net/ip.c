@@ -99,8 +99,8 @@ int ip_output(struct pbuf *p, struct in_addr *src, struct in_addr *dest, uint8_t
 int ip_input(struct pbuf *p) {
 	uint32_t iphdr_hlen, iphdr_len;
 	struct ip_hdr *iphdr = (struct ip_hdr *)p->payload;
-	printk("start of ip %p \n", p->payload);
-	print_pbuf(p);
+	//printk("start of ip %p \n", p->payload);
+	//print_pbuf(p);
 	/* use that info to build arp table */
   if (iphdr->version != 4) {
 		warn("ip version not 4!\n");
@@ -109,7 +109,7 @@ int ip_input(struct pbuf *p) {
 	}
 	iphdr_hlen = iphdr->hdr_len * 4;
 	iphdr_len = ntohs(iphdr->packet_len);
-	printk("ip input coming from %x of size %d", ntohs(iphdr->dst_addr), iphdr_len);
+	// printk("ip input coming from %x of size %d", ntohs(iphdr->dst_addr), iphdr_len);
   /* header length exceeds first pbuf length, or ip length exceeds total pbuf length? */
   if ((iphdr_hlen > p->len) || (iphdr_len > p->tot_len)) {
     if (iphdr_hlen > p->len) {
@@ -146,7 +146,7 @@ int ip_input(struct pbuf *p) {
 		pbuf_free(p);
 	}
 
-	printk ("loc head %p, loc protocol %p\n", iphdr, &iphdr->protocol);
+	//printk ("loc head %p, loc protocol %p\n", iphdr, &iphdr->protocol);
 	/* currently a noop, compared to the memory wasted, cutting out ipheader is not really saving much */
 	// pbuf_realloc(p, iphdr_len);
 	switch (iphdr->protocol) {

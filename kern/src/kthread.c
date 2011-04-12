@@ -178,6 +178,7 @@ void restart_kthread(struct kthread *kthread)
 	kthread->stacktop = current_stacktop;
 	/* Only change current if we need to (the kthread was in process context) */
 	if (kthread->proc) {
+	/* Only change current if we need to (the kthread was in process context) */
 		/* Load our page tables before potentially decreffing cur_proc */
 		lcr3(kthread->proc->env_cr3);
 		/* Might have to clear out an existing current.  If they need to be set
@@ -187,6 +188,7 @@ void restart_kthread(struct kthread *kthread)
 		/* We also transfer our counted ref from kthread->proc to cur_proc */
 		pcpui->cur_proc = kthread->proc;
 	}
+
 	/* Tell the core which syscall we are running (if any) */
 	assert(!pcpui->cur_sysc);	/* catch bugs, prev user should clear */
 	pcpui->cur_sysc = kthread->sysc;

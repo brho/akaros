@@ -71,6 +71,7 @@ struct socket* alloc_sock(int socket_family, int socket_type, int protocol){
 	newsock->so_state = SS_ISDISCONNECTED;
 	pbuf_head_init(&newsock->recv_buff);
 	pbuf_head_init(&newsock->send_buff);
+	init_sem(&newsock->sem, 0);
 	if (socket_type == SOCK_DGRAM){
 		newsock->so_pcb = udp_new();
 		/* back link */
@@ -229,6 +230,11 @@ intreg_t sys_sendto(struct proc *p_proc, int fd, const void *buffer, size_t leng
     error = send_iov(soc, iov, flags);
 	#endif
 }
+
+/* UDP and TCP has different waiting semantics
+ * UDP requires any packet to be available. 
+ * TCP requires accumulation of certain size? 
+ */
 intreg_t sys_recvfrom(struct proc *p, int socket, void *restrict buffer, size_t length, int flags, struct sockaddr *restrict address, socklen_t *restrict address_len){
 	struct socket* sock = getsocket(p, socket);	
 	int copied = 0;
@@ -240,20 +246,23 @@ intreg_t sys_recvfrom(struct proc *p, int socket, void *restrict buffer, size_t 
 	if (sock->so_type == SOCK_DGRAM){
 		struct pbuf_head *ph = &(sock->recv_buff);
 		struct pbuf* buf = NULL;
-		/* TODO: busy poll the socket buffer for now */
-		while (buf == NULL){
+		buf = detach_pbuf(ph);
+		if (!buf){
+			// about to sleep
+			sleep_on(&sock->sem);
 			buf = detach_pbuf(ph);
-			if (buf){
-				copied = buf->len - sizeof(struct udp_hdr);
-				if (copied > length)
-					copied = length;
+			// Someone woke me up, there should be data..
+			assert(buf);
+		} else {
+			__down_sem(&sock->sem, NULL);
+		}
+			copied = buf->len - sizeof(struct udp_hdr);
+			if (copied > length)
+				copied = length;
 			pbuf_header(buf, -UDP_HDR_SZ);
-			printk("loc of payload %p\n", buf->payload);
 			// copy it to user space
 			returnval = memcpy_to_user_errno(p, buffer, buf->payload, copied);
-			}
 		}
-	}
 	if (returnval < 0) 
 		return -1;
 	else

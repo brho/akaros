@@ -9,6 +9,7 @@
 #include <string.h>
 #include <stdlib.h>
 #define BUF_SIZE 16
+#define LARGE_BUFFER_SIZE 2048
 
 /* Test program
  *
@@ -19,19 +20,38 @@
 int main(int argc, char* argv[]) {
 	struct sockaddr_in server;
 	char buf[BUF_SIZE] = "hello world";
+	char bulkdata[LARGE_BUFFER_SIZE] = "testme";
 	char recv_buf[BUF_SIZE];
-	int sockfd, n;
+	int sockfd, n, inqemu;
 	struct hostent* host;
-	if (argc != 3){
-		printf("udp_test hostname portnum\n");
-		return -1;
-	}
+
 	// ignore the host for now
-	//host = gethostbyname(argv[1]); //hostname
+	if (argc == 2){
+		printf("in qemu client\n");
+		inqemu = 1;
+	}
+	else if (argc == 3){
+		printf("linux client\n");
+		inqemu = 0;
+	} else 
+	{
+		printf("incorrect number of parameters\n");
+	}
+	if (!inqemu){
+		host = gethostbyname(argv[1]); //hostname
+	}
 	bzero(&server, sizeof(server));
 	server.sin_family = AF_INET;
-	server.sin_port = htons(atoi(argv[2]));
-	server.sin_addr.s_addr = inet_addr("10.0.0.1"); //hardcoded server 
+	if (inqemu)
+		server.sin_port = htons(atoi(argv[1]));
+	else
+		server.sin_port = htons(atoi(argv[2]));
+
+
+	if (inqemu)
+		server.sin_addr.s_addr = inet_addr("10.0.0.1"); //hardcoded server 
+	else
+		memcpy(&server.sin_addr.s_addr, host->h_addr, host->h_length);
 	
 	char* printbuf = (char*)&server.sin_addr.s_addr;
 	int size = sizeof(server.sin_addr.s_addr);	
@@ -49,20 +69,25 @@ int main(int argc, char* argv[]) {
 
 	printf ("udp_test: sockfd %d \n", sockfd);
 	int socklen = sizeof(server);
+	// sending large chunk of data of 2K, more than one frame
+	// int sendsize =  sendto(sockfd, bulkdata, LARGE_BUFFER_SIZE, 0, (struct sockaddr*) &server, socklen);
+
+	// sending a large chunk of data but fitting in one packet
+	 //int sendsize =  sendto(sockfd, bulkdata, 500, 0, (struct sockaddr*) &server, socklen);
 
 	int sendsize = sendto(sockfd, buf, strlen(buf), 0, (struct sockaddr*) &server, socklen);
 	printf("sendto returns %d, errno %d\n", sendsize, errno);
 	//assume BUF_SIZE is larger than the packet.. so we will get to see what actually comes back..
 	int j=0;
-	for (j=0; j<1; j++){
+	for (j=0; j<10; j++){
 		strcpy(recv_buf, "DEADBEEFDEADBEE");
-		if (((n = recvfrom(sockfd, recv_buf, BUF_SIZE, 0, (struct sockaddr*) &server, &socklen))< 0)){
+		// if (((n = recvfrom(sockfd, recv_buf, BUF_SIZE, 0, (struct sockaddr*) &server, &socklen))< 0)){
+		if (((n = recvfrom(sockfd, recv_buf, 5, 0, (struct sockaddr*) &server, &socklen))< 0)){ // should discard if it is udp..
 			printf("recv failed\n");
 		}
-		recv_buf[n-2] = 0; //null terminate
-		printf("recv %d with length %d from result %s\n", j,n,  recv_buf);
+		recv_buf[n-1] = 0; //null terminate
+		printf("[OUTPUT] recv %d with length %d from result %s\n", j,n,  recv_buf);
 	}
-
-
+	while(1){;}
 	close(sockfd);
 }

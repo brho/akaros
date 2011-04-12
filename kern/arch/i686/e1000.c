@@ -50,8 +50,10 @@ uint32_t e1000_addr_size = 0;
 unsigned char device_mac[6];
 
 // Vars relating to the receive descriptor ring
+// pointer to receive descriptors
 struct e1000_rx_desc *rx_des_kva;
 unsigned long rx_des_pa;
+// current rx index
 uint32_t e1000_rx_index = 0;
 
 
@@ -78,6 +80,9 @@ spinlock_t packet_buffers_lock;
 // Allow us to register our send_frame as the global send_frame
 uint16_t device_id;
 extern int (*send_frame)(const char *CT(len) data, size_t len);
+
+// compat defines that make transitioning easier
+#define E1000_RX_DESC(x) rx_des_kva[x]
 
 void e1000_dump_rx() {
 
@@ -395,8 +400,8 @@ void e1000_setup_descriptors() {
 	// Must be 16 byte aligned
 
 	// How many pages do we need?
-        uint32_t num_rx_pages = ROUNDUP(NUM_RX_DESCRIPTORS * sizeof(struct e1000_rx_desc), PGSIZE) / PGSIZE;
-        uint32_t num_tx_pages = ROUNDUP(NUM_TX_DESCRIPTORS * sizeof(struct e1000_tx_desc), PGSIZE) / PGSIZE;
+  uint32_t num_rx_pages = ROUNDUP(NUM_RX_DESCRIPTORS * sizeof(struct e1000_rx_desc), PGSIZE) / PGSIZE;
+  uint32_t num_tx_pages = ROUNDUP(NUM_TX_DESCRIPTORS * sizeof(struct e1000_tx_desc), PGSIZE) / PGSIZE;
 	
 	// Get the pages
 	rx_des_kva = get_cont_pages(LOG2_UP(num_rx_pages), 0);
@@ -612,6 +617,7 @@ void e1000_reset() {
 }
 
 void e1000_irq_enable() {
+	printk("e1000 enabled\n");
 	e1000_wr32(E1000_IMS, IMS_ENABLE_MASK);
 	E1000_WRITE_FLUSH();
 }
@@ -641,12 +647,15 @@ void e1000_setup_interrupts() {
 #ifdef __CONFIG_ENABLE_MPTABLES__
 	/* TODO: this should be for any IOAPIC EOI, not just MPTABLES */
 	ioapic_route_irq(e1000_irq, E1000_IRQ_CPU);	
+	printk("ioapic rout\n");
+
 #else 
 	// This will route the interrupts automatically to CORE 0
 	// Call send_kernel_message if you want to route them somewhere else
 	pic_unmask_irq(e1000_irq);
 	unmask_lapic_lvt(LAPIC_LVT_LINT0);
 	enable_irq();
+	printk("picroute\n");
 #endif
 
 	return;
@@ -670,14 +679,14 @@ void e1000_interrupt_handler(trapframe_t *tf, void* data) {
 	e1000_wr32(E1000_IMC, ~0);
 	E1000_WRITE_FLUSH();
 
-	printk("Interrupt status: %x\n", icr);
+	//printk("Interrupt status: %x\n", icr);
 
 	if ((icr & E1000_ICR_INT_ASSERTED) && (icr & E1000_ICR_RXT0)){
 		e1000_interrupt_debug("---->Packet Received\n");
 #ifdef __CONFIG_SOCKET__
 //#if 0
-		struct pbuf *pb = e1000_recv_pbuf();
-		schedule_pb(pb);
+		e1000_clean_rx_irq();
+		// e1000_recv_pbuf(); // really it is now performing the function of rx_clean
 #else
 		e1000_handle_rx_packet();
 #endif
@@ -690,13 +699,14 @@ void process_pbuf(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a
 		warn("pbuf came from a different core\n");
 	/* assume it is an ip packet */
 	struct pbuf* pb = (struct pbuf*) a0;
-	printk("processing pbuf \n");
+	//printk("processing pbuf \n");
 	/*TODO: check checksum and drop */
 	/*check packet type*/
 	struct ethernet_hdr *ethhdr = (struct ethernet_hdr *) pb->payload;
-	printk("start of eth %p \n", pb->payload);
-	print_pbuf(pb);
+	//printk("start of eth %p \n", pb->payload);
+	//print_pbuf(pb);
 	if (memcmp(ethhdr->dst_mac, device_mac, 6)){
+		e1000_debug("mac address do not match, pbuf freed \n");
 		pbuf_free(pb);
 	}
 	switch(htons(ethhdr->eth_type)){
@@ -715,7 +725,6 @@ void process_pbuf(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a
 }
 
 static void schedule_pb(struct pbuf* pb) {
-	printk("scheduled pb \n");
 	/* routine kernel message is kind of heavy weight, because it records src/dst etc */
 	/* TODO: consider a core-local chain of pbufs */
 	// using core 3 for network stuff..XXX
@@ -728,6 +737,7 @@ void e1000_handle_rx_packet() {
 	
 	uint16_t packet_size;
 	uint32_t status;
+	// find rx descriptor head
 	uint32_t head = e1000_rr32(E1000_RDH);
 
 	//printk("Current head is: %x\n", e1000_rr32(E1000_RDH));
@@ -879,17 +889,47 @@ void e1000_handle_rx_packet() {
 	
 	return;
 }
-#if 0
-static int e1000_clean_rx_irq() {
-	uint32_t i= e1000_rx_index;
-	// recv head
-	uint32_t head = e1000_rr32(E1000_RDH);
-	struct e1000_rx_desc *rx_desc, *next_rxd;
 
-	rx_desc = rx_des_kva[i];
-	buffer_info = rx_des_kva[i]
-}
+static void e1000_clean_rx_irq() {
+	// e1000_rx_index is the last one that we have processed
+	uint32_t i= e1000_rx_index;
+	// E1000 RDH is the last descriptor written by the hardware
+	uint32_t head = e1000_rr32(E1000_RDH);
+	uint32_t length = 0;
+	struct e1000_rx_desc *rx_desc =  &(E1000_RX_DESC(i));
+
+	// what happens when i go around the ring? 
+	while (rx_desc->status & E1000_RXD_STAT_DD){
+		struct pbuf* pb;
+		uint8_t status;
+		rx_desc = &rx_des_kva[i];
+		// buffer_info = &rx_des_kva[i];
+		status = rx_desc->status;
+		pb = pbuf_alloc(PBUF_RAW, 0 , PBUF_MTU);
+#if ETH_PAD_SIZE
+		pbuf_header(pb, -ETH_PAD_SIZE); /* drop the padding word */
 #endif
+		// fragment size
+		length = le16_to_cpu(rx_desc->length);
+
+		length -= 4;
+
+		memcpy(pb->payload, KADDR(E1000_RX_DESC(i).buffer_addr), length);
+		// skb_put(skb, length);
+		pb->len = length;
+		pb->tot_len = length;
+		schedule_pb(pb);
+		// do all the error handling 
+next_desc:
+		// this replaces e1000_set_rx_descriptor
+		rx_desc->status = 0;
+		if (++i == NUM_RX_DESCRIPTORS) i = 0;
+		rx_desc = &(E1000_RX_DESC(i)); 
+	}
+	//setting e1000_RDH?
+ 		printk ("cleaned index %d to %d \n", e1000_rx_index, i-1);
+		e1000_rx_index = i;
+}
 
 struct pbuf* e1000_recv_pbuf(void) {
 	uint16_t packet_size;
@@ -899,14 +939,12 @@ struct pbuf* e1000_recv_pbuf(void) {
 
 	printk("Current head is: %x\n", e1000_rr32(E1000_RDH));
 	printk("Current tail is: %x\n", e1000_rr32(E1000_RDT));
-	
+	// e1000_rx_index = cleaned
 	// If the HEAD is where we last processed, no new packets.
 	if (head == e1000_rx_index) {
 		e1000_frame_debug("-->Nothing to process. Returning.");
 		return NULL;
 	}
-
-	
 	// Set our current descriptor to where we last left off.
 	uint32_t rx_des_loop_cur = e1000_rx_index;
 	uint32_t frame_size = 0;
@@ -1011,8 +1049,169 @@ struct pbuf* e1000_recv_pbuf(void) {
 
 	pb->len = copied;
 	pb->tot_len = copied;
+	schedule_pb(pb);
 	return pb;
 }
+
+#if 0
+
+int e1000_clean_rx(){
+	struct net_device *netdev = adapter->netdev;
+	struct pci_dev *pdev = adapter->pdev;
+	struct e1000_rx_desc *rx_desc, *next_rxd;
+	struct e1000_buffer *buffer_info, *next_buffer;
+	unsigned long flags;
+	uint32_t length;
+	uint8_t last_byte;
+	unsigned int i;
+	int cleaned_count = 0;
+	boolean_t cleaned = FALSE;
+	unsigned int total_rx_bytes=0, total_rx_packets=0;
+
+	i = rx_ring->next_to_clean;
+	// rx_desc is the same as rx_des_kva[rx_des_loop_cur]
+	rx_desc = E1000_RX_DESC(*rx_ring, i);
+	buffer_info = &rx_ring->buffer_info[i];
+
+	while (rx_desc->status & E1000_RXD_STAT_DD) {
+		struct sk_buff *skb;
+		u8 status;
+
+#ifdef CONFIG_E1000_NAPI
+		if (*work_done >= work_to_do)
+			break;
+		(*work_done)++;
+#endif
+		status = rx_desc->status;
+		skb = buffer_info->skb;
+		buffer_info->skb = NULL;
+
+		prefetch(skb->data - NET_IP_ALIGN);
+
+		if (++i == rx_ring->count) i = 0;
+		next_rxd = E1000_RX_DESC(*rx_ring, i);
+		prefetch(next_rxd);
+
+		next_buffer = &rx_ring->buffer_info[i];
+
+		cleaned = TRUE;
+		cleaned_count++;
+		pci_unmap_single(pdev,
+		                 buffer_info->dma,
+		                 buffer_info->length,
+		                 PCI_DMA_FROMDEVICE);
+
+		length = le16_to_cpu(rx_desc->length);
+
+		if (unlikely(!(status & E1000_RXD_STAT_EOP))) {
+			/* All receives must fit into a single buffer */
+			E1000_DBG("%s: Receive packet consumed multiple"
+				  " buffers\n", netdev->name);
+			/* recycle */
+			buffer_info->skb = skb;
+			goto next_desc;
+		}
+
+		if (unlikely(rx_desc->errors & E1000_RXD_ERR_FRAME_ERR_MASK)) {
+			last_byte = *(skb->data + length - 1);
+			if (TBI_ACCEPT(&adapter->hw, status,
+			              rx_desc->errors, length, last_byte)) {
+				spin_lock_irqsave(&adapter->stats_lock, flags);
+				e1000_tbi_adjust_stats(&adapter->hw,
+				                       &adapter->stats,
+				                       length, skb->data);
+				spin_unlock_irqrestore(&adapter->stats_lock,
+				                       flags);
+				length--;
+			} else {
+				/* recycle */
+				buffer_info->skb = skb;
+				goto next_desc;
+			}
+		}
+
+		/* adjust length to remove Ethernet CRC, this must be
+		 * done after the TBI_ACCEPT workaround above */
+		length -= 4;
+
+		/* probably a little skewed due to removing CRC */
+		total_rx_bytes += length;
+		total_rx_packets++;
+
+		/* code added for copybreak, this should improve
+		 * performance for small packets with large amounts
+		 * of reassembly being done in the stack */
+		if (length < copybreak) {
+			struct sk_buff *new_skb =
+			    netdev_alloc_skb(netdev, length + NET_IP_ALIGN);
+			if (new_skb) {
+				skb_reserve(new_skb, NET_IP_ALIGN);
+				memcpy(new_skb->data - NET_IP_ALIGN,
+				       skb->data - NET_IP_ALIGN,
+				       length + NET_IP_ALIGN);
+				/* save the skb in buffer_info as good */
+				buffer_info->skb = skb;
+				skb = new_skb;
+			}
+			/* else just continue with the old one */
+		}
+		/* end copybreak code */
+		skb_put(skb, length);
+
+		/* Receive Checksum Offload */
+		e1000_rx_checksum(adapter,
+				  (uint32_t)(status) |
+				  ((uint32_t)(rx_desc->errors) << 24),
+				  le16_to_cpu(rx_desc->csum), skb);
+
+		skb->protocol = eth_type_trans(skb, netdev);
+#ifdef CONFIG_E1000_NAPI
+		if (unlikely(adapter->vlgrp &&
+			    (status & E1000_RXD_STAT_VP))) {
+			vlan_hwaccel_receive_skb(skb, adapter->vlgrp,
+						 le16_to_cpu(rx_desc->special) &
+						 E1000_RXD_SPC_VLAN_MASK);
+		} else {
+			netif_receive_skb(skb);
+		}
+#else /* CONFIG_E1000_NAPI */
+		if (unlikely(adapter->vlgrp &&
+			    (status & E1000_RXD_STAT_VP))) {
+			vlan_hwaccel_rx(skb, adapter->vlgrp,
+					le16_to_cpu(rx_desc->special) &
+					E1000_RXD_SPC_VLAN_MASK);
+		} else {
+			netif_rx(skb);
+		}
+#endif /* CONFIG_E1000_NAPI */
+		netdev->last_rx = jiffies;
+
+next_desc:
+		rx_desc->status = 0;
+
+		/* return some buffers to hardware, one at a time is too slow */
+		if (unlikely(cleaned_count >= E1000_RX_BUFFER_WRITE)) {
+			adapter->alloc_rx_buf(adapter, rx_ring, cleaned_count);
+			cleaned_count = 0;
+		}
+
+		/* use prefetched values */
+		rx_desc = next_rxd;
+		buffer_info = next_buffer;
+	}
+	rx_ring->next_to_clean = i;
+
+	cleaned_count = E1000_DESC_UNUSED(rx_ring);
+	if (cleaned_count)
+		adapter->alloc_rx_buf(adapter, rx_ring, cleaned_count);
+
+	adapter->total_rx_packets += total_rx_packets;
+	adapter->total_rx_bytes += total_rx_bytes;
+	return cleaned;
+}
+}
+
+#endif
 
 int e1000_send_pbuf(struct pbuf *p) {
 	int len = p->tot_len;
