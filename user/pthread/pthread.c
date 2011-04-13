@@ -23,8 +23,9 @@ pthread_once_t init_once = PTHREAD_ONCE_INIT;
 int threads_ready = 0;
 int threads_active = 0;
 
-/* Array of syscall event queues, one per vcore, alloced in pth_init() */
-struct event_queue *sysc_evq;
+/* Array of per-vcore structs to manage waiting on syscalls and handling
+ * overflow.  Init'd in pth_init(). */
+struct sysc_mgmt *sysc_mgmt = 0;
 
 /* Helper / local functions */
 static int get_next_pid(void);
@@ -79,22 +80,25 @@ struct uthread *pth_init(void)
 
 	/* Handle syscall events.  Using small ev_qs, with no internal ev_mbox. */
 	ev_handlers[EV_SYSCALL] = pth_handle_syscall;
-	sysc_evq = malloc(sizeof(struct event_queue) * max_vcores());
-	assert(sysc_evq);
-	/* Set up each of the per-vcore syscall event queues so that they point to
-	 * the VCPD/default vcore mailbox (for now)  Note you'll need the vcore to
-	 * be online to get the events (for now). */
+	/* Set up the per-vcore structs to track outstanding syscalls */
+	sysc_mgmt = malloc(sizeof(struct sysc_mgmt) * max_vcores());
+	assert(sysc_mgmt);
 	for (int i = 0; i < max_vcores(); i++) {
-		sysc_evq[i].ev_mbox =  &__procdata.vcore_preempt_data[i].ev_mbox;
-		sysc_evq[i].ev_flags = EVENT_IPI;		/* totally up to you */
-		sysc_evq[i].ev_vcore = i;
+		/* Set up each of the per-vcore syscall event queues so that they point
+		 * to the VCPD/default vcore mailbox (for now)  Note you'll need the
+		 * vcore to be online to get the events (for now). */
+		sysc_mgmt[i].ev_q.ev_mbox =  &__procdata.vcore_preempt_data[i].ev_mbox;
+		sysc_mgmt[i].ev_q.ev_flags = EVENT_IPI;		/* totally up to you */
+		sysc_mgmt[i].ev_q.ev_vcore = i;
+		/* Init the list and other data */
+		TAILQ_INIT(&sysc_mgmt[i].pending_syscs);
+		sysc_mgmt[i].handling_overflow = FALSE;
 	}
 	/* Create a pthread_tcb for the main thread */
 	pthread_t t = (pthread_t)calloc(1, sizeof(struct pthread_tcb));
 	assert(t);
 	t->id = get_next_pid();
 	assert(t->id == 0);
-
 	/* Put the new pthread on the active queue */
 	mcs_lock_notifsafe(&queue_lock, &local_qn);
 	threads_active++;
@@ -248,16 +252,37 @@ void pth_spawn_thread(uintptr_t pc_start, void *data)
 /* Restarts a uthread hanging off a syscall.  For the simple pthread case, we
  * just make it runnable and let the main scheduler code handle it.
  *
- * TODO: ought to have a queue of waiters on syscalls, and this should remove it
- * from the list.  The list is needed in case we miss syscall events. */
+ * The pthread code relies on syscall handling being done per-vcore.  Don't try
+ * and restart a thread on a different vcore, since you'll get screwed.  We have
+ * a little test to catch that. */
 static void restart_thread(struct syscall *sysc)
 {
-	struct uthread *restartee = (struct uthread*)sysc->u_data;
-	assert(restartee);
-	assert(restartee->state == UT_BLOCKED);
-	assert(restartee->sysc == sysc);
-	restartee->sysc = 0;	/* so we don't 'reblock' on this later */
-	uthread_runnable(restartee);
+	uint32_t vcoreid = vcore_id();
+	/* Using two vars to make the code simpler.  It's the same thread. */
+	struct uthread *ut_restartee = (struct uthread*)sysc->u_data;
+	struct pthread_tcb *pt_restartee = (struct pthread_tcb*)sysc->u_data;
+	/* uthread stuff here: */
+	assert(ut_restartee);
+	assert(ut_restartee->state == UT_BLOCKED);
+	assert(ut_restartee->sysc == sysc);
+	ut_restartee->sysc = 0;	/* so we don't 'reblock' on this later */
+	/* pthread stuff here: */
+	/* Rip it from pending syscall list. */
+	assert(pt_restartee->vcoreid == vcoreid);
+	TAILQ_REMOVE(&sysc_mgmt[vcoreid].pending_syscs, pt_restartee, next);
+	uthread_runnable(ut_restartee);
+}
+
+/* Handles syscall overflow */
+static void handle_sysc_overflow(void)
+{
+	struct sysc_mgmt *vc_sysc_mgmt = &sysc_mgmt[vcore_id()];
+	/* if we're currently handling it on this vcore, bail out */
+	if (vc_sysc_mgmt->handling_overflow)
+		return;
+	/* Actually handle stuff (TODO) */
+	vc_sysc_mgmt->handling_overflow = TRUE;
+	printf("FUUUUUUUUUUUUUUUUCK, OVERFLOW!!!!!!!\n");
 }
 
 /* This handler is usually run in vcore context, though I can imagine it being
@@ -267,11 +292,15 @@ static void pth_handle_syscall(struct event_msg *ev_msg, unsigned int ev_type,
 {
 	struct syscall *sysc;
 	assert(in_vcore_context());
-	/* TODO: handle overflow!! */
-	if (overflow)
-		printf("FUUUUUUUUUUUUUUUUCK, OVERFLOW!!!!!!!\n");
-	if (!ev_msg) /* just as bad as overflow */
+	if (overflow) {
+		handle_sysc_overflow();
+	}
+	if (!ev_msg) {
+		/* Probably a bug somewhere if we had no ev_msg and no overflow */
+		if (!overflow)
+			printf("[pthread] crap, no ev_msg!!\n");
 		return;
+	}
 	sysc = ev_msg->ev_arg3;
 	assert(sysc);
 	restart_thread(sysc);
@@ -285,6 +314,7 @@ void pth_blockon_sysc(struct syscall *sysc)
 {
 	int old_flags;
 	bool need_to_restart = FALSE;
+	uint32_t vcoreid = vcore_id();
 
 	assert(current_uthread->state == UT_BLOCKED);
 	/* rip from the active queue */
@@ -295,14 +325,16 @@ void pth_blockon_sysc(struct syscall *sysc)
 	TAILQ_REMOVE(&active_queue, pthread, next);
 	mcs_unlock_notifsafe(&queue_lock, &local_qn);
 
-	/* TODO: need to register the sysc or uthread in case we lose the
-	 * message.  can put it on a (per-core) tailq or something and rip it
-	 * out when it unblocks. */
-
 	/* Set things up so we can wake this thread up later */
 	sysc->u_data = current_uthread;
+	/* Put the uthread on the pending list.  Note the ordering.  We must be on
+	 * the list before we register the ev_q.  All sysc's must be tracked before
+	 * we tell the kernel to signal us. */
+	TAILQ_INSERT_TAIL(&sysc_mgmt[vcoreid].pending_syscs, pthread, next);
+	/* Safety: later we'll make sure we restart on the core we slept on */
+	pthread->vcoreid = vcoreid;
 	/* Register our vcore's syscall ev_q to hear about this syscall. */
-	if (!register_evq(sysc, &sysc_evq[vcore_id()])) {
+	if (!register_evq(sysc, &sysc_mgmt[vcoreid].ev_q)) {
 		/* Lost the race with the call being done.  The kernel won't send the
 		 * event.  Just restart him. */
 		restart_thread(sysc);
