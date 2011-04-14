@@ -1,5 +1,5 @@
 #include <parlib.h>
-#include <rstdio.h>
+#include <stdio.h>
 
 /* This will keep a core from spinning forever, but will also allow it to still
  * schedule() and run _S processes. */

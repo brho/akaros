@@ -1,5 +1,5 @@
 #include <assert.h>
-#include <rstdio.h>
+#include <stdio.h>
 
 #define BAR0 0xdeadbeef
 volatile __thread int foo;

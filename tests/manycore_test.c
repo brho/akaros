@@ -1,4 +1,4 @@
-#include <rstdio.h>
+#include <stdio.h>
 #include <assert.h>
 #include <vcore.h>
 #include <parlib.h>

@@ -192,7 +192,7 @@ static inline void set_tls_desc(void *tls_desc, uint32_t vcoreid)
 })
 
 /* For debugging. */
-#include <rstdio.h>
+#include <stdio.h>
 static __inline void print_trapframe(struct user_trapframe *tf)
 {
 	printf("[user] TRAP frame\n");

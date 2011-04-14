@@ -9,7 +9,7 @@
 #include <ros/procdata.h>
 #include <ros/bcq.h>
 #include <arch/arch.h>
-#include <rstdio.h>
+#include <stdio.h>
 #include <vcore.h>
 #include <mcs.h>
 #include <timing.h>

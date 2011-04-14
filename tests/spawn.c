@@ -1,5 +1,5 @@
 
-#include <rstdio.h>
+#include <stdio.h>
 #include <parlib.h>
 #include <unistd.h>
 

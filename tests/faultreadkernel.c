@@ -1,6 +1,6 @@
 // buggy program - faults with a read from kernel space
 
-#include <rstdio.h>
+#include <stdio.h>
 
 int main(int argc, char** argv)
 {

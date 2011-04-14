@@ -6,7 +6,7 @@
 
 #include <ros/resource.h>
 #include <parlib.h>
-#include <rstdio.h>
+#include <stdio.h>
 #include <vcore.h>
 #include <timing.h>
 #include <mcs.h>

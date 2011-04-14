@@ -1,7 +1,7 @@
 // test reads and writes to a large bss
 
 #include <stdint.h>
-#include <rstdio.h>
+#include <stdio.h>
 #include <rassert.h>
 
 #define ARRAYSIZE (1024*1024)

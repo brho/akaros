@@ -3,7 +3,7 @@
  * This requests the max_vcores in the system, then just dumbly while loops.
  * If you send it an NE_ALARM, it'll print its TSC. */
 
-#include <rstdio.h>
+#include <stdio.h>
 #include <vcore.h>
 #include <arch/arch.h>
 #include <event.h>

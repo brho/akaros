@@ -8,7 +8,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <sys/mman.h>
-#include <rstdio.h>
+#include <stdio.h>
 #include <glibc-tls.h>
 #include <event.h>
 #include <uthread.h>

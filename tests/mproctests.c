@@ -5,7 +5,7 @@
 #include <vcore.h>
 #include <ros/mman.h>
 #include <ros/resource.h>
-#include <rstdio.h>
+#include <stdio.h>
 #include <timing.h>
 #include <uthread.h>
 

@@ -16,6 +16,7 @@
 #include <ros/procdata.h>
 #include <ros/resource.h>
 #include <stdint.h>
+#include <ros_debug.h>
 
 enum {
 	PG_RDONLY = 4,
