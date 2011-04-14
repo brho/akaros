@@ -1,4 +1,4 @@
-TARGET_ARCH ?= i686
+TARGET_ARCH ?= none	# catch bugs
 CFLAGS = -O2 -static -std=gnu99 -fomit-frame-pointer -DOPTIMIZE=2 -DNO_TIMING
 LIBNAME = c3po
 SUBDIRS = util stack threads #aio 

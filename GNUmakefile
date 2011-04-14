@@ -29,6 +29,9 @@ $(TARGET_ARCH):
 	  $(MAKE) all -j $(MAKE_JOBS);\
 	fi
 
+# So all recursive calls to make know what the target arch is
+MAKE += TARGET_ARCH=$(TARGET_ARCH)
+
 ############################################################################# 
 ########## Beginning of the guts of the real Makefile #######################
 ############################################################################# 
@@ -164,9 +167,13 @@ realtests: $(TESTS_EXECS)
 #	@mkdir -p fs/$(TARGET_ARCH)/tests
 #	cp -R $(OBJDIR)/$(TESTS_DIR)/* $(TOP_DIR)/fs/$(TARGET_ARCH)/tests
 
-USER_LIBS = parlib pthread c3po
+USER_LIBS = parlib pthread
+# for now, c3po can't be built for non-i686
+ifeq ($(TARGET_ARCH),i686)
+USER_LIBS += c3po
+endif
 install-libs: 
-	@for i in $(USER_LIBS) ; do \
+	@for i in $(USER_LIBS) ; do     \
 		cd user/$$i;            \
 		$(MAKE);                \
 		$(MAKE) install;        \

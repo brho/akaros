@@ -1,4 +1,4 @@
-TARGET_ARCH ?= i686
+TARGET_ARCH ?= none	# catch bugs
 CFLAGS = -O2 -std=gnu99 -static -fomit-frame-pointer -g
 LIBNAME = parlib
 V ?= @
