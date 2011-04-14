@@ -31,10 +31,10 @@ static inline void atomic_dec(atomic_t* number);
 static inline long atomic_fetch_and_add(atomic_t *number, long val);
 static inline bool atomic_add_not_zero(atomic_t *number, long val);
 static inline bool atomic_sub_and_test(atomic_t *number, long val);
+static inline void atomic_or(atomic_t *number, int mask);
 static inline uint32_t atomic_swap(uint32_t* addr, uint32_t val);
 static inline bool atomic_comp_swap(uint32_t *addr, uint32_t exp_val,
                                     uint32_t new_val);
-static inline void atomic_or_int(volatile int *number, int mask);
 static inline uint32_t spin_trylock(spinlock_t*SAFE lock);
 static inline uint32_t spin_locked(spinlock_t*SAFE lock);
 static inline void spin_lock(spinlock_t*SAFE lock);
@@ -127,6 +127,19 @@ static inline bool atomic_sub_and_test(atomic_t *number, long val)
 	return retval;
 }
 
+static inline void atomic_or(atomic_t *number, int mask)
+{
+	int val;
+	/* this is pretty clever.  the lower 8 bits (i.e byte 3)
+	 * of the atomic_t serve as a spinlock.  let's acquire it. */
+	spin_lock((spinlock_t*)number);
+	val = atomic_read(number);
+	/* compute new counter value. */
+	val |= mask;
+	/* set the new counter value.  the lock is cleared (for free) */
+	atomic_init(number, val);
+}
+
 static inline uint32_t atomic_swap(uint32_t* addr, uint32_t val)
 {
 	__asm__ __volatile__ ("swap [%2],%0" : "=r"(val) : "0"(val),"r"(addr) : "memory");
@@ -150,19 +163,6 @@ static inline bool atomic_comp_swap(uint32_t *addr, uint32_t exp_val,
 	}
 	spin_unlock_irqsave(&cas_lock);
 	return retval;
-}
-
-static inline void atomic_or_int(volatile int *number, int mask)
-{
-	int val;
-	/* this is pretty clever.  the lower 8 bits (i.e byte 3)
-	 * of the atomic_t serve as a spinlock.  let's acquire it. */
-	spin_lock((spinlock_t*)number);
-	val = atomic_read((atomic_t*)number);
-	/* compute new counter value. */
-	val |= mask;
-	/* set the new counter value.  the lock is cleared (for free) */
-	atomic_init((atomic_t*)number, val);
 }
 
 static inline uint32_t spin_trylock(spinlock_t*SAFE lock)

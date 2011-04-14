@@ -201,7 +201,7 @@ int waiton_syscall(syscall_desc_t* desc)
 	syscall_rsp_t* rsp = RING_GET_RESPONSE(fr, desc->idx);
 
 	// ignoring the ring push response from the kernel side now
-	while (rsp->sc->flags != SC_DONE)
+	while (atomic_read(&rsp->sc->flags) != SC_DONE)
 		cpu_relax();
 	// memcpy(rsp, rsp_inring, sizeof(*rsp));
 	

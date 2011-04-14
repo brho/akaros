@@ -5,8 +5,10 @@
 #include <ros/bits/syscall.h>
 #include <ros/arch/syscall.h>
 #include <ros/event.h>
+#include <arch/atomic.h>
 
-/* Flags for an individual syscall */
+/* Flags for an individual syscall.
+ * Careful, sparc can't handle flags in byte 3. */
 #define SC_DONE					0x0001		/* SC is done */
 #define SC_PROGRESS				0x0002		/* SC made progress */
 #define SC_UEVENT				0x0004		/* user has an ev_q */
@@ -15,7 +17,7 @@ struct syscall {
 	unsigned int				num;
 	long						retval;
 	int							err;			/* errno */
-	int							flags;
+	atomic_t					flags;
 	struct event_queue			*ev_q;
 	void						*u_data;
 	long						arg0;
@@ -36,7 +38,7 @@ void ros_syscall_blockon(struct syscall *sysc);
  * spin, but in the future we could block the whole process. */
 static inline void __ros_syscall_blockon(struct syscall *sysc)
 {
-	while (!(sysc->flags & (SC_DONE | SC_PROGRESS)))
+	while (!(atomic_read(&sysc->flags) & (SC_DONE | SC_PROGRESS)))
 		cpu_relax();
 }
 weak_alias(__ros_syscall_blockon, ros_syscall_blockon);
@@ -60,7 +62,7 @@ static inline long __ros_syscall(unsigned int _num, long _a0, long _a1, long _a2
 	sysc.arg5 = _a5;
 	num_started = __ros_arch_syscall(&sysc, 1);
 	/* Don't proceed til we are done */
-	while (!(sysc.flags & SC_DONE))
+	while (!(atomic_read(&sysc.flags) & SC_DONE))
 		ros_syscall_blockon(&sysc);
 	if (errno_loc)
 		*errno_loc = sysc.err;

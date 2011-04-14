@@ -251,7 +251,7 @@ void ros_syscall_blockon(struct syscall *sysc)
 		return;
 	}
 	/* double check before doing all this crap */
-	if (sysc->flags & (SC_DONE | SC_PROGRESS))
+	if (atomic_read(&sysc->flags) & (SC_DONE | SC_PROGRESS))
 		return;
 	/* So yield knows we are blocking on something */
 	assert(current_uthread);

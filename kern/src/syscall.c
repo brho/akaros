@@ -75,7 +75,7 @@ static void signal_current_sc(int retval)
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	assert(pcpui->cur_sysc);
 	pcpui->cur_sysc->retval = retval;
-	pcpui->cur_sysc->flags |= SC_DONE;
+	atomic_or(&pcpui->cur_sysc->flags, SC_DONE); 
 }
 
 /* Callable by any function while executing a syscall (or otherwise, actually).
@@ -1438,7 +1438,7 @@ void run_local_syscall(struct syscall *sysc)
 	                       sysc->arg2, sysc->arg3, sysc->arg4, sysc->arg5);
 	/* Atomically turn on the SC_DONE flag.  Need the atomics since we're racing
 	 * with userspace for the event_queue registration. */
-	atomic_or_int(&sysc->flags, SC_DONE); 
+	atomic_or(&sysc->flags, SC_DONE); 
 	signal_syscall(sysc, pcpui->cur_proc);
 	/* Can unpin (UMEM) at this point */
 	pcpui->cur_sysc = 0;	/* no longer working on sysc */
@@ -1469,7 +1469,7 @@ void signal_syscall(struct syscall *sysc, struct proc *p)
 	struct event_queue *ev_q;
 	struct event_msg local_msg;
 	/* User sets the ev_q then atomically sets the flag (races with SC_DONE) */
-	if (sysc->flags & SC_UEVENT) {
+	if (atomic_read(&sysc->flags) & SC_UEVENT) {
 		rmb();
 		ev_q = sysc->ev_q;
 		if (ev_q) {

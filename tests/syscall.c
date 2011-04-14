@@ -41,7 +41,7 @@ int main(int argc, char** argv)
 	sysc.ev_q = ev_q;
 	/* Trap */
 	num_started = __ros_arch_syscall((long)&sysc, 1);
-	if (!(sysc.flags & SC_DONE))
+	if (!(atomic_read(&sysc.flags) & SC_DONE))
 		printf("Not done, looping!\n");
 	#if 0
 	/* You could poll on this */
@@ -83,11 +83,11 @@ int main(int argc, char** argv)
 	sysc.ev_q = ev_q;
 	num_started = __ros_arch_syscall((long)&sysc, 1);
 	/* have this thread "wait" */
-	if (!(sysc.flags & SC_DONE))
+	if (!(atomic_read(&sysc.flags) & SC_DONE))
 		printf("Not done, looping on a local variable!\n");
 	while (sysc.u_data)
 		cpu_relax();
-	assert((sysc.flags & SC_DONE));
+	assert(atomic_read(&sysc.flags) & SC_DONE);
 	printf("Syscall unblocked, IPI broke me out of the loop.\n");
 
 	/* done */
@@ -106,7 +106,7 @@ static void handle_syscall(struct event_msg *ev_msg, unsigned int ev_type,
 	printf("Handling syscall event for sysc %08p (%08p)\n",
 	       my_sysc, &sysc);
 	/* our syscall should be done (we ought to check the msg pointer) */
-	if (sysc.flags & SC_DONE) 
+	if (atomic_read(&sysc.flags) & SC_DONE) 
 		printf("Syscall is done, retval: %d\n", sysc.retval);
 	else
 		printf("BUG! Syscall wasn't done!\n");

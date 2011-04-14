@@ -25,12 +25,12 @@ static inline void atomic_dec(atomic_t *number);
 static inline long atomic_fetch_and_add(atomic_t *number, long val);
 static inline bool atomic_add_not_zero(atomic_t *number, long val);
 static inline bool atomic_sub_and_test(atomic_t *number, long val);
+static inline void atomic_or(atomic_t *number, int mask);
 static inline uint32_t atomic_swap(uint32_t *addr, uint32_t val);
 static inline bool atomic_comp_swap(uint32_t *addr, uint32_t exp_val,
                                     uint32_t new_val);
 static inline void atomic_andb(volatile uint8_t RACY* number, uint8_t mask);
 static inline void atomic_orb(volatile uint8_t RACY* number, uint8_t mask);
-static inline void atomic_or_int(volatile int *number, int mask);
 static inline uint32_t spin_locked(spinlock_t *SAFE lock);
 static inline void __spin_lock(volatile uint32_t SRACY*CT(1) rlock);
 static inline void spin_lock(spinlock_t *lock);
@@ -107,6 +107,11 @@ static inline bool atomic_sub_and_test(atomic_t *number, long val)
 	return b;
 }
 
+static inline void atomic_or(atomic_t *number, int mask)
+{
+	asm volatile("lock orl %1,%0" : "=m"(*number) : "q"(mask) : "cc");
+}
+
 static inline uint32_t atomic_swap(uint32_t *addr, uint32_t val)
 {
 	// this would work, but its code is bigger, and it's not like the others
@@ -138,11 +143,6 @@ static inline void atomic_andb(volatile uint8_t RACY*number, uint8_t mask)
 static inline void atomic_orb(volatile uint8_t RACY*number, uint8_t mask)
 {
 	asm volatile("lock orb %1,%0" : "=m"(*number) : "q"(mask) : "cc");
-}
-
-static inline void atomic_or_int(volatile int *number, int mask)
-{
-	asm volatile("lock orl %1,%0" : "=m"(*number) : "q"(mask) : "cc");
 }
 
 static inline uint32_t spin_locked(spinlock_t *SAFE lock)
