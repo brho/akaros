@@ -467,12 +467,8 @@ void
 handle_syscall(trapframe_t* state)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	uint32_t num = state->gpr[1];
+	uint32_t a0 = state->gpr[1];
 	uint32_t a1 = state->gpr[8];
-	uint32_t a2 = state->gpr[9];
-	uint32_t a3 = state->gpr[10];
-	uint32_t a4 = state->gpr[11];
-	uint32_t a5 = state->gpr[12];
 
 	advance_pc(state);
 	enable_irq();
@@ -480,7 +476,7 @@ handle_syscall(trapframe_t* state)
 
 	set_current_tf(pcpui, &state);
 
-	prep_syscalls(current, (struct syscall*)a1, a2);
+	prep_syscalls(current, (struct syscall*)a0, a1);
 
 	proc_restartcore();
 }
