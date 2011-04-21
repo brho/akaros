@@ -1386,6 +1386,8 @@ const static struct sys_table_entry syscall_table[] = {
 	[SYS_socket] ={(syscall_t)sys_socket, "socket"},
 	[SYS_sendto] ={(syscall_t)sys_sendto, "sendto"},
 	[SYS_recvfrom] ={(syscall_t)sys_recvfrom, "recvfrom"},
+	[SYS_select] ={(syscall_t)sys_select, "select"},
+
 
 	[SYS_read] = {(syscall_t)sys_read, "read"},
 	[SYS_write] = {(syscall_t)sys_write, "write"},

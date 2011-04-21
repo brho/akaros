@@ -9,6 +9,7 @@
 #include <ros/common.h>
 #include <socket.h>
 #include <vfs.h>
+#include <time.h>
 #include <kref.h>
 #include <syscall.h>
 #include <sys/uio.h>
@@ -18,6 +19,8 @@
 #include <net/udp.h>
 #include <net/pbuf.h>
 #include <umem.h>
+#include <kthread.h>
+#include <bitmask.h>
 /*
  *TODO: Figure out which socket.h is used where
  *There are several socket.h in kern, and a couple more in glibc. Perhaps the glibc ones
@@ -72,6 +75,8 @@ struct socket* alloc_sock(int socket_family, int socket_type, int protocol){
 	pbuf_head_init(&newsock->recv_buff);
 	pbuf_head_init(&newsock->send_buff);
 	init_sem(&newsock->sem, 0);
+	spinlock_init(&newsock->waiter_lock);
+	LIST_INIT(&newsock->waiters);
 	if (socket_type == SOCK_DGRAM){
 		newsock->so_pcb = udp_new();
 		/* back link */
@@ -133,7 +138,6 @@ intreg_t sys_socket(struct proc *p, int socket_family, int socket_type, int prot
 	return fd;
 }
 intreg_t send_iov(struct socket* sock, struct iovec* iov, int flags){
-	
 	// COPY_COUNT: for each iov, copy into mbuf, and send
 	// should not copy here, copy in the protocol..
 	// should be esomething like this sock->so_proto->pr_send(sock, iov, flags);
@@ -267,4 +271,73 @@ intreg_t sys_recvfrom(struct proc *p, int socket, void *restrict buffer, size_t 
 		return -1;
 	else
 		return copied;
+}
+
+static int selscan(int maxfdp1, fd_set *readset_in, fd_set *writeset_in, fd_set *exceptset_in,
+             fd_set *readset_out, fd_set *writeset_out, fd_set *exceptset_out){
+	return 0;
+}
+
+/* TODO: Start respecting the time out value */ 
+/* TODO: start respecting writefds and exceptfds */
+intreg_t sys_select(struct proc *p, int nfds, fd_set *readfds, fd_set *writefds,
+				fd_set *exceptfds, struct timeval *timeout){
+	/* Create a semaphore */
+	struct semaphore_entry read_sem; 
+
+	init_sem(&(read_sem.sem), 0);
+
+	/* insert into the sem list of a fd / socket */
+	int low_fd = 0;
+	for (int i = low_fd; i< nfds; i++) {
+		if(FD_ISSET(i, readfds)){
+		  struct socket* sock = getsocket(p, i);
+			/* if the fd is not open or if the file descriptor is not a socket 
+			 * go to the next in the fd set 
+			 */
+			if (sock == NULL) continue;
+			/* for each file that is open, insert this semaphore to be woken up when there
+	 		* is data available to be read
+	 		*/
+			spin_lock(&sock->waiter_lock);
+			LIST_INSERT_HEAD(&sock->waiters, &read_sem, link);
+			spin_unlock(&sock->waiter_lock);
+		}
+	}
+	/* At this point wait on the semaphore */
+  sleep_on(&(read_sem.sem));
+	/* someone woke me up, so walk through the list of descriptors and find one that is ready */
+	/* remove itself from all the lists that it is waiting on */
+	for (int i = low_fd; i<nfds; i++) {
+		if (FD_ISSET(i, readfds)){
+			struct socket* sock = getsocket(p,i);
+			if (sock == NULL) continue;
+			spin_lock(&sock->waiter_lock);
+			LIST_REMOVE(&read_sem, link);
+			spin_unlock(&sock->waiter_lock);
+		}
+	}
+	fd_set readout, writeout, exceptout;
+	FD_ZERO(&readout);
+	FD_ZERO(&writeout);
+	FD_ZERO(&exceptout);
+	for (int i = low_fd; i< nfds; i ++){
+		if (readfds && FD_ISSET(i, readfds)){
+		  struct socket* sock = getsocket(p, i);
+			if ((sock->recv_buff).qlen > 0){
+				FD_SET(i, &readout);
+			}
+			/* if the socket is ready, then we can return it */
+		}
+	}
+	if (readfds)
+		memcpy(readfds, &readout, sizeof(*readfds));
+	if (writefds)
+		memcpy(writefds, &writeout, sizeof(*writefds));
+	if (exceptfds)
+		memcpy(readfds, &readout, sizeof(*readfds));
+
+	/* Sleep on that semaphore */
+	/* Somehow get these file descriptors to wake me up when there is new data */
+	return 0;
 }

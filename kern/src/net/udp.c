@@ -276,7 +276,6 @@ int udp_input(struct pbuf *p){
 	}
 
 	/* checksum check */
-	// HERE!
   if (udphdr->checksum != 0) {
     if (inet_chksum_pseudo(p, (iphdr->src_addr), (iphdr->dst_addr), 
 		                 IPPROTO_UDP, p->tot_len) != 0){
@@ -293,11 +292,29 @@ int udp_input(struct pbuf *p){
 		struct socket *sock = pcb->pcbsock;
 		attach_pbuf(p, &sock->recv_buff);
 		struct kthread *kthread;
+		/* First notify any blocking recv calls,
+		 * then notify anyone who might be waiting in a select
+		 */ 
 		// multiple people might be waiting on the socket here..
 		kthread = __up_sem(&(sock->sem), FALSE);
 		if (kthread) {
 			 send_kernel_message(core_id(), (amr_t)wrap_restart_kthread, (long)kthread, 0, 0,
 												  KMSG_ROUTINE);
+		} else {
+			// wake up all waiters
+			struct semaphore_entry *sentry, *sentry_tmp;
+			spin_lock(&sock->waiter_lock);
+		  LIST_FOREACH_SAFE(sentry, &(sock->waiters), link, sentry_tmp){
+				//should only wake up one waiter
+				kthread = __up_sem(&sentry->sem, true);
+				if (kthread){
+			  	send_kernel_message(core_id(), (amr_t)wrap_restart_kthread, (long)kthread, 0, 0,
+												  KMSG_ROUTINE);
+				}
+				LIST_REMOVE(sentry, link);
+				/* do not need to free since all the sentry are stack-based vars */
+			}
+			spin_unlock(&sock->waiter_lock);
 		}
 		// the attaching of pbuf should have increfed pbuf ref, so free is simply a decref
 		pbuf_free(p);

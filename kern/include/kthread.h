@@ -16,7 +16,11 @@
 
 struct proc;
 struct kthread;
+struct semaphore;
+struct semaphore_entry;
 TAILQ_HEAD(kthread_tailq, kthread);
+LIST_HEAD(semaphore_list, semaphore_entry);
+
 
 /* This captures the essence of a kernel context that we want to suspend.  When
  * a kthread is running, we make sure its stacktop is the default kernel stack,
@@ -30,6 +34,7 @@ struct kthread {
 	/* ID, other shit, etc */
 };
 
+
 /* Semaphore for kthreads to sleep on.  0 or less means you need to sleep */
 struct semaphore {
 	struct kthread_tailq		waiters;
@@ -37,6 +42,11 @@ struct semaphore {
 	spinlock_t 					lock;
 };
 
+struct semaphore_entry {
+	struct semaphore sem;
+	int fd;
+	LIST_ENTRY(semaphore_entry) link;
+};
 /* This doesn't have to be inline, but it doesn't matter for now */
 static inline void init_sem(struct semaphore *sem, int signals)
 {

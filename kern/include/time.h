@@ -17,6 +17,11 @@ struct itimerspec {
   struct timespec  it_value;     /* Timer expiration */
 };
 
+struct timeval {
+	time_t tv_sec;		/* seconds */
+	time_t tv_usec;	/* microseconds */
+};
+
 void udelay(uint64_t usec);
 uint64_t tsc2sec(uint64_t tsc_time);
 uint64_t tsc2msec(uint64_t tsc_time);

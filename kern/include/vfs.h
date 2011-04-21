@@ -342,12 +342,21 @@ struct vfsmount {
  * could just use the fd_array to check for openness instead of the bitmask,
  * but eventually we might want to use the bitmasks for other things (like
  * which files are close_on_exec. */
-struct fd_set {
+
+typedef struct fd_set {
     uint8_t fds_bits[BYTES_FOR_BITMASK(NR_FILE_DESC_MAX)];
-};
+} fd_set;
+
+
 struct small_fd_set {
     uint8_t fds_bits[BYTES_FOR_BITMASK(NR_FILE_DESC_DEFAULT)];
 };
+
+/* Helper macros to manage fd_sets */
+#define FD_SET(n, p)  ((p)->fds_bits[(n)/8] |=  (1 << ((n) & 7)))
+#define FD_CLR(n, p)  ((p)->fds_bits[(n)/8] &= ~(1 << ((n) & 7)))
+#define FD_ISSET(n,p) ((p)->fds_bits[(n)/8] &   (1 << ((n) & 7)))
+#define FD_ZERO(p)    memset((void*)(p),0,sizeof(*(p)))
 
 /* Describes an open file.  We need this, since the FD flags are supposed to be
  * per file descriptor, not per file (like the file status flags). */
@@ -368,7 +377,7 @@ struct files_struct {
 	struct file_desc			fd_array[NR_OPEN_FILES_DEFAULT];
 };
 
-/* Process specific filesysten info */
+/* Process specific filesystem info */
 struct fs_struct {
 	spinlock_t					lock;
 	int							umask;

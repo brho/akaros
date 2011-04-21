@@ -45,6 +45,7 @@
 #define SYS_socket					40
 #define SYS_sendto					41
 #define SYS_recvfrom				42
+#define SYS_select          43
 
 
 /* Platform specific syscalls */

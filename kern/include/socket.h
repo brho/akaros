@@ -6,6 +6,7 @@
 #include <atomic.h>
 #include <net/pbuf.h>
 #include <kthread.h>
+#include <vfs.h>
 // Just a couple of AF types that we might support
 #define AF_UNSPEC	0
 #define AF_UNIX		1	/* Unix domain sockets 		*/
@@ -47,6 +48,7 @@ enum sock_type {
     SOCK_DCCP   = 6,
     SOCK_PACKET = 10,
 };
+
 struct socket{
   //int so_count;       /* (b) reference count */
   short   so_type;        /* (a) generic type, see socket.h */
@@ -59,7 +61,9 @@ struct socket{
 	void    *so_pcb;        /* protocol control block */
 	struct pbuf_head recv_buff;
 	struct pbuf_head send_buff;
-	struct semaphore sem;   /* semaphone to for a process to sleep on */
+	struct semaphore sem;
+	spinlock_t waiter_lock;
+	struct semaphore_list waiters;   /* semaphone to for a process to sleep on */
 	
 	//struct  vnet *so_vnet;      /* network stack instance */
 	//struct  protosw *so_proto;  /* (a) protocol handle */
@@ -112,6 +116,8 @@ int send_datagram(struct socket* sock, struct iovec* iov, int flags);
 intreg_t sys_socket(struct proc *p, int socket_family, int socket_type, int protocol);
 intreg_t sys_sendto(struct proc *p, int socket, const void *buffer, size_t length, int flags, const struct sockaddr *dest_addr, socklen_t dest_len);
 intreg_t sys_recvfrom(struct proc *p, int socket, void *restrict buffer, size_t length, int flags, struct sockaddr *restrict address, socklen_t *restrict address_len);
+intreg_t sys_select(struct proc *p, int nfds, fd_set *readfds, fd_set *writefds,
+				fd_set *exceptfds, struct timeval *timeout);
 
 
 #endif /* ROS_SOCKET_H */

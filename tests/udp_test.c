@@ -73,15 +73,25 @@ int main(int argc, char* argv[]) {
 	// int sendsize =  sendto(sockfd, bulkdata, LARGE_BUFFER_SIZE, 0, (struct sockaddr*) &server, socklen);
 
 	// sending a large chunk of data but fitting in one packet
-	 //int sendsize =  sendto(sockfd, bulkdata, 500, 0, (struct sockaddr*) &server, socklen);
-
+	//int sendsize =  sendto(sockfd, bulkdata, 500, 0, (struct sockaddr*) &server, socklen);
+	fd_set readset;
 	int sendsize = sendto(sockfd, buf, strlen(buf), 0, (struct sockaddr*) &server, socklen);
 	printf("sendto returns %d, errno %d\n", sendsize, errno);
 	//assume BUF_SIZE is larger than the packet.. so we will get to see what actually comes back..
 	int j=0;
+	int result;
 	for (j=0; j<10; j++){
 		strcpy(recv_buf, "DEADBEEFDEADBEE");
-		// if (((n = recvfrom(sockfd, recv_buf, BUF_SIZE, 0, (struct sockaddr*) &server, &socklen))< 0)){
+		// select before a blocking receive
+		do {
+			FD_ZERO(&readset);
+			FD_SET(sockfd, &readset);
+			result = select(sockfd + 1, &readset, NULL, NULL, NULL);
+			printf("select result %d \n", result);
+			printf("readset %d \n", FD_ISSET(sockfd, &readset));
+		} while (result == -1 && errno == EINTR);
+		// configure recvfrom not to block when there is 
+
 		if (((n = recvfrom(sockfd, recv_buf, 5, 0, (struct sockaddr*) &server, &socklen))< 0)){ // should discard if it is udp..
 			printf("recv failed\n");
 		}
