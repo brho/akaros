@@ -235,12 +235,12 @@ void print_resources(struct proc *p)
 
 void print_all_resources(void)
 {
-	spin_lock(&pid_hash_lock);
-	if (hashtable_count(pid_hash)) {
-		hashtable_itr_t *phtable_i = hashtable_iterator(pid_hash);
-		do {
-			print_resources(hashtable_iterator_value(phtable_i));
-		} while (hashtable_iterator_advance(phtable_i));
+	/* Hash helper */
+	void __print_resources(void *item)
+	{
+		print_resources((struct proc*)item);
 	}
+	spin_lock(&pid_hash_lock);
+	hash_for_each(pid_hash, __print_resources);
 	spin_unlock(&pid_hash_lock);
 }

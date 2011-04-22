@@ -276,7 +276,8 @@ hashtable_destroy(hashtable_t *h)
 }
 
 /*****************************************************************************/
-/* hashtable_iterator    - iterator constructor
+/* hashtable_iterator    - iterator constructor, be sure to kfree this when
+ * you're done.
  *
  * If the htable isn't empty, e and index will refer to the first entry. */
 
@@ -428,11 +429,12 @@ hashtable_iterator_search(hashtable_itr_t *itr,
 void hash_for_each(struct hashtable *hash, void func(void*))
 {
 	if (hashtable_count(hash)) {
-		hashtable_itr_t *iter = hashtable_iterator(hash);
+		struct hashtable_itr *iter = hashtable_iterator(hash);
 		do {
 			void *item = hashtable_iterator_value(iter);
 			func(item);
 		} while (hashtable_iterator_advance(iter));
+		kfree(iter);
 	}
 }
 
@@ -441,11 +443,12 @@ void hash_for_each(struct hashtable *hash, void func(void*))
 void hash_for_each_remove(struct hashtable *hash, void func(void*))
 {
 	if (hashtable_count(hash)) {
-		hashtable_itr_t *iter = hashtable_iterator(hash);
+		struct hashtable_itr *iter = hashtable_iterator(hash);
 		do {
 			void *item = hashtable_iterator_value(iter);
 			func(item);
 		} while (hashtable_iterator_remove(iter));
+		kfree(iter);
 	}
 }
 

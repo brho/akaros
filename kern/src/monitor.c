@@ -810,16 +810,16 @@ int mon_fs(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 		printk("Dentry Cache:\n----------------------------\n");
 		TAILQ_FOREACH(sb, &super_blocks, s_list) {
 			printk("Superblock for %s\n", sb->s_name);
-			if (hashtable_count(sb->s_dcache)) {
-				hashtable_itr_t *dcache_i = hashtable_iterator(sb->s_dcache);
-				printk("DENTRY     FLAGS      REFCNT NAME\n");
-				printk("--------------------------------\n");
-				do {
-					struct dentry *d_i = hashtable_iterator_value(dcache_i);
-					printk("%08p %08p %02d     %s\n", d_i, d_i->d_flags,
-					       kref_refcnt(&d_i->d_kref), d_i->d_name.name);
-				} while (hashtable_iterator_advance(dcache_i));
+			printk("DENTRY     FLAGS      REFCNT NAME\n");
+			printk("--------------------------------\n");
+			/* Hash helper */
+			void print_dcache_entry(void *item)
+			{
+				struct dentry *d_i = (struct dentry*)item;
+				printk("%08p %08p %02d     %s\n", d_i, d_i->d_flags,
+				       kref_refcnt(&d_i->d_kref), d_i->d_name.name);
 			}
+			hash_for_each(sb->s_dcache, print_dcache_entry);
 		}
 		if (argc < 3)
 			return 0;

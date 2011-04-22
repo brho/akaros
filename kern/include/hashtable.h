@@ -235,7 +235,7 @@ typedef struct hashtable_itr {
 } hashtable_itr_t;
 
 /*****************************************************************************/
-/* hashtable_iterator
+/* hashtable_iterator.  Be sure to kfree this when you are done.
  */
 
 hashtable_itr_t *
