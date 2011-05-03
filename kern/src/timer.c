@@ -11,6 +11,7 @@
 #include <schedule.h>
 #include <multiboot.h>
 #include <pmap.h>
+#include <smp.h>
 
 /* timing_overhead
  * Any user space process that links to this file will get its own copy.  
@@ -79,9 +80,11 @@ void train_timing()
 	timing_overhead = training_overhead;
 }
 
-/* Typical per-core timer interrupt handler.  Note that sparc's timer is
- * periodic by nature, so if you want it to not be periodic, turn off the alarm
- * in here. */
+/* Convenience wrapper called when a core's timer interrupt goes off.  Not to be
+ * confused with global timers (like the PIC).  Do not put your code here.  If
+ * you want something to happen in the future, set an alarm. */
 void timer_interrupt(struct trapframe *tf, void *data)
 {
+	struct timer_chain *pcpui_tchain = &per_cpu_info[core_id()].tchain;
+	trigger_tchain(pcpui_tchain);
 }

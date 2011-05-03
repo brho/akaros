@@ -158,4 +158,6 @@ void smp_percpu_init(void)
 	STAILQ_INIT(&per_cpu_info[coreid].immed_amsgs);
 	spinlock_init(&per_cpu_info[coreid].routine_amsg_lock);
 	STAILQ_INIT(&per_cpu_info[coreid].routine_amsgs);
+	/* Initialize the per-core timer chain */
+	init_timer_chain(&per_cpu_info[coreid].tchain, set_pcpu_alarm_interrupt);
 }

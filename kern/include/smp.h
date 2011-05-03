@@ -16,6 +16,7 @@
 #include <atomic.h>
 #include <process.h>
 #include <syscall.h>
+#include <alarm.h>
 
 #ifdef __SHARC__
 typedef sharC_env_t;
@@ -30,6 +31,7 @@ struct per_cpu_info {
 	struct trapframe actual_tf;	/* storage for cur_tf */
 	struct syscall *cur_sysc;	/* ptr is into cur_proc's address space */
 	struct kthread *spare;		/* useful when restarting */
+	struct timer_chain tchain;	/* for the per-core alarm */
 
 #ifdef __SHARC__
 	// held spin-locks. this will have to go elsewhere if multiple kernel

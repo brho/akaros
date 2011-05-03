@@ -314,4 +314,6 @@ void smp_percpu_init(void)
 	
 	/* need to init perfctr before potentiall using it in timer handler */
 	perfmon_init();
+	/* Initialize the per-core timer chain */
+	init_timer_chain(&per_cpu_info[coreid].tchain, set_pcpu_alarm_interrupt);
 }
