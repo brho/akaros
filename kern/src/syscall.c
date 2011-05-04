@@ -694,17 +694,31 @@ static int sys_self_notify(struct proc *p, uint32_t vcoreid,
 	return 0;
 }
 
-/* This will set a local timer for usec, then shut down the core */
+/* This will set a local timer for usec, then shut down the core.  There's a
+ * slight race between spinner and halt.  For now, the core will wake up for
+ * other interrupts and service them, but will not process routine messages or
+ * do anything other than halt until the alarm goes off.  We could just unset
+ * the alarm and return early.  On hardware, there are a lot of interrupts that
+ * come in.  If we ever use this, we can take a closer look.  */
 static int sys_halt_core(struct proc *p, unsigned int usec)
 {
-	/* TODO: ought to check and see if a timer was already active, etc, esp so
-	 * userspace can't turn off timers.  also note we will also call whatever
-	 * timer_interrupt() will do, though all we care about is just
-	 * self_ipi/interrupting. */
-	set_core_timer(usec);
-	cpu_halt();
-	set_core_timer(0);		/* Disable the timer (we don't have a 0-shot yet) */
-
+	struct timer_chain *tchain = &per_cpu_info[core_id()].tchain;
+	struct alarm_waiter a_waiter;
+	bool spinner = TRUE;
+	void unblock(struct alarm_waiter *waiter)
+	{
+		spinner = FALSE;
+	}
+	init_awaiter(&a_waiter, unblock);
+	set_awaiter_rel(&a_waiter, MAX(usec, 100));
+	set_alarm(tchain, &a_waiter);
+	enable_irq();
+	/* Could wake up due to another interrupt, but we want to sleep still. */
+	while (spinner) {
+		cpu_halt();	/* slight race between spinner and halt */
+		cpu_relax();
+	}
+	printd("Returning from halting\n");
 	return 0;
 }
 

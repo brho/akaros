@@ -77,10 +77,12 @@ static void reset_tchain_interrupt(struct timer_chain *tchain)
 	assert(!irq_is_enabled());
 	if (TAILQ_EMPTY(&tchain->waiters)) {
 		/* Turn it off */
+		printd("Turning alarm off\n");
 		tchain->set_interrupt(0, tchain);
 	} else {
 		/* Make sure it is on and set to the earliest time */
 		/* TODO: check for times in the past or very close to now */
+		printd("Turning alarm on for %llu\n", tchain->earliest_time);
 		tchain->set_interrupt(tchain->earliest_time, tchain);
 	}
 }
@@ -110,7 +112,7 @@ void trigger_tchain(struct timer_chain *tchain)
 	bool changed_list = FALSE;
 	assert(!irq_is_enabled());
 	TAILQ_FOREACH_SAFE(i, &tchain->waiters, next, temp) {
-		printd("Trying to wake up %08p who is due at %llu and it is now %llu\n",
+		printd("Trying to wake up %08p who is due at %llu and now is %llu\n",
 		       i, i->wake_up_time, now);
 		/* TODO: Could also do something in cases where we're close to now */
 		if (i->wake_up_time <= now) {
@@ -174,7 +176,8 @@ void set_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter)
 	enable_irqsave(&irq_state);
 }
 
-/* Removes waiter from the tchain before it goes off.  */
+/* Removes waiter from the tchain before it goes off. 
+ * TODO: handle waiters that already went off. */
 void unset_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter)
 {
 	struct alarm_waiter *temp;
@@ -182,6 +185,7 @@ void unset_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter)
 	int8_t irq_state = 0;
 
 	disable_irqsave(&irq_state);
+	warn("Code currently assumes the alarm waiter hasn't triggered yet!");
 	/* Need to make sure earliest and latest are set, in case we're mucking with
 	 * the first and/or last element of the chain. */
 	if (TAILQ_FIRST(&tchain->waiters) == waiter) {
