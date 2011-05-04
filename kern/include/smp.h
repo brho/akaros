@@ -68,6 +68,7 @@ extern volatile uint32_t RO num_cpus;
 void smp_boot(void);
 void smp_idle(void) __attribute__((noreturn));
 void smp_percpu_init(void); // this must be called by each core individually
+void __arch_pcpu_init(uint32_t coreid);	/* each arch has one of these */
 
 /* SMP utility functions */
 int smp_call_function_self(poly_isr_t handler, TV(t) data,

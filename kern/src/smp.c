@@ -78,3 +78,20 @@ void smp_idle(void)
 	__smp_idle();
 	assert(0);
 }
+
+/* Arch-independent per-cpu initialization.  This will call the arch dependent
+ * init first. */
+void smp_percpu_init(void)
+{
+	uint32_t coreid = core_id();
+	/* Do this first */
+	__arch_pcpu_init(coreid);
+	per_cpu_info[coreid].spare = 0;
+	/* Init relevant lists */
+	spinlock_init(&per_cpu_info[coreid].immed_amsg_lock);
+	STAILQ_INIT(&per_cpu_info[coreid].immed_amsgs);
+	spinlock_init(&per_cpu_info[coreid].routine_amsg_lock);
+	STAILQ_INIT(&per_cpu_info[coreid].routine_amsgs);
+	/* Initialize the per-core timer chain */
+	init_timer_chain(&per_cpu_info[coreid].tchain, set_pcpu_alarm_interrupt);
+}

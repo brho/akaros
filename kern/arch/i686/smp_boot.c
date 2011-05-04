@@ -280,9 +280,8 @@ uint32_t smp_main(void)
  * must still call this for core 0.  This must NOT be called from smp_main,
  * since it relies on the kernel stack pointer to find the gdt.  Be careful not
  * to call it on too deep of a stack frame. */
-void smp_percpu_init(void)
+void __arch_pcpu_init(uint32_t coreid)
 {
-	uint32_t coreid = core_id();
 	uintptr_t my_stack_bot;
 
 	/* Flushes any potentially old mappings from smp_boot() (note the page table
@@ -306,14 +305,6 @@ void smp_percpu_init(void)
 		per_cpu_info[coreid].gdt = (segdesc_t*)(*(uintptr_t*)my_stack_bot +
 		                           sizeof(taskstate_t) + sizeof(pseudodesc_t));
 	}
-	per_cpu_info[coreid].spare = 0;
-	spinlock_init(&per_cpu_info[coreid].immed_amsg_lock);
-	STAILQ_INIT(&per_cpu_info[coreid].immed_amsgs);
-	spinlock_init(&per_cpu_info[coreid].routine_amsg_lock);
-	STAILQ_INIT(&per_cpu_info[coreid].routine_amsgs);
-	
 	/* need to init perfctr before potentiall using it in timer handler */
 	perfmon_init();
-	/* Initialize the per-core timer chain */
-	init_timer_chain(&per_cpu_info[coreid].tchain, set_pcpu_alarm_interrupt);
 }

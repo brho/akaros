@@ -150,14 +150,6 @@ int smp_call_wait(handler_wrapper_t* wrapper)
 /* Perform any initialization needed by per_cpu_info.  Right now, this just
  * inits the amsg list (which sparc will probably also want).  Make sure every
  * core calls this at some point in the smp_boot process. */
-void smp_percpu_init(void)
+void __arch_pcpu_init(uint32_t coreid)
 {
-	uint32_t coreid = core_id();
-	per_cpu_info[coreid].spare = 0;
-	spinlock_init(&per_cpu_info[coreid].immed_amsg_lock);
-	STAILQ_INIT(&per_cpu_info[coreid].immed_amsgs);
-	spinlock_init(&per_cpu_info[coreid].routine_amsg_lock);
-	STAILQ_INIT(&per_cpu_info[coreid].routine_amsgs);
-	/* Initialize the per-core timer chain */
-	init_timer_chain(&per_cpu_info[coreid].tchain, set_pcpu_alarm_interrupt);
 }
