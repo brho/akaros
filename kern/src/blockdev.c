@@ -10,6 +10,9 @@
 #include <slab.h>
 #include <page_alloc.h>
 #include <pmap.h>
+/* These two are needed for the fake interrupt */
+#include <alarm.h>
+#include <smp.h>
 
 struct file_operations block_f_op;
 struct page_map_operations block_pm_op;
@@ -105,27 +108,25 @@ int bdev_submit_request(struct block_device *bdev, struct block_request *breq)
 		}
 		memcpy(dst, src, nr_sector << SECTOR_SZ_LOG);
 	}
-#ifdef __i386__ 	/* Sparc can't register interrupt handlers yet */
-	/* Faking an interrupt.  The handler runs in interrupt context btw */
-	void x86_breq_handler(struct trapframe *tf, void *data)
+#ifdef __i386__ 	/* Sparc can't kthread yet */
+	/* Faking the device interrupt with an alarm */
+	void breq_handler(struct alarm_waiter *waiter)
 	{
-		/* Turn off the interrupt, Re-register the old dumb handler */
-		set_core_timer(0);
-		register_interrupt_handler(interrupt_handlers,
-		                           LAPIC_TIMER_DEFAULT_VECTOR, timer_interrupt,
-		                           NULL);
 		/* In the future, we'll need to figure out which breq this was in
 		 * response to */
-		struct block_request *breq = (struct block_request*)data;
+		struct block_request *breq = (struct block_request*)waiter->data;
 		if (breq->callback)
 			breq->callback(breq);
+		kfree(waiter);
 	}
-	register_interrupt_handler(interrupt_handlers, LAPIC_TIMER_DEFAULT_VECTOR,
-	                           x86_breq_handler, breq);
-	/* Fake a 5ms delay.  or 50... TODO for some reason, KVM needs a much larger
-	 * wait time so that we can get to sleep before the interrupt arrives.  Set
-	 * this to 5000 for "real" use (this is just faking anyway...) */
-	set_core_timer(50000);
+	struct timer_chain *tchain = &per_cpu_info[core_id()].tchain;
+	struct alarm_waiter *waiter = kmalloc(sizeof(struct alarm_waiter), 0);
+	init_awaiter(waiter, breq_handler);
+	/* Stitch things up, so we know how to find things later */
+	waiter->data = breq;
+	/* Set for 5ms.  The time might not be accurate in KVM. */
+	set_awaiter_rel(waiter, 5000);
+	set_alarm(tchain, waiter);
 #else
 	if (breq->callback)
 		breq->callback(breq);
@@ -140,7 +141,8 @@ void generic_breq_done(struct block_request *breq)
 #ifdef __i386__ 	/* Sparc can't restart kthreads yet */
 	struct kthread *sleeper = __up_sem(&breq->sem);
 	if (!sleeper) {
-		/* this is odd, but happened a lot with kvm */
+		/* this is odd, but happened a lot with kvm, probably due to the ghetto
+		 * lack of a one-shot per-core timer.  keeping this just in case. */
 		printk("[kernel] no one waiting on breq %08p\n", breq);
 		return;
 	}
@@ -151,13 +153,15 @@ void generic_breq_done(struct block_request *breq)
 #endif
 }
 
-/* Helper, pairs with generic_breq_done() */
+/* Helper, pairs with generic_breq_done().  Note we sleep here on a semaphore
+ * instead of faking it with an alarm.  Ideally, this code will be the same even
+ * for real block devices (that don't fake things with timer interrupts). */
 void sleep_on_breq(struct block_request *breq)
 {
 	/* Since printk takes a while, this may make you lose the race */
 	printd("Sleeping on breq %08p\n", breq);
 	assert(irq_is_enabled());
-#ifdef __i386__ 	/* Sparc isn't interrupt driven yet */
+#ifdef __i386__
 	sleep_on(&breq->sem);
 #else
 	/* Sparc can't block yet (TODO).  This only works if the completion happened

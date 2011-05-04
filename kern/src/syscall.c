@@ -95,46 +95,20 @@ static int sys_null(void)
 }
 
 /* Diagnostic function: blocks the kthread/syscall, to help userspace test its
- * async I/O handling.  Don't mix this with things that mess with the interrupt
- * handler, like other sys_blocks or the current blockdev crap. */
+ * async I/O handling. */
 static int sys_block(void)
 {
-	struct semaphore local_sem, *sem = &local_sem;
-	init_sem(sem, 0);
-#ifdef __i386__ 	/* Sparc can't register interrupt handlers yet */
-	/* Faking an interrupt.  The handler runs in interrupt context btw */
-	void x86_unblock_handler(struct trapframe *tf, void *data)
-	{
-		/* Turn off the interrupt, Re-register the old dumb handler */
-		set_core_timer(0);
-		register_interrupt_handler(interrupt_handlers,
-		                           LAPIC_TIMER_DEFAULT_VECTOR, timer_interrupt,
-		                           NULL);
-		struct semaphore *sem = (struct semaphore*)data;
-		struct kthread *sleeper = __up_sem(sem);
-		if (!sleeper) {
-			warn("No one sleeping!");
-			return;
-		}
-		kthread_runnable(sleeper);
-		assert(TAILQ_EMPTY(&sem->waiters));
-	}
-	void *prev_data = interrupt_handlers[LAPIC_TIMER_DEFAULT_VECTOR].data;
-	if (prev_data)
-		warn("Something (%08p) already waiting on the LAPIC timer!", prev_data);
-	register_interrupt_handler(interrupt_handlers, LAPIC_TIMER_DEFAULT_VECTOR,
-	                           x86_unblock_handler, sem);
-	/* This fakes a 1ms delay.  Though it might be less, esp in _M mode on KVM.
-	 * TODO KVM-timing (adjust it up by a lot in a VM). */
-	set_core_timer(1000);	/* in microseconds */
+	struct timer_chain *tchain = &per_cpu_info[core_id()].tchain;
+	struct alarm_waiter a_waiter;
+	init_awaiter(&a_waiter, 0);
+	/* Block for 5ms.  The time might not be accurate in KVM.  Note printing
+	 * takes a few ms, so your printds won't be perfect. */
 	printd("[kernel] sys_block(), sleeping at %llu\n", read_tsc());
-	sleep_on(sem);
+	set_awaiter_rel(&a_waiter, 5000);
+	set_alarm(tchain, &a_waiter);
+	sleep_on_awaiter(&a_waiter);
 	printd("[kernel] sys_block(), waking up at %llu\n", read_tsc());
 	return 0;
-#else /* sparc */
-	set_errno(ENOSYS);
-	return -1;
-#endif
 }
 
 // Writes 'val' to 'num_writes' entries of the well-known array in the kernel
