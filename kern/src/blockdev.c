@@ -124,7 +124,7 @@ int bdev_submit_request(struct block_device *bdev, struct block_request *breq)
 	init_awaiter(waiter, breq_handler);
 	/* Stitch things up, so we know how to find things later */
 	waiter->data = breq;
-	/* Set for 5ms.  The time might not be accurate in KVM. */
+	/* Set for 5ms. */
 	set_awaiter_rel(waiter, 5000);
 	set_alarm(tchain, waiter);
 #else
@@ -141,9 +141,8 @@ void generic_breq_done(struct block_request *breq)
 #ifdef __i386__ 	/* Sparc can't restart kthreads yet */
 	struct kthread *sleeper = __up_sem(&breq->sem);
 	if (!sleeper) {
-		/* this is odd, but happened a lot with kvm, probably due to the ghetto
-		 * lack of a one-shot per-core timer.  keeping this just in case. */
-		printk("[kernel] no one waiting on breq %08p\n", breq);
+		/* This shouldn't happen anymore.  Let brho know if it does. */
+		warn("[kernel] no one waiting on breq %08p", breq);
 		return;
 	}
 	kthread_runnable(sleeper);

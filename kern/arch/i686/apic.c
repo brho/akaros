@@ -90,10 +90,10 @@ void lapic_set_timer(uint32_t usec, bool periodic)
 	                  LAPIC_TIMER_DEFAULT_DIVISOR);
 }
 
-void set_core_timer(uint32_t usec)
+void set_core_timer(uint32_t usec, bool periodic)
 {
 	if (usec)
-		lapic_set_timer(usec, TRUE);
+		lapic_set_timer(usec, periodic);
 	else
 		lapic_disable_timer();
 }

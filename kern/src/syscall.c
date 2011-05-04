@@ -101,8 +101,8 @@ static int sys_block(void)
 	struct timer_chain *tchain = &per_cpu_info[core_id()].tchain;
 	struct alarm_waiter a_waiter;
 	init_awaiter(&a_waiter, 0);
-	/* Block for 5ms.  The time might not be accurate in KVM.  Note printing
-	 * takes a few ms, so your printds won't be perfect. */
+	/* Block for 5ms.  Note printing takes a few ms, so your printds won't be
+	 * perfect. */
 	printd("[kernel] sys_block(), sleeping at %llu\n", read_tsc());
 	set_awaiter_rel(&a_waiter, 5000);
 	set_alarm(tchain, &a_waiter);

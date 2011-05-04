@@ -245,12 +245,12 @@ void set_pcpu_alarm_interrupt(uint64_t time, struct timer_chain *tchain)
 		       "tchain %08p\n", time, now, rel_usec, pcpui_tchain);
 		/* Note that sparc doesn't honor the one-shot setting, so you might get
 		 * spurious interrupts. */
-		set_core_timer(rel_usec);	/* TODO: Want this to be one-shot */
+		set_core_timer(rel_usec, FALSE);
 		/* Make sure the caller is setting the right tchain */
 		assert(pcpui_tchain == tchain);
 	} else  {
 		/* Disarm */
-		set_core_timer(0);
+		set_core_timer(0, FALSE);
 	}
 }
 

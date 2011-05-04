@@ -18,8 +18,10 @@ timer_init(void)
 	cprintf("TSC Frequency: %llu\n", system_timing.tsc_freq);
 }
 
+/* Warning!  Sparc is unable to do a one-shot timer, so all timers are periodic,
+ * though that is not normally what we want. */
 void
-set_core_timer(uint32_t usec)
+set_core_timer(uint32_t usec, bool periodic)
 {
 	set_timer(usec);
 }
