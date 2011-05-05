@@ -240,7 +240,8 @@ void set_pcpu_alarm_interrupt(uint64_t time, struct timer_chain *tchain)
 		if (time <= now)
 			rel_usec = 1;
 		else
-			rel_usec = ((time - now) / (system_timing.tsc_freq / 1000000));
+			rel_usec = (time - now) / (system_timing.tsc_freq / 1000000);
+		rel_usec = MAX(rel_usec, 1);
 		printd("Setting alarm for %llu, it is now %llu, rel_time %llu "
 		       "tchain %08p\n", time, now, rel_usec, pcpui_tchain);
 		/* Note that sparc doesn't honor the one-shot setting, so you might get

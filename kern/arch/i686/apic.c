@@ -86,6 +86,7 @@ void lapic_set_timer(uint32_t usec, bool periodic)
 {
 	// divide the bus clock by 128, which is the max.
 	uint32_t ticks = (usec * system_timing.bus_freq / 128) / 1000000;
+	assert(ticks > 0);
 	__lapic_set_timer(ticks, LAPIC_TIMER_DEFAULT_VECTOR, periodic,
 	                  LAPIC_TIMER_DEFAULT_DIVISOR);
 }
