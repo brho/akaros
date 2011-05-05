@@ -132,3 +132,8 @@ void* sys_init_arsc()
 {
 	return (void*)ros_syscall(SYS_init_arsc, 0, 0, 0, 0, 0, 0);
 }
+
+int sys_block(unsigned int usec)
+{
+	return ros_syscall(SYS_block, usec, 0, 0, 0, 0, 0);
+}

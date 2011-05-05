@@ -23,7 +23,7 @@ void *block_thread(void* arg)
 	assert(!in_vcore_context());
 	for (int i = 0; i < NUM_TEST_LOOPS; i++) {
 		printf_safe("[A] pthread %d on vcore %d\n", pthread_self()->id, vcore_id());
-		ros_syscall(SYS_block, 0, 0, 0, 0, 0, 0);
+		sys_block(5000);
 	}
 	return (void*)(pthread_self()->id);
 }

@@ -38,6 +38,7 @@ int main(int argc, char** argv)
 	ev_q = get_big_event_q();
 	/* issue the diagnostic block syscall */
 	sysc.num = SYS_block;
+	sysc.arg0 = 5000;	/* 5ms */
 	sysc.ev_q = ev_q;
 	/* Trap */
 	num_started = __ros_arch_syscall((long)&sysc, 1);
@@ -80,6 +81,7 @@ int main(int argc, char** argv)
 	sysc.u_data = (void*)1;	/* using this to loop on */
 	/* issue the diagnostic blocking syscall */
 	sysc.num = SYS_block;
+	sysc.arg0 = 5000;	/* 5ms */
 	sysc.ev_q = ev_q;
 	num_started = __ros_arch_syscall((long)&sysc, 1);
 	/* have this thread "wait" */

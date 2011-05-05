@@ -50,7 +50,7 @@ int         sys_self_notify(uint32_t vcoreid, unsigned int ev_type,
                             struct event_msg *u_msg);
 int         sys_halt_core(unsigned int usec);
 void*		sys_init_arsc();
-
+int         sys_block(unsigned int usec);
 
 #endif	// !ASSEMBLER
 

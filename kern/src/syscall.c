@@ -96,15 +96,14 @@ static int sys_null(void)
 
 /* Diagnostic function: blocks the kthread/syscall, to help userspace test its
  * async I/O handling. */
-static int sys_block(void)
+static int sys_block(struct proc *p, unsigned int usec)
 {
 	struct timer_chain *tchain = &per_cpu_info[core_id()].tchain;
 	struct alarm_waiter a_waiter;
 	init_awaiter(&a_waiter, 0);
-	/* Block for 5ms.  Note printing takes a few ms, so your printds won't be
-	 * perfect. */
+	/* Note printing takes a few ms, so your printds won't be perfect. */
 	printd("[kernel] sys_block(), sleeping at %llu\n", read_tsc());
-	set_awaiter_rel(&a_waiter, 5000);
+	set_awaiter_rel(&a_waiter, usec);
 	set_alarm(tchain, &a_waiter);
 	sleep_on_awaiter(&a_waiter);
 	printd("[kernel] sys_block(), waking up at %llu\n", read_tsc());
