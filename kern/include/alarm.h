@@ -85,4 +85,8 @@ void trigger_tchain(struct timer_chain *tchain);
 /* How to set a specific alarm: the per-cpu timer interrupt */
 void set_pcpu_alarm_interrupt(uint64_t time, struct timer_chain *tchain);
 
+/* Debugging */
+void print_chain(struct timer_chain *tchain);
+void print_pcpu_chains(void);
+
 #endif /* ROS_KERN_ALARM_H */

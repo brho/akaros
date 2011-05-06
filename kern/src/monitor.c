@@ -61,6 +61,7 @@ static command_t (RO commands)[] = {
 	{ "monitor", "Run the monitor on another core", mon_monitor},
 	{ "fs", "Filesystem Diagnostics", mon_fs},
 	{ "bb", "Try to run busybox (ash)", mon_bb},
+	{ "alarm", "Alarm Diagnostics", mon_alarm},
 };
 #define NCOMMANDS (sizeof(commands)/sizeof(commands[0]))
 
@@ -864,4 +865,20 @@ int mon_bb(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 {
 	char *l_argv[3] = {"", "busybox", "ash"};
 	return mon_bin_run(3, l_argv, tf);
+}
+
+int mon_alarm(int argc, char **argv, struct trapframe *tf)
+{
+	if (argc < 2) {
+		printk("Usage: alarm OPTION\n");
+		printk("\tpcpu: print full alarm tchains from every core\n");
+		return 1;
+	}
+	if (!strcmp(argv[1], "pcpu")) {
+		print_pcpu_chains();
+	} else {
+		printk("Bad option\n");
+		return 1;
+	}
+	return 0;
 }

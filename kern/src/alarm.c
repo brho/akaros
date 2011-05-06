@@ -256,6 +256,8 @@ void set_pcpu_alarm_interrupt(uint64_t time, struct timer_chain *tchain)
 }
 
 /* Debug helpers */
+
+/* Disable irqs before calling this, or otherwise protect yourself. */
 void print_chain(struct timer_chain *tchain)
 {
 	struct alarm_waiter *i;
@@ -266,4 +268,19 @@ void print_chain(struct timer_chain *tchain)
 	TAILQ_FOREACH(i, &tchain->waiters, next) {
 		printk("\tWaiter %08p, time: %llu\n", i, i->wake_up_time);
 	}
+}
+
+/* Prints all chains, rather verbosely */
+void print_pcpu_chains(void)
+{
+	struct timer_chain *pcpu_chain;
+	int8_t irq_state = 0;
+	printk("PCPU Chains:  It is now %llu\n", read_tsc());
+
+	disable_irqsave(&irq_state);
+	for (int i = 0; i < num_cpus; i++) {
+		pcpu_chain = &per_cpu_info[i].tchain;
+		print_chain(pcpu_chain);
+	}
+	enable_irqsave(&irq_state);
 }
