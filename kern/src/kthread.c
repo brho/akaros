@@ -134,11 +134,13 @@ void restart_kthread(struct kthread *kthread)
 	 * free our current kthread *before* popping it, nor can we free the current
 	 * stack until we pop to the kthread's stack). */
 	if (pcpui->spare) {
-		/* TODO: we shouldn't free a page holding current_tf */
+		/* this should never happen now.  it probably only was a concern because
+		 * i accidentally free kthread's stacktop (the one i was jumping too) */
 		assert(ROUNDDOWN((uintptr_t)current_tf, PGSIZE) !=
-		       kthread->stacktop - PGSIZE);
-		/* this should probably have a rounddown, since it's not always the top */
-		page_decref(kva2page((void*)kthread->stacktop - PGSIZE));
+		       pcpui->spare->stacktop - PGSIZE);
+		/* this should probably have a rounddown, since it's not always the top,
+		 * or even always PGSIZE... */
+		page_decref(kva2page((void*)pcpui->spare->stacktop - PGSIZE));
 		kmem_cache_free(kthread_kcache, pcpui->spare);
 	}
 	current_stacktop = get_stack_top();
