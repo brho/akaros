@@ -137,7 +137,8 @@ unsigned int event_clear_overflows(struct event_queue *ev_q)
 unsigned int get_event_type(struct event_mbox *ev_mbox)
 {
 	struct event_msg local_msg = {0};
-	if (bcq_dequeue(&ev_mbox->ev_msgs, &local_msg, NR_BCQ_EVENTS)) {
+	/* BCQ returns 0 on success, so this will dequeue and return the type. */
+	if (!bcq_dequeue(&ev_mbox->ev_msgs, &local_msg, NR_BCQ_EVENTS)) {
 		return local_msg.ev_type;
 	}
 	if (BITMASK_IS_CLEAR(&ev_mbox->ev_bitmap, MAX_NR_EVENT))
