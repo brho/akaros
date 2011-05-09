@@ -48,7 +48,7 @@ static void __kmem_cache_create(struct kmem_cache *kc, const char *name,
 	
 	/* put in cache list based on it's size */
 	struct kmem_cache *i, *prev = NULL;
-	spin_lock(&kmem_caches_lock);
+	spin_lock_irqsave(&kmem_caches_lock);
 	/* find the kmem_cache before us in the list.  yes, this is O(n). */
 	SLIST_FOREACH(i, &kmem_caches, link) {
 		if (i->obj_size < kc->obj_size)
@@ -60,7 +60,7 @@ static void __kmem_cache_create(struct kmem_cache *kc, const char *name,
 		SLIST_INSERT_AFTER(prev, kc, link);
 	else
 		SLIST_INSERT_HEAD(&kmem_caches, kc, link);
-	spin_unlock(&kmem_caches_lock);
+	spin_unlock_irqsave(&kmem_caches_lock);
 }
 
 void kmem_cache_init(void)
@@ -130,7 +130,7 @@ void kmem_cache_destroy(struct kmem_cache *cp)
 {
 	struct kmem_slab *a_slab, *next;
 
-	spin_lock(&cp->cache_lock);
+	spin_lock_irqsave(&cp->cache_lock);
 	assert(TAILQ_EMPTY(&cp->full_slab_list));
 	assert(TAILQ_EMPTY(&cp->partial_slab_list));
 	/* Clean out the empty list.  We can't use a regular FOREACH here, since the
@@ -142,18 +142,18 @@ void kmem_cache_destroy(struct kmem_cache *cp)
 		kmem_slab_destroy(cp, a_slab);
 		a_slab = next;
 	}
-	spin_lock(&kmem_caches_lock);
+	spin_lock_irqsave(&kmem_caches_lock);
 	SLIST_REMOVE(&kmem_caches, cp, kmem_cache, link);
-	spin_unlock(&kmem_caches_lock);
+	spin_unlock_irqsave(&kmem_caches_lock);
 	kmem_cache_free(&kmem_cache_cache, cp); 
-	spin_unlock(&cp->cache_lock);
+	spin_unlock_irqsave(&cp->cache_lock);
 }
 
 /* Front end: clients of caches use these */
 void *kmem_cache_alloc(struct kmem_cache *cp, int flags)
 {
 	void *retval = NULL;
-	spin_lock(&cp->cache_lock);
+	spin_lock_irqsave(&cp->cache_lock);
 	// look at partial list
 	struct kmem_slab *a_slab = TAILQ_FIRST(&cp->partial_slab_list);
 	// 	if none, go to empty list and get an empty and make it partial
@@ -185,7 +185,7 @@ void *kmem_cache_alloc(struct kmem_cache *cp, int flags)
 		TAILQ_REMOVE(&cp->partial_slab_list, a_slab, link);
 		TAILQ_INSERT_HEAD(&cp->full_slab_list, a_slab, link);
 	}
-	spin_unlock(&cp->cache_lock);
+	spin_unlock_irqsave(&cp->cache_lock);
 	return retval;
 }
 
@@ -200,7 +200,7 @@ void kmem_cache_free(struct kmem_cache *cp, void *buf)
 	struct kmem_slab *a_slab;
 	struct kmem_bufctl *a_bufctl;
 
-	spin_lock(&cp->cache_lock);
+	spin_lock_irqsave(&cp->cache_lock);
 	if (cp->obj_size <= SLAB_LARGE_CUTOFF) {
 		// find its slab
 		a_slab = (struct kmem_slab*)(ROUNDDOWN(buf, PGSIZE) + PGSIZE -
@@ -226,7 +226,7 @@ void kmem_cache_free(struct kmem_cache *cp, void *buf)
 		TAILQ_REMOVE(&cp->partial_slab_list, a_slab, link);
 		TAILQ_INSERT_HEAD(&cp->empty_slab_list, a_slab, link);
 	}
-	spin_unlock(&cp->cache_lock);
+	spin_unlock_irqsave(&cp->cache_lock);
 }
 
 /* Back end: internal functions */
@@ -241,7 +241,7 @@ void kmem_cache_grow(struct kmem_cache *cp)
 {
 	struct kmem_slab *a_slab;
 	struct kmem_bufctl *a_bufctl;
-	spin_unlock(&cp->cache_lock);
+	spin_unlock_irqsave(&cp->cache_lock);
 	if (cp->obj_size <= SLAB_LARGE_CUTOFF) {
 		// Just get a single page for small slabs
 		page_t *a_page;
@@ -298,7 +298,7 @@ void kmem_cache_grow(struct kmem_cache *cp)
 	}
 	// add a_slab to the empty_list
 	TAILQ_INSERT_HEAD(&cp->empty_slab_list, a_slab, link);
-	spin_unlock(&cp->cache_lock);
+	spin_unlock_irqsave(&cp->cache_lock);
 }
 
 /* This deallocs every slab from the empty list.  TODO: think a bit more about
@@ -309,19 +309,19 @@ void kmem_cache_reap(struct kmem_cache *cp)
 	struct kmem_slab *a_slab, *next;
 	
 	// Destroy all empty slabs.  Refer to the notes about the while loop
-	spin_lock(&cp->cache_lock);
+	spin_lock_irqsave(&cp->cache_lock);
 	a_slab = TAILQ_FIRST(&cp->empty_slab_list);
 	while (a_slab) {
 		next = TAILQ_NEXT(a_slab, link);
 		kmem_slab_destroy(cp, a_slab);
 		a_slab = next;
 	}
-	spin_unlock(&cp->cache_lock);
+	spin_unlock_irqsave(&cp->cache_lock);
 }
 
 void print_kmem_cache(struct kmem_cache *cp)
 {
-	spin_lock(&cp->cache_lock);
+	spin_lock_irqsave(&cp->cache_lock);
 	printk("\nPrinting kmem_cache:\n---------------------\n");
 	printk("Name: %s\n", cp->name);
 	printk("Objsize: %d\n", cp->obj_size);
@@ -332,7 +332,7 @@ void print_kmem_cache(struct kmem_cache *cp)
 	printk("Slab Full: 0x%08x\n", cp->full_slab_list);
 	printk("Slab Partial: 0x%08x\n", cp->partial_slab_list);
 	printk("Slab Empty: 0x%08x\n", cp->empty_slab_list);
-	spin_unlock(&cp->cache_lock);
+	spin_unlock_irqsave(&cp->cache_lock);
 }
 
 void print_kmem_slab(struct kmem_slab *slab)
