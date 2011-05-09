@@ -237,6 +237,9 @@ retry:
 	/* Try to insert the new one in place.  If it fails, retry the whole "find
 	 * the bh" process.  This should be rare, so no sense optimizing it. */
 	next_loc = prev ? &prev->bh_next : (struct buffer_head**)&page->pg_private;
+	/* Normally, there'd be an ABA problem here, but we never actually remove
+	 * bhs from the chain until the whole page gets cleaned up, which can't
+	 * happen while we hold a reference to the page. */
 	if (!atomic_comp_swap((uint32_t*)next_loc, (uint32_t)bh, (uint32_t)new)) {
 		kmem_cache_free(bh_kcache, new);
 		goto retry;

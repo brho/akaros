@@ -43,6 +43,7 @@ char *user_strdup(struct proc *p, const char *u_string, size_t strlen);
 char *user_strdup_errno(struct proc *p, const char *u_string, size_t strlen);
 void *kmalloc_errno(int len);
 bool uva_is_kva(struct proc *p, void *uva, void *kva);
+uintptr_t uva2kva(struct proc *p, void *uva);
 
 /* UTOP is defined as virtual address below which a process can write */
 static inline bool is_user_rwaddr(void *addr)
