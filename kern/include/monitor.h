@@ -32,5 +32,6 @@ int mon_monitor(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
 int mon_fs(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
 int mon_bb(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
 int mon_alarm(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
+int mon_bcq(int argc, char **argv, struct trapframe *tf);
 
 #endif	// !ROS_KERN_MONITOR_H

@@ -29,6 +29,7 @@
 
 #include <ros/timer.h>
 #include <ros/memlayout.h>
+#include <ros/event.h>
 
 #define CMDBUF_SIZE	80	// enough for one VGA text line
 
@@ -62,6 +63,7 @@ static command_t (RO commands)[] = {
 	{ "fs", "Filesystem Diagnostics", mon_fs},
 	{ "bb", "Try to run busybox (ash)", mon_bb},
 	{ "alarm", "Alarm Diagnostics", mon_alarm},
+	{ "bcq", "BCQ Diagnostics", mon_bcq},
 };
 #define NCOMMANDS (sizeof(commands)/sizeof(commands[0]))
 
@@ -876,6 +878,39 @@ int mon_alarm(int argc, char **argv, struct trapframe *tf)
 	}
 	if (!strcmp(argv[1], "pcpu")) {
 		print_pcpu_chains();
+	} else {
+		printk("Bad option\n");
+		return 1;
+	}
+	return 0;
+}
+
+/* This is ghetto: assumes a VCPD 10 element BCQ.  This is a pain in the ass to
+ * do generically, since size of a struct doesn't tell you its alignment.
+ * (picture a struct with just chars vs one that requires padding due to longer
+ * members).  This just works for event BCQs. */
+int mon_bcq(int argc, char **argv, struct trapframe *tf)
+{
+	if (argc < 2) {
+		printk("Usage: bcq OPTION [KVA_OF_BCQ] \n");
+		printk("\tstatus KVA_OF_BCQ: prints the status of the bcq\n");
+		return 1;
+	}
+	if (!strcmp(argv[1], "status")) {
+		if (argc != 3) {
+			printk("Give me a bcq.\n");
+			return 1;
+		}
+		struct event_msg_bcq *bcq =
+		                     (struct event_msg_bcq*)strtol(argv[2], 0, 16);
+		printk("Event BCQ: %08p\n", bcq);
+		printk("\tprod_idx: %08p\n", bcq->hdr.prod_idx);
+		printk("\tcons_pub_idx: %08p\n", bcq->hdr.cons_pub_idx);
+		printk("\tcons_pvt_idx: %08p\n", bcq->hdr.cons_pvt_idx);
+		for (int i = 0; i < NR_BCQ_EVENTS; i++) {
+			printk("Element %d, rdy_for_cons: %02p\n", i,
+			       bcq->wraps[i].rdy_for_cons);
+		}
 	} else {
 		printk("Bad option\n");
 		return 1;

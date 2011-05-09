@@ -878,6 +878,7 @@ void test_hashtable(void)
 /* Ghetto test, only tests one prod or consumer at a time */
 void test_bcq(void)
 {
+	/* Tests a basic struct */
 	struct my_struct {
 		int x;
 		int y;
@@ -897,44 +898,65 @@ void test_bcq(void)
 	bcq_dequeue(&t_bcq, &out_struct, 16);
 	printk("out x %d. out y %d\n", out_struct.x, out_struct.y);
 	
-	DEFINE_BCQ_TYPES(my, int, 8);
+	/* Tests the BCQ a bit more, esp with overflow */
+	#define NR_ELEM_A_BCQ 8 /* NOTE: this must be a power of 2! */
+	DEFINE_BCQ_TYPES(my, int, NR_ELEM_A_BCQ);
 	struct my_bcq a_bcq;
-	bcq_init(&a_bcq, int, 8);
+	bcq_init(&a_bcq, int, NR_ELEM_A_BCQ);
 	
 	int y = 2;
 	int output[100];
 	int retval[100];
-	
+
+	/* Helpful debugger */
+	void print_a_bcq(struct my_bcq *bcq)
+	{
+		printk("A BCQ (made of ints): %08p\n", bcq);
+		printk("\tprod_idx: %08p\n", bcq->hdr.prod_idx);
+		printk("\tcons_pub_idx: %08p\n", bcq->hdr.cons_pub_idx);
+		printk("\tcons_pvt_idx: %08p\n", bcq->hdr.cons_pvt_idx);
+		for (int i = 0; i < NR_ELEM_A_BCQ; i++) {
+			printk("Element %d, rdy_for_cons: %02p\n", i,
+			       bcq->wraps[i].rdy_for_cons);
+		}
+	}
+
+	/* Put in more than it can take */
 	for (int i = 0; i < 15; i++) {
 		y = i;
-		retval[i] = bcq_enqueue(&a_bcq, &y, 8, 10);
+		retval[i] = bcq_enqueue(&a_bcq, &y, NR_ELEM_A_BCQ, 10);
 		printk("enqueued: %d, had retval %d \n", y, retval[i]);
 	}
+	//print_a_bcq(&a_bcq);
 	
+	/* Try to dequeue more than we put in */
 	for (int i = 0; i < 15; i++) {
-		retval[i] = bcq_dequeue(&a_bcq, &output[i], 8);
+		retval[i] = bcq_dequeue(&a_bcq, &output[i], NR_ELEM_A_BCQ);
 		printk("dequeued: %d with retval %d\n", output[i], retval[i]);
 	}
+	//print_a_bcq(&a_bcq);
 	
+	/* Put in some it should be able to take */
 	for (int i = 0; i < 3; i++) {
 		y = i;
-		retval[i] = bcq_enqueue(&a_bcq, &y, 8, 10);
+		retval[i] = bcq_enqueue(&a_bcq, &y, NR_ELEM_A_BCQ, 10);
 		printk("enqueued: %d, had retval %d \n", y, retval[i]);
 	}
 	
+	/* Take those, and then a couple extra */
 	for (int i = 0; i < 5; i++) {
-		retval[i] = bcq_dequeue(&a_bcq, &output[i], 8);
+		retval[i] = bcq_dequeue(&a_bcq, &output[i], NR_ELEM_A_BCQ);
 		printk("dequeued: %d with retval %d\n", output[i], retval[i]);
 	}
 	
+	/* Try some one-for-one */
 	for (int i = 0; i < 5; i++) {
 		y = i;
-		retval[i] = bcq_enqueue(&a_bcq, &y, 8, 10);
+		retval[i] = bcq_enqueue(&a_bcq, &y, NR_ELEM_A_BCQ, 10);
 		printk("enqueued: %d, had retval %d \n", y, retval[i]);
-		retval[i] = bcq_dequeue(&a_bcq, &output[i], 8);
+		retval[i] = bcq_dequeue(&a_bcq, &output[i], NR_ELEM_A_BCQ);
 		printk("dequeued: %d with retval %d\n", output[i], retval[i]);
 	}
-	
 }
 
 /* rudimentary tests.  does the basics, create, merge, split, etc.  Feel free to

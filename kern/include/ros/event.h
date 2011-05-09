@@ -52,7 +52,7 @@ struct event_msg {
 };
 
 /* Random numbers */
-#define NR_BCQ_EVENTS 10		/* nr events in a bcq */
+#define NR_BCQ_EVENTS 16		/* nr events in a bcq (power of 2!) */
 #define NR_BCQ_EV_LOOPS 4		/* how many loops to try to enqueue */
 
 DEFINE_BCQ_TYPES(event_msg, struct event_msg, NR_BCQ_EVENTS);

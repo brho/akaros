@@ -21,7 +21,7 @@
  * blocks and does not need to trust the data structure (which is writable by
  * the consumer).
  *
- * A producer enqueues and item, based on the indexes of the producer and
+ * A producer enqueues an item, based on the indexes of the producer and
  * consumer.  Enqueue cannot block, but can fail if the queue is full or if it
  * fails to enqueue after a certain amount of tries.
  *
@@ -73,6 +73,7 @@
  * bcq_enqueue(&some_bcq, &some_my_type, my_size, num_fails_okay);
  * bcq_dequeue(&some_bcq, &some_my_type, my_size);
  *
+ * They both return 0 on success, or some error code on failure.
  *
  * TODO later:
  * How about an atomic_add_return for the prod?  Now that we use powers of two,
