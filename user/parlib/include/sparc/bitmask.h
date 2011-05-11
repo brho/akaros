@@ -67,9 +67,9 @@ static inline bool BITMASK_IS_FULL(uint8_t* map, size_t size)
 #define PRINT_BITMASK(name, size) { \
 	int i;	\
 	for (i = 0; i < BYTES_FOR_BITMASK(size); i++) { \
-		printk("%x", (name)[i] );	\
+		printf("%x", (name)[i] );	\
 	} \
-	printk("\n"); \
+	printf("\n"); \
 }
 
 #endif /* PARLIB_ARCH_BITMASK_H */

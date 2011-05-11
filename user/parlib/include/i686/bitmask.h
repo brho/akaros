@@ -101,10 +101,10 @@ static inline bool BITMASK_IS_FULL(uint8_t* map, size_t size)
 	for (i = 0; i < BYTES_FOR_BITMASK(size); i++) { \
 		int j;	\
 		for (j = 0; j < MIN(8,_size); j++) \
-			printk("%x", ((name)[i] >> j) & 1);	\
+			printf("%x", ((name)[i] >> j) & 1);	\
 			_size--; \
 	} \
-	printk("\n"); \
+	printf("\n"); \
 }
 
 #endif /* PARLIB_ARCH_BITMASK_H */
