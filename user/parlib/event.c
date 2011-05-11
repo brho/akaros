@@ -185,7 +185,12 @@ static int handle_mbox(struct event_mbox *ev_mbox, unsigned int flags)
 	/* Race here with another core clearing overflows/bits.  Don't have more
 	 * than one vcore work on an mbox without being more careful of overflows
 	 * (as in, assume any overflow means all bits must be checked, since someone
-	 * might have not told a handler of an overflow). */
+	 * might have not told a handler of an overflow).
+	 *
+	 * The purpose of this is to let everyone know we are dealing with
+	 * overflows, mostly for preventing code from freaking out about having too
+	 * many overflows.  Also slightly important to not have wraparound (though
+	 * in theory it is still possible). */
 	if (ev_mbox->ev_overflows) {
 		ev_mbox->ev_overflows = 0;
 		overflow = TRUE;
@@ -195,13 +200,19 @@ static int handle_mbox(struct event_mbox *ev_mbox, unsigned int flags)
 	 * have the function use addresses relative to the frame pointer). */
 	void bit_handler(unsigned int bit) {
 		printd("Bit: ev_type: %d\n", bit);
+		cmb();
 		if (ev_handlers[bit])
-			ev_handlers[bit](0, bit, overflow);
+			ev_handlers[bit](0, bit, overflow || ev_mbox->ev_overflows);
 		retval++;
 		check_preempt_pending(vcoreid);
 		/* Consider checking the queue for incoming messages while we're here */
 	}
 	BITMASK_FOREACH_SET(ev_mbox->ev_bitmap, MAX_NR_EVENT, bit_handler, TRUE);
+	/* If you ever have bugs where bits are set without overflow (for
+	 * non-EVENT_NOMSG handlers, like the syscall, check here for the bit being
+	 * set AND there is no overflow.  You must read the bit before checking
+	 * the overflows, since the kernel writes them in the other order (kernel
+	 * sets overflow, then sets the bit). */
 	return retval;
 }
 
