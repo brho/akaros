@@ -87,6 +87,8 @@ buffer is full).  This means that a process can produce for one of its ev_qs
 
 2. Async Syscalls and I/O
 ====================
+2.1 Basics
+----------------------------------------------
 The syscall struct is the contract for work with the kernel, including async
 I/O.  Lots of current OS async packages use epoll or other polling systems.
 Note the distinction between Polling and Async I/O.  Polling is about finding
@@ -126,6 +128,128 @@ syscalls can be SC_PROGRESS (new stuff happened on it), which can trigger a
 notification event.  Some calls, like AIO or bulk accept, exist for a while
 and slowly get filled in / completed.  In the future, we'll also want a way to
 abort the in-progress syscalls (possibly any syscall!).
+
+2.2 Uthreads Blocking on Syscalls
+----------------------------------------------
+Many threading libraries will want some notion of a synchronous, blocking
+thread.  These threads use regular I/O calls, which are async under the hood,
+but don't want to bother with call backs or other details of async I/O.  In
+this section, I'll talk a bit about how this works, esp regarding
+uthreads/pthreads.
+
+'Blocking' refers to user threads, and has nothing to do with an actual
+process blocking/waiting on some kernel event.  The kernel does not know
+anything about what goes on here.  While a bit confusing, this allows
+applications to do whatever they want on top of an async interface, and is a
+consequence of decoupling cores from user-threads from kthreads.
+
+2.2.1 Basics of Uthread Blocking
+---------------
+When a thread calls a glibc function that makes a system call, if the syscall
+is not yet complete when the kernel returns to userspace, glibc will check for
+the existence of a second level scheduler and attempt to use it to yield its
+uthread.  If there is no 2LS, the code just spins for now.  Eventually, it
+will try to suspend/yield the process for a while (til the call is done), aka,
+block in the kernel.
+
+If there is a 2LS, the current thread will yield, and call out to the 2LS's
+blockon_sysc() method, which needs a way to stop the thread and be able to
+restart it when the syscall completes.  Specifically, the pthread 2LS puts the
+thread on a "syscall pending" list and registers the syscall to respond to an
+event (described in detail elsewhere in this doc).  When the event comes in,
+meaning the syscall is complete, the thread is put on the runnable list.
+
+Details:
+- A pointer to the struct pthread is stored in the syscall's void*.  You need
+  to be on the pending list before registering for the event (due to how we
+  handle event overflow recovery).  When the syscall is done, we normally get
+  a message from the kernel, and the payload tells us the syscall is done,
+  which tells us which thread to unblock. 
+- The pthread code also always asks for an IPI and event message for every
+  syscall that completes.  This is far from ideal.  Still, the basics are the
+  same for any threading library.  Once you know a thread is done, you need to
+  do something about it.
+- The pthread code does syscall blocking/ pending lists and event notification
+  on a per-core basis.
+- There's a race between the 2LS trying to sign up for events and the kernel
+  finishing the event.  We handle this in uthread code, so use the helper to
+  register_evq(), which does the the right thing (atomics, careful ordering
+  with writes, etc).
+- If as syscall has an ev_q*, it is on the pending list.  It can be on the
+  pending list without an ev_q.
+
+2.2.1 Recovering from Event Overflow
+---------------
+The pthread code expects to receive an event somehow to unblock a thread
+once its syscall is done.  One limitation to our messaging systems is that you
+can't send an infinite amount of event messages.  (By messages, I mean a chunk
+of memory with a payload, in this case consisting of a struct syscall *).
+Event delivery degrades to a bit in the case of the message queue being full
+(more details on that later).
+
+The pthread code (and any similar 2LS) needs to handle waking up syscalls when
+the event message was lost and all we know is that some syscall that was meant
+to have a message sent to a particular event queue (per-core in the case of
+pthread stuff (actually the VCPD for now)).  The basic idea is to poll all
+outstanding system calls and unblock whoever is done.
+
+The key problem is due to a race: for a given syscall we don't know if we're
+going to get a message for a syscall or not.  There could be a completion
+message in the queue for the syscall while we are going through the list of
+blocked threads.  If we assume we already got the message (or it was lost in
+the overflow), but didn't really, then if we finish as SC and free its memory
+(free or return up the stack), we could later get a message for it, and all
+sorts of things would go wrong (like trying to unblock a pointer that is
+gibberish).
+
+Here's what we do:
+1) Set a "handling overflow" flag so we don't recurse.
+2) Turn off event delivery for all syscalls on our list
+3) Handle any event messages.  This is how we make a distinction between
+finished syscalls that had a message sent and those that didn't.  We're doing
+the message-sent ones here.
+4) For any left on the list, check to see if they are done.  We actually do
+this by attempting to turn on event delivery for them.  Turning on event
+delivery can fail if the call is already done.  So if it fails, they are done
+and we unblock them (similar to how we block the threads in the first place).
+If it doesn't fail, they are now ready to receive messages.  This can be
+tweaked a bit.
+5) Unset the overflow-handling flag.
+
+There are a couple implications of this style.  If you have a shared event
+queue (with other event sources), those events can get mixed in with the
+recovery.  Don't leave the vcore context due to other events.  This'll
+probably need work.  The other thing is that completed syscalls can get
+handled in a different order than they were signaled.  Shouldn't be a big
+deal.
+
+Note on the overflow handling flag and unsetting it.  There should not be any
+races with this.  The flag prevented us from handling overflows on the event
+queue.  Other than when we checked for events that had been succesfully sent,
+we didn't try to handle events.  We can unset the flag, and at that point we
+can start handling missed events.  If there was an overflow after we last
+checked the list, but before we cleared the overflow-handling flag, we'll
+still catch it since we haven't tried handling events in between checking the
+list and clearing the flag.  That flag doesn't even matter until we want to
+handle_events, so we aren't missing anything.  the next handle_events() will
+deal with everything from scratch.
+
+For blocking threads that block concurrently with the overflow handling: in
+the pthread case, this can't happen since everything is per-vcore.  If you do
+have process-wide thread blocking/syscall management, we can add new ones, but
+they must have event delivery turned off when they are added to the list.  And
+you'll need to lock the list, etc.  This should work in part due to new
+syscalls being added to the end of the list, and the overflow-handler
+proceeding linearly through the list.
+
+Also note that we shouldn't handle the event for unblocking a syscall on a
+different core than the one it was submitted to.  This could result in
+concurrent modifications to the original core's TAILQ (bad).  This restriction
+is dependent on how a 2LS does its thread handling/blocking.
+
+Eventually, we'll want a way to detect and handle excessive overflow, since
+it's probably quite expensive.  Perhaps turn it off and periodically poll the
+syscalls for completion (but don't bother turning on the ev_q).
 
 3. Event Delivery / Notification
 ====================

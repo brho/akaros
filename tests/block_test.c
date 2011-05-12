@@ -11,7 +11,7 @@ pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 	printf(__VA_ARGS__); \
 	pthread_mutex_unlock(&lock);
 
-#define NUM_TEST_THREADS 1
+#define NUM_TEST_THREADS 20
 #define NUM_TEST_LOOPS 1000
 
 pthread_t my_threads[NUM_TEST_THREADS];
@@ -23,7 +23,7 @@ void *block_thread(void* arg)
 	assert(!in_vcore_context());
 	for (int i = 0; i < NUM_TEST_LOOPS; i++) {
 		printf_safe("[A] pthread %d on vcore %d\n", pthread_self()->id, vcore_id());
-		sys_block(5000);
+		sys_block(5000 + pthread_self()->id);
 	}
 	return (void*)(pthread_self()->id);
 }

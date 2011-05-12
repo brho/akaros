@@ -273,34 +273,61 @@ static void restart_thread(struct syscall *sysc)
 	uthread_runnable(ut_restartee);
 }
 
-/* Handles syscall overflow */
-static void handle_sysc_overflow(void)
-{
-	struct sysc_mgmt *vc_sysc_mgmt = &sysc_mgmt[vcore_id()];
-	/* if we're currently handling it on this vcore, bail out */
-	if (vc_sysc_mgmt->handling_overflow)
-		return;
-	/* Actually handle stuff (TODO) */
-	vc_sysc_mgmt->handling_overflow = TRUE;
-	printf("FUUUUUUUUUUUUUUUUCK, OVERFLOW!!!!!!!\n");
-}
-
 /* This handler is usually run in vcore context, though I can imagine it being
  * called by a uthread in some other threading library. */
 static void pth_handle_syscall(struct event_msg *ev_msg, unsigned int ev_type,
                                bool overflow)
 {
+	uint32_t vcoreid = vcore_id();
+	struct sysc_mgmt *vc_sysc_mgmt = &sysc_mgmt[vcoreid];
 	struct syscall *sysc;
+	struct pthread_tcb *i, *temp;
 	assert(in_vcore_context());
-	if (overflow) {
-		handle_sysc_overflow();
-	}
-	if (!ev_msg) {
-		/* Probably a bug somewhere if we had no ev_msg and no overflow */
-		if (!overflow)
-			printf("[pthread] crap, no ev_msg!!\n");
+	/* Handle overflow: (if we haven't started handling it yet): */
+	if (overflow && !vc_sysc_mgmt->handling_overflow) {
+		vc_sysc_mgmt->handling_overflow = TRUE;
+		printd("[pthread] handling syscall overflow on vcore %d\n", vcoreid);
+		/* Turn off event handling for all syscs on our list.  Note they remain
+		 * on the pending_sysc list. */
+		TAILQ_FOREACH(i, &sysc_mgmt[vcoreid].pending_syscs, next) {
+			sysc = ((struct uthread*)i)->sysc;
+			deregister_sysc(sysc);
+		}
+		/* Handle event msgs, to get any syscs that sent messages.  We don't
+		 * care about bits, since we're dealing with overflow already.  Note
+		 * that pthreads currently uses an ev_q shared by a bunch of message
+		 * types, so other things could also run (careful with them!). */  
+		handle_mbox_msgs(vc_sysc_mgmt->ev_q.ev_mbox);
+		/* Try to manually handle all syscs, turning on the ev_q if they are not
+		 * done, and handling them if they are done.  This deals with the same
+		 * issues we dealt with in pth_blockon_sysc().
+		 *
+		 * This might end up sucking, since we could get more overflow because
+		 * of the early turning-on of events.  Alternatively, we could loop
+		 * through and simply check for completion (and handle), and then do
+		 * this loop. */
+		TAILQ_FOREACH_SAFE(i, &sysc_mgmt[vcoreid].pending_syscs, next, temp) {
+			sysc = ((struct uthread*)i)->sysc;
+			if (!reregister_sysc(sysc)) {
+				/* They are already done, can't sign up for events, just like
+				 * when we blocked on them the first time. */
+				restart_thread(sysc);
+			}
+		}
+		/* Done dealing with overflow */
+		vc_sysc_mgmt->handling_overflow = FALSE;
+		/* The original sysc in an ev_msg, if any, has already been done. */
 		return;
 	}
+	/* It's a bug if we don't have a msg (we are handling a syscall bit-event)
+	 * while still dealing with overflow.  The only bit events should be for the
+	 * first (or subsequent) overflow. */
+	if (!ev_msg) {
+		printf("[pthread] crap, no ev_msg, overflow: %d, handling: %d!!\n",
+		       overflow, vc_sysc_mgmt->handling_overflow);
+		return;
+	}
+	/* Normal path: get the sysc from the message and just restart it */
 	sysc = ev_msg->ev_arg3;
 	assert(sysc);
 	restart_thread(sysc);

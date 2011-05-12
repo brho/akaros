@@ -36,5 +36,6 @@ void handle_ev_ev(struct event_msg *ev_msg, unsigned int ev_type,
                   bool overflow);
 int handle_events(uint32_t vcoreid);
 void handle_event_q(struct event_queue *ev_q);
+int handle_mbox_msgs(struct event_mbox *ev_mbox);
 
 #endif /* _EVENT_H */

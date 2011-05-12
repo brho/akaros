@@ -159,29 +159,44 @@ unsigned int get_event_type(struct event_mbox *ev_mbox)
  * 0. */
 handle_event_t ev_handlers[MAX_NR_EVENT] = {[EV_EVENT] handle_ev_ev, 0};
 
+/* Handles all the messages in the mbox, but not the single bits.  Currently
+ * this doesn't tell the handler about overflow, since you should be handling
+ * that because of the bits.  Returns the number handled. */
+int handle_mbox_msgs(struct event_mbox *ev_mbox)
+{
+	int retval = 0;
+	struct event_msg local_msg;
+	unsigned int ev_type;
+	uint32_t vcoreid = vcore_id();
+	/* Try to dequeue, dispatch whatever you get. */
+	while (!bcq_dequeue(&ev_mbox->ev_msgs, &local_msg, NR_BCQ_EVENTS)) {
+		ev_type = local_msg.ev_type;
+		printd("BCQ: ev_type: %d\n", ev_type);
+		if (ev_handlers[ev_type])
+			ev_handlers[ev_type](&local_msg, ev_type, FALSE);	/* no overflow*/
+		check_preempt_pending(vcoreid);
+		retval++;
+	}
+	return retval;
+}
+
 /* Handle an mbox.  This is the receive-side processing of an event_queue.  It
  * takes an ev_mbox, since the vcpd mbox isn't a regular ev_q.  For now, we
  * check for preemptions between each event handler. */
 static int handle_mbox(struct event_mbox *ev_mbox, unsigned int flags)
 {
-	struct event_msg local_msg;
-	unsigned int ev_type;
 	bool overflow = FALSE;
 	int retval = 0;
 	uint32_t vcoreid = vcore_id();
 
+	/* TODO: This may be unnecessary anymore.  All it does is save the effort of
+	 * checking the bitmask, though if we send EVENT_NOMSG, we'll have to check
+	 * the bitmask anyway (the flag means you could get bit events that aren't
+	 * overflow. */
 	if (!event_activity(ev_mbox, flags))
 		return retval;
-	/* Try to dequeue, dispatch whatever you get.  TODO consider checking for
-	 * overflow first */
-	while (!bcq_dequeue(&ev_mbox->ev_msgs, &local_msg, NR_BCQ_EVENTS)) {
-		ev_type = local_msg.ev_type;
-		printd("BCQ: ev_type: %d\n", ev_type);
-		if (ev_handlers[ev_type])
-			ev_handlers[ev_type](&local_msg, ev_type, overflow);
-		check_preempt_pending(vcoreid);
-		retval++;
-	}
+	/* Handle full messages.  Will deal with overflow and bits later. */
+	retval = handle_mbox_msgs(ev_mbox);
 	/* Race here with another core clearing overflows/bits.  Don't have more
 	 * than one vcore work on an mbox without being more careful of overflows
 	 * (as in, assume any overflow means all bits must be checked, since someone
