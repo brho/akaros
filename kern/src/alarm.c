@@ -21,13 +21,13 @@
 #include <smp.h>
 
 /* Helper, resets the earliest/latest times, based on the elements of the list.
- * If the list is empty, any new waiters will be earlier and later than the
- * current (which is none). */
+ * If the list is empty, we set the times to be the 12345 poison time.  Since
+ * the list is empty, the alarm shouldn't be going off. */
 static void reset_tchain_times(struct timer_chain *tchain)
 {
 	if (TAILQ_EMPTY(&tchain->waiters)) {
-		tchain->earliest_time = (uint64_t)-1;
-		tchain->latest_time = 0;
+		tchain->earliest_time = ALARM_POISON_TIME;
+		tchain->latest_time = ALARM_POISON_TIME;
 	} else {
 		tchain->earliest_time = TAILQ_FIRST(&tchain->waiters)->wake_up_time;
 		tchain->latest_time =
@@ -49,7 +49,7 @@ void init_timer_chain(struct timer_chain *tchain,
 void init_awaiter(struct alarm_waiter *waiter,
                   void (*func) (struct alarm_waiter *awaiter))
 {
-	waiter->wake_up_time = (uint64_t)-1;
+	waiter->wake_up_time = ALARM_POISON_TIME;
 	waiter->func = func;
 	if (!func)
 		init_sem(&waiter->sem, 0);
@@ -66,8 +66,13 @@ void set_awaiter_abs(struct alarm_waiter *waiter, uint64_t abs_time)
  * use than dealing with the TSC. */
 void set_awaiter_rel(struct alarm_waiter *waiter, uint64_t usleep)
 {
-	uint64_t now = read_tsc();
-	set_awaiter_abs(waiter, now + usleep * (system_timing.tsc_freq / 1000000));
+	uint64_t now, then;
+	now = read_tsc();
+	then = now + usleep * (system_timing.tsc_freq / 1000000);
+	/* This will go off if we wrap-around the TSC.  It'll never happen for legit
+	 * values, but this might catch some bugs with large usleeps. */
+	assert(now < then);
+	set_awaiter_abs(waiter, then);
 }
 
 /* Helper, makes sure the interrupt is turned on at the right time.  Most of the
@@ -81,6 +86,7 @@ static void reset_tchain_interrupt(struct timer_chain *tchain)
 		tchain->set_interrupt(0, tchain);
 	} else {
 		/* Make sure it is on and set to the earliest time */
+		assert(tchain->earliest_time != ALARM_POISON_TIME);
 		/* TODO: check for times in the past or very close to now */
 		printd("Turning alarm on for %llu\n", tchain->earliest_time);
 		tchain->set_interrupt(tchain->earliest_time, tchain);
@@ -136,44 +142,50 @@ void trigger_tchain(struct timer_chain *tchain)
 void set_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter)
 {
 	struct alarm_waiter *i, *temp;
-	bool reset_int = FALSE;
 	int8_t irq_state = 0;
-	bool inserted = FALSE;
 
+	/* This will fail if you don't set a time */
+	assert(waiter->wake_up_time != ALARM_POISON_TIME);
 	disable_irqsave(&irq_state);
-	/* Set the tchains upper and lower bounds, possibly needing a change to the
-	 * interrupt time. */
+	/* Either the list is empty, or not. */
+	if (TAILQ_EMPTY(&tchain->waiters)) {
+		tchain->earliest_time = waiter->wake_up_time;
+		tchain->latest_time = waiter->wake_up_time;
+		TAILQ_INSERT_HEAD(&tchain->waiters, waiter, next);
+		/* Need to turn on the timer interrupt later */
+		goto reset_out;
+	}
+	/* If not, either we're first, last, or in the middle.  Reset the interrupt
+	 * and adjust the tchain's times accordingly. */
 	if (waiter->wake_up_time < tchain->earliest_time) {
 		tchain->earliest_time = waiter->wake_up_time;
-		/* later on, set the core time to go off at the new, earliest time */
-		reset_int = TRUE;
+		TAILQ_INSERT_HEAD(&tchain->waiters, waiter, next);
+		/* Changed the first entry; we'll need to reset the interrupt later */
+		goto reset_out;
 	}
-	if (waiter->wake_up_time > tchain->latest_time) {
+	/* If there is a tie for last, the newer one will really go last.  We need
+	 * to handle equality here since the loop later won't catch it. */
+	if (waiter->wake_up_time >= tchain->latest_time) {
 		tchain->latest_time = waiter->wake_up_time;
 		/* Proactively put it at the end if we know we're last */
 		TAILQ_INSERT_TAIL(&tchain->waiters, waiter, next);
-		inserted = TRUE;
+		goto no_reset_out;
 	}
 	/* Insert before the first one you are earlier than.  This won't scale well
 	 * (TODO) if we have a lot of inserts.  The proactive insert_tail up above
 	 * will help a bit. */
-	if (!inserted) {
-		TAILQ_FOREACH_SAFE(i, &tchain->waiters, next, temp) {
-			if (waiter->wake_up_time < i->wake_up_time) {
-				TAILQ_INSERT_BEFORE(i, waiter, next);
-				inserted = TRUE;
-				break;
-			}
+	TAILQ_FOREACH_SAFE(i, &tchain->waiters, next, temp) {
+		if (waiter->wake_up_time < i->wake_up_time) {
+			TAILQ_INSERT_BEFORE(i, waiter, next);
+			goto no_reset_out;
 		}
 	}
-	/* Still not in?  The list ought to be empty. */
-	if (!inserted) {
-		assert(TAILQ_EMPTY(&tchain->waiters));
-		TAILQ_INSERT_HEAD(&tchain->waiters, waiter, next);
-	}
-	if (reset_int)
-		reset_tchain_interrupt(tchain);
+	panic("Could not find a spot for awaiter %08p\n", waiter);
+reset_out:
+	reset_tchain_interrupt(tchain);
+no_reset_out:
 	enable_irqsave(&irq_state);
+	/* TODO: could put some debug stuff here */
 }
 
 /* Removes waiter from the tchain before it goes off. 
@@ -190,12 +202,12 @@ void unset_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter)
 	 * the first and/or last element of the chain. */
 	if (TAILQ_FIRST(&tchain->waiters) == waiter) {
 		temp = TAILQ_NEXT(waiter, next);
-		tchain->earliest_time = (temp) ? temp->wake_up_time : (uint64_t)-1;
+		tchain->earliest_time = (temp) ? temp->wake_up_time : ALARM_POISON_TIME;
 		reset_int = TRUE;		/* we'll need to reset the timer later */
 	}
 	if (TAILQ_LAST(&tchain->waiters, awaiters_tailq) == waiter) {
 		temp = TAILQ_PREV(waiter, awaiters_tailq, next);
-		tchain->latest_time = (temp) ? temp->wake_up_time : 0;
+		tchain->latest_time = (temp) ? temp->wake_up_time : ALARM_POISON_TIME;
 	}
 	TAILQ_REMOVE(&tchain->waiters, waiter, next);
 	if (reset_int)
