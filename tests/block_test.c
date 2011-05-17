@@ -11,7 +11,7 @@ pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 	printf(__VA_ARGS__); \
 	pthread_mutex_unlock(&lock);
 
-#define NUM_TEST_THREADS 20
+#define NUM_TEST_THREADS 500
 #define NUM_TEST_LOOPS 1000
 
 pthread_t my_threads[NUM_TEST_THREADS];

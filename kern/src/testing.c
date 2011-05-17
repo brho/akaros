@@ -1248,3 +1248,84 @@ void test_kthreads(void)
 	sleep_on(&sem);
 	printk("Kthread restarted!, Stacktop is %08p.\n", get_stack_top());
 }
+
+/* Runs a simple test between core 0 (caller) and core 2 */
+void test_kref(void)
+{
+	struct kref local_kref;
+	bool done = FALSE;
+	/* Second player's kmsg */
+	void test_kref_2(struct trapframe *tf, uint32_t srcid, void *a0, void *a1,
+	                 void *a2)
+	{
+		struct kref *kref = (struct kref*)a0;
+		bool *done = (bool*)a1;
+		enable_irq();
+		for (int i = 0; i < 10000000; i++) {
+			kref_get(kref, 1);
+			set_core_timer(1, TRUE);
+			udelay(2);
+			kref_put(kref);
+		}
+		*done = TRUE;
+	}
+	
+	kref_init(&local_kref, fake_release, 1);
+	send_kernel_message(2, test_kref_2, &local_kref, &done, 0, KMSG_ROUTINE);
+	for (int i = 0; i < 10000000; i++) {
+		kref_get(&local_kref, 1);
+		udelay(2);
+		kref_put(&local_kref);
+	}
+	while (!done)
+		cpu_relax();
+	assert(kref_refcnt(&local_kref) == 1);
+	printk("[TEST-KREF] Simple 2-core getting/putting passed.\n");
+}
+
+void test_atomics(void)
+{
+	/* subtract_and_test */
+	atomic_t num;
+	/* Test subing to 0 */
+	atomic_init(&num, 1);
+	assert(atomic_sub_and_test(&num, 1) == 1);
+	atomic_init(&num, 2);
+	assert(atomic_sub_and_test(&num, 2) == 1);
+	/* Test not getting to 0 */
+	atomic_init(&num, 1);
+	assert(atomic_sub_and_test(&num, 0) == 0);
+	atomic_init(&num, 2);
+	assert(atomic_sub_and_test(&num, 1) == 0);
+	/* Test negatives */
+	atomic_init(&num, -1);
+	assert(atomic_sub_and_test(&num, 1) == 0);
+	atomic_init(&num, -1);
+	assert(atomic_sub_and_test(&num, -1) == 1);
+	/* Test larger nums */
+	atomic_init(&num, 265);
+	assert(atomic_sub_and_test(&num, 265) == 1);
+	atomic_init(&num, 265);
+	assert(atomic_sub_and_test(&num, 2) == 0);
+
+	/* CAS */
+	/* Simple test, make sure the bool retval of CAS handles failure */
+	void test_cas_val(long init_val)
+	{
+		long actual_num, old_num;
+		int attempt;
+		actual_num = init_val;
+		attempt = 0;
+		do {
+			old_num = actual_num;
+			/* First time, try to fail */
+			if (attempt == 0) 
+				old_num++;
+			attempt++;	
+		} while (!atomic_comp_swap((uint32_t*)&actual_num, old_num, old_num + 10));
+		if (actual_num != init_val + 10)
+			printk("FUCK, CAS test failed for %d\n", init_val);
+	}
+	test_cas_val(257);
+	test_cas_val(1);
+}

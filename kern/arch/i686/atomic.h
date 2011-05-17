@@ -101,7 +101,7 @@ static inline bool atomic_add_not_zero(atomic_t *number, long val)
 static inline bool atomic_sub_and_test(atomic_t *number, long val)
 {
 	bool b;
-	asm volatile("lock sub %2,%1; setz %0" : "=r"(b), "=m"(*number)
+	asm volatile("lock sub %2,%1; setz %0" : "=q"(b), "=m"(*number)
 	                                       : "r"(val), "m"(*number)
 	                                       : "cc" );
 	return b;
@@ -120,11 +120,12 @@ static inline uint32_t atomic_swap(uint32_t *addr, uint32_t val)
 	return val;
 }
 
-/* reusing exp_val for the bool return.  1 (TRUE) for success (like test). */
+/* reusing exp_val for the bool return.  1 (TRUE) for success (like test).  Need
+ * to zero eax, since it will get set if the cmpxchgl failed. */
 static inline bool atomic_comp_swap(uint32_t *addr, uint32_t exp_val,
                                     uint32_t new_val)
 {
-	asm volatile("lock cmpxchgl %4,%1; sete %%al"
+	asm volatile("lock cmpxchgl %4,%1; movl $0,%%eax; sete %%al"
 	             : "=a"(exp_val), "=m"(*addr)
 	             : "m"(*addr), "a"(exp_val), "r"(new_val)
 	             : "cc");

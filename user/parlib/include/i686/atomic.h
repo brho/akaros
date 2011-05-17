@@ -59,7 +59,7 @@ static inline uint32_t atomic_swap(uint32_t *addr, uint32_t val)
 static inline bool atomic_comp_swap(uint32_t *addr, uint32_t exp_val,
                                     uint32_t new_val)
 {
-	asm volatile("lock cmpxchgl %4,%1; sete %%al"
+	asm volatile("lock cmpxchgl %4,%1; movl $0,%%eax; sete %%al"
 	             : "=a"(exp_val), "=m"(*addr)
 	             : "m"(*addr), "a"(exp_val), "r"(new_val)
 	             : "cc");
