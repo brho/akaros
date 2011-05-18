@@ -91,9 +91,6 @@ void sleep_on(struct semaphore *sem)
 	/* Switch to the core's default stack.  After this, don't use local
 	 * variables.  TODO: we shouldn't be using new_stacktop either, can't always
 	 * trust the register keyword (AFAIK). */
-	/* TODO: we shouldn't do this if new_stacktop is on the same page as cur_tf */
-	assert(ROUNDDOWN((uintptr_t)current_tf, PGSIZE) !=
-	       kthread->stacktop - PGSIZE);
 	set_stack_pointer(new_stacktop);
 	smp_idle();
 	/* smp_idle never returns */
@@ -134,10 +131,6 @@ void restart_kthread(struct kthread *kthread)
 	 * free our current kthread *before* popping it, nor can we free the current
 	 * stack until we pop to the kthread's stack). */
 	if (pcpui->spare) {
-		/* this should never happen now.  it probably only was a concern because
-		 * i accidentally free kthread's stacktop (the one i was jumping too) */
-		assert(ROUNDDOWN((uintptr_t)current_tf, PGSIZE) !=
-		       pcpui->spare->stacktop - PGSIZE);
 		/* this should probably have a rounddown, since it's not always the top,
 		 * or even always PGSIZE... */
 		page_decref(kva2page((void*)pcpui->spare->stacktop - PGSIZE));
@@ -196,6 +189,7 @@ void __launch_kthread(struct trapframe *tf, uint32_t srcid, void *a0, void *a1,
 			                    0, 0, KMSG_ROUTINE);
 			return;
 		}
+		/* TODO: this whole area needs serious work */
 		if (cur_proc != kthread->proc) {
 			/* we're running the kthread from a different proc.  For now, we
 			 * can't be _M, since that would be taking away someone's vcore to

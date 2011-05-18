@@ -45,6 +45,7 @@ static void __kmem_cache_create(struct kmem_cache *kc, const char *name,
 	TAILQ_INIT(&kc->empty_slab_list);
 	kc->ctor = ctor;
 	kc->dtor = dtor;
+	kc->nr_cur_alloc = 0;
 	
 	/* put in cache list based on it's size */
 	struct kmem_cache *i, *prev = NULL;
@@ -185,6 +186,7 @@ void *kmem_cache_alloc(struct kmem_cache *cp, int flags)
 		TAILQ_REMOVE(&cp->partial_slab_list, a_slab, link);
 		TAILQ_INSERT_HEAD(&cp->full_slab_list, a_slab, link);
 	}
+	cp->nr_cur_alloc++;
 	spin_unlock_irqsave(&cp->cache_lock);
 	return retval;
 }
@@ -217,6 +219,7 @@ void kmem_cache_free(struct kmem_cache *cp, void *buf)
 		TAILQ_INSERT_HEAD(&a_slab->bufctl_freelist, a_bufctl, link);
 	}
 	a_slab->num_busy_obj--;
+	cp->nr_cur_alloc--;
 	// if it was full, move it to partial
 	if (a_slab->num_busy_obj + 1 == a_slab->num_total_obj) {
 		TAILQ_REMOVE(&cp->full_slab_list, a_slab, link);
@@ -332,6 +335,7 @@ void print_kmem_cache(struct kmem_cache *cp)
 	printk("Slab Full: 0x%08x\n", cp->full_slab_list);
 	printk("Slab Partial: 0x%08x\n", cp->partial_slab_list);
 	printk("Slab Empty: 0x%08x\n", cp->empty_slab_list);
+	printk("Current Allocations: %d\n", cp->nr_cur_alloc);
 	spin_unlock_irqsave(&cp->cache_lock);
 }
 

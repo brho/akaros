@@ -80,6 +80,7 @@ struct kmem_cache {
 	struct kmem_slab_list empty_slab_list;
 	void (*ctor)(void *, size_t);
 	void (*dtor)(void *, size_t);
+	unsigned long nr_cur_alloc;
 };
 
 /* List of all kmem_caches, sorted in order of size */
