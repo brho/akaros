@@ -29,6 +29,8 @@
 #KERN_CFLAGS += $(CONFIG_PCI_VERBOSE)
 # Rimas's Ethernet audio device
 #KERN_CFLAGS += $(CONFIG_ETH_AUDIO)
+# Avoid KB input on buggy nehalems (brho's machine)
+#KERN_CFLAGS += $(CONFIG_KB_CORE0_ONLY)
 
 #KERN_CFLAGS += -DDEVELOPER_NAME=waterman
 #KERN_CFLAGS += -DDEVELOPER_NAME=brho

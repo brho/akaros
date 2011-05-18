@@ -405,6 +405,17 @@ kbd_proc_data(void)
 	int c;
 	uint8_t data;
 
+#ifdef __CONFIG_KB_CORE0_ONLY__
+	/* Ghetto hack to avoid crashing brho's buggy nehalem. */
+	uint32_t eax, ebx, ecx, edx, family, model, stepping;
+	cpuid(1, &eax, &ebx, &ecx, &edx);
+	family = ((eax & 0x0FF00000) >> 20) + ((eax & 0x00000F00) >> 8);
+	model = ((eax & 0x000F0000) >> 12) + ((eax & 0x000000F0) >> 4);
+	stepping = eax & 0x0000000F;
+	if (family == 6 && model == 26 && stepping == 4)
+		if (core_id())
+			return -1;
+#endif /* __CONFIG_KB_CORE0_ONLY */
 
 	if ((inb(KBSTATP) & KBS_DIB) == 0)
 		return -1;
