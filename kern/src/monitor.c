@@ -693,7 +693,7 @@ int mon_monitor(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 	void run_mon(struct trapframe *tf, uint32_t srcid, void *a0, void *a1,
 	             void *a2)
 	{
-		monitor(0); // TODO consider passing the tf
+		monitor(0);
 	}
 	send_kernel_message(core, run_mon, 0, 0, 0, KMSG_ROUTINE);
 	return 0;

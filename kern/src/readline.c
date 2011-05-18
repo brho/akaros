@@ -13,13 +13,13 @@ int readline(char *buf, size_t buf_l, const char *prompt, ...)
 	int i, c, echoing, retval;
 	va_list ap;
 
+	spin_lock_irqsave(&readline_lock);
 	va_start(ap, prompt);
 	if (prompt != NULL)
 		vcprintf(prompt, ap);
 	va_end(ap);
 
 	i = 0;
-	spin_lock_irqsave(&readline_lock);
 	echoing = iscons(0);
 	while (1) {
 		c = getchar();
