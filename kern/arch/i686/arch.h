@@ -33,7 +33,6 @@ static __inline void reboot(void) __attribute__((always_inline)) __attribute__((
 
 void print_cpuinfo(void);
 void show_mapping(uintptr_t start, size_t size);
-void backtrace(void);
 
 /* declared in smp.c */
 int hw_coreid_lookup[MAX_NUM_CPUS];

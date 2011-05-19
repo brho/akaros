@@ -36,7 +36,6 @@ static __inline uint32_t rcr3(void) __attribute__((always_inline));
 
 void print_cpuinfo(void);
 void show_mapping(uintptr_t start, size_t size);
-void backtrace(void);
 void cpu_halt(void);
 
 extern uintptr_t mmu_context_tables[MAX_NUM_CPUS][NCONTEXTS+CONTEXT_TABLE_PAD];

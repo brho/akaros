@@ -150,43 +150,6 @@ void show_mapping(uintptr_t start, size_t size)
 	}
 }
 
-void backtrace(void)
-{ TRUSTEDBLOCK
-	extern char (SNT RO _start)[];
-	uint32_t *ebp, eip;
-	eipdebuginfo_t debuginfo;
-	char buf[256];
-	int j, i = 1;
-	ebp = (uint32_t*)read_ebp();
-	// this is part of the way back into the call() instruction's bytes
-	// eagle-eyed readers should be able to explain why this is good enough,
-	// and retaddr (just *(ebp + 1) is not)
-	eip = *(ebp + 1) - 1;
-	// jump back a frame (out of backtrace)
-	ebp = (uint32_t*)(*ebp);
-	printk("Stack Backtrace on Core %d:\n", core_id());
-	// on each iteration, ebp holds the stack frame and eip an addr in that func
-	while (ebp != 0) {
-		debuginfo_eip(eip, &debuginfo);
-		memset(buf, 0, 256);
-		strncpy(buf, debuginfo.eip_fn_name, MIN(debuginfo.eip_fn_namelen, 256));
-		buf[MIN(debuginfo.eip_fn_namelen, 255)] = 0;
-		cprintf("#%02d [<%p>] in %s+%x(%p) from %s:%d\n", i++,  eip, buf, 
-		        debuginfo.eip_fn_addr - (uint32_t)_start, debuginfo.eip_fn_addr, 
-		        debuginfo.eip_file, debuginfo.eip_line);
-		cprintf("    ebp: %x   Args:", ebp);
-		for (j = 0; j < MIN(debuginfo.eip_fn_narg, 5); j++)
-			cprintf(" %08x", *(ebp + 2 + j));
-		cprintf("\n");
-		eip = *(ebp + 1) - 1;
-		ebp = (uint32_t*)(*ebp);
-		#ifdef __CONFIG_RESET_STACKS__
-		if (!strncmp("__smp_idle", debuginfo.eip_fn_name, 10))
-			break;
-		#endif /* __CONFIG_RESET_STACKS__ */
-	}
-}
-
 /* Like backtrace, this is probably not the best place for this. */
 void spinlock_debug(spinlock_t *lock)
 {

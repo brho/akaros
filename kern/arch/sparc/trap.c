@@ -13,6 +13,7 @@
 #include <ros/mman.h>
 #include <umem.h>
 #include <pmap.h>
+#include <kdebug.h>
 
 #ifdef __SHARC__
 #pragma nosharc

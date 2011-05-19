@@ -53,6 +53,7 @@ KERN_SRCFILES := $(KERN_ARCH_SRCFILES) \
                  $(KERN_SRC_DIR)/net.c \
                  $(KERN_SRC_DIR)/event.c \
                  $(KERN_SRC_DIR)/alarm.c \
+                 $(KERN_SRC_DIR)/kdebug.c \
                  $(KERN_SRC_DIR)/arsc.c
 
 # Only build files if they exist.
