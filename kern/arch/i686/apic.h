@@ -125,6 +125,7 @@ static inline void send_broadcast_ipi(uint8_t vector);
 static inline void send_all_others_ipi(uint8_t vector);
 static inline void send_ipi(uint8_t hw_coreid, uint8_t vector);
 static inline void send_group_ipi(uint8_t hw_groupid, uint8_t vector);
+static inline void __send_nmi(uint8_t os_coreid);
 static inline bool ipi_is_pending(uint8_t vector);
 
 #define mask_lapic_lvt(entry) \
@@ -255,6 +256,15 @@ static inline void send_group_ipi(uint8_t hw_groupid, uint8_t vector)
 {
 	write_mmreg32(LAPIC_IPI_ICR_UPPER, hw_groupid << 24);
 	write_mmreg32(LAPIC_IPI_ICR_LOWER, 0x00004800 | vector);
+	lapic_wait_to_send();
+}
+
+static inline void __send_nmi(uint8_t hw_coreid)
+{
+	if (hw_coreid == 255)
+		return;
+	write_mmreg32(LAPIC_IPI_ICR_UPPER, hw_coreid << 24);
+	write_mmreg32(LAPIC_IPI_ICR_LOWER, 0x00004400);
 	lapic_wait_to_send();
 }
 

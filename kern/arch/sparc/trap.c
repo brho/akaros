@@ -108,6 +108,11 @@ void pop_kernel_tf(struct trapframe *tf)
 	panic("Not implemented.  =(");
 }
 
+/* Does nothing on sparc... */
+void send_nmi(uint32_t os_coreid)
+{
+}
+
 void
 idt_init(void)
 {

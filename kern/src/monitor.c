@@ -26,6 +26,7 @@
 #include <kmalloc.h>
 #include <elf.h>
 #include <event.h>
+#include <trap.h>
 
 #include <ros/timer.h>
 #include <ros/memlayout.h>
@@ -58,7 +59,7 @@ static command_t (RO commands)[] = {
 	{ "kfunc", "Run a kernel function directly (!!!)", mon_kfunc},
 	{ "notify", "Notify a process.  Vcoreid will skip their prefs", mon_notify},
 	{ "measure", "Run a specific measurement", mon_measure},
-	{ "trace", "Run a specific measurement", mon_trace},
+	{ "trace", "Run some tracing functions", mon_trace},
 	{ "monitor", "Run the monitor on another core", mon_monitor},
 	{ "fs", "Filesystem Diagnostics", mon_fs},
 	{ "bb", "Try to run busybox (ash)", mon_bb},
@@ -631,10 +632,12 @@ int mon_measure(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 
 int mon_trace(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 {
+	uint32_t core;
 	if (argc < 2) {
 		printk("Usage: trace OPTION\n");
 		printk("\tsyscall start [silent] [pid]: starts tracing\n");
 		printk("\tsyscall stop: stops tracing, prints if it was silent\n");
+		printk("\tcoretf COREID: cause the other core to print its TF (NMI)\n");
 		return 1;
 	}
 	if (!strcmp(argv[1], "syscall")) {
@@ -666,6 +669,18 @@ int mon_trace(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 			systrace_print(TRUE, 0);
 			systrace_clear_buffer();
 		}
+	} else if (!strcmp(argv[1], "coretf")) {
+		if (argc != 3) {
+			printk("Need a coreid, fool.\n");
+			return 1;
+		}
+		core = strtol(argv[2], 0, 0);
+		if (core >= num_cpus) {
+			printk("No such core!  Maybe it's in another cell...\n");
+			return 1;
+		}
+		send_nmi(core);
+		udelay(1000000);
 	} else if (!strcmp(argv[1], "opt2")) {
 		if (argc != 3) {
 			printk("ERRRRRRRRRR.\n");

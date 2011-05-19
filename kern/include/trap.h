@@ -52,6 +52,9 @@ static inline void save_kernel_tf(struct trapframe *tf)
                    __attribute__((always_inline));
 void pop_kernel_tf(struct trapframe *tf) __attribute__((noreturn));
 
+/* Sends a non-maskable interrupt, which we have print a trapframe. */
+void send_nmi(uint32_t os_coreid);
+
 /* Kernel messages.  Each arch implements them in their own way.  Both should be
  * guaranteeing in-order delivery.  Kept here in trap.h, since sparc is using
  * trap.h for KMs.  Eventually, both arches will use the same implementation.

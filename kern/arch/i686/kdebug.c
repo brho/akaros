@@ -147,6 +147,9 @@ debuginfo_eip(uintptr_t addr, eipdebuginfo_t *NONNULL info)
 		stabstr_end = __STABSTR_END__;
 		stabstr = __STABSTR_BEGIN__;
 	} else {
+		/* TODO: short circuiting this, til our user space apps pack stab data
+		 * the kernel knows about */
+		return -1;
 		// The user-application linker script, user/user.ld,
 		// puts information about the application's stabs (equivalent
 		// to __STAB_BEGIN__, __STAB_END__, __STABSTR_BEGIN__, and

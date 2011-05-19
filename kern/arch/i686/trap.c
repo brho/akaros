@@ -19,6 +19,8 @@
 #include <stdio.h>
 #include <slab.h>
 #include <syscall.h>
+#include <kdebug.h>
+#include <kmalloc.h>
 
 taskstate_t RO ts;
 
@@ -118,6 +120,14 @@ void pop_kernel_tf(struct trapframe *tf)
 	              :
 	              : "g"(tf), "r"(tf->tf_esp), "r"(tf->tf_eip) : "memory");
 	panic("ret failed");				/* mostly to placate your mom */
+}
+
+/* Sends a non-maskable interrupt; the handler will print a trapframe. */
+void send_nmi(uint32_t os_coreid)
+{
+	/* NMI / IPI for x86 are limited to 8 bits */
+	uint8_t hw_core = (uint8_t)get_hw_coreid(os_coreid);
+	__send_nmi(hw_core);
 }
 
 void idt_init(void)
@@ -224,11 +234,16 @@ print_trapframe(trapframe_t *tf)
 	spin_unlock_irqsave(&ptf_lock);
 }
 
-static void
-trap_dispatch(trapframe_t *tf)
+static void trap_dispatch(struct trapframe *tf)
 {
 	// Handle processor exceptions.
 	switch(tf->tf_trapno) {
+		case T_NMI:
+			print_trapframe(tf);
+			char *fn_name = get_fn_name(tf->tf_eip);
+			printk("Core %d is at %08p (%s)\n", core_id(), tf->tf_eip, fn_name);
+			kfree(fn_name);
+			break;
 		case T_BRKPT:
 			monitor(tf);
 			break;
