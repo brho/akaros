@@ -330,7 +330,8 @@ bool register_evq(struct syscall *sysc, struct event_queue *ev_q)
 	wmb();
 	/* Try and set the SC_UEVENT flag (so the kernel knows to look at ev_q) */
 	do {
-		old_flags = sysc->flags;
+		cmb();
+		old_flags = atomic_read(&sysc->flags);
 		/* If the kernel finishes while we are trying to sign up for an event,
 		 * we need to bail out */
 		if (old_flags & (SC_DONE | SC_PROGRESS)) {
@@ -353,7 +354,8 @@ void deregister_sysc(struct syscall *sysc)
 	int old_flags;
 	/* Try and unset the SC_UEVENT flag */
 	do {
-		old_flags = sysc->flags;
+		cmb();
+		old_flags = atomic_read(&sysc->flags);
 		/* Note we don't care if the SC_DONE flag is getting set.  We just need
 		 * to avoid clobbering flags */
 	} while (!atomic_comp_swap(&sysc->flags, old_flags, old_flags & ~SC_UEVENT));
@@ -367,7 +369,8 @@ bool reregister_sysc(struct syscall *sysc)
 	int old_flags;
 	/* Try and set the SC_UEVENT flag (so the kernel knows to look at ev_q) */
 	do {
-		old_flags = sysc->flags;
+		cmb();
+		old_flags = atomic_read(&sysc->flags);
 		/* If the kernel finishes while we are trying to sign up for an event,
 		 * we need to bail out */
 		if (old_flags & (SC_DONE | SC_PROGRESS)) {

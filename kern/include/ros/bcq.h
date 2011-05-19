@@ -127,6 +127,7 @@ struct bcq_header {
 	uint32_t __prod, __new_prod, __cons_pub, __failctr = 0;                    \
 	int __retval = 0;                                                          \
 	do {                                                                       \
+		cmb();                                                                 \
 		if (((_num_fail)) && (__failctr++ >= (_num_fail))) {                   \
 			__retval = -EFAIL;                                                 \
 			break;                                                             \
@@ -154,6 +155,7 @@ struct bcq_header {
 	uint32_t __prod, __cons_pvt, __new_cons_pvt, __cons_pub;                   \
 	int __retval = 0;                                                          \
 	do {                                                                       \
+		cmb();                                                                 \
 		__prod = (_bcq)->hdr.prod_idx;                                         \
 		__cons_pvt = (_bcq)->hdr.cons_pvt_idx;                                 \
 		if (BCQ_NO_WORK(__prod, __cons_pvt)) {                                 \
