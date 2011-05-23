@@ -1048,8 +1048,8 @@ static bool create_each_func(struct ext2_dirent *dir_i, void *a1, void *a2,
                              void *a3)
 {
 	struct dentry *dentry = (struct dentry*)a1;
-	unsigned int our_rec_len = (unsigned int)a2;
-	unsigned int mode = (unsigned int)a3;
+	uintptr_t our_rec_len = (uintptr_t)a2;
+	uintptr_t mode = (uintptr_t)a3;
 	struct ext2_dirent *dir_new;
 	unsigned int real_len = ext2_dirent_len(dir_i);
 	/* How much room is available after this dir_i before the next one */
@@ -1082,7 +1082,7 @@ int ext2_create(struct inode *dir, struct dentry *dentry, int mode,
 	struct ext2_inode *disk_inode;
 	struct ext2_i_info *e2ii;
 	uint32_t dir_block;
-	unsigned int our_rec_len;
+	uintptr_t our_rec_len;
 	/* TODO: figure out the real time!  (Nanwan's birthday, bitches!) */
 	time_t now = 1242129600;
 	struct ext2_dirent *new_dirent;
@@ -1114,7 +1114,7 @@ int ext2_create(struct inode *dir, struct dentry *dentry, int mode,
 	/* Consider caching the start point for future dirent ops.  Or even using
 	 * the indexed directory.... */
 	dir_block = ext2_foreach_dirent(dir, create_each_func, dentry,
-	                                (void*)our_rec_len, (void*)mode);
+	                                (void*)our_rec_len, (void*)(uintptr_t)mode);
 	/* If this returned a block number, we didn't find room in any of the
 	 * existing directory blocks, so we need to make a new one, stick it in the
 	 * dir inode, and stick our dirent at the beginning.  The reclen is the

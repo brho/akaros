@@ -195,7 +195,7 @@ void __diediedie(trapframe_t* tf, uint32_t srcid, uint32_t code, uint32_t a1, ui
 	while(1);
 }
 
-void appserver_die(int code)
+void appserver_die(uintptr_t code)
 {
 	int i;
 	for(i = 0; i < num_cpus; i++)

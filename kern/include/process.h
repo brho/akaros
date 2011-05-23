@@ -143,7 +143,7 @@ void __tlbshootdown(struct trapframe *tf, uint32_t srcid, void *a0, void *a1,
 
 /* Arch Specific */
 void proc_init_trapframe(trapframe_t *SAFE tf, uint32_t vcoreid,
-                         uint32_t entryp, uint32_t stack_top);
+                         uintptr_t entryp, uintptr_t stack_top);
 void proc_secure_trapframe(struct trapframe *tf);
 void __abandon_core(void);
 

@@ -51,48 +51,48 @@ typedef size_t uintreg_t;
 // Round down to the nearest multiple of n
 #define ROUNDDOWN(a, n)						\
 ({								\
-	uint32_t __a = (uint32_t) (a);				\
+	uintptr_t __a = (uintptr_t) (a);				\
 	(typeof(a)) (__a - __a % (n));				\
 })
 // Round up to the nearest multiple of n
 #define ROUNDUP(a, n)						\
 ({								\
-	uint32_t __n = (uint32_t) (n);				\
-	(typeof(a)) (ROUNDDOWN((uint32_t) (a) + __n - 1, __n));	\
+	uintptr_t __n = (uintptr_t) (n);				\
+	(typeof(a)) (ROUNDDOWN((uintptr_t) (a) + __n - 1, __n));	\
 })
 
 // Round down to the nearest multiple of n
 #define PTRROUNDDOWN(a, n)						\
 ({								\
 	char * __a = (char *) (a);				\
-	(typeof(a)) (__a - (uint32_t)__a % (n));				\
+	(typeof(a)) (__a - (uintptr_t)__a % (n));				\
 })
 // Round pointer up to the nearest multiple of n
 #define PTRROUNDUP(a, n)						\
 ({								\
-	uint32_t __n = (uint32_t) (n);				\
+	uintptr_t __n = (uintptr_t) (n);				\
 	(typeof(a)) (PTRROUNDDOWN((char *) (a) + __n - 1, __n));	\
 })
 
 // Return the integer logarithm of the value provided rounded down
-static inline uint32_t LOG2_DOWN(uint32_t value)
+static inline uintptr_t LOG2_DOWN(uintptr_t value)
 {
-	uint32_t l = 0;
+	uintptr_t l = 0;
 	while( (value >> l) > 1 ) ++l;
 	return l;
 }
 
 // Return the integer logarithm of the value provided rounded up
-static inline uint32_t LOG2_UP(uint32_t value)
+static inline uintptr_t LOG2_UP(uintptr_t value)
 {
-	uint32_t _v = LOG2_DOWN(value);
+	uintptr_t _v = LOG2_DOWN(value);
 	if (value ^ (1 << _v))
 		return _v + 1;
 	else
 		return _v;
 }
 
-static inline uint32_t ROUNDUPPWR2(uint32_t value)
+static inline uintptr_t ROUNDUPPWR2(uintptr_t value)
 {
 	return 1 << LOG2_UP(value);
 }

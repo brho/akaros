@@ -33,7 +33,7 @@ struct proc {
 	uint32_t state;				// Status of the process
 	struct kref p_kref;		/* Refcnt */
 	uint32_t env_flags;
-	uint32_t env_entry;
+	uintptr_t env_entry;
 
 	/* Cache color map: bitmap of the cache colors currently allocated to this
 	 * process */

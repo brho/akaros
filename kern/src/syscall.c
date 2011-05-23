@@ -45,7 +45,7 @@ extern unsigned char device_mac[6];
 /* Tracing Globals */
 int systrace_flags = 0;
 struct systrace_record *systrace_buffer = 0;
-unsigned int systrace_bufidx = 0;
+uintptr_t systrace_bufidx = 0;
 size_t systrace_bufsize = 0;
 struct proc *systrace_procs[MAX_NUM_TRACED] = {0};
 spinlock_t systrace_lock = SPINLOCK_INITIALIZER;
@@ -117,7 +117,7 @@ static int sys_block(struct proc *p, unsigned int usec)
 static int sys_cache_buster(struct proc *p, uint32_t num_writes,
                              uint32_t num_pages, uint32_t flags)
 { TRUSTEDBLOCK /* zra: this is not really part of the kernel */
-	#define BUSTER_ADDR		0xd0000000  // around 512 MB deep
+	#define BUSTER_ADDR		0xd0000000L  // around 512 MB deep
 	#define MAX_WRITES		1048576*8
 	#define MAX_PAGES		32
 	#define INSERT_ADDR 	(UINFO + 2*PGSIZE) // should be free for these tests
@@ -1387,7 +1387,7 @@ intreg_t syscall(struct proc *p, uintreg_t sc_num, uintreg_t a0, uintreg_t a1,
 				       a4, a5, p->pid, coreid, vcoreid);
 			} else {
 				struct systrace_record *trace;
-				unsigned int idx, new_idx;
+				uintptr_t idx, new_idx;
 				do {
 					idx = systrace_bufidx;
 					new_idx = (idx + 1) % systrace_bufsize;

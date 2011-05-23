@@ -916,7 +916,7 @@ struct inode *get_inode(struct dentry *dentry)
 }
 
 /* Helper: loads/ reads in the inode numbered ino and attaches it to dentry */
-void load_inode(struct dentry *dentry, unsigned int ino)
+void load_inode(struct dentry *dentry, unsigned long ino)
 {
 	struct inode *inode;
 
@@ -1075,7 +1075,7 @@ void stat_inode(struct inode *inode, struct kstat *kstat)
 /* Inode Cache management.  In general, search on the ino, get a refcnt'd value
  * back.  Remove does not give you a reference back - it should only be called
  * in inode_release(). */
-struct inode *icache_get(struct super_block *sb, unsigned int ino)
+struct inode *icache_get(struct super_block *sb, unsigned long ino)
 {
 	/* This is the same style as in pid2proc, it's the "safely create a strong
 	 * reference from a weak one, so long as other strong ones exist" pattern */
@@ -1097,7 +1097,7 @@ void icache_put(struct super_block *sb, struct inode *inode)
 	spin_unlock(&sb->s_icache_lock);
 }
 
-struct inode *icache_remove(struct super_block *sb, unsigned int ino)
+struct inode *icache_remove(struct super_block *sb, unsigned long ino)
 {
 	struct inode *inode;
 	/* Presumably these hashtable removals could be easier since callers

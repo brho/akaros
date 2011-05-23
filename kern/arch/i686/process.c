@@ -9,7 +9,7 @@
 #include <stdio.h>
 
 void proc_init_trapframe(trapframe_t *tf, uint32_t vcoreid,
-                         uint32_t entryp, uint32_t stack_top)
+                         uintptr_t entryp, uintptr_t stack_top)
 {
 	memset(tf,0,sizeof(*tf));
 

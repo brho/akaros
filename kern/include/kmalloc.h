@@ -32,11 +32,11 @@ void  (DFREE(addr) kfree)(void *addr);
 
 struct kmalloc_tag {
 	int flags;
+	uint32_t canary;
 	union {
 		struct kmem_cache *my_cache WHEN(flags == KMALLOC_TAG_CACHE);
 		size_t num_pages WHEN(flags == KMALLOC_TAG_PAGES);
 	};
-	uint32_t canary;
 };
 
 #endif //ROS_KERN_KMALLOC_H

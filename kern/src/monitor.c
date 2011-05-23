@@ -89,10 +89,10 @@ int mon_kerninfo(int argc, char **argv, trapframe_t *tf)
 	extern char (RO SNT _start)[], (RO SNT etext)[], (RO SNT edata)[], (RO SNT end)[];
 
 	cprintf("Special kernel symbols:\n");
-	cprintf("  _start %08x (virt)  %08x (phys)\n", _start, (uint32_t)(_start - KERNBASE));
-	cprintf("  etext  %08x (virt)  %08x (phys)\n", etext, (uint32_t)(etext - KERNBASE));
-	cprintf("  edata  %08x (virt)  %08x (phys)\n", edata, (uint32_t)(edata - KERNBASE));
-	cprintf("  end    %08x (virt)  %08x (phys)\n", end, (uint32_t)(end - KERNBASE));
+	cprintf("  _start %016x (virt)  %016x (phys)\n", _start, (uintptr_t)(_start - KERNBASE));
+	cprintf("  etext  %016x (virt)  %016x (phys)\n", etext, (uintptr_t)(etext - KERNBASE));
+	cprintf("  edata  %016x (virt)  %016x (phys)\n", edata, (uintptr_t)(edata - KERNBASE));
+	cprintf("  end    %016x (virt)  %016x (phys)\n", end, (uintptr_t)(end - KERNBASE));
 	cprintf("Kernel executable memory footprint: %dKB\n",
 		(uint32_t)(end-_start+1023)/1024);
 	return 0;

@@ -786,7 +786,7 @@ void test_hashtable(void)
 	struct test tstruct[10];
 
 	struct hashtable *h;
-	int k = 5;
+	uintptr_t k = 5;
 	struct test *v = &tstruct[0];
 
 	h = create_hashtable(32, __generic_hash, __generic_eq);

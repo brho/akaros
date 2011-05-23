@@ -240,7 +240,7 @@ retry:
 	/* Normally, there'd be an ABA problem here, but we never actually remove
 	 * bhs from the chain until the whole page gets cleaned up, which can't
 	 * happen while we hold a reference to the page. */
-	if (!atomic_comp_swap((uint32_t*)next_loc, (uint32_t)bh, (uint32_t)new)) {
+	if (!atomic_comp_swap((uintptr_t*)next_loc, (uintptr_t)bh, (uintptr_t)new)) {
 		kmem_cache_free(bh_kcache, new);
 		goto retry;
 	}

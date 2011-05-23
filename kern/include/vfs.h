@@ -427,7 +427,7 @@ void dcache_prune(struct super_block *sb, bool negative_only);
 
 /* Inode Functions */
 struct inode *get_inode(struct dentry *dentry);
-void load_inode(struct dentry *dentry, unsigned int ino);
+void load_inode(struct dentry *dentry, unsigned long ino);
 int create_file(struct inode *dir, struct dentry *dentry, int mode);
 int create_dir(struct inode *dir, struct dentry *dentry, int mode);
 int create_symlink(struct inode *dir, struct dentry *dentry,
@@ -435,9 +435,9 @@ int create_symlink(struct inode *dir, struct dentry *dentry,
 int check_perms(struct inode *inode, int access_mode);
 void inode_release(struct kref *kref);
 void stat_inode(struct inode *inode, struct kstat *kstat);
-struct inode *icache_get(struct super_block *sb, unsigned int ino);
+struct inode *icache_get(struct super_block *sb, unsigned long ino);
 void icache_put(struct super_block *sb, struct inode *inode);
-struct inode *icache_remove(struct super_block *sb, unsigned int ino);
+struct inode *icache_remove(struct super_block *sb, unsigned long ino);
 
 /* File-ish functions */
 ssize_t generic_file_read(struct file *file, char *buf, size_t count,
