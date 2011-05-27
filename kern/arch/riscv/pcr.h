@@ -10,7 +10,9 @@
 #define SR_UX    0x0000000000000040
 #define SR_SX    0x0000000000000080
 #define SR_IM    0x000000000000FF00
-#define SR_IM7   0x0000000000008000
+#define SR_VM    0x0000000000010000
+
+#define SR_IM_SHIFT 8
 
 #define PCR_SR       0
 #define PCR_EPC      1
@@ -19,6 +21,7 @@
 #define PCR_COUNT    4
 #define PCR_COMPARE  5
 #define PCR_CAUSE    6
+#define PCR_IPI      7
 #define PCR_MEMSIZE  8
 #define PCR_PTBR     9
 #define PCR_TOHOST   16
@@ -33,7 +36,10 @@
 #define MEMSIZE_SHIFT 12
 
 #define TIMER_PERIOD 0x1000
+
+#define IPI_IRQ   5
 #define TIMER_IRQ 7
+#define NIRQ 8
 
 #define CAUSE_EXCCODE 0x000000FF
 #define CAUSE_IP      0x0000FF00

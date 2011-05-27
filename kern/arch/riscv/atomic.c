@@ -12,13 +12,14 @@ bool atomic_comp_swap(uintptr_t *addr, uintptr_t exp_val, uintptr_t new_val)
 	static spinlock_t cas_locks[K*HW_CACHE_ALIGN/sizeof(spinlock_t)];
 
   uintptr_t bucket = (uintptr_t)addr / sizeof(uintptr_t) % K;
-	spinlock_t* lock = &cas_lock[bucket*HW_CACHE_ALIGN/sizeof(spinlock_t)];
+	spinlock_t* lock = &cas_locks[bucket*HW_CACHE_ALIGN/sizeof(spinlock_t)];
 	
-	spin_lock_irqsave(&lock);
+	bool retval = 0;
+	spin_lock_irqsave(lock);
 	if (*addr == exp_val) {
 		atomic_swap(addr, new_val);
 		retval = 1;
 	}
-	spin_unlock_irqsave(&lock);
+	spin_unlock_irqsave(lock);
 	return retval;
 }

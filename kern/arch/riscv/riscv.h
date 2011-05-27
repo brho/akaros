@@ -23,4 +23,10 @@ read_pc(void)
   return pc;
 }
 
+static __inline void
+send_ipi(uint32_t who)
+{
+  mtpcr(PCR_IPI, who);
+}
+
 #endif

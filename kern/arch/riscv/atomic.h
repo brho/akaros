@@ -102,15 +102,15 @@ static inline uint32_t spin_locked(spinlock_t* lock)
 	return lock->rlock;
 }
 
-static inline void __spin_lock(volatile uint32_t* rlock)
+static inline uint32_t spin_trylock(spinlock_t* lock)
 {
-	while(__sync_fetch_and_or(rlock, 1))
-		while(*rlock);
+	return __sync_fetch_and_or(&lock->rlock, 1);
 }
 
 static inline void spin_lock(spinlock_t *lock)
 {
-	__spin_lock(&lock->rlock);
+	while(spin_trylock(lock))
+		while(lock->rlock);
 }
 
 static inline void spin_unlock(spinlock_t *lock)

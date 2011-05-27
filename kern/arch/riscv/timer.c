@@ -12,7 +12,7 @@ timer_init(void)
 {	
   mtpcr(PCR_COUNT, 0);
   mtpcr(PCR_COMPARE, 0);
-	mtpcr(PCR_SR, mfpcr(PCR_SR) | SR_IM7);
+	mtpcr(PCR_SR, mfpcr(PCR_SR) | (SR_IM & (1 << (TIMER_IRQ+SR_IM_SHIFT))));
 
 	system_timing.tsc_freq = TSC_HZ;
 	cprintf("TSC Frequency: %llu\n", system_timing.tsc_freq);
@@ -26,7 +26,7 @@ set_core_timer(uint32_t usec, bool periodic)
 {
 	uint32_t clocks =  (uint64_t)usec*TSC_HZ/1000000;
 
-  uint8_t irq_state = 0;
+  int8_t irq_state = 0;
 	disable_irqsave(&irq_state);
 
   mtpcr(PCR_COMPARE, mfpcr(PCR_COUNT) + clocks);

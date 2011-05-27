@@ -1,6 +1,7 @@
 /* See COPYRIGHT for copyright information. */
 
-#include <arch/arch.h>
+#include <arch/pcr.h>
+#include <ros/arch/arch.h>
 #include <ros/memlayout.h>
 
 ///////////////////////////////////////////////////////////////////
@@ -9,13 +10,6 @@
 // 0x00000000, which is the start of extended memory.
 // (See kernel.ld)
 ///////////////////////////////////////////////////////////////////
-
-
-///////////////////////////////////////////////////////////////////
-// RELOC(x) maps a symbol x from its link address to its actual
-// location in physical memory (its load address).
-///////////////////////////////////////////////////////////////////
-#define RELOC(x) ((x) - KERNBASE)
 
 ///////////////////////////////////////////////////////////////////
 // entry point
@@ -30,17 +24,19 @@ _start:
 
   // set up stack and terminate frame pointer for backtracing
   li     $fp, 0
-  la     $sp, RELOC(bootstacktop)
+  la     $sp, bootstacktop
+	li     $t1, KERNBASE
+	sub    $sp, $sp, $t1
 
   // set up trap entry point
-  la     $t0, RELOC(trap_entry)
+  la     $t0, trap_entry
+	sub    $t0, $t0, $t1
   mtpcr  $t0, ASM_CR(PCR_EVEC)
 
   // enable traps
   li     $t0, SR_S | SR_ET | SR_SX
   mtpcr  $t0, ASM_CR(PCR_SR)
 
-	// turn on paging (no RELOC() since jal is pc-relative)
 	jal    mmu_init
 
   // relocate stack and call into C code using absolute jump, not pc-relative
@@ -56,13 +52,13 @@ _start:
 ///////////////////////////////////////////////////////////////////
 
 .data
-  .align  PGSIZE
+  .align  PGSHIFT
   .space  KSTKSIZE
   .global bootstacktop
 bootstacktop:
 
 .bss
-  .align  PGSIZE
+  .align  PGSHIFT
   .global percore_stacks
 percore_stacks:
   .space  KSTKSIZE*MAX_NUM_CPUS

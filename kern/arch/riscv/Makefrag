@@ -11,6 +11,18 @@ OBJDIRS += $(KERN_ARCH_SRC_DIR)
 #
 # We also snatch the use of a couple handy source files
 # from the lib directory, to avoid gratuitous code duplication.
-KERN_ARCH_SRCFILES := $(KERN_ARCH_SRC_DIR)/entry.S \
+KERN_ARCH_SRCFILES := $(KERN_ARCH_SRC_DIR)/boot.S \
+                      $(KERN_ARCH_SRC_DIR)/entry.S \
+                      $(KERN_ARCH_SRC_DIR)/cboot.c \
+                      $(KERN_ARCH_SRC_DIR)/trap.c \
                       $(KERN_ARCH_SRC_DIR)/cpuinfo.c \
                       $(KERN_ARCH_SRC_DIR)/console.c \
+                      $(KERN_ARCH_SRC_DIR)/pmap.c \
+                      $(KERN_ARCH_SRC_DIR)/timer.c \
+                      $(KERN_ARCH_SRC_DIR)/atomic.c \
+                      $(KERN_ARCH_SRC_DIR)/smp.c \
+                      $(KERN_ARCH_SRC_DIR)/colored_caches.c \
+                      $(KERN_ARCH_SRC_DIR)/page_alloc.c \
+                      $(KERN_ARCH_SRC_DIR)/process.c \
+                      $(KERN_ARCH_SRC_DIR)/env.c \
+                      $(KERN_ARCH_SRC_DIR)/init.c \

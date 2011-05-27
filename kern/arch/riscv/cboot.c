@@ -1,5 +1,9 @@
 #include <multiboot.h>
 #include <ros/memlayout.h>
+#include <arch/arch.h>
+#include <arch/mmu.h>
+#include <string.h>
+#include <assert.h>
 
 static void
 build_multiboot_info(multiboot_info_t* mbi)
@@ -14,12 +18,14 @@ build_multiboot_info(multiboot_info_t* mbi)
 	mbi->mem_upper = memsize_kb - basemem_kb;
 }
 
+#define KERNSIZE ((uintptr_t)(-KERNBASE))
 #ifdef __riscv64
 #define NL3PT ((KERNSIZE+L2PGSIZE-1)/L2PGSIZE)
-static pte_t l1pt[NL1ENTRIES], l2pt[NL2ENTRIES], l3pts[NL3PT][NL3ENTRIES]
+pte_t l1pt[NPTENTRIES], l2pt[NPTENTRIES], l3pts[NL3PT][NPTENTRIES]
       __attribute__((section("data"))) __attribute__((aligned(PGSIZE)));
 #else
-static pte_t l1pt[NL1ENTRIES];
+pte_t l1pt[NPTENTRIES]
+      __attribute__((section("data"))) __attribute__((aligned(PGSIZE)));
 #endif
 
 void
@@ -65,20 +71,20 @@ mmu_init()
 	// more efficiently with a LUI/ADD pair, which can only reach addresses
 	// 0x00000000->0x7FFFF7FF and 0xFFFFFFFF80000000->0xFFFFFFFFFFFFF7FF.
 	// The alternative requires an 8-instruction sequence in the general case.
-  uintptr_t start = 0xFFFFFFFF80000000;
+  const uintptr_t start = 0xFFFFFFFF80000000;
 	static_assert(start % L2PGSIZE == 0);
-	for(uintptr_t i = 0; i < ((uintptr_t)-start)/L2PGSIZE; i++)
-	  l2pt[i+start/L2PGSIZE] = PTE(LA2PPN(i*L2PGSIZE), PTE_KERN_RW|PTE_E);
+	for(uintptr_t va = start; va != 0; va += L2PGSIZE)
+	  l2pt[L2X(va)] = PTE(LA2PPN(va-start), PTE_KERN_RW|PTE_E);
 	#else
 	// for rv32, just create the L1 page table.
 	static_assert(KERNBASE % L1PGSIZE == 0);
 
 	// KERNBASE mapping
-	for(uintptr_t i = 0; i < KERNSIZE/L1PGSIZE; i++)
-		l1pt_phys[i+KERNBASE/L1PGSIZE] = PTE(LA2PPN(i*L1PGSIZE), PTE_KERN_RW|PTE_E);
+	for(uintptr_t pa = 0; pa < KERNSIZE; pa += L1PGSIZE)
+		l1pt_phys[L1X(KERNBASE+pa)] = PTE(LA2PPN(pa), PTE_KERN_RW|PTE_E);
 	#endif
 
-	lcr3(l1pt_phys);
+	lcr3((uintptr_t)l1pt_phys);
 	mtpcr(PCR_SR, mfpcr(PCR_SR) | SR_VM);
 }
 
@@ -86,8 +92,8 @@ static void
 mmu_init_cleanup()
 {
 	// after relocation, we no longer rely on the identity mapping
-	for(uintptr_t i = 0; i < (KERNSIZE+L1PGSIZE-1)/L1PGSIZE; i++)
-		l1pt_phys[i] = 0;
+	for(uintptr_t va = 0; va < KERNSIZE+L1PGSIZE-1; va += L1PGSIZE)
+		l1pt[L1X(va)] = 0;
 	tlbflush();
 }
 

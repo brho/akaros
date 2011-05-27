@@ -35,6 +35,30 @@ save_kernel_tf_asm:
 
   .end  save_kernel_tf_asm
 
+  .text
+  .ent    pop_kernel_tf
+  .global pop_kernel_tf
+pop_kernel_tf:
+  LOAD  $t0,32*REGBYTES($a0)
+  LOAD  $ra,33*REGBYTES($x2)
+
+  LOAD  $s0,20*REGBYTES($a0)
+  LOAD  $s1,21*REGBYTES($a0)
+  LOAD  $s2,22*REGBYTES($a0)
+  LOAD  $s3,23*REGBYTES($a0)
+  LOAD  $s4,24*REGBYTES($a0)
+  LOAD  $s5,25*REGBYTES($a0)
+  LOAD  $s6,26*REGBYTES($a0)
+  LOAD  $s7,27*REGBYTES($a0)
+  LOAD  $s8,28*REGBYTES($a0)
+  LOAD  $s9,29*REGBYTES($a0)
+  LOAD  $sp,30*REGBYTES($a0)
+
+  mtpcr  $t0,ASM_CR(PCR_SR)
+	ret
+
+  .end  pop_kernel_tf
+
   .ent  save_tf
 save_tf:  # write the trap frame onto the stack
 
@@ -97,9 +121,9 @@ save_tf:  # write the trap frame onto the stack
   ret
   .end  save_tf
 
-  .globl  pop_tf
-  .ent  pop_tf
-pop_tf:  # write the trap frame onto the stack
+  .globl  env_pop_tf
+  .ent  env_pop_tf
+env_pop_tf:  # write the trap frame onto the stack
   # restore gprs
   LOAD  $t0,32*REGBYTES($a0)  # restore sr (should disable interrupts)
   mtpcr  $t0,ASM_CR(PCR_SR)
@@ -145,7 +169,7 @@ pop_tf:  # write the trap frame onto the stack
   mfpcr $x1,ASM_CR(PCR_K0)
   mfpcr $x2,ASM_CR(PCR_K1)
   eret
-  .end  pop_tf
+  .end  env_pop_tf
 
   .global  trap_entry
   .ent  trap_entry
