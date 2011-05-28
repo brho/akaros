@@ -492,7 +492,7 @@ int __do_mprotect(struct proc *p, uintptr_t addr, size_t len, int prot)
 
 int munmap(struct proc *p, uintptr_t addr, size_t len)
 {
-	printd("munmap(addr %x, len %x, prot %x)\n", addr, len, prot);
+	printd("munmap(addr %x, len %x)\n", addr, len);
 	if (!len)
 		return 0;
 	if ((addr % PGSIZE) || (addr < MMAP_LOWEST_VA)) {

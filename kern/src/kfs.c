@@ -913,7 +913,7 @@ void parse_cpio_entries(struct super_block *sb, void *cpio_b)
 		}
 		c_bhdr->c_filename = (char*)c_hdr + sizeof(*c_hdr);
 		namesize = cpio_strntol(buf, c_hdr->c_namesize, 8);
-		printd("Namesize: %d\n", size);
+		printd("Namesize: %d\n", namesize);
 		if (!strcmp(c_bhdr->c_filename, "TRAILER!!!"))
 			break;
 		c_bhdr->c_ino = cpio_strntol(buf, c_hdr->c_ino, 8);

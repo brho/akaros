@@ -110,8 +110,6 @@ static intreg_t process_generic_syscalls(struct proc *p, size_t max)
 		syscall_rsp_t rsp;
 		// this assumes we get our answer immediately for the syscall.
 		syscall_req_t* req = RING_GET_REQUEST(sysbr, ++sysbr->req_cons);
-		// print req
-		printd("req no %d, req arg %c\n", req->num, *((char*)req->args[0]));
 		
 		pcpui->cur_sysc = req->sc;
 		run_local_syscall(req->sc); // TODO: blocking call will block arcs as well.
