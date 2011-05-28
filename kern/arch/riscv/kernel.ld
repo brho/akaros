@@ -8,7 +8,8 @@ SECTIONS
 {
 	/* Link the kernel for 0xC01000C0, but load it at 0x001000C0) */
 
-	.text 0xFFFFFF8000000000 : AT(0) {
+	.text 0xFFFFFFFF80000000 : AT(0) {
+	  *(.boottext)
 		*(.text .stub .text.* .gnu.linkonce.t.*)
 	}
 
@@ -45,12 +46,14 @@ SECTIONS
 	/* The data segment */
 	.data : {
 		*(.data)
+		*(.sdata)
 	}
 
 	PROVIDE(edata = .);
 
 	.bss : {
 		*(.bss)
+		*(.sbss)
 	}
 
 	PROVIDE(end = .);

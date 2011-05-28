@@ -2,6 +2,7 @@
 #define ROS_INC_ARCH_H
 
 #include <ros/arch/arch.h>
+#include <arch/mmu.h>
 #include <ros/common.h>
 #include <ros/arch/membar.h>
 #include <arch/riscv.h>
@@ -10,7 +11,7 @@
 
 /* Arch Constants */
 #define HW_CACHE_ALIGN 64
-#define IOAPIC_BASE    0xFFFFFFFF80000000 // upper 2GB reserved (see mmu_init)
+#define IOAPIC_BASE    LOAD_ADDR // upper 2GB reserved (see mmu_init)
 
 void print_cpuinfo(void);
 void show_mapping(uintptr_t start, size_t size);
@@ -133,7 +134,7 @@ get_hw_coreid(int coreid)
 static __inline int
 hw_core_id(void)
 {
-  return 0;
+  return mfpcr(PCR_COREID);
 }
 
 /* hw_coreid -> os_coreid */

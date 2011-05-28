@@ -4,6 +4,7 @@
 // All physical memory mapped at this address
 #ifdef __riscv64
 # define KERNBASE  0xFFFFFF8000000000
+# define LOAD_ADDR 0xFFFFFFFF80000000
 # define NPTLEVELS                  4
 # define L1PGSHIFT         (12+9+9+9)
 # define L1PGSIZE   (1L << L1PGSHIFT)
@@ -17,6 +18,7 @@
 # define KPGSHIFT           L3PGSHIFT
 #else
 # define KERNBASE          0x80000000
+# define LOAD_ADDR         0x80000000
 # define NPTLEVELS                  2
 # define L1PGSHIFT            (12+10)
 # define L1PGSIZE    (1 << L1PGSHIFT)

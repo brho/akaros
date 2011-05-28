@@ -6,18 +6,22 @@
 #include <error.h>
 #include <assert.h>
 #include <atomic.h>
+#include <pmap.h>
 
 volatile uint32_t num_cpus;
 
 void
 smp_boot(void)
 {
+	smp_percpu_init();
+
 	num_cpus = 1;
 	printd("Cores, report in!\n");
 
-	smp_percpu_init();
-
-	//while(*(volatile uint32_t*)&num_cpus < num_cores());
+	for(uintptr_t i = 1, ncores = num_cores(); i < ncores; i++)
+		send_ipi(i);
+	
+	while(*(volatile uint32_t*)&num_cpus < num_cores());
 
 	printd("%d cores reporting!\n",num_cpus);
 }
@@ -144,4 +148,8 @@ int smp_call_wait(handler_wrapper_t* wrapper)
  * core calls this at some point in the smp_boot process. */
 void __arch_pcpu_init(uint32_t coreid)
 {
+	// Switch to the real L1 page table, rather than the boot page table which
+	// has the [0,KERNSIZE-1] identity mapping.
+	extern pte_t l1pt[NPTENTRIES];
+	lcr3(PADDR(l1pt));
 }

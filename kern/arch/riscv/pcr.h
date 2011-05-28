@@ -24,6 +24,8 @@
 #define PCR_IPI      7
 #define PCR_MEMSIZE  8
 #define PCR_PTBR     9
+#define PCR_COREID   10
+#define PCR_NUMCORES 12
 #define PCR_TOHOST   16
 #define PCR_FROMHOST 17
 #define PCR_CONSOLE  18

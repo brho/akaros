@@ -23,6 +23,12 @@ read_pc(void)
   return pc;
 }
 
+static __inline uintptr_t
+num_cores(void)
+{
+	return mfpcr(PCR_NUMCORES);
+}
+
 static __inline void
 send_ipi(uint32_t who)
 {
