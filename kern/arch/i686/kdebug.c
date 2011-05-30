@@ -315,7 +315,7 @@ void backtrace(void)
 	ebp = (uint32_t*)(*ebp);
 	printk("Stack Backtrace on Core %d:\n", core_id());
 	// on each iteration, ebp holds the stack frame and eip an addr in that func
-	while (ebp != 0) {
+	while (1) {
 		debuginfo_eip(eip, &debuginfo);
 		memset(buf, 0, 256);
 		strncpy(buf, debuginfo.eip_fn_name, MIN(debuginfo.eip_fn_namelen, 256));
@@ -327,6 +327,8 @@ void backtrace(void)
 		for (j = 0; j < MIN(debuginfo.eip_fn_narg, 5); j++)
 			cprintf(" %08x", *(ebp + 2 + j));
 		cprintf("\n");
+		if (!ebp)
+			break;
 		eip = *(ebp + 1) - 1;
 		ebp = (uint32_t*)(*ebp);
 		#ifdef __CONFIG_RESET_STACKS__
