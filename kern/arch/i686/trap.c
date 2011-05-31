@@ -434,6 +434,7 @@ uint32_t send_kernel_message(uint32_t dst, amr_t pc, TV(a0t) arg0, TV(a1t) arg1,
 	// note this will be freed on the destination core
 	k_msg = (kernel_message_t *CT(1))TC(kmem_cache_alloc(kernel_msg_cache, 0));
 	k_msg->srcid = core_id();
+	k_msg->dstid = dst;
 	k_msg->pc = pc;
 	k_msg->arg0 = arg0;
 	k_msg->arg1 = arg1;
@@ -517,6 +518,7 @@ void __kernel_message(struct trapframe *tf)
 				send_self_ipi(I_KERNEL_MSG);
 			/* Execute the kernel message */
 			assert(msg_cp.pc);
+			assert(msg_cp.dstid == core_id());
 			/* TODO: when batching syscalls, this should be reread from cur_tf*/
 			msg_cp.pc(tf, msg_cp.srcid, msg_cp.arg0, msg_cp.arg1, msg_cp.arg2);
 		}
@@ -567,6 +569,7 @@ void process_routine_kmsg(struct trapframe *tf)
 			send_self_ipi(I_KERNEL_MSG);
 		/* Execute the kernel message */
 		assert(msg_cp.pc);
+		assert(msg_cp.dstid == core_id());
 		msg_cp.pc(tf, msg_cp.srcid, msg_cp.arg0, msg_cp.arg1, msg_cp.arg2);
 	}
 }

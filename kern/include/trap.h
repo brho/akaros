@@ -83,6 +83,7 @@ struct kernel_message
 	STAILQ_ENTRY(kernel_message NTPTV(a0t) NTPTV(a1t) NTPTV(a2t))
 		NTPTV(a0t) NTPTV(a1t) NTPTV(a2t) link;
 	uint32_t srcid;
+	uint32_t dstid;
 	amr_t pc;
 	TV(a0t) arg0;
 	TV(a1t) arg1;

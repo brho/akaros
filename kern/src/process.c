@@ -587,6 +587,7 @@ static void __proc_startcore(struct proc *p, trapframe_t *tf)
 void proc_restartcore(void)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	assert(!pcpui->cur_sysc);
 	/* If there is no cur_tf, it is because the old one was already restarted
 	 * (and we weren't interrupting another one to finish).  In which case, we
 	 * should just smp_idle() */

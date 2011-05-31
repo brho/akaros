@@ -226,6 +226,7 @@ uint32_t smp_main(void)
 	/* This blob is the GDT, the GDT PD, and the TSS. */
 	unsigned int blob_size = sizeof(segdesc_t) * SEG_COUNT +
 	                         sizeof(pseudodesc_t) + sizeof(taskstate_t);
+	/* TODO: don't use kmalloc - might have issues in the future */
 	void *gdt_etc = kmalloc(blob_size, 0);		/* we'll never free this btw */
 	taskstate_t *my_ts = gdt_etc;
 	pseudodesc_t *my_gdt_pd = (void*)my_ts + sizeof(taskstate_t);
