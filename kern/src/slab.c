@@ -24,6 +24,10 @@
 struct kmem_cache_list kmem_caches;
 spinlock_t kmem_caches_lock;
 
+/* Backend/internal functions, defined later.  Grab the lock before calling
+ * these. */
+static void kmem_cache_grow(struct kmem_cache *cp);
+
 /* Cache of the kmem_cache objects, needed for bootstrapping */
 struct kmem_cache kmem_cache_cache;
 struct kmem_cache *kmem_slab_cache, *kmem_bufctl_cache;
@@ -240,11 +244,10 @@ void kmem_cache_free(struct kmem_cache *cp, void *buf)
  * Grab the cache lock before calling this.
  *
  * TODO: think about page colouring issues with kernel memory allocation. */
-void kmem_cache_grow(struct kmem_cache *cp)
+static void kmem_cache_grow(struct kmem_cache *cp)
 {
 	struct kmem_slab *a_slab;
 	struct kmem_bufctl *a_bufctl;
-	spin_unlock_irqsave(&cp->cache_lock);
 	if (cp->obj_size <= SLAB_LARGE_CUTOFF) {
 		// Just get a single page for small slabs
 		page_t *a_page;
@@ -301,7 +304,6 @@ void kmem_cache_grow(struct kmem_cache *cp)
 	}
 	// add a_slab to the empty_list
 	TAILQ_INSERT_HEAD(&cp->empty_slab_list, a_slab, link);
-	spin_unlock_irqsave(&cp->cache_lock);
 }
 
 /* This deallocs every slab from the empty list.  TODO: think a bit more about
