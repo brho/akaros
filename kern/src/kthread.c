@@ -131,9 +131,11 @@ void restart_kthread(struct kthread *kthread)
 	 * free our current kthread *before* popping it, nor can we free the current
 	 * stack until we pop to the kthread's stack). */
 	if (pcpui->spare) {
-		/* this should probably have a rounddown, since it's not always the top,
-		 * or even always PGSIZE... */
-		page_decref(kva2page((void*)pcpui->spare->stacktop - PGSIZE));
+		/* assumes the stack is a page, and that stacktop is somewhere in
+		 * (pg_bottom, pg_bottom + PGSIZE].  Normally, it ought to be pg_bottom
+		 * + PGSIZE (on x86).  kva2page can take any kva, not just a page
+		 * aligned addr. */
+		page_decref(kva2page((void*)pcpui->spare->stacktop - 1));
 		kmem_cache_free(kthread_kcache, pcpui->spare);
 	}
 	current_stacktop = get_stack_top();
