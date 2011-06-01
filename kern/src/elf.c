@@ -7,7 +7,13 @@
 #include <elf.h>
 #include <pmap.h>
 #include <smp.h>
+#include <arch/arch.h>
 
+#ifdef KERN64
+# define elf_field(obj, field) (elf64 ? (obj##64)->field : (obj##32)->field)
+#else
+# define elf_field(obj, field) ((obj##32)->field)
+#endif
 
 static int load_one_elf(struct proc *p, struct file *f, int pgoffset,
                         elf_info_t *ei)
@@ -30,40 +36,61 @@ static int load_one_elf(struct proc *p, struct file *f, int pgoffset,
 		goto fail;
 	current = cur_proc;
 
-	elf_t* elfhdr = (elf_t*)elf;
-	proghdr_t* proghdrs = (proghdr_t*)(elf + elfhdr->e_phoff);
-	if (elfhdr->e_phoff + elfhdr->e_phnum * sizeof(proghdr_t) > PGSIZE)
+	elf32_t* elfhdr32 = (elf32_t*)elf;
+	elf64_t* elfhdr64 = (elf64_t*)elf;
+	bool elf32 = elfhdr32->e_ident[ELF_IDENT_CLASS] == ELFCLASS32;
+	bool elf64 = elfhdr32->e_ident[ELF_IDENT_CLASS] == ELFCLASS64;
+	if (!elf64 && !elf32)
 		goto fail;
-	if (elfhdr->e_phentsize != sizeof(proghdr_t))
+	#ifndef KERN64
+	if(elf64)
+		goto fail;
+	#endif
+	
+	proghdr32_t* proghdrs32 = (proghdr32_t*)(elf + elfhdr32->e_phoff);
+	proghdr64_t* proghdrs64 = (proghdr64_t*)(elf + elfhdr64->e_phoff);
+	uintptr_t e_phoff = elf_field(elfhdr, e_phoff);
+	size_t phsz = elf64 ? sizeof(proghdr64_t) : sizeof(proghdr32_t);
+	uint16_t e_phnum = elf_field(elfhdr, e_phnum);
+	// we don't support prog hdrs extending past the first elf page
+	if (e_phoff + e_phnum * phsz > PGSIZE)
 		goto fail;
 
-	for (int i = 0; i < elfhdr->e_phnum; i++) {
-		proghdr_t* ph = proghdrs+i;
-		if (ph->p_type == ELF_PROG_PHDR)
-			ei->phdr = ph->p_va;
-		if (ph->p_type == ELF_PROG_INTERP) {
-			int maxlen = MIN(PGSIZE-ph->p_offset, sizeof(ei->interp));
-			int len = strnlen(elf + ph->p_offset, maxlen);
+	for (int i = 0; i < e_phnum; i++) {
+		proghdr32_t* ph32 = proghdrs32+i;
+		proghdr64_t* ph64 = proghdrs64+i;
+		uint16_t p_type = elf_field(ph, p_type);
+		uintptr_t p_va = elf_field(ph, p_va);
+		uintptr_t p_offset = elf_field(ph, p_offset);
+		uintptr_t p_align = elf_field(ph, p_align);
+		uintptr_t p_memsz = elf_field(ph, p_memsz);
+		uintptr_t p_filesz = elf_field(ph, p_filesz);
+
+		if (p_type == ELF_PROG_PHDR)
+			ei->phdr = elf_field(ph, p_va);
+		if (p_type == ELF_PROG_INTERP) {
+			int maxlen = MIN(PGSIZE - p_offset, sizeof(ei->interp));
+			int len = strnlen(elf + p_offset, maxlen);
 			if (len < maxlen) {
-				memcpy(ei->interp, elf+ph->p_offset, maxlen + 1);
+				memcpy(ei->interp, elf + p_offset, maxlen + 1);
 				ei->dynamic = 1;
 			}
 			else
 				goto fail;
 		}
 
-		if (ph->p_type == ELF_PROG_LOAD && ph->p_memsz) {
-			if (ph->p_align % PGSIZE)
+		if (p_type == ELF_PROG_LOAD && p_memsz) {
+			if (p_align % PGSIZE)
 				goto fail;
-			if (ph->p_offset % PGSIZE != ph->p_va % PGSIZE)
+			if (p_offset % PGSIZE != p_va % PGSIZE)
 				goto fail;
 
-			uintptr_t filestart = ROUNDDOWN(ph->p_offset, PGSIZE);
-			uintptr_t fileend = ph->p_offset + ph->p_filesz;
+			uintptr_t filestart = ROUNDDOWN(p_offset, PGSIZE);
+			uintptr_t fileend = p_offset + p_filesz;
 			uintptr_t filesz = fileend - filestart;
 
-			uintptr_t memstart = ROUNDDOWN(ph->p_va, PGSIZE);
-			uintptr_t memend = ROUNDUP(ph->p_va + ph->p_memsz, PGSIZE);
+			uintptr_t memstart = ROUNDDOWN(p_va, PGSIZE);
+			uintptr_t memend = ROUNDUP(p_va + p_memsz, PGSIZE);
 			uintptr_t memsz = memend - memstart;
 			if (memend > ei->highest_addr)
 				ei->highest_addr = memend;
@@ -102,10 +129,11 @@ static int load_one_elf(struct proc *p, struct file *f, int pgoffset,
 		                          0);
 		if (phdr_addr == MAP_FAILED)
 			goto fail;
-		ei->phdr = (long)phdr_addr + elfhdr->e_phoff;
+		ei->phdr = (long)phdr_addr + e_phoff;
 	}
-	ei->entry = elfhdr->e_entry + pgoffset*PGSIZE;
-	ei->phnum = elfhdr->e_phnum;
+	ei->entry = elf_field(elfhdr, e_entry) + pgoffset*PGSIZE;
+	ei->phnum = e_phnum;
+	ei->elf64 = elf64;
 	ret = 0;
 fail:
 	kfree(elf);
@@ -131,7 +159,7 @@ int load_elf(struct proc* p, struct file* f)
 
 	// fill in auxiliary info for dynamic linker/runtime
 	elf_aux_t auxp[] = {{ELF_AUX_PHDR, ei.phdr},
-	                    {ELF_AUX_PHENT, sizeof(proghdr_t)},
+	                    {ELF_AUX_PHENT, sizeof(proghdr32_t)},
 	                    {ELF_AUX_PHNUM, ei.phnum},
 	                    {ELF_AUX_ENTRY, ei.entry},
 	                    #ifdef __sparc_v8__

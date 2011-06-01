@@ -12,9 +12,9 @@
 #  error I know not my endianness!
 #endif
 
-typedef struct Elf {
+typedef struct Elf32 {
 	uint32_t e_magic;	// must equal ELF_MAGIC
-	uint8_t e_elf[12];
+	uint8_t e_ident[12];
 	uint16_t e_type;
 	uint16_t e_machine;
 	uint32_t e_version;
@@ -28,9 +28,9 @@ typedef struct Elf {
 	uint16_t e_shentsize;
 	uint16_t e_shnum;
 	uint16_t e_shstrndx;
-} elf_t;
+} elf32_t;
 
-typedef struct Proghdr {
+typedef struct Proghdr32 {
 	uint32_t p_type;
 	uint32_t p_offset;
 	uint32_t p_va;
@@ -39,9 +39,9 @@ typedef struct Proghdr {
 	uint32_t p_memsz;
 	uint32_t p_flags;
 	uint32_t p_align;
-} proghdr_t;
+} proghdr32_t;
 
-typedef struct Secthdr {
+typedef struct Secthdr32 {
 	uint32_t sh_name;
 	uint32_t sh_type;
 	uint32_t sh_flags;
@@ -52,7 +52,49 @@ typedef struct Secthdr {
 	uint32_t sh_info;
 	uint32_t sh_addralign;
 	uint32_t sh_entsize;
-} secthdr_t;
+} secthdr32_t;
+
+typedef struct Elf64 {
+	uint32_t e_magic;	// must equal ELF_MAGIC
+	uint8_t e_ident[12];
+	uint16_t e_type;
+	uint16_t e_machine;
+	uint32_t e_version;
+	uint64_t e_entry;
+	uint64_t e_phoff;
+	uint64_t e_shoff;
+	uint32_t e_flags;
+	uint16_t e_ehsize;
+	uint16_t e_phentsize;
+	uint16_t e_phnum;
+	uint16_t e_shentsize;
+	uint16_t e_shnum;
+	uint16_t e_shstrndx;
+} elf64_t;
+
+typedef struct Proghdr64 {
+	uint32_t p_type;
+	uint32_t p_flags;
+	uint64_t p_offset;
+	uint64_t p_va;
+	uint64_t p_pa;
+	uint64_t p_filesz;
+	uint64_t p_memsz;
+	uint64_t p_align;
+} proghdr64_t;
+
+typedef struct Secthdr64 {
+	uint32_t sh_name;
+	uint32_t sh_type;
+	uint64_t sh_flags;
+	uint64_t sh_addr;
+	uint64_t sh_offset;
+	uint64_t sh_size;
+	uint32_t sh_link;
+	uint32_t sh_info;
+	uint64_t sh_addralign;
+	uint64_t sh_entsize;
+} secthdr64_t;
 
 typedef struct
 {
@@ -61,10 +103,16 @@ typedef struct
 	long phdr;
 	int phnum;
 	int dynamic;
+	bool elf64;
 	char interp[256];
 } elf_info_t;
 
 typedef long elf_aux_t[2];
+
+#define ELF_IDENT_CLASS 0
+// Values for Elf::e_ident[ELF_IDENT_CLASS]
+#define ELFCLASS32 1
+#define ELFCLASS64 2
 
 // Values for Proghdr::p_type
 #define ELF_PROG_LOAD		1
