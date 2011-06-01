@@ -49,22 +49,22 @@ vm_init(void)
 pte_t*
 pgdir_walk(pde_t *pgdir, const void *SNT va, int create)
 {
-  pte_t* ppte[NPTLEVELS];
-	pte_t* pt[NPTLEVELS];
+	pte_t* ppte;
+	pte_t* pt;
 
-	pt[0] = pgdir;
+	pt = pgdir;
 	for(int i = 0; i < NPTLEVELS-1; i++)
 	{
-	  // this code relies upon the fact that all page tables are the same size
-	  uintptr_t idx = (uintptr_t)va >> (L1PGSHIFT - i*(L1PGSHIFT-L2PGSHIFT));
+		// this code relies upon the fact that all page tables are the same size
+		uintptr_t idx = (uintptr_t)va >> (L1PGSHIFT - i*(L1PGSHIFT-L2PGSHIFT));
 		idx = idx & (NPTENTRIES-1);
 
-		ppte[i] = &pt[i][idx];
+		ppte = &pt[idx];
 
-		if(*ppte[i] & PTE_E)
-			return ppte[i];
+		if(*ppte & PTE_E)
+			return ppte;
 
-  	if(!(*ppte[i] & PTE_T))
+		if(!(*ppte & PTE_T))
 		{
 			if(!create)
 				return NULL;
@@ -74,15 +74,15 @@ pgdir_walk(pde_t *pgdir, const void *SNT va, int create)
 				return NULL;
 			memset(page2kva(new_table), 0, PGSIZE);
 
-			*ppte[i] = PTD(page2pa(new_table));
+			*ppte = PTD(page2pa(new_table));
 		}
 
-		pt[i+1] = (pte_t*)KADDR(PTD_ADDR(*ppte[i]));
+		pt = (pte_t*)KADDR(PTD_ADDR(*ppte));
 	}
 
 	uintptr_t idx = (uintptr_t)va >> (L1PGSHIFT - (NPTLEVELS-1)*(L1PGSHIFT-L2PGSHIFT));
 	idx = idx & (NPTENTRIES-1);
-  return &pt[NPTLEVELS-1][idx];
+  return &pt[idx];
 }
 
 /* Returns the effective permissions for PTE_U, PTE_W, and PTE_P on a given

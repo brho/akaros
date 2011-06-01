@@ -7,7 +7,11 @@
 #include <stdio.h>
 #include <pmap.h>
 
-#define KERNSIZE L1PGSIZE
+#ifdef __riscv64
+# define MAX_KERNBASE_SIZE L1PGSIZE
+#else
+# define MAX_KERNBASE_SIZE ((uintptr_t)(-KERNBASE))
+#endif
 
 static void
 build_multiboot_info(multiboot_info_t* mbi)
@@ -46,25 +50,29 @@ void pagetable_init(pte_t* l1pt_phys, pte_t* l1pt_boot_phys,
 void pagetable_init(pte_t* l1pt_phys, pte_t* l1pt_boot_phys)
 #endif
 {
-	// The boot L1 PT retains the identity mapping [0,KERNSIZE-1],
-	// whereas the post-boot L1 PT does not.
-	for(uintptr_t va = 0; va < KERNSIZE+L1PGSIZE-1; va += L1PGSIZE)
-		l1pt_boot_phys[L1X(va)] = PTE(LA2PPN(va), PTE_KERN_RW | PTE_E);
+	pte_t perm = PTE_KERN_RW | PTE_E;
+
+	// The boot L1 PT retains the identity mapping [0,MAX_KERNBASE_SIZE-1],
+	// whereas the post-boot L1 PT does not.  This is not a "safe" mapping,
+	// since there may be fewer than MAX_KERNBASE_SIZE bytes of physical memory,
+	// so we'll only use this mapping briefly.
+	for(uintptr_t va = 0; va < MAX_KERNBASE_SIZE+L1PGSIZE-1; va += L1PGSIZE)
+		l1pt_boot_phys[L1X(va)] = PTE(LA2PPN(va), perm);
 
 	#ifdef __riscv64
-	// for rv64, we need to create an L1 and an L2 PT.
-	
 	// kernel can be mapped by a single L2 PT.
-	static_assert(L1X(KERNBASE) == L1X(KERNBASE+KERNSIZE-1));
-	static_assert(KERNSIZE % L2PGSIZE == 0);
+	static_assert(L1X(KERNBASE) == L1X(KERNBASE+MAX_KERNBASE_SIZE-1));
+	static_assert(MAX_KERNBASE_SIZE % L2PGSIZE == 0);
 	static_assert(KERNBASE % L2PGSIZE == 0);
 
 	// KERNBASE mapping uses one L1 PTD -> L2 PT
 	l1pt_phys[L1X(KERNBASE)]      = PTD(l2pt_kernbase_phys);
 	l1pt_boot_phys[L1X(KERNBASE)] = PTD(l2pt_kernbase_phys);
 
-	for(uintptr_t va = KERNBASE; va < KERNBASE+KERNSIZE; va += L2PGSIZE)
-		l2pt_kernbase_phys[L2X(va)] = PTE(LA2PPN(va-KERNBASE), PTE_KERN_RW | PTE_E);
+	// don't actually map all the way up to MAX_KERNBASE_SIZE, just to phys. mem size
+	uintptr_t memsize = ROUNDDOWN(mfpcr(PCR_MEMSIZE)*PGSIZE, L2PGSIZE);
+	for(uintptr_t va = KERNBASE; va < KERNBASE+memsize; va += L2PGSIZE)
+		l2pt_kernbase_phys[L2X(va)] = PTE(LA2PPN(va-KERNBASE), perm);
 
 	// The kernel code and static data actually are usually not accessed
 	// via the KERNBASE mapping, but rather by an aliased "load" mapping in
@@ -81,15 +89,15 @@ void pagetable_init(pte_t* l1pt_phys, pte_t* l1pt_boot_phys)
 	l1pt_boot_phys[L1X(KERN_LOAD_ADDR)] = PTD(l2pt_load_phys);
 
 	for(uintptr_t va = KERN_LOAD_ADDR; va != 0; va += L2PGSIZE)
-		l2pt_load_phys[L2X(va)] = PTE(LA2PPN(va-KERN_LOAD_ADDR), PTE_KERN_RW|PTE_E);
+		l2pt_load_phys[L2X(va)] = PTE(LA2PPN(va-KERN_LOAD_ADDR), perm);
 	#else
 	// for rv32, just create the L1 page table.
 	static_assert(KERNBASE % L1PGSIZE == 0);
 
 	// KERNBASE mapping
-	for(uintptr_t pa = 0; pa < KERNSIZE; pa += L1PGSIZE)
+	for(uintptr_t pa = 0; pa < MAX_KERNBASE_SIZE; pa += L1PGSIZE)
 	{
-		pte_t pte = PTE(LA2PPN(pa), PTE_KERN_RW|PTE_E);
+		pte_t pte = PTE(LA2PPN(pa), perm);
 		l1pt_phys[L1X(KERNBASE+pa)] = pte;
 		l1pt_boot_phys[L1X(KERNBASE+pa)] = pte;
 	}

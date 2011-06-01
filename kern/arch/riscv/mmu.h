@@ -60,7 +60,7 @@
 #define PTD(pa) ((uintptr_t)(pa) | PTE_T)
 
 // Page directory and page table constants
-#define NPTENTRIES (PTSIZE/sizeof(pte_t))
+#define NPTENTRIES (PGSIZE/sizeof(pte_t))
 
 // Page table/directory entry flags.
 #define PTE_T    0x001 // Entry is a page Table descriptor
@@ -88,7 +88,7 @@
 #define PDX(la)    L1X(la)			// for env stuff
 
 // address in page table entry
-#define PTE_ADDR(pte)	((physaddr_t) (pte) & (PGSIZE-1))
+#define PTE_ADDR(pte)	((physaddr_t) (pte) & ~(PGSIZE-1))
 
 // address in page table descriptor
 #define PTD_ADDR(ptd)	PTE_ADDR(ptd)

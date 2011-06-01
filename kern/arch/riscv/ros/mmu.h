@@ -15,6 +15,7 @@
 # define L4PGSHIFT                    (12)
 # define L4PGSIZE        (1L << L4PGSHIFT)
 # define PGSHIFT                 L4PGSHIFT
+# define PTSIZE                   L2PGSIZE
 #else
 # define KERNBASE               0x80000000
 # define KERN_LOAD_ADDR           KERNBASE
@@ -24,10 +25,10 @@
 # define L2PGSHIFT                      12
 # define L2PGSIZE         (1 << L2PGSHIFT)
 # define PGSHIFT                 L2PGSHIFT
+# define PTSIZE                   L1PGSIZE
 #endif
 
 #define PGSIZE (1 << PGSHIFT)
-#define PTSIZE PGSIZE
 
 #ifndef __ASSEMBLER__
 typedef unsigned long pte_t;
