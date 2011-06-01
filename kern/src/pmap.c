@@ -61,8 +61,8 @@ void page_init(void)
 	 */
 	page_alloc_init();
 
-	static_assert(PROCINFO_NUM_PAGES <= PTSIZE);
-	static_assert(PROCDATA_NUM_PAGES <= PTSIZE);
+	static_assert(PROCINFO_NUM_PAGES*PGSIZE <= PTSIZE);
+	static_assert(PROCDATA_NUM_PAGES*PGSIZE <= PTSIZE);
 }
 
 /** 
