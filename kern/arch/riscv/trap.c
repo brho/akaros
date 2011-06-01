@@ -335,7 +335,7 @@ handle_fault_fetch(trapframe_t* state)
 	if(in_kernel(state))
 	{
 		print_trapframe(state);
-		panic("Load Page Fault in the Kernel at 0x%08x!", state->badvaddr);
+		panic("Load Page Fault in the Kernel at %p!", state->badvaddr);
 	}
 	
 	if(handle_page_fault(current, state->badvaddr, PROT_READ))
@@ -348,7 +348,7 @@ handle_fault_load(trapframe_t* state)
 	if(in_kernel(state))
 	{
 		print_trapframe(state);
-		panic("Load Page Fault in the Kernel at 0x%08x!", state->badvaddr);
+		panic("Load Page Fault in the Kernel at %p!", state->badvaddr);
 	}
 	
 	if(handle_page_fault(current, state->badvaddr, PROT_READ))
@@ -361,7 +361,7 @@ handle_fault_store(trapframe_t* state)
 	if(in_kernel(state))
 	{
 		print_trapframe(state);
-		panic("Store Page Fault in the Kernel at 0x%08x!", state->badvaddr);
+		panic("Store Page Fault in the Kernel at %p!", state->badvaddr);
 	}
 	
 	if(handle_page_fault(current, state->badvaddr, PROT_WRITE))

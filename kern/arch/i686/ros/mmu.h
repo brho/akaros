@@ -8,6 +8,7 @@ typedef unsigned long pde_t;
 
 // All physical memory mapped at this address
 #define KERNBASE        0xC0000000
+#define KERN_LOAD_ADDR  KERNBASE
 
 // Use this if needed in annotations
 #define IVY_KERNBASE (0xC000U << 16)

@@ -38,7 +38,7 @@ _start:
   // set up stack and terminate frame pointer for backtracing
   li     $fp, 0
   la     $sp, bootstacktop
-  li     $t1, LOAD_ADDR
+  li     $t1, KERN_LOAD_ADDR
   sub    $sp, $sp, $t1
 
   // set up initial page mappings
@@ -47,8 +47,10 @@ _start:
   la     $a1, l1pt_boot
   sub    $a1, $a1, $t1
 #ifdef __riscv64
-  la     $a2, l2pt
+  la     $a2, l2pt_kernbase
   sub    $a2, $a2, $t1
+  la     $a3, l2pt_load
+  sub    $a3, $a3, $t1
 #endif
   jal    pagetable_init
 
@@ -70,7 +72,7 @@ notcore0:
   add    $t0, $t0, 1
   sll    $t0, $t0, KSTKSHIFT
   add    $sp, $sp, $t0
-  li     $t1, LOAD_ADDR
+  li     $t1, KERN_LOAD_ADDR
   sub    $sp, $sp, $t1
   
   // turn on MMU
@@ -79,7 +81,7 @@ notcore0:
   jal    mmu_init
 
   // relocate stack and call into C code
-  li     $t1, LOAD_ADDR
+  li     $t1, KERN_LOAD_ADDR
   add    $sp, $sp, $t1
   lui    $t0, %hi(smp_init)
   jalr.j $t0, %lo(smp_init)

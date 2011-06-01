@@ -31,10 +31,14 @@
  */
 #define PADDR(kva)						\
 ({								\
-	physaddr_t __m_kva = (physaddr_t) (kva);		\
+	physaddr_t __m_pa, __m_kva = (physaddr_t) (kva);		\
 	if (__m_kva < KERNBASE)					\
-		panic("PADDR called with invalid kva %08lx", __m_kva);\
-	__m_kva - KERNBASE;					\
+		panic("PADDR called with invalid kva %p", __m_kva);\
+	if(__m_kva >= KERN_LOAD_ADDR)					\
+		__m_pa = __m_kva - KERN_LOAD_ADDR;					\
+	else					\
+		__m_pa = __m_kva - KERNBASE;					\
+	__m_pa; \
 })
 
 /* This macro takes a physical address and returns the corresponding kernel
@@ -44,7 +48,7 @@
 	physaddr_t __m_pa = (pa);				\
 	size_t __m_ppn = LA2PPN(__m_pa);			\
 	if (__m_ppn >= npages)					\
-		warn("KADDR called with invalid pa %08lx", __m_pa);\
+		warn("KADDR called with invalid pa %p", __m_pa);\
 	(void*TRUSTED) (__m_pa + KERNBASE);				\
 })
 
@@ -83,7 +87,7 @@ void* mmio_alloc(physaddr_t pa, size_t size);
 static inline page_t *SAFE ppn2page(size_t ppn)
 {
 	if( ppn >= npages )
-		warn("ppn2page called with ppn (%08u) larger than npages", ppn);
+		warn("ppn2page called with ppn (%08lu) larger than npages", ppn);
 	return &(pages[ppn]);
 }
 
@@ -100,7 +104,7 @@ static inline physaddr_t page2pa(page_t *pp)
 static inline page_t*COUNT(1) pa2page(physaddr_t pa)
 {
 	if (LA2PPN(pa) >= npages)
-		warn("pa2page called with pa (0x%08x) larger than npages", pa);
+		warn("pa2page called with pa (%p) larger than npages", pa);
 	return &pages[LA2PPN(pa)];
 }
 

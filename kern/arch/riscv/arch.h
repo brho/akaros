@@ -11,7 +11,7 @@
 
 /* Arch Constants */
 #define HW_CACHE_ALIGN 64
-#define IOAPIC_BASE    LOAD_ADDR // upper 2GB reserved (see mmu_init)
+#define IOAPIC_BASE    KERN_LOAD_ADDR // upper 2GB reserved (see mmu_init)
 
 void print_cpuinfo(void);
 void show_mapping(uintptr_t start, size_t size);
