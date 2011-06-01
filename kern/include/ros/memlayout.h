@@ -96,7 +96,6 @@
 #define KSTACKTOP	VPT
 #define KSTKSHIFT	(PGSHIFT+3)		// KSTKSIZE == 8*PGSIZE
 #define KSTKSIZE	(1 << KSTKSHIFT)	// size of a kernel stack
-#define ULIM		(KSTACKTOP - PTSIZE)
 
 /*
  * User read-only mappings! Anything below here til UTOP are readonly to user.

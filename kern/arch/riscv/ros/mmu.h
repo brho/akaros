@@ -4,6 +4,7 @@
 // All physical memory mapped at this address
 #ifdef __riscv64
 # define KERNBASE       0xFFFF800000000000
+# define ULIM           0x0000800000000000
 # define KERN_LOAD_ADDR 0xFFFFFFFF80000000
 # define NPTLEVELS                       4
 # define L1PGSHIFT              (12+9+9+9)
@@ -18,6 +19,7 @@
 # define PTSIZE                   L2PGSIZE
 #else
 # define KERNBASE               0x80000000
+# define ULIM                   0x7F000000
 # define KERN_LOAD_ADDR           KERNBASE
 # define NPTLEVELS                       2
 # define L1PGSHIFT                 (12+10)
