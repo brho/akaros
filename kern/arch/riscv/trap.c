@@ -435,3 +435,8 @@ handle_trap(trapframe_t* tf)
 	
 	env_pop_tf(tf);
 }
+
+/* We don't have NMIs now. */
+void send_nmi(uint32_t os_coreid)
+{
+}

@@ -1322,7 +1322,7 @@ void test_atomics(void)
 			if (attempt == 0) 
 				old_num++;
 			attempt++;	
-		} while (!atomic_comp_swap((uint32_t*)&actual_num, old_num, old_num + 10));
+		} while (!atomic_comp_swap((uintptr_t*)&actual_num, old_num, old_num + 10));
 		if (actual_num != init_val + 10)
 			printk("FUCK, CAS test failed for %d\n", init_val);
 	}

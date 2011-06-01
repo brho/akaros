@@ -26,3 +26,4 @@ KERN_ARCH_SRCFILES := $(KERN_ARCH_SRC_DIR)/boot.S \
                       $(KERN_ARCH_SRC_DIR)/process.c \
                       $(KERN_ARCH_SRC_DIR)/env.c \
                       $(KERN_ARCH_SRC_DIR)/init.c \
+                      $(KERN_ARCH_SRC_DIR)/kdebug.c \

@@ -43,9 +43,3 @@ void show_mapping(uintptr_t start, size_t size)
 			cprintf("%016p\n",0);
 	}
 }
-
-void
-backtrace(void)
-{
-  panic("No backtrace yet!");
-}
