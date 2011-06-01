@@ -71,8 +71,10 @@ WRITES(e->env_pgdir, e->env_cr3, e->procinfo, e->procdata)
 
 	// VPT and UVPT map the env's own page table, with
 	// different permissions.
+	#ifndef NOVPT
 	e->env_pgdir[PDX(VPT)]  = PTE(LA2PPN(e->env_cr3), PTE_P | PTE_KERN_RW);
 	e->env_pgdir[PDX(UVPT)] = PTE(LA2PPN(e->env_cr3), PTE_P | PTE_USER_RO);
+	#endif
 
 	/* These need to be contiguous, so the kernel can alias them.  Note the
 	 * pages return with a refcnt, but it's okay to insert them since we free

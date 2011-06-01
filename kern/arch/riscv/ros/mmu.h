@@ -30,6 +30,8 @@
 
 #define PGSIZE (1 << PGSHIFT)
 
+#define NOVPT
+
 #ifndef __ASSEMBLER__
 typedef unsigned long pte_t;
 typedef unsigned long pde_t;
