@@ -731,7 +731,7 @@ static ssize_t sys_serial_read(env_t* e, char *DANGEROUS _buf, size_t len)
 		return 0;
 
 	#ifdef __CONFIG_SERIAL_IO__
-	    char *COUNT(len) buf = user_mem_assert(e, _buf, len, PTE_USER_RO);
+	    char *COUNT(len) buf = user_mem_assert(e, _buf, len, 1, PTE_USER_RO);
 		size_t bytes_read = 0;
 		int c;
 		while((c = serial_read_byte()) != -1) {
@@ -751,7 +751,7 @@ static ssize_t sys_serial_write(env_t* e, const char *DANGEROUS buf, size_t len)
 	if (len == 0)
 		return 0;
 	#ifdef __CONFIG_SERIAL_IO__
-		char *COUNT(len) _buf = user_mem_assert(e, buf, len, PTE_USER_RO);
+		char *COUNT(len) _buf = user_mem_assert(e, buf, len, 1, PTE_USER_RO);
 		for(int i =0; i<len; i++)
 			serial_send_byte(buf[i]);
 		return (ssize_t)len;
@@ -784,7 +784,7 @@ static ssize_t sys_eth_read(env_t* e, char *DANGEROUS buf)
 
 		spin_unlock(&packet_buffers_lock);
 
-		char* _buf = user_mem_assert(e, buf, len, PTE_U);
+		char* _buf = user_mem_assert(e, buf, len, 1, PTE_U);
 
 		memcpy(_buf, ptr, len);
 
@@ -1419,7 +1419,7 @@ void run_local_syscall(struct syscall *sysc)
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 
 	/* TODO: (UMEM) assert / pin the memory for the sysc */
-	user_mem_assert(pcpui->cur_proc, sysc, sizeof(struct syscall), PTE_USER_RW);
+	user_mem_assert(pcpui->cur_proc, sysc, sizeof(struct syscall), sizeof(uintptr_t), PTE_USER_RW);
 	pcpui->cur_sysc = sysc;			/* let the core know which sysc it is */
 	sysc->retval = syscall(pcpui->cur_proc, sysc->num, sysc->arg0, sysc->arg1,
 	                       sysc->arg2, sysc->arg3, sysc->arg4, sysc->arg5);

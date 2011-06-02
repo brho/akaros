@@ -51,13 +51,12 @@ static void *DANGEROUS RACY user_mem_check_addr;
  * @return NULL trying to access this range of virtual addresses is not allowed
  */
 void *user_mem_check(struct proc *p, const void *DANGEROUS va, size_t len,
-                     int perm)
+                     size_t align, int perm)
 {
-	if (len == 0) {
-		warn("Called user_mem_check with a len of 0. Don't do that. Returning NULL");
+	align--;
+	if(((align+1) & align) || ((uintptr_t)va & align) || (len & align))
 		return NULL;
-	}
-	
+
 	// TODO - will need to sort this out wrt page faulting / PTE_P
 	// also could be issues with sleeping and waking up to find pages
 	// are unmapped, though i think the lab ignores this since the 
@@ -115,14 +114,9 @@ void *user_mem_check(struct proc *p, const void *DANGEROUS va, size_t len,
  * GIANT WARNING: this could fuck up your refcnting for p if p was an
  * edible/refcounted reference.  (fix is to return, or just not use this) */
 void *user_mem_assert(struct proc *p, const void *DANGEROUS va, size_t len,
-                       int perm)
+                      size_t align, int perm)
 {
-	if (len == 0) {
-		warn("Called user_mem_assert with a len of 0. Don't do that. Returning NULL");
-		return NULL;
-	}
-	
-	void *COUNT(len) res = user_mem_check(p, va, len, perm | PTE_USER_RO);
+	void* res = user_mem_check(p, va, len, align, perm | PTE_USER_RO);
 	if (!res) {
 		cprintf("[%08x] user_mem_check assertion failure for "
 			"va %08x\n", p->pid, user_mem_check_addr);
