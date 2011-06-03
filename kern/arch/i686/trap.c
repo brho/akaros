@@ -416,6 +416,7 @@ void sysenter_callwrapper(struct trapframe *tf)
 	/* Set up and run the async calls */
 	prep_syscalls(current, (struct syscall*)tf->tf_regs.reg_eax,
 	              tf->tf_regs.reg_esi);
+	/* If you use pcpui again, reread it, since you might have migrated */
 	proc_restartcore();
 }
 

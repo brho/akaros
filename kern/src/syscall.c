@@ -1423,6 +1423,8 @@ void run_local_syscall(struct syscall *sysc)
 	pcpui->cur_sysc = sysc;			/* let the core know which sysc it is */
 	sysc->retval = syscall(pcpui->cur_proc, sysc->num, sysc->arg0, sysc->arg1,
 	                       sysc->arg2, sysc->arg3, sysc->arg4, sysc->arg5);
+	/* Need to re-load pcpui, in case we migrated */
+	pcpui = &per_cpu_info[core_id()];
 	/* Atomically turn on the SC_DONE flag.  Need the atomics since we're racing
 	 * with userspace for the event_queue registration. */
 	atomic_or(&sysc->flags, SC_DONE); 
@@ -1437,7 +1439,7 @@ void run_local_syscall(struct syscall *sysc)
 void prep_syscalls(struct proc *p, struct syscall *sysc, unsigned int nr_syscs)
 {
 	int retval;
-	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	/* Careful with pcpui here, we could have migrated */
 	if (!nr_syscs)
 		return;
 	/* For all after the first call, send ourselves a KMSG (TODO). */

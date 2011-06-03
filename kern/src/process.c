@@ -597,7 +597,6 @@ void proc_restartcore(void)
 		abandon_core();
 		smp_idle();
 	}
-	/* TODO: this is where we can decide to smp_idle() if there is no cur_tf */
 	/* Need ints disabled when we return from processing (race) */
 	disable_irq();
 	/* Need to be current (set by the caller), in case a kmsg is there that
