@@ -105,7 +105,9 @@ static void wake_awaiter(struct alarm_waiter *waiter)
 		sleeper = __up_sem(&waiter->sem);
 		if (sleeper)
 			kthread_runnable(sleeper);
-		assert(TAILQ_EMPTY(&waiter->sem.waiters));
+		/* Don't touch the sleeper or waiter after making the kthread runnable,
+		 * since it could be in use on another core (and the waiter can be
+		 * clobbered as the kthread unwinds its stack). */
 	}
 }
 
@@ -124,6 +126,9 @@ void trigger_tchain(struct timer_chain *tchain)
 		if (i->wake_up_time <= now) {
 			changed_list = TRUE;
 			TAILQ_REMOVE(&tchain->waiters, i, next);
+			/* Don't touch the waiter after waking it, since it could be in use
+			 * on another core (and the waiter can be clobbered as the kthread
+			 * unwinds its stack). */
 			wake_awaiter(i);
 		} else {
 			break;
