@@ -26,5 +26,4 @@ int debuginfo_eip(uintptr_t eip, struct eipdebuginfo *info)
 void
 backtrace(void)
 {
-  panic("No backtrace yet!");
 }

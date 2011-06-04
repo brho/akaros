@@ -200,7 +200,8 @@ void free_cont_pages(void *buf, size_t order)
 {
 	size_t npages = 1 << order;	
 	spin_lock_irqsave(&colored_page_free_list_lock);
-	for (int i = kva2ppn(buf); i < kva2ppn(buf) + npages; i++) {
+	for (size_t i = kva2ppn(buf); i < kva2ppn(buf) + npages; i++) {
+		page_t* page = ppn2page(i);
 		__page_decref(ppn2page(i));
 		assert(page_is_free(i));
 	}

@@ -110,15 +110,15 @@ static int
 user_mem_walk_recursive(env_t* e, uintptr_t start, size_t len,
                         mem_walk_callback_t callback, void* arg,
                         mem_walk_callback_t pt_callback, void* pt_arg,
-												pte_t* pt, int level)
+                        pte_t* pt, int level)
 {
-  int pgshift = L1PGSHIFT - level*(L1PGSHIFT-L2PGSHIFT);
+	int pgshift = L1PGSHIFT - level*(L1PGSHIFT-L2PGSHIFT);
 	uintptr_t pgsize = 1UL << pgshift;
 
 	uintptr_t start_idx = (start >> pgshift) & (NPTENTRIES-1);
-	uintptr_t end_idx = (ROUNDUP(start+len, pgsize) >> pgshift) & (NPTENTRIES-1);
+	uintptr_t end_idx = ((start+len-1) >> pgshift) & (NPTENTRIES-1);
 
-	for(uintptr_t idx = start_idx; idx < end_idx; idx++)
+	for(uintptr_t idx = start_idx; idx <= end_idx; idx++)
 	{
 		int ret;
 		uintptr_t pgaddr = ROUNDDOWN(start, pgsize) + idx*pgsize;
@@ -127,7 +127,8 @@ user_mem_walk_recursive(env_t* e, uintptr_t start, size_t len,
 		if(*pte & PTE_T)
 		{
 			assert(level < NPTLEVELS-1);
-			if((ret = user_mem_walk_recursive(e, pgaddr, MIN(pgsize, start+len),
+			if((ret = user_mem_walk_recursive(e, MAX(pgaddr, start),
+			                                  MIN(pgsize, pgaddr+len),
 			                                  callback, arg,
 																				pt_callback, pt_arg,
 																				KADDR(PTD_ADDR(*pte)), level+1)))
@@ -139,7 +140,6 @@ user_mem_walk_recursive(env_t* e, uintptr_t start, size_t len,
 			if((ret = callback(e, pte, (void*)pgaddr, arg)))
 				return ret;
 	}
-
 	return 0;
 }
 

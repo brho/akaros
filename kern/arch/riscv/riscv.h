@@ -32,7 +32,13 @@ num_cores(void)
 static __inline void
 send_ipi(uint32_t who)
 {
-  mtpcr(PCR_IPI, who);
+ 	mtpcr(PCR_IPI, who);
+}
+
+static __inline void
+clear_ipi()
+{
+ 	mfpcr(PCR_IPI);
 }
 
 #endif

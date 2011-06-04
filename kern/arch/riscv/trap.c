@@ -171,6 +171,8 @@ static kernel_message_t *get_next_amsg(struct kernel_msg_list *list_head,
 static void
 handle_ipi(trapframe_t* tf)
 {
+	clear_ipi();
+
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	if (!in_kernel(tf))
 		set_current_tf(pcpui, &tf);
@@ -293,9 +295,9 @@ handle_interrupt(trapframe_t* state)
 	  [IPI_IRQ] = handle_ipi,
 	};
 
-	int interrupts = (state->cause & CAUSE_IP) >> CAUSE_IP_SHIFT;
+	uintptr_t interrupts = (state->cause & CAUSE_IP) >> CAUSE_IP_SHIFT;
 
-	for(int i = 0; interrupts; interrupts >>= 1, i++)
+	for(uintptr_t i = 0; interrupts; interrupts >>= 1, i++)
 	{
 		if(interrupts & 1)
 		{

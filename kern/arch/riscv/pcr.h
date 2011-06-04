@@ -75,13 +75,6 @@
           asm volatile ("mfpcr %0,$cr%1" : "=r"(__tmp) : "i"(reg)); \
           __tmp; })
 
-#define mtcr(reg,val) ({ long __tmp = (long)(val); \
-          asm volatile ("mtcr %0,$cr%1"::"r"(__tmp),"i"(reg)); })
-
-#define mfcr(reg) ({ long __tmp; \
-          asm volatile ("mfcr %0,$cr%1" : "=r"(__tmp) : "i"(reg)); \
-          __tmp; })
-
 #define irq_disable() asm volatile("di")
 #define irq_enable() asm volatile("ei")
 
