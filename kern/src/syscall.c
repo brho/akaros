@@ -59,6 +59,19 @@ static bool proc_is_traced(struct proc *p)
 	return false;
 }
 
+/* Helper to finish a syscall, signalling if appropriate */
+static void finish_sysc(struct syscall *sysc, struct proc *p)
+{
+	/* Atomically turn on the LOCK and SC_DONE flag.  The lock tells userspace
+	 * we're messing with the flags and to not proceed.  We use it instead of
+	 * CASing with userspace.  We need the atomics since we're racing with
+	 * userspace for the event_queue registration.  The 'lock' tells userspace
+	 * to not muck with the flags while we're signalling. */
+	atomic_or(&sysc->flags, SC_K_LOCK | SC_DONE); 
+	__signal_syscall(sysc, p);
+	atomic_and(&sysc->flags, ~SC_K_LOCK); 
+}
+
 /* Helper that "finishes" the current async syscall.  This should be used when
  * we are calling a function in a syscall that might not return and won't be
  * able to use the normal syscall return path, such as proc_yield() and
@@ -70,12 +83,12 @@ static bool proc_is_traced(struct proc *p)
  *
  * *sysc is in user memory, and should be pinned (TODO: UMEM).  There may be
  * issues with unpinning this if we never return. */
-static void signal_current_sc(int retval)
+static void finish_current_sysc(int retval)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	assert(pcpui->cur_sysc);
 	pcpui->cur_sysc->retval = retval;
-	atomic_or(&pcpui->cur_sysc->flags, SC_DONE); 
+	finish_sysc(pcpui->cur_sysc, pcpui->cur_proc);
 }
 
 /* Callable by any function while executing a syscall (or otherwise, actually).
@@ -353,7 +366,7 @@ static int sys_proc_yield(struct proc *p, bool being_nice)
 	/* proc_yield() often doesn't return - we need to set the syscall retval
 	 * early.  If it doesn't return, it expects to eat our reference (for now).
 	 */
-	signal_current_sc(0);
+	finish_current_sysc(0);
 	proc_incref(p, 1);
 	proc_yield(p, being_nice);
 	proc_decref(p);
@@ -384,7 +397,7 @@ static ssize_t sys_fork(env_t* e)
 	 * out, since the 'forked' process's call never actually goes through the
 	 * syscall return path, and will never think it is done.  This violates a
 	 * few things.  Just be careful with fork. */
-	signal_current_sc(0);
+	finish_current_sysc(0);
 
 	env->cache_colors_map = cache_colors_map_alloc();
 	for(int i=0; i < llc_cache->num_colors; i++)
@@ -535,7 +548,7 @@ mid_error:
 	kref_put(&program->f_kref);
 early_error:
 	p->env_tf = *old_cur_tf;
-	signal_current_sc(-1);
+	finish_current_sysc(-1);
 success:
 	/* Here's how we'll restart the new (or old) process: */
 	spin_lock(&p->proc_lock);
@@ -634,7 +647,7 @@ static int sys_resource_req(struct proc *p, int type, unsigned int amt_wanted,
                             unsigned int amt_wanted_min, int flags)
 {
 	int retval;
-	signal_current_sc(0);
+	finish_current_sysc(0);
 	/* this might not return (if it's a _S -> _M transition) */
 	proc_incref(p, 1);
 	retval = resource_req(p, type, amt_wanted, amt_wanted_min, flags);
@@ -1425,14 +1438,7 @@ void run_local_syscall(struct syscall *sysc)
 	                       sysc->arg2, sysc->arg3, sysc->arg4, sysc->arg5);
 	/* Need to re-load pcpui, in case we migrated */
 	pcpui = &per_cpu_info[core_id()];
-	/* Atomically turn on the LOCK and SC_DONE flag.  The lock tells userspace
-	 * we're messing with the flags and to not proceed.  We use it instead of
-	 * CASing with userspace.  We need the atomics since we're racing with
-	 * userspace for the event_queue registration.  The 'lock' tells userspace
-	 * to not muck with the flags while we're signalling. */
-	atomic_or(&sysc->flags, SC_K_LOCK | SC_DONE); 
-	__signal_syscall(sysc, pcpui->cur_proc);
-	atomic_and(&sysc->flags, ~SC_K_LOCK); 
+	finish_sysc(sysc, pcpui->cur_proc);
 	/* Can unpin (UMEM) at this point */
 	pcpui->cur_sysc = 0;	/* no longer working on sysc */
 }
