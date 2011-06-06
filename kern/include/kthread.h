@@ -67,8 +67,8 @@ static inline bool __down_sem(struct semaphore *sem, struct kthread *kthread)
 }
 
 /* Ups the semaphore.  If it was < 0, we need to wake up someone, which is the
- * return value. */
-static inline struct kthread *__up_sem(struct semaphore *sem)
+ * return value.  If you think there should be at most one, set exactly_one. */
+static inline struct kthread *__up_sem(struct semaphore *sem, bool exactly_one)
 {
 	struct kthread *kthread = 0;
 	spin_lock(&sem->lock);
@@ -76,6 +76,8 @@ static inline struct kthread *__up_sem(struct semaphore *sem)
 		/* could do something with 'priority' here */
 		kthread = TAILQ_FIRST(&sem->waiters);
 		TAILQ_REMOVE(&sem->waiters, kthread, link);
+		if (exactly_one)
+			assert(TAILQ_EMPTY(&sem->waiters));
 	} else {
 		assert(TAILQ_EMPTY(&sem->waiters));
 	}

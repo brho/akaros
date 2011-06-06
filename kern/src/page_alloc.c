@@ -311,7 +311,7 @@ void unlock_page(struct page *page)
 {
 	struct kthread *sleeper;
 	page->pg_flags &= ~PG_LOCKED;
-	sleeper = __up_sem(&page->pg_sem);
+	sleeper = __up_sem(&page->pg_sem, FALSE);
 	if (sleeper) {
 		printk("Unexpected sleeper on a page!");	/* til we test this */
 		kthread_runnable(sleeper);

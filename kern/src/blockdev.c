@@ -139,14 +139,13 @@ int bdev_submit_request(struct block_device *bdev, struct block_request *breq)
 void generic_breq_done(struct block_request *breq)
 {
 #ifdef __i386__ 	/* Sparc can't restart kthreads yet */
-	struct kthread *sleeper = __up_sem(&breq->sem);
+	struct kthread *sleeper = __up_sem(&breq->sem, TRUE);
 	if (!sleeper) {
 		/* This shouldn't happen anymore.  Let brho know if it does. */
 		warn("[kernel] no one waiting on breq %08p", breq);
 		return;
 	}
 	kthread_runnable(sleeper);
-	assert(TAILQ_EMPTY(&breq->sem.waiters));
 #else
 	breq->data = (void*)1;
 #endif

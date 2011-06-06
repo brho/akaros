@@ -1222,7 +1222,7 @@ void test_kthreads(void)
 		struct kthread *kthread;
 		printk("[kmsg] Upping the sem to start the kthread, stacktop is %08p\n",
 		       get_stack_top());
-		kthread = __up_sem(sem);
+		kthread = __up_sem(sem, FALSE);
 		if (!kthread) {
 			printk("[kmsg] Crap, the sem didn't have a kthread waiting!\n");
 			return;

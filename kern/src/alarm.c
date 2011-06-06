@@ -102,7 +102,7 @@ static void wake_awaiter(struct alarm_waiter *waiter)
 	} else {
 		/* Might encaps this */
 		struct kthread *sleeper;
-		sleeper = __up_sem(&waiter->sem);
+		sleeper = __up_sem(&waiter->sem, TRUE);
 		if (sleeper)
 			kthread_runnable(sleeper);
 		/* Don't touch the sleeper or waiter after making the kthread runnable,
