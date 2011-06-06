@@ -170,6 +170,11 @@ void idt_init(void)
 	uintptr_t stacktop_kva = (uintptr_t)ppn2kva(PTE2PPN(*pte)) + PGSIZE;
 	ts.ts_esp0 = stacktop_kva;
 	ts.ts_ss0 = SINIT(GD_KD);
+#ifdef __CONFIG_KTHREAD_POISON__
+	/* TODO: KTHR-STACK */
+	uintptr_t *poison = (uintptr_t*)ROUNDDOWN(stacktop_kva - 1, PGSIZE);
+	*poison = 0xdeadbeef;
+#endif /* __CONFIG_KTHREAD_POISON__ */
 
 	// Initialize the TSS field of the gdt.
 	SEG16ROINIT(gdt[GD_TSS >> 3],STS_T32A, (uint32_t)(&ts),sizeof(taskstate_t),0);

@@ -94,4 +94,11 @@ void smp_percpu_init(void)
 	STAILQ_INIT(&per_cpu_info[coreid].routine_amsgs);
 	/* Initialize the per-core timer chain */
 	init_timer_chain(&per_cpu_info[coreid].tchain, set_pcpu_alarm_interrupt);
+
+#ifdef __CONFIG_KTHREAD_POISON__
+/* TODO: KTHR-STACK */
+uintptr_t *poison = (uintptr_t*)ROUNDDOWN(get_stack_top() - 1, PGSIZE);
+*poison = 0xdeadbeef;
+#endif /* __CONFIG_KTHREAD_POISON__ */
+
 }
