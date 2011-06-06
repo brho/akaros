@@ -1425,10 +1425,14 @@ void run_local_syscall(struct syscall *sysc)
 	                       sysc->arg2, sysc->arg3, sysc->arg4, sysc->arg5);
 	/* Need to re-load pcpui, in case we migrated */
 	pcpui = &per_cpu_info[core_id()];
-	/* Atomically turn on the SC_DONE flag.  Need the atomics since we're racing
-	 * with userspace for the event_queue registration. */
-	atomic_or(&sysc->flags, SC_DONE); 
-	signal_syscall(sysc, pcpui->cur_proc);
+	/* Atomically turn on the LOCK and SC_DONE flag.  The lock tells userspace
+	 * we're messing with the flags and to not proceed.  We use it instead of
+	 * CASing with userspace.  We need the atomics since we're racing with
+	 * userspace for the event_queue registration.  The 'lock' tells userspace
+	 * to not muck with the flags while we're signalling. */
+	atomic_or(&sysc->flags, SC_K_LOCK | SC_DONE); 
+	__signal_syscall(sysc, pcpui->cur_proc);
+	atomic_and(&sysc->flags, ~SC_K_LOCK); 
 	/* Can unpin (UMEM) at this point */
 	pcpui->cur_sysc = 0;	/* no longer working on sysc */
 }
@@ -1452,8 +1456,10 @@ void prep_syscalls(struct proc *p, struct syscall *sysc, unsigned int nr_syscs)
 
 /* Call this when something happens on the syscall where userspace might want to
  * get signaled.  Passing p, since the caller should know who the syscall
- * belongs to (probably is current). */
-void signal_syscall(struct syscall *sysc, struct proc *p)
+ * belongs to (probably is current). 
+ *
+ * You need to have SC_K_LOCK set when you call this. */
+void __signal_syscall(struct syscall *sysc, struct proc *p)
 {
 	struct event_queue *ev_q;
 	struct event_msg local_msg;

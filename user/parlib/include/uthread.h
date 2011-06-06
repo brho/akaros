@@ -60,8 +60,7 @@ void ros_syscall_blockon(struct syscall *sysc);
 bool check_preempt_pending(uint32_t vcoreid);
 
 bool register_evq(struct syscall *sysc, struct event_queue *ev_q);
-void deregister_sysc(struct syscall *sysc);
-bool reregister_sysc(struct syscall *sysc);
+void deregister_evq(struct syscall *sysc);
 
 /* Helpers, which sched_entry() can call */
 void run_current_uthread(void);

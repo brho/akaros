@@ -291,7 +291,7 @@ static void pth_handle_syscall(struct event_msg *ev_msg, unsigned int ev_type,
 		 * on the pending_sysc list. */
 		TAILQ_FOREACH(i, &sysc_mgmt[vcoreid].pending_syscs, next) {
 			sysc = ((struct uthread*)i)->sysc;
-			deregister_sysc(sysc);
+			deregister_evq(sysc);
 		}
 		/* Handle event msgs, to get any syscs that sent messages.  We don't
 		 * care about bits, since we're dealing with overflow already.  Note
@@ -308,7 +308,7 @@ static void pth_handle_syscall(struct event_msg *ev_msg, unsigned int ev_type,
 		 * this loop. */
 		TAILQ_FOREACH_SAFE(i, &sysc_mgmt[vcoreid].pending_syscs, next, temp) {
 			sysc = ((struct uthread*)i)->sysc;
-			if (!reregister_sysc(sysc)) {
+			if (!register_evq(sysc, &vc_sysc_mgmt->ev_q)) {
 				/* They are already done, can't sign up for events, just like
 				 * when we blocked on them the first time. */
 				restart_thread(sysc);
@@ -360,7 +360,8 @@ void pth_blockon_sysc(struct syscall *sysc)
 	TAILQ_INSERT_TAIL(&sysc_mgmt[vcoreid].pending_syscs, pthread, next);
 	/* Safety: later we'll make sure we restart on the core we slept on */
 	pthread->vcoreid = vcoreid;
-	/* Register our vcore's syscall ev_q to hear about this syscall. */
+	/* Register our vcore's syscall ev_q to hear about this syscall.  Keep this
+	 * in sync with how we handle overflowed syscalls later. */
 	if (!register_evq(sysc, &sysc_mgmt[vcoreid].ev_q)) {
 		/* Lost the race with the call being done.  The kernel won't send the
 		 * event.  Just restart him. */

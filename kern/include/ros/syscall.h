@@ -12,11 +12,12 @@
 #define SC_DONE					0x0001		/* SC is done */
 #define SC_PROGRESS				0x0002		/* SC made progress */
 #define SC_UEVENT				0x0004		/* user has an ev_q */
+#define SC_K_LOCK				0x0008		/* kernel locked sysc */
 
 struct syscall {
 	unsigned int				num;
-	long						retval;
 	int							err;			/* errno */
+	long						retval;
 	atomic_t					flags;
 	struct event_queue			*ev_q;
 	void						*u_data;
@@ -64,6 +65,10 @@ static inline long __ros_syscall(unsigned int _num, long _a0, long _a1, long _a2
 	/* Don't proceed til we are done */
 	while (!(atomic_read(&sysc.flags) & SC_DONE))
 		ros_syscall_blockon(&sysc);
+	/* Need to wait til it is unlocked.  It's not really done until SC_DONE &
+	 * !SC_K_LOCK. */
+	while (atomic_read(&sysc.flags) & SC_K_LOCK)
+		cpu_relax();
 	if (errno_loc)
 		*errno_loc = sysc.err;
 	return sysc.retval;

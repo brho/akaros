@@ -332,6 +332,9 @@ bool register_evq(struct syscall *sysc, struct event_queue *ev_q)
 	do {
 		cmb();
 		old_flags = atomic_read(&sysc->flags);
+		/* Spin if the kernel is mucking with syscall flags */
+		while (old_flags & SC_K_LOCK)
+			old_flags = atomic_read(&sysc->flags);
 		/* If the kernel finishes while we are trying to sign up for an event,
 		 * we need to bail out */
 		if (old_flags & (SC_DONE | SC_PROGRESS)) {
@@ -347,38 +350,26 @@ bool register_evq(struct syscall *sysc, struct event_queue *ev_q)
  * to unset SC_UEVENT.
  *
  * There is a chance the kernel sent an event if you didn't do this in time, but
- * once it is done, the kernel won't send a message.  You can later turn it back
- * on with reregister_sysc (which doesn't need to know the ev_q. */
-void deregister_sysc(struct syscall *sysc)
+ * once this returns, the kernel won't send a message.
+ *
+ * If the kernel is trying to send a message right now, this will spin (on
+ * SC_K_LOCK).  We need to make sure we deregistered, and that if a message
+ * is coming, that it already was sent (and possibly overflowed), before
+ * returning. */
+void deregister_evq(struct syscall *sysc)
 {
 	int old_flags;
+	sysc->ev_q = 0;
 	/* Try and unset the SC_UEVENT flag */
 	do {
 		cmb();
 		old_flags = atomic_read(&sysc->flags);
+		/* Spin if the kernel is mucking with syscall flags */
+		while (old_flags & SC_K_LOCK)
+			old_flags = atomic_read(&sysc->flags);
 		/* Note we don't care if the SC_DONE flag is getting set.  We just need
 		 * to avoid clobbering flags */
 	} while (!atomic_comp_swap(&sysc->flags, old_flags, old_flags & ~SC_UEVENT));
-}
-
-/* Turns SC handling back on.  Returns true if it succeeded, and false
- * otherwise.  False means that the syscall is done, and does not need an event
- * set (and should be handled accordingly). */
-bool reregister_sysc(struct syscall *sysc)
-{
-	int old_flags;
-	/* Try and set the SC_UEVENT flag (so the kernel knows to look at ev_q) */
-	do {
-		cmb();
-		old_flags = atomic_read(&sysc->flags);
-		/* If the kernel finishes while we are trying to sign up for an event,
-		 * we need to bail out */
-		if (old_flags & (SC_DONE | SC_PROGRESS)) {
-			sysc->ev_q = 0;		/* not necessary, but might help with bugs */
-			return FALSE;
-		}
-	} while (!atomic_comp_swap(&sysc->flags, old_flags, old_flags | SC_UEVENT));
-	return TRUE;
 }
 
 /* TLS helpers */

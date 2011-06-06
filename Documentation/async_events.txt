@@ -216,6 +216,13 @@ If it doesn't fail, they are now ready to receive messages.  This can be
 tweaked a bit.
 5) Unset the overflow-handling flag.
 
+One thing to be careful of is that when we turn off event delivery, you need to
+be sure the kernel isn't in the process of sending an event.  This is why we
+have the SC_K_LOCK syscall flag.  Uthread code will not consider deregistration
+complete while that flag is set, since the kernel is still mucking with the
+syscall (and sending an event).  Once the flag is clear, the event has been
+delivered (the ev_msg is in the ev_mbox), and our assumptions remain true.
+
 There are a couple implications of this style.  If you have a shared event
 queue (with other event sources), those events can get mixed in with the
 recovery.  Don't leave the vcore context due to other events.  This'll
