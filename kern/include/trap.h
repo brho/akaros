@@ -78,6 +78,7 @@ void kernel_msg_init(void);
 typedef void (*amr_t)(trapframe_t* tf, uint32_t srcid,
                       TV(a0t) a0, TV(a1t) a1, TV(a2t) a2);
 
+/* Must stay 8-byte aligned for sparc */
 struct kernel_message
 {
 	STAILQ_ENTRY(kernel_message NTPTV(a0t) NTPTV(a1t) NTPTV(a2t))
@@ -88,7 +89,8 @@ struct kernel_message
 	TV(a0t) arg0;
 	TV(a1t) arg1;
 	TV(a2t) arg2;
-};
+}__attribute__((aligned(8)));
+
 STAILQ_HEAD(kernel_msg_list, kernel_message NTPTV(a0t) NTPTV(a1t) NTPTV(a2t));
 typedef struct kernel_message NTPTV(a0t) NTPTV(a1t) NTPTV(a2t) kernel_message_t;
 
