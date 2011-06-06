@@ -69,6 +69,11 @@ static inline bool atomic_sub_and_test(atomic_t* number, uintptr_t val)
 	return __sync_fetch_and_sub((uintptr_t*)number, val) == val;
 }
 
+static inline void atomic_and(atomic_t *number, uintptr_t mask)
+{
+	__sync_fetch_and_and(number, mask);
+}
+
 static inline void atomic_or(atomic_t* number, uintptr_t mask)
 {
 	__sync_fetch_and_or(number, mask);

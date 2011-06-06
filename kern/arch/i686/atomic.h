@@ -25,6 +25,7 @@ static inline void atomic_dec(atomic_t *number);
 static inline long atomic_fetch_and_add(atomic_t *number, long val);
 static inline bool atomic_add_not_zero(atomic_t *number, long val);
 static inline bool atomic_sub_and_test(atomic_t *number, long val);
+static inline void atomic_and(atomic_t *number, long mask);
 static inline void atomic_or(atomic_t *number, int mask);
 static inline uint32_t atomic_swap(uint32_t *addr, uint32_t val);
 static inline bool atomic_comp_swap(uint32_t *addr, uint32_t exp_val,
@@ -58,7 +59,7 @@ static inline void atomic_set(atomic_t *number, int32_t val)
 
 static inline void atomic_add(atomic_t* number, long val)
 {
-	asm volatile("lock addl %1,%0" : "=m"(*number) : "r"(val));
+	asm volatile("lock addl %1,%0" : "=m"(*number) : "r"(val) : "cc");
 }
 
 // need to do this with pointers and deref.  %0 needs to be the memory address
@@ -105,6 +106,11 @@ static inline bool atomic_sub_and_test(atomic_t *number, long val)
 	                                       : "r"(val), "m"(*number)
 	                                       : "cc" );
 	return b;
+}
+
+static inline void atomic_and(atomic_t *number, long mask)
+{
+	asm volatile("lock andl %1,%0" : "=m"(*number) : "q"(mask) : "cc");
 }
 
 static inline void atomic_or(atomic_t *number, int mask)

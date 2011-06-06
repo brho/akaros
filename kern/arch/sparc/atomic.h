@@ -31,6 +31,7 @@ static inline void atomic_dec(atomic_t* number);
 static inline long atomic_fetch_and_add(atomic_t *number, long val);
 static inline bool atomic_add_not_zero(atomic_t *number, long val);
 static inline bool atomic_sub_and_test(atomic_t *number, long val);
+static inline void atomic_and(atomic_t *number, long mask);
 static inline void atomic_or(atomic_t *number, int mask);
 static inline uint32_t atomic_swap(uint32_t* addr, uint32_t val);
 static inline bool atomic_comp_swap(uint32_t *addr, uint32_t exp_val,
@@ -125,6 +126,19 @@ static inline bool atomic_sub_and_test(atomic_t *number, long val)
 	/* set the new counter value.  the lock is cleared (for free) */
 	atomic_init(number, num);
 	return retval;
+}
+
+static inline void atomic_and(atomic_t *number, long mask)
+{
+	long val;
+	/* this is pretty clever.  the lower 8 bits (i.e byte 3)
+	 * of the atomic_t serve as a spinlock.  let's acquire it. */
+	spin_lock((spinlock_t*)number);
+	val = atomic_read(number);
+	/* compute new counter value. */
+	val &= mask;
+	/* set the new counter value.  the lock is cleared (for free) */
+	atomic_init(number, val);
 }
 
 static inline void atomic_or(atomic_t *number, int mask)
