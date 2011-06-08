@@ -253,10 +253,10 @@ void setup_default_mtrrs(barrier_t* smp_barrier)
 // (i.e., the segment base addrs are set to zero).
 // 
 // This function only sets up the kernel part of the address space
-// (ie. addresses >= UTOP).  The user part of the address space
+// (ie. addresses >= ULIM).  The user part of the address space
 // will be setup later.
 //
-// From UTOP to ULIM, the user is allowed to read but not write.
+// From UWLIM to ULIM, the user is allowed to read but not write.
 // Above ULIM the user cannot read (or write). 
 void
 vm_init(void)
@@ -473,7 +473,7 @@ check_boot_pgdir(bool pse)
 	 * having a U on the entry doesn't make sense.  Thus we check for a jumbo
 	 * page, and special case it.  This will happen at 0xbf701000.  Why is this
 	 * magical?  Get your eagle glasses and figure it out. */
-	for (i = UTOP; i < ULIM; i+=PGSIZE) {
+	for (i = UWLIM; i < ULIM; i+=PGSIZE) {
 		pte = get_va_perms(pgdir, (void*SAFE)TC(i));
 		if (pte & PTE_P) {
 			if (i == UVPT+(VPT >> 10))

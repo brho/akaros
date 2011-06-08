@@ -63,7 +63,7 @@ WRITES(e->env_pgdir, e->env_cr3, e->procinfo, e->procdata)
 
 	// Map in the kernel to the top of every address space
 	// should be able to do this so long as boot_pgdir never has
-	// anything put below UTOP
+	// anything put below ULIM
 	// TODO check on this!  had a nasty bug because of it
 	// this is a bit wonky, since if it's not PGSIZE, lots of other things are
 	// screwed up...

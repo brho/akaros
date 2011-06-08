@@ -45,8 +45,8 @@ void *kmalloc_errno(int len);
 bool uva_is_kva(struct proc *p, void *uva, void *kva);
 uintptr_t uva2kva(struct proc *p, void *uva);
 
-/* UTOP is defined as virtual address below which a process can write */
+/* UWLIM is defined as virtual address below which a process can write */
 static inline bool is_user_rwaddr(void *addr)
 {
-	return ((uintptr_t)addr < UTOP) ? TRUE : FALSE;
+	return ((uintptr_t)addr < UWLIM) ? TRUE : FALSE;
 }

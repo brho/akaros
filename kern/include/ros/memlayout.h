@@ -39,7 +39,7 @@
  *                     | Unmapped (expandable region) |                   |
  *                     |                              | R-/R-            PTSIZE
  *                     |     Per-Process R/O Info     |                   |
- * UTOP, UINFO  ---->  +------------------------------+ 0xbf000000      --+
+ * UWLIM, UINFO ---->  +------------------------------+ 0xbf000000      --+
  *                     | Unmapped (expandable region) |                   |
  *                     |                              | RW/RW            PTSIZE
  *                     |     Per-Process R/W Data     |                   |
@@ -98,7 +98,7 @@
 #define KSTKSIZE	(1 << KSTKSHIFT)	/* size of a static kernel stack */
 
 /*
- * User read-only mappings! Anything below here til UTOP are readonly to user.
+ * User read-only mappings! Anything below here til UWLIM are readonly to user.
  * They are global pages mapped in at env allocation time.
  */
 
@@ -106,17 +106,17 @@
 #define UVPT		(ULIM - PTSIZE)
 
 /*
- * Top of user VM. User can manipulate VA from UTOP-1 and down!
+ * Top of user VM. User can manipulate VA from UWLIM-1 and down!
  */
 
 // Top of user-accessible VM
-#define UTOP		(UVPT - PTSIZE)
+#define UWLIM		(UVPT - PTSIZE)
 // Read-only, per-process shared info structures
-#define UINFO		UTOP
+#define UINFO		UWLIM
 
 // Read-write, per-process shared page for sending asynchronous 
 // syscalls to the kernel
-#define UDATA    (UTOP - PTSIZE)
+#define UDATA    (UWLIM - PTSIZE)
 
 // Read-write, global page.  Shared by all processes.  Can't be trusted.
 #define UGDATA   (UDATA - PGSIZE)

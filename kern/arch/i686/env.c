@@ -18,10 +18,10 @@ void env_pop_tf(trapframe_t *tf)
 {
 	/* Bug with this whole idea (TODO: (TLSV))*/
 	/* Load the LDT for this process.  Slightly ghetto doing it here. */
-	/* copy-in and check the LDT location.  the segmentation hardware write the
+	/* copy-in and check the LDT location.  the segmentation hardware writes the
 	 * accessed bit, so we want the memory to be in the user-writeable area. */
 	segdesc_t *ldt = current->procdata->ldt;
-	ldt = (segdesc_t*)MIN((uintptr_t)ldt, UTOP - LDT_SIZE);
+	ldt = (segdesc_t*)MIN((uintptr_t)ldt, UWLIM - LDT_SIZE);
 	/* Only set up the ldt if a pointer to the ldt actually exists */
 	if(ldt != NULL) {
 		segdesc_t *my_gdt = per_cpu_info[core_id()].gdt;
