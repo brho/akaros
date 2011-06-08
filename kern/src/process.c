@@ -516,8 +516,8 @@ void proc_run(struct proc *p)
 				if (is_mapped_vcore(p, core_id()))
 					self_ipi_pending = TRUE;
 				for (int i = 0; i < p->procinfo->num_vcores; i++)
-					send_kernel_message(get_pcoreid(p, i), __startcore, p, 0,
-					                    0, KMSG_ROUTINE);
+					send_kernel_message(get_pcoreid(p, i), __startcore, (long)p,
+					                    0, 0, KMSG_ROUTINE);
 			} else {
 				warn("Tried to proc_run() an _M with no vcores!");
 			}
@@ -642,7 +642,7 @@ void proc_destroy(struct proc *p)
 		case PROC_RUNNABLE_M:
 			/* Need to reclaim any cores this proc might have, even though it's
 			 * not running yet. */
-			__proc_take_allcores(p, NULL, NULL, NULL, NULL);
+			__proc_take_allcores(p, 0, 0, 0, 0);
 			// fallthrough
 		case PROC_RUNNABLE_S:
 			// Think about other lists, like WAITING, or better ways to do this
@@ -674,8 +674,7 @@ void proc_destroy(struct proc *p)
 			 * deallocate the cores.
 			 * The rule is that the vcoremap is set before proc_run, and reset
 			 * within proc_destroy */
-			__proc_take_allcores(p, __death, (void *SNT)0, (void *SNT)0,
-			                     (void *SNT)0);
+			__proc_take_allcores(p, __death, 0, 0, 0);
 			break;
 		case PROC_CREATED:
 			break;
@@ -872,8 +871,8 @@ void proc_notify(struct proc *p, uint32_t vcoreid)
 			if ((p->state & PROC_RUNNING_M) && // TODO: (VC#) (_S state)
 			              (p->procinfo->vcoremap[vcoreid].valid)) {
 				printd("[kernel] sending notif to vcore %d\n", vcoreid);
-				send_kernel_message(get_pcoreid(p, vcoreid), __notify, p, 0, 0,
-				                    KMSG_ROUTINE);
+				send_kernel_message(get_pcoreid(p, vcoreid), __notify, (long)p,
+				                    0, 0, KMSG_ROUTINE);
 			} else { // TODO: think about this, fallback, etc
 				warn("Vcore unmapped, not receiving an active notif");
 			}
@@ -939,7 +938,7 @@ bool __proc_preempt_core(struct proc *p, uint32_t pcoreid)
 
 	p->procinfo->vcoremap[vcoreid].preempt_served = TRUE;
 	// expects a pcorelist.  assumes pcore is mapped and running_m
-	return __proc_take_cores(p, &pcoreid, 1, __preempt, p, 0, 0);
+	return __proc_take_cores(p, &pcoreid, 1, __preempt, (long)p, 0, 0);
 }
 
 /* Raw function to preempt every vcore.  Returns TRUE if the calling core will
@@ -955,7 +954,7 @@ bool __proc_preempt_all(struct proc *p)
 		p->procinfo->vcoremap[active_vcoreid].preempt_served = TRUE;
 		active_vcoreid++;
 	}
-	return __proc_take_allcores(p, __preempt, p, 0, 0);
+	return __proc_take_allcores(p, __preempt, (long)p, 0, 0);
 }
 
 /* Warns and preempts a vcore from p.  No delaying / alarming, or anything.  The
@@ -1121,7 +1120,7 @@ bool __proc_give_cores(struct proc *SAFE p, uint32_t *pcorelist, size_t num)
 				       pcorelist[i]);
 				__map_vcore(p, free_vcoreid, pcorelist[i]);
 				p->procinfo->num_vcores++;
-				send_kernel_message(pcorelist[i], __startcore, p, 0, 0,
+				send_kernel_message(pcorelist[i], __startcore, (long)p, 0, 0,
 				                    KMSG_ROUTINE);
 				if (pcorelist[i] == core_id())
 					self_ipi_pending = TRUE;
@@ -1159,9 +1158,8 @@ bool __proc_set_allcores(struct proc *SAFE p, uint32_t *pcorelist,
  * in this function group, bool signals whether or not an IPI is pending.
  *
  * WARNING: You must hold the proc_lock before calling this! */
-bool __proc_take_cores(struct proc *SAFE p, uint32_t *pcorelist,
-                       size_t num, amr_t message, TV(a0t) arg0,
-                       TV(a1t) arg1, TV(a2t) arg2)
+bool __proc_take_cores(struct proc *p, uint32_t *pcorelist, size_t num,
+                       amr_t message, long arg0, long arg1, long arg2)
 { TRUSTEDBLOCK
 	uint32_t vcoreid, pcoreid;
 	bool self_ipi_pending = FALSE;
@@ -1211,8 +1209,8 @@ bool __proc_take_cores(struct proc *SAFE p, uint32_t *pcorelist,
  * IPI is coming in once you unlock.
  *
  * WARNING: You must hold the proc_lock before calling this! */
-bool __proc_take_allcores(struct proc *SAFE p, amr_t message,
-                          TV(a0t) arg0, TV(a1t) arg1, TV(a2t) arg2)
+bool __proc_take_allcores(struct proc *p, amr_t message, long arg0, long arg1,
+                          long arg2)
 {
 	uint32_t active_vcoreid = 0, pcoreid;
 	bool self_ipi_pending = FALSE;
@@ -1336,7 +1334,7 @@ void __proc_tlbshootdown(struct proc *p, uintptr_t start, uintptr_t end)
 				/* find next active vcore */
 				active_vcoreid = get_busy_vcoreid(p, active_vcoreid);
 				send_kernel_message(get_pcoreid(p, active_vcoreid),
-				                    __tlbshootdown, (void*)start, (void*)end,
+				                    __tlbshootdown, start, end,
 				                    0, KMSG_IMMEDIATE);
 				active_vcoreid++; /* next loop, skip the one we just used */
 			}
@@ -1354,7 +1352,7 @@ void __proc_tlbshootdown(struct proc *p, uintptr_t start, uintptr_t end)
 
 /* Kernel message handler to start a process's context on this core.  Tightly
  * coupled with proc_run().  Interrupts are disabled. */
-void __startcore(trapframe_t *tf, uint32_t srcid, void *a0, void *a1, void *a2)
+void __startcore(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2)
 {
 	uint32_t pcoreid = core_id(), vcoreid;
 	struct proc *p_to_run = (struct proc *CT(1))a0;
@@ -1401,7 +1399,7 @@ void __startcore(trapframe_t *tf, uint32_t srcid, void *a0, void *a1, void *a2)
 /* Bail out if it's the wrong process, or if they no longer want a notif.  Make
  * sure that you are passing in a user tf (otherwise, it's a bug).  Try not to
  * grab locks or write access to anything that isn't per-core in here. */
-void __notify(trapframe_t *tf, uint32_t srcid, void *a0, void *a1, void *a2)
+void __notify(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2)
 {
 	struct user_trapframe local_tf;
 	struct preempt_data *vcpd;
@@ -1434,7 +1432,7 @@ void __notify(trapframe_t *tf, uint32_t srcid, void *a0, void *a1, void *a2)
 	__proc_startcore(p, &local_tf);
 }
 
-void __preempt(trapframe_t *tf, uint32_t srcid, void *a0, void *a1, void *a2)
+void __preempt(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2)
 {
 	struct preempt_data *vcpd;
 	uint32_t vcoreid, coreid = core_id();
@@ -1472,8 +1470,7 @@ void __preempt(trapframe_t *tf, uint32_t srcid, void *a0, void *a1, void *a2)
  * Note this leaves no trace of what was running.
  * It's okay if death comes to a core that's already idling and has no current.
  * It could happen if a process decref'd before __proc_startcore could incref. */
-void __death(trapframe_t *tf, uint32_t srcid, void *SNT a0, void *SNT a1,
-             void *SNT a2)
+void __death(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2)
 {
 	uint32_t vcoreid, coreid = core_id();
 	if (current) {
@@ -1488,8 +1485,8 @@ void __death(trapframe_t *tf, uint32_t srcid, void *SNT a0, void *SNT a1,
 
 /* Kernel message handler, usually sent IMMEDIATE, to shoot down virtual
  * addresses from a0 to a1. */
-void __tlbshootdown(struct trapframe *tf, uint32_t srcid, void *a0, void *a1,
-                    void *a2)
+void __tlbshootdown(struct trapframe *tf, uint32_t srcid, long a0, long a1,
+                    long a2)
 {
 	/* TODO: (TLB) something more intelligent with the range */
 	tlbflush();

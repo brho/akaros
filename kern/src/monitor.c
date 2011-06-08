@@ -705,8 +705,8 @@ int mon_monitor(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 		printk("No such core!  Maybe it's in another cell...\n");
 		return 1;
 	}
-	void run_mon(struct trapframe *tf, uint32_t srcid, void *a0, void *a1,
-	             void *a2)
+	void run_mon(struct trapframe *tf, uint32_t srcid, long a0, long a1,
+	             long a2)
 	{
 		monitor(0);
 	}

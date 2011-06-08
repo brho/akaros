@@ -36,8 +36,8 @@ spinlock_t kernel_message_buf_busy[MAX_NUM_CPUS] = {SPINLOCK_INITIALIZER};
 kernel_message_t kernel_message_buf[MAX_NUM_CPUS];
 
 /* This is mostly identical to x86's, minus the different send_ipi call. */
-uint32_t send_kernel_message(uint32_t dst, amr_t pc,
-                             TV(a0t) arg0, TV(a1t) arg1, TV(a2t) arg2, int type)
+uint32_t send_kernel_message(uint32_t dst, amr_t pc, long arg0, long arg1,
+                             long arg2, int type)
 {
 	kernel_message_t *k_msg;
 	assert(pc);

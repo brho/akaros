@@ -428,8 +428,8 @@ void kernel_msg_init(void)
 	                   sizeof(struct kernel_message), HW_CACHE_ALIGN, 0, 0, 0);
 }
 
-uint32_t send_kernel_message(uint32_t dst, amr_t pc, TV(a0t) arg0, TV(a1t) arg1,
-                             TV(a2t) arg2, int type)
+uint32_t send_kernel_message(uint32_t dst, amr_t pc, long arg0, long arg1,
+                             long arg2, int type)
 {
 	kernel_message_t *k_msg;
 	assert(pc);

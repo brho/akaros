@@ -675,8 +675,8 @@ void test_circ_buffer(void)
 	return;
 }
 
-void test_km_handler(trapframe_t* tf, uint32_t srcid, void *a0, void *a1,
-                     void *a2)
+void test_km_handler(struct trapframe *tf, uint32_t srcid, long a0, long a1,
+                     long a2)
 {
 	printk("Received KM on core %d from core %d: arg0= 0x%08x, arg1 = "
 	       "0x%08x, arg2 = 0x%08x\n", core_id(), srcid, a0, a1, a2);
@@ -690,28 +690,28 @@ void test_kernel_messages(void)
 	 * precendence (the immediates should trump the others) */
 	printk("sending 5 IMMED to core 1, sending (#,deadbeef,0)\n");
 	for (int i = 0; i < 5; i++)
-		send_kernel_message(1, test_km_handler, (void*)i, (void*)0xdeadbeef,
-		                    (void*)0, KMSG_IMMEDIATE);
+		send_kernel_message(1, test_km_handler, (long)i, 0xdeadbeef, 0,
+		                    KMSG_IMMEDIATE);
 	udelay(5000000);
 	printk("sending 5 routine to core 1, sending (#,cafebabe,0)\n");
 	for (int i = 0; i < 5; i++)
-		send_kernel_message(1, test_km_handler, (void*)i, (void*)0xcafebabe,
-		                    (void*)0, KMSG_ROUTINE);
+		send_kernel_message(1, test_km_handler, (long)i, 0xcafebabe, 0,
+		                    KMSG_ROUTINE);
 	udelay(5000000);
 	printk("sending 10 routine and 3 immediate to core 2\n");
 	for (int i = 0; i < 10; i++)
-		send_kernel_message(2, test_km_handler, (void*)i, (void*)0xcafebabe,
-		                    (void*)0, KMSG_ROUTINE);
+		send_kernel_message(2, test_km_handler, (long)i, 0xcafebabe, 0,
+		                    KMSG_ROUTINE);
 	for (int i = 0; i < 3; i++)
-		send_kernel_message(2, test_km_handler, (void*)i, (void*)0xdeadbeef,
-		                    (void*)0, KMSG_IMMEDIATE);
+		send_kernel_message(2, test_km_handler, (long)i, 0xdeadbeef, 0,
+		                    KMSG_IMMEDIATE);
 	udelay(5000000);
 	printk("sending 5 ea alternating to core 2\n");
 	for (int i = 0; i < 5; i++) {
-		send_kernel_message(2, test_km_handler, (void*)i, (void*)0xdeadbeef,
-		                    (void*)0, KMSG_IMMEDIATE);
-		send_kernel_message(2, test_km_handler, (void*)i, (void*)0xcafebabe,
-		                    (void*)0, KMSG_ROUTINE);
+		send_kernel_message(2, test_km_handler, (long)i, 0xdeadbeef, 0,
+		                    KMSG_IMMEDIATE);
+		send_kernel_message(2, test_km_handler, (long)i, 0xcafebabe, 0,
+		                    KMSG_ROUTINE);
 	}
 	udelay(5000000);
 	return;
@@ -1215,8 +1215,8 @@ void test_random_fs(void)
 void test_kthreads(void)
 {
 	/* Kernel message to restart our kthread */
-	void test_up_sem(struct trapframe *tf, uint32_t srcid, void *a0, void *a1,
-	                 void *a2)
+	void test_up_sem(struct trapframe *tf, uint32_t srcid, long a0, long a1,
+	                 long a2)
 	{
 		struct semaphore *sem = (struct semaphore*)a0;
 		struct kthread *kthread;
@@ -1237,7 +1237,7 @@ void test_kthreads(void)
 	       get_stack_top());
 	/* So we have something that will wake us up.  Routine messages won't get
 	 * serviced in the kernel right away. */
-	send_kernel_message(core_id(), test_up_sem, (void*)&sem, 0, 0,
+	send_kernel_message(core_id(), test_up_sem, (long)&sem, 0, 0,
 	                    KMSG_ROUTINE);
 	/* Actually block (or try to) */
 	/* This one shouldn't block - but will test the unwind (if 1 above) */
@@ -1255,8 +1255,8 @@ void test_kref(void)
 	struct kref local_kref;
 	bool done = FALSE;
 	/* Second player's kmsg */
-	void test_kref_2(struct trapframe *tf, uint32_t srcid, void *a0, void *a1,
-	                 void *a2)
+	void test_kref_2(struct trapframe *tf, uint32_t srcid, long a0, long a1,
+	                 long a2)
 	{
 		struct kref *kref = (struct kref*)a0;
 		bool *done = (bool*)a1;
@@ -1271,7 +1271,8 @@ void test_kref(void)
 	}
 	
 	kref_init(&local_kref, fake_release, 1);
-	send_kernel_message(2, test_kref_2, &local_kref, &done, 0, KMSG_ROUTINE);
+	send_kernel_message(2, test_kref_2, (long)&local_kref, (long)&done, 0,
+	                    KMSG_ROUTINE);
 	for (int i = 0; i < 10000000; i++) {
 		kref_get(&local_kref, 1);
 		udelay(2);

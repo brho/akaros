@@ -212,7 +212,7 @@ void kthread_runnable(struct kthread *kthread)
 	}
 	#endif
 	/* For lack of anything better, send it to ourselves. (TODO: KSCHED) */
-	send_kernel_message(dst, __launch_kthread, (void*)kthread, 0, 0,
+	send_kernel_message(dst, __launch_kthread, (long)kthread, 0, 0,
 	                    KMSG_ROUTINE);
 }
 
@@ -220,8 +220,8 @@ void kthread_runnable(struct kthread *kthread)
  * it does not return.  Furthermore, like all routine kmsgs that don't return,
  * this needs to handle the fact that it won't return to the given TF (which is
  * a proc's TF, since this was routine). */
-void __launch_kthread(struct trapframe *tf, uint32_t srcid, void *a0, void *a1,
-	                  void *a2)
+void __launch_kthread(struct trapframe *tf, uint32_t srcid, long a0, long a1,
+	                  long a2)
 {
 	struct kthread *kthread = (struct kthread*)a0;
 	struct proc *cur_proc = current;
@@ -232,7 +232,7 @@ void __launch_kthread(struct trapframe *tf, uint32_t srcid, void *a0, void *a1,
 		 * is a bit ghetto, and a lot of this will need work. */
 		if (cur_proc->state == PROC_DYING) {
 			/* We could fake it and send it manually, but this is fine */
-			send_kernel_message(core_id(), __launch_kthread, (void*)kthread,
+			send_kernel_message(core_id(), __launch_kthread, (long)kthread,
 			                    0, 0, KMSG_ROUTINE);
 			return;
 		}

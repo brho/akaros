@@ -74,28 +74,28 @@ void send_nmi(uint32_t os_coreid);
 
 #define KMSG_IMMEDIATE 			1
 #define KMSG_ROUTINE 			2
+
 void kernel_msg_init(void);
-typedef void (*amr_t)(trapframe_t* tf, uint32_t srcid,
-                      TV(a0t) a0, TV(a1t) a1, TV(a2t) a2);
+typedef void (*amr_t)(struct trapframe *tf, uint32_t srcid, long a0, long a1,
+                      long a2);
 
 /* Must stay 8-byte aligned for sparc */
 struct kernel_message
 {
-	STAILQ_ENTRY(kernel_message NTPTV(a0t) NTPTV(a1t) NTPTV(a2t))
-		NTPTV(a0t) NTPTV(a1t) NTPTV(a2t) link;
+	STAILQ_ENTRY(kernel_message) link;
 	uint32_t srcid;
 	uint32_t dstid;
 	amr_t pc;
-	TV(a0t) arg0;
-	TV(a1t) arg1;
-	TV(a2t) arg2;
+	long arg0;
+	long arg1;
+	long arg2;
 }__attribute__((aligned(8)));
 
-STAILQ_HEAD(kernel_msg_list, kernel_message NTPTV(a0t) NTPTV(a1t) NTPTV(a2t));
-typedef struct kernel_message NTPTV(a0t) NTPTV(a1t) NTPTV(a2t) kernel_message_t;
+STAILQ_HEAD(kernel_msg_list, kernel_message);
+typedef struct kernel_message kernel_message_t;
 
-uint32_t send_kernel_message(uint32_t dst, amr_t pc, TV(a0t) arg0, TV(a1t) arg1,
-                             TV(a2t) arg2, int type);
+uint32_t send_kernel_message(uint32_t dst, amr_t pc, long arg0, long arg1,
+                             long arg2, int type);
 void process_routine_kmsg(struct trapframe *tf);
 
 #endif /* ROS_KERN_TRAP_H */

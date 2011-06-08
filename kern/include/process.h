@@ -110,11 +110,10 @@ bool __proc_set_allcores(struct proc *SAFE p, uint32_t *pcorelist,
                          size_t *num, amr_t message, TV(a0t) arg0,
                          TV(a1t) arg1, TV(a2t) arg2);
 /* Takes from process p the num cores listed in corelist */
-bool __proc_take_cores(struct proc *SAFE p, uint32_t *pcorelist,
-                       size_t num, amr_t message, TV(a0t) arg0,
-                       TV(a1t) arg1, TV(a2t) arg2);
-bool __proc_take_allcores(struct proc *SAFE p, amr_t message, TV(a0t) arg0,
-                          TV(a1t) arg1, TV(a2t) arg2);
+bool __proc_take_cores(struct proc *p, uint32_t *pcorelist, size_t num,
+                       amr_t message, long arg0, long arg1, long arg2);
+bool __proc_take_allcores(struct proc *p, amr_t message, long arg0, long arg1,
+                          long arg2);
 void __proc_kmsg_pending(struct proc *p, bool ipi_pending);
 /* Exposed for kern/src/resource.c for now */
 void __map_vcore(struct proc *p, uint32_t vcoreid, uint32_t pcoreid);
@@ -134,12 +133,13 @@ void abandon_core(void);
 void __proc_tlbshootdown(struct proc *p, uintptr_t start, uintptr_t end);
 
 /* Kernel message handlers for process management */
-void __startcore(trapframe_t *tf, uint32_t srcid, void *a0, void *a1, void *a2);
-void __notify(trapframe_t *tf, uint32_t srcid, void *a0, void *a1, void *a2);
-void __preempt(trapframe_t *tf, uint32_t srcid, void *a0, void *a1, void *a2);
-void __death(trapframe_t *tf, uint32_t srcid, void *a0, void *a1, void *a2);
-void __tlbshootdown(struct trapframe *tf, uint32_t srcid, void *a0, void *a1,
-                    void *a2);
+void __startcore(struct trapframe *tf, uint32_t srcid, long a0, long a1,
+                 long a2);
+void __notify(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2);
+void __preempt(trapframe_t *tf, uint32_t srcid, long a0, long a1, long a2);
+void __death(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2);
+void __tlbshootdown(struct trapframe *tf, uint32_t srcid, long a0, long a1,
+                    long a2);
 
 /* Arch Specific */
 void proc_init_trapframe(trapframe_t *SAFE tf, uint32_t vcoreid,
