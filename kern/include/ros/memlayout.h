@@ -94,8 +94,8 @@
 // which maps all the PTEs containing the page mappings for the entire
 // virtual address space into that 4 Meg region starting at VPT.
 #define VPT		(KERNBASE - PTSIZE)
-#define KSTKSHIFT	(PGSHIFT+3)		// KSTKSIZE == 8*PGSIZE
-#define KSTKSIZE	(1 << KSTKSHIFT)	// size of a kernel stack
+#define KSTKSHIFT	(PGSHIFT)			/* KSTKSIZE == PGSIZE */
+#define KSTKSIZE	(1 << KSTKSHIFT)	/* size of a static kernel stack */
 
 /*
  * User read-only mappings! Anything below here til UTOP are readonly to user.
