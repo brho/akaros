@@ -12,6 +12,7 @@
  * which are relevant to both the kernel and user-mode software.
  */
 
+/* Note: this map is out of date, esp for the 64 bit layout */
 /*
  * Virtual memory map:                                Permissions
  *                                                    kernel/user
@@ -28,9 +29,9 @@
  *                     |                              | RW/--
  *    KERNBASE ----->  +------------------------------+ 0xc0000000
  *                     |  Cur. Page Table (Kern. RW)  | RW/--  PTSIZE
- *    VPT,KSTACKTOP--> +------------------------------+ 0xbfc00000      --+
- *                     |         Kernel Stack         | RW/--  KSTKSIZE   |
- *                     | - - - - - - - - - - - - - - -|                 PTSIZE
+ *    VPT          --> +------------------------------+ 0xbfc00000      --+
+ *                     |                              |                   |
+ *                     |                              |                 PTSIZE
  *                     |      Invalid Memory (*)      | --/--             |
  *    ULIM      ---->  +------------------------------+ 0xbf800000      --+
  *                     |  Cur. Page Table (User R-)   | R-/R-  PTSIZE
@@ -93,7 +94,6 @@
 // which maps all the PTEs containing the page mappings for the entire
 // virtual address space into that 4 Meg region starting at VPT.
 #define VPT		(KERNBASE - PTSIZE)
-#define KSTACKTOP	VPT
 #define KSTKSHIFT	(PGSHIFT+3)		// KSTKSIZE == 8*PGSIZE
 #define KSTKSIZE	(1 << KSTKSHIFT)	// size of a kernel stack
 

@@ -324,21 +324,6 @@ vm_init(void)
 	pgdir[PDX(UVPT)] = PADDR(pgdir) | PTE_U | PTE_P | PTE_G;
 
 	//////////////////////////////////////////////////////////////////////
-	// Map the kernel stack (symbol name "bootstack").  The complete VA
-	// range of the stack, [KSTACKTOP-PTSIZE, KSTACKTOP), breaks into two
-	// pieces:
-	//     * [KSTACKTOP-KSTKSIZE, KSTACKTOP) -- backed by physical memory
-	//     * [KSTACKTOP-PTSIZE, KSTACKTOP-KSTKSIZE) -- not backed => faults
-	//     Permissions: kernel RW, user NONE
-	// Your code goes here:
-
-	// remember that the space for the kernel stack is allocated in the binary.
-	// bootstack and bootstacktop point to symbols in the data section, which 
-	// at this point are like 0xc010b000.  KSTACKTOP is the desired loc in VM
-	boot_map_segment(pgdir, (uintptr_t)KSTACKTOP - KSTKSIZE, 
-	                 KSTKSIZE, PADDR(bootstack), PTE_W | PTE_G);
-
-	//////////////////////////////////////////////////////////////////////
 	// Map all of physical memory at KERNBASE. 
 	// Ie.  the VA range [KERNBASE, 2^32) should map to
 	//      the PA range [0, 2^32 - KERNBASE)
@@ -458,16 +443,11 @@ check_boot_pgdir(bool pse)
 		for (i = 0; i < maxaddrpa; i += PGSIZE)
 			assert(check_va2pa(pgdir, KERNBASE + i) == i);
 
-	// check kernel stack
-	for (i = 0; i < KSTKSIZE; i += PGSIZE)
-		assert(check_va2pa(pgdir, KSTACKTOP - KSTKSIZE + i) == PADDR(bootstack) + i);
-
 	// check for zero/non-zero in PDEs
 	for (i = 0; i < NPDENTRIES; i++) {
 		switch (i) {
 		case PDX(VPT):
 		case PDX(UVPT):
-		case PDX(KSTACKTOP-1):
 		case PDX(LAPIC_BASE): // LAPIC mapping.  TODO: remove when MTRRs are up
 			assert(pgdir[i]);
 			break;

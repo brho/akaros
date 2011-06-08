@@ -163,16 +163,12 @@ void idt_init(void)
 	idt[T_SYSCALL].gd_type = SINIT(STS_TG32);
 	idt[T_BRKPT].gd_dpl = SINIT(3);
 
-	/* Setup a TSS so that we get the right stack when we trap to the kernel.
-	 * We need to use the KVA for stacktop, and not the memlayout virtual
-	 * address, so we can free it later (and check for other bugs). */
-	pte_t *pte = pgdir_walk(boot_pgdir, (void*)KSTACKTOP - PGSIZE, 0);
-	uintptr_t stacktop_kva = (uintptr_t)ppn2kva(PTE2PPN(*pte)) + PGSIZE;
-	ts.ts_esp0 = stacktop_kva;
+	/* Setup a TSS so that we get the right stack when we trap to the kernel. */
+	ts.ts_esp0 = (uintptr_t)bootstacktop;
 	ts.ts_ss0 = SINIT(GD_KD);
 #ifdef __CONFIG_KTHREAD_POISON__
 	/* TODO: KTHR-STACK */
-	uintptr_t *poison = (uintptr_t*)ROUNDDOWN(stacktop_kva - 1, PGSIZE);
+	uintptr_t *poison = (uintptr_t*)ROUNDDOWN(bootstacktop - 1, PGSIZE);
 	*poison = 0xdeadbeef;
 #endif /* __CONFIG_KTHREAD_POISON__ */
 
