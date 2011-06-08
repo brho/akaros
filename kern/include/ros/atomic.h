@@ -9,6 +9,8 @@
 
 #include <ros/common.h>
 
+typedef void* atomic_t;
+
 /* The seq counters are used by userspace to see if the kernel is updating
  * something or if something is valid, such as the vcore->pcore mapping.  The
  * way a reader can tell nothing has changed is to read the counter before and
@@ -37,4 +39,4 @@ static inline bool seqctr_retry(seq_ctr_t old_ctr, seq_ctr_t new_ctr)
 	return (seq_is_locked(old_ctr)) || (old_ctr != new_ctr);	
 }
 
-#endif /* !ROS_INC_ATOMIC_H */
+#endif /* ROS_INC_ATOMIC_H */

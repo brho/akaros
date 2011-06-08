@@ -11,9 +11,15 @@
 
 #include <ros/common.h>
 #include <ros/bcq_struct.h>
-/* Each arch has some basic atomic ops.  We need comp_and_swap for now. */
-#include <arch/atomic.h>
 #include <string.h>
+
+/* Pain in the ass includes.  Glibc has an atomic.h, and eventually userspace
+ * will have to deal with the clobbering. */
+#ifdef ROS_KERNEL
+#include <atomic.h>
+#else
+#include <arch/atomic.h>
+#endif /* ROS_KERNEL */
 
 /* Bounded Concurrent Queues, untrusted consumer
  *
@@ -139,7 +145,7 @@ struct bcq_header {
 			break;                                                             \
 		}                                                                      \
 		__new_prod = __prod + 1;                                               \
-	} while (!atomic_comp_swap(&(_bcq)->hdr.prod_idx, __prod, __new_prod));    \
+	} while (!atomic_cas_u32(&(_bcq)->hdr.prod_idx, __prod, __new_prod));      \
 	if (!__retval) {                                                           \
 		/* from here out, __prod is the local __prod that we won */            \
 		(_bcq)->wraps[__prod & ((_num_elems)-1)].elem = *(_elem);              \
@@ -163,7 +169,7 @@ struct bcq_header {
 			break;                                                             \
 		}                                                                      \
 		__new_cons_pvt = (__cons_pvt + 1);                                     \
-	} while (!atomic_comp_swap(&(_bcq)->hdr.cons_pvt_idx, __cons_pvt,          \
+	} while (!atomic_cas_u32(&(_bcq)->hdr.cons_pvt_idx, __cons_pvt,            \
 	                           __new_cons_pvt));                               \
 	if (!__retval) {                                                           \
 		/* from here out, __cons_pvt is the local __cons_pvt that we won */    \
@@ -184,66 +190,4 @@ struct bcq_header {
 #define bcq_empty(_bcq)                                                        \
 	BCQ_NO_WORK((_bcq)->hdr.prod_idx, (_bcq)->hdr.cons_pvt_idx)
 
-#if 0
-/* Original C Code, for posterity / debugging */
-static inline int enqueue(struct __name_bcq *bcq, __elem_t *elem,
-                          int num_fail)
-{
-	uint32_t __prod, __new_prod, __cons_pub, __failctr = 0;
-	do {
-		if ((num_fail) && (__failctr++ >= num_fail)) {
-			printk("FAILED\n");
-			return -EFAIL;
-		}
-		__prod = bcq->hdr.prod_idx;
-		__cons_pub = bcq->hdr.cons_pub_idx;
-	printk("# free slots : %d\n", BCQ_FREE_SLOTS(__prod, __cons_pub, __num_elems));
-
-//		printk("__prod = %p, cons_pub = %p\n", __prod, __cons_pub-1);
-//		printk("__prod mod = %p, cons_pub mod = %p\n", __prod &(__num_elems-1), (__cons_pub-1) &(__num_elems-1));
-
-		if (BCQ_FULL(__prod, __cons_pub, __num_elems)) {
-			printk("BUSY\n");
-			return -EBUSY;
-		}
-		__new_prod = __prod + 1;
-	} while (!atomic_comp_swap(&bcq->hdr.prod_idx, __prod, __new_prod));
-	/* from here out, __prod is the local __prod that we won */
-
-	printk("enqueuing to location %d\n", __prod & (__num_elems-1));
-
-	bcq->wraps[__prod & (__num_elems-1)].elem = *elem;
-	bcq->wraps[__prod & (__num_elems-1)].rdy_for_cons = TRUE;
-	return 0;
-}
-
-/* Similar to enqueue, spin afterwards til cons_pub is our element, then */
-/* advance it. */
-static inline int dequeue(struct __name_bcq *bcq, __elem_t *elem)
-{
-	uint32_t __prod, __cons_pvt, __new_cons_pvt, __cons_pub;
-	do {
-		__prod = bcq->hdr.prod_idx;
-		__cons_pvt = bcq->hdr.cons_pvt_idx;
-		if (BCQ_NO_WORK(__prod, __cons_pvt))
-			return -EBUSY;
-		__new_cons_pvt = (__cons_pvt + 1);
-	} while (!atomic_comp_swap(&bcq->hdr.cons_pvt_idx, __cons_pvt,
-	                           __new_cons_pvt));
-	/* from here out, __cons_pvt is the local __cons_pvt that we won */
-	printk("dequeueing from location %d\n", __cons_pvt & (__num_elems-1));
-
-	/* wait for the producer to finish copying it in */
-	while (!bcq->wraps[__cons_pvt & (__num_elems-1)].rdy_for_cons)
-		cpu_relax();
-	*elem = bcq->wraps[__cons_pvt & (__num_elems-1)].elem;
-	bcq->wraps[__cons_pvt & (__num_elems-1)].rdy_for_cons = FALSE;
-	/* wait til we're the cons_pub, then advance it by one */
-	while (bcq->hdr.cons_pub_idx != __cons_pvt)
-		cpu_relax();
-	bcq->hdr.cons_pub_idx = __cons_pvt + 1;
-	return 0;
-}
-#endif
-
-#endif /* !ROS_INC_BCQ_H */
+#endif /* ROS_INC_BCQ_H */

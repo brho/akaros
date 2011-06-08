@@ -341,7 +341,7 @@ bool register_evq(struct syscall *sysc, struct event_queue *ev_q)
 			sysc->ev_q = 0;		/* not necessary, but might help with bugs */
 			return FALSE;
 		}
-	} while (!atomic_comp_swap(&sysc->flags, old_flags, old_flags | SC_UEVENT));
+	} while (!atomic_cas(&sysc->flags, old_flags, old_flags | SC_UEVENT));
 	return TRUE;
 }
 
@@ -369,7 +369,7 @@ void deregister_evq(struct syscall *sysc)
 			old_flags = atomic_read(&sysc->flags);
 		/* Note we don't care if the SC_DONE flag is getting set.  We just need
 		 * to avoid clobbering flags */
-	} while (!atomic_comp_swap(&sysc->flags, old_flags, old_flags & ~SC_UEVENT));
+	} while (!atomic_cas(&sysc->flags, old_flags, old_flags & ~SC_UEVENT));
 }
 
 /* TLS helpers */

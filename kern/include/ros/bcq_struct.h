@@ -8,10 +8,12 @@
 #ifndef ROS_INC_BCQ_STRUCT_H
 #define ROS_INC_BCQ_STRUCT_H
 
+#include <ros/common.h>
+
 struct bcq_header {
-	uintptr_t prod_idx;		/* next to be produced in */
-	uintptr_t cons_pub_idx;	/* last completely consumed */
-	uintptr_t cons_pvt_idx;	/* last a consumer has dibs on */
+	uint32_t prod_idx;		/* next to be produced in */
+	uint32_t cons_pub_idx;	/* last completely consumed */
+	uint32_t cons_pvt_idx;	/* last a consumer has dibs on */
 };
 
 #define DEFINE_BCQ_TYPES(__name, __elem_t, __num_elems)                        \

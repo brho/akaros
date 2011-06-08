@@ -57,7 +57,7 @@ typedef struct
 typedef struct
 {
   const pthread_mutexattr_t* attr;
-  int lock;
+  atomic_t lock;
 } pthread_mutex_t;
 
 /* TODO: MAX_PTHREADS is arbitrarily defined for now.
@@ -101,9 +101,9 @@ typedef struct
 typedef struct
 {
   const pthread_condattr_t* attr;
-  int waiters[MAX_PTHREADS];
-  int in_use[MAX_PTHREADS];
-  int next_waiter; //start the search for an available waiter at this spot
+  uint32_t waiters[MAX_PTHREADS];
+  uint32_t in_use[MAX_PTHREADS];
+  uint32_t next_waiter; //start the search for an available waiter at this spot
 } pthread_cond_t;
 typedef struct 
 {

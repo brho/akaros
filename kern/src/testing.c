@@ -1312,18 +1312,19 @@ void test_atomics(void)
 	/* Simple test, make sure the bool retval of CAS handles failure */
 	void test_cas_val(long init_val)
 	{
-		long actual_num, old_num;
+		atomic_t actual_num;
+		long old_num;
 		int attempt;
-		actual_num = init_val;
+		atomic_init(&actual_num, init_val);
 		attempt = 0;
 		do {
-			old_num = actual_num;
+			old_num = atomic_read(&actual_num);
 			/* First time, try to fail */
 			if (attempt == 0) 
 				old_num++;
 			attempt++;	
-		} while (!atomic_comp_swap((uintptr_t*)&actual_num, old_num, old_num + 10));
-		if (actual_num != init_val + 10)
+		} while (!atomic_cas(&actual_num, old_num, old_num + 10));
+		if (atomic_read(&actual_num) != init_val + 10)
 			printk("FUCK, CAS test failed for %d\n", init_val);
 	}
 	test_cas_val(257);

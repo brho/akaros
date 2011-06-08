@@ -1,11 +1,11 @@
-#ifndef ROS_INCLUDE_SYSCALL_H
-#define ROS_INCLUDE_SYSCALL_H
+#ifndef ROS_INC_SYSCALL_H
+#define ROS_INC_SYSCALL_H
 
 #include <arch/arch.h>
 #include <ros/bits/syscall.h>
 #include <ros/arch/syscall.h>
 #include <ros/event.h>
-#include <arch/atomic.h>
+#include <ros/atomic.h>
 
 /* Flags for an individual syscall.
  * Careful, sparc can't handle flags in byte 3. */
@@ -30,6 +30,8 @@ struct syscall {
 };
 
 #ifndef ROS_KERNEL
+
+#include <arch/atomic.h>
 
 /* Attempts to block on sysc, returning when it is done or progress has been
  * made. */
@@ -90,4 +92,4 @@ static inline long __ros_syscall_errno(unsigned int _num, long _a0, long _a1,
 
 #endif /* ifndef ROS_KERNEL */
 
-#endif /* !ROS_INCLUDE_SYSCALL_H */
+#endif /* ROS_INC_SYSCALL_H */

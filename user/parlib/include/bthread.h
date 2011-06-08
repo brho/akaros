@@ -34,7 +34,7 @@ typedef struct
 typedef struct
 {
   const bthread_mutexattr_t* attr;
-  int lock;
+  atomic_t lock;
 } bthread_mutex_t;
 
 typedef struct
@@ -54,7 +54,7 @@ typedef struct
 typedef struct
 {
   const bthread_condattr_t* attr;
-  int waiters[MAX_VCORES];
+  uint32_t waiters[MAX_VCORES];
 } bthread_cond_t;
 
 typedef struct bthread_wqt work_queue_t;

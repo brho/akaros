@@ -490,7 +490,7 @@ int pthread_mutexattr_settype(pthread_mutexattr_t* attr, int type)
 int pthread_mutex_init(pthread_mutex_t* m, const pthread_mutexattr_t* attr)
 {
   m->attr = attr;
-  m->lock = 0;
+  atomic_init(&m->lock, 0);
   return 0;
 }
 
@@ -517,7 +517,7 @@ int pthread_mutex_lock(pthread_mutex_t* m)
 
 int pthread_mutex_trylock(pthread_mutex_t* m)
 {
-  return atomic_swap(&m->lock,1) == 0 ? 0 : EBUSY;
+  return atomic_swap(&m->lock, 1) == 0 ? 0 : EBUSY;
 }
 
 int pthread_mutex_unlock(pthread_mutex_t* m)
@@ -525,7 +525,7 @@ int pthread_mutex_unlock(pthread_mutex_t* m)
   /* Need to prevent the compiler (and some arches) from reordering older
    * stores */
   wmb();
-  m->lock = 0;
+  atomic_set(&m->lock, 0);
   return 0;
 }
 
@@ -570,11 +570,11 @@ int pthread_cond_signal(pthread_cond_t *c)
 
 int pthread_cond_wait(pthread_cond_t *c, pthread_mutex_t *m)
 {
-  int old_waiter = c->next_waiter;
-  int my_waiter = c->next_waiter;
+  uint32_t old_waiter = c->next_waiter;
+  uint32_t my_waiter = c->next_waiter;
   
   //allocate a slot
-  while (atomic_swap (& (c->in_use[my_waiter]), SLOT_IN_USE) == SLOT_IN_USE)
+  while (atomic_swap_u32(& (c->in_use[my_waiter]), SLOT_IN_USE) == SLOT_IN_USE)
   {
     my_waiter = (my_waiter + 1) % MAX_PTHREADS;
     assert (old_waiter != my_waiter);  // do not want to wrap around
@@ -636,7 +636,7 @@ void pthread_exit(void *ret)
 
 int pthread_once(pthread_once_t* once_control, void (*init_routine)(void))
 {
-  if(atomic_swap(once_control,1) == 0)
+  if (atomic_swap_u32(once_control, 1) == 0)
     init_routine();
   return 0;
 }

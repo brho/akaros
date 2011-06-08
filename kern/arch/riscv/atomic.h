@@ -1,85 +1,85 @@
-#ifndef ROS_INCLUDE_ATOMIC_H
-#define ROS_INCLUDE_ATOMIC_H
+#ifndef ROS_KERN_ARCH_ATOMIC_H
+#define ROS_KERN_ARCH_ATOMIC_H
 
 #include <ros/common.h>
 #include <arch/arch.h>
 
-typedef void* atomic_t;
-struct spinlock {
-	volatile uint32_t rlock;
-};
-typedef struct spinlock spinlock_t;
-#define SPINLOCK_INITIALIZER {0}
+bool atomic_cas(atomic_t *addr, long exp_val, long new_val);
+bool atomic_cas_ptr(void **addr, void *exp_val, void *new_val);
+bool atomic_cas_u32(uint32_t *addr, uint32_t exp_val, uint32_t new_val);
 
-bool atomic_comp_swap(uintptr_t* addr, uintptr_t exp_val, uintptr_t new_val);
-
-static inline void atomic_init(atomic_t* number, uintptr_t val)
+static inline void atomic_init(atomic_t *number, long val)
 {
-  *(uintptr_t*)number = val;
+  *(long*)number = val;
 }
 
-static inline uintptr_t atomic_read(atomic_t* number)
+static inline long atomic_read(atomic_t *number)
 {
-  return *(uintptr_t*)number;
+  return *(long*)number;
 }
 
-static inline void atomic_set(atomic_t* number, uintptr_t val)
+static inline void atomic_set(atomic_t *number, long val)
 {
-  *(uintptr_t*)number = val;
+  *(long*)number = val;
 }
 
 /* Adds val to number, returning number's original value */
-static inline uintptr_t atomic_fetch_and_add(atomic_t* number, uintptr_t val)
+static inline long atomic_fetch_and_add(atomic_t *number, long val)
 {
-	return __sync_fetch_and_add((uintptr_t*)number, val);
+	return __sync_fetch_and_add((long*)number, val);
 }
 
-static inline void atomic_add(atomic_t* number, uintptr_t val)
+static inline void atomic_add(atomic_t *number, long val)
 {
 	atomic_fetch_and_add(number, val);
 }
 
-static inline void atomic_inc(atomic_t* number)
+static inline void atomic_inc(atomic_t *number)
 {
 	atomic_add(number, 1);
 }
 
-static inline void atomic_dec(atomic_t* number)
+static inline void atomic_dec(atomic_t *number)
 {
 	atomic_add(number, -1);
 }
 
 /* Adds val to number, so long as number was not zero.	Returns TRUE if the
  * operation succeeded (added, not zero), returns FALSE if number is zero. */
-static inline bool atomic_add_not_zero(atomic_t* number, uintptr_t val)
+static inline bool atomic_add_not_zero(atomic_t *number, long val)
 {
-	uintptr_t old_num, new_num;
+	long old_num, new_num;
 	do {
 		old_num = atomic_read(number);
 		if (!old_num)
 			return FALSE;
 		new_num = old_num + val;
-	} while (!atomic_comp_swap((uintptr_t*)number, old_num, new_num));
+	} while (!atomic_cas(number, old_num, new_num));
 	return TRUE;
 }
 
 /* Subtraces val from number, returning True if the new value is 0. */
-static inline bool atomic_sub_and_test(atomic_t* number, uintptr_t val)
+static inline bool atomic_sub_and_test(atomic_t *number, long val)
 {
-	return __sync_fetch_and_sub((uintptr_t*)number, val) == val;
+	return __sync_fetch_and_sub((long*)number, val) == val;
 }
 
-static inline void atomic_and(atomic_t *number, uintptr_t mask)
+static inline void atomic_and(atomic_t *number, long mask)
 {
 	__sync_fetch_and_and(number, mask);
 }
 
-static inline void atomic_or(atomic_t* number, uintptr_t mask)
+static inline void atomic_or(atomic_t *number, long mask)
 {
 	__sync_fetch_and_or(number, mask);
 }
 
-static inline uintptr_t atomic_swap(uintptr_t* addr, uintptr_t val)
+static inline long atomic_swap(atomic_t *addr, long val)
+{
+	return __sync_lock_test_and_set(addr, val); // yes, really
+}
+
+static inline long atomic_swap_u32(uint32_t *addr, uint32_t val)
 {
 	return __sync_lock_test_and_set(addr, val); // yes, really
 }
@@ -135,4 +135,4 @@ static inline void spinlock_debug(spinlock_t* lock)
 {
 }
 
-#endif /* !ROS_INCLUDE_ATOMIC_H */
+#endif /* ROS_KERN_ARCH_ATOMIC_H */

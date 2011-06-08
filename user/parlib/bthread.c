@@ -138,7 +138,7 @@ int bthread_mutexattr_settype(bthread_mutexattr_t* attr, int type)
 int bthread_mutex_init(bthread_mutex_t* m, const bthread_mutexattr_t* attr)
 {
   m->attr = attr;
-  m->lock = 0;
+  atomic_init(&m->lock, 0);
   return 0;
 }
 
@@ -151,12 +151,12 @@ int bthread_mutex_lock(bthread_mutex_t* m)
 
 int bthread_mutex_trylock(bthread_mutex_t* m)
 {
-  return atomic_swap(&m->lock,1) == 0 ? 0 : EBUSY;
+  return atomic_swap(&m->lock, 1) == 0 ? 0 : EBUSY;
 }
 
 int bthread_mutex_unlock(bthread_mutex_t* m)
 {
-  m->lock = 0;
+  atomic_set(&m->lock, 0);
   return 0;
 }
 
@@ -269,7 +269,7 @@ void bthread_exit(void* ret)
 
 int bthread_once(bthread_once_t* once_control, void (*init_routine)(void))
 {
-  if(atomic_swap(once_control,1) == 0)
+  if (atomic_swap_u32(once_control, 1) == 0)
     init_routine();
   return 0;
 }

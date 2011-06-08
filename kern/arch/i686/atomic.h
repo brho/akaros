@@ -1,63 +1,39 @@
-#ifndef ROS_INCLUDE_ATOMIC_H
-#define ROS_INCLUDE_ATOMIC_H
+/* Copyright (c) 2009-2011 The Regents of the University of California
+ * Barret Rhoden <brho@cs.berkeley.edu>
+ * See LICENSE for details.
+ *
+ * x86 atomics and locking functions. */
+
+#ifndef ROS_KERN_ARCH_ATOMIC_H
+#define ROS_KERN_ARCH_ATOMIC_H
 
 #include <ros/common.h>
 #include <ros/arch/membar.h>
 #include <arch/x86.h>
 #include <arch/arch.h>
-typedef void * RACY atomic_t;
-struct spinlock {
-	volatile uint32_t RACY rlock;
-#ifdef __CONFIG_SPINLOCK_DEBUG__
-	void *call_site;	
-	uint32_t calling_core;
-#endif
-};
-typedef struct spinlock spinlock_t;
-#define SPINLOCK_INITIALIZER {0}
 
-static inline void atomic_init(atomic_t *number, int32_t val);
-static inline int32_t atomic_read(atomic_t *number);
-static inline void atomic_set(atomic_t *number, int32_t val);
-static inline void atomic_add(atomic_t* number, long val);
-static inline void atomic_inc(atomic_t *number);
-static inline void atomic_dec(atomic_t *number);
-static inline long atomic_fetch_and_add(atomic_t *number, long val);
-static inline bool atomic_add_not_zero(atomic_t *number, long val);
-static inline bool atomic_sub_and_test(atomic_t *number, long val);
-static inline void atomic_and(atomic_t *number, long mask);
-static inline void atomic_or(atomic_t *number, int mask);
-static inline uint32_t atomic_swap(uint32_t *addr, uint32_t val);
-static inline bool atomic_comp_swap(uint32_t *addr, uint32_t exp_val,
-                                    uint32_t new_val);
 static inline void atomic_andb(volatile uint8_t RACY* number, uint8_t mask);
 static inline void atomic_orb(volatile uint8_t RACY* number, uint8_t mask);
-static inline uint32_t spin_locked(spinlock_t *SAFE lock);
-static inline void __spin_lock(volatile uint32_t SRACY*CT(1) rlock);
-static inline void spin_lock(spinlock_t *lock);
-static inline void spin_unlock(spinlock_t *lock);
-static inline void spinlock_init(spinlock_t *lock);
-void spinlock_debug(spinlock_t *lock);
 
 /* Inlined functions declared above */
-static inline void atomic_init(atomic_t *number, int32_t val)
+static inline void atomic_init(atomic_t *number, long val)
 {
 	asm volatile("movl %1,%0" : "=m"(*number) : "r"(val));
 }
 
-static inline int32_t atomic_read(atomic_t *number)
+static inline long atomic_read(atomic_t *number)
 {
-	int32_t val;
+	long val;
 	asm volatile("movl %1,%0" : "=r"(val) : "m"(*number));
 	return val;
 }
 
-static inline void atomic_set(atomic_t *number, int32_t val)
+static inline void atomic_set(atomic_t *number, long val)
 {
 	asm volatile("movl %1,%0" : "=m"(*number) : "r"(val));
 }
 
-static inline void atomic_add(atomic_t* number, long val)
+static inline void atomic_add(atomic_t *number, long val)
 {
 	asm volatile("lock addl %1,%0" : "=m"(*number) : "r"(val) : "cc");
 }
@@ -84,6 +60,46 @@ static inline long atomic_fetch_and_add(atomic_t *number, long val)
 	return val;
 }
 
+static inline void atomic_and(atomic_t *number, long mask)
+{
+	asm volatile("lock andl %1,%0" : "=m"(*number) : "q"(mask) : "cc");
+}
+
+static inline void atomic_or(atomic_t *number, long mask)
+{
+	asm volatile("lock orl %1,%0" : "=m"(*number) : "q"(mask) : "cc");
+}
+
+static inline long atomic_swap(atomic_t *addr, long val)
+{
+	// this would work, but its code is bigger, and it's not like the others
+	//asm volatile("xchgl %0,(%2)" : "=r"(val) : "0"(val), "r"(addr) : "memory");
+	asm volatile("xchgl %0,%1" : "=r"(val), "=m"(*addr) : "0"(val), "m"(*addr));
+	return val;
+}
+
+/* reusing exp_val for the bool return.  1 (TRUE) for success (like test).  Need
+ * to zero eax, since it will get set if the cmpxchgl failed. */
+static inline bool atomic_cas(atomic_t *addr, long exp_val, long new_val)
+{
+	asm volatile("lock cmpxchgl %4,%1; movl $0,%%eax; sete %%al"
+	             : "=a"(exp_val), "=m"(*addr)
+	             : "m"(*addr), "a"(exp_val), "r"(new_val)
+	             : "cc", "memory");
+	return exp_val;
+}
+
+static inline bool atomic_cas_ptr(void **addr, void *exp_val, void *new_val)
+{
+	return atomic_cas((atomic_t*)addr, (long)exp_val, (long)new_val);
+}
+
+static inline bool atomic_cas_u32(uint32_t *addr, uint32_t exp_val,
+                                  uint32_t new_val)
+{
+	return atomic_cas((atomic_t*)addr, (long)exp_val, (long)new_val);
+}
+
 /* Adds val to number, so long as number was not zero.  Returns TRUE if the
  * operation succeeded (added, not zero), returns FALSE if number is zero. */
 static inline bool atomic_add_not_zero(atomic_t *number, long val)
@@ -94,7 +110,7 @@ static inline bool atomic_add_not_zero(atomic_t *number, long val)
 		if (!old_num)
 			return FALSE;
 		new_num = old_num + val;
-	} while (!atomic_comp_swap((uint32_t*)number, old_num, new_num));
+	} while (!atomic_cas(number, old_num, new_num));
 	return TRUE;
 }
 
@@ -106,36 +122,6 @@ static inline bool atomic_sub_and_test(atomic_t *number, long val)
 	                                       : "r"(val), "m"(*number)
 	                                       : "cc" );
 	return b;
-}
-
-static inline void atomic_and(atomic_t *number, long mask)
-{
-	asm volatile("lock andl %1,%0" : "=m"(*number) : "q"(mask) : "cc");
-}
-
-static inline void atomic_or(atomic_t *number, int mask)
-{
-	asm volatile("lock orl %1,%0" : "=m"(*number) : "q"(mask) : "cc");
-}
-
-static inline uint32_t atomic_swap(uint32_t *addr, uint32_t val)
-{
-	// this would work, but its code is bigger, and it's not like the others
-	//asm volatile("xchgl %0,(%2)" : "=r"(val) : "0"(val), "r"(addr) : "memory");
-	asm volatile("xchgl %0,%1" : "=r"(val), "=m"(*addr) : "0"(val), "m"(*addr));
-	return val;
-}
-
-/* reusing exp_val for the bool return.  1 (TRUE) for success (like test).  Need
- * to zero eax, since it will get set if the cmpxchgl failed. */
-static inline bool atomic_comp_swap(uint32_t *addr, uint32_t exp_val,
-                                    uint32_t new_val)
-{
-	asm volatile("lock cmpxchgl %4,%1; movl $0,%%eax; sete %%al"
-	             : "=a"(exp_val), "=m"(*addr)
-	             : "m"(*addr), "a"(exp_val), "r"(new_val)
-	             : "cc", "memory");
-	return exp_val;
 }
 
 /* Be sure to use "q" for byte operations (compared to longs), since this
@@ -152,7 +138,7 @@ static inline void atomic_orb(volatile uint8_t RACY*number, uint8_t mask)
 	asm volatile("lock orb %1,%0" : "=m"(*number) : "q"(mask) : "cc");
 }
 
-static inline uint32_t spin_locked(spinlock_t *SAFE lock)
+static inline bool spin_locked(spinlock_t *lock)
 {
 	// the lock status is the lowest byte of the lock
 	return lock->rlock & 0xff;
@@ -205,4 +191,4 @@ WRITES(lock->rlock)
 #endif
 }
 
-#endif /* !ROS_INCLUDE_ATOMIC_H */
+#endif /* ROS_KERN_ARCH_ATOMIC_H */

@@ -1,11 +1,12 @@
-#ifndef PARLIB_ATOMIC_H
-#define PARLIB_ATOMIC_H
+#ifndef PARLIB_ARCH_ATOMIC_H
+#define PARLIB_ARCH_ATOMIC_H
 
 /* Unlike in x86, we need to include spinlocks in the user atomic ops file.
  * Since compare and swap isn't truely non-blocking, and we can't disable
  * interrupts in userspace, there is a slight chance of deadlock. */
 
 #include <ros/common.h>
+#include <ros/atomic.h>
 #include <ros/arch/membar.h>
 
 typedef struct
@@ -15,20 +16,19 @@ typedef struct
 
 #define SPINLOCK_INITIALIZER {0}
 
-// atomic_t is void*, so we can't accidentally dereference it
-typedef void* atomic_t;
-
-static inline void atomic_init(atomic_t* number, int32_t val);
-static inline int32_t atomic_read(atomic_t* number);
-static inline void atomic_set(atomic_t* number, int32_t val);
-static inline void atomic_inc(atomic_t* number);
-static inline void atomic_dec(atomic_t* number);
+static inline void atomic_init(atomic_t *number, long val);
+static inline long atomic_read(atomic_t *number);
+static inline void atomic_set(atomic_t *number, long val);
+static inline void atomic_inc(atomic_t *number);
+static inline void atomic_dec(atomic_t *number);
 static inline long atomic_fetch_and_add(atomic_t *number, long val);
-static inline bool atomic_add_not_zero(atomic_t *number, long val);
-static inline bool atomic_sub_and_test(atomic_t *number, long val);
-static inline uint32_t atomic_swap(uint32_t* addr, uint32_t val);
-static inline bool atomic_comp_swap(uint32_t *addr, uint32_t exp_val,
-                                    uint32_t new_val);
+static inline long atomic_swap(atomic_t *addr, long val);
+static inline void *atomic_swap_ptr(void **addr, void *val);
+static inline uint32_t atomic_swap_u32(uint32_t *addr, uint32_t val);
+static inline bool atomic_cas(atomic_t *addr, long exp_val, long new_val);
+static inline bool atomic_cas_ptr(void **addr, void *exp_val, void *new_val);
+static inline bool atomic_cas_u32(uint32_t *addr, uint32_t exp_val,
+                                  uint32_t new_val);
 static inline void atomic_or_int(volatile int *number, int mask);
 static inline uint32_t spin_trylock(spinlock_t*SAFE lock);
 static inline uint32_t spin_locked(spinlock_t*SAFE lock);
@@ -37,39 +37,39 @@ static inline void spin_unlock(spinlock_t*SAFE lock);
 
 /* Inlined functions declared above */
 
-static inline void atomic_init(atomic_t* number, int32_t val)
+static inline void atomic_init(atomic_t *number, long val)
 {
 	val <<= 8;
 	__asm__ __volatile__ ("st %0,[%1]" : : "r"(val), "r"(number) : "memory");
 }
 
-static inline int32_t atomic_read(atomic_t* number)
+static inline long atomic_read(atomic_t *number)
 {
-	int32_t val;
+	long val;
 	__asm__ __volatile__ ("ld [%1],%0" : "=r"(val) : "r"(number));
 	return val >> 8;
 }
 
 /* Sparc needs atomic add, but the regular ROS atomic add conflicts with
  * glibc's internal one. */
-static inline void ros_atomic_add(atomic_t* number, int32_t inc)
+static inline void ros_atomic_add(atomic_t *number, long inc)
 {
 	atomic_fetch_and_add(number, inc);
 }
 
-static inline void atomic_set(atomic_t* number, int32_t val)
+static inline void atomic_set(atomic_t *number, long val)
 {
 	// this works basically the same as atomic_add... but without the add
 	spin_lock((spinlock_t*)number);
 	atomic_init(number,val);
 }
 
-static inline void atomic_inc(atomic_t* number)
+static inline void atomic_inc(atomic_t *number)
 {
 	ros_atomic_add(number,1);
 }
 
-static inline void atomic_dec(atomic_t* number)
+static inline void atomic_dec(atomic_t *number)
 {
 	ros_atomic_add(number,-1);
 }
@@ -89,64 +89,50 @@ static inline long atomic_fetch_and_add(atomic_t *number, long val)
 	return retval;
 }
 
-/* Adds val to number, so long as number was not zero.  Returns TRUE if the
- * operation succeeded (added, not zero), returns FALSE if number is zero. */
-static inline bool atomic_add_not_zero(atomic_t *number, long val)
-{
-	long num;
-	bool retval = FALSE;
-	/* this is pretty clever.  the lower 8 bits (i.e byte 3)
-	 * of the atomic_t serve as a spinlock.  let's acquire it. */
-	spin_lock((spinlock_t*)number);
-	num = atomic_read(number);
-	if (num) {
-		num += val;
-		retval = TRUE;
-	}
-	/* set the new (maybe old) counter value.  the lock is cleared (for free) */
-	atomic_init(number, num);
-	return retval;
-}
-
-/* Subtraces val from number, returning True if the new value is 0. */
-static inline bool atomic_sub_and_test(atomic_t *number, long val)
-{
-	long num;
-	bool retval = FALSE;
-	/* this is pretty clever.  the lower 8 bits (i.e byte 3)
-	 * of the atomic_t serve as a spinlock.  let's acquire it. */
-	spin_lock((spinlock_t*)number);
-	num = atomic_read(number);
-	num -= val;
-	retval = num ? FALSE : TRUE;
-	/* set the new counter value.  the lock is cleared (for free) */
-	atomic_init(number, num);
-	return retval;
-}
-
-static inline uint32_t atomic_swap(uint32_t* addr, uint32_t val)
+static inline long atomic_swap(atomic_t *addr, long val)
 {
 	__asm__ __volatile__ ("swap [%2],%0" : "=r"(val) : "0"(val),"r"(addr) : "memory");
 	return val;
 }
 
-// TODO: make this better! (no global locks, etc)
-static inline bool atomic_comp_swap(uint32_t *addr, uint32_t exp_val,
-                                    uint32_t new_val)
+static inline void *atomic_swap_ptr(void **addr, void *val)
+{
+	__asm__ __volatile__ ("swap [%2],%0" : "=r"(val) : "0"(val),"r"(addr) : "memory");
+	return val;
+}
+
+static inline uint32_t atomic_swap_u32(uint32_t *addr, uint32_t val)
+{
+	__asm__ __volatile__ ("swap [%2],%0" : "=r"(val) : "0"(val),"r"(addr) : "memory");
+	return val;
+}
+
+static inline bool atomic_cas(atomic_t *addr, long exp_val, long new_val)
 {
 	bool retval = 0;
-	uint32_t temp;
+	long temp;
 	static spinlock_t cas_lock = SPINLOCK_INITIALIZER;
 
-	if (*addr != exp_val)
+	if ((long)*addr != exp_val)
 		return 0;
 	spin_lock(&cas_lock);
-	if (*addr == exp_val) {
+	if ((long)*addr == exp_val) {
 		atomic_swap(addr, new_val);
 		retval = 1;
 	}
 	spin_unlock(&cas_lock);
 	return retval;
+}
+
+static inline bool atomic_cas_ptr(void **addr, void *exp_val, void *new_val)
+{
+	return atomic_cas((atomic_t*)addr, (long)exp_val, (long)new_val);
+}
+
+static inline bool atomic_cas_u32(uint32_t *addr, uint32_t exp_val,
+                                  uint32_t new_val)
+{
+	return atomic_cas((atomic_t*)addr, (long)exp_val, (long)new_val);
 }
 
 static inline void atomic_or_int(volatile int *number, int mask)
@@ -193,4 +179,4 @@ static inline void spinlock_init(spinlock_t* lock)
 	lock->rlock = 0;
 }
 
-#endif /* !PARLIB_ATOMIC_H */
+#endif /* !PARLIB_ARCH_ATOMIC_H */

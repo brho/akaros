@@ -1,19 +1,65 @@
+/* Copyright (c) 2009-2011 The Regents of the University of California
+ * Barret Rhoden <brho@cs.berkeley.edu>
+ * See LICENSE for details.
+ *
+ * Kernel atomics and locking functions.
+ *
+ * The extern inline declarations are arch-dependent functions.  We do this
+ * so that each arch can either static inline or just have a regular function,
+ * whichever is appropriate. The actual implementation usually will be in
+ * arch/atomic.h (for inlines).
+ *
+ * The static inlines are defined farther down in the file (as always). */
+
 #ifndef ROS_KERN_ATOMIC_H
 #define ROS_KERN_ATOMIC_H
 
 #include <ros/common.h>
 #include <ros/atomic.h>
 #include <arch/mmu.h>
-#include <arch/atomic.h>
 #include <arch/arch.h>
 #include <assert.h>
 
-static inline void
-(SLOCK(0) spin_lock_irqsave)(spinlock_t RACY*SAFE lock);
-static inline void
-(SUNLOCK(0) spin_unlock_irqsave)(spinlock_t RACY*SAFE lock);
-static inline bool spin_lock_irq_enabled(spinlock_t *SAFE lock);
+/* Atomics */
+extern inline void atomic_init(atomic_t *number, long val);
+extern inline long atomic_read(atomic_t *number);
+extern inline void atomic_set(atomic_t *number, long val);
+extern inline void atomic_add(atomic_t *number, long val);
+extern inline void atomic_inc(atomic_t *number);
+extern inline void atomic_dec(atomic_t *number);
+extern inline long atomic_fetch_and_add(atomic_t *number, long val);
+extern inline void atomic_and(atomic_t *number, long mask);
+extern inline void atomic_or(atomic_t *number, long mask);
+extern inline long atomic_swap(atomic_t *addr, long val);
+extern inline bool atomic_cas(atomic_t *addr, long exp_val, long new_val);
+extern inline bool atomic_cas_ptr(void **addr, void *exp_val, void *new_val);
+extern inline bool atomic_cas_u32(uint32_t *addr, uint32_t exp_val,
+                                  uint32_t new_val);
+extern inline bool atomic_add_not_zero(atomic_t *number, long val);
+extern inline bool atomic_sub_and_test(atomic_t *number, long val);
 
+/* Spin locks */
+struct spinlock {
+	volatile uint32_t RACY rlock;
+#ifdef __CONFIG_SPINLOCK_DEBUG__
+	void *call_site;	
+	uint32_t calling_core;
+#endif
+};
+typedef struct spinlock spinlock_t;
+#define SPINLOCK_INITIALIZER {0}
+
+extern inline void spinlock_init(spinlock_t *lock);
+extern inline bool spin_locked(spinlock_t *lock);
+extern inline void spin_lock(spinlock_t *lock);
+extern inline void spin_unlock(spinlock_t *lock);
+extern inline void spinlock_debug(spinlock_t *lock);
+
+static inline void spin_lock_irqsave(spinlock_t *lock);
+static inline void spin_unlock_irqsave(spinlock_t *lock);
+static inline bool spin_lock_irq_enabled(spinlock_t *lock);
+
+/* Seq locks */
 /* An example seq lock, built from the counter.  I don't particularly like this,
  * since it forces you to use a specific locking type.  */
 typedef struct seq_lock {
@@ -27,6 +73,9 @@ static inline void write_seqlock(seqlock_t *lock);
 static inline void write_sequnlock(seqlock_t *lock);
 static inline seq_ctr_t read_seqbegin(seqlock_t *lock);
 static inline bool read_seqretry(seqlock_t *lock, seq_ctr_t ctr);
+
+/* Arch-specific implementations / declarations go here */
+#include <arch/atomic.h>
 
 #define MAX_SPINS 1000000000
 
@@ -182,4 +231,4 @@ static inline bool read_seqretry(seqlock_t *lock, seq_ctr_t ctr)
 	return seqctr_retry(lock->r_ctr, ctr);
 }
 
-#endif /* !ROS_KERN_ATOMIC_H */
+#endif /* ROS_KERN_ATOMIC_H */

@@ -45,7 +45,7 @@ extern unsigned char device_mac[6];
 /* Tracing Globals */
 int systrace_flags = 0;
 struct systrace_record *systrace_buffer = 0;
-uintptr_t systrace_bufidx = 0;
+uint32_t systrace_bufidx = 0;
 size_t systrace_bufsize = 0;
 struct proc *systrace_procs[MAX_NUM_TRACED] = {0};
 spinlock_t systrace_lock = SPINLOCK_INITIALIZER;
@@ -1404,7 +1404,7 @@ intreg_t syscall(struct proc *p, uintreg_t sc_num, uintreg_t a0, uintreg_t a1,
 				do {
 					idx = systrace_bufidx;
 					new_idx = (idx + 1) % systrace_bufsize;
-				} while (!atomic_comp_swap(&systrace_bufidx, idx, new_idx));
+				} while (!atomic_cas_u32(&systrace_bufidx, idx, new_idx));
 				trace = &systrace_buffer[idx];
 				trace->timestamp = read_tsc();
 				trace->syscallno = sc_num;
@@ -1432,7 +1432,8 @@ void run_local_syscall(struct syscall *sysc)
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 
 	/* TODO: (UMEM) assert / pin the memory for the sysc */
-	user_mem_assert(pcpui->cur_proc, sysc, sizeof(struct syscall), sizeof(uintptr_t), PTE_USER_RW);
+	user_mem_assert(pcpui->cur_proc, sysc, sizeof(struct syscall),
+	                sizeof(uintptr_t), PTE_USER_RW);
 	pcpui->cur_sysc = sysc;			/* let the core know which sysc it is */
 	sysc->retval = syscall(pcpui->cur_proc, sysc->num, sysc->arg0, sysc->arg1,
 	                       sysc->arg2, sysc->arg3, sysc->arg4, sysc->arg5);
