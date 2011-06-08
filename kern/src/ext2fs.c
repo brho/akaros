@@ -960,14 +960,14 @@ static void ext2_init_diskinode(struct ext2_inode *e2i, struct inode *inode)
 
 /* These should return true if foreach_dirent should stop working on the
  * dirents. */
-typedef bool (*each_func_t) (struct ext2_dirent *dir_i, void *a1, void *a2,
-                             void *a3);
+typedef bool (*each_func_t) (struct ext2_dirent *dir_i, long a1, long a2,
+                             long a3);
 
 /* Loads the buffer and performs my_work on each dirent, stopping and returning
  * 0 if one of the calls succeeded, or returning the dir block num of what would
  * be the next dir block otherwise (aka, how many blocks we went through). */
 static uint32_t ext2_foreach_dirent(struct inode *dir, each_func_t my_work,
-                                    void *a1, void *a2, void *a3)
+                                    long a1, long a2, long a3)
 {
 	struct ext2_dirent *dir_buf, *dir_i;
 	uint32_t dir_block = 0;
@@ -1044,12 +1044,12 @@ static void ext2_write_dirent(struct ext2_dirent *e2dir, struct dentry *dentry,
 
 /* Helper for ext2_create().  This tries to squeeze a dirent in the slack space
  * after an existing dirent, returning TRUE if it succeeded (to break out). */
-static bool create_each_func(struct ext2_dirent *dir_i, void *a1, void *a2,
-                             void *a3)
+static bool create_each_func(struct ext2_dirent *dir_i, long a1, long a2,
+                             long a3)
 {
 	struct dentry *dentry = (struct dentry*)a1;
-	uintptr_t our_rec_len = (uintptr_t)a2;
-	uintptr_t mode = (uintptr_t)a3;
+	unsigned int our_rec_len = (unsigned int)a2;
+	unsigned int mode = (unsigned int)a3;
 	struct ext2_dirent *dir_new;
 	unsigned int real_len = ext2_dirent_len(dir_i);
 	/* How much room is available after this dir_i before the next one */
@@ -1082,7 +1082,7 @@ int ext2_create(struct inode *dir, struct dentry *dentry, int mode,
 	struct ext2_inode *disk_inode;
 	struct ext2_i_info *e2ii;
 	uint32_t dir_block;
-	uintptr_t our_rec_len;
+	unsigned int our_rec_len;
 	/* TODO: figure out the real time!  (Nanwan's birthday, bitches!) */
 	time_t now = 1242129600;
 	struct ext2_dirent *new_dirent;
@@ -1113,8 +1113,8 @@ int ext2_create(struct inode *dir, struct dentry *dentry, int mode,
 	assert(our_rec_len <= 8 + 256);
 	/* Consider caching the start point for future dirent ops.  Or even using
 	 * the indexed directory.... */
-	dir_block = ext2_foreach_dirent(dir, create_each_func, dentry,
-	                                (void*)our_rec_len, (void*)(uintptr_t)mode);
+	dir_block = ext2_foreach_dirent(dir, create_each_func, (long)dentry,
+	                                (long)our_rec_len, (long)mode);
 	/* If this returned a block number, we didn't find room in any of the
 	 * existing directory blocks, so we need to make a new one, stick it in the
 	 * dir inode, and stick our dirent at the beginning.  The reclen is the
@@ -1130,8 +1130,8 @@ int ext2_create(struct inode *dir, struct dentry *dentry, int mode,
 
 /* If we match, this loads the inode for the dentry and returns true (so we
  * break out) */
-static bool lookup_each_func(struct ext2_dirent *dir_i, void *a1, void *a2,
-                             void *a3)
+static bool lookup_each_func(struct ext2_dirent *dir_i, long a1, long a2,
+                             long a3)
 {
 	struct dentry *dentry = (struct dentry*)a1;
 	/* Test if we're the one (TODO: use d_compare).  Note, dir_name is not
@@ -1139,7 +1139,7 @@ static bool lookup_each_func(struct ext2_dirent *dir_i, void *a1, void *a2,
 	if (!strncmp((char*)dir_i->dir_name, dentry->d_name.name,
 	             dir_i->dir_namelen) &&
 	            (dentry->d_name.name[dir_i->dir_namelen] == '\0')) {
-		load_inode(dentry, le32_to_cpu(dir_i->dir_inode));
+		load_inode(dentry, (long)le32_to_cpu(dir_i->dir_inode));
 		/* TODO: (HASH) add dentry to dcache (maybe the caller should) */
 		return TRUE;
 	}
@@ -1158,7 +1158,7 @@ struct dentry *ext2_lookup(struct inode *dir, struct dentry *dentry,
 {
 	assert(S_ISDIR(dir->i_mode));
 	struct ext2_dirent *dir_buf, *dir_i;
-	if (!ext2_foreach_dirent(dir, lookup_each_func, dentry, 0, 0))
+	if (!ext2_foreach_dirent(dir, lookup_each_func, (long)dentry, 0, 0))
 		return dentry;
 	printd("EXT2: Not Found, %s\n", dentry->d_name.name);	
 	return 0;
