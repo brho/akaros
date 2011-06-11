@@ -6,6 +6,7 @@
 # define KERNBASE       0xFFFF800000000000
 # define ULIM           0x0000800000000000
 # define KERN_LOAD_ADDR 0xFFFFFFFF80000000
+# define KERN_VMAP_TOP    	KERN_LOAD_ADDR // upper 2GB reserved (see mmu_init)
 # define NPTLEVELS                       4
 # define L1PGSHIFT              (12+9+9+9)
 # define L1PGSIZE        (1L << L1PGSHIFT)
@@ -21,6 +22,7 @@
 # define KERNBASE               0x80000000
 # define ULIM                   0x7F000000
 # define KERN_LOAD_ADDR           KERNBASE
+# define KERN_VMAP_TOP    		0xfec00000 /* using sparc's upper limit */
 # define NPTLEVELS                       2
 # define L1PGSHIFT                 (12+10)
 # define L1PGSIZE         (1 << L1PGSHIFT)
@@ -29,6 +31,10 @@
 # define PGSHIFT                 L2PGSHIFT
 # define PTSIZE                   L1PGSIZE
 #endif
+
+/* All arches must define this, which is the lower limit of their static
+ * mappings, and where the dynamic mappings will start. */
+#define KERN_DYN_TOP    KERNBASE
 
 #define PGSIZE (1 << PGSHIFT)
 

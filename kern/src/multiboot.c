@@ -42,9 +42,9 @@ multiboot_detect_memory(multiboot_info_t *mbi)
 
 	npages = SINIT(maxpa / PGSIZE);
 
-	// IOAPIC - KERNBASE is the max amount of virtual addresses we can use
-	// for the physical memory mapping (aka - the KERNBASE mapping)
-	maxaddrpa = SINIT(MIN(maxpa, IOAPIC_BASE - KERNBASE));
+	/* KERN_VMAP_TOP - KERNBASE is the max amount of virtual addresses we can
+	 * use for the physical memory mapping (aka - the KERNBASE mapping) */
+	maxaddrpa = SINIT(MIN(maxpa, KERN_VMAP_TOP - KERNBASE));
 	maxaddrpa_ptr = SINIT((void *SNT)maxaddrpa);
 
 	naddrpages = SINIT(maxaddrpa / PGSIZE);

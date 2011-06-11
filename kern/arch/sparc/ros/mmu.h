@@ -6,6 +6,10 @@
 #define KERN_LOAD_ADDR  KERNBASE
 #define ULIM            0x70000000
 
+/* All arches must define this, which is the lower limit of their static
+ * mappings, and where the dynamic mappings will start. */
+#define KERN_DYN_TOP    KERNBASE
+
 // Use this if needed in annotations
 #define IVY_KERNBASE (0x8000U << 16)
 

@@ -27,7 +27,8 @@
 #define PIC_EOI						0x20
 
 // Local APIC
-#define LAPIC_BASE					0xfee00000 // this is the default, can be changed
+/* PBASE is the physical address.  It is mapped in at the VADDR LAPIC_BASE */
+#define LAPIC_PBASE					0xfee00000 /* default *physical* address */
 #define LAPIC_EOI					(LAPIC_BASE + 0x0b0)
 #define LAPIC_SPURIOUS				(LAPIC_BASE + 0x0f0)
 #define LAPIC_VERSION				(LAPIC_BASE + 0x030)

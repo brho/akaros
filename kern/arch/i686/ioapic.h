@@ -8,12 +8,9 @@
 
 #include <ros/common.h>
 
-/* IOAPIC_BASE really go away. This is NOT required by the spec as far as I know.
- * This was originally in apic.h, but Paul moved it here. This is NOT used by
- * anything in the IOAPIC, just some other kernel stuff which uses it for
- * size calculations. It should be called something else and moved.
- */
-#define IOAPIC_BASE					0xfec00000 // this is the default, can be changed
+/* Physical address of the IOAPIC, can be changed.  Currently, it's mapped at
+ * the VADDR IOAPIC_BASE */
+#define IOAPIC_PBASE				0xfec00000 /* default *physical* address */
 
 /* These are things like level sensitive, edge triggered, fixed, nmi, extint, etc
  * This is based on the x58 chipset spec. There are only 2 combinations so

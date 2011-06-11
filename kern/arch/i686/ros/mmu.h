@@ -9,6 +9,20 @@ typedef unsigned long pde_t;
 // All physical memory mapped at this address
 #define KERNBASE        0xC0000000
 #define KERN_LOAD_ADDR  KERNBASE
+
+/* Static kernel mappings */
+/* Virtual page table.  Entry PDX(VPT) in the PD contains a pointer to
+ * the page directory itself, thereby turning the PD into a page table,
+ * which maps all the PTEs containing the page mappings for the entire
+ * virtual address space into that 4 Meg region starting at VPT. */
+#define VPT				(KERNBASE - PTSIZE)
+#define LAPIC_BASE		(VPT - PGSIZE)
+#define IOAPIC_BASE		(LAPIC_BASE - PGSIZE)
+
+/* All arches must define this, which is the lower limit of their static
+ * mappings, and where the dynamic mappings will start. */
+#define KERN_DYN_TOP	IOAPIC_BASE
+
 #define ULIM            0x80000000
 
 // Use this if needed in annotations

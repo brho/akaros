@@ -5,7 +5,7 @@
 
 /* Arch Constants */
 #define HW_CACHE_ALIGN		64
-#define IOAPIC_BASE		0xFEC00000 // max virtual address
+#define KERN_VMAP_TOP		0xFEC00000 // max virtual address
 
 #include <arch/mmu.h>
 #include <arch/sparc.h>

@@ -29,8 +29,8 @@ physaddr_t RO boot_cr3;		// Physical address of boot time page directory
 // Global variables
 page_t *RO pages = NULL;          // Virtual address of physical page array
 
-// Base of unalloced MMIO space
-void* mmio_base = (void*)LAPIC_BASE + PGSIZE;
+/* Base of unalloced MMIO space (TODO: have a facility for MMIO paddr alloc) */
+void *mmio_base = (void*)LAPIC_PBASE + PGSIZE;
 
 // Global descriptor table.
 //
@@ -348,10 +348,10 @@ vm_init(void)
 
 	// APIC mapping: using PAT (but not *the* PAT flag) to make these type UC
 	// IOAPIC
-	boot_map_segment(pgdir, (uintptr_t)IOAPIC_BASE, PGSIZE, IOAPIC_BASE, 
+	boot_map_segment(pgdir, IOAPIC_BASE, PGSIZE, IOAPIC_PBASE, 
 	                 PTE_PCD | PTE_PWT | PTE_W | PTE_G);
 	// Local APIC
-	boot_map_segment(pgdir, (uintptr_t)LAPIC_BASE, PGSIZE, LAPIC_BASE,
+	boot_map_segment(pgdir, LAPIC_BASE, PGSIZE, LAPIC_PBASE,
 	                 PTE_PCD | PTE_PWT | PTE_W | PTE_G);
 
 	// Check that the initial page directory has been set up correctly.

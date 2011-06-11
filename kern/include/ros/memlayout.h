@@ -12,14 +12,16 @@
  * which are relevant to both the kernel and user-mode software.
  */
 
-/* Note: this map is out of date, esp for the 64 bit layout */
-/*
+/* x86's 32 bit Virtual Memory Map.  Symbols are similar on other archs
+ *
  * Virtual memory map:                                Permissions
  *                                                    kernel/user
  *
  *    4 Gig -------->  +------------------------------+
- *                     |                              | RW/--
- *                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ *                     :              .               :
+ *  KERN_VMAP_TOP      +------------------------------+ 0xfffff000
+ *                     |                              |
+ *                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ RW/--
  *                     :              .               :
  *                     :              .               :
  *                     :              .               :
@@ -29,31 +31,38 @@
  *                     |                              | RW/--
  *    KERNBASE ----->  +------------------------------+ 0xc0000000
  *                     |  Cur. Page Table (Kern. RW)  | RW/--  PTSIZE
- *    VPT          --> +------------------------------+ 0xbfc00000      --+
- *                     |                              |                   |
- *                     |                              |                 PTSIZE
- *                     |      Invalid Memory (*)      | --/--             |
- *    ULIM      ---->  +------------------------------+ 0xbf800000      --+
- *                     |  Cur. Page Table (User R-)   | R-/R-  PTSIZE
- *    UVPT      ---->  +------------------------------+ 0xbf400000      --+
+ *    VPT          --> +------------------------------+ 0xbfc00000
+ *                     |          Local APIC          | RW/--  PGSIZE
+ *    LAPIC        --> +------------------------------+ 0xbfbff000
+ *                     |            IOAPIC            | RW/--  PGSIZE
+ *    IOAPIC,      --> +------------------------------+ 0xbfbfe000
+ *  KERN_DYN_TOP       |   Kernel Dynamic Mappings    |
+ *                     |              .               |
+ *                     :              .               :
+ *                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ RW/--
+ *                     :                              :
+ *                     |      Invalid Memory (*)      | --/--
+ *    ULIM      ---->  +------------------------------+ 0x80000000      --+
+ *                     |  Cur. Page Table (User R-)   | R-/R-  PTSIZE     |
+ *    UVPT      ---->  +------------------------------+ 0x7fc00000      --+
  *                     | Unmapped (expandable region) |                   |
  *                     |                              | R-/R-            PTSIZE
  *                     |     Per-Process R/O Info     |                   |
- * UWLIM, UINFO ---->  +------------------------------+ 0xbf000000      --+
+ * UWLIM, UINFO ---->  +------------------------------+ 0x7f800000      --+
  *                     | Unmapped (expandable region) |                   |
  *                     |                              | RW/RW            PTSIZE
  *                     |     Per-Process R/W Data     |                   |
- *    UDATA     ---->  +------------------------------+ 0xbec00000      --+
+ *    UDATA     ---->  +------------------------------+ 0x7f400000      --+
  *    UMAPTOP,         |    Global Shared R/W Data    | RW/RW  PGSIZE
- * UXSTACKTOP,UGDATA ->+------------------------------+ 0xbebff000
+ * UXSTACKTOP,UGDATA ->+------------------------------+ 0x7f3ff000
  *                     |     User Exception Stack     | RW/RW  PGSIZE
- *                     +------------------------------+ 0xbebfe000
+ *                     +------------------------------+ 0x7f3fe000
  *                     |       Empty Memory (*)       | --/--  PGSIZE
- *    USTACKTOP  --->  +------------------------------+ 0xbebfd000
+ *    USTACKTOP  --->  +------------------------------+ 0x7f3fd000
  *                     |      Normal User Stack       | RW/RW  256*PGSIZE (1MB)
- *                     +------------------------------+ 0xbeafd000
+ *                     +------------------------------+ 0x7f2fd000
  *                     |       Empty Memory (*)       | --/--  PGSIZE
- *    USTACKBOT  --->  +------------------------------+ 0xbeafc000
+ *    USTACKBOT  --->  +------------------------------+ 0x7f2fc000
  *                     |                              |
  *                     |                              |
  *                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -89,11 +98,6 @@
 #define BIOSPHYSMEM	0x0F0000
 #define EXTPHYSMEM	0x100000
 
-// Virtual page table.  Entry PDX(VPT) in the PD contains a pointer to
-// the page directory itself, thereby turning the PD into a page table,
-// which maps all the PTEs containing the page mappings for the entire
-// virtual address space into that 4 Meg region starting at VPT.
-#define VPT		(KERNBASE - PTSIZE)
 #define KSTKSHIFT	(PGSHIFT)			/* KSTKSIZE == PGSIZE */
 #define KSTKSIZE	(1 << KSTKSHIFT)	/* size of a static kernel stack */
 

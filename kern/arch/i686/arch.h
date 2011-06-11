@@ -9,6 +9,9 @@
 
 /* Arch Constants */
 #define HW_CACHE_ALIGN				 64
+/* Top of the kernel virtual mapping area (KERNBASE) */
+/* For sanity reasons, I don't plan to map the top page */
+#define KERN_VMAP_TOP				0xfffff000
 
 static __inline void breakpoint(void) __attribute__((always_inline));
 static __inline void invlpg(void *SNT addr) __attribute__((always_inline));
