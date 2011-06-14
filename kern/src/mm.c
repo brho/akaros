@@ -697,6 +697,9 @@ int map_vmap_segment(uintptr_t vaddr, uintptr_t paddr, unsigned long num_pages,
 			spin_unlock(&dyn_vmap_lock);
 			return -ENOMEM;
 		}
+		/* You probably should have unmapped first */
+		if (*pte)
+			warn("Existing PTE value %08p\n", *pte);
 		*pte = PTE(pa2ppn(paddr + i * PGSIZE), perm);
 	}
 	spin_unlock(&dyn_vmap_lock);

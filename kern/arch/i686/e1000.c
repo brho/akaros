@@ -152,11 +152,14 @@ void e1000_handle_bar0(uint32_t addr) {
 		// Restore the MMIO addr to the device (unchanged)
 		outl(PCI_CONFIG_DATA, addr);
 
-		// Map the page in.
-		e1000_mmio_base_addr = (uint32_t)mmio_alloc(addr, e1000_addr_size);
-		if (e1000_mmio_base_addr == 0x00) {
-			panic("Could not map in E1000 MMIO space\n");
-		}
+		/* Get a virt address chunk */
+		e1000_mmio_base_addr = get_vmap_segment(e1000_addr_size >> PGSHIFT);
+		if (!e1000_mmio_base_addr)
+			panic("Could not aquire VM space for e1000 MMIO\n");
+		/* Map the pages in */
+		if (map_vmap_segment(e1000_mmio_base_addr, addr,
+		                     e1000_addr_size >> PGSHIFT, PTE_P | PTE_KERN_RW))
+			panic("Unable to map e1000 MMIO\n");
 	}
 	return;
 }

@@ -104,7 +104,7 @@ void kernel_init(multiboot_info_t *mboot_info)
 #ifdef __CONFIG_ETH_AUDIO__
 	eth_audio_init();
 #endif /* __CONFIG_ETH_AUDIO__ */
-		
+
 	// zra: let's Ivy know we're done booting
 	booting = 0;
 
