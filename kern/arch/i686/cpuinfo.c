@@ -133,20 +133,22 @@ void show_mapping(uintptr_t start, size_t size)
 	page_t *page;
 	uintptr_t i;
 
-	cprintf("   Virtual    Physical  Ps Dr Ac CD WT U W\n");
-	cprintf("------------------------------------------\n");
+	printk("   Virtual    Physical  Ps Dr Ac CD WT U W P\n");
+	printk("--------------------------------------------\n");
 	for(i = 0; i < size; i += PGSIZE, start += PGSIZE) {
-		page = page_lookup(pgdir, (void*SNT)start, &pte);
-		cprintf("%08p  ", start);
-		if (page) {
+		pte = pgdir_walk(pgdir, (void*)start, 0);
+		printk("%08p  ", start);
+		if (pte) {
 			pde = &pgdir[PDX(start)];
-			// for a jumbo, pde = pte and PTE_PS (better be) = 1
-			cprintf("%08p  %1d  %1d  %1d  %1d  %1d  %1d %1d\n", page2pa(page),
-			       (*pte & PTE_PS) >> 7, (*pte & PTE_D) >> 6, (*pte & PTE_A) >> 5,
-			       (*pte & PTE_PCD) >> 4, (*pte & PTE_PWT) >> 3,
-			       (*pte & *pde & PTE_U) >> 2, (*pte & *pde & PTE_W) >> 1);
-		} else
-			cprintf("%08p\n", 0);
+			/* for a jumbo, pde = pte and PTE_PS (better be) = 1 */
+			printk("%08p  %1d  %1d  %1d  %1d  %1d  %1d %1d %1d\n",
+			       PTE_ADDR(*pte), (*pte & PTE_PS) >> 7, (*pte & PTE_D) >> 6,
+			       (*pte & PTE_A) >> 5, (*pte & PTE_PCD) >> 4,
+			       (*pte & PTE_PWT) >> 3, (*pte & *pde & PTE_U) >> 2,
+			       (*pte & *pde & PTE_W) >> 1, (*pte & PTE_P));
+		} else {
+			printk("%08p\n", 0);
+		}
 	}
 }
 
