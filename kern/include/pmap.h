@@ -108,6 +108,11 @@ static inline page_t*COUNT(1) pa2page(physaddr_t pa)
 	return &pages[LA2PPN(pa)];
 }
 
+static inline ppn_t pa2ppn(physaddr_t pa)
+{
+	return pa >> PGSHIFT;
+}
+
 static inline void*COUNT(PGSIZE) page2kva(page_t *pp)
 {
 	return KADDR(page2pa(pp));

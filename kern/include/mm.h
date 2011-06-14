@@ -80,4 +80,13 @@ int __do_mprotect(struct proc *p, uintptr_t addr, size_t len, int prot);
 int __do_munmap(struct proc *p, uintptr_t addr, size_t len);
 int __handle_page_fault(struct proc* p, uintptr_t va, int prot);
 
+/* Kernel Dynamic Memory Mappings */
+/* These two are just about reserving VA space */
+uintptr_t get_vmap_segment(unsigned long num_pages);
+uintptr_t put_vmap_segment(uintptr_t vaddr, unsigned long num_pages);
+/* These two are about actually mapping stuff in some reserved space */
+int map_vmap_segment(uintptr_t vaddr, uintptr_t paddr, unsigned long num_pages,
+                     int perm);
+int unmap_vmap_segment(uintptr_t vaddr, unsigned long num_pages);
+
 #endif /* !ROS_KERN_MM_H */

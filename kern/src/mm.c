@@ -636,3 +636,90 @@ int __handle_page_fault(struct proc *p, uintptr_t va, int prot)
 	*pte = PTE(page2ppn(a_page), PTE_P | pte_prot);
 	return 0;
 }
+
+/* Kernel Dynamic Memory Mappings */
+uintptr_t dyn_vmap_llim = KERN_DYN_TOP;
+spinlock_t dyn_vmap_lock = SPINLOCK_INITIALIZER;
+
+/* Reserve space in the kernel dynamic memory map area */
+uintptr_t get_vmap_segment(unsigned long num_pages)
+{
+	uintptr_t retval;
+	spin_lock(&dyn_vmap_lock);
+	retval = dyn_vmap_llim - num_pages * PGSIZE;
+	if ((retval > ULIM) && (retval < KERN_DYN_TOP)) {
+		dyn_vmap_llim = retval;
+	} else {
+		warn("[kernel] dynamic mapping failed!");
+		retval = 0;
+	}
+	spin_unlock(&dyn_vmap_lock);
+	return retval;
+}
+
+/* Give up your space.  Note this isn't supported yet */
+uintptr_t put_vmap_segment(uintptr_t vaddr, unsigned long num_pages)
+{
+	/* TODO: use vmem regions for adjustable vmap segments */
+	panic("Unsupported.\n");
+}
+
+/* Map a virtual address chunk to physical addresses.  Make sure you got a vmap
+ * segment before actually trying to do the mapping.
+ *
+ * Careful with more than one 'page', since it will assume your physical pages
+ * are also contiguous.  Most callers will only use one page.
+ *
+ * Finally, note that this does not care whether or not there are real pages
+ * being mapped, and will not attempt to incref your page (if there is such a
+ * thing).  Handle your own refcnting for pages. */
+int map_vmap_segment(uintptr_t vaddr, uintptr_t paddr, unsigned long num_pages,
+                     int perm)
+{
+	/* For now, we only handle the root pgdir, and not any of the other ones
+	 * (like for processes).  To do so, we'll need to insert into every pgdir,
+	 * and send tlb shootdowns to those that are active (which we don't track
+	 * yet). */
+	extern int booting;
+	assert(booting);
+
+	/* TODO: (MM) you should lock on boot pgdir modifications.  A vm region lock
+	 * isn't enough, since there might be a race on outer levels of page tables.
+	 * For now, we'll just use the dyn_vmap_lock (which technically works). */
+	spin_lock(&dyn_vmap_lock);
+	pte_t *pte;
+#ifdef __i386__
+	perm |= PTE_G;
+#endif
+	for (int i = 0; i < num_pages; i++) {
+		pte = pgdir_walk(boot_pgdir, (void*)(vaddr + i * PGSIZE), 1);
+		if (!pte) {
+			spin_unlock(&dyn_vmap_lock);
+			return -ENOMEM;
+		}
+		*pte = PTE(pa2ppn(paddr + i * PGSIZE), perm);
+	}
+	spin_unlock(&dyn_vmap_lock);
+	return 0;
+}
+
+/* Unmaps / 0's the PTEs of a chunk of vaddr space */
+int unmap_vmap_segment(uintptr_t vaddr, unsigned long num_pages)
+{
+	/* Not a big deal - won't need this til we do something with kthreads */
+	panic("Incomplete, don't call this yet.");
+	spin_lock(&dyn_vmap_lock);
+	/* TODO: For all pgdirs */
+	pte_t *pte;
+	for (int i = 0; i < num_pages; i++) {
+		pte = pgdir_walk(boot_pgdir, (void*)(vaddr + i * PGSIZE), 1);
+		*pte = 0;
+	}
+	/* TODO: TLB shootdown.  Also note that the global flag is set on the PTE
+	 * (for x86 for now), which requires a global shootdown.  bigger issue is
+	 * the TLB shootdowns for multiple pgdirs.  We'll need to remove from every
+	 * pgdir, and send tlb shootdowns to those that are active (which we don't
+	 * track yet). */
+	spin_unlock(&dyn_vmap_lock);
+	return 0;
+}
