@@ -3,7 +3,7 @@
 // This emulates compare and swap by hashing the address into one of
 // K buckets, acquiring the lock for that bucket, then performing the
 // operation during the critical section.  :-(
-bool atomic_cas(atomic_t *addr, long exp_val, long new_val);
+bool atomic_cas(atomic_t *addr, long exp_val, long new_val)
 {
 	if ((long)*addr != exp_val)
 		return 0;

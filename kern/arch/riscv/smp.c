@@ -23,7 +23,7 @@ smp_boot(void)
 	
 	while(*(volatile uint32_t*)&num_cpus < num_cores());
 
-	printd("%d cores reporting!\n",num_cpus);
+	printd("%d cores reporting!\n", num_cpus);
 }
 
 void
@@ -56,24 +56,24 @@ smp_make_wrapper()
 
 void
 smp_call_wrapper(trapframe_t* tf, uint32_t src, isr_t handler,
-                 handler_wrapper_t* wrapper,void* data)
+                 handler_wrapper_t* wrapper, void* data)
 {
 	if(wrapper)
 		wrapper->wait_list[core_id()] = 0;
-	handler(tf,data);
+	handler(tf, data);
 }
 
 int smp_call_function_self(isr_t handler, void* data,
                            handler_wrapper_t** wait_wrapper)
 {
-	return smp_call_function_single(core_id(),handler,data,wait_wrapper);
+	return smp_call_function_single(core_id(), handler, data, wait_wrapper);
 }
 
 int smp_call_function_all(isr_t handler, void* data,
                           handler_wrapper_t** wait_wrapper)
 {
 	int8_t state = 0;
-	int i;
+	int i, me;
 	handler_wrapper_t* wrapper = 0;
 	if(wait_wrapper)
 	{
@@ -88,18 +88,18 @@ int smp_call_function_all(isr_t handler, void* data,
 	enable_irqsave(&state);
 
 	// send to others
-	for(i = 0; i < num_cpus; i++)
+	for(i = 0, me = core_id(); i < num_cpus; i++)
 	{
-		if(i == core_id())
+		if(i == me)
 			continue;
 
-		send_kernel_message(i,(amr_t)smp_call_wrapper,
-	        	                  handler, wrapper, data, KMSG_IMMEDIATE);
+		send_kernel_message(i, (amr_t)smp_call_wrapper, (long)handler,
+		                    (long)wrapper, (long)data, KMSG_IMMEDIATE);
 	}
 
 	// send to me
-	send_kernel_message(core_id(),(amr_t)smp_call_wrapper,
-	                          handler,wrapper,data, KMSG_IMMEDIATE);
+	send_kernel_message(me, (amr_t)smp_call_wrapper, (long)handler,
+	                    (long)wrapper, (long)data, KMSG_IMMEDIATE);
 
 	cpu_relax(); // wait to get the interrupt
 
@@ -123,8 +123,8 @@ int smp_call_function_single(uint32_t dest, isr_t handler, void* data,
 
 	enable_irqsave(&state);
 
-	send_kernel_message(dest,(amr_t)smp_call_wrapper,
-	                          handler,wrapper,data, KMSG_IMMEDIATE);
+	send_kernel_message(dest, (amr_t)smp_call_wrapper, (long)handler,
+	                    (long)wrapper, (long)data, KMSG_IMMEDIATE);
 
 	cpu_relax(); // wait to get the interrupt, if it's to this core
 

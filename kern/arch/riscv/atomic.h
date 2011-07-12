@@ -76,10 +76,10 @@ static inline void atomic_or(atomic_t *number, long mask)
 
 static inline long atomic_swap(atomic_t *addr, long val)
 {
-	return __sync_lock_test_and_set(addr, val); // yes, really
+	return (long)__sync_lock_test_and_set(addr, val); // yes, really
 }
 
-static inline long atomic_swap_u32(uint32_t *addr, uint32_t val)
+static inline uint32_t atomic_swap_u32(uint32_t *addr, uint32_t val)
 {
 	return __sync_lock_test_and_set(addr, val); // yes, really
 }
@@ -102,7 +102,7 @@ static inline void atomic_orb(volatile uint8_t* number, uint8_t mask)
 	__sync_fetch_and_or((uint32_t*)((uintptr_t)number & ~3), wmask);
 }
 
-static inline uint32_t spin_locked(spinlock_t* lock)
+static inline bool spin_locked(spinlock_t* lock)
 {
 	return lock->rlock;
 }
