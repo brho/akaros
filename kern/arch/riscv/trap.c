@@ -337,11 +337,11 @@ handle_fault_fetch(trapframe_t* state)
 	if(in_kernel(state))
 	{
 		print_trapframe(state);
-		panic("Load Page Fault in the Kernel at %p!", state->badvaddr);
+		panic("Instruction Page Fault in the Kernel at %p!", state->badvaddr);
 	}
 	
 	if(handle_page_fault(current, state->badvaddr, PROT_READ))
-		unhandled_trap(state, "Load Page Fault");
+		unhandled_trap(state, "Instruction Page Fault");
 }
 
 static void

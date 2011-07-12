@@ -16,9 +16,10 @@
 // entry point
 ///////////////////////////////////////////////////////////////////
 
-.section ".boottext"
+.text
 
 .global _start
+.ent _start
 _start:
   // This is the first kernel code that executes; it is run only by core 0.
 
@@ -86,6 +87,7 @@ notcore0:
   lui    $t0, %hi(smp_init)
   jalr.j $t0, %lo(smp_init)
 
+.end _start
 ///////////////////////////////////////////////////////////////////
 // boot stack and regular stacks.
 // (boot stack cannot be in .bss, as .bss is later zereoed by the kernel.)

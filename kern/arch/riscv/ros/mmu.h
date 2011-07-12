@@ -3,8 +3,8 @@
 
 // All physical memory mapped at this address
 #ifdef __riscv64
-# define KERNBASE       0xFFFF800000000000
-# define ULIM           0x0000800000000000
+# define KERNBASE       0xFFFFFF0000000000
+# define ULIM           0x0000010000000000
 # define KERN_LOAD_ADDR 0xFFFFFFFF80000000
 # define KERN_VMAP_TOP    	KERN_LOAD_ADDR // upper 2GB reserved (see mmu_init)
 # define NPTLEVELS                       4
