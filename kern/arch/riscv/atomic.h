@@ -10,17 +10,17 @@ bool atomic_cas_u32(uint32_t *addr, uint32_t exp_val, uint32_t new_val);
 
 static inline void atomic_init(atomic_t *number, long val)
 {
-  *(long*)number = val;
+  *(volatile long*)number = val;
 }
 
 static inline long atomic_read(atomic_t *number)
 {
-  return *(long*)number;
+  return *(volatile long*)number;
 }
 
 static inline void atomic_set(atomic_t *number, long val)
 {
-  *(long*)number = val;
+  *(volatile long*)number = val;
 }
 
 /* Adds val to number, returning number's original value */
@@ -116,13 +116,12 @@ static inline void spin_lock(spinlock_t *lock)
 {
 	while(spin_trylock(lock))
 		while(lock->rlock);
+	mb();
 }
 
 static inline void spin_unlock(spinlock_t *lock)
 {
-	/* Need to prevent the compiler (and some arches) from reordering older
-	 * stores */
-	wmb();
+	mb();
 	lock->rlock = 0;
 }
 
