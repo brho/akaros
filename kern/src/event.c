@@ -32,7 +32,7 @@ static void post_ev_msg(struct event_mbox *mbox, struct event_msg *msg,
 {
 	printd("Sending event type %d\n", msg->ev_type);
 	/* Sanity check */
-	if (is_user_rwaddr(mbox))
+	if (is_user_rwaddr(mbox, 0))	/* don't care about len here */
 		assert(current);
 	/* If they just want a bit (NOMSG), just set the bit */
 	if (ev_flags & EVENT_NOMSG) {
@@ -67,7 +67,7 @@ void send_event(struct proc *p, struct event_queue *ev_q, struct event_msg *msg,
 		warn("[kernel] Null ev_q - kernel code should check before sending!");
 		return;
 	}
-	if (!is_user_rwaddr(ev_q)) {
+	if (!is_user_rwaddr(ev_q, sizeof(struct event_queue))) {
 		/* Ought to kill them, just warn for now */
 		warn("[kernel] Illegal addr for ev_q");
 		return;
@@ -113,7 +113,8 @@ void send_event(struct proc *p, struct event_queue *ev_q, struct event_msg *msg,
 	vcore_mbox = get_proc_ev_mbox(p, vcoreid);
 	/* Allows the mbox to be the right vcoreid mbox (a KVA in procdata), or any
 	 * other user RW location. */
-	if ((ev_mbox != vcore_mbox) && (!is_user_rwaddr(ev_mbox))) {
+	if ((ev_mbox != vcore_mbox) &&
+	    (!is_user_rwaddr(ev_mbox, sizeof(struct event_mbox)))) {
 		/* Ought to kill them, just warn for now */
 		warn("[kernel] Illegal addr for ev_mbox");
 		goto out;

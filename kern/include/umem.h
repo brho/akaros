@@ -10,8 +10,8 @@
 
 /* Is this a valid user pointer for read/write?  It doesn't care if the address
  * is paged out or even an unmapped region: simply if it is in part of the
- * address space that could be RW user */
-static inline bool is_user_rwaddr(void *addr);
+ * address space that could be RW user.  Will also check for len bytes. */
+static inline bool is_user_rwaddr(void *addr, size_t len);
 
 /* Can they use the area in the manner of perm? */
 void *user_mem_check(struct proc *p, const void *DANGEROUS va, size_t len,
@@ -46,7 +46,10 @@ bool uva_is_kva(struct proc *p, void *uva, void *kva);
 uintptr_t uva2kva(struct proc *p, void *uva);
 
 /* UWLIM is defined as virtual address below which a process can write */
-static inline bool is_user_rwaddr(void *addr)
+static inline bool is_user_rwaddr(void *addr, size_t len)
 {
-	return ((uintptr_t)addr < UWLIM) ? TRUE : FALSE;
+	if (((uintptr_t)addr < UWLIM) && ((uintptr_t)addr + len <= UWLIM))
+		return TRUE;
+	else
+		return FALSE;
 }
