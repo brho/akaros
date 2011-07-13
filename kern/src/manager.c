@@ -225,27 +225,9 @@ void manager_klueska()
 
 void manager_waterman()
 {
-	static int init = 0;
-	if(!init)
-	{
-		warn("Old file creation might not work");
-		init = 1;
-		struct proc *p;
-		proc_alloc(&p, 0);
-
-		char* argv[] = {"/bin/sh","-l",0};
-		char* envp[] = {"LD_LIBRARY_PATH=/lib",0};
-		procinfo_pack_args(p->procinfo,argv,envp);
-
-		struct file* f = file_open("/bin/busybox",0,0);
-		assert(f != NULL);
-		assert(load_elf(p,f) == 0);
-		file_decref(f);
-
-		__proc_set_state(p, PROC_RUNNABLE_S);
-		proc_run(p);
-	}
 	schedule();
+	monitor(0);
+	assert(0);
 }
 
 void manager_pearce()
