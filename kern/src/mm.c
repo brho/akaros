@@ -321,7 +321,8 @@ void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 	/* If they don't care where to put it, we'll start looking after the break.
 	 * We could just have userspace handle this (in glibc's mmap), so we don't
 	 * need to know about BRK_END, but this will work for now (and may avoid
-	 * bugs).  Note that this limits mmap(0) a bit. */
+	 * bugs).  Note that this limits mmap(0) a bit.  Keep this in sync with
+	 * __do_mmap()'s check.  (Both are necessary).  */
 	if (addr == 0)
 		addr = BRK_END;
 	/* Still need to enforce this: */
@@ -350,6 +351,12 @@ void *__do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 	int retval;
 
 	struct vm_region *vmr, *vmr_temp;
+
+	/* Sanity check, for callers that bypass mmap().  We want addr for anon
+	 * memory to start above the break limit (BRK_END), but not 0.  Keep this in
+	 * sync with BRK_END in mmap(). */
+	if (addr == 0)
+		addr = BRK_END;
 
 #ifndef __CONFIG_DEMAND_PAGING__
 	flags |= MAP_POPULATE;
