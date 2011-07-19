@@ -10,7 +10,6 @@
 #include <smp.h>
 #include <slab.h>
 #include <mm.h>
-#include <ros/mman.h>
 #include <umem.h>
 #include <pmap.h>
 #include <kdebug.h>

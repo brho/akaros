@@ -9,6 +9,7 @@
 #define ROS_KERN_MM_H
 
 #include <ros/common.h>
+#include <ros/mman.h>
 #include <atomic.h>
 #include <sys/queue.h>
 #include <slab.h>

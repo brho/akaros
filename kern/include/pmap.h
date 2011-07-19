@@ -15,7 +15,6 @@
 #define ROS_KERN_PMAP_H
 
 #include <ros/memlayout.h>
-#include <ros/mman.h>
 #include <sys/queue.h>
 #include <multiboot.h>
 #include <atomic.h>

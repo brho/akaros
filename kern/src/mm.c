@@ -15,7 +15,6 @@
 
 #include <frontend.h>
 #include <ros/common.h>
-#include <ros/mman.h>
 #include <pmap.h>
 #include <mm.h>
 #include <process.h>
