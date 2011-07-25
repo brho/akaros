@@ -128,7 +128,7 @@ void trigger_tchain(struct timer_chain *tchain)
 			TAILQ_REMOVE(&tchain->waiters, i, next);
 			/* Don't touch the waiter after waking it, since it could be in use
 			 * on another core (and the waiter can be clobbered as the kthread
-			 * unwinds its stack). */
+			 * unwinds its stack).  Or it could be kfreed */
 			wake_awaiter(i);
 		} else {
 			break;

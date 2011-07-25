@@ -17,19 +17,24 @@
  *
  * Quick howto, using the pcpu tchains:
  * 	struct timer_chain *tchain = &per_cpu_info[core_id()].tchain;
- * 	struct alarm_waiter a_waiter;
  * 1) To block your kthread on an alarm:
+ * 	struct alarm_waiter a_waiter;
  * 	init_awaiter(&a_waiter, 0);
  * 	set_awaiter_rel(&a_waiter, USEC);
  * 	set_alarm(tchain, &a_waiter);
  * 	sleep_on_awaiter(&a_waiter);
  * 2) To set a handler to run on an alarm:
- * 	init_awaiter(&a_waiter, HANDLER);
- * 	set_awaiter_rel(&a_waiter, USEC);
- * 	set_alarm(tchain, &a_waiter);
- * If you want the HANDLER to run again, do this at the end of it::
+ * 	struct alarm_waiter *waiter = kmalloc(sizeof(struct alarm_waiter), 0);
+ * 	init_awaiter(waiter, HANDLER);
  * 	set_awaiter_rel(waiter, USEC);
  * 	set_alarm(tchain, waiter);
+ * If you want the HANDLER to run again, do this at the end of it:
+ * 	set_awaiter_rel(waiter, USEC);
+ * 	set_alarm(tchain, waiter);
+ * 	kfree(waiter);
+ * In the future, we might have a slab for these.  You can get it from wherever
+ * you want, just don't use the stack for handler style, since you'll usually
+ * return and pop up the stack after setting the alarm.
  * */
 
 #ifndef ROS_KERN_ALARM_H
