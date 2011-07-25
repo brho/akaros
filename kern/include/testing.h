@@ -28,6 +28,7 @@ void test_slab(void);
 void test_kmalloc(void);
 void test_hashtable(void);
 void test_bcq(void);
+void test_ucq(void);
 void test_vm_regions(void);
 void test_radix_tree(void);
 void test_random_fs(void);

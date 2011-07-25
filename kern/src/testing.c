@@ -11,6 +11,7 @@
 #include <ros/memlayout.h>
 #include <ros/common.h>
 #include <ros/bcq.h>
+#include <ros/ucq.h>
 
 #include <atomic.h>
 #include <stdio.h>
@@ -33,6 +34,9 @@
 #include <radix.h>
 #include <monitor.h>
 #include <kthread.h>
+#include <schedule.h>
+#include <umem.h>
+#include <ucq.h>
 
 #define l1 (available_caches.l1)
 #define l2 (available_caches.l2)
@@ -957,6 +961,93 @@ void test_bcq(void)
 		retval[i] = bcq_dequeue(&a_bcq, &output[i], NR_ELEM_A_BCQ);
 		printk("dequeued: %d with retval %d\n", output[i], retval[i]);
 	}
+}
+
+/* Test a simple concurrent send and receive (one prod, one cons).  We spawn a
+ * process that will go into _M mode on another core, and we'll do the test from
+ * an alarm handler run on our core.  When we start up the process, we won't
+ * return so we need to defer the work with an alarm. */
+void test_ucq(void)
+{
+	struct timer_chain *tchain = &per_cpu_info[core_id()].tchain;
+	struct alarm_waiter *waiter = kmalloc(sizeof(struct alarm_waiter), 0);
+
+	/* Alarm handler: what we want to do after the process is up */
+	void send_msgs(struct alarm_waiter *waiter)
+	{
+		struct timer_chain *tchain;
+		struct proc *p = waiter->data;
+		struct ucq *ucq = (struct ucq*)USTACKTOP;
+		physaddr_t old_cr3 = rcr3();
+		struct event_msg msg;
+
+		printk("Running the alarm handler!\n");
+		/* might not be mmaped yet, if not, abort */
+		if (!user_mem_check(p, ucq, PGSIZE, 1, PTE_USER_RW)) {
+			printk("Not mmaped yet\n");
+			goto abort;
+		}
+		/* load their address space */
+		lcr3(p->env_cr3);
+		/* So it's mmaped, see if it is ready (note that this is dangerous) */
+		if (!ucq->ucq_ready) {
+			printk("Not ready yet\n");
+			lcr3(old_cr3);
+			goto abort;
+		}
+		/* So it's ready, time to finally do the tests... */
+		printk("[kernel] Finally starting the tests... \n");
+		/* 1: Send a simple message */
+		printk("[kernel] Sending simple message (7, deadbeef)\n");
+		msg.ev_type = 7;
+		msg.ev_arg2 = 0xdeadbeef;
+		send_ucq_msg(ucq, p, &msg);
+		/* 2: Send a bunch.  In a VM, this causes one swap, and then a bunch of
+		 * mmaps. */
+		for (int i = 0; i < 5000; i++) {
+			msg.ev_type = i;
+			send_ucq_msg(ucq, p, &msg);
+		}
+		/* other things we could do:
+		 *  - concurrent producers / consumers...  ugh.
+		 */
+		/* done, switch back and free things */
+		lcr3(old_cr3);
+		proc_decref(p);
+		kfree(waiter); /* since it was kmalloc()d */
+		return;
+	abort:
+		tchain = &per_cpu_info[core_id()].tchain;
+		/* Set to run again */
+		set_awaiter_rel(waiter, 1000000);
+		set_alarm(tchain, waiter);
+	}
+	/* Set up a handler to run the real part of the test */
+	init_awaiter(waiter, send_msgs);
+	set_awaiter_rel(waiter, 1000000);	/* 1s should be long enough */
+	set_alarm(tchain, waiter);
+	/* Just spawn the program */
+	struct file *program;
+	program = do_file_open("/bin/ucq", 0, 0);
+	if (!program) {
+		printk("Unable to find /bin/ucq!\n");
+		return;
+	}
+	char *p_envp[] = {"LD_LIBRARY_PATH=/lib", 0};
+	struct proc *p = proc_create(program, 0, p_envp);
+	spin_lock(&p->proc_lock);
+	__proc_set_state(p, PROC_RUNNABLE_S);
+	schedule_proc(p);
+	spin_unlock(&p->proc_lock);
+	/* instead of getting rid of the reference created in proc_create, we'll put
+	 * it in the awaiter */
+	waiter->data = p;
+	kref_put(&program->f_kref);
+	/* Should never return from schedule (env_pop in there) also note you may
+	 * not get the process you created, in the event there are others floating
+	 * around that are runnable */
+	schedule();
+	assert(0);
 }
 
 /* rudimentary tests.  does the basics, create, merge, split, etc.  Feel free to

@@ -1,0 +1,206 @@
+ucq.txt
+Barret Rhoden
+
+1. Overview
+====================
+1.1 What are they?
+------------------------------------------------------------------
+UCQs are a tool to send messages, with payloads, from the kernel to a process
+through shared memory.  The depth of the queue is unlimited, barring running
+out of memory.  They should be used in closed loop or low rate scenarios that
+require a payload (or that building a system that can handle missing a message
+is unwieldy).
+
+The old BCQs were designed for a shared memory segment, such as procdata.
+Since the kernel is sending the messages, we can use a more customized
+solution.  The problems in this area are running out of memory, having the
+kernel use user-provided-pointers, and synchronizing within the kernel (like a
+spinlock for a TAILQ). 
+
+The basic plan for these "unbounded concurrent queues" (UCQ) is to have linked
+mmap'd pages of arrays of event messages (the BCQ is a circular array of event
+messages, roughly).  As the kernel over-produces, it mmaps more pages and links
+them together (via a header at the beginning of the page).  Userspace munmaps
+when it is done with a page.  To avoid excessive mmap/munmap, we double-buffer
+with two pages, one current and one spare.  We only need to mmap new ones when
+the kernel gets far ahead of the user.
+
+- When we run out of room, the kernel will implicitly mmap another page,
+  solving the memory allocation issue.  The worst thing userspace can do is
+leak its memory, or cause an OOM condition, which we have to deal with anyway.
+
+- Using user-pointers isn't conceptually a problem any more, so long as the
+  kernel reads it in and verifies the address is in userspace (and that it can
+handle page faults).  This wasn't the case a couple years ago when I made the
+BCQs.  We still are careful about pointers - we only use them when messing with
+which page is current, etc, and not when atomically adding items.
+
+- Swapping pages/buffers requires locking, but we can't put the lock in the UCQ
+  structure, since userspace could muck with it.  Instead, we lock at the
+process level.  And instead of grabbing the process lock, we'll grab a hash
+lock (hash table of locks, hashed on the pointer of the UCQ).  This will happen
+every ~170 events or so.  Synchronization for normal ops (not buffer swaps) are
+done with atomics.
+
+Another option instead of allocating more memory would be to have the kernel
+block kthreads until the queue empties.  I really dislike that for a couple
+reasons.  It's easier to handle running out of memory than spawning too many
+kthreads, esp in critical parts of the code (where we can't sleep on memory
+allocation).  More importantly, it's a real pain to block on a user's actions.
+For instance, I'm not about to put a semaphore in user-writable memory.
+
+1.2 Why do we have them?
+------------------------------------------------------------------
+Enqueuing messages in BCQs could fail, due to either a misbehaving process, an
+unlucky circumstance, or most commonly because the queue was full.  Event
+queues, which used BCQs as a building block, would handle the failure as an
+'overflow' of events, and signal the process with a bit.  This means the
+program needs to know how to handle overflow, which becomes painful.
+
+A specific case was syscall completion events.  When a syscall was done, the
+kernel would send a message that a particular syscall was done.  Userspace
+needed to know exactly which one was done, under normal circumstances.  With
+BCQs, the 2LS needed to know how to handle overflow, which means it needs to
+track every outstanding syscall so that it can poll to see which call
+completed.  To do this in a scalable manner required each vcore to have its own
+TAILQ of oustanding uthreads (blocked on syscalls).  The problem with this is
+that blocked syscalls are now tied to vcores, and that vcore might not want to
+yield even if it has no work to do (since it needs to receive its message).
+
+Ultimately, the issue is that complicated systems could benefit from not
+needing to handle overflow.  For certain event queue usages, the unbounded
+nature of UCQs make the system far simpler.  When we build other systems in
+userspace, such as using ev_qs for syscalls and uthread blocking, then we can
+leverage the UCQs.
+
+Note the main downfall of UCQs is that a process can die if it the kernel runs
+out of mememory while trying to send it messages.  If the kernel sends messages
+faster than the process can handle them (for whatever reason, including being
+swapped out), eventually we'll run out of memory.  UCQs need to be used
+carefully, such that the process isn't requesting an *unbounded* amount of
+messages at one time.
+
+The main benefit of UCQs in this situation is that they can handle spikes of
+messages and they remove the need to handle overflow.  Using BCQs, we'd need to
+handle overflow even if it was unlikely, and the impact of this extended beyond
+actually handling overflow.  Check out the old overflow handling code (and
+maybe some notes in the Documentation) for details about how we needed to do
+work for every syscall, in the off chance we had to handle overflow.
+
+2. How do they work?
+====================
+2.1 Producer (kernel)
+------------------------------------------------------------------
+Producers atomically fight for slots in prod_idx, which encode both the page
+and the msg number within the page.  If the slot is good, we just write our
+message.  If it isn't, things get interesting.  We need to synchronize, so we
+lock externally to the ucq.  This is where the hash lock comes in.  A bad slot
+is one in which there is no page or the message slot is greater than the array
+of msgs in the page.
+
+Whoever grabs the lock first will be responsible for getting a new page and
+resetting the counter (which tracks which slot is next).  All future lockers
+can tell that the work is done by examining the counter and trying to get a
+slot.  If they got a good one, everything is okay and it is just like they got
+a good slot in the first place (with the exception of a lock/unlock pair).
+
+One minor problem is that with sufficient producers and a delayed fixer (who
+holds the lock), we could overflow the prod_idx (around 3900 would overflow
+into a new page on the 0th slot).  To avoid this, the first producer to detect
+the slot/index is no good will set an overflow flag.  All future producers will
+check this flag before attempting to get a slot, and if we're overflowing, they
+will jump to the "grab lock" phase.  This limits the window of vulnerability.
+In theory, you could have 3900 producers at exactly the same time all fetch and
+add, before any of the others have a chance to set the overflow.  Not only does
+this require 3900 cores, but they all have to be writing to the exact same UCQ.
+If this happens, we have a warning that will go off and I'll fix it.
+
+So the last part to deal with is getting a new page and linking it with the old
+one.  We simply atomic_swap on the spare_pg.  If there is a spare already
+mmaped, we use it.  If there isn't, we need to mmap a new page.  Either way, we
+tell the old page to follow to the new page.  We set the index to a good value,
+then unlock (and clear the overflow flag).
+
+When we set the counter, we set it to 1, instead of 0, thereby reserving slot 0
+for ourselves.  This prevents a DoS from the program.  The user could muck with
+the prod_idx endlessly, in a way that seems benign.  To prevent this, we make
+sure that any time the process grabs the hashlock that it gets a good slot.
+Whenever we fail to get a slot we lock, and whenever we lock we get a good
+slot.
+
+Side note: another related DoS involves using CAS.  You can't CAS with
+userspace unless you're willing to fail.  O/W, you could be DoS'd.
+
+When we have a slot, we write in the ev_msg, and then toggle the 'ready' flag
+in the message container.  This is in case the consumer is trying to
+concurrently read our message while we are writing.
+
+And finally, every time the kernel reads or writes to something, we need to
+verify the address (which is user-supplied).  Eventually, the kernel can handle
+a page fault on a user address, but we can't tolerate KVAs in UCQs.  Note that
+old versions allowed UCQs/BCQs to be at KVAs (procdata), but that behavior will
+probably go away soon (error prone, we now handle user pointers anyway, and we
+usually load 'current' when dealing with a proc).
+
+
+2.2 Consumer
+------------------------------------------------------------------
+Consumers CAS (compare-and-swap) on claiming a slot.  We need to use CAS, since
+we don't want to advance unless the queue is not empty.  If they detect the
+slot is bad, they fight among themselves for a lock, which is embedded in the
+UCQ, and the winner sets the counter to track the next page, frees extra pages,
+etc.
+
+Emptiness is defined as the prod_idx == cons_idx.  Both the producer's and the
+consumer's *next* slot is the same, so there is no items to be consumed.  If
+the prod_idx is bad, the consumer needs to wait til there is a good next page
+(the kernel is in the process of finding and filling a good slot).  If the
+cons_idx is bad, it means we need to go to the next page (lock first).
+
+When locking, the consumer does the same trick as the producer: try to get a
+slot again, in case someone else got the lock before you and fixed things up.
+
+So once we have the next page (it has been posted by the kernel), we can set up
+the cons_idx so consumers can grab slots.  We don't need to reserve a slot for
+ourselves (no DoS risk).
+
+After setting up the counter, our next job is to *free* the old page of
+consumed items.  The trick here is that there may be consumers still using it.
+We statically know how many items there are on the page, so we have all
+consumers increment another counter when they are done with the slot.  When
+that counter is the max, we know everyone is done with the page and it can be
+*freed*.  That counter is like an inverted reference count.  I don't care when
+it is 0, I care when it is the max.  Alternatively, we could have initialized
+it to MAX and decremented, but this way felt more natural.  When the page is
+done, we don't actually free it.  We'll atomic_swap it with the spare_pg,
+making it the spare.  If there already was a spare, then we have too many pages
+and need to munmap the old spare.
+
+So we finally get our good slot, and we spin til the kernel has loaded it with
+a message.  Then we just copy it out, increment the 'number consumed' counter,
+and we're done.
+
+3. Misc Other Notes:
+====================
+I think most of these things were discussed inline.  There are a few random
+things worth mentioning, some of which are obvious in hindsight:
+- The kernel can't CAS and also not fail, o/w it can be DoSed.
+
+- Without CAS, the kernel can't atomically change the page and the index unless
+  they are the same long / modifiable in the same atomic statement.  This is
+why the page and the counter/slot number are put together in prod_idx.
+
+- Kernel writers/producers need to stop/delay while another producer fixes
+  things up.  The only acceptable place to delay/spin is on the proc's
+hashlock.  Any other scheme will probably fail, even if all you want to do is
+swap the spare page and reset the counter.It doesn't work for the same reason
+we have the current page and the index in one memory location.
+
+- The prod_idx and cons_idx are both protected by the lock and atomically
+  incremented.  The lock protects who resets them, with the understanding that
+it should only be done when everyone agrees the counter is bad (too large), but
+the normal atomics happen lock-free.
+
+- Userspace should mmap a huge chunk of memory and then pass in page addresses
+  to the ucq_init() function.  I made the init function so that this would be
+really easy.
