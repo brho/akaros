@@ -36,9 +36,9 @@ void send_ucq_msg(struct ucq *ucq, struct proc *p, struct event_msg *msg)
 	if (PGOFF(my_slot) > 3000)
 		warn("Abnormally high counter, there's probably something wrong!");
 grab_lock:
-	/* TODO: use a hashlock, instead of the proc lock.  think about irqsave.  do
-	 * we send events from IRQ context?  The proc_lock isn't irqsave */
-	spin_lock(&p->proc_lock);
+	/* Lock, for this proc/ucq.  Using an irqsave, since we may want to send ucq
+	 * messages from irq context. */
+	hash_lock_irqsave(p->ucq_hashlock, (long)ucq);
 	/* Grab a potential slot (again, preventing another DoS) */
 	my_slot = (uintptr_t)atomic_fetch_and_add(&ucq->prod_idx, 1);
 	if (slot_is_good(my_slot))
@@ -60,11 +60,9 @@ grab_lock:
 		/* Warn if we have a ridiculous amount of pages in the ucq */
 		if (atomic_fetch_and_add(&ucq->nr_extra_pgs, 1) > UCQ_WARN_THRESH)
 			warn("Over %d pages in ucq %08p!\n", UCQ_WARN_THRESH, ucq);
-		/* TODO: use a proc_lock/mm_lock or call the external one.  Need to do
-		 * this for now since we don't have hash locks yet HASH LOCK */
-		new_page = (struct ucq_page*)__do_mmap(p, 0, PGSIZE,
-		                                       PROT_READ | PROT_WRITE,
-		                                       MAP_ANON | MAP_POPULATE, 0, 0);
+		new_page = (struct ucq_page*)do_mmap(p, 0, PGSIZE,
+		                                     PROT_READ | PROT_WRITE,
+		                                     MAP_ANON | MAP_POPULATE, 0, 0);
 		assert(new_page);
 		assert(!PGOFF(new_page));
 	} else {
@@ -88,7 +86,7 @@ unlock_lock:
 	/* At this point, any normal (non-locking) producers can succeed in getting
 	 * a slot.  The ones that failed earlier will fight for the lock, then
 	 * quickly proceed when they get a good slot */
-	spin_unlock(&p->proc_lock);	/* TODO HASH LOCK */
+	hash_unlock_irqsave(p->ucq_hashlock, (long)ucq);
 	/* Fall through to having a slot */
 have_slot:
 	/* Sanity check on our slot. */
@@ -110,7 +108,7 @@ error_addr_unlock:
 	/* Had a bad addr while holding the lock.  This is a bit more serious */
 	warn("Bad addr in ucq page management!");
 	ucq->prod_overflow = FALSE;
-	spin_unlock(&p->proc_lock);	/* TODO HASH LOCK */
+	hash_unlock_irqsave(p->ucq_hashlock, (long)ucq);
 	/* Fall-through to normal error out */
 error_addr:
 	warn("Invalid user address, not sending a message");

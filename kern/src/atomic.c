@@ -9,6 +9,45 @@
 #include <error.h>
 #include <string.h>
 #include <assert.h>
+#include <hashtable.h>
+
+/* Inits a hashlock. */
+void hashlock_init(struct hashlock *hl, unsigned int nr_entries)
+{
+	hl->nr_entries = nr_entries;
+	/* this is the right way to do it, though memset is faster.  If we ever
+	 * find that this is taking a lot of time, we can change it. */
+	for (int i = 0; i < hl->nr_entries; i++) {
+		spinlock_init(&hl->locks[i]);
+	}
+}
+
+/* Helper, gets the specific spinlock for a hl/key combo. */
+static spinlock_t *get_spinlock(struct hashlock *hl, long key)
+{
+	/* using the hashtable's generic hash function */
+	return &hl->locks[__generic_hash((void*)key) % hl->nr_entries];
+}
+
+void hash_lock(struct hashlock *hl, long key)
+{
+	spin_lock(get_spinlock(hl, key));
+}
+
+void hash_unlock(struct hashlock *hl, long key)
+{
+	spin_unlock(get_spinlock(hl, key));
+}
+
+void hash_lock_irqsave(struct hashlock *hl, long key)
+{
+	spin_lock_irqsave(get_spinlock(hl, key));
+}
+
+void hash_unlock_irqsave(struct hashlock *hl, long key)
+{
+	spin_unlock_irqsave(get_spinlock(hl, key));
+}
 
 // Must be called in a pair with waiton_checklist
 int commit_checklist_wait(checklist_t* list, checklist_mask_t* mask)

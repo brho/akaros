@@ -59,6 +59,26 @@ static inline void spin_lock_irqsave(spinlock_t *lock);
 static inline void spin_unlock_irqsave(spinlock_t *lock);
 static inline bool spin_lock_irq_enabled(spinlock_t *lock);
 
+/* Hash locks (array of spinlocks).  Most all users will want the default one,
+ * so point your pointer to one of them, though you could always kmalloc a
+ * bigger one.  In the future, they might be growable, etc, which init code may
+ * care about. */
+struct hashlock {
+	unsigned int		nr_entries;
+	struct spinlock		locks[];
+};
+#define HASHLOCK_DEFAULT_SZ 53		/* nice prime, might be a bit large */
+struct small_hashlock {
+	unsigned int		nr_entries;
+	struct spinlock		locks[HASHLOCK_DEFAULT_SZ];
+};
+
+void hashlock_init(struct hashlock *hl, unsigned int nr_entries);
+void hash_lock(struct hashlock *hl, long key);
+void hash_unlock(struct hashlock *hl, long key);
+void hash_lock_irqsave(struct hashlock *hl, long key);
+void hash_unlock_irqsave(struct hashlock *hl, long key);
+
 /* Seq locks */
 /* An example seq lock, built from the counter.  I don't particularly like this,
  * since it forces you to use a specific locking type.  */

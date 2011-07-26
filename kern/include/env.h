@@ -68,6 +68,10 @@ struct proc {
 	struct namespace			*ns;
 	struct fs_struct			fs_env;
 	struct files_struct			open_files;
+
+	/* UCQ hashlocks */
+	struct hashlock				*ucq_hashlock;
+	struct small_hashlock		ucq_hl_noref;	/* don't reference directly */
 };
 
 /* Til we remove all Env references */
