@@ -105,23 +105,6 @@ void disable_kevent(unsigned int ev_type)
 }
 
 /********* Event Handling / Reception ***********/
-/* Tests the ev_q to see if anything has happened on it.  Up to the caller to do
- * something with the info, such as try and dequeue or handle an overflow.
- * Flags is for the ev_q's flags (if you know it), which is to check the NO_MSG
- * style ev_qs. */
-bool event_activity(struct event_mbox *ev_mbox, int flags)
-{
-	if (!bcq_empty(&ev_mbox->ev_msgs))
-		return TRUE;
-	/* Only need to check the bitmask for activity if we've had overflows or if
-	 * we are a NO_MSG.  This means the client can clear its overflows. */
-	if (ev_mbox->ev_overflows || (flags & EVENT_NOMSG)) {
-		if (!BITMASK_IS_CLEAR(&ev_mbox->ev_bitmap, MAX_NR_EVENT))
-			return TRUE;
-	}
-	return FALSE;
-}
-
 /* Clears the overflows, returning the number of overflows cleared. */
 unsigned int event_clear_overflows(struct event_queue *ev_q)
 {
@@ -189,14 +172,9 @@ static int handle_mbox(struct event_mbox *ev_mbox, unsigned int flags)
 	int retval = 0;
 	uint32_t vcoreid = vcore_id();
 
-	/* TODO: This may be unnecessary anymore.  All it does is save the effort of
-	 * checking the bitmask, though if we send EVENT_NOMSG, we'll have to check
-	 * the bitmask anyway (the flag means you could get bit events that aren't
-	 * overflow. */
-	if (!event_activity(ev_mbox, flags))
-		return retval;
 	/* Handle full messages.  Will deal with overflow and bits later. */
 	retval = handle_mbox_msgs(ev_mbox);
+
 	/* Race here with another core clearing overflows/bits.  Don't have more
 	 * than one vcore work on an mbox without being more careful of overflows
 	 * (as in, assume any overflow means all bits must be checked, since someone

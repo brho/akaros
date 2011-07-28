@@ -23,7 +23,6 @@ void enable_kevent(unsigned int ev_type, uint32_t vcoreid, int ev_flags);
 void disable_kevent(unsigned int ev_type);
 
 /********* Event Handling / Reception ***********/
-bool event_activity(struct event_mbox *ev_mbox, int flags);
 unsigned int event_clear_overflows(struct event_queue *ev_q);
 unsigned int get_event_type(struct event_mbox *ev_mbox);
 

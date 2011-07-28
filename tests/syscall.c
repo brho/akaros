@@ -44,14 +44,9 @@ int main(int argc, char** argv)
 	num_started = __ros_arch_syscall((long)&sysc, 1);
 	if (!(atomic_read(&sysc.flags) & SC_DONE))
 		printf("Not done, looping!\n");
-	#if 0
-	/* You could poll on this */
-	while (!(sysc.flags & SC_DONE))
-		cpu_relax();
-	#endif
-	/* But let's check on events...  Spin til something happened, then handle
-	 * events.  This method is just used for this testing code. */
-	while (!event_activity(ev_q->ev_mbox, ev_q->ev_flags))
+	/* You could poll on this.  This is really ghetto, but i got rid of
+	 * event_activity, whose sole purpose was to encourage spinning. */
+	while (!(atomic_read(&sysc.flags) & SC_DONE))
 		cpu_relax();
 	handle_event_q(ev_q);
 	/* by now, we should have run our handler */
