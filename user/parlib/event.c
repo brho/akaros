@@ -105,18 +105,10 @@ void disable_kevent(unsigned int ev_type)
 }
 
 /********* Event Handling / Reception ***********/
-/* Clears the overflows, returning the number of overflows cleared. */
-unsigned int event_clear_overflows(struct event_queue *ev_q)
-{
-	unsigned int retval = ev_q->ev_mbox->ev_overflows;
-	ev_q->ev_mbox->ev_overflows = 0;
-	return retval;
-}
-
 /* Somewhat ghetto helper, for the lazy.  If all you care about is an event
  * number, this will see if the event happened or not.  It will try for a
  * message, but if there is none, it will go for a bit.  Note that multiple
- * messages that overflowed could turn into just one bit. */
+ * bit messages will turn into just one bit. */
 unsigned int get_event_type(struct event_mbox *ev_mbox)
 {
 	struct event_msg local_msg = {0};
@@ -138,13 +130,11 @@ unsigned int get_event_type(struct event_mbox *ev_mbox)
 /* Actual Event Handling */
 
 /* List of handlers, process-wide, that the 2LS should fill in.  They all must
- * return (don't context switch to a u_thread), and need to handle ev_msg being
- * 0. */
+ * return (don't context switch to a u_thread) */
 handle_event_t ev_handlers[MAX_NR_EVENT] = {[EV_EVENT] handle_ev_ev, 0};
 
-/* Handles all the messages in the mbox, but not the single bits.  Currently
- * this doesn't tell the handler about overflow, since you should be handling
- * that because of the bits.  Returns the number handled. */
+/* Handles all the messages in the mbox, but not the single bits.  Returns the
+ * number handled. */
 int handle_mbox_msgs(struct event_mbox *ev_mbox)
 {
 	int retval = 0;
@@ -156,7 +146,7 @@ int handle_mbox_msgs(struct event_mbox *ev_mbox)
 		ev_type = local_msg.ev_type;
 		printd("UCQ: ev_type: %d\n", ev_type);
 		if (ev_handlers[ev_type])
-			ev_handlers[ev_type](&local_msg, ev_type, FALSE);	/* no overflow*/
+			ev_handlers[ev_type](&local_msg, ev_type);
 		check_preempt_pending(vcoreid);
 		retval++;
 	}
@@ -168,61 +158,43 @@ int handle_mbox_msgs(struct event_mbox *ev_mbox)
  * check for preemptions between each event handler. */
 static int handle_mbox(struct event_mbox *ev_mbox, unsigned int flags)
 {
-	bool overflow = FALSE;
 	int retval = 0;
 	uint32_t vcoreid = vcore_id();
 
-	/* Handle full messages.  Will deal with overflow and bits later. */
+	/* Handle full messages.  Will deal with bits later. */
 	retval = handle_mbox_msgs(ev_mbox);
 
-	/* Race here with another core clearing overflows/bits.  Don't have more
-	 * than one vcore work on an mbox without being more careful of overflows
-	 * (as in, assume any overflow means all bits must be checked, since someone
-	 * might have not told a handler of an overflow).
+	/* Process all bits, if they requested NOMSG.  o/w, we'll skip the bitmask
+	 * scan.
 	 *
-	 * The purpose of this is to let everyone know we are dealing with
-	 * overflows, mostly for preventing code from freaking out about having too
-	 * many overflows.  Also slightly important to not have wraparound (though
-	 * in theory it is still possible). */
-	if (ev_mbox->ev_overflows) {
-		ev_mbox->ev_overflows = 0;
-		overflow = TRUE;
-	}
-	/* Process all bits.  As far as I've seen, using overflow like this is
-	 * thread safe (tested on some code in mhello, asm looks like it knows to
-	 * have the function use addresses relative to the frame pointer). */
+	 * TODO: if they have a flag saying "it's okay to overflow", then we'll want
+	 * to check the bits regardless */
 	void bit_handler(unsigned int bit) {
 		printd("Bit: ev_type: %d\n", bit);
 		cmb();
 		if (ev_handlers[bit])
-			ev_handlers[bit](0, bit, overflow || ev_mbox->ev_overflows);
+			ev_handlers[bit](0, bit);
 		retval++;
 		check_preempt_pending(vcoreid);
 		/* Consider checking the queue for incoming messages while we're here */
 	}
-	BITMASK_FOREACH_SET(ev_mbox->ev_bitmap, MAX_NR_EVENT, bit_handler, TRUE);
-	/* If you ever have bugs where bits are set without overflow (for
-	 * non-EVENT_NOMSG handlers, like the syscall, check here for the bit being
-	 * set AND there is no overflow.  You must read the bit before checking
-	 * the overflows, since the kernel writes them in the other order (kernel
-	 * sets overflow, then sets the bit). */
+	if (flags & EVENT_NOMSG)
+		BITMASK_FOREACH_SET(ev_mbox->ev_bitmap, MAX_NR_EVENT, bit_handler,
+		                    TRUE);
 	return retval;
 }
 
-/* The EV_EVENT handler - extract the ev_q from the message.  If you want this
- * to catch overflows, you'll need to register your event_queues (TODO).  Might
- * be issues with per-core handling (register globally, or just per vcore). */
-void handle_ev_ev(struct event_msg *ev_msg, unsigned int ev_type, bool overflow)
+/* The EV_EVENT handler - extract the ev_q from the message. */
+void handle_ev_ev(struct event_msg *ev_msg, unsigned int ev_type)
 {
 	struct event_queue *ev_q;
-	/* TODO: handle overflow (register, etc) */
-	if (overflow)
-		printf("Ignoring overflow!  Deal with me!\n");
-	if (!ev_msg)
-		return;
+	/* EV_EVENT can't handle not having a message / being a bit.  If we got a
+	 * bit message, it's a bug somewhere */
+	assert(ev_msg);
 	ev_q = ev_msg->ev_arg3;
-	if (ev_q)
-		handle_event_q(ev_q);
+	/* Same deal, a null ev_q is probably a bug, or someone being a jackass */
+	assert(ev_q);
+	handle_event_q(ev_q);
 }
 
 /* 2LS will probably call this in vcore_entry and places where it wants to check

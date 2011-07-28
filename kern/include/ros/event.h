@@ -60,8 +60,6 @@ struct event_msg {
 struct event_mbox {
 	struct ucq 					ev_msgs;
 	uint8_t						ev_bitmap[(MAX_NR_EVENT - 1) / 8 + 1];
-	/* this will go away in a commit or two: TODO */
-	unsigned int				ev_overflows;
 };
 
 /* The kernel sends messages to this structure, which describes how and where

@@ -154,32 +154,34 @@ block in the kernel.
 
 If there is a 2LS, the current thread will yield, and call out to the 2LS's
 blockon_sysc() method, which needs a way to stop the thread and be able to
-restart it when the syscall completes.  Specifically, the pthread 2LS puts the
-thread on a "syscall pending" list and registers the syscall to respond to an
-event (described in detail elsewhere in this doc).  When the event comes in,
-meaning the syscall is complete, the thread is put on the runnable list.
+restart it when the syscall completes.  Specifically, the pthread 2LS registers
+the syscall to respond to an event (described in detail elsewhere in this doc).
+When the event comes in, meaning the syscall is complete, the thread is put on
+the runnable list.
 
 Details:
-- A pointer to the struct pthread is stored in the syscall's void*.  You need
-  to be on the pending list before registering for the event (due to how we
-  handle event overflow recovery).  When the syscall is done, we normally get
-  a message from the kernel, and the payload tells us the syscall is done,
-  which tells us which thread to unblock. 
+- A pointer to the struct pthread is stored in the syscall's void*.  When the
+  syscall is done, we normally get a message from the kernel, and the payload
+  tells us the syscall is done, which tells us which thread to unblock. 
 - The pthread code also always asks for an IPI and event message for every
   syscall that completes.  This is far from ideal.  Still, the basics are the
   same for any threading library.  Once you know a thread is done, you need to
   do something about it.
-- The pthread code does syscall blocking/ pending lists and event notification
-  on a per-core basis.
+- The pthread code does syscall blocking and event notification on a per-core
+  basis.  Using the default (VCPD) ev_mbox for this is a bad idea (which we did
+  at some point).
 - There's a race between the 2LS trying to sign up for events and the kernel
   finishing the event.  We handle this in uthread code, so use the helper to
   register_evq(), which does the the right thing (atomics, careful ordering
   with writes, etc).
-- If as syscall has an ev_q*, it is on the pending list.  It can be on the
-  pending list without an ev_q.
 
 2.2.1 Recovering from Event Overflow
 ---------------
+Event overflow recovery is unnecessary, since syscall ev_qs use UCQs now.  this
+section is kept around for some useful tidbits, such as details about
+deregistering ev_qs for a syscall:
+
+---------------------------
 The pthread code expects to receive an event somehow to unblock a thread
 once its syscall is done.  One limitation to our messaging systems is that you
 can't send an infinite amount of event messages.  (By messages, I mean a chunk
@@ -257,17 +259,16 @@ is dependent on how a 2LS does its thread handling/blocking.
 Eventually, we'll want a way to detect and handle excessive overflow, since
 it's probably quite expensive.  Perhaps turn it off and periodically poll the
 syscalls for completion (but don't bother turning on the ev_q).
+---------------------------
 
 3. Event Delivery / Notification
 ====================
 3.1 Basics
 ----------------------------------------------
-The mbox (mailbox) is where the actual messages go, or the overflow of a
-message is tracked.
+The mbox (mailbox) is where the actual messages go.
 
 	struct ev_mbox {
 		bcq of notif_events 	/* bounded buffer, multi-consumer/producer */
-		overflow_count
 		msg_bitmap
 	}
 	struct ev_queue {			/* aka, event_q, ev_q, etc. */
@@ -423,6 +424,11 @@ know about an event for which a handler is already running.
 
 3.5 Overflowed/Missed Messages in the VCPD 
 ---------------------------------------
+This too is no longer necessary.  It's useful in that it shows what we don't
+have to put up with.  Missing messages requires potentially painful
+infrastructure to handle it:
+
+-----------------------------
 All event_q's requesting IPIs ought to register with the 2LS.  This is for
 recovering in case the vcpd's mbox overflowed, and the vcore knows it missed a
 NE_EVENT type message.  At that point, it would have to check all of its
@@ -444,6 +450,7 @@ message overflow, it would have the check the event_q (which was registered
 before) anyway, and could potentially page fault there.  Also the kernel would
 have faulted on it (and read it in) back when it tried to read those values.
 It's somewhat moot, since we're going to have an allocator that pins event_qs.
+-----------------------------
 
 3.6 Round-Robin or Other IPI-delivery styles
 ---------------------------------------

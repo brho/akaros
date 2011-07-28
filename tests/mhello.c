@@ -23,8 +23,7 @@ __thread int temp;
 void *core0_tls = 0;
 
 struct event_queue *indirect_q;
-static void handle_generic(struct event_msg *ev_msg, unsigned int ev_type,
-                           bool overflow);
+static void handle_generic(struct event_msg *ev_msg, unsigned int ev_type);
 
 void ghetto_vcore_entry(void);
 struct uthread *ghetto_init(void)
@@ -137,11 +136,9 @@ int main(int argc, char** argv)
 	return 0;
 }
 
-static void handle_generic(struct event_msg *ev_msg, unsigned int ev_type,
-                           bool overflow)
+static void handle_generic(struct event_msg *ev_msg, unsigned int ev_type)
 {
-	printf("Got event type %d on vcore %d, with%s overflow\n",
-	       ev_type, vcore_id(), overflow ? "" : "out");
+	printf("Got event type %d on vcore %d\n", ev_type, vcore_id());
 }
 
 void ghetto_vcore_entry(void)

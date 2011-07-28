@@ -23,16 +23,13 @@ void enable_kevent(unsigned int ev_type, uint32_t vcoreid, int ev_flags);
 void disable_kevent(unsigned int ev_type);
 
 /********* Event Handling / Reception ***********/
-unsigned int event_clear_overflows(struct event_queue *ev_q);
 unsigned int get_event_type(struct event_mbox *ev_mbox);
 
 /* List of handlers, process-wide, that the 2LS should fill in.  They all must
  * return (don't context switch to a u_thread) */
-typedef void (*handle_event_t)(struct event_msg *ev_msg, unsigned int ev_type,
-                               bool overflow);
+typedef void (*handle_event_t)(struct event_msg *ev_msg, unsigned int ev_type);
 extern handle_event_t ev_handlers[];
-void handle_ev_ev(struct event_msg *ev_msg, unsigned int ev_type,
-                  bool overflow);
+void handle_ev_ev(struct event_msg *ev_msg, unsigned int ev_type);
 int handle_events(uint32_t vcoreid);
 void handle_event_q(struct event_queue *ev_q);
 int handle_mbox_msgs(struct event_mbox *ev_mbox);

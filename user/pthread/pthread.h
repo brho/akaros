@@ -23,20 +23,15 @@ struct pthread_tcb {
 	void *arg;
 	void *stacktop;
 	void *retval;
-	uint32_t vcoreid;
 };
 typedef struct pthread_tcb* pthread_t;
 TAILQ_HEAD(pthread_queue, pthread_tcb);
 
 /* Per-vcore data structures to manage syscalls.  The ev_q is where we tell the
- * kernel to signal us.  The tailq is for handling overflow of syscall events.
- * The current pthread code handles syscall events (ev_qs, overflow, etc) on a
- * per-vcore basis).  We don't need a lock since this is per-vcore and accessed
- * in vcore context. */
+ * kernel to signal us.  We don't need a lock since this is per-vcore and
+ * accessed in vcore context. */
 struct sysc_mgmt {
 	struct event_queue 			ev_q;
-	struct pthread_queue		pending_syscs;
-	bool						handling_overflow;
 };
 
 #define PTHREAD_ONCE_INIT 0

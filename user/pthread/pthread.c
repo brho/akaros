@@ -43,8 +43,7 @@ void pth_spawn_thread(uintptr_t pc_start, void *data);
 void pth_blockon_sysc(struct syscall *sysc);
 
 /* Event Handlers */
-static void pth_handle_syscall(struct event_msg *ev_msg, unsigned int ev_type,
-                               bool overflow);
+static void pth_handle_syscall(struct event_msg *ev_msg, unsigned int ev_type);
 
 struct schedule_ops pthread_sched_ops = {
 	pth_init,
@@ -90,9 +89,6 @@ struct uthread *pth_init(void)
 		sysc_mgmt[i].ev_q.ev_mbox =  &__procdata.vcore_preempt_data[i].ev_mbox;
 		sysc_mgmt[i].ev_q.ev_flags = EVENT_IPI;		/* totally up to you */
 		sysc_mgmt[i].ev_q.ev_vcore = i;
-		/* Init the list and other data */
-		TAILQ_INIT(&sysc_mgmt[i].pending_syscs);
-		sysc_mgmt[i].handling_overflow = FALSE;
 	}
 	/* Create a pthread_tcb for the main thread */
 	pthread_t t = (pthread_t)calloc(1, sizeof(struct pthread_tcb));
@@ -250,84 +246,27 @@ void pth_spawn_thread(uintptr_t pc_start, void *data)
 }
 
 /* Restarts a uthread hanging off a syscall.  For the simple pthread case, we
- * just make it runnable and let the main scheduler code handle it.
- *
- * The pthread code relies on syscall handling being done per-vcore.  Don't try
- * and restart a thread on a different vcore, since you'll get screwed.  We have
- * a little test to catch that. */
+ * just make it runnable and let the main scheduler code handle it. */
 static void restart_thread(struct syscall *sysc)
 {
-	uint32_t vcoreid = vcore_id();
-	/* Using two vars to make the code simpler.  It's the same thread. */
 	struct uthread *ut_restartee = (struct uthread*)sysc->u_data;
-	struct pthread_tcb *pt_restartee = (struct pthread_tcb*)sysc->u_data;
 	/* uthread stuff here: */
 	assert(ut_restartee);
 	assert(ut_restartee->state == UT_BLOCKED);
 	assert(ut_restartee->sysc == sysc);
 	ut_restartee->sysc = 0;	/* so we don't 'reblock' on this later */
-	/* pthread stuff here: */
-	/* Rip it from pending syscall list. */
-	assert(pt_restartee->vcoreid == vcoreid);
-	TAILQ_REMOVE(&sysc_mgmt[vcoreid].pending_syscs, pt_restartee, next);
 	uthread_runnable(ut_restartee);
 }
 
 /* This handler is usually run in vcore context, though I can imagine it being
  * called by a uthread in some other threading library. */
-static void pth_handle_syscall(struct event_msg *ev_msg, unsigned int ev_type,
-                               bool overflow)
+static void pth_handle_syscall(struct event_msg *ev_msg, unsigned int ev_type)
 {
-	uint32_t vcoreid = vcore_id();
-	struct sysc_mgmt *vc_sysc_mgmt = &sysc_mgmt[vcoreid];
 	struct syscall *sysc;
-	struct pthread_tcb *i, *temp;
 	assert(in_vcore_context());
-	/* Handle overflow: (if we haven't started handling it yet): */
-	if (overflow && !vc_sysc_mgmt->handling_overflow) {
-		vc_sysc_mgmt->handling_overflow = TRUE;
-		printd("[pthread] handling syscall overflow on vcore %d\n", vcoreid);
-		/* Turn off event handling for all syscs on our list.  Note they remain
-		 * on the pending_sysc list. */
-		TAILQ_FOREACH(i, &sysc_mgmt[vcoreid].pending_syscs, next) {
-			sysc = ((struct uthread*)i)->sysc;
-			deregister_evq(sysc);
-		}
-		/* Handle event msgs, to get any syscs that sent messages.  We don't
-		 * care about bits, since we're dealing with overflow already.  Note
-		 * that pthreads currently uses an ev_q shared by a bunch of message
-		 * types, so other things could also run (careful with them!). */  
-		handle_mbox_msgs(vc_sysc_mgmt->ev_q.ev_mbox);
-		/* Try to manually handle all syscs, turning on the ev_q if they are not
-		 * done, and handling them if they are done.  This deals with the same
-		 * issues we dealt with in pth_blockon_sysc().
-		 *
-		 * This might end up sucking, since we could get more overflow because
-		 * of the early turning-on of events.  Alternatively, we could loop
-		 * through and simply check for completion (and handle), and then do
-		 * this loop. */
-		TAILQ_FOREACH_SAFE(i, &sysc_mgmt[vcoreid].pending_syscs, next, temp) {
-			sysc = ((struct uthread*)i)->sysc;
-			if (!register_evq(sysc, &vc_sysc_mgmt->ev_q)) {
-				/* They are already done, can't sign up for events, just like
-				 * when we blocked on them the first time. */
-				restart_thread(sysc);
-			}
-		}
-		/* Done dealing with overflow */
-		vc_sysc_mgmt->handling_overflow = FALSE;
-		/* The original sysc in an ev_msg, if any, has already been done. */
-		return;
-	}
-	/* It's a bug if we don't have a msg (we are handling a syscall bit-event)
-	 * while still dealing with overflow.  The only bit events should be for the
-	 * first (or subsequent) overflow. */
-	if (!ev_msg) {
-		printf("[pthread] crap, no ev_msg, overflow: %d, handling: %d!!\n",
-		       overflow, vc_sysc_mgmt->handling_overflow);
-		return;
-	}
-	/* Normal path: get the sysc from the message and just restart it */
+	/* It's a bug if we don't have a msg (we're handling a syscall bit-event) */
+	assert(ev_msg);
+	/* Get the sysc from the message and just restart it */
 	sysc = ev_msg->ev_arg3;
 	assert(sysc);
 	restart_thread(sysc);
@@ -354,14 +293,7 @@ void pth_blockon_sysc(struct syscall *sysc)
 
 	/* Set things up so we can wake this thread up later */
 	sysc->u_data = current_uthread;
-	/* Put the uthread on the pending list.  Note the ordering.  We must be on
-	 * the list before we register the ev_q.  All sysc's must be tracked before
-	 * we tell the kernel to signal us. */
-	TAILQ_INSERT_TAIL(&sysc_mgmt[vcoreid].pending_syscs, pthread, next);
-	/* Safety: later we'll make sure we restart on the core we slept on */
-	pthread->vcoreid = vcoreid;
-	/* Register our vcore's syscall ev_q to hear about this syscall.  Keep this
-	 * in sync with how we handle overflowed syscalls later. */
+	/* Register our vcore's syscall ev_q to hear about this syscall. */
 	if (!register_evq(sysc, &sysc_mgmt[vcoreid].ev_q)) {
 		/* Lost the race with the call being done.  The kernel won't send the
 		 * event.  Just restart him. */
