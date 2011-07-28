@@ -12,6 +12,7 @@
 #include <glibc-tls.h>
 #include <event.h>
 #include <uthread.h>
+#include <ucq.h>
 #include <ros/arch/membar.h>
 
 /* starting with 1 since we alloc vcore0's stacks and TLS in vcore_init(). */
@@ -100,6 +101,7 @@ static int allocate_transition_stack(int id)
 int vcore_init()
 {
 	static int initialized = 0;
+	uintptr_t mmap_block;
 	if(initialized)
 		return 0;
 
@@ -114,6 +116,22 @@ int vcore_init()
 	if(allocate_transition_stack(0) || allocate_transition_tls(0))
 		goto vcore_init_tls_fail;
 
+	/* Initialize our VCPD event queues' ucqs, two pages per vcore */
+	mmap_block = (uintptr_t)mmap(0, PGSIZE * 2 * max_vcores(),
+	                             PROT_WRITE | PROT_READ,
+	                             MAP_POPULATE, -1, 0);
+	/* Yeah, this doesn't fit in the error-handling scheme, but this whole
+	 * system doesn't really handle failure, and needs a rewrite involving less
+	 * mmaps/munmaps. */
+	assert(mmap_block);
+	/* Note we may end up doing vcore 0's elsewhere, for _Ss, or else have a
+	 * separate ev_q for that. */
+	for (int i = 0; i < max_vcores(); i++) {
+		/* two pages each from the big block */
+		ucq_init(&__procdata.vcore_preempt_data[i].ev_mbox.ev_msgs,
+		         mmap_block + (2 * i    ) * PGSIZE, 
+		         mmap_block + (2 * i + 1) * PGSIZE); 
+	}
 	assert(!in_vcore_context());
 	initialized = 1;
 	return 0;

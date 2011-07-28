@@ -7,7 +7,7 @@
 
 #include <ros/event.h>
 #include <ros/procdata.h>
-#include <ros/bcq.h>
+#include <ucq.h>
 #include <bitmask.h>
 #include <vcore.h>
 #include <stdlib.h>
@@ -120,8 +120,8 @@ unsigned int event_clear_overflows(struct event_queue *ev_q)
 unsigned int get_event_type(struct event_mbox *ev_mbox)
 {
 	struct event_msg local_msg = {0};
-	/* BCQ returns 0 on success, so this will dequeue and return the type. */
-	if (!bcq_dequeue(&ev_mbox->ev_msgs, &local_msg, NR_BCQ_EVENTS)) {
+	/* UCQ returns 0 on success, so this will dequeue and return the type. */
+	if (!get_ucq_msg(&ev_mbox->ev_msgs, &local_msg)) {
 		return local_msg.ev_type;
 	}
 	if (BITMASK_IS_CLEAR(&ev_mbox->ev_bitmap, MAX_NR_EVENT))
@@ -152,9 +152,9 @@ int handle_mbox_msgs(struct event_mbox *ev_mbox)
 	unsigned int ev_type;
 	uint32_t vcoreid = vcore_id();
 	/* Try to dequeue, dispatch whatever you get. */
-	while (!bcq_dequeue(&ev_mbox->ev_msgs, &local_msg, NR_BCQ_EVENTS)) {
+	while (!get_ucq_msg(&ev_mbox->ev_msgs, &local_msg)) {
 		ev_type = local_msg.ev_type;
-		printd("BCQ: ev_type: %d\n", ev_type);
+		printd("UCQ: ev_type: %d\n", ev_type);
 		if (ev_handlers[ev_type])
 			ev_handlers[ev_type](&local_msg, ev_type, FALSE);	/* no overflow*/
 		check_preempt_pending(vcoreid);

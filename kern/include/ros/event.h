@@ -9,8 +9,8 @@
 
 #include <ros/common.h>
 #include <ros/atomic.h>
-#include <ros/bcq_struct.h>
 #include <ros/arch/trapframe.h>
+/* #include <ros/ucq.h> included below */
 
 /* Event Delivery Flags from the process to the kernel */
 #define EVENT_IPI				0x001	/* IPI the core */
@@ -51,18 +51,16 @@ struct event_msg {
 	uint64_t					ev_arg4;
 };
 
-/* Random numbers */
-#define NR_BCQ_EVENTS 16		/* nr events in a bcq (power of 2!) */
-#define NR_BCQ_EV_LOOPS 4		/* how many loops to try to enqueue */
-
-DEFINE_BCQ_TYPES(event_msg, struct event_msg, NR_BCQ_EVENTS);
+/* Including here since ucq.h needs to know about struct event_msg */
+#include <ros/ucq.h>
 
 /* Structure for storing / receiving event messages.  An overflow causes the
  * bit of the event to get set in the bitmap.  You can also have just the bit
  * sent (and no message). */
 struct event_mbox {
-	struct event_msg_bcq 		ev_msgs;
+	struct ucq 					ev_msgs;
 	uint8_t						ev_bitmap[(MAX_NR_EVENT - 1) / 8 + 1];
+	/* this will go away in a commit or two: TODO */
 	unsigned int				ev_overflows;
 };
 
@@ -95,18 +93,6 @@ struct preempt_data {
 	bool						notif_pending;		/* notif k_msg on the way */
 	seq_ctr_t					preempt_tf_valid;
 	struct event_mbox			ev_mbox;
-};
-
-/* Structs for different types of events that need parameters. */
-// TODO: think about this a bit.  And don't want to make them til we need them.
-
-/* Example: want the vcoreid of what was lost. */
-struct ev_vcore_revoke {
-	uint16_t					type;
-	uint16_t					pad1;
-	uint32_t					vcoreid;
-	void						*pad3;
-	uint64_t					pad4;
 };
 
 #endif /* ROS_INC_EVENT_H */

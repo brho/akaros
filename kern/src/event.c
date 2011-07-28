@@ -5,7 +5,7 @@
  * Kernel utility functions for sending events and notifications (IPIs) to
  * processes. */
 
-#include <ros/bcq.h>
+#include <ucq.h>
 #include <bitmask.h>
 #include <event.h>
 #include <atomic.h>
@@ -32,21 +32,15 @@ static struct event_mbox *get_proc_ev_mbox(uint32_t vcoreid)
 static void post_ev_msg(struct event_mbox *mbox, struct event_msg *msg,
                         int ev_flags)
 {
+	struct proc *p = current;
 	printd("Sending event type %d\n", msg->ev_type);
 	/* Sanity check */
-	assert(current);
+	assert(p);
 	/* If they just want a bit (NOMSG), just set the bit */
 	if (ev_flags & EVENT_NOMSG) {
 		SET_BITMASK_BIT_ATOMIC(mbox->ev_bitmap, msg->ev_type);
 	} else {
-		/* Enqueue returns 0 on success.  On failure, set a bit. */
-		if (bcq_enqueue(&mbox->ev_msgs, msg, NR_BCQ_EVENTS, NR_BCQ_EV_LOOPS)) {
-			atomic_inc((atomic_t)&mbox->ev_overflows); // careful here
-			SET_BITMASK_BIT_ATOMIC(mbox->ev_bitmap, msg->ev_type);
-			/* Catch "lots" of overflows that aren't acknowledged */
-			if (mbox->ev_overflows > 10000)
-				warn("proc %d has way too many overflows", current->pid);
-		}
+		send_ucq_msg(&mbox->ev_msgs, p, msg);
 	}
 }
 

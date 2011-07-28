@@ -19,9 +19,9 @@
 #define ROS_INC_UCQ_H
 
 #include <ros/common.h>
-#include <ros/event.h>
 #include <ros/atomic.h>
 #include <ros/arch/mmu.h>
+/* #include <ros/event.h> included below */
 
 /* The main UCQ structure, contains indexes and start points (for the indexes),
  * etc. */
@@ -42,6 +42,9 @@ struct ucq_page_header {
 	uintptr_t					cons_next_pg;	/* next page to consume */
 	atomic_t 					nr_cons;		/* like an inverted refcnt */
 };
+
+/* Including here since event.h needs to know about struct ucq */
+#include <ros/event.h>
 
 struct msg_container {
 	struct event_msg			ev_msg;
