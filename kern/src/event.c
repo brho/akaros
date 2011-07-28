@@ -16,10 +16,12 @@
 #include <assert.h>
 #include <pmap.h>
 
-/* Note this returns the KVA of the mbox, not the user one. */
-static struct event_mbox *get_proc_ev_mbox(struct proc *p, uint32_t vcoreid)
+/* Note this returns the user address of the mbox, not the KVA.  You'll need
+ * current loaded to access this, and it will work for any process. */
+static struct event_mbox *get_proc_ev_mbox(uint32_t vcoreid)
 {
-	return &p->procdata->vcore_preempt_data[vcoreid].ev_mbox;
+	struct procdata *pd = (struct procdata*)UDATA;
+	return &pd->vcore_preempt_data[vcoreid].ev_mbox;
 }
 
 /* Posts a message to the mbox, subject to flags.  Feel free to send 0 for the
@@ -32,8 +34,7 @@ static void post_ev_msg(struct event_mbox *mbox, struct event_msg *msg,
 {
 	printd("Sending event type %d\n", msg->ev_type);
 	/* Sanity check */
-	if (is_user_rwaddr(mbox, 0))	/* don't care about len here */
-		assert(current);
+	assert(current);
 	/* If they just want a bit (NOMSG), just set the bit */
 	if (ev_flags & EVENT_NOMSG) {
 		SET_BITMASK_BIT_ATOMIC(mbox->ev_bitmap, msg->ev_type);
@@ -72,8 +73,8 @@ void send_event(struct proc *p, struct event_queue *ev_q, struct event_msg *msg,
 		warn("[kernel] Illegal addr for ev_q");
 		return;
 	}
-	/* ev_q can be a user pointer (not in procdata), so we need to make sure
-	 * we're in the right address space */
+	/* ev_q is a user pointer, so we need to make sure we're in the right
+	 * address space */
 	if (old_proc != p) {
 		/* Technically, we're storing a ref here, but our current ref on p is
 		 * sufficient (so long as we don't decref below) */
@@ -84,7 +85,7 @@ void send_event(struct proc *p, struct event_queue *ev_q, struct event_msg *msg,
 	/* If we're going with APPRO, we use the kernel's suggested vcore's ev_mbox.
 	 * vcoreid is already what the kernel suggests. */
 	if (ev_q->ev_flags & EVENT_VCORE_APPRO) {
-		ev_mbox = get_proc_ev_mbox(p, vcoreid);
+		ev_mbox = get_proc_ev_mbox(vcoreid);
 	} else {	/* common case */
 		ev_mbox = ev_q->ev_mbox;
 		vcoreid = ev_q->ev_vcore;
@@ -100,7 +101,7 @@ void send_event(struct proc *p, struct event_queue *ev_q, struct event_msg *msg,
 		vcoreid = (ev_q->ev_vcore + 1) % p->procinfo->num_vcores;
 		ev_q->ev_vcore = vcoreid;
 		if (!ev_mbox)
-			ev_mbox = get_proc_ev_mbox(p, vcoreid);
+			ev_mbox = get_proc_ev_mbox(vcoreid);
 	}
 	/* At this point, we ought to have the right mbox to send the msg to, and
 	 * which vcore to send an IPI to (if we send one).  The mbox could be the
@@ -110,23 +111,23 @@ void send_event(struct proc *p, struct event_queue *ev_q, struct event_msg *msg,
 		warn("[kernel] ought to have an mbox by now!");
 		goto out;
 	}
-	vcore_mbox = get_proc_ev_mbox(p, vcoreid);
-	/* Allows the mbox to be the right vcoreid mbox (a KVA in procdata), or any
-	 * other user RW location. */
-	if ((ev_mbox != vcore_mbox) &&
-	    (!is_user_rwaddr(ev_mbox, sizeof(struct event_mbox)))) {
+	/* Even if we're using an mbox in procdata (VCPD), we want a user pointer */
+	if (!is_user_rwaddr(ev_mbox, sizeof(struct event_mbox))) {
 		/* Ought to kill them, just warn for now */
 		warn("[kernel] Illegal addr for ev_mbox");
 		goto out;
 	}
-	/* We used to support no msgs, but quit being lazy and send a msg */
+	/* We used to support no msgs, but quit being lazy and send a 'msg'.  If the
+	 * ev_q is a NOMSG, we won't actually memcpy or anything, it'll just be a
+	 * vehicle for sending the ev_type. */
 	assert(msg);
 	post_ev_msg(ev_mbox, msg, ev_q->ev_flags);
 	/* Optional IPIs */
 	if (ev_q->ev_flags & EVENT_IPI) {
 		/* if the mbox we sent to isn't the default one, we need to send the
 		 * vcore an ev_q indirection event */
-		if ((ev_mbox != vcore_mbox) && (!uva_is_kva(p, ev_mbox, vcore_mbox))) {
+		vcore_mbox = get_proc_ev_mbox(vcoreid);
+		if (ev_mbox != vcore_mbox) {
 			/* it is tempting to send_kernel_event(), using the ev_q for that
 			 * event, but that is inappropriate here, since we are sending to a
 			 * specific vcore */
@@ -136,6 +137,7 @@ void send_event(struct proc *p, struct event_queue *ev_q, struct event_msg *msg,
 		}
 		proc_notify(p, vcoreid);
 	}
+	/* Fall through */
 out:
 	/* Return to the old address space.  We switched to p in the first place if
 	 * it wasn't the same as the original current (old_proc). */
@@ -160,12 +162,26 @@ void send_kernel_event(struct proc *p, struct event_msg *msg, uint32_t vcoreid)
 		send_event(p, ev_q, msg, vcoreid);
 }
 
-/* Writes the msg to the vcpd/default mbox of the vcore.  Doesn't need to check
- * for current, or care about what the process wants. */
+/* Writes the msg to the vcpd/default mbox of the vcore.  Needs to load current,
+ * but doesn't need to care about what the process wants.  Note this isn't
+ * commonly used - just the monitor and sys_self_notify(). */
 void post_vcore_event(struct proc *p, struct event_msg *msg, uint32_t vcoreid)
 {
-	struct event_mbox *vcore_mbox;
-	/* kernel address of the vcpd mbox */
-	vcore_mbox = get_proc_ev_mbox(p, vcoreid);
-	post_ev_msg(vcore_mbox, msg, 0);		/* no chance for a NOMSG either */
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	struct proc *old_proc = pcpui->cur_proc;	/* uncounted ref */
+	/* Need to set p as current to post the event */
+	if (old_proc != p) {
+		pcpui->cur_proc = p;
+		lcr3(p->env_cr3);
+	}
+	/* *ev_mbox is the user address of the vcpd mbox */
+	post_ev_msg(get_proc_ev_mbox(vcoreid), msg, 0);	/* no chance for a NOMSG */
+	/* Unload the address space, if applicable */
+	if (old_proc != p) {
+		pcpui->cur_proc = old_proc;
+		if (old_proc)
+			lcr3(old_proc->env_cr3);
+		else
+			lcr3(boot_cr3);
+	}
 }
