@@ -33,7 +33,7 @@ static void post_ev_msg(struct event_mbox *mbox, struct event_msg *msg,
                         int ev_flags)
 {
 	struct proc *p = current;
-	printd("Sending event type %d\n", msg->ev_type);
+	printd("[kernel] Sending event type %d to mbox %08p\n", msg->ev_type, mbox);
 	/* Sanity check */
 	assert(p);
 	/* If they just want a bit (NOMSG), just set the bit */
@@ -58,6 +58,7 @@ void send_event(struct proc *p, struct event_queue *ev_q, struct event_msg *msg,
 	struct event_mbox *ev_mbox = 0, *vcore_mbox;
 	struct event_msg local_msg = {0};
 	assert(p);
+	printd("[kernel] sending msg to proc %08p, ev_q %08p\n", p, ev_q);
 	if (!ev_q) {
 		warn("[kernel] Null ev_q - kernel code should check before sending!");
 		return;

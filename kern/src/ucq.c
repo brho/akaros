@@ -20,8 +20,11 @@ void send_ucq_msg(struct ucq *ucq, struct proc *p, struct event_msg *msg)
 
 	assert(is_user_rwaddr(ucq, sizeof(struct ucq)));
 	/* So we can try to send ucqs to _Ss before they initialize */
-	if (!ucq->ucq_ready)
+	if (!ucq->ucq_ready) {
+		if (p->state & (PROC_RUNNING_M | PROC_RUNNABLE_M))
+			warn("proc %d is _M with an uninitialized ucq %08p\n", p->pid, ucq);
 		return;
+	}
 	/* Bypass fetching/incrementing the counter if we're overflowing, helps
 	 * prevent wraparound issues on the counter (only 12 bits of counter) */
 	if (ucq->prod_overflow)

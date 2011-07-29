@@ -119,7 +119,7 @@ int vcore_init()
 	/* Initialize our VCPD event queues' ucqs, two pages per vcore */
 	mmap_block = (uintptr_t)mmap(0, PGSIZE * 2 * max_vcores(),
 	                             PROT_WRITE | PROT_READ,
-	                             MAP_POPULATE, -1, 0);
+	                             MAP_POPULATE | MAP_ANONYMOUS, -1, 0);
 	/* Yeah, this doesn't fit in the error-handling scheme, but this whole
 	 * system doesn't really handle failure, and needs a rewrite involving less
 	 * mmaps/munmaps. */
@@ -128,9 +128,9 @@ int vcore_init()
 	 * separate ev_q for that. */
 	for (int i = 0; i < max_vcores(); i++) {
 		/* two pages each from the big block */
-		ucq_init(&__procdata.vcore_preempt_data[i].ev_mbox.ev_msgs,
-		         mmap_block + (2 * i    ) * PGSIZE, 
-		         mmap_block + (2 * i + 1) * PGSIZE); 
+		ucq_init_raw(&__procdata.vcore_preempt_data[i].ev_mbox.ev_msgs,
+		             mmap_block + (2 * i    ) * PGSIZE, 
+		             mmap_block + (2 * i + 1) * PGSIZE); 
 	}
 	assert(!in_vcore_context());
 	initialized = 1;

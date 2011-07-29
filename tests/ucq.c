@@ -16,9 +16,9 @@ int main(int argc, char** argv)
 	assert((uintptr_t)ucq == USTACKTOP);
 	/* Now init it */
 	uintptr_t two_pages = (uintptr_t)mmap(0, PGSIZE * 2, PROT_WRITE | PROT_READ,
-	                                      MAP_POPULATE, -1, 0);
+	                                      MAP_POPULATE | MAP_ANONYMOUS, -1, 0);
 	assert(two_pages);
-	ucq_init(ucq, two_pages, two_pages + PGSIZE);
+	ucq_init_raw(ucq, two_pages, two_pages + PGSIZE);
 	/* try to get a simple message */
 	struct event_msg msg;
 	/* 1: Spin til we can get a message (0 on success breaks) */

@@ -12,7 +12,9 @@
 #include <ros/common.h>
 
 /********* Event_q Setup / Registration  ***********/
+struct event_queue *get_big_event_q_raw(void);
 struct event_queue *get_big_event_q(void);
+void put_big_event_q_raw(struct event_queue *ev_q);
 void put_big_event_q(struct event_queue *ev_q);
 struct event_queue *get_event_q(void);
 struct event_queue *get_event_q_vcpd(uint32_t vcoreid);

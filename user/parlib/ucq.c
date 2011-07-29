@@ -18,7 +18,7 @@
 /* Initializes a ucq.  You pass in addresses of mmaped pages for the main page
  * (prod_idx) and the spare page.  I recommend mmaping a big chunk and breaking
  * it up over a bunch of ucqs, instead of doing a lot of little mmap() calls. */
-void ucq_init(struct ucq *ucq, uintptr_t pg1, uintptr_t pg2)
+void ucq_init_raw(struct ucq *ucq, uintptr_t pg1, uintptr_t pg2)
 {
 	assert(!PGOFF(pg1));
 	assert(!PGOFF(pg2));
@@ -32,6 +32,29 @@ void ucq_init(struct ucq *ucq, uintptr_t pg1, uintptr_t pg2)
 	static_assert(sizeof(struct mcs_lock) <= sizeof(ucq->u_lock));
 	mcs_lock_init((struct mcs_lock*)(&ucq->u_lock));
 	ucq->ucq_ready = TRUE;
+}
+
+/* Inits a ucq, where you don't have to bother with the memory allocation.  This
+ * would be appropriate for one or two UCQs, though if you're allocating in
+ * bulk, use the raw version. */
+void ucq_init(struct ucq *ucq)
+{
+	uintptr_t two_pages = (uintptr_t)mmap(0, PGSIZE * 2,
+	                                      PROT_WRITE | PROT_READ,
+	                                      MAP_POPULATE | MAP_ANONYMOUS, -1, 0);
+	assert(two_pages);
+	ucq_init_raw(ucq, two_pages, two_pages + PGSIZE);
+}
+
+/* Only call this on ucq's made with the simple ucq_init().  And be sure the ucq
+ * is no longer in use. */
+void ucq_free_pgs(struct ucq *ucq)
+{
+	uintptr_t pg1 = atomic_read(&ucq->prod_idx);
+	uintptr_t pg2 = atomic_read(&ucq->spare_pg);
+	assert(pg1 && pg2);
+	munmap((void*)pg1, PGSIZE);
+	munmap((void*)pg2, PGSIZE);
 }
 
 /* Consumer side, returns 0 on success and fills *msg with the ev_msg.  If the

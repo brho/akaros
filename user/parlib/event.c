@@ -21,10 +21,17 @@
 /********* Event_q Setup / Registration  ***********/
 
 /* Get event_qs via these interfaces, since eventually we'll want to either
- * allocate from pinned memory or use some form of a slab allocator.  Also, this
- * stitches up the big_q so its ev_mbox points to its internal mbox.  Never
- * access the internal mbox directly. */
-struct event_queue *get_big_event_q(void)
+ * allocate from pinned memory or use some form of a slab allocator.  Also,
+ * these stitch up the big_q so its ev_mbox points to its internal mbox.  Never
+ * access the internal mbox directly.
+ *
+ * Raw ones need to have their UCQs initialized.  If you're making a lot of
+ * these, you can do one big mmap and init the ucqs on your own, which ought to
+ * perform better.
+ *
+ * Use the 'regular' one for big_qs if you don't want to worry about the ucq
+ * initalization */
+struct event_queue *get_big_event_q_raw(void)
 {
 	/* TODO: (PIN) should be pinned memory */
 	struct event_queue_big *big_q = malloc(sizeof(struct event_queue_big));
@@ -33,13 +40,28 @@ struct event_queue *get_big_event_q(void)
 	return (struct event_queue*)big_q;
 }
 
-/* Give it up */
-void put_big_event_q(struct event_queue *ev_q)
+struct event_queue *get_big_event_q(void)
+{
+	struct event_queue *big_q = get_big_event_q_raw();
+	/* uses the simpler, internally mmapping ucq_init() */
+	ucq_init(&big_q->ev_mbox->ev_msgs);
+	return big_q;
+}
+
+/* Give it up.  I don't recommend calling these unless you're sure the queues
+ * aren't in use (unregistered, etc). (TODO: consider some checks for this) */
+void put_big_event_q_raw(struct event_queue *ev_q)
 {
 	/* if we use something other than malloc, we'll need to be aware that ev_q
 	 * is actually an event_queue_big.  One option is to use the flags, though
 	 * this could be error prone. */
 	free(ev_q);
+}
+
+void put_big_event_q(struct event_queue *ev_q)
+{
+	ucq_free_pgs(&ev_q->ev_mbox->ev_msgs);
+	put_big_event_q_raw(ev_q);
 }
 
 /* Need to point this event_q to an mbox - usually to a vcpd */
@@ -62,7 +84,7 @@ struct event_queue *get_event_q_vcpd(uint32_t vcoreid)
 void put_event_q(struct event_queue *ev_q)
 {
 	/* if we use something other than malloc, we'll need to be aware that ev_q
-	 * is actually an event_queue_big. */
+	 * is not an event_queue_big. */
 	free(ev_q);
 }
 
@@ -144,7 +166,7 @@ int handle_mbox_msgs(struct event_mbox *ev_mbox)
 	/* Try to dequeue, dispatch whatever you get. */
 	while (!get_ucq_msg(&ev_mbox->ev_msgs, &local_msg)) {
 		ev_type = local_msg.ev_type;
-		printd("UCQ: ev_type: %d\n", ev_type);
+		printd("[event] UCQ (mbox %08p), ev_type: %d\n", ev_mbox, ev_type);
 		if (ev_handlers[ev_type])
 			ev_handlers[ev_type](&local_msg, ev_type);
 		check_preempt_pending(vcoreid);
@@ -161,6 +183,7 @@ static int handle_mbox(struct event_mbox *ev_mbox, unsigned int flags)
 	int retval = 0;
 	uint32_t vcoreid = vcore_id();
 
+	printd("[event] handling ev_mbox %08p on vcore %d\n", ev_mbox, vcore_id());
 	/* Handle full messages.  Will deal with bits later. */
 	retval = handle_mbox_msgs(ev_mbox);
 
@@ -170,7 +193,7 @@ static int handle_mbox(struct event_mbox *ev_mbox, unsigned int flags)
 	 * TODO: if they have a flag saying "it's okay to overflow", then we'll want
 	 * to check the bits regardless */
 	void bit_handler(unsigned int bit) {
-		printd("Bit: ev_type: %d\n", bit);
+		printd("[event] Bit: ev_type: %d\n", bit);
 		cmb();
 		if (ev_handlers[bit])
 			ev_handlers[bit](0, bit);
@@ -233,5 +256,6 @@ void handle_event_q(struct event_queue *ev_q)
 		}
 		return;
 	}
+	printd("[event] handling ev_q %08p on vcore %d\n", ev_q, vcore_id());
 	handle_mbox(ev_q->ev_mbox, ev_q->ev_flags);
 }
