@@ -31,7 +31,7 @@ TAILQ_HEAD(pthread_queue, pthread_tcb);
  * kernel to signal us.  We don't need a lock since this is per-vcore and
  * accessed in vcore context. */
 struct sysc_mgmt {
-	struct event_queue 			ev_q;
+	struct event_queue 			*ev_q;
 };
 
 #define PTHREAD_ONCE_INIT 0

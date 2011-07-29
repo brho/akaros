@@ -15,6 +15,7 @@
 #include <sys/mman.h>
 #include <assert.h>
 #include <event.h>
+#include <ucq.h>
 
 struct pthread_queue ready_queue = TAILQ_HEAD_INITIALIZER(ready_queue);
 struct pthread_queue active_queue = TAILQ_HEAD_INITIALIZER(active_queue);
@@ -68,6 +69,7 @@ static int __pthread_allocate_stack(struct pthread_tcb *pt);
  * main()) */
 struct uthread *pth_init(void)
 {
+	uintptr_t mmap_block;
 	struct mcs_lock_qnode local_qn = {0};
 	/* Tell the kernel where and how we want to receive events.  This is just an
 	 * example of what to do to have a notification turned on.  We're turning on
@@ -82,14 +84,24 @@ struct uthread *pth_init(void)
 	/* Set up the per-vcore structs to track outstanding syscalls */
 	sysc_mgmt = malloc(sizeof(struct sysc_mgmt) * max_vcores());
 	assert(sysc_mgmt);
+	/* Get a block of pages for our per-vcore (but non-VCPD) ev_qs */
+	mmap_block = (uintptr_t)mmap(0, PGSIZE * 2 * max_vcores(),
+	                             PROT_WRITE | PROT_READ,
+	                             MAP_POPULATE | MAP_ANONYMOUS, -1, 0);
+	assert(mmap_block);
+	/* Could be smarter and do this on demand (in case we don't actually want
+	 * max_vcores()). */
 	for (int i = 0; i < max_vcores(); i++) {
-		/* Set up each of the per-vcore syscall event queues so that they point
-		 * to the VCPD/default vcore mailbox (for now)  Note you'll need the
-		 * vcore to be online to get the events (for now). */
-		sysc_mgmt[i].ev_q.ev_mbox =  &__procdata.vcore_preempt_data[i].ev_mbox;
-		sysc_mgmt[i].ev_q.ev_flags = EVENT_IPI;		/* totally up to you */
-		sysc_mgmt[i].ev_q.ev_vcore = i;
+		/* Each vcore needs to point to a non-VCPD ev_q */
+		sysc_mgmt[i].ev_q = get_big_event_q_raw();
+		sysc_mgmt[i].ev_q->ev_flags = EVENT_IPI;		/* totally up to you */
+		sysc_mgmt[i].ev_q->ev_vcore = i;
+		ucq_init_raw(&sysc_mgmt[i].ev_q->ev_mbox->ev_msgs, 
+		             mmap_block + (2 * i    ) * PGSIZE, 
+		             mmap_block + (2 * i + 1) * PGSIZE); 
 	}
+	/* Technically, we should munmap and free what we've alloc'd, but the
+	 * kernel will clean it up for us when we exit. */
 	/* Create a pthread_tcb for the main thread */
 	pthread_t t = (pthread_t)calloc(1, sizeof(struct pthread_tcb));
 	assert(t);
@@ -294,7 +306,7 @@ void pth_blockon_sysc(struct syscall *sysc)
 	/* Set things up so we can wake this thread up later */
 	sysc->u_data = current_uthread;
 	/* Register our vcore's syscall ev_q to hear about this syscall. */
-	if (!register_evq(sysc, &sysc_mgmt[vcoreid].ev_q)) {
+	if (!register_evq(sysc, sysc_mgmt[vcoreid].ev_q)) {
 		/* Lost the race with the call being done.  The kernel won't send the
 		 * event.  Just restart him. */
 		restart_thread(sysc);
