@@ -90,6 +90,9 @@ loop_top:
 		if (slot_is_good(my_idx)) {
 			/* Someone else fixed it already, let's just try to get out */
 			mcs_unlock_notifsafe(ucq_lock, &local_qn);
+			/* Make sure this new slot has a producer (ucq isn't empty) */
+			if (my_idx == atomic_read(&ucq->prod_idx))
+				return -1;
 			goto claim_slot;
 		}
 		/* At this point, the slot is bad, and all other possible consumers are
@@ -132,6 +135,7 @@ claim_slot:
 		/* If we're still here, my_idx is good, and we'll try to claim it.  If
 		 * we fail, we need to repeat the whole process. */
 	} while (!atomic_cas(&ucq->cons_idx, my_idx, my_idx + 1));
+	assert(slot_is_good(my_idx));
 	/* Now we have a good slot that we can consume */
 	my_msg = slot2msg(my_idx);
 	/* Wait til the msg is ready (kernel sets this flag) */
@@ -146,4 +150,3 @@ claim_slot:
 	atomic_inc(&((struct ucq_page*)PTE_ADDR(my_idx))->header.nr_cons);
 	return 0;
 }
-
