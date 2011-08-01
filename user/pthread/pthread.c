@@ -84,6 +84,7 @@ struct uthread *pth_init(void)
 	/* Set up the per-vcore structs to track outstanding syscalls */
 	sysc_mgmt = malloc(sizeof(struct sysc_mgmt) * max_vcores());
 	assert(sysc_mgmt);
+#if 1   /* Independent ev_mboxes per vcore */
 	/* Get a block of pages for our per-vcore (but non-VCPD) ev_qs */
 	mmap_block = (uintptr_t)mmap(0, PGSIZE * 2 * max_vcores(),
 	                             PROT_WRITE | PROT_READ,
@@ -102,6 +103,24 @@ struct uthread *pth_init(void)
 	}
 	/* Technically, we should munmap and free what we've alloc'd, but the
 	 * kernel will clean it up for us when we exit. */
+#endif 
+#if 0   /* One global ev_mbox, separate ev_q per vcore */
+	struct event_mbox *sysc_mbox = malloc(sizeof(struct event_mbox));
+	uintptr_t two_pages = (uintptr_t)mmap(0, PGSIZE * 2, PROT_WRITE | PROT_READ,
+	                                      MAP_POPULATE | MAP_ANONYMOUS, -1, 0);
+	printd("Global ucq: %08p\n", &sysc_mbox->ev_msgs);
+	assert(sysc_mbox);
+	assert(two_pages);
+	memset(sysc_mbox, 0, sizeof(struct event_mbox));
+	ucq_init_raw(&sysc_mbox->ev_msgs, two_pages, two_pages + PGSIZE);
+	for (int i = 0; i < max_vcores(); i++) {
+		sysc_mgmt[i].ev_q = get_event_q();
+		sysc_mgmt[i].ev_q->ev_flags = EVENT_IPI;
+		sysc_mgmt[i].ev_q->ev_vcore = i;
+		sysc_mgmt[i].ev_q->ev_mbox = sysc_mbox;
+	}
+#endif
+
 	/* Create a pthread_tcb for the main thread */
 	pthread_t t = (pthread_t)calloc(1, sizeof(struct pthread_tcb));
 	assert(t);
