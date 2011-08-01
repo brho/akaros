@@ -121,3 +121,26 @@ error_addr:
 	 * itself. */
 	return;
 }
+
+/* Debugging */
+#include <smp.h>
+#include <pmap.h>
+
+/* Prints the status and up to 25 of the previous messages for the UCQ. */
+void print_ucq(struct proc *p, struct ucq *ucq)
+{
+	struct proc *old_proc = switch_to(p);
+
+	printk("UCQ %08p\n", ucq);
+	printk("prod_idx: %08p, cons_idx: %08p\n", atomic_read(&ucq->prod_idx),
+	       atomic_read(&ucq->cons_idx));
+	printk("spare_pg: %08p, nr_extra_pgs: %d\n", atomic_read(&ucq->spare_pg),
+	       atomic_read(&ucq->nr_extra_pgs));
+	printk("prod_overflow: %d\n", ucq->prod_overflow);
+	/* Try to see our previous ucqs */
+	for (int i = atomic_read(&ucq->prod_idx), count = 0;
+	     slot_is_good(i), count < 25;  i--, count++) {
+		printk("Prod idx %08p message ready is %08p\n", i, slot2msg(i)->ready);
+	}
+	switch_back(p, old_proc);
+}
