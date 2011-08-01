@@ -39,7 +39,8 @@ syscall_sring_t* sys_init_arsc(struct proc *p)
 	syscall_sring_t* sring;
 	void * va;
 	// TODO: need to pin this page in the future when swapping happens
-	va = do_mmap(p,MMAP_LOWEST_VA, SYSCALLRINGSIZE, PROT_READ|PROT_WRITE, MAP_ANON|MAP_POPULATE, NULL, 0);
+	va = do_mmap(p,MMAP_LOWEST_VA, SYSCALLRINGSIZE, PROT_READ | PROT_WRITE,
+	             MAP_ANONYMOUS | MAP_POPULATE, NULL, 0);
 	pte_t *pte = pgdir_walk(p->env_pgdir, (void*)va, 0);
 	assert(pte);
 	sring = (syscall_sring_t*) (ppn2kva(PTE2PPN(*pte)));
@@ -87,23 +88,20 @@ static intreg_t process_generic_syscalls(struct proc *p, size_t max)
 	size_t count = 0;
 	syscall_back_ring_t* sysbr = &p->syscallbackring;
 	struct per_cpu_info* pcpui = &per_cpu_info[core_id()];
+	struct proc *old_proc;
 	// looking at a process not initialized to perform arsc. 
 	if (sysbr == NULL) 
 		return count;
-	
+	/* Bail out if there is nothing to do */
+	if (!RING_HAS_UNCONSUMED_REQUESTS(sysbr))
+		return 0;
+	/* Switch to the address space of the process, so we can handle their
+	 * pointers, etc. */
+	old_proc = switch_to(p);
 	// max is the most we'll process.  max = 0 means do as many as possible
 	// TODO: check for initialization of the ring. 
 	while (RING_HAS_UNCONSUMED_REQUESTS(sysbr) && ((!max)||(count < max)) ) {
-		if (!count) {
-			// ASSUME: one queue per process
-			// only switch cr3 for the very first request for this queue
-			// need to switch to the right context, so we can handle the user pointer
-			// that points to a data payload of the syscall
-			/* TODO: use switch_to() and switch_back(), and take a closer look
-			 * at the logic of when we switch - seems like it might be buggy. */
-			lcr3(p->env_cr3);
-			pcpui->cur_proc = p;
-		}
+		// ASSUME: one queue per process
 		count++;
 		//printk("DEBUG PRE: sring->req_prod: %d, sring->rsp_prod: %d\n",
 		//	   sysbr->sring->req_prod, sysbr->sring->rsp_prod);
@@ -124,8 +122,8 @@ static intreg_t process_generic_syscalls(struct proc *p, size_t max)
 		//printk("DEBUG POST: sring->req_prod: %d, sring->rsp_prod: %d\n",
 		//	   sysbr->sring->req_prod, sysbr->sring->rsp_prod);
 	}
-	// load sane page tables (and don't rely on decref to do it for you).
-	lcr3(boot_cr3);
+	/* switch back to whatever context we were in before */
+	switch_back(p, old_proc);
 	return (intreg_t)count;
 }
 
