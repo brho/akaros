@@ -99,6 +99,8 @@ static intreg_t process_generic_syscalls(struct proc *p, size_t max)
 			// only switch cr3 for the very first request for this queue
 			// need to switch to the right context, so we can handle the user pointer
 			// that points to a data payload of the syscall
+			/* TODO: use switch_to() and switch_back(), and take a closer look
+			 * at the logic of when we switch - seems like it might be buggy. */
 			lcr3(p->env_cr3);
 			pcpui->cur_proc = p;
 		}

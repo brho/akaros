@@ -127,7 +127,11 @@ bool __proc_preempt_all(struct proc *p);
 void proc_preempt_core(struct proc *p, uint32_t pcoreid, uint64_t usec);
 void proc_preempt_all(struct proc *p, uint64_t usec);
 
+/* Current / cr3 / context management */
+struct proc *switch_to(struct proc *new_p);
+void switch_back(struct proc *new_p, struct proc *old_proc);
 void abandon_core(void);
+
 /* Hold the proc_lock, since it'll use the vcoremapping to send an unmapping
  * message for the region from start to end.  */
 void __proc_tlbshootdown(struct proc *p, uintptr_t start, uintptr_t end);

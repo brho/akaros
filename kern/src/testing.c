@@ -976,9 +976,8 @@ void test_ucq(void)
 	void send_msgs(struct alarm_waiter *waiter)
 	{
 		struct timer_chain *tchain;
-		struct proc *p = waiter->data;
+		struct proc *old_proc, *p = waiter->data;
 		struct ucq *ucq = (struct ucq*)USTACKTOP;
-		physaddr_t old_cr3 = rcr3();
 		struct event_msg msg;
 
 		printk("Running the alarm handler!\n");
@@ -988,11 +987,11 @@ void test_ucq(void)
 			goto abort;
 		}
 		/* load their address space */
-		lcr3(p->env_cr3);
+		old_proc = switch_to(p);
 		/* So it's mmaped, see if it is ready (note that this is dangerous) */
 		if (!ucq->ucq_ready) {
 			printk("Not ready yet\n");
-			lcr3(old_cr3);
+			switch_back(p, old_proc);
 			goto abort;
 		}
 		/* So it's ready, time to finally do the tests... */
@@ -1012,7 +1011,7 @@ void test_ucq(void)
 		 *  - concurrent producers / consumers...  ugh.
 		 */
 		/* done, switch back and free things */
-		lcr3(old_cr3);
+		switch_back(p, old_proc);
 		proc_decref(p);
 		kfree(waiter); /* since it was kmalloc()d */
 		return;

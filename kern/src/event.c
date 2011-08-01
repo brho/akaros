@@ -53,8 +53,7 @@ static void post_ev_msg(struct event_mbox *mbox, struct event_msg *msg,
 void send_event(struct proc *p, struct event_queue *ev_q, struct event_msg *msg,
                 uint32_t vcoreid)
 {
-	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	struct proc *old_proc = pcpui->cur_proc;	/* uncounted ref */
+	struct proc *old_proc;
 	struct event_mbox *ev_mbox = 0, *vcore_mbox;
 	struct event_msg local_msg = {0};
 	assert(p);
@@ -70,12 +69,7 @@ void send_event(struct proc *p, struct event_queue *ev_q, struct event_msg *msg,
 	}
 	/* ev_q is a user pointer, so we need to make sure we're in the right
 	 * address space */
-	if (old_proc != p) {
-		/* Technically, we're storing a ref here, but our current ref on p is
-		 * sufficient (so long as we don't decref below) */
-		pcpui->cur_proc = p;
-		lcr3(p->env_cr3);
-	}
+	old_proc = switch_to(p);
 	/* Get the mbox and vcoreid */
 	/* If we're going with APPRO, we use the kernel's suggested vcore's ev_mbox.
 	 * vcoreid is already what the kernel suggests. */
@@ -134,15 +128,8 @@ void send_event(struct proc *p, struct event_queue *ev_q, struct event_msg *msg,
 	}
 	/* Fall through */
 out:
-	/* Return to the old address space.  We switched to p in the first place if
-	 * it wasn't the same as the original current (old_proc). */
-	if (old_proc != p) {
-		pcpui->cur_proc = old_proc;
-		if (old_proc)
-			lcr3(old_proc->env_cr3);
-		else
-			lcr3(boot_cr3);
-	}
+	/* Return to the old address space. */
+	switch_back(p, old_proc);
 }
 
 /* Send an event for the kernel event ev_num.  These are the "one sided" kernel
@@ -162,21 +149,10 @@ void send_kernel_event(struct proc *p, struct event_msg *msg, uint32_t vcoreid)
  * commonly used - just the monitor and sys_self_notify(). */
 void post_vcore_event(struct proc *p, struct event_msg *msg, uint32_t vcoreid)
 {
-	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	struct proc *old_proc = pcpui->cur_proc;	/* uncounted ref */
 	/* Need to set p as current to post the event */
-	if (old_proc != p) {
-		pcpui->cur_proc = p;
-		lcr3(p->env_cr3);
-	}
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	struct proc *old_proc = switch_to(p);
 	/* *ev_mbox is the user address of the vcpd mbox */
 	post_ev_msg(get_proc_ev_mbox(vcoreid), msg, 0);	/* no chance for a NOMSG */
-	/* Unload the address space, if applicable */
-	if (old_proc != p) {
-		pcpui->cur_proc = old_proc;
-		if (old_proc)
-			lcr3(old_proc->env_cr3);
-		else
-			lcr3(boot_cr3);
-	}
+	switch_back(p, old_proc);
 }
