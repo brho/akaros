@@ -1,45 +1,37 @@
-#include <arch/timer.h>
+#include <arch/time.h>
 #include <ros/common.h>
 #include <arch/trap.h>
 #include <arch/arch.h>
 #include <stdio.h>
 #include <assert.h>
 
-#ifdef __SHARC__
-#pragma nosharc
-#endif
-
 system_timing_t system_timing = {0};
 
 void
 timer_init(void)
 {	
+  mtpcr(PCR_COUNT, 0);
+  mtpcr(PCR_COMPARE, 0);
+	mtpcr(PCR_SR, mfpcr(PCR_SR) | (SR_IM & (1 << (TIMER_IRQ+SR_IM_SHIFT))));
+
 	system_timing.tsc_freq = TSC_HZ;
 	cprintf("TSC Frequency: %llu\n", system_timing.tsc_freq);
 }
 
-/* Warning!  Sparc is unable to do a one-shot timer, so all timers are periodic,
- * though that is not normally what we want. */
+/* Warning: one-shot timers are unsupported; all timers are periodic.
+ * Perhaps this support could be added with a per_cpu boolean, set
+ * by set_core_timer, and interpreted by the interrupt handler. */
 void
 set_core_timer(uint32_t usec, bool periodic)
 {
-	set_timer(usec);
-}
-
-void
-set_timer(uint32_t usec)
-{
 	uint32_t clocks =  (uint64_t)usec*TSC_HZ/1000000;
-	if(clocks & (clocks-1))
-		clocks = ROUNDUPPWR2(clocks);
 
-	if(clocks > TIMER_MAX_PERIOD)
-	{
-		clocks = TIMER_MAX_PERIOD;
-		warn("set_timer: truncating to %d usec",
-		     (uint64_t)clocks*1000000/TSC_HZ);
-	}
-	sparc_set_timer(clocks,!!clocks);
+  int8_t irq_state = 0;
+	disable_irqsave(&irq_state);
+
+  mtpcr(PCR_COMPARE, mfpcr(PCR_COUNT) + clocks);
+
+	enable_irqsave(&irq_state);
 }
 
 void

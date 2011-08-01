@@ -28,7 +28,7 @@
 #include <event.h>
 #include <trap.h>
 
-#include <ros/timer.h>
+#include <ros/time.h>
 #include <ros/memlayout.h>
 #include <ros/event.h>
 

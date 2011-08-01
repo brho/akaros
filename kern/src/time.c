@@ -6,7 +6,7 @@
 #endif
 
 #include <arch/arch.h>
-#include <ros/timer.h>
+#include <ros/time.h>
 #include <stdio.h>
 #include <schedule.h>
 #include <multiboot.h>

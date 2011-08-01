@@ -22,7 +22,7 @@
 #include <arch/trap.h>
 #include <process.h>
 #include <syscall.h>
-#include <timing.h>
+#include <time.h>
 #include <kfs.h>
 #include <multiboot.h>
 #include <pmap.h>

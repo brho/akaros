@@ -18,7 +18,7 @@ KERN_ARCH_SRCFILES := $(KERN_ARCH_SRC_DIR)/boot.S \
                       $(KERN_ARCH_SRC_DIR)/cpuinfo.c \
                       $(KERN_ARCH_SRC_DIR)/console.c \
                       $(KERN_ARCH_SRC_DIR)/pmap.c \
-                      $(KERN_ARCH_SRC_DIR)/timer.c \
+                      $(KERN_ARCH_SRC_DIR)/time.c \
                       $(KERN_ARCH_SRC_DIR)/atomic.c \
                       $(KERN_ARCH_SRC_DIR)/smp.c \
                       $(KERN_ARCH_SRC_DIR)/colored_caches.c \

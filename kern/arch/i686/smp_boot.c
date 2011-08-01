@@ -15,7 +15,7 @@
 #include <arch/console.h>
 #include <arch/apic.h>
 #include <arch/perfmon.h>
-#include <timing.h>
+#include <time.h>
 
 #include <bitmask.h>
 #include <atomic.h>
@@ -26,7 +26,6 @@
 #include <pmap.h>
 #include <env.h>
 #include <trap.h>
-#include <timing.h>
 #include <kmalloc.h>
 
 extern handler_wrapper_t (RO handler_wrappers)[NUM_HANDLER_WRAPPERS];

@@ -29,7 +29,7 @@ KERN_SRCFILES := $(KERN_ARCH_SRCFILES) \
                  $(KERN_SRC_DIR)/env.c \
                  $(KERN_SRC_DIR)/manager.c \
                  $(KERN_SRC_DIR)/syscall.c \
-                 $(KERN_SRC_DIR)/timer.c \
+                 $(KERN_SRC_DIR)/time.c \
                  $(KERN_SRC_DIR)/kfs.c \
                  $(KERN_SRC_DIR)/process.c \
                  $(KERN_SRC_DIR)/kmalloc.c \

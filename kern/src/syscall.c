@@ -9,7 +9,7 @@
 #include <arch/arch.h>
 #include <arch/mmu.h>
 #include <arch/console.h>
-#include <ros/timer.h>
+#include <ros/time.h>
 #include <error.h>
 
 #include <elf.h>

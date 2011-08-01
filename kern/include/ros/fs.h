@@ -2,7 +2,7 @@
 #define _ROS_INC_STAT_H
 
 #include <sys/types.h>
-#include <timing.h>
+#include <time.h>
 
 /* Keep this 255 to stay in sync with glibc (expects d_name[256]) */
 #define MAX_FILENAME_SZ 255

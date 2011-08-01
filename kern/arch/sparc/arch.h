@@ -13,7 +13,7 @@
 #ifndef __ASSEMBLER__
 
 #include <ros/common.h>
-#include <arch/timer.h>
+#include <arch/time.h>
 
 static __inline void breakpoint(void) __attribute__((always_inline));
 static __inline void invlpg(void *addr) __attribute__((always_inline));

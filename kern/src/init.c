@@ -8,7 +8,7 @@
 #error "Yeah, it's not possible to build ROS with BSD on Core 0, sorry......"
 #else
 
-#include <ros/timer.h>
+#include <ros/time.h>
 #include <arch/arch.h>
 #include <arch/console.h>
 #include <multiboot.h>

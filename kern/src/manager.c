@@ -25,13 +25,13 @@
 #include <testing.h>
 #include <kfs.h>
 #include <stdio.h>
-#include <timing.h>
+#include <time.h>
 #include <resource.h>
 #include <monitor.h>
 #include <colored_caches.h>
 #include <string.h>
 #include <pmap.h>
-#include <ros/timer.h>
+#include <ros/time.h>
 #include <ros/arch/membar.h>
 
 /*

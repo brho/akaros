@@ -1,5 +1,5 @@
-#ifndef ROS_INC_TIMER_H
-#define ROS_INC_TIMER_H
+#ifndef ROS_INC_TIME_H
+#define ROS_INC_TIME_H
 
 #include <pool.h>
 #include <string.h>
@@ -58,5 +58,4 @@ typedef struct Timer{
 	_timer_##tag->aggr_run += _timer_##tag->curr_run;                       \
 })
 
-#endif /* !ROS_INC_TIMER_H */
-
+#endif /* ROS_INC_TIME_H */

@@ -1,7 +1,8 @@
-#ifndef ROS_INC_TIMING_H
-#define ROS_INC_TIMING_H
+#ifndef ROS_KERN_TIME_H
+#define ROS_KERN_TIME_H
 
 #include <ros/common.h>
+#include <arch/time.h>
 
 /* (newlib) Time Value Specification Structures, P1003.1b-1993, p. 261 */
 typedef long time_t;
@@ -18,4 +19,4 @@ struct itimerspec {
 
 void udelay(uint64_t usec);
 
-#endif
+#endif /* ROS_KERN_TIME_H */

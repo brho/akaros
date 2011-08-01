@@ -7,7 +7,7 @@
 #include <ros/arch/membar.h>
 #include <arch/riscv.h>
 #include <arch/trap.h>
-#include <arch/timer.h>
+#include <arch/time.h>
 
 /* Arch Constants */
 #define HW_CACHE_ALIGN 64

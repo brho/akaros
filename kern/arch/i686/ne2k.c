@@ -23,7 +23,7 @@
 #include <kmalloc.h>
 
 #include <pmap.h>
-#include <timing.h>
+#include <time.h>
 
 /** @file
  * @brief NE2K Driver Sketch

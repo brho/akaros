@@ -13,7 +13,7 @@
 #include <arch/x86.h>
 #include <arch/arch.h>
 #include <arch/apic.h>
-#include <ros/timer.h>
+#include <ros/time.h>
 #include <assert.h>
 #include <stdio.h>
 
@@ -159,7 +159,7 @@ static int getpit()
     return ((high << 8) | low);
 }
 
-// forces cpu to relax for usec miliseconds.  declared in kern/include/timing.h
+// forces cpu to relax for usec miliseconds.  declared in kern/include/time.h
 void udelay(uint64_t usec)
 {
 	#if !defined(__BOCHS__)
