@@ -1264,6 +1264,7 @@ intreg_t sys_gettimeofday(struct proc *p, int *buf)
 	spin_unlock(&gtod_lock);
 
 	long long dt = read_tsc();
+	/* TODO: This probably wants its own function, using a struct timeval */
 	int kbuf[2] = {t0+dt/system_timing.tsc_freq,
 	    (dt%system_timing.tsc_freq)*1000000/system_timing.tsc_freq};
 

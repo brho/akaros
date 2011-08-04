@@ -273,7 +273,18 @@ void *debug_get_fn_addr(char *fn_name)
 
 	// String table validity checks (from above)
 	{
+		/* this tripped a couple times, probably erroneously.  Will try to
+		 * catch. */
 		int stabstrsz = stabstr_end - stabstr;
+		if (stabstr_end <= stabstr) {
+			printk("stabstr_end %08p, stabstr %08p\n", stabstr_end, stabstr);
+			warn("Crap, possible corrupt stabs.");
+		}
+		if (stabstr[stabstrsz-1] != 0) {
+			printk("stabstr %08p, stabstr[last] %08p\n", stabstr,
+			       stabstr[stabstrsz-1]);
+			warn("Crap, possible corrupt stabs.");
+		}
 		if (stabstr_end <= stabstr || stabstr[stabstrsz-1] != 0)
 			return 0;
 	}

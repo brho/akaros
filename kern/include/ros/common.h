@@ -97,6 +97,14 @@ static inline uintptr_t ROUNDUPPWR2(uintptr_t value)
 	return 1 << LOG2_UP(value);
 }
 
+/* We wraparound if UINT_MAX < a * b, which is also UINT_MAX / a < b. */
+static inline bool mult_will_overflow_u64(uint64_t a, uint64_t b)
+{
+	if (!a)
+		return FALSE;
+	return (uint64_t)(-1) / a < b;
+}
+
 // Return the offset of 'member' relative to the beginning of a struct type
 #ifndef offsetof
 #define offsetof(type, member)  ((size_t) (&((type*)0)->member))

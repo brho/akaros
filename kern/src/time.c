@@ -1,10 +1,3 @@
-
-// zra: why is this in the kernel?
-
-#ifdef __SHARC__
-#pragma nosharc
-#endif
-
 #include <arch/arch.h>
 #include <ros/time.h>
 #include <stdio.h>
@@ -87,4 +80,73 @@ void timer_interrupt(struct trapframe *tf, void *data)
 {
 	struct timer_chain *pcpui_tchain = &per_cpu_info[core_id()].tchain;
 	trigger_tchain(pcpui_tchain);
+}
+
+/* We can overflow/wraparound when we multiply up, but we have to divide last,
+ * or else we lose precision.  If we're too big and will overflow, we'll
+ * sacrifice precision for correctness, and degrade to the next lower level
+ * (losing 3 digits worth).  The recursive case shouldn't overflow, since it
+ * called something that scaled down the tsc_time by more than 1000. */
+uint64_t tsc2sec(uint64_t tsc_time)
+{
+	return tsc_time / system_timing.tsc_freq;
+}
+
+uint64_t tsc2msec(uint64_t tsc_time)
+{
+	if (mult_will_overflow_u64(tsc_time, 1000))
+		return tsc2sec(tsc_time) * 1000;
+	else 
+		return (tsc_time * 1000) / system_timing.tsc_freq;
+}
+
+uint64_t tsc2usec(uint64_t tsc_time)
+{
+	if (mult_will_overflow_u64(tsc_time, 1000000))
+		return tsc2msec(tsc_time) * 1000;
+	else
+		return (tsc_time * 1000000) / system_timing.tsc_freq;
+}
+
+uint64_t tsc2nsec(uint64_t tsc_time)
+{
+	if (mult_will_overflow_u64(tsc_time, 1000000000))
+		return tsc2usec(tsc_time) * 1000;
+	else
+		return (tsc_time * 1000000000) / system_timing.tsc_freq;
+}
+
+uint64_t sec2tsc(uint64_t sec)
+{
+	if (mult_will_overflow_u64(sec, system_timing.tsc_freq)) {
+		/* in this case, we simply can't express the number of ticks */
+		warn("Wraparound in sec2tsc(), rounding up");
+		return (uint64_t)(-1);
+	} else {
+		return sec * system_timing.tsc_freq;
+	}
+}
+
+uint64_t msec2tsc(uint64_t msec)
+{
+	if (mult_will_overflow_u64(msec, system_timing.tsc_freq))
+		return sec2tsc(msec / 1000);
+	else
+		return (msec * system_timing.tsc_freq) / 1000;
+}
+
+uint64_t usec2tsc(uint64_t usec)
+{
+	if (mult_will_overflow_u64(usec, system_timing.tsc_freq))
+		return msec2tsc(usec / 1000);
+	else
+		return (usec * system_timing.tsc_freq) / 1000000;
+}
+
+uint64_t nsec2tsc(uint64_t nsec)
+{
+	if (mult_will_overflow_u64(nsec, system_timing.tsc_freq))
+		return usec2tsc(nsec / 1000);
+	else
+		return (nsec * system_timing.tsc_freq) / 1000000000;
 }

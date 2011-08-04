@@ -68,7 +68,7 @@ void set_awaiter_rel(struct alarm_waiter *waiter, uint64_t usleep)
 {
 	uint64_t now, then;
 	now = read_tsc();
-	then = now + usleep * (system_timing.tsc_freq / 1000000);
+	then = now + usec2tsc(usleep);
 	/* This will go off if we wrap-around the TSC.  It'll never happen for legit
 	 * values, but this might catch some bugs with large usleeps. */
 	assert(now < then);
@@ -257,7 +257,7 @@ void set_pcpu_alarm_interrupt(uint64_t time, struct timer_chain *tchain)
 		if (time <= now)
 			rel_usec = 1;
 		else
-			rel_usec = (time - now) / (system_timing.tsc_freq / 1000000);
+			rel_usec = tsc2usec(time - now);
 		rel_usec = MAX(rel_usec, 1);
 		printd("Setting alarm for %llu, it is now %llu, rel_time %llu "
 		       "tchain %08p\n", time, now, rel_usec, pcpui_tchain);

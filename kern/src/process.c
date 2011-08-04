@@ -965,7 +965,7 @@ bool __proc_preempt_all(struct proc *p)
 void proc_preempt_core(struct proc *p, uint32_t pcoreid, uint64_t usec)
 {
 	bool self_ipi_pending = FALSE;
-	uint64_t warn_time = read_tsc() + usec * 1000000 / system_timing.tsc_freq;
+	uint64_t warn_time = read_tsc() + usec2tsc(usec);
 
 	/* DYING could be okay */
 	if (p->state != PROC_RUNNING_M) {
@@ -996,7 +996,7 @@ void proc_preempt_core(struct proc *p, uint32_t pcoreid, uint64_t usec)
 void proc_preempt_all(struct proc *p, uint64_t usec)
 {
 	bool self_ipi_pending = FALSE;
-	uint64_t warn_time = read_tsc() + usec * 1000000 / system_timing.tsc_freq;
+	uint64_t warn_time = read_tsc() + usec2tsc(usec);
 
 	spin_lock(&p->proc_lock);
 	/* DYING could be okay */

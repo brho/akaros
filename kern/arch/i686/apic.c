@@ -13,7 +13,7 @@
 #include <arch/x86.h>
 #include <arch/arch.h>
 #include <arch/apic.h>
-#include <ros/time.h>
+#include <time.h>
 #include <assert.h>
 #include <stdio.h>
 
@@ -168,7 +168,7 @@ void udelay(uint64_t usec)
 		uint64_t start, end, now;
 
 		start = read_tsc();
-        end = start + (system_timing.tsc_freq * usec) / 1000000;
+        end = start + usec2tsc(usec);
         //cprintf("start %llu, end %llu\n", start, end);
 		if (end == 0) cprintf("This is terribly wrong \n");
 		do {

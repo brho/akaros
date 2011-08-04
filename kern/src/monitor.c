@@ -624,8 +624,7 @@ int mon_measure(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 		return 1;
 	}
 	printk("[Tired Giraffe Accent] Took %llu usec (%llu nsec) to finish.\n",
-	       diff * 1000000 / system_timing.tsc_freq,
-	       diff * 1000000000 / system_timing.tsc_freq);
+	       tsc2usec(diff), tsc2nsec(diff));
 	return 0;
 }
 

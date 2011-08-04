@@ -18,5 +18,13 @@ struct itimerspec {
 };
 
 void udelay(uint64_t usec);
+uint64_t tsc2sec(uint64_t tsc_time);
+uint64_t tsc2msec(uint64_t tsc_time);
+uint64_t tsc2usec(uint64_t tsc_time);
+uint64_t tsc2nsec(uint64_t tsc_time);
+uint64_t sec2tsc(uint64_t sec);
+uint64_t msec2tsc(uint64_t msec);
+uint64_t usec2tsc(uint64_t usec);
+uint64_t nsec2tsc(uint64_t nsec);
 
 #endif /* ROS_KERN_TIME_H */
