@@ -5,7 +5,6 @@
 #include <ros/syscall.h>
 
 #define UTHREAD_DONT_MIGRATE		0x001 /* don't move to another vcore */
-#define UTHREAD_DYING				0x002 /* uthread is exiting */
 
 /* Thread States */
 #define UT_CREATED	1
@@ -35,7 +34,7 @@ struct schedule_ops {
 	struct uthread *(*thread_create)(void (*func)(void), void *);
 	void (*thread_runnable)(struct uthread *);
 	void (*thread_yield)(struct uthread *);
-	void (*thread_exit)(struct uthread *);
+	void (*thread_destroy)(struct uthread *);
 	void (*thread_blockon_sysc)(struct syscall *);
 	/* Functions event handling wants */
 	void (*preempt_pending)(void);
@@ -51,8 +50,8 @@ extern struct schedule_ops *sched_ops;
  * what gets run, and if you want args, wrap it (like pthread) */
 struct uthread *uthread_create(void (*func)(void), void *udata);
 void uthread_runnable(struct uthread *uthread);
-void uthread_yield(void);
-void uthread_exit(void);
+void uthread_yield(bool save_state);
+void uthread_destroy(struct uthread *uthread);
 /* Block the calling uthread on sysc until it makes progress or is done */
 void ros_syscall_blockon(struct syscall *sysc);
 

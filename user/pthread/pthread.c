@@ -38,7 +38,7 @@ void pth_sched_entry(void);
 struct uthread *pth_thread_create(void (*func)(void), void *udata);
 void pth_thread_runnable(struct uthread *uthread);
 void pth_thread_yield(struct uthread *uthread);
-void pth_thread_exit(struct uthread *uthread);
+void pth_thread_destroy(struct uthread *uthread);
 void pth_preempt_pending(void);
 void pth_spawn_thread(uintptr_t pc_start, void *data);
 void pth_blockon_sysc(struct syscall *sysc);
@@ -52,7 +52,7 @@ struct schedule_ops pthread_sched_ops = {
 	pth_thread_create,
 	pth_thread_runnable,
 	pth_thread_yield,
-	pth_thread_exit,
+	pth_thread_destroy,
 	pth_blockon_sysc,
 	0, /* pth_preempt_pending, */
 	0, /* pth_spawn_thread, */
@@ -195,6 +195,8 @@ struct uthread *pth_thread_create(void (*func)(void), void *udata)
 	pthread = (pthread_t)calloc(1, sizeof(struct pthread_tcb));
 	assert(pthread);
 	pthread->stacksize = PTHREAD_STACK_SIZE;	/* default */
+	pthread->finished = 0;
+	pthread->flags = 0;
 	pthread->id = get_next_pid();
 	pthread->detached = FALSE;				/* default */
 	/* Respect the attributes */
@@ -237,28 +239,27 @@ void pth_thread_yield(struct uthread *uthread)
 {
 	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
 	struct mcs_lock_qnode local_qn = {0};
-	/* Take from the active list, and put on the ready list (tail).  Don't do
-	 * this until we are done completely with the thread, since it can be
-	 * restarted somewhere else. */
+	/* Remove from the active list, whether exiting or yielding.  We're holding
+	 * the lock throughout both list modifications (if applicable). */
 	mcs_lock_notifsafe(&queue_lock, &local_qn);
 	threads_active--;
 	TAILQ_REMOVE(&active_queue, pthread, next);
-	threads_ready++;
-	TAILQ_INSERT_TAIL(&ready_queue, pthread, next);
-	mcs_unlock_notifsafe(&queue_lock, &local_qn);
+	if (pthread->flags & PTHREAD_EXITING) {
+		mcs_unlock_notifsafe(&queue_lock, &local_qn);
+		uthread_destroy(uthread);
+	} else {
+		/* Put it on the ready list (tail).  Don't do this until we are done
+		 * completely with the thread, since it can be restarted somewhere else.
+		 * */
+		threads_ready++;
+		TAILQ_INSERT_TAIL(&ready_queue, pthread, next);
+		mcs_unlock_notifsafe(&queue_lock, &local_qn);
+	}
 }
-
-/* Thread is exiting, do your 2LS specific stuff.  You're in vcore context.
- * Don't use the thread's TLS or stack or anything. */
-void pth_thread_exit(struct uthread *uthread)
+	
+void pth_thread_destroy(struct uthread *uthread)
 {
 	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
-	struct mcs_lock_qnode local_qn = {0};
-	/* Remove from the active runqueue */
-	mcs_lock_notifsafe(&queue_lock, &local_qn);
-	threads_active--;
-	TAILQ_REMOVE(&active_queue, pthread, next);
-	mcs_unlock_notifsafe(&queue_lock, &local_qn);
 	/* Cleanup, mirroring pth_thread_create() */
 	__pthread_free_stack(pthread);
 	/* TODO: race on detach state */
@@ -415,7 +416,7 @@ int pthread_join(pthread_t thread, void** retval)
 
 int pthread_yield(void)
 {
-	uthread_yield();
+	uthread_yield(TRUE);
 	return 0;
 }
 
@@ -594,7 +595,9 @@ void pthread_exit(void *ret)
 {
 	struct pthread_tcb *pthread = pthread_self();
 	pthread->retval = ret;
-	uthread_exit();
+	/* So our pth_thread_yield knows we want to exit */
+	pthread->flags |= PTHREAD_EXITING;
+	uthread_yield(FALSE);
 }
 
 int pthread_once(pthread_once_t* once_control, void (*init_routine)(void))

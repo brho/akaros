@@ -10,12 +10,16 @@
   extern "C" {
 #endif
 
+/* Flags */
+#define PTHREAD_EXITING		0x001
+
 /* Pthread struct.  First has to be the uthread struct, which the vcore code
  * will access directly (as if pthread_tcb is a struct uthread). */
 struct pthread_tcb {
 	struct uthread uthread;
 	TAILQ_ENTRY(pthread_tcb) next;
-	int finished;
+	int finished;	/* TODO: merge this with flags */
+	int flags;
 	bool detached;
 	uint32_t id;
 	uint32_t stacksize;

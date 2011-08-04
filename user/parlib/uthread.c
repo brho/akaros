@@ -138,34 +138,22 @@ __uthread_yield(void)
 	struct uthread *uthread = current_uthread;
 	assert(in_vcore_context());
 	assert(!notif_is_enabled(vcore_id()));
-	/* Do slightly different things depending on whether or not we're exiting.
-	 * While it is tempting to get rid of the UTHREAD_DYING flag and have
-	 * callers just set the thread state, we'd lose the ability to assert
-	 * UT_RUNNING, which helps catch bugs. */
-	if (!(uthread->flags & UTHREAD_DYING)) {
-		uthread->flags &= ~UTHREAD_DONT_MIGRATE;
-		/* Determine if we're blocking on a syscall or just yielding.  Might end
-		 * up doing this differently when/if we have more ways to yield. */
-		if (uthread->sysc) {
-			uthread->state = UT_BLOCKED;
-			assert(sched_ops->thread_blockon_sysc);
-			sched_ops->thread_blockon_sysc(uthread->sysc);
-		} else { /* generic yield */
-			uthread->state = UT_RUNNABLE;
-			assert(sched_ops->thread_yield);
-			/* 2LS will save the thread somewhere for restarting.  Later on,
-			 * we'll probably have a generic function for all sorts of waiting.
-			 */
-			sched_ops->thread_yield(uthread);
-		}
-	} else { /* DYING */
-		printd("[U] thread %08p on vcore %d is DYING!\n", uthread, vcore_id());
-		uthread->state = UT_DYING;
-		/* we alloc and manage the TLS, so lets get rid of it */
-		__uthread_free_tls(uthread);
-		/* 2LS specific cleanup */
-		assert(sched_ops->thread_exit);
-		sched_ops->thread_exit(uthread);
+	/* Note: we no longer care if the thread is exiting, the 2LS will call
+	 * uthread_destroy() */
+	uthread->flags &= ~UTHREAD_DONT_MIGRATE;
+	/* Determine if we're blocking on a syscall or just yielding.  Might end
+	 * up doing this differently when/if we have more ways to yield. */
+	if (uthread->sysc) {
+		uthread->state = UT_BLOCKED;
+		assert(sched_ops->thread_blockon_sysc);
+		sched_ops->thread_blockon_sysc(uthread->sysc);
+	} else { /* generic yield */
+		uthread->state = UT_RUNNABLE;
+		assert(sched_ops->thread_yield);
+		/* 2LS will save the thread somewhere for restarting.  Later on,
+		 * we'll probably have a generic function for all sorts of waiting.
+		 */
+		sched_ops->thread_yield(uthread);
 	}
 	/* Leave the current vcore completely */
 	current_uthread = NULL;
@@ -176,12 +164,12 @@ __uthread_yield(void)
 
 /* Calling thread yields.  Both exiting and yielding calls this, the difference
  * is the thread's state (in the flags). */
-void uthread_yield(void)
+void uthread_yield(bool save_state)
 {
 	struct uthread *uthread = current_uthread;
 	volatile bool yielding = TRUE; /* signal to short circuit when restarting */
 	/* TODO: (HSS) Save silly state */
-	// if (!(uthread->flags & UTHREAD_DYING))
+	// if (save_state)
 	// 	save_fp_state(&t->as);
 	assert(!in_vcore_context());
 	assert(uthread->state == UT_RUNNING);
@@ -200,7 +188,7 @@ void uthread_yield(void)
 	/* take the current state and save it into t->utf when this pthread
 	 * restarts, it will continue from right after this, see yielding is false,
 	 * and short ciruit the function.  Don't do this if we're dying. */
-	if (!(uthread->flags & UTHREAD_DYING))
+	if (save_state)
 		save_ros_tf(&uthread->utf);
 	/* Restart path doesn't matter if we're dying */
 	if (!yielding)
@@ -228,12 +216,17 @@ yield_return_path:
 	printd("[U] Uthread %08p returning from a yield!\n", uthread);
 }
 
-/* Exits from the uthread.  Tempting to get rid of this function, but we need to
- * manage the flags so we know to clean up the TLS and stuff later. */
-void uthread_exit(void)
+/* Destroys the uthread.  If you want to destroy a currently running uthread,
+ * you'll want something like pthread_exit(), which yields, and calls this from
+ * its sched_ops yield. */
+void uthread_destroy(struct uthread *uthread)
 {
-	current_uthread->flags |= UTHREAD_DYING;
-	uthread_yield();
+	printd("[U] thread %08p on vcore %d is DYING!\n", uthread, vcore_id());
+	uthread->state = UT_DYING;
+	/* we alloc and manage the TLS, so lets get rid of it */
+	__uthread_free_tls(uthread);
+	assert(sched_ops->thread_destroy);
+	sched_ops->thread_destroy(uthread);
 }
 
 /* Attempts to block on sysc, returning when it is done or progress has been
@@ -256,7 +249,7 @@ void ros_syscall_blockon(struct syscall *sysc)
 	/* So yield knows we are blocking on something */
 	assert(current_uthread);
 	current_uthread->sysc = sysc;
-	uthread_yield();
+	uthread_yield(TRUE);
 }
 
 /* Runs whatever thread is vcore's current_uthread */
