@@ -125,6 +125,11 @@ struct uthread *pth_init(void)
 	pthread_t t = (pthread_t)calloc(1, sizeof(struct pthread_tcb));
 	assert(t);
 	t->id = get_next_pid();
+	t->stacksize = USTACK_NUM_PAGES * PGSIZE;
+	t->stacktop = (void*)USTACKTOP;
+	t->detached = TRUE;
+	t->flags = 0;
+	t->finished = 0;
 	assert(t->id == 0);
 	/* Put the new pthread on the active queue */
 	mcs_lock_notifsafe(&queue_lock, &local_qn);

@@ -23,9 +23,9 @@ struct pthread_tcb {
 	bool detached;
 	uint32_t id;
 	uint32_t stacksize;
+	void *stacktop;
 	void *(*start_routine)(void*);
 	void *arg;
-	void *stacktop;
 	void *retval;
 };
 typedef struct pthread_tcb* pthread_t;
