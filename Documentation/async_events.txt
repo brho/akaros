@@ -323,39 +323,104 @@ There are also interfaces in the kernel to put a message in an ev_mbox
 regardless of the process's wishes (post_vcore_event()), and can send an IPI
 at any time (proc_notify()).
 
-3.3 IPIs and Indirection Events
+3.3 IPIs, Indirection Events, and Fallback
 ----------------------------------------------
-When an ev_q calls for an IPI, the kernel finds out what vcore the process
-wants.  The code already sent the message to the ev_q's mbox.  If the vcore's
-vcpd mbox is the same as the ev_q's mbox (pointer check), then just send the
-IPI.  If it is different, we need to put a message in the vcpd's mbox telling
-them "ev_q*", so the vcore knows why it got an IPI.  This level of indirection
-is only necessary when the ev_q requests an IPI and it is not the vcore using
-its vcpd mbox.  The vcore needs to know why it received an IPI.  The IPI
-(active notifcation) is merely a prodding, and the vcore needs a known place
-to look for why it was woken up.  This is a little different when dealing with
-non-specific IPIs (like Round-Robin).
+An ev_q can ask for an IPI, an indirection event, and a fallback in case a vcore
+is offline.  Or any combination of these.  Note that these have little to do
+with the actual message being sent.  The actual message is dropped in the
+ev_mbox pointed to by the ev_q.
 
-If the vcore gets an indirection message, it will be of type NE_EVENT (or
-whatever), with an ev_q* as the payload.
+The main use for all of this is for syscalls.  If you want to receive an event
+when a syscall completes or has a change in status, simply allocate an event_q,
+and point the syscall at it.  syscall: ev_q* -> "vcore for IPI, syscall message
+in the ev_q mbox", etc.  You can also point it to an existing ev_q.  Pthread
+code has examples of two ways to do this.  Both have per vcore ev_qs, requesting
+IPIs, INDIRS, and FALLBACK.  One way is to have an ev_mbox per vcore, and
+another is to have a global ev_mbox that all ev_qs point to.  As a side note, if
+you do the latter, you don't need to worry about a vcore's ev_q if it gets
+preempted: just check the global ev_mbox (which is done by checking your own
+vcore's syscall ev_q).
 
-In the event there are issues with this, we can introduce a flag that says we
-don't need a separate notif_event explaining the IPI: prodding the vcore was
-enough.  Either way, we can deliver event messages directly to the vcore's
-mbox / bcq.
+3.3.1: IPIs and INDIRs
+---------------
+An EVENT_IPI simply means we'll send an IPI to the given vcore.  Nothing else.
+This will usually be paired with an Indirection event (EVENT_INDIR).  An INDIR
+is a message of type EV_EVENT with an ev_q* payload.  It means "check this
+ev_q".  Most ev_qs that ask for an IPI will also want an INDIR so that the vcore
+knows why it was IPIed.  You don't have to do this: for instance, your 2LS might
+poll its own ev_q, so you won't need the indirection event.
 
-There's a slight race on changing the mbox* and the vcore number within the
-event_q.  The message could have gone to the wrong (old) vcore, but not the
-IPI.  Not a big deal - IPIs can be spurious, and the other vcore will
-eventually get it.  The real way around this is create a new ev_q and change
-the pointer (thus atomically changing the entire ev_q's contents), though this
-can be a bit tricky if you have multiple places pointing to the same ev_q
+Additionally, note that IPIs and INDIRs can be spurious.  It's not a big deal to
+receive and IPI and have nothing to do, or to be told to check an empty ev_q.
+All of the event handling code can deal with this.  The only thing you shouldn't
+do is have one vcore handle another's VCPD.  That mbox is meant for
+vcore-business.  Never use a VCPD for messages you might want to receive if that
+vcore is offline.
+
+3.3.2: Fallback
+---------------
+Both IPI and INDIR need an actual vcore.  If that vcore is offline and if
+EVENT_FALLBACK is set, the kernel will pick an online vcore and send the
+messages there.  This allows an ev_q to be set up to handle work when the vcore
+is online, while allowing the program to handle events when that core goes
+offline: perhaps due to a yield or a preemption, without having to reset all of
+its ev_qs to point to "known" online vcores (and avoiding those races).
+
+One question is whether or not 2LSs need a FALLBACK flag for their ev_qs.  The
+main use for FALLBACK is so that vcores can yield.  (Note that fallback won't
+help you *miss* INDIR messages in the event of a preemption; you can always lose
+that race due to it taking too long to process the messages).  An alternative
+would be for vcores to pick another vcore and change all of its ev_qs to that
+vcore.  There are a couple problems with this.  One is that it'll be a pain to
+get those ev_qs back when the vcore comes back online (if ever).  Another issue
+is that other vcores will build up a list of ev_qs that they aren't aware of,
+which will be hard to deal with when *they* yield.  FALLBACK avoids all of those
+problems.
+
+Also, in case this comes up, there's a slight race on changing the mbox* and the
+vcore number within the event_q.  The message could have gone to the wrong (old)
+vcore, but not the IPI.  Not a big deal - IPIs can be spurious, and the other
+vcore will eventually get it.  The real way around this is create a new ev_q and
+change the pointer (thus atomically changing the entire ev_q's contents), though
+this can be a bit tricky if you have multiple places pointing to the same ev_q
 (can't change them all at once).
 
-If you want to receive an event when a syscall completes or has a change in
-status, simply allocate an event_q, and point the syscall at it.  syscall:
-ev_q* -> "vcore for IPI, syscall message in the ev_q mbox", etc.  You can also
-point it to an existing ev_q.
+3.3.3: Fallback and Preemption
+---------------
+FALLBACK doesn't protect you from preemptions.  A vcore can be preempted and
+have INDIRs in its VCPD.  Dealing with this is part of the 2LSs job.  The 2LS
+must check the ev_mboxes/ev_qs of all ev_qs that could send INDIRS to the
+offline vcore.  There could be INDIRS in the VCPD that are just lying there.
+The 2LS knows which ev_qs these are (such as for completed syscalls), and for
+many things, this will be a common ev_q (such as for 'vcore-x-was-preempted').
+
+A couple things will ameliorate this:
+1) the 2LS can inspect the VCPD of the target.  If it is empty, then we don't
+have to worry about any INDIRs, and we're done worrying about their messages
+(though we still have to worry about them being stuck in vcore context and
+having a uthread).  Also note you only need to check the UCQ, since INDIRs must
+be messages, not bits.
+2) the kernel will initiate FALLBACK if the vcore has a preempt pending, which
+ought to cut down on this happening frequently.
+
+It is tempting to just use sys_change_vcore(), which will change the calling
+vcore to the new one.  This should only be used to "unstick" a vcore.  A vcore
+is stuck when it was preempted while it had notifications disabled.  This is
+usually when it is vcore context, but also in any lock holding code for locks
+shared with vcore context (the userspace equivalent of irqsave locks).  With
+this syscall, you could change to the offline vcore and process its INDIRs.
+
+The problem with that plan is the calling core (that is trying to save the
+other) may have extra messages, and that sys_change_vcore does not return.  We
+need a way to deal with our other messages.  We're back to the same problem we
+had before, just with different vcores.  The only thing we really accomplished
+is that we unstuck the other vcore.  We could tell the restarted vcore (via an
+event) to switch back to us, but by the time it does that, it may have other
+events that got lost.  So we're back to polling the ev_qs that it might have
+received INDIRs about.  Note that we still want to send an event with
+sys_change_vcore().  We want the new vcore to know the old vcore was put
+offline: a preemption (albeit one that it chose to do, and one that isn't stuck
+in vcore context).
 
 3.4 Application-specific Event Handling
 ---------------------------------------

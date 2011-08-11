@@ -81,20 +81,24 @@ void send_event(struct proc *p, struct event_queue *ev_q, struct event_msg *msg,
 	}
 	/* Check on the style, which could affect our mbox selection.  Other styles
 	 * would go here (or in similar functions we call to).  Important thing is
-	 * we come out knowing which vcore to send to in the event of an IPI, and we
-	 * know what mbox to post to. */
+	 * we come out knowing which vcore to send to in the event of an IPI/INDIR,
+	 * and we know what mbox to post to. */
 	if (ev_q->ev_flags & EVENT_ROUNDROBIN) {
 		/* Pick a vcore, and if we don't have a mbox yet, pick that vcore's
 		 * default mbox.  Assuming ev_vcore was the previous one used.  Note
 		 * that round-robin overrides the passed-in vcoreid. */
 		vcoreid = (ev_q->ev_vcore + 1) % p->procinfo->num_vcores;
 		ev_q->ev_vcore = vcoreid;
+		/* Note that the style of not having a specific ev_mbox may go away.  I
+		 * can't think of legitimate uses of this for now, since things that are
+		 * RR probably are non-vcore-business, and thus inappropriate for a VCPD
+		 * ev_mbox. */
 		if (!ev_mbox)
 			ev_mbox = get_proc_ev_mbox(vcoreid);
 	}
 	/* At this point, we ought to have the right mbox to send the msg to, and
 	 * which vcore to send an IPI to (if we send one).  The mbox could be the
-	 * vcore's vcpd ev_mbox. */
+	 * vcore's vcpd ev_mbox.  The vcoreid only matters for IPIs and INDIRs. */
 	if (!ev_mbox) {
 		/* this is a process error */
 		warn("[kernel] ought to have an mbox by now!");
@@ -111,21 +115,19 @@ void send_event(struct proc *p, struct event_queue *ev_q, struct event_msg *msg,
 	 * vehicle for sending the ev_type. */
 	assert(msg);
 	post_ev_msg(ev_mbox, msg, ev_q->ev_flags);
-	/* Optional IPIs */
-	if (ev_q->ev_flags & EVENT_IPI) {
-		/* if the mbox we sent to isn't the default one, we need to send the
-		 * vcore an ev_q indirection event */
+	/* Vcore options: IPIs and INDIRs */
+	if (ev_q->ev_flags & EVENT_INDIR) {
 		vcore_mbox = get_proc_ev_mbox(vcoreid);
-		if (ev_mbox != vcore_mbox) {
-			/* it is tempting to send_kernel_event(), using the ev_q for that
-			 * event, but that is inappropriate here, since we are sending to a
-			 * specific vcore */
-			local_msg.ev_type = EV_EVENT;
-			local_msg.ev_arg3 = ev_q;
-			post_ev_msg(vcore_mbox, &local_msg, 0);
-		}
-		proc_notify(p, vcoreid);
+		/* Help out userspace, since we can detect this bug:*/
+		if (ev_mbox == vcore_mbox)
+			printk("[kernel] EVENT_INDIR requested for a VCPD mbox!\n");
+		/* Actually post the INDIR */
+		local_msg.ev_type = EV_EVENT;
+		local_msg.ev_arg3 = ev_q;
+		post_ev_msg(vcore_mbox, &local_msg, 0);
 	}
+	if (ev_q->ev_flags & EVENT_IPI)
+		proc_notify(p, vcoreid);
 	/* Fall through */
 out:
 	/* Return to the old address space. */
