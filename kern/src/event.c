@@ -20,8 +20,7 @@
  * current loaded to access this, and it will work for any process. */
 static struct event_mbox *get_proc_ev_mbox(uint32_t vcoreid)
 {
-	struct procdata *pd = (struct procdata*)UDATA;
-	return &pd->vcore_preempt_data[vcoreid].ev_mbox;
+	return &__procdata.vcore_preempt_data[vcoreid].ev_mbox;
 }
 
 /* Posts a message to the mbox, subject to flags.  Feel free to send 0 for the
@@ -44,6 +43,112 @@ static void post_ev_msg(struct event_mbox *mbox, struct event_msg *msg,
 	}
 }
 
+/* Can we alert the vcore?  (Will it check its messages).  Note this checks
+ * procdata via the user pointer. */
+static bool can_alert_vcore(struct proc *p, uint32_t vcoreid)
+{
+	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
+	return vcpd->can_rcv_msg;
+}
+
+/* Scans the vcoremap, looking for an alertable vcore (returing that vcoreid).
+ * If this fails, it's userspace's fault, so we'll complain loudly.  
+ *
+ * It is possible for a vcore to yield and toggle this flag off before we post
+ * the indir, which is why we have that loop in alert_vcore().
+ *
+ * Note this checks procdata via the user pointer. */
+uint32_t find_alertable_vcore(struct proc *p, uint32_t start_loc)
+{
+	struct procinfo *pi = p->procinfo;
+	for (uint32_t i = start_loc; i < pi->max_vcores; i++) {
+		if (can_alert_vcore(p, i)) {
+			return i;
+		}
+	}
+	/* if we're here, the program is likely fucked.  buggy at least */
+	printk("[kernel] no vcores can recv messages!  (user bug)\n");
+	return 0;	/* vcore 0 is the most likely to come back online */
+}
+
+/* Helper to send an indir, called from a couple places */
+static void send_indir_to_vcore(struct event_queue *ev_q, uint32_t vcoreid)
+{
+	struct event_msg local_msg = {0};
+	local_msg.ev_type = EV_EVENT;
+	local_msg.ev_arg3 = ev_q;
+	post_ev_msg(get_proc_ev_mbox(vcoreid), &local_msg, 0);
+}
+
+/* Helper that alerts a vcore, by IPI and/or INDIR, that it needs to check the
+ * ev_q.  Handles FALLBACK and other tricky things.  Returns which vcore was
+ * alerted.  The only caller of this is send_event(), and this makes it a little
+ * clearer/easier.
+ *
+ * One of the goals of FALLBACK (and this func) is to allow processes to yield
+ * cores without fear of losing messages (INDIR messages, btw (aka, non-vcore
+ * business)).
+ *
+ * The plan for dealing with FALLBACK is that we get a good vcoreid (can recv
+ * messages), then do the IPI/INDIRs, and then check to make sure the vcore is
+ * still good.  If the vcore is no longer available, we find another.  Userspace
+ * will make sure to turn off the can_recv_msg flag (and then check for messages
+ * again) before yielding.
+ *
+ * I don't particularly care if the vcore is offline or not for INDIRs.  There
+ * is a small window when a vcore is offline but can receive messages AND that
+ * another vcore is online.  This would only happen when a vcore doesn't respond
+ * to a preemption.  This would NOT happen when the entire process was preempted
+ * (which is when I would want to send to the initial offline vcore anyway).  In
+ * short, if can_recv is set, I'll send it there, and let userspace handle the
+ * rare "unresponsive" preemption.  There are a lot of legit reasons why a vcore
+ * would be offline (or preempt_pending) and have can_recv set.
+ *
+ * IPIs don't matter as much.  We'll send them to the (fallback) vcore, but
+ * never send them to an offline vcore.  If we lose a race and try to IPI an
+ * offline core, proc_notify can handle it.  I do the checks here to avoid some
+ * future pain (for now). */
+static uint32_t alert_vcore(struct proc *p, struct event_queue *ev_q,
+                            uint32_t vcoreid)
+{
+	int num_loops = 0;
+	/* Don't care about FALLBACK, just send and be done with it */
+	if (!ev_q->ev_flags & EVENT_FALLBACK) {
+		if (ev_q->ev_flags & EVENT_INDIR)
+			send_indir_to_vcore(ev_q, vcoreid);
+		/* Don't bother with the IPI if the vcore is offline */
+		if ((ev_q->ev_flags & EVENT_IPI) && vcore_is_mapped(p, vcoreid))
+			proc_notify(p, vcoreid);
+		return vcoreid;
+	}
+	/* If we're here, we care about FALLBACK.  Loop, trying vcores til we don't
+	 * lose the race.  It's a user bug (which we'll comment on in a helper) if
+	 * there are no vcores willing to rcv a message. */
+	do {
+		/* Sanity check.  Should never happen, unless we're buggy */
+		if (num_loops++ > MAX_NUM_CPUS)
+			warn("Having a hard time finding an online vcore");
+		/* Preemptively try to get a 'good' vcoreid.  The vcore might actually
+		 * be offline. */
+		if (!can_alert_vcore(p, vcoreid)) {
+			vcoreid = 0;	/* start the search from 0, more likely to be on */
+			vcoreid = find_alertable_vcore(p, vcoreid);
+		}
+		/* If we're here, we think the vcore can recv the INDIR */
+		if (ev_q->ev_flags & EVENT_INDIR)
+			send_indir_to_vcore(ev_q, vcoreid);
+		/* Only send the IPI if it is also online (optimization) */
+		if ((ev_q->ev_flags & EVENT_IPI) && vcore_is_mapped(p, vcoreid))
+			proc_notify(p, vcoreid);
+		wmb();
+		/* If the vcore now can't receive the message, we probably lost the
+		 * race, so let's loop and try with another.  Some vcore is getting
+		 * spurious messages, but those are not incorrect (just slows things a
+		 * bit if we lost the race). */
+	} while (!can_alert_vcore(p, vcoreid));
+	return vcoreid;
+}
+
 /* Send an event to ev_q, based on the parameters in ev_q's flag.  We don't
  * accept null ev_qs, since the caller ought to be checking before bothering to
  * make a msg and send it to the event_q.  Vcoreid is who the kernel thinks the
@@ -54,8 +159,7 @@ void send_event(struct proc *p, struct event_queue *ev_q, struct event_msg *msg,
                 uint32_t vcoreid)
 {
 	struct proc *old_proc;
-	struct event_mbox *ev_mbox = 0, *vcore_mbox;
-	struct event_msg local_msg = {0};
+	struct event_mbox *ev_mbox = 0;
 	assert(p);
 	printd("[kernel] sending msg to proc %08p, ev_q %08p\n", p, ev_q);
 	if (!ev_q) {
@@ -115,19 +219,13 @@ void send_event(struct proc *p, struct event_queue *ev_q, struct event_msg *msg,
 	 * vehicle for sending the ev_type. */
 	assert(msg);
 	post_ev_msg(ev_mbox, msg, ev_q->ev_flags);
-	/* Vcore options: IPIs and INDIRs */
-	if (ev_q->ev_flags & EVENT_INDIR) {
-		vcore_mbox = get_proc_ev_mbox(vcoreid);
-		/* Help out userspace, since we can detect this bug:*/
-		if (ev_mbox == vcore_mbox)
-			printk("[kernel] EVENT_INDIR requested for a VCPD mbox!\n");
-		/* Actually post the INDIR */
-		local_msg.ev_type = EV_EVENT;
-		local_msg.ev_arg3 = ev_q;
-		post_ev_msg(vcore_mbox, &local_msg, 0);
-	}
-	if (ev_q->ev_flags & EVENT_IPI)
-		proc_notify(p, vcoreid);
+	/* Prod/alert a vcore with an IPI or INDIR, if desired */
+	if ((ev_q->ev_flags & (EVENT_IPI | EVENT_INDIR)))
+		alert_vcore(p, ev_q, vcoreid);
+	/* TODO: If the whole proc is offline, this is where we can check and make
+	 * it runnable (if we want).  Alternatively, we can do this only if they
+	 * asked for IPIs or INDIRs. */
+
 	/* Fall through */
 out:
 	/* Return to the old address space. */

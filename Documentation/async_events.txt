@@ -359,12 +359,15 @@ vcore is offline.
 
 3.3.2: Fallback
 ---------------
-Both IPI and INDIR need an actual vcore.  If that vcore is offline and if
-EVENT_FALLBACK is set, the kernel will pick an online vcore and send the
-messages there.  This allows an ev_q to be set up to handle work when the vcore
-is online, while allowing the program to handle events when that core goes
-offline: perhaps due to a yield or a preemption, without having to reset all of
-its ev_qs to point to "known" online vcores (and avoiding those races).
+Both IPI and INDIR need an actual vcore.  If that vcore is unavailable and if
+EVENT_FALLBACK is set, the kernel will pick another vcore and send the messages
+there.  This allows an ev_q to be set up to handle work when the vcore is
+online, while allowing the program to handle events when that core yields,
+without having to reset all of its ev_qs to point to "known" available vcores
+(and avoiding those races).  Note 'online' is synonymous with 'mapped', when
+talking about vcores.  A vcore technically isn't always online, only destined to
+be online, when it is mapped to a pcore (kmsg on the way, etc).  It's easiest to
+think of it being online for the sake of this discussion.
 
 One question is whether or not 2LSs need a FALLBACK flag for their ev_qs.  The
 main use for FALLBACK is so that vcores can yield.  (Note that fallback won't
@@ -376,6 +379,36 @@ get those ev_qs back when the vcore comes back online (if ever).  Another issue
 is that other vcores will build up a list of ev_qs that they aren't aware of,
 which will be hard to deal with when *they* yield.  FALLBACK avoids all of those
 problems.
+
+An important aspect of FALLBACK is that it works with yielded vcores, not
+preempted vcores.  It could be that there are no cores that are online, but
+there should always be at least one core that *will* be online in the future, a
+core that the process didn't want to lose and will deal with in the future.  If
+not for this distinction, FALLBACK could fail.  An older idea would be to have
+fallback send the msg to the desired vcore if there were no others.  This would
+not work if the vcore yielded and then the entire process was preempted or
+otherwise not running.  Another way to put this is that we need a field to
+determine whether a vcore is offline temporarily or permanently.
+
+This is why we have the VCPD field 'can_rcv_msg'.  It tells the kernel's event
+delivery code that the vcore will check the messages: it is an acceptable
+destination for a FALLBACK.  There are two reasons to put this in VCPD:
+1) Userspace can remotely turn off a vcore's msg reception.  This is necessary
+for handling preemption of a vcore that was in uthread context, so that we can
+remotely 'yield' the core without having to sys_change_vcore() (which I discuss
+below, and is meant to 'unstick' a vcore).
+2) Yield is simplified.  The kernel no longer races with itself nor has to worry
+about turning off that flag - userspace can do it when it wants to yield.  (turn
+off the flag, check messages, then yield).
+
+Two aspects of the code make this work nicely.  The 'can_rcv_msg' flag greatly
+simplifies the kernel's job.  There are a lot of weird races we'd have to deal
+with, such as process state (RUNNING_M), whether a mass preempt is going on, or
+just one core, or a bunch of cores, mass yields, etc.  A flag that does one
+thing well helps a lot - esp since preemption is not the same as yielding.  The
+other useful thing is being able to handle spurious events.  Vcore code can
+handle extra IPIs and INDIRs to non-VCPD ev_qs.  Any vcore can handle an ev_q
+that is "non-VCPD business".
 
 Also, in case this comes up, there's a slight race on changing the mbox* and the
 vcore number within the event_q.  The message could have gone to the wrong (old)

@@ -91,6 +91,7 @@ struct preempt_data {
 	uintptr_t					transition_stack;	/* advertised by the user */
 	bool						notif_enabled;		/* vcore willing to recv */
 	bool						notif_pending;		/* notif k_msg on the way */
+	bool						can_rcv_msg;		/* can receive FALLBACK */
 	seq_ctr_t					preempt_tf_valid;
 	struct event_mbox			ev_mbox;
 };

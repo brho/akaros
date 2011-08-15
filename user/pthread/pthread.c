@@ -95,7 +95,7 @@ struct uthread *pth_init(void)
 	for (int i = 0; i < max_vcores(); i++) {
 		/* Each vcore needs to point to a non-VCPD ev_q */
 		sysc_mgmt[i].ev_q = get_big_event_q_raw();
-		sysc_mgmt[i].ev_q->ev_flags = EVENT_IPI | EVENT_INDIR;	/* up to you */
+		sysc_mgmt[i].ev_q->ev_flags = EVENT_IPI | EVENT_INDIR | EVENT_FALLBACK;
 		sysc_mgmt[i].ev_q->ev_vcore = i;
 		ucq_init_raw(&sysc_mgmt[i].ev_q->ev_mbox->ev_msgs, 
 		             mmap_block + (2 * i    ) * PGSIZE, 
@@ -115,7 +115,7 @@ struct uthread *pth_init(void)
 	ucq_init_raw(&sysc_mbox->ev_msgs, two_pages, two_pages + PGSIZE);
 	for (int i = 0; i < max_vcores(); i++) {
 		sysc_mgmt[i].ev_q = get_event_q();
-		sysc_mgmt[i].ev_q->ev_flags = EVENT_IPI | EVENT_INDIR;
+		sysc_mgmt[i].ev_q->ev_flags = EVENT_IPI | EVENT_INDIR | EVENT_FALLBACK;
 		sysc_mgmt[i].ev_q->ev_vcore = i;
 		sysc_mgmt[i].ev_q->ev_mbox = sysc_mbox;
 	}
@@ -152,11 +152,10 @@ void __attribute__((noreturn)) pth_sched_entry(void)
 	/* no one currently running, so lets get someone from the ready queue */
 	struct pthread_tcb *new_thread = NULL;
 	struct mcs_lock_qnode local_qn = {0};
-	/* For now, let's spin and handle events til we get a thread to run.  This
-	 * will help catch races, instead of only having one core ever run a thread
-	 * (if there is just one, etc).  Also, we don't need the EVENT_IPIs for this
-	 * to work (since we poll handle_events() */
-	while (!new_thread) {
+	/* Try to get a thread.  If we get one, we'll break out and run it.  If not,
+	 * we'll try to yield.  vcore_yield() might return, if we lost a race and
+	 * had a new event come in, one that may make us able to get a new_thread */
+	do {
 		handle_events(vcoreid);
 		mcs_lock_notifsafe(&queue_lock, &local_qn);
 		new_thread = TAILQ_FIRST(&ready_queue);
@@ -165,21 +164,16 @@ void __attribute__((noreturn)) pth_sched_entry(void)
 			TAILQ_INSERT_TAIL(&active_queue, new_thread, next);
 			threads_active++;
 			threads_ready--;
+			mcs_unlock_notifsafe(&queue_lock, &local_qn);
+			break;
 		}
 		mcs_unlock_notifsafe(&queue_lock, &local_qn);
-	}
-	/* Instead of yielding, you could spin, turn off the core, set an alarm,
-	 * whatever.  You want some logic to decide this.  Uthread code wil have
-	 * helpers for this (like how we provide run_uthread()) */
-	if (!new_thread) {
-		/* Note, we currently don't get here (due to the while loop) */
+		/* no new thread, try to yield */
 		printd("[P] No threads, vcore %d is yielding\n", vcore_id());
-		/* Not actually yielding - just spin for now, so we can get syscall
-		 * unblocking events */
-		vcore_idle();
-		//sys_yield(0);
-		assert(0);
-	}
+		/* TODO: you can imagine having something smarter here, like spin for a
+		 * bit before yielding (or not at all if you want to be greedy). */
+		vcore_yield();
+	} while (1);
 	assert(((struct uthread*)new_thread)->state != UT_RUNNING);
 	run_uthread((struct uthread*)new_thread);
 	assert(0);

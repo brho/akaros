@@ -870,14 +870,14 @@ void proc_notify(struct proc *p, uint32_t vcoreid)
 		if (vcpd->notif_enabled) {
 			/* GIANT WARNING: we aren't using the proc-lock to protect the
 			 * vcoremap.  We want to be able to use this from interrupt context,
-			 * and don't want the proc_lock to be an irqsave. */
+			 * and don't want the proc_lock to be an irqsave.  Spurious
+			 * __notify() kmsgs are okay (it checks to see if the right receiver
+			 * is current). */
 			if ((p->state & PROC_RUNNING_M) && // TODO: (VC#) (_S state)
 			              vcore_is_mapped(p, vcoreid)) {
 				printd("[kernel] sending notif to vcore %d\n", vcoreid);
 				send_kernel_message(get_pcoreid(p, vcoreid), __notify, (long)p,
 				                    0, 0, KMSG_ROUTINE);
-			} else { // TODO: think about this, fallback, etc
-				warn("Vcore unmapped, not receiving an active notif");
 			}
 		}
 	}
@@ -1406,9 +1406,15 @@ void __startcore(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2
 		proc_decref(p_to_run);
 	vcoreid = get_vcoreid(p_to_run, pcoreid);
 	vcpd = &p_to_run->procdata->vcore_preempt_data[vcoreid];
+	/* We could let userspace do this, though they come into vcore entry many
+	 * times, and we just need this to happen when the cores comes online the
+	 * first time.  That, and they want this turned on as soon as we know a
+	 * vcore *WILL* be online.  We could also do this earlier, when we map the
+	 * vcore to its pcore, though we don't always have current loaded or
+	 * otherwise mess with the VCPD in those code paths. */
+	vcpd->can_rcv_msg = TRUE;
 	printd("[kernel] startcore on physical core %d for process %d's vcore %d\n",
 	       pcoreid, p_to_run->pid, vcoreid);
-
 	if (seq_is_locked(vcpd->preempt_tf_valid)) {
 		__seq_end_write(&vcpd->preempt_tf_valid); /* mark tf as invalid */
 		restore_fp_state(&vcpd->preempt_anc);

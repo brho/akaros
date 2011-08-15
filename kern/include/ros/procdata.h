@@ -33,9 +33,7 @@ typedef struct procdata {
 
 #define PROCDATA_NUM_PAGES  ((sizeof(procdata_t)-1)/PGSIZE + 1)
 
-// this is how user programs access the procdata page
-#ifndef ROS_KERNEL
-# define __procdata (*(procdata_t*)UDATA)
-#endif
+/* TODO: I dislike having this not be a pointer (for kernel programming) */
+#define __procdata (*(procdata_t*)UDATA)
 
-#endif // !ROS_PROCDATA_H
+#endif /* ROS_PROCDATA_H */

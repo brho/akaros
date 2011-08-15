@@ -184,8 +184,19 @@ fail:
 	return ret;
 }
 
+/* This can return, if you failed to yield due to a concurrent event. */
 void vcore_yield()
 {
+	uint32_t vcoreid = vcore_id();
+	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
+	vcpd->can_rcv_msg = FALSE;
+	wmb();
+	if (handle_events(vcoreid)) {
+		/* we handled outstanding events, turn the flag back on and return */
+		vcpd->can_rcv_msg = TRUE;
+		return;
+	}
+	/* o/w, we can safely yield */
 	sys_yield(0);
 }
 
