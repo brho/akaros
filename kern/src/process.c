@@ -710,7 +710,7 @@ static uint32_t get_free_vcoreid(struct proc *SAFE p, uint32_t prev)
 {
 	uint32_t i;
 	for (i = prev; i < MAX_NUM_CPUS; i++)
-		if (!p->procinfo->vcoremap[i].valid)
+		if (!vcore_is_mapped(p, i))
 			break;
 	if (i + 1 >= MAX_NUM_CPUS)
 		warn("At the end of the vcorelist.  Might want to check that out.");
@@ -724,7 +724,7 @@ static uint32_t get_busy_vcoreid(struct proc *SAFE p, uint32_t prev)
 {
 	uint32_t i;
 	for (i = prev; i < MAX_NUM_CPUS; i++)
-		if (p->procinfo->vcoremap[i].valid)
+		if (vcore_is_mapped(p, i))
 			break;
 	if (i + 1 >= MAX_NUM_CPUS)
 		warn("At the end of the vcorelist.  Might want to check that out.");
@@ -750,7 +750,7 @@ static uint32_t get_vcoreid(struct proc *p, uint32_t pcoreid)
  * No locking involved, be careful.  Panics on failure. */
 static uint32_t get_pcoreid(struct proc *p, uint32_t vcoreid)
 {
-	assert(p->procinfo->vcoremap[vcoreid].valid);
+	assert(vcore_is_mapped(p, vcoreid));
 	return p->procinfo->vcoremap[vcoreid].pcoreid;
 }
 
@@ -872,7 +872,7 @@ void proc_notify(struct proc *p, uint32_t vcoreid)
 			 * vcoremap.  We want to be able to use this from interrupt context,
 			 * and don't want the proc_lock to be an irqsave. */
 			if ((p->state & PROC_RUNNING_M) && // TODO: (VC#) (_S state)
-			              (p->procinfo->vcoremap[vcoreid].valid)) {
+			              vcore_is_mapped(p, vcoreid)) {
 				printd("[kernel] sending notif to vcore %d\n", vcoreid);
 				send_kernel_message(get_pcoreid(p, vcoreid), __notify, (long)p,
 				                    0, 0, KMSG_ROUTINE);
@@ -1057,6 +1057,12 @@ uint32_t proc_get_vcoreid(struct proc *SAFE p, uint32_t pcoreid)
 	}
 }
 
+/* TODO: make this a static inline when we gut the env crap */
+bool vcore_is_mapped(struct proc *p, uint32_t vcoreid)
+{
+	return p->procinfo->vcoremap[vcoreid].valid;
+}
+
 /* Gives process p the additional num cores listed in pcorelist.  You must be
  * RUNNABLE_M or RUNNING_M before calling this.  If you're RUNNING_M, this will
  * startup your new cores at the entry point with their virtual IDs (or restore
@@ -1098,7 +1104,7 @@ bool __proc_give_cores(struct proc *SAFE p, uint32_t *pcorelist, size_t num)
 				// somewhere, like someone forgot to take vcores after
 				// preempting.
 				for (int i = 0; i < p->procinfo->num_vcores; i++)
-					assert(p->procinfo->vcoremap[i].valid);
+					assert(vcore_is_mapped(p, i));
 			}
 			// add new items to the vcoremap
 			__seq_start_write(&p->procinfo->coremap_seqctr);
