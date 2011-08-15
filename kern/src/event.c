@@ -219,6 +219,10 @@ void send_event(struct proc *p, struct event_queue *ev_q, struct event_msg *msg,
 	 * vehicle for sending the ev_type. */
 	assert(msg);
 	post_ev_msg(ev_mbox, msg, ev_q->ev_flags);
+	/* Help out userspace a bit by checking for a potentially confusing bug */
+	if ((ev_mbox == get_proc_ev_mbox(vcoreid)) &&
+	    (ev_q->ev_flags & EVENT_INDIR))
+		printk("[kernel] User-bug: ev_q has an INDIR with a VCPD ev_mbox!\n");
 	/* Prod/alert a vcore with an IPI or INDIR, if desired */
 	if ((ev_q->ev_flags & (EVENT_IPI | EVENT_INDIR)))
 		alert_vcore(p, ev_q, vcoreid);
