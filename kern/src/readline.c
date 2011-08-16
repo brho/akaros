@@ -36,8 +36,10 @@ int readline(char *buf, size_t buf_l, const char *prompt, ...)
 				cputchar(c);
 			i--;
 		} else if (c == '\n' || c == '\r') {
+			/* sending a \n regardless, since the serial port gives us a \r for
+			 * carriage returns. */
 			if (echoing)
-				cputchar(c);
+				cputchar('\n');
 			assert(i <= buf_l - 1);	/* never write to buf_l - 1 til the end */
 			buf[i++] = c;
 			retval =  i;
