@@ -14,6 +14,7 @@ __thread struct uthread *current_uthread = 0;
 
 /* static helpers: */
 static int __uthread_allocate_tls(struct uthread *uthread);
+static int __uthread_reinit_tls(struct uthread *uthread);
 static void __uthread_free_tls(struct uthread *uthread);
 
 /* The real 2LS calls this, passing in a uthread representing thread0.  When it
@@ -87,8 +88,11 @@ void uthread_init(struct uthread *new_thread)
 	new_thread->state = UT_CREATED;
 	/* They should have zero'd the uthread.  Let's check critical things: */
 	assert(!new_thread->flags && !new_thread->sysc);
-	/* Get a TLS */
-	assert(!__uthread_allocate_tls(new_thread));
+	/* Get a TLS.  If we already have one, reallocate/refresh it */
+	if (new_thread->tls_desc)
+		assert(!__uthread_reinit_tls(new_thread));
+	else
+		assert(!__uthread_allocate_tls(new_thread));
 	/* Switch into the new guys TLS and let it know who it is */
 	struct uthread *caller = current_uthread;
 	assert(caller);
@@ -109,7 +113,7 @@ void uthread_init(struct uthread *new_thread)
 	set_tls_desc(caller->tls_desc, vcoreid);
 	/* Okay to migrate now, and enable interrupts/notifs.  This could be called
 	 * from vcore context, so only enable if we're in _M and in vcore context. */
-	if (!in_vcore_context() && num_vcores() > 0)
+	if (!in_vcore_context() && in_multi_mode())
 		enable_notifs(vcoreid);
 	wmb();
 	caller->flags &= ~UTHREAD_DONT_MIGRATE;
@@ -362,6 +366,16 @@ static int __uthread_allocate_tls(struct uthread *uthread)
 {
 	assert(!uthread->tls_desc);
 	uthread->tls_desc = allocate_tls();
+	if (!uthread->tls_desc) {
+		errno = ENOMEM;
+		return -1;
+	}
+	return 0;
+}
+
+static int __uthread_reinit_tls(struct uthread *uthread)
+{
+	uthread->tls_desc = reinit_tls(uthread->tls_desc);
 	if (!uthread->tls_desc) {
 		errno = ENOMEM;
 		return -1;

@@ -47,6 +47,17 @@ void free_tls(void *tcb)
 	_dl_deallocate_tls(tcb, TRUE);
 }
 
+/* Reinitialize / reset / refresh a TLS to its initial values.  This doesn't do
+ * it properly yet, it merely frees and re-allocates the TLS, which is why we're
+ * slightly ghetto and return the pointer you should use for the TCB. */
+void *reinit_tls(void *tcb)
+{
+	/* TODO: keep this in sync with the methods used in
+	 * allocate_transition_tls() */
+	free_tls(tcb);
+	return allocate_tls();
+}
+
 /* TODO: probably don't want to dealloc.  Considering caching */
 static void free_transition_tls(int id)
 {
