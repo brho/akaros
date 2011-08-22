@@ -16,15 +16,17 @@ __thread struct uthread *current_uthread = 0;
 static int __uthread_allocate_tls(struct uthread *uthread);
 static void __uthread_free_tls(struct uthread *uthread);
 
-/* Gets called once out of uthread_create().  Can also do this in a ctor. */
-static int uthread_init(void)
+/* The real 2LS calls this, passing in a uthread representing thread0.  When it
+ * returns, you're in _M mode, still running thread0, on vcore0 */
+int uthread_lib_init(struct uthread *uthread)
 {
+	/* Make sure this only runs once */
+	static bool initialized = FALSE;
+	if (initialized)
+		return -1;
+	initialized = TRUE;
 	/* Init the vcore system */
 	assert(!vcore_init());
-	/* Bug if vcore init was called with no 2LS */
-	assert(sched_ops->sched_init);
-	/* Get thread 0's thread struct (2LS allocs it) */
-	struct uthread *uthread = sched_ops->sched_init();
 	assert(uthread);
 	/* Save a pointer to thread0's tls region (the glibc one) into its tcb */
 	uthread->tls_desc = get_tls_desc(0);
@@ -72,21 +74,14 @@ void __attribute__((noreturn)) uthread_vcore_entry(void)
 	assert(0);
 }
 
-/* Creates a uthread.  Will pass udata to sched_ops's thread_create.  For now,
- * the vcore/default 2ls code handles start routines and args.  Mostly because
- * this is used when initing a utf, which is vcore specific for now. */
-struct uthread *uthread_create(void (*func)(void), void *udata)
+/* Does the uthread initialization of a uthread that the caller created.  Call
+ * this whenever you are "starting over" with a thread. */
+void uthread_init(struct uthread *new_thread)
 {
-	/* First time through, init the uthread code (which makes a uthread out of
-	 * thread0 / the current code.  Could move this to a ctor. */
-	static bool first = TRUE;
-	if (first) {
-		assert(!uthread_init());
-		first = FALSE;
-	}
+	/* don't remove this assert without dealing with 'caller' below.  if we want
+	 * to call this while in vcore context, we'll need to handle the TLS
+	 * swapping a little differently */
 	assert(!in_vcore_context());
-	assert(sched_ops->thread_create);
-	struct uthread *new_thread = sched_ops->thread_create(func, udata);
 	uint32_t vcoreid;
 	assert(new_thread);
 	new_thread->state = UT_CREATED;
@@ -118,7 +113,6 @@ struct uthread *uthread_create(void (*func)(void), void *udata)
 		enable_notifs(vcoreid);
 	wmb();
 	caller->flags &= ~UTHREAD_DONT_MIGRATE;
-	return new_thread;
 }
 
 void uthread_runnable(struct uthread *uthread)
@@ -216,17 +210,15 @@ yield_return_path:
 	printd("[U] Uthread %08p returning from a yield!\n", uthread);
 }
 
-/* Destroys the uthread.  If you want to destroy a currently running uthread,
- * you'll want something like pthread_exit(), which yields, and calls this from
- * its sched_ops yield. */
-void uthread_destroy(struct uthread *uthread)
+/* Cleans up the uthread (the stuff we did in uthread_init()).  If you want to
+ * destroy a currently running uthread, you'll want something like
+ * pthread_exit(), which yields, and calls this from its sched_ops yield. */
+void uthread_cleanup(struct uthread *uthread)
 {
 	printd("[U] thread %08p on vcore %d is DYING!\n", uthread, vcore_id());
 	uthread->state = UT_DYING;
 	/* we alloc and manage the TLS, so lets get rid of it */
 	__uthread_free_tls(uthread);
-	assert(sched_ops->thread_destroy);
-	sched_ops->thread_destroy(uthread);
 }
 
 /* Attempts to block on sysc, returning when it is done or progress has been

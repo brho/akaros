@@ -26,30 +26,13 @@ struct event_queue *indirect_q;
 static void handle_generic(struct event_msg *ev_msg, unsigned int ev_type);
 
 void ghetto_vcore_entry(void);
-struct uthread *ghetto_init(void)
-{
-	struct uthread *uthread = malloc(sizeof(struct uthread));
-	memset(uthread, 0, sizeof(struct uthread));
-	return uthread;
-}
-
-struct uthread *ghetto_create(void (*func)(void), void *data)
-{
-	return ghetto_init();
-}
 
 struct schedule_ops ghetto_sched_ops = {
-	.sched_init = ghetto_init,
 	.sched_entry = ghetto_vcore_entry,
-	.thread_create = ghetto_create,
 };
 struct schedule_ops *sched_ops = &ghetto_sched_ops;
 
 /* to trick uthread_create() */
-void dummy(void)
-{
-}
-
 int main(int argc, char** argv)
 {
 	uint32_t vcoreid;
@@ -86,9 +69,10 @@ int main(int argc, char** argv)
 	ev_q->ev_flags = EVENT_IPI | EVENT_NOMSG | EVENT_VCORE_APPRO;
 	register_kevent_q(ev_q, EV_PREEMPT_PENDING);
 
-	/* Makes a thread for us, though we won't use it.  Just a hack to get into
+	/* Inits a thread for us, though we won't use it.  Just a hack to get into
 	 * _M mode.  Note this requests one vcore for us */
-	uthread_create(dummy, 0);
+	struct uthread dummy = {0};
+	uthread_lib_init(&dummy);
 
 	if ((vcoreid = vcore_id())) {
 		printf("Should never see me! (from vcore %d)\n", vcoreid);
@@ -133,6 +117,9 @@ int main(int argc, char** argv)
 
 	printf("All Cores Done!\n", vcoreid);
 	while(1); // manually kill from the monitor
+	/* since everyone should cleanup their uthreads, even if they don't plan on
+	 * calling their code or want uthreads in the first place. <3 */
+	uthread_cleanup(&dummy);
 	return 0;
 }
 

@@ -33,12 +33,9 @@ static int get_next_pid(void);
 static inline void spin_to_sleep(unsigned int spins, unsigned int *spun);
 
 /* Pthread 2LS operations */
-struct uthread *pth_init(void);
 void pth_sched_entry(void);
-struct uthread *pth_thread_create(void (*func)(void), void *udata);
 void pth_thread_runnable(struct uthread *uthread);
 void pth_thread_yield(struct uthread *uthread);
-void pth_thread_destroy(struct uthread *uthread);
 void pth_preempt_pending(void);
 void pth_spawn_thread(uintptr_t pc_start, void *data);
 void pth_blockon_sysc(struct syscall *sysc);
@@ -47,12 +44,9 @@ void pth_blockon_sysc(struct syscall *sysc);
 static void pth_handle_syscall(struct event_msg *ev_msg, unsigned int ev_type);
 
 struct schedule_ops pthread_sched_ops = {
-	pth_init,
 	pth_sched_entry,
-	pth_thread_create,
 	pth_thread_runnable,
 	pth_thread_yield,
-	pth_thread_destroy,
 	pth_blockon_sysc,
 	0, /* pth_preempt_pending, */
 	0, /* pth_spawn_thread, */
@@ -64,80 +58,6 @@ struct schedule_ops *sched_ops = &pthread_sched_ops;
 /* Static helpers */
 static void __pthread_free_stack(struct pthread_tcb *pt);
 static int __pthread_allocate_stack(struct pthread_tcb *pt);
-
-/* Do whatever init you want.  Return a uthread representing thread0 (int
- * main()) */
-struct uthread *pth_init(void)
-{
-	uintptr_t mmap_block;
-	struct mcs_lock_qnode local_qn = {0};
-	/* Tell the kernel where and how we want to receive events.  This is just an
-	 * example of what to do to have a notification turned on.  We're turning on
-	 * USER_IPIs, posting events to vcore 0's vcpd, and telling the kernel to
-	 * send to vcore 0.  Note sys_self_notify will ignore the vcoreid pref.
-	 * Also note that enable_kevent() is just an example, and you probably want
-	 * to use parts of event.c to do what you want. */
-	enable_kevent(EV_USER_IPI, 0, EVENT_IPI);
-
-	/* Handle syscall events.  Using small ev_qs, with no internal ev_mbox. */
-	ev_handlers[EV_SYSCALL] = pth_handle_syscall;
-	/* Set up the per-vcore structs to track outstanding syscalls */
-	sysc_mgmt = malloc(sizeof(struct sysc_mgmt) * max_vcores());
-	assert(sysc_mgmt);
-#if 1   /* Independent ev_mboxes per vcore */
-	/* Get a block of pages for our per-vcore (but non-VCPD) ev_qs */
-	mmap_block = (uintptr_t)mmap(0, PGSIZE * 2 * max_vcores(),
-	                             PROT_WRITE | PROT_READ,
-	                             MAP_POPULATE | MAP_ANONYMOUS, -1, 0);
-	assert(mmap_block);
-	/* Could be smarter and do this on demand (in case we don't actually want
-	 * max_vcores()). */
-	for (int i = 0; i < max_vcores(); i++) {
-		/* Each vcore needs to point to a non-VCPD ev_q */
-		sysc_mgmt[i].ev_q = get_big_event_q_raw();
-		sysc_mgmt[i].ev_q->ev_flags = EVENT_IPI | EVENT_INDIR | EVENT_FALLBACK;
-		sysc_mgmt[i].ev_q->ev_vcore = i;
-		ucq_init_raw(&sysc_mgmt[i].ev_q->ev_mbox->ev_msgs, 
-		             mmap_block + (2 * i    ) * PGSIZE, 
-		             mmap_block + (2 * i + 1) * PGSIZE); 
-	}
-	/* Technically, we should munmap and free what we've alloc'd, but the
-	 * kernel will clean it up for us when we exit. */
-#endif 
-#if 0   /* One global ev_mbox, separate ev_q per vcore */
-	struct event_mbox *sysc_mbox = malloc(sizeof(struct event_mbox));
-	uintptr_t two_pages = (uintptr_t)mmap(0, PGSIZE * 2, PROT_WRITE | PROT_READ,
-	                                      MAP_POPULATE | MAP_ANONYMOUS, -1, 0);
-	printd("Global ucq: %08p\n", &sysc_mbox->ev_msgs);
-	assert(sysc_mbox);
-	assert(two_pages);
-	memset(sysc_mbox, 0, sizeof(struct event_mbox));
-	ucq_init_raw(&sysc_mbox->ev_msgs, two_pages, two_pages + PGSIZE);
-	for (int i = 0; i < max_vcores(); i++) {
-		sysc_mgmt[i].ev_q = get_event_q();
-		sysc_mgmt[i].ev_q->ev_flags = EVENT_IPI | EVENT_INDIR | EVENT_FALLBACK;
-		sysc_mgmt[i].ev_q->ev_vcore = i;
-		sysc_mgmt[i].ev_q->ev_mbox = sysc_mbox;
-	}
-#endif
-
-	/* Create a pthread_tcb for the main thread */
-	pthread_t t = (pthread_t)calloc(1, sizeof(struct pthread_tcb));
-	assert(t);
-	t->id = get_next_pid();
-	t->stacksize = USTACK_NUM_PAGES * PGSIZE;
-	t->stacktop = (void*)USTACKTOP;
-	t->detached = TRUE;
-	t->flags = 0;
-	t->finished = 0;
-	assert(t->id == 0);
-	/* Put the new pthread on the active queue */
-	mcs_lock_notifsafe(&queue_lock, &local_qn);
-	threads_active++;
-	TAILQ_INSERT_TAIL(&active_queue, t, next);
-	mcs_unlock_notifsafe(&queue_lock, &local_qn);
-	return (struct uthread*)t;
-}
 
 /* Called from vcore entry.  Options usually include restarting whoever was
  * running there before or running a new thread.  Events are handled out of
@@ -186,36 +106,6 @@ static void __pthread_run(void)
 	pthread_exit(me->start_routine(me->arg));
 }
 
-/* Responible for creating the uthread and initializing its user trap frame */
-struct uthread *pth_thread_create(void (*func)(void), void *udata)
-{
-	struct pthread_tcb *pthread;
-	pthread_attr_t *attr = (pthread_attr_t*)udata;
-	pthread = (pthread_t)calloc(1, sizeof(struct pthread_tcb));
-	assert(pthread);
-	pthread->stacksize = PTHREAD_STACK_SIZE;	/* default */
-	pthread->finished = 0;
-	pthread->flags = 0;
-	pthread->id = get_next_pid();
-	pthread->detached = FALSE;				/* default */
-	/* Respect the attributes */
-	if (attr) {
-		if (attr->stacksize)					/* don't set a 0 stacksize */
-			pthread->stacksize = attr->stacksize;
-		if (attr->detachstate == PTHREAD_CREATE_DETACHED)
-			pthread->detached = TRUE;
-	}
-	/* allocate a stack */
-	if (__pthread_allocate_stack(pthread))
-		printf("We're fucked\n");
-	/* Set the u_tf to start up in __pthread_run, which will call the real
-	 * start_routine and pass it the arg.  Note those aren't set until later in
-	 * pthread_create(). */
-	init_user_tf(&pthread->uthread.utf, (uint32_t)__pthread_run, 
-                 (uint32_t)(pthread->stacktop));
-	return (struct uthread*)pthread;
-}
-
 void pth_thread_runnable(struct uthread *uthread)
 {
 	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
@@ -245,7 +135,15 @@ void pth_thread_yield(struct uthread *uthread)
 	TAILQ_REMOVE(&active_queue, pthread, next);
 	if (pthread->flags & PTHREAD_EXITING) {
 		mcs_unlock_notifsafe(&queue_lock, &local_qn);
-		uthread_destroy(uthread);
+		/* Destroy the pthread */
+		uthread_cleanup(uthread);
+		/* Cleanup, mirroring pthread_create() */
+		__pthread_free_stack(pthread);
+		/* TODO: race on detach state */
+		if (pthread->detached)
+			free(pthread);
+		else
+			pthread->finished = 1;
 	} else {
 		/* Put it on the ready list (tail).  Don't do this until we are done
 		 * completely with the thread, since it can be restarted somewhere else.
@@ -254,18 +152,6 @@ void pth_thread_yield(struct uthread *uthread)
 		TAILQ_INSERT_TAIL(&ready_queue, pthread, next);
 		mcs_unlock_notifsafe(&queue_lock, &local_qn);
 	}
-}
-	
-void pth_thread_destroy(struct uthread *uthread)
-{
-	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
-	/* Cleanup, mirroring pth_thread_create() */
-	__pthread_free_stack(pthread);
-	/* TODO: race on detach state */
-	if (pthread->detached)
-		free(pthread);
-	else
-		pthread->finished = 1;
 }
 
 void pth_preempt_pending(void)
@@ -382,15 +268,126 @@ int pthread_attr_getstacksize(const pthread_attr_t *attr, size_t *stacksize)
 	return 0;
 }
 
-int pthread_create(pthread_t* thread, const pthread_attr_t* attr,
-                   void *(*start_routine)(void *), void* arg)
+/* Do whatever init you want.  At some point call uthread_lib_init() and pass it
+ * a uthread representing thread0 (int main()) */
+static int pthread_lib_init(void)
 {
-	struct pthread_tcb *pthread =
-	       (struct pthread_tcb*)uthread_create(__pthread_run, (void*)attr);
-	if (!pthread)
+	/* Make sure this only runs once */
+	static bool initialized = FALSE;
+	if (initialized)
 		return -1;
+	initialized = TRUE;
+	uintptr_t mmap_block;
+	struct mcs_lock_qnode local_qn = {0};
+	/* Create a pthread_tcb for the main thread */
+	pthread_t t = (pthread_t)calloc(1, sizeof(struct pthread_tcb));
+	assert(t);
+	t->id = get_next_pid();
+	t->stacksize = USTACK_NUM_PAGES * PGSIZE;
+	t->stacktop = (void*)USTACKTOP;
+	t->detached = TRUE;
+	t->flags = 0;
+	t->finished = 0;
+	assert(t->id == 0);
+	/* Put the new pthread (thread0) on the active queue */
+	mcs_lock_notifsafe(&queue_lock, &local_qn);
+	threads_active++;
+	TAILQ_INSERT_TAIL(&active_queue, t, next);
+	mcs_unlock_notifsafe(&queue_lock, &local_qn);
+	/* Tell the kernel where and how we want to receive events.  This is just an
+	 * example of what to do to have a notification turned on.  We're turning on
+	 * USER_IPIs, posting events to vcore 0's vcpd, and telling the kernel to
+	 * send to vcore 0.  Note sys_self_notify will ignore the vcoreid pref.
+	 * Also note that enable_kevent() is just an example, and you probably want
+	 * to use parts of event.c to do what you want. */
+	enable_kevent(EV_USER_IPI, 0, EVENT_IPI);
+
+	/* Handle syscall events. */
+	ev_handlers[EV_SYSCALL] = pth_handle_syscall;
+	/* Set up the per-vcore structs to track outstanding syscalls */
+	sysc_mgmt = malloc(sizeof(struct sysc_mgmt) * max_vcores());
+	assert(sysc_mgmt);
+#if 1   /* Independent ev_mboxes per vcore */
+	/* Get a block of pages for our per-vcore (but non-VCPD) ev_qs */
+	mmap_block = (uintptr_t)mmap(0, PGSIZE * 2 * max_vcores(),
+	                             PROT_WRITE | PROT_READ,
+	                             MAP_POPULATE | MAP_ANONYMOUS, -1, 0);
+	assert(mmap_block);
+	/* Could be smarter and do this on demand (in case we don't actually want
+	 * max_vcores()). */
+	for (int i = 0; i < max_vcores(); i++) {
+		/* Each vcore needs to point to a non-VCPD ev_q */
+		sysc_mgmt[i].ev_q = get_big_event_q_raw();
+		sysc_mgmt[i].ev_q->ev_flags = EVENT_IPI | EVENT_INDIR | EVENT_FALLBACK;
+		sysc_mgmt[i].ev_q->ev_vcore = i;
+		ucq_init_raw(&sysc_mgmt[i].ev_q->ev_mbox->ev_msgs, 
+		             mmap_block + (2 * i    ) * PGSIZE, 
+		             mmap_block + (2 * i + 1) * PGSIZE); 
+	}
+	/* Technically, we should munmap and free what we've alloc'd, but the
+	 * kernel will clean it up for us when we exit. */
+#endif 
+#if 0   /* One global ev_mbox, separate ev_q per vcore */
+	struct event_mbox *sysc_mbox = malloc(sizeof(struct event_mbox));
+	uintptr_t two_pages = (uintptr_t)mmap(0, PGSIZE * 2, PROT_WRITE | PROT_READ,
+	                                      MAP_POPULATE | MAP_ANONYMOUS, -1, 0);
+	printd("Global ucq: %08p\n", &sysc_mbox->ev_msgs);
+	assert(sysc_mbox);
+	assert(two_pages);
+	memset(sysc_mbox, 0, sizeof(struct event_mbox));
+	ucq_init_raw(&sysc_mbox->ev_msgs, two_pages, two_pages + PGSIZE);
+	for (int i = 0; i < max_vcores(); i++) {
+		sysc_mgmt[i].ev_q = get_event_q();
+		sysc_mgmt[i].ev_q->ev_flags = EVENT_IPI | EVENT_INDIR | EVENT_FALLBACK;
+		sysc_mgmt[i].ev_q->ev_vcore = i;
+		sysc_mgmt[i].ev_q->ev_mbox = sysc_mbox;
+	}
+#endif
+	/* Initialize the uthread code (we're in _M mode after this).  Doing this
+	 * last so that all the event stuff is ready when we're in _M mode.  Not a
+	 * big deal one way or the other.  Note that vcore_init() hasn't happened
+	 * yet, so if a 2LS somehow wants to have its init stuff use things like
+	 * vcore stacks or TLSs, we'll need to change this. */
+	assert(!uthread_lib_init((struct uthread*)t));
+	return 0;
+}
+
+int pthread_create(pthread_t *thread, const pthread_attr_t *attr,
+                   void *(*start_routine)(void *), void *arg)
+{
+	static bool first = TRUE;
+	if (first) {
+		assert(!pthread_lib_init());
+		first = FALSE;
+	}
+	/* Create the actual thread */
+	struct pthread_tcb *pthread;
+	pthread = (pthread_t)calloc(1, sizeof(struct pthread_tcb));
+	assert(pthread);
+	pthread->stacksize = PTHREAD_STACK_SIZE;	/* default */
+	pthread->finished = 0;
+	pthread->flags = 0;
+	pthread->id = get_next_pid();
+	pthread->detached = FALSE;				/* default */
+	/* Respect the attributes */
+	if (attr) {
+		if (attr->stacksize)					/* don't set a 0 stacksize */
+			pthread->stacksize = attr->stacksize;
+		if (attr->detachstate == PTHREAD_CREATE_DETACHED)
+			pthread->detached = TRUE;
+	}
+	/* allocate a stack */
+	if (__pthread_allocate_stack(pthread))
+		printf("We're fucked\n");
+	/* Set the u_tf to start up in __pthread_run, which will call the real
+	 * start_routine and pass it the arg.  Note those aren't set until later in
+	 * pthread_create(). */
+	init_user_tf(&pthread->uthread.utf, (uint32_t)__pthread_run, 
+	             (uint32_t)(pthread->stacktop));
 	pthread->start_routine = start_routine;
 	pthread->arg = arg;
+	/* Initializse the uthread */
+	uthread_init((struct uthread*)pthread);
 	uthread_runnable((struct uthread*)pthread);
 	*thread = pthread;
 	return 0;

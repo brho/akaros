@@ -29,12 +29,9 @@ extern __thread struct uthread *current_uthread;
 /* 2L-Scheduler operations.  Can be 0.  Examples in pthread.c. */
 struct schedule_ops {
 	/* Functions supporting thread ops */
-	struct uthread *(*sched_init)(void);
 	void (*sched_entry)(void);
-	struct uthread *(*thread_create)(void (*func)(void), void *);
 	void (*thread_runnable)(struct uthread *);
 	void (*thread_yield)(struct uthread *);
-	void (*thread_destroy)(struct uthread *);
 	void (*thread_blockon_sysc)(struct syscall *);
 	/* Functions event handling wants */
 	void (*preempt_pending)(void);
@@ -42,16 +39,21 @@ struct schedule_ops {
 };
 extern struct schedule_ops *sched_ops;
 
+/* Call this, passing it a uthread representing thread0, from your 2LS init
+ * routines.  When it returns, you're in _M mode (thread0 on vcore0) */
+int uthread_lib_init(struct uthread *uthread);
+
 /* Functions to make/manage uthreads.  Can be called by functions such as
  * pthread_create(), which can wrap these with their own stuff (like attrs,
  * retvals, etc). */
 
-/* Creates a uthread.  Will pass udata to sched_ops's thread_create.  Func is
- * what gets run, and if you want args, wrap it (like pthread) */
-struct uthread *uthread_create(void (*func)(void), void *udata);
+/* Does the uthread initialization of a uthread that the caller created.  Call
+ * this whenever you are "starting over" with a thread. */
+void uthread_init(struct uthread *new_thread);
+/* Call this when you are done with a uthread, forever, but before you free it */
+void uthread_cleanup(struct uthread *uthread);
 void uthread_runnable(struct uthread *uthread);
 void uthread_yield(bool save_state);
-void uthread_destroy(struct uthread *uthread);
 /* Block the calling uthread on sysc until it makes progress or is done */
 void ros_syscall_blockon(struct syscall *sysc);
 

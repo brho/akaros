@@ -7,19 +7,14 @@
 #include <ros/bcq.h>
 #include <uthread.h>
 
+/* Deprecated, don't use this in any serious way */
+
 static void handle_syscall(struct event_msg *ev_msg, unsigned int ev_type);
 struct syscall sysc = {0};
 struct event_queue *ev_q;
-void *core0_tls = 0;
-
 void ghetto_vcore_entry(void);
-struct uthread *ghetto_init(void)
-{
-	return malloc(sizeof(struct uthread));
-}
 
 struct schedule_ops ghetto_sched_ops = {
-	.sched_init = ghetto_init,
 	.sched_entry = ghetto_vcore_entry,
 };
 struct schedule_ops *sched_ops = &ghetto_sched_ops;
@@ -58,9 +53,10 @@ int main(int argc, char** argv)
 	/* Note we don't need to set up event reception for any particular kevent.
 	 * The ev_q in the syscall said to send an IPI to vcore 0 which means an
 	 * EV_EVENT will be sent straight to vcore0. */
-	/* Need to save this somewhere that you can find it again when restarting
-	 * core0 */
-	core0_tls = get_tls_desc(0);
+	/* Inits a thread for us, though we won't use it.  Just a hack to get into
+	 * _M mode.  Note this requests one vcore for us */
+	struct uthread dummy = {0};
+	uthread_lib_init(&dummy);
 	/* Need to save our floating point state somewhere (like in the
 	 * user_thread_tcb so it can be restarted too */
 	enable_notifs(0);
