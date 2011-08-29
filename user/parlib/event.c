@@ -217,6 +217,14 @@ void handle_ev_ev(struct event_msg *ev_msg, unsigned int ev_type)
 	ev_q = ev_msg->ev_arg3;
 	/* Same deal, a null ev_q is probably a bug, or someone being a jackass */
 	assert(ev_q);
+	/* Clear pending, so we can start getting INDIRs and IPIs again.  We must
+	 * set this before (compared to handle_events, then set it, then handle
+	 * again), since there is no guarantee handle_event_q() will return.  If
+	 * there is a pending preemption, the vcore quickly yields and will deal
+	 * with the remaining events in the future - meaning it won't return to
+	 * here. */
+	ev_q->ev_alert_pending = FALSE;
+	wmb();			/* should be unnecessary, due to the function call */
 	handle_event_q(ev_q);
 }
 

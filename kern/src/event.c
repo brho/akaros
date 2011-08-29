@@ -112,6 +112,21 @@ static uint32_t alert_vcore(struct proc *p, struct event_queue *ev_q,
                             uint32_t vcoreid)
 {
 	int num_loops = 0;
+	/* If an alert is already pending, just return */
+	if (ev_q->ev_alert_pending)
+		return vcoreid;
+	/* We'll eventually get an INDIR through, so don't send any more til
+	 * userspace toggles this.  Regardless of other writers to this flag, we
+	 * eventually send an alert that causes userspace to turn throttling off
+	 * again (before handling all of the ev_q's events).
+	 *
+	 * This will also squelch IPIs, since there's no reason to send the IPI if
+	 * the INDIR is still un-acknowledged.  The vcore is either in vcore
+	 * context, attempting to deal with the INDIR, or offline.  This statement
+	 * is probably true. */
+	if (ev_q->ev_flags & EVENT_INDIR) {
+		ev_q->ev_alert_pending = TRUE;
+	}
 	/* Don't care about FALLBACK, just send and be done with it */
 	if (!ev_q->ev_flags & EVENT_FALLBACK) {
 		if (ev_q->ev_flags & EVENT_INDIR)

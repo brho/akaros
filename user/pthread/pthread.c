@@ -386,7 +386,7 @@ int pthread_create(pthread_t *thread, const pthread_attr_t *attr,
 	             (uint32_t)(pthread->stacktop));
 	pthread->start_routine = start_routine;
 	pthread->arg = arg;
-	/* Initializse the uthread */
+	/* Initialize the uthread */
 	uthread_init((struct uthread*)pthread);
 	uthread_runnable((struct uthread*)pthread);
 	*thread = pthread;
