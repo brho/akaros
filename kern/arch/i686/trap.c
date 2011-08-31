@@ -296,6 +296,19 @@ static void set_current_tf(struct per_cpu_info *pcpui, struct trapframe **tf)
 	*tf = &pcpui->actual_tf;
 }
 
+/* If the interrupt interrupted a halt, we advance past it.  Made to work with
+ * x86's custom cpu_halt() in arch/arch.h.  Note this nearly never gets called.
+ * I needed to insert exactly one 'nop' in cpu_halt() (that isn't there now) to
+ * get the interrupt to trip on the hlt, o/w the hlt will execute before the
+ * interrupt arrives (even with a pending interrupt that should hit right after
+ * an interrupt_enable (sti)).  This was on the i7. */
+static void abort_halt(struct trapframe *tf)
+{
+	/* the halt instruction in 32 bit is 0xf4, and it's size is 1 byte */
+	if (*(uint8_t*)tf->tf_eip == 0xf4)
+		tf->tf_eip += 1;
+}
+
 void trap(struct trapframe *tf)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
@@ -325,7 +338,8 @@ void irq_handler(struct trapframe *tf)
 	/* Copy out the TF for now, set tf to point to it. */
 	if (!in_kernel(tf))
 		set_current_tf(pcpui, &tf);
-
+	/* Coupled with cpu_halt() and smp_idle() */
+	abort_halt(tf);
 	//if (core_id())
 		printd("Incoming IRQ, ISR: %d on core %d\n", tf->tf_trapno, core_id());
 

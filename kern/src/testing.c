@@ -721,7 +721,6 @@ void test_kernel_messages(void)
 	return;
 }
 #endif // __i386__
-
 static void test_single_cache(int iters, size_t size, int align, int flags,
                               void (*ctor)(void *, size_t),
                               void (*dtor)(void *, size_t))
@@ -1420,4 +1419,30 @@ void test_atomics(void)
 	}
 	test_cas_val(257);
 	test_cas_val(1);
+}
+
+/* x86 test, making sure our cpu_halt() and irq_handler() work.  If you want to
+ * see it fail, you'll probably need to put a nop in the asm for cpu_halt(), and
+ * comment out abort_halt() in irq_handler(). */
+void test_abort_halt(void)
+{
+#ifdef __i386__
+	/* Core 1 does this, while core 0 hammers it with interrupts */
+	void test_try_halt(struct trapframe *tf, uint32_t srcid, long a0, long a1,
+	                   long a2)
+	{
+		disable_irq();
+		/* wait 10 sec.  should have a bunch of ints pending */
+		udelay(10000000);
+		printk("Core 1 is about to halt\n");
+		cpu_halt();
+		printk("Returned from halting on core 1\n");
+	}
+	send_kernel_message(1, test_try_halt, 0, 0, 0, KMSG_ROUTINE);
+	/* wait 1 sec, enough time to for core 1 to be in its KMSG */
+	udelay(1000000);
+	/* Send an IPI */
+	send_ipi(get_hw_coreid(0x01), I_TESTING);
+	printk("Core 0 sent the IPI\n");
+#endif /* __i386__ */
 }

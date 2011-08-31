@@ -51,10 +51,15 @@ static void __smp_idle(void)
 	 * for now, it is possible to have a current loaded, even if we are idle
 	 * (and presumably about to execute a kmsg or fire up a vcore). */
 	if (!management_core()) {
-		enable_irq();
 		while (1) {
+			disable_irq();
 			process_routine_kmsg(0);
+			/* cpu_halt() atomically turns on interrupts and halts the core.
+			 * Important to do this, since we could have a RKM come in via an
+			 * interrupt right while PRKM is returning, and we wouldn't catch
+			 * it. */
 			cpu_halt();
+			/* interrupts are back on now (given our current semantics) */
 		}
 	} else {
 		enable_irqsave(&state);
