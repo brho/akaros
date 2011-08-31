@@ -213,10 +213,10 @@ handle_perfctr:
 	jmp	%l2
 	 rett	%l2+4
 
-	// we make cpu_halt a linker symbol so we know if we were halted.
+	// we make __cpu_halt a linker symbol so we know if we were halted.
 	// if we were halted, we should return to PC+4, not PC.
-	.global cpu_halt
-cpu_halt:
-	ba,a cpu_halt
+	.global __cpu_halt
+__cpu_halt:
+	ba,a __cpu_halt
 	retl
 	 nop

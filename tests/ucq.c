@@ -3,6 +3,7 @@
 #include <parlib.h>
 #include <sys/mman.h>
 #include <ucq.h>
+#include <assert.h>
 
 int main(int argc, char** argv)
 {
