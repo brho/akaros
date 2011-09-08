@@ -13,6 +13,13 @@ x86: busted
 endif
 endif 
 
+# Check to make sure that we have gawk installed on our system and not some
+# other version of awk
+AWK := $(shell awk -W version 2>&1 | head -n 1 | awk '{print $$1}')
+ifneq ($(AWK),GNU)
+$(error You need to have 'gawk' installed on your system!)
+endif
+
 BINUTILS_VERSION := 2.18
 GCC_VERSION := 4.3.2
 GLIBC_VERSION := 2.11.1
@@ -69,7 +76,7 @@ x86:
 	export GCC_BUILD_FLAGS=$(X86_GCC_BUILD_FLAGS);\
 	$(MAKE) make-all
 
-make-all:
+make-all: 
 	$(MAKE) .glibc-patch
 	$(MAKE) .$(BINARY_PREFIX)binutils-make
 	$(MAKE) .$(BINARY_PREFIX)binutils-install
