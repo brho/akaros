@@ -3,6 +3,7 @@
 #include <arch/atomic.h>
 #include <string.h>
 #include <stdlib.h>
+#include <uthread.h>
 
 // MCS locks
 void mcs_lock_init(struct mcs_lock *lock)
@@ -54,16 +55,30 @@ void mcs_lock_unlock(struct mcs_lock *lock, struct mcs_lock_qnode *qnode)
  * (when switching into the TLS, etc). */
 void mcs_lock_notifsafe(struct mcs_lock *lock, struct mcs_lock_qnode *qnode)
 {
-	if (!in_vcore_context())
+	if (!in_vcore_context()) {
+		if (current_uthread)
+			current_uthread->flags |= UTHREAD_DONT_MIGRATE;
+		wmb();
 		disable_notifs(vcore_id());
+		wmb();
+		if (current_uthread)
+			current_uthread->flags &= ~UTHREAD_DONT_MIGRATE;
+	}
 	mcs_lock_lock(lock, qnode);
 }
 
 void mcs_unlock_notifsafe(struct mcs_lock *lock, struct mcs_lock_qnode *qnode)
 {
 	mcs_lock_unlock(lock, qnode);
-	if (!in_vcore_context() && num_vcores() > 0)
+	if (!in_vcore_context() && in_multi_mode()) {
+		if (current_uthread)
+			current_uthread->flags |= UTHREAD_DONT_MIGRATE;
+		wmb();
 		enable_notifs(vcore_id());
+		wmb();
+		if (current_uthread)
+			current_uthread->flags &= ~UTHREAD_DONT_MIGRATE;
+	}
 }
 
 // MCS dissemination barrier!

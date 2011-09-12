@@ -237,6 +237,15 @@ void enable_notifs(uint32_t vcoreid)
 		sys_self_notify(vcoreid, EV_NONE, 0);
 }
 
+/* Helper to disable notifs.  It simply checks to make sure we disabled uthread
+ * migration, which is a common mistake. */
+void disable_notifs(uint32_t vcoreid)
+{
+	if (!in_vcore_context() && current_uthread)
+		assert(current_uthread->flags & UTHREAD_DONT_MIGRATE);
+	__disable_notifs(vcoreid);
+}
+
 /* Like smp_idle(), this will put the core in a state that it can only be woken
  * up by an IPI.  In the future, we may halt or something. */
 void __attribute__((noreturn)) vcore_idle(void)
