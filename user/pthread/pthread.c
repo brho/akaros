@@ -92,7 +92,7 @@ void __attribute__((noreturn)) pth_sched_entry(void)
 		printd("[P] No threads, vcore %d is yielding\n", vcore_id());
 		/* TODO: you can imagine having something smarter here, like spin for a
 		 * bit before yielding (or not at all if you want to be greedy). */
-		vcore_yield();
+		vcore_yield(FALSE);
 	} while (1);
 	assert(((struct uthread*)new_thread)->state != UT_RUNNING);
 	run_uthread((struct uthread*)new_thread);

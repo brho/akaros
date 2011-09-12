@@ -302,8 +302,10 @@ bool check_preempt_pending(uint32_t vcoreid)
 		if (sched_ops->preempt_pending)
 			sched_ops->preempt_pending();
 		/* this tries to yield, but will pop back up if this was a spurious
-		 * preempt_pending. */
-		sys_yield(TRUE);
+		 * preempt_pending.  Note this will handle events internally, and then
+		 * recurse once per event in the queue.  This sucks, but keeps us from
+		 * missing messages for now. */
+		vcore_yield(TRUE);
 	}
 	return retval;
 }

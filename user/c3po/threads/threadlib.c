@@ -362,7 +362,7 @@ void run_next_thread()
 	if(gflags.exit_func_done) {
       bool yieldcore = __query_vcore_yield();
       mcs_lock_unlock(&thread_lock, &local_qn);
-      if(yieldcore) vcore_yield();
+      if(yieldcore) vcore_yield(FALSE);
     }
 		
     // Otherwise, grab a thread from the scheduler queue 
@@ -376,7 +376,7 @@ void run_next_thread()
     if(t == NULL) {
       bool yieldcore = __query_vcore_yield();
       mcs_lock_unlock(&thread_lock, &local_qn);
-      if(yieldcore) vcore_yield();
+      if(yieldcore) vcore_yield(FALSE);
     }
 	// Otherwise, if the thread is in the ZOMBIE state, then it must have been
 	// detached and added back to the queue for the scheduler to reap.  
@@ -988,7 +988,7 @@ void thread_exit(void *ret)
 
   /* If we were told to yield the vcore, do it! */
   if(yieldcore)
-    vcore_yield();
+    vcore_yield(FALSE);
 	  
   /* Otherwise switch back to vcore context to schedule the next thread. */
   switch_to_vcore();

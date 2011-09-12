@@ -47,7 +47,7 @@ static inline void disable_notifs(uint32_t vcoreid);
 static inline bool notif_is_enabled(uint32_t vcoreid);
 int vcore_init(void);
 int vcore_request(size_t k);
-void vcore_yield(void);
+void vcore_yield(bool preempt_pending);
 void clear_notif_pending(uint32_t vcoreid);
 void enable_notifs(uint32_t vcoreid);
 void vcore_idle(void);

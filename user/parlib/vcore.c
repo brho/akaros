@@ -196,7 +196,7 @@ fail:
 }
 
 /* This can return, if you failed to yield due to a concurrent event. */
-void vcore_yield()
+void vcore_yield(bool preempt_pending)
 {
 	uint32_t vcoreid = vcore_id();
 	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
@@ -208,7 +208,7 @@ void vcore_yield()
 		return;
 	}
 	/* o/w, we can safely yield */
-	sys_yield(0);
+	sys_yield(preempt_pending);
 }
 
 /* Clear pending, and try to handle events that came in between a previous call
@@ -227,7 +227,9 @@ void clear_notif_pending(uint32_t vcoreid)
 }
 
 /* Enables notifs, and deals with missed notifs by self notifying.  This should
- * be rare, so the syscall overhead isn't a big deal. */
+ * be rare, so the syscall overhead isn't a big deal.  The other alternative
+ * would be to uthread_yield(), which would require us to revert some uthread
+ * interface changes. */
 void enable_notifs(uint32_t vcoreid)
 {
 	__enable_notifs(vcoreid);
