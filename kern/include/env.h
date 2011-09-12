@@ -20,6 +20,9 @@
 #include <mm.h>
 #include <vfs.h>
 
+/* List def for the three vcore lists */
+TAILQ_HEAD(vcore_tailq, vcore);
+
 // TODO: clean this up.
 struct proc {
 	TAILQ_ENTRY(proc) proc_link NOINIT;	// Free list link pointers
@@ -34,6 +37,10 @@ struct proc {
 	struct kref p_kref;		/* Refcnt */
 	uint32_t env_flags;
 	uintptr_t env_entry;
+	/* Lists of vcores */
+	struct vcore_tailq online_vcs;
+	struct vcore_tailq bulk_preempted_vcs;
+	struct vcore_tailq inactive_vcs;
 
 	/* Cache color map: bitmap of the cache colors currently allocated to this
 	 * process */

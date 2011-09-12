@@ -102,6 +102,9 @@
  *
  */
 #ifdef QUEUE_MACRO_DEBUG
+/* ROS has TAILQ-sized elements in a vcore, exposed to userspace via the
+ * vcoremap.  If you have QM tracing turned on, you'll mess it up. */
+#error "Don't use sys/queue QUEUE_MACRO_DEBUG without dealing with the vcoremap"
 /* Store the last 2 places the queue element or head was altered */
 struct qm_trace {
 	char * lastfile;

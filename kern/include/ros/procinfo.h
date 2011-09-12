@@ -11,10 +11,20 @@
 #define PROCINFO_MAX_ARGP 32
 #define PROCINFO_ARGBUF_SIZE 3072
 
+#ifdef ROS_KERNEL
+#include <sys/queue.h>
+#endif /* ROS_KERNEL */
 
 /* Not necessary to expose all of this, but it doesn't hurt, and is convenient
- * for the kernel. */
+ * for the kernel.  Need to do some acrobatics for the TAILQ_ENTRY. */
+struct vcore;
 struct vcore {
+#ifdef ROS_KERNEL
+	TAILQ_ENTRY(vcore)	list;
+#else /* userspace */
+	void				*dummy_ptr1;
+	void				*dummy_ptr2;
+#endif /* ROS_KERNEL */
 	uint32_t			pcoreid;
 	bool				valid;
 	bool				preempt_served;

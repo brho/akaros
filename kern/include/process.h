@@ -87,8 +87,10 @@ void proc_notify(struct proc *p, uint32_t vcoreid);
 
 /* Vcoremap info: */
 uint32_t proc_get_vcoreid(struct proc *SAFE p, uint32_t pcoreid);
-/* TODO: make this an inline once we gut the Env crap */
+/* TODO: make all of these inline once we gut the Env crap */
 bool vcore_is_mapped(struct proc *p, uint32_t vcoreid);
+uint32_t vcore2vcoreid(struct proc *p, struct vcore *vc);
+struct vcore *vcoreid2vcore(struct proc *p, uint32_t vcoreid);
 
 /* Process core management.  Only call these if you are RUNNING_M or RUNNABLE_M.
  * These all adjust the vcoremap and take appropriate actions (like __startcore

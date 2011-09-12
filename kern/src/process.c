@@ -184,6 +184,8 @@ struct proc *pid2proc(pid_t pid)
  * any process related function. */
 void proc_init(void)
 {
+	/* Catch issues with the vcoremap and TAILQ_ENTRY sizes */
+	static_assert(sizeof(TAILQ_ENTRY(vcore)) == sizeof(void*) * 2);
 	proc_cache = kmem_cache_create("proc", sizeof(struct proc),
 	             MAX(HW_CACHE_ALIGN, __alignof__(struct proc)), 0, 0, 0);
 	/* Init PID mask and hash.  pid 0 is reserved. */
@@ -238,8 +240,8 @@ void proc_init(void)
 	atomic_init(&num_envs, 0);
 }
 
-void
-proc_init_procinfo(struct proc* p)
+/* Be sure you init'd the vcore lists before calling this. */
+void proc_init_procinfo(struct proc* p)
 {
 	memset(&p->procinfo->vcoremap, 0, sizeof(p->procinfo->vcoremap));
 	memset(&p->procinfo->pcoremap, 0, sizeof(p->procinfo->pcoremap));
@@ -255,6 +257,12 @@ proc_init_procinfo(struct proc* p)
 #else
 	p->procinfo->max_vcores = MAX(1,num_cpus-num_mgmtcores);
 #endif /* __CONFIG_DISABLE_SMT__ */
+	/* For now, we'll go up to the max num_cpus (at runtime).  In the future,
+	 * there may be cases where we can have more vcores than num_cpus, but for
+	 * now we'll leave it like this. */
+	for (int i = 0; i < num_cpus; i++) {
+		TAILQ_INSERT_TAIL(&p->inactive_vcs, &p->procinfo->vcoremap[i], list);
+	}
 }
 
 /* Allocates and initializes a process, with the given parent.  Currently
@@ -299,7 +307,11 @@ error_t proc_alloc(struct proc **pp, struct proc *parent)
 	memset(&p->env_ancillary_state, 0, sizeof(p->env_ancillary_state));
 	memset(&p->env_tf, 0, sizeof(p->env_tf));
 	TAILQ_INIT(&p->vm_regions); /* could init this in the slab */
-
+	/* Initialize the vcore lists, we'll build the inactive list so that it includes
+	 * all vcores when we initialize procinfo.  Do this before initing procinfo. */
+	TAILQ_INIT(&p->online_vcs);
+	TAILQ_INIT(&p->bulk_preempted_vcs);
+	TAILQ_INIT(&p->inactive_vcs);
 	/* Initialize the contents of the e->procinfo structure */
 	proc_init_procinfo(p);
 	/* Initialize the contents of the e->procdata structure */
@@ -1057,10 +1069,21 @@ uint32_t proc_get_vcoreid(struct proc *SAFE p, uint32_t pcoreid)
 	}
 }
 
-/* TODO: make this a static inline when we gut the env crap */
+/* TODO: make all of these static inlines when we gut the env crap */
 bool vcore_is_mapped(struct proc *p, uint32_t vcoreid)
 {
 	return p->procinfo->vcoremap[vcoreid].valid;
+}
+
+/* Can do this, or just create a new field and save it in the vcoremap */
+uint32_t vcore2vcoreid(struct proc *p, struct vcore *vc)
+{
+	return (vc - p->procinfo->vcoremap);
+}
+
+struct vcore *vcoreid2vcore(struct proc *p, uint32_t vcoreid)
+{
+	return &p->procinfo->vcoremap[vcoreid];
 }
 
 /* Gives process p the additional num cores listed in pcorelist.  You must be
@@ -1567,6 +1590,7 @@ void print_proc_info(pid_t pid)
 {
 	int j = 0;
 	struct proc *p = pid2proc(pid);
+	struct vcore *vc_i;
 	if (!p) {
 		printk("Bad PID.\n");
 		return;
@@ -1581,13 +1605,23 @@ void print_proc_info(pid_t pid)
 	printk("Flags: 0x%08x\n", p->env_flags);
 	printk("CR3(phys): 0x%08x\n", p->env_cr3);
 	printk("Num Vcores: %d\n", p->procinfo->num_vcores);
-	printk("Vcoremap:\n");
+	printk("Vcoremap (old style):\n");
 	for (int i = 0; i < p->procinfo->num_vcores; i++) {
 		j = get_busy_vcoreid(p, j);
 		printk("\tVcore %d: Pcore %d\n", j, get_pcoreid(p, j));
 		j++;
 	}
-	printk("Resources:\n");
+	printk("Vcore Lists:\n----------------------\n");
+	printk("Online:\n");
+	TAILQ_FOREACH(vc_i, &p->online_vcs, list)
+		printk("\tVcore %d -> Pcore %d\n", vcore2vcoreid(p, vc_i), vc_i->pcoreid);
+	printk("Bulk Preempted:\n");
+	TAILQ_FOREACH(vc_i, &p->bulk_preempted_vcs, list)
+		printk("\tVcore %d\n", vcore2vcoreid(p, vc_i));
+	printk("Inactive / Yielded:\n");
+	TAILQ_FOREACH(vc_i, &p->inactive_vcs, list)
+		printk("\tVcore %d\n", vcore2vcoreid(p, vc_i));
+	printk("Resources:\n------------------------\n");
 	for (int i = 0; i < MAX_NUM_RESOURCES; i++)
 		printk("\tRes type: %02d, amt wanted: %08d, amt granted: %08d\n", i,
 		       p->resources[i].amt_wanted, p->resources[i].amt_granted);
