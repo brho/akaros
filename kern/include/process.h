@@ -67,7 +67,6 @@ extern uint32_t LCKD(&idle_lock) num_idlecores;
 
 /* Initialization */
 void proc_init(void);
-void proc_init_procinfo(struct proc *p);
 
 /* Process management: */
 error_t proc_alloc(struct proc **pp, struct proc *parent);

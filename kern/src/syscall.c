@@ -436,12 +436,16 @@ static ssize_t sys_fork(env_t* e)
 		return 0;
 	}
 
-	// TODO: (PC) this won't work.  Needs revisiting.
-	// copy procdata and procinfo
-	memcpy(env->procdata,e->procdata,sizeof(struct procdata));
-	memcpy(env->procinfo,e->procinfo,sizeof(struct procinfo));
-	env->procinfo->pid = env->pid;
-	env->procinfo->ppid = env->ppid;
+	/* In general, a forked process should be a fresh process, and we copy over
+	 * whatever stuff is needed between procinfo/procdata. */
+	/* Copy over the procinfo argument stuff in case they don't exec */
+	memcpy(env->procinfo->argp, e->procinfo->argp, sizeof(e->procinfo->argp));
+	memcpy(env->procinfo->argbuf, e->procinfo->argbuf,
+	       sizeof(e->procinfo->argbuf));
+	#ifdef __i386__
+	/* new guy needs to know about ldt (everything else in procdata is fresh */
+	env->procdata->ldt = e->procdata->ldt;
+	#endif
 
 	/* for now, just copy the contents of every present page in the entire
 	 * address space. */
@@ -517,11 +521,10 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	                           sizeof(pi->argbuf)))
 		goto mid_error;
 	/* This is the point of no return for the process. */
-	/* TODO: issues with this: Need to also assert there are no outstanding
-	 * users of the sysrings.  the ldt page will get freed shortly, so that's
-	 * okay.  Potentially issues with the nm and vcpd if we were in _M before
-	 * and someone is trying to notify. */
-	memset(p->procdata, 0, sizeof(procdata_t));
+	#ifdef __i386__
+	/* clear this, so the new program knows to get an LDT */
+	p->procdata->ldt = 0;
+	#endif
 	destroy_vmrs(p);
 	close_all_files(&p->open_files, TRUE);
 	env_user_mem_free(p, 0, UMAPTOP);

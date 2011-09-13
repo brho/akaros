@@ -241,28 +241,37 @@ void proc_init(void)
 }
 
 /* Be sure you init'd the vcore lists before calling this. */
-void proc_init_procinfo(struct proc* p)
+static void proc_init_procinfo(struct proc* p)
 {
-	memset(&p->procinfo->vcoremap, 0, sizeof(p->procinfo->vcoremap));
-	memset(&p->procinfo->pcoremap, 0, sizeof(p->procinfo->pcoremap));
-	p->procinfo->num_vcores = 0;
-	p->procinfo->coremap_seqctr = SEQCTR_INITIALIZER;
-	// TODO: change these too
 	p->procinfo->pid = p->pid;
 	p->procinfo->ppid = p->ppid;
-	p->procinfo->tsc_freq = system_timing.tsc_freq;
 	// TODO: maybe do something smarter here
 #ifdef __CONFIG_DISABLE_SMT__
 	p->procinfo->max_vcores = num_cpus >> 1;
 #else
 	p->procinfo->max_vcores = MAX(1,num_cpus-num_mgmtcores);
 #endif /* __CONFIG_DISABLE_SMT__ */
+	p->procinfo->tsc_freq = system_timing.tsc_freq;
+	p->procinfo->heap_bottom = (void*)UTEXT;
+	/* 0'ing the arguments.  Some higher function will need to set them */
+	memset(p->procinfo->argp, 0, sizeof(p->procinfo->argp));
+	memset(p->procinfo->argbuf, 0, sizeof(p->procinfo->argbuf));
+	/* 0'ing the vcore/pcore map.  Will link the vcores later. */
+	memset(&p->procinfo->vcoremap, 0, sizeof(p->procinfo->vcoremap));
+	memset(&p->procinfo->pcoremap, 0, sizeof(p->procinfo->pcoremap));
+	p->procinfo->num_vcores = 0;
+	p->procinfo->coremap_seqctr = SEQCTR_INITIALIZER;
 	/* For now, we'll go up to the max num_cpus (at runtime).  In the future,
 	 * there may be cases where we can have more vcores than num_cpus, but for
 	 * now we'll leave it like this. */
 	for (int i = 0; i < num_cpus; i++) {
 		TAILQ_INSERT_TAIL(&p->inactive_vcs, &p->procinfo->vcoremap[i], list);
 	}
+}
+
+static void proc_init_procdata(struct proc *p)
+{
+	memset(p->procdata, 0, sizeof(struct procdata));
 }
 
 /* Allocates and initializes a process, with the given parent.  Currently
@@ -301,8 +310,7 @@ error_t proc_alloc(struct proc **pp, struct proc *parent)
 	p->state = PROC_CREATED; /* shouldn't go through state machine for init */
 	p->env_flags = 0;
 	p->env_entry = 0; // cheating.  this really gets set later
-	p->procinfo->heap_bottom = (void*)UTEXT;
-	p->heap_top = (void*)UTEXT;
+	p->heap_top = (void*)UTEXT;	/* heap_bottom set in proc_init_procinfo */
 	memset(&p->resources, 0, sizeof(p->resources));
 	memset(&p->env_ancillary_state, 0, sizeof(p->env_ancillary_state));
 	memset(&p->env_tf, 0, sizeof(p->env_tf));
@@ -312,9 +320,9 @@ error_t proc_alloc(struct proc **pp, struct proc *parent)
 	TAILQ_INIT(&p->online_vcs);
 	TAILQ_INIT(&p->bulk_preempted_vcs);
 	TAILQ_INIT(&p->inactive_vcs);
-	/* Initialize the contents of the e->procinfo structure */
+	/* Init procinfo/procdata.  Procinfo's argp/argb are 0'd */
 	proc_init_procinfo(p);
-	/* Initialize the contents of the e->procdata structure */
+	proc_init_procdata(p);
 
 	/* Initialize the generic sysevent ring buffer */
 	SHARED_RING_INIT(&p->procdata->syseventring);

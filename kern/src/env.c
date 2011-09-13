@@ -83,6 +83,8 @@ WRITES(e->env_pgdir, e->env_cr3, e->procinfo, e->procdata)
 		goto env_setup_vm_error_i;
 	if (!(e->procdata = get_cont_pages(LOG2_UP(PROCDATA_NUM_PAGES), 0)))
 		goto env_setup_vm_error_d;
+	/* Normally we'd 0 the pages here.  We handle it in proc_init_proc*.  Don't
+	 * start the process without calling those. */
 	for (int i = 0; i < PROCINFO_NUM_PAGES; i++) {
 		if (page_insert(e->env_pgdir, kva2page((void*)e->procinfo + i *
 		                PGSIZE), (void*SNT)(UINFO + i*PGSIZE), PTE_USER_RO) < 0)
@@ -93,9 +95,6 @@ WRITES(e->env_pgdir, e->env_cr3, e->procinfo, e->procdata)
 		                PGSIZE), (void*SNT)(UDATA + i*PGSIZE), PTE_USER_RW) < 0)
 			goto env_setup_vm_error;
 	}
-	memset(e->procinfo, 0, sizeof(struct procinfo));
-	memset(e->procdata, 0, sizeof(struct procdata));
-
 	/* Finally, set up the Global Shared Data page for all processes.  Can't be
 	 * trusted, but still very useful at this stage for us.  Consider removing
 	 * when we have real processes (TODO). 
