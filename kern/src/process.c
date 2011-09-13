@@ -508,7 +508,9 @@ void proc_run(struct proc *p)
 			 * Also, this is the signal used in trap.c to know to save the tf in
 			 * env_tf. */
 			__seq_start_write(&p->procinfo->coremap_seqctr);
-			p->procinfo->num_vcores = 0;
+			p->procinfo->num_vcores = 0;	/* TODO (VC#) */
+			/* TODO: For now, we won't count this as an active vcore (on the
+			 * lists).  This gets unmapped in resource.c, and needs work. */
 			__map_vcore(p, 0, core_id()); // sort of.  this needs work.
 			__seq_end_write(&p->procinfo->coremap_seqctr);
 			/* __set_proc_current assumes the reference we give it is for
@@ -803,7 +805,7 @@ void __proc_yield_s(struct proc *p, struct trapframe *tf)
 void proc_yield(struct proc *SAFE p, bool being_nice)
 {
 	uint32_t vcoreid = get_vcoreid(p, core_id());
-	struct vcore *vc = &p->procinfo->vcoremap[vcoreid];
+	struct vcore *vc = vcoreid2vcore(p, vcoreid);
 
 	/* no reason to be nice, return */
 	if (being_nice && !vc->preempt_pending)
@@ -836,8 +838,12 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 				return;
 			}
 			__seq_start_write(&p->procinfo->coremap_seqctr);
-			// give up core
-			__unmap_vcore(p, get_vcoreid(p, core_id()));
+			/* Remove from the online list, add to the yielded list, and unmap
+			 * the vcore, which gives up the core. */
+			TAILQ_REMOVE(&p->online_vcs, vc, list);
+			TAILQ_INSERT_HEAD(&p->inactive_vcs, vc, list);
+			__unmap_vcore(p, vcoreid);
+			/* Adjust implied resource desires */
 			p->resources[RES_CORES].amt_granted = --(p->procinfo->num_vcores);
 			if (!being_nice)
 				p->resources[RES_CORES].amt_wanted = p->procinfo->num_vcores;
@@ -1139,11 +1145,17 @@ bool __proc_give_cores(struct proc *SAFE p, uint32_t *pcorelist, size_t num)
 			}
 			// add new items to the vcoremap
 			__seq_start_write(&p->procinfo->coremap_seqctr);
+			/* TODO: consider bulk preemption */
 			for (int i = 0; i < num; i++) {
+				/* TODO: (VCL) should be the head item, and could be empty */
 				// find the next free slot, which should be the next one
 				free_vcoreid = get_free_vcoreid(p, free_vcoreid);
 				printd("setting vcore %d to pcore %d\n", free_vcoreid,
 				       pcorelist[i]);
+				TAILQ_REMOVE(&p->inactive_vcs, vcoreid2vcore(p, free_vcoreid),
+				             list);
+				TAILQ_INSERT_TAIL(&p->online_vcs, vcoreid2vcore(p, free_vcoreid),
+				                  list);
 				__map_vcore(p, free_vcoreid, pcorelist[i]);
 				p->procinfo->num_vcores++;
 			}
@@ -1155,9 +1167,14 @@ bool __proc_give_cores(struct proc *SAFE p, uint32_t *pcorelist, size_t num)
 			proc_incref(p, num);
 			__seq_start_write(&p->procinfo->coremap_seqctr);
 			for (int i = 0; i < num; i++) {
+				/* TODO: (VCL) should be the head item, and could be empty */
 				free_vcoreid = get_free_vcoreid(p, free_vcoreid);
 				printd("setting vcore %d to pcore %d\n", free_vcoreid,
 				       pcorelist[i]);
+				TAILQ_REMOVE(&p->inactive_vcs, vcoreid2vcore(p, free_vcoreid),
+				             list);
+				TAILQ_INSERT_TAIL(&p->online_vcs, vcoreid2vcore(p, free_vcoreid),
+				                  list);
 				__map_vcore(p, free_vcoreid, pcorelist[i]);
 				p->procinfo->num_vcores++;
 				send_kernel_message(pcorelist[i], __startcore, (long)p, 0, 0,
@@ -1224,6 +1241,11 @@ bool __proc_take_cores(struct proc *p, uint32_t *pcorelist, size_t num,
 		// while ugly, this is done to facilitate merging with take_all_cores
 		pcoreid = get_pcoreid(p, vcoreid);
 		assert(pcoreid == pcorelist[i]);
+		/* Change lists for the vcore.  We do this before either unmapping or
+		 * sending the message, so the lists represent what will be very soon
+		 * (before we unlock, the messages are in flight). */
+		TAILQ_REMOVE(&p->online_vcs, vcoreid2vcore(p, vcoreid), list);
+		TAILQ_INSERT_HEAD(&p->inactive_vcs, vcoreid2vcore(p, vcoreid), list);
 		if (message) {
 			if (pcoreid == core_id())
 				self_ipi_pending = TRUE;
@@ -1269,10 +1291,17 @@ bool __proc_take_allcores(struct proc *p, amr_t message, long arg0, long arg1,
 	assert(num_idlecores + p->procinfo->num_vcores <= num_cpus); // sanity
 	spin_unlock(&idle_lock);
 	__seq_start_write(&p->procinfo->coremap_seqctr);
+	/* TODO: (VCL) use the active list, make it a while loop, assert, etc */
 	for (int i = 0; i < p->procinfo->num_vcores; i++) {
 		// find next active vcore
 		active_vcoreid = get_busy_vcoreid(p, active_vcoreid);
 		pcoreid = get_pcoreid(p, active_vcoreid);
+		/* Change lists for the vcore.  We do this before either unmapping or
+		 * sending the message, so the lists represent what will be very soon
+		 * (before we unlock, the messages are in flight). */
+		TAILQ_REMOVE(&p->online_vcs, vcoreid2vcore(p, active_vcoreid), list);
+		TAILQ_INSERT_HEAD(&p->inactive_vcs, vcoreid2vcore(p, active_vcoreid),
+		                  list);
 		if (message) {
 			if (pcoreid == core_id())
 				self_ipi_pending = TRUE;
