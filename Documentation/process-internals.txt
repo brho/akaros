@@ -14,7 +14,8 @@ Contents:
 5. Current_tf
 6. Locking!
 7. TLB Coherency
-8. TBD
+8. Process Management
+9. TBD
 
 1. Reference Counting
 ===========================
@@ -872,5 +873,55 @@ it'll get changed to is to send the kmsg with the range to the appropriate
 cores, and then maybe put the page on the end of the freelist (instead of the
 head).  More to come.
 
-8. TBD
+8. Process Management
+===========================
+8.1 Vcore lists
+---------------------------
+We have three lists to track a process's vcores.  The vcores themselves sit in
+the vcoremap in procinfo; they aren't dynamically allocated (memory) or
+anything like that.  The lists greatly eases vcore discovery and management.
+
+A vcore is on exactly one of three lists: online (mapped and running vcores,
+sometimes called 'active'), bulk_preempt (was online when the process was bulk
+preempted (like a timeslice)), and inactive (yielded, hasn't come on yet,
+etc).  When writes are complete (unlocked), either the online list or the
+bulk_preempt list should be empty.
+
+List modifications are protected by the proc_lock.  You can concurrently read,
+but note you may get some weird behavior, such as a vcore on multiple lists, a
+vcore on no lists, online and bulk_preempt both having items, etc.  Currently,
+event code will read these lists when hunting for a suitable core, and will
+have to be careful about races.  I want to avoid event FALLBACK code from
+grabbing the proc_lock.
+
+Another slight thing to be careful of is that the vcore lists don't always
+agree with the vcore mapping.  However, it will always agree with what the
+state of the process will be when all kmsgs are processed (fate).
+Specifically, when we take vcores, the unmapping happens with the lock not
+held on the vcore itself (as discussed elsewhere).  The vcore lists represent
+the result of those pending unmaps.
+
+Before we used the lists, we scanned the vcoremap in a painful, clunky manner.
+In the old style, when you asked for a vcore, the first one you got was the
+first hole in the vcoremap.  Ex: Vcore0 would always be granted if it was
+offline.  That's no longer true; the most recent vcore yielded will be given
+out next.  This will help with cache locality, and also cuts down on the
+scenarios on which the kernel gives out a vcore that userspace wasn't
+expecting.  This can still happen if they ask for more vcores than they set up
+for, or if a vcore doesn't *want* to come online (there's a couple scenarios
+with preemption recovery where that may come up).
+
+So the plan with the bulk preempt list is that vcores on it were preempted,
+and the kernel will attempt to restart all of them (and move them to the online
+list).  Any leftovers will be moved to the inactive list, and have preemption
+recovery messages sent out.  Any shortages (they want more vcores than were
+bulk_preempted) will be taken from the yield list.  This all means that
+whether or not a vcore needs to be preempt-recovered or if there is a message
+out about its preemption doesn't really affect which list it is on.  You could
+have a vcore on the inactive list that was bulk preempted (and not turned back
+on), and then that vcore gets granted in the next round of vcore_requests().
+The preemption recovery handlers will need to deal with concurrent handlers
+and the vcore itself starting back up.
+
+9. TBD
 ===========================

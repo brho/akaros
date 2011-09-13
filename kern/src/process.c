@@ -54,8 +54,6 @@ void put_idle_core(uint32_t coreid)
 
 /* Other helpers, implemented later. */
 static void __proc_startcore(struct proc *p, trapframe_t *tf);
-static uint32_t get_free_vcoreid(struct proc *SAFE p, uint32_t prev);
-static uint32_t get_busy_vcoreid(struct proc *SAFE p, uint32_t prev);
 static bool is_mapped_vcore(struct proc *p, uint32_t pcoreid);
 static uint32_t get_vcoreid(struct proc *p, uint32_t pcoreid);
 static uint32_t get_pcoreid(struct proc *p, uint32_t vcoreid);
@@ -490,6 +488,7 @@ static void __set_proc_current(struct proc *p)
 void proc_run(struct proc *p)
 {
 	bool self_ipi_pending = FALSE;
+	struct vcore *vc_i;
 	spin_lock(&p->proc_lock);
 
 	switch (p->state) {
@@ -540,9 +539,13 @@ void proc_run(struct proc *p)
 				 * an IPI (once we reenable interrupts) and never return. */
 				if (is_mapped_vcore(p, core_id()))
 					self_ipi_pending = TRUE;
-				for (int i = 0; i < p->procinfo->num_vcores; i++)
-					send_kernel_message(get_pcoreid(p, i), __startcore, (long)p,
+				/* Send kernel messages to all online vcores (which were added
+				 * to the list and mapped in __proc_give_cores()), making them
+				 * turn online */
+				TAILQ_FOREACH(vc_i, &p->online_vcs, list) {
+					send_kernel_message(vc_i->pcoreid, __startcore, (long)p,
 					                    0, 0, KMSG_ROUTINE);
+				}
 			} else {
 				warn("Tried to proc_run() an _M with no vcores!");
 			}
@@ -723,34 +726,6 @@ void proc_destroy(struct proc *p)
 	 * one for every 'current'.  and maybe one for a parent */
 	__proc_kmsg_pending(p, self_ipi_pending);
 	return;
-}
-
-/* Helper function.  Starting from prev, it will find the next free vcoreid,
- * which is the next vcore that is not valid.
- * You better hold the lock before calling this. */
-static uint32_t get_free_vcoreid(struct proc *SAFE p, uint32_t prev)
-{
-	uint32_t i;
-	for (i = prev; i < MAX_NUM_CPUS; i++)
-		if (!vcore_is_mapped(p, i))
-			break;
-	if (i + 1 >= MAX_NUM_CPUS)
-		warn("At the end of the vcorelist.  Might want to check that out.");
-	return i;
-}
-
-/* Helper function.  Starting from prev, it will find the next busy vcoreid,
- * which is the next vcore that is valid.
- * You better hold the lock before calling this. */
-static uint32_t get_busy_vcoreid(struct proc *SAFE p, uint32_t prev)
-{
-	uint32_t i;
-	for (i = prev; i < MAX_NUM_CPUS; i++)
-		if (vcore_is_mapped(p, i))
-			break;
-	if (i + 1 >= MAX_NUM_CPUS)
-		warn("At the end of the vcorelist.  Might want to check that out.");
-	return i;
 }
 
 /* Helper function.  Is the given pcore a mapped vcore?  No locking involved, be
@@ -947,12 +922,9 @@ void __proc_preempt_warn(struct proc *p, uint32_t vcoreid, uint64_t when)
  * care about the mapping (and you should). */
 void __proc_preempt_warnall(struct proc *p, uint64_t when)
 {
-	uint32_t active_vcoreid = 0;
-	for (int i = 0; i < p->procinfo->num_vcores; i++) {
-		active_vcoreid = get_busy_vcoreid(p, active_vcoreid);
-		__proc_preempt_warn(p, active_vcoreid, when);
-		active_vcoreid++;
-	}
+	struct vcore *vc_i;
+	TAILQ_FOREACH(vc_i, &p->online_vcs, list)
+		__proc_preempt_warn(p, vcore2vcoreid(p, vc_i), when);
 	/* TODO: consider putting in some lookup place for the alarm to find it.
 	 * til then, it'll have to scan the vcoremap (O(n) instead of O(m)) */
 }
@@ -977,12 +949,9 @@ bool __proc_preempt_all(struct proc *p)
 	/* instead of doing this, we could just preempt_served all possible vcores,
 	 * and not just the active ones.  We would need to sort out a way to deal
 	 * with stale preempt_serveds first.  This might be just as fast anyways. */
-	uint32_t active_vcoreid = 0;
-	for (int i = 0; i < p->procinfo->num_vcores; i++) {
-		active_vcoreid = get_busy_vcoreid(p, active_vcoreid);
-		p->procinfo->vcoremap[active_vcoreid].preempt_served = TRUE;
-		active_vcoreid++;
-	}
+	struct vcore *vc_i;
+	TAILQ_FOREACH(vc_i, &p->online_vcs, list)
+		vc_i->preempt_served = TRUE;
 	return __proc_take_allcores(p, __preempt, (long)p, 0, 0);
 }
 
@@ -1121,9 +1090,9 @@ struct vcore *vcoreid2vcore(struct proc *p, uint32_t vcoreid)
  *
  * WARNING: You must hold the proc_lock before calling this! */
 bool __proc_give_cores(struct proc *SAFE p, uint32_t *pcorelist, size_t num)
-{ TRUSTEDBLOCK
+{
 	bool self_ipi_pending = FALSE;
-	uint32_t free_vcoreid = 0;
+	struct vcore *new_vc;
 	switch (p->state) {
 		case (PROC_RUNNABLE_S):
 		case (PROC_RUNNING_S):
@@ -1147,16 +1116,14 @@ bool __proc_give_cores(struct proc *SAFE p, uint32_t *pcorelist, size_t num)
 			__seq_start_write(&p->procinfo->coremap_seqctr);
 			/* TODO: consider bulk preemption */
 			for (int i = 0; i < num; i++) {
-				/* TODO: (VCL) should be the head item, and could be empty */
-				// find the next free slot, which should be the next one
-				free_vcoreid = get_free_vcoreid(p, free_vcoreid);
-				printd("setting vcore %d to pcore %d\n", free_vcoreid,
+				new_vc = TAILQ_FIRST(&p->inactive_vcs);
+				/* there are cases where this isn't true; deal with it later */
+				assert(new_vc);
+				printd("setting vcore %d to pcore %d\n", vcore2vcoreid(p, new_vc),
 				       pcorelist[i]);
-				TAILQ_REMOVE(&p->inactive_vcs, vcoreid2vcore(p, free_vcoreid),
-				             list);
-				TAILQ_INSERT_TAIL(&p->online_vcs, vcoreid2vcore(p, free_vcoreid),
-				                  list);
-				__map_vcore(p, free_vcoreid, pcorelist[i]);
+				TAILQ_REMOVE(&p->inactive_vcs, new_vc, list);
+				TAILQ_INSERT_TAIL(&p->online_vcs, new_vc, list);
+				__map_vcore(p, vcore2vcoreid(p, new_vc), pcorelist[i]);
 				p->procinfo->num_vcores++;
 			}
 			__seq_end_write(&p->procinfo->coremap_seqctr);
@@ -1167,15 +1134,14 @@ bool __proc_give_cores(struct proc *SAFE p, uint32_t *pcorelist, size_t num)
 			proc_incref(p, num);
 			__seq_start_write(&p->procinfo->coremap_seqctr);
 			for (int i = 0; i < num; i++) {
-				/* TODO: (VCL) should be the head item, and could be empty */
-				free_vcoreid = get_free_vcoreid(p, free_vcoreid);
-				printd("setting vcore %d to pcore %d\n", free_vcoreid,
+				new_vc = TAILQ_FIRST(&p->inactive_vcs);
+				/* there are cases where this isn't true; deal with it later */
+				assert(new_vc);
+				printd("setting vcore %d to pcore %d\n", vcore2vcoreid(p, new_vc),
 				       pcorelist[i]);
-				TAILQ_REMOVE(&p->inactive_vcs, vcoreid2vcore(p, free_vcoreid),
-				             list);
-				TAILQ_INSERT_TAIL(&p->online_vcs, vcoreid2vcore(p, free_vcoreid),
-				                  list);
-				__map_vcore(p, free_vcoreid, pcorelist[i]);
+				TAILQ_REMOVE(&p->inactive_vcs, new_vc, list);
+				TAILQ_INSERT_TAIL(&p->online_vcs, new_vc, list);
+				__map_vcore(p, vcore2vcoreid(p, new_vc), pcorelist[i]);
 				p->procinfo->num_vcores++;
 				send_kernel_message(pcorelist[i], __startcore, (long)p, 0, 0,
 				                    KMSG_ROUTINE);
@@ -1274,7 +1240,7 @@ bool __proc_take_cores(struct proc *p, uint32_t *pcorelist, size_t num,
 bool __proc_take_allcores(struct proc *p, amr_t message, long arg0, long arg1,
                           long arg2)
 {
-	uint32_t active_vcoreid = 0, pcoreid;
+	struct vcore *vc_i, *vc_temp;
 	bool self_ipi_pending = FALSE;
 	switch (p->state) {
 		case (PROC_RUNNABLE_M):
@@ -1291,30 +1257,24 @@ bool __proc_take_allcores(struct proc *p, amr_t message, long arg0, long arg1,
 	assert(num_idlecores + p->procinfo->num_vcores <= num_cpus); // sanity
 	spin_unlock(&idle_lock);
 	__seq_start_write(&p->procinfo->coremap_seqctr);
-	/* TODO: (VCL) use the active list, make it a while loop, assert, etc */
-	for (int i = 0; i < p->procinfo->num_vcores; i++) {
-		// find next active vcore
-		active_vcoreid = get_busy_vcoreid(p, active_vcoreid);
-		pcoreid = get_pcoreid(p, active_vcoreid);
+	TAILQ_FOREACH_SAFE(vc_i, &p->online_vcs, list, vc_temp) {
 		/* Change lists for the vcore.  We do this before either unmapping or
 		 * sending the message, so the lists represent what will be very soon
 		 * (before we unlock, the messages are in flight). */
-		TAILQ_REMOVE(&p->online_vcs, vcoreid2vcore(p, active_vcoreid), list);
-		TAILQ_INSERT_HEAD(&p->inactive_vcs, vcoreid2vcore(p, active_vcoreid),
-		                  list);
+		TAILQ_REMOVE(&p->online_vcs, vc_i, list);
+		TAILQ_INSERT_HEAD(&p->inactive_vcs, vc_i, list);
 		if (message) {
-			if (pcoreid == core_id())
+			if (vc_i->pcoreid == core_id())
 				self_ipi_pending = TRUE;
-			send_kernel_message(pcoreid, message, arg0, arg1, arg2,
+			send_kernel_message(vc_i->pcoreid, message, arg0, arg1, arg2,
 			                    KMSG_ROUTINE);
 		} else {
 			/* if there was a msg, the vcore is unmapped on the receive side.
 			 * o/w, we need to do it here. */
-			__unmap_vcore(p, active_vcoreid);
+			__unmap_vcore(p, vcore2vcoreid(p, vc_i));
 		}
-		// give the pcore back to the idlecoremap
-		put_idle_core(pcoreid);
-		active_vcoreid++; // for the next loop, skip the one we just used
+		/* give the pcore back to the idlecoremap */
+		put_idle_core(vc_i->pcoreid);
 	}
 	p->procinfo->num_vcores = 0;
 	__seq_end_write(&p->procinfo->coremap_seqctr);
@@ -1424,20 +1384,16 @@ void switch_back(struct proc *new_p, struct proc *old_proc)
  * immediate message. */
 void __proc_tlbshootdown(struct proc *p, uintptr_t start, uintptr_t end)
 {
-	uint32_t active_vcoreid = 0;
+	struct vcore *vc_i;
 	switch (p->state) {
 		case (PROC_RUNNING_S):
 			tlbflush();
 			break;
 		case (PROC_RUNNING_M):
 			/* TODO: (TLB) sanity checks and rounding on the ranges */
-			for (int i = 0; i < p->procinfo->num_vcores; i++) {
-				/* find next active vcore */
-				active_vcoreid = get_busy_vcoreid(p, active_vcoreid);
-				send_kernel_message(get_pcoreid(p, active_vcoreid),
-				                    __tlbshootdown, start, end,
+			TAILQ_FOREACH(vc_i, &p->online_vcs, list) {
+				send_kernel_message(vc_i->pcoreid, __tlbshootdown, start, end,
 				                    0, KMSG_IMMEDIATE);
-				active_vcoreid++; /* next loop, skip the one we just used */
 			}
 			break;
 		case (PROC_DYING):
@@ -1642,13 +1598,7 @@ void print_proc_info(pid_t pid)
 	printk("Flags: 0x%08x\n", p->env_flags);
 	printk("CR3(phys): 0x%08x\n", p->env_cr3);
 	printk("Num Vcores: %d\n", p->procinfo->num_vcores);
-	printk("Vcoremap (old style):\n");
-	for (int i = 0; i < p->procinfo->num_vcores; i++) {
-		j = get_busy_vcoreid(p, j);
-		printk("\tVcore %d: Pcore %d\n", j, get_pcoreid(p, j));
-		j++;
-	}
-	printk("Vcore Lists:\n----------------------\n");
+	printk("Vcore Lists (may be in flux w/o locking):\n----------------------\n");
 	printk("Online:\n");
 	TAILQ_FOREACH(vc_i, &p->online_vcs, list)
 		printk("\tVcore %d -> Pcore %d\n", vcore2vcoreid(p, vc_i), vc_i->pcoreid);
