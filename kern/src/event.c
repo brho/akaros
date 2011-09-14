@@ -71,13 +71,18 @@ uint32_t find_alertable_vcore(struct proc *p, uint32_t start_loc)
 	return 0;	/* vcore 0 is the most likely to come back online */
 }
 
-/* Helper to send an indir, called from a couple places */
+/* Helper to send an indir, called from a couple places.  Note this uses a
+ * userspace address for the VCPD (though not a user's pointer). */
 static void send_indir_to_vcore(struct event_queue *ev_q, uint32_t vcoreid)
 {
+	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
 	struct event_msg local_msg = {0};
 	local_msg.ev_type = EV_EVENT;
 	local_msg.ev_arg3 = ev_q;
 	post_ev_msg(get_proc_ev_mbox(vcoreid), &local_msg, 0);
+	/* Set notif pending, so userspace doesn't miss the INDIR while yielding */
+	wmb();
+	vcpd->notif_pending = TRUE;
 }
 
 /* Helper that alerts a vcore, by IPI and/or INDIR, that it needs to check the

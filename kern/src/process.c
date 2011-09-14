@@ -781,6 +781,7 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 {
 	uint32_t vcoreid = get_vcoreid(p, core_id());
 	struct vcore *vc = vcoreid2vcore(p, vcoreid);
+	struct preempt_data *vcpd = &p->procdata->vcore_preempt_data[vcoreid];
 
 	/* no reason to be nice, return */
 	if (being_nice && !vc->preempt_pending)
@@ -798,7 +799,17 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 	/* no need to preempt later, since we are yielding (nice or otherwise) */
 	if (vc->preempt_pending)
 		vc->preempt_pending = 0;
-
+	/* Don't let them yield if they are missing a notification.  Userspace must
+	 * not leave vcore context without dealing with notif_pending.  pop_ros_tf()
+	 * handles leaving via uthread context.  This handles leaving via a yield.
+	 *
+	 * This early check is an optimization.  The real check is below when it
+	 * works with the online_vcs list (syncing with event.c and INDIR/IPI
+	 * posting). */
+	if (vcpd->notif_pending) {
+		spin_unlock(&p->proc_lock);
+		return;
+	}
 	switch (p->state) {
 		case (PROC_RUNNING_S):
 			__proc_yield_s(p, current_tf);	/* current_tf 0'd in abandon core */
@@ -812,11 +823,23 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 				spin_unlock(&p->proc_lock);
 				return;
 			}
-			__seq_start_write(&p->procinfo->coremap_seqctr);
 			/* Remove from the online list, add to the yielded list, and unmap
 			 * the vcore, which gives up the core. */
 			TAILQ_REMOVE(&p->online_vcs, vc, list);
+			/* Now that we're off the online list, check to see if an alert made
+			 * it through (event.c sets this) */
+			cmb();
+			if (vcpd->notif_pending) {
+				/* We lost, put it back on the list and abort the yield */
+				TAILQ_INSERT_TAIL(&p->online_vcs, vc, list); /* could go HEAD */
+				spin_unlock(&p->proc_lock);
+				return;
+			}
+			/* We won the race with event sending, we can safely yield */
 			TAILQ_INSERT_HEAD(&p->inactive_vcs, vc, list);
+			/* Note this protects stuff userspace should look at, which doesn't
+			 * include the TAILQs. */
+			__seq_start_write(&p->procinfo->coremap_seqctr);
 			__unmap_vcore(p, vcoreid);
 			/* Adjust implied resource desires */
 			p->resources[RES_CORES].amt_granted = --(p->procinfo->num_vcores);
@@ -1446,6 +1469,7 @@ void __startcore(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2
 			proc_secure_trapframe(&local_tf);
 		}
 	} else { /* not restarting from a preemption, use a fresh vcore */
+		assert(vcpd->transition_stack);
 		proc_init_trapframe(&local_tf, vcoreid, p_to_run->env_entry,
 		                    vcpd->transition_stack);
 		/* Disable/mask active notifications for fresh vcores */

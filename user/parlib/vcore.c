@@ -202,13 +202,22 @@ void vcore_yield(bool preempt_pending)
 	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
 	vcpd->can_rcv_msg = FALSE;
 	wmb();
-	if (handle_events(vcoreid)) {
-		/* we handled outstanding events, turn the flag back on and return */
+	/* Clears notif pending.  If we had an event outstanding, this will handle
+	 * it and return TRUE, at which point we want to unwind and return to the
+	 * 2LS loop (where we may not want to yield anymore).  Note that the kernel
+	 * only cares about can_rcv_msg for the desired vcore, not for a FALLBACK.
+	 * We need to deal with this notif_pending business regardless of
+	 * can_rcv_msg.  We just want to avoid a yield syscall if possible.  It is
+	 * important that clear_notif_pending will handle_events().  That is
+	 * necessary to do/check after setting can_rcv_msg to FALSE. */
+	if (clear_notif_pending(vcoreid)) {
 		vcpd->can_rcv_msg = TRUE;
 		return;
 	}
-	/* o/w, we can safely yield */
+	/* We can probably yield.  This may pop back up if notif_pending became set
+	 * by the kernel after we cleared it and we lost the race. */
 	sys_yield(preempt_pending);
+	vcpd->can_rcv_msg = TRUE;
 }
 
 /* Clear pending, and try to handle events that came in between a previous call
@@ -217,13 +226,16 @@ void vcore_yield(bool preempt_pending)
  * events, and we will have send pending to 0. 
  *
  * Note that this won't catch every race/case of an incoming event.  Future
- * events will get caught in pop_ros_tf() */
-void clear_notif_pending(uint32_t vcoreid)
+ * events will get caught in pop_ros_tf() or proc_yield() */
+bool clear_notif_pending(uint32_t vcoreid)
 {
+	bool handled_event = FALSE;
 	do {
 		cmb();
 		__procdata.vcore_preempt_data[vcoreid].notif_pending = 0;
-	} while (handle_events(vcoreid));
+		handled_event = handle_events(vcoreid);
+	} while (handled_event);
+	return handled_event;
 }
 
 /* Enables notifs, and deals with missed notifs by self notifying.  This should
