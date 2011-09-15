@@ -442,6 +442,42 @@ void kernel_msg_init(void)
 	                   sizeof(struct kernel_message), HW_CACHE_ALIGN, 0, 0, 0);
 }
 
+void kmsg_queue_stat(void)
+{
+	struct kernel_message *kmsg;
+	bool immed_emp, routine_emp;
+	for (int i = 0; i < num_cpus; i++) {
+		spin_lock_irqsave(&per_cpu_info[i].immed_amsg_lock);
+		immed_emp = STAILQ_EMPTY(&per_cpu_info[i].immed_amsgs);
+		spin_unlock_irqsave(&per_cpu_info[i].immed_amsg_lock);
+		spin_lock_irqsave(&per_cpu_info[i].routine_amsg_lock);
+		routine_emp = STAILQ_EMPTY(&per_cpu_info[i].routine_amsgs);
+		spin_unlock_irqsave(&per_cpu_info[i].routine_amsg_lock);
+		printk("Core %d's immed_emp: %d, routine_emp %d\n", i, immed_emp, routine_emp);
+		if (!immed_emp) {
+			kmsg = STAILQ_FIRST(&per_cpu_info[i].immed_amsgs);
+			printk("Immed msg on core %d:\n", i);
+			printk("\tsrc:  %d\n", kmsg->srcid);
+			printk("\tdst:  %d\n", kmsg->dstid);
+			printk("\tpc:   %08p\n", kmsg->pc);
+			printk("\targ0: %08p\n", kmsg->arg0);
+			printk("\targ1: %08p\n", kmsg->arg1);
+			printk("\targ2: %08p\n", kmsg->arg2);
+		}
+		if (!routine_emp) {
+			kmsg = STAILQ_FIRST(&per_cpu_info[i].routine_amsgs);
+			printk("Routine msg on core %d:\n", i);
+			printk("\tsrc:  %d\n", kmsg->srcid);
+			printk("\tdst:  %d\n", kmsg->dstid);
+			printk("\tpc:   %08p\n", kmsg->pc);
+			printk("\targ0: %08p\n", kmsg->arg0);
+			printk("\targ1: %08p\n", kmsg->arg1);
+			printk("\targ2: %08p\n", kmsg->arg2);
+		}
+			
+	}
+}
+
 uint32_t send_kernel_message(uint32_t dst, amr_t pc, long arg0, long arg1,
                              long arg2, int type)
 {
