@@ -399,7 +399,8 @@ remotely 'yield' the core without having to sys_change_vcore() (which I discuss
 below, and is meant to 'unstick' a vcore).
 2) Yield is simplified.  The kernel no longer races with itself nor has to worry
 about turning off that flag - userspace can do it when it wants to yield.  (turn
-off the flag, check messages, then yield).
+off the flag, check messages, then yield).  This is less big of a deal now that
+the kernel races with vcore membership in the online_vcs list.
 
 Two aspects of the code make this work nicely.  The 'can_rcv_msg' flag greatly
 simplifies the kernel's job.  There are a lot of weird races we'd have to deal
@@ -439,8 +440,9 @@ have to worry about any INDIRs, and we're done worrying about their messages
 (though we still have to worry about them being stuck in vcore context and
 having a uthread).  Also note you only need to check the UCQ, since INDIRs must
 be messages, not bits.
-2) the kernel will initiate FALLBACK if the vcore has a preempt pending, which
-ought to cut down on this happening frequently.
+2) the kernel could initiate FALLBACK if the vcore has a preempt pending, which
+ought to cut down on this happening frequently. (we don't do this yet, and
+probably never will, since it complicates the design).
 
 It is tempting to just use sys_change_vcore(), which will change the calling
 vcore to the new one.  This should only be used to "unstick" a vcore.  A vcore
@@ -460,6 +462,19 @@ received INDIRs about.  Note that we still want to send an event with
 sys_change_vcore().  We want the new vcore to know the old vcore was put
 offline: a preemption (albeit one that it chose to do, and one that isn't stuck
 in vcore context).
+
+3.3.5: Lists to Find Vcores
+---------------
+A process has three lists: online, bulk_preempt, and inactive.  These not only
+are good for process management, but also for helping alert_vcore() find
+potentially alertable vcores.  alert_vcore() and its associated helpers are
+failry complicated and heavily commented.  I've set things up so both the
+online_vcs and the bulk_preempted_vcs lists can be handled the same way: post to
+the first element, then see if it still 'can_rcv_msg'.  If not, if it is still
+the first on the list, then it hasn't proc_yield()ed yet, and it will eventually
+restart when it tries to yield.  And this all works without locking the
+proc_lock.  There are a bunch more details and races avoided.  Check the code
+out.
 
 3.4 Application-specific Event Handling
 ---------------------------------------
