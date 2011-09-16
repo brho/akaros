@@ -111,7 +111,9 @@ int __proc_set_state(struct proc *p, uint32_t state)
 	 * RBS -> RGS
 	 * RGS -> RBS
 	 * RGS -> W
+	 * RGM -> W
 	 * W   -> RBS
+	 * W   -> RBM
 	 * RGS -> RBM
 	 * RBM -> RGM
 	 * RGM -> RBM
@@ -139,7 +141,7 @@ int __proc_set_state(struct proc *p, uint32_t state)
 				panic("Invalid State Transition! PROC_RUNNING_S to %02x", state);
 			break;
 		case PROC_WAITING:
-			if (state != PROC_RUNNABLE_S)
+			if (!(state & (PROC_RUNNABLE_S | PROC_RUNNABLE_M)))
 				panic("Invalid State Transition! PROC_WAITING to %02x", state);
 			break;
 		case PROC_DYING:
@@ -151,7 +153,8 @@ int __proc_set_state(struct proc *p, uint32_t state)
 				panic("Invalid State Transition! PROC_RUNNABLE_M to %02x", state);
 			break;
 		case PROC_RUNNING_M:
-			if (!(state & (PROC_RUNNABLE_S | PROC_RUNNABLE_M | PROC_DYING)))
+			if (!(state & (PROC_RUNNABLE_S | PROC_RUNNABLE_M | PROC_WAITING |
+			               PROC_DYING)))
 				panic("Invalid State Transition! PROC_RUNNING_M to %02x", state);
 			break;
 	}
@@ -306,6 +309,7 @@ error_t proc_alloc(struct proc **pp, struct proc *parent)
 	p->exitcode = 1337;	/* so we can see processes killed by the kernel */
 	p->ppid = parent ? parent->pid : 0;
 	p->state = PROC_CREATED; /* shouldn't go through state machine for init */
+	p->is_mcp = FALSE;
 	p->env_flags = 0;
 	p->env_entry = 0; // cheating.  this really gets set later
 	p->heap_top = (void*)UTEXT;	/* heap_bottom set in proc_init_procinfo */
@@ -905,6 +909,27 @@ void proc_notify(struct proc *p, uint32_t vcoreid)
 			}
 		}
 	}
+}
+
+/* Hold the lock before calling this.  If the process is WAITING, it will wake
+ * it up and schedule it. */
+void __proc_wakeup(struct proc *p)
+{
+	if (p->state != PROC_WAITING)
+		return;
+	if (__proc_is_mcp(p))
+		__proc_set_state(p, PROC_RUNNABLE_M);
+	else
+		__proc_set_state(p, PROC_RUNNABLE_S);
+	schedule_proc(p);
+}
+
+/* Is the process in multi_mode / is an MCP or not?  */
+bool __proc_is_mcp(struct proc *p)
+{
+	/* in lieu of using the amount of cores requested, or having a bunch of
+	 * states (like PROC_WAITING_M and _S), I'll just track it with a bool. */
+	return p->is_mcp;
 }
 
 /************************  Preemption Functions  ******************************
@@ -1612,7 +1637,7 @@ void print_proc_info(pid_t pid)
 	printk("struct proc: %p\n", p);
 	printk("PID: %d\n", p->pid);
 	printk("PPID: %d\n", p->ppid);
-	printk("State: 0x%08x\n", p->state);
+	printk("State: 0x%08x (%s)\n", p->state, p->is_mcp ? "M" : "S");
 	printk("Refcnt: %d\n", atomic_read(&p->p_kref.refcount) - 1);
 	printk("Flags: 0x%08x\n", p->env_flags);
 	printk("CR3(phys): 0x%08x\n", p->env_cr3);
