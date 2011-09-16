@@ -184,9 +184,12 @@ static void alert_vcore(struct proc *p, struct event_queue *ev_q,
                         uint32_t vcoreid)
 {
 	struct vcore *vc;
-	/* If an alert is already pending, just return */
-	/* TODO: need a flag to turn this off for preempt_msg ev_qs. */
-	if (ev_q->ev_alert_pending)
+	/* If an alert is already pending and they don't want repeats, just return.
+	 * One of the few uses of NOTHROTTLE will be for preempt_msg ev_qs.  Ex: an
+	 * INDIR was already sent to the preempted vcore, then alert throttling
+	 * would stop another vcore from getting the message about the original
+	 * vcore. */
+	if (!(ev_q->ev_flags & EVENT_NOTHROTTLE) && (ev_q->ev_alert_pending))
 		return;
 	/* We'll eventually get an INDIR through, so don't send any more til
 	 * userspace toggles this.  Regardless of other writers to this flag, we
