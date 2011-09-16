@@ -63,6 +63,9 @@ grab_lock:
 		/* Warn if we have a ridiculous amount of pages in the ucq */
 		if (atomic_fetch_and_add(&ucq->nr_extra_pgs, 1) > UCQ_WARN_THRESH)
 			warn("Over %d pages in ucq %08p!\n", UCQ_WARN_THRESH, ucq);
+		/* Giant warning: don't ask for anything other than anonymous memory at
+		 * a non-fixed location.  o/w, it may cause a TLB shootdown, which grabs
+		 * the proc_lock, and potentially deadlock the system. */
 		new_page = (struct ucq_page*)do_mmap(p, 0, PGSIZE,
 		                                     PROT_READ | PROT_WRITE,
 		                                     MAP_ANON | MAP_POPULATE, 0, 0);

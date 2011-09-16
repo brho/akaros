@@ -316,6 +316,7 @@ error_t proc_alloc(struct proc **pp, struct proc *parent)
 	memset(&p->resources, 0, sizeof(p->resources));
 	memset(&p->env_ancillary_state, 0, sizeof(p->env_ancillary_state));
 	memset(&p->env_tf, 0, sizeof(p->env_tf));
+	spinlock_init(&p->mm_lock);
 	TAILQ_INIT(&p->vm_regions); /* could init this in the slab */
 	/* Initialize the vcore lists, we'll build the inactive list so that it includes
 	 * all vcores when we initialize procinfo.  Do this before initing procinfo. */
@@ -1419,15 +1420,16 @@ void switch_back(struct proc *new_p, struct proc *old_proc)
  * shootdown and batching our messages.  Should do the sanity about rounding up
  * and down in this function too.
  *
- * Hold the proc_lock before calling this.
- *
  * Would be nice to have a broadcast kmsg at this point.  Note this may send a
  * message to the calling core (interrupting it, possibly while holding the
  * proc_lock).  We don't need to process routine messages since it's an
  * immediate message. */
-void __proc_tlbshootdown(struct proc *p, uintptr_t start, uintptr_t end)
+void proc_tlbshootdown(struct proc *p, uintptr_t start, uintptr_t end)
 {
 	struct vcore *vc_i;
+	/* TODO: we might be able to avoid locking here in the future (we must hit
+	 * all online, and we can check __mapped).  it'll be complicated. */
+	spin_lock(&p->proc_lock);
 	switch (p->state) {
 		case (PROC_RUNNING_S):
 			tlbflush();
@@ -1448,6 +1450,7 @@ void __proc_tlbshootdown(struct proc *p, uintptr_t start, uintptr_t end)
 			warn("Unexpected case %s in %s", procstate2str(p->state),
 			     __FUNCTION__);
 	}
+	spin_unlock(&p->proc_lock);
 }
 
 /* Kernel message handler to start a process's context on this core.  Tightly

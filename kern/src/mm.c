@@ -7,8 +7,8 @@
  *
  * In general, error checking / bounds checks are done in the main function
  * (e.g. mmap()), and the work is done in a do_ function (e.g. do_mmap()).
- * Versions of those functions that are called when the memory lock (proc_lock
- * for now) is already held begin with __ (e.g. __do_munmap()).
+ * Versions of those functions that are called when the memory lock (mm_lock) is
+ * already held begin with __ (e.g. __do_munmap()).
  *
  * Note that if we were called from kern/src/syscall.c, we probably don't have
  * an edible reference to p. */
@@ -335,10 +335,9 @@ void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
               struct file *file, size_t offset)
 {
-	// TODO: grab the appropriate mm_lock
-	spin_lock(&p->proc_lock);
+	spin_lock(&p->mm_lock);
 	void *ret = __do_mmap(p, addr, len, prot, flags, file, offset);
-	spin_unlock(&p->proc_lock);
+	spin_unlock(&p->mm_lock);
 	return ret;
 }
 
@@ -423,9 +422,9 @@ int mprotect(struct proc *p, uintptr_t addr, size_t len, int prot)
 		set_errno(ENOMEM);
 		return -1;
 	}
-	spin_lock(&p->proc_lock);
+	spin_lock(&p->mm_lock);
 	int ret = __do_mprotect(p, addr, len, prot);
-	spin_unlock(&p->proc_lock);
+	spin_unlock(&p->mm_lock);
 	return ret;
 }
 
@@ -492,7 +491,7 @@ int __do_mprotect(struct proc *p, uintptr_t addr, size_t len, int prot)
 		vmr = next_vmr;
 	}
 	if (shootdown_needed)
-		__proc_tlbshootdown(p, addr, addr + len);
+		proc_tlbshootdown(p, addr, addr + len);
 	return 0;
 }
 
@@ -510,9 +509,9 @@ int munmap(struct proc *p, uintptr_t addr, size_t len)
 		set_errno(EINVAL);
 		return -1;
 	}
-	spin_lock(&p->proc_lock);
+	spin_lock(&p->mm_lock);
 	int ret = __do_munmap(p, addr, len);
-	spin_unlock(&p->proc_lock);
+	spin_unlock(&p->mm_lock);
 	return ret;
 }
 
@@ -552,7 +551,7 @@ int __do_munmap(struct proc *p, uintptr_t addr, size_t len)
 		vmr = next_vmr;
 	}
 	if (shootdown_needed)
-		__proc_tlbshootdown(p, addr, addr + len);
+		proc_tlbshootdown(p, addr, addr + len);
 	return 0;
 }
 
@@ -562,14 +561,14 @@ int handle_page_fault(struct proc* p, uintptr_t va, int prot)
 
 	if (prot != PROT_READ && prot != PROT_WRITE && prot != PROT_EXEC)
 		panic("bad prot!");
-	spin_lock(&p->proc_lock);
+	spin_lock(&p->mm_lock);
 	int ret = __handle_page_fault(p, va, prot);
-	spin_unlock(&p->proc_lock);
+	spin_unlock(&p->mm_lock);
 	return ret;
 }
 
 /* Returns 0 on success, or an appropriate -error code.  Assumes you hold the
- * appropriate lock.
+ * mm_lock.
  *
  * Notes: if your TLB caches negative results, you'll need to flush the
  * appropriate tlb entry.  Also, you could have a weird race where a present PTE

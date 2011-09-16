@@ -136,10 +136,7 @@ void proc_preempt_all(struct proc *p, uint64_t usec);
 struct proc *switch_to(struct proc *new_p);
 void switch_back(struct proc *new_p, struct proc *old_proc);
 void abandon_core(void);
-
-/* Hold the proc_lock, since it'll use the vcoremapping to send an unmapping
- * message for the region from start to end.  */
-void __proc_tlbshootdown(struct proc *p, uintptr_t start, uintptr_t end);
+void proc_tlbshootdown(struct proc *p, uintptr_t start, uintptr_t end);
 
 /* Kernel message handlers for process management */
 void __startcore(struct trapframe *tf, uint32_t srcid, long a0, long a1,

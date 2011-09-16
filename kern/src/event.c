@@ -249,7 +249,9 @@ ultimate_fallback:
 	/* At this point, we can't find one.  This could be due to a (hopefully
 	 * rare) weird yield/request storm, or more commonly because the lists were
 	 * empty and the process is simply WAITING (yielded all of its vcores and is
-	 * waiting on an event).  Time for the ultimate fallback: locking. */
+	 * waiting on an event).  Time for the ultimate fallback: locking.  Note
+	 * that when we __alert_vcore(), there is a chance we need to mmap, which
+	 * grabs the mm_lock. */
 	spin_lock(&p->proc_lock);
 	if (p->state != PROC_WAITING) {
 		/* We need to check the online and bulk_preempt lists again, now that we are
