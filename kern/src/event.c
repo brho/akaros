@@ -214,9 +214,10 @@ static void alert_vcore(struct proc *p, struct event_queue *ev_q,
 		return;
 	}
 	/* If we're here, we care about FALLBACK. First, try posting to the desired
-	 * vcore. */
-	/* TODO: need a ONLINE_ONLY flag or something, for preempt messages */
-	if (try_alert_vcore(p, ev_q, vcoreid))
+	 * vcore (so long as we don't have to send it to a vcore that will run, like
+	 * we do for preempt messages). */
+	if (!(ev_q->ev_flags & EVENT_VCORE_MUST_RUN) &&
+	   (try_alert_vcore(p, ev_q, vcoreid)))
 		return;
 	/* If the process is WAITING, let's just jump to the fallback */
 	if (p->state == PROC_WAITING)

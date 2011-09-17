@@ -20,6 +20,7 @@
 #define EVENT_ROUNDROBIN		0x010	/* pick a vcore, RR style */
 #define EVENT_VCORE_APPRO		0x020	/* send to where the kernel wants */
 #define EVENT_NOTHROTTLE		0x040	/* send all alerts (no throttling) */
+#define EVENT_VCORE_MUST_RUN	0x080	/* Alerts go to a vcore that will run */
 /* Flags from the program to the 2LS */
 #define EVENT_JUSTHANDLEIT		0x100	/* 2LS should handle the ev_q */
 #define EVENT_THREAD			0x200	/* spawn thread to handle ev_q */
