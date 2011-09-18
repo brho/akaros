@@ -31,6 +31,7 @@
 #include <colored_caches.h>
 #include <string.h>
 #include <pmap.h>
+#include <arch/console.h>
 #include <ros/time.h>
 #include <ros/arch/membar.h>
 
@@ -112,17 +113,29 @@ void manager_brho(void)
 	static uint8_t RACY progress = 0;	/* this will wrap around. */
 	static struct proc *p;
 	struct file *temp_f;
+	static bool first = TRUE;
 
-	/* I usually want this */
-	schedule();
-	process_routine_kmsg(0);	/* maybe do this before schedule() */
+	if (first) {	
+		printk("*** Hit shift-g to get into the monitor. ***\n");
+		first = FALSE;
+	}
+	while (1) {
+		enable_irq();
+		/* one time keyboard / serial check for some magic, then monitor */
+		if (cons_getc() == 'G') {
+			printk("Heard the call of the giraffe!\n");
+			monitor(0);
+		}
+		process_routine_kmsg(0);
+		schedule();
+	}
+	/* whatever we do in the manager, keep in mind that we need to not do
+	 * anything too soon (like make processes), since we'll drop in here during
+	 * boot if the boot sequence required any I/O (like EXT2), and we need to
+	 * PRKM() */
 
-	enable_irq();
-	/* this ghetto hack really wants to wait for an interrupt, but time out */
-	udelay(60000);	/* wait for IO when there really is nothing to do */
-	process_routine_kmsg(0);
-	printd("No work to do (schedule returned)\n");
-	monitor(0);
+	assert(0);
+	/* ancient tests below: */
 
 	// for testing taking cores, check in case 1 for usage
 	uint32_t corelist[MAX_NUM_CPUS];
