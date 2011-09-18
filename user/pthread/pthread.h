@@ -12,15 +12,18 @@
 
 /* Flags */
 #define PTHREAD_EXITING		0x001
+#define PTHREAD_JOINING		0x002
 
 /* Pthread struct.  First has to be the uthread struct, which the vcore code
  * will access directly (as if pthread_tcb is a struct uthread). */
+struct pthread_tcb;
 struct pthread_tcb {
 	struct uthread uthread;
 	TAILQ_ENTRY(pthread_tcb) next;
-	int finished;	/* TODO: merge this with flags */
 	int flags;
 	bool detached;
+	struct pthread_tcb *join_target;	/* only used to communicate with yield*/
+	struct pthread_tcb *joiner;			/* raced on by exit and join */
 	uint32_t id;
 	uint32_t stacksize;
 	void *stacktop;

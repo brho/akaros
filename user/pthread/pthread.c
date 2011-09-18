@@ -127,30 +127,53 @@ void pth_thread_runnable(struct uthread *uthread)
 void pth_thread_yield(struct uthread *uthread)
 {
 	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
+	struct pthread_tcb *temp_pth = 0;	/* used for exiting AND joining */
 	struct mcs_lock_qnode local_qn = {0};
 	/* Remove from the active list, whether exiting or yielding.  We're holding
 	 * the lock throughout both list modifications (if applicable). */
 	mcs_lock_notifsafe(&queue_lock, &local_qn);
 	threads_active--;
 	TAILQ_REMOVE(&active_queue, pthread, next);
+	mcs_unlock_notifsafe(&queue_lock, &local_qn);
 	if (pthread->flags & PTHREAD_EXITING) {
-		mcs_unlock_notifsafe(&queue_lock, &local_qn);
 		/* Destroy the pthread */
 		uthread_cleanup(uthread);
 		/* Cleanup, mirroring pthread_create() */
 		__pthread_free_stack(pthread);
 		/* TODO: race on detach state */
-		if (pthread->detached)
+		if (pthread->detached) {
 			free(pthread);
-		else
-			pthread->finished = 1;
+		} else {
+			/* See if someone is joining on us.  If not, we're done (and the
+			 * joiner will wake itself when it saw us there instead of 0). */
+			temp_pth = atomic_swap_ptr((void**)&pthread->joiner, pthread);
+			if (temp_pth) {
+				/* they joined before we exited, we need to wake them */
+				printd("[pth] %08p exiting, waking joiner %08p\n",
+				       pthread, temp_pth);
+				pth_thread_runnable((struct uthread*)temp_pth);
+			}
+		}
+	} else if (pthread->flags & PTHREAD_JOINING) {
+		/* We're trying to join, yield til we get woken up */
+		/* put ourselves in the join target's joiner slot.  If we get anything
+		 * back, we lost the race and need to wake ourselves. */
+		temp_pth = atomic_swap_ptr((void**)&pthread->join_target->joiner,
+		                           pthread);
+		/* after that atomic swap, the pthread might be woken up (if it
+		 * succeeded), so don't touch pthread again after that (this following
+		 * if () is okay). */
+		if (temp_pth) {
+			assert(temp_pth == pthread->join_target);	/* Sanity */
+			/* wake ourselves, not the exited one! */
+			printd("[pth] %08p already exit, rewaking ourselves, joiner %08p\n",
+			       temp_pth, pthread);
+			pth_thread_runnable((struct uthread*)pthread);
+		}
 	} else {
-		/* Put it on the ready list (tail).  Don't do this until we are done
-		 * completely with the thread, since it can be restarted somewhere else.
-		 * */
-		threads_ready++;
-		TAILQ_INSERT_TAIL(&ready_queue, pthread, next);
-		mcs_unlock_notifsafe(&queue_lock, &local_qn);
+		/* Yielding for no apparent reason (being nice / help break deadlocks).
+		 * Just wake it up and make it ready again. */
+		pth_thread_runnable((struct uthread*)pthread);
 	}
 }
 
@@ -287,7 +310,8 @@ static int pthread_lib_init(void)
 	t->stacktop = (void*)USTACKTOP;
 	t->detached = TRUE;
 	t->flags = 0;
-	t->finished = 0;
+	t->join_target = 0;
+	t->joiner = 0;
 	assert(t->id == 0);
 	/* Put the new pthread (thread0) on the active queue */
 	mcs_lock_notifsafe(&queue_lock, &local_qn);
@@ -365,10 +389,11 @@ int pthread_create(pthread_t *thread, const pthread_attr_t *attr,
 	pthread = (pthread_t)calloc(1, sizeof(struct pthread_tcb));
 	assert(pthread);
 	pthread->stacksize = PTHREAD_STACK_SIZE;	/* default */
-	pthread->finished = 0;
 	pthread->flags = 0;
 	pthread->id = get_next_pid();
 	pthread->detached = FALSE;				/* default */
+	pthread->join_target = 0;
+	pthread->joiner = 0;
 	/* Respect the attributes */
 	if (attr) {
 		if (attr->stacksize)					/* don't set a 0 stacksize */
@@ -395,6 +420,7 @@ int pthread_create(pthread_t *thread, const pthread_attr_t *attr,
 
 int pthread_join(pthread_t thread, void** retval)
 {
+	struct pthread_tcb *caller = (struct pthread_tcb*)current_uthread;
 	/* Not sure if this is the right semantics.  There is a race if we deref
 	 * thread and he is already freed (which would have happened if he was
 	 * detached. */
@@ -402,8 +428,17 @@ int pthread_join(pthread_t thread, void** retval)
 		printf("[pthread] trying to join on a detached pthread");
 		return -1;
 	}
-	while (!thread->finished)
-		pthread_yield();
+	/* See if it is already done, to avoid the pain of a uthread_yield() (the
+	 * early check is an optimization, pth_thread_yield() handles the race). */
+	if (!thread->joiner) {
+		/* Time to join, set things up so pth_thread_yield() knows what to do */
+		caller->flags |= PTHREAD_JOINING;
+		caller->join_target = thread;
+		uthread_yield(TRUE);
+		/* When we return/restart, the thread will be done */
+	} else {
+		assert(thread->joiner == thread);	/* sanity check */
+	}
 	if (retval)
 		*retval = thread->retval;
 	free(thread);
