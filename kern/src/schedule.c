@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include <atomic.h>
+#include <resource.h>
 #include <sys/queue.h>
 
 // This could be useful for making scheduling decisions.  
@@ -71,8 +72,17 @@ void schedule(void)
 		TAILQ_REMOVE(&proc_runnablelist, p, proc_link);
 		spin_unlock_irqsave(&runnablelist_lock);
 		printd("PID of proc i'm running: %d\n", p->pid);
+		/* We can safely read is_mcp without locking (i think). */
+		if (p->is_mcp) {
+			/* _Ms need to get some cores, which will call proc_run() internally
+			 * (for now) */
+			if (core_request(p) <= 0)
+				schedule_proc(p);	/* got none, put it back on the queue */
+		} else {
+			/* _S proc, just run it */
+			proc_run(p);
+		}
 		/* proc_run will either eat the ref, or we'll decref manually. */
-		proc_run(p);
 		proc_decref(p);
 	} else {
 		spin_unlock_irqsave(&runnablelist_lock);

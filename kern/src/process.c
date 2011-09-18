@@ -822,12 +822,6 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 		case (PROC_RUNNING_M):
 			printd("[K] Process %d (%p) is yielding on vcore %d\n", p->pid, p,
 			       get_vcoreid(p, core_id()));
-			/* TODO: (RMS) the Scheduler cannot handle the Runnable Ms (RMS), so
-			 * don't yield the last vcore. */
-			if (p->procinfo->num_vcores == 1) {
-				spin_unlock(&p->proc_lock);
-				return;
-			}
 			/* Remove from the online list, add to the yielded list, and unmap
 			 * the vcore, which gives up the core. */
 			TAILQ_REMOVE(&p->online_vcs, vc, list);
@@ -852,13 +846,12 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 				p->resources[RES_CORES].amt_wanted = p->procinfo->num_vcores;
 			__seq_end_write(&p->procinfo->coremap_seqctr);
 			// add to idle list
-			put_idle_core(core_id());
+			put_idle_core(core_id());	/* TODO: prod the ksched? */
 			// last vcore?  then we really want 1, and to yield the gang
-			// TODO: (RMS) will actually do this.
 			if (p->procinfo->num_vcores == 0) {
 				p->resources[RES_CORES].amt_wanted = 1;
-				__proc_set_state(p, PROC_RUNNABLE_M);
-				schedule_proc(p);
+				/* wait on an event (not supporting 'being nice' for now */
+				__proc_set_state(p, PROC_WAITING);
 			}
 			break;
 		case (PROC_DYING):

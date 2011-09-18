@@ -43,8 +43,6 @@ ssize_t core_request(struct proc *p)
 	bool need_to_idle = FALSE;
 	bool self_ipi_pending = FALSE;
 
-	/* There are a few things broken for now if you don't have a current_tf */
-	assert(current_tf);
 	spin_lock(&p->proc_lock);
 	if (p->state == PROC_DYING) {
 		spin_unlock(&p->proc_lock);
@@ -53,8 +51,10 @@ ssize_t core_request(struct proc *p)
 	/* check to see if this is a full deallocation.  for cores, it's a
 	 * transition from _M to _S.  Will be issues with handling this async. */
 	if (!p->resources[RES_CORES].amt_wanted) {
+		printk("[kernel] trying to transition _M -> _S (deprecated)!\n");
 		assert(p->state == PROC_RUNNING_M); // TODO: (ACR) async core req
 		/* save the context, to be restarted in _S mode */
+		assert(current_tf);
 		p->env_tf = *current_tf;
 		current_tf = 0;			/* Make sure it isn't used in the future */
 		env_push_ancillary_state(p); // TODO: (HSS)
@@ -122,6 +122,7 @@ ssize_t core_request(struct proc *p)
 				 * it in the preempt slot so that we can also save the silly
 				 * state. */
 				struct preempt_data *vcpd = &p->procdata->vcore_preempt_data[0];
+				assert(current_tf);
 				vcpd->preempt_tf = *current_tf;
 				save_fp_state(&vcpd->preempt_anc);
 				__seq_start_write(&vcpd->preempt_tf_valid);
@@ -164,7 +165,7 @@ ssize_t core_request(struct proc *p)
 		/* if there's a race on state (like DEATH), it'll get handled by
 		 * proc_run or proc_destroy */
 		if (p->state == PROC_RUNNABLE_M)
-			proc_run(p);
+			proc_run(p);	/* I dislike this - caller should run it */
 		/* if we are moving to a partitionable core from a RUNNING_S on a
 		 * management core, the kernel needs to do something else on this core
 		 * (just like in proc_destroy).  it also needs to decref, to consume the
