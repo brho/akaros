@@ -116,14 +116,14 @@ void enable_kevent(unsigned int ev_type, uint32_t vcoreid, int ev_flags)
 	register_kevent_q(ev_q, ev_type);
 }
 
-/* Stop receiving the events (one could be on the way) */
-void disable_kevent(unsigned int ev_type)
+/* Stop receiving the events (one could be on the way).  Caller needs to be
+ * careful, since the kernel might be sending an event to the ev_q.  Depending
+ * on the ev_q, it may be hard to know when it is done (for instance, if all
+ * syscalls you ever registered with the ev_q are done, then it would be okay).
+ * o/w, don't free it. */
+struct event_queue *disable_kevent(unsigned int ev_type)
 {
-	struct event_queue *ev_q = clear_kevent_q(ev_type);
-	if (ev_q)
-		put_event_q(ev_q);
-	else
-		printf("Tried to disable but no event_q loaded on ev_type %d", ev_type);
+	return clear_kevent_q(ev_type);
 }
 
 /********* Event Handling / Reception ***********/

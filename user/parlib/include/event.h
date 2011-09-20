@@ -22,7 +22,7 @@ void put_event_q(struct event_queue *ev_q);
 void register_kevent_q(struct event_queue *ev_q, unsigned int ev_type);
 struct event_queue *clear_kevent_q(unsigned int ev_type);
 void enable_kevent(unsigned int ev_type, uint32_t vcoreid, int ev_flags);
-void disable_kevent(unsigned int ev_type);
+struct event_queue *disable_kevent(unsigned int ev_type);
 
 /********* Event Handling / Reception ***********/
 unsigned int get_event_type(struct event_mbox *ev_mbox);
