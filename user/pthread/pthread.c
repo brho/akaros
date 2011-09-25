@@ -507,6 +507,9 @@ int pthread_mutex_lock(pthread_mutex_t* m)
 			cpu_relax();
 			spin_to_sleep(PTHREAD_MUTEX_SPINS, &spinner);
 		}
+	/* normally we'd need a wmb() and a wrmb() after locking, but the
+	 * atomic_swap handles the CPU mb(), so just a cmb() is necessary. */
+	cmb();
 	return 0;
 }
 
@@ -517,8 +520,8 @@ int pthread_mutex_trylock(pthread_mutex_t* m)
 
 int pthread_mutex_unlock(pthread_mutex_t* m)
 {
-  /* Need to prevent the compiler (and some arches) from reordering older
-   * stores */
+  /* keep reads and writes inside the protected region */
+  rwmb();
   wmb();
   atomic_set(&m->lock, 0);
   return 0;

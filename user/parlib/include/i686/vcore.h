@@ -99,6 +99,10 @@ static inline void pop_ros_tf(struct user_trapframe *tf, uint32_t vcoreid)
 	              "subl %%eax,%%esp;     " /* move to notif_en_loc slot */
 	              "popl %%eax;           " /* load notif_enabaled addr */
 	              "movb $0x01,(%%eax);   " /* enable notifications */
+				  /* Need a wrmb() here so the write of enable_notif can't pass
+				   * the read of notif_pending (racing with a potential
+				   * cross-core call with proc_notify()). */
+				  "lock addl $0,(%%esp); " /* LOCK is a CPU mb() */
 				  /* From here down, we can get interrupted and restarted */
 	              "popl %%eax;           " /* get notif_pending status */
 	              "testb $0x01,(%%eax);  " /* test if a notif is pending */

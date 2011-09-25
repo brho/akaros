@@ -167,13 +167,15 @@ static inline void spin_lock(spinlock_t *lock)
 	lock->call_site = (void RACY*CT(1))TC(read_eip());
 	lock->calling_core = core_id();
 #endif
+	cmb();	/* need cmb(), the CPU mb() was handled by the xchgb */
 }
 
 static inline void spin_unlock(spinlock_t *lock)
 {
 	/* Need to prevent the compiler (and some arches) from reordering older
-	 * stores */
+	 * stores. */
 	wmb();
+	rwmb();	/* x86 makes both of these a cmb() */
 	lock->rlock = 0;
 }
 

@@ -113,6 +113,7 @@ void enable_kevent(unsigned int ev_type, uint32_t vcoreid, int ev_flags)
 	ev_q->ev_flags = ev_flags;
 	ev_q->ev_vcore = vcoreid;
 	ev_q->ev_handler = 0;
+	wmb();	/* make sure ev_q is filled out before registering */
 	register_kevent_q(ev_q, ev_type);
 }
 
@@ -194,7 +195,6 @@ static int handle_mbox(struct event_mbox *ev_mbox, unsigned int flags)
 	 * to check the bits regardless */
 	void bit_handler(unsigned int bit) {
 		printd("[event] Bit: ev_type: %d\n", bit);
-		cmb();
 		if (ev_handlers[bit])
 			ev_handlers[bit](0, bit);
 		retval++;
@@ -224,7 +224,7 @@ void handle_ev_ev(struct event_msg *ev_msg, unsigned int ev_type)
 	 * with the remaining events in the future - meaning it won't return to
 	 * here. */
 	ev_q->ev_alert_pending = FALSE;
-	wmb();			/* should be unnecessary, due to the function call */
+	wmb();	/* don't let the pending write pass the signaling of an ev recv */
 	handle_event_q(ev_q);
 }
 

@@ -8,6 +8,7 @@
 #define ROS_INC_ATOMIC_H
 
 #include <ros/common.h>
+#include <ros/arch/membar.h>
 
 typedef void* atomic_t;
 
@@ -36,6 +37,7 @@ static inline bool seq_is_locked(seq_ctr_t seq_ctr)
 
 static inline bool seqctr_retry(seq_ctr_t old_ctr, seq_ctr_t new_ctr)
 {
+	rmb();	/* don't allow protected reads to reorder after the check */
 	return (seq_is_locked(old_ctr)) || (old_ctr != new_ctr);	
 }
 

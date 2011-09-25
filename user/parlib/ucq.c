@@ -138,14 +138,16 @@ claim_slot:
 	assert(slot_is_good(my_idx));
 	/* Now we have a good slot that we can consume */
 	my_msg = slot2msg(my_idx);
+	/* linux would put an rmb_depends() here */
 	/* Wait til the msg is ready (kernel sets this flag) */
 	while (!my_msg->ready)
 		cpu_relax();
+	rmb();	/* order the ready read before the contents */
 	/* Copy out */
 	*msg = my_msg->ev_msg;
 	/* Unset this for the next usage of the container */
 	my_msg->ready = FALSE;
-	wmb();
+	wmb();	/* post the ready write before incrementing */
 	/* Increment nr_cons, showing we're done */
 	atomic_inc(&((struct ucq_page*)PTE_ADDR(my_idx))->header.nr_cons);
 	return 0;

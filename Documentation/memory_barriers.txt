@@ -1,0 +1,224 @@
+memory_barriers.txt
+Barret Rhoden
+
+1. Overview
+2. General Rules
+3. Use in the Code Base
+4. Memory Barriers and Locking
+5. Other Stuff
+
+1. Overview
+====================
+Memory barriers exist to make sure the compiler and the CPU do what we intend.
+The compiler memory barreir (cmb()) (called an optimization barrier in linux)
+prevents the compliler from reordering operations.  However, CPUs can also
+reorder reads and writes, in an architecture-dependent manner.  In most places
+with shared memory synchronization, you'll need some form of memory barriers.
+
+These barriers apply to 'unrelated' reads and writes.  The compiler or the CPU
+cannot detect any relationship between them, so it believes it is safe to
+reorder them.  The problem arises in that we attach some meaning to them,
+often in the form of signalling other cores.
+
+CPU memory barriers only apply when talking to different cores or hardware
+devices.  They do not matter when dealing with your own core (perhaps between
+a uthread and vcore context, running on the same core).  cmb()s still matter,
+even when the synchronizing code runs on the same core.  See Section 3 for
+more details.
+
+2. General Rules
+====================
+2.1: Types of Memory Barriers
+---------------------
+For CPU memory barriers, we have 5 types. 
+- rmb() no reordering of reads with future reads
+- wmb() no reordering of writes with future writes
+- wrmb() no reordering of writes with future reads
+- rwmb() no reordering of reads with future writes
+- mb() no reordering of reads or writes with future reads or writes
+
+All 5 of these have a cmb() built in. (a "memory" clobber).
+
+Part of the reason for the distinction between wrmb/rwmb and the full mb is
+that on many machines (x86), rwmb() is a noop (for us).
+
+These barriers are used on 'normal' reads and writes, and they do not include
+streaming/SSE instructions and string ops (on x86), and they do not include
+talking with hardware devices.  For memory barriers for those types of
+operations, use the _f variety (force), e.g. rmb() -> rmb_f().
+
+2.2: Atomics
+---------------------
+Most atomic operations, such as atomic_inc(), provide some form of memory
+barrier protection.  Specifically, all read-modify-write (RMW) atomic ops act
+as a CPU memory barrier (like an mb()), but do *not* provide a cmb().  They
+only provide a cmb() on the variables they apply to (i.e., variables in the
+clobber list).  
+
+I considered making all atomics clobber "memory" (like the cmb()), but
+sync_fetch_and_add() and friends do not do this by default, and it also means
+that any use of atomics (even when we don't require a cmb()) then provides a
+cmb().
+
+Also note that not all atomic operations are RMW.  atomic_set(), _init(), and
+_read() do not enforce a memory barrier in the CPU.  If in doubt, look for the
+LOCK in the assembly (except for xchg, which is a locking function).  We're
+taking advantage of the LOCK the atomics provide to serialize and synchronize
+our memory.
+
+In a lot of places, even if we have an atomic I'll still put in the expected
+mb (e.g., a rmb()), especially if it clarifies the code.  When I rely on the
+atomic's LOCK, I'll make a note of it (such as in spinlock code).
+
+Finally, note that the atomic RMWs handle the mb_f()s just like they handle
+the regular memory barriers.  The LOCK prefix does quite a bit.
+
+These rules are a bit x86 specific, so for now other architectures will need
+to implement their atomics such that they provide the same effects.
+
+2.3: Locking
+---------------------
+If you access shared memory variables only when inside locks, then you do not
+need to worry about memory barriers.  The details are sorted out in the
+locking code.
+
+3. Use in the Code Base
+====================
+Figuring out how / when / if to use memory barriers is relatively easy.
+- First, notice when  you are using shared memory to synchronize.  Any time
+  you are using a global variable or working on structs that someone else
+  might look at concurrently, and you aren't using locks or another vetted
+  tool (like krefs), then you need to worry about this.
+- Second, determine what reads and writes you are doing.
+- Third, determine who you are talking to.
+
+If you're talking to other cores or devices, you need CPU mbs.  If not, a cmb
+suffices.  Based on the types of reads and writes you are doing, just pick one
+of the 5 memory barriers.
+
+3.1: What's a Read or Write?
+---------------------
+When writing code that synchronizes with other threads via shared memory, we
+have a variety of patterns.  Most infamous is the "signal, then check if the
+receiver is still listening", which is the critical part of the "check,
+signal, check again" pattern.  For exmaples, look at things like
+'notif_pending' and 'can_rcv_msg'.  
+
+In these examples, "write" and "read" include things such as posting events or
+checking flags (which ultimately involve writes and reads).  You need to be
+aware that some functions, such as TAILQ_REMOVE are writes, even though it is
+not written as *x = 3;.  Whatever your code is, you should be able to point
+out what are the critical variables and their interleavings.  You should see
+how a CPU reordering would break your algorithm just like a poorly timed
+interrupt or other concurrent interleaving.
+
+When looking at a function that we consider a signal/write, you need to know
+what it does.  It might handle its memory barriers internally (protecting its
+own memory operations).  However, it might not.  In general, I err on the side
+of extra mbs, or at the very least leave a comment about what I am doing and
+what sort of barriers I desire from the code.
+
+3.2: Who Are We Talking To?
+---------------------
+CPU memory barriers are necessary when synchronizing/talking with remote cores
+or devices, but not when "talking" with your own core.  For instance, if you
+issue two writes, then read them, you will see both writes (reads may not be
+reorderd with older writes to the same location on a single processor, and
+your reads get served out of the write buffer).  Note, the read can
+pass/happen before the write, but the CPU gives you the correct value that the
+write gave you (store-buffer forwarding).  Other cores may not see both of
+them due to reordering magic.  Put another way, since those remote processors
+didn't do the initial writing, the rule about reading the same location
+doesn't apply to them.
+
+Given this, when finding spots in the code that may require a mb(), I think
+about signalling a concurrent viewer on a different core.  A classic example
+is when we signal to say "process an item".  Say we were on one core and
+filled the struct out and then signalled, if we then started reading from that
+same core, we would see our old write (you see writes you previously wrote),
+but someone else on another core may see the signal before the filled out
+struct.  
+
+There is still a distinction between the compiler reordering code and the
+processor reordering code.  Imagine the case of "filling a struct, then
+posting the pointer to the struct".  If the compiler reorders, the pointer may
+be posted before the struct is filled, and an interrupt may come in.  The
+interrupt handler may look at that structure and see invalid data.  This has
+nothing to do with the CPU reordering - simply the compiler messed with you.
+Note this only matters if we care about a concurrent interleaving (interrupt
+handler with a kthread for instance), and we ought to be aware that there is
+some shared state being mucked with.
+
+For a more complicated example, consider DONT_MIGRATE and reading vcoreid.
+Logically, we want to make sure the vcoreid read doesn't come before the flag
+write (since uthread code now thinks it is on a particular vcore).  This
+write, then read would normally require a wrmb(), but is that overkill?
+Clearly, we need the compiler to issue the writes in order, so we need a cmb()
+at least.  Here's the code that the processor will get:
+	orl    $0x1,0x254(%edi)      (write DONT_MIGRATE)
+	mov    $0xfffffff0,%ebp      (getting ready with the TLS)
+	mov    %gs:0x0(%ebp),%esi    (reading the vcoreid from TLS)
+
+Do we need a wrmb() here?  Any remote code might see the write after the
+vcoreid read, but the read is a bit different than normal ones.  We aren't
+reading global memory, and we aren't trying to synchronize with another core.
+All that matters is that if the thread running this code saw the vcoreid read,
+then whoever reads the flag sees the write.
+
+The 'whoever' is not concurrently running code - it is 2LS code that either
+runs on the vcore due to an IPI/notification, or it is 2LS code running
+remotely that responded to a preemption of that vcore.  Both of these cases
+require an IPI.  AFAIK, interrupts serialize memory operations, so whatever
+writes were issued before the interrupt hit memory (or cache) before we even
+do things like write out the trapframe of the thread.  If this isn't true,
+then the synchronization we do when writing out the trapframe (before allowing
+a remote core to try and recover the preempted uthread), will handle the
+DONT_MIGRATE write.
+
+Anyway, the point is that remote code will look at it, but only when told to
+look.  That "telling" is the write, which happens after the
+synchronizing/serializing events of the IPI path.
+
+4. Memory Barriers and Locking
+====================
+The implementation of locks require memory barriers (both compiler and CPU).
+Regular users of locks do not need to worry about this.  Lock implementers do.
+
+We need to consider reorderings of reads and writes from before and after the
+lock/unlock write.  In these next sections, the reads and writes I talk about
+are from a given thread/CPU.  Protected reads/writes are those that happen
+while the lock is held.  When I say you need a wmb(), you could get by with a
+cmb() and an atomic-RMW op: just so long as you have the cmb() and the
+approrpiate CPU mb() at a minimum.
+
+4.1: Locking
+---------------------
+- Don't care about our reads or writes before the lock happening after the
+  lock write.
+- Don't want protected writes slipping out before the lock write, need a wmb()
+  after the lock write.
+- Don't want protected reads slipping out before the lock write, need a wrmb()
+  after the lock write.
+
+4.2: Unlocking
+---------------------
+- Don't want protected writes slipping out after the unlock, so we need a
+  wmb() before the unlock write.
+- Don't want protected reads slipping out after the unlock, so we need a
+  rwmb() before the unlock write.  Arguably, there is some causality that
+  makes this less meaningful (what did you do with the info? if not a write
+  that was protected, then who cares? )
+- Don't care about reads or writes after the unlock happening earlier than the
+  unlock write.
+
+5. Other Stuff
+====================
+Linux has a lot of work on memory barriers, far more advanced than our stuff.
+Some of it doesn't make any sense.  I've asked our architects about things
+like read_barrier_depends() and a few other things.  They also support some
+non-Intel x86 clones that need wmb_f() in place of a wmb() (support out of
+order writes).  If this pops up, we'll deal with it.
+	
+Also note that none of these barriers deal with things like page talble walks,
+page/segmentation update writes, non-temporal hints on writes, etc.  glhf with
+that, future self!

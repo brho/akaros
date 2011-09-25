@@ -69,7 +69,7 @@ static void send_indir_to_vcore(struct event_queue *ev_q, uint32_t vcoreid)
 	local_msg.ev_arg3 = ev_q;
 	post_ev_msg(get_proc_ev_mbox(vcoreid), &local_msg, 0);
 	/* Set notif pending, so userspace doesn't miss the INDIR while yielding */
-	wmb();
+	wmb(); /* Ensure ev_msg write is before notif_pending */
 	vcpd->notif_pending = TRUE;
 }
 
@@ -98,7 +98,7 @@ static bool try_alert_vcore(struct proc *p, struct event_queue *ev_q,
 	 * only critical part is that we __alert, then check can_alert. */
 	if (can_alert_vcore(vcoreid)) {
 		__alert_vcore(p, ev_q, vcoreid);
-		cmb();
+		wrmb();	/* prev write (notif_pending) must come before following reads*/
 		if (can_alert_vcore(vcoreid))
 			return TRUE;
 	}
@@ -125,7 +125,7 @@ static bool __alert_list_member(struct vcore_tailq *list, struct proc *p,
 		/* post the alert.  Not using the try_alert_vcore() helper since I want
 		 * something more customized for the lists. */
 		__alert_vcore(p, ev_q, vcoreid);
-		cmb();
+		wrmb();	/* prev write (notif_pending) must come before following reads*/
 		/* if they are still alertable after we sent the msg, then they'll get
 		 * it before yielding (racing with userspace yield here).  This check is
 		 * not as critical as the next one, but will allow us to alert vcores
@@ -133,7 +133,6 @@ static bool __alert_list_member(struct vcore_tailq *list, struct proc *p,
 		 * bulk_preempt list. */
 		if (can_alert_vcore(vcoreid))
 			return TRUE;
-		cmb();
 		/* As a backup, if they are still the first on the list, then they are
 		 * still going to get the message.  For the online list, proc_yield()
 		 * will return them to userspace (where they will get the message)
@@ -202,6 +201,7 @@ static void alert_vcore(struct proc *p, struct event_queue *ev_q,
 	 * is probably true. */
 	if (ev_q->ev_flags & EVENT_INDIR) {
 		ev_q->ev_alert_pending = TRUE;
+		wmb();	/* force this write to happen before any event writes */
 	}
 	/* Don't care about FALLBACK, just send and be done with it.  TODO:
 	 * considering getting rid of FALLBACK as an option and making it mandatory
@@ -365,6 +365,7 @@ void send_event(struct proc *p, struct event_queue *ev_q, struct event_msg *msg,
 	 * vehicle for sending the ev_type. */
 	assert(msg);
 	post_ev_msg(ev_mbox, msg, ev_q->ev_flags);
+	wmb();	/* ensure ev_msg write is before alert_vcore() */
 	/* Help out userspace a bit by checking for a potentially confusing bug */
 	if ((ev_mbox == get_proc_ev_mbox(vcoreid)) &&
 	    (ev_q->ev_flags & EVENT_INDIR))
@@ -386,6 +387,7 @@ void send_kernel_event(struct proc *p, struct event_msg *msg, uint32_t vcoreid)
 	uint16_t ev_num = msg->ev_type;
 	assert(ev_num < MAX_NR_EVENT);		/* events start at 0 */
 	struct event_queue *ev_q = p->procdata->kernel_evts[ev_num];
+	/* linux would put a rmb_depends() here too, i think. */
 	if (ev_q)
 		send_event(p, ev_q, msg, vcoreid);
 }

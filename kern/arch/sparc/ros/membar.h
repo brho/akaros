@@ -1,13 +1,23 @@
-#ifndef _ARCH_MEMBAR_H
-#define _ARCH_MEMBAR_H
+#ifndef ROS_INC_ARCH_MEMBAR_H
+#define ROS_INC_ARCH_MEMBAR_H
 
+/* Full CPU memory barrier */
 #define mb() {rmb(); wmb();}
-#define rmb()
-#define wmb() ({ __asm__ __volatile__ ("stbar" ::: "memory"); })
-/* Compiler memory barrier */
+/* Compiler memory barrier (optimization barrier) */
 #define cmb() ({ asm volatile("" ::: "memory"); })
-/* Force a wmb, used in cases where an IPI could beat a write, even though
- * write-orderings are respected.  (Used by x86) */
-#define wmb_f() wmb()
+/* Partial CPU memory barriers */
+#define rmb() cmb()
+#define wmb() ({ __asm__ __volatile__ ("stbar" ::: "memory"); })
+#define wrmb() mb()
+#define rwmb() mb()
 
-#endif
+/* Forced barriers, used for string ops, SSE ops, dealing with hardware, or
+ * other places where you avoid 'normal' x86 read/writes (like having an IPI
+ * beat a write) */
+#define mb_f() mb()
+#define rmb_f() rmb()
+#define wmb_f() wmb()
+#define wrmb_f() wrmb()
+#define rwmb_f() rwmb()
+
+#endif /* ROS_INC_ARCH_MEMBAR_H */

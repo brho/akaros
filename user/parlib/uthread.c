@@ -68,7 +68,7 @@ void __attribute__((noreturn)) uthread_vcore_entry(void)
 
 	check_preempt_pending(vcoreid);
 	handle_events(vcoreid);
-	assert(in_vcore_context());	/* double check, in case and event changed it */
+	assert(in_vcore_context());	/* double check, in case an event changed it */
 	assert(sched_ops->sched_entry);
 	sched_ops->sched_entry();
 	/* 2LS sched_entry should never return */
@@ -102,7 +102,8 @@ void uthread_init(struct uthread *new_thread)
 	 * when we were interrupted.  We need to not migrate, since once we know the
 	 * vcoreid, we depend on being on the same vcore throughout. */
 	caller->flags |= UTHREAD_DONT_MIGRATE;
-	wmb();
+	/* not concerned about cross-core memory ordering, so no CPU mbs needed */
+	cmb();	/* don't let the compiler issue the vcore read before the write */
 	/* Note the first time we call this, we technically aren't on a vcore */
 	vcoreid = vcore_id();
 	disable_notifs(vcoreid);
@@ -115,7 +116,7 @@ void uthread_init(struct uthread *new_thread)
 	 * from vcore context, so only enable if we're in _M and in vcore context. */
 	if (!in_vcore_context() && in_multi_mode())
 		enable_notifs(vcoreid);
-	wmb();
+	cmb();	/* issue this write after we're done with vcoreid */
 	caller->flags &= ~UTHREAD_DONT_MIGRATE;
 }
 
@@ -175,7 +176,7 @@ void uthread_yield(bool save_state)
 	 * the same vcore throughout (once it disables notifs).  The race is that we
 	 * read vcoreid, then get interrupted / migrated before disabling notifs. */
 	uthread->flags |= UTHREAD_DONT_MIGRATE;
-	wmb();
+	cmb();	/* don't let DONT_MIGRATE write pass the vcoreid read */
 	uint32_t vcoreid = vcore_id();
 	printd("[U] Uthread %08p is yielding on vcore %d\n", uthread, vcoreid);
 	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
@@ -188,6 +189,7 @@ void uthread_yield(bool save_state)
 	 * and short ciruit the function.  Don't do this if we're dying. */
 	if (save_state)
 		save_ros_tf(&uthread->utf);
+	cmb();	/* Force a reread of yielding. Technically save_ros_tf() is enough*/
 	/* Restart path doesn't matter if we're dying */
 	if (!yielding)
 		goto yield_return_path;
@@ -267,6 +269,7 @@ void run_current_uthread(void)
 /* Launches the uthread on the vcore.  Don't call this on current_uthread. */
 void run_uthread(struct uthread *uthread)
 {
+	uint32_t vcoreid;
 	assert(uthread != current_uthread);
 	if (uthread->state != UT_RUNNABLE) {
 		/* had vcore3 throw this, when the UT blocked on vcore1 and didn't come
@@ -276,10 +279,9 @@ void run_uthread(struct uthread *uthread)
 	}
 	assert(uthread->state == UT_RUNNABLE);
 	uthread->state = UT_RUNNING;
-	/* Save a ptr to the pthread running in the transition context's TLS */
-	uint32_t vcoreid = vcore_id();
-	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
+	/* Save a ptr to the uthread we'll run in the transition context's TLS */
 	current_uthread = uthread;
+	vcoreid = vcore_id();
 	clear_notif_pending(vcoreid);
 	set_tls_desc(uthread->tls_desc, vcoreid);
 	/* Load silly state (Floating point) too.  For real */
@@ -318,10 +320,10 @@ bool register_evq(struct syscall *sysc, struct event_queue *ev_q)
 {
 	int old_flags;
 	sysc->ev_q = ev_q;
-	wmb();
+	wrmb();	/* don't let that write pass any future reads (flags) */
 	/* Try and set the SC_UEVENT flag (so the kernel knows to look at ev_q) */
 	do {
-		cmb();
+		/* no cmb() needed, the atomic_read will reread flags */
 		old_flags = atomic_read(&sysc->flags);
 		/* Spin if the kernel is mucking with syscall flags */
 		while (old_flags & SC_K_LOCK)
@@ -351,9 +353,10 @@ void deregister_evq(struct syscall *sysc)
 {
 	int old_flags;
 	sysc->ev_q = 0;
+	wrmb();	/* don't let that write pass any future reads (flags) */
 	/* Try and unset the SC_UEVENT flag */
 	do {
-		cmb();
+		/* no cmb() needed, the atomic_read will reread flags */
 		old_flags = atomic_read(&sysc->flags);
 		/* Spin if the kernel is mucking with syscall flags */
 		while (old_flags & SC_K_LOCK)

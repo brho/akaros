@@ -827,7 +827,7 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 			TAILQ_REMOVE(&p->online_vcs, vc, list);
 			/* Now that we're off the online list, check to see if an alert made
 			 * it through (event.c sets this) */
-			cmb();
+			wrmb();	/* prev write must hit before reading notif_pending */
 			if (vcpd->notif_pending) {
 				/* We lost, put it back on the list and abort the yield */
 				TAILQ_INSERT_TAIL(&p->online_vcs, vc, list); /* could go HEAD */
@@ -889,6 +889,7 @@ void proc_notify(struct proc *p, uint32_t vcoreid)
 	 * use a bool. (wrong answer). */
 	if (!vcpd->notif_pending) {
 		vcpd->notif_pending = TRUE;
+		wrmb();	/* must write notif_pending before reading notif_enabled */
 		if (vcpd->notif_enabled) {
 			/* GIANT WARNING: we aren't using the proc-lock to protect the
 			 * vcoremap.  We want to be able to use this from interrupt context,

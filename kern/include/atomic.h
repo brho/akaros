@@ -243,7 +243,9 @@ static inline void write_sequnlock(seqlock_t *lock)
 
 static inline seq_ctr_t read_seqbegin(seqlock_t *lock)
 {
-	return lock->r_ctr;
+	seq_ctr_t retval = lock->r_ctr;
+	rmb();	/* don't want future reads to come before our ctr read */
+	return retval;
 }
 
 static inline bool read_seqretry(seqlock_t *lock, seq_ctr_t ctr)

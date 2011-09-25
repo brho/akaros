@@ -201,7 +201,7 @@ void vcore_yield(bool preempt_pending)
 	uint32_t vcoreid = vcore_id();
 	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
 	vcpd->can_rcv_msg = FALSE;
-	wmb();
+	/* no wrmb() necessary, clear_notif() has an mb() */
 	/* Clears notif pending.  If we had an event outstanding, this will handle
 	 * it and return TRUE, at which point we want to unwind and return to the
 	 * 2LS loop (where we may not want to yield anymore).  Note that the kernel
@@ -231,8 +231,10 @@ bool clear_notif_pending(uint32_t vcoreid)
 {
 	bool handled_event = FALSE;
 	do {
-		cmb();
 		__procdata.vcore_preempt_data[vcoreid].notif_pending = 0;
+		/* need a full mb(), since handle events might be just a read or might
+		 * be a write, either way, it needs to happen after notif_pending */
+		mb();
 		handled_event = handle_events(vcoreid);
 	} while (handled_event);
 	return handled_event;
@@ -245,6 +247,7 @@ bool clear_notif_pending(uint32_t vcoreid)
 void enable_notifs(uint32_t vcoreid)
 {
 	__enable_notifs(vcoreid);
+	wrmb();	/* need to read after the write that enabled notifs */
 	if (__procdata.vcore_preempt_data[vcoreid].notif_pending)
 		sys_self_notify(vcoreid, EV_NONE, 0);
 }

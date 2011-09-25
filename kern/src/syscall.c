@@ -1476,7 +1476,7 @@ void __signal_syscall(struct syscall *sysc, struct proc *p)
 	struct event_msg local_msg;
 	/* User sets the ev_q then atomically sets the flag (races with SC_DONE) */
 	if (atomic_read(&sysc->flags) & SC_UEVENT) {
-		rmb();
+		rmb();	/* read the ev_q after reading the flag */
 		ev_q = sysc->ev_q;
 		if (ev_q) {
 			memset(&local_msg, 0, sizeof(struct event_msg));

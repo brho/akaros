@@ -20,33 +20,39 @@ static inline mcs_lock_qnode_t *mcs_qnode_swap(mcs_lock_qnode_t **addr,
 void mcs_lock_lock(struct mcs_lock *lock, struct mcs_lock_qnode *qnode)
 {
 	qnode->next = 0;
-	mcs_lock_qnode_t* predecessor = mcs_qnode_swap(&lock->lock,qnode);
-	if(predecessor)
-	{
+	mcs_lock_qnode_t *predecessor = mcs_qnode_swap(&lock->lock, qnode);
+	if (predecessor) {
 		qnode->locked = 1;
+		wmb();
 		predecessor->next = qnode;
-		while(qnode->locked)
+		/* no need for a wrmb(), since this will only get unlocked after they
+		 * read our previous write */
+		while (qnode->locked)
 			cpu_relax();
 	}
+	cmb();	/* just need a cmb, the swap handles the CPU wmb/wrmb() */
 }
 
 void mcs_lock_unlock(struct mcs_lock *lock, struct mcs_lock_qnode *qnode)
 {
-	if(qnode->next == 0)
-	{
-		mcs_lock_qnode_t* old_tail = mcs_qnode_swap(&lock->lock,0);
-		if(old_tail == qnode)
+	if (qnode->next == 0) {
+		cmb();	/* no need for CPU mbs, since there's an atomic_swap() */
+		mcs_lock_qnode_t *old_tail = mcs_qnode_swap(&lock->lock,0);
+		if (old_tail == qnode)
 			return;
-
-		mcs_lock_qnode_t* usurper = mcs_qnode_swap(&lock->lock,old_tail);
-		while(qnode->next == 0);
-		if(usurper)
+		mcs_lock_qnode_t *usurper = mcs_qnode_swap(&lock->lock,old_tail);
+		while (qnode->next == 0)
+			cpu_relax();
+		if (usurper)
 			usurper->next = qnode->next;
 		else
 			qnode->next->locked = 0;
-	}
-	else
+	} else {
+		/* mb()s necessary since we didn't call an atomic_swap() */
+		wmb();	/* need to make sure any previous writes don't pass unlocking */
+		rwmb();	/* need to make sure any reads happen before the unlocking */
 		qnode->next->locked = 0;
+	}
 }
 
 /* We don't bother saving the state, like we do with irqsave, since we can use
@@ -58,9 +64,9 @@ void mcs_lock_notifsafe(struct mcs_lock *lock, struct mcs_lock_qnode *qnode)
 	if (!in_vcore_context()) {
 		if (current_uthread)
 			current_uthread->flags |= UTHREAD_DONT_MIGRATE;
-		wmb();
+		cmb();	/* don't issue the flag write before the vcore_id() read */
 		disable_notifs(vcore_id());
-		wmb();
+		cmb();	/* don't issue the flag write before the disable */
 		if (current_uthread)
 			current_uthread->flags &= ~UTHREAD_DONT_MIGRATE;
 	}
@@ -73,9 +79,9 @@ void mcs_unlock_notifsafe(struct mcs_lock *lock, struct mcs_lock_qnode *qnode)
 	if (!in_vcore_context() && in_multi_mode()) {
 		if (current_uthread)
 			current_uthread->flags |= UTHREAD_DONT_MIGRATE;
-		wmb();
+		cmb();	/* don't issue the flag write before the vcore_id() read */
 		enable_notifs(vcore_id());
-		wmb();
+		cmb();	/* don't issue the flag write before the enable */
 		if (current_uthread)
 			current_uthread->flags &= ~UTHREAD_DONT_MIGRATE;
 	}
