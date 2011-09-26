@@ -514,7 +514,8 @@ void proc_run(struct proc *p)
 			__seq_start_write(&p->procinfo->coremap_seqctr);
 			p->procinfo->num_vcores = 0;	/* TODO (VC#) */
 			/* TODO: For now, we won't count this as an active vcore (on the
-			 * lists).  This gets unmapped in resource.c, and needs work. */
+			 * lists).  This gets unmapped in resource.c and yield_s, and needs
+			 * work. */
 			__map_vcore(p, 0, core_id()); // sort of.  this needs work.
 			__seq_end_write(&p->procinfo->coremap_seqctr);
 			/* __set_proc_current assumes the reference we give it is for
@@ -762,6 +763,7 @@ void __proc_yield_s(struct proc *p, struct trapframe *tf)
 	assert(p->state == PROC_RUNNING_S);
 	p->env_tf= *tf;
 	env_push_ancillary_state(p);			/* TODO: (HSS) */
+	__unmap_vcore(p, 0);	/* VC# keep in sync with proc_run _S */
 	__proc_set_state(p, PROC_RUNNABLE_S);
 	schedule_proc(p);
 }
