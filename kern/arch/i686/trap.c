@@ -43,6 +43,9 @@ pseudodesc_t RO idt_pd = {
 spinlock_t iht_lock;
 handler_t TP(TV(t)) LCKD(&iht_lock) (RO interrupt_handlers)[NUM_INTERRUPT_HANDLERS];
 
+/* x86-specific interrupt handlers */
+void __kernel_message(struct trapframe *tf, void *data);
+
 static const char *NTS trapname(int trapno)
 {
     // zra: excnames is SREADONLY because Ivy doesn't trust const
@@ -195,6 +198,9 @@ void idt_init(void)
 	/* register the generic timer_interrupt() handler for the per-core timers */
 	register_interrupt_handler(interrupt_handlers, LAPIC_TIMER_DEFAULT_VECTOR,
 	                           timer_interrupt, NULL);
+	/* register the kernel message handler */
+	register_interrupt_handler(interrupt_handlers, I_KERNEL_MSG,
+	                           __kernel_message, NULL);
 }
 
 void
@@ -536,7 +542,7 @@ static kernel_message_t *get_next_amsg(struct kernel_msg_list *list_head,
  * Note that all of this happens from interrupt context, and interrupts are
  * currently disabled for this gate.  Interrupts need to be disabled so that the
  * self-ipi doesn't preempt the execution of this kernel message. */
-void __kernel_message(struct trapframe *tf)
+void __kernel_message(struct trapframe *tf, void *data)
 {
 	per_cpu_info_t *myinfo = &per_cpu_info[core_id()];
 	kernel_message_t msg_cp, *k_msg;
@@ -575,9 +581,6 @@ void __kernel_message(struct trapframe *tf)
 			msg_cp.pc(tf, msg_cp.srcid, msg_cp.arg0, msg_cp.arg1, msg_cp.arg2);
 		}
 	}
-	/* TODO: should this proc_restartcore, like the irq/trap paths?  Or at least
-	 * take some things from __proc_startcore() (since we don't want to re-run
-	 * kmsgs). */
 }
 
 /* Runs any outstanding routine kernel messages from within the kernel.  Will
