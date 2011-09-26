@@ -1349,6 +1349,8 @@ void __proc_kmsg_pending(struct proc *p, bool ipi_pending)
  * calling. */
 void __map_vcore(struct proc *p, uint32_t vcoreid, uint32_t pcoreid)
 {
+	while (p->procinfo->vcoremap[vcoreid].valid)
+		cpu_relax();
 	p->procinfo->vcoremap[vcoreid].pcoreid = pcoreid;
 	p->procinfo->vcoremap[vcoreid].valid = TRUE;
 	p->procinfo->pcoremap[pcoreid].vcoreid = vcoreid;
@@ -1359,8 +1361,9 @@ void __map_vcore(struct proc *p, uint32_t vcoreid, uint32_t pcoreid)
  * calling. */
 void __unmap_vcore(struct proc *p, uint32_t vcoreid)
 {
-	p->procinfo->vcoremap[vcoreid].valid = FALSE;
 	p->procinfo->pcoremap[p->procinfo->vcoremap[vcoreid].pcoreid].valid = FALSE;
+	wmb();
+	p->procinfo->vcoremap[vcoreid].valid = FALSE;
 }
 
 /* Stop running whatever context is on this core, load a known-good cr3, and
