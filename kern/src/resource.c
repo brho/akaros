@@ -65,7 +65,6 @@ ssize_t core_request(struct proc *p)
 		__proc_set_state(p, PROC_RUNNABLE_S);
 		schedule_proc(p);
 		spin_unlock(&p->proc_lock);
-		__proc_kmsg_pending(p, self_ipi_pending);
 		return 0;
 	}
 	/* Fail if we can never handle this amount (based on how many we told the

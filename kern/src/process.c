@@ -636,6 +636,14 @@ void proc_restartcore(void)
 	/* Need to be current (set by the caller), in case a kmsg is there that
 	 * tries to clobber us. */
 	process_routine_kmsg(pcpui->cur_tf);
+	cmb();
+	/* We need to re-evaluate whether or not we should run something, in case a
+	 * __death or __preempt came in since we last checked. */
+	if (!pcpui->cur_tf) {
+		abandon_core();
+		enable_irq();
+		smp_idle();
+	}
 	__proc_startcore(pcpui->cur_proc, pcpui->cur_tf);
 }
 
@@ -657,21 +665,19 @@ void proc_restartcore(void)
  * Note that some cores can be processing async calls, but will eventually
  * decref.  Should think about this more, like some sort of callback/revocation.
  *
- * This will eat your reference if it won't return.  Note that this function
- * needs to change anyways when we make __death more like __preempt.  (TODO) */
+ * This function will now always return (it used to not return if the calling
+ * core was dying).  However, when it returns, a kernel message will eventually
+ * come in, making you abandon_core, as if you weren't running.  It may be that
+ * the only reference to p is the one you passed in, and when you decref, it'll
+ * get __proc_free()d. */
 void proc_destroy(struct proc *p)
 {
 	bool self_ipi_pending = FALSE;
 	
 	spin_lock(&p->proc_lock);
-	/* TODO: (DEATH) look at this again when we sort the __death IPI */
-	if (current == p)
-		self_ipi_pending = TRUE;
-
 	switch (p->state) {
 		case PROC_DYING: // someone else killed this already.
 			spin_unlock(&p->proc_lock);
-			__proc_kmsg_pending(p, self_ipi_pending);
 			return;
 		case PROC_RUNNABLE_M:
 			/* Need to reclaim any cores this proc might have, even though it's
@@ -723,14 +729,11 @@ void proc_destroy(struct proc *p)
 	close_all_files(&p->open_files, FALSE);
 	/* This decref is for the process's existence. */
 	proc_decref(p);
-	/* Unlock and possible decref and wait.  A death IPI should be on its way,
-	 * either from the RUNNING_S one, or from proc_take_cores with a __death.
-	 * in general, interrupts should be on when you call proc_destroy locally,
-	 * but currently aren't for all things (like traphandlers). */
+	/* Unlock.  A death IPI should be on its way, either from the RUNNING_S one,
+	 * or from proc_take_cores with a __death.  in general, interrupts should be
+	 * on when you call proc_destroy locally, but currently aren't for all
+	 * things (like traphandlers). */
 	spin_unlock(&p->proc_lock);
-	/* at this point, we normally have one ref to be eaten in kmsg_pending and
-	 * one for every 'current'.  and maybe one for a parent */
-	__proc_kmsg_pending(p, self_ipi_pending);
 	return;
 }
 
@@ -1028,7 +1031,6 @@ void proc_preempt_core(struct proc *p, uint32_t pcoreid, uint64_t usec)
 	}
 	#endif
 	spin_unlock(&p->proc_lock);
-	__proc_kmsg_pending(p, self_ipi_pending);
 }
 
 /* Warns and preempts all from p.  No delaying / alarming, or anything.  The
@@ -1055,7 +1057,6 @@ void proc_preempt_all(struct proc *p, uint64_t usec)
 	schedule_proc(p);
 	#endif
 	spin_unlock(&p->proc_lock);
-	__proc_kmsg_pending(p, self_ipi_pending);
 }
 
 /* Give the specific pcore to proc p.  Lots of assumptions, so don't really use
@@ -1572,7 +1573,6 @@ void __preempt(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2)
 	__seq_start_write(&vcpd->preempt_tf_valid);
 	__unmap_vcore(p, vcoreid);
 	abandon_core();
-	smp_idle();
 }
 
 /* Kernel message handler to clean up the core when a process is dying.
@@ -1589,7 +1589,6 @@ void __death(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2)
 		__unmap_vcore(current, vcoreid);
 	}
 	abandon_core();
-	smp_idle();
 }
 
 /* Kernel message handler, usually sent IMMEDIATE, to shoot down virtual
