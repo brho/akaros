@@ -161,9 +161,9 @@ void idt_init(void)
 
 	// turn on syscall handling and other user-accessible ints
 	// DPL 3 means this can be triggered by the int instruction
-	// STS_TG32 sets the IDT type to a Trap Gate (interrupts enabled)
+	// STS_TG32 sets the IDT type to a Interrupt Gate (interrupts disabled)
 	idt[T_SYSCALL].gd_dpl = SINIT(3);
-	idt[T_SYSCALL].gd_type = SINIT(STS_TG32);
+	idt[T_SYSCALL].gd_type = SINIT(STS_IG32);
 	idt[T_BRKPT].gd_dpl = SINIT(3);
 
 	/* Setup a TSS so that we get the right stack when we trap to the kernel. */
@@ -241,6 +241,8 @@ print_trapframe(trapframe_t *tf)
 	spin_unlock_irqsave(&ptf_lock);
 }
 
+/* Certain traps want IRQs enabled, such as the syscall.  Others can't handle
+ * it, like the page fault handler.  Turn them on on a case-by-case basis. */
 static void trap_dispatch(struct trapframe *tf)
 {
 	// Handle processor exceptions.
@@ -252,12 +254,14 @@ static void trap_dispatch(struct trapframe *tf)
 			kfree(fn_name);
 			break;
 		case T_BRKPT:
+			enable_irq();
 			monitor(tf);
 			break;
 		case T_PGFLT:
 			page_fault_handler(tf);
 			break;
 		case T_SYSCALL:
+			enable_irq();
 			// check for userspace, for now
 			assert(tf->tf_cs != GD_KT);
 			/* Set up and run the async calls */
@@ -297,6 +301,7 @@ env_pop_ancillary_state(env_t* e)
  * Eventually, we ought to do this in trapentry.S */
 static void set_current_tf(struct per_cpu_info *pcpui, struct trapframe **tf)
 {
+	assert(!irq_is_enabled());
 	pcpui->actual_tf = **tf;
 	pcpui->cur_tf = &pcpui->actual_tf;
 	*tf = &pcpui->actual_tf;
@@ -338,6 +343,7 @@ void trap(struct trapframe *tf)
 	assert(0);
 }
 
+/* Note IRQs are disabled unless explicitly turned on. */
 void irq_handler(struct trapframe *tf)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
@@ -431,6 +437,8 @@ void sysenter_callwrapper(struct trapframe *tf)
 	/* Copy out the TF for now, set tf to point to it. */
 	if (!in_kernel(tf))
 		set_current_tf(pcpui, &tf);
+	/* Once we've set_current_tf, we can enable interrupts */
+	enable_irq();
 
 	if (in_kernel(tf))
 		panic("sysenter from a kernel TF!!");
@@ -546,10 +554,6 @@ void __kernel_message(struct trapframe *tf, void *data)
 {
 	per_cpu_info_t *myinfo = &per_cpu_info[core_id()];
 	kernel_message_t msg_cp, *k_msg;
-
-	/* Copy out the TF for now, set tf to point to it. */
-	if (!in_kernel(tf))
-		set_current_tf(myinfo, &tf);
 
 	lapic_send_eoi();
 	while (1) { // will break out when there are no more messages

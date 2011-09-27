@@ -247,7 +247,6 @@ _allirqs:
 # All of the pushl zeros are to keep the trap frame looking the same as when we
 # receive a trap or an interrupt
 sysenter_handler:
-	sti						# enable interrupts (things are sane here)
 	cld
 	pushl $0				# ss
 	pushl $0				# esp
