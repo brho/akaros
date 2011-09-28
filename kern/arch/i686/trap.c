@@ -297,14 +297,14 @@ env_pop_ancillary_state(env_t* e)
 	// Here's where you'll restore FP/MMX/XMM regs
 }
 
-/* Helper.  For now, this copies out the TF to pcpui, and sets the tf to use it.
- * Eventually, we ought to do this in trapentry.S */
-static void set_current_tf(struct per_cpu_info *pcpui, struct trapframe **tf)
+/* Helper.  For now, this copies out the TF to pcpui.  Eventually, we should
+ * consider doing this in trapentry.S */
+static void set_current_tf(struct per_cpu_info *pcpui, struct trapframe *tf)
 {
 	assert(!irq_is_enabled());
-	pcpui->actual_tf = **tf;
+	assert(!pcpui->cur_tf);
+	pcpui->actual_tf = *tf;
 	pcpui->cur_tf = &pcpui->actual_tf;
-	*tf = &pcpui->actual_tf;
 }
 
 /* If the interrupt interrupted a halt, we advance past it.  Made to work with
@@ -325,7 +325,7 @@ void trap(struct trapframe *tf)
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	/* Copy out the TF for now, set tf to point to it.  */
 	if (!in_kernel(tf))
-		set_current_tf(pcpui, &tf);
+		set_current_tf(pcpui, tf);
 
 	printd("Incoming TRAP %d on core %d, TF at %p\n", tf->tf_trapno, core_id(),
 	       tf);
@@ -349,7 +349,7 @@ void irq_handler(struct trapframe *tf)
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	/* Copy out the TF for now, set tf to point to it. */
 	if (!in_kernel(tf))
-		set_current_tf(pcpui, &tf);
+		set_current_tf(pcpui, tf);
 	/* Coupled with cpu_halt() and smp_idle() */
 	abort_halt(tf);
 	//if (core_id())
@@ -436,7 +436,7 @@ void sysenter_callwrapper(struct trapframe *tf)
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	/* Copy out the TF for now, set tf to point to it. */
 	if (!in_kernel(tf))
-		set_current_tf(pcpui, &tf);
+		set_current_tf(pcpui, tf);
 	/* Once we've set_current_tf, we can enable interrupts */
 	enable_irq();
 

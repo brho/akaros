@@ -100,14 +100,15 @@ sysenter_init(void)
 {
 }
 
-/* Helper.  For now, this copies out the TF to pcpui, and sets the tf to use it.
- * Eventually, we ought to do this in trap_entry.S.  Honestly, do whatever you
- * want with this.  The **tf is for convenience in x86. */
-static void set_current_tf(struct per_cpu_info *pcpui, struct trapframe **tf)
+/* Helper.  For now, this copies out the TF to pcpui, and sets cur_tf to point
+ * to it. */
+static void set_current_tf(struct per_cpu_info *pcpui, struct trapframe *tf)
 {
-	pcpui->actual_tf = **tf;
+	if (irq_is_enabled())
+		warn("Turn off IRQs until cur_tf is set!");
+	assert(!pcpui->cur_tf);
+	pcpui->actual_tf = *tf;
 	pcpui->cur_tf = &pcpui->actual_tf;
-	*tf = &pcpui->actual_tf;
 }
 
 static int
@@ -174,7 +175,7 @@ handle_ipi(trapframe_t* tf)
 
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	if (!in_kernel(tf))
-		set_current_tf(pcpui, &tf);
+		set_current_tf(pcpui, tf);
 	else if((void*)tf->epc == &cpu_halt) // break out of the cpu_halt loop
 		advance_pc(tf);
 
@@ -395,7 +396,7 @@ handle_syscall(trapframe_t* state)
 	enable_irq();
 	struct per_cpu_info* coreinfo = &per_cpu_info[core_id()];
 
-	set_current_tf(pcpui, &state);
+	set_current_tf(pcpui, state);
 
 	prep_syscalls(current, (struct syscall*)a0, a1);
 
