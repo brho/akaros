@@ -375,6 +375,7 @@ static int sys_proc_yield(struct proc *p, bool being_nice)
 
 static ssize_t sys_fork(env_t* e)
 {
+	int8_t state = 0;
 	// TODO: right now we only support fork for single-core processes
 	if (e->state != PROC_RUNNING_S) {
 		set_errno(EINVAL);
@@ -386,12 +387,14 @@ static ssize_t sys_fork(env_t* e)
 
 	env->heap_top = e->heap_top;
 	env->ppid = e->pid;
+	disable_irqsave(&state);	/* protect cur_tf */
 	/* Can't really fork if we don't have a current_tf to fork */
 	if (!current_tf) {
 		set_errno(EINVAL);
 		return -1;
 	}
 	env->env_tf = *current_tf;
+	enable_irqsave(&state);
 
 	/* We need to speculatively say the syscall worked before copying the memory
 	 * out, since the 'forked' process's call never actually goes through the
@@ -482,7 +485,7 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	char *t_path;
 	struct file *program;
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	struct trapframe *old_cur_tf = pcpui->cur_tf;
+	int8_t state = 0;
 
 	/* We probably want it to never be allowed to exec if it ever was _M */
 	if (p->state != PROC_RUNNING_S) {
@@ -493,21 +496,27 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 		set_errno(EINVAL);
 		return -1;
 	}
-	/* Can't exec if we don't have a current_tf to restart (if we fail).  This
-	 * isn't 100% true, but I'm okay with it. */
-	if (!old_cur_tf) {
-		set_errno(EINVAL);
-		return -1;
-	}
 	/* Copy in the path.  Consider putting an upper bound on path_l. */
 	t_path = user_strdup_errno(p, path, path_l);
 	if (!t_path)
 		return -1;
+	disable_irqsave(&state);	/* protect cur_tf */
+	/* Can't exec if we don't have a current_tf to restart (if we fail).  This
+	 * isn't 100% true, but I'm okay with it. */
+	if (!pcpui->cur_tf) {
+		enable_irqsave(&state);
+		set_errno(EINVAL);
+		return -1;
+	}
+	/* Preemptively copy out the cur_tf, in case we fail later (easier on cur_tf
+	 * if we do this now) */
+	p->env_tf = *pcpui->cur_tf;
 	/* Clear the current_tf.  We won't be returning the 'normal' way.  Even if
 	 * we want to return with an error, we need to go back differently in case
 	 * we succeed.  This needs to be done before we could possibly block, but
 	 * unfortunately happens before the point of no return. */
 	pcpui->cur_tf = 0;
+	enable_irqsave(&state);
 	/* This could block: */
 	program = do_file_open(t_path, 0, 0);
 	user_memdup_free(p, t_path);
@@ -550,7 +559,6 @@ mid_error:
 	 * error value (errno is already set). */
 	kref_put(&program->f_kref);
 early_error:
-	p->env_tf = *old_cur_tf;
 	finish_current_sysc(-1);
 success:
 	/* Here's how we'll restart the new (or old) process: */
@@ -561,7 +569,7 @@ success:
 	spin_unlock(&p->proc_lock);
 all_out:
 	/* we can't return, since we'd write retvals to the old location of the
-	 * sycall struct (which has been freed and is in the old userspace) (or has
+	 * syscall struct (which has been freed and is in the old userspace) (or has
 	 * already been written to).*/
 	abandon_core();
 	smp_idle();

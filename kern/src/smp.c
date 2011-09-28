@@ -31,13 +31,14 @@ static void try_run_proc(void)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 
+	disable_irq();
 	/* There was a process running here, and we should return to it */
 	if (pcpui->cur_tf) {			/* aka, current_tf */
 		assert(pcpui->cur_proc);	/* aka, current */
 		proc_restartcore();
 		assert(0);
-	} else if (pcpui->cur_proc) {
-		abandon_core();
+	} else {
+		assert(!pcpui->cur_proc);
 	}
 }
 
@@ -55,6 +56,8 @@ static void __smp_idle(void)
 {
 	int8_t state = 0;
 
+	/* TODO: idle, abandon_core(), and proc_restartcore() need cleaned up */
+	enable_irq();	/* get any IRQs before we halt later */
 	try_run_proc();
 	/* if we made it here, we truly want to idle */
 	/* in the future, we may need to proactively leave process context here.

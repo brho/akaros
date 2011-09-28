@@ -529,7 +529,7 @@ void proc_run(struct proc *p)
 			 * lower level and we want a chance to process kmsgs before starting
 			 * the process. */
 			spin_unlock(&p->proc_lock);
-			current_tf = &p->env_tf;
+			current_tf = &p->env_tf;	/* no need for irq disable yet */
 			proc_restartcore();
 			break;
 		case (PROC_RUNNABLE_M):
@@ -603,7 +603,7 @@ static void __proc_startcore(struct proc *p, trapframe_t *tf)
 	if (p->state == PROC_RUNNING_S)
 		env_pop_ancillary_state(p);
 	/* Clear the current_tf, since it is no longer used */
-	current_tf = 0;
+	current_tf = 0;	/* TODO: might not need this... */
 	env_pop_tf(tf);
 }
 
@@ -622,26 +622,15 @@ void proc_restartcore(void)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	assert(!pcpui->cur_sysc);
+	/* Need ints disabled when we return from processing (race on missing
+	 * messages/IPIs) */
+	disable_irq();
+	process_routine_kmsg(pcpui->cur_tf);
 	/* If there is no cur_tf, it is because the old one was already restarted
 	 * (and we weren't interrupting another one to finish).  In which case, we
 	 * should just smp_idle() */
 	if (!pcpui->cur_tf) {
-		/* It is possible for us to have current loaded if a kthread restarted
-		 * after the process yielded the core. */
 		abandon_core();
-		smp_idle();
-	}
-	/* Need ints disabled when we return from processing (race) */
-	disable_irq();
-	/* Need to be current (set by the caller), in case a kmsg is there that
-	 * tries to clobber us. */
-	process_routine_kmsg(pcpui->cur_tf);
-	cmb();
-	/* We need to re-evaluate whether or not we should run something, in case a
-	 * __death or __preempt came in since we last checked. */
-	if (!pcpui->cur_tf) {
-		abandon_core();
-		enable_irq();
 		smp_idle();
 	}
 	__proc_startcore(pcpui->cur_proc, pcpui->cur_tf);
@@ -785,13 +774,19 @@ void __proc_yield_s(struct proc *p, struct trapframe *tf)
  * (which needs to be checked).  If there is no preemption pending, just return.
  * No matter what, don't adjust the number of cores wanted.
  *
- * This usually does not return (abandon_core()), so it will eat your reference.
- * */
+ * This usually does not return (smp_idle()), so it will eat your reference.
+ * Also note that it needs a non-current/edible reference, since it will abandon
+ * and continue to use the *p (current == 0, no cr3, etc).
+ *
+ * We disable interrupts for most of it too, since we need to protect current_tf
+ * and not race with __notify (which doesn't play well with concurrent
+ * yielders). */
 void proc_yield(struct proc *SAFE p, bool being_nice)
 {
 	uint32_t vcoreid = get_vcoreid(p, core_id());
 	struct vcore *vc = vcoreid2vcore(p, vcoreid);
 	struct preempt_data *vcpd = &p->procdata->vcore_preempt_data[vcoreid];
+	int8_t state = 0;
 
 	/* no reason to be nice, return */
 	if (being_nice && !vc->preempt_pending)
@@ -820,6 +815,7 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 		spin_unlock(&p->proc_lock);
 		return;
 	}
+	disable_irqsave(&state);
 	switch (p->state) {
 		case (PROC_RUNNING_S):
 			__proc_yield_s(p, current_tf);	/* current_tf 0'd in abandon core */
@@ -833,10 +829,13 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 			/* Now that we're off the online list, check to see if an alert made
 			 * it through (event.c sets this) */
 			wrmb();	/* prev write must hit before reading notif_pending */
+			/* Note we need interrupts disabled, since a __notify can come in
+			 * and set pending to FALSE */
 			if (vcpd->notif_pending) {
 				/* We lost, put it back on the list and abort the yield */
 				TAILQ_INSERT_TAIL(&p->online_vcs, vc, list); /* could go HEAD */
 				spin_unlock(&p->proc_lock);
+				enable_irqsave(&state);
 				return;
 			}
 			/* We won the race with event sending, we can safely yield */
@@ -862,6 +861,7 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 		case (PROC_DYING):
 			/* just return and take the death message (which should be otw) */
 			spin_unlock(&p->proc_lock);
+			enable_irqsave(&state);
 			return;
 		default:
 			// there are races that can lead to this (async death, preempt, etc)
@@ -873,8 +873,12 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 	/* TODO: (RMS) If there was a change to the idle cores, try and give our
 	 * core to someone who was preempted. */
 	/* Clean up the core and idle.  For mgmt cores, they will ultimately call
-	 * manager, which will call schedule() and will repick the yielding proc. */
+	 * manager, which will call schedule() and will repick the yielding proc.
+	 *
+	 * Need to do this before enabling interrupts, since once we put_idle_core()
+	 * and unlock, we could get a startcore. */
 	abandon_core();
+	enable_irqsave(&state);	/* arguably unnecessary, smp_idle() will recheck */
 	smp_idle();
 }
 
@@ -1367,18 +1371,21 @@ void __unmap_vcore(struct proc *p, uint32_t vcoreid)
 	p->procinfo->vcoremap[vcoreid].valid = FALSE;
 }
 
-/* Stop running whatever context is on this core, load a known-good cr3, and
- * 'idle'.  Note this leaves no trace of what was running. This "leaves the
- * process's context. */
+/* Stop running whatever context is on this core and load a known-good cr3.
+ * Note this leaves no trace of what was running. This "leaves the process's
+ * context. */
 void abandon_core(void)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	int8_t state = 0;
 	/* Syscalls that don't return will ultimately call abadon_core(), so we need
 	 * to make sure we don't think we are still working on a syscall. */
 	pcpui->cur_sysc = 0;
 	if (pcpui->cur_proc) {
-		pcpui->cur_tf = 0;
+		disable_irqsave(&state);
+		pcpui->cur_tf = 0;	/* shouldn't have one of these without a proc btw */
 		__abandon_core();
+		enable_irqsave(&state);
 	}
 }
 

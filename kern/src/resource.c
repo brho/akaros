@@ -42,6 +42,7 @@ ssize_t core_request(struct proc *p)
 	uint32_t corelist[MAX_NUM_CPUS];
 	bool need_to_idle = FALSE;
 	bool self_ipi_pending = FALSE;
+	int8_t state = 0;
 
 	spin_lock(&p->proc_lock);
 	if (p->state == PROC_DYING) {
@@ -54,9 +55,11 @@ ssize_t core_request(struct proc *p)
 		printk("[kernel] trying to transition _M -> _S (deprecated)!\n");
 		assert(p->state == PROC_RUNNING_M); // TODO: (ACR) async core req
 		/* save the context, to be restarted in _S mode */
+		disable_irqsave(&state);	/* protect cur_tf */
 		assert(current_tf);
 		p->env_tf = *current_tf;
 		current_tf = 0;			/* Make sure it isn't used in the future */
+		enable_irqsave(&state);
 		env_push_ancillary_state(p); // TODO: (HSS)
 		/* sending death, since it's not our job to save contexts or anything in
 		 * this case.  also, if this returns true, we will not return down
@@ -121,8 +124,10 @@ ssize_t core_request(struct proc *p)
 				 * it in the preempt slot so that we can also save the silly
 				 * state. */
 				struct preempt_data *vcpd = &p->procdata->vcore_preempt_data[0];
+				disable_irqsave(&state);	/* protect cur_tf */
 				assert(current_tf);
 				vcpd->preempt_tf = *current_tf;
+				enable_irqsave(&state);
 				save_fp_state(&vcpd->preempt_anc);
 				__seq_start_write(&vcpd->preempt_tf_valid);
 				/* If we remove this, vcore0 will start where the _S left off */
