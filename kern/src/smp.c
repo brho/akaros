@@ -25,6 +25,22 @@ struct per_cpu_info per_cpu_info[MAX_NUM_CPUS];
 // tracks number of global waits on smp_calls, must be <= NUM_HANDLER_WRAPPERS
 atomic_t outstanding_calls = 0;
 
+/* Helper for running a proc (if we should).  Lots of repetition with
+ * proc_restartcore */
+static void try_run_proc(void)
+{
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+
+	/* There was a process running here, and we should return to it */
+	if (pcpui->cur_tf) {			/* aka, current_tf */
+		assert(pcpui->cur_proc);	/* aka, current */
+		proc_restartcore();
+		assert(0);
+	} else if (pcpui->cur_proc) {
+		abandon_core();
+	}
+}
+
 /* All cores end up calling this whenever there is nothing left to do.  Non-zero
  * cores call it when they are done booting.  Other cases include after getting
  * a DEATH IPI.
@@ -38,14 +54,8 @@ atomic_t outstanding_calls = 0;
 static void __smp_idle(void)
 {
 	int8_t state = 0;
-	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 
-	/* There was a process running here, and we should return to it */
-	if (pcpui->cur_tf) {			/* aka, current_tf */
-		assert(pcpui->cur_proc);	/* aka, current */
-		proc_restartcore();
-		assert(0);
-	}
+	try_run_proc();
 	/* if we made it here, we truly want to idle */
 	/* in the future, we may need to proactively leave process context here.
 	 * for now, it is possible to have a current loaded, even if we are idle
@@ -54,6 +64,7 @@ static void __smp_idle(void)
 		while (1) {
 			disable_irq();
 			process_routine_kmsg(0);
+			try_run_proc();
 			/* cpu_halt() atomically turns on interrupts and halts the core.
 			 * Important to do this, since we could have a RKM come in via an
 			 * interrupt right while PRKM is returning, and we wouldn't catch
@@ -69,6 +80,7 @@ static void __smp_idle(void)
 		 * 10ms regardless of how long the IO takes.  This all needs work. */
 		//udelay(10000); /* done in the manager for now */
 		process_routine_kmsg(0);
+		try_run_proc();
 		disable_irqsave(&state);
 		manager();
 	}

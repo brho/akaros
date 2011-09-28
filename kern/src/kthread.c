@@ -224,7 +224,8 @@ void __launch_kthread(struct trapframe *tf, uint32_t srcid, long a0, long a1,
 	                  long a2)
 {
 	struct kthread *kthread = (struct kthread*)a0;
-	struct proc *cur_proc = current;
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	struct proc *cur_proc = pcpui->cur_proc;
 	/* If there is no proc running, don't worry about not returning. */
 	if (cur_proc) {
 		/* If we're dying, we have a message incoming that we need to deal with,
@@ -251,9 +252,10 @@ void __launch_kthread(struct trapframe *tf, uint32_t srcid, long a0, long a1,
 				       kthread->proc);
 			}
 			assert(cur_proc->state == PROC_RUNNING_S);
+			assert(pcpui->cur_tf);
 			spin_lock(&cur_proc->proc_lock);
 			/* Wrap up / yield the current _S proc, which calls schedule_proc */
-			__proc_yield_s(cur_proc, tf);
+			__proc_yield_s(cur_proc, pcpui->cur_tf);
 			spin_unlock(&cur_proc->proc_lock);
 			abandon_core();
 		} else {
@@ -264,7 +266,7 @@ void __launch_kthread(struct trapframe *tf, uint32_t srcid, long a0, long a1,
 			 * kthread tries to get restarted here on the way out.  cur_tf ought
 			 * to be the TF that needs to be restarted when the kernel is done
 			 * (regardless of whether or not we rerun kthreads). */
-			assert(tf == current_tf);
+			//assert(tf == current_tf);	/* no longer using the passed in tf */
 			/* And just let the kthread restart, abandoning the call path via
 			 * proc_restartcore (or however we got here). */
 		}
