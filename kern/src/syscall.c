@@ -657,13 +657,10 @@ static int sys_shared_page_free(env_t* p1, void*DANGEROUS addr, pid_t p2)
 static int sys_resource_req(struct proc *p, int type, unsigned int amt_wanted,
                             unsigned int amt_wanted_min, int flags)
 {
-	int retval;
-	finish_current_sysc(0);
-	/* this might not return (if it's a _S -> _M transition) */
-	proc_incref(p, 1);
-	retval = resource_req(p, type, amt_wanted, amt_wanted_min, flags);
-	proc_decref(p);
-	return retval;
+	/* resource_req returns and we'll eventually finish the sysc later.  The
+	 * original context may restart on a remote core before we return and
+	 * finish, but that's fine thanks to the async kernel interface. */
+	return resource_req(p, type, amt_wanted, amt_wanted_min, flags);
 }
 
 /* Untested.  Will notify the target on the given vcore, if the caller controls

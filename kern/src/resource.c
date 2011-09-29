@@ -124,10 +124,13 @@ ssize_t core_request(struct proc *p)
 				 * state. */
 				struct preempt_data *vcpd = &p->procdata->vcore_preempt_data[0];
 				disable_irqsave(&state);	/* protect cur_tf */
+				/* Note this won't play well with concurrent proc kmsgs, but
+				 * since we're _S and locked, we shouldn't have any. */
 				assert(current_tf);
 				vcpd->preempt_tf = *current_tf;
-				enable_irqsave(&state);
+				current_tf = 0;				/* so we don't restart */
 				save_fp_state(&vcpd->preempt_anc);
+				enable_irqsave(&state);
 				__seq_start_write(&vcpd->preempt_tf_valid);
 				/* If we remove this, vcore0 will start where the _S left off */
 				vcpd->notif_pending = TRUE;
@@ -164,18 +167,11 @@ ssize_t core_request(struct proc *p)
 		__proc_give_cores(p, corelist, num_granted);
 		spin_unlock(&p->proc_lock);
 		/* if there's a race on state (like DEATH), it'll get handled by
-		 * proc_run or proc_destroy */
+		 * proc_run or proc_destroy.  TODO: Theoretical race here, since someone
+		 * else could make p an _S (in theory), and then we would be calling
+		 * this with an inedible ref (which is currently a concern). */
 		if (p->state == PROC_RUNNABLE_M)
 			proc_run(p);	/* I dislike this - caller should run it */
-		/* if we are moving to a partitionable core from a RUNNING_S on a
-		 * management core, the kernel needs to do something else on this core
-		 * (just like in proc_destroy).  it also needs to decref, to consume the
-		 * reference that came into this function (since we don't return).  */
-		if (need_to_idle) {
-			proc_decref(p);
-			abandon_core();
-			smp_idle();
-		}
 	} else { // nothing granted, just return
 		spin_unlock(&p->proc_lock);
 	}

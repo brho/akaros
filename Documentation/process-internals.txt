@@ -190,28 +190,7 @@ cores, after it knows all cores unloaded the cr3.  This would be a good use of
 the checklist (possibly with one cacheline per core).  It would take a large
 amount of memory for better scalability.
 
-1.8 Core Request:
----------------------------
-core_request() is run outside of the process code (for now), though it is fairly
-intricate.  It's another function that might not return.  Historically, there
-were a few reasons for it, but now only one is true (and may not be for long):
-	1: The process is moving from _S to _M so the return path to userspace won't
-	happen (and sort of will on the new core / the other side), but that will
-	happen when popping into userspace.
-
-For these reasons, core_request() needs to have an edible reference.
-
-Also, since core_request calls functions that might not return, there are cases
-where it will not be able to call abandon_core() and leave process context.
-This is an example of why we have the fallback case of leaving process context
-in proc_startcore().  See the section below about process context for more
-information.
-
-Eventually, core_request() will be split better, probably with the brutal logic
-in process.c that would call out some functions in resource.c that actually make
-choices.
-
-1.9 Things I Could Have Done But Didn't And Why:
+1.8 Things I Could Have Done But Didn't And Why:
 ---------------------------
 Q: Could we have the first reference (existence) mean it could be on the runnable
 list or otherwise in the proc system (but not other subsystems)?  In this case,
