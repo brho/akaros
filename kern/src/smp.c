@@ -37,8 +37,6 @@ static void try_run_proc(void)
 		assert(pcpui->cur_proc);	/* aka, current */
 		proc_restartcore();
 		assert(0);
-	} else {
-		assert(!pcpui->cur_proc);
 	}
 }
 

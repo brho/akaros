@@ -337,10 +337,10 @@ unhandled_trap(trapframe_t* state)
 		spin_unlock(&screwup_lock);
 
 		assert(current);
-		proc_incref(current, 1);
 		proc_destroy(current);
-
-		panic("I shouldn't have gotten here!");
+		/* Not sure if SPARC has a central point that would run proc_restartcore
+		 */
+		proc_restartcore();
 	}
 }
 
@@ -448,9 +448,8 @@ handle_pop_tf(trapframe_t* state)
 
 	trapframe_t tf, *tf_p = &tf;
 	if (memcpy_from_user(current,&tf,(void*)state->gpr[8],sizeof(tf))) {
-		proc_incref(current, 1);
 		proc_destroy(current);
-		assert(0);
+		proc_restartcore();
 	}
 
 	proc_secure_trapframe(&tf);
@@ -465,7 +464,7 @@ handle_set_tf(trapframe_t* state)
 	if (memcpy_to_user(current,(void*)state->gpr[8],state,sizeof(*state))) {
 		proc_incref(current, 1);
 		proc_destroy(current);
-		assert(0);
+		proc_restartcore();
 	}
 }
 

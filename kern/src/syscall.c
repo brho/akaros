@@ -299,6 +299,7 @@ static int sys_proc_create(struct proc *p, char *path, size_t path_l,
 	return pid;
 late_error:
 	proc_destroy(new_p);
+	proc_decref(new_p);	/* give up the reference created in proc_create() */
 mid_error:
 	kref_put(&program->f_kref);
 	return -1;
@@ -454,6 +455,7 @@ static ssize_t sys_fork(env_t* e)
 	 * address space. */
 	if (env_user_mem_walk(e, 0, UMAPTOP, &copy_page, env)) {
 		proc_destroy(env);	/* this is prob what you want, not decref by 2 */
+		proc_decref(env);
 		set_errno(ENOMEM);
 		return -1;
 	}
@@ -539,11 +541,8 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	env_user_mem_free(p, 0, UMAPTOP);
 	if (load_elf(p, program)) {
 		kref_put(&program->f_kref);
-		/* Need an edible reference for proc_destroy in case it doesn't return.
-		 * sys_exec was given current's ref (counted once just for current) */
-		proc_incref(p, 1);
+		/* Note this is an inedible reference, but proc_destroy now returns */
 		proc_destroy(p);
-		proc_decref(p);
 		/* We don't want to do anything else - we just need to not accidentally
 		 * return to the user (hence the all_out) */
 		goto all_out;

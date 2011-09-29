@@ -272,10 +272,10 @@ unhandled_trap(trapframe_t* state, const char* name)
 		spin_unlock(&screwup_lock);
 
 		assert(current);
-		proc_incref(current, 1);
 		proc_destroy(current);
-
-		panic("I shouldn't have gotten here!");
+		/* Not sure if RISCV has a central point that would run proc_restartcore
+		 */
+		proc_restartcore();
 	}
 }
 

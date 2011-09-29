@@ -172,13 +172,12 @@ __proc_startcore(): assumes all references to p are sorted.  *p is already
 accounted for as if it was current on the core startcore runs on. (there is only
 one refcnt for both *p and current, not 2 separate ones).
 
-proc_destroy(): it might not return (if the calling core belongs to the
-process), so it may eat your reference and you must have an edible reference.
-It is possible you called proc_destroy(current).  The cleanup of the current
-will be its own decref, so you need to have a usable/real reference (current
-doesn't count as an edible reference).  So incref before doing that.  Even if p
-== current, proc_destroy() can't tell if you sent it p (and had a reference) or
-current and didn't.
+proc_destroy(): it used to not return, and back then if your reference was
+from 'current', you needed to incref.  Now that proc_destroy() returns, it
+isn't a big deal.  Just keep in mind that if you have a function that doesn't
+return, there's no way for the function to know if it's passed reference is
+edible.  Even if p == current, proc_destroy() can't tell if you sent it p (and
+had a reference) or current and didn't.
 
 proc_yield(): this never returns, so it eats your reference.  It will also
 decref when it abandon_core()s.
@@ -235,15 +234,16 @@ its implementation?
 A: Yeah, technically, but it'd be a pain, as mentioned above.  You'd need to
 reaquire a reference via pid2proc, and is rather easy to mess up.
 
-Q: Could we have made proc_destroy() take a flag, saying whether or not it was
-called on current and needed a decref instead of wasting an incref?
+Q: (Moot) Could we have made proc_destroy() take a flag, saying whether or not
+it was called on current and needed a decref instead of wasting an incref?
 
 A: We could, but won't.  This is one case where the external caller is the one
 that knows the function needs to decref or not.  But it breaks the convention a
 bit, doesn't mirror proc_create() as well, and we need to pull in the cacheline
 with the refcnt anyways.  So for now, no.
 
-Q: Could we make __proc_give_cores() simply not return if an IPI is coming?
+Q: (Moot) Could we make __proc_give_cores() simply not return if an IPI is
+coming?
 
 A: I did this originally, and manually unlocked and __wait_for_ipi()d.  Though
 we'd then need to deal with it like that for all of the related functions, which

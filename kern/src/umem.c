@@ -120,10 +120,8 @@ void *user_mem_assert(struct proc *p, const void *DANGEROUS va, size_t len,
 	if (!res) {
 		cprintf("[%08x] user_mem_check assertion failure for "
 			"va %08x\n", p->pid, user_mem_check_addr);
-		/* assuming this is used with an inedible reference */
-		proc_incref(p, 1);
-		proc_destroy(p);	// may not return
-		assert(0);
+		/* won't be freed til the caller decrefs */
+		proc_destroy(p);
         return NULL;
 	}
     return res;
