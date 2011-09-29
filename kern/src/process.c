@@ -487,12 +487,11 @@ static void __set_proc_current(struct proc *p)
  * it's old core0 context, and the other cores will come in at the entry point.
  * Including in the case of preemption.
  *
- * This won't return if the current core is going to be one of the processes
- * cores (either for _S mode or for _M if it's in the vcoremap).  proc_run will
- * eat your reference if it does not return. */
+ * This won't return if the current core is going to be running the process as a
+ * _S.  It will return if the process is an _M.  Regardless, proc_run will eat
+ * your reference if it does not return. */
 void proc_run(struct proc *p)
 {
-	bool self_ipi_pending = FALSE;
 	struct vcore *vc_i;
 	spin_lock(&p->proc_lock);
 
@@ -541,10 +540,6 @@ void proc_run(struct proc *p)
 				/* Up the refcnt, since num_vcores are going to start using this
 				 * process and have it loaded in their 'current'. */
 				proc_incref(p, p->procinfo->num_vcores);
-				/* If the core we are running on is in the vcoremap, we will get
-				 * an IPI (once we reenable interrupts) and never return. */
-				if (is_mapped_vcore(p, core_id()))
-					self_ipi_pending = TRUE;
 				/* Send kernel messages to all online vcores (which were added
 				 * to the list and mapped in __proc_give_cores()), making them
 				 * turn online */
@@ -566,7 +561,6 @@ void proc_run(struct proc *p)
 			 * - Note there is no guarantee this core's interrupts were on, so
 			 *   it may not get the message for a while... */
 			spin_unlock(&p->proc_lock);
-			__proc_kmsg_pending(p, self_ipi_pending);
 			break;
 		default:
 			spin_unlock(&p->proc_lock);
@@ -661,8 +655,6 @@ void proc_restartcore(void)
  * get __proc_free()d. */
 void proc_destroy(struct proc *p)
 {
-	bool self_ipi_pending = FALSE;
-	
 	spin_lock(&p->proc_lock);
 	switch (p->state) {
 		case PROC_DYING: // someone else killed this already.
@@ -983,20 +975,20 @@ void __proc_preempt_warnall(struct proc *p, uint64_t when)
 
 // TODO: function to set an alarm, if none is outstanding
 
-/* Raw function to preempt a single core.  Returns TRUE if the calling core will
- * get a kmsg.  If you care about locking, do it before calling. */
-bool __proc_preempt_core(struct proc *p, uint32_t pcoreid)
+/* Raw function to preempt a single core.  If you care about locking, do it
+ * before calling. */
+void __proc_preempt_core(struct proc *p, uint32_t pcoreid)
 {
 	uint32_t vcoreid = get_vcoreid(p, pcoreid);
 
 	p->procinfo->vcoremap[vcoreid].preempt_served = TRUE;
 	// expects a pcorelist.  assumes pcore is mapped and running_m
-	return __proc_take_cores(p, &pcoreid, 1, __preempt, (long)p, 0, 0);
+	__proc_take_cores(p, &pcoreid, 1, __preempt, (long)p, 0, 0);
 }
 
-/* Raw function to preempt every vcore.  Returns TRUE if the calling core will
- * get a kmsg.  If you care about locking, do it before calling. */
-bool __proc_preempt_all(struct proc *p)
+/* Raw function to preempt every vcore.  If you care about locking, do it before
+ * calling. */
+void __proc_preempt_all(struct proc *p)
 {
 	/* instead of doing this, we could just preempt_served all possible vcores,
 	 * and not just the active ones.  We would need to sort out a way to deal
@@ -1004,14 +996,13 @@ bool __proc_preempt_all(struct proc *p)
 	struct vcore *vc_i;
 	TAILQ_FOREACH(vc_i, &p->online_vcs, list)
 		vc_i->preempt_served = TRUE;
-	return __proc_take_allcores(p, __preempt, (long)p, 0, 0);
+	__proc_take_allcores(p, __preempt, (long)p, 0, 0);
 }
 
 /* Warns and preempts a vcore from p.  No delaying / alarming, or anything.  The
  * warning will be for u usec from now. */
 void proc_preempt_core(struct proc *p, uint32_t pcoreid, uint64_t usec)
 {
-	bool self_ipi_pending = FALSE;
 	uint64_t warn_time = read_tsc() + usec2tsc(usec);
 
 	/* DYING could be okay */
@@ -1022,7 +1013,7 @@ void proc_preempt_core(struct proc *p, uint32_t pcoreid, uint64_t usec)
 	spin_lock(&p->proc_lock);
 	if (is_mapped_vcore(p, pcoreid)) {
 		__proc_preempt_warn(p, get_vcoreid(p, pcoreid), warn_time);
-		self_ipi_pending = __proc_preempt_core(p, pcoreid);
+		__proc_preempt_core(p, pcoreid);
 	} else {
 		warn("Pcore doesn't belong to the process!!");
 	}
@@ -1041,7 +1032,6 @@ void proc_preempt_core(struct proc *p, uint32_t pcoreid, uint64_t usec)
  * warning will be for u usec from now. */
 void proc_preempt_all(struct proc *p, uint64_t usec)
 {
-	bool self_ipi_pending = FALSE;
 	uint64_t warn_time = read_tsc() + usec2tsc(usec);
 
 	spin_lock(&p->proc_lock);
@@ -1052,7 +1042,7 @@ void proc_preempt_all(struct proc *p, uint64_t usec)
 		return;
 	}
 	__proc_preempt_warnall(p, warn_time);
-	self_ipi_pending = __proc_preempt_all(p);
+	__proc_preempt_all(p);
 	assert(!p->procinfo->num_vcores);
 	/* TODO: (RMS) do this once a scheduler can handle RUNNABLE_M, and make sure
 	 * to schedule it */
@@ -1068,13 +1058,10 @@ void proc_preempt_all(struct proc *p, uint64_t usec)
  * free, etc. */
 void proc_give(struct proc *p, uint32_t pcoreid)
 {
-	bool self_ipi_pending = FALSE;
-
 	spin_lock(&p->proc_lock);
 	// expects a pcorelist, we give it a list of one
-	self_ipi_pending = __proc_give_cores(p, &pcoreid, 1);
+	__proc_give_cores(p, &pcoreid, 1);
 	spin_unlock(&p->proc_lock);
-	__proc_kmsg_pending(p, self_ipi_pending);
 }
 
 /* Global version of the helper, for sys_get_vcoreid (might phase that syscall
@@ -1149,13 +1136,9 @@ static void __proc_give_a_pcore(struct proc *p, uint32_t pcore)
  * The other way would be to have this function have the side effect of changing
  * state, and finding another way to do the need_to_idle.
  *
- * The returned bool signals whether or not a stack-crushing IPI will come in
- * once you unlock after this function.
- *
  * WARNING: You must hold the proc_lock before calling this! */
-bool __proc_give_cores(struct proc *SAFE p, uint32_t *pcorelist, size_t num)
+void __proc_give_cores(struct proc *SAFE p, uint32_t *pcorelist, size_t num)
 {
-	bool self_ipi_pending = FALSE;
 	switch (p->state) {
 		case (PROC_RUNNABLE_S):
 		case (PROC_RUNNING_S):
@@ -1193,8 +1176,6 @@ bool __proc_give_cores(struct proc *SAFE p, uint32_t *pcorelist, size_t num)
 				__proc_give_a_pcore(p, pcorelist[i]);
 				send_kernel_message(pcorelist[i], __startcore, (long)p, 0, 0,
 				                    KMSG_IMMEDIATE);
-				if (pcorelist[i] == core_id())
-					self_ipi_pending = TRUE;
 			}
 			__seq_end_write(&p->procinfo->coremap_seqctr);
 			break;
@@ -1203,7 +1184,6 @@ bool __proc_give_cores(struct proc *SAFE p, uint32_t *pcorelist, size_t num)
 			      __FUNCTION__);
 	}
 	p->resources[RES_CORES].amt_granted += num;
-	return self_ipi_pending;
 }
 
 /* Makes process p's coremap look like pcorelist (add, remove, etc).  Caller
@@ -1217,7 +1197,7 @@ bool __proc_give_cores(struct proc *SAFE p, uint32_t *pcorelist, size_t num)
  * implementing it.
  *
  * WARNING: You must hold the proc_lock before calling this! */
-bool __proc_set_allcores(struct proc *SAFE p, uint32_t *pcorelist,
+void __proc_set_allcores(struct proc *SAFE p, uint32_t *pcorelist,
                          size_t *num, amr_t message,TV(a0t) arg0,
                          TV(a1t) arg1, TV(a2t) arg2)
 {
@@ -1225,20 +1205,17 @@ bool __proc_set_allcores(struct proc *SAFE p, uint32_t *pcorelist,
 }
 
 /* Helper for the take_cores calls: takes a specific vcore from p, optionally
- * sending the message (or just unmapping), gives the pcore to the idlecoremap,
- * and returns TRUE if a self_ipi is pending. */
-static bool __proc_take_a_core(struct proc *p, struct vcore *vc, amr_t message,
+ * sending the message (or just unmapping), gives the pcore to the idlecoremap.
+ */
+static void __proc_take_a_core(struct proc *p, struct vcore *vc, amr_t message,
                                long arg0, long arg1, long arg2)
 {
-	bool self_ipi_pending = FALSE;
 	/* Change lists for the vcore.  We do this before either unmapping or
 	 * sending the message, so the lists represent what will be very soon
 	 * (before we unlock, the messages are in flight). */
 	TAILQ_REMOVE(&p->online_vcs, vc, list);
 	TAILQ_INSERT_HEAD(&p->inactive_vcs, vc, list);
 	if (message) {
-		if (vc->pcoreid == core_id())
-			self_ipi_pending = TRUE;
 		send_kernel_message(vc->pcoreid, message, arg0, arg1, arg2,
 		                    KMSG_IMMEDIATE);
 	} else {
@@ -1248,19 +1225,16 @@ static bool __proc_take_a_core(struct proc *p, struct vcore *vc, amr_t message,
 	}
 	/* give the pcore back to the idlecoremap */
 	put_idle_core(vc->pcoreid);
-	return self_ipi_pending;
 }
 
 /* Takes from process p the num cores listed in pcorelist, using the given
- * message for the kernel message (__death, __preempt, etc).  Like the others
- * in this function group, bool signals whether or not an IPI is pending.
+ * message for the kernel message (__death, __preempt, etc).
  *
  * WARNING: You must hold the proc_lock before calling this! */
-bool __proc_take_cores(struct proc *p, uint32_t *pcorelist, size_t num,
+void __proc_take_cores(struct proc *p, uint32_t *pcorelist, size_t num,
                        amr_t message, long arg0, long arg1, long arg2)
 {
 	uint32_t vcoreid;
-	bool self_ipi_pending = FALSE;
 	switch (p->state) {
 		case (PROC_RUNNABLE_M):
 			assert(!message);
@@ -1281,26 +1255,23 @@ bool __proc_take_cores(struct proc *p, uint32_t *pcorelist, size_t num,
 		vcoreid = get_vcoreid(p, pcorelist[i]);
 		/* Sanity check */
 		assert(pcorelist[i] == get_pcoreid(p, vcoreid));
-		self_ipi_pending = __proc_take_a_core(p, vcoreid2vcore(p, vcoreid),
-		                                      message, arg0, arg1, arg2);
+		__proc_take_a_core(p, vcoreid2vcore(p, vcoreid), message, arg0, arg1,
+		                   arg2);
 	}
 	p->procinfo->num_vcores -= num;
 	__seq_end_write(&p->procinfo->coremap_seqctr);
 	p->resources[RES_CORES].amt_granted -= num;
-	return self_ipi_pending;
 }
 
 /* Takes all cores from a process, which must be in an _M state.  Cores are
  * placed back in the idlecoremap.  If there's a message, such as __death or
- * __preempt, it will be sent to the cores.  The bool signals whether or not an
- * IPI is coming in once you unlock.
+ * __preempt, it will be sent to the cores.
  *
  * WARNING: You must hold the proc_lock before calling this! */
-bool __proc_take_allcores(struct proc *p, amr_t message, long arg0, long arg1,
+void __proc_take_allcores(struct proc *p, amr_t message, long arg0, long arg1,
                           long arg2)
 {
 	struct vcore *vc_i, *vc_temp;
-	bool self_ipi_pending = FALSE;
 	switch (p->state) {
 		case (PROC_RUNNABLE_M):
 			assert(!message);
@@ -1317,37 +1288,12 @@ bool __proc_take_allcores(struct proc *p, amr_t message, long arg0, long arg1,
 	spin_unlock(&idle_lock);
 	__seq_start_write(&p->procinfo->coremap_seqctr);
 	TAILQ_FOREACH_SAFE(vc_i, &p->online_vcs, list, vc_temp) {
-		self_ipi_pending = __proc_take_a_core(p, vc_i,
-		                                      message, arg0, arg1, arg2);
+		__proc_take_a_core(p, vc_i, message, arg0, arg1, arg2);
 	}
 	p->procinfo->num_vcores = 0;
 	assert(TAILQ_EMPTY(&p->online_vcs));
 	__seq_end_write(&p->procinfo->coremap_seqctr);
 	p->resources[RES_CORES].amt_granted = 0;
-	return self_ipi_pending;
-}
-
-/* Helper, to be used when a proc management kmsg should be on its way.  This
- * used to also unlock and then handle the message, back when the proc_lock was
- * an irqsave, and we had an IPI pending.  Now we use routine kmsgs.  If a msg
- * is pending, this needs to decref (to eat the reference of the caller) and
- * then process the message.  Unlock before calling this, since you might not
- * return.
- *
- * There should already be a kmsg waiting for us, since when we checked state to
- * see a message was coming, the message had already been sent before unlocking.
- * Note we do not need interrupts enabled for this to work (you can receive a
- * message before its IPI by polling), though in most cases they will be.
- *
- * TODO: consider inlining this, so __FUNCTION__ works (will require effort in
- * core_request(). */
-void __proc_kmsg_pending(struct proc *p, bool ipi_pending)
-{
-	if (ipi_pending) {
-		proc_decref(p);
-		process_routine_kmsg(0);
-		panic("stack-killing kmsg not found in %s!!!", __FUNCTION__);
-	}
 }
 
 /* Helper to do the vcore->pcore and inverse mapping.  Hold the lock when

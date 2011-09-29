@@ -41,7 +41,6 @@ ssize_t core_request(struct proc *p)
 	ssize_t amt_new;
 	uint32_t corelist[MAX_NUM_CPUS];
 	bool need_to_idle = FALSE;
-	bool self_ipi_pending = FALSE;
 	int8_t state = 0;
 
 	spin_lock(&p->proc_lock);
@@ -64,7 +63,7 @@ ssize_t core_request(struct proc *p)
 		/* sending death, since it's not our job to save contexts or anything in
 		 * this case.  also, if this returns true, we will not return down
 		 * below, and need to eat the reference to p */
-		self_ipi_pending = __proc_take_allcores(p, __death, 0, 0, 0);
+		__proc_take_allcores(p, __death, 0, 0, 0);
 		__proc_set_state(p, PROC_RUNNABLE_S);
 		schedule_proc(p);
 		spin_unlock(&p->proc_lock);
@@ -162,10 +161,8 @@ ssize_t core_request(struct proc *p)
 				break;
 		}
 		/* give them the cores.  this will start up the extras if RUNNING_M. */
-		self_ipi_pending = __proc_give_cores(p, corelist, num_granted);
+		__proc_give_cores(p, corelist, num_granted);
 		spin_unlock(&p->proc_lock);
-		// TODO: (RMS) think about this, esp when its called from a scheduler
-		__proc_kmsg_pending(p, self_ipi_pending);
 		/* if there's a race on state (like DEATH), it'll get handled by
 		 * proc_run or proc_destroy */
 		if (p->state == PROC_RUNNABLE_M)

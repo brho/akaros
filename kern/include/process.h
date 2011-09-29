@@ -109,17 +109,16 @@ struct vcore *vcoreid2vcore(struct proc *p, uint32_t vcoreid);
  *
  * WARNING: YOU MUST HOLD THE PROC_LOCK BEFORE CALLING THESE! */
 /* Gives process p the additional num cores listed in corelist */
-bool __proc_give_cores(struct proc *SAFE p, uint32_t *pcorelist, size_t num);
+void __proc_give_cores(struct proc *SAFE p, uint32_t *pcorelist, size_t num);
 /* Makes process p's coremap look like corelist (add, remove, etc). Not used */
-bool __proc_set_allcores(struct proc *SAFE p, uint32_t *pcorelist,
+void __proc_set_allcores(struct proc *SAFE p, uint32_t *pcorelist,
                          size_t *num, amr_t message, TV(a0t) arg0,
                          TV(a1t) arg1, TV(a2t) arg2);
 /* Takes from process p the num cores listed in corelist */
-bool __proc_take_cores(struct proc *p, uint32_t *pcorelist, size_t num,
+void __proc_take_cores(struct proc *p, uint32_t *pcorelist, size_t num,
                        amr_t message, long arg0, long arg1, long arg2);
-bool __proc_take_allcores(struct proc *p, amr_t message, long arg0, long arg1,
+void __proc_take_allcores(struct proc *p, amr_t message, long arg0, long arg1,
                           long arg2);
-void __proc_kmsg_pending(struct proc *p, bool ipi_pending);
 /* Exposed for kern/src/resource.c for now */
 void __map_vcore(struct proc *p, uint32_t vcoreid, uint32_t pcoreid);
 void __unmap_vcore(struct proc *p, uint32_t vcoreid);
@@ -127,8 +126,8 @@ void __unmap_vcore(struct proc *p, uint32_t vcoreid);
 /* Preemption management.  Some of these will change */
 void __proc_preempt_warn(struct proc *p, uint32_t vcoreid, uint64_t when);
 void __proc_preempt_warnall(struct proc *p, uint64_t when);
-bool __proc_preempt_core(struct proc *p, uint32_t pcoreid);
-bool __proc_preempt_all(struct proc *p);
+void __proc_preempt_core(struct proc *p, uint32_t pcoreid);
+void __proc_preempt_all(struct proc *p);
 void proc_preempt_core(struct proc *p, uint32_t pcoreid, uint64_t usec);
 void proc_preempt_all(struct proc *p, uint64_t usec);
 

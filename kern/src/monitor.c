@@ -473,7 +473,6 @@ int mon_notify(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 int mon_measure(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 {
 	uint64_t begin = 0, diff = 0;
-	bool self_ipi_pending = FALSE;
 	uint32_t end_refcnt = 0;
 
 	if (argc < 2) {
@@ -599,9 +598,8 @@ int mon_measure(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 				return 1;
 			}
 			begin = start_timing();
-			self_ipi_pending = __proc_preempt_core(p, pcoreid);
+			__proc_preempt_core(p, pcoreid);
 			spin_unlock(&p->proc_lock);
-			__proc_kmsg_pending(p, self_ipi_pending);
 			/* done when unmapped (right before abandoning) */
 			spin_on(p->procinfo->pcoremap[pcoreid].valid);
 			diff = stop_timing(begin);
@@ -610,10 +608,9 @@ int mon_measure(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 			spin_lock(&p->proc_lock);
 			end_refcnt = kref_refcnt(&p->p_kref) - p->procinfo->num_vcores;
 			begin = start_timing();
-			self_ipi_pending = __proc_preempt_all(p);
+			__proc_preempt_all(p);
 			/* TODO: (RMS), RUNNABLE_M, schedule */
 			spin_unlock(&p->proc_lock);
-			__proc_kmsg_pending(p, self_ipi_pending);
 			/* a little ghetto, implies no one else is using p */
 			spin_on(kref_refcnt(&p->p_kref) != end_refcnt);
 			diff = stop_timing(begin);

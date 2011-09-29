@@ -183,15 +183,6 @@ current and didn't.
 proc_yield(): this never returns, so it eats your reference.  It will also
 decref when it abandon_core()s.
 
-__proc_give_cores() and friends: you call this while holding the lock, but it is
-possible that your core is in the corelist you gave it.  In this case, it will
-detect it, and return a bool signalling if an IPI is pending.  It will not
-consume your reference.  The reasoning behind this is that it is an internal
-function, and you may want to do other things before decreffing.  There is also
-a helper function that will unlock and possibly decref/wait for the IPI, called
-__proc_unlock_ipi_pending().  Use this when it is time to unlock.  It's just a
-helper, which may go away.
-
 abandon_core(): it was not given a reference, so it doesn't eat one.  It will
 decref when it unloads the cr3.  Note that this is a potential performance
 issue.  When preempting or killing, there are n cores that are fighting for the
@@ -203,15 +194,11 @@ amount of memory for better scalability.
 1.8 Core Request:
 ---------------------------
 core_request() is run outside of the process code (for now), though it is fairly
-intricate.  It's another function that might not return, but the reasons for
-this vary:
+intricate.  It's another function that might not return.  Historically, there
+were a few reasons for it, but now only one is true (and may not be for long):
 	1: The process is moving from _S to _M so the return path to userspace won't
 	happen (and sort of will on the new core / the other side), but that will
 	happen when popping into userspace.
-	2: The scheduler is giving the current core to the process, which can kick
-	in via either proc_run() or __proc_give_cores().
-	3: It was a request to give up all cores, which means the current core will
-	receive an IPI (if it wasn't an async call, which isn't handled yet).
 
 For these reasons, core_request() needs to have an edible reference.
 
@@ -681,15 +668,32 @@ this.  It's possible, but unnecessary.
 
 5. current_tf
 ===========================
-current_tf is a per-core macro that returns a struct trapframe * that points
-back on the kernel stack to the user context that was running on the given core
-when an interrupt or trap happened.  Saving the reference to the TF helps
-simplify code that needs to do something with the TF (like save it and pop
-another TF).  This way, we don't need to pass the context all over the place,
-especially through code that might not care.
+Originally, current_tf is a per-core macro that returns a struct trapframe *
+that points back on the kernel stack to the user context that was running on
+the given core when an interrupt or trap happened.  Saving the reference to
+the TF helps simplify code that needs to do something with the TF (like save
+it and pop another TF).  This way, we don't need to pass the context all over
+the place, especially through code that might not care.
+
+Now, current_tf is more broadly defined as the user context that should be run
+when the kernel is ready to run a process.  In the older case, it was when the
+kernel tries to return to userspace from a trap/interrupt.  Now, current_tf
+can be set by an IPI/KMSG (like '__startcore') so that when the kernel wants
+to idle, it will find a cur_tf that it needs to run, even though we never
+trapped in on that context in the first place.
+
+Process management KMSGs now simply modify cur_tf, as if we had interrupted a
+process.  Instead of '__startcore' forcing the kernel to actually run the
+context, it will just mean we will eventually run it.  In the meantime a
+'__notify' or a '__preempt' can come in, and they will apply to the cur_tf.
+This greatly simplifies process code and code calling process code (like the
+scheduler), since we no longer need to worry about whether or not we are
+getting a "stack killing" kernel message.  Before this, code needed to care
+where it was running when managing _Ms.
 
 current_tf should go along with current.  It's the current_tf of the current
-process.  Withouth 'current', it has no meaning.
+process.  Withouth 'current', it has no meaning.  This will probably change
+slightly, since kthreads care about 'current' but not about current_tf.
 
 It does not point to kernel trapframes, which is important when we receive an
 interrupt in the kernel.  At one point, we were (hypothetically) clobbering the
