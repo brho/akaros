@@ -550,7 +550,7 @@ void proc_run(struct proc *p)
 				 * turn online */
 				TAILQ_FOREACH(vc_i, &p->online_vcs, list) {
 					send_kernel_message(vc_i->pcoreid, __startcore, (long)p,
-					                    0, 0, KMSG_ROUTINE);
+					                    0, 0, KMSG_IMMEDIATE);
 				}
 			} else {
 				warn("Tried to proc_run() an _M with no vcores!");
@@ -687,7 +687,7 @@ void proc_destroy(struct proc *p)
 			}
 			#endif
 			send_kernel_message(get_pcoreid(p, 0), __death, 0, 0, 0,
-			                    KMSG_ROUTINE);
+			                    KMSG_IMMEDIATE);
 			__seq_start_write(&p->procinfo->coremap_seqctr);
 			// TODO: might need to sort num_vcores too later (VC#)
 			/* vcore is unmapped on the receive side */
@@ -909,7 +909,7 @@ void proc_notify(struct proc *p, uint32_t vcoreid)
 			              vcore_is_mapped(p, vcoreid)) {
 				printd("[kernel] sending notif to vcore %d\n", vcoreid);
 				send_kernel_message(get_pcoreid(p, vcoreid), __notify, (long)p,
-				                    0, 0, KMSG_ROUTINE);
+				                    0, 0, KMSG_IMMEDIATE);
 			}
 		}
 	}
@@ -1192,7 +1192,7 @@ bool __proc_give_cores(struct proc *SAFE p, uint32_t *pcorelist, size_t num)
 			for (int i = 0; i < num; i++) {
 				__proc_give_a_pcore(p, pcorelist[i]);
 				send_kernel_message(pcorelist[i], __startcore, (long)p, 0, 0,
-				                    KMSG_ROUTINE);
+				                    KMSG_IMMEDIATE);
 				if (pcorelist[i] == core_id())
 					self_ipi_pending = TRUE;
 			}
@@ -1240,7 +1240,7 @@ static bool __proc_take_a_core(struct proc *p, struct vcore *vc, amr_t message,
 		if (vc->pcoreid == core_id())
 			self_ipi_pending = TRUE;
 		send_kernel_message(vc->pcoreid, message, arg0, arg1, arg2,
-		                    KMSG_ROUTINE);
+		                    KMSG_IMMEDIATE);
 	} else {
 		/* if there was a msg, the vcore is unmapped on the receive side.
 		 * o/w, we need to do it here. */
@@ -1707,4 +1707,41 @@ void print_proc_info(pid_t pid)
 	/* no locking / unlocking or refcnting */
 	// spin_unlock(&p->proc_lock);
 	proc_decref(p);
+}
+
+/* Debugging function, checks what (process, vcore) is supposed to run on this
+ * pcore.  Meant to be called from smp_idle() before halting. */
+void check_my_owner(void)
+{
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	void shazbot(void *item)
+	{
+		struct proc *p = (struct proc*)item;
+		struct vcore *vc_i;
+		assert(p);
+		spin_lock(&p->proc_lock);
+		TAILQ_FOREACH(vc_i, &p->online_vcs, list) {
+			/* this isn't true, a __startcore could be on the way and we're
+			 * already "online" */
+			if (vc_i->pcoreid == core_id()) {
+				/* Immediate message was sent, we should get it when we enable
+				 * interrupts, which should cause us to skip cpu_halt() */
+				if (!STAILQ_EMPTY(&pcpui->immed_amsgs))
+					continue;
+				printk("Owned pcore (%d) has no cur_tf, belong to %08p, vc %d!\n",
+				       core_id(), p, vcore2vcoreid(p, vc_i));
+				spin_unlock(&p->proc_lock);
+				spin_unlock(&pid_hash_lock);
+				monitor(0);
+			}
+		}
+		spin_unlock(&p->proc_lock);
+	}
+	assert(!irq_is_enabled());
+	extern int booting;
+	if (!booting && !pcpui->cur_tf) {
+		spin_lock(&pid_hash_lock);
+		hash_for_each(pid_hash, shazbot);
+		spin_unlock(&pid_hash_lock);
+	}
 }
