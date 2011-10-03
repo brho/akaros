@@ -1344,12 +1344,16 @@ void abandon_core(void)
 struct proc *switch_to(struct proc *new_p)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	struct proc *old_proc = pcpui->cur_proc;	/* uncounted ref */
+	struct proc *old_proc;
+	int8_t irq_state = 0;
+	disable_irqsave(&irq_state);
+	old_proc = pcpui->cur_proc;					/* uncounted ref */
 	/* If we aren't the proc already, then switch to it */
 	if (old_proc != new_p) {
 		pcpui->cur_proc = new_p;				/* uncounted ref */
 		lcr3(new_p->env_cr3);
 	}
+	enable_irqsave(&irq_state);
 	return old_proc;
 }
 
@@ -1358,12 +1362,15 @@ struct proc *switch_to(struct proc *new_p)
 void switch_back(struct proc *new_p, struct proc *old_proc)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	int8_t irq_state = 0;
 	if (old_proc != new_p) {
+		disable_irqsave(&irq_state);
 		pcpui->cur_proc = old_proc;
 		if (old_proc)
 			lcr3(old_proc->env_cr3);
 		else
 			lcr3(boot_cr3);
+		enable_irqsave(&irq_state);
 	}
 }
 
