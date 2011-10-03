@@ -26,7 +26,8 @@ struct per_cpu_info {
 	spinlock_t lock;
 	/* Process management */
 	// cur_proc should be valid on all cores that are not management cores.
-	struct proc *cur_proc;
+	struct proc *cur_proc;		/* which process context is loaded */
+	struct proc *owning_proc;	/* proc owning the core / cur_tf */
 	struct trapframe *cur_tf;	/* user tf we came in on (can be 0) */
 	struct trapframe actual_tf;	/* storage for cur_tf */
 	struct syscall *cur_sysc;	/* ptr is into cur_proc's address space */

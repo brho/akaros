@@ -11,10 +11,9 @@ To best understand krefs, keep in mind this quote (from their kref.txt): "the
 kref is appropriate when the object doesn't outlive its last external
 reference."  What we want is to know when all "external" references to an object
 are gone.  At which point we can do something (cleanup, free, etc) and be sure
-that no other code can get a reference.  This is similar to what we used to do
-with proc_decref() and a handful of other custom refcounting mechanisms.  We
-want to do this without locks, if possible, so we make use of a variety of
-helpful atomics (though RAMP uses a lock-per-atomic).
+that no other code can get a reference.  We want to do this without locks, if
+possible, so we make use of a variety of helpful atomics (though RAMP uses a
+lock-per-atomic).
 
 This document will ramble about the details and other stuff.
 Here are things to keep in mind, which differ in some of the use cases:

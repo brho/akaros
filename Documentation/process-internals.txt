@@ -11,7 +11,7 @@ Contents:
 2. When Do We Really Leave "Process Context"?
 3. Leaving the Kernel Stack
 4. Preemption and Notification Issues
-5. Current_tf
+5. current_tf and owning_proc
 6. Locking!
 7. TLB Coherency
 8. Process Management
@@ -52,8 +52,16 @@ meaning.
 current is a pointer to the proc that is currently loaded/running on any given
 core.  It is stored in the per_cpu_info struct, and set/managed by low-level
 process code.  It is necessary for the kernel to quickly figure out who is
-running on its code, especially when servicing interrupts and traps.  current is
+running on its core, especially when servicing interrupts and traps.  current is
 protected by a refcnt.
+
+current does not say which process owns / will-run on a core.  The per-cpu
+variable 'owning_proc' covers that.  'owning_proc' should be treated like
+'current' (aka, 'cur_proc') when it comes to reference counting.  Like all
+refcnts, you can use it, but you can't consume it without atomically either
+upping the refcnt or passing the reference (clearing the variable storing the
+reference).  Don't pass it to a function that will consume it and not return
+without upping it.
 
 1.4 Reference Counting Rules:
 ---------------------------
@@ -81,10 +89,9 @@ protected by a refcnt.
 +1 for current.
 - current counts as someone using it (expressing interest in the core), but is
   also a source of the pointer, so its a bit different.  Note that all kref's
-  are sources of a pointer.  Technically, to even use 'current', we should kref
-  it and pass it around as a proc.  We don't for performance reasons.  When we
-  are running on a core that has current loaded, the ref is both for its usage
-  as well as for being the current process.
+  are sources of a pointer.  When we are running on a core that has current
+  loaded, the ref is both for its usage as well as for being the current
+  process.
 - You have a reference from current and can use it without refcnting, but
   anything that needs to eat a reference or store/use it needs an incref first.
   To be clear, your reference is *NOT* edible.  It protects the cr3, guarantees
@@ -140,12 +147,6 @@ proc_run(pid2proc(55)) works, since pid2proc() increfs for you.  But you cannot
 proc_run(current), unless you incref current in advance.  Incidentally,
 proc_running current doesn't make a lot of sense.
 
-As another example, __proc_startcore() will take your reference and store it
-in current.  Since it is used by both the __startcore and the interrupt return
-paths (proc_restartcore() now, formerly called proc_startcore()), we're
-currently going with the model of "caller makes sure there is a ref for
-current".  Check its comments for details.
-
 1.6 Runnable List:
 ---------------------------
 Procs on the runnable list need to have a refcnt (other than the +1 for
@@ -160,17 +161,20 @@ abandon_core()).
 
 1.7 Internal Details for Specific Functions:
 ---------------------------
-proc_run(): makes sure enough refcnts are in place for all places that will
-install current.  This also makes it easier on the system (one big incref(n),
-instead of n increfs of (1) from multiple cores).  In the off chance current was
-already set for a core receiving the kernel message, __startcore will decref.
+proc_run()/__proc_give_cores(): makes sure enough refcnts are in place for all
+places that will install owning_proc.  This also makes it easier on the system
+(one big incref(n), instead of n increfs of (1) from multiple cores). 
 Also note that while proc_run() consumes your reference, it's not actually
 decreffing, so there's no danger within proc_run() of the process dying /
 __proc_free()ing.
 
-__proc_startcore(): assumes all references to p are sorted.  *p is already
-accounted for as if it was current on the core startcore runs on. (there is only
-one refcnt for both *p and current, not 2 separate ones).
+__set_proc_current() is a helper that makes sure p is the cur_proc.  It will
+incref if installing a new reference to p.  If it removed an old proc, it will
+decref.
+
+__proc_startcore(): assumes all references to p are sorted.  It will not
+return, and you should not pass it a reference you need to decref().  Passing
+it 'owning_proc' works, since you don't want to decref owning_proc.
 
 proc_destroy(): it used to not return, and back then if your reference was
 from 'current', you needed to incref.  Now that proc_destroy() returns, it
@@ -179,8 +183,9 @@ return, there's no way for the function to know if it's passed reference is
 edible.  Even if p == current, proc_destroy() can't tell if you sent it p (and
 had a reference) or current and didn't.
 
-proc_yield(): this never returns, so it eats your reference.  It will also
-decref when it abandon_core()s.
+proc_yield(): when this doesn't return, it eats your reference.  It will also
+decref twice.  Once when it clears_owning_proc, and again when it calls
+abandon_core() (which clears cur_proc).
 
 abandon_core(): it was not given a reference, so it doesn't eat one.  It will
 decref when it unloads the cr3.  Note that this is a potential performance
@@ -259,24 +264,40 @@ it to proc B.
 If no process is running there, current == 0 and boot_cr3 is loaded, meaning no
 process's context is loaded.
 
+All changes to cur_proc, owning_proc, and cur_tf need to be done with
+interrupts disabled, since they change in interrupt handlers.
+
 2.2 Here's how it is done now:
 ---------------------------
-We try to proactively leave, but have the ability to stay in context til
-__proc_startcore() to handle the corner cases (and to maybe cut down the TLB
-flushes later).  To stop proactively leaving, just change abandon_core() to not
-do anything with current/cr3.  You'll see weird things like processes that won't
-die until their old cores are reused.  The reason we proactively leave context
-is to help with sanity for these issues, and also to avoid decref's in
-__startcore().
+All code is capable of 'spamming' cur_proc (with interrupts disabled!).  If it
+is 0, feel free to set it to whatever process you want.  All code that
+requires current to be set will do so (like __proc_startcore()).  The
+smp_idle() path will make sure current is clear when it halts.  So long as you
+don't change other concurrent code's expectations, you're okay.  What I mean
+by that is you don't clear cur_proc while in an interrupt handler.  But if it
+is already 0, __startcore is allowed to set it to it's future proc (which is
+an optimization).  Other code didn't have any expectations of it (it was 0).
+Likewise, kthread code when we sleep_on() doesn't have to keep cur_proc set.
+A kthread is somewhat an isolated block (codewise), and leaving current set
+when it is done is solely to avoid a TLB flush (at the cost of an incref).
+
+In general, we try to proactively leave process context, but have the ability
+to stay in context til __proc_startcore() to handle the corner cases (and to
+maybe cut down the TLB flushes later).  To stop proactively leaving, just
+change abandon_core() to not do anything with current/cr3.  You'll see weird
+things like processes that won't die until their old cores are reused.  The
+reason we proactively leave context is to help with sanity for these issues,
+and also to avoid decref's in __startcore().
 
 A couple other details: __startcore() sorts the extra increfs, and
 __proc_startcore() sorts leaving the old context.  Anytime a __startcore kernel
-message is sent, the sender increfs in advance for the current refcnt.  If that
-was in error, __startcore decrefs.  __proc_startcore(), which the last moment
-before we *must* have the cr3/current issues sorted, does the actual check if
-there was an old process there or not, while it handles the lcr3 (if necessary).
-In general, lcr3's ought to have refcnts near them, or else comments explaining
-why not.
+message is sent, the sender increfs in advance for the owning_proc refcnt.  As
+an optimization, we can also incref to *attempt* to set current.  If current
+was 0, we set it.  If it was already something else, we failed and need to
+decref.  __proc_startcore(), which the last moment before we *must* have the
+cr3/current issues sorted, does the actual check if there was an old process
+there or not, while it handles the lcr3 (if necessary).  In general, lcr3's
+ought to have refcnts near them, or else comments explaining why not.
 
 So we leave process context when told to do so (__death/abandon_core()) or if
 another process is run there.  The _M code is such that a proc will stay on its
@@ -645,7 +666,7 @@ We also considered using the transition stack as a signal that a process is in
 a notification handler.  The kernel can inspect the stack pointer to determine
 this.  It's possible, but unnecessary.
 
-5. current_tf
+5. current_tf and owning_proc
 ===========================
 Originally, current_tf is a per-core macro that returns a struct trapframe *
 that points back on the kernel stack to the user context that was running on
@@ -661,20 +682,24 @@ can be set by an IPI/KMSG (like '__startcore') so that when the kernel wants
 to idle, it will find a cur_tf that it needs to run, even though we never
 trapped in on that context in the first place.
 
-Process management KMSGs now simply modify cur_tf, as if we had interrupted a
-process.  Instead of '__startcore' forcing the kernel to actually run the
-context, it will just mean we will eventually run it.  In the meantime a
-'__notify' or a '__preempt' can come in, and they will apply to the cur_tf.
-This greatly simplifies process code and code calling process code (like the
-scheduler), since we no longer need to worry about whether or not we are
-getting a "stack killing" kernel message.  Before this, code needed to care
-where it was running when managing _Ms.
+Further, we now have 'owning_proc', which tells the kernel which process
+should be run.  'owning_proc' is a bigger deal than 'current_tf', and it is
+what tells us to run cur_tf.
 
-current_tf should go along with current.  It's the current_tf of the current
-process.  Withouth 'current', it has no meaning.  This will probably change
-slightly, since kthreads care about 'current' but not about current_tf.
+Process management KMSGs now simply modify 'owning_proc' and cur_tf, as if we
+had interrupted a process.  Instead of '__startcore' forcing the kernel to
+actually run the process and trapframe, it will just mean we will eventually
+run it.  In the meantime a '__notify' or a '__preempt' can come in, and they
+will apply to the owning_proc/cur_tf.  This greatly simplifies process code
+and code calling process code (like the scheduler), since we no longer need to
+worry about whether or not we are getting a "stack killing" kernel message.
+Before this, code needed to care where it was running when managing _Ms.
 
-It does not point to kernel trapframes, which is important when we receive an
+Note that neither 'current_tf' nor 'owning_proc' rely on 'current'/'cur_proc'.
+'current' is just what process context we're in, not what process (and which
+trapframe) we will eventually run.
+
+cur_tf does not point to kernel trapframes, which is important when we receive an
 interrupt in the kernel.  At one point, we were (hypothetically) clobbering the
 reference to the user trapframe, and were unable to recover.  We can get away
 with this because the kernel always returns to its previous context from a

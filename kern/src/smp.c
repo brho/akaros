@@ -32,9 +32,8 @@ static void try_run_proc(void)
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 
 	disable_irq();
-	/* There was a process running here, and we should return to it */
-	if (pcpui->cur_tf) {			/* aka, current_tf */
-		assert(pcpui->cur_proc);	/* aka, current */
+	/* There was a process running here, and we should return to it. */
+	if (pcpui->owning_proc) {
 		proc_restartcore();
 		assert(0);
 	}

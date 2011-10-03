@@ -570,9 +570,10 @@ all_out:
 	/* we can't return, since we'd write retvals to the old location of the
 	 * syscall struct (which has been freed and is in the old userspace) (or has
 	 * already been written to).*/
+	disable_irq();			/* abandon_core/clear_own wants irqs disabled */
+	clear_owning_proc(core_id());
 	abandon_core();
-	smp_idle();
-	assert(0);
+	smp_idle();				/* will reenable interrupts */
 }
 
 static ssize_t sys_trywait(env_t* e, pid_t pid, int* status)

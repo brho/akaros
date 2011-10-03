@@ -57,7 +57,7 @@ ssize_t core_request(struct proc *p)
 		disable_irqsave(&state);	/* protect cur_tf */
 		assert(current_tf);
 		p->env_tf = *current_tf;
-		current_tf = 0;			/* Make sure it isn't used in the future */
+		clear_owning_proc(core_id());	/* so we don't restart */
 		enable_irqsave(&state);
 		env_push_ancillary_state(p); // TODO: (HSS)
 		/* sending death, since it's not our job to save contexts or anything in
@@ -128,7 +128,7 @@ ssize_t core_request(struct proc *p)
 				 * since we're _S and locked, we shouldn't have any. */
 				assert(current_tf);
 				vcpd->preempt_tf = *current_tf;
-				current_tf = 0;				/* so we don't restart */
+				clear_owning_proc(core_id());	/* so we don't restart */
 				save_fp_state(&vcpd->preempt_anc);
 				enable_irqsave(&state);
 				__seq_start_write(&vcpd->preempt_tf_valid);

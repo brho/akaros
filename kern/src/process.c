@@ -454,8 +454,9 @@ void proc_decref(struct proc *p)
 	kref_put(&p->p_kref);
 }
 
-/* Helper, makes p the 'current' process, dropping the old current/cr3.  Don't
- * incref - this assumes the passed in reference already counted 'current'. */
+/* Helper, makes p the 'current' process, dropping the old current/cr3.  This no
+ * longer assumes the passed in reference already counted 'current'.  It will
+ * incref internally when needed. */
 static void __set_proc_current(struct proc *p)
 {
 	/* We use the pcpui to access 'current' to cut down on the core_id() calls,
@@ -463,8 +464,7 @@ static void __set_proc_current(struct proc *p)
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	/* If the process wasn't here, then we need to load its address space. */
 	if (p != pcpui->cur_proc) {
-		/* Do not incref here.  We were given the reference to current,
-		 * pre-upped. */
+		proc_incref(p, 1);
 		lcr3(p->env_cr3);
 		/* This is "leaving the process context" of the previous proc.  The
 		 * previous lcr3 unloaded the previous proc's context.  This should
@@ -517,19 +517,17 @@ void proc_run(struct proc *p)
 			 * work. */
 			__map_vcore(p, 0, core_id()); // sort of.  this needs work.
 			__seq_end_write(&p->procinfo->coremap_seqctr);
-			/* __set_proc_current assumes the reference we give it is for
-			 * current.  Decref if current is already properly set, otherwise
-			 * ensure current is set. */
-			if (p == current)
-				proc_decref(p);
-			else
-				__set_proc_current(p);
+			__set_proc_current(p);
 			/* We restartcore, instead of startcore, since startcore is a bit
 			 * lower level and we want a chance to process kmsgs before starting
 			 * the process. */
 			spin_unlock(&p->proc_lock);
+			disable_irq();		/* before mucking with cur_tf / owning_proc */
+			/* this is one of the few times cur_tf != &actual_tf */
 			current_tf = &p->env_tf;	/* no need for irq disable yet */
-			proc_restartcore();
+			/* storing the passed in ref of p in owning_proc */
+			per_cpu_info[core_id()].owning_proc = p;
+			proc_restartcore();	/* will reenable interrupts */
 			break;
 		case (PROC_RUNNABLE_M):
 			/* vcoremap[i] holds the coreid of the physical core allocated to
@@ -616,18 +614,23 @@ void proc_restartcore(void)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	assert(!pcpui->cur_sysc);
+	/* Try and get any interrupts before we pop back to userspace.  If we didn't
+	 * do this, we'd just get them in userspace, but this might save us some
+	 * effort/overhead. */
+	enable_irq();
 	/* Need ints disabled when we return from processing (race on missing
 	 * messages/IPIs) */
 	disable_irq();
 	process_routine_kmsg(pcpui->cur_tf);
-	/* If there is no cur_tf, it is because the old one was already restarted
-	 * (and we weren't interrupting another one to finish).  In which case, we
-	 * should just smp_idle() */
-	if (!pcpui->cur_tf) {
+	/* If there is no owning process, just idle, since we don't know what to do.
+	 * This could be because the process had been restarted a long time ago and
+	 * has since left the core, or due to a KMSG like __preempt or __death. */
+	if (!pcpui->owning_proc) {
 		abandon_core();
 		smp_idle();
 	}
-	__proc_startcore(pcpui->cur_proc, pcpui->cur_tf);
+	assert(pcpui->cur_tf);
+	__proc_startcore(pcpui->owning_proc, pcpui->cur_tf);
 }
 
 /*
@@ -775,7 +778,8 @@ void __proc_yield_s(struct proc *p, struct trapframe *tf)
  * yielders). */
 void proc_yield(struct proc *SAFE p, bool being_nice)
 {
-	uint32_t vcoreid = get_vcoreid(p, core_id());
+	uint32_t coreid = core_id();
+	uint32_t vcoreid = get_vcoreid(p, coreid);
 	struct vcore *vc = vcoreid2vcore(p, vcoreid);
 	struct preempt_data *vcpd = &p->procdata->vcore_preempt_data[vcoreid];
 	int8_t state = 0;
@@ -814,7 +818,7 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 			break;
 		case (PROC_RUNNING_M):
 			printd("[K] Process %d (%p) is yielding on vcore %d\n", p->pid, p,
-			       get_vcoreid(p, core_id()));
+			       get_vcoreid(p, coreid));
 			/* Remove from the online list, add to the yielded list, and unmap
 			 * the vcore, which gives up the core. */
 			TAILQ_REMOVE(&p->online_vcs, vc, list);
@@ -842,7 +846,7 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 				p->resources[RES_CORES].amt_wanted = p->procinfo->num_vcores;
 			__seq_end_write(&p->procinfo->coremap_seqctr);
 			// add to idle list
-			put_idle_core(core_id());	/* TODO: prod the ksched? */
+			put_idle_core(coreid);	/* TODO: prod the ksched? */
 			// last vcore?  then we really want 1, and to yield the gang
 			if (p->procinfo->num_vcores == 0) {
 				p->resources[RES_CORES].amt_wanted = 1;
@@ -864,14 +868,11 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 	proc_decref(p);			/* need to eat the ref passed in */
 	/* TODO: (RMS) If there was a change to the idle cores, try and give our
 	 * core to someone who was preempted. */
-	/* Clean up the core and idle.  For mgmt cores, they will ultimately call
-	 * manager, which will call schedule() and will repick the yielding proc.
-	 *
-	 * Need to do this before enabling interrupts, since once we put_idle_core()
-	 * and unlock, we could get a startcore. */
+	/* Clean up the core and idle.  Need to do this before enabling interrupts,
+	 * since once we put_idle_core() and unlock, we could get a startcore. */
+	clear_owning_proc(coreid);	/* so we don't restart */
 	abandon_core();
-	enable_irqsave(&state);	/* arguably unnecessary, smp_idle() will recheck */
-	smp_idle();
+	smp_idle();				/* will reenable interrupts */
 }
 
 /* Sends a notification (aka active notification, aka IPI) to p's vcore.  We
@@ -1319,20 +1320,32 @@ void __unmap_vcore(struct proc *p, uint32_t vcoreid)
 
 /* Stop running whatever context is on this core and load a known-good cr3.
  * Note this leaves no trace of what was running. This "leaves the process's
- * context. */
+ * context.  Also, we want interrupts disabled, to not conflict with kmsgs
+ * (__launch_kthread, proc mgmt, etc).
+ *
+ * This does not clear the owning proc.  Use the other helper for that. */
 void abandon_core(void)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	int8_t state = 0;
+	assert(!irq_is_enabled());
 	/* Syscalls that don't return will ultimately call abadon_core(), so we need
 	 * to make sure we don't think we are still working on a syscall. */
 	pcpui->cur_sysc = 0;
-	if (pcpui->cur_proc) {
-		disable_irqsave(&state);
-		pcpui->cur_tf = 0;	/* shouldn't have one of these without a proc btw */
+	if (pcpui->cur_proc)
 		__abandon_core();
-		enable_irqsave(&state);
-	}
+}
+
+/* Helper to clear the core's owning processor and manage refcnting.  Pass in
+ * core_id() to save a couple core_id() calls. */
+void clear_owning_proc(uint32_t coreid)
+{
+	struct per_cpu_info *pcpui = &per_cpu_info[coreid];
+	struct proc *p = pcpui->owning_proc;
+	assert(!irq_is_enabled());
+	pcpui->owning_proc = 0;
+	pcpui->cur_tf = 0;			/* catch bugs for now (will go away soon) */
+	if (p);
+		proc_decref(p);
 }
 
 /* Switches to the address space/context of new_p, doing nothing if we are
@@ -1425,17 +1438,10 @@ void __startcore(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2
 
 	assert(p_to_run);
 	/* Can not be any TF from a process here already */
-	assert(!pcpui->cur_tf);
-	/* the sender of the amsg increfed, thinking we weren't running current. */
-	if (p_to_run == pcpui->cur_proc)
-		proc_decref(p_to_run); // how does this assumption match kthreading?
-	else
-		if (pcpui->cur_proc)
-			warn("clobbering current!");
-	/* TODO: assumes no kthreads from other processes, and that we should just
-	 * change this immediately.  This will change (along with the warn())
-	 * eventually, maybe when we figure out the kthread/CG plan. */
-	__set_proc_current(p_to_run);
+	assert(!pcpui->owning_proc);
+	/* the sender of the amsg increfed already for this saved ref to p_to_run */
+	pcpui->owning_proc = p_to_run;
+	/* Note we are not necessarily in the cr3 of p_to_run */
 	vcoreid = get_vcoreid(p_to_run, coreid);
 	vcpd = &p_to_run->procdata->vcore_preempt_data[vcoreid];
 	/* We could let userspace do this, though they come into vcore entry many
@@ -1490,12 +1496,10 @@ void __notify(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2)
 	struct proc *p = (struct proc*)a0;
 
 	/* Not the right proc */
-	if (p != pcpui->cur_proc)
-		return;
-	/* No TF here to notify (could be spurious) */
-	if (!pcpui->cur_tf)
+	if (p != pcpui->owning_proc)
 		return;
 	/* Common cur_tf sanity checks */
+	assert(pcpui->cur_tf);
 	assert(pcpui->cur_tf == &pcpui->actual_tf);
 	assert(!in_kernel(pcpui->cur_tf));
 	/* We shouldn't need to lock here, since unmapping happens on the pcore and
@@ -1527,9 +1531,9 @@ void __preempt(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2)
 	struct proc *p = (struct proc*)a0;
 
 	assert(p);
-	if (p != pcpui->cur_proc) {
-		panic("__preempt arrived for a process (%p) that was not current (%p)!",
-		      p, pcpui->cur_proc);
+	if (p != pcpui->owning_proc) {
+		panic("__preempt arrived for a process (%p) that was not owning (%p)!",
+		      p, pcpui->owning_proc);
 	}
 	/* Common cur_tf sanity checks */
 	assert(pcpui->cur_tf);
@@ -1554,9 +1558,10 @@ void __preempt(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2)
 	save_fp_state(&vcpd->preempt_anc);
 	__seq_start_write(&vcpd->preempt_tf_valid);
 	__unmap_vcore(p, vcoreid);
-	/* so we no longer run the process.  current gets cleared later when we notice
-	 * current_tf is 0 and we have nothing to do (smp_idle, restartcore, etc) */
-	pcpui->cur_tf = 0;
+	/* We won't restart the process later.  current gets cleared later when we
+	 * notice there is no owning_proc and we have nothing to do (smp_idle,
+	 * restartcore, etc) */
+	clear_owning_proc(coreid);
 }
 
 /* Kernel message handler to clean up the core when a process is dying.
@@ -1567,15 +1572,17 @@ void __death(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2)
 {
 	uint32_t vcoreid, coreid = core_id();
 	struct per_cpu_info *pcpui = &per_cpu_info[coreid];
-	if (pcpui->cur_proc) {
-		vcoreid = get_vcoreid(pcpui->cur_proc, coreid);
+	struct proc *p = pcpui->owning_proc;
+	if (p) {
+		vcoreid = get_vcoreid(p, coreid);
 		printd("[kernel] death on physical core %d for process %d's vcore %d\n",
-		       coreid, pcpui->cur_proc->pid, vcoreid);
-		__unmap_vcore(pcpui->cur_proc, vcoreid);
+		       coreid, p->pid, vcoreid);
+		__unmap_vcore(p, vcoreid);
+		/* We won't restart the process later.  current gets cleared later when
+		 * we notice there is no owning_proc and we have nothing to do
+		 * (smp_idle, restartcore, etc) */
+		clear_owning_proc(coreid);
 	}
-	/* so we no longer run the process.  current gets cleared later when we notice
-	 * current_tf is 0 and we have nothing to do (smp_idle, restartcore, etc) */
-	pcpui->cur_tf = 0;
 }
 
 /* Kernel message handler, usually sent IMMEDIATE, to shoot down virtual
@@ -1681,7 +1688,7 @@ void check_my_owner(void)
 				 * interrupts, which should cause us to skip cpu_halt() */
 				if (!STAILQ_EMPTY(&pcpui->immed_amsgs))
 					continue;
-				printk("Owned pcore (%d) has no cur_tf, belong to %08p, vc %d!\n",
+				printk("Owned pcore (%d) has no owner, by %08p, vc %d!\n",
 				       core_id(), p, vcore2vcoreid(p, vc_i));
 				spin_unlock(&p->proc_lock);
 				spin_unlock(&pid_hash_lock);
@@ -1692,7 +1699,7 @@ void check_my_owner(void)
 	}
 	assert(!irq_is_enabled());
 	extern int booting;
-	if (!booting && !pcpui->cur_tf) {
+	if (!booting && !pcpui->owning_proc) {
 		spin_lock(&pid_hash_lock);
 		hash_for_each(pid_hash, shazbot);
 		spin_unlock(&pid_hash_lock);
