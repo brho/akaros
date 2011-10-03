@@ -20,6 +20,7 @@ static inline mcs_lock_qnode_t *mcs_qnode_swap(mcs_lock_qnode_t **addr,
 void mcs_lock_lock(struct mcs_lock *lock, struct mcs_lock_qnode *qnode)
 {
 	qnode->next = 0;
+	cmb();	/* swap provides a CPU mb() */
 	mcs_lock_qnode_t *predecessor = mcs_qnode_swap(&lock->lock, qnode);
 	if (predecessor) {
 		qnode->locked = 1;

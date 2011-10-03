@@ -218,6 +218,24 @@ Some of it doesn't make any sense.  I've asked our architects about things
 like read_barrier_depends() and a few other things.  They also support some
 non-Intel x86 clones that need wmb_f() in place of a wmb() (support out of
 order writes).  If this pops up, we'll deal with it.
+
+I chatted with Andrew a bit, and it turns out the following needs a barrier
+on P2 under the Alpha's memory model:
+
+	(global) int x = 0, *p = 0;
+	
+	P1:
+	x = 3;
+	FENCE
+	p = &x;
+	
+	P2:
+	while (p == NULL) ;
+	assert(*p == 3);
+
+As far as we can figure, you'd need some sort of 'value-speculating' hardware
+to make this an issue in practice.  For now, we'll mark these spots in the code
+if we see them, but I'm not overly concerned about it.
 	
 Also note that none of these barriers deal with things like page talble walks,
 page/segmentation update writes, non-temporal hints on writes, etc.  glhf with
