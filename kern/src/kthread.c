@@ -176,16 +176,16 @@ void restart_kthread(struct kthread *kthread)
 	/* Set the spare stuff (current kthread, current (not kthread) stacktop) */
 	pcpui->spare = kthread;
 	kthread->stacktop = current_stacktop;
-	if (current) {
-		/* __launch_kthread() should have abandoned if it was diff */
-		assert(current == kthread->proc);
-		/* no longer need this ref, current holds it */
-		proc_decref(kthread->proc);
-	} else {
-		/* ref gets transfered (or it was 0 (no ref held)) */
-		current = kthread->proc;
-		if (kthread->proc)
-			lcr3(kthread->proc->env_cr3);
+	/* Only change current if we need to (the kthread was in process context) */
+	if (kthread->proc) {
+		/* Load our page tables before potentially decreffing cur_proc */
+		lcr3(kthread->proc->env_cr3);
+		/* Might have to clear out an existing current.  If they need to be set
+		 * later (like in restartcore), it'll be done on demand. */
+		if (pcpui->cur_proc)
+			proc_decref(pcpui->cur_proc);
+		/* We also transfer our counted ref from kthread->proc to cur_proc */
+		pcpui->cur_proc = kthread->proc;
 	}
 	/* Tell the core which syscall we are running (if any) */
 	assert(!pcpui->cur_sysc);	/* catch bugs, prev user should clear */
@@ -217,60 +217,38 @@ void kthread_runnable(struct kthread *kthread)
 }
 
 /* Kmsg handler to launch/run a kthread.  This must be a routine message, since
- * it does not return.  Furthermore, like all routine kmsgs that don't return,
- * this needs to handle the fact that it won't return to the given TF (which is
- * a proc's TF, since this was routine). */
+ * it does not return.  */
 void __launch_kthread(struct trapframe *tf, uint32_t srcid, long a0, long a1,
 	                  long a2)
 {
 	struct kthread *kthread = (struct kthread*)a0;
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	struct proc *cur_proc = pcpui->cur_proc;
-	/* If there is no proc running, don't worry about not returning. */
-	if (cur_proc) {
-		/* If we're dying, we have a message incoming that we need to deal with,
-		 * so we send this message to ourselves (at the end of the queue).  This
-		 * is a bit ghetto, and a lot of this will need work. */
-		if (cur_proc->state == PROC_DYING) {
-			/* We could fake it and send it manually, but this is fine */
-			send_kernel_message(core_id(), __launch_kthread, (long)kthread,
-			                    0, 0, KMSG_ROUTINE);
-			return;
-		}
-		/* TODO: this whole area needs serious work */
-		if (cur_proc != kthread->proc) {
-			/* we're running the kthread from a different proc.  For now, we
-			 * can't be _M, since that would be taking away someone's vcore to
-			 * process another process's work. */
-			/* Keep in mind this can happen if you yield your core after
-			 * submitting work (like sys_block()) that will complete on the
-			 * current core, and then someone else gets it.
-			 * TODO: This can also happen if we started running another _M
-			 * here... */
-			if (cur_proc->state != PROC_RUNNING_S) {
-				printk("cur_proc: %08p, kthread->proc: %08p\n", cur_proc,
-				       kthread->proc);
-			}
-			assert(cur_proc->state == PROC_RUNNING_S);
-			assert(pcpui->cur_tf);
-			spin_lock(&cur_proc->proc_lock);
-			/* Wrap up / yield the current _S proc, which calls schedule_proc */
-			__proc_yield_s(cur_proc, pcpui->cur_tf);
-			spin_unlock(&cur_proc->proc_lock);
+	
+	if (pcpui->owning_proc && pcpui->owning_proc != kthread->proc) {
+		/* Some process should be running here that is not the same as the
+		 * kthread.  This means the _M is getting interrupted or otherwise
+		 * delayed.  If we want to do something other than run it (like send the
+		 * kmsg to another pcore, or ship the context from here to somewhere
+		 * else/deschedule it (like for an _S)), do it here. */
+		cmb();	/* do nothing/placeholder */
+		#if 0
+		/* example of something to do (wrap up and schedule an _S).  Note this
+		 * might not work perfectly, but is just an example.  One thing to be
+		 * careful of is that spin_lock() can't be called if __launch isn't
+		 * ROUTINE (which it is right now). */
+		if (pcpui->owning_proc->state == PROC_RUNNING_S) {
+			spin_lock(&pcpui->owning_proc->proc_lock);
+			/* Wrap up / yield the _S proc, which calls schedule_proc */
+			__proc_yield_s(pcpui->owning_proc, pcpui->cur_tf);
+			spin_unlock(&pcpui->owning_proc->proc_lock);
 			abandon_core();
-		} else {
-			/* possible to get here if there is only one _S proc that blocked */
-			//assert(cur_proc->state == PROC_RUNNING_M);
-			/* Our proc was current, but also wants an old kthread restarted.
-			 * This could happen if we are in the kernel servicing a call, and a
-			 * kthread tries to get restarted here on the way out.  cur_tf ought
-			 * to be the TF that needs to be restarted when the kernel is done
-			 * (regardless of whether or not we rerun kthreads). */
-			//assert(tf == current_tf);	/* no longer using the passed in tf */
-			/* And just let the kthread restart, abandoning the call path via
-			 * proc_restartcore (or however we got here). */
 		}
+		#endif
 	}
+	/* o/w, just run the kthread.  any trapframes that are supposed to run or
+	 * were interrupted will run whenever the kthread smp_idles() or otherwise
+	 * finishes. */
 	restart_kthread(kthread);
 	assert(0);
 }
