@@ -80,9 +80,9 @@ void sleep_on(struct semaphore *sem)
 	*kth_stack_poison = 0;
 #endif /* __CONFIG_KTHREAD_POISON__ */
 	/* The kthread needs to stay in the process context (if there is one), but
-	 * we want the core (which could be a vcore) to stay in the context too.  If
-	 * we want to leave, we'll need to do that in smp_idle() or elsewhere in the
-	 * code. */
+	 * we want the core (which could be a vcore) to stay in the context too.  In
+	 * the future, we could check owning_proc. If it isn't set, we could leave
+	 * the process context and transfer the refcnt to kthread->proc. */
 	kthread->proc = current;
 	/* kthread tracks the syscall it is working on, which implies errno */
 	kthread->sysc = pcpui->cur_sysc;

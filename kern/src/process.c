@@ -535,9 +535,9 @@ void proc_run(struct proc *p)
 			 * message, a0 = struct proc*, a1 = struct trapframe*.   */
 			if (p->procinfo->num_vcores) {
 				__proc_set_state(p, PROC_RUNNING_M);
-				/* Up the refcnt, since num_vcores are going to start using this
-				 * process and have it loaded in their 'current'. */
-				proc_incref(p, p->procinfo->num_vcores);
+				/* Up the refcnt, to avoid the n refcnt upping on the
+				 * destination cores.  Keep in sync with __startcore */
+				proc_incref(p, p->procinfo->num_vcores * 2);
 				/* Send kernel messages to all online vcores (which were added
 				 * to the list and mapped in __proc_give_cores()), making them
 				 * turn online */
@@ -1169,8 +1169,8 @@ void __proc_give_cores(struct proc *SAFE p, uint32_t *pcorelist, size_t num)
 			break;
 		case (PROC_RUNNING_M):
 			/* Up the refcnt, since num cores are going to start using this
-			 * process and have it loaded in their 'current'. */
-			proc_incref(p, num);
+			 * process and have it loaded in their owning_proc and 'current'. */
+			proc_incref(p, num * 2);	/* keep in sync with __startcore */
 			__seq_start_write(&p->procinfo->coremap_seqctr);
 			p->procinfo->num_vcores += num;
 			for (int i = 0; i < num; i++) {
@@ -1441,6 +1441,17 @@ void __startcore(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2
 	assert(!pcpui->owning_proc);
 	/* the sender of the amsg increfed already for this saved ref to p_to_run */
 	pcpui->owning_proc = p_to_run;
+	/* sender increfed again, assuming we'd install to cur_proc.  only do this
+	 * if no one else is there.  this is an optimization, since we expect to
+	 * send these __startcores to idles cores, and this saves a scramble to
+	 * incref when all of the cores restartcore/startcore later.  Keep in sync
+	 * with __proc_give_cores() and proc_run(). */
+	if (!pcpui->cur_proc) {
+		pcpui->cur_proc = p_to_run;	/* install the ref to cur_proc */
+		lcr3(p_to_run->env_cr3);	/* load the page tables to match cur_proc */
+	} else {
+		proc_decref(p_to_run);		/* can't install, decref the extra one */
+	}
 	/* Note we are not necessarily in the cr3 of p_to_run */
 	vcoreid = get_vcoreid(p_to_run, coreid);
 	vcpd = &p_to_run->procdata->vcore_preempt_data[vcoreid];
