@@ -18,8 +18,9 @@
 /* These structs are declared again and initialized farther down */
 struct file_operations dev_f_op_stdin;
 struct file_operations dev_f_op_stdout;
+struct file_operations dev_f_op_null;
 
-struct file *dev_stdin, *dev_stdout, *dev_stderr;
+struct file *dev_stdin, *dev_stdout, *dev_stderr, *dev_null;
 
 void devfs_init(void)
 {
@@ -39,6 +40,8 @@ void devfs_init(void)
 	/* Note stderr uses the same f_op as stdout */
 	dev_stderr = make_device("/dev/stderr", S_IWUSR | S_IWGRP | S_IWOTH,
 	                         __S_IFCHR, &dev_f_op_stdout);
+	dev_null = make_device("/dev/null", S_IWUSR | S_IWGRP | S_IWOTH,
+	                       __S_IFCHR, &dev_f_op_null);
 }
 
 /* Creates a device node at a given location in the FS-tree */
@@ -128,6 +131,30 @@ struct file_operations dev_f_op_stdout = {
 	dev_c_llseek,
 	0,	/* read - can't read stdout */
 	dev_stdout_write,
+	kfs_readdir,	/* this will fail gracefully */
+	dev_mmap,
+	kfs_open,
+	kfs_flush,
+	kfs_release,
+	0,	/* fsync - makes no sense */
+	kfs_poll,
+	0,	/* readv */
+	0,	/* writev */
+	kfs_sendpage,
+	kfs_check_flags,
+};
+
+/* /dev/null: just take whatever was given and pretend it was written */
+ssize_t dev_null_write(struct file *file, const char *buf, size_t count,
+                       off_t *offset)
+{
+	return count;
+}
+
+struct file_operations dev_f_op_null = {
+	dev_c_llseek,
+	0,	/* read - can't read null */
+	dev_null_write,
 	kfs_readdir,	/* this will fail gracefully */
 	dev_mmap,
 	kfs_open,
