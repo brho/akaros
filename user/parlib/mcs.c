@@ -62,29 +62,27 @@ void mcs_lock_unlock(struct mcs_lock *lock, struct mcs_lock_qnode *qnode)
  * (when switching into the TLS, etc). */
 void mcs_lock_notifsafe(struct mcs_lock *lock, struct mcs_lock_qnode *qnode)
 {
-	if (!in_vcore_context()) {
+	if (!in_vcore_context() && in_multi_mode()) {
 		if (current_uthread)
 			current_uthread->flags |= UTHREAD_DONT_MIGRATE;
 		cmb();	/* don't issue the flag write before the vcore_id() read */
 		disable_notifs(vcore_id());
-		cmb();	/* don't issue the flag write before the disable */
-		if (current_uthread)
-			current_uthread->flags &= ~UTHREAD_DONT_MIGRATE;
 	}
 	mcs_lock_lock(lock, qnode);
 }
 
+/* Note we turn off the DONT_MIGRATE flag before enabling notifs.  This is fine,
+ * since we wouldn't receive any notifs that could lead to us migrating after we
+ * set DONT_MIGRATE but before enable_notifs().  We need it to be in this order,
+ * since we need to check messages after ~DONT_MIGRATE. */
 void mcs_unlock_notifsafe(struct mcs_lock *lock, struct mcs_lock_qnode *qnode)
 {
 	mcs_lock_unlock(lock, qnode);
 	if (!in_vcore_context() && in_multi_mode()) {
 		if (current_uthread)
-			current_uthread->flags |= UTHREAD_DONT_MIGRATE;
-		cmb();	/* don't issue the flag write before the vcore_id() read */
-		enable_notifs(vcore_id());
-		cmb();	/* don't issue the flag write before the enable */
-		if (current_uthread)
 			current_uthread->flags &= ~UTHREAD_DONT_MIGRATE;
+		cmb();	/* don't enable before ~DONT_MIGRATE */
+		enable_notifs(vcore_id());
 	}
 }
 

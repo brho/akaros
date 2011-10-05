@@ -114,10 +114,10 @@ void uthread_init(struct uthread *new_thread)
 	set_tls_desc(caller->tls_desc, vcoreid);
 	/* Okay to migrate now, and enable interrupts/notifs.  This could be called
 	 * from vcore context, so only enable if we're in _M and in vcore context. */
+	caller->flags &= ~UTHREAD_DONT_MIGRATE;		/* turn this on first */
 	if (!in_vcore_context() && in_multi_mode())
 		enable_notifs(vcoreid);
 	cmb();	/* issue this write after we're done with vcoreid */
-	caller->flags &= ~UTHREAD_DONT_MIGRATE;
 }
 
 void uthread_runnable(struct uthread *uthread)
