@@ -876,34 +876,28 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 }
 
 /* Sends a notification (aka active notification, aka IPI) to p's vcore.  We
- * only send a notification if one isn't already pending and they are enabled.
- * There's a bunch of weird cases with this, and how pending / enabled are
- * signals between the user and kernel - check the documentation.
- *
- * If you expect to notify yourself, cleanup state and process_routine_kmsg() */
+ * only send a notification if one they are enabled.  There's a bunch of weird
+ * cases with this, and how pending / enabled are signals between the user and
+ * kernel - check the documentation.  Note that pending is more about messages.
+ * The process needs to be in vcore_context, and the reason is usually a
+ * message.  We set pending here in case we were called to prod them into vcore
+ * context (like via a sys_self_notify. */
 void proc_notify(struct proc *p, uint32_t vcoreid)
 {
 	struct preempt_data *vcpd = &p->procdata->vcore_preempt_data[vcoreid];
-	/* TODO: Currently, there is a race for notif_pending, and multiple senders
-	 * can send an IPI.  Worst thing is that the process gets interrupted
-	 * briefly and the kernel immediately returns back once it realizes notifs
-	 * are masked.  To fix it, we'll need atomic_swapb() (right answer), or not
-	 * use a bool. (wrong answer). */
-	if (!vcpd->notif_pending) {
-		vcpd->notif_pending = TRUE;
-		wrmb();	/* must write notif_pending before reading notif_enabled */
-		if (vcpd->notif_enabled) {
-			/* GIANT WARNING: we aren't using the proc-lock to protect the
-			 * vcoremap.  We want to be able to use this from interrupt context,
-			 * and don't want the proc_lock to be an irqsave.  Spurious
-			 * __notify() kmsgs are okay (it checks to see if the right receiver
-			 * is current). */
-			if ((p->state & PROC_RUNNING_M) && // TODO: (VC#) (_S state)
-			              vcore_is_mapped(p, vcoreid)) {
-				printd("[kernel] sending notif to vcore %d\n", vcoreid);
-				send_kernel_message(get_pcoreid(p, vcoreid), __notify, (long)p,
-				                    0, 0, KMSG_IMMEDIATE);
-			}
+	vcpd->notif_pending = TRUE;
+	wrmb();	/* must write notif_pending before reading notif_enabled */
+	if (vcpd->notif_enabled) {
+		/* GIANT WARNING: we aren't using the proc-lock to protect the
+		 * vcoremap.  We want to be able to use this from interrupt context,
+		 * and don't want the proc_lock to be an irqsave.  Spurious
+		 * __notify() kmsgs are okay (it checks to see if the right receiver
+		 * is current). */
+		if ((p->state & PROC_RUNNING_M) && // TODO: (VC#) (_S state)
+		              vcore_is_mapped(p, vcoreid)) {
+			printd("[kernel] sending notif to vcore %d\n", vcoreid);
+			send_kernel_message(get_pcoreid(p, vcoreid), __notify, (long)p,
+			                    0, 0, KMSG_IMMEDIATE);
 		}
 	}
 }
