@@ -64,6 +64,34 @@ static inline void pop_ros_tf(struct user_trapframe *tf, uint32_t vcoreid)
 	asm volatile ("mov %0, %%o0; ta 4" : : "r"(tf) : "memory");
 }
 
+/* Like the regular pop_ros_tf, but this one doesn't check or clear
+ * notif_pending.  TODO: someone from sparc should look at this. */
+static inline void pop_ros_tf_raw(struct user_trapframe *tf, uint32_t vcoreid)
+{
+	// since we're changing the stack, move stuff into regs for now
+	register uint32_t _vcoreid = vcoreid;
+	register struct user_trapframe* _tf = tf;
+
+	set_stack_pointer((void*)tf->gpr[14]);
+
+	tf = _tf;
+	vcoreid = _vcoreid;
+	struct preempt_data* vcpd = &__procdata.vcore_preempt_data[vcoreid];
+
+	// if this is a trap frame we just init'ed, we need to set up TLS
+	if(tf->gpr[7] == 0)
+		tf->gpr[7] = (uint32_t)get_tls_desc(vcoreid);
+	else
+		assert(tf->gpr[7] == (uint32_t)get_tls_desc(vcoreid));
+
+	vcpd->notif_enabled = true;
+	/* This is just like the regular one, but we don't bother with
+	 * notif_pending.  This comment is where it was dealt with. */
+
+	// tell the kernel to load the new trapframe
+	asm volatile ("mov %0, %%o0; ta 4" : : "r"(tf) : "memory");
+}
+
 /* Save the current context/registers into the given tf, setting the pc of the
  * tf to the end of this function.  You only need to save that which you later
  * restore with pop_ros_tf(). */

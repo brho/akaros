@@ -125,6 +125,52 @@ static inline void pop_ros_tf(struct user_trapframe *tf, uint32_t vcoreid)
 	              : "memory");
 }
 
+/* Like the regular pop_ros_tf, but this one doesn't check or clear
+ * notif_pending. */
+static inline void pop_ros_tf_raw(struct user_trapframe *tf, uint32_t vcoreid)
+{
+	struct restart_helper *rst;
+	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
+	if (!tf->tf_cs) { /* sysenter TF.  esp and eip are in other regs. */
+		tf->tf_esp = tf->tf_regs.reg_ebp;
+		tf->tf_eip = tf->tf_regs.reg_edx;
+	}
+	/* The stuff we need to write will be below the current stack of the utf */
+	rst = (struct restart_helper*)((void*)tf->tf_esp -
+	                               sizeof(struct restart_helper));
+	/* Fill in the info we'll need later */
+	rst->notif_enab_loc = (uint32_t)&vcpd->notif_enabled;
+	rst->eax_save = 0;			/* avoid bugs */
+	rst->eflags = tf->tf_eflags;
+	rst->eip = tf->tf_eip;
+
+	asm volatile ("movl %0,%%esp;        " /* jump esp to the utf */
+	              "popal;                " /* restore normal registers */
+	              "addl $0x24,%%esp;     " /* move to the esp slot in the tf */
+	              "popl %%esp;           " /* change to the utf's %esp */
+	              "subl $0x08,%%esp;     " /* move esp to below eax's slot */
+	              "pushl %%eax;          " /* save eax, will clobber soon */
+				  "movl %2,%%eax;        " /* sizeof struct syscall */
+				  "addl $0x0c,%%eax;     " /* more offset btw eax/notif_en_loc*/
+	              "subl %%eax,%%esp;     " /* move to notif_en_loc slot */
+	              "popl %%eax;           " /* load notif_enabaled addr */
+	              "movb $0x01,(%%eax);   " /* enable notifications */
+				  /* Here's where we differ from the regular pop_ros_tf().  We
+				   * do the same pops/esp moves, just to keep things similar
+				   * and simple, but don't do test, clear notif_pending, or
+				   * call a syscall. */
+				  /* From here down, we can get interrupted and restarted */
+	              "popl %%eax;           " /* get notif_pending status */
+				  "popl %%eax;           " /* discard &sysc (on non-sc path) */
+	              "addl %2,%%esp;        " /* jump over the sysc (both paths) */
+	              "popl %%eax;           " /* restore tf's %eax */
+				  "popfl;                " /* restore utf's eflags */
+	              "ret;                  " /* return to the new PC */
+	              :
+	              : "g"(tf), "i"(T_SYSCALL), "i"(sizeof(struct syscall))
+	              : "memory");
+}
+
 /* Save the current context/registers into the given tf, setting the pc of the
  * tf to the end of this function.  You only need to save that which you later
  * restore with pop_ros_tf(). */

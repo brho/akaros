@@ -16,6 +16,7 @@ __thread struct uthread *current_uthread = 0;
 static int __uthread_allocate_tls(struct uthread *uthread);
 static int __uthread_reinit_tls(struct uthread *uthread);
 static void __uthread_free_tls(struct uthread *uthread);
+static void __run_current_uthread_raw(void);
 
 /* The real 2LS calls this, passing in a uthread representing thread0.  When it
  * returns, you're in _M mode, still running thread0, on vcore0 */
@@ -61,11 +62,15 @@ int uthread_lib_init(struct uthread *uthread)
 void __attribute__((noreturn)) uthread_vcore_entry(void)
 {
 	uint32_t vcoreid = vcore_id();
-
 	/* Should always have notifications disabled when coming in here. */
 	assert(!notif_is_enabled(vcoreid));
 	assert(in_vcore_context());
-
+	/* If we have a current uthread that is DONT_MIGRATE, pop it real quick and
+	 * let it disable notifs (like it wants to).  It's important that we don't
+	 * check messages/handle events with a DONT_MIGRATE uthread. */
+	if (current_uthread && (current_uthread->flags & UTHREAD_DONT_MIGRATE))
+		__run_current_uthread_raw();
+	/* Otherwise, go about our usual vcore business (messages, etc). */
 	check_preempt_pending(vcoreid);
 	handle_events(vcoreid);
 	assert(in_vcore_context());	/* double check, in case an event changed it */
@@ -263,6 +268,22 @@ void run_current_uthread(void)
 	set_tls_desc(current_uthread->tls_desc, vcoreid);
 	/* Pop the user trap frame */
 	pop_ros_tf(&vcpd->notif_tf, vcoreid);
+	assert(0);
+}
+
+/* Runs the uthread, but doesn't care about notif pending.  Only call this when
+ * there was a DONT_MIGRATE uthread, or a similar situation where the uthread
+ * will check messages soon (like calling enable_notifs()). */
+static void __run_current_uthread_raw(void)
+{
+	uint32_t vcoreid = vcore_id();
+	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
+	/* We need to manually say we have a notif pending, so we eventually return
+	 * to vcore context.  (note the kernel turned it off for us) */
+	vcpd->notif_pending = TRUE;
+	set_tls_desc(current_uthread->tls_desc, vcoreid);
+	/* Pop the user trap frame */
+	pop_ros_tf_raw(&vcpd->notif_tf, vcoreid);
 	assert(0);
 }
 

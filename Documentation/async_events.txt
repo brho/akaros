@@ -601,6 +601,36 @@ functions in the kernel, much like the Round Robin set will need to do.  No
 need to force things to fit just for the sake of using a 'solution'.  We want
 tools to make solutions, not packaged solutions.
 
+3.8 UTHREAD_DONT_MIGRATE
+---------------------------------------
+DONT_MIGRATE exists to allow uthreads to disable notifications/IPIs and enter
+vcore context.  It is needed since you need to read vcoreid to disable notifs,
+but once you read it, you need to not move to another vcore.  Here are a few
+rules/guidelines.
+
+We turn off the flag so that we can disable notifs, but turn the flag back on
+before enabling.  The thread won't get migrated in that instant since notifs are
+off.  But if it was the other way, we could miss a message (because we skipped
+an opportunity to be dropped into vcore context to read a message).
+
+Don't check messages/handle events when you have a DONT_MIGRATE uthread.  There
+are issues with preemption recovery if you do.  In short, if two uthreads are
+both DONT_MIGRATE with notifs enabled on two different vcores, and one vcore
+gets preempted while the other gets an IPI telling it to recover the other one,
+both could keep bouncing back and forth if they handle their preemption
+*messages* without dealing with their own DONT_MIGRATEs first.
+
+All uses of DONT_MIGRATE must reenable notifs (and check messages) at some
+point.  One such case is uthread_yield().  Another is mcs_unlock_notifsafe().
+Note that mcs_notif_safe locks have uthreads that can't migrate for a
+potentially long time.  notifs are also disabled, so it's not a big deal.  It's
+basically just the same as if you were in vcore context (though technically you
+aren't) when it comes to preemption recovery: we'll just need to restart the
+vcore via a syscall.  Also note that it would be a real pain in the ass to
+migrate a notif_safe locking uthread.  The whole point of it is in case it grabs
+a lock that would be held by vcore context, and there's no way to know it isn't
+a lock on the restart-path.
+
 4. Misc Things That Aren't Sorted Completely:
 ====================
 4.1 What about short handlers?

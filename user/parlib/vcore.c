@@ -248,6 +248,9 @@ void enable_notifs(uint32_t vcoreid)
 {
 	__enable_notifs(vcoreid);
 	wrmb();	/* need to read after the write that enabled notifs */
+	/* Note we could get migrated before executing this.  If that happens, our
+	 * vcore had gone into vcore context (which is what we wanted), and this
+	 * self_notify to our old vcore is spurious and harmless. */
 	if (__procdata.vcore_preempt_data[vcoreid].notif_pending)
 		sys_self_notify(vcoreid, EV_NONE, 0);
 }
