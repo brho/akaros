@@ -207,7 +207,7 @@ static void alert_vcore(struct proc *p, struct event_queue *ev_q,
 	 * considering getting rid of FALLBACK as an option and making it mandatory
 	 * when you want an INDIR.  Having trouble thinking of when you'd want an
 	 * INDIR but not a FALLBACK. */
-	if (!ev_q->ev_flags & EVENT_FALLBACK) {
+	if (!(ev_q->ev_flags & EVENT_FALLBACK)) {
 		if (ev_q->ev_flags & EVENT_INDIR)
 			printk("[kernel] INDIR requested without FALLBACK, prob a bug.\n");
 		__alert_vcore(p, ev_q, vcoreid);
