@@ -57,8 +57,10 @@ void uthread_yield(bool save_state);
 /* Block the calling uthread on sysc until it makes progress or is done */
 void ros_syscall_blockon(struct syscall *sysc);
 
-/* Utility function.  Event code also calls this. */
+/* Utility functions */
 bool check_preempt_pending(uint32_t vcoreid);
+void uth_disable_notifs(void);
+void uth_enable_notifs(void);
 
 bool register_evq(struct syscall *sysc, struct event_queue *ev_q);
 void deregister_evq(struct syscall *sysc);

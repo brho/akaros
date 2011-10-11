@@ -104,12 +104,7 @@ void mcs_lock_unlock_cas(struct mcs_lock *lock, struct mcs_lock_qnode *qnode)
  * (when switching into the TLS, etc). */
 void mcs_lock_notifsafe(struct mcs_lock *lock, struct mcs_lock_qnode *qnode)
 {
-	if (!in_vcore_context() && in_multi_mode()) {
-		if (current_uthread)
-			current_uthread->flags |= UTHREAD_DONT_MIGRATE;
-		cmb();	/* don't issue the flag write before the vcore_id() read */
-		disable_notifs(vcore_id());
-	}
+	uth_disable_notifs();
 	mcs_lock_lock(lock, qnode);
 }
 
@@ -120,12 +115,7 @@ void mcs_lock_notifsafe(struct mcs_lock *lock, struct mcs_lock_qnode *qnode)
 void mcs_unlock_notifsafe(struct mcs_lock *lock, struct mcs_lock_qnode *qnode)
 {
 	mcs_lock_unlock(lock, qnode);
-	if (!in_vcore_context() && in_multi_mode()) {
-		if (current_uthread)
-			current_uthread->flags &= ~UTHREAD_DONT_MIGRATE;
-		cmb();	/* don't enable before ~DONT_MIGRATE */
-		enable_notifs(vcore_id());
-	}
+	uth_enable_notifs();
 }
 
 // MCS dissemination barrier!

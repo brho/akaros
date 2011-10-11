@@ -333,6 +333,30 @@ bool check_preempt_pending(uint32_t vcoreid)
 	return retval;
 }
 
+/* Helper: This is a safe way for code to disable notifs if it *might* be called
+ * from uthread context (like from a notif_safe lock).  Pair this with
+ * uth_enable_notifs() unless you know what you're doing. */
+void uth_disable_notifs(void)
+{
+	if (!in_vcore_context() && in_multi_mode()) {
+		if (current_uthread)
+			current_uthread->flags |= UTHREAD_DONT_MIGRATE;
+		cmb();	/* don't issue the flag write before the vcore_id() read */
+		disable_notifs(vcore_id());
+	}
+}
+
+/* Helper: Pair this with uth_disable_notifs(). */
+void uth_enable_notifs(void)
+{
+	if (!in_vcore_context() && in_multi_mode()) {
+		if (current_uthread)
+			current_uthread->flags &= ~UTHREAD_DONT_MIGRATE;
+		cmb();	/* don't enable before ~DONT_MIGRATE */
+		enable_notifs(vcore_id());
+	}
+}
+
 /* Attempts to register ev_q with sysc, so long as sysc is not done/progress.
  * Returns true if it succeeded, and false otherwise.  False means that the
  * syscall is done, and does not need an event set (and should be handled
