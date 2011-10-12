@@ -778,25 +778,55 @@ void __proc_yield_s(struct proc *p, struct trapframe *tf)
  * yielders). */
 void proc_yield(struct proc *SAFE p, bool being_nice)
 {
-	uint32_t coreid = core_id();
-	uint32_t vcoreid = get_vcoreid(p, coreid);
-	struct vcore *vc = vcoreid2vcore(p, vcoreid);
-	struct preempt_data *vcpd = &p->procdata->vcore_preempt_data[vcoreid];
+	uint32_t vcoreid, pcoreid = core_id();
+	struct vcore *vc;
+	struct preempt_data *vcpd;
 	int8_t state = 0;
-
+	/* Need to disable before even reading vcoreid, since we could be unmapped
+	 * by a __preempt or __death.  _S also needs ints disabled, so we'll just do
+	 * it immediately. */
+	disable_irqsave(&state);
+	/* Need to lock before checking the vcoremap to find out who we are, in case
+	 * we're getting __preempted and __startcored, from a remote core (in which
+	 * case we might have come in thinking we were vcore X, but had X preempted
+	 * and Y restarted on this pcore, and we suddenly are the wrong vcore
+	 * yielding).  Arguably, this is incredibly rare, since you'd need to
+	 * preempt the core, then decide to give it back with another grant in
+	 * between. */
+	spin_lock(&p->proc_lock); /* horrible scalability.  =( */
+	switch (p->state) {
+		case (PROC_RUNNING_S):
+			__proc_yield_s(p, current_tf);	/* current_tf 0'd in abandon core */
+			goto out_yield_core;
+		case (PROC_RUNNING_M):
+			break;				/* will handle this stuff below */
+		case (PROC_DYING):		/* incoming __death */
+		case (PROC_RUNNABLE_M):	/* incoming (bulk) preempt/myield TODO:(BULK) */
+			goto out_failed;
+		default:
+			panic("Weird state(%s) in %s()", procstate2str(p->state),
+			      __FUNCTION__);
+	}
+	/* If we're already unmapped (__preempt or a __death hit us), bail out.
+	 * Note that if a __death hit us, we should have bailed when we saw
+	 * PROC_DYING. */
+	if (!is_mapped_vcore(p, pcoreid))
+		goto out_failed;
+	vcoreid = get_vcoreid(p, pcoreid);
+	vc = vcoreid2vcore(p, vcoreid);
+	vcpd = &p->procdata->vcore_preempt_data[vcoreid];
 	/* no reason to be nice, return */
 	if (being_nice && !vc->preempt_pending)
-		return;
-
-	spin_lock(&p->proc_lock); /* horrible scalability.  =( */
-
-	/* fate is sealed, return and take the preempt message on the way out.
-	 * we're making this check while holding the lock, since the preemptor
-	 * should hold the lock when sending messages. */
-	if (vc->preempt_served) {
-		spin_unlock(&p->proc_lock);
-		return;
-	}
+		goto out_failed;
+	/* Fate is sealed, return and take the preempt message when we enable_irqs.
+	 * Note this keeps us from mucking with our lists, since we were already
+	 * removed from the online_list.  We have a similar concern with __death,
+	 * but we check for DYING to handle that. */
+	if (vc->preempt_served)
+		goto out_failed;
+	/* At this point, AFAIK there should be no preempt/death messages on the
+	 * way, and we're on the online list.  So we'll go ahead and do the yielding
+	 * business. */
 	/* no need to preempt later, since we are yielding (nice or otherwise) */
 	if (vc->preempt_pending)
 		vc->preempt_pending = 0;
@@ -807,70 +837,58 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 	 * This early check is an optimization.  The real check is below when it
 	 * works with the online_vcs list (syncing with event.c and INDIR/IPI
 	 * posting). */
+	if (vcpd->notif_pending)
+		goto out_failed;
+	/* Now we'll actually try to yield */
+	printd("[K] Process %d (%p) is yielding on vcore %d\n", p->pid, p,
+	       get_vcoreid(p, coreid));
+	/* Remove from the online list, add to the yielded list, and unmap
+	 * the vcore, which gives up the core. */
+	TAILQ_REMOVE(&p->online_vcs, vc, list);
+	/* Now that we're off the online list, check to see if an alert made
+	 * it through (event.c sets this) */
+	wrmb();	/* prev write must hit before reading notif_pending */
+	/* Note we need interrupts disabled, since a __notify can come in
+	 * and set pending to FALSE */
 	if (vcpd->notif_pending) {
-		spin_unlock(&p->proc_lock);
-		return;
+		/* We lost, put it back on the list and abort the yield */
+		TAILQ_INSERT_TAIL(&p->online_vcs, vc, list); /* could go HEAD */
+		goto out_failed;
 	}
-	disable_irqsave(&state);
-	switch (p->state) {
-		case (PROC_RUNNING_S):
-			__proc_yield_s(p, current_tf);	/* current_tf 0'd in abandon core */
-			break;
-		case (PROC_RUNNING_M):
-			printd("[K] Process %d (%p) is yielding on vcore %d\n", p->pid, p,
-			       get_vcoreid(p, coreid));
-			/* Remove from the online list, add to the yielded list, and unmap
-			 * the vcore, which gives up the core. */
-			TAILQ_REMOVE(&p->online_vcs, vc, list);
-			/* Now that we're off the online list, check to see if an alert made
-			 * it through (event.c sets this) */
-			wrmb();	/* prev write must hit before reading notif_pending */
-			/* Note we need interrupts disabled, since a __notify can come in
-			 * and set pending to FALSE */
-			if (vcpd->notif_pending) {
-				/* We lost, put it back on the list and abort the yield */
-				TAILQ_INSERT_TAIL(&p->online_vcs, vc, list); /* could go HEAD */
-				spin_unlock(&p->proc_lock);
-				enable_irqsave(&state);
-				return;
-			}
-			/* We won the race with event sending, we can safely yield */
-			TAILQ_INSERT_HEAD(&p->inactive_vcs, vc, list);
-			/* Note this protects stuff userspace should look at, which doesn't
-			 * include the TAILQs. */
-			__seq_start_write(&p->procinfo->coremap_seqctr);
-			__unmap_vcore(p, vcoreid);
-			/* Adjust implied resource desires */
-			p->resources[RES_CORES].amt_granted = --(p->procinfo->num_vcores);
-			if (!being_nice)
-				p->resources[RES_CORES].amt_wanted = p->procinfo->num_vcores;
-			__seq_end_write(&p->procinfo->coremap_seqctr);
-			// add to idle list
-			put_idle_core(coreid);	/* TODO: prod the ksched? */
-			// last vcore?  then we really want 1, and to yield the gang
-			if (p->procinfo->num_vcores == 0) {
-				p->resources[RES_CORES].amt_wanted = 1;
-				/* wait on an event (not supporting 'being nice' for now */
-				__proc_set_state(p, PROC_WAITING);
-			}
-			break;
-		case (PROC_DYING):
-			/* just return and take the death message (which should be otw) */
-			spin_unlock(&p->proc_lock);
-			enable_irqsave(&state);
-			return;
-		default:
-			// there are races that can lead to this (async death, preempt, etc)
-			panic("Weird state(%s) in %s()", procstate2str(p->state),
-			      __FUNCTION__);
+	/* We won the race with event sending, we can safely yield */
+	TAILQ_INSERT_HEAD(&p->inactive_vcs, vc, list);
+	/* Note this protects stuff userspace should look at, which doesn't
+	 * include the TAILQs. */
+	__seq_start_write(&p->procinfo->coremap_seqctr);
+	__unmap_vcore(p, vcoreid);
+	/* Adjust implied resource desires */
+	p->resources[RES_CORES].amt_granted = --(p->procinfo->num_vcores);
+	if (!being_nice)
+		p->resources[RES_CORES].amt_wanted = p->procinfo->num_vcores;
+	__seq_end_write(&p->procinfo->coremap_seqctr);
+	// add to idle list
+	put_idle_core(pcoreid);	/* TODO: prod the ksched? */
+	// last vcore?  then we really want 1, and to yield the gang
+	if (p->procinfo->num_vcores == 0) {
+		p->resources[RES_CORES].amt_wanted = 1;
+		/* wait on an event (not supporting 'being nice' for now */
+		__proc_set_state(p, PROC_WAITING);
 	}
+	goto out_yield_core;
+out_failed:
+	/* for some reason we just want to return, either to take a KMSG that cleans
+	 * us up, or because we shouldn't yield (ex: notif_pending). */
+	spin_unlock(&p->proc_lock);
+	enable_irqsave(&state);
+	return;
+out_yield_core:			/* successfully yielded the core */
 	spin_unlock(&p->proc_lock);
 	proc_decref(p);			/* need to eat the ref passed in */
 	/* TODO: (RMS) If there was a change to the idle cores, try and give our
 	 * core to someone who was preempted. */
 	/* Clean up the core and idle.  Need to do this before enabling interrupts,
 	 * since once we put_idle_core() and unlock, we could get a startcore. */
-	clear_owning_proc(coreid);	/* so we don't restart */
+	clear_owning_proc(pcoreid);	/* so we don't restart */
 	abandon_core();
 	smp_idle();				/* will reenable interrupts */
 }
@@ -993,6 +1011,8 @@ void __proc_preempt_all(struct proc *p)
 	 * and not just the active ones.  We would need to sort out a way to deal
 	 * with stale preempt_serveds first.  This might be just as fast anyways. */
 	struct vcore *vc_i;
+	/* TODO:(BULK) PREEMPT - don't bother with this, set a proc wide flag, or
+	 * just make us RUNNABLE_M. */
 	TAILQ_FOREACH(vc_i, &p->online_vcs, list)
 		vc_i->preempt_served = TRUE;
 	__proc_take_allcores(p, __preempt, (long)p, 0, 0);
@@ -1707,7 +1727,7 @@ void print_proc_info(pid_t pid)
 	printk("struct proc: %p\n", p);
 	printk("PID: %d\n", p->pid);
 	printk("PPID: %d\n", p->ppid);
-	printk("State: 0x%08x (%s)\n", p->state, p->is_mcp ? "M" : "S");
+	printk("State: %s (%p)\n", procstate2str(p->state), p->state);
 	printk("Refcnt: %d\n", atomic_read(&p->p_kref.refcount) - 1);
 	printk("Flags: 0x%08x\n", p->env_flags);
 	printk("CR3(phys): 0x%08x\n", p->env_cr3);
