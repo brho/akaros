@@ -17,7 +17,7 @@
 #define SYS_proc_run				11
 #define SYS_proc_destroy			12
 #define SYS_yield					13
-/* sys_run_binary removed */
+#define SYS_change_vcore			14
 #define SYS_fork					15
 #define SYS_exec					16
 #define SYS_trywait					17

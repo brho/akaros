@@ -374,6 +374,12 @@ static int sys_proc_yield(struct proc *p, bool being_nice)
 	return 0;
 }
 
+static void sys_change_vcore(struct proc *p, uint32_t vcoreid,
+                            bool enable_my_notif)
+{
+	proc_change_to_vcore(p, vcoreid, enable_my_notif);
+}
+
 static ssize_t sys_fork(env_t* e)
 {
 	int8_t state = 0;
@@ -1333,6 +1339,7 @@ const static struct sys_table_entry syscall_table[] = {
 	[SYS_proc_run] = {(syscall_t)sys_proc_run, "proc_run"},
 	[SYS_proc_destroy] = {(syscall_t)sys_proc_destroy, "proc_destroy"},
 	[SYS_yield] = {(syscall_t)sys_proc_yield, "proc_yield"},
+	[SYS_change_vcore] = {(syscall_t)sys_change_vcore, "change_vcore"},
 	[SYS_fork] = {(syscall_t)sys_fork, "fork"},
 	[SYS_exec] = {(syscall_t)sys_exec, "exec"},
 	[SYS_trywait] = {(syscall_t)sys_trywait, "trywait"},

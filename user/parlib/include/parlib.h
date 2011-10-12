@@ -51,6 +51,7 @@ int         sys_self_notify(uint32_t vcoreid, unsigned int ev_type,
 int         sys_halt_core(unsigned int usec);
 void*		sys_init_arsc();
 int         sys_block(unsigned int usec);
+void        sys_change_vcore(uint32_t vcoreid, bool enable_my_notif);
 
 #endif	// !ASSEMBLER
 

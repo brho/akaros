@@ -137,3 +137,14 @@ int sys_block(unsigned int usec)
 {
 	return ros_syscall(SYS_block, usec, 0, 0, 0, 0, 0);
 }
+
+/* enable_my_notif tells the kernel whether or not it is okay to turn on notifs
+ * when our calling vcore 'yields'.  This controls whether or not the vcore will
+ * get started from vcore_entry() or not, and whether or not remote cores need
+ * to sys_change_vcore to preempt-recover the calling vcore.  Only set this to
+ * FALSE if you are unable to handle starting fresh at vcore_entry().  One
+ * example of this is in mcs_pdr_locks */
+void sys_change_vcore(uint32_t vcoreid, bool enable_my_notif)
+{
+	ros_syscall(SYS_change_vcore, vcoreid, enable_my_notif, 0, 0, 0, 0);
+}

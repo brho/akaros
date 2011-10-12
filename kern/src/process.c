@@ -1425,6 +1425,109 @@ void proc_tlbshootdown(struct proc *p, uintptr_t start, uintptr_t end)
 	spin_unlock(&p->proc_lock);
 }
 
+/* Helper, used by __startcore and change_to_vcore, which sets up cur_tf to run
+ * a given process's vcore.  Caller needs to set up things like owning_proc and
+ * whatnot.  Note that we might not have p loaded as current. */
+static void __set_curtf_to_vcoreid(struct proc *p, uint32_t vcoreid)
+{
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	struct preempt_data *vcpd = &p->procdata->vcore_preempt_data[vcoreid];
+
+	/* We could let userspace do this, though they come into vcore entry many
+	 * times, and we just need this to happen when the cores comes online the
+	 * first time.  That, and they want this turned on as soon as we know a
+	 * vcore *WILL* be online.  We could also do this earlier, when we map the
+	 * vcore to its pcore, though we don't always have current loaded or
+	 * otherwise mess with the VCPD in those code paths. */
+	vcpd->can_rcv_msg = TRUE;
+	printd("[kernel] startcore on physical core %d for process %d's vcore %d\n",
+	       core_id(), p->pid, vcoreid);
+	if (seq_is_locked(vcpd->preempt_tf_valid)) {
+		__seq_end_write(&vcpd->preempt_tf_valid); /* mark tf as invalid */
+		restore_fp_state(&vcpd->preempt_anc);
+		/* notif_pending and enabled means the proc wants to receive the IPI,
+		 * but might have missed it.  copy over the tf so they can restart it
+		 * later, and give them a fresh vcore. */
+		if (vcpd->notif_pending && vcpd->notif_enabled) {
+			vcpd->notif_tf = vcpd->preempt_tf; // could memset
+			proc_init_trapframe(&pcpui->actual_tf, vcoreid, p->env_entry,
+			                    vcpd->transition_stack);
+			if (!vcpd->transition_stack)
+				warn("No transition stack!");
+			vcpd->notif_enabled = FALSE;
+			vcpd->notif_pending = FALSE;
+		} else {
+			/* copy-in the tf we'll pop, then set all security-related fields */
+			pcpui->actual_tf = vcpd->preempt_tf;
+			proc_secure_trapframe(&pcpui->actual_tf);
+		}
+	} else { /* not restarting from a preemption, use a fresh vcore */
+		assert(vcpd->transition_stack);
+		/* TODO: consider 0'ing the FP state.  We're probably leaking. */
+		proc_init_trapframe(&pcpui->actual_tf, vcoreid, p->env_entry,
+		                    vcpd->transition_stack);
+		/* Disable/mask active notifications for fresh vcores */
+		vcpd->notif_enabled = FALSE;
+	}
+	/* cur_tf was built above (in actual_tf), now use it */
+	pcpui->cur_tf = &pcpui->actual_tf;
+	/* this cur_tf will get run when the kernel returns / idles */
+}
+
+/* Changes calling vcore to be vcoreid.  enable_my_notif tells us about how the
+ * state calling vcore wants to be left in.  It will look like caller_vcoreid
+ * was preempted.  Note we don't care about notif_pending.  */
+void proc_change_to_vcore(struct proc *p, uint32_t vcoreid,
+                          bool enable_my_notif)
+{
+	uint32_t pcoreid = core_id();
+	uint32_t caller_vcoreid = get_vcoreid(p, pcoreid);
+	struct preempt_data *caller_vcpd =
+	                    &p->procdata->vcore_preempt_data[caller_vcoreid];
+	struct vcore *caller_vc = vcoreid2vcore(p, caller_vcoreid);
+	struct vcore *new_vc = vcoreid2vcore(p, vcoreid);
+	struct event_msg preempt_msg = {0};
+	spin_lock(&p->proc_lock);
+	/* vcoreid is already runing, abort */
+	if (vcore_is_mapped(p, vcoreid)) {
+		spin_unlock(&p->proc_lock);
+		return;
+	}
+	if (enable_my_notif) {
+		/* if they set this flag, then the vcore can just restart from scratch,
+		 * and we don't care about either the notif_tf or the preempt_tf. */
+		caller_vcpd->notif_enabled = TRUE;
+	} else {
+		/* need to set up the calling vcore's tf so that it'll get restarted by
+		 * __startcore, to make the caller look like it was preempted. */
+		caller_vcpd->preempt_tf = *current_tf;
+		caller_vcpd->preempt_tf_valid = TRUE;
+	}
+	/* Either way, unmap and offline our current vcore */
+	/* Move the caller from online to inactive */
+	TAILQ_REMOVE(&p->online_vcs, caller_vc, list);
+	/* We don't bother with the notif_pending race.  note that notif_pending
+	 * could still be set.  this was a preempted vcore, and userspace will need
+	 * to deal with missed messages (preempt_recover() will handle that) */
+	TAILQ_INSERT_HEAD(&p->inactive_vcs, caller_vc, list);
+	/* Move the new one from inactive to online */
+	TAILQ_REMOVE(&p->inactive_vcs, new_vc, list);
+	TAILQ_INSERT_TAIL(&p->online_vcs, new_vc, list);
+	/* Change the vcore map (TODO: might get rid of this seqctr) */
+	__seq_start_write(&p->procinfo->coremap_seqctr);
+	__unmap_vcore(p, caller_vcoreid);
+	__map_vcore(p, vcoreid, pcoreid);
+	__seq_end_write(&p->procinfo->coremap_seqctr);
+	/* send preempt message about the calling vcore.  might as well prefer
+	 * directing it to the new_vc (vcoreid) to cut down on an IPI. */
+	preempt_msg.ev_type = EV_VCORE_PREEMPT;
+	preempt_msg.ev_arg2 = caller_vcoreid;	/* arg2 is 32 bits */
+	send_kernel_event(p, &preempt_msg, vcoreid);
+	/* Change cur_tf so we'll be the new vcoreid */
+	__set_curtf_to_vcoreid(p, vcoreid);
+	spin_unlock(&p->proc_lock);
+}
+
 /* Kernel message handler to start a process's context on this core, when the
  * core next considers running a process.  Tightly coupled with proc_run().
  * Interrupts are disabled. */
@@ -1433,7 +1536,6 @@ void __startcore(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2
 	uint32_t vcoreid, coreid = core_id();
 	struct per_cpu_info *pcpui = &per_cpu_info[coreid];
 	struct proc *p_to_run = (struct proc *CT(1))a0;
-	struct preempt_data *vcpd;
 
 	assert(p_to_run);
 	/* Can not be any TF from a process here already */
@@ -1453,46 +1555,9 @@ void __startcore(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2
 	}
 	/* Note we are not necessarily in the cr3 of p_to_run */
 	vcoreid = get_vcoreid(p_to_run, coreid);
-	vcpd = &p_to_run->procdata->vcore_preempt_data[vcoreid];
-	/* We could let userspace do this, though they come into vcore entry many
-	 * times, and we just need this to happen when the cores comes online the
-	 * first time.  That, and they want this turned on as soon as we know a
-	 * vcore *WILL* be online.  We could also do this earlier, when we map the
-	 * vcore to its pcore, though we don't always have current loaded or
-	 * otherwise mess with the VCPD in those code paths. */
-	vcpd->can_rcv_msg = TRUE;
-	printd("[kernel] startcore on physical core %d for process %d's vcore %d\n",
-	       coreid, p_to_run->pid, vcoreid);
-	if (seq_is_locked(vcpd->preempt_tf_valid)) {
-		__seq_end_write(&vcpd->preempt_tf_valid); /* mark tf as invalid */
-		restore_fp_state(&vcpd->preempt_anc);
-		/* notif_pending and enabled means the proc wants to receive the IPI,
-		 * but might have missed it.  copy over the tf so they can restart it
-		 * later, and give them a fresh vcore. */
-		if (vcpd->notif_pending && vcpd->notif_enabled) {
-			vcpd->notif_tf = vcpd->preempt_tf; // could memset
-			proc_init_trapframe(&pcpui->actual_tf, vcoreid, p_to_run->env_entry,
-			                    vcpd->transition_stack);
-			if (!vcpd->transition_stack)
-				warn("No transition stack!");
-			vcpd->notif_enabled = FALSE;
-			vcpd->notif_pending = FALSE;
-		} else {
-			/* copy-in the tf we'll pop, then set all security-related fields */
-			pcpui->actual_tf = vcpd->preempt_tf;
-			proc_secure_trapframe(&pcpui->actual_tf);
-		}
-	} else { /* not restarting from a preemption, use a fresh vcore */
-		assert(vcpd->transition_stack);
-		/* TODO: consider 0'ing the FP state.  We're probably leaking. */
-		proc_init_trapframe(&pcpui->actual_tf, vcoreid, p_to_run->env_entry,
-		                    vcpd->transition_stack);
-		/* Disable/mask active notifications for fresh vcores */
-		vcpd->notif_enabled = FALSE;
-	}
-	/* cur_tf was built above (in actual_tf), now use it */
-	pcpui->cur_tf = &pcpui->actual_tf;
-	/* this cur_tf will get run when the kernel returns / idles */
+	/* Now that we sorted refcnts and know p / which vcore it should be, set up
+	 * pcpui->cur_tf so that it will run that particular vcore */
+	__set_curtf_to_vcoreid(p_to_run, vcoreid);
 }
 
 /* Bail out if it's the wrong process, or if they no longer want a notif.  Don't

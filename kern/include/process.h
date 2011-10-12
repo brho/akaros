@@ -85,6 +85,8 @@ void proc_yield(struct proc *SAFE p, bool being_nice);
 void proc_notify(struct proc *p, uint32_t vcoreid);
 void __proc_wakeup(struct proc *p);
 bool __proc_is_mcp(struct proc *p);
+void proc_change_to_vcore(struct proc *p, uint32_t vcoreid,
+                          bool enable_my_notif);
 
 /* Vcoremap info: */
 uint32_t proc_get_vcoreid(struct proc *SAFE p, uint32_t pcoreid);

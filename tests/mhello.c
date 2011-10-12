@@ -91,6 +91,7 @@ int main(int argc, char** argv)
 		assert(!in_vcore_context());
 	}
 
+	//#if 0
 	/* test notifying my vcore2 */
 	udelay(5000000);
 	printf("Vcore 0 self-notifying vcore 2 with notif 4!\n");
@@ -102,6 +103,7 @@ int main(int argc, char** argv)
 	msg.ev_type = 6;
 	sys_notify(sys_getpid(), 6, &msg);
 	udelay(1000000);
+	//#endif
 
 	/* test loop for restarting a notif_tf */
 	if (vcoreid == 0) {
@@ -153,6 +155,21 @@ void ghetto_vcore_entry(void)
 
 	printf("Hello from vcore_entry in vcore %d with temp addr %p and temp %p\n",
 	       vcoreid, &temp, temp);
+
+	#if 0
+	/* Test sys change vcore.  Need to manually preempt the pcore vcore4 is
+	 * mapped to from the monitor */
+	udelay(20000000);
+	if (vcoreid == 1) {
+		disable_notifs(vcoreid);
+		printf("VC1 changing to VC4\n");
+		sys_change_vcore(4, TRUE);		/* try both of these manually */
+		//sys_change_vcore(4, FALSE);		/* try both of these manually */
+		printf("VC1 returned\n");
+	}
+	udelay(10000000);
+	#endif
+
 	vcore_request(1);
 	//mcs_barrier_wait(&b,vcore_id());
 	udelay(vcoreid * 10000000);
