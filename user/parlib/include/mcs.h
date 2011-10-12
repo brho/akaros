@@ -50,6 +50,35 @@ void mcs_lock_unlock(struct mcs_lock *lock, struct mcs_lock_qnode *qnode);
 void mcs_lock_notifsafe(struct mcs_lock *lock, struct mcs_lock_qnode *qnode);
 void mcs_unlock_notifsafe(struct mcs_lock *lock, struct mcs_lock_qnode *qnode);
 
+/* Preemption detection and recovering MCS locks.
+ *
+ * The basic idea is that when spinning, vcores make sure someone else is
+ * making progress that will lead to them not spinning.  Usually, it'll be to
+ * make sure the lock holder (if known) is running.  If we don't know the lock
+ * holder, we nsure the end of whatever chain we can see is running, which will
+ * make sure its predecessor runs, which will eventually unjam the system.
+ *
+ * These are memory safe ones.  In the future, we can make ones that you pass
+ * the qnode to, so long as you never free the qnode storage (stacks).  */
+struct mcs_pdr_qnode
+{
+	struct mcs_pdr_qnode *next;
+	int locked;
+	uint32_t vcoreid;
+}__attribute__((aligned(ARCH_CL_SIZE)));
+
+struct mcs_pdr_lock
+{
+	struct mcs_pdr_qnode *lock;
+	struct mcs_pdr_qnode *lock_holder;
+	struct mcs_pdr_qnode *vc_qnodes;	/* malloc this at init time */
+};
+
+void mcs_pdr_init(struct mcs_pdr_lock *lock);
+void mcs_pdr_fini(struct mcs_pdr_lock *lock);
+void mcs_pdr_lock(struct mcs_pdr_lock *lock);
+void mcs_pdr_unlock(struct mcs_pdr_lock *lock);
+
 #ifdef __cplusplus
 }
 #endif

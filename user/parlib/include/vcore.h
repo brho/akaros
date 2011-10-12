@@ -45,6 +45,7 @@ static inline bool in_multi_mode(void);
 static inline void __enable_notifs(uint32_t vcoreid);
 static inline void __disable_notifs(uint32_t vcoreid);
 static inline bool notif_is_enabled(uint32_t vcoreid);
+static inline bool vcore_is_mapped(uint32_t vcoreid);
 int vcore_init(void);
 int vcore_request(size_t k);
 void vcore_yield(bool preempt_pending);
@@ -93,6 +94,11 @@ static inline void __disable_notifs(uint32_t vcoreid)
 static inline bool notif_is_enabled(uint32_t vcoreid)
 {
 	return __procdata.vcore_preempt_data[vcoreid].notif_enabled;
+}
+
+static inline bool vcore_is_mapped(uint32_t vcoreid)
+{
+	return __procinfo.vcoremap[vcoreid].valid;
 }
 
 #ifdef __cplusplus
