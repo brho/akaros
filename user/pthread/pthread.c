@@ -19,7 +19,7 @@
 
 struct pthread_queue ready_queue = TAILQ_HEAD_INITIALIZER(ready_queue);
 struct pthread_queue active_queue = TAILQ_HEAD_INITIALIZER(active_queue);
-mcs_lock_t queue_lock = MCS_LOCK_INIT;
+struct mcs_pdr_lock queue_lock;
 pthread_once_t init_once = PTHREAD_ONCE_INIT;
 int threads_ready = 0;
 int threads_active = 0;
@@ -71,23 +71,22 @@ void __attribute__((noreturn)) pth_sched_entry(void)
 	}
 	/* no one currently running, so lets get someone from the ready queue */
 	struct pthread_tcb *new_thread = NULL;
-	struct mcs_lock_qnode local_qn = {0};
 	/* Try to get a thread.  If we get one, we'll break out and run it.  If not,
 	 * we'll try to yield.  vcore_yield() might return, if we lost a race and
 	 * had a new event come in, one that may make us able to get a new_thread */
 	do {
 		handle_events(vcoreid);
-		mcs_lock_notifsafe(&queue_lock, &local_qn);
+		mcs_pdr_lock(&queue_lock);
 		new_thread = TAILQ_FIRST(&ready_queue);
 		if (new_thread) {
 			TAILQ_REMOVE(&ready_queue, new_thread, next);
 			TAILQ_INSERT_TAIL(&active_queue, new_thread, next);
 			threads_active++;
 			threads_ready--;
-			mcs_unlock_notifsafe(&queue_lock, &local_qn);
+			mcs_pdr_unlock(&queue_lock);
 			break;
 		}
-		mcs_unlock_notifsafe(&queue_lock, &local_qn);
+		mcs_pdr_unlock(&queue_lock);
 		/* no new thread, try to yield */
 		printd("[P] No threads, vcore %d is yielding\n", vcore_id());
 		/* TODO: you can imagine having something smarter here, like spin for a
@@ -109,13 +108,12 @@ static void __pthread_run(void)
 void pth_thread_runnable(struct uthread *uthread)
 {
 	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
-	struct mcs_lock_qnode local_qn = {0};
 	/* Insert the newly created thread into the ready queue of threads.
 	 * It will be removed from this queue later when vcore_entry() comes up */
-	mcs_lock_notifsafe(&queue_lock, &local_qn);
+	mcs_pdr_lock(&queue_lock);
 	TAILQ_INSERT_TAIL(&ready_queue, pthread, next);
 	threads_ready++;
-	mcs_unlock_notifsafe(&queue_lock, &local_qn);
+	mcs_pdr_unlock(&queue_lock);
 	/* Smarter schedulers should look at the num_vcores() and how much work is
 	 * going on to make a decision about how many vcores to request. */
 	vcore_request(threads_ready);
@@ -128,13 +126,12 @@ void pth_thread_yield(struct uthread *uthread)
 {
 	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
 	struct pthread_tcb *temp_pth = 0;	/* used for exiting AND joining */
-	struct mcs_lock_qnode local_qn = {0};
 	/* Remove from the active list, whether exiting or yielding.  We're holding
 	 * the lock throughout both list modifications (if applicable). */
-	mcs_lock_notifsafe(&queue_lock, &local_qn);
+	mcs_pdr_lock(&queue_lock);
 	threads_active--;
 	TAILQ_REMOVE(&active_queue, pthread, next);
-	mcs_unlock_notifsafe(&queue_lock, &local_qn);
+	mcs_pdr_unlock(&queue_lock);
 	if (pthread->flags & PTHREAD_EXITING) {
 		/* Destroy the pthread */
 		uthread_cleanup(uthread);
@@ -224,12 +221,11 @@ void pth_blockon_sysc(struct syscall *sysc)
 
 	assert(current_uthread->state == UT_BLOCKED);
 	/* rip from the active queue */
-	struct mcs_lock_qnode local_qn = {0};
 	struct pthread_tcb *pthread = (struct pthread_tcb*)current_uthread;
-	mcs_lock_notifsafe(&queue_lock, &local_qn);
+	mcs_pdr_lock(&queue_lock);
 	threads_active--;
 	TAILQ_REMOVE(&active_queue, pthread, next);
-	mcs_unlock_notifsafe(&queue_lock, &local_qn);
+	mcs_pdr_unlock(&queue_lock);
 
 	/* Set things up so we can wake this thread up later */
 	sysc->u_data = current_uthread;
@@ -301,7 +297,7 @@ static int pthread_lib_init(void)
 		return -1;
 	initialized = TRUE;
 	uintptr_t mmap_block;
-	struct mcs_lock_qnode local_qn = {0};
+	mcs_pdr_init(&queue_lock);
 	/* Create a pthread_tcb for the main thread */
 	pthread_t t = (pthread_t)calloc(1, sizeof(struct pthread_tcb));
 	assert(t);
@@ -314,10 +310,10 @@ static int pthread_lib_init(void)
 	t->joiner = 0;
 	assert(t->id == 0);
 	/* Put the new pthread (thread0) on the active queue */
-	mcs_lock_notifsafe(&queue_lock, &local_qn);
+	mcs_pdr_lock(&queue_lock);	/* arguably, we don't need these (_S mode) */
 	threads_active++;
 	TAILQ_INSERT_TAIL(&active_queue, t, next);
-	mcs_unlock_notifsafe(&queue_lock, &local_qn);
+	mcs_pdr_unlock(&queue_lock);
 	/* Tell the kernel where and how we want to receive events.  This is just an
 	 * example of what to do to have a notification turned on.  We're turning on
 	 * USER_IPIs, posting events to vcore 0's vcpd, and telling the kernel to
