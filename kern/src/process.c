@@ -1323,8 +1323,10 @@ void __map_vcore(struct proc *p, uint32_t vcoreid, uint32_t pcoreid)
 	while (p->procinfo->vcoremap[vcoreid].valid)
 		cpu_relax();
 	p->procinfo->vcoremap[vcoreid].pcoreid = pcoreid;
+	wmb();
 	p->procinfo->vcoremap[vcoreid].valid = TRUE;
 	p->procinfo->pcoremap[pcoreid].vcoreid = vcoreid;
+	wmb();
 	p->procinfo->pcoremap[pcoreid].valid = TRUE;
 }
 
@@ -1497,22 +1499,50 @@ static void __set_curtf_to_vcoreid(struct proc *p, uint32_t vcoreid)
 /* Changes calling vcore to be vcoreid.  enable_my_notif tells us about how the
  * state calling vcore wants to be left in.  It will look like caller_vcoreid
  * was preempted.  Note we don't care about notif_pending.  */
-void proc_change_to_vcore(struct proc *p, uint32_t vcoreid,
+void proc_change_to_vcore(struct proc *p, uint32_t new_vcoreid,
                           bool enable_my_notif)
 {
-	uint32_t pcoreid = core_id();
-	uint32_t caller_vcoreid = get_vcoreid(p, pcoreid);
-	struct preempt_data *caller_vcpd =
-	                    &p->procdata->vcore_preempt_data[caller_vcoreid];
-	struct vcore *caller_vc = vcoreid2vcore(p, caller_vcoreid);
-	struct vcore *new_vc = vcoreid2vcore(p, vcoreid);
+	uint32_t caller_vcoreid, pcoreid = core_id();
+	struct preempt_data *caller_vcpd;
+	struct vcore *caller_vc, *new_vc;
 	struct event_msg preempt_msg = {0};
+	int8_t state = 0;
+	/* Need to disable before even reading caller_vcoreid, since we could be
+	 * unmapped by a __preempt or __death, like in yield. */
+	disable_irqsave(&state);
+	/* Need to lock before reading the vcoremap, like in yield */
 	spin_lock(&p->proc_lock);
-	/* vcoreid is already runing, abort */
-	if (vcore_is_mapped(p, vcoreid)) {
-		spin_unlock(&p->proc_lock);
-		return;
+	/* new_vcoreid is already runing, abort */
+	if (vcore_is_mapped(p, new_vcoreid))
+		goto out_failed;
+	/* Need to make sure our vcore is allowed to switch.  We might have a
+	 * __preempt, __death, etc, coming in.  Similar to yield. */
+	switch (p->state) {
+		case (PROC_RUNNING_M):
+			break;				/* the only case we can proceed */
+		case (PROC_RUNNING_S):	/* user bug, just return */
+		case (PROC_DYING):		/* incoming __death */
+		case (PROC_RUNNABLE_M):	/* incoming (bulk) preempt/myield TODO:(BULK) */
+			goto out_failed;
+		default:
+			panic("Weird state(%s) in %s()", procstate2str(p->state),
+			      __FUNCTION__);
 	}
+	/* Make sure we're still mapped in the proc. */
+	if (!is_mapped_vcore(p, pcoreid))
+		goto out_failed;
+	/* Get all our info */
+	caller_vcoreid = get_vcoreid(p, pcoreid);
+	caller_vcpd = &p->procdata->vcore_preempt_data[caller_vcoreid];
+	caller_vc = vcoreid2vcore(p, caller_vcoreid);
+	/* Return and take the preempt message when we enable_irqs. */
+	if (caller_vc->preempt_served)
+		goto out_failed;
+	/* Ok, we're clear to do the switch.  Lets figure out who the new one is */
+	new_vc = vcoreid2vcore(p, new_vcoreid);
+	printd("[kernel] changing vcore %d to vcore %d\n", caller_vcoreid,
+	       new_vcoreid);
+	/* enable_my_notif signals how we'll be restarted */
 	if (enable_my_notif) {
 		/* if they set this flag, then the vcore can just restart from scratch,
 		 * and we don't care about either the notif_tf or the preempt_tf. */
@@ -1521,6 +1551,7 @@ void proc_change_to_vcore(struct proc *p, uint32_t vcoreid,
 		/* need to set up the calling vcore's tf so that it'll get restarted by
 		 * __startcore, to make the caller look like it was preempted. */
 		caller_vcpd->preempt_tf = *current_tf;
+		save_fp_state(&caller_vcpd->preempt_anc);
 		caller_vcpd->preempt_tf_valid = TRUE;
 	}
 	/* Either way, unmap and offline our current vcore */
@@ -1536,16 +1567,19 @@ void proc_change_to_vcore(struct proc *p, uint32_t vcoreid,
 	/* Change the vcore map (TODO: might get rid of this seqctr) */
 	__seq_start_write(&p->procinfo->coremap_seqctr);
 	__unmap_vcore(p, caller_vcoreid);
-	__map_vcore(p, vcoreid, pcoreid);
+	__map_vcore(p, new_vcoreid, pcoreid);
 	__seq_end_write(&p->procinfo->coremap_seqctr);
 	/* send preempt message about the calling vcore.  might as well prefer
 	 * directing it to the new_vc (vcoreid) to cut down on an IPI. */
 	preempt_msg.ev_type = EV_VCORE_PREEMPT;
 	preempt_msg.ev_arg2 = caller_vcoreid;	/* arg2 is 32 bits */
-	send_kernel_event(p, &preempt_msg, vcoreid);
+	send_kernel_event(p, &preempt_msg, new_vcoreid);
 	/* Change cur_tf so we'll be the new vcoreid */
-	__set_curtf_to_vcoreid(p, vcoreid);
+	__set_curtf_to_vcoreid(p, new_vcoreid);
+	/* Fall through to exit (we didn't fail) */
+out_failed:
 	spin_unlock(&p->proc_lock);
+	enable_irqsave(&state);
 }
 
 /* Kernel message handler to start a process's context on this core, when the
