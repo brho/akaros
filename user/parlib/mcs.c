@@ -184,7 +184,12 @@ void mcs_pdr_fini(struct mcs_pdr_lock *lock)
 
 /* Helper, will make sure the vcore owning qnode is running.  If we change to
  * that vcore, we'll continue when our vcore gets restarted.  If the change
- * fails, it is because the vcore is running, and we'll continue. */
+ * fails, it is because the vcore is running, and we'll continue.
+ *
+ * It's worth noting that changing to another vcore won't hurt correctness.
+ * Even if they are no longer the lockholder, they will be checking preemption
+ * messages and will help break out of the deadlock.  So long as we don't
+ * wastefully spin, we're okay. */
 void __ensure_qnode_runs(struct mcs_pdr_qnode *qnode)
 {
 	if (!vcore_is_mapped(qnode->vcoreid)) {
