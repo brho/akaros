@@ -975,10 +975,14 @@ void __proc_preempt_warnall(struct proc *p, uint64_t when)
 void __proc_preempt_core(struct proc *p, uint32_t pcoreid)
 {
 	uint32_t vcoreid = get_vcoreid(p, pcoreid);
-
+	struct event_msg preempt_msg = {0};
 	p->procinfo->vcoremap[vcoreid].preempt_served = TRUE;
 	// expects a pcorelist.  assumes pcore is mapped and running_m
 	__proc_take_cores(p, &pcoreid, 1, __preempt, (long)p, 0, 0);
+	/* Send a message about the preemption. */
+	preempt_msg.ev_type = EV_VCORE_PREEMPT;
+	preempt_msg.ev_arg2 = vcoreid;
+	send_kernel_event(p, &preempt_msg, 0);
 }
 
 /* Raw function to preempt every vcore.  If you care about locking, do it before
@@ -992,6 +996,7 @@ void __proc_preempt_all(struct proc *p)
 	TAILQ_FOREACH(vc_i, &p->online_vcs, list)
 		vc_i->preempt_served = TRUE;
 	__proc_take_allcores(p, __preempt, (long)p, 0, 0);
+	/* TODO: send a bulk preemption message */
 }
 
 /* Warns and preempts a vcore from p.  No delaying / alarming, or anything.  The

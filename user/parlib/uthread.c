@@ -11,12 +11,16 @@ struct schedule_ops default_2ls_ops = {0};
 struct schedule_ops *sched_ops __attribute__((weak)) = &default_2ls_ops;
 
 __thread struct uthread *current_uthread = 0;
+/* ev_q for all preempt messages (handled here to keep 2LSs from worrying
+ * extensively about the details.  Will call out when necessary. */
+struct event_queue *preempt_ev_q;
 
 /* static helpers: */
 static int __uthread_allocate_tls(struct uthread *uthread);
 static int __uthread_reinit_tls(struct uthread *uthread);
 static void __uthread_free_tls(struct uthread *uthread);
 static void __run_current_uthread_raw(void);
+static void handle_vc_preempt(struct event_msg *ev_msg, unsigned int ev_type);
 
 /* The real 2LS calls this, passing in a uthread representing thread0.  When it
  * returns, you're in _M mode, still running thread0, on vcore0 */
@@ -49,6 +53,14 @@ int uthread_lib_init(struct uthread *uthread)
 	/* don't forget to enable notifs on vcore0.  if you don't, the kernel will
 	 * restart your _S with notifs disabled, which is a path to confusion. */
 	__enable_notifs(0);
+	/* Receive preemption events */
+	ev_handlers[EV_VCORE_PREEMPT] = handle_vc_preempt;
+	preempt_ev_q = get_big_event_q();
+	preempt_ev_q->ev_flags = EVENT_IPI | EVENT_INDIR | EVENT_FALLBACK |
+	                         EVENT_NOTHROTTLE | EVENT_VCORE_MUST_RUN;
+	register_kevent_q(preempt_ev_q, EV_VCORE_PREEMPT);
+	printd("[user] registered %08p (flags %08p) for preempt messages\n",
+	       preempt_ev_q, preempt_ev_q->ev_flags);
 	/* Get ourselves into _M mode.  Could consider doing this elsewhere... */
 	while (!in_multi_mode()) {
 		vcore_request(1);
@@ -355,6 +367,11 @@ void uth_enable_notifs(void)
 		cmb();	/* don't enable before ~DONT_MIGRATE */
 		enable_notifs(vcore_id());
 	}
+}
+
+static void handle_vc_preempt(struct event_msg *ev_msg, unsigned int ev_type)
+{
+	printf("Vcore %d was preempted, we're fucked!!!\n", ev_msg->ev_arg2);
 }
 
 /* Attempts to register ev_q with sysc, so long as sysc is not done/progress.

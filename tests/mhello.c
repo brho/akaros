@@ -68,6 +68,7 @@ int main(int argc, char** argv)
 	struct event_queue *ev_q = get_event_q();
 	ev_q->ev_flags = EVENT_IPI | EVENT_NOMSG | EVENT_VCORE_APPRO;
 	register_kevent_q(ev_q, EV_PREEMPT_PENDING);
+	/* We also receive preemption events, it is set up in uthread.c */
 
 	/* Inits a thread for us, though we won't use it.  Just a hack to get into
 	 * _M mode.  Note this requests one vcore for us */
@@ -97,9 +98,9 @@ int main(int argc, char** argv)
 	msg.ev_type = 4;
 	sys_self_notify(2, 4, &msg);
 	udelay(5000000);
-	printf("Vcore 0 notifying itself with notif 3!\n");
-	msg.ev_type = 3;
-	sys_notify(sys_getpid(), 3, &msg);
+	printf("Vcore 0 notifying itself with notif 6!\n");
+	msg.ev_type = 6;
+	sys_notify(sys_getpid(), 6, &msg);
 	udelay(1000000);
 
 	/* test loop for restarting a notif_tf */

@@ -29,7 +29,7 @@
 #define EV_NONE					 0
 #define EV_PREEMPT_PENDING		 1
 #define EV_GANG_PREMPT_PENDING	 2
-#define EV_VCORE_REVOKE			 3
+#define EV_VCORE_PREEMPT		 3
 #define EV_GANG_RETURN			 4
 #define EV_USER_IPI				 5
 #define EV_PAGE_FAULT			 6
