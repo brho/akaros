@@ -1552,7 +1552,8 @@ void proc_change_to_vcore(struct proc *p, uint32_t new_vcoreid,
 		 * __startcore, to make the caller look like it was preempted. */
 		caller_vcpd->preempt_tf = *current_tf;
 		save_fp_state(&caller_vcpd->preempt_anc);
-		caller_vcpd->preempt_tf_valid = TRUE;
+		/* Signal a preemption, like __preempt does with this... (TODO) */
+		__seq_start_write(&caller_vcpd->preempt_tf_valid);
 	}
 	/* Either way, unmap and offline our current vcore */
 	/* Move the caller from online to inactive */

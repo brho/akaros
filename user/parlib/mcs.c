@@ -192,7 +192,9 @@ void mcs_pdr_fini(struct mcs_pdr_lock *lock)
  * wastefully spin, we're okay. */
 void __ensure_qnode_runs(struct mcs_pdr_qnode *qnode)
 {
-	if (!vcore_is_mapped(qnode->vcoreid)) {
+	assert(qnode);
+	if (vcore_is_preempted(qnode->vcoreid)) {
+		assert(!vcore_is_mapped(qnode->vcoreid));
 		/* We want to recover them from preemption.  Since we know they have
 		 * notifs disabled, they will need to be directly restarted, so we can
 		 * skip the other logic and cut straight to the sys_change_vcore() */

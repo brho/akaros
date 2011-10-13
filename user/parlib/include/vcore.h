@@ -47,6 +47,7 @@ static inline void __enable_notifs(uint32_t vcoreid);
 static inline void __disable_notifs(uint32_t vcoreid);
 static inline bool notif_is_enabled(uint32_t vcoreid);
 static inline bool vcore_is_mapped(uint32_t vcoreid);
+static inline bool vcore_is_preempted(uint32_t vcoreid);
 int vcore_init(void);
 int vcore_request(size_t k);
 void vcore_yield(bool preempt_pending);
@@ -100,6 +101,14 @@ static inline bool notif_is_enabled(uint32_t vcoreid)
 static inline bool vcore_is_mapped(uint32_t vcoreid)
 {
 	return __procinfo.vcoremap[vcoreid].valid;
+}
+
+/* For now, preempt_tf is a seq_ctr, and when it is locked, we think the vcore
+ * is preempted.  Needs work... */
+static inline bool vcore_is_preempted(uint32_t vcoreid)
+{
+	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
+	return seq_is_locked(vcpd->preempt_tf_valid);
 }
 
 #ifdef __cplusplus
