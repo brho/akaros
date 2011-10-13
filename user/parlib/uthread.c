@@ -258,11 +258,18 @@ void ros_syscall_blockon(struct syscall *sysc)
 		__ros_syscall_blockon(sysc);
 		return;
 	}
+	/* At this point, we know we're a uthread.  If we're a DONT_MIGRATE uthread,
+	 * then it's disabled notifs and is basically in vcore context, enough so
+	 * that it can't call into the 2LS. */
+	assert(current_uthread);
+	if (current_uthread->flags & UTHREAD_DONT_MIGRATE) {
+		assert(!notif_is_enabled(vcore_id()));	/* catch bugs */
+		__ros_syscall_blockon(sysc);
+	}
 	/* double check before doing all this crap */
 	if (atomic_read(&sysc->flags) & (SC_DONE | SC_PROGRESS))
 		return;
 	/* So yield knows we are blocking on something */
-	assert(current_uthread);
 	current_uthread->sysc = sysc;
 	uthread_yield(TRUE);
 }
