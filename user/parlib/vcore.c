@@ -17,7 +17,8 @@
 
 /* starting with 1 since we alloc vcore0's stacks and TLS in vcore_init(). */
 static size_t _max_vcores_ever_wanted = 1;
-static mcs_lock_t _vcore_lock = MCS_LOCK_INIT;
+atomic_t nr_new_vcores_wanted;
+atomic_t vc_req_being_handled;
 
 extern void** vcore_thread_control_blocks;
 
@@ -113,6 +114,8 @@ int vcore_init()
 {
 	static int initialized = 0;
 	uintptr_t mmap_block;
+	/* Note this is racy, but okay.  The only time it'll be 0 is the first time
+	 * through, when we are _S */
 	if(initialized)
 		return 0;
 
@@ -143,8 +146,11 @@ int vcore_init()
 		             mmap_block + (2 * i    ) * PGSIZE, 
 		             mmap_block + (2 * i + 1) * PGSIZE); 
 	}
+	atomic_init(&vc_req_being_handled, 0);
 	assert(!in_vcore_context());
 	initialized = 1;
+	/* Ugly hack, but we need to be able to transition to _M mode later. */
+	__enable_notifs(vcore_id());
 	return 0;
 vcore_init_tls_fail:
 	free(vcore_thread_control_blocks);
@@ -158,41 +164,82 @@ vcore_init_fail:
  * internally).
  *
  * Note the doesn't block or anything (despite the min number requested is
- * 1), since the kernel won't block the call. */
-int vcore_request(size_t k)
+ * 1), since the kernel won't block the call.
+ *
+ * There are a few concurrency concerns.  We have _max_vcores_ever_wanted,
+ * initialization of new vcore stacks/TLSs, making sure we don't ask for too
+ * many (minor point), and most importantly not asking the kernel for too much
+ * or otherwise miscommunicating our desires to the kernel.  Remember, the
+ * kernel wants just one answer from the process about what it wants, and it is
+ * up to the process to figure that out.
+ *
+ * So we basically have one thread do the submitting/prepping/bookkeeping, and
+ * other threads come in just update the number wanted and make sure someone
+ * is sorting things out.  This will perform a bit better too, since only one
+ * vcore makes syscalls (which hammer the proc_lock).  This essentially has
+ * cores submit work, and one core does the work (like Eric's old delta
+ * functions).
+ *
+ * There's a slight semantic change: this will return 0 (success) for the
+ * non-submitters, and 0 if we submitted.  -1 only if the submitter had some
+ * non-kernel failure.
+ *
+ * Also, beware that this (like the old version) doesn't protect with races on
+ * num_vcores().  num_vcores() is how many you have now or very soon (accounting
+ * for messages in flight that will take your cores), not how many you told the
+ * kernel you want. */
+int vcore_request(long nr_new_vcores)
 {
-	struct mcs_lock_qnode local_qn = {0};
-	int ret = -1;
-	size_t i,j;
+	long nr_to_prep_now, nr_vcores_wanted;
 
-	if(vcore_init() < 0)
-		return -1;
-
-	// TODO: could do this function without a lock once we 
-	// have atomic fetch and add in user space
-	mcs_lock_notifsafe(&_vcore_lock, &local_qn);
-
-	size_t vcores_wanted = num_vcores() + k;
-	if(k < 0 || vcores_wanted > max_vcores())
-	{
-		errno = EAGAIN;
-		goto fail;
+	if (vcore_init() < 0)
+		return -1;	/* consider ERRNO */
+	/* Early sanity checks */
+	if ((nr_new_vcores < 0) || (nr_new_vcores + num_vcores() > max_vcores()))
+		return -1;	/* consider ERRNO */
+	/* Post our desires (ROS atomic_add() conflicts with glibc) */
+	atomic_fetch_and_add(&nr_new_vcores_wanted, nr_new_vcores);
+try_handle_it:
+	cmb();	/* inc before swap.  the atomic is a CPU mb() */
+	if (atomic_swap(&vc_req_being_handled, 1)) {
+		/* We got a 1 back, so someone else is already working on it */
+		return 0;
 	}
-
-	for(i = _max_vcores_ever_wanted; i < vcores_wanted; i++)
-	{
-		if(allocate_transition_stack(i) || allocate_transition_tls(i))
-			goto fail; // errno set by the call that failed
-		_max_vcores_ever_wanted++;
+handle_it:
+	/* So now we're the ones supposed to handle things.  Figure out how many we
+	 * have, though this is racy.  Yields/preempts/grants will change this over
+	 * time, and we may end up asking for less than we had. */
+	nr_vcores_wanted = num_vcores();
+	cmb();	/* force a reread of num_vcores() later */
+	/* Pull all of the vcores wanted into our local variable, where we'll deal
+	 * with prepping/requesting that many vcores.  Keep doing this til we think
+	 * no more are wanted. */
+	while ((nr_to_prep_now = atomic_swap(&nr_new_vcores_wanted, 0))) {
+		nr_vcores_wanted += nr_to_prep_now;
+		/* Don't bother prepping or asking for more than we can ever get */
+		nr_vcores_wanted = MIN(nr_vcores_wanted, max_vcores());
+		/* Make sure all we might ask for are prepped */
+		for(long i = _max_vcores_ever_wanted; i < nr_vcores_wanted; i++) {
+			if (allocate_transition_stack(i) || allocate_transition_tls(i)) {
+				atomic_set(&vc_req_being_handled, 0);	/* unlock and bail out*/
+				return -1;
+			}
+			_max_vcores_ever_wanted++;	/* done in the loop to handle failures*/
+		}
 	}
-	/* Ugly hack, but we need to be able to transition to _M mode */
-	if (num_vcores() == 0)
-		__enable_notifs(vcore_id());
-	ret = sys_resource_req(RES_CORES, vcores_wanted, 1, 0);
-
-fail:
-	mcs_unlock_notifsafe(&_vcore_lock, &local_qn);
-	return ret;
+	/* Got all the ones we can get, let's submit it to the kernel.  We check
+	 * against num_vcores() one last time, though we still have some races... */
+	if (nr_vcores_wanted > num_vcores()) {
+		sys_resource_req(RES_CORES, nr_vcores_wanted, 1, 0);
+		cmb();	/* force a reread of num_vcores() at handle_it: */
+		goto handle_it;
+	}
+	/* Here, we believe there are none left to do */
+	atomic_set(&vc_req_being_handled, 0);	/* unlock, to allow others to try */
+	/* Double check for any that might have come in while we were out */
+	if (atomic_read(&nr_new_vcores_wanted))
+		goto try_handle_it;
+	return 0;
 }
 
 /* This can return, if you failed to yield due to a concurrent event. */

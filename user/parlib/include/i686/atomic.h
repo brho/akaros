@@ -9,6 +9,7 @@ static inline long atomic_read(atomic_t *number);
 static inline void atomic_set(atomic_t *number, long val);
 static inline void atomic_inc(atomic_t *number);
 static inline void atomic_dec(atomic_t *number);
+static inline long atomic_fetch_and_add(atomic_t *number, long val);
 static inline long atomic_swap(atomic_t *addr, long val);
 static inline void *atomic_swap_ptr(void **addr, void *val);
 static inline uint32_t atomic_swap_u32(uint32_t *addr, uint32_t val);
@@ -48,6 +49,15 @@ static inline void atomic_dec(atomic_t *number)
 	// for instance, this doesn't work:
 	//asm volatile("lock decl (%0)" : "=r"(number) : : "cc");
 	asm volatile("lock decl %0" : "=m"(*number) : : "cc");
+}
+
+/* Adds val to number, returning number's original value */
+static inline long atomic_fetch_and_add(atomic_t *number, long val)
+{
+	asm volatile("lock xadd %0,%1" : "=r"(val), "=m"(*number)
+	                               : "0"(val), "m"(*number)
+	                               : "cc" );
+	return val;
 }
 
 static inline long atomic_swap(atomic_t *addr, long val)
