@@ -73,7 +73,7 @@ void schedule(void)
 		spin_unlock_irqsave(&runnablelist_lock);
 		printd("PID of proc i'm running: %d\n", p->pid);
 		/* We can safely read is_mcp without locking (i think). */
-		if (p->is_mcp) {
+		if (__proc_is_mcp(p)) {
 			/* _Ms need to get some cores, which will call proc_run() internally
 			 * (for now) */
 			if (core_request(p) <= 0)

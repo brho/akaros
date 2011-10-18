@@ -261,6 +261,7 @@ static void proc_init_procinfo(struct proc* p)
 	memset(&p->procinfo->vcoremap, 0, sizeof(p->procinfo->vcoremap));
 	memset(&p->procinfo->pcoremap, 0, sizeof(p->procinfo->pcoremap));
 	p->procinfo->num_vcores = 0;
+	p->procinfo->is_mcp = FALSE;
 	p->procinfo->coremap_seqctr = SEQCTR_INITIALIZER;
 	/* For now, we'll go up to the max num_cpus (at runtime).  In the future,
 	 * there may be cases where we can have more vcores than num_cpus, but for
@@ -309,7 +310,6 @@ error_t proc_alloc(struct proc **pp, struct proc *parent)
 	p->exitcode = 1337;	/* so we can see processes killed by the kernel */
 	p->ppid = parent ? parent->pid : 0;
 	p->state = PROC_CREATED; /* shouldn't go through state machine for init */
-	p->is_mcp = FALSE;
 	p->env_flags = 0;
 	p->env_entry = 0; // cheating.  this really gets set later
 	p->heap_top = (void*)UTEXT;	/* heap_bottom set in proc_init_procinfo */
@@ -938,7 +938,7 @@ bool __proc_is_mcp(struct proc *p)
 {
 	/* in lieu of using the amount of cores requested, or having a bunch of
 	 * states (like PROC_WAITING_M and _S), I'll just track it with a bool. */
-	return p->is_mcp;
+	return p->procinfo->is_mcp;
 }
 
 /************************  Preemption Functions  ******************************

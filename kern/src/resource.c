@@ -149,7 +149,7 @@ ssize_t core_request(struct proc *p)
 				need_to_idle = TRUE;
 				// change to runnable_m (it's TF is already saved)
 				__proc_set_state(p, PROC_RUNNABLE_M);
-				p->is_mcp = TRUE;
+				p->procinfo->is_mcp = TRUE;
 				break;
 			case (PROC_RUNNABLE_S):
 				/* Issues: being on the runnable_list, proc_set_state not liking

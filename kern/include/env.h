@@ -34,7 +34,6 @@ struct proc {
 	pid_t ppid;                 // Parent's PID
 	pid_t exitcode;				// exit() param or main() return value
 	uint32_t state;				// Status of the process
-	bool is_mcp;			/* is in multi mode */
 	struct kref p_kref;		/* Refcnt */
 	uint32_t env_flags;
 	uintptr_t env_entry;

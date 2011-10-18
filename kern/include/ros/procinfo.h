@@ -47,6 +47,7 @@ typedef struct procinfo {
 	char argbuf[PROCINFO_ARGBUF_SIZE];
 	/* glibc relies on stuff above this point.  if you change it, you need to
 	 * rebuild glibc. */
+	bool is_mcp;			/* is in multi mode */
 	struct vcore		vcoremap[MAX_NUM_CPUS];
 	uint32_t			num_vcores;
 	struct pcore		pcoremap[MAX_NUM_CPUS];

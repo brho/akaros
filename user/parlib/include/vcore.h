@@ -79,7 +79,7 @@ static inline bool in_vcore_context(void)
 
 static inline bool in_multi_mode(void)
 {
-	return (num_vcores() > 0) ? TRUE : FALSE;
+	return __procinfo.is_mcp;
 }
 
 /* Only call this if you know what you are doing. */
