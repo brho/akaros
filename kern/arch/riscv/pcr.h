@@ -64,15 +64,15 @@
 #define NUM_CAUSES 13
 
 #define ASM_CR(r)   _ASM_CR(r)
-#define _ASM_CR(r)  $cr##r
+#define _ASM_CR(r)  cr##r
 
 #ifndef __ASSEMBLER__
 
 #define mtpcr(reg,val) ({ long __tmp = (long)(val); \
-          asm volatile ("mtpcr %0,$cr%1"::"r"(__tmp),"i"(reg)); })
+          asm volatile ("mtpcr %0,cr%1"::"r"(__tmp),"i"(reg)); })
 
 #define mfpcr(reg) ({ long __tmp; \
-          asm volatile ("mfpcr %0,$cr%1" : "=r"(__tmp) : "i"(reg)); \
+          asm volatile ("mfpcr %0,cr%1" : "=r"(__tmp) : "i"(reg)); \
           __tmp; })
 
 #define irq_disable() asm volatile("di")

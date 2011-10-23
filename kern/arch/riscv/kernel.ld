@@ -1,7 +1,7 @@
 /* Simple linker script for the ROS kernel.
    See the GNU ld 'info' manual ("info ld") to learn the syntax. */
 
-OUTPUT_ARCH("mips:riscv")
+OUTPUT_ARCH("riscv")
 ENTRY(_start)
 
 SECTIONS

@@ -25,67 +25,64 @@ _start:
 
   // set up trap entry point.  this is not a relocated address, as we
   // do not support trapping before the MMU is set up.
-  la     $t0, trap_entry
-  mtpcr  $t0, ASM_CR(PCR_EVEC)
+  la     t0, trap_entry
+  mtpcr  t0, ASM_CR(PCR_EVEC)
 
   // enable traps
-  li     $t0, SR_S | SR_ET | SR_SX
-  mtpcr  $t0, ASM_CR(PCR_SR)
+  li     t0, SR_S | SR_ET | SR_SX
+  mtpcr  t0, ASM_CR(PCR_SR)
 
   // core 0?
-  mfpcr  $t0, ASM_CR(PCR_COREID)
-  bnez   $t0, notcore0
+  mfpcr  t0, ASM_CR(PCR_COREID)
+  bnez   t0, notcore0
 
-  // set up stack and terminate frame pointer for backtracing
-  li     $fp, 0
-  la     $sp, bootstacktop
-  li     $t1, KERN_LOAD_ADDR
-  sub    $sp, $sp, $t1
+  // set up stack
+  la     sp, bootstacktop
+  li     t1, KERN_LOAD_ADDR
+  sub    sp, sp, t1
 
   // set up initial page mappings
-  la     $a0, l1pt
-  sub    $a0, $a0, $t1
-  la     $a1, l1pt_boot
-  sub    $a1, $a1, $t1
+  la     a0, l1pt
+  sub    a0, a0, t1
+  la     a1, l1pt_boot
+  sub    a1, a1, t1
 #ifdef __riscv64
-  la     $a2, l2pt_kernbase
-  sub    $a2, $a2, $t1
-  la     $a3, l2pt_load
-  sub    $a3, $a3, $t1
+  la     a2, l2pt_kernbase
+  sub    a2, a2, t1
+  la     a3, l2pt_load
+  sub    a3, a3, t1
 #endif
   jal    pagetable_init
 
   // turn on MMU
-  la     $a0, l1pt_boot
-  sub    $a0, $a0, $t1
+  la     a0, l1pt_boot
+  sub    a0, a0, t1
   jal    mmu_init
 
   // relocate stack and call into C code using absolute jump, not pc-relative
-  la     $sp, bootstacktop
-  lui    $t0, %hi(cmain)
-  jalr.j $t0, %lo(cmain)
+  la     sp, bootstacktop
+  lui    t0, %hi(cmain)
+  jalr.j t0, %lo(cmain)
 
 notcore0:
-  // set up stack and terminate frame pointer for backtracing
-  // sp = percoore_stacks+(core_id()+1)*KSTKSIZE
-  li     $fp, 0
-  la     $sp, percore_stacks
-  add    $t0, $t0, 1
-  sll    $t0, $t0, KSTKSHIFT
-  add    $sp, $sp, $t0
-  li     $t1, KERN_LOAD_ADDR
-  sub    $sp, $sp, $t1
+  // set up stack: sp = percoore_stacks+(core_id()+1)*KSTKSIZE
+  la     sp, percore_stacks
+  add    t0, t0, 1
+  sll    t0, t0, KSTKSHIFT
+  add    sp, sp, t0
+  li     t1, KERN_LOAD_ADDR
+  sub    sp, sp, t1
   
   // turn on MMU
-  la     $a0, l1pt_boot
-  sub    $a0, $a0, $t1
+  la     a0, l1pt_boot
+  sub    a0, a0, t1
   jal    mmu_init
 
   // relocate stack and call into C code
-  li     $t1, KERN_LOAD_ADDR
-  add    $sp, $sp, $t1
-  lui    $t0, %hi(smp_init)
-  jalr.j $t0, %lo(smp_init)
+  li     t1, KERN_LOAD_ADDR
+  add    sp, sp, t1
+  lui    t0, %hi(smp_init)
+  jalr.j t0, %lo(smp_init)
 
 .end _start
 ///////////////////////////////////////////////////////////////////

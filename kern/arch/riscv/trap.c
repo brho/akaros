@@ -83,9 +83,8 @@ void set_stack_top(uintptr_t stacktop)
 /* Note the assertion assumes we are in the top page of the stack. */
 uintptr_t get_stack_top(void)
 {
-	uintptr_t sp, stacktop;
-	stacktop = core_stacktops[core_id()];
-	asm volatile("move %0,$sp" : "=r"(sp));
+	register uintptr_t sp asm ("sp");
+	uintptr_t stacktop = core_stacktops[core_id()];
 	assert(ROUNDUP(sp, PGSIZE) == stacktop);
 	return stacktop;
 }

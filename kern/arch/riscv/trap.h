@@ -20,7 +20,7 @@ static inline bool in_kernel(struct trapframe *tf)
 static inline void __attribute__((always_inline))
 set_stack_pointer(uintptr_t sp)
 {
-	asm volatile("move $sp,%0" : : "r"(sp) : "memory");
+	asm volatile("move sp, %0" : : "r"(sp) : "memory");
 }
 
 /* Save's the current kernel context into tf, setting the PC to the end of this
