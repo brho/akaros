@@ -1687,6 +1687,7 @@ void __preempt(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2)
 	vcpd->preempt_tf = *pcpui->cur_tf;
 	save_fp_state(&vcpd->preempt_anc);
 	__seq_start_write(&vcpd->preempt_tf_valid);
+	wmb();	/* make sure everything else hits before we unmap */
 	__unmap_vcore(p, vcoreid);
 	/* We won't restart the process later.  current gets cleared later when we
 	 * notice there is no owning_proc and we have nothing to do (smp_idle,

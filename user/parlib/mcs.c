@@ -194,12 +194,13 @@ void __ensure_qnode_runs(struct mcs_pdr_qnode *qnode)
 {
 	assert(qnode);
 	if (vcore_is_preempted(qnode->vcoreid)) {
-		assert(!vcore_is_mapped(qnode->vcoreid));
+		/* Note that at this moment, the vcore could still be mapped (we're
+		 * racing with __preempt.  If that happens, we'll just fail the
+		 * sys_change_vcore(), and next time __ensure runs we'll get it. */
 		/* We want to recover them from preemption.  Since we know they have
 		 * notifs disabled, they will need to be directly restarted, so we can
 		 * skip the other logic and cut straight to the sys_change_vcore() */
 		sys_change_vcore(qnode->vcoreid, FALSE);
-		cmb();
 	}
 }
 
