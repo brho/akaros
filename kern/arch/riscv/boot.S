@@ -16,6 +16,7 @@
 // entry point
 ///////////////////////////////////////////////////////////////////
 
+#define PCR0 (SR_S | SR_ET | SR_SX)
 .text
 
 .global _start
@@ -29,7 +30,7 @@ _start:
   mtpcr  t0, ASM_CR(PCR_EVEC)
 
   // enable traps
-  li     t0, SR_S | SR_ET | SR_SX
+  li     t0, PCR0
   mtpcr  t0, ASM_CR(PCR_SR)
 
   // core 0?
@@ -47,22 +48,16 @@ _start:
   la     a1, l1pt_boot
   sub    a1, a1, t1
 #ifdef __riscv64
-  la     a2, l2pt_kernbase
-  sub    a2, a2, t1
-  la     a3, l2pt_load
-  sub    a3, a3, t1
+  la     a2, l2pt
+  sub    a2, a1, t1
 #endif
   jal    pagetable_init
-
-  // turn on MMU
-  la     a0, l1pt_boot
-  sub    a0, a0, t1
-  jal    mmu_init
+  jal    enable_mmu
 
   // relocate stack and call into C code using absolute jump, not pc-relative
   la     sp, bootstacktop
-  lui    t0, %hi(cmain)
-  jalr.j t0, %lo(cmain)
+  la     t0, cmain
+  jr     t0
 
 notcore0:
   // set up stack: sp = percoore_stacks+(core_id()+1)*KSTKSIZE
@@ -73,18 +68,27 @@ notcore0:
   li     t1, KERN_LOAD_ADDR
   sub    sp, sp, t1
   
-  // turn on MMU
-  la     a0, l1pt_boot
-  sub    a0, a0, t1
-  jal    mmu_init
+  jal    enable_mmu
 
   // relocate stack and call into C code
   li     t1, KERN_LOAD_ADDR
   add    sp, sp, t1
-  lui    t0, %hi(smp_init)
-  jalr.j t0, %lo(smp_init)
+  la     t0, smp_init
+  jr     t0
 
 .end _start
+
+.ent enable_mmu
+enable_mmu:
+  la     t0, l1pt_boot
+  li     t1, KERN_LOAD_ADDR
+  sub    t0, t0, t1
+  mtpcr  t0, ASM_CR(PCR_PTBR)
+  li     t0, PCR0 | SR_VM
+  mtpcr  t0, ASM_CR(PCR_SR)
+  ret
+.end enable_mmu
+
 ///////////////////////////////////////////////////////////////////
 // boot stack and regular stacks.
 // (boot stack cannot be in .bss, as .bss is later zereoed by the kernel.)
@@ -92,6 +96,14 @@ notcore0:
 
 .data
   .align  PGSHIFT
+l1pt_boot:
+  .space  PGSIZE
+.global l1pt
+l1pt:
+  .space  PGSIZE
+l2pt:
+  .space  PGSIZE
+
   .space  KSTKSIZE
   .global bootstacktop
 bootstacktop:

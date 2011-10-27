@@ -9,20 +9,18 @@
 
 // All physical memory mapped at this address
 #ifdef __riscv64
-# define KERNBASE       0xFFFFFF0000000000
-# define ULIM           0x0000010000000000
+# define KERNBASE       0xFFFFFC0000000000
+# define ULIM           0x0000040000000000
 # define KERN_LOAD_ADDR 0xFFFFFFFF80000000
 # define KERN_VMAP_TOP    	KERN_LOAD_ADDR // upper 2GB reserved (see mmu_init)
-# define NPTLEVELS                       4
-# define L1PGSHIFT              (12+9+9+9)
+# define NPTLEVELS                       3
+# define L1PGSHIFT              (13+10+10)
 # define L1PGSIZE        (1L << L1PGSHIFT)
-# define L2PGSHIFT                (12+9+9)
+# define L2PGSHIFT                 (13+10)
 # define L2PGSIZE        (1L << L2PGSHIFT)
-# define L3PGSHIFT                  (12+9)
+# define L3PGSHIFT                    (13)
 # define L3PGSIZE        (1L << L3PGSHIFT)
-# define L4PGSHIFT                    (12)
-# define L4PGSIZE        (1L << L4PGSHIFT)
-# define PGSHIFT                 L4PGSHIFT
+# define PGSHIFT                 L3PGSHIFT
 # define PTSIZE                   L2PGSIZE
 #else
 # define KERNBASE               0x80000000
@@ -30,9 +28,9 @@
 # define KERN_LOAD_ADDR           KERNBASE
 # define KERN_VMAP_TOP    		0xfec00000 /* using sparc's upper limit */
 # define NPTLEVELS                       2
-# define L1PGSHIFT                 (12+10)
+# define L1PGSHIFT                 (13+11)
 # define L1PGSIZE         (1 << L1PGSHIFT)
-# define L2PGSHIFT                      12
+# define L2PGSHIFT                      13
 # define L2PGSIZE         (1 << L2PGSHIFT)
 # define PGSHIFT                 L2PGSHIFT
 # define PTSIZE                   L1PGSIZE
@@ -91,7 +89,7 @@
 #define PTE(ppn, flags) ((ppn) << PTE_PPN_SHIFT | (flags))
 
 // construct PTD from physical address
-#define PTD(pa) ((uintptr_t)(pa) | PTE_T)
+#define PTD(pa) (((uintptr_t)(pa) >> PGSHIFT << PTE_PPN_SHIFT) | PTE_T)
 
 // Page directory and page table constants
 #define NPTENTRIES (PGSIZE/sizeof(pte_t))
@@ -108,7 +106,7 @@
 #define PTE_SW   0x100 // Supervisor Read permission
 #define PTE_SR   0x200 // Supervisor Write permission
 #define PTE_PERM (PTE_SR | PTE_SW | PTE_SX | PTE_UR | PTE_UW | PTE_UX)
-#define PTE_PPN_SHIFT 12
+#define PTE_PPN_SHIFT 13
 
 // commly used access modes
 #define PTE_KERN_RW	(PTE_SR | PTE_SW | PTE_SX)
