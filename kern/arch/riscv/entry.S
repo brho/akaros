@@ -55,7 +55,7 @@ pop_kernel_tf:
   LOAD  sp,30*REGBYTES(a0)
 
   mtpcr  t0,ASM_CR(PCR_SR)
-	ret
+  ret
 
   .end  pop_kernel_tf
 
@@ -187,5 +187,12 @@ trap_entry:
 1:jal   save_tf
   move  sp,x2
   move  a0,x2
-  jal    handle_trap
+  j     handle_trap
   .end  trap_entry
+
+  .global  cpu_halt
+  .ent  cpu_halt
+cpu_halt:
+1:b     1b   # handle_ipi can advance the PC to break out of this loop.
+  ret
+  .end  cpu_halt

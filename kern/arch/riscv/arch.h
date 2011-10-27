@@ -117,12 +117,6 @@ cpu_relax(void)
 }
 
 static __inline void
-cpu_halt(void)
-{
-  while(1);
-}
-
-static __inline void
 clflush(uintptr_t* addr)
 {
 }
@@ -168,5 +162,7 @@ reboot(void)
 	fesvr_die();
 	while(1);
 }
+
+extern void cpu_halt(void);
 
 #endif /* !ROS_INC_ARCH_H */

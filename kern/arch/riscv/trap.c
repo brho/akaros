@@ -101,7 +101,8 @@ sysenter_init(void)
 
 /* Helper.  For now, this copies out the TF to pcpui, and sets cur_tf to point
  * to it. */
-static void set_current_tf(struct per_cpu_info *pcpui, struct trapframe *tf)
+static void
+set_current_tf(struct per_cpu_info *pcpui, struct trapframe *tf)
 {
 	if (irq_is_enabled())
 		warn("Turn off IRQs until cur_tf is set!");
@@ -211,7 +212,8 @@ handle_ipi(trapframe_t* tf)
 
 /* Same as in x86.  Might be diff in the future if there is no way to check for
  * immediate messages or there is the ability to selectively mask IPI vectors.*/
-void process_routine_kmsg(struct trapframe *tf)
+void
+process_routine_kmsg(struct trapframe *tf)
 {
 	per_cpu_info_t *myinfo = &per_cpu_info[core_id()];
 	kernel_message_t msg_cp, *k_msg;
@@ -387,19 +389,13 @@ handle_fp_disabled(trapframe_t* state)
 static void
 handle_syscall(trapframe_t* state)
 {
-	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	uintptr_t a0 = state->gpr[4];
 	uintptr_t a1 = state->gpr[5];
 
 	advance_pc(state);
+	set_current_tf(&per_cpu_info[core_id()], state);
 	enable_irq();
-	struct per_cpu_info* coreinfo = &per_cpu_info[core_id()];
-
-	set_current_tf(pcpui, state);
-
 	prep_syscalls(current, (struct syscall*)a0, a1);
-
-	proc_restartcore();
 }
 
 static void
@@ -412,9 +408,7 @@ handle_breakpoint(trapframe_t* state)
 void
 handle_trap(trapframe_t* tf)
 {
-	typedef void (*trap_handler)(trapframe_t*);
-	
-	const static trap_handler trap_handlers[NUM_CAUSES] = {
+	static void (*const trap_handlers[NUM_CAUSES])(trapframe_t*) = {
 	  [CAUSE_MISALIGNED_FETCH] = handle_misaligned_fetch,
 	  [CAUSE_FAULT_FETCH] = handle_fault_fetch,
 	  [CAUSE_ILLEGAL_INSTRUCTION] = handle_illegal_instruction,
@@ -431,10 +425,15 @@ handle_trap(trapframe_t* tf)
 	
 	int exccode = (tf->cause & CAUSE_EXCCODE) >> CAUSE_EXCCODE_SHIFT;
 	assert(exccode < NUM_CAUSES && trap_handlers[exccode]);
-	
 	trap_handlers[exccode](tf);
 	
-	env_pop_tf(tf);
+	/* Return to the current process, which should be runnable.  If we're the
+	 * kernel, we should just return naturally.  Note that current and tf need
+	 * to still be okay (might not be after blocking) */
+	if (in_kernel(tf))
+		env_pop_tf(tf);
+	else
+		proc_restartcore();
 }
 
 /* We don't have NMIs now. */
