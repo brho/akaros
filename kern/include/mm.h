@@ -65,7 +65,7 @@ void print_vmrs(struct proc *p);
 /* mmap() related functions.  These manipulate VMRs and change the hardware page
  * tables.  Any requests below the LOWEST_VA will silently be upped.  This may
  * be a dynamic proc-specific variable later. */
-#define MMAP_LOWEST_VA 0x00001000
+#define MMAP_LOWEST_VA PGSIZE
 void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
            int fd, size_t offset);
 void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
