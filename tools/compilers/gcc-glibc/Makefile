@@ -141,14 +141,6 @@ gcc-$(GCC_VERSION):
 	tar -zxf gcc-$(GCC_VERSION).tar.gz
 	cd gcc-$(GCC_VERSION); \
 	patch -p1 < ../gcc-$(GCC_VERSION)-ros.patch
-	
-	cd gcc-$(GCC_VERSION); \
-	tar -zxf ../mpfr-2.3.2.tar.gz; \
-	mv mpfr* mpfr
-	
-	cd gcc-$(GCC_VERSION); \
-	tar -zxf ../gmp-4.2.4.tar.gz; \
-	mv gmp* gmp
 
 glibc-$(GLIBC_VERSION): 
 	rm -rf glibc-$(GLIBC_VERSION)
@@ -335,8 +327,6 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 	make -j $(MAKE_JOBS) install
 
 patches:
-	mv gcc-$(GCC_VERSION)/gmp .
-	mv gcc-$(GCC_VERSION)/mpfr .
 	rm -rf gcc-$(GCC_VERSION)/libstdc++-v3/autom4te.cache
 	mv gcc-$(GCC_VERSION) gcc-$(GCC_VERSION).new
 	tar -zxf gcc-$(GCC_VERSION).tar.gz
@@ -344,8 +334,6 @@ patches:
 	      > gcc-$(GCC_VERSION)-ros.patch
 	rm -rf gcc-$(GCC_VERSION)
 	mv gcc-$(GCC_VERSION).new gcc-$(GCC_VERSION)
-	mv gmp gcc-$(GCC_VERSION)
-	mv mpfr gcc-$(GCC_VERSION)
 	
 	mv binutils-$(BINUTILS_VERSION) binutils-$(BINUTILS_VERSION).new
 	tar -zxf binutils-$(BINUTILS_VERSION).tar.gz
