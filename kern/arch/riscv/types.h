@@ -28,10 +28,10 @@ typedef unsigned int uint32_t;
 typedef long long int64_t;
 typedef unsigned long long uint64_t;
 
-typedef long ssize_t;
-typedef long pid_t;
-typedef long uid_t;
-typedef long gid_t;
+typedef int64_t ssize_t;
+typedef int32_t pid_t;
+typedef int32_t uid_t;
+typedef int32_t gid_t;
 
 typedef unsigned long uintptr_t;
 

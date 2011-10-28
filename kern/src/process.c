@@ -172,7 +172,7 @@ int __proc_set_state(struct proc *p, uint32_t state)
 struct proc *pid2proc(pid_t pid)
 {
 	spin_lock(&pid_hash_lock);
-	struct proc *p = hashtable_search(pid_hash, (void*)pid);
+	struct proc *p = hashtable_search(pid_hash, (void*)(long)pid);
 	if (p)
 		if (!kref_get_not_zero(&p->p_kref, 1))
 			p = 0;
@@ -368,7 +368,7 @@ error_t proc_alloc(struct proc **pp, struct proc *parent)
 void __proc_ready(struct proc *p)
 {
 	spin_lock(&pid_hash_lock);
-	hashtable_insert(pid_hash, (void*)p->pid, p);
+	hashtable_insert(pid_hash, (void*)(long)p->pid, p);
 	spin_unlock(&pid_hash_lock);
 }
 
@@ -414,7 +414,7 @@ static void __proc_free(struct kref *kref)
 	}
 	/* Remove us from the pid_hash and give our PID back (in that order). */
 	spin_lock(&pid_hash_lock);
-	if (!hashtable_remove(pid_hash, (void*)p->pid))
+	if (!hashtable_remove(pid_hash, (void*)(long)p->pid))
 		panic("Proc not in the pid table in %s", __FUNCTION__);
 	spin_unlock(&pid_hash_lock);
 	put_free_pid(p->pid);
