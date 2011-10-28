@@ -142,6 +142,7 @@ format_trapframe(trapframe_t *tf, char* buf, int bufsz)
 	                "sr %016lx pc %016lx va %016lx insn       %008x\n", tf->sr, tf->epc,
 	                tf->badvaddr, (uint32_t)tf->insn);
 
+	buf[bufsz-1] = 0;
 	return len;
 }
 
@@ -172,12 +173,6 @@ static void
 handle_ipi(trapframe_t* tf)
 {
 	clear_ipi();
-
-	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	if (!in_kernel(tf))
-		set_current_tf(pcpui, tf);
-	else if((void*)tf->epc == &cpu_halt) // break out of the cpu_halt loop
-		advance_pc(tf);
 
 	per_cpu_info_t *myinfo = &per_cpu_info[core_id()];
 	kernel_message_t msg_cp, *k_msg;
@@ -266,7 +261,7 @@ unhandled_trap(trapframe_t* state, const char* name)
 	else
 	{
 		char tf_buf[1024];
-		int tf_len = format_trapframe(state, tf_buf, sizeof(tf_buf));
+		format_trapframe(state, tf_buf, sizeof(tf_buf));
 
 		warn("Unhandled trap in user!\nTrap type: %s\n%s", name, tf_buf);
 		backtrace();
@@ -274,9 +269,6 @@ unhandled_trap(trapframe_t* state, const char* name)
 
 		assert(current);
 		proc_destroy(current);
-		/* Not sure if RISCV has a central point that would run proc_restartcore
-		 */
-		proc_restartcore();
 	}
 }
 
@@ -287,8 +279,13 @@ handle_timer_interrupt(trapframe_t* state)
 }
 
 static void
-handle_interrupt(trapframe_t* state)
+handle_interrupt(trapframe_t* tf)
 {
+	if (!in_kernel(tf))
+		set_current_tf(&per_cpu_info[core_id()], tf);
+	else if((void*)tf->epc == &cpu_halt) // break out of the cpu_halt loop
+		advance_pc(tf);
+	
 	typedef void (*trap_handler)(trapframe_t*);
 	
 	const static trap_handler trap_handlers[NIRQ] = {
@@ -296,20 +293,16 @@ handle_interrupt(trapframe_t* state)
 	  [IPI_IRQ] = handle_ipi,
 	};
 
-	uintptr_t interrupts = (state->cause & CAUSE_IP) >> CAUSE_IP_SHIFT;
+	uintptr_t interrupts = (tf->cause & CAUSE_IP) >> CAUSE_IP_SHIFT;
 
 	for(uintptr_t i = 0; interrupts; interrupts >>= 1, i++)
 	{
 		if(interrupts & 1)
 		{
 			if(trap_handlers[i])
-				trap_handlers[i](state);
+				trap_handlers[i](tf);
 			else
-			{
-				char name[32];
-				snprintf(name, sizeof(name), "Bad Interrupt %d", i);
-				unhandled_trap(state, name);
-			}
+				panic("Bad interrupt %d", i);
 		}
 	}
 }
@@ -378,12 +371,13 @@ handle_illegal_instruction(trapframe_t* state)
 }
 
 static void
-handle_fp_disabled(trapframe_t* state)
+handle_fp_disabled(trapframe_t* tf)
 {
-	if(in_kernel(state))
+	if(in_kernel(tf))
 		panic("kernel executed an FP instruction!");
 
-	state->sr |= SR_EF;
+	tf->sr |= SR_EF;
+	env_pop_tf(tf); /* We didn't save our TF, so don't use proc_restartcore */
 }
 
 static void
