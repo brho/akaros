@@ -2497,7 +2497,7 @@ diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/bfd/elf32-riscv.c binutils-2
 +#include "elf32-target.h"
 diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/bfd/elf64-riscv.c binutils-2.21.1/bfd/elf64-riscv.c
 --- ../binutils-2.21.1-orig/bfd/elf64-riscv.c	1969-12-31 16:00:00.000000000 -0800
-+++ binutils-2.21.1/bfd/elf64-riscv.c	2011-10-22 18:50:03.000000000 -0700
++++ binutils-2.21.1/bfd/elf64-riscv.c	2011-10-31 18:59:25.000000000 -0700
 @@ -0,0 +1,3298 @@
 +/* MIPS-specific support for 64-bit ELF
 +   Copyright 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005,
@@ -3777,10 +3777,10 @@ diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/bfd/elf64-riscv.c binutils-2
 +	 FALSE),		/* pcrel_offset */
 +
 +  /* TLS general dynamic variable reference.  */
-+  HOWTO (R_RISCV_TLS_GD,		/* type */
++  HOWTO (R_RISCV_TLS_GD,	/* type */
 +	 0,			/* rightshift */
 +	 2,			/* size (0 = byte, 1 = short, 2 = long) */
-+	 RISCV_IMM_BITS,			/* bitsize */
++	 RISCV_IMM_BITS,	/* bitsize */
 +	 FALSE,			/* pc_relative */
 +	 OP_SH_IMMEDIATE,	/* bitpos */
 +	 complain_overflow_signed, /* complain_on_overflow */
@@ -3795,14 +3795,14 @@ diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/bfd/elf64-riscv.c binutils-2
 +  HOWTO (R_RISCV_TLS_LDM,	/* type */
 +	 0,			/* rightshift */
 +	 2,			/* size (0 = byte, 1 = short, 2 = long) */
-+	 RISCV_IMM_BITS,			/* bitsize */
++	 RISCV_IMM_BITS,	/* bitsize */
 +	 FALSE,			/* pc_relative */
 +	 OP_SH_IMMEDIATE,	/* bitpos */
 +	 complain_overflow_signed, /* complain_on_overflow */
 +	 _bfd_riscv_elf_generic_reloc, /* special_function */
 +	 "R_RISCV_TLS_LDM",	/* name */
 +	 TRUE,			/* partial_inplace */
-+	 (RISCV_IMM_REACH-1) << OP_SH_IMMEDIATE,	/* src_mask */
++	 0,			/* src_mask */
 +	 (RISCV_IMM_REACH-1) << OP_SH_IMMEDIATE,	/* dst_mask */
 +	 FALSE),		/* pcrel_offset */
 +
@@ -3810,14 +3810,14 @@ diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/bfd/elf64-riscv.c binutils-2
 +  HOWTO (R_RISCV_TLS_DTPREL_HI16,	/* type */
 +	 0,			/* rightshift */
 +	 2,			/* size (0 = byte, 1 = short, 2 = long) */
-+	 RISCV_BIGIMM_BITS,			/* bitsize */
++	 RISCV_BIGIMM_BITS,	/* bitsize */
 +	 FALSE,			/* pc_relative */
 +	 OP_SH_BIGIMMEDIATE,	/* bitpos */
 +	 complain_overflow_signed, /* complain_on_overflow */
 +	 _bfd_riscv_elf_generic_reloc, /* special_function */
 +	 "R_RISCV_TLS_DTPREL_HI16",	/* name */
 +	 TRUE,			/* partial_inplace */
-+	 ((1<<RISCV_BIGIMM_BITS)-1) << OP_SH_BIGIMMEDIATE,	/* src_mask */
++	 0,			/* src_mask */
 +	 ((1<<RISCV_BIGIMM_BITS)-1) << OP_SH_BIGIMMEDIATE,	/* dst_mask */
 +	 FALSE),		/* pcrel_offset */
 +
@@ -3825,14 +3825,14 @@ diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/bfd/elf64-riscv.c binutils-2
 +  HOWTO (R_RISCV_TLS_DTPREL_LO16,	/* type */
 +	 0,			/* rightshift */
 +	 2,			/* size (0 = byte, 1 = short, 2 = long) */
-+	 RISCV_IMM_BITS,			/* bitsize */
++	 RISCV_IMM_BITS,	/* bitsize */
 +	 FALSE,			/* pc_relative */
 +	 OP_SH_IMMEDIATE,	/* bitpos */
 +	 complain_overflow_signed, /* complain_on_overflow */
 +	 _bfd_riscv_elf_generic_reloc, /* special_function */
 +	 "R_RISCV_TLS_DTPREL_LO16",	/* name */
 +	 TRUE,			/* partial_inplace */
-+	 (RISCV_IMM_REACH-1) << OP_SH_IMMEDIATE,	/* src_mask */
++	 0,			/* src_mask */
 +	 (RISCV_IMM_REACH-1) << OP_SH_IMMEDIATE,	/* dst_mask */
 +	 FALSE),		/* pcrel_offset */
 +
@@ -3840,14 +3840,14 @@ diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/bfd/elf64-riscv.c binutils-2
 +  HOWTO (R_RISCV_TLS_GOTTPREL,	/* type */
 +	 0,			/* rightshift */
 +	 2,			/* size (0 = byte, 1 = short, 2 = long) */
-+	 RISCV_IMM_BITS,			/* bitsize */
++	 RISCV_IMM_BITS,	/* bitsize */
 +	 FALSE,			/* pc_relative */
 +	 OP_SH_IMMEDIATE,	/* bitpos */
 +	 complain_overflow_signed, /* complain_on_overflow */
 +	 _bfd_riscv_elf_generic_reloc, /* special_function */
 +	 "R_RISCV_TLS_GOTTPREL",	/* name */
 +	 TRUE,			/* partial_inplace */
-+	 (RISCV_IMM_REACH-1) << OP_SH_IMMEDIATE,	/* src_mask */
++	 0,			/* src_mask */
 +	 (RISCV_IMM_REACH-1) << OP_SH_IMMEDIATE,	/* dst_mask */
 +	 FALSE),		/* pcrel_offset */
 +
@@ -3871,14 +3871,14 @@ diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/bfd/elf64-riscv.c binutils-2
 +  HOWTO (R_RISCV_TLS_TPREL_HI16,	/* type */
 +	 0,			/* rightshift */
 +	 2,			/* size (0 = byte, 1 = short, 2 = long) */
-+	 RISCV_BIGIMM_BITS,			/* bitsize */
++	 RISCV_BIGIMM_BITS,	/* bitsize */
 +	 FALSE,			/* pc_relative */
 +	 OP_SH_BIGIMMEDIATE,	/* bitpos */
 +	 complain_overflow_signed, /* complain_on_overflow */
 +	 _bfd_riscv_elf_generic_reloc, /* special_function */
 +	 "R_RISCV_TLS_TPREL_HI16", /* name */
 +	 TRUE,			/* partial_inplace */
-+	 ((1<<RISCV_BIGIMM_BITS)-1) << OP_SH_BIGIMMEDIATE,	/* src_mask */
++	 0,			/* src_mask */
 +	 ((1<<RISCV_BIGIMM_BITS)-1) << OP_SH_BIGIMMEDIATE,	/* dst_mask */
 +	 FALSE),		/* pcrel_offset */
 +
@@ -3886,14 +3886,14 @@ diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/bfd/elf64-riscv.c binutils-2
 +  HOWTO (R_RISCV_TLS_TPREL_LO16,	/* type */
 +	 0,			/* rightshift */
 +	 2,			/* size (0 = byte, 1 = short, 2 = long) */
-+	 RISCV_IMM_BITS,			/* bitsize */
++	 RISCV_IMM_BITS,	/* bitsize */
 +	 FALSE,			/* pc_relative */
 +	 OP_SH_IMMEDIATE,	/* bitpos */
 +	 complain_overflow_signed, /* complain_on_overflow */
 +	 _bfd_riscv_elf_generic_reloc, /* special_function */
 +	 "R_RISCV_TLS_TPREL_LO16", /* name */
 +	 TRUE,			/* partial_inplace */
-+	 (RISCV_IMM_REACH-1) << OP_SH_IMMEDIATE,	/* src_mask */
++	 0,			/* src_mask */
 +	 (RISCV_IMM_REACH-1) << OP_SH_IMMEDIATE,	/* dst_mask */
 +	 FALSE),		/* pcrel_offset */
 +
@@ -5799,9 +5799,8 @@ diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/bfd/elf64-riscv.c binutils-2
 +#include "elf64-target.h"
 diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/bfd/elfxx-riscv.c binutils-2.21.1/bfd/elfxx-riscv.c
 --- ../binutils-2.21.1-orig/bfd/elfxx-riscv.c	1969-12-31 16:00:00.000000000 -0800
-+++ binutils-2.21.1/bfd/elfxx-riscv.c	2011-10-28 05:18:11.000000000 -0700
-@@ -0,0 +1,9385 @@
-+/* vim: set ts=8 */
++++ binutils-2.21.1/bfd/elfxx-riscv.c	2011-11-01 23:35:35.000000000 -0700
+@@ -0,0 +1,9403 @@
 +/* MIPS-specific support for ELF
 +   Copyright 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002,
 +   2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010 Free Software Foundation, Inc.
@@ -6472,7 +6471,21 @@ diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/bfd/elfxx-riscv.c binutils-2
 +  (ELF32_R_INFO (s, t))
 +#endif
 +
++#define IS_STORE_RELOC(bfd, reloc, opcode) \
++  ((ELF_R_TYPE (bfd, reloc) == R_RISCV_LO16		\
++    || ELF_R_TYPE (bfd, reloc) == R_RISCV_TLS_TPREL_LO16	\
++    || ELF_R_TYPE (bfd, reloc) == R_RISCV_TLS_DTPREL_LO16)	\
++   && OPCODE_IS_STORE(opcode))
++
 +#define MATCH_LREG(abfd) (ABI_64_P(abfd) ? MATCH_LD : MATCH_LW)
++
++#define OPCODE_MATCHES(OPCODE, OP) \
++  (((OPCODE) & MASK_##OP) == MATCH_##OP)
++
++#define OPCODE_IS_STORE(OPCODE) \
++  (OPCODE_MATCHES(OPCODE, SD)  || OPCODE_MATCHES(OPCODE, SW) || \
++   OPCODE_MATCHES(OPCODE, SH)  || OPCODE_MATCHES(OPCODE, SB) || \
++   OPCODE_MATCHES(OPCODE, FSW) || OPCODE_MATCHES(OPCODE, FSD))
 +
 +/* The format of the first PLT entry.  */
 +
@@ -7228,14 +7241,25 @@ diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/bfd/elfxx-riscv.c binutils-2
 +    reloc_entry->addend += val;
 +  else
 +    {
-+      bfd_byte *location = (bfd_byte *) data + reloc_entry->address;
++      bfd_byte *loc = (bfd_byte *) data + reloc_entry->address;
++      struct reloc_howto_struct howto = *reloc_entry->howto;
 +
 +      /* Add in the separate addend, if any.  */
 +      val += reloc_entry->addend;
 +
-+      /* Add VAL to the relocation field.  */
-+      status = _bfd_relocate_contents (reloc_entry->howto, abfd, val,
-+				       location);
++      /* Fix up dst_mask and value for R_RISCV_LO16 relocs on stores. */
++      if (IS_STORE_RELOC (abfd, howto.type,
++		bfd_big_endian(abfd) ? bfd_getb32(loc) : bfd_getl32(loc)))
++	{
++	  val >>= OP_SH_IMMEDIATE;
++	  val = ((val >> RISCV_IMMLO_BITS) << OP_SH_IMMHI) |
++		((val & ((1<<RISCV_IMMLO_BITS)-1)) << OP_SH_IMMLO);
++	  howto.dst_mask = (OP_MASK_IMMHI << OP_SH_IMMHI) | 
++			   (OP_MASK_IMMLO << OP_SH_IMMLO);
++	}
++
++      /* Add VAL to the reloc field.  */
++      status = _bfd_relocate_contents (&howto, abfd, val, loc);
 +
 +      if (status != bfd_reloc_ok)
 +	return status;
@@ -9968,16 +9992,18 @@ diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/bfd/elfxx-riscv.c binutils-2
 +    case R_RISCV_TLS_DTPREL_LO16:
 +    case R_RISCV_TLS_DTPREL32:
 +    case R_RISCV_TLS_DTPREL64:
-+      value = (symbol + addend - dtprel_base (info)) & howto->dst_mask;
++      value = ((addend + symbol - dtprel_base (info))
++		<< OP_SH_IMMEDIATE) & howto->dst_mask;
 +      break;
 +
 +    case R_RISCV_TLS_TPREL_HI16:
-+      value = ((mips_elf_high (addend + symbol - tprel_base (info))
-+	        << OP_SH_BIGIMMEDIATE) & howto->dst_mask);
++      value = (mips_elf_high (addend + symbol - tprel_base (info))
++	       << OP_SH_BIGIMMEDIATE) & howto->dst_mask;
 +      break;
 +
 +    case R_RISCV_TLS_TPREL_LO16:
-+      value = (symbol + addend - tprel_base (info)) & howto->dst_mask;
++      value = ((symbol + addend - tprel_base (info))
++	        << OP_SH_IMMEDIATE) & howto->dst_mask;
 +      break;
 +
 +    case R_RISCV_HI16:
@@ -10152,21 +10178,13 @@ diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/bfd/elfxx-riscv.c binutils-2
 +  x = mips_elf_obtain_contents (howto, relocation, input_bfd, contents);
 +
 +  /* Fix up dst_mask and value for R_RISCV_LO16 relocs on stores. */
-+  if((ELF_R_TYPE (input_bfd, relocation->r_info) == R_RISCV_LO16 ||
-+      ELF_R_TYPE (input_bfd, relocation->r_info) == R_RISCV_TLS_TPREL_LO16 ||
-+      ELF_R_TYPE (input_bfd, relocation->r_info) == R_RISCV_TLS_DTPREL_LO16) &&
-+	 ((x & MASK_SD)  == MATCH_SD  ||
-+      (x & MASK_SW)  == MATCH_SW  ||
-+      (x & MASK_SH)  == MATCH_SH  ||
-+      (x & MASK_SB)  == MATCH_SB  ||
-+      (x & MASK_FSW) == MATCH_FSW ||
-+      (x & MASK_FSD) == MATCH_FSD))
-+  {
-+    value >>= OP_SH_IMMEDIATE;
-+    value = ((value >> RISCV_IMMLO_BITS) << OP_SH_IMMHI) |
-+            ((value & ((1<<RISCV_IMMLO_BITS)-1)) << OP_SH_IMMLO);
-+    dst_mask = (OP_MASK_IMMHI << OP_SH_IMMHI) | (OP_MASK_IMMLO << OP_SH_IMMLO);
-+  }
++  if (IS_STORE_RELOC (input_bfd, relocation->r_info, x))
++    {
++      value >>= OP_SH_IMMEDIATE;
++      value = ((value >> RISCV_IMMLO_BITS) << OP_SH_IMMHI) |
++	      ((value & ((1<<RISCV_IMMLO_BITS)-1)) << OP_SH_IMMLO);
++      dst_mask = (OP_MASK_IMMHI << OP_SH_IMMHI) | (OP_MASK_IMMLO << OP_SH_IMMLO);
++    }
 +
 +  /* Clear the field we are setting.  */
 +  x &= ~dst_mask;
@@ -12733,7 +12751,7 @@ diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/bfd/elfxx-riscv.c binutils-2
 +
 +  if (stub->stub_section != htab->strampoline)
 +    {
-+      /* This is a simple LUI/ADIDU stub.  Zero out the beginning
++      /* This is a simple LUI/ADDI stub.  Zero out the beginning
 +	 of the section and write the two instructions at the end.  */
 +      memset (loc, 0, offset);
 +      loc += offset;
@@ -12744,9 +12762,9 @@ diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/bfd/elfxx-riscv.c binutils-2
 +    {
 +      /* This is trampoline.  */
 +      loc += offset;
-+      bfd_put_32 (hti->output_bfd, RISCV_LTYPE (LUI, 19, RISCV_LUI_HIGH_PART(target)), loc);
-+      bfd_put_32 (hti->output_bfd, RISCV_ITYPE (ADDI, 19, 19, RISCV_CONST_LOW_PART(target)), loc + 4);
-+      bfd_put_32 (hti->output_bfd, RISCV_JTYPE (J, RISCV_JUMP_TARGET(target)), loc + 8);
++      bfd_put_32 (hti->output_bfd, RISCV_LTYPE (LUI, 18, RISCV_LUI_HIGH_PART(target)), loc);
++      bfd_put_32 (hti->output_bfd, RISCV_ITYPE (ADDI, 19, 18, RISCV_CONST_LOW_PART(target)), loc + 4);
++      bfd_put_32 (hti->output_bfd, RISCV_ITYPE (JALR_J, 0, 18, RISCV_CONST_LOW_PART(target)), loc + 8);
 +      bfd_put_32 (hti->output_bfd, 0, loc + 12);
 +    }
 +  return TRUE;
@@ -15425,7 +15443,7 @@ diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/config.sub binutils-2.21.1/c
  	# because (1) that's what they normally are, and
 diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/gas/config/tc-riscv.c binutils-2.21.1/gas/config/tc-riscv.c
 --- ../binutils-2.21.1-orig/gas/config/tc-riscv.c	1969-12-31 16:00:00.000000000 -0800
-+++ binutils-2.21.1/gas/config/tc-riscv.c	2011-10-22 22:13:39.000000000 -0700
++++ binutils-2.21.1/gas/config/tc-riscv.c	2011-11-01 20:58:24.000000000 -0700
 @@ -0,0 +1,4942 @@
 +/* tc-mips.c -- assemble code for a MIPS chip.
 +   Copyright 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002,
@@ -15525,15 +15543,6 @@ diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/gas/config/tc-riscv.c binuti
 +#endif
 +
 +extern int target_big_endian;
-+
-+/* The name of the readonly data section.  */
-+#define RDATA_SECTION_NAME (OUTPUT_FLAVOR == bfd_target_ecoff_flavour \
-+			    ? ".rdata" \
-+			    : OUTPUT_FLAVOR == bfd_target_coff_flavour \
-+			    ? ".rdata" \
-+			    : OUTPUT_FLAVOR == bfd_target_elf_flavour \
-+			    ? ".rodata" \
-+			    : (abort (), ""))
 +
 +/* Information about an instruction, including its format, operands
 +   and fixups.  */
@@ -15771,8 +15780,16 @@ diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/gas/config/tc-riscv.c binuti
 +  EXTRACT_BITS ((INSN).insn_opcode, OP_MASK_##FIELD, OP_SH_##FIELD)
 +
 +/* Determine if an instruction matches an opcode. */
++#define OPCODE_MATCHES(OPCODE, OP) \
++  (((OPCODE) & MASK_##OP) == MATCH_##OP)
++
 +#define INSN_MATCHES(INSN, OP) \
 +  (((INSN).insn_opcode & MASK_##OP) == MATCH_##OP)
++
++#define OPCODE_IS_STORE(OPCODE) \
++  (OPCODE_MATCHES(OPCODE, SD)  || OPCODE_MATCHES(OPCODE, SW) || \
++   OPCODE_MATCHES(OPCODE, SH)  || OPCODE_MATCHES(OPCODE, SB) || \
++   OPCODE_MATCHES(OPCODE, FSW) || OPCODE_MATCHES(OPCODE, FSD))
 +
 +/* Prototypes for static functions.  */
 +
@@ -16950,17 +16967,15 @@ diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/gas/config/tc-riscv.c binuti
 +	    case BFD_RELOC_UNUSED:
 +	    case BFD_RELOC_LO16:
 +	    case BFD_RELOC_MIPS_GOT_DISP:
-+	      // handle stores specially (split immediate)
-+        if(INSN_MATCHES(*ip, SD)  || INSN_MATCHES(*ip, SW) ||
-+           INSN_MATCHES(*ip, SH)  || INSN_MATCHES(*ip, SB) ||
-+           INSN_MATCHES(*ip, FSW) || INSN_MATCHES(*ip, FSD))
-+	      {
-+	        int value = address_expr->X_add_number & (RISCV_IMM_REACH-1);
-+	        value = ((value >> RISCV_IMMLO_BITS) << OP_SH_IMMHI) |
-+	                ((value & ((1<<RISCV_IMMLO_BITS)-1)) << OP_SH_IMMLO);
-+	        ip->insn_opcode |= value;
-+	      }
-+          else
++		  /* Stores have a split immediate field. */
++	      if (OPCODE_IS_STORE(ip->insn_opcode))
++		{
++		  int value = address_expr->X_add_number & (RISCV_IMM_REACH-1);
++		  value = ((value >> RISCV_IMMLO_BITS) << OP_SH_IMMHI) |
++		          ((value & ((1<<RISCV_IMMLO_BITS)-1)) << OP_SH_IMMLO);
++		  ip->insn_opcode |= value;
++		}
++	      else
 +	        ip->insn_opcode |= (address_expr->X_add_number & (RISCV_IMM_REACH-1)) << OP_SH_IMMEDIATE;
 +	      break;
 +
@@ -18734,20 +18749,24 @@ diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/gas/config/tc-riscv.c binuti
 +
 +    case BFD_RELOC_LO16:
 +    case BFD_RELOC_MIPS16_LO16:
-+      /* FIXME: Now that embedded-PIC is gone, some of this code/comment
-+	 may be safe to remove, but if so it's not obvious.  */
-+      /* When handling an embedded PIC switch statement, we can wind
-+	 up deleting a LO16 reloc.  See the 'o' case in mips_ip.  */
-+      if (fixP->fx_done)
++      if (!fixP->fx_done)
++	break;
++
++      if (*valP + RISCV_IMM_REACH/2 > RISCV_IMM_REACH-1)
++        as_bad_where (fixP->fx_file, fixP->fx_line,
++		      _("relocation overflow"));
++
++      if (OPCODE_IS_STORE(insn)) /* Stores have a split immediate field. */
 +	{
-+	  if (*valP + RISCV_IMM_REACH/2 > RISCV_IMM_REACH-1)
-+	    as_bad_where (fixP->fx_file, fixP->fx_line,
-+			  _("relocation overflow"));
-+	  if (target_big_endian)
-+	    buf += 2;
-+	  insn |= (*valP & ((1<<RISCV_IMM_BITS)-1)) << OP_SH_IMMEDIATE;
-+	  md_number_to_chars ((char *) buf, insn, 4);
++	  valueT value = *valP & (RISCV_IMM_REACH-1);
++	  value = ((value >> RISCV_IMMLO_BITS) << OP_SH_IMMHI) |
++	          ((value & ((1<<RISCV_IMMLO_BITS)-1)) << OP_SH_IMMLO);
++	  insn |= value;
 +	}
++      else
++	insn |= (*valP & ((1<<RISCV_IMM_BITS)-1)) << OP_SH_IMMEDIATE;
++
++      md_number_to_chars ((char *) buf, insn, 4);
 +      break;
 +
 +    case BFD_RELOC_MIPS_JMP:
@@ -18945,8 +18964,7 @@ diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/gas/config/tc-riscv.c binuti
 +      break;
 +
 +    case 'r':
-+      seg = subseg_new (RDATA_SECTION_NAME,
-+			(subsegT) get_absolute_expression ());
++      seg = subseg_new (".rodata", (subsegT) get_absolute_expression ());
 +      if (IS_ELF)
 +	{
 +	  bfd_set_section_flags (stdoutput, seg, (SEC_ALLOC | SEC_LOAD

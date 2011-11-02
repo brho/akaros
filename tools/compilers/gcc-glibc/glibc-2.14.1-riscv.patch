@@ -17,8 +17,8 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/a
 +#define ABORT_INSTRUCTION asm ("unimp")
 diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/bits/atomic.h glibc-2.14.1/sysdeps/riscv/bits/atomic.h
 --- ../glibc-2.14.1-orig/sysdeps/riscv/bits/atomic.h	1969-12-31 16:00:00.000000000 -0800
-+++ glibc-2.14.1/sysdeps/riscv/bits/atomic.h	2011-10-25 02:48:44.000000000 -0700
-@@ -0,0 +1,178 @@
++++ glibc-2.14.1/sysdeps/riscv/bits/atomic.h	2011-11-01 23:44:42.000000000 -0700
+@@ -0,0 +1,177 @@
 +/* Low-level functions for atomic operations. Mips version.
 +   Copyright (C) 2005 Free Software Foundation, Inc.
 +   This file is part of the GNU C Library.
@@ -67,8 +67,7 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/b
 +  (".gnu.linkonce.b.__riscv_atomic_lock, \"aw\", %nobits");
 +
 +volatile int __riscv_atomic_lock
-+  __attribute__ ((nocommon, section (".gnu.linkonce.b.__riscv_atomic_lock"
-+				     __sec_comment),
++  __attribute__ ((nocommon, section(".gnu.linkonce.b.__riscv_atomic_lock\n\t#"),
 +		  visibility ("hidden")));
 +
 +#define __riscv_atomic_do_lock(addr) ({ \
@@ -642,7 +641,7 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/b
 +#endif	/* GCC.  */
 diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/bits/setjmp.h glibc-2.14.1/sysdeps/riscv/bits/setjmp.h
 --- ../glibc-2.14.1-orig/sysdeps/riscv/bits/setjmp.h	1969-12-31 16:00:00.000000000 -0800
-+++ glibc-2.14.1/sysdeps/riscv/bits/setjmp.h	2011-10-25 02:48:44.000000000 -0700
++++ glibc-2.14.1/sysdeps/riscv/bits/setjmp.h	2011-11-02 01:20:35.000000000 -0700
 @@ -0,0 +1,47 @@
 +/* Define the machine-dependent type `jmp_buf'.  RISC-V version.
 +   Copyright (C) 1992,1993,1995,1997,2000,2002,2003,2004,2005,2006
@@ -687,7 +686,7 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/b
 +    /* Callee-saved floating point registers.
 +       Note that there are an even number of preceding words in this struct,
 +       so no padding will be inserted before __fpregs, even for RV32. */
-+    double __fpregs[8];
++    double __fpregs[10];
 +  } __jmp_buf[1];
 +
 +#endif /* _RISCV_BITS_SETJMP_H */
@@ -5555,8 +5554,8 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/l
 +#endif
 diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/__longjmp.S glibc-2.14.1/sysdeps/riscv/__longjmp.S
 --- ../glibc-2.14.1-orig/sysdeps/riscv/__longjmp.S	1969-12-31 16:00:00.000000000 -0800
-+++ glibc-2.14.1/sysdeps/riscv/__longjmp.S	2011-10-25 02:48:44.000000000 -0700
-@@ -0,0 +1,57 @@
++++ glibc-2.14.1/sysdeps/riscv/__longjmp.S	2011-11-02 01:24:15.000000000 -0700
+@@ -0,0 +1,59 @@
 +/* Copyright (C) 1996, 1997, 2000, 2002, 2003, 2004
 +	Free Software Foundation, Inc.
 +   This file is part of the GNU C Library.
@@ -5597,20 +5596,22 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/_
 +#ifdef __riscv_hard_float
 +	REG_L t0, 13*SZREG(a0)
 +
-+	fld  fs0, 14*SZREG(a0)
-+	fld  fs1, 15*SZREG(a0)
-+	fld  fs2, 16*SZREG(a0)
-+	fld  fs3, 17*SZREG(a0)
-+	fld  fs4, 18*SZREG(a0)
-+	fld  fs5, 19*SZREG(a0)
-+	fld  fs6, 20*SZREG(a0)
-+	fld  fs7, 21*SZREG(a0)
++	fld  fs0, 8*0 + 14*SZREG(a0)
++	fld  fs1, 8*1 + 14*SZREG(a0)
++	fld  fs2, 8*2 + 14*SZREG(a0)
++	fld  fs3, 8*3 + 14*SZREG(a0)
++	fld  fs4, 8*4 + 14*SZREG(a0)
++	fld  fs5, 8*5 + 14*SZREG(a0)
++	fld  fs6, 8*6 + 14*SZREG(a0)
++	fld  fs7, 8*7 + 14*SZREG(a0)
++	fld  fs8, 8*8 + 14*SZREG(a0)
++	fld  fs9, 8*9 + 14*SZREG(a0)
 +
 +	mtfsr t0
 +#endif
 +
-+	sltu t0, a1, 1  # t0 = (a1 == 0)
-+	add  v0, t0, a1 # v0 = (a1 == 0 ? 1 : a1)
++	sltu t0, a1, 1    # t0 = (a1 == 0)
++	add  v0, t0, a1   # v0 = (a1 == 0 ? 1 : a1)
 +	ret
 +
 +END(__longjmp)
@@ -7574,8 +7575,8 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/r
 +}
 diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/setjmp.S glibc-2.14.1/sysdeps/riscv/setjmp.S
 --- ../glibc-2.14.1-orig/sysdeps/riscv/setjmp.S	1969-12-31 16:00:00.000000000 -0800
-+++ glibc-2.14.1/sysdeps/riscv/setjmp.S	2011-10-25 02:48:44.000000000 -0700
-@@ -0,0 +1,73 @@
++++ glibc-2.14.1/sysdeps/riscv/setjmp.S	2011-11-02 01:21:55.000000000 -0700
+@@ -0,0 +1,75 @@
 +/* Copyright (C) 1996, 1997, 2000, 2002, 2003, 2004
 +	Free Software Foundation, Inc.
 +   This file is part of the GNU C Library.
@@ -7632,6 +7633,8 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/s
 +  fsd  fs5, 8*5 + 14*SZREG(a0)
 +  fsd  fs6, 8*6 + 14*SZREG(a0)
 +  fsd  fs7, 8*7 + 14*SZREG(a0)
++  fsd  fs8, 8*8 + 14*SZREG(a0)
++  fsd  fs9, 8*9 + 14*SZREG(a0)
 +
 +  REG_S t0, 13*SZREG(a0)
 +#endif
@@ -11444,8 +11447,8 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/unix/sy
 +#endif
 diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/unix/sysv/linux/riscv/getcontext.S glibc-2.14.1/sysdeps/unix/sysv/linux/riscv/getcontext.S
 --- ../glibc-2.14.1-orig/sysdeps/unix/sysv/linux/riscv/getcontext.S	1969-12-31 16:00:00.000000000 -0800
-+++ glibc-2.14.1/sysdeps/unix/sysv/linux/riscv/getcontext.S	2011-10-27 22:24:14.000000000 -0700
-@@ -0,0 +1,81 @@
++++ glibc-2.14.1/sysdeps/unix/sysv/linux/riscv/getcontext.S	2011-11-02 01:26:28.000000000 -0700
+@@ -0,0 +1,83 @@
 +/* Save current context.
 +   Copyright (C) 2009 Free Software Foundation, Inc.
 +   This file is part of the GNU C Library.
@@ -11497,14 +11500,16 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/unix/sy
 +#ifdef __riscv_hard_float
 +  mffsr v1
 +
-+	fsd	fs0, (24 * 8 + MCONTEXT_FPREGS)(a0)
-+	fsd	fs1, (25 * 8 + MCONTEXT_FPREGS)(a0)
-+	fsd	fs2, (26 * 8 + MCONTEXT_FPREGS)(a0)
-+	fsd	fs3, (27 * 8 + MCONTEXT_FPREGS)(a0)
-+	fsd	fs4, (28 * 8 + MCONTEXT_FPREGS)(a0)
-+	fsd	fs5, (29 * 8 + MCONTEXT_FPREGS)(a0)
-+	fsd	fs6, (30 * 8 + MCONTEXT_FPREGS)(a0)
-+	fsd	fs7, (31 * 8 + MCONTEXT_FPREGS)(a0)
++	fsd	fs0, (20 * 8 + MCONTEXT_FPREGS)(a0)
++	fsd	fs1, (21 * 8 + MCONTEXT_FPREGS)(a0)
++	fsd	fs2, (22 * 8 + MCONTEXT_FPREGS)(a0)
++	fsd	fs3, (23 * 8 + MCONTEXT_FPREGS)(a0)
++	fsd	fs4, (24 * 8 + MCONTEXT_FPREGS)(a0)
++	fsd	fs5, (25 * 8 + MCONTEXT_FPREGS)(a0)
++	fsd	fs6, (26 * 8 + MCONTEXT_FPREGS)(a0)
++	fsd	fs7, (27 * 8 + MCONTEXT_FPREGS)(a0)
++	fsd	fs8, (28 * 8 + MCONTEXT_FPREGS)(a0)
++	fsd	fs9, (29 * 8 + MCONTEXT_FPREGS)(a0)
 +
 +	sw	v1, MCONTEXT_FSR(a0)
 +#endif /* __mips_hard_float */
@@ -14230,8 +14235,8 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/unix/sy
 +weak_alias (__umount, umount);
 diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/unix/sysv/linux/riscv/setcontext.S glibc-2.14.1/sysdeps/unix/sysv/linux/riscv/setcontext.S
 --- ../glibc-2.14.1-orig/sysdeps/unix/sysv/linux/riscv/setcontext.S	1969-12-31 16:00:00.000000000 -0800
-+++ glibc-2.14.1/sysdeps/unix/sysv/linux/riscv/setcontext.S	2011-10-27 22:24:24.000000000 -0700
-@@ -0,0 +1,129 @@
++++ glibc-2.14.1/sysdeps/unix/sysv/linux/riscv/setcontext.S	2011-11-02 01:26:08.000000000 -0700
+@@ -0,0 +1,131 @@
 +/* Set current context.
 +   Copyright (C) 2009 Free Software Foundation, Inc.
 +   This file is part of the GNU C Library.
@@ -14286,14 +14291,16 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/unix/sy
 +#ifdef __riscv_hard_float
 +	lw	v1, MCONTEXT_FSR(v0)
 +
-+	fld	fs0, (24 * 8 + MCONTEXT_FPREGS)(v0)
-+	fld	fs1, (25 * 8 + MCONTEXT_FPREGS)(v0)
-+	fld	fs2, (26 * 8 + MCONTEXT_FPREGS)(v0)
-+	fld	fs3, (27 * 8 + MCONTEXT_FPREGS)(v0)
-+	fld	fs4, (28 * 8 + MCONTEXT_FPREGS)(v0)
-+	fld	fs5, (29 * 8 + MCONTEXT_FPREGS)(v0)
-+	fld	fs6, (30 * 8 + MCONTEXT_FPREGS)(v0)
-+	fld	fs7, (31 * 8 + MCONTEXT_FPREGS)(v0)
++	fld	fs0, (20 * 8 + MCONTEXT_FPREGS)(v0)
++	fld	fs1, (21 * 8 + MCONTEXT_FPREGS)(v0)
++	fld	fs2, (22 * 8 + MCONTEXT_FPREGS)(v0)
++	fld	fs3, (23 * 8 + MCONTEXT_FPREGS)(v0)
++	fld	fs4, (24 * 8 + MCONTEXT_FPREGS)(v0)
++	fld	fs5, (25 * 8 + MCONTEXT_FPREGS)(v0)
++	fld	fs6, (26 * 8 + MCONTEXT_FPREGS)(v0)
++	fld	fs7, (27 * 8 + MCONTEXT_FPREGS)(v0)
++	fld	fs8, (28 * 8 + MCONTEXT_FPREGS)(v0)
++	fld	fs9, (29 * 8 + MCONTEXT_FPREGS)(v0)
 +
 +	mtfsr	v1
 +#endif /* __mips_hard_float */
@@ -14744,8 +14751,8 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/unix/sy
 +PSEUDO_END (__start_context)
 diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/unix/sysv/linux/riscv/swapcontext.S glibc-2.14.1/sysdeps/unix/sysv/linux/riscv/swapcontext.S
 --- ../glibc-2.14.1-orig/sysdeps/unix/sysv/linux/riscv/swapcontext.S	1969-12-31 16:00:00.000000000 -0800
-+++ glibc-2.14.1/sysdeps/unix/sysv/linux/riscv/swapcontext.S	2011-10-27 22:24:08.000000000 -0700
-@@ -0,0 +1,127 @@
++++ glibc-2.14.1/sysdeps/unix/sysv/linux/riscv/swapcontext.S	2011-11-02 01:25:30.000000000 -0700
+@@ -0,0 +1,131 @@
 +/* Save and set current context.
 +   Copyright (C) 2009 Free Software Foundation, Inc.
 +   This file is part of the GNU C Library.
@@ -14796,14 +14803,16 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/unix/sy
 +#ifdef __riscv_hard_float
 +  mffsr v1
 +
-+	fsd	fs0, (24 * 8 + MCONTEXT_FPREGS)(a0)
-+	fsd	fs1, (25 * 8 + MCONTEXT_FPREGS)(a0)
-+	fsd	fs2, (26 * 8 + MCONTEXT_FPREGS)(a0)
-+	fsd	fs3, (27 * 8 + MCONTEXT_FPREGS)(a0)
-+	fsd	fs4, (28 * 8 + MCONTEXT_FPREGS)(a0)
-+	fsd	fs5, (29 * 8 + MCONTEXT_FPREGS)(a0)
-+	fsd	fs6, (30 * 8 + MCONTEXT_FPREGS)(a0)
-+	fsd	fs7, (31 * 8 + MCONTEXT_FPREGS)(a0)
++	fsd	fs0, (20 * 8 + MCONTEXT_FPREGS)(a0)
++	fsd	fs1, (21 * 8 + MCONTEXT_FPREGS)(a0)
++	fsd	fs2, (22 * 8 + MCONTEXT_FPREGS)(a0)
++	fsd	fs3, (23 * 8 + MCONTEXT_FPREGS)(a0)
++	fsd	fs4, (24 * 8 + MCONTEXT_FPREGS)(a0)
++	fsd	fs5, (25 * 8 + MCONTEXT_FPREGS)(a0)
++	fsd	fs6, (26 * 8 + MCONTEXT_FPREGS)(a0)
++	fsd	fs7, (27 * 8 + MCONTEXT_FPREGS)(a0)
++	fsd	fs8, (28 * 8 + MCONTEXT_FPREGS)(a0)
++	fsd	fs9, (29 * 8 + MCONTEXT_FPREGS)(a0)
 +
 +	sw	v1, MCONTEXT_FSR(a0)
 +#endif /* __mips_hard_float */
@@ -14827,14 +14836,16 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/unix/sy
 +#ifdef __riscv_hard_float
 +	lw	v1, MCONTEXT_FSR(v0)
 +
-+	fld	fs0, (24 * 8 + MCONTEXT_FPREGS)(v0)
-+	fld	fs1, (25 * 8 + MCONTEXT_FPREGS)(v0)
-+	fld	fs2, (26 * 8 + MCONTEXT_FPREGS)(v0)
-+	fld	fs3, (27 * 8 + MCONTEXT_FPREGS)(v0)
-+	fld	fs4, (28 * 8 + MCONTEXT_FPREGS)(v0)
-+	fld	fs5, (29 * 8 + MCONTEXT_FPREGS)(v0)
-+	fld	fs6, (30 * 8 + MCONTEXT_FPREGS)(v0)
-+	fld	fs7, (31 * 8 + MCONTEXT_FPREGS)(v0)
++	fld	fs0, (20 * 8 + MCONTEXT_FPREGS)(v0)
++	fld	fs1, (21 * 8 + MCONTEXT_FPREGS)(v0)
++	fld	fs2, (22 * 8 + MCONTEXT_FPREGS)(v0)
++	fld	fs3, (23 * 8 + MCONTEXT_FPREGS)(v0)
++	fld	fs4, (24 * 8 + MCONTEXT_FPREGS)(v0)
++	fld	fs5, (25 * 8 + MCONTEXT_FPREGS)(v0)
++	fld	fs6, (26 * 8 + MCONTEXT_FPREGS)(v0)
++	fld	fs7, (27 * 8 + MCONTEXT_FPREGS)(v0)
++	fld	fs8, (28 * 8 + MCONTEXT_FPREGS)(v0)
++	fld	fs9, (29 * 8 + MCONTEXT_FPREGS)(v0)
 +
 +	mtfsr	v1
 +#endif /* __mips_hard_float */

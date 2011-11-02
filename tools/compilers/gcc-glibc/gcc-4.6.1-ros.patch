@@ -298,7 +298,7 @@ diff -ruN orig-src/gcc-4.6.1/gcc/config.gcc gcc-4.6.1/gcc/config.gcc
 +	tmake_file="${tmake_file} t-slibgcc-elf-ver t-linux i386/t-fprules-softfp soft-fp/t-softfp i386/t-linux"
 +	;;
 +riscv*-*-ros*)
-+	tm_file="${tm_file} dbxelf.h elfos.h gnu-user.h ros.h riscv/ros.h riscv/ros64.h glibc-stdint.h"
++	tm_file="dbxelf.h elfos.h gnu-user.h ros.h ${tm_file} riscv/ros.h riscv/ros64.h glibc-stdint.h"
 +	tmake_file="${tmake_file} t-slibgcc-elf-ver t-linux"
 +	;;
  x86_64-*-elf*)

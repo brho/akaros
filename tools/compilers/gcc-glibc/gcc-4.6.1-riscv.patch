@@ -1322,8 +1322,8 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +  (match_code "eq,lt,le,gt,ge"))
 diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/riscv/riscv.c gcc-4.6.1/gcc/config/riscv/riscv.c
 --- ../gcc-4.6.1-orig/gcc/config/riscv/riscv.c	1969-12-31 16:00:00.000000000 -0800
-+++ gcc-4.6.1/gcc/config/riscv/riscv.c	2011-10-22 17:02:49.000000000 -0700
-@@ -0,0 +1,7604 @@
++++ gcc-4.6.1/gcc/config/riscv/riscv.c	2011-11-01 22:28:20.000000000 -0700
+@@ -0,0 +1,7599 @@
 +/* vim: set ts=8: */
 +/* Subroutines used for MIPS code generation.
 +   Copyright (C) 1989, 1990, 1991, 1993, 1994, 1995, 1996, 1997, 1998,
@@ -8492,14 +8492,9 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +    mips_branch_cost = mips_cost->branch_cost;
 +
 +  if (flag_pic)
-+    {
-+      target_flags |= MASK_ABICALLS;
-+
-+      if (!flag_pie)
-+	target_flags |= MASK_SHARED;
-+    }
-+  else if (TARGET_ABICALLS_PIC2 && !flag_pic)
-+    flag_pic = flag_shlib = 1;
++    target_flags |= MASK_ABICALLS;
++  else
++    TARGET_SHARED = 0;
 +
 +  /* Prefer a call to memcpy over inline code when optimizing for size,
 +     though see MOVE_RATIO in mips.h.  */
@@ -9060,8 +9055,8 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +DEF_MIPS_FTYPE (2, (VOID, V4QI, V4QI))
 diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/riscv/riscv.h gcc-4.6.1/gcc/config/riscv/riscv.h
 --- ../gcc-4.6.1-orig/gcc/config/riscv/riscv.h	1969-12-31 16:00:00.000000000 -0800
-+++ gcc-4.6.1/gcc/config/riscv/riscv.h	2011-10-22 19:22:40.000000000 -0700
-@@ -0,0 +1,2017 @@
++++ gcc-4.6.1/gcc/config/riscv/riscv.h	2011-11-01 22:20:08.000000000 -0700
+@@ -0,0 +1,2014 @@
 +/* vim: set ts=8: */
 +/* Definitions of target machine for GNU compiler.  MIPS version.
 +   Copyright (C) 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998
@@ -10907,9 +10902,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +#define TEXT_SECTION_ASM_OP	"\t.text"	/* instructions */
 +#define DATA_SECTION_ASM_OP	"\t.data"	/* large data */
 +
-+#undef READONLY_DATA_SECTION_ASM_OP
-+#define READONLY_DATA_SECTION_ASM_OP	"\t.rdata"	/* read-only data */
-+
 +#define ASM_OUTPUT_REG_PUSH(STREAM,REGNO)				\
 +do									\
 +  {									\
@@ -14652,7 +14644,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +#define  MASK_SD 0x3ff
 diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/riscv/riscv.opt gcc-4.6.1/gcc/config/riscv/riscv.opt
 --- ../gcc-4.6.1-orig/gcc/config/riscv/riscv.opt	1969-12-31 16:00:00.000000000 -0800
-+++ gcc-4.6.1/gcc/config/riscv/riscv.opt	2011-10-22 17:02:09.000000000 -0700
++++ gcc-4.6.1/gcc/config/riscv/riscv.opt	2011-11-01 21:51:56.000000000 -0700
 @@ -0,0 +1,206 @@
 +; Options for the MIPS port of the compiler
 +;
@@ -14815,7 +14807,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +Try to allow the linker to turn PIC calls into direct calls
 +
 +mshared
-+Target Report Mask(SHARED)
++Target Report Var(TARGET_SHARED) Init(1)
 +When generating -mabicalls code, make the code suitable for use in shared libraries
 +
 +msingle-float
@@ -15130,7 +15122,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +#define LINUX_DYNAMIC_LINKER64 GLIBC_DYNAMIC_LINKER64
 diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/riscv/ros.h gcc-4.6.1/gcc/config/riscv/ros.h
 --- ../gcc-4.6.1-orig/gcc/config/riscv/ros.h	1969-12-31 16:00:00.000000000 -0800
-+++ gcc-4.6.1/gcc/config/riscv/ros.h	2011-10-24 17:57:49.000000000 -0700
++++ gcc-4.6.1/gcc/config/riscv/ros.h	2011-11-01 22:15:05.000000000 -0700
 @@ -0,0 +1,9 @@
 +#include "linux.h"
 +
