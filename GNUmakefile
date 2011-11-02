@@ -130,7 +130,7 @@ endif
 # -fno-builtin is required to avoid refs to undefined functions in the kernel.
 # Only optimize to -O1 to discourage inlining, which complicates backtraces.
 KERN_CFLAGS += -D$(TARGET_ARCH) $(EXTRAARGS)
-KERN_CFLAGS += -O2 -pipe -MD -fno-builtin -gstabs
+KERN_CFLAGS += -O2 -pipe -MD -fno-builtin -gstabs -static
 KERN_CFLAGS += -Wall -Wno-format -Wno-unused -fno-strict-aliasing
 KERN_CFLAGS += -nostdinc -I$(dir $(GCC_LIB))/include
 
