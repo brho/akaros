@@ -22,7 +22,7 @@ void *thread(void* arg)
 		//printf_safe("[A] pthread %d on vcore %d\n", pthread_self()->id, vcore_id());
 		pthread_barrier_wait(&barrier);
 	}
-	return (void*)(pthread_self()->id);
+	return (void*)(long)pthread_self()->id;
 }
 
 int main(int argc, char** argv) 
