@@ -19,9 +19,16 @@ uc = $(shell echo $(1) | tr a-z A-Z)
 LIBUCNAME := $(call uc, $(LIBNAME))
 HEADERS := $(shell find $(INCDIR) -name *.h)
 CFILES  := $(wildcard $(SRCDIR)*.c)
-OBJS    := $(patsubst %.c, $(OBJDIR)/%.o, $(CFILES))
+SFILES  := $(wildcard $(SRCDIR)$(TARGET_ARCH)/*.S)
+OBJS    := $(patsubst %.c, $(OBJDIR)/%.o, $(CFILES)) \
+           $(patsubst %.S, $(OBJDIR)/%.o, $(SFILES))
 
 all: $(FINALLIB)
+
+$(OBJDIR)/$(TARGET_ARCH)/%.o: $(SRCDIR)$(TARGET_ARCH)/%.S $(HEADERS)
+	@echo + as [$(LIBUCNAME)] $<
+	@mkdir -p $(@D)
+	$(V)$(CC) $(CFLAGS) $(INCS) -o $@ -c $<
 
 $(OBJDIR)/%.o: $(SRCDIR)%.c $(HEADERS)
 	@echo + cc [$(LIBUCNAME)] $<

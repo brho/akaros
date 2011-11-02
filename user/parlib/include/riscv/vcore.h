@@ -32,9 +32,51 @@ static inline void set_tls_desc(void *tls_desc, uint32_t vcoreid)
 	__vcoreid = vcoreid;
 }
 
-extern void __pop_ros_tf(struct user_trapframe *tf, bool* notif_enabled_p,
-                         bool* notif_pending_p, uint32_t vcoreid);
-extern void __save_ros_tf(struct user_trapframe *tf);
+/* Register saves and restores happen in asm. */
+void __pop_ros_tf_regs(struct user_trapframe *tf, struct preempt_data* vcpd,
+                    uint32_t vcoreid, void* helper) __attribute__((noreturn));
+void __save_ros_tf_regs(struct user_trapframe *tf);
+
+/* Helper function that may handle notifications after re-enabling them. */
+static void __pop_ros_tf_notifs(struct user_trapframe *tf,
+                                struct preempt_data* vcpd, uint32_t vcoreid)
+{
+	vcpd->notif_enabled = true;
+
+	__sync_synchronize();
+
+	if(vcpd->notif_pending)
+		ros_syscall(SYS_self_notify, vcoreid, 0, 0, 0, 0, 0);
+}
+
+/* Helper function that won't handle notifications after re-enabling them. */
+static void __pop_ros_tf_notifs_raw(struct user_trapframe *tf,
+                                    struct preempt_data* vcpd, uint32_t vcoreid)
+{
+	vcpd->notif_enabled = true;
+}
+
+static inline void __pop_ros_tf(struct user_trapframe *tf, uint32_t vcoreid,
+                                void* helper)
+{
+	// since we're changing the stack, move stuff into regs for now
+	register uint32_t _vcoreid = vcoreid;
+	register struct user_trapframe* _tf = tf;
+
+	set_stack_pointer((void*)tf->gpr[30]);
+
+	tf = _tf;
+	vcoreid = _vcoreid;
+	struct preempt_data* vcpd = &__procdata.vcore_preempt_data[vcoreid];
+
+	// if this is a trap frame we just init'ed, we need to set up TLS
+	if(tf->gpr[31] == 0)
+		tf->gpr[31] = (long)get_tls_desc(vcoreid);
+	else
+		assert(tf->gpr[31] == (long)get_tls_desc(vcoreid));
+
+	__pop_ros_tf_regs(tf, vcpd, vcoreid, helper);
+}
 
 /* Pops an ROS kernel-provided TF, reanabling notifications at the same time.
  * A Userspace scheduler can call this when transitioning off the transition
@@ -51,46 +93,14 @@ extern void __save_ros_tf(struct user_trapframe *tf);
  * running. */
 static inline void pop_ros_tf(struct user_trapframe *tf, uint32_t vcoreid)
 {
-	// since we're changing the stack, move stuff into regs for now
-	register uint32_t _vcoreid = vcoreid;
-	register struct user_trapframe* _tf = tf;
-
-	set_stack_pointer((void*)tf->gpr[30]);
-
-	tf = _tf;
-	vcoreid = _vcoreid;
-	struct preempt_data* vcpd = &__procdata.vcore_preempt_data[vcoreid];
-
-	// if this is a trap frame we just init'ed, we need to set up TLS
-	if(tf->gpr[31] == 0)
-		tf->gpr[31] = (long)get_tls_desc(vcoreid);
-	else
-		assert(tf->gpr[31] == (long)get_tls_desc(vcoreid));
-
-	__pop_ros_tf(tf, &vcpd->notif_enabled, &vcpd->notif_pending, vcoreid);
+	__pop_ros_tf(tf, vcoreid, &__pop_ros_tf_notifs);
 }
 
 /* Like the regular pop_ros_tf, but this one doesn't check or clear
- * notif_pending.  TODO: someone from sparc should look at this. */
+ * notif_pending. */
 static inline void pop_ros_tf_raw(struct user_trapframe *tf, uint32_t vcoreid)
 {
-	// since we're changing the stack, move stuff into regs for now
-	register uint32_t _vcoreid = vcoreid;
-	register struct user_trapframe* _tf = tf;
-
-	set_stack_pointer((void*)tf->gpr[30]);
-
-	tf = _tf;
-	vcoreid = _vcoreid;
-	struct preempt_data* vcpd = &__procdata.vcore_preempt_data[vcoreid];
-
-	// if this is a trap frame we just init'ed, we need to set up TLS
-	if(tf->gpr[31] == 0)
-		tf->gpr[31] = (long)get_tls_desc(vcoreid);
-	else
-		assert(tf->gpr[31] == (long)get_tls_desc(vcoreid));
-
-	__pop_ros_tf(tf, &vcpd->notif_enabled, 0, 0);
+	__pop_ros_tf(tf, vcoreid, &__pop_ros_tf_notifs_raw);
 }
 
 /* Save the current context/registers into the given tf, setting the pc of the
@@ -98,12 +108,12 @@ static inline void pop_ros_tf_raw(struct user_trapframe *tf, uint32_t vcoreid)
  * restore with pop_ros_tf(). */
 static inline void save_ros_tf(struct user_trapframe *tf)
 {
-	__save_ros_tf(tf);
+	__save_ros_tf_regs(tf);
 }
 
 /* This assumes a user_tf looks like a regular kernel trapframe */
 static __inline void
-init_user_tf(struct user_trapframe *u_tf, uint32_t entry_pt, uint32_t stack_top)
+init_user_tf(struct user_trapframe *u_tf, long entry_pt, long stack_top)
 {
 	memset(u_tf, 0, sizeof(*u_tf));
 	u_tf->gpr[30] = stack_top;

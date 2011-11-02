@@ -8,33 +8,44 @@
 #include <stdio.h>
 
 #define DECL_BITMASK(name, size) \
-	unsigned long (name)[WORDS_FOR_BITMASK((size))]
+	uint8_t (name)[BYTES_FOR_BITMASK((size))]
 
-#define BPW (CHAR_BIT*sizeof(long))
-#define WORDS_FOR_BITMASK(size) (((size)-1) / BPW + 1)
-#define BYTES_FOR_BITMASK(size) (WORDS_FOR_BITMASK * sizeof(long))
+#define BYTES_FOR_BITMASK(size) \
+	(((size) - 1) / 8 + 1)
 
 #define BYTES_FOR_BITMASK_WITH_CHECK(size) \
-	((size) ? BYTES_FOR_BITMASK(size) : (0))
+	((size) ? ((size) - (1)) / (8) + (1) : (0))
 
-static bool GET_BITMASK_BIT(unsigned long* name, size_t bit) 
+static bool GET_BITMASK_BIT(uint8_t* name, size_t bit) 
 {
-	return (((name)[(bit)/BPW] & (1 << ((bit) % BPW))) ? 1 : 0);
+	return (((name)[(bit)/8] & (1 << ((bit) % 8))) ? 1 : 0);
 }
 
 #define SET_BITMASK_BIT(name, bit) \
-	((name)[(bit)/BPW] |= (1 << ((bit) % BPW)));
+	((name)[(bit)/8] |= (1 << ((bit) % 8)));
+/*
+static void SET_BITMASK_BIT(uint8_t* name, size_t bit)
+{
+	((name)[(bit)/8] |= (1 << ((bit) % 8)));
+}
+*/
 
 #define CLR_BITMASK_BIT(name, bit) \
-	((name)[(bit)/BPW] &= ~(1 << ((bit) % BPW)));
-
-static void SET_BITMASK_BIT_ATOMIC(unsigned long* name, size_t bit) 
+	((name)[(bit)/8] &= ~(1 << ((bit) % 8)));
+/*
+static void CLR_BITMASK_BIT(uint8_t* name, size_t bit) 
 {
-	__sync_fetch_and_or(&name[bit/BPW], bit % BPW);
+	((name)[(bit)/8] &= ~(1 << ((bit) % 8)));
+}
+*/
+
+static void SET_BITMASK_BIT_ATOMIC(uint8_t* name, size_t bit) 
+{
+	(atomic_orb(&(name)[(bit)/8], (1 << ((bit) % 8))));
 }
 
 #define CLR_BITMASK_BIT_ATOMIC(name, bit) \
-	(__sync_fetch_and_and(&(name)[(bit)/BPW], ~(1UL << ((bit) % BPW))))
+	(atomic_andb(&(name)[(bit)/8], ~(1 << ((bit) % 8))))
 
 #define CLR_BITMASK(name, size) \
 ({ \
@@ -48,8 +59,7 @@ static void SET_BITMASK_BIT_ATOMIC(unsigned long* name, size_t bit)
 	{TRUSTEDBLOCK \
 	memset((void*)((uintptr_t)(name)), 255, BYTES_FOR_BITMASK((size))); \
 	} \
-	if ((size) % BPW) \
-	  (name)[WORDS_FOR_BITMASK((size))-1] >>= BPW - ((size) % BPW); \
+	(name)[BYTES_FOR_BITMASK((size))-1] >>= (((size) % 8) ? (8 - ((size) % 8)) : 0 ); \
 }) 
 
 #define COPY_BITMASK(newmask, oldmask, size) \
@@ -63,32 +73,26 @@ static void SET_BITMASK_BIT_ATOMIC(unsigned long* name, size_t bit)
 
 // this checks the entire last byte, so keep it 0 in the other macros
 #define BITMASK_IS_CLEAR(name, size) ({ \
-	size_t __n = WORDS_FOR_BITMASK(size); \
-	unsigned long clear = 1; \
-	while (clear != 0 && __n-- > 0) \
-		clear = (name)[__n]; \
-	clear != 0; })
-
-static inline bool BITMASK_IS_FULL(unsigned long* map, size_t size)
-{
-	size_t extra = size % BPW;
-	for (size_t i = 0; i < WORDS_FOR_BITMASK(size) - (extra != 0); i++)
-	  if (map[i] != ~0UL)
-		return FALSE;
-	
-	return !extra || map[WORDS_FOR_BITMASK(size)-1] == ((1UL << extra) - 1);
-}
-
-#define PRINT_BITMASK(name, size) { \
-	int i;	\
-	int _size = size; \
-	for (i = 0; i < WORDS_FOR_BITMASK(size); i++) { \
-		int j;	\
-		for (j = 0; j < MIN(BPW,_size); j++) \
-			printf("%x", ((name)[i] >> j) & 1);	\
-			_size--; \
+	uint32_t __n = BYTES_FOR_BITMASK((size)); \
+	bool clear = 1; \
+	while (__n-- > 0) { \
+		if ((name)[__n]) { \
+			clear = 0; \
+			break;\
+		}\
 	} \
-	printf("\n"); \
+	clear; })
+
+static inline bool BITMASK_IS_FULL(uint8_t* map, size_t size)
+{
+	int _size = size;
+	for (int i = 0; i < BYTES_FOR_BITMASK(size); i++) {
+		for (int j = 0; j < MIN(8,_size); j++)
+			if(!((map[i] >> j) &1))
+				return FALSE;
+			_size--;
+	}
+	return TRUE;
 }
 
 #endif /* PARLIB_ARCH_BITMASK_H */

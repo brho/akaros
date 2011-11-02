@@ -35,6 +35,7 @@ extern __thread bool __vcore_context;
 /* Utility Functions */
 void *allocate_tls(void);
 void free_tls(void *tcb);
+void *reinit_tls(void *tcb);
 
 /* Vcore API functions */
 static inline size_t max_vcores(void);

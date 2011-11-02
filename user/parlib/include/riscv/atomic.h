@@ -90,12 +90,29 @@ static inline uint32_t atomic_swap_u32(uint32_t *addr, uint32_t val)
 	return __sync_lock_test_and_set(addr, val);
 }
 
+// RISC-V has atomic word ops, not byte ops, so we must manipulate addresses
+static inline void atomic_andb(volatile uint8_t* number, uint8_t mask)
+{
+	uintptr_t offset = (uintptr_t)number & 3;
+	uint32_t wmask = (1<<(8*offset+8)) - (1<<(8*offset));
+	wmask = ~wmask | ((uint32_t)mask << (8*offset));
+
+	__sync_fetch_and_and((uint32_t*)((uintptr_t)number & ~3), wmask);
+}
+
+static inline void atomic_orb(volatile uint8_t* number, uint8_t mask)
+{
+	uintptr_t offset = (uintptr_t)number & 3;
+	uint32_t wmask = (uint32_t)mask << (8*offset);
+
+	__sync_fetch_and_or((uint32_t*)((uintptr_t)number & ~3), wmask);
+}
+
 asm (".section .gnu.linkonce.b.__riscv_ros_atomic_lock, \"aw\", %nobits\n"
      "\t.previous");
 
 spinlock_t __riscv_ros_atomic_lock
-  __attribute__ ((nocommon, section (".gnu.linkonce.b.__riscv_ros_atomic_lock"
-                                     __sec_comment),
+  __attribute__ ((nocommon, section(".gnu.linkonce.b.__riscv_ros_atomic_lock\n\t#"),
                   visibility ("hidden")));
 
 static inline bool atomic_cas(atomic_t *addr, long exp_val, long new_val)
@@ -127,7 +144,7 @@ static inline bool atomic_cas_u32(uint32_t *addr, uint32_t exp_val,
 
 static inline void atomic_or_int(volatile int *number, int mask)
 {
-	return __sync_fetch_and_or(number, mask);
+	__sync_fetch_and_or(number, mask);
 }
 
 static inline uint32_t spin_trylock(spinlock_t* lock)
