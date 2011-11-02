@@ -27,9 +27,9 @@ sim
 fs
 tools/.*
 tools/compilers/gcc-glibc/.*
-tools/compilers/gcc-glibc/binutils-2.18
-tools/compilers/gcc-glibc/gcc-4.3.2
-tools/compilers/gcc-glibc/glibc-2.11.1
+tools/compilers/gcc-glibc/binutils-2.21.1
+tools/compilers/gcc-glibc/gcc-4.6.1
+tools/compilers/gcc-glibc/glibc-2.14.1
 tools/compilers/gcc-glibc/install
 tools/compilers/gcc-glibc/*-builddir
 tools/syscall_server/syscall_server_*
