@@ -168,7 +168,7 @@ glibc-$(GLIBC_VERSION): glibc-$(GLIBC_VERSION).tar.bz2
 
 $(BINARY_PREFIX)binutils-builddir: binutils-$(BINUTILS_VERSION)
 	rm -rf $@
-	cp -R binutils-$(BINUTILS_VERSION) $@
+	mkdir -p $@
 
 $(BINARY_PREFIX)gcc-stage1-builddir: gcc-$(GCC_VERSION)
 	rm -rf $@
@@ -185,7 +185,8 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 .$(BINARY_PREFIX)binutils-configure: 
 	$(MAKE) $(BINARY_PREFIX)binutils-builddir 
 	cd $(BINARY_PREFIX)binutils-builddir; \
-	./configure --enable-shared \
+	../binutils-$(BINUTILS_VERSION)/configure \
+	            --enable-shared \
 	            --disable-multilib \
 	            --disable-nls \
 	            --target=$(ARCH)-ros \
