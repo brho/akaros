@@ -7,6 +7,7 @@
 KERN_SRC_DIR = $(KERN_DIR)/src
 OBJDIRS += $(KERN_SRC_DIR)
 KERN_CPIO = initramfs.cpio
+KERN_CPIO_OBJ = $(KERN_CPIO).o
 
 # entry.S must be first, so that it's the first code in the text segment!!!
 #
@@ -72,7 +73,7 @@ KERN_OBJFILES  := $(patsubst $(KERN_DIR)/%.S, \
 
 KERN_LDDEPENDS := $(KERN_OBJFILES) $(ARCH_DIR)/$(TARGET_ARCH)/kernel.ld \
                   $(OBJDIR)/$(KERN_DIR)/libivykern.a \
-                  $(OBJDIR)/$(KERN_DIR)/$(KERN_CPIO) $(EXT2_BDEV)
+                  $(OBJDIR)/$(KERN_DIR)/$(KERN_CPIO_OBJ) $(EXT2_BDEV)
 
 KERN_LDLIBS    := -livykern
 
@@ -92,6 +93,12 @@ $(OBJDIR)/$(KERN_DIR)/$(KERN_CPIO) initramfs: $(KERN_INITRAMFS_FILES)
         cd $$OLDPWD; \
     done;
 
+LD_EMULATION := $(shell $(OBJDUMP) -i | grep -v BFD | grep ^[a-z] | head -n1)
+LD_ARCH := $(shell $(OBJDUMP) -i | grep -v BFD | grep "^  [a-z]" | head -n1)
+
+$(OBJDIR)/$(KERN_DIR)/$(KERN_CPIO_OBJ): $(OBJDIR)/$(KERN_DIR)/$(KERN_CPIO)
+	$(V)$(OBJCOPY) -I binary -B $(LD_ARCH) -O $(LD_EMULATION) $^ $@
+
 $(OBJDIR)/$(KERN_DIR)/%.o: $(KERN_DIR)/%.c
 	@echo + cc [KERN] $<
 	@mkdir -p $(@D)
@@ -105,7 +112,7 @@ $(OBJDIR)/$(KERN_DIR)/%.o: $(KERN_DIR)/%.S
 $(OBJDIR)/$(KERN_DIR)/kernel: $(KERN_LDDEPENDS)
 	@echo + ld [KERN] $@
 	$(V)$(LD) -o $@ $(KERN_LDFLAGS) $(KERN_OBJFILES) $(KERN_LDLIBS) \
-	                $(KERN_GCC_LIB) -b binary $(OBJDIR)/$(KERN_DIR)/$(KERN_CPIO) \
+	                $(KERN_GCC_LIB) $(OBJDIR)/$(KERN_DIR)/$(KERN_CPIO_OBJ) \
 	                $(EXT2_BDEV)
 	$(V)$(OBJDUMP) -S $@ > $@.asm
 	$(V)$(NM) -n $@ > $@.sym
