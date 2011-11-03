@@ -1,0 +1,61 @@
+diff -ruN binutils-2.21.1-orig/bfd/config.bfd binutils-2.21.1/bfd/config.bfd
+--- binutils-2.21.1-orig/bfd/config.bfd	2011-04-01 05:02:42.000000000 -0700
++++ binutils-2.21.1/bfd/config.bfd	2011-10-24 17:08:29.000000000 -0700
+@@ -519,6 +519,19 @@
+   i[3-7]86-*-aros*)
+     targ_defvec=bfd_elf32_i386_vec
+     ;;
++  i[3-7]86-*-ros*)
++    targ_defvec=bfd_elf32_i386_vec
++    ;;
++#ifdef BFD64
++  riscv*-*-ros*)
++    targ_defvec=bfd_elf64_littleriscv_vec
++    targ_selvecs="bfd_elf32_littleriscv_vec bfd_elf64_littleriscv_vec"
++    want64=true
++    ;;
++#endif
++  sparc-*-ros*) 
++    targ_defvec=bfd_elf32_sparc_vec
++    ;;
+   i[3-7]86-*-chorus*)
+     targ_defvec=bfd_elf32_i386_vec
+     ;;
+diff -ruN binutils-2.21.1-orig/config.sub binutils-2.21.1/config.sub
+--- binutils-2.21.1-orig/config.sub	2010-06-01 10:53:40.000000000 -0700
++++ binutils-2.21.1/config.sub	2011-10-24 17:00:52.000000000 -0700
+@@ -1297,7 +1297,7 @@
+ 	      | -hpux* | -unos* | -osf* | -luna* | -dgux* | -auroraux* | -solaris* \
+ 	      | -sym* | -kopensolaris* \
+ 	      | -amigaos* | -amigados* | -msdos* | -newsos* | -unicos* | -aof* \
+-	      | -aos* | -aros* \
++	      | -aos* | -aros* | -ros* \
+ 	      | -nindy* | -vxsim* | -vxworks* | -ebmon* | -hms* | -mvs* \
+ 	      | -clix* | -riscos* | -uniplus* | -iris* | -rtu* | -xenix* \
+ 	      | -hiux* | -386bsd* | -knetbsd* | -mirbsd* | -netbsd* \
+diff -ruN binutils-2.21.1-orig/gas/configure.tgt binutils-2.21.1/gas/configure.tgt
+--- binutils-2.21.1-orig/gas/configure.tgt	2011-04-01 05:02:42.000000000 -0700
++++ binutils-2.21.1/gas/configure.tgt	2011-10-24 17:06:31.000000000 -0700
+@@ -180,6 +180,9 @@
+   i386-*-beos*)				fmt=elf ;;
+   i386-*-coff)				fmt=coff ;;
+   i386-*-elf)				fmt=elf ;;
++  i386-*-ros)				fmt=elf ;;
++  riscv-*-ros)				fmt=elf ;;
++  sparc-*-ros)				fmt=elf ;;
+   i386-*-kaos*)				fmt=elf ;;
+   i386-*-bsd*)				fmt=aout em=386bsd ;;
+   i386-*-netbsd0.8)			fmt=aout em=386bsd ;;
+diff -ruN binutils-2.21.1-orig/ld/configure.tgt binutils-2.21.1/ld/configure.tgt
+--- binutils-2.21.1-orig/ld/configure.tgt	2011-04-01 05:03:54.000000000 -0700
++++ binutils-2.21.1/ld/configure.tgt	2011-10-24 17:07:38.000000000 -0700
+@@ -242,6 +242,9 @@
+ 			esac ;;
+ i[3-7]86-*-netware)	targ_emul=i386nw ;;
+ i[3-7]86-*-elf*)	targ_emul=elf_i386 ;;
++i[3-7]86-*-ros)	targ_emul=elf_i386 ;;
++riscv*-*-ros)		targ_emul=elf64lriscv targ_extra_emuls="elf32lriscv" ;;
++sparc*-*-ros)		targ_emul=elf32_sparc ;;
+ x86_64-*-elf*)		targ_emul=elf_x86_64
+ 			targ_extra_emuls="elf_i386 elf_l1om"
+ 			;;

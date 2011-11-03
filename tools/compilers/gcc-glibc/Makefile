@@ -4,11 +4,11 @@ MAKE_JOBS :=
 # Defines where to install the toolchain
 -include Makelocal
 
-ifndef RAMP_INSTDIR
+ifndef RISCV_INSTDIR
 ifndef X86_INSTDIR
 busted: 
-	@echo "You need to setup either a RAMP_INSTDIR or X86_INSTDIR to point to where you want the tools installed. The best way to do this is to create a 'Makelocal' file in the current directory and put it in there."; false
-ramp: busted
+	@echo "You need to setup either a RISCV_INSTDIR or X86_INSTDIR to point to where you want the tools installed. The best way to do this is to create a 'Makelocal' file in the current directory and put it in there."; false
+riscv: busted
 x86: busted
 endif
 endif 
@@ -20,7 +20,7 @@ ifneq ($(AWK),GNU)
 $(error You need to have 'gawk' installed on your system!)
 endif
 
-BINUTILS_VERSION := 2.18
+BINUTILS_VERSION := 2.21.1
 GCC_VERSION := 4.3.2
 GLIBC_VERSION := 2.11.1
 
@@ -28,11 +28,11 @@ BUILDDIR ?= $(shell pwd)/
 ROSDIR ?= $(BUILDDIR)/../../../
 DESTDIR ?= /
 
-# Configuration parameters for make-ramp
-RAMP_ARCH := sparc
-RAMP_BINARY_PREFIX := $(RAMP_ARCH)-ros-
-RAMP_GCC_BUILD_FLAGS := --with-cpu=v8
-RAMP_CFLAGS :=
+# Configuration parameters for make-riscv
+RISCV_ARCH := riscv
+RISCV_BINARY_PREFIX := $(RISCV_ARCH)-ros-
+RISCV_GCC_BUILD_FLAGS := --with-cpu=v8
+RISCV_CFLAGS :=
 
 # Configuration parameters for x86
 X86_ARCH := i686
@@ -43,24 +43,24 @@ X86_CFLAGS := -march=i486
 all:
 	@echo "You need to run one of the following commands, "
 	@echo "depending on which version of the cross compiler you are trying to generate:"
-	@echo "  make ramp"
+	@echo "  make riscv"
 	@echo "  make x86"
-	@echo "  make ramp-revert"
+	@echo "  make riscv-revert"
 	@echo "  make x86-revert"
-	@echo "  make ramp-uninstall"
+	@echo "  make riscv-uninstall"
 	@echo "  make x86-uninstall"
 	@echo "  make clean"
 
-ramp:
+riscv:
 	export LD_LIBRARY_PATH=; \
 	export DESTDIR=$(DESTDIR);\
-	export INSTDIR=$(RAMP_INSTDIR);\
-	export PATH=$(DESTDIR)$(RAMP_INSTDIR)/bin:$(PATH);\
-	export ARCH=$(RAMP_ARCH);\
-	export ARCH_CFLAGS=$(RAMP_CFLAGS);\
-	export ROS_ARCH_DIR=$(RAMP_ARCH);\
-	export BINARY_PREFIX=$(RAMP_BINARY_PREFIX);\
-	export GCC_BUILD_FLAGS=$(RAMP_GCC_BUILD_FLAGS);\
+	export INSTDIR=$(RISCV_INSTDIR);\
+	export PATH=$(DESTDIR)$(RISCV_INSTDIR)/bin:$(PATH);\
+	export ARCH=$(RISCV_ARCH);\
+	export ARCH_CFLAGS=$(RISCV_CFLAGS);\
+	export ROS_ARCH_DIR=$(RISCV_ARCH);\
+	export BINARY_PREFIX=$(RISCV_BINARY_PREFIX);\
+	export GCC_BUILD_FLAGS=$(RISCV_GCC_BUILD_FLAGS);\
 	$(MAKE) make-all
 
 x86:
@@ -91,15 +91,15 @@ make-all:
 	mkdir -p $(ROSDIR)/fs/$(ARCH)/lib
 	cp -r $(INSTDIR)/$(ARCH)-ros/lib/* $(ROSDIR)/fs/$(ARCH)/lib
 
-ramp-uninstall:
-	-rm -rf $(RAMP_INSTDIR)
+riscv-uninstall:
+	-rm -rf $(RISCV_INSTDIR)
 
 x86-uninstall:
 	-rm -rf $(X86_INSTDIR)
 
-ramp-revert: 
-	rm -rf $(RAMP_INSTDIR)
-	cp -r $(RAMP_BINARY_PREFIX)install.bak $(RAMP_INSTDIR)
+riscv-revert:
+	rm -rf $(RISCV_INSTDIR)
+	cp -r $(RISCV_BINARY_PREFIX)install.bak $(RISCV_INSTDIR)
 
 x86-revert: 
 	rm -rf $(X86_INSTDIR)
@@ -127,10 +127,14 @@ glibc-clean:
 	cd $(BINARY_PREFIX)glibc-builddir; \
 	make clean
 
-binutils-$(BINUTILS_VERSION):
+%.tar.bz2:
+	wget http://akaros.cs.berkeley.edu/xcc/$@
+
+binutils-$(BINUTILS_VERSION): binutils-$(BINUTILS_VERSION).tar.bz2
 	rm -rf binutils-$(BINUTILS_VERSION);
-	tar -zxf binutils-$(BINUTILS_VERSION).tar.gz
+	tar -jxf binutils-$(BINUTILS_VERSION).tar.bz2
 	patch -p0 < binutils-$(BINUTILS_VERSION)-ros.patch
+	patch -p0 < binutils-$(BINUTILS_VERSION)-riscv.patch
 
 gcc-$(GCC_VERSION):
 	rm -rf gcc-$(GCC_VERSION)
