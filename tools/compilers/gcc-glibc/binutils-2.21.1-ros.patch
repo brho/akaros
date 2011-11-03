@@ -1,6 +1,6 @@
-diff -ruN binutils-2.21.1-orig/bfd/config.bfd binutils-2.21.1/bfd/config.bfd
---- binutils-2.21.1-orig/bfd/config.bfd	2011-04-01 05:02:42.000000000 -0700
-+++ binutils-2.21.1/bfd/config.bfd	2011-10-24 17:08:29.000000000 -0700
+diff -ruN orig-src/binutils-2.21.1/bfd/config.bfd binutils-2.21.1/bfd/config.bfd
+--- orig-src/binutils-2.21.1/bfd/config.bfd	2011-04-01 05:02:42.000000000 -0700
++++ binutils-2.21.1/bfd/config.bfd	2011-10-27 19:58:05.000000000 -0700
 @@ -519,6 +519,19 @@
    i[3-7]86-*-aros*)
      targ_defvec=bfd_elf32_i386_vec
@@ -21,9 +21,9 @@ diff -ruN binutils-2.21.1-orig/bfd/config.bfd binutils-2.21.1/bfd/config.bfd
    i[3-7]86-*-chorus*)
      targ_defvec=bfd_elf32_i386_vec
      ;;
-diff -ruN binutils-2.21.1-orig/config.sub binutils-2.21.1/config.sub
---- binutils-2.21.1-orig/config.sub	2010-06-01 10:53:40.000000000 -0700
-+++ binutils-2.21.1/config.sub	2011-10-24 17:00:52.000000000 -0700
+diff -ruN orig-src/binutils-2.21.1/config.sub binutils-2.21.1/config.sub
+--- orig-src/binutils-2.21.1/config.sub	2010-06-01 10:53:40.000000000 -0700
++++ binutils-2.21.1/config.sub	2011-10-27 19:58:05.000000000 -0700
 @@ -1297,7 +1297,7 @@
  	      | -hpux* | -unos* | -osf* | -luna* | -dgux* | -auroraux* | -solaris* \
  	      | -sym* | -kopensolaris* \
@@ -33,9 +33,9 @@ diff -ruN binutils-2.21.1-orig/config.sub binutils-2.21.1/config.sub
  	      | -nindy* | -vxsim* | -vxworks* | -ebmon* | -hms* | -mvs* \
  	      | -clix* | -riscos* | -uniplus* | -iris* | -rtu* | -xenix* \
  	      | -hiux* | -386bsd* | -knetbsd* | -mirbsd* | -netbsd* \
-diff -ruN binutils-2.21.1-orig/gas/configure.tgt binutils-2.21.1/gas/configure.tgt
---- binutils-2.21.1-orig/gas/configure.tgt	2011-04-01 05:02:42.000000000 -0700
-+++ binutils-2.21.1/gas/configure.tgt	2011-10-24 17:06:31.000000000 -0700
+diff -ruN orig-src/binutils-2.21.1/gas/configure.tgt binutils-2.21.1/gas/configure.tgt
+--- orig-src/binutils-2.21.1/gas/configure.tgt	2011-04-01 05:02:42.000000000 -0700
++++ binutils-2.21.1/gas/configure.tgt	2011-10-27 19:58:05.000000000 -0700
 @@ -180,6 +180,9 @@
    i386-*-beos*)				fmt=elf ;;
    i386-*-coff)				fmt=coff ;;
@@ -46,9 +46,9 @@ diff -ruN binutils-2.21.1-orig/gas/configure.tgt binutils-2.21.1/gas/configure.t
    i386-*-kaos*)				fmt=elf ;;
    i386-*-bsd*)				fmt=aout em=386bsd ;;
    i386-*-netbsd0.8)			fmt=aout em=386bsd ;;
-diff -ruN binutils-2.21.1-orig/ld/configure.tgt binutils-2.21.1/ld/configure.tgt
---- binutils-2.21.1-orig/ld/configure.tgt	2011-04-01 05:03:54.000000000 -0700
-+++ binutils-2.21.1/ld/configure.tgt	2011-10-24 17:07:38.000000000 -0700
+diff -ruN orig-src/binutils-2.21.1/ld/configure.tgt binutils-2.21.1/ld/configure.tgt
+--- orig-src/binutils-2.21.1/ld/configure.tgt	2011-04-01 05:03:54.000000000 -0700
++++ binutils-2.21.1/ld/configure.tgt	2011-10-27 19:58:05.000000000 -0700
 @@ -242,6 +242,9 @@
  			esac ;;
  i[3-7]86-*-netware)	targ_emul=i386nw ;;

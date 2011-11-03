@@ -1,5 +1,5 @@
-diff -ruN binutils-2.21.1-orig/bfd/archures.c binutils-2.21.1/bfd/archures.c
---- binutils-2.21.1-orig/bfd/archures.c	2010-07-23 07:52:46.000000000 -0700
+diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/bfd/archures.c binutils-2.21.1/bfd/archures.c
+--- ../binutils-2.21.1-orig/bfd/archures.c	2010-07-23 07:52:46.000000000 -0700
 +++ binutils-2.21.1/bfd/archures.c	2011-10-22 18:46:17.000000000 -0700
 @@ -515,6 +515,7 @@
  extern const bfd_arch_info_type bfd_plugin_arch;
@@ -17,8 +17,8 @@ diff -ruN binutils-2.21.1-orig/bfd/archures.c binutils-2.21.1/bfd/archures.c
      &bfd_rs6000_arch,
      &bfd_rx_arch,
      &bfd_s390_arch,
-diff -ruN binutils-2.21.1-orig/bfd/bfd-in2.h binutils-2.21.1/bfd/bfd-in2.h
---- binutils-2.21.1-orig/bfd/bfd-in2.h	2011-06-27 00:39:01.000000000 -0700
+diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/bfd/bfd-in2.h binutils-2.21.1/bfd/bfd-in2.h
+--- ../binutils-2.21.1-orig/bfd/bfd-in2.h	2011-06-27 00:39:01.000000000 -0700
 +++ binutils-2.21.1/bfd/bfd-in2.h	2011-10-22 18:46:17.000000000 -0700
 @@ -1919,6 +1919,9 @@
  #define bfd_mach_ppc_e500mc    5001
@@ -45,8 +45,8 @@ diff -ruN binutils-2.21.1-orig/bfd/bfd-in2.h binutils-2.21.1/bfd/bfd-in2.h
  /* This is used to tell the dynamic linker to copy the value out of
  the dynamic object into the runtime process image.  */
    BFD_RELOC_MICROBLAZE_COPY,
-diff -ruN binutils-2.21.1-orig/bfd/config.bfd binutils-2.21.1/bfd/config.bfd
---- binutils-2.21.1-orig/bfd/config.bfd	2011-04-01 05:02:42.000000000 -0700
+diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/bfd/config.bfd binutils-2.21.1/bfd/config.bfd
+--- ../binutils-2.21.1-orig/bfd/config.bfd	2011-04-01 05:02:42.000000000 -0700
 +++ binutils-2.21.1/bfd/config.bfd	2011-10-22 18:46:17.000000000 -0700
 @@ -96,6 +96,7 @@
  pdp11*)		 targ_archs=bfd_pdp11_arch ;;
@@ -71,8 +71,8 @@ diff -ruN binutils-2.21.1-orig/bfd/config.bfd binutils-2.21.1/bfd/config.bfd
    rx-*-elf)
      targ_defvec=bfd_elf32_rx_le_vec
      targ_selvecs="bfd_elf32_rx_be_vec bfd_elf32_rx_le_vec"
-diff -ruN binutils-2.21.1-orig/bfd/configure binutils-2.21.1/bfd/configure
---- binutils-2.21.1-orig/bfd/configure	2011-06-27 01:57:12.000000000 -0700
+diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/bfd/configure binutils-2.21.1/bfd/configure
+--- ../binutils-2.21.1-orig/bfd/configure	2011-06-27 01:57:12.000000000 -0700
 +++ binutils-2.21.1/bfd/configure	2011-10-22 18:47:51.000000000 -0700
 @@ -15239,6 +15239,7 @@
      bfd_elf32_littlemips_vec) 	tb="$tb elf32-mips.lo elfxx-mips.lo elf-vxworks.lo elf32.lo $elf ecofflink.lo" ;;
@@ -90,8 +90,8 @@ diff -ruN binutils-2.21.1-orig/bfd/configure binutils-2.21.1/bfd/configure
      bfd_elf64_mmix_vec) 	tb="$tb elf64-mmix.lo elf64.lo $elf" target_size=64 ;;
      bfd_elf64_powerpc_vec)	tb="$tb elf64-ppc.lo elf64-gen.lo elf64.lo $elf"; target_size=64 ;;
      bfd_elf64_powerpcle_vec)	tb="$tb elf64-ppc.lo elf64-gen.lo elf64.lo $elf" target_size=64 ;;
-diff -ruN binutils-2.21.1-orig/bfd/configure.in binutils-2.21.1/bfd/configure.in
---- binutils-2.21.1-orig/bfd/configure.in	2011-06-27 01:57:10.000000000 -0700
+diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/bfd/configure.in binutils-2.21.1/bfd/configure.in
+--- ../binutils-2.21.1-orig/bfd/configure.in	2011-06-27 01:57:10.000000000 -0700
 +++ binutils-2.21.1/bfd/configure.in	2011-10-22 18:46:17.000000000 -0700
 @@ -730,6 +730,7 @@
      bfd_elf32_littlemips_vec) 	tb="$tb elf32-mips.lo elfxx-mips.lo elf-vxworks.lo elf32.lo $elf ecofflink.lo" ;;
@@ -109,8 +109,8 @@ diff -ruN binutils-2.21.1-orig/bfd/configure.in binutils-2.21.1/bfd/configure.in
      bfd_elf64_mmix_vec) 	tb="$tb elf64-mmix.lo elf64.lo $elf" target_size=64 ;;
      bfd_elf64_powerpc_vec)	tb="$tb elf64-ppc.lo elf64-gen.lo elf64.lo $elf"; target_size=64 ;;
      bfd_elf64_powerpcle_vec)	tb="$tb elf64-ppc.lo elf64-gen.lo elf64.lo $elf" target_size=64 ;;
-diff -ruN binutils-2.21.1-orig/bfd/cpu-riscv.c binutils-2.21.1/bfd/cpu-riscv.c
---- binutils-2.21.1-orig/bfd/cpu-riscv.c	1969-12-31 16:00:00.000000000 -0800
+diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/bfd/cpu-riscv.c binutils-2.21.1/bfd/cpu-riscv.c
+--- ../binutils-2.21.1-orig/bfd/cpu-riscv.c	1969-12-31 16:00:00.000000000 -0800
 +++ binutils-2.21.1/bfd/cpu-riscv.c	2011-10-22 18:50:03.000000000 -0700
 @@ -0,0 +1,78 @@
 +/* bfd back-end for mips support
@@ -191,8 +191,8 @@ diff -ruN binutils-2.21.1-orig/bfd/cpu-riscv.c binutils-2.21.1/bfd/cpu-riscv.c
 +
 +const bfd_arch_info_type bfd_riscv_arch =
 +N (64, 64, 0, "riscv", TRUE, &arch_info_struct[0]);
-diff -ruN binutils-2.21.1-orig/bfd/elf32-riscv.c binutils-2.21.1/bfd/elf32-riscv.c
---- binutils-2.21.1-orig/bfd/elf32-riscv.c	1969-12-31 16:00:00.000000000 -0800
+diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/bfd/elf32-riscv.c binutils-2.21.1/bfd/elf32-riscv.c
+--- ../binutils-2.21.1-orig/bfd/elf32-riscv.c	1969-12-31 16:00:00.000000000 -0800
 +++ binutils-2.21.1/bfd/elf32-riscv.c	2011-10-22 18:50:03.000000000 -0700
 @@ -0,0 +1,2300 @@
 +/* MIPS-specific support for 32-bit ELF
@@ -2495,8 +2495,8 @@ diff -ruN binutils-2.21.1-orig/bfd/elf32-riscv.c binutils-2.21.1/bfd/elf32-riscv
 +#define ELF_COMMONPAGESIZE		0x1000
 +
 +#include "elf32-target.h"
-diff -ruN binutils-2.21.1-orig/bfd/elf64-riscv.c binutils-2.21.1/bfd/elf64-riscv.c
---- binutils-2.21.1-orig/bfd/elf64-riscv.c	1969-12-31 16:00:00.000000000 -0800
+diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/bfd/elf64-riscv.c binutils-2.21.1/bfd/elf64-riscv.c
+--- ../binutils-2.21.1-orig/bfd/elf64-riscv.c	1969-12-31 16:00:00.000000000 -0800
 +++ binutils-2.21.1/bfd/elf64-riscv.c	2011-10-22 18:50:03.000000000 -0700
 @@ -0,0 +1,3298 @@
 +/* MIPS-specific support for 64-bit ELF
@@ -5797,8 +5797,8 @@ diff -ruN binutils-2.21.1-orig/bfd/elf64-riscv.c binutils-2.21.1/bfd/elf64-riscv
 +#define ELF_COMMONPAGESIZE		0x1000
 +
 +#include "elf64-target.h"
-diff -ruN binutils-2.21.1-orig/bfd/elfxx-riscv.c binutils-2.21.1/bfd/elfxx-riscv.c
---- binutils-2.21.1-orig/bfd/elfxx-riscv.c	1969-12-31 16:00:00.000000000 -0800
+diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/bfd/elfxx-riscv.c binutils-2.21.1/bfd/elfxx-riscv.c
+--- ../binutils-2.21.1-orig/bfd/elfxx-riscv.c	1969-12-31 16:00:00.000000000 -0800
 +++ binutils-2.21.1/bfd/elfxx-riscv.c	2011-10-22 18:50:03.000000000 -0700
 @@ -0,0 +1,9383 @@
 +/* vim: set ts=8 */
@@ -15184,8 +15184,8 @@ diff -ruN binutils-2.21.1-orig/bfd/elfxx-riscv.c binutils-2.21.1/bfd/elfxx-riscv
 +	i_ehdrp->e_ident[EI_ABIVERSION] = 1;
 +    }
 +}
-diff -ruN binutils-2.21.1-orig/bfd/elfxx-riscv.h binutils-2.21.1/bfd/elfxx-riscv.h
---- binutils-2.21.1-orig/bfd/elfxx-riscv.h	1969-12-31 16:00:00.000000000 -0800
+diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/bfd/elfxx-riscv.h binutils-2.21.1/bfd/elfxx-riscv.h
+--- ../binutils-2.21.1-orig/bfd/elfxx-riscv.h	1969-12-31 16:00:00.000000000 -0800
 +++ binutils-2.21.1/bfd/elfxx-riscv.h	2011-10-22 18:50:03.000000000 -0700
 @@ -0,0 +1,150 @@
 +/* RISC-V ELF specific backend routines.
@@ -15338,8 +15338,8 @@ diff -ruN binutils-2.21.1-orig/bfd/elfxx-riscv.h binutils-2.21.1/bfd/elfxx-riscv
 +#define elf_backend_eh_frame_address_size _bfd_riscv_elf_eh_frame_address_size
 +#define elf_backend_merge_symbol_attribute  _bfd_riscv_elf_merge_symbol_attribute
 +#define elf_backend_post_process_headers _bfd_riscv_post_process_headers
-diff -ruN binutils-2.21.1-orig/bfd/targets.c binutils-2.21.1/bfd/targets.c
---- binutils-2.21.1-orig/bfd/targets.c	2010-10-22 05:08:28.000000000 -0700
+diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/bfd/targets.c binutils-2.21.1/bfd/targets.c
+--- ../binutils-2.21.1-orig/bfd/targets.c	2010-10-22 05:08:28.000000000 -0700
 +++ binutils-2.21.1/bfd/targets.c	2011-10-22 18:46:17.000000000 -0700
 @@ -624,6 +624,7 @@
  extern const bfd_target bfd_elf32_littlearm_vxworks_vec;
@@ -15357,8 +15357,8 @@ diff -ruN binutils-2.21.1-orig/bfd/targets.c binutils-2.21.1/bfd/targets.c
  extern const bfd_target bfd_elf64_mmix_vec;
  extern const bfd_target bfd_elf64_powerpc_vec;
  extern const bfd_target bfd_elf64_powerpcle_vec;
-diff -ruN binutils-2.21.1-orig/binutils/readelf.c binutils-2.21.1/binutils/readelf.c
---- binutils-2.21.1-orig/binutils/readelf.c	2011-03-16 01:36:01.000000000 -0700
+diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/binutils/readelf.c binutils-2.21.1/binutils/readelf.c
+--- ../binutils-2.21.1-orig/binutils/readelf.c	2011-03-16 01:36:01.000000000 -0700
 +++ binutils-2.21.1/binutils/readelf.c	2011-10-22 18:46:17.000000000 -0700
 @@ -123,6 +123,7 @@
  #include "elf/mep.h"
@@ -15408,8 +15408,8 @@ diff -ruN binutils-2.21.1-orig/binutils/readelf.c binutils-2.21.1/binutils/reade
  	case EM_SH:
  	  switch ((e_flags & EF_SH_MACH_MASK))
  	    {
-diff -ruN binutils-2.21.1-orig/config.sub binutils-2.21.1/config.sub
---- binutils-2.21.1-orig/config.sub	2010-06-01 10:53:40.000000000 -0700
+diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/config.sub binutils-2.21.1/config.sub
+--- ../binutils-2.21.1-orig/config.sub	2010-06-01 10:53:40.000000000 -0700
 +++ binutils-2.21.1/config.sub	2011-10-22 18:46:17.000000000 -0700
 @@ -323,6 +323,9 @@
  	ms1)
@@ -15421,8 +15421,8 @@ diff -ruN binutils-2.21.1-orig/config.sub binutils-2.21.1/config.sub
  
  	# We use `pc' rather than `unknown'
  	# because (1) that's what they normally are, and
-diff -ruN binutils-2.21.1-orig/gas/config/tc-riscv.c binutils-2.21.1/gas/config/tc-riscv.c
---- binutils-2.21.1-orig/gas/config/tc-riscv.c	1969-12-31 16:00:00.000000000 -0800
+diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/gas/config/tc-riscv.c binutils-2.21.1/gas/config/tc-riscv.c
+--- ../binutils-2.21.1-orig/gas/config/tc-riscv.c	1969-12-31 16:00:00.000000000 -0800
 +++ binutils-2.21.1/gas/config/tc-riscv.c	2011-10-22 22:13:39.000000000 -0700
 @@ -0,0 +1,4942 @@
 +/* tc-mips.c -- assemble code for a MIPS chip.
@@ -20367,8 +20367,8 @@ diff -ruN binutils-2.21.1-orig/gas/config/tc-riscv.c binutils-2.21.1/gas/config/
 +
 +  return regnum;
 +}
-diff -ruN binutils-2.21.1-orig/gas/config/tc-riscv.h binutils-2.21.1/gas/config/tc-riscv.h
---- binutils-2.21.1-orig/gas/config/tc-riscv.h	1969-12-31 16:00:00.000000000 -0800
+diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/gas/config/tc-riscv.h binutils-2.21.1/gas/config/tc-riscv.h
+--- ../binutils-2.21.1-orig/gas/config/tc-riscv.h	1969-12-31 16:00:00.000000000 -0800
 +++ binutils-2.21.1/gas/config/tc-riscv.h	2011-10-22 18:50:03.000000000 -0700
 @@ -0,0 +1,162 @@
 +/* tc-mips.h -- header file for tc-mips.c.
@@ -20533,8 +20533,8 @@ diff -ruN binutils-2.21.1-orig/gas/config/tc-riscv.h binutils-2.21.1/gas/config/
 +#define DWARF2_CIE_DATA_ALIGNMENT (-4)
 +
 +#endif /* TC_RISCV */
-diff -ruN binutils-2.21.1-orig/gas/configure.tgt binutils-2.21.1/gas/configure.tgt
---- binutils-2.21.1-orig/gas/configure.tgt	2011-04-01 05:02:42.000000000 -0700
+diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/gas/configure.tgt binutils-2.21.1/gas/configure.tgt
+--- ../binutils-2.21.1-orig/gas/configure.tgt	2011-04-01 05:02:42.000000000 -0700
 +++ binutils-2.21.1/gas/configure.tgt	2011-10-22 18:46:17.000000000 -0700
 @@ -63,6 +63,7 @@
    pj*)			cpu_type=pj endian=big ;;
@@ -20553,8 +20553,8 @@ diff -ruN binutils-2.21.1-orig/gas/configure.tgt binutils-2.21.1/gas/configure.t
    s390-*-linux-*)			fmt=elf em=linux ;;
    s390-*-tpf*)				fmt=elf ;;
  
-diff -ruN binutils-2.21.1-orig/gas/Makefile.am binutils-2.21.1/gas/Makefile.am
---- binutils-2.21.1-orig/gas/Makefile.am	2010-07-04 07:35:53.000000000 -0700
+diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/gas/Makefile.am binutils-2.21.1/gas/Makefile.am
+--- ../binutils-2.21.1-orig/gas/Makefile.am	2010-07-04 07:35:53.000000000 -0700
 +++ binutils-2.21.1/gas/Makefile.am	2011-10-22 18:46:17.000000000 -0700
 @@ -150,6 +150,7 @@
  	config/tc-pdp11.c \
@@ -20572,8 +20572,8 @@ diff -ruN binutils-2.21.1-orig/gas/Makefile.am binutils-2.21.1/gas/Makefile.am
  	config/tc-rx.h \
  	config/tc-s390.h \
  	config/tc-score.h \
-diff -ruN binutils-2.21.1-orig/gas/Makefile.in binutils-2.21.1/gas/Makefile.in
---- binutils-2.21.1-orig/gas/Makefile.in	2010-11-05 03:33:35.000000000 -0700
+diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/gas/Makefile.in binutils-2.21.1/gas/Makefile.in
+--- ../binutils-2.21.1-orig/gas/Makefile.in	2010-11-05 03:33:35.000000000 -0700
 +++ binutils-2.21.1/gas/Makefile.in	2011-10-22 18:46:17.000000000 -0700
 @@ -417,6 +417,7 @@
  	config/tc-pdp11.c \
@@ -20620,8 +20620,8 @@ diff -ruN binutils-2.21.1-orig/gas/Makefile.in binutils-2.21.1/gas/Makefile.in
  tc-rx.o: config/tc-rx.c
  @am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT tc-rx.o -MD -MP -MF $(DEPDIR)/tc-rx.Tpo -c -o tc-rx.o `test -f 'config/tc-rx.c' || echo '$(srcdir)/'`config/tc-rx.c
  @am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/tc-rx.Tpo $(DEPDIR)/tc-rx.Po
-diff -ruN binutils-2.21.1-orig/include/dis-asm.h binutils-2.21.1/include/dis-asm.h
---- binutils-2.21.1-orig/include/dis-asm.h	2010-06-28 21:17:27.000000000 -0700
+diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/include/dis-asm.h binutils-2.21.1/include/dis-asm.h
+--- ../binutils-2.21.1-orig/include/dis-asm.h	2010-06-28 21:17:27.000000000 -0700
 +++ binutils-2.21.1/include/dis-asm.h	2011-10-22 18:46:17.000000000 -0700
 @@ -227,6 +227,7 @@
  extern int print_insn_big_mips		(bfd_vma, disassemble_info *);
@@ -20639,8 +20639,8 @@ diff -ruN binutils-2.21.1-orig/include/dis-asm.h binutils-2.21.1/include/dis-asm
  extern int print_insn_little_score      (bfd_vma, disassemble_info *); 
  extern int print_insn_lm32		(bfd_vma, disassemble_info *);
  extern int print_insn_m32c	        (bfd_vma, disassemble_info *);
-diff -ruN binutils-2.21.1-orig/include/elf/common.h binutils-2.21.1/include/elf/common.h
---- binutils-2.21.1-orig/include/elf/common.h	2010-05-17 20:31:06.000000000 -0700
+diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/include/elf/common.h binutils-2.21.1/include/elf/common.h
+--- ../binutils-2.21.1-orig/include/elf/common.h	2010-05-17 20:31:06.000000000 -0700
 +++ binutils-2.21.1/include/elf/common.h	2011-10-22 18:46:17.000000000 -0700
 @@ -295,6 +295,7 @@
  #define EM_TILEPRO	188	/* Tilera TILEPro multicore architecture family */
@@ -20650,8 +20650,8 @@ diff -ruN binutils-2.21.1-orig/include/elf/common.h binutils-2.21.1/include/elf/
  
  /* If it is necessary to assign new unofficial EM_* values, please pick large
     random numbers (0x8523, 0xa7f2, etc.) to minimize the chances of collision
-diff -ruN binutils-2.21.1-orig/include/elf/riscv.h binutils-2.21.1/include/elf/riscv.h
---- binutils-2.21.1-orig/include/elf/riscv.h	1969-12-31 16:00:00.000000000 -0800
+diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/include/elf/riscv.h binutils-2.21.1/include/elf/riscv.h
+--- ../binutils-2.21.1-orig/include/elf/riscv.h	1969-12-31 16:00:00.000000000 -0800
 +++ binutils-2.21.1/include/elf/riscv.h	2011-10-22 18:50:03.000000000 -0700
 @@ -0,0 +1,485 @@
 +/* RISC-V ELF support for BFD.
@@ -21139,8 +21139,8 @@ diff -ruN binutils-2.21.1-orig/include/elf/riscv.h binutils-2.21.1/include/elf/r
 +  (bfd *, const Elf64_Internal_RegInfo *, Elf64_External_RegInfo *);
 +
 +#endif /* _ELF_RISCV_H */
-diff -ruN binutils-2.21.1-orig/include/opcode/riscv.h binutils-2.21.1/include/opcode/riscv.h
---- binutils-2.21.1-orig/include/opcode/riscv.h	1969-12-31 16:00:00.000000000 -0800
+diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/include/opcode/riscv.h binutils-2.21.1/include/opcode/riscv.h
+--- ../binutils-2.21.1-orig/include/opcode/riscv.h	1969-12-31 16:00:00.000000000 -0800
 +++ binutils-2.21.1/include/opcode/riscv.h	2011-10-22 19:17:57.000000000 -0700
 @@ -0,0 +1,253 @@
 +/* riscv.h.  RISC-V opcode list for GDB, the GNU debugger.
@@ -21396,8 +21396,8 @@ diff -ruN binutils-2.21.1-orig/include/opcode/riscv.h binutils-2.21.1/include/op
 +#define NUMOPCODES bfd_riscv_num_opcodes
 +
 +#endif /* _MIPS_H_ */
-diff -ruN binutils-2.21.1-orig/include/opcode/riscv-opc.h binutils-2.21.1/include/opcode/riscv-opc.h
---- binutils-2.21.1-orig/include/opcode/riscv-opc.h	1969-12-31 16:00:00.000000000 -0800
+diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/include/opcode/riscv-opc.h binutils-2.21.1/include/opcode/riscv-opc.h
+--- ../binutils-2.21.1-orig/include/opcode/riscv-opc.h	1969-12-31 16:00:00.000000000 -0800
 +++ binutils-2.21.1/include/opcode/riscv-opc.h	2011-10-22 18:50:03.000000000 -0700
 @@ -0,0 +1,545 @@
 +/* Automatically generated by parse-opcodes */
@@ -21945,8 +21945,8 @@ diff -ruN binutils-2.21.1-orig/include/opcode/riscv-opc.h binutils-2.21.1/includ
 +#define  MASK_VFSSEGD 0x1ffff
 +#define MATCH_SD 0x1a3
 +#define  MASK_SD 0x3ff
-diff -ruN binutils-2.21.1-orig/ld/configure.tgt binutils-2.21.1/ld/configure.tgt
---- binutils-2.21.1-orig/ld/configure.tgt	2011-04-01 05:03:54.000000000 -0700
+diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/ld/configure.tgt binutils-2.21.1/ld/configure.tgt
+--- ../binutils-2.21.1-orig/ld/configure.tgt	2011-04-01 05:03:54.000000000 -0700
 +++ binutils-2.21.1/ld/configure.tgt	2011-10-22 18:46:17.000000000 -0700
 @@ -504,6 +504,9 @@
  powerpc-*-beos*)	targ_emul=aixppc ;;
@@ -21958,9 +21958,8 @@ diff -ruN binutils-2.21.1-orig/ld/configure.tgt binutils-2.21.1/ld/configure.tgt
  rs6000-*-aix[5-9]*)	targ_emul=aix5rs6 ;;
  rs6000-*-aix*)		targ_emul=aixrs6
  			;;
-Binary files binutils-2.21.1-orig/ld/.configure.tgt.swp and binutils-2.21.1/ld/.configure.tgt.swp differ
-diff -ruN binutils-2.21.1-orig/ld/emulparams/elf32lriscv-defs.sh binutils-2.21.1/ld/emulparams/elf32lriscv-defs.sh
---- binutils-2.21.1-orig/ld/emulparams/elf32lriscv-defs.sh	1969-12-31 16:00:00.000000000 -0800
+diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/ld/emulparams/elf32lriscv-defs.sh binutils-2.21.1/ld/emulparams/elf32lriscv-defs.sh
+--- ../binutils-2.21.1-orig/ld/emulparams/elf32lriscv-defs.sh	1969-12-31 16:00:00.000000000 -0800
 +++ binutils-2.21.1/ld/emulparams/elf32lriscv-defs.sh	2011-10-22 18:50:03.000000000 -0700
 @@ -0,0 +1,93 @@
 +# This is an ELF platform.
@@ -22056,8 +22055,8 @@ diff -ruN binutils-2.21.1-orig/ld/emulparams/elf32lriscv-defs.sh binutils-2.21.1
 +OTHER_SECTIONS="/DISCARD/ : { *(.MIPS.content*) *(.MIPS.events*) }"
 +
 +TEXT_DYNAMIC=
-diff -ruN binutils-2.21.1-orig/ld/emulparams/elf32lriscv.sh binutils-2.21.1/ld/emulparams/elf32lriscv.sh
---- binutils-2.21.1-orig/ld/emulparams/elf32lriscv.sh	1969-12-31 16:00:00.000000000 -0800
+diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/ld/emulparams/elf32lriscv.sh binutils-2.21.1/ld/emulparams/elf32lriscv.sh
+--- ../binutils-2.21.1-orig/ld/emulparams/elf32lriscv.sh	1969-12-31 16:00:00.000000000 -0800
 +++ binutils-2.21.1/ld/emulparams/elf32lriscv.sh	2011-10-22 18:50:03.000000000 -0700
 @@ -0,0 +1,15 @@
 +# If you change this file, please also look at files which source this one:
@@ -22075,15 +22074,15 @@ diff -ruN binutils-2.21.1-orig/ld/emulparams/elf32lriscv.sh binutils-2.21.1/ld/e
 +  .gptab.sdata : { *(.gptab.data) *(.gptab.sdata) }
 +  .gptab.sbss : { *(.gptab.bss) *(.gptab.sbss) }
 +'
-diff -ruN binutils-2.21.1-orig/ld/emulparams/elf64lriscv-defs.sh binutils-2.21.1/ld/emulparams/elf64lriscv-defs.sh
---- binutils-2.21.1-orig/ld/emulparams/elf64lriscv-defs.sh	1969-12-31 16:00:00.000000000 -0800
+diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/ld/emulparams/elf64lriscv-defs.sh binutils-2.21.1/ld/emulparams/elf64lriscv-defs.sh
+--- ../binutils-2.21.1-orig/ld/emulparams/elf64lriscv-defs.sh	1969-12-31 16:00:00.000000000 -0800
 +++ binutils-2.21.1/ld/emulparams/elf64lriscv-defs.sh	2011-10-22 18:50:03.000000000 -0700
 @@ -0,0 +1,3 @@
 +. ${srcdir}/emulparams/elf32lriscv-defs.sh
 +COMMONPAGESIZE="CONSTANT (COMMONPAGESIZE)"
 +INITIAL_READONLY_SECTIONS=".MIPS.options : { *(.MIPS.options) }"
-diff -ruN binutils-2.21.1-orig/ld/emulparams/elf64lriscv.sh binutils-2.21.1/ld/emulparams/elf64lriscv.sh
---- binutils-2.21.1-orig/ld/emulparams/elf64lriscv.sh	1969-12-31 16:00:00.000000000 -0800
+diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/ld/emulparams/elf64lriscv.sh binutils-2.21.1/ld/emulparams/elf64lriscv.sh
+--- ../binutils-2.21.1-orig/ld/emulparams/elf64lriscv.sh	1969-12-31 16:00:00.000000000 -0800
 +++ binutils-2.21.1/ld/emulparams/elf64lriscv.sh	2011-10-22 18:50:03.000000000 -0700
 @@ -0,0 +1,13 @@
 +# If you change this file, please also look at files which source this one:
@@ -22099,8 +22098,8 @@ diff -ruN binutils-2.21.1-orig/ld/emulparams/elf64lriscv.sh binutils-2.21.1/ld/e
 +  .gptab.sdata : { *(.gptab.data) *(.gptab.sdata) }
 +  .gptab.sbss : { *(.gptab.bss) *(.gptab.sbss) }
 +'
-diff -ruN binutils-2.21.1-orig/ld/emultempl/riscvelf.em binutils-2.21.1/ld/emultempl/riscvelf.em
---- binutils-2.21.1-orig/ld/emultempl/riscvelf.em	1969-12-31 16:00:00.000000000 -0800
+diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/ld/emultempl/riscvelf.em binutils-2.21.1/ld/emultempl/riscvelf.em
+--- ../binutils-2.21.1-orig/ld/emultempl/riscvelf.em	1969-12-31 16:00:00.000000000 -0800
 +++ binutils-2.21.1/ld/emultempl/riscvelf.em	2011-10-24 17:20:34.000000000 -0700
 @@ -0,0 +1,241 @@
 +# This shell script emits a C file. -*- C -*-
@@ -22344,8 +22343,8 @@ diff -ruN binutils-2.21.1-orig/ld/emultempl/riscvelf.em binutils-2.21.1/ld/emult
 +LDEMUL_AFTER_PARSE=riscv_after_parse
 +LDEMUL_BEFORE_ALLOCATION=riscv_before_allocation
 +LDEMUL_CREATE_OUTPUT_SECTION_STATEMENTS=riscv_create_output_section_statements
-diff -ruN binutils-2.21.1-orig/ld/Makefile.am binutils-2.21.1/ld/Makefile.am
---- binutils-2.21.1-orig/ld/Makefile.am	2011-03-16 01:37:30.000000000 -0700
+diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/ld/Makefile.am binutils-2.21.1/ld/Makefile.am
+--- ../binutils-2.21.1-orig/ld/Makefile.am	2011-03-16 01:37:30.000000000 -0700
 +++ binutils-2.21.1/ld/Makefile.am	2011-10-22 18:46:17.000000000 -0700
 @@ -211,6 +211,7 @@
  	eelf32lppc.c \
@@ -22386,8 +22385,8 @@ diff -ruN binutils-2.21.1-orig/ld/Makefile.am binutils-2.21.1/ld/Makefile.am
  eelf64ltsmip.c: $(srcdir)/emulparams/elf64ltsmip.sh \
    $(srcdir)/emulparams/elf64btsmip.sh $(srcdir)/emulparams/elf64bmip-defs.sh \
    $(srcdir)/emulparams/elf32bmipn32-defs.sh $(ELF_DEPS) \
-diff -ruN binutils-2.21.1-orig/ld/Makefile.in binutils-2.21.1/ld/Makefile.in
---- binutils-2.21.1-orig/ld/Makefile.in	2011-03-16 01:37:30.000000000 -0700
+diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/ld/Makefile.in binutils-2.21.1/ld/Makefile.in
+--- ../binutils-2.21.1-orig/ld/Makefile.in	2011-03-16 01:37:30.000000000 -0700
 +++ binutils-2.21.1/ld/Makefile.in	2011-10-22 18:46:17.000000000 -0700
 @@ -516,6 +516,7 @@
  	eelf32lppc.c \
@@ -22444,8 +22443,8 @@ diff -ruN binutils-2.21.1-orig/ld/Makefile.in binutils-2.21.1/ld/Makefile.in
  eelf64ltsmip.c: $(srcdir)/emulparams/elf64ltsmip.sh \
    $(srcdir)/emulparams/elf64btsmip.sh $(srcdir)/emulparams/elf64bmip-defs.sh \
    $(srcdir)/emulparams/elf32bmipn32-defs.sh $(ELF_DEPS) \
-diff -ruN binutils-2.21.1-orig/opcodes/configure binutils-2.21.1/opcodes/configure
---- binutils-2.21.1-orig/opcodes/configure	2010-11-05 03:32:32.000000000 -0700
+diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/opcodes/configure binutils-2.21.1/opcodes/configure
+--- ../binutils-2.21.1-orig/opcodes/configure	2010-11-05 03:32:32.000000000 -0700
 +++ binutils-2.21.1/opcodes/configure	2011-10-22 18:48:48.000000000 -0700
 @@ -12462,6 +12462,7 @@
  	bfd_powerpc_arch)	ta="$ta ppc-dis.lo ppc-opc.lo" ;;
@@ -22455,8 +22454,8 @@ diff -ruN binutils-2.21.1-orig/opcodes/configure binutils-2.21.1/opcodes/configu
  	bfd_romp_arch)		;;
  	bfd_rs6000_arch)	ta="$ta ppc-dis.lo ppc-opc.lo" ;;
  	bfd_rx_arch)		ta="$ta rx-dis.lo rx-decode.lo";;
-diff -ruN binutils-2.21.1-orig/opcodes/configure.in binutils-2.21.1/opcodes/configure.in
---- binutils-2.21.1-orig/opcodes/configure.in	2010-06-28 21:17:33.000000000 -0700
+diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/opcodes/configure.in binutils-2.21.1/opcodes/configure.in
+--- ../binutils-2.21.1-orig/opcodes/configure.in	2010-06-28 21:17:33.000000000 -0700
 +++ binutils-2.21.1/opcodes/configure.in	2011-10-22 18:46:17.000000000 -0700
 @@ -268,6 +268,7 @@
  	bfd_powerpc_arch)	ta="$ta ppc-dis.lo ppc-opc.lo" ;;
@@ -22466,8 +22465,8 @@ diff -ruN binutils-2.21.1-orig/opcodes/configure.in binutils-2.21.1/opcodes/conf
  	bfd_romp_arch)		;;
  	bfd_rs6000_arch)	ta="$ta ppc-dis.lo ppc-opc.lo" ;;
  	bfd_rx_arch)		ta="$ta rx-dis.lo rx-decode.lo";;
-diff -ruN binutils-2.21.1-orig/opcodes/disassemble.c binutils-2.21.1/opcodes/disassemble.c
---- binutils-2.21.1-orig/opcodes/disassemble.c	2010-08-05 20:59:49.000000000 -0700
+diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/opcodes/disassemble.c binutils-2.21.1/opcodes/disassemble.c
+--- ../binutils-2.21.1-orig/opcodes/disassemble.c	2010-08-05 20:59:49.000000000 -0700
 +++ binutils-2.21.1/opcodes/disassemble.c	2011-10-22 18:46:17.000000000 -0700
 @@ -338,6 +338,14 @@
  	disassemble = print_insn_little_powerpc;
@@ -22484,8 +22483,8 @@ diff -ruN binutils-2.21.1-orig/opcodes/disassemble.c binutils-2.21.1/opcodes/dis
  #ifdef ARCH_rs6000
      case bfd_arch_rs6000:
        if (bfd_get_mach (abfd) == bfd_mach_ppc_620)
-diff -ruN binutils-2.21.1-orig/opcodes/riscv-dis.c binutils-2.21.1/opcodes/riscv-dis.c
---- binutils-2.21.1-orig/opcodes/riscv-dis.c	1969-12-31 16:00:00.000000000 -0800
+diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/opcodes/riscv-dis.c binutils-2.21.1/opcodes/riscv-dis.c
+--- ../binutils-2.21.1-orig/opcodes/riscv-dis.c	1969-12-31 16:00:00.000000000 -0800
 +++ binutils-2.21.1/opcodes/riscv-dis.c	2011-10-22 19:19:34.000000000 -0700
 @@ -0,0 +1,905 @@
 +/* vim: set ts=8: */
@@ -23393,8 +23392,8 @@ diff -ruN binutils-2.21.1-orig/opcodes/riscv-dis.c binutils-2.21.1/opcodes/riscv
 +
 +  fprintf (stream, _("\n"));
 +}
-diff -ruN binutils-2.21.1-orig/opcodes/riscv-opc.c binutils-2.21.1/opcodes/riscv-opc.c
---- binutils-2.21.1-orig/opcodes/riscv-opc.c	1969-12-31 16:00:00.000000000 -0800
+diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/opcodes/riscv-opc.c binutils-2.21.1/opcodes/riscv-opc.c
+--- ../binutils-2.21.1-orig/opcodes/riscv-opc.c	1969-12-31 16:00:00.000000000 -0800
 +++ binutils-2.21.1/opcodes/riscv-opc.c	2011-10-22 19:14:45.000000000 -0700
 @@ -0,0 +1,449 @@
 +/* mips-opc.c -- MIPS opcode list.

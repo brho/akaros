@@ -20,9 +20,16 @@ ifneq ($(AWK),GNU)
 $(error You need to have 'gawk' installed on your system!)
 endif
 
+# Check to make sure that we have the GMP, MPFR, and MPC libraries installed
+GMP_OK := $(shell echo "int main() {return 0;}" | gcc -x c - -lgmp -lmpfr -lmpc -o /dev/null > /dev/null && echo OK)
+ifneq ($(GMP_OK),OK)
+$(error You need to have the libraries GMP, MPFR, and MPC installed on your system!)
+endif
+
+
 BINUTILS_VERSION := 2.21.1
-GCC_VERSION := 4.3.2
-GLIBC_VERSION := 2.11.1
+GCC_VERSION := 4.6.1
+GLIBC_VERSION := 2.14.1
 
 BUILDDIR ?= $(shell pwd)/
 ROSDIR ?= $(BUILDDIR)/../../../
@@ -31,7 +38,7 @@ DESTDIR ?= /
 # Configuration parameters for make-riscv
 RISCV_ARCH := riscv
 RISCV_BINARY_PREFIX := $(RISCV_ARCH)-ros-
-RISCV_GCC_BUILD_FLAGS := --with-cpu=v8
+RISCV_GCC_BUILD_FLAGS :=
 RISCV_CFLAGS :=
 
 # Configuration parameters for x86
@@ -134,15 +141,15 @@ binutils-$(BINUTILS_VERSION): binutils-$(BINUTILS_VERSION).tar.bz2
 	rm -rf binutils-$(BINUTILS_VERSION);
 	tar -jxf binutils-$(BINUTILS_VERSION).tar.bz2
 	patch -p0 < binutils-$(BINUTILS_VERSION)-ros.patch
-	patch -p0 < binutils-$(BINUTILS_VERSION)-riscv.patch
+	patch --no-backup-if-mismatch -p0 < binutils-$(BINUTILS_VERSION)-riscv.patch
 
-gcc-$(GCC_VERSION):
+gcc-$(GCC_VERSION): gcc-$(GCC_VERSION).tar.bz2
 	rm -rf gcc-$(GCC_VERSION)
-	tar -zxf gcc-$(GCC_VERSION).tar.gz
-	cd gcc-$(GCC_VERSION); \
-	patch -p1 < ../gcc-$(GCC_VERSION)-ros.patch
+	tar -jxf gcc-$(GCC_VERSION).tar.bz2
+	patch -p0 < gcc-$(GCC_VERSION)-ros.patch
+	patch --no-backup-if-mismatch -p0 < gcc-$(GCC_VERSION)-riscv.patch
 
-glibc-$(GLIBC_VERSION): 
+glibc-$(GLIBC_VERSION): glibc-$(GLIBC_VERSION).tar.bz2
 	rm -rf glibc-$(GLIBC_VERSION)
 	tar -jxf glibc-$(GLIBC_VERSION).tar.bz2
 	rm glibc-$(GLIBC_VERSION)/sysdeps/sparc/sparc32/elf/start.S
@@ -151,6 +158,7 @@ glibc-$(GLIBC_VERSION):
 	rm glibc-$(GLIBC_VERSION)/sysdeps/i386/init-first.c
 	rm glibc-$(GLIBC_VERSION)/sysdeps/i386/sysdep.h
 	$(MAKE) .glibc-patch
+	patch --no-backup-if-mismatch -p0 < glibc-$(GLIBC_VERSION)-riscv.patch
 
 .glibc-patch: glibc-$(GLIBC_VERSION)
 	-cd glibc-$(GLIBC_VERSION); \
@@ -249,9 +257,10 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 	        --disable-checking \
 	        --disable-werror \
 	        --disable-multilib \
-        	--disable-libmudflap \
-        	--disable-libssp \
-        	--disable-libgomp \
+	        --disable-libmudflap \
+	        --disable-libssp \
+	        --disable-libquadmath \
+	        --disable-libgomp \
 	        --disable-nls \
 	        --program-prefix=$(BINARY_PREFIX) \
 	        --target=$(ARCH)-ros \
@@ -269,7 +278,7 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 	make -j $(MAKE_JOBS) inhibit_libc=true cross-compiling=yes
 
 .$(BINARY_PREFIX)gcc-stage1-install: 
-	cd $(BINARY_PREFIX)gcc-stage1-builddir; \
+	-cd $(BINARY_PREFIX)gcc-stage1-builddir; \
 	make -j $(MAKE_JOBS) install
 	#-ln -vs libgcc.a `$(BINARY_PREFIX)gcc -print-libgcc-file-name | \
 	#                 sed 's/libgcc/&_eh/'`
@@ -306,7 +315,7 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 	../gcc-$(GCC_VERSION)/configure \
 	          --enable-shared \
 	          --disable-multilib \
-        	  --disable-nls \
+	          --disable-nls \
 	          --program-prefix=$(BINARY_PREFIX) \
 	          --target=$(ARCH)-ros \
 	          --prefix=$(INSTDIR) \
@@ -327,18 +336,20 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 	make -j $(MAKE_JOBS) install
 
 patches:
-	rm -rf gcc-$(GCC_VERSION)/libstdc++-v3/autom4te.cache
-	mv gcc-$(GCC_VERSION) gcc-$(GCC_VERSION).new
-	tar -zxf gcc-$(GCC_VERSION).tar.gz
-	-diff -ruN gcc-$(GCC_VERSION) gcc-$(GCC_VERSION).new \
-	      > gcc-$(GCC_VERSION)-ros.patch
-	rm -rf gcc-$(GCC_VERSION)
-	mv gcc-$(GCC_VERSION).new gcc-$(GCC_VERSION)
+	rm -rf orig-src
+	mkdir orig-src
 	
-	mv binutils-$(BINUTILS_VERSION) binutils-$(BINUTILS_VERSION).new
-	tar -zxf binutils-$(BINUTILS_VERSION).tar.gz
-	-diff -ruN binutils-$(BINUTILS_VERSION) binutils-$(BINUTILS_VERSION).new \
+	find . -name autom4te.cache | xargs rm -rf
+	patch --no-backup-if-mismatch -Rp0 < gcc-$(GCC_VERSION)-riscv.patch
+	tar -C orig-src -jxf gcc-$(GCC_VERSION).tar.bz2
+	-diff -ruN orig-src/gcc-$(GCC_VERSION) gcc-$(GCC_VERSION) \
+	      > gcc-$(GCC_VERSION)-ros.patch
+	patch --no-backup-if-mismatch -p0 < gcc-$(GCC_VERSION)-riscv.patch
+	
+	patch --no-backup-if-mismatch -Rp0 < binutils-$(BINUTILS_VERSION)-riscv.patch
+	tar -C orig-src -jxf binutils-$(BINUTILS_VERSION).tar.bz2
+	-diff -ruN orig-src/binutils-$(BINUTILS_VERSION) binutils-$(BINUTILS_VERSION) \
 	      > binutils-$(BINUTILS_VERSION)-ros.patch
-	rm -rf binutils-$(BINUTILS_VERSION)
-	mv binutils-$(BINUTILS_VERSION).new binutils-$(BINUTILS_VERSION)
-
+	patch --no-backup-if-mismatch -p0 < binutils-$(BINUTILS_VERSION)-riscv.patch
+	
+	rm -rf orig-src
