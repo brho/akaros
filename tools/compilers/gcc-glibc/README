@@ -1,9 +1,0 @@
-Before you can compile the cross compiler, you need to download the following
-files from akaros.cs:
-
-wget http://akaros.cs.berkeley.edu/xcc/binutils-2.18.tar.gz
-wget http://akaros.cs.berkeley.edu/xcc/gcc-4.3.2.tar.gz
-wget http://akaros.cs.berkeley.edu/xcc/glibc-2.11.1.tar.bz2
-wget http://akaros.cs.berkeley.edu/xcc/gmp-4.2.4.tar.gz
-wget http://akaros.cs.berkeley.edu/xcc/mpfr-2.3.2.tar.gz
-
