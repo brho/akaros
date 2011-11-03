@@ -269,7 +269,7 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/b
 +#endif
 diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/bits/endian.h glibc-2.14.1/sysdeps/riscv/bits/endian.h
 --- ../glibc-2.14.1-orig/sysdeps/riscv/bits/endian.h	1969-12-31 16:00:00.000000000 -0800
-+++ glibc-2.14.1/sysdeps/riscv/bits/endian.h	2011-10-25 02:48:44.000000000 -0700
++++ glibc-2.14.1/sysdeps/riscv/bits/endian.h	2011-10-27 21:55:31.000000000 -0700
 @@ -0,0 +1,13 @@
 +/* The MIPS architecture has selectable endianness.
 +   This file is for a machine using big-endian mode.  */
@@ -278,10 +278,10 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/b
 +# error "Never use <bits/endian.h> directly; include <endian.h> instead."
 +#endif
 +
-+#if __MIPSEB
++#if __RISCVEB
 +# define __BYTE_ORDER __BIG_ENDIAN
 +#endif
-+#if __MIPSEL
++#if __RISCVEL
 +# define __BYTE_ORDER __LITTLE_ENDIAN
 +#endif
 diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/bits/fenv.h glibc-2.14.1/sysdeps/riscv/bits/fenv.h
@@ -3090,34 +3090,6 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/e
 +	.long 0
 +	.weak data_start
 +	data_start = __data_start
-diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/fpregdef.h glibc-2.14.1/sysdeps/riscv/fpregdef.h
---- ../glibc-2.14.1-orig/sysdeps/riscv/fpregdef.h	1969-12-31 16:00:00.000000000 -0800
-+++ glibc-2.14.1/sysdeps/riscv/fpregdef.h	2011-10-25 02:48:44.000000000 -0700
-@@ -0,0 +1,24 @@
-+/* Copyright (C) 1991, 92, 94, 95, 96 Free Software Foundation, Inc.
-+   This file is part of the GNU C Library.
-+
-+   The GNU C Library is free software; you can redistribute it and/or
-+   modify it under the terms of the GNU Lesser General Public
-+   License as published by the Free Software Foundation; either
-+   version 2.1 of the License, or (at your option) any later version.
-+
-+   The GNU C Library is distributed in the hope that it will be useful,
-+   but WITHOUT ANY WARRANTY; without even the implied warranty of
-+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-+   Lesser General Public License for more details.
-+
-+   You should have received a copy of the GNU Lesser General Public
-+   License along with the GNU C Library; if not, write to the Free
-+   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
-+   02111-1307 USA.  */
-+
-+#ifndef _FPREGDEF_H
-+#define _FPREGDEF_H
-+
-+#include <sys/fpregdef.h>
-+
-+#endif /* _FPREGDEF_H */
 diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/fpu/bits/mathinline.h glibc-2.14.1/sysdeps/riscv/fpu/bits/mathinline.h
 --- ../glibc-2.14.1-orig/sysdeps/riscv/fpu/bits/mathinline.h	1969-12-31 16:00:00.000000000 -0800
 +++ glibc-2.14.1/sysdeps/riscv/fpu/bits/mathinline.h	2011-10-25 02:48:44.000000000 -0700
@@ -3176,8 +3148,8 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/f
 +#endif /* __GNUC__ */
 diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/fpu/e_sqrt.c glibc-2.14.1/sysdeps/riscv/fpu/e_sqrt.c
 --- ../glibc-2.14.1-orig/sysdeps/riscv/fpu/e_sqrt.c	1969-12-31 16:00:00.000000000 -0800
-+++ glibc-2.14.1/sysdeps/riscv/fpu/e_sqrt.c	2011-10-25 02:48:44.000000000 -0700
-@@ -0,0 +1,38 @@
++++ glibc-2.14.1/sysdeps/riscv/fpu/e_sqrt.c	2011-10-27 22:20:54.000000000 -0700
+@@ -0,0 +1,26 @@
 +/* Copyright (C) 2002 Free Software Foundation, Inc.
 +   This file is part of the GNU C Library.
 +   Contributed by Hartvig Ekner <hartvige@mips.com>, 2002.
@@ -3196,30 +3168,18 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/f
 +   License along with the GNU C Library; if not, write to the Free
 +   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 +   02111-1307 USA.  */
-+
-+
-+#include <sgidefs.h>
-+
-+
-+#if (_MIPS_ISA >= _MIPS_ISA_MIPS2)
 +
 +double
 +__ieee754_sqrt (double x)
 +{
 +  double z;
-+  __asm__ ("sqrt.d %0,%1" : "=f" (z) : "f" (x));
++  __asm__ ("fsqrt.d %0,%1" : "=f" (z) : "f" (x));
 +  return z;
 +}
-+
-+#else
-+
-+#include <sysdeps/ieee754/dbl-64/e_sqrt.c>
-+
-+#endif
 diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/fpu/e_sqrtf.c glibc-2.14.1/sysdeps/riscv/fpu/e_sqrtf.c
 --- ../glibc-2.14.1-orig/sysdeps/riscv/fpu/e_sqrtf.c	1969-12-31 16:00:00.000000000 -0800
-+++ glibc-2.14.1/sysdeps/riscv/fpu/e_sqrtf.c	2011-10-25 02:48:44.000000000 -0700
-@@ -0,0 +1,39 @@
++++ glibc-2.14.1/sysdeps/riscv/fpu/e_sqrtf.c	2011-10-27 22:21:11.000000000 -0700
+@@ -0,0 +1,26 @@
 +/* Copyright (C) 2002 Free Software Foundation, Inc.
 +   This file is part of the GNU C Library.
 +   Contributed by Hartvig Ekner <hartvige@mips.com>, 2002.
@@ -3239,26 +3199,13 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/f
 +   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 +   02111-1307 USA.  */
 +
-+
-+#include <sgidefs.h>
-+
-+
-+#if (_MIPS_ISA >= _MIPS_ISA_MIPS2)
-+
 +float
 +__ieee754_sqrtf (float x)
 +{
 +  float z;
-+  __asm__ ("sqrt.s %0,%1" : "=f" (z) : "f" (x));
++  __asm__ ("fsqrt.s %0,%1" : "=f" (z) : "f" (x));
 +  return z;
 +}
-+
-+#else
-+
-+#include <sysdeps/ieee754/flt-32/e_sqrtf.c>
-+
-+#endif
-+
 diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/fpu/fclrexcpt.c glibc-2.14.1/sysdeps/riscv/fpu/fclrexcpt.c
 --- ../glibc-2.14.1-orig/sysdeps/riscv/fpu/fclrexcpt.c	1969-12-31 16:00:00.000000000 -0800
 +++ glibc-2.14.1/sysdeps/riscv/fpu/fclrexcpt.c	2011-10-25 02:48:44.000000000 -0700
@@ -5669,11 +5616,10 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/_
 +END(__longjmp)
 diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/Makefile glibc-2.14.1/sysdeps/riscv/Makefile
 --- ../glibc-2.14.1-orig/sysdeps/riscv/Makefile	1969-12-31 16:00:00.000000000 -0800
-+++ glibc-2.14.1/sysdeps/riscv/Makefile	2011-10-25 02:48:44.000000000 -0700
-@@ -0,0 +1,10 @@
++++ glibc-2.14.1/sysdeps/riscv/Makefile	2011-10-27 22:23:23.000000000 -0700
+@@ -0,0 +1,9 @@
 +ifeq ($(subdir),misc)
-+sysdep_headers += regdef.h fpregdef.h sys/regdef.h sys/fpregdef.h \
-+		  sys/asm.h sgidefs.h
++sysdep_headers += sys/asm.h sgidefs.h
 +endif
 +
 +ifeq ($(subdir),rt)
@@ -5981,8 +5927,8 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/n
 +TID_OFFSET			thread_offsetof (tid)
 diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/nptl/tls.h glibc-2.14.1/sysdeps/riscv/nptl/tls.h
 --- ../glibc-2.14.1-orig/sysdeps/riscv/nptl/tls.h	1969-12-31 16:00:00.000000000 -0800
-+++ glibc-2.14.1/sysdeps/riscv/nptl/tls.h	2011-10-25 02:48:44.000000000 -0700
-@@ -0,0 +1,173 @@
++++ glibc-2.14.1/sysdeps/riscv/nptl/tls.h	2011-10-27 22:17:29.000000000 -0700
+@@ -0,0 +1,165 @@
 +/* Definition for thread-local data handling.  NPTL/MIPS version.
 +   Copyright (C) 2005, 2007 Free Software Foundation, Inc.
 +   This file is part of the GNU C Library.
@@ -6023,9 +5969,8 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/n
 +  } pointer;
 +} dtv_t;
 +
-+# define READ_THREAD_POINTER() \
-+    ({ register void* __result asm("tp");      \
-+       __result; })
++register void* __thread_self asm("tp");
++# define READ_THREAD_POINTER() ({ __thread_self; })
 +
 +#endif /* __ASSEMBLER__ */
 +
@@ -6092,16 +6037,9 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/n
 +# define GET_DTV(tcbp) \
 +  (((tcbhead_t *) (tcbp))[-1].dtv)
 +
-+/* Code to initially initialize the thread pointer.  This might need
-+   special attention since 'errno' is not yet available and if the
-+   operation can cause a failure 'errno' must not be touched.  */
++/* Code to initially initialize the thread pointer. */
 +# define TLS_INIT_TP(tcbp, secondcall) \
-+  ({ INTERNAL_SYSCALL_DECL (err);					\
-+     long result_var;							\
-+     result_var = INTERNAL_SYSCALL (set_thread_area, err, 1,		\
-+				    (char *) (tcbp) + TLS_TCB_OFFSET);	\
-+     INTERNAL_SYSCALL_ERROR_P (result_var, err)				\
-+       ? "unknown error" : NULL; })
++  ({ __thread_self = (char*)tcbp + TLS_TCB_OFFSET; NULL; })
 +
 +/* Return the address of the dtv for the current thread.  */
 +# define THREAD_DTV() \
@@ -6181,37 +6119,6 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/p
 +  CPPFLAGS="$CPPFLAGS -mabi=$mips_config_abi"
 +fi
 +;;
-diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/regdef.h glibc-2.14.1/sysdeps/riscv/regdef.h
---- ../glibc-2.14.1-orig/sysdeps/riscv/regdef.h	1969-12-31 16:00:00.000000000 -0800
-+++ glibc-2.14.1/sysdeps/riscv/regdef.h	2011-10-25 02:48:44.000000000 -0700
-@@ -0,0 +1,27 @@
-+/* Copyright (C) 1994, 1995, 1996, 1997, 1998 Free Software Foundation, Inc.
-+   This file is part of the GNU C Library.
-+   Contributed by Ralf Baechle <ralf@gnu.org>.
-+
-+   The GNU C Library is free software; you can redistribute it and/or
-+   modify it under the terms of the GNU Lesser General Public
-+   License as published by the Free Software Foundation; either
-+   version 2.1 of the License, or (at your option) any later version.
-+
-+   The GNU C Library is distributed in the hope that it will be useful,
-+   but WITHOUT ANY WARRANTY; without even the implied warranty of
-+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-+   Lesser General Public License for more details.
-+
-+   You should have received a copy of the GNU Lesser General Public
-+   License along with the GNU C Library; if not, write to the Free
-+   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
-+   02111-1307 USA.  */
-+
-+#ifndef _REGDEF_H
-+#define _REGDEF_H
-+
-+#include <sys/regdef.h>
-+#include <sys/fpregdef.h>
-+
-+#endif /* _REGDEF_H */
-+
 diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/rv32/Implies glibc-2.14.1/sysdeps/riscv/rv32/Implies
 --- ../glibc-2.14.1-orig/sysdeps/riscv/rv32/Implies	1969-12-31 16:00:00.000000000 -0800
 +++ glibc-2.14.1/sysdeps/riscv/rv32/Implies	2011-10-25 02:48:44.000000000 -0700
@@ -7744,8 +7651,8 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/s
 +weak_alias(_setjmp, __GI__setjmp)
 diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/sgidefs.h glibc-2.14.1/sysdeps/riscv/sgidefs.h
 --- ../glibc-2.14.1-orig/sysdeps/riscv/sgidefs.h	1969-12-31 16:00:00.000000000 -0800
-+++ glibc-2.14.1/sysdeps/riscv/sgidefs.h	2011-10-25 02:48:44.000000000 -0700
-@@ -0,0 +1,73 @@
++++ glibc-2.14.1/sysdeps/riscv/sgidefs.h	2011-10-27 22:22:09.000000000 -0700
+@@ -0,0 +1,41 @@
 +/* Copyright (C) 1996, 1997, 1998, 2003, 2004 Free Software Foundation, Inc.
 +   This file is part of the GNU C Library.
 +   Contributed by Ralf Baechle <ralf@gnu.org>.
@@ -7767,38 +7674,6 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/s
 +
 +#ifndef _SGIDEFS_H
 +#define _SGIDEFS_H	1
-+
-+/*
-+ * A crude hack to stop <asm/sgidefs.h>
-+ */
-+#undef __ASM_SGIDEFS_H
-+#define __ASM_SGIDEFS_H
-+
-+/*
-+ * And remove any damage it might have already done
-+ */
-+#undef _MIPS_ISA_MIPS1
-+#undef _MIPS_ISA_MIPS2
-+#undef _MIPS_ISA_MIPS3
-+#undef _MIPS_ISA_MIPS4
-+#undef _MIPS_ISA_MIPS5
-+#undef _MIPS_ISA_MIPS32
-+#undef _MIPS_ISA_MIPS64
-+
-+#undef _RISCV_SIM_ABI32
-+#undef _RISCV_SIM_NABI32
-+#undef _RISCV_SIM_ABI64
-+
-+/*
-+ * Definitions for the ISA level
-+ */
-+#define _MIPS_ISA_MIPS1 1
-+#define _MIPS_ISA_MIPS2 2
-+#define _MIPS_ISA_MIPS3 3
-+#define _MIPS_ISA_MIPS4 4
-+#define _MIPS_ISA_MIPS5 5
-+#define _MIPS_ISA_MIPS32 6
-+#define _MIPS_ISA_MIPS64 7
 +
 +/*
 + * Subprogram calling convention
@@ -8143,34 +8018,6 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/s
 +#endif
 +
 +#endif /* sys/asm.h */
-diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/sys/fpregdef.h glibc-2.14.1/sysdeps/riscv/sys/fpregdef.h
---- ../glibc-2.14.1-orig/sysdeps/riscv/sys/fpregdef.h	1969-12-31 16:00:00.000000000 -0800
-+++ glibc-2.14.1/sysdeps/riscv/sys/fpregdef.h	2011-10-25 02:48:44.000000000 -0700
-@@ -0,0 +1,24 @@
-+/* Copyright (C) 1991,92,94,95,96,97,98,2009 Free Software Foundation, Inc.
-+   This file is part of the GNU C Library.
-+
-+   The GNU C Library is free software; you can redistribute it and/or
-+   modify it under the terms of the GNU Lesser General Public
-+   License as published by the Free Software Foundation; either
-+   version 2.1 of the License, or (at your option) any later version.
-+
-+   The GNU C Library is distributed in the hope that it will be useful,
-+   but WITHOUT ANY WARRANTY; without even the implied warranty of
-+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-+   Lesser General Public License for more details.
-+
-+   You should have received a copy of the GNU Lesser General Public
-+   License along with the GNU C Library; if not, write to the Free
-+   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
-+   02111-1307 USA.  */
-+
-+#ifndef _SYS_FPREGDEF_H
-+#define _SYS_FPREGDEF_H
-+
-+#include <sgidefs.h>
-+
-+#endif /* sys/fpregdef.h */
 diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/sys/ucontext.h glibc-2.14.1/sysdeps/riscv/sys/ucontext.h
 --- ../glibc-2.14.1-orig/sysdeps/riscv/sys/ucontext.h	1969-12-31 16:00:00.000000000 -0800
 +++ glibc-2.14.1/sysdeps/riscv/sys/ucontext.h	2011-10-25 02:48:44.000000000 -0700
@@ -8539,8 +8386,8 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/unix/ri
 +}
 diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/unix/riscv/sysdep.h glibc-2.14.1/sysdeps/unix/riscv/sysdep.h
 --- ../glibc-2.14.1-orig/sysdeps/unix/riscv/sysdep.h	1969-12-31 16:00:00.000000000 -0800
-+++ glibc-2.14.1/sysdeps/unix/riscv/sysdep.h	2011-10-25 02:48:44.000000000 -0700
-@@ -0,0 +1,74 @@
++++ glibc-2.14.1/sysdeps/unix/riscv/sysdep.h	2011-10-27 22:23:40.000000000 -0700
+@@ -0,0 +1,73 @@
 +/* Copyright (C) 1992, 1995, 1997, 1999, 2000, 2002, 2003, 2004
 +   Free Software Foundation, Inc.
 +   This file is part of the GNU C Library.
@@ -8565,7 +8412,6 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/unix/ri
 +
 +#ifdef __ASSEMBLER__
 +
-+#include <regdef.h>
 +#include <sys/asm.h>
 +
 +#define ENTRY(name) LEAF(name)
@@ -11598,8 +11444,8 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/unix/sy
 +#endif
 diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/unix/sysv/linux/riscv/getcontext.S glibc-2.14.1/sysdeps/unix/sysv/linux/riscv/getcontext.S
 --- ../glibc-2.14.1-orig/sysdeps/unix/sysv/linux/riscv/getcontext.S	1969-12-31 16:00:00.000000000 -0800
-+++ glibc-2.14.1/sysdeps/unix/sysv/linux/riscv/getcontext.S	2011-10-25 02:48:44.000000000 -0700
-@@ -0,0 +1,83 @@
++++ glibc-2.14.1/sysdeps/unix/sysv/linux/riscv/getcontext.S	2011-10-27 22:24:14.000000000 -0700
+@@ -0,0 +1,81 @@
 +/* Save current context.
 +   Copyright (C) 2009 Free Software Foundation, Inc.
 +   This file is part of the GNU C Library.
@@ -11622,8 +11468,6 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/unix/sy
 +
 +#include <sysdep.h>
 +#include <sys/asm.h>
-+#include <sys/fpregdef.h>
-+#include <sys/regdef.h>
 +
 +#include "ucontext_i.h"
 +
@@ -12023,12 +11867,10 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/unix/sy
 +#include <__longjmp.S>
 diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/unix/sysv/linux/riscv/makecontext.c glibc-2.14.1/sysdeps/unix/sysv/linux/riscv/makecontext.c
 --- ../glibc-2.14.1-orig/sysdeps/unix/sysv/linux/riscv/makecontext.c	1969-12-31 16:00:00.000000000 -0800
-+++ glibc-2.14.1/sysdeps/unix/sysv/linux/riscv/makecontext.c	2011-10-25 02:48:44.000000000 -0700
-@@ -0,0 +1,36 @@
++++ glibc-2.14.1/sysdeps/unix/sysv/linux/riscv/makecontext.c	2011-10-27 22:23:54.000000000 -0700
+@@ -0,0 +1,34 @@
 +#include <sysdep.h>
 +#include <sys/asm.h>
-+#include <sys/fpregdef.h>
-+#include <sys/regdef.h>
 +#include <sys/ucontext.h>
 +#include <stdarg.h>
 +
@@ -14388,8 +14230,8 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/unix/sy
 +weak_alias (__umount, umount);
 diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/unix/sysv/linux/riscv/setcontext.S glibc-2.14.1/sysdeps/unix/sysv/linux/riscv/setcontext.S
 --- ../glibc-2.14.1-orig/sysdeps/unix/sysv/linux/riscv/setcontext.S	1969-12-31 16:00:00.000000000 -0800
-+++ glibc-2.14.1/sysdeps/unix/sysv/linux/riscv/setcontext.S	2011-10-25 02:48:44.000000000 -0700
-@@ -0,0 +1,131 @@
++++ glibc-2.14.1/sysdeps/unix/sysv/linux/riscv/setcontext.S	2011-10-27 22:24:24.000000000 -0700
+@@ -0,0 +1,129 @@
 +/* Set current context.
 +   Copyright (C) 2009 Free Software Foundation, Inc.
 +   This file is part of the GNU C Library.
@@ -14412,8 +14254,6 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/unix/sy
 +
 +#include <sysdep.h>
 +#include <sys/asm.h>
-+#include <sys/fpregdef.h>
-+#include <sys/regdef.h>
 +
 +#include "ucontext_i.h"
 +
@@ -14861,8 +14701,8 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/unix/sy
 +#endif
 diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/unix/sysv/linux/riscv/__start_context.S glibc-2.14.1/sysdeps/unix/sysv/linux/riscv/__start_context.S
 --- ../glibc-2.14.1-orig/sysdeps/unix/sysv/linux/riscv/__start_context.S	1969-12-31 16:00:00.000000000 -0800
-+++ glibc-2.14.1/sysdeps/unix/sysv/linux/riscv/__start_context.S	2011-10-25 02:48:44.000000000 -0700
-@@ -0,0 +1,41 @@
++++ glibc-2.14.1/sysdeps/unix/sysv/linux/riscv/__start_context.S	2011-10-27 22:24:01.000000000 -0700
+@@ -0,0 +1,39 @@
 +/* Modify saved context.
 +   Copyright (C) 2009 Free Software Foundation, Inc.
 +   This file is part of the GNU C Library.
@@ -14885,8 +14725,6 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/unix/sy
 +
 +#include <sysdep.h>
 +#include <sys/asm.h>
-+#include <sys/fpregdef.h>
-+#include <sys/regdef.h>
 +
 +#include "ucontext_i.h"
 +
@@ -14906,8 +14744,8 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/unix/sy
 +PSEUDO_END (__start_context)
 diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/unix/sysv/linux/riscv/swapcontext.S glibc-2.14.1/sysdeps/unix/sysv/linux/riscv/swapcontext.S
 --- ../glibc-2.14.1-orig/sysdeps/unix/sysv/linux/riscv/swapcontext.S	1969-12-31 16:00:00.000000000 -0800
-+++ glibc-2.14.1/sysdeps/unix/sysv/linux/riscv/swapcontext.S	2011-10-25 02:48:44.000000000 -0700
-@@ -0,0 +1,129 @@
++++ glibc-2.14.1/sysdeps/unix/sysv/linux/riscv/swapcontext.S	2011-10-27 22:24:08.000000000 -0700
+@@ -0,0 +1,127 @@
 +/* Save and set current context.
 +   Copyright (C) 2009 Free Software Foundation, Inc.
 +   This file is part of the GNU C Library.
@@ -14930,8 +14768,6 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/unix/sy
 +
 +#include <sysdep.h>
 +#include <sys/asm.h>
-+#include <sys/fpregdef.h>
-+#include <sys/regdef.h>
 +
 +#include "ucontext_i.h"
 +

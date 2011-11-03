@@ -35,7 +35,7 @@ __libc_lock_define (typedef, mutex_t)
 
 #include <bits/libc-tsd.h>
 
-typedef int tsd_key_t[1];	/* no key data structure, libc magic does it */
+typedef void* tsd_key_t;	/* no key data structure, libc magic does it */
 __libc_tsd_define (static, void *, MALLOC)	/* declaration/common definition */
 #define tsd_key_create(key, destr)	((void) (key))
 #define tsd_setspecific(key, data)	__libc_tsd_set (void *, MALLOC, (data))

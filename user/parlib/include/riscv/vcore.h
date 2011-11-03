@@ -1,0 +1,119 @@
+#ifndef PARLIB_ARCH_VCORE_H
+#define PARLIB_ARCH_VCORE_H
+
+#include <ros/common.h>
+#include <ros/arch/trapframe.h>
+#include <arch/arch.h>
+#include <ros/syscall.h>
+#include <ros/procdata.h>
+#include <assert.h>
+
+extern __thread int __vcoreid;
+
+/* Feel free to ignore vcoreid.  It helps x86 to avoid a call to
+ * sys_getvcoreid() if we pass it in. */
+static inline void *get_tls_desc(uint32_t vcoreid)
+{
+	register void* tp asm("tp");
+	return tp;
+}
+
+#ifdef __riscv64
+# define REG_L "ld"
+# define REG_S "sd"
+#else
+# define REG_L "lw"
+# define REG_S "sw"
+#endif
+
+static inline void set_tls_desc(void *tls_desc, uint32_t vcoreid)
+{
+	asm volatile ("move tp, %0" : : "r"(tls_desc) : "memory");
+	__vcoreid = vcoreid;
+}
+
+extern void __pop_ros_tf(struct user_trapframe *tf, bool* notif_enabled_p,
+                         bool* notif_pending_p, uint32_t vcoreid);
+extern void __save_ros_tf(struct user_trapframe *tf);
+
+/* Pops an ROS kernel-provided TF, reanabling notifications at the same time.
+ * A Userspace scheduler can call this when transitioning off the transition
+ * stack.
+ *
+ * Make sure you clear the notif_pending flag, and then check the queue before
+ * calling this.  If notif_pending is not clear, this will self_notify this
+ * core, since it should be because we missed a notification message while
+ * notifs were disabled. 
+ *
+ * The important thing is that it can a notification after it enables
+ * notifications, and when it gets resumed it can ultimately run the new
+ * context.  Enough state is saved in the running context and stack to continue
+ * running. */
+static inline void pop_ros_tf(struct user_trapframe *tf, uint32_t vcoreid)
+{
+	// since we're changing the stack, move stuff into regs for now
+	register uint32_t _vcoreid = vcoreid;
+	register struct user_trapframe* _tf = tf;
+
+	set_stack_pointer((void*)tf->gpr[30]);
+
+	tf = _tf;
+	vcoreid = _vcoreid;
+	struct preempt_data* vcpd = &__procdata.vcore_preempt_data[vcoreid];
+
+	// if this is a trap frame we just init'ed, we need to set up TLS
+	if(tf->gpr[31] == 0)
+		tf->gpr[31] = (long)get_tls_desc(vcoreid);
+	else
+		assert(tf->gpr[31] == (long)get_tls_desc(vcoreid));
+
+	__pop_ros_tf(tf, &vcpd->notif_enabled, &vcpd->notif_pending, vcoreid);
+}
+
+/* Like the regular pop_ros_tf, but this one doesn't check or clear
+ * notif_pending.  TODO: someone from sparc should look at this. */
+static inline void pop_ros_tf_raw(struct user_trapframe *tf, uint32_t vcoreid)
+{
+	// since we're changing the stack, move stuff into regs for now
+	register uint32_t _vcoreid = vcoreid;
+	register struct user_trapframe* _tf = tf;
+
+	set_stack_pointer((void*)tf->gpr[30]);
+
+	tf = _tf;
+	vcoreid = _vcoreid;
+	struct preempt_data* vcpd = &__procdata.vcore_preempt_data[vcoreid];
+
+	// if this is a trap frame we just init'ed, we need to set up TLS
+	if(tf->gpr[31] == 0)
+		tf->gpr[31] = (long)get_tls_desc(vcoreid);
+	else
+		assert(tf->gpr[31] == (long)get_tls_desc(vcoreid));
+
+	__pop_ros_tf(tf, &vcpd->notif_enabled, 0, 0);
+}
+
+/* Save the current context/registers into the given tf, setting the pc of the
+ * tf to the end of this function.  You only need to save that which you later
+ * restore with pop_ros_tf(). */
+static inline void save_ros_tf(struct user_trapframe *tf)
+{
+	__save_ros_tf(tf);
+}
+
+/* This assumes a user_tf looks like a regular kernel trapframe */
+static __inline void
+init_user_tf(struct user_trapframe *u_tf, uint32_t entry_pt, uint32_t stack_top)
+{
+	memset(u_tf, 0, sizeof(*u_tf));
+	u_tf->gpr[30] = stack_top;
+	u_tf->epc = entry_pt;
+}
+
+#define __vcore_id_on_entry \
+({ \
+	register int temp asm ("a0"); \
+	temp; \
+})
+
+#endif /* PARLIB_ARCH_VCORE_H */

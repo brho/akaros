@@ -71,7 +71,6 @@ riscv:
 	$(MAKE) make-all
 
 x86:
-	$(MAKE) .glibc-patch
 	export LD_LIBRARY_PATH=; \
 	export DESTDIR=$(DESTDIR);\
 	export INSTDIR=$(X86_INSTDIR);\
@@ -84,11 +83,9 @@ x86:
 	$(MAKE) make-all
 
 make-all: 
-	$(MAKE) .glibc-patch
 	$(MAKE) .$(BINARY_PREFIX)binutils-make
 	$(MAKE) .$(BINARY_PREFIX)binutils-install
 	$(MAKE) .$(BINARY_PREFIX)ros-headers-install
-	$(MAKE) .$(BINARY_PREFIX)glibc-headers-install
 	$(MAKE) .$(BINARY_PREFIX)gcc-stage1-make
 	$(MAKE) .$(BINARY_PREFIX)gcc-stage1-install
 	$(MAKE) .$(BINARY_PREFIX)glibc-make
@@ -130,7 +127,6 @@ gcc-clean:
 	make clean
 
 glibc-clean:
-	cd $(BINARY_PREFIX)glibc-headers-builddir; \
 	cd $(BINARY_PREFIX)glibc-builddir; \
 	make clean
 
@@ -152,15 +148,17 @@ gcc-$(GCC_VERSION): gcc-$(GCC_VERSION).tar.bz2
 glibc-$(GLIBC_VERSION): glibc-$(GLIBC_VERSION).tar.bz2
 	rm -rf glibc-$(GLIBC_VERSION)
 	tar -jxf glibc-$(GLIBC_VERSION).tar.bz2
+	$(MAKE) .glibc-patch
+	patch --no-backup-if-mismatch -p0 < glibc-$(GLIBC_VERSION)-riscv.patch
 	rm glibc-$(GLIBC_VERSION)/sysdeps/sparc/sparc32/elf/start.S
+	rm glibc-$(GLIBC_VERSION)/sysdeps/riscv/elf/start.S
+	rm glibc-$(GLIBC_VERSION)/sysdeps/riscv/init-first.c
 	rm glibc-$(GLIBC_VERSION)/sysdeps/i386/elf/start.S
 	rm glibc-$(GLIBC_VERSION)/sysdeps/i386/____longjmp_chk.S
 	rm glibc-$(GLIBC_VERSION)/sysdeps/i386/init-first.c
 	rm glibc-$(GLIBC_VERSION)/sysdeps/i386/sysdep.h
-	$(MAKE) .glibc-patch
-	patch --no-backup-if-mismatch -p0 < glibc-$(GLIBC_VERSION)-riscv.patch
 
-.glibc-patch: glibc-$(GLIBC_VERSION)
+.glibc-patch:
 	-cd glibc-$(GLIBC_VERSION); \
 	diff -ruB --unidirectional-new-file \
 	     ../glibc-$(GLIBC_VERSION) \
@@ -171,10 +169,6 @@ glibc-$(GLIBC_VERSION): glibc-$(GLIBC_VERSION).tar.bz2
 $(BINARY_PREFIX)binutils-builddir: binutils-$(BINUTILS_VERSION)
 	rm -rf $@
 	cp -R binutils-$(BINUTILS_VERSION) $@
-
-$(BINARY_PREFIX)glibc-headers-builddir: glibc-$(GLIBC_VERSION)
-	rm -rf $@
-	mkdir -p $@
 
 $(BINARY_PREFIX)gcc-stage1-builddir: gcc-$(GCC_VERSION)
 	rm -rf $@
@@ -208,30 +202,6 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 	cd $(BINARY_PREFIX)binutils-builddir; \
 	make -j $(MAKE_JOBS) install
 
-.$(BINARY_PREFIX)glibc-headers-configure:
-	$(MAKE) $(BINARY_PREFIX)glibc-headers-builddir
-	cd $(BINARY_PREFIX)glibc-headers-builddir; \
-	../glibc-$(GLIBC_VERSION)/configure \
-	          --host=$(ARCH)-ros \
-	          --enable-hacker-mode \
-	          --enable-shared \
-	          --disable-nls \
-	          --with-elf \
-	          --with-tls \
-	          --with-__thread \
-	          --prefix=$(INSTDIR)/$(ARCH)-ros \
-	          --with-headers=$(INSTDIR)/$(ARCH)-ros/sys-include \
-	          libc_cv_forced_unwind=yes \
-	          libc_cv_c_cleanup=yes;
-	touch $@
-
-.$(BINARY_PREFIX)glibc-headers-install: .$(BINARY_PREFIX)glibc-headers-configure
-	cd $(BINARY_PREFIX)glibc-headers-builddir; \
-	make -j $(MAKE_JOBS) install-headers; \
-	mkdir -p $(INSTDIR)/$(ARCH)-ros/include/gnu; \
-	echo > $(INSTDIR)/$(ARCH)-ros/include/gnu/stubs.h; \
-	cp bits/stdio_lim.h $(INSTDIR)/$(ARCH)-ros/include/bits/
-
 .$(BINARY_PREFIX)ros-headers-install: $(ROSDIR)
 	rm -rf $(INSTDIR)/$(ARCH)-ros/sys-include/*
 	mkdir -p $(INSTDIR)/$(ARCH)-ros/sys-include
@@ -254,6 +224,7 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 	../gcc-$(GCC_VERSION)/configure \
 	        --enable-languages=c \
 	        --enable-shared \
+	        --enable-tls \
 	        --disable-checking \
 	        --disable-werror \
 	        --disable-multilib \
@@ -314,6 +285,7 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 	cd $(BINARY_PREFIX)gcc-stage2-builddir; \
 	../gcc-$(GCC_VERSION)/configure \
 	          --enable-shared \
+	          --enable-tls \
 	          --disable-multilib \
 	          --disable-nls \
 	          --program-prefix=$(BINARY_PREFIX) \
@@ -321,7 +293,6 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 	          --prefix=$(INSTDIR) \
 	          --enable-languages=c,c++ \
 	          $(GCC_BUILD_FLAGS) \
-	          --with-tls \
 	          --with-__thread \
 	          --with-headers=$(INSTDIR)/$(ARCH)-ros/include \
 	          --disable-werror;

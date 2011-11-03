@@ -24,12 +24,17 @@
 /* Read the contents of the symbolic link PATH into no more than
    LEN bytes of BUF.  The contents are not null-terminated.
    Returns the number of characters read, or -1 for errors.  */
+
 ssize_t
-__readlink (path, buf, len)
-     const char *path;
-     char *buf;
-     size_t len;
+readlink (const char* path, char* buf, size_t len)
 {
   return ros_syscall(SYS_readlink, path, strlen(path), buf, len, 0, 0);
 }
-weak_alias (__readlink, readlink)
+
+/* __readlink has a different signature, so we can't just weak_alias it. */
+
+int
+__readlink (const char* path, char* buf, size_t len)
+{
+  return (int) readlink (path, buf, len);
+}

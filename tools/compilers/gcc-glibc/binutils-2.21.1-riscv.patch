@@ -5799,8 +5799,8 @@ diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/bfd/elf64-riscv.c binutils-2
 +#include "elf64-target.h"
 diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/bfd/elfxx-riscv.c binutils-2.21.1/bfd/elfxx-riscv.c
 --- ../binutils-2.21.1-orig/bfd/elfxx-riscv.c	1969-12-31 16:00:00.000000000 -0800
-+++ binutils-2.21.1/bfd/elfxx-riscv.c	2011-10-22 18:50:03.000000000 -0700
-@@ -0,0 +1,9383 @@
++++ binutils-2.21.1/bfd/elfxx-riscv.c	2011-10-28 05:18:11.000000000 -0700
+@@ -0,0 +1,9385 @@
 +/* vim: set ts=8 */
 +/* MIPS-specific support for ELF
 +   Copyright 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002,
@@ -10151,9 +10151,11 @@ diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/bfd/elfxx-riscv.c binutils-2
 +  /* Obtain the current value.  */
 +  x = mips_elf_obtain_contents (howto, relocation, input_bfd, contents);
 +
-+  /* Fix up dst_mask and value for R_MIPS_LO16 relocs on stores. */
-+  if(ELF_R_TYPE (input_bfd, relocation->r_info) == R_MIPS_LO16 &&
-+     ((x & MASK_SD)  == MATCH_SD  ||
++  /* Fix up dst_mask and value for R_RISCV_LO16 relocs on stores. */
++  if((ELF_R_TYPE (input_bfd, relocation->r_info) == R_RISCV_LO16 ||
++      ELF_R_TYPE (input_bfd, relocation->r_info) == R_RISCV_TLS_TPREL_LO16 ||
++      ELF_R_TYPE (input_bfd, relocation->r_info) == R_RISCV_TLS_DTPREL_LO16) &&
++	 ((x & MASK_SD)  == MATCH_SD  ||
 +      (x & MASK_SW)  == MATCH_SW  ||
 +      (x & MASK_SH)  == MATCH_SH  ||
 +      (x & MASK_SB)  == MATCH_SB  ||

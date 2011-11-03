@@ -35,7 +35,7 @@ typedef int __libc_lock_t;
 typedef struct __libc_lock_recursive { 
 	__libc_lock_t lock; 
 	int count; 
-	int owner; 
+	void* owner; 
 } __libc_lock_recursive_t;
 #define _LIBC_LOCK_RECURSIVE_INITIALIZER {_LIBC_LOCK_INITIALIZER,0,0}
 

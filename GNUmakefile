@@ -183,6 +183,7 @@ install-libs:
 fill-kfs: install-libs
 	@rm -rf $(FIRST_INITRAMFS_PATH)/lib
 	@cp -R $(GCC_ROOT)/$(TARGET_ARCH)-ros/lib $(FIRST_INITRAMFS_PATH)
+endif
 
 userclean:
 	@for i in $(USER_LIBS) ; do \
@@ -192,7 +193,6 @@ userclean:
 	done
 	@rm -rf $(OBJDIR)/$(TESTS_DIR)
 .PHONY: tests
-endif
 
 # Eliminate default suffix rules
 .SUFFIXES:
