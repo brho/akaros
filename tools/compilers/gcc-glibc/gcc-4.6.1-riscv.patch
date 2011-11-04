@@ -13,8 +13,8 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/config.sub g
  	# because (1) that's what they normally are, and
 diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/riscv/constraints.md gcc-4.6.1/gcc/config/riscv/constraints.md
 --- ../gcc-4.6.1-orig/gcc/config/riscv/constraints.md	1969-12-31 16:00:00.000000000 -0800
-+++ gcc-4.6.1/gcc/config/riscv/constraints.md	2011-10-22 16:54:57.000000000 -0700
-@@ -0,0 +1,199 @@
++++ gcc-4.6.1/gcc/config/riscv/constraints.md	2011-11-03 02:32:03.000000000 -0700
+@@ -0,0 +1,157 @@
 +;; Constraint definitions for MIPS.
 +;; Copyright (C) 2006, 2007, 2008, 2010 Free Software Foundation, Inc.
 +;;
@@ -39,9 +39,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +(define_register_constraint "d" "BASE_REG_CLASS"
 +  "An address register.  This is equivalent to @code{r} unless
 +   generating MIPS16 code.")
-+
-+(define_register_constraint "t" "T_REG"
-+  "@internal")
 +
 +(define_register_constraint "f" "TARGET_HARD_FLOAT ? FP_REGS : NO_REGS"
 +  "A floating-point register (if available).")
@@ -118,21 +115,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +       (match_test "!SMALL_OPERAND (ival)")
 +       (match_test "!LUI_OPERAND (ival)")))
 +
-+(define_constraint "N"
-+  "A constant in the range -65535 to -1 (inclusive)."
-+  (and (match_code "const_int")
-+       (match_test "ival >= -0xffff && ival < 0")))
-+
-+(define_constraint "O"
-+  "A signed 15-bit constant."
-+  (and (match_code "const_int")
-+       (match_test "ival >= -0x4000 && ival < 0x4000")))
-+
-+(define_constraint "P"
-+  "A constant in the range 1 to 65535 (inclusive)."
-+  (and (match_code "const_int")
-+       (match_test "ival > 0 && ival < 0x10000")))
-+
 +;; Floating-point constraints
 +
 +(define_constraint "G"
@@ -190,30 +172,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +   A vector zero."
 +  (and (match_code "const_vector")
 +       (match_test "op == CONST0_RTX (mode)")))
-+
-+(define_constraint "YA"
-+  "@internal
-+   An unsigned 6-bit constant."
-+  (and (match_code "const_int")
-+       (match_test "UIMM6_OPERAND (ival)")))
-+
-+(define_constraint "YB"
-+  "@internal
-+   A signed 10-bit constant."
-+  (and (match_code "const_int")
-+       (match_test "IMM10_OPERAND (ival)")))
-+
-+(define_constraint "Yb"
-+   "@internal"
-+   (match_operand 0 "qi_mask_operand"))
-+
-+(define_constraint "Yh"
-+   "@internal"
-+    (match_operand 0 "hi_mask_operand"))
-+
-+(define_constraint "Yw"
-+   "@internal"
-+    (match_operand 0 "si_mask_operand"))
 diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/riscv/crti.asm gcc-4.6.1/gcc/config/riscv/crti.asm
 --- ../gcc-4.6.1-orig/gcc/config/riscv/crti.asm	1969-12-31 16:00:00.000000000 -0800
 +++ gcc-4.6.1/gcc/config/riscv/crti.asm	2011-10-22 02:23:59.000000000 -0700
@@ -1068,8 +1026,8 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +#endif /* _MIPS_H_ */
 diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/riscv/predicates.md gcc-4.6.1/gcc/config/riscv/predicates.md
 --- ../gcc-4.6.1-orig/gcc/config/riscv/predicates.md	1969-12-31 16:00:00.000000000 -0800
-+++ gcc-4.6.1/gcc/config/riscv/predicates.md	2011-10-22 17:06:59.000000000 -0700
-@@ -0,0 +1,250 @@
++++ gcc-4.6.1/gcc/config/riscv/predicates.md	2011-11-03 02:32:31.000000000 -0700
+@@ -0,0 +1,209 @@
 +;; Predicate definitions for MIPS.
 +;; Copyright (C) 2004, 2007, 2008 Free Software Foundation, Inc.
 +;;
@@ -1095,18 +1053,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +
 +(define_predicate "arith_operand"
 +  (ior (match_operand 0 "const_arith_operand")
-+       (match_operand 0 "register_operand")))
-+
-+(define_predicate "const_uimm6_operand"
-+  (and (match_code "const_int")
-+       (match_test "UIMM6_OPERAND (INTVAL (op))")))
-+
-+(define_predicate "const_imm10_operand"
-+  (and (match_code "const_int")
-+       (match_test "IMM10_OPERAND (INTVAL (op))")))
-+
-+(define_predicate "reg_imm10_operand"
-+  (ior (match_operand 0 "const_imm10_operand")
 +       (match_operand 0 "register_operand")))
 +
 +(define_predicate "sle_operand"
@@ -1139,35 +1085,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +       (ior (match_test "op == CONST0_RTX (GET_MODE (op))")
 +	    (match_test "op == CONST1_RTX (GET_MODE (op))"))))
 +
-+(define_predicate "qi_mask_operand"
-+  (and (match_code "const_int")
-+       (match_test "UINTVAL (op) == 0xff")))
-+
-+(define_predicate "hi_mask_operand"
-+  (and (match_code "const_int")
-+       (match_test "UINTVAL (op) == 0xffff")))
-+
-+(define_predicate "si_mask_operand"
-+  (and (match_code "const_int")
-+       (match_test "UINTVAL (op) == 0xffffffff")))
-+
-+(define_predicate "and_load_operand"
-+  (ior (match_operand 0 "qi_mask_operand")
-+       (match_operand 0 "hi_mask_operand")
-+       (match_operand 0 "si_mask_operand")))
-+
-+(define_predicate "and_reg_operand"
-+  (ior (match_operand 0 "register_operand")
-+	     (match_operand 0 "const_arith_operand")
-+       (match_operand 0 "si_mask_operand")))
-+
-+(define_predicate "and_operand"
-+  (ior (match_operand 0 "and_load_operand")
-+       (match_operand 0 "and_reg_operand")))
-+
-+(define_predicate "d_operand"
-+  (and (match_code "reg")
-+       (match_test "GP_REG_P (REGNO (op))")))
 +(define_special_predicate "pc_or_label_operand"
 +  (match_code "pc,label_ref"))
 +
@@ -1322,8 +1239,8 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +  (match_code "eq,lt,le,gt,ge"))
 diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/riscv/riscv.c gcc-4.6.1/gcc/config/riscv/riscv.c
 --- ../gcc-4.6.1-orig/gcc/config/riscv/riscv.c	1969-12-31 16:00:00.000000000 -0800
-+++ gcc-4.6.1/gcc/config/riscv/riscv.c	2011-11-01 22:28:20.000000000 -0700
-@@ -0,0 +1,7599 @@
++++ gcc-4.6.1/gcc/config/riscv/riscv.c	2011-11-03 16:54:11.000000000 -0700
+@@ -0,0 +1,6930 @@
 +/* vim: set ts=8: */
 +/* Subroutines used for MIPS code generation.
 +   Copyright (C) 1989, 1990, 1991, 1993, 1994, 1995, 1996, 1997, 1998,
@@ -1540,14 +1457,8 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +  HOST_WIDE_INT gp_sp_offset;
 +  HOST_WIDE_INT fp_sp_offset;
 +
-+  /* Similar, but the value passed to _mcount.  */
-+  HOST_WIDE_INT ra_fp_offset;
-+
 +  /* The offset of arg_pointer_rtx from the bottom of the frame.  */
 +  HOST_WIDE_INT arg_pointer_offset;
-+
-+  /* The offset of hard_frame_pointer_rtx from the bottom of the frame.  */
-+  HOST_WIDE_INT hard_frame_pointer_offset;
 +};
 +
 +struct GTY(())  machine_function {
@@ -1641,7 +1552,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +   The worst accepted case for 64-bit constants is LUI,ORI,SLL,ORI,SLL,ORI.
 +   When the lowest bit is clear, we can try, but reject a sequence with
 +   an extra SLL at the end.  */
-+#define MIPS_MAX_INTEGER_OPS 256
++#define MIPS_MAX_INTEGER_OPS 32
 +
 +/* Costs of various operations on the different architectures.  */
 +
@@ -1708,9 +1619,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +static int mips_base_align_jumps; /* align_jumps */
 +static int mips_base_align_functions; /* align_functions */
 +
-+/* The -mcode-readable setting.  */
-+enum mips_code_readable_setting mips_code_readable = CODE_READABLE_YES;
-+
 +/* Index [M][R] is true if register R is allowed to hold a value of mode M.  */
 +bool mips_hard_regno_mode_ok[(int) MAX_MACHINE_MODE][FIRST_PSEUDO_REGISTER];
 +
@@ -1735,21 +1643,21 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +const enum reg_class mips_regno_to_class[FIRST_PSEUDO_REGISTER] = {
 +/*
 +yunsup: new register mapping
-+$0 , $ra, $v0, $v1,
-+$a0, $a1, $a2, $a3,
-+$a4, $a5, $a6, $a7,
-+$t0, $t1, $t2, $t3,
-+$t4, $t5, $t6, $t7,
-+$s0, $s1, $s2, $s3,
-+$s4, $s5, $s6, $s7,
-+$s8, $s9, $sp, $tp
++x0, ra, v0, v1,
++a0, a1, a2, a3,
++a4, a5, a6, a7,
++t0, t1, t2, t3,
++t4, t5, t6, t7,
++s0, s1, s2, s3,
++s4, s5, s6, s7,
++s8, s9, sp, tp
 +*/
-+  LEA_REGS,	LEA_REGS,	M16_REGS,	V1_REG,
-+  M16_REGS,	M16_REGS,	M16_REGS,	M16_REGS,
++  LEA_REGS,	LEA_REGS,	LEA_REGS,	V1_REG,
 +  LEA_REGS,	LEA_REGS,	LEA_REGS,	LEA_REGS,
 +  LEA_REGS,	LEA_REGS,	LEA_REGS,	LEA_REGS,
-+  LEA_REGS,	LEA_REGS,	T_REG,		PIC_FN_ADDR_REG,
-+  M16_REGS,	M16_REGS,	LEA_REGS,	LEA_REGS,
++  LEA_REGS,	LEA_REGS,	LEA_REGS,	LEA_REGS,
++  LEA_REGS,	LEA_REGS,	LEA_REGS,	PIC_FN_ADDR_REG,
++  LEA_REGS,	LEA_REGS,	LEA_REGS,	LEA_REGS,
 +  LEA_REGS,	LEA_REGS,	LEA_REGS,	LEA_REGS,
 +  LEA_REGS,	LEA_REGS,	LEA_REGS,	LEA_REGS,
 +  FP_REGS,	FP_REGS,	FP_REGS,	FP_REGS,
@@ -1891,123 +1799,61 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +  return 1;
 +}
 +
-+/* If X is a PLUS of a CONST_INT, return the two terms in *BASE_PTR
-+   and *OFFSET_PTR.  Return X in *BASE_PTR and 0 in *OFFSET_PTR otherwise.  */
-+
-+static void
-+mips_split_plus (rtx x, rtx *base_ptr, HOST_WIDE_INT *offset_ptr)
-+{
-+  if (GET_CODE (x) == PLUS && CONST_INT_P (XEXP (x, 1)))
-+    {
-+      *base_ptr = XEXP (x, 0);
-+      *offset_ptr = INTVAL (XEXP (x, 1));
-+    }
-+  else
-+    {
-+      *base_ptr = x;
-+      *offset_ptr = 0;
-+    }
-+}
++/* Fill CODES with a sequence of rtl operations to load VALUE.
++   Return the number of operations needed.  */
 +
 +static unsigned int
-+mips_build_integer_recursive (struct mips_integer_op *codes,
-+		    unsigned HOST_WIDE_INT value, int level)
++mips_build_integer_1 (struct mips_integer_op *codes,
++		      unsigned HOST_WIDE_INT value)
 +{
-+  unsigned HOST_WIDE_INT tmp;
-+  int shamt = 0, i, j;
-+  unsigned alt_cost, cost = (unsigned)-1;
-+  struct mips_integer_op alt_codes[MIPS_MAX_INTEGER_OPS];
++  unsigned HOST_WIDE_INT high_part = RISCV_CONST_HIGH_PART (value);
++  unsigned HOST_WIDE_INT low_part = RISCV_CONST_LOW_PART (value);
++  unsigned cost = UINT_MAX;
 +
-+  // try simply ORI/ADDI or LUI
-+  if(SMALL_OPERAND(value) || LUI_OPERAND(value))
-+  {
-+    codes[0].code = UNKNOWN;
-+    codes[0].value = value;
-+    return 1;
-+  }
-+
-+  // try (whatever) followed by ADDI
-+  if((value & (RISCV_IMM_REACH-1)) != 0)
-+  {
-+    struct { signed int x : RISCV_IMM_BITS; } s;
-+
-+    alt_cost = mips_build_integer_recursive(alt_codes, (value + RISCV_IMM_REACH/2) & ~(unsigned HOST_WIDE_INT)(RISCV_IMM_REACH-1), level+1);
-+    alt_codes[alt_cost].code = PLUS;
-+    alt_codes[alt_cost++].value = (HOST_WIDE_INT)(s.x = value & (unsigned HOST_WIDE_INT)(RISCV_IMM_REACH-1));
-+
-+    if(alt_cost < cost)
++  if (SMALL_OPERAND (value) || LUI_OPERAND (value))
 +    {
-+      memcpy(codes, alt_codes, sizeof(alt_codes));
-+      cost = alt_cost;
++      /* The value can be loaded with a single instruction.  */
++      codes[0].code = UNKNOWN;
++      codes[0].value = value;
++      return 1;
 +    }
-+  }
 +
-+  // try (whatever) followed by either kind of right shift.
-+  // this step occurs at most once in any recursive call chain
-+  if(level < 2)
-+  {
-+    // try all reasonable widths of shifting
-+    for(i = 1; i < 32; i++)
++  if (LUI_OPERAND (high_part))
 +    {
-+      // try SRLI
-+      if(((value << i) >> i) == value)
-+      {
-+        // try both zero extension and sign extension
-+        for(j = 0; j <= i; j += i)
-+        {
-+          tmp = (value << i) | (((unsigned HOST_WIDE_INT)1 << j) - 1);
-+          alt_cost = mips_build_integer_recursive(alt_codes, tmp, level+2);
-+          alt_codes[alt_cost].code = LSHIFTRT;
-+          alt_codes[alt_cost++].value = i;
-+          if(alt_cost < cost)
-+          {
-+            memcpy(codes, alt_codes, sizeof(alt_codes));
-+            cost = alt_cost;
-+          }
-+        }
-+      }
-+      // try SRAI
-+      if(((HOST_WIDE_INT)(value << i) >> i) == (HOST_WIDE_INT)value)
-+      {
-+        // try both zero extension and sign extension
-+        for(j = 0; j <= i; j += i)
-+        {
-+          tmp = (value << i) | (((unsigned HOST_WIDE_INT)1 << j) - 1);
-+          alt_cost = mips_build_integer_recursive(alt_codes, tmp, level+2);
-+          alt_codes[alt_cost].code = ASHIFTRT;
-+          alt_codes[alt_cost++].value = i;
-+          if(alt_cost < cost)
-+          {
-+            memcpy(codes, alt_codes, sizeof(alt_codes));
-+            cost = alt_cost;
-+          }
-+        }
-+      }
++      /* The value can be loaded with a LUI/ADDI combination. */
++      codes[0].code = UNKNOWN;
++      codes[0].value = high_part;
++      codes[1].code = PLUS;
++      codes[1].value = low_part;
++      return 2;
 +    }
-+  }
 +
-+  // if the number has trailing zeros, try building it without them, then
-+  // generate a left shift.  this isn't included in the brute-force code
-+  // above because it's necessary to guarantee forward progress for some
-+  // 64b constants.
-+  tmp = value;
-+  shamt = 0;
-+  while((tmp & 1) == 0)
-+    tmp >>= 1, shamt++;
-+  if(shamt)
-+  {
-+    alt_cost = mips_build_integer_recursive(alt_codes,tmp,level+1);
-+    alt_codes[alt_cost].code = ASHIFT;
-+    alt_codes[alt_cost++].value = shamt;
-+
-+    if(alt_cost < cost)
++  if ((value & 1) == 0)
 +    {
-+      memcpy(codes, alt_codes, sizeof(alt_codes));
-+      cost = alt_cost;
++      /* Try eliminating all trailing zeros by ending with SLL. */
++      unsigned lshift = __builtin_ctzl (value);
++      cost = mips_build_integer_1 (codes, (int64_t)value >> lshift);
++      codes[cost].code = ASHIFT;
++      codes[cost].value = lshift;
++      cost++;
 +    }
-+  }
 +
-+  gcc_assert(cost != (unsigned)-1);
++  if (low_part != 0)
++    {
++      struct mips_integer_op add_codes[MIPS_MAX_INTEGER_OPS];
++      unsigned add_cost = mips_build_integer_1 (add_codes, high_part);
++      add_codes[add_cost].code = PLUS;
++      add_codes[add_cost].value = low_part;
++      add_cost++;
++
++      if (add_cost < cost)
++	{
++	  memcpy (codes, add_codes, add_cost * sizeof (codes[0]));
++          cost = add_cost;
++	}
++    }
++
++  gcc_assert (cost != UINT_MAX);
 +
 +  return cost;
 +}
@@ -2016,29 +1862,45 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +mips_build_integer (struct mips_integer_op *codes,
 +		    unsigned HOST_WIDE_INT value)
 +{
-+  unsigned HOST_WIDE_INT foo;
-+  int i, ninsns;
++  unsigned cost = mips_build_integer_1 (codes, value);
 +
-+  ninsns = mips_build_integer_recursive (codes, value, 0);
-+
-+  // simulate the generated instructions to verify we correctly generated
-+  // the constant.  fail noisily if we didn't.
-+  foo = codes[0].value;
-+  for(i = 1; i < ninsns; i++)
-+  {
-+    switch(codes[i].code)
++  if (cost > 2 && (int64_t)value >= 0)
 +    {
-+      case IOR: foo |= codes[i].value; break;
-+      case PLUS: foo += codes[i].value; break;
-+      case ASHIFT: foo <<= codes[i].value; break;
-+      case LSHIFTRT: foo >>= codes[i].value; break;
-+      case ASHIFTRT: foo = (HOST_WIDE_INT)foo >> codes[i].value; break;
-+      default: abort();
-+    }
-+  }
-+  gcc_assert(foo == value);
++      /* Try eliminating all leading zeros by ending with SRL. */
++      struct mips_integer_op rshift_codes[MIPS_MAX_INTEGER_OPS];
++      unsigned rshift_cost, rshift;
++      unsigned HOST_WIDE_INT rshift_value;
 +
-+  return ninsns;
++      rshift = __builtin_clzl (value);
++      rshift_value = value << rshift;
++      rshift_cost = mips_build_integer_1 (rshift_codes, rshift_value);
++
++      rshift_codes[rshift_cost].code = LSHIFTRT;
++      rshift_codes[rshift_cost].value = rshift;
++      rshift_cost++;
++
++      if (rshift_cost < cost)
++	{
++	  memcpy (codes, rshift_codes, rshift_cost * sizeof (codes[0]));
++          cost = rshift_cost;
++	}
++
++      /* Try again with the discarded bits as 1s. */
++      rshift_value = (value << rshift) | (((HOST_WIDE_INT)1 << rshift)-1);
++      rshift_cost = mips_build_integer_1 (rshift_codes, rshift_value);
++
++      rshift_codes[rshift_cost].code = LSHIFTRT;
++      rshift_codes[rshift_cost].value = rshift;
++      rshift_cost++;
++
++      if (rshift_cost < cost)
++	{
++	  memcpy (codes, rshift_codes, rshift_cost * sizeof (codes[0]));
++          cost = rshift_cost;
++	}
++    }
++
++  return cost;
 +}
 +
 +/* Return true if symbols of type TYPE require a GOT access.  */
@@ -2498,32 +2360,22 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +mips_address_insns (rtx x, enum machine_mode mode, bool might_split_p)
 +{
 +  struct mips_address_info addr;
-+  int factor;
-+
-+  /* BLKmode is used for single unaligned loads and stores and should
-+     not count as a multiword mode.  (GET_MODE_SIZE (BLKmode) is pretty
-+     meaningless, so we have to single it out as a special case one way
-+     or the other.)  */
-+  if (mode != BLKmode && might_split_p)
-+    factor = (GET_MODE_SIZE (mode) + UNITS_PER_WORD - 1) / UNITS_PER_WORD;
-+  else
-+    factor = 1;
 +
 +  if (mips_classify_address (&addr, x, mode, false))
-+    switch (addr.type)
-+      {
-+      case ADDRESS_REG:
-+	return factor;
++    {
++      int factor = 1;
 +
-+      case ADDRESS_LO_SUM:
-+	return factor;
++      /* BLKmode is used for single unaligned loads and stores and should
++         not count as a multiword mode. */
++      if (mode != BLKmode && might_split_p)
++        factor = (GET_MODE_SIZE (mode) + UNITS_PER_WORD - 1) / UNITS_PER_WORD;
 +
-+      case ADDRESS_CONST_INT:
-+	return factor;
++      if (addr.type == ADDRESS_SYMBOLIC)
++	factor *= mips_symbol_insns (addr.symbol_type, mode);
 +
-+      case ADDRESS_SYMBOLIC:
-+	return factor * mips_symbol_insns (addr.symbol_type, mode);
-+      }
++      return factor;
++    }
++
 +  return 0;
 +}
 +
@@ -2632,20 +2484,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +  return mips_address_insns (XEXP (mem, 0), mode, might_split_p);
 +}
 +
-+/* Return the number of instructions needed for an integer division.  */
-+
-+int
-+mips_idiv_insns (void)
-+{
-+  int count;
-+
-+  count = 1;
-+  if (TARGET_CHECK_ZERO_DIV)
-+    count += 2;
-+
-+  return count;
-+}
-+
 +/* Emit a move from SRC to DEST.  Assume that the move expanders can
 +   handle all moves if !can_create_pseudo_p ().  The distinction is
 +   important because, unlike emit_move_insn, the move expanders know
@@ -3018,8 +2856,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +mips_legitimize_address (rtx x, rtx oldx ATTRIBUTE_UNUSED,
 +			 enum machine_mode mode)
 +{
-+  rtx base, addr;
-+  HOST_WIDE_INT offset;
++  rtx addr;
 +
 +  if (mips_tls_symbol_p (x))
 +    return mips_legitimize_tls_address (x);
@@ -3029,9 +2866,12 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +    return mips_force_address (addr, mode);
 +
 +  /* Handle BASE + OFFSET using mips_add_offset.  */
-+  mips_split_plus (x, &base, &offset);
-+  if (offset != 0)
++  if (GET_CODE (x) == PLUS && CONST_INT_P (XEXP (x, 1))
++      && INTVAL (XEXP (x, 1)) != 0)
 +    {
++      rtx base = XEXP (x, 0);
++      HOST_WIDE_INT offset = INTVAL (XEXP (x, 1));
++
 +      if (!mips_valid_base_register_p (base, mode, false))
 +	base = copy_to_mode_reg (Pmode, base);
 +      addr = mips_add_offset (NULL, base, offset);
@@ -3058,52 +2898,44 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +     source operand for a SET pattern.  */
 +  x = GEN_INT (codes[0].value);
 +
-+  /* The story with HImode:
-+   * MIPS didn't handle it because HImode constants could always fit in ORI.
-+   * For our HImode constants that don't fit, we hack it together with an LUI
-+   * followed by a right shift (logical or arithmetic).  mips_build_integer
-+   * is guaranteed to produce either LUI/ADDI
-+   *
-+   * We generate a "bullshit addi" to add the low part to the SImode result
-+   * of LUI to generate the HImode value we desire.  We call it bullshit
-+   * because, in general, it doesn't guarantee that the result is in
-+   * canonical form (i.e. bits above 16 are equal to bit 16).  However, we
-+   * know that for any legitimate HImode constant, this will be the case,
-+   * so it's safe.
-+   */
-+  if(mode == HImode && num_ops > 1)
-+  {
-+    gcc_assert(num_ops == 2);
-+    gcc_assert(codes[1].code == PLUS);
-+    gcc_assert((codes[0].value + codes[1].value) == value);
-+
-+    if (!can_create_pseudo_p ())
++  if(mode == HImode && num_ops == 2)
 +    {
-+      emit_insn (gen_rtx_SET (SImode, temp, x));
-+      x = temp;
-+    }
-+    else
-+      x = force_reg (SImode, x);
++      /* Some HImode constants are loaded with a LUI/ADDI[W] pair, whose
++         result would ordinarily be SImode.  For the ADDI[W], we invoke a
++         special addsihi instruction to mark the output as HImode instead.
++         The instruction doesn't actually canonicalize the result to 16 bits,
++	 as it's really just ADDI[W], but that's OK here because any HImode
++	 constant is already canonical. */
++      gcc_assert(codes[1].code == PLUS);
++      gcc_assert((codes[0].value + codes[1].value) == value);
 +
-+    emit_insn (gen_bullshit_addsihi(dest, x, GEN_INT(codes[1].value)));
-+
-+    return;
-+  }
-+
-+  for (i = 1; i < num_ops; i++)
-+    {
 +      if (!can_create_pseudo_p ())
 +	{
-+	  emit_insn (gen_rtx_SET (VOIDmode, temp, x));
-+	  x = temp;
-+	}
++      	  emit_insn (gen_rtx_SET (SImode, temp, x));
++      	  x = temp;
++      	}
 +      else
-+	x = force_reg (mode, x);
++        x = force_reg (SImode, x);
 +
-+      x = gen_rtx_fmt_ee (codes[i].code, mode, x, GEN_INT (codes[i].value));
++      emit_insn (gen_bullshit_addsihi(dest, x, GEN_INT (codes[1].value)));
 +    }
++  else
++    {
++      for (i = 1; i < num_ops; i++)
++        {
++          if (!can_create_pseudo_p ())
++            {
++              emit_insn (gen_rtx_SET (VOIDmode, temp, x));
++              x = temp;
++            }
++          else
++            x = force_reg (mode, x);
 +
-+  emit_insn (gen_rtx_SET (VOIDmode, dest, x));
++          x = gen_rtx_fmt_ee (codes[i].code, mode, x, GEN_INT (codes[i].value));
++        }
++
++      emit_insn (gen_rtx_SET (VOIDmode, dest, x));
++    }
 +}
 +
 +/* Subroutine of mips_legitimize_move.  Move constant SRC into register
@@ -3199,32 +3031,14 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +      /* All shift counts are truncated to a valid constant.  */
 +      return true;
 +
-+    case ROTATE:
-+    case ROTATERT:
-+      /* Likewise rotates, if the target supports rotates at all.  */
-+      return false;
-+
 +    case AND:
 +    case IOR:
 +    case XOR:
 +    case PLUS:
 +    case LT:
 +    case LTU:
-+      /* These instructions take 16-bit signed immediates.  */
++      /* These instructions take 12-bit signed immediates.  */
 +      return SMALL_OPERAND (x);
-+
-+    case EQ:
-+    case NE:
-+    case GT:
-+    case GTU:
-+      /* The "immediate" forms of these instructions are really
-+	 implemented as comparisons with register 0.  */
-+      return x == 0;
-+
-+    case GE:
-+    case GEU:
-+      /* Likewise, meaning that the only valid immediate operand is 1.  */
-+      return x == 1;
 +
 +    case LE:
 +      /* We add 1 to the immediate and use SLT.  */
@@ -3234,13 +3048,13 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +      /* Likewise SLTU, but reject the always-true case.  */
 +      return SMALL_OPERAND (x + 1) && x + 1 != 0;
 +
-+    case SIGN_EXTRACT:
-+    case ZERO_EXTRACT:
-+      /* The bit position and size are immediate operands.  */
-+      return false;
++    case GE:
++    case GEU:
++      /* We can emulate an immediate of 1 by using GT/GTU against x0. */
++      return x == 1;
 +
 +    default:
-+      /* By default assume that $0 can be used for 0.  */
++      /* By default assume that x0 can be used for 0.  */
 +      return x == 0;
 +    }
 +}
@@ -3253,13 +3067,10 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +static int
 +mips_binary_cost (rtx x, int single_cost, int double_cost, bool speed)
 +{
-+  int cost;
-+
 +  if (GET_MODE_SIZE (GET_MODE (x)) == UNITS_PER_WORD * 2)
-+    cost = double_cost;
-+  else
-+    cost = single_cost;
-+  return (cost
++    single_cost = double_cost;
++
++  return (single_cost
 +	  + rtx_cost (XEXP (x, 0), SET, speed)
 +	  + rtx_cost (XEXP (x, 1), GET_CODE (x), speed));
 +}
@@ -3586,11 +3397,8 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +      if (float_mode_p)
 +	*total = mips_fp_mult_cost (mode);
 +      else if (mode == DImode && !TARGET_64BIT)
-+	/* Synthesized from 2 mulsi3s, 1 mulsidi3 and two additions,
-+	   where the mulsidi3 always includes an MFHI and an MFLO.  */
-+	*total = (speed
-+		  ? mips_cost->int_mult_si * 3 + 6
-+		  : COSTS_N_INSNS (7));
++	/* We use a MUL and a MULH[[S]U]. */
++	*total = mips_cost->int_mult_si * 2;
 +      else if (!speed)
 +	*total = 1;
 +      else if (mode == DImode)
@@ -3628,9 +3436,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +    case UDIV:
 +    case UMOD:
 +      if (!speed)
-+	{
-+	  *total = COSTS_N_INSNS (mips_idiv_insns ());
-+	}
++	*total = 1;
 +      else if (mode == DImode)
 +        *total = mips_cost->int_div_di;
 +      else
@@ -3703,25 +3509,15 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +bool
 +mips_split_64bit_move_p (rtx dest, rtx src)
 +{
-+  /* in 64-bit mode, no moves need to be split */
-+  if (TARGET_64BIT)
-+    return false;
-+
-+  /* FPR-to-FPR moves can be done in a single instruction, if they're
-+     allowed at all.  */
-+  if (FP_REG_RTX_P (src) && FP_REG_RTX_P (dest))
-+    return false;
-+
-+  /* if it's an FP load/store, no need to split */
-+  if ((FP_REG_RTX_P(dest) && MEM_P(src)) || (FP_REG_RTX_P(src) && MEM_P(dest)))
-+    return false;
-+
-+  /* if we're moving 0 to an FPR, we can do fcvt.d.w $fpr, $x0 */
-+  if (FP_REG_RTX_P(dest) && src == CONST0_RTX(GET_MODE(src)))
-+    return false;
-+
-+  /* any other cases, e.g. integer <-> FP, need to be split */
-+  return true;
++  /* All 64b moves are legal in 64b mode.  All 64b FPR <-> FPR and
++     FPR <-> MEM moves are legal in 32b mode, too.  Although
++     FPR <-> GPR moves are not available in general in 32b mode,
++     we can at least load 0 into an FPR with fcvt.d.w fpr, x0. */
++  return !(TARGET_64BIT
++	   || (FP_REG_RTX_P (src) && FP_REG_RTX_P (dest))
++	   || (FP_REG_RTX_P (dest) && MEM_P (src))
++	   || (FP_REG_RTX_P (src) && MEM_P (dest))
++	   || (FP_REG_RTX_P(dest) && src == CONST0_RTX(GET_MODE(src))));
 +}
 +
 +/* Split a doubleword move from SRC to DEST.  On 32-bit targets,
@@ -3732,8 +3528,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +mips_split_doubleword_move (rtx dest, rtx src)
 +{
 +  rtx low_dest;
-+
-+  gcc_assert(!FP_REG_RTX_P (dest) && !FP_REG_RTX_P (src));
 +
 +   /* The operation can be split into two normal moves.  Decide in
 +      which order to do them.  */
@@ -4115,53 +3909,12 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +						operands[2], operands[3])));
 +}
 +
-+/* Perform the comparison in COMPARISON, then trap if the condition holds.  */
-+
-+void
-+mips_expand_conditional_trap (rtx comparison)
-+{
-+  rtx op0, op1;
-+  enum machine_mode mode;
-+  enum rtx_code code;
-+
-+  /* MIPS conditional trap instructions don't have GT or LE flavors,
-+     so we must swap the operands and convert to LT and GE respectively.  */
-+  code = GET_CODE (comparison);
-+  switch (code)
-+    {
-+    case GT:
-+    case LE:
-+    case GTU:
-+    case LEU:
-+      code = swap_condition (code);
-+      op0 = XEXP (comparison, 1);
-+      op1 = XEXP (comparison, 0);
-+      break;
-+
-+    default:
-+      op0 = XEXP (comparison, 0);
-+      op1 = XEXP (comparison, 1);
-+      break;
-+    }
-+
-+  mode = GET_MODE (XEXP (comparison, 0));
-+  op0 = force_reg (mode, op0);
-+  if (!arith_operand (op1, mode))
-+    op1 = force_reg (mode, op1);
-+
-+  emit_insn (gen_rtx_TRAP_IF (VOIDmode,
-+			      gen_rtx_fmt_ee (code, mode, op0, op1),
-+			      const0_rtx));
-+}
-+
 +/* Initialize *CUM for a call to a function of type FNTYPE.  */
 +
 +void
-+mips_init_cumulative_args (CUMULATIVE_ARGS *cum, tree fntype)
++mips_init_cumulative_args (CUMULATIVE_ARGS *cum, tree fntype ATTRIBUTE_UNUSED)
 +{
 +  memset (cum, 0, sizeof (*cum));
-+  cum->prototype = (fntype && prototype_p (fntype));
-+  cum->gp_reg_found = (cum->prototype && stdarg_p (fntype));
 +}
 +
 +/* Fill INFO with information about a single argument.  CUM is the
@@ -4269,10 +4022,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +{
 +  struct mips_arg_info info;
 +
-+  /* We will be called with a mode of VOIDmode after the last argument
-+     has been seen.  Whatever we return will be passed to the call expander.
-+     If we need a MIPS16 fp_code, return a REG with the code stored as
-+     the mode.  */
 +  if (mode == VOIDmode)
 +    return NULL;
 +
@@ -4390,16 +4139,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +
 +  mips_get_arg_info (&info, cum, mode, type, named);
 +
-+  if (!info.fpr_p)
-+    cum->gp_reg_found = true;
-+
-+  /* See the comment above the CUMULATIVE_ARGS structure in mips.h for
-+     an explanation of what this code does.  It assumes that we're using
-+     either the o32 or the o64 ABI, both of which pass at most 2 arguments
-+     in FPRs.  */
-+  if (cum->arg_number < 2 && info.fpr_p)
-+    cum->fp_code += (mode == SFmode ? 1 : 2) << (cum->arg_number * 2);
-+
 +  /* Advance the register count.  This has the effect of setting
 +     num_gprs to MAX_ARGS_IN_REGISTERS if a doubleword-aligned
 +     argument required us to skip the final GPR and pass the whole
@@ -4409,8 +4148,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +  /* Advance the stack word count.  */
 +  if (info.stack_words > 0)
 +    cum->stack_words = info.stack_offset + info.stack_words;
-+
-+  cum->arg_number++;
 +}
 +
 +/* Implement TARGET_ARG_PARTIAL_BYTES.  */
@@ -4484,28 +4221,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +  return mips_pad_arg_upward (mode, type);
 +}
 +
-+/* Return nonzero when an argument must be passed by reference.  */
-+
-+static bool
-+mips_pass_by_reference (CUMULATIVE_ARGS *cum ATTRIBUTE_UNUSED,
-+			enum machine_mode mode, const_tree type,
-+			bool named ATTRIBUTE_UNUSED)
-+{
-+  /* If we have a variable-sized parameter, we have no choice.  */
-+  return targetm.calls.must_pass_in_stack (mode, type);
-+}
-+
-+/* Implement TARGET_CALLEE_COPIES.  */
-+
-+static bool
-+mips_callee_copies (CUMULATIVE_ARGS *cum ATTRIBUTE_UNUSED,
-+		    enum machine_mode mode ATTRIBUTE_UNUSED,
-+		    const_tree type ATTRIBUTE_UNUSED,
-+		    bool named ATTRIBUTE_UNUSED)
-+{
-+  return false;
-+}
-+
 +/* See whether VALTYPE is a record whose fields should be returned in
 +   floating-point registers.  If so, return the number of fields and
 +   list them in FIELDS (which should have two elements).  Return 0
@@ -4694,18 +4409,15 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +  return gen_rtx_REG (mode, GP_RETURN);
 +}
 +
-+/* Implement TARGET_RETURN_IN_MEMORY.  Under the o32 and o64 ABIs,
-+   all BLKmode objects are returned in memory.  Under the n32, n64
-+   and embedded ABIs, small structures are returned in a register.
-+   Objects with varying size must still be returned in memory, of
-+   course.  */
++/* Implement TARGET_RETURN_IN_MEMORY.  Scalars and small structures
++   that fit in two registers are returned in v0/v1. */
 +
 +static bool
 +mips_return_in_memory (const_tree type, const_tree fndecl ATTRIBUTE_UNUSED)
 +{
 +  return !IN_RANGE (int_size_in_bytes (type), 0, 2 * UNITS_PER_WORD);
 +}
-+
++
 +/* Implement TARGET_SETUP_INCOMING_VARARGS.  */
 +
 +static void
@@ -4714,7 +4426,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +			     int no_rtl)
 +{
 +  CUMULATIVE_ARGS local_cum;
-+  int gp_saved, fp_saved;
++  int gp_saved;
 +
 +  /* The caller has advanced CUM up to, but not beyond, the last named
 +     argument.  Advance a local copy of CUM past the last "real" named
@@ -4724,54 +4436,22 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +
 +  /* Found out how many registers we need to save.  */
 +  gp_saved = MAX_ARGS_IN_REGISTERS - local_cum.num_gprs;
-+  fp_saved = 0;
 +
-+  if (!no_rtl)
++  if (!no_rtl && gp_saved > 0)
 +    {
-+      if (gp_saved > 0)
-+	{
-+	  rtx ptr, mem;
++      rtx ptr, mem;
 +
-+	  ptr = plus_constant (virtual_incoming_args_rtx,
-+			       REG_PARM_STACK_SPACE (cfun->decl)
-+			       - gp_saved * UNITS_PER_WORD);
-+	  mem = gen_frame_mem (BLKmode, ptr);
-+	  set_mem_alias_set (mem, get_varargs_alias_set ());
++      ptr = plus_constant (virtual_incoming_args_rtx,
++			   REG_PARM_STACK_SPACE (cfun->decl)
++			   - gp_saved * UNITS_PER_WORD);
++      mem = gen_frame_mem (BLKmode, ptr);
++      set_mem_alias_set (mem, get_varargs_alias_set ());
 +
-+	  move_block_from_reg (local_cum.num_gprs + GP_ARG_FIRST,
-+			       mem, gp_saved);
-+	}
-+      if (fp_saved > 0)
-+	{
-+	  /* We can't use move_block_from_reg, because it will use
-+	     the wrong mode.  */
-+	  enum machine_mode mode;
-+	  int off, i;
-+
-+	  /* Set OFF to the offset from virtual_incoming_args_rtx of
-+	     the first float register.  The FP save area lies below
-+	     the integer one, and is aligned to UNITS_PER_FPVALUE bytes.  */
-+	  off = (-gp_saved * UNITS_PER_WORD) & -UNITS_PER_FPVALUE;
-+	  off -= fp_saved * UNITS_PER_FPREG;
-+
-+	  mode = TARGET_SINGLE_FLOAT ? SFmode : DFmode;
-+
-+	  for (i = local_cum.num_fprs; i < MAX_ARGS_IN_REGISTERS;
-+	       i += MAX_FPRS_PER_FMT)
-+	    {
-+	      rtx ptr, mem;
-+
-+	      ptr = plus_constant (virtual_incoming_args_rtx, off);
-+	      mem = gen_frame_mem (mode, ptr);
-+	      set_mem_alias_set (mem, get_varargs_alias_set ());
-+	      mips_emit_move (mem, gen_rtx_REG (mode, FP_ARG_FIRST + i));
-+	      off += UNITS_PER_HWFPVALUE;
-+	    }
-+	}
++      move_block_from_reg (local_cum.num_gprs + GP_ARG_FIRST,
++			   mem, gp_saved);
 +    }
 +  if (REG_PARM_STACK_SPACE (cfun->decl) == 0)
-+    cfun->machine->varargs_size = (gp_saved * UNITS_PER_WORD
-+				   + fp_saved * UNITS_PER_FPREG);
++    cfun->machine->varargs_size = gp_saved * UNITS_PER_WORD;
 +}
 +
 +/* Implement TARGET_EXPAND_BUILTIN_VA_START.  */
@@ -4783,8 +4463,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +  std_expand_builtin_va_start (valist, nextarg);
 +}
 +
-+/* Start a definition of function NAME.  MIPS16_P indicates whether the
-+   function contains MIPS16 code.  */
++/* Start a definition of function NAME. */
 +
 +static void
 +mips_start_function_definition (const char *name)
@@ -4815,7 +4494,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +      fputs ("\n", asm_out_file);
 +    }
 +}
-+
++
 +/* Return true if calls to X can use R_MIPS_CALL* relocations.  */
 +
 +static bool
@@ -4918,16 +4597,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +    }
 +
 +  return mips_emit_call_insn (pattern, lazy_p);
-+}
-+
-+/* Implement TARGET_FUNCTION_OK_FOR_SIBCALL.  */
-+
-+static bool
-+mips_function_ok_for_sibcall (tree decl ATTRIBUTE_UNUSED,
-+			      tree exp ATTRIBUTE_UNUSED)
-+{
-+  /* Otherwise OK.  */
-+  return true;
 +}
 +
 +/* Emit straight-line code to move LENGTH bytes from SRC to DEST.
@@ -5047,15 +4716,20 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +{
 +  if (CONST_INT_P (length))
 +    {
-+      if (INTVAL (length) <= MIPS_MAX_MOVE_BYTES_STRAIGHT)
++      HOST_WIDE_INT factor, align;
++      
++      align = MIN (MIN (MEM_ALIGN (src), MEM_ALIGN (dest)), BITS_PER_WORD);
++      factor = BITS_PER_WORD / align;
++
++      if (INTVAL (length) <= MIPS_MAX_MOVE_BYTES_STRAIGHT / factor)
 +	{
 +	  mips_block_move_straight (dest, src, INTVAL (length));
 +	  return true;
 +	}
-+      else if (optimize)
++      else if (optimize && align >= BITS_PER_WORD)
 +	{
 +	  mips_block_move_loop (dest, src, INTVAL (length),
-+				MIPS_MAX_MOVE_BYTES_PER_LOOP_ITER);
++				MIPS_MAX_MOVE_BYTES_PER_LOOP_ITER / factor);
 +	  return true;
 +	}
 +    }
@@ -5074,44 +4748,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +
 +  size = MEM_SIZE (x);
 +  return size && INTVAL (size) == GET_MODE_SIZE (mode);
-+}
-+
-+/* Check if MASK and SHIFT are valid in mask-low-and-shift-left
-+   operation if MAXLEN is the maxium length of consecutive bits that
-+   can make up MASK.  MODE is the mode of the operation.  See
-+   mask_low_and_shift_len for the actual definition.  */
-+
-+bool
-+mask_low_and_shift_p (enum machine_mode mode, rtx mask, rtx shift, int maxlen)
-+{
-+  return IN_RANGE (mask_low_and_shift_len (mode, mask, shift), 1, maxlen);
-+}
-+
-+/* Return true iff OP1 and OP2 are valid operands together for the
-+   *and<MODE>3 and *and<MODE>3_mips16 patterns.  For the cases to consider,
-+   see the table in the comment before the pattern.  */
-+
-+bool
-+and_operands_ok (enum machine_mode mode, rtx op1, rtx op2)
-+{
-+  return (memory_operand (op1, mode)
-+	  ? and_load_operand (op2, mode)
-+	  : and_reg_operand (op2, mode));
-+}
-+
-+/* The canonical form of a mask-low-and-shift-left operation is
-+   (and (ashift X SHIFT) MASK) where MASK has the lower SHIFT number of bits
-+   cleared.  Thus we need to shift MASK to the right before checking if it
-+   is a valid mask value.  MODE is the mode of the operation.  If true
-+   return the length of the mask, otherwise return -1.  */
-+
-+int
-+mask_low_and_shift_len (enum machine_mode mode, rtx mask, rtx shift)
-+{
-+  HOST_WIDE_INT shval;
-+
-+  shval = INTVAL (shift) & (GET_MODE_BITSIZE (mode) - 1);
-+  return exact_log2 ((UINTVAL (mask) >> shval) + 1);
 +}
 +
 +/* (Re-)Initialize mips_split_p, mips_lo_relocs and mips_hi_relocs.  */
@@ -5466,34 +5102,16 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +  rtx offset2 = const0_rtx;
 +  rtx reg = eliminate_constant_term (addr, &offset2);
 +
++  gcc_assert (reg == stack_pointer_rtx
++              || reg == frame_pointer_rtx
++              || reg == hard_frame_pointer_rtx);
++
 +  if (offset == 0)
 +    offset = INTVAL (offset2);
-+
-+  if (reg == stack_pointer_rtx
-+      || reg == frame_pointer_rtx
-+      || reg == hard_frame_pointer_rtx)
-+    {
-+      offset -= cfun->machine->frame.total_size;
-+      if (reg == hard_frame_pointer_rtx)
-+	offset += cfun->machine->frame.hard_frame_pointer_offset;
-+    }
-+
-+  /* sdbout_parms does not want this to crash for unrecognized cases.  */
-+#if 0
-+  else if (reg != arg_pointer_rtx)
-+    fatal_insn ("mips_debugger_offset called with non stack/frame/arg pointer",
-+		addr);
-+#endif
++  
++  offset -= cfun->machine->frame.total_size;
 +
 +  return offset;
-+}
-+
-+/* Implement ASM_OUTPUT_EXTERNAL.  */
-+
-+void
-+mips_output_external (FILE *file, tree decl, const char *name)
-+{
-+  default_elf_asm_output_external (file, decl, name);
 +}
 +
 +/* Implement TARGET_ASM_OUTPUT_SOURCE_FILENAME.  */
@@ -5549,32 +5167,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +    }
 +  output_addr_const (file, x);
 +  fputs ("+0x8000", file);
-+}
-+
-+/* Implement TARGET_DWARF_REGISTER_SPAN.  */
-+
-+static rtx
-+mips_dwarf_register_span (rtx reg)
-+{
-+  rtx high, low;
-+  enum machine_mode mode;
-+
-+  /* By default, GCC maps increasing register numbers to increasing
-+     memory locations, but paired FPRs are always little-endian,
-+     regardless of the prevailing endianness.  */
-+  mode = GET_MODE (reg);
-+  if (FP_REG_P (REGNO (reg))
-+      && TARGET_BIG_ENDIAN
-+      && MAX_FPRS_PER_FMT > 1
-+      && GET_MODE_SIZE (mode) > UNITS_PER_FPREG)
-+    {
-+      gcc_assert (GET_MODE_SIZE (mode) == UNITS_PER_HWFPVALUE);
-+      high = mips_subword (reg, true);
-+      low = mips_subword (reg, false);
-+      return gen_rtx_PARALLEL (VOIDmode, gen_rtvec (2, high, low));
-+    }
-+
-+  return NULL_RTX;
 +}
 +
 +/* Implement ASM_OUTPUT_ASCII.  */
@@ -5666,30 +5258,12 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +   elfos.h version, but we also need to handle -muninit-const-in-rodata.  */
 +
 +void
-+mips_output_aligned_decl_common (FILE *stream, tree decl, const char *name,
++mips_output_aligned_decl_common (FILE *stream, tree decl ATTRIBUTE_UNUSED,
++				 const char *name,
 +				 unsigned HOST_WIDE_INT size,
 +				 unsigned int align)
 +{
-+  /* If the target wants uninitialized const declarations in
-+     .rdata then don't put them in .comm.  */
-+  if (TARGET_EMBEDDED_DATA
-+      && TARGET_UNINIT_CONST_IN_RODATA
-+      && TREE_CODE (decl) == VAR_DECL
-+      && TREE_READONLY (decl)
-+      && (DECL_INITIAL (decl) == 0 || DECL_INITIAL (decl) == error_mark_node))
-+    {
-+      if (TREE_PUBLIC (decl) && DECL_NAME (decl))
-+	targetm.asm_out.globalize_label (stream, name);
-+
-+      switch_to_section (readonly_data_section);
-+      ASM_OUTPUT_ALIGN (stream, floor_log2 (align / BITS_PER_UNIT));
-+      mips_declare_object (stream, name, "",
-+			   ":\n\t.space\t" HOST_WIDE_INT_PRINT_UNSIGNED "\n",
-+			   size);
-+    }
-+  else
-+    mips_declare_common_object (stream, name, "\n\t.comm\t",
-+				size, align, true);
++  mips_declare_common_object (stream, name, "\n\t.comm\t", size, align, true);
 +}
 +
 +#ifdef ASM_OUTPUT_SIZE_DIRECTIVE
@@ -5790,11 +5364,8 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +	/* Soft-float code, -msoft-float.  */
 +	else if (!TARGET_HARD_FLOAT_ABI)
 +	  attr = 3;
-+	/* Single-float code, -msingle-float.  */
-+	else if (!TARGET_DOUBLE_FLOAT)
-+	  attr = 2;
-+	/* 64-bit FP registers on a 32-bit target, -mips32r2 -mfp64.  */
-+	else if (!TARGET_64BIT && TARGET_FLOAT64)
++	/* 64-bit FP registers on a 32-bit target. */
++	else if (!TARGET_64BIT)
 +	  attr = 4;
 +	/* Regular FP code, FP regs same size as GP regs, -mdouble-float.  */
 +	else
@@ -6030,26 +5601,9 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +static bool
 +mips_save_reg_p (unsigned int regno)
 +{
-+  if (mips_cfun_call_saved_reg_p (regno))
-+    {
-+      if (mips_cfun_might_clobber_call_saved_reg_p (regno))
-+	return true;
-+
-+      /* Save both registers in an FPR pair if either one is used.  This is
-+	 needed for the case when MIN_FPRS_PER_FMT == 1, which allows the odd
-+	 register to be used without the even register.  */
-+      if (FP_REG_P (regno)
-+	  && MAX_FPRS_PER_FMT == 2
-+	  && mips_cfun_might_clobber_call_saved_reg_p (regno + 1))
-+	return true;
-+    }
-+
-+  /* We need to save the incoming return address if __builtin_eh_return
-+     is being used to set a different return address.  */
-+  if (regno == RETURN_ADDR_REGNUM && crtl->calls_eh_return)
-+    return true;
-+
-+  return false;
++  bool clobbered = mips_cfun_might_clobber_call_saved_reg_p (regno);
++  return (mips_cfun_call_saved_reg_p (regno) && clobbered)
++	 || (regno == RETURN_ADDR_REGNUM && crtl->calls_eh_return);
 +}
 +
 +/* Return the register that should be used as the global pointer
@@ -6198,11 +5752,11 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +  /* Find out which FPRs we need to save.  This loop must iterate over
 +     the same space as its companion in mips_for_each_saved_gpr_and_fpr.  */
 +  if (TARGET_HARD_FLOAT)
-+    for (regno = FP_REG_FIRST; regno <= FP_REG_LAST; regno += MAX_FPRS_PER_FMT)
++    for (regno = FP_REG_FIRST; regno <= FP_REG_LAST; regno++)
 +      if (mips_save_reg_p (regno))
 +	{
-+	  frame->num_fp += MAX_FPRS_PER_FMT;
-+	  frame->fmask |= ~(~0 << MAX_FPRS_PER_FMT) << (regno - FP_REG_FIRST);
++	  frame->num_fp++;
++	  frame->fmask |= 1 << (regno - FP_REG_FIRST);
 +	}
 +
 +  /* Move above the FPR save area.  */
@@ -6247,12 +5801,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +static bool
 +mips_frame_pointer_required (void)
 +{
-+  /* If the function contains dynamic stack allocations, we need to
-+     use the frame pointer to access the static parts of the frame.  */
-+  if (cfun->calls_alloca)
-+    return true;
-+
-+  return false;
++  return cfun->calls_alloca;
 +}
 +
 +/* Make sure that we're not trying to eliminate to the wrong hard frame
@@ -6269,7 +5818,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +   pointer.  */
 +
 +HOST_WIDE_INT
-+mips_initial_elimination_offset (int from, int to)
++mips_initial_elimination_offset (int from)
 +{
 +  HOST_WIDE_INT offset;
 +
@@ -6294,12 +5843,9 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +      gcc_unreachable ();
 +    }
 +
-+  if (to == HARD_FRAME_POINTER_REGNUM)
-+    offset -= cfun->machine->frame.hard_frame_pointer_offset;
-+
 +  return offset;
 +}
-+
++
 +/* Implement TARGET_EXTRA_LIVE_ON_ENTRY.  */
 +
 +static void
@@ -6370,7 +5916,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +mips_for_each_saved_gpr_and_fpr (HOST_WIDE_INT sp_offset,
 +				 mips_save_restore_fn fn)
 +{
-+  enum machine_mode fpr_mode;
 +  HOST_WIDE_INT offset;
 +  int regno;
 +
@@ -6382,9 +5927,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +  for (regno = GP_REG_LAST; regno >= GP_REG_FIRST; regno--)
 +    if (BITSET_P (cfun->machine->frame.mask, regno - GP_REG_FIRST))
 +      {
-+	/* Record the ra offset for use by mips_function_profiler.  */
-+	if (regno == RETURN_ADDR_REGNUM)
-+	  cfun->machine->frame.ra_fp_offset = offset + sp_offset;
 +	mips_save_restore_reg (word_mode, regno, offset, fn);
 +	offset -= UNITS_PER_WORD;
 +      }
@@ -6392,14 +5934,13 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +  /* This loop must iterate over the same space as its companion in
 +     mips_compute_frame_info.  */
 +  offset = cfun->machine->frame.fp_sp_offset - sp_offset;
-+  fpr_mode = (TARGET_SINGLE_FLOAT ? SFmode : DFmode);
-+  for (regno = FP_REG_LAST - MAX_FPRS_PER_FMT + 1;
++  for (regno = FP_REG_LAST - 1;
 +       regno >= FP_REG_FIRST;
-+       regno -= MAX_FPRS_PER_FMT)
++       regno --)
 +    if (BITSET_P (cfun->machine->frame.fmask, regno - FP_REG_FIRST))
 +      {
-+	mips_save_restore_reg (fpr_mode, regno, offset, fn);
-+	offset -= GET_MODE_SIZE (fpr_mode);
++	mips_save_restore_reg (DFmode, regno, offset, fn);
++	offset -= GET_MODE_SIZE (DFmode);
 +      }
 +}
 +
@@ -6493,9 +6034,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +	       reg_names[frame_pointer_needed
 +			 ? HARD_FRAME_POINTER_REGNUM
 +			 : STACK_POINTER_REGNUM],
-+	       (frame_pointer_needed
-+		? frame->total_size - frame->hard_frame_pointer_offset
-+		: frame->total_size),
++	       frame->total_size,
 +	       reg_names[RETURN_ADDR_REGNUM],
 +	       frame->var_size,
 +	       frame->num_gp, frame->num_fp,
@@ -6534,23 +6073,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +static void
 +mips_save_reg (rtx reg, rtx mem)
 +{
-+  if (GET_MODE (reg) == DFmode && !TARGET_FLOAT64)
-+    {
-+      rtx x1, x2;
-+
-+      if (mips_split_64bit_move_p (mem, reg))
-+	mips_split_doubleword_move (mem, reg);
-+      else
-+	mips_emit_move (mem, reg);
-+
-+      x1 = mips_frame_set (mips_subword (mem, false),
-+			   mips_subword (reg, false));
-+      x2 = mips_frame_set (mips_subword (mem, true),
-+			   mips_subword (reg, true));
-+      mips_set_frame_expr (gen_rtx_PARALLEL (VOIDmode, gen_rtvec (2, x1, x2)));
-+    }
-+  else
-+    mips_emit_save_slot_move (mem, reg, MIPS_PROLOGUE_TEMP (GET_MODE (reg)));
++  mips_emit_save_slot_move (mem, reg, MIPS_PROLOGUE_TEMP (GET_MODE (reg)));
 +}
 +
 +/* The __gnu_local_gp symbol.  */
@@ -6659,31 +6182,8 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +  /* Set up the frame pointer, if we're using one.  */
 +  if (frame_pointer_needed)
 +    {
-+      HOST_WIDE_INT offset;
-+
-+      offset = frame->hard_frame_pointer_offset;
-+      if (offset == 0)
-+	{
-+	  insn = mips_emit_move (hard_frame_pointer_rtx, stack_pointer_rtx);
-+	  RTX_FRAME_RELATED_P (insn) = 1;
-+	}
-+      else if (SMALL_OPERAND (offset))
-+	{
-+	  insn = gen_add3_insn (hard_frame_pointer_rtx,
-+				stack_pointer_rtx, GEN_INT (offset));
-+	  RTX_FRAME_RELATED_P (emit_insn (insn)) = 1;
-+	}
-+      else
-+	{
-+	  mips_emit_move (MIPS_PROLOGUE_TEMP (Pmode), GEN_INT (offset));
-+	  mips_emit_move (hard_frame_pointer_rtx, stack_pointer_rtx);
-+	  emit_insn (gen_add3_insn (hard_frame_pointer_rtx,
-+				    hard_frame_pointer_rtx,
-+				    MIPS_PROLOGUE_TEMP (Pmode)));
-+	  mips_set_frame_expr
-+	    (gen_rtx_SET (VOIDmode, hard_frame_pointer_rtx,
-+			  plus_constant (stack_pointer_rtx, offset)));
-+	}
++      insn = mips_emit_move (hard_frame_pointer_rtx, stack_pointer_rtx);
++      RTX_FRAME_RELATED_P (insn) = 1;
 +    }
 +
 +  mips_emit_loadgp ();
@@ -6722,15 +6222,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +  step1 = frame->total_size;
 +  step2 = 0;
 +
-+  /* Work out which register holds the frame address.  */
-+  if (!frame_pointer_needed)
-+    base = stack_pointer_rtx;
-+  else
-+    {
-+      base = hard_frame_pointer_rtx;
-+      step1 -= frame->hard_frame_pointer_offset;
-+    }
-+
 +  /* If we need to restore registers, deallocate as much stack as
 +     possible in the second step without going out of range.  */
 +  if ((frame->mask | frame->fmask) != 0)
@@ -6740,6 +6231,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +    }
 +
 +  /* Set TARGET to BASE + STEP1.  */
++  base = frame_pointer_needed ? hard_frame_pointer_rtx : stack_pointer_rtx;
 +  target = base;
 +  if (step1 > 0)
 +    {
@@ -6785,7 +6277,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +  if (!sibcall_p)
 +    emit_jump_insn (gen_return_internal (gen_rtx_REG (Pmode, RETURN_ADDR_REGNUM)));
 +}
-+
++
 +/* Return nonzero if this function is known to have a null epilogue.
 +   This allows the optimizer to omit jumps to jumps if no stack
 +   was created.  */
@@ -6793,12 +6285,9 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +bool
 +mips_can_use_return_insn (void)
 +{
-+  if (!reload_completed)
-+    return false;
-+
-+  return cfun->machine->frame.total_size == 0;
++  return reload_completed && cfun->machine->frame.total_size == 0;
 +}
-+
++
 +/* Return true if register REGNO can store a value of mode MODE.
 +   The result of this function is cached in mips_hard_regno_mode_ok.  */
 +
@@ -6817,9 +6306,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +  if (GP_REG_P (regno))
 +    return ((regno - GP_REG_FIRST) & 1) == 0 || size <= UNITS_PER_WORD;
 +
-+  if (FP_REG_P (regno)
-+      && (((regno - FP_REG_FIRST) % MAX_FPRS_PER_FMT) == 0
-+	  || (MIN_FPRS_PER_FMT == 1 && size <= UNITS_PER_FPREG)))
++  if (FP_REG_P (regno))
 +    {
 +      /* Allow TFmode for CCmode reloads.  */
 +      if (mode == TFmode)
@@ -6928,10 +6415,8 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +  switch (mode)
 +    {
 +    case SFmode:
-+      return TARGET_HARD_FLOAT;
-+
 +    case DFmode:
-+      return TARGET_HARD_FLOAT && TARGET_DOUBLE_FLOAT;
++      return TARGET_HARD_FLOAT;
 +
 +    case V2SFmode:
 +      return TARGET_HARD_FLOAT && TARGET_PAIRED_SINGLE_FLOAT;
@@ -6993,7 +6478,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +      return 1;
 +
 +    case FP_REGS:
-+      /* FP->int moves can cause recoupling on decoupled integer/float architectures  */
++      /* FP->int moves can cause recoupling on decoupled implementations */
 +      return 4;
 +
 +    default:
@@ -7011,8 +6496,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +  switch (to)
 +    {
 +    case GENERAL_REGS:
-+      return 1;
-+
 +    case FP_REGS:
 +      return 1;
 +
@@ -7029,7 +6512,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +mips_register_move_cost (enum machine_mode mode,
 +			 reg_class_t from, reg_class_t to)
 +{
-+  reg_class_t dregs;
 +  int cost1, cost2;
 +
 +  from = mips_canonicalize_move_class (from);
@@ -7037,17 +6519,14 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +
 +  /* Handle moves that can be done without using general-purpose registers.  */
 +  if (from == FP_REGS)
-+    {
-+      if (to == FP_REGS && mips_mode_ok_for_mov_fmt_p (mode))
-+	/* MOV.FMT.  */
-+	return 4;
-+    }
++    if (to == FP_REGS && mips_mode_ok_for_mov_fmt_p (mode))
++      /* fsgnj.fmt.  */
++      return 1;
 +
 +  /* Handle cases in which only one class deviates from the ideal.  */
-+  dregs = GENERAL_REGS;
-+  if (from == dregs)
++  if (from == GENERAL_REGS)
 +    return mips_move_from_gpr_cost (to);
-+  if (to == dregs)
++  if (to == GENERAL_REGS)
 +    return mips_move_to_gpr_cost (from);
 +
 +  /* Handles cases that require a GPR temporary.  */
@@ -7092,7 +6571,8 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +
 +enum reg_class
 +mips_secondary_reload_class (enum reg_class rclass,
-+			     enum machine_mode mode, rtx x, bool in_p)
++			     enum machine_mode mode, rtx x,
++			     bool in_p ATTRIBUTE_UNUSED)
 +{
 +  int regno;
 +
@@ -7140,7 +6620,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +
 +  return UNKNOWN;
 +}
-+
++
 +/* Implement TARGET_VALID_POINTER_MODE.  */
 +
 +static bool
@@ -7152,7 +6632,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +/* Implement TARGET_VECTOR_MODE_SUPPORTED_P.  */
 +
 +static bool
-+mips_vector_mode_supported_p (enum machine_mode mode)
++mips_vector_mode_supported_p (enum machine_mode mode ATTRIBUTE_UNUSED)
 +{
 +  return false;
 +}
@@ -7222,92 +6702,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +  return "";
 +}
 +
-+/* Return the assembly code for INSN, which branches to OPERANDS[0]
-+   if some ordering condition is true.  The condition is given by
-+   OPERANDS[1] if !INVERTED_P, otherwise it is the inverse of
-+   OPERANDS[1].  OPERANDS[2] is the comparison's first operand;
-+   its second is always zero.  */
-+
-+const char *
-+mips_output_order_conditional_branch (rtx insn, rtx *operands, bool inverted_p)
-+{
-+  const char *branch[2];
-+
-+  /* Make BRANCH[1] branch to OPERANDS[0] when the condition is true.
-+     Make BRANCH[0] branch on the inverse condition.  */
-+  switch (GET_CODE (operands[1]))
-+    {
-+      /* These cases are equivalent to comparisons against zero.  */
-+    case LEU:
-+      inverted_p = !inverted_p;
-+      /* Fall through.  */
-+    case GTU:
-+      branch[!inverted_p] = "bnez\t%2,%0";
-+      branch[inverted_p] = "beqz\t%2,%0";
-+      break;
-+
-+      /* These cases are always true or always false.  */
-+    case LTU:
-+      inverted_p = !inverted_p;
-+      /* Fall through.  */
-+    case GEU:
-+      branch[!inverted_p] = "b\t%0";
-+      branch[inverted_p] = "bnez zero,%0";
-+      break;
-+
-+    default:
-+      branch[!inverted_p] = "b%C1z\t%2,%0";
-+      branch[inverted_p] = "b%N1z\t%2,%0";
-+      break;
-+    }
-+  return mips_output_conditional_branch (insn, operands, branch[1], branch[0]);
-+}
-+
-+/* Return the assembly code for DIV or DDIV instruction DIVISION, which has
-+   the operands given by OPERANDS.  Add in a divide-by-zero check. */
-+
-+const char *
-+mips_output_division (const char *division, rtx *operands)
-+{
-+  const char *s;
-+
-+  s = division;
-+  if (TARGET_CHECK_ZERO_DIV)
-+    {
-+      output_asm_insn ("%(bnez\t%2,1f", operands);
-+      output_asm_insn (s, operands);
-+      s = "break\t7%)\n1:";
-+    }
-+  return s;
-+}
-+
-+/* Return true if IN_INSN is a multiply-add or multiply-subtract
-+   instruction and if OUT_INSN assigns to the accumulator operand.  */
-+
-+bool
-+mips_linked_madd_p (rtx out_insn, rtx in_insn)
-+{
-+  rtx x;
-+
-+  x = single_set (in_insn);
-+  if (x == 0)
-+    return false;
-+
-+  x = SET_SRC (x);
-+
-+  if (GET_CODE (x) == PLUS
-+      && GET_CODE (XEXP (x, 0)) == MULT
-+      && reg_set_p (XEXP (x, 1), out_insn))
-+    return true;
-+
-+  if (GET_CODE (x) == MINUS
-+      && GET_CODE (XEXP (x, 1)) == MULT
-+      && reg_set_p (XEXP (x, 0), out_insn))
-+    return true;
-+
-+  return false;
-+}
-+
 +/* Implement TARGET_SCHED_ADJUST_COST.  We assume that anti and output
 +   dependencies have no cost. */
 +
@@ -7335,39 +6729,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +    }
 +}
 +
-+/* Implement TARGET_SCHED_INIT_DFA_POST_CYCLE_INSN hook.
-+   Init data used in mips_dfa_post_advance_cycle.  */
-+
-+static void
-+mips_init_dfa_post_cycle_insn (void)
-+{
-+}
-+
-+/* Implement TARGET_SCHED_DFA_POST_ADVANCE_CYCLE.
-+   This hook is being called at the start of each cycle.  */
-+
-+static void
-+mips_dfa_post_advance_cycle (void)
-+{
-+}
-+
-+/* Implement TARGET_SCHED_FIRST_CYCLE_MULTIPASS_DFA_LOOKAHEAD.  This should
-+   be as wide as the scheduling freedom in the DFA.  */
-+
-+static int
-+mips_multipass_dfa_lookahead (void)
-+{
-+  return 0;
-+}
-+
-+/* Implement TARGET_SCHED_INIT.  */
-+
-+static void
-+mips_sched_init (FILE *file ATTRIBUTE_UNUSED, int verbose ATTRIBUTE_UNUSED,
-+		 int max_ready ATTRIBUTE_UNUSED)
-+{
-+}
-+
 +/* Implement TARGET_SCHED_VARIABLE_ISSUE.  */
 +
 +static int
@@ -7389,41 +6750,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +
 +  return more;
 +}
-+
-+/* Given that we have an rtx of the form (prefetch ... WRITE LOCALITY),
-+   return the first operand of the associated PREF or PREFX insn.  */
-+
-+rtx
-+mips_prefetch_cookie (rtx write, rtx locality)
-+{
-+  /* store_streamed / load_streamed.  */
-+  if (INTVAL (locality) <= 0)
-+    return GEN_INT (INTVAL (write) + 4);
-+
-+  /* store / load.  */
-+  if (INTVAL (locality) <= 2)
-+    return write;
-+
-+  /* store_retained / load_retained.  */
-+  return GEN_INT (INTVAL (write) + 6);
-+}
-+
-+/* Flags that indicate when a built-in function is available.
-+
-+   BUILTIN_AVAIL_NON_MIPS16
-+	The function is available on the current target, but only
-+	in non-MIPS16 mode.  */
-+#define BUILTIN_AVAIL_NON_MIPS16 1
-+
-+/* Declare an availability predicate for built-in functions that
-+   require non-MIPS16 mode and also require COND to be true.
-+   NAME is the main part of the predicate's name.  */
-+#define AVAIL_NON_MIPS16(NAME, COND)					\
-+ static unsigned int							\
-+ mips_builtin_avail_##NAME (void)					\
-+ {									\
-+   return (COND) ? BUILTIN_AVAIL_NON_MIPS16 : 0;			\
-+ }
 +
 +/* This structure describes a single built-in function.  */
 +struct mips_builtin_description {
@@ -7910,32 +7236,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +				   UNSPEC_CALL_ATTR);
 +}
 +
-+/* OPERANDS[ARGS_SIZE_OPNO] is the arg_size operand of a CALL expression.  See
-+   if instead of the arg_size argument it contains the call attributes.  If
-+   yes return true along with setting OPERANDS[ARGS_SIZE_OPNO] to the function
-+   symbol from the call attributes.  Also return false if ARGS_SIZE_OPNO is
-+   -1.  */
-+
-+bool
-+mips_get_pic_call_symbol (rtx *operands, int args_size_opno)
-+{
-+  rtx args_size, symbol;
-+
-+  if (!TARGET_RELAX_PIC_CALLS || args_size_opno == -1)
-+    return false;
-+
-+  args_size = operands[args_size_opno];
-+  if (GET_CODE (args_size) != UNSPEC)
-+    return false;
-+  gcc_assert (XINT (args_size, 1) == UNSPEC_CALL_ATTR);
-+
-+  symbol = XVECEXP (args_size, 0, 1);
-+  gcc_assert (GET_CODE (symbol) == SYMBOL_REF);
-+
-+  operands[args_size_opno] = symbol;
-+  return true;
-+}
-+
 +/* Use DF to annotate PIC indirect calls with the function symbol they
 +   dispatch to.  */
 +
@@ -8168,8 +7468,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +
 +  /* Determine if we can use a sibcall to call FUNCTION directly.  */
 +  fnaddr = XEXP (DECL_RTL (function), 0);
-+  use_sibcall_p = (mips_function_ok_for_sibcall (function, NULL)
-+		   && const_call_insn_operand (fnaddr, Pmode));
++  use_sibcall_p = const_call_insn_operand (fnaddr, Pmode);
 +
 +  /* Determine if we need to load FNADDR from the GOT.  */
 +  if (!use_sibcall_p
@@ -8407,17 +7706,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +      mips_isa_option_info = mips_parse_cpu (ACONCAT (("mips", arg, NULL)));
 +      return mips_isa_option_info != 0;
 +
-+    case OPT_mcode_readable_:
-+      if (strcmp (arg, "yes") == 0)
-+	mips_code_readable = CODE_READABLE_YES;
-+      else if (strcmp (arg, "pcrel") == 0)
-+	mips_code_readable = CODE_READABLE_PCREL;
-+      else if (strcmp (arg, "no") == 0)
-+	mips_code_readable = CODE_READABLE_NO;
-+      else
-+	return false;
-+      return true;
-+
 +    default:
 +      return true;
 +    }
@@ -8473,8 +7761,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +    target_flags &= ~MASK_64BIT;
 +  else
 +    target_flags |= MASK_64BIT;
-+
-+  target_flags |= MASK_FLOAT64; /* both RV32 and RV64 support 64b floats */
 +
 +  /* End of code shared with GAS.  */
 +
@@ -8607,20 +7893,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +  emit_move_insn (target, mem);
 +}
 +
-+/* When generating MIPS16 code, we want to allocate $24 (T_REG) before
-+   other registers for instructions for which it is possible.  This
-+   encourages the compiler to use CMP in cases where an XOR would
-+   require some register shuffling.  */
-+
-+void
-+mips_order_regs_for_local_alloc (void)
-+{
-+  int i;
-+
-+  for (i = 0; i < FIRST_PSEUDO_REGISTER; i++)
-+    reg_alloc_order[i] = i;
-+}
-+
 +/* Implement EPILOGUE_USES.  */
 +
 +bool
@@ -8640,16 +7912,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +  return false;
 +}
 +
-+/* Return the size in bytes of the trampoline code, padded to
-+   TRAMPOLINE_ALIGNMENT bits.  The static chain pointer and target
-+   function address immediately follow.  */
-+
-+int
-+mips_trampoline_code_size (void)
-+{
-+  return 4 * 4;
-+}
-+
 +/* Implement TARGET_TRAMPOLINE_INIT.  */
 +
 +static void
@@ -8658,17 +7920,16 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +  rtx addr, end_addr, mem;
 +  rtx trampoline[8];
 +  unsigned int i, j, gp;
-+  HOST_WIDE_INT end_addr_offset, static_chain_offset, target_function_offset;
++  HOST_WIDE_INT static_chain_offset, target_function_offset;
 +
 +  /* Work out the offsets of the pointers from the start of the
 +     trampoline code.  */
-+  end_addr_offset = mips_trampoline_code_size ();
-+  static_chain_offset = end_addr_offset;
++  static_chain_offset = TRAMPOLINE_CODE_SIZE;
 +  target_function_offset = static_chain_offset + GET_MODE_SIZE (ptr_mode);
 +
 +  /* Get pointers to the beginning and end of the code block.  */
 +  addr = force_reg (Pmode, XEXP (m_tramp, 0));
-+  end_addr = mips_force_binary (Pmode, PLUS, addr, GEN_INT (end_addr_offset));
++  end_addr = mips_force_binary (Pmode, PLUS, addr, GEN_INT (TRAMPOLINE_CODE_SIZE));
 +
 +#define OP(X) gen_int_mode (X, SImode)
 +#define MATCH_LREG ((Pmode) == DImode ? MATCH_LD : MATCH_LW)
@@ -8693,6 +7954,8 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +    				   static_chain_offset - 4,
 +    				   gp));
 +  trampoline[i++] = OP (RISCV_ITYPE (JALR_J, 0, PIC_FUNCTION_ADDR_REGNUM, 0));
++
++  gcc_assert (i * 4 == TRAMPOLINE_CODE_SIZE);
 +
 +#undef MATCH_LREG
 +#undef OP
@@ -8749,34 +8012,23 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +#undef TARGET_ASM_FUNCTION_RODATA_SECTION
 +#define TARGET_ASM_FUNCTION_RODATA_SECTION mips_function_rodata_section
 +
-+#undef TARGET_SCHED_INIT
-+#define TARGET_SCHED_INIT mips_sched_init
 +#undef TARGET_SCHED_VARIABLE_ISSUE
 +#define TARGET_SCHED_VARIABLE_ISSUE mips_variable_issue
 +#undef TARGET_SCHED_ADJUST_COST
 +#define TARGET_SCHED_ADJUST_COST mips_adjust_cost
 +#undef TARGET_SCHED_ISSUE_RATE
 +#define TARGET_SCHED_ISSUE_RATE mips_issue_rate
-+#undef TARGET_SCHED_INIT_DFA_POST_CYCLE_INSN
-+#define TARGET_SCHED_INIT_DFA_POST_CYCLE_INSN mips_init_dfa_post_cycle_insn
-+#undef TARGET_SCHED_DFA_POST_ADVANCE_CYCLE
-+#define TARGET_SCHED_DFA_POST_ADVANCE_CYCLE mips_dfa_post_advance_cycle
-+#undef TARGET_SCHED_FIRST_CYCLE_MULTIPASS_DFA_LOOKAHEAD
-+#define TARGET_SCHED_FIRST_CYCLE_MULTIPASS_DFA_LOOKAHEAD \
-+  mips_multipass_dfa_lookahead
 +
 +#undef TARGET_DEFAULT_TARGET_FLAGS
 +#define TARGET_DEFAULT_TARGET_FLAGS		\
 +  (TARGET_DEFAULT				\
 +   | TARGET_CPU_DEFAULT				\
-+   | TARGET_ENDIAN_DEFAULT			\
-+   | MASK_CHECK_ZERO_DIV			\
-+   | MASK_FUSED_MADD)
++   | TARGET_ENDIAN_DEFAULT)
 +#undef TARGET_HANDLE_OPTION
 +#define TARGET_HANDLE_OPTION mips_handle_option
 +
 +#undef TARGET_FUNCTION_OK_FOR_SIBCALL
-+#define TARGET_FUNCTION_OK_FOR_SIBCALL mips_function_ok_for_sibcall
++#define TARGET_FUNCTION_OK_FOR_SIBCALL hook_bool_tree_tree_true
 +
 +#undef TARGET_VALID_POINTER_MODE
 +#define TARGET_VALID_POINTER_MODE mips_valid_pointer_mode
@@ -8833,9 +8085,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +#undef TARGET_MUST_PASS_IN_STACK
 +#define TARGET_MUST_PASS_IN_STACK must_pass_in_stack_var_size
 +#undef TARGET_PASS_BY_REFERENCE
-+#define TARGET_PASS_BY_REFERENCE mips_pass_by_reference
-+#undef TARGET_CALLEE_COPIES
-+#define TARGET_CALLEE_COPIES mips_callee_copies
++#define TARGET_PASS_BY_REFERENCE hook_pass_by_reference_must_pass_in_stack
 +#undef TARGET_ARG_PARTIAL_BYTES
 +#define TARGET_ARG_PARTIAL_BYTES mips_arg_partial_bytes
 +#undef TARGET_FUNCTION_ARG
@@ -8893,8 +8143,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +#undef TARGET_ASM_OUTPUT_DWARF_DTPREL
 +#define TARGET_ASM_OUTPUT_DWARF_DTPREL mips_output_dwarf_dtprel
 +#endif
-+#undef TARGET_DWARF_REGISTER_SPAN
-+#define TARGET_DWARF_REGISTER_SPAN mips_dwarf_register_span
 +
 +#undef TARGET_IRA_COVER_CLASSES
 +#define TARGET_IRA_COVER_CLASSES mips_ira_cover_classes
@@ -9055,8 +8303,8 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +DEF_MIPS_FTYPE (2, (VOID, V4QI, V4QI))
 diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/riscv/riscv.h gcc-4.6.1/gcc/config/riscv/riscv.h
 --- ../gcc-4.6.1-orig/gcc/config/riscv/riscv.h	1969-12-31 16:00:00.000000000 -0800
-+++ gcc-4.6.1/gcc/config/riscv/riscv.h	2011-11-01 22:20:08.000000000 -0700
-@@ -0,0 +1,2014 @@
++++ gcc-4.6.1/gcc/config/riscv/riscv.h	2011-11-03 19:13:54.000000000 -0700
+@@ -0,0 +1,1896 @@
 +/* vim: set ts=8: */
 +/* Definitions of target machine for GNU compiler.  MIPS version.
 +   Copyright (C) 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998
@@ -9099,14 +8347,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +#define ABI_32  1
 +#define ABI_64  2
 +
-+/* Masks that affect tuning.
-+
-+   PTF_AVOID_BRANCHLIKELY
-+	Set if it is usually not profitable to use branch-likely instructions
-+	for this target, typically because the branches are always predicted
-+	taken and so incur a large overhead when not taken.  */
-+#define PTF_AVOID_BRANCHLIKELY 0x1
-+
 +/* Information about one recognized processor.  Defined here for the
 +   benefit of TARGET_CPU_CPP_BUILTINS.  */
 +struct mips_cpu_info {
@@ -9125,13 +8365,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +
 +  /* A mask of PTF_* values.  */
 +  unsigned int tune_flags;
-+};
-+
-+/* Enumerates the setting of the -mcode-readable option.  */
-+enum mips_code_readable_setting {
-+  CODE_READABLE_NO,
-+  CODE_READABLE_PCREL,
-+  CODE_READABLE_YES
 +};
 +
 +/* Macros to silence warnings about numbers being signed in traditional
@@ -9287,15 +8520,16 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +      MIPS_CPP_SET_PROCESSOR ("_RISCV_ARCH", mips_arch_info);		\
 +      MIPS_CPP_SET_PROCESSOR ("_RISCV_TUNE", mips_tune_info);		\
 +									\
-+      switch (mips_abi)						\
++      builtin_define ("_ABI32=1");					\
++      builtin_define ("_ABI64=2");					\
++									\
++      switch (mips_abi)							\
 +	{								\
 +	case ABI_32:							\
-+	  builtin_define ("_ABI32=1");					\
 +	  builtin_define ("_RISCV_SIM=_ABI32");			        \
 +	  break;							\
 +									\
 +	case ABI_64:							\
-+	  builtin_define ("_ABI64=2");					\
 +	  builtin_define ("_RISCV_SIM=_ABI64");				\
 +	  break;							\
 +	}								\
@@ -9303,8 +8537,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +      builtin_define_with_int_value ("_RISCV_SZINT", INT_TYPE_SIZE);	\
 +      builtin_define_with_int_value ("_RISCV_SZLONG", LONG_TYPE_SIZE);	\
 +      builtin_define_with_int_value ("_RISCV_SZPTR", POINTER_SIZE);	\
-+      builtin_define_with_int_value ("_RISCV_FPSET",			\
-+				     32 / MAX_FPRS_PER_FMT);		\
++      builtin_define_with_int_value ("_RISCV_FPSET", 32);		\
 +									\
 +      /* These defines reflect the ABI in use, not whether the  	\
 +	 FPU is directly accessible.  */				\
@@ -9385,17 +8618,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +#define TARGET_64BIT		1
 +#else
 +#define TARGET_64BIT		0
-+#endif
-+#endif /* IN_LIBGCC2 */
-+
-+/* Force the call stack unwinders in unwind.inc not to be MIPS16 code
-+   when compiled with hardware floating point.  This is because MIPS16
-+   code cannot save and restore the floating-point registers, which is
-+   important if in a mixed MIPS16/non-MIPS16 environment.  */
-+
-+#ifdef IN_LIBGCC2
-+#if __mips_hard_float
-+#define LIBGCC2_UNWIND_ATTRIBUTE __attribute__((__nomips16__))
 +#endif
 +#endif /* IN_LIBGCC2 */
 +
@@ -9522,9 +8744,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +
 +#define DRIVER_SELF_SPECS BASE_DRIVER_SELF_SPECS
 +
-+/* True if the ABI can only work with 64-bit integer registers.  We
-+   generally allow ad-hoc variations for TARGET_SINGLE_FLOAT, but
-+   otherwise floating-point registers must also be 64-bit.  */
++/* True if the ABI can only work with 64-bit integer registers. */
 +#define ABI_NEEDS_64BIT_REGS	(mips_abi == ABI_64)
 +
 +/* Likewise for 32-bit regs.  */
@@ -9725,11 +8945,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +#endif
 +
 +/* For MIPS, width of a floating point register.  */
-+#define UNITS_PER_FPREG (TARGET_FLOAT64 ? 8 : 4)
-+
-+/* The number of consecutive floating-point registers needed to store the
-+   largest format supported by the FPU.  */
-+#define MAX_FPRS_PER_FMT 1
++#define UNITS_PER_FPREG 8
 +
 +/* The number of consecutive floating-point registers needed to store the
 +   smallest format supported by the FPU.  */
@@ -9738,13 +8954,12 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +/* The largest size of value that can be held in floating-point
 +   registers and moved with a single instruction.  */
 +#define UNITS_PER_HWFPVALUE \
-+  (TARGET_SOFT_FLOAT_ABI ? 0 : MAX_FPRS_PER_FMT * UNITS_PER_FPREG)
++  (TARGET_SOFT_FLOAT_ABI ? 0 : UNITS_PER_FPREG)
 +
 +/* The largest size of value that can be held in floating-point
 +   registers.  */
 +#define UNITS_PER_FPVALUE			\
 +  (TARGET_SOFT_FLOAT_ABI ? 0			\
-+   : TARGET_SINGLE_FLOAT ? UNITS_PER_FPREG	\
 +   : LONG_DOUBLE_TYPE_SIZE / BITS_PER_UNIT)
 +
 +/* The number of bytes in a double.  */
@@ -10027,8 +9242,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +
 +#define GP_REG_P(REGNO)	\
 +  ((unsigned int) ((int) (REGNO) - GP_REG_FIRST) < GP_REG_NUM)
-+#define M16_REG_P(REGNO) \
-+  (((REGNO) >= 2 && (REGNO) <= 7) || (REGNO) == 16 || (REGNO) == 17)
 +#define FP_REG_P(REGNO)  \
 +  ((unsigned int) ((int) (REGNO) - FP_REG_FIRST) < FP_REG_NUM)
 +#define VEC_GP_REG_P(REGNO)	\
@@ -10135,9 +9348,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +enum reg_class
 +{
 +  NO_REGS,			/* no registers in set */
-+  M16_REGS,			/* mips16 directly accessible registers */
-+  T_REG,			/* mips16 T register ($24) */
-+  M16_T_REGS,			/* mips16 registers plus T register */
 +  PIC_FN_ADDR_REG,		/* SVR4 PIC function address register */
 +  V1_REG,			/* Register $v1 ($3) used for TLS access.  */
 +  LEA_REGS,			/* Every GPR except $25 */
@@ -10161,9 +9371,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +#define REG_CLASS_NAMES							\
 +{									\
 +  "NO_REGS",								\
-+  "M16_REGS",								\
-+  "T_REG",								\
-+  "M16_T_REGS",								\
 +  "PIC_FN_ADDR_REG",							\
 +  "V1_REG",								\
 +  "LEA_REGS",								\
@@ -10189,9 +9396,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +#define REG_CLASS_CONTENTS									\
 +{												\
 +  { 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 },	/* NO_REGS */		\
-+  { 0x003000fc, 0x00000000, 0x00000000, 0x00000000, 0x00000000 },	/* M16_REGS */		\
-+  { 0x00040000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 },	/* T_REG */		\
-+  { 0x003400fc, 0x00000000, 0x00000000, 0x00000000, 0x00000000 },	/* M16_T_REGS */	\
 +  { 0x00080000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 },	/* PIC_FN_ADDR_REG */	\
 +  { 0x00000008, 0x00000000, 0x00000000, 0x00000000, 0x00000000 },	/* V1_REG */		\
 +  { 0xfff7ffff, 0x00000000, 0x00000000, 0x00000000, 0x00000000 },	/* LEA_REGS */		\
@@ -10261,23 +9465,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +     registers.  */							\
 + 128,129,130,131 \
 +}
-+
-+/* ADJUST_REG_ALLOC_ORDER is a macro which permits reg_alloc_order
-+   to be rearranged based on a particular function.  On the mips16, we
-+   want to allocate $24 (T_REG) before other registers for
-+   instructions for which it is possible.  */
-+
-+#define ADJUST_REG_ALLOC_ORDER mips_order_regs_for_local_alloc ()
-+
-+/* True if VALUE is an unsigned 6-bit number.  */
-+
-+#define UIMM6_OPERAND(VALUE) \
-+  (((VALUE) & ~(unsigned HOST_WIDE_INT) 0x3f) == 0)
-+
-+/* True if VALUE is a signed 10-bit number.  */
-+
-+#define IMM10_OPERAND(VALUE) \
-+  ((unsigned HOST_WIDE_INT) (VALUE) + 0x200 < 0x400)
 +
 +/* True if VALUE is a signed 16-bit number.  */
 +
@@ -10349,7 +9536,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 + { FRAME_POINTER_REGNUM, HARD_FRAME_POINTER_REGNUM}}				\
 +
 +#define INITIAL_ELIMINATION_OFFSET(FROM, TO, OFFSET) \
-+  (OFFSET) = mips_initial_elimination_offset ((FROM), (TO))
++  (OFFSET) = mips_initial_elimination_offset (FROM)
 +
 +/* Allocate stack space for arguments at the beginning of each function.  */
 +#define ACCUMULATE_OUTGOING_ARGS 1
@@ -10432,39 +9619,13 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +   or in a floating-point one.  */
 +
 +typedef struct mips_args {
-+  /* Always true for varargs functions.  Otherwise true if at least
-+     one argument has been passed in an integer register.  */
-+  int gp_reg_found;
-+
-+  /* The number of arguments seen so far.  */
-+  unsigned int arg_number;
-+
 +  /* The number of integer registers used so far.  For all ABIs except
 +     EABI, this is the number of words that have been added to the
 +     argument structure, limited to MAX_ARGS_IN_REGISTERS.  */
 +  unsigned int num_gprs;
 +
-+  /* For EABI, the number of floating-point registers used so far.  */
-+  unsigned int num_fprs;
-+
 +  /* The number of words passed on the stack.  */
 +  unsigned int stack_words;
-+
-+  /* On the mips16, we need to keep track of which floating point
-+     arguments were passed in general registers, but would have been
-+     passed in the FP regs if this were a 32-bit function, so that we
-+     can move them to the FP regs if we wind up calling a 32-bit
-+     function.  We record this information in fp_code, encoded in base
-+     four.  A zero digit means no floating point argument, a one digit
-+     means an SFmode argument, and a two digit means a DFmode argument,
-+     and a three digit is not used.  The low order digit is the first
-+     argument.  Thus 6 == 1 * 4 + 2 means a DFmode argument followed by
-+     an SFmode argument.  ??? A more sophisticated approach will be
-+     needed if MIPS_ABI != ABI_32.  */
-+  int fp_code;
-+
-+  /* True if the function has a prototype.  */
-+  int prototype;
 +} CUMULATIVE_ARGS;
 +
 +/* Initialize a variable CUM of type CUMULATIVE_ARGS
@@ -10509,8 +9670,8 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +
 +/* Trampolines are a block of code followed by two pointers.  */
 +
-+#define TRAMPOLINE_SIZE \
-+  (mips_trampoline_code_size () + GET_MODE_SIZE (ptr_mode) * 2)
++#define TRAMPOLINE_CODE_SIZE 16
++#define TRAMPOLINE_SIZE (TRAMPOLINE_CODE_SIZE + GET_MODE_SIZE (ptr_mode) * 2)
 +
 +/* Forcing a 64-bit alignment for 32-bit targets allows us to load two
 +   pointers from a single LUI base.  */
@@ -10644,27 +9805,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +#define BRANCH_COST(speed_p, predictable_p) mips_branch_cost
 +#define LOGICAL_OP_NON_SHORT_CIRCUIT 0
 +
-+/* Return the asm template for a call.  INSN is the instruction's mnemonic
-+   ("j" or "jal"), OPERANDS are its operands, TARGET_OPNO is the operand
-+   number of the target.  SIZE_OPNO is the operand number of the argument size
-+   operand that can optionally hold the call attributes.  If SIZE_OPNO is not
-+   -1 and the call is indirect, use the function symbol from the call
-+   attributes to attach a R_MIPS_JALR relocation to the call.
-+
-+   When generating GOT code without explicit relocation operators,
-+   all calls should use assembly macros.  Otherwise, all indirect
-+   calls should use "jr" or "jalr"; we will arrange to restore $gp
-+   afterwards if necessary.  Finally, we can only generate direct
-+   calls for -mabicalls by temporarily switching to non-PIC mode.  */
-+#define MIPS_CALL(INSN, OPERANDS, TARGET_OPNO, SIZE_OPNO)	\
-+  ((REG_P (OPERANDS[TARGET_OPNO])				\
-+      && mips_get_pic_call_symbol (OPERANDS, SIZE_OPNO))	\
-+   ? (".reloc\t1f,R_MIPS_JALR,%" #SIZE_OPNO "\n"		\
-+      "1:\t" INSN "r\t%" #TARGET_OPNO)				\
-+   : REG_P (OPERANDS[TARGET_OPNO])				\
-+   ? INSN "r\t%" #TARGET_OPNO					\
-+   : INSN "\t%" #TARGET_OPNO)
-+
 +/* Control the assembler format that we output.  */
 +
 +/* Output to assembler file text saying following lines
@@ -10792,15 +9932,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +#define ASM_OUTPUT_ALIGNED_LOCAL(STREAM, NAME, SIZE, ALIGN) \
 +  mips_declare_common_object (STREAM, NAME, "\n\t.lcomm\t", SIZE, ALIGN, false)
 +#endif
-+
-+/* This says how to output an external.  It would be possible not to
-+   output anything and let undefined symbol become external. However
-+   the assembler uses length information on externals to allocate in
-+   data/sdata bss/sbss, thereby saving exec time.  */
-+
-+#undef ASM_OUTPUT_EXTERNAL
-+#define ASM_OUTPUT_EXTERNAL(STREAM,DECL,NAME) \
-+  mips_output_external(STREAM,DECL,NAME)
 +
 +/* This is how to declare a function name.  The actual work of
 +   emitting the label is moved to function_prologue, so that we can
@@ -11038,7 +10169,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +extern int mips_abi;			/* which ABI to use */
 +extern const struct mips_cpu_info *mips_arch_info;
 +extern const struct mips_cpu_info *mips_tune_info;
-+extern enum mips_code_readable_setting mips_code_readable;
 +extern GTY(()) struct target_globals *mips16_globals;
 +#endif
 +
@@ -11073,8 +10203,8 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +#define SWITCHABLE_TARGET 1
 diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/riscv/riscv.md gcc-4.6.1/gcc/config/riscv/riscv.md
 --- ../gcc-4.6.1-orig/gcc/config/riscv/riscv.md	1969-12-31 16:00:00.000000000 -0800
-+++ gcc-4.6.1/gcc/config/riscv/riscv.md	2011-10-22 16:58:52.000000000 -0700
-@@ -0,0 +1,2969 @@
++++ gcc-4.6.1/gcc/config/riscv/riscv.md	2011-11-03 03:26:39.000000000 -0700
+@@ -0,0 +1,2966 @@
 +;; vim: set ts=8:
 +;;  Mips.md	     Machine Description for MIPS based processors
 +;;  Copyright (C) 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
@@ -11440,9 +10570,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +	  (symbol_ref "mips_load_store_insns (operands[1], insn) * 4")
 +	  (eq_attr "move_type" "store,fpstore")
 +	  (symbol_ref "mips_load_store_insns (operands[0], insn) * 4")
-+
-+	  (eq_attr "type" "idiv,idiv3")
-+	  (symbol_ref "mips_idiv_insns () * 4")
 +	  ] (const_int 4)))
 +
 +;; Attribute describing the processor.
@@ -11484,19 +10611,19 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +;; This mode iterator allows :ANYF to be used wherever a scalar or vector
 +;; floating-point mode is allowed.
 +(define_mode_iterator ANYF [(SF "TARGET_HARD_FLOAT")
-+			    (DF "TARGET_HARD_FLOAT && TARGET_DOUBLE_FLOAT")
++			    (DF "TARGET_HARD_FLOAT")
 +			    (V2SF "TARGET_HARD_FLOAT && TARGET_PAIRED_SINGLE_FLOAT")])
 +
 +;; Like ANYF, but only applies to scalar modes.
 +(define_mode_iterator SCALARF [(SF "TARGET_HARD_FLOAT")
-+			       (DF "TARGET_HARD_FLOAT && TARGET_DOUBLE_FLOAT")])
++			       (DF "TARGET_HARD_FLOAT")])
 +
 +;; A floating-point mode for which moves involving FPRs may need to be split.
 +(define_mode_iterator SPLITF
-+  [(DF "!TARGET_64BIT && TARGET_DOUBLE_FLOAT")
-+   (DI "!TARGET_64BIT && TARGET_DOUBLE_FLOAT")
++  [(DF "!TARGET_64BIT")
++   (DI "!TARGET_64BIT")
 +   (V2SF "!TARGET_64BIT && TARGET_PAIRED_SINGLE_FLOAT")
-+   (TF "TARGET_64BIT && TARGET_FLOAT64")])
++   (TF "TARGET_64BIT")])
 +
 +;; This attribute gives the length suffix for a sign- or zero-extension
 +;; instruction.
@@ -12076,7 +11203,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +	(plus:ANYF (mult:ANYF (match_operand:ANYF 1 "register_operand" "f")
 +			      (match_operand:ANYF 2 "register_operand" "f"))
 +		   (match_operand:ANYF 3 "register_operand" "f")))]
-+  "TARGET_HARD_FLOAT && TARGET_FUSED_MADD"
++  "TARGET_HARD_FLOAT"
 +  "fmadd.<fmt>\t%0,%1,%2,%3"
 +  [(set_attr "type" "fmadd")
 +   (set_attr "mode" "<UNITMODE>")])
@@ -12086,7 +11213,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +	(minus:ANYF (mult:ANYF (match_operand:ANYF 1 "register_operand" "f")
 +			       (match_operand:ANYF 2 "register_operand" "f"))
 +		    (match_operand:ANYF 3 "register_operand" "f")))]
-+  "TARGET_HARD_FLOAT && TARGET_FUSED_MADD"
++  "TARGET_HARD_FLOAT"
 +  "fmsub.<fmt>\t%0,%1,%2,%3"
 +  [(set_attr "type" "fmadd")
 +   (set_attr "mode" "<UNITMODE>")])
@@ -12097,7 +11224,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +		   (mult:ANYF (match_operand:ANYF 1 "register_operand" "f")
 +			      (match_operand:ANYF 2 "register_operand" "f"))
 +		   (match_operand:ANYF 3 "register_operand" "f"))))]
-+  "TARGET_HARD_FLOAT && TARGET_FUSED_MADD"
++  "TARGET_HARD_FLOAT"
 +  "fnmadd.<fmt>\t%0,%1,%2,%3"
 +  [(set_attr "type" "fmadd")
 +   (set_attr "mode" "<UNITMODE>")])
@@ -12108,7 +11235,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +	 (mult:ANYF (neg:ANYF (match_operand:ANYF 1 "register_operand" "f"))
 +		    (match_operand:ANYF 2 "register_operand" "f"))
 +	 (match_operand:ANYF 3 "register_operand" "f")))]
-+  "TARGET_HARD_FLOAT && TARGET_FUSED_MADD"
++  "TARGET_HARD_FLOAT"
 +  "fnmadd.<fmt>\t%0,%1,%2,%3"
 +  [(set_attr "type" "fmadd")
 +   (set_attr "mode" "<UNITMODE>")])
@@ -12119,7 +11246,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +		   (mult:ANYF (match_operand:ANYF 2 "register_operand" "f")
 +			      (match_operand:ANYF 3 "register_operand" "f"))
 +		   (match_operand:ANYF 1 "register_operand" "f"))))]
-+  "TARGET_HARD_FLOAT && TARGET_FUSED_MADD"
++  "TARGET_HARD_FLOAT"
 +  "fnmsub.<fmt>\t%0,%1,%2,%3"
 +  [(set_attr "type" "fmadd")
 +   (set_attr "mode" "<UNITMODE>")])
@@ -12130,7 +11257,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +	 (match_operand:ANYF 1 "register_operand" "f")
 +	 (mult:ANYF (match_operand:ANYF 2 "register_operand" "f")
 +		    (match_operand:ANYF 3 "register_operand" "f"))))]
-+  "TARGET_HARD_FLOAT && TARGET_FUSED_MADD"
++  "TARGET_HARD_FLOAT"
 +  "fnmsub.<fmt>\t%0,%1,%2,%3"
 +  [(set_attr "type" "fmadd")
 +   (set_attr "mode" "<UNITMODE>")])
@@ -12273,7 +11400,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +(define_insn "truncdfsf2"
 +  [(set (match_operand:SF 0 "register_operand" "=f")
 +	(float_truncate:SF (match_operand:DF 1 "register_operand" "f")))]
-+  "TARGET_HARD_FLOAT && TARGET_DOUBLE_FLOAT"
++  "TARGET_HARD_FLOAT"
 +  "fcvt.s.d\t%0,%1"
 +  [(set_attr "type"	"fcvt")
 +   (set_attr "cnv_mode"	"D2S")   
@@ -12568,7 +11695,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +(define_insn "extendsfdf2"
 +  [(set (match_operand:DF 0 "register_operand" "=f")
 +	(float_extend:DF (match_operand:SF 1 "register_operand" "f")))]
-+  "TARGET_HARD_FLOAT && TARGET_DOUBLE_FLOAT"
++  "TARGET_HARD_FLOAT"
 +  "fcvt.d.s\t%0,%1"
 +  [(set_attr "type"	"fcvt")
 +   (set_attr "cnv_mode"	"S2D")   
@@ -12584,7 +11711,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +(define_insn "fix_truncdfsi2"
 +  [(set (match_operand:SI 0 "register_operand" "=d")
 +	(fix:SI (match_operand:DF 1 "register_operand" "f")))]
-+  "TARGET_HARD_FLOAT && TARGET_DOUBLE_FLOAT"
++  "TARGET_HARD_FLOAT"
 +  "fcvt.w.d %0,%1,rtz"
 +  [(set_attr "type"	"fcvt")
 +   (set_attr "mode"	"DF")
@@ -12604,7 +11731,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +(define_insn "fix_truncdfdi2"
 +  [(set (match_operand:DI 0 "register_operand" "=d")
 +	(fix:DI (match_operand:DF 1 "register_operand" "f")))]
-+  "TARGET_HARD_FLOAT && TARGET_FLOAT64 && TARGET_DOUBLE_FLOAT"
++  "TARGET_HARD_FLOAT"
 +  "fcvt.l.d %0,%1,rtz"
 +  [(set_attr "type"	"fcvt")
 +   (set_attr "mode"	"DF")
@@ -12614,7 +11741,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +(define_insn "fix_truncsfdi2"
 +  [(set (match_operand:DI 0 "register_operand" "=d")
 +	(fix:DI (match_operand:SF 1 "register_operand" "f")))]
-+  "TARGET_HARD_FLOAT && TARGET_FLOAT64 && TARGET_DOUBLE_FLOAT"
++  "TARGET_HARD_FLOAT"
 +  "fcvt.l.s %0,%1,rtz"
 +  [(set_attr "type"	"fcvt")
 +   (set_attr "mode"	"SF")
@@ -12624,7 +11751,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +(define_insn "floatsidf2"
 +  [(set (match_operand:DF 0 "register_operand" "=f")
 +	(float:DF (match_operand:SI 1 "register_operand" "d")))]
-+  "TARGET_HARD_FLOAT && TARGET_DOUBLE_FLOAT"
++  "TARGET_HARD_FLOAT"
 +  "fcvt.d.w\t%0,%1"
 +  [(set_attr "type"	"fcvt")
 +   (set_attr "mode"	"DF")
@@ -12634,7 +11761,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +(define_insn "floatdidf2"
 +  [(set (match_operand:DF 0 "register_operand" "=f")
 +	(float:DF (match_operand:DI 1 "register_operand" "d")))]
-+  "TARGET_HARD_FLOAT && TARGET_FLOAT64 && TARGET_DOUBLE_FLOAT"
++  "TARGET_HARD_FLOAT"
 +  "fcvt.d.l\t%0,%1"
 +  [(set_attr "type"	"fcvt")
 +   (set_attr "mode"	"DF")
@@ -12654,7 +11781,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +(define_insn "floatdisf2"
 +  [(set (match_operand:SF 0 "register_operand" "=f")
 +	(float:SF (match_operand:DI 1 "register_operand" "d")))]
-+  "TARGET_HARD_FLOAT && TARGET_FLOAT64 && TARGET_DOUBLE_FLOAT"
++  "TARGET_HARD_FLOAT"
 +  "fcvt.s.l\t%0,%1"
 +  [(set_attr "type"	"fcvt")
 +   (set_attr "mode"	"SF")
@@ -12664,7 +11791,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +(define_insn "floatunssidf2"
 +  [(set (match_operand:DF 0 "register_operand" "=f")
 +	(unsigned_float:DF (match_operand:SI 1 "register_operand" "d")))]
-+  "TARGET_HARD_FLOAT && TARGET_DOUBLE_FLOAT"
++  "TARGET_HARD_FLOAT"
 +  "fcvt.d.wu\t%0,%1"
 +  [(set_attr "type"	"fcvt")
 +   (set_attr "mode"	"DF")
@@ -12674,7 +11801,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +(define_insn "floatunsdidf2"
 +  [(set (match_operand:DF 0 "register_operand" "=f")
 +	(unsigned_float:DF (match_operand:DI 1 "register_operand" "d")))]
-+  "TARGET_HARD_FLOAT && TARGET_FLOAT64 && TARGET_DOUBLE_FLOAT"
++  "TARGET_HARD_FLOAT"
 +  "fcvt.d.lu\t%0,%1"
 +  [(set_attr "type"	"fcvt")
 +   (set_attr "mode"	"DF")
@@ -12694,7 +11821,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +(define_insn "floatunsdisf2"
 +  [(set (match_operand:SF 0 "register_operand" "=f")
 +	(unsigned_float:SF (match_operand:DI 1 "register_operand" "d")))]
-+  "TARGET_HARD_FLOAT && TARGET_FLOAT64 && TARGET_DOUBLE_FLOAT"
++  "TARGET_HARD_FLOAT"
 +  "fcvt.s.lu\t%0,%1"
 +  [(set_attr "type"	"fcvt")
 +   (set_attr "mode"	"SF")
@@ -12704,7 +11831,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +(define_insn "fixuns_truncdfsi2"
 +  [(set (match_operand:SI 0 "register_operand" "=d")
 +	(unsigned_fix:SI (match_operand:DF 1 "register_operand" "f")))]
-+  "TARGET_HARD_FLOAT && TARGET_DOUBLE_FLOAT"
++  "TARGET_HARD_FLOAT"
 +  "fcvt.wu.d %0,%1,rtz"
 +  [(set_attr "type"	"fcvt")
 +   (set_attr "mode"	"DF")
@@ -12724,7 +11851,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +(define_insn "fixuns_truncdfdi2"
 +  [(set (match_operand:DI 0 "register_operand" "=d")
 +	(unsigned_fix:DI (match_operand:DF 1 "register_operand" "f")))]
-+  "TARGET_HARD_FLOAT && TARGET_FLOAT64 && TARGET_DOUBLE_FLOAT"
++  "TARGET_HARD_FLOAT"
 +  "fcvt.lu.d %0,%1,rtz"
 +  [(set_attr "type"	"fcvt")
 +   (set_attr "mode"	"DF")
@@ -12734,7 +11861,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +(define_insn "fixuns_truncsfdi2"
 +  [(set (match_operand:DI 0 "register_operand" "=d")
 +	(unsigned_fix:DI (match_operand:SF 1 "register_operand" "f")))]
-+  "TARGET_HARD_FLOAT && TARGET_FLOAT64 && TARGET_DOUBLE_FLOAT"
++  "TARGET_HARD_FLOAT"
 +  "fcvt.lu.s %0,%1,rtz"
 +  [(set_attr "type"	"fcvt")
 +   (set_attr "mode"	"SF")
@@ -13006,7 +12133,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +(define_insn "*movdf_hardfloat_rv32"
 +  [(set (match_operand:DF 0 "nonimmediate_operand" "=f,f,f,m,m,*d,*d,*m")
 +	(match_operand:DF 1 "move_operand" "f,G,m,f,G,*d*G,*m,*d"))]
-+  "!TARGET_64BIT && TARGET_HARD_FLOAT && TARGET_DOUBLE_FLOAT
++  "!TARGET_64BIT && TARGET_HARD_FLOAT
 +   && (register_operand (operands[0], DFmode)
 +       || reg_or_0_operand (operands[1], DFmode))"
 +  { return mips_output_move (operands[0], operands[1]); }
@@ -13016,7 +12143,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +(define_insn "*movdf_hardfloat_rv64"
 +  [(set (match_operand:DF 0 "nonimmediate_operand" "=f,f,f,m,m,*f,*d,*d,*d,*m")
 +	(match_operand:DF 1 "move_operand" "f,G,m,f,G,*d,*f,*d*G,*m,*d"))]
-+  "TARGET_64BIT && TARGET_HARD_FLOAT && TARGET_DOUBLE_FLOAT
++  "TARGET_64BIT && TARGET_HARD_FLOAT
 +   && (register_operand (operands[0], DFmode)
 +       || reg_or_0_operand (operands[1], DFmode))"
 +  { return mips_output_move (operands[0], operands[1]); }
@@ -13026,7 +12153,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +(define_insn "*movdf_softfloat"
 +  [(set (match_operand:DF 0 "nonimmediate_operand" "=d,d,m")
 +	(match_operand:DF 1 "move_operand" "dG,m,dG"))]
-+  "(TARGET_SOFT_FLOAT || TARGET_SINGLE_FLOAT)
++  "TARGET_SOFT_FLOAT
 +   && (register_operand (operands[0], DFmode)
 +       || reg_or_0_operand (operands[1], DFmode))"
 +  { return mips_output_move (operands[0], operands[1]); }
@@ -13814,7 +12941,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +  [(call (mem:SI (match_operand 0 "call_insn_operand" "j,S"))
 +	 (match_operand 1 "" ""))]
 +  "SIBLING_CALL_P (insn)"
-+  { return MIPS_CALL ("j", operands, 0, 1); }
++  { return REG_P (operands[0]) ? "jr\t%0" : "j\t%0"; }
 +  [(set_attr "type" "call")])
 +
 +(define_expand "sibcall_value"
@@ -13834,7 +12961,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +        (call (mem:SI (match_operand 1 "call_insn_operand" "j,S"))
 +              (match_operand 2 "" "")))]
 +  "SIBLING_CALL_P (insn)"
-+  { return MIPS_CALL ("j", operands, 1, 2); }
++  { return REG_P (operands[1]) ? "jr\t%1" : "j\t%1"; }
 +  [(set_attr "type" "call")])
 +
 +(define_insn "sibcall_value_multiple_internal"
@@ -13845,7 +12972,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +	(call (mem:SI (match_dup 1))
 +	      (match_dup 2)))]
 +  "SIBLING_CALL_P (insn)"
-+  { return MIPS_CALL ("j", operands, 1, 2); }
++  { return REG_P (operands[1]) ? "jr\t%1" : "j\t%1"; }
 +  [(set_attr "type" "call")])
 +
 +(define_expand "call"
@@ -13900,7 +13027,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +	 (match_operand 1 "" ""))
 +   (clobber (reg:SI RETURN_ADDR_REGNUM))]
 +  ""
-+  { return MIPS_CALL ("jal", operands, 0, 1); }
++  { return REG_P (operands[0]) ? "jalr\t%0" : "jal\t%0"; }
 +  "0"
 +  [(const_int 0)]
 +{
@@ -13919,7 +13046,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +   (const_int 1)
 +   (clobber (reg:SI RETURN_ADDR_REGNUM))]
 +  ""
-+  { return MIPS_CALL ("jal", operands, 0, -1); }
++  "jal\t%0"
 +  "0"
 +  [(const_int 0)]
 +{
@@ -13947,7 +13074,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +              (match_operand 2 "" "")))
 +   (clobber (reg:SI RETURN_ADDR_REGNUM))]
 +  ""
-+  { return MIPS_CALL ("jal", operands, 1, 2); }
++  { return REG_P (operands[1]) ? "jalr\t%1" : "jal\t%1"; }
 +  "0"
 +  [(const_int 0)]
 +{
@@ -13964,7 +13091,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +   (const_int 1)
 +   (clobber (reg:SI RETURN_ADDR_REGNUM))]
 +  ""
-+  { return MIPS_CALL ("jal", operands, 1, -1); }
++  "jal\t%1"
 +  "0"
 +  [(const_int 0)]
 +{
@@ -13983,7 +13110,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +	      (match_dup 2)))
 +   (clobber (reg:SI RETURN_ADDR_REGNUM))]
 +  ""
-+  { return MIPS_CALL ("jal", operands, 1, 2); }
++  { return REG_P (operands[1]) ? "jalr\t%1" : "jal\t%1"; }
 +  "0"
 +  [(const_int 0)]
 +{
@@ -14644,8 +13771,8 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +#define  MASK_SD 0x3ff
 diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/riscv/riscv.opt gcc-4.6.1/gcc/config/riscv/riscv.opt
 --- ../gcc-4.6.1-orig/gcc/config/riscv/riscv.opt	1969-12-31 16:00:00.000000000 -0800
-+++ gcc-4.6.1/gcc/config/riscv/riscv.opt	2011-11-01 21:51:56.000000000 -0700
-@@ -0,0 +1,206 @@
++++ gcc-4.6.1/gcc/config/riscv/riscv.opt	2011-11-02 23:39:53.000000000 -0700
+@@ -0,0 +1,144 @@
 +; Options for the MIPS port of the compiler
 +;
 +; Copyright (C) 2005, 2007, 2008, 2010, 2011 Free Software Foundation, Inc.
@@ -14680,10 +13807,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +Target Report Mask(ABICALLS)
 +Generate code that can be used in SVR4-style dynamic objects
 +
-+mad
-+Target Report Var(TARGET_MAD)
-+Use PMC-style 'mad' instructions
-+
 +march=
 +Target RejectNegative Joined Var(mips_arch_string)
 +-march=ISA	Generate code for the given ISA
@@ -14692,36 +13815,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +Target RejectNegative Joined UInteger Var(mips_branch_cost)
 +-mbranch-cost=COST	Set the cost of branches to roughly COST instructions
 +
-+mbranch-likely
-+Target Report Mask(BRANCHLIKELY)
-+Use Branch Likely instructions, overriding the architecture default
-+
-+mcheck-zero-division
-+Target Report Mask(CHECK_ZERO_DIV)
-+Trap on integer divide by zero
-+
-+mcode-readable=
-+Target RejectNegative Joined
-+-mcode-readable=SETTING	Specify when instructions are allowed to access code
-+
-+mdivide-breaks
-+Target Report RejectNegative Mask(DIVIDE_BREAKS)
-+Use branch-and-break sequences to check for integer divide by zero
-+
-+mdivide-traps
-+Target Report RejectNegative InverseMask(DIVIDE_BREAKS, DIVIDE_TRAPS)
-+Use trap instructions to check for integer divide by zero
-+
-+mdouble-float
-+Target Report RejectNegative InverseMask(SINGLE_FLOAT, DOUBLE_FLOAT)
-+Allow hardware floating-point instructions to cover both 32-bit and 64-bit operations
-+
-+mdebug
-+Target Var(TARGET_DEBUG_MODE) Undocumented
-+
-+mdebugd
-+Target Var(TARGET_DEBUG_D_MODE) Undocumented
-+
 +meb
 +Target Report RejectNegative Mask(BIG_ENDIAN)
 +Use big-endian byte order
@@ -14729,22 +13822,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +mel
 +Target Report RejectNegative InverseMask(BIG_ENDIAN, LITTLE_ENDIAN)
 +Use little-endian byte order
-+
-+membedded-data
-+Target Report Var(TARGET_EMBEDDED_DATA)
-+Use ROM instead of RAM
-+
-+mfp32
-+Target Report RejectNegative InverseMask(FLOAT64)
-+Use 32-bit floating-point registers
-+
-+mfp64
-+Target Report RejectNegative Mask(FLOAT64)
-+Use 64-bit floating-point registers
-+
-+mfused-madd
-+Target Report Mask(FUSED_MADD)
-+Generate floating-point multiply-add instructions
 +
 +mgp32
 +Target Report RejectNegative InverseMask(64BIT)
@@ -14765,10 +13842,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +mips
 +Target RejectNegative Joined
 +-mipsN	Generate code for ISA level N
-+
-+mllsc
-+Target Report Mask(LLSC)
-+Use ll, sc and sync instructions
 +
 +mlong-calls
 +Target Report Var(TARGET_LONG_CALLS)
@@ -14810,10 +13883,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +Target Report Var(TARGET_SHARED) Init(1)
 +When generating -mabicalls code, make the code suitable for use in shared libraries
 +
-+msingle-float
-+Target Report RejectNegative Mask(SINGLE_FLOAT)
-+Restrict the use of hardware floating-point instructions to 32-bit operations
-+
 +msmartmips
 +Target Report Mask(SMARTMIPS)
 +Use SmartMIPS instructions
@@ -14838,10 +13907,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +Target RejectNegative Joined Var(mips_tune_string)
 +-mtune=PROCESSOR	Optimize the output for PROCESSOR
 +
-+muninit-const-in-rodata
-+Target Report Var(TARGET_UNINIT_CONST_IN_RODATA)
-+Put uninitialized constants in ROM (needs -membedded-data)
-+
 +mvr4130-align
 +Target Report Mask(VR4130_ALIGN)
 +Perform VR4130-specific alignment optimizations
@@ -14854,8 +13919,8 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +Driver
 diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/riscv/riscv-protos.h gcc-4.6.1/gcc/config/riscv/riscv-protos.h
 --- ../gcc-4.6.1-orig/gcc/config/riscv/riscv-protos.h	1969-12-31 16:00:00.000000000 -0800
-+++ gcc-4.6.1/gcc/config/riscv/riscv-protos.h	2011-10-22 16:52:34.000000000 -0700
-@@ -0,0 +1,253 @@
++++ gcc-4.6.1/gcc/config/riscv/riscv-protos.h	2011-11-03 02:55:14.000000000 -0700
+@@ -0,0 +1,205 @@
 +/* Prototypes of target machine for GNU compiler.  MIPS version.
 +   Copyright (C) 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
 +   1999, 2001, 2002, 2003, 2004, 2005, 2007, 2008, 2009, 2010, 2011
@@ -14981,30 +14046,12 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +extern int mips_const_insns (rtx);
 +extern int mips_split_const_insns (rtx);
 +extern int mips_load_store_insns (rtx, rtx);
-+extern int mips_idiv_insns (void);
 +extern rtx mips_emit_move (rtx, rtx);
 +extern rtx mips_got_load (rtx, rtx, enum mips_symbol_type);
 +extern bool mips_split_symbol (rtx, rtx, enum machine_mode, rtx *);
 +extern rtx mips_unspec_address (rtx, enum mips_symbol_type);
 +extern void mips_move_integer (rtx, rtx, unsigned HOST_WIDE_INT);
 +extern bool mips_legitimize_move (enum machine_mode, rtx, rtx);
-+
-+extern int m16_uimm3_b (rtx, enum machine_mode);
-+extern int m16_simm4_1 (rtx, enum machine_mode);
-+extern int m16_nsimm4_1 (rtx, enum machine_mode);
-+extern int m16_simm5_1 (rtx, enum machine_mode);
-+extern int m16_nsimm5_1 (rtx, enum machine_mode);
-+extern int m16_uimm5_4 (rtx, enum machine_mode);
-+extern int m16_nuimm5_4 (rtx, enum machine_mode);
-+extern int m16_simm8_1 (rtx, enum machine_mode);
-+extern int m16_nsimm8_1 (rtx, enum machine_mode);
-+extern int m16_uimm8_1 (rtx, enum machine_mode);
-+extern int m16_nuimm8_1 (rtx, enum machine_mode);
-+extern int m16_uimm8_m1_1 (rtx, enum machine_mode);
-+extern int m16_uimm8_4 (rtx, enum machine_mode);
-+extern int m16_nuimm8_4 (rtx, enum machine_mode);
-+extern int m16_simm8_8 (rtx, enum machine_mode);
-+extern int m16_nsimm8_8 (rtx, enum machine_mode);
 +
 +extern rtx mips_subword (rtx, bool);
 +extern bool mips_split_64bit_move_p (rtx, rtx);
@@ -15015,11 +14062,9 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +extern void mips_expand_conditional_branch (rtx *);
 +extern void mips_expand_vcondv2sf (rtx, rtx, rtx, enum rtx_code, rtx, rtx);
 +extern void mips_expand_conditional_move (rtx *);
-+extern void mips_expand_conditional_trap (rtx);
 +#endif
 +extern bool mips_use_pic_fn_addr_reg_p (const_rtx);
 +extern rtx mips_expand_call (enum mips_call_type, rtx, rtx, rtx, rtx, bool);
-+extern bool mips_get_pic_call_symbol (rtx *, int);
 +extern void mips_expand_fcc_reload (rtx, rtx, rtx);
 +extern void mips_set_return_address (rtx, rtx);
 +extern bool mips_expand_block_move (rtx, rtx, rtx);
@@ -15050,7 +14095,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +extern void mips_declare_object_name (FILE *, const char *, tree);
 +extern void mips_finish_declare_object (FILE *, tree, int, int);
 +
-+extern HOST_WIDE_INT mips_initial_elimination_offset (int, int);
++extern HOST_WIDE_INT mips_initial_elimination_offset (int);
 +extern rtx mips_return_addr (int, rtx);
 +extern bool mips_must_initialize_gp_p (void);
 +extern enum mips_loadgp_style mips_current_loadgp_style (void);
@@ -15070,43 +14115,15 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +
 +extern const char *mips_output_conditional_branch (rtx, rtx *, const char *,
 +						   const char *);
-+extern const char *mips_output_order_conditional_branch (rtx, rtx *, bool);
-+extern const char *mips_output_sync (void);
-+extern const char *mips_output_sync_loop (rtx, rtx *);
-+extern unsigned int mips_sync_loop_insns (rtx, rtx *);
-+extern const char *mips_output_division (const char *, rtx *);
 +extern unsigned int mips_hard_regno_nregs (int, enum machine_mode);
-+extern bool mips_linked_madd_p (rtx, rtx);
-+extern rtx mips_prefetch_cookie (rtx, rtx);
 +
 +extern void irix_asm_output_align (FILE *, unsigned);
 +extern const char *current_section_name (void);
 +extern unsigned int current_section_flags (void);
 +
-+extern bool mask_low_and_shift_p (enum machine_mode, rtx, rtx, int);
-+extern int mask_low_and_shift_len (enum machine_mode, rtx, rtx);
-+extern bool and_operands_ok (enum machine_mode, rtx, rtx);
-+
-+union mips_gen_fn_ptrs
-+{
-+  rtx (*fn_6) (rtx, rtx, rtx, rtx, rtx, rtx);
-+  rtx (*fn_5) (rtx, rtx, rtx, rtx, rtx);
-+  rtx (*fn_4) (rtx, rtx, rtx, rtx);
-+};
-+
-+extern void mips_expand_atomic_qihi (union mips_gen_fn_ptrs,
-+				     rtx, rtx, rtx, rtx);
-+
 +extern void mips_expand_vector_init (rtx, rtx);
 +
 +extern bool mips_epilogue_uses (unsigned int);
-+extern int mips_trampoline_code_size (void);
-+extern void mips_function_profiler (FILE *);
-+
-+typedef rtx (*mulsidi3_gen_fn) (rtx, rtx, rtx);
-+#ifdef RTX_CODE
-+extern mulsidi3_gen_fn mips_mulsidi3_gen_fn (enum rtx_code);
-+#endif
 +
 +#endif /* ! GCC_MIPS_PROTOS_H */
 diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/riscv/ros64.h gcc-4.6.1/gcc/config/riscv/ros64.h

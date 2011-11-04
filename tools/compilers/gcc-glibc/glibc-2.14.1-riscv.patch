@@ -402,8 +402,8 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/b
 +#endif /* bits/ipctypes.h */
 diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/bits/link.h glibc-2.14.1/sysdeps/riscv/bits/link.h
 --- ../glibc-2.14.1-orig/sysdeps/riscv/bits/link.h	1969-12-31 16:00:00.000000000 -0800
-+++ glibc-2.14.1/sysdeps/riscv/bits/link.h	2011-10-25 02:48:44.000000000 -0700
-@@ -0,0 +1,118 @@
++++ glibc-2.14.1/sysdeps/riscv/bits/link.h	2011-11-03 19:06:26.000000000 -0700
+@@ -0,0 +1,76 @@
 +/* Copyright (C) 2005, 2009 Free Software Foundation, Inc.
 +   This file is part of the GNU C Library.
 +
@@ -426,68 +426,26 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/b
 +# error "Never include <bits/link.h> directly; use <link.h> instead."
 +#endif
 +
-+#include <sgidefs.h>
-+
-+#if _RISCV_SIM == _ABIO32
-+
-+/* Registers for entry into PLT on MIPS.  */
-+typedef struct La_mips_32_regs
-+{
-+  uint32_t lr_reg[4]; /* $a0 through $a3 */
-+  double lr_fpreg[2]; /* $f12 and $f14 */
-+  uint32_t lr_ra;
-+  uint32_t lr_sp;
-+} La_mips_32_regs;
-+
-+/* Return values for calls from PLT on MIPS.  */
-+typedef struct La_mips_32_retval
-+{
-+  uint32_t lrv_v0;
-+  uint32_t lrv_v1;
-+  double lrv_f0;
-+  double lrv_f2;
-+} La_mips_32_retval;
-+
-+#else
-+
 +typedef struct La_mips_64_regs
 +{
-+  uint64_t lr_reg[8]; /* $a0 through $a7 */
-+  double lr_fpreg[8]; /* $f12 throgh $f19 */
-+  uint64_t lr_ra;
-+  uint64_t lr_sp;
++  unsigned long lr_reg[8]; /* $a0 through $a7 */
++  double lr_fpreg[8]; /* $f4 throgh $f11 */
++  unsigned long lr_ra;
++  unsigned long lr_sp;
 +} La_mips_64_regs;
 +
 +/* Return values for calls from PLT on MIPS.  */
 +typedef struct La_mips_64_retval
 +{
-+  uint64_t lrv_v0;
-+  uint64_t lrv_v1;
-+  double lrv_f0;
-+  double lrv_f2;
++  unsigned long lrv_v0;
++  unsigned long lrv_v1;
++  double lrv_fv0;
++  double lrv_fv1;
 +} La_mips_64_retval;
-+
-+#endif
 +
 +__BEGIN_DECLS
 +
-+#if _RISCV_SIM == _ABIO32
-+
-+extern Elf32_Addr la_mips_o32_gnu_pltenter (Elf32_Sym *__sym, unsigned int __ndx,
-+					    uintptr_t *__refcook,
-+					    uintptr_t *__defcook,
-+					    La_mips_32_regs *__regs,
-+					    unsigned int *__flags,
-+					    const char *__symname,
-+					    long int *__framesizep);
-+extern unsigned int la_mips_o32_gnu_pltexit (Elf32_Sym *__sym, unsigned int __ndx,
-+					     uintptr_t *__refcook,
-+					     uintptr_t *__defcook,
-+					     const La_mips_32_regs *__inregs,
-+					     La_mips_32_retval *__outregs,
-+					     const char *__symname);
-+
-+#elif _RISCV_SIM == _ABIN32
++#if _RISCV_SIM == _ABI32
 +
 +extern Elf32_Addr la_mips_n32_gnu_pltenter (Elf32_Sym *__sym, unsigned int __ndx,
 +					    uintptr_t *__refcook,
@@ -532,7 +490,7 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/b
 +  };
 diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/bits/mathdef.h glibc-2.14.1/sysdeps/riscv/bits/mathdef.h
 --- ../glibc-2.14.1-orig/sysdeps/riscv/bits/mathdef.h	1969-12-31 16:00:00.000000000 -0800
-+++ glibc-2.14.1/sysdeps/riscv/bits/mathdef.h	2011-10-25 02:48:44.000000000 -0700
++++ glibc-2.14.1/sysdeps/riscv/bits/mathdef.h	2011-11-03 18:57:51.000000000 -0700
 @@ -0,0 +1,45 @@
 +/* Copyright (C) 1997, 1998, 1999, 2000, 2002, 2003, 2004, 2007
 +	Free Software Foundation, Inc.
@@ -574,7 +532,7 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/b
 +
 +#endif	/* ISO C99 */
 +
-+#if ! defined __NO_LONG_DOUBLE_MATH && _RISCV_SIM == _ABIO32
++#if ! defined __NO_LONG_DOUBLE_MATH && _RISCV_SIM == _ABI32
 +/* Signal that we do not really have a `long double'.  This disables the
 +   declaration of all the `long double' function variants.  */
 +# define __NO_LONG_DOUBLE_MATH	1
@@ -1791,8 +1749,8 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/d
 +}
 diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/dl-machine.h glibc-2.14.1/sysdeps/riscv/dl-machine.h
 --- ../glibc-2.14.1-orig/sysdeps/riscv/dl-machine.h	1969-12-31 16:00:00.000000000 -0800
-+++ glibc-2.14.1/sysdeps/riscv/dl-machine.h	2011-10-25 02:48:44.000000000 -0700
-@@ -0,0 +1,746 @@
++++ glibc-2.14.1/sysdeps/riscv/dl-machine.h	2011-11-03 19:07:06.000000000 -0700
+@@ -0,0 +1,740 @@
 +/* Machine-dependent ELF dynamic relocation inline functions.  MIPS version.
 +   Copyright (C) 1996-2001, 2002, 2003, 2004, 2005, 2006, 2007
 +   Free Software Foundation, Inc.
@@ -1826,7 +1784,6 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/d
 +#error ENTRY_POINT needs to be defined for MIPS.
 +#endif
 +
-+#include <sgidefs.h>
 +#include <sys/asm.h>
 +#include <dl-tls.h>
 +
@@ -1999,19 +1956,14 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/d
 +	# Subtract OFFSET_GP_GOT\n\
 +	" STRINGXP(REG_S) " a0, -" STRINGXP(OFFSET_GP_GOT) "(gp)\n\
 +	move a0, sp\n\
-+	addi sp, sp, -16\n\
-+	\n\
 +	rdnpc t0\n\
 +.Lcoff: \n\
-+	" STRINGXV(PIC_LA(a4, gp, .Lcoff)) "\n\
-+	sub a4, t0, a4\n\
-+	\n\
++	" STRINGXV(PIC_LA(t1, gp, .Lcoff)) "\n\
 +	" STRINGXV(PIC_LA(t7, gp, _dl_start)) "\n\
-+	add t7, t7, t0\n\
++	sub  t0, t0, t1\n\
++	add  t7, t7, t0\n\
 +	jalr t7\n\
-+	\n\
-+	addi sp, sp, 16\n\
-+	j _dl_start_user\n\
++	# Fall through to _dl_start_user \
 +	" _RTLD_EPILOGUE(ENTRY_POINT) "\
 +	\n\
 +	\n\
@@ -8023,8 +7975,8 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/s
 +#endif /* sys/asm.h */
 diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/sys/ucontext.h glibc-2.14.1/sysdeps/riscv/sys/ucontext.h
 --- ../glibc-2.14.1-orig/sysdeps/riscv/sys/ucontext.h	1969-12-31 16:00:00.000000000 -0800
-+++ glibc-2.14.1/sysdeps/riscv/sys/ucontext.h	2011-10-25 02:48:44.000000000 -0700
-@@ -0,0 +1,159 @@
++++ glibc-2.14.1/sysdeps/riscv/sys/ucontext.h	2011-11-03 19:08:52.000000000 -0700
+@@ -0,0 +1,144 @@
 +/* Copyright (C) 1998, 1999, 2002, 2003, 2004 Free Software Foundation, Inc.
 +   This file is part of the GNU C Library.
 +
@@ -8049,15 +8001,10 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/s
 +#define _SYS_UCONTEXT_H	1
 +
 +#include <features.h>
-+#include <sgidefs.h>
 +#include <signal.h>
 +
 +/* Type for general register.  */
-+#if _RISCV_SIM == _ABIO32
-+typedef __uint32_t greg_t;
-+#else
-+typedef __uint64_t greg_t;
-+#endif
++typedef unsigned long greg_t;
 +
 +/* Number of general registers.  */
 +#define NGREG	36
@@ -8147,15 +8094,9 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/s
 +{
 +  union
 +  {
-+#if _RISCV_SIM == _ABIO32
-+    double fp_dregs[16];
-+    float fp_fregs[32];
-+    unsigned int fp_regs[32];
-+#else
 +    double fp_dregs[32];
 +    /* float fp_fregs[32]; */
 +    __uint64_t fp_regs[32];
-+#endif
 +  } fp_r;
 +  unsigned int fp_csr;
 +  unsigned int fp_pad;
@@ -8171,11 +8112,7 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/s
 +/* Userlevel context.  */
 +typedef struct ucontext
 +{
-+#if _RISCV_SIM == _ABIO32
 +  unsigned long int uc_flags;
-+#else
-+  __uint64_t uc_flags;
-+#endif
 +  struct ucontext *uc_link;
 +  __sigset_t uc_sigmask;
 +  stack_t uc_stack;
@@ -8256,8 +8193,8 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/t
 +     __result; })
 diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/tst-audit.h glibc-2.14.1/sysdeps/riscv/tst-audit.h
 --- ../glibc-2.14.1-orig/sysdeps/riscv/tst-audit.h	1969-12-31 16:00:00.000000000 -0800
-+++ glibc-2.14.1/sysdeps/riscv/tst-audit.h	2011-10-25 02:48:44.000000000 -0700
-@@ -0,0 +1,40 @@
++++ glibc-2.14.1/sysdeps/riscv/tst-audit.h	2011-11-03 19:05:17.000000000 -0700
+@@ -0,0 +1,33 @@
 +/* Definitions for testing PLT entry/exit auditing.  ARM version.
 +
 +   Copyright (C) 2005 Free Software Foundation, Inc.
@@ -8281,13 +8218,7 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/t
 +
 +#include <sgidefs.h>
 +
-+#if _RISCV_SIM == _ABIO32
-+#define pltenter la_mips_o32_gnu_pltenter
-+#define pltexit la_mips_o32_gnu_pltexit
-+#define La_regs La_mips_32_regs
-+#define La_retval La_mips_32_retval
-+#else
-+#if _RISCV_SIM == _ABIN32
++#if _RISCV_SIM == _ABI32
 +#define pltenter la_mips_n32_gnu_pltenter
 +#define pltexit la_mips_n32_gnu_pltexit
 +#else
@@ -8296,7 +8227,6 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/t
 +#endif
 +#define La_regs La_mips_64_regs
 +#define La_retval La_mips_64_retval
-+#endif
 +#define int_retval lrv_v0
 diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/unix/riscv/pipe.S glibc-2.14.1/sysdeps/unix/riscv/pipe.S
 --- ../glibc-2.14.1-orig/sysdeps/unix/riscv/pipe.S	1969-12-31 16:00:00.000000000 -0800
@@ -11351,15 +11281,6 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/unix/sy
 +}
 +
 +#endif
-diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/unix/sysv/linux/riscv/entry.h glibc-2.14.1/sysdeps/unix/sysv/linux/riscv/entry.h
---- ../glibc-2.14.1-orig/sysdeps/unix/sysv/linux/riscv/entry.h	1969-12-31 16:00:00.000000000 -0800
-+++ glibc-2.14.1/sysdeps/unix/sysv/linux/riscv/entry.h	2011-10-25 02:48:44.000000000 -0700
-@@ -0,0 +1,5 @@
-+#ifndef __ASSEMBLY__
-+extern void __start (void);
-+#endif
-+
-+#define ENTRY_POINT __start
 diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/unix/sysv/linux/riscv/fcntl.c glibc-2.14.1/sysdeps/unix/sysv/linux/riscv/fcntl.c
 --- ../glibc-2.14.1-orig/sysdeps/unix/sysv/linux/riscv/fcntl.c	1969-12-31 16:00:00.000000000 -0800
 +++ glibc-2.14.1/sysdeps/unix/sysv/linux/riscv/fcntl.c	2011-10-25 02:48:44.000000000 -0700

@@ -21980,7 +21980,7 @@ diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/ld/configure.tgt binutils-2.
  			;;
 diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/ld/emulparams/elf32lriscv-defs.sh binutils-2.21.1/ld/emulparams/elf32lriscv-defs.sh
 --- ../binutils-2.21.1-orig/ld/emulparams/elf32lriscv-defs.sh	1969-12-31 16:00:00.000000000 -0800
-+++ binutils-2.21.1/ld/emulparams/elf32lriscv-defs.sh	2011-10-22 18:50:03.000000000 -0700
++++ binutils-2.21.1/ld/emulparams/elf32lriscv-defs.sh	2011-11-03 04:00:16.000000000 -0700
 @@ -0,0 +1,93 @@
 +# This is an ELF platform.
 +SCRIPT_NAME=elf
@@ -22016,7 +22016,7 @@ diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/ld/emulparams/elf32lriscv-de
 +
 +TEXT_START_ADDR=0x10000000
 +MAXPAGESIZE="CONSTANT (MAXPAGESIZE)"
-+ENTRY=__start
++ENTRY=_start
 +
 +# Unlike most targets, the MIPS backend puts all dynamic relocations
 +# in a single dynobj section, which it also calls ".rel.dyn".  It does

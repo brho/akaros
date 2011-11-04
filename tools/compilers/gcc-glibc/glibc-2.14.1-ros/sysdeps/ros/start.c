@@ -98,5 +98,3 @@ diediedie:
 	#endif
 	while(1);
 }
-
-weak_alias (_start, __start)
