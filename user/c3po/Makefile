@@ -1,5 +1,6 @@
 TARGET_ARCH ?= none	# catch bugs
-CFLAGS = -O2 -static -std=gnu99 -fomit-frame-pointer -DOPTIMIZE=2 -DNO_TIMING
+CFLAGS = -O2 -static -std=gnu99 -fomit-frame-pointer -DOPTIMIZE=2 -DNO_TIMING \
+         -Wno-deprecated-declarations
 LIBNAME = c3po
 SUBDIRS = util stack threads #aio 
 V ?= @

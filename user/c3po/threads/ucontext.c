@@ -9,12 +9,12 @@
 /* Maintain a static reference to the main threads tls region */
 static void *__main_tls_desc;
 
-struct ucontext* create_context(thread_t *t, void *entry_pt, void *stack_top)
+struct u_context* create_context(thread_t *t, void *entry_pt, void *stack_top)
 {
 	uint32_t vcoreid = vcore_id();
 
 	/* Allocate a new context struct */
-	struct ucontext *uc = malloc(sizeof(struct ucontext));
+	struct u_context *uc = malloc(sizeof(struct u_context));
 	if(!uc) return NULL;
 
 	/* If we are the main thread, then current_thread has not been set yet, so
@@ -57,13 +57,13 @@ struct ucontext* create_context(thread_t *t, void *entry_pt, void *stack_top)
 	return uc;
 }
 
-void save_context(struct ucontext *uc)
+void save_context(struct u_context *uc)
 {
 	/* Save the trapframe for this context */
 	save_ros_tf(&uc->utf);
 }
 
-void restore_context(struct ucontext *uc)
+void restore_context(struct u_context *uc)
 {
 	uint32_t vcoreid = vcore_id();
 
@@ -76,7 +76,7 @@ void restore_context(struct ucontext *uc)
 	pop_ros_tf(&uc->utf, vcoreid);
 }
 
-void destroy_context(struct ucontext *uc)
+void destroy_context(struct u_context *uc)
 {
     extern void _dl_deallocate_tls (void *tcb, bool dealloc_tcb) internal_function;
 
@@ -90,7 +90,7 @@ void destroy_context(struct ucontext *uc)
 	free(uc);
 }
 
-void print_context(struct ucontext *uc)
+void print_context(struct u_context *uc)
 {
 	/* Just print the trapframe */
 	print_trapframe(&uc->utf);

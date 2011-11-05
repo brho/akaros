@@ -32,7 +32,7 @@ struct _thread_attr {
 struct thread_st {
   unsigned tid;   // thread id, mainly for readability of debug output
   struct thread_st *self; // pointer to itself 
-  struct ucontext *context;
+  struct u_context *context;
   void *stack;
   void *stack_bottom;
   int stack_fingerprint;
