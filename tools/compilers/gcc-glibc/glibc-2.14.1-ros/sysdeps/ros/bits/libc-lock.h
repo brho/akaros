@@ -107,6 +107,8 @@ do {\
 	({ lll_lock (NAME, LLL_PRIVATE); 0; })
 
 /* Lock the recursive named lock variable.  */
+#ifndef IS_IN_rtld
+
 # define __libc_lock_lock_recursive(NAME)\
 do {\
 	void *self = THREAD_SELF;\
@@ -116,6 +118,23 @@ do {\
 	}\
 	++(NAME).count;\
 } while (0)
+
+/* Unlock the recursive named lock variable.  */
+/* We do no error checking here.  */
+# define __libc_lock_unlock_recursive(NAME)\
+	do {\
+		if(--(NAME).count == 0) {\
+			(NAME).owner = NULL;\
+			lll_unlock((NAME).lock, LLL_PRIVATE);\
+		}\
+	} while (0)
+
+#else /* Ignore recursive locks within rtld */
+
+# define __libc_lock_lock_recursive(NAME) do { } while(0)
+# define __libc_lock_unlock_recursive(NAME) do { } while(0)
+
+#endif
 
 /* Try to lock the named lock variable.  */
 #define __libc_lock_trylock(NAME)\
@@ -142,16 +161,6 @@ do {\
 /* Unlock the named lock variable.  */
 #define __libc_lock_unlock(NAME)\
 	lll_unlock (NAME, LLL_PRIVATE)
-
-/* Unlock the recursive named lock variable.  */
-/* We do no error checking here.  */
-# define __libc_lock_unlock_recursive(NAME)\
-	do {\
-		if(--(NAME).count == 0) {\
-			(NAME).owner = NULL;\
-			lll_unlock((NAME).lock, LLL_PRIVATE);\
-		}\
-	} while (0)
 
 #define __libc_lock_default_lock_recursive(lock)\
 	++((__libc_lock_recursive_t *)(lock))->count;
