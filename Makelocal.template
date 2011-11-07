@@ -63,6 +63,9 @@ x86:
 ramp:
 	$(MAKE) TARGET_ARCH=sparc
 
+riscv:
+	$(MAKE) TARGET_ARCH=riscv
+
 # various sparc functional simulator configurations
 NP ?= 1
 fs: all
@@ -72,4 +75,10 @@ fsd: all
 hw: all
 	sparc_app -p$(NP) -fappserver_ros.conf hw obj/kern/kernel none
 
-.PHONY: fs fsd hw
+# risc-v functional simulator
+rvfs: all
+	fesvr -p$(NP) -nopk obj/kern/kernel
+rvfsd: all
+	fesvr -d -p$(NP) -nopk obj/kern/kernel
+
+.PHONY: fs fsd hw rvfs rvfsd

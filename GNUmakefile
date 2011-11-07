@@ -16,11 +16,11 @@ endif
 ifeq ($(TARGET_ARCH),)
 busted:
 	@echo "You must initially specify your target in the form TARGET_ARCH=<target>"
-	@echo "Current valid values for TARGET_ARCH are 'i686' and 'sparc'"
+	@echo "Current valid values for TARGET_ARCH are 'i686', 'sparc', and 'riscv'."
 	@echo "Subsequent calls for the same target can be made by simply invoking 'make'"
 endif
 
-$(TARGET_ARCH):
+real-$(TARGET_ARCH):
 	@if [ "$(ARCH_LINK)" != "$@" ];\
 	then\
 	  $(MAKE) realclean;\
