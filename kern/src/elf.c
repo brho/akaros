@@ -182,9 +182,13 @@ int load_elf(struct proc* p, struct file* f)
 	p->env_entry = ei.entry;
 
 	// map in stack using POPULATE (because SPARC requires it)
+	int flags = MAP_FIXED | MAP_ANONYMOUS;
+	#ifdef __sparc_v8__
+	flags |= MAP_POPULATE; // SPARC stacks must be mapped in
+	#endif
 	uintptr_t stacksz = USTACK_NUM_PAGES*PGSIZE;
 	if (do_mmap(p, USTACKTOP-stacksz, stacksz, PROT_READ | PROT_WRITE,
-	            MAP_FIXED | MAP_ANONYMOUS | MAP_POPULATE, NULL, 0) == MAP_FAILED)
+	            flags, NULL, 0) == MAP_FAILED)
 		return -1;
 
 	// Set the heap bottom and top to just past where the text 
