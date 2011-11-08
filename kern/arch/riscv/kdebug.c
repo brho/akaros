@@ -26,4 +26,9 @@ int debuginfo_eip(uintptr_t eip, struct eipdebuginfo *info)
 void
 backtrace(void)
 {
+	static bool once = TRUE;
+	if (once) {
+		warn("Not implemented for RISC-V");
+		once = FALSE;
+	}
 }

@@ -37,7 +37,8 @@ _start:
   mfpcr  t0, ASM_CR(PCR_COREID)
   bnez   t0, notcore0
 
-  // set up stack
+  // terminate frame pointer for backtracing and set up stack
+  li     s9, 0
   la     sp, bootstacktop
   li     t1, KERN_LOAD_ADDR
   sub    sp, sp, t1
