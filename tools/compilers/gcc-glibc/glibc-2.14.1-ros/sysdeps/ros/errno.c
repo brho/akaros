@@ -22,12 +22,19 @@
 #include <dl-sysdep.h>
 #undef errno
 
-/* Code compiled for rtld refers only to this name.  */
+#if RTLD_PRIVATE_ERRNO
+
+/* Code compiled for rtld has errno #defined to rtld_errno. */
 int rtld_errno attribute_hidden;
+#define errno rtld_errno
+
+#else
 
 __thread int errno;
 extern __thread int __libc_errno __attribute__ ((alias ("errno")))
   attribute_hidden;
+
+#endif
 
 int* __errno_location(void)
 {

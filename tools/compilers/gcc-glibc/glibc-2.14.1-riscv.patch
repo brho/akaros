@@ -2546,7 +2546,7 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/d
 +#define TLS_DTV_UNALLOCATED	((void *) -1l)
 diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/dl-trampoline.c glibc-2.14.1/sysdeps/riscv/dl-trampoline.c
 --- ../glibc-2.14.1-orig/sysdeps/riscv/dl-trampoline.c	1969-12-31 16:00:00.000000000 -0800
-+++ glibc-2.14.1/sysdeps/riscv/dl-trampoline.c	2011-10-25 02:48:44.000000000 -0700
++++ glibc-2.14.1/sysdeps/riscv/dl-trampoline.c	2011-11-07 21:41:52.000000000 -0800
 @@ -0,0 +1,295 @@
 +/* PLT trampoline.  MIPS version.
 +   Copyright (C) 1996-2001, 2002, 2003, 2004, 2005
@@ -2783,7 +2783,7 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/d
 +	.frame	sp, " STRINGXP(ELF_DL_FRAME_SIZE) ", ra\n\
 +	" STRINGXV(SETUP_GP64(t4, _dl_runtime_resolve)) "\n\
 +	# Save arguments and sp value in stack.\n\
-+	addi  sp, sp, " STRINGXP(ELF_DL_FRAME_SIZE) "\n\
++	addi  sp, sp, " STRINGXP(-ELF_DL_FRAME_SIZE) "\n\
 +	# Save slot call pc.\n\
 +	move	v0, ra\n\
 +	" ELF_DL_SAVE_ARG_REGS "\
@@ -2808,7 +2808,7 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/d
 +   - x17 (t5) - caller's return address
 +   - x18 (t6) - PLT entry index
 +   - x19 (t7) - address of _dl_runtime_pltresolve
-+   - o32 $28 (gp), n32/n64 $14 (t2) - address of .got.plt
++   - x14 (t2) - address of .got.plt
 +
 +   Different registers are used for .got.plt because the ABI was
 +   originally designed for o32, where gp was available (call
@@ -2816,8 +2816,8 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/riscv/d
 +
 +   _dl_fixup needs:
 +
-+   - $4 (a0) - link map address
-+   - $5 (a1) - .rel.plt offset (== PLT entry index * 8)  */
++   - x4 (a0) - link map address
++   - x5 (a1) - .rel.plt offset (== PLT entry index * 8)  */
 +
 +asm ("\n\
 +	.text\n\
@@ -11061,22 +11061,22 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/unix/sy
 +weak_alias (__clone, clone)
 diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/unix/sysv/linux/riscv/configure glibc-2.14.1/sysdeps/unix/sysv/linux/riscv/configure
 --- ../glibc-2.14.1-orig/sysdeps/unix/sysv/linux/riscv/configure	1969-12-31 16:00:00.000000000 -0800
-+++ glibc-2.14.1/sysdeps/unix/sysv/linux/riscv/configure	2011-10-25 02:48:44.000000000 -0700
++++ glibc-2.14.1/sysdeps/unix/sysv/linux/riscv/configure	2011-11-07 20:22:30.000000000 -0800
 @@ -0,0 +1,28 @@
 +# This file is generated from configure.in by Autoconf.  DO NOT EDIT!
 + # Local configure fragment for sysdeps/unix/sysv/linux/riscv.
 +
 +case "$prefix" in
 +/usr | /usr/)
-+  # 64-bit libraries on bi-arch platforms go in /lib64 instead of /lib.
++  # 32-bit libraries on bi-arch platforms go in /lib32 instead of /lib.
 +  # Allow earlier configure scripts to handle libc_cv_slibdir, libdir,
 +  # and libc_cv_localedir.
 +  test -n "$libc_cv_slibdir" || \
 +  case $machine in
-+  riscv/rv64* )
-+    libc_cv_slibdir="/lib64"
++  riscv/rv32* )
++    libc_cv_slibdir="/lib32"
 +    if test "$libdir" = '${exec_prefix}/lib'; then
-+      libdir='${exec_prefix}/lib64';
++      libdir='${exec_prefix}/lib32';
 +      # Locale data can be shared between 32bit and 64bit libraries
 +      libc_cv_localedir='${exec_prefix}/lib/locale'
 +    fi
@@ -11093,7 +11093,7 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/unix/sy
 +fi
 diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/unix/sysv/linux/riscv/configure.in glibc-2.14.1/sysdeps/unix/sysv/linux/riscv/configure.in
 --- ../glibc-2.14.1-orig/sysdeps/unix/sysv/linux/riscv/configure.in	1969-12-31 16:00:00.000000000 -0800
-+++ glibc-2.14.1/sysdeps/unix/sysv/linux/riscv/configure.in	2011-10-25 02:48:44.000000000 -0700
++++ glibc-2.14.1/sysdeps/unix/sysv/linux/riscv/configure.in	2011-11-07 20:22:37.000000000 -0800
 @@ -0,0 +1,29 @@
 +sinclude(./aclocal.m4)dnl Autoconf lossage
 +GLIBC_PROVIDES dnl See aclocal.m4 in the top level source directory.
@@ -11101,15 +11101,15 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/unix/sy
 +
 +case "$prefix" in
 +/usr | /usr/)
-+  # 64-bit libraries on bi-arch platforms go in /lib64 instead of /lib.
++  # 32-bit libraries on bi-arch platforms go in /lib32 instead of /lib.
 +  # Allow earlier configure scripts to handle libc_cv_slibdir, libdir,
 +  # and libc_cv_localedir.
 +  test -n "$libc_cv_slibdir" || \
 +  case $machine in
-+  riscv/rv64* )
-+    libc_cv_slibdir="/lib64"
++  riscv/rv32* )
++    libc_cv_slibdir="/lib32"
 +    if test "$libdir" = '${exec_prefix}/lib'; then
-+      libdir='${exec_prefix}/lib64';
++      libdir='${exec_prefix}/lib32';
 +      # Locale data can be shared between 32bit and 64bit libraries
 +      libc_cv_localedir='${exec_prefix}/lib/locale'
 +    fi
@@ -14017,7 +14017,7 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/unix/sy
 +/* glob64 is in glob.c */
 diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/unix/sysv/linux/riscv/rv64/ldconfig.h glibc-2.14.1/sysdeps/unix/sysv/linux/riscv/rv64/ldconfig.h
 --- ../glibc-2.14.1-orig/sysdeps/unix/sysv/linux/riscv/rv64/ldconfig.h	1969-12-31 16:00:00.000000000 -0800
-+++ glibc-2.14.1/sysdeps/unix/sysv/linux/riscv/rv64/ldconfig.h	2011-10-25 02:48:44.000000000 -0700
++++ glibc-2.14.1/sysdeps/unix/sysv/linux/riscv/rv64/ldconfig.h	2011-11-07 20:23:06.000000000 -0800
 @@ -0,0 +1,26 @@
 +/* Copyright (C) 2001, 2002, 2003 Free Software Foundation, Inc.
 +   This file is part of the GNU C Library.
@@ -14041,7 +14041,7 @@ diff -x manual -x po -x autom4te.cache -ruN ../glibc-2.14.1-orig/sysdeps/unix/sy
 +
 +#define SYSDEP_KNOWN_INTERPRETER_NAMES \
 +  { "/lib32/ld.so.1", FLAG_ELF_LIBC6 }, \
-+  { "/lib64/ld.so.1", FLAG_ELF_LIBC6 },
++  { "/lib/ld.so.1", FLAG_ELF_LIBC6 },
 +#define SYSDEP_KNOWN_LIBRARY_NAMES \
 +  { "libc.so.6", FLAG_ELF_LIBC6 },	\
 +  { "libm.so.6", FLAG_ELF_LIBC6 },

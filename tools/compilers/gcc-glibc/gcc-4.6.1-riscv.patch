@@ -441,7 +441,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +  "alu")
 diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/riscv/linux64.h gcc-4.6.1/gcc/config/riscv/linux64.h
 --- ../gcc-4.6.1-orig/gcc/config/riscv/linux64.h	1969-12-31 16:00:00.000000000 -0800
-+++ gcc-4.6.1/gcc/config/riscv/linux64.h	2011-10-24 18:12:40.000000000 -0700
++++ gcc-4.6.1/gcc/config/riscv/linux64.h	2011-11-07 20:15:18.000000000 -0800
 @@ -0,0 +1,62 @@
 +/* Definitions for MIPS running Linux-based GNU systems with ELF format
 +   using n32/64 abi.
@@ -480,8 +480,8 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +%{!shared: \
 +  %{profile:-lc_p} %{!profile:-lc}}"
 +
-+#define GLIBC_DYNAMIC_LINKER32 "/lib/ld.so.1"
-+#define GLIBC_DYNAMIC_LINKER64 "/lib64/ld.so.1"
++#define GLIBC_DYNAMIC_LINKER32 "/lib32/ld.so.1"
++#define GLIBC_DYNAMIC_LINKER64 "/lib/ld.so.1"
 +
 +#undef LINK_SPEC
 +#define LINK_SPEC "\
@@ -14313,7 +14313,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +INSTALL_LIBGCC = install-multilib
 diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/riscv/t-linux64 gcc-4.6.1/gcc/config/riscv/t-linux64
 --- ../gcc-4.6.1-orig/gcc/config/riscv/t-linux64	1969-12-31 16:00:00.000000000 -0800
-+++ gcc-4.6.1/gcc/config/riscv/t-linux64	2011-09-21 16:25:06.000000000 -0700
++++ gcc-4.6.1/gcc/config/riscv/t-linux64	2011-11-07 20:15:36.000000000 -0800
 @@ -0,0 +1,35 @@
 +# Copyright (C) 2003, 2004, 2005, 2006 Free Software Foundation, Inc.
 +#
@@ -14335,7 +14335,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +
 +MULTILIB_OPTIONS = mabi=64/mabi=32
 +MULTILIB_DIRNAMES = 64 32
-+MULTILIB_OSDIRNAMES = ../lib64 ../lib
++MULTILIB_OSDIRNAMES = ../lib ../lib32
 +
 +EXTRA_MULTILIB_PARTS=crtbegin.o crtend.o crtbeginS.o crtendS.o crtbeginT.o
 +
