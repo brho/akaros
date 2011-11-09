@@ -127,14 +127,17 @@ ssize_t core_request(struct proc *p)
 				/* Note this won't play well with concurrent proc kmsgs, but
 				 * since we're _S and locked, we shouldn't have any. */
 				assert(current_tf);
-				vcpd->preempt_tf = *current_tf;
+				/* Copy uthread0's context to the notif slot */
+				vcpd->notif_tf = *current_tf;
 				clear_owning_proc(core_id());	/* so we don't restart */
 				save_fp_state(&vcpd->preempt_anc);
 				enable_irqsave(&state);
-				__seq_start_write(&vcpd->preempt_tf_valid);
-				/* If we remove this, vcore0 will start where the _S left off */
-				vcpd->notif_pending = TRUE;
-				assert(!vcpd->notif_disabled);
+				/* Userspace needs to not fuck with notif_disabled before
+				 * transitioning to _M. */
+				if (vcpd->notif_disabled) {
+					printk("[kernel] user bug: notifs disabled for vcore 0\n");
+					vcpd->notif_disabled = FALSE;
+				}
 				/* in the async case, we'll need to remotely stop and bundle
 				 * vcore0's TF.  this is already done for the sync case (local
 				 * syscall). */

@@ -860,6 +860,8 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 	/* Note this protects stuff userspace should look at, which doesn't
 	 * include the TAILQs. */
 	__seq_start_write(&p->procinfo->coremap_seqctr);
+	/* Next time the vcore starts, it starts fresh */
+	vcpd->notif_disabled = FALSE;
 	__unmap_vcore(p, vcoreid);
 	/* Adjust implied resource desires */
 	p->resources[RES_CORES].amt_granted = --(p->procinfo->num_vcores);
@@ -1464,25 +1466,19 @@ static void __set_curtf_to_vcoreid(struct proc *p, uint32_t vcoreid)
 	vcpd->can_rcv_msg = TRUE;
 	printd("[kernel] startcore on physical core %d for process %d's vcore %d\n",
 	       core_id(), p->pid, vcoreid);
-	if (seq_is_locked(vcpd->preempt_tf_valid)) {
+	/* If notifs are disabled, the vcore was in vcore context and we need to
+	 * restart the preempt_tf.  o/w, we give them a fresh vcore (which is also
+	 * what happens the first time a vcore comes online).  No matter what,
+	 * they'll restart in vcore context.  It's just a matter of whether or not
+	 * it is the old, interrupted vcore context. */
+	if (vcpd->notif_disabled) {
+		/* TODO: legacy preempt_tf_valid shit, will go away soon */
+		assert(seq_is_locked(vcpd->preempt_tf_valid));
 		__seq_end_write(&vcpd->preempt_tf_valid); /* mark tf as invalid */
 		restore_fp_state(&vcpd->preempt_anc);
-		/* notif_pending and enabled means the proc wants to receive the IPI,
-		 * but might have missed it.  copy over the tf so they can restart it
-		 * later, and give them a fresh vcore. */
-		if (vcpd->notif_pending && !vcpd->notif_disabled) {
-			vcpd->notif_tf = vcpd->preempt_tf; // could memset
-			proc_init_trapframe(&pcpui->actual_tf, vcoreid, p->env_entry,
-			                    vcpd->transition_stack);
-			if (!vcpd->transition_stack)
-				warn("No transition stack!");
-			vcpd->notif_disabled = TRUE;
-			vcpd->notif_pending = FALSE;
-		} else {
-			/* copy-in the tf we'll pop, then set all security-related fields */
-			pcpui->actual_tf = vcpd->preempt_tf;
-			proc_secure_trapframe(&pcpui->actual_tf);
-		}
+		/* copy-in the tf we'll pop, then set all security-related fields */
+		pcpui->actual_tf = vcpd->preempt_tf;
+		proc_secure_trapframe(&pcpui->actual_tf);
 	} else { /* not restarting from a preemption, use a fresh vcore */
 		assert(vcpd->transition_stack);
 		/* TODO: consider 0'ing the FP state.  We're probably leaking. */
@@ -1535,6 +1531,11 @@ void proc_change_to_vcore(struct proc *p, uint32_t new_vcoreid,
 	caller_vcoreid = get_vcoreid(p, pcoreid);
 	caller_vcpd = &p->procdata->vcore_preempt_data[caller_vcoreid];
 	caller_vc = vcoreid2vcore(p, caller_vcoreid);
+	/* Should only call from vcore context */
+	if (!caller_vcpd->notif_disabled) {
+		printk("[kernel] You tried to change vcores from uthread ctx\n");
+		goto out_failed;
+	}
 	/* Return and take the preempt message when we enable_irqs. */
 	if (caller_vc->preempt_served)
 		goto out_failed;
@@ -1643,6 +1644,7 @@ void __notify(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2)
 	if (vcpd->notif_disabled)
 		return;
 	vcpd->notif_disabled = TRUE;
+	/* This bit shouldn't be important anymore */
 	vcpd->notif_pending = FALSE; // no longer pending - it made it here
 	/* save the old tf in the notify slot, build and pop a new one.  Note that
 	 * silly state isn't our business for a notification. */
@@ -1679,13 +1681,17 @@ void __preempt(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2)
 	vcpd = &p->procdata->vcore_preempt_data[vcoreid];
 	printd("[kernel] received __preempt for proc %d's vcore %d on pcore %d\n",
 	       p->procinfo->pid, vcoreid, coreid);
-	/* save the process's tf (current_tf) in the preempt slot, save the silly
-	 * state, and signal the state is a valid tf.  when it is 'written,' it is
-	 * valid.  Using the seq_ctrs so userspace can tell between different valid
-	 * versions.  If the TF was already valid, it will panic (if CONFIGed that
-	 * way). */
-	vcpd->preempt_tf = *pcpui->cur_tf;
+	/* if notifs are disabled, the vcore is in vcore context (as far as we're
+	 * concerned), and we save it in the preempt slot. o/w, we save the
+	 * process's cur_tf in the notif slot, and it'll appear to the vcore when it
+	 * comes back up that it just took a notification. */
+	if (vcpd->notif_disabled)
+		vcpd->preempt_tf = *pcpui->cur_tf;
+	else
+		vcpd->notif_tf = *pcpui->cur_tf;
+	/* either way, we save the silly state (FP) */
 	save_fp_state(&vcpd->preempt_anc);
+	/* signal that the core is preempted. */
 	__seq_start_write(&vcpd->preempt_tf_valid);
 	wmb();	/* make sure everything else hits before we unmap */
 	__unmap_vcore(p, vcoreid);
