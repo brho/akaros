@@ -103,12 +103,11 @@ static inline bool vcore_is_mapped(uint32_t vcoreid)
 	return __procinfo.vcoremap[vcoreid].valid;
 }
 
-/* For now, preempt_tf is a seq_ctr, and when it is locked, we think the vcore
- * is preempted.  Needs work... */
+/* We could also check for VC_K_LOCK, but that's a bit much. */
 static inline bool vcore_is_preempted(uint32_t vcoreid)
 {
 	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
-	return seq_is_locked(vcpd->preempt_tf_valid);
+	return atomic_read(&vcpd->flags) & VC_PREEMPTED;
 }
 
 #ifdef __cplusplus

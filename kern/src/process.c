@@ -1232,18 +1232,22 @@ void __proc_set_allcores(struct proc *SAFE p, uint32_t *pcorelist,
 static void __proc_take_a_core(struct proc *p, struct vcore *vc, amr_t message,
                                long arg0, long arg1, long arg2)
 {
+	uint32_t vcoreid = vcore2vcoreid(p, vc);
+	struct preempt_data *vcpd = &p->procdata->vcore_preempt_data[vcoreid];
 	/* Change lists for the vcore.  We do this before either unmapping or
 	 * sending the message, so the lists represent what will be very soon
 	 * (before we unlock, the messages are in flight). */
 	TAILQ_REMOVE(&p->online_vcs, vc, list);
 	TAILQ_INSERT_HEAD(&p->inactive_vcs, vc, list);
 	if (message) {
+		/* lock the vcore's state.  This is okay even if we kill the proc */
+		atomic_or(&vcpd->flags, VC_K_LOCK);
 		send_kernel_message(vc->pcoreid, message, arg0, arg1, arg2,
 		                    KMSG_IMMEDIATE);
 	} else {
 		/* if there was a msg, the vcore is unmapped on the receive side.
 		 * o/w, we need to do it here. */
-		__unmap_vcore(p, vcore2vcoreid(p, vc));
+		__unmap_vcore(p, vcoreid);
 	}
 	/* give the pcore back to the idlecoremap */
 	put_idle_core(vc->pcoreid);
@@ -1464,6 +1468,11 @@ static void __set_curtf_to_vcoreid(struct proc *p, uint32_t vcoreid)
 	 * vcore to its pcore, though we don't always have current loaded or
 	 * otherwise mess with the VCPD in those code paths. */
 	vcpd->can_rcv_msg = TRUE;
+	/* Mark that this vcore as no longer preempted.  No danger of clobbering
+	 * other writes, since this would get turned on in __preempt (which can't be
+	 * concurrent with this function on this core), and the atomic is just
+	 * toggling the one bit (a concurrent VC_K_LOCK will work) */
+	atomic_and(&vcpd->flags, ~VC_PREEMPTED);
 	printd("[kernel] startcore on physical core %d for process %d's vcore %d\n",
 	       core_id(), p->pid, vcoreid);
 	/* If notifs are disabled, the vcore was in vcore context and we need to
@@ -1472,9 +1481,6 @@ static void __set_curtf_to_vcoreid(struct proc *p, uint32_t vcoreid)
 	 * they'll restart in vcore context.  It's just a matter of whether or not
 	 * it is the old, interrupted vcore context. */
 	if (vcpd->notif_disabled) {
-		/* TODO: legacy preempt_tf_valid shit, will go away soon */
-		assert(seq_is_locked(vcpd->preempt_tf_valid));
-		__seq_end_write(&vcpd->preempt_tf_valid); /* mark tf as invalid */
 		restore_fp_state(&vcpd->preempt_anc);
 		/* copy-in the tf we'll pop, then set all security-related fields */
 		pcpui->actual_tf = vcpd->preempt_tf;
@@ -1553,10 +1559,13 @@ void proc_change_to_vcore(struct proc *p, uint32_t new_vcoreid,
 		 * __startcore, to make the caller look like it was preempted. */
 		caller_vcpd->preempt_tf = *current_tf;
 		save_fp_state(&caller_vcpd->preempt_anc);
-		/* Signal a preemption, like __preempt does with this... (TODO) */
-		__seq_start_write(&caller_vcpd->preempt_tf_valid);
+		/* Mark our core as preempted (for userspace recovery). */
+		atomic_or(&caller_vcpd->flags, VC_PREEMPTED);
 	}
 	/* Either way, unmap and offline our current vcore */
+	/* TODO: remove this once userspace can distinguish between a preemption and
+	 * a "just check my INDIRS" */
+	atomic_or(&caller_vcpd->flags, VC_PREEMPTED);
 	/* Move the caller from online to inactive */
 	TAILQ_REMOVE(&p->online_vcs, caller_vc, list);
 	/* We don't bother with the notif_pending race.  note that notif_pending
@@ -1572,7 +1581,8 @@ void proc_change_to_vcore(struct proc *p, uint32_t new_vcoreid,
 	__map_vcore(p, new_vcoreid, pcoreid);
 	__seq_end_write(&p->procinfo->coremap_seqctr);
 	/* send preempt message about the calling vcore.  might as well prefer
-	 * directing it to the new_vc (vcoreid) to cut down on an IPI. */
+	 * directing it to the new_vc (vcoreid) to cut down on an IPI.  TODO: change
+	 * this to a "just check my INDIRS" message. */
 	preempt_msg.ev_type = EV_VCORE_PREEMPT;
 	preempt_msg.ev_arg2 = caller_vcoreid;	/* arg2 is 32 bits */
 	send_kernel_event(p, &preempt_msg, new_vcoreid);
@@ -1691,8 +1701,9 @@ void __preempt(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2)
 		vcpd->notif_tf = *pcpui->cur_tf;
 	/* either way, we save the silly state (FP) */
 	save_fp_state(&vcpd->preempt_anc);
-	/* signal that the core is preempted. */
-	__seq_start_write(&vcpd->preempt_tf_valid);
+	/* Mark the vcore as preempted and unlock (was locked by the sender). */
+	atomic_or(&vcpd->flags, VC_PREEMPTED);
+	atomic_and(&vcpd->flags, ~VC_K_LOCK);
 	wmb();	/* make sure everything else hits before we unmap */
 	__unmap_vcore(p, vcoreid);
 	/* We won't restart the process later.  current gets cleared later when we

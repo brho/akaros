@@ -86,16 +86,22 @@ struct event_queue_big {
 	struct event_mbox 			ev_imbox;
 };
 
+/* Vcore state flags.  K_LOCK means the kernel is writing */
+#define VC_K_LOCK				0x001				/* CASing with the kernel */
+#define VC_PREEMPTED			0x002				/* VC is preempted */
+#define VC_RECOVERING			0x004				/* VC being recovered */
+#define VC_UTHREAD_STEALING		0x008				/* Uthread being stolen */
+
 /* Per-core data about preemptions and notifications */
 struct preempt_data {
 	struct user_trapframe		preempt_tf;			/* slot for vcore ctx */
 	struct ancillary_state		preempt_anc;
 	struct user_trapframe		notif_tf;			/* slot for uthread ctx */
 	uintptr_t					transition_stack;	/* advertised by the user */
+	atomic_t					flags;
 	bool						notif_disabled;		/* vcore unwilling to recv*/
 	bool						notif_pending;		/* notif k_msg on the way */
 	bool						can_rcv_msg;		/* can receive FALLBACK */
-	seq_ctr_t					preempt_tf_valid;
 	struct event_mbox			ev_mbox;
 };
 
