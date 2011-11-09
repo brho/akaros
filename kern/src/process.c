@@ -904,8 +904,8 @@ void proc_notify(struct proc *p, uint32_t vcoreid)
 {
 	struct preempt_data *vcpd = &p->procdata->vcore_preempt_data[vcoreid];
 	vcpd->notif_pending = TRUE;
-	wrmb();	/* must write notif_pending before reading notif_enabled */
-	if (vcpd->notif_enabled) {
+	wrmb();	/* must write notif_pending before reading notif_disabled */
+	if (!vcpd->notif_disabled) {
 		/* GIANT WARNING: we aren't using the proc-lock to protect the
 		 * vcoremap.  We want to be able to use this from interrupt context,
 		 * and don't want the proc_lock to be an irqsave.  Spurious
@@ -1470,13 +1470,13 @@ static void __set_curtf_to_vcoreid(struct proc *p, uint32_t vcoreid)
 		/* notif_pending and enabled means the proc wants to receive the IPI,
 		 * but might have missed it.  copy over the tf so they can restart it
 		 * later, and give them a fresh vcore. */
-		if (vcpd->notif_pending && vcpd->notif_enabled) {
+		if (vcpd->notif_pending && !vcpd->notif_disabled) {
 			vcpd->notif_tf = vcpd->preempt_tf; // could memset
 			proc_init_trapframe(&pcpui->actual_tf, vcoreid, p->env_entry,
 			                    vcpd->transition_stack);
 			if (!vcpd->transition_stack)
 				warn("No transition stack!");
-			vcpd->notif_enabled = FALSE;
+			vcpd->notif_disabled = TRUE;
 			vcpd->notif_pending = FALSE;
 		} else {
 			/* copy-in the tf we'll pop, then set all security-related fields */
@@ -1489,7 +1489,7 @@ static void __set_curtf_to_vcoreid(struct proc *p, uint32_t vcoreid)
 		proc_init_trapframe(&pcpui->actual_tf, vcoreid, p->env_entry,
 		                    vcpd->transition_stack);
 		/* Disable/mask active notifications for fresh vcores */
-		vcpd->notif_enabled = FALSE;
+		vcpd->notif_disabled = TRUE;
 	}
 	/* cur_tf was built above (in actual_tf), now use it */
 	pcpui->cur_tf = &pcpui->actual_tf;
@@ -1546,7 +1546,7 @@ void proc_change_to_vcore(struct proc *p, uint32_t new_vcoreid,
 	if (enable_my_notif) {
 		/* if they set this flag, then the vcore can just restart from scratch,
 		 * and we don't care about either the notif_tf or the preempt_tf. */
-		caller_vcpd->notif_enabled = TRUE;
+		caller_vcpd->notif_disabled = FALSE;
 	} else {
 		/* need to set up the calling vcore's tf so that it'll get restarted by
 		 * __startcore, to make the caller look like it was preempted. */
@@ -1640,9 +1640,9 @@ void __notify(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2)
 	printd("received active notification for proc %d's vcore %d on pcore %d\n",
 	       p->procinfo->pid, vcoreid, coreid);
 	/* sort signals.  notifs are now masked, like an interrupt gate */
-	if (!vcpd->notif_enabled)
+	if (vcpd->notif_disabled)
 		return;
-	vcpd->notif_enabled = FALSE;
+	vcpd->notif_disabled = TRUE;
 	vcpd->notif_pending = FALSE; // no longer pending - it made it here
 	/* save the old tf in the notify slot, build and pop a new one.  Note that
 	 * silly state isn't our business for a notification. */

@@ -56,7 +56,7 @@ static inline void pop_ros_tf(struct user_trapframe *tf, uint32_t vcoreid)
 	else
 		assert(tf->gpr[7] == (uint32_t)get_tls_desc(vcoreid));
 
-	vcpd->notif_enabled = true;
+	vcpd->notif_disabled = FALSE;
 	if(vcpd->notif_pending)
 		ros_syscall(SYS_self_notify, vcoreid, 0, 0, 0, 0, 0);
 
@@ -84,7 +84,7 @@ static inline void pop_ros_tf_raw(struct user_trapframe *tf, uint32_t vcoreid)
 	else
 		assert(tf->gpr[7] == (uint32_t)get_tls_desc(vcoreid));
 
-	vcpd->notif_enabled = true;
+	vcpd->notif_disabled = FALSE;
 	/* This is just like the regular one, but we don't bother with
 	 * notif_pending.  This comment is where it was dealt with. */
 

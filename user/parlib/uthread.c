@@ -50,9 +50,6 @@ int uthread_lib_init(struct uthread *uthread)
 	current_uthread = uthread;
 	set_tls_desc(uthread->tls_desc, 0);
 	assert(!in_vcore_context());
-	/* don't forget to enable notifs on vcore0.  if you don't, the kernel will
-	 * restart your _S with notifs disabled, which is a path to confusion. */
-	__enable_notifs(0);
 	/* Receive preemption events */
 	ev_handlers[EV_VCORE_PREEMPT] = handle_vc_preempt;
 	preempt_ev_q = get_big_event_q();

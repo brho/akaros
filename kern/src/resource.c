@@ -134,7 +134,7 @@ ssize_t core_request(struct proc *p)
 				__seq_start_write(&vcpd->preempt_tf_valid);
 				/* If we remove this, vcore0 will start where the _S left off */
 				vcpd->notif_pending = TRUE;
-				assert(vcpd->notif_enabled);
+				assert(!vcpd->notif_disabled);
 				/* in the async case, we'll need to remotely stop and bundle
 				 * vcore0's TF.  this is already done for the sync case (local
 				 * syscall). */

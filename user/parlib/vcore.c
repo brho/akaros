@@ -149,8 +149,9 @@ int vcore_init()
 	atomic_init(&vc_req_being_handled, 0);
 	assert(!in_vcore_context());
 	initialized = 1;
-	/* Ugly hack, but we need to be able to transition to _M mode later. */
-	__enable_notifs(vcore_id());
+	/* no longer need to enable notifs on vcore 0, it is set like that by
+	 * default (so you drop into vcore context immediately on transtioning to
+	 * _M) */
 	return 0;
 vcore_init_tls_fail:
 	free(vcore_thread_control_blocks);

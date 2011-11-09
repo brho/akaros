@@ -63,11 +63,6 @@ int main()
 	/* Need to save our floating point state somewhere (like in the
 	 * user_thread_tcb so it can be restarted too */
 
-	/* don't forget to enable notifs on vcore0 at some point */
-	struct preempt_data *vcpd;
-	vcpd = &__procdata.vcore_preempt_data[0];
-	vcpd->notif_enabled = TRUE;
-	
 /* end: stuff userspace needs to do before switching to multi-mode */
 	/* ETHAUD */
 	/* Switch into _M mode */
@@ -133,7 +128,7 @@ void vcore_entry(void)
 	 * to clobber the transition stack.
 	 * Check Documentation/processes.txt: 4.2.4.  In real code, you should be
 	 * popping the tf of whatever user process you want (get off the x-stack) */
-	vcpd->notif_enabled = TRUE;
+	vcpd->notif_disabled = FALSE;
 	
 /* end: stuff userspace needs to do to handle notifications */
 	/* The other vcores will hit here. */

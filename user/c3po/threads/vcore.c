@@ -80,11 +80,6 @@ void vcore_startup()
 	 * to use parts of event.c to do what you want. */
 	enable_kevent(EV_USER_IPI, 0, EVENT_IPI);
 
-	/* Don't forget to enable notifs on vcore0.  if you don't, the kernel will
-	 * restart your _S with notifs disabled, which is a path to confusion. */
-	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[0];
-	vcpd->notif_enabled = TRUE;
-
 	/* Grab a reference to the main_thread on the current stack (i.e.
 	 * current_thread, since we know this has been set up for us properly by
 	 * the fact that the constructor calls main_thread_init() before this
@@ -118,7 +113,7 @@ void switch_to_vcore() {
 	 * so we need to enter vcore entry later.  Need to disable notifs so we
 	 * don't get in weird loops */
 	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
-	vcpd->notif_enabled = FALSE;
+	vcpd->notif_disabled = TRUE;
 
 	/* Grab a reference to the currently running thread on this vcore */
 	thread_t *t = current_thread; 
@@ -165,7 +160,7 @@ void __attribute__((noreturn)) vcore_entry()
 
 	/* Assert that notifications are disabled. Should always have notifications
 	 * disabled when coming in here. */
-	assert(vcpd->notif_enabled == FALSE);
+	assert(vcpd->notif_disabled == TRUE);
 
 	/* Put this in the loop that deals with notifications.  It will return if
 	 * there is no preempt pending. */ 

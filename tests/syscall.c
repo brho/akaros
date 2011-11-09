@@ -124,7 +124,7 @@ void ghetto_vcore_entry(void)
 	 * popping the tf of whatever user process you want (get off the x-stack) */
 	struct preempt_data *vcpd;
 	vcpd = &__procdata.vcore_preempt_data[vcoreid];
-	vcpd->notif_enabled = TRUE;
+	vcpd->notif_disabled = FALSE;
 	
 /* end: stuff userspace needs to do to handle notifications */
 	/* if you have other vcores, they'll just chill here */

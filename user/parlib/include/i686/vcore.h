@@ -21,7 +21,7 @@ extern __thread int __vcoreid;
  * Basically, it sets up the future stack pointer to have extra stuff after it,
  * and then it pops the registers, then pops the new context's stack
  * pointer.  Then it uses the extra stuff (the new PC is on the stack, the
- * location of notif_enabled, and a clobbered work register) to enable notifs,
+ * location of notif_disabled, and a clobbered work register) to enable notifs,
  * make sure notif IPIs weren't pending, restore the work reg, and then "ret".
  *
  * This is what the target notif_tf's stack will look like (growing down):
@@ -33,7 +33,7 @@ extern __thread int __vcoreid;
  *               |   actual syscall         | 0x10 below (0x30 space)
  *               |   *sysc ptr to syscall   | 0x40 below (0x10 + 0x30)
  *               |   notif_pending_loc      | 0x44 below (0x10 + 0x30)
- *               |   notif_enabled_loc      | 0x48 below (0x10 + 0x30)
+ *               |   notif_disabled_loc     | 0x48 below (0x10 + 0x30)
  *
  * The important thing is that it can handle a notification after it enables
  * notifications, and when it gets resumed it can ultimately run the new
@@ -56,7 +56,7 @@ extern __thread int __vcoreid;
  * could get fucked if the struct syscall isn't a multiple of 4-bytes.  Also,
  * note this goes backwards, since memory reads up the stack. */
 struct restart_helper {
-	uint32_t					notif_enab_loc;
+	uint32_t					notif_disab_loc;
 	uint32_t					notif_pend_loc;
 	struct syscall				*sysc;
 	struct syscall				local_sysc;
@@ -77,7 +77,7 @@ static inline void pop_ros_tf(struct user_trapframe *tf, uint32_t vcoreid)
 	rst = (struct restart_helper*)((void*)tf->tf_esp -
 	                               sizeof(struct restart_helper));
 	/* Fill in the info we'll need later */
-	rst->notif_enab_loc = (uint32_t)&vcpd->notif_enabled;
+	rst->notif_disab_loc = (uint32_t)&vcpd->notif_disabled;
 	rst->notif_pend_loc = (uint32_t)&vcpd->notif_pending;
 	rst->sysc = &rst->local_sysc;	/* point to the local one */
 	memset(rst->sysc, 0, sizeof(struct syscall));
@@ -97,8 +97,8 @@ static inline void pop_ros_tf(struct user_trapframe *tf, uint32_t vcoreid)
 				  "movl %2,%%eax;        " /* sizeof struct syscall */
 				  "addl $0x0c,%%eax;     " /* more offset btw eax/notif_en_loc*/
 	              "subl %%eax,%%esp;     " /* move to notif_en_loc slot */
-	              "popl %%eax;           " /* load notif_enabaled addr */
-	              "movb $0x01,(%%eax);   " /* enable notifications */
+	              "popl %%eax;           " /* load notif_disabled addr */
+	              "movb $0x00,(%%eax);   " /* enable notifications */
 				  /* Need a wrmb() here so the write of enable_notif can't pass
 				   * the read of notif_pending (racing with a potential
 				   * cross-core call with proc_notify()). */
@@ -139,7 +139,7 @@ static inline void pop_ros_tf_raw(struct user_trapframe *tf, uint32_t vcoreid)
 	rst = (struct restart_helper*)((void*)tf->tf_esp -
 	                               sizeof(struct restart_helper));
 	/* Fill in the info we'll need later */
-	rst->notif_enab_loc = (uint32_t)&vcpd->notif_enabled;
+	rst->notif_disab_loc = (uint32_t)&vcpd->notif_disabled;
 	rst->eax_save = 0;			/* avoid bugs */
 	rst->eflags = tf->tf_eflags;
 	rst->eip = tf->tf_eip;
@@ -153,8 +153,8 @@ static inline void pop_ros_tf_raw(struct user_trapframe *tf, uint32_t vcoreid)
 				  "movl %2,%%eax;        " /* sizeof struct syscall */
 				  "addl $0x0c,%%eax;     " /* more offset btw eax/notif_en_loc*/
 	              "subl %%eax,%%esp;     " /* move to notif_en_loc slot */
-	              "popl %%eax;           " /* load notif_enabaled addr */
-	              "movb $0x01,(%%eax);   " /* enable notifications */
+	              "popl %%eax;           " /* load notif_disabled addr */
+	              "movb $0x00,(%%eax);   " /* enable notifications */
 				  /* Here's where we differ from the regular pop_ros_tf().  We
 				   * do the same pops/esp moves, just to keep things similar
 				   * and simple, but don't do test, clear notif_pending, or

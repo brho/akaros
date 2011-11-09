@@ -21,12 +21,6 @@ uint64_t begin = 0, end = 0;
 
 int main(int argc, char** argv)
 {
-
-	/* don't forget to enable notifs on vcore0.  if you don't, the kernel will
-	 * restart your _S with notifs disabled, which is a path to confusion. */
-	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[0];
-	vcpd->notif_enabled = TRUE;
-
 	mcs_barrier_init(&b, max_vcores());
 
 	vcore_request(max_vcores());

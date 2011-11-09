@@ -92,7 +92,7 @@ struct preempt_data {
 	struct ancillary_state		preempt_anc;
 	struct user_trapframe		notif_tf;
 	uintptr_t					transition_stack;	/* advertised by the user */
-	bool						notif_enabled;		/* vcore willing to recv */
+	bool						notif_disabled;		/* vcore unwilling to recv*/
 	bool						notif_pending;		/* notif k_msg on the way */
 	bool						can_rcv_msg;		/* can receive FALLBACK */
 	seq_ctr_t					preempt_tf_valid;
