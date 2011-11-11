@@ -5799,8 +5799,8 @@ diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/bfd/elf64-riscv.c binutils-2
 +#include "elf64-target.h"
 diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/bfd/elfxx-riscv.c binutils-2.21.1/bfd/elfxx-riscv.c
 --- ../binutils-2.21.1-orig/bfd/elfxx-riscv.c	1969-12-31 16:00:00.000000000 -0800
-+++ binutils-2.21.1/bfd/elfxx-riscv.c	2011-11-07 21:55:01.000000000 -0800
-@@ -0,0 +1,8558 @@
++++ binutils-2.21.1/bfd/elfxx-riscv.c	2011-11-09 01:25:54.000000000 -0800
+@@ -0,0 +1,8366 @@
 +/* MIPS-specific support for ELF
 +   Copyright 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002,
 +   2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010 Free Software Foundation, Inc.
@@ -6387,13 +6387,6 @@ diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/bfd/elfxx-riscv.c binutils-2
 +#define MIPS_ELF_GNU_GOT1_MASK(abfd) \
 +  ((bfd_vma) 1 << (ABI_64_P (abfd) ? 63 : 31))
 +
-+/* The offset of $gp from the beginning of the .got section.  */
-+#define ELF_MIPS_GP_OFFSET(INFO) 0x7f0
-+
-+/* The maximum size of the GOT for it to be addressable using 16-bit
-+   offsets from $gp.  */
-+#define MIPS_ELF_GOT_MAX_SIZE(INFO) (ELF_MIPS_GP_OFFSET (INFO) + 0x7ff)
-+
 +#define MIPS_FUNCTION_STUB_NORMAL_SIZE 16
 +#define MIPS_FUNCTION_STUB_BIG_SIZE 20
 +
@@ -6766,7 +6759,7 @@ diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/bfd/elfxx-riscv.c binutils-2
 +}
 +
 +/* STUB describes an la25 stub that we have decided to implement
-+   by inserting an LUI/ADDIU pair before the target function.
++   by inserting RDNPC before the target function.
 +   Create the section and redirect the function symbol to it.  */
 +
 +static bfd_boolean
@@ -6799,8 +6792,8 @@ diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/bfd/elfxx-riscv.c binutils-2
 +  align = input_section->alignment_power;
 +  if (!bfd_set_section_alignment (s->owner, s, align))
 +    return FALSE;
-+  if (align > 3)
-+    s->size = (1 << align) - 8;
++  if (align > 2)
++    s->size = (1 << align) - 4;
 +
 +  /* Create a symbol for the stub.  */
 +  mips_elf_create_stub_symbol (info, stub->h, ".pic.", s, s->size, 8);
@@ -6808,7 +6801,7 @@ diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/bfd/elfxx-riscv.c binutils-2
 +  stub->offset = s->size;
 +
 +  /* Allocate room for it.  */
-+  s->size += 8;
++  s->size += 4;
 +  return TRUE;
 +}
 +
@@ -12000,12 +11993,11 @@ diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/bfd/elfxx-riscv.c binutils-2
 +
 +  if (stub->stub_section != htab->strampoline)
 +    {
-+      /* This is a simple LUI/ADDI stub.  Zero out the beginning
-+	 of the section and write the two instructions at the end.  */
++      /* This is a simple RDNPC stub.  Zero out the beginning
++	 of the section and write the instruction at the end. */
 +      memset (loc, 0, offset);
 +      loc += offset;
-+      bfd_put_32 (hti->output_bfd, RISCV_LTYPE (LUI, 19, RISCV_LUI_HIGH_PART(target)), loc);
-+      bfd_put_32 (hti->output_bfd, RISCV_ITYPE (ADDI, 19, 19, RISCV_CONST_LOW_PART(target)), loc + 4);
++      bfd_put_32 (hti->output_bfd, RISCV_ITYPE (RDNPC, 19, 0, 0), loc);
 +    }
 +  else
 +    {
@@ -12125,7 +12117,7 @@ diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/bfd/elfxx-riscv.c binutils-2
 +         jalr   t7
 +       */
 +      idx = 0;
-+      bfd_put_32 (output_bfd, RISCV_ITYPE (LREG(output_bfd), 19, 28, -ELF_MIPS_GP_OFFSET (info)), stub + idx);
++      bfd_put_32 (output_bfd, RISCV_ITYPE (LREG(output_bfd), 19, 28, 0), stub + idx);
 +      idx += 4;
 +      bfd_put_32 (output_bfd, RISCV_ITYPE (ADDI, 17, LINK_REG, 0), stub + idx);
 +      idx += 4;
@@ -12574,110 +12566,17 @@ diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/bfd/elfxx-riscv.c binutils-2
 +  switch (bfd_get_mach (abfd))
 +    {
 +    default:
-+    case bfd_mach_mips3000:
-+      val = E_MIPS_ARCH_1;
++    case bfd_mach_riscv_rocket64:
++      val = E_RISCV_ARCH_RV64 | E_RISCV_MACH_ROCKET64;
 +      break;
 +
-+    case bfd_mach_mips3900:
-+      val = E_MIPS_ARCH_1 | E_MIPS_MACH_3900;
-+      break;
-+
-+    case bfd_mach_mips6000:
-+      val = E_MIPS_ARCH_2;
-+      break;
-+
-+    case bfd_mach_mips4000:
-+    case bfd_mach_mips4300:
-+    case bfd_mach_mips4400:
-+    case bfd_mach_mips4600:
-+      val = E_MIPS_ARCH_3;
-+      break;
-+
-+    case bfd_mach_mips4010:
-+      val = E_MIPS_ARCH_3 | E_MIPS_MACH_4010;
-+      break;
-+
-+    case bfd_mach_mips4100:
-+      val = E_MIPS_ARCH_3 | E_MIPS_MACH_4100;
-+      break;
-+
-+    case bfd_mach_mips4111:
-+      val = E_MIPS_ARCH_3 | E_MIPS_MACH_4111;
-+      break;
-+
-+    case bfd_mach_mips4120:
-+      val = E_MIPS_ARCH_3 | E_MIPS_MACH_4120;
-+      break;
-+
-+    case bfd_mach_mips4650:
-+      val = E_MIPS_ARCH_3 | E_MIPS_MACH_4650;
-+      break;
-+
-+    case bfd_mach_mips5400:
-+      val = E_MIPS_ARCH_4 | E_MIPS_MACH_5400;
-+      break;
-+
-+    case bfd_mach_mips5500:
-+      val = E_MIPS_ARCH_4 | E_MIPS_MACH_5500;
-+      break;
-+
-+    case bfd_mach_mips9000:
-+      val = E_MIPS_ARCH_4 | E_MIPS_MACH_9000;
-+      break;
-+
-+    case bfd_mach_mips5000:
-+    case bfd_mach_mips7000:
-+    case bfd_mach_mips8000:
-+    case bfd_mach_mips10000:
-+    case bfd_mach_mips12000:
-+    case bfd_mach_mips14000:
-+    case bfd_mach_mips16000:
-+      val = E_MIPS_ARCH_4;
-+      break;
-+
-+    case bfd_mach_mips5:
-+      val = E_MIPS_ARCH_5;
-+      break;
-+
-+    case bfd_mach_mips_loongson_2e:
-+      val = E_MIPS_ARCH_3 | E_MIPS_MACH_LS2E;
-+      break;
-+
-+    case bfd_mach_mips_loongson_2f:
-+      val = E_MIPS_ARCH_3 | E_MIPS_MACH_LS2F;
-+      break;
-+
-+    case bfd_mach_mips_sb1:
-+      val = E_MIPS_ARCH_64 | E_MIPS_MACH_SB1;
-+      break;
-+
-+    case bfd_mach_mips_octeon:
-+      val = E_MIPS_ARCH_64R2 | E_MIPS_MACH_OCTEON;
-+      break;
-+
-+    case bfd_mach_mips_xlr:
-+      val = E_MIPS_ARCH_64 | E_MIPS_MACH_XLR;
-+      break;
-+
-+    case bfd_mach_mipsisa32:
-+      val = E_MIPS_ARCH_32;
-+      break;
-+
-+    case bfd_mach_mipsisa64:
-+      val = E_MIPS_ARCH_64;
-+      break;
-+
-+    case bfd_mach_mipsisa32r2:
-+      val = E_MIPS_ARCH_32R2;
-+      break;
-+
-+    case bfd_mach_mipsisa64r2:
-+      val = E_MIPS_ARCH_64R2;
++    case bfd_mach_riscv_rocket32:
++      val = E_RISCV_ARCH_RV32 | E_RISCV_MACH_ROCKET32;
 +      break;
 +    }
++
 +  elf_elfheader (abfd)->e_flags &= ~(EF_MIPS_ARCH | EF_MIPS_MACH);
 +  elf_elfheader (abfd)->e_flags |= val;
-+
 +}
 +
 +
@@ -13499,7 +13398,7 @@ diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/bfd/elfxx-riscv.c binutils-2
 +	      lo = o->vma;
 +
 +	  /* And calculate GP relative to that.  */
-+	  elf_gp (abfd) = lo + ELF_MIPS_GP_OFFSET (info);
++	  elf_gp (abfd) = lo;
 +	}
 +      else
 +	{
@@ -13788,104 +13687,13 @@ diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/bfd/elfxx-riscv.c binutils-2
 +
 +  return TRUE;
 +}
-+
-+/* Structure for saying that BFD machine EXTENSION extends BASE.  */
-+
-+struct mips_mach_extension {
-+  unsigned long extension, base;
-+};
-+
-+
-+/* An array describing how BFD machines relate to one another.  The entries
-+   are ordered topologically with MIPS I extensions listed last.  */
-+
-+static const struct mips_mach_extension mips_mach_extensions[] = {
-+  /* MIPS64r2 extensions.  */
-+  { bfd_mach_mips_octeon, bfd_mach_mipsisa64r2 },
-+
-+  /* MIPS64 extensions.  */
-+  { bfd_mach_mipsisa64r2, bfd_mach_mipsisa64 },
-+  { bfd_mach_mips_sb1, bfd_mach_mipsisa64 },
-+  { bfd_mach_mips_xlr, bfd_mach_mipsisa64 },
-+
-+  /* MIPS V extensions.  */
-+  { bfd_mach_mipsisa64, bfd_mach_mips5 },
-+
-+  /* R10000 extensions.  */
-+  { bfd_mach_mips12000, bfd_mach_mips10000 },
-+  { bfd_mach_mips14000, bfd_mach_mips10000 },
-+  { bfd_mach_mips16000, bfd_mach_mips10000 },
-+
-+  /* R5000 extensions.  Note: the vr5500 ISA is an extension of the core
-+     vr5400 ISA, but doesn't include the multimedia stuff.  It seems
-+     better to allow vr5400 and vr5500 code to be merged anyway, since
-+     many libraries will just use the core ISA.  Perhaps we could add
-+     some sort of ASE flag if this ever proves a problem.  */
-+  { bfd_mach_mips5500, bfd_mach_mips5400 },
-+  { bfd_mach_mips5400, bfd_mach_mips5000 },
-+
-+  /* MIPS IV extensions.  */
-+  { bfd_mach_mips5, bfd_mach_mips8000 },
-+  { bfd_mach_mips10000, bfd_mach_mips8000 },
-+  { bfd_mach_mips5000, bfd_mach_mips8000 },
-+  { bfd_mach_mips7000, bfd_mach_mips8000 },
-+  { bfd_mach_mips9000, bfd_mach_mips8000 },
-+
-+  /* VR4100 extensions.  */
-+  { bfd_mach_mips4120, bfd_mach_mips4100 },
-+  { bfd_mach_mips4111, bfd_mach_mips4100 },
-+
-+  /* MIPS III extensions.  */
-+  { bfd_mach_mips_loongson_2e, bfd_mach_mips4000 },
-+  { bfd_mach_mips_loongson_2f, bfd_mach_mips4000 },
-+  { bfd_mach_mips8000, bfd_mach_mips4000 },
-+  { bfd_mach_mips4650, bfd_mach_mips4000 },
-+  { bfd_mach_mips4600, bfd_mach_mips4000 },
-+  { bfd_mach_mips4400, bfd_mach_mips4000 },
-+  { bfd_mach_mips4300, bfd_mach_mips4000 },
-+  { bfd_mach_mips4100, bfd_mach_mips4000 },
-+  { bfd_mach_mips4010, bfd_mach_mips4000 },
-+
-+  /* MIPS32 extensions.  */
-+  { bfd_mach_mipsisa32r2, bfd_mach_mipsisa32 },
-+
-+  /* MIPS II extensions.  */
-+  { bfd_mach_mips4000, bfd_mach_mips6000 },
-+  { bfd_mach_mipsisa32, bfd_mach_mips6000 },
-+
-+  /* MIPS I extensions.  */
-+  { bfd_mach_mips6000, bfd_mach_mips3000 },
-+  { bfd_mach_mips3900, bfd_mach_mips3000 }
-+};
-+
 +
 +/* Return true if bfd machine EXTENSION is an extension of machine BASE.  */
 +
 +static bfd_boolean
 +mips_mach_extends_p (unsigned long base, unsigned long extension)
 +{
-+  size_t i;
-+
-+  if (extension == base)
-+    return TRUE;
-+
-+  if (base == bfd_mach_mipsisa32
-+      && mips_mach_extends_p (bfd_mach_mipsisa64, extension))
-+    return TRUE;
-+
-+  if (base == bfd_mach_mipsisa32r2
-+      && mips_mach_extends_p (bfd_mach_mipsisa64r2, extension))
-+    return TRUE;
-+
-+  for (i = 0; i < ARRAY_SIZE (mips_mach_extensions); i++)
-+    if (extension == mips_mach_extensions[i].extension)
-+      {
-+	extension = mips_mach_extensions[i].base;
-+	if (extension == base)
-+	  return TRUE;
-+      }
-+
-+  return FALSE;
++  return extension == base;
 +}
 +
 +
@@ -14598,8 +14406,8 @@ diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/config.sub binutils-2.21.1/c
  	# because (1) that's what they normally are, and
 diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/gas/config/tc-riscv.c binutils-2.21.1/gas/config/tc-riscv.c
 --- ../binutils-2.21.1-orig/gas/config/tc-riscv.c	1969-12-31 16:00:00.000000000 -0800
-+++ binutils-2.21.1/gas/config/tc-riscv.c	2011-11-01 20:58:24.000000000 -0700
-@@ -0,0 +1,4942 @@
++++ binutils-2.21.1/gas/config/tc-riscv.c	2011-11-09 01:26:08.000000000 -0800
+@@ -0,0 +1,4920 @@
 +/* tc-mips.c -- assemble code for a MIPS chip.
 +   Copyright 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002,
 +   2003, 2004, 2005, 2006, 2007, 2008, 2009  Free Software Foundation, Inc.
@@ -14733,10 +14541,6 @@ diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/gas/config/tc-riscv.c binuti
 +
 +/* Whether or not we have code that can call pic code.  */
 +int mips_abicalls = FALSE;
-+
-+/* Whether or not we have code which can be put into a shared
-+   library.  */
-+static bfd_boolean mips_in_shared = TRUE;
 +
 +/* This is the set of options which may be modified by the .set
 +   pseudo-op.  We use a struct so that .set push and .set pop are more
@@ -16545,12 +16349,6 @@ diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/gas/config/tc-riscv.c binuti
 +  else
 +    {
 +      gas_assert (ep->X_op == O_symbol);
-+      /* _gp_disp is a special case, used from s_cpload.
-+	 __gnu_local_gp is used if mips_no_shared.  */
-+      gas_assert (mips_pic == NO_PIC
-+	      || (! mips_in_shared
-+		  && strcmp (S_GET_NAME (ep->X_add_symbol),
-+                             "__gnu_local_gp") == 0));
 +      *r = BFD_RELOC_HI16_S;
 +    }
 +
@@ -17483,8 +17281,6 @@ diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/gas/config/tc-riscv.c binuti
 +    OPTION_MNO_RVC,
 +    OPTION_GP32,
 +    OPTION_GP64,
-+    OPTION_MSHARED,
-+    OPTION_MNO_SHARED,
 +    OPTION_MSYM32,
 +    OPTION_MNO_SYM32,
 +#ifdef OBJ_ELF
@@ -17512,8 +17308,6 @@ diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/gas/config/tc-riscv.c binuti
 +  {"mno-rvc", no_argument, NULL, OPTION_MNO_RVC},
 +  {"mgp32", no_argument, NULL, OPTION_GP32},
 +  {"mgp64", no_argument, NULL, OPTION_GP64},
-+  {"mshared", no_argument, NULL, OPTION_MSHARED},
-+  {"mno-shared", no_argument, NULL, OPTION_MNO_SHARED},
 +  {"msym32", no_argument, NULL, OPTION_MSYM32},
 +  {"mno-sym32", no_argument, NULL, OPTION_MNO_SYM32},
 +  
@@ -17572,14 +17366,6 @@ diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/gas/config/tc-riscv.c binuti
 +
 +    case OPTION_MARCH:
 +      mips_set_option_string (&mips_arch_string, arg);
-+      break;
-+
-+    case OPTION_MSHARED:
-+      mips_in_shared = TRUE;
-+      break;
-+
-+    case OPTION_MNO_SHARED:
-+      mips_in_shared = FALSE;
 +      break;
 +
 +    case OPTION_MSYM32:
@@ -20573,7 +20359,7 @@ diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/include/opcode/riscv.h binut
 +#endif /* _MIPS_H_ */
 diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/include/opcode/riscv-opc.h binutils-2.21.1/include/opcode/riscv-opc.h
 --- ../binutils-2.21.1-orig/include/opcode/riscv-opc.h	1969-12-31 16:00:00.000000000 -0800
-+++ binutils-2.21.1/include/opcode/riscv-opc.h	2011-10-22 18:50:03.000000000 -0700
++++ binutils-2.21.1/include/opcode/riscv-opc.h	2011-11-11 00:13:56.000000000 -0800
 @@ -0,0 +1,545 @@
 +/* Automatically generated by parse-opcodes */
 +#define MATCH_MOVN 0x6f7
@@ -20701,13 +20487,13 @@ diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/include/opcode/riscv-opc.h b
 +#define MATCH_VSSEGSTB 0x80f
 +#define  MASK_VSSEGSTB 0xfff
 +#define MATCH_MFTX_D 0x1c0d3
-+#define  MASK_MFTX_D 0x7c1ffff
++#define  MASK_MFTX_D 0x3fffff
 +#define MATCH_DIV 0x633
 +#define  MASK_DIV 0x1ffff
 +#define MATCH_C_LD 0x9
 +#define  MASK_C_LD 0x1f
 +#define MATCH_MFTX_S 0x1c053
-+#define  MASK_MFTX_S 0x7c1ffff
++#define  MASK_MFTX_S 0x3fffff
 +#define MATCH_VSSEGSTH 0x88f
 +#define  MASK_VSSEGSTH 0xfff
 +#define MATCH_VVCFGIVL 0xf3
@@ -21135,7 +20921,7 @@ diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/ld/configure.tgt binutils-2.
  			;;
 diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/ld/emulparams/elf32lriscv-defs.sh binutils-2.21.1/ld/emulparams/elf32lriscv-defs.sh
 --- ../binutils-2.21.1-orig/ld/emulparams/elf32lriscv-defs.sh	1969-12-31 16:00:00.000000000 -0800
-+++ binutils-2.21.1/ld/emulparams/elf32lriscv-defs.sh	2011-11-07 20:20:08.000000000 -0800
++++ binutils-2.21.1/ld/emulparams/elf32lriscv-defs.sh	2011-11-08 19:52:33.000000000 -0800
 @@ -0,0 +1,90 @@
 +# This is an ELF platform.
 +SCRIPT_NAME=elf
@@ -21184,7 +20970,7 @@ diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/ld/emulparams/elf32lriscv-de
 +# of .got.
 +OTHER_GOT_SYMBOLS='
 +  . = .;
-+  _gp = ALIGN(16) + 0x7f0;
++  _gp = ALIGN(16);
 +'
 +# .got.plt is only used for the PLT psABI extension.  It should not be
 +# included in the .sdata block with .got, as there is no need to access
@@ -21657,9 +21443,8 @@ diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/opcodes/disassemble.c binuti
        if (bfd_get_mach (abfd) == bfd_mach_ppc_620)
 diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/opcodes/riscv-dis.c binutils-2.21.1/opcodes/riscv-dis.c
 --- ../binutils-2.21.1-orig/opcodes/riscv-dis.c	1969-12-31 16:00:00.000000000 -0800
-+++ binutils-2.21.1/opcodes/riscv-dis.c	2011-10-22 19:19:34.000000000 -0700
-@@ -0,0 +1,905 @@
-+/* vim: set ts=8: */
++++ binutils-2.21.1/opcodes/riscv-dis.c	2011-11-08 21:34:09.000000000 -0800
+@@ -0,0 +1,904 @@
 +/* Print mips instructions for GDB, the GNU debugger, or for objdump.
 +   Copyright 1989, 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999,
 +   2000, 2001, 2002, 2003, 2005, 2007, 2008
@@ -22566,7 +22351,7 @@ diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/opcodes/riscv-dis.c binutils
 +}
 diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/opcodes/riscv-opc.c binutils-2.21.1/opcodes/riscv-opc.c
 --- ../binutils-2.21.1-orig/opcodes/riscv-opc.c	1969-12-31 16:00:00.000000000 -0800
-+++ binutils-2.21.1/opcodes/riscv-opc.c	2011-10-22 19:14:45.000000000 -0700
++++ binutils-2.21.1/opcodes/riscv-opc.c	2011-11-11 00:12:46.000000000 -0800
 @@ -0,0 +1,449 @@
 +/* mips-opc.c -- MIPS opcode list.
 +   Copyright 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002
@@ -22756,12 +22541,12 @@ diff -x autom4te.cache -ruN ../binutils-2.21.1-orig/opcodes/riscv-opc.c binutils
 +{"mtfsr",   "d,s",	MATCH_MTFSR, MASK_MTFSR,  WR_xd|RD_xs1 },
 +{"mfpcr",   "d,E",	MATCH_MFPCR, MASK_MFPCR,  WR_xd },
 +{"mtpcr",   "s,E",	MATCH_MTPCR, MASK_MTPCR,  RD_xs1 },
-+{"mftx.s",   "d,T",	MATCH_MFTX_S, MASK_MFTX_S,  WR_xd|RD_fs1 },
-+{"mftx.s",   "d,t",	MATCH_MFTX_S, MASK_MFTX_S,  WR_xd|RD_fs1 },
++{"mftx.s",   "d,S",	MATCH_MFTX_S, MASK_MFTX_S,  WR_xd|RD_fs1 },
++{"mftx.s",   "d,s",	MATCH_MFTX_S, MASK_MFTX_S,  WR_xd|RD_fs1 },
 +{"mxtf.s",   "D,s",	MATCH_MXTF_S, MASK_MXTF_S,  WR_fd|RD_xs1 },
 +{"mxtf.s",   "d,s",	MATCH_MXTF_S, MASK_MXTF_S,  WR_fd|RD_xs1 },
-+{"mftx.d",   "d,T",	MATCH_MFTX_D, MASK_MFTX_D,  WR_xd|RD_fs1 },
-+{"mftx.d",   "d,t",	MATCH_MFTX_D, MASK_MFTX_D,  WR_xd|RD_fs1 },
++{"mftx.d",   "d,S",	MATCH_MFTX_D, MASK_MFTX_D,  WR_xd|RD_fs1 },
++{"mftx.d",   "d,s",	MATCH_MFTX_D, MASK_MFTX_D,  WR_xd|RD_fs1 },
 +{"mxtf.d",   "D,s",	MATCH_MXTF_D, MASK_MXTF_D,  WR_fd|RD_xs1 },
 +{"mxtf.d",   "d,s",	MATCH_MXTF_D, MASK_MXTF_D,  WR_fd|RD_xs1 },
 +{"mul",    "d,s,t",	MATCH_MUL, MASK_MUL,  WR_xd|RD_xs1|RD_xs2 },

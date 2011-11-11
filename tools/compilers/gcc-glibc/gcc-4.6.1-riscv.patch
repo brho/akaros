@@ -13,8 +13,8 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/config.sub g
  	# because (1) that's what they normally are, and
 diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/riscv/constraints.md gcc-4.6.1/gcc/config/riscv/constraints.md
 --- ../gcc-4.6.1-orig/gcc/config/riscv/constraints.md	1969-12-31 16:00:00.000000000 -0800
-+++ gcc-4.6.1/gcc/config/riscv/constraints.md	2011-11-03 02:32:03.000000000 -0700
-@@ -0,0 +1,157 @@
++++ gcc-4.6.1/gcc/config/riscv/constraints.md	2011-11-09 01:24:47.000000000 -0800
+@@ -0,0 +1,156 @@
 +;; Constraint definitions for MIPS.
 +;; Copyright (C) 2006, 2007, 2008, 2010 Free Software Foundation, Inc.
 +;;
@@ -51,8 +51,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +
 +;; MIPS16 code always calls through a MIPS16 register; see mips_emit_call_insn
 +;; for details.
-+(define_register_constraint "c" "TARGET_USE_PIC_FN_ADDR_REG ? PIC_FN_ADDR_REG
-+				 : GR_REGS"
++(define_register_constraint "c" "TARGET_ABICALLS ? PIC_FN_ADDR_REG : GR_REGS"
 +  "A register suitable for use in an indirect jump.  This will always be
 +   @code{$25} for @option{-mabicalls}.")
 +
@@ -441,8 +440,8 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +  "alu")
 diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/riscv/linux64.h gcc-4.6.1/gcc/config/riscv/linux64.h
 --- ../gcc-4.6.1-orig/gcc/config/riscv/linux64.h	1969-12-31 16:00:00.000000000 -0800
-+++ gcc-4.6.1/gcc/config/riscv/linux64.h	2011-11-07 20:15:18.000000000 -0800
-@@ -0,0 +1,62 @@
++++ gcc-4.6.1/gcc/config/riscv/linux64.h	2011-11-09 01:25:00.000000000 -0800
+@@ -0,0 +1,61 @@
 +/* Definitions for MIPS running Linux-based GNU systems with ELF format
 +   using n32/64 abi.
 +   Copyright 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2010, 2011
@@ -468,7 +467,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +   in order to make the other specs easier to write.  */
 +#undef DRIVER_SELF_SPECS
 +#define DRIVER_SELF_SPECS \
-+  BASE_DRIVER_SELF_SPECS, \
 +  LINUX_DRIVER_SELF_SPECS \
 +  " %{!EB:%{!EL:%(endian_spec)}}" \
 +  " %{!mabi=*: -mabi=64}"
@@ -507,8 +505,8 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +#define MIPS_TFMODE_FORMAT mips_quad_format
 diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/riscv/linux.h gcc-4.6.1/gcc/config/riscv/linux.h
 --- ../gcc-4.6.1-orig/gcc/config/riscv/linux.h	1969-12-31 16:00:00.000000000 -0800
-+++ gcc-4.6.1/gcc/config/riscv/linux.h	2011-10-22 03:19:37.000000000 -0700
-@@ -0,0 +1,134 @@
++++ gcc-4.6.1/gcc/config/riscv/linux.h	2011-11-09 01:24:56.000000000 -0800
+@@ -0,0 +1,128 @@
 +/* Definitions for MIPS running Linux-based GNU systems with ELF format.
 +   Copyright (C) 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006,
 +   2007, 2008, 2010, 2011 Free Software Foundation, Inc.
@@ -626,17 +624,11 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +#define MARCH_MTUNE_NATIVE_SPECS ""
 +
 +#define LINUX_DRIVER_SELF_SPECS \
-+  NO_SHARED_SPECS							\
-+  MARCH_MTUNE_NATIVE_SPECS,						\
-+  /* -mplt has no effect without -mno-shared.  Simplify later		\
-+     specs handling by removing a redundant option.  */			\
-+  "%{!mno-shared:%<mplt}",						\
-+  /* -mplt likewise has no effect for -mabi=64 without -msym32.  */	\
-+  "%{mabi=64:%{!msym32:%<mplt}}"
++  NO_SHARED_SPECS		\
++  MARCH_MTUNE_NATIVE_SPECS
 +
 +#undef DRIVER_SELF_SPECS
 +#define DRIVER_SELF_SPECS \
-+  BASE_DRIVER_SELF_SPECS, \
 +  LINUX_DRIVER_SELF_SPECS
 +
 +/* Similar to standard Linux, but adding -ffast-math support.  */
@@ -1026,8 +1018,8 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +#endif /* _MIPS_H_ */
 diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/riscv/predicates.md gcc-4.6.1/gcc/config/riscv/predicates.md
 --- ../gcc-4.6.1-orig/gcc/config/riscv/predicates.md	1969-12-31 16:00:00.000000000 -0800
-+++ gcc-4.6.1/gcc/config/riscv/predicates.md	2011-11-03 02:32:31.000000000 -0700
-@@ -0,0 +1,209 @@
++++ gcc-4.6.1/gcc/config/riscv/predicates.md	2011-11-09 02:01:56.000000000 -0800
+@@ -0,0 +1,206 @@
 +;; Predicate definitions for MIPS.
 +;; Copyright (C) 2004, 2007, 2008 Free Software Foundation, Inc.
 +;;
@@ -1099,8 +1091,9 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +  if (symbol_type == SYMBOL_ABSOLUTE)
 +    {
 +      /* We can only use direct calls if we're sure that the target
-+	 function does not need $25 to be valid on entry.  */
-+      if (mips_use_pic_fn_addr_reg_p (op))
++	 function does not need t7 to be valid on entry.  If we're
++	 non-PIC, t7 can be set up using the PLT. */
++      if (TARGET_ABICALLS && flag_pic)
 +	return false;
 +
 +      /* If -mlong-calls or if this function has an explicit long_call
@@ -1225,10 +1218,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +(define_predicate "symbol_ref_operand"
 +  (match_code "symbol_ref"))
 +
-+(define_predicate "stack_operand"
-+  (and (match_code "mem")
-+       (match_test "mips_stack_address_p (XEXP (op, 0), GET_MODE (op))")))
-+
 +(define_predicate "equality_operator"
 +  (match_code "eq,ne"))
 +
@@ -1239,9 +1228,8 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +  (match_code "eq,lt,le,gt,ge"))
 diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/riscv/riscv.c gcc-4.6.1/gcc/config/riscv/riscv.c
 --- ../gcc-4.6.1-orig/gcc/config/riscv/riscv.c	1969-12-31 16:00:00.000000000 -0800
-+++ gcc-4.6.1/gcc/config/riscv/riscv.c	2011-11-03 16:54:11.000000000 -0700
-@@ -0,0 +1,6930 @@
-+/* vim: set ts=8: */
++++ gcc-4.6.1/gcc/config/riscv/riscv.c	2011-11-09 02:01:56.000000000 -0800
+@@ -0,0 +1,6481 @@
 +/* Subroutines used for MIPS code generation.
 +   Copyright (C) 1989, 1990, 1991, 1993, 1994, 1995, 1996, 1997, 1998,
 +   1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,
@@ -1590,34 +1578,18 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +
 +/* The current instruction-set architecture.  */
 +enum processor mips_arch;
-+const struct mips_cpu_info *mips_arch_info;
 +
 +/* The processor that we should tune the code for.  */
 +enum processor mips_tune;
-+const struct mips_cpu_info *mips_tune_info;
 +
 +/* The ISA level associated with mips_arch.  */
 +int mips_isa;
-+
-+/* The architecture selected by -mipsN, or null if -mipsN wasn't used.  */
-+static const struct mips_cpu_info *mips_isa_option_info;
 +
 +/* Which ABI to use.  */
 +int mips_abi = MIPS_ABI_DEFAULT;
 +
 +/* Which cost information to use.  */
 +static const struct mips_rtx_cost_data *mips_cost;
-+
-+/* The ambient target flags, excluding MASK_MIPS16.  */
-+static int mips_base_target_flags;
-+
-+/* The ambient values of other global variables.  */
-+static int mips_base_schedule_insns; /* flag_schedule_insns */
-+static int mips_base_reorder_blocks_and_partition; /* flag_reorder... */
-+static int mips_base_move_loop_invariants; /* flag_move_loop_invariants */
-+static int mips_base_align_loops; /* align_loops */
-+static int mips_base_align_jumps; /* align_jumps */
-+static int mips_base_align_functions; /* align_functions */
 +
 +/* Index [M][R] is true if register R is allowed to hold a value of mode M.  */
 +bool mips_hard_regno_mode_ok[(int) MAX_MACHINE_MODE][FIRST_PSEUDO_REGISTER];
@@ -1707,7 +1679,8 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +   options correctly.  */
 +static const struct mips_cpu_info mips_cpu_info_table[] = {
 +  /* Entries for generic ISAs.  */
-+  { "rocket", PROCESSOR_ROCKET, ISA_RV64, 0 }
++  { "rocket32", PROCESSOR_ROCKET32, ISA_RV32, 0 },
++  { "rocket64", PROCESSOR_ROCKET64, ISA_RV64, 0 }
 +};
 +
 +/* Default costs.  If these are used for a processor we should look
@@ -1765,7 +1738,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +  }
 +};
 +
-+static rtx mips_find_pic_call_symbol (rtx, rtx, bool);
 +static int mips_register_move_cost (enum machine_mode, reg_class_t,
 +				    reg_class_t);
 +static unsigned int mips_function_arg_boundary (enum machine_mode, const_tree);
@@ -1903,56 +1875,12 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +  return cost;
 +}
 +
-+/* Return true if symbols of type TYPE require a GOT access.  */
-+
-+static bool
-+mips_got_symbol_type_p (enum mips_symbol_type type)
-+{
-+  return type == SYMBOL_GOT_DISP;
-+}
-+
 +/* Return true if X is a thread-local symbol.  */
 +
 +static bool
-+mips_tls_symbol_p (rtx x)
++mips_tls_symbol_p (const_rtx x)
 +{
 +  return GET_CODE (x) == SYMBOL_REF && SYMBOL_REF_TLS_MODEL (x) != 0;
-+}
-+
-+/* Return true if SYMBOL_REF X binds locally.  */
-+
-+static bool
-+mips_symbol_binds_local_p (const_rtx x)
-+{
-+  return (SYMBOL_REF_DECL (x)
-+	  ? targetm.binds_local_p (SYMBOL_REF_DECL (x))
-+	  : SYMBOL_REF_LOCAL_P (x));
-+}
-+
-+/* Return true if calls to X might need $25 to be valid on entry.  */
-+
-+bool
-+mips_use_pic_fn_addr_reg_p (const_rtx x)
-+{
-+  if (!TARGET_USE_PIC_FN_ADDR_REG)
-+    return false;
-+
-+  if (GET_CODE (x) == SYMBOL_REF)
-+    {
-+      /* If PLTs and copy relocations are available, the static linker
-+	 will make sure that $25 is valid on entry to the target function.  */
-+      if (TARGET_ABICALLS_PIC0)
-+	return false;
-+
-+      /* Locally-defined functions use absolute accesses to set up
-+	 the global pointer.  */
-+      if (TARGET_ABSOLUTE_ABICALLS
-+	  && mips_symbol_binds_local_p (x)
-+	  && !SYMBOL_REF_EXTERNAL_P (x))
-+	return false;
-+    }
-+
-+  return true;
 +}
 +
 +/* Return the method that should be used to access SYMBOL_REF or
@@ -1961,23 +1889,11 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +static enum mips_symbol_type
 +mips_classify_symbol (const_rtx x)
 +{
-+  if (GET_CODE (x) == LABEL_REF)
-+    {
-+      if (TARGET_ABICALLS && !TARGET_ABSOLUTE_ABICALLS)
-+	return SYMBOL_GOT_DISP;
-+
-+      return SYMBOL_ABSOLUTE;
-+    }
-+
-+  gcc_assert (GET_CODE (x) == SYMBOL_REF);
-+
-+  if (SYMBOL_REF_TLS_MODEL (x))
++  if (mips_tls_symbol_p (x))
 +    return SYMBOL_TLS;
 +
-+  /* Don't use GOT accesses for locally-binding symbols when -mno-shared
-+     is in effect.  */
-+  if (TARGET_ABICALLS_PIC2
-+      && !(TARGET_ABSOLUTE_ABICALLS && mips_symbol_binds_local_p (x)))
++  /* Don't use GOT accesses when -mno-shared is in effect.  */
++  if (TARGET_ABICALLS && flag_pic)
 +    return SYMBOL_GOT_DISP;
 +
 +  return SYMBOL_ABSOLUTE;
@@ -2047,7 +1963,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +	 supports 32-bit symbols, the values of those symbols will be
 +	 sign-extended.  In this case we can't allow an arbitrary offset
 +	 in case the 32-bit value X + OFFSET has a different sign from X.  */
-+      if (Pmode == DImode && !ABI_HAS_64BIT_SYMBOLS)
++      if (Pmode == DImode)
 +	return offset_within_block_p (x, INTVAL (offset));
 +
 +      /* In other cases the relocations can handle any offset.  */
@@ -2174,16 +2090,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +  return false;
 +}
 +
-+/* Implement TARGET_USE_BLOCKS_FOR_CONSTANT_P.  We can't use blocks for
-+   constants when we're using a per-function constant pool.  */
-+
-+static bool
-+mips_use_blocks_for_constant_p (enum machine_mode mode ATTRIBUTE_UNUSED,
-+				const_rtx x ATTRIBUTE_UNUSED)
-+{
-+  return true;
-+}
-+
 +/* Return true if register REGNO is a valid base register for mode MODE.
 +   STRICT_P is true if REG_OK_STRICT is in effect.  */
 +
@@ -2226,7 +2132,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +static bool
 +mips_valid_offset_p (rtx x, enum machine_mode mode)
 +{
-+  /* Check that X is a signed 16-bit number.  */
++  /* Check that X is a signed 12-bit number.  */
 +  if (!const_arith_operand (x, Pmode))
 +    return false;
 +
@@ -2334,18 +2240,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +  struct mips_address_info addr;
 +
 +  return mips_classify_address (&addr, x, mode, strict_p);
-+}
-+
-+/* Return true if X is a legitimate $sp-based address for mode MDOE.  */
-+
-+bool
-+mips_stack_address_p (rtx x, enum machine_mode mode)
-+{
-+  struct mips_address_info addr;
-+
-+  return (mips_classify_address (&addr, x, mode, false)
-+	  && addr.type == ADDRESS_REG
-+	  && addr.reg == stack_pointer_rtx);
 +}
 +
 +/* Return the number of instructions needed to load or store a value
@@ -2630,17 +2524,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +
 +  vec = gen_rtvec (3, reg, symbol, gen_rtx_REG (SImode, GOT_VERSION_REGNUM));
 +  return gen_rtx_UNSPEC (Pmode, vec, UNSPEC_LOAD_CALL);
-+}
-+
-+/* If SRC is the RHS of a load_call<mode> insn, return the underlying symbol
-+   reference.  Return NULL_RTX otherwise.  */
-+
-+static rtx
-+mips_strip_unspec_call (rtx src)
-+{
-+  if (GET_CODE (src) == UNSPEC && XINT (src, 1) == UNSPEC_LOAD_CALL)
-+    return mips_strip_unspec_address (XVECEXP (src, 0, 1));
-+  return NULL_RTX;
 +}
 +
 +/* Create and return a GOT reference of type TYPE for address ADDR.
@@ -4006,14 +3889,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +    return FP_ARG_FIRST + info->reg_offset;
 +}
 +
-+/* Implement TARGET_STRICT_ARGUMENT_NAMING.  */
-+
-+static bool
-+mips_strict_argument_naming (CUMULATIVE_ARGS *ca ATTRIBUTE_UNUSED)
-+{
-+  return true;
-+}
-+
 +/* Implement TARGET_FUNCTION_ARG.  */
 +
 +static rtx
@@ -4493,6 +4368,16 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +      assemble_name (asm_out_file, name);
 +      fputs ("\n", asm_out_file);
 +    }
++}
++
++/* Return true if SYMBOL_REF X binds locally.  */
++
++static bool
++mips_symbol_binds_local_p (const_rtx x)
++{
++  return (SYMBOL_REF_DECL (x)
++	  ? targetm.binds_local_p (SYMBOL_REF_DECL (x))
++	  : SYMBOL_REF_LOCAL_P (x));
 +}
 +
 +/* Return true if calls to X can use R_MIPS_CALL* relocations.  */
@@ -5051,42 +4936,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +    }
 +}
 +
-+/* Implement TARGET_ASM_FUNCTION_RODATA_SECTION.
-+
-+   The complication here is that, with the combination TARGET_ABICALLS
-+   && !TARGET_ABSOLUTE_ABICALLS && !TARGET_GPWORD, jump tables will use
-+   absolute addresses, and should therefore not be included in the
-+   read-only part of a DSO.  Handle such cases by selecting a normal
-+   data section instead of a read-only one.  The logic apes that in
-+   default_function_rodata_section.  */
-+
-+static section *
-+mips_function_rodata_section (tree decl)
-+{
-+  if (!TARGET_ABICALLS || TARGET_ABSOLUTE_ABICALLS || TARGET_GPWORD)
-+    return default_function_rodata_section (decl);
-+
-+  if (decl && DECL_SECTION_NAME (decl))
-+    {
-+      const char *name = TREE_STRING_POINTER (DECL_SECTION_NAME (decl));
-+      if (DECL_ONE_ONLY (decl) && strncmp (name, ".gnu.linkonce.t.", 16) == 0)
-+	{
-+	  char *rname = ASTRDUP (name);
-+	  rname[14] = 'd';
-+	  return get_section (rname, SECTION_LINKONCE | SECTION_WRITE, decl);
-+	}
-+      else if (flag_function_sections
-+	       && flag_data_sections
-+	       && strncmp (name, ".text.", 6) == 0)
-+	{
-+	  char *rname = ASTRDUP (name);
-+	  memcpy (rname + 1, "data", 4);
-+	  return get_section (rname, SECTION_WRITE, decl);
-+	}
-+    }
-+  return data_section;
-+}
-+
 +/* The MIPS debug format wants all automatic variables and arguments
 +   to be in terms of the virtual frame pointer (stack pointer before
 +   any adjustment in the function), while the MIPS 3.0 linker wants
@@ -5358,11 +5207,8 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +      {
 +	int attr;
 +
-+	/* No floating-point operations, -mno-float.  */
-+	if (TARGET_NO_FLOAT)
-+	  attr = 0;
 +	/* Soft-float code, -msoft-float.  */
-+	else if (!TARGET_HARD_FLOAT_ABI)
++	if (!TARGET_HARD_FLOAT_ABI)
 +	  attr = 3;
 +	/* 64-bit FP registers on a 32-bit target. */
 +	else if (!TARGET_64BIT)
@@ -5380,7 +5226,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +  if (TARGET_ABICALLS)
 +    {
 +      fprintf (asm_out_file, "\t.abicalls\n");
-+      if (TARGET_ABICALLS_PIC0)
++      if (!flag_pic)
 +	fprintf (asm_out_file, "\t.option\tpic0\n");
 +    }
 +}
@@ -5551,58 +5397,19 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +  return cfun->machine->must_initialize_gp_p;
 +}
 +
-+/* Return true if the current function should treat register REGNO
-+   as call-saved.  */
-+
-+static bool
-+mips_cfun_call_saved_reg_p (unsigned int regno)
-+{
-+  /* If the user makes an ordinarily-call-saved register global,
-+     that register is no longer call-saved.  */
-+  if (global_regs[regno])
-+    return false;
-+
-+  return !call_really_used_regs[regno];
-+}
-+
-+/* Return true if the function body might clobber register REGNO.
-+   We know that REGNO is call-saved.  */
-+
-+static bool
-+mips_cfun_might_clobber_call_saved_reg_p (unsigned int regno)
-+{
-+  /* Some functions should be treated as clobbering all call-saved
-+     registers.  */
-+  if (crtl->saves_all_registers)
-+    return true;
-+
-+  /* DF handles cases where a register is explicitly referenced in
-+     the rtl.  Incoming values are passed in call-clobbered registers,
-+     so we can assume that any live call-saved register is set within
-+     the function.  */
-+  if (df_regs_ever_live_p (regno))
-+    return true;
-+
-+  /* If we're using a call-saved global pointer, the function's
-+     prologue will need to set it up.  */
-+  if (cfun->machine->global_pointer == regno)
-+    return true;
-+
-+  /* The function's prologue will need to set the frame pointer if
-+     frame_pointer_needed.  */
-+  if (regno == HARD_FRAME_POINTER_REGNUM && frame_pointer_needed)
-+    return true;
-+
-+  return false;
-+}
-+
 +/* Return true if the current function must save register REGNO.  */
 +
 +static bool
 +mips_save_reg_p (unsigned int regno)
 +{
-+  bool clobbered = mips_cfun_might_clobber_call_saved_reg_p (regno);
-+  return (mips_cfun_call_saved_reg_p (regno) && clobbered)
++  bool call_saved = !global_regs[regno] && !call_really_used_regs[regno];
++  bool might_clobber = crtl->saves_all_registers
++		       || df_regs_ever_live_p (regno)
++		       || cfun->machine->global_pointer == regno
++		       || (regno == HARD_FRAME_POINTER_REGNUM
++			   && frame_pointer_needed);
++
++  return (call_saved && might_clobber)
 +	 || (regno == RETURN_ADDR_REGNUM && crtl->calls_eh_return);
 +}
 +
@@ -5790,7 +5597,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +  if (!TARGET_USE_GOT || cfun->machine->global_pointer == INVALID_REGNUM)
 +    return LOADGP_NONE;
 +
-+  if (TARGET_ABSOLUTE_ABICALLS)
++  if (TARGET_ABICALLS && !flag_pic)
 +    return LOADGP_ABSOLUTE;
 +
 +  return LOADGP_NEWABI;
@@ -5855,7 +5662,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +    {
 +      /* PIC_FUNCTION_ADDR_REGNUM is live if we need it to set up
 +	 the global pointer.   */
-+      if (!TARGET_ABSOLUTE_ABICALLS)
++      if (flag_pic)
 +	bitmap_set_bit (regs, PIC_FUNCTION_ADDR_REGNUM);
 +
 +      /* See the comment above load_call<mode> for details.  */
@@ -6418,9 +6225,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +    case DFmode:
 +      return TARGET_HARD_FLOAT;
 +
-+    case V2SFmode:
-+      return TARGET_HARD_FLOAT && TARGET_PAIRED_SINGLE_FLOAT;
-+
 +    default:
 +      return false;
 +    }
@@ -6721,7 +6525,8 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +{
 +  switch (mips_tune)
 +    {
-+    case PROCESSOR_ROCKET:
++    case PROCESSOR_ROCKET32:
++    case PROCESSOR_ROCKET64:
 +      return 1;
 +
 +    default:
@@ -7083,192 +6888,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +  gcc_unreachable ();
 +}
 +
-+/* Return whether CFG is used in mips_reorg.  */
-+
-+static bool
-+mips_cfg_in_reorg (void)
-+{
-+  return TARGET_RELAX_PIC_CALLS;
-+}
-+
-+/* If INSN is a call, return the underlying CALL expr.  Return NULL_RTX
-+   otherwise.  If INSN has two call rtx, then store the second one in
-+   SECOND_CALL.  */
-+
-+static rtx
-+mips_call_expr_from_insn (rtx insn, rtx *second_call)
-+{
-+  rtx x;
-+  rtx x2;
-+
-+  if (!CALL_P (insn))
-+    return NULL_RTX;
-+
-+  x = PATTERN (insn);
-+  if (GET_CODE (x) == PARALLEL)
-+    {
-+      /* Calls returning complex values have two CALL rtx.  Look for the second
-+	 one here, and return it via the SECOND_CALL arg.  */
-+      x2 = XVECEXP (x, 0, 1);
-+      if (GET_CODE (x2) == SET)
-+	x2 = XEXP (x2, 1);
-+      if (GET_CODE (x2) == CALL)
-+	*second_call = x2;
-+
-+      x = XVECEXP (x, 0, 0);
-+    }
-+  if (GET_CODE (x) == SET)
-+    x = XEXP (x, 1);
-+  gcc_assert (GET_CODE (x) == CALL);
-+
-+  return x;
-+}
-+
-+/* REG is set in DEF.  See if the definition is one of the ways we load a
-+   register with a symbol address for a mips_use_pic_fn_addr_reg_p call.
-+   If it is, return the symbol reference of the function, otherwise return
-+   NULL_RTX.
-+
-+   If RECURSE_P is true, use mips_find_pic_call_symbol to interpret
-+   the values of source registers, otherwise treat such registers as
-+   having an unknown value.  */
-+
-+static rtx
-+mips_pic_call_symbol_from_set (df_ref def, rtx reg, bool recurse_p)
-+{
-+  rtx def_insn, set;
-+
-+  if (DF_REF_IS_ARTIFICIAL (def))
-+    return NULL_RTX;
-+
-+  def_insn = DF_REF_INSN (def);
-+  set = single_set (def_insn);
-+  if (set && rtx_equal_p (SET_DEST (set), reg))
-+    {
-+      rtx note, src, symbol;
-+
-+      /* First, look at REG_EQUAL/EQUIV notes.  */
-+      note = find_reg_equal_equiv_note (def_insn);
-+      if (note && GET_CODE (XEXP (note, 0)) == SYMBOL_REF)
-+	return XEXP (note, 0);
-+
-+      /* For %call16 references we don't have REG_EQUAL.  */
-+      src = SET_SRC (set);
-+      symbol = mips_strip_unspec_call (src);
-+      if (symbol)
-+	{
-+	  gcc_assert (GET_CODE (symbol) == SYMBOL_REF);
-+	  return symbol;
-+	}
-+
-+      /* Follow at most one simple register copy.  Such copies are
-+	 interesting in cases like:
-+
-+	     for (...)
-+	       {
-+	         locally_binding_fn (...);
-+	       }
-+
-+	 and:
-+
-+	     locally_binding_fn (...);
-+	     ...
-+	     locally_binding_fn (...);
-+
-+	 where the load of locally_binding_fn can legitimately be
-+	 hoisted or shared.  However, we do not expect to see complex
-+	 chains of copies, so a full worklist solution to the problem
-+	 would probably be overkill.  */
-+      if (recurse_p && REG_P (src))
-+	return mips_find_pic_call_symbol (def_insn, src, false);
-+    }
-+
-+  return NULL_RTX;
-+}
-+
-+/* Find the definition of the use of REG in INSN.  See if the definition
-+   is one of the ways we load a register with a symbol address for a
-+   mips_use_pic_fn_addr_reg_p call.  If it is return the symbol reference
-+   of the function, otherwise return NULL_RTX.  RECURSE_P is as for
-+   mips_pic_call_symbol_from_set.  */
-+
-+static rtx
-+mips_find_pic_call_symbol (rtx insn, rtx reg, bool recurse_p)
-+{
-+  df_ref use;
-+  struct df_link *defs;
-+  rtx symbol;
-+
-+  use = df_find_use (insn, regno_reg_rtx[REGNO (reg)]);
-+  if (!use)
-+    return NULL_RTX;
-+  defs = DF_REF_CHAIN (use);
-+  if (!defs)
-+    return NULL_RTX;
-+  symbol = mips_pic_call_symbol_from_set (defs->ref, reg, recurse_p);
-+  if (!symbol)
-+    return NULL_RTX;
-+
-+  /* If we have more than one definition, they need to be identical.  */
-+  for (defs = defs->next; defs; defs = defs->next)
-+    {
-+      rtx other;
-+
-+      other = mips_pic_call_symbol_from_set (defs->ref, reg, recurse_p);
-+      if (!rtx_equal_p (symbol, other))
-+	return NULL_RTX;
-+    }
-+
-+  return symbol;
-+}
-+
-+/* Replace the args_size operand of the call expression CALL with the
-+   call-attribute UNSPEC and fill in SYMBOL as the function symbol.  */
-+
-+static void
-+mips_annotate_pic_call_expr (rtx call, rtx symbol)
-+{
-+  rtx args_size;
-+
-+  args_size = XEXP (call, 1);
-+  XEXP (call, 1) = gen_rtx_UNSPEC (GET_MODE (args_size),
-+				   gen_rtvec (2, args_size, symbol),
-+				   UNSPEC_CALL_ATTR);
-+}
-+
-+/* Use DF to annotate PIC indirect calls with the function symbol they
-+   dispatch to.  */
-+
-+static void
-+mips_annotate_pic_calls (void)
-+{
-+  basic_block bb;
-+  rtx insn;
-+
-+  FOR_EACH_BB (bb)
-+    FOR_BB_INSNS (bb, insn)
-+    {
-+      rtx call, reg, symbol, second_call;
-+
-+      second_call = 0;
-+      call = mips_call_expr_from_insn (insn, &second_call);
-+      if (!call)
-+	continue;
-+      gcc_assert (MEM_P (XEXP (call, 0)));
-+      reg = XEXP (XEXP (call, 0), 0);
-+      if (!REG_P (reg))
-+	continue;
-+
-+      symbol = mips_find_pic_call_symbol (insn, reg, true);
-+      if (symbol)
-+	{
-+	  mips_annotate_pic_call_expr (call, symbol);
-+	  if (second_call)
-+	    mips_annotate_pic_call_expr (second_call, symbol);
-+	}
-+    }
-+}
-+
 +/* This structure records that the current function has a LO_SUM
 +   involving SYMBOL_REF or LABEL_REF BASE and that MAX_OFFSET is
 +   the largest offset applied to BASE by all such LO_SUMs.  */
@@ -7414,38 +7033,11 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +  htab_delete (htab);
 +}
 +
-+/* Subroutine of mips_reorg to manage passes that require DF.  */
-+
-+static void
-+mips_df_reorg (void)
-+{
-+  /* Create def-use chains.  */
-+  df_set_flags (DF_EQ_NOTES);
-+  df_chain_add_problem (DF_UD_CHAIN);
-+  df_analyze ();
-+
-+  if (TARGET_RELAX_PIC_CALLS)
-+    mips_annotate_pic_calls ();
-+
-+  df_finish_pass (false);
-+}
-+
 +/* Implement TARGET_MACHINE_DEPENDENT_REORG.  */
 +
 +static void
 +mips_reorg (void)
 +{
-+  /* Restore the BLOCK_FOR_INSN pointers, which are needed by DF.  Also during
-+     insn splitting in mips16_lay_out_constants, DF insn info is only kept up
-+     to date if the CFG is available.  */
-+  if (mips_cfg_in_reorg ())
-+    compute_bb_for_insn ();
-+  if (mips_cfg_in_reorg ())
-+    {
-+      mips_df_reorg ();
-+      free_bb_for_insn ();
-+    }
-+
 +  mips_reorg_process_insns ();
 +}
 +
@@ -7471,8 +7063,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +  use_sibcall_p = const_call_insn_operand (fnaddr, Pmode);
 +
 +  /* Determine if we need to load FNADDR from the GOT.  */
-+  if (!use_sibcall_p
-+      && (mips_got_symbol_type_p (mips_classify_symbol (fnaddr))))
++  if (!use_sibcall_p && mips_classify_symbol (fnaddr) == SYMBOL_GOT_DISP)
 +    {
 +      cfun->machine->global_pointer = GLOBAL_POINTER_REGNUM - GP_REG_FIRST;
 +      cfun->machine->must_initialize_gp_p = true;
@@ -7529,7 +7120,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +    }
 +  else
 +    {
-+      if (TARGET_USE_PIC_FN_ADDR_REG)
++      if (TARGET_ABICALLS)
 +	temp1 = gen_rtx_REG (Pmode, PIC_FUNCTION_ADDR_REGNUM);
 +      mips_load_call_address (MIPS_CALL_SIBCALL, temp1, fnaddr);
 +      emit_jump_insn (gen_indirect_jump (temp1));
@@ -7645,9 +7236,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +     EABIs, we have to decide whether we're using the 32-bit or 64-bit
 +     version.  */
 +  if (strcasecmp (cpu_string, "from-abi") == 0)
-+    return mips_cpu_info_from_isa (ABI_NEEDS_32BIT_REGS ? ISA_RV32
-+				   : ABI_NEEDS_64BIT_REGS ? ISA_RV64
-+				   : (TARGET_64BIT ? ISA_RV64 : ISA_RV32));
++    return mips_cpu_info_from_isa (TARGET_64BIT ? ISA_RV32 : ISA_RV64);
 +
 +  for (i = 0; i < ARRAY_SIZE (mips_cpu_info_table); i++)
 +    if (mips_matching_cpu_name_p (mips_cpu_info_table[i].name, cpu_string))
@@ -7664,8 +7253,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +{
 +  if (info != 0)
 +    {
-+      mips_arch_info = info;
-+      mips_arch = info->cpu;
++      mips_tune = mips_arch = info->cpu;
 +      mips_isa = info->isa;
 +    }
 +}
@@ -7676,10 +7264,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +mips_set_tune (const struct mips_cpu_info *info)
 +{
 +  if (info != 0)
-+    {
-+      mips_tune_info = info;
-+      mips_tune = info->cpu;
-+    }
++    mips_tune = info->cpu;
 +}
 +
 +/* Implement TARGET_HANDLE_OPTION.  */
@@ -7702,10 +7287,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +    case OPT_mtune_:
 +      return mips_parse_cpu (arg) != 0;
 +
-+    case OPT_mips:
-+      mips_isa_option_info = mips_parse_cpu (ACONCAT (("mips", arg, NULL)));
-+      return mips_isa_option_info != 0;
-+
 +    default:
 +      return true;
 +    }
@@ -7717,50 +7298,26 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +mips_option_override (void)
 +{
 +  int i, start, regno, mode;
++  const struct mips_cpu_info *info = 0;
 +
 +#ifdef SUBTARGET_OVERRIDE_OPTIONS
 +  SUBTARGET_OVERRIDE_OPTIONS;
 +#endif
-+
-+  /* -mno-float overrides -mhard-float and -msoft-float.  */
-+  if (TARGET_NO_FLOAT)
-+    {
-+      target_flags |= MASK_SOFT_FLOAT_ABI;
-+      target_flags_explicit |= MASK_SOFT_FLOAT_ABI;
-+    }
 +
 +  /* The following code determines the architecture and register size.
 +     Similar code was added to GAS 2.14 (see tc-mips.c:md_after_parse_args()).
 +     The GAS and GCC code should be kept in sync as much as possible.  */
 +
 +  if (mips_arch_string != 0)
-+    mips_set_architecture (mips_parse_cpu (mips_arch_string));
-+
-+  if (mips_isa_option_info != 0)
-+    {
-+      if (mips_arch_info == 0)
-+	mips_set_architecture (mips_isa_option_info);
-+      else if (mips_arch_info->isa != mips_isa_option_info->isa)
-+	error ("%<-%s%> conflicts with the other architecture options, "
-+	       "which specify a %s processor",
-+	       mips_isa_option_info->name,
-+	       mips_cpu_info_from_isa (mips_arch_info->isa)->name);
-+    }
-+
-+  if (mips_arch_info == 0)
-+      mips_set_architecture (mips_parse_cpu (MIPS_CPU_STRING_DEFAULT));
++    info = mips_parse_cpu (mips_arch_string);
++  if (info == 0)
++    info = mips_parse_cpu (MIPS_CPU_STRING_DEFAULT);
++  gcc_assert (info);
++  mips_set_architecture (info);
 +
 +  /* Optimize for mips_arch, unless -mtune selects a different processor.  */
 +  if (mips_tune_string != 0)
 +    mips_set_tune (mips_parse_cpu (mips_tune_string));
-+
-+  if (mips_tune_info == 0)
-+    mips_set_tune (mips_arch_info);
-+
-+  if (ABI_NEEDS_32BIT_REGS)
-+    target_flags &= ~MASK_64BIT;
-+  else
-+    target_flags |= MASK_64BIT;
 +
 +  /* End of code shared with GAS.  */
 +
@@ -7779,8 +7336,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +
 +  if (flag_pic)
 +    target_flags |= MASK_ABICALLS;
-+  else
-+    TARGET_SHARED = 0;
 +
 +  /* Prefer a call to memcpy over inline code when optimizing for size,
 +     though see MOVE_RATIO in mips.h.  */
@@ -7824,19 +7379,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +
 +  /* Function to allocate machine-dependent function status.  */
 +  init_machine_status = &mips_init_machine_status;
-+
-+  /* Only optimize PIC indirect calls if they are actually required.  */
-+  if (!TARGET_USE_GOT)
-+    target_flags &= ~MASK_RELAX_PIC_CALLS;
-+
-+  /* Save base state of options.  */
-+  mips_base_target_flags = target_flags;
-+  mips_base_schedule_insns = flag_schedule_insns;
-+  mips_base_reorder_blocks_and_partition = flag_reorder_blocks_and_partition;
-+  mips_base_move_loop_invariants = flag_move_loop_invariants;
-+  mips_base_align_loops = align_loops;
-+  mips_base_align_jumps = align_jumps;
-+  mips_base_align_functions = align_functions;
 +
 +  targetm.min_anchor_offset = -RISCV_IMM_REACH/2;
 +  targetm.max_anchor_offset = RISCV_IMM_REACH/2-1;
@@ -8009,8 +7551,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +#define TARGET_ASM_FUNCTION_PROLOGUE mips_output_function_prologue
 +#undef TARGET_ASM_FUNCTION_EPILOGUE
 +#define TARGET_ASM_FUNCTION_EPILOGUE mips_output_function_epilogue
-+#undef TARGET_ASM_FUNCTION_RODATA_SECTION
-+#define TARGET_ASM_FUNCTION_RODATA_SECTION mips_function_rodata_section
 +
 +#undef TARGET_SCHED_VARIABLE_ISSUE
 +#define TARGET_SCHED_VARIABLE_ISSUE mips_variable_issue
@@ -8081,7 +7621,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +#undef TARGET_SETUP_INCOMING_VARARGS
 +#define TARGET_SETUP_INCOMING_VARARGS mips_setup_incoming_varargs
 +#undef TARGET_STRICT_ARGUMENT_NAMING
-+#define TARGET_STRICT_ARGUMENT_NAMING mips_strict_argument_naming
++#define TARGET_STRICT_ARGUMENT_NAMING hook_bool_CUMULATIVE_ARGS_true
 +#undef TARGET_MUST_PASS_IN_STACK
 +#define TARGET_MUST_PASS_IN_STACK must_pass_in_stack_var_size
 +#undef TARGET_PASS_BY_REFERENCE
@@ -8134,7 +7674,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +#define TARGET_EXTRA_LIVE_ON_ENTRY mips_extra_live_on_entry
 +
 +#undef TARGET_USE_BLOCKS_FOR_CONSTANT_P
-+#define TARGET_USE_BLOCKS_FOR_CONSTANT_P mips_use_blocks_for_constant_p
++#define TARGET_USE_BLOCKS_FOR_CONSTANT_P hook_bool_mode_const_rtx_true
 +
 +#undef  TARGET_COMP_TYPE_ATTRIBUTES
 +#define TARGET_COMP_TYPE_ATTRIBUTES mips_comp_type_attributes
@@ -8303,9 +7843,8 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +DEF_MIPS_FTYPE (2, (VOID, V4QI, V4QI))
 diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/riscv/riscv.h gcc-4.6.1/gcc/config/riscv/riscv.h
 --- ../gcc-4.6.1-orig/gcc/config/riscv/riscv.h	1969-12-31 16:00:00.000000000 -0800
-+++ gcc-4.6.1/gcc/config/riscv/riscv.h	2011-11-03 19:13:54.000000000 -0700
-@@ -0,0 +1,1896 @@
-+/* vim: set ts=8: */
++++ gcc-4.6.1/gcc/config/riscv/riscv.h	2011-11-09 01:24:21.000000000 -0800
+@@ -0,0 +1,1749 @@
 +/* Definitions of target machine for GNU compiler.  MIPS version.
 +   Copyright (C) 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998
 +   1999, 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008, 2009, 2010, 2011
@@ -8374,97 +7913,19 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +#define BITMASK_UPPER16	((unsigned long)0xffff << 16)	/* 0xffff0000 */
 +#define BITMASK_LOWER16	((unsigned long)0xffff)		/* 0x0000ffff */
 +
-+
-+/* Run-time compilation parameters selecting different hardware subsets.  */
-+
-+/* True if the output file is marked as ".abicalls; .option pic0"
-+   (-call_nonpic).  */
-+#define TARGET_ABICALLS_PIC0 \
-+  (TARGET_ABSOLUTE_ABICALLS && TARGET_PLT)
-+
-+/* True if the output file is marked as ".abicalls; .option pic2" (-KPIC).  */
-+#define TARGET_ABICALLS_PIC2 \
-+  (TARGET_ABICALLS && !TARGET_ABICALLS_PIC0)
-+
-+/* True if we're generating a form of -mabicalls in which we can use
-+   operators like %hi and %lo to refer to locally-binding symbols.
-+   We can only do this for -mno-shared, and only then if we can use
-+   relocation operations instead of assembly macros.  It isn't really
-+   worth using absolute sequences for 64-bit symbols because GOT
-+   accesses are so much shorter.  */
-+
-+#define TARGET_ABSOLUTE_ABICALLS	\
-+  (TARGET_ABICALLS			\
-+   && !TARGET_SHARED			\
-+   && !ABI_HAS_64BIT_SYMBOLS)
-+
-+/* True if we can optimize sibling calls.  For simplicity, we only
-+   handle cases in which call_insn_operand will reject invalid
-+   sibcall addresses.  There are two cases in which this isn't true:
-+
-+      - TARGET_MIPS16.  call_insn_operand accepts constant addresses
-+	but there is no direct jump instruction.  It isn't worth
-+	using sibling calls in this case anyway; they would usually
-+	be longer than normal calls.
-+
-+      - TARGET_USE_GOT && !TARGET_EXPLICIT_RELOCS.  call_insn_operand
-+	accepts global constants, but all sibcalls must be indirect.  */
-+#define TARGET_SIBCALLS 1
-+
 +/* True if we need to use a global offset table to access some symbols.  */
 +#define TARGET_USE_GOT TARGET_ABICALLS
 +
-+/* True if TARGET_USE_GOT and if $gp is a call-saved register.  */
-+#define TARGET_CALL_SAVED_GP TARGET_USE_GOT
-+
-+/* True if indirect calls must use register class PIC_FN_ADDR_REG.
-+   This is true for both the PIC and non-PIC VxWorks RTP modes.  */
-+#define TARGET_USE_PIC_FN_ADDR_REG TARGET_ABICALLS
-+
-+/* True if .gpword or .gpdword should be used for switch tables.
-+
-+   Although GAS does understand .gpdword, the SGI linker mishandles
-+   the relocations GAS generates (R_MIPS_GPREL32 followed by R_MIPS_64).
-+   We therefore disable GP-relative switch tables for n64 on IRIX targets.  */
-+#define TARGET_GPWORD				\
-+  (TARGET_ABICALLS				\
-+   && !TARGET_ABSOLUTE_ABICALLS			\
-+   && !(mips_abi == ABI_64 && TARGET_IRIX6))
++/* True if .gpword or .gpdword should be used for switch tables. */
++#define TARGET_GPWORD (TARGET_ABICALLS && flag_pic)
 +
 +/* True if the output must have a writable .eh_frame.
 +   See ASM_PREFERRED_EH_DATA_FORMAT for details.  */
 +#ifdef HAVE_LD_PERSONALITY_RELAXATION
 +#define TARGET_WRITABLE_EH_FRAME 0
 +#else
-+#define TARGET_WRITABLE_EH_FRAME (flag_pic && TARGET_SHARED)
++#define TARGET_WRITABLE_EH_FRAME flag_pic
 +#endif
-+
-+/* Architecture target defines.  */
-+#define TARGET_LOONGSON_2E          (mips_arch == PROCESSOR_LOONGSON_2E)
-+#define TARGET_LOONGSON_2F          (mips_arch == PROCESSOR_LOONGSON_2F)
-+#define TARGET_LOONGSON_2EF         (TARGET_LOONGSON_2E || TARGET_LOONGSON_2F)
-+#define TARGET_LOONGSON_3A          (mips_arch == PROCESSOR_LOONGSON_3A)
-+#define TARGET_MIPS3900             (mips_arch == PROCESSOR_R3900)
-+#define TARGET_MIPS4000             (mips_arch == PROCESSOR_R4000)
-+#define TARGET_MIPS4120             (mips_arch == PROCESSOR_R4120)
-+#define TARGET_MIPS4130             (mips_arch == PROCESSOR_R4130)
-+#define TARGET_MIPS5400             (mips_arch == PROCESSOR_R5400)
-+#define TARGET_MIPS5500             (mips_arch == PROCESSOR_R5500)
-+#define TARGET_MIPS7000             (mips_arch == PROCESSOR_R7000)
-+#define TARGET_MIPS9000             (mips_arch == PROCESSOR_R9000)
-+#define TARGET_OCTEON		    (mips_arch == PROCESSOR_OCTEON)
-+#define TARGET_SB1                  (mips_arch == PROCESSOR_SB1		\
-+				     || mips_arch == PROCESSOR_SB1A)
-+#define TARGET_SR71K                (mips_arch == PROCESSOR_SR71000)
-+
-+/* Whether vector modes and intrinsics for ST Microelectronics
-+   Loongson-2E/2F processors should be enabled.  In o32 pairs of
-+   floating-point registers provide 64-bit values.  */
-+#define TARGET_LOONGSON_VECTORS	    (TARGET_HARD_FLOAT_ABI		\
-+				     && (TARGET_LOONGSON_2EF		\
-+					 || TARGET_LOONGSON_3A))
-+
-+#define TARGET_NEWABI		    1
 +
 +/* TARGET_HARD_FLOAT and TARGET_SOFT_FLOAT reflect whether the FPU is
 +   directly accessible, while the command-line options select
@@ -8473,35 +7934,8 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +#define TARGET_HARD_FLOAT TARGET_HARD_FLOAT_ABI
 +#define TARGET_SOFT_FLOAT TARGET_SOFT_FLOAT_ABI
 +
-+/* False if SC acts as a memory barrier with respect to itself,
-+   otherwise a SYNC will be emitted after SC for atomic operations
-+   that require ordering between the SC and following loads and
-+   stores.  It does not tell anything about ordering of loads and
-+   stores prior to and following the SC, only about the SC itself and
-+   those loads and stores follow it.  */
-+#define TARGET_SYNC_AFTER_SC (!TARGET_OCTEON)
-+
 +/* IRIX specific stuff.  */
 +#define TARGET_IRIX6	   0
-+
-+/* Define preprocessor macros for the -march and -mtune options.
-+   PREFIX is either _MIPS_ARCH or _MIPS_TUNE, INFO is the selected
-+   processor.  If INFO's canonical name is "foo", define PREFIX to
-+   be "foo", and define an additional macro PREFIX_FOO.  */
-+#define MIPS_CPP_SET_PROCESSOR(PREFIX, INFO)			\
-+  do								\
-+    {								\
-+      char *macro, *p;						\
-+								\
-+      macro = concat ((PREFIX), "_", (INFO)->name, NULL);	\
-+      for (p = macro; *p != 0; p++)				\
-+	*p = TOUPPER (*p);					\
-+								\
-+      builtin_define (macro);					\
-+      builtin_define_with_value ((PREFIX), (INFO)->name, 1);	\
-+      free (macro);						\
-+    }								\
-+  while (0)
 +
 +/* Target CPU builtins.  */
 +#define TARGET_CPU_CPP_BUILTINS()					\
@@ -8516,9 +7950,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +									\
 +      if (TARGET_64BIT)							\
 +	builtin_define ("__riscv64");					\
-+									\
-+      MIPS_CPP_SET_PROCESSOR ("_RISCV_ARCH", mips_arch_info);		\
-+      MIPS_CPP_SET_PROCESSOR ("_RISCV_TUNE", mips_tune_info);		\
 +									\
 +      builtin_define ("_ABI32=1");					\
 +      builtin_define ("_ABI64=2");					\
@@ -8541,9 +7972,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +									\
 +      /* These defines reflect the ABI in use, not whether the  	\
 +	 FPU is directly accessible.  */				\
-+      if (TARGET_NO_FLOAT)						\
-+	builtin_define ("__riscv_no_float");				\
-+      else if (TARGET_HARD_FLOAT_ABI)					\
++      if (TARGET_HARD_FLOAT_ABI)					\
 +	builtin_define ("__riscv_hard_float");				\
 +      else								\
 +	builtin_define ("__riscv_soft_float");				\
@@ -8632,7 +8061,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +#endif
 +
 +#ifndef MIPS_ABI_DEFAULT
-+#define MIPS_ABI_DEFAULT ABI_32
++#define MIPS_ABI_DEFAULT ABI_64
 +#endif
 +
 +#if MIPS_ABI_DEFAULT == ABI_32
@@ -8730,35 +8159,10 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +  {"tune_64", "%{" OPT_ARCH64 ":%{!mtune=*:-mtune=%(VALUE)}}" }, \
 +  {"abi", "%{!mabi=*:-mabi=%(VALUE)}" }, \
 +  {"float", "%{!msoft-float:%{!mhard-float:-m%(VALUE)-float}}" }, \
-+  {"divide", "%{!mdivide-traps:%{!mdivide-breaks:-mdivide-%(VALUE)}}" }, \
-+  {"llsc", "%{!mllsc:%{!mno-llsc:-m%(VALUE)}}" }, \
-+  {"mips-plt", "%{!mplt:%{!mno-plt:-m%(VALUE)}}" }, \
-+  {"synci", "%{!msynci:%{!mno-synci:-m%(VALUE)}}" }
 +
++#define DRIVER_SELF_SPECS
 +
-+/* A spec that infers the -mdsp setting from an -march argument.  */
-+#define BASE_DRIVER_SELF_SPECS \
-+  "%{!mno-dsp: \
-+     %{march=24ke*|march=34k*|march=1004k*: -mdsp} \
-+     %{march=74k*:%{!mno-dspr2: -mdspr2 -mdsp}}}"
-+
-+#define DRIVER_SELF_SPECS BASE_DRIVER_SELF_SPECS
-+
-+/* True if the ABI can only work with 64-bit integer registers. */
-+#define ABI_NEEDS_64BIT_REGS	(mips_abi == ABI_64)
-+
-+/* Likewise for 32-bit regs.  */
-+#define ABI_NEEDS_32BIT_REGS	(mips_abi == ABI_32)
-+
-+/* True if the file format uses 64-bit symbols.  At present, this is
-+   only true for n64, which uses 64-bit ELF.  */
-+#define FILE_HAS_64BIT_SYMBOLS	(mips_abi == ABI_64)
-+
-+/* True if symbols are 64 bits wide.  This is usually determined by
-+   the ABI's file format, but it can be overridden by -msym32.  Note that
-+   overriding the size with -msym32 changes the ABI of relocatable objects,
-+   although it doesn't change the ABI of a fully-linked object.  */
-+#define ABI_HAS_64BIT_SYMBOLS	(FILE_HAS_64BIT_SYMBOLS && !TARGET_SYM32)
++#define TARGET_64BIT	(mips_abi == ABI_64)
 +
 +/* Tell collect what flags to pass to nm.  */
 +#ifndef NM_FLAGS
@@ -8794,7 +8198,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +%{mabi=*} %{!mabi=*: %(asm_abi_default_spec)} \
 +%{mgp32} %{mgp64} %{march=*} \
 +%{mshared} %{mno-shared} \
-+%{msym32} %{mno-sym32} \
 +%{mtune=*} \
 +%(subtarget_asm_spec)"
 +
@@ -8863,14 +8266,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +#define PREFERRED_DEBUGGING_TYPE DWARF2_DEBUG
 +#endif
 +
-+/* The size of DWARF addresses should be the same as the size of symbols
-+   in the target file format.  They shouldn't depend on things like -msym32,
-+   because many DWARF consumers do not allow the mixture of address sizes
-+   that one would then get from linking -msym32 code with -msym64 code.
-+
-+   Note that the default POINTER_SIZE test is not appropriate for MIPS.
-+   EABI64 has 64-bit pointers but uses 32-bit ELF.  */
-+#define DWARF2_ADDR_SIZE (FILE_HAS_64BIT_SYMBOLS ? 8 : 4)
++#define DWARF2_ADDR_SIZE UNITS_PER_WORD
 +
 +/* By default, turn on GDB extensions.  */
 +#define DEFAULT_GDB_EXTENSIONS 1
@@ -9647,7 +9043,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +/* Treat LOC as a byte offset from the stack pointer and round it up
 +   to the next fully-aligned offset.  */
 +#define MIPS_STACK_ALIGN(LOC) \
-+  (TARGET_NEWABI ? ((LOC) + 15) & -16 : ((LOC) + 7) & -8)
++  (TARGET_64BIT ? ((LOC) + 15) & -16 : ((LOC) + 7) & -8)
 +
 +/* No mips port has ever used the profiler counter word, so don't emit it
 +   or the label for it.  */
@@ -10165,10 +9561,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +extern bool mips_split_p[];
 +extern enum processor mips_arch;        /* which cpu to codegen for */
 +extern enum processor mips_tune;        /* which cpu to schedule for */
-+extern int mips_isa;			/* architectural level */
 +extern int mips_abi;			/* which ABI to use */
-+extern const struct mips_cpu_info *mips_arch_info;
-+extern const struct mips_cpu_info *mips_tune_info;
 +extern GTY(()) struct target_globals *mips16_globals;
 +#endif
 +
@@ -10203,9 +9596,8 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +#define SWITCHABLE_TARGET 1
 diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/riscv/riscv.md gcc-4.6.1/gcc/config/riscv/riscv.md
 --- ../gcc-4.6.1-orig/gcc/config/riscv/riscv.md	1969-12-31 16:00:00.000000000 -0800
-+++ gcc-4.6.1/gcc/config/riscv/riscv.md	2011-11-03 03:26:39.000000000 -0700
-@@ -0,0 +1,2966 @@
-+;; vim: set ts=8:
++++ gcc-4.6.1/gcc/config/riscv/riscv.md	2011-11-09 01:24:21.000000000 -0800
+@@ -0,0 +1,2874 @@
 +;;  Mips.md	     Machine Description for MIPS based processors
 +;;  Copyright (C) 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
 +;;  1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010
@@ -10232,7 +9624,8 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +;; <http://www.gnu.org/licenses/>.
 +
 +(define_enum "processor" [
-+  rocket
++  rocket32
++  rocket64
 +])
 +
 +(define_c_enum "unspec" [
@@ -10277,14 +9670,10 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +  UNSPEC_BLOCKAGE
 +  UNSPEC_CLEAR_HAZARD
 +  UNSPEC_RDHWR
-+  UNSPEC_SYNCI
 +  UNSPEC_SYNC
 +
-+  ;; Cache manipulation.
-+  UNSPEC_MIPS_CACHE
-+  UNSPEC_R10K_CACHE_BARRIER
-+
 +  ;; Interrupt handling.
++  UNSPEC_MIPS_CACHE
 +  UNSPEC_ERET
 +  UNSPEC_DERET
 +  UNSPEC_DI
@@ -10611,8 +10000,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +;; This mode iterator allows :ANYF to be used wherever a scalar or vector
 +;; floating-point mode is allowed.
 +(define_mode_iterator ANYF [(SF "TARGET_HARD_FLOAT")
-+			    (DF "TARGET_HARD_FLOAT")
-+			    (V2SF "TARGET_HARD_FLOAT && TARGET_PAIRED_SINGLE_FLOAT")])
++			    (DF "TARGET_HARD_FLOAT")])
 +
 +;; Like ANYF, but only applies to scalar modes.
 +(define_mode_iterator SCALARF [(SF "TARGET_HARD_FLOAT")
@@ -10622,7 +10010,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +(define_mode_iterator SPLITF
 +  [(DF "!TARGET_64BIT")
 +   (DI "!TARGET_64BIT")
-+   (V2SF "!TARGET_64BIT && TARGET_PAIRED_SINGLE_FLOAT")
 +   (TF "TARGET_64BIT")])
 +
 +;; This attribute gives the length suffix for a sign- or zero-extension
@@ -12204,26 +11591,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +
 +;; 64-bit paired-single floating point moves
 +
-+(define_expand "movv2sf"
-+  [(set (match_operand:V2SF 0)
-+	(match_operand:V2SF 1))]
-+  "TARGET_HARD_FLOAT && TARGET_PAIRED_SINGLE_FLOAT"
-+{
-+  if (mips_legitimize_move (V2SFmode, operands[0], operands[1]))
-+    DONE;
-+})
-+
-+(define_insn "*movv2sf"
-+  [(set (match_operand:V2SF 0 "nonimmediate_operand" "=f,f,f,m,m,*f,*d,*d,*d,*m")
-+	(match_operand:V2SF 1 "move_operand" "f,YG,m,f,YG,*d,*f,*d*YG,*m,*d"))]
-+  "TARGET_HARD_FLOAT
-+   && TARGET_PAIRED_SINGLE_FLOAT
-+   && (register_operand (operands[0], V2SFmode)
-+       || reg_or_0_operand (operands[1], V2SFmode))"
-+  { return mips_output_move (operands[0], operands[1]); }
-+  [(set_attr "move_type" "fmove,mtc,fpload,fpstore,store,mtc,mfc,move,load,store")
-+   (set_attr "mode" "DF")])
-+
 +;; Load the low word of operand 0 with operand 1.
 +(define_insn "load_low<mode>"
 +  [(set (match_operand:SPLITF 0 "register_operand" "=f,f")
@@ -12920,10 +12287,9 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +;; constraints.
 +
 +;; When we use an indirect jump, we need a register that will be
-+;; preserved by the epilogue.  Since TARGET_USE_PIC_FN_ADDR_REG forces
-+;; us to use $25 for this purpose -- and $25 is never clobbered by the
-+;; epilogue -- we might as well use it for !TARGET_USE_PIC_FN_ADDR_REG
-+;; as well.
++;; preserved by the epilogue.  Since TARGET_ABICALLS forces us to use
++;; t7 for this purpose, which the epilogue never clobbers, we may
++;; as well use it in general.
 +
 +(define_expand "sibcall"
 +  [(parallel [(call (match_operand 0 "")
@@ -12987,72 +12353,25 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +  DONE;
 +})
 +
-+;; This instruction directly corresponds to an assembly-language "jal".
-+;; There are four cases:
-+;;
-+;;    - -mno-abicalls:
-+;;	  Both symbolic and register destinations are OK.  The pattern
-+;;	  always expands to a single mips instruction.
-+;;
-+;;    - -mabicalls/-mno-explicit-relocs:
-+;;	  Again, both symbolic and register destinations are OK.
-+;;	  The call is treated as a multi-instruction black box.
-+;;
-+;;    - -mabicalls/-mexplicit-relocs with n32 or n64:
-+;;	  Only "jal $25" is allowed.  This expands to a single "jalr $25"
-+;;	  instruction.
-+;;
-+;;    - -mabicalls/-mexplicit-relocs with o32 or o64:
-+;;	  Only "jal $25" is allowed.  The call is actually two instructions:
-+;;	  "jalr $25" followed by an insn to reload $gp.
-+;;
-+;; In the last case, we can generate the individual instructions with
-+;; a define_split.  There are several things to be wary of:
-+;;
-+;;   - We can't expose the load of $gp before reload.  If we did,
-+;;     it might get removed as dead, but reload can introduce new
-+;;     uses of $gp by rematerializing constants.
-+;;
-+;;   - We shouldn't restore $gp after calls that never return.
-+;;     It isn't valid to insert instructions between a noreturn
-+;;     call and the following barrier.
-+;;
-+;;   - The splitter deliberately changes the liveness of $gp.  The unsplit
-+;;     instruction preserves $gp and so have no effect on its liveness.
-+;;     But once we generate the separate insns, it becomes obvious that
-+;;     $gp is not live on entry to the call.
-+;;
-+(define_insn_and_split "call_internal"
++(define_insn "call_internal"
 +  [(call (mem:SI (match_operand 0 "call_insn_operand" "c,S"))
 +	 (match_operand 1 "" ""))
 +   (clobber (reg:SI RETURN_ADDR_REGNUM))]
 +  ""
 +  { return REG_P (operands[0]) ? "jalr\t%0" : "jal\t%0"; }
-+  "0"
-+  [(const_int 0)]
-+{
-+  gcc_unreachable();
-+  DONE;
-+}
 +  [(set_attr "jal" "indirect,direct")])
 +
 +;; A pattern for calls that must be made directly.  It is used for
 +;; MIPS16 calls that the linker may need to redirect to a hard-float
 +;; stub; the linker relies on the call relocation type to detect when
 +;; such redirection is needed.
-+(define_insn_and_split "call_internal_direct"
++(define_insn "call_internal_direct"
 +  [(call (mem:SI (match_operand 0 "const_call_insn_operand"))
 +	 (match_operand 1))
 +   (const_int 1)
 +   (clobber (reg:SI RETURN_ADDR_REGNUM))]
 +  ""
 +  "jal\t%0"
-+  "0"
-+  [(const_int 0)]
-+{
-+  gcc_unreachable();
-+  DONE;
-+}
 +  [(set_attr "type" "call")])
 +
 +(define_expand "call_value"
@@ -13068,23 +12387,17 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +})
 +
 +;; See comment for call_internal.
-+(define_insn_and_split "call_value_internal"
++(define_insn "call_value_internal"
 +  [(set (match_operand 0 "register_operand" "")
 +        (call (mem:SI (match_operand 1 "call_insn_operand" "c,S"))
 +              (match_operand 2 "" "")))
 +   (clobber (reg:SI RETURN_ADDR_REGNUM))]
 +  ""
 +  { return REG_P (operands[1]) ? "jalr\t%1" : "jal\t%1"; }
-+  "0"
-+  [(const_int 0)]
-+{
-+  gcc_unreachable();
-+  DONE;
-+}
 +  [(set_attr "jal" "indirect,direct")])
 +
 +;; See call_internal_direct.
-+(define_insn_and_split "call_value_internal_direct"
++(define_insn "call_value_internal_direct"
 +  [(set (match_operand 0 "register_operand")
 +        (call (mem:SI (match_operand 1 "const_call_insn_operand"))
 +              (match_operand 2)))
@@ -13092,16 +12405,10 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +   (clobber (reg:SI RETURN_ADDR_REGNUM))]
 +  ""
 +  "jal\t%1"
-+  "0"
-+  [(const_int 0)]
-+{
-+  gcc_unreachable();
-+  DONE;
-+}
 +  [(set_attr "type" "call")])
 +
 +;; See comment for call_internal.
-+(define_insn_and_split "call_value_multiple_internal"
++(define_insn "call_value_multiple_internal"
 +  [(set (match_operand 0 "register_operand" "")
 +        (call (mem:SI (match_operand 1 "call_insn_operand" "c,S"))
 +              (match_operand 2 "" "")))
@@ -13111,12 +12418,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +   (clobber (reg:SI RETURN_ADDR_REGNUM))]
 +  ""
 +  { return REG_P (operands[1]) ? "jalr\t%1" : "jal\t%1"; }
-+  "0"
-+  [(const_int 0)]
-+{
-+  gcc_unreachable();
-+  DONE;
-+}
 +  [(set_attr "jal" "indirect,direct")])
 +
 +;; Call subroutine returning any type.
@@ -13144,9 +12445,9 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +
 +(define_insn "mips_cache"
 +  [(set (mem:BLK (scratch))
-+       (unspec:BLK [(match_operand:SI 0 "const_int_operand")
-+                    (match_operand:QI 1 "address_operand" "p")]
-+                   UNSPEC_MIPS_CACHE))]
++	(unspec:BLK [(match_operand:SI 0 "const_int_operand")
++		     (match_operand:QI 1 "address_operand" "p")]
++		    UNSPEC_MIPS_CACHE))]
 +  "0"
 +  "cache\t%X0,%a1")
 +
@@ -13222,7 +12523,7 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +ADJUST_ALIGNMENT (CCV4, 16);
 diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/riscv/riscv-opc.h gcc-4.6.1/gcc/config/riscv/riscv-opc.h
 --- ../gcc-4.6.1-orig/gcc/config/riscv/riscv-opc.h	1969-12-31 16:00:00.000000000 -0800
-+++ gcc-4.6.1/gcc/config/riscv/riscv-opc.h	2011-10-22 19:22:24.000000000 -0700
++++ gcc-4.6.1/gcc/config/riscv/riscv-opc.h	2011-11-11 00:14:28.000000000 -0800
 @@ -0,0 +1,545 @@
 +/* Automatically generated by parse-opcodes */
 +#define MATCH_MOVN 0x6f7
@@ -13350,13 +12651,13 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +#define MATCH_VSSEGSTB 0x80f
 +#define  MASK_VSSEGSTB 0xfff
 +#define MATCH_MFTX_D 0x1c0d3
-+#define  MASK_MFTX_D 0x7c1ffff
++#define  MASK_MFTX_D 0x3fffff
 +#define MATCH_DIV 0x633
 +#define  MASK_DIV 0x1ffff
 +#define MATCH_C_LD 0x9
 +#define  MASK_C_LD 0x1f
 +#define MATCH_MFTX_S 0x1c053
-+#define  MASK_MFTX_S 0x7c1ffff
++#define  MASK_MFTX_S 0x3fffff
 +#define MATCH_VSSEGSTH 0x88f
 +#define  MASK_VSSEGSTH 0xfff
 +#define MATCH_VVCFGIVL 0xf3
@@ -13771,8 +13072,8 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +#define  MASK_SD 0x3ff
 diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/riscv/riscv.opt gcc-4.6.1/gcc/config/riscv/riscv.opt
 --- ../gcc-4.6.1-orig/gcc/config/riscv/riscv.opt	1969-12-31 16:00:00.000000000 -0800
-+++ gcc-4.6.1/gcc/config/riscv/riscv.opt	2011-11-02 23:39:53.000000000 -0700
-@@ -0,0 +1,144 @@
++++ gcc-4.6.1/gcc/config/riscv/riscv.opt	2011-11-09 01:24:21.000000000 -0800
+@@ -0,0 +1,77 @@
 +; Options for the MIPS port of the compiler
 +;
 +; Copyright (C) 2005, 2007, 2008, 2010, 2011 Free Software Foundation, Inc.
@@ -13823,18 +13124,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +Target Report RejectNegative InverseMask(BIG_ENDIAN, LITTLE_ENDIAN)
 +Use little-endian byte order
 +
-+mgp32
-+Target Report RejectNegative InverseMask(64BIT)
-+Use 32-bit general registers
-+
-+mgp64
-+Target Report RejectNegative Mask(64BIT)
-+Use 64-bit general registers
-+
-+mplt
-+Target Report Var(TARGET_PLT) Init(1)
-+When generating -mabicalls code, allow executables to use PLTs and copy relocations
-+
 +mhard-float
 +Target Report RejectNegative InverseMask(SOFT_FLOAT_ABI, HARD_FLOAT_ABI)
 +Allow the use of hardware floating-point ABI and instructions
@@ -13851,76 +13140,21 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +Target Report Mask(MEMCPY)
 +Don't optimize block moves
 +
-+mmips-tfile
-+Target
-+Use the mips-tfile postpass
-+
-+mno-float
-+Target Report RejectNegative Var(TARGET_NO_FLOAT) Condition(TARGET_SUPPORTS_NO_FLOAT)
-+Prevent the use of all floating-point operations
-+
-+mno-flush-func
-+Target RejectNegative
-+Do not use a cache-flushing function before calling stack trampolines
-+
-+mno-mdmx
-+Target Report RejectNegative Var(TARGET_MDMX, 0)
-+Do not use MDMX instructions
-+
-+mpaired-single
-+Target Report Mask(PAIRED_SINGLE_FLOAT)
-+Use paired-single floating-point instructions
-+
-+mr10k-cache-barrier=
-+Target Joined RejectNegative
-+-mr10k-cache-barrier=SETTING	Specify when r10k cache barriers should be inserted
-+
-+mrelax-pic-calls
-+Target Report Mask(RELAX_PIC_CALLS)
-+Try to allow the linker to turn PIC calls into direct calls
-+
-+mshared
-+Target Report Var(TARGET_SHARED) Init(1)
-+When generating -mabicalls code, make the code suitable for use in shared libraries
-+
-+msmartmips
-+Target Report Mask(SMARTMIPS)
-+Use SmartMIPS instructions
-+
 +msoft-float
 +Target Report RejectNegative Mask(SOFT_FLOAT_ABI)
 +Prevent the use of all hardware floating-point instructions
-+
-+msplit-addresses
-+Target Report Mask(SPLIT_ADDRESSES)
-+Optimize lui/addiu address loads
-+
-+msym32
-+Target Report Var(TARGET_SYM32) Init(1)
-+Assume all symbols have 32-bit values
-+
-+msynci
-+Target Report Mask(SYNCI)
-+Use synci instruction to invalidate i-cache
 +
 +mtune=
 +Target RejectNegative Joined Var(mips_tune_string)
 +-mtune=PROCESSOR	Optimize the output for PROCESSOR
 +
-+mvr4130-align
-+Target Report Mask(VR4130_ALIGN)
-+Perform VR4130-specific alignment optimizations
-+
 +mxgot
 +Target Report Var(TARGET_XGOT) Init(1)
 +Lift restrictions on GOT size
-+
-+noasmopt
-+Driver
 diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/riscv/riscv-protos.h gcc-4.6.1/gcc/config/riscv/riscv-protos.h
 --- ../gcc-4.6.1-orig/gcc/config/riscv/riscv-protos.h	1969-12-31 16:00:00.000000000 -0800
-+++ gcc-4.6.1/gcc/config/riscv/riscv-protos.h	2011-11-03 02:55:14.000000000 -0700
-@@ -0,0 +1,205 @@
++++ gcc-4.6.1/gcc/config/riscv/riscv-protos.h	2011-11-09 02:01:56.000000000 -0800
+@@ -0,0 +1,203 @@
 +/* Prototypes of target machine for GNU compiler.  MIPS version.
 +   Copyright (C) 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
 +   1999, 2001, 2002, 2003, 2004, 2005, 2007, 2008, 2009, 2010, 2011
@@ -14041,7 +13275,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +
 +extern bool mips_symbolic_constant_p (rtx, enum mips_symbol_type *);
 +extern int mips_regno_mode_ok_for_base_p (int, enum machine_mode, bool);
-+extern bool mips_stack_address_p (rtx, enum machine_mode);
 +extern int mips_address_insns (rtx, enum machine_mode, bool);
 +extern int mips_const_insns (rtx);
 +extern int mips_split_const_insns (rtx);
@@ -14063,7 +13296,6 @@ diff -x mpfr -x mpc -x gmp -x autom4te.cache -ruN ../gcc-4.6.1-orig/gcc/config/r
 +extern void mips_expand_vcondv2sf (rtx, rtx, rtx, enum rtx_code, rtx, rtx);
 +extern void mips_expand_conditional_move (rtx *);
 +#endif
-+extern bool mips_use_pic_fn_addr_reg_p (const_rtx);
 +extern rtx mips_expand_call (enum mips_call_type, rtx, rtx, rtx, rtx, bool);
 +extern void mips_expand_fcc_reload (rtx, rtx, rtx);
 +extern void mips_set_return_address (rtx, rtx);
