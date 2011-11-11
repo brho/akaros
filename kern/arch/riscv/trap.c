@@ -314,7 +314,9 @@ handle_fault_fetch(trapframe_t* state)
 		print_trapframe(state);
 		panic("Instruction Page Fault in the Kernel at %p!", state->badvaddr);
 	}
-	
+
+	set_current_tf(&per_cpu_info[core_id()], state);
+
 	if(handle_page_fault(current, state->badvaddr, PROT_EXEC))
 		unhandled_trap(state, "Instruction Page Fault");
 }
@@ -327,7 +329,9 @@ handle_fault_load(trapframe_t* state)
 		print_trapframe(state);
 		panic("Load Page Fault in the Kernel at %p!", state->badvaddr);
 	}
-	
+
+	set_current_tf(&per_cpu_info[core_id()], state);
+
 	if(handle_page_fault(current, state->badvaddr, PROT_READ))
 		unhandled_trap(state, "Load Page Fault");
 }
@@ -341,6 +345,8 @@ handle_fault_store(trapframe_t* state)
 		panic("Store Page Fault in the Kernel at %p!", state->badvaddr);
 	}
 	
+	set_current_tf(&per_cpu_info[core_id()], state);
+
 	if(handle_page_fault(current, state->badvaddr, PROT_WRITE))
 		unhandled_trap(state, "Store Page Fault");
 }
