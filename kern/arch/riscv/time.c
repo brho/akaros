@@ -9,9 +9,9 @@ system_timing_t system_timing = {0};
 
 void
 timer_init(void)
-{	
-  mtpcr(PCR_COUNT, 0);
-  mtpcr(PCR_COMPARE, 0);
+{
+	mtpcr(PCR_COUNT, 0);
+	mtpcr(PCR_COMPARE, 0);
 	mtpcr(PCR_SR, mfpcr(PCR_SR) | (SR_IM & (1 << (TIMER_IRQ+SR_IM_SHIFT))));
 
 	system_timing.tsc_freq = TSC_HZ;

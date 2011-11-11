@@ -183,7 +183,6 @@ trap_entry:
   STORE  x3,35*REGBYTES(x2)
 
   # get faulting insn, if it wasn't a fetch-related trap
-  and   x3, x3, CAUSE_EXCCODE
   li    x5, CAUSE_MISALIGNED_FETCH
   li    x6, CAUSE_FAULT_FETCH
   beq   x3, x5, 1f

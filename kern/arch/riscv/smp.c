@@ -8,20 +8,19 @@
 #include <atomic.h>
 #include <pmap.h>
 
-volatile uint32_t num_cpus;
+static volatile uint32_t num_cpus_booted = 1;
 
 void
 smp_boot(void)
 {
 	smp_percpu_init();
 
-	num_cpus = 1;
 	printd("Cores, report in!\n");
 
-	for(uintptr_t i = 1, ncores = num_cores(); i < ncores; i++)
+	for(uint32_t i = 1; i < num_cpus; i++)
 		send_ipi(i);
 	
-	while(*(volatile uint32_t*)&num_cpus < num_cores());
+	while(num_cpus_booted < num_cpus);
 
 	printd("%d cores reporting!\n", num_cpus);
 }
@@ -29,13 +28,9 @@ smp_boot(void)
 void
 smp_init(void)
 {
-	static spinlock_t report_in_lock = SPINLOCK_INITIALIZER;
-
 	smp_percpu_init();
-	spin_lock(&report_in_lock);
-	num_cpus++;
-	spin_unlock(&report_in_lock);
 
+	__sync_fetch_and_add(&num_cpus_booted, 1);
 	printd("Good morning, Vietnam! (core id = %d)\n",core_id());
 
 	smp_idle();

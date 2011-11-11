@@ -6,9 +6,9 @@ ENTRY(_start)
 
 SECTIONS
 {
-	/* Link the kernel for 0xC01000C0, but load it at 0x001000C0) */
+	/* Link the kernel for 0xFFFFFFFF80002000, but load it at 0x2000) */
 
-	.text 0xFFFFFFFF80000000 : AT(0) {
+	.text 0xFFFFFFFF80002000 : AT(0x2000) {
 		*(.text .stub .text.* .gnu.linkonce.t.*)
 	}
 

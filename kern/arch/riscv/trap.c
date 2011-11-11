@@ -172,6 +172,11 @@ static kernel_message_t *get_next_amsg(struct kernel_msg_list *list_head,
 static void
 handle_ipi(trapframe_t* tf)
 {
+	if (!in_kernel(tf))
+		set_current_tf(&per_cpu_info[core_id()], tf);
+	else if((void*)tf->epc == &cpu_halt) // break out of the cpu_halt loop
+		advance_pc(tf);
+	
 	clear_ipi();
 
 	per_cpu_info_t *myinfo = &per_cpu_info[core_id()];
@@ -273,38 +278,14 @@ unhandled_trap(trapframe_t* state, const char* name)
 }
 
 static void
-handle_timer_interrupt(trapframe_t* state)
-{
-	timer_interrupt(state, NULL);
-}
-
-static void
-handle_interrupt(trapframe_t* tf)
+handle_timer_interrupt(trapframe_t* tf)
 {
 	if (!in_kernel(tf))
 		set_current_tf(&per_cpu_info[core_id()], tf);
 	else if((void*)tf->epc == &cpu_halt) // break out of the cpu_halt loop
 		advance_pc(tf);
 	
-	typedef void (*trap_handler)(trapframe_t*);
-	
-	const static trap_handler trap_handlers[NIRQ] = {
-	  [TIMER_IRQ] = handle_timer_interrupt,
-	  [IPI_IRQ] = handle_ipi,
-	};
-
-	uintptr_t interrupts = (tf->cause & CAUSE_IP) >> CAUSE_IP_SHIFT;
-
-	for(uintptr_t i = 0; interrupts; interrupts >>= 1, i++)
-	{
-		if(interrupts & 1)
-		{
-			if(trap_handlers[i])
-				trap_handlers[i](tf);
-			else
-				panic("Bad interrupt %d", i);
-		}
-	}
+	timer_interrupt(tf, NULL);
 }
 
 static void
@@ -408,18 +389,18 @@ handle_trap(trapframe_t* tf)
 	  [CAUSE_ILLEGAL_INSTRUCTION] = handle_illegal_instruction,
 	  [CAUSE_PRIVILEGED_INSTRUCTION] = handle_illegal_instruction,
 	  [CAUSE_FP_DISABLED] = handle_fp_disabled,
-	  [CAUSE_INTERRUPT] = handle_interrupt,
 	  [CAUSE_SYSCALL] = handle_syscall,
 	  [CAUSE_BREAKPOINT] = handle_breakpoint,
 	  [CAUSE_MISALIGNED_LOAD] = handle_misaligned_load,
 	  [CAUSE_MISALIGNED_STORE] = handle_misaligned_store,
 	  [CAUSE_FAULT_LOAD] = handle_fault_load,
 	  [CAUSE_FAULT_STORE] = handle_fault_store,
+	  [CAUSE_IRQ0 + IPI_IRQ] = handle_ipi,
+	  [CAUSE_IRQ0 + TIMER_IRQ] = handle_timer_interrupt,
 	};
 	
-	int exccode = (tf->cause & CAUSE_EXCCODE) >> CAUSE_EXCCODE_SHIFT;
-	assert(exccode < NUM_CAUSES && trap_handlers[exccode]);
-	trap_handlers[exccode](tf);
+	assert(tf->cause < NUM_CAUSES && trap_handlers[tf->cause]);
+	trap_handlers[tf->cause](tf);
 	
 	/* Return to the current process, which should be runnable.  If we're the
 	 * kernel, we should just return naturally.  Note that current and tf need

@@ -9,23 +9,22 @@
 
 #define MAX_KERNBASE_SIZE (KERN_VMAP_TOP - KERNBASE)
 
+uint32_t num_cpus = 1;   // this must not be in BSS
+
 static uint64_t
-mem_size(void)
+mem_size(uint64_t sz_mb)
 {
-	uint64_t sz = MIN(mfpcr(PCR_MEMSIZE)*PGSIZE, MAX_KERNBASE_SIZE);
-#ifndef __riscv64
-	// limit memory size for RV32
-	sz = MIN(sz, L1PGSIZE*NPTENTRIES);
-#endif
-	return sz;
+	uint64_t sz = (uint64_t)sz_mb * 1024 * 1024;
+	return MIN(sz,  MIN(MAX_KERNBASE_SIZE, (uint64_t)L1PGSIZE * NPTENTRIES));
 }
 
-void pagetable_init(pte_t* l1pt, pte_t* l1pt_boot, pte_t* l2pt)
+void pagetable_init(uint32_t memsize_mb, pte_t* l1pt, pte_t* l1pt_boot,
+                    pte_t* l2pt)
 {
 	static_assert(KERNBASE % L1PGSIZE == 0);
 	// The boot L1 PT retains the identity mapping [0,memsize-1],
 	// whereas the post-boot L1 PT does not.
-	uint64_t memsize = mem_size();
+	uint64_t memsize = mem_size(memsize_mb);
 	for(uint64_t pa = 0; pa < memsize+L1PGSIZE-1; pa += L1PGSIZE)
 	{
 		pte_t pte = PTE(LA2PPN(pa), PTE_KERN_RW | PTE_E);
@@ -56,12 +55,14 @@ void pagetable_init(pte_t* l1pt, pte_t* l1pt_boot, pte_t* l2pt)
 }
 
 void
-cmain()
+cmain(uint32_t memsize_mb, uint32_t num_cores)
 {
 	multiboot_info_t mbi;
 	memset(&mbi, 0, sizeof(mbi));
 	mbi.flags = 0x00000001;
-	mbi.mem_lower = (unsigned long)(mem_size() / 1024);
+	mbi.mem_lower = mem_size(memsize_mb) / 1024;
+
+	num_cpus = num_cores;
 
 	extern void kernel_init(multiboot_info_t *mboot_info);
 	// kernel_init expects a pre-relocation mbi address

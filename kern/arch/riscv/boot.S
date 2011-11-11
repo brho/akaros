@@ -29,7 +29,8 @@ _start:
   la     t0, trap_entry
   mtpcr  t0, ASM_CR(PCR_EVEC)
 
-  // enable traps
+  // clear IPIs and enable traps
+  mtpcr  zero, ASM_CR(PCR_CLR_IPI)
   li     t0, PCR0
   mtpcr  t0, ASM_CR(PCR_SR)
 
@@ -43,19 +44,26 @@ _start:
   li     t1, KERN_LOAD_ADDR
   sub    sp, sp, t1
 
+  // get memory size and core count from first two words of memory
+  lw     s0, 0(zero)
+  lw     s1, 4(zero)
+
   // set up initial page mappings
-  la     a0, l1pt
-  sub    a0, a0, t1
-  la     a1, l1pt_boot
+  move   a0, s0
+  la     a1, l1pt
   sub    a1, a1, t1
+  la     a2, l1pt_boot
+  sub    a2, a2, t1
 #ifdef __riscv64
-  la     a2, l2pt
-  sub    a2, a1, t1
+  la     a3, l2pt
+  sub    a3, a3, t1
 #endif
   jal    pagetable_init
   jal    enable_mmu
 
   // relocate stack and call into C code using absolute jump, not pc-relative
+  move   a0, s0
+  move   a1, s1
   la     sp, bootstacktop
   la     t0, cmain
   jr     t0
