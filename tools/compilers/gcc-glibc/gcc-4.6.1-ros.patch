@@ -1,6 +1,6 @@
 diff -ruN orig-src/gcc-4.6.1/config.sub gcc-4.6.1/config.sub
 --- orig-src/gcc-4.6.1/config.sub	2010-05-25 06:22:07.000000000 -0700
-+++ gcc-4.6.1/config.sub	2011-10-27 19:57:44.000000000 -0700
++++ gcc-4.6.1/config.sub	2011-11-11 04:05:17.000000000 -0800
 @@ -1297,7 +1297,7 @@
  	      | -hpux* | -unos* | -osf* | -luna* | -dgux* | -auroraux* | -solaris* \
  	      | -sym* | -kopensolaris* \
@@ -12,7 +12,7 @@ diff -ruN orig-src/gcc-4.6.1/config.sub gcc-4.6.1/config.sub
  	      | -hiux* | -386bsd* | -knetbsd* | -mirbsd* | -netbsd* \
 diff -ruN orig-src/gcc-4.6.1/gcc/config/i386/ros.h gcc-4.6.1/gcc/config/i386/ros.h
 --- orig-src/gcc-4.6.1/gcc/config/i386/ros.h	1969-12-31 16:00:00.000000000 -0800
-+++ gcc-4.6.1/gcc/config/i386/ros.h	2011-10-27 19:46:25.000000000 -0700
++++ gcc-4.6.1/gcc/config/i386/ros.h	2011-11-11 04:01:00.000000000 -0800
 @@ -0,0 +1,213 @@
 +/* Definitions for Intel 386 running Linux-based GNU systems with ELF format.
 +   Copyright (C) 1994, 1995, 1996, 1997, 1998, 1999, 2001, 2002, 2004, 2005,
@@ -229,7 +229,7 @@ diff -ruN orig-src/gcc-4.6.1/gcc/config/i386/ros.h gcc-4.6.1/gcc/config/i386/ros
 +#endif
 diff -ruN orig-src/gcc-4.6.1/gcc/config/ros.h gcc-4.6.1/gcc/config/ros.h
 --- orig-src/gcc-4.6.1/gcc/config/ros.h	1969-12-31 16:00:00.000000000 -0800
-+++ gcc-4.6.1/gcc/config/ros.h	2011-10-27 19:46:25.000000000 -0700
++++ gcc-4.6.1/gcc/config/ros.h	2011-11-11 04:01:00.000000000 -0800
 @@ -0,0 +1,39 @@
 +/* Definitions for systems using the Linux kernel, with or without
 +   MMU, using ELF at the compiler level but possibly FLT for final
@@ -272,7 +272,7 @@ diff -ruN orig-src/gcc-4.6.1/gcc/config/ros.h gcc-4.6.1/gcc/config/ros.h
 +    } while (0)
 diff -ruN orig-src/gcc-4.6.1/gcc/config.gcc gcc-4.6.1/gcc/config.gcc
 --- orig-src/gcc-4.6.1/gcc/config.gcc	2011-05-22 13:03:43.000000000 -0700
-+++ gcc-4.6.1/gcc/config.gcc	2011-10-27 19:57:44.000000000 -0700
++++ gcc-4.6.1/gcc/config.gcc	2011-11-11 04:05:17.000000000 -0800
 @@ -699,6 +699,14 @@
    default_use_cxa_atexit=yes
    use_gcc_stdint=wrap
@@ -306,7 +306,7 @@ diff -ruN orig-src/gcc-4.6.1/gcc/config.gcc gcc-4.6.1/gcc/config.gcc
  	tmake_file="${tmake_file} i386/t-i386elf t-svr4"
 diff -ruN orig-src/gcc-4.6.1/libgcc/config.host gcc-4.6.1/libgcc/config.host
 --- orig-src/gcc-4.6.1/libgcc/config.host	2011-03-13 23:06:23.000000000 -0700
-+++ gcc-4.6.1/libgcc/config.host	2011-10-27 19:57:44.000000000 -0700
++++ gcc-4.6.1/libgcc/config.host	2011-11-11 04:05:17.000000000 -0800
 @@ -162,6 +162,9 @@
  *-*-linux* | frv-*-*linux* | *-*-kfreebsd*-gnu | *-*-knetbsd*-gnu | *-*-gnu*)
    extra_parts="crtbegin.o crtbeginS.o crtbeginT.o crtend.o crtendS.o"
@@ -338,7 +338,7 @@ diff -ruN orig-src/gcc-4.6.1/libgcc/config.host gcc-4.6.1/libgcc/config.host
    i[34567]86-*-freebsd* | x86_64-*-freebsd*)
 diff -ruN orig-src/gcc-4.6.1/libstdc++-v3/configure gcc-4.6.1/libstdc++-v3/configure
 --- orig-src/gcc-4.6.1/libstdc++-v3/configure	2011-05-25 17:15:58.000000000 -0700
-+++ gcc-4.6.1/libstdc++-v3/configure	2011-10-27 19:46:25.000000000 -0700
++++ gcc-4.6.1/libstdc++-v3/configure	2011-11-11 04:01:00.000000000 -0800
 @@ -57157,6 +57157,5665 @@
      $as_echo "#define HAVE_SINHL 1" >>confdefs.h
  
@@ -6007,7 +6007,7 @@ diff -ruN orig-src/gcc-4.6.1/libstdc++-v3/configure gcc-4.6.1/libstdc++-v3/confi
    # All these tests are for C++; save the language and the compiler flags.
 diff -ruN orig-src/gcc-4.6.1/libstdc++-v3/crossconfig.m4 gcc-4.6.1/libstdc++-v3/crossconfig.m4
 --- orig-src/gcc-4.6.1/libstdc++-v3/crossconfig.m4	2011-02-03 23:26:57.000000000 -0800
-+++ gcc-4.6.1/libstdc++-v3/crossconfig.m4	2011-10-27 19:46:25.000000000 -0700
++++ gcc-4.6.1/libstdc++-v3/crossconfig.m4	2011-11-11 04:01:00.000000000 -0800
 @@ -198,6 +198,10 @@
      AC_DEFINE(HAVE_SINHF)
      AC_DEFINE(HAVE_SINHL)
