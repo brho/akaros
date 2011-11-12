@@ -112,6 +112,7 @@ user_mem_walk_recursive(env_t* e, uintptr_t start, size_t len,
                         mem_walk_callback_t pt_callback, void* pt_arg,
                         pte_t* pt, int level)
 {
+	int ret = 0;
 	int pgshift = L1PGSHIFT - level*(L1PGSHIFT-L2PGSHIFT);
 	uintptr_t pgsize = 1UL << pgshift;
 
@@ -120,33 +121,34 @@ user_mem_walk_recursive(env_t* e, uintptr_t start, size_t len,
 
 	for(uintptr_t idx = start_idx; idx <= end_idx; idx++)
 	{
-		int ret;
 		uintptr_t pgaddr = ROUNDDOWN(start, pgsize) + idx*pgsize;
 		pte_t* pte = &pt[idx];
 
 		if(*pte & PTE_T)
 		{
 			assert(level < NPTLEVELS-1);
-			if((ret = user_mem_walk_recursive(e, MAX(pgaddr, start),
-			                                  MIN(pgsize, pgaddr+len),
-			                                  callback, arg,
-																				pt_callback, pt_arg,
-																				KADDR(PTD_ADDR(*pte)), level+1)))
-				return ret;
+			uintptr_t st = MAX(pgaddr, start);
+			size_t ln = MIN(start + len, pgaddr + pgsize) - st;
+			if((ret = user_mem_walk_recursive(e, st, ln, callback, arg,
+			                                  pt_callback, pt_arg,
+			                                  KADDR(PTD_ADDR(*pte)), level+1)))
+				goto out;
 			if(pt_callback != NULL && (ret = pt_callback(e, pte, (void*)pgaddr, arg)))
-				return ret;
+				goto out;
 		}
 		else if(callback != NULL && !PAGE_UNMAPPED(*pte))
 			if((ret = callback(e, pte, (void*)pgaddr, arg)))
-				return ret;
+				goto out;
 	}
-	return 0;
+out:
+	return ret;
 }
 
 int
 env_user_mem_walk(env_t* e, void* start, size_t len,
                   mem_walk_callback_t callback, void* arg)
 {
+	assert(PGOFF(start) == 0 && PGOFF(len) == 0);
 	return user_mem_walk_recursive(e, (uintptr_t)start, len, callback, arg,
 	                               NULL, NULL, e->env_pgdir, 0);
 }
