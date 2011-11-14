@@ -377,7 +377,17 @@ static int sys_proc_yield(struct proc *p, bool being_nice)
 static void sys_change_vcore(struct proc *p, uint32_t vcoreid,
                             bool enable_my_notif)
 {
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	/* Change to vcore may start the vcore up remotely before we can finish the
+	 * async syscall, so we need to finish the sysc and not touch the struct.
+	 * Note this sysc has no return value. */
+	finish_sysc(pcpui->cur_sysc, pcpui->cur_proc);
+	pcpui->cur_sysc = 0;	/* don't touch sysc again */
 	proc_change_to_vcore(p, vcoreid, enable_my_notif);
+	/* Should't return, to prevent the chance of mucking with cur_sysc.
+	 * smp_idle will make sure we run the appropriate cur_tf (which will be the
+	 * new vcore for successful calls). */
+	smp_idle();
 }
 
 static ssize_t sys_fork(env_t* e)
