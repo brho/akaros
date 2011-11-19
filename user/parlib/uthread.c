@@ -208,6 +208,9 @@ void uthread_yield(bool save_state)
 	if (!yielding)
 		goto yield_return_path;
 	yielding = FALSE; /* for when it starts back up */
+	/* Signal the current state is in utf.  Need to do this only the first time
+	 * through (not on the yield return path that comes after save_ros_tf) */
+	uthread->flags |= UTHREAD_SAVED;
 	/* Change to the transition context (both TLS and stack). */
 	extern void** vcore_thread_control_blocks;
 	set_tls_desc(vcore_thread_control_blocks[vcoreid], vcoreid);
@@ -281,6 +284,8 @@ void run_current_uthread(void)
 	printd("[U] Vcore %d is restarting uthread %08p\n", vcoreid,
 	       current_uthread);
 	clear_notif_pending(vcoreid);
+	/* utf no longer represents the current state of the uthread */
+	current_uthread->flags &= ~UTHREAD_SAVED;
 	set_tls_desc(current_uthread->tls_desc, vcoreid);
 	/* Pop the user trap frame */
 	pop_ros_tf(&vcpd->notif_tf, vcoreid);
@@ -297,6 +302,8 @@ static void __run_current_uthread_raw(void)
 	/* We need to manually say we have a notif pending, so we eventually return
 	 * to vcore context.  (note the kernel turned it off for us) */
 	vcpd->notif_pending = TRUE;
+	/* utf no longer represents the current state of the uthread */
+	current_uthread->flags &= ~UTHREAD_SAVED;
 	set_tls_desc(current_uthread->tls_desc, vcoreid);
 	/* Pop the user trap frame */
 	pop_ros_tf_raw(&vcpd->notif_tf, vcoreid);
@@ -320,6 +327,8 @@ void run_uthread(struct uthread *uthread)
 	current_uthread = uthread;
 	vcoreid = vcore_id();
 	clear_notif_pending(vcoreid);
+	/* utf no longer represents the current state of the uthread */
+	uthread->flags &= ~UTHREAD_SAVED;
 	set_tls_desc(uthread->tls_desc, vcoreid);
 	/* Load silly state (Floating point) too.  For real */
 	/* TODO: (HSS) */
