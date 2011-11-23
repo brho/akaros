@@ -274,7 +274,11 @@ void vcore_yield(bool preempt_pending)
  * events, and we will have send pending to 0. 
  *
  * Note that this won't catch every race/case of an incoming event.  Future
- * events will get caught in pop_ros_tf() or proc_yield() */
+ * events will get caught in pop_ros_tf() or proc_yield().
+ *
+ * Also note that this handles events, which may change your current uthread or
+ * might not return!  Be careful calling this.  Check run_uthread for an example
+ * of how to use this. */
 bool clear_notif_pending(uint32_t vcoreid)
 {
 	bool handled_event = FALSE;

@@ -274,6 +274,37 @@ void ros_syscall_blockon(struct syscall *sysc)
 	uthread_yield(TRUE);
 }
 
+/* Helper for run_current and run_uthread.  Make sure the uthread you want to
+ * run is the current_uthread before calling this.  It will pop the TF of
+ * whatever you send in (run_cur and run_uth use different TFs).
+ *
+ * This will adjust the thread's state, do one last check on notif_pending, and
+ * pop the tf.  Note that the notif check is an optimization.  pop_ros_tf() will
+ * definitely handle it, but it will take a syscall to do so later. */
+static void __run_cur_uthread(struct user_trapframe *utf)
+{
+	uint32_t vcoreid = vcore_id();
+	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
+	clear_notif_pending(vcoreid);
+	/* clear_notif might have handled a preemption event, and we might not have
+	 * a current_uthread anymore.  Need to recheck */
+	cmb();
+	if (!current_uthread) {
+		/* Start over, as if we just had a notif from the kernel.
+		 * Note that  we're resetting the stack here.  Don't do anything other
+		 * than call vcore_entry() */
+		set_stack_pointer((void*)vcpd->transition_stack);
+		uthread_vcore_entry();
+		assert(0);
+	}
+	/* Go ahead and start the uthread */
+	/* utf no longer represents the current state of the uthread */
+	current_uthread->flags &= ~UTHREAD_SAVED;
+	set_tls_desc(current_uthread->tls_desc, vcoreid);
+	/* Pop the user trap frame */
+	pop_ros_tf(utf, vcoreid);
+}
+
 /* Runs whatever thread is vcore's current_uthread */
 void run_current_uthread(void)
 {
@@ -283,12 +314,29 @@ void run_current_uthread(void)
 	assert(current_uthread->state == UT_RUNNING);
 	printd("[U] Vcore %d is restarting uthread %08p\n", vcoreid,
 	       current_uthread);
-	clear_notif_pending(vcoreid);
-	/* utf no longer represents the current state of the uthread */
-	current_uthread->flags &= ~UTHREAD_SAVED;
-	set_tls_desc(current_uthread->tls_desc, vcoreid);
-	/* Pop the user trap frame */
-	pop_ros_tf(&vcpd->notif_tf, vcoreid);
+	/* Run, using the TF in the VCPD.  FP state should already be loaded */
+	__run_cur_uthread(&vcpd->notif_tf);
+	assert(0);
+}
+
+/* Launches the uthread on the vcore.  Don't call this on current_uthread. */
+void run_uthread(struct uthread *uthread)
+{
+	uint32_t vcoreid = vcore_id();
+	assert(uthread != current_uthread);
+	if (uthread->state != UT_RUNNABLE) {
+		/* had vcore3 throw this, when the UT blocked on vcore1 and didn't come
+		 * back up yet (kernel didn't wake up, didn't send IPI) */
+		printf("Uthread %08p not runnable (was %d) in run_uthread on vcore %d!\n",
+		       uthread, uthread->state, vcore_id());
+	}
+	assert(uthread->state == UT_RUNNABLE);
+	uthread->state = UT_RUNNING;
+	/* Save a ptr to the uthread we'll run in the transition context's TLS */
+	current_uthread = uthread;
+	/* Load silly state (Floating point) too.  For real */
+	/* TODO: (HSS) */
+	__run_cur_uthread(&uthread->utf);
 	assert(0);
 }
 
@@ -307,33 +355,6 @@ static void __run_current_uthread_raw(void)
 	set_tls_desc(current_uthread->tls_desc, vcoreid);
 	/* Pop the user trap frame */
 	pop_ros_tf_raw(&vcpd->notif_tf, vcoreid);
-	assert(0);
-}
-
-/* Launches the uthread on the vcore.  Don't call this on current_uthread. */
-void run_uthread(struct uthread *uthread)
-{
-	uint32_t vcoreid;
-	assert(uthread != current_uthread);
-	if (uthread->state != UT_RUNNABLE) {
-		/* had vcore3 throw this, when the UT blocked on vcore1 and didn't come
-		 * back up yet (kernel didn't wake up, didn't send IPI) */
-		printf("Uthread %08p not runnable (was %d) in run_uthread on vcore %d!\n",
-		       uthread, uthread->state, vcore_id());
-	}
-	assert(uthread->state == UT_RUNNABLE);
-	uthread->state = UT_RUNNING;
-	/* Save a ptr to the uthread we'll run in the transition context's TLS */
-	current_uthread = uthread;
-	vcoreid = vcore_id();
-	clear_notif_pending(vcoreid);
-	/* utf no longer represents the current state of the uthread */
-	uthread->flags &= ~UTHREAD_SAVED;
-	set_tls_desc(uthread->tls_desc, vcoreid);
-	/* Load silly state (Floating point) too.  For real */
-	/* TODO: (HSS) */
-	/* Pop the user trap frame */
-	pop_ros_tf(&uthread->utf, vcoreid);
 	assert(0);
 }
 
