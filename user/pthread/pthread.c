@@ -36,6 +36,7 @@ static inline void spin_to_sleep(unsigned int spins, unsigned int *spun);
 void pth_sched_entry(void);
 void pth_thread_runnable(struct uthread *uthread);
 void pth_thread_yield(struct uthread *uthread);
+void pth_thread_paused(struct uthread *uthread);
 void pth_preempt_pending(void);
 void pth_spawn_thread(uintptr_t pc_start, void *data);
 void pth_blockon_sysc(struct syscall *sysc);
@@ -47,6 +48,7 @@ struct schedule_ops pthread_sched_ops = {
 	pth_sched_entry,
 	pth_thread_runnable,
 	pth_thread_yield,
+	pth_thread_paused,
 	pth_blockon_sysc,
 	0, /* pth_preempt_pending, */
 	0, /* pth_spawn_thread, */
@@ -84,6 +86,12 @@ void __attribute__((noreturn)) pth_sched_entry(void)
 			threads_active++;
 			threads_ready--;
 			mcs_pdr_unlock(&queue_lock);
+			/* If you see what looks like the same uthread running in multiple
+			 * places, your list might be jacked up.  Turn this on. */
+			printd("[P] got uthread %08p on vc %d state %08p flags %08p\n",
+			       new_thread, vcoreid,
+			       ((struct uthread*)new_thread)->state,
+			       ((struct uthread*)new_thread)->flags);
 			break;
 		}
 		mcs_pdr_unlock(&queue_lock);
@@ -126,8 +134,7 @@ void pth_thread_yield(struct uthread *uthread)
 {
 	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
 	struct pthread_tcb *temp_pth = 0;	/* used for exiting AND joining */
-	/* Remove from the active list, whether exiting or yielding.  We're holding
-	 * the lock throughout both list modifications (if applicable). */
+	/* Remove from the active list, whether exiting or yielding. */
 	mcs_pdr_lock(&queue_lock);
 	threads_active--;
 	TAILQ_REMOVE(&active_queue, pthread, next);
@@ -172,6 +179,32 @@ void pth_thread_yield(struct uthread *uthread)
 		 * Just wake it up and make it ready again. */
 		pth_thread_runnable((struct uthread*)pthread);
 	}
+}
+
+/* For some reason not under its control, the uthread stopped running (compared
+ * to yield, which was caused by uthread/2LS code).
+ *
+ * The main case for this is if the vcore was preempted or if the vcore it was
+ * running on needed to stop.  You are given a uthread that looks like it took a
+ * notif, and had its context/silly state copied out to the uthread struct.
+ * (copyout_uthread).  Note that this will be called in the context (TLS) of the
+ * vcore that is losing the uthread.  If that vcore is running, it'll be in a
+ * preempt-event handling loop (not in your 2LS code).  If this is a big
+ * problem, I'll change it. */
+void pth_thread_paused(struct uthread *uthread)
+{
+	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
+	/* Remove from the active list.  Note that I don't particularly care about
+	 * the active list.  We keep it around because it causes bugs and keeps us
+	 * honest.  After all, some 2LS may want an active list */
+	mcs_pdr_lock(&queue_lock);
+	threads_active--;
+	TAILQ_REMOVE(&active_queue, pthread, next);
+	mcs_pdr_unlock(&queue_lock);
+	/* At this point, you could do something clever, like put it at the front of
+	 * the runqueue, see if it was holding a lock, do some accounting, or
+	 * whatever. */
+	uthread_runnable(uthread);
 }
 
 void pth_preempt_pending(void)
