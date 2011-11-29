@@ -183,9 +183,6 @@ static int handle_mbox(struct event_mbox *ev_mbox, unsigned int flags)
 {
 	int retval = 0;
 	uint32_t vcoreid = vcore_id();
-	/* Make sure no one made it in here with a DONT_MIGRATE */
-	if (current_uthread)
-		assert(!(current_uthread->flags & UTHREAD_DONT_MIGRATE));
 	printd("[event] handling ev_mbox %08p on vcore %d\n", ev_mbox, vcore_id());
 	/* Handle full messages.  Will deal with bits later. */
 	retval = handle_mbox_msgs(ev_mbox);
