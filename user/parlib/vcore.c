@@ -94,7 +94,7 @@ static void free_transition_stack(int id)
 
 static int allocate_transition_stack(int id)
 {
-	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[id];
+	struct preempt_data *vcpd = vcpd_of(id);
 	if (vcpd->transition_stack)
 		return 0; // reuse old stack
 
@@ -247,7 +247,7 @@ handle_it:
 void vcore_yield(bool preempt_pending)
 {
 	uint32_t vcoreid = vcore_id();
-	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
+	struct preempt_data *vcpd = vcpd_of(vcoreid);
 	vcpd->can_rcv_msg = FALSE;
 	/* no wrmb() necessary, clear_notif() has an mb() */
 	/* Clears notif pending.  If we had an event outstanding, this will handle
@@ -283,7 +283,7 @@ bool clear_notif_pending(uint32_t vcoreid)
 {
 	bool handled_event = FALSE;
 	do {
-		__procdata.vcore_preempt_data[vcoreid].notif_pending = 0;
+		vcpd_of(vcoreid)->notif_pending = 0;
 		/* need a full mb(), since handle events might be just a read or might
 		 * be a write, either way, it needs to happen after notif_pending */
 		mb();
@@ -303,7 +303,7 @@ void enable_notifs(uint32_t vcoreid)
 	/* Note we could get migrated before executing this.  If that happens, our
 	 * vcore had gone into vcore context (which is what we wanted), and this
 	 * self_notify to our old vcore is spurious and harmless. */
-	if (__procdata.vcore_preempt_data[vcoreid].notif_pending)
+	if (vcpd_of(vcoreid)->notif_pending)
 		sys_self_notify(vcoreid, EV_NONE, 0);
 }
 

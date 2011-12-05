@@ -112,7 +112,7 @@ void switch_to_vcore() {
 	/* Disable notifications.  Once we do this, we might miss a notif_pending,
 	 * so we need to enter vcore entry later.  Need to disable notifs so we
 	 * don't get in weird loops */
-	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
+	struct preempt_data *vcpd = vcpd_of(vcoreid);
 	vcpd->notif_disabled = TRUE;
 
 	/* Grab a reference to the currently running thread on this vcore */
@@ -152,7 +152,7 @@ void __attribute__((noreturn)) vcore_entry()
      * vcoremap */
 	assert(in_vcore_context());
 	uint32_t vcoreid = vcore_id();
-	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
+	struct preempt_data *vcpd = vcpd_of(vcoreid);
 	struct vcore *vc = &__procinfo.vcoremap[vcoreid];
 
 	tdebug("current=%s, vcore=%d\n",

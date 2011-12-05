@@ -48,6 +48,7 @@ static inline void __disable_notifs(uint32_t vcoreid);
 static inline bool notif_is_enabled(uint32_t vcoreid);
 static inline bool vcore_is_mapped(uint32_t vcoreid);
 static inline bool vcore_is_preempted(uint32_t vcoreid);
+static inline struct preempt_data *vcpd_of(uint32_t vcoreid);
 int vcore_init(void);
 int vcore_request(long nr_new_vcores);
 void vcore_yield(bool preempt_pending);
@@ -85,17 +86,17 @@ static inline bool in_multi_mode(void)
 /* Only call this if you know what you are doing. */
 static inline void __enable_notifs(uint32_t vcoreid)
 {
-	__procdata.vcore_preempt_data[vcoreid].notif_disabled = FALSE;
+	vcpd_of(vcoreid)->notif_disabled = FALSE;
 }
 
 static inline void __disable_notifs(uint32_t vcoreid)
 {
-	__procdata.vcore_preempt_data[vcoreid].notif_disabled = TRUE;
+	vcpd_of(vcoreid)->notif_disabled = TRUE;
 }
 
 static inline bool notif_is_enabled(uint32_t vcoreid)
 {
-	return !__procdata.vcore_preempt_data[vcoreid].notif_disabled;
+	return !vcpd_of(vcoreid)->notif_disabled;
 }
 
 static inline bool vcore_is_mapped(uint32_t vcoreid)
@@ -106,8 +107,13 @@ static inline bool vcore_is_mapped(uint32_t vcoreid)
 /* We could also check for VC_K_LOCK, but that's a bit much. */
 static inline bool vcore_is_preempted(uint32_t vcoreid)
 {
-	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
+	struct preempt_data *vcpd = vcpd_of(vcoreid);
 	return atomic_read(&vcpd->flags) & VC_PREEMPTED;
+}
+
+static inline struct preempt_data *vcpd_of(uint32_t vcoreid)
+{
+	return &__procdata.vcore_preempt_data[vcoreid];
 }
 
 #ifdef __cplusplus

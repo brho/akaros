@@ -71,7 +71,7 @@ int uthread_lib_init(struct uthread *uthread)
 void __attribute__((noreturn)) uthread_vcore_entry(void)
 {
 	uint32_t vcoreid = vcore_id();
-	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
+	struct preempt_data *vcpd = vcpd_of(vcoreid);
 	/* Should always have notifications disabled when coming in here. */
 	assert(!notif_is_enabled(vcoreid));
 	assert(in_vcore_context());
@@ -202,7 +202,7 @@ void uthread_yield(bool save_state)
 	cmb();	/* don't let DONT_MIGRATE write pass the vcoreid read */
 	uint32_t vcoreid = vcore_id();
 	printd("[U] Uthread %08p is yielding on vcore %d\n", uthread, vcoreid);
-	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
+	struct preempt_data *vcpd = vcpd_of(vcoreid);
 	/* once we do this, we might miss a notif_pending, so we need to enter vcore
 	 * entry later.  Need to disable notifs so we don't get in weird loops with
 	 * save_ros_tf() and pop_ros_tf(). */
@@ -293,7 +293,7 @@ void ros_syscall_blockon(struct syscall *sysc)
 static void __run_cur_uthread(struct user_trapframe *utf)
 {
 	uint32_t vcoreid = vcore_id();
-	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
+	struct preempt_data *vcpd = vcpd_of(vcoreid);
 	clear_notif_pending(vcoreid);
 	/* clear_notif might have handled a preemption event, and we might not have
 	 * a current_uthread anymore.  Need to recheck */
@@ -318,7 +318,7 @@ static void __run_cur_uthread(struct user_trapframe *utf)
 void run_current_uthread(void)
 {
 	uint32_t vcoreid = vcore_id();
-	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
+	struct preempt_data *vcpd = vcpd_of(vcoreid);
 	assert(current_uthread);
 	assert(current_uthread->state == UT_RUNNING);
 	printd("[U] Vcore %d is restarting uthread %08p\n", vcoreid,
@@ -355,7 +355,7 @@ void run_uthread(struct uthread *uthread)
 static void __run_current_uthread_raw(void)
 {
 	uint32_t vcoreid = vcore_id();
-	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
+	struct preempt_data *vcpd = vcpd_of(vcoreid);
 	/* We need to manually say we have a notif pending, so we eventually return
 	 * to vcore context.  (note the kernel turned it off for us) */
 	vcpd->notif_pending = TRUE;
