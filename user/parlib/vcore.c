@@ -130,8 +130,8 @@ int vcore_init()
 	if(allocate_transition_stack(0) || allocate_transition_tls(0))
 		goto vcore_init_tls_fail;
 
-	/* Initialize our VCPD event queues' ucqs, two pages per vcore */
-	mmap_block = (uintptr_t)mmap(0, PGSIZE * 2 * max_vcores(),
+	/* Initialize our VCPD event queues' ucqs, two pages per ucq, 4 per vcore */
+	mmap_block = (uintptr_t)mmap(0, PGSIZE * 4 * max_vcores(),
 	                             PROT_WRITE | PROT_READ,
 	                             MAP_POPULATE | MAP_ANONYMOUS, -1, 0);
 	/* Yeah, this doesn't fit in the error-handling scheme, but this whole
@@ -141,10 +141,13 @@ int vcore_init()
 	/* Note we may end up doing vcore 0's elsewhere, for _Ss, or else have a
 	 * separate ev_q for that. */
 	for (int i = 0; i < max_vcores(); i++) {
-		/* two pages each from the big block */
-		ucq_init_raw(&__procdata.vcore_preempt_data[i].ev_mbox.ev_msgs,
-		             mmap_block + (2 * i    ) * PGSIZE, 
-		             mmap_block + (2 * i + 1) * PGSIZE); 
+		/* four pages total for both ucqs from the big block (2 pages each) */
+		ucq_init_raw(&vcpd_of(i)->ev_mbox_public.ev_msgs,
+		             mmap_block + (4 * i    ) * PGSIZE,
+		             mmap_block + (4 * i + 1) * PGSIZE);
+		ucq_init_raw(&vcpd_of(i)->ev_mbox_private.ev_msgs,
+		             mmap_block + (4 * i + 2) * PGSIZE,
+		             mmap_block + (4 * i + 3) * PGSIZE);
 	}
 	atomic_init(&vc_req_being_handled, 0);
 	assert(!in_vcore_context());

@@ -63,7 +63,7 @@ int main(int argc, char** argv)
 	 * event and IPI for USER_IPIs on vcore 0.  Check event.c for more stuff.
 	 * Note you don't have to register for USER_IPIs to receive ones you send
 	 * yourself with sys_self_notify(). */
-	enable_kevent(EV_USER_IPI, 0, EVENT_IPI);
+	enable_kevent(EV_USER_IPI, 0, EVENT_IPI | EVENT_VCORE_PRIVATE);
 	/* Receive pending preemption events.  Can also get a MSG if you want. */
 	struct event_queue *ev_q = get_event_q();
 	ev_q->ev_flags = EVENT_IPI | EVENT_NOMSG | EVENT_VCORE_APPRO;

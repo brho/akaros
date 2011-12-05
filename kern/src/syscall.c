@@ -375,7 +375,7 @@ static int sys_proc_yield(struct proc *p, bool being_nice)
 }
 
 static void sys_change_vcore(struct proc *p, uint32_t vcoreid,
-                            bool enable_my_notif)
+                             bool enable_my_notif)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	/* Change to vcore may start the vcore up remotely before we can finish the
@@ -384,7 +384,7 @@ static void sys_change_vcore(struct proc *p, uint32_t vcoreid,
 	finish_sysc(pcpui->cur_sysc, pcpui->cur_proc);
 	pcpui->cur_sysc = 0;	/* don't touch sysc again */
 	proc_change_to_vcore(p, vcoreid, enable_my_notif);
-	/* Should't return, to prevent the chance of mucking with cur_sysc.
+	/* Shouldn't return, to prevent the chance of mucking with cur_sysc.
 	 * smp_idle will make sure we run the appropriate cur_tf (which will be the
 	 * new vcore for successful calls). */
 	smp_idle();
@@ -726,7 +726,7 @@ static int sys_self_notify(struct proc *p, uint32_t vcoreid,
 		}
 	}
 	/* this will post a message and IPI, regardless of wants/needs/debutantes.*/
-	post_vcore_event(p, &local_msg, vcoreid);
+	post_vcore_event(p, &local_msg, vcoreid, EVENT_VCORE_PRIVATE);
 	proc_notify(p, vcoreid);
 	return 0;
 }

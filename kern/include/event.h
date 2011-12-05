@@ -14,6 +14,7 @@
 void send_event(struct proc *p, struct event_queue *ev_q, struct event_msg *msg,
                 uint32_t vcoreid);
 void send_kernel_event(struct proc *p, struct event_msg *msg, uint32_t vcoreid);
-void post_vcore_event(struct proc *p, struct event_msg *msg, uint32_t vcoreid);
+void post_vcore_event(struct proc *p, struct event_msg *msg, uint32_t vcoreid,
+                      int ev_flags);
 
 #endif /* ROS_KERN_EVENT_H */

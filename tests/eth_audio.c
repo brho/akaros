@@ -102,7 +102,7 @@ void vcore_entry(void)
 	vcpd = &__procdata.vcore_preempt_data[vcoreid];
 	
 	/* Ghetto way to get just an event number */
-	unsigned int ev_type = get_event_type(&vcpd->ev_mbox);
+	unsigned int ev_type = get_event_type(&vcpd->ev_mbox_public);
 
 	/* ETHAUD app: process the packet if we got a notif */
 	if (ev_type == EV_FREE_APPLE_PIE)

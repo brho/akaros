@@ -62,6 +62,13 @@ all things related to the management of vcores, such as its event_mbox (queue
 of incoming messages/notifications/events).  Both the kernel and the vcore
 code know to look here for a variety of things.
 
+Vcore-business: This is a term I use for a class of messages where the receiver
+is the actual vcore, and not just using the vcore as a place to receive the
+message.  Examples of vcore-business are INDIR events, preempt_pending events,
+scheduling events (self-ipis by the 2LS from one vcore to another), and things
+like that.  There are two types: public and private.  Private will only be
+handled by that vcore.  Public might be handled by another vcore.
+
 Notif_table: This is a list of event_q*s that correspond to certain
 unexpected/"one-sided" events the kernel sends to the process.  It is similar
 to an IRQ table in the kernel.  Each event_q tells the kernel how the process
@@ -84,6 +91,10 @@ payloads into a process's address space.  Note that producers don't trust each
 other either (in the event of weirdness, the producers give up and say the
 buffer is full).  This means that a process can produce for one of its ev_qs
 (which is what they need to do to send message to itself).
+
+UCQ: "unbounded concurrent queue".  This is a data structure allowing the kernel
+to produce an unbounded number of messages for the process to consume.  The main
+limitation to the number of messages is RAM.  Check out its documentation.
 
 2. Async Syscalls and I/O
 ====================
@@ -352,10 +363,24 @@ poll its own ev_q, so you won't need the indirection event.
 
 Additionally, note that IPIs and INDIRs can be spurious.  It's not a big deal to
 receive and IPI and have nothing to do, or to be told to check an empty ev_q.
-All of the event handling code can deal with this.  The only thing you shouldn't
-do is have one vcore handle another's VCPD.  That mbox is meant for
-vcore-business.  Never use a VCPD for messages you might want to receive if that
-vcore is offline.
+All of the event handling code can deal with this.
+
+INDIR events are sent to the VCPD public mbox, which means they will get handled
+if the vcore gets preempted.  Any other messages sent here will also get handled
+during a preemption.  However, the only type of messages you should use this for
+are ones that can handle spurious messages.  The completion of a syscall is an
+example of a message that cannot be spurious.  Since INDIRs can be spurious, we
+can use the public mbox.  (Side note: the kernel may spam INDIRs in attempting
+to make sure you get the message on a vcore that didn't yield.)
+
+Never use a VCPD mbox (public or private) for messages you might want to receive
+if that vcore is offline.  If you want to be sure to get a message, create your
+own ev_q and set flags for INDIR, FALLBACK, and IPI.  There's no guarantee a
+*specific* message will get looked at.  In cases where it won't, the kernel will
+send that message to another vcore.  For example, if the kernel posts an INDIR
+to a VCPD mbox (the public one btw) and it loses a race with the vcore yielding,
+the vcore might never see that message.  However, the kernel knows it lost the
+race, and will find another vcore to send it to.
 
 3.3.2: Fallback
 ---------------
@@ -428,21 +453,7 @@ this can be a bit tricky if you have multiple places pointing to the same ev_q
 3.3.3: Fallback and Preemption
 ---------------
 FALLBACK doesn't protect you from preemptions.  A vcore can be preempted and
-have INDIRs in its VCPD.  Dealing with this is part of the 2LSs job.  The 2LS
-must check the ev_mboxes/ev_qs of all ev_qs that could send INDIRS to the
-offline vcore.  There could be INDIRS in the VCPD that are just lying there.
-The 2LS knows which ev_qs these are (such as for completed syscalls), and for
-many things, this will be a common ev_q (such as for 'vcore-x-was-preempted').
-
-A couple things will ameliorate this:
-1) the 2LS can inspect the VCPD of the target.  If it is empty, then we don't
-have to worry about any INDIRs, and we're done worrying about their messages
-(though we still have to worry about them being stuck in vcore context and
-having a uthread).  Also note you only need to check the UCQ, since INDIRs must
-be messages, not bits.
-2) the kernel could initiate FALLBACK if the vcore has a preempt pending, which
-ought to cut down on this happening frequently. (we don't do this yet, and
-probably never will, since it complicates the design).
+have INDIRs in its VCPD.
 
 It is tempting to just use sys_change_vcore(), which will change the calling
 vcore to the new one.  This should only be used to "unstick" a vcore.  A vcore
@@ -463,6 +474,20 @@ sys_change_vcore().  We want the new vcore to know the old vcore was put
 offline: a preemption (albeit one that it chose to do, and one that isn't stuck
 in vcore context).
 
+One older way to deal with this was to force the 2LS to deal with this. The 2LS
+would check the ev_mboxes/ev_qs of all ev_qs that could send INDIRS to the
+offline vcore.  There could be INDIRS in the VCPD that are just lying there.
+The 2LS knows which ev_qs these are (such as for completed syscalls), and for
+many things, this will be a common ev_q (such as for 'vcore-x-was-preempted').
+However, this is a huge pain in the ass, since a preempted vcore could have the
+FALLBACK INDIR for an ev_q associated with another vcore.  To deal with this,
+the 2LS would need to check *every* ev_q that requests INDIRs.  We don't do
+this.
+
+Instead, we simply have the remote core check the VCPD public mbox of the
+preempted vcore.  INDIRs (and other vcore business that other vcores can handle)
+will get sorted here.
+
 3.3.5: Lists to Find Vcores
 ---------------
 A process has three lists: online, bulk_preempt, and inactive.  These not only
@@ -475,6 +500,37 @@ the first on the list, then it hasn't proc_yield()ed yet, and it will eventually
 restart when it tries to yield.  And this all works without locking the
 proc_lock.  There are a bunch more details and races avoided.  Check the code
 out.
+
+3.3.6: Vcore Business and the VCPD mboxs
+---------------
+There are two types of VCPD mboxes: public and private.  Public ones will get
+handled during preemption recovery.  Messages sent here need to be handle-able
+by any vcore.  Private messages are for that specific vcore.  In the common
+case, the public mbox will usually only get looked at by its vcore.  Only during
+recovery and some corner cases will we deal with it remotely.
+
+Here's some guidelines: if you message is spammy and the handler can deal with
+spurious events and it doesn't need to be on a specific vcore, then go with
+public.  Examples of public mbox events are ones that need to be spammed:
+preemption recovery, INDIRs, etc.  Note that you won't need to worry about
+these: uthread code and the kernel handle them.  But if you have something
+similar, then that's where it would go.  You can also send non-spammy things,
+but there's no guarantee they'll be looked at.
+
+Some messages should only be sent to the private mbox.  These include ones that
+make no sense for other vcores to handle.  Examples: 2LS IPIs/preemptions (like
+"change your scheduling policy vcore 3", preemption-pending notifs from the
+kernel, timer interrupts, etc.
+
+An example of something that shouldn't be sent to either is syscall completions.
+They can't be spammed, so you can't send them around like INDIRs.  And they need
+to be dealt with.  Other than carefully-spammed public messages, there's no
+guarantee of getting a message for certain scenarios (yields).  Instead, use an
+ev_q with INDIR set.
+
+Also note that a 2LS could set up a big ev_q with EVENT_IPI and not EVENT_INDIR,
+and then poll for that in their vcore_entry().  This is equivalent to setting up
+a small ev_q with EVENT_IPI and pointing it at the private mbox.
 
 3.4 Application-specific Event Handling
 ---------------------------------------
@@ -618,7 +674,9 @@ are issues with preemption recovery if you do.  In short, if two uthreads are
 both DONT_MIGRATE with notifs enabled on two different vcores, and one vcore
 gets preempted while the other gets an IPI telling it to recover the other one,
 both could keep bouncing back and forth if they handle their preemption
-*messages* without dealing with their own DONT_MIGRATEs first.
+*messages* without dealing with their own DONT_MIGRATEs first.  Note that the
+preemption recovery code can handle having a DONT_MIGRATE thread on the vcore.
+This is a special case, and it is very careful about how cur_uthread works.
 
 All uses of DONT_MIGRATE must reenable notifs (and check messages) at some
 point.  One such case is uthread_yield().  Another is mcs_unlock_notifsafe().

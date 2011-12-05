@@ -458,7 +458,8 @@ int mon_notify(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 	msg.ev_type = strtol(argv[2], 0, 0);
 	if (argc == 4) {
 		vcoreid = strtol(argv[3], 0, 0);
-		post_vcore_event(p, &msg, vcoreid);
+		/* This will go to the private mbox */
+		post_vcore_event(p, &msg, vcoreid, EVENT_VCORE_PRIVATE);
 		proc_notify(p, vcoreid);
 	} else {
 		/* o/w, try and do what they want */

@@ -12,7 +12,7 @@
 int main(int argc, char** argv)
 {
 	/* Get EV_ALARM on vcore 1, with IPI. */
-	enable_kevent(EV_ALARM, 1, EVENT_IPI);
+	enable_kevent(EV_ALARM, 1, EVENT_IPI | EVENT_VCORE_PRIVATE);
 
 	vcore_request(max_vcores());
 
@@ -25,7 +25,7 @@ void vcore_entry(void)
 	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[0];
 	vcpd->notif_disabled = FALSE;
 
-	unsigned int ev_type = get_event_type(&vcpd->ev_mbox);
+	unsigned int ev_type = get_event_type(&vcpd->ev_mbox_private);
 	if (ev_type == EV_ALARM)
 		printf("[T]:009:E:%llu\n", read_tsc());
 	while(1);

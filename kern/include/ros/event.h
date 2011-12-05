@@ -17,13 +17,16 @@
 #define EVENT_INDIR				0x002	/* send an indirection event to vcore */
 #define EVENT_FALLBACK			0x004	/* pick another vcore if it's offline */
 #define EVENT_NOMSG				0x008	/* just send the bit, not the msg */
-#define EVENT_ROUNDROBIN		0x010	/* pick a vcore, RR style */
-#define EVENT_VCORE_APPRO		0x020	/* send to where the kernel wants */
-#define EVENT_NOTHROTTLE		0x040	/* send all alerts (no throttling) */
-#define EVENT_VCORE_MUST_RUN	0x080	/* Alerts go to a vcore that will run */
+#define EVENT_NOTHROTTLE		0x010	/* send all alerts (no throttling) */
+#define EVENT_VCORE_MUST_RUN	0x020	/* Alerts go to a vcore that will run */
+/* Not seriously used flags */
+#define EVENT_ROUNDROBIN		0x040	/* pick a vcore, RR style */
+#define EVENT_VCORE_APPRO		0x080	/* send to where the kernel wants */
+#define EVENT_VCORE_PRIVATE		0x100	/* Will go to the private VCPD mbox */
+
 /* Flags from the program to the 2LS */
-#define EVENT_JUSTHANDLEIT		0x100	/* 2LS should handle the ev_q */
-#define EVENT_THREAD			0x200	/* spawn thread to handle ev_q */
+#define EVENT_JUSTHANDLEIT		0x200	/* 2LS should handle the ev_q */
+#define EVENT_THREAD			0x400	/* spawn thread to handle ev_q */
 
 /* Event Message Types */
 #define EV_NONE					 0
@@ -102,7 +105,8 @@ struct preempt_data {
 	bool						notif_disabled;		/* vcore unwilling to recv*/
 	bool						notif_pending;		/* notif k_msg on the way */
 	bool						can_rcv_msg;		/* can receive FALLBACK */
-	struct event_mbox			ev_mbox;
+	struct event_mbox			ev_mbox_public;		/* can be read remotely */
+	struct event_mbox			ev_mbox_private;	/* for this vcore only */
 };
 
 #endif /* ROS_INC_EVENT_H */

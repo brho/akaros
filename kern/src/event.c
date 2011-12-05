@@ -16,11 +16,24 @@
 #include <assert.h>
 #include <pmap.h>
 
-/* Note this returns the user address of the mbox, not the KVA.  You'll need
- * current loaded to access this, and it will work for any process. */
-static struct event_mbox *get_proc_ev_mbox(uint32_t vcoreid)
+/* Note these three helpers return the user address of the mbox, not the KVA.
+ * Load current to access this, and it will work for any process. */
+static struct event_mbox *get_vcpd_mbox_priv(uint32_t vcoreid)
 {
-	return &__procdata.vcore_preempt_data[vcoreid].ev_mbox;
+	return &__procdata.vcore_preempt_data[vcoreid].ev_mbox_private;
+}
+
+static struct event_mbox *get_vcpd_mbox_pub(uint32_t vcoreid)
+{
+	return &__procdata.vcore_preempt_data[vcoreid].ev_mbox_public;
+}
+
+static struct event_mbox *get_vcpd_mbox(uint32_t vcoreid, int ev_flags)
+{
+	if (ev_flags & EVENT_VCORE_PRIVATE)
+		return get_vcpd_mbox_priv(vcoreid);
+	else
+		return get_vcpd_mbox_pub(vcoreid);
 }
 
 /* Posts a message to the mbox, subject to flags.  Feel free to send 0 for the
@@ -67,7 +80,7 @@ static void send_indir_to_vcore(struct event_queue *ev_q, uint32_t vcoreid)
 	struct event_msg local_msg = {0};
 	local_msg.ev_type = EV_EVENT;
 	local_msg.ev_arg3 = ev_q;
-	post_ev_msg(get_proc_ev_mbox(vcoreid), &local_msg, 0);
+	post_ev_msg(get_vcpd_mbox_pub(vcoreid), &local_msg, 0);
 	/* Set notif pending, so userspace doesn't miss the INDIR while yielding */
 	wmb(); /* Ensure ev_msg write is before notif_pending */
 	vcpd->notif_pending = TRUE;
@@ -324,7 +337,8 @@ void send_event(struct proc *p, struct event_queue *ev_q, struct event_msg *msg,
 	/* If we're going with APPRO, we use the kernel's suggested vcore's ev_mbox.
 	 * vcoreid is already what the kernel suggests. */
 	if (ev_q->ev_flags & EVENT_VCORE_APPRO) {
-		ev_mbox = get_proc_ev_mbox(vcoreid);
+		/* flags determine if it's private (like a preempt pending) or not */
+		ev_mbox = get_vcpd_mbox(vcoreid, ev_q->ev_flags);
 	} else {	/* common case */
 		ev_mbox = ev_q->ev_mbox;
 		vcoreid = ev_q->ev_vcore;
@@ -344,7 +358,7 @@ void send_event(struct proc *p, struct event_queue *ev_q, struct event_msg *msg,
 		 * RR probably are non-vcore-business, and thus inappropriate for a VCPD
 		 * ev_mbox. */
 		if (!ev_mbox)
-			ev_mbox = get_proc_ev_mbox(vcoreid);
+			ev_mbox = get_vcpd_mbox(vcoreid, ev_q->ev_flags);
 	}
 	/* At this point, we ought to have the right mbox to send the msg to, and
 	 * which vcore to send an IPI to (if we send one).  The mbox could be the
@@ -367,7 +381,7 @@ void send_event(struct proc *p, struct event_queue *ev_q, struct event_msg *msg,
 	post_ev_msg(ev_mbox, msg, ev_q->ev_flags);
 	wmb();	/* ensure ev_msg write is before alert_vcore() */
 	/* Help out userspace a bit by checking for a potentially confusing bug */
-	if ((ev_mbox == get_proc_ev_mbox(vcoreid)) &&
+	if ((ev_mbox == get_vcpd_mbox_pub(vcoreid)) &&
 	    (ev_q->ev_flags & EVENT_INDIR))
 		printk("[kernel] User-bug: ev_q has an INDIR with a VCPD ev_mbox!\n");
 	/* Prod/alert a vcore with an IPI or INDIR, if desired */
@@ -392,15 +406,22 @@ void send_kernel_event(struct proc *p, struct event_msg *msg, uint32_t vcoreid)
 		send_event(p, ev_q, msg, vcoreid);
 }
 
-/* Writes the msg to the vcpd/default mbox of the vcore.  Needs to load current,
- * but doesn't need to care about what the process wants.  Note this isn't
- * commonly used - just the monitor and sys_self_notify(). */
-void post_vcore_event(struct proc *p, struct event_msg *msg, uint32_t vcoreid)
+/* Writes the msg to the vcpd mbox of the vcore.  If you want the private mbox,
+ * send in the ev_flag EVENT_VCORE_PRIVATE.  If not, the message could
+ * be received by other vcores if the given vcore is offline/preempted/etc.
+ * Whatever other flags you pass in will get sent to post_ev_msg.  Currently,
+ * the only one that will get looked at is NO_MSG (set a bit).
+ *
+ * This needs to load current (switch_to), but doesn't need to care about what
+ * the process wants.  Note this isn't commonly used - just the monitor and
+ * sys_self_notify(). */
+void post_vcore_event(struct proc *p, struct event_msg *msg, uint32_t vcoreid,
+                      int ev_flags)
 {
 	/* Need to set p as current to post the event */
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	struct proc *old_proc = switch_to(p);
 	/* *ev_mbox is the user address of the vcpd mbox */
-	post_ev_msg(get_proc_ev_mbox(vcoreid), msg, 0);	/* no chance for a NOMSG */
+	post_ev_msg(get_vcpd_mbox(vcoreid, ev_flags), msg, ev_flags);
 	switch_back(p, old_proc);
 }

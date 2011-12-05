@@ -350,10 +350,10 @@ static int pthread_lib_init(void)
 	/* Tell the kernel where and how we want to receive events.  This is just an
 	 * example of what to do to have a notification turned on.  We're turning on
 	 * USER_IPIs, posting events to vcore 0's vcpd, and telling the kernel to
-	 * send to vcore 0.  Note sys_self_notify will ignore the vcoreid pref.
-	 * Also note that enable_kevent() is just an example, and you probably want
-	 * to use parts of event.c to do what you want. */
-	enable_kevent(EV_USER_IPI, 0, EVENT_IPI);
+	 * send to vcore 0.  Note sys_self_notify will ignore the vcoreid and
+	 * private preference.  Also note that enable_kevent() is just an example,
+	 * and you probably want to use parts of event.c to do what you want. */
+	enable_kevent(EV_USER_IPI, 0, EVENT_IPI | EVENT_VCORE_PRIVATE);
 
 	/* Handle syscall events. */
 	ev_handlers[EV_SYSCALL] = pth_handle_syscall;

@@ -73,11 +73,16 @@ struct event_queue *get_event_q(void)
 	return ev_q;
 }
 
-/* Gets a small ev_q, with ev_mbox pointing to the vcpd mbox of vcoreid */
-struct event_queue *get_event_q_vcpd(uint32_t vcoreid)
+/* Gets a small ev_q, with ev_mbox pointing to the vcpd mbox of vcoreid.  If
+ * ev_flags has EVENT_VCORE_PRIVATE set, it'll give you the private mbox.  o/w,
+ * you'll get the public one. */
+struct event_queue *get_event_q_vcpd(uint32_t vcoreid, int ev_flags)
 {
 	struct event_queue *ev_q = get_event_q();
-	ev_q->ev_mbox = &__procdata.vcore_preempt_data[vcoreid].ev_mbox;
+	if (ev_flags & EVENT_VCORE_PRIVATE)
+		ev_q->ev_mbox = &vcpd_of(vcoreid)->ev_mbox_private;
+	else
+		ev_q->ev_mbox = &vcpd_of(vcoreid)->ev_mbox_public;
 	return ev_q;
 }
 
@@ -104,12 +109,15 @@ struct event_queue *clear_kevent_q(unsigned int ev_type)
 }
 
 /* Enables an IPI/event combo for ev_type sent to vcoreid's default mbox.  IPI
- * if you want one or not.  This is the simplest thing applications may want,
- * and shows how you can put the other event functions together to get similar
- * things done. */
+ * if you want one or not.  If you want the event to go to the vcore private
+ * mbox (meaning no other core should ever handle it), send in
+ * EVENT_VCORE_PRIVATE with ev_flags.
+ *
+ * This is the simplest thing applications may want, and shows how you can put
+ * the other event functions together to get similar things done. */
 void enable_kevent(unsigned int ev_type, uint32_t vcoreid, int ev_flags)
 {
-	struct event_queue *ev_q = get_event_q_vcpd(vcoreid);
+	struct event_queue *ev_q = get_event_q_vcpd(vcoreid, ev_flags);
 	ev_q->ev_flags = ev_flags;
 	ev_q->ev_vcore = vcoreid;
 	ev_q->ev_handler = 0;
@@ -179,7 +187,7 @@ int handle_mbox_msgs(struct event_mbox *ev_mbox)
 /* Handle an mbox.  This is the receive-side processing of an event_queue.  It
  * takes an ev_mbox, since the vcpd mbox isn't a regular ev_q.  For now, we
  * check for preemptions between each event handler. */
-static int handle_mbox(struct event_mbox *ev_mbox, unsigned int flags)
+int handle_mbox(struct event_mbox *ev_mbox, unsigned int flags)
 {
 	int retval = 0;
 	uint32_t vcoreid = vcore_id();
@@ -232,11 +240,14 @@ void handle_ev_ev(struct event_msg *ev_msg, unsigned int ev_type)
  * number of events handled. */
 int handle_events(uint32_t vcoreid)
 {
-	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
+	struct preempt_data *vcpd = vcpd_of(vcoreid);
+	int retval = 0;
 	/* TODO: EVENT_NOMSG checks could be painful.  we could either keep track of
 	 * whether or not the 2LS has a NOMSG ev_q pointing to its vcpd, or have the
 	 * kernel set another flag for "bits" */
-	return handle_mbox(&vcpd->ev_mbox, EVENT_NOMSG);
+	retval += handle_mbox(&vcpd->ev_mbox_private, EVENT_NOMSG);
+	retval += handle_mbox(&vcpd->ev_mbox_public, EVENT_NOMSG);
+	return retval;
 }
 
 /* Handles the events on ev_q IAW the event_handlers[].  If the ev_q is
