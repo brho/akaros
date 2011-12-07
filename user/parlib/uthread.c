@@ -11,6 +11,9 @@ struct schedule_ops default_2ls_ops = {0};
 struct schedule_ops *sched_ops __attribute__((weak)) = &default_2ls_ops;
 
 __thread struct uthread *current_uthread = 0;
+/* For remote VCPD mbox event handling */
+__thread bool uth_handle_an_mbox = FALSE;
+__thread uint32_t uth_rem_vcoreid;
 /* ev_q for all preempt messages (handled here to keep 2LSs from worrying
  * extensively about the details.  Will call out when necessary. */
 struct event_queue *preempt_ev_q;
@@ -88,6 +91,12 @@ void __attribute__((noreturn)) uthread_vcore_entry(void)
 	 * DONT_MIGRATE uthread. */
 	if (current_uthread && (current_uthread->flags & UTHREAD_DONT_MIGRATE))
 		__run_current_uthread_raw();
+	/* Check and see if we wanted ourselves to handle a remote VCPD mbox */
+	if (uth_handle_an_mbox) {
+		uth_handle_an_mbox = FALSE;
+		/* TODO: need to catch the bits (for now), like in handle_events */
+		handle_mbox(&vcpd_of(uth_rem_vcoreid)->ev_mbox_public, EVENT_NOMSG);
+	}
 	/* Otherwise, go about our usual vcore business (messages, etc). */
 	check_preempt_pending(vcoreid);
 	handle_events(vcoreid);
@@ -410,6 +419,23 @@ void uth_enable_notifs(void)
 		cmb();	/* don't enable before ~DONT_MIGRATE */
 		enable_notifs(vcore_id());
 	}
+}
+
+/* This makes the current core handle a remote vcore's VCPD public mbox events.
+ *
+ * We need to reset the stack and deal with it in vcore entry to avoid recursing
+ * deeply and running off the transition stack.  (handler calling handle event)
+ * */
+static void handle_vcpd_mbox(uint32_t rem_vcoreid)
+{
+	struct preempt_data *vcpd = vcpd_of(vcore_id());
+	/* Tell our future self what to do */
+	uth_handle_an_mbox = TRUE;
+	uth_rem_vcoreid = rem_vcoreid;
+	/* Reset the stack and start over in vcore context */
+	set_stack_pointer((void*)vcpd->transition_stack);
+	uthread_vcore_entry();
+	assert(0);
 }
 
 static void handle_vc_preempt(struct event_msg *ev_msg, unsigned int ev_type)
