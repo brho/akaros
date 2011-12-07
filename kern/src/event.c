@@ -36,15 +36,30 @@ static struct event_mbox *get_vcpd_mbox(uint32_t vcoreid, int ev_flags)
 		return get_vcpd_mbox_pub(vcoreid);
 }
 
+/* Can we message the vcore?  (Will it check its messages).  Note this checks
+ * procdata via the user pointer. */
+static bool can_msg_vcore(uint32_t vcoreid)
+{
+	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
+	return vcpd->can_rcv_msg;
+}
+
+/* Says a vcore can be messaged.  Only call this once you are sure this is true
+ * (holding the proc_lock, etc). */
+static void set_vcore_msgable(uint32_t vcoreid)
+{
+	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
+	vcpd->can_rcv_msg = TRUE;
+}
+
 /* Posts a message to the mbox, subject to flags.  Feel free to send 0 for the
  * flags if you don't want to give them the option of EVENT_NOMSG (which is what
  * we do when sending an indirection event).  Make sure that if mbox is a user
  * pointer, that you've checked it *and* have that processes address space
  * loaded.  This can get called with a KVA for mbox. */
-static void post_ev_msg(struct event_mbox *mbox, struct event_msg *msg,
-                        int ev_flags)
+static void post_ev_msg(struct proc *p, struct event_mbox *mbox,
+                        struct event_msg *msg, int ev_flags)
 {
-	struct proc *p = current;
 	printd("[kernel] Sending event type %d to mbox %08p\n", msg->ev_type, mbox);
 	/* Sanity check */
 	assert(p);
@@ -56,77 +71,65 @@ static void post_ev_msg(struct event_mbox *mbox, struct event_msg *msg,
 	}
 }
 
-/* Can we alert the vcore?  (Will it check its messages).  Note this checks
- * procdata via the user pointer. */
-static bool can_alert_vcore(uint32_t vcoreid)
+/* Helper: use this when sending a message to a VCPD mbox.  It just posts to the
+ * ev_mbox and sets notif pending.  Note this uses a userspace address for the
+ * VCPD (though not a user's pointer). */
+static void post_vc_msg(struct proc *p, uint32_t vcoreid,
+                        struct event_mbox *ev_mbox, struct event_msg *ev_msg,
+                        int ev_flags)
 {
 	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
-	return vcpd->can_rcv_msg;
-}
-
-/* Says a vcore can be alerted.  Only call this once you are sure this is true
- * (holding the proc_lock, etc. */
-static void set_vcore_alertable(uint32_t vcoreid)
-{
-	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
-	vcpd->can_rcv_msg = TRUE;
-}
-
-/* Helper to send an indir, called from a couple places.  Note this uses a
- * userspace address for the VCPD (though not a user's pointer). */
-static void send_indir_to_vcore(struct event_queue *ev_q, uint32_t vcoreid)
-{
-	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
-	struct event_msg local_msg = {0};
-	local_msg.ev_type = EV_EVENT;
-	local_msg.ev_arg3 = ev_q;
-	post_ev_msg(get_vcpd_mbox_pub(vcoreid), &local_msg, 0);
-	/* Set notif pending, so userspace doesn't miss the INDIR while yielding */
+	post_ev_msg(p, ev_mbox, ev_msg, ev_flags);
+	/* Set notif pending so userspace doesn't miss the message while yielding */
 	wmb(); /* Ensure ev_msg write is before notif_pending */
+	/* proc_notify() also sets this, but the ev_q might not have requested an
+	 * IPI, so we have to do it here too. */
 	vcpd->notif_pending = TRUE;
 }
 
-/* Yet another helper, will post INDIRs and IPI a vcore, based on the needs of
- * an ev_q.  This is called by alert_vcore(), which handles finding the vcores
- * to alert. */
-static void __alert_vcore(struct proc *p, struct event_queue *ev_q,
-                          uint32_t vcoreid)
+/* Helper: will IPI / proc_notify if the flags say so.  We also check to make
+ * sure it is mapped (slight optimization) */
+static void try_notify(struct proc *p, uint32_t vcoreid, int ev_flags)
 {
-	if (ev_q->ev_flags & EVENT_INDIR)
-		send_indir_to_vcore(ev_q, vcoreid);
-	/* Only send the IPI if it is also online (optimization).  There's a race
-	 * here, but proc_notify should be able to handle it (perhaps in the
-	 * future). TODO: we might need to send regardless of mapping. */
-	if ((ev_q->ev_flags & EVENT_IPI) && vcore_is_mapped(p, vcoreid))
+	if ((ev_flags & EVENT_IPI) && vcore_is_mapped(p, vcoreid))
 		proc_notify(p, vcoreid);
 }
 
-/* Attempts to alert a vcore that may or may not have 'can_rcv_msg' set.  If so,
- * we'll post the message and the message will eventually get dealt with (when
- * the vcore runs or when it is preempte-recovered). */
-static bool try_alert_vcore(struct proc *p, struct event_queue *ev_q,
-                            uint32_t vcoreid)
+/* Helper: sends the message and an optional IPI to the vcore.  Sends to the
+ * public mbox.  This is meant for spammy messages. */
+static void spam_vcore(struct proc *p, uint32_t vcoreid,
+                       struct event_msg *ev_msg, int ev_flags)
+{
+	post_vc_msg(p, vcoreid, get_vcpd_mbox_pub(vcoreid), ev_msg, ev_flags);
+	try_notify(p, vcoreid, ev_flags);
+}
+
+/* Attempts to message a vcore that may or may not have 'can_rcv_msg' set.  If
+ * so, we'll post the message and the message will eventually get dealt with
+ * (when the vcore runs or when it is preempte-recovered). */
+static bool try_spam_vcore(struct proc *p, uint32_t vcoreid,
+                           struct event_msg *ev_msg, int ev_flags)
 {
 	/* Not sure if we can or not, so check before spamming.  Technically, the
 	 * only critical part is that we __alert, then check can_alert. */
-	if (can_alert_vcore(vcoreid)) {
-		__alert_vcore(p, ev_q, vcoreid);
+	if (can_msg_vcore(vcoreid)) {
+		spam_vcore(p, vcoreid, ev_msg, ev_flags);
 		wrmb();	/* prev write (notif_pending) must come before following reads*/
-		if (can_alert_vcore(vcoreid))
+		if (can_msg_vcore(vcoreid))
 			return TRUE;
 	}
 	return FALSE;
 }
 
-/* Helper: will try to alert (INDIR/IPI) a list member (lists of vcores).  We
+/* Helper: will try to message (INDIR/IPI) a list member (lists of vcores).  We
  * use this on the online and bulk_preempted vcore lists.  If this succeeds in
  * alerting a vcore on the list, it'll return TRUE.  We need to be careful here,
  * since we're reading a list that could be concurrently modified.  The
  * important thing is that we can always fail if we're unsure (such as with
  * lists being temporarily empty).  The caller will be able to deal with it via
  * the ultimate fallback. */
-static bool __alert_list_member(struct vcore_tailq *list, struct proc *p,
-                                struct event_queue *ev_q)
+static bool spam_list_member(struct vcore_tailq *list, struct proc *p,
+                             struct event_msg *ev_msg, int ev_flags)
 {
 	struct vcore *vc, *vc_first;
 	uint32_t vcoreid;
@@ -135,16 +138,16 @@ static bool __alert_list_member(struct vcore_tailq *list, struct proc *p,
 	/* If the list appears empty, we'll bail out (failing) after the loop. */
 	while (vc) {
 		vcoreid = vcore2vcoreid(p, vc);
-		/* post the alert.  Not using the try_alert_vcore() helper since I want
+		/* post the alert.  Not using the try_spam_vcore() helper since I want
 		 * something more customized for the lists. */
-		__alert_vcore(p, ev_q, vcoreid);
+		spam_vcore(p, vcoreid, ev_msg, ev_flags);
 		wrmb();	/* prev write (notif_pending) must come before following reads*/
 		/* if they are still alertable after we sent the msg, then they'll get
 		 * it before yielding (racing with userspace yield here).  This check is
 		 * not as critical as the next one, but will allow us to alert vcores
 		 * that happen to concurrently be moved from the active to the
 		 * bulk_preempt list. */
-		if (can_alert_vcore(vcoreid))
+		if (can_msg_vcore(vcoreid))
 			return TRUE;
 		/* As a backup, if they are still the first on the list, then they are
 		 * still going to get the message.  For the online list, proc_yield()
@@ -171,18 +174,18 @@ static bool __alert_list_member(struct vcore_tailq *list, struct proc *p,
 	return FALSE;
 }
 
-/* Helper that alerts a vcore, by IPI and/or INDIR, that it needs to check the
- * ev_q.  Handles FALLBACK and other tricky things.  Returns which vcore was
- * alerted.  The only caller of this is send_event(), and this makes it a little
- * clearer/easier.
+/* This makes sure ev_msg is sent to some vcore, preferring vcoreid.
  *
  * One of the goals of FALLBACK (and this func) is to allow processes to yield
- * cores without fear of losing messages (INDIR messages, btw (aka, non-vcore
- * business)).
+ * cores without fear of losing messages.  Even when yielding and getting
+ * preempted, if your message is spammed, it will get to some vcore.  If
+ * MUST_RUN is set, it'll get to a running vcore.  Messages that you send like
+ * this must be able to handle spurious reads, since more than one vcore is
+ * likely to get the message and handle it.
  *
  * We try the desired vcore, using 'can_rcv_msg'.  Failing that, we'll search
  * the online and then the bulk_preempted lists.  These lists serve as a way to
- * find likely alertable vcores.  __alert_list_member() helps us with them,
+ * find likely messageable vcores.  spam_list_member() helps us with them,
  * failing if anything seems to go wrong.  At which point we just lock and try
  * to deal with things.  In that scenario, we most likely would need to lock
  * anyway to wake up the process (was WAITING).
@@ -192,45 +195,14 @@ static bool __alert_list_member(struct vcore_tailq *list, struct proc *p,
  * since a given vcore that was preempted will be removed from that list before
  * we try to send_event() (in theory, there isn't code that can send that event
  * yet).  Someone else will get the event and wake up the preempted vcore. */
-static void alert_vcore(struct proc *p, struct event_queue *ev_q,
-                        uint32_t vcoreid)
+static void spam_public_msg(struct proc *p, struct event_msg *ev_msg,
+							uint32_t vcoreid, int ev_flags)
 {
 	struct vcore *vc;
-	/* If an alert is already pending and they don't want repeats, just return.
-	 * One of the few uses of NOTHROTTLE will be for preempt_msg ev_qs.  Ex: an
-	 * INDIR was already sent to the preempted vcore, then alert throttling
-	 * would stop another vcore from getting the message about the original
-	 * vcore. */
-	if (!(ev_q->ev_flags & EVENT_NOTHROTTLE) && (ev_q->ev_alert_pending))
-		return;
-	/* We'll eventually get an INDIR through, so don't send any more til
-	 * userspace toggles this.  Regardless of other writers to this flag, we
-	 * eventually send an alert that causes userspace to turn throttling off
-	 * again (before handling all of the ev_q's events).
-	 *
-	 * This will also squelch IPIs, since there's no reason to send the IPI if
-	 * the INDIR is still un-acknowledged.  The vcore is either in vcore
-	 * context, attempting to deal with the INDIR, or offline.  This statement
-	 * is probably true. */
-	if (ev_q->ev_flags & EVENT_INDIR) {
-		ev_q->ev_alert_pending = TRUE;
-		wmb();	/* force this write to happen before any event writes */
-	}
-	/* Don't care about FALLBACK, just send and be done with it.  TODO:
-	 * considering getting rid of FALLBACK as an option and making it mandatory
-	 * when you want an INDIR.  Having trouble thinking of when you'd want an
-	 * INDIR but not a FALLBACK. */
-	if (!(ev_q->ev_flags & EVENT_FALLBACK)) {
-		if (ev_q->ev_flags & EVENT_INDIR)
-			printk("[kernel] INDIR requested without FALLBACK, prob a bug.\n");
-		__alert_vcore(p, ev_q, vcoreid);
-		return;
-	}
-	/* If we're here, we care about FALLBACK. First, try posting to the desired
-	 * vcore (so long as we don't have to send it to a vcore that will run, like
-	 * we do for preempt messages). */
-	if (!(ev_q->ev_flags & EVENT_VCORE_MUST_RUN) &&
-	   (try_alert_vcore(p, ev_q, vcoreid)))
+	/* First, try posting to the desired vcore (so long as we don't have to send
+	 * it to a vcore that will run, like we do for preempt messages). */
+	if (!(ev_flags & EVENT_VCORE_MUST_RUN) &&
+	   (try_spam_vcore(p, vcoreid, ev_msg, ev_flags)))
 		return;
 	/* If the process is WAITING, let's just jump to the fallback */
 	if (p->state == PROC_WAITING)
@@ -238,9 +210,9 @@ static void alert_vcore(struct proc *p, struct event_queue *ev_q,
 	/* If we're here, the desired vcore is unreachable, but the process is
 	 * probably RUNNING_M (online_vs) or RUNNABLE_M (bulk preempted or recently
 	 * woken up), so we'll need to find another vcore. */
-	if (__alert_list_member(&p->online_vcs, p, ev_q))
+	if (spam_list_member(&p->online_vcs, p, ev_msg, ev_flags))
 		return;
-	if (__alert_list_member(&p->bulk_preempted_vcs, p, ev_q))
+	if (spam_list_member(&p->bulk_preempted_vcs, p, ev_msg, ev_flags))
 		return;
 	/* Last chance, let's check the head of the inactives.  It might be
 	 * alertable (the kernel set it earlier due to an event, or it was a
@@ -248,7 +220,7 @@ static void alert_vcore(struct proc *p, struct event_queue *ev_q,
 	 * proc_lock. */
 	vc = TAILQ_FIRST(&p->inactive_vcs);
 	if (vc) {	/* might be none in rare circumstances */
-		if (try_alert_vcore(p, ev_q, vcore2vcoreid(p, vc))) {
+		if (try_spam_vcore(p, vcore2vcoreid(p, vc), ev_msg, ev_flags)) {
 			/* Need to ensure the proc wakes up, but only if it was WAITING.
 			 * One way for this to happen is if a normal vcore was preempted
 			 * right as another vcore was yielding, and the preempted
@@ -278,14 +250,14 @@ ultimate_fallback:
 		if (vc) {
 			/* there's an online vcore, so just alert it (we know it isn't going
 			 * anywhere), and return */
-			__alert_vcore(p, ev_q, vcore2vcoreid(p, vc));
+			spam_vcore(p, vcore2vcoreid(p, vc), ev_msg, ev_flags);
 			spin_unlock(&p->proc_lock);
 			return;
 		}
 		vc = TAILQ_FIRST(&p->bulk_preempted_vcs);
 		if (vc) {
 			/* the process is bulk preempted, similar deal to above */
-			__alert_vcore(p, ev_q, vcore2vcoreid(p, vc));
+			spam_vcore(p, vcore2vcoreid(p, vc), ev_msg, ev_flags);
 			spin_unlock(&p->proc_lock);
 			return;
 		}
@@ -295,10 +267,10 @@ ultimate_fallback:
 	 * will definitely be woken up) */
 	vc = TAILQ_FIRST(&p->inactive_vcs);
 	assert(vc);
-	__alert_vcore(p, ev_q, vcore2vcoreid(p, vc));
+	spam_vcore(p, vcore2vcoreid(p, vc), ev_msg, ev_flags);
 	/* Set the vcore's alertable flag, to short circuit our last ditch effort
 	 * above */
-	set_vcore_alertable(vcore2vcoreid(p, vc));
+	set_vcore_msgable(vcore2vcoreid(p, vc));
 	/* The first event to catch the process with no online/bp vcores will need
 	 * to wake it up.  (We could be RUNNABLE_M here if another event already woke
 	 * us.) and we didn't get lucky with the penultimate fallback.
@@ -306,6 +278,61 @@ ultimate_fallback:
 	__proc_wakeup(p);
 	spin_unlock(&p->proc_lock);
 	return;
+}
+
+/* Helper: sends an indirection event for an ev_q, preferring vcoreid */
+static void send_indir(struct proc *p, struct event_queue *ev_q,
+                       uint32_t vcoreid)
+{
+	struct event_msg local_msg = {0};
+	/* If an alert is already pending and they don't want repeats, just return.
+	 * One of the few uses of NOTHROTTLE will be for preempt_msg ev_qs.  Ex: an
+	 * INDIR was already sent to the preempted vcore, then alert throttling
+	 * would stop another vcore from getting the message about the original
+	 * vcore. */
+	if (!(ev_q->ev_flags & EVENT_NOTHROTTLE) && (ev_q->ev_alert_pending))
+		return;
+	/* We'll eventually get an INDIR through, so don't send any more til
+	 * userspace toggles this.  Regardless of other writers to this flag, we
+	 * eventually send an alert that causes userspace to turn throttling off
+	 * again (before handling all of the ev_q's events).
+	 *
+	 * This will also squelch IPIs, since there's no reason to send the IPI if
+	 * the INDIR is still un-acknowledged.  The vcore is either in vcore
+	 * context, attempting to deal with the INDIR, or offline.  This statement
+	 * is probably true. */
+	ev_q->ev_alert_pending = TRUE;
+	wmb();	/* force this write to happen before any event writes */
+	local_msg.ev_type = EV_EVENT;
+	local_msg.ev_arg3 = ev_q;
+	/* Don't care about FALLBACK, just send and be done with it.  TODO:
+	 * considering getting rid of FALLBACK as an option and making it mandatory
+	 * when you want an INDIR.  Having trouble thinking of when you'd want an
+	 * INDIR but not a FALLBACK. */
+	if (!(ev_q->ev_flags & EVENT_FALLBACK)) {
+		printk("[kernel] INDIR requested without FALLBACK, prob a bug.\n");
+		spam_vcore(p, vcoreid, &local_msg, ev_q->ev_flags);
+		return;
+	}
+	/* At this point, we actually want to send an INDIR (with FALLBACK).
+	 * This will guarantee the message makes it to some vcore.  For flags, we
+	 * only want to send flags relevant to spamming messages. */
+	spam_public_msg(p, &local_msg, vcoreid, ev_q->ev_flags & EVENT_SPAM_FLAGS);
+}
+
+/* Helper that alerts a vcore, by IPI and/or INDIR, that it needs to check the
+ * ev_q.  send_indir() eventually Handles FALLBACK and other tricky things. 
+ * alerted. */
+static void alert_vcore(struct proc *p, struct event_queue *ev_q,
+                        uint32_t vcoreid)
+{
+	/* INDIR will also call try_notify (IPI) later */
+	if (ev_q->ev_flags & EVENT_INDIR) {
+		send_indir(p, ev_q, vcoreid);
+	} else {
+		/* they may want an IPI despite not wanting an INDIR */
+		try_notify(p, vcoreid, ev_q->ev_flags);
+	}
 }
 
 /* Send an event to ev_q, based on the parameters in ev_q's flag.  We don't
@@ -378,7 +405,7 @@ void send_event(struct proc *p, struct event_queue *ev_q, struct event_msg *msg,
 	 * ev_q is a NOMSG, we won't actually memcpy or anything, it'll just be a
 	 * vehicle for sending the ev_type. */
 	assert(msg);
-	post_ev_msg(ev_mbox, msg, ev_q->ev_flags);
+	post_ev_msg(p, ev_mbox, msg, ev_q->ev_flags);
 	wmb();	/* ensure ev_msg write is before alert_vcore() */
 	/* Help out userspace a bit by checking for a potentially confusing bug */
 	if ((ev_mbox == get_vcpd_mbox_pub(vcoreid)) &&
@@ -422,6 +449,6 @@ void post_vcore_event(struct proc *p, struct event_msg *msg, uint32_t vcoreid,
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	struct proc *old_proc = switch_to(p);
 	/* *ev_mbox is the user address of the vcpd mbox */
-	post_ev_msg(get_vcpd_mbox(vcoreid, ev_flags), msg, ev_flags);
+	post_vc_msg(p, vcoreid, get_vcpd_mbox(vcoreid, ev_flags), msg, ev_flags);
 	switch_back(p, old_proc);
 }

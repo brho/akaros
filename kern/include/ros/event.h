@@ -28,6 +28,9 @@
 #define EVENT_JUSTHANDLEIT		0x200	/* 2LS should handle the ev_q */
 #define EVENT_THREAD			0x400	/* spawn thread to handle ev_q */
 
+/* Certain event flags apply to spam/fallback messages */
+#define EVENT_SPAM_FLAGS 		(EVENT_IPI | EVENT_VCORE_MUST_RUN)
+
 /* Event Message Types */
 #define EV_NONE					 0
 #define EV_PREEMPT_PENDING		 1
