@@ -30,7 +30,7 @@ ssize_t     sys_serial_write(void* buf, size_t len);
 ssize_t     sys_serial_read(void* buf, size_t len);
 ssize_t     sys_eth_write(void *COUNT(len) buf, size_t len); 
 ssize_t     sys_eth_read(void *COUNT(len) buf, size_t len);
-size_t      sys_getcpuid(void);
+size_t      sys_getpcoreid(void);
 /* Process Management */
 int         sys_getpid(void);
 int         sys_proc_destroy(int pid, int exitcode);

@@ -234,8 +234,8 @@ static uint16_t sys_cgetc(struct proc *p)
 	return c;
 }
 
-/* Returns the id of the cpu this syscall is executed on. */
-static uint32_t sys_getcpuid(void)
+/* Returns the id of the physical core this syscall is executed on. */
+static uint32_t sys_getpcoreid(void)
 {
 	return core_id();
 }
@@ -1342,7 +1342,7 @@ const static struct sys_table_entry syscall_table[] = {
 	[SYS_reboot] = {(syscall_t)reboot, "reboot!"},
 	[SYS_cputs] = {(syscall_t)sys_cputs, "cputs"},
 	[SYS_cgetc] = {(syscall_t)sys_cgetc, "cgetc"},
-	[SYS_getcpuid] = {(syscall_t)sys_getcpuid, "getcpuid"},
+	[SYS_getpcoreid] = {(syscall_t)sys_getpcoreid, "getpcoreid"},
 	[SYS_getvcoreid] = {(syscall_t)sys_getvcoreid, "getvcoreid"},
 	[SYS_getpid] = {(syscall_t)sys_getpid, "getpid"},
 	[SYS_proc_create] = {(syscall_t)sys_proc_create, "proc_create"},

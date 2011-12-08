@@ -9,9 +9,10 @@ mcs_barrier_t b;
 
 void do_work_son(int vcoreid)
 {
-	int cpuid = sys_getcpuid();
+	int pcoreid = sys_getpcoreid();
 	int pid = sys_getpid();
-	printf("Hello! My Process ID: %d My VCoreID: %d My CPU: %d\n", pid, vcoreid, cpuid);
+	printf("Hello! My Process ID: %d My VCoreID: %d My CPU: %d\n", pid, vcoreid,
+	       pcoreid);
 	mcs_barrier_wait(&b,vcoreid);
 }
 

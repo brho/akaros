@@ -10,7 +10,7 @@
 #define SYS_reboot					 4
 #define SYS_cputs					 5
 #define SYS_cgetc					 6
-#define SYS_getcpuid				 7
+#define SYS_getpcoreid				 7
 #define SYS_getvcoreid				 8
 #define SYS_getpid					 9
 #define SYS_proc_create				10

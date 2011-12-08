@@ -12,9 +12,9 @@ int sys_getpid(void)
 	 return ros_syscall(SYS_getpid, 0, 0, 0, 0, 0, 0);
 }
 
-size_t sys_getcpuid(void)
+size_t sys_getpcoreid(void)
 {
-	 return ros_syscall(SYS_getcpuid, 0, 0, 0, 0, 0, 0);
+	 return ros_syscall(SYS_getpcoreid, 0, 0, 0, 0, 0, 0);
 }
 
 ssize_t sys_cputs(const uint8_t *s, size_t len)
