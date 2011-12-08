@@ -18,6 +18,7 @@
 #include <kdebug.h>
 #include <string.h>
 
+/* Check Intel's SDM 2a for Table 3-17 for the cpuid leaves */
 void print_cpuinfo(void)
 {
 	uint32_t eax, ebx, ecx, edx;
@@ -37,9 +38,9 @@ void print_cpuinfo(void)
 	vendor_id[12] = '\0';
 	cprintf("Vendor ID: %s\n", vendor_id);
 	cprintf("Largest Standard Function Number Supported: %d\n", eax);
-	cpuid(0x80000000, &eax, 0, 0, 0);
+	cpuid(0x80000000, 0x0, &eax, 0, 0, 0);
 	cprintf("Largest Extended Function Number Supported: 0x%08x\n", eax);
-	cpuid(1, &eax, &ebx, &ecx, &edx);
+	cpuid(1, 0x0, &eax, &ebx, &ecx, &edx);
 	family = ((eax & 0x0FF00000) >> 20) + ((eax & 0x00000F00) >> 8);
 	model = ((eax & 0x000F0000) >> 12) + ((eax & 0x000000F0) >> 4);
 	cprintf("Family: %d\n", family);
@@ -104,7 +105,7 @@ void print_cpuinfo(void)
 	if ((edx & (1 << 25)) && (!(edx & (1 << 24))))
 		panic("SSE support, but no FXSAVE!");
 	printk("\n");
-	cpuid(0x80000008, &eax, &ebx, &ecx, &edx);
+	cpuid(0x80000008, 0x0, &eax, &ebx, &ecx, &edx);
 	cprintf("Physical Address Bits: %d\n", eax & 0x000000FF);
 	cprintf("Cores per Die: %d\n", (ecx & 0x000000FF) + 1);
     cprintf("This core's Default APIC ID: 0x%08x\n", lapic_get_default_id());
@@ -117,11 +118,17 @@ void print_cpuinfo(void)
 		cprintf("I am the Boot Strap Processor\n");
 	else
 		cprintf("I am an Application Processor\n");
-	cpuid(0x80000007, &eax, &ebx, &ecx, &edx);
+	cpuid(0x80000007, 0x0, &eax, &ebx, &ecx, &edx);
 	if (edx & 0x00000100)
 		printk("Invariant TSC present\n");
 	else
 		printk("Invariant TSC not present\n");
+	cpuid(0x07, 0x0, &eax, &ebx, &ecx, &edx);
+	if (ebx & 0x00000001)
+		printk("FS/GS Base RD/W supported\n");
+	else
+		printk("FS/GS Base RD/W not supported\n");
+
 }
 
 void show_mapping(uintptr_t start, size_t size)

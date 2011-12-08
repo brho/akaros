@@ -61,7 +61,8 @@ static __inline void write_eflags(uint32_t eflags) __attribute__((always_inline)
 static __inline uint32_t read_ebp(void) __attribute__((always_inline));
 static __inline uint32_t read_eip(void) __attribute__((always_inline));
 static __inline uint32_t read_esp(void) __attribute__((always_inline));
-static __inline void cpuid(uint32_t info, uint32_t *eaxp, uint32_t *ebxp, uint32_t *ecxp, uint32_t *edxp);
+static __inline void cpuid(uint32_t info1, uint32_t info2, uint32_t *eaxp,
+                           uint32_t *ebxp, uint32_t *ecxp, uint32_t *edxp);
 static __inline uint64_t read_msr(uint32_t reg) __attribute__((always_inline));
 static __inline void write_msr(uint32_t reg, uint64_t val) __attribute__((always_inline));
 static __inline uint32_t read_mmreg32(uint32_t reg) __attribute__((always_inline));
@@ -272,12 +273,14 @@ read_esp(void)
 }
 
 static __inline void
-cpuid(uint32_t info, uint32_t *eaxp, uint32_t *ebxp, uint32_t *ecxp, uint32_t *edxp)
+cpuid(uint32_t info1, uint32_t info2, uint32_t *eaxp, uint32_t *ebxp,
+      uint32_t *ecxp, uint32_t *edxp)
 {
 	uint32_t eax, ebx, ecx, edx;
+	/* Can select with both eax (info1) and ecx (info2) */
 	asm volatile("cpuid" 
 		: "=a" (eax), "=b" (ebx), "=c" (ecx), "=d" (edx)
-		: "a" (info));
+		: "a" (info1), "c" (info2));
 	if (eaxp)
 		*eaxp = eax;
 	if (ebxp)

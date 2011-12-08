@@ -79,7 +79,7 @@ static __inline uint64_t
 read_tsc_serialized(void)
 {
     uint64_t tsc;
-	cpuid(0, 0, 0, 0, 0);
+	cpuid(0x0, 0x0, 0, 0, 0, 0);
 	tsc = read_tsc();
 	return tsc;
 }

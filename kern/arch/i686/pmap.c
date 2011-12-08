@@ -72,7 +72,7 @@ nvram_read(int r)
 bool enable_pse(void)
 {
 	uint32_t edx, cr4;
-	cpuid(1, 0, 0, 0, &edx);
+	cpuid(0x1, 0x0, 0, 0, 0, &edx);
 	if (edx & CPUID_PSE_SUPPORT) {
 		cr4 = rcr4();
 		cr4 |= CR4_PSE;

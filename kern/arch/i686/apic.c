@@ -102,7 +102,7 @@ void set_core_timer(uint32_t usec, bool periodic)
 uint32_t lapic_get_default_id(void)
 {
 	uint32_t ebx;
-	cpuid(1, 0, &ebx, 0, 0);
+	cpuid(0x1, 0x0, 0, &ebx, 0, 0);
 	// p6 family only uses 4 bits here, and 0xf is reserved for the IOAPIC
 	return (ebx & 0xFF000000) >> 24;
 }
