@@ -94,8 +94,7 @@ void __attribute__((noreturn)) uthread_vcore_entry(void)
 	/* Check and see if we wanted ourselves to handle a remote VCPD mbox */
 	if (uth_handle_an_mbox) {
 		uth_handle_an_mbox = FALSE;
-		/* TODO: need to catch the bits (for now), like in handle_events */
-		handle_mbox(&vcpd_of(uth_rem_vcoreid)->ev_mbox_public, EVENT_NOMSG);
+		handle_mbox(&vcpd_of(uth_rem_vcoreid)->ev_mbox_public);
 	}
 	/* Otherwise, go about our usual vcore business (messages, etc). */
 	check_preempt_pending(vcoreid);

@@ -69,6 +69,7 @@ struct event_msg {
  * sent (and no message). */
 struct event_mbox {
 	struct ucq 					ev_msgs;
+	bool						ev_check_bits;
 	uint8_t						ev_bitmap[(MAX_NR_EVENT - 1) / 8 + 1];
 };
 

@@ -34,7 +34,7 @@ extern handle_event_t ev_handlers[];
 void handle_ev_ev(struct event_msg *ev_msg, unsigned int ev_type);
 int handle_events(uint32_t vcoreid);
 void handle_event_q(struct event_queue *ev_q);
-int handle_mbox(struct event_mbox *ev_mbox, unsigned int flags);
+int handle_mbox(struct event_mbox *ev_mbox);
 int handle_mbox_msgs(struct event_mbox *ev_mbox);
 
 #endif /* _EVENT_H */

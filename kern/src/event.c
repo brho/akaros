@@ -66,6 +66,8 @@ static void post_ev_msg(struct proc *p, struct event_mbox *mbox,
 	/* If they just want a bit (NOMSG), just set the bit */
 	if (ev_flags & EVENT_NOMSG) {
 		SET_BITMASK_BIT_ATOMIC(mbox->ev_bitmap, msg->ev_type);
+		wmb();
+		mbox->ev_check_bits = TRUE;
 	} else {
 		send_ucq_msg(&mbox->ev_msgs, p, msg);
 	}

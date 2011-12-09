@@ -187,18 +187,10 @@ int handle_mbox_msgs(struct event_mbox *ev_mbox)
 /* Handle an mbox.  This is the receive-side processing of an event_queue.  It
  * takes an ev_mbox, since the vcpd mbox isn't a regular ev_q.  For now, we
  * check for preemptions between each event handler. */
-int handle_mbox(struct event_mbox *ev_mbox, unsigned int flags)
+int handle_mbox(struct event_mbox *ev_mbox)
 {
 	int retval = 0;
 	uint32_t vcoreid = vcore_id();
-	printd("[event] handling ev_mbox %08p on vcore %d\n", ev_mbox, vcore_id());
-	/* Handle full messages.  Will deal with bits later. */
-	retval = handle_mbox_msgs(ev_mbox);
-	/* Process all bits, if they requested NOMSG.  o/w, we'll skip the bitmask
-	 * scan.
-	 *
-	 * TODO: if they have a flag saying "it's okay to overflow", then we'll want
-	 * to check the bits regardless */
 	void bit_handler(unsigned int bit) {
 		printd("[event] Bit: ev_type: %d\n", bit);
 		if (ev_handlers[bit])
@@ -207,9 +199,22 @@ int handle_mbox(struct event_mbox *ev_mbox, unsigned int flags)
 		check_preempt_pending(vcoreid);
 		/* Consider checking the queue for incoming messages while we're here */
 	}
-	if (flags & EVENT_NOMSG)
-		BITMASK_FOREACH_SET(ev_mbox->ev_bitmap, MAX_NR_EVENT, bit_handler,
-		                    TRUE);
+	printd("[event] handling ev_mbox %08p on vcore %d\n", ev_mbox, vcore_id());
+	/* Handle full messages. */
+	retval = handle_mbox_msgs(ev_mbox);
+	/* Process all bits, if the kernel tells us any bit is set.  We don't clear
+	 * the flag til after we check everything, in case one of the handlers
+	 * doesn't return.  After we clear it, we recheck. */
+	if (ev_mbox->ev_check_bits) {
+		do {
+			ev_mbox->ev_check_bits = TRUE;	/* in case we don't return */
+			cmb();
+			BITMASK_FOREACH_SET(ev_mbox->ev_bitmap, MAX_NR_EVENT, bit_handler,
+			                    TRUE);
+			ev_mbox->ev_check_bits = FALSE;
+			wrmb();	/* check_bits written before we check for it being clear */
+		} while (!BITMASK_IS_CLEAR(ev_mbox->ev_bitmap, MAX_NR_EVENT));
+	}
 	return retval;
 }
 
@@ -242,11 +247,8 @@ int handle_events(uint32_t vcoreid)
 {
 	struct preempt_data *vcpd = vcpd_of(vcoreid);
 	int retval = 0;
-	/* TODO: EVENT_NOMSG checks could be painful.  we could either keep track of
-	 * whether or not the 2LS has a NOMSG ev_q pointing to its vcpd, or have the
-	 * kernel set another flag for "bits" */
-	retval += handle_mbox(&vcpd->ev_mbox_private, EVENT_NOMSG);
-	retval += handle_mbox(&vcpd->ev_mbox_public, EVENT_NOMSG);
+	retval += handle_mbox(&vcpd->ev_mbox_private);
+	retval += handle_mbox(&vcpd->ev_mbox_public);
 	return retval;
 }
 
@@ -274,5 +276,5 @@ void handle_event_q(struct event_queue *ev_q)
 		return;
 	}
 	printd("[event] handling ev_q %08p on vcore %d\n", ev_q, vcore_id());
-	handle_mbox(ev_q->ev_mbox, ev_q->ev_flags);
+	handle_mbox(ev_q->ev_mbox);
 }
