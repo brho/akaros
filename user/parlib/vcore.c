@@ -307,7 +307,7 @@ void enable_notifs(uint32_t vcoreid)
 	 * vcore had gone into vcore context (which is what we wanted), and this
 	 * self_notify to our old vcore is spurious and harmless. */
 	if (vcpd_of(vcoreid)->notif_pending)
-		sys_self_notify(vcoreid, EV_NONE, 0);
+		sys_self_notify(vcoreid, EV_NONE, 0, TRUE);
 }
 
 /* Helper to disable notifs.  It simply checks to make sure we disabled uthread

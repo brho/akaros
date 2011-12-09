@@ -97,7 +97,7 @@ int main(int argc, char** argv)
 	printf("Vcore 0 self-notifying vcore 2 with notif 4!\n");
 	struct event_msg msg;
 	msg.ev_type = 4;
-	sys_self_notify(2, 4, &msg);
+	sys_self_notify(2, 4, &msg, TRUE);
 	udelay(5000000);
 	printf("Vcore 0 notifying itself with notif 6!\n");
 	msg.ev_type = 6;

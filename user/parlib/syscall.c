@@ -118,9 +118,9 @@ int sys_notify(int pid, unsigned int ev_type, struct event_msg *u_msg)
 }
 
 int sys_self_notify(uint32_t vcoreid, unsigned int ev_type,
-                    struct event_msg *u_msg)
+                    struct event_msg *u_msg, bool priv)
 {
-	return ros_syscall(SYS_self_notify, vcoreid, ev_type, u_msg, 0, 0, 0);
+	return ros_syscall(SYS_self_notify, vcoreid, ev_type, u_msg, priv, 0, 0);
 }
 
 int sys_halt_core(unsigned int usec)

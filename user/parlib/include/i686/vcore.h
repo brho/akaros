@@ -84,6 +84,7 @@ static inline void pop_ros_tf(struct user_trapframe *tf, uint32_t vcoreid)
 	/* Need to prep the async sysc in case we need to notify ourselves */
 	rst->sysc->num = SYS_self_notify;
 	rst->sysc->arg0 = vcoreid;	/* arg 1 & 2 already = 0 (null notif, no u_ne)*/
+	rst->sysc->arg3 = TRUE;		/* just a private VCPD notification */
 	rst->eax_save = 0;			/* avoid bugs */
 	rst->eflags = tf->tf_eflags;
 	rst->eip = tf->tf_eip;

@@ -47,7 +47,7 @@ void *COUNT(length) sys_mmap(void *SNT addr, size_t length, int prot, int flags,
                              int fd, size_t offset);
 int         sys_notify(int pid, unsigned int ev_type, struct event_msg *u_msg);
 int         sys_self_notify(uint32_t vcoreid, unsigned int ev_type,
-                            struct event_msg *u_msg);
+                            struct event_msg *u_msg, bool priv);
 int         sys_halt_core(unsigned int usec);
 void*		sys_init_arsc();
 int         sys_block(unsigned int usec);
