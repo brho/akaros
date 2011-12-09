@@ -152,3 +152,10 @@ claim_slot:
 	atomic_inc(&((struct ucq_page*)PTE_ADDR(my_idx))->header.nr_cons);
 	return 0;
 }
+
+bool ucq_is_empty(struct ucq *ucq)
+{
+	/* The ucq is empty if the consumer and producer are on the same 'next'
+	 * slot. */
+	return (atomic_read(&ucq->cons_idx) == atomic_read(&ucq->prod_idx));
+}

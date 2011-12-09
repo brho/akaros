@@ -166,7 +166,7 @@ handle_event_t ev_handlers[MAX_NR_EVENT] = {[EV_EVENT] handle_ev_ev, 0};
 
 /* Handles all the messages in the mbox, but not the single bits.  Returns the
  * number handled. */
-int handle_mbox_msgs(struct event_mbox *ev_mbox)
+static int handle_mbox_msgs(struct event_mbox *ev_mbox)
 {
 	int retval = 0;
 	struct event_msg local_msg;
@@ -216,6 +216,12 @@ int handle_mbox(struct event_mbox *ev_mbox)
 		} while (!BITMASK_IS_CLEAR(ev_mbox->ev_bitmap, MAX_NR_EVENT));
 	}
 	return retval;
+}
+
+/* Empty if the UCQ is empty and the bits don't need checked */
+bool mbox_is_empty(struct event_mbox *ev_mbox)
+{
+	return (ucq_is_empty(&ev_mbox->ev_msgs) && (!ev_mbox->ev_check_bits));
 }
 
 /* The EV_EVENT handler - extract the ev_q from the message. */

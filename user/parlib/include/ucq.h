@@ -14,5 +14,6 @@ void ucq_init_raw(struct ucq *ucq, uintptr_t pg1, uintptr_t pg2);
 void ucq_init(struct ucq *ucq);
 void ucq_free_pgs(struct ucq *ucq);
 int get_ucq_msg(struct ucq *ucq, struct event_msg *msg);
+bool ucq_is_empty(struct ucq *ucq);
 
 #endif /* _UCQ_H */
