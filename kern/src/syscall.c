@@ -725,6 +725,8 @@ static int sys_self_notify(struct proc *p, uint32_t vcoreid,
 			set_errno(EINVAL);
 			return -1;
 		}
+	} else {
+		local_msg.ev_type = ev_type;
 	}
 	/* this will post a message and IPI, regardless of wants/needs/debutantes.*/
 	post_vcore_event(p, &local_msg, vcoreid, priv ? EVENT_VCORE_PRIVATE : 0);
