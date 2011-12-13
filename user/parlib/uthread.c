@@ -444,9 +444,202 @@ void copyout_uthread(struct preempt_data *vcpd, struct uthread *uthread)
 	}
 }
 
+/* Helper: returns TRUE if it succeeded in starting the uth stealing process. */
+static bool start_uth_stealing(struct preempt_data *vcpd)
+{
+	long old_flags;
+	/* Might not need to bother with the K_LOCK, we aren't talking to the kernel
+	 * in these two helpers. */
+	do {
+		old_flags = atomic_read(&vcpd->flags);
+		/* Spin if the kernel is mucking with the flags */
+		while (old_flags & VC_K_LOCK)
+			old_flags = atomic_read(&vcpd->flags);
+		/* Someone else is stealing, we failed */
+		if (old_flags & VC_UTHREAD_STEALING)
+			return FALSE;
+	} while (!atomic_cas(&vcpd->flags, old_flags,
+	                     old_flags | VC_UTHREAD_STEALING));
+	return TRUE;
+}
+
+/* Helper: pairs with stop_uth_stealing */
+static void stop_uth_stealing(struct preempt_data *vcpd)
+{
+	long old_flags;
+	do {
+		old_flags = atomic_read(&vcpd->flags);
+		assert(old_flags & VC_UTHREAD_STEALING);	/* sanity */
+		while (old_flags & VC_K_LOCK)
+			old_flags = atomic_read(&vcpd->flags);
+	} while (!atomic_cas(&vcpd->flags, old_flags,
+	                     old_flags & ~VC_UTHREAD_STEALING));
+}
+
+/* Helper, used in preemption recovery.  When you can freely leave vcore
+ * context and need to change to another vcore, call this.  vcpd is the caller,
+ * rem_vcoreid is the remote vcore.  This will try to package up your uthread.
+ * It may return, either because the other core already started up (someone else
+ * got it), or in some very rare cases where we had to stay in our vcore
+ * context */
+static void change_to_vcore(struct preempt_data *vcpd, uint32_t rem_vcoreid)
+{
+	bool were_handling_remotes;
+	/* Unlikely, but if we have no uthread we can just change.  This is the
+	 * check, sync, then really check pattern: we can only really be sure about
+	 * current_uthread after we check STEALING. */
+	if (!current_uthread) {
+		/* there might be an issue with doing this while someone is recovering.
+		 * once they 0'd it, we should be good to yield.  just a bit dangerous.
+		 * */
+		were_handling_remotes = ev_might_not_return();
+		sys_change_vcore(rem_vcoreid, TRUE);	/* noreturn on success */
+		goto out_we_returned;
+	}
+	/* Note that the reason we need to check STEALING is because we can get into
+	 * vcore context and slip past that check in vcore_entry when we are
+	 * handling a preemption message.  Anytime preemption recovery cares about
+	 * the calling vcore's cur_uth, it needs to be careful about STEALING.  But
+	 * it is safe to do the check up above (if it's 0, it won't concurrently
+	 * become non-zero).
+	 *
+	 * STEALING might be turned on at any time.  Whoever turns it on will do
+	 * nothing if we are online or were in vc_ctx.  So if it is on, we can't
+	 * touch current_uthread til it is turned off (not sure what state they saw
+	 * us in).  We could spin here til they unset STEALING (since they will
+	 * soon), but there is a chance they were preempted, so we need to make
+	 * progress by doing a sys_change_vcore(). */
+	/* Crap, someone is stealing (unlikely).  All we can do is change. */
+	if (atomic_read(&vcpd->flags) & VC_UTHREAD_STEALING) {
+		sys_change_vcore(rem_vcoreid, FALSE);	/* returns on success */
+		return;
+	}
+	cmb();
+	/* Need to recheck, in case someone stole it and finished before we checked
+	 * VC_UTHREAD_STEALING. */
+	if (!current_uthread) {
+		were_handling_remotes = ev_might_not_return();
+		sys_change_vcore(rem_vcoreid, TRUE);	/* noreturn on success */
+		goto out_we_returned;
+	}
+	/* Need to make sure we don't have a DONT_MIGRATE (very rare, someone would
+	 * have to steal from us to get us to handle a preempt message, and then had
+	 * to finish stealing (and fail) fast enough for us to miss the previous
+	 * check). */
+	if (current_uthread->flags & UTHREAD_DONT_MIGRATE) {
+		sys_change_vcore(rem_vcoreid, FALSE);	/* returns on success */
+		return;
+	}
+	/* Now save our uthread and restart them */
+	assert(current_uthread);
+	copyout_uthread(vcpd, current_uthread);
+	/* Call out to the 2LS to package up its uthread */;
+	assert(sched_ops->thread_paused);
+	sched_ops->thread_paused(current_uthread);
+	current_uthread = 0;
+	were_handling_remotes = ev_might_not_return();
+	sys_change_vcore(rem_vcoreid, TRUE);		/* noreturn on success */
+	/* Fall-through to out_we_returned */
+out_we_returned:
+	ev_we_returned(were_handling_remotes);
+}
+
+/* This handles a preemption message.  When this is done, either we recovered,
+ * or recovery *for our message* isn't needed. */
 static void handle_vc_preempt(struct event_msg *ev_msg, unsigned int ev_type)
 {
-	printf("Vcore %d was preempted, we're fucked!!!\n", ev_msg->ev_arg2);
+	uint32_t vcoreid = vcore_id();
+	struct preempt_data *vcpd = vcpd_of(vcoreid);
+	uint32_t rem_vcoreid = ev_msg->ev_arg2;
+	struct preempt_data *rem_vcpd = vcpd_of(rem_vcoreid);
+	extern void **vcore_thread_control_blocks;
+
+	assert(in_vcore_context());
+	/* Just drop messages about ourselves.  They are old.  If we happen to be
+	 * getting preempted right now, there's another message out there about
+	 * that. */
+	if (rem_vcoreid == vcoreid)
+		return;
+	printd("Vcore %d was preempted (i'm %d), it's flags %08p!\n",
+	       ev_msg->ev_arg2, vcoreid, rem_vcpd->flags);
+	/* Spin til the kernel is done with flags.  This is how we avoid handling
+	 * the preempt message before the preemption. */
+	while (atomic_read(&rem_vcpd->flags) & VC_K_LOCK)
+		cpu_relax();
+	/* If they aren't preempted anymore, just return (optimization). */
+	if (!(atomic_read(&rem_vcpd->flags) & VC_PREEMPTED))
+		return;
+	/* At this point, we need to try to recover */
+	/* TODO: if we want to bother with VC_RECOVERING, set it here */
+	/* This case handles when the remote core was in vcore context */
+	if (rem_vcpd->notif_disabled) {
+		printd("VC %d recovering %d, notifs were disabled\n", vcoreid, rem_vcoreid);
+		change_to_vcore(vcpd, rem_vcoreid);
+		return;	/* in case it returns.  we've done our job recovering */
+	}
+	/* So now it looks like they were not in vcore context.  We want to steal
+	 * the uthread.  Set stealing, then doublecheck everything.  If stealing
+	 * fails, someone else is stealing and we can just leave.  That other vcore
+	 * who is stealing will check the VCPD/INDIRs when it is done. */
+	if (!start_uth_stealing(rem_vcpd))
+		return;
+	/* Now we're stealing.  Double check everything.  A change in preempt status
+	 * or notif_disable status means the vcore has since restarted.  The vcore
+	 * may or may not have started after we set STEALING.  If it didn't, we'll
+	 * need to bail out (but still check messages, since above we assumed the
+	 * uthread stealer handles the VCPD/INDIRs).  Since the vcore is running, we
+	 * don't need to worry about handling the message any further.  Future
+	 * preemptions will generate another message, so we can ignore getting the
+	 * uthread or anything like that. */
+	printd("VC %d recovering %d, trying to steal uthread\n", vcoreid, rem_vcoreid);
+	if (!(atomic_read(&rem_vcpd->flags) & VC_PREEMPTED))
+		goto out_stealing;
+	/* Might be preempted twice quickly, and the second time had notifs
+	 * disabled. */
+	if (rem_vcpd->notif_disabled)
+		goto out_stealing;
+	/* At this point, we're clear to try and steal the uthread.  Need to switch
+	 * into their TLS to take their uthread */
+	vcoreid = vcore_id();	/* need to copy this out to our stack var */
+	set_tls_desc(vcore_thread_control_blocks[rem_vcoreid], vcoreid);
+	printd("VC %d recovering %d, switched TLS\n", vcoreid, rem_vcoreid);
+	/* Check their uthread and try to steal it */
+	if (!current_uthread) {
+		goto out_tls;
+	}
+	/* Extremely rare: they have a uthread, but it can't migrate.  So we'll need
+	 * to change to them. */
+	if (current_uthread->flags & UTHREAD_DONT_MIGRATE) {
+		printd("VC %d recovering %d, can't migrate uthread!\n", vcoreid, rem_vcoreid);
+		set_tls_desc(vcore_thread_control_blocks[vcoreid], vcoreid);
+		stop_uth_stealing(rem_vcpd);
+		change_to_vcore(vcpd, rem_vcoreid);
+		return;	/* in case it returns.  we've done our job recovering */
+	}
+	/* we're clear to steal it */
+	copyout_uthread(rem_vcpd, current_uthread);
+	printd("VC %d recovering %d, uthread %08p stolen\n", vcoreid, rem_vcoreid,
+	       current_uthread);
+	/* Call out to the 2LS to package up its uthread */;
+	assert(sched_ops->thread_paused);
+	sched_ops->thread_paused(current_uthread);
+	current_uthread = 0;
+	wmb();	/* cur_uth and uth_runnable writes can't pass stop_uth_stealing */
+	/* Fallthrough, whether we stole or not */
+out_tls:
+	/* switch back to our TLS */
+	set_tls_desc(vcore_thread_control_blocks[vcoreid], vcoreid);
+	printd("VC %d recovering %d, switched TLS back\n", vcoreid, rem_vcoreid);
+out_stealing:
+	/* Turn off the UTHREAD_STEALING */
+	stop_uth_stealing(rem_vcpd);
+out_indirs:
+	/* Last thing: handle their INDIRs */
+	/* First, start routing this vcore's messages to fallback vcores */
+	rem_vcpd->can_rcv_msg = FALSE;
+	wrmb();	/* don't let the can_rcv write pass reads of the mbox status */
+	/* handle all INDIRs of the remote vcore */
+	handle_vcpd_mbox(rem_vcoreid);
 }
 
 /* Attempts to register ev_q with sysc, so long as sysc is not done/progress.
