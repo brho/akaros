@@ -18,6 +18,10 @@
 #include <event.h>
 #include <uthread.h>
 
+/* For remote VCPD mbox event handling */
+__thread bool __vc_handle_an_mbox = FALSE;
+__thread uint32_t __vc_rem_vcoreid;
+
 /********* Event_q Setup / Registration  ***********/
 
 /* Get event_qs via these interfaces, since eventually we'll want to either
@@ -162,7 +166,9 @@ unsigned int get_event_type(struct event_mbox *ev_mbox)
 
 /* List of handlers, process-wide, that the 2LS should fill in.  They all must
  * return (don't context switch to a u_thread) */
-handle_event_t ev_handlers[MAX_NR_EVENT] = {[EV_EVENT] handle_ev_ev, 0};
+handle_event_t ev_handlers[MAX_NR_EVENT] = {[EV_EVENT] handle_ev_ev,
+                                            [EV_CHECK_MSGS] handle_check_msgs,
+                                            0};
 
 /* Handles all the messages in the mbox, but not the single bits.  Returns the
  * number handled. */
@@ -245,6 +251,25 @@ void handle_ev_ev(struct event_msg *ev_msg, unsigned int ev_type)
 	handle_event_q(ev_q);
 }
 
+/* This handler tells us to check the public message box of a vcore. */
+void handle_check_msgs(struct event_msg *ev_msg, unsigned int ev_type)
+{
+	uint32_t rem_vcoreid;
+	assert(ev_msg);
+	rem_vcoreid = ev_msg->ev_arg2;
+	printd("[event] handle check msgs for VC %d on VC %d\n", rem_vcoreid,
+	       vcore_id());
+	/* if it is a message for ourselves, then we can abort.  Vcores will check
+	 * their own messages via handle_events() (which either we're doing now, or
+	 * will do when we are done dealing with another vcore's mbox). */
+	if (rem_vcoreid == vcore_id())
+		return;
+	/* they should have had their can_rcv turned off at some point, though it is
+	 * possible that it was turned back on by now.  we don't really care - our
+	 * job is to make sure their messages get checked. */
+	handle_vcpd_mbox(rem_vcoreid);
+}
+
 /* 2LS will probably call this in vcore_entry and places where it wants to check
  * for / handle events.  This will process all the events for the given vcore.
  * Note, it probably should be the calling vcore you do this to...  Returns the
@@ -283,4 +308,119 @@ void handle_event_q(struct event_queue *ev_q)
 	}
 	printd("[event] handling ev_q %08p on vcore %d\n", ev_q, vcore_id());
 	handle_mbox(ev_q->ev_mbox);
+}
+
+/* Sends the calling vcore a message to its public mbox.  This is purposefully
+ * limited to just the calling vcore, since in future versions, we can send via
+ * ucqs directly (in many cases).  That will require the caller to be the
+ * vcoreid, due to some preemption recovery issues (another ucq poller is
+ * waiting on us when we got preempted, and we never up nr_cons). */
+void send_self_vc_msg(struct event_msg *ev_msg)
+{
+	// TODO: try to use UCQs (requires additional support)
+	/* ev_type actually gets ignored currently.  ev_msg is what matters if it is
+	 * non-zero.  FALSE means it's going to the public mbox */
+	sys_self_notify(vcore_id(), ev_msg->ev_type, ev_msg, FALSE);
+}
+
+/* Helper: makes the current core handle a remote vcore's VCPD public mbox events.
+ *
+ * Both cases (whether we are handling someone else's already or not) use some
+ * method of telling our future self what to do.  When we aren't already
+ * handling it, we use TLS, and jump to vcore entry.  When we are already
+ * handling, then we send a message to ourself, which we deal with when we
+ * handle our own events (which is later in vcore entry).
+ *
+ * We need to reset the stack and deal with it in vcore entry to avoid recursing
+ * deeply and running off the transition stack.  (handler calling handle event).
+ *
+ * Note that we might not be the one that gets the message we send.  If we pull
+ * a sys_change_to, someone else might be polling our public message box.  All
+ * we're doing is making sure that we don't forget to check rem_vcoreid's mbox.
+ *
+ * Finally, note that this function might not return.  However, it'll handle the
+ * details related to vcpd mboxes, so you don't use the ev_might_not_return()
+ * helpers with this. */
+void handle_vcpd_mbox(uint32_t rem_vcoreid)
+{
+	uint32_t vcoreid = vcore_id();
+	struct preempt_data *vcpd = vcpd_of(vcoreid);
+	struct event_msg local_msg = {0};
+	assert(vcoreid != rem_vcoreid);			/* this shouldn't happen */
+	/* If they are empty, then we're done */
+	if (mbox_is_empty(&vcpd_of(rem_vcoreid)->ev_mbox_public))
+		return;
+	if (__vc_handle_an_mbox) {
+		/* we might be already handling them, in which case, abort */
+		if (__vc_rem_vcoreid == rem_vcoreid)
+			return;
+		/* Already handling message for someone, need to send ourselves a
+		 * message to check rem_vcoreid, which we'll process later. */
+		local_msg.ev_type = EV_CHECK_MSGS;
+		local_msg.ev_arg2 = rem_vcoreid;	/* 32bit arg */
+		send_self_vc_msg(&local_msg);
+		return;
+	}
+	/* No return after here */
+	/* At this point, we aren't in the process of handling someone else's
+	 * messages, so just tell our future self what to do */
+	__vc_handle_an_mbox = TRUE;
+	__vc_rem_vcoreid = rem_vcoreid;
+	/* Reset the stack and start over in vcore context */
+	set_stack_pointer((void*)vcpd->transition_stack);
+	vcore_entry();
+	assert(0);
+}
+
+/* Handle remote vcpd public mboxes, if that's what we want to do.  Call this
+ * from vcore entry, pairs with handle_vcpd_mbox(). */
+void try_handle_remote_mbox(void)
+{
+	if (__vc_handle_an_mbox) {
+		handle_mbox(&vcpd_of(__vc_rem_vcoreid)->ev_mbox_public);
+		/* only clear the flag when we have returned from handling messages.  if
+		 * an event handler (like preempt_recover) doesn't return, we'll clear
+		 * this flag elsewhere. (it's actually not a big deal if we don't). */
+		cmb();
+		__vc_handle_an_mbox = FALSE;
+	}
+}
+
+/* Event handler helpers */
+
+/* For event handlers that might not return, we need to call this before the
+ * command that might not return.  In the event we were handling a remote
+ * vcore's messages, it'll send ourselves a messages that we (or someone who
+ * polls us) will get so that someone finishes off that vcore's messages).
+ * Doesn't matter who does, so long as someone does.
+ *
+ * This returns whether or not we were handling someone's messages.  Pass the
+ * parameter to ev_we_returned() */
+bool ev_might_not_return(void)
+{
+	struct event_msg local_msg = {0};
+	bool were_handling_remotes = FALSE;
+	if (__vc_handle_an_mbox) {
+		/* slight chance we finished with their mbox (were on the last one) */
+		if (!mbox_is_empty(&vcpd_of(__vc_rem_vcoreid)->ev_mbox_public)) {
+			/* But we aren't, so we'll need to send a message */
+			local_msg.ev_type = EV_CHECK_MSGS;
+			local_msg.ev_arg2 = __vc_rem_vcoreid;	/* 32bit arg */
+			send_self_vc_msg(&local_msg);
+		}
+		/* Either way, we're not working on this one now.  Note this is more of
+		 * an optimization - it'd be harmless (I think) to poll another vcore's
+		 * pub mbox once when we pop up in vc_entry in the future */
+		__vc_handle_an_mbox = FALSE;
+		return TRUE;
+	}
+	return FALSE;
+}
+
+/* Call this when you return, paired up with ev_might_not_return().  If
+ * ev_might_not_return turned off uth_handle, we'll turn it back on. */
+void ev_we_returned(bool were_handling_remotes)
+{
+	if (were_handling_remotes)
+		__vc_handle_an_mbox = TRUE;
 }

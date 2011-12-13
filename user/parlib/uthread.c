@@ -11,9 +11,6 @@ struct schedule_ops default_2ls_ops = {0};
 struct schedule_ops *sched_ops __attribute__((weak)) = &default_2ls_ops;
 
 __thread struct uthread *current_uthread = 0;
-/* For remote VCPD mbox event handling */
-__thread bool uth_handle_an_mbox = FALSE;
-__thread uint32_t uth_rem_vcoreid;
 /* ev_q for all preempt messages (handled here to keep 2LSs from worrying
  * extensively about the details.  Will call out when necessary. */
 struct event_queue *preempt_ev_q;
@@ -59,6 +56,8 @@ int uthread_lib_init(struct uthread *uthread)
 	preempt_ev_q->ev_flags = EVENT_IPI | EVENT_INDIR | EVENT_FALLBACK |
 	                         EVENT_NOTHROTTLE | EVENT_VCORE_MUST_RUN;
 	register_kevent_q(preempt_ev_q, EV_VCORE_PREEMPT);
+	/* For now, send CHECK_MSGS to the preempt ev_q */
+	register_kevent_q(preempt_ev_q, EV_CHECK_MSGS);
 	printd("[user] registered %08p (flags %08p) for preempt messages\n",
 	       preempt_ev_q, preempt_ev_q->ev_flags);
 	/* Get ourselves into _M mode.  Could consider doing this elsewhere... */
@@ -91,11 +90,9 @@ void __attribute__((noreturn)) uthread_vcore_entry(void)
 	 * DONT_MIGRATE uthread. */
 	if (current_uthread && (current_uthread->flags & UTHREAD_DONT_MIGRATE))
 		__run_current_uthread_raw();
-	/* Check and see if we wanted ourselves to handle a remote VCPD mbox */
-	if (uth_handle_an_mbox) {
-		uth_handle_an_mbox = FALSE;
-		handle_mbox(&vcpd_of(uth_rem_vcoreid)->ev_mbox_public);
-	}
+	/* Check and see if we wanted ourselves to handle a remote VCPD mbox.  Want
+	 * to do this after we've handled STEALING and DONT_MIGRATE. */
+	try_handle_remote_mbox();
 	/* Otherwise, go about our usual vcore business (messages, etc). */
 	check_preempt_pending(vcoreid);
 	handle_events(vcoreid);
@@ -418,23 +415,6 @@ void uth_enable_notifs(void)
 		cmb();	/* don't enable before ~DONT_MIGRATE */
 		enable_notifs(vcore_id());
 	}
-}
-
-/* This makes the current core handle a remote vcore's VCPD public mbox events.
- *
- * We need to reset the stack and deal with it in vcore entry to avoid recursing
- * deeply and running off the transition stack.  (handler calling handle event)
- * */
-static void handle_vcpd_mbox(uint32_t rem_vcoreid)
-{
-	struct preempt_data *vcpd = vcpd_of(vcore_id());
-	/* Tell our future self what to do */
-	uth_handle_an_mbox = TRUE;
-	uth_rem_vcoreid = rem_vcoreid;
-	/* Reset the stack and start over in vcore context */
-	set_stack_pointer((void*)vcpd->transition_stack);
-	uthread_vcore_entry();
-	assert(0);
 }
 
 static void handle_vc_preempt(struct event_msg *ev_msg, unsigned int ev_type)
