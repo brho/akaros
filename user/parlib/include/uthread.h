@@ -64,6 +64,7 @@ void ros_syscall_blockon(struct syscall *sysc);
 bool check_preempt_pending(uint32_t vcoreid);
 void uth_disable_notifs(void);
 void uth_enable_notifs(void);
+void copyout_uthread(struct preempt_data *vcpd, struct uthread *uthread);
 
 bool register_evq(struct syscall *sysc, struct event_queue *ev_q);
 void deregister_evq(struct syscall *sysc);

@@ -423,6 +423,27 @@ void uth_enable_notifs(void)
 	}
 }
 
+/* Copies the uthread trapframe and silly state from the vcpd to the uthread,
+ * subject to the uthread's flags. */
+void copyout_uthread(struct preempt_data *vcpd, struct uthread *uthread)
+{
+	assert(uthread);
+	/* Copy out the main tf if we need to */
+	if (!(uthread->flags & UTHREAD_SAVED)) {
+		uthread->utf = vcpd->notif_tf;
+		uthread->flags |= UTHREAD_SAVED;
+		printd("VC %d copying out uthread %08p\n", vcore_id(), uthread);
+	}
+	/* could optimize here in case the FP/silly state wasn't being used.
+	 * Depends how we use the FPSAVED flag.  It means that the uthread's FP
+	 * state is not currently saved, for whatever reason, so we'll do it. */
+	if (!(uthread->flags & UTHREAD_FPSAVED)) {
+		/* TODO: (HSS) handle FP state: review this when fixing the other HSS */
+		uthread->as = vcpd->preempt_anc;
+		uthread->flags |= UTHREAD_FPSAVED;
+	}
+}
+
 static void handle_vc_preempt(struct event_msg *ev_msg, unsigned int ev_type)
 {
 	printf("Vcore %d was preempted, we're fucked!!!\n", ev_msg->ev_arg2);
