@@ -194,6 +194,7 @@ void __ensure_qnode_runs(struct mcs_pdr_qnode *qnode)
 {
 	assert(qnode);
 	if (vcore_is_preempted(qnode->vcoreid)) {
+		printd("MCS-PDR: VC %d changing to VC %d\n", vcore_id(), qnode->vcoreid);
 		/* Note that at this moment, the vcore could still be mapped (we're
 		 * racing with __preempt.  If that happens, we'll just fail the
 		 * sys_change_vcore(), and next time __ensure runs we'll get it. */

@@ -40,6 +40,8 @@ int uthread_lib_init(struct uthread *uthread)
 	current_uthread = uthread;
 	/* Thread is currently running (it is 'us') */
 	uthread->state = UT_RUNNING;
+	/* utf/as doesn't represent the state of the uthread (we are running) */
+	uthread->flags &= ~(UTHREAD_SAVED | UTHREAD_FPSAVED);
 	/* Change temporarily to vcore0s tls region so we can save the newly created
 	 * tcb into its current_uthread variable and then restore it.  One minor
 	 * issue is that vcore0's transition-TLS isn't TLS_INITed yet.  Until it is
@@ -116,6 +118,8 @@ void uthread_init(struct uthread *new_thread)
 	new_thread->state = UT_CREATED;
 	/* They should have zero'd the uthread.  Let's check critical things: */
 	assert(!new_thread->flags && !new_thread->sysc);
+	/* the utf/as holds the context of the uthread (set by the 2LS earlier) */
+	new_thread->flags |= UTHREAD_SAVED | UTHREAD_FPSAVED;
 	/* Get a TLS.  If we already have one, reallocate/refresh it */
 	if (new_thread->tls_desc)
 		assert(!__uthread_reinit_tls(new_thread));
@@ -195,9 +199,6 @@ void uthread_yield(bool save_state)
 {
 	struct uthread *uthread = current_uthread;
 	volatile bool yielding = TRUE; /* signal to short circuit when restarting */
-	/* TODO: (HSS) Save silly state */
-	// if (save_state)
-	// 	save_fp_state(&t->as);
 	assert(!in_vcore_context());
 	assert(uthread->state == UT_RUNNING);
 	/* Don't migrate this thread to another vcore, since it depends on being on
@@ -215,8 +216,11 @@ void uthread_yield(bool save_state)
 	/* take the current state and save it into t->utf when this pthread
 	 * restarts, it will continue from right after this, see yielding is false,
 	 * and short ciruit the function.  Don't do this if we're dying. */
-	if (save_state)
+	if (save_state) {
+		/* TODO: (HSS) Save silly state */
+		// save_fp_state(&t->as);
 		save_ros_tf(&uthread->utf);
+	}
 	cmb();	/* Force a reread of yielding. Technically save_ros_tf() is enough*/
 	/* Restart path doesn't matter if we're dying */
 	if (!yielding)
@@ -224,7 +228,8 @@ void uthread_yield(bool save_state)
 	yielding = FALSE; /* for when it starts back up */
 	/* Signal the current state is in utf.  Need to do this only the first time
 	 * through (not on the yield return path that comes after save_ros_tf) */
-	uthread->flags |= UTHREAD_SAVED;
+	if (save_state)
+		uthread->flags |= UTHREAD_SAVED | UTHREAD_FPSAVED;
 	/* Change to the transition context (both TLS and stack). */
 	extern void** vcore_thread_control_blocks;
 	set_tls_desc(vcore_thread_control_blocks[vcoreid], vcoreid);
@@ -341,7 +346,7 @@ void run_uthread(struct uthread *uthread)
 	if (uthread->state != UT_RUNNABLE) {
 		/* had vcore3 throw this, when the UT blocked on vcore1 and didn't come
 		 * back up yet (kernel didn't wake up, didn't send IPI) */
-		printf("Uthread %08p not runnable (was %d) in run_uthread on vcore %d!\n",
+		printf("Uth %08p not runnable (was %d) in run_uthread on vcore %d!\n",
 		       uthread, uthread->state, vcore_id());
 	}
 	assert(uthread->state == UT_RUNNABLE);
@@ -350,6 +355,7 @@ void run_uthread(struct uthread *uthread)
 	current_uthread = uthread;
 	/* Load silly state (Floating point) too.  For real */
 	/* TODO: (HSS) */
+	uthread->flags &= ~UTHREAD_FPSAVED;	/* uth->as no longer has the latest FP*/
 	__run_cur_uthread(&uthread->utf);
 	assert(0);
 }

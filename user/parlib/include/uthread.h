@@ -6,6 +6,7 @@
 
 #define UTHREAD_DONT_MIGRATE		0x001 /* don't move to another vcore */
 #define UTHREAD_SAVED				0x002 /* uthread's state is in utf */
+#define UTHREAD_FPSAVED				0x004 /* uthread's FP state is in uth->as */
 
 /* Thread States */
 #define UT_CREATED	1
