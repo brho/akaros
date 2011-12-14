@@ -322,21 +322,6 @@ static void send_indir(struct proc *p, struct event_queue *ev_q,
 	spam_public_msg(p, &local_msg, vcoreid, ev_q->ev_flags & EVENT_SPAM_FLAGS);
 }
 
-/* Helper that alerts a vcore, by IPI and/or INDIR, that it needs to check the
- * ev_q.  send_indir() eventually Handles FALLBACK and other tricky things. 
- * alerted. */
-static void alert_vcore(struct proc *p, struct event_queue *ev_q,
-                        uint32_t vcoreid)
-{
-	/* INDIR will also call try_notify (IPI) later */
-	if (ev_q->ev_flags & EVENT_INDIR) {
-		send_indir(p, ev_q, vcoreid);
-	} else {
-		/* they may want an IPI despite not wanting an INDIR */
-		try_notify(p, vcoreid, ev_q->ev_flags);
-	}
-}
-
 /* Send an event to ev_q, based on the parameters in ev_q's flag.  We don't
  * accept null ev_qs, since the caller ought to be checking before bothering to
  * make a msg and send it to the event_q.  Vcoreid is who the kernel thinks the
@@ -362,45 +347,47 @@ void send_event(struct proc *p, struct event_queue *ev_q, struct event_msg *msg,
 	/* ev_q is a user pointer, so we need to make sure we're in the right
 	 * address space */
 	old_proc = switch_to(p);
-	/* Get the mbox and vcoreid */
-	/* If we're going with APPRO, we use the kernel's suggested vcore's ev_mbox.
-	 * vcoreid is already what the kernel suggests. */
-	if (ev_q->ev_flags & EVENT_VCORE_APPRO) {
-		/* flags determine if it's private (like a preempt pending) or not */
-		ev_mbox = get_vcpd_mbox(vcoreid, ev_q->ev_flags);
-	} else {	/* common case */
-		ev_mbox = ev_q->ev_mbox;
-		vcoreid = ev_q->ev_vcore;
-	}
-	/* Check on the style, which could affect our mbox selection.  Other styles
-	 * would go here (or in similar functions we call to).  Important thing is
-	 * we come out knowing which vcore to send to in the event of an IPI/INDIR,
-	 * and we know what mbox to post to. */
+	/* Get the vcoreid that we'll message (if appropriate).  For INDIR and
+	 * SPAMMING, this is the first choice of a vcore, but other vcores might get
+	 * it.  Common case is !APPRO and !ROUNDROBIN.  Note we are clobbering the
+	 * vcoreid parameter. */
+	if (!(ev_q->ev_flags & EVENT_VCORE_APPRO))
+		vcoreid = ev_q->ev_vcore;	/* use the ev_q's vcoreid */
+	/* Note that RR overwrites APPRO */
 	if (ev_q->ev_flags & EVENT_ROUNDROBIN) {
-		/* Pick a vcore, and if we don't have a mbox yet, pick that vcore's
-		 * default mbox.  Assuming ev_vcore was the previous one used.  Note
-		 * that round-robin overrides the passed-in vcoreid. */
+		/* Pick a vcore, round-robin style.  Assuming ev_vcore was the previous
+		 * one used.  Note that round-robin overrides the passed-in vcoreid.
+		 * Also note this may be 'wrong' if num_vcores changes. */
 		vcoreid = (ev_q->ev_vcore + 1) % p->procinfo->num_vcores;
 		ev_q->ev_vcore = vcoreid;
-		/* Note that the style of not having a specific ev_mbox may go away.  I
-		 * can't think of legitimate uses of this for now, since things that are
-		 * RR probably are non-vcore-business, and thus inappropriate for a VCPD
-		 * ev_mbox. */
-		if (!ev_mbox)
-			ev_mbox = get_vcpd_mbox(vcoreid, ev_q->ev_flags);
 	}
+	/* If we're a SPAM_PUBLIC, they just want us to spam the message.  Note we
+	 * don't care about the mbox, since it'll go to VCPD public mboxes, and
+	 * we'll prefer to send it to whatever vcoreid we determined at this point
+	 * (via APPRO or whatever). */
+	if (ev_q->ev_flags & EVENT_SPAM_PUBLIC) {
+		spam_public_msg(p, msg, vcoreid, ev_q->ev_flags & EVENT_SPAM_FLAGS);
+		goto out;
+	}
+	/* We aren't spamming and we know the default vcore, and now we need to
+	 * figure out which mbox to use.  If they provided an mbox, we'll use it.
+	 * If not, we'll use a VCPD mbox (public or private, depending on the
+	 * flags). */
+	ev_mbox = ev_q->ev_mbox;
+	if (!ev_mbox)
+		ev_mbox = get_vcpd_mbox(vcoreid, ev_q->ev_flags);
 	/* At this point, we ought to have the right mbox to send the msg to, and
-	 * which vcore to send an IPI to (if we send one).  The mbox could be the
-	 * vcore's vcpd ev_mbox.  The vcoreid only matters for IPIs and INDIRs. */
+	 * which vcore to alert (IPI/INDIR) (if applicable).  The mbox could be the
+	 * vcore's vcpd ev_mbox. */
 	if (!ev_mbox) {
-		/* this is a process error */
+		/* This shouldn't happen any more, this is more for sanity's sake */
 		warn("[kernel] ought to have an mbox by now!");
 		goto out;
 	}
 	/* Even if we're using an mbox in procdata (VCPD), we want a user pointer */
 	if (!is_user_rwaddr(ev_mbox, sizeof(struct event_mbox))) {
 		/* Ought to kill them, just warn for now */
-		warn("[kernel] Illegal addr for ev_mbox");
+		printk("[kernel] Illegal addr for ev_mbox");
 		goto out;
 	}
 	/* We used to support no msgs, but quit being lazy and send a 'msg'.  If the
@@ -408,14 +395,15 @@ void send_event(struct proc *p, struct event_queue *ev_q, struct event_msg *msg,
 	 * vehicle for sending the ev_type. */
 	assert(msg);
 	post_ev_msg(p, ev_mbox, msg, ev_q->ev_flags);
-	wmb();	/* ensure ev_msg write is before alert_vcore() */
-	/* Help out userspace a bit by checking for a potentially confusing bug */
-	if ((ev_mbox == get_vcpd_mbox_pub(vcoreid)) &&
-	    (ev_q->ev_flags & EVENT_INDIR))
-		printk("[kernel] User-bug: ev_q has an INDIR with a VCPD ev_mbox!\n");
-	/* Prod/alert a vcore with an IPI or INDIR, if desired */
-	if ((ev_q->ev_flags & (EVENT_IPI | EVENT_INDIR)))
-		alert_vcore(p, ev_q, vcoreid);
+	wmb();	/* ensure ev_msg write is before alerting the vcore */
+	/* Prod/alert a vcore with an IPI or INDIR, if desired.  INDIR will also
+	 * call try_notify (IPI) later */
+	if (ev_q->ev_flags & EVENT_INDIR) {
+		send_indir(p, ev_q, vcoreid);
+	} else {
+		/* they may want an IPI despite not wanting an INDIR */
+		try_notify(p, vcoreid, ev_q->ev_flags);
+	}
 	/* Fall through */
 out:
 	/* Return to the old address space. */
