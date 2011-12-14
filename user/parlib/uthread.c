@@ -52,13 +52,17 @@ int uthread_lib_init(struct uthread *uthread)
 	current_uthread = uthread;
 	set_tls_desc(uthread->tls_desc, 0);
 	assert(!in_vcore_context());
-	/* Receive preemption events */
+	/* Receive preemption events.  Note that this merely tells the kernel how to
+	 * send the messages, and does not necessarily provide storage space for the
+	 * messages.  What we're doing is saying that all PREEMPT and CHECK_MSGS
+	 * events should be spammed to vcores that are running, preferring whatever
+	 * the kernel thinks is appropriate.  And IPI them. */
 	ev_handlers[EV_VCORE_PREEMPT] = handle_vc_preempt;
-	preempt_ev_q = get_big_event_q();
-	preempt_ev_q->ev_flags = EVENT_IPI | EVENT_INDIR | EVENT_FALLBACK |
-	                         EVENT_NOTHROTTLE | EVENT_VCORE_MUST_RUN;
+	preempt_ev_q = get_event_q();	/* small ev_q, mostly a vehicle for flags */
+	preempt_ev_q->ev_flags = EVENT_IPI | EVENT_SPAM_PUBLIC | EVENT_VCORE_APPRO |
+	                         EVENT_VCORE_MUST_RUN;
+	/* Tell the kernel to use the ev_q (it's settings) for the two types */
 	register_kevent_q(preempt_ev_q, EV_VCORE_PREEMPT);
-	/* For now, send CHECK_MSGS to the preempt ev_q */
 	register_kevent_q(preempt_ev_q, EV_CHECK_MSGS);
 	printd("[user] registered %08p (flags %08p) for preempt messages\n",
 	       preempt_ev_q, preempt_ev_q->ev_flags);
