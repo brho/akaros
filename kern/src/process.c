@@ -1563,9 +1563,6 @@ void proc_change_to_vcore(struct proc *p, uint32_t new_vcoreid,
 		atomic_or(&caller_vcpd->flags, VC_PREEMPTED);
 	}
 	/* Either way, unmap and offline our current vcore */
-	/* TODO: remove this once userspace can distinguish between a preemption and
-	 * a "just check my INDIRS" */
-	atomic_or(&caller_vcpd->flags, VC_PREEMPTED);
 	/* Move the caller from online to inactive */
 	TAILQ_REMOVE(&p->online_vcs, caller_vc, list);
 	/* We don't bother with the notif_pending race.  note that notif_pending
@@ -1580,10 +1577,10 @@ void proc_change_to_vcore(struct proc *p, uint32_t new_vcoreid,
 	__unmap_vcore(p, caller_vcoreid);
 	__map_vcore(p, new_vcoreid, pcoreid);
 	__seq_end_write(&p->procinfo->coremap_seqctr);
-	/* send preempt message about the calling vcore.  might as well prefer
-	 * directing it to the new_vc (vcoreid) to cut down on an IPI.  TODO: change
-	 * this to a "just check my INDIRS" message. */
-	preempt_msg.ev_type = EV_VCORE_PREEMPT;
+	/* Send either a PREEMPT msg or a CHECK_MSGS msg.  If they said to
+	 * enable_my_notif, then all userspace needs is to check messages, not a
+	 * full preemption recovery. */
+	preempt_msg.ev_type = (enable_my_notif ? EV_CHECK_MSGS : EV_VCORE_PREEMPT);
 	preempt_msg.ev_arg2 = caller_vcoreid;	/* arg2 is 32 bits */
 	send_kernel_event(p, &preempt_msg, new_vcoreid);
 	/* Change cur_tf so we'll be the new vcoreid */
