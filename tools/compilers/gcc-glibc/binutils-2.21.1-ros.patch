@@ -26,6 +26,20 @@ diff -ruN orig-src/binutils-2.21.1/config.sub binutils-2.21.1/config.sub
  	      | -nindy* | -vxsim* | -vxworks* | -ebmon* | -hms* | -mvs* \
  	      | -clix* | -riscos* | -uniplus* | -iris* | -rtu* | -xenix* \
  	      | -hiux* | -386bsd* | -knetbsd* | -mirbsd* | -netbsd* \
+diff -ruN orig-src/binutils-2.21.1/configure binutils-2.21.1/configure
+--- orig-src/binutils-2.21.1/configure	2011-06-27 00:39:00.000000000 -0700
++++ binutils-2.21.1/configure	2011-12-15 09:57:17.000000000 -0800
+@@ -6701,6 +6701,10 @@
+   *-*-mingw* | *-*-cygwin ) RPATH_ENVVAR=PATH ;;
+   *) RPATH_ENVVAR=LD_LIBRARY_PATH ;;
+ esac
++# Override RPATH_ENVVAR, courtesy of Gentoo.  See this thread for more info:
++# http://www.cygwin.com/ml/binutils/2010-02/msg00266.html
++# http://sources.gentoo.org/cgi-bin/viewvc.cgi/gentoo/src/patchsets/binutils/2.20/08_all_binutils-RPATH_ENVVAR-smack.patch?view=markup&revision=1.1
++RPATH_ENVVAR="cant_touch_this_nah_nah_nah"
+ 
+ # On systems where the dynamic library environment variable is PATH,
+ # gcc/ will put dynamic libraries into a subdirectory to avoid adding
 diff -ruN orig-src/binutils-2.21.1/gas/configure.tgt binutils-2.21.1/gas/configure.tgt
 --- orig-src/binutils-2.21.1/gas/configure.tgt	2011-04-01 05:02:42.000000000 -0700
 +++ binutils-2.21.1/gas/configure.tgt	2011-11-11 04:05:38.000000000 -0800
