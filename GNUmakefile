@@ -21,7 +21,7 @@ busted:
 endif
 
 real-$(TARGET_ARCH):
-	@if [ "$(ARCH_LINK)" != "$@" ];\
+	@if [ "$(ARCH_LINK)" != "$(TARGET_ARCH)" ];\
 	then\
 	  $(MAKE) realclean;\
 	  $(MAKE) realall -j $(MAKE_JOBS);\
