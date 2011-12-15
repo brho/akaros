@@ -307,7 +307,7 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 	cd $(BINARY_PREFIX)gcc-stage2-builddir; \
 	make -j $(MAKE_JOBS) install
 
-patches:
+patches: gcc-$(GCC_VERSION) binutils-$(BINUTILS_VERSION)
 	rm -rf orig-src
 	mkdir orig-src
 	
