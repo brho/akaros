@@ -105,7 +105,7 @@ static inline void save_kernel_tf(struct trapframe *tf)
 	             "popl %%esp;            " /* restore esp */
 	             "1:                     " /* where this tf will restart */
 	             : 
-	             : "g"(&tf->tf_esp), "g"(&tf->tf_eip), "g"(tf)
+	             : "r"(&tf->tf_esp), "r"(&tf->tf_eip), "g"(tf)
 	             : "eax", "memory", "cc");
 }
 
