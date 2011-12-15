@@ -78,6 +78,7 @@ void __attribute__((noreturn)) pth_sched_entry(void)
 	 * had a new event come in, one that may make us able to get a new_thread */
 	do {
 		handle_events(vcoreid);
+		__check_preempt_pending(vcoreid);
 		mcs_pdr_lock(&queue_lock);
 		new_thread = TAILQ_FIRST(&ready_queue);
 		if (new_thread) {

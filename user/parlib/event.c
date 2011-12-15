@@ -184,7 +184,6 @@ static int handle_mbox_msgs(struct event_mbox *ev_mbox)
 		printd("[event] UCQ (mbox %08p), ev_type: %d\n", ev_mbox, ev_type);
 		if (ev_handlers[ev_type])
 			ev_handlers[ev_type](&local_msg, ev_type);
-		check_preempt_pending(vcoreid);
 		retval++;
 	}
 	return retval;
@@ -202,7 +201,6 @@ int handle_mbox(struct event_mbox *ev_mbox)
 		if (ev_handlers[bit])
 			ev_handlers[bit](0, bit);
 		retval++;
-		check_preempt_pending(vcoreid);
 		/* Consider checking the queue for incoming messages while we're here */
 	}
 	printd("[event] handling ev_mbox %08p on vcore %d\n", ev_mbox, vcore_id());

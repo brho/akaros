@@ -100,8 +100,8 @@ void __attribute__((noreturn)) uthread_vcore_entry(void)
 	 * to do this after we've handled STEALING and DONT_MIGRATE. */
 	try_handle_remote_mbox();
 	/* Otherwise, go about our usual vcore business (messages, etc). */
-	check_preempt_pending(vcoreid);
 	handle_events(vcoreid);
+	__check_preempt_pending(vcoreid);
 	assert(in_vcore_context());	/* double check, in case an event changed it */
 	assert(sched_ops->sched_entry);
 	sched_ops->sched_entry();
@@ -385,20 +385,42 @@ static void __run_current_uthread_raw(void)
 /* Deals with a pending preemption (checks, responds).  If the 2LS registered a
  * function, it will get run.  Returns true if you got preempted.  Called
  * 'check' instead of 'handle', since this isn't an event handler.  It's the "Oh
- * shit a preempt is on its way ASAP".  While it is isn't too involved with
- * uthreads, it is tied in to sched_ops. */
-bool check_preempt_pending(uint32_t vcoreid)
+ * shit a preempt is on its way ASAP".
+ *
+ * Be careful calling this: you might not return, so don't call it if you can't
+ * handle that.  If you are calling this from an event handler, you'll need to
+ * do things like ev_might_not_return().  If the event can via an INDIR ev_q,
+ * that ev_q must be a NOTHROTTLE.
+ *
+ * Finally, don't call this from a place that might have a DONT_MIGRATE
+ * cur_uth.  This should be safe for most 2LS code. */
+bool __check_preempt_pending(uint32_t vcoreid)
 {
 	bool retval = FALSE;
-	if (__procinfo.vcoremap[vcoreid].preempt_pending) {
+	assert(in_vcore_context());
+	if (__preempt_is_pending(vcoreid)) {
 		retval = TRUE;
 		if (sched_ops->preempt_pending)
 			sched_ops->preempt_pending();
-		/* this tries to yield, but will pop back up if this was a spurious
-		 * preempt_pending.  Note this will handle events internally, and then
-		 * recurse once per event in the queue.  This sucks, but keeps us from
-		 * missing messages for now. */
-		vcore_yield(TRUE);
+		/* If we still have a cur_uth, copy it out and hand it back to the 2LS
+		 * before yielding. */
+		if (current_uthread) {
+			assert(!(current_uthread->flags & UTHREAD_DONT_MIGRATE));
+			copyout_uthread(vcpd_of(vcoreid), current_uthread);
+			assert(sched_ops->thread_paused);
+			sched_ops->thread_paused(current_uthread);
+			current_uthread = 0;
+		}
+		/* vcore_yield tries to yield, and will pop back up if this was a spurious
+		 * preempt_pending or if it handled an event.  For now, we'll just keep
+		 * trying to yield so long as a preempt is coming in.  Eventually, we'll
+		 * handle all of our events and yield, or else the preemption will hit
+		 * and someone will recover us (at which point we'll break out of the
+		 * loop) */
+		while (__procinfo.vcoremap[vcoreid].preempt_pending) {
+			vcore_yield(TRUE);
+			cpu_relax();
+		}
 	}
 	return retval;
 }

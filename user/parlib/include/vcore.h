@@ -49,6 +49,8 @@ static inline bool notif_is_enabled(uint32_t vcoreid);
 static inline bool vcore_is_mapped(uint32_t vcoreid);
 static inline bool vcore_is_preempted(uint32_t vcoreid);
 static inline struct preempt_data *vcpd_of(uint32_t vcoreid);
+static inline bool preempt_is_pending(uint32_t vcoreid);
+static inline bool __preempt_is_pending(uint32_t vcoreid);
 int vcore_init(void);
 int vcore_request(long nr_new_vcores);
 void vcore_yield(bool preempt_pending);
@@ -114,6 +116,26 @@ static inline bool vcore_is_preempted(uint32_t vcoreid)
 static inline struct preempt_data *vcpd_of(uint32_t vcoreid)
 {
 	return &__procdata.vcore_preempt_data[vcoreid];
+}
+
+/* Uthread's can call this in case they care if a preemption is coming.  If a
+ * preempt is incoming, this will return TRUE, if you are in uthread context.  A
+ * reasonable response for a uthread is to yield, and vcore_entry will deal with
+ * the preempt pending.
+ *
+ * If you call this from vcore context, it will do nothing.  In general, it's
+ * not safe to just yield (or do whatever you plan on doing) from arbitrary
+ * places in vcore context.  So we just lie about PP. */
+static inline bool preempt_is_pending(uint32_t vcoreid)
+{
+	if (in_vcore_context())
+		return FALSE;
+	return __preempt_is_pending(vcoreid);
+}
+
+static inline bool __preempt_is_pending(uint32_t vcoreid)
+{
+	return __procinfo.vcoremap[vcoreid].preempt_pending;
 }
 
 #ifdef __cplusplus

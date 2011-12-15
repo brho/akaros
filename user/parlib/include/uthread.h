@@ -61,7 +61,7 @@ void uthread_yield(bool save_state);
 void ros_syscall_blockon(struct syscall *sysc);
 
 /* Utility functions */
-bool check_preempt_pending(uint32_t vcoreid);
+bool __check_preempt_pending(uint32_t vcoreid);	/* careful: check the code */
 void uth_disable_notifs(void);
 void uth_enable_notifs(void);
 void copyout_uthread(struct preempt_data *vcpd, struct uthread *uthread);
