@@ -16,6 +16,16 @@
 #include <assert.h>
 #include <pmap.h>
 
+/* Userspace could give us a vcoreid that causes us to compute a vcpd that is
+ * outside procdata.  If we hit UWLIM, then we've gone farther than we should.
+ * We check the vcoreid, instead of the resulting address, to avoid issues like
+ * address wrap-around. */
+static bool vcoreid_is_safe(uint32_t vcoreid)
+{
+	/* MAX_NUM_VCORES == MAX_NUM_CPUS (check procinfo/procdata) */
+	return vcoreid < MAX_NUM_CPUS;
+}
+
 /* Note these three helpers return the user address of the mbox, not the KVA.
  * Load current to access this, and it will work for any process. */
 static struct event_mbox *get_vcpd_mbox_priv(uint32_t vcoreid)
@@ -341,7 +351,7 @@ void send_event(struct proc *p, struct event_queue *ev_q, struct event_msg *msg,
 	}
 	if (!is_user_rwaddr(ev_q, sizeof(struct event_queue))) {
 		/* Ought to kill them, just warn for now */
-		warn("[kernel] Illegal addr for ev_q");
+		printk("[kernel] Illegal addr for ev_q\n");
 		return;
 	}
 	/* ev_q is a user pointer, so we need to make sure we're in the right
@@ -360,6 +370,11 @@ void send_event(struct proc *p, struct event_queue *ev_q, struct event_msg *msg,
 		 * Also note this may be 'wrong' if num_vcores changes. */
 		vcoreid = (ev_q->ev_vcore + 1) % p->procinfo->num_vcores;
 		ev_q->ev_vcore = vcoreid;
+	}
+	if (!vcoreid_is_safe(vcoreid)) {
+		/* Ought to kill them, just warn for now */
+		printk("[kernel] Vcoreid %d unsafe! (too big?)\n", vcoreid);
+		goto out;
 	}
 	/* If we're a SPAM_PUBLIC, they just want us to spam the message.  Note we
 	 * don't care about the mbox, since it'll go to VCPD public mboxes, and
@@ -387,7 +402,7 @@ void send_event(struct proc *p, struct event_queue *ev_q, struct event_msg *msg,
 	/* Even if we're using an mbox in procdata (VCPD), we want a user pointer */
 	if (!is_user_rwaddr(ev_mbox, sizeof(struct event_mbox))) {
 		/* Ought to kill them, just warn for now */
-		printk("[kernel] Illegal addr for ev_mbox");
+		printk("[kernel] Illegal addr for ev_mbox\n");
 		goto out;
 	}
 	/* We used to support no msgs, but quit being lazy and send a 'msg'.  If the

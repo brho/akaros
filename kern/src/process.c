@@ -1161,6 +1161,8 @@ static void __proc_give_a_pcore(struct proc *p, uint32_t pcore)
  * WARNING: You must hold the proc_lock before calling this! */
 void __proc_give_cores(struct proc *SAFE p, uint32_t *pcorelist, size_t num)
 {
+	/* should never happen: */
+	assert(num + p->procinfo->num_vcores <= MAX_NUM_CPUS);
 	switch (p->state) {
 		case (PROC_RUNNABLE_S):
 		case (PROC_RUNNING_S):
