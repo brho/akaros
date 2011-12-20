@@ -190,19 +190,10 @@ void mcs_pdr_fini(struct mcs_pdr_lock *lock)
  * Even if they are no longer the lockholder, they will be checking preemption
  * messages and will help break out of the deadlock.  So long as we don't
  * wastefully spin, we're okay. */
-void __ensure_qnode_runs(struct mcs_pdr_qnode *qnode)
+static void __ensure_qnode_runs(struct mcs_pdr_qnode *qnode)
 {
 	assert(qnode);
-	if (vcore_is_preempted(qnode->vcoreid)) {
-		printd("MCS-PDR: VC %d changing to VC %d\n", vcore_id(), qnode->vcoreid);
-		/* Note that at this moment, the vcore could still be mapped (we're
-		 * racing with __preempt.  If that happens, we'll just fail the
-		 * sys_change_vcore(), and next time __ensure runs we'll get it. */
-		/* We want to recover them from preemption.  Since we know they have
-		 * notifs disabled, they will need to be directly restarted, so we can
-		 * skip the other logic and cut straight to the sys_change_vcore() */
-		sys_change_vcore(qnode->vcoreid, FALSE);
-	}
+	ensure_vcore_runs(qnode->vcoreid);
 }
 
 /* Internal version of the locking function, doesn't care about storage of qnode

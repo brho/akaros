@@ -330,3 +330,63 @@ void __attribute__((noreturn)) vcore_idle(void)
 		cpu_relax();
 	}
 }
+
+/* Helper, that actually makes sure a vcore is running.  Call this is you really
+ * want vcoreid.  More often, you'll want to call the regular version. */
+static void __ensure_vcore_runs(uint32_t vcoreid)
+{
+	if (vcore_is_preempted(vcoreid)) {
+		printd("[vcore]: VC %d changing to VC %d\n", vcore_id(), vcoreid);
+		/* Note that at this moment, the vcore could still be mapped (we're
+		 * racing with __preempt.  If that happens, we'll just fail the
+		 * sys_change_vcore(), and next time __ensure runs we'll get it. */
+		/* We want to recover them from preemption.  Since we know they have
+		 * notifs disabled, they will need to be directly restarted, so we can
+		 * skip the other logic and cut straight to the sys_change_vcore() */
+		sys_change_vcore(vcoreid, FALSE);
+	}
+}
+
+/* Helper, looks for any preempted vcores, making sure each of them runs at some
+ * point.  This is pretty heavy-weight, and should be used to help get out of
+ * weird deadlocks (spinning in vcore context, waiting on another vcore).  If
+ * you might know which vcore you are waiting on, use ensure_vc_runs. */
+static void __ensure_all_run(void)
+{
+	for (int i = 0; i < max_vcores(); i++)
+		__ensure_vcore_runs(i);
+}
+
+/* Makes sure a vcore is running.  If it is preempted, we'll switch to
+ * it.  This will return, either immediately if the vcore is running, or later
+ * when someone preempt-recovers us.
+ *
+ * If you pass in your own vcoreid, this will make sure all other preempted
+ * vcores run. */
+void ensure_vcore_runs(uint32_t vcoreid)
+{
+	/* if the vcoreid is ourselves, make sure everyone else is running */
+	if (vcoreid == vcore_id()) {
+		__ensure_all_run();
+		return;
+	}
+	__ensure_vcore_runs(vcoreid);
+}
+
+#define NR_RELAX_SPINS 1000
+/* If you are spinning in vcore context and it is likely that you don't know who
+ * you are waiting on, call this.  It will spin for a bit before firing up the
+ * potentially expensive __ensure_all_run().  Don't call this from uthread
+ * context.  sys_change_vcore will probably mess you up. */
+void cpu_relax_vc(uint32_t vcoreid)
+{
+	static __thread unsigned int spun;		/* vcore TLS */
+	assert(in_vcore_context());
+	spun = 0;
+	if (spun++ >= NR_RELAX_SPINS) {
+		/* if vcoreid == vcore_id(), this might be expensive */
+		ensure_vcore_runs(vcoreid);
+		spun = 0;
+	}
+	cpu_relax();
+}

@@ -58,6 +58,8 @@ bool clear_notif_pending(uint32_t vcoreid);
 void enable_notifs(uint32_t vcoreid);
 void disable_notifs(uint32_t vcoreid);
 void vcore_idle(void);
+void ensure_vcore_runs(uint32_t vcoreid);
+void cpu_relax_vc(uint32_t vcoreid);
 
 /* Static inlines */
 static inline size_t max_vcores(void)
