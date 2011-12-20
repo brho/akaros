@@ -246,7 +246,7 @@ static inline void set_tls_desc(void *tls_desc, uint32_t vcoreid)
 #include <stdio.h>
 static __inline void print_trapframe(struct user_trapframe *tf)
 {
-	printf("[user] TRAP frame\n");
+	printf("[user] TRAP frame %08p\n", tf);
 	printf("  edi  0x%08x\n", tf->tf_regs.reg_edi);
 	printf("  esi  0x%08x\n", tf->tf_regs.reg_esi);
 	printf("  ebp  0x%08x\n", tf->tf_regs.reg_ebp);

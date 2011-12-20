@@ -182,6 +182,7 @@ __uthread_yield(void)
 		uthread->state = UT_BLOCKED;
 		assert(sched_ops->thread_blockon_sysc);
 		sched_ops->thread_blockon_sysc(uthread->sysc);
+		/* make sure you don't touch uthread after that sched ops call */
 	} else { /* generic yield */
 		uthread->state = UT_RUNNABLE;
 		assert(sched_ops->thread_yield);
@@ -298,16 +299,19 @@ void ros_syscall_blockon(struct syscall *sysc)
 }
 
 /* Helper for run_current and run_uthread.  Make sure the uthread you want to
- * run is the current_uthread before calling this.  It will pop the TF of
- * whatever you send in (run_cur and run_uth use different TFs).
+ * run is the current_uthread before calling this.  Both of those are just
+ * wrappers for this, and they manage current_uthread and its states.   This
+ * manages the TF, FP state, and related flags.
  *
  * This will adjust the thread's state, do one last check on notif_pending, and
  * pop the tf.  Note that the notif check is an optimization.  pop_ros_tf() will
  * definitely handle it, but it will take a syscall to do so later. */
-static void __run_cur_uthread(struct user_trapframe *utf)
+static void __run_cur_uthread(void)
 {
 	uint32_t vcoreid = vcore_id();
 	struct preempt_data *vcpd = vcpd_of(vcoreid);
+	struct uthread *uthread;
+	/* Last check for messages.  Might not return, or cur_uth might be unset. */
 	clear_notif_pending(vcoreid);
 	/* clear_notif might have handled a preemption event, and we might not have
 	 * a current_uthread anymore.  Need to recheck */
@@ -320,15 +324,28 @@ static void __run_cur_uthread(struct user_trapframe *utf)
 		uthread_vcore_entry();
 		assert(0);
 	}
+	uthread = current_uthread;	/* for TLS sanity */
+	/* Load silly state (Floating point) too.  For real */
+	if (uthread->flags & UTHREAD_FPSAVED) {
+		uthread->flags &= ~UTHREAD_FPSAVED;
+		/* TODO: (HSS) actually load it */
+	}
 	/* Go ahead and start the uthread */
-	/* utf no longer represents the current state of the uthread */
-	current_uthread->flags &= ~UTHREAD_SAVED;
-	set_tls_desc(current_uthread->tls_desc, vcoreid);
-	/* Pop the user trap frame */
-	pop_ros_tf(utf, vcoreid);
+	set_tls_desc(uthread->tls_desc, vcoreid);
+	/* Depending on where it was saved, we pop differently.  This assumes that
+	 * if a uthread was not saved, that it was running in the vcpd notif tf.
+	 * There should never be a time that the TF is unsaved and not in the notif
+	 * TF (or about to be in that TF). */
+	if (uthread->flags & UTHREAD_SAVED) {
+		uthread->flags &= ~UTHREAD_SAVED;
+		pop_ros_tf(&uthread->utf, vcoreid);
+	} else  {
+		pop_ros_tf(&vcpd->notif_tf, vcoreid);
+	}
 }
 
-/* Runs whatever thread is vcore's current_uthread */
+/* Runs whatever thread is vcore's current_uthread.  This is nothing but a
+ * couple checks, then the real run_cur_uth. */
 void run_current_uthread(void)
 {
 	uint32_t vcoreid = vcore_id();
@@ -338,11 +355,13 @@ void run_current_uthread(void)
 	printd("[U] Vcore %d is restarting uthread %08p\n", vcoreid,
 	       current_uthread);
 	/* Run, using the TF in the VCPD.  FP state should already be loaded */
-	__run_cur_uthread(&vcpd->notif_tf);
+	__run_cur_uthread();
 	assert(0);
 }
 
-/* Launches the uthread on the vcore.  Don't call this on current_uthread. */
+/* Launches the uthread on the vcore.  Don't call this on current_uthread.  All
+ * this does is set up uthread as cur_uth, check for bugs, and then runs the
+ * real run_cur_uth. */
 void run_uthread(struct uthread *uthread)
 {
 	uint32_t vcoreid = vcore_id();
@@ -357,10 +376,7 @@ void run_uthread(struct uthread *uthread)
 	uthread->state = UT_RUNNING;
 	/* Save a ptr to the uthread we'll run in the transition context's TLS */
 	current_uthread = uthread;
-	/* Load silly state (Floating point) too.  For real */
-	/* TODO: (HSS) */
-	uthread->flags &= ~UTHREAD_FPSAVED;	/* uth->as no longer has the latest FP*/
-	__run_cur_uthread(&uthread->utf);
+	__run_cur_uthread();
 	assert(0);
 }
 
