@@ -14,6 +14,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <rassert.h> /* for the static_assert() */
+#include <vcore.h>
 
 /* Initializes a ucq.  You pass in addresses of mmaped pages for the main page
  * (prod_idx) and the spare page.  I recommend mmaping a big chunk and breaking
@@ -111,8 +112,12 @@ loop_top:
 		 * slots based off the new counter index (cons_idx) */
 		/* Now free up the old page.  Need to make sure all other consumers are
 		 * done.  We spin til enough are done, like an inverted refcnt. */
-		while (atomic_read(&old_page->header.nr_cons) < NR_MSG_PER_PAGE)
-			cpu_relax();
+		while (atomic_read(&old_page->header.nr_cons) < NR_MSG_PER_PAGE) {
+			/* spinning on userspace here, specifically, another vcore and we
+			 * don't know who it is.  This will spin a bit, then make sure they
+			 * aren't preeempted */
+			cpu_relax_vc(vcore_id());	/* pass in self to check everyone else*/
+		}
 		/* Now the page is done.  0 its metadata and give it up. */
 		old_page->header.cons_next_pg = 0;
 		atomic_set(&old_page->header.nr_cons, 0);
