@@ -1210,24 +1210,6 @@ void __proc_give_cores(struct proc *SAFE p, uint32_t *pcorelist, size_t num)
 	p->resources[RES_CORES].amt_granted += num;
 }
 
-/* Makes process p's coremap look like pcorelist (add, remove, etc).  Caller
- * needs to know what cores are free after this call (removed, failed, etc).
- * This info will be returned via corelist and *num.  This will send message to
- * any cores that are getting removed.
- *
- * Before implementing this, we should probably think about when this will be
- * used.  Implies preempting for the message.  The more that I think about this,
- * the less I like it.  For now, don't use this, and think hard before
- * implementing it.
- *
- * WARNING: You must hold the proc_lock before calling this! */
-void __proc_set_allcores(struct proc *SAFE p, uint32_t *pcorelist,
-                         size_t *num, amr_t message,TV(a0t) arg0,
-                         TV(a1t) arg1, TV(a2t) arg2)
-{
-	panic("Set all cores not implemented.\n");
-}
-
 /* Helper for the take_cores calls: takes a specific vcore from p, optionally
  * sending the message (or just unmapping), gives the pcore to the idlecoremap.
  */

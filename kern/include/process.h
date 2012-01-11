@@ -104,18 +104,9 @@ struct vcore *vcoreid2vcore(struct proc *p, uint32_t vcoreid);
  * shouldn't call these functions with parameters you are not sure about (like
  * an invalid corelist).  
  *
- * They also may cause an IPI to be sent to core it is called on.  If so, the
- * return value will be true.  Once you unlock (and enable interrupts) you will
- * be preempted, and usually lose your stack.  There is a helper to unlock and
- * handle the refcnt.
- *
  * WARNING: YOU MUST HOLD THE PROC_LOCK BEFORE CALLING THESE! */
 /* Gives process p the additional num cores listed in corelist */
 void __proc_give_cores(struct proc *SAFE p, uint32_t *pcorelist, size_t num);
-/* Makes process p's coremap look like corelist (add, remove, etc). Not used */
-void __proc_set_allcores(struct proc *SAFE p, uint32_t *pcorelist,
-                         size_t *num, amr_t message, TV(a0t) arg0,
-                         TV(a1t) arg1, TV(a2t) arg2);
 /* Takes from process p the num cores listed in corelist */
 void __proc_take_cores(struct proc *p, uint32_t *pcorelist, size_t num,
                        amr_t message, long arg0, long arg1, long arg2);
