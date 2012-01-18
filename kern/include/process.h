@@ -107,11 +107,14 @@ struct vcore *vcoreid2vcore(struct proc *p, uint32_t vcoreid);
  * WARNING: YOU MUST HOLD THE PROC_LOCK BEFORE CALLING THESE! */
 /* Gives process p the additional num cores listed in corelist */
 void __proc_give_cores(struct proc *SAFE p, uint32_t *pcorelist, size_t num);
-/* Takes from process p the num cores listed in corelist */
-void __proc_take_cores(struct proc *p, uint32_t *pcorelist, size_t num,
-                       amr_t message, long arg0, long arg1, long arg2);
-void __proc_take_allcores(struct proc *p, amr_t message, long arg0, long arg1,
-                          long arg2);
+/* Takes from process p the num cores listed in pc_arr */
+void __proc_take_corelist(struct proc *p, uint32_t *pc_arr, size_t num,
+                          bool preempt);
+/* Takes all cores, returns the count, fills in pc_arr with their pcoreid */
+uint32_t __proc_take_allcores(struct proc *p, uint32_t *pc_arr, bool preempt);
+/* Dumb legacy helper, til we fix the ksched a bit */
+void __proc_take_allcores_dumb(struct proc *p, bool preempt);
+
 /* Exposed for kern/src/resource.c for now */
 void __map_vcore(struct proc *p, uint32_t vcoreid, uint32_t pcoreid);
 void __unmap_vcore(struct proc *p, uint32_t vcoreid);

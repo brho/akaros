@@ -667,7 +667,7 @@ void proc_destroy(struct proc *p)
 		case PROC_RUNNABLE_M:
 			/* Need to reclaim any cores this proc might have, even though it's
 			 * not running yet. */
-			__proc_take_allcores(p, 0, 0, 0, 0);
+			__proc_take_allcores_dumb(p, FALSE);
 			// fallthrough
 		case PROC_RUNNABLE_S:
 			// Think about other lists, like WAITING, or better ways to do this
@@ -699,7 +699,7 @@ void proc_destroy(struct proc *p)
 			 * deallocate the cores.
 			 * The rule is that the vcoremap is set before proc_run, and reset
 			 * within proc_destroy */
-			__proc_take_allcores(p, __death, 0, 0, 0);
+			__proc_take_allcores_dumb(p, FALSE);
 			break;
 		case PROC_CREATED:
 			break;
@@ -1008,7 +1008,8 @@ void __proc_preempt_core(struct proc *p, uint32_t pcoreid)
 	struct event_msg preempt_msg = {0};
 	p->procinfo->vcoremap[vcoreid].preempt_served = TRUE;
 	// expects a pcorelist.  assumes pcore is mapped and running_m
-	__proc_take_cores(p, &pcoreid, 1, __preempt, (long)p, 0, 0);
+	__proc_take_corelist(p, &pcoreid, 1, TRUE);
+	put_idle_core(pcoreid);	/* TODO (IDLE) */
 	/* Send a message about the preemption. */
 	preempt_msg.ev_type = EV_VCORE_PREEMPT;
 	preempt_msg.ev_arg2 = vcoreid;
@@ -1027,7 +1028,7 @@ void __proc_preempt_all(struct proc *p)
 	 * just make us RUNNABLE_M. */
 	TAILQ_FOREACH(vc_i, &p->online_vcs, list)
 		vc_i->preempt_served = TRUE;
-	__proc_take_allcores(p, __preempt, (long)p, 0, 0);
+	__proc_take_allcores_dumb(p, TRUE);
 	/* TODO: send a bulk preemption message */
 }
 
@@ -1220,100 +1221,133 @@ void __proc_give_cores(struct proc *SAFE p, uint32_t *pcorelist, size_t num)
 	p->resources[RES_CORES].amt_granted += num;
 }
 
-/* Helper for the take_cores calls: takes a specific vcore from p, optionally
- * sending the message (or just unmapping), gives the pcore to the idlecoremap.
- */
-static void __proc_take_a_core(struct proc *p, struct vcore *vc, amr_t message,
-                               long arg0, long arg1, long arg2)
+/********** Core revocation (bulk and single) ***********/
+
+/* Revokes a single vcore from a process (unmaps or sends a KMSG to unmap). */
+static void __proc_revoke_core(struct proc *p, uint32_t vcoreid, bool preempt)
 {
-	uint32_t vcoreid = vcore2vcoreid(p, vc);
-	struct preempt_data *vcpd = &p->procdata->vcore_preempt_data[vcoreid];
-	/* Change lists for the vcore.  We do this before either unmapping or
-	 * sending the message, so the lists represent what will be very soon
-	 * (before we unlock, the messages are in flight). */
-	TAILQ_REMOVE(&p->online_vcs, vc, list);
-	TAILQ_INSERT_HEAD(&p->inactive_vcs, vc, list);
-	if (message) {
-		/* lock the vcore's state.  This is okay even if we kill the proc */
+	uint32_t pcoreid = get_pcoreid(p, vcoreid);
+	struct preempt_data *vcpd;
+	if (preempt) {
+		/* Lock the vcore's state (necessary for preemption recovery) */
+		vcpd = &p->procdata->vcore_preempt_data[vcoreid];
 		atomic_or(&vcpd->flags, VC_K_LOCK);
-		send_kernel_message(vc->pcoreid, message, arg0, arg1, arg2,
-		                    KMSG_IMMEDIATE);
+		send_kernel_message(pcoreid, __preempt, (long)p, 0, 0, KMSG_IMMEDIATE);
 	} else {
-		/* if there was a msg, the vcore is unmapped on the receive side.
-		 * o/w, we need to do it here. */
-		__unmap_vcore(p, vcoreid);
+		send_kernel_message(pcoreid, __death, 0, 0, 0, KMSG_IMMEDIATE);
 	}
-	/* give the pcore back to the idlecoremap */
-	put_idle_core(vc->pcoreid);
 }
 
-/* Takes from process p the num cores listed in pcorelist, using the given
- * message for the kernel message (__death, __preempt, etc).
- *
- * WARNING: You must hold the proc_lock before calling this! */
-void __proc_take_cores(struct proc *p, uint32_t *pcorelist, size_t num,
-                       amr_t message, long arg0, long arg1, long arg2)
+/* Revokes all cores from the process (unmaps or sends a KMSGS). */
+static void __proc_revoke_allcores(struct proc *p, bool preempt)
 {
+	struct vcore *vc_i;
+	/* TODO: if we ever get broadcast messaging, use it here (still need to lock
+	 * the vcores' states for preemption) */
+	TAILQ_FOREACH(vc_i, &p->online_vcs, list)
+		__proc_revoke_core(p, vcore2vcoreid(p, vc_i), preempt);
+}
+
+/* Might be faster to scan the vcoremap than to walk the list... */
+static void __proc_unmap_allcores(struct proc *p)
+{
+	struct vcore *vc_i;
+	TAILQ_FOREACH(vc_i, &p->online_vcs, list)
+		__unmap_vcore(p, vcore2vcoreid(p, vc_i));
+}
+
+/* Takes (revoke via kmsg or unmap) from process p the num cores listed in
+ * pc_arr.  Will preempt if 'preempt' is set.  o/w, no state will be saved, etc.
+ * Don't use this for taking all of a process's cores.
+ *
+ * Make sure you hold the lock when you call this. */
+void __proc_take_corelist(struct proc *p, uint32_t *pc_arr, size_t num,
+                          bool preempt)
+{
+	struct vcore *vc;
 	uint32_t vcoreid;
-	switch (p->state) {
-		case (PROC_RUNNABLE_M):
-			assert(!message);
-			break;
-		case (PROC_RUNNING_M):
-			assert(message);
-			break;
-		default:
-			panic("Weird state(%s) in %s()", procstate2str(p->state),
-			      __FUNCTION__);
-	}
+	/* Legacy sanity checks */
 	spin_lock(&idle_lock);
 	assert((num <= p->procinfo->num_vcores) &&
 	       (num_idlecores + num <= num_cpus));
 	spin_unlock(&idle_lock);
 	__seq_start_write(&p->procinfo->coremap_seqctr);
 	for (int i = 0; i < num; i++) {
-		vcoreid = get_vcoreid(p, pcorelist[i]);
+		vcoreid = get_vcoreid(p, pc_arr[i]);
 		/* Sanity check */
-		assert(pcorelist[i] == get_pcoreid(p, vcoreid));
-		__proc_take_a_core(p, vcoreid2vcore(p, vcoreid), message, arg0, arg1,
-		                   arg2);
+		assert(pc_arr[i] == get_pcoreid(p, vcoreid));
+		/* Revoke / unmap core */
+		if (p->state == PROC_RUNNING_M) {
+			__proc_revoke_core(p, vcoreid, preempt);
+		} else {
+			assert(p->state == PROC_RUNNABLE_M);
+			__unmap_vcore(p, vcoreid);
+		}
+		/* Change lists for the vcore.  Note, the messages are already in flight
+		 * (or the vcore is already unmapped), if applicable.  The only code
+		 * that looks at the lists without holding the lock is event code, and
+		 * it doesn't care if the vcore was unmapped (it handles that) */
+		vc = vcoreid2vcore(p, vcoreid);
+		TAILQ_REMOVE(&p->online_vcs, vc, list);
+		/* even for single preempts, we use the inactive list.  bulk preempt is
+		 * only used for when we take everything. */
+		TAILQ_INSERT_HEAD(&p->inactive_vcs, vc, list);
 	}
 	p->procinfo->num_vcores -= num;
 	__seq_end_write(&p->procinfo->coremap_seqctr);
 	p->resources[RES_CORES].amt_granted -= num;
 }
 
-/* Takes all cores from a process, which must be in an _M state.  Cores are
- * placed back in the idlecoremap.  If there's a message, such as __death or
- * __preempt, it will be sent to the cores.
+/* Takes all cores from a process (revoke via kmsg or unmap), putting them on
+ * the appropriate vcore list, and fills pc_arr with the pcores revoked, and
+ * returns the number of entries in pc_arr.
  *
- * WARNING: You must hold the proc_lock before calling this! */
-void __proc_take_allcores(struct proc *p, amr_t message, long arg0, long arg1,
-                          long arg2)
+ * Make sure pc_arr is big enough to handle num_vcores().
+ * Make sure you hold the lock when you call this. */
+uint32_t __proc_take_allcores(struct proc *p, uint32_t *pc_arr, bool preempt)
 {
 	struct vcore *vc_i, *vc_temp;
-	switch (p->state) {
-		case (PROC_RUNNABLE_M):
-			assert(!message);
-			break;
-		case (PROC_RUNNING_M):
-			assert(message);
-			break;
-		default:
-			panic("Weird state(%s) in %s()", procstate2str(p->state),
-			      __FUNCTION__);
-	}
+	uint32_t num = 0;
+	/* Legacy sanity check */
 	spin_lock(&idle_lock);
-	assert(num_idlecores + p->procinfo->num_vcores <= num_cpus); // sanity
+	assert(num_idlecores + p->procinfo->num_vcores <= num_cpus);
 	spin_unlock(&idle_lock);
 	__seq_start_write(&p->procinfo->coremap_seqctr);
-	TAILQ_FOREACH_SAFE(vc_i, &p->online_vcs, list, vc_temp) {
-		__proc_take_a_core(p, vc_i, message, arg0, arg1, arg2);
+	/* Write out which pcores we're going to take */
+	TAILQ_FOREACH(vc_i, &p->online_vcs, list)
+		pc_arr[num++] = vc_i->pcoreid;
+	/* Revoke if they are running, o/w unmap.  Both of these need the online
+	 * list to not be changed yet. */
+	if (p->state == PROC_RUNNING_M) {
+		__proc_revoke_allcores(p, preempt);
+	} else {
+		assert(p->state == PROC_RUNNABLE_M);
+		__proc_unmap_allcores(p);
 	}
-	p->procinfo->num_vcores = 0;
+	/* Move the vcores from online to the head of the appropriate list */
+	TAILQ_FOREACH_SAFE(vc_i, &p->online_vcs, list, vc_temp) {
+		/* TODO: we may want a TAILQ_CONCAT_HEAD, or something that does that */
+		TAILQ_REMOVE(&p->online_vcs, vc_i, list);
+		/* TODO: put on the bulk preempt list, if applicable */
+		TAILQ_INSERT_HEAD(&p->inactive_vcs, vc_i, list);
+	}
 	assert(TAILQ_EMPTY(&p->online_vcs));
+	assert(num == p->procinfo->num_vcores);
+	p->procinfo->num_vcores = 0;
 	__seq_end_write(&p->procinfo->coremap_seqctr);
 	p->resources[RES_CORES].amt_granted = 0;
+	return num;
+}
+
+/* Dumb legacy helper, simply takes all cores and just puts them on the idle
+ * core map (which belongs in the scheduler */
+void __proc_take_allcores_dumb(struct proc *p, bool preempt)
+{
+	uint32_t num_revoked;
+	uint32_t pc_arr[p->procinfo->num_vcores];
+	num_revoked = __proc_take_allcores(p, pc_arr, preempt);
+	for (int i = 0; i < num_revoked; i++)
+		put_idle_core(pc_arr[i]);
 }
 
 /* Helper to do the vcore->pcore and inverse mapping.  Hold the lock when

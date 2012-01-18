@@ -63,7 +63,7 @@ ssize_t core_request(struct proc *p)
 		/* sending death, since it's not our job to save contexts or anything in
 		 * this case.  also, if this returns true, we will not return down
 		 * below, and need to eat the reference to p */
-		__proc_take_allcores(p, __death, 0, 0, 0);
+		__proc_take_allcores_dumb(p, FALSE);
 		__proc_set_state(p, PROC_RUNNABLE_S);
 		schedule_proc(p);
 		spin_unlock(&p->proc_lock);
