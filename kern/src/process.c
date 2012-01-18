@@ -56,6 +56,7 @@ void put_idle_core(uint32_t coreid)
 static void __proc_startcore(struct proc *p, trapframe_t *tf);
 static bool is_mapped_vcore(struct proc *p, uint32_t pcoreid);
 static uint32_t get_vcoreid(struct proc *p, uint32_t pcoreid);
+static uint32_t try_get_pcoreid(struct proc *p, uint32_t vcoreid);
 static uint32_t get_pcoreid(struct proc *p, uint32_t vcoreid);
 static void __proc_free(struct kref *kref);
 
@@ -736,12 +737,20 @@ static uint32_t get_vcoreid(struct proc *p, uint32_t pcoreid)
 	return p->procinfo->pcoremap[pcoreid].vcoreid;
 }
 
+/* Helper function.  Try to find the pcoreid for a given virtual core id for
+ * proc p.  No locking involved, be careful.  Use this when you can tolerate a
+ * stale or otherwise 'wrong' answer. */
+static uint32_t try_get_pcoreid(struct proc *p, uint32_t vcoreid)
+{
+	return p->procinfo->vcoremap[vcoreid].pcoreid;
+}
+
 /* Helper function.  Find the pcoreid for a given virtual core id for proc p.
  * No locking involved, be careful.  Panics on failure. */
 static uint32_t get_pcoreid(struct proc *p, uint32_t vcoreid)
 {
 	assert(vcore_is_mapped(p, vcoreid));
-	return p->procinfo->vcoremap[vcoreid].pcoreid;
+	return try_get_pcoreid(p, vcoreid);
 }
 
 /* Helper function: yields / wraps up current_tf and schedules the _S */
@@ -916,7 +925,8 @@ void proc_notify(struct proc *p, uint32_t vcoreid)
 		if ((p->state & PROC_RUNNING_M) && // TODO: (VC#) (_S state)
 		              vcore_is_mapped(p, vcoreid)) {
 			printd("[kernel] sending notif to vcore %d\n", vcoreid);
-			send_kernel_message(get_pcoreid(p, vcoreid), __notify, (long)p,
+			/* This use of try_get_pcoreid is racy, might be unmapped */
+			send_kernel_message(try_get_pcoreid(p, vcoreid), __notify, (long)p,
 			                    0, 0, KMSG_IMMEDIATE);
 		}
 	}
