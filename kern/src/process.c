@@ -1139,18 +1139,81 @@ struct vcore *vcoreid2vcore(struct proc *p, uint32_t vcoreid)
 	return &p->procinfo->vcoremap[vcoreid];
 }
 
-/* Helper: gives pcore to the process, mapping it to the next available vcore */
-static void __proc_give_a_pcore(struct proc *p, uint32_t pcore)
+/* Helper: gives pcore to the process, mapping it to the next available vcore
+ * from list vc_list.  Returns TRUE if we succeeded (non-empty). */
+static bool __proc_give_a_pcore(struct proc *p, uint32_t pcore,
+                                struct vcore_tailq *vc_list)
 {
 	struct vcore *new_vc;
-	new_vc = TAILQ_FIRST(&p->inactive_vcs);
-	/* there are cases where this isn't true; deal with it later */
-	assert(new_vc);
+	new_vc = TAILQ_FIRST(vc_list);
+	if (!new_vc)
+		return FALSE;
 	printd("setting vcore %d to pcore %d\n", vcore2vcoreid(p, new_vc),
 	       pcorelist[i]);
-	TAILQ_REMOVE(&p->inactive_vcs, new_vc, list);
+	TAILQ_REMOVE(vc_list, new_vc, list);
 	TAILQ_INSERT_TAIL(&p->online_vcs, new_vc, list);
 	__map_vcore(p, vcore2vcoreid(p, new_vc), pcore);
+	return TRUE;
+}
+
+static void __proc_give_cores_runnable(struct proc *p, uint32_t *pc_arr,
+                                       uint32_t num)
+{
+	struct vcore *vc_i, *vc_temp;
+	struct event_msg preempt_msg = {0};
+	/* They shouldn't have any vcores yet.  One issue with allowing multiple
+	 * calls to _give_cores_ is that the bulk preempt list needs to be handled
+	 * in one shot. */
+	assert(!p->procinfo->num_vcores);
+	assert(num);	/* catch bugs */
+	/* add new items to the vcoremap */
+	__seq_start_write(&p->procinfo->coremap_seqctr);
+	p->procinfo->num_vcores += num;
+	for (int i = 0; i < num; i++) {
+		/* Try from the bulk list first */
+		if (__proc_give_a_pcore(p, pc_arr[i], &p->bulk_preempted_vcs))
+			continue;
+		/* o/w, try from the inactive list.  at one point, i thought there might
+		 * be a legit way in which the inactive list could be empty, but that i
+		 * wanted to catch it via an assert. */
+		assert(__proc_give_a_pcore(p, pc_arr[i], &p->inactive_vcs));
+	}
+	__seq_end_write(&p->procinfo->coremap_seqctr);
+	/* Send preempt messages for any left on the BP list.  No need to set any
+	 * flags, it all was done on the real preempt.  Now we're just telling the
+	 * process about any that didn't get restarted and are still preempted. */
+	TAILQ_FOREACH_SAFE(vc_i, &p->bulk_preempted_vcs, list, vc_temp) {
+		/* Note that if there are no active vcores, send_k_e will post to our
+		 * own vcore, the last of which will be put on the inactive list and be
+		 * the first to be started.  We don't have to worry too much, since
+		 * we're holding the proc lock */
+		preempt_msg.ev_type = EV_VCORE_PREEMPT;
+		preempt_msg.ev_arg2 = vcore2vcoreid(p, vc_i);	/* arg2 is 32 bits */
+		send_kernel_event(p, &preempt_msg, 0);
+		/* TODO: we may want a TAILQ_CONCAT_HEAD, or something that does that.
+		 * We need a loop for the messages, but not necessarily for the list
+		 * changes.  */
+		TAILQ_REMOVE(&p->bulk_preempted_vcs, vc_i, list);
+		/* TODO: put on the bulk preempt list, if applicable */
+		TAILQ_INSERT_HEAD(&p->inactive_vcs, vc_i, list);
+	}
+}
+
+static void __proc_give_cores_running(struct proc *p, uint32_t *pc_arr,
+                                      uint32_t num)
+{
+	/* Up the refcnt, since num cores are going to start using this
+	 * process and have it loaded in their owning_proc and 'current'. */
+	proc_incref(p, num * 2);	/* keep in sync with __startcore */
+	__seq_start_write(&p->procinfo->coremap_seqctr);
+	p->procinfo->num_vcores += num;
+	assert(TAILQ_EMPTY(&p->bulk_preempted_vcs));
+	for (int i = 0; i < num; i++) {
+		assert(__proc_give_a_pcore(p, pc_arr[i], &p->inactive_vcs));
+		send_kernel_message(pc_arr[i], __startcore, (long)p, 0, 0,
+		                    KMSG_IMMEDIATE);
+	}
+	__seq_end_write(&p->procinfo->coremap_seqctr);
 }
 
 /* Gives process p the additional num cores listed in pcorelist.  You must be
@@ -1170,7 +1233,7 @@ static void __proc_give_a_pcore(struct proc *p, uint32_t pcore)
  * state, and finding another way to do the need_to_idle.
  *
  * WARNING: You must hold the proc_lock before calling this! */
-void __proc_give_cores(struct proc *SAFE p, uint32_t *pcorelist, size_t num)
+void __proc_give_cores(struct proc *p, uint32_t *pc_arr, uint32_t num)
 {
 	/* should never happen: */
 	assert(num + p->procinfo->num_vcores <= MAX_NUM_CPUS);
@@ -1183,36 +1246,10 @@ void __proc_give_cores(struct proc *SAFE p, uint32_t *pcorelist, size_t num)
 			panic("Attempted to give cores to a DYING process.\n");
 			break;
 		case (PROC_RUNNABLE_M):
-			// set up vcoremap.  list should be empty, but could be called
-			// multiple times before proc_running (someone changed their mind?)
-			if (p->procinfo->num_vcores) {
-				printk("[kernel] Yaaaaaarrrrr!  Giving extra cores, are we?\n");
-				// debugging: if we aren't packed, then there's a problem
-				// somewhere, like someone forgot to take vcores after
-				// preempting.
-				for (int i = 0; i < p->procinfo->num_vcores; i++)
-					assert(vcore_is_mapped(p, i));
-			}
-			// add new items to the vcoremap
-			__seq_start_write(&p->procinfo->coremap_seqctr);
-			p->procinfo->num_vcores += num;
-			/* TODO: consider bulk preemption */
-			for (int i = 0; i < num; i++)
-				__proc_give_a_pcore(p, pcorelist[i]);
-			__seq_end_write(&p->procinfo->coremap_seqctr);
+			__proc_give_cores_runnable(p, pc_arr, num);
 			break;
 		case (PROC_RUNNING_M):
-			/* Up the refcnt, since num cores are going to start using this
-			 * process and have it loaded in their owning_proc and 'current'. */
-			proc_incref(p, num * 2);	/* keep in sync with __startcore */
-			__seq_start_write(&p->procinfo->coremap_seqctr);
-			p->procinfo->num_vcores += num;
-			for (int i = 0; i < num; i++) {
-				__proc_give_a_pcore(p, pcorelist[i]);
-				send_kernel_message(pcorelist[i], __startcore, (long)p, 0, 0,
-				                    KMSG_IMMEDIATE);
-			}
-			__seq_end_write(&p->procinfo->coremap_seqctr);
+			__proc_give_cores_running(p, pc_arr, num);
 			break;
 		default:
 			panic("Weird state(%s) in %s()", procstate2str(p->state),
