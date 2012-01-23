@@ -31,6 +31,19 @@ typedef struct UserStabData {
 } user_stab_data_t;
 
 
+/* We used to check for a null terminating byte for the entire strings section
+ * (due to JOS, I think), but that's not what the spec says: only that all
+ * strings are null terminated.  There might be random stuff tacked on at the
+ * end.  I had some stabs that seemed valid (lookups worked), that did not have
+ * the entire table be null terminated.  Still, something else might be jacked
+ * up.  If it turns out that's the case, put the checks in here. */
+static bool stab_table_valid(const char *stabstr, const char *stabstr_end)
+{
+	if (stabstr_end <= stabstr)
+		return FALSE;
+	return TRUE;
+}
+
 // stab_binsearch(stabs, region_left, region_right, type, addr)
 //
 //	Some stab types are arranged in increasing order by instruction
@@ -170,12 +183,8 @@ debuginfo_eip(uintptr_t addr, eipdebuginfo_t *NONNULL info)
 		// LAB 3: Your code here.
 	}
 
-	// String table validity checks
-	{
-		int stabstrsz = stabstr_end - stabstr;
-		if (stabstr_end <= stabstr || stabstr[stabstrsz-1] != 0)
-			return -1;
-	}
+	if (!stab_table_valid(stabstr, stabstr_end))
+		return -1;
 
 	// Now we find the right stabs that define the function containing
 	// 'eip'.  First, we find the basic source file containing 'eip'.
@@ -271,23 +280,8 @@ void *debug_get_fn_addr(char *fn_name)
 	const char *stab_fn_name = 0;
 	void *retval = 0;
 
-	// String table validity checks (from above)
-	{
-		/* this tripped a couple times, probably erroneously.  Will try to
-		 * catch. */
-		int stabstrsz = stabstr_end - stabstr;
-		if (stabstr_end <= stabstr) {
-			printk("stabstr_end %08p, stabstr %08p\n", stabstr_end, stabstr);
-			warn("Crap, possible corrupt stabs.");
-		}
-		if (stabstr[stabstrsz-1] != 0) {
-			printk("stabstr %08p, stabstr[last] %08p\n", stabstr,
-			       stabstr[stabstrsz-1]);
-			warn("Crap, possible corrupt stabs.");
-		}
-		if (stabstr_end <= stabstr || stabstr[stabstrsz-1] != 0)
-			return 0;
-	}
+	if (!stab_table_valid(stabstr, stabstr_end))
+		return 0;
 
 	for (/* i set */; &stabs[i] < stab_end; i++) {
 		if (stabs[i].n_type != N_FUN)
