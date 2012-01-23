@@ -962,10 +962,6 @@ bool __proc_is_mcp(struct proc *p)
  * (or local traps) may not yet be ready to handle seeing their future state.
  * But they should be, so fix those when they pop up.
  *
- * TODO: (RMS) we need to actually make the scheduler handle RUNNABLE_Ms and
- * then schedule these, or change proc_destroy to not assume they need to be
- * descheduled.
- *
  * Another thing to do would be to make the _core functions take a pcorelist,
  * and not just one pcoreid. */
 
@@ -1029,7 +1025,6 @@ void __proc_preempt_all(struct proc *p)
 	TAILQ_FOREACH(vc_i, &p->online_vcs, list)
 		vc_i->preempt_served = TRUE;
 	__proc_take_allcores_dumb(p, TRUE);
-	/* TODO: send a bulk preemption message */
 }
 
 /* Warns and preempts a vcore from p.  No delaying / alarming, or anything.  The
@@ -1050,14 +1045,10 @@ void proc_preempt_core(struct proc *p, uint32_t pcoreid, uint64_t usec)
 	} else {
 		warn("Pcore doesn't belong to the process!!");
 	}
-	/* TODO: (RMS) do this once a scheduler can handle RUNNABLE_M, and make sure
-	 * to schedule it */
-	#if 0
 	if (!p->procinfo->num_vcores) {
 		__proc_set_state(p, PROC_RUNNABLE_M);
 		schedule_proc(p);
 	}
-	#endif
 	spin_unlock(&p->proc_lock);
 }
 
@@ -1077,12 +1068,8 @@ void proc_preempt_all(struct proc *p, uint64_t usec)
 	__proc_preempt_warnall(p, warn_time);
 	__proc_preempt_all(p);
 	assert(!p->procinfo->num_vcores);
-	/* TODO: (RMS) do this once a scheduler can handle RUNNABLE_M, and make sure
-	 * to schedule it */
-	#if 0
 	__proc_set_state(p, PROC_RUNNABLE_M);
 	schedule_proc(p);
-	#endif
 	spin_unlock(&p->proc_lock);
 }
 
@@ -1091,6 +1078,7 @@ void proc_preempt_all(struct proc *p, uint64_t usec)
  * free, etc. */
 void proc_give(struct proc *p, uint32_t pcoreid)
 {
+	warn("Your idlecoremap is now screwed up");	/* TODO (IDLE) */
 	spin_lock(&p->proc_lock);
 	// expects a pcorelist, we give it a list of one
 	__proc_give_cores(p, &pcoreid, 1);
@@ -1138,6 +1126,8 @@ struct vcore *vcoreid2vcore(struct proc *p, uint32_t vcoreid)
 {
 	return &p->procinfo->vcoremap[vcoreid];
 }
+
+/********** Core granting (bulk and single) ***********/
 
 /* Helper: gives pcore to the process, mapping it to the next available vcore
  * from list vc_list.  Returns TRUE if we succeeded (non-empty). */
@@ -1365,8 +1355,11 @@ uint32_t __proc_take_allcores(struct proc *p, uint32_t *pc_arr, bool preempt)
 	TAILQ_FOREACH_SAFE(vc_i, &p->online_vcs, list, vc_temp) {
 		/* TODO: we may want a TAILQ_CONCAT_HEAD, or something that does that */
 		TAILQ_REMOVE(&p->online_vcs, vc_i, list);
-		/* TODO: put on the bulk preempt list, if applicable */
-		TAILQ_INSERT_HEAD(&p->inactive_vcs, vc_i, list);
+		/* Put the cores on the appropriate list */
+		if (preempt)
+			TAILQ_INSERT_HEAD(&p->bulk_preempted_vcs, vc_i, list);
+		else
+			TAILQ_INSERT_HEAD(&p->inactive_vcs, vc_i, list);
 	}
 	assert(TAILQ_EMPTY(&p->online_vcs));
 	assert(num == p->procinfo->num_vcores);
