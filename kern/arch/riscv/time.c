@@ -10,28 +10,34 @@ system_timing_t system_timing = {0};
 void
 timer_init(void)
 {
-	mtpcr(PCR_COUNT, 0);
-	mtpcr(PCR_COMPARE, 0);
-	mtpcr(PCR_SR, mfpcr(PCR_SR) | (SR_IM & (1 << (TIMER_IRQ+SR_IM_SHIFT))));
-
 	system_timing.tsc_freq = TSC_HZ;
 	cprintf("TSC Frequency: %llu\n", system_timing.tsc_freq);
 }
 
-/* Warning: one-shot timers are unsupported; all timers are periodic.
- * Perhaps this support could be added with a per_cpu boolean, set
- * by set_core_timer, and interpreted by the interrupt handler. */
 void
 set_core_timer(uint32_t usec, bool periodic)
 {
-	uint32_t clocks =  (uint64_t)usec*TSC_HZ/1000000;
+	// we could implement periodic timers using one-shot timers,
+	// but for now we only support one-shot
+	assert(!periodic);
 
-  int8_t irq_state = 0;
-	disable_irqsave(&irq_state);
+	if (usec)
+	{
+	  uint32_t clocks =  (uint64_t)usec*TSC_HZ/1000000;
 
-  mtpcr(PCR_COMPARE, mfpcr(PCR_COUNT) + clocks);
+	  int8_t irq_state = 0;
+	  disable_irqsave(&irq_state);
 
-	enable_irqsave(&irq_state);
+	  mtpcr(PCR_COUNT, 0);
+	  mtpcr(PCR_COMPARE, clocks);
+	  mtpcr(PCR_SR, mfpcr(PCR_SR) | (1 << (TIMER_IRQ+SR_IM_SHIFT)));
+
+	  enable_irqsave(&irq_state);
+	}
+	else
+	{
+	  mtpcr(PCR_SR, mfpcr(PCR_SR) & ~(1 << (TIMER_IRQ+SR_IM_SHIFT)));
+	}
 }
 
 void

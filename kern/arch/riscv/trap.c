@@ -312,12 +312,12 @@ handle_fault_fetch(trapframe_t* state)
 	if(in_kernel(state))
 	{
 		print_trapframe(state);
-		panic("Instruction Page Fault in the Kernel at %p!", state->badvaddr);
+		panic("Instruction Page Fault in the Kernel at %p!", state->epc);
 	}
 
 	set_current_tf(&per_cpu_info[core_id()], state);
 
-	if(handle_page_fault(current, state->badvaddr, PROT_EXEC))
+	if(handle_page_fault(current, state->epc, PROT_EXEC))
 		unhandled_trap(state, "Instruction Page Fault");
 }
 
