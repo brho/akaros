@@ -270,7 +270,7 @@ static int copy_pages(struct proc *p, struct proc *new_p, uintptr_t va_start,
 				page_decref(pp);
 				return -ENOMEM;
 			}
-			pagecopy(page2kva(pp), ppn2kva(PTE2PPN(*pte)));
+			memcpy(page2kva(pp), ppn2kva(PTE2PPN(*pte)), PGSIZE);
 			page_decref(pp);
 		} else if (PAGE_PAGED_OUT(*pte)) {
 			/* TODO: (SWAP) will need to either make a copy or CoW/refcnt the
