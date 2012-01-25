@@ -35,23 +35,6 @@ struct proc_list proc_runnablelist = TAILQ_HEAD_INITIALIZER(proc_runnablelist);
 spinlock_t runnablelist_lock = SPINLOCK_INITIALIZER;
 struct kmem_cache *proc_cache;
 
-/* Tracks which cores are idle, similar to the vcoremap.  Each value is the
- * physical coreid of an unallocated core. */
-spinlock_t idle_lock = SPINLOCK_INITIALIZER;
-uint32_t LCKD(&idle_lock) (RO idlecoremap)[MAX_NUM_CPUS];
-uint32_t LCKD(&idle_lock) num_idlecores = 0;
-uint32_t num_mgmtcores = 1;
-
-/* Helper function to return a core to the idlemap.  It causes some more lock
- * acquisitions (like in a for loop), but it's a little easier.  Plus, one day
- * we might be able to do this without locks (for the putting). */
-void put_idle_core(uint32_t coreid)
-{
-	spin_lock(&idle_lock);
-	idlecoremap[num_idlecores++] = coreid;
-	spin_unlock(&idle_lock);
-}
-
 /* Other helpers, implemented later. */
 static void __proc_startcore(struct proc *p, trapframe_t *tf);
 static bool is_mapped_vcore(struct proc *p, uint32_t pcoreid);
@@ -197,48 +180,7 @@ void proc_init(void)
 	pid_hash = create_hashtable(100, __generic_hash, __generic_eq);
 	spin_unlock(&pid_hash_lock);
 	schedule_init();
-	/* Init idle cores. Core 0 is the management core. */
-	spin_lock(&idle_lock);
-#ifdef __CONFIG_DISABLE_SMT__
-	/* assumes core0 is the only management core (NIC and monitor functionality
-	 * are run there too.  it just adds the odd cores to the idlecoremap */
-	assert(!(num_cpus % 2));
-	// TODO: consider checking x86 for machines that actually hyperthread
-	num_idlecores = num_cpus >> 1;
-#ifdef __CONFIG_ARSC_SERVER__
-	// Dedicate one core (core 2) to sysserver, might be able to share wit NIC
-	num_mgmtcores++;
-	assert(num_cpus >= num_mgmtcores);
-	send_kernel_message(2, (amr_t)arsc_server, 0,0,0, KMSG_ROUTINE);
-#endif
-	for (int i = 0; i < num_idlecores; i++)
-		idlecoremap[i] = (i * 2) + 1;
-#else
-	// __CONFIG_DISABLE_SMT__
-	#ifdef __CONFIG_NETWORKING__
-	num_mgmtcores++; // Next core is dedicated to the NIC
-	assert(num_cpus >= num_mgmtcores);
-	#endif
-	#ifdef __CONFIG_APPSERVER__
-	#ifdef __CONFIG_DEDICATED_MONITOR__
-	num_mgmtcores++; // Next core dedicated to running the kernel monitor
-	assert(num_cpus >= num_mgmtcores);
-	// Need to subtract 1 from the num_mgmtcores # to get the cores index
-	send_kernel_message(num_mgmtcores-1, (amr_t)monitor, 0,0,0, KMSG_ROUTINE);
-	#endif
-	#endif
-#ifdef __CONFIG_ARSC_SERVER__
-	// Dedicate one core (core 2) to sysserver, might be able to share wit NIC
-	num_mgmtcores++;
-	assert(num_cpus >= num_mgmtcores);
-	send_kernel_message(num_mgmtcores-1, (amr_t)arsc_server, 0,0,0, KMSG_ROUTINE);
-#endif
-	num_idlecores = num_cpus - num_mgmtcores;
-	for (int i = 0; i < num_idlecores; i++)
-		idlecoremap[i] = i + num_mgmtcores;
-#endif /* __CONFIG_DISABLE_SMT__ */
 
-	spin_unlock(&idle_lock);
 	atomic_init(&num_envs, 0);
 }
 
@@ -247,12 +189,7 @@ static void proc_init_procinfo(struct proc* p)
 {
 	p->procinfo->pid = p->pid;
 	p->procinfo->ppid = p->ppid;
-	// TODO: maybe do something smarter here
-#ifdef __CONFIG_DISABLE_SMT__
-	p->procinfo->max_vcores = num_cpus >> 1;
-#else
-	p->procinfo->max_vcores = MAX(1,num_cpus-num_mgmtcores);
-#endif /* __CONFIG_DISABLE_SMT__ */
+	p->procinfo->max_vcores = max_vcores(p);
 	p->procinfo->tsc_freq = system_timing.tsc_freq;
 	p->procinfo->heap_bottom = (void*)UTEXT;
 	/* 0'ing the arguments.  Some higher function will need to set them */
@@ -877,8 +814,8 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 	if (!being_nice)
 		p->resources[RES_CORES].amt_wanted = p->procinfo->num_vcores;
 	__seq_end_write(&p->procinfo->coremap_seqctr);
-	// add to idle list
-	put_idle_core(pcoreid);	/* TODO: prod the ksched? */
+	/* Hand the now-idle core to the ksched */
+	put_idle_core(pcoreid);
 	// last vcore?  then we really want 1, and to yield the gang
 	if (p->procinfo->num_vcores == 0) {
 		p->resources[RES_CORES].amt_wanted = 1;
@@ -895,8 +832,6 @@ out_failed:
 out_yield_core:			/* successfully yielded the core */
 	spin_unlock(&p->proc_lock);
 	proc_decref(p);			/* need to eat the ref passed in */
-	/* TODO: (RMS) If there was a change to the idle cores, try and give our
-	 * core to someone who was preempted. */
 	/* Clean up the core and idle.  Need to do this before enabling interrupts,
 	 * since once we put_idle_core() and unlock, we could get a startcore. */
 	clear_owning_proc(pcoreid);	/* so we don't restart */
@@ -1005,7 +940,6 @@ void __proc_preempt_core(struct proc *p, uint32_t pcoreid)
 	p->procinfo->vcoremap[vcoreid].preempt_served = TRUE;
 	// expects a pcorelist.  assumes pcore is mapped and running_m
 	__proc_take_corelist(p, &pcoreid, 1, TRUE);
-	put_idle_core(pcoreid);	/* TODO (IDLE) */
 	/* Send a message about the preemption. */
 	preempt_msg.ev_type = EV_VCORE_PREEMPT;
 	preempt_msg.ev_arg2 = vcoreid;
@@ -1042,6 +976,7 @@ void proc_preempt_core(struct proc *p, uint32_t pcoreid, uint64_t usec)
 	if (is_mapped_vcore(p, pcoreid)) {
 		__proc_preempt_warn(p, get_vcoreid(p, pcoreid), warn_time);
 		__proc_preempt_core(p, pcoreid);
+		put_idle_core(pcoreid);
 	} else {
 		warn("Pcore doesn't belong to the process!!");
 	}
@@ -1293,11 +1228,6 @@ void __proc_take_corelist(struct proc *p, uint32_t *pc_arr, size_t num,
 {
 	struct vcore *vc;
 	uint32_t vcoreid;
-	/* Legacy sanity checks */
-	spin_lock(&idle_lock);
-	assert((num <= p->procinfo->num_vcores) &&
-	       (num_idlecores + num <= num_cpus));
-	spin_unlock(&idle_lock);
 	__seq_start_write(&p->procinfo->coremap_seqctr);
 	for (int i = 0; i < num; i++) {
 		vcoreid = get_vcoreid(p, pc_arr[i]);
@@ -1335,10 +1265,6 @@ uint32_t __proc_take_allcores(struct proc *p, uint32_t *pc_arr, bool preempt)
 {
 	struct vcore *vc_i, *vc_temp;
 	uint32_t num = 0;
-	/* Legacy sanity check */
-	spin_lock(&idle_lock);
-	assert(num_idlecores + p->procinfo->num_vcores <= num_cpus);
-	spin_unlock(&idle_lock);
 	__seq_start_write(&p->procinfo->coremap_seqctr);
 	/* Write out which pcores we're going to take */
 	TAILQ_FOREACH(vc_i, &p->online_vcs, list)
@@ -1370,7 +1296,9 @@ uint32_t __proc_take_allcores(struct proc *p, uint32_t *pc_arr, bool preempt)
 }
 
 /* Dumb legacy helper, simply takes all cores and just puts them on the idle
- * core map (which belongs in the scheduler */
+ * core map (which belongs in the scheduler.
+ *
+ * TODO: no one should call this; the ksched should handle this internally */
 void __proc_take_allcores_dumb(struct proc *p, bool preempt)
 {
 	uint32_t num_revoked;
@@ -1795,15 +1723,6 @@ void __tlbshootdown(struct trapframe *tf, uint32_t srcid, long a0, long a1,
 {
 	/* TODO: (TLB) something more intelligent with the range */
 	tlbflush();
-}
-
-void print_idlecoremap(void)
-{
-	spin_lock(&idle_lock);
-	printk("There are %d idle cores.\n", num_idlecores);
-	for (int i = 0; i < num_idlecores; i++)
-		printk("idlecoremap[%d] = %d\n", i, idlecoremap[i]);
-	spin_unlock(&idle_lock);
 }
 
 void print_allpids(void)

@@ -60,11 +60,6 @@ extern struct proc_list LCKD(&runnablelist_lock) proc_runnablelist;
 extern struct hashtable *pid_hash;
 extern spinlock_t pid_hash_lock;
 
-/* Idle cores: ones able to be exclusively given to a process (worker cores). */
-extern spinlock_t idle_lock;  // never grab this before a proc_lock
-extern uint32_t LCKD(&idle_lock) (RO idlecoremap)[MAX_NUM_CPUS];
-extern uint32_t LCKD(&idle_lock) num_idlecores;
-
 /* Initialization */
 void proc_init(void);
 
@@ -150,7 +145,6 @@ void proc_secure_trapframe(struct trapframe *tf);
 void __abandon_core(void);
 
 /* Degubbing */
-void print_idlecoremap(void);
 void print_allpids(void);
 void print_proc_info(pid_t pid);
 

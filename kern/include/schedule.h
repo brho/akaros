@@ -29,7 +29,17 @@ void deschedule_proc(struct proc *p);
 /* Pick and run a process.  Note that this can return. */
 void schedule(void);
 
+/* Gets called when a pcore becomes idle (like in proc yield) */
+void put_idle_core(uint32_t coreid);
+
+/* How many vcores p will think it can have */
+uint32_t max_vcores(struct proc *p);
+
+/* P wants some cores.  Put them in pc_arr */
+uint32_t proc_wants_cores(struct proc *p, uint32_t *pc_arr, uint32_t amt_new);
+
 /* Debugging */
 void dump_proclist(struct proc_list *list);
+void print_idlecoremap(void);
 
-#endif // !ROS_KERN_SCHEDULE_H
+#endif /* ROS_KERN_SCHEDULE_H */

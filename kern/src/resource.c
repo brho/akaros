@@ -87,25 +87,7 @@ ssize_t core_request(struct proc *p)
 		return 0;
 	}
 	// else, we try to handle the request
-
-	/* TODO: someone needs to decide if the process gets the resources.
-	 * we just check to see if they are available and give them out.  This
-	 * should call out to the scheduler or some other *smart* function.  You
-	 * could also imagine just putting it on the scheduler's queue and letting
-	 * that do the core request */
-	spin_lock(&idle_lock);
-	if (num_idlecores >= amt_new) {
-		for (int i = 0; i < amt_new; i++) {
-			// grab the last one on the list
-			corelist[i] = idlecoremap[num_idlecores-1];
-			num_idlecores--;
-		}
-		num_granted = amt_new;
-	} else {
-		/* In this case, you might want to preempt or do other fun things... */
-		num_granted = 0;
-	}
-	spin_unlock(&idle_lock);
+	num_granted = proc_wants_cores(p, corelist, amt_new);
 
 	// Now, actually give them out
 	if (num_granted) {
