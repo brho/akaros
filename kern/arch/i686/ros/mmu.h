@@ -69,7 +69,7 @@ typedef unsigned long pde_t;
 #define JPGOFF(la)	(((uintptr_t) (la)) & 0x003FFFFF)
 
 // construct PTE from PPN and flags
-#define PTE(ppn, flags) ((ppn) << PTXSHIFT | (flags))
+#define PTE(ppn, flags) ((ppn) << PTXSHIFT | PGOFF(flags))
 
 // construct linear address from indexes and offset
 #define PGADDR(d, t, o)	((void*SNT) ((d) << PDXSHIFT | (t) << PTXSHIFT | (o)))

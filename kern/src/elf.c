@@ -57,7 +57,7 @@ static int load_one_elf(struct proc *p, struct file *f, uintptr_t pgoffset,
 	if (!phdrs || f->f_op->read(f, phdrs, e_phnum * phsz, &f_off) == -1)
 		goto fail;
 
-	int flags = MAP_FIXED | MAP_PRIVATE;
+	int flags = MAP_FIXED | MAP_PRIVATE;	/* TODO: why private? */
 
 	for (int i = 0; i < e_phnum; i++) {
 		proghdr32_t* ph32 = (proghdr32_t*)phdrs + i;

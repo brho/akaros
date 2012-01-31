@@ -615,9 +615,13 @@ int __handle_page_fault(struct proc *p, uintptr_t va, int prot)
 		retval = pm_load_page(vmr->vm_file->f_mapping, f_idx, &a_page);
 		if (retval)
 			return retval;
-		/* If we want a private map that is writable, we'll preemptively give
-		 * you a new page.  In the future, we want to CoW this. */
-		if ((vmr->vm_flags |= MAP_PRIVATE) && (vmr->vm_prot |= PROT_WRITE)) {
+		/* If we want a private map, we'll preemptively give you a new page.  We
+		 * used to just care if it was private and writable, but were running
+		 * into issues with libc changing its mapping (map private, then
+		 * mprotect to writable...)  In the future, we want to CoW this anyway,
+		 * so it's not a big deal. */
+		if ((vmr->vm_flags & MAP_PRIVATE))
+		{
 			struct page *cache_page = a_page;
 			if (upage_alloc(p, &a_page, FALSE)) {
 				page_decref(cache_page);	/* was the original a_page */
@@ -625,6 +629,10 @@ int __handle_page_fault(struct proc *p, uintptr_t va, int prot)
 			}
 			memcpy(page2kva(a_page), page2kva(cache_page), PGSIZE);
 			page_decref(cache_page);		/* was the original a_page */
+			/* Debugging */
+			if (!(vmr->vm_prot & PROT_WRITE))
+				printd("[kernel] private, but unwritable file mapping of %s "
+				       "at va %08p\n", file_name(vmr->vm_file), va);
 		}
 		/* if this is an executable page, we might have to flush the instruction
 		 * cache if our HW requires it. */
