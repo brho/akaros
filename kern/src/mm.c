@@ -341,6 +341,54 @@ void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 	return ret;
 }
 
+/* Helper: returns TRUE if the VMR is allowed to access the file with prot.
+ * This is a bit ghetto still: messes with the file mode and assumes it can walk
+ * the dentry/inode paths without locking.  It also ignores the CoW stuff we'll
+ * need to do eventually. */
+static bool check_file_perms(struct vm_region *vmr, struct file *file, int prot)
+{
+	assert(file);
+	if (prot & PROT_READ) {
+		if (check_perms(file->f_dentry->d_inode, S_IRUSR))
+			goto out_error;
+	}
+	if (prot & PROT_WRITE) {
+		/* if vmr maps a file as MAP_SHARED, then we need to make sure the
+		 * protection change is in compliance with the open mode of the
+		 * file. */
+		if (vmr->vm_flags & MAP_SHARED) {
+			if (!(file->f_mode & S_IWUSR)) {
+				/* at this point, we have a file opened in the wrong mode,
+				 * but we may be allowed to access it still. */
+				if (check_perms(file->f_dentry->d_inode, S_IWUSR)) {
+					goto out_error;
+				} else {
+					/* it is okay, though we need to change the file mode. (note
+					 * the lack of a lock/protection (TODO) */
+					file->f_mode |= S_IWUSR;
+				}
+			}
+		} else {	/* PRIVATE mapping */
+			/* TODO: we want a CoW mapping (like we want in handle_page_fault()),
+			 * since there is a concern of a process having the page already
+			 * mapped in to a file it does not have permissions to, and then
+			 * mprotecting it so it can access it.  So we can't just change
+			 * the prot, and we don't know yet if a page is mapped in.  To
+			 * handle this, we ought to sort out the CoW bit, and then this
+			 * will be easy.  Til then, just do a permissions check.  If we
+			 * start having weird issues with libc overwriting itself (since
+			 * procs mprotect that W), then change this. */
+			if (check_perms(file->f_dentry->d_inode, S_IWUSR))
+				goto out_error;
+		}
+	}
+	return TRUE;
+out_error:	/* for debugging */
+	printk("[kernel] mmap perm check failed for %s for access %d\n",
+	       file_name(file), prot);
+	return FALSE;
+}
+
 void *__do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
                 struct file *file, size_t offset)
 {
@@ -373,8 +421,14 @@ void *__do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 	}
 	vmr->vm_prot = prot;
 	vmr->vm_flags = flags;
-	if (file)
+	if (file) {
+		if (!check_file_perms(vmr, file, prot)) {
+			destroy_vmr(vmr);
+			set_errno(EACCES);
+			return MAP_FAILED;
+		}
 		kref_get(&file->f_kref, 1);
+	}
 	vmr->vm_file = file;
 	vmr->vm_foff = offset;
 	/* Prep the FS to make sure it can mmap the file.  Slightly weird semantics:
@@ -444,38 +498,9 @@ int __do_mprotect(struct proc *p, uintptr_t addr, size_t len, int prot)
 	while (vmr && vmr->vm_base < addr + len) {
 		if (vmr->vm_prot == prot)
 			continue;
-		if (vmr->vm_file && (prot & PROT_WRITE)) {
-			/* if vmr maps a file as MAP_SHARED, then we need to make sure the
-			 * protection change is in compliance with the open mode of the
-			 * file. */
-		    if (vmr->vm_flags & MAP_SHARED) {
-				if (!(vmr->vm_file->f_mode & S_IWUSR)) {
-					/* at this point, we have a file opened in the wrong mode,
-					 * but we may be allowed to access it still. */
-					if (check_perms(vmr->vm_file->f_dentry->d_inode, S_IWUSR)) {
-						set_errno(EACCES);
-						return -1;
-					} else {
-						/* it is okay, though we need to change the file mode.
-						 */
-						vmr->vm_file->f_mode |= S_IWUSR;
-					}
-				}
-			} else {	/* PRIVATE mapping */
-				/* TODO: we want a CoW mapping (like we want in handle_page_fault()),
-				 * since there is a concern of a process having the page already
-				 * mapped in to a file it does not have permissions to, and then
-				 * mprotecting it so it can access it.  So we can't just change
-				 * the prot, and we don't know yet if a page is mapped in.  To
-				 * handle this, we ought to sort out the CoW bit, and then this
-				 * will be easy.  Til then, just do a permissions check.  If we
-				 * start having weird issues with libc overwriting itself (since
-				 * procs mprotect that W), then change this. */
-				if (check_perms(vmr->vm_file->f_dentry->d_inode, S_IWUSR)) {
-					set_errno(EACCES);
-					return -1;
-				}
-			}
+		if (vmr->vm_file && !check_file_perms(vmr, vmr->vm_file, prot)) {
+			set_errno(EACCES);
+			return -1;
 		}
 		vmr->vm_prot = prot;
 		for (uintptr_t va = vmr->vm_base; va < vmr->vm_end; va += PGSIZE) { 
@@ -607,6 +632,12 @@ int __handle_page_fault(struct proc *p, uintptr_t va, int prot)
 		if (upage_alloc(p, &a_page, TRUE))
 			return -ENOMEM;
 	} else {
+		/* If this fails, either something got screwed up with the VMR, or the
+		 * permissions changed after mmap/mprotect.  Either way, I want to know
+		 * (though it's not critical). */
+		if (!check_file_perms(vmr, vmr->vm_file, prot))
+			printk("[kernel] possible issue with VMR prots on file %s!\n",
+			       file_name(vmr->vm_file));
 		/* Load the file's page in the page cache.
 		 * TODO: (BLK) Note, we are holding the mem lock!  We need to rewrite
 		 * this stuff so we aren't hold the lock as excessively as we are, and
