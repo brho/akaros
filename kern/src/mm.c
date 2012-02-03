@@ -280,6 +280,11 @@ void print_vmrs(struct proc *p)
 		       vmr->vm_file, vmr->vm_foff);
 }
 
+/* Helper: returns the number of pages required to hold nr_bytes */
+unsigned long nr_pages(unsigned long nr_bytes)
+{
+	return (nr_bytes >> PGSHIFT) + (PGOFF(nr_bytes) ? 1 : 0);
+}
 
 /* Error values aren't quite comprehensive - check man mmap() once we do better
  * with the FS.
@@ -426,6 +431,13 @@ void *__do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 		if (!check_file_perms(vmr, file, prot)) {
 			destroy_vmr(vmr);
 			set_errno(EACCES);
+			return MAP_FAILED;
+		}
+		/* TODO: consider locking the file while checking (not as manadatory as
+		 * in handle_page_fault() */
+		if (nr_pages(offset + len) > nr_pages(file->f_dentry->d_inode->i_size)) {
+			destroy_vmr(vmr);
+			set_errno(ESPIPE); /* linux sends a SIGBUS at access time */
 			return MAP_FAILED;
 		}
 		kref_get(&file->f_kref, 1);
@@ -645,7 +657,17 @@ int __handle_page_fault(struct proc *p, uintptr_t va, int prot)
 		 * such that we can block and resume later. */
 		assert(!PGOFF(va - vmr->vm_base + vmr->vm_foff));
 		f_idx = (va - vmr->vm_base + vmr->vm_foff) >> PGSHIFT;
+		/* TODO: need some sort of lock on the file to deal with someone
+		 * concurrently shrinking it.  Adding 1 to f_idx, since it is
+		 * zero-indexed */
+		if (f_idx + 1 > nr_pages(vmr->vm_file->f_dentry->d_inode->i_size)) {
+			/* We're asking for pages that don't exist in the file */
+			/* TODO: unlock the file */
+			return -ESPIPE; /* linux sends a SIGBUS at access time */
+		}
 		retval = pm_load_page(vmr->vm_file->f_mapping, f_idx, &a_page);
+		/* TODO: should be able to let go of that file shrink-lock now.  We have
+		 * a page refcnt, which might be enough (depending on how it works) */
 		if (retval)
 			return retval;
 		/* If we want a private map, we'll preemptively give you a new page.  We
