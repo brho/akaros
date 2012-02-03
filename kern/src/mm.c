@@ -403,6 +403,7 @@ void *__do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 	 * sync with BRK_END in mmap(). */
 	if (addr == 0)
 		addr = BRK_END;
+	assert(!PGOFF(offset));
 
 #ifndef __CONFIG_DEMAND_PAGING__
 	flags |= MAP_POPULATE;
@@ -642,6 +643,7 @@ int __handle_page_fault(struct proc *p, uintptr_t va, int prot)
 		 * TODO: (BLK) Note, we are holding the mem lock!  We need to rewrite
 		 * this stuff so we aren't hold the lock as excessively as we are, and
 		 * such that we can block and resume later. */
+		assert(!PGOFF(va - vmr->vm_base + vmr->vm_foff));
 		f_idx = (va - vmr->vm_base + vmr->vm_foff) >> PGSHIFT;
 		retval = pm_load_page(vmr->vm_file->f_mapping, f_idx, &a_page);
 		if (retval)
@@ -651,8 +653,7 @@ int __handle_page_fault(struct proc *p, uintptr_t va, int prot)
 		 * into issues with libc changing its mapping (map private, then
 		 * mprotect to writable...)  In the future, we want to CoW this anyway,
 		 * so it's not a big deal. */
-		if ((vmr->vm_flags & MAP_PRIVATE))
-		{
+		if ((vmr->vm_flags & MAP_PRIVATE)) {
 			struct page *cache_page = a_page;
 			if (upage_alloc(p, &a_page, FALSE)) {
 				page_decref(cache_page);	/* was the original a_page */

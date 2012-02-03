@@ -14,8 +14,11 @@
 # define elf_field(obj, field) ((obj##32)->field)
 #endif
 
+/* We need the writable flag for ld.  Even though the elf header says it wants
+ * RX (and not W) for its main program header, it will page fault (eip 56f0,
+ * 46f0 after being relocated to 0x1000, va 0x20f4). */
 static int load_one_elf(struct proc *p, struct file *f, uintptr_t pgoffset,
-                        elf_info_t *ei)
+                        elf_info_t *ei, bool writable)
 {
 	int ret = -1;
 	ei->phdr = -1;
@@ -23,6 +26,7 @@ static int load_one_elf(struct proc *p, struct file *f, uintptr_t pgoffset,
 	ei->highest_addr = 0;
 	off_t f_off = 0;
 	void* phdrs = 0;
+	int mm_perms, mm_flags = MAP_FIXED;
 	
 	/* When reading on behalf of the kernel, we need to make sure no proc is
 	 * "current".  This is a bit ghetto (TODO: KFOP) */
@@ -56,9 +60,6 @@ static int load_one_elf(struct proc *p, struct file *f, uintptr_t pgoffset,
 	f_off = e_phoff;
 	if (!phdrs || f->f_op->read(f, phdrs, e_phnum * phsz, &f_off) == -1)
 		goto fail;
-
-	int flags = MAP_FIXED | MAP_PRIVATE;	/* TODO: why private? */
-
 	for (int i = 0; i < e_phnum; i++) {
 		proghdr32_t* ph32 = (proghdr32_t*)phdrs + i;
 		proghdr64_t* ph64 = (proghdr64_t*)phdrs + i;
@@ -68,6 +69,13 @@ static int load_one_elf(struct proc *p, struct file *f, uintptr_t pgoffset,
 		uintptr_t p_align = elf_field(ph, p_align);
 		uintptr_t p_memsz = elf_field(ph, p_memsz);
 		uintptr_t p_filesz = elf_field(ph, p_filesz);
+		uintptr_t p_flags = elf_field(ph, p_flags);
+
+		/* Here's the ld hack, mentioned above */
+		p_flags |= (writable ? ELF_PROT_WRITE : 0);
+		/* All mmaps need to be fixed to their VAs.  If the program wants it to
+		 * be a writable region, we also need the region to be private. */
+		mm_flags = MAP_FIXED | (p_flags & ELF_PROT_WRITE ? MAP_PRIVATE : 0);
 
 		if (p_type == ELF_PROG_PHDR)
 			ei->phdr = p_va;
@@ -100,8 +108,10 @@ static int load_one_elf(struct proc *p, struct file *f, uintptr_t pgoffset,
 			if (memstart + memsz > ei->highest_addr)
 				ei->highest_addr = memstart + memsz;
 
-			/* TODO: figure out proper permissions from the elf */
-			int perms = PROT_READ | PROT_WRITE | PROT_EXEC;
+			mm_perms = 0;
+			mm_perms |= (p_flags & ELF_PROT_READ  ? PROT_READ : 0);
+			mm_perms |= (p_flags & ELF_PROT_WRITE ? PROT_WRITE : 0);
+			mm_perms |= (p_flags & ELF_PROT_EXEC  ? PROT_EXEC : 0);
 
 			if (filesz) {
 				/* Due to elf-ghetto-ness, we need to zero the first part of
@@ -114,16 +124,22 @@ static int load_one_elf(struct proc *p, struct file *f, uintptr_t pgoffset,
 
 				if (filesz - partial) {
 					/* Map the complete pages. */
-					if (do_mmap(p, memstart, filesz - partial, perms, flags,
-					            f, filestart) == MAP_FAILED)
+					if (do_mmap(p, memstart, filesz - partial, mm_perms,
+					            mm_flags, f, filestart) == MAP_FAILED)
 						goto fail;
 				}
-
+				/* Note that we (probably) only need to do this zeroing the end
+				 * of a partial file page when we are dealing with
+				 * ELF_PROT_WRITE-able PHs, and not for all cases.  */
 				if (partial) {
+					/* Need our own populated, private copy of the page so that
+					 * we can zero the remainder - and not zero chunks of the
+					 * real file in the page cache. */
+					mm_flags |= MAP_PRIVATE | MAP_POPULATE;
+
 					/* Map the final partial page. */
 					uintptr_t last_page = memstart + filesz - partial;
-					int partial_flags = flags | MAP_POPULATE;
-					if (do_mmap(p, last_page, PGSIZE, perms, partial_flags,
+					if (do_mmap(p, last_page, PGSIZE, mm_perms, mm_flags,
 					            f, filestart + filesz - partial) == MAP_FAILED)
 						goto fail;
 
@@ -139,7 +155,8 @@ static int load_one_elf(struct proc *p, struct file *f, uintptr_t pgoffset,
 			/* Any extra pages are mapped anonymously... (a bit weird) */
 			if (filesz < memsz)
 				if (do_mmap(p, memstart + filesz, memsz-filesz,
-				           perms, flags, NULL, 0) == MAP_FAILED)
+				            PROT_READ | PROT_WRITE, MAP_PRIVATE,
+					        NULL, 0) == MAP_FAILED)
 					goto fail;
 		}
 	}
@@ -148,8 +165,8 @@ static int load_one_elf(struct proc *p, struct file *f, uintptr_t pgoffset,
 	if (ei->phdr == -1) {
 		uintptr_t filestart = ROUNDDOWN(e_phoff, PGSIZE);
 		uintptr_t filesz = e_phoff + (e_phnum * phsz) - filestart;
-		void *phdr_addr = do_mmap(p, 0, filesz, PROT_READ,
-		                          flags & ~MAP_FIXED, f, filestart);
+		void *phdr_addr = do_mmap(p, 0, filesz, PROT_READ | PROT_WRITE,
+		                          MAP_PRIVATE, f, filestart);
 		if (phdr_addr == MAP_FAILED)
 			goto fail;
 		ei->phdr = (long)phdr_addr + e_phoff;
@@ -158,9 +175,12 @@ static int load_one_elf(struct proc *p, struct file *f, uintptr_t pgoffset,
 	ei->phnum = e_phnum;
 	ei->elf64 = elf64;
 	ret = 0;
+	goto out;
 fail:
+	printk("[kernel] Load failed during loadelf of file %s!\n", file_name(f));
+out:
 	if (phdrs)
-	  kfree(phdrs);
+		kfree(phdrs);
 	current = cur_proc;
 	return ret;
 }
@@ -168,7 +188,7 @@ fail:
 int load_elf(struct proc* p, struct file* f)
 {
 	elf_info_t ei, interp_ei;
-	if (load_one_elf(p, f, 0, &ei))
+	if (load_one_elf(p, f, 0, &ei, FALSE))
 		return -1;
 
 	if (ei.dynamic) {
@@ -176,7 +196,7 @@ int load_elf(struct proc* p, struct file* f)
 		if (!interp)
 			return -1;
 		/* Load dynamic linker one page into the address space */
-		int error = load_one_elf(p, interp, 1, &interp_ei);
+		int error = load_one_elf(p, interp, 1, &interp_ei, TRUE);
 		kref_put(&interp->f_kref);
 		if (error)
 			return -1;

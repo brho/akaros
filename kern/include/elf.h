@@ -12,6 +12,10 @@
 #  error I know not my endianness!
 #endif
 
+#define ELF_PROT_READ			0x04
+#define ELF_PROT_WRITE			0x02
+#define ELF_PROT_EXEC			0x01
+
 typedef struct Elf32 {
 	uint32_t e_magic;	// must equal ELF_MAGIC
 	uint8_t e_ident[12];
