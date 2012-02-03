@@ -243,19 +243,94 @@ void destroy_vmrs(struct proc *p)
 		destroy_vmr(vm_i);
 }
 
-/* This will make new_p have the same VMRs as p, though it does nothing to
- * ensure the physical pages or whatever are shared/mapped/copied/whatever.
+/* Helper: copies the contents of pages from p to new p.  For pages that aren't
+ * present, once we support swapping or CoW, we can do something more
+ * intelligent.  0 on success, -ERROR on failure. */
+static int copy_pages(struct proc *p, struct proc *new_p, uintptr_t va_start,
+                      uintptr_t va_end)
+{
+	/* Sanity checks.  If these fail, we had a screwed up VMR.
+	 * Check for: alignment, wraparound, or userspace addresses */
+	if ((PGOFF(va_start)) ||
+	    (PGOFF(va_end)) ||
+	    (va_end < va_start) ||	/* now, start > UMAPTOP -> end > UMAPTOP */
+	    (va_end > UMAPTOP)) {
+		warn("VMR mapping is probably screwed up (%08p - %08p)", va_start,
+		     va_end);
+		return -EINVAL;
+	}
+	int copy_page(struct proc *p, pte_t *pte, void *va, void *arg) {
+		struct proc *new_p = (struct proc*)arg;
+		struct page *pp;
+		if (PAGE_PRESENT(*pte)) {
+			/* TODO: check for jumbos */
+			if (upage_alloc(new_p, &pp, 0))
+				return -ENOMEM;
+			if (page_insert(new_p->env_pgdir, pp, va, *pte & PTE_PERM)) {
+				page_decref(pp);
+				return -ENOMEM;
+			}
+			pagecopy(page2kva(pp), ppn2kva(PTE2PPN(*pte)));
+			page_decref(pp);
+		} else if (PAGE_PAGED_OUT(*pte)) {
+			/* TODO: (SWAP) will need to either make a copy or CoW/refcnt the
+			 * backend store.  For now, this PTE will be the same as the
+			 * original PTE */
+			panic("Swapping not supported!");
+		} else {
+			panic("Weird PTE %08p in %s!", *pte, __FUNCTION__);
+		}
+		return 0;
+	}
+	return env_user_mem_walk(p, (void*)va_start, va_end - va_start, &copy_page,
+	                         new_p);
+	/* here's how to do it without the env_user_mem_walk */
+#if 0
+	pte_t *old_pte;
+	struct page *pp;
+	/* For each page, check the old PTE and copy present pages over */
+	for (uintptr_t va_i = va_start; va_i < va_end; va_i += PGSIZE) {
+		old_pte = pgdir_walk(p->env_pgdir, (void*)va_i, 0);
+		if (!old_pte)
+			continue;
+		if (PAGE_PRESENT(*old_pte)) {
+			/* TODO: check for jumbos */
+			if (upage_alloc(new_p, &pp, 0))
+				return -ENOMEM;
+			if (page_insert(new_p->env_pgdir, pp, (void*)va_i,
+			                *old_pte & PTE_PERM)) {
+				page_decref(pp);
+				return -ENOMEM;
+			}
+			pagecopy(page2kva(pp), ppn2kva(PTE2PPN(*old_pte)));
+			page_decref(pp);
+		} else if (PAGE_PAGED_OUT(*old_pte)) {
+			/* TODO: (SWAP) will need to either make a copy or CoW/refcnt the
+			 * backend store.  For now, this PTE will be the same as the
+			 * original PTE */
+			panic("Swapping not supported!");
+		} else {
+			panic("Weird PTE %08p in %s!", *old_pte, __FUNCTION__);
+		}
+	}
+	return 0;
+#endif
+}
+
+/* This will make new_p have the same VMRs as p, and it will make sure all
+ * physical pages are copied over, with the exception of MAP_SHARED files.
  * This is used by fork().
  *
  * Note that if you are working on a VMR that is a file, you'll want to be
  * careful about how it is mapped (SHARED, PRIVATE, etc). */
-void duplicate_vmrs(struct proc *p, struct proc *new_p)
+int duplicate_vmrs(struct proc *p, struct proc *new_p)
 {
+	int ret = 0;
 	struct vm_region *vmr, *vm_i;
 	TAILQ_FOREACH(vm_i, &p->vm_regions, vm_link) {
 		vmr = kmem_cache_alloc(vmr_kcache, 0);
 		if (!vmr)
-			panic("EOM!");
+			return -ENOMEM;
 		vmr->vm_proc = new_p;
 		vmr->vm_base = vm_i->vm_base;
 		vmr->vm_end = vm_i->vm_end;
@@ -265,8 +340,15 @@ void duplicate_vmrs(struct proc *p, struct proc *new_p)
 			kref_get(&vm_i->vm_file->f_kref, 1);
 		vmr->vm_file = vm_i->vm_file;
 		vmr->vm_foff = vm_i->vm_foff;
+		if (!vmr->vm_file || vmr->vm_flags & MAP_PRIVATE) {
+			assert(!(vmr->vm_flags & MAP_SHARED));
+			/* Copy over the memory from one VMR to the other */
+			if ((ret = copy_pages(p, new_p, vmr->vm_base, vmr->vm_end)))
+				return ret;
+		}
 		TAILQ_INSERT_TAIL(&new_p->vm_regions, vmr, vm_link);
 	}
+	return 0;
 }
 
 void print_vmrs(struct proc *p)

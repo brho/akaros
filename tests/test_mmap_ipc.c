@@ -23,25 +23,18 @@ int main(void)
 	first[0] = 3;
 	printf("the first number after initialization is %d at %08p\n", first[0],
 	       first);
-	munmap(first, 4096);
 	if ((pid = fork()) < 0) {
 		perror("fork error");
 		exit(1);
 	}
 	if (pid == 0) {
-		first = (int*)mmap(0, 4096, PROT_READ | PROT_WRITE, MAP_SHARED, pFile,
-		                   0);
 		/* delay here, to avoid the race a bit */
 		udelay(1000000);
 		printf("After fork in the parent, the first number is %d\n", first[0]);
 		first[0] = 99;
 		printf("Pid 0 sees value %d at mmapped address %08p\n", first[0],
 		       first);
-	}
-	else
-	{
-		first = (int*)mmap(0, 4096, PROT_READ | PROT_WRITE, MAP_SHARED, pFile,
-		                   0);
+	} else {
 		printf("After fork in the child, the first number is %d\n", first[0]);
 		first[0] = 11;
 		printf("Child pid %d sees value %d at mmapped address %08p\n", pid,

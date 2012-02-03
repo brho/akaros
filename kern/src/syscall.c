@@ -424,36 +424,13 @@ static ssize_t sys_fork(env_t* e)
 		if(GET_BITMASK_BIT(e->cache_colors_map,i))
 			cache_color_alloc(llc_cache, env->cache_colors_map);
 
-	duplicate_vmrs(e, env);
-
-	int copy_page(env_t* e, pte_t* pte, void* va, void* arg)
-	{
-		env_t* env = (env_t*)arg;
-
-		if(PAGE_PRESENT(*pte))
-		{
-			page_t* pp;
-			if(upage_alloc(env,&pp,0))
-				return -1;
-			if(page_insert(env->env_pgdir,pp,va,*pte & PTE_PERM))
-			{
-				page_decref(pp);
-				return -1;
-			}
-			pagecopy(page2kva(pp),ppn2kva(PTE2PPN(*pte)));
-			page_decref(pp);
-		} else {
-			assert(PAGE_PAGED_OUT(*pte));
-			/* TODO: (SWAP) will need to either make a copy or CoW/refcnt the
-			 * backend store.  For now, this PTE will be the same as the
-			 * original PTE */
-			panic("Swapping not supported!");
-			pte_t* newpte = pgdir_walk(env->env_pgdir,va,1);
-			if(!newpte)
-				return -1;
-			*newpte = *pte;
-		}
-		return 0;
+	/* Make the new process have the same VMRs as the older.  This will copy the
+	 * contents of non MAP_SHARED pages to the new VMRs. */
+	if (duplicate_vmrs(e, env)) {
+		proc_destroy(env);	/* this is prob what you want, not decref by 2 */
+		proc_decref(env);
+		set_errno(ENOMEM);
+		return -1;
 	}
 
 	/* In general, a forked process should be a fresh process, and we copy over
@@ -467,14 +444,6 @@ static ssize_t sys_fork(env_t* e)
 	env->procdata->ldt = e->procdata->ldt;
 	#endif
 
-	/* for now, just copy the contents of every present page in the entire
-	 * address space. */
-	if (env_user_mem_walk(e, 0, UMAPTOP, &copy_page, env)) {
-		proc_destroy(env);	/* this is prob what you want, not decref by 2 */
-		proc_decref(env);
-		set_errno(ENOMEM);
-		return -1;
-	}
 	clone_files(&e->open_files, &env->open_files);
 	__proc_ready(env);
 	__proc_set_state(env, PROC_RUNNABLE_S);
