@@ -133,6 +133,8 @@ KERN_CFLAGS += -D$(TARGET_ARCH) $(EXTRAARGS)
 KERN_CFLAGS += -O2 -pipe -MD -fno-builtin -gstabs -static
 KERN_CFLAGS += -Wall -Wno-format -Wno-unused -fno-strict-aliasing
 KERN_CFLAGS += -nostdinc -I$(dir $(GCC_LIB))/include
+# Our backtraces need the frame pointer
+KERN_CFLAGS += -fno-omit-frame-pointer
 
 # Universal loader flags
 LDFLAGS := -nostdlib
