@@ -15,7 +15,7 @@
 #include <arch/trap.h>
 #include <process.h>
 
-ssize_t core_request(struct proc *p);
+bool core_request(struct proc *p);
 error_t resource_req(struct proc *p, int type, size_t amt_wanted,
                      size_t amt_wanted_min, uint32_t flags);
 

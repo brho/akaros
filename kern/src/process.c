@@ -607,8 +607,11 @@ void proc_destroy(struct proc *p)
 			__proc_take_allcores_dumb(p, FALSE);
 			// fallthrough
 		case PROC_RUNNABLE_S:
-			// Think about other lists, like WAITING, or better ways to do this
-			deschedule_proc(p);
+			/* might need to pull from lists, though i'm currently a fan of the
+			 * model where external refs notice DYING (if it matters to them)
+			 * and decref when they are done.  the ksched will notice the proc
+			 * is dying and handle it accordingly (which delay the reaping til
+			 * the next call to schedule()) */
 			break;
 		case PROC_RUNNING_S:
 			#if 0
@@ -657,6 +660,88 @@ void proc_destroy(struct proc *p)
 	 * things (like traphandlers). */
 	spin_unlock(&p->proc_lock);
 	return;
+}
+
+/* Turns *p into an MCP.  Needs to be called from a local syscall of a RUNNING_S
+ * process.  Currently, this ignores whether or not you are an _M already.  You
+ * should hold the lock before calling. */
+void __proc_switch_to_m(struct proc *p)
+{
+	int8_t state = 0;
+	switch (p->state) {
+		case (PROC_RUNNING_S):
+			/* issue with if we're async or not (need to preempt it)
+			 * either of these should trip it. TODO: (ACR) async core req
+			 * TODO: relies on vcore0 being the caller (VC#) */
+			if ((current != p) || (get_pcoreid(p, 0) != core_id()))
+				panic("We don't handle async RUNNING_S core requests yet.");
+			/* save the tf so userspace can restart it.  Like in __notify,
+			 * this assumes a user tf is the same as a kernel tf.  We save
+			 * it in the preempt slot so that we can also save the silly
+			 * state. */
+			struct preempt_data *vcpd = &p->procdata->vcore_preempt_data[0];
+			disable_irqsave(&state);	/* protect cur_tf */
+			/* Note this won't play well with concurrent proc kmsgs, but
+			 * since we're _S and locked, we shouldn't have any. */
+			assert(current_tf);
+			/* Copy uthread0's context to the notif slot */
+			vcpd->notif_tf = *current_tf;
+			clear_owning_proc(core_id());	/* so we don't restart */
+			save_fp_state(&vcpd->preempt_anc);
+			enable_irqsave(&state);
+			/* Userspace needs to not fuck with notif_disabled before
+			 * transitioning to _M. */
+			if (vcpd->notif_disabled) {
+				printk("[kernel] user bug: notifs disabled for vcore 0\n");
+				vcpd->notif_disabled = FALSE;
+			}
+			/* in the async case, we'll need to remotely stop and bundle
+			 * vcore0's TF.  this is already done for the sync case (local
+			 * syscall). */
+			/* this process no longer runs on its old location (which is
+			 * this core, for now, since we don't handle async calls) */
+			__seq_start_write(&p->procinfo->coremap_seqctr);
+			// TODO: (VC#) might need to adjust num_vcores
+			// TODO: (ACR) will need to unmap remotely (receive-side)
+			__unmap_vcore(p, 0);	/* VC# keep in sync with proc_run _S */
+			__seq_end_write(&p->procinfo->coremap_seqctr);
+			/* change to runnable_m (it's TF is already saved) */
+			__proc_set_state(p, PROC_RUNNABLE_M);
+			p->procinfo->is_mcp = TRUE;
+			break;
+		case (PROC_RUNNABLE_S):
+			/* Issues: being on the runnable_list, proc_set_state not liking
+			 * it, and not clearly thinking through how this would happen.
+			 * Perhaps an async call that gets serviced after you're
+			 * descheduled? */
+			panic("Not supporting RUNNABLE_S -> RUNNABLE_M yet.\n");
+			break;
+		case (PROC_DYING):
+			warn("Dying, core request coming from %d\n", core_id());
+		default:
+			break;
+	}
+}
+
+/* Old code to turn a RUNNING_M to a RUNNING_S, with the calling context
+ * becoming the new 'thread0'.  Don't use this. */
+void __proc_switch_to_s(struct proc *p)
+{
+	int8_t state = 0;
+	printk("[kernel] trying to transition _M -> _S (deprecated)!\n");
+	assert(p->state == PROC_RUNNING_M); // TODO: (ACR) async core req
+	/* save the context, to be restarted in _S mode */
+	disable_irqsave(&state);	/* protect cur_tf */
+	assert(current_tf);
+	p->env_tf = *current_tf;
+	clear_owning_proc(core_id());	/* so we don't restart */
+	enable_irqsave(&state);
+	env_push_ancillary_state(p); // TODO: (HSS)
+	/* sending death, since it's not our job to save contexts or anything in
+	 * this case.  also, if this returns true, we will not return down
+	 * below, and need to eat the reference to p */
+	__proc_take_allcores_dumb(p, FALSE);
+	__proc_set_state(p, PROC_RUNNABLE_S);
 }
 
 /* Helper function.  Is the given pcore a mapped vcore?  No locking involved, be
@@ -1153,9 +1238,7 @@ static void __proc_give_cores_running(struct proc *p, uint32_t *pc_arr,
  *
  * The reason I didn't bring the _S cases from core_request over here is so we
  * can keep this family of calls dealing with only *_Ms, to avoiding caring if
- * this is called from another core, and to avoid the need_to_idle business.
- * The other way would be to have this function have the side effect of changing
- * state, and finding another way to do the need_to_idle.
+ * this is called from another core, and to avoid the _S -> _M transition.
  *
  * WARNING: You must hold the proc_lock before calling this! */
 void __proc_give_cores(struct proc *p, uint32_t *pc_arr, uint32_t num)
@@ -1168,8 +1251,10 @@ void __proc_give_cores(struct proc *p, uint32_t *pc_arr, uint32_t num)
 			panic("Don't give cores to a process in a *_S state!\n");
 			break;
 		case (PROC_DYING):
-			panic("Attempted to give cores to a DYING process.\n");
-			break;
+			/* We're dying, give the cores back to the ksched and return */
+			for (int i = 0; i < num; i++)
+				put_idle_core(pc_arr[i]);
+			return;
 		case (PROC_RUNNABLE_M):
 			__proc_give_cores_runnable(p, pc_arr, num);
 			break;

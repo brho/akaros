@@ -29,6 +29,9 @@ void deschedule_proc(struct proc *p);
 /* Pick and run a process.  Note that this can return. */
 void schedule(void);
 
+/* Take a look at proc's resource (temp interface) */
+void poke_ksched(struct proc *p, int res_type);
+
 /* Gets called when a pcore becomes idle (like in proc yield) */
 void put_idle_core(uint32_t coreid);
 

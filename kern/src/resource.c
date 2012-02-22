@@ -31,136 +31,59 @@
  * transition a process from _M to _S (amt_wanted == 0).
  *
  * This needs a consumable/edible reference of p, in case it doesn't return.
- *
- * TODO: this is a giant function.  need to split it up a bit, probably move the
- * guts to process.c and have functions to call for the brains.
  */
-ssize_t core_request(struct proc *p)
+bool core_request(struct proc *p)
 {
-	size_t num_granted;
-	ssize_t amt_new;
-	uint32_t corelist[MAX_NUM_CPUS];
-	bool need_to_idle = FALSE;
-	int8_t state = 0;
+	uint32_t num_granted, amt_new, amt_wanted, amt_granted;
+	uint32_t corelist[MAX_NUM_CPUS]; /* TODO UGH, this could be huge! */
 
+	/* Currently, this is all locked, and there's a variety of races involved,
+	 * esp with moving amt_wanted to procdata (TODO).  Will probably want to
+	 * copy-in amt_wanted too. */
 	spin_lock(&p->proc_lock);
-	if (p->state == PROC_DYING) {
-		spin_unlock(&p->proc_lock);
-		return -EFAIL;
+	amt_wanted = p->resources[RES_CORES].amt_wanted;
+	amt_granted = p->resources[RES_CORES].amt_granted;	/* aka, num_vcores */
+
+	/* Help them out - if they ask for something impossible, give them 1 so they
+	 * can make some progress. */
+	if (amt_wanted > p->procinfo->max_vcores) {
+		p->resources[RES_CORES].amt_wanted = 1;
 	}
-	/* check to see if this is a full deallocation.  for cores, it's a
-	 * transition from _M to _S.  Will be issues with handling this async. */
-	if (!p->resources[RES_CORES].amt_wanted) {
-		printk("[kernel] trying to transition _M -> _S (deprecated)!\n");
-		assert(p->state == PROC_RUNNING_M); // TODO: (ACR) async core req
-		/* save the context, to be restarted in _S mode */
-		disable_irqsave(&state);	/* protect cur_tf */
-		assert(current_tf);
-		p->env_tf = *current_tf;
-		clear_owning_proc(core_id());	/* so we don't restart */
-		enable_irqsave(&state);
-		env_push_ancillary_state(p); // TODO: (HSS)
-		/* sending death, since it's not our job to save contexts or anything in
-		 * this case.  also, if this returns true, we will not return down
-		 * below, and need to eat the reference to p */
-		__proc_take_allcores_dumb(p, FALSE);
-		__proc_set_state(p, PROC_RUNNABLE_S);
-		schedule_proc(p);
-		spin_unlock(&p->proc_lock);
-		return 0;
+	/* TODO: sort how this works with WAITING. */
+	if (!amt_wanted) {
+		p->resources[RES_CORES].amt_wanted = 1;
 	}
-	/* Fail if we can never handle this amount (based on how many we told the
-	 * process it can get). */
-	if (p->resources[RES_CORES].amt_wanted > p->procinfo->max_vcores) {
-		spin_unlock(&p->proc_lock);
-		return -EFAIL;
+	/* if they are satisfied, we're done.  There's a slight chance they have
+	 * cores, but they aren't running (sched gave them cores while they were
+	 * yielding, and now we see them on the run queue). */
+	if (amt_wanted <= amt_granted) {
+		if (amt_granted) {
+			spin_unlock(&p->proc_lock);
+			return TRUE;
+		} else {
+			spin_unlock(&p->proc_lock);
+			return FALSE;
+		}
 	}
-	/* otherwise, see how many new cores are wanted */
-	amt_new = p->resources[RES_CORES].amt_wanted -
-	          p->resources[RES_CORES].amt_granted;
-	if (amt_new < 0) {
-		p->resources[RES_CORES].amt_wanted = p->resources[RES_CORES].amt_granted;
-		spin_unlock(&p->proc_lock);
-		return -EINVAL;
-	} else if (amt_new == 0) {
-		spin_unlock(&p->proc_lock);
-		return 0;
-	}
-	// else, we try to handle the request
+	/* otherwise, see what they want.  Current models are simple - it's just a
+	 * raw number of cores, and we just give out what we can. */
+	amt_new = amt_wanted - amt_granted;
+	/* TODO: Could also consider amt_min */
+
+	/* TODO: change this.  this function is really "find me amt_new cores", the
+	 * nature of this info depends on how we express desires, and a lot of that
+	 * info could be lost through this interface. */
 	num_granted = proc_wants_cores(p, corelist, amt_new);
 
-	// Now, actually give them out
+	/* Now, actually give them out */
 	if (num_granted) {
-		switch (p->state) {
-			case (PROC_RUNNING_S):
-				// issue with if we're async or not (need to preempt it)
-				// either of these should trip it. TODO: (ACR) async core req
-				// TODO: relies on vcore0 being the caller (VC#)
-				// TODO: do this in process.c and use this line:
-				//if ((current != p) || (get_pcoreid(p, 0) != core_id()))
-				if ((current != p) || (p->procinfo->vcoremap[0].pcoreid != core_id()))
-					panic("We don't handle async RUNNING_S core requests yet.");
-				/* save the tf so userspace can restart it.  Like in __notify,
-				 * this assumes a user tf is the same as a kernel tf.  We save
-				 * it in the preempt slot so that we can also save the silly
-				 * state. */
-				struct preempt_data *vcpd = &p->procdata->vcore_preempt_data[0];
-				disable_irqsave(&state);	/* protect cur_tf */
-				/* Note this won't play well with concurrent proc kmsgs, but
-				 * since we're _S and locked, we shouldn't have any. */
-				assert(current_tf);
-				/* Copy uthread0's context to the notif slot */
-				vcpd->notif_tf = *current_tf;
-				clear_owning_proc(core_id());	/* so we don't restart */
-				save_fp_state(&vcpd->preempt_anc);
-				enable_irqsave(&state);
-				/* Userspace needs to not fuck with notif_disabled before
-				 * transitioning to _M. */
-				if (vcpd->notif_disabled) {
-					printk("[kernel] user bug: notifs disabled for vcore 0\n");
-					vcpd->notif_disabled = FALSE;
-				}
-				/* in the async case, we'll need to remotely stop and bundle
-				 * vcore0's TF.  this is already done for the sync case (local
-				 * syscall). */
-				/* this process no longer runs on its old location (which is
-				 * this core, for now, since we don't handle async calls) */
-				__seq_start_write(&p->procinfo->coremap_seqctr);
-				// TODO: (VC#) might need to adjust num_vcores
-				// TODO: (ACR) will need to unmap remotely (receive-side)
-				__unmap_vcore(p, 0);	/* VC# keep in sync with proc_run _S */
-				__seq_end_write(&p->procinfo->coremap_seqctr);
-				// will need to give up this core / idle later (sync)
-				need_to_idle = TRUE;
-				// change to runnable_m (it's TF is already saved)
-				__proc_set_state(p, PROC_RUNNABLE_M);
-				p->procinfo->is_mcp = TRUE;
-				break;
-			case (PROC_RUNNABLE_S):
-				/* Issues: being on the runnable_list, proc_set_state not liking
-				 * it, and not clearly thinking through how this would happen.
-				 * Perhaps an async call that gets serviced after you're
-				 * descheduled? */
-				panic("Not supporting RUNNABLE_S -> RUNNABLE_M yet.\n");
-				break;
-			case (PROC_DYING):
-				warn("Dying, core request coming from %d\n", core_id());
-			default:
-				break;
-		}
 		/* give them the cores.  this will start up the extras if RUNNING_M. */
 		__proc_give_cores(p, corelist, num_granted);
 		spin_unlock(&p->proc_lock);
-		/* if there's a race on state (like DEATH), it'll get handled by
-		 * proc_run or proc_destroy.  TODO: Theoretical race here, since someone
-		 * else could make p an _S (in theory), and then we would be calling
-		 * this with an inedible ref (which is currently a concern). */
-		if (p->state == PROC_RUNNABLE_M)
-			proc_run(p);	/* I dislike this - caller should run it */
-	} else { // nothing granted, just return
-		spin_unlock(&p->proc_lock);
+		return TRUE;	/* proc can run (if it isn't already) */
 	}
-	return num_granted;
+	spin_unlock(&p->proc_lock);
+	return FALSE;		/* Not giving them anything more */
 }
 
 error_t resource_req(struct proc *p, int type, size_t amt_wanted,
@@ -183,14 +106,17 @@ error_t resource_req(struct proc *p, int type, size_t amt_wanted,
 
 	switch (type) {
 		case RES_CORES:
-			retval = core_request(p);
-			// i don't like this retval hackery
-			if (retval < 0) {
-				set_errno(-retval);
-				return -1;
+			spin_lock(&p->proc_lock);
+			if (p->state == PROC_RUNNING_S) {
+				__proc_switch_to_m(p);	/* will later be a separate syscall */
+				schedule_proc(p);
+				spin_unlock(&p->proc_lock);
+			} else {
+				/* _M */
+				spin_unlock(&p->proc_lock);
+				poke_ksched(p, RES_CORES); /* will be a separate syscall */
 			}
-			else
-				return 0;
+			return 0;
 			break;
 		case RES_MEMORY:
 			// not clear if we should be in RUNNABLE_M or not

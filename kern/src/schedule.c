@@ -1,10 +1,8 @@
-/*
- * Copyright (c) 2009 The Regents of the University of California
+/* Copyright (c) 2009, 2012 The Regents of the University of California
  * Barret Rhoden <brho@cs.berkeley.edu>
  * See LICENSE for details.
  *
- * Scheduling and dispatching.
- */
+ * Scheduling and dispatching. */
 
 #ifdef __SHARC__
 #pragma nosharc
@@ -93,23 +91,11 @@ void schedule_proc(struct proc *p)
 	return;
 }
 
-/* TODO: race here.  it's possible that p was already removed from the
- * list (by schedule()), while proc_destroy is trying to remove it from the
- * list.  schedule()'s proc_run() won't actually run it (since it's DYING), but
- * this code will probably fuck up.  Having TAILQ_REMOVE not hurt will help. */
-void deschedule_proc(struct proc *p)
-{
-	spin_lock_irqsave(&runnablelist_lock);
-	printd("Descheduling PID: %d\n", p->pid);
-	TAILQ_REMOVE(&proc_runnablelist, p, proc_link);
-	spin_unlock_irqsave(&runnablelist_lock);
-	/* down the refcnt, since its no longer stored */
-	proc_decref(p);
-	return;
-}
-
-/*
- * FIFO - just pop the head from the list and run it.
+/* Something has changed, and for whatever reason the scheduler should
+ * reevaluate things.  Currently, this assumes the calling core is free (since
+ * an _S can be proc_run()'d), and it only attempts to run one process at a time
+ * (which will suck, longer term, since the manager will just spin this func).
+ *
  * Using irqsave spinlocks for now, since this could be called from a timer
  * interrupt handler (though ought to be in a bottom half or something).
  */
@@ -118,17 +104,40 @@ void schedule(void)
 	struct proc *p;
 	
 	spin_lock_irqsave(&runnablelist_lock);
+	/* TODO at the very least, we should do a TAILQ_FOREACH_SAFE, trying to sort
+	 * out everyone, but with the highest priority one first (want a priority
+	 * queue or something), so people don't have to loop calling schedule().
+	 *
+	 * Also, we don't want a 'runnable list'.  that's so _S. */
 	p = TAILQ_FIRST(&proc_runnablelist);
 	if (p) {
 		TAILQ_REMOVE(&proc_runnablelist, p, proc_link);
 		spin_unlock_irqsave(&runnablelist_lock);
+		/* TODO: consider the process's state, or push that into
+		 * give_cores/core_request */
+		/* lockless reference check, safe since we hold a ref and it's dying.
+		 * Note that a process can still be killed right after we do this
+		 * check, but give_cores and proc_run can handle that race. */
+		if (p->state == PROC_DYING) {
+			proc_decref(p);
+			return;
+		}
+		/* TODO: ^^^^^ this is shit i'd like to hide from pluggable kscheds */
 		printd("PID of proc i'm running: %d\n", p->pid);
 		/* We can safely read is_mcp without locking (i think). */
 		if (__proc_is_mcp(p)) {
 			/* _Ms need to get some cores, which will call proc_run() internally
 			 * (for now) */
-			if (core_request(p) <= 0)
-				schedule_proc(p);	/* got none, put it back on the queue */
+			/* TODO: this interface sucks, change it */
+			if (!core_request(p))
+				schedule_proc(p);	/* can't run, put it back on the queue */
+			else
+				/* if there's a race on state (like DEATH), it'll get handled by
+				 * proc_run or proc_destroy.  TODO: Theoretical race here, since
+				 * someone else could make p an _S (in theory), and then we
+				 * would be calling this with an inedible ref (which is
+				 * currently a concern). */
+				proc_run(p); /* trying to run a RUNNABLE_M here */
 		} else {
 			/* _S proc, just run it */
 			proc_run(p);
@@ -139,6 +148,24 @@ void schedule(void)
 		spin_unlock_irqsave(&runnablelist_lock);
 	}
 	return;
+}
+
+/* A process is asking the ksched to look at its resource desires.  The
+ * scheduler is free to ignore this, for its own reasons, so long as it
+ * eventually gets around to looking at resource desires. */
+void poke_ksched(struct proc *p, int res_type)
+{
+	/* TODO: probably want something to trigger all res_types */
+	/* Consider races with core_req called from other pokes or schedule */
+	switch (res_type) {
+		case RES_CORES:
+			/* TODO: issues with whether or not they are RUNNING.  Need to
+			 * change core_request / give_cores. */
+			core_request(p);
+			break;
+		default:
+			break;
+	}
 }
 
 /* Helper function to return a core to the idlemap.  It causes some more lock
