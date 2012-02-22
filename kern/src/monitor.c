@@ -305,10 +305,13 @@ int mon_bin_run(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 	spin_unlock(&p->proc_lock);
 	proc_decref(p); /* let go of the reference created in proc_create() */
 	kref_put(&program->f_kref);
-	/* Should never return from schedule (env_pop in there) also note you may
-	 * not get the process you created, in the event there are others floating
-	 * around that are runnable */
+	/* Make a scheduling decision.  You might not get the process you created,
+	 * in the event there are others floating around that are runnable */
 	schedule();
+	/* want to idle, so we un the process we just selected.  this is a bit
+	 * hackish, but so is the monitor. */
+	smp_idle();
+	assert(0);
 	return 0;
 }
 

@@ -142,7 +142,7 @@ void schedule(void)
 			/* _S proc, just run it */
 			proc_run(p);
 		}
-		/* proc_run will either eat the ref, or we'll decref manually. */
+		/* decref the ref from the TAILQ */
 		proc_decref(p);
 	} else {
 		spin_unlock_irqsave(&runnablelist_lock);

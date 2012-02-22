@@ -418,28 +418,22 @@ static void __set_proc_current(struct proc *p)
  * RUNNABLE_S, or on its partition in the case of a RUNNABLE_M.  This should
  * never be called to "restart" a core.  This expects that the "instructions"
  * for which core(s) to run this on will be in the vcoremap, which needs to be
- * set externally.
+ * set externally (give_cores()).
  *
- * When a process goes from RUNNABLE_M to RUNNING_M, its vcoremap will be
- * "packed" (no holes in the vcore->pcore mapping), vcore0 will continue to run
- * it's old core0 context, and the other cores will come in at the entry point.
- * Including in the case of preemption.
+ * This will always return, regardless of whether or not the calling core is
+ * being given to a process. (it used to pop the tf directly, before we had
+ * cur_tf).
  *
- * This won't return if the current core is going to be running the process as a
- * _S.  It will return if the process is an _M.  Regardless, proc_run will eat
- * your reference if it does not return. */
+ * Since it always returns, it will never "eat" your reference (old
+ * documentation talks about this a bit). */
 void proc_run(struct proc *p)
 {
 	struct vcore *vc_i;
 	spin_lock(&p->proc_lock);
-
 	switch (p->state) {
 		case (PROC_DYING):
 			spin_unlock(&p->proc_lock);
 			printk("Process %d not starting due to async death\n", p->pid);
-			// if we're a worker core, smp_idle, o/w return
-			if (!management_core())
-				smp_idle(); // this never returns
 			return;
 		case (PROC_RUNNABLE_S):
 			assert(current != p);
@@ -455,6 +449,8 @@ void proc_run(struct proc *p)
 			 * work. */
 			__map_vcore(p, 0, core_id()); // sort of.  this needs work.
 			__seq_end_write(&p->procinfo->coremap_seqctr);
+			/* incref, since we're saving a reference in current */
+			proc_incref(p, 1);
 			__set_proc_current(p);
 			/* We restartcore, instead of startcore, since startcore is a bit
 			 * lower level and we want a chance to process kmsgs before starting
@@ -465,8 +461,9 @@ void proc_run(struct proc *p)
 			current_tf = &p->env_tf;	/* no need for irq disable yet */
 			/* storing the passed in ref of p in owning_proc */
 			per_cpu_info[core_id()].owning_proc = p;
-			proc_restartcore();	/* will reenable interrupts */
-			break;
+			/* When the calling core idles, it'll call restartcore and run the
+			 * _S process's context. */
+			return;
 		case (PROC_RUNNABLE_M):
 			/* vcoremap[i] holds the coreid of the physical core allocated to
 			 * this process.  It is set outside proc_run.  For the kernel
@@ -486,10 +483,7 @@ void proc_run(struct proc *p)
 			} else {
 				warn("Tried to proc_run() an _M with no vcores!");
 			}
-			/* Unlock and decref/wait for the IPI if one is pending.  This will
-			 * eat the reference if we aren't returning.
-			 *
-			 * There a subtle race avoidance here.  __proc_startcore can handle
+			/* There a subtle race avoidance here.  __proc_startcore can handle
 			 * a death message, but we can't have the startcore come after the
 			 * death message.  Otherwise, it would look like a new process.  So
 			 * we hold the lock til after we send our message, which prevents a
@@ -497,7 +491,7 @@ void proc_run(struct proc *p)
 			 * - Note there is no guarantee this core's interrupts were on, so
 			 *   it may not get the message for a while... */
 			spin_unlock(&p->proc_lock);
-			break;
+			return;
 		default:
 			spin_unlock(&p->proc_lock);
 			panic("Invalid process state %p in proc_run()!!", p->state);

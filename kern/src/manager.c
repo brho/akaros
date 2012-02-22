@@ -110,10 +110,8 @@ char *p_envp[] = {"LD_LIBRARY_PATH=/lib", 0};
 
 void manager_brho(void)
 {
-	static uint8_t RACY progress = 0;	/* this will wrap around. */
-	static struct proc *p;
-	struct file *temp_f;
 	static bool first = TRUE;
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 
 	if (first) {	
 		printk("*** Hit shift-g to get into the monitor. ***\n");
@@ -128,19 +126,26 @@ void manager_brho(void)
 		}
 		process_routine_kmsg(0);
 		schedule();
+		/* would like to idle here, but without reset stacks, people will run
+		 * off the kstack.  so just idle if we have an owning proc (which we
+		 * should then 'restart'). */
+		if (pcpui->owning_proc)
+			smp_idle();
 	}
 	/* whatever we do in the manager, keep in mind that we need to not do
 	 * anything too soon (like make processes), since we'll drop in here during
 	 * boot if the boot sequence required any I/O (like EXT2), and we need to
 	 * PRKM() */
-
 	assert(0);
-	/* ancient tests below: */
 
+#if 0 /* ancient tests below: (keeping around til we ditch the manager) */
 	// for testing taking cores, check in case 1 for usage
 	uint32_t corelist[MAX_NUM_CPUS];
 	uint32_t num = 3;
+	struct file *temp_f;
+	static struct proc *p;
 
+	static uint8_t RACY progress = 0;	/* this will wrap around. */
 	switch (progress++) {
 		case 0:
 			printk("Top of the manager to ya!\n");
@@ -188,6 +193,7 @@ void manager_brho(void)
 			envs[0] = kfs_proc_create(kfs_lookup_path("roslib_hello"));
 			__proc_set_state(envs[0], PROC_RUNNABLE_S);
 			proc_run(envs[0]);
+			warn("DEPRECATED");
 			break;
 			#endif
 		case 2:
@@ -217,6 +223,7 @@ void manager_brho(void)
 	}
 	*/
 	return;
+#endif
 }
 
 void manager_klueska()
@@ -230,6 +237,7 @@ void manager_klueska()
 		//envs[0] = kfs_proc_create(kfs_lookup_path("fillmeup"));
 		__proc_set_state(envs[0], PROC_RUNNABLE_S);
 		proc_run(envs[0]);
+		warn("DEPRECATED");
 	}
 	schedule();
 
@@ -241,25 +249,6 @@ void manager_waterman()
 	schedule();
 	monitor(0);
 	assert(0);
-}
-
-void manager_pearce()
-{
-	static struct proc *envs[256];
-	static volatile uint8_t progress = 0;
-
-	if (progress == 0) {
-		progress++;
-		panic("what do you want to do?");
-		//envs[0] = kfs_proc_create(kfs_lookup_path("parlib_httpserver_integrated"));
-		//envs[0] = kfs_proc_create(kfs_lookup_path("parlib_lock_test"));
-		__proc_set_state(envs[0], PROC_RUNNABLE_S);
-		proc_run(envs[0]);
-	}
-	schedule();
-
-	panic("DON'T PANIC");
-
 }
 
 void manager_yuzhu()

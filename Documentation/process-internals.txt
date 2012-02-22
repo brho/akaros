@@ -113,8 +113,9 @@ stores or makes a copy of the reference.
 ---------------------------
 Refcnting and especially decreffing gets tricky when there are functions that
 MAY not return.  proc_restartcore() does not return (it pops into userspace).
-proc_run() might not return, if the core it was called on will pop into
+proc_run() used to not return, if the core it was called on would pop into
 userspace (if it was a _S, or if the core is part of the vcoremap for a _M).
+This doesn't happen anymore, since we have cur_tf in the per-cpu info.
 
 Functions that MAY not return will "eat" your reference *IF* they do not return.
 This means that you must have a reference when you call them (like always), and
@@ -136,8 +137,9 @@ screw up, and semantically, if the function returns, then we may still have an
 interest in p and should decref later.
 
 The downside is that functions need to determine if they will return or not,
-which can be a pain (a linear time search when running an _M, for instance,
-which can suck if we are trying to use a broadcast/logical IPI).
+which can be a pain (for an out-of-date example: a linear time search when
+running an _M, for instance, which can suck if we are trying to use a
+broadcast/logical IPI).
 
 As the caller, you usually won't know if the function will return or not, so you
 need to provide a consumable reference.  Current doesn't count.  For example,
@@ -155,18 +157,14 @@ had it implicitly be refcnt'd (the fact that it's on the list is enough, sort of
 as if it was part of the +1 for existing), but that complicates things.  For
 instance, it is a source of a reference (for the scheduler) and you could not
 proc_run() a process from the runnable list without worrying about increfing it
-before hand.  Remember that proc_run() might consume your reference (which
-actually turns into a current reference, which is later destroyed by decref in
-abandon_core()).
+before hand.  This isn't true anymore, but the runnable lists are getting
+overhauled anyway.  We'll see what works nicely.
 
 1.7 Internal Details for Specific Functions:
 ---------------------------
 proc_run()/__proc_give_cores(): makes sure enough refcnts are in place for all
 places that will install owning_proc.  This also makes it easier on the system
 (one big incref(n), instead of n increfs of (1) from multiple cores). 
-Also note that while proc_run() consumes your reference, it's not actually
-decreffing, so there's no danger within proc_run() of the process dying /
-__proc_free()ing.
 
 __set_proc_current() is a helper that makes sure p is the cur_proc.  It will
 incref if installing a new reference to p.  If it removed an old proc, it will
@@ -202,18 +200,20 @@ list or otherwise in the proc system (but not other subsystems)?  In this case,
 proc_run() won't need to eat a reference at all - it will just incref for every
 current it will set up.
 
-A: No: if you pid2proc(), then proc_run() but never return, you have (and lose)
-an extra reference.  We need proc_run() to eat the reference when it does not
-return.  If you decref between pid2proc() and proc_run(), there's a (rare) race
-where the refcnt hits 0 by someone else trying to kill it.  While proc_run()
-will check to see if someone else is trying to kill it, there's a slight chance
-that the struct will be reused and recreated.  It'll probably never happen, but
-it could, and out of principle we shouldn't be referencing memory after it's
-been deallocated.  Avoiding races like this is one of the reasons for our refcnt
-discipline.
+New A: Maybe, now that proc_run() returns.
 
-Q: Could proc_run() always eat your reference, which would make it easier for
-its implementation?
+Old A: No: if you pid2proc(), then proc_run() but never return, you have (and
+lose) an extra reference.  We need proc_run() to eat the reference when it
+does not return.  If you decref between pid2proc() and proc_run(), there's a
+(rare) race where the refcnt hits 0 by someone else trying to kill it.  While
+proc_run() will check to see if someone else is trying to kill it, there's a
+slight chance that the struct will be reused and recreated.  It'll probably
+never happen, but it could, and out of principle we shouldn't be referencing
+memory after it's been deallocated.  Avoiding races like this is one of the
+reasons for our refcnt discipline.
+
+Q: (Moot) Could proc_run() always eat your reference, which would make it
+easier for its implementation?
 
 A: Yeah, technically, but it'd be a pain, as mentioned above.  You'd need to
 reaquire a reference via pid2proc, and is rather easy to mess up.
