@@ -51,10 +51,7 @@
 
 #include <env.h>
 
-TAILQ_HEAD(proc_list, proc);		// Declares 'struct proc_list'
-
-extern spinlock_t runnablelist_lock;
-extern struct proc_list LCKD(&runnablelist_lock) proc_runnablelist;
+TAILQ_HEAD(proc_list, proc);		/* Declares 'struct proc_list' */
 
 /* Can use a htable iterator to iterate through all active procs */
 extern struct hashtable *pid_hash;

@@ -30,9 +30,6 @@
 #include <arsc_server.h>
 #include <devfs.h>
 
-/* Process Lists */
-struct proc_list proc_runnablelist = TAILQ_HEAD_INITIALIZER(proc_runnablelist);
-spinlock_t runnablelist_lock = SPINLOCK_INITIALIZER;
 struct kmem_cache *proc_cache;
 
 /* Other helpers, implemented later. */

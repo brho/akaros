@@ -321,7 +321,7 @@ int mon_procinfo(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 		printk("Usage: procinfo OPTION\n");
 		printk("\tidlecores: show idle core map\n");
 		printk("\tall: show all active pids\n");
-		printk("\trunnable: show proc_runnablelist\n");
+		printk("\tsched: scheduler diagnostic report\n");
 		printk("\tresources: show resources wanted/granted for all procs\n");
 		printk("\tpid NUM: show a lot of info for proc NUM\n");
 		printk("\tunlock: unlock the lock for the ADDR (OMG!!!)\n");
@@ -332,8 +332,8 @@ int mon_procinfo(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 		print_idlecoremap();
 	} else if (!strcmp(argv[1], "all")) {
 		print_allpids();
-	} else if (!strcmp(argv[1], "runnable")) {
-		dump_proclist(&proc_runnablelist);
+	} else if (!strcmp(argv[1], "sched")) {
+		sched_diag();
 	} else if (!strcmp(argv[1], "resources")) {
 		print_all_resources();
 	} else if (!strcmp(argv[1], "pid")) {

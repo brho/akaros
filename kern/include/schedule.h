@@ -42,7 +42,7 @@ uint32_t max_vcores(struct proc *p);
 uint32_t proc_wants_cores(struct proc *p, uint32_t *pc_arr, uint32_t amt_new);
 
 /* Debugging */
-void dump_proclist(struct proc_list *list);
+void sched_diag(void);
 void print_idlecoremap(void);
 
 #endif /* ROS_KERN_SCHEDULE_H */

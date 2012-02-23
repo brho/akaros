@@ -18,6 +18,10 @@
 #include <smp.h>
 #include <sys/queue.h>
 
+/* Process Lists */
+struct proc_list proc_runnablelist = TAILQ_HEAD_INITIALIZER(proc_runnablelist);
+spinlock_t runnablelist_lock = SPINLOCK_INITIALIZER;
+
 // This could be useful for making scheduling decisions.  
 /* Physical coremap: each index is a physical core id, with a proc ptr for
  * whoever *should be or is* running.  Very similar to current, which is what
@@ -212,10 +216,11 @@ uint32_t proc_wants_cores(struct proc *p, uint32_t *pc_arr, uint32_t amt_new)
 }
 
 /************** Debugging **************/
-void dump_proclist(struct proc_list *list)
+void sched_diag(void)
 {
 	struct proc *p;
-	TAILQ_FOREACH(p, list, proc_link)
+	/* just print the runnables for now */
+	TAILQ_FOREACH(p, &proc_runnablelist, proc_link)
 		printk("PID: %d\n", p->pid);
 	return;
 }
