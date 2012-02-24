@@ -17,7 +17,7 @@
 /* Process States.  Not 100% on the names yet.  RUNNABLE_* are waiting to go to
  * RUNNING_*.  For instance, RUNNABLE_M is expecting to go to RUNNING_M.  It
  * could be waiting for it's timeslice, or possibly for all the cores it asked
- * for.  You use proc_run() to transition between these states.
+ * for.
  *
  * Difference between the _M and the _S states:
  * - _S : legacy process mode
@@ -27,7 +27,7 @@
  * - The time slicing is at a coarser granularity for _M states.  This means
  *   that when you run an _S on a core, it should be interrupted/time sliced
  *   more often, which also means the core should be classified differently for
- *   a while.  Possibly even using it's local APIC timer.
+ *   a while.  Possibly even using its local APIC timer.
  * - A process in an _M state will be informed about changes to its state, e.g.,
  *   will have a handler run in the event of a page fault
  */
@@ -69,7 +69,8 @@ struct proc *pid2proc(pid_t pid);
 bool proc_controls(struct proc *SAFE actor, struct proc *SAFE target);
 void proc_incref(struct proc *p, unsigned int val);
 void proc_decref(struct proc *p);
-void proc_run(struct proc *SAFE p);
+void proc_run_s(struct proc *p);
+void __proc_run_m(struct proc *p);
 void proc_restartcore(void);
 void proc_destroy(struct proc *SAFE p);
 void __proc_switch_to_m(struct proc *p);

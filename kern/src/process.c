@@ -411,11 +411,8 @@ static void __set_proc_current(struct proc *p)
 	}
 }
 
-/* Dispatches a process to run, either on the current core in the case of a
- * RUNNABLE_S, or on its partition in the case of a RUNNABLE_M.  This should
- * never be called to "restart" a core.  This expects that the "instructions"
- * for which core(s) to run this on will be in the vcoremap, which needs to be
- * set externally (give_cores()).
+/* Dispatches a _S process to run on the current core.  This should never be
+ * called to "restart" a core.   
  *
  * This will always return, regardless of whether or not the calling core is
  * being given to a process. (it used to pop the tf directly, before we had
@@ -423,9 +420,8 @@ static void __set_proc_current(struct proc *p)
  *
  * Since it always returns, it will never "eat" your reference (old
  * documentation talks about this a bit). */
-void proc_run(struct proc *p)
+void proc_run_s(struct proc *p)
 {
-	struct vcore *vc_i;
 	spin_lock(&p->proc_lock);
 	switch (p->state) {
 		case (PROC_DYING):
@@ -446,8 +442,9 @@ void proc_run(struct proc *p)
 			 * work. */
 			__map_vcore(p, 0, core_id()); // sort of.  this needs work.
 			__seq_end_write(&p->procinfo->coremap_seqctr);
-			/* incref, since we're saving a reference in current */
+			/* incref, since we're saving a reference in owning proc */
 			proc_incref(p, 1);
+			/* redundant with proc_startcore, might be able to remove that one*/
 			__set_proc_current(p);
 			/* We restartcore, instead of startcore, since startcore is a bit
 			 * lower level and we want a chance to process kmsgs before starting
@@ -460,6 +457,28 @@ void proc_run(struct proc *p)
 			per_cpu_info[core_id()].owning_proc = p;
 			/* When the calling core idles, it'll call restartcore and run the
 			 * _S process's context. */
+			return;
+		default:
+			spin_unlock(&p->proc_lock);
+			panic("Invalid process state %p in %s()!!", p->state, __FUNCTION__);
+	}
+}
+
+/* Run an _M.  Can be called safely on one that is already running.  Hold the
+ * lock before calling.  Other than state checks, this just starts up the _M's
+ * vcores, much like the second part of give_cores_running.  More specifically,
+ * give_cores_runnable puts cores on the online list, which this then sends
+ * messages to.  give_cores_running immediately puts them on the list and sends
+ * the message.  the two-step style may go out of fashion soon.
+ *
+ * This expects that the "instructions" for which core(s) to run this on will be
+ * in the vcoremap, which needs to be set externally (give_cores()). */
+void __proc_run_m(struct proc *p)
+{
+	struct vcore *vc_i;
+	switch (p->state) {
+		case (PROC_DYING):
+			printk("Process %d not starting due to async death\n", p->pid);
 			return;
 		case (PROC_RUNNABLE_M):
 			/* vcoremap[i] holds the coreid of the physical core allocated to
@@ -480,18 +499,21 @@ void proc_run(struct proc *p)
 			} else {
 				warn("Tried to proc_run() an _M with no vcores!");
 			}
-			/* There a subtle race avoidance here.  __proc_startcore can handle
-			 * a death message, but we can't have the startcore come after the
-			 * death message.  Otherwise, it would look like a new process.  So
-			 * we hold the lock til after we send our message, which prevents a
-			 * possible death message.
+			/* There a subtle race avoidance here (when we unlock after sending
+			 * the message).  __proc_startcore can handle a death message, but
+			 * we can't have the startcore come after the death message.
+			 * Otherwise, it would look like a new process.  So we hold the lock
+			 * til after we send our message, which prevents a possible death
+			 * message.
 			 * - Note there is no guarantee this core's interrupts were on, so
 			 *   it may not get the message for a while... */
-			spin_unlock(&p->proc_lock);
+			return;
+		case (PROC_RUNNING_M):
 			return;
 		default:
+			/* unlock just so the monitor can call something that might lock*/
 			spin_unlock(&p->proc_lock);
-			panic("Invalid process state %p in proc_run()!!", p->state);
+			panic("Invalid process state %p in %s()!!", p->state, __FUNCTION__);
 	}
 }
 
@@ -694,7 +716,7 @@ void __proc_switch_to_m(struct proc *p)
 			__seq_start_write(&p->procinfo->coremap_seqctr);
 			// TODO: (VC#) might need to adjust num_vcores
 			// TODO: (ACR) will need to unmap remotely (receive-side)
-			__unmap_vcore(p, 0);	/* VC# keep in sync with proc_run _S */
+			__unmap_vcore(p, 0);	/* VC# keep in sync with proc_run_s */
 			__seq_end_write(&p->procinfo->coremap_seqctr);
 			/* change to runnable_m (it's TF is already saved) */
 			__proc_set_state(p, PROC_RUNNABLE_M);
@@ -772,7 +794,7 @@ void __proc_yield_s(struct proc *p, struct trapframe *tf)
 	assert(p->state == PROC_RUNNING_S);
 	p->env_tf= *tf;
 	env_push_ancillary_state(p);			/* TODO: (HSS) */
-	__unmap_vcore(p, 0);	/* VC# keep in sync with proc_run _S */
+	__unmap_vcore(p, 0);	/* VC# keep in sync with proc_run_s */
 	__proc_set_state(p, PROC_RUNNABLE_S);
 	schedule_proc(p);
 }
@@ -1220,12 +1242,12 @@ static void __proc_give_cores_running(struct proc *p, uint32_t *pc_arr,
 /* Gives process p the additional num cores listed in pcorelist.  You must be
  * RUNNABLE_M or RUNNING_M before calling this.  If you're RUNNING_M, this will
  * startup your new cores at the entry point with their virtual IDs (or restore
- * a preemption).  If you're RUNNABLE_M, you should call proc_run after this so
- * that the process can start to use its cores.
+ * a preemption).  If you're RUNNABLE_M, you should call __proc_run_m after this
+ * so that the process can start to use its cores.
  *
  * If you're *_S, make sure your core0's TF is set (which is done when coming in
  * via arch/trap.c and we are RUNNING_S), change your state, then call this.
- * Then call proc_run().
+ * Then call __proc_run_m().
  *
  * The reason I didn't bring the _S cases from core_request over here is so we
  * can keep this family of calls dealing with only *_Ms, to avoiding caring if
@@ -1654,7 +1676,7 @@ out_failed:
 }
 
 /* Kernel message handler to start a process's context on this core, when the
- * core next considers running a process.  Tightly coupled with proc_run().
+ * core next considers running a process.  Tightly coupled with __proc_run_m().
  * Interrupts are disabled. */
 void __startcore(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2)
 {
@@ -1671,7 +1693,7 @@ void __startcore(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2
 	 * if no one else is there.  this is an optimization, since we expect to
 	 * send these __startcores to idles cores, and this saves a scramble to
 	 * incref when all of the cores restartcore/startcore later.  Keep in sync
-	 * with __proc_give_cores() and proc_run(). */
+	 * with __proc_give_cores() and __proc_run_m(). */
 	if (!pcpui->cur_proc) {
 		pcpui->cur_proc = p_to_run;	/* install the ref to cur_proc */
 		lcr3(p_to_run->env_cr3);	/* load the page tables to match cur_proc */

@@ -67,7 +67,7 @@ char *p_envp[] = {"LD_LIBRARY_PATH=/lib", 0};
 	spin_lock(&(p)->proc_lock);                                                  \
 	__proc_set_state((p), PROC_RUNNABLE_S);                                      \
 	spin_unlock(&(p)->proc_lock);                                                \
-	proc_run((p));                                                               \
+	proc_run_s((p));                                                             \
 	proc_decref((p));
 
 #define quick_proc_create(x, p, f)                                               \
@@ -92,7 +92,7 @@ char *p_envp[] = {"LD_LIBRARY_PATH=/lib", 0};
 	p->cache_colors_map = cache_colors_map_alloc();                              \
 	for (int i = 0; i < (c); i++)                                                \
 		cache_color_alloc(llc_cache, p->cache_colors_map);                       \
-	proc_run((p));                                                               \
+	proc_run_s((p));                                                             \
 	proc_decref((p));
 
 #define quick_proc_color_create(x, p, c, f)                                      \
@@ -236,7 +236,7 @@ void manager_klueska()
 		panic("what do you want to do?");
 		//envs[0] = kfs_proc_create(kfs_lookup_path("fillmeup"));
 		__proc_set_state(envs[0], PROC_RUNNABLE_S);
-		proc_run(envs[0]);
+		proc_run_s(envs[0]);
 		warn("DEPRECATED");
 	}
 	schedule();

@@ -102,6 +102,8 @@ void schedule_proc(struct proc *p)
  *
  * Using irqsave spinlocks for now, since this could be called from a timer
  * interrupt handler (though ought to be in a bottom half or something).
+ * 	- TODO: the functions we call aren't irqsafe (proc_run, for instance), so
+ * 	we'll have to not call this directly from interrupt context.
  */
 void schedule(void)
 {
@@ -141,10 +143,12 @@ void schedule(void)
 				 * someone else could make p an _S (in theory), and then we
 				 * would be calling this with an inedible ref (which is
 				 * currently a concern). */
-				proc_run(p); /* trying to run a RUNNABLE_M here */
+				spin_lock(&p->proc_lock);
+				__proc_run_m(p); /* trying to run a RUNNABLE_M here */
+				spin_unlock(&p->proc_lock);
 		} else {
 			/* _S proc, just run it */
-			proc_run(p);
+			proc_run_s(p);
 		}
 		/* decref the ref from the TAILQ */
 		proc_decref(p);

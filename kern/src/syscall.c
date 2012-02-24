@@ -547,7 +547,7 @@ early_error:
 success:
 	/* Here's how we'll restart the new (or old) process: */
 	spin_lock(&p->proc_lock);
-	__unmap_vcore(p, 0);	/* VC# keep in sync with proc_run _S */
+	__unmap_vcore(p, 0);	/* VC# keep in sync with proc_run_s */
 	__proc_set_state(p, PROC_RUNNABLE_S);
 	schedule_proc(p);
 	spin_unlock(&p->proc_lock);
