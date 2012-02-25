@@ -137,15 +137,6 @@ void schedule(void)
 			/* TODO: this interface sucks, change it */
 			if (!core_request(p))
 				schedule_proc(p);	/* can't run, put it back on the queue */
-			else
-				/* if there's a race on state (like DEATH), it'll get handled by
-				 * proc_run or proc_destroy.  TODO: Theoretical race here, since
-				 * someone else could make p an _S (in theory), and then we
-				 * would be calling this with an inedible ref (which is
-				 * currently a concern). */
-				spin_lock(&p->proc_lock);
-				__proc_run_m(p); /* trying to run a RUNNABLE_M here */
-				spin_unlock(&p->proc_lock);
 		} else {
 			/* _S proc, just run it */
 			proc_run_s(p);

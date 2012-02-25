@@ -79,6 +79,11 @@ bool core_request(struct proc *p)
 	if (num_granted) {
 		/* give them the cores.  this will start up the extras if RUNNING_M. */
 		__proc_give_cores(p, corelist, num_granted);
+		/* at some point after giving cores, call proc_run_m() (harmless on
+		 * RUNNING_Ms).  You can give small groups of cores, then run them
+		 * (which is more efficient than interleaving runs with the gives for
+		 * bulk preempted processes). */
+		__proc_run_m(p); /* harmless to call this on RUNNING_Ms */
 		spin_unlock(&p->proc_lock);
 		return TRUE;	/* proc can run (if it isn't already) */
 	}

@@ -464,6 +464,32 @@ void proc_run_s(struct proc *p)
 	}
 }
 
+/* Helper: sends preempt messages to all vcores on the bulk preempt list, and
+ * moves them to the inactive list. */
+static void __send_bulkp_events(struct proc *p)
+{
+	struct vcore *vc_i, *vc_temp;
+	struct event_msg preempt_msg = {0};
+	/* Send preempt messages for any left on the BP list.  No need to set any
+	 * flags, it all was done on the real preempt.  Now we're just telling the
+	 * process about any that didn't get restarted and are still preempted. */
+	TAILQ_FOREACH_SAFE(vc_i, &p->bulk_preempted_vcs, list, vc_temp) {
+		/* Note that if there are no active vcores, send_k_e will post to our
+		 * own vcore, the last of which will be put on the inactive list and be
+		 * the first to be started.  We could have issues with deadlocking,
+		 * since send_k_e() could grab the proclock (if there are no active
+		 * vcores) */
+		preempt_msg.ev_type = EV_VCORE_PREEMPT;
+		preempt_msg.ev_arg2 = vcore2vcoreid(p, vc_i);	/* arg2 is 32 bits */
+		send_kernel_event(p, &preempt_msg, 0);
+		/* TODO: we may want a TAILQ_CONCAT_HEAD, or something that does that.
+		 * We need a loop for the messages, but not necessarily for the list
+		 * changes.  */
+		TAILQ_REMOVE(&p->bulk_preempted_vcs, vc_i, list);
+		TAILQ_INSERT_HEAD(&p->inactive_vcs, vc_i, list);
+	}
+}
+
 /* Run an _M.  Can be called safely on one that is already running.  Hold the
  * lock before calling.  Other than state checks, this just starts up the _M's
  * vcores, much like the second part of give_cores_running.  More specifically,
@@ -485,6 +511,7 @@ void __proc_run_m(struct proc *p)
 			 * this process.  It is set outside proc_run.  For the kernel
 			 * message, a0 = struct proc*, a1 = struct trapframe*.   */
 			if (p->procinfo->num_vcores) {
+				__send_bulkp_events(p);
 				__proc_set_state(p, PROC_RUNNING_M);
 				/* Up the refcnt, to avoid the n refcnt upping on the
 				 * destination cores.  Keep in sync with __startcore */
@@ -1182,15 +1209,10 @@ static bool __proc_give_a_pcore(struct proc *p, uint32_t pcore,
 static void __proc_give_cores_runnable(struct proc *p, uint32_t *pc_arr,
                                        uint32_t num)
 {
-	struct vcore *vc_i, *vc_temp;
-	struct event_msg preempt_msg = {0};
-	/* They shouldn't have any vcores yet.  One issue with allowing multiple
-	 * calls to _give_cores_ is that the bulk preempt list needs to be handled
-	 * in one shot. */
-	assert(!p->procinfo->num_vcores);
+	assert(p->state == PROC_RUNNABLE_M);
 	assert(num);	/* catch bugs */
 	/* add new items to the vcoremap */
-	__seq_start_write(&p->procinfo->coremap_seqctr);
+	__seq_start_write(&p->procinfo->coremap_seqctr);/* unncessary if offline */
 	p->procinfo->num_vcores += num;
 	for (int i = 0; i < num; i++) {
 		/* Try from the bulk list first */
@@ -1202,24 +1224,6 @@ static void __proc_give_cores_runnable(struct proc *p, uint32_t *pc_arr,
 		assert(__proc_give_a_pcore(p, pc_arr[i], &p->inactive_vcs));
 	}
 	__seq_end_write(&p->procinfo->coremap_seqctr);
-	/* Send preempt messages for any left on the BP list.  No need to set any
-	 * flags, it all was done on the real preempt.  Now we're just telling the
-	 * process about any that didn't get restarted and are still preempted. */
-	TAILQ_FOREACH_SAFE(vc_i, &p->bulk_preempted_vcs, list, vc_temp) {
-		/* Note that if there are no active vcores, send_k_e will post to our
-		 * own vcore, the last of which will be put on the inactive list and be
-		 * the first to be started.  We don't have to worry too much, since
-		 * we're holding the proc lock */
-		preempt_msg.ev_type = EV_VCORE_PREEMPT;
-		preempt_msg.ev_arg2 = vcore2vcoreid(p, vc_i);	/* arg2 is 32 bits */
-		send_kernel_event(p, &preempt_msg, 0);
-		/* TODO: we may want a TAILQ_CONCAT_HEAD, or something that does that.
-		 * We need a loop for the messages, but not necessarily for the list
-		 * changes.  */
-		TAILQ_REMOVE(&p->bulk_preempted_vcs, vc_i, list);
-		/* TODO: put on the bulk preempt list, if applicable */
-		TAILQ_INSERT_HEAD(&p->inactive_vcs, vc_i, list);
-	}
 }
 
 static void __proc_give_cores_running(struct proc *p, uint32_t *pc_arr,
