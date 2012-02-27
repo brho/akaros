@@ -41,7 +41,7 @@ void __save_ros_tf_regs(struct user_trapframe *tf);
 static void __pop_ros_tf_notifs(struct user_trapframe *tf,
                                 struct preempt_data* vcpd, uint32_t vcoreid)
 {
-	vcpd->notif_enabled = true;
+	vcpd->notif_disabled = FALSE;
 
 	__sync_synchronize();
 
@@ -53,7 +53,7 @@ static void __pop_ros_tf_notifs(struct user_trapframe *tf,
 static void __pop_ros_tf_notifs_raw(struct user_trapframe *tf,
                                     struct preempt_data* vcpd, uint32_t vcoreid)
 {
-	vcpd->notif_enabled = true;
+	vcpd->notif_disabled = FALSE;
 }
 
 static inline void __pop_ros_tf(struct user_trapframe *tf, uint32_t vcoreid,

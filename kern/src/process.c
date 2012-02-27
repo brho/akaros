@@ -1223,7 +1223,7 @@ static void __proc_unmap_allcores(struct proc *p)
  * Don't use this for taking all of a process's cores.
  *
  * Make sure you hold the lock when you call this. */
-void __proc_take_corelist(struct proc *p, uint32_t *pc_arr, size_t num,
+void __proc_take_corelist(struct proc *p, uint32_t *pc_arr, uint32_t num,
                           bool preempt)
 {
 	struct vcore *vc;

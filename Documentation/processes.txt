@@ -347,8 +347,8 @@ bother sending IPIs, and if an IPI is sent before notifications are masked,
 then the kernel will double-check this flag to make sure interrupts should
 have arrived.
 
-Notification unmasking is done by setting the notif_enabled flag (similar to
-turning interrupts on in hardware).  When a core starts up, this flag is off,
+Notification unmasking is done by clearing the notif_disabled flag (similar to
+turning interrupts on in hardware).  When a core starts up, this flag is on,
 meaning that notifications are disabled by default.  It is the process's
 responsibility to turn on notifications for a given vcore.
 
@@ -425,7 +425,7 @@ which we aren't even sure is a problem yet.
 We considered having the kernel be aware of a process's transition stacks and
 sizes so that it can detect if a vcore is in a notification handler based on
 the stack pointer in the trapframe when a trap or interrupt fires.  While
-cool, the flag for notif_enabled is much easier and just as capable.
+cool, the flag for notif_disabled is much easier and just as capable.
 Userspace needs to be aware of various races, and only enable notifications
 when it is ready to have its transition stack clobbered.  This means that when
 switching from big user-thread to user-thread, the process should temporarily
@@ -465,8 +465,8 @@ wanted, but the vcore did not get truly interrupted since its notifs were
 disabled.  There is a race between checking the queue/bitmask and then enabling
 notifications.  The way we deal with it is that the kernel posts the
 message/bit, then sets notif_pending.  Then it sends the IPI, which may or may
-not be received (based on notif_enabled).  (Actually, the kernel only ought to
-send the IPI if notif_pending was 0 (atomically) and notif_enabled is 1).  When
+not be received (based on notif_disabled).  (Actually, the kernel only ought to
+send the IPI if notif_pending was 0 (atomically) and notif_disabled is 0).  When
 leaving the transition stack, userspace should clear the notif_pending, then
 check the queue do whatever, and then try to pop the tf.  When popping the tf,
 after enabling notifications, check notif_pending.  If it is still clear, return
