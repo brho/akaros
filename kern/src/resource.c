@@ -114,7 +114,8 @@ error_t resource_req(struct proc *p, int type, size_t amt_wanted,
 			spin_lock(&p->proc_lock);
 			if (p->state == PROC_RUNNING_S) {
 				__proc_switch_to_m(p);	/* will later be a separate syscall */
-				schedule_proc(p);
+				/* tell the ksched about us */
+				register_mcp(p);
 				spin_unlock(&p->proc_lock);
 			} else {
 				/* _M */

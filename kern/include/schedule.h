@@ -13,20 +13,12 @@
 
 void schedule_init(void);
 
-/*
- * Add a process to the runnable list.  If you do this, do not manually env_run
- * the process.  It must be selected with schedule().  This also applies to
- * smp_call_function to indirectly call env_run.  Currently, this is always
- * called with changing the state to RUNNABLE_S, but in the future, it might
- * need a RUNNABLE_M instead - but one or the other should be done before
- * calling this.
- */
-void schedule_proc(struct proc *p);
+/* _S is runnable, tell the ksched to try to run it. */
+void schedule_scp(struct proc *p);
+/* _M exists.  Tell the ksched about it. */
+void register_mcp(struct proc *p);
+/* to remove from these lists, simply proc_destroy - the ksched will notice */
 
-/* Rip a process out of the runnable list */
-void deschedule_proc(struct proc *p);
-
-/* Pick and run a process.  Note that this can return. */
 void schedule(void);
 
 /* Take a look at proc's resource (temp interface) */

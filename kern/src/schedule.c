@@ -19,8 +19,9 @@
 #include <sys/queue.h>
 
 /* Process Lists */
-struct proc_list proc_runnablelist = TAILQ_HEAD_INITIALIZER(proc_runnablelist);
-spinlock_t runnablelist_lock = SPINLOCK_INITIALIZER;
+struct proc_list runnable_scps = TAILQ_HEAD_INITIALIZER(runnable_scps);
+struct proc_list all_mcps = TAILQ_HEAD_INITIALIZER(all_mcps);
+spinlock_t sched_lock = SPINLOCK_INITIALIZER;
 
 // This could be useful for making scheduling decisions.  
 /* Physical coremap: each index is a physical core id, with a proc ptr for
@@ -37,7 +38,8 @@ uint32_t num_mgmtcores = 1;
 
 void schedule_init(void)
 {
-	TAILQ_INIT(&proc_runnablelist);
+	TAILQ_INIT(&runnable_scps);
+	TAILQ_INIT(&all_mcps);
 
 	/* Ghetto old idle core init */
 	/* Init idle cores. Core 0 is the management core. */
@@ -84,69 +86,75 @@ void schedule_init(void)
 	return;
 }
 
-void schedule_proc(struct proc *p)
+/* _S procs are scheduled like in traditional systems */
+void schedule_scp(struct proc *p)
 {
 	/* up the refcnt since we are storing the reference */
 	proc_incref(p, 1);
-	spin_lock_irqsave(&runnablelist_lock);
+	spin_lock(&sched_lock);
 	printd("Scheduling PID: %d\n", p->pid);
-	TAILQ_INSERT_TAIL(&proc_runnablelist, p, proc_link);
-	spin_unlock_irqsave(&runnablelist_lock);
-	return;
+	TAILQ_INSERT_TAIL(&runnable_scps, p, proc_link);
+	spin_unlock(&sched_lock);
+}
+
+/* important to only call this on RUNNING_S, for now */
+void register_mcp(struct proc *p)
+{
+	proc_incref(p, 1);
+	spin_lock(&sched_lock);
+	TAILQ_INSERT_TAIL(&all_mcps, p, proc_link);
+	spin_unlock(&sched_lock);
+	//poke_ksched(p, RES_CORES);
 }
 
 /* Something has changed, and for whatever reason the scheduler should
- * reevaluate things.  Currently, this assumes the calling core is free (since
- * an _S can be proc_run()'d), and it only attempts to run one process at a time
- * (which will suck, longer term, since the manager will just spin this func).
+ * reevaluate things. 
  *
- * Using irqsave spinlocks for now, since this could be called from a timer
- * interrupt handler (though ought to be in a bottom half or something).
- * 	- TODO: the functions we call aren't irqsafe (proc_run, for instance), so
- * 	we'll have to not call this directly from interrupt context.
- */
+ * Don't call this from interrupt context (grabs proclocks). */
 void schedule(void)
 {
-	struct proc *p;
-	
-	spin_lock_irqsave(&runnablelist_lock);
-	/* TODO at the very least, we should do a TAILQ_FOREACH_SAFE, trying to sort
-	 * out everyone, but with the highest priority one first (want a priority
-	 * queue or something), so people don't have to loop calling schedule().
-	 *
-	 * Also, we don't want a 'runnable list'.  that's so _S. */
-	p = TAILQ_FIRST(&proc_runnablelist);
-	if (p) {
-		TAILQ_REMOVE(&proc_runnablelist, p, proc_link);
-		spin_unlock_irqsave(&runnablelist_lock);
-		/* TODO: consider the process's state, or push that into
-		 * give_cores/core_request */
-		/* lockless reference check, safe since we hold a ref and it's dying.
-		 * Note that a process can still be killed right after we do this
-		 * check, but give_cores and proc_run can handle that race. */
+	struct proc *p, *temp;
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	spin_lock(&sched_lock);
+	/* trivially try to handle the needs of all our MCPS.  smarter schedulers
+	 * would do something other than FCFS */
+	TAILQ_FOREACH_SAFE(p, &all_mcps, proc_link, temp) {
+		printd("Ksched has MCP %08p (%d)\n", p, p->pid);
+		/* If they are dying, abort.  There's a bit of a race here.  If they
+		 * start dying right after the check, core_request/give_cores would
+		 * start dealing with a DYING proc.  The code can handle it, but this
+		 * will probably change. */
 		if (p->state == PROC_DYING) {
+			TAILQ_REMOVE(&all_mcps, p, proc_link);
 			proc_decref(p);
-			return;
+			continue;
 		}
-		/* TODO: ^^^^^ this is shit i'd like to hide from pluggable kscheds */
-		printd("PID of proc i'm running: %d\n", p->pid);
-		/* We can safely read is_mcp without locking (i think). */
-		if (__proc_is_mcp(p)) {
-			/* _Ms need to get some cores, which will call proc_run() internally
-			 * (for now) */
-			/* TODO: this interface sucks, change it */
-			if (!core_request(p))
-				schedule_proc(p);	/* can't run, put it back on the queue */
-		} else {
-			/* _S proc, just run it */
-			proc_run_s(p);
-		}
-		/* decref the ref from the TAILQ */
-		proc_decref(p);
-	} else {
-		spin_unlock_irqsave(&runnablelist_lock);
+		if (!num_idlecores)
+			break;
+		/* TODO: might use amt_wanted as a proxy.  right now, they have
+		 * amt_wanted == 1, even though they are waiting.
+		 * TODO: this is RACY too - just like with DYING. */
+		if (p->state == PROC_WAITING)
+			continue;
+		core_request(p);
 	}
-	return;
+	/* prune any dying SCPs at the head of the queue and maybe sched our core */
+	while ((p = TAILQ_FIRST(&runnable_scps))) {
+		if (p->state == PROC_DYING) {
+			TAILQ_REMOVE(&runnable_scps, p, proc_link);
+			proc_decref(p);
+		} else {
+			/* check our core to see if we can give it out to an SCP */
+			if (!pcpui->owning_proc) {
+				TAILQ_REMOVE(&runnable_scps, p, proc_link);
+				printd("PID of the SCP i'm running: %d\n", p->pid);
+				proc_run_s(p);	/* gives it core we're running on */
+				proc_decref(p);
+			}
+			break;
+		}
+	}
+	spin_unlock(&sched_lock);
 }
 
 /* A process is asking the ksched to look at its resource desires.  The
@@ -214,9 +222,10 @@ uint32_t proc_wants_cores(struct proc *p, uint32_t *pc_arr, uint32_t amt_new)
 void sched_diag(void)
 {
 	struct proc *p;
-	/* just print the runnables for now */
-	TAILQ_FOREACH(p, &proc_runnablelist, proc_link)
-		printk("PID: %d\n", p->pid);
+	TAILQ_FOREACH(p, &runnable_scps, proc_link)
+		printk("_S PID: %d\n", p->pid);
+	TAILQ_FOREACH(p, &all_mcps, proc_link)
+		printk("MCP PID: %d\n", p->pid);
 	return;
 }
 

@@ -301,7 +301,7 @@ int mon_bin_run(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 
 	spin_lock(&p->proc_lock);
 	__proc_set_state(p, PROC_RUNNABLE_S);
-	schedule_proc(p);
+	schedule_scp(p);
 	spin_unlock(&p->proc_lock);
 	proc_decref(p); /* let go of the reference created in proc_create() */
 	kref_put(&program->f_kref);

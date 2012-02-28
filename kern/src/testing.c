@@ -1035,7 +1035,7 @@ void test_ucq(void)
 	struct proc *p = proc_create(program, 0, p_envp);
 	spin_lock(&p->proc_lock);
 	__proc_set_state(p, PROC_RUNNABLE_S);
-	schedule_proc(p);
+	schedule_scp(p);
 	spin_unlock(&p->proc_lock);
 	/* instead of getting rid of the reference created in proc_create, we'll put
 	 * it in the awaiter */

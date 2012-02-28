@@ -536,6 +536,7 @@ void __proc_run_m(struct proc *p)
 			 *   it may not get the message for a while... */
 			return;
 		case (PROC_RUNNING_M):
+		case (PROC_WAITING):
 			return;
 		default:
 			/* unlock just so the monitor can call something that might lock*/
@@ -823,7 +824,7 @@ void __proc_yield_s(struct proc *p, struct trapframe *tf)
 	env_push_ancillary_state(p);			/* TODO: (HSS) */
 	__unmap_vcore(p, 0);	/* VC# keep in sync with proc_run_s */
 	__proc_set_state(p, PROC_RUNNABLE_S);
-	schedule_proc(p);
+	schedule_scp(p);
 }
 
 /* Yields the calling core.  Must be called locally (not async) for now.
@@ -998,11 +999,13 @@ void __proc_wakeup(struct proc *p)
 {
 	if (p->state != PROC_WAITING)
 		return;
-	if (__proc_is_mcp(p))
+	if (__proc_is_mcp(p)) {
+		/* TODO: adjust amt_wanted here, instead of in yield */
 		__proc_set_state(p, PROC_RUNNABLE_M);
-	else
+	} else {
 		__proc_set_state(p, PROC_RUNNABLE_S);
-	schedule_proc(p);
+		schedule_scp(p);
+	}
 }
 
 /* Is the process in multi_mode / is an MCP or not?  */
@@ -1107,7 +1110,6 @@ void proc_preempt_core(struct proc *p, uint32_t pcoreid, uint64_t usec)
 	}
 	if (!p->procinfo->num_vcores) {
 		__proc_set_state(p, PROC_RUNNABLE_M);
-		schedule_proc(p);
 	}
 	spin_unlock(&p->proc_lock);
 }
@@ -1129,7 +1131,6 @@ void proc_preempt_all(struct proc *p, uint64_t usec)
 	__proc_preempt_all(p);
 	assert(!p->procinfo->num_vcores);
 	__proc_set_state(p, PROC_RUNNABLE_M);
-	schedule_proc(p);
 	spin_unlock(&p->proc_lock);
 }
 
@@ -1268,7 +1269,8 @@ void __proc_give_cores(struct proc *p, uint32_t *pc_arr, uint32_t num)
 			panic("Don't give cores to a process in a *_S state!\n");
 			break;
 		case (PROC_DYING):
-			/* We're dying, give the cores back to the ksched and return */
+		case (PROC_WAITING):
+			/* can't accept, give the cores back to the ksched and return */
 			for (int i = 0; i < num; i++)
 				put_idle_core(pc_arr[i]);
 			return;

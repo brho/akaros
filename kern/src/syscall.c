@@ -324,7 +324,7 @@ static error_t sys_proc_run(struct proc *p, unsigned pid)
 		retval = -EINVAL;
 	} else {
 		__proc_set_state(target, PROC_RUNNABLE_S);
-		schedule_proc(target);
+		schedule_scp(target);
 	}
 	spin_unlock(&p->proc_lock);
 	proc_decref(target);
@@ -447,7 +447,7 @@ static ssize_t sys_fork(env_t* e)
 	clone_files(&e->open_files, &env->open_files);
 	__proc_ready(env);
 	__proc_set_state(env, PROC_RUNNABLE_S);
-	schedule_proc(env);
+	schedule_scp(env);
 
 	// don't decref the new process.
 	// that will happen when the parent waits for it.
@@ -549,7 +549,7 @@ success:
 	spin_lock(&p->proc_lock);
 	__unmap_vcore(p, 0);	/* VC# keep in sync with proc_run_s */
 	__proc_set_state(p, PROC_RUNNABLE_S);
-	schedule_proc(p);
+	schedule_scp(p);
 	spin_unlock(&p->proc_lock);
 all_out:
 	/* we can't return, since we'd write retvals to the old location of the
