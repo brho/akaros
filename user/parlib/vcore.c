@@ -246,7 +246,8 @@ handle_it:
 	return 0;
 }
 
-/* This can return, if you failed to yield due to a concurrent event. */
+/* This can return, if you failed to yield due to a concurrent event.
+ * TODO: consider decreasing the amt_wanted, perhaps in the calling code. */
 void vcore_yield(bool preempt_pending)
 {
 	uint32_t vcoreid = vcore_id();

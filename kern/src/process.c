@@ -834,9 +834,6 @@ void __proc_yield_s(struct proc *p, struct trapframe *tf)
  * - If you have only one vcore, you switch to RUNNABLE_M.  When you run again,
  *   you'll have one guaranteed core, starting from the entry point.
  *
- * - RES_CORES amt_wanted will be the amount running after taking away the
- *   yielder, unless there are none left, in which case it will be 1.
- *
  * If the call is being nice, it means that it is in response to a preemption
  * (which needs to be checked).  If there is no preemption pending, just return.
  * No matter what, don't adjust the number of cores wanted.
@@ -937,15 +934,12 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 	__unmap_vcore(p, vcoreid);
 	/* Adjust implied resource desires */
 	p->resources[RES_CORES].amt_granted = --(p->procinfo->num_vcores);
-	if (!being_nice)
-		p->resources[RES_CORES].amt_wanted = p->procinfo->num_vcores;
 	__seq_end_write(&p->procinfo->coremap_seqctr);
 	/* Hand the now-idle core to the ksched */
 	put_idle_core(pcoreid);
-	// last vcore?  then we really want 1, and to yield the gang
+	/* No more vcores?  Then we wait on an event */
 	if (p->procinfo->num_vcores == 0) {
-		p->resources[RES_CORES].amt_wanted = 1;
-		/* wait on an event (not supporting 'being nice' for now */
+		/* consider a ksched op to tell it about us WAITING */
 		__proc_set_state(p, PROC_WAITING);
 	}
 	goto out_yield_core;
@@ -1000,9 +994,13 @@ void __proc_wakeup(struct proc *p)
 	if (p->state != PROC_WAITING)
 		return;
 	if (__proc_is_mcp(p)) {
-		/* TODO: adjust amt_wanted here, instead of in yield */
+		/* Need to make sure they want at least 1 vcore, so the ksched gives
+		 * them something.  Might do this via short handler later. */
+		if (!p->resources[RES_CORES].amt_wanted)
+			p->resources[RES_CORES].amt_wanted = 1;
 		__proc_set_state(p, PROC_RUNNABLE_M);
 	} else {
+		printk("[kernel] FYI, waking up an _S proc\n");
 		__proc_set_state(p, PROC_RUNNABLE_S);
 		schedule_scp(p);
 	}
