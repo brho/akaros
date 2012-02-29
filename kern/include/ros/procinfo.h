@@ -5,6 +5,7 @@
 
 #include <ros/memlayout.h>
 #include <ros/common.h>
+#include <ros/resource.h>
 #include <ros/atomic.h>
 #include <ros/arch/arch.h>
 
@@ -48,6 +49,7 @@ typedef struct procinfo {
 	/* glibc relies on stuff above this point.  if you change it, you need to
 	 * rebuild glibc. */
 	bool is_mcp;			/* is in multi mode */
+	unsigned long 		res_grant[MAX_NUM_RESOURCES];
 	struct vcore		vcoremap[MAX_NUM_CPUS];
 	uint32_t			num_vcores;
 	struct pcore		pcoremap[MAX_NUM_CPUS];

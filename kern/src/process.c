@@ -192,6 +192,7 @@ static void proc_init_procinfo(struct proc* p)
 	/* 0'ing the arguments.  Some higher function will need to set them */
 	memset(p->procinfo->argp, 0, sizeof(p->procinfo->argp));
 	memset(p->procinfo->argbuf, 0, sizeof(p->procinfo->argbuf));
+	memset(p->procinfo->res_grant, 0, sizeof(p->procinfo->res_grant));
 	/* 0'ing the vcore/pcore map.  Will link the vcores later. */
 	memset(&p->procinfo->vcoremap, 0, sizeof(p->procinfo->vcoremap));
 	memset(&p->procinfo->pcoremap, 0, sizeof(p->procinfo->pcoremap));
@@ -248,7 +249,6 @@ error_t proc_alloc(struct proc **pp, struct proc *parent)
 	p->env_flags = 0;
 	p->env_entry = 0; // cheating.  this really gets set later
 	p->heap_top = (void*)UTEXT;	/* heap_bottom set in proc_init_procinfo */
-	memset(&p->resources, 0, sizeof(p->resources));
 	memset(&p->env_ancillary_state, 0, sizeof(p->env_ancillary_state));
 	memset(&p->env_tf, 0, sizeof(p->env_tf));
 	spinlock_init(&p->mm_lock);
@@ -932,8 +932,8 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 	/* Next time the vcore starts, it starts fresh */
 	vcpd->notif_disabled = FALSE;
 	__unmap_vcore(p, vcoreid);
-	/* Adjust implied resource desires */
-	p->resources[RES_CORES].amt_granted = --(p->procinfo->num_vcores);
+	p->procinfo->num_vcores--;
+	p->procinfo->res_grant[RES_CORES] = p->procinfo->num_vcores;
 	__seq_end_write(&p->procinfo->coremap_seqctr);
 	/* Hand the now-idle core to the ksched */
 	put_idle_core(pcoreid);
@@ -996,8 +996,8 @@ void __proc_wakeup(struct proc *p)
 	if (__proc_is_mcp(p)) {
 		/* Need to make sure they want at least 1 vcore, so the ksched gives
 		 * them something.  Might do this via short handler later. */
-		if (!p->resources[RES_CORES].amt_wanted)
-			p->resources[RES_CORES].amt_wanted = 1;
+		if (!p->procdata->res_req[RES_CORES].amt_wanted)
+			p->procdata->res_req[RES_CORES].amt_wanted = 1;
 		__proc_set_state(p, PROC_RUNNABLE_M);
 	} else {
 		printk("[kernel] FYI, waking up an _S proc\n");
@@ -1282,7 +1282,8 @@ void __proc_give_cores(struct proc *p, uint32_t *pc_arr, uint32_t num)
 			panic("Weird state(%s) in %s()", procstate2str(p->state),
 			      __FUNCTION__);
 	}
-	p->resources[RES_CORES].amt_granted += num;
+	/* TODO: move me to the ksched */
+	p->procinfo->res_grant[RES_CORES] += num;
 }
 
 /********** Core revocation (bulk and single) ***********/
@@ -1354,7 +1355,7 @@ void __proc_take_corelist(struct proc *p, uint32_t *pc_arr, uint32_t num,
 	}
 	p->procinfo->num_vcores -= num;
 	__seq_end_write(&p->procinfo->coremap_seqctr);
-	p->resources[RES_CORES].amt_granted -= num;
+	p->procinfo->res_grant[RES_CORES] -= num;
 }
 
 /* Takes all cores from a process (revoke via kmsg or unmap), putting them on
@@ -1393,7 +1394,7 @@ uint32_t __proc_take_allcores(struct proc *p, uint32_t *pc_arr, bool preempt)
 	assert(num == p->procinfo->num_vcores);
 	p->procinfo->num_vcores = 0;
 	__seq_end_write(&p->procinfo->coremap_seqctr);
-	p->resources[RES_CORES].amt_granted = 0;
+	p->procinfo->res_grant[RES_CORES] = 0;
 	return num;
 }
 
@@ -1874,7 +1875,7 @@ void print_proc_info(pid_t pid)
 	printk("Resources:\n------------------------\n");
 	for (int i = 0; i < MAX_NUM_RESOURCES; i++)
 		printk("\tRes type: %02d, amt wanted: %08d, amt granted: %08d\n", i,
-		       p->resources[i].amt_wanted, p->resources[i].amt_granted);
+		       p->procdata->res_req[i].amt_wanted, p->procinfo->res_grant[i]);
 	printk("Open Files:\n");
 	struct files_struct *files = &p->open_files;
 	spin_lock(&files->lock);

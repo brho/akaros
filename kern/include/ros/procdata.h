@@ -25,6 +25,7 @@ typedef struct procdata {
 #endif
 	/* glibc relies on stuff above this point.  if you change it, you need to
 	 * rebuild glibc. */
+	struct resource_req		res_req[MAX_NUM_RESOURCES];
 	struct event_queue		*kernel_evts[MAX_NR_EVENT];
 	/* Long range, would like these to be mapped in lazily, as the vcores are
 	 * requested.  Sharing MAX_NUM_CPUS is a bit weird too. */

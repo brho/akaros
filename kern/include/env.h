@@ -47,9 +47,6 @@ struct proc {
 	uint8_t* cache_colors_map;
 	size_t next_cache_color;
 
-	/* Info about this process's resources (granted, desired) for each type. */
-	struct resource resources[MAX_NUM_RESOURCES];
-
 	/* Keeps track of this process's current memory allocation 
      * (i.e. its heap pointer) */
 	void* heap_top;

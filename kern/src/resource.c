@@ -41,17 +41,17 @@ bool core_request(struct proc *p)
 	 * esp with moving amt_wanted to procdata (TODO).  Will probably want to
 	 * copy-in amt_wanted too. */
 	spin_lock(&p->proc_lock);
-	amt_wanted = p->resources[RES_CORES].amt_wanted;
-	amt_granted = p->resources[RES_CORES].amt_granted;	/* aka, num_vcores */
+	amt_wanted = p->procdata->res_req[RES_CORES].amt_wanted;
+	amt_granted = p->procinfo->res_grant[RES_CORES];
 
 	/* Help them out - if they ask for something impossible, give them 1 so they
-	 * can make some progress. */
+	 * can make some progress. (these two are racy). */
 	if (amt_wanted > p->procinfo->max_vcores) {
-		p->resources[RES_CORES].amt_wanted = 1;
+		p->procdata->res_req[RES_CORES].amt_wanted = 1;
 	}
 	/* TODO: sort how this works with WAITING. */
 	if (!amt_wanted) {
-		p->resources[RES_CORES].amt_wanted = 1;
+		p->procdata->res_req[RES_CORES].amt_wanted = 1;
 	}
 	/* if they are satisfied, we're done.  There's a slight chance they have
 	 * cores, but they aren't running (sched gave them cores while they were
@@ -103,10 +103,9 @@ error_t resource_req(struct proc *p, int type, size_t amt_wanted,
 
 	/* set the desired resource amount in the process's resource list. */
 	spin_lock(&p->proc_lock);
-	size_t old_amount = p->resources[type].amt_wanted;
-	p->resources[type].amt_wanted = amt_wanted;
-	p->resources[type].amt_wanted_min = MIN(amt_wanted_min, amt_wanted);
-	p->resources[type].flags = flags;
+	p->procdata->res_req[type].amt_wanted = amt_wanted;
+	p->procdata->res_req[type].amt_wanted_min = MIN(amt_wanted_min, amt_wanted);
+	p->procdata->res_req[type].flags = flags;
 	spin_unlock(&p->proc_lock);
 
 	switch (type) {
@@ -146,7 +145,7 @@ void print_resources(struct proc *p)
 	printk("--------------------\n");
 	for (int i = 0; i < MAX_NUM_RESOURCES; i++)
 		printk("Res type: %02d, amt wanted: %08d, amt granted: %08d\n", i,
-		       p->resources[i].amt_wanted, p->resources[i].amt_granted);
+		       p->procdata->res_req[i].amt_wanted, p->procinfo->res_grant[i]);
 }
 
 void print_all_resources(void)

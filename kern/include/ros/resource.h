@@ -45,12 +45,10 @@
 #define REQ_ASYNC			0x01 // Sync by default (?)
 #define REQ_SOFT			0x02 // just making something up
 
-struct resource {
-	int type;
-	size_t amt_wanted;
-	size_t amt_wanted_min;
-	size_t amt_granted;
-	uint32_t flags;
+struct resource_req {
+	unsigned long				amt_wanted;
+	unsigned long				amt_wanted_min;
+	int							flags;
 };
 
 #endif // !ROS_INCLUDE_RESOURCE_H
