@@ -167,6 +167,22 @@ vcore_init_fail:
  * the number of cores actually granted (though some parts of the kernel do
  * internally).
  *
+ * This tries to get "more vcores", based on the number we currently have.
+ * We'll probably need smarter 2LSs in the future that just directly set
+ * amt_wanted.  What happens is we can have a bunch of 2LS vcore contexts
+ * trying to get "another vcore", which currently means more than num_vcores().
+ * If you have someone ask for two more, and then someone else ask for one more,
+ * how many you ultimately ask for depends on if the kernel heard you and
+ * adjusted num_vcores in between the two calls.  Or maybe your amt_wanted
+ * already was num_vcores + 5, so neither call is telling the kernel anything
+ * new.  It comes down to "one more than I have" vs "one more than I've already
+ * asked for".
+ *
+ * So for now, this will keep the older behavior (one more than I have).  It
+ * will try to accumulate any concurrent requests, and adjust amt_wanted up.
+ * Interleaving, repetitive calls (everyone asking for one more) may get
+ * ignored.
+ *
  * Note the doesn't block or anything (despite the min number requested is
  * 1), since the kernel won't block the call.
  *
@@ -209,12 +225,14 @@ try_handle_it:
 		/* We got a 1 back, so someone else is already working on it */
 		return 0;
 	}
-handle_it:
-	/* So now we're the ones supposed to handle things.  Figure out how many we
-	 * have, though this is racy.  Yields/preempts/grants will change this over
-	 * time, and we may end up asking for less than we had. */
+	/* So now we're the ones supposed to handle things.  This does things in the
+	 * "increment based on the number we have", vs "increment on the number we
+	 * said we want".
+	 *
+	 * Figure out how many we have, though this is racy.  Yields/preempts/grants
+	 * will change this over time, and we may end up asking for less than we
+	 * had. */
 	nr_vcores_wanted = num_vcores();
-	cmb();	/* force a reread of num_vcores() later */
 	/* Pull all of the vcores wanted into our local variable, where we'll deal
 	 * with prepping/requesting that many vcores.  Keep doing this til we think
 	 * no more are wanted. */
@@ -223,7 +241,7 @@ handle_it:
 		/* Don't bother prepping or asking for more than we can ever get */
 		nr_vcores_wanted = MIN(nr_vcores_wanted, max_vcores());
 		/* Make sure all we might ask for are prepped */
-		for(long i = _max_vcores_ever_wanted; i < nr_vcores_wanted; i++) {
+		for (long i = _max_vcores_ever_wanted; i < nr_vcores_wanted; i++) {
 			if (allocate_transition_stack(i) || allocate_transition_tls(i)) {
 				atomic_set(&vc_req_being_handled, 0);	/* unlock and bail out*/
 				return -1;
@@ -231,23 +249,31 @@ handle_it:
 			_max_vcores_ever_wanted++;	/* done in the loop to handle failures*/
 		}
 	}
-	/* Got all the ones we can get, let's submit it to the kernel.  We check
-	 * against num_vcores() one last time, though we still have some races... */
-	if (nr_vcores_wanted > num_vcores()) {
-		sys_resource_req(RES_CORES, nr_vcores_wanted, 1, 0);
-		cmb();	/* force a reread of num_vcores() at handle_it: */
-		goto handle_it;
+	cmb();	/* force a reread of num_vcores() */
+	/* Update amt_wanted if we now want *more* than what the kernel already
+	 * knows.  See notes in the func doc. */
+	if (nr_vcores_wanted > __procdata.res_req[RES_CORES].amt_wanted) {
+		__procdata.res_req[RES_CORES].amt_wanted = nr_vcores_wanted;
+		__procdata.res_req[RES_CORES].amt_wanted_min = 1;	/* whatever */
 	}
-	/* Here, we believe there are none left to do */
+	/* If num_vcores isn't what we want, we can poke the ksched.  Due to some
+	 * races with yield, our desires may be old.  Not a big deal; any vcores
+	 * that pop up will just end up yielding (or get preempt messages.)  */
+	if (nr_vcores_wanted > num_vcores()) {
+		/* res_req just transitions to MCP or pokes the ksched now */
+		sys_resource_req(RES_CORES, nr_vcores_wanted, 1, 0);
+	}
+	/* Unlock, (which lets someone else work), and check to see if more work
+	 * needs to be done.  If so, we'll make sure it gets handled. */
 	atomic_set(&vc_req_being_handled, 0);	/* unlock, to allow others to try */
-	/* Double check for any that might have come in while we were out */
+	wrmb();
+	/* check for any that might have come in while we were out */
 	if (atomic_read(&nr_new_vcores_wanted))
 		goto try_handle_it;
 	return 0;
 }
 
-/* This can return, if you failed to yield due to a concurrent event.
- * TODO: consider decreasing the amt_wanted, perhaps in the calling code. */
+/* This can return, if you failed to yield due to a concurrent event. */
 void vcore_yield(bool preempt_pending)
 {
 	uint32_t vcoreid = vcore_id();
@@ -266,6 +292,13 @@ void vcore_yield(bool preempt_pending)
 		vcpd->can_rcv_msg = TRUE;
 		return;
 	}
+	/* Tell the kernel we want one less vcore.  If yield fails (slight race), we
+	 * may end up having more vcores than amt_wanted for a while, and might lose
+	 * one later on (after a preempt/timeslicing) - the 2LS will have to notice
+	 * eventually if it actually needs more vcores (which it already needs to
+	 * do).  We need to atomically decrement, though I don't want the kernel's
+	 * data type here to be atomic_t (only userspace cares in this one case). */
+	__sync_fetch_and_sub(&__procdata.res_req[RES_CORES].amt_wanted, 1);
 	/* We can probably yield.  This may pop back up if notif_pending became set
 	 * by the kernel after we cleared it and we lost the race. */
 	sys_yield(preempt_pending);

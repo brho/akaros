@@ -101,13 +101,6 @@ error_t resource_req(struct proc *p, int type, size_t amt_wanted,
 		// We have no sense of time yet, or of half-filling requests
 		printk("[kernel] Async requests treated synchronously for now.\n");
 
-	/* set the desired resource amount in the process's resource list. */
-	spin_lock(&p->proc_lock);
-	p->procdata->res_req[type].amt_wanted = amt_wanted;
-	p->procdata->res_req[type].amt_wanted_min = MIN(amt_wanted_min, amt_wanted);
-	p->procdata->res_req[type].flags = flags;
-	spin_unlock(&p->proc_lock);
-
 	switch (type) {
 		case RES_CORES:
 			spin_lock(&p->proc_lock);
