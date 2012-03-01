@@ -166,6 +166,10 @@ void poke_ksched(struct proc *p, int res_type)
 	/* Consider races with core_req called from other pokes or schedule */
 	switch (res_type) {
 		case RES_CORES:
+			/* ignore core requests from non-mcps (note we have races if we ever
+			 * allow procs to switch back). */
+			if (!__proc_is_mcp(p))
+				break;
 			/* TODO: issues with whether or not they are RUNNING.  Need to
 			 * change core_request / give_cores. */
 			core_request(p);

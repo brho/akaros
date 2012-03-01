@@ -73,8 +73,8 @@ void proc_run_s(struct proc *p);
 void __proc_run_m(struct proc *p);
 void proc_restartcore(void);
 void proc_destroy(struct proc *SAFE p);
-void __proc_switch_to_m(struct proc *p);
-void __proc_switch_to_s(struct proc *p); /* don't call this */
+void __proc_change_to_m(struct proc *p);
+void __proc_change_to_s(struct proc *p); /* don't call this */
 void __proc_yield_s(struct proc *p, struct trapframe *tf);
 void proc_yield(struct proc *SAFE p, bool being_nice);
 void proc_notify(struct proc *p, uint32_t vcoreid);

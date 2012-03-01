@@ -37,9 +37,9 @@
 #define SYS_notify					25
 #define SYS_self_notify				26
 #define SYS_halt_core				27
-
-/* ARSC call init */
 #define SYS_init_arsc				28
+#define SYS_change_to_m				29
+#define SYS_poke_ksched				30
 
 /* Platform specific syscalls */
 #define SYS_serial_read				75

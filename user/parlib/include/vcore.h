@@ -52,6 +52,7 @@ static inline struct preempt_data *vcpd_of(uint32_t vcoreid);
 static inline bool preempt_is_pending(uint32_t vcoreid);
 static inline bool __preempt_is_pending(uint32_t vcoreid);
 int vcore_init(void);
+void vcore_change_to_m(void);
 int vcore_request(long nr_new_vcores);
 void vcore_yield(bool preempt_pending);
 bool clear_notif_pending(uint32_t vcoreid);

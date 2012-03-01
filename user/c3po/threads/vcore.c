@@ -98,8 +98,8 @@ void vcore_startup()
 	/* Jump into multi-core mode! */
 	/* The next line of code that will run is inside vcore_entry().  When this
 	 * thread is resumed, it will continue directly after this call to
-	 * vcore_request() */
-	vcore_request(1);
+	 * vcore_change_to_m() */
+	vcore_change_to_m();
 }
 
 /**

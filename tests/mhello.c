@@ -82,7 +82,6 @@ int main(int argc, char** argv)
 		printf("Hello from vcore %d with temp addr = %p and temp = %p\n",
 		       vcoreid, &temp, temp);
 		printf("Multi-Goodbye, world, from PID: %d!\n", sys_getpid());
-		//retval = sys_resource_req(RES_CORES, 2, 0);
 		printf("Requesting %d vcores\n", max_vcores() - 1);
 		retval = vcore_request(max_vcores() - 1); /* since we already have 1 */
 		//retval = vcore_request(5);

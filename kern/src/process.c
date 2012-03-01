@@ -706,7 +706,7 @@ void proc_destroy(struct proc *p)
 /* Turns *p into an MCP.  Needs to be called from a local syscall of a RUNNING_S
  * process.  Currently, this ignores whether or not you are an _M already.  You
  * should hold the lock before calling. */
-void __proc_switch_to_m(struct proc *p)
+void __proc_change_to_m(struct proc *p)
 {
 	int8_t state = 0;
 	switch (p->state) {
@@ -766,7 +766,7 @@ void __proc_switch_to_m(struct proc *p)
 
 /* Old code to turn a RUNNING_M to a RUNNING_S, with the calling context
  * becoming the new 'thread0'.  Don't use this. */
-void __proc_switch_to_s(struct proc *p)
+void __proc_change_to_s(struct proc *p)
 {
 	int8_t state = 0;
 	printk("[kernel] trying to transition _M -> _S (deprecated)!\n");

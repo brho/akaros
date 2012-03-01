@@ -731,6 +731,37 @@ static int sys_halt_core(struct proc *p, unsigned int usec)
 	return 0;
 }
 
+/* Changes a process into _M mode, or -EINVAL if it already is an mcp */
+static int sys_change_to_m(struct proc *p)
+{
+	int retval = 0;
+	spin_lock(&p->proc_lock);
+	if (!__proc_is_mcp(p)) {
+		/* Catch user bugs */
+		if (!p->procdata->res_req[RES_CORES].amt_wanted) {
+			printk("[kernel] process needs to specify amt_wanted\n");
+			p->procdata->res_req[RES_CORES].amt_wanted = 1;
+		}
+		__proc_change_to_m(p);
+		/* Tell the ksched about us */
+		register_mcp(p);
+	} else {
+		set_errno(EINVAL);
+		retval = -1;
+	}
+	spin_unlock(&p->proc_lock);
+	return retval;
+}
+
+/* Not sure what people will need.  For now, they can send in the resource they
+ * want.  Up to the ksched to support this, and other things (like -1 for all
+ * resources).  Might have this info go in via procdata instead. */
+static int sys_poke_ksched(struct proc *p, int res_type)
+{
+	poke_ksched(p, res_type);
+	return 0;
+}
+
 /************** Platform Specific Syscalls **************/
 
 //Read a buffer over the serial port
@@ -1347,6 +1378,8 @@ const static struct sys_table_entry syscall_table[] = {
 #ifdef __CONFIG_ARSC_SERVER__
 	[SYS_init_arsc] = {(syscall_t)sys_init_arsc, "init_arsc"},
 #endif
+	[SYS_change_to_m] = {(syscall_t)sys_change_to_m, "change_to_m"},
+	[SYS_poke_ksched] = {(syscall_t)sys_poke_ksched, "poke_ksched"},
 	[SYS_read] = {(syscall_t)sys_read, "read"},
 	[SYS_write] = {(syscall_t)sys_write, "write"},
 	[SYS_open] = {(syscall_t)sys_open, "open"},

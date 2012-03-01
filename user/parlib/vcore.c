@@ -163,6 +163,18 @@ vcore_init_fail:
 	return -1;
 }
 
+/* Helper, picks some sane defaults and changes the process into an MCP */
+void vcore_change_to_m(void)
+{
+	__procdata.res_req[RES_CORES].amt_wanted = 1;
+	__procdata.res_req[RES_CORES].amt_wanted_min = 1;	/* whatever */
+	assert(!in_multi_mode());
+	assert(!in_vcore_context());
+	assert(!sys_change_to_m());
+	assert(in_multi_mode());
+	assert(!in_vcore_context());
+}
+
 /* Returns -1 with errno set on error, or 0 on success.  This does not return
  * the number of cores actually granted (though some parts of the kernel do
  * internally).
@@ -252,17 +264,13 @@ try_handle_it:
 	cmb();	/* force a reread of num_vcores() */
 	/* Update amt_wanted if we now want *more* than what the kernel already
 	 * knows.  See notes in the func doc. */
-	if (nr_vcores_wanted > __procdata.res_req[RES_CORES].amt_wanted) {
+	if (nr_vcores_wanted > __procdata.res_req[RES_CORES].amt_wanted)
 		__procdata.res_req[RES_CORES].amt_wanted = nr_vcores_wanted;
-		__procdata.res_req[RES_CORES].amt_wanted_min = 1;	/* whatever */
-	}
 	/* If num_vcores isn't what we want, we can poke the ksched.  Due to some
 	 * races with yield, our desires may be old.  Not a big deal; any vcores
 	 * that pop up will just end up yielding (or get preempt messages.)  */
-	if (nr_vcores_wanted > num_vcores()) {
-		/* res_req just transitions to MCP or pokes the ksched now */
-		sys_resource_req(RES_CORES, nr_vcores_wanted, 1, 0);
-	}
+	if (nr_vcores_wanted > num_vcores())
+		sys_poke_ksched(RES_CORES);
 	/* Unlock, (which lets someone else work), and check to see if more work
 	 * needs to be done.  If so, we'll make sure it gets handled. */
 	atomic_set(&vc_req_being_handled, 0);	/* unlock, to allow others to try */

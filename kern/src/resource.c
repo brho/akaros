@@ -103,18 +103,7 @@ error_t resource_req(struct proc *p, int type, size_t amt_wanted,
 
 	switch (type) {
 		case RES_CORES:
-			spin_lock(&p->proc_lock);
-			if (p->state == PROC_RUNNING_S) {
-				__proc_switch_to_m(p);	/* will later be a separate syscall */
-				/* tell the ksched about us */
-				register_mcp(p);
-				spin_unlock(&p->proc_lock);
-			} else {
-				/* _M */
-				spin_unlock(&p->proc_lock);
-				poke_ksched(p, RES_CORES); /* will be a separate syscall */
-			}
-			return 0;
+			return -EFAIL;
 			break;
 		case RES_MEMORY:
 			// not clear if we should be in RUNNABLE_M or not

@@ -67,11 +67,7 @@ int uthread_lib_init(struct uthread *uthread)
 	printd("[user] registered %08p (flags %08p) for preempt messages\n",
 	       preempt_ev_q, preempt_ev_q->ev_flags);
 	/* Get ourselves into _M mode.  Could consider doing this elsewhere... */
-	while (!in_multi_mode()) {
-		vcore_request(1);
-		/* TODO: consider blocking */
-		cpu_relax();
-	}
+	vcore_change_to_m();
 	return 0;
 }
 
