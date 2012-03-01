@@ -24,7 +24,6 @@
 #include <syscall.h>
 #include <kmalloc.h>
 #include <stdio.h>
-#include <resource.h>
 #include <frontend.h>
 #include <colored_caches.h>
 #include <hashtable.h>
@@ -74,8 +73,8 @@ static void finish_sysc(struct syscall *sysc, struct proc *p)
 
 /* Helper that "finishes" the current async syscall.  This should be used when
  * we are calling a function in a syscall that might not return and won't be
- * able to use the normal syscall return path, such as proc_yield() and
- * resource_req().  Call this from within syscall.c (I don't want it global).
+ * able to use the normal syscall return path, such as proc_yield().  Call this
+ * from within syscall.c (I don't want it global).
  *
  * It is possible for another user thread to see the syscall being done early -
  * they just need to be careful with the weird proc management calls (as in,
@@ -639,16 +638,6 @@ static int sys_shared_page_free(env_t* p1, void*DANGEROUS addr, pid_t p2)
 	return -1;
 }
 
-
-static int sys_resource_req(struct proc *p, int type, unsigned int amt_wanted,
-                            unsigned int amt_wanted_min, int flags)
-{
-	/* resource_req returns and we'll eventually finish the sysc later.  The
-	 * original context may restart on a remote core before we return and
-	 * finish, but that's fine thanks to the async kernel interface. */
-	return resource_req(p, type, amt_wanted, amt_wanted_min, flags);
-}
-
 /* Untested.  Will notify the target on the given vcore, if the caller controls
  * the target.  Will honor the target's wanted/vcoreid.  u_ne can be NULL. */
 static int sys_notify(struct proc *p, int target_pid, unsigned int ev_type,
@@ -731,7 +720,10 @@ static int sys_halt_core(struct proc *p, unsigned int usec)
 	return 0;
 }
 
-/* Changes a process into _M mode, or -EINVAL if it already is an mcp */
+/* Changes a process into _M mode, or -EINVAL if it already is an mcp.
+ * __proc_change_to_m() returns and we'll eventually finish the sysc later.  The
+ * original context may restart on a remote core before we return and finish,
+ * but that's fine thanks to the async kernel interface. */
 static int sys_change_to_m(struct proc *p)
 {
 	int retval = 0;
@@ -1361,7 +1353,6 @@ const static struct sys_table_entry syscall_table[] = {
 	[SYS_mprotect] = {(syscall_t)sys_mprotect, "mprotect"},
 	[SYS_shared_page_alloc] = {(syscall_t)sys_shared_page_alloc, "pa"},
 	[SYS_shared_page_free] = {(syscall_t)sys_shared_page_free, "pf"},
-	[SYS_resource_req] = {(syscall_t)sys_resource_req, "resource_req"},
 	[SYS_notify] = {(syscall_t)sys_notify, "notify"},
 	[SYS_self_notify] = {(syscall_t)sys_self_notify, "self_notify"},
 	[SYS_halt_core] = {(syscall_t)sys_halt_core, "halt_core"},

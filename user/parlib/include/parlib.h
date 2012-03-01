@@ -14,7 +14,6 @@
 #include <ros/syscall.h>
 #include <ros/procinfo.h>
 #include <ros/procdata.h>
-#include <ros/resource.h>
 #include <stdint.h>
 #include <ros_debug.h>
 
@@ -40,7 +39,6 @@ int         sys_proc_run(int pid);
 ssize_t     sys_shared_page_alloc(void *COUNT(PGSIZE) *addr, pid_t p2, 
                                   int p1_flags, int p2_flags);
 ssize_t     sys_shared_page_free(void *COUNT(PGSIZE) addr, pid_t p2);
-ssize_t     sys_resource_req(int type, size_t amt_max, size_t amt_min, uint32_t flags);
 void        sys_reboot();
 int         gettimeofday(struct timeval* tp, void* tzp);
 void *COUNT(length) sys_mmap(void *SNT addr, size_t length, int prot, int flags,

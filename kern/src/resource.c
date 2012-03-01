@@ -91,35 +91,6 @@ bool core_request(struct proc *p)
 	return FALSE;		/* Not giving them anything more */
 }
 
-error_t resource_req(struct proc *p, int type, size_t amt_wanted,
-                     size_t amt_wanted_min, uint32_t flags)
-{
-	error_t retval;
-	printd("Received request for type: %d, amt_wanted: %d, amt_wanted_min: %d, "
-	       "flag: %d\n", type, amt_wanted, amt_wanted_min, flags);
-	if (flags & REQ_ASYNC)
-		// We have no sense of time yet, or of half-filling requests
-		printk("[kernel] Async requests treated synchronously for now.\n");
-
-	switch (type) {
-		case RES_CORES:
-			return -EFAIL;
-			break;
-		case RES_MEMORY:
-			// not clear if we should be in RUNNABLE_M or not
-			printk("[kernel] Memory requests are not implemented.\n");
-			return -EFAIL;
-			break;
-		case RES_APPLE_PIES:
-			printk("You can have all the apple pies you want.\n");
-			break;
-		default:
-			printk("[kernel] Unknown resource!  No oranges for you!\n");
-			return -EINVAL;
-	}
-	return 0;
-}
-
 void print_resources(struct proc *p)
 {
 	printk("--------------------\n");
