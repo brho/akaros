@@ -15,6 +15,7 @@
 #include <assert.h>
 #include <atomic.h>
 #include <smp.h>
+#include <manager.h>
 #include <sys/queue.h>
 
 /* Process Lists */
@@ -147,7 +148,7 @@ void schedule(void)
 			proc_decref(p);
 		} else {
 			/* check our core to see if we can give it out to an SCP */
-			if (!pcpui->owning_proc) {
+			if (management_core() && (!pcpui->owning_proc)) {
 				TAILQ_REMOVE(&runnable_scps, p, proc_link);
 				printd("PID of the SCP i'm running: %d\n", p->pid);
 				proc_run_s(p);	/* gives it core we're running on */
