@@ -26,7 +26,6 @@
 #include <kfs.h>
 #include <stdio.h>
 #include <time.h>
-#include <resource.h>
 #include <monitor.h>
 #include <colored_caches.h>
 #include <string.h>

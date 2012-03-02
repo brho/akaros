@@ -30,11 +30,10 @@ void put_idle_core(uint32_t coreid);
 /* How many vcores p will think it can have */
 uint32_t max_vcores(struct proc *p);
 
-/* P wants some cores.  Put them in pc_arr */
-uint32_t proc_wants_cores(struct proc *p, uint32_t *pc_arr, uint32_t amt_new);
-
 /* Debugging */
 void sched_diag(void);
 void print_idlecoremap(void);
+void print_resources(struct proc *p);
+void print_all_resources(void);
 
 #endif /* ROS_KERN_SCHEDULE_H */

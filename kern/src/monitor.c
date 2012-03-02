@@ -20,7 +20,6 @@
 #include <testing.h>
 #include <manager.h>
 #include <schedule.h>
-#include <resource.h>
 #include <kdebug.h>
 #include <syscall.h>
 #include <kmalloc.h>

@@ -25,7 +25,6 @@
 #include <sys/queue.h>
 #include <frontend.h>
 #include <monitor.h>
-#include <resource.h>
 #include <elf.h>
 #include <arsc_server.h>
 #include <devfs.h>
