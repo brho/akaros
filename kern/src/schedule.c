@@ -37,7 +37,7 @@ uint32_t num_idlecores = 0;
 uint32_t num_mgmtcores = 1;
 
 /* Helper, defined below */
-static bool core_request(struct proc *p);
+static void __core_request(struct proc *p);
 
 void schedule_init(void)
 {
@@ -139,7 +139,7 @@ void schedule(void)
 		 * TODO: this is RACY too - just like with DYING. */
 		if (p->state == PROC_WAITING)
 			continue;
-		core_request(p);
+		__core_request(p);
 	}
 	/* prune any dying SCPs at the head of the queue and maybe sched our core */
 	while ((p = TAILQ_FIRST(&runnable_scps))) {
@@ -166,20 +166,19 @@ void schedule(void)
 void poke_ksched(struct proc *p, int res_type)
 {
 	/* TODO: probably want something to trigger all res_types */
-	/* Consider races with core_req called from other pokes or schedule */
+	spin_lock(&sched_lock);
 	switch (res_type) {
 		case RES_CORES:
 			/* ignore core requests from non-mcps (note we have races if we ever
 			 * allow procs to switch back). */
 			if (!__proc_is_mcp(p))
 				break;
-			/* TODO: issues with whether or not they are RUNNING.  Need to
-			 * change core_request / give_cores. */
-			core_request(p);
+			__core_request(p);
 			break;
 		default:
 			break;
 	}
+	spin_unlock(&sched_lock);
 }
 
 /* Helper function to return a core to the idlemap.  It causes some more lock
@@ -228,39 +227,25 @@ static uint32_t get_idle_cores(struct proc *p, uint32_t *pc_arr,
 
 /* This deals with a request for more cores.  The request is already stored in
  * the proc's amt_wanted (it is compared to amt_granted). */
-static bool core_request(struct proc *p)
+static void __core_request(struct proc *p)
 {
 	uint32_t num_granted, amt_new, amt_wanted, amt_granted;
 	uint32_t corelist[MAX_NUM_CPUS]; /* TODO UGH, this could be huge! */
 
-	/* Currently, this is all locked, and there's a variety of races involved,
-	 * esp with moving amt_wanted to procdata (TODO).  Will probably want to
-	 * copy-in amt_wanted too. */
-	spin_lock(&p->proc_lock);
+	/* TODO: consider copy-in for amt_wanted too. */
 	amt_wanted = p->procdata->res_req[RES_CORES].amt_wanted;
 	amt_granted = p->procinfo->res_grant[RES_CORES];
 
 	/* Help them out - if they ask for something impossible, give them 1 so they
-	 * can make some progress. (these two are racy). */
+	 * can make some progress. (this is racy). */
 	if (amt_wanted > p->procinfo->max_vcores) {
-		p->procdata->res_req[RES_CORES].amt_wanted = 1;
-	}
-	/* TODO: sort how this works with WAITING. */
-	if (!amt_wanted) {
 		p->procdata->res_req[RES_CORES].amt_wanted = 1;
 	}
 	/* if they are satisfied, we're done.  There's a slight chance they have
 	 * cores, but they aren't running (sched gave them cores while they were
 	 * yielding, and now we see them on the run queue). */
-	if (amt_wanted <= amt_granted) {
-		if (amt_granted) {
-			spin_unlock(&p->proc_lock);
-			return TRUE;
-		} else {
-			spin_unlock(&p->proc_lock);
-			return FALSE;
-		}
-	}
+	if (amt_wanted <= amt_granted)
+		return;
 	/* otherwise, see what they want.  Current models are simple - it's just a
 	 * raw number of cores, and we just give out what we can. */
 	amt_new = amt_wanted - amt_granted;
@@ -274,6 +259,7 @@ static bool core_request(struct proc *p)
 	/* Now, actually give them out */
 	if (num_granted) {
 		/* give them the cores.  this will start up the extras if RUNNING_M. */
+		spin_lock(&p->proc_lock);
 		__proc_give_cores(p, corelist, num_granted);
 		/* at some point after giving cores, call proc_run_m() (harmless on
 		 * RUNNING_Ms).  You can give small groups of cores, then run them
@@ -281,10 +267,7 @@ static bool core_request(struct proc *p)
 		 * bulk preempted processes). */
 		__proc_run_m(p); /* harmless to call this on RUNNING_Ms */
 		spin_unlock(&p->proc_lock);
-		return TRUE;	/* proc can run (if it isn't already) */
 	}
-	spin_unlock(&p->proc_lock);
-	return FALSE;		/* Not giving them anything more */
 }
 
 /************** Debugging **************/
