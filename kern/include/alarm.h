@@ -31,6 +31,7 @@
  * If you want the HANDLER to run again, do this at the end of it:
  * 	set_awaiter_rel(waiter, USEC);
  * 	set_alarm(tchain, waiter);
+ * Don't forget to manage your memory at some (safe) point:
  * 	kfree(waiter);
  * In the future, we might have a slab for these.  You can get it from wherever
  * you want, just don't use the stack for handler style, since you'll usually
@@ -80,6 +81,7 @@ void init_awaiter(struct alarm_waiter *waiter,
 /* Sets the time an awaiter goes off */
 void set_awaiter_abs(struct alarm_waiter *waiter, uint64_t abs_time);
 void set_awaiter_rel(struct alarm_waiter *waiter, uint64_t usleep);
+void set_awaiter_inc(struct alarm_waiter *waiter, uint64_t usleep);
 /* Arms/disarms the alarm */
 void set_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter);
 void unset_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter);

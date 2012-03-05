@@ -75,6 +75,15 @@ void set_awaiter_rel(struct alarm_waiter *waiter, uint64_t usleep)
 	set_awaiter_abs(waiter, then);
 }
 
+/* Increment the timer that was already set, so that it goes off usleep usec
+ * from the previous tick.  This is different than 'rel' in that it doesn't care
+ * about when 'now' is. */
+void set_awaiter_inc(struct alarm_waiter *waiter, uint64_t usleep)
+{
+	assert(waiter->wake_up_time != ALARM_POISON_TIME);
+	waiter->wake_up_time += usec2tsc(usleep);
+}
+
 /* Helper, makes sure the interrupt is turned on at the right time.  Most of the
  * heavy lifting is in the timer-source specific function pointer. */
 static void reset_tchain_interrupt(struct timer_chain *tchain)
