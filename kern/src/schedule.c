@@ -16,6 +16,7 @@
 #include <atomic.h>
 #include <smp.h>
 #include <manager.h>
+#include <alarm.h>
 #include <sys/queue.h>
 
 /* Process Lists */
@@ -39,10 +40,49 @@ uint32_t num_mgmtcores = 1;
 /* Helper, defined below */
 static void __core_request(struct proc *p);
 
+/* Alarm struct, for our example 'timer tick' */
+struct alarm_waiter ksched_waiter;
+
+#define TIMER_TICK_USEC 10000 	/* 10msec */
+
+/* Helper: Sets up a timer tick on the calling core to go off 10 msec from now.
+ * This assumes the calling core is an LL core, etc. */
+static void set_ksched_alarm(void)
+{
+	set_awaiter_rel(&ksched_waiter, TIMER_TICK_USEC);
+	set_alarm(&per_cpu_info[core_id()].tchain, &ksched_waiter);
+}
+
+/* Kmsg, to run the scheduler tick (not in interrupt context) and reset the
+ * alarm.  Note that interrupts will be disabled, but this is not the same as
+ * interrupt context.  We're a routine kmsg, which means the core is in a
+ * quiescent state. */
+static void __ksched_tick(struct trapframe *tf, uint32_t srcid, long a0,
+                          long a1, long a2)
+{
+	/* TODO: imagine doing some accounting here */
+	schedule();
+	/* Set our alarm to go off, incrementing from our last tick (instead of
+	 * setting it relative to now, since some time has passed since the alarm
+	 * first went off.  Note, this may be now or in the past! */
+	set_awaiter_inc(&ksched_waiter, TIMER_TICK_USEC);
+	set_alarm(&per_cpu_info[core_id()].tchain, &ksched_waiter);
+}
+
+/* Interrupt/alarm handler: tells our core to run the scheduler (out of
+ * interrupt context). */
+static void __kalarm(struct alarm_waiter *waiter)
+{
+	send_kernel_message(core_id(), __ksched_tick, 0, 0, 0, KMSG_ROUTINE);
+}
+
 void schedule_init(void)
 {
 	TAILQ_INIT(&runnable_scps);
 	TAILQ_INIT(&all_mcps);
+	assert(!core_id());		/* want the alarm on core0 for now */
+	init_awaiter(&ksched_waiter, __kalarm);
+	set_ksched_alarm();
 
 	/* Ghetto old idle core init */
 	/* Init idle cores. Core 0 is the management core. */

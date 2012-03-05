@@ -124,7 +124,6 @@ void manager_brho(void)
 			monitor(0);
 		}
 		process_routine_kmsg(0);
-		schedule();
 		/* would like to idle here, but without reset stacks, people will run
 		 * off the kstack.  so just idle if we have an owning proc (which we
 		 * should then 'restart'). */
