@@ -201,25 +201,18 @@ uint32_t max_vcores(struct proc *p)
 #endif /* __CONFIG_DISABLE_SMT__ */
 }
 
-/* Ghetto helper, just hands out the next amt_new cores, or 0 if we can't do all
- * of them. */
+/* Ghetto helper, just hands out up to 'amt_new' cores (no sense of locality or
+ * anything) */
 static uint32_t get_idle_cores(struct proc *p, uint32_t *pc_arr,
                                uint32_t amt_new)
 {
-	uint32_t num_granted;
-	/* You should do something smarter than just giving the stuff out.  Like
-	 * take in to account priorities, node locations, etc */
+	uint32_t num_granted = 0;
 	spin_lock(&idle_lock);
-	if (num_idlecores >= amt_new) {
-		for (int i = 0; i < amt_new; i++) {
-			// grab the last one on the list
-			pc_arr[i] = idlecoremap[num_idlecores - 1];
-			num_idlecores--;
-		}
-		num_granted = amt_new;
-	} else {
-		/* In this case, you might want to preempt or do other fun things... */
-		num_granted = 0;
+	for (int i = 0; i < num_idlecores && i < amt_new; i++) {
+		/* grab the last one on the list */
+		pc_arr[i] = idlecoremap[num_idlecores - 1];
+		num_idlecores--;
+		num_granted++;
 	}
 	spin_unlock(&idle_lock);
 	return num_granted;
@@ -229,8 +222,8 @@ static uint32_t get_idle_cores(struct proc *p, uint32_t *pc_arr,
  * the proc's amt_wanted (it is compared to amt_granted). */
 static void __core_request(struct proc *p)
 {
-	uint32_t num_granted, amt_new, amt_wanted, amt_granted;
-	uint32_t corelist[MAX_NUM_CPUS]; /* TODO UGH, this could be huge! */
+	uint32_t num_granted, amt_wanted, amt_granted;
+	uint32_t corelist[num_cpus];
 
 	/* TODO: consider copy-in for amt_wanted too. */
 	amt_wanted = p->procdata->res_req[RES_CORES].amt_wanted;
@@ -246,16 +239,10 @@ static void __core_request(struct proc *p)
 	 * yielding, and now we see them on the run queue). */
 	if (amt_wanted <= amt_granted)
 		return;
-	/* otherwise, see what they want.  Current models are simple - it's just a
-	 * raw number of cores, and we just give out what we can. */
-	amt_new = amt_wanted - amt_granted;
-	/* TODO: Could also consider amt_min */
-
-	/* TODO: change this.  this function is really "find me amt_new cores", the
-	 * nature of this info depends on how we express desires, and a lot of that
-	 * info could be lost through this interface. */
-	num_granted = get_idle_cores(p, corelist, amt_new);
-
+	/* Otherwise, see what they want, and try to give out as many as possible.
+	 * Current models are simple - it's just a raw number of cores, and we just
+	 * give out what we can. */
+	num_granted = get_idle_cores(p, corelist, amt_wanted - amt_granted);
 	/* Now, actually give them out */
 	if (num_granted) {
 		/* give them the cores.  this will start up the extras if RUNNING_M. */
