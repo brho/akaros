@@ -312,6 +312,11 @@ static void set_current_tf(struct per_cpu_info *pcpui, struct trapframe *tf)
  * an interrupt_enable (sti)).  This was on the i7. */
 static void abort_halt(struct trapframe *tf)
 {
+	/* Don't care about user TFs.  Incidentally, dereferencing user EIPs is
+	 * reading userspace memory, which can be dangerous.  It can page fault,
+	 * like immediately after a fork (which doesn't populate the pages). */
+	if (!in_kernel(tf))
+		return;
 	/* the halt instruction in 32 bit is 0xf4, and it's size is 1 byte */
 	if (*(uint8_t*)tf->tf_eip == 0xf4)
 		tf->tf_eip += 1;
