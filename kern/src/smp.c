@@ -17,7 +17,7 @@
 #include <assert.h>
 #include <pmap.h>
 #include <process.h>
-#include <manager.h>
+#include <schedule.h>
 #include <trap.h>
 
 struct per_cpu_info per_cpu_info[MAX_NUM_CPUS];
@@ -39,16 +39,14 @@ static void try_run_proc(void)
 	}
 }
 
-/* All cores end up calling this whenever there is nothing left to do.  Non-zero
- * cores call it when they are done booting.  Other cases include after getting
- * a DEATH IPI.
- * - Management cores (core 0 for now) call manager, which should never return.
- * - Worker cores halt and wake up when interrupted, do any work on their work
- *   queue, then halt again.
- * TODO: think about unifying the manager into a workqueue function, so we don't
- * need to check mgmt_core in here.  it gets a little ugly, since there are
- * other places where we check for mgmt and might not smp_idle / call manager.
- */
+/* All cores end up calling this whenever there is nothing left to do or they
+ * don't know explicitly what to do.  Non-zero cores call it when they are done
+ * booting.  Other cases include after getting a DEATH IPI.
+ *
+ * All cores attempt to run the context of any owning proc.  Barring that, the
+ * cores enter a loop.  They halt and wake up when interrupted, do any work on
+ * their work queue, then halt again.  In between, the ksched gets a chance to
+ * tell it to do something else, or perhaps to halt in another manner. */
 static void __smp_idle(void)
 {
 	int8_t state = 0;
@@ -60,29 +58,17 @@ static void __smp_idle(void)
 	/* in the future, we may need to proactively leave process context here.
 	 * for now, it is possible to have a current loaded, even if we are idle
 	 * (and presumably about to execute a kmsg or fire up a vcore). */
-	if (!management_core()) {
-		while (1) {
-			disable_irq();
-			process_routine_kmsg(0);
-			try_run_proc();
-			/* cpu_halt() atomically turns on interrupts and halts the core.
-			 * Important to do this, since we could have a RKM come in via an
-			 * interrupt right while PRKM is returning, and we wouldn't catch
-			 * it. */
-			cpu_halt();
-			/* interrupts are back on now (given our current semantics) */
-		}
-	} else {
-		enable_irqsave(&state);
-		/* this makes us wait to enter the manager til any IO is done (totally
-		 * arbitrary 10ms), so we can handle the routine message that we
-		 * currently use to do the completion.  Note this also causes us to wait
-		 * 10ms regardless of how long the IO takes.  This all needs work. */
-		//udelay(10000); /* done in the manager for now */
+	while (1) {
+		disable_irq();
 		process_routine_kmsg(0);
 		try_run_proc();
-		disable_irqsave(&state);
-		manager();
+		cpu_bored();		/* call out to the ksched */
+		/* cpu_halt() atomically turns on interrupts and halts the core.
+		 * Important to do this, since we could have a RKM come in via an
+		 * interrupt right while PRKM is returning, and we wouldn't catch
+		 * it. */
+		cpu_halt();
+		/* interrupts are back on now (given our current semantics) */
 	}
 	assert(0);
 }

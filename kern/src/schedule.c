@@ -221,14 +221,51 @@ void poke_ksched(struct proc *p, int res_type)
 	spin_unlock(&sched_lock);
 }
 
+/* The calling cpu/core has nothing to do and plans to idle/halt.  This is an
+ * opportunity to pick the nature of that halting (low power state, etc), or
+ * provide some other work (_Ss on LL cores).  Note that interrupts are
+ * disabled, and if you return, the core will cpu_halt(). */
+void cpu_bored(void)
+{
+	if (!management_core())
+		return;
+	/* TODO: something smart.  For now, do what smp_idle did */
+	manager();
+	assert(0);
+	/* TODO run a process, and if none exist at all and we're core 0, bring up
+	 * the monitor/manager */
+}
+
 /* Helper function to return a core to the idlemap.  It causes some more lock
  * acquisitions (like in a for loop), but it's a little easier.  Plus, one day
- * we might be able to do this without locks (for the putting). */
+ * we might be able to do this without locks (for the putting).
+ *
+ * TODO: this is a trigger, telling us we have more cores.  Could/should make a
+ * scheduling decision (or at least plan to).  Note that right now, the proc's
+ * lock is still being held, so we can't do anything in this context. */
 void put_idle_core(uint32_t coreid)
 {
 	spin_lock(&idle_lock);
 	idlecoremap[num_idlecores++] = coreid;
 	spin_unlock(&idle_lock);
+}
+
+/* Bulk interface for put_idle */
+void put_idle_cores(uint32_t *pc_arr, uint32_t num)
+{
+	spin_lock(&idle_lock);
+	for (int i = 0; i < num; i++)
+		idlecoremap[num_idlecores++] = pc_arr[i];
+	spin_unlock(&idle_lock);
+}
+
+/* Available resources changed (plus or minus).  Some parts of the kernel may
+ * call this if a particular resource that is 'quantity-based' changes.  Things
+ * like available RAM to processes, bandwidth, etc.  Cores would probably be
+ * inappropriate, since we need to know which specific core is now free. */
+void avail_res_changed(int res_type, long change)
+{
+	printk("[kernel] ksched doesn't track any resources yet!\n");
 }
 
 /* Normally it'll be the max number of CG cores ever */
