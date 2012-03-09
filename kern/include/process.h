@@ -74,7 +74,6 @@ void __proc_run_m(struct proc *p);
 void proc_restartcore(void);
 void proc_destroy(struct proc *SAFE p);
 void __proc_change_to_m(struct proc *p);
-void __proc_change_to_s(struct proc *p); /* don't call this */
 void __proc_yield_s(struct proc *p, struct trapframe *tf);
 void proc_yield(struct proc *SAFE p, bool being_nice);
 void proc_notify(struct proc *p, uint32_t vcoreid);
@@ -107,8 +106,6 @@ void __proc_take_corelist(struct proc *p, uint32_t *pc_arr, uint32_t num,
                           bool preempt);
 /* Takes all cores, returns the count, fills in pc_arr with their pcoreid */
 uint32_t __proc_take_allcores(struct proc *p, uint32_t *pc_arr, bool preempt);
-/* Dumb legacy helper, til we fix the ksched a bit */
-void __proc_take_allcores_dumb(struct proc *p, bool preempt);
 
 /* Exposed for kern/src/resource.c for now */
 void __map_vcore(struct proc *p, uint32_t vcoreid, uint32_t pcoreid);
@@ -118,7 +115,7 @@ void __unmap_vcore(struct proc *p, uint32_t vcoreid);
 void __proc_preempt_warn(struct proc *p, uint32_t vcoreid, uint64_t when);
 void __proc_preempt_warnall(struct proc *p, uint64_t when);
 void __proc_preempt_core(struct proc *p, uint32_t pcoreid);
-void __proc_preempt_all(struct proc *p);
+uint32_t __proc_preempt_all(struct proc *p, uint32_t *pc_arr);
 void proc_preempt_core(struct proc *p, uint32_t pcoreid, uint64_t usec);
 void proc_preempt_all(struct proc *p, uint64_t usec);
 

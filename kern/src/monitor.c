@@ -602,18 +602,25 @@ int mon_measure(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 			}
 			begin = start_timing();
 			__proc_preempt_core(p, pcoreid);
+			if (!p->procinfo->num_vcores)
+				__proc_set_state(p, PROC_RUNNABLE_M);
 			spin_unlock(&p->proc_lock);
+			/* ghetto, since the ksched should be calling all of this */
+			put_idle_core(pcoreid);
 			/* done when unmapped (right before abandoning) */
 			spin_on(p->procinfo->pcoremap[pcoreid].valid);
 			diff = stop_timing(begin);
-			/* TODO: (RMS), if num_vcores == 0, RUNNABLE_M, schedule */
 		} else { /* preempt all cores, no warning or waiting */
 			spin_lock(&p->proc_lock);
+			uint32_t pc_arr[p->procinfo->num_vcores];
+			uint32_t num_revoked;
 			end_refcnt = kref_refcnt(&p->p_kref) - p->procinfo->num_vcores;
 			begin = start_timing();
-			__proc_preempt_all(p);
-			/* TODO: (RMS), RUNNABLE_M, schedule */
+			num_revoked = __proc_preempt_all(p, pc_arr);
+			__proc_set_state(p, PROC_RUNNABLE_M);
 			spin_unlock(&p->proc_lock);
+			if (num_revoked)
+				put_idle_cores(pc_arr, num_revoked);
 			/* a little ghetto, implies no one else is using p */
 			spin_on(kref_refcnt(&p->p_kref) != end_refcnt);
 			diff = stop_timing(begin);

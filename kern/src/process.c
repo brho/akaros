@@ -636,7 +636,10 @@ void proc_restartcore(void)
  * get __proc_free()d. */
 void proc_destroy(struct proc *p)
 {
+	uint32_t num_revoked = 0;
 	spin_lock(&p->proc_lock);
+	/* storage for pc_arr is alloced at decl, which is after grabbing the lock*/
+	uint32_t pc_arr[p->procinfo->num_vcores];
 	switch (p->state) {
 		case PROC_DYING: // someone else killed this already.
 			spin_unlock(&p->proc_lock);
@@ -644,7 +647,7 @@ void proc_destroy(struct proc *p)
 		case PROC_RUNNABLE_M:
 			/* Need to reclaim any cores this proc might have, even though it's
 			 * not running yet. */
-			__proc_take_allcores_dumb(p, FALSE);
+			num_revoked = __proc_take_allcores(p, pc_arr, FALSE);
 			// fallthrough
 		case PROC_RUNNABLE_S:
 			/* might need to pull from lists, though i'm currently a fan of the
@@ -668,18 +671,15 @@ void proc_destroy(struct proc *p)
 			// TODO: might need to sort num_vcores too later (VC#)
 			/* vcore is unmapped on the receive side */
 			__seq_end_write(&p->procinfo->coremap_seqctr);
-			#if 0
-			/* right now, RUNNING_S only runs on a mgmt core (0), not cores
-			 * managed by the idlecoremap.  so don't do this yet. */
-			put_idle_core(get_pcoreid(p, 0));
-			#endif
+			/* If we ever have RUNNING_S run on non-mgmt cores, we'll need to
+			 * tell the ksched about this now-idle core (after unlocking) */
 			break;
 		case PROC_RUNNING_M:
 			/* Send the DEATH message to every core running this process, and
 			 * deallocate the cores.
 			 * The rule is that the vcoremap is set before proc_run, and reset
 			 * within proc_destroy */
-			__proc_take_allcores_dumb(p, FALSE);
+			num_revoked = __proc_take_allcores(p, pc_arr, FALSE);
 			break;
 		case PROC_CREATED:
 			break;
@@ -699,6 +699,9 @@ void proc_destroy(struct proc *p)
 	 * on when you call proc_destroy locally, but currently aren't for all
 	 * things (like traphandlers). */
 	spin_unlock(&p->proc_lock);
+	/* Return the cores to the ksched */
+	if (num_revoked)
+		put_idle_cores(pc_arr, num_revoked);
 	return;
 }
 
@@ -764,10 +767,13 @@ void __proc_change_to_m(struct proc *p)
 }
 
 /* Old code to turn a RUNNING_M to a RUNNING_S, with the calling context
- * becoming the new 'thread0'.  Don't use this. */
-void __proc_change_to_s(struct proc *p)
+ * becoming the new 'thread0'.  Don't use this.  Caller needs to send in a
+ * pc_arr big enough for all vcores.  Will return the number of cores given up
+ * by the proc. */
+uint32_t __proc_change_to_s(struct proc *p, uint32_t *pc_arr)
 {
 	int8_t state = 0;
+	uint32_t num_revoked;
 	printk("[kernel] trying to transition _M -> _S (deprecated)!\n");
 	assert(p->state == PROC_RUNNING_M); // TODO: (ACR) async core req
 	/* save the context, to be restarted in _S mode */
@@ -778,10 +784,10 @@ void __proc_change_to_s(struct proc *p)
 	enable_irqsave(&state);
 	env_push_ancillary_state(p); // TODO: (HSS)
 	/* sending death, since it's not our job to save contexts or anything in
-	 * this case.  also, if this returns true, we will not return down
-	 * below, and need to eat the reference to p */
-	__proc_take_allcores_dumb(p, FALSE);
+	 * this case. */
+	num_revoked = __proc_take_allcores(p, pc_arr, FALSE);
 	__proc_set_state(p, PROC_RUNNABLE_S);
+	return num_revoked;
 }
 
 /* Helper function.  Is the given pcore a mapped vcore?  No locking involved, be
@@ -1074,7 +1080,7 @@ void __proc_preempt_core(struct proc *p, uint32_t pcoreid)
 
 /* Raw function to preempt every vcore.  If you care about locking, do it before
  * calling. */
-void __proc_preempt_all(struct proc *p)
+uint32_t __proc_preempt_all(struct proc *p, uint32_t *pc_arr)
 {
 	/* instead of doing this, we could just preempt_served all possible vcores,
 	 * and not just the active ones.  We would need to sort out a way to deal
@@ -1084,7 +1090,7 @@ void __proc_preempt_all(struct proc *p)
 	 * just make us RUNNABLE_M. */
 	TAILQ_FOREACH(vc_i, &p->online_vcs, list)
 		vc_i->preempt_served = TRUE;
-	__proc_take_allcores_dumb(p, TRUE);
+	return __proc_take_allcores(p, pc_arr, TRUE);
 }
 
 /* Warns and preempts a vcore from p.  No delaying / alarming, or anything.  The
@@ -1117,8 +1123,10 @@ void proc_preempt_core(struct proc *p, uint32_t pcoreid, uint64_t usec)
 void proc_preempt_all(struct proc *p, uint64_t usec)
 {
 	uint64_t warn_time = read_tsc() + usec2tsc(usec);
-
+	uint32_t num_revoked = 0;
 	spin_lock(&p->proc_lock);
+	/* storage for pc_arr is alloced at decl, which is after grabbing the lock*/
+	uint32_t pc_arr[p->procinfo->num_vcores];
 	/* DYING could be okay */
 	if (p->state != PROC_RUNNING_M) {
 		warn("Tried to preempt from a non RUNNING_M proc!");
@@ -1126,10 +1134,13 @@ void proc_preempt_all(struct proc *p, uint64_t usec)
 		return;
 	}
 	__proc_preempt_warnall(p, warn_time);
-	__proc_preempt_all(p);
+	num_revoked = __proc_preempt_all(p, pc_arr);
 	assert(!p->procinfo->num_vcores);
 	__proc_set_state(p, PROC_RUNNABLE_M);
 	spin_unlock(&p->proc_lock);
+	/* Return the cores to the ksched */
+	if (num_revoked)
+		put_idle_cores(pc_arr, num_revoked);
 }
 
 /* Give the specific pcore to proc p.  Lots of assumptions, so don't really use
@@ -1325,7 +1336,8 @@ static void __proc_unmap_allcores(struct proc *p)
  * pc_arr.  Will preempt if 'preempt' is set.  o/w, no state will be saved, etc.
  * Don't use this for taking all of a process's cores.
  *
- * Make sure you hold the lock when you call this. */
+ * Make sure you hold the lock when you call this, and make sure that the pcore
+ * actually belongs to the proc, non-trivial due to other __preempt messages. */
 void __proc_take_corelist(struct proc *p, uint32_t *pc_arr, uint32_t num,
                           bool preempt)
 {
@@ -1396,19 +1408,6 @@ uint32_t __proc_take_allcores(struct proc *p, uint32_t *pc_arr, bool preempt)
 	__seq_end_write(&p->procinfo->coremap_seqctr);
 	p->procinfo->res_grant[RES_CORES] = 0;
 	return num;
-}
-
-/* Dumb legacy helper, simply takes all cores and just puts them on the idle
- * core map (which belongs in the scheduler.
- *
- * TODO: no one should call this; the ksched should handle this internally */
-void __proc_take_allcores_dumb(struct proc *p, bool preempt)
-{
-	uint32_t num_revoked;
-	uint32_t pc_arr[p->procinfo->num_vcores];
-	num_revoked = __proc_take_allcores(p, pc_arr, preempt);
-	for (int i = 0; i < num_revoked; i++)
-		put_idle_core(pc_arr[i]);
 }
 
 /* Helper to do the vcore->pcore and inverse mapping.  Hold the lock when
