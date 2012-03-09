@@ -872,6 +872,7 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 	switch (p->state) {
 		case (PROC_RUNNING_S):
 			__proc_yield_s(p, current_tf);	/* current_tf 0'd in abandon core */
+			spin_unlock(&p->proc_lock);
 			goto out_yield_core;
 		case (PROC_RUNNING_M):
 			break;				/* will handle this stuff below */
@@ -941,13 +942,14 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 	p->procinfo->num_vcores--;
 	p->procinfo->res_grant[RES_CORES] = p->procinfo->num_vcores;
 	__seq_end_write(&p->procinfo->coremap_seqctr);
-	/* Hand the now-idle core to the ksched */
-	put_idle_core(pcoreid);
 	/* No more vcores?  Then we wait on an event */
 	if (p->procinfo->num_vcores == 0) {
 		/* consider a ksched op to tell it about us WAITING */
 		__proc_set_state(p, PROC_WAITING);
 	}
+	spin_unlock(&p->proc_lock);
+	/* Hand the now-idle core to the ksched */
+	put_idle_core(pcoreid);
 	goto out_yield_core;
 out_failed:
 	/* for some reason we just want to return, either to take a KMSG that cleans
@@ -955,8 +957,7 @@ out_failed:
 	spin_unlock(&p->proc_lock);
 	enable_irqsave(&state);
 	return;
-out_yield_core:			/* successfully yielded the core */
-	spin_unlock(&p->proc_lock);
+out_yield_core:				/* successfully yielded the core */
 	proc_decref(p);			/* need to eat the ref passed in */
 	/* Clean up the core and idle.  Need to do this before enabling interrupts,
 	 * since once we put_idle_core() and unlock, we could get a startcore. */
@@ -1099,17 +1100,19 @@ uint32_t __proc_preempt_all(struct proc *p, uint32_t *pc_arr)
 void proc_preempt_core(struct proc *p, uint32_t pcoreid, uint64_t usec)
 {
 	uint64_t warn_time = read_tsc() + usec2tsc(usec);
-
+	bool preempted = FALSE;
 	/* DYING could be okay */
 	if (p->state != PROC_RUNNING_M) {
 		warn("Tried to preempt from a non RUNNING_M proc!");
 		return;
 	}
 	spin_lock(&p->proc_lock);
+	/* TODO: this is racy, could be messages in flight that haven't unmapped
+	 * yet, so we need to do something more complicated */
 	if (is_mapped_vcore(p, pcoreid)) {
 		__proc_preempt_warn(p, get_vcoreid(p, pcoreid), warn_time);
 		__proc_preempt_core(p, pcoreid);
-		put_idle_core(pcoreid);
+		preempted = TRUE;
 	} else {
 		warn("Pcore doesn't belong to the process!!");
 	}
@@ -1117,6 +1120,8 @@ void proc_preempt_core(struct proc *p, uint32_t pcoreid, uint64_t usec)
 		__proc_set_state(p, PROC_RUNNABLE_M);
 	}
 	spin_unlock(&p->proc_lock);
+	if (preempted)
+		put_idle_core(pcoreid);
 }
 
 /* Warns and preempts all from p.  No delaying / alarming, or anything.  The

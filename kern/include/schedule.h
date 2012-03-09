@@ -40,8 +40,7 @@ void cpu_bored(void);
 
 /* Gets called when a pcore becomes idle (like in proc yield).  These are 'cg'
  * cores, given to MCPs, that have been async returned to the ksched.  If the
- * ksched preempts a core, this won't get called (unless it yielded first).
- * Note that this is called with a proc's lock held (for now). */
+ * ksched preempts a core, this won't get called (unless it yielded first). */
 void put_idle_core(uint32_t coreid);
 void put_idle_cores(uint32_t *pc_arr, uint32_t num);
 

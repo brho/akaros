@@ -241,9 +241,8 @@ void cpu_bored(void)
  * acquisitions (like in a for loop), but it's a little easier.  Plus, one day
  * we might be able to do this without locks (for the putting).
  *
- * TODO: this is a trigger, telling us we have more cores.  Could/should make a
- * scheduling decision (or at least plan to).  Note that right now, the proc's
- * lock is still being held, so we can't do anything in this context. */
+ * This is a trigger, telling us we have more cores.  We could/should make a
+ * scheduling decision (or at least plan to). */
 void put_idle_core(uint32_t coreid)
 {
 	spin_lock(&idle_lock);
