@@ -425,7 +425,7 @@ void proc_run_s(struct proc *p)
 	switch (p->state) {
 		case (PROC_DYING):
 			spin_unlock(&p->proc_lock);
-			printk("Process %d not starting due to async death\n", p->pid);
+			printk("[kernel] _S %d not starting due to async death\n", p->pid);
 			return;
 		case (PROC_RUNNABLE_S):
 			assert(current != p);
@@ -502,8 +502,10 @@ void __proc_run_m(struct proc *p)
 {
 	struct vcore *vc_i;
 	switch (p->state) {
+		case (PROC_WAITING):
 		case (PROC_DYING):
-			printk("Process %d not starting due to async death\n", p->pid);
+			warn("ksched tried to run proc %d in state %s\n", p->pid,
+			     procstate2str(p->state));
 			return;
 		case (PROC_RUNNABLE_M):
 			/* vcoremap[i] holds the coreid of the physical core allocated to
@@ -535,7 +537,6 @@ void __proc_run_m(struct proc *p)
 			 *   it may not get the message for a while... */
 			return;
 		case (PROC_RUNNING_M):
-		case (PROC_WAITING):
 			return;
 		default:
 			/* unlock just so the monitor can call something that might lock*/
@@ -1253,11 +1254,12 @@ static void __proc_give_cores_running(struct proc *p, uint32_t *pc_arr,
 	__seq_end_write(&p->procinfo->coremap_seqctr);
 }
 
-/* Gives process p the additional num cores listed in pcorelist.  You must be
- * RUNNABLE_M or RUNNING_M before calling this.  If you're RUNNING_M, this will
- * startup your new cores at the entry point with their virtual IDs (or restore
- * a preemption).  If you're RUNNABLE_M, you should call __proc_run_m after this
- * so that the process can start to use its cores.
+/* Gives process p the additional num cores listed in pcorelist.  If the proc is
+ * not RUNNABLE_M or RUNNING_M, this will fail and allocate none of the core
+ * (and return -1).  If you're RUNNING_M, this will startup your new cores at
+ * the entry point with their virtual IDs (or restore a preemption).  If you're
+ * RUNNABLE_M, you should call __proc_run_m after this so that the process can
+ * start to use its cores.  In either case, this returns 0.
  *
  * If you're *_S, make sure your core0's TF is set (which is done when coming in
  * via arch/trap.c and we are RUNNING_S), change your state, then call this.
@@ -1268,21 +1270,19 @@ static void __proc_give_cores_running(struct proc *p, uint32_t *pc_arr,
  * this is called from another core, and to avoid the _S -> _M transition.
  *
  * WARNING: You must hold the proc_lock before calling this! */
-void __proc_give_cores(struct proc *p, uint32_t *pc_arr, uint32_t num)
+int __proc_give_cores(struct proc *p, uint32_t *pc_arr, uint32_t num)
 {
 	/* should never happen: */
 	assert(num + p->procinfo->num_vcores <= MAX_NUM_CPUS);
 	switch (p->state) {
 		case (PROC_RUNNABLE_S):
 		case (PROC_RUNNING_S):
-			panic("Don't give cores to a process in a *_S state!\n");
-			break;
+			warn("Don't give cores to a process in a *_S state!\n");
+			return -1;
 		case (PROC_DYING):
 		case (PROC_WAITING):
-			/* can't accept, give the cores back to the ksched and return */
-			for (int i = 0; i < num; i++)
-				put_idle_core(pc_arr[i]);
-			return;
+			/* can't accept, just fail */
+			return -1;
 		case (PROC_RUNNABLE_M):
 			__proc_give_cores_runnable(p, pc_arr, num);
 			break;
@@ -1293,8 +1293,9 @@ void __proc_give_cores(struct proc *p, uint32_t *pc_arr, uint32_t num)
 			panic("Weird state(%s) in %s()", procstate2str(p->state),
 			      __FUNCTION__);
 	}
-	/* TODO: move me to the ksched */
+	/* TODO: considering moving to the ksched (hard, due to yield) */
 	p->procinfo->res_grant[RES_CORES] += num;
+	return 0;
 }
 
 /********** Core revocation (bulk and single) ***********/

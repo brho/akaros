@@ -100,7 +100,7 @@ struct vcore *vcoreid2vcore(struct proc *p, uint32_t vcoreid);
  *
  * WARNING: YOU MUST HOLD THE PROC_LOCK BEFORE CALLING THESE! */
 /* Gives process p the additional num cores listed in corelist */
-void __proc_give_cores(struct proc *p, uint32_t *pc_arr, uint32_t num);
+int __proc_give_cores(struct proc *p, uint32_t *pc_arr, uint32_t num);
 /* Takes from process p the num cores listed in pc_arr */
 void __proc_take_corelist(struct proc *p, uint32_t *pc_arr, uint32_t num,
                           bool preempt);

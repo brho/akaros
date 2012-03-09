@@ -39,6 +39,7 @@ uint32_t num_mgmtcores = 1;
 
 /* Helper, defined below */
 static void __core_request(struct proc *p);
+static void __put_idle_cores(uint32_t *pc_arr, uint32_t num);
 
 /* Alarm struct, for our example 'timer tick' */
 struct alarm_waiter ksched_waiter;
@@ -250,13 +251,20 @@ void put_idle_core(uint32_t coreid)
 	spin_unlock(&idle_lock);
 }
 
-/* Bulk interface for put_idle */
-void put_idle_cores(uint32_t *pc_arr, uint32_t num)
+/* Helper for put_idle and core_req. */
+static void __put_idle_cores(uint32_t *pc_arr, uint32_t num)
 {
 	spin_lock(&idle_lock);
 	for (int i = 0; i < num; i++)
 		idlecoremap[num_idlecores++] = pc_arr[i];
 	spin_unlock(&idle_lock);
+}
+
+/* Bulk interface for put_idle */
+void put_idle_cores(uint32_t *pc_arr, uint32_t num)
+{
+	/* could trigger a sched decision here */
+	__put_idle_cores(pc_arr, num);
 }
 
 /* Available resources changed (plus or minus).  Some parts of the kernel may
@@ -324,12 +332,20 @@ static void __core_request(struct proc *p)
 	if (num_granted) {
 		/* give them the cores.  this will start up the extras if RUNNING_M. */
 		spin_lock(&p->proc_lock);
-		__proc_give_cores(p, corelist, num_granted);
-		/* at some point after giving cores, call proc_run_m() (harmless on
-		 * RUNNING_Ms).  You can give small groups of cores, then run them
-		 * (which is more efficient than interleaving runs with the gives for
-		 * bulk preempted processes). */
-		__proc_run_m(p); /* harmless to call this on RUNNING_Ms */
+		/* if they fail, it is because they are WAITING or DYING.  we could give
+		 * the cores to another proc or whatever.  for the current type of
+		 * ksched, we'll just put them back on the pile and return.  Note, the
+		 * ksched could check the states after locking, but it isn't necessary:
+		 * just need to check at some point in the ksched loop. */
+		if (__proc_give_cores(p, corelist, num_granted)) {
+			__put_idle_cores(corelist, num_granted);
+		} else {
+			/* at some point after giving cores, call proc_run_m() (harmless on
+			 * RUNNING_Ms).  You can give small groups of cores, then run them
+			 * (which is more efficient than interleaving runs with the gives
+			 * for bulk preempted processes). */
+			__proc_run_m(p);
+		}
 		spin_unlock(&p->proc_lock);
 	}
 }
