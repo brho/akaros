@@ -222,6 +222,13 @@ void poke_ksched(struct proc *p, int res_type)
 	spin_unlock(&sched_lock);
 }
 
+/* Proc p just woke up (due to an event).  Our dumb ksched will just try to deal
+ * with its core desires. */
+void ksched_proc_unblocked(struct proc *p)
+{
+	poke_ksched(p, RES_CORES);
+}
+
 /* The calling cpu/core has nothing to do and plans to idle/halt.  This is an
  * opportunity to pick the nature of that halting (low power state, etc), or
  * provide some other work (_Ss on LL cores).  Note that interrupts are

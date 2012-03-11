@@ -1006,7 +1006,6 @@ void __proc_wakeup(struct proc *p)
 		if (!p->procdata->res_req[RES_CORES].amt_wanted)
 			p->procdata->res_req[RES_CORES].amt_wanted = 1;
 		__proc_set_state(p, PROC_RUNNABLE_M);
-		/* TODO: consider poke_ksched() here */
 	} else {
 		printk("[kernel] FYI, waking up an _S proc\n");
 		__proc_set_state(p, PROC_RUNNABLE_S);

@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include <pmap.h>
+#include <schedule.h>
 
 /* Userspace could give us a vcoreid that causes us to compute a vcpd that is
  * outside procdata.  If we hit UWLIM, then we've gone farther than we should.
@@ -242,6 +243,7 @@ static void spam_public_msg(struct proc *p, struct event_msg *ev_msg,
 				spin_lock(&p->proc_lock);
 				__proc_wakeup(p);	/* internally, this double-checks WAITING */
 				spin_unlock(&p->proc_lock);
+				ksched_proc_unblocked(p);
 			}
 			return;
 		}
@@ -289,6 +291,7 @@ ultimate_fallback:
 	 * __proc_wakeup() will check for WAITING. */
 	__proc_wakeup(p);
 	spin_unlock(&p->proc_lock);
+	ksched_proc_unblocked(p);
 	return;
 }
 

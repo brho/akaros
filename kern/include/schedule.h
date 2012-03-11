@@ -28,10 +28,15 @@ void register_mcp(struct proc *p);
  * ever call this directly. */
 void schedule(void);
 
-/* Proc p's resource desires changed, it recently became RUNNABLE, or something
- * in general that would lead to a new decision.  The process can directly poke
- * the ksched via a syscall, so be careful of abuse. */
+/* Proc p's resource desires changed, or something in general that would lead to
+ * a new decision.  The process can directly poke the ksched via a syscall, so
+ * be careful of abuse. */
 void poke_ksched(struct proc *p, int res_type);
+
+/* Proc p just woke up (due to an event).  This is a more specific case than
+ * poke_ksched(), in case kscheds want to do some accounting or something more
+ * than just giving it cores. */
+void ksched_proc_unblocked(struct proc *p);
 
 /* The calling cpu/core has nothing to do and plans to idle/halt.  This is an
  * opportunity to pick the nature of that halting (low power state, etc), or

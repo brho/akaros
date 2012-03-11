@@ -30,6 +30,10 @@ void *block_thread(void* arg)
 
 int main(int argc, char** argv) 
 {
+	struct timeval tv = {0};
+	if (gettimeofday(&tv, 0))
+		perror("Time error...");
+	printf("Start time: %dsec %dusec\n", tv.tv_sec, tv.tv_usec);
 	for (int i = 0; i < NUM_TEST_THREADS; i++) {
 		printf_safe("[A] About to create thread %d\n", i);
 		pthread_create(&my_threads[i], NULL, &block_thread, NULL);
@@ -40,5 +44,8 @@ int main(int argc, char** argv)
 		printf_safe("[A] Successfully joined on thread %d (retval: %p)\n", i,
 		            my_retvals[i]);
 	}
+	if (gettimeofday(&tv, 0))
+		perror("Time error...");
+	printf("End time  : %dsec %dusec\n", tv.tv_sec, tv.tv_usec);
 	printf("All done, exiting cleanishly\n");
 } 
