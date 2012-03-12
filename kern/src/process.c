@@ -915,6 +915,10 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 	 * posting). */
 	if (vcpd->notif_pending)
 		goto out_failed;
+	/* Optional: check to see if we are putting them below amt_wanted (help with
+	 * correctness-benign user races) and bail */
+	if (p->procdata->res_req[RES_CORES].amt_wanted >= p->procinfo->num_vcores)
+		goto out_failed;
 	/* Now we'll actually try to yield */
 	printd("[K] Process %d (%p) is yielding on vcore %d\n", p->pid, p,
 	       get_vcoreid(p, coreid));
