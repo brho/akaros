@@ -53,6 +53,8 @@ int uthread_lib_init(struct uthread *uthread);
 /* Does the uthread initialization of a uthread that the caller created.  Call
  * this whenever you are "starting over" with a thread. */
 void uthread_init(struct uthread *new_thread);
+/* Low-level _S code calls this for basic uthreading without a 2LS */
+void uthread_slim_init(void);
 /* Call this when you are done with a uthread, forever, but before you free it */
 void uthread_cleanup(struct uthread *uthread);
 void uthread_runnable(struct uthread *uthread);

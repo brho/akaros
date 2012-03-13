@@ -22,17 +22,12 @@ static void __uthread_free_tls(struct uthread *uthread);
 static void __run_current_uthread_raw(void);
 static void handle_vc_preempt(struct event_msg *ev_msg, unsigned int ev_type);
 
-/* The real 2LS calls this, passing in a uthread representing thread0.  When it
- * returns, you're in _M mode, still running thread0, on vcore0 */
-int uthread_lib_init(struct uthread *uthread)
+/* Helper, make the uthread code manage thread0.  This sets up uthread such
+ * that the calling code and its TLS are tracked by the uthread struct, and
+ * vcore0 thinks the uthread is running there.  Called only by slim_init (early
+ * _S code) and lib_init. */
+static void uthread_manage_thread0(struct uthread *uthread)
 {
-	/* Make sure this only runs once */
-	static bool initialized = FALSE;
-	if (initialized)
-		return -1;
-	initialized = TRUE;
-	/* Init the vcore system */
-	assert(!vcore_init());
 	assert(uthread);
 	/* Save a pointer to thread0's tls region (the glibc one) into its tcb */
 	uthread->tls_desc = get_tls_desc(0);
@@ -49,9 +44,27 @@ int uthread_lib_init(struct uthread *uthread)
 	 * its TLS vars. */
 	extern void** vcore_thread_control_blocks;
 	set_tls_desc(vcore_thread_control_blocks[0], 0);
+	/* We might have a basic uthread already installed (from slim_init), so
+	 * free it before installing the new one. */
+	if (current_uthread)
+		free(current_uthread);
 	current_uthread = uthread;
 	set_tls_desc(uthread->tls_desc, 0);
 	assert(!in_vcore_context());
+}
+
+/* The real 2LS calls this, passing in a uthread representing thread0.  When it
+ * returns, you're in _M mode, still running thread0, on vcore0 */
+int uthread_lib_init(struct uthread *uthread)
+{
+	/* Make sure this only runs once */
+	static bool initialized = FALSE;
+	if (initialized)
+		return -1;
+	initialized = TRUE;
+	/* Init the vcore system */
+	assert(!vcore_init());
+	uthread_manage_thread0(uthread);
 	/* Receive preemption events.  Note that this merely tells the kernel how to
 	 * send the messages, and does not necessarily provide storage space for the
 	 * messages.  What we're doing is saying that all PREEMPT and CHECK_MSGS
@@ -69,6 +82,17 @@ int uthread_lib_init(struct uthread *uthread)
 	/* Get ourselves into _M mode.  Could consider doing this elsewhere... */
 	vcore_change_to_m();
 	return 0;
+}
+
+/* Slim-init - sets up basic uthreading for when we are in _S mode and before
+ * we set up the 2LS.  Some apps may not have a 2LS and thus never do the full
+ * vcore/2LS/uthread init. */
+void uthread_slim_init(void)
+{
+	struct uthread *uthread = malloc(sizeof(*uthread));
+	/* TODO: consider a vcore_init_vc0 call.  Init the vcore system */
+	assert(!vcore_init());
+	uthread_manage_thread0(uthread);
 }
 
 /* 2LSs shouldn't call uthread_vcore_entry directly */
