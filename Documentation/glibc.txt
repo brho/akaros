@@ -21,9 +21,14 @@ How to recompile glibc
 Normally, make x86 (or whatever) works fairly well.  However, sometimes you
 need to rebuild all of glibc.  This might be on a hunch, or to get rid of
 things that might have compiled, but are failing to link and don't seem to
-rebuild.
+rebuild.  This happens when you change parts of glibc.
 
-In this event, the next step is to remove the build directories
+If you know what file(s) you changed and it doesn't seem like the changes are
+being applied, you can copy the file from the -ros directory to the glibc-XXX
+directory.  The glibc make process doesn't apply diffs or track the changes
+from -ros to the glibc directory, so your recompile won't notice the changes.
+
+If things are stil messed up, the next step is to remove the build directories
 (i686-ros-glibc-*) and also the hidden files (.i686-ros-glibc*).  If you get
 errors from make very early on about not finding some targets (such as
 install-headers), you forgot to delete the hidden files.

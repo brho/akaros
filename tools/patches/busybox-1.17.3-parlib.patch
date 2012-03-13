@@ -1,0 +1,33 @@
+--- busybox-1.17.3/Makefile.orig	2012-03-13 13:50:26.000000000 -0700
++++ busybox-1.17.3/Makefile	2012-03-13 13:28:51.000000000 -0700
+@@ -315,13 +315,13 @@
+ 
+ # Use LINUXINCLUDE when you must reference the include/ directory.
+ # Needed to be compatible with the O= option
+-CFLAGS		:= $(CFLAGS)
++CFLAGS		:= $(CFLAGS) -u force_parlib_symbols
+ # Added only to final link stage of busybox binary
+ CFLAGS_busybox	:= $(CFLAGS_busybox)
+ CPPFLAGS	:= $(CPPFLAGS)
+ AFLAGS		:= $(AFLAGS)
+ LDFLAGS		:= $(LDFLAGS)
+-LDLIBS		:=
++LDLIBS		:= parlib
+ 
+ # Read KERNELRELEASE from .kernelrelease (if it exists)
+ KERNELRELEASE = $(shell cat .kernelrelease 2> /dev/null)
+--- busybox-1.17.3/scripts/trylink.orig	2012-03-13 13:50:53.000000000 -0700
++++ busybox-1.17.3/scripts/trylink	2012-03-13 13:32:33.000000000 -0700
+@@ -144,6 +144,12 @@
+ 	l_list=`echo "$without_one" | sed -e 's/ / -l/g' -e 's/^/-l/' -e 's/^-l$//'`
+ 	test x"$l_list" != x"" && l_list="$START_GROUP $l_list $END_GROUP"
+ 	$debug && echo "Trying -l options: '$l_list'"
++	# brho: put in this if block to make sure they build parlib
++	if [ "$one" = "parlib" ]; then
++		echo " Forcing link with parlib"
++		last_needed=true
++		continue
++	fi
+ 	try $CC $CFLAGS $LDFLAGS \
+ 		-o $EXE \
+ 		$SORT_COMMON \
