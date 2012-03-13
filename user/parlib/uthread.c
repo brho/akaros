@@ -123,9 +123,16 @@ void __attribute__((noreturn)) uthread_vcore_entry(void)
 	handle_events(vcoreid);
 	__check_preempt_pending(vcoreid);
 	assert(in_vcore_context());	/* double check, in case an event changed it */
-	assert(sched_ops->sched_entry);
-	sched_ops->sched_entry();
+	/* Consider using the default_2ls_op for this, though it's a bit weird. */
+	if (sched_ops->sched_entry) {
+		sched_ops->sched_entry();
+	} else if (current_uthread) {
+		run_current_uthread();
+	}
 	/* 2LS sched_entry should never return */
+	/* Either the 2LS sched_entry returned, run_cur_uth() returned, or we
+	 * didn't have a current_uthread.  If we didn't have a 2LS op, we should be
+	 * in _S mode and always have a current_uthread. */
 	assert(0);
 }
 
