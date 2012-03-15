@@ -91,6 +91,7 @@ struct event_queue {
 struct event_queue_big {
 	struct event_mbox 			*ev_mbox;
 	int							ev_flags;
+	bool						ev_alert_pending;
 	uint32_t					ev_vcore;
 	void						(*ev_handler)(struct event_queue *);
 	struct event_mbox 			ev_imbox;
