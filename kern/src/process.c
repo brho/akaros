@@ -432,7 +432,6 @@ void proc_run_s(struct proc *p)
 			printk("[kernel] _S %d not starting due to async death\n", p->pid);
 			return;
 		case (PROC_RUNNABLE_S):
-			assert(current != p);
 			__proc_set_state(p, PROC_RUNNING_S);
 			/* We will want to know where this process is running, even if it is
 			 * only in RUNNING_S.  can use the vcoremap, which makes death easy.
