@@ -421,6 +421,10 @@ static void __set_proc_current(struct proc *p)
  * documentation talks about this a bit). */
 void proc_run_s(struct proc *p)
 {
+	int8_t state = 0;
+	uint32_t coreid = core_id();
+	struct per_cpu_info *pcpui = &per_cpu_info[coreid];
+	struct preempt_data *vcpd = &p->procdata->vcore_preempt_data[0];
 	spin_lock(&p->proc_lock);
 	switch (p->state) {
 		case (PROC_DYING):
@@ -439,21 +443,38 @@ void proc_run_s(struct proc *p)
 			/* TODO: For now, we won't count this as an active vcore (on the
 			 * lists).  This gets unmapped in resource.c and yield_s, and needs
 			 * work. */
-			__map_vcore(p, 0, core_id()); // sort of.  this needs work.
+			__map_vcore(p, 0, coreid); /* not treated like a true vcore */
 			__seq_end_write(&p->procinfo->coremap_seqctr);
-			/* incref, since we're saving a reference in owning proc */
+			/* incref, since we're saving a reference in owning proc later */
 			proc_incref(p, 1);
+			/* disable interrupts to protect cur_tf, owning_proc, and current */
+			disable_irqsave(&state);
+			/* wait til ints are disabled before unlocking, in case someone else
+			 * grabs the lock and IPIs us before we get set up in cur_tf */
+			spin_unlock(&p->proc_lock);
 			/* redundant with proc_startcore, might be able to remove that one*/
 			__set_proc_current(p);
-			/* We restartcore, instead of startcore, since startcore is a bit
-			 * lower level and we want a chance to process kmsgs before starting
-			 * the process. */
-			spin_unlock(&p->proc_lock);
-			disable_irq();		/* before mucking with cur_tf / owning_proc */
-			/* this is one of the few times cur_tf != &actual_tf */
-			current_tf = &p->env_tf;	/* no need for irq disable yet */
-			/* storing the passed in ref of p in owning_proc */
-			per_cpu_info[core_id()].owning_proc = p;
+			/* set us up as owning_proc.  ksched bug if there is already one,
+			 * for now.  can simply clear_owning if we want to. */
+			assert(!pcpui->owning_proc);
+			pcpui->owning_proc = p;
+			/* TODO: (HSS) set silly state here (__startcore does it instantly) */
+			/* similar to the old __startcore, start them in vcore context if
+			 * they have notifs and aren't already in vcore context. */
+			if (!vcpd->notif_disabled && vcpd->notif_pending) {
+				vcpd->notif_disabled = TRUE;
+				/* save the _S's tf in the notify slot, build and pop a new one
+				 * in actual/cur_tf. */
+				vcpd->notif_tf = p->env_tf;
+				pcpui->cur_tf = &pcpui->actual_tf;
+				memset(pcpui->cur_tf, 0, sizeof(struct trapframe));
+				proc_init_trapframe(pcpui->cur_tf, 0, p->env_entry,
+				                    vcpd->transition_stack);
+			} else {
+				/* this is one of the few times cur_tf != &actual_tf */
+				pcpui->cur_tf = &p->env_tf;
+			}
+			enable_irqsave(&state);
 			/* When the calling core idles, it'll call restartcore and run the
 			 * _S process's context. */
 			return;
@@ -976,7 +997,8 @@ out_yield_core:				/* successfully yielded the core */
  * kernel - check the documentation.  Note that pending is more about messages.
  * The process needs to be in vcore_context, and the reason is usually a
  * message.  We set pending here in case we were called to prod them into vcore
- * context (like via a sys_self_notify. */
+ * context (like via a sys_self_notify).  Also note that this works for _S
+ * procs, if you send to vcore 0 (and the proc is running). */
 void proc_notify(struct proc *p, uint32_t vcoreid)
 {
 	struct preempt_data *vcpd = &p->procdata->vcore_preempt_data[vcoreid];
@@ -988,8 +1010,7 @@ void proc_notify(struct proc *p, uint32_t vcoreid)
 		 * and don't want the proc_lock to be an irqsave.  Spurious
 		 * __notify() kmsgs are okay (it checks to see if the right receiver
 		 * is current). */
-		if ((p->state & PROC_RUNNING_M) && // TODO: (VC#) (_S state)
-		              vcore_is_mapped(p, vcoreid)) {
+		if (vcore_is_mapped(p, vcoreid)) {
 			printd("[kernel] sending notif to vcore %d\n", vcoreid);
 			/* This use of try_get_pcoreid is racy, might be unmapped */
 			send_kernel_message(try_get_pcoreid(p, vcoreid), __notify, (long)p,
@@ -1733,9 +1754,8 @@ void __notify(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2)
 	/* Not the right proc */
 	if (p != pcpui->owning_proc)
 		return;
-	/* Common cur_tf sanity checks */
+	/* Common cur_tf sanity checks.  Note cur_tf could be an _S's env_tf */
 	assert(pcpui->cur_tf);
-	assert(pcpui->cur_tf == &pcpui->actual_tf);
 	assert(!in_kernel(pcpui->cur_tf));
 	/* We shouldn't need to lock here, since unmapping happens on the pcore and
 	 * mapping would only happen if the vcore was free, which it isn't until
@@ -1748,8 +1768,6 @@ void __notify(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2)
 	if (vcpd->notif_disabled)
 		return;
 	vcpd->notif_disabled = TRUE;
-	/* This bit shouldn't be important anymore */
-	vcpd->notif_pending = FALSE; // no longer pending - it made it here
 	/* save the old tf in the notify slot, build and pop a new one.  Note that
 	 * silly state isn't our business for a notification. */
 	vcpd->notif_tf = *pcpui->cur_tf;

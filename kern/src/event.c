@@ -360,6 +360,19 @@ void send_event(struct proc *p, struct event_queue *ev_q, struct event_msg *msg,
 	/* ev_q is a user pointer, so we need to make sure we're in the right
 	 * address space */
 	old_proc = switch_to(p);
+	/* If we're an _S, just spam vcore0, and wake up if necessary. */
+	if (!__proc_is_mcp(p)) {
+		spam_vcore(p, 0, msg, ev_q->ev_flags);
+		/* using the same pattern as in spam_public (which can have multiple
+		 * unblock callbacks */
+		if (p->state == PROC_WAITING) {
+			spin_lock(&p->proc_lock);
+			__proc_wakeup(p);
+			spin_unlock(&p->proc_lock);
+			ksched_proc_unblocked(p);
+		}
+		goto out;
+	}
 	/* Get the vcoreid that we'll message (if appropriate).  For INDIR and
 	 * SPAMMING, this is the first choice of a vcore, but other vcores might get
 	 * it.  Common case is !APPRO and !ROUNDROBIN.  Note we are clobbering the

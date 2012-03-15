@@ -130,6 +130,8 @@ void schedule_init(void)
 	return;
 }
 
+/* TODO: the proc lock is currently held for sched and register, though not
+ * currently in any situations that can deadlock */
 /* _S procs are scheduled like in traditional systems */
 void schedule_scp(struct proc *p)
 {
@@ -226,6 +228,9 @@ void poke_ksched(struct proc *p, int res_type)
  * with its core desires. */
 void ksched_proc_unblocked(struct proc *p)
 {
+	/* TODO: this now gets called when an _S unblocks.  schedule_scp() also gets
+	 * called, so the process is on the _S runqueue.  Might merge the two in the
+	 * future. */
 	poke_ksched(p, RES_CORES);
 }
 
