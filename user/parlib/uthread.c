@@ -295,27 +295,50 @@ void uthread_cleanup(struct uthread *uthread)
 	__uthread_free_tls(uthread);
 }
 
+static void __ros_syscall_spinon(struct syscall *sysc)
+{
+	while (!(atomic_read(&sysc->flags) & (SC_DONE | SC_PROGRESS)))
+		cpu_relax();
+}
+
+static void __ros_syscall_scp_blockon(struct syscall *sysc)
+{
+	/* Until we're ready (advertised via the *evq), we must spin */
+	if (!__scp_simple_evq) {
+		__ros_syscall_spinon(sysc);
+		return;
+	}
+	/* Ask for a SYSCALL event when the sysc is done.  We don't need a handler,
+	 * we just need the kernel to restart us from proc_yield.  If register
+	 * fails, we're already done. */
+	if (register_evq(sysc, __scp_simple_evq)) {
+		/* Sending false for now - we want to signal proc code that we want to
+		 * wait (piggybacking on the MCP meaning of this variable */
+		sys_yield(FALSE);
+	}
+}
+
 /* Attempts to block on sysc, returning when it is done or progress has been
  * made. */
 void ros_syscall_blockon(struct syscall *sysc)
 {
+	/* even if we are in 'vcore context', an _S can block */
+	if (!in_multi_mode()) {
+		__ros_syscall_scp_blockon(sysc);
+		return;
+	}
+	/* MCP vcore's don't know what to do yet, so we have to spin */
 	if (in_vcore_context()) {
-		/* vcore's don't know what to do yet, so do the default (spin) */
-		__ros_syscall_blockon(sysc);
+		__ros_syscall_spinon(sysc);
 		return;
 	}
-	if (!sched_ops->thread_blockon_sysc || !in_multi_mode()) {
-		/* There isn't a 2LS op for blocking, or we're _S.  Spin for now. */
-		__ros_syscall_blockon(sysc);
-		return;
-	}
-	/* At this point, we know we're a uthread.  If we're a DONT_MIGRATE uthread,
-	 * then it's disabled notifs and is basically in vcore context, enough so
-	 * that it can't call into the 2LS. */
+	/* At this point, we know we're a uthread in an MCP.  If we're a
+	 * DONT_MIGRATE uthread, then it's disabled notifs and is basically in
+	 * vcore context, enough so that it can't call into the 2LS. */
 	assert(current_uthread);
 	if (current_uthread->flags & UTHREAD_DONT_MIGRATE) {
 		assert(!notif_is_enabled(vcore_id()));	/* catch bugs */
-		__ros_syscall_blockon(sysc);
+		__ros_syscall_spinon(sysc);
 	}
 	/* double check before doing all this crap */
 	if (atomic_read(&sysc->flags) & (SC_DONE | SC_PROGRESS))

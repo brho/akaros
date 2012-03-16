@@ -34,15 +34,16 @@ struct syscall {
 #include <arch/atomic.h>
 
 /* Attempts to block on sysc, returning when it is done or progress has been
- * made. */
+ * made.  (function is in uthread.c) */
 void ros_syscall_blockon(struct syscall *sysc);
 
-/* This weak version is meant to work if there is no 2LS.  For now we just
- * spin, but in the future we could block the whole process. */
+/* No one should be using this - it's meant to allow glibc to compile, and all
+ * apps will link against parlib to get the real function. */
 static inline void __ros_syscall_blockon(struct syscall *sysc)
 {
-	while (!(atomic_read(&sysc->flags) & (SC_DONE | SC_PROGRESS)))
-		cpu_relax();
+	/* My ghetto error message: force a PF */
+	int *x = (int*)0xdeadbeef;
+	*x = 1337;
 }
 weak_alias(__ros_syscall_blockon, ros_syscall_blockon);
 

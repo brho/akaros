@@ -19,6 +19,8 @@
 static size_t _max_vcores_ever_wanted = 1;
 atomic_t nr_new_vcores_wanted;
 atomic_t vc_req_being_handled;
+/* Simple ev_q (bits, IPIs, vc0) for scp syscalls, signals, etc */
+struct event_queue *__scp_simple_evq = 0;
 
 extern void** vcore_thread_control_blocks;
 
@@ -169,6 +171,7 @@ vcore_init_fail:
 void force_parlib_symbols(void)
 {
 	vcore_event_init();
+	ros_syscall_blockon(0);	/* don't seem to need to force this for now */
 	assert(0);
 }
 
@@ -179,7 +182,15 @@ void vcore_event_init(void)
 {
 	/* set up our thread0 as a uthread */
 	uthread_slim_init();
-	/* TODO: actually register for event handlers and whatnot */
+	/* Set up an ev_q for blocking _Ss on syscalls.  Events will get sent to
+	 * vcore0's VCPD public mbox.  We'll get a bit, instead of a full message,
+	 * since we don't need to know *sysc.  Also note that the event handler is
+	 * 0, until set by a 2LS.  We don't need a handler - just need to get woken
+	 * up. */
+	__scp_simple_evq = get_event_q_vcpd(0, EVENT_NOMSG | EVENT_IPI);
+	/* TODO: register for other kevents/signals and whatnot (can probably reuse
+	 * the simple ev_q).  Could also do this via explicit functions from the
+	 * program. */
 }
 
 /* Helper, picks some sane defaults and changes the process into an MCP */

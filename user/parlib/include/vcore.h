@@ -31,6 +31,8 @@ extern "C" {
 extern void vcore_entry();
 /* Declared in glibc's start.c */
 extern __thread bool __vcore_context;
+/* Simple ev_q (bits, IPIs, vc0) for scp syscalls, signals, etc */
+struct event_queue *__scp_simple_evq;
 
 /* Utility Functions */
 void *allocate_tls(void);
