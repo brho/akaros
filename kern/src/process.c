@@ -842,27 +842,39 @@ static uint32_t get_pcoreid(struct proc *p, uint32_t vcoreid)
 	return try_get_pcoreid(p, vcoreid);
 }
 
-/* Helper function: yields / wraps up current_tf and schedules the _S */
-void __proc_yield_s(struct proc *p, struct trapframe *tf)
+/* Helper: saves the SCP's tf state and unmaps vcore 0.  In the future, we'll
+ * probably use vc0's space for env_tf and the silly state. */
+static void __proc_save_context_s(struct proc *p, struct trapframe *tf)
 {
-	assert(p->state == PROC_RUNNING_S);
 	p->env_tf= *tf;
 	env_push_ancillary_state(p);			/* TODO: (HSS) */
 	__unmap_vcore(p, 0);	/* VC# keep in sync with proc_run_s */
+}
+
+/* Helper function: yields / wraps up current_tf */
+void __proc_yield_s(struct proc *p, struct trapframe *tf)
+{
+	assert(p->state == PROC_RUNNING_S);
 	__proc_set_state(p, PROC_RUNNABLE_S);
+	__proc_save_context_s(p, tf);
 	schedule_scp(p);
 }
 
 /* Yields the calling core.  Must be called locally (not async) for now.
- * - If RUNNING_S, you just give up your time slice and will eventually return.
+ * - If RUNNING_S, you just give up your time slice and will eventually return,
+ *   possibly after WAITING on an event.
  * - If RUNNING_M, you give up the current vcore (which never returns), and
  *   adjust the amount of cores wanted/granted.
- * - If you have only one vcore, you switch to RUNNABLE_M.  When you run again,
- *   you'll have one guaranteed core, starting from the entry point.
+ * - If you have only one vcore, you switch to WAITING.  There's no 'classic
+ *   yield' for MCPs (at least not now).  When you run again, you'll have one
+ *   guaranteed core, starting from the entry point.
  *
- * If the call is being nice, it means that it is in response to a preemption
- * (which needs to be checked).  If there is no preemption pending, just return.
- * No matter what, don't adjust the number of cores wanted.
+ * If the call is being nice, it means different things for SCPs and MCPs.  For
+ * MCPs, it means that it is in response to a preemption (which needs to be
+ * checked).  If there is no preemption pending, just return.  For SCPs, it
+ * means the proc wants to give up the core, but still has work to do.  If not,
+ * the proc is trying to wait on an event.  It's not being nice to others, it
+ * just has no work to do.
  *
  * This usually does not return (smp_idle()), so it will eat your reference.
  * Also note that it needs a non-current/edible reference, since it will abandon
@@ -891,8 +903,34 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 	spin_lock(&p->proc_lock); /* horrible scalability.  =( */
 	switch (p->state) {
 		case (PROC_RUNNING_S):
-			__proc_yield_s(p, current_tf);	/* current_tf 0'd in abandon core */
-			spin_unlock(&p->proc_lock);
+			if (!being_nice) {
+				/* waiting for an event to unblock us */
+				vcpd = &p->procdata->vcore_preempt_data[0];
+				/* this check is an early optimization (check, signal, check
+				 * again pattern).  We could also lock before spamming the
+				 * vcore in event.c */
+				if (vcpd->notif_pending)
+					goto out_failed;
+				/* syncing with event's SCP code.  we set waiting, then check
+				 * pending.  they set pending, then check waiting.  it's not
+				 * possible for us to miss the notif *and* for them to miss
+				 * WAITING.  one (or both) of us will see and make sure the proc
+				 * wakes up.  */
+				__proc_set_state(p, PROC_WAITING);
+				wrmb(); /* don't let the state write pass the notif read */ 
+				if (vcpd->notif_pending) {
+					__proc_set_state(p, PROC_RUNNING_S);
+					goto out_failed;
+				}
+				/* if we're here, we want to sleep.  a concurrent event that
+				 * hasn't already written notif_pending will have seen WAITING,
+				 * and will be spinning while we do this. */
+				__proc_save_context_s(p, current_tf);
+			} else {
+				/* yielding to allow other processes to run */
+				__proc_yield_s(p, current_tf);
+			}
+			spin_unlock(&p->proc_lock);	/* note that irqs are not enabled yet */
 			goto out_yield_core;
 		case (PROC_RUNNING_M):
 			break;				/* will handle this stuff below */
@@ -1031,7 +1069,7 @@ void __proc_wakeup(struct proc *p)
 			p->procdata->res_req[RES_CORES].amt_wanted = 1;
 		__proc_set_state(p, PROC_RUNNABLE_M);
 	} else {
-		printk("[kernel] FYI, waking up an _S proc\n");
+		printd("[kernel] FYI, waking up an _S proc\n");	/* thanks, past brho! */
 		__proc_set_state(p, PROC_RUNNABLE_S);
 		schedule_scp(p);
 	}

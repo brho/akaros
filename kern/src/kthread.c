@@ -243,6 +243,8 @@ void __launch_kthread(struct trapframe *tf, uint32_t srcid, long a0, long a1,
 			__proc_yield_s(pcpui->owning_proc, pcpui->cur_tf);
 			spin_unlock(&pcpui->owning_proc->proc_lock);
 			abandon_core();
+			/* prob need to clear the owning proc?  this is some old shit, so
+			 * don't just uncomment it. */
 		}
 		#endif
 	}

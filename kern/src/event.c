@@ -363,6 +363,7 @@ void send_event(struct proc *p, struct event_queue *ev_q, struct event_msg *msg,
 	/* If we're an _S, just spam vcore0, and wake up if necessary. */
 	if (!__proc_is_mcp(p)) {
 		spam_vcore(p, 0, msg, ev_q->ev_flags);
+		wrmb();	/* don't let the notif_pending write pass the state read */
 		/* using the same pattern as in spam_public (which can have multiple
 		 * unblock callbacks */
 		if (p->state == PROC_WAITING) {
