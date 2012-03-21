@@ -102,6 +102,7 @@ struct event_queue_big {
 #define VC_PREEMPTED			0x002				/* VC is preempted */
 #define VC_RECOVERING			0x004				/* VC being recovered */
 #define VC_UTHREAD_STEALING		0x008				/* Uthread being stolen */
+#define VC_SCP_NOVCCTX			0x010				/* can't go into vc ctx */
 
 /* Per-core data about preemptions and notifications */
 struct preempt_data {

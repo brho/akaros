@@ -84,6 +84,23 @@ int uthread_lib_init(struct uthread *uthread)
 	return 0;
 }
 
+/* Helper: tells the kernel our SCP is capable of going into vcore context on
+ * vcore 0.  Pairs with k/s/process.c scp_is_vcctx_ready(). */
+static void scp_vcctx_ready(void)
+{
+	struct preempt_data *vcpd = vcpd_of(0);
+	long old_flags;
+	/* the CAS is a bit overkill; keeping it around in case people use this
+	 * code in other situations. */
+	do {
+		old_flags = atomic_read(&vcpd->flags);
+		/* Spin if the kernel is mucking with the flags */
+		while (old_flags & VC_K_LOCK)
+			old_flags = atomic_read(&vcpd->flags);
+	} while (!atomic_cas(&vcpd->flags, old_flags,
+	                     old_flags & ~VC_SCP_NOVCCTX));
+}
+
 /* Slim-init - sets up basic uthreading for when we are in _S mode and before
  * we set up the 2LS.  Some apps may not have a 2LS and thus never do the full
  * vcore/2LS/uthread init. */
@@ -93,6 +110,7 @@ void uthread_slim_init(void)
 	/* TODO: consider a vcore_init_vc0 call.  Init the vcore system */
 	assert(!vcore_init());
 	uthread_manage_thread0(uthread);
+	scp_vcctx_ready();
 }
 
 /* 2LSs shouldn't call uthread_vcore_entry directly */

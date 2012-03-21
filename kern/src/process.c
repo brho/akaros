@@ -38,6 +38,7 @@ static uint32_t get_vcoreid(struct proc *p, uint32_t pcoreid);
 static uint32_t try_get_pcoreid(struct proc *p, uint32_t vcoreid);
 static uint32_t get_pcoreid(struct proc *p, uint32_t vcoreid);
 static void __proc_free(struct kref *kref);
+static bool scp_is_vcctx_ready(struct preempt_data *vcpd);
 
 /* PID management. */
 #define PID_MAX 32767 // goes from 0 to 32767, with 0 reserved
@@ -209,6 +210,9 @@ static void proc_init_procinfo(struct proc* p)
 static void proc_init_procdata(struct proc *p)
 {
 	memset(p->procdata, 0, sizeof(struct procdata));
+	/* processes can't go into vc context on vc 0 til they unset this.  This is
+	 * for processes that block before initing uthread code (like rtld). */
+	atomic_set(&p->procdata->vcore_preempt_data[0].flags, VC_SCP_NOVCCTX);
 }
 
 /* Allocates and initializes a process, with the given parent.  Currently
@@ -410,6 +414,14 @@ static void __set_proc_current(struct proc *p)
 	}
 }
 
+/* Flag says if vcore context is not ready, which is set in init_procdata.  The
+ * process must turn off this flag on vcore0 at some point.  It's off by default
+ * on all other vcores. */
+static bool scp_is_vcctx_ready(struct preempt_data *vcpd)
+{
+	return !(atomic_read(&vcpd->flags) & VC_SCP_NOVCCTX);
+}
+
 /* Dispatches a _S process to run on the current core.  This should never be
  * called to "restart" a core.   
  *
@@ -459,8 +471,10 @@ void proc_run_s(struct proc *p)
 			pcpui->owning_proc = p;
 			/* TODO: (HSS) set silly state here (__startcore does it instantly) */
 			/* similar to the old __startcore, start them in vcore context if
-			 * they have notifs and aren't already in vcore context. */
-			if (!vcpd->notif_disabled && vcpd->notif_pending) {
+			 * they have notifs and aren't already in vcore context.  o/w, start
+			 * them wherever they were before (could be either vc ctx or not) */
+			if (!vcpd->notif_disabled && vcpd->notif_pending
+			                          && scp_is_vcctx_ready(vcpd)) {
 				vcpd->notif_disabled = TRUE;
 				/* save the _S's tf in the notify slot, build and pop a new one
 				 * in actual/cur_tf. */
@@ -470,6 +484,12 @@ void proc_run_s(struct proc *p)
 				proc_init_trapframe(pcpui->cur_tf, 0, p->env_entry,
 				                    vcpd->transition_stack);
 			} else {
+				/* If they have no transition stack, then they can't receive
+				 * events.  The most they are getting is a wakeup from the
+				 * kernel.  They won't even turn off notif_pending, so we'll do
+				 * that for them. */
+				if (!scp_is_vcctx_ready(vcpd))
+					vcpd->notif_pending = FALSE;
 				/* this is one of the few times cur_tf != &actual_tf */
 				pcpui->cur_tf = &p->env_tf;
 			}
@@ -909,8 +929,13 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 				/* this check is an early optimization (check, signal, check
 				 * again pattern).  We could also lock before spamming the
 				 * vcore in event.c */
-				if (vcpd->notif_pending)
+				if (vcpd->notif_pending) {
+					/* they can't handle events, just need to prevent a yield.
+					 * (note the notif_pendings are collapsed). */
+					if (!scp_is_vcctx_ready(vcpd))
+						vcpd->notif_pending = FALSE;
 					goto out_failed;
+				}
 				/* syncing with event's SCP code.  we set waiting, then check
 				 * pending.  they set pending, then check waiting.  it's not
 				 * possible for us to miss the notif *and* for them to miss
@@ -920,6 +945,8 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 				wrmb(); /* don't let the state write pass the notif read */ 
 				if (vcpd->notif_pending) {
 					__proc_set_state(p, PROC_RUNNING_S);
+					if (!scp_is_vcctx_ready(vcpd))
+						vcpd->notif_pending = FALSE;
 					goto out_failed;
 				}
 				/* if we're here, we want to sleep.  a concurrent event that
@@ -1799,6 +1826,10 @@ void __notify(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2)
 	 * after we unmap. */
 	vcoreid = get_vcoreid(p, coreid);
 	vcpd = &p->procdata->vcore_preempt_data[vcoreid];
+	/* for SCPs that haven't (and might never) call vc_event_init, like rtld.
+	 * this is harmless for MCPS to check this */
+	if (!scp_is_vcctx_ready(vcpd))
+		return;
 	printd("received active notification for proc %d's vcore %d on pcore %d\n",
 	       p->procinfo->pid, vcoreid, coreid);
 	/* sort signals.  notifs are now masked, like an interrupt gate */

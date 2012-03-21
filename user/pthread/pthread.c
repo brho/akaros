@@ -235,6 +235,14 @@ static void pth_handle_syscall(struct event_msg *ev_msg, unsigned int ev_type)
 {
 	struct syscall *sysc;
 	assert(in_vcore_context());
+	/* if we just got a bit (not a msg), it should be because the process is
+	 * still an SCP and hasn't started using the MCP ev_q yet (using the simple
+	 * ev_q and glibc's blockon) or because the bit is still set from an old
+	 * ev_q (blocking syscalls from before we could enter vcore ctx).  Either
+	 * way, just return.  Note that if you screwed up the pth ev_q and made it
+	 * NO_MSG, you'll never notice (we used to assert(ev_msg)). */
+	if (!ev_msg)
+		return;
 	/* It's a bug if we don't have a msg (we're handling a syscall bit-event) */
 	assert(ev_msg);
 	/* Get the sysc from the message and just restart it */

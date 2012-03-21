@@ -4,7 +4,8 @@ Barret Rhoden
 1. Overview
 2. Async Syscalls and I/O
 3. Event Delivery / Notification
-4. Misc Things That Aren't Sorted Completely:
+4. Single-core Process (SCP) Events
+5. Misc Things That Aren't Sorted Completely:
 
 1. Overview
 ====================
@@ -689,14 +690,94 @@ migrate a notif_safe locking uthread.  The whole point of it is in case it grabs
 a lock that would be held by vcore context, and there's no way to know it isn't
 a lock on the restart-path.
 
-4. Misc Things That Aren't Sorted Completely:
+4. Single-core Process (SCP) Events:
 ====================
-4.1 What about short handlers?
+4.1 Basics:
+---------------------------------------
+Event delivery is important for SCP's blocking syscalls.  It can also be used
+(in the future) to deliver POSIX signals, which would just be another kernel
+event.
+
+SCPs can receive events just like MCPs.  For the most part, the code paths are
+the same on both sides of the K/U interface.  The kernel sends events (which
+can detect an SCP and will send it to vcore0), the kernel will make sure you
+can't yield/miss an event, etc.  Userspace preps vcore context in advance, and
+can do all the things vcore context does: handle events, select thread to run.
+For an SCP, there is only one thread to run.
+
+4.2 Degenerate Event Delivery:
+---------------------------------------
+That being said, there are a few tricky things.  First, there is a time before
+the SCP is ready to fully receive events.  Specifically, before
+vcore_event_init(), which is called out of glibc's _start.  More importantly,
+the runtime linker never calls that function, yet it wants to block.
+
+The important thing to note is that there are a few parts to event delivery:
+registration (user), sending the event (kernel), making sure the proc wakes up
+(kernel), and actually handling the event (user).  For syscalls, the only thing
+the process (even rtld) needs is the first three.  Registration is easy - can be
+done with nothing more than kernel headers (no need for parlib) for NO_MSG ev_qs
+(no need to init the UCQ).  Event handling is trickier, and requires parlib
+(which rtld can't link against).  To support processes that could register for
+events, but not handle them (or even enter vcore context), the kernel needed a
+few changes (checking the VC_SCP_NOVCCTX flag) so that it would wake the
+process, but never put it in vcore context.  
+
+This degenerate event handling just wakes the process up, at which point it can
+check on its syscall.  Very early in the process's life, it'll init vcore0's
+UCQ and be able to handle full events, enter vcore context, etc.
+
+Once the SCP is up and running, it can receive events like normal.  One thing to
+note is that the SCPs are not using a handle_syscall() event handler, like the
+MCPs do.  They are only using the event to get the process restarted, at which
+point their vcore 0 restarts thread0.  One consequence of this is that if a
+process receives an unrelated event while blocking on a syscall, it'll handle
+that event, then restart thread0.  Thread0 will see its syscall isn't complete,
+and then re-block.  (It also re-registers its ev_q, which is harmless).  When
+that syscall is finally done, the kernel will send an event and wake it up
+again.
+
+4.3 Extra Tidbits:
+---------------------------------------
+One minor point: SCPs can't receive INDIRs, at least for now.  The kernel event
+code short circuits all the fallback business and just spams vcore0's public
+mbox.  If we ever change that, we need to be sure to post a notif_pending to
+vcore0 (that's the signal to trigger a wakeup).
+
+If we receive an event right as we transition from SCP to MCP, vcore0 could get
+spammed with a message that is never received.  Right now, it's not a problem,
+since vcore0 is the first vcore that will get woken up as an MCP.  This could be
+an issue if we ever allow transitions from MCP back to SCP.
+
+On a related note, it's now wrong for SCPs to sys_yield(FALSE) (not being nice,
+meaning they are waiting for an event) in a loop that does not check events or
+otherwise allow them to break out of that loop.  This should be fairly obvious.
+A little more subtle is that these loops also need to sort out notif_pending.
+If you are trying to yield and still have an old notif_pending set, the kernel
+won't let you yield (it thinks you are missing the notif).  For the degenerate
+mode, (VC_SCP_NOVCCTX is set on vcore0), the kernel will handle dealing with
+this flag.
+
+Finally, note that while the SCP is in vcore context, it has none of the
+guarantees of an MCP.  It's somewhat meaningless to talk about being gang
+scheduled or knowing about the state of other vcores.  If you're running, you're
+on a physical core.  You may get unexpected interrupts, descheduled, etc.  Aside
+from the guarantees and being the only vcore, the main differences are really up
+to the kernel scheduler.  In that sense, we have somewhat of a new state for
+processes - SCPs that can enter vcore context.  From the user's perspective,
+they look a lot like an MCP, and the degenerate/early mode SCPs are like the
+old, dumb SCPs.  The big difference for userspace is that there isn't a 2LS yet
+(will need to reinit things slightly).  The kernel treats SCPs and MCPs very
+differently too, but that may not always be the case.
+
+5. Misc Things That Aren't Sorted Completely:
+====================
+5.1 What about short handlers?
 ---------------------------------------
 Once we sort the other issues, we can ask for them via a flag in the event_q,
 and run the handler in the event_q struct.
 
-4.2 What about blocking on a syscall?
+5.2 What about blocking on a syscall?
 ---------------------------------------
 The current plan is to set a flag, and let the kernel go from there.  The
 kernel knows which process it is, since that info is saved in the kthread that
