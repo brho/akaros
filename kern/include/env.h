@@ -33,6 +33,7 @@ struct proc {
 	pid_t pid;
 	pid_t ppid;                 // Parent's PID
 	pid_t exitcode;				// exit() param or main() return value
+	struct semaphore state_change;
 	uint32_t state;				// Status of the process
 	struct kref p_kref;		/* Refcnt */
 	uint32_t env_flags;

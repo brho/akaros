@@ -562,6 +562,12 @@ all_out:
 
 static ssize_t sys_trywait(env_t* e, pid_t pid, int* status)
 {
+	/* TODO:
+	 * - WAIT should handle stop and start via signal too
+	 *   	- what semantics?  need a wait for every change to state?  etc.
+	 * - should have an option for WNOHANG, and a bunch of other things.
+	 * - think about what functions we want to work with MCPS
+	 *   */
 	struct proc* p = pid2proc(pid);
 
 	// TODO: this syscall is racy, so we only support for single-core procs
@@ -576,6 +582,10 @@ static ssize_t sys_trywait(env_t* e, pid_t pid, int* status)
 
 		if(current->pid == p->ppid)
 		{
+			/* Block til there is some activity */
+			if (!(p->state == PROC_DYING)) {
+				sleep_on(&p->state_change);
+			}
 			if(p->state == PROC_DYING)
 			{
 				memcpy_to_user(e,status,&p->exitcode,sizeof(int));
@@ -585,6 +595,7 @@ static ssize_t sys_trywait(env_t* e, pid_t pid, int* status)
 			}
 			else // not dead yet
 			{
+				warn("Should not have reached here.");
 				set_errno(ESUCCESS);
 				ret = -1;
 			}

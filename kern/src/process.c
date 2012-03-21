@@ -247,6 +247,7 @@ error_t proc_alloc(struct proc **pp, struct proc *parent)
 	/* Set the basic status variables. */
 	spinlock_init(&p->proc_lock);
 	p->exitcode = 1337;	/* so we can see processes killed by the kernel */
+	init_sem(&p->state_change, 0);
 	p->ppid = parent ? parent->pid : 0;
 	p->state = PROC_CREATED; /* shouldn't go through state machine for init */
 	p->env_flags = 0;
@@ -678,6 +679,7 @@ void proc_restartcore(void)
 void proc_destroy(struct proc *p)
 {
 	uint32_t num_revoked = 0;
+	struct kthread *sleeper;
 	spin_lock(&p->proc_lock);
 	/* storage for pc_arr is alloced at decl, which is after grabbing the lock*/
 	uint32_t pc_arr[p->procinfo->num_vcores];
@@ -735,6 +737,10 @@ void proc_destroy(struct proc *p)
 	close_all_files(&p->open_files, FALSE);
 	/* This decref is for the process's existence. */
 	proc_decref(p);
+	/* Signal our state change.  Assuming we only have one waiter right now. */
+	sleeper = __up_sem(&p->state_change, TRUE);
+	if (sleeper)
+		kthread_runnable(sleeper);
 	/* Unlock.  A death IPI should be on its way, either from the RUNNING_S one,
 	 * or from proc_take_cores with a __death.  in general, interrupts should be
 	 * on when you call proc_destroy locally, but currently aren't for all
