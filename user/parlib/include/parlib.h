@@ -15,6 +15,7 @@
 #include <ros/procinfo.h>
 #include <ros/procdata.h>
 #include <stdint.h>
+#include <errno.h>
 #include <ros_debug.h>
 
 enum {

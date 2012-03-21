@@ -30,7 +30,7 @@
 # include <sysdep.h>
 # include <kernel-features.h>
 #include <sys/mman.h>
-#include <ros/syscall.h>
+#include <sys/syscall.h>
 #include <ros/procinfo.h>
 #include <ros/procdata.h>
 #include <ros/arch/mmu.h>

@@ -1,6 +1,10 @@
 libc {
   GLIBC_2.0 {
     __errno_location;
+    ros_syscall_blockon;
+    __ros_scp_syscall_blockon;
+    __ros_scp_simple_evq;
+    __ros_syscall;
+    __ros_syscall_errno;
   }
 }
-

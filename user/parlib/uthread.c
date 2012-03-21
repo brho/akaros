@@ -22,6 +22,9 @@ static void __uthread_free_tls(struct uthread *uthread);
 static void __run_current_uthread_raw(void);
 static void handle_vc_preempt(struct event_msg *ev_msg, unsigned int ev_type);
 
+/* Block the calling uthread on sysc until it makes progress or is done */
+static void __ros_mcp_syscall_blockon(struct syscall *sysc);
+
 /* Helper, make the uthread code manage thread0.  This sets up uthread such
  * that the calling code and its TLS are tracked by the uthread struct, and
  * vcore0 thinks the uthread is running there.  Called only by slim_init (early
@@ -111,6 +114,11 @@ void uthread_slim_init(void)
 	assert(!vcore_init());
 	uthread_manage_thread0(uthread);
 	scp_vcctx_ready();
+	/* change our blockon from glibc's internal one to the mcp one (which can
+	 * handle SCPs too).  we must do this before switching to _M, or at least
+	 * before blocking while an _M.  it's harmless (and probably saner) to do it
+	 * earlier, so we do it as early as possible. */
+	ros_syscall_blockon = __ros_mcp_syscall_blockon;
 }
 
 /* 2LSs shouldn't call uthread_vcore_entry directly */
@@ -319,30 +327,13 @@ static void __ros_syscall_spinon(struct syscall *sysc)
 		cpu_relax();
 }
 
-static void __ros_syscall_scp_blockon(struct syscall *sysc)
-{
-	/* Until we're ready (advertised via the *evq), we must spin */
-	if (!__scp_simple_evq) {
-		__ros_syscall_spinon(sysc);
-		return;
-	}
-	/* Ask for a SYSCALL event when the sysc is done.  We don't need a handler,
-	 * we just need the kernel to restart us from proc_yield.  If register
-	 * fails, we're already done. */
-	if (register_evq(sysc, __scp_simple_evq)) {
-		/* Sending false for now - we want to signal proc code that we want to
-		 * wait (piggybacking on the MCP meaning of this variable */
-		sys_yield(FALSE);
-	}
-}
-
 /* Attempts to block on sysc, returning when it is done or progress has been
  * made. */
-void ros_syscall_blockon(struct syscall *sysc)
+void __ros_mcp_syscall_blockon(struct syscall *sysc)
 {
 	/* even if we are in 'vcore context', an _S can block */
 	if (!in_multi_mode()) {
-		__ros_syscall_scp_blockon(sysc);
+		__ros_scp_syscall_blockon(sysc);
 		return;
 	}
 	/* MCP vcore's don't know what to do yet, so we have to spin */
@@ -755,7 +746,9 @@ out_indirs:
 /* Attempts to register ev_q with sysc, so long as sysc is not done/progress.
  * Returns true if it succeeded, and false otherwise.  False means that the
  * syscall is done, and does not need an event set (and should be handled
- * accordingly)*/
+ * accordingly).
+ * 
+ * A copy of this is in glibc/sysdeps/ros/syscall.c.  Keep them in sync. */
 bool register_evq(struct syscall *sysc, struct event_queue *ev_q)
 {
 	int old_flags;

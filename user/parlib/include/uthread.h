@@ -59,8 +59,6 @@ void uthread_slim_init(void);
 void uthread_cleanup(struct uthread *uthread);
 void uthread_runnable(struct uthread *uthread);
 void uthread_yield(bool save_state);
-/* Block the calling uthread on sysc until it makes progress or is done */
-void ros_syscall_blockon(struct syscall *sysc);
 
 /* Utility functions */
 bool __check_preempt_pending(uint32_t vcoreid);	/* careful: check the code */

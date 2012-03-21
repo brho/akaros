@@ -9,3 +9,4 @@ CPPFLAGS += -D_IO_MTSAFE_IO=1
 ifeq ($(subdir),socket)
 sysdep_routines += sa_len
 endif
+sysdep_headers += sys/syscall.h

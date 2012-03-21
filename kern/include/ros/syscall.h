@@ -31,65 +31,8 @@ struct syscall {
 
 #ifndef ROS_KERNEL
 
-#include <arch/atomic.h>
-
-/* Attempts to block on sysc, returning when it is done or progress has been
- * made.  (function is in uthread.c) */
-void ros_syscall_blockon(struct syscall *sysc);
-
-/* No one should be using this - it's meant to allow glibc to compile, and all
- * apps will link against parlib to get the real function. */
-static inline void __ros_syscall_blockon(struct syscall *sysc)
-{
-	/* My ghetto error message: force a PF */
-	int *x = (int*)0xdeadbeef;
-	*x = 1337;
-}
-weak_alias(__ros_syscall_blockon, ros_syscall_blockon);
-
-/* TODO: make variants of __ros_syscall() based on the number of args (0 - 6) */
-/* These are simple synchronous system calls, built on top of the kernel's async
- * interface.  This version makes no assumptions about errno.  You usually don't
- * want this. */
-static inline long __ros_syscall(unsigned int _num, long _a0, long _a1, long _a2,
-                                 long _a3, long _a4, long _a5, int *errno_loc)
-{
-	int num_started;	/* not used yet */
-	struct syscall sysc = {0};
-	sysc.num = _num;
-	sysc.ev_q = 0;
-	sysc.arg0 = _a0;
-	sysc.arg1 = _a1;
-	sysc.arg2 = _a2;
-	sysc.arg3 = _a3;
-	sysc.arg4 = _a4;
-	sysc.arg5 = _a5;
-	num_started = __ros_arch_syscall(&sysc, 1);
-	/* Don't proceed til we are done */
-	while (!(atomic_read(&sysc.flags) & SC_DONE))
-		ros_syscall_blockon(&sysc);
-	/* Need to wait til it is unlocked.  It's not really done until SC_DONE &
-	 * !SC_K_LOCK. */
-	while (atomic_read(&sysc.flags) & SC_K_LOCK)
-		cpu_relax();
-	if (errno_loc)
-		*errno_loc = sysc.err;
-	return sysc.retval;
-}
-
-#include <errno.h>
-
-/* This version knows about errno and will handle it. */
-static inline long __ros_syscall_errno(unsigned int _num, long _a0, long _a1,
-                                       long _a2, long _a3, long _a4, long _a5)
-{
-	return __ros_syscall(_num, _a0, _a1, _a2, _a3, _a4, _a5, &errno);
-}
-
-/* Convenience wrapper for __ros_syscall */
-#define ros_syscall(which, a0, a1, a2, a3, a4, a5) \
-   __ros_syscall_errno(which, (long)(a0), (long)(a1), (long)(a2), (long)(a3), \
-                       (long)(a4), (long)(a5))
+/* Temp hack, til the rest of glibc/userspace uses sys/syscall.h */
+#include <sys/syscall.h>
 
 #endif /* ifndef ROS_KERNEL */
 

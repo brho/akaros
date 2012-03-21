@@ -115,9 +115,6 @@ Because errno is valid when the linker runs, regular syscalls can be made.
 However for statically linked apps, several syscalls cannot use the ros_syscall
 macro, because there is no valid errno set up. 
 
-
-
-
 Unimplemented Stubs
 --------------------------
 There are a lot of things we haven't ported, but we have the stub functions so
@@ -130,6 +127,47 @@ We've included some header files from Linux's kernel.  For now, we just need
 something to keep glibc happy, even though ROS doesn't have any networking
 syscalls.  Don't rely on this stuff too much.  These files, and other future
 glibc compatibility kernel headers, are in kern/include/ros/glibc-asm.
+
+Weak Symbols, start.c, and ros_syscall_blockon
+--------------------------
+For a long time, __ros_syscall_blockon was not getting overridden by the
+strong symbol in parlib.  This means that glibc's syscalls were not blocking
+uthreads properly.  Why did the weak symbols work for vcore_entry() and
+vcore_event_init(), but not blockon?
+
+Side note: we needed to force the linker to find out about vcore_entry and
+vcore_event_init, via the -u tricks of commit f188983.  The linker is not
+obligated to look in libraries to override a weak symbol.
+
+The crux of the matter is that start.c is not linked with applications in the
+same manner as the rest of glibc (notably all the I/O syscalls).  start.c will
+get linked with the program at compile time, while libc can be linked
+dynamically.  Because of this, start.c's weak symbols would get (correctly)
+overridden by the strong symbols of libparlib.a.  But glibc would build
+libc.so, and that would not get a chance to link against the binary (and
+libparlib.a) until load time.  The weak symbols in libc get promoted to strong
+symbols when it is done linking libc.so, and when it later is linked against
+the program, there is no longer an opportunity to override the weak symbol.
+
+Also note that rtld will never link with parlib, so any weak symbol in there
+will never get overriden.  I briefly considered linking rtld with -lparlib,
+but it blows up in a nasty way: parlib needs lots of libc, which rtld is not
+built with (memset for example).
+
+Anyway, the moral of the story is to be careful with your weak
+symbols/aliases.  Only put them in start.c, or similar files.
+
+Adding a Global Variable to the ABI
+--------------------------
+It's not enough to simply 'extern' a variable (or declare a function, which is
+extern by default).  At some point, glibc will change those symbols from
+GLOBAL to LOCAL.
+
+You need to add an entry to the Versions file (sysdeps/ros/Versions).  Be sure
+to indent with spaces, not tabs, or else glibc's scripts will not handle your
+symbol.
+
+Putting them in the libc, glibc 2.0 section seems to work fine.
 
 Tips, Questions, and Misc Notes
 --------------------------
