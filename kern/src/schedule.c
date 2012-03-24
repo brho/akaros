@@ -242,9 +242,6 @@ void cpu_bored(void)
 {
 	if (!management_core())
 		return;
-	/* TODO: something smart.  For now, do what smp_idle did */
-	manager();
-	assert(0);
 	/* TODO run a process, and if none exist at all and we're core 0, bring up
 	 * the monitor/manager */
 }

@@ -116,15 +116,8 @@ void manager_brho(void)
 		printk("*** Hit shift-g to get into the monitor. ***\n");
 		first = FALSE;
 	}
-	while (1) {
-		enable_irq();
-		process_routine_kmsg(0);
-		/* would like to idle here, but without reset stacks, people will run
-		 * off the kstack.  so just idle if we have an owning proc (which we
-		 * should then 'restart'). */
-		if (pcpui->owning_proc)
-			smp_idle();
-	}
+	/* just idle, and deal with things via interrupts.  or via face. */
+	smp_idle();
 	/* whatever we do in the manager, keep in mind that we need to not do
 	 * anything too soon (like make processes), since we'll drop in here during
 	 * boot if the boot sequence required any I/O (like EXT2), and we need to
