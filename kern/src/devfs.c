@@ -14,6 +14,7 @@
 #include <smp.h>
 #include <umem.h>
 #include <kmalloc.h>
+#include <console.h>
 
 /* These structs are declared again and initialized farther down */
 struct file_operations dev_f_op_stdin;
@@ -75,23 +76,25 @@ int dev_mmap(struct file *file, struct vm_region *vmr)
 	return -1;
 }
 
+/* this is really /dev/console, and will need some tty work.  for now, no matter
+ * how much they ask for, we return one character at a time. */
 ssize_t dev_stdin_read(struct file *file, char *buf, size_t count,
                        off_t *offset)
 {
-	int read_amt;
-	char *kbuf = kmalloc(count, 0);
-	memset(kbuf, 0, count);// TODO REMOVE ME
-	read_amt = readline(kbuf, count, 0);
-	assert(read_amt <= count);
+	char c;
+	extern struct kb_buffer cons_buf;
+	kb_get_from_buf(&cons_buf, &c, 1);
+	/* this is faking some tcgetattr attributes */
 	/* applications (ash) expect a \n instead of a \r */
-	if (kbuf[read_amt - 1] == '\r')
-		kbuf[read_amt - 1] = '\n';
+	if (c == '\r')
+		c = '\n';
+	printk("%c", c);
 	/* TODO UMEM */
 	if (current)
-		memcpy_to_user_errno(current, buf, kbuf, read_amt);
+		memcpy_to_user_errno(current, buf, &c, 1);
 	else
-		memcpy(buf, kbuf, read_amt);
-	return read_amt;
+		memcpy(buf, &c, 1);
+	return 1;
 }
 
 ssize_t dev_stdout_write(struct file *file, const char *buf, size_t count,
