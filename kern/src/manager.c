@@ -118,11 +118,6 @@ void manager_brho(void)
 	}
 	while (1) {
 		enable_irq();
-		/* one time keyboard / serial check for some magic, then monitor */
-		if (cons_getc() == 'G') {
-			printk("Heard the call of the giraffe!\n");
-			monitor(0);
-		}
 		process_routine_kmsg(0);
 		/* would like to idle here, but without reset stacks, people will run
 		 * off the kstack.  so just idle if we have an owning proc (which we

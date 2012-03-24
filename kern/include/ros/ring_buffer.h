@@ -33,6 +33,12 @@
 #define xen_rmb() rmb()
 #define xen_wmb() wmb()
 
+/* Helpers for generic power-of-2 ring buffers */
+#define __ring_nr_empty(sz, prod, cons) ((sz) - ((prod) - (cons)))
+#define __ring_empty(prod, cons) ((prod) == (cons))
+#define __ring_nr_full(prod, cons) ((prod) - (cons))
+#define __ring_full(sz, prod, cons) (__ring_nr_empty((sz), (prod), (cons)) == 0)
+
 typedef unsigned int RING_IDX;
 
 /* Round a 32-bit unsigned constant down to the nearest power of two. */

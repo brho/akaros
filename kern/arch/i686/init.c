@@ -14,8 +14,42 @@
 #include <arch/ioapic.h>
 #include <arch/console.h>
 #include <arch/perfmon.h>
+#include <console.h>
 
-#include <monitor.h>
+/* irq handler for the console (kb, serial, etc) */
+static void irq_console(struct trapframe *tf, void *data)
+{
+	int c = cons_getc();
+	if (!c)
+		return;
+	/* Do our work in an RKM, instead of interrupt context */
+	if (c == 'G')
+		send_kernel_message(core_id(), __run_mon, 0, 0, 0, KMSG_ROUTINE);
+	else
+		send_kernel_message(core_id(), __cons_add_char, (long)&cons_buf,
+		                    (long)c, 0, KMSG_ROUTINE);
+}
+
+static void cons_irq_init(void)
+{
+	register_interrupt_handler(interrupt_handlers, 1 + PIC1_OFFSET, irq_console,
+	                           0);
+	register_interrupt_handler(interrupt_handlers, 3 + PIC1_OFFSET, irq_console,
+	                           0);
+	register_interrupt_handler(interrupt_handlers, 4 + PIC1_OFFSET, irq_console,
+	                           0);
+	/* route kb and both serial interrupts to core 0 */
+#ifdef __CONFIG_ENABLE_MPTABLES__
+	ioapic_route_irq(1, 0);
+	ioapic_route_irq(3, 0);
+	ioapic_route_irq(4, 0);
+#else 
+	pic_unmask_irq(1);	/* keyboard */
+	pic_unmask_irq(3);	/* serial 2 or 4 */
+	pic_unmask_irq(4);	/* serial 1 or 3 */
+	unmask_lapic_lvt(LAPIC_LVT_LINT0);
+#endif /* __CONFIG_ENABLE_MPTABLES__ */
+}
 
 void arch_init()
 {
@@ -56,34 +90,5 @@ void arch_init()
 	#endif // __CONFIG_NETWORKING__
 
 	perfmon_init();
-		
-#ifdef __CONFIG_MONITOR_ON_INT__
-	/* Handler to read a char from the interrupt source and call the monitor.
-	 * Need to read the character so the device will send another interrupt.
-	 * Note this will read from both the serial and the keyboard, and throw away
-	 * the result.  We condition, since we don't want to trigger on a keyboard
-	 * up interrupt */
-	void mon_int(struct trapframe *tf, void *data)
-	{
-		// Enable interrupts here so that we can receive 
-		// other interrupts (e.g. from the NIC)
-		enable_irq();
-		if (cons_getc())
-			monitor(0);
-	}
-	register_interrupt_handler(interrupt_handlers, 1 + PIC1_OFFSET, mon_int, 0);
-	register_interrupt_handler(interrupt_handlers, 3 + PIC1_OFFSET, mon_int, 0);
-	register_interrupt_handler(interrupt_handlers, 4 + PIC1_OFFSET, mon_int, 0);
-# ifdef __CONFIG_ENABLE_MPTABLES__
-	ioapic_route_irq(1, 0);
-	ioapic_route_irq(3, 0);
-	ioapic_route_irq(4, 0);
-# else 
-	pic_unmask_irq(1);	/* keyboard */
-	pic_unmask_irq(3);	/* serial 2 or 4 */
-	pic_unmask_irq(4);	/* serial 1 or 3 */
-	unmask_lapic_lvt(LAPIC_LVT_LINT0);
-# endif /* __CONFIG_ENABLE_MPTABLES__ */
-	enable_irq(); /* we want these interrupts to work in the kernel. */
-#endif /* __CONFIG_MONITOR_ON_INT__ */
+	cons_irq_init();
 }

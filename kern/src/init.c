@@ -44,6 +44,7 @@
 #include <kthread.h>
 #include <net.h>
 #include <eth_audio.h>
+#include <console.h>
 
 // zra: flag for Ivy
 int booting = 1;
@@ -94,6 +95,7 @@ void kernel_init(multiboot_info_t *mboot_info)
 	sysenter_init();
 	timer_init();
 	train_timing();
+	kb_buf_init(&cons_buf);
 	
 	arch_init();
 	block_init();
