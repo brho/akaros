@@ -35,6 +35,12 @@ weak_alias(__vcore_event_init, vcore_event_init)
 
 #define failmsg(str) write(2,str"\n",sizeof(str"\n")-1)
 
+void __ros_libc_csu_init(int argc, char **argv, char **envp)
+{
+	__libc_csu_init(argc, argv, envp);
+	vcore_event_init();
+}
+
 void
 _start(void)
 {
@@ -94,8 +100,8 @@ _start(void)
 	extern char** _environ;
 	_environ = argv+argc+1;
 
-	vcore_event_init();
-	__libc_start_main(&main,argc,argv,&__libc_csu_init,&__libc_csu_fini,0,0);
+	__libc_start_main(&main, argc, argv, &__ros_libc_csu_init, &__libc_csu_fini,
+	                  0, 0);
 
 	failmsg("why did main() return?");
 
