@@ -153,6 +153,55 @@ void register_mcp(struct proc *p)
 	//poke_ksched(p, RES_CORES);
 }
 
+/* mgmt/LL cores should call this to schedule the calling core and give it to an
+ * SCP.  will also prune the dead SCPs from the list.  hold the lock before
+ * calling.  returns TRUE if it scheduled a proc. */
+static bool __schedule_scp(void)
+{
+	struct proc *p;
+	uint32_t pcoreid = core_id();
+	struct per_cpu_info *pcpui = &per_cpu_info[pcoreid];
+	int8_t state = 0;
+	/* prune any dying SCPs at the head of the queue and maybe sched our core
+	 * (let all the cores do this, whoever happens to be running schedule()). */
+	while ((p = TAILQ_FIRST(&runnable_scps))) {
+		if (p->state == PROC_DYING) {
+			TAILQ_REMOVE(&runnable_scps, p, proc_link);
+			proc_decref(p);
+		} else {
+			/* protect owning proc, cur_tf, etc.  note this nests with the
+			 * calls in proc_yield_s */
+			disable_irqsave(&state);
+			/* someone is currently running, dequeue them */
+			if (pcpui->owning_proc) {
+				printd("Descheduled %d in favor of %d\n",
+				       pcpui->owning_proc->pid, p->pid);
+				__proc_yield_s(pcpui->owning_proc, pcpui->cur_tf);
+				/* round-robin the SCPs */
+				TAILQ_INSERT_TAIL(&runnable_scps, pcpui->owning_proc,
+				                  proc_link);
+				/* could optimize the refcnting if we cared */
+				proc_incref(pcpui->owning_proc, 1);
+				clear_owning_proc(pcoreid);
+				/* Note we abandon core.  It's not strictly necessary.  If
+				 * we didn't, the TLB would still be loaded with the old
+				 * one, til we proc_run_s, and the various paths in
+				 * proc_run_s would pick it up.  This way is a bit safer for
+				 * future changes, but has an extra (empty) TLB flush.  */
+				abandon_core();
+			} 
+			/* Run the new proc */
+			TAILQ_REMOVE(&runnable_scps, p, proc_link);
+			printd("PID of the SCP i'm running: %d\n", p->pid);
+			proc_run_s(p);	/* gives it core we're running on */
+			proc_decref(p);
+			enable_irqsave(&state);
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
 /* Something has changed, and for whatever reason the scheduler should
  * reevaluate things. 
  *
@@ -160,7 +209,6 @@ void register_mcp(struct proc *p)
 void schedule(void)
 {
 	struct proc *p, *temp;
-	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	spin_lock(&sched_lock);
 	/* trivially try to handle the needs of all our MCPS.  smarter schedulers
 	 * would do something other than FCFS */
@@ -184,22 +232,8 @@ void schedule(void)
 			continue;
 		__core_request(p);
 	}
-	/* prune any dying SCPs at the head of the queue and maybe sched our core */
-	while ((p = TAILQ_FIRST(&runnable_scps))) {
-		if (p->state == PROC_DYING) {
-			TAILQ_REMOVE(&runnable_scps, p, proc_link);
-			proc_decref(p);
-		} else {
-			/* check our core to see if we can give it out to an SCP */
-			if (management_core() && (!pcpui->owning_proc)) {
-				TAILQ_REMOVE(&runnable_scps, p, proc_link);
-				printd("PID of the SCP i'm running: %d\n", p->pid);
-				proc_run_s(p);	/* gives it core we're running on */
-				proc_decref(p);
-			}
-			break;
-		}
-	}
+	if (management_core())
+		__schedule_scp();
 	spin_unlock(&sched_lock);
 }
 
@@ -240,10 +274,20 @@ void ksched_proc_unblocked(struct proc *p)
  * disabled, and if you return, the core will cpu_halt(). */
 void cpu_bored(void)
 {
+	bool new_proc = FALSE;
 	if (!management_core())
 		return;
-	/* TODO run a process, and if none exist at all and we're core 0, bring up
-	 * the monitor/manager */
+	spin_lock(&sched_lock);
+	new_proc = __schedule_scp();
+	spin_unlock(&sched_lock);
+	/* if we just scheduled a proc, we need to manually restart it, instead of
+	 * returning.  if we return, the core will halt. */
+	if (new_proc) {
+		proc_restartcore();
+		assert(0);
+	}
+	/* Could drop into the monitor if there are no processes at all.  For now,
+	 * the 'call of the giraffe' suffices. */
 }
 
 /* Helper function to return a core to the idlemap.  It causes some more lock

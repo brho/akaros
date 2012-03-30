@@ -634,6 +634,8 @@ void proc_restartcore(void)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	assert(!pcpui->cur_sysc);
+	/* TODO: can probably remove this enable_irq.  it was an optimization for
+	 * RKMs */
 	/* Try and get any interrupts before we pop back to userspace.  If we didn't
 	 * do this, we'd just get them in userspace, but this might save us some
 	 * effort/overhead. */
@@ -883,7 +885,6 @@ void __proc_yield_s(struct proc *p, struct trapframe *tf)
 	assert(p->state == PROC_RUNNING_S);
 	__proc_set_state(p, PROC_RUNNABLE_S);
 	__proc_save_context_s(p, tf);
-	schedule_scp(p);
 }
 
 /* Yields the calling core.  Must be called locally (not async) for now.
@@ -962,6 +963,7 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 			} else {
 				/* yielding to allow other processes to run */
 				__proc_yield_s(p, current_tf);
+				schedule_scp(p);
 			}
 			spin_unlock(&p->proc_lock);	/* note that irqs are not enabled yet */
 			goto out_yield_core;
