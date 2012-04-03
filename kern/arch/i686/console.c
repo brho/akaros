@@ -33,6 +33,7 @@ void scroll_screen(void);
 #define	COM_MCR_RTS		0x02	// RTS complement
 #define	COM_MCR_DTR		0x01	// DTR complement
 #define	COM_MCR_OUT2	0x08	// Out2 complement
+#define	COM_MCR_GLB_IRQ	0x08	/* global irq controlled via MCR */
 #define COM_LSR			5		// In:	Line Status Register
 #define COM_LSR_DATA	0x01	//   Data available
 #define COM_LSR_READY	0x20	//   Ready to send
@@ -74,8 +75,13 @@ serial_init(void)
 	// 8 data bits, 1 stop bit, parity off; turn off DLAB latch
 	outb(COM1+COM_LCR, COM_LCR_WLEN8 & ~COM_LCR_DLAB);
 
-	// This should turn on hardware flow control
-	outb(COM1+COM_MCR, COM_MCR_RTS | COM_MCR_DTR);
+	/* This should turn on hardware flow control and make sure the global irq
+	 * bit is on.  This bit is definitely used some hardware's 16550As, though
+	 * not for qemu.  Also, on both qemu and hardware, this whole line is a
+	 * noop, since the COM_MCR is already 0x0b, so we're just making sure the
+	 * three bits are still turned on (and leaving other bits unchanged) */
+	outb(COM1+COM_MCR, inb(COM1+COM_MCR) | COM_MCR_RTS | COM_MCR_DTR |
+	                                       COM_MCR_GLB_IRQ);
 	// Enable rcv interrupts
 	outb(COM1+COM_IER, COM_IER_RDI);
 
