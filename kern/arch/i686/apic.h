@@ -16,7 +16,11 @@
 #include <arch/x86.h>
 #include <arch/ioapic.h>
 
-// PIC
+/* PIC (8259A)
+ * When looking at the specs, A0 is our CMD line, and A1 is the DATA line.  This
+ * means that blindly writing to PIC1_DATA is an OCW1 (interrupt masks).  When
+ * writing to CMD (A0), the chip can determine betweeb OCW2 and OCW3 by the
+ * setting of a few specific bits (OCW2 has bit 3 unset, OCW3 has it set). */
 #define PIC1_CMD					0x20
 #define PIC1_DATA					0x21
 #define PIC2_CMD					0xA0
@@ -24,7 +28,12 @@
 // These are also hardcoded into the IRQ_HANDLERs of kern/trapentry.S
 #define PIC1_OFFSET					0x20
 #define PIC2_OFFSET					0x28
-#define PIC_EOI						0x20
+#define PIC_EOI						0x20	/* OCW2 EOI */
+/* These set the next CMD read to return specific values.  Note that the chip
+ * remembers what setting we had before (IRR or ISR), if you do other reads of
+ * CMD. (not tested, written in the spec sheet) */
+#define PIC_READ_IRR				0x0a	/* OCW3 irq ready next CMD read */
+#define PIC_READ_ISR				0x0b	/* OCW3 irq service next CMD read */
 
 // Local APIC
 /* PBASE is the physical address.  It is mapped in at the VADDR LAPIC_BASE */
@@ -96,6 +105,9 @@ extern system_timing_t system_timing;
 void pic_remap(void);
 void pic_mask_irq(uint8_t irq);
 void pic_unmask_irq(uint8_t irq);
+uint16_t pic_get_mask(void);
+uint16_t pic_get_irr(void);
+uint16_t pic_get_isr(void);
 void __lapic_set_timer(uint32_t ticks, uint8_t vec, bool periodic, uint8_t div);
 void lapic_set_timer(uint32_t usec, bool periodic);
 uint32_t lapic_get_default_id(void);
@@ -273,6 +285,8 @@ static inline void __send_nmi(uint8_t hw_coreid)
  * ExtInts.  To prevent abuse, we'll use it just for IPIs for now. */
 static inline bool ipi_is_pending(uint8_t vector)
 {
+	/* TODO: look at this, it's so fucked up.  also, there's a bit that needs to
+	 * be set to allow us to read from the IRR. */
 	return (LAPIC_ISR & vector) || (LAPIC_IRR & vector);
 }
 

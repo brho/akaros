@@ -19,29 +19,26 @@
 
 system_timing_t RO system_timing = {0, 0, 0xffff, 0};
 
-/*
- * Remaps the Programmable Interrupt Controller to use IRQs 32-47
+/* * Remaps the Programmable Interrupt Controller to use IRQs 32-47
  * http://wiki.osdev.org/PIC
- * Not 100% on this stuff, after looking over 
- * http://bochs.sourceforge.net/techspec/PORTS.LST  The cascading and other 
- * stuff might need to be in one command, and after that all we are doing
- * is toggling masks.
- */
+ * Check osdev for a more thorough explanation/implementation.
+ * http://bochs.sourceforge.net/techspec/PORTS.LST  */
 void pic_remap() 
 {
-	// start initialization
+	/* start initialization (ICW1) */
 	outb(PIC1_CMD, 0x11);
 	outb(PIC2_CMD, 0x11);
-	// set new offsets
+	/* set new offsets (ICW2) */
 	outb(PIC1_DATA, PIC1_OFFSET);
 	outb(PIC2_DATA, PIC2_OFFSET);
-	// set up cascading
+	/* set up cascading (ICW3) */
 	outb(PIC1_DATA, 0x04);
 	outb(PIC2_DATA, 0x02);
-	// other stuff (put in 8086/88 mode, or whatever)
+	/* other stuff (put in 8086/88 mode, or whatever) (ICW4) */
 	outb(PIC1_DATA, 0x01);
 	outb(PIC2_DATA, 0x01);
-	// set masks, defaulting to all masked for now
+	/* Init done, further data R/W access the interrupt mask */
+	/* set masks, defaulting to all masked for now */
 	outb(PIC1_DATA, 0xff);
 	outb(PIC2_DATA, 0xff);
 }
@@ -61,6 +58,33 @@ void pic_unmask_irq(uint8_t irq)
 		outb(PIC1_DATA, inb(PIC1_DATA) & 0xfb); // make sure irq2 is unmasked
 	} else
 		outb(PIC1_DATA, inb(PIC1_DATA) & ~(1 << irq));
+}
+
+/* Aka, the IMR.  Simply reading the data port are OCW1s. */
+uint16_t pic_get_mask(void)
+{
+	return (inb(PIC2_DATA) << 8) | inb(PIC1_DATA);
+}
+
+static uint16_t __pic_get_irq_reg(int ocw3)
+{
+	/* OCW3 to PIC CMD to get the register values.  PIC2 is chained, and
+	 * represents IRQs 8-15.  PIC1 is IRQs 0-7, with 2 being the chain */
+	outb(PIC1_CMD, ocw3);
+	outb(PIC2_CMD, ocw3);
+	return (inb(PIC2_CMD) << 8) | inb(PIC1_CMD);
+}
+
+/* Returns the combined value of the cascaded PICs irq request register */
+uint16_t pic_get_irr(void)
+{
+	return __pic_get_irq_reg(PIC_READ_IRR);
+}
+
+/* Returns the combined value of the cascaded PICs irq service register */
+uint16_t pic_get_isr(void)
+{
+	return __pic_get_irq_reg(PIC_READ_ISR);
 }
 
 /*
