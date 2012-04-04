@@ -1,29 +1,42 @@
-/* See COPYRIGHT for copyright information. */
+/* Copyright (c) 2012 The Regents of the University of California
+ * Barret Rhoden <brho@cs.berkeley.edu>
+ * See LICENSE for details.
+ *
+ * x86 Console (keyboard/serial/monitor) interfaces */
 
-#ifndef _CONSOLE_H_
-#define _CONSOLE_H_
-#ifndef ROS_KERNEL
-# error "This is a ROS kernel header; user programs should not #include it"
-#endif
+#ifndef ROS_KERN_ARCH_CONSOLE_H
+#define ROS_KERN_ARCH_CONSOLE_H
 
 #include <ros/common.h>
+#include <sys/queue.h>
 
-#define MONO_BASE	0x3B4
-#define MONO_BUF	0xB0000
-#define CGA_BASE	0x3D4
-#define CGA_BUF		0xB8000
+/* Types of console devices */
+#define CONS_KB_DEV		1
+#define CONS_SER_DEV	2
 
-#define CRT_ROWS	25
-#define CRT_COLS	80
-#define CRT_SIZE	(CRT_ROWS * CRT_COLS)
+struct cons_dev;
+/* Interrupt-driven console input devices */
+struct cons_dev {
+	SLIST_ENTRY(cons_dev)		next;
+	int							type;		/* e.g., CONS_KB_DEV */
+	int							val;		/* e.g., COM1 */
+	int							irq;		/* desired irq */
+	char						*model;		/* descriptive string */
+	int (*getc)(struct cons_dev *, uint8_t *);
+};
+SLIST_HEAD(cons_dev_slist, cons_dev);
+extern struct cons_dev_slist cdev_list;
 
 void cons_init(void);
+/* Returns 0 on success, with the char in *data */
+int cons_get_char(struct cons_dev *cdev, uint8_t *data);
+/* Returns any available character, or 0 for none (legacy helper) */
+int cons_get_any_char(void);
+/* Writes c to the monitor and to all CONS_SER_DEV console devices */
 void cons_putc(int c);
-int cons_getc(void);
 
-void kbd_intr(void); // irq 1
-void serial_intr(void); // irq 4
+/* TODO: remove us (and serial IO) */
 void serial_send_byte(uint8_t b);
 int serial_read_byte();
 
-#endif /* _CONSOLE_H_ */
+#endif /* ROS_KERN_ARCH_CONSOLE_H */

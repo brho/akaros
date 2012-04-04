@@ -221,13 +221,14 @@ static ssize_t sys_cputs(struct proc *p, const char *DANGEROUS string,
 
 // Read a character from the system console.
 // Returns the character.
+/* TODO: remove me */
 static uint16_t sys_cgetc(struct proc *p)
 {
 	uint16_t c;
 
-	// The cons_getc() primitive doesn't wait for a character,
+	// The cons_get_any_char() primitive doesn't wait for a character,
 	// but the sys_cgetc() system call does.
-	while ((c = cons_getc()) == 0)
+	while ((c = cons_get_any_char()) == 0)
 		cpu_relax();
 
 	return c;

@@ -8,16 +8,16 @@
 #include <string.h>
 #include <assert.h>
 #include <stdio.h>
+#include <sys/queue.h>
 
 #include <ros/memlayout.h>
 
-void cons_intr(int (*proc)(void));
-void scroll_screen(void);
-
-
 /***** Serial I/O code *****/
 
-#define COM1		0x3F8
+#define COM1			0x3F8	/* irq 4 */
+#define COM2			0x2F8	/* irq 3 */
+#define COM3			0x3E8	/* irq 4 */
+#define COM4			0x2E8	/* irq 3 */
 
 #define	COM_RX			0		// In:	Receive buffer (DLAB=0)
 #define COM_DLL			0		// Out: Divisor Latch Low (DLAB=1)
@@ -37,93 +37,164 @@ void scroll_screen(void);
 #define COM_LSR			5		// In:	Line Status Register
 #define COM_LSR_DATA	0x01	//   Data available
 #define COM_LSR_READY	0x20	//   Ready to send
+#define COM_SCRATCH		7		/* Scratch register */
 
-static bool SREADONLY serial_exists;
+/* List of all initialized console devices */
+struct cons_dev_slist cdev_list = SLIST_HEAD_INITIALIZER(cdev_list);
+/* need to statically allocate these, since cons_init is called so damn early */
+struct cons_dev com1, com2, com3, com4, kb;
 
-int
-serial_proc_data(void)
+static int __serial_get_char(int com, uint8_t *data)
 {
-	if (!(inb(COM1+COM_LSR) & COM_LSR_DATA))
+	if (!(inb(com + COM_LSR) & COM_LSR_DATA))
 		return -1;
-	return inb(COM1+COM_RX);
+	*data = inb(com + COM_RX);
+	return 0;
 }
 
-int serial_read_byte()
+static int serial_get_char(struct cons_dev *cdev, uint8_t *data)
 {
-	return serial_proc_data();
+	return __serial_get_char(cdev->val, data);
 }
 
-void
-serial_intr(void)
+static void __serial_put_char(int com, uint8_t c)
 {
-	if (serial_exists)
-		cons_intr(serial_proc_data);
+	while (!(inb(com + COM_LSR) & COM_LSR_READY))
+		cpu_relax();
+	outb(com, c);
 }
 
-void
-serial_init(void)
+/* Writes c (or some variant of) to the serial cdev */
+static void serial_put_char(struct cons_dev *cdev, uint8_t c)
 {
-	// Turn off the FIFO
-	outb(COM1+COM_FCR, 0);
-	
-	// Set speed; requires DLAB latch
-	outb(COM1+COM_LCR, COM_LCR_DLAB);
-	// Setting speed to 115200 (setting the divider to 1)
-	outb(COM1+COM_DLL, 1);
-	outb(COM1+COM_DLM, 0);
+	assert(cdev->type == CONS_SER_DEV);
+	/* We do some funky editing of a few chars, to suit what minicom seems to
+	 * expect (at least for brho) */
+	switch (c & 0xff) {
+		case '\b':
+			__serial_put_char(cdev->val, '\b');
+			__serial_put_char(cdev->val, (uint8_t)(' '));
+			__serial_put_char(cdev->val, '\b');
+			break;
+		case '\n':
+		case '\r':
+			__serial_put_char(cdev->val, (uint8_t)('\n'));
+			__serial_put_char(cdev->val, (uint8_t)('\r'));
+			break;
+		default:
+			__serial_put_char(cdev->val, (uint8_t)(c & 0xff));
+			break;
+	}
+}
 
-	// 8 data bits, 1 stop bit, parity off; turn off DLAB latch
-	outb(COM1+COM_LCR, COM_LCR_WLEN8 & ~COM_LCR_DLAB);
+/* Writes c to every initialized serial port */
+static void serial_spam_char(int c)
+{
+	struct cons_dev *i;
+	SLIST_FOREACH(i, &cdev_list, next) {
+		if (i->type == CONS_SER_DEV)
+			serial_put_char(i, c);
+	}
+}
 
+/* http://en.wikibooks.org/wiki/Serial_Programming/8250_UART_Programming \
+ * #Software_Identification_of_the_UART
+ *
+ * We return 0 for unknown (probably not there), and the char * o/w */
+static char *__serial_detect_type(int com)
+{
+	uint8_t val;
+	char *model = 0;
+	/* First, check that the port actually exists.  I haven't seen any
+	 * documentation of the LSR 0xff check, but it seems to work on qemu and
+	 * hardware (brho's nehalem).  Perhaps 0xff is the default state for
+	 * 'unmapped' ports. */
+	/* Serial port doesn't exist if COM_LSR returns 0xff */
+	if (inb(com + COM_LSR) == 0xff)
+		return model;
+	/* Try to set FIFO, then based on the bits enabled, we can tell what model
+	 * it is */
+	outb(com + COM_FCR, 0xe7);
+	val = inb(com + COM_IIR);
+	if (val & (1 << 6)) {
+		if (val & (1 << 7)) {
+			if (val & (1 << 5))
+				model = "UART 16750";
+			else
+				model = "UART 16550A";
+		} else {
+			model = "UART 16550";
+		}
+	} else {
+		/* no FIFO at all.  the 8250 had a buggy scratch register. */
+		outb(com + COM_SCRATCH, 0x2a);
+		val = inb(com + COM_SCRATCH);
+		if (val == 0x2a)
+			model = "UART 16450";
+		else
+			model = "UART 8250";
+	}
+	return model;
+}
+
+/* Helper: attempts to initialize the serial device cdev with COM com.  If it
+ * succeeds, the cdev will be on the cdev_list. */ 
+static void serial_com_init(struct cons_dev *cdev, int com)
+{
+	cdev->model = __serial_detect_type(com);
+	/* Bail if detection failed */
+	if (!cdev->model)
+		return;
+	/* Set up the struct */
+	cdev->type = CONS_SER_DEV;
+	cdev->val = com;
+	switch (com) {
+		case (COM1):
+		case (COM3):
+			cdev->irq = 4;
+			break;
+		case (COM2):
+		case (COM4):
+			cdev->irq = 3;
+			break;
+		default:
+			/* not that printing is the safest thing right now... */
+			panic("Unknown COM %d", com);
+	}
+	cdev->getc = serial_get_char;
+	/* Turn off the FIFO (not sure this is needed) */
+	outb(com + COM_FCR, 0);
+	/* Set speed; requires DLAB latch */
+	outb(com + COM_LCR, COM_LCR_DLAB);
+	/* Setting speed to 115200 (setting the divider to 1) */
+	outb(com + COM_DLL, 1);
+	outb(com + COM_DLM, 0);
+	/* 8 data bits, 1 stop bit, parity off; turn off DLAB latch */
+	outb(com + COM_LCR, COM_LCR_WLEN8 & ~COM_LCR_DLAB);
 	/* This should turn on hardware flow control and make sure the global irq
 	 * bit is on.  This bit is definitely used some hardware's 16550As, though
 	 * not for qemu.  Also, on both qemu and hardware, this whole line is a
 	 * noop, since the COM_MCR is already 0x0b, so we're just making sure the
 	 * three bits are still turned on (and leaving other bits unchanged) */
-	outb(COM1+COM_MCR, inb(COM1+COM_MCR) | COM_MCR_RTS | COM_MCR_DTR |
-	                                       COM_MCR_GLB_IRQ);
-	// Enable rcv interrupts
-	outb(COM1+COM_IER, COM_IER_RDI);
-
-	// Clear any preexisting overrun indications and interrupts
-	// Serial port doesn't exist if COM_LSR returns 0xFF
-	{
-		bool lbool = ((inb(COM1+COM_LSR) != 0xFF));
-		serial_exists = SINIT(lbool);
-	}
-	(void) inb(COM1+COM_IIR);
-	(void) inb(COM1+COM_RX);
-
+	outb(com + COM_MCR, inb(com + COM_MCR) | COM_MCR_RTS | COM_MCR_DTR |
+	                                         COM_MCR_GLB_IRQ);
+	/* Enable rx interrupts */
+	outb(com + COM_IER, COM_IER_RDI);
+	/* Clear any preexisting overrun indications and interrupts */
+	inb(com + COM_IIR);
+	inb(com + COM_RX);
+	/* Put us on the list of initialized cdevs (now that it is init'd) */
+	SLIST_INSERT_HEAD(&cdev_list, cdev, next);
 }
 
-void serial_send_byte(uint8_t b)
+static void serial_init(void)
 {
-	while (!(inb(COM1+COM_LSR) & COM_LSR_READY));
-	outb(COM1, b);
+	/* attempt to init all four COMs */
+	serial_com_init(&com1, COM1);
+	serial_com_init(&com2, COM2);
+	serial_com_init(&com3, COM3);
+	serial_com_init(&com4, COM4);
 }
-
-static void
-serial_putc(int c)
-{
-	switch (c & 0xff) {
-	case '\b':
-		serial_send_byte('\b');
-		serial_send_byte((uint8_t)(' '));
-		serial_send_byte('\b');
-		break;
-	case '\n':
-	case '\r':
-		serial_send_byte((uint8_t)('\n'));
-		serial_send_byte((uint8_t)('\r'));
-		break;
-	default:
-		serial_send_byte((uint8_t)(c & 0xff));
-		break;
-	}
-	return;
-}
-
-
 
 /***** Parallel port output code *****/
 // For information on PC parallel port programming, see the class References
@@ -151,10 +222,16 @@ lpt_putc(int c)
 	outb(0x378+2, 0x08);
 }
 
-
-
-
 /***** Text-mode CGA/VGA display output with scrolling *****/
+#define MONO_BASE	0x3B4
+#define MONO_BUF	0xB0000
+#define CGA_BASE	0x3D4
+#define CGA_BUF		0xB8000
+
+#define CRT_ROWS	25
+#define CRT_COLS	80
+#define CRT_SIZE	(CRT_ROWS * CRT_COLS)
+
 #define MAX_SCROLL_LENGTH	20
 #define SCROLLING_CRT_SIZE	(MAX_SCROLL_LENGTH * CRT_SIZE)
 
@@ -405,6 +482,7 @@ static uint8_t * COUNT(256) (SREADONLY charcode)[4] = {
 static uint32_t SLOCKED(&lock) shift;
 static bool SLOCKED(&lock) crt_scrolled = FALSE;
 
+/* TODO: i'm concerned about the (lack of) locking when scrolling the screen. */
 static int
 kbd_proc_data(void)
 {
@@ -489,104 +567,70 @@ kbd_proc_data(void)
 	return c;
 }
 
-void
-kbd_intr(void)
+static int kb_get_char(struct cons_dev *cdev, uint8_t *data)
 {
-	cons_intr(kbd_proc_data);
-}
-
-void
-kbd_init(void)
-{
-}
-
-
-
-/***** General device-independent console code *****/
-// Here we manage the console input buffer,
-// where we stash characters received from the keyboard or serial port
-// whenever the corresponding interrupt occurs.
-
-#define CONSBUFSIZE	512
-struct cons {
-	uint8_t buf[CONSBUFSIZE];
-	uint32_t rpos;
-	uint32_t wpos;
-};
-
-static struct cons SLOCKED(&lock) cons;
-
-// called by device interrupt routines to feed input characters
-// into the circular console input buffer.
-void
-cons_intr(int (*proc)(void))
-{
-	int c;
-
-	while ((c = (*proc)()) != -1) {
-		if (c == 0)
-			continue;
-		spin_lock_irqsave(&lock);
-		cons.buf[cons.wpos++] = c;
-		if (cons.wpos == CONSBUFSIZE)
-			cons.wpos = 0;
-		spin_unlock_irqsave(&lock);
-	}
-}
-
-// return the next input character from the console, or 0 if none waiting
-int
-cons_getc(void)
-{
-	int c;
-
-	// poll for any pending input characters,
-	// so that this function works even when interrupts are disabled
-	// (e.g., when called from the kernel monitor).
-	#ifndef __CONFIG_SERIAL_IO__
-		serial_intr();
-	#endif
-	kbd_intr();
-
-	// grab the next character from the input buffer.
-	spin_lock_irqsave(&lock);
-	if (cons.rpos != cons.wpos) {
-		c = cons.buf[cons.rpos++];
-		if (cons.rpos == CONSBUFSIZE)
-			cons.rpos = 0;
-		spin_unlock_irqsave(&lock);
-		return c;
-	}
-	spin_unlock_irqsave(&lock);
+ 	int kb_d;
+	/* kbd_proc_data returns 0 if we should keep asking.  It return -1 when
+	 * there is no data, and anything else is a char */
+	while ((kb_d = kbd_proc_data()) == 0)
+		cpu_relax();
+	if (kb_d == -1)
+		return -1;
+	*data = (uint8_t)kb_d;
 	return 0;
 }
 
-// output a character to the console
-void
-cons_putc(int c)
+void kbd_init(void)
 {
-	//static uint32_t lock; zra: moving up for sharC annotations
-	spin_lock_irqsave(&lock);
-	#ifndef __CONFIG_SERIAL_IO__
-		serial_putc(c);
-	#endif
-	//lpt_putc(c);
-	cga_putc(c);
-	spin_unlock_irqsave(&lock);
+	/* init and post the kb cons_dev */
+	kb.type = CONS_KB_DEV;
+	kb.val = 0;
+	kb.irq = 1;		/* default PC keyboard IRQ */
+	kb.model = "PC Keyboard";
+	kb.getc = kb_get_char;
+	SLIST_INSERT_HEAD(&cdev_list, &kb, next);
 }
 
-// initialize the console devices
-void
-cons_init(void)
+/***** General device-independent console code *****/
+
+/* Initialize the console devices */
+void cons_init(void)
 {
 	cga_init();
 	kbd_init();
 	serial_init();
-
-	if (!serial_exists)
-		cprintf("Serial port does not exist!\n");
 }
 
+/* Returns 0 on success, with the char in *data */
+int cons_get_char(struct cons_dev *cdev, uint8_t *data)
+{
+	return cdev->getc(cdev, data);
+}
+
+/* Returns any available character, or 0 for none (legacy helper) */
+int cons_get_any_char(void)
+{
+	uint8_t c;
+	struct cons_dev *i;
+	/* First to succeed gets returned */
+	SLIST_FOREACH(i, &cdev_list, next) {
+		if (!cons_get_char(i, &c))
+			return c;
+	}
+	return 0;
+}
+
+/* output a character to all console outputs (monitor and all serials) */
+void cons_putc(int c)
+{
+	spin_lock_irqsave(&lock);
+	#ifndef __CONFIG_SERIAL_IO__
+		serial_spam_char(c);
+	#endif
+	//lpt_putc(c); 	/* very slow on the nehalem */
+	cga_putc(c);
+	spin_unlock_irqsave(&lock);
+}
 
 // `High'-level console I/O.  Used by readline and cprintf.
 
@@ -609,7 +653,7 @@ getchar(void)
 {
 	int c;
 
-	while ((c = cons_getc()) == 0)
+	while ((c = cons_get_any_char()) == 0)
 		/* do nothing */;
 	return c;
 }
@@ -619,4 +663,14 @@ iscons(int fdnum)
 {
 	// used by readline
 	return 1;
+}
+
+/* TODO: remove us (and serial IO) */
+void serial_send_byte(uint8_t b)
+{
+}
+
+int serial_read_byte(void)
+{
+	return -1;
 }

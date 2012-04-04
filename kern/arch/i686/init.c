@@ -19,7 +19,7 @@
 /* irq handler for the console (kb, serial, etc) */
 static void irq_console(struct trapframe *tf, void *data)
 {
-	int c = cons_getc();
+	int c = cons_get_any_char();
 	if (!c)
 		return;
 	/* Do our work in an RKM, instead of interrupt context */
