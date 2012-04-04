@@ -19,10 +19,13 @@
 /* irq handler for the console (kb, serial, etc) */
 static void irq_console(struct trapframe *tf, void *data)
 {
-	int c = cons_get_any_char();
-	if (!c)
+	uint8_t c;
+	struct cons_dev *cdev = (struct cons_dev*)data;
+	assert(cdev);
+	if (cons_get_char(cdev, &c))
 		return;
-	/* Do our work in an RKM, instead of interrupt context */
+	/* Do our work in an RKM, instead of interrupt context.  Note the RKM will
+	 * cast 'c' to a char. */
 	if (c == 'G')
 		send_kernel_message(core_id(), __run_mon, 0, 0, 0, KMSG_ROUTINE);
 	else
@@ -32,23 +35,21 @@ static void irq_console(struct trapframe *tf, void *data)
 
 static void cons_irq_init(void)
 {
-	register_interrupt_handler(interrupt_handlers, 1 + PIC1_OFFSET, irq_console,
-	                           0);
-	register_interrupt_handler(interrupt_handlers, 3 + PIC1_OFFSET, irq_console,
-	                           0);
-	register_interrupt_handler(interrupt_handlers, 4 + PIC1_OFFSET, irq_console,
-	                           0);
-	/* route kb and both serial interrupts to core 0 */
-#ifdef __CONFIG_ENABLE_MPTABLES__
-	ioapic_route_irq(1, 0);
-	ioapic_route_irq(3, 0);
-	ioapic_route_irq(4, 0);
-#else 
-	pic_unmask_irq(1);	/* keyboard */
-	pic_unmask_irq(3);	/* serial 2 or 4 */
-	pic_unmask_irq(4);	/* serial 1 or 3 */
-	unmask_lapic_lvt(LAPIC_LVT_LINT0);
-#endif /* __CONFIG_ENABLE_MPTABLES__ */
+	struct cons_dev *i;
+	/* Register interrupt handlers for all console devices */
+	SLIST_FOREACH(i, &cdev_list, next) {
+		register_interrupt_handler(interrupt_handlers, i->irq + PIC1_OFFSET,
+		                           irq_console, i);
+		/* Route any console IRQs to core 0 */
+	#ifdef __CONFIG_ENABLE_MPTABLES__
+		ioapic_route_irq(i->irq, 0);
+	#else
+		pic_unmask_irq(i->irq);
+		unmask_lapic_lvt(LAPIC_LVT_LINT0);
+	#endif /* __CONFIG_ENABLE_MPTABLES__ */
+		printd("Registered handler for IRQ %d (ISR %d)\n", i->irq,
+		       i->irq + PIC1_OFFSET);
+	}
 }
 
 void arch_init()
