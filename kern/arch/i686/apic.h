@@ -28,6 +28,8 @@
 // These are also hardcoded into the IRQ_HANDLERs of kern/trapentry.S
 #define PIC1_OFFSET					0x20
 #define PIC2_OFFSET					0x28
+#define PIC1_SPURIOUS				(7 + PIC1_OFFSET)
+#define PIC2_SPURIOUS				(7 + PIC2_OFFSET)
 #define PIC_EOI						0x20	/* OCW2 EOI */
 /* These set the next CMD read to return specific values.  Note that the chip
  * remembers what setting we had before (IRR or ISR), if you do other reads of

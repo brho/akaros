@@ -345,7 +345,83 @@ void trap(struct trapframe *tf)
 	assert(0);
 }
 
-/* Note IRQs are disabled unless explicitly turned on. */
+/* Tells us if an interrupt (trap_nr) came from the PIC or not */
+static bool irq_from_pic(uint32_t trap_nr)
+{
+	/* The 16 IRQs within the range [PIC1_OFFSET, PIC1_OFFSET + 15] came from
+	 * the PIC.  [32-47] */
+	if (trap_nr < PIC1_OFFSET)
+		return FALSE;
+	if (trap_nr > PIC1_OFFSET + 15)
+		return FALSE;
+	return TRUE;
+}
+
+/* Helper: returns TRUE if the irq is spurious.  Pass in the trap_nr, not the
+ * IRQ number (trap_nr = PIC_OFFSET + irq) */
+static bool check_spurious_irq(uint32_t trap_nr)
+{
+#ifndef __CONFIG_ENABLE_MPTABLES__		/* TODO: our proxy for using the PIC */
+	/* the PIC may send spurious irqs via one of the chips irq 7.  if the isr
+	 * doesn't show that irq, then it was spurious, and we don't send an eoi.
+	 * Check out http://wiki.osdev.org/8259_PIC#Spurious_IRQs */
+	if ((trap_nr == PIC1_SPURIOUS) && !(pic_get_isr() & PIC1_SPURIOUS)) {
+		printk("Spurious PIC1 irq!\n");	/* want to know if this happens */
+		return TRUE;
+	}
+	if ((trap_nr == PIC2_SPURIOUS) && !(pic_get_isr() & PIC2_SPURIOUS)) {
+		printk("Spurious PIC2 irq!\n");	/* want to know if this happens */
+		/* for the cascaded PIC, we *do* need to send an EOI to the master's
+		 * cascade irq (2). */
+		pic_send_eoi(2);
+		return TRUE;
+	}
+	/* At this point, we know the PIC didn't send a spurious IRQ */
+	if (irq_from_pic(trap_nr))
+		return FALSE;
+#endif
+	/* Either way (with or without a PIC), we need to check the LAPIC.
+	 * FYI: lapic_spurious is 255 on qemu and 15 on the nehalem..  We actually
+	 * can set bits 4-7, and P6s have 0-3 hardwired to 0.  YMMV.
+	 *
+	 * The SDM recommends not using the spurious vector for any other IRQs (LVT
+	 * or IOAPIC RTE), since the handlers don't send an EOI.  However, our check
+	 * here allows us to use the vector since we can tell the diff btw a
+	 * spurious and a real IRQ. */
+	uint8_t lapic_spurious = read_mmreg32(LAPIC_SPURIOUS) & 0xff;
+	/* Note the lapic's vectors are not shifted by an offset. */
+	if ((trap_nr == lapic_spurious) &&
+	    !GET_BITMASK_BIT((uint8_t*)LAPIC_ISR, lapic_spurious)) {
+		printk("Spurious LAPIC irq %d!\n", lapic_spurious);
+		return TRUE;
+	}
+	return FALSE;
+}
+
+/* Helper, sends an end-of-interrupt for the trap_nr (not HW IRQ number). */
+static void send_eoi(uint32_t trap_nr)
+{
+#ifndef __CONFIG_ENABLE_MPTABLES__		/* TODO: our proxy for using the PIC */
+	/* WARNING: this will break if the LAPIC requests vectors that overlap with
+	 * the PIC's range. */
+	if (irq_from_pic(trap_nr))
+		pic_send_eoi(trap_nr - PIC1_OFFSET);
+	else
+		lapic_send_eoi();
+#else
+	lapic_send_eoi();
+#endif
+}
+
+/* Note IRQs are disabled unless explicitly turned on.
+ *
+ * In general, we should only get trapno's >= PIC1_OFFSET (32).  Anything else
+ * should be a trap.  Even if we don't use the PIC, that should be the standard.
+ * It is possible to get a spurious LAPIC IRQ with vector 15 (or similar), but
+ * the spurious check should catch that.
+ *
+ * Note that from hardware's perspective (PIC, etc), IRQs start from 0, but they
+ * are all mapped up at PIC1_OFFSET for the cpu / irq_handler. */
 void irq_handler(struct trapframe *tf)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
@@ -356,7 +432,8 @@ void irq_handler(struct trapframe *tf)
 	abort_halt(tf);
 	//if (core_id())
 		printd("Incoming IRQ, ISR: %d on core %d\n", tf->tf_trapno, core_id());
-
+	if (check_spurious_irq(tf->tf_trapno))
+		goto out_no_eoi;
 	extern handler_wrapper_t (RO handler_wrappers)[NUM_HANDLER_WRAPPERS];
 
 	// determine the interrupt handler table to use.  for now, pick the global
@@ -374,17 +451,8 @@ void irq_handler(struct trapframe *tf)
 	// All others are LAPIC (timer, IPIs, perf, non-ExtINT LINTS, etc)
 	// For now, only 235-255 are available
 	assert(tf->tf_trapno >= 32); // slows us down, but we should never have this
-
-#ifdef __CONFIG_ENABLE_MPTABLES__
-	/* TODO: this should be for any IOAPIC EOI, not just MPTABLES */
-	lapic_send_eoi();
-#else
-	//Old PIC relatd code. Should be gone for good, but leaving it just incase.
-	if (tf->tf_trapno < 48)
-		pic_send_eoi(tf->tf_trapno - PIC1_OFFSET);
-	else
-		lapic_send_eoi();
-#endif
+	send_eoi(tf->tf_trapno);
+out_no_eoi:
 	/* Return to the current process, which should be runnable.  If we're the
 	 * kernel, we should just return naturally.  Note that current and tf need
 	 * to still be okay (might not be after blocking) */
