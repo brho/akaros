@@ -108,6 +108,7 @@ void pic_unmask_irq(uint8_t irq);
 uint16_t pic_get_mask(void);
 uint16_t pic_get_irr(void);
 uint16_t pic_get_isr(void);
+bool ipi_is_pending(uint8_t vector);
 void __lapic_set_timer(uint32_t ticks, uint8_t vec, bool periodic, uint8_t div);
 void lapic_set_timer(uint32_t usec, bool periodic);
 uint32_t lapic_get_default_id(void);
@@ -139,7 +140,6 @@ static inline void send_all_others_ipi(uint8_t vector);
 static inline void send_ipi(uint8_t hw_coreid, uint8_t vector);
 static inline void send_group_ipi(uint8_t hw_groupid, uint8_t vector);
 static inline void __send_nmi(uint8_t os_coreid);
-static inline bool ipi_is_pending(uint8_t vector);
 
 #define mask_lapic_lvt(entry) \
 	write_mmreg32(entry, read_mmreg32(entry) | LAPIC_LVT_MASK)
@@ -279,15 +279,6 @@ static inline void __send_nmi(uint8_t hw_coreid)
 	write_mmreg32(LAPIC_IPI_ICR_UPPER, hw_coreid << 24);
 	write_mmreg32(LAPIC_IPI_ICR_LOWER, 0x00004400);
 	lapic_wait_to_send();
-}
-
-/* This works for any interrupt that goes through the LAPIC, but not things like
- * ExtInts.  To prevent abuse, we'll use it just for IPIs for now. */
-static inline bool ipi_is_pending(uint8_t vector)
-{
-	/* TODO: look at this, it's so fucked up.  also, there's a bit that needs to
-	 * be set to allow us to read from the IRR. */
-	return (LAPIC_ISR & vector) || (LAPIC_IRR & vector);
 }
 
 /* To change the LAPIC Base (not recommended):

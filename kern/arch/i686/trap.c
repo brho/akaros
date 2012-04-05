@@ -555,6 +555,9 @@ void __kernel_message(struct trapframe *tf, void *data)
 	per_cpu_info_t *myinfo = &per_cpu_info[core_id()];
 	kernel_message_t msg_cp, *k_msg;
 
+	/* Important that we send the EOI first, so that the ipi_is_pending check
+	 * doesn't see the irq we're servicing (which it would see if it was still
+	 * 'inside' the IRQ handler (which to the APIC ends upon EOI)). */
 	lapic_send_eoi();
 	while (1) { // will break out when there are no more messages
 		/* Try to get an immediate message.  Exec and free it. */
@@ -574,7 +577,7 @@ void __kernel_message(struct trapframe *tf, void *data)
 			msg_cp = *k_msg;
 			kmem_cache_free(kernel_msg_cache, (void*)k_msg);
 			/* make sure an IPI is pending if we have more work */
-			/* techincally, we don't need to lock when checking */
+			/* technically, we don't need to lock when checking */
 			if (!STAILQ_EMPTY(&myinfo->routine_amsgs) &&
 		               !ipi_is_pending(I_KERNEL_MSG))
 				send_self_ipi(I_KERNEL_MSG);

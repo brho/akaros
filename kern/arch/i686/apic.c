@@ -16,6 +16,7 @@
 #include <time.h>
 #include <assert.h>
 #include <stdio.h>
+#include <bitmask.h>
 
 system_timing_t RO system_timing = {0, 0, 0xffff, 0};
 
@@ -85,6 +86,20 @@ uint16_t pic_get_irr(void)
 uint16_t pic_get_isr(void)
 {
 	return __pic_get_irq_reg(PIC_READ_ISR);
+}
+
+/* This works for any interrupt that goes through the LAPIC, but not things like
+ * ExtInts.  To prevent abuse, we'll use it just for IPIs for now (which only
+ * come via the APIC).
+ *
+ * Note that if you call this from an interrupt handler for 'vector' before you
+ * EOI, the ISR will show your bit as set.  It is the EOI that clears the bit
+ * from the ISR. */
+bool ipi_is_pending(uint8_t vector)
+{
+	/* The ISR/IRR are 256 bits long.  We want to check if 'vector' is set. */
+	return GET_BITMASK_BIT((uint8_t*)LAPIC_ISR, vector) ||
+	       GET_BITMASK_BIT((uint8_t*)LAPIC_IRR, vector);
 }
 
 /*
@@ -256,4 +271,3 @@ uint64_t getfreq(void)
 {
 	return system_timing.tsc_freq;
 }
-
