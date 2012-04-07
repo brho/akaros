@@ -321,13 +321,15 @@ void vcore_yield(bool preempt_pending)
 		vcpd->can_rcv_msg = TRUE;
 		return;
 	}
-	/* Tell the kernel we want one less vcore.  If yield fails (slight race), we
-	 * may end up having more vcores than amt_wanted for a while, and might lose
-	 * one later on (after a preempt/timeslicing) - the 2LS will have to notice
-	 * eventually if it actually needs more vcores (which it already needs to
-	 * do).  We need to atomically decrement, though I don't want the kernel's
-	 * data type here to be atomic_t (only userspace cares in this one case). */
-	__sync_fetch_and_sub(&__procdata.res_req[RES_CORES].amt_wanted, 1);
+	/* If we are yielding since we don't want the core, tell the kernel we want
+	 * one less vcore.  If yield fails (slight race), we may end up having more
+	 * vcores than amt_wanted for a while, and might lose one later on (after a
+	 * preempt/timeslicing) - the 2LS will have to notice eventually if it
+	 * actually needs more vcores (which it already needs to do).  We need to
+	 * atomically decrement, though I don't want the kernel's data type here to
+	 * be atomic_t (only userspace cares in this one case). */
+	if (!preempt_pending)
+		__sync_fetch_and_sub(&__procdata.res_req[RES_CORES].amt_wanted, 1);
 	/* We can probably yield.  This may pop back up if notif_pending became set
 	 * by the kernel after we cleared it and we lost the race. */
 	sys_yield(preempt_pending);

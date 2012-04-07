@@ -996,9 +996,17 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 	/* At this point, AFAIK there should be no preempt/death messages on the
 	 * way, and we're on the online list.  So we'll go ahead and do the yielding
 	 * business. */
-	/* no need to preempt later, since we are yielding (nice or otherwise) */
-	if (vc->preempt_pending)
+	/* If there's a preempt pending, we don't need to preempt later since we are
+	 * yielding (nice or otherwise).  If not, this is just a regular yield. */
+	if (vc->preempt_pending) {
 		vc->preempt_pending = 0;
+	} else {
+		/* Optional: on a normal yield, check to see if we are putting them
+		 * below amt_wanted (help with user races) and bail. */
+		if (p->procdata->res_req[RES_CORES].amt_wanted >=
+		                       p->procinfo->num_vcores)
+			goto out_failed;
+	}
 	/* Don't let them yield if they are missing a notification.  Userspace must
 	 * not leave vcore context without dealing with notif_pending.  pop_ros_tf()
 	 * handles leaving via uthread context.  This handles leaving via a yield.
@@ -1007,10 +1015,6 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 	 * works with the online_vcs list (syncing with event.c and INDIR/IPI
 	 * posting). */
 	if (vcpd->notif_pending)
-		goto out_failed;
-	/* Optional: check to see if we are putting them below amt_wanted (help with
-	 * correctness-benign user races) and bail */
-	if (p->procdata->res_req[RES_CORES].amt_wanted >= p->procinfo->num_vcores)
 		goto out_failed;
 	/* Now we'll actually try to yield */
 	printd("[K] Process %d (%p) is yielding on vcore %d\n", p->pid, p,
