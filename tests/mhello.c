@@ -32,6 +32,13 @@ struct schedule_ops ghetto_sched_ops = {
 };
 struct schedule_ops *sched_ops = &ghetto_sched_ops;
 
+/* Extreme ghetto */
+static void __ros_syscall_spinon(struct syscall *sysc)
+{
+	while (!(atomic_read(&sysc->flags) & (SC_DONE | SC_PROGRESS)))
+		cpu_relax();
+}
+
 /* to trick uthread_create() */
 int main(int argc, char** argv)
 {
@@ -74,6 +81,10 @@ int main(int argc, char** argv)
 	 * _M mode.  Note this requests one vcore for us */
 	struct uthread dummy = {0};
 	uthread_lib_init(&dummy);
+	/* Reset the blockon to be the spinner...  This is really shitty.  Any
+	 * blocking calls after we become an MCP and before this will fail.  This is
+	 * just mhello showing its warts due to trying to work outside uthread.c */
+	ros_syscall_blockon = __ros_syscall_spinon;
 
 	if ((vcoreid = vcore_id())) {
 		printf("Should never see me! (from vcore %d)\n", vcoreid);
