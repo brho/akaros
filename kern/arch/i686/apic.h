@@ -63,9 +63,12 @@
 // IPI Interrupt Command Register
 #define LAPIC_IPI_ICR_LOWER			(LAPIC_BASE + 0x300)
 #define LAPIC_IPI_ICR_UPPER			(LAPIC_BASE + 0x310)
-// Interrupts being serviced (in-service) and pending (interrupt request reg)
-#define LAPIC_ISR					(LAPIC_BASE + 0x170)
-#define LAPIC_IRR					(LAPIC_BASE + 0x310)
+/* Interrupts being serviced (in-service) and pending (interrupt request reg).
+ * Note these registers are not normal bitmaps, but instead are 8 separate
+ * 32-bit registers, spaced/aligned on 16 byte boundaries in the LAPIC address
+ * space. */
+#define LAPIC_ISR					(LAPIC_BASE + 0x100)
+#define LAPIC_IRR					(LAPIC_BASE + 0x200)
 
 // PIT (Programmable Interval Timer)
 #define	TIMER_REG_CNTR0	0	/* timer 0 counter port */
@@ -110,6 +113,9 @@ void pic_unmask_irq(uint8_t irq);
 uint16_t pic_get_mask(void);
 uint16_t pic_get_irr(void);
 uint16_t pic_get_isr(void);
+bool lapic_get_isr_bit(uint8_t vector);
+bool lapic_get_irr_bit(uint8_t vector);
+void lapic_print_isr(void);
 bool ipi_is_pending(uint8_t vector);
 void __lapic_set_timer(uint32_t ticks, uint8_t vec, bool periodic, uint8_t div);
 void lapic_set_timer(uint32_t usec, bool periodic);

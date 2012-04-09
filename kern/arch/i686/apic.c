@@ -88,6 +88,40 @@ uint16_t pic_get_isr(void)
 	return __pic_get_irq_reg(PIC_READ_ISR);
 }
 
+/* Debugging helper.  Note the ISR/IRR are 32 bits at a time, spaced every 16
+ * bytes in the LAPIC address space. */
+void lapic_print_isr(void)
+{
+	printk("LAPIC ISR on core %d\n--------------\n", core_id());
+	for (int i = 7; i >= 0; i--)
+		printk("%3d-%3d: %08p\n", (i + 1) * 32 - 1, i * 32,
+		       *(uint32_t*)(LAPIC_ISR + i * 0x10));
+	printk("LAPIC IRR on core %d\n--------------\n", core_id());
+	for (int i = 7; i >= 0; i--)
+		printk("%3d-%3d: %08p\n", (i + 1) * 32 - 1, i * 32,
+		       *(uint32_t*)(LAPIC_IRR + i * 0x10));
+}
+
+/* Returns TRUE if the bit 'vector' is set in the LAPIC ISR or IRR (whatever you
+ * pass in.  These registers consist of 8, 32 byte registers spaced every 16
+ * bytes from the base in the LAPIC. */
+static bool __lapic_get_isrr_bit(uint32_t base, uint8_t vector)
+{
+	int which_reg = vector >> 5;	/* 32 bits per reg */
+	uint32_t *lapic_reg = (uint32_t*)(base + which_reg * 0x10);	/* offset 16 */
+	return (*lapic_reg & (1 << (vector % 32)) ? 1 : 0);
+}
+
+bool lapic_get_isr_bit(uint8_t vector)
+{
+	return __lapic_get_isrr_bit(LAPIC_ISR, vector);
+}
+
+bool lapic_get_irr_bit(uint8_t vector)
+{
+	return __lapic_get_isrr_bit(LAPIC_IRR, vector);
+}
+
 /* This works for any interrupt that goes through the LAPIC, but not things like
  * ExtInts.  To prevent abuse, we'll use it just for IPIs for now (which only
  * come via the APIC).
@@ -97,9 +131,7 @@ uint16_t pic_get_isr(void)
  * from the ISR. */
 bool ipi_is_pending(uint8_t vector)
 {
-	/* The ISR/IRR are 256 bits long.  We want to check if 'vector' is set. */
-	return GET_BITMASK_BIT((uint8_t*)LAPIC_ISR, vector) ||
-	       GET_BITMASK_BIT((uint8_t*)LAPIC_IRR, vector);
+	return lapic_get_isr_bit(vector) || lapic_get_isr_bit(vector);
 }
 
 /*

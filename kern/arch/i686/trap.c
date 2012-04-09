@@ -390,9 +390,9 @@ static bool check_spurious_irq(uint32_t trap_nr)
 	 * spurious and a real IRQ. */
 	uint8_t lapic_spurious = read_mmreg32(LAPIC_SPURIOUS) & 0xff;
 	/* Note the lapic's vectors are not shifted by an offset. */
-	if ((trap_nr == lapic_spurious) &&
-	    !GET_BITMASK_BIT((uint8_t*)LAPIC_ISR, lapic_spurious)) {
-		printk("Spurious LAPIC irq %d!\n", lapic_spurious);
+	if ((trap_nr == lapic_spurious) && !lapic_get_isr_bit(lapic_spurious)) {
+		printk("Spurious LAPIC irq %d, core %d!\n", lapic_spurious, core_id());
+		lapic_print_isr();
 		return TRUE;
 	}
 	return FALSE;
