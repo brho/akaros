@@ -43,6 +43,8 @@ $(FINALLIB): $(OBJS)
 install: $(FINALLIB)
 	cp $(FINALLIB) $(GCC_ROOT)/$(TARGET_ARCH)-ros/lib/
 	cp -R $(INCDIR)/* $(GCC_ROOT)/$(TARGET_ARCH)-ros/sys-include/
+	rm -rf $(GCC_ROOT)/$(TARGET_ARCH)-ros/sys-include/parlib  
+	ln -fs . $(GCC_ROOT)/$(TARGET_ARCH)-ros/sys-include/parlib  
 
 clean: 
 	@echo + clean [$(LIBUCNAME)]
