@@ -72,6 +72,7 @@ static void serial_put_char(struct cons_dev *cdev, uint8_t c)
 	 * expect (at least for brho) */
 	switch (c & 0xff) {
 		case '\b':
+		case 0x7f:
 			__serial_put_char(cdev->val, '\b');
 			__serial_put_char(cdev->val, (uint8_t)(' '));
 			__serial_put_char(cdev->val, '\b');
@@ -316,6 +317,7 @@ cga_putc(int c)
 
 	switch (c & 0xff) {
 	case '\b':
+	case 0x7f:
 		if (crt_pos > 0) {
 			crt_pos--;
 			scrolling_crt_pos--;

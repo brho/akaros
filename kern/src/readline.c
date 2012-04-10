@@ -27,14 +27,13 @@ int readline(char *buf, size_t buf_l, const char *prompt, ...)
 			printk("read error: %e\n", c);	/* %e! */
 			retval = i;
 			break;
-		} else if (c >= ' ' && i < buf_l - 1) {
-			if (echoing)
-				cputchar(c);
-			buf[i++] = c;
-		} else if (c == '\b' && i > 0) {
-			if (echoing)
-				cputchar(c);
-			i--;
+		} else if (c == '\b' || c == 0x7f) {
+			if (i > 0) {
+				if (echoing)
+					cputchar(c);
+				i--;
+			}
+			continue;
 		} else if (c == '\n' || c == '\r') {
 			/* sending a \n regardless, since the serial port gives us a \r for
 			 * carriage returns. */
@@ -44,6 +43,10 @@ int readline(char *buf, size_t buf_l, const char *prompt, ...)
 			buf[i++] = c;
 			retval =  i;
 			break;
+		} else if (c >= ' ' && i < buf_l - 1) {
+			if (echoing)
+				cputchar(c);
+			buf[i++] = c;
 		}
 	}
 	spin_unlock_irqsave(&readline_lock);
