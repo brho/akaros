@@ -10,6 +10,10 @@
 #include <ros/syscall.h>
 #include <ros/event.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**************** Functions to invoke syscalls ****************/
 /* Convenience wrapper for __ros_syscall_errno.  Most code uses this (for now)*/
 #define ros_syscall(which, a0, a1, a2, a3, a4, a5) \
@@ -38,5 +42,9 @@ extern void (*ros_syscall_blockon)(struct syscall *sysc);
 /* Glibc initial blockon, usable before parlib code can init things (or if it
  * never can, like for RTLD).  MCPs will need the 'uthread-aware' blockon. */
 void __ros_scp_syscall_blockon(struct syscall *sysc);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _GLIBC_ROS_SYSCALL_H */
