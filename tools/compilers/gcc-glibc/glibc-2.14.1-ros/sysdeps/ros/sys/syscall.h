@@ -33,7 +33,7 @@ long __ros_syscall_errno(unsigned int _num, long _a0, long _a1, long _a2,
 /* Simple ev_q that routes notifs to vcore0's public mbox.  This is used by the
  * default scp_syscall, but can also be used for signals or other basic
  * event/signal needs. */
-struct event_queue __ros_scp_simple_evq;
+extern struct event_queue __ros_scp_simple_evq;
 
 /* Attempts to block on sysc, returning when it is done or progress has been
  * made.  (function is in uthread.c) */
