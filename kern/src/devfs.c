@@ -84,11 +84,6 @@ ssize_t dev_stdin_read(struct file *file, char *buf, size_t count,
 	char c;
 	extern struct kb_buffer cons_buf;
 	kb_get_from_buf(&cons_buf, &c, 1);
-	/* this is faking some tcgetattr attributes */
-	/* applications (ash) expect a \n instead of a \r */
-	if (c == '\r')
-		c = '\n';
-	printk("%c", c);
 	/* TODO UMEM */
 	if (current)
 		memcpy_to_user_errno(current, buf, &c, 1);
@@ -108,6 +103,12 @@ ssize_t dev_stdout_write(struct file *file, const char *buf, size_t count,
 		t_buf = (char*)buf;
 	if (!t_buf)
 		return -1;
+	/* TODO: tty hack.  they are sending us an escape sequence, and the keyboard
+	 * would try to print it (which it can't do yet).  The hack is even dirtier
+	 * in that we only detect it if it is the first char, and we ignore
+	 * everything else. */
+	if (t_buf[0] == '\033') /* 0x1b */
+		return count;
 	printk("%s", t_buf);
 	return count;
 }

@@ -33,6 +33,7 @@
 #include <smp.h>
 #include <arsc_server.h>
 #include <event.h>
+#include <termios.h>
 
 
 #ifdef __CONFIG_NETWORKING__
@@ -1303,26 +1304,63 @@ intreg_t sys_gettimeofday(struct proc *p, int *buf)
 	return memcpy_to_user_errno(p,buf,kbuf,sizeof(kbuf));
 }
 
-#define SIZEOF_STRUCT_TERMIOS 60
 intreg_t sys_tcgetattr(struct proc *p, int fd, void *termios_p)
 {
-	int* kbuf = kmalloc(SIZEOF_STRUCT_TERMIOS,0);
-	int ret = ufe(tcgetattr,fd,PADDR(kbuf),0,0);
-	if(ret != -1 && memcpy_to_user_errno(p,termios_p,kbuf,SIZEOF_STRUCT_TERMIOS))
-		ret = -1;
+	int retval = 0;
+	/* TODO: actually support this call on tty FDs.  Right now, we just fake
+	 * what my linux box reports for a bash pty. */
+	struct termios *kbuf = kmalloc(sizeof(struct termios), 0);
+	kbuf->c_iflag = 0x2d02;
+	kbuf->c_oflag = 0x0005;
+	kbuf->c_cflag = 0x04bf;
+	kbuf->c_lflag = 0x8a3b;
+	kbuf->c_line = 0x0;
+	kbuf->c_ispeed = 0xf;
+	kbuf->c_ospeed = 0xf;
+	kbuf->c_cc[0] = 0x03;
+	kbuf->c_cc[1] = 0x1c;
+	kbuf->c_cc[2] = 0x7f;
+	kbuf->c_cc[3] = 0x15;
+	kbuf->c_cc[4] = 0x04;
+	kbuf->c_cc[5] = 0x00;
+	kbuf->c_cc[6] = 0x01;
+	kbuf->c_cc[7] = 0xff;
+	kbuf->c_cc[8] = 0x11;
+	kbuf->c_cc[9] = 0x13;
+	kbuf->c_cc[10] = 0x1a;
+	kbuf->c_cc[11] = 0xff;
+	kbuf->c_cc[12] = 0x12;
+	kbuf->c_cc[13] = 0x0f;
+	kbuf->c_cc[14] = 0x17;
+	kbuf->c_cc[15] = 0x16;
+	kbuf->c_cc[16] = 0xff;
+	kbuf->c_cc[17] = 0x00;
+	kbuf->c_cc[18] = 0x00;
+	kbuf->c_cc[19] = 0x00;
+	kbuf->c_cc[20] = 0x00;
+	kbuf->c_cc[21] = 0x00;
+	kbuf->c_cc[22] = 0x00;
+	kbuf->c_cc[23] = 0x00;
+	kbuf->c_cc[24] = 0x00;
+	kbuf->c_cc[25] = 0x00;
+	kbuf->c_cc[26] = 0x00;
+	kbuf->c_cc[27] = 0x00;
+	kbuf->c_cc[28] = 0x00;
+	kbuf->c_cc[29] = 0x00;
+	kbuf->c_cc[30] = 0x00;
+	kbuf->c_cc[31] = 0x00;
+
+	if (memcpy_to_user_errno(p, termios_p, kbuf, sizeof(struct termios)))
+		retval = -1;
 	kfree(kbuf);
-	return ret;
+	return retval;
 }
 
 intreg_t sys_tcsetattr(struct proc *p, int fd, int optional_actions,
                        const void *termios_p)
 {
-	void* kbuf = user_memdup_errno(p,termios_p,SIZEOF_STRUCT_TERMIOS);
-	if(kbuf == NULL)
-		return -1;
-	int ret = ufe(tcsetattr,fd,optional_actions,PADDR(kbuf),0);
-	user_memdup_free(p,kbuf);
-	return ret;
+	/* TODO: do this properly too.  For now, we just say 'it worked' */
+	return 0;
 }
 
 /* TODO: we don't have any notion of UIDs or GIDs yet, but don't let that stop a
