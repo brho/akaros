@@ -26,6 +26,7 @@ struct uthread {
 	struct syscall *sysc;	/* syscall we're blocking on, if any */
 	int state;
 };
+typedef struct uthread uthread_t;
 extern __thread struct uthread *current_uthread;
 
 /* 2L-Scheduler operations.  Can be 0.  Examples in pthread.c. */
@@ -70,7 +71,32 @@ bool register_evq(struct syscall *sysc, struct event_queue *ev_q);
 void deregister_evq(struct syscall *sysc);
 
 /* Helpers, which sched_entry() can call */
+void highjack_current_uthread(struct uthread *uthread);
 void run_current_uthread(void);
 void run_uthread(struct uthread *uthread);
+
+static inline void
+init_uthread_tf(uthread_t *uth, void (*entry)(void),
+                void *stack_bottom, uint32_t size)
+{
+  init_user_tf(&uth->utf, (long)entry, (long)(stack_bottom));
+}
+
+#define uthread_set_tls_var(uthread, name, val)                          \
+{                                                                        \
+      typeof(val) __val = val;                                           \
+      begin_access_tls_vars(((uthread_t*)(uthread))->tls_desc);          \
+      name = __val;                                                      \
+      end_access_tls_vars();                                             \
+}
+
+#define uthread_get_tls_var(uthread, name)                               \
+({                                                                       \
+      typeof(name) val;                                                  \
+      begin_access_tls_vars(((uthread_t*)(uthread))->tls_desc);          \
+      val = name;                                                        \
+      end_access_tls_vars();                                             \
+      val;                                                               \
+})
 
 #endif /* _UTHREAD_H */

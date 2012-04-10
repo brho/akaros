@@ -143,6 +143,107 @@ static inline bool __preempt_is_pending(uint32_t vcoreid)
 	return __procinfo.vcoremap[vcoreid].preempt_pending;
 }
 
+
+#ifndef __PIC__
+
+#define begin_safe_access_tls_vars()
+
+#define end_safe_access_tls_vars()
+
+#else
+
+#include <features.h>
+#if __GNUC_PREREQ(4,4)
+
+#define begin_safe_access_tls_vars()                                    \
+  void __attribute__((noinline, optimize("O0")))                        \
+  safe_access_tls_var_internal() {                                      \
+    asm("");                                                            \
+
+#define end_safe_access_tls_vars()                                      \
+  } safe_access_tls_var_internal();                                     \
+
+#else
+
+#define begin_safe_access_tls_vars()                                                   \
+  printf("ERROR: For PIC you must be using gcc 4.4 or above for tls support!\n");      \
+  printf("ERROR: As a quick fix, try recompiling your application with -static...\n"); \
+  exit(2);
+
+#define end_safe_access_tls_vars()                                         \
+  printf("Will never be called because we abort above!");                  \
+  exit(2);
+
+#endif //__GNUC_PREREQ
+#endif // __PIC__
+
+#define begin_access_tls_vars(tls_desc)                               \
+{                                                                     \
+	uthread_t *caller;                                            \
+        int invcore = in_vcore_context();                             \
+        if(!invcore) {                                                \
+          caller = current_uthread;                                   \
+	  assert(caller);                                             \
+	  caller->flags |= UTHREAD_DONT_MIGRATE;                      \
+        }                                                             \
+                                                                      \
+	cmb();                                                        \
+	int vcoreid = vcore_id();                                     \
+        void *temp_tls_desc = get_tls_desc(vcoreid);                  \
+                                                                      \
+        if(!invcore)                                                  \
+	  disable_notifs(vcoreid);                                    \
+                                                                      \
+        set_tls_desc(tls_desc, vcoreid);                              \
+        begin_safe_access_tls_vars();
+
+#define end_access_tls_vars()                                         \
+        end_safe_access_tls_vars();                                   \
+        set_tls_desc(temp_tls_desc, vcoreid);                         \
+                                                                      \
+        if(!invcore) {                                                \
+	  caller->flags &= ~UTHREAD_DONT_MIGRATE;                     \
+          cmb();                                                      \
+	  if(in_multi_mode())                                         \
+            enable_notifs(vcoreid);                                   \
+        }                                                             \
+	cmb();                                                        \
+}
+
+#define safe_set_tls_var(name, val)                                   \
+({                                                                    \
+        begin_safe_access_tls_vars();                                 \
+        name = val;                                                   \
+        end_safe_access_tls_vars();                                   \
+})
+
+#define safe_get_tls_var(name)                                        \
+({                                                                    \
+        typeof(name) __val;                                           \
+        begin_safe_access_tls_vars();                                 \
+        __val = name;                                                 \
+        end_safe_access_tls_vars();                                   \
+        __val;                                                        \
+})
+
+#define vcore_set_tls_var(name, val)                                     \
+{                                                                        \
+      extern void** vcore_thread_control_blocks;                         \
+      typeof(val) __val = val;                                           \
+      begin_access_tls_vars(vcore_thread_control_blocks[vcoreid]);       \
+      name = __val;                                                      \
+      end_access_tls_vars();                                             \
+}
+
+#define vcore_get_tls_var(name)                                 \
+({                                                              \
+      typeof(name) val;                                         \
+      begin_access_tls_vars(vcore_tls_descs[vcoreid]);          \
+      val = name;                                               \
+      end_access_tls_vars();                                    \
+      val;                                                      \
+})
+
 #ifdef __cplusplus
 }
 #endif

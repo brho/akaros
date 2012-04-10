@@ -403,6 +403,22 @@ static void __run_cur_uthread(void)
 	}
 }
 
+/* Simply sets current uthread to be whatever the value of uthread is.  This
+ * can be called from outside of sched_entry() to highjack the current context,
+ * and make sure that the new uthread struct is used to store this context upon
+ * yielding, etc. USE WITH EXTREME CAUTION!
+*/
+void highjack_current_uthread(struct uthread *uthread)
+{
+	assert(uthread != current_uthread);
+	assert(uthread->tls_desc);
+
+	current_uthread->state = UT_RUNNABLE;
+	uthread->state = UT_RUNNING;
+	vcore_set_tls_var(current_uthread, uthread);
+	set_tls_desc(uthread->tls_desc, vcore_id());
+}
+
 /* Runs whatever thread is vcore's current_uthread.  This is nothing but a
  * couple checks, then the real run_cur_uth. */
 void run_current_uthread(void)
