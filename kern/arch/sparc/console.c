@@ -21,8 +21,13 @@ cons_putc(int c)
 {
 	if(c == '\b' || c == 0x7F)
 	{
+	#ifdef __CONFIG_PRINTK_NO_BACKSPACE__
+		char buf[2] = {'^', 'H'};
+		cputbuf(buf, 2);
+	#else
 		char buf[3] = {'\b', ' ', '\b'};
-		cputbuf(buf,3);
+		cputbuf(buf, 3);
+	#endif /* __CONFIG_PRINTK_NO_BACKSPACE__ */
 	}
 	else
 	{

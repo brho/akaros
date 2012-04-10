@@ -69,13 +69,18 @@ static void serial_put_char(struct cons_dev *cdev, uint8_t c)
 {
 	assert(cdev->type == CONS_SER_DEV);
 	/* We do some funky editing of a few chars, to suit what minicom seems to
-	 * expect (at least for brho) */
+	 * expect (at least for brho). */
 	switch (c & 0xff) {
 		case '\b':
 		case 0x7f:
+		#ifdef __CONFIG_PRINTK_NO_BACKSPACE__
+			__serial_put_char(cdev->val, (uint8_t)('^'));
+			__serial_put_char(cdev->val, (uint8_t)('H'));
+		#else
 			__serial_put_char(cdev->val, '\b');
 			__serial_put_char(cdev->val, (uint8_t)(' '));
 			__serial_put_char(cdev->val, '\b');
+		#endif /* __CONFIG_PRINTK_NO_BACKSPACE__ */
 			break;
 		case '\n':
 		case '\r':
@@ -318,13 +323,17 @@ cga_putc(int c)
 	switch (c & 0xff) {
 	case '\b':
 	case 0x7f:
+	#ifdef __CONFIG_PRINTK_NO_BACKSPACE__
+		cga_putc('^');
+		cga_putc('H');
+	#else
 		if (crt_pos > 0) {
 			crt_pos--;
 			scrolling_crt_pos--;
-
 			crt_buf[crt_pos] = (c & ~0xff) | ' ';
 			scrolling_crt_buf[scrolling_crt_pos] = crt_buf[crt_pos];
 		}
+	#endif /* __CONFIG_PRINTK_NO_BACKSPACE__ */
 		break;
 	case '\n':
 		crt_pos += CRT_COLS;
