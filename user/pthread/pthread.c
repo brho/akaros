@@ -35,9 +35,9 @@ static inline void spin_to_sleep(unsigned int spins, unsigned int *spun);
 /* Pthread 2LS operations */
 void pth_sched_entry(void);
 void pth_thread_runnable(struct uthread *uthread);
-void pth_thread_yield(struct uthread *uthread);
 void pth_thread_paused(struct uthread *uthread);
 void pth_thread_blockon_sysc(struct uthread *uthread, void *sysc);
+void pth_thread_has_blocked(struct uthread *uthread, int flags);
 void pth_preempt_pending(void);
 void pth_spawn_thread(uintptr_t pc_start, void *data);
 
@@ -47,9 +47,9 @@ static void pth_handle_syscall(struct event_msg *ev_msg, unsigned int ev_type);
 struct schedule_ops pthread_sched_ops = {
 	pth_sched_entry,
 	pth_thread_runnable,
-	pth_thread_yield,
 	pth_thread_paused,
 	pth_thread_blockon_sysc,
+	pth_thread_has_blocked,
 	0, /* pth_preempt_pending, */
 	0, /* pth_spawn_thread, */
 };
@@ -148,7 +148,8 @@ void pth_thread_runnable(struct uthread *uthread)
 /* The calling thread is yielding.  Do what you need to do to restart (like put
  * yourself on a runqueue), or do some accounting.  Eventually, this might be a
  * little more generic than just yield. */
-void pth_thread_yield(struct uthread *uthread)
+/* TODO: keeping this around temporarily */
+static void pth_thread_yield(struct uthread *uthread, void *junk)
 {
 	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
 	struct pthread_tcb *temp_pth = 0;	/* used for exiting AND joining */
@@ -226,14 +227,6 @@ void pth_thread_paused(struct uthread *uthread)
 	uthread_runnable(uthread);
 }
 
-void pth_preempt_pending(void)
-{
-}
-
-void pth_spawn_thread(uintptr_t pc_start, void *data)
-{
-}
-
 /* Restarts a uthread hanging off a syscall.  For the simple pthread case, we
  * just make it runnable and let the main scheduler code handle it. */
 static void restart_thread(struct syscall *sysc)
@@ -242,7 +235,7 @@ static void restart_thread(struct syscall *sysc)
 	/* uthread stuff here: */
 	assert(ut_restartee);
 	assert(((struct pthread_tcb*)ut_restartee)->state == PTH_BLK_SYSC);
-	assert(ut_restartee->sysc == sysc);
+	assert(ut_restartee->sysc == sysc);	/* set in uthread.c */
 	ut_restartee->sysc = 0;	/* so we don't 'reblock' on this later */
 	uthread_runnable(ut_restartee);
 }
@@ -295,6 +288,27 @@ void pth_thread_blockon_sysc(struct uthread *uthread, void *syscall)
 		restart_thread(sysc);
 	}
 	/* GIANT WARNING: do not touch the thread after this point. */
+}
+
+void pth_thread_has_blocked(struct uthread *uthread, int flags)
+{
+	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
+	/* could imagine doing something with the flags.  For now, we just treat all
+	 * externally blocked reasons as 'MUTEX'.  Whatever we do here, we are
+	 * mostly communicating to our future selves in pth_thread_runnable(), which
+	 * gets called by whoever triggered this callback */
+	pthread->state = PTH_BLK_MUTEX;
+	/* Just for yucks: */
+	if (flags == UTH_EXT_BLK_JUSTICE)
+		printf("For great justice!\n");
+}
+
+void pth_preempt_pending(void)
+{
+}
+
+void pth_spawn_thread(uintptr_t pc_start, void *data)
+{
 }
 
 /* Pthread interface stuff and helpers */
@@ -489,7 +503,7 @@ int pthread_join(pthread_t thread, void** retval)
 		/* Time to join, set things up so pth_thread_yield() knows what to do */
 		caller->state = PTH_BLK_JOINING;
 		caller->join_target = thread;
-		uthread_yield(TRUE);
+		uthread_yield(TRUE, pth_thread_yield, 0);
 		/* When we return/restart, the thread will be done */
 	} else {
 		assert(thread->joiner == thread);	/* sanity check */
@@ -504,7 +518,7 @@ int pthread_yield(void)
 {
 	struct pthread_tcb *caller = (struct pthread_tcb*)current_uthread;
 	caller->state = PTH_BLK_YIELDING;
-	uthread_yield(TRUE);
+	uthread_yield(TRUE, pth_thread_yield, 0);
 	return 0;
 }
 
@@ -688,7 +702,7 @@ void pthread_exit(void *ret)
 	pthread->retval = ret;
 	/* So our pth_thread_yield knows we want to exit */
 	pthread->state = PTH_EXITING;
-	uthread_yield(FALSE);
+	uthread_yield(FALSE, pth_thread_yield, 0);
 }
 
 int pthread_once(pthread_once_t* once_control, void (*init_routine)(void))

@@ -12,6 +12,10 @@
 #define UT_RUNNING		1
 #define UT_NOT_RUNNING	2
 
+/* Externally blocked thread reasons (for uthread_has_blocked()) */
+#define UTH_EXT_BLK_MUTEX			1
+#define UTH_EXT_BLK_JUSTICE			2	/* whatever.  might need more options */
+
 /* Bare necessities of a user thread.  2LSs should allocate a bigger struct and
  * cast their threads to uthreads when talking with vcore code.  Vcore/default
  * 2LS code won't touch udata or beyond. */
@@ -22,6 +26,8 @@ struct uthread {
 	int flags;
 	struct syscall *sysc;	/* syscall we're blocking on, if any */
 	int state;
+	void (*yield_func)(struct uthread*, void*);
+	void *yield_arg;
 };
 typedef struct uthread uthread_t;
 extern __thread struct uthread *current_uthread;
@@ -31,9 +37,9 @@ struct schedule_ops {
 	/* Functions supporting thread ops */
 	void (*sched_entry)(void);
 	void (*thread_runnable)(struct uthread *);
-	void (*thread_yield)(struct uthread *);
 	void (*thread_paused)(struct uthread *);
 	void (*thread_blockon_sysc)(struct uthread *, void *);
+	void (*thread_has_blocked)(struct uthread *, int);
 	/* Functions event handling wants */
 	void (*preempt_pending)(void);
 	void (*spawn_thread)(uintptr_t pc_start, void *data);	/* don't run yet */
@@ -56,7 +62,8 @@ void uthread_slim_init(void);
 /* Call this when you are done with a uthread, forever, but before you free it */
 void uthread_cleanup(struct uthread *uthread);
 void uthread_runnable(struct uthread *uthread);
-void uthread_yield(bool save_state);
+void uthread_yield(bool save_state, void (*yield_func)(struct uthread*, void*),
+                   void *yield_arg);
 
 /* Utility functions */
 bool __check_preempt_pending(uint32_t vcoreid);	/* careful: check the code */

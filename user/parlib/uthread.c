@@ -216,10 +216,27 @@ void uthread_runnable(struct uthread *uthread)
 	sched_ops->thread_runnable(uthread);
 }
 
+/* Informs the 2LS that its thread blocked, and it is not under the control of
+ * the 2LS.  This is for informational purposes, and some semantic meaning
+ * should be passed by flags (from uthread.h's UTH_EXT_BLK_xxx options).
+ * Eventually, whoever calls this will call uthread_runnable(), giving the
+ * thread back to the 2LS.
+ *
+ * If code outside the 2LS has blocked a thread (via uthread_yield) and ran its
+ * own callback/yield_func instead of some 2LS code, that callback needs to
+ * call this.
+ *
+ * AKA: obviously_a_uthread_has_blocked_in_lincoln_park() */
+void uthread_has_blocked(struct uthread *uthread, int flags)
+{
+	if (sched_ops->thread_has_blocked)
+		sched_ops->thread_has_blocked(uthread, flags);
+}
+
 /* Need to have this as a separate, non-inlined function since we clobber the
  * stack pointer before calling it, and don't want the compiler to play games
  * with my hart. */
-static void __attribute__((noinline, noreturn)) 
+static void __attribute__((noinline, noreturn))
 __uthread_yield(void)
 {
 	struct uthread *uthread = current_uthread;
@@ -229,19 +246,10 @@ __uthread_yield(void)
 	 * uthread_destroy() */
 	uthread->flags &= ~UTHREAD_DONT_MIGRATE;
 	uthread->state = UT_NOT_RUNNING;
-	/* Determine if we're blocking on a syscall or just yielding.  Might end
-	 * up doing this differently when/if we have more ways to yield. */
-	if (uthread->sysc) {
-		assert(sched_ops->thread_blockon_sysc);
-		sched_ops->thread_blockon_sysc(uthread, uthread->sysc);
-		/* make sure you don't touch uthread after that sched ops call */
-	} else { /* generic yield */
-		assert(sched_ops->thread_yield);
-		/* 2LS will save the thread somewhere for restarting.  Later on,
-		 * we'll probably have a generic function for all sorts of waiting.
-		 */
-		sched_ops->thread_yield(uthread);
-	}
+	/* Do whatever the yielder wanted us to do */
+	assert(uthread->yield_func);
+	uthread->yield_func(uthread, uthread->yield_arg);
+	/* Make sure you do not touch uthread after that func call */
 	/* Leave the current vcore completely */
 	current_uthread = NULL;
 	/* Go back to the entry point, where we can handle notifications or
@@ -249,14 +257,25 @@ __uthread_yield(void)
 	uthread_vcore_entry();
 }
 
-/* Calling thread yields.  Both exiting and yielding calls this, the difference
- * is the thread's state (in the flags). */
-void uthread_yield(bool save_state)
+/* Calling thread yields for some reason.  Set 'save_state' if you want to ever
+ * run the thread again.  Once in vcore context in __uthread_yield, yield_func
+ * will get called with the uthread and yield_arg passed to it.  This way, you
+ * can do whatever you want when you get into vcore context, which can be
+ * thread_blockon_sysc, unlocking mutexes, joining, whatever.
+ *
+ * If you do *not* pass a 2LS sched op or other 2LS function as yield_func,
+ * then you must also call uthread_has_blocked(flags), which will let the 2LS
+ * know a thread blocked beyond its control (and why). */
+void uthread_yield(bool save_state, void (*yield_func)(struct uthread*, void*),
+                   void *yield_arg)
 {
 	struct uthread *uthread = current_uthread;
 	volatile bool yielding = TRUE; /* signal to short circuit when restarting */
 	assert(!in_vcore_context());
 	assert(uthread->state == UT_RUNNING);
+	/* Pass info to ourselves across the uth_yield -> __uth_yield transition. */
+	uthread->yield_func = yield_func;
+	uthread->yield_arg = yield_arg;
 	/* Don't migrate this thread to another vcore, since it depends on being on
 	 * the same vcore throughout (once it disables notifs).  The race is that we
 	 * read vcoreid, then get interrupted / migrated before disabling notifs. */
@@ -289,7 +308,7 @@ void uthread_yield(bool save_state)
 	/* Change to the transition context (both TLS and stack). */
 	extern void** vcore_thread_control_blocks;
 	set_tls_desc(vcore_thread_control_blocks[vcoreid], vcoreid);
-	assert(current_uthread == uthread);	
+	assert(current_uthread == uthread);
 	assert(in_vcore_context());	/* technically, we aren't fully in vcore context */
 	/* After this, make sure you don't use local variables.  Also, make sure the
 	 * compiler doesn't use them without telling you (TODO).
@@ -349,9 +368,10 @@ void __ros_mcp_syscall_blockon(struct syscall *sysc)
 	/* double check before doing all this crap */
 	if (atomic_read(&sysc->flags) & (SC_DONE | SC_PROGRESS))
 		return;
-	/* So yield knows we are blocking on something */
+	/* Debugging: so we can match sysc when it tries to wake us up later */
 	current_uthread->sysc = sysc;
-	uthread_yield(TRUE);
+	/* yield, calling 2ls-blockon(cur_uth, sysc) on the other side */
+	uthread_yield(TRUE, sched_ops->thread_blockon_sysc, sysc);
 }
 
 /* Helper for run_current and run_uthread.  Make sure the uthread you want to
