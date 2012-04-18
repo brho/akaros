@@ -145,62 +145,6 @@ void pth_thread_runnable(struct uthread *uthread)
 	vcore_request(threads_ready);
 }
 
-/* The calling thread is yielding.  Do what you need to do to restart (like put
- * yourself on a runqueue), or do some accounting.  Eventually, this might be a
- * little more generic than just yield. */
-/* TODO: keeping this around temporarily */
-static void pth_thread_yield(struct uthread *uthread, void *junk)
-{
-	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
-	struct pthread_tcb *temp_pth = 0;	/* used for exiting AND joining */
-	/* Remove from the active list, whether exiting or yielding. */
-	mcs_pdr_lock(&queue_lock);
-	threads_active--;
-	TAILQ_REMOVE(&active_queue, pthread, next);
-	mcs_pdr_unlock(&queue_lock);
-	if (pthread->state == PTH_EXITING) {
-		/* Destroy the pthread */
-		uthread_cleanup(uthread);
-		/* Cleanup, mirroring pthread_create() */
-		__pthread_free_stack(pthread);
-		/* TODO: race on detach state */
-		if (pthread->detached) {
-			free(pthread);
-		} else {
-			/* See if someone is joining on us.  If not, we're done (and the
-			 * joiner will wake itself when it saw us there instead of 0). */
-			temp_pth = atomic_swap_ptr((void**)&pthread->joiner, pthread);
-			if (temp_pth) {
-				/* they joined before we exited, we need to wake them */
-				printd("[pth] %08p exiting, waking joiner %08p\n",
-				       pthread, temp_pth);
-				uthread_runnable((struct uthread*)temp_pth);
-			}
-		}
-	} else if (pthread->state == PTH_BLK_JOINING) {
-		/* We're trying to join, yield til we get woken up */
-		/* put ourselves in the join target's joiner slot.  If we get anything
-		 * back, we lost the race and need to wake ourselves. */
-		temp_pth = atomic_swap_ptr((void**)&pthread->join_target->joiner,
-		                           pthread);
-		/* after that atomic swap, the pthread might be woken up (if it
-		 * succeeded), so don't touch pthread again after that (this following
-		 * if () is okay). */
-		if (temp_pth) {
-			assert(temp_pth == pthread->join_target);	/* Sanity */
-			/* wake ourselves, not the exited one! */
-			printd("[pth] %08p already exit, rewaking ourselves, joiner %08p\n",
-			       temp_pth, pthread);
-			uthread_runnable((struct uthread*)pthread);
-		}
-	} else {
-		assert(pthread->state == PTH_BLK_YIELDING);
-		/* Yielding for no apparent reason (being nice / help break deadlocks).
-		 * Just wake it up and make it ready again. */
-		uthread_runnable((struct uthread*)pthread);
-	}
-}
-
 /* For some reason not under its control, the uthread stopped running (compared
  * to yield, which was caused by uthread/2LS code).
  *
@@ -379,7 +323,6 @@ static int pthread_lib_init(void)
 	t->stacktop = (void*)USTACKTOP;
 	t->detached = TRUE;
 	t->state = PTH_RUNNING;
-	t->join_target = 0;
 	t->joiner = 0;
 	assert(t->id == 0);
 	/* Put the new pthread (thread0) on the active queue */
@@ -461,7 +404,6 @@ int pthread_create(pthread_t *thread, const pthread_attr_t *attr,
 	pthread->state = PTH_CREATED;
 	pthread->id = get_next_pid();
 	pthread->detached = FALSE;				/* default */
-	pthread->join_target = 0;
 	pthread->joiner = 0;
 	/* Respect the attributes */
 	if (attr) {
@@ -487,38 +429,121 @@ int pthread_create(pthread_t *thread, const pthread_attr_t *attr,
 	return 0;
 }
 
-int pthread_join(pthread_t thread, void** retval)
+/* Helper that all pthread-controlled yield paths call.  Just does some
+ * accounting.  This is another example of how the much-loathed (and loved)
+ * active queue is keeping us honest. */
+static void __pthread_generic_yield(struct pthread_tcb *pthread)
 {
-	struct pthread_tcb *caller = (struct pthread_tcb*)current_uthread;
+	mcs_pdr_lock(&queue_lock);
+	threads_active--;
+	TAILQ_REMOVE(&active_queue, pthread, next);
+	mcs_pdr_unlock(&queue_lock);
+}
+
+/* Callback/bottom half of join, called from __uthread_yield (vcore context).
+ * join_target is who we are trying to join on (and who is calling exit). */
+static void __pth_join_cb(struct uthread *uthread, void *arg)
+{
+	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
+	struct pthread_tcb *join_target = (struct pthread_tcb*)arg;
+	struct pthread_tcb *temp_pth = 0;
+	__pthread_generic_yield(pthread);
+	/* We're trying to join, yield til we get woken up */
+	pthread->state = PTH_BLK_JOINING;	/* could do this front-side */
+	/* Put ourselves in the join target's joiner slot.  If we get anything back,
+	 * we lost the race and need to wake ourselves.  Syncs with __pth_exit_cb.*/
+	temp_pth = atomic_swap_ptr((void**)&join_target->joiner, pthread);
+	/* After that atomic swap, the pthread might be woken up (if it succeeded),
+	 * so don't touch pthread again after that (this following if () is okay).*/
+	if (temp_pth) {		/* temp_pth != 0 means they exited first */
+		assert(temp_pth == join_target);	/* Sanity */
+		/* wake ourselves, not the exited one! */
+		printd("[pth] %08p already exit, rewaking ourselves, joiner %08p\n",
+		       temp_pth, pthread);
+		uthread_runnable(uthread);	/* wake ourselves */
+	}
+}
+
+int pthread_join(struct pthread_tcb *join_target, void **retval)
+{
 	/* Not sure if this is the right semantics.  There is a race if we deref
-	 * thread and he is already freed (which would have happened if he was
+	 * join_target and he is already freed (which would have happened if he was
 	 * detached. */
-	if (thread->detached) {
+	if (join_target->detached) {
 		printf("[pthread] trying to join on a detached pthread");
 		return -1;
 	}
 	/* See if it is already done, to avoid the pain of a uthread_yield() (the
 	 * early check is an optimization, pth_thread_yield() handles the race). */
-	if (!thread->joiner) {
-		/* Time to join, set things up so pth_thread_yield() knows what to do */
-		caller->state = PTH_BLK_JOINING;
-		caller->join_target = thread;
-		uthread_yield(TRUE, pth_thread_yield, 0);
+	if (!join_target->joiner) {
+		uthread_yield(TRUE, __pth_join_cb, join_target);
 		/* When we return/restart, the thread will be done */
 	} else {
-		assert(thread->joiner == thread);	/* sanity check */
+		assert(join_target->joiner == join_target);	/* sanity check */
 	}
 	if (retval)
-		*retval = thread->retval;
-	free(thread);
+		*retval = join_target->retval;
+	free(join_target);
 	return 0;
 }
 
+/* Callback/bottom half of exit.  Syncs with __pth_join_cb.  Here's how it
+ * works: the slot for joiner is initially 0.  Joiners try to swap themselves
+ * into that spot.  Exiters try to put 'themselves' into it.  Whoever gets 0
+ * back won the race.  If the exiter lost the race, it must wake up the joiner
+ * (which was the value from temp_pth).  If the joiner lost the race, it must
+ * wake itself up, and for sanity reasons can ensure the value from temp_pth is
+ * the join target). */
+static void __pth_exit_cb(struct uthread *uthread, void *junk)
+{
+	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
+	struct pthread_tcb *temp_pth = 0;
+	__pthread_generic_yield(pthread);
+	/* Catch some bugs */
+	pthread->state = PTH_EXITING;
+	/* Destroy the pthread */
+	uthread_cleanup(uthread);
+	/* Cleanup, mirroring pthread_create() */
+	__pthread_free_stack(pthread);
+	/* TODO: race on detach state (see join) */
+	if (pthread->detached) {
+		free(pthread);
+	} else {
+		/* See if someone is joining on us.  If not, we're done (and the
+		 * joiner will wake itself when it saw us there instead of 0). */
+		temp_pth = atomic_swap_ptr((void**)&pthread->joiner, pthread);
+		if (temp_pth) {
+			/* they joined before we exited, we need to wake them */
+			printd("[pth] %08p exiting, waking joiner %08p\n",
+			       pthread, temp_pth);
+			uthread_runnable((struct uthread*)temp_pth);
+		}
+	}
+}
+
+void pthread_exit(void *ret)
+{
+	struct pthread_tcb *pthread = pthread_self();
+	pthread->retval = ret;
+	uthread_yield(FALSE, __pth_exit_cb, 0);
+}
+
+/* Callback/bottom half of yield.  For those writing these pth callbacks, the
+ * minimum is call generic, set state (communicate with runnable), then do
+ * something that causes it to be runnable in the future (or right now). */
+static void __pth_yield_cb(struct uthread *uthread, void *junk)
+{
+	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
+	__pthread_generic_yield(pthread);
+	pthread->state = PTH_BLK_YIELDING;
+	/* just immediately restart it */
+	uthread_runnable(uthread);
+}
+
+/* Cooperative yielding of the processor, to allow other threads to run */
 int pthread_yield(void)
 {
-	struct pthread_tcb *caller = (struct pthread_tcb*)current_uthread;
-	caller->state = PTH_BLK_YIELDING;
-	uthread_yield(TRUE, pth_thread_yield, 0);
+	uthread_yield(TRUE, __pth_yield_cb, 0);
 	return 0;
 }
 
@@ -692,17 +717,6 @@ pthread_t pthread_self()
 int pthread_equal(pthread_t t1, pthread_t t2)
 {
   return t1 == t2;
-}
-
-/* This function cannot be migrated to a different vcore by the userspace
- * scheduler.  Will need to sort that shit out. */
-void pthread_exit(void *ret)
-{
-	struct pthread_tcb *pthread = pthread_self();
-	pthread->retval = ret;
-	/* So our pth_thread_yield knows we want to exit */
-	pthread->state = PTH_EXITING;
-	uthread_yield(FALSE, pth_thread_yield, 0);
 }
 
 int pthread_once(pthread_once_t* once_control, void (*init_routine)(void))

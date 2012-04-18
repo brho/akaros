@@ -28,7 +28,6 @@ struct pthread_tcb {
 	TAILQ_ENTRY(pthread_tcb) next;
 	int state;
 	bool detached;
-	struct pthread_tcb *join_target;	/* only used to communicate with yield*/
 	struct pthread_tcb *joiner;			/* raced on by exit and join */
 	uint32_t id;
 	uint32_t stacksize;
