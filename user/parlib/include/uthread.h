@@ -9,11 +9,8 @@
 #define UTHREAD_FPSAVED				0x004 /* uthread's FP state is in uth->as */
 
 /* Thread States */
-#define UT_CREATED	1
-#define UT_RUNNABLE	2
-#define UT_RUNNING	3
-#define UT_BLOCKED	4
-#define UT_DYING	5
+#define UT_RUNNING		1
+#define UT_NOT_RUNNING	2
 
 /* Bare necessities of a user thread.  2LSs should allocate a bigger struct and
  * cast their threads to uthreads when talking with vcore code.  Vcore/default

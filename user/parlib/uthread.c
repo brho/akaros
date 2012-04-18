@@ -172,7 +172,7 @@ void uthread_init(struct uthread *new_thread)
 	assert(!in_vcore_context());
 	uint32_t vcoreid;
 	assert(new_thread);
-	new_thread->state = UT_CREATED;
+	new_thread->state = UT_NOT_RUNNING;
 	/* They should have zero'd the uthread.  Let's check critical things: */
 	assert(!new_thread->flags && !new_thread->sysc);
 	/* the utf/as holds the context of the uthread (set by the 2LS earlier) */
@@ -213,7 +213,6 @@ void uthread_runnable(struct uthread *uthread)
 {
 	/* Allow the 2LS to make the thread runnable, and do whatever. */
 	assert(sched_ops->thread_runnable);
-	uthread->state = UT_RUNNABLE;
 	sched_ops->thread_runnable(uthread);
 }
 
@@ -229,15 +228,14 @@ __uthread_yield(void)
 	/* Note: we no longer care if the thread is exiting, the 2LS will call
 	 * uthread_destroy() */
 	uthread->flags &= ~UTHREAD_DONT_MIGRATE;
+	uthread->state = UT_NOT_RUNNING;
 	/* Determine if we're blocking on a syscall or just yielding.  Might end
 	 * up doing this differently when/if we have more ways to yield. */
 	if (uthread->sysc) {
-		uthread->state = UT_BLOCKED;
 		assert(sched_ops->thread_blockon_sysc);
 		sched_ops->thread_blockon_sysc(uthread->sysc);
 		/* make sure you don't touch uthread after that sched ops call */
 	} else { /* generic yield */
-		uthread->state = UT_RUNNABLE;
 		assert(sched_ops->thread_yield);
 		/* 2LS will save the thread somewhere for restarting.  Later on,
 		 * we'll probably have a generic function for all sorts of waiting.
@@ -316,7 +314,6 @@ yield_return_path:
 void uthread_cleanup(struct uthread *uthread)
 {
 	printd("[U] thread %08p on vcore %d is DYING!\n", uthread, vcore_id());
-	uthread->state = UT_DYING;
 	/* we alloc and manage the TLS, so lets get rid of it */
 	__uthread_free_tls(uthread);
 }
@@ -406,14 +403,12 @@ static void __run_cur_uthread(void)
 /* Simply sets current uthread to be whatever the value of uthread is.  This
  * can be called from outside of sched_entry() to highjack the current context,
  * and make sure that the new uthread struct is used to store this context upon
- * yielding, etc. USE WITH EXTREME CAUTION!
-*/
+ * yielding, etc. USE WITH EXTREME CAUTION! */
 void highjack_current_uthread(struct uthread *uthread)
 {
 	assert(uthread != current_uthread);
 	assert(uthread->tls_desc);
-
-	current_uthread->state = UT_RUNNABLE;
+	current_uthread->state = UT_NOT_RUNNING;
 	uthread->state = UT_RUNNING;
 	vcore_set_tls_var(current_uthread, uthread);
 	set_tls_desc(uthread->tls_desc, vcore_id());
@@ -441,13 +436,13 @@ void run_uthread(struct uthread *uthread)
 {
 	uint32_t vcoreid = vcore_id();
 	assert(uthread != current_uthread);
-	if (uthread->state != UT_RUNNABLE) {
+	if (uthread->state != UT_NOT_RUNNING) {
 		/* had vcore3 throw this, when the UT blocked on vcore1 and didn't come
 		 * back up yet (kernel didn't wake up, didn't send IPI) */
 		printf("Uth %08p not runnable (was %d) in run_uthread on vcore %d!\n",
 		       uthread, uthread->state, vcore_id());
 	}
-	assert(uthread->state == UT_RUNNABLE);
+	assert(uthread->state == UT_NOT_RUNNING);
 	uthread->state = UT_RUNNING;
 	/* Save a ptr to the uthread we'll run in the transition context's TLS */
 	current_uthread = uthread;

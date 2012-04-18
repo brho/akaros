@@ -102,7 +102,6 @@ void __attribute__((noreturn)) pth_sched_entry(void)
 		 * bit before yielding (or not at all if you want to be greedy). */
 		vcore_yield(FALSE);
 	} while (1);
-	assert(((struct uthread*)new_thread)->state != UT_RUNNING);
 	run_uthread((struct uthread*)new_thread);
 	assert(0);
 }
@@ -223,7 +222,7 @@ static void restart_thread(struct syscall *sysc)
 	struct uthread *ut_restartee = (struct uthread*)sysc->u_data;
 	/* uthread stuff here: */
 	assert(ut_restartee);
-	assert(ut_restartee->state == UT_BLOCKED);
+	//assert(ut_restartee->state == UT_BLOCKED);
 	assert(ut_restartee->sysc == sysc);
 	ut_restartee->sysc = 0;	/* so we don't 'reblock' on this later */
 	uthread_runnable(ut_restartee);
@@ -261,7 +260,7 @@ void pth_blockon_sysc(struct syscall *sysc)
 	bool need_to_restart = FALSE;
 	uint32_t vcoreid = vcore_id();
 
-	assert(current_uthread->state == UT_BLOCKED);
+	//assert(current_uthread->state == UT_BLOCKED);
 	/* rip from the active queue */
 	struct pthread_tcb *pthread = (struct pthread_tcb*)current_uthread;
 	mcs_pdr_lock(&queue_lock);
