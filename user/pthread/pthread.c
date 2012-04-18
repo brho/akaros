@@ -37,9 +37,9 @@ void pth_sched_entry(void);
 void pth_thread_runnable(struct uthread *uthread);
 void pth_thread_yield(struct uthread *uthread);
 void pth_thread_paused(struct uthread *uthread);
+void pth_thread_blockon_sysc(struct uthread *uthread, void *sysc);
 void pth_preempt_pending(void);
 void pth_spawn_thread(uintptr_t pc_start, void *data);
-void pth_blockon_sysc(struct syscall *sysc);
 
 /* Event Handlers */
 static void pth_handle_syscall(struct event_msg *ev_msg, unsigned int ev_type);
@@ -49,7 +49,7 @@ struct schedule_ops pthread_sched_ops = {
 	pth_thread_runnable,
 	pth_thread_yield,
 	pth_thread_paused,
-	pth_blockon_sysc,
+	pth_thread_blockon_sysc,
 	0, /* pth_preempt_pending, */
 	0, /* pth_spawn_thread, */
 };
@@ -273,22 +273,21 @@ static void pth_handle_syscall(struct event_msg *ev_msg, unsigned int ev_type)
  * and is trying to block on sysc.  Need to put it somewhere were we can wake it
  * up when the sysc is done.  For now, we'll have the kernel send us an event
  * when the syscall is done. */
-void pth_blockon_sysc(struct syscall *sysc)
+void pth_thread_blockon_sysc(struct uthread *uthread, void *syscall)
 {
+	struct syscall *sysc = (struct syscall*)syscall;
 	int old_flags;
 	bool need_to_restart = FALSE;
 	uint32_t vcoreid = vcore_id();
-
 	/* rip from the active queue */
-	struct pthread_tcb *pthread = (struct pthread_tcb*)current_uthread;
+	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
 	pthread->state = PTH_BLK_SYSC;
 	mcs_pdr_lock(&queue_lock);
 	threads_active--;
 	TAILQ_REMOVE(&active_queue, pthread, next);
 	mcs_pdr_unlock(&queue_lock);
-
 	/* Set things up so we can wake this thread up later */
-	sysc->u_data = current_uthread;
+	sysc->u_data = uthread;
 	/* Register our vcore's syscall ev_q to hear about this syscall. */
 	if (!register_evq(sysc, sysc_mgmt[vcoreid].ev_q)) {
 		/* Lost the race with the call being done.  The kernel won't send the

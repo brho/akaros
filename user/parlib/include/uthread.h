@@ -33,7 +33,7 @@ struct schedule_ops {
 	void (*thread_runnable)(struct uthread *);
 	void (*thread_yield)(struct uthread *);
 	void (*thread_paused)(struct uthread *);
-	void (*thread_blockon_sysc)(struct syscall *);
+	void (*thread_blockon_sysc)(struct uthread *, void *);
 	/* Functions event handling wants */
 	void (*preempt_pending)(void);
 	void (*spawn_thread)(uintptr_t pc_start, void *data);	/* don't run yet */

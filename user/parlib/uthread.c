@@ -233,7 +233,7 @@ __uthread_yield(void)
 	 * up doing this differently when/if we have more ways to yield. */
 	if (uthread->sysc) {
 		assert(sched_ops->thread_blockon_sysc);
-		sched_ops->thread_blockon_sysc(uthread->sysc);
+		sched_ops->thread_blockon_sysc(uthread, uthread->sysc);
 		/* make sure you don't touch uthread after that sched ops call */
 	} else { /* generic yield */
 		assert(sched_ops->thread_yield);
