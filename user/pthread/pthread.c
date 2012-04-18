@@ -155,7 +155,7 @@ void pth_thread_yield(struct uthread *uthread)
 				/* they joined before we exited, we need to wake them */
 				printd("[pth] %08p exiting, waking joiner %08p\n",
 				       pthread, temp_pth);
-				pth_thread_runnable((struct uthread*)temp_pth);
+				uthread_runnable((struct uthread*)temp_pth);
 			}
 		}
 	} else if (pthread->flags & PTHREAD_JOINING) {
@@ -172,12 +172,12 @@ void pth_thread_yield(struct uthread *uthread)
 			/* wake ourselves, not the exited one! */
 			printd("[pth] %08p already exit, rewaking ourselves, joiner %08p\n",
 			       temp_pth, pthread);
-			pth_thread_runnable((struct uthread*)pthread);
+			uthread_runnable((struct uthread*)pthread);
 		}
 	} else {
 		/* Yielding for no apparent reason (being nice / help break deadlocks).
 		 * Just wake it up and make it ready again. */
-		pth_thread_runnable((struct uthread*)pthread);
+		uthread_runnable((struct uthread*)pthread);
 	}
 }
 
