@@ -10,9 +10,15 @@
   extern "C" {
 #endif
 
-/* Flags */
-#define PTHREAD_EXITING		0x001
-#define PTHREAD_JOINING		0x002
+/* Pthread states.  These are mostly examples for other 2LSs */
+#define PTH_CREATED			1
+#define PTH_RUNNABLE		2
+#define PTH_RUNNING			3
+#define PTH_EXITING			4
+#define PTH_BLK_YIELDING	5	/* brief state btw pth_yield and pth_runnable */
+#define PTH_BLK_JOINING		6	/* joining on a child */
+#define PTH_BLK_SYSC		7	/* blocked on a syscall */
+#define PTH_BLK_MUTEX		8	/* blocked externally, possibly on a mutex */
 
 /* Pthread struct.  First has to be the uthread struct, which the vcore code
  * will access directly (as if pthread_tcb is a struct uthread). */
@@ -20,7 +26,7 @@ struct pthread_tcb;
 struct pthread_tcb {
 	struct uthread uthread;
 	TAILQ_ENTRY(pthread_tcb) next;
-	int flags;
+	int state;
 	bool detached;
 	struct pthread_tcb *join_target;	/* only used to communicate with yield*/
 	struct pthread_tcb *joiner;			/* raced on by exit and join */
