@@ -230,8 +230,9 @@ error_t proc_alloc(struct proc **pp, struct proc *parent)
 
 	{ INITSTRUCT(*p)
 
-	/* one reference for the proc existing, and one for the ref we pass back. */
-	kref_init(&p->p_kref, __proc_free, 2);
+	/* only one ref, which we pass back.  the old 'existence' ref is managed by
+	 * the ksched */
+	kref_init(&p->p_kref, __proc_free, 1);
 	// Setup the default map of where to get cache colors from
 	p->cache_colors_map = global_cache_colors_map;
 	p->next_cache_color = 0;
@@ -741,8 +742,6 @@ bool __proc_destroy(struct proc *p, uint32_t *pc_arr, uint32_t *nr_revoked)
 	 * will help if these files (or similar objects in the future) hold
 	 * references to p (preventing a __proc_free()). */
 	close_all_files(&p->open_files, FALSE);
-	/* This decref is for the process's existence. */
-	proc_decref(p);
 	/* Signal our state change.  Assuming we only have one waiter right now. */
 	sleeper = __up_sem(&p->state_change, TRUE);
 	if (sleeper)
