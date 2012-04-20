@@ -10,19 +10,27 @@
 #define ROS_KERN_SCHEDULE_H
 
 #include <ros/common.h>
+#include <sys/queue.h>
 
 struct proc;	/* process.h includes us, but we need pointers now */
+TAILQ_HEAD(proc_list, proc);		/* Declares 'struct proc_list' */
+
+/* One of these embedded in every struct proc */
+struct sched_proc_data {
+	TAILQ_ENTRY(proc)			proc_link;			/* tailq linkage */
+	struct proc_list 			*cur_list;			/* which tailq we're on */
+};
 
 void schedule_init(void);
 
 /************** Process registration **************/
-/* _S procs will get 'scheduled' every time they become RUNNABLE.  MCPs will get
- * registered on creation, and then that's it.  They will get removed from the
- * lists 'naturally' when proc_destroy() sets their state to DYING.  The ksched
- * needs to notice that, remove them from its lists, and decref. */
-/* _S is runnable, tell the ksched to try to run it. */
+/* Tell the ksched about the process, which it will track cradle-to-grave */
+void register_proc(struct proc *p);
+
+/* _S is now runnable, tell the ksched to try to run it. */
 void schedule_scp(struct proc *p);
-/* _M exists.  Tell the ksched about it. */
+
+/* p is now an _M.  Tell the ksched about it. */
 void register_mcp(struct proc *p);
 
 /* The ksched starts the death process (lock ordering issue), which calls back

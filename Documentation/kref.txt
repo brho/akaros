@@ -33,7 +33,7 @@ kref_get_not_zero().  You must have an internal reference for this.  And to
 protect that *internal* reference, you often need to lock or otherwise sync
 around the source of that internal reference (usually a list-like structure
 (LLS)), unless that ref is otherwise protected from concurrent freeing.
-4. If you plan to ressurect an object (make its refcnt go from 0 to 1), you
+4. If you plan to resurrect an object (make its refcnt go from 0 to 1), you
 need to use some other form of sync between the final freeing and the
 resurrection.
 
@@ -46,7 +46,7 @@ put the release function in the kref, which is what Linux used to do.  We do it
 to cut down on the number of places the function pointer is writen, since I
 expect those to change a lot as subsystems use krefs.  Finally, we only use
 krefs to trigger an object's release function, which might not free them
-forever.  They can be "ressurectd" back to having an external reference.  You
+forever.  They can be "resurrected" back to having an external reference.  You
 can do similar things in Linux, but it's not clear (to me) how separate that
 idea is from a kref.
 
@@ -133,7 +133,7 @@ which then the cache reader gets instead of failing at trying to get the
 original object.  The kref refcount only helps when the refcount goes from 1 to
 0, and on triggering the followup/release action.
 
-To ressurect, we can't just do:
+To resurrect, we can't just do:
 	if (!kref_refcnt(&dentry->d_kref))
 		kref_init(&dentry->d_kref, dentry_release, 1);
 	else
@@ -143,7 +143,7 @@ There is a race on reading the refcnt and mucking with it.  If it is
 concurrently going from 1 -> 0, and we read 0, it is okay.  We still up it to 1.
 However, if we go from 1 -> 0 and read 1, we'll panic when we try to kref_get a
 0'd kref.  Also, doing this would be dangerous going from 0 -> 1 if other code
-would ressurect (which it does not!).  The solution is to use a kref_get that
+would resurrect (which it does not!).  The solution is to use a kref_get that
 doesn't care about 0 (__kref_get()).
 
 Elsewhere in this documentation, we talk about kref_get_not_zero().  That one
@@ -154,7 +154,7 @@ what we want.
 Trickiness with lockless data structures:
 ----------------------------
 Ideally, we want concurrent access to the dentry cache (or whatever cache has
-krefd objects that we want to ressurect).  Perhaps this is with CAS on linked
+krefd objects that we want to resurrect).  Perhaps this is with CAS on linked
 lists, or locks per hash bucket.  Since we need to prevent the resurrection of
 objects from proceeding while another thread could be trying to remove them, we
 need some sync between readers and writers.  Both threads in the scenario we've

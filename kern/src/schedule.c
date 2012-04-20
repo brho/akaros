@@ -19,7 +19,9 @@
 #include <alarm.h>
 #include <sys/queue.h>
 
-/* Process Lists */
+/* Process Lists.  'unrunnable' is a holding list for SCPs that are running or
+ * waiting or otherwise not considered for sched decisions. */
+struct proc_list unrunnable_scps = TAILQ_HEAD_INITIALIZER(unrunnable_scps);
 struct proc_list runnable_scps = TAILQ_HEAD_INITIALIZER(runnable_scps);
 struct proc_list all_mcps = TAILQ_HEAD_INITIALIZER(all_mcps);
 spinlock_t sched_lock = SPINLOCK_INITIALIZER;
@@ -40,6 +42,10 @@ uint32_t num_mgmtcores = 1;
 /* Helper, defined below */
 static void __core_request(struct proc *p);
 static void __put_idle_cores(uint32_t *pc_arr, uint32_t num);
+static void add_to_list(struct proc *p, struct proc_list *list);
+static void remove_from_list(struct proc *p, struct proc_list *list);
+static void switch_lists(struct proc *p, struct proc_list *old,
+                         struct proc_list *new);
 
 /* Alarm struct, for our example 'timer tick' */
 struct alarm_waiter ksched_waiter;
@@ -130,25 +136,63 @@ void schedule_init(void)
 	return;
 }
 
-/* TODO: the proc lock is currently held for sched and register, though not
- * currently in any situations that can deadlock */
-/* _S procs are scheduled like in traditional systems */
-void schedule_scp(struct proc *p)
+/* Round-robins on whatever list it's on */
+static void add_to_list(struct proc *p, struct proc_list *new)
 {
-	/* up the refcnt since we are storing the reference */
-	proc_incref(p, 1);
+	TAILQ_INSERT_TAIL(new, p, ksched_data.proc_link);
+	p->ksched_data.cur_list = new;
+}
+
+static void remove_from_list(struct proc *p, struct proc_list *old)
+{
+	assert(p->ksched_data.cur_list == old);
+	TAILQ_REMOVE(old, p, ksched_data.proc_link);
+}
+
+static void switch_lists(struct proc *p, struct proc_list *old,
+                         struct proc_list *new)
+{
+	remove_from_list(p, old);
+	add_to_list(p, new);
+}
+
+/* Removes from whatever list p is on */
+static void remove_from_any_list(struct proc *p)
+{
+	assert(p->ksched_data.cur_list);
+	TAILQ_REMOVE(p->ksched_data.cur_list, p, ksched_data.proc_link);
+}
+
+void register_proc(struct proc *p)
+{
+	/* one ref for the proc's existence, cradle-to-grave */
+	proc_incref(p, 1);	/* need at least this OR the 'one for existing' */
 	spin_lock(&sched_lock);
-	printd("Scheduling PID: %d\n", p->pid);
-	TAILQ_INSERT_TAIL(&runnable_scps, p, proc_link);
+	add_to_list(p, &unrunnable_scps);
 	spin_unlock(&sched_lock);
 }
 
-/* important to only call this on RUNNING_S, for now */
+/* TODO: the proc lock is currently held for sched and register */
+/* sched_scp tells us to try and run the scp
+ * TODO: change this horrible name */
+void schedule_scp(struct proc *p)
+{
+	spin_lock(&sched_lock);
+	printd("Scheduling PID: %d\n", p->pid);
+	switch_lists(p, &unrunnable_scps, &runnable_scps);
+	spin_unlock(&sched_lock);
+}
+
+/* Tells us the proc is now an mcp.  Assuming it was RUNNING before */
+/* TODO: the proc lock is currently held for sched and register */
 void register_mcp(struct proc *p)
 {
-	proc_incref(p, 1);
 	spin_lock(&sched_lock);
-	TAILQ_INSERT_TAIL(&all_mcps, p, proc_link);
+	/* For now, this should only ever be called on an unrunnable.  It's probably
+	 * a bug, at this stage in development, to do o/w. */
+	remove_from_list(p, &unrunnable_scps);
+	//remove_from_any_list(p); 	/* ^^ instead of this */
+	add_to_list(p, &all_mcps);
 	spin_unlock(&sched_lock);
 	//poke_ksched(p, RES_CORES);
 }
@@ -170,8 +214,11 @@ void proc_destroy(struct proc *p)
 	if (__proc_destroy(p, pc_arr, &nr_cores_revoked)) {
 		/* Do our cleanup.  note that proc_free won't run since we have an
 		 * external reference, passed in */
-		/* TODO: pull from lists (no list polling), free structs, etc. */
 
+		/* Remove from whatever list we are on */
+		remove_from_any_list(p);
+		/* Drop the cradle-to-the-grave reference, jet-li */
+		proc_decref(p);
 		/* Put the cores back on the idlecore map.  For future changes, be
 		 * careful with the idle_lock.  It's safe to call this here or outside
 		 * the sched lock (for now). */
@@ -191,42 +238,33 @@ static bool __schedule_scp(void)
 	uint32_t pcoreid = core_id();
 	struct per_cpu_info *pcpui = &per_cpu_info[pcoreid];
 	int8_t state = 0;
-	/* prune any dying SCPs at the head of the queue and maybe sched our core
-	 * (let all the cores do this, whoever happens to be running schedule()). */
-	while ((p = TAILQ_FIRST(&runnable_scps))) {
-		if (p->state == PROC_DYING) {
-			TAILQ_REMOVE(&runnable_scps, p, proc_link);
-			proc_decref(p);
-		} else {
-			/* protect owning proc, cur_tf, etc.  note this nests with the
-			 * calls in proc_yield_s */
-			disable_irqsave(&state);
-			/* someone is currently running, dequeue them */
-			if (pcpui->owning_proc) {
-				printd("Descheduled %d in favor of %d\n",
-				       pcpui->owning_proc->pid, p->pid);
-				__proc_yield_s(pcpui->owning_proc, pcpui->cur_tf);
-				/* round-robin the SCPs */
-				TAILQ_INSERT_TAIL(&runnable_scps, pcpui->owning_proc,
-				                  proc_link);
-				/* could optimize the refcnting if we cared */
-				proc_incref(pcpui->owning_proc, 1);
-				clear_owning_proc(pcoreid);
-				/* Note we abandon core.  It's not strictly necessary.  If
-				 * we didn't, the TLB would still be loaded with the old
-				 * one, til we proc_run_s, and the various paths in
-				 * proc_run_s would pick it up.  This way is a bit safer for
-				 * future changes, but has an extra (empty) TLB flush.  */
-				abandon_core();
-			} 
-			/* Run the new proc */
-			TAILQ_REMOVE(&runnable_scps, p, proc_link);
-			printd("PID of the SCP i'm running: %d\n", p->pid);
-			proc_run_s(p);	/* gives it core we're running on */
-			proc_decref(p);
-			enable_irqsave(&state);
-			return TRUE;
-		}
+	/* if there are any runnables, run them here and put any currently running
+	 * SCP on the tail of the runnable queue. */
+	if ((p = TAILQ_FIRST(&runnable_scps))) {
+		/* protect owning proc, cur_tf, etc.  note this nests with the
+		 * calls in proc_yield_s */
+		disable_irqsave(&state);
+		/* someone is currently running, dequeue them */
+		if (pcpui->owning_proc) {
+			printd("Descheduled %d in favor of %d\n", pcpui->owning_proc->pid,
+			       p->pid);
+			__proc_yield_s(pcpui->owning_proc, pcpui->cur_tf);
+			/* round-robin the SCPs (inserts at the end of the queue) */
+			switch_lists(pcpui->owning_proc, &unrunnable_scps, &runnable_scps);
+			clear_owning_proc(pcoreid);
+			/* Note we abandon core.  It's not strictly necessary.  If
+			 * we didn't, the TLB would still be loaded with the old
+			 * one, til we proc_run_s, and the various paths in
+			 * proc_run_s would pick it up.  This way is a bit safer for
+			 * future changes, but has an extra (empty) TLB flush.  */
+			abandon_core();
+		} 
+		/* Run the new proc */
+		switch_lists(p, &runnable_scps, &unrunnable_scps);
+		printd("PID of the SCP i'm running: %d\n", p->pid);
+		proc_run_s(p);	/* gives it core we're running on */
+		enable_irqsave(&state);
+		return TRUE;
 	}
 	return FALSE;
 }
@@ -241,17 +279,8 @@ void schedule(void)
 	spin_lock(&sched_lock);
 	/* trivially try to handle the needs of all our MCPS.  smarter schedulers
 	 * would do something other than FCFS */
-	TAILQ_FOREACH_SAFE(p, &all_mcps, proc_link, temp) {
+	TAILQ_FOREACH_SAFE(p, &all_mcps, ksched_data.proc_link, temp) {
 		printd("Ksched has MCP %08p (%d)\n", p, p->pid);
-		/* If they are dying, abort.  There's a bit of a race here.  If they
-		 * start dying right after the check, core_request/give_cores would
-		 * start dealing with a DYING proc.  The code can handle it, but this
-		 * will probably change. */
-		if (p->state == PROC_DYING) {
-			TAILQ_REMOVE(&all_mcps, p, proc_link);
-			proc_decref(p);
-			continue;
-		}
 		if (!num_idlecores)
 			break;
 		/* TODO: might use amt_wanted as a proxy.  right now, they have
@@ -436,10 +465,14 @@ static void __core_request(struct proc *p)
 void sched_diag(void)
 {
 	struct proc *p;
-	TAILQ_FOREACH(p, &runnable_scps, proc_link)
-		printk("_S PID: %d\n", p->pid);
-	TAILQ_FOREACH(p, &all_mcps, proc_link)
+	spin_lock(&sched_lock);
+	TAILQ_FOREACH(p, &runnable_scps, ksched_data.proc_link)
+		printk("Runnable _S PID: %d\n", p->pid);
+	TAILQ_FOREACH(p, &unrunnable_scps, ksched_data.proc_link)
+		printk("Unrunnable _S PID: %d\n", p->pid);
+	TAILQ_FOREACH(p, &all_mcps, ksched_data.proc_link)
 		printk("MCP PID: %d\n", p->pid);
+	spin_unlock(&sched_lock);
 	return;
 }
 

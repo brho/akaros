@@ -306,6 +306,8 @@ error_t proc_alloc(struct proc **pp, struct proc *parent)
  * push setting the state to CREATED into here. */
 void __proc_ready(struct proc *p)
 {
+	/* Tell the ksched about us */
+	register_proc(p);
 	spin_lock(&pid_hash_lock);
 	hashtable_insert(pid_hash, (void*)(long)p->pid, p);
 	spin_unlock(&pid_hash_lock);

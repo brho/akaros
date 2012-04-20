@@ -52,8 +52,6 @@
 
 #include <env.h>
 
-TAILQ_HEAD(proc_list, proc);		/* Declares 'struct proc_list' */
-
 /* Can use a htable iterator to iterate through all active procs */
 extern struct hashtable *pid_hash;
 extern spinlock_t pid_hash_lock;

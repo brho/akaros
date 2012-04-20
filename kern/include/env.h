@@ -19,13 +19,13 @@
 #include <atomic.h>
 #include <mm.h>
 #include <vfs.h>
+#include <schedule.h>
 
 /* List def for the three vcore lists */
 TAILQ_HEAD(vcore_tailq, vcore);
 
 // TODO: clean this up.
 struct proc {
-	TAILQ_ENTRY(proc) proc_link NOINIT;	// Free list link pointers
 	TAILQ_ENTRY(proc) proc_arsc_link NOINIT; // Free list link pointers for the arsc list
 	spinlock_t proc_lock;
 	trapframe_t env_tf; 						// Saved registers
@@ -42,6 +42,8 @@ struct proc {
 	struct vcore_tailq online_vcs;
 	struct vcore_tailq bulk_preempted_vcs;
 	struct vcore_tailq inactive_vcs;
+	/* Scheduler mgmt (info, data, whatever) */
+	struct sched_proc_data ksched_data;
 
 	/* Cache color map: bitmap of the cache colors currently allocated to this
 	 * process */
