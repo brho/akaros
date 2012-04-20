@@ -68,7 +68,7 @@ void arsc_server(struct trapframe *tf)
 		while (TAILQ_EMPTY(&arsc_proc_list))
 			cpu_relax();
 		
-		TAILQ_FOREACH(p, &arsc_proc_list, proc_link) {
+		TAILQ_FOREACH(p, &arsc_proc_list, proc_arsc_link) {
 			/* Probably want to try to process a dying process's syscalls.  If
 			 * not, just move it to an else case */
 			process_generic_syscalls (p, MAX_ASRC_BATCH); 
