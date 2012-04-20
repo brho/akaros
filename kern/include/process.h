@@ -13,6 +13,7 @@
 #include <trap.h>
 #include <atomic.h>
 #include <kref.h>
+#include <schedule.h>
 
 /* Process States.  Not 100% on the names yet.  RUNNABLE_* are waiting to go to
  * RUNNING_*.  For instance, RUNNABLE_M is expecting to go to RUNNING_M.  It
@@ -72,7 +73,7 @@ void proc_decref(struct proc *p);
 void proc_run_s(struct proc *p);
 void __proc_run_m(struct proc *p);
 void proc_restartcore(void);
-void proc_destroy(struct proc *SAFE p);
+bool __proc_destroy(struct proc *p, uint32_t *pc_arr, uint32_t *nr_revoked);
 void __proc_change_to_m(struct proc *p);
 void __proc_yield_s(struct proc *p, struct trapframe *tf);
 void proc_yield(struct proc *SAFE p, bool being_nice);

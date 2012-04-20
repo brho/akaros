@@ -9,7 +9,9 @@
 #ifndef ROS_KERN_SCHEDULE_H
 #define ROS_KERN_SCHEDULE_H
 
-#include <process.h>
+#include <ros/common.h>
+
+struct proc;	/* process.h includes us, but we need pointers now */
 
 void schedule_init(void);
 
@@ -22,6 +24,10 @@ void schedule_init(void);
 void schedule_scp(struct proc *p);
 /* _M exists.  Tell the ksched about it. */
 void register_mcp(struct proc *p);
+
+/* The ksched starts the death process (lock ordering issue), which calls back
+ * to proc.c's __proc_destroy while holding the locks (or whatever) */
+void proc_destroy(struct proc *p);
 
 /************** Decision making **************/
 /* Call the main scheduling algorithm.  Not clear yet if the main kernel will

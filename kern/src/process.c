@@ -655,10 +655,12 @@ void proc_restartcore(void)
 	__proc_startcore(pcpui->owning_proc, pcpui->cur_tf);
 }
 
-/*
- * Destroys the given process.  This may be called from another process, a light
- * kernel thread (no real process context), asynchronously/cross-core, or from
- * the process on its own core.
+/* Destroys the process.  This should be called by the ksched, which needs to
+ * hold the lock.  It will destroy the process and return any cores allocated to
+ * the proc via pc_arr and nr_revoked.  It's up to the caller to have enough
+ * space for pc_arr.  This will return TRUE if we successfully killed it, FALSE
+ * otherwise.  Failure isn't a big deal either - it can happen due to concurrent
+ * calls to proc_destroy. 
  *
  * Here's the way process death works:
  * 0. grab the lock (protects state transition and core map)
@@ -678,21 +680,16 @@ void proc_restartcore(void)
  * come in, making you abandon_core, as if you weren't running.  It may be that
  * the only reference to p is the one you passed in, and when you decref, it'll
  * get __proc_free()d. */
-void proc_destroy(struct proc *p)
+bool __proc_destroy(struct proc *p, uint32_t *pc_arr, uint32_t *nr_revoked)
 {
-	uint32_t num_revoked = 0;
 	struct kthread *sleeper;
-	spin_lock(&p->proc_lock);
-	/* storage for pc_arr is alloced at decl, which is after grabbing the lock*/
-	uint32_t pc_arr[p->procinfo->num_vcores];
 	switch (p->state) {
 		case PROC_DYING: // someone else killed this already.
-			spin_unlock(&p->proc_lock);
-			return;
+			return FALSE;
 		case PROC_RUNNABLE_M:
 			/* Need to reclaim any cores this proc might have, even though it's
 			 * not running yet. */
-			num_revoked = __proc_take_allcores(p, pc_arr, FALSE);
+			*nr_revoked = __proc_take_allcores(p, pc_arr, FALSE);
 			// fallthrough
 		case PROC_RUNNABLE_S:
 			/* might need to pull from lists, though i'm currently a fan of the
@@ -724,14 +721,19 @@ void proc_destroy(struct proc *p)
 			 * deallocate the cores.
 			 * The rule is that the vcoremap is set before proc_run, and reset
 			 * within proc_destroy */
-			num_revoked = __proc_take_allcores(p, pc_arr, FALSE);
+			*nr_revoked = __proc_take_allcores(p, pc_arr, FALSE);
 			break;
 		case PROC_CREATED:
 			break;
 		default:
-			panic("Weird state(%s) in %s()", procstate2str(p->state),
-			      __FUNCTION__);
+			warn("Weird state(%s) in %s()", procstate2str(p->state),
+			     __FUNCTION__);
+			return FALSE;
 	}
+	/* At this point, a death IPI should be on its way, either from the
+	 * RUNNING_S one, or from proc_take_cores with a __death.  in general,
+	 * interrupts should be on when you call proc_destroy locally, but currently
+	 * aren't for all things (like traphandlers). */
 	__proc_set_state(p, PROC_DYING);
 	/* This prevents processes from accessing their old files while dying, and
 	 * will help if these files (or similar objects in the future) hold
@@ -743,15 +745,7 @@ void proc_destroy(struct proc *p)
 	sleeper = __up_sem(&p->state_change, TRUE);
 	if (sleeper)
 		kthread_runnable(sleeper);
-	/* Unlock.  A death IPI should be on its way, either from the RUNNING_S one,
-	 * or from proc_take_cores with a __death.  in general, interrupts should be
-	 * on when you call proc_destroy locally, but currently aren't for all
-	 * things (like traphandlers). */
-	spin_unlock(&p->proc_lock);
-	/* Return the cores to the ksched */
-	if (num_revoked)
-		put_idle_cores(pc_arr, num_revoked);
-	return;
+	return TRUE;
 }
 
 /* Turns *p into an MCP.  Needs to be called from a local syscall of a RUNNING_S

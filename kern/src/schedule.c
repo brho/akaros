@@ -153,6 +153,35 @@ void register_mcp(struct proc *p)
 	//poke_ksched(p, RES_CORES);
 }
 
+/* Destroys the given process.  This may be called from another process, a light
+ * kernel thread (no real process context), asynchronously/cross-core, or from
+ * the process on its own core.
+ *
+ * An external, edible ref is passed in.  when we return and they decref,
+ * __proc_free will be called */
+void proc_destroy(struct proc *p)
+{
+	uint32_t nr_cores_revoked = 0;
+	spin_lock(&sched_lock);
+	spin_lock(&p->proc_lock);
+	/* storage for pc_arr is alloced at decl, which is after grabbing the lock*/
+	uint32_t pc_arr[p->procinfo->num_vcores];
+	/* If this returns true, it means we successfully destroyed the proc */
+	if (__proc_destroy(p, pc_arr, &nr_cores_revoked)) {
+		/* Do our cleanup.  note that proc_free won't run since we have an
+		 * external reference, passed in */
+		/* TODO: pull from lists (no list polling), free structs, etc. */
+
+		/* Put the cores back on the idlecore map.  For future changes, be
+		 * careful with the idle_lock.  It's safe to call this here or outside
+		 * the sched lock (for now). */
+		if (nr_cores_revoked) 
+			put_idle_cores(pc_arr, nr_cores_revoked);
+	}
+	spin_unlock(&p->proc_lock);
+	spin_unlock(&sched_lock);
+}
+
 /* mgmt/LL cores should call this to schedule the calling core and give it to an
  * SCP.  will also prune the dead SCPs from the list.  hold the lock before
  * calling.  returns TRUE if it scheduled a proc. */
@@ -259,7 +288,8 @@ void poke_ksched(struct proc *p, int res_type)
 }
 
 /* Proc p just woke up (due to an event).  Our dumb ksched will just try to deal
- * with its core desires. */
+ * with its core desires. 
+ * TODO: this may get called multiple times per unblock */
 void ksched_proc_unblocked(struct proc *p)
 {
 	/* TODO: this now gets called when an _S unblocks.  schedule_scp() also gets
