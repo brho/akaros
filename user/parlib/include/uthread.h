@@ -69,7 +69,6 @@ void uthread_yield(bool save_state, void (*yield_func)(struct uthread*, void*),
 bool __check_preempt_pending(uint32_t vcoreid);	/* careful: check the code */
 void uth_disable_notifs(void);
 void uth_enable_notifs(void);
-void copyout_uthread(struct preempt_data *vcpd, struct uthread *uthread);
 
 bool register_evq(struct syscall *sysc, struct event_queue *ev_q);
 void deregister_evq(struct syscall *sysc);

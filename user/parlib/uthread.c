@@ -488,6 +488,44 @@ static void __run_current_uthread_raw(void)
 	assert(0);
 }
 
+/* Copies the uthread trapframe and silly state from the vcpd to the uthread,
+ * subject to the uthread's flags.  Might have other uses in the future, but
+ * for now our only user is the helper __uthread_pause. */
+static void copyout_uthread(struct preempt_data *vcpd, struct uthread *uthread)
+{
+	assert(uthread);
+	/* Copy out the main tf if we need to */
+	if (!(uthread->flags & UTHREAD_SAVED)) {
+		uthread->utf = vcpd->notif_tf;
+		uthread->flags |= UTHREAD_SAVED;
+		printd("VC %d copying out uthread %08p\n", vcore_id(), uthread);
+	}
+	/* could optimize here in case the FP/silly state wasn't being used.
+	 * Depends how we use the FPSAVED flag.  It means that the uthread's FP
+	 * state is not currently saved, for whatever reason, so we'll do it. */
+	if (!(uthread->flags & UTHREAD_FPSAVED)) {
+		/* TODO: (HSS) handle FP state: review this when fixing the other HSS */
+		uthread->as = vcpd->preempt_anc;
+		uthread->flags |= UTHREAD_FPSAVED;
+	}
+}
+
+/* Helper, packages up and pauses a uthread that was running on vcoreid.  Used
+ * by preemption handling (and detection) so far.  Careful using this, esp if
+ * it is on another vcore (need to make sure it's not running!).
+ * 
+ * Do not rely on TLS too much in here - this is called in the TLS of whoever
+ * owns VCPD, which might not be the calling vcore. */
+static void __uthread_pause(struct preempt_data *vcpd, struct uthread *uthread)
+{
+	assert(!(uthread->flags & UTHREAD_DONT_MIGRATE));
+	copyout_uthread(vcpd, uthread);
+	uthread->state = UT_NOT_RUNNING;
+	/* Call out to the 2LS to package up its uthread */
+	assert(sched_ops->thread_paused);
+	sched_ops->thread_paused(uthread);
+}
+
 /* Deals with a pending preemption (checks, responds).  If the 2LS registered a
  * function, it will get run.  Returns true if you got preempted.  Called
  * 'check' instead of 'handle', since this isn't an event handler.  It's the "Oh
@@ -511,10 +549,7 @@ bool __check_preempt_pending(uint32_t vcoreid)
 		/* If we still have a cur_uth, copy it out and hand it back to the 2LS
 		 * before yielding. */
 		if (current_uthread) {
-			assert(!(current_uthread->flags & UTHREAD_DONT_MIGRATE));
-			copyout_uthread(vcpd_of(vcoreid), current_uthread);
-			assert(sched_ops->thread_paused);
-			sched_ops->thread_paused(current_uthread);
+			__uthread_pause(vcpd_of(vcoreid), current_uthread);
 			current_uthread = 0;
 		}
 		/* vcore_yield tries to yield, and will pop back up if this was a spurious
@@ -552,27 +587,6 @@ void uth_enable_notifs(void)
 			current_uthread->flags &= ~UTHREAD_DONT_MIGRATE;
 		cmb();	/* don't enable before ~DONT_MIGRATE */
 		enable_notifs(vcore_id());
-	}
-}
-
-/* Copies the uthread trapframe and silly state from the vcpd to the uthread,
- * subject to the uthread's flags. */
-void copyout_uthread(struct preempt_data *vcpd, struct uthread *uthread)
-{
-	assert(uthread);
-	/* Copy out the main tf if we need to */
-	if (!(uthread->flags & UTHREAD_SAVED)) {
-		uthread->utf = vcpd->notif_tf;
-		uthread->flags |= UTHREAD_SAVED;
-		printd("VC %d copying out uthread %08p\n", vcore_id(), uthread);
-	}
-	/* could optimize here in case the FP/silly state wasn't being used.
-	 * Depends how we use the FPSAVED flag.  It means that the uthread's FP
-	 * state is not currently saved, for whatever reason, so we'll do it. */
-	if (!(uthread->flags & UTHREAD_FPSAVED)) {
-		/* TODO: (HSS) handle FP state: review this when fixing the other HSS */
-		uthread->as = vcpd->preempt_anc;
-		uthread->flags |= UTHREAD_FPSAVED;
 	}
 }
 
@@ -664,10 +678,7 @@ static void change_to_vcore(struct preempt_data *vcpd, uint32_t rem_vcoreid)
 	}
 	/* Now save our uthread and restart them */
 	assert(current_uthread);
-	copyout_uthread(vcpd, current_uthread);
-	/* Call out to the 2LS to package up its uthread */;
-	assert(sched_ops->thread_paused);
-	sched_ops->thread_paused(current_uthread);
+	__uthread_pause(vcpd, current_uthread);
 	current_uthread = 0;
 	were_handling_remotes = ev_might_not_return();
 	sys_change_vcore(rem_vcoreid, TRUE);		/* noreturn on success */
@@ -749,12 +760,9 @@ static void handle_vc_preempt(struct event_msg *ev_msg, unsigned int ev_type)
 		return;	/* in case it returns.  we've done our job recovering */
 	}
 	/* we're clear to steal it */
-	copyout_uthread(rem_vcpd, current_uthread);
 	printd("VC %d recovering %d, uthread %08p stolen\n", vcoreid, rem_vcoreid,
 	       current_uthread);
-	/* Call out to the 2LS to package up its uthread */;
-	assert(sched_ops->thread_paused);
-	sched_ops->thread_paused(current_uthread);
+	__uthread_pause(rem_vcpd, current_uthread);
 	current_uthread = 0;
 	wmb();	/* cur_uth and uth_runnable writes can't pass stop_uth_stealing */
 	/* Fallthrough, whether we stole or not */

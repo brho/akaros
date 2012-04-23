@@ -19,6 +19,7 @@
 #define PTH_BLK_JOINING		6	/* joining on a child */
 #define PTH_BLK_SYSC		7	/* blocked on a syscall */
 #define PTH_BLK_MUTEX		8	/* blocked externally, possibly on a mutex */
+#define PTH_BLK_PAUSED		9	/* handed back to us from uthread code */
 
 /* Pthread struct.  First has to be the uthread struct, which the vcore code
  * will access directly (as if pthread_tcb is a struct uthread). */

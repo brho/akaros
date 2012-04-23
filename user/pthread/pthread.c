@@ -127,6 +127,7 @@ void pth_thread_runnable(struct uthread *uthread)
 		case (PTH_BLK_YIELDING):
 		case (PTH_BLK_JOINING):
 		case (PTH_BLK_SYSC):
+		case (PTH_BLK_PAUSED):
 		case (PTH_BLK_MUTEX):
 			/* can do whatever for each of these cases */
 			break;
@@ -165,6 +166,8 @@ void pth_thread_paused(struct uthread *uthread)
 	threads_active--;
 	TAILQ_REMOVE(&active_queue, pthread, next);
 	mcs_pdr_unlock(&queue_lock);
+	/* communicate to pth_thread_runnable */
+	pthread->state = PTH_BLK_PAUSED;
 	/* At this point, you could do something clever, like put it at the front of
 	 * the runqueue, see if it was holding a lock, do some accounting, or
 	 * whatever. */
