@@ -750,11 +750,14 @@ bool __proc_destroy(struct proc *p, uint32_t *pc_arr, uint32_t *nr_revoked)
 }
 
 /* Turns *p into an MCP.  Needs to be called from a local syscall of a RUNNING_S
- * process.  Currently, this ignores whether or not you are an _M already.  You
- * should hold the lock before calling. */
-void __proc_change_to_m(struct proc *p)
+ * process.  Returns 0 if it succeeded, an error code otherwise.  You should
+ * hold the lock before calling. */
+int __proc_change_to_m(struct proc *p)
 {
 	int8_t state = 0;
+	/* in case userspace erroneously tries to change more than once */
+	if (__proc_is_mcp(p))
+		return -EINVAL;
 	switch (p->state) {
 		case (PROC_RUNNING_S):
 			/* issue with if we're async or not (need to preempt it)
@@ -801,13 +804,15 @@ void __proc_change_to_m(struct proc *p)
 			 * it, and not clearly thinking through how this would happen.
 			 * Perhaps an async call that gets serviced after you're
 			 * descheduled? */
-			panic("Not supporting RUNNABLE_S -> RUNNABLE_M yet.\n");
-			break;
+			warn("Not supporting RUNNABLE_S -> RUNNABLE_M yet.\n");
+			return -EINVAL;
 		case (PROC_DYING):
 			warn("Dying, core request coming from %d\n", core_id());
+			return -EINVAL;
 		default:
-			break;
+			return -EINVAL;
 	}
+	return 0;
 }
 
 /* Old code to turn a RUNNING_M to a RUNNING_S, with the calling context

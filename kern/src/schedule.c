@@ -183,18 +183,36 @@ void schedule_scp(struct proc *p)
 	spin_unlock(&sched_lock);
 }
 
-/* Tells us the proc is now an mcp.  Assuming it was RUNNING before */
-/* TODO: the proc lock is currently held for sched and register */
-void register_mcp(struct proc *p)
+/* Returns 0 if it succeeded, an error code otherwise. */
+int proc_change_to_m(struct proc *p)
 {
+	int retval;
 	spin_lock(&sched_lock);
-	/* For now, this should only ever be called on an unrunnable.  It's probably
-	 * a bug, at this stage in development, to do o/w. */
+	/* Should only be necessary to lock around the change_to_m call.  It's
+	 * definitely necessary to hold the sched lock the whole time - need to
+	 * atomically change the proc's state and have the ksched take action (and
+	 * not squeeze a proc_destroy in there or something). */
+	spin_lock(&p->proc_lock);
+	retval = __proc_change_to_m(p);
+	spin_unlock(&p->proc_lock);
+	if (retval) {
+		/* Failed for some reason. */
+		spin_unlock(&sched_lock);
+		return retval;
+	}
+	/* Catch user bugs */
+	if (!p->procdata->res_req[RES_CORES].amt_wanted) {
+		printk("[kernel] process needs to specify amt_wanted\n");
+		p->procdata->res_req[RES_CORES].amt_wanted = 1;
+	}
+	/* For now, this should only ever be called on an unrunnable.  It's
+	 * probably a bug, at this stage in development, to do o/w. */
 	remove_from_list(p, &unrunnable_scps);
 	//remove_from_any_list(p); 	/* ^^ instead of this */
 	add_to_list(p, &all_mcps);
 	spin_unlock(&sched_lock);
 	//poke_ksched(p, RES_CORES);
+	return retval;
 }
 
 /* Destroys the given process.  This may be called from another process, a light

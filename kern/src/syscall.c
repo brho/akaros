@@ -739,22 +739,12 @@ static int sys_halt_core(struct proc *p, unsigned int usec)
  * but that's fine thanks to the async kernel interface. */
 static int sys_change_to_m(struct proc *p)
 {
-	int retval = 0;
-	spin_lock(&p->proc_lock);
-	if (!__proc_is_mcp(p)) {
-		/* Catch user bugs */
-		if (!p->procdata->res_req[RES_CORES].amt_wanted) {
-			printk("[kernel] process needs to specify amt_wanted\n");
-			p->procdata->res_req[RES_CORES].amt_wanted = 1;
-		}
-		__proc_change_to_m(p);
-		/* Tell the ksched about us */
-		register_mcp(p);
-	} else {
-		set_errno(EINVAL);
+	int retval = proc_change_to_m(p);
+	/* convert the kernel error code into (-1, errno) */
+	if (retval) {
+		set_errno(-retval);
 		retval = -1;
 	}
-	spin_unlock(&p->proc_lock);
 	return retval;
 }
 

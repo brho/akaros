@@ -30,12 +30,12 @@ void register_proc(struct proc *p);
 /* _S is now runnable, tell the ksched to try to run it. */
 void schedule_scp(struct proc *p);
 
-/* p is now an _M.  Tell the ksched about it. */
-void register_mcp(struct proc *p);
-
 /* The ksched starts the death process (lock ordering issue), which calls back
  * to proc.c's __proc_destroy while holding the locks (or whatever) */
 void proc_destroy(struct proc *p);
+
+/* Changes the proc from an SCP to an MCP */
+int proc_change_to_m(struct proc *p);
 
 /************** Decision making **************/
 /* Call the main scheduling algorithm.  Not clear yet if the main kernel will
