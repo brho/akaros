@@ -239,12 +239,8 @@ static void spam_public_msg(struct proc *p, struct event_msg *ev_msg,
 			 * right as another vcore was yielding, and the preempted
 			 * message was sent after the last vcore yielded (which caused
 			 * us to be WAITING */
-			if (p->state == PROC_WAITING) {
-				spin_lock(&p->proc_lock);
-				__proc_wakeup(p);	/* internally, this double-checks WAITING */
-				spin_unlock(&p->proc_lock);
-				ksched_proc_unblocked(p);
-			}
+			if (p->state == PROC_WAITING)
+				proc_wakeup(p);	/* internally, this double-checks WAITING */
 			return;
 		}
 	}
@@ -288,10 +284,9 @@ ultimate_fallback:
 	/* The first event to catch the process with no online/bp vcores will need
 	 * to wake it up.  (We could be RUNNABLE_M here if another event already woke
 	 * us.) and we didn't get lucky with the penultimate fallback.
-	 * __proc_wakeup() will check for WAITING. */
-	__proc_wakeup(p);
+	 * proc_wakeup (and __proc_wakeup()) will check for WAITING. */
 	spin_unlock(&p->proc_lock);
-	ksched_proc_unblocked(p);
+	proc_wakeup(p);
 	return;
 }
 
@@ -366,12 +361,8 @@ void send_event(struct proc *p, struct event_queue *ev_q, struct event_msg *msg,
 		wrmb();	/* don't let the notif_pending write pass the state read */
 		/* using the same pattern as in spam_public (which can have multiple
 		 * unblock callbacks */
-		if (p->state == PROC_WAITING) {
-			spin_lock(&p->proc_lock);
-			__proc_wakeup(p);
-			spin_unlock(&p->proc_lock);
-			ksched_proc_unblocked(p);
-		}
+		if (p->state == PROC_WAITING)
+			proc_wakeup(p);
 		goto out;
 	}
 	/* Get the vcoreid that we'll message (if appropriate).  For INDIR and

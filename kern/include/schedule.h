@@ -23,12 +23,16 @@ struct sched_proc_data {
 
 void schedule_init(void);
 
-/************** Process registration **************/
+/************** Process management **************/
 /* Tell the ksched about the process, which it will track cradle-to-grave */
 void register_proc(struct proc *p);
 
 /* _S is now runnable, tell the ksched to try to run it. */
 void schedule_scp(struct proc *p);
+
+/* Makes sure p is runnable.  Callers include event delivery, SCP yield, and new
+ * SCPs.  Will trigger the __sched_.cp_wakeup() callbacks. */
+void proc_wakeup(struct proc *p);
 
 /* The ksched starts the death process (lock ordering issue), which calls back
  * to proc.c's __proc_destroy while holding the locks (or whatever) */
@@ -47,10 +51,9 @@ void schedule(void);
  * be careful of abuse. */
 void poke_ksched(struct proc *p, int res_type);
 
-/* Proc p just woke up (due to an event).  This is a more specific case than
- * poke_ksched(), in case kscheds want to do some accounting or something more
- * than just giving it cores. */
-void ksched_proc_unblocked(struct proc *p);
+/* Callbacks triggered from proc_wakeup() */
+void __sched_mcp_wakeup(struct proc *p);
+void __sched_scp_wakeup(struct proc *p);
 
 /* The calling cpu/core has nothing to do and plans to idle/halt.  This is an
  * opportunity to pick the nature of that halting (low power state, etc), or

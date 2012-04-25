@@ -1095,23 +1095,53 @@ void proc_notify(struct proc *p, uint32_t vcoreid)
 	}
 }
 
-/* Hold the lock before calling this.  If the process is WAITING, it will wake
- * it up and schedule it. */
+/* Makes sure p is runnable.  May be spammed, via the ksched.  Called only by
+ * the ksched when it holds the ksched lock (or whatever).  We need to lock both
+ * the ksched and the proc at some point, so we need to start this call in the
+ * ksched (lock ordering).
+ *
+ * Will call back to the ksched via one of the __sched_.cp_wakeup() calls. */
 void __proc_wakeup(struct proc *p)
 {
-	if (p->state != PROC_WAITING)
-		return;
+	spin_lock(&p->proc_lock);
 	if (__proc_is_mcp(p)) {
-		/* Need to make sure they want at least 1 vcore, so the ksched gives
-		 * them something.  Might do this via short handler later. */
+		/* we only wake up WAITING mcps */
+		if (p->state != PROC_WAITING)
+			goto out_unlock;
 		if (!p->procdata->res_req[RES_CORES].amt_wanted)
 			p->procdata->res_req[RES_CORES].amt_wanted = 1;
 		__proc_set_state(p, PROC_RUNNABLE_M);
+		spin_unlock(&p->proc_lock);
+		__sched_mcp_wakeup(p);
+		goto out;
 	} else {
+		/* SCPs can wake up for a variety of reasons.  the only times we need
+		 * to do something is if it was waiting or just created.  other cases
+		 * are either benign (just go out), or potential bugs (_Ms) */
+		switch (p->state) {
+			case (PROC_CREATED):
+			case (PROC_WAITING):
+				__proc_set_state(p, PROC_RUNNABLE_S);
+				break;
+			case (PROC_RUNNABLE_S):
+			case (PROC_RUNNING_S):
+			case (PROC_DYING):
+				goto out_unlock;
+			case (PROC_RUNNABLE_M):
+			case (PROC_RUNNING_M):
+				warn("Weird state(%s) in %s()", procstate2str(p->state),
+				     __FUNCTION__);
+				goto out_unlock;
+		}
 		printd("[kernel] FYI, waking up an _S proc\n");	/* thanks, past brho! */
-		__proc_set_state(p, PROC_RUNNABLE_S);
-		schedule_scp(p);
+		spin_unlock(&p->proc_lock);
+		__sched_scp_wakeup(p);
+		goto out;
 	}
+out_unlock:
+	spin_unlock(&p->proc_lock);
+out:
+	return;
 }
 
 /* Is the process in multi_mode / is an MCP or not?  */

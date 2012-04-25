@@ -156,6 +156,12 @@ static void switch_lists(struct proc *p, struct proc_list *old,
 	add_to_list(p, new);
 }
 
+static void __remove_from_any_list(struct proc *p)
+{
+	if (p->ksched_data.cur_list)
+		TAILQ_REMOVE(p->ksched_data.cur_list, p, ksched_data.proc_link);
+}
+
 /* Removes from whatever list p is on */
 static void remove_from_any_list(struct proc *p)
 {
@@ -213,6 +219,18 @@ int proc_change_to_m(struct proc *p)
 	spin_unlock(&sched_lock);
 	//poke_ksched(p, RES_CORES);
 	return retval;
+}
+
+/* Makes sure p is runnable.  Callers may spam this, so it needs to handle
+ * repeated calls for the same event.  Callers include event delivery, SCP
+ * yield, and new SCPs.  Most every scheduler should do something like this -
+ * grab whatever lock you have, then call the proc helper. */
+void proc_wakeup(struct proc *p)
+{
+	spin_lock(&sched_lock);
+	/* will trigger one of the __sched_.cp_wakeup()s */
+	__proc_wakeup(p);
+	spin_unlock(&sched_lock);
 }
 
 /* Destroys the given process.  This may be called from another process, a light
@@ -334,15 +352,19 @@ void poke_ksched(struct proc *p, int res_type)
 	spin_unlock(&sched_lock);
 }
 
-/* Proc p just woke up (due to an event).  Our dumb ksched will just try to deal
- * with its core desires. 
- * TODO: this may get called multiple times per unblock */
-void ksched_proc_unblocked(struct proc *p)
+/* ksched callbacks.  p just woke up, is unlocked, and the ksched lock is held */
+void __sched_mcp_wakeup(struct proc *p)
 {
-	/* TODO: this now gets called when an _S unblocks.  schedule_scp() also gets
-	 * called, so the process is on the _S runqueue.  Might merge the two in the
-	 * future. */
-	poke_ksched(p, RES_CORES);
+	/* the essence of poke_ksched for RES_CORES */
+	__core_request(p);
+}
+
+/* ksched callbacks.  p just woke up, is unlocked, and the ksched lock is held */
+void __sched_scp_wakeup(struct proc *p)
+{
+	/* might not be on a list if it is new.  o/w, it should be unrunnable */
+	__remove_from_any_list(p);
+	add_to_list(p, &runnable_scps);
 }
 
 /* The calling cpu/core has nothing to do and plans to idle/halt.  This is an
