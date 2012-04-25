@@ -33,15 +33,15 @@ spinlock_t sched_lock = SPINLOCK_INITIALIZER;
 struct proc *pcoremap[MAX_NUM_CPUS];
 
 /* Tracks which cores are idle, similar to the vcoremap.  Each value is the
- * physical coreid of an unallocated core. */
-spinlock_t idle_lock = SPINLOCK_INITIALIZER;
+ * physical coreid of an unallocated core.  These are all now protected by the
+ * sched_lock (they will change sooner or later). */
 uint32_t idlecoremap[MAX_NUM_CPUS];
 uint32_t num_idlecores = 0;
 uint32_t num_mgmtcores = 1;
 
 /* Helper, defined below */
 static void __core_request(struct proc *p);
-static void __put_idle_cores(uint32_t *pc_arr, uint32_t num);
+static void __put_idle_cores(struct proc *p, uint32_t *pc_arr, uint32_t num);
 static void add_to_list(struct proc *p, struct proc_list *list);
 static void remove_from_list(struct proc *p, struct proc_list *list);
 static void switch_lists(struct proc *p, struct proc_list *old,
@@ -90,7 +90,7 @@ void schedule_init(void)
 	set_ksched_alarm();
 	/* Ghetto old idle core init */
 	/* Init idle cores. Core 0 is the management core. */
-	spin_lock(&idle_lock);
+	spin_lock(&sched_lock);
 #ifdef __CONFIG_DISABLE_SMT__
 	/* assumes core0 is the only management core (NIC and monitor functionality
 	 * are run there too.  it just adds the odd cores to the idlecoremap */
@@ -129,7 +129,7 @@ void schedule_init(void)
 	for (int i = 0; i < num_idlecores; i++)
 		idlecoremap[i] = i + num_mgmtcores;
 #endif /* __CONFIG_DISABLE_SMT__ */
-	spin_unlock(&idle_lock);
+	spin_unlock(&sched_lock);
 	return;
 }
 
@@ -241,11 +241,9 @@ void proc_destroy(struct proc *p)
 		remove_from_any_list(p);
 		/* Drop the cradle-to-the-grave reference, jet-li */
 		proc_decref(p);
-		/* Put the cores back on the idlecore map.  For future changes, be
-		 * careful with the idle_lock.  It's safe to call this here or outside
-		 * the sched lock (for now). */
+		/* Put the cores back on the idlecore map. */
 		if (nr_cores_revoked) 
-			put_idle_cores(pc_arr, nr_cores_revoked);
+			__put_idle_cores(p, pc_arr, nr_cores_revoked);
 	}
 	spin_unlock(&p->proc_lock);
 	spin_unlock(&sched_lock);
@@ -385,27 +383,27 @@ void cpu_bored(void)
  *
  * This is a trigger, telling us we have more cores.  We could/should make a
  * scheduling decision (or at least plan to). */
-void put_idle_core(uint32_t coreid)
+void put_idle_core(struct proc *p, uint32_t coreid)
 {
-	spin_lock(&idle_lock);
+	spin_lock(&sched_lock);
 	idlecoremap[num_idlecores++] = coreid;
-	spin_unlock(&idle_lock);
+	spin_unlock(&sched_lock);
 }
 
 /* Helper for put_idle and core_req. */
-static void __put_idle_cores(uint32_t *pc_arr, uint32_t num)
+static void __put_idle_cores(struct proc *p, uint32_t *pc_arr, uint32_t num)
 {
-	spin_lock(&idle_lock);
 	for (int i = 0; i < num; i++)
 		idlecoremap[num_idlecores++] = pc_arr[i];
-	spin_unlock(&idle_lock);
 }
 
 /* Bulk interface for put_idle */
-void put_idle_cores(uint32_t *pc_arr, uint32_t num)
+void put_idle_cores(struct proc *p, uint32_t *pc_arr, uint32_t num)
 {
+	spin_lock(&sched_lock);
 	/* could trigger a sched decision here */
-	__put_idle_cores(pc_arr, num);
+	__put_idle_cores(p, pc_arr, num);
+	spin_unlock(&sched_lock);
 }
 
 /* Available resources changed (plus or minus).  Some parts of the kernel may
@@ -429,18 +427,16 @@ uint32_t max_vcores(struct proc *p)
 
 /* Ghetto helper, just hands out up to 'amt_new' cores (no sense of locality or
  * anything) */
-static uint32_t get_idle_cores(struct proc *p, uint32_t *pc_arr,
-                               uint32_t amt_new)
+static uint32_t __get_idle_cores(struct proc *p, uint32_t *pc_arr,
+                                 uint32_t amt_new)
 {
 	uint32_t num_granted = 0;
-	spin_lock(&idle_lock);
 	for (int i = 0; i < num_idlecores && i < amt_new; i++) {
 		/* grab the last one on the list */
 		pc_arr[i] = idlecoremap[num_idlecores - 1];
 		num_idlecores--;
 		num_granted++;
 	}
-	spin_unlock(&idle_lock);
 	return num_granted;
 }
 
@@ -468,7 +464,7 @@ static void __core_request(struct proc *p)
 	/* Otherwise, see what they want, and try to give out as many as possible.
 	 * Current models are simple - it's just a raw number of cores, and we just
 	 * give out what we can. */
-	num_granted = get_idle_cores(p, corelist, amt_wanted - amt_granted);
+	num_granted = __get_idle_cores(p, corelist, amt_wanted - amt_granted);
 	/* Now, actually give them out */
 	if (num_granted) {
 		/* give them the cores.  this will start up the extras if RUNNING_M. */
@@ -479,7 +475,7 @@ static void __core_request(struct proc *p)
 		 * ksched could check the states after locking, but it isn't necessary:
 		 * just need to check at some point in the ksched loop. */
 		if (__proc_give_cores(p, corelist, num_granted)) {
-			__put_idle_cores(corelist, num_granted);
+			__put_idle_cores(p, corelist, num_granted);
 		} else {
 			/* at some point after giving cores, call proc_run_m() (harmless on
 			 * RUNNING_Ms).  You can give small groups of cores, then run them
@@ -508,11 +504,9 @@ void sched_diag(void)
 
 void print_idlecoremap(void)
 {
-	spin_lock(&idle_lock);
 	printk("There are %d idle cores.\n", num_idlecores);
 	for (int i = 0; i < num_idlecores; i++)
 		printk("idlecoremap[%d] = %d\n", i, idlecoremap[i]);
-	spin_unlock(&idle_lock);
 }
 
 void print_resources(struct proc *p)

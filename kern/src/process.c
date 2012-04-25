@@ -1046,7 +1046,7 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 	}
 	spin_unlock(&p->proc_lock);
 	/* Hand the now-idle core to the ksched */
-	put_idle_core(pcoreid);
+	put_idle_core(p, pcoreid);
 	goto out_yield_core;
 out_failed:
 	/* for some reason we just want to return, either to take a KMSG that cleans
@@ -1247,7 +1247,7 @@ void proc_preempt_core(struct proc *p, uint32_t pcoreid, uint64_t usec)
 	}
 	spin_unlock(&p->proc_lock);
 	if (preempted)
-		put_idle_core(pcoreid);
+		put_idle_core(p, pcoreid);
 }
 
 /* Warns and preempts all from p.  No delaying / alarming, or anything.  The
@@ -1272,7 +1272,7 @@ void proc_preempt_all(struct proc *p, uint64_t usec)
 	spin_unlock(&p->proc_lock);
 	/* Return the cores to the ksched */
 	if (num_revoked)
-		put_idle_cores(pc_arr, num_revoked);
+		put_idle_cores(p, pc_arr, num_revoked);
 }
 
 /* Give the specific pcore to proc p.  Lots of assumptions, so don't really use

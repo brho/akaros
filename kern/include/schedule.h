@@ -60,8 +60,8 @@ void cpu_bored(void);
 /* Gets called when a pcore becomes idle (like in proc yield).  These are 'cg'
  * cores, given to MCPs, that have been async returned to the ksched.  If the
  * ksched preempts a core, this won't get called (unless it yielded first). */
-void put_idle_core(uint32_t coreid);
-void put_idle_cores(uint32_t *pc_arr, uint32_t num);
+void put_idle_core(struct proc *p, uint32_t coreid);
+void put_idle_cores(struct proc *p, uint32_t *pc_arr, uint32_t num);
 
 /* Available resources changed (plus or minus).  Some parts of the kernel may
  * call this if a particular resource that is 'quantity-based' changes.  Things

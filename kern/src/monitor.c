@@ -602,7 +602,7 @@ int mon_measure(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 				__proc_set_state(p, PROC_RUNNABLE_M);
 			spin_unlock(&p->proc_lock);
 			/* ghetto, since the ksched should be calling all of this */
-			put_idle_core(pcoreid);
+			put_idle_core(p, pcoreid);
 			/* done when unmapped (right before abandoning) */
 			spin_on(p->procinfo->pcoremap[pcoreid].valid);
 			diff = stop_timing(begin);
@@ -616,7 +616,7 @@ int mon_measure(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 			__proc_set_state(p, PROC_RUNNABLE_M);
 			spin_unlock(&p->proc_lock);
 			if (num_revoked)
-				put_idle_cores(pc_arr, num_revoked);
+				put_idle_cores(p, pc_arr, num_revoked);
 			/* a little ghetto, implies no one else is using p */
 			spin_on(kref_refcnt(&p->p_kref) != end_refcnt);
 			diff = stop_timing(begin);
