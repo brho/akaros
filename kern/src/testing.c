@@ -1033,10 +1033,7 @@ void test_ucq(void)
 	}
 	char *p_envp[] = {"LD_LIBRARY_PATH=/lib", 0};
 	struct proc *p = proc_create(program, 0, p_envp);
-	spin_lock(&p->proc_lock);
-	__proc_set_state(p, PROC_RUNNABLE_S);
-	schedule_scp(p);
-	spin_unlock(&p->proc_lock);
+	proc_wakeup(p);
 	/* instead of getting rid of the reference created in proc_create, we'll put
 	 * it in the awaiter */
 	waiter->data = p;

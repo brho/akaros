@@ -297,11 +297,7 @@ int mon_bin_run(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 	char *p_envp[] = {"LD_LIBRARY_PATH=/lib", 0};
 	struct proc *p = proc_create(program, p_argv, p_envp);
 	kfree(p_argv);
-
-	spin_lock(&p->proc_lock);
-	__proc_set_state(p, PROC_RUNNABLE_S);
-	schedule_scp(p);
-	spin_unlock(&p->proc_lock);
+	proc_wakeup(p);
 	proc_decref(p); /* let go of the reference created in proc_create() */
 	kref_put(&program->f_kref);
 	/* Make a scheduling decision.  You might not get the process you created,

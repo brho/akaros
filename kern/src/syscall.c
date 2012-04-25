@@ -312,24 +312,26 @@ static error_t sys_proc_run(struct proc *p, unsigned pid)
 	struct proc *target = pid2proc(pid);
 	error_t retval = 0;
 
-	if (!target)
-		return -EBADPROC;
- 	// note we can get interrupted here. it's not bad.
-	spin_lock(&p->proc_lock);
-	// make sure we have access and it's in the right state to be activated
-	if (!proc_controls(p, target)) {
-		proc_decref(target);
-		retval = -EPERM;
-	} else if (target->state != PROC_CREATED) {
-		proc_decref(target);
-		retval = -EINVAL;
-	} else {
-		__proc_set_state(target, PROC_RUNNABLE_S);
-		schedule_scp(target);
+	if (!target) {
+		set_errno(EBADPROC);
+		return -1;
 	}
-	spin_unlock(&p->proc_lock);
+	/* make sure we have access and it's in the right state to be activated */
+	if (!proc_controls(p, target)) {
+		set_errno(EPERM);
+		goto out_error;
+	} else if (target->state != PROC_CREATED) {
+		set_errno(EINVAL);
+		goto out_error;
+	}
+	/* Note a proc can spam this for someone it controls.  Seems safe - if it
+	 * isn't we can change it. */
+	proc_wakeup(target);
 	proc_decref(target);
-	return retval;
+	return 0;
+out_error:
+	proc_decref(target);
+	return -1;
 }
 
 /* Destroy proc pid.  If this is called by the dying process, it will never
@@ -446,9 +448,9 @@ static ssize_t sys_fork(env_t* e)
 	#endif
 
 	clone_files(&e->open_files, &env->open_files);
+	/* FYI: once we call ready, the proc is open for concurrent usage */
 	__proc_ready(env);
-	__proc_set_state(env, PROC_RUNNABLE_S);
-	schedule_scp(env);
+	proc_wakeup(env);
 
 	// don't decref the new process.
 	// that will happen when the parent waits for it.
@@ -546,12 +548,12 @@ mid_error:
 early_error:
 	finish_current_sysc(-1);
 success:
-	/* Here's how we'll restart the new (or old) process: */
+	/* Here's how we restart the new (on success) or old (on failure) proc: */
 	spin_lock(&p->proc_lock);
 	__unmap_vcore(p, 0);	/* VC# keep in sync with proc_run_s */
-	__proc_set_state(p, PROC_RUNNABLE_S);
-	schedule_scp(p);
+	__proc_set_state(p, PROC_WAITING);	/* fake a yield */
 	spin_unlock(&p->proc_lock);
+	proc_wakeup(p);
 all_out:
 	/* we can't return, since we'd write retvals to the old location of the
 	 * syscall struct (which has been freed and is in the old userspace) (or has

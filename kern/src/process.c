@@ -872,19 +872,11 @@ static uint32_t get_pcoreid(struct proc *p, uint32_t vcoreid)
 
 /* Helper: saves the SCP's tf state and unmaps vcore 0.  In the future, we'll
  * probably use vc0's space for env_tf and the silly state. */
-static void __proc_save_context_s(struct proc *p, struct trapframe *tf)
+void __proc_save_context_s(struct proc *p, struct trapframe *tf)
 {
 	p->env_tf= *tf;
 	env_push_ancillary_state(p);			/* TODO: (HSS) */
 	__unmap_vcore(p, 0);	/* VC# keep in sync with proc_run_s */
-}
-
-/* Helper function: yields / wraps up current_tf */
-void __proc_yield_s(struct proc *p, struct trapframe *tf)
-{
-	assert(p->state == PROC_RUNNING_S);
-	__proc_set_state(p, PROC_RUNNABLE_S);
-	__proc_save_context_s(p, tf);
 }
 
 /* Yields the calling core.  Must be called locally (not async) for now.
@@ -960,12 +952,16 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 				 * hasn't already written notif_pending will have seen WAITING,
 				 * and will be spinning while we do this. */
 				__proc_save_context_s(p, current_tf);
+				spin_unlock(&p->proc_lock);	/* note irqs are not enabled yet */
 			} else {
-				/* yielding to allow other processes to run */
-				__proc_yield_s(p, current_tf);
-				schedule_scp(p);
+				/* yielding to allow other processes to run.  we're briefly
+				 * WAITING, til we are woken up */
+				__proc_set_state(p, PROC_WAITING);
+				__proc_save_context_s(p, current_tf);
+				spin_unlock(&p->proc_lock);	/* note irqs are not enabled yet */
+				/* immediately wake up the proc (makes it runnable) */
+				proc_wakeup(p);
 			}
-			spin_unlock(&p->proc_lock);	/* note that irqs are not enabled yet */
 			goto out_yield_core;
 		case (PROC_RUNNING_M):
 			break;				/* will handle this stuff below */

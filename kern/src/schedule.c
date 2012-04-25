@@ -85,12 +85,9 @@ static void __kalarm(struct alarm_waiter *waiter)
 
 void schedule_init(void)
 {
-	TAILQ_INIT(&runnable_scps);
-	TAILQ_INIT(&all_mcps);
 	assert(!core_id());		/* want the alarm on core0 for now */
 	init_awaiter(&ksched_waiter, __kalarm);
 	set_ksched_alarm();
-
 	/* Ghetto old idle core init */
 	/* Init idle cores. Core 0 is the management core. */
 	spin_lock(&idle_lock);
@@ -175,17 +172,6 @@ void register_proc(struct proc *p)
 	proc_incref(p, 1);	/* need at least this OR the 'one for existing' */
 	spin_lock(&sched_lock);
 	add_to_list(p, &unrunnable_scps);
-	spin_unlock(&sched_lock);
-}
-
-/* TODO: the proc lock is currently held for sched and register */
-/* sched_scp tells us to try and run the scp
- * TODO: change this horrible name */
-void schedule_scp(struct proc *p)
-{
-	spin_lock(&sched_lock);
-	printd("Scheduling PID: %d\n", p->pid);
-	switch_lists(p, &unrunnable_scps, &runnable_scps);
 	spin_unlock(&sched_lock);
 }
 
@@ -284,7 +270,11 @@ static bool __schedule_scp(void)
 		if (pcpui->owning_proc) {
 			printd("Descheduled %d in favor of %d\n", pcpui->owning_proc->pid,
 			       p->pid);
-			__proc_yield_s(pcpui->owning_proc, pcpui->cur_tf);
+			/* locking just to be safe */
+			spin_lock(&p->proc_lock);
+			__proc_set_state(pcpui->owning_proc, PROC_RUNNABLE_S);
+			__proc_save_context_s(pcpui->owning_proc, pcpui->cur_tf);
+			spin_unlock(&p->proc_lock);
 			/* round-robin the SCPs (inserts at the end of the queue) */
 			switch_lists(pcpui->owning_proc, &unrunnable_scps, &runnable_scps);
 			clear_owning_proc(pcoreid);

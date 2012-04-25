@@ -240,9 +240,10 @@ void __launch_kthread(struct trapframe *tf, uint32_t srcid, long a0, long a1,
 		if (pcpui->owning_proc->state == PROC_RUNNING_S) {
 			spin_lock(&pcpui->owning_proc->proc_lock);
 			/* Wrap up / yield the _S proc */
-			__proc_yield_s(pcpui->owning_proc, pcpui->cur_tf);
+			__proc_set_state(pcpui->owning_proc, PROC_WAITING);
+			__proc_save_context_s(pcpui->owning_proc, current_tf);
 			spin_unlock(&pcpui->owning_proc->proc_lock);
-			schedule_scp(p);
+			proc_wakeup(p);
 			abandon_core();
 			/* prob need to clear the owning proc?  this is some old shit, so
 			 * don't just uncomment it. */

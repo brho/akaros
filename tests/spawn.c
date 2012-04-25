@@ -36,13 +36,13 @@ int main(int argc, char **argv, char **envp)
 	#endif
 	printf("U: attempting to create and run hello\n");
 	p_argv[0] = filename;
-	printf("SPAWN, pid %d, filename %08p\n", getpid(), filename);
+	printf("SPAWN, I'm pid %d, filename %s\n", getpid(), filename);
 	child_pid[0] = sys_proc_create(FILENAME, strlen(FILENAME), p_argv, p_envp);
 	if (child_pid[0] <= 0)
 		printf("Failed to create the child\n");
 	else
 		if (sys_proc_run(child_pid[0]) < 0)
-			printf("Failed to run the child\n");
+			printf("Failed to run the child (pid %d)\n", child_pid[0]);
 
 	#if 0
 	printf("U: attempting to create and run another hello\n");

@@ -27,9 +27,6 @@ void schedule_init(void);
 /* Tell the ksched about the process, which it will track cradle-to-grave */
 void register_proc(struct proc *p);
 
-/* _S is now runnable, tell the ksched to try to run it. */
-void schedule_scp(struct proc *p);
-
 /* Makes sure p is runnable.  Callers include event delivery, SCP yield, and new
  * SCPs.  Will trigger the __sched_.cp_wakeup() callbacks. */
 void proc_wakeup(struct proc *p);

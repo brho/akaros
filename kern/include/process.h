@@ -73,7 +73,7 @@ void __proc_run_m(struct proc *p);
 void proc_restartcore(void);
 bool __proc_destroy(struct proc *p, uint32_t *pc_arr, uint32_t *nr_revoked);
 int __proc_change_to_m(struct proc *p);
-void __proc_yield_s(struct proc *p, struct trapframe *tf);
+void __proc_save_context_s(struct proc *p, struct trapframe *tf);
 void proc_yield(struct proc *SAFE p, bool being_nice);
 void proc_notify(struct proc *p, uint32_t vcoreid);
 void __proc_wakeup(struct proc *p);
