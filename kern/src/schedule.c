@@ -18,6 +18,7 @@
 #include <manager.h>
 #include <alarm.h>
 #include <sys/queue.h>
+#include <kmalloc.h>
 
 /* Process Lists.  'unrunnable' is a holding list for SCPs that are running or
  * waiting or otherwise not considered for sched decisions. */
@@ -26,11 +27,8 @@ struct proc_list runnable_scps = TAILQ_HEAD_INITIALIZER(runnable_scps);
 struct proc_list all_mcps = TAILQ_HEAD_INITIALIZER(all_mcps);
 spinlock_t sched_lock = SPINLOCK_INITIALIZER;
 
-// This could be useful for making scheduling decisions.  
-/* Physical coremap: each index is a physical core id, with a proc ptr for
- * whoever *should be or is* running.  Very similar to current, which is what
- * process is *really* running there. */
-struct proc *pcoremap[MAX_NUM_CPUS];
+/* The pcores in the system.  (array gets alloced in init()).  */
+struct sched_pcore *all_pcores;
 
 /* Tracks which cores are idle, similar to the vcoremap.  Each value is the
  * physical coreid of an unallocated core.  These are all now protected by the
@@ -46,6 +44,12 @@ static void add_to_list(struct proc *p, struct proc_list *list);
 static void remove_from_list(struct proc *p, struct proc_list *list);
 static void switch_lists(struct proc *p, struct proc_list *old,
                          struct proc_list *new);
+static uint32_t schedpcore2pcoreid(struct sched_pcore *spc);
+static bool is_ll_core(uint32_t pcoreid);
+static void __prov_track_alloc(struct proc *p, uint32_t pcoreid);
+static void __prov_track_dealloc(struct proc *p, uint32_t pcoreid);
+static void __prov_track_dealloc_bulk(struct proc *p, uint32_t *pc_arr,
+                                      uint32_t nr_cores);
 
 /* Alarm struct, for our example 'timer tick' */
 struct alarm_waiter ksched_waiter;
@@ -85,6 +89,9 @@ static void __kalarm(struct alarm_waiter *waiter)
 
 void schedule_init(void)
 {
+	/* init provisioning stuff */
+	all_pcores = kmalloc(sizeof(struct sched_pcore) * num_cpus, 0);
+	memset(all_pcores, 0, sizeof(struct sched_pcore) * num_cpus);
 	assert(!core_id());		/* want the alarm on core0 for now */
 	init_awaiter(&ksched_waiter, __kalarm);
 	set_ksched_alarm();
@@ -107,10 +114,6 @@ void schedule_init(void)
 		idlecoremap[i] = (i * 2) + 1;
 #else
 	// __CONFIG_DISABLE_SMT__
-	#ifdef __CONFIG_NETWORKING__
-	num_mgmtcores++; // Next core is dedicated to the NIC
-	assert(num_cpus >= num_mgmtcores);
-	#endif
 	#ifdef __CONFIG_APPSERVER__
 	#ifdef __CONFIG_DEDICATED_MONITOR__
 	num_mgmtcores++; // Next core dedicated to running the kernel monitor
@@ -171,6 +174,8 @@ void register_proc(struct proc *p)
 	/* one ref for the proc's existence, cradle-to-grave */
 	proc_incref(p, 1);	/* need at least this OR the 'one for existing' */
 	spin_lock(&sched_lock);
+	TAILQ_INIT(&p->ksched_data.prov_alloc_me);
+	TAILQ_INIT(&p->ksched_data.prov_not_alloc_me);
 	add_to_list(p, &unrunnable_scps);
 	spin_unlock(&sched_lock);
 }
@@ -219,6 +224,25 @@ void proc_wakeup(struct proc *p)
 	spin_unlock(&sched_lock);
 }
 
+static uint32_t schedpcore2pcoreid(struct sched_pcore *spc)
+{
+	return spc - all_pcores;
+}
+
+/* Helper for proc destroy: unprovisions any pcores for the given list */
+static void unprov_pcore_list(struct sched_pcore_tailq *list_head)
+{
+	struct sched_pcore *spc_i;
+	/* We can leave them connected within the tailq, since the scps don't have a
+	 * default list (if they aren't on a proc's list, then we don't care about
+	 * them), and since the INSERTs don't care what list you were on before
+	 * (chummy with the implementation).  Pretty sure this is right.  If there's
+	 * suspected list corruption, be safer here. */
+	TAILQ_FOREACH(spc_i, list_head, next)
+		spc_i->prov_proc = 0;
+	TAILQ_INIT(list_head);
+}
+
 /* Destroys the given process.  This may be called from another process, a light
  * kernel thread (no real process context), asynchronously/cross-core, or from
  * the process on its own core.
@@ -236,14 +260,19 @@ void proc_destroy(struct proc *p)
 	if (__proc_destroy(p, pc_arr, &nr_cores_revoked)) {
 		/* Do our cleanup.  note that proc_free won't run since we have an
 		 * external reference, passed in */
-
+		/* Unprovision any cores.  Note this is different than track_dealloc.
+		 * The latter does bookkeeping when an allocation changes.  This is a
+		 * bulk *provisioning* change. */
+		unprov_pcore_list(&p->ksched_data.prov_alloc_me);
+		unprov_pcore_list(&p->ksched_data.prov_not_alloc_me);
 		/* Remove from whatever list we are on */
 		remove_from_any_list(p);
 		/* Drop the cradle-to-the-grave reference, jet-li */
 		proc_decref(p);
-		/* Put the cores back on the idlecore map. */
-		if (nr_cores_revoked) 
+		if (nr_cores_revoked) {
 			__put_idle_cores(p, pc_arr, nr_cores_revoked);
+			__prov_track_dealloc_bulk(p, pc_arr, nr_cores_revoked);
+		}
 	}
 	spin_unlock(&p->proc_lock);
 	spin_unlock(&sched_lock);
@@ -377,33 +406,35 @@ void cpu_bored(void)
 	 * the 'call of the giraffe' suffices. */
 }
 
-/* Helper function to return a core to the idlemap.  It causes some more lock
- * acquisitions (like in a for loop), but it's a little easier.  Plus, one day
- * we might be able to do this without locks (for the putting).
+/* Externally called function to return a core to the ksched, which tracks it as
+ * idle and deallocated from p.
  *
- * This is a trigger, telling us we have more cores.  We could/should make a
- * scheduling decision (or at least plan to). */
+ * This also is a trigger, telling us we have more cores.  We could/should make
+ * a scheduling decision (or at least plan to). */
 void put_idle_core(struct proc *p, uint32_t coreid)
 {
 	spin_lock(&sched_lock);
 	idlecoremap[num_idlecores++] = coreid;
+	__prov_track_dealloc(p, coreid);
 	spin_unlock(&sched_lock);
 }
 
-/* Helper for put_idle and core_req. */
+/* Helper for put_idle and core_req.  Note this does not all track_dealloc */
 static void __put_idle_cores(struct proc *p, uint32_t *pc_arr, uint32_t num)
 {
 	for (int i = 0; i < num; i++)
 		idlecoremap[num_idlecores++] = pc_arr[i];
 }
 
-/* Bulk interface for put_idle */
+/* External interface for put_idle.  Note this one also calls track_dealloc,
+ * which the internal version does not. */
 void put_idle_cores(struct proc *p, uint32_t *pc_arr, uint32_t num)
 {
 	spin_lock(&sched_lock);
-	/* could trigger a sched decision here */
 	__put_idle_cores(p, pc_arr, num);
+	__prov_track_dealloc_bulk(p, pc_arr, num);
 	spin_unlock(&sched_lock);
+	/* could trigger a sched decision here */
 }
 
 /* Available resources changed (plus or minus).  Some parts of the kernel may
@@ -477,6 +508,9 @@ static void __core_request(struct proc *p)
 		if (__proc_give_cores(p, corelist, num_granted)) {
 			__put_idle_cores(p, corelist, num_granted);
 		} else {
+			/* track the (successful) allocation of the sched_pcores */
+			for (int i = 0; i < num_granted; i++)
+				__prov_track_alloc(p, corelist[i]);
 			/* at some point after giving cores, call proc_run_m() (harmless on
 			 * RUNNING_Ms).  You can give small groups of cores, then run them
 			 * (which is more efficient than interleaving runs with the gives
@@ -485,6 +519,102 @@ static void __core_request(struct proc *p)
 		}
 		spin_unlock(&p->proc_lock);
 	}
+}
+
+/* TODO: need more thorough CG/LL management.  For now, core0 is the only LL
+ * core.  This won't play well with the ghetto shit in schedule_init() if you do
+ * anything like 'DEDICATED_MONITOR' or the ARSC server.  All that needs an
+ * overhaul. */
+static bool is_ll_core(uint32_t pcoreid)
+{
+	if (pcoreid == 0)
+		return TRUE;
+	return FALSE;
+}
+
+/* Helper, makes sure the prov/alloc structures track the pcore properly when it
+ * is allocated to p.  Might make this take a sched_pcore * in the future. */
+static void __prov_track_alloc(struct proc *p, uint32_t pcoreid)
+{
+	struct sched_pcore *spc;
+	assert(pcoreid < num_cpus);		/* catch bugs */
+	spc = &all_pcores[pcoreid];
+	assert(spc->alloc_proc != p);	/* corruption or double-alloc */
+	spc->alloc_proc = p;
+	/* if the pcore is prov to them and now allocated, move lists */
+	if (spc->prov_proc == p) {
+		TAILQ_REMOVE(&p->ksched_data.prov_not_alloc_me, spc, next);
+		TAILQ_INSERT_TAIL(&p->ksched_data.prov_alloc_me, spc, next);
+	}
+}
+
+/* Helper, makes sure the prov/alloc structures track the pcore properly when it
+ * is deallocated from p. */
+static void __prov_track_dealloc(struct proc *p, uint32_t pcoreid)
+{
+	struct sched_pcore *spc;
+	assert(pcoreid < num_cpus);		/* catch bugs */
+	spc = &all_pcores[pcoreid];
+	spc->alloc_proc = 0;
+	/* if the pcore is prov to them and now deallocated, move lists */
+	if (spc->prov_proc == p) {
+		TAILQ_REMOVE(&p->ksched_data.prov_alloc_me, spc, next);
+		/* this is the victim list, which can be sorted so that we pick the
+		 * right victim (sort by alloc_proc reverse priority, etc).  In this
+		 * case, the core isn't alloc'd by anyone, so it should be the first
+		 * victim. */
+		TAILQ_INSERT_HEAD(&p->ksched_data.prov_not_alloc_me, spc, next);
+	}
+}
+
+/* Bulk interface for __prov_track_dealloc */
+static void __prov_track_dealloc_bulk(struct proc *p, uint32_t *pc_arr,
+                                      uint32_t nr_cores)
+{
+	for (int i = 0; i < nr_cores; i++)
+		__prov_track_dealloc(p, pc_arr[i]);
+}
+
+/* P will get pcore if it needs more cores next time we look at it */
+void provision_core(struct proc *p, uint32_t pcoreid)
+{
+	struct sched_pcore *spc;
+	struct sched_pcore_tailq *prov_list;
+	/* Make sure we aren't asking for something that doesn't exist (bounds check
+	 * on the pcore array) */
+	if (!(pcoreid < num_cpus))
+		return;	/* could do an error code */
+	/* Don't allow the provisioning of LL cores */
+	if (is_ll_core(pcoreid))
+		return;
+	spc = &all_pcores[pcoreid];
+	/* Note the sched lock protects the spc tailqs for all procs in this code.
+	 * If we need a finer grained sched lock, this is one place where we could
+	 * have a different lock */
+	spin_lock(&sched_lock);
+	/* If the core is already prov to someone else, take it away.  (last write
+	 * wins, some other layer or new func can handle permissions). */
+	if (spc->prov_proc) {
+		/* the list the spc is on depends on whether it is alloced to the
+		 * prov_proc or not */
+		prov_list = (spc->alloc_proc == spc->prov_proc ?
+		             &spc->prov_proc->ksched_data.prov_alloc_me :
+		             &spc->prov_proc->ksched_data.prov_not_alloc_me);
+		TAILQ_REMOVE(prov_list, spc, next);
+	}
+	/* Now prov it to p.  Again, the list it goes on depends on whether it is
+	 * alloced to p or not.  Callers can also send in 0 to de-provision. */
+	if (p) {
+		if (spc->alloc_proc == p) {
+			TAILQ_INSERT_TAIL(&p->ksched_data.prov_alloc_me, spc, next);
+		} else {
+			/* this is be the victim list, which can be sorted so that we pick
+			 * the right victim (sort by alloc_proc reverse priority, etc). */
+			TAILQ_INSERT_TAIL(&p->ksched_data.prov_not_alloc_me, spc, next);
+		}
+	}
+	spc->prov_proc = p;
+	spin_unlock(&sched_lock);
 }
 
 /************** Debugging **************/
@@ -529,4 +659,31 @@ void print_all_resources(void)
 	spin_lock(&pid_hash_lock);
 	hash_for_each(pid_hash, __print_resources);
 	spin_unlock(&pid_hash_lock);
+}
+
+void print_prov_map(void)
+{
+	struct sched_pcore *spc_i;
+	/* Doing this unlocked, which is dangerous, but won't deadlock */
+	printk("Which cores are provisioned to which procs:\n------------------\n");
+	for (int i = 0; i < num_cpus; i++) {
+		spc_i = &all_pcores[i];
+		printk("Core %02d, prov: %08p(%d) alloc: %08p(%d)\n", i,
+		       spc_i->prov_proc,  spc_i->prov_proc  ? spc_i->prov_proc->pid :0,
+		       spc_i->alloc_proc, spc_i->alloc_proc ? spc_i->alloc_proc->pid:0);
+	}
+}
+
+void print_proc_prov(struct proc *p)
+{
+	struct sched_pcore *spc_i;
+	if (!p)
+		return;
+	printk("Prov cores alloced to proc %08p (%d)\n----------\n", p, p->pid);
+	TAILQ_FOREACH(spc_i, &p->ksched_data.prov_alloc_me, next)
+		printk("Pcore %d\n", schedpcore2pcoreid(spc_i));
+	printk("Prov cores not alloced to proc %08p (%d)\n----------\n", p, p->pid);
+	TAILQ_FOREACH(spc_i, &p->ksched_data.prov_not_alloc_me, next)
+		printk("Pcore %d (alloced to %08p (%d))\n", schedpcore2pcoreid(spc_i),
+		       spc_i->alloc_proc, spc_i->alloc_proc ? spc_i->alloc_proc->pid:0);
 }

@@ -15,10 +15,22 @@
 struct proc;	/* process.h includes us, but we need pointers now */
 TAILQ_HEAD(proc_list, proc);		/* Declares 'struct proc_list' */
 
+/* The ksched maintains an internal array of these: the global pcore map */
+struct sched_pcore {
+	TAILQ_ENTRY(sched_pcore)	next;				/* on a proc's prov list */
+	struct proc					*prov_proc;			/* who this is prov to */
+	struct proc					*alloc_proc;		/* who this is alloc to */
+};
+TAILQ_HEAD(sched_pcore_tailq, sched_pcore);
+
 /* One of these embedded in every struct proc */
 struct sched_proc_data {
 	TAILQ_ENTRY(proc)			proc_link;			/* tailq linkage */
 	struct proc_list 			*cur_list;			/* which tailq we're on */
+	struct sched_pcore_tailq	prov_alloc_me;		/* prov cores alloced us */
+	struct sched_pcore_tailq	prov_not_alloc_me;	/* maybe alloc to others */
+	/* count of lists? */
+	/* other accounting info */
 };
 
 void schedule_init(void);
@@ -72,6 +84,12 @@ void avail_res_changed(int res_type, long change);
 /************** Proc's view of the world **************/
 /* How many vcores p will think it can have */
 uint32_t max_vcores(struct proc *p);
+
+/************** Provisioning / Allocating *************/
+/* This section is specific to a provisioning ksched.  Careful calling any of
+ * this from generic kernel code, since it might not be present in all kernel
+ * schedulers. */
+void provision_core(struct proc *p, uint32_t pcoreid);
 
 /************** Debugging **************/
 void sched_diag(void);
