@@ -618,13 +618,24 @@ future, we would like to have broadcast messaging of some sort (literally a
 broadcast, like the IPIs, and if not that, then a communication tree of
 sorts).  
 
-Given those desires, we want to make sure that no message we send needs
-details specific to a pcore (such as the vcoreid running on it, a history
-number, or anything like that).  Thus no k_msg related to process management
-should have anything that cannot apply to the entire process.  At this point,
-most just have a struct proc *.  A pcore ought to be able to figure out what
-is happening based on the pcoremap, information in the struct proc, and in the
-preempt struct in procdata.
+In the past, (OLD INFO): given those desires, we wanted to make sure that no
+message we send needs details specific to a pcore (such as the vcoreid running
+on it, a history number, or anything like that).  Thus no k_msg related to
+process management would have anything that cannot apply to the entire
+process.  At this point, most just have a struct proc *.  A pcore was be able
+to figure out what is happening based on the pcoremap, information in the
+struct proc, and in the preempt struct in procdata.
+
+In more recent revisions, the coremap no longer is meant to be used across
+kmsgs, so some messages ('__startcore') send the vcoreid.  This means we can't
+easily broadcast the message.  However, many broadcast mechanisms wouldn't
+handle '__startcore' naturally.  For instance, logical IPIs need something
+already set in the LAPIC, or maybe need to be sent to a somewhat predetermined
+group (again, bits in the LAPIC).  If we tried this for '__startcore', we
+could add something in to the messaging to carry these vcoreids.  More likely,
+we'll have a broadcast tree.  Keeping vcoreid (or any arg) next to whoever
+needs to receive the message is a very small amount of bookkeeping on a struct
+that already does bookkeeping.
 
 4.10: Other Things We Thought of but Don't Like
 ---------------------------

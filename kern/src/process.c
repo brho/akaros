@@ -566,7 +566,8 @@ void __proc_run_m(struct proc *p)
 				 * turn online */
 				TAILQ_FOREACH(vc_i, &p->online_vcs, list) {
 					send_kernel_message(vc_i->pcoreid, __startcore, (long)p,
-					                    0, 0, KMSG_IMMEDIATE);
+					                    (long)vcore2vcoreid(p, vc_i), 0,
+					                    KMSG_IMMEDIATE);
 				}
 			} else {
 				warn("Tried to proc_run() an _M with no vcores!");
@@ -1332,9 +1333,10 @@ struct vcore *vcoreid2vcore(struct proc *p, uint32_t vcoreid)
 /********** Core granting (bulk and single) ***********/
 
 /* Helper: gives pcore to the process, mapping it to the next available vcore
- * from list vc_list.  Returns TRUE if we succeeded (non-empty). */
+ * from list vc_list.  Returns TRUE if we succeeded (non-empty).  If you pass in
+ * **vc, we'll tell you which vcore it was. */
 static bool __proc_give_a_pcore(struct proc *p, uint32_t pcore,
-                                struct vcore_tailq *vc_list)
+                                struct vcore_tailq *vc_list, struct vcore **vc)
 {
 	struct vcore *new_vc;
 	new_vc = TAILQ_FIRST(vc_list);
@@ -1345,6 +1347,8 @@ static bool __proc_give_a_pcore(struct proc *p, uint32_t pcore,
 	TAILQ_REMOVE(vc_list, new_vc, list);
 	TAILQ_INSERT_TAIL(&p->online_vcs, new_vc, list);
 	__map_vcore(p, vcore2vcoreid(p, new_vc), pcore);
+	if (vc)
+		*vc = new_vc;
 	return TRUE;
 }
 
@@ -1358,12 +1362,12 @@ static void __proc_give_cores_runnable(struct proc *p, uint32_t *pc_arr,
 	p->procinfo->num_vcores += num;
 	for (int i = 0; i < num; i++) {
 		/* Try from the bulk list first */
-		if (__proc_give_a_pcore(p, pc_arr[i], &p->bulk_preempted_vcs))
+		if (__proc_give_a_pcore(p, pc_arr[i], &p->bulk_preempted_vcs, 0))
 			continue;
 		/* o/w, try from the inactive list.  at one point, i thought there might
 		 * be a legit way in which the inactive list could be empty, but that i
 		 * wanted to catch it via an assert. */
-		assert(__proc_give_a_pcore(p, pc_arr[i], &p->inactive_vcs));
+		assert(__proc_give_a_pcore(p, pc_arr[i], &p->inactive_vcs, 0));
 	}
 	__seq_end_write(&p->procinfo->coremap_seqctr);
 }
@@ -1371,6 +1375,7 @@ static void __proc_give_cores_runnable(struct proc *p, uint32_t *pc_arr,
 static void __proc_give_cores_running(struct proc *p, uint32_t *pc_arr,
                                       uint32_t num)
 {
+	struct vcore *vc_i;
 	/* Up the refcnt, since num cores are going to start using this
 	 * process and have it loaded in their owning_proc and 'current'. */
 	proc_incref(p, num * 2);	/* keep in sync with __startcore */
@@ -1378,9 +1383,9 @@ static void __proc_give_cores_running(struct proc *p, uint32_t *pc_arr,
 	p->procinfo->num_vcores += num;
 	assert(TAILQ_EMPTY(&p->bulk_preempted_vcs));
 	for (int i = 0; i < num; i++) {
-		assert(__proc_give_a_pcore(p, pc_arr[i], &p->inactive_vcs));
-		send_kernel_message(pc_arr[i], __startcore, (long)p, 0, 0,
-		                    KMSG_IMMEDIATE);
+		assert(__proc_give_a_pcore(p, pc_arr[i], &p->inactive_vcs, &vc_i));
+		send_kernel_message(pc_arr[i], __startcore, (long)p,
+		                    (long)vcore2vcoreid(p, vc_i), 0, KMSG_IMMEDIATE);
 	}
 	__seq_end_write(&p->procinfo->coremap_seqctr);
 }
@@ -1816,7 +1821,8 @@ out_failed:
  * Interrupts are disabled. */
 void __startcore(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2)
 {
-	uint32_t vcoreid, coreid = core_id();
+	uint32_t vcoreid = (uint32_t)a1;
+	uint32_t coreid = core_id();
 	struct per_cpu_info *pcpui = &per_cpu_info[coreid];
 	struct proc *p_to_run = (struct proc *CT(1))a0;
 
@@ -1837,7 +1843,6 @@ void __startcore(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2
 		proc_decref(p_to_run);		/* can't install, decref the extra one */
 	}
 	/* Note we are not necessarily in the cr3 of p_to_run */
-	vcoreid = get_vcoreid(p_to_run, coreid);
 	/* Now that we sorted refcnts and know p / which vcore it should be, set up
 	 * pcpui->cur_tf so that it will run that particular vcore */
 	__set_curtf_to_vcoreid(p_to_run, vcoreid);
