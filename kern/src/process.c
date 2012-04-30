@@ -1289,10 +1289,9 @@ void proc_give(struct proc *p, uint32_t pcoreid)
 
 /* Global version of the helper, for sys_get_vcoreid (might phase that syscall
  * out). */
-uint32_t proc_get_vcoreid(struct proc *SAFE p, uint32_t pcoreid)
+uint32_t proc_get_vcoreid(struct proc *p)
 {
-	struct per_cpu_info *pcpui = &per_cpu_info[pcoreid];
-	return pcpui->owning_vcoreid;
+	return per_cpu_info[core_id()].owning_vcoreid;
 }
 
 /* TODO: make all of these static inlines when we gut the env crap */

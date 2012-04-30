@@ -245,7 +245,7 @@ static uint32_t sys_getpcoreid(void)
 // this is removed from the user interface
 static size_t sys_getvcoreid(struct proc *p)
 {
-	return proc_get_vcoreid(p, core_id());
+	return proc_get_vcoreid(p);
 }
 
 /************** Process management syscalls **************/
@@ -1457,7 +1457,7 @@ intreg_t syscall(struct proc *p, uintreg_t sc_num, uintreg_t a0, uintreg_t a1,
 	if (systrace_flags & SYSTRACE_ON) {
 		if ((systrace_flags & SYSTRACE_ALLPROC) || (proc_is_traced(p))) {
 			coreid = core_id();
-			vcoreid = proc_get_vcoreid(p, coreid);
+			vcoreid = proc_get_vcoreid(p);
 			if (systrace_flags & SYSTRACE_LOUD) {
 				printk("[%16llu] Syscall %3d (%12s):(%08p, %08p, %08p, %08p, "
 				       "%08p, %08p) proc: %d core: %d vcore: %d\n", read_tsc(),

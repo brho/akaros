@@ -82,7 +82,7 @@ void proc_change_to_vcore(struct proc *p, uint32_t new_vcoreid,
                           bool enable_my_notif);
 
 /* Vcoremap info: */
-uint32_t proc_get_vcoreid(struct proc *SAFE p, uint32_t pcoreid);
+uint32_t proc_get_vcoreid(struct proc *p);
 /* TODO: make all of these inline once we gut the Env crap */
 bool vcore_is_mapped(struct proc *p, uint32_t vcoreid);
 uint32_t vcore2vcoreid(struct proc *p, struct vcore *vc);
