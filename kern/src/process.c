@@ -473,6 +473,7 @@ void proc_run_s(struct proc *p)
 			 * for now.  can simply clear_owning if we want to. */
 			assert(!pcpui->owning_proc);
 			pcpui->owning_proc = p;
+			pcpui->owning_vcoreid = 0; /* TODO (VC#) */
 			/* TODO: (HSS) set silly state here (__startcore does it instantly) */
 			/* similar to the old __startcore, start them in vcore context if
 			 * they have notifs and aren't already in vcore context.  o/w, start
@@ -1292,25 +1293,8 @@ void proc_give(struct proc *p, uint32_t pcoreid)
  * out). */
 uint32_t proc_get_vcoreid(struct proc *SAFE p, uint32_t pcoreid)
 {
-	uint32_t vcoreid;
-	// TODO: the code currently doesn't track the vcoreid properly for _S (VC#)
-	spin_lock(&p->proc_lock);
-	switch (p->state) {
-		case PROC_RUNNING_S:
-			spin_unlock(&p->proc_lock);
-			return 0; // TODO: here's the ugly part
-		case PROC_RUNNING_M:
-			vcoreid = get_vcoreid(p, pcoreid);
-			spin_unlock(&p->proc_lock);
-			return vcoreid;
-		case PROC_DYING: // death message is on the way
-			spin_unlock(&p->proc_lock);
-			return 0;
-		default:
-			spin_unlock(&p->proc_lock);
-			panic("Weird state(%s) in %s()", procstate2str(p->state),
-			      __FUNCTION__);
-	}
+	struct per_cpu_info *pcpui = &per_cpu_info[pcoreid];
+	return pcpui->owning_vcoreid;
 }
 
 /* TODO: make all of these static inlines when we gut the env crap */
@@ -1595,6 +1579,7 @@ void clear_owning_proc(uint32_t coreid)
 	struct proc *p = pcpui->owning_proc;
 	assert(!irq_is_enabled());
 	pcpui->owning_proc = 0;
+	pcpui->owning_vcoreid = 0xdeadbeef;
 	pcpui->cur_tf = 0;			/* catch bugs for now (will go away soon) */
 	if (p);
 		proc_decref(p);
@@ -1730,6 +1715,7 @@ void proc_change_to_vcore(struct proc *p, uint32_t new_vcoreid,
                           bool enable_my_notif)
 {
 	uint32_t caller_vcoreid, pcoreid = core_id();
+	struct per_cpu_info *pcpui = &per_cpu_info[pcoreid];
 	struct preempt_data *caller_vcpd;
 	struct vcore *caller_vc, *new_vc;
 	struct event_msg preempt_msg = {0};
@@ -1759,7 +1745,8 @@ void proc_change_to_vcore(struct proc *p, uint32_t new_vcoreid,
 	if (!is_mapped_vcore(p, pcoreid))
 		goto out_failed;
 	/* Get all our info */
-	caller_vcoreid = get_vcoreid(p, pcoreid);
+	caller_vcoreid = get_vcoreid(p, pcoreid);	/* holding lock, we can check */
+	assert(caller_vcoreid == pcpui->owning_vcoreid);
 	caller_vcpd = &p->procdata->vcore_preempt_data[caller_vcoreid];
 	caller_vc = vcoreid2vcore(p, caller_vcoreid);
 	/* Should only call from vcore context */
@@ -1802,6 +1789,8 @@ void proc_change_to_vcore(struct proc *p, uint32_t new_vcoreid,
 	__unmap_vcore(p, caller_vcoreid);
 	__map_vcore(p, new_vcoreid, pcoreid);
 	__seq_end_write(&p->procinfo->coremap_seqctr);
+	/* So this core knows which vcore is here: */
+	pcpui->owning_vcoreid = new_vcoreid;
 	/* Send either a PREEMPT msg or a CHECK_MSGS msg.  If they said to
 	 * enable_my_notif, then all userspace needs is to check messages, not a
 	 * full preemption recovery. */
@@ -1831,6 +1820,7 @@ void __startcore(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2
 	assert(!pcpui->owning_proc);
 	/* the sender of the amsg increfed already for this saved ref to p_to_run */
 	pcpui->owning_proc = p_to_run;
+	pcpui->owning_vcoreid = vcoreid;
 	/* sender increfed again, assuming we'd install to cur_proc.  only do this
 	 * if no one else is there.  this is an optimization, since we expect to
 	 * send these __startcores to idles cores, and this saves a scramble to
@@ -1864,10 +1854,8 @@ void __notify(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2)
 	/* Common cur_tf sanity checks.  Note cur_tf could be an _S's env_tf */
 	assert(pcpui->cur_tf);
 	assert(!in_kernel(pcpui->cur_tf));
-	/* We shouldn't need to lock here, since unmapping happens on the pcore and
-	 * mapping would only happen if the vcore was free, which it isn't until
-	 * after we unmap. */
-	vcoreid = get_vcoreid(p, coreid);
+	vcoreid = pcpui->owning_vcoreid;
+	assert(vcoreid == get_vcoreid(p, coreid));
 	vcpd = &p->procdata->vcore_preempt_data[vcoreid];
 	/* for SCPs that haven't (and might never) call vc_event_init, like rtld.
 	 * this is harmless for MCPS to check this */
@@ -1904,10 +1892,8 @@ void __preempt(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2)
 	assert(pcpui->cur_tf);
 	assert(pcpui->cur_tf == &pcpui->actual_tf);
 	assert(!in_kernel(pcpui->cur_tf));
-	/* We shouldn't need to lock here, since unmapping happens on the pcore and
-	 * mapping would only happen if the vcore was free, which it isn't until
-	 * after we unmap. */
-	vcoreid = get_vcoreid(p, coreid);
+	vcoreid = pcpui->owning_vcoreid;
+	assert(vcoreid == get_vcoreid(p, coreid));
 	p->procinfo->vcoremap[vcoreid].preempt_served = FALSE;
 	/* either __preempt or proc_yield() ends the preempt phase. */
 	p->procinfo->vcoremap[vcoreid].preempt_pending = 0;
@@ -1945,7 +1931,8 @@ void __death(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2)
 	struct per_cpu_info *pcpui = &per_cpu_info[coreid];
 	struct proc *p = pcpui->owning_proc;
 	if (p) {
-		vcoreid = get_vcoreid(p, coreid);
+		vcoreid = pcpui->owning_vcoreid;
+		assert(vcoreid == get_vcoreid(p, coreid));
 		printd("[kernel] death on physical core %d for process %d's vcore %d\n",
 		       coreid, p->pid, vcoreid);
 		__unmap_vcore(p, vcoreid);
