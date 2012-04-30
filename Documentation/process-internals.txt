@@ -387,12 +387,14 @@ something.
 ----------------
 There are two ways to deal with this.  One (and the better one, I think) is to
 check state, and determine if it should proceed or abort.  This requires that
-all local-fate dependent calls always have enough state, meaning that any
-function that results in sending a directive to a vcore store enough info in
-the proc struct that a local call can determine if it should take action or
-abort.  This might be sufficient.  This works for death already, since you
-aren't supposed to do anything other than die (and restore any invariants
-first, handled in Section 3).  We'll go with this way.
+all local-fate dependent calls always have enough state to do its job.  In the
+past, this meant that any function that results in sending a directive to a
+vcore store enough info in the proc struct that a local call can determine if
+it should take action or abort.  In the past, we used the vcore/pcoremap as a
+way to send info to the receiver about what vcore they are (or should be).
+Now, we store that info in pcpui (for '__startcore', we send it as a
+parameter.  Either way, the general idea is still true: local calls can
+proceed when they are called, and not self-ipi'd to a nebulous later time.
 
 The other way is to send the work (including the checks) in a self-ipi kernel
 message.  This will guarantee that the message is executed after any existing
@@ -411,23 +413,29 @@ for a proc until AFTER the preemption is completed.
 4.2: Preempt-Served Flag
 ----------------
 We want to be able to consider a pcore free once its owning proc has dealt
-with removing it (not necessarily taken from the vcoremap, but at least it is
-a done-deal that the core will go away and the messages are sent).  This
-allows a scheduler-like function to easily take a core and then give it to
-someone else, without waiting for each vcore to respond, saying that the pcore
-is free/idle.
+with removing it.  This allows a scheduler-like function to easily take a core
+and then give it to someone else, without waiting for each vcore to respond,
+saying that the pcore is free/idle.
 
-Since we want to keep the pcore in the vcoremap, we need another signal to let
-a process know a message is already on its way.  preempt_pending is a signal
-to userspace that the alarm was set, not that an actual message is on its way
-and that a vcore's fate is sealed.  Since we can't use a pcore's presence in
-the vcoremap to determine that the core should be revoked, we have to check
-the "fate sealed"/preempt-served flag. 
+We used to not unmap until we were in '__preempt' or '__death', and we needed
+a flag to tell yield-like calls that a message was already on the way and to
+not rely on the vcoremap.  This is pretty fucked up for a number of reasons,
+so we changed that.  But we still wanted to know when a preempt was in
+progress so that the kernel could avoid giving out the vcore until the preempt
+was complete.
 
-It's a bit of a pain to have this flag, just to resolve this race in the
-kernel, though the local call would have to check the vcoremap anyway,
-incurring a cache miss if we go with using the vcoremap to signal the
-impending message.
+Here's the scenario: we send a '__startcore' to core 3 for VC5->PC3.  Then we
+quickly send a '__preempt' to 3, and then a '__startcore' to core 4 (a
+different pcore) for VC5->PC4.  Imagine all of this happens before the first
+'__startcore' gets processed (IRQ delay, fast ksched, whatever).  We need to
+not run the second '__startcore' on pcore 4 before the preemption has saved
+all of the state of the VC5.  So we spin on preempt_served (which may get
+renamed to preempt_in_progress).  We need to do this in the sender, and not
+the receiver (not in the kmsg), because the kmsgs can't tell which one they
+are.  Specifically, the first '__startcore' on core 3 runs the same code as
+the '__startcore' on core 4, working on the same vcore.  Anything we tell VC5
+will be seen by both PC3 and PC4.  We'd end up deadlocking on PC3 while it
+spins waiting for the preempt message that also needs to run on PC3.
 
 The preempt_pending flag is actual a timestamp, with the expiration time of
 the core at which the message will be sent.  We could try to use that, but
@@ -585,14 +593,13 @@ flexibility in schedule()-like functions (no need to wait to give the core
 out), quicker dispatch latencies, less contention on shared structs (like the
 idle-core-map), etc.
 
-Also, we don't remove the pcore from the vcoremap, even if it is being
-allocated to another core (the same pcore can exist in two vcoremaps, contrary
-to older statements).  Taking the pcore from the vcoremap would mean some
-non-fate related local calls (sys_get_vcoreid()) will fail, since the vcoreid
-is gone!  Additionally, we don't need a vcoreid in the k_msg (we would have if
-we could not use the vcore/pcoremappings).  There should not be any issues
-with the new process sending messages to the pcore before the core is sorted,
-since k_msgs are delivered in order.
+This 'freeing' of the pcore is from the perspective of the kernel scheduler
+and the proc struct.  Contrary to all previous announcements, vcores are
+unmapped from pcores when sending k_msgs (technically right after), while
+holding the lock.  The pcore isn't actually not-running-the-proc until the
+kmsg completes and we abandon_core().  Previously, we used the vcoremap to
+communicate to other cores in a lock-free manner, but that was pretty shitty
+and now we just store the vcoreid in pcpu info.
 
 Another tricky part is the seq_ctr used to signal userspace of changes to the
 coremap or num_vcores (coremap_seqctr).  While we may not even need this in the
@@ -676,6 +683,30 @@ useful invariant might be broken.
 We also considered using the transition stack as a signal that a process is in
 a notification handler.  The kernel can inspect the stack pointer to determine
 this.  It's possible, but unnecessary.
+
+Using the pcoremap as a way to pass info with kmsgs: it worked a little, but
+had some serious problems, as well as making life difficult.  It had two
+purposes: help with local fate calls (yield) and allow broadcast messaging.
+The main issue is that it was using a global struct to pass info with
+messages, but it was based on the snapshot of state at the time the message
+was sent.  When you send a bunch of messages, certain state may have changed
+between messages, and the old snapshot isn't there anymore by the time the
+message gets there.  To avoid this, we went through some hoops and had some
+fragile code that would use other signals to avoid those scenarios where the
+global state change would send the wrong message.  It was tough to understand,
+and not clear it was correct (hint: it wasn't).  Here's an example (on one
+pcore): if we send a preempt and we then try to map that pcore to another
+vcore in the same process before the preempt call checks its pcoremap, we'll
+clobber the pcore->vcore mapping (used by startcore) and the preempt will
+think it is the new vcore, not the one it was when the message was sent.
+While this is a bit convoluted, I can imagine a ksched doing this, and
+perhaps with weird IRQ delays, the messages might get delayed enough for it to
+happen.  I'd rather not have to have the ksched worry about this just because
+proc code was old and ghetto.  Another reason we changed all of this was so
+that you could trust the vcoremap while holding the lock.  Otherwise, it's
+actually non-trivial to know the state of a vcore (need to check a combination
+of preempt_served and is_mapped), and even if you do that, there are some
+complications with doing this in the ksched.
 
 5. current_tf and owning_proc
 ===========================

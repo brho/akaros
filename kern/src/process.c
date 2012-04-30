@@ -1217,7 +1217,7 @@ uint32_t __proc_preempt_all(struct proc *p, uint32_t *pc_arr)
 	 * with stale preempt_serveds first.  This might be just as fast anyways. */
 	struct vcore *vc_i;
 	/* TODO:(BULK) PREEMPT - don't bother with this, set a proc wide flag, or
-	 * just make us RUNNABLE_M. */
+	 * just make us RUNNABLE_M.  Note this is also used by __map_vcore. */
 	TAILQ_FOREACH(vc_i, &p->online_vcs, list)
 		vc_i->preempt_served = TRUE;
 	return __proc_take_allcores(p, pc_arr, TRUE);
@@ -1235,8 +1235,6 @@ void proc_preempt_core(struct proc *p, uint32_t pcoreid, uint64_t usec)
 		return;
 	}
 	spin_lock(&p->proc_lock);
-	/* TODO: this is racy, could be messages in flight that haven't unmapped
-	 * yet, so we need to do something more complicated */
 	if (is_mapped_vcore(p, pcoreid)) {
 		__proc_preempt_warn(p, get_vcoreid(p, pcoreid), warn_time);
 		__proc_preempt_core(p, pcoreid);
@@ -1464,22 +1462,19 @@ void __proc_take_corelist(struct proc *p, uint32_t *pc_arr, uint32_t num,
 {
 	struct vcore *vc;
 	uint32_t vcoreid;
+	assert(p->state & (PROC_RUNNING_M | PROC_RUNNABLE_M));
 	__seq_start_write(&p->procinfo->coremap_seqctr);
 	for (int i = 0; i < num; i++) {
 		vcoreid = get_vcoreid(p, pc_arr[i]);
 		/* Sanity check */
 		assert(pc_arr[i] == get_pcoreid(p, vcoreid));
 		/* Revoke / unmap core */
-		if (p->state == PROC_RUNNING_M) {
+		if (p->state == PROC_RUNNING_M)
 			__proc_revoke_core(p, vcoreid, preempt);
-		} else {
-			assert(p->state == PROC_RUNNABLE_M);
-			__unmap_vcore(p, vcoreid);
-		}
-		/* Change lists for the vcore.  Note, the messages are already in flight
-		 * (or the vcore is already unmapped), if applicable.  The only code
-		 * that looks at the lists without holding the lock is event code, and
-		 * it doesn't care if the vcore was unmapped (it handles that) */
+		__unmap_vcore(p, vcoreid);
+		/* Change lists for the vcore.  Note, the vcore is already unmapped
+		 * and/or the messages are already in flight.  The only code that looks
+		 * at the lists without holding the lock is event code. */
 		vc = vcoreid2vcore(p, vcoreid);
 		TAILQ_REMOVE(&p->online_vcs, vc, list);
 		/* even for single preempts, we use the inactive list.  bulk preempt is
@@ -1501,18 +1496,16 @@ uint32_t __proc_take_allcores(struct proc *p, uint32_t *pc_arr, bool preempt)
 {
 	struct vcore *vc_i, *vc_temp;
 	uint32_t num = 0;
+	assert(p->state & (PROC_RUNNING_M | PROC_RUNNABLE_M));
 	__seq_start_write(&p->procinfo->coremap_seqctr);
 	/* Write out which pcores we're going to take */
 	TAILQ_FOREACH(vc_i, &p->online_vcs, list)
 		pc_arr[num++] = vc_i->pcoreid;
-	/* Revoke if they are running, o/w unmap.  Both of these need the online
+	/* Revoke if they are running, and unmap.  Both of these need the online
 	 * list to not be changed yet. */
-	if (p->state == PROC_RUNNING_M) {
+	if (p->state == PROC_RUNNING_M)
 		__proc_revoke_allcores(p, preempt);
-	} else {
-		assert(p->state == PROC_RUNNABLE_M);
-		__proc_unmap_allcores(p);
-	}
+	__proc_unmap_allcores(p);
 	/* Move the vcores from online to the head of the appropriate list */
 	TAILQ_FOREACH_SAFE(vc_i, &p->online_vcs, list, vc_temp) {
 		/* TODO: we may want a TAILQ_CONCAT_HEAD, or something that does that */
@@ -1535,13 +1528,16 @@ uint32_t __proc_take_allcores(struct proc *p, uint32_t *pc_arr, bool preempt)
  * calling. */
 void __map_vcore(struct proc *p, uint32_t vcoreid, uint32_t pcoreid)
 {
-	while (p->procinfo->vcoremap[vcoreid].valid)
+	/* Need to spin until __preempt is done saving state and whatnot before we
+	 * give the core back out.  Note that __preempt doesn't need the mapping: we
+	 * just need to not give out the same vcore (via a __startcore) until the
+	 * state is saved so __startcore has something to start. (and spinning in
+	 * startcore won't work, since startcore has no versioning). */
+	while (p->procinfo->vcoremap[vcoreid].preempt_served)
 		cpu_relax();
 	p->procinfo->vcoremap[vcoreid].pcoreid = pcoreid;
-	wmb();
 	p->procinfo->vcoremap[vcoreid].valid = TRUE;
 	p->procinfo->pcoremap[pcoreid].vcoreid = vcoreid;
-	wmb();
 	p->procinfo->pcoremap[pcoreid].valid = TRUE;
 }
 
@@ -1550,7 +1546,6 @@ void __map_vcore(struct proc *p, uint32_t vcoreid, uint32_t pcoreid)
 void __unmap_vcore(struct proc *p, uint32_t vcoreid)
 {
 	p->procinfo->pcoremap[p->procinfo->vcoremap[vcoreid].pcoreid].valid = FALSE;
-	wmb();
 	p->procinfo->vcoremap[vcoreid].valid = FALSE;
 }
 
@@ -1855,7 +1850,6 @@ void __notify(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2)
 	assert(pcpui->cur_tf);
 	assert(!in_kernel(pcpui->cur_tf));
 	vcoreid = pcpui->owning_vcoreid;
-	assert(vcoreid == get_vcoreid(p, coreid));
 	vcpd = &p->procdata->vcore_preempt_data[vcoreid];
 	/* for SCPs that haven't (and might never) call vc_event_init, like rtld.
 	 * this is harmless for MCPS to check this */
@@ -1893,10 +1887,6 @@ void __preempt(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2)
 	assert(pcpui->cur_tf == &pcpui->actual_tf);
 	assert(!in_kernel(pcpui->cur_tf));
 	vcoreid = pcpui->owning_vcoreid;
-	assert(vcoreid == get_vcoreid(p, coreid));
-	p->procinfo->vcoremap[vcoreid].preempt_served = FALSE;
-	/* either __preempt or proc_yield() ends the preempt phase. */
-	p->procinfo->vcoremap[vcoreid].preempt_pending = 0;
 	vcpd = &p->procdata->vcore_preempt_data[vcoreid];
 	printd("[kernel] received __preempt for proc %d's vcore %d on pcore %d\n",
 	       p->procinfo->pid, vcoreid, coreid);
@@ -1913,8 +1903,10 @@ void __preempt(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2)
 	/* Mark the vcore as preempted and unlock (was locked by the sender). */
 	atomic_or(&vcpd->flags, VC_PREEMPTED);
 	atomic_and(&vcpd->flags, ~VC_K_LOCK);
-	wmb();	/* make sure everything else hits before we unmap */
-	__unmap_vcore(p, vcoreid);
+	wmb();	/* make sure everything else hits before we finish the preempt */
+	p->procinfo->vcoremap[vcoreid].preempt_served = FALSE;
+	/* either __preempt or proc_yield() ends the preempt phase. */
+	p->procinfo->vcoremap[vcoreid].preempt_pending = 0;
 	/* We won't restart the process later.  current gets cleared later when we
 	 * notice there is no owning_proc and we have nothing to do (smp_idle,
 	 * restartcore, etc) */
@@ -1932,10 +1924,8 @@ void __death(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2)
 	struct proc *p = pcpui->owning_proc;
 	if (p) {
 		vcoreid = pcpui->owning_vcoreid;
-		assert(vcoreid == get_vcoreid(p, coreid));
 		printd("[kernel] death on physical core %d for process %d's vcore %d\n",
 		       coreid, p->pid, vcoreid);
-		__unmap_vcore(p, vcoreid);
 		/* We won't restart the process later.  current gets cleared later when
 		 * we notice there is no owning_proc and we have nothing to do
 		 * (smp_idle, restartcore, etc) */

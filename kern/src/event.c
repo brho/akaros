@@ -104,6 +104,7 @@ static void post_vc_msg(struct proc *p, uint32_t vcoreid,
  * sure it is mapped (slight optimization) */
 static void try_notify(struct proc *p, uint32_t vcoreid, int ev_flags)
 {
+	/* Note this is an unlocked-peek at the vcoremap */
 	if ((ev_flags & EVENT_IPI) && vcore_is_mapped(p, vcoreid))
 		proc_notify(p, vcoreid);
 }
