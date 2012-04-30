@@ -974,9 +974,10 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 			panic("Weird state(%s) in %s()", procstate2str(p->state),
 			      __FUNCTION__);
 	}
-	/* If we're already unmapped (__preempt or a __death hit us), bail out.
-	 * Note that if a __death hit us, we should have bailed when we saw
-	 * PROC_DYING. */
+	/* If we're already unmapped (__preempt or a __death was sent and the caller
+	 * unmapped us), bail out.  Note that if a __death hit us, we should have
+	 * bailed when we saw PROC_DYING.  Also note we might not have received the
+	 * __preempt or __death kmsg yet. */
 	if (!is_mapped_vcore(p, pcoreid))
 		goto out_failed;
 	vcoreid = get_vcoreid(p, pcoreid);
@@ -985,12 +986,8 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 	/* no reason to be nice, return */
 	if (being_nice && !vc->preempt_pending)
 		goto out_failed;
-	/* Fate is sealed, return and take the preempt message when we enable_irqs.
-	 * Note this keeps us from mucking with our lists, since we were already
-	 * removed from the online_list.  We have a similar concern with __death,
-	 * but we check for DYING to handle that. */
-	if (vc->preempt_served)
-		goto out_failed;
+	/* Sanity check, can remove after a while (we should have been unmapped) */
+	assert(!vc->preempt_served);
 	/* At this point, AFAIK there should be no preempt/death messages on the
 	 * way, and we're on the online list.  So we'll go ahead and do the yielding
 	 * business. */
@@ -1739,7 +1736,7 @@ void proc_change_to_vcore(struct proc *p, uint32_t new_vcoreid,
 	if (!is_mapped_vcore(p, pcoreid))
 		goto out_failed;
 	/* Get all our info */
-	caller_vcoreid = get_vcoreid(p, pcoreid);	/* holding lock, we can check */
+	caller_vcoreid = get_vcoreid(p, pcoreid);
 	assert(caller_vcoreid == pcpui->owning_vcoreid);
 	caller_vcpd = &p->procdata->vcore_preempt_data[caller_vcoreid];
 	caller_vc = vcoreid2vcore(p, caller_vcoreid);
@@ -1748,9 +1745,8 @@ void proc_change_to_vcore(struct proc *p, uint32_t new_vcoreid,
 		printk("[kernel] You tried to change vcores from uthread ctx\n");
 		goto out_failed;
 	}
-	/* Return and take the preempt message when we enable_irqs. */
-	if (caller_vc->preempt_served)
-		goto out_failed;
+	/* Sanity check, can remove after a while (we should have been unmapped) */
+	assert(!caller_vc->preempt_served);
 	/* Ok, we're clear to do the switch.  Lets figure out who the new one is */
 	new_vc = vcoreid2vcore(p, new_vcoreid);
 	printd("[kernel] changing vcore %d to vcore %d\n", caller_vcoreid,
