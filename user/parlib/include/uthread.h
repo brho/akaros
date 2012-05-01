@@ -82,7 +82,7 @@ static inline void
 init_uthread_tf(uthread_t *uth, void (*entry)(void),
                 void *stack_bottom, uint32_t size)
 {
-  init_user_tf(&uth->utf, (long)entry, (long)(stack_bottom));
+  init_user_tf(&uth->utf, (long)entry, (long)(stack_bottom) + size);
 }
 
 #define uthread_set_tls_var(uthread, name, val)                          \
