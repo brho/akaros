@@ -1221,30 +1221,28 @@ uint32_t __proc_preempt_all(struct proc *p, uint32_t *pc_arr)
 }
 
 /* Warns and preempts a vcore from p.  No delaying / alarming, or anything.  The
- * warning will be for u usec from now. */
-void proc_preempt_core(struct proc *p, uint32_t pcoreid, uint64_t usec)
+ * warning will be for u usec from now.  Returns TRUE if the core belonged to
+ * the proc (and thus preempted), False if the proc no longer has the core. */
+bool proc_preempt_core(struct proc *p, uint32_t pcoreid, uint64_t usec)
 {
 	uint64_t warn_time = read_tsc() + usec2tsc(usec);
-	bool preempted = FALSE;
-	/* DYING could be okay */
+	bool retval = FALSE;
 	if (p->state != PROC_RUNNING_M) {
+		/* more of an FYI for brho.  should be harmless to just return. */
 		warn("Tried to preempt from a non RUNNING_M proc!");
-		return;
+		return FALSE;
 	}
 	spin_lock(&p->proc_lock);
 	if (is_mapped_vcore(p, pcoreid)) {
 		__proc_preempt_warn(p, get_vcoreid(p, pcoreid), warn_time);
 		__proc_preempt_core(p, pcoreid);
-		preempted = TRUE;
-	} else {
-		warn("Pcore doesn't belong to the process!!");
-	}
-	if (!p->procinfo->num_vcores) {
-		__proc_set_state(p, PROC_RUNNABLE_M);
+		/* we might have taken the last core */
+		if (!p->procinfo->num_vcores)
+			__proc_set_state(p, PROC_RUNNABLE_M);
+		retval = TRUE;
 	}
 	spin_unlock(&p->proc_lock);
-	if (preempted)
-		put_idle_core(p, pcoreid);
+	return retval;
 }
 
 /* Warns and preempts all from p.  No delaying / alarming, or anything.  The

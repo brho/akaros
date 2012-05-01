@@ -527,9 +527,13 @@ int mon_measure(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 		if (argc == 4) { /* single core being preempted, warned but no delay */
 			uint32_t pcoreid = strtol(argv[3], 0, 0);
 			begin = start_timing();
-			proc_preempt_core(p, pcoreid, 1000000); // 1 sec warning
-			/* done when unmapped (right before abandoning) */
-			spin_on(p->procinfo->pcoremap[pcoreid].valid);
+			if (proc_preempt_core(p, pcoreid, 1000000)) {
+				put_idle_core(p, pcoreid);
+				/* done when unmapped (right before abandoning) */
+				spin_on(p->procinfo->pcoremap[pcoreid].valid);
+			} else {
+				printk("Core %d was not mapped to proc\n", pcoreid);
+			}
 			diff = stop_timing(begin);
 		} else { /* preempt all cores, warned but no delay */
 			end_refcnt = kref_refcnt(&p->p_kref) - p->procinfo->num_vcores;

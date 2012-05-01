@@ -115,7 +115,7 @@ void __proc_preempt_warn(struct proc *p, uint32_t vcoreid, uint64_t when);
 void __proc_preempt_warnall(struct proc *p, uint64_t when);
 void __proc_preempt_core(struct proc *p, uint32_t pcoreid);
 uint32_t __proc_preempt_all(struct proc *p, uint32_t *pc_arr);
-void proc_preempt_core(struct proc *p, uint32_t pcoreid, uint64_t usec);
+bool proc_preempt_core(struct proc *p, uint32_t pcoreid, uint64_t usec);
 void proc_preempt_all(struct proc *p, uint64_t usec);
 
 /* Current / cr3 / context management */
