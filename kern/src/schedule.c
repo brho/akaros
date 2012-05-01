@@ -44,7 +44,8 @@ static void add_to_list(struct proc *p, struct proc_list *list);
 static void remove_from_list(struct proc *p, struct proc_list *list);
 static void switch_lists(struct proc *p, struct proc_list *old,
                          struct proc_list *new);
-static uint32_t schedpcore2pcoreid(struct sched_pcore *spc);
+static uint32_t spc2pcoreid(struct sched_pcore *spc);
+static struct sched_pcore *pcoreid2spc(uint32_t pcoreid);
 static bool is_ll_core(uint32_t pcoreid);
 static void __prov_track_alloc(struct proc *p, uint32_t pcoreid);
 static void __prov_track_dealloc(struct proc *p, uint32_t pcoreid);
@@ -216,9 +217,14 @@ void proc_wakeup(struct proc *p)
 	spin_unlock(&sched_lock);
 }
 
-static uint32_t schedpcore2pcoreid(struct sched_pcore *spc)
+static uint32_t spc2pcoreid(struct sched_pcore *spc)
 {
 	return spc - all_pcores;
+}
+
+static struct sched_pcore *pcoreid2spc(uint32_t pcoreid)
+{
+	return &all_pcores[pcoreid];
 }
 
 /* Helper for proc destroy: unprovisions any pcores for the given list */
@@ -530,7 +536,7 @@ static void __prov_track_alloc(struct proc *p, uint32_t pcoreid)
 {
 	struct sched_pcore *spc;
 	assert(pcoreid < num_cpus);		/* catch bugs */
-	spc = &all_pcores[pcoreid];
+	spc = pcoreid2spc(pcoreid);
 	assert(spc->alloc_proc != p);	/* corruption or double-alloc */
 	spc->alloc_proc = p;
 	/* if the pcore is prov to them and now allocated, move lists */
@@ -546,7 +552,7 @@ static void __prov_track_dealloc(struct proc *p, uint32_t pcoreid)
 {
 	struct sched_pcore *spc;
 	assert(pcoreid < num_cpus);		/* catch bugs */
-	spc = &all_pcores[pcoreid];
+	spc = pcoreid2spc(pcoreid);
 	spc->alloc_proc = 0;
 	/* if the pcore is prov to them and now deallocated, move lists */
 	if (spc->prov_proc == p) {
@@ -579,7 +585,7 @@ void provision_core(struct proc *p, uint32_t pcoreid)
 	/* Don't allow the provisioning of LL cores */
 	if (is_ll_core(pcoreid))
 		return;
-	spc = &all_pcores[pcoreid];
+	spc = pcoreid2spc(pcoreid);
 	/* Note the sched lock protects the spc tailqs for all procs in this code.
 	 * If we need a finer grained sched lock, this is one place where we could
 	 * have a different lock */
@@ -660,10 +666,11 @@ void print_prov_map(void)
 	/* Doing this unlocked, which is dangerous, but won't deadlock */
 	printk("Which cores are provisioned to which procs:\n------------------\n");
 	for (int i = 0; i < num_cpus; i++) {
-		spc_i = &all_pcores[i];
-		printk("Core %02d, prov: %08p(%d) alloc: %08p(%d)\n", i,
-		       spc_i->prov_proc,  spc_i->prov_proc  ? spc_i->prov_proc->pid :0,
-		       spc_i->alloc_proc, spc_i->alloc_proc ? spc_i->alloc_proc->pid:0);
+		spc_i = pcoreid2spc(i);
+		printk("Core %02d, prov: %d(%08p) alloc: %d(%08p)\n", i,
+		       spc_i->prov_proc ? spc_i->prov_proc->pid : 0, spc_i->prov_proc,
+		       spc_i->alloc_proc ? spc_i->alloc_proc->pid : 0,
+		       spc_i->alloc_proc);
 	}
 }
 
@@ -672,11 +679,12 @@ void print_proc_prov(struct proc *p)
 	struct sched_pcore *spc_i;
 	if (!p)
 		return;
-	printk("Prov cores alloced to proc %08p (%d)\n----------\n", p, p->pid);
+	printk("Prov cores alloced to proc %d (%08p)\n----------\n", p->pid, p);
 	TAILQ_FOREACH(spc_i, &p->ksched_data.prov_alloc_me, prov_next)
-		printk("Pcore %d\n", schedpcore2pcoreid(spc_i));
-	printk("Prov cores not alloced to proc %08p (%d)\n----------\n", p, p->pid);
+		printk("Pcore %d\n", spc2pcoreid(spc_i));
+	printk("Prov cores not alloced to proc %d (%08p)\n----------\n", p->pid, p);
 	TAILQ_FOREACH(spc_i, &p->ksched_data.prov_not_alloc_me, prov_next)
-		printk("Pcore %d (alloced to %08p (%d))\n", schedpcore2pcoreid(spc_i),
-		       spc_i->alloc_proc, spc_i->alloc_proc ? spc_i->alloc_proc->pid:0);
+		printk("Pcore %d (alloced to %d (%08p))\n", spc2pcoreid(spc_i),
+		       spc_i->alloc_proc ? spc_i->alloc_proc->pid : 0,
+		       spc_i->alloc_proc);
 }
