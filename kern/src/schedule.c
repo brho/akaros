@@ -320,8 +320,6 @@ void schedule(void)
 	 * would do something other than FCFS */
 	TAILQ_FOREACH_SAFE(p, &all_mcps, ksched_data.proc_link, temp) {
 		printd("Ksched has MCP %08p (%d)\n", p, p->pid);
-		if (TAILQ_EMPTY(&idlecores))
-			break;
 		/* TODO: might use amt_wanted as a proxy.  right now, they have
 		 * amt_wanted == 1, even though they are waiting.
 		 * TODO: this is RACY too - just like with DYING. */
@@ -399,17 +397,39 @@ void cpu_bored(void)
  * a scheduling decision (or at least plan to). */
 void put_idle_core(struct proc *p, uint32_t coreid)
 {
+	struct sched_pcore *spc = pcoreid2spc(coreid);
 	spin_lock(&sched_lock);
-	TAILQ_INSERT_TAIL(&idlecores, pcoreid2spc(coreid), alloc_next);
-	__prov_track_dealloc(p, coreid);
+	/* ignore_next_idle gets set if the ksched notices a core is not allocated
+	 * before put_idle gets called.  This can happen if the proc yielded the
+	 * core while the ksched is holding its lock (protecting lists), and the
+	 * proc is spinning on the lock in this function, trying to give it back.
+	 * When this happens, the core has already been 'given back', so we ignore
+	 * the signal.  We're using a count instead of a bool for cases where this
+	 * stacks (would require a change in provisioning, so it shouldn't happen
+	 * for now). */
+	if (spc->ignore_next_idle) {
+		spc->ignore_next_idle--;
+	} else {
+		TAILQ_INSERT_TAIL(&idlecores, spc, alloc_next);
+		__prov_track_dealloc(p, coreid);
+	}
 	spin_unlock(&sched_lock);
 }
 
-/* Helper for put_idle and core_req.  Note this does not all track_dealloc */
+/* Helper for put_idle and core_req.  Note this does not track_dealloc, but it
+ * does handle ignore_next.  When we get rid of / revise proc_preempt_all and
+ * put_idle_cores, we can get rid of this.  (the ksched will never need it -
+ * only external callers). */
 static void __put_idle_cores(struct proc *p, uint32_t *pc_arr, uint32_t num)
 {
-	for (int i = 0; i < num; i++)
-		TAILQ_INSERT_TAIL(&idlecores, pcoreid2spc(pc_arr[i]), alloc_next);
+	struct sched_pcore *spc_i;
+	for (int i = 0; i < num; i++) {
+		spc_i = pcoreid2spc(pc_arr[i]);
+		if (spc_i->ignore_next_idle)
+			spc_i->ignore_next_idle--;
+		else
+			TAILQ_INSERT_TAIL(&idlecores, spc_i, alloc_next);
+	}
 }
 
 /* External interface for put_idle.  Note this one also calls track_dealloc,
@@ -417,6 +437,7 @@ static void __put_idle_cores(struct proc *p, uint32_t *pc_arr, uint32_t num)
 void put_idle_cores(struct proc *p, uint32_t *pc_arr, uint32_t num)
 {
 	spin_lock(&sched_lock);
+	/* TODO: when we revise this func, look at __put_idle */
 	__put_idle_cores(p, pc_arr, num);
 	__prov_track_dealloc_bulk(p, pc_arr, num);
 	spin_unlock(&sched_lock);
@@ -443,29 +464,13 @@ uint32_t max_vcores(struct proc *p)
 #endif /* __CONFIG_DISABLE_SMT__ */
 }
 
-/* Ghetto helper, just hands out up to 'amt_new' cores (no sense of locality or
- * anything) */
-static uint32_t __get_idle_cores(struct proc *p, uint32_t *pc_arr,
-                                 uint32_t amt_new)
-{
-	struct sched_pcore *spc_i;
-	uint32_t nr_granted = 0;
-	for (/* init above */; nr_granted < amt_new; nr_granted++) {
-		spc_i = TAILQ_FIRST(&idlecores);
-		if (!spc_i)
-			break;
-		TAILQ_REMOVE(&idlecores, spc_i, alloc_next);
-		pc_arr[nr_granted] = spc2pcoreid(spc_i);
-	}
-	return nr_granted;
-}
-
 /* This deals with a request for more cores.  The request is already stored in
  * the proc's amt_wanted (it is compared to amt_granted). */
 static void __core_request(struct proc *p)
 {
-	uint32_t num_granted, amt_wanted, amt_granted;
+	uint32_t nr_to_grant = 0, amt_wanted, amt_granted, amt_needed;
 	uint32_t corelist[num_cpus];
+	struct sched_pcore *spc_i, *temp;
 
 	/* TODO: consider copy-in for amt_wanted too. */
 	amt_wanted = p->procdata->res_req[RES_CORES].amt_wanted;
@@ -481,12 +486,52 @@ static void __core_request(struct proc *p)
 	 * yielding, and now we see them on the run queue). */
 	if (amt_wanted <= amt_granted)
 		return;
-	/* Otherwise, see what they want, and try to give out as many as possible.
-	 * Current models are simple - it's just a raw number of cores, and we just
-	 * give out what we can. */
-	num_granted = __get_idle_cores(p, corelist, amt_wanted - amt_granted);
+	amt_needed = amt_wanted - amt_granted;
+	/* Try to give out provisioned cores.  the not_alloc_me list is the victim
+	 * list.  Side note: if we want to warn, then we can't deal with this proc's
+	 * prov'd cores until we wait til the alarm goes off.  would need to put all
+	 * alarmed cores on a list and wait til the alarm goes off to do the full
+	 * preempt.  and when those cores come in voluntarily, we'd need to know to
+	 * give them to this proc. */
+	TAILQ_FOREACH_SAFE(spc_i, &p->ksched_data.prov_not_alloc_me, prov_next,
+	                   temp) {
+		if (nr_to_grant == amt_needed)
+			break;
+		if (spc_i->alloc_proc) {
+			/* someone else has this proc's pcore, so we need to try to preempt.
+			 * sending no warning time for now - just an immediate preempt. */
+			if (!proc_preempt_core(spc_i->alloc_proc, spc2pcoreid(spc_i), 0)) {
+				/* core is unmapped, they must have just yielded and are
+				 * spinning in put_idle */
+				spc_i->ignore_next_idle++;
+				if (spc_i->ignore_next_idle > 100)
+					warn("Unusually high ignore_next_idle %d",
+					     spc_i->ignore_next_idle);
+			}
+			/* Note that we do NOT want to __prov_track_dealloc.  Instead, we
+			 * just leave it on its list (which we'll change later), and clear
+			 * alloc_proc (which is what __prov_track_dealloc does). */
+			spc_i->alloc_proc = 0;
+		} else {
+			/* must be an idle core, rip it off that list */
+			TAILQ_REMOVE(&idlecores, spc_i, alloc_next);
+		}
+		/* At this point, we have the core, ready to try to give it to the proc.
+		 * We'll give them via a list, which is better for the proc mgmt code
+		 * (when going from runnable to running. */
+		corelist[nr_to_grant] = spc2pcoreid(spc_i);
+		nr_to_grant++;
+	}
+	/* Try to get cores from the idle list that aren't prov to me (FCFS) */
+	TAILQ_FOREACH_SAFE(spc_i, &idlecores, alloc_next, temp) {
+		if (nr_to_grant == amt_needed)
+			break;
+		TAILQ_REMOVE(&idlecores, spc_i, alloc_next);
+		corelist[nr_to_grant] = spc2pcoreid(spc_i);
+		nr_to_grant++;
+	}
 	/* Now, actually give them out */
-	if (num_granted) {
+	if (nr_to_grant) {
 		/* give them the cores.  this will start up the extras if RUNNING_M. */
 		spin_lock(&p->proc_lock);
 		/* if they fail, it is because they are WAITING or DYING.  we could give
@@ -494,11 +539,11 @@ static void __core_request(struct proc *p)
 		 * ksched, we'll just put them back on the pile and return.  Note, the
 		 * ksched could check the states after locking, but it isn't necessary:
 		 * just need to check at some point in the ksched loop. */
-		if (__proc_give_cores(p, corelist, num_granted)) {
-			__put_idle_cores(p, corelist, num_granted);
+		if (__proc_give_cores(p, corelist, nr_to_grant)) {
+			__put_idle_cores(p, corelist, nr_to_grant);
 		} else {
 			/* track the (successful) allocation of the sched_pcores */
-			for (int i = 0; i < num_granted; i++)
+			for (int i = 0; i < nr_to_grant; i++)
 				__prov_track_alloc(p, corelist[i]);
 			/* at some point after giving cores, call proc_run_m() (harmless on
 			 * RUNNING_Ms).  You can give small groups of cores, then run them

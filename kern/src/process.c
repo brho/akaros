@@ -1265,6 +1265,7 @@ void proc_preempt_all(struct proc *p, uint64_t usec)
 	assert(!p->procinfo->num_vcores);
 	__proc_set_state(p, PROC_RUNNABLE_M);
 	spin_unlock(&p->proc_lock);
+	/* TODO: when we revise this func, look at __put_idle */
 	/* Return the cores to the ksched */
 	if (num_revoked)
 		put_idle_cores(p, pc_arr, num_revoked);

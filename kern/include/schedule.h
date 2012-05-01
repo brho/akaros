@@ -21,6 +21,7 @@ struct sched_pcore {
 	TAILQ_ENTRY(sched_pcore)	alloc_next;			/* on an alloc list (idle)*/
 	struct proc					*prov_proc;			/* who this is prov to */
 	struct proc					*alloc_proc;		/* who this is alloc to */
+	unsigned int				ignore_next_idle;	/* helps with lock order */
 };
 TAILQ_HEAD(sched_pcore_tailq, sched_pcore);
 
