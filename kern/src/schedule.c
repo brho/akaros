@@ -114,14 +114,6 @@ void schedule_init(void)
 		idlecoremap[i] = (i * 2) + 1;
 #else
 	// __CONFIG_DISABLE_SMT__
-	#ifdef __CONFIG_APPSERVER__
-	#ifdef __CONFIG_DEDICATED_MONITOR__
-	num_mgmtcores++; // Next core dedicated to running the kernel monitor
-	assert(num_cpus >= num_mgmtcores);
-	// Need to subtract 1 from the num_mgmtcores # to get the cores index
-	send_kernel_message(num_mgmtcores-1, (amr_t)monitor, 0,0,0, KMSG_ROUTINE);
-	#endif
-	#endif
  #ifdef __CONFIG_ARSC_SERVER__
 	// Dedicate one core (core 2) to sysserver, might be able to share with NIC
 	num_mgmtcores++;
