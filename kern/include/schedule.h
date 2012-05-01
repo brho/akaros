@@ -18,6 +18,7 @@ TAILQ_HEAD(proc_list, proc);		/* Declares 'struct proc_list' */
 /* The ksched maintains an internal array of these: the global pcore map */
 struct sched_pcore {
 	TAILQ_ENTRY(sched_pcore)	prov_next;			/* on a proc's prov list */
+	TAILQ_ENTRY(sched_pcore)	alloc_next;			/* on an alloc list (idle)*/
 	struct proc					*prov_proc;			/* who this is prov to */
 	struct proc					*alloc_proc;		/* who this is alloc to */
 };

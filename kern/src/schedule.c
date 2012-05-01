@@ -30,12 +30,8 @@ spinlock_t sched_lock = SPINLOCK_INITIALIZER;
 /* The pcores in the system.  (array gets alloced in init()).  */
 struct sched_pcore *all_pcores;
 
-/* Tracks which cores are idle, similar to the vcoremap.  Each value is the
- * physical coreid of an unallocated core.  These are all now protected by the
- * sched_lock (they will change sooner or later). */
-uint32_t idlecoremap[MAX_NUM_CPUS];
-uint32_t num_idlecores = 0;
-uint32_t num_mgmtcores = 1;
+/* TAILQ of all unallocated, idle (CG) cores */
+struct sched_pcore_tailq idlecores = TAILQ_HEAD_INITIALIZER(idlecores);
 
 /* Helper, defined below */
 static void __core_request(struct proc *p);
@@ -90,41 +86,33 @@ static void __kalarm(struct alarm_waiter *waiter)
 
 void schedule_init(void)
 {
+	spin_lock(&sched_lock);
 	/* init provisioning stuff */
 	all_pcores = kmalloc(sizeof(struct sched_pcore) * num_cpus, 0);
 	memset(all_pcores, 0, sizeof(struct sched_pcore) * num_cpus);
 	assert(!core_id());		/* want the alarm on core0 for now */
 	init_awaiter(&ksched_waiter, __kalarm);
 	set_ksched_alarm();
-	/* Ghetto old idle core init */
-	/* Init idle cores. Core 0 is the management core. */
-	spin_lock(&sched_lock);
-#ifdef __CONFIG_DISABLE_SMT__
-	/* assumes core0 is the only management core (NIC and monitor functionality
-	 * are run there too.  it just adds the odd cores to the idlecoremap */
-	assert(!(num_cpus % 2));
-	// TODO: consider checking x86 for machines that actually hyperthread
-	num_idlecores = num_cpus >> 1;
- #ifdef __CONFIG_ARSC_SERVER__
-	// Dedicate one core (core 2) to sysserver, might be able to share wit NIC
-	num_mgmtcores++;
-	assert(num_cpus >= num_mgmtcores);
-	send_kernel_message(2, (amr_t)arsc_server, 0,0,0, KMSG_ROUTINE);
- #endif
-	for (int i = 0; i < num_idlecores; i++)
-		idlecoremap[i] = (i * 2) + 1;
+	/* init the idlecore list.  if they turned off hyperthreading, give them the
+	 * odds from 1..max-1.  otherwise, give them everything by 0 (default mgmt
+	 * core).  TODO: (CG/LL) better LL/CG mgmt */
+#ifndef __CONFIG_DISABLE_SMT__
+	for (int i = 1; i < num_cpus; i++)
+		TAILQ_INSERT_TAIL(&idlecores, pcoreid2spc(i), alloc_next);
 #else
-	// __CONFIG_DISABLE_SMT__
- #ifdef __CONFIG_ARSC_SERVER__
-	// Dedicate one core (core 2) to sysserver, might be able to share with NIC
-	num_mgmtcores++;
-	assert(num_cpus >= num_mgmtcores);
-	send_kernel_message(num_mgmtcores-1, (amr_t)arsc_server, 0,0,0, KMSG_ROUTINE);
- #endif
-	num_idlecores = num_cpus - num_mgmtcores;
-	for (int i = 0; i < num_idlecores; i++)
-		idlecoremap[i] = i + num_mgmtcores;
+	assert(!(num_cpus % 2));
+	for (int i = 1; i < num_cpus; i += 2)
+		TAILQ_INSERT_TAIL(&idlecores, pcoreid2spc(i), alloc_next);
 #endif /* __CONFIG_DISABLE_SMT__ */
+#ifdef __CONFIG_ARSC_SERVER__
+	struct sched_pcore *a_core = TAILQ_FIRST(&idlecores);
+	assert(a_core);
+	TAILQ_REMOVE(&idlecores, a_core, alloc_next);
+	send_kernel_message(spc2pcoreid(a_core), (amr_t)arsc_server, 0, 0, 0,
+	                    KMSG_ROUTINE);
+	warn("Using core %d for the ARSCs - there are probably issues with this.",
+	     spc2pcoreid(a_core));
+#endif /* __CONFIG_ARSC_SERVER__ */
 	spin_unlock(&sched_lock);
 	return;
 }
@@ -332,7 +320,7 @@ void schedule(void)
 	 * would do something other than FCFS */
 	TAILQ_FOREACH_SAFE(p, &all_mcps, ksched_data.proc_link, temp) {
 		printd("Ksched has MCP %08p (%d)\n", p, p->pid);
-		if (!num_idlecores)
+		if (TAILQ_EMPTY(&idlecores))
 			break;
 		/* TODO: might use amt_wanted as a proxy.  right now, they have
 		 * amt_wanted == 1, even though they are waiting.
@@ -412,7 +400,7 @@ void cpu_bored(void)
 void put_idle_core(struct proc *p, uint32_t coreid)
 {
 	spin_lock(&sched_lock);
-	idlecoremap[num_idlecores++] = coreid;
+	TAILQ_INSERT_TAIL(&idlecores, pcoreid2spc(coreid), alloc_next);
 	__prov_track_dealloc(p, coreid);
 	spin_unlock(&sched_lock);
 }
@@ -421,7 +409,7 @@ void put_idle_core(struct proc *p, uint32_t coreid)
 static void __put_idle_cores(struct proc *p, uint32_t *pc_arr, uint32_t num)
 {
 	for (int i = 0; i < num; i++)
-		idlecoremap[num_idlecores++] = pc_arr[i];
+		TAILQ_INSERT_TAIL(&idlecores, pcoreid2spc(pc_arr[i]), alloc_next);
 }
 
 /* External interface for put_idle.  Note this one also calls track_dealloc,
@@ -447,10 +435,11 @@ void avail_res_changed(int res_type, long change)
 /* Normally it'll be the max number of CG cores ever */
 uint32_t max_vcores(struct proc *p)
 {
+/* TODO: (CG/LL) */
 #ifdef __CONFIG_DISABLE_SMT__
 	return num_cpus >> 1;
 #else
-	return MAX(1, num_cpus - num_mgmtcores);
+	return num_cpus - 1;	/* reserving core 0 */
 #endif /* __CONFIG_DISABLE_SMT__ */
 }
 
@@ -459,14 +448,16 @@ uint32_t max_vcores(struct proc *p)
 static uint32_t __get_idle_cores(struct proc *p, uint32_t *pc_arr,
                                  uint32_t amt_new)
 {
-	uint32_t num_granted = 0;
-	for (int i = 0; i < num_idlecores && i < amt_new; i++) {
-		/* grab the last one on the list */
-		pc_arr[i] = idlecoremap[num_idlecores - 1];
-		num_idlecores--;
-		num_granted++;
+	struct sched_pcore *spc_i;
+	uint32_t nr_granted = 0;
+	for (/* init above */; nr_granted < amt_new; nr_granted++) {
+		spc_i = TAILQ_FIRST(&idlecores);
+		if (!spc_i)
+			break;
+		TAILQ_REMOVE(&idlecores, spc_i, alloc_next);
+		pc_arr[nr_granted] = spc2pcoreid(spc_i);
 	}
-	return num_granted;
+	return nr_granted;
 }
 
 /* This deals with a request for more cores.  The request is already stored in
@@ -633,9 +624,12 @@ void sched_diag(void)
 
 void print_idlecoremap(void)
 {
-	printk("There are %d idle cores.\n", num_idlecores);
-	for (int i = 0; i < num_idlecores; i++)
-		printk("idlecoremap[%d] = %d\n", i, idlecoremap[i]);
+	struct sched_pcore *spc_i;
+	/* not locking, so we can look at this without deadlocking. */
+	printk("Idle cores (unlocked!):\n");
+	TAILQ_FOREACH(spc_i, &idlecores, alloc_next)
+		printk("Core %d, prov to %d (%08p)\n", spc2pcoreid(spc_i),
+		       spc_i->prov_proc ? spc_i->prov_proc->pid : 0, spc_i->prov_proc);
 }
 
 void print_resources(struct proc *p)
