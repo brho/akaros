@@ -34,6 +34,8 @@ void sleep_on(struct semaphore *sem)
 
 	/* interrups would be messy here */
 	disable_irqsave(&irq_state);
+	/* Make sure we aren't holding any locks (only works if SPINLOCK_DEBUG) */
+	assert(!pcpui->lock_depth);
 	/* Try to down the semaphore.  If there is a signal there, we can skip all
 	 * of the sleep prep and just return. */
 	spin_lock(&sem->lock);	/* no need for irqsave, since we disabled ints */

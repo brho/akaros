@@ -34,6 +34,7 @@ struct per_cpu_info {
 	struct syscall *cur_sysc;	/* ptr is into cur_proc's address space */
 	struct kthread *spare;		/* useful when restarting */
 	struct timer_chain tchain;	/* for the per-core alarm */
+	unsigned int lock_depth;
 
 #ifdef __SHARC__
 	// held spin-locks. this will have to go elsewhere if multiple kernel

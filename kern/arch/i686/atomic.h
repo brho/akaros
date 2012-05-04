@@ -166,12 +166,16 @@ static inline void spin_lock(spinlock_t *lock)
 #ifdef __CONFIG_SPINLOCK_DEBUG__
 	lock->call_site = (void RACY*CT(1))TC(read_eip());
 	lock->calling_core = core_id();
+	increase_lock_depth(lock->calling_core);
 #endif
 	cmb();	/* need cmb(), the CPU mb() was handled by the xchgb */
 }
 
 static inline void spin_unlock(spinlock_t *lock)
 {
+#ifdef __CONFIG_SPINLOCK_DEBUG__
+	decrease_lock_depth(lock->calling_core);
+#endif
 	/* Need to prevent the compiler (and some arches) from reordering older
 	 * stores. */
 	wmb();

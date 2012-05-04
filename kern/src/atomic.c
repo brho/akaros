@@ -10,6 +10,17 @@
 #include <string.h>
 #include <assert.h>
 #include <hashtable.h>
+#include <smp.h>
+
+void increase_lock_depth(uint32_t coreid)
+{
+	per_cpu_info[coreid].lock_depth++;
+}
+
+void decrease_lock_depth(uint32_t coreid)
+{
+	per_cpu_info[coreid].lock_depth--;
+}
 
 /* Inits a hashlock. */
 void hashlock_init(struct hashlock *hl, unsigned int nr_entries)
