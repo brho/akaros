@@ -514,6 +514,8 @@ static void __send_bulkp_events(struct proc *p)
 {
 	struct vcore *vc_i, *vc_temp;
 	struct event_msg preempt_msg = {0};
+	/* Whenever we send msgs with the proc locked, we need at least 1 online */
+	assert(!TAILQ_EMPTY(&p->online_vcs));
 	/* Send preempt messages for any left on the BP list.  No need to set any
 	 * flags, it all was done on the real preempt.  Now we're just telling the
 	 * process about any that didn't get restarted and are still preempted. */
@@ -1171,6 +1173,9 @@ void __proc_preempt_warn(struct proc *p, uint32_t vcoreid, uint64_t when)
 	/* Send the event (which internally checks to see how they want it) */
 	local_msg.ev_type = EV_PREEMPT_PENDING;
 	local_msg.ev_arg1 = vcoreid;
+	/* Whenever we send msgs with the proc locked, we need at least 1 online.
+	 * Caller needs to make sure the core was online/mapped. */
+	assert(!TAILQ_EMPTY(&p->online_vcs));
 	send_kernel_event(p, &local_msg, vcoreid);
 
 	/* TODO: consider putting in some lookup place for the alarm to find it.
@@ -1199,10 +1204,16 @@ void __proc_preempt_core(struct proc *p, uint32_t pcoreid)
 	p->procinfo->vcoremap[vcoreid].preempt_served = TRUE;
 	// expects a pcorelist.  assumes pcore is mapped and running_m
 	__proc_take_corelist(p, &pcoreid, 1, TRUE);
-	/* Send a message about the preemption. */
-	preempt_msg.ev_type = EV_VCORE_PREEMPT;
-	preempt_msg.ev_arg2 = vcoreid;
-	send_kernel_event(p, &preempt_msg, 0);
+	/* Only send the message if we have an online core.  o/w, it would fuck
+	 * us up (deadlock), and hey don't need a message.  the core we just took
+	 * will be the first one to be restarted.  It will look like a notif.  in
+	 * the future, we could send the event if we want, but the caller needs to
+	 * do that (after unlocking). */
+	if (!TAILQ_EMPTY(&p->online_vcs)) {
+		preempt_msg.ev_type = EV_VCORE_PREEMPT;
+		preempt_msg.ev_arg2 = vcoreid;
+		send_kernel_event(p, &preempt_msg, 0);
+	}
 }
 
 /* Raw function to preempt every vcore.  If you care about locking, do it before
@@ -1785,6 +1796,9 @@ void proc_change_to_vcore(struct proc *p, uint32_t new_vcoreid,
 	 * full preemption recovery. */
 	preempt_msg.ev_type = (enable_my_notif ? EV_CHECK_MSGS : EV_VCORE_PREEMPT);
 	preempt_msg.ev_arg2 = caller_vcoreid;	/* arg2 is 32 bits */
+	/* Whenever we send msgs with the proc locked, we need at least 1 online.
+	 * In this case, it's the one we just changed to. */
+	assert(!TAILQ_EMPTY(&p->online_vcs));
 	send_kernel_event(p, &preempt_msg, new_vcoreid);
 	/* Change cur_tf so we'll be the new vcoreid */
 	__set_curtf_to_vcoreid(p, new_vcoreid);
