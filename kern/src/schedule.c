@@ -472,15 +472,20 @@ static void __core_request(struct proc *p)
 	uint32_t corelist[num_cpus];
 	struct sched_pcore *spc_i, *temp;
 
-	/* TODO: consider copy-in for amt_wanted too. */
 	amt_wanted = p->procdata->res_req[RES_CORES].amt_wanted;
-	amt_granted = p->procinfo->res_grant[RES_CORES];
-
 	/* Help them out - if they ask for something impossible, give them 1 so they
 	 * can make some progress. (this is racy). */
 	if (amt_wanted > p->procinfo->max_vcores) {
 		p->procdata->res_req[RES_CORES].amt_wanted = 1;
+		amt_wanted = 1;
 	}
+	/* amt_granted is racy - they could be *yielding*, but currently they can't
+	 * be getting any new cores.  this is okay - we won't accidentally give them
+	 * more cores than they *ever* wanted (which could crash them), but they
+	 * might not get fully satisfied this time.  next core_req will get them */
+	amt_granted = p->procinfo->res_grant[RES_CORES];
+	/* Do not do an assert like this: it could fail (yield in progress): */
+	//assert(amt_granted == p->procinfo->num_vcores);
 	/* if they are satisfied, we're done.  There's a slight chance they have
 	 * cores, but they aren't running (sched gave them cores while they were
 	 * yielding, and now we see them on the run queue). */
@@ -498,6 +503,7 @@ static void __core_request(struct proc *p)
 		if (nr_to_grant == amt_needed)
 			break;
 		if (spc_i->alloc_proc) {
+			assert(spc_i->alloc_proc != spc_i->prov_proc);
 			/* someone else has this proc's pcore, so we need to try to preempt.
 			 * sending no warning time for now - just an immediate preempt. */
 			if (!proc_preempt_core(spc_i->alloc_proc, spc2pcoreid(spc_i), 0)) {
