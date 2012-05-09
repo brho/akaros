@@ -24,7 +24,12 @@
  * waiting or otherwise not considered for sched decisions. */
 struct proc_list unrunnable_scps = TAILQ_HEAD_INITIALIZER(unrunnable_scps);
 struct proc_list runnable_scps = TAILQ_HEAD_INITIALIZER(runnable_scps);
-struct proc_list all_mcps = TAILQ_HEAD_INITIALIZER(all_mcps);
+/* mcp lists.  we actually could get by with one list and a TAILQ_CONCAT, but
+ * I'm expecting to want the flexibility of the pointers later. */
+struct proc_list all_mcps_1 = TAILQ_HEAD_INITIALIZER(all_mcps_1);
+struct proc_list all_mcps_2 = TAILQ_HEAD_INITIALIZER(all_mcps_2);
+struct proc_list *primary_mcps = &all_mcps_1;
+struct proc_list *secondary_mcps = &all_mcps_2;
 
 /* The pcores in the system.  (array gets alloced in init()).  */
 struct sched_pcore *all_pcores;
@@ -33,7 +38,7 @@ struct sched_pcore *all_pcores;
 struct sched_pcore_tailq idlecores = TAILQ_HEAD_INITIALIZER(idlecores);
 
 /* Helper, defined below */
-static void __core_request(struct proc *p);
+static void __core_request(struct proc *p, uint32_t amt_needed);
 static void __put_idle_cores(struct proc *p, uint32_t *pc_arr, uint32_t num);
 static void add_to_list(struct proc *p, struct proc_list *list);
 static void remove_from_list(struct proc *p, struct proc_list *list);
@@ -47,6 +52,7 @@ static void __prov_track_dealloc(struct proc *p, uint32_t pcoreid);
 static void __prov_track_dealloc_bulk(struct proc *p, uint32_t *pc_arr,
                                       uint32_t nr_cores);
 static void __run_mcp_ksched(void *arg);	/* don't call directly */
+static uint32_t get_cores_needed(struct proc *p);
 
 /* Locks / sync tools */
 
@@ -217,7 +223,7 @@ int proc_change_to_m(struct proc *p)
 	 * probably a bug, at this stage in development, to do o/w. */
 	remove_from_list(p, &unrunnable_scps);
 	//remove_from_any_list(p); 	/* ^^ instead of this */
-	add_to_list(p, &all_mcps);
+	add_to_list(p, primary_mcps);
 	spin_unlock(&sched_lock);
 	//poke_ksched(p, RES_CORES);
 	return retval;
@@ -340,6 +346,30 @@ static bool __schedule_scp(void)
 	return FALSE;
 }
 
+/* Returns how many new cores p needs.  This doesn't lock the proc, so your
+ * answer might be stale. */
+static uint32_t get_cores_needed(struct proc *p)
+{
+	uint32_t amt_wanted, amt_granted;
+	amt_wanted = p->procdata->res_req[RES_CORES].amt_wanted;
+	/* Help them out - if they ask for something impossible, give them 1 so they
+	 * can make some progress. (this is racy, and unnecessary). */
+	if (amt_wanted > p->procinfo->max_vcores) {
+		p->procdata->res_req[RES_CORES].amt_wanted = 1;
+		amt_wanted = 1;
+	}
+	/* amt_granted is racy - they could be *yielding*, but currently they can't
+	 * be getting any new cores if the caller is in the mcp_ksched.  this is
+	 * okay - we won't accidentally give them more cores than they *ever* wanted
+	 * (which could crash them), but our answer might be a little stale. */
+	amt_granted = p->procinfo->res_grant[RES_CORES];
+	/* Do not do an assert like this: it could fail (yield in progress): */
+	//assert(amt_granted == p->procinfo->num_vcores);
+	if (amt_wanted <= amt_granted)
+		return 0;
+	return amt_wanted - amt_granted;
+}
+
 /* Actual work of the MCP kscheduler.  if we were called by poke_ksched, *arg
  * might be the process who wanted special service.  this would be the case if
  * we weren't already running the ksched.  Sort of a ghetto way to "post work",
@@ -347,19 +377,60 @@ static bool __schedule_scp(void)
 static void __run_mcp_ksched(void *arg)
 {
 	struct proc *p, *temp;
-	/* TODO: don't hold the sched_lock the whole time */
+	uint32_t amt_needed;
+	struct proc_list *temp_mcp_list;
+	/* locking to protect the MCP lists' integrity and membership */
 	spin_lock(&sched_lock);
-	/* trivially try to handle the needs of all our MCPS.  smarter schedulers
-	 * would do something other than FCFS */
-	TAILQ_FOREACH_SAFE(p, &all_mcps, ksched_data.proc_link, temp) {
-		printd("Ksched has MCP %08p (%d)\n", p, p->pid);
-		/* TODO: might use amt_wanted as a proxy.  right now, they have
-		 * amt_wanted == 1, even though they are waiting.
-		 * TODO: this is RACY too - just like with DYING. */
-		if (p->state == PROC_WAITING)
-			continue;
-		__core_request(p);
+	/* 2-pass scheme: check each proc on the primary list (FCFS).  if they need
+	 * nothing, put them on the secondary list.  if they need something, rip
+	 * them off the list, service them, and if they are still not dying, put
+	 * them on the secondary list.  We cull the entire primary list, so that
+	 * when we start from the beginning each time, we aren't repeatedly checking
+	 * procs we looked at on previous waves.
+	 *
+	 * TODO: we could modify this such that procs that we failed to service move
+	 * to yet another list or something.  We can also move the WAITINGs to
+	 * another list and have wakeup move them back, etc. */
+	while (!TAILQ_EMPTY(primary_mcps)) {
+		TAILQ_FOREACH_SAFE(p, primary_mcps, ksched_data.proc_link, temp) {
+			if (p->state == PROC_WAITING) {	/* unlocked peek at the state */
+				switch_lists(p, primary_mcps, secondary_mcps);
+				continue;
+			}
+			amt_needed = get_cores_needed(p);
+			if (!amt_needed) {
+				switch_lists(p, primary_mcps, secondary_mcps);
+				continue;
+			}
+			/* o/w, we want to give cores to this proc */
+			remove_from_list(p, primary_mcps);
+			/* now it won't die, but it could get removed from lists and have
+			 * its stuff unprov'd when we unlock */
+			proc_incref(p, 1);
+			/* GIANT WARNING: __core_req will unlock the sched lock for a bit.
+			 * It will return with it locked still.  We could unlock before we
+			 * pass in, but they will relock right away. */
+			// notionally_unlock(&ksched_lock);	/* for mouse-eyed viewers */
+			__core_request(p, amt_needed);
+			// notionally_lock(&ksched_lock);
+			/* Peeking at the state is okay, since we hold a ref.  Once it is
+			 * DYING, it'll remain DYING until we decref.  And if there is a
+			 * concurrent death, that will spin on the ksched lock (which we
+			 * hold, and which protects the proc lists). */
+			if (p->state != PROC_DYING)
+				add_to_list(p, secondary_mcps);
+			proc_decref(p);			/* fyi, this may trigger __proc_free */
+			/* need to break: the proc lists may have changed when we unlocked
+			 * in core_req in ways that the FOREACH_SAFE can't handle. */
+			break;
+		}
 	}
+	/* at this point, we moved all the procs over to the secondary list, and
+	 * attempted to service the ones that wanted something.  now just swap the
+	 * lists for the next invocation of the ksched. */
+	temp_mcp_list = primary_mcps;
+	primary_mcps = secondary_mcps;
+	secondary_mcps = temp_mcp_list;
 	spin_unlock(&sched_lock);
 }
 
@@ -502,34 +573,15 @@ uint32_t max_vcores(struct proc *p)
 #endif /* __CONFIG_DISABLE_SMT__ */
 }
 
-/* This deals with a request for more cores.  The request is already stored in
- * the proc's amt_wanted (it is compared to amt_granted). */
-static void __core_request(struct proc *p)
+/* This deals with a request for more cores.  The amt of new cores needed is
+ * passed in.  The ksched lock is held, but we are free to unlock if we want
+ * (and we must, if calling out of the ksched to anything high-level). */
+static void __core_request(struct proc *p, uint32_t amt_needed)
 {
-	uint32_t nr_to_grant = 0, amt_wanted, amt_granted, amt_needed;
+	uint32_t nr_to_grant = 0;
 	uint32_t corelist[num_cpus];
 	struct sched_pcore *spc_i, *temp;
 
-	amt_wanted = p->procdata->res_req[RES_CORES].amt_wanted;
-	/* Help them out - if they ask for something impossible, give them 1 so they
-	 * can make some progress. (this is racy). */
-	if (amt_wanted > p->procinfo->max_vcores) {
-		p->procdata->res_req[RES_CORES].amt_wanted = 1;
-		amt_wanted = 1;
-	}
-	/* amt_granted is racy - they could be *yielding*, but currently they can't
-	 * be getting any new cores.  this is okay - we won't accidentally give them
-	 * more cores than they *ever* wanted (which could crash them), but they
-	 * might not get fully satisfied this time.  next core_req will get them */
-	amt_granted = p->procinfo->res_grant[RES_CORES];
-	/* Do not do an assert like this: it could fail (yield in progress): */
-	//assert(amt_granted == p->procinfo->num_vcores);
-	/* if they are satisfied, we're done.  There's a slight chance they have
-	 * cores, but they aren't running (sched gave them cores while they were
-	 * yielding, and now we see them on the run queue). */
-	if (amt_wanted <= amt_granted)
-		return;
-	amt_needed = amt_wanted - amt_granted;
 	/* Try to give out provisioned cores.  the not_alloc_me list is the victim
 	 * list.  Side note: if we want to warn, then we can't deal with this proc's
 	 * prov'd cores until we wait til the alarm goes off.  would need to put all
@@ -542,6 +594,7 @@ static void __core_request(struct proc *p)
 			break;
 		if (spc_i->alloc_proc) {
 			assert(spc_i->alloc_proc != spc_i->prov_proc);
+			/* TODO: reverse lock order: proc->ksched */
 			/* someone else has this proc's pcore, so we need to try to preempt.
 			 * sending no warning time for now - just an immediate preempt. */
 			if (!proc_preempt_core(spc_i->alloc_proc, spc2pcoreid(spc_i), 0)) {
@@ -574,6 +627,7 @@ static void __core_request(struct proc *p)
 		corelist[nr_to_grant] = spc2pcoreid(spc_i);
 		nr_to_grant++;
 	}
+	/* TODO: reverse lock order: proc->ksched */
 	/* Now, actually give them out */
 	if (nr_to_grant) {
 		/* give them the cores.  this will start up the extras if RUNNING_M. */
@@ -705,8 +759,10 @@ void sched_diag(void)
 		printk("Runnable _S PID: %d\n", p->pid);
 	TAILQ_FOREACH(p, &unrunnable_scps, ksched_data.proc_link)
 		printk("Unrunnable _S PID: %d\n", p->pid);
-	TAILQ_FOREACH(p, &all_mcps, ksched_data.proc_link)
-		printk("MCP PID: %d\n", p->pid);
+	TAILQ_FOREACH(p, primary_mcps, ksched_data.proc_link)
+		printk("Primary MCP PID: %d\n", p->pid);
+	TAILQ_FOREACH(p, secondary_mcps, ksched_data.proc_link)
+		printk("Secondary MCP PID: %d\n", p->pid);
 	spin_unlock(&sched_lock);
 	return;
 }
