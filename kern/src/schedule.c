@@ -25,7 +25,6 @@
 struct proc_list unrunnable_scps = TAILQ_HEAD_INITIALIZER(unrunnable_scps);
 struct proc_list runnable_scps = TAILQ_HEAD_INITIALIZER(runnable_scps);
 struct proc_list all_mcps = TAILQ_HEAD_INITIALIZER(all_mcps);
-spinlock_t sched_lock = SPINLOCK_INITIALIZER;
 
 /* The pcores in the system.  (array gets alloced in init()).  */
 struct sched_pcore *all_pcores;
@@ -47,6 +46,37 @@ static void __prov_track_alloc(struct proc *p, uint32_t pcoreid);
 static void __prov_track_dealloc(struct proc *p, uint32_t pcoreid);
 static void __prov_track_dealloc_bulk(struct proc *p, uint32_t *pc_arr,
                                       uint32_t nr_cores);
+static void __run_mcp_ksched(void *arg);	/* don't call directly */
+
+/* Locks / sync tools */
+
+/* poke-style ksched - ensures the MCP ksched only runs once at a time.  since
+ * only one mcp ksched runs at a time, while this is set, the ksched knows no
+ * cores are being allocated by other code (though they could be dealloc, due to
+ * yield). 
+ *
+ * The main value to this sync method is to make the 'make sure the ksched runs
+ * only once at a time and that it actually runs' invariant/desire wait-free, so
+ * that it can be called anywhere (deep event code, etc).
+ *
+ * As the ksched gets smarter, we'll probably embedd this poker in a bigger
+ * struct that can handle the posting of different types of work. */
+struct poke_tracker ksched_poker = {0, 0, __run_mcp_ksched};
+
+/* this 'big ksched lock' protects a bunch of things, which i may make fine
+ * grained: */
+/* - protects the integrity of proc tailqs/structures, as well as the membership
+ * of a proc on those lists.  proc lifetime within the ksched but outside this
+ * lock is protected by the proc kref. */
+//spinlock_t proclist_lock = SPINLOCK_INITIALIZER; /* subsumed by bksl */
+/* - protects the provisioning assignment, membership of sched_pcores in
+ * provision lists, and the integrity of all prov lists (the lists of each
+ * proc).  does NOT protect spc->alloc_proc. */
+//spinlock_t prov_lock = SPINLOCK_INITIALIZER;
+/* - protects allocation structures: spc->alloc_proc, the integrity and
+ * membership of the idelcores tailq. */
+//spinlock_t alloc_lock = SPINLOCK_INITIALIZER;
+spinlock_t sched_lock = SPINLOCK_INITIALIZER;
 
 /* Alarm struct, for our example 'timer tick' */
 struct alarm_waiter ksched_waiter;
@@ -199,6 +229,8 @@ int proc_change_to_m(struct proc *p)
  * grab whatever lock you have, then call the proc helper. */
 void proc_wakeup(struct proc *p)
 {
+	/* catch current shitty deadlock... */
+	assert(!per_cpu_info[core_id()].lock_depth);
 	spin_lock(&sched_lock);
 	/* will trigger one of the __sched_.cp_wakeup()s */
 	__proc_wakeup(p);
@@ -308,13 +340,14 @@ static bool __schedule_scp(void)
 	return FALSE;
 }
 
-/* Something has changed, and for whatever reason the scheduler should
- * reevaluate things. 
- *
- * Don't call this from interrupt context (grabs proclocks). */
-void schedule(void)
+/* Actual work of the MCP kscheduler.  if we were called by poke_ksched, *arg
+ * might be the process who wanted special service.  this would be the case if
+ * we weren't already running the ksched.  Sort of a ghetto way to "post work",
+ * such that it's an optimization. */
+static void __run_mcp_ksched(void *arg)
 {
 	struct proc *p, *temp;
+	/* TODO: don't hold the sched_lock the whole time */
 	spin_lock(&sched_lock);
 	/* trivially try to handle the needs of all our MCPS.  smarter schedulers
 	 * would do something other than FCFS */
@@ -327,9 +360,23 @@ void schedule(void)
 			continue;
 		__core_request(p);
 	}
-	if (management_core())
-		__schedule_scp();
 	spin_unlock(&sched_lock);
+}
+
+/* Something has changed, and for whatever reason the scheduler should
+ * reevaluate things. 
+ *
+ * Don't call this from interrupt context (grabs proclocks). */
+void schedule(void)
+{
+	/* MCP scheduling: post work, then poke.  for now, i just want the func to
+	 * run again, so merely a poke is sufficient. */
+	poke(&ksched_poker, 0);
+	if (management_core()) {
+		spin_lock(&sched_lock);
+		__schedule_scp();
+		spin_unlock(&sched_lock);
+	}
 }
 
 /* A process is asking the ksched to look at its resource desires.  The
@@ -337,27 +384,18 @@ void schedule(void)
  * eventually gets around to looking at resource desires. */
 void poke_ksched(struct proc *p, int res_type)
 {
-	/* TODO: probably want something to trigger all res_types */
-	spin_lock(&sched_lock);
-	switch (res_type) {
-		case RES_CORES:
-			/* ignore core requests from non-mcps (note we have races if we ever
-			 * allow procs to switch back). */
-			if (!__proc_is_mcp(p))
-				break;
-			__core_request(p);
-			break;
-		default:
-			break;
-	}
-	spin_unlock(&sched_lock);
+	/* ignoring res_type for now.  could post that if we wanted (would need some
+	 * other structs/flags) */
+	if (!__proc_is_mcp(p))
+		return;
+	poke(&ksched_poker, p);
 }
 
 /* ksched callbacks.  p just woke up, is unlocked, and the ksched lock is held */
 void __sched_mcp_wakeup(struct proc *p)
 {
-	/* the essence of poke_ksched for RES_CORES */
-	__core_request(p);
+	/* could try and prioritize p somehow (move it to the front of the list) */
+	poke(&ksched_poker, p);
 }
 
 /* ksched callbacks.  p just woke up, is unlocked, and the ksched lock is held */

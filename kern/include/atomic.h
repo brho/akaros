@@ -99,6 +99,23 @@ static inline void write_sequnlock(seqlock_t *lock);
 static inline seq_ctr_t read_seqbegin(seqlock_t *lock);
 static inline bool read_seqretry(seqlock_t *lock, seq_ctr_t ctr);
 
+/* Post work and poke synchronization.  This is a wait-free way to make sure
+ * some code is run, usually by the calling core, but potentially by any core.
+ * Under contention, everyone just posts work, and one core will carry out the
+ * work.  Callers post work (the meaning of which is particular to their
+ * subsystem), then call this function.  The function is not run concurrently
+ * with itself.
+ *
+ * In the future, this may send RKMs to LL cores to ensure the work is done
+ * somewhere, but not necessarily on the calling core.  Will reserve 'flags'
+ * for that. */
+struct poke_tracker {
+	atomic_t			need_to_run;
+	atomic_t			run_in_progress;
+	void				(*func)(void *);
+};
+void poke(struct poke_tracker *tracker, void *arg);
+
 /* Arch-specific implementations / declarations go here */
 #include <arch/atomic.h>
 
