@@ -15,7 +15,9 @@
 struct proc;	/* process.h includes us, but we need pointers now */
 TAILQ_HEAD(proc_list, proc);		/* Declares 'struct proc_list' */
 
-/* The ksched maintains an internal array of these: the global pcore map */
+/* The ksched maintains an internal array of these: the global pcore map.  Note
+ * the prov_proc and alloc_proc are weak (internal) references, and should only
+ * be used as a ref source while the ksched has a valid kref. */
 struct sched_pcore {
 	TAILQ_ENTRY(sched_pcore)	prov_next;			/* on a proc's prov list */
 	TAILQ_ENTRY(sched_pcore)	alloc_next;			/* on an alloc list (idle)*/

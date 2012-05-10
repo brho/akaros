@@ -575,49 +575,103 @@ uint32_t max_vcores(struct proc *p)
 
 /* This deals with a request for more cores.  The amt of new cores needed is
  * passed in.  The ksched lock is held, but we are free to unlock if we want
- * (and we must, if calling out of the ksched to anything high-level). */
+ * (and we must, if calling out of the ksched to anything high-level).
+ *
+ * Side note: if we want to warn, then we can't deal with this proc's prov'd
+ * cores until we wait til the alarm goes off.  would need to put all
+ * alarmed cores on a list and wait til the alarm goes off to do the full
+ * preempt.  and when those cores come in voluntarily, we'd need to know to
+ * give them to this proc. */
 static void __core_request(struct proc *p, uint32_t amt_needed)
 {
 	uint32_t nr_to_grant = 0;
 	uint32_t corelist[num_cpus];
 	struct sched_pcore *spc_i, *temp;
-
-	/* Try to give out provisioned cores.  the not_alloc_me list is the victim
-	 * list.  Side note: if we want to warn, then we can't deal with this proc's
-	 * prov'd cores until we wait til the alarm goes off.  would need to put all
-	 * alarmed cores on a list and wait til the alarm goes off to do the full
-	 * preempt.  and when those cores come in voluntarily, we'd need to know to
-	 * give them to this proc. */
-	TAILQ_FOREACH_SAFE(spc_i, &p->ksched_data.prov_not_alloc_me, prov_next,
-	                   temp) {
+	struct proc *proc_to_preempt;
+	bool success;
+	/* we come in holding the ksched lock, and we hold it here to protect
+	 * allocations and provisioning. */
+	/* get all available cores from their prov_not_alloc list.  the list might
+	 * change when we unlock (new cores added to it, or the entire list emptied,
+	 * but no core allocations will happen (we hold the poke)). */
+	while (!TAILQ_EMPTY(&p->ksched_data.prov_not_alloc_me)) {
 		if (nr_to_grant == amt_needed)
 			break;
+		/* picking the next victim (first on the not_alloc list) */
+		spc_i = TAILQ_FIRST(&p->ksched_data.prov_not_alloc_me);
+		/* someone else has this proc's pcore, so we need to try to preempt.
+		 * after this block, the core will be tracked dealloc'd and on the idle
+		 * list (regardless of whether we had to preempt or not) */
 		if (spc_i->alloc_proc) {
-			assert(spc_i->alloc_proc != spc_i->prov_proc);
-			/* TODO: reverse lock order: proc->ksched */
-			/* someone else has this proc's pcore, so we need to try to preempt.
-			 * sending no warning time for now - just an immediate preempt. */
-			if (!proc_preempt_core(spc_i->alloc_proc, spc2pcoreid(spc_i), 0)) {
-				/* core is unmapped, they must have just yielded and are
-				 * spinning in put_idle */
-				spc_i->ignore_next_idle++;
-				if (spc_i->ignore_next_idle > 100)
-					warn("Unusually high ignore_next_idle %d",
-					     spc_i->ignore_next_idle);
+			proc_to_preempt = spc_i->alloc_proc;
+			/* would break both preemption and maybe the later decref */
+			assert(proc_to_preempt != p);
+			/* need to keep a valid, external ref when we unlock */
+			proc_incref(proc_to_preempt, 1);
+			spin_unlock(&sched_lock);
+			/* sending no warning time for now - just an immediate preempt. */
+			success = proc_preempt_core(proc_to_preempt, spc2pcoreid(spc_i), 0);
+			/* reaquire locks to protect provisioning and idle lists */
+			spin_lock(&sched_lock);
+			if (success) {
+				/* we preempted it before the proc could yield or die.
+				 * alloc_proc should not have changed (it'll change in death and
+				 * idle CBs).  the core is not on the idle core list.  (if we
+				 * ever have proc alloc lists, it'll still be on the old proc's
+				 * list). */
+				assert(spc_i->alloc_proc);
+				/* regardless of whether or not it is still prov to p, we need
+				 * to note its dealloc.  we are doing some excessive checking of
+				 * p == prov_proc, but using this helper is a lot clearer. */
+				__prov_track_dealloc(proc_to_preempt, spc2pcoreid(spc_i));
+				/* here, we rely on the fact that we are the only preemptor.  we
+				 * assume no one else preempted it, so we know it is available*/
+				TAILQ_INSERT_TAIL(&idlecores, spc_i, alloc_next);
+			} else {
+				/* the preempt failed, which should only happen if the pcore was
+				 * unmapped (could be dying, could be yielding, but NOT
+				 * preempted).  whoever unmapped it also triggered (or will soon
+				 * trigger) a track_dealloc and put it on the idle list.  our
+				 * signal for this is spc_i->alloc_proc being 0.  We need to
+				 * spin and let whoever is trying to free the core grab the
+				 * ksched lock.
+				 *
+				 * Note, we're relying on us being the only preemptor - if the
+				 * core was unmapped by *another* preemptor, there would be no
+				 * way of knowing the core was made idle *yet* (the success
+				 * branch in another thread).  likewise, if there were another
+				 * allocator, the pcore could have been put on the idle list and
+				 * then quickly removed/allocated. */
+				cmb();
+				while (spc_i->alloc_proc) {
+					/* this loop should be very rare */
+					spin_unlock(&sched_lock);
+					udelay(1);
+					spin_lock(&sched_lock);
+				}
 			}
-			/* Note that we do NOT want to __prov_track_dealloc.  Instead, we
-			 * just leave it on its list (which we'll change later), and clear
-			 * alloc_proc (which is what __prov_track_dealloc does). */
-			spc_i->alloc_proc = 0;
-		} else {
-			/* must be an idle core, rip it off that list */
-			TAILQ_REMOVE(&idlecores, spc_i, alloc_next);
+			/* no longer need to keep p_to_pre alive */
+			proc_decref(proc_to_preempt);
+			/* might not be prov to p anymore (rare race).  spc_i is idle - we
+			 * might get it later, or maybe we'll give it to its rightful proc*/
+			if (spc_i->prov_proc != p)
+				continue;
 		}
+		/* at this point, the pcore is idle, regardless of how we got here
+		 * (successful preempt, failed preempt, or it was idle in the first
+		 * place.  the core is still provisioned.  lets pull from the idle list
+		 * and add it to the pc_arr for p.  here, we rely on the fact that we
+		 * are the only allocator (spc_i is still idle, despite unlocking). */
+		TAILQ_REMOVE(&idlecores, spc_i, alloc_next);
 		/* At this point, we have the core, ready to try to give it to the proc.
-		 * We'll give them via a list, which is better for the proc mgmt code
-		 * (when going from runnable to running. */
+		 * It is on no alloc lists, and is track_dealloc'd() (regardless of how
+		 * we got here).
+		 *
+		 * We'll give p its cores via a bulk list, which is better for the proc
+		 * mgmt code (when going from runnable to running). */
 		corelist[nr_to_grant] = spc2pcoreid(spc_i);
 		nr_to_grant++;
+		__prov_track_alloc(p, spc2pcoreid(spc_i));
 	}
 	/* Try to get cores from the idle list that aren't prov to me (FCFS) */
 	TAILQ_FOREACH_SAFE(spc_i, &idlecores, alloc_next, temp) {
@@ -626,10 +680,16 @@ static void __core_request(struct proc *p, uint32_t amt_needed)
 		TAILQ_REMOVE(&idlecores, spc_i, alloc_next);
 		corelist[nr_to_grant] = spc2pcoreid(spc_i);
 		nr_to_grant++;
+		__prov_track_alloc(p, spc2pcoreid(spc_i));
 	}
-	/* TODO: reverse lock order: proc->ksched */
 	/* Now, actually give them out */
 	if (nr_to_grant) {
+		/* Need to unlock before calling out to proc code.  We are somewhat
+		 * relying on being the only one allocating 'thread' here, since another
+		 * allocator could have seen these cores (if they are prov to some proc)
+		 * and could be trying to give them out (and assuming they are already
+		 * on the idle list). */
+		spin_unlock(&sched_lock);
 		/* give them the cores.  this will start up the extras if RUNNING_M. */
 		spin_lock(&p->proc_lock);
 		/* if they fail, it is because they are WAITING or DYING.  we could give
@@ -638,19 +698,24 @@ static void __core_request(struct proc *p, uint32_t amt_needed)
 		 * ksched could check the states after locking, but it isn't necessary:
 		 * just need to check at some point in the ksched loop. */
 		if (__proc_give_cores(p, corelist, nr_to_grant)) {
+			spin_unlock(&p->proc_lock);
+			/* we failed, put the cores and track their dealloc.  lock is
+			 * protecting those structures. */
+			spin_lock(&sched_lock);
 			__put_idle_cores(p, corelist, nr_to_grant);
+			__prov_track_dealloc_bulk(p, corelist, nr_to_grant);
 		} else {
-			/* track the (successful) allocation of the sched_pcores */
-			for (int i = 0; i < nr_to_grant; i++)
-				__prov_track_alloc(p, corelist[i]);
 			/* at some point after giving cores, call proc_run_m() (harmless on
 			 * RUNNING_Ms).  You can give small groups of cores, then run them
 			 * (which is more efficient than interleaving runs with the gives
 			 * for bulk preempted processes). */
 			__proc_run_m(p);
+			spin_unlock(&p->proc_lock);
+			/* main mcp_ksched wants this held (it came to __core_req held) */
+			spin_lock(&sched_lock);
 		}
-		spin_unlock(&p->proc_lock);
 	}
+	/* note the ksched lock is still held */
 }
 
 /* TODO: need more thorough CG/LL management.  For now, core0 is the only LL
