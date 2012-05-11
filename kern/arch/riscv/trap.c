@@ -389,7 +389,7 @@ handle_breakpoint(trapframe_t* state)
 void
 handle_trap(trapframe_t* tf)
 {
-	static void (*const trap_handlers[NUM_CAUSES])(trapframe_t*) = {
+	static void (*const trap_handlers[])(trapframe_t*) = {
 	  [CAUSE_MISALIGNED_FETCH] = handle_misaligned_fetch,
 	  [CAUSE_FAULT_FETCH] = handle_fault_fetch,
 	  [CAUSE_ILLEGAL_INSTRUCTION] = handle_illegal_instruction,
@@ -401,12 +401,26 @@ handle_trap(trapframe_t* tf)
 	  [CAUSE_MISALIGNED_STORE] = handle_misaligned_store,
 	  [CAUSE_FAULT_LOAD] = handle_fault_load,
 	  [CAUSE_FAULT_STORE] = handle_fault_store,
-	  [CAUSE_IRQ0 + IPI_IRQ] = handle_ipi,
-	  [CAUSE_IRQ0 + TIMER_IRQ] = handle_timer_interrupt,
+	};
+
+	static void (*const irq_handlers[])(trapframe_t*) = {
+	  [IRQ_TIMER] = handle_timer_interrupt,
+	  [IRQ_IPI] = handle_ipi,
 	};
 	
-	assert(tf->cause < NUM_CAUSES && trap_handlers[tf->cause]);
-	trap_handlers[tf->cause](tf);
+	if (tf->cause < 0)
+	{
+		uint8_t irq = tf->cause;
+		assert(irq < sizeof(irq_handlers)/sizeof(irq_handlers[0]) &&
+		       irq_handlers[irq]);
+		irq_handlers[irq](tf);
+	}
+	else
+	{
+		assert(tf->cause < sizeof(trap_handlers)/sizeof(trap_handlers[0]) &&
+		       trap_handlers[tf->cause]);
+		trap_handlers[tf->cause](tf);
+	}
 	
 	/* Return to the current process, which should be runnable.  If we're the
 	 * kernel, we should just return naturally.  Note that current and tf need

@@ -15,7 +15,13 @@ static_asserts_can_go_here()
 void
 print_cpuinfo(void)
 {
-	cprintf("CPU Info: Not Just Any Other RISC-V Core (TM)\n");
+	int id = mfpcr(PCR_IMPL);
+	const char* name = "(unknown implementation)";
+	if (id == 1)
+	  name = "ISA Simulator";
+	else if (id == 2)
+	  name = "Rocket64";
+	cprintf("CPU Info: RISC-V %s\n", name);
 }
 
 void show_mapping(uintptr_t start, size_t size)

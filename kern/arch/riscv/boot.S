@@ -16,7 +16,7 @@
 // entry point
 ///////////////////////////////////////////////////////////////////
 
-#define PCR0 (SR_S | SR_ET | SR_SX | (1 << (IPI_IRQ + SR_IM_SHIFT)))
+#define PCR0 (SR_S | SR_ET | SR_S64 | (1 << (IRQ_IPI + SR_IM_SHIFT)))
 .text
 
 .global _start

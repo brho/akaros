@@ -14,7 +14,7 @@ void proc_init_trapframe(trapframe_t *tf, uint32_t vcoreid,
 	memset(tf, 0, sizeof(*tf));
 
 	tf->gpr[30] = stack_top-64;
-	tf->sr = SR_S | (mfpcr(PCR_SR) & SR_IM) | SR_SX | SR_UX | SR_VM;
+	tf->sr = SR_S | (mfpcr(PCR_SR) & SR_IM) | SR_S64 | SR_U64 | SR_VM;
 
 	tf->epc = entryp;
 
@@ -25,7 +25,7 @@ void proc_init_trapframe(trapframe_t *tf, uint32_t vcoreid,
 
 void proc_secure_trapframe(struct trapframe *tf)
 {
-	tf->sr = SR_S | (mfpcr(PCR_SR) & SR_IM) | SR_SX | SR_UX | SR_VM;
+	tf->sr = SR_S | (mfpcr(PCR_SR) & SR_IM) | SR_S64 | SR_U64 | SR_VM;
 }
 
 /* Called when we are currently running an address space on our core and want to

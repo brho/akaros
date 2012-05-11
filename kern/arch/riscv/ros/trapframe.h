@@ -10,7 +10,7 @@ typedef struct trapframe
   uintptr_t sr;
   uintptr_t epc;
   uintptr_t badvaddr;
-  uintptr_t cause;
+  long cause;
   uintptr_t insn;
 } trapframe_t;
 

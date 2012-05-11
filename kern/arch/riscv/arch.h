@@ -65,13 +65,13 @@ read_tsc_serialized(void)
 static __inline void
 enable_irq(void)
 {
-  asm volatile("ei");
+  setpcr(PCR_SR, SR_ET);
 }
 
 static __inline void
 disable_irq(void)
 {
-  asm volatile("di");
+  clearpcr(PCR_SR, SR_ET);
 }
 
 static __inline int
