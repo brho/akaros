@@ -40,7 +40,7 @@ _start:
 
   // terminate frame pointer for backtracing and set up stack
   li     s9, 0
-  la     sp, bootstacktop
+  la     sp, percore_stacks + KSTKSIZE
   li     t1, KERN_LOAD_ADDR
   sub    sp, sp, t1
 
@@ -64,7 +64,7 @@ _start:
   // relocate stack and call into C code using absolute jump, not pc-relative
   move   a0, s0
   move   a1, s1
-  la     sp, bootstacktop
+  la     sp, percore_stacks + KSTKSIZE
   la     t0, cmain
   jr     t0
 
@@ -113,12 +113,6 @@ l1pt:
 l2pt:
   .space  PGSIZE
 
-  .space  KSTKSIZE
-  .global bootstacktop
-bootstacktop:
-
-.bss
-  .align  PGSHIFT
   .global percore_stacks
 percore_stacks:
   .space  KSTKSIZE*MAX_NUM_CPUS

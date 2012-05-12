@@ -5,12 +5,13 @@
 #ifdef __riscv64
 # define STORE    sd
 # define LOAD     ld
-# define REGBYTES 8
+# define LOG_REGBYTES 3
 #else
 # define STORE    sw
 # define LOAD     lw
-# define REGBYTES 4
+# define LOG_REGBYTES 2
 #endif
+#define REGBYTES (1 << LOG_REGBYTES)
 
   .text
   .ent    save_kernel_tf_asm
@@ -32,7 +33,7 @@ save_kernel_tf_asm:
   STORE  t0,32*REGBYTES(a0)
 
   # set EPC to this function's return address
-  STORE  ra,33*REGBYTES(x2)
+  STORE  ra,33*REGBYTES(a0)
 
   .end  save_kernel_tf_asm
 
@@ -41,7 +42,7 @@ save_kernel_tf_asm:
   .global pop_kernel_tf
 pop_kernel_tf:
   LOAD  t0,32*REGBYTES(a0)
-  LOAD  ra,33*REGBYTES(x2)
+  LOAD  ra,33*REGBYTES(a0)
 
   LOAD  s0,20*REGBYTES(a0)
   LOAD  s1,21*REGBYTES(a0)
@@ -130,11 +131,11 @@ trap_entry:
   bnez  x1, 1f
 
   # otherwise, start at the top of the per-core stack
-  la    x2, percore_stacks - SIZEOF_TRAPFRAME_T
+  la    x2, core_stacktops
   mfpcr x1, ASM_CR(PCR_COREID)
-  add   x1, x1, 1
-  sll   x1, x1, KSTKSHIFT
+  sll   x1, x1, LOG_REGBYTES
   add   x2, x2, x1
+  LOAD  x2, 0(x2)
 
 1:# save gprs
   STORE  x3,3*REGBYTES(x2)
@@ -199,8 +200,11 @@ trap_entry:
   .end  trap_entry
 
   .global  cpu_halt
+  .global  after_cpu_halt
   .ent  cpu_halt
 cpu_halt:
+  setpcr ASM_CR(PCR_SR), SR_ET
 1:b     1b   # handle_ipi can advance the PC to break out of this loop.
   ret
+after_cpu_halt:
   .end  cpu_halt

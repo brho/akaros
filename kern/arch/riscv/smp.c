@@ -147,4 +147,7 @@ void __arch_pcpu_init(uint32_t coreid)
 	// has the [0,KERNSIZE-1] identity mapping.
 	extern pte_t l1pt[NPTENTRIES];
 	lcr3(PADDR(l1pt));
+
+	register uintptr_t sp asm ("sp");
+	set_stack_top(ROUNDUP(sp, PGSIZE));
 }

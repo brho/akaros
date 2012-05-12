@@ -55,29 +55,32 @@ read_tsc(void)
 static __inline uint64_t 
 read_tsc_serialized(void)
 {
-	uint64_t tsc;
-  mb();
-	tsc = read_tsc();
 	mb();
-	return tsc;
+	return read_tsc();
 }
 
-static __inline void
+static __inline uintptr_t
 enable_irq(void)
 {
-  setpcr(PCR_SR, SR_ET);
+	return setpcr(PCR_SR, SR_ET);
+}
+
+static __inline uintptr_t
+disable_irq(void)
+{
+	return clearpcr(PCR_SR, SR_ET);
 }
 
 static __inline void
-disable_irq(void)
+restore_irq(uintptr_t val)
 {
-  clearpcr(PCR_SR, SR_ET);
+	mtpcr(PCR_SR, val);
 }
 
 static __inline int
 irq_is_enabled(void)
 {
-  return mfpcr(PCR_SR) & SR_ET;
+	return mfpcr(PCR_SR) & SR_ET;
 }
 
 static __inline void

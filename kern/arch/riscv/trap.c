@@ -167,15 +167,23 @@ static kernel_message_t *get_next_amsg(struct kernel_msg_list *list_head,
 	return k_msg;
 }
 
+static void exit_halt_loop(trapframe_t* tf)
+{
+	extern char after_cpu_halt;
+	if ((char*)tf->epc >= (char*)&cpu_halt && (char*)tf->epc < &after_cpu_halt)
+		tf->epc = tf->gpr[1];
+}
+
 /* Mostly the same as x86's implementation.  Keep them in sync.  This assumes
  * you can send yourself an IPI, and that IPIs can get squashed like on x86. */
 static void
 handle_ipi(trapframe_t* tf)
 {
+
 	if (!in_kernel(tf))
 		set_current_tf(&per_cpu_info[core_id()], tf);
-	else if((void*)tf->epc == &cpu_halt) // break out of the cpu_halt loop
-		advance_pc(tf);
+	else
+		exit_halt_loop(tf);
 	
 	clear_ipi();
 
@@ -282,8 +290,8 @@ handle_timer_interrupt(trapframe_t* tf)
 {
 	if (!in_kernel(tf))
 		set_current_tf(&per_cpu_info[core_id()], tf);
-	else if((void*)tf->epc == &cpu_halt) // break out of the cpu_halt loop
-		advance_pc(tf);
+	else
+		exit_halt_loop(tf);
 	
 	timer_interrupt(tf, NULL);
 }
