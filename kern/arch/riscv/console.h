@@ -13,8 +13,9 @@
 #define CRT_SIZE	(CRT_ROWS * CRT_COLS)
 
 void cons_init(void);
-void cons_putc(int c);
-int cons_getc(void);
+void keyboard_alarm_init();
+/* Returns any available character, or 0 for none (legacy helper) */
+int cons_get_any_char(void);
 
 #define	FESVR_SYS_exit	1
 #define	FESVR_SYS_getpid	20
@@ -35,7 +36,6 @@ int cons_getc(void);
 #define	FESVR_SYS_pwrite 181
 #define FESVR_SYS_getmainvars 201
 
-long fesvr_syscall(long n, long a0, long a1, long a2, long a3);
 void fesvr_die();
 
 #endif /* _CONSOLE_H_ */

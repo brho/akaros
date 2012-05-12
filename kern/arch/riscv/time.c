@@ -23,20 +23,20 @@ set_core_timer(uint32_t usec, bool periodic)
 
 	if (usec)
 	{
-	  uint32_t clocks =  (uint64_t)usec*TSC_HZ/1000000;
+		uint32_t clocks =  (uint64_t)usec*TSC_HZ/1000000;
 
-	  int8_t irq_state = 0;
-	  disable_irqsave(&irq_state);
+		int8_t irq_state = 0;
+		disable_irqsave(&irq_state);
 
-	  mtpcr(PCR_COUNT, 0);
-	  mtpcr(PCR_COMPARE, clocks);
-	  mtpcr(PCR_SR, mfpcr(PCR_SR) | (1 << (IRQ_TIMER+SR_IM_SHIFT)));
+		mtpcr(PCR_COUNT, 0);
+		mtpcr(PCR_COMPARE, clocks);
+		mtpcr(PCR_SR, mfpcr(PCR_SR) | (1 << (IRQ_TIMER+SR_IM_SHIFT)));
 
-	  enable_irqsave(&irq_state);
+		enable_irqsave(&irq_state);
 	}
 	else
 	{
-	  mtpcr(PCR_SR, mfpcr(PCR_SR) & ~(1 << (IRQ_TIMER+SR_IM_SHIFT)));
+		mtpcr(PCR_SR, mfpcr(PCR_SR) & ~(1 << (IRQ_TIMER+SR_IM_SHIFT)));
 	}
 }
 
