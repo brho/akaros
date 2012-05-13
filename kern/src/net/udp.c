@@ -16,6 +16,7 @@
 #include <net/udp.h>
 #include <slab.h>
 #include <socket.h>
+#include <debug.h>
 
 struct udp_pcb *udp_pcbs;
 uint16_t udp_port_num = SOCKET_PORT_START;
@@ -121,19 +122,19 @@ int udp_sendto(struct udp_pcb *pcb, struct pbuf *p,
     udphdr->length = htons(q->tot_len); 
 		udphdr->checksum = 0; // just to be sure.
 		// printd("checksum inet_chksum %x \n", udphdr->checksum);
-		printd("params src addr %x, dst addr %x, length %x \n", global_ip.s_addr, (dst_ip->s_addr), 
+		printd("params src addr %x, dst addr %x, length %x \n", LOCAL_IP_ADDR.s_addr, (dst_ip->s_addr), 
 					  q->tot_len);
 
-    udphdr->checksum = inet_chksum_pseudo(q, htonl(global_ip.s_addr), dst_ip->s_addr,
+    udphdr->checksum = inet_chksum_pseudo(q, htonl(LOCAL_IP_ADDR.s_addr), dst_ip->s_addr,
 											 IPPROTO_UDP, q->tot_len);
 		printd ("method ours %x\n", udphdr->checksum);
 		// 0x0000; //either use brho's checksum or use cards' capabilities
-		// ip_output(q, src_ip, dst_ip, pcb->ttl, pcb->tos, IP_PROTO_UDP);
-		ip_output(q, &global_ip, dst_ip, IPPROTO_UDP);
+		ip_output(q, &LOCAL_IP_ADDR, dst_ip, pcb->ttl, pcb->tos, IPPROTO_UDP);
+		// ip_output(q, &global_ip, dst_ip, IPPROTO_UDP);
     return 0;
 }
 /* TODO: use the real queues we have implemented... */
-int udp_bind(struct udp_pcb *pcb, struct in_addr *ip, uint16_t port){ 
+int udp_bind(struct udp_pcb *pcb, const struct in_addr *ip, uint16_t port){ 
     int rebind = pcb->local_port;
     struct udp_pcb *ipcb;
 		assert(pcb);
@@ -239,7 +240,7 @@ int udp_attach(struct pbuf *p, struct sock *socket) {
 // TODO: figure out if we even need a PCB? or just socket buff. 
 // TODO: test out looking up pcbs.. since matching function may fail
 
-void wrap_restart_kthread(struct trapframe *tf, uint32_t srcid,
+static void wrap_restart_kthread(struct trapframe *tf, uint32_t srcid,
 					long a0, long a1, long a2){
 	restart_kthread((struct kthread*) a0);
 }
@@ -253,7 +254,7 @@ int udp_input(struct pbuf *p){
 	bool local_match = 0;
 	iphdr = (struct ip_hdr *)p->payload;
 	/* Move the header to where the udp header is */
-	if (pbuf_header(p, - PBUF_IP_HLEN)){
+	if (pbuf_header(p, -((int16_t)((iphdr->hdr_len) * 4)))) {
 		warn("udp_input: Did not find a matching PCB for a udp packet\n");
 		pbuf_free(p);
 		return -1;

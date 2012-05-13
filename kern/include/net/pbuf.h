@@ -21,6 +21,14 @@ extern "C" {
 #define PBUF_IP_HLEN        20
 #define PBUF_LINK_HLEN      14 + ETH_PAD_SIZE // Padding
 
+/** indicates this packet's data should be immediately passed to the application */
+#define PBUF_FLAG_PUSH      0x01U
+/** indicates this is a custom pbuf: pbuf_free and pbuf_header handle such a
+    a pbuf differently */
+#define PBUF_FLAG_IS_CUSTOM 0x02U
+/** indicates this pbuf is UDP multicast to be looped back */
+#define PBUF_FLAG_MCASTLOOP 0x04U
+
 typedef enum {
   PBUF_TRANSPORT,
   PBUF_IP,
@@ -96,10 +104,10 @@ bool pbuf_free(struct pbuf *p);
 
 void attach_pbuf(struct pbuf *p, struct pbuf_head *buf_head);
 struct pbuf* detach_pbuf(struct pbuf_head *buf_head);
+uint8_t pbuf_clen(struct pbuf *p);  
+void pbuf_realloc(struct pbuf *p, uint16_t size); 
 // end
 #if 0
-void pbuf_realloc(struct pbuf *p, u16_t size); 
-u8_t pbuf_clen(struct pbuf *p);  
 struct pbuf *pbuf_dechain(struct pbuf *p);
 err_t pbuf_copy(struct pbuf *p_to, struct pbuf *p_from);
 err_t pbuf_take(struct pbuf *buf, const void *dataptr, u16_t len);

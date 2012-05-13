@@ -5,6 +5,7 @@
 #include <net.h>
 #include <net/ip.h>
 #include <net/udp.h>
+#include <net/tcp_impl.h>
 #include <ros/errno.h>
 #include <arch/nic_common.h>
 
@@ -14,7 +15,6 @@ const uint8_t GTWAY[6] = {0xda, 0x76, 0xe7, 0x4c, 0xca, 0x7e};
 /* TODO: ip id unique for all ip packets? or is it unique for a flow? */
 // can do atomic increment at a minimum
 static uint16_t ip_id = 0;
-struct in_addr global_ip = {IP_ADDR};
 
 /* TODO: build arp table, and look up */
 int eth_send(struct pbuf *p, struct in_addr *dest) {
@@ -51,7 +51,8 @@ int eth_send(struct pbuf *p, struct in_addr *dest) {
  * efficiently.
  */
 /* Assume no ip options */
-int ip_output(struct pbuf *p, struct in_addr *src, struct in_addr *dest, uint8_t proto) {
+int ip_output(struct pbuf *p, struct in_addr *src, struct in_addr *dest, 
+							uint8_t ttl, uint8_t tos, uint8_t proto) {
 	struct pbuf *q;
 	struct ip_hdr *iphdr; 	
 	/* TODO: Check for IP_HDRINCL */
@@ -71,14 +72,19 @@ int ip_output(struct pbuf *p, struct in_addr *src, struct in_addr *dest, uint8_t
 	iphdr->version = IPPROTO_IPV4;
 	/* assume no IP options */
 	iphdr->hdr_len = IP_HDR_SZ >> 2;
-	iphdr->tos = 0;
+	if (tos != 0) {
+		iphdr->tos = htons(tos);
+	}
+	else {
+		iphdr->tos = 0;
+	}
 	iphdr->packet_len = htons(p->tot_len);
 	// TODO: NET_LOCK
 	iphdr->id = htons (ip_id); // 1
 	ip_id++;
 	iphdr->flags_frags = htons(0); // 4000  may fragment
 	iphdr->protocol = proto;
-	iphdr->ttl = DEFAULT_TTL;
+	iphdr->ttl = ttl; //DEFAULT_TTL;
 	/* Eventually if we support more than one device this may change */
 	printk("src ip %x, dest ip %x \n", src->s_addr, dest->s_addr);
 	iphdr->src_addr = htonl(src->s_addr);
@@ -132,9 +138,9 @@ int ip_input(struct pbuf *p) {
 
 	/* check if it is destined for me? */
 	/* XXX: IP address for the interface is IP_ANY */
-	if (ntohl(iphdr->dst_addr) != global_ip.s_addr){
+	if (ntohl(iphdr->dst_addr) != LOCAL_IP_ADDR.s_addr){
 		printk("dest ip in network order%x\n", ntohl(iphdr->dst_addr));
-		printk("dest ip in network order%x\n", global_ip.s_addr);
+		printk("dest ip in network order%x\n", LOCAL_IP_ADDR.s_addr);
 		warn("ip mismatch \n");
 		pbuf_free(p);
 		/* TODO:forward packets */
@@ -153,6 +159,9 @@ int ip_input(struct pbuf *p) {
 		case IPPROTO_UDP:
 			return udp_input(p);
 		case IPPROTO_TCP:
+			tcp_input(p);
+			// XXX: error handling for tcp
+			return 0;
 		default:
 			printk("IP protocol type %02x\n", iphdr->protocol);
 			warn("protocol not supported! \n");
