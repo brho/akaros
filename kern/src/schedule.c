@@ -153,6 +153,16 @@ void schedule_init(void)
 	return;
 }
 
+static uint32_t spc2pcoreid(struct sched_pcore *spc)
+{
+	return spc - all_pcores;
+}
+
+static struct sched_pcore *pcoreid2spc(uint32_t pcoreid)
+{
+	return &all_pcores[pcoreid];
+}
+
 /* Round-robins on whatever list it's on */
 static void add_to_list(struct proc *p, struct proc_list *new)
 {
@@ -186,8 +196,19 @@ static void remove_from_any_list(struct proc *p)
 	TAILQ_REMOVE(p->ksched_data.cur_list, p, ksched_data.proc_link);
 }
 
-void register_proc(struct proc *p)
+/************** Process Management Callbacks **************/
+/* a couple notes:
+ * - the proc lock is NOT held for any of these calls.  currently, there is no
+ *   lock ordering between the sched lock and the proc lock.  since the proc
+ *   code doesn't know what we do, it doesn't hold its lock when calling our
+ *   CBs.
+ * - since the proc lock isn't held, the proc could be dying, which means we
+ *   will receive a __sched_proc_destroy() either before or after some of these
+ *   other CBs.  the CBs related to list management need to check and abort if
+ *   DYING */
+void __sched_proc_register(struct proc *p)
 {
+	assert(p->state != PROC_DYING);	/* shouldn't be abel to happen yet */
 	/* one ref for the proc's existence, cradle-to-grave */
 	proc_incref(p, 1);	/* need at least this OR the 'one for existing' */
 	spin_lock(&sched_lock);
@@ -198,21 +219,15 @@ void register_proc(struct proc *p)
 }
 
 /* Returns 0 if it succeeded, an error code otherwise. */
-int proc_change_to_m(struct proc *p)
+void __sched_proc_change_to_m(struct proc *p)
 {
-	int retval;
 	spin_lock(&sched_lock);
-	/* Should only be necessary to lock around the change_to_m call.  It's
-	 * definitely necessary to hold the sched lock the whole time - need to
-	 * atomically change the proc's state and have the ksched take action (and
-	 * not squeeze a proc_destroy in there or something). */
-	spin_lock(&p->proc_lock);
-	retval = __proc_change_to_m(p);
-	spin_unlock(&p->proc_lock);
-	if (retval) {
-		/* Failed for some reason. */
+	/* Need to make sure they aren't dying.  if so, we already dealt with their
+	 * list membership, etc (or soon will).  taking advantage of the 'immutable
+	 * state' of dying (so long as refs are held). */
+	if (p->state == PROC_DYING) {
 		spin_unlock(&sched_lock);
-		return retval;
+		return;
 	}
 	/* Catch user bugs */
 	if (!p->procdata->res_req[RES_CORES].amt_wanted) {
@@ -226,34 +241,9 @@ int proc_change_to_m(struct proc *p)
 	add_to_list(p, primary_mcps);
 	spin_unlock(&sched_lock);
 	//poke_ksched(p, RES_CORES);
-	return retval;
 }
 
-/* Makes sure p is runnable.  Callers may spam this, so it needs to handle
- * repeated calls for the same event.  Callers include event delivery, SCP
- * yield, and new SCPs.  Most every scheduler should do something like this -
- * grab whatever lock you have, then call the proc helper. */
-void proc_wakeup(struct proc *p)
-{
-	/* catch current shitty deadlock... */
-	assert(!per_cpu_info[core_id()].lock_depth);
-	spin_lock(&sched_lock);
-	/* will trigger one of the __sched_.cp_wakeup()s */
-	__proc_wakeup(p);
-	spin_unlock(&sched_lock);
-}
-
-static uint32_t spc2pcoreid(struct sched_pcore *spc)
-{
-	return spc - all_pcores;
-}
-
-static struct sched_pcore *pcoreid2spc(uint32_t pcoreid)
-{
-	return &all_pcores[pcoreid];
-}
-
-/* Helper for proc destroy: unprovisions any pcores for the given list */
+/* Helper for the destroy CB : unprovisions any pcores for the given list */
 static void unprov_pcore_list(struct sched_pcore_tailq *list_head)
 {
 	struct sched_pcore *spc_i;
@@ -267,39 +257,97 @@ static void unprov_pcore_list(struct sched_pcore_tailq *list_head)
 	TAILQ_INIT(list_head);
 }
 
-/* Destroys the given process.  This may be called from another process, a light
- * kernel thread (no real process context), asynchronously/cross-core, or from
- * the process on its own core.
+/* Sched callback called when the proc dies.  pc_arr holds the cores the proc
+ * had, if any, and nr_cores tells us how many are in the array.
  *
  * An external, edible ref is passed in.  when we return and they decref,
- * __proc_free will be called */
-void proc_destroy(struct proc *p)
+ * __proc_free will be called (when the last one is done). */
+void __sched_proc_destroy(struct proc *p, uint32_t *pc_arr, uint32_t nr_cores)
 {
-	uint32_t nr_cores_revoked = 0;
 	spin_lock(&sched_lock);
-	spin_lock(&p->proc_lock);
-	/* storage for pc_arr is alloced at decl, which is after grabbing the lock*/
-	uint32_t pc_arr[p->procinfo->num_vcores];
-	/* If this returns true, it means we successfully destroyed the proc */
-	if (__proc_destroy(p, pc_arr, &nr_cores_revoked)) {
-		/* Do our cleanup.  note that proc_free won't run since we have an
-		 * external reference, passed in */
-		/* Unprovision any cores.  Note this is different than track_dealloc.
-		 * The latter does bookkeeping when an allocation changes.  This is a
-		 * bulk *provisioning* change. */
-		unprov_pcore_list(&p->ksched_data.prov_alloc_me);
-		unprov_pcore_list(&p->ksched_data.prov_not_alloc_me);
-		/* Remove from whatever list we are on */
-		remove_from_any_list(p);
-		/* Drop the cradle-to-the-grave reference, jet-li */
-		proc_decref(p);
-		if (nr_cores_revoked) {
-			__put_idle_cores(p, pc_arr, nr_cores_revoked);
-			__prov_track_dealloc_bulk(p, pc_arr, nr_cores_revoked);
-		}
+	/* Unprovision any cores.  Note this is different than track_dealloc.
+	 * The latter does bookkeeping when an allocation changes.  This is a
+	 * bulk *provisioning* change. */
+	unprov_pcore_list(&p->ksched_data.prov_alloc_me);
+	unprov_pcore_list(&p->ksched_data.prov_not_alloc_me);
+	/* Remove from whatever list we are on */
+	remove_from_any_list(p);
+	if (nr_cores) {
+		__put_idle_cores(p, pc_arr, nr_cores);
+		__prov_track_dealloc_bulk(p, pc_arr, nr_cores);
 	}
-	spin_unlock(&p->proc_lock);
 	spin_unlock(&sched_lock);
+	/* Drop the cradle-to-the-grave reference, jet-li */
+	proc_decref(p);
+}
+
+/* ksched callbacks.  p just woke up and is UNLOCKED. */
+void __sched_mcp_wakeup(struct proc *p)
+{
+	spin_lock(&sched_lock);
+	if (p->state == PROC_DYING) {
+		spin_unlock(&sched_lock);
+		return;
+	}
+	/* could try and prioritize p somehow (move it to the front of the list).
+	 * for now, just help them out a bit (mild help here, can remove this) */
+	if (!p->procdata->res_req[RES_CORES].amt_wanted)
+		p->procdata->res_req[RES_CORES].amt_wanted = 1;
+	spin_unlock(&sched_lock);
+	/* note they could be dying at this point too. */
+	poke(&ksched_poker, p);
+}
+
+/* ksched callbacks.  p just woke up and is UNLOCKED. */
+void __sched_scp_wakeup(struct proc *p)
+{
+	spin_lock(&sched_lock);
+	if (p->state == PROC_DYING) {
+		spin_unlock(&sched_lock);
+		return;
+	}
+	/* might not be on a list if it is new.  o/w, it should be unrunnable */
+	__remove_from_any_list(p);
+	add_to_list(p, &runnable_scps);
+	spin_unlock(&sched_lock);
+}
+
+/* Callback to return a core to the ksched, which tracks it as idle and
+ * deallocated from p.  The proclock is held (__core_req depends on that).
+ *
+ * This also is a trigger, telling us we have more cores.  We could/should make
+ * a scheduling decision (or at least plan to). */
+void __sched_put_idle_core(struct proc *p, uint32_t coreid)
+{
+	struct sched_pcore *spc = pcoreid2spc(coreid);
+	spin_lock(&sched_lock);
+	TAILQ_INSERT_TAIL(&idlecores, spc, alloc_next);
+	__prov_track_dealloc(p, coreid);
+	spin_unlock(&sched_lock);
+}
+
+/* Helper for put_idle and core_req.  Note this does not track_dealloc.  When we
+ * get rid of / revise proc_preempt_all and put_idle_cores, we can get rid of
+ * this.  (the ksched will never need it - only external callers). */
+static void __put_idle_cores(struct proc *p, uint32_t *pc_arr, uint32_t num)
+{
+	struct sched_pcore *spc_i;
+	for (int i = 0; i < num; i++) {
+		spc_i = pcoreid2spc(pc_arr[i]);
+		TAILQ_INSERT_TAIL(&idlecores, spc_i, alloc_next);
+	}
+}
+
+/* Callback, bulk interface for put_idle.  Note this one also calls track_dealloc,
+ * which the internal version does not.  The proclock is held for this. */
+void __sched_put_idle_cores(struct proc *p, uint32_t *pc_arr, uint32_t num)
+{
+	spin_lock(&sched_lock);
+	/* TODO: when we revise this func, look at __put_idle */
+	__put_idle_cores(p, pc_arr, num);
+	__prov_track_dealloc_bulk(p, pc_arr, num);
+	spin_unlock(&sched_lock);
+	/* could trigger a sched decision here */
 }
 
 /* mgmt/LL cores should call this to schedule the calling core and give it to an
@@ -307,6 +355,7 @@ void proc_destroy(struct proc *p)
  * calling.  returns TRUE if it scheduled a proc. */
 static bool __schedule_scp(void)
 {
+	// TODO: sort out lock ordering (proc_run_s also locks)
 	struct proc *p;
 	uint32_t pcoreid = core_id();
 	struct per_cpu_info *pcpui = &per_cpu_info[pcoreid];
@@ -462,21 +511,6 @@ void poke_ksched(struct proc *p, int res_type)
 	poke(&ksched_poker, p);
 }
 
-/* ksched callbacks.  p just woke up, is unlocked, and the ksched lock is held */
-void __sched_mcp_wakeup(struct proc *p)
-{
-	/* could try and prioritize p somehow (move it to the front of the list) */
-	poke(&ksched_poker, p);
-}
-
-/* ksched callbacks.  p just woke up, is unlocked, and the ksched lock is held */
-void __sched_scp_wakeup(struct proc *p)
-{
-	/* might not be on a list if it is new.  o/w, it should be unrunnable */
-	__remove_from_any_list(p);
-	add_to_list(p, &runnable_scps);
-}
-
 /* The calling cpu/core has nothing to do and plans to idle/halt.  This is an
  * opportunity to pick the nature of that halting (low power state, etc), or
  * provide some other work (_Ss on LL cores).  Note that interrupts are
@@ -497,60 +531,6 @@ void cpu_bored(void)
 	}
 	/* Could drop into the monitor if there are no processes at all.  For now,
 	 * the 'call of the giraffe' suffices. */
-}
-
-/* Externally called function to return a core to the ksched, which tracks it as
- * idle and deallocated from p.
- *
- * This also is a trigger, telling us we have more cores.  We could/should make
- * a scheduling decision (or at least plan to). */
-void put_idle_core(struct proc *p, uint32_t coreid)
-{
-	struct sched_pcore *spc = pcoreid2spc(coreid);
-	spin_lock(&sched_lock);
-	/* ignore_next_idle gets set if the ksched notices a core is not allocated
-	 * before put_idle gets called.  This can happen if the proc yielded the
-	 * core while the ksched is holding its lock (protecting lists), and the
-	 * proc is spinning on the lock in this function, trying to give it back.
-	 * When this happens, the core has already been 'given back', so we ignore
-	 * the signal.  We're using a count instead of a bool for cases where this
-	 * stacks (would require a change in provisioning, so it shouldn't happen
-	 * for now). */
-	if (spc->ignore_next_idle) {
-		spc->ignore_next_idle--;
-	} else {
-		TAILQ_INSERT_TAIL(&idlecores, spc, alloc_next);
-		__prov_track_dealloc(p, coreid);
-	}
-	spin_unlock(&sched_lock);
-}
-
-/* Helper for put_idle and core_req.  Note this does not track_dealloc, but it
- * does handle ignore_next.  When we get rid of / revise proc_preempt_all and
- * put_idle_cores, we can get rid of this.  (the ksched will never need it -
- * only external callers). */
-static void __put_idle_cores(struct proc *p, uint32_t *pc_arr, uint32_t num)
-{
-	struct sched_pcore *spc_i;
-	for (int i = 0; i < num; i++) {
-		spc_i = pcoreid2spc(pc_arr[i]);
-		if (spc_i->ignore_next_idle)
-			spc_i->ignore_next_idle--;
-		else
-			TAILQ_INSERT_TAIL(&idlecores, spc_i, alloc_next);
-	}
-}
-
-/* External interface for put_idle.  Note this one also calls track_dealloc,
- * which the internal version does not. */
-void put_idle_cores(struct proc *p, uint32_t *pc_arr, uint32_t num)
-{
-	spin_lock(&sched_lock);
-	/* TODO: when we revise this func, look at __put_idle */
-	__put_idle_cores(p, pc_arr, num);
-	__prov_track_dealloc_bulk(p, pc_arr, num);
-	spin_unlock(&sched_lock);
-	/* could trigger a sched decision here */
 }
 
 /* Available resources changed (plus or minus).  Some parts of the kernel may
@@ -634,7 +614,8 @@ static void __core_request(struct proc *p, uint32_t amt_needed)
 				 * trigger) a track_dealloc and put it on the idle list.  our
 				 * signal for this is spc_i->alloc_proc being 0.  We need to
 				 * spin and let whoever is trying to free the core grab the
-				 * ksched lock.
+				 * ksched lock.  We could use an 'ignore_next_idle' flag per
+				 * sched_pcore, but it's not critical anymore.
 				 *
 				 * Note, we're relying on us being the only preemptor - if the
 				 * core was unmapped by *another* preemptor, there would be no

@@ -23,7 +23,6 @@ struct sched_pcore {
 	TAILQ_ENTRY(sched_pcore)	alloc_next;			/* on an alloc list (idle)*/
 	struct proc					*prov_proc;			/* who this is prov to */
 	struct proc					*alloc_proc;		/* who this is alloc to */
-	unsigned int				ignore_next_idle;	/* helps with lock order */
 };
 TAILQ_HEAD(sched_pcore_tailq, sched_pcore);
 
@@ -39,20 +38,24 @@ struct sched_proc_data {
 
 void schedule_init(void);
 
-/************** Process management **************/
+/************** Process Management Callbacks **************/
 /* Tell the ksched about the process, which it will track cradle-to-grave */
-void register_proc(struct proc *p);
+void __sched_proc_register(struct proc *p);
 
-/* Makes sure p is runnable.  Callers include event delivery, SCP yield, and new
- * SCPs.  Will trigger the __sched_.cp_wakeup() callbacks. */
-void proc_wakeup(struct proc *p);
+/* The proc was an SCP and is becoming an MCP */
+void __sched_proc_change_to_m(struct proc *p);
 
-/* The ksched starts the death process (lock ordering issue), which calls back
- * to proc.c's __proc_destroy while holding the locks (or whatever) */
-void proc_destroy(struct proc *p);
+/* The proc is dying */
+void __sched_proc_destroy(struct proc *p, uint32_t *pc_arr, uint32_t nr_cores);
 
-/* Changes the proc from an SCP to an MCP */
-int proc_change_to_m(struct proc *p);
+/* Makes sure p is runnable. */
+void __sched_mcp_wakeup(struct proc *p);
+void __sched_scp_wakeup(struct proc *p);
+
+/* Gets called when a pcore becomes idle (like in proc yield).  These are 'cg'
+ * cores, given to MCPs, that have been async returned to the ksched. */
+void __sched_put_idle_core(struct proc *p, uint32_t coreid);
+void __sched_put_idle_cores(struct proc *p, uint32_t *pc_arr, uint32_t num);
 
 /************** Decision making **************/
 /* Call the main scheduling algorithm.  Not clear yet if the main kernel will
@@ -64,20 +67,10 @@ void schedule(void);
  * be careful of abuse. */
 void poke_ksched(struct proc *p, int res_type);
 
-/* Callbacks triggered from proc_wakeup() */
-void __sched_mcp_wakeup(struct proc *p);
-void __sched_scp_wakeup(struct proc *p);
-
 /* The calling cpu/core has nothing to do and plans to idle/halt.  This is an
  * opportunity to pick the nature of that halting (low power state, etc), or
  * provide some other work (_Ss on LL cores). */
 void cpu_bored(void);
-
-/* Gets called when a pcore becomes idle (like in proc yield).  These are 'cg'
- * cores, given to MCPs, that have been async returned to the ksched.  If the
- * ksched preempts a core, this won't get called (unless it yielded first). */
-void put_idle_core(struct proc *p, uint32_t coreid);
-void put_idle_cores(struct proc *p, uint32_t *pc_arr, uint32_t num);
 
 /* Available resources changed (plus or minus).  Some parts of the kernel may
  * call this if a particular resource that is 'quantity-based' changes.  Things

@@ -307,8 +307,9 @@ error_t proc_alloc(struct proc **pp, struct proc *parent)
  * push setting the state to CREATED into here. */
 void __proc_ready(struct proc *p)
 {
-	/* Tell the ksched about us */
-	register_proc(p);
+	/* Tell the ksched about us.  TODO: do we need to worry about the ksched
+	 * doing stuff to us before we're added to the pid_hash? */
+	__sched_proc_register(p);
 	spin_lock(&pid_hash_lock);
 	hashtable_insert(pid_hash, (void*)(long)p->pid, p);
 	spin_unlock(&pid_hash_lock);
@@ -662,12 +663,8 @@ void proc_restartcore(void)
 	__proc_startcore(pcpui->owning_proc, pcpui->cur_tf);
 }
 
-/* Destroys the process.  This should be called by the ksched, which needs to
- * hold the lock.  It will destroy the process and return any cores allocated to
- * the proc via pc_arr and nr_revoked.  It's up to the caller to have enough
- * space for pc_arr.  This will return TRUE if we successfully killed it, FALSE
- * otherwise.  Failure isn't a big deal either - it can happen due to concurrent
- * calls to proc_destroy. 
+/* Destroys the process.  It will destroy the process and return any cores
+ * to the ksched via the __sched_proc_destroy() CB.
  *
  * Here's the way process death works:
  * 0. grab the lock (protects state transition and core map)
@@ -687,23 +684,26 @@ void proc_restartcore(void)
  * come in, making you abandon_core, as if you weren't running.  It may be that
  * the only reference to p is the one you passed in, and when you decref, it'll
  * get __proc_free()d. */
-bool __proc_destroy(struct proc *p, uint32_t *pc_arr, uint32_t *nr_revoked)
+void proc_destroy(struct proc *p)
 {
+	uint32_t nr_cores_revoked = 0;
 	struct kthread *sleeper;
+	spin_lock(&p->proc_lock);
+	/* storage for pc_arr is alloced at decl, which is after grabbing the lock*/
+	uint32_t pc_arr[p->procinfo->num_vcores];
 	switch (p->state) {
-		case PROC_DYING: // someone else killed this already.
-			return FALSE;
-		case PROC_RUNNABLE_M:
-			/* Need to reclaim any cores this proc might have, even though it's
-			 * not running yet. */
-			*nr_revoked = __proc_take_allcores(p, pc_arr, FALSE);
-			// fallthrough
+		case PROC_DYING: /* someone else killed this already. */
+			spin_unlock(&p->proc_lock);
+			return;
+		case PROC_CREATED:
 		case PROC_RUNNABLE_S:
-			/* might need to pull from lists, though i'm currently a fan of the
-			 * model where external refs notice DYING (if it matters to them)
-			 * and decref when they are done.  the ksched will notice the proc
-			 * is dying and handle it accordingly (which delay the reaping til
-			 * the next call to schedule()) */
+		case PROC_WAITING:
+			break;
+		case PROC_RUNNABLE_M:
+		case PROC_RUNNING_M:
+			/* Need to reclaim any cores this proc might have, even if it's not
+			 * running yet.  Those running will receive a __death */
+			nr_cores_revoked = __proc_take_allcores(p, pc_arr, FALSE);
 			break;
 		case PROC_RUNNING_S:
 			#if 0
@@ -723,45 +723,43 @@ bool __proc_destroy(struct proc *p, uint32_t *pc_arr, uint32_t *nr_revoked)
 			/* If we ever have RUNNING_S run on non-mgmt cores, we'll need to
 			 * tell the ksched about this now-idle core (after unlocking) */
 			break;
-		case PROC_RUNNING_M:
-			/* Send the DEATH message to every core running this process, and
-			 * deallocate the cores.
-			 * The rule is that the vcoremap is set before proc_run, and reset
-			 * within proc_destroy */
-			*nr_revoked = __proc_take_allcores(p, pc_arr, FALSE);
-			break;
-		case PROC_CREATED:
-			break;
 		default:
 			warn("Weird state(%s) in %s()", procstate2str(p->state),
 			     __FUNCTION__);
-			return FALSE;
+			spin_unlock(&p->proc_lock);
+			return;
 	}
 	/* At this point, a death IPI should be on its way, either from the
 	 * RUNNING_S one, or from proc_take_cores with a __death.  in general,
 	 * interrupts should be on when you call proc_destroy locally, but currently
 	 * aren't for all things (like traphandlers). */
 	__proc_set_state(p, PROC_DYING);
+	spin_unlock(&p->proc_lock);
 	/* This prevents processes from accessing their old files while dying, and
 	 * will help if these files (or similar objects in the future) hold
-	 * references to p (preventing a __proc_free()). */
+	 * references to p (preventing a __proc_free()).  Need to unlock before
+	 * doing this - the proclock doesn't protect the files (not proc state), and
+	 * closing these might block (can't block while spinning). */
+	/* TODO: might need some sync protection */
 	close_all_files(&p->open_files, FALSE);
+	/* Tell the ksched about our death, and which cores we freed up */
+	__sched_proc_destroy(p, pc_arr, nr_cores_revoked);
 	/* Signal our state change.  Assuming we only have one waiter right now. */
 	sleeper = __up_sem(&p->state_change, TRUE);
 	if (sleeper)
 		kthread_runnable(sleeper);
-	return TRUE;
 }
 
 /* Turns *p into an MCP.  Needs to be called from a local syscall of a RUNNING_S
- * process.  Returns 0 if it succeeded, an error code otherwise.  You should
- * hold the lock before calling. */
-int __proc_change_to_m(struct proc *p)
+ * process.  Returns 0 if it succeeded, an error code otherwise. */
+int proc_change_to_m(struct proc *p)
 {
+	int retval = 0;
 	int8_t state = 0;
+	spin_lock(&p->proc_lock);
 	/* in case userspace erroneously tries to change more than once */
 	if (__proc_is_mcp(p))
-		return -EINVAL;
+		goto error_out;
 	switch (p->state) {
 		case (PROC_RUNNING_S):
 			/* issue with if we're async or not (need to preempt it)
@@ -802,21 +800,26 @@ int __proc_change_to_m(struct proc *p)
 			/* change to runnable_m (it's TF is already saved) */
 			__proc_set_state(p, PROC_RUNNABLE_M);
 			p->procinfo->is_mcp = TRUE;
-			break;
+			spin_unlock(&p->proc_lock);
+			/* Tell the ksched that we're a real MCP now! */
+			__sched_proc_change_to_m(p);
+			return 0;
 		case (PROC_RUNNABLE_S):
 			/* Issues: being on the runnable_list, proc_set_state not liking
 			 * it, and not clearly thinking through how this would happen.
 			 * Perhaps an async call that gets serviced after you're
 			 * descheduled? */
 			warn("Not supporting RUNNABLE_S -> RUNNABLE_M yet.\n");
-			return -EINVAL;
+			goto error_out;
 		case (PROC_DYING):
 			warn("Dying, core request coming from %d\n", core_id());
-			return -EINVAL;
+			goto error_out;
 		default:
-			return -EINVAL;
+			goto error_out;
 	}
-	return 0;
+error_out:
+	spin_unlock(&p->proc_lock);
+	return -EINVAL;
 }
 
 /* Old code to turn a RUNNING_M to a RUNNING_S, with the calling context
@@ -1047,7 +1050,7 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 	}
 	spin_unlock(&p->proc_lock);
 	/* Hand the now-idle core to the ksched */
-	put_idle_core(p, pcoreid);
+	__sched_put_idle_core(p, pcoreid);
 	goto out_yield_core;
 out_failed:
 	/* for some reason we just want to return, either to take a KMSG that cleans
@@ -1058,7 +1061,7 @@ out_failed:
 out_yield_core:				/* successfully yielded the core */
 	proc_decref(p);			/* need to eat the ref passed in */
 	/* Clean up the core and idle.  Need to do this before enabling interrupts,
-	 * since once we put_idle_core() and unlock, we could get a startcore. */
+	 * since once we call __sched_put_idle_core(), we could get a startcore. */
 	clear_owning_proc(pcoreid);	/* so we don't restart */
 	abandon_core();
 	smp_idle();				/* will reenable interrupts */
@@ -1092,25 +1095,24 @@ void proc_notify(struct proc *p, uint32_t vcoreid)
 	}
 }
 
-/* Makes sure p is runnable.  May be spammed, via the ksched.  Called only by
- * the ksched when it holds the ksched lock (or whatever).  We need to lock both
- * the ksched and the proc at some point, so we need to start this call in the
- * ksched (lock ordering).
- *
- * Will call back to the ksched via one of the __sched_.cp_wakeup() calls. */
-void __proc_wakeup(struct proc *p)
+/* Makes sure p is runnable.  Callers may spam this, so it needs to handle
+ * repeated calls for the same event.  Callers include event delivery, SCP
+ * yield, and new SCPs.  Will trigger __sched_.cp_wakeup() CBs.  Will only
+ * trigger the CB once, regardless of how many times we are called, *until* the
+ * proc becomes WAITING again, presumably because of something the ksched did.*/
+void proc_wakeup(struct proc *p)
 {
 	spin_lock(&p->proc_lock);
 	if (__proc_is_mcp(p)) {
 		/* we only wake up WAITING mcps */
-		if (p->state != PROC_WAITING)
-			goto out_unlock;
-		if (!p->procdata->res_req[RES_CORES].amt_wanted)
-			p->procdata->res_req[RES_CORES].amt_wanted = 1;
+		if (p->state != PROC_WAITING) {
+			spin_unlock(&p->proc_lock);
+			return;
+		}
 		__proc_set_state(p, PROC_RUNNABLE_M);
 		spin_unlock(&p->proc_lock);
 		__sched_mcp_wakeup(p);
-		goto out;
+		return;
 	} else {
 		/* SCPs can wake up for a variety of reasons.  the only times we need
 		 * to do something is if it was waiting or just created.  other cases
@@ -1123,22 +1125,19 @@ void __proc_wakeup(struct proc *p)
 			case (PROC_RUNNABLE_S):
 			case (PROC_RUNNING_S):
 			case (PROC_DYING):
-				goto out_unlock;
+				spin_unlock(&p->proc_lock);
+				return;
 			case (PROC_RUNNABLE_M):
 			case (PROC_RUNNING_M):
 				warn("Weird state(%s) in %s()", procstate2str(p->state),
 				     __FUNCTION__);
-				goto out_unlock;
+				spin_unlock(&p->proc_lock);
+				return;
 		}
 		printd("[kernel] FYI, waking up an _S proc\n");	/* thanks, past brho! */
 		spin_unlock(&p->proc_lock);
 		__sched_scp_wakeup(p);
-		goto out;
 	}
-out_unlock:
-	spin_unlock(&p->proc_lock);
-out:
-	return;
 }
 
 /* Is the process in multi_mode / is an MCP or not?  */
@@ -1279,7 +1278,7 @@ void proc_preempt_all(struct proc *p, uint64_t usec)
 	/* TODO: when we revise this func, look at __put_idle */
 	/* Return the cores to the ksched */
 	if (num_revoked)
-		put_idle_cores(p, pc_arr, num_revoked);
+		__sched_put_idle_cores(p, pc_arr, num_revoked);
 }
 
 /* Give the specific pcore to proc p.  Lots of assumptions, so don't really use
