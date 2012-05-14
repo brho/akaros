@@ -312,6 +312,26 @@ void process_routine_kmsg(struct trapframe *tf)
 	}
 }
 
+/* extremely dangerous and racy: prints out the immed and routine kmsgs for a
+ * specific core (so possibly remotely).  Same as x86. */
+void print_kmsgs(uint32_t coreid)
+{
+	struct per_cpu_info *pcpui = &per_cpu_info[coreid];
+	void __print_kmsgs(struct kernel_msg_list *list, char *type)
+	{
+		char *fn_name;
+		struct kernel_message *kmsg_i;
+		STAILQ_FOREACH(kmsg_i, list, link) {
+			fn_name = get_fn_name((long)kmsg_i->pc);
+			printk("%s KMSG on %d from %d to run %08p(%s)\n", type,
+			       kmsg_i->dstid, kmsg_i->srcid, kmsg_i->pc, fn_name); 
+			kfree(fn_name);
+		}
+	}
+	__print_kmsgs(&pcpui->immed_amsgs, "Immedte");
+	__print_kmsgs(&pcpui->routine_amsgs, "Routine");
+}
+
 void
 unhandled_trap(trapframe_t* state)
 {

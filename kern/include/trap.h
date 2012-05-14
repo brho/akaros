@@ -97,5 +97,6 @@ typedef struct kernel_message kernel_message_t;
 uint32_t send_kernel_message(uint32_t dst, amr_t pc, long arg0, long arg1,
                              long arg2, int type);
 void process_routine_kmsg(struct trapframe *tf);
+void print_kmsgs(uint32_t coreid);
 
 #endif /* ROS_KERN_TRAP_H */

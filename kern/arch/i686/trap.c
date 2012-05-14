@@ -252,6 +252,7 @@ static void trap_dispatch(struct trapframe *tf)
 			char *fn_name = get_fn_name(tf->tf_eip);
 			printk("Core %d is at %08p (%s)\n", core_id(), tf->tf_eip, fn_name);
 			kfree(fn_name);
+			print_kmsgs(core_id());
 			break;
 		case T_BRKPT:
 			enable_irq();
@@ -702,4 +703,24 @@ void process_routine_kmsg(struct trapframe *tf)
 		assert(msg_cp.dstid == core_id());
 		msg_cp.pc(tf, msg_cp.srcid, msg_cp.arg0, msg_cp.arg1, msg_cp.arg2);
 	}
+}
+
+/* extremely dangerous and racy: prints out the immed and routine kmsgs for a
+ * specific core (so possibly remotely) */
+void print_kmsgs(uint32_t coreid)
+{
+	struct per_cpu_info *pcpui = &per_cpu_info[coreid];
+	void __print_kmsgs(struct kernel_msg_list *list, char *type)
+	{
+		char *fn_name;
+		struct kernel_message *kmsg_i;
+		STAILQ_FOREACH(kmsg_i, list, link) {
+			fn_name = get_fn_name((long)kmsg_i->pc);
+			printk("%s KMSG on %d from %d to run %08p(%s)\n", type,
+			       kmsg_i->dstid, kmsg_i->srcid, kmsg_i->pc, fn_name); 
+			kfree(fn_name);
+		}
+	}
+	__print_kmsgs(&pcpui->immed_amsgs, "Immedte");
+	__print_kmsgs(&pcpui->routine_amsgs, "Routine");
 }
