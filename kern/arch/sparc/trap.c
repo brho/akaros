@@ -357,6 +357,7 @@ unhandled_trap(trapframe_t* state)
 		spin_unlock(&screwup_lock);
 
 		assert(current);
+		enable_irq();
 		proc_destroy(current);
 		/* Not sure if SPARC has a central point that would run proc_restartcore
 		 */
@@ -468,6 +469,7 @@ handle_pop_tf(trapframe_t* state)
 
 	trapframe_t tf, *tf_p = &tf;
 	if (memcpy_from_user(current,&tf,(void*)state->gpr[8],sizeof(tf))) {
+		enable_irq();
 		proc_destroy(current);
 		proc_restartcore();
 	}
@@ -483,6 +485,7 @@ handle_set_tf(trapframe_t* state)
 	advance_pc(state);
 	if (memcpy_to_user(current,(void*)state->gpr[8],state,sizeof(*state))) {
 		proc_incref(current, 1);
+		enable_irq();
 		proc_destroy(current);
 		proc_restartcore();
 	}

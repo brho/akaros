@@ -276,6 +276,7 @@ static void trap_dispatch(struct trapframe *tf)
 				panic("Damn Damn!  Unhandled trap in the kernel!");
 			else {
 				warn("Unexpected trap from userspace");
+				enable_irq();
 				proc_destroy(current);
 			}
 	}
@@ -482,6 +483,8 @@ void page_fault_handler(struct trapframe *tf)
 		print_trapframe(tf);
 		panic("Page Fault in the Kernel at 0x%08x!", fault_va);
 	}
+	/* safe to reenable after rcr2 */
+	enable_irq();
 	if ((err = handle_page_fault(current, fault_va, prot))) {
 		/* Destroy the faulting process */
 		printk("[%08x] user %s fault va %08x ip %08x on core %d with err %d\n",

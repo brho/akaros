@@ -312,6 +312,7 @@ int mon_bin_run(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 
 int mon_procinfo(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 {
+	int8_t irq_state = 0;
 	if (argc < 2) {
 		printk("Usage: procinfo OPTION\n");
 		printk("\tidlecores: show idle core map\n");
@@ -358,7 +359,9 @@ int mon_procinfo(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 			printk("No such proc\n");
 			return 1;
 		}
+		enable_irqsave(&irq_state);
 		proc_destroy(p);
+		disable_irqsave(&irq_state);
 		proc_decref(p);
 	} else {
 		printk("Bad option\n");
@@ -473,6 +476,7 @@ int mon_measure(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 {
 	uint64_t begin = 0, diff = 0;
 	uint32_t end_refcnt = 0;
+	int8_t irq_state = 0;
 
 	if (argc < 2) {
 		printk("Usage: measure OPTION\n");
@@ -500,7 +504,9 @@ int mon_measure(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 		printk("Warning: this will be inaccurate due to the appserver.\n");
 		end_refcnt = kref_refcnt(&p->p_kref) - p->procinfo->num_vcores - 1;
 #endif /* __CONFIG_APPSERVER__ */
+		enable_irqsave(&irq_state);
 		proc_destroy(p);
+		disable_irqsave(&irq_state);
 		proc_decref(p);
 #ifdef __CONFIG_APPSERVER__
 		/* Won't be that accurate, since it's not actually going through the
