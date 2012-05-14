@@ -919,10 +919,6 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 	struct vcore *vc;
 	struct preempt_data *vcpd;
 	int8_t state = 0;
-	/* Need to disable before even reading vcoreid, since we could be unmapped
-	 * by a __preempt or __death.  _S also needs ints disabled, so we'll just do
-	 * it immediately. */
-	disable_irqsave(&state);
 	/* Need to lock before checking the vcoremap to find out who we are, in case
 	 * we're getting __preempted and __startcored, from a remote core (in which
 	 * case we might have come in thinking we were vcore X, but had X preempted
@@ -931,6 +927,11 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 	 * preempt the core, then decide to give it back with another grant in
 	 * between. */
 	spin_lock(&p->proc_lock); /* horrible scalability.  =( */
+	/* Need to disable before even reading vcoreid, since we could be unmapped
+	 * by a __preempt or __death.  _S also needs ints disabled, so we'll just do
+	 * it immediately.  Finally, we need to disable AFTER locking.  It is a bug
+	 * to grab the lock while irq's are disabled. */
+	disable_irqsave(&state);
 	switch (p->state) {
 		case (PROC_RUNNING_S):
 			if (!being_nice) {
@@ -1724,11 +1725,12 @@ void proc_change_to_vcore(struct proc *p, uint32_t new_vcoreid,
 	struct vcore *caller_vc, *new_vc;
 	struct event_msg preempt_msg = {0};
 	int8_t state = 0;
+	/* Need to lock before reading the vcoremap, like in yield.  Need to do this
+	 * before disabling irqs (deadlock with incoming proc mgmt kmsgs) */
+	spin_lock(&p->proc_lock);
 	/* Need to disable before even reading caller_vcoreid, since we could be
 	 * unmapped by a __preempt or __death, like in yield. */
 	disable_irqsave(&state);
-	/* Need to lock before reading the vcoremap, like in yield */
-	spin_lock(&p->proc_lock);
 	/* new_vcoreid is already runing, abort */
 	if (vcore_is_mapped(p, new_vcoreid))
 		goto out_failed;
