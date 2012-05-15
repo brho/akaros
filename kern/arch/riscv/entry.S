@@ -34,7 +34,7 @@ save_kernel_tf_asm:
 
   # set EPC to this function's return address
   STORE  ra,33*REGBYTES(a0)
-
+  ret
   .end  save_kernel_tf_asm
 
   .text
@@ -136,6 +136,7 @@ trap_entry:
   sll   x1, x1, LOG_REGBYTES
   add   x2, x2, x1
   LOAD  x2, 0(x2)
+  add   x2, x2, -SIZEOF_TRAPFRAME_T
 
 1:# save gprs
   STORE  x3,3*REGBYTES(x2)

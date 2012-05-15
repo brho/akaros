@@ -30,8 +30,8 @@ read_tsc(void)
 static __inline void
 cpu_relax(void)
 {
-	long ctr = 8;
-	asm volatile("1: addi %0, %0, -1; bnez %0, 1b" : "=&r"(ctr) : : "memory");
+	long ctr;
+	asm volatile("li %0, 8; 1: addi %0, %0, -1; bnez %0, 1b" : "=r"(ctr) : : "memory");
 }
 
 #endif /* PARLIB_ARCH_H */

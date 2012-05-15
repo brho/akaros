@@ -2247,10 +2247,10 @@ index 0000000..9b2aa4c
 +#endif /* ! GCC_MIPS_PROTOS_H */
 diff --git a/gcc-4.6.1/gcc/config/riscv/riscv.c b/gcc-4.6.1/gcc/config/riscv/riscv.c
 new file mode 100644
-index 0000000..4de93b0
+index 0000000..c325df9
 --- /dev/null
 +++ gcc-4.6.1/gcc/config/riscv/riscv.c
-@@ -0,0 +1,6481 @@
+@@ -0,0 +1,6479 @@
 +/* Subroutines used for MIPS code generation.
 +   Copyright (C) 1989, 1990, 1991, 1993, 1994, 1995, 1996, 1997, 1998,
 +   1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,
@@ -8511,11 +8511,9 @@ index 0000000..4de93b0
 +
 +  trampoline[i++] = OP (RISCV_ITYPE (RDNPC, gp, 0, 0));
 +  trampoline[i++] = OP (RISCV_ITYPE (LREG, PIC_FUNCTION_ADDR_REGNUM,
-+    				   target_function_offset - 4,
-+    				   gp));
++    				   gp, target_function_offset - 4));
 +  trampoline[i++] = OP (RISCV_ITYPE (LREG, STATIC_CHAIN_REGNUM,
-+    				   static_chain_offset - 4,
-+    				   gp));
++    				   gp, static_chain_offset - 4));
 +  trampoline[i++] = OP (RISCV_ITYPE (JALR_J, 0, PIC_FUNCTION_ADDR_REGNUM, 0));
 +
 +  gcc_assert (i * 4 == TRAMPOLINE_CODE_SIZE);

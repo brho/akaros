@@ -17,7 +17,6 @@ __pop_ros_tf_regs:
   REG_L s8,28*SZREG(a0)
   REG_L s9,29*SZREG(a0)
   REG_L sp,30*SZREG(a0)
-  REG_L tp,31*SZREG(a0)
 
   REG_L ra,33*SZREG(a0)
 
@@ -39,7 +38,6 @@ __save_ros_tf_regs:
   REG_S s8,28*SZREG(a0)
   REG_S s9,29*SZREG(a0)
   REG_S sp,30*SZREG(a0)
-  REG_S tp,31*SZREG(a0)
 
   REG_S ra,33*SZREG(a0)
 

@@ -68,13 +68,6 @@ static inline void __pop_ros_tf(struct user_trapframe *tf, uint32_t vcoreid,
 	tf = _tf;
 	vcoreid = _vcoreid;
 	struct preempt_data* vcpd = &__procdata.vcore_preempt_data[vcoreid];
-
-	// if this is a trap frame we just init'ed, we need to set up TLS
-	if(tf->gpr[31] == 0)
-		tf->gpr[31] = (long)get_tls_desc(vcoreid);
-	else
-		assert(tf->gpr[31] == (long)get_tls_desc(vcoreid));
-
 	__pop_ros_tf_regs(tf, vcpd, vcoreid, helper);
 }
 
