@@ -183,16 +183,6 @@ trap_entry:
   mfpcr  x3,ASM_CR(PCR_CAUSE)        # cause
   STORE  x3,35*REGBYTES(x2)
 
-  # get faulting insn, if it wasn't a fetch-related trap
-  li    x5, CAUSE_MISALIGNED_FETCH
-  li    x6, CAUSE_FAULT_FETCH
-  beq   x3, x5, 1f
-  beq   x3, x6, 1f
-  lh    x3,0(x4)
-  lh    x4,2(x4)
-  sh    x3,  36*REGBYTES(x2)
-  sh    x4,2+36*REGBYTES(x2)
-1:
   li    s9, 0
   move  sp, x2
   move  a0, x2

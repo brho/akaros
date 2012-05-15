@@ -139,8 +139,8 @@ format_trapframe(trapframe_t *tf, char* buf, int bufsz)
 			                j < 3 ? ' ' : '\n');
 	}
 	len += snprintf(buf+len, bufsz-len,
-	                "sr %016lx pc %016lx va %016lx insn       %008x\n", tf->sr, tf->epc,
-	                tf->badvaddr, (uint32_t)tf->insn);
+	                "sr %016lx pc %016lx va %016lx\n", tf->sr, tf->epc,
+	                tf->badvaddr);
 
 	buf[bufsz-1] = 0;
 	return len;

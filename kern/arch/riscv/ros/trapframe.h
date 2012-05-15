@@ -11,7 +11,6 @@ typedef struct trapframe
   uintptr_t epc;
   uintptr_t badvaddr;
   long cause;
-  uintptr_t insn;
 } trapframe_t;
 
 /* TODO: consider using a user-space specific trapframe, since they don't need
