@@ -6,5 +6,11 @@ libc {
     __ros_scp_simple_evq;
     __ros_syscall;
     __ros_syscall_errno;
+
+    set_tls_desc;
+    get_tls_desc;
+    allocate_tls;
+    free_tls;
+    reinit_tls;
   }
 }

@@ -112,13 +112,15 @@ _init (int argc, char **argv, char **envp)
         break;
     }
   }
-  
+
+  extern void __libc_setup_tls (size_t tcbsize, size_t tcbalign);
   __libc_setup_tls (TLS_INIT_TCB_SIZE, TLS_INIT_TCB_ALIGN);
 
   __libc_init_secure ();
 
   /* First the initialization which normally would be done by the
      dynamic linker.  */
+  extern void _dl_non_dynamic_init (void) internal_function;
   _dl_non_dynamic_init ();
 #endif
 

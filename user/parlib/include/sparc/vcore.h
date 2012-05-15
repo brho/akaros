@@ -8,8 +8,6 @@
 #include <ros/procdata.h>
 #include <assert.h>
 
-extern __thread int __vcoreid;
-
 /* Feel free to ignore vcoreid.  It helps x86 to avoid a call to
  * sys_getvcoreid() if we pass it in. */
 static inline void *get_tls_desc(uint32_t vcoreid)

@@ -430,6 +430,31 @@ union user_desc_init
 #define THREAD_GSCOPE_WAIT() \
   GL(dl_wait_lookup_done) ()
 
+/* Reading from the LDT.  Could also use %gs, but that would require including
+ * half of libc's TLS header.  Sparc will probably ignore the vcoreid, so don't
+ * rely on it too much.  The intent of it is vcoreid is the caller's vcoreid,
+ * and that vcoreid might be in the TLS of the caller (it will be for transition
+ * stacks) and we could avoid a trap on x86 to sys_getvcoreid(). */
+static inline void *__get_tls_desc(uint32_t vcoreid)
+{
+	return (void*)(__procdata.ldt[vcoreid].sd_base_31_24 << 24 |
+	               __procdata.ldt[vcoreid].sd_base_23_16 << 16 |
+	               __procdata.ldt[vcoreid].sd_base_15_0);
+}
+
+/* passing in the vcoreid, since it'll be in TLS of the caller */
+static inline void __set_tls_desc(void *tls_desc, uint32_t vcoreid)
+{
+	/* Keep this technique in sync with sysdeps/ros/i386/tls.h */
+	segdesc_t tmp = SEG(STA_W, (uint32_t)tls_desc, 0xffffffff, 3);
+	__procdata.ldt[vcoreid] = tmp;
+
+	/* GS is still the same (should be!), but it needs to be reloaded to force a
+	 * re-read of the LDT. */
+	uint32_t gs = (vcoreid << 3) | 0x07;
+	asm volatile("movl %0,%%gs" : : "r" (gs) : "memory");
+}
+
 static const char* tls_init_tp(void* thrdescr)
 {
   // TCB lives at thrdescr.
@@ -460,18 +485,7 @@ static const char* tls_init_tp(void* thrdescr)
 	__ros_syscall(SYS_getpid, 0, 0, 0, 0, 0, 0, NULL);
   }
 
-  // Build the segment
-  segdesc_t tmp = SEG(STA_W, (uint32_t)thrdescr, 0xffffffff, 3);
-
-  // Setup the correct LDT entry for this vcore
-  __procdata.ldt[core_id] = tmp;
-
-  // Create the GS register.
-  uint32_t gs = (core_id << 3) | 0x07;
-
-  // Set the GS register.
-  asm volatile("movl %0,%%gs" : : "r" (gs) : "memory");
-
+  __set_tls_desc(thrdescr, core_id);
   return NULL;
 }
 

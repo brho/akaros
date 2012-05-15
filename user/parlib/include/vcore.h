@@ -32,11 +32,7 @@ extern "C" {
 extern void vcore_entry();
 /* Declared in glibc's start.c */
 extern __thread bool __vcore_context;
-
-/* Utility Functions */
-void *allocate_tls(void);
-void free_tls(void *tcb);
-void *reinit_tls(void *tcb);
+extern __thread int __vcoreid;
 
 /* Vcore API functions */
 static inline size_t max_vcores(void);

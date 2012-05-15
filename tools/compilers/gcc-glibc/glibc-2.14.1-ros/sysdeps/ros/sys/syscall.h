@@ -7,6 +7,8 @@
 #ifndef _GLIBC_ROS_SYSCALL_H
 #define _GLIBC_ROS_SYSCALL_H
 
+#ifndef __ASSEMBLER__
+
 #include <ros/syscall.h>
 #include <ros/event.h>
 
@@ -45,6 +47,8 @@ void __ros_scp_syscall_blockon(struct syscall *sysc);
 
 #ifdef __cplusplus
 }
+#endif
+
 #endif
 
 #endif /* _GLIBC_ROS_SYSCALL_H */

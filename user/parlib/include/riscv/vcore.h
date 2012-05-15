@@ -7,16 +7,7 @@
 #include <ros/syscall.h>
 #include <ros/procdata.h>
 #include <assert.h>
-
-extern __thread int __vcoreid;
-
-/* Feel free to ignore vcoreid.  It helps x86 to avoid a call to
- * sys_getvcoreid() if we pass it in. */
-static inline void *get_tls_desc(uint32_t vcoreid)
-{
-	register void* tp asm("tp");
-	return tp;
-}
+#include <sys/vcore-tls.h>
 
 #ifdef __riscv64
 # define REG_L "ld"
@@ -25,12 +16,6 @@ static inline void *get_tls_desc(uint32_t vcoreid)
 # define REG_L "lw"
 # define REG_S "sw"
 #endif
-
-static inline void set_tls_desc(void *tls_desc, uint32_t vcoreid)
-{
-	asm volatile ("move tp, %0" : : "r"(tls_desc) : "memory");
-	__vcoreid = vcoreid;
-}
 
 /* Register saves and restores happen in asm. */
 void __pop_ros_tf_regs(struct user_trapframe *tf, struct preempt_data* vcpd,

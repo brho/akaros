@@ -5,7 +5,7 @@
 #include <ros/syscall.h>
 #include <ros/procinfo.h>
 #include <unistd.h>
-#include <tls.h>
+#include <vcore-tls.c>
 
 void** __vcore_thread_control_blocks = NULL;
 weak_alias(__vcore_thread_control_blocks,vcore_thread_control_blocks)
