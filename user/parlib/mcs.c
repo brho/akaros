@@ -283,20 +283,16 @@ void mcs_pdr_lock(struct mcs_pdr_lock *lock)
 	__mcs_pdr_lock(lock, qnode);
 }
 
-void mcs_pdr_unlock(struct mcs_pdr_lock *lock)
-{
-	struct mcs_pdr_qnode *qnode = &lock->vc_qnodes[vcore_id()];
-	assert(qnode->vcoreid == vcore_id());	/* sanity */
-	__mcs_pdr_unlock(lock, qnode);
-	/* Enable notifs, if we're an _M uthread */
-	uth_enable_notifs();
-}
-
-#if 0
-/* We don't actually use this.  To use this, you'll need the unlock code to save
- * pred to a specific field in the qnode and check both its initial pred as well
- * as its run time pred (who could be an usurper).  It's all possible, but a
- * little more difficult to follow. */
+/* CAS-less unlock, not quite as efficient and will make sure every vcore runs
+ * (since we don't have a convenient way to make sure our qnode->next runs
+ * yet, other than making sure everyone runs).
+ *
+ * To use this without ensuring all vcores run, you'll need the unlock code to
+ * save pred to a specific field in the qnode and check both its initial pred
+ * as well as its run time pred (who could be an usurper).  It's all possible,
+ * but a little more difficult to follow.  Also, I'm adjusting this comment
+ * months after writing it originally, so it is probably not sufficient, but
+ * necessary. */
 void __mcs_pdr_unlock_no_cas(struct mcs_pdr_lock *lock,
                              struct mcs_pdr_qnode *qnode)
 {
@@ -316,8 +312,10 @@ void __mcs_pdr_unlock_no_cas(struct mcs_pdr_lock *lock,
 		/* since someone else was waiting, they should have made themselves our
 		 * next.  spin (very briefly!) til it happens. */
 		while (qnode->next == 0) {
-			/* make sure old_tail isn't preempted */
-
+			/* make sure old_tail isn't preempted.  best we can do for now is
+			 * to make sure all vcores run, and thereby get our next. */
+			for (int i = 0; i < max_vcores(); i++)
+				ensure_vcore_runs(i);
 			cpu_relax();
 		}
 		if (usurper) {
@@ -328,8 +326,12 @@ void __mcs_pdr_unlock_no_cas(struct mcs_pdr_lock *lock,
 			 * First, we need to change our next's pred.  There's a slight race
 			 * here, so our next will need to make sure both us and pred are
 			 * done */
-			qnode->next->pred = usurper;
-			wmb();
+			/* I was trying to do something so we didn't need to ensure all
+			 * vcores run, using more space in the qnode to figure out who our
+			 * pred was a lock time (guessing actually, since there's a race,
+			 * etc). */
+			//qnode->next->pred = usurper;
+			//wmb();
 			usurper->next = qnode->next;
 			/* could imagine another wmb() and a flag so our next knows to no
 			 * longer check us too. */
@@ -346,4 +348,16 @@ void __mcs_pdr_unlock_no_cas(struct mcs_pdr_lock *lock,
 		qnode->next->locked = 0;
 	}
 }
+
+void mcs_pdr_unlock(struct mcs_pdr_lock *lock)
+{
+	struct mcs_pdr_qnode *qnode = &lock->vc_qnodes[vcore_id()];
+	assert(qnode->vcoreid == vcore_id());	/* sanity */
+#ifndef __riscv__
+	__mcs_pdr_unlock(lock, qnode);
+#else
+	__mcs_pdr_unlock_no_cas(lock, qnode);
 #endif
+	/* Enable notifs, if we're an _M uthread */
+	uth_enable_notifs();
+}
