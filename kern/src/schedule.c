@@ -166,6 +166,7 @@ static struct sched_pcore *pcoreid2spc(uint32_t pcoreid)
 /* Round-robins on whatever list it's on */
 static void add_to_list(struct proc *p, struct proc_list *new)
 {
+	assert(!(p->ksched_data.cur_list));
 	TAILQ_INSERT_TAIL(new, p, ksched_data.proc_link);
 	p->ksched_data.cur_list = new;
 }
@@ -174,6 +175,7 @@ static void remove_from_list(struct proc *p, struct proc_list *old)
 {
 	assert(p->ksched_data.cur_list == old);
 	TAILQ_REMOVE(old, p, ksched_data.proc_link);
+	p->ksched_data.cur_list = 0;
 }
 
 static void switch_lists(struct proc *p, struct proc_list *old,
@@ -183,17 +185,13 @@ static void switch_lists(struct proc *p, struct proc_list *old,
 	add_to_list(p, new);
 }
 
-static void __remove_from_any_list(struct proc *p)
-{
-	if (p->ksched_data.cur_list)
-		TAILQ_REMOVE(p->ksched_data.cur_list, p, ksched_data.proc_link);
-}
-
 /* Removes from whatever list p is on */
 static void remove_from_any_list(struct proc *p)
 {
-	assert(p->ksched_data.cur_list);
-	TAILQ_REMOVE(p->ksched_data.cur_list, p, ksched_data.proc_link);
+	if (p->ksched_data.cur_list) {
+		TAILQ_REMOVE(p->ksched_data.cur_list, p, ksched_data.proc_link);
+		p->ksched_data.cur_list = 0;
+	}
 }
 
 /************** Process Management Callbacks **************/
@@ -270,7 +268,8 @@ void __sched_proc_destroy(struct proc *p, uint32_t *pc_arr, uint32_t nr_cores)
 	 * bulk *provisioning* change. */
 	unprov_pcore_list(&p->ksched_data.prov_alloc_me);
 	unprov_pcore_list(&p->ksched_data.prov_not_alloc_me);
-	/* Remove from whatever list we are on */
+	/* Remove from whatever list we are on (if any - might not be on one if it
+	 * was in the middle of __run_mcp_sched) */
 	remove_from_any_list(p);
 	if (nr_cores) {
 		__put_idle_cores(p, pc_arr, nr_cores);
@@ -307,7 +306,7 @@ void __sched_scp_wakeup(struct proc *p)
 		return;
 	}
 	/* might not be on a list if it is new.  o/w, it should be unrunnable */
-	__remove_from_any_list(p);
+	remove_from_any_list(p);
 	add_to_list(p, &runnable_scps);
 	spin_unlock(&sched_lock);
 }
