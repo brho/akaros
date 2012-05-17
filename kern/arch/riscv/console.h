@@ -35,6 +35,7 @@ int cons_get_any_char(void);
 #define	FESVR_SYS_pread 180
 #define	FESVR_SYS_pwrite 181
 #define FESVR_SYS_getmainvars 201
+#define FESVR_SYS_read_noncanonical 202
 
 void fesvr_die();
 

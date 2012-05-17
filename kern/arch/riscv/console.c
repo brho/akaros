@@ -73,7 +73,7 @@ static struct alarm_waiter keyboard_waiter;
 static void cons_poll(struct alarm_waiter* awaiter)
 {
 	static char buf[64] __attribute__((aligned(64)));
-	fesvr_syscall(FESVR_SYS_read, 0, PADDR(buf), sizeof(buf), 0, cons_polled, 0);
+	fesvr_syscall(FESVR_SYS_read_noncanonical, 0, PADDR(buf), sizeof(buf), 0, cons_polled, 0);
 
 	set_awaiter_rel(&keyboard_waiter, 100);
 	set_alarm(&per_cpu_info[core_id()].tchain, &keyboard_waiter);
