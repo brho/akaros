@@ -169,7 +169,6 @@ void uthread_init(struct uthread *new_thread)
 	/* don't remove this assert without dealing with 'caller' below.  if we want
 	 * to call this while in vcore context, we'll need to handle the TLS
 	 * swapping a little differently */
-	assert(!in_vcore_context());
 	uint32_t vcoreid;
 	assert(new_thread);
 	new_thread->state = UT_NOT_RUNNING;
@@ -182,31 +181,7 @@ void uthread_init(struct uthread *new_thread)
 		assert(!__uthread_reinit_tls(new_thread));
 	else
 		assert(!__uthread_allocate_tls(new_thread));
-	/* Switch into the new guys TLS and let it know who it is */
-	struct uthread *caller = current_uthread;
-	assert(caller);
-	/* We need to disable notifs here (in addition to not migrating), since we
-	 * could get interrupted when we're in the other guy's TLS, and when the
-	 * vcore restarts us, it will put us in our old TLS, not the one we were in
-	 * when we were interrupted.  We need to not migrate, since once we know the
-	 * vcoreid, we depend on being on the same vcore throughout. */
-	caller->flags |= UTHREAD_DONT_MIGRATE;
-	/* not concerned about cross-core memory ordering, so no CPU mbs needed */
-	cmb();	/* don't let the compiler issue the vcore read before the write */
-	/* Note the first time we call this, we technically aren't on a vcore */
-	vcoreid = vcore_id();
-	disable_notifs(vcoreid);
-	/* Save the new_thread to the new uthread in that uthread's TLS */
-	set_tls_desc(new_thread->tls_desc, vcoreid);
-	current_uthread = new_thread;
-	/* Switch back to the caller */
-	set_tls_desc(caller->tls_desc, vcoreid);
-	/* Okay to migrate now, and enable interrupts/notifs.  This could be called
-	 * from vcore context, so only enable if we're in _M and in vcore context. */
-	caller->flags &= ~UTHREAD_DONT_MIGRATE;		/* turn this on first */
-	if (!in_vcore_context() && in_multi_mode())
-		enable_notifs(vcoreid);
-	cmb();	/* issue this write after we're done with vcoreid */
+	uthread_set_tls_var(new_thread, current_uthread, new_thread);
 }
 
 void uthread_runnable(struct uthread *uthread)
