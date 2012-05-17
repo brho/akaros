@@ -10488,7 +10488,7 @@ index 0000000..266678b
 +#define SWITCHABLE_TARGET 1
 diff --git a/gcc-4.6.1/gcc/config/riscv/riscv.md b/gcc-4.6.1/gcc/config/riscv/riscv.md
 new file mode 100644
-index 0000000..02ced58
+index 0000000..f74a0d7
 --- /dev/null
 +++ gcc-4.6.1/gcc/config/riscv/riscv.md
 @@ -0,0 +1,2874 @@
@@ -11568,7 +11568,7 @@ index 0000000..02ced58
 +
 +(define_insn "smin<mode>3"
 +  [(set (match_operand:ANYF 0 "register_operand" "=f")
-+		   (smin:ANYF (match_operand:SF 1 "register_operand" "f")
++		   (smin:ANYF (match_operand:ANYF 1 "register_operand" "f")
 +			    (match_operand:ANYF 2 "register_operand" "f")))]
 +  ""
 +  "fmin.<fmt>\t%0,%1,%2"
@@ -11577,7 +11577,7 @@ index 0000000..02ced58
 +
 +(define_insn "smax<mode>3"
 +  [(set (match_operand:ANYF 0 "register_operand" "=f")
-+		   (smax:ANYF (match_operand:SF 1 "register_operand" "f")
++		   (smax:ANYF (match_operand:ANYF 1 "register_operand" "f")
 +			    (match_operand:ANYF 2 "register_operand" "f")))]
 +  ""
 +  "fmax.<fmt>\t%0,%1,%2"
