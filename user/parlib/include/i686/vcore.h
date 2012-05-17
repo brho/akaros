@@ -6,6 +6,7 @@
 #include <ros/procdata.h>
 #include <ros/syscall.h>
 #include <ros/arch/mmu.h>
+#include <sys/vcore-tls.h>
 
 /* Pops an ROS kernel-provided TF, reanabling notifications at the same time.
  * A Userspace scheduler can call this when transitioning off the transition
