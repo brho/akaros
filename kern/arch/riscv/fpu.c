@@ -3,23 +3,16 @@
 #include <umem.h>
 #include <arch/softfloat.h>
 
-typedef union {
-	uint32_t i;
-	float f;
-} sreg;
-
 static uint32_t ls(uint64_t* addr)
 {
-	sreg r;
-	r.f = *(float*)addr;
-	return r.i;
+	uint32_t r;
+	asm ("fld f0, %1; mftx.s %0, f0" : "=r"(r) : "m"(*addr));
+	return r;
 }
 
 static void ss(uint64_t* addr, uint32_t val)
 {
-	sreg r;
-	r.i = val;
-	*(float*)addr = r.f;
+	asm ("mxtf.s f0, %0; fsd f0, %1" : : "r"(val), "m"(*addr));
 }
 
 static int emulate_fpu_silly(struct trapframe* state, ancillary_state_t* silly)
@@ -54,9 +47,9 @@ static int emulate_fpu_silly(struct trapframe* state, ancillary_state_t* silly)
 		ss(&silly->fpr[rd], float32_sqrt(&sf, ls(&silly->fpr[rs1])));
 	else if (is_fsqrt_d)
 		silly->fpr[rd] = float64_sqrt(&sf, silly->fpr[rs1]);
-	else if (is_fsqrt_s)
+	else if (is_fdiv_s)
 		ss(&silly->fpr[rd], float32_div(&sf, ls(&silly->fpr[rs1]), ls(&silly->fpr[rs2])));
-	else if (is_fsqrt_d)
+	else if (is_fdiv_d)
 		silly->fpr[rd] = float64_div(&sf, silly->fpr[rs1], silly->fpr[rs2]);
 	/* Eventually, we will emulate the full FPU, including the below insns
 	else if (is_mffsr)
