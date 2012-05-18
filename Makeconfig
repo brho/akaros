@@ -3,6 +3,7 @@
 # To enable any of these options, add a line like the following to your Makelocal
 # CFLAGS += $(CONFIG_APPSERVER)
 CONFIG_APPSERVER:=                 -D__CONFIG_APPSERVER__
+CONFIG_DEMO_SLAVE:=                -D__CONFIG_DEMO_SLAVE__
 CONFIG_ARSC_SERVER:=               -D__CONFIG_ARSC_SERVER__
 
 # Kernel configuration parameters
