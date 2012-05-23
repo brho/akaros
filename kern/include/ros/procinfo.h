@@ -8,6 +8,7 @@
 #include <ros/resource.h>
 #include <ros/atomic.h>
 #include <ros/arch/arch.h>
+#include <string.h>
 
 #define PROCINFO_MAX_ARGP 32
 #define PROCINFO_ARGBUF_SIZE 3072

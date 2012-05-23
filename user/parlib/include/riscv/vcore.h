@@ -18,8 +18,9 @@
 #endif
 
 /* Register saves and restores happen in asm. */
+typedef void (*helper_fn)(struct user_trapframe*, struct preempt_data*, uint32_t);
 void __pop_ros_tf_regs(struct user_trapframe *tf, struct preempt_data* vcpd,
-                    uint32_t vcoreid, void* helper) __attribute__((noreturn));
+                    uint32_t vcoreid, helper_fn helper) __attribute__((noreturn));
 void __save_ros_tf_regs(struct user_trapframe *tf);
 
 /* Helper function that may handle notifications after re-enabling them. */
@@ -42,7 +43,7 @@ static void __pop_ros_tf_notifs_raw(struct user_trapframe *tf,
 }
 
 static inline void __pop_ros_tf(struct user_trapframe *tf, uint32_t vcoreid,
-                                void* helper)
+                                helper_fn helper)
 {
 	// since we're changing the stack, move stuff into regs for now
 	register uint32_t _vcoreid = vcoreid;
