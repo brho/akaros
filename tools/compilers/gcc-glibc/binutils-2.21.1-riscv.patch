@@ -200,10 +200,10 @@ index 0000000..22edee7
 +N (64, 64, 0, "riscv", TRUE, &arch_info_struct[0]);
 diff --git a/binutils-2.21.1/bfd/elf32-riscv.c b/binutils-2.21.1/bfd/elf32-riscv.c
 new file mode 100644
-index 0000000..9a2912c
+index 0000000..7188663
 --- /dev/null
 +++ binutils-2.21.1/bfd/elf32-riscv.c
-@@ -0,0 +1,2300 @@
+@@ -0,0 +1,2298 @@
 +/* MIPS-specific support for 32-bit ELF
 +   Copyright 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002,
 +   2003, 2004, 2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
@@ -2031,7 +2031,6 @@ index 0000000..9a2912c
 +{
 +  bfd_boolean relocatable;
 +  bfd_reloc_status_type ret;
-+  bfd_byte *location;
 +  bfd_vma gp;
 +
 +  /* If we're relocating, and this is an external symbol, we don't want
@@ -2057,7 +2056,6 @@ index 0000000..9a2912c
 +  if (ret != bfd_reloc_ok)
 +    return ret;
 +
-+  location = (bfd_byte *) data + reloc_entry->address;
 +  ret = _bfd_riscv_elf_gprel16_with_gp (abfd, symbol, reloc_entry,
 +				       input_section, relocatable,
 +				       data, gp);
@@ -2506,10 +2504,10 @@ index 0000000..9a2912c
 +#include "elf32-target.h"
 diff --git a/binutils-2.21.1/bfd/elf64-riscv.c b/binutils-2.21.1/bfd/elf64-riscv.c
 new file mode 100644
-index 0000000..7b9ad66
+index 0000000..aa3dca1
 --- /dev/null
 +++ binutils-2.21.1/bfd/elf64-riscv.c
-@@ -0,0 +1,3298 @@
+@@ -0,0 +1,3296 @@
 +/* MIPS-specific support for 64-bit ELF
 +   Copyright 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005,
 +   2006, 2007, 2008, 2009, 2010
@@ -4703,7 +4701,6 @@ index 0000000..7b9ad66
 +{
 +  bfd_boolean relocatable;
 +  bfd_reloc_status_type ret;
-+  bfd_byte *location;
 +  bfd_vma gp;
 +
 +  /* If we're relocating, and this is an external symbol, we don't want
@@ -4729,7 +4726,6 @@ index 0000000..7b9ad66
 +  if (ret != bfd_reloc_ok)
 +    return ret;
 +
-+  location = (bfd_byte *) data + reloc_entry->address;
 +  ret = _bfd_riscv_elf_gprel16_with_gp (abfd, symbol, reloc_entry,
 +				       input_section, relocatable,
 +				       data, gp);
@@ -5810,10 +5806,10 @@ index 0000000..7b9ad66
 +#include "elf64-target.h"
 diff --git a/binutils-2.21.1/bfd/elfxx-riscv.c b/binutils-2.21.1/bfd/elfxx-riscv.c
 new file mode 100644
-index 0000000..605bb09
+index 0000000..f6b350e
 --- /dev/null
 +++ binutils-2.21.1/bfd/elfxx-riscv.c
-@@ -0,0 +1,8366 @@
+@@ -0,0 +1,8324 @@
 +/* MIPS-specific support for ELF
 +   Copyright 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002,
 +   2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010 Free Software Foundation, Inc.
@@ -8967,7 +8963,6 @@ index 0000000..605bb09
 +     relocation value.  */
 +  bfd_boolean overflowed_p;
 +  /* TRUE if this relocation refers to a MIPS16 function.  */
-+  bfd_boolean target_is_16_bit_code_p = FALSE;
 +  struct mips_elf_link_hash_table *htab;
 +  bfd *dynobj;
 +
@@ -9030,8 +9025,6 @@ index 0000000..605bb09
 +						sym->st_name);
 +      if (*namep == '\0')
 +	*namep = bfd_section_name (input_bfd, sec);
-+
-+      target_is_16_bit_code_p = ELF_ST_IS_MIPS16 (sym->st_other);
 +    }
 +  else
 +    {
@@ -9103,8 +9096,6 @@ index 0000000..605bb09
 +	{
 +	  return bfd_reloc_notsupported;
 +	}
-+
-+      target_is_16_bit_code_p = ELF_ST_IS_MIPS16 (h->root.other);
 +    }
 +
 +  /* If this is a direct call to a PIC function, redirect to the
@@ -9478,7 +9469,6 @@ index 0000000..605bb09
 +{
 +  Elf_Internal_Rela outrel[3];
 +  asection *sreloc;
-+  bfd *dynobj;
 +  int r_type;
 +  long indx;
 +  bfd_boolean defined_p;
@@ -9488,7 +9478,6 @@ index 0000000..605bb09
 +  BFD_ASSERT (htab != NULL);
 +
 +  r_type = ELF_R_TYPE (output_bfd, rel->r_info);
-+  dynobj = elf_hash_table (info)->dynobj;
 +  sreloc = mips_elf_rel_dyn_section (info, FALSE);
 +  BFD_ASSERT (sreloc != NULL);
 +  BFD_ASSERT (sreloc->contents != NULL);
@@ -10512,12 +10501,7 @@ index 0000000..605bb09
 +mips_elf_read_rel_addend (bfd *abfd, const Elf_Internal_Rela *rel,
 +			  reloc_howto_type *howto, bfd_byte *contents)
 +{
-+  bfd_byte *location;
-+  unsigned int r_type;
 +  bfd_vma addend;
-+
-+  r_type = ELF_R_TYPE (abfd, rel->r_info);
-+  location = contents + rel->r_offset;
 +
 +  /* Get the addend, which is stored in the input file.  */
 +  addend = mips_elf_obtain_contents (howto, rel, abfd, contents);
@@ -10537,12 +10521,11 @@ index 0000000..605bb09
 +			      const Elf_Internal_Rela *relend,
 +			      bfd_byte *contents, bfd_vma *addend)
 +{
-+  unsigned int r_type, lo16_type;
++  unsigned int lo16_type;
 +  const Elf_Internal_Rela *lo16_relocation;
 +  reloc_howto_type *lo16_howto;
 +  bfd_vma l;
 +
-+  r_type = ELF_R_TYPE (abfd, rel->r_info);
 +  lo16_type = R_RISCV_LO16;
 +
 +  /* The combined value is the sum of the HI16 addend, left-shifted by
@@ -11482,7 +11465,6 @@ index 0000000..605bb09
 +{
 +  bfd *dynobj;
 +  asection *s, *sreldyn;
-+  bfd_boolean reltext;
 +  struct mips_elf_link_hash_table *htab;
 +
 +  htab = mips_elf_hash_table (info);
@@ -11532,7 +11514,6 @@ index 0000000..605bb09
 +  /* The check_relocs and adjust_dynamic_symbol entry points have
 +     determined the sizes of the various dynamic sections.  Allocate
 +     memory for them.  */
-+  reltext = FALSE;
 +  for (s = dynobj->sections; s != NULL; s = s->next)
 +    {
 +      const char *name;
@@ -11548,24 +11529,6 @@ index 0000000..605bb09
 +	{
 +	  if (s->size != 0)
 +	    {
-+	      const char *outname;
-+	      asection *target;
-+
-+	      /* If this relocation section applies to a read only
-+                 section, then we probably need a DT_TEXTREL entry.
-+                 If the relocation section is .rel(a).dyn, we always
-+                 assert a DT_TEXTREL entry rather than testing whether
-+                 there exists a relocation to a read only section or
-+                 not.  */
-+	      outname = bfd_get_section_name (output_bfd,
-+					      s->output_section);
-+	      target = bfd_get_section_by_name (output_bfd, outname + 4);
-+	      if ((target != NULL
-+		   && (target->flags & SEC_READONLY) != 0
-+		   && (target->flags & SEC_ALLOC) != 0)
-+		  || strcmp (outname, MIPS_ELF_REL_DYN_NAME (info)) == 0)
-+		reltext = TRUE;
-+
 +	      /* We use the reloc_count field as a counter if we need
 +		 to copy relocs into the output file.  */
 +	      if (strcmp (name, MIPS_ELF_REL_DYN_NAME (info)) != 0)
@@ -13174,9 +13137,6 @@ index 0000000..605bb09
 +  if (reloc_count > 0)
 +    {
 +      arelent **parent;
-+      /* for mips */
-+      int gp_found;
-+      bfd_vma gp = 0x12345678;	/* initialize just to shut gcc up */
 +
 +      {
 +	struct bfd_hash_entry *h;
@@ -13198,12 +13158,8 @@ index 0000000..605bb09
 +	      case bfd_link_hash_undefined:
 +	      case bfd_link_hash_undefweak:
 +	      case bfd_link_hash_common:
-+		gp_found = 0;
-+		break;
 +	      case bfd_link_hash_defined:
 +	      case bfd_link_hash_defweak:
-+		gp_found = 1;
-+		gp = lh->u.def.value;
 +		break;
 +	      case bfd_link_hash_indirect:
 +	      case bfd_link_hash_warning:
@@ -13215,8 +13171,6 @@ index 0000000..605bb09
 +		abort ();
 +	      }
 +	  }
-+	else
-+	  gp_found = 0;
 +      }
 +      /* end mips */
 +      for (parent = reloc_vector; *parent != NULL; parent++)
@@ -14493,10 +14447,10 @@ index 1aa9bb4..435df2b 100644
  @am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/tc-rx.Tpo $(DEPDIR)/tc-rx.Po
 diff --git a/binutils-2.21.1/gas/config/tc-riscv.c b/binutils-2.21.1/gas/config/tc-riscv.c
 new file mode 100644
-index 0000000..ac4e21b
+index 0000000..20549f1
 --- /dev/null
 +++ binutils-2.21.1/gas/config/tc-riscv.c
-@@ -0,0 +1,4920 @@
+@@ -0,0 +1,4894 @@
 +/* tc-mips.c -- assemble code for a MIPS chip.
 +   Copyright 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002,
 +   2003, 2004, 2005, 2006, 2007, 2008, 2009  Free Software Foundation, Inc.
@@ -16536,20 +16490,12 @@ index 0000000..ac4e21b
 +static void
 +macro (struct mips_cl_insn *ip)
 +{
-+  unsigned int treg, sreg, dreg, breg, imm;
++  unsigned int sreg, dreg, breg;
 +  int mask;
-+  expressionS expr1;
 +
-+  treg = (ip->insn_opcode >> OP_SH_RT) & OP_MASK_RT;
 +  dreg = (ip->insn_opcode >> OP_SH_RD) & OP_MASK_RD;
 +  breg = sreg = (ip->insn_opcode >> OP_SH_RS) & OP_MASK_RS;
 +  mask = ip->insn_mo->mask;
-+  imm = (ip->insn_opcode >> OP_SH_IMMEDIATE) & OP_MASK_IMMEDIATE;
-+
-+  expr1.X_op = O_constant;
-+  expr1.X_op_symbol = NULL;
-+  expr1.X_add_symbol = NULL;
-+  expr1.X_add_number = 1;
 +
 +  switch (mask)
 +    {
@@ -16711,8 +16657,6 @@ index 0000000..ac4e21b
 +  struct riscv_opcode *insn;
 +  char *argsStart;
 +  unsigned int regno;
-+  unsigned int lastregno = 0;
-+  char *s_reset;
 +  char save_c = 0;
 +  int argnum;
 +  unsigned int rtype;
@@ -16776,7 +16720,6 @@ index 0000000..ac4e21b
 +      create_insn (ip, insn);
 +      insn_error = NULL;
 +      argnum = 1;
-+      lastregno = 0xffffffff;
 +      for (args = insn->args;; ++args)
 +	{
 +	  s += strspn (s, " \t");
@@ -16944,10 +16887,7 @@ index 0000000..ac4e21b
 +	      ok = reg_lookup (&s, RTYPE_NUM | RTYPE_CP0, &regno);
 +	      INSERT_OPERAND (RS, *ip, regno);
 +	      if (ok) 
-+		{
-+		  lastregno = regno;
-+		  continue;
-+		}
++		continue;
 +	      else
 +		break;
 +
@@ -16973,7 +16913,6 @@ index 0000000..ac4e21b
 +	    case 'z':		/* must be zero register */
 +	    case 'U':           /* destination register (clo/clz).  */
 +	    case 'g':		/* coprocessor destination register */
-+	      s_reset = s;	      
 +	      ok = reg_lookup (&s, RTYPE_NUM | RTYPE_GP, &regno);
 +	      if (ok)
 +		{
@@ -17027,7 +16966,6 @@ index 0000000..ac4e21b
 +		      /* What about all other operands like 'i', which
 +			 can be specified in the opcode table? */
 +		    }
-+		  lastregno = regno;
 +		  continue;
 +		}
 +	      break;
@@ -17037,7 +16975,6 @@ index 0000000..ac4e21b
 +	    case 'T':		/* floating point target register */
 +	    case 'R':		/* floating point source register */
 +	      rtype = RTYPE_FPU;
-+	      s_reset = s;
 +	      if (reg_lookup (&s, rtype, &regno))
 +		{
 +		  c = *args;
@@ -17058,7 +16995,6 @@ index 0000000..ac4e21b
 +		      INSERT_OPERAND (FR, *ip, regno);
 +		      break;
 +		    }
-+		  lastregno = regno;
 +		  continue;
 +		}
 +
@@ -18032,7 +17968,6 @@ index 0000000..ac4e21b
 +  int section_type;
 +  int section_flag;
 +  int section_entry_size;
-+  int section_alignment;
 +
 +  if (!IS_ELF)
 +    return;
@@ -18066,10 +18001,6 @@ index 0000000..ac4e21b
 +    section_entry_size = get_absolute_expression ();
 +  else
 +    section_entry_size = 0;
-+  if (*input_line_pointer++ == ',')
-+    section_alignment = get_absolute_expression ();
-+  else
-+    section_alignment = 0;
 +
 +  section_name = xstrdup (section_name);
 +
@@ -19040,11 +18971,8 @@ index 0000000..ac4e21b
 +    {
 +      segT saved_seg = now_seg;
 +      subsegT saved_subseg = now_subseg;
-+      valueT dot;
 +      expressionS exp;
 +      char *fragp;
-+
-+      dot = frag_now_fix ();
 +
 +#ifdef md_flush_pending_output
 +      md_flush_pending_output ();
@@ -21510,10 +21438,10 @@ index 0fb35ac..cef365e 100644
        if (bfd_get_mach (abfd) == bfd_mach_ppc_620)
 diff --git a/binutils-2.21.1/opcodes/riscv-dis.c b/binutils-2.21.1/opcodes/riscv-dis.c
 new file mode 100644
-index 0000000..8c200df
+index 0000000..f890f07
 --- /dev/null
 +++ binutils-2.21.1/opcodes/riscv-dis.c
-@@ -0,0 +1,904 @@
+@@ -0,0 +1,903 @@
 +/* Print mips instructions for GDB, the GNU debugger, or for objdump.
 +   Copyright 1989, 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999,
 +   2000, 2001, 2002, 2003, 2005, 2007, 2008
@@ -21880,7 +21808,7 @@ index 0000000..8c200df
 +		 bfd_vma pc,
 +		 struct disassemble_info *info)
 +{
-+  int op, delta;
++  int delta;
 +
 +  for (; *d != '\0'; d++)
 +    {
@@ -22076,7 +22004,6 @@ index 0000000..8c200df
 +
 +	case 'G':
 +	  /* Control registers */
-+	  op = (l >> OP_SH_OP) & OP_MASK_OP;
 +	  (*info->fprintf_func) (info->stream, "%s",
 +				 mips_cp0_names[(l >> OP_SH_RS) & OP_MASK_RS]);
 +	  break;
