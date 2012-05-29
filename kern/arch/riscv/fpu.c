@@ -1,17 +1,37 @@
 #include <arch/trap.h>
 #include <smp.h>
 #include <umem.h>
+#include <arch/softfloat.h>
 
-int emulate_fpu(struct trapframe* state, ancillary_state_t* silly)
+typedef union {
+	uint32_t i;
+	float f;
+} sreg;
+
+static uint32_t ls(uint64_t* addr)
+{
+	sreg r;
+	r.f = *(float*)addr;
+	return r.i;
+}
+
+static void ss(uint64_t* addr, uint32_t val)
+{
+	sreg r;
+	r.i = val;
+	*(float*)addr = r.f;
+}
+
+static int emulate_fpu_silly(struct trapframe* state, ancillary_state_t* silly)
 {
 	int insn;
-	if (!memcpy_from_user(current, &insn, (void*)state->epc, 4))
+	if (memcpy_from_user(current, &insn, (void*)state->epc, 4))
 	{
 		state->cause = CAUSE_FAULT_FETCH;
 		handle_trap(state);
 	}
 
-	#define DECLARE_INSN(name, match, mask) bool is_##name = (insn & match) == mask;
+	#define DECLARE_INSN(name, match, mask) bool is_##name = (insn & mask) == match;
 	#include <arch/opcodes.h>
 	#undef DECLARE_INSN
 
@@ -26,13 +46,30 @@ int emulate_fpu(struct trapframe* state, ancillary_state_t* silly)
 	void* load_address = (void*)(state->gpr[rs1] + imm);
 	void* store_address = (void*)(state->gpr[rs1] + bimm);
 
-	if (is_mffsr)
+	softfloat_t sf;
+	sf.float_rounding_mode = silly->fsr >> 5;
+	sf.float_exception_flags = silly->fsr & 0x1f;
+
+	if (is_fsqrt_s)
+		ss(&silly->fpr[rd], float32_sqrt(&sf, ls(&silly->fpr[rs1])));
+	else if (is_fsqrt_d)
+		silly->fpr[rd] = float64_sqrt(&sf, silly->fpr[rs1]);
+	else if (is_fsqrt_s)
+		ss(&silly->fpr[rd], float32_div(&sf, ls(&silly->fpr[rs1]), ls(&silly->fpr[rs2])));
+	else if (is_fsqrt_d)
+		silly->fpr[rd] = float64_div(&sf, silly->fpr[rs1], silly->fpr[rs2]);
+	/* Eventually, we will emulate the full FPU, including the below insns
+	else if (is_mffsr)
 	{
+		// use sf instead of silly->fsr
 		state->gpr[rd] = silly->fsr;
 	}
 	else if (is_mtfsr)
 	{
-		silly->fsr = state->gpr[rs1];
+		// use sf instead of silly->fsr
+		int temp = silly->fsr;
+		silly->fsr = state->gpr[rs1] & 0xFF;
+		state->gpr[rd] = silly->fsr;
 	}
 	else if (is_fld)
 	{
@@ -74,8 +111,26 @@ int emulate_fpu(struct trapframe* state, ancillary_state_t* silly)
 			handle_trap(state);
 		}
 	}
+	*/
 	else
 	  return 1;
 	
+	silly->fsr = sf.float_rounding_mode << 5 | sf.float_exception_flags;
 	return 0;
+}
+
+/* For now we can only emulate missing compute insns, not the whole FPU */
+int emulate_fpu(struct trapframe* state)
+{
+	if (!(state->sr & SR_EF))
+	{
+		state->cause = CAUSE_FP_DISABLED;
+		handle_trap(state);
+	}
+
+	ancillary_state_t fp_state;
+	save_fp_state(&fp_state);
+	int code = emulate_fpu_silly(state, &fp_state);
+	restore_fp_state(&fp_state);
+	return code;
 }

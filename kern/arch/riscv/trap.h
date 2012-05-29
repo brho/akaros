@@ -32,6 +32,9 @@ static inline void save_kernel_tf(struct trapframe *tf)
 	save_kernel_tf_asm(tf);
 }
 
+void handle_trap(struct trapframe *tf);
+int emulate_fpu(struct trapframe *tf);
+
 #endif
 
 #endif

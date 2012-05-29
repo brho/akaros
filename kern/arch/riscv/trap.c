@@ -139,8 +139,8 @@ format_trapframe(trapframe_t *tf, char* buf, int bufsz)
 			                j < 3 ? ' ' : '\n');
 	}
 	len += snprintf(buf+len, bufsz-len,
-	                "sr %016lx pc %016lx va %016lx\n", tf->sr, tf->epc,
-	                tf->badvaddr);
+	                "sr %016lx pc %016lx va %016lx insn       %08x\n",
+					tf->sr, tf->epc, tf->badvaddr, insn);
 
 	buf[bufsz-1] = 0;
 	return len;
@@ -362,6 +362,14 @@ handle_fault_store(trapframe_t* state)
 static void
 handle_illegal_instruction(trapframe_t* state)
 {
+	set_current_tf(&per_cpu_info[core_id()], state);
+
+	if (emulate_fpu(state) == 0)
+	{
+		advance_pc(per_cpu_info[core_id()].cur_tf);
+		return;
+	}
+
 	unhandled_trap(state, "Illegal Instruction");
 }
 
