@@ -10443,10 +10443,10 @@ index 0000000..266678b
 +#define SWITCHABLE_TARGET 1
 diff --git a/gcc-4.6.1/gcc/config/riscv/riscv.md b/gcc-4.6.1/gcc/config/riscv/riscv.md
 new file mode 100644
-index 0000000..f74a0d7
+index 0000000..864de87
 --- /dev/null
 +++ gcc-4.6.1/gcc/config/riscv/riscv.md
-@@ -0,0 +1,2874 @@
+@@ -0,0 +1,2882 @@
 +;;  Mips.md	     Machine Description for MIPS based processors
 +;;  Copyright (C) 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
 +;;  1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010
@@ -11439,7 +11439,8 @@ index 0000000..f74a0d7
 +	(plus:ANYF (mult:ANYF (match_operand:ANYF 1 "register_operand" "f")
 +			      (match_operand:ANYF 2 "register_operand" "f"))
 +		   (match_operand:ANYF 3 "register_operand" "f")))]
-+  "TARGET_HARD_FLOAT"
++  "TARGET_HARD_FLOAT
++   && !HONOR_NANS (<MODE>mode)"
 +  "fmadd.<fmt>\t%0,%1,%2,%3"
 +  [(set_attr "type" "fmadd")
 +   (set_attr "mode" "<UNITMODE>")])
@@ -11449,7 +11450,8 @@ index 0000000..f74a0d7
 +	(minus:ANYF (mult:ANYF (match_operand:ANYF 1 "register_operand" "f")
 +			       (match_operand:ANYF 2 "register_operand" "f"))
 +		    (match_operand:ANYF 3 "register_operand" "f")))]
-+  "TARGET_HARD_FLOAT"
++  "TARGET_HARD_FLOAT
++   && !HONOR_NANS (<MODE>mode)"
 +  "fmsub.<fmt>\t%0,%1,%2,%3"
 +  [(set_attr "type" "fmadd")
 +   (set_attr "mode" "<UNITMODE>")])
@@ -11460,7 +11462,8 @@ index 0000000..f74a0d7
 +		   (mult:ANYF (match_operand:ANYF 1 "register_operand" "f")
 +			      (match_operand:ANYF 2 "register_operand" "f"))
 +		   (match_operand:ANYF 3 "register_operand" "f"))))]
-+  "TARGET_HARD_FLOAT"
++  "TARGET_HARD_FLOAT
++   && !HONOR_NANS (<MODE>mode)"
 +  "fnmadd.<fmt>\t%0,%1,%2,%3"
 +  [(set_attr "type" "fmadd")
 +   (set_attr "mode" "<UNITMODE>")])
@@ -11471,7 +11474,9 @@ index 0000000..f74a0d7
 +	 (mult:ANYF (neg:ANYF (match_operand:ANYF 1 "register_operand" "f"))
 +		    (match_operand:ANYF 2 "register_operand" "f"))
 +	 (match_operand:ANYF 3 "register_operand" "f")))]
-+  "TARGET_HARD_FLOAT"
++  "TARGET_HARD_FLOAT
++   && !HONOR_SIGNED_ZEROS (<MODE>mode)
++   && !HONOR_NANS (<MODE>mode)"
 +  "fnmadd.<fmt>\t%0,%1,%2,%3"
 +  [(set_attr "type" "fmadd")
 +   (set_attr "mode" "<UNITMODE>")])
@@ -11482,7 +11487,8 @@ index 0000000..f74a0d7
 +		   (mult:ANYF (match_operand:ANYF 2 "register_operand" "f")
 +			      (match_operand:ANYF 3 "register_operand" "f"))
 +		   (match_operand:ANYF 1 "register_operand" "f"))))]
-+  "TARGET_HARD_FLOAT"
++  "TARGET_HARD_FLOAT
++   && !HONOR_NANS (<MODE>mode)"
 +  "fnmsub.<fmt>\t%0,%1,%2,%3"
 +  [(set_attr "type" "fmadd")
 +   (set_attr "mode" "<UNITMODE>")])
@@ -11493,7 +11499,9 @@ index 0000000..f74a0d7
 +	 (match_operand:ANYF 1 "register_operand" "f")
 +	 (mult:ANYF (match_operand:ANYF 2 "register_operand" "f")
 +		    (match_operand:ANYF 3 "register_operand" "f"))))]
-+  "TARGET_HARD_FLOAT"
++  "TARGET_HARD_FLOAT
++   && !HONOR_SIGNED_ZEROS (<MODE>mode)
++   && !HONOR_NANS (<MODE>mode)"
 +  "fnmsub.<fmt>\t%0,%1,%2,%3"
 +  [(set_attr "type" "fmadd")
 +   (set_attr "mode" "<UNITMODE>")])
