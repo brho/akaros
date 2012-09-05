@@ -131,15 +131,18 @@ void __attribute__((noreturn)) uthread_vcore_entry(void)
 	assert(in_vcore_context());
 	/* If someone is stealing our uthread (from when we were preempted before),
 	 * we can't touch our uthread.  But we might be the last vcore around, so
-	 * we'll handle preemption events. */
+	 * we'll handle preemption events (spammed to our public mbox). */
 	while (atomic_read(&vcpd->flags) & VC_UTHREAD_STEALING) {
-		handle_event_q(preempt_ev_q);
+		/* Note we're handling INDIRs and other public messages while someone
+		 * is stealing our uthread.  Remember that those event handlers cannot
+		 * touch cur_uth, as it is "vcore business". */
+		handle_mbox(&vcpd->ev_mbox_public);
 		cpu_relax();
 	}
 	/* If we have a current uthread that is DONT_MIGRATE, pop it real quick and
 	 * let it disable notifs (like it wants to).  Other than dealing with
-	 * preemption events, we shouldn't do anything in vc_ctx when we have a
-	 * DONT_MIGRATE uthread. */
+	 * preemption events (or other INDIRs), we shouldn't do anything in vc_ctx
+	 * when we have a DONT_MIGRATE uthread. */
 	if (current_uthread && (current_uthread->flags & UTHREAD_DONT_MIGRATE))
 		__run_current_uthread_raw();
 	/* Check and see if we wanted ourselves to handle a remote VCPD mbox.  Want
