@@ -166,10 +166,6 @@ void __attribute__((noreturn)) uthread_vcore_entry(void)
  * this whenever you are "starting over" with a thread. */
 void uthread_init(struct uthread *new_thread)
 {
-	/* don't remove this assert without dealing with 'caller' below.  if we want
-	 * to call this while in vcore context, we'll need to handle the TLS
-	 * swapping a little differently */
-	uint32_t vcoreid;
 	assert(new_thread);
 	new_thread->state = UT_NOT_RUNNING;
 	/* They should have zero'd the uthread.  Let's check critical things: */
