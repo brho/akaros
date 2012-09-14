@@ -938,7 +938,7 @@ tcp_connect(struct tcp_pcb *pcb, ip_addr_t *ipaddr, uint16_t port,
   /* As initial send MSS, we use TCP_MSS but limit it to 536.
      The send MSS is updated when an MSS option is received. */
   pcb->mss = (TCP_MSS > 536) ? 536 : TCP_MSS;
-#if TCP_CALCULATE_EFF_SEND_MSS
+#if TCP_CALCULATE_EFF_SEND_MSS 
   pcb->mss = tcp_eff_send_mss(pcb->mss, ipaddr);
 #endif /* TCP_CALCULATE_EFF_SEND_MSS */
   pcb->cwnd = 1;
@@ -946,7 +946,6 @@ tcp_connect(struct tcp_pcb *pcb, ip_addr_t *ipaddr, uint16_t port,
 #if LWIP_CALLBACK_API
   pcb->connected = connected;
 #else /* LWIP_CALLBACK_API */  
-  LWIP_UNUSED_ARG(connected);
 #endif /* LWIP_CALLBACK_API */
 
   /* Send a SYN together with the MSS option. */

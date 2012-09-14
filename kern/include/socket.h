@@ -6,6 +6,7 @@
 #include <atomic.h>
 #include <net/pbuf.h>
 #include <kthread.h>
+#include <net/ip.h>
 #include <vfs.h>
 // Just a couple of AF types that we might support
 #define AF_UNSPEC	0
@@ -69,9 +70,6 @@ struct socket{
 	//struct  protosw *so_proto;  /* (a) protocol handle */
 };
 
-struct in_addr {
-    uint32_t s_addr;
-};
 
 /* members are in network byte order */
 struct sockaddr_in {
@@ -104,10 +102,61 @@ struct msghdr {
 };
 
 
+/* Socket-level options for `getsockopt' and `setsockopt'.  */
+enum
+  {
+    SO_DEBUG = 0x0001,		/* Record debugging information.  */
+#define SO_DEBUG SO_DEBUG
+    SO_ACCEPTCONN = 0x0002,	/* Accept connections on socket.  */
+#define SO_ACCEPTCONN SO_ACCEPTCONN
+    SO_REUSEADDR = 0x0004,	/* Allow reuse of local addresses.  */
+#define SO_REUSEADDR SO_REUSEADDR
+    SO_KEEPALIVE = 0x0008,	/* Keep connections alive and send
+				   SIGPIPE when they die.  */
+#define SO_KEEPALIVE SO_KEEPALIVE
+    SO_DONTROUTE = 0x0010,	/* Don't do local routing.  */
+#define SO_DONTROUTE SO_DONTROUTE
+    SO_BROADCAST = 0x0020,	/* Allow transmission of
+				   broadcast messages.  */
+#define SO_BROADCAST SO_BROADCAST
+    SO_USELOOPBACK = 0x0040,	/* Use the software loopback to avoid
+				   hardware use when possible.  */
+#define SO_USELOOPBACK SO_USELOOPBACK
+    SO_LINGER = 0x0080,		/* Block on close of a reliable
+				   socket to transmit pending data.  */
+#define SO_LINGER SO_LINGER
+    SO_OOBINLINE = 0x0100,	/* Receive out-of-band data in-band.  */
+#define SO_OOBINLINE SO_OOBINLINE
+    SO_REUSEPORT = 0x0200,	/* Allow local address and port reuse.  */
+#define SO_REUSEPORT SO_REUSEPORT
+    SO_SNDBUF = 0x1001,		/* Send buffer size.  */
+#define SO_SNDBUF SO_SNDBUF
+    SO_RCVBUF = 0x1002,		/* Receive buffer.  */
+#define SO_RCVBUF SO_RCVBUF
+    SO_SNDLOWAT = 0x1003,	/* Send low-water mark.  */
+#define SO_SNDLOWAT SO_SNDLOWAT
+    SO_RCVLOWAT = 0x1004,	/* Receive low-water mark.  */
+#define SO_RCVLOWAT SO_RCVLOWAT
+    SO_SNDTIMEO = 0x1005,	/* Send timeout.  */
+#define SO_SNDTIMEO SO_SNDTIMEO
+    SO_RCVTIMEO = 0x1006,	/* Receive timeout.  */
+#define SO_RCVTIMEO SO_RCVTIMEO
+    SO_ERROR = 0x1007,		/* Get and clear error status.  */
+#define SO_ERROR SO_ERROR
+    SO_STYLE = 0x1008,		/* Get socket connection style.  */
+#define SO_STYLE SO_STYLE
+    SO_TYPE = SO_STYLE		/* Compatible name for SO_STYLE.  */
+#define SO_TYPE SO_TYPE
+  };
+#define SO_INHERITED   (SO_REUSEADDR|SO_KEEPALIVE|SO_LINGER)
 
 extern struct kmem_cache *sock_kcache;
 extern struct kmem_cache *mbuf_kcache;
 extern struct kmem_cache *udp_pcb_kcache;
+extern struct kmem_cache *tcp_pcb_kcache;
+extern struct kmem_cache *tcp_pcb_listen_kcache;
+extern struct kmem_cache *tcp_segment_kcache;
+
 
 void socket_init();
 intreg_t send_iov(struct socket* sock, struct iovec* iov, int flags);
@@ -118,6 +167,12 @@ intreg_t sys_sendto(struct proc *p, int socket, const void *buffer, size_t lengt
 intreg_t sys_recvfrom(struct proc *p, int socket, void *restrict buffer, size_t length, int flags, struct sockaddr *restrict address, socklen_t *restrict address_len);
 intreg_t sys_select(struct proc *p, int nfds, fd_set *readfds, fd_set *writefds,
 				fd_set *exceptfds, struct timeval *timeout);
+intreg_t sys_connect(struct proc *p, int sockfd, const struct sockaddr *addr, socklen_t addrlen);
+intreg_t sys_send(struct proc *p, int sockfd, const void *buf, size_t len, int flags);
+intreg_t sys_recv(struct proc *p, int sockfd, void *buf, size_t len, int flags);
+intreg_t sys_bind(struct proc* p, int sockfd, const struct sockaddr *addr, socklen_t addrlen);
+intreg_t sys_accept(struct proc *p, int sockfd, struct sockaddr *addr, socklen_t *addrlen);
+intreg_t sys_listen(struct proc *p, int sockfd, int backlog);
 
 
 #endif /* ROS_SOCKET_H */

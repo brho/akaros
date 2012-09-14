@@ -62,8 +62,12 @@ KERN_SRCFILES := $(KERN_ARCH_SRCFILES) \
                  $(KERN_SRC_DIR)/socket.c \
                  $(KERN_SRC_DIR)/arsc.c \
                  $(KERN_SRC_DIR)/net/udp.c \
+                 $(KERN_SRC_DIR)/net/tcp.c \
                  $(KERN_SRC_DIR)/net/ip.c \
-                 $(KERN_SRC_DIR)/net/pbuf.c
+                 $(KERN_SRC_DIR)/net/pbuf.c \
+                 $(KERN_SRC_DIR)/net/tcp_out.c \
+                 $(KERN_SRC_DIR)/net/tcp_in.c \
+                 $(KERN_SRC_DIR)/net/timers.c
 
 
 # Only build files if they exist.

@@ -12,8 +12,6 @@
 #include <net/pbuf.h>
 #include <stdio.h>
 
-/* network internal error code */
-#define ERR_BUF 
 
 /* A few other useful standard defines.  Note the IP header can change size. */
 #define ETH_HDR_SZ 14 // without padding, 16 with padding
@@ -30,7 +28,7 @@
 #define DEFAULT_TTL 64
 #define DEFAULT_MTU 1500
 // is this network order already?
-#define IP_ADDR 0x0A000002  //lookout for address order
+#define LOCAL_IP_ADDR (struct in_addr) {0x0A000002}  //lookout for address order
 
 
 /* Don't forget the bytes are in network order */
@@ -46,6 +44,8 @@ struct ethernet_hdr {
 #define IP_DF 0x4000        /* dont fragment flag */
 #define IP_MF 0x2000        /* more fragments flag */
 #define IP_OFFMASK 0x1fff   /* mask for fragmenting bits */
+
+#define PACK_STRUCT_FIELD(x) x __attribute__((packed))
 
 /* For the bit-enumerated fields, note that you need to read "backwards" through
  * the byte (first bits in memory are the "LSB" of the byte).  Can't seem to be
@@ -74,7 +74,19 @@ struct udp_hdr {
 	uint16_t					dst_port;
 	uint16_t					length;
 	uint16_t					checksum;
-};
+} __attribute__((packed));
+
+struct tcp_hdr {
+  PACK_STRUCT_FIELD(uint16_t src);
+  PACK_STRUCT_FIELD(uint16_t dest);
+  PACK_STRUCT_FIELD(uint32_t seqno);
+  PACK_STRUCT_FIELD(uint32_t ackno);
+  PACK_STRUCT_FIELD(uint16_t _hdrlen_rsvd_flags);
+  PACK_STRUCT_FIELD(uint16_t wnd);
+  PACK_STRUCT_FIELD(uint16_t chksum);
+  PACK_STRUCT_FIELD(uint16_t urgp);
+} __attribute__((packed));
+
 /* src and dst are in network order*/
 uint16_t inet_chksum_pseudo(struct pbuf *p, uint32_t src, uint32_t dest, uint8_t proto, uint16_t proto_len);
 uint16_t __ip_checksum(void *buf, unsigned int len, uint32_t sum);

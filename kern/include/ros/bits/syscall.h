@@ -46,7 +46,11 @@
 #define SYS_sendto					41
 #define SYS_recvfrom				42
 #define SYS_select          43
-
+#define SYS_connect				  44
+#define SYS_send						45
+#define SYS_recv						46
+#define SYS_bind 						47
+#define SYS_accept 					48
 
 /* Platform specific syscalls */
 #define SYS_serial_read				75

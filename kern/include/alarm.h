@@ -44,6 +44,8 @@
 #include <ros/common.h>
 #include <sys/queue.h>
 #include <kthread.h>
+#include <alarm.h>
+
 
 /* These structures allow code to block or defer work for a certain amount of
  * time.  Timer chains (like off a per-core timer) are made of lists/trees of
@@ -61,6 +63,8 @@ struct alarm_waiter {
 	TAILQ_ENTRY(alarm_waiter)	next;
 };
 TAILQ_HEAD(awaiters_tailq, alarm_waiter);		/* ideally not a LL */
+
+typedef void (* alarm_handler)(struct alarm_waiter *waiter);
 
 /* One of these per alarm source, such as a per-core timer.  Based on the
  * source, you may need a lock (such as for a global timer).  set_interrupt() is

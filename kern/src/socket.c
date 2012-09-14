@@ -17,10 +17,13 @@
 #include <ros/errno.h>
 #include <net.h>
 #include <net/udp.h>
+#include <net/tcp.h>
 #include <net/pbuf.h>
+#include <net/tcp_impl.h>
 #include <umem.h>
 #include <kthread.h>
 #include <bitmask.h>
+#include <debug.h>
 /*
  *TODO: Figure out which socket.h is used where
  *There are several socket.h in kern, and a couple more in glibc. Perhaps the glibc ones
@@ -30,6 +33,10 @@
 struct kmem_cache *sock_kcache;
 struct kmem_cache *mbuf_kcache;
 struct kmem_cache *udp_pcb_kcache;
+struct kmem_cache *tcp_pcb_kcache;
+struct kmem_cache *tcp_pcb_listen_kcache;
+struct kmem_cache *tcp_segment_kcache;
+
 // file ops needed to support read/write on socket fd
 static struct file_operations socket_op = {
 	0,
@@ -77,11 +84,6 @@ struct socket* alloc_sock(int socket_family, int socket_type, int protocol){
 	init_sem(&newsock->sem, 0);
 	spinlock_init(&newsock->waiter_lock);
 	LIST_INIT(&newsock->waiters);
-	if (socket_type == SOCK_DGRAM){
-		newsock->so_pcb = udp_new();
-		/* back link */
-		((struct udp_pcb*) (newsock->so_pcb))->pcbsock = newsock;
-	}
 	return newsock;
 
 }
@@ -113,18 +115,137 @@ void socket_init(){
 	/* allocate buf for socket */
 	sock_kcache = kmem_cache_create("socket", sizeof(struct socket),
 									__alignof__(struct socket), 0, 0, 0);
-	udp_pcb_kcache = kmem_cache_create("udppcb", sizeof(struct udp_pcb), 
+	udp_pcb_kcache = kmem_cache_create("udppcb", sizeof(struct udp_pcb),
 									__alignof__(struct udp_pcb), 0, 0, 0);
-
+	tcp_pcb_kcache = kmem_cache_create("tcppcb", sizeof(struct tcp_pcb),
+									__alignof__(struct tcp_pcb), 0, 0, 0);
+	tcp_pcb_listen_kcache = kmem_cache_create("tcppcblisten", sizeof(struct tcp_pcb_listen),
+									__alignof__(struct tcp_pcb_listen), 0, 0, 0);
+	tcp_segment_kcache = kmem_cache_create("tcpsegment", sizeof(struct tcp_seg),
+									__alignof__(struct tcp_seg), 0, 0, 0);
 	pbuf_init();
 
 }
+intreg_t sys_accept(struct proc *p, int sockfd, struct sockaddr *addr, socklen_t *addrlen) {
+	printk ("sysaccept called\n");
+	struct socket* sock = getsocket(p, sockfd);
+	struct sockaddr_in *in_addr = (struct sockaddr_in *)addr;
+	uint16_t r_port;
+	if (sock == NULL) {
+		set_errno(EBADF);
+		return -1;	
+	}
+	if (sock->so_type == SOCK_DGRAM){
+		return -1; // indicates false for connect
+	} else if (sock->so_type == SOCK_STREAM) {
+		// check if the socket is in WAIT state
+		// pulling new socket from the queue
+	}
+	return -1;
+}
+static error_t accept_callback(void *arg, struct tcp_pcb *newpcb, error_t err) {
+	struct socket *sockold = (struct socket *) arg;
+	struct socket *sock = alloc_sock(sockold->so_family, sockold->so_type, sockold->so_protocol);
+	struct file *file = alloc_socket_file(sock);
+	
+	sock->so_pcb = newpcb;
+	newpcb->pcbsock = sock;
+	if (file == NULL) return -1;
+	kref_put(&file->f_kref);
+	return 0;
+}
+intreg_t sys_listen(struct proc *p, int sockfd, int backlog) {
+	struct socket* sock = getsocket(p, sockfd);
+	if (sock == NULL) {
+		set_errno(EBADF);
+		return -1;	
+	}
+	if (sock->so_type == SOCK_DGRAM){
+		return -1; // indicates false for connect
+	} else if (sock->so_type == SOCK_STREAM) {
+		// check if the socket is in WAIT state
+		struct tcp_pcb *tpcb = (struct tcp_pcb*)sock->so_pcb;
+		struct tcp_pcb* lpcb = tcp_listen_with_backlog(tpcb, backlog);
+		if (lpcb == NULL) {
+			return -1;
+		}
+		sock->so_pcb = lpcb;
 
+		// register callback for new connection
+		tcp_arg(lpcb, sock);                                                  
+		tcp_accept(lpcb, accept_callback); 
+
+		return 0;
+
+
+		// XXX: add backlog later
+	}
+	return -1;
+}
+intreg_t sys_connect(struct proc *p, int sock_fd, const struct sockaddr* addr, int addrlen) {
+	printk("sys_connect called \n");
+	struct socket* sock = getsocket(p, sock_fd);
+	struct sockaddr_in *in_addr = (struct sockaddr_in *)addr;
+	uint16_t r_port;
+	if (sock == NULL) {
+		set_errno(EBADF);
+		return -1;	
+	}
+	if (sock->so_type == SOCK_DGRAM){
+		return -1; // indicates false for connect
+	} else if (sock->so_type == SOCK_STREAM) {
+		error_t err = tcp_connect((struct tcp_pcb*)sock->so_pcb, & (in_addr->sin_addr), in_addr->sin_port, NULL);
+		return err;
+	}
+
+	return -1;
+}
+
+intreg_t sys_send(struct proc *p, int sockfd, const void *buf, size_t len, int flags) {
+	printk("sys_send called \n");
+	return len; // indicates success, by returning length
+
+}
+intreg_t sys_recv(struct proc *p, int sockfd, void *buf, size_t len, int flags) {
+	printk("sys_recv called \n");
+	// return actual length filled
+	return len;
+}
+
+intreg_t sys_bind(struct proc* p_proc, int fd, const struct sockaddr *addr, socklen_t addrlen) {
+	struct socket* sock = getsocket(p_proc, fd);
+	const struct sockaddr_in *in_addr = (const struct sockaddr_in *)addr;
+	uint16_t r_port;
+	if (sock == NULL) {
+		set_errno(EBADF);
+		return -1;	
+	}
+	if (sock->so_type == SOCK_DGRAM){
+		return udp_bind((struct udp_pcb*)sock->so_pcb, & (in_addr->sin_addr), in_addr->sin_port);
+	} else if (sock->so_type == SOCK_STREAM) {
+		return tcp_bind((struct tcp_pcb*)sock->so_pcb, & (in_addr->sin_addr), in_addr->sin_port);
+	} else {
+		printk("SOCK type not supported in bind operation \n");
+		return -1;
+	}
+	return 0;
+}
+ 
 intreg_t sys_socket(struct proc *p, int socket_family, int socket_type, int protocol){
 	//check validity of params
-	if (socket_family !=AF_INET && socket_type!=SOCK_DGRAM)
+	if (socket_family != AF_INET && socket_type != SOCK_DGRAM)
 		return 0;
 	struct socket *sock = alloc_sock(socket_family, socket_type, protocol);
+	if (socket_type == SOCK_DGRAM){
+		/* udp socket */
+		sock->so_pcb = udp_new();
+		/* back link */
+		((struct udp_pcb*) (sock->so_pcb))->pcbsock = sock;
+	} else if (socket_type == SOCK_STREAM) {
+		/* tcp socket */
+		sock->so_pcb = tcp_new();
+		((struct tcp_pcb*) (sock->so_pcb))->pcbsock = sock;
+	}
 	struct file *file = alloc_socket_file(sock);
 	
 	if (file == NULL) return -1;
@@ -137,6 +258,7 @@ intreg_t sys_socket(struct proc *p, int socket_family, int socket_type, int prot
 	printk("Socket open, res = %d\n", fd);
 	return fd;
 }
+
 intreg_t send_iov(struct socket* sock, struct iovec* iov, int flags){
 	// COPY_COUNT: for each iov, copy into mbuf, and send
 	// should not copy here, copy in the protocol..
@@ -146,6 +268,7 @@ intreg_t send_iov(struct socket* sock, struct iovec* iov, int flags){
 	// finally time to check for validity of UA, in the protocol send
 	return 0;	
 }
+
 /*TODO: iov support currently broken */
 int send_datagram(struct socket* sock, struct iovec* iov, int flags){
 	// is this a connection oriented protocol? 
@@ -201,7 +324,7 @@ intreg_t sys_sendto(struct proc *p_proc, int fd, const void *buffer, size_t leng
 	}
 
 	return -1;
-  //TODO: support for sendmsg and iovectors? Let's get the basis working first!
+  //TODO: support for sendmsg and iovectors? Let's get the basics working first!
 	#if 0 
 	// use iovector to handle sendmsg calls too, and potentially scatter-gather
 	struct msghdr msg;

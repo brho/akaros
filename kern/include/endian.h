@@ -25,6 +25,14 @@
 #define be32_to_cpu(x) byte_swap32((x))
 #define be64_to_cpu(x) byte_swap64((x))
 
+#define PP_HTONS(x) ((((x) & 0xff) << 8) | (((x) & 0xff00) >> 8))
+#define PP_NTOHS(x) PP_HTONS(x)
+#define PP_HTONL(x) ((((x) & 0xff) << 24) | \
+                     (((x) & 0xff00) << 8) | \
+                     (((x) & 0xff0000UL) >> 8) | \
+                     (((x) & 0xff000000UL) >> 24))
+#define PP_NTOHL(x) PP_HTONL(x)
+
 #else /* big endian */
 
 # ifndef BIG_ENDIAN
@@ -44,6 +52,11 @@
 #define be16_to_cpu(x) ((uint16_t)(x))
 #define be32_to_cpu(x) ((uint32_t)(x))
 #define be64_to_cpu(x) ((uint64_t)(x))
+
+#define PP_HTONS(x) (x)
+#define PP_NTOHS(x) (x)
+#define PP_HTONL(x) (x)
+#define PP_NTOHL(x) (x)
 
 #endif /* endian */
 
