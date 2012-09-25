@@ -21,6 +21,7 @@
  * it up over a bunch of ucqs, instead of doing a lot of little mmap() calls. */
 void ucq_init_raw(struct ucq *ucq, uintptr_t pg1, uintptr_t pg2)
 {
+	printd("[user] initializing ucq %08p for proc %d\n", ucq, getpid());
 	assert(!PGOFF(pg1));
 	assert(!PGOFF(pg2));
 	/* Prod and cons both start on the first page, slot 0.  When they are equal,

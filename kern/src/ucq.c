@@ -62,7 +62,8 @@ grab_lock:
 	if (!new_page) {
 		/* Warn if we have a ridiculous amount of pages in the ucq */
 		if (atomic_fetch_and_add(&ucq->nr_extra_pgs, 1) > UCQ_WARN_THRESH)
-			warn("Over %d pages in ucq %08p!\n", UCQ_WARN_THRESH, ucq);
+			warn("Over %d pages in ucq %08p for pid %d!\n", UCQ_WARN_THRESH,
+			     ucq, p->pid);
 		/* Giant warning: don't ask for anything other than anonymous memory at
 		 * a non-fixed location.  o/w, it may cause a TLB shootdown, which grabs
 		 * the proc_lock, and potentially deadlock the system. */
@@ -132,6 +133,7 @@ error_addr:
 /* Prints the status and up to 25 of the previous messages for the UCQ. */
 void print_ucq(struct proc *p, struct ucq *ucq)
 {
+	struct ucq_page *ucq_pg;
 	struct proc *old_proc = switch_to(p);
 
 	printk("UCQ %08p\n", ucq);
@@ -143,7 +145,17 @@ void print_ucq(struct proc *p, struct ucq *ucq)
 	/* Try to see our previous ucqs */
 	for (int i = atomic_read(&ucq->prod_idx), count = 0;
 	     slot_is_good(i), count < 25;  i--, count++) {
+		/* only attempt to print messages on the same page */
+		if (PTE_ADDR(i) != PTE_ADDR(atomic_read(&ucq->prod_idx)))
+			break;
 		printk("Prod idx %08p message ready is %08p\n", i, slot2msg(i)->ready);
+	}
+	/* look at the chain, starting from cons_idx */
+	ucq_pg = (struct ucq_page*)PTE_ADDR(atomic_read(&ucq->cons_idx));
+	for (int i = 0; i < 10 && ucq_pg; i++) {
+		printk("#%02d: Cons page: %08p, nr_cons: %d, next page: %08p\n", i,
+		       ucq_pg, ucq_pg->header.nr_cons, ucq_pg->header.cons_next_pg);
+		ucq_pg = (struct ucq_page*)(ucq_pg->header.cons_next_pg);
 	}
 	switch_back(p, old_proc);
 }

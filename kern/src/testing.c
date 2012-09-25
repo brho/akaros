@@ -980,6 +980,7 @@ void test_ucq(void)
 		struct event_msg msg;
 
 		printk("Running the alarm handler!\n");
+		printk("NR msg per page: %d\n", NR_MSG_PER_PAGE);
 		/* might not be mmaped yet, if not, abort */
 		if (!user_mem_check(p, ucq, PGSIZE, 1, PTE_USER_RW)) {
 			printk("Not mmaped yet\n");
@@ -996,18 +997,29 @@ void test_ucq(void)
 		/* So it's ready, time to finally do the tests... */
 		printk("[kernel] Finally starting the tests... \n");
 		/* 1: Send a simple message */
-		printk("[kernel] Sending simple message (7, deadbeef)\n");
+		printk("[kernel] #1 Sending simple message (7, deadbeef)\n");
 		msg.ev_type = 7;
 		msg.ev_arg2 = 0xdeadbeef;
 		send_ucq_msg(ucq, p, &msg);
+		printk("nr_pages: %d\n", atomic_read(&ucq->nr_extra_pgs));
 		/* 2: Send a bunch.  In a VM, this causes one swap, and then a bunch of
 		 * mmaps. */
+		printk("[kernel] #2 \n");
 		for (int i = 0; i < 5000; i++) {
 			msg.ev_type = i;
 			send_ucq_msg(ucq, p, &msg);
 		}
+		printk("nr_pages: %d\n", atomic_read(&ucq->nr_extra_pgs));
+		printk("[kernel] #3 \n");
+		/* 3: make sure we chained pages (assuming 1k is enough) */
+		for (int i = 0; i < 1000; i++) {
+			msg.ev_type = i;
+			send_ucq_msg(ucq, p, &msg);
+		}
+		printk("nr_pages: %d\n", atomic_read(&ucq->nr_extra_pgs));
 		/* other things we could do:
 		 *  - concurrent producers / consumers...  ugh.
+		 *  - would require a kmsg to another core, instead of a local alarm
 		 */
 		/* done, switch back and free things */
 		switch_back(p, old_proc);
@@ -1042,6 +1054,7 @@ void test_ucq(void)
 	 * not get the process you created, in the event there are others floating
 	 * around that are runnable */
 	schedule();
+	smp_idle();
 	assert(0);
 }
 
