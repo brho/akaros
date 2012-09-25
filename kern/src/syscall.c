@@ -72,10 +72,11 @@ static void finish_sysc(struct syscall *sysc, struct proc *p)
 	atomic_and(&sysc->flags, ~SC_K_LOCK); 
 }
 
-/* Helper that "finishes" the current async syscall.  This should be used when
- * we are calling a function in a syscall that might not return and won't be
- * able to use the normal syscall return path, such as proc_yield().  Call this
- * from within syscall.c (I don't want it global).
+/* Helper that "finishes" the current async syscall.  This should be used with
+ * care when we are not using the normal syscall completion path.
+ *
+ * Do *NOT* complete the same syscall twice.  This is catastrophic for _Ms, and
+ * a bad idea for _S.
  *
  * It is possible for another user thread to see the syscall being done early -
  * they just need to be careful with the weird proc management calls (as in,
@@ -367,14 +368,18 @@ static error_t sys_proc_destroy(struct proc *p, pid_t pid, int exitcode)
 
 static int sys_proc_yield(struct proc *p, bool being_nice)
 {
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	/* proc_yield() often doesn't return - we need to set the syscall retval
 	 * early.  If it doesn't return, it expects to eat our reference (for now).
 	 */
-	finish_current_sysc(0);
+	finish_sysc(pcpui->cur_sysc, pcpui->cur_proc);
+	pcpui->cur_sysc = 0;	/* don't touch sysc again */
 	proc_incref(p, 1);
 	proc_yield(p, being_nice);
 	proc_decref(p);
-	return 0;
+	/* Shouldn't return, to prevent the chance of mucking with cur_sysc. */
+	smp_idle();
+	assert(0);
 }
 
 static void sys_change_vcore(struct proc *p, uint32_t vcoreid,
@@ -391,10 +396,12 @@ static void sys_change_vcore(struct proc *p, uint32_t vcoreid,
 	 * smp_idle will make sure we run the appropriate cur_tf (which will be the
 	 * new vcore for successful calls). */
 	smp_idle();
+	assert(0);
 }
 
 static ssize_t sys_fork(env_t* e)
 {
+	struct proc *temp;
 	int8_t state = 0;
 	// TODO: right now we only support fork for single-core processes
 	if (e->state != PROC_RUNNING_S) {
@@ -416,12 +423,6 @@ static ssize_t sys_fork(env_t* e)
 	env->env_tf = *current_tf;
 	enable_irqsave(&state);
 
-	/* We need to speculatively say the syscall worked before copying the memory
-	 * out, since the 'forked' process's call never actually goes through the
-	 * syscall return path, and will never think it is done.  This violates a
-	 * few things.  Just be careful with fork. */
-	finish_current_sysc(0);
-
 	env->cache_colors_map = cache_colors_map_alloc();
 	for(int i=0; i < llc_cache->num_colors; i++)
 		if(GET_BITMASK_BIT(e->cache_colors_map,i))
@@ -435,6 +436,13 @@ static ssize_t sys_fork(env_t* e)
 		set_errno(ENOMEM);
 		return -1;
 	}
+	/* Switch to the new proc's address space and finish the syscall.  We'll
+	 * never naturally finish this syscall for the new proc, since its memory
+	 * is cloned before we return for the original process.  If we ever do CoW
+	 * for forked memory, this will be the first place that gets CoW'd. */
+	temp = switch_to(env);
+	finish_current_sysc(0);
+	switch_back(env, temp);
 
 	/* In general, a forked process should be a fresh process, and we copy over
 	 * whatever stuff is needed between procinfo/procdata. */
