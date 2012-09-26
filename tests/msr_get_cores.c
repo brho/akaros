@@ -100,6 +100,7 @@ void vcore_entry(void)
 	if (vcoreid == 0) {
 		clear_notif_pending(vcoreid);
 		set_tls_desc(core0_tls, 0);
+		assert(__vcoreid == 0); /* in case anyone uses this */
 		/* Load silly state (Floating point) too */
 		pop_ros_tf(&vcpd->notif_tf, vcoreid);
 		panic("should never see me!");

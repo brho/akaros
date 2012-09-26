@@ -53,6 +53,7 @@ static void uthread_manage_thread0(struct uthread *uthread)
 		free(current_uthread);
 	current_uthread = uthread;
 	set_tls_desc(uthread->tls_desc, 0);
+	__vcoreid = 0;	/* setting the uthread's TLS var */
 	assert(!in_vcore_context());
 }
 
@@ -382,6 +383,7 @@ static void __run_cur_uthread(void)
 	}
 	/* Go ahead and start the uthread */
 	set_tls_desc(uthread->tls_desc, vcoreid);
+	__vcoreid = vcoreid;	/* setting the uthread's TLS var */
 	/* Depending on where it was saved, we pop differently.  This assumes that
 	 * if a uthread was not saved, that it was running in the vcpd notif tf.
 	 * There should never be a time that the TF is unsaved and not in the notif
@@ -400,12 +402,14 @@ static void __run_cur_uthread(void)
  * yielding, etc. USE WITH EXTREME CAUTION! */
 void highjack_current_uthread(struct uthread *uthread)
 {
+	uint32_t vcoreid = vcore_id();
 	assert(uthread != current_uthread);
 	assert(uthread->tls_desc);
 	current_uthread->state = UT_NOT_RUNNING;
 	uthread->state = UT_RUNNING;
 	vcore_set_tls_var(current_uthread, uthread);
-	set_tls_desc(uthread->tls_desc, vcore_id());
+	set_tls_desc(uthread->tls_desc, vcoreid);
+	__vcoreid = vcoreid;	/* setting the uthread's TLS var */
 }
 
 /* Runs whatever thread is vcore's current_uthread.  This is nothing but a
@@ -428,7 +432,6 @@ void run_current_uthread(void)
  * real run_cur_uth. */
 void run_uthread(struct uthread *uthread)
 {
-	uint32_t vcoreid = vcore_id();
 	assert(uthread != current_uthread);
 	if (uthread->state != UT_NOT_RUNNING) {
 		/* had vcore3 throw this, when the UT blocked on vcore1 and didn't come
@@ -457,6 +460,7 @@ static void __run_current_uthread_raw(void)
 	/* utf no longer represents the current state of the uthread */
 	current_uthread->flags &= ~UTHREAD_SAVED;
 	set_tls_desc(current_uthread->tls_desc, vcoreid);
+	__vcoreid = vcoreid;	/* setting the uthread's TLS var */
 	/* Pop the user trap frame */
 	pop_ros_tf_raw(&vcpd->notif_tf, vcoreid);
 	assert(0);

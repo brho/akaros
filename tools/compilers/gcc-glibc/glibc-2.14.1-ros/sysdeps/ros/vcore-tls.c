@@ -5,7 +5,6 @@
 void set_tls_desc(void* addr, int vcoreid)
 {
 	__set_tls_desc(addr, vcoreid);
-	__vcoreid = vcoreid;
 }
 
 void *get_tls_desc(int vcoreid)

@@ -72,6 +72,8 @@ void restore_context(struct u_context *uc)
 	current_thread = uc->thread;
 	/* Set the proper tls descriptor for the context we are restoring */
     set_tls_desc(uc->tls_desc, vcoreid);
+	/* Tell the uthread which vcore it is on */
+	__vcoreid = vcoreid;
 	/* Pop the trapframe */
 	pop_ros_tf(&uc->utf, vcoreid);
 }
