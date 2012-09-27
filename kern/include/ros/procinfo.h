@@ -97,6 +97,38 @@ procinfo_pack_args(procinfo_t* p, char* const* argv, char* const* envp)
 // this is how user programs access the procinfo page
 #ifndef ROS_KERNEL
 # define __procinfo (*(procinfo_t*)UINFO)
-#endif
+
+#include <ros/common.h>
+#include <ros/atomic.h>
+#include <ros/syscall.h>
+
+/* Figure out what your vcoreid is from your pcoreid and procinfo.  Only low
+ * level or debugging code should call this. */
+static inline uint32_t __get_vcoreid_from_procinfo(void)
+{
+	/* The assumption is that any IPIs/KMSGs would knock userspace into the
+	 * kernel before it could read the closing of the seqctr.  Put another way,
+	 * there is a 'memory barrier' between the IPI write and the seqctr write.
+	 * I think this is true. */
+	uint32_t kpcoreid, kvcoreid;
+	seq_ctr_t old_seq;
+	do {
+		cmb();
+		old_seq = __procinfo.coremap_seqctr;
+		kpcoreid = __ros_syscall(SYS_getpcoreid, 0, 0, 0, 0, 0, 0, NULL);
+		if (!__procinfo.pcoremap[kpcoreid].valid)
+			continue;
+		kvcoreid = __procinfo.pcoremap[kpcoreid].vcoreid;
+	} while (seqctr_retry(old_seq, __procinfo.coremap_seqctr));
+	return kvcoreid;
+}
+
+static inline uint32_t __get_vcoreid(void)
+{
+	/* since sys_getvcoreid could lie (and might never change) */
+	return __get_vcoreid_from_procinfo();
+}
+
+#endif /* ifndef ROS_KERNEL */
 
 #endif // !ROS_PROCDATA_H

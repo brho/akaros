@@ -59,6 +59,8 @@ void disable_notifs(uint32_t vcoreid);
 void vcore_idle(void);
 void ensure_vcore_runs(uint32_t vcoreid);
 void cpu_relax_vc(uint32_t vcoreid);
+uint32_t get_vcoreid(void);
+bool check_vcoreid(const char *str, uint32_t vcoreid);
 
 /* Static inlines */
 static inline size_t max_vcores(void)

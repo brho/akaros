@@ -417,3 +417,30 @@ void cpu_relax_vc(uint32_t vcoreid)
 	}
 	cpu_relax();
 }
+
+/* Check with the kernel to determine what vcore we are.  Normally, you should
+ * never call this, since your vcoreid is stored in your TLS.  Also, if you call
+ * it from a uthread, you could get migrated, so you should drop into some form
+ * of vcore context (DONT_MIGRATE on) */
+uint32_t get_vcoreid(void)
+{
+	if (!in_vcore_context()) {
+		assert(current_uthread);
+		assert(current_uthread->flags & UTHREAD_DONT_MIGRATE);
+	}
+	return __get_vcoreid();
+}
+
+/* Debugging helper.  Pass in the string you want printed if your vcoreid is
+ * wrong, and pass in what vcoreid you think you are.  Don't call from uthread
+ * context unless migrations are disabled.  Will print some stuff and return
+ * FALSE if you were wrong. */
+bool check_vcoreid(const char *str, uint32_t vcoreid)
+{
+	uint32_t kvcoreid = get_vcoreid();
+	if (vcoreid != kvcoreid) {
+		ros_debug("%s: VC %d thought it was VC %d\n", str, kvcoreid, vcoreid);
+		return FALSE;
+	}
+	return TRUE;
+}
