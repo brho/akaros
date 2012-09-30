@@ -79,9 +79,11 @@ struct socket* alloc_sock(int socket_family, int socket_type, int protocol){
 	newsock->so_type = socket_type;
 	newsock->so_protocol = protocol;
 	newsock->so_state = SS_ISDISCONNECTED;
+	STAILQ_INIT(&(newsock->acceptq));
 	pbuf_head_init(&newsock->recv_buff);
 	pbuf_head_init(&newsock->send_buff);
 	init_sem(&newsock->sem, 0);
+	init_sem(&newsock->accept_sem, 0);
 	spinlock_init(&newsock->waiter_lock);
 	LIST_INIT(&newsock->waiters);
 	return newsock;
@@ -131,6 +133,7 @@ intreg_t sys_accept(struct proc *p, int sockfd, struct sockaddr *addr, socklen_t
 	struct socket* sock = getsocket(p, sockfd);
 	struct sockaddr_in *in_addr = (struct sockaddr_in *)addr;
 	uint16_t r_port;
+	struct socket *accepted = NULL;
 	if (sock == NULL) {
 		set_errno(EBADF);
 		return -1;	
@@ -138,20 +141,49 @@ intreg_t sys_accept(struct proc *p, int sockfd, struct sockaddr *addr, socklen_t
 	if (sock->so_type == SOCK_DGRAM){
 		return -1; // indicates false for connect
 	} else if (sock->so_type == SOCK_STREAM) {
-		// check if the socket is in WAIT state
-		// pulling new socket from the queue
+		if (STAILQ_EMPTY(&(sock->acceptq))) {
+			// block on the acceptq
+			sleep_on(&sock->accept_sem);
+		} else {
+			__down_sem(&sock->accept_sem, NULL);
+		}
+		spin_lock_irqsave(&sock->waiter_lock);
+		accepted = STAILQ_FIRST(&(sock->acceptq));
+		STAILQ_REMOVE_HEAD((&(sock->acceptq)), next);
+		spin_unlock_irqsave(&sock->waiter_lock);
+		if (accepted == NULL) return -1;
+		struct file *file = alloc_socket_file(accepted);
+		if (file == NULL) return -1;
+		int fd = insert_file(&p->open_files, file, 0);
+		if (fd < 0) {
+			warn("File insertion for socket open failed");
+			return -1;
+		}
+		kref_put(&file->f_kref);
 	}
 	return -1;
 }
+
+static void wrap_restart_kthread(struct trapframe *tf, uint32_t srcid,
+					long a0, long a1, long a2){
+	restart_kthread((struct kthread*) a0);
+}
+
 static error_t accept_callback(void *arg, struct tcp_pcb *newpcb, error_t err) {
 	struct socket *sockold = (struct socket *) arg;
 	struct socket *sock = alloc_sock(sockold->so_family, sockold->so_type, sockold->so_protocol);
-	struct file *file = alloc_socket_file(sock);
 	
 	sock->so_pcb = newpcb;
 	newpcb->pcbsock = sock;
-	if (file == NULL) return -1;
-	kref_put(&file->f_kref);
+	spin_lock_irqsave(&sockold->waiter_lock);
+	STAILQ_INSERT_TAIL(&sockold->acceptq, sock, next);
+	// wake up any kthread who is potentially waiting
+	spin_unlock_irqsave(&sockold->waiter_lock);
+	struct kthread *kthread = __up_sem(&(sock->accept_sem), FALSE);
+	if (kthread) {
+		send_kernel_message(core_id(), (amr_t)wrap_restart_kthread, (long)kthread, 0, 0,
+												  KMSG_ROUTINE);
+	} 
 	return 0;
 }
 intreg_t sys_listen(struct proc *p, int sockfd, int backlog) {

@@ -34,6 +34,8 @@
 
 struct socket;
 struct proc;
+STAILQ_HEAD(socket_tailq, socket);
+
 // These are probably defined elsewhere too..
 #ifndef socklen_t
 typedef int socklen_t;
@@ -63,9 +65,11 @@ struct socket{
 	struct pbuf_head recv_buff;
 	struct pbuf_head send_buff;
 	struct semaphore sem;
+	struct semaphore accept_sem;
 	spinlock_t waiter_lock;
 	struct semaphore_list waiters;   /* semaphone to for a process to sleep on */
-	
+	struct socket_tailq acceptq;
+	STAILQ_ENTRY(socket) next;
 	//struct  vnet *so_vnet;      /* network stack instance */
 	//struct  protosw *so_proto;  /* (a) protocol handle */
 };
