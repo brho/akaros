@@ -1394,6 +1394,7 @@ const static struct sys_table_entry syscall_table[] = {
 	[SYS_recv] ={(syscall_t)sys_recv, "recvfrom"},
 	[SYS_bind] ={(syscall_t)sys_bind, "bind"},
 	[SYS_accept] ={(syscall_t)sys_accept, "accept"},
+	[SYS_listen] ={(syscall_t)sys_listen, "listen"},
 
 
 	[SYS_read] = {(syscall_t)sys_read, "read"},

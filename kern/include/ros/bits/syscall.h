@@ -51,6 +51,7 @@
 #define SYS_recv						46
 #define SYS_bind 						47
 #define SYS_accept 					48
+#define SYS_listen				  49
 
 /* Platform specific syscalls */
 #define SYS_serial_read				75
