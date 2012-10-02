@@ -172,6 +172,7 @@ void mcs_pdr_init(struct mcs_pdr_lock *lock)
 	lock->lock_holder = 0;
 	lock->vc_qnodes = malloc(sizeof(struct mcs_pdr_qnode) * max_vcores());
 	assert(lock->vc_qnodes);
+	memset(lock->vc_qnodes, 0, sizeof(struct mcs_pdr_qnode) * max_vcores());
 	for (int i = 0; i < max_vcores(); i++)
 		lock->vc_qnodes[i].vcoreid = i;
 }
@@ -192,6 +193,9 @@ void mcs_pdr_fini(struct mcs_pdr_lock *lock)
  * wastefully spin, we're okay. */
 static void __ensure_qnode_runs(struct mcs_pdr_qnode *qnode)
 {
+	/* This assert is somewhat useless.  __lock will compile it out, since it is
+	 * impossible.  If you have a PF around here in __lock, odds are your stack
+	 * is getting gently clobbered (syscall finished twice?). */
 	assert(qnode);
 	ensure_vcore_runs(qnode->vcoreid);
 }
@@ -239,7 +243,7 @@ void __mcs_pdr_unlock(struct mcs_pdr_lock *lock, struct mcs_pdr_qnode *qnode)
 		cmb();	/* no need for CPU mbs, since there's an atomic_cas() */
 		/* If we're still the lock, just swap it with 0 (unlock) and return */
 		if (atomic_cas_ptr((void**)&lock->lock, qnode, 0))
-			return;
+			goto out;
 		cmb();	/* need to read a fresh tail.  the CAS was a CPU mb */
 		/* Read in the tail (or someone who recent was the tail, but could now
 		 * be farther up the chain), in prep for our spinning. */
@@ -266,6 +270,9 @@ void __mcs_pdr_unlock(struct mcs_pdr_lock *lock, struct mcs_pdr_qnode *qnode)
 		/* simply unlock whoever is next */
 		qnode->next->locked = 0;
 	}
+out:
+	/* ease of debugging */
+	qnode->next = 0;
 }
 
 /* Actual MCS-PDR locks.  These use memory in the lock for their qnodes, though

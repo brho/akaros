@@ -353,6 +353,13 @@ void send_event(struct proc *p, struct event_queue *ev_q, struct event_msg *msg,
 		printk("[kernel] Illegal addr for ev_q\n");
 		return;
 	}
+	/* This should be caught by "future technology" that can tell when the
+	 * kernel PFs on the user's behalf.  For now, we catch common userspace bugs
+	 * (had this happen a few times). */
+	if (!PTE_ADDR(ev_q)) {
+		printk("[kernel] Bad addr %08p for ev_q\n", ev_q);
+		return;
+	}
 	/* ev_q is a user pointer, so we need to make sure we're in the right
 	 * address space */
 	old_proc = switch_to(p);

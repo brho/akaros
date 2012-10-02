@@ -178,6 +178,8 @@ static int handle_mbox_msgs(struct event_mbox *ev_mbox)
 	struct event_msg local_msg;
 	unsigned int ev_type;
 	uint32_t vcoreid = vcore_id();
+	/* Some stack-smashing bugs cause this to fail */
+	assert(ev_mbox);
 	/* Try to dequeue, dispatch whatever you get. */
 	while (!get_ucq_msg(&ev_mbox->ev_msgs, &local_msg)) {
 		ev_type = local_msg.ev_type;
@@ -305,6 +307,8 @@ void handle_event_q(struct event_queue *ev_q)
 		return;
 	}
 	printd("[event] handling ev_q %08p on vcore %d\n", ev_q, vcore_id());
+	/* Raw ev_qs that haven't been connected to an mbox, user bug: */
+	assert(ev_q->ev_mbox);
 	handle_mbox(ev_q->ev_mbox);
 }
 

@@ -56,4 +56,3 @@ int ros_debug(const char *fmt, ...)
 
 	return cnt;
 }
-
