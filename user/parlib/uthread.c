@@ -597,6 +597,16 @@ static void stop_uth_stealing(struct preempt_data *vcpd)
 	                     old_flags & ~VC_UTHREAD_STEALING));
 }
 
+/* Helper.  Will ensure a good attempt at changing vcores, meaning we try again
+ * if we failed for some reason other than the vcore was already running. */
+static void __change_vcore(uint32_t rem_vcoreid, bool enable_my_notif)
+{
+	/* okay to do a normal spin/relax here, even though we are in vcore
+	 * context. */
+	while (-EAGAIN == sys_change_vcore(rem_vcoreid, enable_my_notif))
+		cpu_relax();
+}
+
 /* Helper, used in preemption recovery.  When you can freely leave vcore
  * context and need to change to another vcore, call this.  vcpd is the caller,
  * rem_vcoreid is the remote vcore.  This will try to package up your uthread.
@@ -614,7 +624,7 @@ static void change_to_vcore(struct preempt_data *vcpd, uint32_t rem_vcoreid)
 		 * once they 0'd it, we should be good to yield.  just a bit dangerous.
 		 * */
 		were_handling_remotes = ev_might_not_return();
-		sys_change_vcore(rem_vcoreid, TRUE);	/* noreturn on success */
+		__change_vcore(rem_vcoreid, TRUE);	/* noreturn on success */
 		goto out_we_returned;
 	}
 	/* Note that the reason we need to check STEALING is because we can get into
@@ -632,7 +642,7 @@ static void change_to_vcore(struct preempt_data *vcpd, uint32_t rem_vcoreid)
 	 * progress by doing a sys_change_vcore(). */
 	/* Crap, someone is stealing (unlikely).  All we can do is change. */
 	if (atomic_read(&vcpd->flags) & VC_UTHREAD_STEALING) {
-		sys_change_vcore(rem_vcoreid, FALSE);	/* returns on success */
+		__change_vcore(rem_vcoreid, FALSE);	/* returns on success */
 		return;
 	}
 	cmb();
@@ -640,7 +650,7 @@ static void change_to_vcore(struct preempt_data *vcpd, uint32_t rem_vcoreid)
 	 * VC_UTHREAD_STEALING. */
 	if (!current_uthread) {
 		were_handling_remotes = ev_might_not_return();
-		sys_change_vcore(rem_vcoreid, TRUE);	/* noreturn on success */
+		__change_vcore(rem_vcoreid, TRUE);	/* noreturn on success */
 		goto out_we_returned;
 	}
 	/* Need to make sure we don't have a DONT_MIGRATE (very rare, someone would
@@ -648,7 +658,7 @@ static void change_to_vcore(struct preempt_data *vcpd, uint32_t rem_vcoreid)
 	 * to finish stealing (and fail) fast enough for us to miss the previous
 	 * check). */
 	if (current_uthread->flags & UTHREAD_DONT_MIGRATE) {
-		sys_change_vcore(rem_vcoreid, FALSE);	/* returns on success */
+		__change_vcore(rem_vcoreid, FALSE);	/* returns on success */
 		return;
 	}
 	/* Now save our uthread and restart them */
@@ -656,7 +666,7 @@ static void change_to_vcore(struct preempt_data *vcpd, uint32_t rem_vcoreid)
 	__uthread_pause(vcpd, current_uthread);
 	current_uthread = 0;
 	were_handling_remotes = ev_might_not_return();
-	sys_change_vcore(rem_vcoreid, TRUE);		/* noreturn on success */
+	__change_vcore(rem_vcoreid, TRUE);		/* noreturn on success */
 	/* Fall-through to out_we_returned */
 out_we_returned:
 	ev_we_returned(were_handling_remotes);

@@ -1715,9 +1715,17 @@ static void __set_curtf_to_vcoreid(struct proc *p, uint32_t vcoreid)
 
 /* Changes calling vcore to be vcoreid.  enable_my_notif tells us about how the
  * state calling vcore wants to be left in.  It will look like caller_vcoreid
- * was preempted.  Note we don't care about notif_pending.  */
-void proc_change_to_vcore(struct proc *p, uint32_t new_vcoreid,
-                          bool enable_my_notif)
+ * was preempted.  Note we don't care about notif_pending.
+ *
+ * Will return:
+ * 		0 if we successfully changed to the target vcore.
+ * 		-EBUSY if the target vcore is already mapped (a good kind of failure)
+ * 		-EAGAIN if we failed for some other reason and need to try again.  For
+ * 		example, the caller could be preempted, and we never even attempted to
+ * 		change.
+ * 		-EINVAL some userspace bug */
+int proc_change_to_vcore(struct proc *p, uint32_t new_vcoreid,
+                         bool enable_my_notif)
 {
 	uint32_t caller_vcoreid, pcoreid = core_id();
 	struct per_cpu_info *pcpui = &per_cpu_info[pcoreid];
@@ -1725,6 +1733,11 @@ void proc_change_to_vcore(struct proc *p, uint32_t new_vcoreid,
 	struct vcore *caller_vc, *new_vc;
 	struct event_msg preempt_msg = {0};
 	int8_t state = 0;
+	int retval = -EAGAIN;	/* by default, try again */
+	/* Need to not reach outside the vcoremap, which might be smaller in the
+	 * future, but should always be as big as max_vcores */
+	if (new_vcoreid >= p->procinfo->max_vcores)
+		return -EINVAL;
 	/* Need to lock before reading the vcoremap, like in yield.  Need to do this
 	 * before disabling irqs (deadlock with incoming proc mgmt kmsgs) */
 	spin_lock(&p->proc_lock);
@@ -1732,8 +1745,10 @@ void proc_change_to_vcore(struct proc *p, uint32_t new_vcoreid,
 	 * unmapped by a __preempt or __death, like in yield. */
 	disable_irqsave(&state);
 	/* new_vcoreid is already runing, abort */
-	if (vcore_is_mapped(p, new_vcoreid))
-		goto out_failed;
+	if (vcore_is_mapped(p, new_vcoreid)) {
+		retval = -EBUSY;
+		goto out_locked;
+	}
 	/* Need to make sure our vcore is allowed to switch.  We might have a
 	 * __preempt, __death, etc, coming in.  Similar to yield. */
 	switch (p->state) {
@@ -1742,14 +1757,14 @@ void proc_change_to_vcore(struct proc *p, uint32_t new_vcoreid,
 		case (PROC_RUNNING_S):	/* user bug, just return */
 		case (PROC_DYING):		/* incoming __death */
 		case (PROC_RUNNABLE_M):	/* incoming (bulk) preempt/myield TODO:(BULK) */
-			goto out_failed;
+			goto out_locked;
 		default:
 			panic("Weird state(%s) in %s()", procstate2str(p->state),
 			      __FUNCTION__);
 	}
 	/* Make sure we're still mapped in the proc. */
 	if (!is_mapped_vcore(p, pcoreid))
-		goto out_failed;
+		goto out_locked;
 	/* Get all our info */
 	caller_vcoreid = get_vcoreid(p, pcoreid);
 	assert(caller_vcoreid == pcpui->owning_vcoreid);
@@ -1757,8 +1772,9 @@ void proc_change_to_vcore(struct proc *p, uint32_t new_vcoreid,
 	caller_vc = vcoreid2vcore(p, caller_vcoreid);
 	/* Should only call from vcore context */
 	if (!caller_vcpd->notif_disabled) {
+		retval = -EINVAL;
 		printk("[kernel] You tried to change vcores from uthread ctx\n");
-		goto out_failed;
+		goto out_locked;
 	}
 	/* Sanity check, can remove after a while (we should have been unmapped) */
 	assert(!caller_vc->preempt_served);
@@ -1807,10 +1823,12 @@ void proc_change_to_vcore(struct proc *p, uint32_t new_vcoreid,
 	send_kernel_event(p, &preempt_msg, new_vcoreid);
 	/* Change cur_tf so we'll be the new vcoreid */
 	__set_curtf_to_vcoreid(p, new_vcoreid);
-	/* Fall through to exit (we didn't fail) */
-out_failed:
+	retval = 0;
+	/* Fall through to exit */
+out_locked:
 	spin_unlock(&p->proc_lock);
 	enable_irqsave(&state);
+	return retval;
 }
 
 /* Kernel message handler to start a process's context on this core, when the

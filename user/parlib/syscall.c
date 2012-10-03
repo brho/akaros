@@ -137,10 +137,18 @@ int sys_block(unsigned int usec)
  * get started from vcore_entry() or not, and whether or not remote cores need
  * to sys_change_vcore to preempt-recover the calling vcore.  Only set this to
  * FALSE if you are unable to handle starting fresh at vcore_entry().  One
- * example of this is in mcs_pdr_locks */
-void sys_change_vcore(uint32_t vcoreid, bool enable_my_notif)
+ * example of this is in mcs_pdr_locks.
+ *
+ * Will return:
+ * 		0 if we successfully changed to the target vcore.
+ * 		-EBUSY if the target vcore is already mapped (a good kind of failure)
+ * 		-EAGAIN if we failed for some other reason and need to try again.  For
+ * 		example, the caller could be preempted, and we never even attempted to
+ * 		change.
+ * 		-EINVAL some userspace bug */
+int sys_change_vcore(uint32_t vcoreid, bool enable_my_notif)
 {
-	ros_syscall(SYS_change_vcore, vcoreid, enable_my_notif, 0, 0, 0, 0);
+	return ros_syscall(SYS_change_vcore, vcoreid, enable_my_notif, 0, 0, 0, 0);
 }
 
 int sys_change_to_m(void)
