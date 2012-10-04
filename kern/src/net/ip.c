@@ -54,7 +54,8 @@ int eth_send(struct pbuf *p, struct in_addr *dest) {
 int ip_output(struct pbuf *p, struct in_addr *src, struct in_addr *dest, 
 							uint8_t ttl, uint8_t tos, uint8_t proto) {
 	struct pbuf *q;
-	struct ip_hdr *iphdr; 	
+	struct ip_hdr *iphdr;
+	printk ("ip output reached\n");
 	/* TODO: Check for IP_HDRINCL */
 	if (dest->s_addr == IP_HDRINCL) {
 		/*send right away since */

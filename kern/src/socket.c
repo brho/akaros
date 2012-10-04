@@ -235,7 +235,14 @@ intreg_t sys_connect(struct proc *p, int sock_fd, const struct sockaddr* addr, i
 
 intreg_t sys_send(struct proc *p, int sockfd, const void *buf, size_t len, int flags) {
 	printk("sys_send called \n");
-	return len; // indicates success, by returning length
+	struct socket* sock = getsocket(p_proc, fd);
+	const struct sockaddr_in *in_addr = (const struct sockaddr_in *)addr;
+	uint16_t r_port;
+	if (sock == NULL) {
+		set_errno(EBADF);
+		return -1;	
+	}
+	return len;
 
 }
 intreg_t sys_recv(struct proc *p, int sockfd, void *buf, size_t len, int flags) {
