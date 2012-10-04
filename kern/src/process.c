@@ -1586,7 +1586,7 @@ void clear_owning_proc(uint32_t coreid)
 	pcpui->owning_proc = 0;
 	pcpui->owning_vcoreid = 0xdeadbeef;
 	pcpui->cur_tf = 0;			/* catch bugs for now (will go away soon) */
-	if (p);
+	if (p)
 		proc_decref(p);
 }
 
