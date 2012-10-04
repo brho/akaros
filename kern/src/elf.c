@@ -37,16 +37,27 @@ static int load_one_elf(struct proc *p, struct file *f, uintptr_t pgoffset,
 	elf64_t elfhdr_storage;
 	elf32_t* elfhdr32 = (elf32_t*)&elfhdr_storage;
 	elf64_t* elfhdr64 = &elfhdr_storage;
-	if (f->f_op->read(f, (char*)elfhdr64, sizeof(elf64_t), &f_off) == -1)
+	if (f->f_op->read(f, (char*)elfhdr64, sizeof(elf64_t), &f_off)
+	        != sizeof(elf64_t)) {
+		/* if you ever debug this, be sure to 0 out elfhrd_storage in advance */
+		printk("[kernel] load_one_elf: failed to read file\n");
 		goto fail;
-
+	}
+	if (elfhdr64->e_magic != ELF_MAGIC) {
+		printk("[kernel] load_one_elf: file is not an elf!\n");
+		goto fail;
+	}
 	bool elf32 = elfhdr32->e_ident[ELF_IDENT_CLASS] == ELFCLASS32;
 	bool elf64 = elfhdr64->e_ident[ELF_IDENT_CLASS] == ELFCLASS64;
-	if (elf64 == elf32)
+	if (elf64 == elf32) {
+		printk("[kernel] load_one_elf: ID as both 32 and 64 bit\n");
 		goto fail;
+	}
 	#ifndef KERN64
-	if(elf64)
+	if (elf64) {
+		printk("[kernel] load_one_elf: 64 bit elf on 32 bit kernel\n");
 		goto fail;
+	}
 	#endif
 
 	size_t phsz = elf64 ? sizeof(proghdr64_t) : sizeof(proghdr32_t);
@@ -54,12 +65,17 @@ static int load_one_elf(struct proc *p, struct file *f, uintptr_t pgoffset,
 	uint16_t e_phoff = elf_field(elfhdr, e_phoff);
 
 	/* Read in program headers. */
-	if (e_phnum > 10000 || e_phoff % (elf32 ? 4 : 8) != 0)
-	  goto fail;
+	if (e_phnum > 10000 || e_phoff % (elf32 ? 4 : 8) != 0) {
+		printk("[kernel] load_one_elf: Bad program headers\n");
+		goto fail;
+	}
 	phdrs = kmalloc(e_phnum * phsz, 0);
 	f_off = e_phoff;
-	if (!phdrs || f->f_op->read(f, phdrs, e_phnum * phsz, &f_off) == -1)
+	if (!phdrs || f->f_op->read(f, phdrs, e_phnum * phsz, &f_off) !=
+	              e_phnum * phsz) {
+		printk("[kernel] load_one_elf: could not get program headers\n");
 		goto fail;
+	}
 	for (int i = 0; i < e_phnum; i++) {
 		proghdr32_t* ph32 = (proghdr32_t*)phdrs + i;
 		proghdr64_t* ph64 = (proghdr64_t*)phdrs + i;
@@ -83,20 +99,30 @@ static int load_one_elf(struct proc *p, struct file *f, uintptr_t pgoffset,
 			f_off = p_offset;
 			ssize_t maxlen = sizeof(ei->interp);
 			ssize_t bytes = f->f_op->read(f, ei->interp, maxlen, &f_off);
-			if (bytes == -1)
-			  goto fail;
+			/* trying to catch errors.  don't know how big it could be, but it
+			 * should be at least 0. */
+			if (bytes <= 0) {
+				printk("[kernel] load_one_elf: could not read ei->interp\n");
+				goto fail;
+			}
 
 			maxlen = MIN(maxlen, bytes);
-			if (strnlen(ei->interp, maxlen) == maxlen)
-			  goto fail;
+			if (strnlen(ei->interp, maxlen) == maxlen) {
+				printk("[kernel] load_one_elf: interpreter name too long\n");
+				goto fail;
+			}
 
 			ei->dynamic = 1;
 		}
 		else if (p_type == ELF_PROG_LOAD && p_memsz) {
-			if (p_align % PGSIZE)
+			if (p_align % PGSIZE) {
+				printk("[kernel] load_one_elf: not page aligned\n");
 				goto fail;
-			if (p_offset % PGSIZE != p_va % PGSIZE)
+			}
+			if (p_offset % PGSIZE != p_va % PGSIZE) {
+				printk("[kernel] load_one_elf: offset difference \n");
 				goto fail;
+			}
 
 			uintptr_t filestart = ROUNDDOWN(p_offset, PGSIZE);
 			uintptr_t filesz = p_offset + p_filesz - filestart;
@@ -125,8 +151,10 @@ static int load_one_elf(struct proc *p, struct file *f, uintptr_t pgoffset,
 				if (filesz - partial) {
 					/* Map the complete pages. */
 					if (do_mmap(p, memstart, filesz - partial, mm_perms,
-					            mm_flags, f, filestart) == MAP_FAILED)
+					            mm_flags, f, filestart) == MAP_FAILED) {
+						printk("[kernel] load_one_elf: complete mmap failed\n");
 						goto fail;
+					}
 				}
 				/* Note that we (probably) only need to do this zeroing the end
 				 * of a partial file page when we are dealing with
@@ -140,8 +168,10 @@ static int load_one_elf(struct proc *p, struct file *f, uintptr_t pgoffset,
 					/* Map the final partial page. */
 					uintptr_t last_page = memstart + filesz - partial;
 					if (do_mmap(p, last_page, PGSIZE, mm_perms, mm_flags,
-					            f, filestart + filesz - partial) == MAP_FAILED)
+					            f, filestart + filesz - partial) == MAP_FAILED) {
+						printk("[kernel] load_one_elf: partial mmap failed\n");
 						goto fail;
+					}
 
 					/* Zero the end of it. */
 					pte_t *pte = pgdir_walk(p->env_pgdir, (void*)last_page, 0);
@@ -156,8 +186,10 @@ static int load_one_elf(struct proc *p, struct file *f, uintptr_t pgoffset,
 			if (filesz < memsz)
 				if (do_mmap(p, memstart + filesz, memsz-filesz,
 				            PROT_READ | PROT_WRITE, MAP_PRIVATE,
-					        NULL, 0) == MAP_FAILED)
+					        NULL, 0) == MAP_FAILED) {
+					printk("[kernel] load_one_elf: anon mmap failed\n");
 					goto fail;
+				}
 		}
 	}
 	/* map in program headers anyway if not present in binary.
@@ -167,18 +199,18 @@ static int load_one_elf(struct proc *p, struct file *f, uintptr_t pgoffset,
 		uintptr_t filesz = e_phoff + (e_phnum * phsz) - filestart;
 		void *phdr_addr = do_mmap(p, 0, filesz, PROT_READ | PROT_WRITE,
 		                          MAP_PRIVATE, f, filestart);
-		if (phdr_addr == MAP_FAILED)
+		if (phdr_addr == MAP_FAILED) {
+			printk("[kernel] load_one_elf: prog header mmap failed\n");
 			goto fail;
+		}
 		ei->phdr = (long)phdr_addr + e_phoff;
 	}
 	ei->entry = elf_field(elfhdr, e_entry) + pgoffset*PGSIZE;
 	ei->phnum = e_phnum;
 	ei->elf64 = elf64;
 	ret = 0;
-	goto out;
+	/* Fall-through */
 fail:
-	printk("[kernel] Load failed during loadelf of file %s!\n", file_name(f));
-out:
 	if (phdrs)
 		kfree(phdrs);
 	current = cur_proc;

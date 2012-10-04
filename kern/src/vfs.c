@@ -1230,7 +1230,9 @@ ssize_t generic_dir_read(struct file *file, char *u_buf, size_t count,
 		return 0;
 	/* start readdir from where it left off: */
 	dirent->d_off = *offset;
-	for (; (u_buf < buf_end) && (retval == 1); u_buf += sizeof(struct kdirent)){
+	for (   ;
+	        u_buf + sizeof(struct kdirent) <= buf_end;
+	        u_buf += sizeof(struct kdirent)) {
 		/* TODO: UMEM/KFOP (pin the u_buf in the syscall, ditch the local copy,
 		 * get rid of this memcpy and reliance on current, etc).  Might be
 		 * tricky with the dirent->d_off and trust issues */
@@ -1247,6 +1249,9 @@ ssize_t generic_dir_read(struct file *file, char *u_buf, size_t count,
 			memcpy(u_buf, dirent, sizeof(struct dirent));
 		}
 		amt_copied += sizeof(struct dirent);
+		/* 0 signals end of directory */
+		if (retval == 0)
+			break;
 	}
 	/* Next time read is called, we pick up where we left off */
 	*offset = dirent->d_off;	/* UMEM */
