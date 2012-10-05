@@ -37,6 +37,7 @@ void handle_check_msgs(struct event_msg *ev_msg, unsigned int ev_type);
 
 int handle_events(uint32_t vcoreid);
 void handle_event_q(struct event_queue *ev_q);
+int handle_one_mbox_msg(struct event_mbox *ev_mbox);
 int handle_mbox(struct event_mbox *ev_mbox);
 bool mbox_is_empty(struct event_mbox *ev_mbox);
 void send_self_vc_msg(struct event_msg *ev_msg);

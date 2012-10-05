@@ -690,6 +690,139 @@ migrate a notif_safe locking uthread.  The whole point of it is in case it grabs
 a lock that would be held by vcore context, and there's no way to know it isn't
 a lock on the restart-path.
 
+3.9 Why Preemption Handling Doesn't Lock Up (probably)
+---------------------------------------
+One of the concerns of preemption handling is that we don't get into some form
+of livelock, where we ping-pong back and forth between vcores (or a set of
+vcores), all of which are trying to handle each other's preemptions.  Part of
+the concern is that when a vcore sys_changes to another, it can result in
+another preemption message being sent.  We want to be sure that we're making
+progress, and not just livelocked doing sys_change_vcore()s.
+
+A few notes first:
+1) If a vcore is holding locks or otherwise isn't handling events and is
+preempted, it will let go of its locks before it gets to the point of
+attempting to handle any other vcore preemption events.  Event handling is only
+done when it is okay to never return (meaning no locks are held).  If this is
+the situation, eventually it'll work itself out or get to a potential ping-pong
+scenario.
+
+2) When you change_to while handling preemption, once you start back up, you
+will leave change_to and eventually fetch a new event.  This means any
+potential ping-pong needs to happen on a fresh event.
+
+3) If there are enough pcores for the vcores to all run, we won't issue any
+change_tos, since the vcores are no longer preempted.  This means we only are
+worried about situations with insufficient vcores.  We'll mostly talk about 1
+pcore and 2 vcores.
+
+4) Preemption handlers will not call change_to on their target vcore if they
+are also the one STEALING from that vcore.  The handler will stop STEALING
+first.
+
+So the only way to get stuck permanently is if both cores are stuck doing a
+sys_change_to(FALSE).  This means we want to become the other vcore, *and* we
+need to restart our vcore where it left off.  This is due to some invariant
+that keeps us from abandoning vcore context.  If we were to abandon vcore
+context (with a sys_change_to(TRUE)), we basically don't need to be
+preempt-recovered.  We already packaged up our cur_uthread, and we know we
+aren't holding any locks or otherwise breaking any invariants.  The system will
+work fine if we never run again.  (Someone just needs to check our messages).
+
+Now, there are only two cases where we will do a sys_change_to(FALSE) *while*
+handling preemptions.  Again, we aren't concerned about things like MCS-PDR
+locks; those all work because the change_tos are done where we'd normally just
+busy loop.  We are only concerned about change_tos during handle_vc_preempt.
+These two cases are when the changing/handling vcore has a DONT_MIGRATE uthread
+or when someone else is STEALING its uthread.  Note that both of these cases
+are about the calling vcore, not its target.
+
+If a vcore (referred to as "us") has a DONT_MIGRATE uthread and it is handling
+events, it is because someone else is STEALING from our vcore, and we are in
+the short one-shot event handling loop at the beginning of
+uthread_vcore_entry().  Whichever vcore is STEALING will quickly realize it
+can't steal (it sees the DONT_MIGRATE), and bail out.  If that vcore isn't
+running now, we will change_to it (which is the purpose of our handling their
+preemption).  Once that vcore realizes it can't steal, it will stop STEALING
+and change to us.  At this point, no one is STEALING from us, and we move along
+in the code.  Specifically, we do *not* handle events (we now have an event
+about the other vcore being preempted when it changed_to us), and instead we
+start up the DONT_MIGRATE uthread and let it run until it is migratable, at
+which point we handle events and will deal with the other vcore.  
+
+So DONT_MIGRATE will be sorted out.  Likewise, STEALING gets sorted out too,
+quite easily.  If someone is STEALING from us, they will quickly stop STEALING
+and change to us.  There are only two ways this could even happen: they are
+running concurrently with us, and somehow saw us out of vcore context before
+deciding to STEAL, or they were in the process of STEALING and got preempted by
+the kernel.  They would not have willingly stopped running while STEALING our
+cur_uthread.  So if we are running and someone is stealing, after a round of
+change_tos, eventually they run, and stop STEALING.
+
+Note that once someone stops STEALING from us, they will not start again,
+unless we leave vcore context.  If that happened, we basically broke out of the
+ping-pong, and now we're onto another set of preemptions.  We wouldn't leave
+vcore context if we still had preemption events to deal with.
+
+Finally, note that we needed to only check for one message at a time at the
+beginning of uthread_vcore_entry().  If we just handled the entire mbox without
+checking STEALING, then we might not break out of that loop if there is a
+constant supply of messages (perhaps from a vcore in a similar loop).
+
+Anyway, that's the basic plan behind the preemption handler and how we avoid
+the ping-ponging.  change_to_vcore() is built so that we handle our own
+preemption before changing (pack up our current uthread), so that we make
+progress.  The two cases where we can't do that get sorted out after everyone
+gets to run once, and since you can't steal or have other uthread's turn on
+DONT_MIGRATE while we're in vcore context, eventually we clear everything up.
+There might be other bugs or weird corner cases, possibly involving multiple
+vcores, but I think we're okay for now.
+
+3.10: Handling Messages for Other Vcores
+---------------------------------------
+First, remember that when a vcore handles an event, there's no guarantee that
+the vcore will return from the handler.  It may start fresh in vcore_entry().
+
+The issue is that when you handle another vcore's INDIRs, you may handle
+preemption messages.  If you have to do a change_to, the kernel will make sure
+a message goes out about your demise.  Thus someone who recovers that will
+check your public mbox.  However, the recoverer won't know that you were
+working on another vcore's mbox, so those messages might never be checked.
+
+The way around it is to send yourself a "check the other guy's messages" event.
+When we might change_to and never return, if we were dealing with another
+vcores mbox, we'll send ourselves a message to finish up that mbox (if there
+are any messages left).  Whoever reads our messages will eventually get that
+message, and deal with it.
+
+One thing that is a little ugly is that the way you deal with messages two
+layers deep is to send yourself the message.  So if VC1 is handling VC2's
+messages, and then wants to change_to VC3, VC1 sends a message to VC1 to check
+VC2.  Later, when VC3 is checking VC1's messages, it'll handle the "check VC2's messages"
+message.  VC3 can't directly handle VC2's messages, since it could run a
+handler that doesn't return.  Nor can we just forget about VC2.  So VC3 sends
+itself a message to check VC2 later.  Alternatively, VC3 could send itself a
+message to continue checking VC1, and then move on to VC2.  Both seem
+equivalent.  In either case, we ought to check to make sure the mbox has
+something before bothering sending the message.
+
+So for either a "change_to that might not return" or for a "check INDIRs on yet
+another vcore", we send messages to ourself so that we or someone else will
+deal with it.
+
+Note that we use TLS to track whether or not we are handling another vcore's
+messages, and if we do plan to change_to that might not return, we clear the
+bool so that when our vcore starts over at vcore_entry(), it starts over and
+isn't still checking someone elses message.
+
+As a reminder of why this is important: these messages we are hunting down
+include INDIRs, specifically ones to ev_qs such as the "syscall completed
+ev_q".  If we never get that message, a uthread will block forever.  If we
+accidentally yield a vcore instead of checking that message, we would end up
+yielding the process forever since that uthread will eventually be the last
+one, but our main thread is probably blocked on a join call.  Our process is
+blocked on a message that already came, but we just missed it. 
+
 4. Single-core Process (SCP) Events:
 ====================
 4.1 Basics:

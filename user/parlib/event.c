@@ -170,30 +170,24 @@ handle_event_t ev_handlers[MAX_NR_EVENT] = {[EV_EVENT] handle_ev_ev,
                                             [EV_CHECK_MSGS] handle_check_msgs,
                                             0};
 
-/* Handles all the messages in the mbox, but not the single bits.  Returns the
- * number handled. */
-static int handle_mbox_msgs(struct event_mbox *ev_mbox)
+/* Attempts to handle a message.  Returns 1 if we dequeued a msg, 0 o/w. */
+int handle_one_mbox_msg(struct event_mbox *ev_mbox)
 {
-	int retval = 0;
 	struct event_msg local_msg;
 	unsigned int ev_type;
-	uint32_t vcoreid = vcore_id();
-	/* Some stack-smashing bugs cause this to fail */
-	assert(ev_mbox);
-	/* Try to dequeue, dispatch whatever you get. */
-	while (!get_ucq_msg(&ev_mbox->ev_msgs, &local_msg)) {
-		ev_type = local_msg.ev_type;
-		printd("[event] UCQ (mbox %08p), ev_type: %d\n", ev_mbox, ev_type);
-		if (ev_handlers[ev_type])
-			ev_handlers[ev_type](&local_msg, ev_type);
-		retval++;
-	}
-	return retval;
+	/* get_ucq returns 0 on success, -1 on empty */
+	if (get_ucq_msg(&ev_mbox->ev_msgs, &local_msg) == -1)
+		return 0;
+	ev_type = local_msg.ev_type;
+	printd("[event] UCQ (mbox %08p), ev_type: %d\n", ev_mbox, ev_type);
+	if (ev_handlers[ev_type])
+		ev_handlers[ev_type](&local_msg, ev_type);
+	return 1;
 }
 
 /* Handle an mbox.  This is the receive-side processing of an event_queue.  It
- * takes an ev_mbox, since the vcpd mbox isn't a regular ev_q.  For now, we
- * check for preemptions between each event handler. */
+ * takes an ev_mbox, since the vcpd mbox isn't a regular ev_q.  Returns the
+ * number handled/attempted: counts if you don't have a handler. */
 int handle_mbox(struct event_mbox *ev_mbox)
 {
 	int retval = 0;
@@ -206,8 +200,11 @@ int handle_mbox(struct event_mbox *ev_mbox)
 		/* Consider checking the queue for incoming messages while we're here */
 	}
 	printd("[event] handling ev_mbox %08p on vcore %d\n", ev_mbox, vcore_id());
-	/* Handle full messages. */
-	retval = handle_mbox_msgs(ev_mbox);
+	/* Some stack-smashing bugs cause this to fail */
+	assert(ev_mbox);
+	/* Handle all full messages, tracking the number of attempts. */
+	while (handle_one_mbox_msg(ev_mbox))
+		retval++;
 	/* Process all bits, if the kernel tells us any bit is set.  We don't clear
 	 * the flag til after we check everything, in case one of the handlers
 	 * doesn't return.  After we clear it, we recheck. */

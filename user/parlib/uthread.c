@@ -137,12 +137,15 @@ void __attribute__((noreturn)) uthread_vcore_entry(void)
 	assert(in_vcore_context());
 	/* If someone is stealing our uthread (from when we were preempted before),
 	 * we can't touch our uthread.  But we might be the last vcore around, so
-	 * we'll handle preemption events (spammed to our public mbox). */
+	 * we'll handle preemption events (spammed to our public mbox).
+	 *
+	 * It's important that we only check/handle one message per loop, otherwise
+	 * we could get stuck in a ping-pong scenario with a recoverer (maybe). */
 	while (atomic_read(&vcpd->flags) & VC_UTHREAD_STEALING) {
 		/* Note we're handling INDIRs and other public messages while someone
 		 * is stealing our uthread.  Remember that those event handlers cannot
 		 * touch cur_uth, as it is "vcore business". */
-		handle_mbox(&vcpd->ev_mbox_public);
+		handle_one_mbox_msg(&vcpd->ev_mbox_public);
 		cpu_relax();
 	}
 	/* If we have a current uthread that is DONT_MIGRATE, pop it real quick and
