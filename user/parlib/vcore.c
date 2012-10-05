@@ -264,23 +264,26 @@ try_handle_it:
 	return 0;
 }
 
-/* This can return, if you failed to yield due to a concurrent event. */
+/* This can return, if you failed to yield due to a concurrent event.  Note
+ * we're atomicly setting the CAN_RCV flag, and aren't bothering with CASing
+ * (either with the kernel or uthread's handle_indirs()).  We don't particularly
+ * care what other code does - we intend to set those flags no matter what. */
 void vcore_yield(bool preempt_pending)
 {
 	uint32_t vcoreid = vcore_id();
 	struct preempt_data *vcpd = vcpd_of(vcoreid);
-	vcpd->can_rcv_msg = FALSE;
+	__sync_fetch_and_and(&vcpd->flags, ~VC_CAN_RCV_MSG);
 	/* no wrmb() necessary, clear_notif() has an mb() */
 	/* Clears notif pending.  If we had an event outstanding, this will handle
 	 * it and return TRUE, at which point we want to unwind and return to the
 	 * 2LS loop (where we may not want to yield anymore).  Note that the kernel
-	 * only cares about can_rcv_msg for the desired vcore, not for a FALLBACK.
+	 * only cares about CAN_RCV_MSG for the desired vcore, not for a FALLBACK.
 	 * We need to deal with this notif_pending business regardless of
-	 * can_rcv_msg.  We just want to avoid a yield syscall if possible.  It is
+	 * CAN_RCV_MSG.  We just want to avoid a yield syscall if possible.  It is
 	 * important that clear_notif_pending will handle_events().  That is
-	 * necessary to do/check after setting can_rcv_msg to FALSE. */
+	 * necessary to do/check after turning off CAN_RCV_MSG. */
 	if (clear_notif_pending(vcoreid)) {
-		vcpd->can_rcv_msg = TRUE;
+		__sync_fetch_and_or(&vcpd->flags, VC_CAN_RCV_MSG);
 		return;
 	}
 	/* If we are yielding since we don't want the core, tell the kernel we want
@@ -295,7 +298,7 @@ void vcore_yield(bool preempt_pending)
 	/* We can probably yield.  This may pop back up if notif_pending became set
 	 * by the kernel after we cleared it and we lost the race. */
 	sys_yield(preempt_pending);
-	vcpd->can_rcv_msg = TRUE;
+	__sync_fetch_and_or(&vcpd->flags, VC_CAN_RCV_MSG);
 }
 
 /* Clear pending, and try to handle events that came in between a previous call

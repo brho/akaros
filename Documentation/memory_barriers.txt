@@ -101,8 +101,8 @@ of the 5 memory barriers.
 When writing code that synchronizes with other threads via shared memory, we
 have a variety of patterns.  Most infamous is the "signal, then check if the
 receiver is still listening", which is the critical part of the "check,
-signal, check again" pattern.  For exmaples, look at things like
-'notif_pending' and 'can_rcv_msg'.  
+signal, check again" pattern.  For examples, look at things like
+'notif_pending' and when we check VC_CAN_RCV_MSG in event.c.
 
 In these examples, "write" and "read" include things such as posting events or
 checking flags (which ultimately involve writes and reads).  You need to be

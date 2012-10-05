@@ -100,7 +100,7 @@ struct event_queue_big {
 /* Vcore state flags.  K_LOCK means the kernel is writing */
 #define VC_K_LOCK				0x001				/* CASing with the kernel */
 #define VC_PREEMPTED			0x002				/* VC is preempted */
-#define VC_RECOVERING			0x004				/* VC being recovered */
+#define VC_CAN_RCV_MSG			0x004 				/* can receive FALLBACK */
 #define VC_UTHREAD_STEALING		0x008				/* Uthread being stolen */
 #define VC_SCP_NOVCCTX			0x010				/* can't go into vc ctx */
 
@@ -113,7 +113,6 @@ struct preempt_data {
 	atomic_t					flags;
 	bool						notif_disabled;		/* vcore unwilling to recv*/
 	bool						notif_pending;		/* notif k_msg on the way */
-	bool						can_rcv_msg;		/* can receive FALLBACK */
 	struct event_mbox			ev_mbox_public;		/* can be read remotely */
 	struct event_mbox			ev_mbox_private;	/* for this vcore only */
 };

@@ -52,7 +52,7 @@ static struct event_mbox *get_vcpd_mbox(uint32_t vcoreid, int ev_flags)
 static bool can_msg_vcore(uint32_t vcoreid)
 {
 	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
-	return vcpd->can_rcv_msg;
+	return atomic_read(&vcpd->flags) & VC_CAN_RCV_MSG;
 }
 
 /* Says a vcore can be messaged.  Only call this once you are sure this is true
@@ -60,7 +60,7 @@ static bool can_msg_vcore(uint32_t vcoreid)
 static void set_vcore_msgable(uint32_t vcoreid)
 {
 	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
-	vcpd->can_rcv_msg = TRUE;
+	atomic_or(&vcpd->flags, VC_CAN_RCV_MSG);
 }
 
 /* Posts a message to the mbox, subject to flags.  Feel free to send 0 for the
@@ -118,7 +118,7 @@ static void spam_vcore(struct proc *p, uint32_t vcoreid,
 	try_notify(p, vcoreid, ev_flags);
 }
 
-/* Attempts to message a vcore that may or may not have 'can_rcv_msg' set.  If
+/* Attempts to message a vcore that may or may not have VC_CAN_RCV_MSG set.  If
  * so, we'll post the message and the message will eventually get dealt with
  * (when the vcore runs or when it is preempte-recovered). */
 static bool try_spam_vcore(struct proc *p, uint32_t vcoreid,
@@ -170,7 +170,7 @@ static bool spam_list_member(struct vcore_tailq *list, struct proc *p,
 		 * will either be turned on later, or have a preempt message sent about
 		 * their demise.
 		 *
-		 * We race on list membership (and not exclusively 'can_rcv_msg', so
+		 * We race on list membership (and not exclusively VC_CAN_RCV_MSG, so
 		 * that when it fails we can get a new vcore to try (or know WHP there
 		 * are none). */
 		vc_first = TAILQ_FIRST(list);
@@ -197,7 +197,7 @@ static bool spam_list_member(struct vcore_tailq *list, struct proc *p,
  * this must be able to handle spurious reads, since more than one vcore is
  * likely to get the message and handle it.
  *
- * We try the desired vcore, using 'can_rcv_msg'.  Failing that, we'll search
+ * We try the desired vcore, using VC_CAN_RCV_MSG.  Failing that, we'll search
  * the online and then the bulk_preempted lists.  These lists serve as a way to
  * find likely messageable vcores.  spam_list_member() helps us with them,
  * failing if anything seems to go wrong.  At which point we just lock and try

@@ -1676,18 +1676,16 @@ static void __set_curtf_to_vcoreid(struct proc *p, uint32_t vcoreid)
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	struct preempt_data *vcpd = &p->procdata->vcore_preempt_data[vcoreid];
 
-	/* We could let userspace do this, though they come into vcore entry many
-	 * times, and we just need this to happen when the cores comes online the
-	 * first time.  That, and they want this turned on as soon as we know a
-	 * vcore *WILL* be online.  We could also do this earlier, when we map the
-	 * vcore to its pcore, though we don't always have current loaded or
-	 * otherwise mess with the VCPD in those code paths. */
-	vcpd->can_rcv_msg = TRUE;
 	/* Mark that this vcore as no longer preempted.  No danger of clobbering
 	 * other writes, since this would get turned on in __preempt (which can't be
 	 * concurrent with this function on this core), and the atomic is just
 	 * toggling the one bit (a concurrent VC_K_LOCK will work) */
 	atomic_and(&vcpd->flags, ~VC_PREEMPTED);
+	/* Once the VC is no longer preempted, we allow it to receive msgs.  We
+	 * could let userspace do it, but handling it here makes it easier for them
+	 * to handle_indirs (when they turn this flag off).  Note the atomics
+	 * provide the needed barriers (cmb and mb on flags). */
+	atomic_or(&vcpd->flags, VC_CAN_RCV_MSG);
 	printd("[kernel] startcore on physical core %d for process %d's vcore %d\n",
 	       core_id(), p->pid, vcoreid);
 	/* If notifs are disabled, the vcore was in vcore context and we need to

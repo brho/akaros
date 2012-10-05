@@ -597,6 +597,29 @@ static void stop_uth_stealing(struct preempt_data *vcpd)
 	                     old_flags & ~VC_UTHREAD_STEALING));
 }
 
+/* Handles INDIRS for another core (the public mbox).  We synchronize with the
+ * kernel (__set_curtf_to_vcoreid). */
+static void handle_indirs(uint32_t rem_vcoreid)
+{
+	long old_flags;
+	struct preempt_data *rem_vcpd = vcpd_of(rem_vcoreid);
+	/* Turn off their message reception if they are still preempted.  If they
+	 * are no longer preempted, we do nothing - they will handle their own
+	 * messages.  Turning on CAN_RCV will route this vcore's messages to
+	 * fallback vcores (if applicable). */
+	do {
+		old_flags = atomic_read(&rem_vcpd->flags);
+		while (old_flags & VC_K_LOCK)
+			old_flags = atomic_read(&rem_vcpd->flags);
+		if (!(old_flags & VC_PREEMPTED))
+			return;
+	} while (!atomic_cas(&rem_vcpd->flags, old_flags,
+	                     old_flags & ~VC_CAN_RCV_MSG));
+	wrmb();	/* don't let the CAN_RCV write pass reads of the mbox status */
+	/* handle all INDIRs of the remote vcore */
+	handle_vcpd_mbox(rem_vcoreid);
+}
+
 /* Helper.  Will ensure a good attempt at changing vcores, meaning we try again
  * if we failed for some reason other than the vcore was already running. */
 static void __change_vcore(uint32_t rem_vcoreid, bool enable_my_notif)
@@ -700,7 +723,6 @@ static void handle_vc_preempt(struct event_msg *ev_msg, unsigned int ev_type)
 	if (!(atomic_read(&rem_vcpd->flags) & VC_PREEMPTED))
 		return;
 	/* At this point, we need to try to recover */
-	/* TODO: if we want to bother with VC_RECOVERING, set it here */
 	/* This case handles when the remote core was in vcore context */
 	if (rem_vcpd->notif_disabled) {
 		printd("VC %d recovering %d, notifs were disabled\n", vcoreid, rem_vcoreid);
@@ -725,7 +747,16 @@ static void handle_vc_preempt(struct event_msg *ev_msg, unsigned int ev_type)
 	if (!(atomic_read(&rem_vcpd->flags) & VC_PREEMPTED))
 		goto out_stealing;
 	/* Might be preempted twice quickly, and the second time had notifs
-	 * disabled. */
+	 * disabled.
+	 *
+	 * Also note that the second preemption event had another
+	 * message sent, which either we or someone else will deal with.  And also,
+	 * we don't need to worry about how we are stealing still and plan to
+	 * abort.  If another vcore handles that second preemption message, either
+	 * the original vcore is in vc ctx or not.  If so, we bail out and the
+	 * second preemption handling needs to change_to.  If not, we aren't
+	 * bailing out, and we'll handle the preemption as normal, and the second
+	 * handler will bail when it fails to steal. */
 	if (rem_vcpd->notif_disabled)
 		goto out_stealing;
 	/* At this point, we're clear to try and steal the uthread.  Need to switch
@@ -762,15 +793,8 @@ static void handle_vc_preempt(struct event_msg *ev_msg, unsigned int ev_type)
 	wmb();
 	/* Fallthrough */
 out_stealing:
-	/* Turn off the UTHREAD_STEALING */
 	stop_uth_stealing(rem_vcpd);
-out_indirs:
-	/* Last thing: handle their INDIRs */
-	/* First, start routing this vcore's messages to fallback vcores */
-	rem_vcpd->can_rcv_msg = FALSE;
-	wrmb();	/* don't let the can_rcv write pass reads of the mbox status */
-	/* handle all INDIRs of the remote vcore */
-	handle_vcpd_mbox(rem_vcoreid);
+	handle_indirs(rem_vcoreid);
 }
 
 /* Attempts to register ev_q with sysc, so long as sysc is not done/progress.
