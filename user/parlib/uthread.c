@@ -21,6 +21,7 @@ static int __uthread_reinit_tls(struct uthread *uthread);
 static void __uthread_free_tls(struct uthread *uthread);
 static void __run_current_uthread_raw(void);
 static void handle_vc_preempt(struct event_msg *ev_msg, unsigned int ev_type);
+static void handle_vc_indir(struct event_msg *ev_msg, unsigned int ev_type);
 
 /* Block the calling uthread on sysc until it makes progress or is done */
 static void __ros_mcp_syscall_blockon(struct syscall *sysc);
@@ -75,10 +76,14 @@ int uthread_lib_init(struct uthread *uthread)
 	 * events should be spammed to vcores that are running, preferring whatever
 	 * the kernel thinks is appropriate.  And IPI them. */
 	ev_handlers[EV_VCORE_PREEMPT] = handle_vc_preempt;
+	ev_handlers[EV_CHECK_MSGS] = handle_vc_indir;
 	preempt_ev_q = get_event_q();	/* small ev_q, mostly a vehicle for flags */
 	preempt_ev_q->ev_flags = EVENT_IPI | EVENT_SPAM_PUBLIC | EVENT_VCORE_APPRO |
-	                         EVENT_VCORE_MUST_RUN;
-	/* Tell the kernel to use the ev_q (it's settings) for the two types */
+							 EVENT_VCORE_MUST_RUN;
+	/* Tell the kernel to use the ev_q (it's settings) for the two types.  Note
+	 * that we still have two separate handlers.  We just want the events
+	 * delivered in the same way.  If we ever want to have a big_event_q with
+	 * INDIRs, we could consider using separate ones. */
 	register_kevent_q(preempt_ev_q, EV_VCORE_PREEMPT);
 	register_kevent_q(preempt_ev_q, EV_CHECK_MSGS);
 	printd("[user] registered %08p (flags %08p) for preempt messages\n",
@@ -794,6 +799,20 @@ static void handle_vc_preempt(struct event_msg *ev_msg, unsigned int ev_type)
 	/* Fallthrough */
 out_stealing:
 	stop_uth_stealing(rem_vcpd);
+	handle_indirs(rem_vcoreid);
+}
+
+/* This handles a "check indirs" message.  When this is done, either we checked
+ * their indirs, or the vcore restarted enough so that checking them is
+ * unnecessary.  If that happens and they got preempted quickly, then another
+ * preempt/check_indirs was sent out. */
+static void handle_vc_indir(struct event_msg *ev_msg, unsigned int ev_type)
+{
+	uint32_t vcoreid = vcore_id();
+	uint32_t rem_vcoreid = ev_msg->ev_arg2;
+
+	if (rem_vcoreid == vcoreid)
+		return;
 	handle_indirs(rem_vcoreid);
 }
 
