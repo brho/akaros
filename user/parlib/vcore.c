@@ -20,6 +20,7 @@ atomic_t nr_new_vcores_wanted;
 atomic_t vc_req_being_handled;
 
 extern void** vcore_thread_control_blocks;
+__thread struct syscall __vcore_one_sysc = {.flags = (atomic_t)SC_DONE, 0};
 
 /* TODO: probably don't want to dealloc.  Considering caching */
 static void free_transition_tls(int id)

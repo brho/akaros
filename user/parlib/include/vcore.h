@@ -30,9 +30,11 @@ extern "C" {
 
 /* Defined by glibc; Must be implemented by a user level threading library */
 extern void vcore_entry();
-/* Declared in glibc's start.c */
+/* Defined in glibc's start.c */
 extern __thread bool __vcore_context;
 extern __thread int __vcoreid;
+/* Defined in vcore.c */
+extern __thread struct syscall __vcore_one_sysc;	/* see sys_change_vcore */
 
 /* Vcore API functions */
 static inline size_t max_vcores(void);

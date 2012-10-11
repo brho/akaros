@@ -1,6 +1,7 @@
 // System call stubs.
 
 #include <parlib.h>
+#include <vcore.h>
 
 int sys_proc_destroy(int pid, int exitcode)
 {
@@ -148,7 +149,32 @@ int sys_block(unsigned int usec)
  * 		-EINVAL some userspace bug */
 int sys_change_vcore(uint32_t vcoreid, bool enable_my_notif)
 {
-	return ros_syscall(SYS_change_vcore, vcoreid, enable_my_notif, 0, 0, 0, 0);
+	/* Since we might be asking to start up on a fresh stack (if
+	 * enable_my_notif), we need to use some non-stack memory for the struct
+	 * sysc.  Our vcore could get restarted before the syscall finishes (after
+	 * unlocking the proc, before finish_sysc()), and the act of finishing would
+	 * write onto our stack.  Thus we use the per-vcore struct. */
+	int flags;
+	/* Need to wait while a previous syscall is not done or locked.  Since this
+	 * should only be called from VC ctx, we'll just spin.  Should be extremely
+	 * rare.  Note flags is initialized to SC_DONE. */
+	do {
+		cpu_relax();
+		flags = atomic_read(&__vcore_one_sysc.flags);
+	} while (!(flags & SC_DONE) || flags & SC_K_LOCK);
+	__vcore_one_sysc.num = SYS_change_vcore;
+	__vcore_one_sysc.arg0 = vcoreid;
+	__vcore_one_sysc.arg1 = enable_my_notif;
+	/* keep in sync with glibc sysdeps/ros/syscall.c */
+	__ros_arch_syscall((long)&__vcore_one_sysc, 1);
+	/* If we returned, either we wanted to (!enable_my_notif) or we failed.
+	 * Need to wait til the sysc is finished to find out why.  Again, its okay
+	 * to just spin. */
+	do {
+		cpu_relax();
+		flags = atomic_read(&__vcore_one_sysc.flags);
+	} while (!(flags & SC_DONE) || flags & SC_K_LOCK);
+	return __vcore_one_sysc.retval;
 }
 
 int sys_change_to_m(void)
