@@ -128,6 +128,8 @@ void proc_tlbshootdown(struct proc *p, uintptr_t start, uintptr_t end);
 /* Kernel message handlers for process management */
 void __startcore(struct trapframe *tf, uint32_t srcid, long a0, long a1,
                  long a2);
+void __set_curtf(struct trapframe *tf, uint32_t srcid, long a0, long a1,
+                 long a2);
 void __notify(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2);
 void __preempt(trapframe_t *tf, uint32_t srcid, long a0, long a1, long a2);
 void __death(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2);

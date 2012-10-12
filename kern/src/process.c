@@ -570,7 +570,8 @@ void __proc_run_m(struct proc *p)
 				 * turn online */
 				TAILQ_FOREACH(vc_i, &p->online_vcs, list) {
 					send_kernel_message(vc_i->pcoreid, __startcore, (long)p,
-					                    (long)vcore2vcoreid(p, vc_i), 0,
+					                    (long)vcore2vcoreid(p, vc_i),
+					                    (long)vc_i->nr_preempts_sent,
 					                    KMSG_IMMEDIATE);
 				}
 			} else {
@@ -916,6 +917,7 @@ void __proc_save_context_s(struct proc *p, struct trapframe *tf)
 void proc_yield(struct proc *SAFE p, bool being_nice)
 {
 	uint32_t vcoreid, pcoreid = core_id();
+	struct per_cpu_info *pcpui = &per_cpu_info[pcoreid];
 	struct vcore *vc;
 	struct preempt_data *vcpd;
 	int8_t state = 0;
@@ -984,20 +986,24 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 			panic("Weird state(%s) in %s()", procstate2str(p->state),
 			      __FUNCTION__);
 	}
-	/* If we're already unmapped (__preempt or a __death was sent and the caller
-	 * unmapped us), bail out.  Note that if a __death hit us, we should have
-	 * bailed when we saw PROC_DYING.  Also note we might not have received the
-	 * __preempt or __death kmsg yet. */
-	if (!is_mapped_vcore(p, pcoreid))
-		goto out_failed;
-	vcoreid = get_vcoreid(p, pcoreid);
+	/* This is which vcore this pcore thinks it is, regardless of any unmappings
+	 * that may have happened remotely (with __PRs waiting to run) */
+	vcoreid = pcpui->owning_vcoreid;
 	vc = vcoreid2vcore(p, vcoreid);
 	vcpd = &p->procdata->vcore_preempt_data[vcoreid];
+	/* This is how we detect whether or not a __PR happened. */
+	if (vc->nr_preempts_sent != vc->nr_preempts_done)
+		goto out_failed;
+	/* Temp, til we stop sending IMMED kmsgs TODO (IMMED) */
+	if (!is_mapped_vcore(p, pcoreid) || vcoreid == get_vcoreid(p, pcoreid))
+		goto out_failed;
+	/* Sanity checks.  If we were preempted or are dying, we should have noticed
+	 * by now. */
+	assert(is_mapped_vcore(p, pcoreid));
+	assert(vcoreid == get_vcoreid(p, pcoreid));
 	/* no reason to be nice, return */
 	if (being_nice && !vc->preempt_pending)
 		goto out_failed;
-	/* Sanity check, can remove after a while (we should have been unmapped) */
-	assert(!vc->preempt_served);
 	/* At this point, AFAIK there should be no preempt/death messages on the
 	 * way, and we're on the online list.  So we'll go ahead and do the yielding
 	 * business. */
@@ -1205,7 +1211,8 @@ void __proc_preempt_core(struct proc *p, uint32_t pcoreid)
 {
 	uint32_t vcoreid = get_vcoreid(p, pcoreid);
 	struct event_msg preempt_msg = {0};
-	p->procinfo->vcoremap[vcoreid].preempt_served = TRUE;
+	/* works with nr_preempts_done to signal completion of a preemption */
+	p->procinfo->vcoremap[vcoreid].nr_preempts_sent++;
 	// expects a pcorelist.  assumes pcore is mapped and running_m
 	__proc_take_corelist(p, &pcoreid, 1, TRUE);
 	/* Only send the message if we have an online core.  o/w, it would fuck
@@ -1224,14 +1231,11 @@ void __proc_preempt_core(struct proc *p, uint32_t pcoreid)
  * calling. */
 uint32_t __proc_preempt_all(struct proc *p, uint32_t *pc_arr)
 {
-	/* instead of doing this, we could just preempt_served all possible vcores,
-	 * and not just the active ones.  We would need to sort out a way to deal
-	 * with stale preempt_serveds first.  This might be just as fast anyways. */
 	struct vcore *vc_i;
 	/* TODO:(BULK) PREEMPT - don't bother with this, set a proc wide flag, or
 	 * just make us RUNNABLE_M.  Note this is also used by __map_vcore. */
 	TAILQ_FOREACH(vc_i, &p->online_vcs, list)
-		vc_i->preempt_served = TRUE;
+		vc_i->nr_preempts_sent++;
 	return __proc_take_allcores(p, pc_arr, TRUE);
 }
 
@@ -1377,7 +1381,8 @@ static void __proc_give_cores_running(struct proc *p, uint32_t *pc_arr,
 	for (int i = 0; i < num; i++) {
 		assert(__proc_give_a_pcore(p, pc_arr[i], &p->inactive_vcs, &vc_i));
 		send_kernel_message(pc_arr[i], __startcore, (long)p,
-		                    (long)vcore2vcoreid(p, vc_i), 0, KMSG_IMMEDIATE);
+		                    (long)vcore2vcoreid(p, vc_i), 
+		                    (long)vc_i->nr_preempts_sent, KMSG_IMMEDIATE);
 	}
 	__seq_end_write(&p->procinfo->coremap_seqctr);
 }
@@ -1538,13 +1543,6 @@ uint32_t __proc_take_allcores(struct proc *p, uint32_t *pc_arr, bool preempt)
  * calling. */
 void __map_vcore(struct proc *p, uint32_t vcoreid, uint32_t pcoreid)
 {
-	/* Need to spin until __preempt is done saving state and whatnot before we
-	 * give the core back out.  Note that __preempt doesn't need the mapping: we
-	 * just need to not give out the same vcore (via a __startcore) until the
-	 * state is saved so __startcore has something to start. (and spinning in
-	 * startcore won't work, since startcore has no versioning). */
-	while (p->procinfo->vcoremap[vcoreid].preempt_served)
-		cpu_relax();
 	p->procinfo->vcoremap[vcoreid].pcoreid = pcoreid;
 	p->procinfo->vcoremap[vcoreid].valid = TRUE;
 	p->procinfo->pcoremap[pcoreid].vcoreid = vcoreid;
@@ -1668,14 +1666,24 @@ void proc_tlbshootdown(struct proc *p, uintptr_t start, uintptr_t end)
 	spin_unlock(&p->proc_lock);
 }
 
-/* Helper, used by __startcore and change_to_vcore, which sets up cur_tf to run
- * a given process's vcore.  Caller needs to set up things like owning_proc and
+/* Helper, used by __startcore and __set_curtf, which sets up cur_tf to run a
+ * given process's vcore.  Caller needs to set up things like owning_proc and
  * whatnot.  Note that we might not have p loaded as current. */
-static void __set_curtf_to_vcoreid(struct proc *p, uint32_t vcoreid)
+static void __set_curtf_to_vcoreid(struct proc *p, uint32_t vcoreid,
+                                   uint32_t old_nr_preempts_sent)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	struct preempt_data *vcpd = &p->procdata->vcore_preempt_data[vcoreid];
-
+	struct vcore *vc = vcoreid2vcore(p, vcoreid);
+	/* Spin until our vcore's old preemption is done.  When __SC was sent, we
+	 * were told what the nr_preempts_sent was at that time.  Once that many are
+	 * done, it is time for us to run.  This forces a 'happens-before' ordering
+	 * on a __PR of our VC before this __SC of the VC.  Note the nr_done should
+	 * not exceed old_nr_sent, since further __PR are behind this __SC in the
+	 * KMSG queue. */
+	while (old_nr_preempts_sent != vc->nr_preempts_done)
+		cpu_relax();
+	cmb();	/* read nr_done before any other rd or wr.  CPU mb in the atomic. */
 	/* Mark that this vcore as no longer preempted.  No danger of clobbering
 	 * other writes, since this would get turned on in __preempt (which can't be
 	 * concurrent with this function on this core), and the atomic is just
@@ -1760,22 +1768,29 @@ int proc_change_to_vcore(struct proc *p, uint32_t new_vcoreid,
 			panic("Weird state(%s) in %s()", procstate2str(p->state),
 			      __FUNCTION__);
 	}
-	/* Make sure we're still mapped in the proc. */
-	if (!is_mapped_vcore(p, pcoreid))
-		goto out_locked;
-	/* Get all our info */
-	caller_vcoreid = get_vcoreid(p, pcoreid);
-	assert(caller_vcoreid == pcpui->owning_vcoreid);
-	caller_vcpd = &p->procdata->vcore_preempt_data[caller_vcoreid];
+	/* This is which vcore this pcore thinks it is, regardless of any unmappings
+	 * that may have happened remotely (with __PRs waiting to run) */
+	caller_vcoreid = pcpui->owning_vcoreid;
 	caller_vc = vcoreid2vcore(p, caller_vcoreid);
+	caller_vcpd = &p->procdata->vcore_preempt_data[caller_vcoreid];
+	/* This is how we detect whether or not a __PR happened.  If it did, just
+	 * abort and handle the kmsg.  No new __PRs are coming since we hold the
+	 * lock.  This also detects a __PR followed by a __SC for the same VC. */
+	if (caller_vc->nr_preempts_sent != caller_vc->nr_preempts_done)
+		goto out_locked;
+	/* Temp, til we stop sending IMMED kmsgs TODO (IMMED) */
+	if (!is_mapped_vcore(p, pcoreid) || caller_vcoreid == get_vcoreid(p, pcoreid))
+		goto out_locked;
+	/* Sanity checks.  If we were preempted or are dying, we should have noticed
+	 * by now. */
+	assert(is_mapped_vcore(p, pcoreid));
+	assert(caller_vcoreid == get_vcoreid(p, pcoreid));
 	/* Should only call from vcore context */
 	if (!caller_vcpd->notif_disabled) {
 		retval = -EINVAL;
 		printk("[kernel] You tried to change vcores from uthread ctx\n");
 		goto out_locked;
 	}
-	/* Sanity check, can remove after a while (we should have been unmapped) */
-	assert(!caller_vc->preempt_served);
 	/* Ok, we're clear to do the switch.  Lets figure out who the new one is */
 	new_vc = vcoreid2vcore(p, new_vcoreid);
 	printd("[kernel] changing vcore %d to vcore %d\n", caller_vcoreid,
@@ -1803,13 +1818,11 @@ int proc_change_to_vcore(struct proc *p, uint32_t new_vcoreid,
 	/* Move the new one from inactive to online */
 	TAILQ_REMOVE(&p->inactive_vcs, new_vc, list);
 	TAILQ_INSERT_TAIL(&p->online_vcs, new_vc, list);
-	/* Change the vcore map (TODO: might get rid of this seqctr) */
+	/* Change the vcore map */
 	__seq_start_write(&p->procinfo->coremap_seqctr);
 	__unmap_vcore(p, caller_vcoreid);
 	__map_vcore(p, new_vcoreid, pcoreid);
 	__seq_end_write(&p->procinfo->coremap_seqctr);
-	/* So this core knows which vcore is here: */
-	pcpui->owning_vcoreid = new_vcoreid;
 	/* Send either a PREEMPT msg or a CHECK_MSGS msg.  If they said to
 	 * enable_my_notif, then all userspace needs is to check messages, not a
 	 * full preemption recovery. */
@@ -1819,8 +1832,19 @@ int proc_change_to_vcore(struct proc *p, uint32_t new_vcoreid,
 	 * In this case, it's the one we just changed to. */
 	assert(!TAILQ_EMPTY(&p->online_vcs));
 	send_kernel_event(p, &preempt_msg, new_vcoreid);
-	/* Change cur_tf so we'll be the new vcoreid */
-	__set_curtf_to_vcoreid(p, new_vcoreid);
+	/* So this core knows which vcore is here. (cur_proc and owning_proc are
+	 * already correct): */
+	pcpui->owning_vcoreid = new_vcoreid;
+	/* Until we set_curtf, we don't really have a valid current tf.  The stuff
+	 * in that old one is from our previous vcore, not the current
+	 * owning_vcoreid.  This matters for other KMSGS that will run before
+	 * __set_curtf (like __notify). */
+	pcpui->cur_tf = 0;
+	/* Need to send a kmsg to finish.  We can't set_curtf til the __PR is done,
+	 * but we can't spin right here while holding the lock (can't spin while
+	 * waiting on a message, roughly) */
+	send_kernel_message(pcoreid, __set_curtf, (long)p, (long)new_vcoreid,
+	                    (long)new_vc->nr_preempts_sent, KMSG_IMMEDIATE);
 	retval = 0;
 	/* Fall through to exit */
 out_locked:
@@ -1838,11 +1862,12 @@ void __startcore(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2
 	uint32_t coreid = core_id();
 	struct per_cpu_info *pcpui = &per_cpu_info[coreid];
 	struct proc *p_to_run = (struct proc *CT(1))a0;
+	uint32_t old_nr_preempts_sent = (uint32_t)a2;
 
 	assert(p_to_run);
 	/* Can not be any TF from a process here already */
 	assert(!pcpui->owning_proc);
-	/* the sender of the amsg increfed already for this saved ref to p_to_run */
+	/* the sender of the kmsg increfed already for this saved ref to p_to_run */
 	pcpui->owning_proc = p_to_run;
 	pcpui->owning_vcoreid = vcoreid;
 	/* sender increfed again, assuming we'd install to cur_proc.  only do this
@@ -1859,7 +1884,19 @@ void __startcore(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2
 	/* Note we are not necessarily in the cr3 of p_to_run */
 	/* Now that we sorted refcnts and know p / which vcore it should be, set up
 	 * pcpui->cur_tf so that it will run that particular vcore */
-	__set_curtf_to_vcoreid(p_to_run, vcoreid);
+	__set_curtf_to_vcoreid(p_to_run, vcoreid, old_nr_preempts_sent);
+}
+
+/* Kernel message handler to load a proc's vcore context on this core.  Similar
+ * to __startcore, except it is used when p already controls the core (e.g.
+ * change_to).  Since the core is already controlled, pcpui such as owning proc,
+ * vcoreid, and cur_proc are all already set. */
+void __set_curtf(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2)
+{
+	struct proc *p = (struct proc*)a0;
+	uint32_t vcoreid = (uint32_t)a1;
+	uint32_t old_nr_preempts_sent = (uint32_t)a2;
+	__set_curtf_to_vcoreid(p, vcoreid, old_nr_preempts_sent);
 }
 
 /* Bail out if it's the wrong process, or if they no longer want a notif.  Don't
@@ -1875,8 +1912,11 @@ void __notify(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2)
 	/* Not the right proc */
 	if (p != pcpui->owning_proc)
 		return;
+	/* the core might be owned, but not have a valid cur_tf (if we're in the
+	 * process of changing */
+	if (!pcpui->cur_tf)
+		return;
 	/* Common cur_tf sanity checks.  Note cur_tf could be an _S's env_tf */
-	assert(pcpui->cur_tf);
 	assert(!in_kernel(pcpui->cur_tf));
 	vcoreid = pcpui->owning_vcoreid;
 	vcpd = &p->procdata->vcore_preempt_data[vcoreid];
@@ -1932,10 +1972,11 @@ void __preempt(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2)
 	/* Mark the vcore as preempted and unlock (was locked by the sender). */
 	atomic_or(&vcpd->flags, VC_PREEMPTED);
 	atomic_and(&vcpd->flags, ~VC_K_LOCK);
-	wmb();	/* make sure everything else hits before we finish the preempt */
-	p->procinfo->vcoremap[vcoreid].preempt_served = FALSE;
 	/* either __preempt or proc_yield() ends the preempt phase. */
 	p->procinfo->vcoremap[vcoreid].preempt_pending = 0;
+	wmb();	/* make sure everything else hits before we finish the preempt */
+	/* up the nr_done, which signals the next __startcore for this vc */
+	p->procinfo->vcoremap[vcoreid].nr_preempts_done++;
 	/* We won't restart the process later.  current gets cleared later when we
 	 * notice there is no owning_proc and we have nothing to do (smp_idle,
 	 * restartcore, etc) */

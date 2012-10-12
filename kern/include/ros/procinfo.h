@@ -29,7 +29,8 @@ struct vcore {
 #endif /* ROS_KERNEL */
 	uint32_t			pcoreid;
 	bool				valid;
-	bool				preempt_served;
+	uint32_t			nr_preempts_sent;	/* these two differ when a preempt*/
+	uint32_t			nr_preempts_done;	/* is in flight. */
 	uint64_t			preempt_pending;
 };
 
