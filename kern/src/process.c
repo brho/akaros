@@ -572,7 +572,7 @@ void __proc_run_m(struct proc *p)
 					send_kernel_message(vc_i->pcoreid, __startcore, (long)p,
 					                    (long)vcore2vcoreid(p, vc_i),
 					                    (long)vc_i->nr_preempts_sent,
-					                    KMSG_IMMEDIATE);
+					                    KMSG_ROUTINE);
 				}
 			} else {
 				warn("Tried to proc_run() an _M with no vcores!");
@@ -720,7 +720,7 @@ void proc_destroy(struct proc *p)
 			}
 			#endif
 			send_kernel_message(get_pcoreid(p, 0), __death, 0, 0, 0,
-			                    KMSG_IMMEDIATE);
+			                    KMSG_ROUTINE);
 			__seq_start_write(&p->procinfo->coremap_seqctr);
 			// TODO: might need to sort num_vcores too later (VC#)
 			/* vcore is unmapped on the receive side */
@@ -994,9 +994,6 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 	/* This is how we detect whether or not a __PR happened. */
 	if (vc->nr_preempts_sent != vc->nr_preempts_done)
 		goto out_failed;
-	/* Temp, til we stop sending IMMED kmsgs TODO (IMMED) */
-	if (!is_mapped_vcore(p, pcoreid) || vcoreid == get_vcoreid(p, pcoreid))
-		goto out_failed;
 	/* Sanity checks.  If we were preempted or are dying, we should have noticed
 	 * by now. */
 	assert(is_mapped_vcore(p, pcoreid));
@@ -1101,7 +1098,7 @@ void proc_notify(struct proc *p, uint32_t vcoreid)
 			printd("[kernel] sending notif to vcore %d\n", vcoreid);
 			/* This use of try_get_pcoreid is racy, might be unmapped */
 			send_kernel_message(try_get_pcoreid(p, vcoreid), __notify, (long)p,
-			                    0, 0, KMSG_IMMEDIATE);
+			                    0, 0, KMSG_ROUTINE);
 		}
 	}
 }
@@ -1382,7 +1379,7 @@ static void __proc_give_cores_running(struct proc *p, uint32_t *pc_arr,
 		assert(__proc_give_a_pcore(p, pc_arr[i], &p->inactive_vcs, &vc_i));
 		send_kernel_message(pc_arr[i], __startcore, (long)p,
 		                    (long)vcore2vcoreid(p, vc_i), 
-		                    (long)vc_i->nr_preempts_sent, KMSG_IMMEDIATE);
+		                    (long)vc_i->nr_preempts_sent, KMSG_ROUTINE);
 	}
 	__seq_end_write(&p->procinfo->coremap_seqctr);
 }
@@ -1442,9 +1439,9 @@ static void __proc_revoke_core(struct proc *p, uint32_t vcoreid, bool preempt)
 		/* Lock the vcore's state (necessary for preemption recovery) */
 		vcpd = &p->procdata->vcore_preempt_data[vcoreid];
 		atomic_or(&vcpd->flags, VC_K_LOCK);
-		send_kernel_message(pcoreid, __preempt, (long)p, 0, 0, KMSG_IMMEDIATE);
+		send_kernel_message(pcoreid, __preempt, (long)p, 0, 0, KMSG_ROUTINE);
 	} else {
-		send_kernel_message(pcoreid, __death, 0, 0, 0, KMSG_IMMEDIATE);
+		send_kernel_message(pcoreid, __death, 0, 0, 0, KMSG_ROUTINE);
 	}
 }
 
@@ -1778,9 +1775,6 @@ int proc_change_to_vcore(struct proc *p, uint32_t new_vcoreid,
 	 * lock.  This also detects a __PR followed by a __SC for the same VC. */
 	if (caller_vc->nr_preempts_sent != caller_vc->nr_preempts_done)
 		goto out_locked;
-	/* Temp, til we stop sending IMMED kmsgs TODO (IMMED) */
-	if (!is_mapped_vcore(p, pcoreid) || caller_vcoreid == get_vcoreid(p, pcoreid))
-		goto out_locked;
 	/* Sanity checks.  If we were preempted or are dying, we should have noticed
 	 * by now. */
 	assert(is_mapped_vcore(p, pcoreid));
@@ -1844,7 +1838,7 @@ int proc_change_to_vcore(struct proc *p, uint32_t new_vcoreid,
 	 * but we can't spin right here while holding the lock (can't spin while
 	 * waiting on a message, roughly) */
 	send_kernel_message(pcoreid, __set_curtf, (long)p, (long)new_vcoreid,
-	                    (long)new_vc->nr_preempts_sent, KMSG_IMMEDIATE);
+	                    (long)new_vc->nr_preempts_sent, KMSG_ROUTINE);
 	retval = 0;
 	/* Fall through to exit */
 out_locked:
