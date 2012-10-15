@@ -327,7 +327,7 @@ static void abort_halt(struct trapframe *tf)
 void trap(struct trapframe *tf)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	/* Copy out the TF for now, set tf to point to it.  */
+	/* Copy out the TF for now */
 	if (!in_kernel(tf))
 		set_current_tf(pcpui, tf);
 
@@ -427,7 +427,7 @@ static void send_eoi(uint32_t trap_nr)
 void irq_handler(struct trapframe *tf)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	/* Copy out the TF for now, set tf to point to it. */
+	/* Copy out the TF for now */
 	if (!in_kernel(tf))
 		set_current_tf(pcpui, tf);
 	/* Coupled with cpu_halt() and smp_idle() */
@@ -506,10 +506,12 @@ void sysenter_init(void)
 void sysenter_callwrapper(struct trapframe *tf)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	/* Copy out the TF for now, set tf to point to it. */
+	/* Copy out the TF for now */
 	if (!in_kernel(tf))
 		set_current_tf(pcpui, tf);
-	/* Once we've set_current_tf, we can enable interrupts */
+	/* Once we've set_current_tf, we can enable interrupts.  This used to be
+	 * mandatory (we had immediate KMSGs that would muck with cur_tf).  Now it
+	 * should only help for sanity/debugging. */
 	enable_irq();
 
 	if (in_kernel(tf))

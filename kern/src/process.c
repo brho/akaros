@@ -438,7 +438,6 @@ static bool scp_is_vcctx_ready(struct preempt_data *vcpd)
  * documentation talks about this a bit). */
 void proc_run_s(struct proc *p)
 {
-	int8_t state = 0;
 	uint32_t coreid = core_id();
 	struct per_cpu_info *pcpui = &per_cpu_info[coreid];
 	struct preempt_data *vcpd = &p->procdata->vcore_preempt_data[0];
@@ -463,10 +462,7 @@ void proc_run_s(struct proc *p)
 			__seq_end_write(&p->procinfo->coremap_seqctr);
 			/* incref, since we're saving a reference in owning proc later */
 			proc_incref(p, 1);
-			/* disable interrupts to protect cur_tf, owning_proc, and current */
-			disable_irqsave(&state);
-			/* wait til ints are disabled before unlocking, in case someone else
-			 * grabs the lock and IPIs us before we get set up in cur_tf */
+			/* lock was protecting the state and VC mapping, not pcpui stuff */
 			spin_unlock(&p->proc_lock);
 			/* redundant with proc_startcore, might be able to remove that one*/
 			__set_proc_current(p);
@@ -499,7 +495,6 @@ void proc_run_s(struct proc *p)
 				/* this is one of the few times cur_tf != &actual_tf */
 				pcpui->cur_tf = &p->env_tf;
 			}
-			enable_irqsave(&state);
 			/* When the calling core idles, it'll call restartcore and run the
 			 * _S process's context. */
 			return;
@@ -760,7 +755,6 @@ void proc_destroy(struct proc *p)
 int proc_change_to_m(struct proc *p)
 {
 	int retval = 0;
-	int8_t state = 0;
 	spin_lock(&p->proc_lock);
 	/* in case userspace erroneously tries to change more than once */
 	if (__proc_is_mcp(p))
@@ -777,15 +771,11 @@ int proc_change_to_m(struct proc *p)
 			 * it in the preempt slot so that we can also save the silly
 			 * state. */
 			struct preempt_data *vcpd = &p->procdata->vcore_preempt_data[0];
-			disable_irqsave(&state);	/* protect cur_tf */
-			/* Note this won't play well with concurrent proc kmsgs, but
-			 * since we're _S and locked, we shouldn't have any. */
 			assert(current_tf);
 			/* Copy uthread0's context to the notif slot */
 			vcpd->notif_tf = *current_tf;
 			clear_owning_proc(core_id());	/* so we don't restart */
 			save_fp_state(&vcpd->preempt_anc);
-			enable_irqsave(&state);
 			/* Userspace needs to not fuck with notif_disabled before
 			 * transitioning to _M. */
 			if (vcpd->notif_disabled) {
@@ -833,16 +823,13 @@ error_out:
  * by the proc. */
 uint32_t __proc_change_to_s(struct proc *p, uint32_t *pc_arr)
 {
-	int8_t state = 0;
 	uint32_t num_revoked;
 	printk("[kernel] trying to transition _M -> _S (deprecated)!\n");
 	assert(p->state == PROC_RUNNING_M); // TODO: (ACR) async core req
 	/* save the context, to be restarted in _S mode */
-	disable_irqsave(&state);	/* protect cur_tf */
 	assert(current_tf);
 	p->env_tf = *current_tf;
 	clear_owning_proc(core_id());	/* so we don't restart */
-	enable_irqsave(&state);
 	env_push_ancillary_state(p); // TODO: (HSS)
 	/* sending death, since it's not our job to save contexts or anything in
 	 * this case. */
@@ -920,20 +907,10 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 	struct per_cpu_info *pcpui = &per_cpu_info[pcoreid];
 	struct vcore *vc;
 	struct preempt_data *vcpd;
-	int8_t state = 0;
-	/* Need to lock before checking the vcoremap to find out who we are, in case
-	 * we're getting __preempted and __startcored, from a remote core (in which
-	 * case we might have come in thinking we were vcore X, but had X preempted
-	 * and Y restarted on this pcore, and we suddenly are the wrong vcore
-	 * yielding).  Arguably, this is incredibly rare, since you'd need to
-	 * preempt the core, then decide to give it back with another grant in
-	 * between. */
+	/* Need to lock to prevent concurrent vcore changes (online, inactive, the
+	 * mapping, etc).  This plus checking the nr_preempts is enough to tell if
+	 * our vcoreid and cur_tf ought to be here still or if we should abort */
 	spin_lock(&p->proc_lock); /* horrible scalability.  =( */
-	/* Need to disable before even reading vcoreid, since we could be unmapped
-	 * by a __preempt or __death.  _S also needs ints disabled, so we'll just do
-	 * it immediately.  Finally, we need to disable AFTER locking.  It is a bug
-	 * to grab the lock while irq's are disabled. */
-	disable_irqsave(&state);
 	switch (p->state) {
 		case (PROC_RUNNING_S):
 			if (!being_nice) {
@@ -966,13 +943,13 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 				 * hasn't already written notif_pending will have seen WAITING,
 				 * and will be spinning while we do this. */
 				__proc_save_context_s(p, current_tf);
-				spin_unlock(&p->proc_lock);	/* note irqs are not enabled yet */
+				spin_unlock(&p->proc_lock);
 			} else {
 				/* yielding to allow other processes to run.  we're briefly
 				 * WAITING, til we are woken up */
 				__proc_set_state(p, PROC_WAITING);
 				__proc_save_context_s(p, current_tf);
-				spin_unlock(&p->proc_lock);	/* note irqs are not enabled yet */
+				spin_unlock(&p->proc_lock);
 				/* immediately wake up the proc (makes it runnable) */
 				proc_wakeup(p);
 			}
@@ -1064,15 +1041,13 @@ out_failed:
 	/* for some reason we just want to return, either to take a KMSG that cleans
 	 * us up, or because we shouldn't yield (ex: notif_pending). */
 	spin_unlock(&p->proc_lock);
-	enable_irqsave(&state);
 	return;
 out_yield_core:				/* successfully yielded the core */
 	proc_decref(p);			/* need to eat the ref passed in */
-	/* Clean up the core and idle.  Need to do this before enabling interrupts,
-	 * since once we call __sched_put_idle_core(), we could get a startcore. */
+	/* Clean up the core and idle. */
 	clear_owning_proc(pcoreid);	/* so we don't restart */
 	abandon_core();
-	smp_idle();				/* will reenable interrupts */
+	smp_idle();
 }
 
 /* Sends a notification (aka active notification, aka IPI) to p's vcore.  We
@@ -1303,7 +1278,13 @@ void proc_give(struct proc *p, uint32_t pcoreid)
  * out). */
 uint32_t proc_get_vcoreid(struct proc *p)
 {
-	return per_cpu_info[core_id()].owning_vcoreid;
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	if (pcpui->owning_proc == p) {
+		return pcpui->owning_vcoreid;
+	} else {
+		warn("Asked for vcoreid for %p, but %p is pwns", p, pcpui->owning_proc);
+		return (uint32_t)-1;
+	}
 }
 
 /* TODO: make all of these static inlines when we gut the env crap */
@@ -1556,14 +1537,12 @@ void __unmap_vcore(struct proc *p, uint32_t vcoreid)
 
 /* Stop running whatever context is on this core and load a known-good cr3.
  * Note this leaves no trace of what was running. This "leaves the process's
- * context.  Also, we want interrupts disabled, to not conflict with kmsgs
- * (__launch_kthread, proc mgmt, etc).
+ * context.
  *
  * This does not clear the owning proc.  Use the other helper for that. */
 void abandon_core(void)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	assert(!irq_is_enabled());
 	/* Syscalls that don't return will ultimately call abadon_core(), so we need
 	 * to make sure we don't think we are still working on a syscall. */
 	pcpui->cur_sysc = 0;
@@ -1577,7 +1556,6 @@ void clear_owning_proc(uint32_t coreid)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[coreid];
 	struct proc *p = pcpui->owning_proc;
-	assert(!irq_is_enabled());
 	pcpui->owning_proc = 0;
 	pcpui->owning_vcoreid = 0xdeadbeef;
 	pcpui->cur_tf = 0;			/* catch bugs for now (will go away soon) */
@@ -1595,15 +1573,12 @@ struct proc *switch_to(struct proc *new_p)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	struct proc *old_proc;
-	int8_t irq_state = 0;
-	disable_irqsave(&irq_state);
 	old_proc = pcpui->cur_proc;					/* uncounted ref */
 	/* If we aren't the proc already, then switch to it */
 	if (old_proc != new_p) {
 		pcpui->cur_proc = new_p;				/* uncounted ref */
 		lcr3(new_p->env_cr3);
 	}
-	enable_irqsave(&irq_state);
 	return old_proc;
 }
 
@@ -1612,15 +1587,12 @@ struct proc *switch_to(struct proc *new_p)
 void switch_back(struct proc *new_p, struct proc *old_proc)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	int8_t irq_state = 0;
 	if (old_proc != new_p) {
-		disable_irqsave(&irq_state);
 		pcpui->cur_proc = old_proc;
 		if (old_proc)
 			lcr3(old_proc->env_cr3);
 		else
 			lcr3(boot_cr3);
-		enable_irqsave(&irq_state);
 	}
 }
 
@@ -1735,18 +1707,13 @@ int proc_change_to_vcore(struct proc *p, uint32_t new_vcoreid,
 	struct preempt_data *caller_vcpd;
 	struct vcore *caller_vc, *new_vc;
 	struct event_msg preempt_msg = {0};
-	int8_t state = 0;
 	int retval = -EAGAIN;	/* by default, try again */
 	/* Need to not reach outside the vcoremap, which might be smaller in the
 	 * future, but should always be as big as max_vcores */
 	if (new_vcoreid >= p->procinfo->max_vcores)
 		return -EINVAL;
-	/* Need to lock before reading the vcoremap, like in yield.  Need to do this
-	 * before disabling irqs (deadlock with incoming proc mgmt kmsgs) */
+	/* Need to lock to prevent concurrent vcore changes, like in yield. */
 	spin_lock(&p->proc_lock);
-	/* Need to disable before even reading caller_vcoreid, since we could be
-	 * unmapped by a __preempt or __death, like in yield. */
-	disable_irqsave(&state);
 	/* new_vcoreid is already runing, abort */
 	if (vcore_is_mapped(p, new_vcoreid)) {
 		retval = -EBUSY;
@@ -1843,7 +1810,6 @@ int proc_change_to_vcore(struct proc *p, uint32_t new_vcoreid,
 	/* Fall through to exit */
 out_locked:
 	spin_unlock(&p->proc_lock);
-	enable_irqsave(&state);
 	return retval;
 }
 
