@@ -49,12 +49,12 @@ struct sysc_mgmt {
 
 #define PTHREAD_ONCE_INIT 0
 #define PTHREAD_BARRIER_SERIAL_THREAD 12345
-#define PTHREAD_MUTEX_INITIALIZER {0}
+#define PTHREAD_MUTEX_INITIALIZER {0,0}
 #define PTHREAD_MUTEX_NORMAL 0
 #define PTHREAD_MUTEX_DEFAULT PTHREAD_MUTEX_NORMAL
 #define PTHREAD_MUTEX_SPINS 100 // totally arbitrary
 #define PTHREAD_BARRIER_SPINS 100 // totally arbitrary
-#define PTHREAD_COND_INITIALIZER {0}
+#define PTHREAD_COND_INITIALIZER {0,{0},{0},0}
 #define PTHREAD_PROCESS_PRIVATE 0
 
 typedef struct
@@ -178,6 +178,9 @@ int pthread_barrier_destroy(pthread_barrier_t* b);
 int pthread_detach(pthread_t __th);
 int pthread_attr_setstacksize(pthread_attr_t *attr, size_t stacksize);
 int pthread_attr_getstacksize(const pthread_attr_t *attr, size_t *stacksize);
+
+//added for go compile
+int pthread_kill (pthread_t __threadid, int __signo);
 
 #ifdef __cplusplus
   }

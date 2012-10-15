@@ -142,13 +142,21 @@ binutils-$(BINUTILS_VERSION): binutils-$(BINUTILS_VERSION).tar.bz2
 gcc-$(GCC_VERSION): gcc-$(GCC_VERSION).tar.bz2
 	rm -rf gcc-$(GCC_VERSION)
 	tar -jxf gcc-$(GCC_VERSION).tar.bz2
-	patch -p0 < gcc-$(GCC_VERSION)-ros.patch
+	$(MAKE) .gcc-ros-patch
 	patch --no-backup-if-mismatch -p0 < gcc-$(GCC_VERSION)-riscv.patch
+
+.gcc-ros-patch:
+	-cd gcc-$(GCC_VERSION); \
+	diff -ruB --unidirectional-new-file \
+	     ../gcc-$(GCC_VERSION) \
+	     ../gcc-$(GCC_VERSION)-ros \
+	     | grep -v "Only in ../gcc-$(GCC_VERSION)" \
+	     | patch -p2 
 
 glibc-$(GLIBC_VERSION): glibc-$(GLIBC_VERSION).tar.bz2
 	rm -rf glibc-$(GLIBC_VERSION)
 	tar -jxf glibc-$(GLIBC_VERSION).tar.bz2
-	$(MAKE) .glibc-patch
+	$(MAKE) .glibc-ros-patch
 	patch --no-backup-if-mismatch -p0 < glibc-$(GLIBC_VERSION)-riscv.patch
 	rm glibc-$(GLIBC_VERSION)/sysdeps/sparc/sparc32/elf/start.S
 	rm glibc-$(GLIBC_VERSION)/sysdeps/riscv/elf/start.S
@@ -158,7 +166,7 @@ glibc-$(GLIBC_VERSION): glibc-$(GLIBC_VERSION).tar.bz2
 	rm glibc-$(GLIBC_VERSION)/sysdeps/i386/init-first.c
 	rm glibc-$(GLIBC_VERSION)/sysdeps/i386/sysdep.h
 
-.glibc-patch:
+.glibc-ros-patch:
 	-cd glibc-$(GLIBC_VERSION); \
 	diff -ruB --unidirectional-new-file \
 	     ../glibc-$(GLIBC_VERSION) \
@@ -292,8 +300,9 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 	          --program-prefix=$(BINARY_PREFIX) \
 	          --target=$(ARCH)-ros \
 	          --prefix=$(INSTDIR) \
-	          --enable-languages=c,c++ \
+	          --enable-languages=c,c++,go \
 	          $(GCC_BUILD_FLAGS) \
+	          --without-libffi \
 	          --with-__thread \
 	          --with-headers=$(INSTDIR)/$(ARCH)-ros/include \
 	          --disable-werror;
