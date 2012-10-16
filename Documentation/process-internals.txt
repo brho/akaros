@@ -15,7 +15,8 @@ Contents:
 6. Locking!
 7. TLB Coherency
 8. Process Management
-9. TBD
+9. On the Ordering of Messages
+10. TBD
 
 1. Reference Counting
 ===========================
@@ -752,6 +753,25 @@ iret.  At which point, if the code path is deep enough that we don't want to
 carry the TF pointer, we may revisit this.  Until then, current_tf is just for
 userspace contexts, and is simply stored in per_cpu_info.
 
+Brief note from the future (months after this paragraph was written): cur_tf
+has two aspects/jobs:
+1) tell the kernel what we should do (trap, fault, sysc, etc), how we came
+into the kernel (the fact that it is a user tf), which is why we copy-out
+early on
+2) be a vehicle for us to restart the process/vcore
+
+We've been focusing on the latter case a lot, since that is what gets
+removed when preempted, changed during a notify, created during a startcore,
+etc.  Don't forget it was also an instruction of sorts.  The former case is
+always true throughout the life of the syscall.  The latter only happens to be
+true throughout the life of a *non-blocking* trap since preempts are routine
+KMSGs.  But if we block in a syscall, the cur_tf is no longer the TF we came
+in on (and possibly the one we are asked to operate on), and that old cur_tf
+has probably restarted.
+
+(Note that cur_tf is a pointer, and syscalls/traps actually operate on the TF
+they came in on regardless of what happens to cur_tf or pcpui->actual_tf.)
+
 6. Locking!
 ===========================
 6.1: proc_lock
@@ -973,5 +993,404 @@ on), and then that vcore gets granted in the next round of vcore_requests().
 The preemption recovery handlers will need to deal with concurrent handlers
 and the vcore itself starting back up.
 
-9. TBD
+9. On the Ordering of Messages and Bugs with Old State
+===========================
+This is a sordid tale involving message ordering, message delivery times, and
+finding out (sometimes too late) that the state you expected is gone and
+having to deal with that error.
+
+A few design issues:
+- being able to send messages and have them execute in the order they are
+  sent
+- having message handlers resolve issues with global state.  Some need to know
+  the correct 'world view', and others need to know what was the state at the
+  time they were sent.
+- realizing syscalls, traps, faults, and any non-IRQ entry into the kernel is
+  really a message.
+
+Process management messages have alternated from ROUTINE to IMMEDIATE and now
+back to ROUTINE.  These messages include such family favorites as
+'__startcore', '__preempt', etc.  Meanwhile, syscalls were coming in that
+needed to know about the core and the process's state (specifically, yield,
+change_to, and get_vcoreid).  Finally, we wanted to avoid locking, esp in
+KMSGs handlers (imagine all cores grabbing the lock to check the vcoremap or
+something).
+
+Incidentally, events were being delivered concurretly to vcores, though that
+actually didn't matter much (check out async_events.txt for more on that).
+
+9.1: Design Guidelines
+---------------------------
+Initially, we wanted to keep broadcast messaging available as an option.  As
+noted elsewhere, we can't really do this well for startcore, since most
+hardware broadcast options need some initial per-core setup, and any sort of
+broadcast tree we make should be able to handle a small message.  Anyway, this
+desire in the early code to keep all messages identical lead to a few
+problems.
+
+Another objective of the kernel messaging was to avoid having the message
+handlers grab any locks, especially the same lock (the proc lock is used to
+protect the vcore map, for instance).
+
+Later on, a few needs popped up that motivated the changes discussed below:
+- Being able to find out which proc/vcore was on a pcore
+- Not having syscalls/traps require crazy logic if the carpet was pulled out
+  from under them.
+- Having proc management calls return.  This one was sorted out by making all
+  kmsg handlers return.  It would be a nightmare making a ksched without this.
+
+9.2: Looking at Old State: a New Bug for an Old Problem
+---------------------------
+We've always had issues with syscalls coming in and already had the fate of a
+core determined.  This is referred to in a few places as "predetermined fate"
+vs "local state".  A remote lock holder (ksched) already determined a core
+should be unmapped and sent a message.  Only later does some call like
+proc_yield() realize its core is already *unmapped*. (I use that term poorly
+here).  This sort of code had to realize it was working on an old version of
+state and just abort.  This was usually safe, though looking at the vcoremap
+was a bad idea.  Initially, we used preempt_served as the signal, which was
+okay.  Around 12b06586 yield started to use the vcoremap, which turned out to
+be wrong.
+
+A similar issue happens for the vcore messages (startcore, preempt, etc).  The
+way startcore used to work was that it would only know what pcore it was on,
+and then look into the vcoremap to figure out what vcoreid it should be
+running.  This was to keep broadcast messaging available as an option.  The
+problem with it is that the vcoremap may have changed between when the
+messages were sent and when they were executed.  Imagine a startcore followed
+by a preempt, afterwhich the vcore was unmapped.  Well, to get around that, we
+had the unmapping happen in the preempt or death handlers.  Yikes!  This was
+the case back in the early days of ROS.  This meant the vcoremap wasn't
+actually representative of the decisions the ksched made - we also needed to
+look at the state we'd have after all outstanding messages executed.  And this
+would differ from the vcore lists (which were correct for a lock holder).
+
+This was managable for a little while, until I tried to conclusively know who
+owned a particular pcore.  This came up while making a provisioning scheduler.
+Given a pcore, tell me which process/vcore (if any) were on it.  It was rather
+tough.  Getting the proc wasn't too hard, but knowing which vcore was a little
+tougher.  (Note the ksched doesn't care about which vcore is running, and the
+process can change vcores on a pcore at will).  But once you start looking at
+the process, you can't tell which vcore a certain pcore has.  The vcoremap may
+be wrong, since a preempt is already on the way.  You would have had to scan
+the vcore lists to see if the proc code thought that vcore was online or not
+(which would mean there had been no preempts).  This is the pain I was talking
+about back around commit 5343a74e0.
+
+So I changed things so that the vcoremap was always correct for lock holders,
+and used pcpui to track owning_vcoreid (for preempt/notify), and used an extra
+KMSG variable to tell startcore which vcoreid it should use.  In doing so, we
+(re)created the issue that the delayed unmapping dealt with: the vcoremap
+would represent *now*, and not the vcoremap of when the messages were first
+sent.  However, this had little to do with the KMSGs, which I was originally
+worried about.  No one was looking at the vcoremap without the lock, so the
+KMSGs were okay, but remember: syscalls are like messages too.  They needed to
+figure out what vcore they were on, i.e. what vcore userspace was making
+requests on (viewing a trap/fault as a type of request).
+
+Now the problem was that we were using the vcoremap to figure out which vcore
+we were supposed to be.  When a syscall finally ran, the vcoremap could be
+completely wrong, and with immediate KMSGs (discussed below), the pcpui was
+already changed!  We dealt with the problem for KMSGs, but not syscalls, and
+basically reintroduced the bug of looking at current state and thinking it
+represented the state from when the 'message' was sent (when we trapped into
+the kernel, for a syscall/exception).
+
+9.3: Message Delivery, Circular Waiting, and Having the Carpet Pulled Out
+---------------------------
+In-order message delivery was what drove me to build the kernel messaging
+system in the first place.  It provides in-order messages to a particular
+pcore.  This was enough for a few scenarios, such as preempts racing ahead of
+startcores, or deaths racing a head of preempts, etc.  However, I also wanted
+an ordering of messages related to a particular vcore, and this wasn't
+apparent early on.
+
+The issue first popped up with a startcore coming quickly on the heals of a
+preempt for the same VC, but on different PCs.  The startcore cannot proceed
+until the preempt saved the TF into the VCPD.  The old way of dealing with
+this was to spin in '__map_vcore()'.  This was problematic, since it meant we
+were spinning while holding a lock, and resulted in some minor bugs and issues
+with lock ordering and IRQ disabling (couldn't disable IRQs and then try to
+grab the lock, since the lock holder could have sent you a message and is
+waiting for you to handle the IRQ/IMMED KMSG).  However, it was doable.  But
+what wasn't doable was to have the KMSGs be ROUTINE.  Any syscalls that tried
+to grab the proc lock (lots of them) would deadlock, since the lock holder was
+waiting on us to handle the preempt (same circular waiting issue as above).
+
+This was fine, albeit subpar, until a new issue showed up.  Sending IMMED
+KMSGs worked fine if we were coming from userspace already, but if we were in
+the kernel, those messages would run immediately (hence the name), just like
+an IRQ handler, and could confuse syscalls that touched cur_tf/pcpui.  If a
+preempt came in during a syscall, the process/vcore could be changed before
+the syscall took place.  Some syscalls could handle this, albeit poorly.
+sys_proc_yield() and sys_change_vcore() delicately tried to detect if they
+were still mapped or not and use that to determine if a preemption happened.
+
+As mentioned above, looking at the vcoremap only tells you what is currently
+happening, and not what happened in the past.  Specifically, it doesn't tell
+you the state of the mapping when a particular core trapped into the kernel
+for a syscall (referred to as when the 'message' was sent up above).  Imagine
+sys_get_vcoreid(): you trap in, then immediately get preempted, then startcore
+for the same process but a different vcoreid.  The syscall would return with
+the vcoreid of the new vcore, since it cannot tell there was a change.  The
+async syscall would complete and we'd have a wrong answer.  While this never
+happened to me, I had a similar issue while debugging some other bugs (I'd get
+a vcoreid of 0xdeadbeef, for instance, which was the old poison value for an
+unmapped vcoreid).  There are a bunch of other scenarios that trigger similar
+disasters, and they are very hard to avoid.
+
+One way out of this was a per-core history counter, that changed whenever we
+changed cur_tf.  Then when we trapped in for a syscall, we could save the
+value, enable_irqs(), and go about our business.  Later on, we'd have to
+disable_irqs() and compare the counters.  If they were different, we'd have to
+bail out some how.  This could have worked for change_to and yield, and some
+others.  But any syscall that wanted to operate on cur_tf in some way would
+fail (imagine a hypothetical sys_change_stack_pointer()).  The context that
+trapped has already returned on another core.  I guess we could just fail that
+syscall, though it seems a little silly to not be able to do that.
+
+The previous example was a bit contrived, but lets also remember that it isn't
+just syscalls: all exceptions have the same issue.  Faults might be fixable,
+since if you restart a faulting context, it will start on the faulting
+instruction.  However all traps (like syscall) restart on the next
+instruction.  Hope we don't want to do anything fancy with breakpoint!  Note
+that I had breakpointing contexts restart on other pcores and continue while I
+was in the breakpoint handler (noticed while I was debugging some bugs with
+lots of preempts).  Yikes.  And don't forget we eventually want to do some
+complicated things with the page fault handler, and may want to turn on
+interrupts / kthread during a page fault (imaging hitting disk).  Yikes.
+
+So I looked into going back to ROUTINE kernel messages.  With ROUTINE
+messages, I didn't have to worry about having the carpet pulled out from under
+syscalls and exceptions (traps, faults, etc).  The 'carpet' is stuff like
+cur_tf, owning_proc, owning_vcoreid, etc.  We still cannot trust the vcoremap,
+unless we *know* there were no preempts or other KMSGs waiting for us.
+(Incidentally, in the recent fix a93aa7559, we merely use the vcoremap as a
+sanity check).
+
+However, we can't just switch back to ROUTINEs.  Remember: with ROUTINEs,
+we will deadlock in '__map_vcore()', when it waits for the completion of
+preempt.  Ideally, we would have had startcore spin on the signal.  Since we
+already gave up on using x86-style broadcast IPIs for startcore (in
+5343a74e0), we might as well pass along a history counter, so it knows to wait
+on preempt.
+
+9.4: The Solution
+---------------------------
+To fix up all of this, we now detect preemptions in syscalls/traps and order
+our kernel messages with two simple per-vcore counters.  Whenever we send a
+preempt, we up one counter.  Whenever that preempt finishes, it ups another
+counter.  When we send out startcores, we send a copy of the first counter.
+This is a way of telling startcore where it belongs in the list of messages.
+More specifically, it tells it which preempt happens-before it.
+
+Basically, I wanted a partial ordering on my messages, so that messages sent
+to a particular vcore are handled in the order they were sent, even if those
+messages run on different physical cores.
+
+It is not sufficient to use a seq counter (one integer, odd values for
+'preempt in progress' and even values for 'preempt done').  It is possible to
+have multiple preempts in flight for the same vcore, albeit with startcores in
+between.  Still, there's no way to encode that scenario in just one counter.
+
+Here's a normal example of traffic to some vcore.  I note both the sending and
+the execution of the kmsgs:
+   nr_pre_sent    nr_pre_done    pcore     message sent/status
+   -------------------------------------------------------------
+   0              0              X         startcore (nr_pre_sent == 0)
+   0              0              X         startcore (executes)
+   1              0              X         preempt   (kmsg sent)
+   1              1              Y         preempt   (executes)
+   1              1              Y         startcore (nr_pre_sent == 1)
+   1              1              Y         startcore (executes)
+
+Note the messages are always sent by the lockholder in the order of the
+example above.
+
+Here's when the startcore gets ahead of the prior preempt:
+   nr_pre_sent    nr_pre_done    pcore     message sent/status
+   -------------------------------------------------------------
+   0              0              X         startcore (nr_pre_sent == 0) 
+   0              0              X         startcore (executes)
+   1              0              X         preempt   (kmsg sent)
+   1              0              Y         startcore (nr_pre_sent == 1)
+   1              1              X         preempt   (executes)
+   1              1              Y         startcore (executes)
+
+Note that this can only happen across cores, since KMSGs to a particular core
+are handled in order (for a given class of message).  The startcore blocks on
+the prior preempt.
+
+Finally, here's an example of what a seq ctr can't handle:
+   nr_pre_sent    nr_pre_done    pcore     message sent/status
+   -------------------------------------------------------------
+   0              0              X         startcore (nr_pre_sent == 0) 
+   1              0              X         preempt   (kmsg sent)
+   1              0              Y         startcore (nr_pre_sent == 1)
+   2              0              Y         preempt   (kmsg sent)
+   2              0              Z         startcore (nr_pre_sent == 2)
+   2              1              X         preempt   (executes (upped to 1))
+   2              1              Y         startcore (executes (needed 1))
+   2              2              Y         preempt   (executes (upped to 2))
+   2              Z              Z         startcore (executes (needed 2))
+
+As a nice bonus, it is easy for syscalls that care about the vcoreid (yield,
+change_to, get_vcoreid) to check if they have a preempt_served.  Just grab the
+lock (to prevent further messages being sent), then check the counters.  If
+they are equal, there is no preempt on its way.  This actually was the
+original way we checked for preempts in proc_yield back in the day.  It was
+just called preempt_served.  Now, it is split into two counters, instead of
+just being a bool.  
+
+Regardless of whether or not we were preempted, we still can look at
+pcpui->owning_proc and owning_vcoreid to figure out what the vcoreid of the
+trap/syscall is, and we know that the cur_tf is still the correct cur_tf (no
+carpet pulled out), since while there could be a preempt ROUTINE message
+waiting for us, we simply haven't run it yet.  So calls like yield should
+still fail (since your core has been unmapped and you need to bail out and run
+the preempt handler), but calls like sys_change_stack_pointer can proceed.
+More importantly than that old joke syscall, the page fault handler can try to
+do some cool things without worrying about really crazy stuff.
+
+9.5: Why We (probably) Don't Deadlock
+---------------------------
+It's worth thinking about why this setup of preempts and startcores can't
+deadlock.  Anytime we spin in the kernel, we ought to do this.  Perhaps there
+is some issue with other KMSGs for other processes, or other vcores, or
+something like that that can cause a deadlock.
+
+Hypothetical case: pcore 1 has a startcore for vc1 which is stuck behind vc2's
+startcore on PC2, with time going upwards.  In these examples, startcores are
+waiting on particular preempts, subject to the nr_preempts_sent parameter sent
+along with the startcores.
+
+^                       
+|            _________                 _________
+|           |         |               |         |
+|           | pr vc 2 |               | pr vc 1 |
+|           |_________|               |_________|
+|
+|            _________                 _________
+|           |         |               |         |
+|           | sc vc 1 |               | sc vc 2 |
+|           |_________|               |_________|
+t           
+---------------------------------------------------------------------------
+              ______                    ______
+             |      |                  |      |
+             | PC 1 |                  | PC 2 |
+             |______|                  |______|
+
+Here's the same picture, but with certain happens-before arrows.  We'll use X --> Y to
+mean X happened before Y, was sent before Y.  e.g., a startcore is sent after
+a preempt.
+
+^                       
+|            _________                 _________
+|           |         |               |         |
+|       .-> | pr vc 2 | --.    .----- | pr vc 1 | <-.
+|       |   |_________|    \  /   &   |_________|   |  
+|     * |                   \/                      | * 
+|       |    _________      /\         _________    |  
+|       |   |         |    /  \   &   |         |   |  
+|       '-- | sc vc 1 | <-'    '----> | sc vc 2 | --'
+|           |_________|               |_________|
+t           
+---------------------------------------------------------------------------
+              ______                    ______
+             |      |                  |      |
+             | PC 1 |                  | PC 2 |
+             |______|                  |______|
+
+The arrows marked with * are ordered like that due to the property of KMSGs,
+in that we have in order delivery.  Messages are executed in the order in
+which they were sent (serialized with a spinlock btw), so on any pcore,
+messages that are further ahead in the queue were sent before (and thus will
+be run before) other messages.
+
+The arrows marked with a & are ordered like that due to how the proc
+management code works.  The kernel won't send out a startcore for a particular
+vcore before it sent out a preempt.  (Note that techincally, preempts follow
+startcores.  The startcores in this example are when we start up a vcore after
+it had been preempted in the past.).
+
+Anyway, note that we have a cycle, where all events happened before each
+other, which isn't possible.  The trick to connecting "unrelated" events like
+this (unrelated meaning 'not about the same vcore') in a happens-before manner
+is the in-order properties of the KMSGs.
+
+Based on this example, we can derive general rules.  Note that 'sc vc 2' could
+be any kmsg that waits on another message placed behind 'sc vc 1'.  This would
+require us having sent a KMSG that waits on a KMSGs that we send later.  Bad
+idea!  (you could have sent that KMSGs to yourself, aside from just being
+dangerous).  If you want to spin, make sure you send the work that should
+happen-before actually-before the waiter.
+
+In fact, we don't even need 'sc vc 2' to be a KMSG.  It could be miscellaneous
+kernel code, like a proc mgmt syscall.  Imagine if we did something like the
+old '__map_vcore' call from within the ksched.  That would be code that holds
+the lock, and then waits on the execution of a message handler.  That would
+deadlock (which is why we don't do it anymore).
+
+Finally, in case this isn't clear, all of the startcores and preempts for
+a given vcore exist in a happens-before relation, both in sending and in
+execution.  The sending aspect is handled by proc mgmt code.  For execution,
+preempts always follow startcores due to the KMSG ordering property.  For
+execution of startcores, startcores always spin until the preempt they follow
+is complete, ensuring the execution of the main part of their handler happens
+after the prior preempt.
+
+Here's some good ideas for the ordering of locks/irqs/messages:
+- You can't hold a spinlock of any sort and then wait on a routine kernel
+  message.  The core where that runs may be waiting on you, or some scenario
+  like above.
+	- Similarly, think about how this works with kthreads.  A kthread restart
+	  is a routine KMSG.  You shouldn't be waiting on code that could end up
+	  kthreading, mostly because those calls block!
+- You can hold a spinlock and wait on an IMMED kmsg, if the waiters of the
+  spinlock have irqs enabled while spinning (this is what we used to do with
+  the proc lock and IMMED kmsgs, and 54c6008 is an example of doing it wrong)
+	- As a corollary, locks like this cannot be irqsave, since the other
+	  attempted locker will have irq disabled
+- For broadcast trees, you'd have to send IMMEDs for the intermediates, and
+  then it'd be okay to wait on those intermediate, immediate messages (if we
+  wanted confirmation of the posting of RKM)
+  	- The main thing any broadcast mechanism needs to do is make sure all
+	  messages get delivered in order to particular pcores (the central
+	  premise of KMSGs) (and not deadlock due to waiting on a KMSG improperly)
+- Alternatively, we could use routines for the intermediates if we didn't want
+  to wait for RKMs to hit their destination, we'd need to always use the same
+  proxy for the same destination pcore, e.g., core 16 always covers 16-31.
+	- Otherwise, we couldn't guarantee the ordering of SC before PR before
+	  another SC (which the proc_lock and proc mgmt code does); we need the
+	  ordering of intermediate msgs on the message queues of a particular
+	  core.
+	- All kmsgs would need to use this broadcasting style (couldn't mix
+	  regular direct messages with broadcast), so odds are this style would be
+	  of limited use.
+	- since we're not waiting on execution of a message, we could use RKMs
+	  (while holding a spinlock)
+- There might be some bad effects with kthreads delaying the reception of RKMS
+  for a while, but probably not catastrophically.
+
+9.6: Things That We Don't Handle Nicely
+---------------------------
+If for some reason a syscall or fault handler blocks *unexpectedly*, we could
+have issues.  Imagine if change_to happens to block in some early syscall code
+(like instrumentation, or who knows what, that blocks in memory allocation).
+When the syscall kthread restarts, its old cur_tf is gone.  It may or may not
+be running on a core owned by the original process.  If it was, we probably
+would accidentally yield that vcore (clearly a bug).  
+
+For now, any of these calls that care about cur_tf/pcpui need to not block
+without some sort of protection.  None of them do, but in the future we might
+do something that causes them to block.  We could deal with it by having a
+pcpu or per-kthread/syscall flag that says if it ever blocked, and possibly
+abort.  We get into similar nasty areas as with preempts, but this time, we
+can't solve it by making preempt a routine KMSG - we block as part of that
+syscall/handler code.  Odds are, we'll just have to outlaw this, now and
+forever.  Just note that if a syscall/handler blocks, the TF it came in on is
+probably not cur_tf any longer, and that old cur_tf has probably restarted.
+
+10. TBD
 ===========================
