@@ -314,7 +314,7 @@ static error_t sys_proc_run(struct proc *p, unsigned pid)
 	error_t retval = 0;
 
 	if (!target) {
-		set_errno(EBADPROC);
+		set_errno(ESRCH);
 		return -1;
 	}
 	/* make sure we have access and it's in the right state to be activated */
@@ -337,7 +337,7 @@ out_error:
 
 /* Destroy proc pid.  If this is called by the dying process, it will never
  * return.  o/w it will return 0 on success, or an error.  Errors include:
- * - EBADPROC: if there is no such process with pid
+ * - ESRCH: if there is no such process with pid
  * - EPERM: if caller does not control pid */
 static error_t sys_proc_destroy(struct proc *p, pid_t pid, int exitcode)
 {
@@ -363,7 +363,7 @@ static error_t sys_proc_destroy(struct proc *p, pid_t pid, int exitcode)
 	proc_destroy(p_to_die);
 	/* we only get here if we weren't the one to die */
 	proc_decref(p_to_die);
-	return ESUCCESS;
+	return 0;
 }
 
 static int sys_proc_yield(struct proc *p, bool being_nice)
@@ -660,7 +660,7 @@ static int sys_notify(struct proc *p, int target_pid, unsigned int ev_type,
 	struct event_msg local_msg = {0};
 	struct proc *target = pid2proc(target_pid);
 	if (!target) {
-		set_errno(EBADPROC);
+		set_errno(ESRCH);
 		return -1;
 	}
 	if (!proc_controls(p, target)) {

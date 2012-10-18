@@ -147,7 +147,6 @@
 // New with ROS
 #define EFAIL			132 /* Generic Failure */
 #define ENOCACHE		133 /* No memory available */
-#define EBADPROC		134 /* Bad process */
 #define ENOFREEPID		135 /* No free pid */
 #define EUNSPECIFIED	136 /* Unspecified */
 #define EMORON			137 /* Moron */
