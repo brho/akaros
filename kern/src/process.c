@@ -227,6 +227,8 @@ error_t proc_alloc(struct proc **pp, struct proc *parent)
 
 	if (!(p = kmem_cache_alloc(proc_cache, 0)))
 		return -ENOMEM;
+	/* zero everything by default, other specific items are set below */
+	memset(p, 0, sizeof(struct proc));
 
 	{ INITSTRUCT(*p)
 
@@ -254,8 +256,6 @@ error_t proc_alloc(struct proc **pp, struct proc *parent)
 	p->env_flags = 0;
 	p->env_entry = 0; // cheating.  this really gets set later
 	p->heap_top = (void*)UTEXT;	/* heap_bottom set in proc_init_procinfo */
-	memset(&p->env_ancillary_state, 0, sizeof(p->env_ancillary_state));
-	memset(&p->env_tf, 0, sizeof(p->env_tf));
 	spinlock_init(&p->mm_lock);
 	TAILQ_INIT(&p->vm_regions); /* could init this in the slab */
 	/* Initialize the vcore lists, we'll build the inactive list so that it includes
