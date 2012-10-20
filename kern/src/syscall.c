@@ -675,6 +675,8 @@ static int sys_notify(struct proc *p, int target_pid, unsigned int ev_type,
 			set_errno(EINVAL);
 			return -1;
 		}
+	} else {
+		local_msg.ev_type = ev_type;
 	}
 	send_kernel_event(target, &local_msg, 0);
 	proc_decref(target);

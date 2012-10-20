@@ -9,6 +9,7 @@
 #define ROS_KERN_EVENT_H
 
 #include <ros/event.h>
+#include <ros/bits/posix_signum.h>
 #include <process.h>
 
 void send_event(struct proc *p, struct event_queue *ev_q, struct event_msg *msg,
@@ -16,5 +17,6 @@ void send_event(struct proc *p, struct event_queue *ev_q, struct event_msg *msg,
 void send_kernel_event(struct proc *p, struct event_msg *msg, uint32_t vcoreid);
 void post_vcore_event(struct proc *p, struct event_msg *msg, uint32_t vcoreid,
                       int ev_flags);
+void send_posix_signal(struct proc *p, int sig_nr);
 
 #endif /* ROS_KERN_EVENT_H */

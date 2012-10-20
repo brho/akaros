@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Busybox version: 1.17.3
-# Mon Apr  9 19:14:46 2012
+# Thu Oct 18 13:11:01 2012
 #
 CONFIG_HAVE_DOT_CONFIG=y
 
@@ -833,9 +833,9 @@ CONFIG_FEATURE_MIME_CHARSET=""
 # CONFIG_SMEMCAP is not set
 # CONFIG_FREE is not set
 # CONFIG_FUSER is not set
-# CONFIG_KILL is not set
-# CONFIG_KILLALL is not set
-# CONFIG_KILLALL5 is not set
+CONFIG_KILL=y
+CONFIG_KILLALL=y
+CONFIG_KILLALL5=y
 # CONFIG_NMETER is not set
 # CONFIG_PGREP is not set
 # CONFIG_PIDOF is not set

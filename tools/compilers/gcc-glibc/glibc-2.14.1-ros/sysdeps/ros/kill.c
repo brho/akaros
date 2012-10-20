@@ -19,18 +19,23 @@
 #include <errno.h>
 #include <signal.h>
 #include <ros/syscall.h>
+#include <ros/event.h>
 
 /* Send signal SIG to process number PID.  If PID is zero,
    send SIG to all processes in the current process's process group.
-   If PID is < -1, send SIG to all processes in process group - PID.  */
-int
-__kill (int pid, int sig)
+   If PID is < -1, send SIG to all processes in process group - PID.
+   If SIG is SIGKILL, kill the process. */
+int __kill (int pid, int sig)
 {
-  if(pid <= 0)
-  {
-    errno = ENOSYS;
-    return -1;
-  }
-  return ros_syscall(SYS_proc_destroy, pid, 0, 0, 0, 0, 0);
+	struct event_msg local_msg = {0};
+	if (pid <= 0) {
+		errno = ENOSYS;
+		return -1;
+	}
+	if (sig == SIGKILL)
+		return ros_syscall(SYS_proc_destroy, pid, 0, 0, 0, 0, 0);
+	local_msg.ev_type = EV_POSIX_SIGNAL;
+	local_msg.ev_arg1 = sig;
+	return ros_syscall(SYS_notify, pid, EV_POSIX_SIGNAL, &local_msg, 0, 0, 0);
 }
 weak_alias (__kill, kill)

@@ -473,3 +473,13 @@ void post_vcore_event(struct proc *p, struct event_msg *msg, uint32_t vcoreid,
 	post_vc_msg(p, vcoreid, get_vcpd_mbox(vcoreid, ev_flags), msg, ev_flags);
 	switch_back(p, old_proc);
 }
+
+/* Attempts to send a posix signal to the process.  If they do not have an ev_q
+ * registered for EV_POSIX_SIGNAL, then nothing will happen. */
+void send_posix_signal(struct proc *p, int sig_nr)
+{
+	struct event_msg local_msg = {0};
+	local_msg.ev_type = EV_POSIX_SIGNAL;
+	local_msg.ev_arg1 = sig_nr;
+	send_kernel_event(p, &local_msg, 0);
+}
