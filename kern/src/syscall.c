@@ -563,7 +563,11 @@ all_out:
 	smp_idle();				/* will reenable interrupts */
 }
 
-static ssize_t sys_trywait(env_t* e, pid_t pid, int* status)
+/* Note: we only allow waiting on children (no such thing as threads, for
+ * instance).  Right now we only allow waiting on termination (not signals),
+ * and we don't have a way for parents to disown their children (such as
+ * ignoring SIGCHLD, see man 2 waitpid's Notes). */
+static int sys_trywait(struct proc *parent, pid_t pid, int *status)
 {
 	/* TODO:
 	 * - WAIT should handle stop and start via signal too
@@ -571,53 +575,38 @@ static ssize_t sys_trywait(env_t* e, pid_t pid, int* status)
 	 * - should have an option for WNOHANG, and a bunch of other things.
 	 * - think about what functions we want to work with MCPS
 	 *   */
-	struct proc* p = pid2proc(pid);
+	struct proc* child = pid2proc(pid);
+	int ret = -1;
+	int ret_status;
 
-	// TODO: this syscall is racy, so we only support for single-core procs
-	if(e->state != PROC_RUNNING_S)
-		return -1;
-
-	// TODO: need to use errno properly.  sadly, ROS error codes conflict..
-
-	if(p)
-	{
-		ssize_t ret;
-
-		if(current->pid == p->ppid)
-		{
-			/* Block til there is some activity */
-			if (!(p->state == PROC_DYING)) {
-				sleep_on(&p->state_change);
-			}
-			if(p->state == PROC_DYING)
-			{
-				memcpy_to_user(e,status,&p->exitcode,sizeof(int));
-				printd("[PID %d] waited for PID %d (code %d)\n",
-				       e->pid,p->pid,p->exitcode);
-				ret = 0;
-			}
-			else // not dead yet
-			{
-				warn("Should not have reached here.");
-				set_errno(ESUCCESS);
-				ret = -1;
-			}
-		}
-		else // not a child of the calling process
-		{
-			set_errno(EPERM);
-			ret = -1;
-		}
-
-		// if the wait succeeded, decref twice
-		if (ret == 0)
-			proc_decref(p);
-		proc_decref(p);
-		return ret;
+	if (!child) {
+		set_errno(ECHILD);	/* ECHILD also used for no proc */
+		goto out;
 	}
-
-	set_errno(EPERM);
-	return -1;
+	if (!(parent->pid == child->ppid)) {
+		set_errno(ECHILD);
+		goto out_decref;
+	}
+	/* Block til there is some activity (DYING for now) */
+	if (!(child->state == PROC_DYING)) {
+		sleep_on(&child->state_change);
+		cpu_relax();
+	}
+	assert(child->state == PROC_DYING);
+	ret_status = child->exitcode;
+	/* wait succeeded - need to clean up the proc. */
+	proc_disown_child(parent, child);
+	/* fall through */
+out_success:
+	/* ignoring the retval here - don't care if they have a bad addr. */
+	memcpy_to_user(parent, status, &ret_status, sizeof(ret_status));
+	printd("[PID %d] waited for PID %d (code %d)\n", parent->pid,
+	       pid, ret_status);
+	ret = 0;
+out_decref:
+	proc_decref(child);
+out:
+	return ret;
 }
 
 /************** Memory Management Syscalls **************/

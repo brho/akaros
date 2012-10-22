@@ -250,8 +250,16 @@ error_t proc_alloc(struct proc **pp, struct proc *parent)
 	/* Set the basic status variables. */
 	spinlock_init(&p->proc_lock);
 	p->exitcode = 1337;	/* so we can see processes killed by the kernel */
+	if (parent) {
+		p->ppid = parent->pid;
+		spin_lock(&parent->proc_lock);
+		TAILQ_INSERT_TAIL(&parent->children, p, sibling_link);
+		spin_unlock(&parent->proc_lock);
+	} else {
+		p->ppid = 0;
+	}
+	TAILQ_INIT(&p->children);
 	init_sem(&p->state_change, 0);
-	p->ppid = parent ? parent->pid : 0;
 	p->state = PROC_CREATED; /* shouldn't go through state machine for init */
 	p->env_flags = 0;
 	p->env_entry = 0; // cheating.  this really gets set later
@@ -748,6 +756,20 @@ void proc_destroy(struct proc *p)
 	sleeper = __up_sem(&p->state_change, TRUE);
 	if (sleeper)
 		kthread_runnable(sleeper);
+}
+
+/* Called when a parent is done with its child, and no longer wants to track the
+ * child, nor to allow the child to track it. */
+void proc_disown_child(struct proc *parent, struct proc *child)
+{
+	/* lock protects from concurrent inserts / removals from the list */
+	spin_lock(&parent->proc_lock);
+	TAILQ_REMOVE(&parent->children, child, sibling_link);
+	/* After this, the child won't be able to get more refs to us, but it may
+	 * still have some references in running code. */
+	child->ppid = 0;
+	spin_unlock(&parent->proc_lock);
+	proc_decref(child);	/* ref that was keeping the child alive after dying */
 }
 
 /* Turns *p into an MCP.  Needs to be called from a local syscall of a RUNNING_S
@@ -1978,10 +2000,10 @@ void print_allpids(void)
 	{
 		struct proc *p = (struct proc*)item;
 		assert(p);
-		printk("%8d %s\n", p->pid, procstate2str(p->state));
+		printk("%8d %-10s %6d\n", p->pid, procstate2str(p->state), p->ppid);
 	}
-	printk("PID      STATE    \n");
-	printk("------------------\n");
+	printk("     PID STATE      Parent    \n");
+	printk("------------------------------\n");
 	spin_lock(&pid_hash_lock);
 	hash_for_each(pid_hash, print_proc_state);
 	spin_unlock(&pid_hash_lock);
@@ -1990,7 +2012,7 @@ void print_allpids(void)
 void print_proc_info(pid_t pid)
 {
 	int j = 0;
-	struct proc *p = pid2proc(pid);
+	struct proc *child, *p = pid2proc(pid);
 	struct vcore *vc_i;
 	if (!p) {
 		printk("Bad PID.\n");
@@ -2030,9 +2052,9 @@ void print_proc_info(pid_t pid)
 			       file_name(files->fd_array[i].fd_file));
 		}
 	spin_unlock(&files->lock);
-	/* No one cares, and it clutters the terminal */
-	//printk("Vcore 0's Last Trapframe:\n");
-	//print_trapframe(&p->env_tf);
+	printk("Children: (PID (struct proc *))\n");
+	TAILQ_FOREACH(child, &p->children, sibling_link)
+		printk("\t%d (%08p)\n", child->pid, child);
 	/* no locking / unlocking or refcnting */
 	// spin_unlock(&p->proc_lock);
 	proc_decref(p);

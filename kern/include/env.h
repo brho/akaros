@@ -21,18 +21,25 @@
 #include <vfs.h>
 #include <schedule.h>
 
-/* List def for the three vcore lists */
 TAILQ_HEAD(vcore_tailq, vcore);
+/* 'struct proc_list' declared in sched.h (not ideal...) */
 
 // TODO: clean this up.
 struct proc {
-	TAILQ_ENTRY(proc) proc_arsc_link NOINIT; // Free list link pointers for the arsc list
+	TAILQ_ENTRY(proc) proc_arsc_link;
+	TAILQ_ENTRY(proc) sibling_link;
 	spinlock_t proc_lock;
 	trapframe_t env_tf; 						// Saved registers
 	ancillary_state_t env_ancillary_state; 	// State saved when descheduled
 	pid_t pid;
-	pid_t ppid;                 // Parent's PID
-	pid_t exitcode;				// exit() param or main() return value
+	/* Tempting to add a struct proc *parent, but we'd need to protect the use
+	 * of that reference from concurrent parent-death (letting init inherit
+	 * children, etc), which is basically what we do when we do pid2proc.  If we
+	 * do add *parent, it'll be a weak ref, and you'll need to lock the child to
+	 * kref_get or to remove the pointer. */
+	pid_t ppid;					/* parent's pid, not a reference */
+	struct proc_list children;	/* protected by the proc lock for now */
+	int exitcode;				/* exit() param or main() return value */
 	struct semaphore state_change;
 	uint32_t state;				// Status of the process
 	struct kref p_kref;		/* Refcnt */

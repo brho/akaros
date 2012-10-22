@@ -72,6 +72,7 @@ void proc_run_s(struct proc *p);
 void __proc_run_m(struct proc *p);
 void proc_restartcore(void);
 void proc_destroy(struct proc *p);
+void proc_disown_child(struct proc *parent, struct proc *child);
 int proc_change_to_m(struct proc *p);
 void __proc_save_context_s(struct proc *p, struct trapframe *tf);
 void proc_yield(struct proc *SAFE p, bool being_nice);
