@@ -32,7 +32,7 @@ void sleep_on(struct semaphore *sem)
 	int8_t irq_state = 0;
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 
-	/* interrups would be messy here */
+	/* interrupts would be messy here */
 	disable_irqsave(&irq_state);
 	/* Make sure we aren't holding any locks (only works if SPINLOCK_DEBUG) */
 	assert(!pcpui->lock_depth);
@@ -257,4 +257,21 @@ void __launch_kthread(struct trapframe *tf, uint32_t srcid, long a0, long a1,
 	 * finishes. */
 	restart_kthread(kthread);
 	assert(0);
+}
+
+/* Stop the current kthread.  It'll get woken up next time we run routine kmsgs,
+ * after all existing kmsgs are processed. */
+void kthread_yield(void)
+{
+	struct semaphore local_sem, *sem = &local_sem;
+	void __wake_me_up(struct trapframe *tf, uint32_t srcid, long a0, long a1,
+	                  long a2)
+	{
+		struct kthread *me = __up_sem(sem, TRUE);
+		assert(me);
+		kthread_runnable(me);
+	}
+	init_sem(sem, 0);
+	send_kernel_message(core_id(), __wake_me_up, 0, 0, 0, KMSG_ROUTINE);
+	sleep_on(sem);
 }

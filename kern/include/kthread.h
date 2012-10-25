@@ -93,5 +93,6 @@ void kthread_runnable(struct kthread *kthread);
  * it does not return. */
 void __launch_kthread(struct trapframe *tf, uint32_t srcid, long a0, long a1,
 	                  long a2);
+void kthread_yield(void);
 
 #endif /* ROS_KERN_KTHREAD_H */
