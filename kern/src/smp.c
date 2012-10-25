@@ -47,10 +47,8 @@ static void try_run_proc(void)
  * cores enter a loop.  They halt and wake up when interrupted, do any work on
  * their work queue, then halt again.  In between, the ksched gets a chance to
  * tell it to do something else, or perhaps to halt in another manner. */
-static void __smp_idle(void)
+static void __attribute__((noinline, noreturn)) __smp_idle(void)
 {
-	int8_t state = 0;
-
 	/* TODO: idle, abandon_core(), and proc_restartcore() need cleaned up */
 	enable_irq();	/* get any IRQs before we halt later */
 	try_run_proc();
