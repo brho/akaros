@@ -275,3 +275,96 @@ void kthread_yield(void)
 	send_kernel_message(core_id(), __wake_me_up, 0, 0, 0, KMSG_ROUTINE);
 	sleep_on(sem);
 }
+
+/* Condition variables, using semaphores and kthreads */
+void cv_init(struct cond_var *cv)
+{
+	init_sem(&cv->sem, 0);
+	spinlock_init(&cv->lock);
+	cv->nr_waiters = 0;
+}
+
+void cv_lock(struct cond_var *cv)
+{
+	spin_lock_irqsave(&cv->lock);
+}
+
+void cv_unlock(struct cond_var *cv)
+{
+	spin_unlock_irqsave(&cv->lock);
+}
+
+/* Helper to clarify the wait/signalling code */
+static int nr_sem_waiters(struct semaphore *sem)
+{
+	int retval;
+	retval = 0 - sem->nr_signals;
+	assert(retval >= 0);
+	return retval;
+}
+
+/* Comes in locked */
+void cv_wait_and_unlock(struct cond_var *cv)
+{
+	unsigned long nr_prev_waiters;
+	nr_prev_waiters = cv->nr_waiters++;
+	spin_unlock_irqsave(&cv->lock);
+	/* Wait til our turn.  This forces an ordering of all waiters such that the
+	 * order in which they wait is the order in which they down the sem. */
+	while (nr_prev_waiters != nr_sem_waiters(&cv->sem))
+		cpu_relax();
+	printd("core %d, sees nr_sem_waiters: %d, cv_nr_waiters %d\n",
+	       core_id(), nr_sem_waiters(&cv->sem), cv->nr_waiters);
+	/* Atomically sleeps and 'unlocks' the next kthread from its busy loop (the
+	 * one right above this), when it changes the sems nr_signals/waiters. */
+	sleep_on(&cv->sem);
+}
+
+/* Comes in locked */
+void cv_wait(struct cond_var *cv)
+{
+	cv_wait_and_unlock(cv);
+	cv_lock(cv);
+}
+
+/* Helper, wakes exactly one, and there should have been at least one waiter. */
+static void sem_wake_one(struct semaphore *sem)
+{
+	struct kthread *kthread;
+	spin_lock_irqsave(&sem->lock);
+	assert(sem->nr_signals < 0);
+	sem->nr_signals++;
+	kthread = TAILQ_FIRST(&sem->waiters);
+	TAILQ_REMOVE(&sem->waiters, kthread, link);
+	spin_unlock_irqsave(&sem->lock);
+	kthread_runnable(kthread);
+}
+
+void cv_signal(struct cond_var *cv)
+{
+	spin_lock_irqsave(&cv->lock);
+	/* Can't short circuit this stuff.  We need to make sure any waiters that
+	 * made it past upping the cv->nr_waiters has also downed the sem.
+	 * Otherwise we muck with nr_waiters, which could break the ordering
+	 * required by the waiters.  We also need to lock while making this check,
+	 * o/w a new waiter can slip in after our while loop. */
+	while (cv->nr_waiters != nr_sem_waiters(&cv->sem))
+		cpu_relax();
+	if (cv->nr_waiters) {
+		cv->nr_waiters--;
+		sem_wake_one(&cv->sem);
+	}
+	spin_unlock_irqsave(&cv->lock);
+}
+
+void cv_broadcast(struct cond_var *cv)
+{
+	spin_lock_irqsave(&cv->lock);
+	while (cv->nr_waiters != nr_sem_waiters(&cv->sem))
+		cpu_relax();
+	while (cv->nr_waiters) {
+		cv->nr_waiters--;
+		sem_wake_one(&cv->sem);
+	}
+	spin_unlock_irqsave(&cv->lock);
+}

@@ -1456,3 +1456,137 @@ void test_abort_halt(void)
 	printk("Core 0 sent the IPI\n");
 #endif /* __i386__ */
 }
+
+void test_cv(void)
+{
+	static struct cond_var local_cv;
+	static atomic_t counter;
+	struct cond_var *cv = &local_cv;
+	int nr_msgs;
+	volatile bool state = FALSE;	/* for test 3 */
+
+	void __test_cv_signal(struct trapframe *tf, uint32_t srcid, long a0,
+	                        long a1, long a2)
+	{
+		if (atomic_read(&counter) % 4)
+			cv_signal(cv);
+		else
+			cv_broadcast(cv);
+		atomic_dec(&counter);
+		smp_idle();
+	}
+	void __test_cv_waiter(struct trapframe *tf, uint32_t srcid, long a0,
+	                      long a1, long a2)
+	{
+		cv_lock(cv);
+		/* check state, etc */
+		cv_wait_and_unlock(cv);
+		atomic_dec(&counter);
+		smp_idle();
+	}
+	void __test_cv_waiter_t3(struct trapframe *tf, uint32_t srcid, long a0,
+	                         long a1, long a2)
+	{
+		udelay(a0);
+		/* if state == false, we haven't seen the signal yet */
+#if 0
+		/* this way is a little more verbose, but avoids unnecessary locking */
+		while (!state) {
+			cv_lock(cv);
+			/* first check is an optimization */
+			if (state) {
+				cv_unlock(cv);
+				break;
+			}
+			cpu_relax();
+			cv_wait_and_unlock(cv);
+		}
+#endif
+		/* this is the more traditional CV style */
+		cv_lock(cv);
+		while (!state) {
+			cpu_relax();
+			cv_wait(cv);	/* unlocks and relocks */
+		}
+		cv_unlock(cv);
+
+		/* Make sure we are done, tell the controller we are done */
+		cmb();
+		assert(state);
+		atomic_dec(&counter);
+		smp_idle();	/* kmsgs that might block cannot return! */
+	}
+
+	cv_init(cv);
+	/* Test 0: signal without waiting */
+	cv_broadcast(cv);
+	cv_signal(cv);
+	kthread_yield();
+	printk("test_cv: signal without waiting complete\n");
+
+	/* Test 1: single / minimal shit */
+	nr_msgs = num_cpus - 1; /* not using cpu 0 */
+	atomic_init(&counter, nr_msgs);
+	for (int i = 1; i < num_cpus; i++)
+		send_kernel_message(i, __test_cv_waiter, 0, 0, 0, KMSG_ROUTINE);
+	udelay(1000000);
+	cv_signal(cv);
+	kthread_yield();
+	while (atomic_read(&counter) != nr_msgs - 1)
+		cpu_relax();
+	printk("test_cv: single signal complete\n");
+	cv_broadcast(cv);
+	/* broadcast probably woke up the waiters on our core.  since we want to
+	 * spin on their completion, we need to yield for a bit. */
+	kthread_yield();
+	while (atomic_read(&counter))
+		cpu_relax();
+	printk("test_cv: broadcast signal complete\n");
+
+	/* Test 2: shitloads of waiters and signalers */
+	nr_msgs = 0x500;	/* any more than 0x20000 could go OOM */
+	atomic_init(&counter, nr_msgs);
+	for (int i = 0; i < nr_msgs; i++) {
+		int cpu = (i % (num_cpus - 1)) + 1;
+		if (atomic_read(&counter) % 5)
+			send_kernel_message(cpu, __test_cv_waiter, 0, 0, 0, KMSG_ROUTINE);
+		else
+			send_kernel_message(cpu, __test_cv_signal, 0, 0, 0, KMSG_ROUTINE);
+	}
+	kthread_yield();	/* run whatever messages we sent to ourselves */
+	while (atomic_read(&counter)) {
+		cpu_relax();
+		cv_broadcast(cv);
+		udelay(1000000);
+		kthread_yield();	/* run whatever messages we sent to ourselves */
+	}
+	assert(!cv->nr_waiters);
+	printk("test_cv: massive message storm complete\n");
+
+	/* Test 3: basic one signaller, one receiver.  we want to vary the amount of
+	 * time the sender and receiver delays, starting with (1ms, 0ms) and ending
+	 * with (0ms, 1ms).  At each extreme, such as with the sender waiting 1ms,
+	 * the receiver/waiter should hit the "check and wait" point well before the
+	 * sender/signaller hits the "change state and signal" point. */
+	for (int i = 0; i < 1000; i++) {
+		for (int j = 0; j < 10; j++) {	/* some extra chances at each point */
+			state = FALSE;
+			atomic_init(&counter, 1);	/* signal that the client is done */
+			/* client waits for i usec */
+			send_kernel_message(2, __test_cv_waiter_t3, i, 0, 0, KMSG_ROUTINE);
+			cmb();
+			udelay(1000 - i);	/* senders wait time: 1000..0 */
+			state = TRUE;
+			cv_signal(cv);
+			/* signal might have unblocked a kthread, let it run */
+			kthread_yield();
+			/* they might not have run at all yet (in which case they lost the
+			 * race and don't need the signal).  but we need to wait til they're
+			 * done */
+			while (atomic_read(&counter))
+				cpu_relax();
+			assert(!cv->nr_waiters);
+		}
+	}
+	printk("test_cv: single sender/receiver complete\n");
+}

@@ -37,6 +37,12 @@ struct semaphore {
 	spinlock_t 					lock;
 };
 
+struct cond_var {
+	struct semaphore			sem;
+	spinlock_t 					lock;
+	unsigned long				nr_waiters;
+};
+
 /* This doesn't have to be inline, but it doesn't matter for now */
 static inline void init_sem(struct semaphore *sem, int signals)
 {
@@ -96,5 +102,13 @@ void kthread_runnable(struct kthread *kthread);
 void __launch_kthread(struct trapframe *tf, uint32_t srcid, long a0, long a1,
 	                  long a2);
 void kthread_yield(void);
+
+void cv_init(struct cond_var *cv);
+void cv_lock(struct cond_var *cv);
+void cv_unlock(struct cond_var *cv);
+void cv_wait_and_unlock(struct cond_var *cv);
+void cv_wait(struct cond_var *cv);
+void cv_signal(struct cond_var *cv);
+void cv_broadcast(struct cond_var *cv);
 
 #endif /* ROS_KERN_KTHREAD_H */
