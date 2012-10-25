@@ -55,14 +55,16 @@ static inline void init_sem(struct semaphore *sem, int signals)
  * the kthread did not need to sleep (the signal was already there). */
 static inline bool __down_sem(struct semaphore *sem, struct kthread *kthread)
 {
+	/* Don't actually use this, this is an example of how to build a sem */
+	assert(0);
 	bool retval = FALSE;
-	spin_lock(&sem->lock);
+	spin_lock_irqsave(&sem->lock);
 	if (sem->nr_signals-- <= 0) {
 		/* Need to sleep */
 		retval = TRUE;
 		TAILQ_INSERT_TAIL(&sem->waiters, kthread, link);
 	}
-	spin_unlock(&sem->lock);
+	spin_unlock_irqsave(&sem->lock);
 	return retval;
 }
 
@@ -71,7 +73,7 @@ static inline bool __down_sem(struct semaphore *sem, struct kthread *kthread)
 static inline struct kthread *__up_sem(struct semaphore *sem, bool exactly_one)
 {
 	struct kthread *kthread = 0;
-	spin_lock(&sem->lock);
+	spin_lock_irqsave(&sem->lock);
 	if (sem->nr_signals++ < 0) {
 		/* could do something with 'priority' here */
 		kthread = TAILQ_FIRST(&sem->waiters);
@@ -81,7 +83,7 @@ static inline struct kthread *__up_sem(struct semaphore *sem, bool exactly_one)
 	} else {
 		assert(TAILQ_EMPTY(&sem->waiters));
 	}
-	spin_unlock(&sem->lock);
+	spin_unlock_irqsave(&sem->lock);
 	return kthread;
 }
 
