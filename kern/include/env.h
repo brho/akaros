@@ -40,7 +40,7 @@ struct proc {
 	pid_t ppid;					/* parent's pid, not a reference */
 	struct proc_list children;	/* protected by the proc lock for now */
 	int exitcode;				/* exit() param or main() return value */
-	struct semaphore state_change;
+	struct cond_var child_wait;	/* signal for dying or o/w waitable child */
 	uint32_t state;				// Status of the process
 	struct kref p_kref;		/* Refcnt */
 	uint32_t env_flags;

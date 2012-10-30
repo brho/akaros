@@ -259,7 +259,7 @@ error_t proc_alloc(struct proc **pp, struct proc *parent)
 		p->ppid = 0;
 	}
 	TAILQ_INIT(&p->children);
-	init_sem(&p->state_change, 0);
+	cv_init(&p->child_wait);
 	p->state = PROC_CREATED; /* shouldn't go through state machine for init */
 	p->env_flags = 0;
 	p->env_entry = 0; // cheating.  this really gets set later
@@ -752,10 +752,22 @@ void proc_destroy(struct proc *p)
 	close_all_files(&p->open_files, FALSE);
 	/* Tell the ksched about our death, and which cores we freed up */
 	__sched_proc_destroy(p, pc_arr, nr_cores_revoked);
-	/* Signal our state change.  Assuming we only have one waiter right now. */
-	sleeper = __up_sem(&p->state_change, TRUE);
-	if (sleeper)
-		kthread_runnable(sleeper);
+	/* Tell our parent about our state change (to DYING) */
+	proc_signal_parent(p);
+}
+
+/* Can use this to signal anything that might cause a parent to wait on the
+ * child, such as termination, or (in the future) signals.  Change the state or
+ * whatever before calling. */
+void proc_signal_parent(struct proc *child)
+{
+	struct kthread *sleeper;
+	struct proc *parent = pid2proc(child->ppid);
+	if (!parent)
+		return;
+	cv_signal(&parent->child_wait);
+	/* if the parent was waiting, there's a __launch kthread KMSG out there */
+	proc_decref(parent);
 }
 
 /* Called when a parent is done with its child, and no longer wants to track the

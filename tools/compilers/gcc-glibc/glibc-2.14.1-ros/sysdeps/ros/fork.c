@@ -18,41 +18,16 @@
 
 #include <errno.h>
 #include <unistd.h>
+#include <sys/types.h>
 #include <stdlib.h>
-#include <bits/libc-lock.h>
 #include <ros/syscall.h>
-
-__libc_lock_define(,__fork_lock);
-int* child_list = NULL;
-int  child_list_capacity = 0;
-int  child_list_size = 0;
 
 /* Clone the calling process, creating an exact copy.
    Return -1 for errors, 0 to the new process,
    and the process ID of the new process to the old process.  */
-int
-__fork ()
+pid_t __fork(void)
 {
-  int ret = -1;
-  __libc_lock_lock(__fork_lock);
-
-  if(child_list_size == child_list_capacity)
-  {
-    int newcap = child_list_capacity ? 2*child_list_capacity : 1;
-    int* tmp = realloc(child_list,newcap*sizeof(int));
-    if(!tmp)
-      goto out;
-    child_list_capacity = newcap;
-    child_list = tmp;
-  }
-
-  ret = ros_syscall(SYS_fork, 0, 0, 0, 0, 0, 0);
-  if(ret > 0)
-    child_list[child_list_size++] = ret;
-
-out:
-  __libc_lock_unlock(__fork_lock);
-  return ret;
+	return ros_syscall(SYS_fork, 0, 0, 0, 0, 0, 0);
 }
 libc_hidden_def (__fork)
 weak_alias (__fork, fork)

@@ -563,50 +563,134 @@ all_out:
 	smp_idle();				/* will reenable interrupts */
 }
 
+/* Helper, will attempt a particular wait on a proc.  Returns the pid of the
+ * process if we waited on it successfully, and the status will be passed back
+ * in ret_status (kernel memory).  Returns 0 if the wait failed.  Not
+ * idempotent.  Only handles DYING. */
+static pid_t try_wait(struct proc *parent, struct proc *child, int *ret_status,
+                      int options)
+{
+	if (child->state == PROC_DYING) {
+		*ret_status = child->exitcode;
+		/* allow the child to be fully cleaned up.  If we're the last ref, this
+		 * will trigger a __proc_free() */
+		proc_disown_child(parent, child);
+		return child->pid;
+	}
+	return 0;
+}
+
+/* Waits on a particular child, returns the pid of the child waited on, and
+ * puts the ret status in *ret_status. */
+static pid_t wait_one(struct proc *parent, struct proc *child, int *ret_status,
+                      int options)
+{
+	pid_t retval = 0;	/* 0 means no pids were waited on */
+	if ((retval = try_wait(parent, child, ret_status, options)))
+		return retval;
+	if (options & WNOHANG)
+		return 0;
+	cv_lock(&parent->child_wait);
+	/* Block til there is some activity.  Any child can wake us up, but we
+	 * check for the particular child we care about */
+	while (!(retval = try_wait(parent, child, ret_status, options))) {
+		cpu_relax();
+		cv_wait(&parent->child_wait);
+		/* If we're dying, then we don't need to worry about waiting.  We don't
+		 * do this yet, but we'll need this outlet when we deal with orphaned
+		 * children and having init inherit them. */
+		if (parent->state == PROC_DYING)
+			break;
+	}
+	cv_unlock(&parent->child_wait);
+	return retval;
+}
+
+/* Helper, like try_wait, but attempts a wait on all children, returning the
+ * specific PID we waited on */
+static pid_t try_wait_any(struct proc *parent, int *ret_status, int options)
+{
+	struct proc *i, *temp;
+	pid_t retval = 0;
+	TAILQ_FOREACH_SAFE(i, &parent->children, sibling_link, temp) {
+		if ((retval = try_wait(parent, i, ret_status, options)))
+			return retval;
+	}
+	return retval;
+}
+
+/* Waits on any child, returns the pid of the child waited on, and puts the ret
+ * status in *ret_status.  Is basically a waitpid(-1, ... ); */
+static pid_t wait_any(struct proc *parent, int *ret_status, int options)
+{
+	pid_t retval = 0;	/* 0 means no pids were waited on */
+	if (TAILQ_EMPTY(&parent->children))
+		return 0;
+	if ((retval = try_wait_any(parent, ret_status, options)))
+		return retval;
+	if (options & WNOHANG)
+		return 0;
+	cv_lock(&parent->child_wait);
+	/* Block til there is some activity.  Any child can wake us up.  We scan
+	 * with a try_wait, but if we have a lot of children, we could try to
+	 * optimize this. */
+	while (!(retval = try_wait_any(parent, ret_status, options))) {
+		cpu_relax();
+		cv_wait(&parent->child_wait);
+		/* If we're dying, then we don't need to worry about waiting.  We don't
+		 * do this yet, but we'll need this outlet when we deal with orphaned
+		 * children and having init inherit them. */
+		if (parent->state == PROC_DYING)
+			break;
+	}
+	cv_unlock(&parent->child_wait);
+	return retval;
+}
+
 /* Note: we only allow waiting on children (no such thing as threads, for
  * instance).  Right now we only allow waiting on termination (not signals),
  * and we don't have a way for parents to disown their children (such as
- * ignoring SIGCHLD, see man 2 waitpid's Notes). */
-static int sys_trywait(struct proc *parent, pid_t pid, int *status)
+ * ignoring SIGCHLD, see man 2 waitpid's Notes).
+ *
+ * We don't bother with stop/start signals here, though we can probably build
+ * it in the helper above.
+ *
+ * Returns the pid of who we waited on, or -1 on error, or 0 if we couldn't
+ * wait (WNOHANG). */
+static pid_t sys_waitpid(struct proc *parent, pid_t pid, int *status,
+                         int options)
 {
-	/* TODO:
-	 * - WAIT should handle stop and start via signal too
-	 *   	- what semantics?  need a wait for every change to state?  etc.
-	 * - should have an option for WNOHANG, and a bunch of other things.
-	 * - think about what functions we want to work with MCPS
-	 *   */
-	struct proc* child = pid2proc(pid);
-	int ret = -1;
-	int ret_status;
+	struct proc *child;
+	pid_t retval = 0;
+	int ret_status = 0;
 
+	/* -1 is the signal for 'any child' */
+	if (pid == -1) {
+		retval = wait_any(parent, &ret_status, options);
+		goto out;
+	}
+	child = pid2proc(pid);
 	if (!child) {
 		set_errno(ECHILD);	/* ECHILD also used for no proc */
+		retval = -1;
 		goto out;
 	}
 	if (!(parent->pid == child->ppid)) {
 		set_errno(ECHILD);
+		retval = -1;
 		goto out_decref;
 	}
-	/* Block til there is some activity (DYING for now) */
-	if (!(child->state == PROC_DYING)) {
-		sleep_on(&child->state_change);
-		cpu_relax();
-	}
-	assert(child->state == PROC_DYING);
-	ret_status = child->exitcode;
-	/* wait succeeded - need to clean up the proc. */
-	proc_disown_child(parent, child);
-	/* fall through */
-out_success:
-	/* ignoring the retval here - don't care if they have a bad addr. */
-	memcpy_to_user(parent, status, &ret_status, sizeof(ret_status));
-	printd("[PID %d] waited for PID %d (code %d)\n", parent->pid,
-	       pid, ret_status);
-	ret = 0;
+	retval = wait_one(parent, child, &ret_status, options);
+	/* fall-through */
 out_decref:
 	proc_decref(child);
 out:
-	return ret;
+	/* ignoring / don't care about memcpy's retval here. */
+	if (retval > 0)
+		memcpy_to_user(parent, status, &ret_status, sizeof(ret_status));
+	printd("[PID %d] waited for PID %d, got retval %d (code %d)\n", parent->pid,
+	       pid, retval, ret_status);
+	return retval;
 }
 
 /************** Memory Management Syscalls **************/
@@ -1379,7 +1463,7 @@ const static struct sys_table_entry syscall_table[] = {
 	[SYS_change_vcore] = {(syscall_t)sys_change_vcore, "change_vcore"},
 	[SYS_fork] = {(syscall_t)sys_fork, "fork"},
 	[SYS_exec] = {(syscall_t)sys_exec, "exec"},
-	[SYS_trywait] = {(syscall_t)sys_trywait, "trywait"},
+	[SYS_waitpid] = {(syscall_t)sys_waitpid, "waitpid"},
 	[SYS_mmap] = {(syscall_t)sys_mmap, "mmap"},
 	[SYS_munmap] = {(syscall_t)sys_munmap, "munmap"},
 	[SYS_mprotect] = {(syscall_t)sys_mprotect, "mprotect"},

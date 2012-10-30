@@ -20,7 +20,7 @@
 #define SYS_change_vcore			14
 #define SYS_fork					15
 #define SYS_exec					16
-#define SYS_trywait					17
+#define SYS_waitpid					17
 #define SYS_mmap					18
 #define SYS_munmap					19
 #define SYS_mprotect				20

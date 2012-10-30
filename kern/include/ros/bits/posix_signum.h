@@ -43,6 +43,11 @@
 
 #define __SIGRTMIN	32
 #define __SIGRTMAX	(_NSIG - 1)
+
+/* Posix wait flags (glibc has a copy of these) */
+#define	WNOHANG		1
+#define	WUNTRACED	2
+
 #endif /* ROS_KERNEL */
 
 #endif /* ROS_INC_BITS_POSIX_SIGNUM_H */
