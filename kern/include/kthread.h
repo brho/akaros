@@ -106,9 +106,15 @@ void kthread_yield(void);
 void cv_init(struct cond_var *cv);
 void cv_lock(struct cond_var *cv);
 void cv_unlock(struct cond_var *cv);
-void cv_wait_and_unlock(struct cond_var *cv);
+void cv_lock_irqsave(struct cond_var *cv, int8_t *state);
+void cv_unlock_irqsave(struct cond_var *cv, int8_t *state);
+void cv_wait_and_unlock(struct cond_var *cv);	/* does not mess with irqs */
 void cv_wait(struct cond_var *cv);
+void __cv_signal(struct cond_var *cv);
+void __cv_broadcast(struct cond_var *cv);
 void cv_signal(struct cond_var *cv);
 void cv_broadcast(struct cond_var *cv);
+void cv_signal_irqsave(struct cond_var *cv, int8_t *state);
+void cv_broadcast_irqsave(struct cond_var *cv, int8_t *state);
 
 #endif /* ROS_KERN_KTHREAD_H */

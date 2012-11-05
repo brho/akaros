@@ -286,12 +286,24 @@ void cv_init(struct cond_var *cv)
 
 void cv_lock(struct cond_var *cv)
 {
-	spin_lock_irqsave(&cv->lock);
+	spin_lock(&cv->lock);
 }
 
 void cv_unlock(struct cond_var *cv)
 {
-	spin_unlock_irqsave(&cv->lock);
+	spin_unlock(&cv->lock);
+}
+
+void cv_lock_irqsave(struct cond_var *cv, int8_t *irq_state)
+{
+	disable_irqsave(irq_state);
+	cv_lock(cv);
+}
+
+void cv_unlock_irqsave(struct cond_var *cv, int8_t *irq_state)
+{
+	cv_unlock(cv);
+	enable_irqsave(irq_state);
 }
 
 /* Helper to clarify the wait/signalling code */
@@ -303,12 +315,14 @@ static int nr_sem_waiters(struct semaphore *sem)
 	return retval;
 }
 
-/* Comes in locked */
+/* Comes in locked.  Note we don't mess with enabling/disabling irqs.  The
+ * initial cv_lock would have disabled irqs (if applicable), and we don't mess
+ * with that setting at all. */
 void cv_wait_and_unlock(struct cond_var *cv)
 {
 	unsigned long nr_prev_waiters;
 	nr_prev_waiters = cv->nr_waiters++;
-	spin_unlock_irqsave(&cv->lock);
+	spin_unlock(&cv->lock);
 	/* Wait til our turn.  This forces an ordering of all waiters such that the
 	 * order in which they wait is the order in which they down the sem. */
 	while (nr_prev_waiters != nr_sem_waiters(&cv->sem))
@@ -320,7 +334,7 @@ void cv_wait_and_unlock(struct cond_var *cv)
 	sleep_on(&cv->sem);
 }
 
-/* Comes in locked */
+/* Comes in locked.  Note cv_lock does not disable irqs. */
 void cv_wait(struct cond_var *cv)
 {
 	cv_wait_and_unlock(cv);
@@ -340,9 +354,8 @@ static void sem_wake_one(struct semaphore *sem)
 	kthread_runnable(kthread);
 }
 
-void cv_signal(struct cond_var *cv)
+void __cv_signal(struct cond_var *cv)
 {
-	spin_lock_irqsave(&cv->lock);
 	/* Can't short circuit this stuff.  We need to make sure any waiters that
 	 * made it past upping the cv->nr_waiters has also downed the sem.
 	 * Otherwise we muck with nr_waiters, which could break the ordering
@@ -354,17 +367,42 @@ void cv_signal(struct cond_var *cv)
 		cv->nr_waiters--;
 		sem_wake_one(&cv->sem);
 	}
-	spin_unlock_irqsave(&cv->lock);
 }
 
-void cv_broadcast(struct cond_var *cv)
+void __cv_broadcast(struct cond_var *cv)
 {
-	spin_lock_irqsave(&cv->lock);
 	while (cv->nr_waiters != nr_sem_waiters(&cv->sem))
 		cpu_relax();
 	while (cv->nr_waiters) {
 		cv->nr_waiters--;
 		sem_wake_one(&cv->sem);
 	}
-	spin_unlock_irqsave(&cv->lock);
+}
+
+void cv_signal(struct cond_var *cv)
+{
+	spin_lock(&cv->lock);
+	__cv_signal(cv);
+	spin_unlock(&cv->lock);
+}
+
+void cv_broadcast(struct cond_var *cv)
+{
+	spin_lock(&cv->lock);
+	__cv_broadcast(cv);
+	spin_unlock(&cv->lock);
+}
+
+void cv_signal_irqsave(struct cond_var *cv, int8_t *irq_state)
+{
+	disable_irqsave(irq_state);
+	cv_signal(cv);
+	enable_irqsave(irq_state);
+}
+
+void cv_broadcast_irqsave(struct cond_var *cv, int8_t *irq_state)
+{
+	disable_irqsave(irq_state);
+	cv_broadcast(cv);
+	enable_irqsave(irq_state);
 }
