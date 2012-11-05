@@ -456,7 +456,7 @@ static ssize_t sys_fork(env_t* e)
 	// TODO: if the parent doesn't wait, we need to change the child's parent
 	// when the parent dies, or at least decref it
 
-	printd("[PID %d] fork PID %d\n",e->pid,env->pid);
+	printk("[PID %d] fork PID %d\n",e->pid,env->pid);
 	return env->pid;
 }
 
@@ -565,84 +565,112 @@ all_out:
 
 /* Helper, will attempt a particular wait on a proc.  Returns the pid of the
  * process if we waited on it successfully, and the status will be passed back
- * in ret_status (kernel memory).  Returns 0 if the wait failed.  Not
- * idempotent.  Only handles DYING. */
+ * in ret_status (kernel memory).  Returns 0 if the wait failed and we should
+ * try again.  Returns -1 if we should abort.  Only handles DYING.  Callers
+ * need to lock to protect the children tailq and reaping bits. */
 static pid_t try_wait(struct proc *parent, struct proc *child, int *ret_status,
                       int options)
 {
 	if (child->state == PROC_DYING) {
+		/* Disown returns -1 if it's already been disowned or we should o/w
+		 * abort.  This can happen if we have concurrent waiters, both with
+		 * pointers to the child (only one should reap).  Note that if we don't
+		 * do this, we could go to sleep and never receive a cv_signal. */
+		if (__proc_disown_child(parent, child))
+			return -1;
+		/* despite disowning, the child won't be freed til we drop this ref
+		 * held by this function. */
 		*ret_status = child->exitcode;
-		/* allow the child to be fully cleaned up.  If we're the last ref, this
-		 * will trigger a __proc_free() */
-		proc_disown_child(parent, child);
 		return child->pid;
 	}
 	return 0;
 }
 
+/* Helper, like try_wait, but attempts a wait on any of the children, returning
+ * the specific PID we waited on, 0 to try again (a waitable exists), and -1 to
+ * abort (no children/waitables exist).  Callers need to lock to protect the
+ * children tailq and reaping bits.*/
+static pid_t try_wait_any(struct proc *parent, int *ret_status, int options)
+{
+	struct proc *i, *temp;
+	pid_t retval;
+	if (TAILQ_EMPTY(&parent->children))
+		return -1;
+	/* Could have concurrent waiters mucking with the tailq, caller must lock */
+	TAILQ_FOREACH_SAFE(i, &parent->children, sibling_link, temp) {
+		retval = try_wait(parent, i, ret_status, options);
+		/* This catches a thread causing a wait to fail but not taking the
+		 * child off the list before unlocking.  Should never happen. */
+		assert(retval != -1);
+		/* Succeeded, return the pid of the child we waited on */
+		if (retval)
+			return retval;
+	}
+	assert(retval == 0);
+	return 0;
+}
+
 /* Waits on a particular child, returns the pid of the child waited on, and
- * puts the ret status in *ret_status. */
+ * puts the ret status in *ret_status.  Returns the pid if we succeeded, 0 if
+ * the child was not waitable and WNOHANG, and -1 on error. */
 static pid_t wait_one(struct proc *parent, struct proc *child, int *ret_status,
                       int options)
 {
-	pid_t retval = 0;	/* 0 means no pids were waited on */
-	if ((retval = try_wait(parent, child, ret_status, options)))
-		return retval;
-	if (options & WNOHANG)
-		return 0;
+	pid_t retval;
 	cv_lock(&parent->child_wait);
-	/* Block til there is some activity.  Any child can wake us up, but we
-	 * check for the particular child we care about */
-	while (!(retval = try_wait(parent, child, ret_status, options))) {
+	/* retval == 0 means we should block */
+	retval = try_wait(parent, child, ret_status, options);
+	if ((retval == 0) && (options & WNOHANG))
+		goto out_unlock;
+	while (!retval) {
 		cpu_relax();
 		cv_wait(&parent->child_wait);
 		/* If we're dying, then we don't need to worry about waiting.  We don't
 		 * do this yet, but we'll need this outlet when we deal with orphaned
 		 * children and having init inherit them. */
 		if (parent->state == PROC_DYING)
-			break;
+			goto out_unlock;
+		/* Any child can wake us up, but we check for the particular child we
+		 * care about */
+		retval = try_wait(parent, child, ret_status, options);
 	}
+	if (retval == -1) {
+		/* Child was already waited on by a concurrent syscall. */
+		set_errno(ECHILD);
+	}
+	/* Fallthrough */
+out_unlock:
 	cv_unlock(&parent->child_wait);
 	return retval;
 }
 
-/* Helper, like try_wait, but attempts a wait on all children, returning the
- * specific PID we waited on */
-static pid_t try_wait_any(struct proc *parent, int *ret_status, int options)
-{
-	struct proc *i, *temp;
-	pid_t retval = 0;
-	TAILQ_FOREACH_SAFE(i, &parent->children, sibling_link, temp) {
-		if ((retval = try_wait(parent, i, ret_status, options)))
-			return retval;
-	}
-	return retval;
-}
-
 /* Waits on any child, returns the pid of the child waited on, and puts the ret
- * status in *ret_status.  Is basically a waitpid(-1, ... ); */
+ * status in *ret_status.  Is basically a waitpid(-1, ... );  See wait_one for
+ * more details.  Returns 0 if there are no children to wait on, or if we
+ * needed to block but WNOHANG was set. */
 static pid_t wait_any(struct proc *parent, int *ret_status, int options)
 {
-	pid_t retval = 0;	/* 0 means no pids were waited on */
-	if (TAILQ_EMPTY(&parent->children))
-		return 0;
-	if ((retval = try_wait_any(parent, ret_status, options)))
-		return retval;
-	if (options & WNOHANG)
-		return 0;
+	pid_t retval;
 	cv_lock(&parent->child_wait);
-	/* Block til there is some activity.  Any child can wake us up.  We scan
-	 * with a try_wait, but if we have a lot of children, we could try to
-	 * optimize this. */
-	while (!(retval = try_wait_any(parent, ret_status, options))) {
+	retval = try_wait_any(parent, ret_status, options);
+	if ((retval == 0) && (options & WNOHANG))
+		goto out_unlock;
+	while (!retval) {
 		cpu_relax();
 		cv_wait(&parent->child_wait);
-		/* If we're dying, then we don't need to worry about waiting.  We don't
-		 * do this yet, but we'll need this outlet when we deal with orphaned
-		 * children and having init inherit them. */
 		if (parent->state == PROC_DYING)
-			break;
+			goto out_unlock;
+		/* Any child can wake us up from the CV.  This is a linear try_wait
+		 * scan.  If we have a lot of children, we could optimize this. */
+		retval = try_wait_any(parent, ret_status, options);
 	}
+	if (retval == -1) {
+		/* unable to wait (no children) */
+		retval = 0;
+		assert(TAILQ_EMPTY(&parent->children));
+	}
+	/* Fallthrough */
+out_unlock:
 	cv_unlock(&parent->child_wait);
 	return retval;
 }

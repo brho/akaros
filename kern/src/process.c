@@ -252,9 +252,10 @@ error_t proc_alloc(struct proc **pp, struct proc *parent)
 	p->exitcode = 1337;	/* so we can see processes killed by the kernel */
 	if (parent) {
 		p->ppid = parent->pid;
-		spin_lock(&parent->proc_lock);
+		/* using the CV's lock to protect anything related to child waiting */
+		cv_lock(&parent->child_wait);
 		TAILQ_INSERT_TAIL(&parent->children, p, sibling_link);
-		spin_unlock(&parent->proc_lock);
+		cv_unlock(&parent->child_wait);
 	} else {
 		p->ppid = 0;
 	}
@@ -765,23 +766,29 @@ void proc_signal_parent(struct proc *child)
 	struct proc *parent = pid2proc(child->ppid);
 	if (!parent)
 		return;
-	cv_signal(&parent->child_wait);
+	/* there could be multiple kthreads sleeping for various reasons.  even an
+	 * SCP could have multiple async syscalls. */
+	cv_broadcast(&parent->child_wait);
 	/* if the parent was waiting, there's a __launch kthread KMSG out there */
 	proc_decref(parent);
 }
 
 /* Called when a parent is done with its child, and no longer wants to track the
- * child, nor to allow the child to track it. */
-void proc_disown_child(struct proc *parent, struct proc *child)
+ * child, nor to allow the child to track it.  Call with a lock (cv) held.
+ * Returns 0 if we disowned, -1 on failure. */
+int __proc_disown_child(struct proc *parent, struct proc *child)
 {
+	/* Bail out if the child has already been reaped */
+	if (!child->ppid)
+		return -1;
+	assert(child->ppid == parent->pid);
 	/* lock protects from concurrent inserts / removals from the list */
-	spin_lock(&parent->proc_lock);
 	TAILQ_REMOVE(&parent->children, child, sibling_link);
 	/* After this, the child won't be able to get more refs to us, but it may
 	 * still have some references in running code. */
 	child->ppid = 0;
-	spin_unlock(&parent->proc_lock);
 	proc_decref(child);	/* ref that was keeping the child alive after dying */
+	return 0;
 }
 
 /* Turns *p into an MCP.  Needs to be called from a local syscall of a RUNNING_S
