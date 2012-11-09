@@ -679,8 +679,8 @@ void test_circ_buffer(void)
 	return;
 }
 
-void test_km_handler(struct trapframe *tf, uint32_t srcid, long a0, long a1,
-                     long a2)
+static void test_km_handler(struct trapframe *tf, uint32_t srcid, long a0,
+                            long a1, long a2)
 {
 	printk("Received KM on core %d from core %d: arg0= 0x%08x, arg1 = "
 	       "0x%08x, arg2 = 0x%08x\n", core_id(), srcid, a0, a1, a2);
@@ -1307,32 +1307,33 @@ void test_random_fs(void)
 	path_release(nd);
 }
 
+/* Kernel message to restart our kthread */
+static void __test_up_sem(struct trapframe *tf, uint32_t srcid, long a0,
+                          long a1, long a2)
+{
+	struct semaphore *sem = (struct semaphore*)a0;
+	printk("[kmsg] Upping the sem to start the kthread, stacktop is %08p\n",
+		   get_stack_top());
+	if (!sem_up(sem)) {
+		printk("[kmsg] Crap, the sem didn't have a kthread waiting!\n");
+		return;
+	}
+	printk("Kthread will restart when we handle the __launch RKM\n");
+}
+
 /* simple test - start one, do something else, and resume it.  For lack of a
  * better infrastructure, we send ourselves a kmsg to run the kthread, which
  * we'll handle in smp_idle (which you may have to manually call).  Note this
  * doesn't test things like memory being leaked, or dealing with processes. */
 void test_kthreads(void)
 {
-	/* Kernel message to restart our kthread */
-	void test_up_sem(struct trapframe *tf, uint32_t srcid, long a0, long a1,
-	                 long a2)
-	{
-		struct semaphore *sem = (struct semaphore*)a0;
-		printk("[kmsg] Upping the sem to start the kthread, stacktop is %08p\n",
-		       get_stack_top());
-		if (!sem_up(sem)) {
-			printk("[kmsg] Crap, the sem didn't have a kthread waiting!\n");
-			return;
-		}
-		printk("Kthread will restart when we handle the __launch RKM\n");
-	}
 	struct semaphore sem;
 	sem_init(&sem, 1);		/* set to 1 to test the unwind */
 	printk("We're a kthread!  Stacktop is %08p.  Testing suspend, etc...\n",
 	       get_stack_top());
 	/* So we have something that will wake us up.  Routine messages won't get
 	 * serviced in the kernel right away. */
-	send_kernel_message(core_id(), test_up_sem, (long)&sem, 0, 0,
+	send_kernel_message(core_id(), __test_up_sem, (long)&sem, 0, 0,
 	                    KMSG_ROUTINE);
 	/* Actually block (or try to) */
 	/* This one shouldn't block - but will test the unwind (if 1 above) */
@@ -1344,29 +1345,30 @@ void test_kthreads(void)
 	printk("Kthread restarted!, Stacktop is %08p.\n", get_stack_top());
 }
 
+/* Second player's kmsg */
+static void __test_kref_2(struct trapframe *tf, uint32_t srcid, long a0,
+                          long a1, long a2)
+{
+	struct kref *kref = (struct kref*)a0;
+	bool *done = (bool*)a1;
+	enable_irq();
+	for (int i = 0; i < 10000000; i++) {
+		kref_get(kref, 1);
+		set_core_timer(1, TRUE);
+		udelay(2);
+		kref_put(kref);
+	}
+	*done = TRUE;
+}
+
 /* Runs a simple test between core 0 (caller) and core 2 */
 void test_kref(void)
 {
 	struct kref local_kref;
 	bool done = FALSE;
-	/* Second player's kmsg */
-	void test_kref_2(struct trapframe *tf, uint32_t srcid, long a0, long a1,
-	                 long a2)
-	{
-		struct kref *kref = (struct kref*)a0;
-		bool *done = (bool*)a1;
-		enable_irq();
-		for (int i = 0; i < 10000000; i++) {
-			kref_get(kref, 1);
-			set_core_timer(1, TRUE);
-			udelay(2);
-			kref_put(kref);
-		}
-		*done = TRUE;
-	}
 	
 	kref_init(&local_kref, fake_release, 1);
-	send_kernel_message(2, test_kref_2, (long)&local_kref, (long)&done, 0,
+	send_kernel_message(2, __test_kref_2, (long)&local_kref, (long)&done, 0,
 	                    KMSG_ROUTINE);
 	for (int i = 0; i < 10000000; i++) {
 		kref_get(&local_kref, 1);
@@ -1427,24 +1429,25 @@ void test_atomics(void)
 	test_cas_val(1);
 }
 
+/* Helper KMSG for test_abort.  Core 1 does this, while core 0 sends an IRQ. */
+static void __test_try_halt(struct trapframe *tf, uint32_t srcid, long a0,
+                            long a1, long a2)
+{
+	disable_irq();
+	/* wait 10 sec.  should have a bunch of ints pending */
+	udelay(10000000);
+	printk("Core 1 is about to halt\n");
+	cpu_halt();
+	printk("Returned from halting on core 1\n");
+}
+
 /* x86 test, making sure our cpu_halt() and irq_handler() work.  If you want to
  * see it fail, you'll probably need to put a nop in the asm for cpu_halt(), and
  * comment out abort_halt() in irq_handler(). */
 void test_abort_halt(void)
 {
 #ifdef __i386__
-	/* Core 1 does this, while core 0 hammers it with interrupts */
-	void test_try_halt(struct trapframe *tf, uint32_t srcid, long a0, long a1,
-	                   long a2)
-	{
-		disable_irq();
-		/* wait 10 sec.  should have a bunch of ints pending */
-		udelay(10000000);
-		printk("Core 1 is about to halt\n");
-		cpu_halt();
-		printk("Returned from halting on core 1\n");
-	}
-	send_kernel_message(1, test_try_halt, 0, 0, 0, KMSG_ROUTINE);
+	send_kernel_message(1, __test_try_halt, 0, 0, 0, KMSG_ROUTINE);
 	/* wait 1 sec, enough time to for core 1 to be in its KMSG */
 	udelay(1000000);
 	/* Send an IPI */
@@ -1453,65 +1456,52 @@ void test_abort_halt(void)
 #endif /* __i386__ */
 }
 
+/* Funcs and global vars for test_cv() */
+struct cond_var local_cv;
+atomic_t counter;
+struct cond_var *cv = &local_cv;
+volatile bool state = FALSE;		/* for test 3 */
+
+void __test_cv_signal(struct trapframe *tf, uint32_t srcid, long a0,
+                      long a1, long a2)
+{
+	if (atomic_read(&counter) % 4)
+		cv_signal(cv);
+	else
+		cv_broadcast(cv);
+	atomic_dec(&counter);
+	smp_idle();
+}
+void __test_cv_waiter(struct trapframe *tf, uint32_t srcid, long a0,
+                      long a1, long a2)
+{
+	cv_lock(cv);
+	/* check state, etc */
+	cv_wait_and_unlock(cv);
+	atomic_dec(&counter);
+	smp_idle();
+}
+void __test_cv_waiter_t3(struct trapframe *tf, uint32_t srcid, long a0,
+                         long a1, long a2)
+{
+	udelay(a0);
+	/* if state == false, we haven't seen the signal yet */
+	cv_lock(cv);
+	while (!state) {
+		cpu_relax();
+		cv_wait(cv);	/* unlocks and relocks */
+	}
+	cv_unlock(cv);
+	/* Make sure we are done, tell the controller we are done */
+	cmb();
+	assert(state);
+	atomic_dec(&counter);
+	smp_idle();	/* kmsgs that might block cannot return! */
+}
+
 void test_cv(void)
 {
-	static struct cond_var local_cv;
-	static atomic_t counter;
-	struct cond_var *cv = &local_cv;
 	int nr_msgs;
-	volatile bool state = FALSE;	/* for test 3 */
-
-	void __test_cv_signal(struct trapframe *tf, uint32_t srcid, long a0,
-	                        long a1, long a2)
-	{
-		if (atomic_read(&counter) % 4)
-			cv_signal(cv);
-		else
-			cv_broadcast(cv);
-		atomic_dec(&counter);
-		smp_idle();
-	}
-	void __test_cv_waiter(struct trapframe *tf, uint32_t srcid, long a0,
-	                      long a1, long a2)
-	{
-		cv_lock(cv);
-		/* check state, etc */
-		cv_wait_and_unlock(cv);
-		atomic_dec(&counter);
-		smp_idle();
-	}
-	void __test_cv_waiter_t3(struct trapframe *tf, uint32_t srcid, long a0,
-	                         long a1, long a2)
-	{
-		udelay(a0);
-		/* if state == false, we haven't seen the signal yet */
-#if 0
-		/* this way is a little more verbose, but avoids unnecessary locking */
-		while (!state) {
-			cv_lock(cv);
-			/* first check is an optimization */
-			if (state) {
-				cv_unlock(cv);
-				break;
-			}
-			cpu_relax();
-			cv_wait_and_unlock(cv);
-		}
-#endif
-		/* this is the more traditional CV style */
-		cv_lock(cv);
-		while (!state) {
-			cpu_relax();
-			cv_wait(cv);	/* unlocks and relocks */
-		}
-		cv_unlock(cv);
-
-		/* Make sure we are done, tell the controller we are done */
-		cmb();
-		assert(state);
-		atomic_dec(&counter);
-		smp_idle();	/* kmsgs that might block cannot return! */
-	}
 
 	cv_init(cv);
 	/* Test 0: signal without waiting */

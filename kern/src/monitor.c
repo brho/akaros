@@ -8,6 +8,7 @@
 #include <arch/arch.h>
 #include <stab.h>
 #include <smp.h>
+#include <console.h>
 #include <arch/console.h>
 
 #include <stdio.h>
@@ -716,12 +717,7 @@ int mon_monitor(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 		printk("No such core!  Maybe it's in another cell...\n");
 		return 1;
 	}
-	void run_mon(struct trapframe *tf, uint32_t srcid, long a0, long a1,
-	             long a2)
-	{
-		monitor(0);
-	}
-	send_kernel_message(core, run_mon, 0, 0, 0, KMSG_ROUTINE);
+	send_kernel_message(core, __run_mon, 0, 0, 0, KMSG_ROUTINE);
 	return 0;
 }
 

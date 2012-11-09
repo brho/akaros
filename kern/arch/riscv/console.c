@@ -119,6 +119,9 @@ void keyboard_alarm_init()
 			off_t off = 0;
 			assert(demo_size == f->f_op->write(f, demo, demo_size, &off));
 			kref_put(&f->f_kref);
+			/* this is potentially dangerous.  the compiler will put run_demo on
+			 * the stack if it references any other stack variables.  the
+			 * compiler might be allowed to do so otherwise too. */
 			void run_demo()
 			{
 				char *argv[2] = {"", "demo"};

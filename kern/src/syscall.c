@@ -456,7 +456,7 @@ static ssize_t sys_fork(env_t* e)
 	// TODO: if the parent doesn't wait, we need to change the child's parent
 	// when the parent dies, or at least decref it
 
-	printk("[PID %d] fork PID %d\n",e->pid,env->pid);
+	printd("[PID %d] fork PID %d\n", e->pid, env->pid);
 	return env->pid;
 }
 

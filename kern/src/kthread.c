@@ -139,18 +139,22 @@ void kthread_runnable(struct kthread *kthread)
 	                    KMSG_ROUTINE);
 }
 
+/* Kmsg helper for kthread_yield */
+static void __wake_me_up(struct trapframe *tf, uint32_t srcid, long a0, long a1,
+				         long a2)
+{
+	struct semaphore *sem = (struct semaphore*)a0;
+	assert(sem_up(sem));
+}
+
 /* Stop the current kthread.  It'll get woken up next time we run routine kmsgs,
  * after all existing kmsgs are processed. */
 void kthread_yield(void)
 {
 	struct semaphore local_sem, *sem = &local_sem;
-	void __wake_me_up(struct trapframe *tf, uint32_t srcid, long a0, long a1,
-	                  long a2)
-	{
-		assert(sem_up(sem));
-	}
 	sem_init(sem, 0);
-	send_kernel_message(core_id(), __wake_me_up, 0, 0, 0, KMSG_ROUTINE);
+	send_kernel_message(core_id(), __wake_me_up, (long)sem, 0, 0,
+	                    KMSG_ROUTINE);
 	sem_down(sem);
 }
 
