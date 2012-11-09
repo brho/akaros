@@ -108,7 +108,6 @@ int bdev_submit_request(struct block_device *bdev, struct block_request *breq)
 		}
 		memcpy(dst, src, nr_sector << SECTOR_SZ_LOG);
 	}
-#ifdef __i386__ 	/* Sparc can't kthread yet */
 	/* Faking the device interrupt with an alarm */
 	void breq_handler(struct alarm_waiter *waiter)
 	{
@@ -127,11 +126,6 @@ int bdev_submit_request(struct block_device *bdev, struct block_request *breq)
 	/* Set for 5ms. */
 	set_awaiter_rel(waiter, 5000);
 	set_alarm(tchain, waiter);
-#else
-	if (breq->callback)
-		breq->callback(breq);
-#endif
-
 	return 0;
 }
 
@@ -139,14 +133,10 @@ int bdev_submit_request(struct block_device *bdev, struct block_request *breq)
 void generic_breq_done(struct block_request *breq)
 {
 	int8_t irq_state = 0;
-#ifdef __i386__ 	/* Sparc can't restart kthreads yet */
 	if (!sem_up_irqsave(&breq->sem, &irq_state)) {
 		/* This shouldn't happen anymore.  Let brho know if it does. */
 		warn("[kernel] no one waiting on breq %08p", breq);
 	}
-#else
-	breq->data = (void*)1;
-#endif
 }
 
 /* Helper, pairs with generic_breq_done().  Note we sleep here on a semaphore
@@ -158,13 +148,7 @@ void sleep_on_breq(struct block_request *breq)
 	/* Since printk takes a while, this may make you lose the race */
 	printd("Sleeping on breq %08p\n", breq);
 	assert(irq_is_enabled());
-#ifdef __i386__
 	sem_down_irqsave(&breq->sem, &irq_state);
-#else
-	/* Sparc can't block yet (TODO).  This only works if the completion happened
-	 * first (for now) */
-	assert(breq->data);
-#endif
 }
 
 /* This just tells the page cache that it is 'up to date'.  Due to the nature of
