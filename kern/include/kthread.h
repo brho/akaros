@@ -43,78 +43,29 @@ struct cond_var {
 	unsigned long				nr_waiters;
 };
 
-/* This doesn't have to be inline, but it doesn't matter for now */
-static inline void init_sem(struct semaphore *sem, int signals)
-{
-	TAILQ_INIT(&sem->waiters);
-	sem->nr_signals = signals;
-	spinlock_init(&sem->lock);
-}
-
-/* Down and up for the semaphore are a little more low-level than usual, since
- * they are meant to be called by functions that manage the sleeping of a
- * kthread.  For instance, __down_sem() always returns right away.  For now,
- * these are just examples, since the actual usage will probably need lower
- * access. */
-
-/* Down : decrement, if it was 0 or less, we need to sleep.  Returns false if
- * the kthread did not need to sleep (the signal was already there). */
-static inline bool __down_sem(struct semaphore *sem, struct kthread *kthread)
-{
-	/* Don't actually use this, this is an example of how to build a sem */
-	assert(0);
-	bool retval = FALSE;
-	spin_lock_irqsave(&sem->lock);
-	if (sem->nr_signals-- <= 0) {
-		/* Need to sleep */
-		retval = TRUE;
-		TAILQ_INSERT_TAIL(&sem->waiters, kthread, link);
-	}
-	spin_unlock_irqsave(&sem->lock);
-	return retval;
-}
-
-/* Ups the semaphore.  If it was < 0, we need to wake up someone, which is the
- * return value.  If you think there should be at most one, set exactly_one. */
-static inline struct kthread *__up_sem(struct semaphore *sem, bool exactly_one)
-{
-	struct kthread *kthread = 0;
-	spin_lock_irqsave(&sem->lock);
-	if (sem->nr_signals++ < 0) {
-		/* could do something with 'priority' here */
-		kthread = TAILQ_FIRST(&sem->waiters);
-		TAILQ_REMOVE(&sem->waiters, kthread, link);
-		if (exactly_one)
-			assert(TAILQ_EMPTY(&sem->waiters));
-	} else {
-		assert(TAILQ_EMPTY(&sem->waiters));
-	}
-	spin_unlock_irqsave(&sem->lock);
-	return kthread;
-}
-
 void kthread_init(void);
-void sleep_on(struct semaphore *sem);
 void restart_kthread(struct kthread *kthread);
 void kthread_runnable(struct kthread *kthread);
-/* Kmsg handler to launch/run a kthread.  This must be a routine message, since
- * it does not return. */
-void __launch_kthread(struct trapframe *tf, uint32_t srcid, long a0, long a1,
-	                  long a2);
 void kthread_yield(void);
+
+void sem_init(struct semaphore *sem, int signals);
+void sem_down(struct semaphore *sem);
+bool sem_up(struct semaphore *sem);
+void sem_down_irqsave(struct semaphore *sem, int8_t *irq_state);
+bool sem_up_irqsave(struct semaphore *sem, int8_t *irq_state);
 
 void cv_init(struct cond_var *cv);
 void cv_lock(struct cond_var *cv);
 void cv_unlock(struct cond_var *cv);
-void cv_lock_irqsave(struct cond_var *cv, int8_t *state);
-void cv_unlock_irqsave(struct cond_var *cv, int8_t *state);
+void cv_lock_irqsave(struct cond_var *cv, int8_t *irq_state);
+void cv_unlock_irqsave(struct cond_var *cv, int8_t *irq_state);
 void cv_wait_and_unlock(struct cond_var *cv);	/* does not mess with irqs */
 void cv_wait(struct cond_var *cv);
 void __cv_signal(struct cond_var *cv);
 void __cv_broadcast(struct cond_var *cv);
 void cv_signal(struct cond_var *cv);
 void cv_broadcast(struct cond_var *cv);
-void cv_signal_irqsave(struct cond_var *cv, int8_t *state);
-void cv_broadcast_irqsave(struct cond_var *cv, int8_t *state);
+void cv_signal_irqsave(struct cond_var *cv, int8_t *irq_state);
+void cv_broadcast_irqsave(struct cond_var *cv, int8_t *irq_state);
 
 #endif /* ROS_KERN_KTHREAD_H */

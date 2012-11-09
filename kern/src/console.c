@@ -16,7 +16,7 @@ void kb_buf_init(struct kb_buffer *kb)
 	kb->prod_idx = 0;
 	kb->cons_idx = 0;
 	spinlock_init(&kb->buf_lock);
-	init_sem(&kb->buf_sem, 0);
+	sem_init(&kb->buf_sem, 0);
 	/* no need to memset the buffer - we only read something that is written */
 }
 
@@ -26,7 +26,6 @@ void kb_add_to_buf(struct kb_buffer *kb, char c)
 {
 	/* make sure we're a power of 2 */
 	static_assert(KB_BUF_SIZE == __RD32(KB_BUF_SIZE));
-	struct kthread *sleeper;
 	bool was_empty = FALSE;
 	spin_lock(&kb->buf_lock);
 	if (!__ring_full(KB_BUF_SIZE, kb->prod_idx, kb->cons_idx)) {
@@ -43,11 +42,8 @@ void kb_add_to_buf(struct kb_buffer *kb, char c)
 	 * blockers: if there are any items in the buffer, either the sem is upped,
 	 * or there is an active consumer.  consumers immediately down (to become an
 	 * active consumer). */
-	if (was_empty) {
-		sleeper = __up_sem(&kb->buf_sem, FALSE);
-		if (sleeper)
-			kthread_runnable(sleeper);
-	}
+	if (was_empty)
+		sem_up(&kb->buf_sem);
 	/* also note that multiple readers on the console/serial are going to fight
 	 * for input and it is going to get interleaved - broader issue */
 }
@@ -55,7 +51,6 @@ void kb_add_to_buf(struct kb_buffer *kb, char c)
 /* Will read cnt chars from the KB buf into dst.  Will block until complete. */
 void kb_get_from_buf(struct kb_buffer *kb, char *dst, size_t cnt)
 {
-	struct kthread *sleeper;
 	unsigned int dst_idx = 0; /* aka, amt copied so far */
 	bool need_an_up = FALSE;
 
@@ -65,7 +60,7 @@ void kb_get_from_buf(struct kb_buffer *kb, char *dst, size_t cnt)
 	while (dst_idx < cnt) {
 		/* this will return immediately if some data is already there, o/w we
 		 * block til there is some activity */
-		sleep_on(&kb->buf_sem);
+		sem_down(&kb->buf_sem);
 		spin_lock(&kb->buf_lock);
 		/* under the current scheme, we should only have one active consumer at
 		 * a time, so if we woke up, the ring must not be empty. */
@@ -84,11 +79,8 @@ void kb_get_from_buf(struct kb_buffer *kb, char *dst, size_t cnt)
 	}
 	/* Remember: if the buf is non empty, there is either an active consumer or
 	 * the sem is upped. */
-	if (need_an_up) {
-		sleeper = __up_sem(&kb->buf_sem, FALSE);
-		if (sleeper)
-			kthread_runnable(sleeper);
-	}
+	if (need_an_up)
+		sem_up(&kb->buf_sem);
 }
 
 /* Kernel messages associated with the console.  Arch-specific interrupt

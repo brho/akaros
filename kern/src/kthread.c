@@ -20,129 +20,9 @@ void kthread_init(void)
 	                                   __alignof__(struct kthread), 0, 0, 0);
 }
 
-/* This downs the semaphore and suspends the current kernel context on its
- * waitqueue if there are no pending signals.  Note that the case where the
- * signal is already there is not optimized. */
-void sleep_on(struct semaphore *sem)
-{
-	volatile bool blocking = TRUE;	/* signal to short circuit when restarting*/
-	struct kthread *kthread;
-	struct page *page;				/* assumption here that stacks are PGSIZE */
-	register uintptr_t new_stacktop;
-	int8_t irq_state = 0;
-	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-
-	/* interrupts would be messy here */
-	disable_irqsave(&irq_state);
-	/* Make sure we aren't holding any locks (only works if SPINLOCK_DEBUG) */
-	assert(!pcpui->lock_depth);
-	/* Try to down the semaphore.  If there is a signal there, we can skip all
-	 * of the sleep prep and just return. */
-	spin_lock(&sem->lock);	/* no need for irqsave, since we disabled ints */
-	if (sem->nr_signals > 0) {
-		sem->nr_signals--;
-		spin_unlock(&sem->lock);
-		goto block_return_path_np;
-	}
-	/* we're probably going to sleep, so get ready.  We'll check again later. */
-	spin_unlock(&sem->lock);
-	/* Try to get the spare first.  If there is one, we'll use it (o/w, we'll
-	 * get a fresh kthread.  Why we need this is more clear when we try to
-	 * restart kthreads.  Having them also ought to cut down on contention.
-	 * Note we do this with interrupts disabled (which protects us from
-	 * concurrent modifications). */
-	if (pcpui->spare) {
-		kthread = pcpui->spare;
-		/* we're using the spare, so we use the page the spare held */
-		new_stacktop = kthread->stacktop;
-		pcpui->spare = 0;
-	} else {
-		kthread = kmem_cache_alloc(kthread_kcache, 0);
-		assert(kthread);
-		assert(!kpage_alloc(&page));	/* decref'd when the kthread is freed */
-#ifdef __CONFIG_KTHREAD_POISON__
-		/* TODO: KTHR-STACK don't poison like this */
-		*(uintptr_t*)page2kva(page) = 0;
-#endif /* __CONFIG_KTHREAD_POISON__ */
-		new_stacktop = (uintptr_t)page2kva(page) + PGSIZE;
-	}
-	/* This is the stacktop we are currently on and wish to save */
-	kthread->stacktop = get_stack_top();
-	/* Set the core's new default stack */
-	set_stack_top(new_stacktop);
-#ifdef __CONFIG_KTHREAD_POISON__
-	/* Mark the new stack as in-use, and unmark the current kthread */
-	/* TODO: KTHR-STACK don't poison like this */
-	uintptr_t *new_stack_poison, *kth_stack_poison;
-	new_stack_poison = (uintptr_t*)ROUNDDOWN(new_stacktop - 1, PGSIZE);
-	assert(!*new_stack_poison);
-	*new_stack_poison = 0xdeadbeef;
-	kth_stack_poison = (uintptr_t*)ROUNDDOWN(kthread->stacktop - 1, PGSIZE);
-	assert(*kth_stack_poison == 0xdeadbeef);
-	*kth_stack_poison = 0;
-#endif /* __CONFIG_KTHREAD_POISON__ */
-	/* The kthread needs to stay in the process context (if there is one), but
-	 * we want the core (which could be a vcore) to stay in the context too.  In
-	 * the future, we could check owning_proc. If it isn't set, we could leave
-	 * the process context and transfer the refcnt to kthread->proc. */
-	kthread->proc = current;
-	/* kthread tracks the syscall it is working on, which implies errno */
-	kthread->sysc = pcpui->cur_sysc;
-	pcpui->cur_sysc = 0;				/* this core no longer works on sysc */
-	if (kthread->proc)
-		proc_incref(kthread->proc, 1);
-	/* Save the context, toggle blocking for the reactivation */
-	save_kernel_tf(&kthread->context);
-	if (!blocking)
-		goto block_return_path;
-	blocking = FALSE;					/* for when it starts back up */
-	/* Down the semaphore.  We need this to be inline.  If we're sleeping, once
-	 * we unlock the kthread could be started up again and can return and start
-	 * trashing this function's stack, hence the weird control flow. */
-	spin_lock(&sem->lock);	/* no need for irqsave, since we disabled ints */
-	if (sem->nr_signals-- <= 0)
-		TAILQ_INSERT_TAIL(&sem->waiters, kthread, link);
-	else								/* we didn't sleep */
-		goto unwind_sleep_prep;
-	spin_unlock(&sem->lock);
-	/* Switch to the core's default stack.  After this, don't use local
-	 * variables.  TODO: we shouldn't be using new_stacktop either, can't always
-	 * trust the register keyword (AFAIK). */
-	set_stack_pointer(new_stacktop);
-	smp_idle();
-	/* smp_idle never returns */
-	assert(0);
-unwind_sleep_prep:
-	/* We get here if we should not sleep on sem (the signal beat the sleep).
-	 * Note we are not optimizing for cases where the signal won. */
-	spin_unlock(&sem->lock);
-	printd("[kernel] Didn't sleep, unwinding...\n");
-	/* Restore the core's current and default stacktop */
-	current = kthread->proc;			/* arguably unnecessary */
-	if (kthread->proc)
-		proc_decref(kthread->proc);
-	set_stack_top(kthread->stacktop);
-	/* Save the allocs as the spare */
-	assert(!pcpui->spare);
-	pcpui->spare = kthread;
-	/* save the "freshly alloc'd" stack/page, not the one we came in on */
-	kthread->stacktop = new_stacktop;
-#ifdef __CONFIG_KTHREAD_POISON__
-	/* TODO: KTHR-STACK don't unpoison like this */
-	/* switch back to old stack in use, new one not */
-	*new_stack_poison = 0;
-	*kth_stack_poison = 0xdeadbeef;
-#endif /* __CONFIG_KTHREAD_POISON__ */
-block_return_path:
-	printd("[kernel] Returning from being 'blocked'! at %llu\n", read_tsc());
-block_return_path_np:
-	enable_irqsave(&irq_state);
-	return;
-}
-
 /* Starts kthread on the calling core.  This does not return, and will handle
  * the details of cleaning up whatever is currently running (freeing its stack,
- * etc). */
+ * etc).  Pairs with sem_down(). */
 void restart_kthread(struct kthread *kthread)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
@@ -196,32 +76,10 @@ void restart_kthread(struct kthread *kthread)
 	pop_kernel_tf(&kthread->context);
 }
 
-/* Call this when a kthread becomes runnable/unblocked.  We don't do anything
- * particularly smart yet, but when we do, we can put it here. */
-void kthread_runnable(struct kthread *kthread)
-{
-	uint32_t dst = core_id();
-	#if 0
-	/* turn this block on if you want to test migrating non-core0 kthreads */
-	switch (dst) {
-		case 0:
-			break;
-		case 7:
-			dst = 2;
-			break;
-		default:
-			dst++;
-	}
-	#endif
-	/* For lack of anything better, send it to ourselves. (TODO: KSCHED) */
-	send_kernel_message(dst, __launch_kthread, (long)kthread, 0, 0,
-	                    KMSG_ROUTINE);
-}
-
 /* Kmsg handler to launch/run a kthread.  This must be a routine message, since
  * it does not return.  */
-void __launch_kthread(struct trapframe *tf, uint32_t srcid, long a0, long a1,
-	                  long a2)
+static void __launch_kthread(struct trapframe *tf, uint32_t srcid, long a0,
+                             long a1, long a2)
 {
 	struct kthread *kthread = (struct kthread*)a0;
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
@@ -259,6 +117,28 @@ void __launch_kthread(struct trapframe *tf, uint32_t srcid, long a0, long a1,
 	assert(0);
 }
 
+/* Call this when a kthread becomes runnable/unblocked.  We don't do anything
+ * particularly smart yet, but when we do, we can put it here. */
+void kthread_runnable(struct kthread *kthread)
+{
+	uint32_t dst = core_id();
+	#if 0
+	/* turn this block on if you want to test migrating non-core0 kthreads */
+	switch (dst) {
+		case 0:
+			break;
+		case 7:
+			dst = 2;
+			break;
+		default:
+			dst++;
+	}
+	#endif
+	/* For lack of anything better, send it to ourselves. (TODO: KSCHED) */
+	send_kernel_message(dst, __launch_kthread, (long)kthread, 0, 0,
+	                    KMSG_ROUTINE);
+}
+
 /* Stop the current kthread.  It'll get woken up next time we run routine kmsgs,
  * after all existing kmsgs are processed. */
 void kthread_yield(void)
@@ -267,19 +147,191 @@ void kthread_yield(void)
 	void __wake_me_up(struct trapframe *tf, uint32_t srcid, long a0, long a1,
 	                  long a2)
 	{
-		struct kthread *me = __up_sem(sem, TRUE);
-		assert(me);
-		kthread_runnable(me);
+		assert(sem_up(sem));
 	}
-	init_sem(sem, 0);
+	sem_init(sem, 0);
 	send_kernel_message(core_id(), __wake_me_up, 0, 0, 0, KMSG_ROUTINE);
-	sleep_on(sem);
+	sem_down(sem);
+}
+
+/* Semaphores, using kthreads directly */
+void sem_init(struct semaphore *sem, int signals)
+{
+	TAILQ_INIT(&sem->waiters);
+	sem->nr_signals = signals;
+	spinlock_init(&sem->lock);
+}
+
+/* This downs the semaphore and suspends the current kernel context on its
+ * waitqueue if there are no pending signals.  Note that the case where the
+ * signal is already there is not optimized. */
+void sem_down(struct semaphore *sem)
+{
+	volatile bool blocking = TRUE;	/* signal to short circuit when restarting*/
+	struct kthread *kthread;
+	struct page *page;				/* assumption here that stacks are PGSIZE */
+	register uintptr_t new_stacktop;
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+
+	/* Make sure we aren't holding any locks (only works if SPINLOCK_DEBUG) */
+	assert(!pcpui->lock_depth);
+	/* Try to down the semaphore.  If there is a signal there, we can skip all
+	 * of the sleep prep and just return. */
+	spin_lock(&sem->lock);	/* no need for irqsave, since we disabled ints */
+	if (sem->nr_signals > 0) {
+		sem->nr_signals--;
+		spin_unlock(&sem->lock);
+		goto block_return_path;
+	}
+	spin_unlock(&sem->lock);
+	/* We're probably going to sleep, so get ready.  We'll check again later. */
+	/* Try to get the spare first.  If there is one, we'll use it (o/w, we'll
+	 * get a fresh kthread.  Why we need this is more clear when we try to
+	 * restart kthreads.  Having them also ought to cut down on contention.
+	 * Note we do this with interrupts disabled (which protects us from
+	 * concurrent modifications). */
+	if (pcpui->spare) {
+		kthread = pcpui->spare;
+		/* we're using the spare, so we use the page the spare held */
+		new_stacktop = kthread->stacktop;
+		pcpui->spare = 0;
+	} else {
+		kthread = kmem_cache_alloc(kthread_kcache, 0);
+		assert(kthread);
+		assert(!kpage_alloc(&page));	/* decref'd when the kthread is freed */
+#ifdef __CONFIG_KTHREAD_POISON__
+		/* TODO: KTHR-STACK don't poison like this */
+		*(uintptr_t*)page2kva(page) = 0;
+#endif /* __CONFIG_KTHREAD_POISON__ */
+		new_stacktop = (uintptr_t)page2kva(page) + PGSIZE;
+	}
+	/* This is the stacktop we are currently on and wish to save */
+	kthread->stacktop = get_stack_top();
+	/* Set the core's new default stack */
+	set_stack_top(new_stacktop);
+#ifdef __CONFIG_KTHREAD_POISON__
+	/* Mark the new stack as in-use, and unmark the current kthread */
+	/* TODO: KTHR-STACK don't poison like this */
+	uintptr_t *new_stack_poison, *kth_stack_poison;
+	new_stack_poison = (uintptr_t*)ROUNDDOWN(new_stacktop - 1, PGSIZE);
+	assert(!*new_stack_poison);
+	*new_stack_poison = 0xdeadbeef;
+	kth_stack_poison = (uintptr_t*)ROUNDDOWN(kthread->stacktop - 1, PGSIZE);
+	assert(*kth_stack_poison == 0xdeadbeef);
+	*kth_stack_poison = 0;
+#endif /* __CONFIG_KTHREAD_POISON__ */
+	/* The kthread needs to stay in the process context (if there is one), but
+	 * we want the core (which could be a vcore) to stay in the context too.  In
+	 * the future, we could check owning_proc. If it isn't set, we could leave
+	 * the process context and transfer the refcnt to kthread->proc. */
+	kthread->proc = current;
+	/* kthread tracks the syscall it is working on, which implies errno */
+	kthread->sysc = pcpui->cur_sysc;
+	pcpui->cur_sysc = 0;				/* this core no longer works on sysc */
+	if (kthread->proc)
+		proc_incref(kthread->proc, 1);
+	/* Save the context, toggle blocking for the reactivation */
+	save_kernel_tf(&kthread->context);
+	if (!blocking)
+		goto block_return_path;
+	blocking = FALSE;					/* for when it starts back up */
+	/* Down the semaphore.  We need this to be inline.  If we're sleeping, once
+	 * we unlock the kthread could be started up again and can return and start
+	 * trashing this function's stack, hence the weird control flow. */
+	spin_lock(&sem->lock);
+	if (sem->nr_signals-- <= 0) {
+		TAILQ_INSERT_TAIL(&sem->waiters, kthread, link);
+		/* At this point, we know we'll sleep and change stacks later.  Once we
+		 * unlock, we could have the kthread restarted (possibly on another
+		 * core), so we need to disable irqs until we are on our new stack.
+		 * Otherwise, if we take an IRQ, we'll be using our stack while another
+		 * core is using it (restarted kthread).  Basically, disabling irqs
+		 * allows us to atomically unlock and 'yield'. */
+		disable_irq();
+	} else {							/* we didn't sleep */
+		goto unwind_sleep_prep;
+	}
+	spin_unlock(&sem->lock);
+	/* Switch to the core's default stack.  After this, don't use local
+	 * variables.  TODO: we shouldn't be using new_stacktop either, can't always
+	 * trust the register keyword (AFAIK). */
+	set_stack_pointer(new_stacktop);
+	smp_idle();							/* reenables irqs eventually */
+	/* smp_idle never returns */
+	assert(0);
+unwind_sleep_prep:
+	/* We get here if we should not sleep on sem (the signal beat the sleep).
+	 * Note we are not optimizing for cases where the signal won. */
+	spin_unlock(&sem->lock);
+	printd("[kernel] Didn't sleep, unwinding...\n");
+	/* Restore the core's current and default stacktop */
+	current = kthread->proc;			/* arguably unnecessary */
+	if (kthread->proc)
+		proc_decref(kthread->proc);
+	set_stack_top(kthread->stacktop);
+	/* Save the allocs as the spare */
+	assert(!pcpui->spare);
+	pcpui->spare = kthread;
+	/* save the "freshly alloc'd" stack/page, not the one we came in on */
+	kthread->stacktop = new_stacktop;
+#ifdef __CONFIG_KTHREAD_POISON__
+	/* TODO: KTHR-STACK don't unpoison like this */
+	/* switch back to old stack in use, new one not */
+	*new_stack_poison = 0;
+	*kth_stack_poison = 0xdeadbeef;
+#endif /* __CONFIG_KTHREAD_POISON__ */
+block_return_path:
+	printd("[kernel] Returning from being 'blocked'! at %llu\n", read_tsc());
+	return;
+}
+
+/* Ups the semaphore.  If it was < 0, we need to wake up someone, which we do.
+ * Returns TRUE if we woke someone, FALSE o/w (used for debugging in some
+ * places).  If we need more control, we can implement a version of the old
+ * __up_sem() again.  */
+bool sem_up(struct semaphore *sem)
+{
+	struct kthread *kthread = 0;
+	spin_lock(&sem->lock);
+	if (sem->nr_signals++ < 0) {
+		assert(!TAILQ_EMPTY(&sem->waiters));
+		/* could do something with 'priority' here */
+		kthread = TAILQ_FIRST(&sem->waiters);
+		TAILQ_REMOVE(&sem->waiters, kthread, link);
+	} else {
+		assert(TAILQ_EMPTY(&sem->waiters));
+	}
+	spin_unlock(&sem->lock);
+	/* Note that once we call kthread_runnable(), we cannot touch the sem again.
+	 * Some sems are on stacks.  The caller can touch sem, if it knows about the
+	 * memory/usage of the sem.  Likewise, we can't touch the kthread either. */
+	if (kthread) {
+		kthread_runnable(kthread);
+		return TRUE;
+	}
+	return FALSE;
+}
+
+void sem_down_irqsave(struct semaphore *sem, int8_t *irq_state)
+{
+	disable_irqsave(irq_state);
+	sem_down(sem);
+	enable_irqsave(irq_state);
+}
+
+bool sem_up_irqsave(struct semaphore *sem, int8_t *irq_state)
+{
+	bool retval;
+	disable_irqsave(irq_state);
+	retval = sem_up(sem);
+	enable_irqsave(irq_state);
+	return retval;
 }
 
 /* Condition variables, using semaphores and kthreads */
 void cv_init(struct cond_var *cv)
 {
-	init_sem(&cv->sem, 0);
+	sem_init(&cv->sem, 0);
 	spinlock_init(&cv->lock);
 	cv->nr_waiters = 0;
 }
@@ -331,7 +383,7 @@ void cv_wait_and_unlock(struct cond_var *cv)
 	       core_id(), nr_sem_waiters(&cv->sem), cv->nr_waiters);
 	/* Atomically sleeps and 'unlocks' the next kthread from its busy loop (the
 	 * one right above this), when it changes the sems nr_signals/waiters. */
-	sleep_on(&cv->sem);
+	sem_down(&cv->sem);
 }
 
 /* Comes in locked.  Note cv_lock does not disable irqs. */
@@ -345,12 +397,13 @@ void cv_wait(struct cond_var *cv)
 static void sem_wake_one(struct semaphore *sem)
 {
 	struct kthread *kthread;
-	spin_lock_irqsave(&sem->lock);
+	/* these locks will be irqsaved if the CV is irqsave (only need the one) */
+	spin_lock(&sem->lock);
 	assert(sem->nr_signals < 0);
 	sem->nr_signals++;
 	kthread = TAILQ_FIRST(&sem->waiters);
 	TAILQ_REMOVE(&sem->waiters, kthread, link);
-	spin_unlock_irqsave(&sem->lock);
+	spin_unlock(&sem->lock);
 	kthread_runnable(kthread);
 }
 

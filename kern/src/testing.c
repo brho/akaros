@@ -1318,20 +1318,16 @@ void test_kthreads(void)
 	                 long a2)
 	{
 		struct semaphore *sem = (struct semaphore*)a0;
-		struct kthread *kthread;
 		printk("[kmsg] Upping the sem to start the kthread, stacktop is %08p\n",
 		       get_stack_top());
-		kthread = __up_sem(sem, FALSE);
-		if (!kthread) {
+		if (!sem_up(sem)) {
 			printk("[kmsg] Crap, the sem didn't have a kthread waiting!\n");
 			return;
 		}
-		printk("[kmsg] Restarting the kthread...\n");
-		restart_kthread(kthread);
-		panic("[kmsg] Damnit...");
+		printk("Kthread will restart when we handle the __launch RKM\n");
 	}
 	struct semaphore sem;
-	init_sem(&sem, 1);		/* set to 1 to test the unwind */
+	sem_init(&sem, 1);		/* set to 1 to test the unwind */
 	printk("We're a kthread!  Stacktop is %08p.  Testing suspend, etc...\n",
 	       get_stack_top());
 	/* So we have something that will wake us up.  Routine messages won't get
@@ -1341,10 +1337,10 @@ void test_kthreads(void)
 	/* Actually block (or try to) */
 	/* This one shouldn't block - but will test the unwind (if 1 above) */
 	printk("About to sleep, but should unwind (signal beat us)\n");
-	sleep_on(&sem);
+	sem_down(&sem);
 	/* This one is for real, yo.  Run and tell that. */
 	printk("About to sleep for real\n");
-	sleep_on(&sem);
+	sem_down(&sem);
 	printk("Kthread restarted!, Stacktop is %08p.\n", get_stack_top());
 }
 

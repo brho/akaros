@@ -50,7 +50,7 @@ static void __page_init(struct page *page)
 {
 	memset(page, 0, sizeof(page_t));
 	page_setref(page, 1);
-	init_sem(&page->pg_sem, 0);
+	sem_init(&page->pg_sem, 0);
 }
 
 #define __PAGE_ALLOC_FROM_RANGE_GENERIC(page, base_color, range, predicate) \
@@ -301,7 +301,7 @@ void page_setref(page_t *page, size_t val)
 void lock_page(struct page *page)
 {
 	/* when this returns, we have are the ones to have locked the page */
-	sleep_on(&page->pg_sem);
+	sem_down(&page->pg_sem);
 	assert(!(page->pg_flags & PG_LOCKED));
 	page->pg_flags |= PG_LOCKED;
 }
@@ -309,12 +309,9 @@ void lock_page(struct page *page)
 /* Unlocks the page, and wakes up whoever is waiting on the lock */
 void unlock_page(struct page *page)
 {
-	struct kthread *sleeper;
 	page->pg_flags &= ~PG_LOCKED;
-	sleeper = __up_sem(&page->pg_sem, FALSE);
-	if (sleeper) {
+	if (sem_up(&page->pg_sem)) {
 		printk("Unexpected sleeper on a page!");	/* til we test this */
-		kthread_runnable(sleeper);
 	}
 }
 

@@ -138,14 +138,12 @@ int bdev_submit_request(struct block_device *bdev, struct block_request *breq)
 /* Helper method, unblocks someone blocked on sleep_on_breq(). */
 void generic_breq_done(struct block_request *breq)
 {
+	int8_t irq_state = 0;
 #ifdef __i386__ 	/* Sparc can't restart kthreads yet */
-	struct kthread *sleeper = __up_sem(&breq->sem, TRUE);
-	if (!sleeper) {
+	if (!sem_up_irqsave(&breq->sem, &irq_state)) {
 		/* This shouldn't happen anymore.  Let brho know if it does. */
 		warn("[kernel] no one waiting on breq %08p", breq);
-		return;
 	}
-	kthread_runnable(sleeper);
 #else
 	breq->data = (void*)1;
 #endif
@@ -156,11 +154,12 @@ void generic_breq_done(struct block_request *breq)
  * for real block devices (that don't fake things with timer interrupts). */
 void sleep_on_breq(struct block_request *breq)
 {
+	int8_t irq_state = 0;
 	/* Since printk takes a while, this may make you lose the race */
 	printd("Sleeping on breq %08p\n", breq);
 	assert(irq_is_enabled());
 #ifdef __i386__
-	sleep_on(&breq->sem);
+	sem_down_irqsave(&breq->sem, &irq_state);
 #else
 	/* Sparc can't block yet (TODO).  This only works if the completion happened
 	 * first (for now) */
@@ -263,7 +262,7 @@ found:
 	breq->flags = BREQ_READ;
 	breq->callback = generic_breq_done;
 	breq->data = 0;
-	init_sem(&breq->sem, 0);
+	sem_init(&breq->sem, 0);
 	breq->bhs = breq->local_bhs;
 	breq->bhs[0] = bh;
 	breq->nr_bhs = 1;

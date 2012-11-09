@@ -52,7 +52,7 @@ void init_awaiter(struct alarm_waiter *waiter,
 	waiter->wake_up_time = ALARM_POISON_TIME;
 	waiter->func = func;
 	if (!func)
-		init_sem(&waiter->sem, 0);
+		sem_init(&waiter->sem, 0);
 }
 
 /* Give this the absolute time.  For now, abs_time is the TSC time that you want
@@ -106,18 +106,11 @@ static void reset_tchain_interrupt(struct timer_chain *tchain)
  * will wake up.  o/w, it will call the func ptr stored in the awaiter. */
 static void wake_awaiter(struct alarm_waiter *waiter)
 {
-	if (waiter->func) {
+	int8_t irq_state = 0;
+	if (waiter->func)
 		waiter->func(waiter);
-	} else {
-		/* Might encaps this */
-		struct kthread *sleeper;
-		sleeper = __up_sem(&waiter->sem, TRUE);
-		if (sleeper)
-			kthread_runnable(sleeper);
-		/* Don't touch the sleeper or waiter after making the kthread runnable,
-		 * since it could be in use on another core (and the waiter can be
-		 * clobbered as the kthread unwinds its stack). */
-	}
+	else
+		sem_up_irqsave(&waiter->sem, &irq_state);
 }
 
 /* This is called when an interrupt triggers a tchain, and needs to wake up
@@ -233,12 +226,13 @@ void unset_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter)
  * (process limit, etc).  Don't call it on a waiter that is an event-handler. */
 int sleep_on_awaiter(struct alarm_waiter *waiter)
 {
+	int8_t irq_state = 0;
 	if (waiter->func)
 		panic("Tried blocking on a waiter %08p with a func %08p!", waiter,
 		      waiter->func);
 	/* Put the kthread to sleep.  TODO: This can fail (or at least it will be
 	 * able to in the future) and we'll need to handle that. */
-	sleep_on(&waiter->sem);
+	sem_down_irqsave(&waiter->sem, &irq_state);
 	return 0;
 }
 
