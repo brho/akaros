@@ -260,10 +260,6 @@ void handle_ipi(trapframe_t* tf)
 			/* copy in, and then free, in case we don't return */
 			msg_cp = *k_msg;
 			kmem_cache_free(kernel_msg_cache, (void*)k_msg);
-			/* make sure an IPI is pending if we have more work */
-			/* techincally, we don't need to lock when checking */
-			if (!STAILQ_EMPTY(&myinfo->routine_amsgs))
-				send_ipi(core_id());
 			/* Execute the kernel message */
 			assert(msg_cp.pc);
 			msg_cp.pc(tf, msg_cp.srcid, msg_cp.arg0, msg_cp.arg1, msg_cp.arg2);
@@ -303,9 +299,6 @@ void process_routine_kmsg(struct trapframe *tf)
 		/* copy in, and then free, in case we don't return */
 		msg_cp = *k_msg;
 		kmem_cache_free(kernel_msg_cache, (void*)k_msg);
-		/* make sure an IPI is pending if we have more work */
-		if (!STAILQ_EMPTY(&myinfo->routine_amsgs))
-			send_ipi(core_id());
 		/* Execute the kernel message */
 		assert(msg_cp.pc);
 		msg_cp.pc(tf, msg_cp.srcid, msg_cp.arg0, msg_cp.arg1, msg_cp.arg2);
