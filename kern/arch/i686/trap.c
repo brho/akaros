@@ -436,24 +436,22 @@ void irq_handler(struct trapframe *tf)
 		printd("Incoming IRQ, ISR: %d on core %d\n", tf->tf_trapno, core_id());
 	if (check_spurious_irq(tf->tf_trapno))
 		goto out_no_eoi;
-	extern handler_wrapper_t (RO handler_wrappers)[NUM_HANDLER_WRAPPERS];
+	/* Send the EOI.  This means the PIC/LAPIC can send us the same IRQ vector,
+	 * and we'll handle it as soon as we reenable IRQs.  This does *not* mean
+	 * the hardware device that triggered the IRQ had its IRQ reset.  This does
+	 * mean we shouldn't enable irqs in a handler that isn't reentrant. */
+	assert(tf->tf_trapno >= 32);
+	send_eoi(tf->tf_trapno);
 
+	extern handler_wrapper_t (RO handler_wrappers)[NUM_HANDLER_WRAPPERS];
 	// determine the interrupt handler table to use.  for now, pick the global
 	handler_t TP(TV(t)) LCKD(&iht_lock) * handler_tbl = interrupt_handlers;
-
 	if (handler_tbl[tf->tf_trapno].isr != 0)
 		handler_tbl[tf->tf_trapno].isr(tf, handler_tbl[tf->tf_trapno].data);
 	// if we're a general purpose IPI function call, down the cpu_list
 	if ((I_SMP_CALL0 <= tf->tf_trapno) && (tf->tf_trapno <= I_SMP_CALL_LAST))
 		down_checklist(handler_wrappers[tf->tf_trapno & 0x0f].cpu_list);
-
-	// Send EOI.  might want to do this in assembly, and possibly earlier
-	// This is set up to work with an old PIC for now
-	// Convention is that all IRQs between 32 and 47 are for the PIC.
-	// All others are LAPIC (timer, IPIs, perf, non-ExtINT LINTS, etc)
-	// For now, only 235-255 are available
-	assert(tf->tf_trapno >= 32); // slows us down, but we should never have this
-	send_eoi(tf->tf_trapno);
+	/* Fall-through */
 out_no_eoi:
 	/* Return to the current process, which should be runnable.  If we're the
 	 * kernel, we should just return naturally.  Note that current and tf need
@@ -633,10 +631,6 @@ void __kernel_message(struct trapframe *tf, void *data)
 	per_cpu_info_t *myinfo = &per_cpu_info[core_id()];
 	kernel_message_t msg_cp, *k_msg;
 
-	/* Important that we send the EOI first, so that the ipi_is_pending check
-	 * doesn't see the irq we're servicing (which it would see if it was still
-	 * 'inside' the IRQ handler (which to the APIC ends upon EOI)). */
-	lapic_send_eoi();
 	while (1) { // will break out when there are no more messages
 		/* Try to get an immediate message.  Exec and free it. */
 		k_msg = get_next_amsg(&myinfo->immed_amsgs, &myinfo->immed_amsg_lock);
