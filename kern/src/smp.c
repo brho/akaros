@@ -58,7 +58,7 @@ static void __attribute__((noinline, noreturn)) __smp_idle(void)
 	 * (and presumably about to execute a kmsg or fire up a vcore). */
 	while (1) {
 		disable_irq();
-		process_routine_kmsg(0);
+		process_routine_kmsg();
 		try_run_proc();
 		cpu_bored();		/* call out to the ksched */
 		/* cpu_halt() atomically turns on interrupts and halts the core.

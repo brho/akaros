@@ -1,134 +1,123 @@
 kernel_messages.txt
 Barret Rhoden
 2010-03-19
+Updated 2012-11-14
 
-This document explains the basic ideas behind our "kernel messages" and some of
-the arcane bits behind the implementation.  These were formerly called active
-messages, since they were an implementation of the low-level hardware messaging.
+This document explains the basic ideas behind our "kernel messages" (KMSGs) and
+some of the arcane bits behind the implementation.  These were formerly called
+active messages, since they were an implementation of the low-level hardware
+messaging.
 
 Overview:
 --------------------------------
-Our kernel messages are just work that is shipped remotely, delayed, or both.
-They currently consist of a PC and a few arguments.  Initially, they were meant
-to be a way to immediately execute code on another core (once interrupts are
-enabled), in the order in which the messages were sent.  This is insufficient
-(and wasn't what we wanted for the task, incidentally).  We simply want to do
-work on another core, but not necessarily instantly.  And not necessarily on
-another core.
+Our kernel messages are just work that is shipped remotely, delayed in time, or
+both.  They currently consist of a function pointer and a few arguments.  Kernel
+messages of a given type will be executed in order, with guaranteed delivery.
+
+Initially, they were meant to be a way to immediately execute code on another
+core (once interrupts are enabled), in the order in which the messages were
+sent.  This is insufficient (and wasn't what we wanted for the task,
+incidentally).  We simply want to do work on another core, but not necessarily
+instantly.  And not necessarily on another core.
 
 Currently, there are two types, distinguished by which list they are sent to per
-core: immediate and routine.  Urgent messages will get executed as soon as
-possible (once interrupts are enabled).  Routine messages will be executed at
-convenient points in the kernel.  This includes when the kernel is about to pop
-back to userspace, or smp_idle()ing.  Routine messages are necessary when their
-function does not return, such as a __startcore, __death, or anything else that
-can ruin whatever the kernel was doing.  They should also be used if the work is
-not worth fully interrupting the kernel.  (An IPI will still be sent, but the
-work will be delayed)
+core: immediate and routine.   Routine messages are often referred to as RKMs.
+Immediate messages will get executed as soon as possible (once interrupts are
+enabled).  Routine messages will be executed at convenient points in the kernel.
+This includes when the kernel is about to pop back to userspace
+(proc_restartcore()), or smp_idle()ing.  Routine messages are necessary when
+their function does not return, such as a __launch_kthread.  They should also be
+used if the work is not worth fully interrupting the kernel.  (An IPI will still
+be sent, but the work will be delayed).  Finally, they should be used if their
+work could affect currently executing kernel code (like a syscall).
 
-Kernel messages of a given type will be executed in order.  If immediate
-messages show up while processing a routine message, the immediate message will
-get processed next, at the latest.  Even if the routine function doesn't return,
-once interrupts are reenabled (like when popping to userspace), the
-__kernel_message() handler will fire again.
+For example, some older KMSGs such as __startcore used to not return and would
+pop directly into user space.  This complicted the KMSG code quite a bit.  While
+these functions now return, they still can't be immediate messages.  Proc
+management KMSGs change the cur_tf out from under a syscall, which can lead to a
+bunch of issues.
 
-Immediate kernel messages are executed in interrupt context.  Routine messages
-may technically be done in interrupt context (it's a nebulous term) because they
-are executed because of an interrupt handler, but from the kernel's perspective
-they are like executing in regular context (like when a process makes a syscall,
-aka real "process context").  This is because there are no concerns about the
-kernel holding locks or otherwise "interrupting" its own execution.  Routine
-messages are a little different than just trapping into the kernel, since the
-functions don't have to return and may result in clobbering the kernel stack.
-Also note that this behavior is dependent on where we call
-process_routine_kmsg().  Don't call it somewhere you need to return to.
+Immediate kernel messages are executed in interrupt context, with interrupts
+disabled.  Routine messages are only executed from places in the code where the
+kernel doesn't care if the functions don't return or otherwise cause trouble.
+This means RKMs aren't run in interrupt context in the kernel (or if the kernel
+code itself traps).  We don't have a 'process context' like Linux does, instead
+its more of a 'default context'.  That's where RKMs run, and they run with IRQs
+disabled.
 
-History:
---------------------------------
-A bit of history: we used to use "immediate" messages (when all messages were
-immediate) for __death calls.  The idea was that we didn't care what the core
-was doing, since we didn't need to save state or anything.  I could see that
-there were going to be issues with preemption, since we would want to do some
-saving of what the core was doing (and what the kernel was doing on its behalf),
-so we prepared to deal with that.  However, even __death could break certain
-codes that were holding a reference (and hence a refcnt) for a process, which
-would prevent the process from ever being cleaned up.  It was a specific case of
-a job that the kernel needed to finish before executing the message.
+RKMs can enable IRQs, or otherwise cause IRQs to be enabled.  __launch_kthread
+is a good example: it runs a kthread, which may have had IRQs enabled.
+
+With RKMs, there are no concerns about the kernel holding locks or otherwise
+"interrupting" its own execution.  Routine messages are a little different than
+just trapping into the kernel, since the functions don't have to return and may
+result in clobbering the kernel stack.  Also note that this behavior is
+dependent on where we call process_routine_kmsg().  Don't call it somewhere you
+need to return to.
 
 An example of an immediate message would be a TLB_shootdown.  Check current,
 flush if applicable, and return.  It doesn't harm the kernel at all.  Another
 example would be certain debug routines.
 
-Kernel messages are currently an arch-dependent thing, but this ought to change
-when sparc has IPI functions similar to x86.
+History:
+--------------------------------
+KMSGs have a long history tied to process management code.  The main issues were
+related to which KMSG functions return and which ones mess with local state (like
+clobbering cur_tf or the owning_proc).  Returning was a big deal because you
+can't just arbitrarily abandon a kernel context (locks or refcnts could be held,
+etc).  This is why immediates must return.  Likewise, there are certain
+invariants about what a core is doing that shouldn't be changed by an IRQ
+handler (which is what an immed message really is).  See all the old proc
+management commits if you want more info (check for changes to __startcore).
 
 Other Uses:
 --------------------------------
 Kernel messages will also be the basis for the alarm system.  All it is is
 expressing work that needs to be done.  That being said, the k_msg struct will
 probably receive a timestamp field, among other things.  Routine messages also
-will replace the old workqueue, which hasn't really been used in 10 months or
+will replace the old workqueue, which hasn't really been used in 40 months or
 so.
+
+Blocking:
+--------------------------------
+If a routine kernel message blocks (or has a chance to block), it must
+smp_idle() at the end.  If it were to return to PRKM(), it could be on a new
+core, due to kthread migration.  We might have a way to enforce this later.
 
 To Return or Not:
 --------------------------------
-Routine k_msgs do not have to return.  Urgent messages must.  The distinction is
-in how they are sent (send_kernel_message() will take a flag), so be careful.
-Technically, an immediate message could not return, but only if the kernel code
-that was interrupted was not holding any locks, mucking with any invariants, or
-otherwise doing work that needed to be done.  Those cases seem rather rare.
+Routine k_msgs do not have to return.  Immediate messages must.  The distinction
+is in how they are sent (send_kernel_message() will take a flag), so be careful.
 
 To retain some sort of sanity, the functions that do not return must adhere to
 some rules.  At some point they need to end in a place where they check routine
-messages or enable interrupts.  Returning to userspace will do this (interrupts
-are enabled).  __death will eventually call smp_idle(), which will check.  The
-idea behind this is that route messages will get processed once the kernel is
-able to (at a convenient place).
+messages or enable interrupts.  Simply calling smp_idle() will do this.  The
+idea behind this is that routine messages will get processed once the kernel is
+able to (at a convenient place). 
 
-Since some routine messages do not return by popping to userspace, we need to
-self-ipi to make sure the kernel regains control (this need might go away in the
-future).  Since we also want immediate messages to get processed before routine
-messages, and we want the system to be able to have a bunch of outstanding
-routine messages (though that is unlikely at this point), we briefly check
-for immed's inside process_routine_kmsg().  By only turning interrupts on for
-this means we avoid receiving excessive self_ipis for potentially not-returning
-routine messages.  Keep in mind that each one of those IPIs would be useless,
-since they will only run their functions when interrupting from userspace.
-
-Trickiness:
+Missing Routine Messages:
 --------------------------------
-If a function does not return, then the code might not check the list again, or
-send the EOI.  This is one reason why we send the EOI first, and insist that the
-__kernel_message() handler execute with interrupts disabled.  The routine
-messages do not need to have their interrupts disabled (if they are executed
-somewhere else).  If another IPI comes in, immediate messages will run, but
-other routine messages won't (they will get executed when the list is checked
-again).  However, enabling interrupts in the __kernel_message() handler can be
-problematic, depending on when the EOI is sent (nesting on the same code).
+It's important that the kernel always checks for routine messages before leaving
+the kernel, either to halt the core or to pop into userspace.  There is a race
+involved with messages getting posted after we check the list, but before we
+pop/halt.  In that time, we send an IPI.  This IPI will force us back into the
+kernel at some point in the code before process_routine_kmsg(), thus keeping us
+from missing the RKM.
 
-The other reason we send_eoi() first is that we can only send it once per
-handler (not per message).  Otherwise, it can start acknowleding other interrupt
-vectors, which is bad.  We might move it in the while loop and protect it with a
-static check, but it doesn't seem worth it.  We still can't turn on interrupts,
-since the self_ipi could would fire and return while processing a routine
-function, negating the intent of the self_ipi.
+In the future, if we know the kernel code on a particular core is not attempting
+to halt/pop, then we could avoid sending this IPI.  This is the essence of the
+optimization in send_kernel_message() where we don't IPI ourselves.  A more
+formal/thorough way to do this would be useful, both to avoid bugs and to
+improve cross-core KMSG performance.
 
-Since IPIs get "squashed" (my word, meaning if a core receives more than two at
-a time, future IPIs for a vector are ignored), and since functions might not
-return, there is the possibility of losing a message.  There can be more
-messages than IPIs (imagine three k_msgs, each that doesn't return).  To protect
-against this, if there is not an IPI pending (you can check on x86), and if
-there are messages in the routine list, then the code self_ipi's the current
-core.
-
-We don't need to check the immediate list, since we just checked it higher in
-the code (o/w, we wouldn't be executing routine messages).  If an immediate
-showed up since we executed the lapic_send_eoi(), an IPI will be on the way
-(messages are enqueued before sending the IPI).
-
-When we check the routine list, we don't need to lock.  All that macro does is
-check to see if head->item == 0 (and the list head won't get changed).  It's
-basically just a read, which gains no protection from a lock.
+IRQ Trickiness:
+--------------------------------
+You cannot enable interrupts in the handle_kmsg_ipi() handler, either in the
+code or in any immediate kmsg.  Since we send the EOI before running the handler
+(on x86), another IPI could cause us to reenter the handler, which would spin on
+the lock the previous context is holding (nested IRQ stacks).  Using irqsave
+locks is not sufficient, since they assume IRQs are not turned on in the middle
+of their operation (such as in the body of an immediate kmsg).
 
 Other Notes:
 --------------------------------
@@ -138,13 +127,6 @@ dynamically create the k_msgs (can pass them around easily, delay with them
 easily (alarms), and most importantly we can't deadlock by running out of room
 in a static buffer).
 
-When running our process_routine_kmsg()s, we could have made a userspace process
-that would get interrupted if there were any outstanding IPIs for routine
-messages.  We'd have to self_ipi, then switch to this process.  That kinda
-sucks, and would also mean that when we want to actually smp_idle, we'd have to
-be in userspace (and probably not cpu_halt()ing).  Making it possible to process
-the messages from within the kernel seemed much more flexible and better.
-
 Architecture Dependence:
 --------------------------------
 Some details will differ, based on architectural support.  For instance,
@@ -153,3 +135,6 @@ with maskable IPI vectors can use a different IPI for routine messages, and that
 interrupt can get masked whenever we enter the kernel (note, that means making
 every trap gate an interrupt gate), and we unmask that interrupt when we want to
 process routine messages.
+
+However, given the main part of kmsgs is arch-independent, I've consolidated all
+of it in one location until we need to have separate parts of the implementation.

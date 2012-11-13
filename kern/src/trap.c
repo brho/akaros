@@ -56,100 +56,82 @@ uint32_t send_kernel_message(uint32_t dst, amr_t pc, long arg0, long arg1,
 	return 0;
 }
 
-/* Helper function.  Returns 0 if the list was empty. */
-static kernel_message_t *get_next_amsg(struct kernel_msg_list *list_head,
-                                       spinlock_t *list_lock)
-{
-	kernel_message_t *k_msg;
-	spin_lock_irqsave(list_lock);
-	k_msg = STAILQ_FIRST(list_head);
-	if (k_msg)
-		STAILQ_REMOVE_HEAD(list_head, link);
-	spin_unlock_irqsave(list_lock);
-	return k_msg;
-}
-
-/* Kernel message handler.  Extensive documentation is in
- * Documentation/kernel_messages.txt.
+/* Kernel message IPI/IRQ handler.
  *
- * In general: this processes immediate messages, then routine messages.
- * Routine messages might not return (__startcore, etc), so we need to be
- * careful about a few things.
+ * This processes immediate messages, and that's it (it used to handle routines
+ * too, if it came in from userspace).  Routine messages will get processed when
+ * the kernel has a chance (right before popping to userspace or in smp_idle
+ * before halting).
  *
  * Note that all of this happens from interrupt context, and interrupts are
- * currently disabled for this gate.  Interrupts need to be disabled so that the
- * self-ipi doesn't preempt the execution of this kernel message. */
+ * disabled. */
 void handle_kmsg_ipi(struct trapframe *tf, void *data)
 {
-
-	per_cpu_info_t *myinfo = &per_cpu_info[core_id()];
-	kernel_message_t msg_cp, *k_msg;
-
-	while (1) { // will break out when there are no more messages
-		/* Try to get an immediate message.  Exec and free it. */
-		k_msg = get_next_amsg(&myinfo->immed_amsgs, &myinfo->immed_amsg_lock);
-		if (k_msg) {
-			assert(k_msg->pc);
-			k_msg->pc(tf, k_msg->srcid, k_msg->arg0, k_msg->arg1, k_msg->arg2);
-			kmem_cache_free(kernel_msg_cache, (void*)k_msg);
-		} else { // no immediate, might be a routine
-			if (in_kernel(tf))
-				return; // don't execute routine msgs if we were in the kernel
-			k_msg = get_next_amsg(&myinfo->routine_amsgs,
-			                      &myinfo->routine_amsg_lock);
-			if (!k_msg) // no routines either
-				return;
-			/* copy in, and then free, in case we don't return */
-			msg_cp = *k_msg;
-			kmem_cache_free(kernel_msg_cache, (void*)k_msg);
-			/* Execute the kernel message */
-			assert(msg_cp.pc);
-			assert(msg_cp.dstid == core_id());
-			/* TODO: when batching syscalls, this should be reread from cur_tf*/
-			msg_cp.pc(tf, msg_cp.srcid, msg_cp.arg0, msg_cp.arg1, msg_cp.arg2);
-		}
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	struct kernel_message *kmsg_i, *temp;
+	assert(!irq_is_enabled());
+	/* Avoid locking if the list appears empty (lockless peak is okay) */
+	if (STAILQ_EMPTY(&pcpui->immed_amsgs))
+		return;
+	/* The lock serves as a cmb to force a re-read of the head of the list */
+	spin_lock(&pcpui->immed_amsg_lock);
+	STAILQ_FOREACH_SAFE(kmsg_i, &pcpui->immed_amsgs, link, temp) {
+		kmsg_i->pc(tf, kmsg_i->srcid, kmsg_i->arg0, kmsg_i->arg1, kmsg_i->arg2);
+		STAILQ_REMOVE(&pcpui->immed_amsgs, kmsg_i, kernel_message, link);
+		kmem_cache_free(kernel_msg_cache, (void*)kmsg_i);
 	}
+	spin_unlock(&pcpui->immed_amsg_lock);
 }
 
-/* Runs any outstanding routine kernel messages from within the kernel.  Will
- * make sure immediates still run first (or when they arrive, if processing a
- * bunch of these messages).  This will disable interrupts, and restore them to
- * whatever state you left them. */
-void process_routine_kmsg(struct trapframe *tf)
+/* Helper function, gets the next routine KMSG (RKM).  Returns 0 if the list was
+ * empty. */
+static kernel_message_t *get_next_rkmsg(struct per_cpu_info *pcpui)
 {
-	per_cpu_info_t *myinfo = &per_cpu_info[core_id()];
-	kernel_message_t msg_cp, *k_msg;
-	int8_t irq_state = 0;
+	struct kernel_message *kmsg;
+	/* Avoid locking if the list appears empty (lockless peak is okay) */
+	if (STAILQ_EMPTY(&pcpui->routine_amsgs))
+		return 0;
+	/* The lock serves as a cmb to force a re-read of the head of the list */
+	spin_lock(&pcpui->routine_amsg_lock);
+	kmsg = STAILQ_FIRST(&pcpui->routine_amsgs);
+	if (kmsg)
+		STAILQ_REMOVE_HEAD(&pcpui->routine_amsgs, link);
+	spin_unlock(&pcpui->routine_amsg_lock);
+	return kmsg;
+}
 
-	disable_irqsave(&irq_state);
-	/* If we were told what our TF was, use that.  o/w, go with current_tf. */
-	tf = tf ? tf : current_tf;
-	while (1) {
-		/* normally, we want ints disabled, so we don't have an empty self-ipi
-		 * for every routine message. (imagine a long list of routines).  But we
-		 * do want immediates to run ahead of routines.  This enabling should
-		 * work (might not in some shitty VMs).  Also note we can receive an
-		 * extra self-ipi for routine messages before we turn off irqs again.
-		 * Not a big deal, since we will process it right away. 
-		 * TODO: consider calling __kernel_message() here. */
-		if (!STAILQ_EMPTY(&myinfo->immed_amsgs)) {
-			enable_irq();
-			cpu_relax();
-			disable_irq();
-		}
-		k_msg = get_next_amsg(&myinfo->routine_amsgs,
-		                      &myinfo->routine_amsg_lock);
-		if (!k_msg) {
-			enable_irqsave(&irq_state);
-			return;
-		}
-		/* copy in, and then free, in case we don't return */
-		msg_cp = *k_msg;
-		kmem_cache_free(kernel_msg_cache, (void*)k_msg);
-		/* Execute the kernel message */
-		assert(msg_cp.pc);
-		assert(msg_cp.dstid == core_id());
-		msg_cp.pc(tf, msg_cp.srcid, msg_cp.arg0, msg_cp.arg1, msg_cp.arg2);
+/* Runs routine kernel messages.  This might not return.  In the past, this
+ * would also run immediate messages, but this is unnecessary.  Immediates will
+ * run whenever we reenable IRQs.  We could have some sort of ordering or
+ * guarantees between KMSG classes, but that's not particularly useful at this
+ * point.
+ *
+ * Note this runs from normal context, with interruptes disabled.  However, a
+ * particular RKM could enable interrupts - for instance __launch_kthread() will
+ * restore an old kthread that may have had IRQs on. */
+void process_routine_kmsg(void)
+{
+	uint32_t pcoreid = core_id();
+	struct per_cpu_info *pcpui = &per_cpu_info[pcoreid];
+	struct kernel_message msg_cp, *kmsg;
+
+	/* Important that callers have IRQs disabled.  When sending cross-core RKMs,
+	 * the IPI is used to keep the core from going to sleep - even though RKMs
+	 * aren't handled in the kmsg handler.  Check smp_idle() for more info. */
+	assert(!irq_is_enabled());
+	while ((kmsg = get_next_rkmsg(pcpui))) {
+		/* Copy in, and then free, in case we don't return */
+		msg_cp = *kmsg;
+		kmem_cache_free(kernel_msg_cache, (void*)kmsg);
+		assert(msg_cp.dstid == pcoreid);	/* caught a brutal bug with this */
+		/* Note we pass pcpui->cur_tf to all kmsgs.  I'm leaning towards
+		 * dropping the TFs completely, but might find a debugging use for them
+		 * later. */
+		msg_cp.pc(pcpui->cur_tf, msg_cp.srcid, msg_cp.arg0, msg_cp.arg1,
+		          msg_cp.arg2);
+		/* Some RKMs might turn on interrupts (perhaps in the future) and then
+		 * return. */
+		disable_irq();
 	}
 }
 

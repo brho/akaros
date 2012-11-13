@@ -656,7 +656,7 @@ void proc_restartcore(void)
 	/* Need ints disabled when we return from processing (race on missing
 	 * messages/IPIs) */
 	disable_irq();
-	process_routine_kmsg(pcpui->cur_tf);
+	process_routine_kmsg();
 	/* If there is no owning process, just idle, since we don't know what to do.
 	 * This could be because the process had been restarted a long time ago and
 	 * has since left the core, or due to a KMSG like __preempt or __death. */

@@ -97,7 +97,7 @@ void kernel_msg_init(void);
 uint32_t send_kernel_message(uint32_t dst, amr_t pc, long arg0, long arg1,
                              long arg2, int type);
 void handle_kmsg_ipi(struct trapframe *tf, void *data);
-void process_routine_kmsg(struct trapframe *tf);
+void process_routine_kmsg(void);
 void print_kmsgs(uint32_t coreid);
 
 #endif /* ROS_KERN_TRAP_H */
