@@ -72,7 +72,7 @@ uint32_t send_kernel_message(uint32_t dst, amr_t pc, long arg0, long arg1,
 	}
 	/* if we're sending a routine message locally, we don't want/need an IPI */
 	if ((dst != k_msg->srcid) || (type == KMSG_IMMEDIATE))
-		send_ipi(dst);
+		send_ipi(dst, I_KERNEL_MSG);
 	return 0;
 }
 

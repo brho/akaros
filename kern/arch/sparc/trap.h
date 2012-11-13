@@ -11,6 +11,9 @@
 #include <arch/ros/arch.h>
 #include <arch/sparc.h>
 
+/* Kernel message interrupt vector.  ignored, for the most part */
+#define I_KERNEL_MSG 255
+
 /* These are the stacks the kernel will load when it receives a trap from user
  * space. */
 uintptr_t core_stacktops[MAX_NUM_CPUS];

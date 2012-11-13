@@ -18,7 +18,7 @@ smp_boot(void)
 	printd("Cores, report in!\n");
 
 	for(uint32_t i = 1; i < num_cpus; i++)
-		send_ipi(i);
+		send_ipi(i, 0);	/* meaningless IRQ vector */
 	
 	while(num_cpus_booted < num_cpus);
 

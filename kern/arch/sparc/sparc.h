@@ -38,7 +38,7 @@ static __inline void write_mmu_reg(uint32_t which, uint32_t val) __attribute__((
 static __inline void write_fsr(uint32_t val) __attribute__((always_inline));
 static __inline uint32_t memsize_mb(void) __attribute__((always_inline));
 static __inline uint32_t mmu_probe(uint32_t va) __attribute__((always_inline));
-static __inline uint32_t send_ipi(uint32_t dst) __attribute__((always_inline));
+static __inline uint32_t send_ipi(uint32_t dst, uint8_t vector) __attribute__((always_inline));
 
 void flush_windows();
 
@@ -160,7 +160,7 @@ load_iobus(uint32_t device, uint32_t addr)
 }
 
 static __inline uint32_t
-send_ipi(uint32_t dst)
+send_ipi(uint32_t dst, uint8_t vector)
 {
 	store_iobus(2,dst<<10,0);
 	return 0;

@@ -24,7 +24,7 @@ read_pc(void)
 }
 
 static __inline void
-send_ipi(uint32_t who)
+send_ipi(uint32_t who, uint8_t vector)
 {
 	mtpcr(PCR_SEND_IPI, who);
 }

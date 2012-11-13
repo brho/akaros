@@ -12,6 +12,9 @@
 #include <ros/arch/trapframe.h>
 #include <arch/arch.h>
 
+/* Kernel message interrupt vector.  ignored, for the most part */
+#define I_KERNEL_MSG 255
+
 static inline bool in_kernel(struct trapframe *tf)
 {
 	return tf->sr & SR_PS;
