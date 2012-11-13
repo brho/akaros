@@ -62,16 +62,16 @@ void test_ipi_sending(void)
 	send_self_ipi(I_TESTING);
 	udelay(3000000);
 	cprintf("\nCORE 0 sending ipi to physical 1\n");
-	send_ipi(get_hw_coreid(0x01), I_TESTING);
+	send_ipi(0x01, I_TESTING);
 	udelay(3000000);
 	cprintf("\nCORE 0 sending ipi to physical 2\n");
-	send_ipi(get_hw_coreid(0x02), I_TESTING);
+	send_ipi(0x02, I_TESTING);
 	udelay(3000000);
 	cprintf("\nCORE 0 sending ipi to physical 3\n");
-	send_ipi(get_hw_coreid(0x03), I_TESTING);
+	send_ipi(0x03, I_TESTING);
 	udelay(3000000);
 	cprintf("\nCORE 0 sending ipi to physical 15\n");
-	send_ipi(get_hw_coreid(0x0f), I_TESTING);
+	send_ipi(0x0f, I_TESTING);
 	udelay(3000000);
 	cprintf("\nCORE 0 sending ipi to logical 2\n");
 	send_group_ipi(0x02, I_TESTING);
@@ -558,7 +558,7 @@ void test_lapic_status_bit(void)
 	atomic_set(&a,0);
 	printk("IPIs received (should be 0): %d\n", a);
 	for(int i = 0; i < NUM_IPI; i++) {
-		send_ipi(get_hw_coreid(7), I_TESTING);
+		send_ipi(7, I_TESTING);
 		lapic_wait_to_send();
 	}
 	// need to wait a bit to let those IPIs get there
@@ -1451,7 +1451,7 @@ void test_abort_halt(void)
 	/* wait 1 sec, enough time to for core 1 to be in its KMSG */
 	udelay(1000000);
 	/* Send an IPI */
-	send_ipi(get_hw_coreid(0x01), I_TESTING);
+	send_ipi(0x01, I_TESTING);
 	printk("Core 0 sent the IPI\n");
 #endif /* __i386__ */
 }

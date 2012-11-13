@@ -525,6 +525,17 @@ void sysenter_callwrapper(struct trapframe *tf)
 	proc_restartcore();
 }
 
+/* Declared in i686/arch.h */
+void send_ipi(uint32_t os_coreid, uint8_t vector)
+{
+	int hw_coreid = get_hw_coreid(os_coreid);
+	if (hw_coreid == -1) {
+		warn("Unmapped OS coreid!\n");
+		return;
+	}
+	__send_ipi(hw_coreid, vector);
+}
+
 struct kmem_cache *kernel_msg_cache;
 void kernel_msg_init(void)
 {
@@ -599,7 +610,7 @@ uint32_t send_kernel_message(uint32_t dst, amr_t pc, long arg0, long arg1,
 	 * need an wmb_f() */
 	/* if we're sending a routine message locally, we don't want/need an IPI */
 	if ((dst != k_msg->srcid) || (type == KMSG_IMMEDIATE))
-		send_ipi(get_hw_coreid(dst), I_KERNEL_MSG);
+		send_ipi(dst, I_KERNEL_MSG);
 	return 0;
 }
 

@@ -27,13 +27,16 @@ static __inline void cpu_relax(void) __attribute__((always_inline));
 static __inline void cpu_halt(void) __attribute__((always_inline));
 static __inline void clflush(uintptr_t* addr) __attribute__((always_inline));
 static __inline int irq_is_enabled(void) __attribute__((always_inline));
-static __inline int get_hw_coreid(int coreid);
+static __inline int get_hw_coreid(uint32_t coreid);
 static __inline int hw_core_id(void) __attribute__((always_inline));
 static __inline int get_os_coreid(int hw_coreid);
 static __inline int core_id(void) __attribute__((always_inline));
 static __inline void cache_flush(void) __attribute__((always_inline));
 static __inline void reboot(void) __attribute__((always_inline)) __attribute__((noreturn));
 
+/* in trap.c */
+void send_ipi(uint32_t os_coreid, uint8_t vector);
+/* in cpuinfo.c */
 void print_cpuinfo(void);
 void show_mapping(uintptr_t start, size_t size);
 
@@ -153,7 +156,7 @@ irq_is_enabled(void)
 
 /* os_coreid -> hw_coreid */
 static __inline int
-get_hw_coreid(int coreid)
+get_hw_coreid(uint32_t coreid)
 {
 	return hw_coreid_lookup[coreid];
 }

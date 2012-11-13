@@ -131,7 +131,7 @@ static int smp_call_function(uint8_t type, uint32_t dest, poly_isr_t handler, TV
 			send_all_others_ipi(wrapper->vector);
 			break;
 		case 4: // physical mode
-			send_ipi(get_hw_coreid(dest), wrapper->vector);
+			send_ipi(dest, wrapper->vector);
 			break;
 		case 5: // logical mode
 			send_group_ipi(dest, wrapper->vector);
