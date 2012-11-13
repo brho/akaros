@@ -75,7 +75,6 @@ void send_nmi(uint32_t os_coreid);
 #define KMSG_IMMEDIATE 			1
 #define KMSG_ROUTINE 			2
 
-void kernel_msg_init(void);
 typedef void (*amr_t)(struct trapframe *tf, uint32_t srcid, long a0, long a1,
                       long a2);
 
@@ -94,8 +93,10 @@ struct kernel_message
 STAILQ_HEAD(kernel_msg_list, kernel_message);
 typedef struct kernel_message kernel_message_t;
 
+void kernel_msg_init(void);
 uint32_t send_kernel_message(uint32_t dst, amr_t pc, long arg0, long arg1,
                              long arg2, int type);
+void handle_kmsg_ipi(struct trapframe *tf, void *data);
 void process_routine_kmsg(struct trapframe *tf);
 void print_kmsgs(uint32_t coreid);
 

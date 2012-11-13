@@ -24,49 +24,6 @@
  * per_cpu_info. */
 uintptr_t core_stacktops[MAX_NUM_CPUS] = {0xcafebabe, 0};
 
-struct kmem_cache *kernel_msg_cache;
-void kernel_msg_init(void)
-{
-	kernel_msg_cache = kmem_cache_create("kernel_msgs",
-	                   sizeof(struct kernel_message), HW_CACHE_ALIGN, 0, 0, 0);
-}
-
-spinlock_t kernel_message_buf_busy[MAX_NUM_CPUS] = {SPINLOCK_INITIALIZER};
-kernel_message_t kernel_message_buf[MAX_NUM_CPUS];
-
-/* This is mostly identical to x86's, minus the different send_ipi call. */
-uint32_t send_kernel_message(uint32_t dst, amr_t pc, long arg0, long arg1,
-                             long arg2, int type)
-{
-	kernel_message_t *k_msg;
-	assert(pc);
-	// note this will be freed on the destination core
-	k_msg = (kernel_message_t *CT(1))TC(kmem_cache_alloc(kernel_msg_cache, 0));
-	k_msg->srcid = core_id();
-	k_msg->pc = pc;
-	k_msg->arg0 = arg0;
-	k_msg->arg1 = arg1;
-	k_msg->arg2 = arg2;
-	switch (type) {
-		case KMSG_IMMEDIATE:
-			spin_lock_irqsave(&per_cpu_info[dst].immed_amsg_lock);
-			STAILQ_INSERT_TAIL(&per_cpu_info[dst].immed_amsgs, k_msg, link);
-			spin_unlock_irqsave(&per_cpu_info[dst].immed_amsg_lock);
-			break;
-		case KMSG_ROUTINE:
-			spin_lock_irqsave(&per_cpu_info[dst].routine_amsg_lock);
-			STAILQ_INSERT_TAIL(&per_cpu_info[dst].routine_amsgs, k_msg, link);
-			spin_unlock_irqsave(&per_cpu_info[dst].routine_amsg_lock);
-			break;
-		default:
-			panic("Unknown type of kernel message!");
-	}
-	/* if we're sending a routine message locally, we don't want/need an IPI */
-	if ((dst != k_msg->srcid) || (type == KMSG_IMMEDIATE))
-		send_ipi(dst, I_KERNEL_MSG);
-	return 0;
-}
-
 void
 advance_pc(trapframe_t* state)
 {
@@ -153,20 +110,6 @@ print_trapframe(trapframe_t* tf)
 	int len = format_trapframe(tf,buf,sizeof(buf));
 	cputbuf(buf,len);
 }
-
-/* Helper function.  Returns 0 if the list was empty. */
-static kernel_message_t *get_next_amsg(struct kernel_msg_list *list_head,
-                                       spinlock_t *list_lock)
-{
-	kernel_message_t *k_msg;
-	spin_lock_irqsave(list_lock);
-	k_msg = STAILQ_FIRST(list_head);
-	if (k_msg)
-		STAILQ_REMOVE_HEAD(list_head, link);
-	spin_unlock_irqsave(list_lock);
-	return k_msg;
-}
-
 static void exit_halt_loop(trapframe_t* tf)
 {
 	extern char after_cpu_halt;
@@ -174,8 +117,7 @@ static void exit_halt_loop(trapframe_t* tf)
 		tf->epc = tf->gpr[1];
 }
 
-/* Mostly the same as x86's implementation.  Keep them in sync.  This assumes
- * you can send yourself an IPI, and that IPIs can get squashed like on x86. */
+/* Assumes that any IPI you get is really a kernel message */
 static void
 handle_ipi(trapframe_t* tf)
 {
@@ -187,90 +129,7 @@ handle_ipi(trapframe_t* tf)
 	
 	clear_ipi();
 
-	per_cpu_info_t *myinfo = &per_cpu_info[core_id()];
-	kernel_message_t msg_cp, *k_msg;
-
-	while (1) { // will break out when there are no more messages
-		/* Try to get an immediate message.  Exec and free it. */
-		k_msg = get_next_amsg(&myinfo->immed_amsgs, &myinfo->immed_amsg_lock);
-		if (k_msg) {
-			assert(k_msg->pc);
-			k_msg->pc(tf, k_msg->srcid, k_msg->arg0, k_msg->arg1, k_msg->arg2);
-			kmem_cache_free(kernel_msg_cache, (void*)k_msg);
-		} else { // no immediate, might be a routine
-			if (in_kernel(tf))
-				return; // don't execute routine msgs if we were in the kernel
-			k_msg = get_next_amsg(&myinfo->routine_amsgs,
-			                      &myinfo->routine_amsg_lock);
-			if (!k_msg) // no routines either
-				return;
-			/* copy in, and then free, in case we don't return */
-			msg_cp = *k_msg;
-			kmem_cache_free(kernel_msg_cache, (void*)k_msg);
-			/* Execute the kernel message */
-			assert(msg_cp.pc);
-			msg_cp.pc(tf, msg_cp.srcid, msg_cp.arg0, msg_cp.arg1, msg_cp.arg2);
-		}
-	}
-}
-
-/* Same as in x86.  Might be diff in the future if there is no way to check for
- * immediate messages or there is the ability to selectively mask IPI vectors.*/
-void
-process_routine_kmsg(struct trapframe *tf)
-{
-	per_cpu_info_t *myinfo = &per_cpu_info[core_id()];
-	kernel_message_t msg_cp, *k_msg;
-	int8_t irq_state = 0;
-
-	disable_irqsave(&irq_state);
-	/* If we were told what our TF was, use that.  o/w, go with current_tf. */
-	tf = tf ? tf : current_tf;
-	while (1) {
-		/* normally, we want ints disabled, so we don't have an empty self-ipi
-		 * for every routine message. (imagine a long list of routines).  But we
-		 * do want immediates to run ahead of routines.  This enabling should
-		 * work (might not in some shitty VMs).  Also note we can receive an
-		 * extra self-ipi for routine messages before we turn off irqs again.
-		 * Not a big deal, since we will process it right away. */
-		if (!STAILQ_EMPTY(&myinfo->immed_amsgs)) {
-			enable_irq();
-			cpu_relax();
-			disable_irq();
-		}
-		k_msg = get_next_amsg(&myinfo->routine_amsgs,
-		                      &myinfo->routine_amsg_lock);
-		if (!k_msg) {
-			enable_irqsave(&irq_state);
-			return;
-		}
-		/* copy in, and then free, in case we don't return */
-		msg_cp = *k_msg;
-		kmem_cache_free(kernel_msg_cache, (void*)k_msg);
-		/* Execute the kernel message */
-		assert(msg_cp.pc);
-		msg_cp.pc(tf, msg_cp.srcid, msg_cp.arg0, msg_cp.arg1, msg_cp.arg2);
-	}
-}
-
-/* extremely dangerous and racy: prints out the immed and routine kmsgs for a
- * specific core (so possibly remotely).  Same as x86. */
-void print_kmsgs(uint32_t coreid)
-{
-	struct per_cpu_info *pcpui = &per_cpu_info[coreid];
-	void __print_kmsgs(struct kernel_msg_list *list, char *type)
-	{
-		char *fn_name;
-		struct kernel_message *kmsg_i;
-		STAILQ_FOREACH(kmsg_i, list, link) {
-			fn_name = get_fn_name((long)kmsg_i->pc);
-			printk("%s KMSG on %d from %d to run %08p(%s)\n", type,
-			       kmsg_i->dstid, kmsg_i->srcid, kmsg_i->pc, fn_name); 
-			kfree(fn_name);
-		}
-	}
-	__print_kmsgs(&pcpui->immed_amsgs, "Immedte");
-	__print_kmsgs(&pcpui->routine_amsgs, "Routine");
+	handle_kmsg_ipi(tf, 0);
 }
 
 static void

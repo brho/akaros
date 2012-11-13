@@ -59,6 +59,7 @@ KERN_SRCFILES := $(KERN_ARCH_SRCFILES) \
                  $(KERN_SRC_DIR)/kdebug.c \
                  $(KERN_SRC_DIR)/ucq.c \
                  $(KERN_SRC_DIR)/console.c \
+                 $(KERN_SRC_DIR)/trap.c \
                  $(KERN_SRC_DIR)/arsc.c
 
 # Only build files if they exist.
