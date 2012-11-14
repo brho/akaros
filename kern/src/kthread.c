@@ -85,6 +85,8 @@ static void __launch_kthread(struct trapframe *tf, uint32_t srcid, long a0,
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	struct proc *cur_proc = pcpui->cur_proc;
 	
+	/* Make sure we are a routine kmsg */
+	assert(in_early_rkmsg_ctx(pcpui));
 	if (pcpui->owning_proc && pcpui->owning_proc != kthread->proc) {
 		/* Some process should be running here that is not the same as the
 		 * kthread.  This means the _M is getting interrupted or otherwise
@@ -112,7 +114,9 @@ static void __launch_kthread(struct trapframe *tf, uint32_t srcid, long a0,
 	}
 	/* o/w, just run the kthread.  any trapframes that are supposed to run or
 	 * were interrupted will run whenever the kthread smp_idles() or otherwise
-	 * finishes. */
+	 * finishes.  We also need to clear the RKMSG context since we will not
+	 * return from restart_kth. */
+	clear_rkmsg(pcpui);
 	restart_kthread(kthread);
 	assert(0);
 }

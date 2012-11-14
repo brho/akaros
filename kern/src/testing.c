@@ -1470,7 +1470,6 @@ void __test_cv_signal(struct trapframe *tf, uint32_t srcid, long a0,
 	else
 		cv_broadcast(cv);
 	atomic_dec(&counter);
-	smp_idle();
 }
 void __test_cv_waiter(struct trapframe *tf, uint32_t srcid, long a0,
                       long a1, long a2)
@@ -1479,7 +1478,6 @@ void __test_cv_waiter(struct trapframe *tf, uint32_t srcid, long a0,
 	/* check state, etc */
 	cv_wait_and_unlock(cv);
 	atomic_dec(&counter);
-	smp_idle();
 }
 void __test_cv_waiter_t3(struct trapframe *tf, uint32_t srcid, long a0,
                          long a1, long a2)
@@ -1496,7 +1494,6 @@ void __test_cv_waiter_t3(struct trapframe *tf, uint32_t srcid, long a0,
 	cmb();
 	assert(state);
 	atomic_dec(&counter);
-	smp_idle();	/* kmsgs that might block cannot return! */
 }
 
 void test_cv(void)

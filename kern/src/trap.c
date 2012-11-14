@@ -124,11 +124,23 @@ void process_routine_kmsg(void)
 		msg_cp = *kmsg;
 		kmem_cache_free(kernel_msg_cache, (void*)kmsg);
 		assert(msg_cp.dstid == pcoreid);	/* caught a brutal bug with this */
+		set_rkmsg(pcpui);					/* we're now in early RKM ctx */
 		/* Note we pass pcpui->cur_tf to all kmsgs.  I'm leaning towards
 		 * dropping the TFs completely, but might find a debugging use for them
 		 * later. */
 		msg_cp.pc(pcpui->cur_tf, msg_cp.srcid, msg_cp.arg0, msg_cp.arg1,
 		          msg_cp.arg2);
+		/* If we aren't still in early RKM, it is because the KMSG blocked
+		 * (thus leaving early RKM, finishing in default context) and then
+		 * returned.  This is a 'detached' RKM.  Must idle in this scenario,
+		 * since we might have migrated or otherwise weren't meant to PRKM
+		 * (can't return twice).  Also note that this may involve a core
+		 * migration, so we need to reread pcpui.*/
+		cmb();
+		pcpui = &per_cpu_info[core_id()];
+		if (!in_early_rkmsg_ctx(pcpui))
+			smp_idle();
+		clear_rkmsg(pcpui);
 		/* Some RKMs might turn on interrupts (perhaps in the future) and then
 		 * return. */
 		disable_irq();

@@ -49,6 +49,8 @@ static void try_run_proc(void)
  * tell it to do something else, or perhaps to halt in another manner. */
 static void __attribute__((noinline, noreturn)) __smp_idle(void)
 {
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	clear_rkmsg(pcpui);
 	/* TODO: idle, abandon_core(), and proc_restartcore() need cleaned up */
 	enable_irq();	/* get any IRQs before we halt later */
 	try_run_proc();
