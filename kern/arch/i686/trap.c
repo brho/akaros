@@ -327,6 +327,8 @@ void trap(struct trapframe *tf)
 	/* Copy out the TF for now */
 	if (!in_kernel(tf))
 		set_current_tf(pcpui, tf);
+	else
+		inc_ktrap_depth(pcpui);
 
 	printd("Incoming TRAP %d on core %d, TF at %p\n", tf->tf_trapno, core_id(),
 	       tf);
@@ -338,8 +340,10 @@ void trap(struct trapframe *tf)
 	/* Return to the current process, which should be runnable.  If we're the
 	 * kernel, we should just return naturally.  Note that current and tf need
 	 * to still be okay (might not be after blocking) */
-	if (in_kernel(tf))
-		return;	/* TODO: think about this, might want a helper instead. */
+	if (in_kernel(tf)) {
+		dec_ktrap_depth(pcpui);
+		return;
+	}
 	proc_restartcore();
 	assert(0);
 }
@@ -427,6 +431,7 @@ void irq_handler(struct trapframe *tf)
 	/* Copy out the TF for now */
 	if (!in_kernel(tf))
 		set_current_tf(pcpui, tf);
+	inc_irq_depth(pcpui);
 	/* Coupled with cpu_halt() and smp_idle() */
 	abort_halt(tf);
 	//if (core_id())
@@ -450,11 +455,12 @@ void irq_handler(struct trapframe *tf)
 		down_checklist(handler_wrappers[tf->tf_trapno & 0x0f].cpu_list);
 	/* Fall-through */
 out_no_eoi:
+	dec_irq_depth(pcpui);
 	/* Return to the current process, which should be runnable.  If we're the
 	 * kernel, we should just return naturally.  Note that current and tf need
 	 * to still be okay (might not be after blocking) */
 	if (in_kernel(tf))
-		return;	/* TODO: think about this, might want a helper instead. */
+		return;
 	proc_restartcore();
 	assert(0);
 }
@@ -505,16 +511,13 @@ void sysenter_init(void)
 void sysenter_callwrapper(struct trapframe *tf)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	/* Copy out the TF for now */
-	if (!in_kernel(tf))
-		set_current_tf(pcpui, tf);
+	assert(!in_kernel(tf));
+	set_current_tf(pcpui, tf);
 	/* Once we've set_current_tf, we can enable interrupts.  This used to be
 	 * mandatory (we had immediate KMSGs that would muck with cur_tf).  Now it
 	 * should only help for sanity/debugging. */
 	enable_irq();
 
-	if (in_kernel(tf))
-		panic("sysenter from a kernel TF!!");
 	/* Set up and run the async calls */
 	prep_syscalls(current, (struct syscall*)tf->tf_regs.reg_eax,
 	              tf->tf_regs.reg_esi);

@@ -192,3 +192,13 @@ void kmsg_queue_stat(void)
 	}
 }
 
+void print_kctx_depths(const char *str)
+{
+	uint32_t coreid = core_id();
+	struct per_cpu_info *pcpui = &per_cpu_info[coreid];
+	
+	if (!str)
+		str = "(none)";
+	printk("%s: Core %d, irq depth %d, ktrap depth %d\n", str, coreid,
+	       irq_depth(pcpui), ktrap_depth(pcpui));
+}

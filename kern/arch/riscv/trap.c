@@ -297,18 +297,27 @@ handle_trap(trapframe_t* tf)
 	  [IRQ_IPI] = handle_ipi,
 	};
 	
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	if (tf->cause < 0)
 	{
 		uint8_t irq = tf->cause;
 		assert(irq < sizeof(irq_handlers)/sizeof(irq_handlers[0]) &&
 		       irq_handlers[irq]);
+		inc_irq_depth(pcpui);
 		irq_handlers[irq](tf);
+		dec_irq_depth(pcpui);
 	}
 	else
 	{
 		assert(tf->cause < sizeof(trap_handlers)/sizeof(trap_handlers[0]) &&
 		       trap_handlers[tf->cause]);
-		trap_handlers[tf->cause](tf);
+		if (in_kernel(tf)) {
+			inc_ktrap_depth(pcpui);
+			trap_handlers[tf->cause](tf);
+			dec_ktrap_depth(pcpui);
+		} else {
+			trap_handlers[tf->cause](tf);
+		}
 	}
 	
 	/* Return to the current process, which should be runnable.  If we're the

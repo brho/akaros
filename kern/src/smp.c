@@ -85,6 +85,8 @@ void smp_idle(void)
 void smp_percpu_init(void)
 {
 	uint32_t coreid = core_id();
+	/* Don't initialize __ctx_depth here, since it is already 1 (at least on
+	 * x86), since this runs in irq context. */
 	/* Do this first */
 	__arch_pcpu_init(coreid);
 	per_cpu_info[coreid].spare = 0;

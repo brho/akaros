@@ -31,6 +31,7 @@ struct per_cpu_info {
 	uint32_t owning_vcoreid;	/* vcoreid of owning proc (if applicable */
 	struct trapframe *cur_tf;	/* user tf we came in on (can be 0) */
 	struct trapframe actual_tf;	/* storage for cur_tf */
+	uint32_t __ctx_depth;		/* don't access directly.  see trap.h. */
 	struct syscall *cur_sysc;	/* ptr is into cur_proc's address space */
 	struct kthread *spare;		/* useful when restarting */
 	struct timer_chain tchain;	/* for the per-core alarm */

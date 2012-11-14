@@ -22,6 +22,8 @@
 #pragma nodeputy
 #endif
 
+/* Warning: SPARC's trap handlers do not increment the ktrap depth */
+
 /* These are the stacks the kernel will load when it receives a trap from user
  * space.  The deal is that they get set right away in entry.S, and can always
  * be used for finding the top of the stack (from which you should subtract the
@@ -183,7 +185,9 @@ void handle_ipi(trapframe_t* tf)
 	else if((void*)tf->pc == &__cpu_halt) // break out of the __cpu_halt loop
 		advance_pc(tf);
 
+	inc_irq_depth(pcpui);
 	handle_kmsg_ipi(tf, 0);
+	dec_irq_depth(pcpui);
 }
 
 void

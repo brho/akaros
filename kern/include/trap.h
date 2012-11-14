@@ -100,4 +100,113 @@ void handle_kmsg_ipi(struct trapframe *tf, void *data);
 void process_routine_kmsg(void);
 void print_kmsgs(uint32_t coreid);
 
+/* Kernel context depths.  IRQ depth is how many nested IRQ stacks/contexts we
+ * are working on.  Kernel trap depth is how many nested kernel traps (not
+ * user-space traps) we have.
+ *
+ * Some examples:
+ * 		(original context in parens, +(x, y) is the change to IRQ and ktrap
+ * 		depth):
+ * - syscall (user): +(0, 0)
+ * - trap (user): +(0, 0)
+ * - irq (user): +(1, 0)
+ * - irq (kernel, handling syscall): +(1, 0)
+ * - trap (kernel, regardless of context): +(0, 1)
+ * - NMI (kernel): it's actually a kernel trap, even though it is
+ *   sent by IPI.  +(0, 1)
+ * - NMI (user): just a trap.  +(0, 0)
+ *
+ * So if the user traps in for a syscall (0, 0), then the kernel takes an IRQ
+ * (1, 0), and then another IRQ (2, 0), and then the kernel page faults (a
+ * trap), we're at (2, 1).
+ *
+ * Or if we're in userspace, then an IRQ arrives, we're in the kernel at (1, 0).
+ * Note that regardless of whether or not we are in userspace or the kernel when
+ * an irq arrives, we still are only at level 1 irq depth.  We don't care if we
+ * have one or 0 kernel contexts under us.  (The reason for this is that I care
+ * if it is *possible* for us to interrupt the kernel, not whether or not it
+ * actually happened). */
+
+/* uint32_t __ctx_depth is laid out like so:
+ *
+ * +------8------+------8------+------8------+------8------+
+ * |    Flags    |    Unused   | Kernel Trap |  IRQ Depth  |
+ * |             |             |    Depth    |             |
+ * +-------------+-------------+-------------+-------------+
+ *
+ */
+#define __CTX_IRQ_D_SHIFT			0
+#define __CTX_KTRAP_D_SHIFT			8
+#define __CTX_FLAG_SHIFT			24
+#define __CTX_IRQ_D_MASK			((1 << 8) - 1)
+#define __CTX_KTRAP_D_MASK			((1 << 8) - 1)
+#define __CTX_NESTED_CTX_MASK		((1 << 16) - 1)
+#define __CTX_EARLY_RKM 			(1 << __CTX_FLAG_SHIFT)
+
+/* Basic functions to get or change depths */
+
+#define irq_depth(pcpui)                                                       \
+	(((pcpui)->__ctx_depth >> __CTX_IRQ_D_SHIFT) & __CTX_IRQ_D_MASK)
+
+#define ktrap_depth(pcpui)                                                     \
+	(((pcpui)->__ctx_depth >> __CTX_KTRAP_D_SHIFT) & __CTX_KTRAP_D_MASK)
+
+#define inc_irq_depth(pcpui)                                                   \
+	((pcpui)->__ctx_depth += 1 << __CTX_IRQ_D_SHIFT)
+
+#define dec_irq_depth(pcpui)                                                   \
+	((pcpui)->__ctx_depth -= 1 << __CTX_IRQ_D_SHIFT)
+
+#define inc_ktrap_depth(pcpui)                                                 \
+	((pcpui)->__ctx_depth += 1 << __CTX_KTRAP_D_SHIFT)
+
+#define dec_ktrap_depth(pcpui)                                                 \
+	((pcpui)->__ctx_depth -= 1 << __CTX_KTRAP_D_SHIFT)
+
+#define set_rkmsg(pcpui)                                                       \
+	((pcpui)->__ctx_depth |= __CTX_EARLY_RKM)
+
+#define clear_rkmsg(pcpui)                                                     \
+	((pcpui)->__ctx_depth &= ~__CTX_EARLY_RKM)
+
+/* Functions to query the kernel context depth/state.  I haven't fully decided
+ * on whether or not 'default' context includes RKMs or not.  Will depend on
+ * how we use it.  Check the code below to see what the latest is. */
+
+#define in_irq_ctx(pcpui)                                                      \
+	(irq_depth(pcpui))
+
+#define in_early_rkmsg_ctx(pcpui)                                              \
+	((pcpui)->__ctx_depth & __CTX_EARLY_RKM)
+
+/* Right now, anything (KTRAP, IRQ, or RKM) makes us not 'default' */
+#define in_default_ctx(pcpui)                                                  \
+	(!(pcpui)->__ctx_depth)
+
+/* Can block only if we have no nested contexts (ktraps or irqs, (which are
+ * potentially nested contexts)) */
+#define can_block(pcpui)                                                       \
+	(!((pcpui)->__ctx_depth & __CTX_NESTED_CTX_MASK))
+
+/* TRUE if we are allowed to spin, given that the 'lock' was declared as not
+ * grabbable from IRQ context.  Meaning, we can't grab the lock from any nested
+ * context.  (And for most locks, we can never grab them from a kernel trap
+ * handler). 
+ *
+ * Example is a lock that is not declared as irqsave, but we later grab it from
+ * irq context.  This could deadlock the system, even if it doesn't do it this
+ * time.  This function will catch that. */
+#define can_spinwait_noirq(pcpui)                                              \
+	(!((pcpui)->__ctx_depth & __CTX_NESTED_CTX_MASK))
+
+/* TRUE if we are allowed to spin, given that the 'lock' was declared as
+ * potentially grabbable by IRQ context (such as with an irqsave lock).  We can
+ * never grab from a ktrap, since there is no way to prevent that.  And we must
+ * have IRQs disabled, since an IRQ handler could attempt to grab the lock. */
+#define can_spinwait_irq(pcpui)                                                \
+	((!ktrap_depth(pcpui) && !irq_is_enabled()))
+
+/* Debugging */
+void print_kctx_depths(const char *str);
+ 
 #endif /* ROS_KERN_TRAP_H */
