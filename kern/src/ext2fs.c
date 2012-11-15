@@ -715,7 +715,7 @@ int ext2_readpage(struct page_map *pm, struct page *page)
 	breq->flags = BREQ_READ;
 	breq->callback = generic_breq_done;
 	breq->data = 0;
-	sem_init(&breq->sem, 0);
+	sem_init_irqsave(&breq->sem, 0);
 	breq->bhs = breq->local_bhs;
 	breq->nr_bhs = 0;
 	/* Pack the BH pointers in the block request */

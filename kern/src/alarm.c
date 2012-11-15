@@ -52,7 +52,7 @@ void init_awaiter(struct alarm_waiter *waiter,
 	waiter->wake_up_time = ALARM_POISON_TIME;
 	waiter->func = func;
 	if (!func)
-		sem_init(&waiter->sem, 0);
+		sem_init_irqsave(&waiter->sem, 0);
 }
 
 /* Give this the absolute time.  For now, abs_time is the TSC time that you want

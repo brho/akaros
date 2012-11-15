@@ -246,7 +246,7 @@ found:
 	breq->flags = BREQ_READ;
 	breq->callback = generic_breq_done;
 	breq->data = 0;
-	sem_init(&breq->sem, 0);
+	sem_init_irqsave(&breq->sem, 0);
 	breq->bhs = breq->local_bhs;
 	breq->bhs[0] = bh;
 	breq->nr_bhs = 1;

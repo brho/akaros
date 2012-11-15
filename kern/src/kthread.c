@@ -168,6 +168,15 @@ void sem_init(struct semaphore *sem, int signals)
 	TAILQ_INIT(&sem->waiters);
 	sem->nr_signals = signals;
 	spinlock_init(&sem->lock);
+	sem->irq_okay = FALSE;
+}
+
+void sem_init_irqsave(struct semaphore *sem, int signals)
+{
+	TAILQ_INIT(&sem->waiters);
+	sem->nr_signals = signals;
+	spinlock_init_irqsave(&sem->lock);
+	sem->irq_okay = TRUE;
 }
 
 /* This downs the semaphore and suspends the current kernel context on its
@@ -181,6 +190,7 @@ void sem_down(struct semaphore *sem)
 	register uintptr_t new_stacktop;
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 
+	assert(can_block(pcpui));
 	/* Make sure we aren't holding any locks (only works if SPINLOCK_DEBUG) */
 	assert(!pcpui->lock_depth);
 	/* Try to down the semaphore.  If there is a signal there, we can skip all
@@ -342,6 +352,15 @@ void cv_init(struct cond_var *cv)
 	sem_init(&cv->sem, 0);
 	spinlock_init(&cv->lock);
 	cv->nr_waiters = 0;
+	cv->irq_okay = FALSE;
+}
+
+void cv_init_irqsave(struct cond_var *cv)
+{
+	sem_init_irqsave(&cv->sem, 0);
+	spinlock_init_irqsave(&cv->lock);
+	cv->nr_waiters = 0;
+	cv->irq_okay = TRUE;
 }
 
 void cv_lock(struct cond_var *cv)

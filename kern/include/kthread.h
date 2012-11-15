@@ -51,12 +51,14 @@ void kthread_runnable(struct kthread *kthread);
 void kthread_yield(void);
 
 void sem_init(struct semaphore *sem, int signals);
+void sem_init_irqsave(struct semaphore *sem, int signals);
 void sem_down(struct semaphore *sem);
 bool sem_up(struct semaphore *sem);
 void sem_down_irqsave(struct semaphore *sem, int8_t *irq_state);
 bool sem_up_irqsave(struct semaphore *sem, int8_t *irq_state);
 
 void cv_init(struct cond_var *cv);
+void cv_init_irqsave(struct cond_var *cv);
 void cv_lock(struct cond_var *cv);
 void cv_unlock(struct cond_var *cv);
 void cv_lock_irqsave(struct cond_var *cv, int8_t *irq_state);
