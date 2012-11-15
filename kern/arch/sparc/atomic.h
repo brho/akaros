@@ -185,7 +185,7 @@ static inline void spin_unlock(spinlock_t*SAFE lock)
 	lock->rlock = 0;
 }
 
-static inline void spinlock_init(spinlock_t* lock)
+static inline void __spinlock_init(spinlock_t* lock)
 {
 	lock->rlock = 0;
 }

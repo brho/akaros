@@ -42,27 +42,37 @@ extern inline bool atomic_sub_and_test(atomic_t *number, long val);
 struct spinlock {
 	volatile uint32_t RACY rlock;
 #ifdef __CONFIG_SPINLOCK_DEBUG__
-	void *call_site;	
+	uintptr_t call_site;
 	uint32_t calling_core;
+	bool irq_okay;
 #endif
 };
 typedef struct spinlock spinlock_t;
 #define SPINLOCK_INITIALIZER {0}
 
-extern inline void spinlock_init(spinlock_t *lock);
+#ifdef __CONFIG_SPINLOCK_DEBUG__
+#define SPINLOCK_INITIALIZER_IRQSAVE {0, .irq_okay = TRUE}
+#else
+#define SPINLOCK_INITIALIZER_IRQSAVE SPINLOCK_INITIALIZER
+#endif
+
+/* Arch dependent helpers/funcs: */
+extern inline void __spinlock_init(spinlock_t *lock);
 extern inline bool spin_locked(spinlock_t *lock);
-extern inline void spin_lock(spinlock_t *lock);
-extern inline void spin_unlock(spinlock_t *lock);
+extern inline void __spin_lock(spinlock_t *lock);
+extern inline void __spin_unlock(spinlock_t *lock);
 extern inline void spinlock_debug(spinlock_t *lock);
 
+/* Arch indep, in k/s/atomic.c */
+void spin_lock(spinlock_t *lock);
+void spin_unlock(spinlock_t *lock);
+
+/* Inlines, defined below */
+static inline void spinlock_init(spinlock_t *lock);
+static inline void spinlock_init_irqsave(spinlock_t *lock);
 static inline void spin_lock_irqsave(spinlock_t *lock);
 static inline void spin_unlock_irqsave(spinlock_t *lock);
 static inline bool spin_lock_irq_enabled(spinlock_t *lock);
-
-/* Used for spinlock debugging.  When we move spinlocks into .c, we can move
- * these too */
-void increase_lock_depth(uint32_t coreid);
-void decrease_lock_depth(uint32_t coreid);
 
 /* Hash locks (array of spinlocks).  Most all users will want the default one,
  * so point your pointer to one of them, though you could always kmalloc a
@@ -79,6 +89,7 @@ struct small_hashlock {
 };
 
 void hashlock_init(struct hashlock *hl, unsigned int nr_entries);
+void hashlock_init_irqsave(struct hashlock *hl, unsigned int nr_entries);
 void hash_lock(struct hashlock *hl, long key);
 void hash_unlock(struct hashlock *hl, long key);
 void hash_lock_irqsave(struct hashlock *hl, long key);
@@ -191,6 +202,26 @@ void waiton_barrier(barrier_t* barrier);
 
 /* Spinlock bit flags */
 #define SPINLOCK_IRQ_EN			0x80000000
+
+static inline void spinlock_init(spinlock_t *lock)
+{
+	__spinlock_init(lock);
+#ifdef __CONFIG_SPINLOCK_DEBUG__
+	lock->call_site = 0;
+	lock->calling_core = 0;
+	lock->irq_okay = FALSE;
+#endif
+}
+
+static inline void spinlock_init_irqsave(spinlock_t *lock)
+{
+	__spinlock_init(lock);
+#ifdef __CONFIG_SPINLOCK_DEBUG__
+	lock->call_site = 0;
+	lock->calling_core = 0;
+	lock->irq_okay = TRUE;
+#endif
+}
 
 // If ints are enabled, disable them and note it in the top bit of the lock
 // There is an assumption about releasing locks in order here...

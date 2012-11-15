@@ -144,7 +144,7 @@ static inline bool spin_locked(spinlock_t *lock)
 	return lock->rlock & 0xff;
 }
 
-static inline void __spin_lock(volatile uint32_t *rlock)
+static inline void __spin_lock_raw(volatile uint32_t *rlock)
 {
 	asm volatile(
 			"1:                       "
@@ -160,41 +160,19 @@ static inline void __spin_lock(volatile uint32_t *rlock)
 	        : : "m"(*rlock) : "eax", "cc");
 }
 
-static inline void spin_lock(spinlock_t *lock)
+static inline void __spin_lock(spinlock_t *lock)
 {
-	__spin_lock(&lock->rlock);
-#ifdef __CONFIG_SPINLOCK_DEBUG__
-	lock->call_site = (void RACY*CT(1))TC(read_eip());
-	lock->calling_core = core_id();
-	increase_lock_depth(lock->calling_core);
-#endif
-	cmb();	/* need cmb(), the CPU mb() was handled by the xchgb */
+	__spin_lock_raw(&lock->rlock);
 }
 
-static inline void spin_unlock(spinlock_t *lock)
+static inline void __spin_unlock(spinlock_t *lock)
 {
-#ifdef __CONFIG_SPINLOCK_DEBUG__
-	decrease_lock_depth(lock->calling_core);
-#endif
-	/* Need to prevent the compiler (and some arches) from reordering older
-	 * stores. */
-	wmb();
-	rwmb();	/* x86 makes both of these a cmb() */
 	lock->rlock = 0;
 }
 
-static inline void spinlock_init(spinlock_t *lock)
-#ifdef __CONFIG_SPINLOCK_DEBUG__
-WRITES(lock->rlock,lock->call_site,lock->calling_core)
-#else
-WRITES(lock->rlock)
-#endif
+static inline void __spinlock_init(spinlock_t *lock)
 {
 	lock->rlock = 0;
-#ifdef __CONFIG_SPINLOCK_DEBUG__
-	lock->call_site = 0;
-	lock->calling_core = 0;
-#endif
 }
 
 #endif /* ROS_KERN_ARCH_ATOMIC_H */

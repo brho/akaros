@@ -35,12 +35,14 @@ struct semaphore {
 	struct kthread_tailq		waiters;
 	int 						nr_signals;
 	spinlock_t 					lock;
+	bool						irq_okay;
 };
 
 struct cond_var {
 	struct semaphore			sem;
 	spinlock_t 					lock;
 	unsigned long				nr_waiters;
+	bool						irq_okay;
 };
 
 void kthread_init(void);

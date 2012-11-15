@@ -117,21 +117,15 @@ static inline void spin_lock(spinlock_t *lock)
 	while(spin_trylock(lock))
 		while(lock->rlock);
 	mb();
-#ifdef __CONFIG_SPINLOCK_DEBUG__
-	increase_lock_depth(core_id());
-#endif
 }
 
 static inline void spin_unlock(spinlock_t *lock)
 {
-#ifdef __CONFIG_SPINLOCK_DEBUG__
-	decrease_lock_depth(core_id());
-#endif
 	mb();
 	lock->rlock = 0;
 }
 
-static inline void spinlock_init(spinlock_t *lock)
+static inline void __spinlock_init(spinlock_t *lock)
 {
 	lock->rlock = 0;
 }

@@ -3,6 +3,7 @@
 #endif
 
 #include <arch/arch.h>
+#include <arch/kdebug.h>
 
 #include <bitmask.h>
 #include <atomic.h>
@@ -12,14 +13,42 @@
 #include <hashtable.h>
 #include <smp.h>
 
-void increase_lock_depth(uint32_t coreid)
+static void increase_lock_depth(uint32_t coreid)
 {
 	per_cpu_info[coreid].lock_depth++;
 }
 
-void decrease_lock_depth(uint32_t coreid)
+static void decrease_lock_depth(uint32_t coreid)
 {
 	per_cpu_info[coreid].lock_depth--;
+}
+
+/* TODO: make this inline if we aren't doing DEBUG? */
+void spin_lock(spinlock_t *lock)
+{
+#ifdef __CONFIG_SPINLOCK_DEBUG__
+	uint32_t coreid = core_id();
+	__spin_lock(lock);
+	lock->call_site = get_caller_pc();
+	lock->calling_core = coreid;
+	/* TODO consider merging this with __ctx_depth (unused field) */
+	increase_lock_depth(lock->calling_core);
+#else
+	__spin_lock(lock);
+#endif
+	cmb();	/* need cmb(), the CPU mb() was handled by the arch-specific xchg */
+}
+
+void spin_unlock(spinlock_t *lock)
+{
+#ifdef __CONFIG_SPINLOCK_DEBUG__
+	decrease_lock_depth(lock->calling_core);
+#endif
+	/* Need to prevent the compiler (and some arches) from reordering older
+	 * stores. */
+	wmb();
+	rwmb();	/* x86 makes both of these a cmb() */
+	__spin_unlock(lock);
 }
 
 /* Inits a hashlock. */
@@ -30,6 +59,16 @@ void hashlock_init(struct hashlock *hl, unsigned int nr_entries)
 	 * find that this is taking a lot of time, we can change it. */
 	for (int i = 0; i < hl->nr_entries; i++) {
 		spinlock_init(&hl->locks[i]);
+	}
+}
+
+void hashlock_init_irqsave(struct hashlock *hl, unsigned int nr_entries)
+{
+	hl->nr_entries = nr_entries;
+	/* this is the right way to do it, though memset is faster.  If we ever
+	 * find that this is taking a lot of time, we can change it. */
+	for (int i = 0; i < hl->nr_entries; i++) {
+		spinlock_init_irqsave(&hl->locks[i]);
 	}
 }
 
