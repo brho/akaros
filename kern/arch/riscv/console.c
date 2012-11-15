@@ -16,7 +16,7 @@ struct fesvr_syscall {
 };
 STAILQ_HEAD(fesvr_syscall_tailq, fesvr_syscall);
 
-spinlock_t fesvr_lock = SPINLOCK_INITIALIZER;
+spinlock_t fesvr_lock = SPINLOCK_INITIALIZER_IRQSAVE;
 struct fesvr_syscall_tailq fesvr_queue;
 struct magic_mem fesvr_current __attribute__((aligned(64)));
 

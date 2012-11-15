@@ -39,7 +39,7 @@ static void __kmem_cache_create(struct kmem_cache *kc, const char *name,
 {
 	assert(kc);
 	assert(align);
-	spinlock_init(&kc->cache_lock);
+	spinlock_init_irqsave(&kc->cache_lock);
 	kc->name = name;
 	kc->obj_size = obj_size;
 	kc->align = align;
@@ -70,7 +70,7 @@ static void __kmem_cache_create(struct kmem_cache *kc, const char *name,
 
 void kmem_cache_init(void)
 {
-	spinlock_init(&kmem_caches_lock);
+	spinlock_init_irqsave(&kmem_caches_lock);
 	SLIST_INIT(&kmem_caches);
 	/* We need to call the __ version directly to bootstrap the global
 	 * kmem_cache_cache. */

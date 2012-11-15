@@ -29,5 +29,5 @@ char* packet_buffers[MAX_PACKET_BUFFERS];
 uint32_t packet_buffers_sizes[MAX_PACKET_BUFFERS];
 uint32_t packet_buffers_head = 0;
 uint32_t packet_buffers_tail = 0;
-spinlock_t packet_buffers_lock = SPINLOCK_INITIALIZER;
+spinlock_t packet_buffers_lock = SPINLOCK_INITIALIZER_IRQSAVE;
 

@@ -135,7 +135,7 @@ static inline bool atomic_cas(atomic_t *addr, long exp_val, long new_val)
 {
 	bool retval = 0;
 	long temp;
-	static spinlock_t cas_lock = SPINLOCK_INITIALIZER;
+	static spinlock_t cas_lock = SPINLOCK_INITIALIZER_IRQSAVE;
 
 	if ((long)*addr != exp_val)
 		return 0;

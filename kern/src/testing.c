@@ -586,7 +586,7 @@ void test_hello_world_handler(trapframe_t *tf, void* data)
 	        trapno, core_id(), tf);
 }
 
-spinlock_t print_info_lock = SPINLOCK_INITIALIZER;
+spinlock_t print_info_lock = SPINLOCK_INITIALIZER_IRQSAVE;
 
 void test_print_info_handler(trapframe_t *tf, void* data)
 {

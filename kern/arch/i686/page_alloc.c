@@ -15,7 +15,7 @@
 #include <pmap.h>
 #include <kmalloc.h>
 
-spinlock_t colored_page_free_list_lock;
+spinlock_t colored_page_free_list_lock = SPINLOCK_INITIALIZER_IRQSAVE;
 
 page_list_t LCKD(&colored_page_free_list_lock) * CT(llc_cache->num_colors) RO
   colored_page_free_list = NULL;

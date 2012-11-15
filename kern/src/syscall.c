@@ -48,7 +48,7 @@ struct systrace_record *systrace_buffer = 0;
 uint32_t systrace_bufidx = 0;
 size_t systrace_bufsize = 0;
 struct proc *systrace_procs[MAX_NUM_TRACED] = {0};
-spinlock_t systrace_lock = SPINLOCK_INITIALIZER;
+spinlock_t systrace_lock = SPINLOCK_INITIALIZER_IRQSAVE;
 
 /* Not enforcing the packing of systrace_procs yet, but don't rely on that */
 static bool proc_is_traced(struct proc *p)

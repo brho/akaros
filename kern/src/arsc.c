@@ -24,7 +24,7 @@
 
 
 struct proc_list arsc_proc_list = TAILQ_HEAD_INITIALIZER(arsc_proc_list);
-spinlock_t arsc_proc_lock = SPINLOCK_INITIALIZER;
+spinlock_t arsc_proc_lock = SPINLOCK_INITIALIZER_IRQSAVE;
 
 intreg_t inline syscall_async(struct proc *p, syscall_req_t *call)
 {

@@ -21,7 +21,7 @@
 #include <colored_caches.h>
 
 page_list_t *COUNT(llc_cache->num_colors) colored_page_free_list = NULL;
-spinlock_t colored_page_free_list_lock;
+spinlock_t colored_page_free_list_lock = SPINLOCK_INITIALIZER_IRQSAVE;
 
 void page_alloc_bootstrap() {
 	// Allocate space for the array required to manage the free lists

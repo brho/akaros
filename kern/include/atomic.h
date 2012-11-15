@@ -161,7 +161,8 @@ typedef struct checklist RACY checklist_t;
 #define ZEROS_ARRAY(size) {[0 ... ((size)-1)] 0}
 
 #define DEFAULT_CHECKLIST_MASK(sz) {(sz), ZEROS_ARRAY(BYTES_FOR_BITMASK(sz))}
-#define DEFAULT_CHECKLIST(sz) {SPINLOCK_INITIALIZER, DEFAULT_CHECKLIST_MASK(sz)}
+#define DEFAULT_CHECKLIST(sz) {SPINLOCK_INITIALIZER_IRQSAVE,                   \
+                               DEFAULT_CHECKLIST_MASK(sz)}
 #define INIT_CHECKLIST(nm, sz)	\
 	checklist_t nm = DEFAULT_CHECKLIST(sz);
 #define INIT_CHECKLIST_MASK(nm, sz)	\

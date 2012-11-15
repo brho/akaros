@@ -241,7 +241,7 @@ lpt_putc(int c)
 #define MAX_SCROLL_LENGTH	20
 #define SCROLLING_CRT_SIZE	(MAX_SCROLL_LENGTH * CRT_SIZE)
 
-static spinlock_t SRACY lock = SPINLOCK_INITIALIZER;
+static spinlock_t SRACY lock = SPINLOCK_INITIALIZER_IRQSAVE;
 
 static unsigned SREADONLY addr_6845;
 static uint16_t *SLOCKED(&lock) COUNT(CRT_SIZE) crt_buf;

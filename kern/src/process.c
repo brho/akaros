@@ -300,7 +300,7 @@ error_t proc_alloc(struct proc **pp, struct proc *parent)
 	p->open_files.open_fds = (struct fd_set*)&p->open_files.open_fds_init;
 	/* Init the ucq hash lock */
 	p->ucq_hashlock = (struct hashlock*)&p->ucq_hl_noref;
-	hashlock_init(p->ucq_hashlock, HASHLOCK_DEFAULT_SZ);
+	hashlock_init_irqsave(p->ucq_hashlock, HASHLOCK_DEFAULT_SZ);
 
 	atomic_inc(&num_envs);
 	frontend_proc_init(p);

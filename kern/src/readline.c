@@ -9,7 +9,7 @@
 
 int readline(char *buf, size_t buf_l, const char *prompt, ...)
 {
-	static spinlock_t readline_lock = SPINLOCK_INITIALIZER;
+	static spinlock_t readline_lock = SPINLOCK_INITIALIZER_IRQSAVE;
 	int i, c, echoing, retval;
 	va_list ap;
 

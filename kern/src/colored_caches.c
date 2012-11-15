@@ -23,7 +23,7 @@
 #define l2 (available_caches.l2)
 #define l3 (available_caches.l3)
 
-spinlock_t cache_colors_lock;
+spinlock_t cache_colors_lock = SPINLOCK_INITIALIZER_IRQSAVE;
 
 /************** Cache Related Functions  *****************/
 inline void init_cache_properties(cache_t *c, size_t sz_k, size_t wa, size_t clsz) {

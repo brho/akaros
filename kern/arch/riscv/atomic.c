@@ -9,7 +9,9 @@ bool atomic_cas(atomic_t *addr, long exp_val, long new_val)
 		return 0;
 	
   #define K 17
-	static spinlock_t cas_locks[K*HW_CACHE_ALIGN/sizeof(spinlock_t)];
+	/* TODO: not sure if this initialization works. */
+	static spinlock_t cas_locks[K*HW_CACHE_ALIGN/sizeof(spinlock_t)] =
+	                  {SPINLOCK_INITIALIZER_IRQSAVE};
 
   uintptr_t bucket = (uintptr_t)addr / sizeof(uintptr_t) % K;
 	spinlock_t* lock = &cas_locks[bucket*HW_CACHE_ALIGN/sizeof(spinlock_t)];
@@ -36,7 +38,9 @@ bool atomic_cas_u32(uint32_t *addr, uint32_t exp_val, uint32_t new_val)
 		return 0;
 	
   #define K 17
-	static spinlock_t cas_locks[K*HW_CACHE_ALIGN/sizeof(spinlock_t)];
+	/* TODO: not sure if this initialization works. */
+	static spinlock_t cas_locks[K*HW_CACHE_ALIGN/sizeof(spinlock_t)] =
+	                  {SPINLOCK_INITIALIZER_IRQSAVE};
 
   uintptr_t bucket = (uintptr_t)addr / sizeof(uintptr_t) % K;
 	spinlock_t* lock = &cas_locks[bucket*HW_CACHE_ALIGN/sizeof(spinlock_t)];

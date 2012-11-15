@@ -28,6 +28,20 @@ void spin_lock(spinlock_t *lock)
 {
 #ifdef __CONFIG_SPINLOCK_DEBUG__
 	uint32_t coreid = core_id();
+	struct per_cpu_info *pcpui = &per_cpu_info[coreid];
+	/* TODO: don't print directly.  If we have a lock on the print path that
+	 * fails, we'll recurse and/or deadlock */
+	if (lock->irq_okay) {
+		if (!can_spinwait_irq(pcpui)) {
+			print_kctx_depths("IRQOK");
+			panic("Lock %08p tried to spin when it shouldn't\n", lock);
+		}
+	} else {
+		if (!can_spinwait_noirq(pcpui)) {
+			print_kctx_depths("NOIRQ");
+			panic("Lock %08p tried to spin when it shouldn't\n", lock);
+		}
+	}
 	__spin_lock(lock);
 	lock->call_site = get_caller_pc();
 	lock->calling_core = coreid;
@@ -246,7 +260,7 @@ void down_checklist(checklist_t* list)
 /* Barriers */
 void init_barrier(barrier_t* barrier, uint32_t count)
 {
-	spinlock_init(&barrier->lock);
+	spinlock_init_irqsave(&barrier->lock);
 	barrier->init_count = count;
 	barrier->current_count = count;
 	barrier->ready = 0;

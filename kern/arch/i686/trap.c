@@ -216,7 +216,7 @@ print_regs(push_regs_t *regs)
 void
 print_trapframe(trapframe_t *tf)
 {
-	static spinlock_t ptf_lock;
+	static spinlock_t ptf_lock = SPINLOCK_INITIALIZER_IRQSAVE;
 
 	spin_lock_irqsave(&ptf_lock);
 	printk("TRAP frame at %p on core %d\n", tf, core_id());
