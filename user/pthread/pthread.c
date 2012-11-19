@@ -23,6 +23,7 @@ struct mcs_pdr_lock queue_lock;
 pthread_once_t init_once = PTHREAD_ONCE_INIT;
 int threads_ready = 0;
 int threads_active = 0;
+bool can_adjust_vcores = TRUE;
 
 /* Array of per-vcore structs to manage waiting on syscalls and handling
  * overflow.  Init'd in pth_init(). */
@@ -100,7 +101,8 @@ void __attribute__((noreturn)) pth_sched_entry(void)
 		printd("[P] No threads, vcore %d is yielding\n", vcore_id());
 		/* TODO: you can imagine having something smarter here, like spin for a
 		 * bit before yielding (or not at all if you want to be greedy). */
-		vcore_yield(FALSE);
+		if (can_adjust_vcores)
+			vcore_yield(FALSE);
 	} while (1);
 	assert(new_thread->state == PTH_RUNNABLE);
 	run_uthread((struct uthread*)new_thread);
@@ -143,7 +145,8 @@ void pth_thread_runnable(struct uthread *uthread)
 	mcs_pdr_unlock(&queue_lock);
 	/* Smarter schedulers should look at the num_vcores() and how much work is
 	 * going on to make a decision about how many vcores to request. */
-	vcore_request(threads_ready);
+	if (can_adjust_vcores)
+		vcore_request(threads_ready);
 }
 
 /* For some reason not under its control, the uthread stopped running (compared
@@ -258,6 +261,16 @@ void pth_spawn_thread(uintptr_t pc_start, void *data)
 {
 }
 
+/* Akaros pthread extensions / hacks */
+
+/* Tells the pthread 2LS to not change the number of vcores.  This means it will
+ * neither request vcores nor yield vcores.  Only used for testing. */
+void pthread_can_vcore_request(bool can)
+{
+	/* checked when we would request or yield */
+	can_adjust_vcores = can;
+}
+
 /* Pthread interface stuff and helpers */
 
 int pthread_attr_init(pthread_attr_t *a)
@@ -309,12 +322,12 @@ int pthread_attr_getstacksize(const pthread_attr_t *attr, size_t *stacksize)
 
 /* Do whatever init you want.  At some point call uthread_lib_init() and pass it
  * a uthread representing thread0 (int main()) */
-static int pthread_lib_init(void)
+int pthread_lib_init(void)
 {
-	/* Make sure this only runs once */
+	/* Make sure this only initializes once */
 	static bool initialized = FALSE;
 	if (initialized)
-		return -1;
+		return 0;
 	initialized = TRUE;
 	uintptr_t mmap_block;
 	mcs_pdr_init(&queue_lock);

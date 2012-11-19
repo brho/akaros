@@ -62,10 +62,10 @@ static void uthread_manage_thread0(struct uthread *uthread)
  * returns, you're in _M mode, still running thread0, on vcore0 */
 int uthread_lib_init(struct uthread *uthread)
 {
-	/* Make sure this only runs once */
+	/* Make sure this only initializes once */
 	static bool initialized = FALSE;
 	if (initialized)
-		return -1;
+		return 0;
 	initialized = TRUE;
 	/* Init the vcore system */
 	assert(!vcore_init());

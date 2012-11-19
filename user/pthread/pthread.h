@@ -122,6 +122,10 @@ typedef int pthread_barrierattr_t;
 typedef int pthread_once_t;
 typedef void** pthread_key_t;
 
+/* Akaros pthread extensions / hacks */
+void pthread_can_vcore_request(bool can);	/* default is TRUE */
+int pthread_lib_init(void);
+
 /* The pthreads API */
 int pthread_attr_init(pthread_attr_t *);
 int pthread_attr_destroy(pthread_attr_t *);
