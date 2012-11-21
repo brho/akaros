@@ -872,3 +872,22 @@ void print_proc_prov(struct proc *p)
 		       spc_i->alloc_proc ? spc_i->alloc_proc->pid : 0,
 		       spc_i->alloc_proc);
 }
+
+void next_core(uint32_t pcoreid)
+{
+	struct sched_pcore *spc_i;
+	bool match = FALSE;
+	spin_lock(&sched_lock);
+	TAILQ_FOREACH(spc_i, &idlecores, alloc_next) {
+		if (spc2pcoreid(spc_i) == pcoreid) {
+			match = TRUE;
+			break;
+		}
+	}
+	if (match) {
+		TAILQ_REMOVE(&idlecores, spc_i, alloc_next);
+		TAILQ_INSERT_HEAD(&idlecores, spc_i, alloc_next);
+		printk("Pcore %d will be given out next (from the idles)\n", pcoreid);
+	}
+	spin_unlock(&sched_lock);
+}

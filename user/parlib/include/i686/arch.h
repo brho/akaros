@@ -34,6 +34,34 @@ read_tsc(void)
 }
 
 static __inline void
+cpuid(uint32_t info1, uint32_t info2, uint32_t *eaxp, uint32_t *ebxp,
+      uint32_t *ecxp, uint32_t *edxp)
+{
+	uint32_t eax, ebx, ecx, edx;
+	/* Can select with both eax (info1) and ecx (info2) */
+	asm volatile("cpuid" 
+		: "=a" (eax), "=b" (ebx), "=c" (ecx), "=d" (edx)
+		: "a" (info1), "c" (info2));
+	if (eaxp)
+		*eaxp = eax;
+	if (ebxp)
+		*ebxp = ebx;
+	if (ecxp)
+		*ecxp = ecx;
+	if (edxp)
+		*edxp = edx;
+}
+
+static __inline uint64_t
+read_tsc_serialized(void)
+{
+	uint64_t tsc;
+	cpuid(0x0, 0x0, 0, 0, 0, 0);
+	tsc = read_tsc();
+	return tsc;
+}
+
+static __inline void
 cpu_relax(void)
 {
 	asm volatile("pause" : : : "memory");

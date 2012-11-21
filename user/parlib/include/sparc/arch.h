@@ -43,6 +43,12 @@ read_tsc(void)
 	return read_perfctr(0,0);
 }
 
+static __inline uint64_t
+read_tsc_serialized(void)
+{
+	return read_tsc();
+}
+
 static __inline void
 cpu_relax(void)
 {
