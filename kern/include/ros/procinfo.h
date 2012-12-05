@@ -70,7 +70,8 @@ procinfo_pack_args(procinfo_t* p, char* const* argv, char* const* envp)
 		return -1;
 
 	int pos = 0;
-	for(int i = 0; i < nargv; i++)
+	int i;
+	for(i = 0; i < nargv; i++)
 	{
 		int len = strlen(argv[i])+1;
 		if(pos+len > PROCINFO_ARGBUF_SIZE)
@@ -81,7 +82,7 @@ procinfo_pack_args(procinfo_t* p, char* const* argv, char* const* envp)
 	}
 	p->argp[nargv] = 0;
 
-	for(int i = 0; i < nenvp; i++)
+	for(i = 0; i < nenvp; i++)
 	{
 		int len = strlen(envp[i])+1;
 		if(pos+len > PROCINFO_ARGBUF_SIZE)
