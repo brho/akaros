@@ -17,18 +17,20 @@
    02111-1307 USA.  */
 
 #ifndef _SEMAPHORE_H
-#define _SEMAPHORE_H	1
+#define _SEMAPHORE_H
 
-/* Get the definition for sem_t.  */
-#define __SIZEOF_SEM_T	16
+#include <sys/queue.h>
+#include <pthread.h>
+#include <mcs.h>
 
 /* Value returned if `sem_open' failed.  */
 #define SEM_FAILED      ((sem_t *) 0)
 
-typedef union
+typedef struct sem
 {
-  char __size[__SIZEOF_SEM_T];
-  long int __attribute__ ((aligned (__BIGGEST_ALIGNMENT__)));
+	unsigned int count;
+	struct pthread_queue queue;
+	struct mcs_pdr_lock lock;
 } sem_t;
 
 extern int sem_init (sem_t *__sem, int __pshared, unsigned int __value);
