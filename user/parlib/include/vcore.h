@@ -19,7 +19,7 @@ extern "C" {
 #include <stdlib.h>
 #include <unistd.h>
 #undef exit
-#define exit(status) ros_syscall(SYS_proc_destroy, getpid(), status, 0, 0, 0, 0)
+#define exit(status) _exit(status)
 /*****************************************************************************/
 
 #define LOG2_MAX_VCORES 6
