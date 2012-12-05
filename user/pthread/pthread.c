@@ -789,3 +789,23 @@ int pthread_detach(pthread_t thread)
 	thread->detached = TRUE;
 	return 0;
 }
+
+int pthread_kill (pthread_t __threadid, int __signo)
+{
+	printf("pthread_kill is not yet implemented!");
+	return -1;
+}
+
+
+int pthread_sigmask(int how, const sigset_t *set, sigset_t *oset)
+{
+	printf("pthread_sigmask is not yet implemented!");
+	return -1;
+}
+
+int pthread_sigqueue(pthread_t *thread, int sig, const union sigval value)
+{
+	printf("pthread_sigqueue is not yet implemented!");
+	return -1;
+}
+

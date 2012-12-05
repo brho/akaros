@@ -2,6 +2,7 @@
 #define _PTHREAD_H
 
 #include <sys/queue.h>
+#include <signal.h>
 #include <vcore.h>
 #include <uthread.h>
 #include <mcs.h>
@@ -36,6 +37,7 @@ struct pthread_tcb {
 	void *(*start_routine)(void*);
 	void *arg;
 	void *retval;
+	uint64_t sigmask;
 };
 typedef struct pthread_tcb* pthread_t;
 TAILQ_HEAD(pthread_queue, pthread_tcb);
@@ -131,10 +133,13 @@ int pthread_attr_init(pthread_attr_t *);
 int pthread_attr_destroy(pthread_attr_t *);
 int pthread_create(pthread_t *, const pthread_attr_t *,
                    void *(*)(void *), void *);
+int pthread_detach(pthread_t __th);
 int pthread_join(pthread_t, void **);
 int pthread_yield(void);
 
 int pthread_attr_setdetachstate(pthread_attr_t *__attr,int __detachstate);
+int pthread_attr_setstacksize(pthread_attr_t *attr, size_t stacksize);
+int pthread_attr_getstacksize(const pthread_attr_t *attr, size_t *stacksize);
 
 int pthread_mutex_destroy(pthread_mutex_t *);
 int pthread_mutex_init(pthread_mutex_t *, const pthread_mutexattr_t *);
@@ -178,13 +183,20 @@ int pthread_barrier_init(pthread_barrier_t* b, const pthread_barrierattr_t* a, i
 int pthread_barrier_wait(pthread_barrier_t* b);
 int pthread_barrier_destroy(pthread_barrier_t* b);
 
-//added for redis compile
-int pthread_detach(pthread_t __th);
-int pthread_attr_setstacksize(pthread_attr_t *attr, size_t stacksize);
-int pthread_attr_getstacksize(const pthread_attr_t *attr, size_t *stacksize);
-
-//added for go compile
+// POSIX signal compliance
 int pthread_kill (pthread_t __threadid, int __signo);
+int pthread_sigmask(int how, const sigset_t *set, sigset_t *oset);
+int pthread_sigqueue(pthread_t *thread, int sig, const union sigval value);
+
+// Dynamic TLS stuff
+static inline int pthread_key_create(pthread_key_t *key, void (*destructor)(void*))
+{ return -1; }
+static inline int pthread_key_delete(pthread_key_t key)
+{ return -1; }
+static inline void *pthread_getspecific(pthread_key_t key)
+{ return NULL; }
+static inline int pthread_setspecific(pthread_key_t key, const void *value)
+{ return -1; }
 
 #ifdef __cplusplus
   }
