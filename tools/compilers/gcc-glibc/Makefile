@@ -90,6 +90,7 @@ make-all:
 	$(MAKE) .$(BINARY_PREFIX)gcc-stage1-install
 	$(MAKE) .$(BINARY_PREFIX)glibc-make
 	$(MAKE) .$(BINARY_PREFIX)glibc-install
+	$(MAKE) .$(BINARY_PREFIX)ros-install-libs
 	$(MAKE) .$(BINARY_PREFIX)gcc-stage2-make
 	$(MAKE) .$(BINARY_PREFIX)gcc-stage2-install
 	mkdir -p $(ROSDIR)/fs/$(ARCH)/lib
@@ -289,12 +290,17 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 	cd $(BINARY_PREFIX)glibc-builddir; \
 	make -j $(MAKE_JOBS) install
 
+.$(BINARY_PREFIX)ros-install-libs:
+	cd $(ROSDIR); \
+	make TARGET_ARCH=$(ARCH) -j $(MAKE_JOBS) install-libs
+
 .$(BINARY_PREFIX)gcc-stage2-configure:
 	$(MAKE) $(BINARY_PREFIX)gcc-stage2-builddir
 	cd $(BINARY_PREFIX)gcc-stage2-builddir; \
 	../gcc-$(GCC_VERSION)/configure \
 	          --enable-shared \
 	          --enable-tls \
+	          --enable-libgomp \
 	          --disable-multilib \
 	          --disable-nls \
 	          --program-prefix=$(BINARY_PREFIX) \
@@ -304,6 +310,7 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 	          $(GCC_BUILD_FLAGS) \
 	          --without-libffi \
 	          --with-__thread \
+	          --with-parlib \
 	          --with-headers=$(INSTDIR)/$(ARCH)-ros/include \
 	          --disable-werror;
 	touch $@
