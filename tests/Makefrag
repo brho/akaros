@@ -2,11 +2,11 @@ TESTS_DIR = tests
 
 OBJDIRS += $(TESTS_DIR)
 
-TESTS_CFLAGS += $(USER_CFLAGS) -g -u force_parlib_symbols
+TESTS_CFLAGS += $(USER_CFLAGS) -g
 
 ALL_TEST_FILES = $(shell ls $(TESTS_DIR)/*.c)
 
-TESTS_LDLIBS := -lpthread -lparlib
+TESTS_LDLIBS := -lpthread
 
 TESTS_SRCS := $(ALL_TEST_FILES)
 

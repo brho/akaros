@@ -540,7 +540,7 @@ extern const char *host_detect_local_cpu (int argc, const char **argv);
    The order here is important so that -march doesn't squash the
    tune or cpu values.  */
 #define OPTION_DEFAULT_SPECS					   \
-  {"parlib", "-lparlib"},			   \
+  {"parlib", "-lparlib -u force_parlib_symbols"},			   \
   {"tune", "%{!mtune=*:%{!mcpu=*:%{!march=*:-mtune=%(VALUE)}}}" }, \
   {"tune_32", "%{" OPT_ARCH32 ":%{!mtune=*:%{!mcpu=*:%{!march=*:-mtune=%(VALUE)}}}}" }, \
   {"tune_64", "%{" OPT_ARCH64 ":%{!mtune=*:%{!mcpu=*:%{!march=*:-mtune=%(VALUE)}}}}" }, \
