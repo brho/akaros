@@ -255,7 +255,7 @@ static void kmem_cache_grow(struct kmem_cache *cp)
 		// Just get a single page for small slabs
 		a_page = mmap(0, PGSIZE, PROT_READ | PROT_WRITE,
 		              MAP_POPULATE | MAP_ANONYMOUS, -1, 0);
-		assert(a_page);
+		assert(a_page != MAP_FAILED);
 		// the slab struct is stored at the end of the page
 		a_slab = (struct kmem_slab*)(a_page + PGSIZE -
 		                             sizeof(struct kmem_slab));
@@ -287,7 +287,7 @@ static void kmem_cache_grow(struct kmem_cache *cp)
 		// round up for the contiguous page allocator
 		void *buf = mmap(0, num_pgs * PGSIZE, PROT_READ | PROT_WRITE,
 		                 MAP_POPULATE | MAP_ANONYMOUS, -1, 0);
-		assert(buf);
+		assert(buf != MAP_FAILED);
 		a_slab->num_busy_obj = 0;
 		a_slab->num_total_obj = ROUNDUPPWR2(num_pgs)*PGSIZE / a_slab->obj_size;
 		TAILQ_INIT(&a_slab->bufctl_freelist);
