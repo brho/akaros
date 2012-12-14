@@ -126,15 +126,6 @@ vcore_init_fail:
 	return -1;
 }
 
-/* this, plus tricking gcc into thinking this is -u (undefined), AND including
- * the event_init in it, causes the linker to need to check parlib.a and see the
- * strong symbol... */
-void force_parlib_symbols(void)
-{
-	vcore_event_init();
-	assert(0);
-}
-
 /* This gets called in glibc before calling the programs 'main'.  Need to set
  * ourselves up so that thread0 is a uthread, and then register basic signals to
  * go to vcore 0. */
