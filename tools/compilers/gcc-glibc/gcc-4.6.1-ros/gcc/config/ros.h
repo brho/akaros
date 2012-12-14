@@ -37,3 +37,8 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 	builtin_assert ("system=unix");				\
 	builtin_assert ("system=posix");			\
     } while (0)
+
+#undef LINK_GCC_C_SEQUENCE_SPEC
+#define LINK_GCC_C_SEQUENCE_SPEC \
+  "--whole-archive -lparlib --no-whole-archive " \
+  "%{static:--start-group} %G %L %{static:--end-group}%{!static:%G}"

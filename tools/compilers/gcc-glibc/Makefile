@@ -88,6 +88,7 @@ make-all:
 	$(MAKE) .$(BINARY_PREFIX)ros-headers-install
 	$(MAKE) .$(BINARY_PREFIX)gcc-stage1-make
 	$(MAKE) .$(BINARY_PREFIX)gcc-stage1-install
+	$(MAKE) .$(BINARY_PREFIX)ros-install-dummy-libs
 	$(MAKE) .$(BINARY_PREFIX)glibc-make
 	$(MAKE) .$(BINARY_PREFIX)glibc-install
 	$(MAKE) .$(BINARY_PREFIX)ros-install-libs
@@ -264,6 +265,9 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 	#-ln -vs libgcc.a `$(BINARY_PREFIX)gcc -print-libgcc-file-name | \
 	#                 sed 's/libgcc/&_eh/'`
 
+.$(BINARY_PREFIX)ros-install-dummy-libs:
+	$(ARCH)-ros-ar cr $(INSTDIR)/$(ARCH)-ros/lib/libparlib.a
+
 .$(BINARY_PREFIX)glibc-configure: 
 	$(MAKE) $(BINARY_PREFIX)glibc-builddir
 	cd $(BINARY_PREFIX)glibc-builddir; \
@@ -310,7 +314,6 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 	          $(GCC_BUILD_FLAGS) \
 	          --without-libffi \
 	          --with-__thread \
-	          --with-parlib \
 	          --with-headers=$(INSTDIR)/$(ARCH)-ros/include \
 	          --disable-werror;
 	touch $@
