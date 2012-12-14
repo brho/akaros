@@ -5,7 +5,7 @@ C3PO_TESTS_CFLAGS += $(TESTS_CFLAGS) \
 
 ALL_C3PO_TEST_FILES = $(shell ls $(C3PO_TESTS_DIR)/*.c)
 
-C3PO_TESTS_LDLIBS := -lpthread -lparlib -lm
+C3PO_TESTS_LDLIBS := -lpthread -lm
 
 C3PO_TESTS_SRCS := $(ALL_C3PO_TEST_FILES)
 
