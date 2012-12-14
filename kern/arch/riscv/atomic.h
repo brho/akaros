@@ -114,8 +114,11 @@ static inline uint32_t spin_trylock(spinlock_t* lock)
 
 static inline void spin_lock(spinlock_t *lock)
 {
-	while(spin_trylock(lock))
-		while(lock->rlock);
+	do
+	{
+		while (lock->rlock)
+			;
+	} while (spin_trylock(lock));
 	mb();
 }
 
