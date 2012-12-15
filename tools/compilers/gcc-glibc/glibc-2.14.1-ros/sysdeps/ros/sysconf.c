@@ -275,5 +275,4 @@ __sysconf (name)
 weak_alias (__sysconf, sysconf)
 libc_hidden_def (__sysconf)
 
-stub_warning (sysconf)
 #include <stub-tag.h>

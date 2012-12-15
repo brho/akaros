@@ -21,6 +21,7 @@
 #include <errno.h>
 #include <sys/sysinfo.h>
 #include <ros/memlayout.h>
+#include <vcore.h>
 
 int
 __get_nprocs_conf ()
@@ -32,7 +33,7 @@ weak_alias (__get_nprocs_conf, get_nprocs_conf)
 int
 __get_nprocs ()
 {
-  return 1;
+  return max_vcores();
 }
 weak_alias (__get_nprocs, get_nprocs)
 
