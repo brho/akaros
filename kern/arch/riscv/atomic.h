@@ -112,7 +112,7 @@ static inline uint32_t spin_trylock(spinlock_t* lock)
 	return __sync_fetch_and_or(&lock->rlock, 1);
 }
 
-static inline void spin_lock(spinlock_t *lock)
+static inline void __spin_lock(spinlock_t *lock)
 {
 	do
 	{
@@ -122,7 +122,7 @@ static inline void spin_lock(spinlock_t *lock)
 	mb();
 }
 
-static inline void spin_unlock(spinlock_t *lock)
+static inline void __spin_unlock(spinlock_t *lock)
 {
 	mb();
 	lock->rlock = 0;
