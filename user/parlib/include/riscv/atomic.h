@@ -9,11 +9,6 @@
 #include <ros/atomic.h>
 #include <ros/arch/membar.h>
 
-typedef struct
-{
-	volatile uint32_t rlock;
-} spinlock_t;
-
 #define SPINLOCK_INITIALIZER {0}
 
 static inline void atomic_init(atomic_t *number, long val);
@@ -30,10 +25,6 @@ static inline bool atomic_cas_ptr(void **addr, void *exp_val, void *new_val);
 static inline bool atomic_cas_u32(uint32_t *addr, uint32_t exp_val,
                                   uint32_t new_val);
 static inline void atomic_or_int(volatile int *number, int mask);
-static inline uint32_t spin_trylock(spinlock_t* lock);
-static inline uint32_t spin_locked(spinlock_t* lock);
-static inline void spin_lock(spinlock_t* lock);
-static inline void spin_unlock(spinlock_t* lock);
 
 /* Inlined functions declared above */
 
@@ -111,7 +102,7 @@ static inline void atomic_orb(volatile uint8_t* number, uint8_t mask)
 asm (".section .gnu.linkonce.b.__riscv_ros_atomic_lock, \"aw\", %nobits\n"
      "\t.previous");
 
-spinlock_t __riscv_ros_atomic_lock
+atomic_t __riscv_ros_atomic_lock
   __attribute__ ((nocommon, section(".gnu.linkonce.b.__riscv_ros_atomic_lock\n\t#"),
                   visibility ("hidden")));
 
@@ -122,12 +113,13 @@ static inline bool atomic_cas(atomic_t *addr, long exp_val, long new_val)
 
 	if ((long)*addr != exp_val)
 		return 0;
-	spin_lock(&__riscv_ros_atomic_lock);
+	if (atomic_swap(&__riscv_ros_atomic_lock, 1))
+		return 0;
 	if ((long)*addr == exp_val) {
 		atomic_swap(addr, new_val);
 		retval = 1;
 	}
-	spin_unlock(&__riscv_ros_atomic_lock);
+	atomic_set(&__riscv_ros_atomic_lock, 0);
 	return retval;
 }
 
@@ -145,34 +137,6 @@ static inline bool atomic_cas_u32(uint32_t *addr, uint32_t exp_val,
 static inline void atomic_or_int(volatile int *number, int mask)
 {
 	__sync_fetch_and_or(number, mask);
-}
-
-static inline uint32_t spin_trylock(spinlock_t* lock)
-{
-	return __sync_fetch_and_or(&lock->rlock, 1) & 1;
-}
-
-static inline uint32_t spin_locked(spinlock_t* lock)
-{
-	return lock->rlock & 1;
-}
-
-static inline void spin_lock(spinlock_t* lock)
-{
-	while(spin_trylock(lock))
-		while(spin_locked(lock));
-	mb();
-}
-
-static inline void spin_unlock(spinlock_t* lock)
-{
-	mb();
-	lock->rlock = 0;
-}
-
-static inline void spinlock_init(spinlock_t* lock)
-{
-	lock->rlock = 0;
 }
 
 #endif /* !PARLIB_ARCH_ATOMIC_H */
