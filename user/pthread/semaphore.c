@@ -73,20 +73,19 @@ int sem_trywait (sem_t *__sem)
 
 int sem_post (sem_t *__sem)
 {
-	int ret = -1;
 	mcs_pdr_lock(&__sem->lock);
-    pthread_t pthread = TAILQ_FIRST(&__sem->queue);
-	if(pthread != NULL) {
+	pthread_t pthread = TAILQ_FIRST(&__sem->queue);
+	if(pthread)
 		TAILQ_REMOVE(&__sem->queue, pthread, next);
-		__sem->count++;
-	}
+	else
+		__sem->count++;	
 	mcs_pdr_unlock(&__sem->lock);
 
-	if(ret == 0) {
+	if(pthread) {
 		pthread->state = PTH_BLK_MUTEX;
 		uthread_runnable((struct uthread*)pthread);
 	}
-	return ret;
+	return 0;
 }
 
 int sem_getvalue (sem_t *__restrict __sem, int *__restrict __sval)
