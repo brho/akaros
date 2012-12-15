@@ -29,10 +29,11 @@
 extern "C" {
 #endif
 
-#define SPINLOCK_LOCKED ((atomic_t)(1))
-#define SPINLOCK_UNLOCKED ((atomic_t)(0))
+#define SPINLOCK_INITIALIZER {0}
 
-typedef atomic_t spinlock_t;
+typedef struct {
+  int lock;
+} spinlock_t;
 
 void spinlock_init(spinlock_t *lock);
 int spinlock_trylock(spinlock_t *lock);
