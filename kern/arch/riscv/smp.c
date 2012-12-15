@@ -8,20 +8,14 @@
 #include <atomic.h>
 #include <pmap.h>
 
-static volatile uint32_t num_cpus_booted = 1;
+volatile uint32_t num_cpus_booted = 0;
 
 void
 smp_boot(void)
 {
 	smp_percpu_init();
-
-	printd("Cores, report in!\n");
-
-	for(uint32_t i = 1; i < num_cpus; i++)
-		send_ipi(i, 0);	/* meaningless IRQ vector */
-	
+	num_cpus_booted = 1;
 	while(num_cpus_booted < num_cpus);
-
 	printd("%d cores reporting!\n", num_cpus);
 }
 

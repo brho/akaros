@@ -16,7 +16,7 @@
 // entry point
 ///////////////////////////////////////////////////////////////////
 
-#define PCR0 (SR_S | SR_ET | SR_S64 | (1 << (IRQ_IPI + SR_IM_SHIFT)))
+#define PCR0 (SR_S | SR_S64 | (1 << (IRQ_IPI + SR_IM_SHIFT)))
 .text
 
 .global _start
@@ -69,6 +69,11 @@ _start:
   jr     t0
 
 notcore0:
+  // wait for core 0 to boot
+  la     t2, num_cpus_booted - KERN_LOAD_ADDR
+1:lw     t3, 0(t2)
+  beqz   t3, 1b
+
   // set up stack: sp = percoore_stacks+(core_id()+1)*KSTKSIZE
   la     sp, percore_stacks
   add    t0, t0, 1
