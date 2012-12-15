@@ -1,6 +1,7 @@
 #include <arch/arch.h>
 #include <assert.h>
 #include <arch/trap.h>
+#include <arch/console.h>
 #include <string.h>
 #include <process.h>
 #include <syscall.h>
@@ -121,13 +122,13 @@ static void exit_halt_loop(trapframe_t* tf)
 static void
 handle_ipi(trapframe_t* tf)
 {
+	clear_ipi();
+	poll_keyboard(); // keypresses can trigger IPIs
 
 	if (!in_kernel(tf))
 		set_current_tf(&per_cpu_info[core_id()], tf);
 	else
 		exit_halt_loop(tf);
-	
-	clear_ipi();
 
 	handle_kmsg_ipi(tf, 0);
 }

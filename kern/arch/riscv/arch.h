@@ -161,9 +161,8 @@ cache_flush(void)
 static __inline void
 reboot(void)
 {
-  extern void fesvr_die();
-	fesvr_die();
-	while(1);
+	extern void cputchar(int ch);
+	cputchar(0);
 }
 
 extern void cpu_halt(void);

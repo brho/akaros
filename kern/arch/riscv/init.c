@@ -8,5 +8,4 @@ void arch_init()
 {		
 	smp_boot();
 	proc_init();
-	keyboard_alarm_init();
 }
