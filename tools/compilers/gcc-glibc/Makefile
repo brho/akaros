@@ -266,6 +266,7 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 	#                 sed 's/libgcc/&_eh/'`
 
 .$(BINARY_PREFIX)ros-install-dummy-libs:
+	rm -rf $(INSTDIR)/$(ARCH)-ros/lib/libparlib.a
 	$(ARCH)-ros-ar cr $(INSTDIR)/$(ARCH)-ros/lib/libparlib.a
 
 .$(BINARY_PREFIX)glibc-configure: 
