@@ -31,7 +31,7 @@
 
 /* The dynamic tls key structure */
 struct dtls_key {
-  atomic_t lock;
+  spinlock_t lock;
   int ref_count;
   bool valid;
   void (*dtor)(void*);
@@ -60,7 +60,7 @@ static struct kmem_cache *__dtls_keys_cache;
 struct kmem_cache *__dtls_values_cache;
   
 /* A lock protecting access to the caches above */
-static atomic_t __dtls_lock;
+static spinlock_t __dtls_lock;
 
 static __thread dtls_data_t __dtls_data;
 static __thread bool __dtls_initialized = false;
