@@ -72,7 +72,11 @@ save_tf:  # write the trap frame onto the stack
 env_pop_tf:  # write the trap frame onto the stack
   # restore gprs
   LOAD  t0,32*REGBYTES(a0)  # restore sr (should disable interrupts)
-  mtpcr  t0,ASM_CR(PCR_SR)
+  mfpcr t1, ASM_CR(PCR_SR)
+  andi  t1, t1, ~(SR_PS | SR_EF | SR_U64)
+  andi  t0, t0, SR_PS | SR_EF | SR_U64
+  or    t0, t0, t1
+  mtpcr t0, ASM_CR(PCR_SR)
 
   LOAD  x1,1*REGBYTES(a0)
   mtpcr  x1,ASM_CR(PCR_K0)
