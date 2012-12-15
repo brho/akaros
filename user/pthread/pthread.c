@@ -541,6 +541,7 @@ void pthread_exit(void *ret)
 {
 	struct pthread_tcb *pthread = pthread_self();
 	pthread->retval = ret;
+	destroy_dtls();
 	uthread_yield(FALSE, __pth_exit_cb, 0);
 }
 
@@ -807,5 +808,29 @@ int pthread_sigqueue(pthread_t *thread, int sig, const union sigval value)
 {
 	printf("pthread_sigqueue is not yet implemented!");
 	return -1;
+}
+
+int pthread_key_create(pthread_key_t *key, void (*destructor)(void*))
+{
+	*key = dtls_key_create(destructor);
+	assert(key);
+	return 0;
+}
+
+int pthread_key_delete(pthread_key_t key)
+{
+	dtls_key_delete(key);
+	return 0;
+}
+
+void *pthread_getspecific(pthread_key_t key)
+{
+	return get_dtls(key);
+}
+
+int pthread_setspecific(pthread_key_t key, const void *value)
+{
+	set_dtls(key, (void*)value);
+	return 0;
 }
 

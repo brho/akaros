@@ -6,6 +6,7 @@
 #include <vcore.h>
 #include <uthread.h>
 #include <mcs.h>
+#include <dtls.h>
 
 #ifdef __cplusplus
   extern "C" {
@@ -122,7 +123,7 @@ typedef struct
 } pthread_attr_t;
 typedef int pthread_barrierattr_t;
 typedef int pthread_once_t;
-typedef void** pthread_key_t;
+typedef dtls_key_t pthread_key_t;
 
 /* Akaros pthread extensions / hacks */
 void pthread_can_vcore_request(bool can);	/* default is TRUE */
@@ -189,14 +190,10 @@ int pthread_sigmask(int how, const sigset_t *set, sigset_t *oset);
 int pthread_sigqueue(pthread_t *thread, int sig, const union sigval value);
 
 // Dynamic TLS stuff
-static inline int pthread_key_create(pthread_key_t *key, void (*destructor)(void*))
-{ return -1; }
-static inline int pthread_key_delete(pthread_key_t key)
-{ return -1; }
-static inline void *pthread_getspecific(pthread_key_t key)
-{ return NULL; }
-static inline int pthread_setspecific(pthread_key_t key, const void *value)
-{ return -1; }
+int pthread_key_create(pthread_key_t *key, void (*destructor)(void*));
+int pthread_key_delete(pthread_key_t key);
+void *pthread_getspecific(pthread_key_t key);
+int pthread_setspecific(pthread_key_t key, const void *value);
 
 #ifdef __cplusplus
   }
