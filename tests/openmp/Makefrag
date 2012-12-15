@@ -1,0 +1,28 @@
+OPENMP_TESTS_DIR = $(TESTS_DIR)/openmp
+
+OPENMP_TESTS_CFLAGS += $(TESTS_CFLAGS) \
+                     -fopenmp \
+                     -I$(GCC_ROOT)/$(TARGET_ARCH)-ros/sys-include/openmp
+
+ALL_OPENMP_TEST_FILES = $(shell ls $(OPENMP_TESTS_DIR)/*.c)
+
+OPENMP_TESTS_LDLIBS := 
+
+OPENMP_TESTS_SRCS := $(ALL_OPENMP_TEST_FILES)
+
+OPENMP_TESTS_LDDEPENDS := $(OPENMP_TESTS_DIR)/%.c 
+
+TESTS_EXECS  += $(patsubst $(OPENMP_TESTS_DIR)/%.c, \
+                      $(OBJDIR)/$(OPENMP_TESTS_DIR)/%, \
+                      $(OPENMP_TESTS_SRCS))
+
+STATIC := $(findstring static,$(OPENMP_TESTS_CFLAGS))
+$(OBJDIR)/$(OPENMP_TESTS_DIR)/%: $(OPENMP_TESTS_LDDEPENDS)
+	@echo + cc [OPENMP_TESTS] $<
+	@mkdir -p $(@D)
+	$(V)$(CC) $(OPENMP_TESTS_CFLAGS) -o $@ $(OPENMP_TESTS_LDFLAGS) \
+	          $(OPENMP_TESTS_LDDIRS) $< $(OPENMP_TESTS_LDLIBS)
+	@if [ "$(STATIC)" != "static" ]; then \
+		$(OBJDUMP) -S $@ > $@.asm; \
+		$(NM) -n $@ > $@.sym; \
+	fi

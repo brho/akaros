@@ -17,6 +17,7 @@ TESTS_EXECS  = $(patsubst $(TESTS_DIR)/%.c, \
                            $(TESTS_SRCS))
 
 include $(TESTS_DIR)/c3po/Makefrag
+include $(TESTS_DIR)/openmp/Makefrag
 
 STATIC := $(findstring static,$(TESTS_CFLAGS))
 $(OBJDIR)/$(TESTS_DIR)/%: $(TESTS_LDDEPENDS)
