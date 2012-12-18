@@ -1,5 +1,6 @@
 #ifndef __PARLIB_TIMING_H__
 #define __PARLIB_TIMING_H__
+#include <stdint.h>
 
 void udelay(uint64_t usec);
 uint64_t udiff(uint64_t begin, uint64_t end);
