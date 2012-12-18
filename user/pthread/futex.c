@@ -24,11 +24,6 @@ static struct futex_data __futex;
 
 static inline void futex_init()
 {
-  static bool initialized = false;
-  if(initialized)
-    return;
-  initialized = true;
-
   mcs_pdr_init(&__futex.lock);
   TAILQ_INIT(&__futex.queue);
   __futex.element_cache = kmem_cache_create("futex_element_cache", 
@@ -63,9 +58,6 @@ static inline int futex_wake(int *uaddr, int count)
 {
   struct futex_element *e,*n = NULL;
   mcs_pdr_lock(&__futex.lock);
-  int size = 0;
-  TAILQ_FOREACH(e, &__futex.queue, link)
-    size++;
   e = TAILQ_FIRST(&__futex.queue);
   while(e != NULL) {
     if(count > 0) {
@@ -91,7 +83,7 @@ int futex(int *uaddr, int op, int val, const struct timespec *timeout,
   assert(uaddr2 == NULL);
   assert(val3 == 0);
 
-  futex_init();
+  run_once(futex_init());
   switch(op) {
     case FUTEX_WAIT:
       return futex_wait(uaddr, val);
