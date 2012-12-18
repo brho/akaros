@@ -119,4 +119,18 @@ static inline bool mult_will_overflow_u64(uint64_t a, uint64_t b)
 // a uint64_t programatically
 #define UINT64(upper, lower) ( (((uint64_t)(upper)) << 32) | (lower) )
 
+#define run_once(func) \
+{\
+	static atomic_t initializing = FALSE; \
+	static bool initialized = FALSE; \
+	if (!atomic_swap(&initializing, TRUE)) { \
+		func; \
+		initialized = TRUE; \
+	} \
+	else { \
+		while(!initialized) \
+			cpu_relax(); \
+	} \
+}
+
 #endif /* ROS_COMMON_H */
