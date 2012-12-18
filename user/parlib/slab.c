@@ -74,11 +74,13 @@ void kmem_cache_init(void)
 	                    sizeof(struct kmem_cache),
 	                    __alignof__(struct kmem_cache), 0, NULL, NULL);
 	/* Build the slab and bufctl caches */
-	kmem_slab_cache = kmem_cache_create("kmem_slab", sizeof(struct kmem_slab),
-	                       __alignof__(struct kmem_slab), 0, NULL, NULL); 
-	kmem_bufctl_cache = kmem_cache_create("kmem_bufctl",
-	                         sizeof(struct kmem_bufctl),
-	                         __alignof__(struct kmem_bufctl), 0, NULL, NULL); 
+	kmem_slab_cache = kmem_cache_alloc(&kmem_cache_cache, 0);
+	__kmem_cache_create(kmem_slab_cache, "kmem_slab", sizeof(struct kmem_slab),
+	                    __alignof__(struct kmem_slab), 0, NULL, NULL); 
+	kmem_bufctl_cache = kmem_cache_alloc(&kmem_cache_cache, 0);
+	__kmem_cache_create(kmem_bufctl_cache, "kmem_bufctl",
+	                    sizeof(struct kmem_bufctl),
+	                    __alignof__(struct kmem_bufctl), 0, NULL, NULL); 
 }
 
 /* Cache management */
@@ -87,12 +89,7 @@ struct kmem_cache *kmem_cache_create(const char *name, size_t obj_size,
                                      void (*ctor)(void *, size_t),
                                      void (*dtor)(void *, size_t))
 {
-	static atomic_t initialized = FALSE;
-	/* Init the slab system.  We'll set it to TRUE, and whoever one the race
-	 * (among multiple initializers) will do the real init. */
-	if (!atomic_swap(&initialized, TRUE))
-		kmem_cache_init();
-
+	run_once(kmem_cache_init());
 	struct kmem_cache *kc = kmem_cache_alloc(&kmem_cache_cache, 0);
 	__kmem_cache_create(kc, name, obj_size, align, flags, ctor, dtor);
 	return kc;
