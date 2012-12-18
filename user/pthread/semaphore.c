@@ -40,7 +40,8 @@ int sem_unlink (__const char *__name)
 
 static void __sem_block(struct uthread *uthread, void *arg) {
 	sem_t *__sem = (sem_t*)arg;
-    pthread_t pthread = (pthread_t)uthread;
+	pthread_t pthread = (pthread_t)uthread;
+	pthread->state = PTH_BLK_MUTEX;
 	TAILQ_INSERT_TAIL(&__sem->queue, pthread, next);
 	mcs_pdr_unlock(&__sem->lock);
 }
@@ -82,7 +83,6 @@ int sem_post (sem_t *__sem)
 	mcs_pdr_unlock(&__sem->lock);
 
 	if(pthread) {
-		pthread->state = PTH_BLK_MUTEX;
 		uthread_runnable((struct uthread*)pthread);
 	}
 	return 0;
