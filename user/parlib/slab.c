@@ -110,9 +110,9 @@ static void kmem_slab_destroy(struct kmem_cache *cp, struct kmem_slab *a_slab)
 	} else {
 		struct kmem_bufctl *i;
 		void *page_start = (void*)-1;
-		// compute how many pages are allocated, given a power of two allocator
-		size_t num_pages = ROUNDUPPWR2(a_slab->num_total_obj * a_slab->obj_size)
-		                                / PGSIZE;
+		/* compute how many pages are allocated, same as in grow */
+		size_t nr_pgs = ROUNDUP(NUM_BUF_PER_SLAB * a_slab->obj_size, PGSIZE) /
+		                        PGSIZE;
 		TAILQ_FOREACH(i, &a_slab->bufctl_freelist, link) {
 			// Track the lowest buffer address, which is the start of the buffer
 			page_start = MIN(page_start, i->buf_addr);
@@ -122,7 +122,7 @@ static void kmem_slab_destroy(struct kmem_cache *cp, struct kmem_slab *a_slab)
 			kmem_cache_free(kmem_bufctl_cache, i);
 		}
 		// free the pages for the slab's buffer
-		munmap(page_start, num_pages * PGSIZE);
+		munmap(page_start, nr_pgs * PGSIZE);
 		// free the slab object
 		kmem_cache_free(kmem_slab_cache, a_slab);
 	}
@@ -278,15 +278,16 @@ static void kmem_cache_grow(struct kmem_cache *cp)
 		a_slab = kmem_cache_alloc(kmem_slab_cache, 0);
 		// TODO: hash table for back reference (BUF)
 		a_slab->obj_size = ROUNDUP(cp->obj_size + sizeof(uintptr_t), cp->align);
-		// alloc n pages, such that it can hold at least 8 items
-		size_t num_pgs = ROUNDUP(NUM_BUF_PER_SLAB * a_slab->obj_size, PGSIZE) /
-		                           PGSIZE;
-		// round up for the contiguous page allocator
-		void *buf = mmap(0, num_pgs * PGSIZE, PROT_READ | PROT_WRITE,
+		/* Need at least nr_pgs to hold NUM_BUF objects.  Note we don't round up
+		 * to the next higher order (power of 2) number of pages, like we do in
+		 * the kernel. */
+		size_t nr_pgs = ROUNDUP(NUM_BUF_PER_SLAB * a_slab->obj_size, PGSIZE) /
+		                         PGSIZE;
+		void *buf = mmap(0, nr_pgs * PGSIZE, PROT_READ | PROT_WRITE,
 		                 MAP_POPULATE | MAP_ANONYMOUS, -1, 0);
 		assert(buf != MAP_FAILED);
 		a_slab->num_busy_obj = 0;
-		a_slab->num_total_obj = ROUNDUPPWR2(num_pgs)*PGSIZE / a_slab->obj_size;
+		a_slab->num_total_obj = nr_pgs * PGSIZE / a_slab->obj_size;
 		TAILQ_INIT(&a_slab->bufctl_freelist);
 		/* for each buffer, set up a bufctl and point to the buffer */
 		for (int i = 0; i < a_slab->num_total_obj; i++) {

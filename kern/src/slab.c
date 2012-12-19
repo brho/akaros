@@ -111,9 +111,12 @@ static void kmem_slab_destroy(struct kmem_cache *cp, struct kmem_slab *a_slab)
 	} else {
 		struct kmem_bufctl *i;
 		void *page_start = (void*)-1;
-		// compute how many pages are allocated, given a power of two allocator
-		size_t num_pages = ROUNDUPPWR2(a_slab->num_total_obj * a_slab->obj_size)
-		                                / PGSIZE;
+		/* Figure out how much memory we asked for earlier.  We needed at least
+		 * min_pgs.  We asked for the next highest order (power of 2) number of
+		 * pages */
+		size_t min_pgs = ROUNDUP(NUM_BUF_PER_SLAB * a_slab->obj_size, PGSIZE) /
+		                         PGSIZE;
+		size_t order_pg_alloc = LOG2_UP(min_pgs);
 		TAILQ_FOREACH(i, &a_slab->bufctl_freelist, link) {
 			// Track the lowest buffer address, which is the start of the buffer
 			page_start = MIN(page_start, i->buf_addr);
@@ -123,7 +126,7 @@ static void kmem_slab_destroy(struct kmem_cache *cp, struct kmem_slab *a_slab)
 			kmem_cache_free(kmem_bufctl_cache, i);
 		}
 		// free the pages for the slab's buffer
-		free_cont_pages(page_start, LOG2_UP(num_pages));
+		free_cont_pages(page_start, order_pg_alloc);
 		// free the slab object
 		kmem_cache_free(kmem_slab_cache, a_slab);
 	}
@@ -278,15 +281,18 @@ static void kmem_cache_grow(struct kmem_cache *cp)
 		a_slab = kmem_cache_alloc(kmem_slab_cache, 0);
 		// TODO: hash table for back reference (BUF)
 		a_slab->obj_size = ROUNDUP(cp->obj_size + sizeof(uintptr_t), cp->align);
-		// alloc n pages, such that it can hold at least 8 items
-		size_t num_pgs = ROUNDUP(NUM_BUF_PER_SLAB * a_slab->obj_size, PGSIZE) /
-		                           PGSIZE;
-		// round up for the contiguous page allocator
-		void *buf = get_cont_pages(LOG2_UP(num_pgs), 0);
+		/* Figure out how much memory we want.  We need at least min_pgs.  We'll
+		 * ask for the next highest order (power of 2) number of pages */
+		size_t min_pgs = ROUNDUP(NUM_BUF_PER_SLAB * a_slab->obj_size, PGSIZE) /
+		                         PGSIZE;
+		size_t order_pg_alloc = LOG2_UP(min_pgs);
+		void *buf = get_cont_pages(order_pg_alloc, 0);
 		if (!buf)
 			panic("[German Accent]: OOM for a large slab growth!!!");
 		a_slab->num_busy_obj = 0;
-		a_slab->num_total_obj = ROUNDUPPWR2(num_pgs)*PGSIZE / a_slab->obj_size;
+		/* The number of objects is based on the rounded up amt requested. */
+		a_slab->num_total_obj = ((1 << order_pg_alloc) * PGSIZE) /
+		                        a_slab->obj_size;
 		TAILQ_INIT(&a_slab->bufctl_freelist);
 		/* for each buffer, set up a bufctl and point to the buffer */
 		for (int i = 0; i < a_slab->num_total_obj; i++) {
