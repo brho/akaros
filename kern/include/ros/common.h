@@ -119,7 +119,10 @@ static inline bool mult_will_overflow_u64(uint64_t a, uint64_t b)
 // a uint64_t programatically
 #define UINT64(upper, lower) ( (((uint64_t)(upper)) << 32) | (lower) )
 
-#define run_once(func) \
+/* Makes sure func is run exactly once.  Can handle concurrent callers, and
+ * other callers spin til the func is complete. */
+/* TODO: look in to optimizing this, with the initialized check first */
+#define run_once_safe(func) \
 {\
 	static atomic_t initializing = FALSE; \
 	static bool initialized = FALSE; \
@@ -131,6 +134,28 @@ static inline bool mult_will_overflow_u64(uint64_t a, uint64_t b)
 		while(!initialized) \
 			cpu_relax(); \
 	} \
+}
+
+/* Unprotected, single-threaded version, makes sure func is run exactly once */
+#define run_once(func)                                                         \
+{                                                                              \
+	static bool ran_once = FALSE;                                              \
+	if (!ran_once) {                                                           \
+		func;                                                                  \
+		ran_once = TRUE;                                                       \
+	}                                                                          \
+}
+
+/* Aborts with 'retcmd' if this function has already been called.  Compared to
+ * run_once, this is put at the top of a function that can be called from
+ * multiple sources but should only execute once. */
+#define init_once(retcmd)                                                      \
+{                                                                              \
+	static bool initialized = FALSE;                                           \
+	if (initialized) {                                                         \
+		retcmd;                                                                \
+	}                                                                          \
+	initialized = TRUE;                                                        \
 }
 
 #endif /* ROS_COMMON_H */
