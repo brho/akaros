@@ -78,7 +78,7 @@ void vcore_init(void)
 {
 	uintptr_t mmap_block;
 	/* Note this is racy, but okay.  The first time through, we are _S */
-	init_once(return);
+	init_once_racy(return);
 
 	vcore_thread_control_blocks = (void**)calloc(max_vcores(),sizeof(void*));
 

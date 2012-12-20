@@ -62,7 +62,7 @@ static void uthread_manage_thread0(struct uthread *uthread)
  * returns, you're in _M mode, still running thread0, on vcore0 */
 void uthread_lib_init(struct uthread *uthread)
 {
-	init_once(return);
+	init_once_racy(return);
 	vcore_init();
 	uthread_manage_thread0(uthread);
 	/* Receive preemption events.  Note that this merely tells the kernel how to

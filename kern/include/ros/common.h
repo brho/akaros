@@ -121,23 +121,27 @@ static inline bool mult_will_overflow_u64(uint64_t a, uint64_t b)
 
 /* Makes sure func is run exactly once.  Can handle concurrent callers, and
  * other callers spin til the func is complete. */
-/* TODO: look in to optimizing this, with the initialized check first */
-#define run_once_safe(func) \
-{\
-	static atomic_t initializing = FALSE; \
-	static bool initialized = FALSE; \
-	if (!atomic_swap(&initializing, TRUE)) { \
-		func; \
-		initialized = TRUE; \
-	} \
-	else { \
-		while(!initialized) \
-			cpu_relax(); \
-	} \
+#define run_once(func)                                                         \
+{                                                                              \
+	static bool ran_once = FALSE;                                              \
+	static atomic_t is_running = FALSE;                                        \
+	if (!ran_once) {                                                           \
+		if (!atomic_swap(&is_running, TRUE)) {                                 \
+			/* we won the race and get to run the func */                      \
+			func;                                                              \
+			wmb();	/* don't let the ran_once write pass previous writes */    \
+			ran_once = TRUE;                                                   \
+		} else {                                                               \
+			/* someone else won, wait til they are done to break out */        \
+			while (!ran_once)                                                  \
+				cpu_relax();                                                   \
+                                                                               \
+		}                                                                      \
+	}                                                                          \
 }
 
 /* Unprotected, single-threaded version, makes sure func is run exactly once */
-#define run_once(func)                                                         \
+#define run_once_racy(func)                                                    \
 {                                                                              \
 	static bool ran_once = FALSE;                                              \
 	if (!ran_once) {                                                           \
@@ -149,7 +153,7 @@ static inline bool mult_will_overflow_u64(uint64_t a, uint64_t b)
 /* Aborts with 'retcmd' if this function has already been called.  Compared to
  * run_once, this is put at the top of a function that can be called from
  * multiple sources but should only execute once. */
-#define init_once(retcmd)                                                      \
+#define init_once_racy(retcmd)                                                 \
 {                                                                              \
 	static bool initialized = FALSE;                                           \
 	if (initialized) {                                                         \

@@ -83,7 +83,7 @@ int futex(int *uaddr, int op, int val, const struct timespec *timeout,
   assert(uaddr2 == NULL);
   assert(val3 == 0);
 
-  run_once_safe(futex_init());
+  run_once(futex_init());
   switch(op) {
     case FUTEX_WAIT:
       return futex_wait(uaddr, val);

@@ -20,7 +20,6 @@
 struct pthread_queue ready_queue = TAILQ_HEAD_INITIALIZER(ready_queue);
 struct pthread_queue active_queue = TAILQ_HEAD_INITIALIZER(active_queue);
 struct mcs_pdr_lock queue_lock;
-pthread_once_t init_once = PTHREAD_ONCE_INIT;
 int threads_ready = 0;
 int threads_active = 0;
 bool can_adjust_vcores = TRUE;
@@ -328,7 +327,7 @@ void pthread_lib_init(void)
 	/* Some testing code might call this more than once (once for a slimmed down
 	 * pth 2LS, and another from pthread_create().  Also, this is racy, but the
 	 * first time through we are an SCP. */
-	init_once(return);
+	init_once_racy(return);
 	assert(!in_multi_mode());
 	mcs_pdr_init(&queue_lock);
 	/* Create a pthread_tcb for the main thread */
@@ -407,7 +406,6 @@ void pthread_lib_init(void)
 int pthread_create(pthread_t *thread, const pthread_attr_t *attr,
                    void *(*start_routine)(void *), void *arg)
 {
-	/* Racy, but the first time through we are an SCP */
 	run_once(pthread_lib_init());
 	/* Create the actual thread */
 	struct pthread_tcb *pthread;

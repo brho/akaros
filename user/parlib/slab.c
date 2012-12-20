@@ -89,7 +89,7 @@ struct kmem_cache *kmem_cache_create(const char *name, size_t obj_size,
                                      void (*ctor)(void *, size_t),
                                      void (*dtor)(void *, size_t))
 {
-	run_once_safe(kmem_cache_init());
+	run_once(kmem_cache_init());
 	struct kmem_cache *kc = kmem_cache_alloc(&kmem_cache_cache, 0);
 	__kmem_cache_create(kc, name, obj_size, align, flags, ctor, dtor);
 	return kc;
