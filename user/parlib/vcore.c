@@ -20,6 +20,7 @@ atomic_t nr_new_vcores_wanted;
 atomic_t vc_req_being_handled;
 
 extern void** vcore_thread_control_blocks;
+bool vc_initialized = FALSE;
 __thread struct syscall __vcore_one_sysc = {.flags = (atomic_t)SC_DONE, 0};
 
 /* TODO: probably don't want to dealloc.  Considering caching */
@@ -73,14 +74,11 @@ static int allocate_transition_stack(int id)
 	return 0;
 }
 
-int vcore_init()
+void vcore_init(void)
 {
-	static int initialized = 0;
 	uintptr_t mmap_block;
-	/* Note this is racy, but okay.  The only time it'll be 0 is the first time
-	 * through, when we are _S */
-	if(initialized)
-		return 0;
+	/* Note this is racy, but okay.  The first time through, we are _S */
+	init_once(return);
 
 	vcore_thread_control_blocks = (void**)calloc(max_vcores(),sizeof(void*));
 
@@ -114,16 +112,15 @@ int vcore_init()
 	}
 	atomic_init(&vc_req_being_handled, 0);
 	assert(!in_vcore_context());
-	initialized = 1;
 	/* no longer need to enable notifs on vcore 0, it is set like that by
 	 * default (so you drop into vcore context immediately on transtioning to
 	 * _M) */
-	return 0;
+	vc_initialized = TRUE;
+	return;
 vcore_init_tls_fail:
 	free(vcore_thread_control_blocks);
 vcore_init_fail:
-	errno = ENOMEM;
-	return -1;
+	assert(0);
 }
 
 /* This gets called in glibc before calling the programs 'main'.  Need to set
@@ -199,8 +196,7 @@ int vcore_request(long nr_new_vcores)
 {
 	long nr_to_prep_now, nr_vcores_wanted;
 
-	if (vcore_init() < 0)
-		return -1;	/* consider ERRNO */
+	assert(vc_initialized);
 	/* Early sanity checks */
 	if ((nr_new_vcores < 0) || (nr_new_vcores + num_vcores() > max_vcores()))
 		return -1;	/* consider ERRNO */

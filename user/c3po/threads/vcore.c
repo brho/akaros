@@ -68,8 +68,7 @@ void __attribute__ ((constructor)) ctors()
 void vcore_startup()
 {
 	/* Initilize the bootstrap code for using the vcores */
-	if (vcore_init())
-		printf("vcore_init() failed, we're fucked!\n");
+	vcore_init();
 	assert(vcore_id() == 0);
 
 	/* Tell the kernel where and how we want to receive events.  This is just an

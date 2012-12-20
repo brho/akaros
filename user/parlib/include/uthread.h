@@ -48,7 +48,7 @@ extern struct schedule_ops *sched_ops;
 
 /* Call this, passing it a uthread representing thread0, from your 2LS init
  * routines.  When it returns, you're in _M mode (thread0 on vcore0) */
-int uthread_lib_init(struct uthread *uthread);
+void uthread_lib_init(struct uthread *uthread);
 
 /* Functions to make/manage uthreads.  Can be called by functions such as
  * pthread_create(), which can wrap these with their own stuff (like attrs,

@@ -322,14 +322,14 @@ int pthread_attr_getstacksize(const pthread_attr_t *attr, size_t *stacksize)
 
 /* Do whatever init you want.  At some point call uthread_lib_init() and pass it
  * a uthread representing thread0 (int main()) */
-int pthread_lib_init(void)
+void pthread_lib_init(void)
 {
-	/* Make sure this only initializes once */
-	static bool initialized = FALSE;
-	if (initialized)
-		return 0;
-	initialized = TRUE;
 	uintptr_t mmap_block;
+	/* Some testing code might call this more than once (once for a slimmed down
+	 * pth 2LS, and another from pthread_create().  Also, this is racy, but the
+	 * first time through we are an SCP. */
+	init_once(return);
+	assert(!in_multi_mode());
 	mcs_pdr_init(&queue_lock);
 	/* Create a pthread_tcb for the main thread */
 	pthread_t t = (pthread_t)calloc(1, sizeof(struct pthread_tcb));
@@ -397,21 +397,18 @@ int pthread_lib_init(void)
 #endif
 	/* Initialize the uthread code (we're in _M mode after this).  Doing this
 	 * last so that all the event stuff is ready when we're in _M mode.  Not a
-	 * big deal one way or the other.  Note that vcore_init() hasn't happened
-	 * yet, so if a 2LS somehow wants to have its init stuff use things like
-	 * vcore stacks or TLSs, we'll need to change this. */
-	assert(!uthread_lib_init((struct uthread*)t));
-	return 0;
+	 * big deal one way or the other.  Note that vcore_init() probably has
+	 * happened, but don't rely on this.  Careful if your 2LS somehow wants to
+	 * have its init stuff use things like vcore stacks or TLSs, we'll need to
+	 * change this. */
+	uthread_lib_init((struct uthread*)t);
 }
 
 int pthread_create(pthread_t *thread, const pthread_attr_t *attr,
                    void *(*start_routine)(void *), void *arg)
 {
-	static bool first = TRUE;
-	if (first) {
-		assert(!pthread_lib_init());
-		first = FALSE;
-	}
+	/* Racy, but the first time through we are an SCP */
+	run_once(pthread_lib_init());
 	/* Create the actual thread */
 	struct pthread_tcb *pthread;
 	pthread = (pthread_t)calloc(1, sizeof(struct pthread_tcb));

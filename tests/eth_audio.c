@@ -51,8 +51,7 @@ int main()
 	//strncpy(out_buf, "Nanwan loves you!\n", 19);
 
 /* begin: stuff userspace needs to do before switching to multi-mode */
-	if (vcore_init())
-		printf("vcore_init() failed, we're fucked!\n");
+	vcore_init();
 
 	/* ETHAUD Turn on Free apple pie (which is the network packet) */
 	enable_kevent(EV_FREE_APPLE_PIE, 0, EVENT_IPI);

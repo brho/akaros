@@ -60,15 +60,10 @@ static void uthread_manage_thread0(struct uthread *uthread)
 
 /* The real 2LS calls this, passing in a uthread representing thread0.  When it
  * returns, you're in _M mode, still running thread0, on vcore0 */
-int uthread_lib_init(struct uthread *uthread)
+void uthread_lib_init(struct uthread *uthread)
 {
-	/* Make sure this only initializes once */
-	static bool initialized = FALSE;
-	if (initialized)
-		return 0;
-	initialized = TRUE;
-	/* Init the vcore system */
-	assert(!vcore_init());
+	init_once(return);
+	vcore_init();
 	uthread_manage_thread0(uthread);
 	/* Receive preemption events.  Note that this merely tells the kernel how to
 	 * send the messages, and does not necessarily provide storage space for the
@@ -90,7 +85,6 @@ int uthread_lib_init(struct uthread *uthread)
 	       preempt_ev_q, preempt_ev_q->ev_flags);
 	/* Get ourselves into _M mode.  Could consider doing this elsewhere... */
 	vcore_change_to_m();
-	return 0;
 }
 
 /* Helper: tells the kernel our SCP is capable of going into vcore context on
@@ -126,8 +120,8 @@ void uthread_slim_init(void)
 {
 	struct uthread *uthread = malloc(sizeof(*uthread));
 	struct event_queue *posix_sig_ev_q;
-	/* TODO: consider a vcore_init_vc0 call.  Init the vcore system */
-	assert(!vcore_init());
+	/* TODO: consider a vcore_init_vc0 call. */
+	vcore_init();
 	uthread_manage_thread0(uthread);
 	scp_vcctx_ready();
 	/* Register an ev_q for posix signals */

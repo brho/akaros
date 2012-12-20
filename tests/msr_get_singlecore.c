@@ -34,8 +34,7 @@ int main(int argc, char** argv)
 	mcs_barrier_init(&b, max_vcores());
 
 /* begin: stuff userspace needs to do before switching to multi-mode */
-	if (vcore_init())
-		printf("vcore_init() failed, we're fucked!\n");
+	vcore_init();
 	#if 0
 	/* tell the kernel where and how we want to receive notifications */
 	struct notif_method *nm;
