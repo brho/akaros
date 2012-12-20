@@ -63,9 +63,29 @@ extern inline void __spin_lock(spinlock_t *lock);
 extern inline void __spin_unlock(spinlock_t *lock);
 extern inline void spinlock_debug(spinlock_t *lock);
 
+/* So we can inline a __spin_lock if we want.  Even though we don't need this
+ * if we're debugging, its helpful to keep the include at the same place for
+ * all builds. */
+#include <arch/atomic.h>
+
+#ifdef __CONFIG_SPINLOCK_DEBUG__
 /* Arch indep, in k/s/atomic.c */
 void spin_lock(spinlock_t *lock);
 void spin_unlock(spinlock_t *lock);
+
+#else
+/* Just inline the arch-specific __ versions */
+static inline void spin_lock(spinlock_t *lock)
+{
+	__spin_lock(lock);
+}
+
+static inline void spin_unlock(spinlock_t *lock)
+{
+	__spin_unlock(lock);
+}
+
+#endif /* __CONFIG_SPINLOCK_DEBUG__ */
 
 /* Inlines, defined below */
 static inline void spinlock_init(spinlock_t *lock);

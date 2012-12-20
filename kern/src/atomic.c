@@ -23,10 +23,9 @@ static void decrease_lock_depth(uint32_t coreid)
 	per_cpu_info[coreid].lock_depth--;
 }
 
-/* TODO: make this inline if we aren't doing DEBUG? */
+#ifdef __CONFIG_SPINLOCK_DEBUG__
 void spin_lock(spinlock_t *lock)
 {
-#ifdef __CONFIG_SPINLOCK_DEBUG__
 	uint32_t coreid = core_id();
 	struct per_cpu_info *pcpui = &per_cpu_info[coreid];
 	/* TODO: don't print directly.  If we have a lock on the print path that
@@ -47,23 +46,17 @@ void spin_lock(spinlock_t *lock)
 	lock->calling_core = coreid;
 	/* TODO consider merging this with __ctx_depth (unused field) */
 	increase_lock_depth(lock->calling_core);
-#else
 	__spin_lock(lock);
-#endif
-	cmb();	/* need cmb(), the CPU mb() was handled by the arch-specific xchg */
+	/* Memory barriers are handled by the particular arches */
 }
 
 void spin_unlock(spinlock_t *lock)
 {
-#ifdef __CONFIG_SPINLOCK_DEBUG__
 	decrease_lock_depth(lock->calling_core);
-#endif
-	/* Need to prevent the compiler (and some arches) from reordering older
-	 * stores. */
-	wmb();
-	rwmb();	/* x86 makes both of these a cmb() */
+	/* Memory barriers are handled by the particular arches */
 	__spin_unlock(lock);
 }
+#endif /* __CONFIG_SPINLOCK_DEBUG__ */
 
 /* Inits a hashlock. */
 void hashlock_init(struct hashlock *hl, unsigned int nr_entries)

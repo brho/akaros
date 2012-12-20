@@ -158,6 +158,7 @@ static inline void __spin_lock_raw(volatile uint32_t *rlock)
 			"	cmpb $0, %%al;        "
 			"	jne 1b;               "
 	        : : "m"(*rlock) : "eax", "cc");
+	cmb();	/* need cmb(), the CPU mb() was handled by the xchg */
 }
 
 static inline void __spin_lock(spinlock_t *lock)
@@ -167,6 +168,9 @@ static inline void __spin_lock(spinlock_t *lock)
 
 static inline void __spin_unlock(spinlock_t *lock)
 {
+	/* Need to prevent the compiler from reordering older stores. */
+	wmb();
+	rwmb();	/* x86 makes both of these a cmb() */
 	lock->rlock = 0;
 }
 

@@ -10,7 +10,7 @@ static inline void spin_lock_irqsave(spinlock_t *lock);
 static inline void spin_unlock_irqsave(spinlock_t *lock);
 /* Same deal with spin locks.  Note that Sparc can deadlock on an atomic op
  * called from interrupt context (TODO) */
-static inline void spin_lock(spinlock_t *lock);
+static inline void __spin_lock(spinlock_t *lock);
 
 /* Actual functions */
 static inline void atomic_init(atomic_t *number, long val)
@@ -32,7 +32,7 @@ static inline long atomic_fetch_and_add(atomic_t *number, long val)
 	long retval;
 	/* this is pretty clever.  the lower 8 bits (i.e byte 3)
 	 * of the atomic_t serve as a spinlock.  let's acquire it. */
-	spin_lock((spinlock_t*)number);
+	__spin_lock((spinlock_t*)number);
 	retval = atomic_read(number);
 	/* compute new counter value. */
 	val += retval;
@@ -49,7 +49,7 @@ static inline void atomic_add(atomic_t *number, long val)
 static inline void atomic_set(atomic_t *number, long val)
 {
 	// this works basically the same as atomic_add... but without the add
-	spin_lock((spinlock_t*)number);
+	__spin_lock((spinlock_t*)number);
 	atomic_init(number,val);
 }
 
@@ -71,7 +71,7 @@ static inline bool atomic_add_not_zero(atomic_t *number, long val)
 	bool retval = FALSE;
 	/* this is pretty clever.  the lower 8 bits (i.e byte 3)
 	 * of the atomic_t serve as a spinlock.  let's acquire it. */
-	spin_lock((spinlock_t*)number);
+	__spin_lock((spinlock_t*)number);
 	num = atomic_read(number);
 	if (num) {
 		num += val;
@@ -89,7 +89,7 @@ static inline bool atomic_sub_and_test(atomic_t *number, long val)
 	bool retval = FALSE;
 	/* this is pretty clever.  the lower 8 bits (i.e byte 3)
 	 * of the atomic_t serve as a spinlock.  let's acquire it. */
-	spin_lock((spinlock_t*)number);
+	__spin_lock((spinlock_t*)number);
 	num = atomic_read(number);
 	num -= val;
 	retval = num ? FALSE : TRUE;
@@ -103,7 +103,7 @@ static inline void atomic_and(atomic_t *number, long mask)
 	long val;
 	/* this is pretty clever.  the lower 8 bits (i.e byte 3)
 	 * of the atomic_t serve as a spinlock.  let's acquire it. */
-	spin_lock((spinlock_t*)number);
+	__spin_lock((spinlock_t*)number);
 	val = atomic_read(number);
 	/* compute new counter value. */
 	val &= mask;
@@ -116,7 +116,7 @@ static inline void atomic_or(atomic_t *number, long mask)
 	long val;
 	/* this is pretty clever.  the lower 8 bits (i.e byte 3)
 	 * of the atomic_t serve as a spinlock.  let's acquire it. */
-	spin_lock((spinlock_t*)number);
+	__spin_lock((spinlock_t*)number);
 	val = atomic_read(number);
 	/* compute new counter value. */
 	val |= mask;
@@ -173,15 +173,16 @@ static inline bool spin_locked(spinlock_t*SAFE lock)
 	return (bool)reg;
 }
 
-static inline void spin_lock(spinlock_t*SAFE lock)
+static inline void __spin_lock(spinlock_t*SAFE lock)
 {
 	while(spin_trylock(lock))
 		while(spin_locked(lock));
+	cmb();
 }
 
-static inline void spin_unlock(spinlock_t*SAFE lock)
+static inline void __spin_unlock(spinlock_t*SAFE lock)
 {
-	wmb();
+	mb();
 	lock->rlock = 0;
 }
 
