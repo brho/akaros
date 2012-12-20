@@ -252,6 +252,7 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 	touch $@
 
 .$(BINARY_PREFIX)gcc-stage1-make: .$(BINARY_PREFIX)gcc-stage1-configure
+	$(MAKE) .gcc-ros-patch
 	# Put the - in front of make because it actually fails and
 	# we don't want the whole make process to fail.
 	# It appears to still work though since this is just stage 1 of compiling
@@ -288,6 +289,7 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 	touch $@
 
 .$(BINARY_PREFIX)glibc-make: .$(BINARY_PREFIX)glibc-configure
+	$(MAKE) .glibc-ros-patch
 	cd $(BINARY_PREFIX)glibc-builddir; \
 	make -j $(MAKE_JOBS)
 
