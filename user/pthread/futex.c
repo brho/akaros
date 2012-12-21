@@ -34,6 +34,7 @@ static inline void futex_init()
 static void __futex_block(struct uthread *uthread, void *arg) {
   struct futex_element *e = (struct futex_element*)arg;
   e->pthread = (pthread_t)uthread;
+	__pthread_generic_yield(e->pthread);
   e->pthread->state = PTH_BLK_MUTEX;
   TAILQ_INSERT_TAIL(&__futex.queue, e, link);
   mcs_pdr_unlock(&__futex.lock);

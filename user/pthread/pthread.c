@@ -442,8 +442,8 @@ int pthread_create(pthread_t *thread, const pthread_attr_t *attr,
 
 /* Helper that all pthread-controlled yield paths call.  Just does some
  * accounting.  This is another example of how the much-loathed (and loved)
- * active queue is keeping us honest. */
-static void __pthread_generic_yield(struct pthread_tcb *pthread)
+ * active queue is keeping us honest.  Need to export for sem and friends. */
+void __pthread_generic_yield(struct pthread_tcb *pthread)
 {
 	mcs_pdr_lock(&queue_lock);
 	threads_active--;
