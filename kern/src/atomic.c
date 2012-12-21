@@ -46,7 +46,6 @@ void spin_lock(spinlock_t *lock)
 	lock->calling_core = coreid;
 	/* TODO consider merging this with __ctx_depth (unused field) */
 	increase_lock_depth(lock->calling_core);
-	__spin_lock(lock);
 	/* Memory barriers are handled by the particular arches */
 }
 
