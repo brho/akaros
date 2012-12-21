@@ -35,7 +35,7 @@
 #ifdef HAVE_ATTRIBUTE_VISIBILITY
 # pragma GCC visibility push(hidden)
 #endif
-#include "futex.h"
+#include "libgomp_futex.h"
 
 static inline void do_wait (int *addr, int val)
 {
