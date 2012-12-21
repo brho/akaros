@@ -30,7 +30,9 @@
    (syscall). The solution here is to push default visibility, include
    our required headers then reinstante the original visibility.  */
 
-#include <ros/futex.h>
+#pragma GCC visibility push(default)
+#include <futex.h>	/* from parlib's pthread library */
+#pragma GCC visibility pop
 
 static inline void
 futex_wait (int *addr, int val)
