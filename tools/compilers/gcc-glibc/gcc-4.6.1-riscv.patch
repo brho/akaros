@@ -69,10 +69,10 @@ index ada68dd..321d4f2 100644
  
 diff --git a/gcc-4.6.1/gcc/config/riscv/constraints.md b/gcc-4.6.1/gcc/config/riscv/constraints.md
 new file mode 100644
-index 0000000..861276a
+index 0000000..d7fbe0b
 --- /dev/null
 +++ gcc-4.6.1/gcc/config/riscv/constraints.md
-@@ -0,0 +1,156 @@
+@@ -0,0 +1,164 @@
 +;; Constraint definitions for MIPS.
 +;; Copyright (C) 2006, 2007, 2008, 2010 Free Software Foundation, Inc.
 +;;
@@ -91,6 +91,14 @@ index 0000000..861276a
 +;; You should have received a copy of the GNU General Public License
 +;; along with GCC; see the file COPYING3.  If not see
 +;; <http://www.gnu.org/licenses/>.
++
++;; Vector register constraints
++
++(define_register_constraint "A" "VEC_GR_REGS"
++  "A vector integer register.")
++
++(define_register_constraint "B" "VEC_FP_REGS"
++  "A vector floating-point register.")
 +
 +;; Register constraints
 +
@@ -1092,10 +1100,10 @@ index 0000000..2a3d835
 +#endif /* _MIPS_H_ */
 diff --git a/gcc-4.6.1/gcc/config/riscv/predicates.md b/gcc-4.6.1/gcc/config/riscv/predicates.md
 new file mode 100644
-index 0000000..a0500ea
+index 0000000..29d9208
 --- /dev/null
 +++ gcc-4.6.1/gcc/config/riscv/predicates.md
-@@ -0,0 +1,206 @@
+@@ -0,0 +1,209 @@
 +;; Predicate definitions for MIPS.
 +;; Copyright (C) 2004, 2007, 2008 Free Software Foundation, Inc.
 +;;
@@ -1302,12 +1310,15 @@ index 0000000..a0500ea
 +
 +(define_predicate "fp_order_operator"
 +  (match_code "eq,lt,le,gt,ge"))
++
++(define_predicate "fp_unorder_operator"
++  (match_code "ordered,unordered"))
 diff --git a/gcc-4.6.1/gcc/config/riscv/riscv-ftypes.def b/gcc-4.6.1/gcc/config/riscv/riscv-ftypes.def
 new file mode 100644
-index 0000000..0357aa6
+index 0000000..69f1cae
 --- /dev/null
 +++ gcc-4.6.1/gcc/config/riscv/riscv-ftypes.def
-@@ -0,0 +1,126 @@
+@@ -0,0 +1,157 @@
 +/* Definitions of prototypes for MIPS built-in functions.  -*- C -*-
 +   Copyright (C) 2007, 2008
 +   Free Software Foundation, Inc.
@@ -1434,12 +1445,43 @@ index 0000000..0357aa6
 +DEF_MIPS_FTYPE (2, (VOID, SI, SI))
 +DEF_MIPS_FTYPE (2, (VOID, V2HI, V2HI))
 +DEF_MIPS_FTYPE (2, (VOID, V4QI, V4QI))
++
++/* RISC-V builtin function types */
++
++DEF_MIPS_FTYPE (1, (VDI, CPOINTER))
++DEF_MIPS_FTYPE (1, (VSI, CPOINTER))
++DEF_MIPS_FTYPE (1, (VHI, CPOINTER))
++DEF_MIPS_FTYPE (1, (VQI, CPOINTER))
++DEF_MIPS_FTYPE (1, (VDF, CPOINTER))
++DEF_MIPS_FTYPE (1, (VSF, CPOINTER))
++
++DEF_MIPS_FTYPE (2, (VDI, CPOINTER, DI))
++DEF_MIPS_FTYPE (2, (VSI, CPOINTER, DI))
++DEF_MIPS_FTYPE (2, (VHI, CPOINTER, DI))
++DEF_MIPS_FTYPE (2, (VQI, CPOINTER, DI))
++DEF_MIPS_FTYPE (2, (VDF, CPOINTER, DI))
++DEF_MIPS_FTYPE (2, (VSF, CPOINTER, DI))
++
++DEF_MIPS_FTYPE (2, (VOID, VDI, POINTER))
++DEF_MIPS_FTYPE (2, (VOID, VSI, POINTER))
++DEF_MIPS_FTYPE (2, (VOID, VHI, POINTER))
++DEF_MIPS_FTYPE (2, (VOID, VQI, POINTER))
++DEF_MIPS_FTYPE (2, (VOID, VDF, POINTER))
++DEF_MIPS_FTYPE (2, (VOID, VSF, POINTER))
++
++DEF_MIPS_FTYPE (3, (VOID, VDI, POINTER, DI))
++DEF_MIPS_FTYPE (3, (VOID, VSI, POINTER, DI))
++DEF_MIPS_FTYPE (3, (VOID, VHI, POINTER, DI))
++DEF_MIPS_FTYPE (3, (VOID, VQI, POINTER, DI))
++DEF_MIPS_FTYPE (3, (VOID, VDF, POINTER, DI))
++DEF_MIPS_FTYPE (3, (VOID, VSF, POINTER, DI))
++
 diff --git a/gcc-4.6.1/gcc/config/riscv/riscv-modes.def b/gcc-4.6.1/gcc/config/riscv/riscv-modes.def
 new file mode 100644
-index 0000000..c12b777
+index 0000000..7848f7c
 --- /dev/null
 +++ gcc-4.6.1/gcc/config/riscv/riscv-modes.def
-@@ -0,0 +1,45 @@
+@@ -0,0 +1,101 @@
 +/* MIPS extra machine modes. 
 +   Copyright (C) 2003, 2004, 2007, 2008 Free Software Foundation, Inc.
 +
@@ -1485,6 +1527,62 @@ index 0000000..c12b777
 +CC_MODE (CCV4);
 +ADJUST_BYTESIZE (CCV4, 16);
 +ADJUST_ALIGNMENT (CCV4, 16);
++
++/* Eventually we want to include syscfg.h here so that we can use the
++   common definition of RISCV_SYSCFG_VLEN_MAX, but for now it is not
++   clear how to do this. syscfg.h in in libgloss which is not used when
++   building the actual cross-compiler. We kind of want to use the
++   "version" in sims - the one for native programs instead of riscv
++   programs. Even if we could include syscfg.h though, we would still
++   need to figure out a way to include it in the mips-riscv.md since the
++   machine description file also refers to these modes. */
++
++#define RISCV_SYSCFG_VLEN_MAX 32
++
++/*----------------------------------------------------------------------*/
++/* RISCV_VECTOR_MODE_NAME                                               */
++/*----------------------------------------------------------------------*/
++/* This is a helper macro which creates a riscv vector mode name from
++   the given inner_mode. It does this by concatenating a 'V' prefix, the
++   maximum riscv vector length, and the inner mode together. For
++   example, RISCV_VECTOR_MODE_NAME(SI) should expand to V32SI if the
++   riscv maximum vector length is 32. We need to use the nested macros
++   to make sure RISCV_SYSCFG_VLEN_MAX is expanded _before_
++   concatenation. */
++
++#define RISCV_VECTOR_MODE_NAME_H2( res_ ) res_
++
++#define RISCV_VECTOR_MODE_NAME_H1( arg0_, arg1_, arg2_ ) \
++  RISCV_VECTOR_MODE_NAME_H2( arg0_ ## arg1_ ## arg2_ )
++
++#define RISCV_VECTOR_MODE_NAME_H0( arg0_, arg1_, arg2_ ) \
++  RISCV_VECTOR_MODE_NAME_H1( arg0_, arg1_, arg2_ )
++
++#define RISCV_VECTOR_MODE_NAME( inner_mode_ ) \
++  RISCV_VECTOR_MODE_NAME_H0( V, RISCV_SYSCFG_VLEN_MAX, inner_mode_ )
++
++/*----------------------------------------------------------------------*/
++/* RISC-V Vector Modes                                                   */
++/*----------------------------------------------------------------------*/
++
++VECTOR_MODE( INT,   DI, RISCV_SYSCFG_VLEN_MAX );
++VECTOR_MODE( INT,   SI, RISCV_SYSCFG_VLEN_MAX );
++VECTOR_MODE( INT,   HI, RISCV_SYSCFG_VLEN_MAX );
++VECTOR_MODE( INT,   QI, RISCV_SYSCFG_VLEN_MAX );
++VECTOR_MODE( FLOAT, DF, RISCV_SYSCFG_VLEN_MAX );
++VECTOR_MODE( FLOAT, SF, RISCV_SYSCFG_VLEN_MAX );
++
++/* By default, vector types are forced to be aligned to the full vector
++   size but in riscv we just need them to be aligned to the element
++   size. */
++
++ADJUST_ALIGNMENT( RISCV_VECTOR_MODE_NAME(DI), 8 );
++ADJUST_ALIGNMENT( RISCV_VECTOR_MODE_NAME(SI), 4 );
++ADJUST_ALIGNMENT( RISCV_VECTOR_MODE_NAME(HI), 2 );
++ADJUST_ALIGNMENT( RISCV_VECTOR_MODE_NAME(QI), 1 );
++ADJUST_ALIGNMENT( RISCV_VECTOR_MODE_NAME(DF), 8 );
++ADJUST_ALIGNMENT( RISCV_VECTOR_MODE_NAME(SF), 4 );
++
 diff --git a/gcc-4.6.1/gcc/config/riscv/riscv-opc.h b/gcc-4.6.1/gcc/config/riscv/riscv-opc.h
 new file mode 100644
 index 0000000..e417397
@@ -2038,10 +2136,10 @@ index 0000000..e417397
 +#define  MASK_SD 0x3ff
 diff --git a/gcc-4.6.1/gcc/config/riscv/riscv-protos.h b/gcc-4.6.1/gcc/config/riscv/riscv-protos.h
 new file mode 100644
-index 0000000..9b2aa4c
+index 0000000..f2a4f11
 --- /dev/null
 +++ gcc-4.6.1/gcc/config/riscv/riscv-protos.h
-@@ -0,0 +1,203 @@
+@@ -0,0 +1,205 @@
 +/* Prototypes of target machine for GNU compiler.  MIPS version.
 +   Copyright (C) 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
 +   1999, 2001, 2002, 2003, 2004, 2005, 2007, 2008, 2009, 2010, 2011
@@ -2172,11 +2270,13 @@ index 0000000..9b2aa4c
 +extern rtx mips_unspec_address (rtx, enum mips_symbol_type);
 +extern void mips_move_integer (rtx, rtx, unsigned HOST_WIDE_INT);
 +extern bool mips_legitimize_move (enum machine_mode, rtx, rtx);
++extern bool mips_legitimize_vector_move (enum machine_mode, rtx, rtx);
 +
 +extern rtx mips_subword (rtx, bool);
 +extern bool mips_split_64bit_move_p (rtx, rtx);
 +extern void mips_split_doubleword_move (rtx, rtx);
 +extern const char *mips_output_move (rtx, rtx);
++extern const char *mips_riscv_output_vector_move (enum machine_mode, rtx, rtx);
 +#ifdef RTX_CODE
 +extern void mips_expand_scc (rtx *);
 +extern void mips_expand_conditional_branch (rtx *);
@@ -2247,10 +2347,10 @@ index 0000000..9b2aa4c
 +#endif /* ! GCC_MIPS_PROTOS_H */
 diff --git a/gcc-4.6.1/gcc/config/riscv/riscv.c b/gcc-4.6.1/gcc/config/riscv/riscv.c
 new file mode 100644
-index 0000000..5ef5a5d
+index 0000000..45dd285
 --- /dev/null
 +++ gcc-4.6.1/gcc/config/riscv/riscv.c
-@@ -0,0 +1,6434 @@
+@@ -0,0 +1,6776 @@
 +/* Subroutines used for MIPS code generation.
 +   Copyright (C) 1989, 1990, 1991, 1993, 1994, 1995, 1996, 1997, 1998,
 +   1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,
@@ -2311,6 +2411,42 @@ index 0000000..5ef5a5d
 +#include "bitmap.h"
 +#include "diagnostic.h"
 +#include "target-globals.h"
++
++/*----------------------------------------------------------------------*/
++/* RISCV_SYSCFG_VLEN_MAX                                                */
++/*----------------------------------------------------------------------*/
++/* Eventually we want to include syscfg.h here so that we can use the
++   common definition of RISCV_SYSCFG_VLEN_MAX, but for now it is not
++   clear how to do this. syscfg.h in in libgloss which is not used when
++   building the actual cross-compiler. We kind of want to use the
++   "version" in sims - the one for native programs instead of RISC-V
++   programs. Even if we could include syscfg.h though, we would still
++   need to figure out a way to include it in the mips-riscv.md since the
++   machine description file also refers to these modes. */
++
++#define RISCV_SYSCFG_VLEN_MAX 32
++
++/*----------------------------------------------------------------------*/
++/* MIPS_RISCV_VECTOR_MODE_NAME                                          */
++/*----------------------------------------------------------------------*/
++/* This is a helper macro which creates a RISC-V vector mode name from
++   the given inner_mode. It does this by concatenating a 'V' prefix, the
++   maximum RISC-V vector length, and the inner mode together. For
++   example, MIPS_RISCV_VECTOR_MODE_NAME(SI) should expand to V32SI if
++   the RISC-V maximum vector length is 32. We need to use the nested
++   macros to make sure RISCV_SYSCFG_VLEN_MAX is expanded _before_
++   concatenation. */
++
++#define MIPS_RISCV_VECTOR_MODE_NAME_H2( res_ ) res_
++
++#define MIPS_RISCV_VECTOR_MODE_NAME_H1( arg0_, arg1_ ) \
++  MIPS_RISCV_VECTOR_MODE_NAME_H2( V ## arg0_ ## arg1_ ## mode )
++
++#define MIPS_RISCV_VECTOR_MODE_NAME_H0( arg0_, arg1_ ) \
++  MIPS_RISCV_VECTOR_MODE_NAME_H1( arg0_, arg1_ )
++
++#define MIPS_RISCV_VECTOR_MODE_NAME( inner_mode_ ) \
++  MIPS_RISCV_VECTOR_MODE_NAME_H0( RISCV_SYSCFG_VLEN_MAX, inner_mode_ )
 +
 +/* True if X is an UNSPEC wrapper around a SYMBOL_REF or LABEL_REF.  */
 +#define UNSPEC_ADDRESS_P(X)					\
@@ -2706,17 +2842,17 @@ index 0000000..5ef5a5d
 +
 +/* Default costs.  If these are used for a processor we should look
 +   up the actual costs.  */
-+#define DEFAULT_COSTS COSTS_N_INSNS (6),  /* fp_add */       \
-+                      COSTS_N_INSNS (7),  /* fp_mult_sf */   \
++#define DEFAULT_COSTS COSTS_N_INSNS (8),  /* fp_add */       \
++                      COSTS_N_INSNS (8),  /* fp_mult_sf */   \
 +                      COSTS_N_INSNS (8),  /* fp_mult_df */   \
-+                      COSTS_N_INSNS (23), /* fp_div_sf */    \
-+                      COSTS_N_INSNS (36), /* fp_div_df */    \
++                      COSTS_N_INSNS (20), /* fp_div_sf */    \
++                      COSTS_N_INSNS (20), /* fp_div_df */    \
 +                      COSTS_N_INSNS (10), /* int_mult_si */  \
 +                      COSTS_N_INSNS (10), /* int_mult_di */  \
 +                      COSTS_N_INSNS (69), /* int_div_si */   \
 +                      COSTS_N_INSNS (69), /* int_div_di */   \
 +                                       2, /* branch_cost */  \
-+                                       4  /* memory_latency */
++                                       7  /* memory_latency */
 +
 +/* Floating-point costs for processors without an FPU.  Just assume that
 +   all floating-point libcalls are very expensive.  */
@@ -2744,19 +2880,8 @@ index 0000000..5ef5a5d
 +/* Costs to use when optimizing for speed, indexed by processor.  */
 +static const struct mips_rtx_cost_data
 +  mips_rtx_cost_data[NUM_PROCESSOR_VALUES] = {
-+  { /* Rocket */
-+    COSTS_N_INSNS (8),            /* fp_add */
-+    COSTS_N_INSNS (8),            /* fp_mult_sf */
-+    COSTS_N_INSNS (8),            /* fp_mult_df */
-+    COSTS_N_INSNS (20),           /* fp_div_sf */
-+    COSTS_N_INSNS (30),           /* fp_div_df */
-+    COSTS_N_INSNS (8),           /* int_mult_si */
-+    COSTS_N_INSNS (8),           /* int_mult_di */
-+    COSTS_N_INSNS (32),           /* int_div_si */
-+    COSTS_N_INSNS (64),           /* int_div_di */
-+		     2,           /* branch_cost */
-+		     7            /* memory_latency */
-+  }
++  { /* Rocket32 */ DEFAULT_COSTS},
++  { /* Rocket64 */ DEFAULT_COSTS}
 +};
 +
 +static int mips_register_move_cost (enum machine_mode, reg_class_t,
@@ -2790,6 +2915,24 @@ index 0000000..5ef5a5d
 +  if (mips_near_type_p (type1) && mips_far_type_p (type2))
 +    return 0;
 +  return 1;
++}
++
++/* If X is a PLUS of a CONST_INT, return the two terms in *BASE_PTR
++   and *OFFSET_PTR.  Return X in *BASE_PTR and 0 in *OFFSET_PTR otherwise.  */
++
++static void
++mips_split_plus (rtx x, rtx *base_ptr, HOST_WIDE_INT *offset_ptr)
++{
++  if (GET_CODE (x) == PLUS && GET_CODE (XEXP (x, 1)) == CONST_INT)
++    {
++      *base_ptr = XEXP (x, 0);
++      *offset_ptr = INTVAL (XEXP (x, 1));
++    }
++  else
++    {
++      *base_ptr = x;
++      *offset_ptr = 0;
++    }
 +}
 +
 +/* Fill CODES with a sequence of rtl operations to load VALUE.
@@ -3872,6 +4015,101 @@ index 0000000..5ef5a5d
 +  return false;
 +}
 +
++bool
++mips_legitimize_vector_move (enum machine_mode mode, rtx dest, rtx src)
++{
++  bool dest_mem, dest_mem_reg;
++  bool src_mem, src_mem_reg;
++
++  dest_mem = (GET_CODE(dest) == MEM);
++  dest_mem_reg = dest_mem && GET_CODE(XEXP(dest, 0)) == REG;
++
++  src_mem = (GET_CODE(src) == MEM);
++  src_mem_reg = src_mem && GET_CODE(XEXP(src, 0)) == REG;
++
++  if (dest_mem && !dest_mem_reg)
++  {
++    rtx add, scratch, base, move;
++    HOST_WIDE_INT offset;
++
++    mips_split_plus(XEXP(dest,0), &base, &offset);
++
++    scratch = gen_reg_rtx(Pmode);
++    add = gen_add3_insn(scratch, base, GEN_INT(offset));
++    emit_insn(add);
++
++    switch (mode)
++    {
++      case MIPS_RISCV_VECTOR_MODE_NAME(DI):
++        move = gen_movv32di(gen_rtx_MEM(mode, scratch), src);
++        break;
++      case MIPS_RISCV_VECTOR_MODE_NAME(SI):
++        move = gen_movv32si(gen_rtx_MEM(mode, scratch), src);
++        break;
++      case MIPS_RISCV_VECTOR_MODE_NAME(HI):
++        move = gen_movv32hi(gen_rtx_MEM(mode, scratch), src);
++        break;
++      case MIPS_RISCV_VECTOR_MODE_NAME(QI):
++        move = gen_movv32qi(gen_rtx_MEM(mode, scratch), src);
++        break;
++      case MIPS_RISCV_VECTOR_MODE_NAME(DF):
++        move = gen_movv32df(gen_rtx_MEM(mode, scratch), src);
++        break;
++      case MIPS_RISCV_VECTOR_MODE_NAME(SF):
++        move = gen_movv32sf(gen_rtx_MEM(mode, scratch), src);
++        break;
++      default:
++        gcc_unreachable();
++    }
++
++    emit_insn(move);
++
++    return true;
++  }
++
++  if (src_mem && !src_mem_reg)
++  {
++    rtx add, scratch, base, move;
++    HOST_WIDE_INT offset;
++
++    mips_split_plus(XEXP(src,0), &base, &offset);
++
++    scratch = gen_reg_rtx(Pmode);
++    add = gen_add3_insn(scratch, base, GEN_INT(offset));
++    emit_insn(add);
++
++    switch (mode)
++    {
++      case MIPS_RISCV_VECTOR_MODE_NAME(DI):
++        move = gen_movv32di(dest, gen_rtx_MEM(mode, scratch));
++        break;
++      case MIPS_RISCV_VECTOR_MODE_NAME(SI):
++        move = gen_movv32si(dest, gen_rtx_MEM(mode, scratch));
++        break;
++      case MIPS_RISCV_VECTOR_MODE_NAME(HI):
++        move = gen_movv32hi(dest, gen_rtx_MEM(mode, scratch));
++        break;
++      case MIPS_RISCV_VECTOR_MODE_NAME(QI):
++        move = gen_movv32qi(dest, gen_rtx_MEM(mode, scratch));
++        break;
++      case MIPS_RISCV_VECTOR_MODE_NAME(DF):
++        move = gen_movv32df(dest, gen_rtx_MEM(mode, scratch));
++        break;
++      case MIPS_RISCV_VECTOR_MODE_NAME(SF):
++        move = gen_movv32sf(dest, gen_rtx_MEM(mode, scratch));
++        break;
++      default:
++        gcc_unreachable();
++    }
++
++    emit_insn(move);
++
++    return true;
++  }
++
++  return false;
++}
++
 +/* The cost of loading values from the constant pool.  It should be
 +   larger than the cost of any constant we want to synthesize inline.  */
 +#define CONSTANT_POOL_COST COSTS_N_INSNS (8)
@@ -4094,7 +4332,7 @@ index 0000000..5ef5a5d
 +      cost = mips_address_insns (addr, mode, true);
 +      if (cost > 0)
 +	{
-+	  *total = COSTS_N_INSNS (cost + 1);
++	  *total = COSTS_N_INSNS (cost + (speed ? mips_cost->memory_latency : 1));
 +	  return true;
 +	}
 +      /* Otherwise use the default handling.  */
@@ -4436,9 +4674,9 @@ index 0000000..5ef5a5d
 +		return "mxtf.s\t%0,%z1";
 +	      if (TARGET_64BIT)
 +		return "mxtf.d\t%0,%z1";
-+	      /* in RV32, we can emulate mxtf.d %0, $x0 using fcvt.d.w */
++	      /* in RV32, we can emulate mxtf.d %0, x0 using fcvt.d.w */
 +	      gcc_assert (src == CONST0_RTX (mode));
-+	      return "fcvt.d.w\t%0,$x0";
++	      return "fcvt.d.w\t%0,x0";
 +	    }
 +	}
 +      if (dest_code == MEM)
@@ -5402,7 +5640,7 @@ index 0000000..5ef5a5d
 +
 +rtx
 +mips_expand_call (enum mips_call_type type, rtx result, rtx addr,
-+		  rtx args_size, rtx aux, bool lazy_p)
++		  rtx args_size, rtx aux ATTRIBUTE_UNUSED, bool lazy_p)
 +{
 +  rtx orig_addr, pattern;
 +
@@ -5841,7 +6079,9 @@ index 0000000..5ef5a5d
 +	  break;
 +
 +	case MEM:
-+	  if (letter == 'D')
++	  if (letter == 'y')
++	    fprintf (file, "%s", reg_names[REGNO(XEXP(op, 0))]);
++	  else if (letter && letter == 'D')
 +	    output_address (plus_constant (XEXP (op, 0), 4));
 +	  else if (letter && letter != 'z')
 +	    output_operand_lossage ("invalid use of '%%%c'", letter);
@@ -6983,6 +7223,8 @@ index 0000000..5ef5a5d
 +/* Expand an "epilogue" or "sibcall_epilogue" pattern; SIBCALL_P
 +   says which.  */
 +
++static bool riscv_in_utfunc = false;
++
 +void
 +mips_expand_epilogue (bool sibcall_p)
 +{
@@ -6992,6 +7234,9 @@ index 0000000..5ef5a5d
 +
 +  if (!sibcall_p && mips_can_use_return_insn ())
 +    {
++      if (riscv_in_utfunc)
++        emit_insn(gen_riscv_stop());
++
 +      emit_jump_insn (gen_return ());
 +      return;
 +    }
@@ -7079,6 +7324,25 @@ index 0000000..5ef5a5d
 +{
 +  unsigned int size;
 +  enum mode_class mclass;
++
++  if (VECTOR_MODE_P(mode))
++  {
++    switch (mode)
++    {
++      case MIPS_RISCV_VECTOR_MODE_NAME(DI):
++      case MIPS_RISCV_VECTOR_MODE_NAME(SI):
++      case MIPS_RISCV_VECTOR_MODE_NAME(HI):
++      case MIPS_RISCV_VECTOR_MODE_NAME(QI):
++        return VEC_GP_REG_P(regno);
++
++      case MIPS_RISCV_VECTOR_MODE_NAME(DF):
++      case MIPS_RISCV_VECTOR_MODE_NAME(SF):
++        return VEC_FP_REG_P(regno);
++
++      default:
++        return false;
++    }
++  }
 +
 +  if (mode == CCmode)
 +    return GP_REG_P (regno);
@@ -7414,7 +7678,19 @@ index 0000000..5ef5a5d
 +static bool
 +mips_vector_mode_supported_p (enum machine_mode mode ATTRIBUTE_UNUSED)
 +{
-+  return false;
++  switch (mode)
++    {
++    case MIPS_RISCV_VECTOR_MODE_NAME(DI):
++    case MIPS_RISCV_VECTOR_MODE_NAME(SI):
++    case MIPS_RISCV_VECTOR_MODE_NAME(HI):
++    case MIPS_RISCV_VECTOR_MODE_NAME(QI):
++    case MIPS_RISCV_VECTOR_MODE_NAME(DF):
++    case MIPS_RISCV_VECTOR_MODE_NAME(SF):
++      return true;
++
++    default:
++      return false;
++    }
 +}
 +
 +/* Implement TARGET_SCALAR_MODE_SUPPORTED_P.  */
@@ -7510,28 +7786,6 @@ index 0000000..5ef5a5d
 +    }
 +}
 +
-+/* Implement TARGET_SCHED_VARIABLE_ISSUE.  */
-+
-+static int
-+mips_variable_issue (FILE *file ATTRIBUTE_UNUSED, int verbose ATTRIBUTE_UNUSED,
-+		     rtx insn, int more)
-+{
-+  /* Ignore USEs and CLOBBERs; don't count them against the issue rate.  */
-+  if (USEFUL_INSN_P (insn))
-+    {
-+      if (get_attr_type (insn) != TYPE_GHOST)
-+	more--;
-+    }
-+
-+  /* Instructions of type 'multi' should all be split before
-+     the second scheduling pass.  */
-+  gcc_assert (!reload_completed
-+	      || recog_memoized (insn) < 0
-+	      || get_attr_type (insn) != TYPE_MULTI);
-+
-+  return more;
-+}
-+
 +/* This structure describes a single built-in function.  */
 +struct mips_builtin_description {
 +  /* The code of the main .md file instruction.  See mips_builtin_type
@@ -7558,6 +7812,12 @@ index 0000000..5ef5a5d
 +mips_builtin_avail_cache (void)
 +{
 +  return 0;
++}
++
++static unsigned int
++mips_builtin_avail_riscv (void)
++{
++  return 1;
 +}
 +
 +/* Construct a mips_builtin_description from the given arguments.
@@ -7596,6 +7856,34 @@ index 0000000..5ef5a5d
 +
 +static const struct mips_builtin_description mips_builtins[] = {
 +  DIRECT_NO_TARGET_BUILTIN (cache, MIPS_VOID_FTYPE_SI_CVPOINTER, cache),
++
++  DIRECT_BUILTIN( riscv_vload_vdi, MIPS_VDI_FTYPE_CPOINTER, riscv ),
++  DIRECT_BUILTIN( riscv_vload_vsi, MIPS_VSI_FTYPE_CPOINTER, riscv ),
++  DIRECT_BUILTIN( riscv_vload_vhi, MIPS_VHI_FTYPE_CPOINTER, riscv ),
++  DIRECT_BUILTIN( riscv_vload_vqi, MIPS_VQI_FTYPE_CPOINTER, riscv ),
++  DIRECT_BUILTIN( riscv_vload_vdf, MIPS_VDF_FTYPE_CPOINTER, riscv ),
++  DIRECT_BUILTIN( riscv_vload_vsf, MIPS_VSF_FTYPE_CPOINTER, riscv ),
++
++  DIRECT_BUILTIN( riscv_vload_strided_vdi, MIPS_VDI_FTYPE_CPOINTER_DI, riscv ),
++  DIRECT_BUILTIN( riscv_vload_strided_vsi, MIPS_VSI_FTYPE_CPOINTER_DI, riscv ),
++  DIRECT_BUILTIN( riscv_vload_strided_vhi, MIPS_VHI_FTYPE_CPOINTER_DI, riscv ),
++  DIRECT_BUILTIN( riscv_vload_strided_vqi, MIPS_VQI_FTYPE_CPOINTER_DI, riscv ),
++  DIRECT_BUILTIN( riscv_vload_strided_vdf, MIPS_VDF_FTYPE_CPOINTER_DI, riscv ),
++  DIRECT_BUILTIN( riscv_vload_strided_vsf, MIPS_VSF_FTYPE_CPOINTER_DI, riscv ),
++
++  DIRECT_NO_TARGET_BUILTIN( riscv_vstore_vdi, MIPS_VOID_FTYPE_VDI_POINTER, riscv ),
++  DIRECT_NO_TARGET_BUILTIN( riscv_vstore_vsi, MIPS_VOID_FTYPE_VSI_POINTER, riscv ),
++  DIRECT_NO_TARGET_BUILTIN( riscv_vstore_vhi, MIPS_VOID_FTYPE_VHI_POINTER, riscv ),
++  DIRECT_NO_TARGET_BUILTIN( riscv_vstore_vqi, MIPS_VOID_FTYPE_VQI_POINTER, riscv ),
++  DIRECT_NO_TARGET_BUILTIN( riscv_vstore_vdf, MIPS_VOID_FTYPE_VDF_POINTER, riscv ),
++  DIRECT_NO_TARGET_BUILTIN( riscv_vstore_vsf, MIPS_VOID_FTYPE_VSF_POINTER, riscv ),
++
++  DIRECT_NO_TARGET_BUILTIN( riscv_vstore_strided_vdi, MIPS_VOID_FTYPE_VDI_POINTER_DI, riscv ),
++  DIRECT_NO_TARGET_BUILTIN( riscv_vstore_strided_vsi, MIPS_VOID_FTYPE_VSI_POINTER_DI, riscv ),
++  DIRECT_NO_TARGET_BUILTIN( riscv_vstore_strided_vhi, MIPS_VOID_FTYPE_VHI_POINTER_DI, riscv ),
++  DIRECT_NO_TARGET_BUILTIN( riscv_vstore_strided_vqi, MIPS_VOID_FTYPE_VQI_POINTER_DI, riscv ),
++  DIRECT_NO_TARGET_BUILTIN( riscv_vstore_strided_vdf, MIPS_VOID_FTYPE_VDF_POINTER_DI, riscv ),
++  DIRECT_NO_TARGET_BUILTIN( riscv_vstore_strided_vsf, MIPS_VOID_FTYPE_VSF_POINTER_DI, riscv ),
 +};
 +
 +/* Index I is the function declaration for mips_builtins[I], or null if the
@@ -7639,6 +7927,7 @@ index 0000000..5ef5a5d
 +#define MIPS_ATYPE_VOID void_type_node
 +#define MIPS_ATYPE_INT integer_type_node
 +#define MIPS_ATYPE_POINTER ptr_type_node
++#define MIPS_ATYPE_CPOINTER const_ptr_type_node
 +#define MIPS_ATYPE_CVPOINTER mips_build_cvpointer_type ()
 +
 +/* Standard mode-based argument types.  */
@@ -7663,6 +7952,30 @@ index 0000000..5ef5a5d
 +  mips_builtin_vector_type (unsigned_intHI_type_node, V4HImode)
 +#define MIPS_ATYPE_UV8QI					\
 +  mips_builtin_vector_type (unsigned_intQI_type_node, V8QImode)
++
++#define MIPS_ATYPE_VDI \
++  mips_builtin_vector_type( intDI_type_node, \
++    MIPS_RISCV_VECTOR_MODE_NAME(DI) )
++
++#define MIPS_ATYPE_VSI \
++  mips_builtin_vector_type( intSI_type_node, \
++    MIPS_RISCV_VECTOR_MODE_NAME(SI) )
++
++#define MIPS_ATYPE_VHI \
++  mips_builtin_vector_type( intHI_type_node, \
++    MIPS_RISCV_VECTOR_MODE_NAME(HI) )
++
++#define MIPS_ATYPE_VQI \
++  mips_builtin_vector_type( intQI_type_node, \
++    MIPS_RISCV_VECTOR_MODE_NAME(QI) )
++
++#define MIPS_ATYPE_VDF \
++  mips_builtin_vector_type( double_type_node, \
++    MIPS_RISCV_VECTOR_MODE_NAME(DF) )
++
++#define MIPS_ATYPE_VSF \
++  mips_builtin_vector_type( float_type_node, \
++    MIPS_RISCV_VECTOR_MODE_NAME(SF) )
 +
 +/* MIPS_FTYPE_ATYPESN takes N MIPS_FTYPES-like type codes and lists
 +   their associated MIPS_ATYPEs.  */
@@ -8117,6 +8430,26 @@ index 0000000..5ef5a5d
 +  reload_completed = 0;
 +}
 +
++/* Implement TARGET_SET_CURRENT_FUNCTION.  Decide whether the current
++   function should use the MIPS16 ISA and switch modes accordingly.  */
++
++static void
++mips_set_current_function (tree fndecl)
++{
++  bool utfunc = fndecl && (lookup_attribute("utfunc", DECL_ATTRIBUTES(fndecl)) != NULL);
++
++  if (!riscv_in_utfunc && utfunc)
++  {
++    riscv_in_utfunc = true;
++    reinit_regs();
++  }
++  else if (riscv_in_utfunc && !utfunc)
++  {
++    riscv_in_utfunc = false;
++    reinit_regs();
++  }
++}
++
 +/* Allocate a chunk of memory for per-function machine-dependent data.  */
 +
 +static struct machine_function *
@@ -8385,6 +8718,47 @@ index 0000000..5ef5a5d
 +      for (regno = FP_REG_FIRST; regno <= FP_REG_LAST; regno++)
 +	fixed_regs[regno] = call_used_regs[regno] = 1;
 +    }
++
++  if (riscv_in_utfunc)
++  {
++    for (regno = CALLEE_SAVED_GP_REG_FIRST;
++         regno <= CALLEE_SAVED_GP_REG_LAST; regno++)
++    {
++      call_used_regs[regno] = 1;
++      call_really_used_regs[regno] = 1;
++    }
++
++    call_used_regs[GP_REG_FIRST + LINK_REG] = 1;
++    call_really_used_regs[GP_REG_FIRST + LINK_REG] = 1;
++
++    for (regno = CALLEE_SAVED_FP_REG_FIRST;
++         regno <= CALLEE_SAVED_FP_REG_LAST; regno++)
++    {
++      call_used_regs[regno] = 1;
++      call_really_used_regs[regno] = 1;
++    }
++  }
++  else
++  {
++    for (regno = CALLEE_SAVED_GP_REG_FIRST;
++         regno <= CALLEE_SAVED_GP_REG_LAST; regno++)
++    {
++      call_used_regs[regno] = 0;
++      call_really_used_regs[regno] = 0;
++    }
++
++    call_used_regs[GP_REG_FIRST + 28] = 1;
++
++    call_used_regs[GP_REG_FIRST + LINK_REG] = 0;
++    call_really_used_regs[GP_REG_FIRST + LINK_REG] = 0;
++
++    for (regno = CALLEE_SAVED_FP_REG_FIRST;
++         regno <= CALLEE_SAVED_FP_REG_LAST; regno++)
++    {
++      call_used_regs[regno] = 0;
++      call_really_used_regs[regno] = 0;
++    }
++  }
 +}
 +
 +/* Initialize vector TARGET to VALS.  */
@@ -8504,6 +8878,73 @@ index 0000000..5ef5a5d
 +  return GET_MODE_BITSIZE (mode) - 1;
 +}
 +
++const char*
++mips_riscv_output_vector_move(enum machine_mode mode, rtx dest, rtx src)
++{
++  bool dest_mem, dest_vgp_reg, dest_vfp_reg;
++  bool src_mem, src_vgp_reg, src_vfp_reg;
++
++  dest_mem = (GET_CODE(dest) == MEM);
++  dest_vgp_reg = (GET_CODE(dest) == REG) && VEC_GP_REG_P(REGNO(dest));
++  dest_vfp_reg = (GET_CODE(dest) == REG) && VEC_FP_REG_P(REGNO(dest));
++
++  src_mem = (GET_CODE(src) == MEM);
++  src_vgp_reg = (GET_CODE(src) == REG) && VEC_GP_REG_P(REGNO(src));
++  src_vfp_reg = (GET_CODE(src) == REG) && VEC_FP_REG_P(REGNO(src));
++
++  if (dest_vgp_reg && src_vgp_reg)
++    return "vmvv\t%0,%1";
++
++  if (dest_vfp_reg && src_vfp_reg)
++    return "vfmvv\t%0,%1";
++
++  if (dest_vgp_reg && src_mem)
++  {
++    switch (mode)
++    {
++      case MIPS_RISCV_VECTOR_MODE_NAME(DI): return "vld\t%0,%y1";
++      case MIPS_RISCV_VECTOR_MODE_NAME(SI): return "vlw\t%0,%y1";
++      case MIPS_RISCV_VECTOR_MODE_NAME(HI): return "vlh\t%0,%y1";
++      case MIPS_RISCV_VECTOR_MODE_NAME(QI): return "vlb\t%0,%y1";
++      default: gcc_unreachable();
++    }
++  }
++
++  if (dest_vfp_reg && src_mem)
++  {
++    switch (mode)
++    {
++      case MIPS_RISCV_VECTOR_MODE_NAME(DF): return "vfld\t%0,%y1";
++      case MIPS_RISCV_VECTOR_MODE_NAME(SF): return "vflw\t%0,%y1";
++      default: gcc_unreachable();
++    }
++  }
++
++  if (dest_mem && src_vgp_reg)
++  {
++    switch (mode)
++    {
++      case MIPS_RISCV_VECTOR_MODE_NAME(DI): return "vsd\t%1,%y0";
++      case MIPS_RISCV_VECTOR_MODE_NAME(SI): return "vsw\t%1,%y0";
++      case MIPS_RISCV_VECTOR_MODE_NAME(HI): return "vsh\t%1,%y0";
++      case MIPS_RISCV_VECTOR_MODE_NAME(QI): return "vsb\t%1,%y0";
++      default: gcc_unreachable();
++    }
++  }
++
++  if (dest_mem && src_vfp_reg)
++  {
++    switch (mode)
++    {
++      case MIPS_RISCV_VECTOR_MODE_NAME(DF): return "vfsd\t%1,%y0";
++      case MIPS_RISCV_VECTOR_MODE_NAME(SF): return "vfsw\t%1,%y0";
++      default: gcc_unreachable();
++    }
++  }
++
++  gcc_unreachable();
++}
++
 +
 +/* Initialize the GCC target structure.  */
 +#undef TARGET_ASM_ALIGNED_HI_OP
@@ -8526,8 +8967,6 @@ index 0000000..5ef5a5d
 +#undef TARGET_ASM_FUNCTION_EPILOGUE
 +#define TARGET_ASM_FUNCTION_EPILOGUE mips_output_function_epilogue
 +
-+#undef TARGET_SCHED_VARIABLE_ISSUE
-+#define TARGET_SCHED_VARIABLE_ISSUE mips_variable_issue
 +#undef TARGET_SCHED_ADJUST_COST
 +#define TARGET_SCHED_ADJUST_COST mips_adjust_cost
 +#undef TARGET_SCHED_ISSUE_RATE
@@ -8543,6 +8982,9 @@ index 0000000..5ef5a5d
 +
 +#undef TARGET_FUNCTION_OK_FOR_SIBCALL
 +#define TARGET_FUNCTION_OK_FOR_SIBCALL hook_bool_tree_tree_true
++
++#undef TARGET_SET_CURRENT_FUNCTION
++#define TARGET_SET_CURRENT_FUNCTION mips_set_current_function
 +
 +#undef TARGET_VALID_POINTER_MODE
 +#define TARGET_VALID_POINTER_MODE mips_valid_pointer_mode
@@ -8687,10 +9129,10 @@ index 0000000..5ef5a5d
 +#include "gt-riscv.h"
 diff --git a/gcc-4.6.1/gcc/config/riscv/riscv.h b/gcc-4.6.1/gcc/config/riscv/riscv.h
 new file mode 100644
-index 0000000..266678b
+index 0000000..0416dc8
 --- /dev/null
 +++ gcc-4.6.1/gcc/config/riscv/riscv.h
-@@ -0,0 +1,1750 @@
+@@ -0,0 +1,1758 @@
 +/* Definitions of target machine for GNU compiler.  MIPS version.
 +   Copyright (C) 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998
 +   1999, 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008, 2009, 2010, 2011
@@ -8886,16 +9328,6 @@ index 0000000..266678b
 +#define MIPS_CPU_STRING_DEFAULT "from-abi"
 +#endif
 +
-+#ifdef IN_LIBGCC2
-+#undef TARGET_64BIT
-+/* Make this compile time constant for libgcc2 */
-+#ifdef __riscv64
-+#define TARGET_64BIT		1
-+#else
-+#define TARGET_64BIT		0
-+#endif
-+#endif /* IN_LIBGCC2 */
-+
 +#define TARGET_LIBGCC_SDATA_SECTION ".sdata"
 +
 +#ifndef MULTILIB_ENDIAN_DEFAULT
@@ -9010,6 +9442,16 @@ index 0000000..266678b
 +
 +#define TARGET_64BIT	(mips_abi == ABI_64)
 +
++#ifdef IN_LIBGCC2
++#undef TARGET_64BIT
++/* Make this compile time constant for libgcc2 */
++#ifdef __riscv64
++#define TARGET_64BIT		1
++#else
++#define TARGET_64BIT		0
++#endif
++#endif /* IN_LIBGCC2 */
++
 +/* Tell collect what flags to pass to nm.  */
 +#ifndef NM_FLAGS
 +#define NM_FLAGS "-Bn"
@@ -9053,6 +9495,8 @@ index 0000000..266678b
 +#define LINK_SPEC "\
 +%{!T:-dT riscv.ld} \
 +%(endian_spec) \
++%{mabi=64:-melf64%{EB:b}%{!EB:l}riscv} \
++%{mabi=32:-melf32%{EB:b}%{!EB:l}riscv} \
 +%{G*} %{mips1} %{mips2} %{mips3} %{mips4} %{mips32*} %{mips64*} \
 +%{shared}"
 +#endif  /* LINK_SPEC defined */
@@ -9358,6 +9802,12 @@ index 0000000..266678b
 +/* Pmode is always the same as ptr_mode, but not always the same as word_mode.
 +   Extensions of pointers to word_mode must be signed.  */
 +#define POINTERS_EXTEND_UNSIGNED false
++
++/* RV32 double-precision FP <-> integer moves go through memory */
++#define SECONDARY_MEMORY_NEEDED(CLASS1,CLASS2,MODE) \
++ (!TARGET_64BIT && GET_MODE_SIZE (MODE) == 8 && \
++   (((CLASS1) == FP_REGS && (CLASS2) != FP_REGS) \
++   || ((CLASS2) == FP_REGS && (CLASS1) != FP_REGS)))
 +
 +/* Define if loading short immediate values into registers sign extends.  */
 +#define SHORT_IMMEDIATES_SIGN_EXTEND
@@ -10443,10 +10893,10 @@ index 0000000..266678b
 +#define SWITCHABLE_TARGET 1
 diff --git a/gcc-4.6.1/gcc/config/riscv/riscv.md b/gcc-4.6.1/gcc/config/riscv/riscv.md
 new file mode 100644
-index 0000000..864de87
+index 0000000..cd5e619
 --- /dev/null
 +++ gcc-4.6.1/gcc/config/riscv/riscv.md
-@@ -0,0 +1,2882 @@
+@@ -0,0 +1,3048 @@
 +;;  Mips.md	     Machine Description for MIPS based processors
 +;;  Copyright (C) 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
 +;;  1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010
@@ -10542,6 +10992,12 @@ index 0000000..864de87
 +(define_constants
 +  [(RETURN_ADDR_REGNUM		1)
 +   (GOT_VERSION_REGNUM		79)
++
++   (UNSPEC_RISCV_VLOAD          700)
++   (UNSPEC_RISCV_VSTORE         701)
++   (UNSPEC_RISCV_VLOAD_STRIDED  702)
++   (UNSPEC_RISCV_VSTORE_STRIDED 703)
++   (UNSPEC_RISCV_STOP           704)
 +  ]
 +)
 +
@@ -10991,6 +11447,150 @@ index 0000000..864de87
 +  "nothing")
 +
 +(include "generic.md")
++
++;;------------------------------------------------------------------------
++;; RISC-V vector mode iterators and attributes
++;;------------------------------------------------------------------------
++;; cbatten - Ideally we would define this using syscfg.h so that it is
++;; easy to change the maximum vector length. Since this file doesn't go
++;; through the preprocessor, we would need to have a separate .md file
++;; included from here which we preprocess explicitly in our t-riscv make
++;; fragment. For now we just hard code the mode types.
++
++;; Basic set of vector modes and attributes
++
++(define_mode_iterator VEC
++  [V32DI V32SI V32HI V32QI V32DF V32SF])
++
++(define_mode_iterator IVEC
++  [V32DI V32SI V32HI V32QI])
++
++(define_mode_attr innermode
++  [(V32DI "DI") (V32SI "SI") (V32HI "HI") (V32QI "QI") (V32DF "DF") (V32SF "SF")])
++
++(define_mode_attr vmode
++  [(V32DI "vdi") (V32SI "vsi") (V32HI "vhi") (V32QI "vqi") (V32DF "vdf") (V32SF "vsf")])
++
++(define_mode_attr vec_mem_prefix
++  [(V32DI "") (V32SI "") (V32HI "") (V32QI "") (V32DF "f") (V32SF "f")])
++
++(define_mode_attr vec_mem_suffix
++  [(V32DI "d") (V32SI "w") (V32HI "h") (V32QI "b") (V32DF "d") (V32SF "w")])
++
++(define_mode_attr vec_umem_suffix
++  [(V32DI "d") (V32SI "wu") (V32HI "hu") (V32QI "bu") (V32DF "d") (V32SF "w")])
++
++(define_mode_attr vec_uarith_suffix
++  [(V32DI "u") (V32SI "u") (V32HI "u") (V32QI "u") (V32DF ".d") (V32SF ".s")])
++
++(define_mode_attr vec_arith_suffix
++  [(V32DI "") (V32SI "") (V32HI "") (V32QI "") (V32DF ".d") (V32SF ".s")])
++
++;;------------------------------------------------------------------------
++;; RISC-V vector move patterns
++;;------------------------------------------------------------------------
++;; cbatten - This pattern is required to support vector modes and
++;; registers. It basically tells gcc how to "reload" vector modes into
++;; and out of vector registers. According to gcc internals we need to be
++;; careful in terms of how we write this pattern - specifically I don't
++;; think you can use multiple patterns via define_qsplit or mutually
++;; exclusive predicates. There needs to be a single pattern for the
++;; reload. This complicates things a bit, because what I really want to
++;; do is a split to brake base offset addressing into two separate
++;; pieces of RTL (the address calculation and the actual load). This
++;; would allow gcc more flexibility in how to schedule and register
++;; allocate the address calculation. Unforutnately, I couldn't get this
++;; to work. I ended up having to hardcode the scheduling and use of the
++;; $at register for the address calculation result (see
++;; mips_riscv_output_vector_move). Works for now but maybe not the best
++;; approach. My attempt at using a split is commented out below as an
++;; example for future work.
++
++(define_expand "mov<mode>"
++  [(set (match_operand:VEC 0 "")
++        (match_operand:VEC 1 ""))]
++  ""
++{
++  if (mips_legitimize_vector_move (<MODE>mode, operands[0], operands[1]))
++    DONE;
++})
++
++(define_insn "*mov<mode>_internal"
++  [(set (match_operand:VEC 0 "nonimmediate_operand" "=A,A,YR,=B,B,YR")
++        (match_operand:VEC 1 "nonimmediate_operand" "A,YR,A,B,YR,B"))]
++  ""
++{
++  return mips_riscv_output_vector_move( <MODE>mode,
++                                        operands[0], operands[1] );
++})
++
++;;------------------------------------------------------------------------
++;; RISC-V unit-stride vector load/store builtins
++;;------------------------------------------------------------------------
++;; cbatten - The signed/unsigned load variants are actually quite tricky
++;; to get right since normally gcc just always uses unsigned loads and
++;; then has separate sign extension patterns which can be used when
++;; necessary. Because with VT we won't know if sign extension is needed
++;; until inside the vector fetched code (and then it is too late to use
++;; a signed-extending vector load) so for now what we do is always use
++;; unsigned types. Then in the VP code you can explicitly cast to an
++;; signed type if you need to. Not as efficient but it will do for now.
++;; Also note that we include an unspec in these patterns. This is to
++;; make sure that these patterns don't match the normal reload movm
++;; pattern above. I'm not positive whether or not this is necessary, but
++;; from the gcc mailing lists it seems like it might be important.
++
++(define_insn "mips_riscv_vload_<VEC:vmode>"
++  [(set (match_operand:VEC 0 "register_operand" "=A,=B")
++        (unspec:VEC [(mem:VEC 
++                       (match_operand:DI 1 "pmode_register_operand" "b,b"))]
++                    UNSPEC_RISCV_VLOAD))]
++  ""
++  "v<vec_mem_prefix>l<vec_mem_suffix>\t%0,%1")
++
++(define_insn "mips_riscv_vstore_<VEC:vmode>"
++  [(set (mem:VEC (match_operand:DI 1 "pmode_register_operand" "b,b"))
++        (unspec:VEC [(match_operand:VEC 0 "register_operand" "A,B")]
++                    UNSPEC_RISCV_VSTORE))]
++  ""
++  "v<vec_mem_prefix>s<vec_mem_suffix>\t%0,%1")
++
++;;------------------------------------------------------------------------
++;; RISC-V strided vector load/store builtins
++;;------------------------------------------------------------------------
++;; cbatten - Since we use a standard scalar register as the base
++;; register, gcc will take care of generating any extra address
++;; arithmetic itself.
++
++(define_insn "mips_riscv_vload_strided_<VEC:vmode>"
++  [(set (match_operand:VEC 0 "register_operand" "=A,=B")
++        (unspec:VEC [(mem:BLK (scratch))
++                     (match_operand:DI 1 "pmode_register_operand" "b,b")
++                     (match_operand:DI 2 "register_operand" "r,r")]
++                    UNSPEC_RISCV_VLOAD_STRIDED))]
++  ""
++  "v<vec_mem_prefix>lst<vec_mem_suffix>\t%0,%1,%2")
++
++(define_insn "mips_riscv_vstore_strided_<VEC:vmode>"
++  [(set (mem:BLK (scratch))
++        (unspec:BLK [(match_operand:VEC 0 "register_operand" "=A,=B")
++                     (match_operand:DI 1 "pmode_register_operand" "b,b")
++                     (match_operand:DI 2 "register_operand" "r,r")]
++                     UNSPEC_RISCV_VSTORE_STRIDED))]
++  ""
++  "v<vec_mem_prefix>sst<vec_mem_suffix>\t%0,%1,%2")
++
++;;------------------------------------------------------------------------
++;; RISC-V stop instruction
++;;------------------------------------------------------------------------
++;; This is explicitly generated for functions with the utfunc attribute.
++;; We do this from within the mips_expand_epilogue() function. I
++;; needed some operand for this so I just used a constant.
++
++(define_insn "riscv_stop"
++  [(unspec_volatile:VOID [(const_int 0)] UNSPEC_RISCV_STOP)]
++  ""
++  "stop")
 +
 +;;
 +;;  ....................
@@ -12758,6 +13358,22 @@ index 0000000..864de87
 +  [(set_attr "type" "fcmp")
 +   (set_attr "mode" "<UNITMODE>")])
 +
++; super ghetto
++(define_insn "cstore<mode>4_ord"
++   [(set (match_operand:SI 0 "register_operand" "=d")
++        (match_operator:SI 1 "fp_unorder_operator"
++	      [(match_operand:SCALARF 2 "register_operand" "f")
++	       (match_dup 2)]))]
++  "TARGET_HARD_FLOAT"
++{
++  if (GET_CODE (operands[1]) == ORDERED)
++    return "feq.<fmt>\t%0,%2,%2";
++  else /* UNORDERED */
++    return "feq.<fmt>\t%0,%2,%2; sltu\t%0,%0,1";
++}
++  [(set_attr "type" "fcmp")
++   (set_attr "mode" "<UNITMODE>")])
++
 +(define_insn "*seq_zero_<GPR:mode><GPR2:mode>"
 +  [(set (match_operand:GPR2 0 "register_operand" "=d")
 +	(eq:GPR2 (match_operand:GPR 1 "register_operand" "d")
@@ -13557,10 +14173,10 @@ index 0000000..14da636
 +  "amoswap.w %0,%2,%1")
 diff --git a/gcc-4.6.1/gcc/config/riscv/t-elf b/gcc-4.6.1/gcc/config/riscv/t-elf
 new file mode 100644
-index 0000000..782c621
+index 0000000..4664de3
 --- /dev/null
 +++ gcc-4.6.1/gcc/config/riscv/t-elf
-@@ -0,0 +1,37 @@
+@@ -0,0 +1,36 @@
 +# Copyright (C) 1999, 2000, 2001, 2002, 2003, 2004, 2006,
 +# 2007 Free Software Foundation, Inc.
 +#
@@ -13591,9 +14207,8 @@ index 0000000..782c621
 +
 +# Build the libraries for both hard and soft floating point
 +
-+MULTILIB_OPTIONS = msoft-float EL/EB
-+MULTILIB_DIRNAMES = soft-float el eb
-+MULTILIB_MATCHES = EL=mel EB=meb msingle-float=m4650
++MULTILIB_OPTIONS = mabi=64/mabi=32
++MULTILIB_DIRNAMES = 64 32
 +EXTRA_MULTILIB_PARTS = crtbegin.o crtend.o crti.o crtn.o
 +
 +LIBGCC = stmp-multilib
@@ -13639,6 +14254,118 @@ index 0000000..7c45312
 +	echo '# define TFLOAT' >> tp-bit.c
 +	cat $(srcdir)/config/fp-bit.c >> tp-bit.c
 +	echo '#endif' >> tp-bit.c
+diff --git a/gcc-4.6.1/gcc/dse.c b/gcc-4.6.1/gcc/dse.c
+index a15b735..05c0d01 100644
+--- a/gcc-4.6.1/gcc/dse.c
++++ gcc-4.6.1/gcc/dse.c
+@@ -1326,7 +1326,46 @@ record_store (rtx body, bb_info_t bb_info)
+   else
+     {
+       width = GET_MODE_SIZE (GET_MODE (mem));
++      /* cbatten - Previously there was the following assertion here:
++
+       gcc_assert ((unsigned) width <= HOST_BITS_PER_WIDE_INT);
++
++         I don't think we need this assertion, and it prevents us from
++         using very large vector types which we would like to do on
++         maven. In the above if condition you can see that we already
++         need to be able to handle widths which are greater than the
++         number of bits in a wide int. And I looked through the
++         remaining codeand it seems like it is used in these two
++         functions:
++
++           set_usage_bits
++           all_positions_needed_p
++
++         neither use is guarded by a check to see if the mode is BLKmode
++         and it looks like both use the general gcc bitmap code which
++         supports arbitrarilty sized bitmaps.
++
++         The width value is also used as "offset + width" in a couple
++         places but all of these places look like it takes an int (as
++         opposed to a bitmap) so we should be okay. 
++
++         And then at the bottom of this function there is this:
++
++          if ( width > HOST_BITS_PER_WIDE_INT ) {
++            store_info->is_large = true;
++            store_info->positions_needed.large.count = 0;
++            store_info->positions_needed.large.bitmap = BITMAP_ALLOC(NULL);
++          }
++          else {
++            store_info->is_large = false;
++            store_info->positions_needed.small_bitmask
++             = lowpart_bitmask(width);
++          }
++
++         Which as you can see explicitly handles the case where the
++         width is too large. The store_info struct has specific hooks to
++         enable this - so other code should work fine as long as it
++         checks the is_large flag. */
+     }
+ 
+   if (spill_alias_set)
+diff --git a/gcc-4.6.1/gcc/expr.c b/gcc-4.6.1/gcc/expr.c
+index 9a81754..773b270 100644
+--- a/gcc-4.6.1/gcc/expr.c
++++ gcc-4.6.1/gcc/expr.c
+@@ -351,7 +351,12 @@ convert_move (rtx to, rtx from, int unsignedp)
+ 
+   if (VECTOR_MODE_P (to_mode) || VECTOR_MODE_P (from_mode))
+     {
++      /* cbatten - On maven the size of both vectors need not be the
++         same, I am not quite sure yet if it is safe to comment out
++         this assertion.
++
+       gcc_assert (GET_MODE_BITSIZE (from_mode) == GET_MODE_BITSIZE (to_mode));
++      */
+ 
+       if (VECTOR_MODE_P (to_mode))
+ 	from = simplify_gen_subreg (to_mode, from, GET_MODE (from), 0);
+diff --git a/gcc-4.6.1/gcc/genmodes.c b/gcc-4.6.1/gcc/genmodes.c
+index dae7e38..df3db0e 100644
+--- a/gcc-4.6.1/gcc/genmodes.c
++++ gcc-4.6.1/gcc/genmodes.c
+@@ -1002,7 +1002,7 @@ emit_mode_size (void)
+   int c;
+   struct mode_data *m;
+ 
+-  print_maybe_const_decl ("%sunsigned char", "mode_size",
++  print_maybe_const_decl ("%sunsigned short", "mode_size",
+ 			  "NUM_MACHINE_MODES", bytesize);
+ 
+   for_all_modes (c, m)
+@@ -1120,7 +1120,7 @@ emit_mode_base_align (void)
+   int c;
+   struct mode_data *m;
+ 
+-  print_maybe_const_decl ("%sunsigned char",
++  print_maybe_const_decl ("%sunsigned short",
+ 			  "mode_base_align", "NUM_MACHINE_MODES",
+ 			  alignment);
+ 
+diff --git a/gcc-4.6.1/gcc/machmode.h b/gcc-4.6.1/gcc/machmode.h
+index bdcd02d..c70a0de 100644
+--- a/gcc-4.6.1/gcc/machmode.h
++++ gcc-4.6.1/gcc/machmode.h
+@@ -176,7 +176,7 @@ extern const unsigned char mode_class[NUM_MACHINE_MODES];
+ 
+ /* Get the size in bytes and bits of an object of mode MODE.  */
+ 
+-extern CONST_MODE_SIZE unsigned char mode_size[NUM_MACHINE_MODES];
++extern CONST_MODE_SIZE unsigned short mode_size[NUM_MACHINE_MODES];
+ #define GET_MODE_SIZE(MODE)    ((unsigned short) mode_size[MODE])
+ #define GET_MODE_BITSIZE(MODE) ((unsigned short) (GET_MODE_SIZE (MODE) * BITS_PER_UNIT))
+ 
+@@ -253,7 +253,7 @@ extern enum machine_mode get_best_mode (int, int, unsigned int,
+ 
+ /* Determine alignment, 1<=result<=BIGGEST_ALIGNMENT.  */
+ 
+-extern CONST_MODE_BASE_ALIGN unsigned char mode_base_align[NUM_MACHINE_MODES];
++extern CONST_MODE_BASE_ALIGN unsigned short mode_base_align[NUM_MACHINE_MODES];
+ 
+ extern unsigned get_mode_alignment (enum machine_mode);
+ 
 diff --git a/gcc-4.6.1/libgcc/config.host b/gcc-4.6.1/libgcc/config.host
 index d3f64d6..27545ff 100644
 --- a/gcc-4.6.1/libgcc/config.host
