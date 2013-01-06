@@ -1044,7 +1044,7 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 		goto out_failed;
 	/* Now we'll actually try to yield */
 	printd("[K] Process %d (%p) is yielding on vcore %d\n", p->pid, p,
-	       get_vcoreid(p, coreid));
+	       get_vcoreid(p, pcoreid));
 	/* Remove from the online list, add to the yielded list, and unmap
 	 * the vcore, which gives up the core. */
 	TAILQ_REMOVE(&p->online_vcs, vc, list);
@@ -1358,7 +1358,7 @@ static bool __proc_give_a_pcore(struct proc *p, uint32_t pcore,
 	if (!new_vc)
 		return FALSE;
 	printd("setting vcore %d to pcore %d\n", vcore2vcoreid(p, new_vc),
-	       pcorelist[i]);
+	       pcore);
 	TAILQ_REMOVE(vc_list, new_vc, list);
 	TAILQ_INSERT_TAIL(&p->online_vcs, new_vc, list);
 	__map_vcore(p, vcore2vcoreid(p, new_vc), pcore);
