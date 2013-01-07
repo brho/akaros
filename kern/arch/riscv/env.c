@@ -14,6 +14,7 @@ env_push_ancillary_state(env_t* e)
 void
 save_fp_state(ancillary_state_t* silly)
 {
+	return; // don't save FP state for now
 	uintptr_t sr = mfpcr(PCR_SR);
 	mtpcr(PCR_SR, sr | SR_EF);
 
@@ -65,6 +66,7 @@ env_pop_ancillary_state(env_t* e)
 void
 restore_fp_state(ancillary_state_t* silly)
 {
+	return; // don't restore FP state for now
 	uintptr_t sr = mfpcr(PCR_SR);
 	mtpcr(PCR_SR, sr | SR_EF);
 

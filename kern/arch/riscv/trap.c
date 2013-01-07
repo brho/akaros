@@ -236,11 +236,17 @@ handle_fault_store(trapframe_t* state)
 static void
 handle_illegal_instruction(trapframe_t* state)
 {
-	set_current_tf(&per_cpu_info[core_id()], state);
+	assert(!in_kernel(state));
 
+	// XXX for noFP demo purposes we're ignoring illegal insts in the user.
+	advance_pc(state);
+	env_pop_tf(state); /* We didn't save our TF, so don't use proc_restartcore */
+
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	set_current_tf(pcpui, state);
 	if (emulate_fpu(state) == 0)
 	{
-		advance_pc(per_cpu_info[core_id()].cur_tf);
+		advance_pc(pcpui->cur_tf);
 		return;
 	}
 
