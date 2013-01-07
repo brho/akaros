@@ -123,7 +123,7 @@ user_mem_walk_recursive(env_t* e, uintptr_t start, size_t len,
 
 	for(uintptr_t idx = start_idx; idx <= end_idx; idx++)
 	{
-		uintptr_t pgaddr = ROUNDDOWN(start, pgsize) + idx*pgsize;
+		uintptr_t pgaddr = ROUNDDOWN(start, pgsize) + (idx-start_idx)*pgsize;
 		pte_t* pte = &pt[idx];
 
 		if(*pte & PTE_T)
