@@ -233,8 +233,10 @@ void manager_klueska()
 
 void manager_waterman()
 {
-	schedule();
-	monitor(0);
+	static bool first = true;
+	if (first)
+		mon_bb(0, 0, 0);
+	smp_idle();
 	assert(0);
 }
 
