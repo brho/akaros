@@ -10,7 +10,7 @@
 static __inline void
 set_stack_pointer(void* sp)
 {
-	asm volatile ("move sp, %0" : : "r"(sp));
+	asm volatile ("move sp, %0" : : "r"(sp) : "memory");
 }
 
 static __inline void
