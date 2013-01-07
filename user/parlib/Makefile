@@ -19,6 +19,7 @@ uc = $(shell echo $(1) | tr a-z A-Z)
 LIBUCNAME := $(call uc, $(LIBNAME))
 HEADERS := $(shell find $(INCDIR) -name *.h)
 CFILES  := $(wildcard $(SRCDIR)*.c)
+CFILES  += $(wildcard $(SRCDIR)$(TARGET_ARCH)/*.c)
 SFILES  := $(wildcard $(SRCDIR)$(TARGET_ARCH)/*.S)
 OBJS    := $(patsubst %.c, $(OBJDIR)/%.o, $(CFILES)) \
            $(patsubst %.S, $(OBJDIR)/%.o, $(SFILES))
