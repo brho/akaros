@@ -1392,7 +1392,7 @@ intreg_t sys_gettimeofday(struct proc *p, int *buf)
 
 	long long dt = read_tsc();
 	/* TODO: This probably wants its own function, using a struct timeval */
-	int kbuf[2] = {t0+dt/system_timing.tsc_freq,
+	long kbuf[2] = {t0+dt/system_timing.tsc_freq,
 	    (dt%system_timing.tsc_freq)*1000000/system_timing.tsc_freq};
 
 	return memcpy_to_user_errno(p,buf,kbuf,sizeof(kbuf));
