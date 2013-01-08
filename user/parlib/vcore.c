@@ -23,6 +23,9 @@ extern void** vcore_thread_control_blocks;
 bool vc_initialized = FALSE;
 __thread struct syscall __vcore_one_sysc = {.flags = (atomic_t)SC_DONE, 0};
 
+/* Per vcore entery function used when reentering at the top of a vcore's stack */
+static __thread void (*__vcore_reentry_func)(void) = NULL;
+
 /* TODO: probably don't want to dealloc.  Considering caching */
 static void free_transition_tls(int id)
 {
@@ -121,6 +124,26 @@ vcore_init_tls_fail:
 	free(vcore_thread_control_blocks);
 vcore_init_fail:
 	assert(0);
+}
+
+/* Helper functions used to reenter at the top of a vcore's stack for an
+ * arbitrary function */
+static void __attribute__((noinline, noreturn)) 
+__vcore_reenter()
+{
+  __vcore_reentry_func();
+  assert(0);
+}
+
+void vcore_reenter(void (*entry_func)(void))
+{
+  assert(in_vcore_context());
+  struct preempt_data *vcpd = vcpd_of(vcore_id());
+
+  __vcore_reentry_func = entry_func;
+  set_stack_pointer((void*)vcpd->transition_stack);
+  cmb();
+  __vcore_reenter();
 }
 
 /* This gets called in glibc before calling the programs 'main'.  Need to set

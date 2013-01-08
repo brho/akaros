@@ -55,6 +55,7 @@ void vcore_event_init(void);
 void vcore_change_to_m(void);
 int vcore_request(long nr_new_vcores);
 void vcore_yield(bool preempt_pending);
+void vcore_reenter(void (*entry_func)(void));
 void enable_notifs(uint32_t vcoreid);
 void disable_notifs(uint32_t vcoreid);
 void vcore_idle(void);
