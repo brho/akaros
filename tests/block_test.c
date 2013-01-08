@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <parlib.h>
 #include <unistd.h>
+#include <sys/time.h>
 
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 #define printf_safe(...) {}

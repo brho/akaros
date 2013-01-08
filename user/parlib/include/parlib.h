@@ -23,6 +23,10 @@ enum {
 	PG_RDWR   = 6,
 };
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 ssize_t     sys_cputs(const uint8_t *s, size_t len);
 uint16_t    sys_cgetc(void);
 int         sys_null(void);
@@ -41,7 +45,6 @@ ssize_t     sys_shared_page_alloc(void *COUNT(PGSIZE) *addr, pid_t p2,
                                   int p1_flags, int p2_flags);
 ssize_t     sys_shared_page_free(void *COUNT(PGSIZE) addr, pid_t p2);
 void        sys_reboot();
-int         gettimeofday(struct timeval* tp, void* tzp);
 void *COUNT(length) sys_mmap(void *SNT addr, size_t length, int prot, int flags,
                              int fd, size_t offset);
 int         sys_notify(int pid, unsigned int ev_type, struct event_msg *u_msg);
@@ -53,6 +56,10 @@ int         sys_block(unsigned int usec);
 int         sys_change_vcore(uint32_t vcoreid, bool enable_my_notif);
 int         sys_change_to_m(void);
 int         sys_poke_ksched(int res_type);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif	// !ASSEMBLER
 
