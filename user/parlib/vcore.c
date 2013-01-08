@@ -261,16 +261,14 @@ void vcore_yield(bool preempt_pending)
 	uint32_t vcoreid = vcore_id();
 	struct preempt_data *vcpd = vcpd_of(vcoreid);
 	__sync_fetch_and_and(&vcpd->flags, ~VC_CAN_RCV_MSG);
-	/* no wrmb() necessary, clear_notif() has an mb() */
-	/* Clears notif pending.  If we had an event outstanding, this will handle
-	 * it and return TRUE, at which point we want to unwind and return to the
-	 * 2LS loop (where we may not want to yield anymore).  Note that the kernel
-	 * only cares about CAN_RCV_MSG for the desired vcore, not for a FALLBACK.
-	 * We need to deal with this notif_pending business regardless of
-	 * CAN_RCV_MSG.  We just want to avoid a yield syscall if possible.  It is
-	 * important that clear_notif_pending will handle_events().  That is
-	 * necessary to do/check after turning off CAN_RCV_MSG. */
-	if (clear_notif_pending(vcoreid)) {
+	/* no wrmb() necessary, handle_events() has an mb() if it is checking */
+	/* Clears notif pending and tries to handle events.  This is an optimization
+	 * to avoid the yield syscall if we have an event pending.  If there is one,
+	 * we want to unwind and return to the 2LS loop, where we may not want to
+	 * yield anymore.
+	 * Note that the kernel only cares about CAN_RCV_MSG for the desired vcore,
+	 * not for a FALLBACK.  */
+	if (handle_events(vcoreid)) {
 		__sync_fetch_and_or(&vcpd->flags, VC_CAN_RCV_MSG);
 		return;
 	}
@@ -287,30 +285,6 @@ void vcore_yield(bool preempt_pending)
 	 * by the kernel after we cleared it and we lost the race. */
 	sys_yield(preempt_pending);
 	__sync_fetch_and_or(&vcpd->flags, VC_CAN_RCV_MSG);
-}
-
-/* Clear pending, and try to handle events that came in between a previous call
- * to handle_events() and the clearing of pending.  While it's not a big deal,
- * we'll loop in case we catch any.  Will break out of this once there are no
- * events, and we will have send pending to 0. 
- *
- * Note that this won't catch every race/case of an incoming event.  Future
- * events will get caught in pop_ros_tf() or proc_yield().
- *
- * Also note that this handles events, which may change your current uthread or
- * might not return!  Be careful calling this.  Check run_uthread for an example
- * of how to use this. */
-bool clear_notif_pending(uint32_t vcoreid)
-{
-	bool handled_event = FALSE;
-	do {
-		vcpd_of(vcoreid)->notif_pending = 0;
-		/* need a full mb(), since handle events might be just a read or might
-		 * be a write, either way, it needs to happen after notif_pending */
-		mb();
-		handled_event = handle_events(vcoreid);
-	} while (handled_event);
-	return handled_event;
 }
 
 /* Enables notifs, and deals with missed notifs by self notifying.  This should
@@ -338,11 +312,13 @@ void disable_notifs(uint32_t vcoreid)
 }
 
 /* Like smp_idle(), this will put the core in a state that it can only be woken
- * up by an IPI.  In the future, we may halt or something. */
-void __attribute__((noreturn)) vcore_idle(void)
+ * up by an IPI.  In the future, we may halt or something.  This will return if
+ * an event was pending (could be the one you were waiting for). */
+void vcore_idle(void)
 {
 	uint32_t vcoreid = vcore_id();
-	clear_notif_pending(vcoreid);
+	if (handle_events(vcoreid))
+		return;
 	enable_notifs(vcoreid);
 	while (1) {
 		cpu_relax();

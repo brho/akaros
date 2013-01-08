@@ -382,7 +382,7 @@ static void __run_cur_uthread(void)
 	struct preempt_data *vcpd = vcpd_of(vcoreid);
 	struct uthread *uthread;
 	/* Last check for messages.  Might not return, or cur_uth might be unset. */
-	clear_notif_pending(vcoreid);
+	handle_events(vcoreid);
 	/* clear_notif might have handled a preemption event, and we might not have
 	 * a current_uthread anymore.  Need to recheck */
 	cmb();

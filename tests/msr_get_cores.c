@@ -23,6 +23,7 @@
 #include <timing.h>
 #include <rassert.h>
 #include <uthread.h>
+#include <event.h>
 
 #ifdef __sparc_v8__
 # define udelay(x) udelay((x)/2000)
@@ -97,7 +98,7 @@ void vcore_entry(void)
 	 * set the appropriate TLS.  On x86, this will involve changing the LDT
 	 * entry for this vcore to point to the TCB of the new user-thread. */
 	if (vcoreid == 0) {
-		clear_notif_pending(vcoreid);
+		handle_events(vcoreid);
 		set_tls_desc(core0_tls, 0);
 		assert(__vcoreid == 0); /* in case anyone uses this */
 		/* Load silly state (Floating point) too */

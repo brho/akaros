@@ -186,8 +186,8 @@ int handle_one_mbox_msg(struct event_mbox *ev_mbox)
 }
 
 /* Handle an mbox.  This is the receive-side processing of an event_queue.  It
- * takes an ev_mbox, since the vcpd mbox isn't a regular ev_q.  Returns the
- * number handled/attempted: counts if you don't have a handler. */
+ * takes an ev_mbox, since the vcpd mbox isn't a regular ev_q.  Returns 1 if we
+ * handled something, 0 o/w. */
 int handle_mbox(struct event_mbox *ev_mbox)
 {
 	int retval = 0;
@@ -196,15 +196,15 @@ int handle_mbox(struct event_mbox *ev_mbox)
 		printd("[event] Bit: ev_type: %d\n", bit);
 		if (ev_handlers[bit])
 			ev_handlers[bit](0, bit);
-		retval++;
+		retval = 1;
 		/* Consider checking the queue for incoming messages while we're here */
 	}
 	printd("[event] handling ev_mbox %08p on vcore %d\n", ev_mbox, vcore_id());
 	/* Some stack-smashing bugs cause this to fail */
 	assert(ev_mbox);
-	/* Handle all full messages, tracking the number of attempts. */
+	/* Handle all full messages, tracking if we do at least one. */
 	while (handle_one_mbox_msg(ev_mbox))
-		retval++;
+		retval = 1;
 	/* Process all bits, if the kernel tells us any bit is set.  We don't clear
 	 * the flag til after we check everything, in case one of the handlers
 	 * doesn't return.  After we clear it, we recheck. */
@@ -267,16 +267,24 @@ void handle_check_msgs(struct event_msg *ev_msg, unsigned int ev_type)
 	handle_vcpd_mbox(rem_vcoreid);
 }
 
-/* 2LS will probably call this in vcore_entry and places where it wants to check
- * for / handle events.  This will process all the events for the given vcore.
- * Note, it probably should be the calling vcore you do this to...  Returns the
- * number of events handled. */
+/* Attempts to handle events, if notif_pending.  The kernel always sets
+ * notif_pending after posting a message to either public or private mailbox.
+ * When this returns, as far as we are concerned, notif_pending is FALSE.
+ * However, a concurrent kernel writer could have reset it to true.  This is
+ * fine; whenever we leave VC ctx we double check notif_pending.  Returns 1 or 2
+ * if we actually handled a message, 0 o/w.
+ *
+ * WARNING: this might not return and/or current_uthread may change. */
 int handle_events(uint32_t vcoreid)
 {
 	struct preempt_data *vcpd = vcpd_of(vcoreid);
 	int retval = 0;
-	retval += handle_mbox(&vcpd->ev_mbox_private);
-	retval += handle_mbox(&vcpd->ev_mbox_public);
+	if (vcpd->notif_pending) {
+		vcpd->notif_pending = FALSE;
+		wrmb();	/* prevent future reads from happening before notif_p write */
+		retval += handle_mbox(&vcpd->ev_mbox_private);
+		retval += handle_mbox(&vcpd->ev_mbox_public);
+	}
 	return retval;
 }
 
