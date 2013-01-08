@@ -74,6 +74,11 @@ notcore0:
 1:lw     t3, 0(t2)
   beqz   t3, 1b
 
+  // if for some reason coreid >= num_cpus, don't boot this core
+  la     t2, num_cpus - KERN_LOAD_ADDR
+  lw     t2, 0(t2)
+1:bgeu   t0, t2, 1b
+
   // set up stack: sp = percoore_stacks+(core_id()+1)*KSTKSIZE
   la     sp, percore_stacks
   add    t0, t0, 1
