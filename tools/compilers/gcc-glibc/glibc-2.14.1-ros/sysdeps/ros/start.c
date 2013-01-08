@@ -37,8 +37,10 @@ weak_alias(__vcore_event_init, vcore_event_init)
 
 void __ros_libc_csu_init(int argc, char **argv, char **envp)
 {
-	__libc_csu_init(argc, argv, envp);
 	vcore_event_init();
+	// Note that we want the ctors to be called after vcore_event_init.
+	// (They are invoked by the next line.)
+	__libc_csu_init(argc, argv, envp);
 }
 
 void
