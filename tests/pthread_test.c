@@ -96,8 +96,8 @@ int main(int argc, char** argv)
 	printf("Nr context switches: %d\n", nr_ctx_switches);
 	printf("Time to run: %d usec\n", usec_diff);
 	if (nr_vcores == 1)
-		printf("Context switch latency: %f usec\n",
-		       (float)usec_diff / (float)nr_ctx_switches);
-	printf("Context switches / sec: %f\n\n",
-	       ((float)nr_ctx_switches / (float)usec_diff) * 1000000);
+		printf("Context switch latency: %d nsec\n",
+		       (int)(1000LL*usec_diff / nr_ctx_switches));
+	printf("Context switches / sec: %d\n\n",
+	       (int)(1000000LL*nr_ctx_switches / usec_diff));
 } 
