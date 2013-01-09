@@ -1573,3 +1573,42 @@ void test_cv(void)
 	}
 	printk("test_cv: single sender/receiver complete\n");
 }
+
+/* Based on a bug I noticed.  TODO: actual memset test... */
+void test_memset(void)
+{
+	#define ARR_SZ 256
+	
+	void print_array(char *c, size_t len)
+	{
+		for (int i = 0; i < len; i++)
+			printk("%04d: %02x\n", i, *c++);
+	}
+	
+	void check_array(char *c, char x, size_t len)
+	{
+		for (int i = 0; i < len; i++) {
+			if (*c != x) {
+				printk("Char %d is %c (%02x), should be %c (%02x)\n", i, *c,
+				       *c, x, x);
+				break;
+			}
+			c++;
+		}
+	}
+	
+	void run_check(char *arr, int ch, size_t len)
+	{
+		char *c = arr;
+		for (int i = 0; i < ARR_SZ; i++)
+			*c++ = 0x0;
+		memset(arr, ch, len - 4);
+		check_array(arr, ch, len - 4);
+		check_array(arr + len - 4, 0x0, 4);
+	}
+
+	char bytes[ARR_SZ];
+	run_check(bytes, 0xfe, 20);
+	run_check(bytes, 0xc0fe, 20);
+	printk("Done!\n");
+}

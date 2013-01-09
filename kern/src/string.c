@@ -139,7 +139,7 @@ memsetw(long* _v, long c, size_t n)
 	start = _v;
 	end = _v + n/sizeof(long);
 	v = _v;
-	c = (char)c;
+	c = c & 0xff;
 	c = c | c<<8;
 	c = c | c<<16;
 	#if NUM_ADDR_BITS == 64
