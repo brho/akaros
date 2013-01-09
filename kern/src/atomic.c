@@ -28,19 +28,26 @@ void spin_lock(spinlock_t *lock)
 {
 	uint32_t coreid = core_id();
 	struct per_cpu_info *pcpui = &per_cpu_info[coreid];
-	/* TODO: don't print directly.  If we have a lock on the print path that
-	 * fails, we'll recurse and/or deadlock */
+	/* Short circuit our lock checking, so we can print or do other things to
+	 * announce the failure that require locks. */
+	if (pcpui->__lock_depth_disabled)
+		goto lock;
 	if (lock->irq_okay) {
 		if (!can_spinwait_irq(pcpui)) {
+			pcpui->__lock_depth_disabled++;
 			print_kctx_depths("IRQOK");
 			panic("Lock %08p tried to spin when it shouldn't\n", lock);
+			pcpui->__lock_depth_disabled--;
 		}
 	} else {
 		if (!can_spinwait_noirq(pcpui)) {
+			pcpui->__lock_depth_disabled++;
 			print_kctx_depths("NOIRQ");
 			panic("Lock %08p tried to spin when it shouldn't\n", lock);
+			pcpui->__lock_depth_disabled--;
 		}
 	}
+lock:
 	__spin_lock(lock);
 	lock->call_site = get_caller_pc();
 	lock->calling_core = coreid;

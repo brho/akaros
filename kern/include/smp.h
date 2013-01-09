@@ -32,6 +32,7 @@ struct per_cpu_info {
 	struct trapframe *cur_tf;	/* user tf we came in on (can be 0) */
 	struct trapframe actual_tf;	/* storage for cur_tf */
 	uint32_t __ctx_depth;		/* don't access directly.  see trap.h. */
+	int __lock_depth_disabled;	/* disables spinlock depth checking */
 	struct syscall *cur_sysc;	/* ptr is into cur_proc's address space */
 	struct kthread *spare;		/* useful when restarting */
 	struct timer_chain tchain;	/* for the per-core alarm */

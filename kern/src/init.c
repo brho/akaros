@@ -120,7 +120,10 @@ void kernel_init(multiboot_info_t *mboot_info)
 void _panic(const char *file, int line, const char *fmt,...)
 {
 	va_list ap;
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 
+	/* We're panicing, possibly in a place that can't handle the lock checker */
+	pcpui->__lock_depth_disabled++;
 	va_start(ap, fmt);
 	cprintf("kernel panic at %s:%d, from core %d: ", file, line, core_id());
 	vcprintf(fmt, ap);
@@ -129,6 +132,10 @@ void _panic(const char *file, int line, const char *fmt,...)
 
 dead:
 	monitor(NULL);
+	/* We could consider turning the lock checker back on here, but things are
+	 * probably a mess anyways, and with it on we would probably lock up right
+	 * away when we idle. */
+	//pcpui->__lock_depth_disabled--;
 	smp_idle();
 }
 

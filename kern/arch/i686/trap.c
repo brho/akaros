@@ -218,6 +218,11 @@ print_trapframe(trapframe_t *tf)
 {
 	static spinlock_t ptf_lock = SPINLOCK_INITIALIZER_IRQSAVE;
 
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	/* This is only called in debug scenarios, and often when the kernel trapped
+	 * and needs to tell us about it.  Disable the lock checker so it doesn't go
+	 * nuts when we print/panic */
+	pcpui->__lock_depth_disabled++;
 	spin_lock_irqsave(&ptf_lock);
 	printk("TRAP frame at %p on core %d\n", tf, core_id());
 	print_regs(&tf->tf_regs);
@@ -236,20 +241,27 @@ print_trapframe(trapframe_t *tf)
 		printk("  ss   0x----%04x\n", tf->tf_ss);
 	}
 	spin_unlock_irqsave(&ptf_lock);
+	pcpui->__lock_depth_disabled--;
 }
 
 /* Certain traps want IRQs enabled, such as the syscall.  Others can't handle
  * it, like the page fault handler.  Turn them on on a case-by-case basis. */
 static void trap_dispatch(struct trapframe *tf)
 {
+	struct per_cpu_info *pcpui;
 	// Handle processor exceptions.
 	switch(tf->tf_trapno) {
 		case T_NMI:
+			/* Temporarily disable deadlock detection when we print.  We could
+			 * deadlock if we were printing when we NMIed. */
+			pcpui = &per_cpu_info[core_id()];
+			pcpui->__lock_depth_disabled++;
 			print_trapframe(tf);
 			char *fn_name = get_fn_name(tf->tf_eip);
 			printk("Core %d is at %08p (%s)\n", core_id(), tf->tf_eip, fn_name);
 			kfree(fn_name);
 			print_kmsgs(core_id());
+			pcpui->__lock_depth_disabled--;
 			break;
 		case T_BRKPT:
 			enable_irq();
@@ -485,8 +497,7 @@ void page_fault_handler(struct trapframe *tf)
 		panic("Page Fault in the Kernel at 0x%08x!", fault_va);
 		/* if we want to do something like kill a process or other code, be
 		 * aware we are in a sort of irq-like context, meaning the main kernel
-		 * code we 'interrupted' could be holding locks - even irqsave locks.
-		 * Send yourself a kernel message to do this sort of work. */
+		 * code we 'interrupted' could be holding locks - even irqsave locks. */
 	}
 	/* safe to reenable after rcr2 */
 	enable_irq();
