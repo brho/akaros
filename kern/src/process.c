@@ -957,16 +957,6 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 			if (!being_nice) {
 				/* waiting for an event to unblock us */
 				vcpd = &p->procdata->vcore_preempt_data[0];
-				/* this check is an early optimization (check, signal, check
-				 * again pattern).  We could also lock before spamming the
-				 * vcore in event.c */
-				if (vcpd->notif_pending) {
-					/* they can't handle events, just need to prevent a yield.
-					 * (note the notif_pendings are collapsed). */
-					if (!scp_is_vcctx_ready(vcpd))
-						vcpd->notif_pending = FALSE;
-					goto out_failed;
-				}
 				/* syncing with event's SCP code.  we set waiting, then check
 				 * pending.  they set pending, then check waiting.  it's not
 				 * possible for us to miss the notif *and* for them to miss
@@ -976,6 +966,8 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 				wrmb(); /* don't let the state write pass the notif read */ 
 				if (vcpd->notif_pending) {
 					__proc_set_state(p, PROC_RUNNING_S);
+					/* they can't handle events, just need to prevent a yield.
+					 * (note the notif_pendings are collapsed). */
 					if (!scp_is_vcctx_ready(vcpd))
 						vcpd->notif_pending = FALSE;
 					goto out_failed;
