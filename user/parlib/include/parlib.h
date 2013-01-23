@@ -57,6 +57,7 @@ int         sys_change_vcore(uint32_t vcoreid, bool enable_my_notif);
 int         sys_change_to_m(void);
 int         sys_poke_ksched(int res_type);
 
+void		init_posix_signals(void);	/* in signal.c */
 #ifdef __cplusplus
 }
 #endif

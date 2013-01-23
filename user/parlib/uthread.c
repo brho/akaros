@@ -104,33 +104,17 @@ static void scp_vcctx_ready(void)
 	                     old_flags & ~VC_SCP_NOVCCTX));
 }
 
-/* TODO: dumb helper, put it in glibc or something */
-static void handle_posix_signal(struct event_msg *ev_msg, unsigned int ev_type)
-{
-	int sig_nr;
-	assert(ev_msg);
-	sig_nr = ev_msg->ev_arg1;
-	printf("Received POSIX signal number %d\n", sig_nr);
-}
-
 /* Slim-init - sets up basic uthreading for when we are in _S mode and before
  * we set up the 2LS.  Some apps may not have a 2LS and thus never do the full
  * vcore/2LS/uthread init. */
 void uthread_slim_init(void)
 {
 	struct uthread *uthread = malloc(sizeof(*uthread));
-	struct event_queue *posix_sig_ev_q;
 	/* TODO: consider a vcore_init_vc0 call. */
 	vcore_init();
 	uthread_manage_thread0(uthread);
 	scp_vcctx_ready();
-	/* Register an ev_q for posix signals */
-	/* TODO: probably put this handler in glibc */
-	ev_handlers[EV_POSIX_SIGNAL] = handle_posix_signal;
-	posix_sig_ev_q = get_big_event_q();
-	assert(posix_sig_ev_q);
-	posix_sig_ev_q->ev_flags = EVENT_IPI | EVENT_INDIR | EVENT_FALLBACK;
-	register_kevent_q(posix_sig_ev_q, EV_POSIX_SIGNAL);
+	init_posix_signals();
 	/* change our blockon from glibc's internal one to the mcp one (which can
 	 * handle SCPs too).  we must do this before switching to _M, or at least
 	 * before blocking while an _M.  it's harmless (and probably saner) to do it
