@@ -123,7 +123,8 @@ int diskio_aio_add_request(iorequest_t* req)
       int len = myevents[0].res;
 
       (void) rreq;
-      assert( rreq = req );
+      rreq = req;
+      assert( rreq );
 
       // set return values
       req->ret = len;

@@ -13,7 +13,6 @@
 #include <arch/arch.h>
 #include <sys/queue.h>
 #include <sys/mman.h>
-#include <assert.h>
 #include <event.h>
 #include <ucq.h>
 
@@ -286,7 +285,8 @@ int pthread_attr_destroy(pthread_attr_t *a)
 
 static void __pthread_free_stack(struct pthread_tcb *pt)
 {
-	assert(!munmap(pt->stacktop - pt->stacksize, pt->stacksize));
+	int ret = munmap(pt->stacktop - pt->stacksize, pt->stacksize);
+	assert(!ret);
 }
 
 static int __pthread_allocate_stack(struct pthread_tcb *pt)

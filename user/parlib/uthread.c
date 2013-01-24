@@ -173,6 +173,7 @@ void __attribute__((noreturn)) uthread_vcore_entry(void)
  * this whenever you are "starting over" with a thread. */
 void uthread_init(struct uthread *new_thread)
 {
+	int ret;
 	assert(new_thread);
 	new_thread->state = UT_NOT_RUNNING;
 	/* They should have zero'd the uthread.  Let's check critical things: */
@@ -181,9 +182,10 @@ void uthread_init(struct uthread *new_thread)
 	new_thread->flags |= UTHREAD_SAVED | UTHREAD_FPSAVED;
 	/* Get a TLS.  If we already have one, reallocate/refresh it */
 	if (new_thread->tls_desc)
-		assert(!__uthread_reinit_tls(new_thread));
+		ret = __uthread_reinit_tls(new_thread);
 	else
-		assert(!__uthread_allocate_tls(new_thread));
+		ret = __uthread_allocate_tls(new_thread);
+	assert(!ret);
 	uthread_set_tls_var(new_thread, current_uthread, new_thread);
 }
 

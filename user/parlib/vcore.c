@@ -161,11 +161,13 @@ void vcore_event_init(void)
 /* Helper, picks some sane defaults and changes the process into an MCP */
 void vcore_change_to_m(void)
 {
+	int ret;
 	__procdata.res_req[RES_CORES].amt_wanted = 1;
 	__procdata.res_req[RES_CORES].amt_wanted_min = 1;	/* whatever */
 	assert(!in_multi_mode());
 	assert(!in_vcore_context());
-	assert(!sys_change_to_m());
+	ret = sys_change_to_m();
+	assert(!ret);
 	assert(in_multi_mode());
 	assert(!in_vcore_context());
 }
