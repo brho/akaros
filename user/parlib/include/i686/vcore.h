@@ -79,7 +79,6 @@ static inline void pop_ros_tf(struct user_trapframe *tf, uint32_t vcoreid)
 	rst->notif_disab_loc = (uint32_t)&vcpd->notif_disabled;
 	rst->notif_pend_loc = (uint32_t)&vcpd->notif_pending;
 	rst->sysc = &rst->local_sysc;	/* point to the local one */
-	memset(rst->sysc, 0, sizeof(struct syscall));
 	/* Need to prep the async sysc in case we need to notify ourselves */
 	rst->sysc->num = SYS_self_notify;
 	rst->sysc->arg0 = vcoreid;	/* arg 1 & 2 already = 0 (null notif, no u_ne)*/
