@@ -3,7 +3,7 @@
 #CFLAGS += $(CONFIG_DEMO_SLAVE)
 
 # Kernel configuration parameters
-#KERN_CFLAGS += $(CONFIG_KFS)
+KERN_CFLAGS += $(CONFIG_KFS)
 #KERN_CFLAGS += $(CONFIG_EXT2FS)
 #KERN_CFLAGS += $(CONFIG_SINGLE_CORE)
 #KERN_CFLAGS += $(CONFIG_NETWORKING)
@@ -40,6 +40,7 @@
 
 # Paths for the initramfs (need to be directories)
 #INITRAMFS_PATHS = kern/kfs obj/tests
+INITRAMFS_PATHS = kern/kfs
 # Program to execute before building the initramfs
 #INITRAMFS_BIN = tools/whatever.sh
 # Image for ext2 (RAM version) (only brho uses this )
@@ -52,11 +53,28 @@
 # User tests configuration parameters
 #TESTS_CFLAGS += $(CONFIG_STATIC_APPS)
 
+# Number of jobs in make
+#MAKE_JOBS := 4
+#
 # Default for sparc (i.e. needs an appserver)
 ifeq ($(TARGET_ARCH),sparc)
 KERN_CFLAGS += $(CONFIG_APPSERVER)
 KERN_CFLAGS += -DDEVELOPER_NAME=waterman
 endif
+
+# brho's (edited) KVM and USB make targets
+#kvm: $(OBJDIR)/kern/kernel
+#	$(V)echo "+ (KVM) Copying to mnt/hdd"
+#	$(V)cp $(OBJDIR)/kern/kernel mnt/hdd/kernel
+#	$(V)sync
+#endif
+#
+#usb: $(OBJDIR)/kern/kernel
+#	$(V)echo "+ (USB) Copying to /dev/sdc4"
+#	$(V)mount /dev/sdc4
+#	$(V)cp $(OBJDIR)/kern/kernel /mnt/usbstick/kernel
+#	$(V)sync
+#	$(V)umount /mnt/usbstick
 
 x86:
 	$(MAKE) TARGET_ARCH=i686

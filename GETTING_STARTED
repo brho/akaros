@@ -1,2 +1,349 @@
-You're on your own...
+GETTING_STARTED
+Barret Rhoden
 
+Last updated 2013-02-07
+
+
+1. Overview
+---------------------
+In this document, I outline what steps I go through to set up my development
+environment.  Some devs use other setups, and they can put sections farther
+down in this document describing their steps.
+
+Due to the nature of different workflows and different Linux distros, you'll
+need to do some configuration of your environment.  Things won't magically work
+out of the box.
+
+
+2. Need help?
+---------------------
+First off, if you get stuck, email someone.  You can join our mailing list by
+sending an email to akaros-request@lists.eecs.berkeley.edu.  Send your messages
+to akaros@lists.eecs.berkeley.edu.  Or just email me (brho@cs), though the
+mailing list is a more scalable method in the long run.
+
+Alternatively, you can poke your head in #akaros on irc.freenode.net.  I'm
+usually idling in there (alone), and if I'm at my computer, I'll respond.
+
+
+3. From Download to Hello World
+---------------------
+I'll describe how to get x86 working.  RISCV is similar.
+
+
+3.1 Cross compiler (and glibc)
+----------
+First step is to build the cross compiler, which lives in
+tools/compilers/gcc-glibc
+
+$ cd tools/compilers/gcc-glibc
+
+In this directory, you first need to set up your Makelocal file.  There is a
+template to work from.
+
+$ cp Makelocal.template Makelocal
+
+You need to set your INSTDIRS to some place where you want the cross compiler
+installed.  I have a directory named ros-gcc-glibc for this.
+
+You can also set up MAKE_JOBS, so you don't over or under load your system when
+building.  I have a 2 core laptop, so I use MAKE_JOBS := 3
+
+At this point, you can build:
+
+$ make x86
+
+This might take a while (10-20 minutes for me on a 2007 era laptop).
+
+Finally, add the cross compiler's bin directories to your PATH.  This will vary
+based on where you installed things.  For instance, my path contains:
+
+/home/brho/classes/ros/ros-gcc-glibc/install-i386-ros-gcc/bin
+
+Just to double check, you should be able to run i686-ros-gcc from your shell.
+
+Now, you have a cross compiler ready, and you can start to build Akaros.
+
+
+3.2 Kernel
+----------
+cd back into the repo root.
+
+Like the cross compiler, the kernel has its own Makelocal.
+
+$ cp Makelocal.template Makelocal
+
+There are a lot of settings in here, which you need to uncomment to turn on.
+
+Most everyone wants KFS turned on (CONFIG_KFS).  This is the in-memory
+filesystem that the kernel uses.  The kernel build scripts will look at
+INITRAMFS_PATHS and take any of those directories and add them to a CPIO
+archive that will eventually become the root filesystem when Akaros runs.  I
+set CONFIG_KFS and suggested a INITRAMFS_PATH in the Makelocal.template.
+
+There are also settings for ext2.  If you turn on ext2 support, you need to
+point to an img file that has been formatted with ext2 and has files in it.  If
+you aren't messing with filesystems at all, feel free to ignore this.  It's an
+in-memory filesystem, like KFS (linked to the end of the kernel), so you won't
+gain much by using it for now.
+
+Now you're ready to build the kernel:
+
+$ make x86
+
+On future makes, you can just 'make'.  The initial make x86 is to pick a target
+architecture.
+
+So the kernel built, but you can't do much with it, and you probably have no
+programs.
+
+3.3 Userspace
+---------
+To build userspace and test programs:
+
+$ make tests
+
+You now have programs and libraries, and need to put them in KFS.  To do this,
+I have a script called 'fill_kfs.sh'.  I usually have it in the directory above
+my repo root.  I put a copy of it in scripts/fill_kfs.sh in the repo.  You will
+need to edit it for your own setup.  Or you can do everything manually.  Either
+way, you need to make sure shared libraries are copied into kern/kfs/lib (given
+kern/kfs as your INITRAMFS_PATH) and you want your programs copied to
+kern/kfs/bin.
+
+Now that you've changed the contents of KFS's source, remake the kernel.  You
+should see something like
+	Building initramfs:
+		Adding kern/kfs to initramfs...
+before the kernel links.  If you don't see this, then you probably didn't
+actually fill KFS properly.
+
+3.4 Busybox
+---------
+If you don't care about busybox or just want to get started immediately, skip
+this section.
+
+Other userspace programs, like busybox need to be compiled with the cross
+compiler and then have their binaries copied to kern/kfs/bin (I do this
+manually).
+
+I'm running busybox 1.17.3, and the config file I use is in tools/patches.
+Copy that to your busybox directory (once you download and untar it, etc) and
+name it ".config".  You can get busybox from http://www.busybox.net/downloads/.
+Eventually I'll upgrade, though it hasn't been a big deal yet.
+
+$ cp tools/patches/busybox-1.17.3.config BUSYBOXDIR/.config
+
+$ cd BUSYBOXDIR ; make
+
+Then I copy the unstripped binary to KFS.
+
+$ cp busybox_unstripped AKAROS-REPO/kern/kfs/bin/busybox
+
+Note I change the name to busybox (dropping the unstripped).  I want the
+unstripped binary for debugging reasons.
+
+Busybox can do core commands like ls and rm, as well as run a shell (ash), all
+from within one binary.  It can tell which command it should execute based on
+the name of the binary (or symlink to it).  I have a bunch of symlinks for
+whatever 'busybox' programs I want to run inside kern/kfs/bin.
+
+For instance, from my AKAROS-ROOT:
+$ ls -l kern/kfs/bin/ | grep busybox
+lrwxrwxrwx 1 brho brho      7 Aug 24  2010 ash -> busybox
+-rwxr-xr-x 1 brho brho 337917 Dec 19 17:39 busybox
+lrwxrwxrwx 1 brho brho      7 Sep 29  2010 cat -> busybox
+lrwxrwxrwx 1 brho brho      7 Sep  1  2010 cp -> busybox
+lrwxrwxrwx 1 brho brho      7 Oct 18 13:12 kill -> busybox
+lrwxrwxrwx 1 brho brho      7 Sep  5  2010 ln -> busybox
+lrwxrwxrwx 1 brho brho      7 Aug 23  2010 ls -> busybox
+lrwxrwxrwx 1 brho brho      7 Sep  5  2010 mkdir -> busybox
+lrwxrwxrwx 1 brho brho      7 Sep  5  2010 rmdir -> busybox
+lrwxrwxrwx 1 brho brho      7 Apr  9  2012 stty -> busybox
+lrwxrwxrwx 1 brho brho      7 Apr  9  2012 tty -> busybox
+
+Note I don't need to update the symlinks (almost ever...).  I just recopy the
+busybox binary whenever I update it.
+
+I think some of the other devs build busybox so that it spits out the links
+into an install directory.  Feel free to do whatever.  I'll probably just add a
+bunch of symlinks to the repos default KFS contents one of these days.
+Incidentally, kern/kfs/* is now ignored by git.
+
+Now that you've changed KFS, don't forget to remake the kernel.
+
+3.5 Building and Loading a Virtual Machine Image
+---------
+At this point, you probably have a runnable kernel with programs in KFS.  It
+should be sitting at obj/kernel/kernel.  However, you need a place to run it.
+
+I run my kernels either in KVM (Qemu) or off a bootable USB stick.
+
+You'll need an image file that looks like a hard disk to boot qemu off of.  I
+put one similar to mine at: http://akaros.cs.berkeley.edu/files/hdd64mb.img
+
+It's 64MB, which isn't that big (occasionally I run into size limits).  If you
+want to make your own, check out
+http://www.omninerd.com/articles/Installing_GRUB_on_a_Hard_Disk_Image_File.
+It's a bit older (Grub v1, and before fdisk changed its alignment, and maybe
+before the loop module supported partitions).  Alternatively, check out
+Documentation/howtos/make-bootable-grub-hdd.txt.  That's actually the original
+document I made back when I first figured it out (and before I made that web
+article).
+
+Anyway, I put that img in AKAROS-ROOT/mnt/, and make a folder next to it:
+AKAROS-ROOT/mnt/hdd.  mnt/hdd is the mount point where I mount hdd.img (Note I
+don't call it hdd64mb.img on my dev machine).
+
+Personally, I always have hdd.img mounted.  Some of the other devs have make
+targets that mount and umount it.  Whenever I reboot my development machine, I
+run a script (as root) that mounts the image file and sets up a few things for
+networking.  I put a script I use for this in scripts/kvm-up.sh.  You'll need
+to edit this to use it, and feel free to comment out the networking stuff.
+That's for using networking in qemu.
+
+Now that your image file is mounted at mnt/hdd, you'll want to copy your
+freshly built kernel to the root of the image.  I have a make target in my
+makelocal for this, so that whenever I do a make kvm, it builds the kernel and
+copies it to my hdd.img.
+
+I added edited versions of my KVM (and USB) make targets to the
+Makelocal.template.  Uncomment the KVM one (at least).
+
+Incidentally, I also have the following in my Makelocal, so that make (and make
+all) also make kvm:
+
+all: kvm
+
+Now, make kvm.  You should be able to see the new kernel in mnt/hdd/ (do an ls
+-l and check the timestamp).
+
+
+3.6 Running Qemu
+---------
+Here is the command I use to run qemu/kvm.  It's evolved over the years, and it
+will vary based on your linux distribution.  Don't run it just yet:
+
+$ qemu-system-i386 -s -enable-kvm -cpu coreduo -smp 8 -m 1024 -nographic -monitor /dev/pts/3 -net nic,model=e1000 -net tap,ifname=tap0,script=no mnt/hdd.img
+
+The -monitor is the qemu monitor, which is a CLI for qemu.  Pick a
+tab/terminal/pty in Linux that you will only use for qemu monitoring, and enter
+'tty'.  Whatever it tells you, put in place of /dev/pts/3.  I've been using the
+same tab for about 4 years now.  In that tab, enter 'sleep 999999999'.  Qemu
+will still access it, but you won't have to worry about bash trying to handle
+your inputs.
+
+-nographic allows qemu to work in the terminal you run qemu from, instead of
+spawning off a fake cpu crt/monitor.
+
+If you don't have networking set up (including the tun/tap stuff from
+kvm-up.sh), remove the -net commands/options.
+
+Fell free to pick different values for the number of cpus and RAM (8 and 1024
+in the example).
+
+Once you finally run it, you can stop the VM by entering 'q' to the qemu
+monitor (or just killing the process)..  Other help commands from the monitor
+include 'info cpus', 'info registers', 'x', and 'help'.
+
+
+3.7 Running on Hardware
+---------
+I have a few bootable USB sticks with grub set up to run Akaros.  The make usb
+target (example in Makelocal.template) will copy freshly made kernels to your
+USB device.  You'll need to adjust those paths according to your distro.  My
+usb sticks are usually /dev/sdc, for instance (some odd USB device in the last
+couple of years has taken over /dev/sdb.  Probably something to do with udev
+changing over the years).
+
+Anyway, you'll need to mess around a bit to get that working.  Or I can dd one
+for you (I have 4GB disks in my office that I use).  If you make your own, the
+critical part is getting grub to pick the right device (from what I remember),
+and its fairly similar to installing grub on any old hard drive (since it's
+just a bloc device).  Much easier than a hard disk image file.
+
+
+3.8 Hello World
+---------
+So now you can run the kernel.  It's time to edit a program (or make your own).
+In this, I'll go through my workflow for making changes.
+
+$ vi tests/hello.c
+(edit, save)
+
+$ make tests
+(new version in obj/tests/hello)
+
+$ ../fill-kfs.sh
+(updates kfs)
+
+$ make
+(rebuilds kernel with the new KFS)
+
+$ qemu...
+
+(following commands are in Akaros)
+Shift-G (to get to the kernel monitor)
+
+ROS(Core 0)> bb (to run busybox)
+
+/ $ hello
+(Should print your message)
+
+
+3.9 Other Dev Workflow stuff
+---------
+One thing to note is that while we use dynamic linking for libc, parlib
+libraries are statically linked with applications.  In fact, nowadays *all*
+Akaros programs need to be linked againt parlib (used to be that single-core
+processes (SCPs) didn't need it).
+
+The makefiles won't notice if you change a file in parlib and then remake a
+binary.  So if you edit user/parlib/uthread.c for example, tests/pthread_test
+won't get rebuilt.  Here's what I do:
+
+$ vi user/parlib/uthread.c (make awesome change)
+
+$ touch tests/pthread_test.c ; make tests
+
+This will force the rebuild of pthread_test.  Older, untouched binaries (e.g.
+block_test), won't get rebuilt.  I actually want this in some cases (different
+versions of parlib when I'm running certain tests).  Anyway, just pay attention
+to what you're building.  There's not much output in the console, so you should
+be able to see what's going on all the time.  (unlike when building glibc...).
+
+Oh, and don't forget to:
+
+$ ../fill-kfs.sh (or whatever you do)
+
+to make sure you run the new pthread_test. 
+
+Early on as a dev, there are lots of times where you accidentally don't run the
+right program (or kernel) and won't understand why your change isn't happening.
+A few printk("WTF\n")'s later, you realize you didn't have the hdd.img mounted,
+or you didn't fill KFS, or you didn't relink your binaries, or you forgot to
+save all files in vi (and not just the current buffer).  But after doing a
+couple hello worlds, you're set. 
+
+Alternatively, you could have a make target to run qemu, which also touches all
+binaries (or otherwise enforces a rebuild), auto-fills KFS, remakes the kernel,
+and mounts/copies/unmounts your hdd.img.  Kevin's sim repo has stuff like this,
+so check it out if that's what you're into.  (I think it is at
+http://akaros.cs.berkeley.edu/ros-sim.tar.gz).  Personally, I'm not that into
+it, since I like to keep track of what is going on under the hood, esp if I
+want to do something a little differently (like with testing ext2, having
+different versions of parlib with some binaries, or being picky about my
+mount/umounts).
+
+
+4. RISCV
+---------------------
+TODO.
+
+For now, you need a 64 bit distro to build the RISCV stuff, so I don't do it
+very often.  I'll eventually sync up with Andrew and we'll get this part sorted
+out.
+
+
+5. Other Developer's Stuff
+---------------------

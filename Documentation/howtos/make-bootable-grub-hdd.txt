@@ -1,0 +1,71 @@
+# Note: this is pretty old (originally from 2009).  You'll need something
+# bigger than 8MB these days.
+
+###############################################
+#
+# How to install grub on an image file
+#
+###############################################
+# make a 8MB image.  picked these values so there is 1 cyl (minimum, it seems)
+dd if=/dev/zero of=mnt/hdd.img bs=512 count=16065
+losetup /dev/loop1 mnt/hdd.img 
+fdisk /dev/loop1
+# determine the offset, in sectors
+fdisk -ul /dev/loop1
+# mult the sector offset by 512, since losetup offsets by bytes
+# this will have us point loop2 to the partition on the disk
+losetup -o 32256 /dev/loop2 /dev/loop1
+mkfs /dev/loop2
+mount /dev/loop2 mnt/hdd/
+# copy over grub info
+mkdir -p mnt/hdd/boot/grub
+cp -r /boot/grub/stage1 /boot/grub/stage2 /boot/grub/menu.lst mnt/hdd/boot/grub
+cp -r the_kernel mnt/hdd/
+# edit accordingly
+vi mnt/hdd/boot/grub/menu.lst 
+grub --device-map=/dev/null 
+	# in here:
+	# important to not use the /dev/loop1, since there is a bug in grub
+	# use the image instead, since it bypasses whatever checks fail later
+	device (hd0) mnt/hdd.img
+	root (hd0,0)
+	setup (hd0) # make sure you don't do (hd0,0).  it'll still work, but not the way you want
+kvm mnt/hdd.img
+# or
+bochs -q 'ata0-master: type=disk, mode=flat, path="./mnt/hdd.img", cylinders=1, heads=255, spt=63'
+# to use a floppy image (made similarly)
+bochs -q 'floppya: 1_44=mnt/floppy.img, status=inserted' 'boot:a'
+
+# to easily edit, keep the hdd image mounted and just copy in your kernel or
+# whatever
+# list the loops, delete them with -d to keep things nice and clean
+losetup -a 
+losetup -o 32256 /dev/loop0 mnt/hdd.img 
+mount /dev/loop0 mnt/hdd
+chown -R brho:brho mnt/hdd
+
+# you'll need to make sure changes to the mnt/hdd take effect immediately
+# if you want to run a VM right away with the .img
+sync
+
+# notes:
+# http://www.linuxjournal.com/article/4622
+# http://sig9.com/bochs-grub
+# http://web2.clarkson.edu/projects/itl/honeypot/ddtutorial.txt
+# http://www.mail-archive.com/bug-grub@gnu.org/msg09648.html
+#
+
+modprobe loop max_part=10
+
+Or if your loop device is compiled into the kernel, add the kernel parameter "loop.max_part=10"
+
+Once you partition loop1, you will see the following devices:
+
+/dev/loop1
+/dev/loop1p1
+/dev/loop1p2
+..etc
+
+Also, when creating an empty file you can do it much more quickly, and with almost nil disk space like this:
+
+dd if=/dev/zero of=myimage bs=512 count=1 seek=16064
