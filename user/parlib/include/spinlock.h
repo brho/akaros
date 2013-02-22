@@ -1,7 +1,8 @@
-/*
- * Copyright (c) 2011 The Regents of the University of California
+/* Copyright (c) 2013 The Regents of the University of California
  * Barret Rhoden <brho@cs.berkeley.edu>
  * Kevin Klues <klueska@cs.berkeley.edu>
+ *
+ * Spinlocks and Spin-PDR locks (preemption detection/recovery)
  *
  * This file is part of Parlib.
  * 
@@ -16,8 +17,7 @@
  * Lesser GNU General Public License for more details.
  * 
  * See COPYING.LESSER for details on the GNU Lesser General Public License.
- * See COPYING for details on the GNU General Public License.
- */
+ * See COPYING for details on the GNU General Public License. */
 
 #ifndef SPINLOCK_H
 #define SPINLOCK_H
@@ -40,6 +40,39 @@ int spinlock_trylock(spinlock_t *lock);
 void spinlock_lock(spinlock_t *lock);
 void spinlock_unlock(spinlock_t *lock);
 
+/* RISCV doesn't support CAS, so til it does, we use the NO_CAS, even if they
+ * didn't ask for it in their config. */
+#ifdef __riscv__
+# ifndef __CONFIG_SPINPDR_NO_CAS__
+#  define __CONFIG_SPINPDR_NO_CAS__ 1
+# endif
+#endif
+
+/* Two different versions, with and without CAS.  Default is with CAS. */
+#ifndef __CONFIG_SPINPDR_NO_CAS__
+
+# define SPINPDR_UNLOCKED ((uint32_t)-1)
+
+struct spin_pdr_lock {
+	uint32_t lock;
+};
+# define SPINPDR_INITIALIZER {SPINPDR_UNLOCKED}
+
+#else /* NO_CAS */
+
+# define SPINPDR_VCOREID_UNKNOWN ((uint32_t)-1)
+
+struct spin_pdr_lock {
+	spinlock_t spinlock;
+	uint32_t lockholder;
+};
+# define SPINPDR_INITIALIZER {SPINLOCK_INITIALIZER, SPINPDR_VCOREID_UNKNOWN}
+
+#endif /* __CONFIG_SPINPDR_NO_CAS__ */
+
+void spin_pdr_init(struct spin_pdr_lock *pdr_lock);
+void spin_pdr_lock(struct spin_pdr_lock *pdr_lock);
+void spin_pdr_unlock(struct spin_pdr_lock *pdr_lock);
 
 #ifdef __cplusplus
 }
