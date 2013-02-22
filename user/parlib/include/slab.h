@@ -34,7 +34,7 @@
 #include <ros/arch/mmu.h>
 #include <sys/queue.h>
 #include <arch/atomic.h>
-#include <mcs.h>
+#include <spinlock.h>
 
 /* Back in the day, their cutoff for "large objects" was 512B, based on
  * measurements and on not wanting more than 1/8 of internal fragmentation. */
@@ -70,7 +70,7 @@ TAILQ_HEAD(kmem_slab_list, kmem_slab);
 /* Actual cache */
 struct kmem_cache {
 	SLIST_ENTRY(kmem_cache) link;
-	struct mcs_pdr_lock cache_lock;
+	struct spin_pdr_lock cache_lock;
 	const char *name;
 	size_t obj_size;
 	int align;

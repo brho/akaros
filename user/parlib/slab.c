@@ -16,9 +16,10 @@
 #include <stdio.h>
 #include <assert.h>
 #include <sys/mman.h>
+#include <sys/param.h>
 
 struct kmem_cache_list kmem_caches;
-struct mcs_pdr_lock kmem_caches_lock;
+struct spin_pdr_lock kmem_caches_lock;
 
 /* Backend/internal functions, defined later.  Grab the lock before calling
  * these. */
@@ -35,7 +36,7 @@ static void __kmem_cache_create(struct kmem_cache *kc, const char *name,
 {
 	assert(kc);
 	assert(align);
-	mcs_pdr_init(&kc->cache_lock);
+	spin_pdr_init(&kc->cache_lock);
 	kc->name = name;
 	kc->obj_size = obj_size;
 	kc->align = align;
@@ -49,7 +50,7 @@ static void __kmem_cache_create(struct kmem_cache *kc, const char *name,
 	
 	/* put in cache list based on it's size */
 	struct kmem_cache *i, *prev = NULL;
-	mcs_pdr_lock(&kmem_caches_lock);
+	spin_pdr_lock(&kmem_caches_lock);
 	/* find the kmem_cache before us in the list.  yes, this is O(n). */
 	SLIST_FOREACH(i, &kmem_caches, link) {
 		if (i->obj_size < kc->obj_size)
@@ -61,12 +62,12 @@ static void __kmem_cache_create(struct kmem_cache *kc, const char *name,
 		SLIST_INSERT_AFTER(prev, kc, link);
 	else
 		SLIST_INSERT_HEAD(&kmem_caches, kc, link);
-	mcs_pdr_unlock(&kmem_caches_lock);
+	spin_pdr_unlock(&kmem_caches_lock);
 }
 
 void kmem_cache_init(void)
 {
-	mcs_pdr_init(&kmem_caches_lock);
+	spin_pdr_init(&kmem_caches_lock);
 	SLIST_INIT(&kmem_caches);
 	/* We need to call the __ version directly to bootstrap the global
 	 * kmem_cache_cache. */
@@ -134,7 +135,7 @@ void kmem_cache_destroy(struct kmem_cache *cp)
 {
 	struct kmem_slab *a_slab, *next;
 
-	mcs_pdr_lock(&cp->cache_lock);
+	spin_pdr_lock(&cp->cache_lock);
 	assert(TAILQ_EMPTY(&cp->full_slab_list));
 	assert(TAILQ_EMPTY(&cp->partial_slab_list));
 	/* Clean out the empty list.  We can't use a regular FOREACH here, since the
@@ -146,18 +147,18 @@ void kmem_cache_destroy(struct kmem_cache *cp)
 		kmem_slab_destroy(cp, a_slab);
 		a_slab = next;
 	}
-	mcs_pdr_lock(&kmem_caches_lock);
+	spin_pdr_lock(&kmem_caches_lock);
 	SLIST_REMOVE(&kmem_caches, cp, kmem_cache, link);
-	mcs_pdr_unlock(&kmem_caches_lock);
+	spin_pdr_unlock(&kmem_caches_lock);
 	kmem_cache_free(&kmem_cache_cache, cp); 
-	mcs_pdr_unlock(&cp->cache_lock);
+	spin_pdr_unlock(&cp->cache_lock);
 }
 
 /* Front end: clients of caches use these */
 void *kmem_cache_alloc(struct kmem_cache *cp, int flags)
 {
 	void *retval = NULL;
-	mcs_pdr_lock(&cp->cache_lock);
+	spin_pdr_lock(&cp->cache_lock);
 	// look at partial list
 	struct kmem_slab *a_slab = TAILQ_FIRST(&cp->partial_slab_list);
 	// 	if none, go to empty list and get an empty and make it partial
@@ -190,7 +191,7 @@ void *kmem_cache_alloc(struct kmem_cache *cp, int flags)
 		TAILQ_INSERT_HEAD(&cp->full_slab_list, a_slab, link);
 	}
 	cp->nr_cur_alloc++;
-	mcs_pdr_unlock(&cp->cache_lock);
+	spin_pdr_unlock(&cp->cache_lock);
 	return retval;
 }
 
@@ -205,7 +206,7 @@ void kmem_cache_free(struct kmem_cache *cp, void *buf)
 	struct kmem_slab *a_slab;
 	struct kmem_bufctl *a_bufctl;
 
-	mcs_pdr_lock(&cp->cache_lock);
+	spin_pdr_lock(&cp->cache_lock);
 	if (cp->obj_size <= SLAB_LARGE_CUTOFF) {
 		// find its slab
 		a_slab = (struct kmem_slab*)(ROUNDDOWN(buf, PGSIZE) + PGSIZE -
@@ -232,7 +233,7 @@ void kmem_cache_free(struct kmem_cache *cp, void *buf)
 		TAILQ_REMOVE(&cp->partial_slab_list, a_slab, link);
 		TAILQ_INSERT_HEAD(&cp->empty_slab_list, a_slab, link);
 	}
-	mcs_pdr_unlock(&cp->cache_lock);
+	spin_pdr_unlock(&cp->cache_lock);
 }
 
 /* Back end: internal functions */
@@ -315,19 +316,19 @@ void kmem_cache_reap(struct kmem_cache *cp)
 	struct kmem_slab *a_slab, *next;
 	
 	// Destroy all empty slabs.  Refer to the notes about the while loop
-	mcs_pdr_lock(&cp->cache_lock);
+	spin_pdr_lock(&cp->cache_lock);
 	a_slab = TAILQ_FIRST(&cp->empty_slab_list);
 	while (a_slab) {
 		next = TAILQ_NEXT(a_slab, link);
 		kmem_slab_destroy(cp, a_slab);
 		a_slab = next;
 	}
-	mcs_pdr_unlock(&cp->cache_lock);
+	spin_pdr_unlock(&cp->cache_lock);
 }
 
 void print_kmem_cache(struct kmem_cache *cp)
 {
-	mcs_pdr_lock(&cp->cache_lock);
+	spin_pdr_lock(&cp->cache_lock);
 	printf("\nPrinting kmem_cache:\n---------------------\n");
 	printf("Name: %s\n", cp->name);
 	printf("Objsize: %d\n", cp->obj_size);
@@ -339,7 +340,7 @@ void print_kmem_cache(struct kmem_cache *cp)
 	printf("Slab Partial: 0x%08x\n", cp->partial_slab_list);
 	printf("Slab Empty: 0x%08x\n", cp->empty_slab_list);
 	printf("Current Allocations: %d\n", cp->nr_cur_alloc);
-	mcs_pdr_unlock(&cp->cache_lock);
+	spin_pdr_unlock(&cp->cache_lock);
 }
 
 void print_kmem_slab(struct kmem_slab *slab)
