@@ -19,19 +19,20 @@
  */
 
 #include <stddef.h>
-#include "spinlock.h"
-#include "dtls.h"
-#include "slab.h"
+#include <assert.h>
+#include <spinlock.h>
+#include <dtls.h>
+#include <slab.h>
 
 /* The current dymamic tls implementation uses a locked linked list
  * to find the key for a given thread. We should probably find a better way to
  * do this based on a custom lock-free hash table or something. */
 #include <sys/queue.h>
-#include "spinlock.h"
+#include <spinlock.h>
 
 /* The dynamic tls key structure */
 struct dtls_key {
-  spinlock_t lock;
+  spinpdrlock_t lock;
   int ref_count;
   bool valid;
   void (*dtor)(void*);
@@ -60,27 +61,27 @@ static struct kmem_cache *__dtls_keys_cache;
 struct kmem_cache *__dtls_values_cache;
   
 /* A lock protecting access to the caches above */
-static spinlock_t __dtls_lock;
+static spinpdrlock_t __dtls_lock;
 
 static __thread dtls_data_t __dtls_data;
 static __thread bool __dtls_initialized = false;
 
 static dtls_key_t __allocate_dtls_key() 
 {
-  spinlock_lock(&__dtls_lock);
+  spin_pdr_lock(&__dtls_lock);
   dtls_key_t key = kmem_cache_alloc(__dtls_keys_cache, 0);
   assert(key);
   key->ref_count = 1;
-  spinlock_unlock(&__dtls_lock);
+  spin_pdr_unlock(&__dtls_lock);
   return key;
 }
 
 static void __maybe_free_dtls_key(dtls_key_t key)
 {
   if(key->ref_count == 0) {
-    spinlock_lock(&__dtls_lock);
+    spin_pdr_lock(&__dtls_lock);
     kmem_cache_free(__dtls_keys_cache, key);
-    spinlock_unlock(&__dtls_lock);
+    spin_pdr_unlock(&__dtls_lock);
   }
 }
 
@@ -101,7 +102,7 @@ int dtls_lib_init()
     sizeof(struct dtls_value), __alignof__(struct dtls_value), 0, NULL, NULL);
   
   /* Initialize the lock that protects the cache */
-  spinlock_init(&__dtls_lock);
+  spin_pdr_init(&__dtls_lock);
   return 0;
 }
 
@@ -109,7 +110,7 @@ dtls_key_t dtls_key_create(dtls_dtor_t dtor)
 {
   dtls_lib_init();
   dtls_key_t key = __allocate_dtls_key();
-  spinlock_init(&key->lock);
+  spin_pdr_init(&key->lock);
   key->valid = true;
   key->dtor = dtor;
   return key;
@@ -119,10 +120,10 @@ void dtls_key_delete(dtls_key_t key)
 {
   assert(key);
 
-  spinlock_lock(&key->lock);
+  spin_pdr_lock(&key->lock);
   key->valid = false;
   key->ref_count--;
-  spinlock_unlock(&key->lock);
+  spin_pdr_unlock(&key->lock);
   __maybe_free_dtls_key(key);
 }
 
@@ -130,18 +131,18 @@ static inline void __set_dtls(dtls_data_t *dtls_data, dtls_key_t key, void *dtls
 {
   assert(key);
 
-  spinlock_lock(&key->lock);
+  spin_pdr_lock(&key->lock);
   key->ref_count++;
-  spinlock_unlock(&key->lock);
+  spin_pdr_unlock(&key->lock);
 
   struct dtls_value *v = NULL;
   TAILQ_FOREACH(v, &dtls_data->list, link)
     if(v->key == key) break;
 
   if(!v) {
-    spinlock_lock(&__dtls_lock);
+    spin_pdr_lock(&__dtls_lock);
     v = kmem_cache_alloc(__dtls_values_cache, 0);
-    spinlock_unlock(&__dtls_lock);
+    spin_pdr_unlock(&__dtls_lock);
     assert(v);
     v->key = key;
     TAILQ_INSERT_HEAD(&dtls_data->list, v, link);
@@ -167,11 +168,11 @@ static inline void __destroy_dtls(dtls_data_t *dtls_data)
     dtls_key_t key = v->key;
     bool run_dtor = false;
   
-    spinlock_lock(&key->lock);
+    spin_pdr_lock(&key->lock);
     if(key->valid)
       if(key->dtor)
         run_dtor = true;
-    spinlock_unlock(&key->lock);
+    spin_pdr_unlock(&key->lock);
 
 	// MUST run the dtor outside the spinlock if we want it to be able to call
 	// code that may deschedule it for a while (i.e. a mutex). Probably a
@@ -187,16 +188,16 @@ static inline void __destroy_dtls(dtls_data_t *dtls_data)
       key->dtor(dtls);
     }
 
-    spinlock_lock(&key->lock);
+    spin_pdr_lock(&key->lock);
     key->ref_count--;
-    spinlock_unlock(&key->lock);
+    spin_pdr_unlock(&key->lock);
     __maybe_free_dtls_key(key);
 
     n = TAILQ_NEXT(v, link);
     TAILQ_REMOVE(&dtls_data->list, v, link);
-    spinlock_lock(&__dtls_lock);
+    spin_pdr_lock(&__dtls_lock);
     kmem_cache_free(__dtls_values_cache, v);
-    spinlock_unlock(&__dtls_lock);
+    spin_pdr_unlock(&__dtls_lock);
     v = n;
   }
 }
