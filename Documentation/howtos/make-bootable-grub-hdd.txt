@@ -1,11 +1,149 @@
-# Note: this is pretty old (originally from 2009).  You'll need something
-# bigger than 8MB these days.
+make-bootable-grub-hdd.txt
+Barret Rhoden
+2013-02-22
 
-###############################################
-#
-# How to install grub on an image file
-#
-###############################################
+This document explains how to make a hard disk image file, install grub on the
+image, and load your kernel (Akaros in the examples).
+
+
+Initial Setup:
+--------------------------
+Commands that begin with # need root access.  Commands beginning with $ should
+be done as your development user.
+
+You need the loop module loaded with max_part=10 (or something more than the
+number of partions you are making on an image file).
+
+# modprobe loop max_part=10
+
+If your loop device is compiled into the kernel, add the kernel parameter "loop.max_part=10"
+
+For example, once you partition an image file and connect it to a loopback
+device (e.g., loop1), you will see the following devices:
+
+/dev/loop1
+/dev/loop1p1
+/dev/loop1p2
+..etc
+
+
+Build your Image File:
+--------------------------
+This makes an image of size 268MB, which is 256MiB):
+
+$ dd if=/dev/zero of=mnt/hdd.img bs=512 count=1 seek=524287
+
+Connect to the image via a loopback device:
+
+# losetup /dev/loop0 mnt/hdd.img 
+
+Fdisk the device:
+
+# fdisk /dev/loop0
+	Create a new linux partition
+	Note it has 524288 sectors (1 + the seek offset)
+	Also note the partition begins at 2048, not 512 like it used to (changes
+	to fdisk, probably to get away from 512 byte alignments)
+
+Disconnect and reconnect the loopback device, so we now can see the
+partitions:
+
+# losetup -d /dev/loop0
+# losetup /dev/loop0 mnt/hdd.img 
+# ls /dev/loop0*
+/dev/loop0  /dev/loop0p1
+
+Make the filesystem:
+
+# mkfs /dev/loop0p1
+
+Create a mount point for your image file (as your user);
+
+$ mkdir mnt/hdd/
+
+Mount and chown.  The chown only needs to be done the first time you mount the
+device.
+
+# mount /dev/loop0p1 mnt/hdd/
+# chown -R brho:brho mnt/hdd/
+
+
+Install Grub on the Image file:
+--------------------------
+
+This assumes legacy grub:  for gentoo, emerge sys-boot/grub-static to get the
+legacy grub.  I glanced at grub2, but don't particularly want to mess with
+that.
+
+Set up the grub1 files and directories (assuming you still have the image
+mounted and have access to stage1 and stage2 files).
+
+$ mkdir -p mnt/hdd/boot/grub
+$ cp /boot/grub/stage1 /boot/grub/stage2 /boot/grub/menu.lst mnt/hdd/boot/grub/
+
+Edit menu.lst.  Here's one similar to mine that works with Akaros:
+	default 0
+	timeout 5
+	serial --unit=0 --speed=115200 --word=8 --parity=no --stop=1
+	terminal --timeout=5 serial console
+	
+	title=Akaros
+	root (hd0,0)
+	kernel /kernel
+
+Now put the kernel on the mounted image.  You can do this whenever, btw, and
+you'll do this whenever you want to update the kernel (my Makelocal has a
+target that does this).  So feel free to do this later.
+
+$ cp obj/kern/kernel mnt/hdd/kernel
+
+Actually install grub on the device.  Do this as a regular user (not root), to
+limit damage in case you mess up (e.g., accidentally write to /dev/sda instead
+of your image file)
+
+$ /sbin/grub --device-map=/dev/null
+
+	Enter the commands at the grub> prompt.  I've included the output you
+	should see if things are going well:
+	
+	grub> device (hd0) mnt/hdd.img
+	device (hd0) mnt/hdd.img
+
+	grub> root (hd0,0)
+	root (hd0,0)
+	 Filesystem type is ext2fs, partition type 0x83
+
+	grub> setup (hd0)
+	setup (hd0)
+	 Checking if "/boot/grub/stage1" exists... yes
+	 Checking if "/boot/grub/stage2" exists... yes
+	 Checking if "/boot/grub/e2fs_stage1_5" exists... no
+	 Running "install /boot/grub/stage1 (hd0) /boot/grub/stage2 p /boot/grub/menu.lst "... succeeded
+	Done.
+
+	grub> quit
+	quit
+
+
+That's it.  Whenever you reboot, you'll need to recreate the loopback device
+and remount the image at mnt/hdd/.  Check out my "kvm-up.sh" script for how I
+do this (it's basically just losetup, sleep, and mount).
+
+Whenever you update the kernel, cp it into mnt/hdd/kernel, and sync.  The sync
+is necessary so the image file / backing store gets updated right away.  If
+you don't do this, your VM might see the old version of kernel if you run the
+VM right away (before the FS naturally syncs).  Check out my Makelocal target
+for kvm for how to do this.
+
+
+Old Stuff:
+--------------------------
+I originally wrote this back in 2009.  It works for older versions of fdisk
+and has some acrobatics with loopback devices that will help if you can't use
+the max_part parameter to the loop module.  Also, it has some examples with
+using bochs
+
+
 # make a 8MB image.  picked these values so there is 1 cyl (minimum, it seems)
 dd if=/dev/zero of=mnt/hdd.img bs=512 count=16065
 losetup /dev/loop1 mnt/hdd.img 
@@ -48,24 +186,11 @@ chown -R brho:brho mnt/hdd
 # if you want to run a VM right away with the .img
 sync
 
-# notes:
-# http://www.linuxjournal.com/article/4622
-# http://sig9.com/bochs-grub
-# http://web2.clarkson.edu/projects/itl/honeypot/ddtutorial.txt
-# http://www.mail-archive.com/bug-grub@gnu.org/msg09648.html
-#
 
-modprobe loop max_part=10
-
-Or if your loop device is compiled into the kernel, add the kernel parameter "loop.max_part=10"
-
-Once you partition loop1, you will see the following devices:
-
-/dev/loop1
-/dev/loop1p1
-/dev/loop1p2
-..etc
-
-Also, when creating an empty file you can do it much more quickly, and with almost nil disk space like this:
-
-dd if=/dev/zero of=myimage bs=512 count=1 seek=16064
+Notes:
+--------------------------
+http://www.linuxjournal.com/article/4622
+http://sig9.com/bochs-grub
+http://web2.clarkson.edu/projects/itl/honeypot/ddtutorial.txt
+http://www.mail-archive.com/bug-grub@gnu.org/msg09648.html
+http://www.omninerd.com/articles/Installing_GRUB_on_a_Hard_Disk_Image_File

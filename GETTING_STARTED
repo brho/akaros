@@ -180,16 +180,14 @@ should be sitting at obj/kernel/kernel.  However, you need a place to run it.
 I run my kernels either in KVM (Qemu) or off a bootable USB stick.
 
 You'll need an image file that looks like a hard disk to boot qemu off of.  I
-put one similar to mine at: http://akaros.cs.berkeley.edu/files/hdd64mb.img
+put one similar to mine at: http://akaros.cs.berkeley.edu/files/hdd268mb.img
 
-It's 64MB, which isn't that big (occasionally I run into size limits).  If you
-want to make your own, check out
-http://www.omninerd.com/articles/Installing_GRUB_on_a_Hard_Disk_Image_File.
-It's a bit older (Grub v1, and before fdisk changed its alignment, and maybe
-before the loop module supported partitions).  Alternatively, check out
-Documentation/howtos/make-bootable-grub-hdd.txt.  That's actually the original
-document I made back when I first figured it out (and before I made that web
-article).
+It's around 268MB (256MiB, or whatever).  If you want to make your own, check
+out Documentation/howtos/make-bootable-grub-hdd.txt.  That's actually the
+original document I made back when I first figured it out back in 2009, which
+has been updated again in 2013.    In between, I wrote it up online at
+http://www.omninerd.com/articles/Installing_GRUB_on_a_Hard_Disk_Image_File,
+which has some other tidbits in the comments.  Both methods still use grub1.
 
 Anyway, I put that img in AKAROS-ROOT/mnt/, and make a folder next to it:
 AKAROS-ROOT/mnt/hdd.  mnt/hdd is the mount point where I mount hdd.img (Note I
