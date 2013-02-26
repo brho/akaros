@@ -579,8 +579,13 @@ static pid_t try_wait(struct proc *parent, struct proc *child, int *ret_status,
 		if (__proc_disown_child(parent, child))
 			return -1;
 		/* despite disowning, the child won't be freed til we drop this ref
-		 * held by this function. */
-		*ret_status = child->exitcode;
+		 * held by this function, so it is safe to access the memory.
+		 *
+		 * Note the exit code one byte in the 0xff00 spot.  Check out glibc's
+		 * posix/sys/wait.h and bits/waitstatus.h for more info.  If we ever
+		 * deal with signalling and stopping, we'll need to do some more work
+		 * here.*/
+		*ret_status = (child->exitcode & 0xff) << 8;
 		return child->pid;
 	}
 	return 0;
@@ -646,8 +651,8 @@ out_unlock:
 
 /* Waits on any child, returns the pid of the child waited on, and puts the ret
  * status in *ret_status.  Is basically a waitpid(-1, ... );  See wait_one for
- * more details.  Returns 0 if there are no children to wait on, or if we
- * needed to block but WNOHANG was set. */
+ * more details.  Returns -1 if there are no children to wait on, and returns 0
+ * if there are children and we need to block but WNOHANG was set. */
 static pid_t wait_any(struct proc *parent, int *ret_status, int options)
 {
 	pid_t retval;
@@ -664,11 +669,8 @@ static pid_t wait_any(struct proc *parent, int *ret_status, int options)
 		 * scan.  If we have a lot of children, we could optimize this. */
 		retval = try_wait_any(parent, ret_status, options);
 	}
-	if (retval == -1) {
-		/* unable to wait (no children) */
-		retval = 0;
+	if (retval == -1)
 		assert(TAILQ_EMPTY(&parent->children));
-	}
 	/* Fallthrough */
 out_unlock:
 	cv_unlock(&parent->child_wait);
@@ -714,10 +716,10 @@ out_decref:
 	proc_decref(child);
 out:
 	/* ignoring / don't care about memcpy's retval here. */
-	if (retval > 0)
+	if (status)
 		memcpy_to_user(parent, status, &ret_status, sizeof(ret_status));
-	printd("[PID %d] waited for PID %d, got retval %d (code %d)\n", parent->pid,
-	       pid, retval, ret_status);
+	printd("[PID %d] waited for PID %d, got retval %d (status 0x%x)\n",
+	       parent->pid, pid, retval, ret_status);
 	return retval;
 }
 
