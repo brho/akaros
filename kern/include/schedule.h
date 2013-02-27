@@ -86,12 +86,13 @@ uint32_t max_vcores(struct proc *p);
 /* This section is specific to a provisioning ksched.  Careful calling any of
  * this from generic kernel code, since it might not be present in all kernel
  * schedulers. */
-void provision_core(struct proc *p, uint32_t pcoreid);
+int provision_core(struct proc *p, uint32_t pcoreid);
 
 /************** Debugging **************/
 void sched_diag(void);
 void print_idlecoremap(void);
 void print_resources(struct proc *p);
 void print_all_resources(void);
+void print_prov_map(void);
 
 #endif /* ROS_KERN_SCHEDULE_H */

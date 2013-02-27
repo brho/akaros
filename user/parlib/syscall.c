@@ -107,6 +107,11 @@ void *CT(length) sys_mmap(void *SNT addr, size_t length, int prot, int flags,
 	return (void*)ros_syscall(SYS_mmap, addr, length, prot, flags, fd, offset);
 }
 
+int sys_provision(int pid, unsigned int res_type, long res_val)
+{
+	return ros_syscall(SYS_provision, pid, res_type, res_val, 0, 0, 0);
+}
+
 int sys_notify(int pid, unsigned int ev_type, struct event_msg *u_msg)
 {
 	return ros_syscall(SYS_notify, pid, ev_type, u_msg, 0, 0, 0);

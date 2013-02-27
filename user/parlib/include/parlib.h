@@ -47,6 +47,7 @@ ssize_t     sys_shared_page_free(void *COUNT(PGSIZE) addr, pid_t p2);
 void        sys_reboot();
 void *COUNT(length) sys_mmap(void *SNT addr, size_t length, int prot, int flags,
                              int fd, size_t offset);
+int			sys_provision(int pid, unsigned int res_type, long res_val);
 int         sys_notify(int pid, unsigned int ev_type, struct event_msg *u_msg);
 int         sys_self_notify(uint32_t vcoreid, unsigned int ev_type,
                             struct event_msg *u_msg, bool priv);

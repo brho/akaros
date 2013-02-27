@@ -33,7 +33,7 @@
 /* sys_brk removed */
 #define SYS_shared_page_alloc		22
 #define SYS_shared_page_free		23
-/* sys_resource_req removed */
+#define SYS_provision				24
 #define SYS_notify					25
 #define SYS_self_notify				26
 #define SYS_halt_core				27

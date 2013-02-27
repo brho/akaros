@@ -753,17 +753,21 @@ static void __prov_track_dealloc_bulk(struct proc *p, uint32_t *pc_arr,
 }
 
 /* P will get pcore if it needs more cores next time we look at it */
-void provision_core(struct proc *p, uint32_t pcoreid)
+int provision_core(struct proc *p, uint32_t pcoreid)
 {
 	struct sched_pcore *spc;
 	struct sched_pcore_tailq *prov_list;
 	/* Make sure we aren't asking for something that doesn't exist (bounds check
 	 * on the pcore array) */
-	if (!(pcoreid < num_cpus))
-		return;	/* could do an error code */
+	if (!(pcoreid < num_cpus)) {
+		set_errno(ENXIO);
+		return -1;
+	}
 	/* Don't allow the provisioning of LL cores */
-	if (is_ll_core(pcoreid))
-		return;
+	if (is_ll_core(pcoreid)) {
+		set_errno(EBUSY);
+		return -1;
+	}
 	spc = pcoreid2spc(pcoreid);
 	/* Note the sched lock protects the spc tailqs for all procs in this code.
 	 * If we need a finer grained sched lock, this is one place where we could
@@ -793,6 +797,7 @@ void provision_core(struct proc *p, uint32_t pcoreid)
 	}
 	spc->prov_proc = p;
 	spin_unlock(&sched_lock);
+	return 0;
 }
 
 /************** Debugging **************/

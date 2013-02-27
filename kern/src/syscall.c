@@ -755,6 +755,43 @@ static int sys_shared_page_free(env_t* p1, void*DANGEROUS addr, pid_t p2)
 	return -1;
 }
 
+/* Helper, to do the actual provisioning of a resource to a proc */
+static int prov_resource(struct proc *target, unsigned int res_type,
+                         long res_val)
+{
+	switch (res_type) {
+		case (RES_CORES):
+			/* in the off chance we have a kernel scheduler that can't
+			 * provision, we'll need to change this. */
+			return provision_core(target, res_val);
+		default:
+			printk("[kernel] received provisioning for unknown resource %d\n",
+			       res_type);
+			set_errno(ENOENT);	/* or EINVAL? */
+			return -1;
+	}
+}
+
+/* Rough syscall to provision res_val of type res_type to target_pid */
+static int sys_provision(struct proc *p, int target_pid,
+                         unsigned int res_type, long res_val)
+{
+	struct proc *target = pid2proc(target_pid);
+	int retval;
+	if (!target) {
+		if (target_pid == 0)
+			return prov_resource(0, res_type, res_val);
+		/* debugging interface */
+		if (target_pid == -1)
+			print_prov_map();
+		set_errno(ESRCH);
+		return -1;
+	}
+	retval = prov_resource(target, res_type, res_val);
+	proc_decref(target);
+	return retval;
+}
+
 /* Untested.  Will notify the target on the given vcore, if the caller controls
  * the target.  Will honor the target's wanted/vcoreid.  u_ne can be NULL. */
 static int sys_notify(struct proc *p, int target_pid, unsigned int ev_type,
@@ -1499,6 +1536,7 @@ const static struct sys_table_entry syscall_table[] = {
 	[SYS_mprotect] = {(syscall_t)sys_mprotect, "mprotect"},
 	[SYS_shared_page_alloc] = {(syscall_t)sys_shared_page_alloc, "pa"},
 	[SYS_shared_page_free] = {(syscall_t)sys_shared_page_free, "pf"},
+	[SYS_provision] = {(syscall_t)sys_provision, "provision"},
 	[SYS_notify] = {(syscall_t)sys_notify, "notify"},
 	[SYS_self_notify] = {(syscall_t)sys_self_notify, "self_notify"},
 	[SYS_halt_core] = {(syscall_t)sys_halt_core, "halt_core"},
