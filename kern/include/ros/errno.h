@@ -1,19 +1,23 @@
 #ifndef _ROS_ERRNO_H
 #define _ROS_ERRNO_H
 
+/* If you edit this file, be careful of tabs vs spaces.  This is processed by
+ * scripts/make_errlist.c, which you need to run if you want glibc strerrno() to
+ * know about your changes. */
+
 // See below for the rest of the new error codes for ROS
-#define ESUCCESS	 0  /* Success */
+#define	ESUCCESS	0	/* Success */
 
 // For compatibility with POSIX
-#define	EPERM		 1	/* Operation not permitted */
-#define	ENOENT		 2	/* No such file or directory */
-#define	ESRCH		 3	/* No such process */
-#define	EINTR		 4	/* Interrupted system call */
-#define	EIO		 5	/* I/O error */
-#define	ENXIO		 6	/* No such device or address */
-#define	E2BIG		 7	/* Argument list too long */
-#define	ENOEXEC		 8	/* Exec format error */
-#define	EBADF		 9	/* Bad file number */
+#define	EPERM		1	/* Operation not permitted */
+#define	ENOENT		2	/* No such file or directory */
+#define	ESRCH		3	/* No such process */
+#define	EINTR		4	/* Interrupted system call */
+#define	EIO			5	/* I/O error */
+#define	ENXIO		6	/* No such device or address */
+#define	E2BIG		7	/* Argument list too long */
+#define	ENOEXEC		8	/* Exec format error */
+#define	EBADF		9	/* Bad file number */
 #define	ECHILD		10	/* No child processes */
 #define	EAGAIN		11	/* Try again */
 #define	ENOMEM		12	/* Out of memory */
@@ -103,7 +107,7 @@
 #define	EPROTONOSUPPORT	93	/* Protocol not supported */
 #define	ESOCKTNOSUPPORT	94	/* Socket type not supported */
 #define	EOPNOTSUPP	95	/* Operation not supported on transport endpoint */
-#define ENOTSUP		EOPNOTSUPP
+#define	ENOTSUP		EOPNOTSUPP
 #define	EPFNOSUPPORT	96	/* Protocol family not supported */
 #define	EAFNOSUPPORT	97	/* Address family not supported by protocol */
 #define	EADDRINUSE	98	/* Address already in use */
@@ -144,11 +148,11 @@
 #define	EOWNERDEAD	130	/* Owner died */
 #define	ENOTRECOVERABLE	131	/* State not recoverable */
 
-// New with ROS
-#define EFAIL			132 /* Generic Failure */
-#define ENOCACHE		133 /* No memory available */
-#define ENOFREEPID		135 /* No free pid */
-#define EUNSPECIFIED	136 /* Unspecified */
-#define EMORON			137 /* Moron */
+/* Old half-assed ROS erronos */
+#define	EFAIL			132	/* Generic Failure */
+#define	ENOCACHE		133	/* No memory available */
+#define	ENOFREEPID		135	/* No free pid */
+#define	EUNSPECIFIED	136	/* Unspecified */
+#define	EMORON			137	/* Moron */
 
 #endif
