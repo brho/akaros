@@ -49,7 +49,8 @@ int main(int argc, char** argv)
     pthread_key_create(&pthread_keys[i], dtls_dtor);
   }
   for (int i = 0; i < NR_TEST_THREADS; i++) {
-  	assert(!pthread_create(&my_threads[i], NULL, &thread, NULL));
+  	if (pthread_create(&my_threads[i], NULL, &thread, NULL))
+		perror("pth_create failed");
   }
   for (int i = 0; i < NR_TEST_THREADS; i++) {
   	pthread_join(my_threads[i], &my_retvals[i]);

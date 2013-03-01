@@ -80,7 +80,8 @@ int main(int argc, char** argv)
 	/* create and join on yield */
 	for (int i = 0; i < nr_yield_threads; i++) {
 		printf_safe("[A] About to create thread %d\n", i);
-		assert(!pthread_create(&my_threads[i], NULL, &yield_thread, NULL));
+		if (pthread_create(&my_threads[i], NULL, &yield_thread, NULL))
+			perror("pth_create failed");
 	}
 	if (gettimeofday(&start_tv, 0))
 		perror("Start time error...");
