@@ -1343,7 +1343,7 @@ intreg_t sys_symlink(struct proc *p, char *old_path, size_t old_l,
 		user_memdup_free(p, t_oldpath);
 		return -1;
 	}
-	ret = do_symlink(new_path, old_path, S_IRWXU | S_IRWXG | S_IRWXO);
+	ret = do_symlink(t_newpath, t_oldpath, S_IRWXU | S_IRWXG | S_IRWXO);
 	user_memdup_free(p, t_oldpath);
 	user_memdup_free(p, t_newpath);
 	return ret;
