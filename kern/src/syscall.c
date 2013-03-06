@@ -1145,7 +1145,6 @@ static intreg_t sys_fstat(struct proc *p, int fd, struct kstat *u_stat)
 	/* TODO: UMEM: pin the memory, copy directly, and skip the kernel buffer */
 	if (memcpy_to_user_errno(p, u_stat, kbuf, sizeof(struct kstat))) {
 		kfree(kbuf);
-		set_errno(EINVAL);
 		return -1;
 	}
 	kfree(kbuf);
@@ -1178,7 +1177,6 @@ static intreg_t stat_helper(struct proc *p, const char *path, size_t path_l,
 	/* TODO: UMEM: pin the memory, copy directly, and skip the kernel buffer */
 	if (memcpy_to_user_errno(p, u_stat, kbuf, sizeof(struct kstat))) {
 		kfree(kbuf);
-		set_errno(EINVAL);
 		return -1;
 	}
 	kfree(kbuf);
@@ -1366,7 +1364,6 @@ intreg_t sys_readlink(struct proc *p, char *path, size_t path_l,
 	copy_amt = strnlen(symname, buf_l - 1) + 1;
 	if (memcpy_to_user_errno(p, u_buf, symname, copy_amt)) {
 		kref_put(&path_d->d_kref);
-		set_errno(EINVAL);
 		return -1;
 	}
 	kref_put(&path_d->d_kref);

@@ -252,7 +252,7 @@ int memcpy_to_user(struct proc *p, void *va, const void *src, size_t len)
 int memcpy_to_user_errno(struct proc *p, void *dst, const void *src, int len)
 {
 	if (memcpy_to_user(p, dst, src, len)) {
-		set_errno(EINVAL);
+		set_errno(EFAULT);
 		return -1;
 	}
 	return 0;
@@ -268,7 +268,7 @@ void *user_memdup(struct proc *p, const void *va, int len)
 		return ERR_PTR(-ENOMEM);
 	if (memcpy_from_user(p, kva, va, len)) {
 		kfree(kva);
-		return ERR_PTR(-EINVAL);
+		return ERR_PTR(-EFAULT);
 	}
 	return kva;
 }
