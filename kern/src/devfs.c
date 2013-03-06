@@ -62,8 +62,7 @@ struct file *make_device(char *path, int mode, int type,
 /* We provide a separate set of f_ops for devices (char and block), and the fops
  * is the only thing that differs from the regular KFS.  We need to do some
  * ghetto-overriding of these ops after we create them. */
-
-off_t dev_c_llseek(struct file *file, off_t offset, int whence)
+int dev_c_llseek(struct file *file, off64_t offset, off64_t *ret, int whence)
 {
 	set_errno(EINVAL);
 	return -1;
@@ -79,7 +78,7 @@ int dev_mmap(struct file *file, struct vm_region *vmr)
 /* this is really /dev/console, and will need some tty work.  for now, no matter
  * how much they ask for, we return one character at a time. */
 ssize_t dev_stdin_read(struct file *file, char *buf, size_t count,
-                       off_t *offset)
+                       off64_t *offset)
 {
 	char c;
 	extern struct kb_buffer cons_buf;
@@ -93,7 +92,7 @@ ssize_t dev_stdin_read(struct file *file, char *buf, size_t count,
 }
 
 ssize_t dev_stdout_write(struct file *file, const char *buf, size_t count,
-                         off_t *offset)
+                         off64_t *offset)
 {
 	char *t_buf;
 	struct proc *p = current;
@@ -150,7 +149,7 @@ struct file_operations dev_f_op_stdout = {
 
 /* /dev/null: just take whatever was given and pretend it was written */
 ssize_t dev_null_write(struct file *file, const char *buf, size_t count,
-                       off_t *offset)
+                       off64_t *offset)
 {
 	return count;
 }

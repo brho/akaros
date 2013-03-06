@@ -1,3 +1,5 @@
+#define _LARGEFILE64_SOURCE /* needed to use lseek64 */
+
 #include <stdio.h> 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -9,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define DUMMY_STR "AAAaaaBBBbbb"
 int main() 
 { 
 	FILE *file; 
@@ -23,13 +26,26 @@ int main()
 	int retval;
 	retval = read(fd, rbuf, 16);
 	printf("Tried to read, got %d bytes of buf: %s\n", retval, rbuf);
-	strcpy(wbuf, "paul <3's the new 61c");
-	retval = write(fd, wbuf, 22);
+	strcpy(wbuf, DUMMY_STR);
+	retval = write(fd, wbuf, strlen(DUMMY_STR));
 	printf("Tried to write, wrote %d bytes\n", retval);
+
 	printf("Trying to seek to 0\n");
 	lseek(fd, 0, SEEK_SET);
 	retval = read(fd, rbuf, 64);
 	printf("Tried to read again, got %d bytes of buf: %s\n", retval, rbuf);
+	if (strcmp(DUMMY_STR, rbuf)) {
+		printf("Failed to read back our dummy string!\n");
+		return -1;
+	}
+	printf("Trying to lseek64 to 0\n");
+	lseek64(fd, 0, SEEK_SET);
+	retval = read(fd, rbuf, 64);
+	printf("Tried to read again, got %d bytes of buf: %s\n", retval, rbuf);
+	if (strcmp(DUMMY_STR, rbuf)) {
+		printf("Failed to read back our dummy string!\n");
+		return -1;
+	}
 
 	retval = access("/bin/laden", X_OK);
 	if (errno != ENOENT)

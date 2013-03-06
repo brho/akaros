@@ -69,7 +69,7 @@ int kfs_d_delete(struct dentry *dentry);
 int kfs_d_release(struct dentry *dentry);
 void kfs_d_iput(struct dentry *dentry, struct inode *inode);
 /* file_operations */
-off_t kfs_llseek(struct file *file, off_t offset, int whence);
+int kfs_llseek(struct file *file, off64_t offset, off64_t *ret, int whence);
 int kfs_readdir(struct file *dir, struct dirent *dirent);
 int kfs_mmap(struct file *file, struct vm_region *vmr);
 int kfs_open(struct inode *inode, struct file *file);
@@ -78,11 +78,11 @@ int kfs_release(struct inode *inode, struct file *file);
 int kfs_fsync(struct file *file, struct dentry *dentry, int datasync);
 unsigned int kfs_poll(struct file *file, struct poll_table_struct *poll_table);
 ssize_t kfs_readv(struct file *file, const struct iovec *vector,
-                  unsigned long count, off_t *offset);
+                  unsigned long count, off64_t *offset);
 ssize_t kfs_writev(struct file *file, const struct iovec *vector,
-                  unsigned long count, off_t *offset);
+                  unsigned long count, off64_t *offset);
 ssize_t kfs_sendpage(struct file *file, struct page *page, int offset,
-                     size_t size, off_t pos, int more);
+                     size_t size, off64_t pos, int more);
 int kfs_check_flags(int flags);
 
 #endif /* !ROS_KERN_KFS_H */

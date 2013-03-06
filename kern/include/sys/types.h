@@ -14,6 +14,7 @@ typedef uint32_t __nlink_t;
 typedef uint32_t __uid_t;
 typedef uint32_t __gid_t;
 typedef int64_t __off64_t;
+typedef __off64_t off64_t;
 typedef int32_t __blksize_t;
 typedef int64_t __blkcnt64_t;
 

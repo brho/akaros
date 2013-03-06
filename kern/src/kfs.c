@@ -523,9 +523,9 @@ void kfs_d_iput(struct dentry *dentry, struct inode *inode)
 
 /* Updates the file pointer.  KFS doesn't let you go past the end of a file
  * yet, so it won't let you seek past either.  TODO: think about locking. */
-off_t kfs_llseek(struct file *file, off_t offset, int whence)
+int kfs_llseek(struct file *file, off64_t offset, off64_t *ret, int whence)
 {
-	off_t temp_off = 0;
+	off64_t temp_off = 0;
 	switch (whence) {
 		case SEEK_SET:
 			temp_off = offset;
@@ -545,7 +545,8 @@ off_t kfs_llseek(struct file *file, off_t offset, int whence)
 	 * techincally, if they go too far, we should return EINVAL */
 	temp_off = MAX(MIN(temp_off, file->f_dentry->d_inode->i_size), 0);
 	file->f_pos = temp_off;
-	return temp_off;
+	*ret = temp_off;
+	return 0;
 }
 
 /* Fills in the next directory entry (dirent), starting with d_off.  KFS treats
@@ -655,7 +656,7 @@ unsigned int kfs_poll(struct file *file, struct poll_table_struct *poll_table)
 /* Reads count bytes from a file, starting from (and modifiying) offset, and
  * putting the bytes into buffers described by vector */
 ssize_t kfs_readv(struct file *file, const struct iovec *vector,
-                  unsigned long count, off_t *offset)
+                  unsigned long count, off64_t *offset)
 {
 	return -1;
 }
@@ -663,14 +664,14 @@ ssize_t kfs_readv(struct file *file, const struct iovec *vector,
 /* Writes count bytes to a file, starting from (and modifiying) offset, and
  * taking the bytes from buffers described by vector */
 ssize_t kfs_writev(struct file *file, const struct iovec *vector,
-                  unsigned long count, off_t *offset)
+                  unsigned long count, off64_t *offset)
 {
 	return -1;
 }
 
 /* Write the contents of file to the page.  Will sort the params later */
 ssize_t kfs_sendpage(struct file *file, struct page *page, int offset,
-                     size_t size, off_t pos, int more)
+                     size_t size, off64_t pos, int more)
 {
 	return -1;
 }

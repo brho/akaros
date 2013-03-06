@@ -1276,17 +1276,30 @@ intreg_t sys_chmod(struct proc *p, const char *path, size_t path_l, int mode)
 	return retval;
 }
 
-static intreg_t sys_lseek(struct proc *p, int fd, off_t offset, int whence)
+/* 64 bit seek, with the off64_t passed in via two (potentially 32 bit) off_ts.
+ * We're supporting both 32 and 64 bit kernels/userspaces, but both use the
+ * llseek syscall with 64 bit parameters. */
+static intreg_t sys_llseek(struct proc *p, int fd, off_t offset_hi,
+                           off_t offset_lo, off64_t *result, int whence)
 {
-	off_t ret;
+	off64_t retoff = 0;
+	off64_t tempoff = 0;
+	int ret = 0;
 	struct file *file = get_file_from_fd(&p->open_files, fd);
 	if (!file) {
 		set_errno(EBADF);
 		return -1;
 	}
-	ret = file->f_op->llseek(file, offset, whence);
+	tempoff = offset_hi;
+	tempoff <<= 32;
+	tempoff |= offset_lo;
+	ret = file->f_op->llseek(file, tempoff, &retoff, whence);
 	kref_put(&file->f_kref);
-	return ret;
+	if (ret)
+		return -1;
+	if (memcpy_to_user_errno(p, result, &retoff, sizeof(off64_t)))
+		return -1;
+	return 0;
 }
 
 intreg_t sys_link(struct proc *p, char *old_path, size_t old_l,
@@ -1566,7 +1579,7 @@ const static struct sys_table_entry syscall_table[] = {
 	[SYS_access] = {(syscall_t)sys_access, "access"},
 	[SYS_umask] = {(syscall_t)sys_umask, "umask"},
 	[SYS_chmod] = {(syscall_t)sys_chmod, "chmod"},
-	[SYS_lseek] = {(syscall_t)sys_lseek, "lseek"},
+	[SYS_llseek] = {(syscall_t)sys_llseek, "llseek"},
 	[SYS_link] = {(syscall_t)sys_link, "link"},
 	[SYS_unlink] = {(syscall_t)sys_unlink, "unlink"},
 	[SYS_symlink] = {(syscall_t)sys_symlink, "symlink"},

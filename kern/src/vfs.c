@@ -1111,16 +1111,16 @@ struct inode *icache_remove(struct super_block *sb, unsigned long ino)
 
 /* File functions */
 
-/* Read count bytes from the file into buf, starting at *offset, which is increased
- * accordingly, returning the number of bytes transfered.  Most filesystems will
- * use this function for their f_op->read.  Note, this uses the page cache.
- * Want to try out page remapping later on... */
+/* Read count bytes from the file into buf, starting at *offset, which is
+ * increased accordingly, returning the number of bytes transfered.  Most
+ * filesystems will use this function for their f_op->read.
+ * Note, this uses the page cache. */
 ssize_t generic_file_read(struct file *file, char *buf, size_t count,
-                          off_t *offset)
+                          off64_t *offset)
 {
 	struct page *page;
 	int error;
-	off_t page_off;
+	off64_t page_off;
 	unsigned long first_idx, last_idx;
 	size_t copy_amt;
 	char *buf_end;
@@ -1163,17 +1163,19 @@ ssize_t generic_file_read(struct file *file, char *buf, size_t count,
 	return count;
 }
 
-/* Write count bytes from buf to the file, starting at *offset, which is increased
- * accordingly, returning the number of bytes transfered.  Most filesystems will
- * use this function for their f_op->write.  Note, this uses the page cache.
+/* Write count bytes from buf to the file, starting at *offset, which is
+ * increased accordingly, returning the number of bytes transfered.  Most
+ * filesystems will use this function for their f_op->write.  Note, this uses
+ * the page cache.
+ *
  * Changes don't get flushed to disc til there is an fsync, page cache eviction,
  * or other means of trying to writeback the pages. */
 ssize_t generic_file_write(struct file *file, const char *buf, size_t count,
-                           off_t *offset)
+                           off64_t *offset)
 {
 	struct page *page;
 	int error;
-	off_t page_off;
+	off64_t page_off;
 	unsigned long first_idx, last_idx;
 	size_t copy_amt;
 	const char *buf_end;
@@ -1215,7 +1217,7 @@ ssize_t generic_file_write(struct file *file, const char *buf, size_t count,
  * currently expects us to do a readdir (short of doing linux's getdents).  Will
  * probably need work, based on whatever real programs want. */
 ssize_t generic_dir_read(struct file *file, char *u_buf, size_t count,
-                         off_t *offset)
+                         off64_t *offset)
 {
 	struct kdirent dir_r = {0}, *dirent = &dir_r;
 	int retval = 1;

@@ -1308,9 +1308,9 @@ void ext2_d_iput(struct dentry *dentry, struct inode *inode)
 /* Updates the file pointer.  TODO: think about locking, and putting this in the
  * VFS. */
 #include <syscall.h>	/* just for set_errno, may go away later */
-off_t ext2_llseek(struct file *file, off_t offset, int whence)
+int ext2_llseek(struct file *file, off64_t offset, off64_t *ret, int whence)
 {
-	off_t temp_off = 0;
+	off64_t temp_off = 0;
 	switch (whence) {
 		case SEEK_SET:
 			temp_off = offset;
@@ -1327,7 +1327,8 @@ off_t ext2_llseek(struct file *file, off_t offset, int whence)
 			return -1;
 	}
 	file->f_pos = temp_off;
-	return temp_off;
+	*ret = temp_off;
+	return 0;
 }
 
 /* Fills in the next directory entry (dirent), starting with d_off.  Like with
@@ -1343,7 +1344,7 @@ int ext2_readdir(struct file *dir, struct dirent *dirent)
 	int block = dirent->d_off / dir->f_dentry->d_sb->s_blocksize;
 	blk_buf = ext2_get_ino_metablock(dir->f_dentry->d_inode, block);
 	assert(blk_buf);
-	off_t f_off = dirent->d_off % dir->f_dentry->d_sb->s_blocksize;
+	off64_t f_off = dirent->d_off % dir->f_dentry->d_sb->s_blocksize;
 	/* Copy out the dirent info */
 	struct ext2_dirent *e2dir = (struct ext2_dirent*)(blk_buf + f_off);
 	dirent->d_ino = le32_to_cpu(e2dir->dir_inode);
@@ -1418,7 +1419,7 @@ unsigned int ext2_poll(struct file *file, struct poll_table_struct *poll_table)
 /* Reads count bytes from a file, starting from (and modifiying) offset, and
  * putting the bytes into buffers described by vector */
 ssize_t ext2_readv(struct file *file, const struct iovec *vector,
-                  unsigned long count, off_t *offset)
+                  unsigned long count, off64_t *offset)
 {
 	return -1;
 }
@@ -1426,14 +1427,14 @@ ssize_t ext2_readv(struct file *file, const struct iovec *vector,
 /* Writes count bytes to a file, starting from (and modifiying) offset, and
  * taking the bytes from buffers described by vector */
 ssize_t ext2_writev(struct file *file, const struct iovec *vector,
-                  unsigned long count, off_t *offset)
+                  unsigned long count, off64_t *offset)
 {
 	return -1;
 }
 
 /* Write the contents of file to the page.  Will sort the params later */
 ssize_t ext2_sendpage(struct file *file, struct page *page, int offset,
-                     size_t size, off_t pos, int more)
+                     size_t size, off64_t pos, int more)
 {
 	return -1;
 }

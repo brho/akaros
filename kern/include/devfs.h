@@ -19,7 +19,7 @@ struct file *make_device(char *path, int mode, int type,
 /* Generic device (block or char) file ops.  Both of these are dummies that say
  * the device can't support the operation. */
 int dev_mmap(struct file *file, struct vm_region *vmr);
-off_t dev_c_llseek(struct file *file, off_t offset, int whence);
+int dev_c_llseek(struct file *file, off64_t offset, off64_t *ret, int whence);
 
 /* Exporting these for convenience (process creation) */
 extern struct file *dev_stdin, *dev_stdout, *dev_stderr;

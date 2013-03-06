@@ -24,7 +24,7 @@ static int load_one_elf(struct proc *p, struct file *f, uintptr_t pgoffset,
 	ei->phdr = -1;
 	ei->dynamic = 0;
 	ei->highest_addr = 0;
-	off_t f_off = 0;
+	off64_t f_off = 0;
 	void* phdrs = 0;
 	int mm_perms, mm_flags = MAP_FIXED;
 	

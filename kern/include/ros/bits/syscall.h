@@ -61,7 +61,7 @@
 #define SYS_access				108
 #define SYS_umask				109
 #define SYS_chmod				110
-#define SYS_lseek				111
+#define SYS_llseek				111
 #define SYS_link				112
 #define SYS_unlink				113
 #define SYS_symlink				114

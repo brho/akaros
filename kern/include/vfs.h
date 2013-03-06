@@ -276,7 +276,7 @@ struct file {
 	struct kref					f_kref;
 	unsigned int				f_flags;		/* O_APPEND, etc */
 	int							f_mode;			/* O_RDONLY, etc */
-	off_t						f_pos;			/* offset / file pointer */
+	off64_t						f_pos;			/* offset / file pointer */
 	unsigned int				f_uid;
 	unsigned int				f_gid;
 	int							f_error;
@@ -292,9 +292,9 @@ struct file {
 };
 
 struct file_operations {
-	off_t (*llseek) (struct file *, off_t, int);
-	ssize_t (*read) (struct file *, char *, size_t, off_t *);
-	ssize_t (*write) (struct file *, const char *, size_t, off_t *);
+	int (*llseek) (struct file *, off64_t, off64_t *, int);
+	ssize_t (*read) (struct file *, char *, size_t, off64_t *);
+	ssize_t (*write) (struct file *, const char *, size_t, off64_t *);
 	int (*readdir) (struct file *, struct dirent *);
 	int (*mmap) (struct file *, struct vm_region *);
 	int (*open) (struct inode *, struct file *);
@@ -303,10 +303,11 @@ struct file_operations {
 	int (*fsync) (struct file *, struct dentry *, int);
 	unsigned int (*poll) (struct file *, struct poll_table_struct *);
 	ssize_t (*readv) (struct file *, const struct iovec *, unsigned long,
-	                  off_t *);
+	                  off64_t *);
 	ssize_t (*writev) (struct file *, const struct iovec *, unsigned long,
-	                  off_t *);
-	ssize_t (*sendpage) (struct file *, struct page *, int, size_t, off_t, int);
+	                  off64_t *);
+	ssize_t (*sendpage) (struct file *, struct page *, int, size_t, off64_t,
+	                     int);
 	int (*check_flags) (int flags);				/* most FS's ignore this */
 };
 
@@ -441,11 +442,11 @@ struct inode *icache_remove(struct super_block *sb, unsigned long ino);
 
 /* File-ish functions */
 ssize_t generic_file_read(struct file *file, char *buf, size_t count,
-                          off_t *offset);
+                          off64_t *offset);
 ssize_t generic_file_write(struct file *file, const char *buf, size_t count,
-                           off_t *offset);
+                           off64_t *offset);
 ssize_t generic_dir_read(struct file *file, char *u_buf, size_t count,
-                         off_t *offset);
+                         off64_t *offset);
 struct file *do_file_open(char *path, int flags, int mode);
 int do_symlink(char *path, const char *symname, int mode);
 int do_link(char *old_path, char *new_path);
