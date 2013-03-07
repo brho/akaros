@@ -184,6 +184,14 @@ Tips, Questions, and Misc Notes
   shared vs static, and it can get complicated with start.c, tls.c, etc.
 - What things in one file rely heavily on another file?  Are there non-obvious
   gotchas?  (yes, and no one documented them).
+- Is the build failing without any clear error messages?  Scroll up a lot, and
+  there may be messages farther up (like a hundred+ lines up).  I've had some
+  gcc stage2 builds that fail with no obvious issue in the short term console
+  output, but the real error is much higher.  Some aspect of the build system
+  will continue on failures and only fail much later, after building other
+  packages.
+- Note that libstdc++ is a subpart of gcc, built during stage2, and has its
+  own configure script and settings.
 
 Ghetto Things (Feel free to fix them):
 --------------------------
