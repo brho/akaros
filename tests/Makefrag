@@ -3,24 +3,29 @@ TESTS_DIR = tests
 OBJDIRS += $(TESTS_DIR)
 
 TESTS_CFLAGS += $(USER_CFLAGS) -g
-
-ALL_TEST_FILES = $(shell ls $(TESTS_DIR)/*.c)
+TESTS_CXXFLAGS += $(USER_CXXFLAGS) -g
 
 TESTS_LDLIBS := -lpthread
 
-TESTS_SRCS := $(ALL_TEST_FILES)
+TESTS_SRCS_C = $(shell ls $(TESTS_DIR)/*.c)
+TESTS_SRCS_CPP = $(shell ls $(TESTS_DIR)/*.cc)
 
-TESTS_LDDEPENDS := $(TESTS_DIR)/%.c 
+TESTS_LDDEPENDS_C := $(TESTS_DIR)/%.c 
+TESTS_LDDEPENDS_CPP := $(TESTS_DIR)/%.cc
 
-TESTS_EXECS  = $(patsubst $(TESTS_DIR)/%.c, \
-                           $(OBJDIR)/$(TESTS_DIR)/%, \
-                           $(TESTS_SRCS))
+TESTS_EXECS_C  = $(patsubst $(TESTS_DIR)/%.c, \
+                            $(OBJDIR)/$(TESTS_DIR)/%, \
+                            $(TESTS_SRCS_C))
+
+TESTS_EXECS_CPP  = $(patsubst $(TESTS_DIR)/%.cc, \
+                            $(OBJDIR)/$(TESTS_DIR)/%, \
+                            $(TESTS_SRCS_CPP))
 
 include $(TESTS_DIR)/c3po/Makefrag
 include $(TESTS_DIR)/openmp/Makefrag
 
 STATIC := $(findstring static,$(TESTS_CFLAGS))
-$(OBJDIR)/$(TESTS_DIR)/%: $(TESTS_LDDEPENDS)
+$(OBJDIR)/$(TESTS_DIR)/%: $(TESTS_LDDEPENDS_C)
 	@echo + cc [TESTS] $<
 	@mkdir -p $(@D)
 	$(V)$(CC) $(TESTS_CFLAGS) -o $@ $(TESTS_LDFLAGS) \
@@ -30,9 +35,17 @@ $(OBJDIR)/$(TESTS_DIR)/%: $(TESTS_LDDEPENDS)
 		$(NM) -n $@ > $@.sym; \
 	fi
 
-install-tests: $(TESTS_EXECS)
+# Note that we don't disassemble CPPs by default, even if they aren't static.
+# The files are pretty large regardless (9MB for a simple stream test asm).
+$(OBJDIR)/$(TESTS_DIR)/%: $(TESTS_LDDEPENDS_CPP)
+	@echo + cc [TESTS] $<
+	@mkdir -p $(@D)
+	$(V)$(CPP) $(TESTS_CXXFLAGS) -o $@ $(TESTS_LDFLAGS) \
+	          $< $(TESTS_LDLIBS)
+
+install-tests: $(TESTS_EXECS_C) $(TESTS_EXECS_CPP) 
 	@echo + install [TESTS] $(FIRST_INITRAMFS_PATH)/bin/
-	$(V)for i in "$(TESTS_EXECS)"; \
+	$(V)for i in "$(TESTS_EXECS) $(TESTS_EXECS_CPP)"; \
 	do \
 	  cp $$i $(FIRST_INITRAMFS_PATH)/bin/; \
 	done;

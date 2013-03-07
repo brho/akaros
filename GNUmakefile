@@ -95,6 +95,7 @@ endif
 
 # Default programs for compilation
 USER_CFLAGS += -O2 -std=gnu99
+USER_CXXFLAGS += -O2
 ifeq ($(COMPILER),IVY)
 KERN_CFLAGS += --deputy \
                --no-rc-sharc \
@@ -110,6 +111,7 @@ else
 CC	    := $(GCCPREFIX)gcc 
 endif
 
+CPP	    := $(GCCPREFIX)g++
 AS	    := $(GCCPREFIX)as
 AR	    := $(GCCPREFIX)ar
 LD	    := $(GCCPREFIX)ld
@@ -164,7 +166,8 @@ GCC_ROOT := $(shell which $(GCCPREFIX)gcc | xargs dirname)/../
 tests/: tests
 tests: install-libs
 	@$(MAKE) -j $(MAKE_JOBS) realtests
-realtests: $(TESTS_EXECS)
+
+realtests: $(TESTS_EXECS_C) $(TESTS_EXECS_CPP)
 # No longer automatically copying to the FS dir (deprecated)
 #	@mkdir -p fs/$(TARGET_ARCH)/tests
 #	cp -R $(OBJDIR)/$(TESTS_DIR)/* $(TOP_DIR)/fs/$(TARGET_ARCH)/tests
