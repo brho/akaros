@@ -33,6 +33,15 @@ read_tsc(void)
 	return tsc;
 }
 
+/* non-core-id reporting style (it is in ecx) */
+static __inline uint64_t
+read_tscp(void)
+{
+	uint64_t tsc;
+	__asm __volatile("rdtscp" : "=A" (tsc) : : "ecx");
+	return tsc;
+}
+
 static __inline void
 cpuid(uint32_t info1, uint32_t info2, uint32_t *eaxp, uint32_t *ebxp,
       uint32_t *ecxp, uint32_t *edxp)

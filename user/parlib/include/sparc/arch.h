@@ -44,6 +44,12 @@ read_tsc(void)
 }
 
 static __inline uint64_t
+read_tscp(void)
+{
+	return read_tsc();
+}
+
+static __inline uint64_t
 read_tsc_serialized(void)
 {
 	return read_tsc();

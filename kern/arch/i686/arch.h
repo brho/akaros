@@ -78,6 +78,15 @@ read_tsc(void)
 	return tsc;
 }
 
+/* non-core-id reporting style (it is in ecx) */
+static __inline uint64_t
+read_tscp(void)
+{
+	uint64_t tsc;
+	__asm __volatile("rdtscp" : "=A" (tsc) : : "ecx");
+	return tsc;
+}
+
 static __inline uint64_t 
 read_tsc_serialized(void)
 {

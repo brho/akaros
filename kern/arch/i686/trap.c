@@ -244,6 +244,15 @@ print_trapframe(trapframe_t *tf)
 	pcpui->__lock_depth_disabled--;
 }
 
+static void fake_rdtscp(struct trapframe *tf)
+{
+	uint64_t tsc_time = read_tsc();
+	tf->tf_eip += 3;
+	tf->tf_regs.reg_eax = tsc_time & 0xffffffff;
+	tf->tf_regs.reg_edx = tsc_time >> 32;
+	tf->tf_regs.reg_ecx = core_id();
+}
+
 /* Certain traps want IRQs enabled, such as the syscall.  Others can't handle
  * it, like the page fault handler.  Turn them on on a case-by-case basis. */
 static void trap_dispatch(struct trapframe *tf)
@@ -266,6 +275,32 @@ static void trap_dispatch(struct trapframe *tf)
 		case T_BRKPT:
 			enable_irq();
 			monitor(tf);
+			break;
+		case T_ILLOP:
+			pcpui = &per_cpu_info[core_id()];
+			pcpui->__lock_depth_disabled++;		/* for print debugging */
+			/* We will muck with the actual TF.  If we're dealing with
+			 * userspace, we need to make sure we edit the actual TF that will
+			 * get restarted (pcpui), and not the TF on the kstack (which aren't
+			 * the same).  See set_current_tf() for more info. */
+			if (!in_kernel(tf))
+				tf = pcpui->cur_tf;
+			printd("bad opcode, eip: %08p, next 3 bytes: %x %x %x\n",
+			       tf->tf_eip, 
+			       *(uint8_t*)(tf->tf_eip + 0), 
+			       *(uint8_t*)(tf->tf_eip + 1), 
+			       *(uint8_t*)(tf->tf_eip + 2)); 
+			/* rdtscp: 0f 01 f9 */
+			if (*(uint8_t*)(tf->tf_eip + 0) == 0x0f, 
+			    *(uint8_t*)(tf->tf_eip + 1) == 0x01, 
+			    *(uint8_t*)(tf->tf_eip + 2) == 0xf9) {
+				fake_rdtscp(tf);
+				pcpui->__lock_depth_disabled--;	/* for print debugging */
+				return;
+			}
+			enable_irq();
+			monitor(tf);
+			pcpui->__lock_depth_disabled--;		/* for print debugging */
 			break;
 		case T_PGFLT:
 			page_fault_handler(tf);
@@ -306,7 +341,17 @@ env_pop_ancillary_state(env_t* e)
 }
 
 /* Helper.  For now, this copies out the TF to pcpui.  Eventually, we should
- * consider doing this in trapentry.S */
+ * consider doing this in trapentry.S
+ *
+ * TODO: consider having this return pcpui->cur_tf, so we can set tf in trap and
+ * irq handlers to edit the TF that will get restarted.  Right now, the kernel
+ * uses and restarts tf, but userspace restarts the old pcpui tf.  It is
+ * tempting to do this, but note that tf stays on the stack of the kthread,
+ * while pcpui->cur_tf is for the core we trapped in on.  Meaning if we ever
+ * block, suddenly cur_tf is pointing to some old clobbered state that was
+ * already returned to and can't be trusted.  Meanwhile tf can always be trusted
+ * (like with an in_kernel() check).  The only types of traps from the user that
+ * can be expected to have editable trapframes are ones that don't block. */
 static void set_current_tf(struct per_cpu_info *pcpui, struct trapframe *tf)
 {
 	assert(!irq_is_enabled());

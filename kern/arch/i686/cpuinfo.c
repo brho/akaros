@@ -128,6 +128,11 @@ void print_cpuinfo(void)
 		printk("FS/GS Base RD/W supported\n");
 	else
 		printk("FS/GS Base RD/W not supported\n");
+	cpuid(0x80000001, 0x0, &eax, &ebx, &ecx, &edx);
+	if (edx & (1 << 27))
+		printk("RDTSCP supported\n");
+	else
+		printk("RDTSCP not supported: don't trust detailed measurements\n");
 
 }
 

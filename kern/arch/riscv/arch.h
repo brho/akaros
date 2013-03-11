@@ -52,6 +52,13 @@ read_tsc(void)
 	return t;
 }
 
+/* Continuing the poor tradition of x86 opcode functions... */
+static __inline uint64_t
+read_tscp(void)
+{
+	return read_tsc();
+}
+
 static __inline uint64_t 
 read_tsc_serialized(void)
 {
