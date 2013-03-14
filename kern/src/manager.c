@@ -31,7 +31,7 @@
 #include <string.h>
 #include <pmap.h>
 #include <arch/console.h>
-#include <ros/time.h>
+#include <time.h>
 #include <ros/arch/membar.h>
 
 /*

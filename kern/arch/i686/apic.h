@@ -101,6 +101,7 @@
 typedef struct system_timing {
 	uint64_t tsc_freq;
 	uint64_t bus_freq;
+	uint64_t timing_overhead;
 	uint16_t pit_divisor;
 	uint8_t pit_mode;
 } system_timing_t;

@@ -8,13 +8,13 @@
 #error "Yeah, it's not possible to build ROS with BSD on Core 0, sorry......"
 #else
 
-#include <ros/time.h>
 #include <arch/arch.h>
 #include <arch/console.h>
 #include <multiboot.h>
 #include <stab.h>
 #include <smp.h>
 
+#include <time.h>
 #include <atomic.h>
 #include <stdio.h>
 #include <string.h>
