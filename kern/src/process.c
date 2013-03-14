@@ -188,6 +188,7 @@ static void proc_init_procinfo(struct proc* p)
 	p->procinfo->ppid = p->ppid;
 	p->procinfo->max_vcores = max_vcores(p);
 	p->procinfo->tsc_freq = system_timing.tsc_freq;
+	p->procinfo->timing_overhead = system_timing.timing_overhead;
 	p->procinfo->heap_bottom = (void*)UTEXT;
 	/* 0'ing the arguments.  Some higher function will need to set them */
 	memset(p->procinfo->argp, 0, sizeof(p->procinfo->argp));
