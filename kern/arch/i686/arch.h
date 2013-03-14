@@ -87,13 +87,12 @@ read_tscp(void)
 	return tsc;
 }
 
+/* Check out k/a/i686/rdtsc_test.c for more info */
 static __inline uint64_t 
 read_tsc_serialized(void)
 {
-    uint64_t tsc;
-	cpuid(0x0, 0x0, 0, 0, 0, 0);
-	tsc = read_tsc();
-	return tsc;
+	asm volatile("lfence");	/* mfence on amd */
+	return read_tsc();
 }
 
 static __inline void

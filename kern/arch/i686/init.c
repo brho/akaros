@@ -14,6 +14,7 @@
 #include <arch/ioapic.h>
 #include <arch/console.h>
 #include <arch/perfmon.h>
+#include <arch/init.h>
 #include <console.h>
 
 /* irq handler for the console (kb, serial, etc) */
@@ -92,4 +93,5 @@ void arch_init()
 
 	perfmon_init();
 	cons_irq_init();
+	check_timing_stability();
 }

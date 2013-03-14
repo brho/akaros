@@ -61,13 +61,12 @@ cpuid(uint32_t info1, uint32_t info2, uint32_t *eaxp, uint32_t *ebxp,
 		*edxp = edx;
 }
 
-static __inline uint64_t
+/* Check out k/a/i686/rdtsc_test.c for more info */
+static __inline uint64_t 
 read_tsc_serialized(void)
 {
-	uint64_t tsc;
-	cpuid(0x0, 0x0, 0, 0, 0, 0);
-	tsc = read_tsc();
-	return tsc;
+	asm volatile("lfence");	/* mfence on amd */
+	return read_tsc();
 }
 
 static __inline void
