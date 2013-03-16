@@ -1,0 +1,5 @@
+Dumping ground for PXE config.  Put the cfg file in pxelinux.cfg, named akaros
+(or whatever), and symlink a MAC address to it.
+
+Make sure you a real mboot.32c, and not one you just found on the street
+somewhere.  This one was compiled from source in March 2013.

@@ -63,7 +63,7 @@ KERN_CFLAGS += $(CONFIG_APPSERVER)
 KERN_CFLAGS += -DDEVELOPER_NAME=waterman
 endif
 
-# brho's (edited) KVM and USB make targets
+# brho's (edited) KVM, USB, PXE, ETC make targets
 #kvm: $(OBJDIR)/kern/kernel
 #	$(V)echo "+ (KVM) Copying to mnt/hdd"
 #	$(V)cp $(OBJDIR)/kern/kernel mnt/hdd/kernel
@@ -76,6 +76,12 @@ endif
 #	$(V)cp $(OBJDIR)/kern/kernel /mnt/usbstick/kernel
 #	$(V)sync
 #	$(V)umount /mnt/usbstick
+#
+#pxe: $(OBJDIR)/kern/kernel
+#	$(V)echo "+ (PXE) Compressing..."
+#	$(V)gzip -c $(OBJDIR)/kern/kernel > $(OBJDIR)/kern/akaros-kernel.gz
+#	$(V)echo "+ (PXE) Copying to Watson"
+#	$(V)scp $(OBJDIR)/kern/akaros-kernel.gz watson.millennium.berkeley.edu:/tftpboot/akaros/akaros-kernel.gz
 
 x86:
 	$(MAKE) TARGET_ARCH=i686

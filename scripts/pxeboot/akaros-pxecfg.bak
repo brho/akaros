@@ -1,0 +1,46 @@
+# skipping the menu stuff for now, just type the label name at the boot prompt
+# DEFAULT akaros/menu.c32
+DEFAULT akaros
+
+#
+# Uncomment next line to send pxelinux boot prompt over serial port 0.
+# NOTE: Be sure your serial port speed is appropriate (57600, 9600, etc.)
+#
+# SERIAL 0 57600
+DISPLAY akaros/message.txt
+PROMPT 10
+TIMEOUT 50
+MENU TITLE Choose Wisely (Akaros is default)
+
+# Add the following to the append line above to use your first serial port
+# (ttyS0) as a console in addition to your monitor (tty0).  NOTE: Be sure
+# your serial port speed is appropriate (57600, 9600, etc.)
+#
+# console=ttyS0,57600
+
+# Add the following to the append line above to increase the size of your tmpfs
+# filesystem.  About 100MB larger than your image size should suffice.
+#
+# Other tmpfs mount options are also supported.  See the FAQ for details.
+# tmpfs_size=800M
+
+LABEL akaros
+	MENU LABEL Akaros
+	MENU DEFAULT
+	KERNEL akaros/mboot.c32
+	APPEND akaros/akaros-kernel.gz
+
+# this might take a while to come up, and the KVM might be unresponsive.  try
+# ping/ssh
+LABEL linux
+	MENU LABEL Linux
+	KERNEL vmlinuz-3.2.0-36-generic pci=conf1
+	APPEND pci=conf1 initrd=amp_precise_3.2.0-36-generic.cgz
+	# KERNEL vmlinuz-3.2.0-37-generic
+	# APPEND initrd=amp-genomics-osd_precise_3.2.0-37-generic.cgz
+
+# this doesn't seem to work
+LABEL local
+	MENU LABEL Boot from local disk
+	LOCALBOOT 0x80
+
