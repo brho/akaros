@@ -155,10 +155,16 @@ void __lapic_set_timer(uint32_t ticks, uint8_t vec, bool periodic, uint8_t div)
 
 void lapic_set_timer(uint32_t usec, bool periodic)
 {
-	uint32_t ticks = (usec * system_timing.bus_freq / LAPIC_TIMER_DIVISOR_VAL)
-	                 / 1000000;
-	assert(ticks > 0);
-	__lapic_set_timer(ticks, LAPIC_TIMER_DEFAULT_VECTOR, periodic,
+	/* If we overflowed a uint32, send in the max timer possible.  The lapic can
+	 * only handle a 32 bit.  We could muck with changing the divisor, but even
+	 * then, we might not be able to match 4000 sec (based on the bus speed).
+	 * The kernel alarm code can handle spurious timer interrupts, so we just
+	 * set the timer for as close as we can get to the desired time. */
+	uint64_t ticks64 = (usec * system_timing.bus_freq) / LAPIC_TIMER_DIVISOR_VAL
+	                    / 1000000;
+	uint32_t ticks32 = ((ticks64 >> 32) ? 0xffffffff : ticks64);
+	assert(ticks32 > 0);
+	__lapic_set_timer(ticks32, LAPIC_TIMER_DEFAULT_VECTOR, periodic,
 	                  LAPIC_TIMER_DIVISOR_BITS);
 }
 
