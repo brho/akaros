@@ -133,7 +133,15 @@ void print_cpuinfo(void)
 		printk("RDTSCP supported\n");
 	else
 		printk("RDTSCP not supported: don't trust detailed measurements\n");
-
+	msr_val = read_msr(IA32_MISC_ENABLE);
+	/* we want this to be not set for cpuid.6h to work. */
+	if (msr_val & (1 << 22))
+		write_msr(IA32_MISC_ENABLE, msr_val & ~(1 << 22));
+	cpuid(0x00000006, 0x0, &eax, 0, 0, 0);
+	if (eax & (1 << 2))
+		printk("Always running APIC detected\n");
+	else
+		printk("Always running APIC *not* detected\n");
 }
 
 void show_mapping(uintptr_t start, size_t size)

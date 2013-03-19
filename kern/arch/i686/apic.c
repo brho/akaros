@@ -155,11 +155,11 @@ void __lapic_set_timer(uint32_t ticks, uint8_t vec, bool periodic, uint8_t div)
 
 void lapic_set_timer(uint32_t usec, bool periodic)
 {
-	// divide the bus clock by 128, which is the max.
-	uint32_t ticks = (usec * system_timing.bus_freq / 128) / 1000000;
+	uint32_t ticks = (usec * system_timing.bus_freq / LAPIC_TIMER_DIVISOR_VAL)
+	                 / 1000000;
 	assert(ticks > 0);
 	__lapic_set_timer(ticks, LAPIC_TIMER_DEFAULT_VECTOR, periodic,
-	                  LAPIC_TIMER_DEFAULT_DIVISOR);
+	                  LAPIC_TIMER_DIVISOR_BITS);
 }
 
 void set_core_timer(uint32_t usec, bool periodic)
@@ -188,18 +188,20 @@ void timer_init(void){
 	udelay_pit(1000000);
 	tscval[1] = read_tsc();
 	system_timing.tsc_freq = SINIT(tscval[1] - tscval[0]);
-	
 	cprintf("TSC Frequency: %llu\n", system_timing.tsc_freq);
-
 	__lapic_set_timer(0xffffffff, LAPIC_TIMER_DEFAULT_VECTOR, FALSE,
-	                  LAPIC_TIMER_DEFAULT_DIVISOR);
+	                  LAPIC_TIMER_DIVISOR_BITS);
 	// Mask the LAPIC Timer, so we never receive this interrupt (minor race)
 	mask_lapic_lvt(LAPIC_LVT_TIMER);
 	timercount[0] = read_mmreg32(LAPIC_TIMER_CURRENT);
 	udelay_pit(1000000);
 	timercount[1] = read_mmreg32(LAPIC_TIMER_CURRENT);
-	system_timing.bus_freq = SINIT((timercount[0] - timercount[1])*128);
-		
+	system_timing.bus_freq = (timercount[0] - timercount[1])
+	                         * LAPIC_TIMER_DIVISOR_VAL;
+	/* The time base for the timer is derived from the processor's bus clock,
+	 * divided by the value specified in the divide configuration register.
+	 * Note we mult and div by the divisor, saving the actual freq (even though
+	 * we don't use it yet). */
 	cprintf("Bus Frequency: %llu\n", system_timing.bus_freq);
 }
 

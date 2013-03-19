@@ -59,7 +59,18 @@
 #define LAPIC_TIMER_CURRENT			(LAPIC_BASE + 0x390)
 #define LAPIC_TIMER_DIVIDE			(LAPIC_BASE + 0x3e0)
 #define LAPIC_TIMER_DEFAULT_VECTOR	0xeb 		/* Aka 235, IRQ203 */
-#define LAPIC_TIMER_DEFAULT_DIVISOR	0xa // This is 128.  Ref SDM 3.a 9.6.4
+/* Quick note on the divisor.  The LAPIC timer ticks once per divisor-bus ticks
+ * (system bus or APIC bus, depending on the model).  Ex: A divisor of 128 means
+ * 128 bus ticks results in 1 timer tick.  The divisor increases the time range
+ * and decreases the granularity of the timer.  Numbers are appx, based on 4
+ * billion ticks, vs 2^32 ticks.
+ * Ex:   1GHz bus, div 001:    4sec max,    1ns granularity
+ * Ex:   1GHz bus, div 128:  512sec max,  128ns granularity
+ * Ex: 100MHz bus, div 001:   40sec max,   10ns granularity
+ * Ex: 100MHz bus, div 128: 5120sec max, 1280ns granularity */
+#define LAPIC_TIMER_DIVISOR_VAL		32	/* seems reasonable */
+#define LAPIC_TIMER_DIVISOR_BITS	0x8	/* Div = 32 */
+
 // IPI Interrupt Command Register
 #define LAPIC_IPI_ICR_LOWER			(LAPIC_BASE + 0x300)
 #define LAPIC_IPI_ICR_UPPER			(LAPIC_BASE + 0x310)
