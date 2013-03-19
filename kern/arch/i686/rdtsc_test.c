@@ -636,9 +636,126 @@ bool check_timing_stability(void)
 	}
 	enable_irqsave(&irq_state);
 	if (max_overhead - min_overhead > 50) {
-		printk("Test TSC overhead unstable (Min: %llu, Max: %llu).  Do not benchmark!\n",
-		       min_overhead, max_overhead);
+		printk("Test TSC overhead unstable (Min: %llu, Max: %llu).  "
+		       "Do not benchmark!\n", min_overhead, max_overhead);
 		return FALSE;
 	}
 	return TRUE;
+}
+
+void test_tsc_cycles(void)
+{
+	uint64_t start, end;
+	int8_t irq_state = 0;
+
+	disable_irqsave(&irq_state);
+	start = read_tsc_serialized();
+	for (int i = 0; i < 1000; i++) {
+		asm volatile ("addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+	                  "addl $1, %%eax;"
+				      : : : "eax", "cc");
+	}
+	end = read_tsc_serialized();
+	end = end - start - system_timing.timing_overhead;
+	printk("%llu (100,000) ticks passed, run twice to load the icache\n", end);
+
+	enable_irqsave(&irq_state);
 }
