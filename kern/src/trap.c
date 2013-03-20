@@ -18,7 +18,7 @@ struct kmem_cache *kernel_msg_cache;
 void kernel_msg_init(void)
 {
 	kernel_msg_cache = kmem_cache_create("kernel_msgs",
-	                   sizeof(struct kernel_message), HW_CACHE_ALIGN, 0, 0, 0);
+	                   sizeof(struct kernel_message), ARCH_CL_SIZE, 0, 0, 0);
 }
 
 uint32_t send_kernel_message(uint32_t dst, amr_t pc, long arg0, long arg1,

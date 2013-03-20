@@ -21,6 +21,7 @@
 #include <ros/common.h>
 #include <ros/atomic.h>
 #include <ros/arch/mmu.h>
+#include <arch/arch.h>			/* both user and kernel have arch/arch.h */
 /* #include <ros/event.h> included below */
 
 /* The main UCQ structure, contains indexes and start points (for the indexes),

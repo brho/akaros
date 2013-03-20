@@ -53,7 +53,7 @@ struct per_cpu_info {
 	struct kernel_msg_list NTPTV(a0t) NTPTV(a1t) NTPTV(a2t) immed_amsgs;
 	spinlock_t routine_amsg_lock;
 	struct kernel_msg_list NTPTV(a0t) NTPTV(a1t) NTPTV(a2t) routine_amsgs;
-}__attribute__((aligned(HW_CACHE_ALIGN)));
+}__attribute__((aligned(ARCH_CL_SIZE)));
 
 /* Allows the kernel to figure out what process is running on this core.  Can be
  * used just like a pointer to a struct proc. */

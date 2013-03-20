@@ -10,7 +10,7 @@
 #include <arch/time.h>
 
 /* Arch Constants */
-#define HW_CACHE_ALIGN 64
+#define ARCH_CL_SIZE 64
 
 #ifdef __riscv64
 # define KERN64
