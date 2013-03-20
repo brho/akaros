@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <uthread.h>
 #include <parlib.h>
+#include <malloc.h>
 
 // MCS locks
 void mcs_lock_init(struct mcs_lock *lock)
@@ -170,7 +171,8 @@ void mcs_pdr_init(struct mcs_pdr_lock *lock)
 {
 	lock->lock = 0;
 	lock->lock_holder = 0;
-	lock->vc_qnodes = malloc(sizeof(struct mcs_pdr_qnode) * max_vcores());
+	lock->vc_qnodes = memalign(__alignof(struct mcs_pdr_qnode),
+	                           sizeof(struct mcs_pdr_qnode) * max_vcores());
 	assert(lock->vc_qnodes);
 	memset(lock->vc_qnodes, 0, sizeof(struct mcs_pdr_qnode) * max_vcores());
 	for (int i = 0; i < max_vcores(); i++)
