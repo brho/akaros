@@ -68,9 +68,14 @@ struct mcs_pdr_qnode
 	uint32_t vcoreid;
 }__attribute__((aligned(ARCH_CL_SIZE)));
 
+/* Want to pad out so lock doesn't share a CL with qnodes.  If we align both
+ * pointers so that they have their own cache line, this actually performs
+ * worse.  Meaning (for some unknown reason), if the lock shares a CL with
+ * other random bss/data, the lock tests perf better... */
 struct mcs_pdr_lock
 {
 	struct mcs_pdr_qnode *lock;
+	char padding[ARCH_CL_SIZE];
 	struct mcs_pdr_qnode *vc_qnodes;	/* malloc this at init time */
 };
 

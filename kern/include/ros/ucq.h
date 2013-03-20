@@ -34,7 +34,7 @@ struct ucq {
 	atomic_t					cons_idx;		/* cons pg and slot nr */
 	bool						ucq_ready;		/* ucq is ready to be used */
 	/* Userspace lock for modifying the UCQ */
-	void						*u_lock[2];		/* sizeof an mcs_pdr_lock */
+	char						u_lock[2 * ARCH_CL_SIZE];	/* mcs_pdr_lock */
 };
 
 /* Struct at the beginning of every page/buffer, tracking consumers and
