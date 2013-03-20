@@ -170,7 +170,6 @@ void mcs_barrier_wait(mcs_barrier_t* b, size_t pid)
 void mcs_pdr_init(struct mcs_pdr_lock *lock)
 {
 	lock->lock = 0;
-	lock->lock_holder = 0;
 	lock->vc_qnodes = memalign(__alignof(struct mcs_pdr_qnode),
 	                           sizeof(struct mcs_pdr_qnode) * max_vcores());
 	assert(lock->vc_qnodes);
@@ -218,19 +217,14 @@ void __mcs_pdr_lock(struct mcs_pdr_lock *lock, struct mcs_pdr_qnode *qnode)
 		/* no need for a wrmb(), since this will only get unlocked after they
 		 * read our previous write */
 		while (qnode->locked) {
-			/* Ideally, we know who the lock holder is, and we'll make sure they
-			 * run.  If not, we'll make sure our pred is running, which trickles
-			 * up to the lock holder, if it isn't them. */
-			if (lock->lock_holder)
-				__ensure_qnode_runs(lock->lock_holder);
-			else
-				__ensure_qnode_runs(predecessor);
+			/* We don't know who the lock holder is (it hurts performance via
+			 * 'true' sharing to track it)  Instead we'll make sure our pred is
+			 * running, which trickles up to the lock holder. */
+			__ensure_qnode_runs(predecessor);
 			cpu_relax();
 		}
 	}
 	cmb();	/* just need a cmb, the swap handles the CPU wmb/wrmb() */
-	/* publish ourselves as the lock holder (optimization) */
-	lock->lock_holder = qnode;	/* mbs() handled by the cmb/swap */
 }
 
 /* Using the CAS style unlocks, since the usurper recovery is a real pain in the
@@ -238,8 +232,6 @@ void __mcs_pdr_lock(struct mcs_pdr_lock *lock, struct mcs_pdr_qnode *qnode)
 void __mcs_pdr_unlock(struct mcs_pdr_lock *lock, struct mcs_pdr_qnode *qnode)
 {
 	struct mcs_pdr_qnode *a_tail;
-	/* Clear us from being the lock holder */
-	lock->lock_holder = 0;	/* mbs() are covered by the cmb/cas and the wmb */
 	/* Check if someone is already waiting on us to unlock */
 	if (qnode->next == 0) {
 		cmb();	/* no need for CPU mbs, since there's an atomic_cas() */

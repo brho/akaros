@@ -71,7 +71,6 @@ struct mcs_pdr_qnode
 struct mcs_pdr_lock
 {
 	struct mcs_pdr_qnode *lock;
-	struct mcs_pdr_qnode *lock_holder;
 	struct mcs_pdr_qnode *vc_qnodes;	/* malloc this at init time */
 };
 
