@@ -5,6 +5,7 @@
 #include <trap.h>
 #include <net.h>
 #include <pmap.h>
+#include <net/pbuf.h>
 
 // Packet sizes
 #define MTU              1500
@@ -19,6 +20,8 @@
 // Global send_frame function pointer
 // Means we can only have one network card per system right now...
 extern int (*send_frame)(const char *data, size_t len);
+extern int (*send_pbuf)(struct pbuf *p);
+extern struct pbuf* (*recv_pbuf)(void);
 
 // Global variables for managing ethernet packets over a nic
 // Again, since these are global for all network cards we are 
@@ -46,5 +49,11 @@ struct eth_frame {
 	struct ETH_Header eth_head;
 	char data[MTU];
 } __attribute__((packed));
+
+static inline void print_mac (uint8_t* mac_addr) {
+	printk("%02x:%02x:%02x:%02x:%02x:%02x\n", 0xFF & mac_addr[0], 0xFF & mac_addr[1],	
+	                                                         0xFF & mac_addr[2], 0xFF & mac_addr[3],	
+                                                           0xFF & mac_addr[4], 0xFF & mac_addr[5]);
+}
 
 #endif /* !ROS_INC_NIC_COMMON_H */

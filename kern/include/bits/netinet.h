@@ -44,8 +44,19 @@
 #define	IPPROTO_TCP			6		/* tcp */
 #define	IPPROTO_UDP			17		/* user datagram protocol */
 
-#define	INADDR_ANY			(uint32_t)0x00000000
-#define	INADDR_BROADCAST	(uint32_t)0xffffffff	/* must be masked */
+#define IP_HDR_SZ 20
+
+
+/* modified to be consistent with linux and our user space tool chain 
+ * we need to make our mind up about bsd/linux structs
+ */
+#define	INADDR_ANY			(struct in_addr) {0x00000000}
+#define	INADDR_BROADCAST	(struct in_addr) {0xffffffff}	/* must be masked */
+
+/** 0.0.0.0 */
+#define IPADDR_ANY          ((uint32_t)0x00000000UL)
+/** 255.255.255.255 */
+#define IPADDR_BROADCAST    ((uint32_t)0xffffffffUL)
 
 #define	htonl(x) cpu_to_be32(x)
 #define	htons(x) cpu_to_be16(x)

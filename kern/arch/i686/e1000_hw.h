@@ -944,4 +944,19 @@ struct e1000_data_desc {
 /* For checksumming, the sum of all words in the EEPROM should equal 0xBABA. */
 #define EEPROM_SUM 0xBABA
 
+/* This defines the bits that are set in the Interrupt Mask
+ * Set/Read Register.  Each bit is documented below:
+ *   o RXT0   = Receiver Timer Interrupt (ring 0)
+ *   o TXDW   = Transmit Descriptor Written Back
+ *   o RXDMT0 = Receive Descriptor Minimum Threshold hit (ring 0)
+ *   o RXSEQ  = Receive Sequence Error
+ *   o LSC    = Link Status Change
+ */
+#define IMS_ENABLE_MASK ( \
+    E1000_IMS_RXT0   |    \
+    E1000_IMS_TXDW   |    \
+    E1000_IMS_RXDMT0 |    \
+    E1000_IMS_RXSEQ  |    \
+    E1000_IMS_LSC)
+
 #endif /* _E1000_HW_H_ */

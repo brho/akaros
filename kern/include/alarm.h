@@ -62,6 +62,8 @@ struct alarm_waiter {
 };
 TAILQ_HEAD(awaiters_tailq, alarm_waiter);		/* ideally not a LL */
 
+typedef void (*alarm_handler)(struct alarm_waiter *waiter);
+
 /* One of these per alarm source, such as a per-core timer.  Based on the
  * source, you may need a lock (such as for a global timer).  set_interrupt() is
  * a method for setting the interrupt source. */

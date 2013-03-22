@@ -106,8 +106,8 @@
 
 // v----- Evil line ------v
 
-char *CT(PACKET_HEADER_SIZE + len)
-rl8168_packet_wrap(const char *CT(len) data, size_t len);
+//char *CT(PACKET_HEADER_SIZE + len)
+//rl8168_packet_wrap(const char *CT(len) data, size_t len);
 
 // ^----- Evil line ------^
 
@@ -128,5 +128,6 @@ void rl8168_set_tx_descriptor(uint32_t des_num);
 void rl8168_process_frame(char *CT(frame_size) frame_buffer,
                           uint32_t frame_size, uint32_t command);
 int rl8168_send_frame(const char *CT(len) data, size_t len);
+int rl8168_send_pbuf(struct pbuf *p);
 
 #endif /* !ROS_INC_REALTEK_H */

@@ -15,6 +15,7 @@
 
 #include <ros/common.h>
 #include <sys/queue.h>
+#include <sys/uio.h>
 #include <bitmask.h>
 #include <kref.h>
 #include <time.h>
@@ -31,7 +32,6 @@ struct vm_region;
 typedef int dev_t;
 typedef int kdev_t;
 typedef int ino_t;
-typedef long off_t; // out there in other .h's, but not in the kernel yet
 struct io_writeback	{int x;};
 struct event_poll {int x;};
 struct poll_table_struct {int x;};
@@ -49,11 +49,6 @@ struct file;
 struct file_operations;
 struct fs_type;
 struct vfsmount;
-
-struct iovec {
-    void *iov_base;
-    size_t iov_len;
-};
 
 /* List def's we need */
 TAILQ_HEAD(sb_tailq, super_block);
@@ -282,7 +277,7 @@ struct file {
 	int							f_error;
 	struct event_poll_tailq		f_ep_links;
 	spinlock_t					f_ep_lock;
-	void						*f_fs_info;		/* tty driver hook */
+	void						*f_privdata;	/* tty/socket driver hook */
 	struct page_map				*f_mapping;		/* page cache mapping */
 
 	/* Ghetto appserver support */
@@ -348,12 +343,21 @@ struct vfsmount {
  * could just use the fd_array to check for openness instead of the bitmask,
  * but eventually we might want to use the bitmasks for other things (like
  * which files are close_on_exec. */
-struct fd_set {
+
+typedef struct fd_set {
     uint8_t fds_bits[BYTES_FOR_BITMASK(NR_FILE_DESC_MAX)];
-};
+} fd_set;
+
+
 struct small_fd_set {
     uint8_t fds_bits[BYTES_FOR_BITMASK(NR_FILE_DESC_DEFAULT)];
 };
+
+/* Helper macros to manage fd_sets */
+#define FD_SET(n, p)  ((p)->fds_bits[(n)/8] |=  (1 << ((n) & 7)))
+#define FD_CLR(n, p)  ((p)->fds_bits[(n)/8] &= ~(1 << ((n) & 7)))
+#define FD_ISSET(n,p) ((p)->fds_bits[(n)/8] &   (1 << ((n) & 7)))
+#define FD_ZERO(p)    memset((void*)(p),0,sizeof(*(p)))
 
 /* Describes an open file.  We need this, since the FD flags are supposed to be
  * per file descriptor, not per file (like the file status flags). */
@@ -374,7 +378,7 @@ struct files_struct {
 	struct file_desc			fd_array[NR_OPEN_FILES_DEFAULT];
 };
 
-/* Process specific filesysten info */
+/* Process specific filesystem info */
 struct fs_struct {
 	spinlock_t					lock;
 	int							umask;
@@ -447,6 +451,7 @@ ssize_t generic_file_write(struct file *file, const char *buf, size_t count,
                            off64_t *offset);
 ssize_t generic_dir_read(struct file *file, char *u_buf, size_t count,
                          off64_t *offset);
+struct file *alloc_file(void);
 struct file *do_file_open(char *path, int flags, int mode);
 int do_symlink(char *path, const char *symname, int mode);
 int do_link(char *old_path, char *new_path);

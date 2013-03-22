@@ -14,26 +14,59 @@
 
 #include <net.h>
 #include <stdio.h>
+#include <arch/types.h>
 
-uint16_t __ip_checksum(void *buf, unsigned int len, uint32_t sum)
+#ifndef FOLD_U32T
+#define FOLD_U32T(u)          (((u) >> 16) + ((u) & 0x0000ffffUL))
+#endif
+
+/* New version of ip_checksum, notice this version does not change it into 
+ * network order. It is useful to keep it in host order for further processing
+ */ 
+uint16_t __ip_checksum(void *dataptr, unsigned int len, uint32_t sum)
 {
-	/* Knock out 2 bytes at a time */
-	while (len > 1) {
-		/* Careful of endianness.  The packet is in network ordering */
-		sum += ntohs(*((uint16_t*)buf));
-		buf += sizeof(uint16_t);
-		/* In case we get close to overflowing while summing. */
-		if (sum & 0x80000000)
-			sum = (sum & 0xFFFF) + (sum >> 16);
-		len -= 2;
-	}
-	/* Handle the last byte, if any */
-	if (len)
-		sum += *(uint8_t*)buf;
-	/* Add the top 16 bytes to the lower ones, til it is done */
-	while (sum >> 16)
-		sum = (sum & 0xFFFF) + (sum >> 16);
-	return ~sum;
+  uint8_t *pb = (uint8_t *)dataptr;
+  uint16_t *ps, t = 0;
+  int odd = ((uintptr_t)pb & 1);
+
+  /* Get aligned to uint16_t */
+	// this means pb started on some weird address..
+	// but in our world this should never happen.. since the payload should always be aligned..
+	// right..
+
+  if (odd && len > 0) {
+		// change the second half of t to what pb is
+		// and advance pb
+    ((uint8_t *)&t)[1] = *pb++;
+    len--;
+  }
+
+  /* Add the bulk of the data */
+  ps = (uint16_t *)(void *)pb;
+  while (len > 1) {
+    sum += *ps++;
+    len -= 2;
+  }
+
+  /* Consume left-over byte, if any */
+  if (len > 0) {
+    ((uint8_t *)&t)[0] = *(uint8_t *)ps;
+  }
+
+  /* Add end bytes */
+  sum += t;
+
+  /* Fold 32-bit sum to 16 bits
+     calling this twice is propably faster than if statements... */
+  sum = FOLD_U32T(sum);
+  sum = FOLD_U32T(sum);
+
+  /* Swap if alignment was odd */
+  if (odd) {
+    sum = byte_swap16(sum);
+  }
+
+  return (uint16_t)sum;
 }
 
 /* Computes the checksum for the IP header.  We could write it in, but for now
@@ -42,28 +75,67 @@ uint16_t __ip_checksum(void *buf, unsigned int len, uint32_t sum)
 uint16_t ip_checksum(struct ip_hdr *ip_hdr)
 {
 	unsigned int ip_hdr_len = ip_hdr->hdr_len * sizeof(uint32_t);
-	ip_hdr->checksum = 0;
-	return __ip_checksum(ip_hdr, ip_hdr_len, 0);
+	return ~__ip_checksum(ip_hdr, ip_hdr_len, 0);
 }
 
 /* Computes the checksum for the UDP header.  We could write it in, but for now
  * we'll return the checksum (in host-ordering) and have the caller store the
  * value.  Note that the UDP header needs info from the IP header (strictly
- * speaking, just the src and destination IPs).  */
+ * speaking, just the src and destination IPs).  
+ * LEGACY: only used for packet that are not in pbuf formats*/
 uint16_t udp_checksum(struct ip_hdr *ip_hdr, struct udp_hdr *udp_hdr)
 {
 	/* Add up the info for the UDP pseudo-header */
 	uint32_t udp_pseudosum = 0;
 	uint16_t udp_len = ntohs(udp_hdr->length);
-	udp_hdr->checksum = 0;
-	udp_pseudosum += ntohs(ip_hdr->src_addr & 0xffff);
-	udp_pseudosum += ntohs(ip_hdr->src_addr >> 16);
-	udp_pseudosum += ntohs(ip_hdr->dst_addr & 0xffff);
-	udp_pseudosum += ntohs(ip_hdr->dst_addr >> 16);
-	udp_pseudosum += ip_hdr->protocol;
-	udp_pseudosum += udp_len;
-	return __ip_checksum(udp_hdr, udp_len, udp_pseudosum);
+	udp_pseudosum += (ip_hdr->src_addr & 0xffff);
+	udp_pseudosum += (ip_hdr->src_addr >> 16);
+	udp_pseudosum += (ip_hdr->dst_addr & 0xffff);
+	udp_pseudosum += (ip_hdr->dst_addr >> 16);
+	udp_pseudosum += (ip_hdr->protocol);
+	udp_pseudosum += udp_hdr->length;
+	return ~(__ip_checksum(udp_hdr, udp_len, udp_pseudosum));
 }
+
+/* ip addresses need to be network order, protolen and proto are HO */
+uint16_t inet_chksum_pseudo(struct pbuf *p, uint32_t src, uint32_t dest, uint8_t proto, uint16_t proto_len) {
+  uint32_t acc;
+  uint32_t addr;
+  struct pbuf *q;
+  uint8_t swapped;
+
+  acc = 0;
+  swapped = 0;
+  /* iterate through all pbuf in chain */
+  for(q = p; q != NULL; q = STAILQ_NEXT(q, next)) {
+    acc += __ip_checksum(q->payload, q->len, 0);
+    acc = FOLD_U32T(acc);
+    if (q->len % 2 != 0) {
+      swapped = 1 - swapped;
+      acc = byte_swap16(acc);
+    }
+  }
+
+  if (swapped) {
+    acc = byte_swap16(acc);
+  }
+
+  addr = (src);
+  acc += (addr & 0xffffUL);
+  acc += ((addr >> 16) & 0xffffUL);
+  addr = (dest);
+  acc += (addr & 0xffffUL);
+  acc += ((addr >> 16) & 0xffffUL);
+  acc += (uint32_t)htons((uint16_t)proto);
+  acc += (uint32_t)htons(proto_len);
+
+  /* Fold 32-bit sum to 16 bits
+     calling this twice is propably faster than if statements... */
+  acc = FOLD_U32T(acc);
+  acc = FOLD_U32T(acc);
+  return (uint16_t)~(acc & 0xffffUL);
+}
+
 /* Print out a network packet in the same format as tcpdump, making it easier 
  * to compare */
 void dumppacket(unsigned char *buff, size_t len)

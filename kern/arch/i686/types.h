@@ -2,8 +2,9 @@
 #define ROS_INC_TYPES_H
 
 #include <stddef.h>
-
+#ifndef LITTLE_ENDIAN
 #define LITTLE_ENDIAN
+#endif /* !LITTLE_ENDIAN */
 
 // Represents true-or-false values
 

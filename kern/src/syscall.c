@@ -34,6 +34,7 @@
 #include <arsc_server.h>
 #include <event.h>
 #include <termios.h>
+#include <socket.h>
 
 
 #ifdef __CONFIG_NETWORKING__
@@ -1565,6 +1566,20 @@ const static struct sys_table_entry syscall_table[] = {
 #endif
 	[SYS_change_to_m] = {(syscall_t)sys_change_to_m, "change_to_m"},
 	[SYS_poke_ksched] = {(syscall_t)sys_poke_ksched, "poke_ksched"},
+
+// socket related syscalls
+	[SYS_socket] ={(syscall_t)sys_socket, "socket"},
+	[SYS_sendto] ={(syscall_t)sys_sendto, "sendto"},
+	[SYS_recvfrom] ={(syscall_t)sys_recvfrom, "recvfrom"},
+	[SYS_select] ={(syscall_t)sys_select, "select"},
+	[SYS_connect] = {(syscall_t)sys_connect, "connect"},
+	[SYS_send] ={(syscall_t)sys_send, "send"},
+	[SYS_recv] ={(syscall_t)sys_recv, "recvfrom"},
+	[SYS_bind] ={(syscall_t)sys_bind, "bind"},
+	[SYS_accept] ={(syscall_t)sys_accept, "accept"},
+	[SYS_listen] ={(syscall_t)sys_listen, "listen"},
+
+
 	[SYS_read] = {(syscall_t)sys_read, "read"},
 	[SYS_write] = {(syscall_t)sys_write, "write"},
 	[SYS_open] = {(syscall_t)sys_open, "open"},

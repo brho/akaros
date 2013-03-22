@@ -71,8 +71,9 @@ static void eth_audio_sendpacket(void *buf)
 	 * Eth-audio device shouldn't care (and Linux seems to be okay with packets
 	 * that have no checksum (but not a wrong checksum)).  Technically, this
 	 * hurts our performance a bit (and some NICs can offload this). */
-	eth_udp_out.udp_hdr.checksum = htons(udp_checksum(&eth_udp_out.ip_hdr,
-	                                                  &eth_udp_out.udp_hdr));
+	eth_udp_out.udp_hdr.checksum = 0;
+	eth_udp_out.udp_hdr.checksum = udp_checksum(&eth_udp_out.ip_hdr,
+	                                                  &eth_udp_out.udp_hdr);
 	/* Send it out */
 	retval = send_frame((const char*)&eth_udp_out, ETH_AUDIO_FRAME_SZ);
 	assert(retval >= 0);
@@ -100,7 +101,8 @@ static void eth_audio_prep_response(struct ethaud_udp_packet *incoming,
 	outgoing->ip_hdr.src_addr = htonl(ntohl(incoming->ip_hdr.src_addr) + 1);
 	outgoing->ip_hdr.dst_addr = incoming->ip_hdr.src_addr;
 	/* Since the IP header is set already, we can compute the checksum. */
-	outgoing->ip_hdr.checksum = htons(ip_checksum(&outgoing->ip_hdr));
+	outgoing->ip_hdr.checksum = 0;
+	outgoing->ip_hdr.checksum = ip_checksum(&outgoing->ip_hdr);
 	outgoing->udp_hdr.src_port = htons(ETH_AUDIO_SRC_PORT);
 	outgoing->udp_hdr.dst_port = htons(ETH_AUDIO_DST_PORT);
 	outgoing->udp_hdr.length = htons(ETH_AUDIO_PAYLOAD_SZ + UDP_HDR_SZ);

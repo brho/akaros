@@ -35,6 +35,7 @@ CONFIG_ETH_AUDIO:=                 -D__CONFIG_ETH_AUDIO__
 CONFIG_KB_CORE0_ONLY:=             -D__CONFIG_KB_CORE0_ONLY__
 CONFIG_KTHREAD_POISON:=            -D__CONFIG_KTHREAD_POISON__
 CONFIG_PRINTK_NO_BACKSPACE:=       -D__CONFIG_PRINTK_NO_BACKSPACE__
+CONFIG_SOCKET:=                    -D__CONFIG_SOCKET__
 
 # Userspace configuration parameters
 # By default, each of these options will be turned off
