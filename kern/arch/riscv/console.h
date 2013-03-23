@@ -15,6 +15,5 @@
 void cons_init(void);
 /* Returns any available character, or 0 for none (legacy helper) */
 int cons_get_any_char(void);
-void poll_keyboard();
 
 #endif /* _CONSOLE_H_ */

@@ -2,6 +2,7 @@
 #include <assert.h>
 #include <arch/trap.h>
 #include <arch/console.h>
+#include <console.h>
 #include <string.h>
 #include <process.h>
 #include <syscall.h>
@@ -111,6 +112,7 @@ print_trapframe(trapframe_t* tf)
 	int len = format_trapframe(tf,buf,sizeof(buf));
 	cputbuf(buf,len);
 }
+
 static void exit_halt_loop(trapframe_t* tf)
 {
 	extern char after_cpu_halt;
@@ -118,18 +120,33 @@ static void exit_halt_loop(trapframe_t* tf)
 		tf->epc = tf->gpr[1];
 }
 
+static void handle_keypress(char c)
+{
+	amr_t handler = c == 'G' ? __run_mon : __cons_add_char;
+	send_kernel_message(core_id(), handler, (long)&cons_buf, (long)c, 0,
+	                    KMSG_ROUTINE);
+	cons_init();
+}
+
+static void handle_host_interrupt(trapframe_t* tf)
+{
+	uintptr_t fh = mtpcr(PCR_FROMHOST, 0);
+	switch (fh >> 56)
+	{
+	  case 0x01: handle_keypress(fh); return;
+	  default: assert(0);
+	}
+}
+
+static void handle_timer_interrupt(trapframe_t* tf)
+{
+	timer_interrupt(tf, NULL);
+}
+
 /* Assumes that any IPI you get is really a kernel message */
-static void
-handle_ipi(trapframe_t* tf)
+static void handle_interprocessor_interrupt(trapframe_t* tf)
 {
 	clear_ipi();
-	poll_keyboard(); // keypresses can trigger IPIs
-
-	if (!in_kernel(tf))
-		set_current_tf(&per_cpu_info[core_id()], tf);
-	else
-		exit_halt_loop(tf);
-
 	handle_kmsg_ipi(tf, 0);
 }
 
@@ -157,17 +174,6 @@ unhandled_trap(trapframe_t* state, const char* name)
 		enable_irq();
 		proc_destroy(current);
 	}
-}
-
-static void
-handle_timer_interrupt(trapframe_t* tf)
-{
-	if (!in_kernel(tf))
-		set_current_tf(&per_cpu_info[core_id()], tf);
-	else
-		exit_halt_loop(tf);
-	
-	timer_interrupt(tf, NULL);
 }
 
 static void
@@ -226,7 +232,7 @@ handle_fault_store(trapframe_t* state)
 		print_trapframe(state);
 		panic("Store Page Fault in the Kernel at %p!", state->badvaddr);
 	}
-	
+
 	set_current_tf(&per_cpu_info[core_id()], state);
 
 	if(handle_page_fault(current, state->badvaddr, PROT_WRITE))
@@ -237,10 +243,6 @@ static void
 handle_illegal_instruction(trapframe_t* state)
 {
 	assert(!in_kernel(state));
-
-	// XXX for noFP demo purposes we're ignoring illegal insts in the user.
-	advance_pc(state);
-	env_pop_tf(state); /* We didn't save our TF, so don't use proc_restartcore */
 
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	set_current_tf(pcpui, state);
@@ -301,7 +303,8 @@ handle_trap(trapframe_t* tf)
 
 	static void (*const irq_handlers[])(trapframe_t*) = {
 	  [IRQ_TIMER] = handle_timer_interrupt,
-	  [IRQ_IPI] = handle_ipi,
+	  [IRQ_HOST] = handle_host_interrupt,
+	  [IRQ_IPI] = handle_interprocessor_interrupt,
 	};
 	
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
@@ -310,6 +313,12 @@ handle_trap(trapframe_t* tf)
 		uint8_t irq = tf->cause;
 		assert(irq < sizeof(irq_handlers)/sizeof(irq_handlers[0]) &&
 		       irq_handlers[irq]);
+
+		if (in_kernel(tf))
+			exit_halt_loop(tf);
+		else
+			set_current_tf(&per_cpu_info[core_id()], tf);
+
 		inc_irq_depth(pcpui);
 		irq_handlers[irq](tf);
 		dec_irq_depth(pcpui);

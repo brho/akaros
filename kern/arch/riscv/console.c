@@ -12,10 +12,10 @@ int cons_get_any_char(void)
 	assert(0);
 }
 
-void
-cons_init(void)
+void cons_init()
 {
-	while (mtpcr(PCR_TOHOST, 0x0180000000000000));
+	mtpcr(PCR_SR, mfpcr(PCR_SR) | (1 << (IRQ_HOST+SR_IM_SHIFT)));
+	while (mtpcr(PCR_TOHOST, 0x01L << 56));
 }
 
 // `High'-level console I/O.  Used by readline and cprintf.
@@ -29,18 +29,6 @@ cputbuf(const char* str, int len)
 
 void poll_keyboard()
 {
-	uintptr_t fh = mtpcr(PCR_FROMHOST, 0);
-	if (fh == 0)
-		return;
-	assert((fh >> 56) == 0x01);
-
-	char c = fh;
-	if (c == 'G')
-		send_kernel_message(core_id(), __run_mon, 0, 0, 0, KMSG_ROUTINE);
-	else
-		send_kernel_message(core_id(), __cons_add_char, (long)&cons_buf,
-		                    (long)c, 0, KMSG_ROUTINE);
-	cons_init();
 }
 
 // Low-level console I/O
