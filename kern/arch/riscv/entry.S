@@ -14,7 +14,6 @@
 #define REGBYTES (1 << LOG_REGBYTES)
 
   .text
-  .ent    save_kernel_tf_asm
   .global save_kernel_tf_asm
 save_kernel_tf_asm:
   STORE  s0,20*REGBYTES(a0)
@@ -35,10 +34,8 @@ save_kernel_tf_asm:
   # set EPC to this function's return address
   STORE  ra,33*REGBYTES(a0)
   ret
-  .end  save_kernel_tf_asm
 
   .text
-  .ent    pop_kernel_tf
   .global pop_kernel_tf
 pop_kernel_tf:
   LOAD  t0,32*REGBYTES(a0)
@@ -59,16 +56,12 @@ pop_kernel_tf:
   mtpcr  t0,ASM_CR(PCR_SR)
   ret
 
-  .end  pop_kernel_tf
 
-  .ent  save_tf
 save_tf:  # write the trap frame onto the stack
 
   ret
-  .end  save_tf
 
   .globl  env_pop_tf
-  .ent  env_pop_tf
 env_pop_tf:  # write the trap frame onto the stack
   # restore gprs
   LOAD  t0,32*REGBYTES(a0)  # restore sr (should disable interrupts)
@@ -119,10 +112,8 @@ env_pop_tf:  # write the trap frame onto the stack
   mfpcr x1,ASM_CR(PCR_K0)
   mfpcr x2,ASM_CR(PCR_K1)
   eret
-  .end  env_pop_tf
 
   .global  trap_entry
-  .ent  trap_entry
 trap_entry:
   # save x1 and x2 so we can use them as temporaries
   mtpcr x1, ASM_CR(PCR_K0)
@@ -192,14 +183,11 @@ trap_entry:
   move  sp, x2
   move  a0, x2
   j     handle_trap
-  .end  trap_entry
 
   .global  cpu_halt
   .global  after_cpu_halt
-  .ent  cpu_halt
 cpu_halt:
   setpcr ASM_CR(PCR_SR), SR_ET
 1:b     1b   # handle_ipi can advance the PC to break out of this loop.
   ret
 after_cpu_halt:
-  .end  cpu_halt

@@ -145,7 +145,6 @@ gcc-$(GCC_VERSION): gcc-$(GCC_VERSION).tar.bz2
 	rm -rf gcc-$(GCC_VERSION)
 	tar -jxf gcc-$(GCC_VERSION).tar.bz2
 	$(MAKE) .gcc-ros-patch
-	patch --no-backup-if-mismatch -p1 < gcc-4.6.1-compile.patch
 	patch --no-backup-if-mismatch -p0 < gcc-$(GCC_VERSION)-riscv.patch
 
 .gcc-ros-patch:

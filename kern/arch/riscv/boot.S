@@ -20,7 +20,6 @@
 .text
 
 .global _start
-.ent _start
 _start:
   // This is the first kernel code that executes; it is run only by core 0.
 
@@ -95,9 +94,6 @@ notcore0:
   la     t0, smp_init
   jr     t0
 
-.end _start
-
-.ent enable_mmu
 enable_mmu:
   la     t0, l1pt_boot
   li     t1, KERN_LOAD_ADDR
@@ -106,7 +102,6 @@ enable_mmu:
   li     t0, PCR0 | SR_VM
   mtpcr  t0, ASM_CR(PCR_SR)
   ret
-.end enable_mmu
 
 ///////////////////////////////////////////////////////////////////
 // boot stack and regular stacks.

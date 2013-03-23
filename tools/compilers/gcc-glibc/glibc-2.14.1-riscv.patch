@@ -1873,10 +1873,10 @@ index 0000000..4090efe
 +}
 diff --git a/glibc-2.14.1/sysdeps/riscv/dl-machine.h b/glibc-2.14.1/sysdeps/riscv/dl-machine.h
 new file mode 100644
-index 0000000..830c199
+index 0000000..e442496
 --- /dev/null
 +++ glibc-2.14.1/sysdeps/riscv/dl-machine.h
-@@ -0,0 +1,735 @@
+@@ -0,0 +1,733 @@
 +/* Machine-dependent ELF dynamic relocation inline functions.  MIPS version.
 +   Copyright (C) 1996-2001, 2002, 2003, 2004, 2005, 2006, 2007
 +   Free Software Foundation, Inc.
@@ -1916,14 +1916,12 @@ index 0000000..830c199
 +#ifndef _RTLD_PROLOGUE
 +# define _RTLD_PROLOGUE(entry)						\
 +	".globl\t" __STRING(entry) "\n\t"				\
-+	".ent\t" __STRING(entry) "\n\t"					\
 +	".type\t" __STRING(entry) ", @function\n"			\
 +	__STRING(entry) ":\n\t"
 +#endif
 +
 +#ifndef _RTLD_EPILOGUE
 +# define _RTLD_EPILOGUE(entry)						\
-+	".end\t" __STRING(entry) "\n\t"					\
 +	".size\t" __STRING(entry) ", . - " __STRING(entry) "\n\t"
 +#endif
 +
@@ -2669,10 +2667,10 @@ index 0000000..69d3893
 +#define TLS_DTV_UNALLOCATED	((void *) -1l)
 diff --git a/glibc-2.14.1/sysdeps/riscv/dl-trampoline.c b/glibc-2.14.1/sysdeps/riscv/dl-trampoline.c
 new file mode 100644
-index 0000000..8baad99
+index 0000000..136a116
 --- /dev/null
 +++ glibc-2.14.1/sysdeps/riscv/dl-trampoline.c
-@@ -0,0 +1,295 @@
+@@ -0,0 +1,289 @@
 +/* PLT trampoline.  MIPS version.
 +   Copyright (C) 1996-2001, 2002, 2003, 2004, 2005
 +   Free Software Foundation, Inc.
@@ -2903,9 +2901,7 @@ index 0000000..8baad99
 +	.align	2\n\
 +	.globl	_dl_runtime_resolve\n\
 +	.type	_dl_runtime_resolve,@function\n\
-+	.ent	_dl_runtime_resolve\n\
 +_dl_runtime_resolve:\n\
-+	.frame	sp, " STRINGXP(ELF_DL_FRAME_SIZE) ", ra\n\
 +	" STRINGXV(SETUP_GP64(t4, _dl_runtime_resolve)) "\n\
 +	# Save arguments and sp value in stack.\n\
 +	addi  sp, sp, " STRINGXP(-ELF_DL_FRAME_SIZE) "\n\
@@ -2921,7 +2917,6 @@ index 0000000..8baad99
 +	move	t7, v0\n\
 +	addi	sp, sp, " STRINGXP(ELF_DL_FRAME_SIZE) "\n\
 +	jr	t7\n\
-+	.end	_dl_runtime_resolve\n\
 +	.previous\n\
 +");
 +
@@ -2949,9 +2944,7 @@ index 0000000..8baad99
 +	.align	2\n\
 +	.globl	_dl_runtime_pltresolve\n\
 +	.type	_dl_runtime_pltresolve,@function\n\
-+	.ent	_dl_runtime_pltresolve\n\
 +_dl_runtime_pltresolve:\n\
-+	.frame	sp, " STRINGXP(ELF_DL_PLT_FRAME_SIZE) ", ra\n\
 +	" STRINGXV(SETUP_GP64(t4, _dl_runtime_pltresolve)) "\n\
 +	# Save arguments and sp value in stack.\n\
 +1:	addi	sp, sp, " STRINGXP(-ELF_DL_PLT_FRAME_SIZE) "\n\
@@ -2964,7 +2957,6 @@ index 0000000..8baad99
 +	" ELF_DL_PLT_RESTORE_ARG_REGS "\
 +	addi	sp, sp, " STRINGXP(ELF_DL_PLT_FRAME_SIZE) "\n\
 +	jr	t7\n\
-+	.end	_dl_runtime_pltresolve\n\
 +	.previous\n\
 +");
 +
@@ -7915,10 +7907,10 @@ index 0000000..7a5e3e0
 +#endif	/* stackinfo.h */
 diff --git a/glibc-2.14.1/sysdeps/riscv/sys/asm.h b/glibc-2.14.1/sysdeps/riscv/sys/asm.h
 new file mode 100644
-index 0000000..331a16e
+index 0000000..7d91b86
 --- /dev/null
 +++ glibc-2.14.1/sysdeps/riscv/sys/asm.h
-@@ -0,0 +1,206 @@
+@@ -0,0 +1,199 @@
 +/* Copyright (C) 1997, 1998, 2002, 2003, 2004, 2005
 +   Free Software Foundation, Inc.
 +   This file is part of the GNU C Library.
@@ -8025,25 +8017,18 @@ index 0000000..331a16e
 +		.globl	symbol;                         \
 +		.align	2;                              \
 +		.type	symbol,@function;               \
-+		.ent	symbol,0;                       \
 +symbol:
 +
 +/*
 + * NESTED - declare nested routine entry point
 + */
-+#define	NESTED(symbol, framesize, rpc)                  \
-+		.globl	symbol;                         \
-+		.align	2;                              \
-+		.type	symbol,@function;               \
-+		.ent	symbol,0;                       \
-+symbol:		.frame	sp, framesize, rpc
++#define	NESTED(symbol, framesize, rpc) LEAF(symbol)
 +
 +/*
 + * END - mark end of function
 + */
 +#ifndef END
 +# define END(function)                                   \
-+		.end	function;		        \
 +		.size	function,.-function
 +#endif
 +
@@ -8485,10 +8470,10 @@ index 0000000..74e7197
 +}
 diff --git a/glibc-2.14.1/sysdeps/unix/riscv/sysdep.h b/glibc-2.14.1/sysdeps/unix/riscv/sysdep.h
 new file mode 100644
-index 0000000..52e47c4
+index 0000000..15079d8
 --- /dev/null
 +++ glibc-2.14.1/sysdeps/unix/riscv/sysdep.h
-@@ -0,0 +1,73 @@
+@@ -0,0 +1,72 @@
 +/* Copyright (C) 1992, 1995, 1997, 1999, 2000, 2002, 2003, 2004
 +   Free Software Foundation, Inc.
 +   This file is part of the GNU C Library.
@@ -8519,13 +8504,12 @@ index 0000000..52e47c4
 +
 +#undef END
 +#define	END(function)                                   \
-+		.end	function;		        \
 +		.size	function,.-function
 +
 +#define ret	ret
 +
 +#undef PSEUDO_END
-+#define PSEUDO_END(sym) .end sym; .size sym,.-sym
++#define PSEUDO_END(sym) .size sym,.-sym
 +
 +#define PSEUDO_NOERRNO(name, syscall_name, args)	\
 +  .align 2;						\
@@ -8534,7 +8518,7 @@ index 0000000..52e47c4
 +  syscall
 +
 +#undef PSEUDO_END_NOERRNO
-+#define PSEUDO_END_NOERRNO(sym) .end sym; .size sym,.-sym
++#define PSEUDO_END_NOERRNO(sym) .size sym,.-sym
 +
 +#define ret_NOERRNO ret
 +
@@ -13130,7 +13114,7 @@ index 0000000..51923be
 +#include <sysdeps/unix/sysv/linux/riscv/vfork.S>
 diff --git a/glibc-2.14.1/sysdeps/unix/sysv/linux/riscv/nptl/sysdep-cancel.h b/glibc-2.14.1/sysdeps/unix/sysv/linux/riscv/nptl/sysdep-cancel.h
 new file mode 100644
-index 0000000..00ea8c2
+index 0000000..8f638f6
 --- /dev/null
 +++ glibc-2.14.1/sysdeps/unix/sysv/linux/riscv/nptl/sysdep-cancel.h
 @@ -0,0 +1,161 @@
@@ -13217,7 +13201,7 @@ index 0000000..00ea8c2
 +
 +
 +  # undef PSEUDO_END
-+  # define PSEUDO_END(sym) cfi_endproc; .end sym; .size sym,.-sym
++  # define PSEUDO_END(sym) cfi_endproc; .size sym,.-sym
 +
 +  #endif
 +
