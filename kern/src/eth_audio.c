@@ -11,7 +11,7 @@
 #include <devfs.h>
 #include <page_alloc.h>
 #include <pmap.h>
-#include <arch/nic_common.h>
+#include <net/nic_common.h>
 #include <process.h>
 #include <smp.h>
 

@@ -19,7 +19,7 @@
 #include <arch/smp.h>
 #include <arch/apic.h>
 #include <arch/pci.h>
-#include <arch/nic_common.h>
+#include <net/nic_common.h>
 #include <arch/e1000.h>
 
 #include <ros/memlayout.h>

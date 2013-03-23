@@ -9,7 +9,7 @@
 #include <sys/queue.h>
 #include <net.h>
 #include <debug.h>
-#include <net/nic_common.h>
+#include <arch/nic_common.h>
 
 
 /* TODO: before running

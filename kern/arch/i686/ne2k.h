@@ -5,7 +5,7 @@
 #include <trap.h>
 #include <pmap.h>
 #include <arch/pci.h>
-#include <arch/nic_common.h>
+#include <net/nic_common.h>
 
 #define ne2k_debug(...)  //cprintf(__VA_ARGS__)  
 #define ne2k_interrupt_debug(...) //cprintf(__VA_ARGS__)  

@@ -4,7 +4,7 @@
 #include <ros/common.h>
 #include <trap.h>
 #include <pmap.h>
-#include <arch/nic_common.h>
+#include <net/nic_common.h>
 
 #define rl8168_debug(...) // cprintf(__VA_ARGS__)  
 #define rl8168_interrupt_debug(...) //cprintf(__VA_ARGS__)  

@@ -38,7 +38,7 @@
 
 
 #ifdef __CONFIG_NETWORKING__
-#include <arch/nic_common.h>
+#include <net/nic_common.h>
 extern int (*send_frame)(const char *CT(len) data, size_t len);
 extern unsigned char device_mac[6];
 #endif

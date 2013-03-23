@@ -7,7 +7,7 @@
 #include <net/udp.h>
 #include <net/tcp_impl.h>
 #include <ros/errno.h>
-#include <net/nic_common.h>
+#include <arch/nic_common.h>
 
 /* statically configured next gateway */
 const uint8_t GTWAY[6] = {0xda, 0x76, 0xe7, 0x4c, 0xca, 0x7e};

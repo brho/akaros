@@ -4,7 +4,7 @@
 #include <ros/common.h>
 #include <trap.h>
 #include <pmap.h>
-#include <arch/nic_common.h>
+#include <net/nic_common.h>
 #include <net/pbuf.h>
 #if 1
 #define e1000_debug(...) 		printk(__VA_ARGS__)  
