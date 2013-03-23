@@ -19,14 +19,20 @@
 #define E1000_IRQ_CPU		0
 
 #define INTEL_VENDOR_ID		0x8086
-#define INTEL_DEV_ID0		0x100E	// Real E1000 QEMU emulates this. Linux device driver e1000
+/* e1000s.  For some info (and lists of more of these, check out
+ * http://pci-ids.ucw.cz/read/PC/8086/  
+ * Some notes:
+ * 	- in 2009, paul mentioned that the 82576{,NS} are supported by the igb
+ * 	driver in Linux, since they support a more advanced feature set.
+ * 	- There are many more e1000s.  We could import the list from pci-ids, or
+ * 	something more clever.  This list mostly just tracks devices we've seen
+ * 	before. */
 
-/* 
- * These two are technically supported by the igb driver in linux, since they support more advanced feature set 
- */
-#define INTEL_DEV_ID1		0x10c9	// 82576
-#define INTEL_DEV_ID2		0x150a	// 82576 NS
-
+#define INTEL_82543GC_ID	0x1004
+#define INTEL_82540EM_ID	0x100e		/* qemu's device */
+#define INTEL_82545EM_ID	0x100f
+#define INTEL_82576_ID		0x10c9
+#define INTEL_82576NS_ID	0x150a
 
 /********** THIS NEXT FILE IS GPL'D! **************/
 #include <arch/e1000_hw.h>

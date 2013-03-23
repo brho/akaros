@@ -66,7 +66,7 @@ extern uint8_t eth_up;
 
 // The PCI device ID we detect
 // This is used for quark behavior
-uint16_t device_id;
+uint16_t device_id = 0;
 
 
 // Hacky variables relating to delivering packets
@@ -78,7 +78,6 @@ extern uint32_t packet_buffers_tail;
 spinlock_t packet_buffers_lock;
 
 // Allow us to register our send_frame as the global send_frame
-uint16_t device_id;
 extern int (*send_frame)(const char *CT(len) data, size_t len);
 
 // compat defines that make transitioning easier
@@ -175,38 +174,45 @@ void e1000_handle_bar0(uint32_t addr) {
 }
 
 // Scan the PCI data structures for our device.
-int e1000_scan_pci() {
+int e1000_scan_pci(void)
+{
 	struct pci_device *pcidev;
 	uint32_t result;
-	unsigned int once = 0;
 	printk("Searching for Intel E1000 Network device...");
 	STAILQ_FOREACH(pcidev, &pci_devices, all_dev) {
 		/* Ignore non Intel Devices */
 		if (pcidev->ven_id != INTEL_VENDOR_ID)
 			continue;
 		/* Ignore non E1000 devices */
-		if ((pcidev->dev_id != INTEL_DEV_ID0) && 
-		    (pcidev->dev_id != INTEL_DEV_ID1) &&
-		    (pcidev->dev_id != INTEL_DEV_ID2))
-			continue;
+		switch (pcidev->dev_id) {
+			case (INTEL_82543GC_ID):
+			case (INTEL_82540EM_ID):
+			case (INTEL_82545EM_ID):
+			case (INTEL_82576_ID):
+			case (INTEL_82576NS_ID):
+				break;
+			default:
+				continue;
+		}
 		printk(" found on BUS %x DEV %x FUNC %x\n", pcidev->bus, pcidev->dev,
 		       pcidev->func);
-		/* TODO: (ghetto) Skip the management nic on the 16 core box.  It is
-		 * probably the first one found (check this) */
-		if ((pcidev->dev_id == INTEL_DEV_ID1) && (once++ == 0)) 
+		/* TODO: WARNING - EXTREMELY GHETTO  (can only handle 1 NIC) */
+		if (device_id) {
+			printk("[e1000] Already configured a device, won't do another\n");
 			continue;
-		/* TODO: WARNING - EXTREMELY GHETTO */
+		}
 		device_id = pcidev->dev_id;
 		/* Find the IRQ */
 		e1000_irq = pcidev->irqline;
 		e1000_debug("-->IRQ: %u\n", e1000_irq);
 		/* Loop over the BARs */
-		/* TODO: pci layer should scan these things and put them in a pci_dev struct */
+		/* TODO: pci layer should scan these things and put them in a pci_dev
+		 * struct */
 		/* SelectBars based on the IORESOURCE_MEM */
 		for (int k = 0; k <= 5; k++) {
+	    	/* TODO: clarify this magic */
 			int reg = 4 + k;
-	    // resource len?
-					result = pcidev_read32(pcidev, reg << 2);	// SHAME! why? 
+			result = pcidev_read32(pcidev, reg << 2);
 
 			if (result == 0) // (0 denotes no valid data)
 				continue;
@@ -228,11 +234,10 @@ int e1000_scan_pci() {
 					e1000_handle_bar0(result);
 				}						
 			}
-				
-			// We found the device and configured it (if we get here). Return OK
-			return 0;
 		}
 	}
+	if (device_id)
+		return 0;
 	printk(" not found. No device configured.\n");
 	return -1;
 }
@@ -311,7 +316,7 @@ void e1000_setup_mac() {
 	e1000_debug("-->Setting up MAC addr\n");
 
 	// Quark: For ID0 type, we read from the EEPROm. Else we read from RAL/RAH.
-	if (device_id == INTEL_DEV_ID0) {
+	if (device_id == INTEL_82540EM_ID) {
 
 		// This is ungodly slow. Like, person perceivable time slow.
 		for (int i = 0; i < 3; i++) {
