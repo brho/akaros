@@ -1,14 +1,5 @@
 #include <arch/types.h>
 
-/* ISO C99: 7.18 Integer types, chunk from glibc's stdint.h */
-# if __WORDSIZE == 64
-#  define __INT64_C(c)	c ## L
-#  define __UINT64_C(c)	c ## UL
-# else
-#  define __INT64_C(c)	c ## LL
-#  define __UINT64_C(c)	c ## ULL
-# endif
-
 /* Limits of integral types.  */
 
 /* Minimum of signed integral types.  */
