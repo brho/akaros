@@ -642,83 +642,132 @@ int pthread_mutex_destroy(pthread_mutex_t* m)
 
 int pthread_cond_init(pthread_cond_t *c, const pthread_condattr_t *a)
 {
-  c->attr = a;
-  memset(c->waiters,0,sizeof(c->waiters));
-  memset(c->in_use,0,sizeof(c->in_use));
-  c->next_waiter = 0;
-  return 0;
+	TAILQ_INIT(&c->waiters);
+	spin_pdr_init(&c->spdr_lock);
+	if (a) {
+		c->attr_pshared = a->pshared;
+		c->attr_clock = a->clock;
+	} else {
+		c->attr_pshared = PTHREAD_PROCESS_PRIVATE;
+		c->attr_clock = 0;
+	}
+	return 0;
 }
 
 int pthread_cond_destroy(pthread_cond_t *c)
 {
-  return 0;
+	return 0;
 }
 
 int pthread_cond_broadcast(pthread_cond_t *c)
 {
-  memset(c->waiters,0,sizeof(c->waiters));
-  return 0;
+	struct pthread_queue restartees = TAILQ_HEAD_INITIALIZER(restartees);
+	struct pthread_tcb *pthread_i, *temp;
+	spin_pdr_lock(&c->spdr_lock);
+	/* moves all items from waiters onto the end of restartees */
+	TAILQ_CONCAT(&restartees, &c->waiters, next);
+	spin_pdr_unlock(&c->spdr_lock);
+	/* Disable notifs when calling the 2LS op - might protect against a few
+	 * things (we don't do this very often).  We're still a uthread, according
+	 * to TLS, but other cores (and the kernel) will think we are in VC ctx
+	 * (notifs disabled) */
+	uth_disable_notifs();
+	TAILQ_FOREACH_SAFE(pthread_i, &restartees, next, temp) {
+		TAILQ_REMOVE(&restartees, pthread_i, next);
+		uthread_runnable((struct uthread*)pthread_i);
+	}
+	uth_enable_notifs();
+	return 0;
 }
 
+/* spec says this needs to work regardless of whether or not it holds the mutex
+ * already. */
 int pthread_cond_signal(pthread_cond_t *c)
 {
-  int i;
-  for(i = 0; i < MAX_PTHREADS; i++)
-  {
-    if(c->waiters[i])
-    {
-      c->waiters[i] = 0;
-      break;
-    }
-  }
-  return 0;
+	struct pthread_tcb *pthread;
+	spin_pdr_lock(&c->spdr_lock);
+	pthread = TAILQ_FIRST(&c->waiters);
+	if (!pthread) {
+		spin_pdr_unlock(&c->spdr_lock);
+		return 0;
+	}
+	TAILQ_REMOVE(&c->waiters, pthread, next);
+	spin_pdr_unlock(&c->spdr_lock);
+	uthread_runnable((struct uthread*)pthread);
+	return 0;
+}
+
+/* Communicate btw cond_wait and its callback */
+struct cond_junk {
+	pthread_cond_t				*c;
+	pthread_mutex_t				*m;
+};
+
+/* Callback/bottom half of cond wait.  For those writing these pth callbacks,
+ * the minimum is call generic, set state (communicate with runnable), then do
+ * something that causes it to be runnable in the future (or right now). */
+static void __pth_wait_cb(struct uthread *uthread, void *junk)
+{
+	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
+	pthread_cond_t *c = ((struct cond_junk*)junk)->c;
+	pthread_mutex_t *m = ((struct cond_junk*)junk)->m;
+	/* this removes us from the active list; we can reuse next below */
+	__pthread_generic_yield(pthread);
+	pthread->state = PTH_BLK_MUTEX;
+	spin_pdr_lock(&c->spdr_lock);
+	TAILQ_INSERT_TAIL(&c->waiters, pthread, next);
+	spin_pdr_unlock(&c->spdr_lock);
+	pthread_mutex_unlock(m);
 }
 
 int pthread_cond_wait(pthread_cond_t *c, pthread_mutex_t *m)
 {
-  uint32_t old_waiter = c->next_waiter;
-  uint32_t my_waiter = c->next_waiter;
-  
-  //allocate a slot
-  while (atomic_swap_u32(& (c->in_use[my_waiter]), SLOT_IN_USE) == SLOT_IN_USE)
-  {
-    my_waiter = (my_waiter + 1) % MAX_PTHREADS;
-    assert (old_waiter != my_waiter);  // do not want to wrap around
-  }
-  c->waiters[my_waiter] = WAITER_WAITING;
-  c->next_waiter = (my_waiter+1) % MAX_PTHREADS;  // race on next_waiter but ok, because it is advisary
-
-  pthread_mutex_unlock(m);
-
-  volatile int* poll = &c->waiters[my_waiter];
-  while(*poll);
-  c->in_use[my_waiter] = SLOT_FREE;
-  pthread_mutex_lock(m);
-
-  return 0;
+	struct cond_junk local_junk;
+	local_junk.c = c;
+	local_junk.m = m;
+	uthread_yield(TRUE, __pth_wait_cb, &local_junk);
+	pthread_mutex_lock(m);
+	return 0;
 }
 
 int pthread_condattr_init(pthread_condattr_t *a)
 {
-  a = PTHREAD_PROCESS_PRIVATE;
-  return 0;
+	a->pshared = PTHREAD_PROCESS_PRIVATE;
+	a->clock = 0;
+	return 0;
 }
 
 int pthread_condattr_destroy(pthread_condattr_t *a)
 {
-  return 0;
-}
-
-int pthread_condattr_setpshared(pthread_condattr_t *a, int s)
-{
-  a->pshared = s;
-  return 0;
+	return 0;
 }
 
 int pthread_condattr_getpshared(pthread_condattr_t *a, int *s)
 {
-  *s = a->pshared;
-  return 0;
+	*s = a->pshared;
+	return 0;
+}
+
+int pthread_condattr_setpshared(pthread_condattr_t *a, int s)
+{
+	a->pshared = s;
+	if (s == PTHREAD_PROCESS_SHARED) {
+		printf("Warning: we don't do shared pthread condvars btw diff MCPs\n");
+		return -1;
+	}
+	return 0;
+}
+
+int pthread_condattr_getclock(const pthread_condattr_t *attr,
+                              clockid_t *clock_id)
+{
+	*clock_id = attr->clock;
+}
+
+int pthread_condattr_setclock(pthread_condattr_t *attr, clockid_t clock_id)
+{
+	printf("Warning: we don't do pthread condvar clock stuff\n");
+	attr->clock = clock_id;
 }
 
 pthread_t pthread_self()

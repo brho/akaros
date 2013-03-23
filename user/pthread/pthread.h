@@ -7,6 +7,7 @@
 #include <uthread.h>
 #include <mcs.h>
 #include <dtls.h>
+#include <spinlock.h>
 
 #ifdef __cplusplus
   extern "C" {
@@ -59,6 +60,7 @@ struct sysc_mgmt {
 #define PTHREAD_BARRIER_SPINS 100 // totally arbitrary
 #define PTHREAD_COND_INITIALIZER {0,{0},{0},0}
 #define PTHREAD_PROCESS_PRIVATE 0
+#define PTHREAD_PROCESS_SHARED 1
 
 typedef struct
 {
@@ -103,19 +105,24 @@ enum
 #define PTHREAD_STACK_PAGES 4
 #define PTHREAD_STACK_SIZE (PTHREAD_STACK_PAGES*PGSIZE)
 
+typedef int clockid_t;
 typedef struct
 {
   int pshared;
+  clockid_t clock;
 } pthread_condattr_t;
 
-
+/* Regarding the spinlock vs MCS, I don't expect this lock to be heavily
+ * contended.  Most of the time, the caller already holds the mutex associated
+ * with the cond var. */
 typedef struct
 {
-  const pthread_condattr_t* attr;
-  uint32_t waiters[MAX_PTHREADS];
-  uint32_t in_use[MAX_PTHREADS];
-  uint32_t next_waiter; //start the search for an available waiter at this spot
+	struct pthread_queue		waiters;
+	struct spin_pdr_lock 		spdr_lock;
+	int 						attr_pshared;
+	int 						attr_clock;
 } pthread_cond_t;
+
 typedef struct 
 {
 	size_t stacksize;
@@ -163,8 +170,11 @@ int pthread_cond_wait(pthread_cond_t *, pthread_mutex_t *);
 
 int pthread_condattr_init(pthread_condattr_t *);
 int pthread_condattr_destroy(pthread_condattr_t *);
-int pthread_condattr_setpshared(pthread_condattr_t *, int);
 int pthread_condattr_getpshared(pthread_condattr_t *, int *);
+int pthread_condattr_setpshared(pthread_condattr_t *, int);
+int pthread_condattr_getclock(const pthread_condattr_t *attr,
+                              clockid_t *clock_id);
+int pthread_condattr_setclock(pthread_condattr_t *attr, clockid_t clock_id);
 
 #define pthread_rwlock_t pthread_mutex_t
 #define pthread_rwlockattr_t pthread_mutexattr_t
