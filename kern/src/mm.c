@@ -543,7 +543,7 @@ void *__do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 	 * If HPF errors out, we'll warn for now, since it is likely a bug in
 	 * userspace, though since POPULATE is an opportunistic thing, we don't need
 	 * to actually kill the process. */
-	if (flags & MAP_POPULATE)
+	if (flags & MAP_POPULATE && vmr->vm_prot != PROT_NONE)
 		for (int i = 0; i < num_pages; i++) {
 			retval = __handle_page_fault(p, addr + i * PGSIZE, vmr->vm_prot);
 			if (retval) {
