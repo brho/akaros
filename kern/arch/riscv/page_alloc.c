@@ -20,14 +20,8 @@
 #include <multiboot.h>
 #include <colored_caches.h>
 
-page_list_t *COUNT(llc_cache->num_colors) colored_page_free_list = NULL;
+page_list_t* colored_page_free_list = NULL;
 spinlock_t colored_page_free_list_lock = SPINLOCK_INITIALIZER_IRQSAVE;
-
-void page_alloc_bootstrap() {
-	// Allocate space for the array required to manage the free lists
-	size_t list_size = llc_cache->num_colors*sizeof(page_list_t);
-	colored_page_free_list = (page_list_t*) boot_alloc(list_size, PGSIZE);
-}
 
 /*
  * Initialize the memory free lists.
@@ -37,47 +31,29 @@ void page_alloc_bootstrap() {
  */
 void page_alloc_init() 
 {
-	// First Bootstrap the page alloc process
-	static bool bootstrapped = FALSE;
-	if(!bootstrapped) {
-		bootstrapped = TRUE;
-		page_alloc_bootstrap();
-	}
+	init_once_racy(return);
 
-	// Then, initialize the array required to manage the 
-		// colored page free list
-	for(int i=0; i<llc_cache->num_colors; i++) {
-		LIST_INIT(&(colored_page_free_list[i]));
-	}
+	size_t list_size = llc_cache->num_colors*sizeof(page_list_t);;
+	page_list_t* lists = (page_list_t*)boot_alloc(list_size, PGSIZE);
+
+	size_t num_colors = llc_cache->num_colors;
+	for (size_t i = 0; i < num_colors; i++)
+		LIST_INIT(&lists[i]);
 	
-	//  Finally, mark the pages already in use by the kernel. 
-	//  1) Mark page 0 as in use.
-	//     This way we preserve the real-mode IDT and BIOS structures
-	//     in case we ever need them.  (Currently we don't, but...)
-	//  2) Mark the rest of base memory as free.
-	//  3) Then comes the IO hole [IOPHYSMEM, EXTPHYSMEM).
-	//     Mark it as in use so that it can never be allocated.      
-	//  4) Then extended memory [EXTPHYSMEM, ...).
-	//     Some of it is in use, some is free.
-	uintptr_t i;
-	physaddr_t physaddr_after_kernel = PADDR(ROUNDUP(boot_freemem, PGSIZE));
+	uintptr_t first_free_page = LA2PPN(PADDR(ROUNDUP(boot_freemem, PGSIZE)));
+	uintptr_t first_invalid_page = LA2PPN(maxaddrpa);
+	assert(first_invalid_page == npages);
 
-	// mark [0, physaddr_after_kernel) as in-use
-	for(i = 0; i < LA2PPN(physaddr_after_kernel); i++)
-		page_setref(&pages[i], 1);
-
-	// mark [physaddr_after_kernel, maxaddrpa) as free
-	for(i = LA2PPN(physaddr_after_kernel); i < LA2PPN(maxaddrpa); i++)
+	// mark kernel pages as in-use
+	for (uintptr_t page = 0; page < first_free_page; page++)
+		page_setref(&pages[page], 1);
+	
+	// append other pages to the free lists
+	for (uintptr_t page = first_free_page; page < first_invalid_page; page++)
 	{
-		page_setref(&pages[i], 0);
-		LIST_INSERT_HEAD(
-		   &(colored_page_free_list[get_page_color(i,llc_cache)]),
-		   &pages[i],
-		   pg_link
-		);
+		page_setref(&pages[page], 0);
+		LIST_INSERT_HEAD(&lists[page & (num_colors-1)], &pages[page], pg_link);
 	}
 
-	// mark [maxaddrpa, ...) as in-use (as they are invalid)
-	for(i = LA2PPN(maxaddrpa); i < npages; i++)
-		page_setref(&pages[i], 1);
+	colored_page_free_list = lists;
 }
