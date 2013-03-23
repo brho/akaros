@@ -103,8 +103,8 @@ hw: all
 
 # risc-v functional simulator
 rvfs: all
-	fesvr -p$(NP) -nopk obj/kern/kernel
+	riscv-isa-run -p$(NP) obj/kern/kernel
 rvfsd: all
-	fesvr -d -p$(NP) -nopk obj/kern/kernel
+	riscv-isa-run -d -p$(NP) obj/kern/kernel
 
 .PHONY: fs fsd hw rvfs rvfsd
