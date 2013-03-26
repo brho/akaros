@@ -607,14 +607,7 @@ void e1000_configure() {
 void e1000_reset() {
 	e1000_debug("-->Resetting device..... ");
 
-	// Get control
-	uint32_t ctrl = e1000_rr32(E1000_CTRL);
-
-	// Set the reset bit
-	ctrl = ctrl & E1000_CTRL_RST;
-
-	// Write the reset bit
-	e1000_wr32(E1000_CTRL, ctrl);
+	e1000_wr32(E1000_CTRL, e1000_rr32(E1000_CTRL) | E1000_CTRL_RST);
 
 	e1000_debug(" done.\n");
 
