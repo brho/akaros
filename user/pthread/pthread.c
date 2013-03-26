@@ -114,6 +114,8 @@ static void __pthread_run(void)
 	pthread_exit(me->start_routine(me->arg));
 }
 
+/* GIANT WARNING: if you make any changes to this, also change the broadcast
+ * wakeups (cond var, barrier, etc) */
 void pth_thread_runnable(struct uthread *uthread)
 {
 	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
@@ -138,6 +140,7 @@ void pth_thread_runnable(struct uthread *uthread)
 	/* Insert the newly created thread into the ready queue of threads.
 	 * It will be removed from this queue later when vcore_entry() comes up */
 	mcs_pdr_lock(&queue_lock);
+	/* Again, GIANT WARNING: if you change this, change batch wakeup code */
 	TAILQ_INSERT_TAIL(&ready_queue, pthread, next);
 	threads_ready++;
 	mcs_pdr_unlock(&queue_lock);
@@ -661,22 +664,27 @@ int pthread_cond_destroy(pthread_cond_t *c)
 
 int pthread_cond_broadcast(pthread_cond_t *c)
 {
+	unsigned int nr_woken = 0;	/* assuming less than 4 bil threads */
 	struct pthread_queue restartees = TAILQ_HEAD_INITIALIZER(restartees);
-	struct pthread_tcb *pthread_i, *temp;
+	struct pthread_tcb *pthread_i;
 	spin_pdr_lock(&c->spdr_lock);
 	/* moves all items from waiters onto the end of restartees */
 	TAILQ_CONCAT(&restartees, &c->waiters, next);
 	spin_pdr_unlock(&c->spdr_lock);
-	/* Disable notifs when calling the 2LS op - might protect against a few
-	 * things (we don't do this very often).  We're still a uthread, according
-	 * to TLS, but other cores (and the kernel) will think we are in VC ctx
-	 * (notifs disabled) */
-	uth_disable_notifs();
-	TAILQ_FOREACH_SAFE(pthread_i, &restartees, next, temp) {
-		TAILQ_REMOVE(&restartees, pthread_i, next);
-		pth_thread_runnable((struct uthread*)pthread_i);
+	/* Do the work of pth_thread_runnable().  We're in uth context here, but I
+	 * think it's okay.  When we need to (when locking) we drop into VC ctx, as
+	 * far as the kernel and other cores are concerned. */
+	TAILQ_FOREACH(pthread_i, &restartees, next) {
+		pthread_i->state = PTH_RUNNABLE;
+		nr_woken++;
 	}
-	uth_enable_notifs();
+	/* Amortize the lock grabbing over all restartees */
+	mcs_pdr_lock(&queue_lock);
+	threads_ready += nr_woken;
+	TAILQ_CONCAT(&ready_queue, &restartees, next);
+	mcs_pdr_unlock(&queue_lock);
+	if (can_adjust_vcores)
+		vcore_request(threads_ready);
 	return 0;
 }
 

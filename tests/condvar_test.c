@@ -62,6 +62,7 @@ void *__test_pthread_cond_waiter_t3(void *arg)
 int main(void)
 {
 	int nr_msgs;
+	pthread_lib_init();
 	pthread_cond_init(cv, 0);
 	pthread_mutex_init(pth_m, 0);
 
