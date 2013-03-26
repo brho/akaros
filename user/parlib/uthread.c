@@ -189,9 +189,12 @@ void uthread_init(struct uthread *new_thread)
 	uthread_set_tls_var(new_thread, current_uthread, new_thread);
 }
 
+/* This is a wrapper for the sched_ops thread_runnable, for use by functions
+ * outside the main 2LS.  Do not put anything important in this, since the 2LSs
+ * internally call their sched op.  This is to improve batch wakeups (barriers,
+ * etc) */
 void uthread_runnable(struct uthread *uthread)
 {
-	/* Allow the 2LS to make the thread runnable, and do whatever. */
 	assert(sched_ops->thread_runnable);
 	sched_ops->thread_runnable(uthread);
 }

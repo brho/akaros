@@ -172,7 +172,7 @@ void pth_thread_paused(struct uthread *uthread)
 	/* At this point, you could do something clever, like put it at the front of
 	 * the runqueue, see if it was holding a lock, do some accounting, or
 	 * whatever. */
-	uthread_runnable(uthread);
+	pth_thread_runnable(uthread);
 }
 
 /* Restarts a uthread hanging off a syscall.  For the simple pthread case, we
@@ -185,7 +185,7 @@ static void restart_thread(struct syscall *sysc)
 	assert(((struct pthread_tcb*)ut_restartee)->state == PTH_BLK_SYSC);
 	assert(ut_restartee->sysc == sysc);	/* set in uthread.c */
 	ut_restartee->sysc = 0;	/* so we don't 'reblock' on this later */
-	uthread_runnable(ut_restartee);
+	pth_thread_runnable(ut_restartee);
 }
 
 /* This handler is usually run in vcore context, though I can imagine it being
@@ -435,7 +435,7 @@ int pthread_create(pthread_t *thread, const pthread_attr_t *attr,
 	pthread->arg = arg;
 	/* Initialize the uthread */
 	uthread_init((struct uthread*)pthread);
-	uthread_runnable((struct uthread*)pthread);
+	pth_thread_runnable((struct uthread*)pthread);
 	*thread = pthread;
 	return 0;
 }
@@ -471,7 +471,7 @@ static void __pth_join_cb(struct uthread *uthread, void *arg)
 		/* wake ourselves, not the exited one! */
 		printd("[pth] %08p already exit, rewaking ourselves, joiner %08p\n",
 		       temp_pth, pthread);
-		uthread_runnable(uthread);	/* wake ourselves */
+		pth_thread_runnable(uthread);	/* wake ourselves */
 	}
 }
 
@@ -527,7 +527,7 @@ static void __pth_exit_cb(struct uthread *uthread, void *junk)
 			/* they joined before we exited, we need to wake them */
 			printd("[pth] %08p exiting, waking joiner %08p\n",
 			       pthread, temp_pth);
-			uthread_runnable((struct uthread*)temp_pth);
+			pth_thread_runnable((struct uthread*)temp_pth);
 		}
 	}
 }
@@ -549,7 +549,7 @@ static void __pth_yield_cb(struct uthread *uthread, void *junk)
 	__pthread_generic_yield(pthread);
 	pthread->state = PTH_BLK_YIELDING;
 	/* just immediately restart it */
-	uthread_runnable(uthread);
+	pth_thread_runnable(uthread);
 }
 
 /* Cooperative yielding of the processor, to allow other threads to run */
@@ -674,7 +674,7 @@ int pthread_cond_broadcast(pthread_cond_t *c)
 	uth_disable_notifs();
 	TAILQ_FOREACH_SAFE(pthread_i, &restartees, next, temp) {
 		TAILQ_REMOVE(&restartees, pthread_i, next);
-		uthread_runnable((struct uthread*)pthread_i);
+		pth_thread_runnable((struct uthread*)pthread_i);
 	}
 	uth_enable_notifs();
 	return 0;
@@ -693,7 +693,7 @@ int pthread_cond_signal(pthread_cond_t *c)
 	}
 	TAILQ_REMOVE(&c->waiters, pthread, next);
 	spin_pdr_unlock(&c->spdr_lock);
-	uthread_runnable((struct uthread*)pthread);
+	pth_thread_runnable((struct uthread*)pthread);
 	return 0;
 }
 
