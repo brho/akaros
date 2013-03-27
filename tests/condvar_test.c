@@ -44,7 +44,7 @@ void *__test_pthread_cond_waiter(void *arg)
 
 void *__test_pthread_cond_waiter_t3(void *arg)
 {
-	udelay((int)arg);
+	udelay((long)arg);
 	/* if state == false, we haven't seen the signal yet */
 	pthread_mutex_lock(pth_m);
 	printd("Came in, saw state %d\n", state);
@@ -125,7 +125,7 @@ int main(void)
 	pthread_can_vcore_request(FALSE);	/* 2LS won't manage vcores */
 	while (num_vcores() < 2)
 		vcore_request(1);
-	for (int i = 0; i < 1000; i++) {
+	for (long i = 0; i < 1000; i++) {
 		for (int j = 0; j < 10; j++) {	/* some extra chances at each point */
 			state = FALSE;
 			/* client waits for i usec */

@@ -55,6 +55,7 @@ static uint32_t __get_pcoreid(void)
 
 void set_tlsdesc_test(unsigned long nr_loops)
 {
+#ifdef __i386__
 	extern void** vcore_thread_control_blocks;
 	uint32_t vcoreid = vcore_id();
 	void *mytls = get_tls_desc(vcoreid);
@@ -67,6 +68,7 @@ void set_tlsdesc_test(unsigned long nr_loops)
 		asm volatile("movl %0,%%gs" : : "r" (gs) : "memory");
     }
 	set_tls_desc(mytls, vcoreid);
+#endif
 }
 
 /* Internal test infrastructure */
