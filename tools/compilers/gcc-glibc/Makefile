@@ -38,7 +38,7 @@ DESTDIR ?= /
 # Configuration parameters for make-riscv
 RISCV_ARCH := riscv
 RISCV_BINARY_PREFIX := $(RISCV_ARCH)-ros-
-RISCV_GCC_BUILD_FLAGS :=
+RISCV_GCC_BUILD_FLAGS := --enable-languages=c,c++
 RISCV_CFLAGS :=
 
 # Configuration parameters for x86
