@@ -38,7 +38,7 @@ DESTDIR ?= /
 # Configuration parameters for make-riscv
 RISCV_ARCH := riscv
 RISCV_BINARY_PREFIX := $(RISCV_ARCH)-ros-
-RISCV_GCC_BUILD_FLAGS := --enable-languages=c,c++
+RISCV_GCC_BUILD_FLAGS := 
 RISCV_CFLAGS :=
 
 # Configuration parameters for x86
@@ -311,7 +311,7 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 	          --program-prefix=$(BINARY_PREFIX) \
 	          --target=$(ARCH)-ros \
 	          --prefix=$(INSTDIR) \
-	          --enable-languages=c,c++,go \
+	          --enable-languages=c,c++ \
 	          $(GCC_BUILD_FLAGS) \
 	          --without-libffi \
 	          --with-__thread \
