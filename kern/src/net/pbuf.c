@@ -19,16 +19,13 @@
  * 3. Tot_len could be useless at some point, especially if the max len is only two...
  * 4. pbuf_chain and pbuf_cat, pbuf_clen has no users yet
  */
-#define SIZEOF_STRUCT_PBUF (ROUNDUP(sizeof(struct pbuf), ROS_MEM_ALIGN))
-#define MTU_PBUF_SIZE SIZEOF_STRUCT_PBUF + MAX_FRAME_SIZE + ETH_PAD_SIZE
+#define MTU_PBUF_SIZE (sizeof(struct pbuf) + MAX_FRAME_SIZE + ETH_PAD_SIZE)
 
 struct kmem_cache *pbuf_kcache;
 struct kmem_cache *mtupbuf_kcache;
 
 
 void pbuf_init(void){
-	printk("size of struct pbuf%d, %d \n", SIZEOF_STRUCT_PBUF, sizeof(struct pbuf));
-	printk("alignment %d\n", __alignof__(struct pbuf));
 	pbuf_kcache = kmem_cache_create("pbuf", sizeof(struct pbuf),
 									__alignof__(struct pbuf), 0, 0, 0);
   mtupbuf_kcache = kmem_cache_create("mtupbuf_kcache", MTU_PBUF_SIZE, 
@@ -126,7 +123,7 @@ struct pbuf *pbuf_alloc(pbuf_layer layer, uint16_t length, pbuf_type type)
     if (p == NULL) {
       return NULL;
     }
-    p->payload = (void *)((uint8_t *)p + SIZEOF_STRUCT_PBUF + offset);
+    p->payload = (void *)((uint8_t *)p + sizeof(struct pbuf) + offset);
 		STAILQ_NEXT(p, next) = NULL;
 		p->type = type;
 		p->alloc_len = MTU_PBUF_SIZE;
@@ -135,14 +132,14 @@ struct pbuf *pbuf_alloc(pbuf_layer layer, uint16_t length, pbuf_type type)
 
 	case PBUF_RAM:
     /* If pbuf is to be allocated in RAM, allocate memory for it. */
-		buf_size =  (SIZEOF_STRUCT_PBUF + offset) + MEM_ALIGN_SIZE(length);
+    buf_size =  (sizeof(struct pbuf) + offset) + ROUNDUP(length, sizeof(void*));
     p = (struct pbuf*)kmalloc(buf_size, 0);
 
     if (p == NULL) {
       return NULL;
     }
     /* Set up internal structure of the pbuf. */
-    p->payload = (void *)((uint8_t *)p + SIZEOF_STRUCT_PBUF + offset);
+    p->payload = (void *)((uint8_t *)p + sizeof(struct pbuf) + offset);
     p->alloc_len = p->len = p->tot_len = length;
 		STAILQ_NEXT(p, next) = NULL;
     p->type = type;
@@ -383,7 +380,7 @@ int pbuf_header(struct pbuf *p, int delta){ // increase header size
     /* set new payload pointer */
     p->payload = (uint8_t *)p->payload - delta;
     /* boundary check fails? */
-    if ((uint8_t *)p->payload < (uint8_t *)p + SIZEOF_STRUCT_PBUF) {
+    if ((uint8_t *)p->payload < (uint8_t *)p + sizeof(struct pbuf)) {
       /* restore old payload pointer */
       p->payload = payload;
 			warn("boundary failed \n");
