@@ -133,6 +133,7 @@ static void handle_host_interrupt(trapframe_t* tf)
 	uintptr_t fh = mtpcr(PCR_FROMHOST, 0);
 	switch (fh >> 56)
 	{
+	  case 0x00: return;
 	  case 0x01: handle_keypress(fh); return;
 	  default: assert(0);
 	}
