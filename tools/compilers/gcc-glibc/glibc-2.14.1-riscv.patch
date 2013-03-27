@@ -111,10 +111,10 @@ index 0000000..a901452
 +#define ABORT_INSTRUCTION asm ("unimp")
 diff --git a/glibc-2.14.1/sysdeps/riscv/bits/atomic.h b/glibc-2.14.1/sysdeps/riscv/bits/atomic.h
 new file mode 100644
-index 0000000..9f7890e
+index 0000000..6711b84
 --- /dev/null
 +++ glibc-2.14.1/sysdeps/riscv/bits/atomic.h
-@@ -0,0 +1,177 @@
+@@ -0,0 +1,119 @@
 +/* Low-level functions for atomic operations. Mips version.
 +   Copyright (C) 2005 Free Software Foundation, Inc.
 +   This file is part of the GNU C Library.
@@ -155,75 +155,17 @@ index 0000000..9f7890e
 +typedef intmax_t atomic_max_t;
 +typedef uintmax_t uatomic_max_t;
 +
-+/* We have no compare and swap, so we acquire a global lock to emulate it.
-+   We assume no variable will be accessed using atomic.h macros from two
-+   different libraries.  */
++/* Atomic compare and exchange. */
 +
-+__make_section_unallocated
-+  (".gnu.linkonce.b.__riscv_atomic_lock, \"aw\", %nobits");
++#define atomic_compare_and_exchange_val_acq(mem, newval, oldval)         \
++  ({ __sync_synchronize();                      \
++     __sync_val_compare_and_swap(mem, oldval, newval); })
 +
-+volatile int __riscv_atomic_lock
-+  __attribute__ ((nocommon, section(".gnu.linkonce.b.__riscv_atomic_lock\n\t#"),
-+		  visibility ("hidden")));
-+
-+#define __riscv_atomic_do_lock(addr) ({ \
-+  extern volatile int __riscv_atomic_lock;				      \
-+  __riscv_atomic_do_lock24(&__riscv_atomic_lock);       	      \
-+  __sync_synchronize(); })
-+
-+#define __riscv_atomic_do_unlock(addr) ({ \
-+  extern volatile int __riscv_atomic_lock;				      \
-+  __sync_synchronize();                                        	      \
-+  __riscv_atomic_lock = 0; })
-+
-+#define __riscv_atomic_do_lock24(addr) ({ \
-+  int __locked_val;                                                     \
-+  int __mask = 0xFF000000;                                              \
-+  while ((__locked_val = __sync_fetch_and_or(addr, __mask)) & __mask)   \
-+    while (*(volatile int*)(addr) & __mask)      	                \
-+      ;                                     		                \
-+  __locked_val; })
-+
-+/* The only basic operation needed is compare and exchange.  */
-+#define atomic_compare_and_exchange_val_acq(mem, newval, oldval) \
-+  ({ __typeof (mem) __acev_memp = (mem);			      \
-+     __typeof (*mem) __acev_ret;				      \
-+     __typeof (*mem) __acev_newval = (newval);			      \
-+								      \
-+     __riscv_atomic_do_lock (__acev_memp);			      \
-+     __acev_ret = *__acev_memp;					      \
-+     if (__acev_ret == (oldval))				      \
-+       *__acev_memp = __acev_newval;				      \
-+     __riscv_atomic_do_unlock (__acev_memp);			      \
-+     __acev_ret; })
-+
-+#define atomic_compare_and_exchange_bool_acq(mem, newval, oldval) \
-+  (atomic_compare_and_exchange_val_acq(mem, newval, oldval) != (oldval))
-+
-+/* Special versions, which guarantee that top 8 bits of all values
-+   are cleared and use those bits as the lock.  */
-+#define atomic_compare_and_exchange_val_24_acq(mem, newval, oldval) \
-+  ({ __typeof (mem) __acev_memp = (mem);			      \
-+     __typeof (*mem) __acev_ret;				      \
-+     __typeof (*mem) __acev_newval = (newval);			      \
-+								      \
-+     __acev_ret = __riscv_atomic_do_lock24 (__acev_memp);	      \
-+     if (__acev_ret == (oldval))				      \
-+       *__acev_memp = __acev_newval & 0x00FFFFFF;		      \
-+     else							      \
-+       *__acev_memp = __acev_ret;	                	      \
-+     __sync_synchronize();              			      \
-+     __acev_ret; })
-+
-+#define atomic_exchange_24_rel(mem, newval) \
-+  ({ __typeof (mem) __acev_memp = (mem);			      \
-+     __typeof (*mem) __acev_ret;				      \
-+     __typeof (*mem) __acev_newval = (newval);			      \
-+								      \
-+     __sync_synchronize();              			      \
-+     __acev_ret = __riscv_atomic_do_lock24 (__acev_memp);	      \
-+     *__acev_memp = __acev_newval & 0x00FFFFFF;                       \
-+     __acev_ret; })
++#define atomic_compare_and_exchange_val_rel(mem, newval, oldval)         \
++  ({ typeof(*mem) __prev;                       \
++     __prev = __sync_val_compare_and_swap(mem, value);  \
++     __sync_synchronize();                      \
++     __prev; })
 +
 +/* Atomic exchange (without compare).  */
 +

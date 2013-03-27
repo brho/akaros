@@ -3,7 +3,6 @@
 .abicalls
 
 .global __pop_ros_tf_regs
-.ent __pop_ros_tf_regs
 __pop_ros_tf_regs:
 
   REG_L s0,20*SZREG(a0)
@@ -21,10 +20,8 @@ __pop_ros_tf_regs:
   REG_L ra,33*SZREG(a0)
 
   jr    a3
-.end __pop_ros_tf_regs
 
 .global __save_ros_tf_regs
-.ent __save_ros_tf_regs
 __save_ros_tf_regs:
 
   REG_S s0,20*SZREG(a0)
@@ -42,4 +39,3 @@ __save_ros_tf_regs:
   REG_S ra,33*SZREG(a0)
 
   ret
-.end __save_ros_tf_regs
