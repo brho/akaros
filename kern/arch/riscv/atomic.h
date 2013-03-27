@@ -65,16 +65,19 @@ static inline void atomic_dec(atomic_t *number)
 
 /* Adds val to number, so long as number was not zero.	Returns TRUE if the
  * operation succeeded (added, not zero), returns FALSE if number is zero. */
-static inline bool atomic_add_not_zero(atomic_t *number, long val)
+static inline bool atomic_add_not_zero(atomic_t *num, long inc)
 {
-	long old_num, new_num;
-	do {
-		old_num = atomic_read(number);
-		if (!old_num)
-			return FALSE;
-		new_num = old_num + val;
-	} while (!atomic_cas(number, old_num, new_num));
-	return TRUE;
+	long res, tmp;
+	asm volatile ("1:\n"
+	              LR_P " %0, 0(%2)\n"     // tmp = *num; lock line
+	              "li    %1, 1\n"         // res = 1
+	              "beqz  %0, 2f\n"        // if (val == 0) goto fail
+	              "add   %0, %0, %3\n"    // tmp += inc
+	              SC_P " %1, %0, 0(%2)\n" // if (locked) *num = tmp
+	              "bnez  %1, 1b\n"        // else goto retry
+				  "2:\n"
+	              : "=&r"(tmp), "=&r"(res) : "r"(num), "r"(inc) : "memory");
+	return res == 0;
 }
 
 /* Subtraces val from number, returning True if the new value is 0. */
