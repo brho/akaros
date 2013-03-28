@@ -1,0 +1,53 @@
+Barret Rhoden
+2013-03-28
+
+It's possible to take platform independent programs compiled for Akaros or
+Linux and link them to run on the other OS, within limits.
+
+The basic way to do this is to simply compile them into .o files, and then
+link them, like so (for ros-compiled, linux-linked):
+
+$ i686-ros-gcc -c file1.c -o file1.o (plus flags)
+$ i686-ros-gcc -c file2.c -o file2.o (plus flags)
+$ gcc file1.o file2.o -o program
+
+For linux-compiled, Akaros-linked
+$ g++ -c file1.cc -o file1.o (plus flags)
+$ g++ -c file2.cc -o file2.o (plus flags)
+$ i686-ros-g++ file1.o file2.o -o program
+
+There are a number of limitations.  Obviously your program needs to be
+platform independent, regardless of ifdefs.  You can't call syscalls directly
+or anything, even if those are ifdef _MY_OS_, since they will actually compile
+for the wrong target.  The code can only interface with libraries.
+
+Another important limitation is that our libraries (like pthreads) may have
+the same API as on Linux, but we don't have the same ABI.  For example, the
+size of a pthread_attr_t on 32 bit linux is 36 bytes.  On Akaros, it is 8
+bytes (for now!).  In this case, if you compile for Akaros, the compiler only
+reserves 8 bytes for the attr, but the Linux pthread libraries will expect to
+be able to write 36 bytes.  Unless your program pads these items, you'll
+clobber important memory.
+
+A temporary hack to make one compiler have the correct sizes is to change the
+header file so the objects your program uses are the 'right' size.  Compile,
+then change the header back.
+
+As of the time of this writing, on 32 bit systems:
+/* On linux:
+ * sizeof pth attr:    36
+ * sizeof pth t:       4
+ * sizeof pth mutex:   24
+ * sizeof pth barrier: 20
+ *
+ * On Akaros:
+ * sizeof pth attr:    8
+ * sizeof pth t:       4
+ * sizeof pth mutex:   8
+ * sizeof pth barrier: 28 */
+
+Additionally, C++ streams don't seem to work.  There's some sort of segfault
+in the C++ libraries, probably related to ABI mismatches and memory
+clobbering.  You could just rewrite your application to not use iostreams, or
+you could poke around in the gcc stage2 build and see what the problem is.  At
+least, if you're running on Linux, you have gdb to help you debug!
