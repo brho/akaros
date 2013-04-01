@@ -234,6 +234,7 @@ __uthread_yield(void)
 	uthread->yield_func(uthread, uthread->yield_arg);
 	/* Make sure you do not touch uthread after that func call */
 	/* Leave the current vcore completely */
+	/* TODO: if the yield func can return a failure, we can abort the yield */
 	current_uthread = NULL;
 	/* Go back to the entry point, where we can handle notifications or
 	 * reschedule someone. */

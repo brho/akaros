@@ -73,17 +73,14 @@ typedef struct
   atomic_t lock;
 } pthread_mutex_t;
 
-/* TODO: MAX_PTHREADS is arbitrarily defined for now.
- * It indicates the maximum number of threads that can wait on  
-   the same cond var/ barrier concurrently. */
-
-#define MAX_PTHREADS 32
 typedef struct
 {
-  volatile int sense;
-  int count;
-  int nprocs;
-  pthread_mutex_t pmutex;
+	int							total_threads;
+	volatile int				sense;	/* state of barrier, flips btw runs */
+	atomic_t					count;
+	struct spin_pdr_lock		lock;
+	struct pthread_queue		waiters;
+	int							nr_waiters;
 } pthread_barrier_t;
 
 #define WAITER_CLEARED 0

@@ -600,6 +600,24 @@ int pthread_mutex_init(pthread_mutex_t* m, const pthread_mutexattr_t* attr)
   return 0;
 }
 
+/* Helper for spinning sync, returns TRUE if it is okay to keep spinning.
+ *
+ * Alternatives include:
+ * 		old_count <= num_vcores() (barrier code, pass in old_count as *state, 
+ * 		                           but this only works if every awake pthread
+ * 		                           will belong to the barrier).
+ * 		just spin for a bit       (use *state to track spins)
+ * 		FALSE                     (always is safe)
+ * 		etc...
+ * 'threads_ready' isn't too great since sometimes it'll be non-zero when it is
+ * about to become 0.  We really want "I have no threads waiting to run that
+ * aren't going to run on their on unless this core yields instead of spins". */
+/* TODO: consider making this a 2LS op */
+static inline bool safe_to_spin(unsigned int *state)
+{
+	return !threads_ready;
+}
+
 /* Set *spun to 0 when calling this the first time.  It will yield after 'spins'
  * calls.  Use this for adaptive mutexes and such. */
 static inline void spin_to_sleep(unsigned int spins, unsigned int *spun)
@@ -795,45 +813,129 @@ int pthread_once(pthread_once_t* once_control, void (*init_routine)(void))
   return 0;
 }
 
-int pthread_barrier_init(pthread_barrier_t* b, const pthread_barrierattr_t* a, int count)
+int pthread_barrier_init(pthread_barrier_t *b,
+                         const pthread_barrierattr_t *a, int count)
 {
-  b->nprocs = b->count = count;
-  b->sense = 0;
-  pthread_mutex_init(&b->pmutex, 0);
-  return 0;
+	b->total_threads = count;
+	b->sense = 0;
+	atomic_set(&b->count, count);
+	spin_pdr_init(&b->lock);
+	TAILQ_INIT(&b->waiters);
+	b->nr_waiters = 0;
+	return 0;
 }
 
-int pthread_barrier_wait(pthread_barrier_t* b)
+struct barrier_junk {
+	pthread_barrier_t				*b;
+	int								ls;
+};
+
+/* Callback/bottom half of barrier. */
+static void __pth_barrier_cb(struct uthread *uthread, void *junk)
 {
-  unsigned int spinner = 0;
-  int ls = !b->sense;
-
-  pthread_mutex_lock(&b->pmutex);
-  int count = --b->count;
-  pthread_mutex_unlock(&b->pmutex);
-
-  if(count == 0)
-  {
-    printd("Thread %d is last to hit the barrier, resetting...\n", pthread_self()->id);
-    b->count = b->nprocs;
-	wmb();
-    b->sense = ls;
-    return PTHREAD_BARRIER_SERIAL_THREAD;
-  }
-  else
-  {
-    while(b->sense != ls) {
-      cpu_relax();
-      spin_to_sleep(PTHREAD_BARRIER_SPINS, &spinner);
-    }
-    return 0;
-  }
+	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
+	pthread_barrier_t *b = ((struct barrier_junk*)junk)->b;
+	int ls = ((struct barrier_junk*)junk)->ls;
+	/* Removes from active list, we can reuse.  must also restart */
+	__pthread_generic_yield(pthread);
+	/* TODO: if we used a trylock, we could bail as soon as we see sense */
+	spin_pdr_lock(&b->lock);
+	/* If sense is ls (our free value), we lost the race and shouldn't sleep */
+	if (b->sense == ls) {
+		/* TODO: i'd like to fast-path the wakeup, skipping pth_runnable */
+		pthread->state = PTH_BLK_YIELDING;	/* not sure which state for this */
+		spin_pdr_unlock(&b->lock);
+		pth_thread_runnable(uthread);
+		return;
+	}
+	/* otherwise, we sleep */
+	pthread->state = PTH_BLK_MUTEX;	/* TODO: consider ignoring this */
+	TAILQ_INSERT_TAIL(&b->waiters, pthread, next);
+	b->nr_waiters++;
+	spin_pdr_unlock(&b->lock);
 }
 
-int pthread_barrier_destroy(pthread_barrier_t* b)
+/* We assume that the same threads participating in the barrier this time will
+ * also participate next time.  Imagine a thread stopped right after its fetch
+ * and add - we know it is coming through eventually.  We finish and change the
+ * sense, which should allow the delayed thread to eventually break through.
+ * But if another n threads come in first, we'll set the sense back to the old
+ * value, thereby catching the delayed thread til the next barrier. 
+ *
+ * A note on preemption: if any thread gets preempted and it is never dealt
+ * with, eventually we deadlock, with all threads waiting on the last one to
+ * enter (and any stragglers from one run will be the last in the next run).
+ * One way or another, we need to handle preemptions.  The current 2LS requests
+ * an IPI for a preempt, so we'll be fine.  Any other strategies will need to
+ * consider how barriers work.  Any time we sleep, we'll be okay (since that
+ * frees up our core to handle preemptions/run other threads. */
+int pthread_barrier_wait(pthread_barrier_t *b)
 {
-  pthread_mutex_destroy(&b->pmutex);
-  return 0;
+	unsigned int spin_state = 0;
+	int ls = !b->sense;	/* when b->sense is the value we read, then we're free*/
+	int nr_waiters;
+	struct pthread_queue restartees = TAILQ_HEAD_INITIALIZER(restartees);
+	struct pthread_tcb *pthread_i;
+	struct barrier_junk local_junk;
+	
+	long old_count = atomic_fetch_and_add(&b->count, -1);
+
+	if (old_count == 1) {
+		printd("Thread %d is last to hit the barrier, resetting...\n",
+		       pthread_self()->id);
+		/* TODO: we might want to grab the lock right away, so a few short
+		 * circuit faster? */
+		atomic_set(&b->count, b->total_threads);
+		/* we still need to maintain ordering btw count and sense, in case
+		 * another thread doesn't sleep (if we wrote sense first, they could
+		 * break out, race around, and muck with count before it is time) */
+		/* wmb(); handled by the spin lock */
+		spin_pdr_lock(&b->lock);
+		/* Sense is only protected in addition to decisions to sleep */
+		b->sense = ls;	/* set to free everyone */
+		/* All access to nr_waiters is protected by the lock */
+		if (!b->nr_waiters) {
+			spin_pdr_unlock(&b->lock);
+			return PTHREAD_BARRIER_SERIAL_THREAD;
+		}
+		TAILQ_CONCAT(&restartees, &b->waiters, next);
+		nr_waiters = b->nr_waiters;
+		b->nr_waiters = 0;
+		spin_pdr_unlock(&b->lock);
+		/* TODO: do we really need this state tracking? */
+		TAILQ_FOREACH(pthread_i, &restartees, next)
+			pthread_i->state = PTH_RUNNABLE;
+		/* bulk restart waiters (skipping pth_thread_runnable()) */
+		mcs_pdr_lock(&queue_lock);
+		threads_ready += nr_waiters;
+		TAILQ_CONCAT(&ready_queue, &restartees, next);
+		mcs_pdr_unlock(&queue_lock);
+		if (can_adjust_vcores)
+			vcore_request(threads_ready);
+		return PTHREAD_BARRIER_SERIAL_THREAD;
+	} else {
+		/* Spin if there are no other threads to run.  No sense sleeping */
+		do {
+			if (b->sense == ls)
+				return 0;
+			cpu_relax();
+		} while (safe_to_spin(&spin_state));
+
+		/* Try to sleep, when we wake/return, we're free to go */
+		local_junk.b = b;
+		local_junk.ls = ls;
+		uthread_yield(TRUE, __pth_barrier_cb, &local_junk);
+		// assert(b->sense == ls);
+		return 0;
+	}
+}
+
+int pthread_barrier_destroy(pthread_barrier_t *b)
+{
+	assert(TAILQ_EMPTY(&b->waiters));
+	assert(!b->nr_waiters);
+	/* Free any locks (if we end up using an MCS) */
+	return 0;
 }
 
 int pthread_detach(pthread_t thread)

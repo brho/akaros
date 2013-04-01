@@ -39,6 +39,7 @@ int spinlock_trylock(spinlock_t *lock)
   return __sync_lock_test_and_set(&lock->lock, EBUSY);
 }
 
+/* TODO: this will perform worse than test, then test and set */
 void spinlock_lock(spinlock_t *lock) 
 {
   assert(lock);
