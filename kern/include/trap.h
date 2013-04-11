@@ -85,8 +85,7 @@ void send_nmi(uint32_t os_coreid);
 #define KMSG_IMMEDIATE 			1
 #define KMSG_ROUTINE 			2
 
-typedef void (*amr_t)(struct trapframe *tf, uint32_t srcid, long a0, long a1,
-                      long a2);
+typedef void (*amr_t)(uint32_t srcid, long a0, long a1, long a2);
 
 /* Must stay 8-byte aligned for sparc */
 struct kernel_message

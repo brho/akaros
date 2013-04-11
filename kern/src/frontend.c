@@ -188,7 +188,7 @@ int32_t frontend_syscall(pid_t pid, int32_t syscall_num,
 	return ret;
 }
 
-void __diediedie(trapframe_t* tf, uint32_t srcid, uint32_t code, uint32_t a1, uint32_t a2)
+void __diediedie(uint32_t srcid, uint32_t code, uint32_t a1, uint32_t a2)
 {
 	int32_t errno;
 	frontend_syscall(0,APPSERVER_SYSCALL_exit,(int)code,0,0,0,&errno);
@@ -204,5 +204,5 @@ void appserver_die(uintptr_t code)
 			                          KMSG_IMMEDIATE));
 
 	// just in case.
-	__diediedie(0,0,code,0,0);
+	__diediedie(0, code, 0, 0);
 }

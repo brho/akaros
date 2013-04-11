@@ -43,13 +43,12 @@ smp_make_wrapper()
 	return NULL;
 }
 
-void
-smp_call_wrapper(trapframe_t* tf, uint32_t src, isr_t handler,
-                 handler_wrapper_t* wrapper, void* data)
+void smp_call_wrapper(uint32_t src, isr_t handler, handler_wrapper_t *wrapper,
+                      void *data)
 {
 	if(wrapper)
 		wrapper->wait_list[core_id()] = 0;
-	handler(tf, data);
+	handler(0, data);
 }
 
 int smp_call_function_self(isr_t handler, void* data,

@@ -19,7 +19,7 @@ extern spinlock_t arsc_proc_lock;
 
 syscall_sring_t* sys_init_arsc(struct proc* p);
 intreg_t syscall_async(struct proc* p, syscall_req_t *syscall);
-void arsc_server(trapframe_t *tf);
+void arsc_server(uint32_t srcid, long a0, long a1, long a2);
 
 static intreg_t process_generic_syscalls(struct proc* p, size_t max);
 #endif //ARSC_SERVER

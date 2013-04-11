@@ -60,7 +60,7 @@ syscall_sring_t* sys_init_arsc(struct proc *p)
 	return (syscall_sring_t*)va;
 }
 
-void arsc_server(struct trapframe *tf)
+void arsc_server(uint32_t srcid, long a0, long a1, long a2)
 {
 	struct proc *p = NULL;
 	TAILQ_INIT(&arsc_proc_list);

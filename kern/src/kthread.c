@@ -78,8 +78,7 @@ void restart_kthread(struct kthread *kthread)
 
 /* Kmsg handler to launch/run a kthread.  This must be a routine message, since
  * it does not return.  */
-static void __launch_kthread(struct trapframe *tf, uint32_t srcid, long a0,
-                             long a1, long a2)
+static void __launch_kthread(uint32_t srcid, long a0, long a1, long a2)
 {
 	struct kthread *kthread = (struct kthread*)a0;
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
@@ -144,8 +143,7 @@ void kthread_runnable(struct kthread *kthread)
 }
 
 /* Kmsg helper for kthread_yield */
-static void __wake_me_up(struct trapframe *tf, uint32_t srcid, long a0, long a1,
-				         long a2)
+static void __wake_me_up(uint32_t srcid, long a0, long a1, long a2)
 {
 	struct semaphore *sem = (struct semaphore*)a0;
 	assert(sem_up(sem));

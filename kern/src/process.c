@@ -1850,7 +1850,7 @@ out_locked:
 /* Kernel message handler to start a process's context on this core, when the
  * core next considers running a process.  Tightly coupled with __proc_run_m().
  * Interrupts are disabled. */
-void __startcore(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2)
+void __startcore(uint32_t srcid, long a0, long a1, long a2)
 {
 	uint32_t vcoreid = (uint32_t)a1;
 	uint32_t coreid = core_id();
@@ -1885,7 +1885,7 @@ void __startcore(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2
  * to __startcore, except it is used when p already controls the core (e.g.
  * change_to).  Since the core is already controlled, pcpui such as owning proc,
  * vcoreid, and cur_proc are all already set. */
-void __set_curtf(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2)
+void __set_curtf(uint32_t srcid, long a0, long a1, long a2)
 {
 	struct proc *p = (struct proc*)a0;
 	uint32_t vcoreid = (uint32_t)a1;
@@ -1896,7 +1896,7 @@ void __set_curtf(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2
 /* Bail out if it's the wrong process, or if they no longer want a notif.  Don't
  * use the TF we passed in, we care about cur_tf.  Try not to grab locks or
  * write access to anything that isn't per-core in here. */
-void __notify(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2)
+void __notify(uint32_t srcid, long a0, long a1, long a2)
 {
 	uint32_t vcoreid, coreid = core_id();
 	struct per_cpu_info *pcpui = &per_cpu_info[coreid];
@@ -1933,7 +1933,7 @@ void __notify(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2)
 	/* this cur_tf will get run when the kernel returns / idles */
 }
 
-void __preempt(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2)
+void __preempt(uint32_t srcid, long a0, long a1, long a2)
 {
 	uint32_t vcoreid, coreid = core_id();
 	struct per_cpu_info *pcpui = &per_cpu_info[coreid];
@@ -1981,7 +1981,7 @@ void __preempt(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2)
  * Note this leaves no trace of what was running.
  * It's okay if death comes to a core that's already idling and has no current.
  * It could happen if a process decref'd before __proc_startcore could incref. */
-void __death(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2)
+void __death(uint32_t srcid, long a0, long a1, long a2)
 {
 	uint32_t vcoreid, coreid = core_id();
 	struct per_cpu_info *pcpui = &per_cpu_info[coreid];
@@ -1999,8 +1999,7 @@ void __death(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2)
 
 /* Kernel message handler, usually sent IMMEDIATE, to shoot down virtual
  * addresses from a0 to a1. */
-void __tlbshootdown(struct trapframe *tf, uint32_t srcid, long a0, long a1,
-                    long a2)
+void __tlbshootdown(uint32_t srcid, long a0, long a1, long a2)
 {
 	/* TODO: (TLB) something more intelligent with the range */
 	tlbflush();

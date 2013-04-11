@@ -101,8 +101,7 @@ static void set_ksched_alarm(void)
  * alarm.  Note that interrupts will be disabled, but this is not the same as
  * interrupt context.  We're a routine kmsg, which means the core is in a
  * quiescent state. */
-static void __ksched_tick(struct trapframe *tf, uint32_t srcid, long a0,
-                          long a1, long a2)
+static void __ksched_tick(uint32_t srcid, long a0, long a1, long a2)
 {
 	/* TODO: imagine doing some accounting here */
 	schedule();
@@ -144,7 +143,7 @@ void schedule_init(void)
 	struct sched_pcore *a_core = TAILQ_FIRST(&idlecores);
 	assert(a_core);
 	TAILQ_REMOVE(&idlecores, a_core, alloc_next);
-	send_kernel_message(spc2pcoreid(a_core), (amr_t)arsc_server, 0, 0, 0,
+	send_kernel_message(spc2pcoreid(a_core), arsc_server, 0, 0, 0,
 	                    KMSG_ROUTINE);
 	warn("Using core %d for the ARSCs - there are probably issues with this.",
 	     spc2pcoreid(a_core));

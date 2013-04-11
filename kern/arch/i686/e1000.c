@@ -692,7 +692,8 @@ void e1000_interrupt_handler(trapframe_t *tf, void* data) {
 	e1000_irq_enable();
 }
 
-void process_pbuf(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2){
+void process_pbuf(uint32_t srcid, long a0, long a1, long a2)
+{
 	if (srcid != core_id())
 		warn("pbuf came from a different core\n");
 	/* assume it is an ip packet */

@@ -33,8 +33,7 @@ void kb_get_from_buf(struct kb_buffer *kb, char *dst, size_t cnt);
 /* Kernel messages associated with the console.  Arch-specific interrupt
  * handlers need to call these.  For add char, a0 = &cons_buf and a1 = the char
  * you read.  Call __run_mon on your 'magic' input.  */
-void __cons_add_char(struct trapframe *tf, uint32_t srcid, long a0, long a1,
-                     long a2);
-void __run_mon(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2);
+void __cons_add_char(uint32_t srcid, long a0, long a1, long a2);
+void __run_mon(uint32_t srcid, long a0, long a1, long a2);
 
 #endif /* ROS_KERN_CONSOLE_H */

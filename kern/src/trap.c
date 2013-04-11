@@ -76,7 +76,7 @@ void handle_kmsg_ipi(struct trapframe *tf, void *data)
 	/* The lock serves as a cmb to force a re-read of the head of the list */
 	spin_lock(&pcpui->immed_amsg_lock);
 	STAILQ_FOREACH_SAFE(kmsg_i, &pcpui->immed_amsgs, link, temp) {
-		kmsg_i->pc(tf, kmsg_i->srcid, kmsg_i->arg0, kmsg_i->arg1, kmsg_i->arg2);
+		kmsg_i->pc(kmsg_i->srcid, kmsg_i->arg0, kmsg_i->arg1, kmsg_i->arg2);
 		STAILQ_REMOVE(&pcpui->immed_amsgs, kmsg_i, kernel_message, link);
 		kmem_cache_free(kernel_msg_cache, (void*)kmsg_i);
 	}
@@ -125,11 +125,7 @@ void process_routine_kmsg(void)
 		kmem_cache_free(kernel_msg_cache, (void*)kmsg);
 		assert(msg_cp.dstid == pcoreid);	/* caught a brutal bug with this */
 		set_rkmsg(pcpui);					/* we're now in early RKM ctx */
-		/* Note we pass pcpui->cur_tf to all kmsgs.  I'm leaning towards
-		 * dropping the TFs completely, but might find a debugging use for them
-		 * later. */
-		msg_cp.pc(pcpui->cur_tf, msg_cp.srcid, msg_cp.arg0, msg_cp.arg1,
-		          msg_cp.arg2);
+		msg_cp.pc(msg_cp.srcid, msg_cp.arg0, msg_cp.arg1, msg_cp.arg2);
 		/* If we aren't still in early RKM, it is because the KMSG blocked
 		 * (thus leaving early RKM, finishing in default context) and then
 		 * returned.  This is a 'detached' RKM.  Must idle in this scenario,
@@ -179,7 +175,8 @@ void kmsg_queue_stat(void)
 		spin_lock_irqsave(&per_cpu_info[i].routine_amsg_lock);
 		routine_emp = STAILQ_EMPTY(&per_cpu_info[i].routine_amsgs);
 		spin_unlock_irqsave(&per_cpu_info[i].routine_amsg_lock);
-		printk("Core %d's immed_emp: %d, routine_emp %d\n", i, immed_emp, routine_emp);
+		printk("Core %d's immed_emp: %d, routine_emp %d\n", i, immed_emp,
+               routine_emp);
 		if (!immed_emp) {
 			kmsg = STAILQ_FIRST(&per_cpu_info[i].immed_amsgs);
 			printk("Immed msg on core %d:\n", i);

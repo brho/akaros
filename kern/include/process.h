@@ -128,15 +128,12 @@ void clear_owning_proc(uint32_t coreid);
 void proc_tlbshootdown(struct proc *p, uintptr_t start, uintptr_t end);
 
 /* Kernel message handlers for process management */
-void __startcore(struct trapframe *tf, uint32_t srcid, long a0, long a1,
-                 long a2);
-void __set_curtf(struct trapframe *tf, uint32_t srcid, long a0, long a1,
-                 long a2);
-void __notify(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2);
-void __preempt(trapframe_t *tf, uint32_t srcid, long a0, long a1, long a2);
-void __death(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2);
-void __tlbshootdown(struct trapframe *tf, uint32_t srcid, long a0, long a1,
-                    long a2);
+void __startcore(uint32_t srcid, long a0, long a1, long a2);
+void __set_curtf(uint32_t srcid, long a0, long a1, long a2);
+void __notify(uint32_t srcid, long a0, long a1, long a2);
+void __preempt(uint32_t srcid, long a0, long a1, long a2);
+void __death(uint32_t srcid, long a0, long a1, long a2);
+void __tlbshootdown(uint32_t srcid, long a0, long a1, long a2);
 
 /* Arch Specific */
 void proc_init_trapframe(trapframe_t *SAFE tf, uint32_t vcoreid,

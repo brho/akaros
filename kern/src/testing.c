@@ -679,8 +679,7 @@ void test_circ_buffer(void)
 	return;
 }
 
-static void test_km_handler(struct trapframe *tf, uint32_t srcid, long a0,
-                            long a1, long a2)
+static void test_km_handler(uint32_t srcid, long a0, long a1, long a2)
 {
 	printk("Received KM on core %d from core %d: arg0= 0x%08x, arg1 = "
 	       "0x%08x, arg2 = 0x%08x\n", core_id(), srcid, a0, a1, a2);
@@ -1308,8 +1307,7 @@ void test_random_fs(void)
 }
 
 /* Kernel message to restart our kthread */
-static void __test_up_sem(struct trapframe *tf, uint32_t srcid, long a0,
-                          long a1, long a2)
+static void __test_up_sem(uint32_t srcid, long a0, long a1, long a2)
 {
 	struct semaphore *sem = (struct semaphore*)a0;
 	printk("[kmsg] Upping the sem to start the kthread, stacktop is %08p\n",
@@ -1346,8 +1344,7 @@ void test_kthreads(void)
 }
 
 /* Second player's kmsg */
-static void __test_kref_2(struct trapframe *tf, uint32_t srcid, long a0,
-                          long a1, long a2)
+static void __test_kref_2(uint32_t srcid, long a0, long a1, long a2)
 {
 	struct kref *kref = (struct kref*)a0;
 	bool *done = (bool*)a1;
@@ -1430,8 +1427,7 @@ void test_atomics(void)
 }
 
 /* Helper KMSG for test_abort.  Core 1 does this, while core 0 sends an IRQ. */
-static void __test_try_halt(struct trapframe *tf, uint32_t srcid, long a0,
-                            long a1, long a2)
+static void __test_try_halt(uint32_t srcid, long a0, long a1, long a2)
 {
 	disable_irq();
 	/* wait 10 sec.  should have a bunch of ints pending */
@@ -1462,8 +1458,7 @@ atomic_t counter;
 struct cond_var *cv = &local_cv;
 volatile bool state = FALSE;		/* for test 3 */
 
-void __test_cv_signal(struct trapframe *tf, uint32_t srcid, long a0,
-                      long a1, long a2)
+void __test_cv_signal(uint32_t srcid, long a0, long a1, long a2)
 {
 	if (atomic_read(&counter) % 4)
 		cv_signal(cv);
@@ -1471,16 +1466,16 @@ void __test_cv_signal(struct trapframe *tf, uint32_t srcid, long a0,
 		cv_broadcast(cv);
 	atomic_dec(&counter);
 }
-void __test_cv_waiter(struct trapframe *tf, uint32_t srcid, long a0,
-                      long a1, long a2)
+
+void __test_cv_waiter(uint32_t srcid, long a0, long a1, long a2)
 {
 	cv_lock(cv);
 	/* check state, etc */
 	cv_wait_and_unlock(cv);
 	atomic_dec(&counter);
 }
-void __test_cv_waiter_t3(struct trapframe *tf, uint32_t srcid, long a0,
-                         long a1, long a2)
+
+void __test_cv_waiter_t3(uint32_t srcid, long a0, long a1, long a2)
 {
 	udelay(a0);
 	/* if state == false, we haven't seen the signal yet */

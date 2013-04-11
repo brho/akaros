@@ -124,6 +124,6 @@ int e1000_send_pbuf(struct pbuf *p);
 static void e1000_clean_rx_irq();
 /* returns a chain of pbuf from the driver */
 struct pbuf* e1000_recv_pbuf();
-void process_pbuf(struct trapframe *tf, uint32_t srcid, long a0, long a1, long a2);
+void process_pbuf(uint32_t srcid, long a0, long a1, long a2);
 static void schedule_pb(struct pbuf* pb);
 #endif /* !ROS_INC_E1000_H */
