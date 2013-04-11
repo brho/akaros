@@ -1,7 +1,11 @@
 /*  Mostly from JOS.   See COPYRIGHT for copyright information. */
 
-#ifndef ROS_INCLUDE_ARCH_TRAPFRAME_H
-#define ROS_INCLUDE_ARCH_TRAPFRAME_H
+#ifndef ROS_INC_ARCH_TRAPFRAME_H
+#define ROS_INC_ARCH_TRAPFRAME_H
+
+#ifndef ROS_INC_TRAPFRAME_H
+#error "Do not include include ros/arch/trapframe.h directly"
+#endif
 
 #include <ros/common.h>
 
@@ -38,6 +42,13 @@ typedef struct trapframe {
 	uint16_t tf_ss;
 	uint16_t tf_padding6;
 } trapframe_t;
+
+/* Temporary aliasing */
+#define hw_trapframe trapframe
+
+struct sw_trapframe {
+	/* TODO */
+};
 
 /* TODO: consider using a user-space specific trapframe, since they don't need
  * all of this information.  Might do that eventually, but til then: */
@@ -137,4 +148,4 @@ typedef struct ancillary_state {
 	__uint128_t		reserv5;
 } __attribute__((aligned(16))) ancillary_state_t;
 
-#endif /* !ROS_INCLUDE_ARCH_TRAPFRAME_H */
+#endif /* ROS_INC_ARCH_TRAPFRAME_H */

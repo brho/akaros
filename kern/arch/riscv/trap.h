@@ -9,7 +9,7 @@
 
 #ifndef __ASSEMBLER__
 
-#include <ros/arch/trapframe.h>
+#include <ros/trapframe.h>
 #include <arch/arch.h>
 
 /* Kernel message interrupt vector.  ignored, for the most part */

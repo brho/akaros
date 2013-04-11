@@ -59,7 +59,7 @@
 
 #include <ros/common.h>
 #include <arch/mmu.h>
-#include <arch/ros/trapframe.h>
+#include <ros/trapframe.h>
 
 /* The kernel's interrupt descriptor table */
 extern gatedesc_t idt[];

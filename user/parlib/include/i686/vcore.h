@@ -2,7 +2,7 @@
 #define PARLIB_ARCH_VCORE_H
 
 #include <ros/common.h>
-#include <ros/arch/trapframe.h>
+#include <ros/trapframe.h>
 #include <ros/procdata.h>
 #include <ros/syscall.h>
 #include <ros/arch/mmu.h>

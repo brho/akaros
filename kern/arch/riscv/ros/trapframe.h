@@ -1,5 +1,9 @@
-#ifndef ROS_INCLUDE_ARCH_TRAPFRAME_H
-#define ROS_INCLUDE_ARCH_TRAPFRAME_H
+#ifndef ROS_INC_ARCH_TRAPFRAME_H
+#define ROS_INC_ARCH_TRAPFRAME_H
+
+#ifndef ROS_INC_TRAPFRAME_H
+#error "Do not include include ros/arch/trapframe.h directly"
+#endif
 
 #include <ros/common.h>
 #include <stdint.h>
@@ -13,6 +17,13 @@ typedef struct trapframe
   long cause;
 } trapframe_t;
 
+/* Temporary aliasing */
+#define hw_trapframe trapframe
+
+struct sw_trapframe {
+	/* TODO */
+};
+
 /* TODO: consider using a user-space specific trapframe, since they don't need
  * all of this information.  Will do that eventually, but til then: */
 #define user_trapframe trapframe
@@ -23,4 +34,4 @@ typedef struct ancillary_state
 	uint32_t fsr;
 } ancillary_state_t;
 
-#endif /* !ROS_INCLUDE_ARCH_TRAPFRAME_H */
+#endif /* ROS_INC_ARCH_TRAPFRAME_H */

@@ -7,7 +7,7 @@
 #ifndef __ASSEMBLER__
 
 #include <ros/common.h>
-#include <ros/arch/trapframe.h>
+#include <ros/trapframe.h>
 #include <arch/ros/arch.h>
 #include <arch/sparc.h>
 

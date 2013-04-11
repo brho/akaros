@@ -9,7 +9,7 @@
 
 #include <ros/common.h>
 #include <ros/atomic.h>
-#include <ros/arch/trapframe.h>
+#include <ros/trapframe.h>
 /* #include <ros/ucq.h> included below */
 
 /* Event Delivery Flags from the process to the kernel */

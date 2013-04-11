@@ -2,7 +2,7 @@
 #define UCONTEXT_H
 
 #include <stdint.h>
-#include <ros/arch/trapframe.h>
+#include <ros/trapframe.h>
 #include <threadlib_internal.h>
 struct u_context {
 	struct user_trapframe utf;

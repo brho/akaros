@@ -1,4 +1,4 @@
-#include <ros/arch/trapframe.h>
+#include <ros/trapframe.h>
 #include <pthread.h>
 #include <vcore.h>
 #include <mcs.h>
