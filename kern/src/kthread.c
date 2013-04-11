@@ -73,7 +73,7 @@ void restart_kthread(struct kthread *kthread)
 	assert(!pcpui->cur_sysc);	/* catch bugs, prev user should clear */
 	pcpui->cur_sysc = kthread->sysc;
 	/* Finally, restart our thread */
-	pop_kernel_tf(&kthread->context);
+	pop_kernel_ctx(&kthread->context);
 }
 
 /* Kmsg handler to launch/run a kthread.  This must be a routine message, since
@@ -249,7 +249,7 @@ void sem_down(struct semaphore *sem)
 	if (kthread->proc)
 		proc_incref(kthread->proc, 1);
 	/* Save the context, toggle blocking for the reactivation */
-	save_kernel_tf(&kthread->context);
+	save_kernel_ctx(&kthread->context);
 	if (!blocking)
 		goto block_return_path;
 	blocking = FALSE;					/* for when it starts back up */

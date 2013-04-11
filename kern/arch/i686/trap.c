@@ -105,7 +105,7 @@ uintptr_t get_stack_top(void)
 }
 
 /* Starts running the current TF, just using ret. */
-void pop_kernel_tf(struct trapframe *tf)
+void pop_kernel_ctx(struct kernel_ctx *ctx)
 {
 	asm volatile ("movl %1,%%esp;           " /* move to future stack */
 	              "pushl %2;                " /* push cs */
@@ -118,7 +118,9 @@ void pop_kernel_tf(struct trapframe *tf)
 	              "subl $0x4,%%esp;         " /* jump down past CS */
 	              "ret                      " /* return to the EIP */
 	              :
-	              : "g"(tf), "r"(tf->tf_esp), "r"(tf->tf_eip) : "memory");
+	              : "g"(&ctx->hw_tf), "r"(ctx->hw_tf.tf_esp),
+	                "r"(ctx->hw_tf.tf_eip)
+	              : "memory");
 	panic("ret failed");				/* mostly to placate your mom */
 }
 

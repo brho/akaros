@@ -94,7 +94,7 @@ set_stack_pointer(uintptr_t sp)
 
 /* Save's the current kernel context into tf, setting the PC to the end of this
  * function.  Note the kernel doesn't need to save a lot. */
-static inline void save_kernel_tf(struct trapframe *tf)
+static inline void save_kernel_ctx(struct kernel_ctx *ctx)
 {
 	/* Save the regs and the future esp. */
 	asm volatile("movl %%esp,(%0);       " /* save esp in it's slot*/
@@ -109,7 +109,8 @@ static inline void save_kernel_tf(struct trapframe *tf)
 	             "popl %%esp;            " /* restore esp */
 	             "1:                     " /* where this tf will restart */
 	             : 
-	             : "r"(&tf->tf_esp), "r"(&tf->tf_eip), "g"(tf)
+	             : "r"(&ctx->hw_tf.tf_esp), "r"(&ctx->hw_tf.tf_eip),
+	               "g"(&ctx->hw_tf)
 	             : "eax", "memory", "cc");
 }
 

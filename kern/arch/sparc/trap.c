@@ -60,7 +60,7 @@ uintptr_t get_stack_top(void)
 }
 
 /* Starts running the current TF. */
-void pop_kernel_tf(struct trapframe *tf)
+void pop_kernel_ctx(struct kernel_ctx *ctx)
 {
 	/* TODO! also do save_kernel_tf() in kern/arch/sparc/trap.h */
 	panic("Not implemented.  =(");

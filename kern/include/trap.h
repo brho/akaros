@@ -7,6 +7,18 @@
 #include <arch/arch.h>
 #include <arch/mmu.h>
 #include <sys/queue.h>
+/* #include <arch/trap.h> included below */
+
+/* For kernel contexts, when we save/restore/move them around.  For now, we'll
+ * just use the old trapframe/hw_trap, but in the future we can slim this down a
+ * bit.  Additionally, we might have different types of these in the future, if
+ * we ever do non-cooperative kthread scheduling. */
+struct kernel_ctx {
+	/* RISCV's current pop_kernel_ctx assumes the hw_tf is the first member */
+	struct hw_trapframe 		hw_tf;
+};
+
+/* Arch needs to hear about kernel_ctx */
 #include <arch/trap.h>
 
 // func ptr for interrupt service routines
@@ -45,10 +57,10 @@ extern inline void restore_fp_state(struct ancillary_state *silly);
 void set_stack_top(uintptr_t stacktop);
 uintptr_t get_stack_top(void);
 
-/* It's important that this is inline and that tf is not a stack variable */
-static inline void save_kernel_tf(struct trapframe *tf)
+/* It's important that this is inline and that ctx is not a stack variable */
+static inline void save_kernel_ctx(struct kernel_ctx *ctx)
                    __attribute__((always_inline));
-void pop_kernel_tf(struct trapframe *tf) __attribute__((noreturn));
+void pop_kernel_ctx(struct kernel_ctx *ctx) __attribute__((noreturn));
 
 /* Sends a non-maskable interrupt, which we have print a trapframe. */
 void send_nmi(uint32_t os_coreid);

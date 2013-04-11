@@ -26,7 +26,7 @@ LIST_HEAD(semaphore_list, semaphore_entry);
  * a kthread is running, we make sure its stacktop is the default kernel stack,
  * meaning it will receive the interrupts from userspace. */
 struct kthread {
-	struct trapframe			context;
+	struct kernel_ctx			context;
 	uintptr_t					stacktop;
 	struct proc					*proc;
 	struct syscall				*sysc;

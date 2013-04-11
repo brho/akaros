@@ -33,10 +33,10 @@ set_stack_pointer(uintptr_t sp)
 /* Save's the current kernel context into tf, setting the PC to the end of this
  * function.  Note the kernel doesn't need to save a lot.
  * Implemented with extern function to cause compiler to clobber most regs. */
-static inline void save_kernel_tf(struct trapframe *tf)
+static inline void save_kernel_ctx(struct kernel_ctx *ctx)
 {
   extern void save_kernel_tf_asm(struct trapframe*);
-	save_kernel_tf_asm(tf);
+	save_kernel_tf_asm(&ctx->hw_tf);
 }
 
 void handle_trap(struct trapframe *tf);

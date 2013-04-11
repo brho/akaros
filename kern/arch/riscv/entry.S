@@ -36,8 +36,8 @@ save_kernel_tf_asm:
   ret
 
   .text
-  .global pop_kernel_tf
-pop_kernel_tf:
+  .global pop_kernel_ctx
+pop_kernel_ctx:
   LOAD  t0,32*REGBYTES(a0)
   LOAD  ra,33*REGBYTES(a0)
 

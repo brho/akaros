@@ -73,7 +73,7 @@ Freeing Stacks and Structs
 -------------------------------
 When we restart a kthread, we have to be careful about freeing the old stack and
 the struct kthread.  We need to delay the freeing of both of these until after
-we pop_kernel_tf().  We can't free the kthread before popping it, and we are on
+we pop_kernel_ctx().  We can't free the kthread before popping it, and we are on
 the stack we need to free (until we pop to the new stack).
 
 To deal with this, we have a "spare" kthread per core, which gets assigned as
@@ -125,7 +125,7 @@ loses the race (unlikely), it can manually unwind.
 
 Note that a lot of this is probably needless worry - we have interrupts disabled
 for most of sleep_on(), though arguably we can be a little more careful with
-pcpui->spare and move the disable_irq() down to right before save_kernel_tf().
+pcpui->spare and move the disable_irq() down to right before save_kernel_ctx().
 
 What's the Deal with Stacks/Stacktops?
 -------------------------------
@@ -166,7 +166,7 @@ kthread run with its stack as the default stacktop.
 
 When restarting a kthread, we eventually will use its stack, instead of the
 current one, but we can't free the current stack until after we actually
-pop_kernel_tf().  this is the same problem as with the struct kthread dealloc.
+pop_kernel_ctx().  this is the same problem as with the struct kthread dealloc.
 So we can have the kthread (which we want to free later) hold on to the page we
 wanted to dealloc.  Likewise, when we would need a fresh kthread, we also need a
 page to use as the default stacktop.  So if we had a cached kthread, we then use

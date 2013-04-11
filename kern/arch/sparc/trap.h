@@ -48,9 +48,10 @@ set_stack_pointer(uintptr_t sp)
 
 /* Save's the current kernel context into tf, setting the PC to the end of this
  * function. */
-static inline void save_kernel_tf(struct trapframe *tf)
+static inline void save_kernel_ctx(struct kernel_ctx *ctx)
 {
 	/* TODO: save the registers, stack pointer, and have the PC pt to the end */
+	panic("Not implemented!\n");
 }
 
 #endif /* !__ASSEMBLER__ */
