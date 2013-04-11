@@ -1,4 +1,4 @@
-#include <arch/trap.h>
+#include <trap.h>
 #include <smp.h>
 #include <umem.h>
 #include <arch/softfloat.h>

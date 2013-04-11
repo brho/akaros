@@ -4,7 +4,6 @@
 #include <ros/arch/arch.h>
 #include <ros/common.h>
 #include <arch/x86.h>
-#include <arch/trap.h>
 #include <arch/apic.h>
 
 /* Arch Constants */

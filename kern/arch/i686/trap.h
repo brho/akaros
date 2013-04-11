@@ -57,6 +57,10 @@
 
 #ifndef __ASSEMBLER__
 
+#ifndef ROS_KERN_TRAP_H
+#error "Do not include include arch/trap.h directly"
+#endif
+
 #include <ros/common.h>
 #include <arch/mmu.h>
 #include <ros/trapframe.h>

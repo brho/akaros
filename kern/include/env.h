@@ -12,7 +12,7 @@
 #include <ros/procdata.h>
 #include <ros/procinfo.h>
 #include <ros/resource.h>
-#include <arch/trap.h>
+#include <trap.h>
 #include <ros/common.h>
 #include <arch/arch.h>
 #include <sys/queue.h>

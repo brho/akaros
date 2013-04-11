@@ -1,5 +1,5 @@
 #include <arch/arch.h>
-#include <arch/trap.h>
+#include <trap.h>
 #include <process.h>
 #include <pmap.h>
 #include <smp.h>

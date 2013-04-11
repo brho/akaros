@@ -1,6 +1,6 @@
 #include <arch/sparcfpu.h>
 #include <arch/arch.h>
-#include <arch/trap.h>
+#include <trap.h>
 #include <umem.h>
 #include <pmap.h>
 #include <smp.h>

@@ -3,7 +3,7 @@
 #pragma nosharc
 #endif
 
-#include <arch/trap.h>
+#include <trap.h>
 #include <env.h>
 #include <assert.h>
 #include <pmap.h>

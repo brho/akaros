@@ -1,6 +1,6 @@
 #include <arch/arch.h>
 #include <assert.h>
-#include <arch/trap.h>
+#include <trap.h>
 #include <arch/console.h>
 #include <console.h>
 #include <string.h>

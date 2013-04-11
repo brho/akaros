@@ -1,6 +1,6 @@
 #include <arch/time.h>
 #include <ros/common.h>
-#include <arch/trap.h>
+#include <trap.h>
 #include <arch/arch.h>
 #include <stdio.h>
 #include <assert.h>

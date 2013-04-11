@@ -6,7 +6,6 @@
 #include <ros/common.h>
 #include <ros/arch/membar.h>
 #include <arch/riscv.h>
-#include <arch/trap.h>
 #include <arch/time.h>
 
 /* Arch Constants */

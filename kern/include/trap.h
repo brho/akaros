@@ -2,14 +2,12 @@
 
 #ifndef ROS_KERN_TRAP_H
 #define ROS_KERN_TRAP_H
-#ifndef ROS_KERNEL
-# error "This is an ROS kernel header; user programs should not #include it"
-#endif
 
+#include <ros/trapframe.h>
 #include <arch/arch.h>
 #include <arch/mmu.h>
-#include <arch/trap.h>
 #include <sys/queue.h>
+#include <arch/trap.h>
 
 // func ptr for interrupt service routines
 typedef void ( *poly_isr_t)(trapframe_t* tf, TV(t) data);
@@ -40,8 +38,8 @@ void timer_interrupt(struct trapframe *tf, void *data);
 void sysenter_init(void);
 extern void sysenter_handler();
 
-void save_fp_state(struct ancillary_state *silly);
-void restore_fp_state(struct ancillary_state *silly);
+extern inline void save_fp_state(struct ancillary_state *silly);
+extern inline void restore_fp_state(struct ancillary_state *silly);
 /* Set stacktop for the current core to be the stack the kernel will start on
  * when trapping/interrupting from userspace */
 void set_stack_top(uintptr_t stacktop);

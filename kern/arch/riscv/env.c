@@ -1,4 +1,4 @@
-#include <arch/trap.h>
+#include <trap.h>
 #include <env.h>
 #include <assert.h>
 #include <arch/arch.h>
