@@ -5,7 +5,8 @@
 #include <pmap.h>
 #include <smp.h>
 
-static inline uint32_t* effective_address(trapframe_t* state, uint32_t insn)
+static inline uint32_t *effective_address(struct hw_trapframe *state,
+                                          uint32_t insn)
 {
 	uint32_t rs1 = state->gpr[(insn>>14)&0x1F];
 	uint32_t rs2 = state->gpr[insn&0x1F];
@@ -15,14 +16,14 @@ static inline uint32_t* effective_address(trapframe_t* state, uint32_t insn)
 	return (uint32_t*)((insn & 0x2000) ? rs1+imm : rs1+rs2);
 }
 
-void fp_access_exception(trapframe_t* state, void* addr)
+void fp_access_exception(struct hw_trapframe *state, void *addr)
 {
 	state->fault_status = 1;
 	state->fault_addr = (uint32_t)addr;
 	data_access_exception(state);
 }
 
-static inline uint32_t fp_load_word(trapframe_t* state, uint32_t* addr)
+static inline uint32_t fp_load_word(struct hw_trapframe *state, uint32_t *addr)
 {
 	uint32_t word;
 	if((long)addr % sizeof(word))
@@ -32,7 +33,7 @@ static inline uint32_t fp_load_word(trapframe_t* state, uint32_t* addr)
 	return word;
 }
 
-static inline uint64_t fp_load_dword(trapframe_t* state, uint64_t* addr)
+static inline uint64_t fp_load_dword(struct hw_trapframe *state, uint64_t *addr)
 {
 	uint64_t word;
 	if((long)addr % sizeof(word))
@@ -42,7 +43,8 @@ static inline uint64_t fp_load_dword(trapframe_t* state, uint64_t* addr)
 	return word;
 }
 
-static inline void fp_store_word(trapframe_t* state, uint32_t* addr, uint32_t word)
+static inline void fp_store_word(struct hw_trapframe *state, uint32_t *addr,
+                                 uint32_t word)
 {
 	if((long)addr % sizeof(word))
 		address_unaligned(state);
@@ -50,7 +52,8 @@ static inline void fp_store_word(trapframe_t* state, uint32_t* addr, uint32_t wo
 		fp_access_exception(state,addr);
 }
 
-static inline void fp_store_dword(trapframe_t* state, uint64_t* addr, uint64_t word)
+static inline void fp_store_dword(struct hw_trapframe *state, uint64_t *addr,
+                                  uint64_t word)
 {
 	if((long)addr % sizeof(word))
 		address_unaligned(state);
@@ -58,7 +61,7 @@ static inline void fp_store_dword(trapframe_t* state, uint64_t* addr, uint64_t w
 		fp_access_exception(state,addr);
 }
 
-void emulate_fpu(trapframe_t* state, ancillary_state_t* astate)
+void emulate_fpu(struct hw_trapframe *state, ancillary_state_t *astate)
 {
 	sparcfpu_t thefpu;
 	sparcfpu_t* fpu = &thefpu;

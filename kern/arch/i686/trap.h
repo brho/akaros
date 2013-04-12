@@ -70,9 +70,9 @@ extern gatedesc_t idt[];
 extern taskstate_t ts;
 
 /* Determines if the given TF was in the kernel or not. */
-static inline bool in_kernel(struct trapframe *tf)
+static inline bool in_kernel(struct hw_trapframe *hw_tf)
 {
-	return (tf->tf_cs & ~3) == GD_KT;
+	return (hw_tf->tf_cs & ~3) == GD_KT;
 }
 
 /* TODO: (HSS) */

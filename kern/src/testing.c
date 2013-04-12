@@ -386,7 +386,7 @@ void test_bitmasks(void)
 
 checklist_t *RO the_global_list;
 
-void test_checklist_handler(trapframe_t *tf, void* data)
+static void test_checklist_handler(struct hw_trapframe *hw_tf, void *data)
 {
 	udelay(1000000);
 	cprintf("down_checklist(%x,%d)\n", the_global_list, core_id());
@@ -428,17 +428,13 @@ void test_checklists(void)
 
 atomic_t a, b, c;
 
-#ifdef __IVY__
-void test_incrementer_handler(trapframe_t *tf, atomic_t *data)
-#else
-void test_incrementer_handler(trapframe_t *tf, void *data)
-#endif
+static void test_incrementer_handler(struct hw_trapframe *tf, void *data)
 {
 	assert(data);
 	atomic_inc(data);
 }
 
-void test_null_handler(trapframe_t *tf, void* data)
+static void test_null_handler(struct hw_trapframe *tf, void *data)
 {
 	asm volatile("nop");
 }
@@ -571,24 +567,24 @@ void test_lapic_status_bit(void)
 /************************************************************/
 /* ISR Handler Functions */
 
-void test_hello_world_handler(trapframe_t *tf, void* data)
+void test_hello_world_handler(struct hw_trapframe *hw_tf, void *data)
 {
 	int trapno;
 	#if defined(__i386__)
-	trapno = tf->tf_trapno;
+	trapno = hw_tf->tf_trapno;
 	#elif defined(__sparc_v8__)
-	trapno = (tf->tbr >> 4) & 0xFF;
+	trapno = (hw_tf->tbr >> 4) & 0xFF;
 	#else
 	trapno = 0;
 	#endif
 
 	cprintf("Incoming IRQ, ISR: %d on core %d with tf at 0x%08x\n",
-	        trapno, core_id(), tf);
+	        trapno, core_id(), hw_tf);
 }
 
 spinlock_t print_info_lock = SPINLOCK_INITIALIZER_IRQSAVE;
 
-void test_print_info_handler(trapframe_t *tf, void* data)
+void test_print_info_handler(struct hw_trapframe *hw_tf, void *data)
 {
 	uint64_t tsc = read_tsc();
 
@@ -620,7 +616,7 @@ void test_print_info_handler(trapframe_t *tf, void* data)
 	spin_unlock_irqsave(&print_info_lock);
 }
 
-void test_barrier_handler(trapframe_t *tf, void* data)
+void test_barrier_handler(struct hw_trapframe *hw_tf, void *data)
 {
 	cprintf("Round 1: Core %d\n", core_id());
 	waiton_barrier(&test_cpu_array);
@@ -636,11 +632,7 @@ void test_barrier_handler(trapframe_t *tf, void* data)
 	//cprintf("Round 4: Core %d\n", core_id());
 }
 
-#ifdef __IVY__
-static void test_waiting_handler(trapframe_t *tf, atomic_t *data)
-#else
-static void test_waiting_handler(trapframe_t *tf, void *data)
-#endif
+static void test_waiting_handler(struct hw_trapframe *hw_tf, void *data)
 {
 	atomic_dec(data);
 }

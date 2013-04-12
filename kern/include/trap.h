@@ -22,8 +22,8 @@ struct kernel_ctx {
 #include <arch/trap.h>
 
 // func ptr for interrupt service routines
-typedef void ( *poly_isr_t)(trapframe_t* tf, TV(t) data);
-typedef void (*isr_t)(trapframe_t* tf, void * data);
+typedef void (*poly_isr_t)(struct hw_trapframe *hw_tf, void *data);
+typedef void (*isr_t)(struct hw_trapframe *hw_tf, void *data);
 typedef struct InterruptHandler {
 	poly_isr_t isr;
 	TV(t) data;
@@ -40,12 +40,12 @@ void
 register_interrupt_handler(handler_t SSOMELOCK (CT(NUM_INTERRUPT_HANDLERS)table)[],
                            uint8_t int_num,
                            poly_isr_t handler, TV(t) data);
-void print_trapframe(trapframe_t *tf);
-void page_fault_handler(trapframe_t *tf);
+void print_trapframe(struct hw_trapframe *hw_tf);
+void page_fault_handler(struct hw_trapframe *hw_tf);
 /* Generic per-core timer interrupt handler.  set_percore_timer() will fire the
  * timer_interrupt(). */
 void set_core_timer(uint32_t usec, bool periodic);
-void timer_interrupt(struct trapframe *tf, void *data);
+void timer_interrupt(struct hw_trapframe *hw_tf, void *data);
 
 void sysenter_init(void);
 extern void sysenter_handler();
@@ -105,7 +105,7 @@ typedef struct kernel_message kernel_message_t;
 void kernel_msg_init(void);
 uint32_t send_kernel_message(uint32_t dst, amr_t pc, long arg0, long arg1,
                              long arg2, int type);
-void handle_kmsg_ipi(struct trapframe *tf, void *data);
+void handle_kmsg_ipi(struct hw_trapframe *hw_tf, void *data);
 void process_routine_kmsg(void);
 void print_kmsgs(uint32_t coreid);
 

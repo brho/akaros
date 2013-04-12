@@ -18,7 +18,7 @@
 #include <console.h>
 
 /* irq handler for the console (kb, serial, etc) */
-static void irq_console(struct trapframe *tf, void *data)
+static void irq_console(struct hw_trapframe *hw_tf, void *data)
 {
 	uint8_t c;
 	struct cons_dev *cdev = (struct cons_dev*)data;

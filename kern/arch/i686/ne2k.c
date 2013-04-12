@@ -245,7 +245,8 @@ void ne2k_test_interrupts() {
 
 // We need to evaluate this routine in terms of concurrency.
 // We also need to figure out whats up with different core interrupts
-void ne2k_interrupt_handler(trapframe_t *tf, void* data) {
+void ne2k_interrupt_handler(struct hw_trapframe *hw_tf, void *data)
+{
 	
 	ne2k_interrupt_debug("\nNE2K interrupt on core %u!\n", lapic_get_id());
 

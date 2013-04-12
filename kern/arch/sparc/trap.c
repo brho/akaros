@@ -35,8 +35,7 @@
  * per_cpu_info. */
 uintptr_t core_stacktops[MAX_NUM_CPUS] = {0xcafebabe, 0};
 
-void
-advance_pc(trapframe_t* state)
+void advance_pc(struct hw_trapframe *state)
 {
 	state->pc = state->npc;
 	state->npc += 4;
@@ -92,44 +91,43 @@ static void set_current_tf(struct per_cpu_info *pcpui, struct trapframe *tf)
 	pcpui->cur_tf = &pcpui->actual_tf;
 }
 
-static int
-format_trapframe(trapframe_t *tf, char* buf, int bufsz)
+static int format_trapframe(struct hw_trapframe *hw_tf, char *buf, int bufsz)
 {
 	// slightly hackish way to read out the instruction that faulted.
 	// not guaranteed to be right 100% of the time
 	uint32_t insn;
-	if(!(current && !memcpy_from_user(current,&insn,(void*)tf->pc,4)))
+	if(!(current && !memcpy_from_user(current, &insn, (void*)hw_tf->pc, 4)))
 		insn = -1;
 
 	int len = snprintf(buf,bufsz,"TRAP frame at %p on core %d\n",
-	                   tf, core_id());
+	                   hw_tf, core_id());
 
 	for(int i = 0; i < 8; i++)
 	{
 		len += snprintf(buf+len,bufsz-len,
 		                "  g%d   0x%08x  o%d   0x%08x"
 		                "  l%d   0x%08x  i%d   0x%08x\n",
-		                i,tf->gpr[i],i,tf->gpr[i+8],
-		                i,tf->gpr[i+16],i,tf->gpr[i+24]);
+		                i, hw_tf->gpr[i], i, hw_tf->gpr[i+8],
+		                i, hw_tf->gpr[i+16], i, hw_tf->gpr[i+24]);
 	}
 
 	len += snprintf(buf+len,bufsz-len,
 	                "  psr  0x%08x  pc   0x%08x  npc  0x%08x  insn 0x%08x\n",
-	                tf->psr,tf->pc,tf->npc,insn);
+	                hw_tf->psr, hw_tf->pc, hw_tf->npc,insn);
 	len += snprintf(buf+len,bufsz-len,
 	                "  y    0x%08x  fsr  0x%08x  far  0x%08x  tbr  0x%08x\n",
-	                tf->y,tf->fault_status,tf->fault_addr,tf->tbr);
+	                hw_tf->y, hw_tf->fault_status, hw_tf->fault_addr,
+	                hw_tf->tbr);
 	len += snprintf(buf+len,bufsz-len,
-	                "  timestamp  %21lld\n",tf->timestamp);
+	                "  timestamp  %21lld\n", hw_tf->timestamp);
 
 	return len;
 }
 
-void
-print_trapframe(trapframe_t* tf)
+void print_trapframe(struct hw_trapframe *hw_tf)
 {
 	char buf[1024];
-	int len = format_trapframe(tf,buf,sizeof(buf));
+	int len = format_trapframe(hw_tf, buf, sizeof(buf));
 	cputbuf(buf,len);
 }
 
@@ -177,21 +175,20 @@ get_trapname(uint8_t tt, char buf[TRAPNAME_MAX])
 }
 
 /* Assumes that any IPI you get is really a kernel message */
-void handle_ipi(trapframe_t* tf)
+void handle_ipi(struct hw_trapframe *hw_tf)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	if (!in_kernel(tf))
-		set_current_tf(pcpui, tf);
-	else if((void*)tf->pc == &__cpu_halt) // break out of the __cpu_halt loop
-		advance_pc(tf);
+	if (!in_kernel(hw_tf))
+		set_current_tf(pcpui, hw_tf);
+	else if((void*)hw_tf->pc == &__cpu_halt) // break out of the __cpu_halt loop
+		advance_pc(hw_tf);
 
 	inc_irq_depth(pcpui);
-	handle_kmsg_ipi(tf, 0);
+	handle_kmsg_ipi(hw_tf, 0);
 	dec_irq_depth(pcpui);
 }
 
-void
-unhandled_trap(trapframe_t* state)
+void unhandled_trap(struct hw_trapframe *state)
 {
 	char buf[TRAPNAME_MAX];
 	uint32_t trap_type = (state->tbr >> 4) & 0xFF;
@@ -223,60 +220,52 @@ unhandled_trap(trapframe_t* state)
 	}
 }
 
-static trapframe_t*
-stack_fucked(trapframe_t* state)
+static hw_trapframe *stack_fucked(struct hw_trapframe *state)
 {
 	warn("You just got stack fucked!");
 	extern char tflush1, tflush2;
 	if(state->pc == (uint32_t)&tflush1 || state->pc == (uint32_t)&tflush2)
-		return (trapframe_t*)(bootstacktop - core_id()*KSTKSIZE
-		                                   - sizeof(trapframe_t));
+		return (struct hw_trapframe*)(bootstacktop - core_id()*KSTKSIZE
+		                                   - sizeof(struct hw_trapframe));
 	return state;
 }
 
-void
-fill_misaligned(trapframe_t* state)
+void fill_misaligned(struct hw_trapframe *state)
 {
 	state = stack_fucked(state);
 	state->tbr = (state->tbr & ~0xFFF) | 0x070;
 	address_unaligned(state);
 }
 
-void
-fill_pagefault(trapframe_t* state)
+void fill_pagefault(struct hw_trapframe *state)
 {
 	state = stack_fucked(state);
 	state->tbr = (state->tbr & ~0xFFF) | 0x090;
 	data_access_exception(state);
 }
 
-void
-spill_misaligned(trapframe_t* state)
+void spill_misaligned(struct hw_trapframe *state)
 {
 	fill_misaligned(state);
 }
 
-void
-spill_pagefault(trapframe_t* state)
+void spill_pagefault(struct hw_trapframe *state)
 {
 	fill_pagefault(state);
 }
 
-void
-address_unaligned(trapframe_t* state)
+void address_unaligned(struct hw_trapframe *state)
 {
 	unhandled_trap(state);
 }
 
-void
-instruction_access_exception(trapframe_t* state)
+void instruction_access_exception(struct hw_trapframe *state)
 {
 	if(in_kernel(state) || handle_page_fault(current,state->pc,PROT_EXEC))
 		unhandled_trap(state);
 }
 
-void
-data_access_exception(trapframe_t* state)
+void data_access_exception(struct hw_trapframe *state)
 {
 	int prot = (state->fault_status & MMU_FSR_WR) ? PROT_WRITE : PROT_READ;
 
@@ -284,20 +273,18 @@ data_access_exception(trapframe_t* state)
 		unhandled_trap(state);
 }
 
-void
-illegal_instruction(trapframe_t* state)
+void illegal_instruction(struct hw_trapframe *state)
 {
 	unhandled_trap(state);
 }
 
-void
-real_fp_exception(trapframe_t* state, ancillary_state_t* sillystate)
+void real_fp_exception(struct hw_trapframe *state,
+                       ancillary_state_t *sillystate)
 {
 	unhandled_trap(state);
 }
 
-void
-fp_exception(trapframe_t* state)
+void fp_exception(struct hw_trapframe *state)
 {
 	ancillary_state_t sillystate;
 	save_fp_state(&sillystate);	
@@ -310,8 +297,7 @@ fp_exception(trapframe_t* state)
 	restore_fp_state(&sillystate);
 }
 
-void
-fp_disabled(trapframe_t* state)
+void fp_disabled(struct hw_trapframe *state)
 {
 	if(in_kernel(state))
 		panic("kernel executed an FP instruction!");
@@ -319,26 +305,24 @@ fp_disabled(trapframe_t* state)
 	state->psr |= PSR_EF;
 }
 
-void
-handle_pop_tf(trapframe_t* state)
+void handle_pop_tf(struct hw_trapframe *state)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	set_current_tf(pcpui, state);
 
-	trapframe_t tf, *tf_p = &tf;
-	if (memcpy_from_user(current,&tf,(void*)state->gpr[8],sizeof(tf))) {
+	struct hw_trapframe hw_tf, *hw_tf_p = &hw_tf;
+	if (memcpy_from_user(current, &hw_tf, (void*)state->gpr[8],sizeof(hw_tf))) {
 		enable_irq();
 		proc_destroy(current);
 		proc_restartcore();
 	}
 
-	proc_secure_trapframe(&tf);
-	set_current_tf(pcpui, tf_p);
+	proc_secure_trapframe(&hw_tf);
+	set_current_tf(pcpui, hw_tf_p);
 	proc_restartcore();
 }
 
-void
-handle_set_tf(trapframe_t* state)
+void handle_set_tf(struct hw_trapframe *state)
 {
 	advance_pc(state);
 	if (memcpy_to_user(current,(void*)state->gpr[8],state,sizeof(*state))) {
@@ -349,8 +333,7 @@ handle_set_tf(trapframe_t* state)
 	}
 }
 
-void
-handle_syscall(trapframe_t* state)
+void handle_syscall(struct hw_trapframe *state)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	uint32_t a0 = state->gpr[1];
@@ -385,16 +368,14 @@ flush_windows()
 	              : "=r"(foo) : "r"(foo));
 }
    
-void
-handle_flushw(trapframe_t* state)
+void handle_flushw(struct hw_trapframe *state)
 {
 	// don't actually need to do anything here.
 	// trap_entry flushes user windows to the stack.
 	advance_pc(state);
 }
 
-void
-handle_breakpoint(trapframe_t* state)
+void handle_breakpoint(struct hw_trapframe *state)
 {
 	advance_pc(state);
 	monitor(state);

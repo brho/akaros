@@ -7,6 +7,7 @@
  */
 
 #include <ros/common.h>
+#include <trap.h>
 
 void test_ipi_sending(void);
 void test_pic_reception(void);
@@ -34,10 +35,8 @@ void test_radix_tree(void);
 void test_random_fs(void);
 void test_kthreads(void);
 
-struct trapframe_t;
-
-void test_hello_world_handler(trapframe_t *tf, void* data);
-void test_print_info_handler(trapframe_t *tf, void* data);
-void test_barrier_handler(trapframe_t *tf, void* data);
+void test_hello_world_handler(struct hw_trapframe *hw_tf, void *data);
+void test_print_info_handler(struct hw_trapframe *hw_tf, void *data);
+void test_barrier_handler(struct hw_trapframe *hw_tf, void *data);
 
 #endif /* !ROS_INC_TESTING_H */

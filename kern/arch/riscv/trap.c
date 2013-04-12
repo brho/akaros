@@ -27,7 +27,7 @@
 uintptr_t core_stacktops[MAX_NUM_CPUS] = {0xcafebabe, 0};
 
 void
-advance_pc(trapframe_t* state)
+advance_pc(struct hw_trapframe *state)
 {
 	state->epc += 4;
 }
@@ -71,16 +71,16 @@ set_current_tf(struct per_cpu_info *pcpui, struct trapframe *tf)
 }
 
 static int
-format_trapframe(trapframe_t *tf, char* buf, int bufsz)
+format_trapframe(struct hw_trapframe *hw_tf, char* buf, int bufsz)
 {
 	// slightly hackish way to read out the instruction that faulted.
 	// not guaranteed to be right 100% of the time
 	uint32_t insn;
-	if(!(current && !memcpy_from_user(current,&insn,(void*)tf->epc,4)))
+	if(!(current && !memcpy_from_user(current,&insn,(void*)hw_tf->epc,4)))
 		insn = -1;
 
 	int len = snprintf(buf,bufsz,"TRAP frame at %p on core %d\n",
-	                   tf, core_id());
+	                   hw_tf, core_id());
 	static const char* regnames[] = {
 	  "z ", "ra", "v0", "v1", "a0", "a1", "a2", "a3",
 	  "a4", "a5", "a6", "a7", "t0", "t1", "t2", "t3",
@@ -88,36 +88,37 @@ format_trapframe(trapframe_t *tf, char* buf, int bufsz)
 	  "s4", "s5", "s6", "s7", "s8", "fp", "sp", "tp"
 	};
 	
-	tf->gpr[0] = 0;
+	hw_tf->gpr[0] = 0;
 	
 	for(int i = 0; i < 32; i+=4)
 	{
 		for(int j = 0; j < 4; j++)
 			len += snprintf(buf+len, bufsz-len,
-			                "%s %016lx%c", regnames[i+j], tf->gpr[i+j], 
+			                "%s %016lx%c", regnames[i+j], hw_tf->gpr[i+j], 
 			                j < 3 ? ' ' : '\n');
 	}
 	len += snprintf(buf+len, bufsz-len,
 	                "sr %016lx pc %016lx va %016lx insn       %08x\n",
-					tf->sr, tf->epc, tf->badvaddr, insn);
+					hw_tf->sr, hw_tf->epc, hw_tf->badvaddr, insn);
 
 	buf[bufsz-1] = 0;
 	return len;
 }
 
 void
-print_trapframe(trapframe_t* tf)
+print_trapframe(struct hw_trapframe *hw_tf)
 {
 	char buf[1024];
-	int len = format_trapframe(tf,buf,sizeof(buf));
+	int len = format_trapframe(hw_tf, buf, sizeof(buf));
 	cputbuf(buf,len);
 }
 
-static void exit_halt_loop(trapframe_t* tf)
+static void exit_halt_loop(struct hw_trapframe *hw_tf)
 {
 	extern char after_cpu_halt;
-	if ((char*)tf->epc >= (char*)&cpu_halt && (char*)tf->epc < &after_cpu_halt)
-		tf->epc = tf->gpr[1];
+	if ((char*)hw_tf->epc >= (char*)&cpu_halt &&
+	    (char*)hw_tf->epc < &after_cpu_halt)
+		hw_tf->epc = hw_tf->gpr[1];
 }
 
 static void handle_keypress(char c)
@@ -128,7 +129,7 @@ static void handle_keypress(char c)
 	cons_init();
 }
 
-static void handle_host_interrupt(trapframe_t* tf)
+static void handle_host_interrupt(struct hw_trapframe *hw_tf)
 {
 	uintptr_t fh = mtpcr(PCR_FROMHOST, 0);
 	switch (fh >> 56)
@@ -139,20 +140,20 @@ static void handle_host_interrupt(trapframe_t* tf)
 	}
 }
 
-static void handle_timer_interrupt(trapframe_t* tf)
+static void handle_timer_interrupt(struct hw_trapframe *hw_tf)
 {
-	timer_interrupt(tf, NULL);
+	timer_interrupt(hw_tf, NULL);
 }
 
 /* Assumes that any IPI you get is really a kernel message */
-static void handle_interprocessor_interrupt(trapframe_t* tf)
+static void handle_interprocessor_interrupt(struct hw_trapframe *hw_tf)
 {
 	clear_ipi();
-	handle_kmsg_ipi(tf, 0);
+	handle_kmsg_ipi(hw_tf, 0);
 }
 
 static void
-unhandled_trap(trapframe_t* state, const char* name)
+unhandled_trap(struct hw_trapframe *state, const char* name)
 {
 	static spinlock_t screwup_lock = SPINLOCK_INITIALIZER;
 	spin_lock(&screwup_lock);
@@ -178,25 +179,25 @@ unhandled_trap(trapframe_t* state, const char* name)
 }
 
 static void
-handle_misaligned_fetch(trapframe_t* state)
+handle_misaligned_fetch(struct hw_trapframe *state)
 {
 	unhandled_trap(state, "Misaligned Fetch");
 }
 
 static void
-handle_misaligned_load(trapframe_t* state)
+handle_misaligned_load(struct hw_trapframe *state)
 {
 	unhandled_trap(state, "Misaligned Load");
 }
 
 static void
-handle_misaligned_store(trapframe_t* state)
+handle_misaligned_store(struct hw_trapframe *state)
 {
 	unhandled_trap(state, "Misaligned Store");
 }
 
 static void
-handle_fault_fetch(trapframe_t* state)
+handle_fault_fetch(struct hw_trapframe *state)
 {
 	if(in_kernel(state))
 	{
@@ -211,7 +212,7 @@ handle_fault_fetch(trapframe_t* state)
 }
 
 static void
-handle_fault_load(trapframe_t* state)
+handle_fault_load(struct hw_trapframe *state)
 {
 	if(in_kernel(state))
 	{
@@ -226,7 +227,7 @@ handle_fault_load(trapframe_t* state)
 }
 
 static void
-handle_fault_store(trapframe_t* state)
+handle_fault_store(struct hw_trapframe *state)
 {
 	if(in_kernel(state))
 	{
@@ -241,7 +242,7 @@ handle_fault_store(trapframe_t* state)
 }
 
 static void
-handle_illegal_instruction(trapframe_t* state)
+handle_illegal_instruction(struct hw_trapframe *state)
 {
 	assert(!in_kernel(state));
 
@@ -257,17 +258,17 @@ handle_illegal_instruction(trapframe_t* state)
 }
 
 static void
-handle_fp_disabled(trapframe_t* tf)
+handle_fp_disabled(struct hw_trapframe *hw_tf)
 {
-	if(in_kernel(tf))
+	if (in_kernel(hw_tf))
 		panic("kernel executed an FP instruction!");
 
-	tf->sr |= SR_EF;
-	env_pop_tf(tf); /* We didn't save our TF, so don't use proc_restartcore */
+	hw_tf->sr |= SR_EF;
+	env_pop_tf(hw_tf); /* We didn't save our TF, so don't proc_restartcore */
 }
 
 static void
-handle_syscall(trapframe_t* state)
+handle_syscall(struct hw_trapframe *state)
 {
 	uintptr_t a0 = state->gpr[4];
 	uintptr_t a1 = state->gpr[5];
@@ -279,16 +280,16 @@ handle_syscall(trapframe_t* state)
 }
 
 static void
-handle_breakpoint(trapframe_t* state)
+handle_breakpoint(struct hw_trapframe *state)
 {
 	advance_pc(state);
 	monitor(state);
 }
 
 void
-handle_trap(trapframe_t* tf)
+handle_trap(struct hw_trapframe *hw_tf)
 {
-	static void (*const trap_handlers[])(trapframe_t*) = {
+	static void (*const trap_handlers[])(struct hw_trapframe *) = {
 	  [CAUSE_MISALIGNED_FETCH] = handle_misaligned_fetch,
 	  [CAUSE_FAULT_FETCH] = handle_fault_fetch,
 	  [CAUSE_ILLEGAL_INSTRUCTION] = handle_illegal_instruction,
@@ -302,46 +303,46 @@ handle_trap(trapframe_t* tf)
 	  [CAUSE_FAULT_STORE] = handle_fault_store,
 	};
 
-	static void (*const irq_handlers[])(trapframe_t*) = {
+	static void (*const irq_handlers[])(struct hw_trapframe *) = {
 	  [IRQ_TIMER] = handle_timer_interrupt,
 	  [IRQ_HOST] = handle_host_interrupt,
 	  [IRQ_IPI] = handle_interprocessor_interrupt,
 	};
 	
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	if (tf->cause < 0)
+	if (hw_tf->cause < 0)
 	{
-		uint8_t irq = tf->cause;
+		uint8_t irq = hw_tf->cause;
 		assert(irq < sizeof(irq_handlers)/sizeof(irq_handlers[0]) &&
 		       irq_handlers[irq]);
 
-		if (in_kernel(tf))
-			exit_halt_loop(tf);
+		if (in_kernel(hw_tf))
+			exit_halt_loop(hw_tf);
 		else
-			set_current_tf(&per_cpu_info[core_id()], tf);
+			set_current_tf(&per_cpu_info[core_id()], hw_tf);
 
 		inc_irq_depth(pcpui);
-		irq_handlers[irq](tf);
+		irq_handlers[irq](hw_tf);
 		dec_irq_depth(pcpui);
 	}
 	else
 	{
-		assert(tf->cause < sizeof(trap_handlers)/sizeof(trap_handlers[0]) &&
-		       trap_handlers[tf->cause]);
-		if (in_kernel(tf)) {
+		assert(hw_tf->cause < sizeof(trap_handlers)/sizeof(trap_handlers[0]) &&
+		       trap_handlers[hw_tf->cause]);
+		if (in_kernel(hw_tf)) {
 			inc_ktrap_depth(pcpui);
-			trap_handlers[tf->cause](tf);
+			trap_handlers[hw_tf->cause](hw_tf);
 			dec_ktrap_depth(pcpui);
 		} else {
-			trap_handlers[tf->cause](tf);
+			trap_handlers[hw_tf->cause](hw_tf);
 		}
 	}
 	
 	/* Return to the current process, which should be runnable.  If we're the
 	 * kernel, we should just return naturally.  Note that current and tf need
 	 * to still be okay (might not be after blocking) */
-	if (in_kernel(tf))
-		env_pop_tf(tf);
+	if (in_kernel(hw_tf))
+		env_pop_tf(hw_tf);	/* TODO: for a kernel tf?  change names? */
 	else
 		proc_restartcore();
 }

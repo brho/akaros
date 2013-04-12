@@ -202,8 +202,7 @@ void idt_init(void)
 	                           handle_kmsg_ipi, NULL);
 }
 
-void
-print_regs(push_regs_t *regs)
+static void print_regs(push_regs_t *regs)
 {
 	cprintf("  edi  0x%08x\n", regs->reg_edi);
 	cprintf("  esi  0x%08x\n", regs->reg_esi);
@@ -215,8 +214,7 @@ print_regs(push_regs_t *regs)
 	cprintf("  eax  0x%08x\n", regs->reg_eax);
 }
 
-void
-print_trapframe(trapframe_t *tf)
+void print_trapframe(struct hw_trapframe *hw_tf)
 {
 	static spinlock_t ptf_lock = SPINLOCK_INITIALIZER_IRQSAVE;
 
@@ -226,57 +224,58 @@ print_trapframe(trapframe_t *tf)
 	 * nuts when we print/panic */
 	pcpui->__lock_depth_disabled++;
 	spin_lock_irqsave(&ptf_lock);
-	printk("TRAP frame at %p on core %d\n", tf, core_id());
-	print_regs(&tf->tf_regs);
-	printk("  gs   0x----%04x\n", tf->tf_gs);
-	printk("  fs   0x----%04x\n", tf->tf_fs);
-	printk("  es   0x----%04x\n", tf->tf_es);
-	printk("  ds   0x----%04x\n", tf->tf_ds);
-	printk("  trap 0x%08x %s\n", tf->tf_trapno, trapname(tf->tf_trapno));
-	printk("  err  0x%08x\n", tf->tf_err);
-	printk("  eip  0x%08x\n", tf->tf_eip);
-	printk("  cs   0x----%04x\n", tf->tf_cs);
-	printk("  flag 0x%08x\n", tf->tf_eflags);
+	printk("TRAP frame at %p on core %d\n", hw_tf, core_id());
+	print_regs(&hw_tf->tf_regs);
+	printk("  gs   0x----%04x\n", hw_tf->tf_gs);
+	printk("  fs   0x----%04x\n", hw_tf->tf_fs);
+	printk("  es   0x----%04x\n", hw_tf->tf_es);
+	printk("  ds   0x----%04x\n", hw_tf->tf_ds);
+	printk("  trap 0x%08x %s\n",  hw_tf->tf_trapno, trapname(hw_tf->tf_trapno));
+	printk("  err  0x%08x\n",     hw_tf->tf_err);
+	printk("  eip  0x%08x\n",     hw_tf->tf_eip);
+	printk("  cs   0x----%04x\n", hw_tf->tf_cs);
+	printk("  flag 0x%08x\n",     hw_tf->tf_eflags);
 	/* Prevents us from thinking these mean something for nested interrupts. */
-	if (tf->tf_cs != GD_KT) {
-		printk("  esp  0x%08x\n", tf->tf_esp);
-		printk("  ss   0x----%04x\n", tf->tf_ss);
+	if (hw_tf->tf_cs != GD_KT) {
+		printk("  esp  0x%08x\n",     hw_tf->tf_esp);
+		printk("  ss   0x----%04x\n", hw_tf->tf_ss);
 	}
 	spin_unlock_irqsave(&ptf_lock);
 	pcpui->__lock_depth_disabled--;
 }
 
-static void fake_rdtscp(struct trapframe *tf)
+static void fake_rdtscp(struct hw_trapframe *hw_tf)
 {
 	uint64_t tsc_time = read_tsc();
-	tf->tf_eip += 3;
-	tf->tf_regs.reg_eax = tsc_time & 0xffffffff;
-	tf->tf_regs.reg_edx = tsc_time >> 32;
-	tf->tf_regs.reg_ecx = core_id();
+	hw_tf->tf_eip += 3;
+	hw_tf->tf_regs.reg_eax = tsc_time & 0xffffffff;
+	hw_tf->tf_regs.reg_edx = tsc_time >> 32;
+	hw_tf->tf_regs.reg_ecx = core_id();
 }
 
 /* Certain traps want IRQs enabled, such as the syscall.  Others can't handle
  * it, like the page fault handler.  Turn them on on a case-by-case basis. */
-static void trap_dispatch(struct trapframe *tf)
+static void trap_dispatch(struct hw_trapframe *hw_tf)
 {
 	struct per_cpu_info *pcpui;
 	// Handle processor exceptions.
-	switch(tf->tf_trapno) {
+	switch(hw_tf->tf_trapno) {
 		case T_NMI:
 			/* Temporarily disable deadlock detection when we print.  We could
 			 * deadlock if we were printing when we NMIed. */
 			pcpui = &per_cpu_info[core_id()];
 			pcpui->__lock_depth_disabled++;
-			print_trapframe(tf);
-			char *fn_name = get_fn_name(tf->tf_eip);
-			printk("Core %d is at %08p (%s)\n", core_id(), tf->tf_eip, fn_name);
+			print_trapframe(hw_tf);
+			char *fn_name = get_fn_name(hw_tf->tf_eip);
+			printk("Core %d is at %08p (%s)\n", core_id(), hw_tf->tf_eip,
+			       fn_name);
 			kfree(fn_name);
 			print_kmsgs(core_id());
 			pcpui->__lock_depth_disabled--;
 			break;
 		case T_BRKPT:
 			enable_irq();
-			monitor(tf);
+			monitor(hw_tf);
 			break;
 		case T_ILLOP:
 			pcpui = &per_cpu_info[core_id()];
@@ -285,40 +284,40 @@ static void trap_dispatch(struct trapframe *tf)
 			 * userspace, we need to make sure we edit the actual TF that will
 			 * get restarted (pcpui), and not the TF on the kstack (which aren't
 			 * the same).  See set_current_tf() for more info. */
-			if (!in_kernel(tf))
-				tf = pcpui->cur_tf;
+			if (!in_kernel(hw_tf))
+				hw_tf = pcpui->cur_tf;
 			printd("bad opcode, eip: %08p, next 3 bytes: %x %x %x\n",
-			       tf->tf_eip, 
-			       *(uint8_t*)(tf->tf_eip + 0), 
-			       *(uint8_t*)(tf->tf_eip + 1), 
-			       *(uint8_t*)(tf->tf_eip + 2)); 
+			       hw_tf->tf_eip, 
+			       *(uint8_t*)(hw_tf->tf_eip + 0), 
+			       *(uint8_t*)(hw_tf->tf_eip + 1), 
+			       *(uint8_t*)(hw_tf->tf_eip + 2)); 
 			/* rdtscp: 0f 01 f9 */
-			if (*(uint8_t*)(tf->tf_eip + 0) == 0x0f, 
-			    *(uint8_t*)(tf->tf_eip + 1) == 0x01, 
-			    *(uint8_t*)(tf->tf_eip + 2) == 0xf9) {
-				fake_rdtscp(tf);
+			if (*(uint8_t*)(hw_tf->tf_eip + 0) == 0x0f, 
+			    *(uint8_t*)(hw_tf->tf_eip + 1) == 0x01, 
+			    *(uint8_t*)(hw_tf->tf_eip + 2) == 0xf9) {
+				fake_rdtscp(hw_tf);
 				pcpui->__lock_depth_disabled--;	/* for print debugging */
 				return;
 			}
 			enable_irq();
-			monitor(tf);
+			monitor(hw_tf);
 			pcpui->__lock_depth_disabled--;		/* for print debugging */
 			break;
 		case T_PGFLT:
-			page_fault_handler(tf);
+			page_fault_handler(hw_tf);
 			break;
 		case T_SYSCALL:
 			enable_irq();
 			// check for userspace, for now
-			assert(tf->tf_cs != GD_KT);
+			assert(hw_tf->tf_cs != GD_KT);
 			/* Set up and run the async calls */
-			prep_syscalls(current, (struct syscall*)tf->tf_regs.reg_eax,
-			              tf->tf_regs.reg_edx);
+			prep_syscalls(current, (struct syscall*)hw_tf->tf_regs.reg_eax,
+			              hw_tf->tf_regs.reg_edx);
 			break;
 		default:
 			// Unexpected trap: The user process or the kernel has a bug.
-			print_trapframe(tf);
-			if (tf->tf_cs == GD_KT)
+			print_trapframe(hw_tf);
+			if (hw_tf->tf_cs == GD_KT)
 				panic("Damn Damn!  Unhandled trap in the kernel!");
 			else {
 				warn("Unexpected trap from userspace");
@@ -368,38 +367,38 @@ static void set_current_tf(struct per_cpu_info *pcpui, struct trapframe *tf)
  * get the interrupt to trip on the hlt, o/w the hlt will execute before the
  * interrupt arrives (even with a pending interrupt that should hit right after
  * an interrupt_enable (sti)).  This was on the i7. */
-static void abort_halt(struct trapframe *tf)
+static void abort_halt(struct hw_trapframe *hw_tf)
 {
 	/* Don't care about user TFs.  Incidentally, dereferencing user EIPs is
 	 * reading userspace memory, which can be dangerous.  It can page fault,
 	 * like immediately after a fork (which doesn't populate the pages). */
-	if (!in_kernel(tf))
+	if (!in_kernel(hw_tf))
 		return;
 	/* the halt instruction in 32 bit is 0xf4, and it's size is 1 byte */
-	if (*(uint8_t*)tf->tf_eip == 0xf4)
-		tf->tf_eip += 1;
+	if (*(uint8_t*)hw_tf->tf_eip == 0xf4)
+		hw_tf->tf_eip += 1;
 }
 
-void trap(struct trapframe *tf)
+void trap(struct hw_trapframe *hw_tf)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	/* Copy out the TF for now */
-	if (!in_kernel(tf))
-		set_current_tf(pcpui, tf);
+	if (!in_kernel(hw_tf))
+		set_current_tf(pcpui, hw_tf);
 	else
 		inc_ktrap_depth(pcpui);
 
-	printd("Incoming TRAP %d on core %d, TF at %p\n", tf->tf_trapno, core_id(),
-	       tf);
-	if ((tf->tf_cs & ~3) != GD_UT && (tf->tf_cs & ~3) != GD_KT) {
-		print_trapframe(tf);
+	printd("Incoming TRAP %d on core %d, TF at %p\n", hw_tf->tf_trapno,
+	       core_id(), hw_tf);
+	if ((hw_tf->tf_cs & ~3) != GD_UT && (hw_tf->tf_cs & ~3) != GD_KT) {
+		print_trapframe(hw_tf);
 		panic("Trapframe with invalid CS!");
 	}
-	trap_dispatch(tf);
+	trap_dispatch(hw_tf);
 	/* Return to the current process, which should be runnable.  If we're the
 	 * kernel, we should just return naturally.  Note that current and tf need
 	 * to still be okay (might not be after blocking) */
-	if (in_kernel(tf)) {
+	if (in_kernel(hw_tf)) {
 		dec_ktrap_depth(pcpui);
 		return;
 	}
@@ -484,41 +483,44 @@ static void send_eoi(uint32_t trap_nr)
  *
  * Note that from hardware's perspective (PIC, etc), IRQs start from 0, but they
  * are all mapped up at PIC1_OFFSET for the cpu / irq_handler. */
-void irq_handler(struct trapframe *tf)
+void irq_handler(struct hw_trapframe *hw_tf)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	/* Copy out the TF for now */
-	if (!in_kernel(tf))
-		set_current_tf(pcpui, tf);
+	if (!in_kernel(hw_tf))
+		set_current_tf(pcpui, hw_tf);
 	inc_irq_depth(pcpui);
 	/* Coupled with cpu_halt() and smp_idle() */
-	abort_halt(tf);
+	abort_halt(hw_tf);
 	//if (core_id())
-		printd("Incoming IRQ, ISR: %d on core %d\n", tf->tf_trapno, core_id());
-	if (check_spurious_irq(tf->tf_trapno))
+		printd("Incoming IRQ, ISR: %d on core %d\n", hw_tf->tf_trapno,
+		       core_id());
+	if (check_spurious_irq(hw_tf->tf_trapno))
 		goto out_no_eoi;
 	/* Send the EOI.  This means the PIC/LAPIC can send us the same IRQ vector,
 	 * and we'll handle it as soon as we reenable IRQs.  This does *not* mean
 	 * the hardware device that triggered the IRQ had its IRQ reset.  This does
 	 * mean we shouldn't enable irqs in a handler that isn't reentrant. */
-	assert(tf->tf_trapno >= 32);
-	send_eoi(tf->tf_trapno);
+	assert(hw_tf->tf_trapno >= 32);
+	send_eoi(hw_tf->tf_trapno);
 
 	extern handler_wrapper_t (RO handler_wrappers)[NUM_HANDLER_WRAPPERS];
 	// determine the interrupt handler table to use.  for now, pick the global
 	handler_t TP(TV(t)) LCKD(&iht_lock) * handler_tbl = interrupt_handlers;
-	if (handler_tbl[tf->tf_trapno].isr != 0)
-		handler_tbl[tf->tf_trapno].isr(tf, handler_tbl[tf->tf_trapno].data);
+	if (handler_tbl[hw_tf->tf_trapno].isr != 0)
+		handler_tbl[hw_tf->tf_trapno].isr(hw_tf,
+		                                  handler_tbl[hw_tf->tf_trapno].data);
 	// if we're a general purpose IPI function call, down the cpu_list
-	if ((I_SMP_CALL0 <= tf->tf_trapno) && (tf->tf_trapno <= I_SMP_CALL_LAST))
-		down_checklist(handler_wrappers[tf->tf_trapno & 0x0f].cpu_list);
+	if ((I_SMP_CALL0 <= hw_tf->tf_trapno) &&
+	    (hw_tf->tf_trapno <= I_SMP_CALL_LAST))
+		down_checklist(handler_wrappers[hw_tf->tf_trapno & 0x0f].cpu_list);
 	/* Fall-through */
 out_no_eoi:
 	dec_irq_depth(pcpui);
 	/* Return to the current process, which should be runnable.  If we're the
 	 * kernel, we should just return naturally.  Note that current and tf need
 	 * to still be okay (might not be after blocking) */
-	if (in_kernel(tf))
+	if (in_kernel(hw_tf))
 		return;
 	proc_restartcore();
 	assert(0);
@@ -532,15 +534,15 @@ register_interrupt_handler(handler_t TP(TV(t)) table[],
 	table[int_num].data = data;
 }
 
-void page_fault_handler(struct trapframe *tf)
+void page_fault_handler(struct hw_trapframe *hw_tf)
 {
 	uint32_t fault_va = rcr2();
-	int prot = tf->tf_err & PF_ERROR_WRITE ? PROT_WRITE : PROT_READ;
+	int prot = hw_tf->tf_err & PF_ERROR_WRITE ? PROT_WRITE : PROT_READ;
 	int err;
 
 	/* TODO - handle kernel page faults */
-	if ((tf->tf_cs & 3) == 0) {
-		print_trapframe(tf);
+	if ((hw_tf->tf_cs & 3) == 0) {
+		print_trapframe(hw_tf);
 		panic("Page Fault in the Kernel at 0x%08x!", fault_va);
 		/* if we want to do something like kill a process or other code, be
 		 * aware we are in a sort of irq-like context, meaning the main kernel
@@ -552,8 +554,8 @@ void page_fault_handler(struct trapframe *tf)
 		/* Destroy the faulting process */
 		printk("[%08x] user %s fault va %08x ip %08x on core %d with err %d\n",
 		       current->pid, prot & PROT_READ ? "READ" : "WRITE", fault_va,
-		       tf->tf_eip, core_id(), err);
-		print_trapframe(tf);
+		       hw_tf->tf_eip, core_id(), err);
+		print_trapframe(hw_tf);
 		proc_destroy(current);
 	}
 }
@@ -566,19 +568,20 @@ void sysenter_init(void)
 }
 
 /* This is called from sysenter's asm, with the tf on the kernel stack. */
-void sysenter_callwrapper(struct trapframe *tf)
+/* TODO: use a sw_tf for sysenter */
+void sysenter_callwrapper(struct hw_trapframe *hw_tf)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	assert(!in_kernel(tf));
-	set_current_tf(pcpui, tf);
-	/* Once we've set_current_tf, we can enable interrupts.  This used to be
-	 * mandatory (we had immediate KMSGs that would muck with cur_tf).  Now it
+	assert(!in_kernel(hw_tf));
+	set_current_tf(pcpui, hw_tf);
+	/* Once we've set_current_ctx, we can enable interrupts.  This used to be
+	 * mandatory (we had immediate KMSGs that would muck with cur_ctx).  Now it
 	 * should only help for sanity/debugging. */
 	enable_irq();
 
 	/* Set up and run the async calls */
-	prep_syscalls(current, (struct syscall*)tf->tf_regs.reg_eax,
-	              tf->tf_regs.reg_esi);
+	prep_syscalls(current, (struct syscall*)hw_tf->tf_regs.reg_eax,
+	              hw_tf->tf_regs.reg_esi);
 	/* If you use pcpui again, reread it, since you might have migrated */
 	proc_restartcore();
 }

@@ -65,7 +65,7 @@ uint32_t send_kernel_message(uint32_t dst, amr_t pc, long arg0, long arg1,
  *
  * Note that all of this happens from interrupt context, and interrupts are
  * disabled. */
-void handle_kmsg_ipi(struct trapframe *tf, void *data)
+void handle_kmsg_ipi(struct hw_trapframe *hw_tf, void *data)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	struct kernel_message *kmsg_i, *temp;

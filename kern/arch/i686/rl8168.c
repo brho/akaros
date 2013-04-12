@@ -325,7 +325,8 @@ void rl8168_setup_interrupts() {
 
 // We need to evaluate this routine in terms of concurrency.
 // We also need to figure out whats up with different core interrupts
-void rl8168_interrupt_handler(trapframe_t *tf, void* data) {
+void rl8168_interrupt_handler(struct hw_trapframe *hw_tf, void *data)
+{
 
 	rl8168_interrupt_debug("\nNic interrupt on core %u!\n", lapic_get_id());
 				

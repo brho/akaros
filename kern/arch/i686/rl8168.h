@@ -116,7 +116,7 @@
 
 void rl8168_init(void);
 void rl8168_reset(void);
-void rl8168_interrupt_handler(trapframe_t *tf, void* data);
+void rl8168_interrupt_handler(struct hw_trapframe *hw_tf, void *data);
 int rl8168_scan_pci(void);
 void rl8168_read_mac(void);
 void rl8168_setup_interrupts(void);

@@ -44,7 +44,7 @@ void train_timing()
 /* Convenience wrapper called when a core's timer interrupt goes off.  Not to be
  * confused with global timers (like the PIC).  Do not put your code here.  If
  * you want something to happen in the future, set an alarm. */
-void timer_interrupt(struct trapframe *tf, void *data)
+void timer_interrupt(struct hw_trapframe *hw_tf, void *data)
 {
 	struct timer_chain *pcpui_tchain = &per_cpu_info[core_id()].tchain;
 	trigger_tchain(pcpui_tchain);

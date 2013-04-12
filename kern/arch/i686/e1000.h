@@ -111,7 +111,7 @@ static void e1000_wr32(uint32_t offset, uint32_t val);
 
 void e1000_init(void);
 void e1000_reset(void);
-void e1000_interrupt_handler(trapframe_t* tf, void* data);
+void e1000_interrupt_handler(struct hw_trapframe *hw_tf, void *data);
 int  e1000_scan_pci(void);
 void e1000_setup_interrupts(void);
 void e1000_setup_descriptors(void);

@@ -19,9 +19,9 @@
 /* Kernel message interrupt vector.  ignored, for the most part */
 #define I_KERNEL_MSG 255
 
-static inline bool in_kernel(struct trapframe *tf)
+static inline bool in_kernel(struct hw_trapframe *hw_tf)
 {
-	return tf->sr & SR_PS;
+	return hw_tf->sr & SR_PS;
 }
 
 static inline void __attribute__((always_inline))
@@ -35,12 +35,12 @@ set_stack_pointer(uintptr_t sp)
  * Implemented with extern function to cause compiler to clobber most regs. */
 static inline void save_kernel_ctx(struct kernel_ctx *ctx)
 {
-  extern void save_kernel_tf_asm(struct trapframe*);
+  extern void save_kernel_tf_asm(struct hw_trapframe*);
 	save_kernel_tf_asm(&ctx->hw_tf);
 }
 
-void handle_trap(struct trapframe *tf);
-int emulate_fpu(struct trapframe *tf);
+void handle_trap(struct hw_trapframe *hw_tf);
+int emulate_fpu(struct hw_trapframe *hw_tf);
 
 #endif
 

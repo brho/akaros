@@ -24,21 +24,21 @@ uintptr_t core_stacktops[MAX_NUM_CPUS];
 
 /* the struct trapframe and friends are in ros/arch/trapframe.h */
 
-void data_access_exception(trapframe_t* state);
-void real_fp_exception(trapframe_t* state, ancillary_state_t* astate);
-void address_unaligned(trapframe_t* state);
-void illegal_instruction(trapframe_t* state);
+void data_access_exception(struct hw_trapframe *state);
+void real_fp_exception(struct hw_trapframe *state, ancillary_state_t *astate);
+void address_unaligned(struct hw_trapframe *state);
+void illegal_instruction(struct hw_trapframe *state);
 
 void save_fp_state(ancillary_state_t* silly);
 void restore_fp_state(ancillary_state_t* silly);
-void emulate_fpu(trapframe_t* state, ancillary_state_t* astate);
+void emulate_fpu(struct hw_trapframe *state, ancillary_state_t *astate);
 
-static inline bool in_kernel(struct trapframe *tf)
+static inline bool in_kernel(struct hw_trapframe *hw_tf)
 {
-	return tf->psr & PSR_PS;
+	return hw_tf->psr & PSR_PS;
 }
 
-/* Needs to leave room for a trapframe at the top of the stack. */
+/* Needs to leave room for a hw_trapframe at the top of the stack. */
 static inline void __attribute__((always_inline))
 set_stack_pointer(uintptr_t sp)
 {

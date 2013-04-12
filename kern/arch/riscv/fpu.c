@@ -15,7 +15,8 @@ static void ss(uint64_t* addr, uint32_t val)
 	asm ("mxtf.s f0, %0; fsd f0, %1" : : "r"(val), "m"(*addr));
 }
 
-static int emulate_fpu_silly(struct trapframe* state, ancillary_state_t* silly)
+static int emulate_fpu_silly(struct hw_trapframe *state,
+                             ancillary_state_t *silly)
 {
 	int insn;
 	if (memcpy_from_user(current, &insn, (void*)state->epc, 4))
@@ -113,7 +114,7 @@ static int emulate_fpu_silly(struct trapframe* state, ancillary_state_t* silly)
 }
 
 /* For now we can only emulate missing compute insns, not the whole FPU */
-int emulate_fpu(struct trapframe* state)
+int emulate_fpu(struct hw_trapframe *state)
 {
 	if (!(state->sr & SR_EF))
 	{

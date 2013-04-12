@@ -660,7 +660,8 @@ void e1000_setup_interrupts() {
 }
 
 // Code that is executed when an interrupt comes in on IRQ e1000_irq
-void e1000_interrupt_handler(trapframe_t *tf, void* data) {
+void e1000_interrupt_handler(struct hw_trapframe *hw_tf, void *data)
+{
 	e1000_interrupt_debug("\nNic interrupt on core %u!\n", lapic_get_id());
 
 	// Read the offending interrupt(s)

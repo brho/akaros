@@ -38,7 +38,7 @@ typedef struct command {
 	const char *NTS name;
 	const char *NTS desc;
 	// return -1 to force monitor to exit
-	int (*func)(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf);
+	int (*func)(int argc, char **argv, struct hw_trapframe *hw_tf);
 } command_t;
 
 static command_t (RO commands)[] = {
@@ -69,7 +69,7 @@ static command_t (RO commands)[] = {
 
 /***** Implementations of basic kernel monitor commands *****/
 
-int mon_help(int argc, char **argv, trapframe_t *tf)
+int mon_help(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
 	int i;
 
@@ -78,13 +78,13 @@ int mon_help(int argc, char **argv, trapframe_t *tf)
 	return 0;
 }
 
-int mon_ps(int argc, char** argv, trapframe_t *tf)
+int mon_ps(int argc, char** argv, struct hw_trapframe *hw_tf)
 {
 	print_allpids();
 	return 0;
 }
 
-int mon_kerninfo(int argc, char **argv, trapframe_t *tf)
+int mon_kerninfo(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
 	extern char (RO SNT _start)[], (RO SNT etext)[], (RO SNT edata)[], (RO SNT end)[];
 
@@ -125,13 +125,13 @@ static char RO* function_of(uint32_t address)
 }
 #endif
 
-int mon_backtrace(int argc, char **argv, trapframe_t *tf)
+int mon_backtrace(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
 	backtrace();
 	return 0;
 }
 
-int mon_reboot(int argc, char **argv, trapframe_t *tf)
+int mon_reboot(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
 	cprintf("[Scottish Accent]: She's goin' down, Cap'n!\n");
 	reboot();
@@ -141,7 +141,7 @@ int mon_reboot(int argc, char **argv, trapframe_t *tf)
 	return 0;
 }
 
-int mon_showmapping(int argc, char **argv, trapframe_t *tf)
+int mon_showmapping(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
 	if (argc < 2) {
 		cprintf("Shows virtual -> physical mappings for a virtual address range.\n");
@@ -164,7 +164,7 @@ int mon_showmapping(int argc, char **argv, trapframe_t *tf)
 	return 0;
 }
 
-int mon_setmapperm(int argc, char **argv, trapframe_t *tf)
+int mon_setmapperm(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
 #ifndef __i386__
 	cprintf("I don't support this call yet!\n");
@@ -204,7 +204,7 @@ int mon_setmapperm(int argc, char **argv, trapframe_t *tf)
 #endif
 }
 
-int mon_cpuinfo(int argc, char **argv, trapframe_t *tf)
+int mon_cpuinfo(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
 	cprintf("Number of CPUs detected: %d\n", num_cpus);
 	cprintf("Calling CPU's ID: 0x%08x\n", core_id());
@@ -217,14 +217,14 @@ int mon_cpuinfo(int argc, char **argv, trapframe_t *tf)
 	return 0;
 }
 
-int mon_manager(int argc, char** argv, trapframe_t *tf)
+int mon_manager(int argc, char** argv, struct hw_trapframe *hw_tf)
 {
 	manager();
 	panic("should never get here");
 	return 0;
 }
 
-int mon_nanwan(int argc, char **argv, trapframe_t *tf)
+int mon_nanwan(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
 	/* Borrowed with love from http://www.geocities.com/SoHo/7373/zoo.htm
 	 * (http://www.ascii-art.com/).  Slightly modified to make it 25 lines tall.
@@ -256,7 +256,7 @@ int mon_nanwan(int argc, char **argv, trapframe_t *tf)
 	return 0;
 }
 
-int mon_bin_ls(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
+int mon_bin_ls(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
 	struct dirent dir = {0};
 	struct file *bin_dir;
@@ -276,7 +276,7 @@ int mon_bin_ls(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 	return 0;
 }
 
-int mon_bin_run(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
+int mon_bin_run(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
 	if (argc < 2) {
 		printk("Usage: bin_run FILENAME\n");
@@ -311,7 +311,7 @@ int mon_bin_run(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 	return 0;
 }
 
-int mon_procinfo(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
+int mon_procinfo(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
 	int8_t irq_state = 0;
 	if (argc < 2) {
@@ -371,12 +371,12 @@ int mon_procinfo(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 	return 0;
 }
 
-int mon_exit(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
+int mon_exit(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
 	return -1;
 }
 
-int mon_kfunc(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
+int mon_kfunc(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
 	#ifndef __i386__
 	printk("Only supported on x86 for now.  =(\n");
@@ -442,7 +442,7 @@ int mon_kfunc(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 }
 
 /* Sending a vcoreid forces an event and an IPI/notification */
-int mon_notify(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
+int mon_notify(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
 	struct proc *p;
 	uint32_t vcoreid;
@@ -473,7 +473,7 @@ int mon_notify(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 
 /* Micro-benchmarky Measurements.  This is really fragile code that probably
  * won't work perfectly, esp as the kernel evolves. */
-int mon_measure(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
+int mon_measure(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
 	uint64_t begin = 0, diff = 0;
 	uint32_t end_refcnt = 0;
@@ -642,7 +642,7 @@ int mon_measure(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 	return 0;
 }
 
-int mon_trace(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
+int mon_trace(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
 	uint32_t core;
 	if (argc < 2) {
@@ -706,7 +706,7 @@ int mon_trace(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 	return 0;
 }
 
-int mon_monitor(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
+int mon_monitor(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
 	if (argc < 2) {
 		printk("Usage: monitor COREID\n");
@@ -726,7 +726,7 @@ int mon_monitor(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 #define WHITESPACE "\t\r\n "
 #define MAXARGS 16
 
-static int runcmd(char *NTS real_buf, trapframe_t *tf) {
+static int runcmd(char *NTS real_buf, struct hw_trapframe *hw_tf) {
 	char * buf = NTEXPAND(real_buf);
 	int argc;
 	char *NTS argv[MAXARGS];
@@ -759,13 +759,13 @@ static int runcmd(char *NTS real_buf, trapframe_t *tf) {
 		return 0;
 	for (i = 0; i < NCOMMANDS; i++) {
 		if (strcmp(argv[0], commands[i].name) == 0)
-			return commands[i].func(argc, argv, tf);
+			return commands[i].func(argc, argv, hw_tf);
 	}
 	cprintf("Unknown command '%s'\n", argv[0]);
 	return 0;
 }
 
-void monitor(struct trapframe *tf)
+void monitor(struct hw_trapframe *hw_tf)
 {
 	#define MON_CMD_LENGTH 256
 	char buf[MON_CMD_LENGTH];
@@ -778,20 +778,20 @@ void monitor(struct trapframe *tf)
 		printk("Entering Nanwan's Dungeon on Core %d (Ints off):\n", core_id());
 	printk("Type 'help' for a list of commands.\n");
 
-	if (tf != NULL)
-		print_trapframe(tf);
+	if (hw_tf != NULL)
+		print_trapframe(hw_tf);
 
 	while (1) {
 		cnt = readline(buf, MON_CMD_LENGTH, "ROS(Core %d)> ", core_id());
 		if (cnt > 0) {
 			buf[cnt] = 0;
-			if (runcmd(buf, tf) < 0)
+			if (runcmd(buf, hw_tf) < 0)
 				break;
 		}
 	}
 }
 
-int mon_fs(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
+int mon_fs(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
 	/* this assumes one mounted FS at the NS root */
 	struct super_block *sb;
@@ -885,13 +885,13 @@ int mon_fs(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
 	return 0;
 }
 
-int mon_bb(int argc, char *NTS *NT COUNT(argc) argv, trapframe_t *tf)
+int mon_bb(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
 	char *l_argv[3] = {"", "busybox", "ash"};
-	return mon_bin_run(3, l_argv, tf);
+	return mon_bin_run(3, l_argv, hw_tf);
 }
 
-int mon_alarm(int argc, char **argv, struct trapframe *tf)
+int mon_alarm(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
 	if (argc < 2) {
 		printk("Usage: alarm OPTION\n");

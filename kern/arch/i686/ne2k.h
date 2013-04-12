@@ -20,7 +20,7 @@ void ne2k_init();
 int ne2k_scan_pci();
 void ne2k_configure_nic();
 void ne2k_setup_interrupts();
-void ne2k_interrupt_handler(trapframe_t *tf, void* data);
+void ne2k_interrupt_handler(struct hw_trapframe *hw_tf, void *data);
 void ne2k_mem_alloc();
 void ne2k_read_mac();
 void ne2k_test_interrupts();

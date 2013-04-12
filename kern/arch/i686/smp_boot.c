@@ -59,11 +59,7 @@ static void init_smp_call_function(void)
 
 /******************************************************************************/
 
-#ifdef __IVY__
-static void smp_final_core_init(trapframe_t *tf, barrier_t *data)
-#else
-static void smp_final_core_init(trapframe_t *tf, void *data)
-#endif
+static void smp_final_core_init(struct hw_trapframe *hw_tf, void *data)
 {
 	setup_default_mtrrs(data);
 	smp_percpu_init();
