@@ -361,7 +361,7 @@ static bool __schedule_scp(void)
 	/* if there are any runnables, run them here and put any currently running
 	 * SCP on the tail of the runnable queue. */
 	if ((p = TAILQ_FIRST(&runnable_scps))) {
-		/* protect owning proc, cur_tf, etc.  note this nests with the
+		/* protect owning proc, cur_ctx, etc.  note this nests with the
 		 * calls in proc_yield_s */
 		disable_irqsave(&state);
 		/* someone is currently running, dequeue them */
@@ -371,7 +371,7 @@ static bool __schedule_scp(void)
 			/* locking just to be safe */
 			spin_lock(&p->proc_lock);
 			__proc_set_state(pcpui->owning_proc, PROC_RUNNABLE_S);
-			__proc_save_context_s(pcpui->owning_proc, pcpui->cur_tf);
+			__proc_save_context_s(pcpui->owning_proc, pcpui->cur_ctx);
 			spin_unlock(&p->proc_lock);
 			/* round-robin the SCPs (inserts at the end of the queue) */
 			switch_lists(pcpui->owning_proc, &unrunnable_scps, &runnable_scps);

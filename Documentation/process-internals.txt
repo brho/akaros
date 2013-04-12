@@ -11,7 +11,7 @@ Contents:
 2. When Do We Really Leave "Process Context"?
 3. Leaving the Kernel Stack
 4. Preemption and Notification Issues
-5. current_tf and owning_proc
+5. current_ctx and owning_proc
 6. Locking!
 7. TLB Coherency
 8. Process Management
@@ -116,7 +116,7 @@ Refcnting and especially decreffing gets tricky when there are functions that
 MAY not return.  proc_restartcore() does not return (it pops into userspace).
 proc_run() used to not return, if the core it was called on would pop into
 userspace (if it was a _S, or if the core is part of the vcoremap for a _M).
-This doesn't happen anymore, since we have cur_tf in the per-cpu info.
+This doesn't happen anymore, since we have cur_ctx in the per-cpu info.
 
 Functions that MAY not return will "eat" your reference *IF* they do not return.
 This means that you must have a reference when you call them (like always), and
@@ -265,7 +265,7 @@ it to proc B.
 If no process is running there, current == 0 and boot_cr3 is loaded, meaning no
 process's context is loaded.
 
-All changes to cur_proc, owning_proc, and cur_tf need to be done with
+All changes to cur_proc, owning_proc, and cur_ctx need to be done with
 interrupts disabled, since they change in interrupt handlers.
 
 2.2 Here's how it is done now:
@@ -709,51 +709,55 @@ actually non-trivial to know the state of a vcore (need to check a combination
 of preempt_served and is_mapped), and even if you do that, there are some
 complications with doing this in the ksched.
 
-5. current_tf and owning_proc
+5. current_ctx and owning_proc
 ===========================
-Originally, current_tf is a per-core macro that returns a struct trapframe *
+Originally, current_tf was a per-core macro that returns a struct trapframe *
 that points back on the kernel stack to the user context that was running on
 the given core when an interrupt or trap happened.  Saving the reference to
 the TF helps simplify code that needs to do something with the TF (like save
 it and pop another TF).  This way, we don't need to pass the context all over
 the place, especially through code that might not care.
 
-Now, current_tf is more broadly defined as the user context that should be run
-when the kernel is ready to run a process.  In the older case, it was when the
-kernel tries to return to userspace from a trap/interrupt.  Now, current_tf
-can be set by an IPI/KMSG (like '__startcore') so that when the kernel wants
-to idle, it will find a cur_tf that it needs to run, even though we never
+Then, current_tf was more broadly defined as the user context that should be
+run when the kernel is ready to run a process.  In the older case, it was when
+the kernel tries to return to userspace from a trap/interrupt.  current_tf
+could be set by an IPI/KMSG (like '__startcore') so that when the kernel wants
+to idle, it will find a current_tf that it needs to run, even though we never
 trapped in on that context in the first place.
 
-Further, we now have 'owning_proc', which tells the kernel which process
-should be run.  'owning_proc' is a bigger deal than 'current_tf', and it is
-what tells us to run cur_tf.
+Finally, current_tf was changed to current_ctx, and instead of tracking a
+struct trapframe (equivalent to a hw_trapframe), it now tracked a struct
+user_context, which could be either a HW or a SW trapframe.
 
-Process management KMSGs now simply modify 'owning_proc' and cur_tf, as if we
+Further, we now have 'owning_proc', which tells the kernel which process
+should be run.  'owning_proc' is a bigger deal than 'current_ctx', and it is
+what tells us to run cur_ctx.
+
+Process management KMSGs now simply modify 'owning_proc' and cur_ctx, as if we
 had interrupted a process.  Instead of '__startcore' forcing the kernel to
 actually run the process and trapframe, it will just mean we will eventually
 run it.  In the meantime a '__notify' or a '__preempt' can come in, and they
-will apply to the owning_proc/cur_tf.  This greatly simplifies process code
+will apply to the owning_proc/cur_ctx.  This greatly simplifies process code
 and code calling process code (like the scheduler), since we no longer need to
 worry about whether or not we are getting a "stack killing" kernel message.
 Before this, code needed to care where it was running when managing _Ms.
 
-Note that neither 'current_tf' nor 'owning_proc' rely on 'current'/'cur_proc'.
+Note that neither 'current_ctx' nor 'owning_proc' rely on 'current'/'cur_proc'.
 'current' is just what process context we're in, not what process (and which
 trapframe) we will eventually run.
 
-cur_tf does not point to kernel trapframes, which is important when we receive an
-interrupt in the kernel.  At one point, we were (hypothetically) clobbering the
-reference to the user trapframe, and were unable to recover.  We can get away
-with this because the kernel always returns to its previous context from a
-nested handler (via iret on x86).  
+cur_ctx does not point to kernel trapframes, which is important when we
+receive an interrupt in the kernel.  At one point, we were (hypothetically)
+clobbering the reference to the user trapframe, and were unable to recover.
+We can get away with this because the kernel always returns to its previous
+context from a nested handler (via iret on x86).  
 
-In the future, we may need to save kernel contexts and may not always return via
-iret.  At which point, if the code path is deep enough that we don't want to
-carry the TF pointer, we may revisit this.  Until then, current_tf is just for
-userspace contexts, and is simply stored in per_cpu_info.
+In the future, we may need to save kernel contexts and may not always return
+via iret.  At which point, if the code path is deep enough that we don't want
+to carry the TF pointer, we may revisit this.  Until then, current_ctx is just
+for userspace contexts, and is simply stored in per_cpu_info.
 
-Brief note from the future (months after this paragraph was written): cur_tf
+Brief note from the future (months after this paragraph was written): cur_ctx
 has two aspects/jobs:
 1) tell the kernel what we should do (trap, fault, sysc, etc), how we came
 into the kernel (the fact that it is a user tf), which is why we copy-out
@@ -765,12 +769,12 @@ removed when preempted, changed during a notify, created during a startcore,
 etc.  Don't forget it was also an instruction of sorts.  The former case is
 always true throughout the life of the syscall.  The latter only happens to be
 true throughout the life of a *non-blocking* trap since preempts are routine
-KMSGs.  But if we block in a syscall, the cur_tf is no longer the TF we came
-in on (and possibly the one we are asked to operate on), and that old cur_tf
+KMSGs.  But if we block in a syscall, the cur_ctx is no longer the TF we came
+in on (and possibly the one we are asked to operate on), and that old cur_ctx
 has probably restarted.
 
-(Note that cur_tf is a pointer, and syscalls/traps actually operate on the TF
-they came in on regardless of what happens to cur_tf or pcpui->actual_tf.)
+(Note that cur_ctx is a pointer, and syscalls/traps actually operate on the TF
+they came in on regardless of what happens to cur_ctx or pcpui->actual_tf.)
 
 6. Locking!
 ===========================
@@ -1120,7 +1124,7 @@ waiting on us to handle the preempt (same circular waiting issue as above).
 This was fine, albeit subpar, until a new issue showed up.  Sending IMMED
 KMSGs worked fine if we were coming from userspace already, but if we were in
 the kernel, those messages would run immediately (hence the name), just like
-an IRQ handler, and could confuse syscalls that touched cur_tf/pcpui.  If a
+an IRQ handler, and could confuse syscalls that touched cur_ctx/pcpui.  If a
 preempt came in during a syscall, the process/vcore could be changed before
 the syscall took place.  Some syscalls could handle this, albeit poorly.
 sys_proc_yield() and sys_change_vcore() delicately tried to detect if they
@@ -1140,11 +1144,11 @@ unmapped vcoreid).  There are a bunch of other scenarios that trigger similar
 disasters, and they are very hard to avoid.
 
 One way out of this was a per-core history counter, that changed whenever we
-changed cur_tf.  Then when we trapped in for a syscall, we could save the
+changed cur_ctx.  Then when we trapped in for a syscall, we could save the
 value, enable_irqs(), and go about our business.  Later on, we'd have to
 disable_irqs() and compare the counters.  If they were different, we'd have to
 bail out some how.  This could have worked for change_to and yield, and some
-others.  But any syscall that wanted to operate on cur_tf in some way would
+others.  But any syscall that wanted to operate on cur_ctx in some way would
 fail (imagine a hypothetical sys_change_stack_pointer()).  The context that
 trapped has already returned on another core.  I guess we could just fail that
 syscall, though it seems a little silly to not be able to do that.
@@ -1163,7 +1167,7 @@ interrupts / kthread during a page fault (imaging hitting disk).  Yikes.
 So I looked into going back to ROUTINE kernel messages.  With ROUTINE
 messages, I didn't have to worry about having the carpet pulled out from under
 syscalls and exceptions (traps, faults, etc).  The 'carpet' is stuff like
-cur_tf, owning_proc, owning_vcoreid, etc.  We still cannot trust the vcoremap,
+cur_ctx, owning_proc, owning_vcoreid, etc.  We still cannot trust the vcoremap,
 unless we *know* there were no preempts or other KMSGs waiting for us.
 (Incidentally, in the recent fix a93aa7559, we merely use the vcoremap as a
 sanity check).
@@ -1244,7 +1248,7 @@ just being a bool.
 
 Regardless of whether or not we were preempted, we still can look at
 pcpui->owning_proc and owning_vcoreid to figure out what the vcoreid of the
-trap/syscall is, and we know that the cur_tf is still the correct cur_tf (no
+trap/syscall is, and we know that the cur_ctx is still the correct cur_ctx (no
 carpet pulled out), since while there could be a preempt ROUTINE message
 waiting for us, we simply haven't run it yet.  So calls like yield should
 still fail (since your core has been unmapped and you need to bail out and run
@@ -1378,11 +1382,11 @@ Here's some good ideas for the ordering of locks/irqs/messages:
 If for some reason a syscall or fault handler blocks *unexpectedly*, we could
 have issues.  Imagine if change_to happens to block in some early syscall code
 (like instrumentation, or who knows what, that blocks in memory allocation).
-When the syscall kthread restarts, its old cur_tf is gone.  It may or may not
+When the syscall kthread restarts, its old cur_ctx is gone.  It may or may not
 be running on a core owned by the original process.  If it was, we probably
 would accidentally yield that vcore (clearly a bug).  
 
-For now, any of these calls that care about cur_tf/pcpui need to not block
+For now, any of these calls that care about cur_ctx/pcpui need to not block
 without some sort of protection.  None of them do, but in the future we might
 do something that causes them to block.  We could deal with it by having a
 pcpu or per-kthread/syscall flag that says if it ever blocked, and possibly
@@ -1390,7 +1394,7 @@ abort.  We get into similar nasty areas as with preempts, but this time, we
 can't solve it by making preempt a routine KMSG - we block as part of that
 syscall/handler code.  Odds are, we'll just have to outlaw this, now and
 forever.  Just note that if a syscall/handler blocks, the TF it came in on is
-probably not cur_tf any longer, and that old cur_tf has probably restarted.
+probably not cur_ctx any longer, and that old cur_ctx has probably restarted.
 
 10. TBD
 ===========================

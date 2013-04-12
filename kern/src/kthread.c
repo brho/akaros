@@ -102,7 +102,7 @@ static void __launch_kthread(uint32_t srcid, long a0, long a1, long a2)
 			spin_lock(&pcpui->owning_proc->proc_lock);
 			/* Wrap up / yield the _S proc */
 			__proc_set_state(pcpui->owning_proc, PROC_WAITING);
-			__proc_save_context_s(pcpui->owning_proc, current_tf);
+			__proc_save_context_s(pcpui->owning_proc, current_ctx);
 			spin_unlock(&pcpui->owning_proc->proc_lock);
 			proc_wakeup(p);
 			abandon_core();

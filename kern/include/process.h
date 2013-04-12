@@ -75,7 +75,7 @@ void proc_destroy(struct proc *p);
 void proc_signal_parent(struct proc *child);
 int __proc_disown_child(struct proc *parent, struct proc *child);
 int proc_change_to_m(struct proc *p);
-void __proc_save_context_s(struct proc *p, struct trapframe *tf);
+void __proc_save_context_s(struct proc *p, struct user_context *ctx);
 void proc_yield(struct proc *SAFE p, bool being_nice);
 void proc_notify(struct proc *p, uint32_t vcoreid);
 void proc_wakeup(struct proc *p);
@@ -129,7 +129,7 @@ void proc_tlbshootdown(struct proc *p, uintptr_t start, uintptr_t end);
 
 /* Kernel message handlers for process management */
 void __startcore(uint32_t srcid, long a0, long a1, long a2);
-void __set_curtf(uint32_t srcid, long a0, long a1, long a2);
+void __set_curctx(uint32_t srcid, long a0, long a1, long a2);
 void __notify(uint32_t srcid, long a0, long a1, long a2);
 void __preempt(uint32_t srcid, long a0, long a1, long a2);
 void __death(uint32_t srcid, long a0, long a1, long a2);

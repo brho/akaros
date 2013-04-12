@@ -27,10 +27,10 @@ struct per_cpu_info {
 	/* Process management */
 	// cur_proc should be valid on all cores that are not management cores.
 	struct proc *cur_proc;		/* which process context is loaded */
-	struct proc *owning_proc;	/* proc owning the core / cur_tf */
+	struct proc *owning_proc;	/* proc owning the core / cur_ctx */
 	uint32_t owning_vcoreid;	/* vcoreid of owning proc (if applicable */
-	struct trapframe *cur_tf;	/* user tf we came in on (can be 0) */
-	struct trapframe actual_tf;	/* storage for cur_tf */
+	struct user_context *cur_ctx;	/* user ctx we came in on (can be 0) */
+	struct user_context actual_ctx;	/* storage for cur_ctx */
 	uint32_t __ctx_depth;		/* don't access directly.  see trap.h. */
 	int __lock_depth_disabled;	/* disables spinlock depth checking */
 	struct syscall *cur_sysc;	/* ptr is into cur_proc's address space */
@@ -58,11 +58,11 @@ struct per_cpu_info {
 /* Allows the kernel to figure out what process is running on this core.  Can be
  * used just like a pointer to a struct proc. */
 #define current per_cpu_info[core_id()].cur_proc
-/* Allows the kernel to figure out what *user* tf is on this core's stack.  Can
- * be used just like a pointer to a struct Trapframe.  Note the distinction
+/* Allows the kernel to figure out what *user* ctx is on this core's stack.  Can
+ * be used just like a pointer to a struct user_context.  Note the distinction
  * between kernel and user contexts.  The kernel always returns to its nested,
  * interrupted contexts via iret/etc.  We never do that for user contexts. */
-#define current_tf per_cpu_info[core_id()].cur_tf
+#define current_ctx per_cpu_info[core_id()].cur_ctx
 
 typedef struct per_cpu_info NTPTV(t) NTPTV(a0t) NTPTV(a1t) NTPTV(a2t) per_cpu_info_t;
 

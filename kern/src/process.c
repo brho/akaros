@@ -32,7 +32,7 @@
 struct kmem_cache *proc_cache;
 
 /* Other helpers, implemented later. */
-static void __proc_startcore(struct proc *p, trapframe_t *tf);
+static void __proc_startcore(struct proc *p, struct user_context *ctx);
 static bool is_mapped_vcore(struct proc *p, uint32_t pcoreid);
 static uint32_t get_vcoreid(struct proc *p, uint32_t pcoreid);
 static uint32_t try_get_pcoreid(struct proc *p, uint32_t vcoreid);
@@ -442,7 +442,7 @@ static bool scp_is_vcctx_ready(struct preempt_data *vcpd)
  *
  * This will always return, regardless of whether or not the calling core is
  * being given to a process. (it used to pop the tf directly, before we had
- * cur_tf).
+ * cur_ctx).
  *
  * Since it always returns, it will never "eat" your reference (old
  * documentation talks about this a bit). */
@@ -462,7 +462,7 @@ void proc_run_s(struct proc *p)
 			/* We will want to know where this process is running, even if it is
 			 * only in RUNNING_S.  can use the vcoremap, which makes death easy.
 			 * Also, this is the signal used in trap.c to know to save the tf in
-			 * env_tf. */
+			 * scp_ctx. */
 			__seq_start_write(&p->procinfo->coremap_seqctr);
 			p->procinfo->num_vcores = 0;	/* TODO (VC#) */
 			/* TODO: For now, we won't count this as an active vcore (on the
@@ -488,12 +488,12 @@ void proc_run_s(struct proc *p)
 			if (!vcpd->notif_disabled && vcpd->notif_pending
 			                          && scp_is_vcctx_ready(vcpd)) {
 				vcpd->notif_disabled = TRUE;
-				/* save the _S's tf in the notify slot, build and pop a new one
-				 * in actual/cur_tf. */
-				vcpd->notif_tf = p->env_tf;
-				pcpui->cur_tf = &pcpui->actual_tf;
-				memset(pcpui->cur_tf, 0, sizeof(struct trapframe));
-				proc_init_trapframe(pcpui->cur_tf, 0, p->env_entry,
+				/* save the _S's ctx in the notify slot, build and pop a new one
+				 * in actual/cur_ctx. */
+				vcpd->notif_tf = p->scp_ctx.tf.hw_tf;	/* TODO CTX */
+				pcpui->cur_ctx = &pcpui->actual_ctx;
+				memset(pcpui->cur_ctx, 0, sizeof(struct user_context));
+				proc_init_trapframe(&pcpui->cur_ctx->tf.hw_tf, 0, p->env_entry,
 				                    vcpd->transition_stack);
 			} else {
 				/* If they have no transition stack, then they can't receive
@@ -502,8 +502,8 @@ void proc_run_s(struct proc *p)
 				 * that for them. */
 				if (!scp_is_vcctx_ready(vcpd))
 					vcpd->notif_pending = FALSE;
-				/* this is one of the few times cur_tf != &actual_tf */
-				pcpui->cur_tf = &p->env_tf;
+				/* this is one of the few times cur_ctx != &actual_ctx */
+				pcpui->cur_ctx = &p->scp_ctx;
 			}
 			/* When the calling core idles, it'll call restartcore and run the
 			 * _S process's context. */
@@ -562,8 +562,7 @@ void __proc_run_m(struct proc *p)
 			return;
 		case (PROC_RUNNABLE_M):
 			/* vcoremap[i] holds the coreid of the physical core allocated to
-			 * this process.  It is set outside proc_run.  For the kernel
-			 * message, a0 = struct proc*, a1 = struct trapframe*.   */
+			 * this process.  It is set outside proc_run. */
 			if (p->procinfo->num_vcores) {
 				__send_bulkp_events(p);
 				__proc_set_state(p, PROC_RUNNING_M);
@@ -613,7 +612,7 @@ void __proc_run_m(struct proc *p)
  * in current and you have one reference, like proc_run(non_current_p), then
  * also do nothing.  The refcnt for your *p will count for the reference stored
  * in current. */
-static void __proc_startcore(struct proc *p, trapframe_t *tf)
+static void __proc_startcore(struct proc *p, struct user_context *ctx)
 {
 	assert(!irq_is_enabled());
 	__set_proc_current(p);
@@ -628,12 +627,12 @@ static void __proc_startcore(struct proc *p, trapframe_t *tf)
 	 * __startcore.  */
 	if (p->state == PROC_RUNNING_S)
 		env_pop_ancillary_state(p);
-	/* Clear the current_tf, since it is no longer used */
-	current_tf = 0;	/* TODO: might not need this... */
-	env_pop_tf(tf);
+	/* Clear the current_ctx, since it is no longer used */
+	current_ctx = 0;	/* TODO: might not need this... */
+	env_pop_tf(&ctx->tf.hw_tf); /* TODO CTX */
 }
 
-/* Restarts/runs the current_tf, which must be for the current process, on the
+/* Restarts/runs the current_ctx, which must be for the current process, on the
  * core this code executes on.  Calls an internal function to do the work.
  *
  * In case there are pending routine messages, like __death, __preempt, or
@@ -665,8 +664,8 @@ void proc_restartcore(void)
 		abandon_core();
 		smp_idle();
 	}
-	assert(pcpui->cur_tf);
-	__proc_startcore(pcpui->owning_proc, pcpui->cur_tf);
+	assert(pcpui->cur_ctx);
+	__proc_startcore(pcpui->owning_proc, pcpui->cur_ctx);
 }
 
 /* Destroys the process.  It will destroy the process and return any cores
@@ -813,9 +812,9 @@ int proc_change_to_m(struct proc *p)
 			 * it in the preempt slot so that we can also save the silly
 			 * state. */
 			struct preempt_data *vcpd = &p->procdata->vcore_preempt_data[0];
-			assert(current_tf);
+			assert(current_ctx);
 			/* Copy uthread0's context to the notif slot */
-			vcpd->notif_tf = *current_tf;
+			vcpd->notif_tf = current_ctx->tf.hw_tf; /* TODO CTX */
 			clear_owning_proc(core_id());	/* so we don't restart */
 			save_fp_state(&vcpd->preempt_anc);
 			/* Userspace needs to not fuck with notif_disabled before
@@ -869,8 +868,8 @@ uint32_t __proc_change_to_s(struct proc *p, uint32_t *pc_arr)
 	printk("[kernel] trying to transition _M -> _S (deprecated)!\n");
 	assert(p->state == PROC_RUNNING_M); // TODO: (ACR) async core req
 	/* save the context, to be restarted in _S mode */
-	assert(current_tf);
-	p->env_tf = *current_tf;
+	assert(current_ctx);
+	p->scp_ctx = *current_ctx;
 	clear_owning_proc(core_id());	/* so we don't restart */
 	env_push_ancillary_state(p); // TODO: (HSS)
 	/* sending death, since it's not our job to save contexts or anything in
@@ -912,10 +911,12 @@ static uint32_t get_pcoreid(struct proc *p, uint32_t vcoreid)
 }
 
 /* Helper: saves the SCP's tf state and unmaps vcore 0.  In the future, we'll
- * probably use vc0's space for env_tf and the silly state. */
-void __proc_save_context_s(struct proc *p, struct trapframe *tf)
+ * probably use vc0's space for scp_ctx and the silly state.  If we ever do
+ * that, we'll need to stop using scp_ctx (soon to be in VCPD) as a location for
+ * pcpui->cur_ctx to point (dangerous) */
+void __proc_save_context_s(struct proc *p, struct user_context *ctx)
 {
-	p->env_tf= *tf;
+	p->scp_ctx = *ctx;
 	env_push_ancillary_state(p);			/* TODO: (HSS) */
 	__unmap_vcore(p, 0);	/* VC# keep in sync with proc_run_s */
 }
@@ -940,9 +941,9 @@ void __proc_save_context_s(struct proc *p, struct trapframe *tf)
  * Also note that it needs a non-current/edible reference, since it will abandon
  * and continue to use the *p (current == 0, no cr3, etc).
  *
- * We disable interrupts for most of it too, since we need to protect current_tf
- * and not race with __notify (which doesn't play well with concurrent
- * yielders). */
+ * We disable interrupts for most of it too, since we need to protect
+ * current_ctx and not race with __notify (which doesn't play well with
+ * concurrent yielders). */
 void proc_yield(struct proc *SAFE p, bool being_nice)
 {
 	uint32_t vcoreid, pcoreid = core_id();
@@ -951,7 +952,7 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 	struct preempt_data *vcpd;
 	/* Need to lock to prevent concurrent vcore changes (online, inactive, the
 	 * mapping, etc).  This plus checking the nr_preempts is enough to tell if
-	 * our vcoreid and cur_tf ought to be here still or if we should abort */
+	 * our vcoreid and cur_ctx ought to be here still or if we should abort */
 	spin_lock(&p->proc_lock); /* horrible scalability.  =( */
 	switch (p->state) {
 		case (PROC_RUNNING_S):
@@ -976,13 +977,13 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 				/* if we're here, we want to sleep.  a concurrent event that
 				 * hasn't already written notif_pending will have seen WAITING,
 				 * and will be spinning while we do this. */
-				__proc_save_context_s(p, current_tf);
+				__proc_save_context_s(p, current_ctx);
 				spin_unlock(&p->proc_lock);
 			} else {
 				/* yielding to allow other processes to run.  we're briefly
 				 * WAITING, til we are woken up */
 				__proc_set_state(p, PROC_WAITING);
-				__proc_save_context_s(p, current_tf);
+				__proc_save_context_s(p, current_ctx);
 				spin_unlock(&p->proc_lock);
 				/* immediately wake up the proc (makes it runnable) */
 				proc_wakeup(p);
@@ -1592,7 +1593,7 @@ void clear_owning_proc(uint32_t coreid)
 	struct proc *p = pcpui->owning_proc;
 	pcpui->owning_proc = 0;
 	pcpui->owning_vcoreid = 0xdeadbeef;
-	pcpui->cur_tf = 0;			/* catch bugs for now (will go away soon) */
+	pcpui->cur_ctx = 0;			/* catch bugs for now (may go away) */
 	if (p)
 		proc_decref(p);
 }
@@ -1669,11 +1670,11 @@ void proc_tlbshootdown(struct proc *p, uintptr_t start, uintptr_t end)
 	spin_unlock(&p->proc_lock);
 }
 
-/* Helper, used by __startcore and __set_curtf, which sets up cur_tf to run a
+/* Helper, used by __startcore and __set_curctx, which sets up cur_ctx to run a
  * given process's vcore.  Caller needs to set up things like owning_proc and
  * whatnot.  Note that we might not have p loaded as current. */
-static void __set_curtf_to_vcoreid(struct proc *p, uint32_t vcoreid,
-                                   uint32_t old_nr_preempts_sent)
+static void __set_curctx_to_vcoreid(struct proc *p, uint32_t vcoreid,
+                                    uint32_t old_nr_preempts_sent)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	struct preempt_data *vcpd = &p->procdata->vcore_preempt_data[vcoreid];
@@ -1707,19 +1708,19 @@ static void __set_curtf_to_vcoreid(struct proc *p, uint32_t vcoreid,
 	if (vcpd->notif_disabled) {
 		restore_fp_state(&vcpd->preempt_anc);
 		/* copy-in the tf we'll pop, then set all security-related fields */
-		pcpui->actual_tf = vcpd->preempt_tf;
-		proc_secure_trapframe(&pcpui->actual_tf);
+		pcpui->actual_ctx.tf.hw_tf = vcpd->preempt_tf;	/* TODO CTX */
+		proc_secure_trapframe(&pcpui->actual_ctx.tf.hw_tf);
 	} else { /* not restarting from a preemption, use a fresh vcore */
 		assert(vcpd->transition_stack);
 		/* TODO: consider 0'ing the FP state.  We're probably leaking. */
-		proc_init_trapframe(&pcpui->actual_tf, vcoreid, p->env_entry,
+		proc_init_trapframe(&pcpui->actual_ctx.tf.hw_tf, vcoreid, p->env_entry,
 		                    vcpd->transition_stack);
 		/* Disable/mask active notifications for fresh vcores */
 		vcpd->notif_disabled = TRUE;
 	}
-	/* cur_tf was built above (in actual_tf), now use it */
-	pcpui->cur_tf = &pcpui->actual_tf;
-	/* this cur_tf will get run when the kernel returns / idles */
+	/* cur_ctx was built above (in actual_ctx), now use it */
+	pcpui->cur_ctx = &pcpui->actual_ctx;
+	/* this cur_ctx will get run when the kernel returns / idles */
 }
 
 /* Changes calling vcore to be vcoreid.  enable_my_notif tells us about how the
@@ -1796,9 +1797,9 @@ int proc_change_to_vcore(struct proc *p, uint32_t new_vcoreid,
 		 * and we don't care about either the notif_tf or the preempt_tf. */
 		caller_vcpd->notif_disabled = FALSE;
 	} else {
-		/* need to set up the calling vcore's tf so that it'll get restarted by
+		/* need to set up the calling vcore's ctx so that it'll get restarted by
 		 * __startcore, to make the caller look like it was preempted. */
-		caller_vcpd->preempt_tf = *current_tf;
+		caller_vcpd->preempt_tf = current_ctx->tf.hw_tf; // TODO CTX
 		save_fp_state(&caller_vcpd->preempt_anc);
 		/* Mark our core as preempted (for userspace recovery). */
 		atomic_or(&caller_vcpd->flags, VC_PREEMPTED);
@@ -1830,15 +1831,15 @@ int proc_change_to_vcore(struct proc *p, uint32_t new_vcoreid,
 	/* So this core knows which vcore is here. (cur_proc and owning_proc are
 	 * already correct): */
 	pcpui->owning_vcoreid = new_vcoreid;
-	/* Until we set_curtf, we don't really have a valid current tf.  The stuff
+	/* Until we set_curctx, we don't really have a valid current tf.  The stuff
 	 * in that old one is from our previous vcore, not the current
 	 * owning_vcoreid.  This matters for other KMSGS that will run before
-	 * __set_curtf (like __notify). */
-	pcpui->cur_tf = 0;
-	/* Need to send a kmsg to finish.  We can't set_curtf til the __PR is done,
+	 * __set_curctx (like __notify). */
+	pcpui->cur_ctx = 0;
+	/* Need to send a kmsg to finish.  We can't set_curctx til the __PR is done,
 	 * but we can't spin right here while holding the lock (can't spin while
 	 * waiting on a message, roughly) */
-	send_kernel_message(pcoreid, __set_curtf, (long)p, (long)new_vcoreid,
+	send_kernel_message(pcoreid, __set_curctx, (long)p, (long)new_vcoreid,
 	                    (long)new_vc->nr_preempts_sent, KMSG_ROUTINE);
 	retval = 0;
 	/* Fall through to exit */
@@ -1877,25 +1878,24 @@ void __startcore(uint32_t srcid, long a0, long a1, long a2)
 	}
 	/* Note we are not necessarily in the cr3 of p_to_run */
 	/* Now that we sorted refcnts and know p / which vcore it should be, set up
-	 * pcpui->cur_tf so that it will run that particular vcore */
-	__set_curtf_to_vcoreid(p_to_run, vcoreid, old_nr_preempts_sent);
+	 * pcpui->cur_ctx so that it will run that particular vcore */
+	__set_curctx_to_vcoreid(p_to_run, vcoreid, old_nr_preempts_sent);
 }
 
 /* Kernel message handler to load a proc's vcore context on this core.  Similar
  * to __startcore, except it is used when p already controls the core (e.g.
  * change_to).  Since the core is already controlled, pcpui such as owning proc,
  * vcoreid, and cur_proc are all already set. */
-void __set_curtf(uint32_t srcid, long a0, long a1, long a2)
+void __set_curctx(uint32_t srcid, long a0, long a1, long a2)
 {
 	struct proc *p = (struct proc*)a0;
 	uint32_t vcoreid = (uint32_t)a1;
 	uint32_t old_nr_preempts_sent = (uint32_t)a2;
-	__set_curtf_to_vcoreid(p, vcoreid, old_nr_preempts_sent);
+	__set_curctx_to_vcoreid(p, vcoreid, old_nr_preempts_sent);
 }
 
-/* Bail out if it's the wrong process, or if they no longer want a notif.  Don't
- * use the TF we passed in, we care about cur_tf.  Try not to grab locks or
- * write access to anything that isn't per-core in here. */
+/* Bail out if it's the wrong process, or if they no longer want a notif.  Try
+ * not to grab locks or write access to anything that isn't per-core in here. */
 void __notify(uint32_t srcid, long a0, long a1, long a2)
 {
 	uint32_t vcoreid, coreid = core_id();
@@ -1906,12 +1906,11 @@ void __notify(uint32_t srcid, long a0, long a1, long a2)
 	/* Not the right proc */
 	if (p != pcpui->owning_proc)
 		return;
-	/* the core might be owned, but not have a valid cur_tf (if we're in the
+	/* the core might be owned, but not have a valid cur_ctx (if we're in the
 	 * process of changing */
-	if (!pcpui->cur_tf)
+	if (!pcpui->cur_ctx)
 		return;
-	/* Common cur_tf sanity checks.  Note cur_tf could be an _S's env_tf */
-	assert(!in_kernel(pcpui->cur_tf));
+	/* Common cur_ctx sanity checks.  Note cur_ctx could be an _S's scp_ctx */
 	vcoreid = pcpui->owning_vcoreid;
 	vcpd = &p->procdata->vcore_preempt_data[vcoreid];
 	/* for SCPs that haven't (and might never) call vc_event_init, like rtld.
@@ -1926,11 +1925,11 @@ void __notify(uint32_t srcid, long a0, long a1, long a2)
 	vcpd->notif_disabled = TRUE;
 	/* save the old tf in the notify slot, build and pop a new one.  Note that
 	 * silly state isn't our business for a notification. */
-	vcpd->notif_tf = *pcpui->cur_tf;
-	memset(pcpui->cur_tf, 0, sizeof(struct trapframe));
-	proc_init_trapframe(pcpui->cur_tf, vcoreid, p->env_entry,
+	vcpd->notif_tf = pcpui->cur_ctx->tf.hw_tf; /* TODO CTX */
+	memset(pcpui->cur_ctx, 0, sizeof(struct user_context));
+	proc_init_trapframe(&pcpui->cur_ctx->tf.hw_tf, vcoreid, p->env_entry,
 	                    vcpd->transition_stack);
-	/* this cur_tf will get run when the kernel returns / idles */
+	/* this cur_ctx will get run when the kernel returns / idles */
 }
 
 void __preempt(uint32_t srcid, long a0, long a1, long a2)
@@ -1945,22 +1944,21 @@ void __preempt(uint32_t srcid, long a0, long a1, long a2)
 		panic("__preempt arrived for a process (%p) that was not owning (%p)!",
 		      p, pcpui->owning_proc);
 	}
-	/* Common cur_tf sanity checks */
-	assert(pcpui->cur_tf);
-	assert(pcpui->cur_tf == &pcpui->actual_tf);
-	assert(!in_kernel(pcpui->cur_tf));
+	/* Common cur_ctx sanity checks */
+	assert(pcpui->cur_ctx);
+	assert(pcpui->cur_ctx == &pcpui->actual_ctx);
 	vcoreid = pcpui->owning_vcoreid;
 	vcpd = &p->procdata->vcore_preempt_data[vcoreid];
 	printd("[kernel] received __preempt for proc %d's vcore %d on pcore %d\n",
 	       p->procinfo->pid, vcoreid, coreid);
 	/* if notifs are disabled, the vcore is in vcore context (as far as we're
 	 * concerned), and we save it in the preempt slot. o/w, we save the
-	 * process's cur_tf in the notif slot, and it'll appear to the vcore when it
-	 * comes back up that it just took a notification. */
+	 * process's cur_ctx in the notif slot, and it'll appear to the vcore when
+	 * it comes back up that it just took a notification. */
 	if (vcpd->notif_disabled)
-		vcpd->preempt_tf = *pcpui->cur_tf;
+		vcpd->preempt_tf = pcpui->cur_ctx->tf.hw_tf; /* TODO CTX */
 	else
-		vcpd->notif_tf = *pcpui->cur_tf;
+		vcpd->notif_tf = pcpui->cur_ctx->tf.hw_tf; /* TODO CTX */
 	/* either way, we save the silly state (FP) */
 	save_fp_state(&vcpd->preempt_anc);
 	/* Mark the vcore as preempted and unlock (was locked by the sender). */

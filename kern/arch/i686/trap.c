@@ -283,9 +283,9 @@ static void trap_dispatch(struct hw_trapframe *hw_tf)
 			/* We will muck with the actual TF.  If we're dealing with
 			 * userspace, we need to make sure we edit the actual TF that will
 			 * get restarted (pcpui), and not the TF on the kstack (which aren't
-			 * the same).  See set_current_tf() for more info. */
+			 * the same).  See set_current_ctx() for more info. */
 			if (!in_kernel(hw_tf))
-				hw_tf = pcpui->cur_tf;
+				hw_tf = &pcpui->cur_ctx->tf.hw_tf;
 			printd("bad opcode, eip: %08p, next 3 bytes: %x %x %x\n",
 			       hw_tf->tf_eip, 
 			       *(uint8_t*)(hw_tf->tf_eip + 0), 
@@ -344,21 +344,33 @@ env_pop_ancillary_state(env_t* e)
 /* Helper.  For now, this copies out the TF to pcpui.  Eventually, we should
  * consider doing this in trapentry.S
  *
- * TODO: consider having this return pcpui->cur_tf, so we can set tf in trap and
+ * TODO: consider having this return the tf used, so we can set tf in trap and
  * irq handlers to edit the TF that will get restarted.  Right now, the kernel
  * uses and restarts tf, but userspace restarts the old pcpui tf.  It is
  * tempting to do this, but note that tf stays on the stack of the kthread,
- * while pcpui->cur_tf is for the core we trapped in on.  Meaning if we ever
- * block, suddenly cur_tf is pointing to some old clobbered state that was
+ * while pcpui->cur_ctx is for the core we trapped in on.  Meaning if we ever
+ * block, suddenly cur_ctx is pointing to some old clobbered state that was
  * already returned to and can't be trusted.  Meanwhile tf can always be trusted
  * (like with an in_kernel() check).  The only types of traps from the user that
  * can be expected to have editable trapframes are ones that don't block. */
-static void set_current_tf(struct per_cpu_info *pcpui, struct trapframe *tf)
+static void set_current_ctx_hw(struct per_cpu_info *pcpui,
+                               struct hw_trapframe *hw_tf)
 {
 	assert(!irq_is_enabled());
-	assert(!pcpui->cur_tf);
-	pcpui->actual_tf = *tf;
-	pcpui->cur_tf = &pcpui->actual_tf;
+	assert(!pcpui->cur_ctx);
+	pcpui->actual_ctx.type = ROS_HW_CTX;
+	pcpui->actual_ctx.tf.hw_tf = *hw_tf;
+	pcpui->cur_ctx = &pcpui->actual_ctx;
+}
+
+static void set_current_ctx_sw(struct per_cpu_info *pcpui,
+                               struct sw_trapframe *sw_tf)
+{
+	assert(!irq_is_enabled());
+	assert(!pcpui->cur_ctx);
+	pcpui->actual_ctx.type = ROS_SW_CTX;
+	pcpui->actual_ctx.tf.sw_tf = *sw_tf;
+	pcpui->cur_ctx = &pcpui->actual_ctx;
 }
 
 /* If the interrupt interrupted a halt, we advance past it.  Made to work with
@@ -384,7 +396,7 @@ void trap(struct hw_trapframe *hw_tf)
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	/* Copy out the TF for now */
 	if (!in_kernel(hw_tf))
-		set_current_tf(pcpui, hw_tf);
+		set_current_ctx_hw(pcpui, hw_tf);
 	else
 		inc_ktrap_depth(pcpui);
 
@@ -488,7 +500,7 @@ void irq_handler(struct hw_trapframe *hw_tf)
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	/* Copy out the TF for now */
 	if (!in_kernel(hw_tf))
-		set_current_tf(pcpui, hw_tf);
+		set_current_ctx_hw(pcpui, hw_tf);
 	inc_irq_depth(pcpui);
 	/* Coupled with cpu_halt() and smp_idle() */
 	abort_halt(hw_tf);
@@ -573,7 +585,7 @@ void sysenter_callwrapper(struct hw_trapframe *hw_tf)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	assert(!in_kernel(hw_tf));
-	set_current_tf(pcpui, hw_tf);
+	set_current_ctx_hw(pcpui, hw_tf);
 	/* Once we've set_current_ctx, we can enable interrupts.  This used to be
 	 * mandatory (we had immediate KMSGs that would muck with cur_ctx).  Now it
 	 * should only help for sanity/debugging. */

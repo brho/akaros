@@ -29,7 +29,7 @@ struct proc {
 	TAILQ_ENTRY(proc) proc_arsc_link;
 	TAILQ_ENTRY(proc) sibling_link;
 	spinlock_t proc_lock;
-	trapframe_t env_tf; 						// Saved registers
+	struct user_context scp_ctx; 	/* context for an SCP.  TODO: move to vc0 */
 	ancillary_state_t env_ancillary_state; 	// State saved when descheduled
 	pid_t pid;
 	/* Tempting to add a struct proc *parent, but we'd need to protect the use

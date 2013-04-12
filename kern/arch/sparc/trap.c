@@ -80,15 +80,28 @@ sysenter_init(void)
 {
 }
 
-/* Helper.  For now, this copies out the TF to pcpui, and sets cur_tf to point
+/* Helper.  For now, this copies out the TF to pcpui, and sets cur_ctx to point
  * to it. */
-static void set_current_tf(struct per_cpu_info *pcpui, struct trapframe *tf)
+static void set_current_ctx_hw(struct per_cpu_info *pcpui,
+                               struct hw_trapframe *hw_tf)
 {
 	if (irq_is_enabled())
-		warn("Turn off IRQs until cur_tf is set!");
-	assert(!pcpui->cur_tf);
-	pcpui->actual_tf = *tf;
-	pcpui->cur_tf = &pcpui->actual_tf;
+		warn("Turn off IRQs until cur_ctx is set!");
+	assert(!pcpui->cur_ctx);
+	pcpui->actual_ctx.type = ROS_HW_CTX;
+	pcpui->actual_ctx.hw_tf = *hw_tf;
+	pcpui->cur_ctx = &pcpui->actual_ctx;
+}
+
+static void set_current_ctx_sw(struct per_cpu_info *pcpui,
+                               struct sw_trapframe *sw_tf)
+{
+	if (irq_is_enabled())
+		warn("Turn off IRQs until cur_ctx is set!");
+	assert(!pcpui->cur_ctx);
+	pcpui->actual_ctx.type = ROS_SW_CTX;
+	pcpui->actual_ctx.sw_tf = *sw_tf;
+	pcpui->cur_ctx = &pcpui->actual_ctx;
 }
 
 static int format_trapframe(struct hw_trapframe *hw_tf, char *buf, int bufsz)
@@ -179,7 +192,7 @@ void handle_ipi(struct hw_trapframe *hw_tf)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	if (!in_kernel(hw_tf))
-		set_current_tf(pcpui, hw_tf);
+		set_current_ctx_hw(pcpui, hw_tf);
 	else if((void*)hw_tf->pc == &__cpu_halt) // break out of the __cpu_halt loop
 		advance_pc(hw_tf);
 
@@ -308,7 +321,7 @@ void fp_disabled(struct hw_trapframe *state)
 void handle_pop_tf(struct hw_trapframe *state)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	set_current_tf(pcpui, state);
+	set_current_ctx_hw(pcpui, state);
 
 	struct hw_trapframe hw_tf, *hw_tf_p = &hw_tf;
 	if (memcpy_from_user(current, &hw_tf, (void*)state->gpr[8],sizeof(hw_tf))) {
@@ -318,7 +331,7 @@ void handle_pop_tf(struct hw_trapframe *state)
 	}
 
 	proc_secure_trapframe(&hw_tf);
-	set_current_tf(pcpui, hw_tf_p);
+	set_current_ctx_hw(pcpui, hw_tf_p);
 	proc_restartcore();
 }
 
@@ -343,7 +356,7 @@ void handle_syscall(struct hw_trapframe *state)
 	enable_irq();
 	struct per_cpu_info* coreinfo = &per_cpu_info[core_id()];
 
-	set_current_tf(pcpui, state);
+	set_current_ctx_hw(pcpui, state);
 
 	prep_syscalls(current, (struct syscall*)a0, a1);
 

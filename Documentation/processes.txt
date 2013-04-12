@@ -228,7 +228,7 @@ not wanting the core anymore.  The other is in response to a preemption.  Yield
 may not be called remotely (ARSC).
 
 In _S mode, it will transition from RUNNING_S to RUNNABLE_S.  The context is
-saved in env_tf.
+saved in scp_ctx.
 
 In _M mode, this yields the calling core.  A yield will *not* transition from _M
 to _S.  The kernel will rip it out of your vcore list.  A process can yield its

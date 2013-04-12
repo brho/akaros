@@ -406,13 +406,13 @@ static ssize_t sys_fork(env_t* e)
 
 	env->heap_top = e->heap_top;
 	env->ppid = e->pid;
-	disable_irqsave(&state);	/* protect cur_tf */
-	/* Can't really fork if we don't have a current_tf to fork */
-	if (!current_tf) {
+	disable_irqsave(&state);	/* protect cur_ctx */
+	/* Can't really fork if we don't have a current_ctx to fork */
+	if (!current_ctx) {
 		set_errno(EINVAL);
 		return -1;
 	}
-	env->env_tf = *current_tf;
+	env->scp_ctx = *current_ctx;
 	enable_irqsave(&state);
 
 	env->cache_colors_map = cache_colors_map_alloc();
@@ -490,22 +490,22 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	t_path = user_strdup_errno(p, path, path_l);
 	if (!t_path)
 		return -1;
-	disable_irqsave(&state);	/* protect cur_tf */
-	/* Can't exec if we don't have a current_tf to restart (if we fail).  This
+	disable_irqsave(&state);	/* protect cur_ctx */
+	/* Can't exec if we don't have a current_ctx to restart (if we fail).  This
 	 * isn't 100% true, but I'm okay with it. */
-	if (!pcpui->cur_tf) {
+	if (!pcpui->cur_ctx) {
 		enable_irqsave(&state);
 		set_errno(EINVAL);
 		return -1;
 	}
-	/* Preemptively copy out the cur_tf, in case we fail later (easier on cur_tf
-	 * if we do this now) */
-	p->env_tf = *pcpui->cur_tf;
-	/* Clear the current_tf.  We won't be returning the 'normal' way.  Even if
+	/* Preemptively copy out the cur_ctx, in case we fail later (easier on
+	 * cur_ctx if we do this now) */
+	p->scp_ctx = *pcpui->cur_ctx;
+	/* Clear the current_ctx.  We won't be returning the 'normal' way.  Even if
 	 * we want to return with an error, we need to go back differently in case
 	 * we succeed.  This needs to be done before we could possibly block, but
 	 * unfortunately happens before the point of no return. */
-	pcpui->cur_tf = 0;
+	pcpui->cur_ctx = 0;
 	enable_irqsave(&state);
 	/* This could block: */
 	program = do_file_open(t_path, 0, 0);

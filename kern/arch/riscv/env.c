@@ -7,7 +7,7 @@
 void
 env_push_ancillary_state(env_t* e)
 {
-	if(e->env_tf.sr & SR_EF)
+	if(e->scp_ctx.hw_tf.sr & SR_EF)
 		save_fp_state(&e->env_ancillary_state);
 }
 
@@ -59,7 +59,7 @@ save_fp_state(ancillary_state_t* silly)
 void
 env_pop_ancillary_state(env_t* e)
 { 
-	if(e->env_tf.sr & SR_EF)
+	if(e->scp_ctx.hw_tf.sr & SR_EF)
 		restore_fp_state(&e->env_ancillary_state);
 }
 

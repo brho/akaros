@@ -34,8 +34,8 @@ work could affect currently executing kernel code (like a syscall).
 For example, some older KMSGs such as __startcore used to not return and would
 pop directly into user space.  This complicted the KMSG code quite a bit.  While
 these functions now return, they still can't be immediate messages.  Proc
-management KMSGs change the cur_tf out from under a syscall, which can lead to a
-bunch of issues.
+management KMSGs change the cur_ctx out from under a syscall, which can lead to
+a bunch of issues.
 
 Immediate kernel messages are executed in interrupt context, with interrupts
 disabled.  Routine messages are only executed from places in the code where the
@@ -63,7 +63,7 @@ History:
 --------------------------------
 KMSGs have a long history tied to process management code.  The main issues were
 related to which KMSG functions return and which ones mess with local state (like
-clobbering cur_tf or the owning_proc).  Returning was a big deal because you
+clobbering cur_ctx or the owning_proc).  Returning was a big deal because you
 can't just arbitrarily abandon a kernel context (locks or refcnts could be held,
 etc).  This is why immediates must return.  Likewise, there are certain
 invariants about what a core is doing that shouldn't be changed by an IRQ

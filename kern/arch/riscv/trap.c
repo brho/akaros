@@ -58,16 +58,28 @@ sysenter_init(void)
 {
 }
 
-/* Helper.  For now, this copies out the TF to pcpui, and sets cur_tf to point
+/* Helper.  For now, this copies out the TF to pcpui, and sets cur_ctx to point
  * to it. */
-static void
-set_current_tf(struct per_cpu_info *pcpui, struct trapframe *tf)
+static void set_current_ctx_hw(struct per_cpu_info *pcpui,
+                               struct hw_trapframe *hw_tf)
 {
 	if (irq_is_enabled())
-		warn("Turn off IRQs until cur_tf is set!");
-	assert(!pcpui->cur_tf);
-	pcpui->actual_tf = *tf;
-	pcpui->cur_tf = &pcpui->actual_tf;
+		warn("Turn off IRQs until cur_ctx is set!");
+	assert(!pcpui->cur_ctx);
+	pcpui->actual_ctx.type = ROS_HW_CTX;
+	pcpui->actual_ctx.hw_tf = *hw_tf;
+	pcpui->cur_ctx = &pcpui->actual_ctx;
+}
+
+static void set_current_ctx_sw(struct per_cpu_info *pcpui,
+                               struct sw_trapframe *sw_tf)
+{
+	if (irq_is_enabled())
+		warn("Turn off IRQs until cur_ctx is set!");
+	assert(!pcpui->cur_ctx);
+	pcpui->actual_ctx.type = ROS_SW_CTX;
+	pcpui->actual_ctx.sw_tf = *sw_tf;
+	pcpui->cur_ctx = &pcpui->actual_ctx;
 }
 
 static int
@@ -205,7 +217,7 @@ handle_fault_fetch(struct hw_trapframe *state)
 		panic("Instruction Page Fault in the Kernel at %p!", state->epc);
 	}
 
-	set_current_tf(&per_cpu_info[core_id()], state);
+	set_current_ctx_hw(&per_cpu_info[core_id()], state);
 
 	if(handle_page_fault(current, state->epc, PROT_EXEC))
 		unhandled_trap(state, "Instruction Page Fault");
@@ -220,7 +232,7 @@ handle_fault_load(struct hw_trapframe *state)
 		panic("Load Page Fault in the Kernel at %p!", state->badvaddr);
 	}
 
-	set_current_tf(&per_cpu_info[core_id()], state);
+	set_current_ctx_hw(&per_cpu_info[core_id()], state);
 
 	if(handle_page_fault(current, state->badvaddr, PROT_READ))
 		unhandled_trap(state, "Load Page Fault");
@@ -235,7 +247,7 @@ handle_fault_store(struct hw_trapframe *state)
 		panic("Store Page Fault in the Kernel at %p!", state->badvaddr);
 	}
 
-	set_current_tf(&per_cpu_info[core_id()], state);
+	set_current_ctx_hw(&per_cpu_info[core_id()], state);
 
 	if(handle_page_fault(current, state->badvaddr, PROT_WRITE))
 		unhandled_trap(state, "Store Page Fault");
@@ -247,10 +259,10 @@ handle_illegal_instruction(struct hw_trapframe *state)
 	assert(!in_kernel(state));
 
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	set_current_tf(pcpui, state);
+	set_current_ctx_hw(pcpui, state);
 	if (emulate_fpu(state) == 0)
 	{
-		advance_pc(pcpui->cur_tf);
+		advance_pc(&pcpui->cur_ctx->hw_tf);
 		return;
 	}
 
@@ -274,7 +286,7 @@ handle_syscall(struct hw_trapframe *state)
 	uintptr_t a1 = state->gpr[5];
 
 	advance_pc(state);
-	set_current_tf(&per_cpu_info[core_id()], state);
+	set_current_ctx_hw(&per_cpu_info[core_id()], state);
 	enable_irq();
 	prep_syscalls(current, (struct syscall*)a0, a1);
 }
@@ -319,7 +331,7 @@ handle_trap(struct hw_trapframe *hw_tf)
 		if (in_kernel(hw_tf))
 			exit_halt_loop(hw_tf);
 		else
-			set_current_tf(&per_cpu_info[core_id()], hw_tf);
+			set_current_ctx_hw(&per_cpu_info[core_id()], hw_tf);
 
 		inc_irq_depth(pcpui);
 		irq_handlers[irq](hw_tf);
