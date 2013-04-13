@@ -276,6 +276,7 @@ handle_fp_disabled(struct hw_trapframe *hw_tf)
 		panic("kernel executed an FP instruction!");
 
 	hw_tf->sr |= SR_EF;
+	extern void env_pop_tf(struct hw_trapframe *tf);	/* in asm */
 	env_pop_tf(hw_tf); /* We didn't save our TF, so don't proc_restartcore */
 }
 
@@ -350,6 +351,7 @@ handle_trap(struct hw_trapframe *hw_tf)
 		}
 	}
 	
+	extern void env_pop_tf(struct hw_trapframe *tf);	/* in asm */
 	/* Return to the current process, which should be runnable.  If we're the
 	 * kernel, we should just return naturally.  Note that current and tf need
 	 * to still be okay (might not be after blocking) */

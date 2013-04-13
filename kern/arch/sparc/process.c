@@ -13,10 +13,22 @@
 #pragma nosharc
 #endif
 
-void
-proc_init_trapframe(trapframe_t *tf, uint32_t vcoreid,
-                    uintptr_t entryp, uintptr_t stack_top)
+/* TODO: handle user and kernel contexts */
+void proc_pop_ctx(struct user_context *ctx)
 {
+	struct hw_trapframe *tf = &ctx->tf.hw_tf;
+	assert(ctx->type = ROS_HW_CTX);
+	extern void env_pop_tf(struct hw_trapframe *tf);	/* in asm */
+	env_pop_tf(tf);
+}
+
+/* TODO: consider using a SW context */
+void proc_init_ctx(struct user_context *ctx, uint32_t vcoreid, uintptr_t entryp,
+                   uintptr_t stack_top)
+{
+	struct hw_trapframe *tf = &ctx->tf.hw_tf;
+	ctx->type = ROS_HW_CTX;
+
 	memset(tf,0,sizeof(*tf));
 
 	tf->psr = PSR_S; // but PS = 0
@@ -28,8 +40,11 @@ proc_init_trapframe(trapframe_t *tf, uint32_t vcoreid,
 	tf->gpr[6] = vcoreid;
 }
 
-void proc_secure_trapframe(struct trapframe *tf)
+/* TODO: handle both HW and SW contexts */
+void proc_secure_ctx(struct user_context *ctx)
 {
+	struct hw_trapframe *tf = &ctx->tf.hw_tf;
+	ctx->type = ROS_HW_CTX;
 	// only take the condition codes from the user.  we set S=1, PS=0
 	tf->psr = (tf->psr & PSR_ICC) | PSR_S;
 }

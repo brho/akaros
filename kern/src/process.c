@@ -493,8 +493,8 @@ void proc_run_s(struct proc *p)
 				vcpd->notif_tf = p->scp_ctx.tf.hw_tf;	/* TODO CTX */
 				pcpui->cur_ctx = &pcpui->actual_ctx;
 				memset(pcpui->cur_ctx, 0, sizeof(struct user_context));
-				proc_init_trapframe(&pcpui->cur_ctx->tf.hw_tf, 0, p->env_entry,
-				                    vcpd->transition_stack);
+				proc_init_ctx(pcpui->cur_ctx, 0, p->env_entry,
+				              vcpd->transition_stack);
 			} else {
 				/* If they have no transition stack, then they can't receive
 				 * events.  The most they are getting is a wakeup from the
@@ -629,7 +629,7 @@ static void __proc_startcore(struct proc *p, struct user_context *ctx)
 		env_pop_ancillary_state(p);
 	/* Clear the current_ctx, since it is no longer used */
 	current_ctx = 0;	/* TODO: might not need this... */
-	env_pop_tf(&ctx->tf.hw_tf); /* TODO CTX */
+	proc_pop_ctx(ctx);
 }
 
 /* Restarts/runs the current_ctx, which must be for the current process, on the
@@ -1709,12 +1709,12 @@ static void __set_curctx_to_vcoreid(struct proc *p, uint32_t vcoreid,
 		restore_fp_state(&vcpd->preempt_anc);
 		/* copy-in the tf we'll pop, then set all security-related fields */
 		pcpui->actual_ctx.tf.hw_tf = vcpd->preempt_tf;	/* TODO CTX */
-		proc_secure_trapframe(&pcpui->actual_ctx.tf.hw_tf);
+		proc_secure_ctx(&pcpui->actual_ctx);
 	} else { /* not restarting from a preemption, use a fresh vcore */
 		assert(vcpd->transition_stack);
 		/* TODO: consider 0'ing the FP state.  We're probably leaking. */
-		proc_init_trapframe(&pcpui->actual_ctx.tf.hw_tf, vcoreid, p->env_entry,
-		                    vcpd->transition_stack);
+		proc_init_ctx(&pcpui->actual_ctx, vcoreid, p->env_entry,
+		              vcpd->transition_stack);
 		/* Disable/mask active notifications for fresh vcores */
 		vcpd->notif_disabled = TRUE;
 	}
@@ -1927,8 +1927,8 @@ void __notify(uint32_t srcid, long a0, long a1, long a2)
 	 * silly state isn't our business for a notification. */
 	vcpd->notif_tf = pcpui->cur_ctx->tf.hw_tf; /* TODO CTX */
 	memset(pcpui->cur_ctx, 0, sizeof(struct user_context));
-	proc_init_trapframe(&pcpui->cur_ctx->tf.hw_tf, vcoreid, p->env_entry,
-	                    vcpd->transition_stack);
+	proc_init_ctx(pcpui->cur_ctx, vcoreid, p->env_entry,
+	              vcpd->transition_stack);
 	/* this cur_ctx will get run when the kernel returns / idles */
 }
 
