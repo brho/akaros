@@ -43,16 +43,9 @@ struct hw_trapframe {
 	uint16_t tf_padding6;
 };
 
-/* Temporary aliasing */
-#define trapframe hw_trapframe
-
 struct sw_trapframe {
 	/* TODO */
 };
-
-/* TODO: consider using a user-space specific trapframe, since they don't need
- * all of this information.  Might do that eventually, but til then: */
-#define user_trapframe trapframe
 
 /* FP state and whatever else the kernel won't muck with automatically.  For
  * now, it's the Non-64-bit-mode layout of FP and XMM registers, as used by

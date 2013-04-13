@@ -103,7 +103,7 @@ void vcore_entry(void)
 		set_tls_desc(core0_tls, 0);
 		assert(__vcoreid == 0); /* in case anyone uses this */
 		/* Load silly state (Floating point) too */
-		pop_ros_tf(&vcpd->notif_tf, vcoreid);
+		pop_ros_tf(&vcpd->uthread_ctx.tf.hw_tf, vcoreid);
 		panic("should never see me!");
 	}	
 /* end: stuff userspace needs to do to handle notifications */

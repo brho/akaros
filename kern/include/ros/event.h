@@ -107,9 +107,9 @@ struct event_queue_big {
 
 /* Per-core data about preemptions and notifications */
 struct preempt_data {
-	struct user_trapframe		preempt_tf;			/* slot for vcore ctx */
+	struct user_context			vcore_ctx;			/* for preemptions */
 	struct ancillary_state		preempt_anc;
-	struct user_trapframe		notif_tf;			/* slot for uthread ctx */
+	struct user_context			uthread_ctx;		/* for preempts or notifs */
 	uintptr_t					transition_stack;	/* advertised by the user */
 	atomic_t					flags;
 	bool						notif_disabled;		/* vcore unwilling to recv*/

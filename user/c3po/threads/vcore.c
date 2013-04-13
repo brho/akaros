@@ -179,8 +179,8 @@ void __attribute__((noreturn)) vcore_entry()
 
 		/* Copy the notification trapframe into the current 
 		 * threads trapframe */
-		memcpy(&current_thread->context->utf, &vcpd->notif_tf, 
-		       sizeof(struct user_trapframe));
+		memcpy(&current_thread->context->u_ctx, &vcpd->uthread_ctx, 
+		       sizeof(struct user_context));
 
         /* Restore the context from the current_thread's trapframe */
         restore_context(current_thread->context);

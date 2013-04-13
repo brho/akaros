@@ -17,16 +17,9 @@ struct hw_trapframe
   long cause;
 };
 
-/* Temporary aliasing */
-#define trapframe hw_trapframe
-
 struct sw_trapframe {
 	/* TODO */
 };
-
-/* TODO: consider using a user-space specific trapframe, since they don't need
- * all of this information.  Will do that eventually, but til then: */
-#define user_trapframe trapframe
 
 typedef struct ancillary_state
 {

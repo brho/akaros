@@ -23,7 +23,7 @@
  * location of notif_disabled, and a clobbered work register) to enable notifs,
  * make sure notif IPIs weren't pending, restore the work reg, and then "ret".
  *
- * This is what the target notif_tf's stack will look like (growing down):
+ * This is what the target uthread's stack will look like (growing down):
  *
  * Target ESP -> |   u_thread's old stuff   | the future %esp, tf->tf_esp
  *               |   new eip                | 0x04 below %esp (one slot is 0x04)
@@ -64,7 +64,7 @@ struct restart_helper {
 	uint32_t					eip;
 };
 
-static inline void pop_ros_tf(struct user_trapframe *tf, uint32_t vcoreid)
+static inline void pop_ros_tf(struct hw_trapframe *tf, uint32_t vcoreid)
 {
 	struct restart_helper *rst;
 	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
@@ -128,7 +128,7 @@ static inline void pop_ros_tf(struct user_trapframe *tf, uint32_t vcoreid)
 
 /* Like the regular pop_ros_tf, but this one doesn't check or clear
  * notif_pending. */
-static inline void pop_ros_tf_raw(struct user_trapframe *tf, uint32_t vcoreid)
+static inline void pop_ros_tf_raw(struct hw_trapframe *tf, uint32_t vcoreid)
 {
 	struct restart_helper *rst;
 	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
@@ -175,9 +175,9 @@ static inline void pop_ros_tf_raw(struct user_trapframe *tf, uint32_t vcoreid)
 /* Save the current context/registers into the given tf, setting the pc of the
  * tf to the end of this function.  You only need to save that which you later
  * restore with pop_ros_tf(). */
-static inline void save_ros_tf(struct user_trapframe *tf)
+static inline void save_ros_tf(struct hw_trapframe *tf)
 {
-	memset(tf, 0, sizeof(struct user_trapframe)); /* sanity */
+	memset(tf, 0, sizeof(struct hw_trapframe)); /* sanity */
 	/* set CS and make sure eflags is okay */
 	tf->tf_cs = GD_UT | 3;
 	tf->tf_eflags = 0x00000200; /* interrupts enabled.  bare minimum eflags. */
@@ -200,9 +200,9 @@ static inline void save_ros_tf(struct user_trapframe *tf)
 
 /* This assumes a user_tf looks like a regular kernel trapframe */
 static __inline void
-init_user_tf(struct user_trapframe *u_tf, uint32_t entry_pt, uint32_t stack_top)
+init_user_tf(struct hw_trapframe *u_tf, uint32_t entry_pt, uint32_t stack_top)
 {
-	memset(u_tf, 0, sizeof(struct user_trapframe));
+	memset(u_tf, 0, sizeof(struct hw_trapframe));
 	u_tf->tf_eip = entry_pt;
 	u_tf->tf_cs = GD_UT | 3;
 	u_tf->tf_esp = stack_top;
@@ -217,7 +217,7 @@ init_user_tf(struct user_trapframe *u_tf, uint32_t entry_pt, uint32_t stack_top)
 
 /* For debugging. */
 #include <stdio.h>
-static __inline void print_trapframe(struct user_trapframe *tf)
+static __inline void print_trapframe(struct hw_trapframe *tf)
 {
 	printf("[user] TRAP frame %08p\n", tf);
 	printf("  edi  0x%08x\n", tf->tf_regs.reg_edi);

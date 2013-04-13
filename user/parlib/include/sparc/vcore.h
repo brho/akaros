@@ -36,11 +36,11 @@ static inline void set_tls_desc(void *tls_desc, uint32_t vcoreid)
  * notifications, and when it gets resumed it can ultimately run the new
  * context.  Enough state is saved in the running context and stack to continue
  * running. */
-static inline void pop_ros_tf(struct user_trapframe *tf, uint32_t vcoreid)
+static inline void pop_ros_tf(struct hw_trapframe *tf, uint32_t vcoreid)
 {
 	// since we're changing the stack, move stuff into regs for now
 	register uint32_t _vcoreid = vcoreid;
-	register struct user_trapframe* _tf = tf;
+	register struct hw_trapframe* _tf = tf;
 
 	set_stack_pointer((void*)tf->gpr[14]);
 
@@ -64,11 +64,11 @@ static inline void pop_ros_tf(struct user_trapframe *tf, uint32_t vcoreid)
 
 /* Like the regular pop_ros_tf, but this one doesn't check or clear
  * notif_pending.  TODO: someone from sparc should look at this. */
-static inline void pop_ros_tf_raw(struct user_trapframe *tf, uint32_t vcoreid)
+static inline void pop_ros_tf_raw(struct hw_trapframe *tf, uint32_t vcoreid)
 {
 	// since we're changing the stack, move stuff into regs for now
 	register uint32_t _vcoreid = vcoreid;
-	register struct user_trapframe* _tf = tf;
+	register struct hw_trapframe* _tf = tf;
 
 	set_stack_pointer((void*)tf->gpr[14]);
 
@@ -93,7 +93,7 @@ static inline void pop_ros_tf_raw(struct user_trapframe *tf, uint32_t vcoreid)
 /* Save the current context/registers into the given tf, setting the pc of the
  * tf to the end of this function.  You only need to save that which you later
  * restore with pop_ros_tf(). */
-static inline void save_ros_tf(struct user_trapframe *tf)
+static inline void save_ros_tf(struct hw_trapframe *tf)
 {
 	// just do it in the kernel.  since we need to flush windows anyway,
 	// this isn't an egregious overhead.
@@ -102,9 +102,9 @@ static inline void save_ros_tf(struct user_trapframe *tf)
 
 /* This assumes a user_tf looks like a regular kernel trapframe */
 static __inline void
-init_user_tf(struct user_trapframe *u_tf, uint32_t entry_pt, uint32_t stack_top)
+init_user_tf(struct hw_trapframe *u_tf, uint32_t entry_pt, uint32_t stack_top)
 {
-	memset(u_tf, 0, sizeof(struct user_trapframe));
+	memset(u_tf, 0, sizeof(struct hw_trapframe));
 	u_tf->gpr[14] = stack_top - 96;
 	u_tf->pc = entry_pt;
 	u_tf->npc = entry_pt + 4;

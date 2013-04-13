@@ -20,7 +20,7 @@
  * cast their threads to uthreads when talking with vcore code.  Vcore/default
  * 2LS code won't touch udata or beyond. */
 struct uthread {
-	struct user_trapframe utf;
+	struct user_context u_ctx;
 	struct ancillary_state as;
 	void *tls_desc;
 	int flags;
@@ -80,10 +80,11 @@ void run_uthread(struct uthread *uthread);
 
 /* Asking for trouble with this API, when we just want stacktop (or whatever
  * the SP will be). */
-static inline void init_uthread_tf(struct uthread *uth, void (*entry)(void),
-                                   void *stack_bottom, uint32_t size)
+static inline void init_uthread_ctx(struct uthread *uth, void (*entry)(void),
+                                    void *stack_bottom, uint32_t size)
 {
-	init_user_tf(&uth->utf, (long)entry, (long)(stack_bottom) + size);
+	init_user_tf(&uth->u_ctx.tf.hw_tf, (long)entry,
+	             (long)(stack_bottom) + size);
 }
 
 #define uthread_set_tls_var(uth, name, val)                                    \

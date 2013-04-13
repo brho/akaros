@@ -163,7 +163,7 @@ is currently done via sys_getcpuid().  The name will probably change.
 2.4.1: To go from _S to _M, a process requests cores.
 --------------
 A resource request from 0 to 1 or more causes a transition from _S to _M.  The
-calling context is saved in the notification slot (notif_tf) in vcore0's
+calling context is saved in the uthread slot (uthread_ctx) in vcore0's
 preemption data (in procdata).  The second level scheduler needs to be able to
 restart the context when vcore0 starts up.  To do this, it will need to save the
 TLS/TCB descriptor and the floating point/silly state (if applicable) in the
@@ -182,13 +182,13 @@ also a syscall to get the vcoreid, but this will save an extra trap at vcore
 start time.
 
 Future proc_runs(), like from RUNNABLE_M to RUNNING_M start all cores at the
-entry point, including vcore0.  The saving of a _S context to vcore0's notif_tf
-only happens on the transition from _S to _M (which the process needs to be
-aware of for a variety of reasons).  This also means that userspace needs to
-handle vcore0 coming up at the entry point again (and not starting the program
-over).  This is currently done in sysdeps-ros/start.c, via the static variable
-init.  Note there are some tricky things involving dynamically linked programs,
-but it all works currently.
+entry point, including vcore0.  The saving of a _S context to vcore0's
+uthread_ctx only happens on the transition from _S to _M (which the process
+needs to be aware of for a variety of reasons).  This also means that userspace
+needs to handle vcore0 coming up at the entry point again (and not starting the
+program over).  This is currently done in sysdeps-ros/start.c, via the static
+variable init.  Note there are some tricky things involving dynamically linked
+programs, but it all works currently.
 
 When coming in to the entry point, whether as the result of a startcore or a
 notification, the kernel will set the stack pointer to whatever is requested
@@ -451,14 +451,14 @@ This can be really tricky.  When userspace is changing threads, it will need to
 unmask notifs as well as jump to the new thread.  There is a slight race here,
 but it is okay.  The race is that an IPI can arrive after notifs are unmasked,
 but before returning to the real user thread.  Then the code will think the
-notif_tf represents the new user thread, even though it hasn't started (and the
-PC is wrong).  The trick is to make sure that all state required to start the
-new thread, as well as future instructions, are all saved within the "stuff"
-that gets saved in the notif_tf.  When these threading packages change contexts,
-they ought to push the PC on the stack of the new thread, (then enable notifs)
-and then execute a return.  If an IPI arrives before the "function return", then
-when that context gets restarted, it will run the "return" with the appropriate
-value on the stack still.
+uthread_ctx represents the new user thread, even though it hasn't started (and
+the PC is wrong).  The trick is to make sure that all state required to start
+the new thread, as well as future instructions, are all saved within the "stuff"
+that gets saved in the uthread_ctx.  When these threading packages change
+contexts, they ought to push the PC on the stack of the new thread, (then enable
+notifs) and then execute a return.  If an IPI arrives before the "function
+return", then when that context gets restarted, it will run the "return" with
+the appropriate value on the stack still.
 
 There is a further complication.  The kernel can send an IPI that the process
 wanted, but the vcore did not get truly interrupted since its notifs were
@@ -478,31 +478,14 @@ handled in pop_ros_tf().
 
 4.3: Preemption Specifics
 -------------------------------
-When a vcore is preempted, the kernel takes whatever context was running (which
-could be a notification context) and stores it in the preempt trapframe for
-that vcore in procdata.  There is also a flag (actually a counter) that states
-if the context there has been sorted out.  Userspace should set this once it
-has copied out the data and dealt with it accordingly.
-
-The invariant regarding the preemption slot is that there should never be
-anything running on a vcore when there is a valid/not-sorted preempt
-trapframe.  The reason is that a preemption can come in at any time (such as
-right after returning from a preemption).
-
-To maintain this invariant, when the kernel starts a vcore, it will run the
-context that is in the preempt trapframe if the "preempt_tf_valid" seq_ctr is
-not set.  A process needs to be careful of a race here.  If they are trying to
-deal with a preempt trapframe (must be from another vcore, btw), the kernel
-could start to run that trapframe (in case it is granting a core request /
-proc_startcore()ing).  When the kernel prepares to use the trapframe (which it
-will do regardless of userspace activities), it will up the seq_ctr.  We use a
-seq_ctr (mostly just a counter) to avoid ABA-related issues.  If the process
-notices a change in that flag, it ought to abort its operation.  It can up the
-counter on its own when it no longer wants the kernel to run that context (this
-means the preempt_tf can get clobbered).
+There's an issue with a preempted vcore getting restarted while a remote core
+tries to restart that context.  They resolve this fight with a variety of VC
+flags (VC_UTHREAD_STEALING).  Check out handle_preempt() in uthread.c.
 
 4.4: Other trickiness
 -------------------------------
+Take all of these with a grain of salt - it's quite old.
+
 4.4.1: Preemption -> deadlock
 -------------------------------
 One issue is that a context can be holding a lock that is necessary for the
@@ -553,35 +536,9 @@ hardware interrupts (on x86, at least).
 
 4.4.3: Restarting a Preempted Notification
 -------------------------------
-There will be cases where the trapframe in the preempt_tf slot is actually a
-notification handler, which was running on the transition stack of that
-particular vcore.  Userspace needs to be careful about restarting contexts
-that were on those cores on different cores.  They can tell by examining the
-stack pointer to see if it was on a transition stack.  Alternatively, if
-notifications are masked, it is also likely they in a notification handler.  The
-real concern is the transition stack.  If a vcore is processing on the
-transition stack of another vcore, there is a risk that the vcore comes back up
-and starts clobbering the transition stack.
-
-To avoid this, userspace could allocate a new transition stack and switch the
-target vcore to use that new stack (in procdata).  The only time (for now)
-that the kernel cares about a transition stack is when it is popping a tf on a
-new or freshly notified vcore.  Something similar will need to be done with TLS.
-
-This all should be a rare occurance, since the vcore should see the
-preempt_pending when it starts its notification and yield, instead of being
-forced into this weird situation.  This also means that notifications should
-take less time than the kernel will wait before preempting.
-
-This issue ties in with deadlocking in 4.4.1.  If userspace is never in a
-notif handler when it gets preempted, that deadlock will not happen (and we
-also may need only one trapframe slot).  Userspace probably cannot guarantee
-that, so we'll have to deal with it.  Avoiding the deadlock on a spinlock is
-much more reasonable (and we can provide the locking function).
-
-Another thing to keep in mind is that userspace probably won't want to restart a
-notification handler on a different core.  It's conceivable that they want to
-take a regular user thread and context and restart it, not a transition context.
+Nowadays, to restart a preempted notification, you just restart the vcore.
+The kernel does, either if it gives the process more cores or if userspace asked
+it to with a sys_change_vcore().
 
 4.4.4: Userspace Yield Races
 -------------------------------

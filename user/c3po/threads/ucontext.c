@@ -53,14 +53,14 @@ struct u_context* create_context(thread_t *t, void *entry_pt, void *stack_top)
 	uc->thread = t;
 
 	/* Initialize the trapframe for this context */
-	init_user_tf(&uc->utf, (uint32_t)entry_pt, (uint32_t)stack_top);
+	init_user_tf(&uc->u_ctx.tf.hw_tf, (uint32_t)entry_pt, (uint32_t)stack_top);
 	return uc;
 }
 
 void save_context(struct u_context *uc)
 {
 	/* Save the trapframe for this context */
-	save_ros_tf(&uc->utf);
+	save_ros_tf(&uc->u_ctx.tf.hw_tf);
 }
 
 void restore_context(struct u_context *uc)
@@ -75,7 +75,7 @@ void restore_context(struct u_context *uc)
 	/* Tell the uthread which vcore it is on */
 	__vcoreid = vcoreid;
 	/* Pop the trapframe */
-	pop_ros_tf(&uc->utf, vcoreid);
+	pop_ros_tf(&uc->u_ctx.tf.hw_tf, vcoreid);
 }
 
 void destroy_context(struct u_context *uc)
@@ -94,7 +94,8 @@ void destroy_context(struct u_context *uc)
 
 void print_context(struct u_context *uc)
 {
+	printf("GIANT WARNING: this assumes a HW ctx\n");
 	/* Just print the trapframe */
-	print_trapframe(&uc->utf);
+	print_trapframe(&uc->u_ctx.tf.hw_tf);
 }
 

@@ -118,8 +118,8 @@ void ghetto_vcore_entry(void)
 		run_current_uthread();
 		panic("should never see me!");
 	}	
-	/* unmask notifications once you can let go of the notif_tf and it is okay
-	 * to clobber the transition stack.
+	/* unmask notifications once you can let go of the uthread_ctx and it is
+	 * okay to clobber the transition stack.
 	 * Check Documentation/processes.txt: 4.2.4.  In real code, you should be
 	 * popping the tf of whatever user process you want (get off the x-stack) */
 	struct preempt_data *vcpd;

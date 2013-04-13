@@ -481,16 +481,16 @@ void proc_run_s(struct proc *p)
 			assert(!pcpui->owning_proc);
 			pcpui->owning_proc = p;
 			pcpui->owning_vcoreid = 0; /* TODO (VC#) */
-			/* TODO: (HSS) set silly state here (__startcore does it instantly) */
+			/* TODO: (HSS) set FP state here (__startcore does it instantly) */
 			/* similar to the old __startcore, start them in vcore context if
 			 * they have notifs and aren't already in vcore context.  o/w, start
 			 * them wherever they were before (could be either vc ctx or not) */
 			if (!vcpd->notif_disabled && vcpd->notif_pending
 			                          && scp_is_vcctx_ready(vcpd)) {
 				vcpd->notif_disabled = TRUE;
-				/* save the _S's ctx in the notify slot, build and pop a new one
-				 * in actual/cur_ctx. */
-				vcpd->notif_tf = p->scp_ctx.tf.hw_tf;	/* TODO CTX */
+				/* save the _S's ctx in the uthread slot, build and pop a new
+				 * one in actual/cur_ctx. */
+				vcpd->uthread_ctx = p->scp_ctx;
 				pcpui->cur_ctx = &pcpui->actual_ctx;
 				memset(pcpui->cur_ctx, 0, sizeof(struct user_context));
 				proc_init_ctx(pcpui->cur_ctx, 0, p->env_entry,
@@ -807,14 +807,10 @@ int proc_change_to_m(struct proc *p)
 			 * TODO: relies on vcore0 being the caller (VC#) */
 			if ((current != p) || (get_pcoreid(p, 0) != core_id()))
 				panic("We don't handle async RUNNING_S core requests yet.");
-			/* save the tf so userspace can restart it.  Like in __notify,
-			 * this assumes a user tf is the same as a kernel tf.  We save
-			 * it in the preempt slot so that we can also save the silly
-			 * state. */
 			struct preempt_data *vcpd = &p->procdata->vcore_preempt_data[0];
 			assert(current_ctx);
-			/* Copy uthread0's context to the notif slot */
-			vcpd->notif_tf = current_ctx->tf.hw_tf; /* TODO CTX */
+			/* Copy uthread0's context to VC 0's uthread slot */
+			vcpd->uthread_ctx = *current_ctx;
 			clear_owning_proc(core_id());	/* so we don't restart */
 			save_fp_state(&vcpd->preempt_anc);
 			/* Userspace needs to not fuck with notif_disabled before
@@ -1701,14 +1697,14 @@ static void __set_curctx_to_vcoreid(struct proc *p, uint32_t vcoreid,
 	printd("[kernel] startcore on physical core %d for process %d's vcore %d\n",
 	       core_id(), p->pid, vcoreid);
 	/* If notifs are disabled, the vcore was in vcore context and we need to
-	 * restart the preempt_tf.  o/w, we give them a fresh vcore (which is also
+	 * restart the vcore_ctx.  o/w, we give them a fresh vcore (which is also
 	 * what happens the first time a vcore comes online).  No matter what,
 	 * they'll restart in vcore context.  It's just a matter of whether or not
 	 * it is the old, interrupted vcore context. */
 	if (vcpd->notif_disabled) {
 		restore_fp_state(&vcpd->preempt_anc);
 		/* copy-in the tf we'll pop, then set all security-related fields */
-		pcpui->actual_ctx.tf.hw_tf = vcpd->preempt_tf;	/* TODO CTX */
+		pcpui->actual_ctx = vcpd->vcore_ctx;
 		proc_secure_ctx(&pcpui->actual_ctx);
 	} else { /* not restarting from a preemption, use a fresh vcore */
 		assert(vcpd->transition_stack);
@@ -1794,12 +1790,12 @@ int proc_change_to_vcore(struct proc *p, uint32_t new_vcoreid,
 	/* enable_my_notif signals how we'll be restarted */
 	if (enable_my_notif) {
 		/* if they set this flag, then the vcore can just restart from scratch,
-		 * and we don't care about either the notif_tf or the preempt_tf. */
+		 * and we don't care about either the uthread_ctx or the vcore_ctx. */
 		caller_vcpd->notif_disabled = FALSE;
 	} else {
 		/* need to set up the calling vcore's ctx so that it'll get restarted by
 		 * __startcore, to make the caller look like it was preempted. */
-		caller_vcpd->preempt_tf = current_ctx->tf.hw_tf; // TODO CTX
+		caller_vcpd->vcore_ctx = *current_ctx;
 		save_fp_state(&caller_vcpd->preempt_anc);
 		/* Mark our core as preempted (for userspace recovery). */
 		atomic_or(&caller_vcpd->flags, VC_PREEMPTED);
@@ -1923,9 +1919,9 @@ void __notify(uint32_t srcid, long a0, long a1, long a2)
 	if (vcpd->notif_disabled)
 		return;
 	vcpd->notif_disabled = TRUE;
-	/* save the old tf in the notify slot, build and pop a new one.  Note that
+	/* save the old ctx in the uthread slot, build and pop a new one.  Note that
 	 * silly state isn't our business for a notification. */
-	vcpd->notif_tf = pcpui->cur_ctx->tf.hw_tf; /* TODO CTX */
+	vcpd->uthread_ctx = *pcpui->cur_ctx;
 	memset(pcpui->cur_ctx, 0, sizeof(struct user_context));
 	proc_init_ctx(pcpui->cur_ctx, vcoreid, p->env_entry,
 	              vcpd->transition_stack);
@@ -1952,13 +1948,13 @@ void __preempt(uint32_t srcid, long a0, long a1, long a2)
 	printd("[kernel] received __preempt for proc %d's vcore %d on pcore %d\n",
 	       p->procinfo->pid, vcoreid, coreid);
 	/* if notifs are disabled, the vcore is in vcore context (as far as we're
-	 * concerned), and we save it in the preempt slot. o/w, we save the
-	 * process's cur_ctx in the notif slot, and it'll appear to the vcore when
-	 * it comes back up that it just took a notification. */
+	 * concerned), and we save it in the vcore slot. o/w, we save the process's
+	 * cur_ctx in the uthread slot, and it'll appear to the vcore when it comes
+	 * back up the uthread just took a notification. */
 	if (vcpd->notif_disabled)
-		vcpd->preempt_tf = pcpui->cur_ctx->tf.hw_tf; /* TODO CTX */
+		vcpd->vcore_ctx = *pcpui->cur_ctx;
 	else
-		vcpd->notif_tf = pcpui->cur_ctx->tf.hw_tf; /* TODO CTX */
+		vcpd->uthread_ctx = *pcpui->cur_ctx;
 	/* either way, we save the silly state (FP) */
 	save_fp_state(&vcpd->preempt_anc);
 	/* Mark the vcore as preempted and unlock (was locked by the sender). */

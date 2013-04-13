@@ -507,7 +507,7 @@ assumptions about the vcore->pcore mapping and can result in multiple
 instances of the same vcore on different pcores.  Imagine a preempt message
 sent to a pcore (after the alarm goes off), meanwhile that vcore/pcore yields
 and the vcore reactivates somewhere else.  There is a potential race on the
-preempt_tf state: the new vcore is reading while the old is writing.  This
+vcore_ctx state: the new vcore is reading while the old is writing.  This
 issue is sorted naturally: the vcore entry in the vcoremap isn't cleared until
 the vcore/pcore is actually yielded/taken away, so the code looking for a free
 vcoreid slot will not try to use it.
@@ -546,7 +546,7 @@ process is not running.  Ultimately, the process wants to be notified on a
 given vcore.  Whenever we send an active notification, we set a flag in procdata
 (notif_pending).  If the vcore is offline, we don't bother sending the IPI/notif
 message.  The kernel will make sure it runs the notification handler (as well as
-restoring the preempt_tf) the next time that vcore is restarted.  Note that
+restoring the vcore_ctx) the next time that vcore is restarted.  Note that
 userspace can toggle this, so they can handle the notifications from a different
 core if it likes, or they can independently send a notification.
 
@@ -555,9 +555,10 @@ disabled (this is done in pop_ros_tf() by userspace).  The overall meaning of
 notif_pending is that a vcore wants to be IPI'd.  The IPI could be in-flight, or
 it could be missed.  Since notification IPIs can be spurious, when we have
 potential races, we err on the side of sending.  This happens when pop_ros_tf()
-notifies itself, and when the kernel starts a vcore in it's notif handler if it
-was preempted and notif was pending.  In the latter case, the kernel will put
-the preempt_tf in the notif_tf, so userspace can restart that at its leisure.
+notifies itself, and when the kernel makes sure to start a vcore in vcore
+context if a notif was pending.  This was simplified a bit over the years by
+having uthreads always get saved into the uthread_ctx (formerly the notif_tf),
+instead of in the old preempt_tf (which is now the vcore_ctx).
 
 If a vcore has a preempt_pending, we will still send the active notification
 (IPI).  The core ought to get a notification for the preemption anyway, so we
@@ -576,7 +577,7 @@ do is execute the notification handler and jump to userspace.  Since there is
 still an k_msg in the queue (and we self_ipi'd ourselves, it's part of how
 k_msgs work), the IPI will fire and push us right back into the kernel to
 execute the preemption, and the notif handler's context will be saved in the
-preempt_tf (ready to go when the vcore gets started again).
+vcore_ctx (ready to go when the vcore gets started again).
 
 We could try to just leave the notif_pending flag set and ignore the message,
 but that would involve inspecting the queue for the preempt k_msg.

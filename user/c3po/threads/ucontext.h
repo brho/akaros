@@ -5,7 +5,8 @@
 #include <ros/trapframe.h>
 #include <threadlib_internal.h>
 struct u_context {
-	struct user_trapframe utf;
+	/* this seems rather screwed up, not inheriting a uthread */
+	struct user_context u_ctx;
     void *tls_desc;
 	thread_t *thread;
 }; 

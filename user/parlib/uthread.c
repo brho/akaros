@@ -278,7 +278,7 @@ void uthread_yield(bool save_state, void (*yield_func)(struct uthread*, void*),
 	if (save_state) {
 		/* TODO: (HSS) Save silly state */
 		// save_fp_state(&t->as);
-		save_ros_tf(&uthread->utf);
+		save_ros_tf(&uthread->u_ctx.tf.hw_tf);
 	}
 	cmb();	/* Force a reread of yielding. Technically save_ros_tf() is enough*/
 	/* Restart path doesn't matter if we're dying */
@@ -394,14 +394,14 @@ static void __run_cur_uthread(void)
 	set_tls_desc(uthread->tls_desc, vcoreid);
 	__vcoreid = vcoreid;	/* setting the uthread's TLS var */
 	/* Depending on where it was saved, we pop differently.  This assumes that
-	 * if a uthread was not saved, that it was running in the vcpd notif tf.
+	 * if a uthread was not saved, that it was running in the vcpd uthread_ctx.
 	 * There should never be a time that the TF is unsaved and not in the notif
 	 * TF (or about to be in that TF). */
 	if (uthread->flags & UTHREAD_SAVED) {
 		uthread->flags &= ~UTHREAD_SAVED;
-		pop_ros_tf(&uthread->utf, vcoreid);
+		pop_ros_tf(&uthread->u_ctx.tf.hw_tf, vcoreid);
 	} else  {
-		pop_ros_tf(&vcpd->notif_tf, vcoreid);
+		pop_ros_tf(&vcpd->uthread_ctx.tf.hw_tf, vcoreid);
 	}
 }
 
@@ -471,7 +471,7 @@ static void __run_current_uthread_raw(void)
 	set_tls_desc(current_uthread->tls_desc, vcoreid);
 	__vcoreid = vcoreid;	/* setting the uthread's TLS var */
 	/* Pop the user trap frame */
-	pop_ros_tf_raw(&vcpd->notif_tf, vcoreid);
+	pop_ros_tf_raw(&vcpd->uthread_ctx.tf.hw_tf, vcoreid);
 	assert(0);
 }
 
@@ -483,7 +483,7 @@ static void copyout_uthread(struct preempt_data *vcpd, struct uthread *uthread)
 	assert(uthread);
 	/* Copy out the main tf if we need to */
 	if (!(uthread->flags & UTHREAD_SAVED)) {
-		uthread->utf = vcpd->notif_tf;
+		uthread->u_ctx = vcpd->uthread_ctx;
 		uthread->flags |= UTHREAD_SAVED;
 		printd("VC %d copying out uthread %08p\n", vcore_id(), uthread);
 	}

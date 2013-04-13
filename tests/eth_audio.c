@@ -121,11 +121,11 @@ void vcore_entry(void)
 		set_tls_desc(core0_tls, 0);
 		assert(__vcoreid == 0); /* in case anyone uses this */
 		/* Load silly state (Floating point) too */
-		pop_ros_tf(&vcpd->notif_tf, vcoreid);
+		pop_ros_tf(&vcpd->uthread_ctx.tf.hw_tf, vcoreid);
 		printf("should never see me!");
 	}	
-	/* unmask notifications once you can let go of the notif_tf and it is okay
-	 * to clobber the transition stack.
+	/* unmask notifications once you can let go of the uthread_ctx and it is
+	 * okay to clobber the transition stack.
 	 * Check Documentation/processes.txt: 4.2.4.  In real code, you should be
 	 * popping the tf of whatever user process you want (get off the x-stack) */
 	vcpd->notif_disabled = FALSE;
