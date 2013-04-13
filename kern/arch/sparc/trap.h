@@ -1,7 +1,7 @@
 #ifndef ROS_INC_ARCH_TRAP_H
 #define ROS_INC_ARCH_TRAP_H
 
-#define SIZEOF_TRAPFRAME_T	0xA8
+#define SIZEOF_HW_TRAPFRAME	0xA8
 #define SIZEOF_KERNEL_MESSAGE_T	0x20
 
 #ifndef __ASSEMBLER__
@@ -22,7 +22,7 @@
  * space. */
 uintptr_t core_stacktops[MAX_NUM_CPUS];
 
-/* the struct trapframe and friends are in ros/arch/trapframe.h */
+/* the struct hw_trapframe and friends are in ros/arch/trapframe.h */
 
 void data_access_exception(struct hw_trapframe *state);
 void real_fp_exception(struct hw_trapframe *state, ancillary_state_t *astate);
@@ -42,7 +42,7 @@ static inline bool in_kernel(struct hw_trapframe *hw_tf)
 static inline void __attribute__((always_inline))
 set_stack_pointer(uintptr_t sp)
 {
-	sp = sp - SIZEOF_TRAPFRAME_T;
+	sp = sp - SIZEOF_HW_TRAPFRAME;
 	asm volatile("mov %0,%%sp" : : "r"(sp));
 }
 

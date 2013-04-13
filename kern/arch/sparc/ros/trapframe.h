@@ -8,7 +8,7 @@
 #include <ros/common.h>
 #include <stdint.h>
 
-typedef struct trapframe
+struct hw_trapframe
 {
 	uint32_t gpr[32] __attribute__((aligned (8)));
 	uint32_t psr;
@@ -20,10 +20,10 @@ typedef struct trapframe
 	uint32_t fault_status;
 	uint32_t fault_addr;
 	uint64_t timestamp;
-} trapframe_t;
+};
 
 /* Temporary aliasing */
-#define hw_trapframe trapframe
+#define trapframe hw_trapframe
 
 struct sw_trapframe {
 	/* TODO */

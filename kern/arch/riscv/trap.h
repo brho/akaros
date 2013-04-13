@@ -2,9 +2,9 @@
 #define ROS_ARCH_TRAP_H
 
 #ifdef __riscv64
-# define SIZEOF_TRAPFRAME_T (36*8)
+# define SIZEOF_HW_TRAPFRAME (36*8)
 #else
-# define SIZEOF_TRAPFRAME_T (36*4)
+# define SIZEOF_HW_TRAPFRAME (36*4)
 #endif
 
 #ifndef __ASSEMBLER__

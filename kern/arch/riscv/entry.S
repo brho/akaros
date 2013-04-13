@@ -122,7 +122,7 @@ trap_entry:
   # when coming from kernel, continue below its stack
   mfpcr x1, ASM_CR(PCR_SR)
   and   x1, x1, SR_PS
-  add   x2, sp, -SIZEOF_TRAPFRAME_T
+  add   x2, sp, -SIZEOF_HW_TRAPFRAME
   bnez  x1, 1f
 
   # otherwise, start at the top of the per-core stack
@@ -131,7 +131,7 @@ trap_entry:
   sll   x1, x1, LOG_REGBYTES
   add   x2, x2, x1
   LOAD  x2, 0(x2)
-  add   x2, x2, -SIZEOF_TRAPFRAME_T
+  add   x2, x2, -SIZEOF_HW_TRAPFRAME
 
 1:# save gprs
   STORE  x3,3*REGBYTES(x2)

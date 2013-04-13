@@ -8,17 +8,17 @@
 #include <ros/common.h>
 #include <stdint.h>
 
-typedef struct trapframe
+struct hw_trapframe
 {
   uintptr_t gpr[32];
   uintptr_t sr;
   uintptr_t epc;
   uintptr_t badvaddr;
   long cause;
-} trapframe_t;
+};
 
 /* Temporary aliasing */
-#define hw_trapframe trapframe
+#define trapframe hw_trapframe
 
 struct sw_trapframe {
 	/* TODO */

@@ -18,8 +18,8 @@
 void
 static_asserts_can_go_here()
 {
-	static_assert(SIZEOF_TRAPFRAME_T == sizeof(struct hw_trapframe));
-	static_assert(SIZEOF_TRAPFRAME_T % 8 == 0);
+	static_assert(SIZEOF_HW_TRAPFRAME == sizeof(struct hw_trapframe));
+	static_assert(SIZEOF_HW_TRAPFRAME % 8 == 0);
 	static_assert(SIZEOF_KERNEL_MESSAGE_T == sizeof(kernel_message_t));
 	static_assert(SIZEOF_KERNEL_MESSAGE_T % 8 == 0);
 	static_assert(offsetof(env_t,scp_ctx) % 8 == 0);

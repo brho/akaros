@@ -20,7 +20,7 @@ typedef struct pushregs {
 	uint32_t reg_eax;
 } push_regs_t;
 
-typedef struct trapframe {
+struct hw_trapframe {
 	push_regs_t tf_regs;
 	uint16_t tf_gs;
 	uint16_t tf_padding1;
@@ -41,10 +41,10 @@ typedef struct trapframe {
 	uintptr_t tf_esp;
 	uint16_t tf_ss;
 	uint16_t tf_padding6;
-} trapframe_t;
+};
 
 /* Temporary aliasing */
-#define hw_trapframe trapframe
+#define trapframe hw_trapframe
 
 struct sw_trapframe {
 	/* TODO */

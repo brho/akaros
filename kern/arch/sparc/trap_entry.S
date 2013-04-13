@@ -64,13 +64,13 @@ handle_trap:
 	 mov	%l1,%l5
 
 	// Trap came from kernel.  Spill a window if necessary.
-	SAVE_MINIMAL_TF(%fp-SIZEOF_TRAPFRAME_T)
+	SAVE_MINIMAL_TF(%fp-SIZEOF_HW_TRAPFRAME)
 	mov	%tbr,%g1
 	restore
 	save
 
 	// Set up stack, save state, call handler
-	sub	%fp,96+SIZEOF_TRAPFRAME_T,%sp
+	sub	%fp,96+SIZEOF_HW_TRAPFRAME,%sp
 
 	// Save full trap frame if this was a synchronous exception (=> bug!!)
 	and	%g1,0xF00,%g1
@@ -99,7 +99,7 @@ handle_trap:
 	sll	%l1,2,%l1
 	set	core_stacktops,%l2
 	ld	[%l2 + %l1],%l1
-	set	SIZEOF_TRAPFRAME_T,%l2
+	set	SIZEOF_HW_TRAPFRAME,%l2
 	sub	%l1,%l2,%l1
 
 	SAVE_MINIMAL_TF(%l1)
@@ -173,7 +173,7 @@ env_pop_tf:
 	RESTORE_MINIMAL_TF(%o0)
 
 	// save_rest_of_tf saves what SAVE_MINIMAL_TF doesn't.
-	// o0: destination trapframe_t*
+	// o0: destination struct hw_trapframe*
 save_rest_of_tf:
 
 	mov	%wim,%o4
