@@ -474,7 +474,7 @@ without fear of missing a notif.  If it is not clear, it needs to manually
 notify itself (sys_self_notify) so that it can process the notification that it
 missed and for which it wanted to receive an IPI.  Before it does this, it needs
 to clear notif_pending, so the kernel will send it an IPI.  These last parts are
-handled in pop_ros_tf().
+handled in pop_user_ctx().
 
 4.3: Preemption Specifics
 -------------------------------

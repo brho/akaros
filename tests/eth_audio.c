@@ -121,7 +121,7 @@ void vcore_entry(void)
 		set_tls_desc(core0_tls, 0);
 		assert(__vcoreid == 0); /* in case anyone uses this */
 		/* Load silly state (Floating point) too */
-		pop_ros_tf(&vcpd->uthread_ctx.tf.hw_tf, vcoreid);
+		pop_user_ctx(&vcpd->uthread_ctx, vcoreid);
 		printf("should never see me!");
 	}	
 	/* unmask notifications once you can let go of the uthread_ctx and it is

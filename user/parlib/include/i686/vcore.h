@@ -8,9 +8,8 @@
 #include <ros/arch/mmu.h>
 #include <sys/vcore-tls.h>
 
-/* Pops an ROS kernel-provided TF, reanabling notifications at the same time.
- * A Userspace scheduler can call this when transitioning off the transition
- * stack.
+/* Pops a user context, reanabling notifications at the same time.  A Userspace
+ * scheduler can call this when transitioning off the transition stack.
  *
  * Make sure you clear the notif_pending flag, and then check the queue before
  * calling this.  If notif_pending is not clear, this will self_notify this
@@ -64,8 +63,10 @@ struct restart_helper {
 	uint32_t					eip;
 };
 
-static inline void pop_ros_tf(struct hw_trapframe *tf, uint32_t vcoreid)
+static inline void pop_user_ctx(struct user_context *ctx, uint32_t vcoreid)
 {
+	struct hw_trapframe *tf = &ctx->tf.hw_tf;
+	assert(ctx->type == ROS_HW_CTX);
 	struct restart_helper *rst;
 	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
 	if (!tf->tf_cs) { /* sysenter TF.  esp and eip are in other regs. */
@@ -126,10 +127,12 @@ static inline void pop_ros_tf(struct hw_trapframe *tf, uint32_t vcoreid)
 	              : "memory");
 }
 
-/* Like the regular pop_ros_tf, but this one doesn't check or clear
+/* Like the regular pop_user_ctx, but this one doesn't check or clear
  * notif_pending. */
-static inline void pop_ros_tf_raw(struct hw_trapframe *tf, uint32_t vcoreid)
+static inline void pop_user_ctx_raw(struct user_context *ctx, uint32_t vcoreid)
 {
+	struct hw_trapframe *tf = &ctx->tf.hw_tf;
+	assert(ctx->type == ROS_HW_CTX);
 	struct restart_helper *rst;
 	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
 	if (!tf->tf_cs) { /* sysenter TF.  esp and eip are in other regs. */
@@ -156,8 +159,8 @@ static inline void pop_ros_tf_raw(struct hw_trapframe *tf, uint32_t vcoreid)
 	              "subl %%eax,%%esp;     " /* move to notif_en_loc slot */
 	              "popl %%eax;           " /* load notif_disabled addr */
 	              "movb $0x00,(%%eax);   " /* enable notifications */
-				  /* Here's where we differ from the regular pop_ros_tf().  We
-				   * do the same pops/esp moves, just to keep things similar
+				  /* Here's where we differ from the regular pop_user_ctx().
+				   * We do the same pops/esp moves, just to keep things similar
 				   * and simple, but don't do test, clear notif_pending, or
 				   * call a syscall. */
 				  /* From here down, we can get interrupted and restarted */
@@ -172,11 +175,13 @@ static inline void pop_ros_tf_raw(struct hw_trapframe *tf, uint32_t vcoreid)
 	              : "memory");
 }
 
-/* Save the current context/registers into the given tf, setting the pc of the
+/* Save the current context/registers into the given ctx, setting the pc of the
  * tf to the end of this function.  You only need to save that which you later
- * restore with pop_ros_tf(). */
-static inline void save_ros_tf(struct hw_trapframe *tf)
+ * restore with pop_user_ctx(). */
+static inline void save_user_ctx(struct user_context *ctx)
 {
+	struct hw_trapframe *tf = &ctx->tf.hw_tf;
+	ctx->type = ROS_HW_CTX;
 	memset(tf, 0, sizeof(struct hw_trapframe)); /* sanity */
 	/* set CS and make sure eflags is okay */
 	tf->tf_cs = GD_UT | 3;
@@ -198,10 +203,11 @@ static inline void save_ros_tf(struct hw_trapframe *tf)
 	             : "eax", "memory", "cc");
 }
 
-/* This assumes a user_tf looks like a regular kernel trapframe */
-static __inline void
-init_user_tf(struct hw_trapframe *u_tf, uint32_t entry_pt, uint32_t stack_top)
+static inline void init_user_ctx(struct user_context *ctx, uint32_t entry_pt,
+                                 uint32_t stack_top)
 {
+	struct hw_trapframe *u_tf = &ctx->tf.hw_tf;
+	ctx->type = ROS_HW_CTX;
 	memset(u_tf, 0, sizeof(struct hw_trapframe));
 	u_tf->tf_eip = entry_pt;
 	u_tf->tf_cs = GD_UT | 3;

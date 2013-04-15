@@ -57,9 +57,8 @@ static inline void __pop_ros_tf(struct hw_trapframe *tf, uint32_t vcoreid,
 	__pop_ros_tf_regs(tf, vcpd, vcoreid, helper);
 }
 
-/* Pops an ROS kernel-provided TF, reanabling notifications at the same time.
- * A Userspace scheduler can call this when transitioning off the transition
- * stack.
+/* Pops a user context, reanabling notifications at the same time.  A Userspace
+ * scheduler can call this when transitioning off the transition stack.
  *
  * Make sure you clear the notif_pending flag, and then check the queue before
  * calling this.  If notif_pending is not clear, this will self_notify this
@@ -70,30 +69,37 @@ static inline void __pop_ros_tf(struct hw_trapframe *tf, uint32_t vcoreid,
  * notifications, and when it gets resumed it can ultimately run the new
  * context.  Enough state is saved in the running context and stack to continue
  * running. */
-static inline void pop_ros_tf(struct hw_trapframe *tf, uint32_t vcoreid)
+static inline void pop_user_ctx(struct user_context *ctx, uint32_t vcoreid)
 {
+	struct hw_trapframe *tf = &ctx->tf.hw_tf;
+	assert(ctx->type == ROS_HW_CTX);
 	__pop_ros_tf(tf, vcoreid, &__pop_ros_tf_notifs);
 }
 
-/* Like the regular pop_ros_tf, but this one doesn't check or clear
+/* Like the regular pop_user_ctx, but this one doesn't check or clear
  * notif_pending. */
-static inline void pop_ros_tf_raw(struct hw_trapframe *tf, uint32_t vcoreid)
+static inline void pop_user_ctx_raw(struct user_context *ctx, uint32_t vcoreid)
 {
+	struct hw_trapframe *tf = &ctx->tf.hw_tf;
+	assert(ctx->type == ROS_HW_CTX);
 	__pop_ros_tf(tf, vcoreid, &__pop_ros_tf_notifs_raw);
 }
 
-/* Save the current context/registers into the given tf, setting the pc of the
+/* Save the current context/registers into the given ctx, setting the pc of the
  * tf to the end of this function.  You only need to save that which you later
- * restore with pop_ros_tf(). */
-static inline void save_ros_tf(struct hw_trapframe *tf)
+ * restore with pop_user_ctx(). */
+static inline void save_user_ctx(struct user_context *ctx)
 {
+	struct hw_trapframe *tf = &ctx->tf.hw_tf;
+	ctx->type = ROS_HW_CTX;
 	__save_ros_tf_regs(tf);
 }
 
-/* This assumes a user_tf looks like a regular kernel trapframe */
-static __inline void
-init_user_tf(struct hw_trapframe *u_tf, long entry_pt, long stack_top)
+static inline void init_user_ctx(struct user_context *ctx, uint32_t entry_pt,
+                                 uint32_t stack_top)
 {
+	struct hw_trapframe *u_tf = &ctx->tf.hw_tf;
+	ctx->type = ROS_HW_CTX;
 	memset(u_tf, 0, sizeof(*u_tf));
 	u_tf->gpr[30] = stack_top;
 	u_tf->epc = entry_pt;

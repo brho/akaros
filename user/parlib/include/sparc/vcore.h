@@ -23,9 +23,8 @@ static inline void set_tls_desc(void *tls_desc, uint32_t vcoreid)
 	__vcoreid = vcoreid;
 }
 
-/* Pops an ROS kernel-provided TF, reanabling notifications at the same time.
- * A Userspace scheduler can call this when transitioning off the transition
- * stack.
+/* Pops a user context, reanabling notifications at the same time.  A Userspace
+ * scheduler can call this when transitioning off the transition stack.
  *
  * Make sure you clear the notif_pending flag, and then check the queue before
  * calling this.  If notif_pending is not clear, this will self_notify this
@@ -36,8 +35,10 @@ static inline void set_tls_desc(void *tls_desc, uint32_t vcoreid)
  * notifications, and when it gets resumed it can ultimately run the new
  * context.  Enough state is saved in the running context and stack to continue
  * running. */
-static inline void pop_ros_tf(struct hw_trapframe *tf, uint32_t vcoreid)
+static inline void pop_user_ctx(struct user_context *ctx, uint32_t vcoreid)
 {
+	struct hw_trapframe *tf = &ctx->tf.hw_tf;
+	assert(ctx->type == ROS_HW_CTX);
 	// since we're changing the stack, move stuff into regs for now
 	register uint32_t _vcoreid = vcoreid;
 	register struct hw_trapframe* _tf = tf;
@@ -62,10 +63,12 @@ static inline void pop_ros_tf(struct hw_trapframe *tf, uint32_t vcoreid)
 	asm volatile ("mov %0, %%o0; ta 4" : : "r"(tf) : "memory");
 }
 
-/* Like the regular pop_ros_tf, but this one doesn't check or clear
+/* Like the regular pop_user_ctx, but this one doesn't check or clear
  * notif_pending.  TODO: someone from sparc should look at this. */
-static inline void pop_ros_tf_raw(struct hw_trapframe *tf, uint32_t vcoreid)
+static inline void pop_user_ctx_raw(struct user_context *ctx, uint32_t vcoreid)
 {
+	struct hw_trapframe *tf = &ctx->tf.hw_tf;
+	assert(ctx->type == ROS_HW_CTX);
 	// since we're changing the stack, move stuff into regs for now
 	register uint32_t _vcoreid = vcoreid;
 	register struct hw_trapframe* _tf = tf;
@@ -90,20 +93,23 @@ static inline void pop_ros_tf_raw(struct hw_trapframe *tf, uint32_t vcoreid)
 	asm volatile ("mov %0, %%o0; ta 4" : : "r"(tf) : "memory");
 }
 
-/* Save the current context/registers into the given tf, setting the pc of the
+/* Save the current context/registers into the given ctx, setting the pc of the
  * tf to the end of this function.  You only need to save that which you later
- * restore with pop_ros_tf(). */
-static inline void save_ros_tf(struct hw_trapframe *tf)
+ * restore with pop_user_ctx(). */
+static inline void save_user_ctx(struct user_context *ctx)
 {
+	struct hw_trapframe *tf = &ctx->tf.hw_tf;
+	ctx->type = ROS_HW_CTX;
 	// just do it in the kernel.  since we need to flush windows anyway,
 	// this isn't an egregious overhead.
 	asm volatile ("mov %0, %%o0; ta 5" : : "r"(tf) : "o0","memory");
 }
 
-/* This assumes a user_tf looks like a regular kernel trapframe */
-static __inline void
-init_user_tf(struct hw_trapframe *u_tf, uint32_t entry_pt, uint32_t stack_top)
+static inline void init_user_ctx(struct user_context *ctx, uint32_t entry_pt,
+                                 uint32_t stack_top)
 {
+	struct hw_trapframe *u_tf = &ctx->tf.hw_tf;
+	ctx->type = ROS_HW_CTX;
 	memset(u_tf, 0, sizeof(struct hw_trapframe));
 	u_tf->gpr[14] = stack_top - 96;
 	u_tf->pc = entry_pt;

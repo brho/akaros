@@ -35,7 +35,7 @@ static inline intreg_t __syscall_trap(uintreg_t a0, uintreg_t a1)
 {
 	intreg_t ret;
 
-	/* If you change this, change pop_ros_tf() */
+	/* If you change this, change pop_user_ctx() */
 	asm volatile("int %1"
 	             : "=a" (ret)
 	             : "i" (T_SYSCALL),

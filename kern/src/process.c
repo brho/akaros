@@ -1024,8 +1024,9 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 			goto out_failed;
 	}
 	/* Don't let them yield if they are missing a notification.  Userspace must
-	 * not leave vcore context without dealing with notif_pending.  pop_ros_tf()
-	 * handles leaving via uthread context.  This handles leaving via a yield.
+	 * not leave vcore context without dealing with notif_pending.
+	 * pop_user_ctx() handles leaving via uthread context.  This handles leaving
+	 * via a yield.
 	 *
 	 * This early check is an optimization.  The real check is below when it
 	 * works with the online_vcs list (syncing with event.c and INDIR/IPI

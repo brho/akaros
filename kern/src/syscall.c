@@ -825,7 +825,8 @@ static int sys_notify(struct proc *p, int target_pid, unsigned int ev_type,
 }
 
 /* Will notify the calling process on the given vcore, independently of WANTED
- * or advertised vcoreid.  If you change the parameters, change pop_ros_tf() */
+ * or advertised vcoreid.  If you change the parameters, change pop_user_ctx().
+ */
 static int sys_self_notify(struct proc *p, uint32_t vcoreid,
                            unsigned int ev_type, struct event_msg *u_msg,
                            bool priv)

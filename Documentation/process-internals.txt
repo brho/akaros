@@ -551,14 +551,14 @@ userspace can toggle this, so they can handle the notifications from a different
 core if it likes, or they can independently send a notification.
 
 Note we use notif_pending to detect if an IPI was missed while notifs were
-disabled (this is done in pop_ros_tf() by userspace).  The overall meaning of
-notif_pending is that a vcore wants to be IPI'd.  The IPI could be in-flight, or
-it could be missed.  Since notification IPIs can be spurious, when we have
-potential races, we err on the side of sending.  This happens when pop_ros_tf()
-notifies itself, and when the kernel makes sure to start a vcore in vcore
-context if a notif was pending.  This was simplified a bit over the years by
-having uthreads always get saved into the uthread_ctx (formerly the notif_tf),
-instead of in the old preempt_tf (which is now the vcore_ctx).
+disabled (this is done in pop_user_ctx() by userspace).  The overall meaning
+of notif_pending is that a vcore wants to be IPI'd.  The IPI could be
+in-flight, or it could be missed.  Since notification IPIs can be spurious,
+when we have potential races, we err on the side of sending.  This happens
+when pop_user_ctx() notifies itself, and when the kernel makes sure to start a
+vcore in vcore context if a notif was pending.  This was simplified a bit over
+the years by having uthreads always get saved into the uthread_ctx (formerly
+the notif_tf), instead of in the old preempt_tf (which is now the vcore_ctx).
 
 If a vcore has a preempt_pending, we will still send the active notification
 (IPI).  The core ought to get a notification for the preemption anyway, so we

@@ -270,7 +270,7 @@ void uthread_yield(bool save_state, void (*yield_func)(struct uthread*, void*),
 	struct preempt_data *vcpd = vcpd_of(vcoreid);
 	/* once we do this, we might miss a notif_pending, so we need to enter vcore
 	 * entry later.  Need to disable notifs so we don't get in weird loops with
-	 * save_ros_tf() and pop_ros_tf(). */
+	 * save_user_ctx() and pop_user_ctx(). */
 	disable_notifs(vcoreid);
 	/* take the current state and save it into t->utf when this pthread
 	 * restarts, it will continue from right after this, see yielding is false,
@@ -278,22 +278,22 @@ void uthread_yield(bool save_state, void (*yield_func)(struct uthread*, void*),
 	if (save_state) {
 		/* TODO: (HSS) Save silly state */
 		// save_fp_state(&t->as);
-		save_ros_tf(&uthread->u_ctx.tf.hw_tf);
+		save_user_ctx(&uthread->u_ctx);
 	}
-	cmb();	/* Force a reread of yielding. Technically save_ros_tf() is enough*/
+	cmb();	/* Force reread of yielding. Technically save_user_ctx() suffices*/
 	/* Restart path doesn't matter if we're dying */
 	if (!yielding)
 		goto yield_return_path;
 	yielding = FALSE; /* for when it starts back up */
 	/* Signal the current state is in utf.  Need to do this only the first time
-	 * through (not on the yield return path that comes after save_ros_tf) */
+	 * through (not on the yield return path that comes after save_user_ctx) */
 	if (save_state)
 		uthread->flags |= UTHREAD_SAVED | UTHREAD_FPSAVED;
 	/* Change to the transition context (both TLS and stack). */
 	extern void** vcore_thread_control_blocks;
 	set_tls_desc(vcore_thread_control_blocks[vcoreid], vcoreid);
 	assert(current_uthread == uthread);
-	assert(in_vcore_context());	/* technically, we aren't fully in vcore context */
+	assert(in_vcore_context());	/* technically, we aren't fully in vcore ctx */
 	/* After this, make sure you don't use local variables.  Also, make sure the
 	 * compiler doesn't use them without telling you (TODO).
 	 *
@@ -364,8 +364,8 @@ void __ros_mcp_syscall_blockon(struct syscall *sysc)
  * manages the TF, FP state, and related flags.
  *
  * This will adjust the thread's state, do one last check on notif_pending, and
- * pop the tf.  Note that the notif check is an optimization.  pop_ros_tf() will
- * definitely handle it, but it will take a syscall to do so later. */
+ * pop the ctx.  Note that the notif check is an optimization.  pop_user_ctx()
+ * will definitely handle it, but it will take a syscall to do so later. */
 static void __run_cur_uthread(void)
 {
 	uint32_t vcoreid = vcore_id();
@@ -395,13 +395,13 @@ static void __run_cur_uthread(void)
 	__vcoreid = vcoreid;	/* setting the uthread's TLS var */
 	/* Depending on where it was saved, we pop differently.  This assumes that
 	 * if a uthread was not saved, that it was running in the vcpd uthread_ctx.
-	 * There should never be a time that the TF is unsaved and not in the notif
-	 * TF (or about to be in that TF). */
+	 * There should never be a time that the ctx is unsaved and not in the VCPD
+	 * uthread ctx slot (or about to be in that ctx slot). */
 	if (uthread->flags & UTHREAD_SAVED) {
 		uthread->flags &= ~UTHREAD_SAVED;
-		pop_ros_tf(&uthread->u_ctx.tf.hw_tf, vcoreid);
+		pop_user_ctx(&uthread->u_ctx, vcoreid);
 	} else  {
-		pop_ros_tf(&vcpd->uthread_ctx.tf.hw_tf, vcoreid);
+		pop_user_ctx(&vcpd->uthread_ctx, vcoreid);
 	}
 }
 
@@ -470,8 +470,7 @@ static void __run_current_uthread_raw(void)
 	current_uthread->flags &= ~UTHREAD_SAVED;
 	set_tls_desc(current_uthread->tls_desc, vcoreid);
 	__vcoreid = vcoreid;	/* setting the uthread's TLS var */
-	/* Pop the user trap frame */
-	pop_ros_tf_raw(&vcpd->uthread_ctx.tf.hw_tf, vcoreid);
+	pop_user_ctx_raw(&vcpd->uthread_ctx, vcoreid);
 	assert(0);
 }
 

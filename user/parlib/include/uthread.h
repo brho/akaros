@@ -83,8 +83,7 @@ void run_uthread(struct uthread *uthread);
 static inline void init_uthread_ctx(struct uthread *uth, void (*entry)(void),
                                     void *stack_bottom, uint32_t size)
 {
-	init_user_tf(&uth->u_ctx.tf.hw_tf, (long)entry,
-	             (long)(stack_bottom) + size);
+	init_user_ctx(&uth->u_ctx, (long)entry, (long)(stack_bottom) + size);
 }
 
 #define uthread_set_tls_var(uth, name, val)                                    \
