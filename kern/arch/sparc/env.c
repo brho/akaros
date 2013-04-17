@@ -14,13 +14,6 @@
 #include <pmap.h>
 
 void
-( env_push_ancillary_state)(env_t* e)
-{
-	if(e->scp_ctx.hw_tf.psr & PSR_EF)
-		save_fp_state(&e->env_ancillary_state);
-}
-
-void
 save_fp_state(ancillary_state_t* silly)
 {
 	#define push_two_fp_regs(pdest,n) \
@@ -49,13 +42,6 @@ save_fp_state(ancillary_state_t* silly)
 	push_two_fp_regs(silly->fpr,30);
 
 	write_psr(read_psr() & ~PSR_EF);
-}
-
-void
-( env_pop_ancillary_state)(env_t* e)
-{ 
-	if(e->scp_ctx.hw_tf.psr & PSR_EF)
-		restore_fp_state(&e->env_ancillary_state);
 }
 
 void

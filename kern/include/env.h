@@ -30,7 +30,6 @@ struct proc {
 	TAILQ_ENTRY(proc) sibling_link;
 	spinlock_t proc_lock;
 	struct user_context scp_ctx; 	/* context for an SCP.  TODO: move to vc0 */
-	ancillary_state_t env_ancillary_state; 	// State saved when descheduled
 	pid_t pid;
 	/* Tempting to add a struct proc *parent, but we'd need to protect the use
 	 * of that reference from concurrent parent-death (letting init inherit
@@ -99,8 +98,6 @@ typedef struct proc env_t;
 extern atomic_t num_envs;		// Number of envs
 
 int		env_setup_vm(env_t *e);
-void	env_push_ancillary_state(env_t* e);
-void	env_pop_ancillary_state(env_t* e);
 void	env_user_mem_free(env_t* e, void* start, size_t len);
 void	env_pagetable_free(env_t* e);
 

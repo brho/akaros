@@ -23,7 +23,6 @@ static_asserts_can_go_here()
 	static_assert(SIZEOF_KERNEL_MESSAGE_T == sizeof(kernel_message_t));
 	static_assert(SIZEOF_KERNEL_MESSAGE_T % 8 == 0);
 	static_assert(offsetof(env_t,scp_ctx) % 8 == 0);
-	static_assert(offsetof(env_t,env_ancillary_state) % 8 == 0);
 }
 
 void

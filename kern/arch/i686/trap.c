@@ -328,19 +328,6 @@ static void trap_dispatch(struct hw_trapframe *hw_tf)
 	return;
 }
 
-void
-env_push_ancillary_state(env_t* e)
-{
-	// TODO: (HSS) handle silly state (don't really want this per-process)
-	// Here's where you'll save FP/MMX/XMM regs
-}
-
-void
-env_pop_ancillary_state(env_t* e)
-{
-	// Here's where you'll restore FP/MMX/XMM regs
-}
-
 /* Helper.  For now, this copies out the TF to pcpui.  Eventually, we should
  * consider doing this in trapentry.S
  *
