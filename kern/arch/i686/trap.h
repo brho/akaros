@@ -75,15 +75,21 @@ static inline bool in_kernel(struct hw_trapframe *hw_tf)
 	return (hw_tf->tf_cs & ~3) == GD_KT;
 }
 
-/* TODO: (HSS) */
 static inline void save_fp_state(struct ancillary_state *silly)
 {
 	asm volatile("fxsave %0" : : "m"(*silly));
 }
 
+/* TODO: this can trigger a GP fault if MXCSR reserved bits are set.  Callers
+ * will need to handle intercepting the kernel fault. */
 static inline void restore_fp_state(struct ancillary_state *silly)
 {
 	asm volatile("fxrstor %0" : : "m"(*silly));
+}
+
+static inline void init_fp_state(void)
+{
+	asm volatile("fninit");
 }
 
 static inline void __attribute__((always_inline))

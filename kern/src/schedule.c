@@ -371,6 +371,9 @@ static bool __schedule_scp(void)
 			/* locking just to be safe */
 			spin_lock(&p->proc_lock);
 			__proc_set_state(pcpui->owning_proc, PROC_RUNNABLE_S);
+			/* Saving FP state aggressively.  Odds are, the SCP was hit by an
+			 * IRQ and has a HW ctx, in which case we must save. */
+			__proc_save_fpu_s(pcpui->owning_proc);
 			__proc_save_context_s(pcpui->owning_proc, pcpui->cur_ctx);
 			spin_unlock(&p->proc_lock);
 			/* round-robin the SCPs (inserts at the end of the queue) */

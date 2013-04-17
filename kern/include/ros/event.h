@@ -105,6 +105,9 @@ struct event_queue_big {
 #define VC_UTHREAD_STEALING		0x008				/* Uthread being stolen */
 #define VC_SCP_NOVCCTX			0x010				/* can't go into vc ctx */
 
+/* Racy flags, where we don't need the atomics */
+#define VC_FPU_SAVED			0x1000				/* valid FPU state in anc */
+
 /* Per-core data about preemptions and notifications */
 struct preempt_data {
 	struct user_context			vcore_ctx;			/* for preemptions */
@@ -112,6 +115,7 @@ struct preempt_data {
 	struct user_context			uthread_ctx;		/* for preempts or notifs */
 	uintptr_t					transition_stack;	/* advertised by the user */
 	atomic_t					flags;
+	int							rflags;				/* racy flags */
 	bool						notif_disabled;		/* vcore unwilling to recv*/
 	bool						notif_pending;		/* notif k_msg on the way */
 	struct event_mbox			ev_mbox_public;		/* can be read remotely */

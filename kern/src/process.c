@@ -39,6 +39,8 @@ static uint32_t try_get_pcoreid(struct proc *p, uint32_t vcoreid);
 static uint32_t get_pcoreid(struct proc *p, uint32_t vcoreid);
 static void __proc_free(struct kref *kref);
 static bool scp_is_vcctx_ready(struct preempt_data *vcpd);
+static void save_vc_fp_state(struct preempt_data *vcpd);
+static void restore_vc_fp_state(struct preempt_data *vcpd);
 
 /* PID management. */
 #define PID_MAX 32767 // goes from 0 to 32767, with 0 reserved
@@ -481,7 +483,7 @@ void proc_run_s(struct proc *p)
 			assert(!pcpui->owning_proc);
 			pcpui->owning_proc = p;
 			pcpui->owning_vcoreid = 0; /* TODO (VC#) */
-			/* TODO: (HSS) set FP state here (__startcore does it instantly) */
+			restore_vc_fp_state(vcpd);
 			/* similar to the old __startcore, start them in vcore context if
 			 * they have notifs and aren't already in vcore context.  o/w, start
 			 * them wherever they were before (could be either vc ctx or not) */
@@ -616,17 +618,6 @@ static void __proc_startcore(struct proc *p, struct user_context *ctx)
 {
 	assert(!irq_is_enabled());
 	__set_proc_current(p);
-	/* need to load our silly state, preferably somewhere other than here so we
-	 * can avoid the case where the context was just running here.  it's not
-	 * sufficient to do it in the "new process" if-block above (could be things
-	 * like page faults that cause us to keep the same process, but want a
-	 * different context.
-	 * for now, we load this silly state here. (TODO) (HSS)
-	 * We also need this to be per trapframe, and not per process...
-	 * For now / OSDI, only load it when in _S mode.  _M mode was handled in
-	 * __startcore.  */
-	if (p->state == PROC_RUNNING_S)
-		env_pop_ancillary_state(p);
 	/* Clear the current_ctx, since it is no longer used */
 	current_ctx = 0;	/* TODO: might not need this... */
 	proc_pop_ctx(ctx);
@@ -812,7 +803,7 @@ int proc_change_to_m(struct proc *p)
 			/* Copy uthread0's context to VC 0's uthread slot */
 			vcpd->uthread_ctx = *current_ctx;
 			clear_owning_proc(core_id());	/* so we don't restart */
-			save_fp_state(&vcpd->preempt_anc);
+			save_vc_fp_state(vcpd);
 			/* Userspace needs to not fuck with notif_disabled before
 			 * transitioning to _M. */
 			if (vcpd->notif_disabled) {
@@ -860,6 +851,7 @@ error_out:
  * by the proc. */
 uint32_t __proc_change_to_s(struct proc *p, uint32_t *pc_arr)
 {
+	struct preempt_data *vcpd = &p->procdata->vcore_preempt_data[0];
 	uint32_t num_revoked;
 	printk("[kernel] trying to transition _M -> _S (deprecated)!\n");
 	assert(p->state == PROC_RUNNING_M); // TODO: (ACR) async core req
@@ -867,7 +859,7 @@ uint32_t __proc_change_to_s(struct proc *p, uint32_t *pc_arr)
 	assert(current_ctx);
 	p->scp_ctx = *current_ctx;
 	clear_owning_proc(core_id());	/* so we don't restart */
-	env_push_ancillary_state(p); // TODO: (HSS)
+	save_vc_fp_state(vcpd);
 	/* sending death, since it's not our job to save contexts or anything in
 	 * this case. */
 	num_revoked = __proc_take_allcores(p, pc_arr, FALSE);
@@ -906,14 +898,51 @@ static uint32_t get_pcoreid(struct proc *p, uint32_t vcoreid)
 	return try_get_pcoreid(p, vcoreid);
 }
 
-/* Helper: saves the SCP's tf state and unmaps vcore 0.  In the future, we'll
- * probably use vc0's space for scp_ctx and the silly state.  If we ever do
- * that, we'll need to stop using scp_ctx (soon to be in VCPD) as a location for
- * pcpui->cur_ctx to point (dangerous) */
+/* Saves the FP state of the calling core into VCPD.  Pairs with
+ * restore_vc_fp_state().  On x86, the best case overhead of the flags:
+ *		FNINIT: 36 ns
+ *		FXSAVE: 46 ns
+ *		FXRSTR: 42 ns
+ *		Flagged FXSAVE: 50 ns
+ *		Flagged FXRSTR: 66 ns
+ *		Excess flagged FXRSTR: 42 ns
+ * If we don't do it, we'll need to initialize every VCPD at process creation
+ * time with a good FPU state (x86 control words are initialized as 0s, like the
+ * rest of VCPD). */
+static void save_vc_fp_state(struct preempt_data *vcpd)
+{
+	save_fp_state(&vcpd->preempt_anc);
+	vcpd->rflags |= VC_FPU_SAVED;
+}
+
+/* Conditionally restores the FP state from VCPD.  If the state was not valid,
+ * we don't bother restoring and just initialize the FPU. */
+static void restore_vc_fp_state(struct preempt_data *vcpd)
+{
+	if (vcpd->rflags & VC_FPU_SAVED) {
+		restore_fp_state(&vcpd->preempt_anc);
+		vcpd->rflags &= ~VC_FPU_SAVED;
+	} else {
+		init_fp_state();
+	}
+}
+
+/* Helper for SCPs, saves the core's FPU state into the VCPD vc0 slot */
+void __proc_save_fpu_s(struct proc *p)
+{
+	struct preempt_data *vcpd = &p->procdata->vcore_preempt_data[0];
+	save_vc_fp_state(vcpd);
+}
+
+/* Helper: saves the SCP's GP tf state and unmaps vcore 0.  This does *not* save
+ * the FPU state.
+ *
+ * In the future, we'll probably use vc0's space for scp_ctx and the silly
+ * state.  If we ever do that, we'll need to stop using scp_ctx (soon to be in
+ * VCPD) as a location for pcpui->cur_ctx to point (dangerous) */
 void __proc_save_context_s(struct proc *p, struct user_context *ctx)
 {
 	p->scp_ctx = *ctx;
-	env_push_ancillary_state(p);			/* TODO: (HSS) */
 	__unmap_vcore(p, 0);	/* VC# keep in sync with proc_run_s */
 }
 
@@ -1703,18 +1732,25 @@ static void __set_curctx_to_vcoreid(struct proc *p, uint32_t vcoreid,
 	 * they'll restart in vcore context.  It's just a matter of whether or not
 	 * it is the old, interrupted vcore context. */
 	if (vcpd->notif_disabled) {
-		restore_fp_state(&vcpd->preempt_anc);
 		/* copy-in the tf we'll pop, then set all security-related fields */
 		pcpui->actual_ctx = vcpd->vcore_ctx;
 		proc_secure_ctx(&pcpui->actual_ctx);
 	} else { /* not restarting from a preemption, use a fresh vcore */
 		assert(vcpd->transition_stack);
-		/* TODO: consider 0'ing the FP state.  We're probably leaking. */
 		proc_init_ctx(&pcpui->actual_ctx, vcoreid, p->env_entry,
 		              vcpd->transition_stack);
 		/* Disable/mask active notifications for fresh vcores */
 		vcpd->notif_disabled = TRUE;
 	}
+	/* Regardless of whether or not we have a 'fresh' VC, we need to restore the
+	 * FPU state for the VC according to VCPD (which means either a saved FPU
+	 * state or a brand new init).  Starting a fresh VC is just referring to the
+	 * GP context we run.  The vcore itself needs to have the FPU state loaded
+	 * from when it previously ran and was saved (or a fresh FPU if it wasn't
+	 * saved).
+	 *
+	 * Note this can cause a GP fault on x86 if the state is corrupt. */
+	restore_vc_fp_state(vcpd);
 	/* cur_ctx was built above (in actual_ctx), now use it */
 	pcpui->cur_ctx = &pcpui->actual_ctx;
 	/* this cur_ctx will get run when the kernel returns / idles */
@@ -1793,11 +1829,13 @@ int proc_change_to_vcore(struct proc *p, uint32_t new_vcoreid,
 		/* if they set this flag, then the vcore can just restart from scratch,
 		 * and we don't care about either the uthread_ctx or the vcore_ctx. */
 		caller_vcpd->notif_disabled = FALSE;
+		/* Don't need to save the FPU.  There should be no uthread or other
+		 * reason to return to the FPU state. */
 	} else {
 		/* need to set up the calling vcore's ctx so that it'll get restarted by
 		 * __startcore, to make the caller look like it was preempted. */
 		caller_vcpd->vcore_ctx = *current_ctx;
-		save_fp_state(&caller_vcpd->preempt_anc);
+		save_vc_fp_state(caller_vcpd);
 		/* Mark our core as preempted (for userspace recovery). */
 		atomic_or(&caller_vcpd->flags, VC_PREEMPTED);
 	}
@@ -1956,8 +1994,16 @@ void __preempt(uint32_t srcid, long a0, long a1, long a2)
 		vcpd->vcore_ctx = *pcpui->cur_ctx;
 	else
 		vcpd->uthread_ctx = *pcpui->cur_ctx;
-	/* either way, we save the silly state (FP) */
-	save_fp_state(&vcpd->preempt_anc);
+	/* Userspace in a preemption handler on another core might be copying FP
+	 * state from memory (VCPD) at the moment, and if so we don't want to
+	 * clobber it.  In this rare case, our current core's FPU state should be
+	 * the same as whatever is in VCPD, so this shouldn't be necessary, but the
+	 * arch-specific save function might do something other than write out
+	 * bit-for-bit the exact same data.  Checking STEALING suffices, since we
+	 * hold the K_LOCK (preventing userspace from starting a fresh STEALING
+	 * phase concurrently). */
+	if (!(atomic_read(&vcpd->flags) & VC_UTHREAD_STEALING))
+		save_vc_fp_state(vcpd);
 	/* Mark the vcore as preempted and unlock (was locked by the sender). */
 	atomic_or(&vcpd->flags, VC_PREEMPTED);
 	atomic_and(&vcpd->flags, ~VC_K_LOCK);

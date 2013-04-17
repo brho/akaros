@@ -89,6 +89,11 @@ restore_fp_state(ancillary_state_t* silly)
 	write_psr(read_psr() & ~PSR_EF);
 }
 
+void init_fp_state(void)
+{
+	/* TODO: implement me! */
+}
+
 // Flush all mapped pages in the user portion of the address space
 // TODO: only supports L3 user pages
 int

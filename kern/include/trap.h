@@ -52,6 +52,7 @@ extern void sysenter_handler();
 
 extern inline void save_fp_state(struct ancillary_state *silly);
 extern inline void restore_fp_state(struct ancillary_state *silly);
+extern inline void init_fp_state(void);
 /* Set stacktop for the current core to be the stack the kernel will start on
  * when trapping/interrupting from userspace */
 void set_stack_top(uintptr_t stacktop);

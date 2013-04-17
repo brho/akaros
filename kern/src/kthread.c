@@ -91,25 +91,11 @@ static void __launch_kthread(uint32_t srcid, long a0, long a1, long a2)
 		 * kthread.  This means the _M is getting interrupted or otherwise
 		 * delayed.  If we want to do something other than run it (like send the
 		 * kmsg to another pcore, or ship the context from here to somewhere
-		 * else/deschedule it (like for an _S)), do it here. */
+		 * else/deschedule it (like for an _S)), do it here.
+		 *
+		 * If you want to do something here, call out to the ksched, then
+		 * abandon_core(). */
 		cmb();	/* do nothing/placeholder */
-		#if 0
-		/* example of something to do (wrap up and schedule an _S).  Note this
-		 * might not work perfectly, but is just an example.  One thing to be
-		 * careful of is that spin_lock() can't be called if __launch isn't
-		 * ROUTINE (which it is right now). */
-		if (pcpui->owning_proc->state == PROC_RUNNING_S) {
-			spin_lock(&pcpui->owning_proc->proc_lock);
-			/* Wrap up / yield the _S proc */
-			__proc_set_state(pcpui->owning_proc, PROC_WAITING);
-			__proc_save_context_s(pcpui->owning_proc, current_ctx);
-			spin_unlock(&pcpui->owning_proc->proc_lock);
-			proc_wakeup(p);
-			abandon_core();
-			/* prob need to clear the owning proc?  this is some old shit, so
-			 * don't just uncomment it. */
-		}
-		#endif
 	}
 	/* o/w, just run the kthread.  any trapframes that are supposed to run or
 	 * were interrupted will run whenever the kthread smp_idles() or otherwise

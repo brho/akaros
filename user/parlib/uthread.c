@@ -577,8 +577,6 @@ void uth_enable_notifs(void)
 static bool start_uth_stealing(struct preempt_data *vcpd)
 {
 	long old_flags;
-	/* Might not need to bother with the K_LOCK, we aren't talking to the kernel
-	 * in these two helpers. */
 	do {
 		old_flags = atomic_read(&vcpd->flags);
 		/* Spin if the kernel is mucking with the flags */

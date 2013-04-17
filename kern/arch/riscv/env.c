@@ -14,6 +14,7 @@ env_push_ancillary_state(env_t* e)
 void
 save_fp_state(ancillary_state_t* silly)
 {
+	/* TODO: save FP state! */
 	return; // don't save FP state for now
 	uintptr_t sr = mfpcr(PCR_SR);
 	mtpcr(PCR_SR, sr | SR_EF);
@@ -106,6 +107,11 @@ restore_fp_state(ancillary_state_t* silly)
 	asm("fld f31,%0" : : "m"(silly->fpr[31]));
 
 	mtpcr(PCR_SR, sr);
+}
+
+void init_fp_state(void)
+{
+	/* TODO: implement me! */
 }
 
 static int
