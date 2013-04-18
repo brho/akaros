@@ -327,6 +327,8 @@ int pthread_attr_getstacksize(const pthread_attr_t *attr, size_t *stacksize)
 void pthread_lib_init(void)
 {
 	uintptr_t mmap_block;
+	struct pthread_tcb *t;
+	int ret;
 	/* Some testing code might call this more than once (once for a slimmed down
 	 * pth 2LS, and another from pthread_create().  Also, this is racy, but the
 	 * first time through we are an SCP. */
@@ -334,8 +336,10 @@ void pthread_lib_init(void)
 	assert(!in_multi_mode());
 	mcs_pdr_init(&queue_lock);
 	/* Create a pthread_tcb for the main thread */
-	pthread_t t = (pthread_t)calloc(1, sizeof(struct pthread_tcb));
-	assert(t);
+	ret = posix_memalign((void**)&t, __alignof__(struct pthread_tcb),
+	                     sizeof(struct pthread_tcb));
+	assert(!ret);
+	memset(t, 0, sizeof(struct pthread_tcb));	/* aggressively 0 for bugs */
 	t->id = get_next_pid();
 	t->stacksize = USTACK_NUM_PAGES * PGSIZE;
 	t->stacktop = (void*)USTACKTOP;
@@ -412,8 +416,10 @@ int pthread_create(pthread_t *thread, const pthread_attr_t *attr,
 	run_once(pthread_lib_init());
 	/* Create the actual thread */
 	struct pthread_tcb *pthread;
-	pthread = (pthread_t)calloc(1, sizeof(struct pthread_tcb));
-	assert(pthread);
+	int ret = posix_memalign((void**)&pthread, __alignof__(struct pthread_tcb),
+	                         sizeof(struct pthread_tcb));
+	assert(!ret);
+	memset(pthread, 0, sizeof(struct pthread_tcb));	/* aggressively 0 for bugs*/
 	pthread->stacksize = PTHREAD_STACK_SIZE;	/* default */
 	pthread->state = PTH_CREATED;
 	pthread->id = get_next_pid();

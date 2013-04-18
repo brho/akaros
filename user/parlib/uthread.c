@@ -4,6 +4,7 @@
 #include <vcore.h>
 #include <uthread.h>
 #include <event.h>
+#include <stdlib.h>
 
 /* Which operations we'll call for the 2LS.  Will change a bit with Lithe.  For
  * now, there are no defaults.  2LSs can override sched_ops. */
@@ -109,7 +110,11 @@ static void scp_vcctx_ready(void)
  * vcore/2LS/uthread init. */
 void uthread_slim_init(void)
 {
-	struct uthread *uthread = malloc(sizeof(*uthread));
+	struct uthread *uthread;
+	int ret = posix_memalign((void**)&uthread, __alignof__(struct uthread),
+	                         sizeof(struct uthread));
+	assert(!ret);
+	memset(uthread, 0, sizeof(struct uthread));	/* aggressively 0 for bugs */
 	/* TODO: consider a vcore_init_vc0 call. */
 	vcore_init();
 	uthread_manage_thread0(uthread);

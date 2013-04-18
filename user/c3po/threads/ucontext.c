@@ -14,6 +14,7 @@ struct u_context* create_context(thread_t *t, void *entry_pt, void *stack_top)
 	uint32_t vcoreid = vcore_id();
 
 	/* Allocate a new context struct */
+	/* TODO: careful of alignment here */
 	struct u_context *uc = malloc(sizeof(struct u_context));
 	if(!uc) return NULL;
 
