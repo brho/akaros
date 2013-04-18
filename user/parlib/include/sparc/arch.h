@@ -63,4 +63,14 @@ cpu_relax(void)
 	             "=r"(ctr) : "0"(ctr) : "cc","memory");
 }
 
+static inline void save_fp_state(struct ancillary_state *silly)
+{
+	/* TODO: (either inlined or in user/parlib/sparc/whatever.c */
+}
+
+static inline void restore_fp_state(struct ancillary_state *silly)
+{
+	/* TODO: (either inlined or in user/parlib/sparc/whatever.c */
+}
+
 #endif /* PARLIB_ARCH_H */

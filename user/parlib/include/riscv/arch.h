@@ -46,4 +46,14 @@ cpu_relax(void)
 	asm volatile("li %0, 8; 1: addi %0, %0, -1; bnez %0, 1b" : "=r"(ctr) : : "memory");
 }
 
+static inline void save_fp_state(struct ancillary_state *silly)
+{
+	/* TODO: (either inlined or in user/parlib/riscv/whatever.c */
+}
+
+static inline void restore_fp_state(struct ancillary_state *silly)
+{
+	/* TODO: (either inlined or in user/parlib/riscv/whatever.c */
+}
+
 #endif /* PARLIB_ARCH_H */

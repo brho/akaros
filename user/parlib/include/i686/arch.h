@@ -84,5 +84,14 @@ read_pmc(uint32_t index)
     return pmc;                                                                                      
 }
 
+static inline void save_fp_state(struct ancillary_state *silly)
+{
+	asm volatile("fxsave %0" : : "m"(*silly));
+}
+
+static inline void restore_fp_state(struct ancillary_state *silly)
+{
+	asm volatile("fxrstor %0" : : "m"(*silly));
+}
 
 #endif /* PARLIB_ARCH_H */

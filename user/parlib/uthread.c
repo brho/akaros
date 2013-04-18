@@ -183,8 +183,10 @@ void uthread_init(struct uthread *new_thread)
 	new_thread->state = UT_NOT_RUNNING;
 	/* They should have zero'd the uthread.  Let's check critical things: */
 	assert(!new_thread->flags && !new_thread->sysc);
-	/* the utf/as holds the context of the uthread (set by the 2LS earlier) */
-	new_thread->flags |= UTHREAD_SAVED | UTHREAD_FPSAVED;
+	/* the utf holds the GP context of the uthread (set by the 2LS earlier).
+	 * There is no FP context to be restored yet.  We only save the FPU when we
+	 * were interrupted off a core. */
+	new_thread->flags |= UTHREAD_SAVED;
 	/* Get a TLS.  If we already have one, reallocate/refresh it */
 	if (new_thread->tls_desc)
 		ret = __uthread_reinit_tls(new_thread);
@@ -281,19 +283,22 @@ void uthread_yield(bool save_state, void (*yield_func)(struct uthread*, void*),
 	 * restarts, it will continue from right after this, see yielding is false,
 	 * and short ciruit the function.  Don't do this if we're dying. */
 	if (save_state) {
-		/* TODO: (HSS) Save silly state */
-		// save_fp_state(&t->as);
+		/* Need to signal this before we actually save, since save_user_ctx
+		 * returns() twice (once now, once when woken up) */
+		uthread->flags |= UTHREAD_SAVED;
 		save_user_ctx(&uthread->u_ctx);
 	}
 	cmb();	/* Force reread of yielding. Technically save_user_ctx() suffices*/
 	/* Restart path doesn't matter if we're dying */
 	if (!yielding)
 		goto yield_return_path;
+	/* From here on down is only executed on the save path (not the wake up) */
 	yielding = FALSE; /* for when it starts back up */
-	/* Signal the current state is in utf.  Need to do this only the first time
-	 * through (not on the yield return path that comes after save_user_ctx) */
-	if (save_state)
-		uthread->flags |= UTHREAD_SAVED | UTHREAD_FPSAVED;
+	/* TODO: remove this when all arches support SW contexts */
+	if (save_state && (uthread->u_ctx.type != ROS_SW_CTX)) {
+		save_fp_state(&uthread->as);
+		uthread->flags |= UTHREAD_FPSAVED;
+	}
 	/* Change to the transition context (both TLS and stack). */
 	extern void** vcore_thread_control_blocks;
 	set_tls_desc(vcore_thread_control_blocks[vcoreid], vcoreid);
@@ -390,10 +395,15 @@ static void __run_cur_uthread(void)
 		assert(0);
 	}
 	uthread = current_uthread;	/* for TLS sanity */
-	/* Load silly state (Floating point) too.  For real */
 	if (uthread->flags & UTHREAD_FPSAVED) {
 		uthread->flags &= ~UTHREAD_FPSAVED;
-		/* TODO: (HSS) actually load it */
+		/* should never have a SW context that needs its FP state loaded */
+		if (uthread->flags & UTHREAD_SAVED) {
+			assert(uthread->u_ctx.type != ROS_SW_CTX);
+		} else  {
+			assert(vcpd->uthread_ctx.type != ROS_SW_CTX);
+		}
+		restore_fp_state(&uthread->as);
 	}
 	/* Go ahead and start the uthread */
 	set_tls_desc(uthread->tls_desc, vcoreid);
@@ -473,6 +483,7 @@ static void __run_current_uthread_raw(void)
 	vcpd->notif_pending = TRUE;
 	/* utf no longer represents the current state of the uthread */
 	current_uthread->flags &= ~UTHREAD_SAVED;
+	assert(!(current_uthread->flags & UTHREAD_FPSAVED));
 	set_tls_desc(current_uthread->tls_desc, vcoreid);
 	__vcoreid = vcoreid;	/* setting the uthread's TLS var */
 	pop_user_ctx_raw(&vcpd->uthread_ctx, vcoreid);
@@ -480,8 +491,14 @@ static void __run_current_uthread_raw(void)
 }
 
 /* Copies the uthread trapframe and silly state from the vcpd to the uthread,
- * subject to the uthread's flags.  Might have other uses in the future, but
- * for now our only user is the helper __uthread_pause. */
+ * subject to the uthread's flags.  The uthread state might still be in the
+ * uthread struct, and the FP state could be either in VCPD, in the uth struct,
+ * or we might not even need to save it.
+ *
+ * There are some cases where we'll have a uthread SW ctx that needs to be
+ * copied out: uth syscalls, notif happens, and the core comes back from the
+ * kernel in VC ctx.  VC ctx calls copy_out (response to preempt_pending or done
+ * while handling a preemption). */
 static void copyout_uthread(struct preempt_data *vcpd, struct uthread *uthread)
 {
 	assert(uthread);
@@ -491,11 +508,12 @@ static void copyout_uthread(struct preempt_data *vcpd, struct uthread *uthread)
 		uthread->flags |= UTHREAD_SAVED;
 		printd("VC %d copying out uthread %08p\n", vcore_id(), uthread);
 	}
-	/* could optimize here in case the FP/silly state wasn't being used.
-	 * Depends how we use the FPSAVED flag.  It means that the uthread's FP
-	 * state is not currently saved, for whatever reason, so we'll do it. */
-	if (!(uthread->flags & UTHREAD_FPSAVED)) {
-		/* TODO: (HSS) handle FP state: review this when fixing the other HSS */
+	/* FPSAVED means the state is in the uth struct, and when we run it later,
+	 * we need to restore it.  SW contexts don't need to have their FP state
+	 * saved - the minimal amount is already in the SW ctx, so it can run on any
+	 * reasonably valid FPU state. */
+	if (uthread->u_ctx.type != ROS_SW_CTX &&
+	    !(uthread->flags & UTHREAD_FPSAVED)) {
 		uthread->as = vcpd->preempt_anc;
 		uthread->flags |= UTHREAD_FPSAVED;
 	}
