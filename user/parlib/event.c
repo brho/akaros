@@ -179,6 +179,7 @@ int handle_one_mbox_msg(struct event_mbox *ev_mbox)
 	if (get_ucq_msg(&ev_mbox->ev_msgs, &local_msg) == -1)
 		return 0;
 	ev_type = local_msg.ev_type;
+	assert(ev_type < MAX_NR_EVENT);
 	printd("[event] UCQ (mbox %08p), ev_type: %d\n", ev_mbox, ev_type);
 	if (ev_handlers[ev_type])
 		ev_handlers[ev_type](&local_msg, ev_type);
@@ -430,4 +431,15 @@ void ev_we_returned(bool were_handling_remotes)
 {
 	if (were_handling_remotes)
 		__vc_handle_an_mbox = TRUE;
+}
+
+/* Debugging */
+void print_ev_msg(struct event_msg *msg)
+{
+	printf("MSG at %08p\n", msg);
+	printf("\ttype: %d\n", msg->ev_type);
+	printf("\targ1 (16): 0x%4x\n", msg->ev_arg1);
+	printf("\targ2 (32): 0x%8x\n", msg->ev_arg2);
+	printf("\targ3 (32): 0x%8x\n", msg->ev_arg3);
+	printf("\targ4 (64): 0x%16x\n", msg->ev_arg4);
 }

@@ -832,9 +832,6 @@ static int sys_self_notify(struct proc *p, uint32_t vcoreid,
                            bool priv)
 {
 	struct event_msg local_msg = {0};
-
-	printd("[kernel] received self notify for vcoreid %d, type %d, msg %08p\n",
-	       vcoreid, ev_type, u_msg);
 	/* if the user provided an ev_msg, copy it in and use that */
 	if (u_msg) {
 		if (memcpy_from_user(p, &local_msg, u_msg, sizeof(struct event_msg))) {
@@ -843,6 +840,12 @@ static int sys_self_notify(struct proc *p, uint32_t vcoreid,
 		}
 	} else {
 		local_msg.ev_type = ev_type;
+	}
+	if (local_msg.ev_type >= MAX_NR_EVENT) {
+		printk("[kernel] received self-notify for vcoreid %d, ev_type %d, "
+		       "u_msg %08p, u_msg->type %d\n", vcoreid, ev_type, u_msg,
+		       u_msg ? u_msg->ev_type : 0);
+		return -1;
 	}
 	/* this will post a message and IPI, regardless of wants/needs/debutantes.*/
 	post_vcore_event(p, &local_msg, vcoreid, priv ? EVENT_VCORE_PRIVATE : 0);

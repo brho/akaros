@@ -555,6 +555,13 @@ void page_fault_handler(struct hw_trapframe *hw_tf)
 		       current->pid, prot & PROT_READ ? "READ" : "WRITE", fault_va,
 		       hw_tf->tf_eip, core_id(), err);
 		print_trapframe(hw_tf);
+		/* Turn this on to help debug bad function pointers */
+		printd("esp %08p\n\t 0(esp): %08p\n\t 4(esp): %08p\n\t 8(esp): %08p\n"
+		       "\t12(esp): %08p\n", hw_tf->tf_esp,
+		       *(uintptr_t*)(hw_tf->tf_esp +  0),
+		       *(uintptr_t*)(hw_tf->tf_esp +  4),
+		       *(uintptr_t*)(hw_tf->tf_esp +  8),
+		       *(uintptr_t*)(hw_tf->tf_esp + 12));
 		proc_destroy(current);
 	}
 }

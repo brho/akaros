@@ -48,4 +48,7 @@ void try_handle_remote_mbox(void);
 bool ev_might_not_return(void);
 void ev_we_returned(bool were_handling_remotes);
 
+/* Debugging */
+void print_ev_msg(struct event_msg *msg);
+
 #endif /* _EVENT_H */

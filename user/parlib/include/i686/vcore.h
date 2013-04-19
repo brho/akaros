@@ -84,7 +84,9 @@ static inline void pop_user_ctx(struct user_context *ctx, uint32_t vcoreid)
 	rst->sysc->num = SYS_self_notify;
 	rst->sysc->flags = 0;
 	rst->sysc->ev_q = 0;		/* technically not needed but will avoid bugs */
-	rst->sysc->arg0 = vcoreid;	/* arg 1 & 2 already = 0 (null notif, no u_ne)*/
+	rst->sysc->arg0 = vcoreid;
+	rst->sysc->arg1 = EV_NONE;
+	rst->sysc->arg2 = 0;		/* no ev_msg */
 	rst->sysc->arg3 = TRUE;		/* just a private VCPD notification */
 	rst->eax_save = 0;			/* avoid bugs */
 	rst->eflags = tf->tf_eflags;
