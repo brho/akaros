@@ -69,6 +69,9 @@
 extern gatedesc_t idt[];
 extern taskstate_t ts;
 
+/* Defined and set up in in arch/init.c, used for XMM initialization */
+extern struct ancillary_state x86_default_fpu;
+
 /* Determines if the given TF was in the kernel or not. */
 static inline bool in_kernel(struct hw_trapframe *hw_tf)
 {
@@ -87,9 +90,14 @@ static inline void restore_fp_state(struct ancillary_state *silly)
 	asm volatile("fxrstor %0" : : "m"(*silly));
 }
 
+/* A regular fninit will only initialize the x87 part of the FPU, not the XMM
+ * registers and the MXCSR state.  So to init, we'll just keep around a copy of
+ * the default FPU state, which we grabbed during boot, and can copy that over
+ * Alternatively, we can fninit, ldmxcsr with the default value, and 0 out the
+ * XMM registers. */
 static inline void init_fp_state(void)
 {
-	asm volatile("fninit");
+	restore_fp_state(&x86_default_fpu);
 }
 
 static inline void __attribute__((always_inline))

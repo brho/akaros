@@ -17,6 +17,8 @@
 #include <arch/init.h>
 #include <console.h>
 
+struct ancillary_state x86_default_fpu;
+
 /* irq handler for the console (kb, serial, etc) */
 static void irq_console(struct hw_trapframe *hw_tf, void *data)
 {
@@ -55,6 +57,7 @@ static void cons_irq_init(void)
 
 void arch_init()
 {
+	save_fp_state(&x86_default_fpu); /* used in arch/trap.h for fpu init */
 	pci_init();
 #ifdef __CONFIG_ENABLE_MPTABLES__
 	mptables_parse();
