@@ -8,19 +8,12 @@
 #include <ros/arch/mmu.h>
 #include <sys/vcore-tls.h>
 
-/* Pops a user context, reanabling notifications at the same time.  A Userspace
- * scheduler can call this when transitioning off the transition stack.
- *
- * Make sure you clear the notif_pending flag, and then check the queue before
- * calling this.  If notif_pending is not clear, this will self_notify this
- * core, since it should be because we missed a notification message while
- * notifs were disabled. 
- *
- * Basically, it sets up the future stack pointer to have extra stuff after it,
- * and then it pops the registers, then pops the new context's stack
- * pointer.  Then it uses the extra stuff (the new PC is on the stack, the
- * location of notif_disabled, and a clobbered work register) to enable notifs,
- * make sure notif IPIs weren't pending, restore the work reg, and then "ret".
+/* Here's how the HW popping works:  It sets up the future stack pointer to
+ * have extra stuff after it, and then it pops the registers, then pops the new
+ * context's stack pointer.  Then it uses the extra stuff (the new PC is on the
+ * stack, the location of notif_disabled, and a clobbered work register) to
+ * enable notifs, make sure notif IPIs weren't pending, restore the work reg,
+ * and then "ret".
  *
  * This is what the target uthread's stack will look like (growing down):
  *
@@ -70,10 +63,8 @@ struct restart_helper {
  * the first call, the DONE flag will be set.  (Set once, then never reset) */
 extern struct syscall vc_entry;	/* in i686/vcore.c */
 
-static inline void pop_user_ctx(struct user_context *ctx, uint32_t vcoreid)
+static inline void pop_hw_tf(struct hw_trapframe *tf, uint32_t vcoreid)
 {
-	struct hw_trapframe *tf = &ctx->tf.hw_tf;
-	assert(ctx->type == ROS_HW_CTX);
 	struct restart_helper *rst;
 	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
 	if (!tf->tf_cs) { /* sysenter TF.  esp and eip are in other regs. */
@@ -110,7 +101,6 @@ static inline void pop_user_ctx(struct user_context *ctx, uint32_t vcoreid)
 	              "popl %%eax;           " /* get notif_pending status */
 	              "testb $0x01,(%%eax);  " /* test if a notif is pending */
 	              "jz 1f;                " /* if not pending, skip syscall */
-	              "movb $0x00,(%%eax);   " /* clear pending */
 				  /* Actual syscall.  Note we don't wait on the async call */
 	              "popl %%eax;           " /* &sysc, trap arg0 */
 	              "pushl %%edx;          " /* save edx, will be trap arg1 */
@@ -128,8 +118,71 @@ static inline void pop_user_ctx(struct user_context *ctx, uint32_t vcoreid)
 	              : "memory");
 }
 
+static inline void pop_sw_tf(struct sw_trapframe *sw_tf, uint32_t vcoreid)
+{
+	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
+
+	/* Restore callee-saved FPU state.  We need to clear exceptions before
+	 * reloading the FP CW, in case the new CW unmasks any. */
+	asm volatile ("ldmxcsr %0" : : "m"(sw_tf->tf_mxcsr));
+	asm volatile ("fnclex; fldcw %0" : : "m"(sw_tf->tf_fpucw));
+	/* Basic plan: restore all regs, off ecx as the sw_tf.  Switch to the new
+	 * stack, push the PC so we can pop it later.  Use eax and edx for the
+	 * locations of sysc and vcpd.  Once on the new stack, we enable notifs,
+	 * check if we missed one, and if so, self notify. */
+	asm volatile ("movl 0x00(%0),%%ebp;  " /* restore regs */
+	              "movl 0x04(%0),%%ebx;  "
+	              "movl 0x08(%0),%%esi;  "
+	              "movl 0x0c(%0),%%edi;  "
+	              "movl 0x10(%0),%%esp;  " /* jump to future stack */
+	              "pushl 0x14(%0);       " /* save PC for future ret */
+	              "movl %2,%%ecx;        " /* vcpd loc into ecx */
+	              "addl %4,%%ecx;        " /* notif_disabled loc into ecx */
+	              "movb $0x00,(%%ecx);   " /* enable notifications */
+	              /* Need a wrmb() here so the write of enable_notif can't pass
+	               * the read of notif_pending (racing with a potential
+	               * cross-core call with proc_notify()). */
+	              "lock addl $0,(%%esp); " /* LOCK is a CPU mb() */
+	              /* From here down, we can get interrupted and restarted */
+	              "movl %2,%%ecx;        " /* vcpd loc into ecx */
+	              "addl %5,%%ecx;        " /* notif_pending loc into ecx */
+	              "testb $0x01,(%%ecx);  " /* test if a notif is pending */
+	              "jz 1f;                " /* if not pending, skip syscall */
+	              /* Actual syscall.  Note we don't wait on the async call.
+	               * &sysc is already in eax (trap arg0). */
+	              "movl $0x1,%%edx;      " /* sending one async syscall: arg1 */
+	              "int %3;               " /* fire the syscall */
+	              "1: ret;               " /* retaddr was pushed earlier */
+	              :
+	              : "c"(sw_tf),
+	                "a"(&vc_entry),
+	                "d"(vcpd),
+	                "i"(T_SYSCALL),
+	                "i"(offsetof(struct preempt_data, notif_disabled)),
+	                "i"(offsetof(struct preempt_data, notif_pending))
+	              : "memory");
+}
+
+/* Pops a user context, reanabling notifications at the same time.  A Userspace
+ * scheduler can call this when transitioning off the transition stack.
+ *
+ * At some point in vcore context before calling this, you need to clear
+ * notif_pending (do this by calling handle_events()).  As a potential
+ * optimization, consider clearing the notif_pending flag / handle_events again
+ * (right before popping), right before calling this.  If notif_pending is not
+ * clear, this will self_notify this core, since it should be because we missed
+ * a notification message while notifs were disabled. */
+static inline void pop_user_ctx(struct user_context *ctx, uint32_t vcoreid)
+{
+	if (ctx->type == ROS_HW_CTX)
+		pop_hw_tf(&ctx->tf.hw_tf, vcoreid);
+	else
+		pop_sw_tf(&ctx->tf.sw_tf, vcoreid);
+}
+
 /* Like the regular pop_user_ctx, but this one doesn't check or clear
- * notif_pending. */
+ * notif_pending.  The only case where we use this is when an IRQ/notif
+ * interrupts a uthread that is in the process of disabling notifs. */
 static inline void pop_user_ctx_raw(struct user_context *ctx, uint32_t vcoreid)
 {
 	struct hw_trapframe *tf = &ctx->tf.hw_tf;
@@ -176,10 +229,40 @@ static inline void pop_user_ctx_raw(struct user_context *ctx, uint32_t vcoreid)
 	              : "memory");
 }
 
-/* Save the current context/registers into the given ctx, setting the pc of the
- * tf to the end of this function.  You only need to save that which you later
- * restore with pop_user_ctx(). */
+/* Save's a SW context, setting the PC to the end of this function.  We only
+ * save callee-saved registers (of the sysv abi).  The compiler knows to save
+ * the others via the input/clobber lists.
+ *
+ * Callers of this function need to have at least one
+ * 'calling-convention-compliant' function call between this and any floating
+ * point, so that the compiler saves any caller-saved FP before getting to
+ * here.
+ *
+ * To some extent, TLS is 'callee-saved', in that no one ever expects it to
+ * change.  We handle uthread TLS changes separately, since we often change to
+ * them early to set some variables.  Arguably we should do this different. */
 static inline void save_user_ctx(struct user_context *ctx)
+{
+	struct sw_trapframe *sw_tf = &ctx->tf.sw_tf;
+	ctx->type = ROS_SW_CTX;
+	asm volatile ("stmxcsr %0" : "=m"(sw_tf->tf_mxcsr));
+	asm volatile ("fnstcw %0" : "=m"(sw_tf->tf_fpucw));
+	/* Pretty simple: save all the regs, IAW the sys-v ABI */
+	asm volatile ("movl %%ebp,0x00(%0);   "
+	              "movl %%ebx,0x04(%0);   "
+	              "movl %%esi,0x08(%0);   "
+	              "movl %%edi,0x0c(%0);   "
+	              "movl %%esp,0x10(%0);   "
+	              "leal 1f,%%eax;         " /* get future eip */
+	              "movl %%eax,0x14(%0);   "
+	              "1:                     " /* where this tf will restart */
+	              :
+	              : "c"(sw_tf)
+	              : "eax", "edx", "memory", "cc");
+}
+
+/* The old version, kept around for testing */
+static inline void save_user_ctx_hw(struct user_context *ctx)
 {
 	struct hw_trapframe *tf = &ctx->tf.hw_tf;
 	ctx->type = ROS_HW_CTX;
@@ -207,12 +290,14 @@ static inline void save_user_ctx(struct user_context *ctx)
 static inline void init_user_ctx(struct user_context *ctx, uint32_t entry_pt,
                                  uint32_t stack_top)
 {
-	struct hw_trapframe *u_tf = &ctx->tf.hw_tf;
-	ctx->type = ROS_HW_CTX;
-	memset(u_tf, 0, sizeof(struct hw_trapframe));
-	u_tf->tf_eip = entry_pt;
-	u_tf->tf_cs = GD_UT | 3;
-	u_tf->tf_esp = stack_top;
+	struct sw_trapframe *sw_tf = &ctx->tf.sw_tf;
+	ctx->type = ROS_SW_CTX;
+	/* No need to bother with setting the other GP registers; the called
+	 * function won't care about their contents. */
+	sw_tf->tf_esp = stack_top;
+	sw_tf->tf_eip = entry_pt;
+	sw_tf->tf_mxcsr = 0x00001f80;	/* x86 default mxcsr */
+	sw_tf->tf_fpucw = 0x037f;		/* x86 default FP CW */
 }
 
 // this is how we get our thread id on entry.
@@ -224,9 +309,9 @@ static inline void init_user_ctx(struct user_context *ctx, uint32_t entry_pt,
 
 /* For debugging. */
 #include <stdio.h>
-static __inline void print_trapframe(struct hw_trapframe *tf)
+static void print_hw_tf(struct hw_trapframe *tf)
 {
-	printf("[user] TRAP frame %08p\n", tf);
+	printf("[user] HW TRAP frame %08p\n", tf);
 	printf("  edi  0x%08x\n", tf->tf_regs.reg_edi);
 	printf("  esi  0x%08x\n", tf->tf_regs.reg_esi);
 	printf("  ebp  0x%08x\n", tf->tf_regs.reg_ebp);
@@ -246,6 +331,29 @@ static __inline void print_trapframe(struct hw_trapframe *tf)
 	printf("  flag 0x%08x\n", tf->tf_eflags);
 	printf("  esp  0x%08x\n", tf->tf_esp);
 	printf("  ss   0x----%04x\n", tf->tf_ss);
+}
+
+static void print_sw_tf(struct sw_trapframe *sw_tf)
+{
+	printf("[user] SW TRAP frame %08p\n", sw_tf);
+	printf("  ebp  0x%08x\n", sw_tf->tf_ebp);
+	printf("  ebx  0x%08x\n", sw_tf->tf_ebx);
+	printf("  esi  0x%08x\n", sw_tf->tf_esi);
+	printf("  edi  0x%08x\n", sw_tf->tf_edi);
+	printf("  esp  0x%08x\n", sw_tf->tf_esp);
+	printf("  eip  0x%08x\n", sw_tf->tf_eip);
+	printf(" mxcsr 0x%08x\n", sw_tf->tf_mxcsr);
+	printf(" fpucw 0x----%04x\n", sw_tf->tf_fpucw);
+}
+
+static void print_user_context(struct user_context *ctx)
+{
+	if (ctx->type == ROS_HW_CTX)
+		print_hw_tf(&ctx->tf.hw_tf);
+	else if (ctx->type == ROS_SW_CTX)
+		print_sw_tf(&ctx->tf.sw_tf);
+	else
+		printf("Unknown context type %d\n", ctx->type);
 }
 
 #endif /* PARLIB_ARCH_VCORE_H */

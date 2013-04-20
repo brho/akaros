@@ -44,7 +44,15 @@ struct hw_trapframe {
 };
 
 struct sw_trapframe {
-	/* TODO */
+	uint32_t tf_ebp;
+	uint32_t tf_ebx;
+	uint32_t tf_esi;
+	uint32_t tf_edi;
+	uint32_t tf_esp;
+	uint32_t tf_eip;
+	uint32_t tf_mxcsr;
+	uint16_t tf_fpucw;
+	uint16_t tf_gs;		/* something to track TLS is callee-saved (sort of) */
 };
 
 /* FP state and whatever else the kernel won't muck with automatically.  For

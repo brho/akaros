@@ -97,6 +97,6 @@ void print_context(struct u_context *uc)
 {
 	printf("GIANT WARNING: this assumes a HW ctx\n");
 	/* Just print the trapframe */
-	print_trapframe(&uc->u_ctx.tf.hw_tf);
+	print_hw_tf(&uc->u_ctx.tf.hw_tf);
 }
 
