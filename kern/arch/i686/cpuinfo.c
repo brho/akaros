@@ -133,6 +133,7 @@ void print_cpuinfo(void)
 		printk("RDTSCP supported\n");
 	else
 		printk("RDTSCP not supported: don't trust detailed measurements\n");
+	printk("FS/GS MSRs %ssupported\n", edx & (1 << 29) ? "" : "not ");
 	msr_val = read_msr(IA32_MISC_ENABLE);
 	/* we want this to be not set for cpuid.6h to work. */
 	if (msr_val & (1 << 22))
