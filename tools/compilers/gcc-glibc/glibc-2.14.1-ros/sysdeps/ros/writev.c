@@ -26,6 +26,16 @@
 #include <errno.h>
 
 
+/* Helper function to assemble and write everything in one shot. */
+static ssize_t
+write_all(int fd, char *buf, const struct iovec *vec, int n, ssize_t bytes)
+{
+  char* bufp = buf;
+  for (int i = 0; i < n; i++)
+    bufp = __mempcpy(bufp, vec[i].iov_base, vec[i].iov_len);
+  return __write(fd, buf, bytes);
+}
+
 /* Write data pointed by the buffers described by VECTOR, which
    is a vector of COUNT 'struct iovec's, to file descriptor FD.
    The data is written in the order specified.
@@ -34,55 +44,34 @@
 ssize_t
 __libc_writev (int fd, const struct iovec *vector, int count)
 {
-  /* Find the total number of bytes to be written.  */
-  size_t bytes = 0;
+  ssize_t bytes = 0;
   for (int i = 0; i < count; ++i)
-    {
-      /* Check for ssize_t overflow.  */
-      if (SSIZE_MAX - bytes < vector[i].iov_len)
-	{
-	  __set_errno (EINVAL);
-	  return -1;
-	}
-      bytes += vector[i].iov_len;
-    }
+    bytes += vector[i].iov_len;
+  
+  if (bytes < 0)
+  {
+    __set_errno(EINVAL);
+    return -1;
+  }
 
-  /* Allocate a temporary buffer to hold the data.  We should normally
-     use alloca since it's faster and does not require synchronization
-     with other threads.  But we cannot if the amount of memory
-     required is too large.  */
-  char *buffer;
-  char *malloced_buffer = NULL;
-  if (__libc_use_alloca (bytes))
-    buffer = (char *) __alloca (bytes);
+  /* Allocate a stack or heap buffer, then have write_all finish up. */
+  if (__builtin_expect(__libc_use_alloca(bytes), 1))
+  {
+    char* buf = __alloca(bytes);
+    return write_all(fd, buf, vector, count, bytes);
+  }
   else
+  {
+    char* buf = malloc(bytes);
+    if (buf == NULL)
     {
-      malloced_buffer = buffer = (char *) malloc (bytes);
-      if (buffer == NULL)
-	/* XXX I don't know whether it is acceptable to try writing
-	   the data in chunks.  Probably not so we just fail here.  */
-	return -1;
+      __set_errno(ENOMEM);
+      return -1;
     }
-
-  /* Copy the data into BUFFER.  */
-  size_t to_copy = bytes;
-  char *bp = buffer;
-  for (int i = 0; i < count; ++i)
-    {
-      size_t copy = MIN (vector[i].iov_len, to_copy);
-
-      bp = __mempcpy ((void *) bp, (void *) vector[i].iov_base, copy);
-
-      to_copy -= copy;
-      if (to_copy == 0)
-	break;
-    }
-
-  ssize_t bytes_written = __write (fd, buffer, bytes);
-
-  free(malloced_buffer);
-
-  return bytes_written;
+    ssize_t res = write_all(fd, buf, vector, count, bytes);
+    free(buf);
+    return res;
+  }
 }
 #ifndef __libc_writev
 strong_alias (__libc_writev, __writev)
