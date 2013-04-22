@@ -92,8 +92,9 @@ void (*ros_syscall_blockon)(struct syscall *sysc) = __ros_scp_syscall_blockon;
 /* These are simple synchronous system calls, built on top of the kernel's async
  * interface.  This version makes no assumptions about errno.  You usually don't
  * want this. */
-long __ros_syscall(unsigned int _num, long _a0, long _a1, long _a2, long _a3,
-                   long _a4, long _a5, int *errno_loc)
+static inline struct syscall
+__ros_syscall_inline(unsigned int _num, long _a0, long _a1, long _a2, long _a3,
+                     long _a4, long _a5)
 {
 	int num_started;	/* not used yet */
 	struct syscall sysc = {0};
@@ -113,7 +114,15 @@ long __ros_syscall(unsigned int _num, long _a0, long _a1, long _a2, long _a3,
 	 * !SC_K_LOCK. */
 	while (atomic_read(&sysc.flags) & SC_K_LOCK)
 		cpu_relax();
-	if (errno_loc)
+	return sysc;
+}
+
+long __ros_syscall(unsigned int _num, long _a0, long _a1, long _a2, long _a3,
+                   long _a4, long _a5, int *errno_loc)
+{
+	struct syscall sysc = __ros_syscall_inline(_num, _a0, _a1, _a2, _a3,
+	                                           _a4, _a5);
+	if (__builtin_expect(errno_loc && sysc.err, 0))
 		*errno_loc = sysc.err;
 	return sysc.retval;
 }
@@ -122,7 +131,11 @@ long __ros_syscall(unsigned int _num, long _a0, long _a1, long _a2, long _a3,
 long __ros_syscall_errno(unsigned int _num, long _a0, long _a1, long _a2,
                          long _a3, long _a4, long _a5)
 {
-	return __ros_syscall(_num, _a0, _a1, _a2, _a3, _a4, _a5, &errno);
+	struct syscall sysc = __ros_syscall_inline(_num, _a0, _a1, _a2, _a3,
+	                                           _a4, _a5);
+	if (__builtin_expect(sysc.err, 0))
+		errno = sysc.err;
+	return sysc.retval;
 }
 
 long int syscall(long int num, ...)
