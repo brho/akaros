@@ -189,7 +189,7 @@ fill-kfs: install-libs
 	@mkdir -p $(FIRST_INITRAMFS_PATH)/lib
 	@cp $(addprefix $(GCC_ROOT)/$(TARGET_ARCH)-ros/lib/, \
 	  libc.so.6 ld.so.1 libm.so libgcc_s.so.1) $(FIRST_INITRAMFS_PATH)/lib
-	@$(STRIP) --strip-unneeded $(FIRST_INITRAMFS_PATH)/lib/libc.so.6
+	$(STRIP) --strip-debug $(addprefix $(FIRST_INITRAMFS_PATH)/lib/, libc.so.6 ld.so.1)
 endif
 
 userclean:
