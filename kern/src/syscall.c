@@ -853,6 +853,15 @@ static int sys_self_notify(struct proc *p, uint32_t vcoreid,
 	return 0;
 }
 
+/* Puts the calling core into vcore context, if it wasn't already, via a
+ * self-IPI / active notification.  Barring any weird unmappings, we just send
+ * ourselves a __notify. */
+static int sys_vc_entry(struct proc *p)
+{
+	send_kernel_message(core_id(), __notify, (long)p, 0, 0, KMSG_ROUTINE);
+	return 0;
+}
+
 /* This will set a local timer for usec, then shut down the core.  There's a
  * slight race between spinner and halt.  For now, the core will wake up for
  * other interrupts and service them, but will not process routine messages or
@@ -1554,6 +1563,7 @@ const static struct sys_table_entry syscall_table[] = {
 	[SYS_provision] = {(syscall_t)sys_provision, "provision"},
 	[SYS_notify] = {(syscall_t)sys_notify, "notify"},
 	[SYS_self_notify] = {(syscall_t)sys_self_notify, "self_notify"},
+	[SYS_vc_entry] = {(syscall_t)sys_vc_entry, "vc_entry"},
 	[SYS_halt_core] = {(syscall_t)sys_halt_core, "halt_core"},
 #ifdef __CONFIG_SERIAL_IO__
 	[SYS_serial_read] = {(syscall_t)sys_serial_read, "ser_read"},

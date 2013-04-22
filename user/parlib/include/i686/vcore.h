@@ -57,11 +57,18 @@ struct restart_helper {
 	uint32_t					notif_disab_loc;
 	uint32_t					notif_pend_loc;
 	struct syscall				*sysc;
-	struct syscall				local_sysc;
+	struct syscall				local_sysc;	/* unused for now */
 	uint32_t					eax_save;
 	uint32_t					eflags;
 	uint32_t					eip;
 };
+
+/* Static syscall, used for self-notifying.  We never wait on it, and we
+ * actually might submit it multiple times in parallel on different cores!
+ * While this may seem dangerous, the kernel needs to be able to handle this
+ * scenario.  It's also important that we never wait on this, since for all but
+ * the first call, the DONE flag will be set.  (Set once, then never reset) */
+extern struct syscall vc_entry;	/* in i686/vcore.c */
 
 static inline void pop_user_ctx(struct user_context *ctx, uint32_t vcoreid)
 {
@@ -79,15 +86,7 @@ static inline void pop_user_ctx(struct user_context *ctx, uint32_t vcoreid)
 	/* Fill in the info we'll need later */
 	rst->notif_disab_loc = (uint32_t)&vcpd->notif_disabled;
 	rst->notif_pend_loc = (uint32_t)&vcpd->notif_pending;
-	rst->sysc = &rst->local_sysc;	/* point to the local one */
-	/* Need to prep the async sysc in case we need to notify ourselves */
-	rst->sysc->num = SYS_self_notify;
-	rst->sysc->flags = 0;
-	rst->sysc->ev_q = 0;		/* technically not needed but will avoid bugs */
-	rst->sysc->arg0 = vcoreid;
-	rst->sysc->arg1 = EV_NONE;
-	rst->sysc->arg2 = 0;		/* no ev_msg */
-	rst->sysc->arg3 = TRUE;		/* just a private VCPD notification */
+	rst->sysc = &vc_entry;
 	rst->eax_save = 0;			/* avoid bugs */
 	rst->eflags = tf->tf_eflags;
 	rst->eip = tf->tf_eip;
