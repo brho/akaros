@@ -25,23 +25,23 @@ _start:
 
   // set up trap entry point.  this is not a relocated address, as we
   // do not support trapping before the MMU is set up.
-  la     t0, trap_entry
-  mtpcr  t0, ASM_CR(PCR_EVEC)
+  la     a6, trap_entry
+  mtpcr  a6, ASM_CR(PCR_EVEC)
 
   // clear IPIs and enable traps
   mtpcr  zero, ASM_CR(PCR_CLR_IPI)
-  li     t0, PCR0
-  mtpcr  t0, ASM_CR(PCR_SR)
+  li     a6, PCR0
+  mtpcr  a6, ASM_CR(PCR_SR)
 
   // core 0?
-  mfpcr  t0, ASM_CR(PCR_COREID)
-  bnez   t0, notcore0
+  mfpcr  a6, ASM_CR(PCR_COREID)
+  bnez   a6, notcore0
 
   // terminate frame pointer for backtracing and set up stack
   li     s9, 0
   la     sp, percore_stacks + KSTKSIZE
-  li     t1, KERN_LOAD_ADDR
-  sub    sp, sp, t1
+  li     a7, KERN_LOAD_ADDR
+  sub    sp, sp, a7
 
   // get memory size and core count from first two words of memory
   lw     s0, 0(zero)
@@ -50,12 +50,12 @@ _start:
   // set up initial page mappings
   move   a0, s0
   la     a1, l1pt
-  sub    a1, a1, t1
+  sub    a1, a1, a7
   la     a2, l1pt_boot
-  sub    a2, a2, t1
+  sub    a2, a2, a7
 #ifdef __riscv64
   la     a3, l2pt
-  sub    a3, a3, t1
+  sub    a3, a3, a7
 #endif
   jal    pagetable_init
   jal    enable_mmu
@@ -64,43 +64,43 @@ _start:
   move   a0, s0
   move   a1, s1
   la     sp, percore_stacks + KSTKSIZE
-  la     t0, cmain
-  jr     t0
+  la     a6, cmain
+  jr     a6
 
 notcore0:
   // wait for core 0 to boot
-  la     t2, num_cpus_booted - KERN_LOAD_ADDR
-1:lw     t3, 0(t2)
-  beqz   t3, 1b
+  la     a8, num_cpus_booted - KERN_LOAD_ADDR
+1:lw     a9, 0(a8)
+  beqz   a9, 1b
 
   // if for some reason coreid >= num_cpus, don't boot this core
-  la     t2, num_cpus - KERN_LOAD_ADDR
-  lw     t2, 0(t2)
-1:bgeu   t0, t2, 1b
+  la     a8, num_cpus - KERN_LOAD_ADDR
+  lw     a8, 0(a8)
+1:bgeu   a6, a8, 1b
 
   // set up stack: sp = percoore_stacks+(core_id()+1)*KSTKSIZE
   la     sp, percore_stacks
-  add    t0, t0, 1
-  sll    t0, t0, KSTKSHIFT
-  add    sp, sp, t0
-  li     t1, KERN_LOAD_ADDR
-  sub    sp, sp, t1
+  add    a6, a6, 1
+  sll    a6, a6, KSTKSHIFT
+  add    sp, sp, a6
+  li     a7, KERN_LOAD_ADDR
+  sub    sp, sp, a7
   
   jal    enable_mmu
 
   // relocate stack and call into C code
-  li     t1, KERN_LOAD_ADDR
-  add    sp, sp, t1
-  la     t0, smp_init
-  jr     t0
+  li     a7, KERN_LOAD_ADDR
+  add    sp, sp, a7
+  la     a6, smp_init
+  jr     a6
 
 enable_mmu:
-  la     t0, l1pt_boot
-  li     t1, KERN_LOAD_ADDR
-  sub    t0, t0, t1
-  mtpcr  t0, ASM_CR(PCR_PTBR)
-  li     t0, PCR0 | SR_VM
-  mtpcr  t0, ASM_CR(PCR_SR)
+  la     a6, l1pt_boot
+  li     a7, KERN_LOAD_ADDR
+  sub    a6, a6, a7
+  mtpcr  a6, ASM_CR(PCR_PTBR)
+  li     a6, PCR0 | SR_VM
+  mtpcr  a6, ASM_CR(PCR_SR)
   ret
 
 ///////////////////////////////////////////////////////////////////

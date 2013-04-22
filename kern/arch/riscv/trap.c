@@ -67,7 +67,7 @@ static void set_current_ctx_hw(struct per_cpu_info *pcpui,
 		warn("Turn off IRQs until cur_ctx is set!");
 	assert(!pcpui->cur_ctx);
 	pcpui->actual_ctx.type = ROS_HW_CTX;
-	pcpui->actual_ctx.hw_tf = *hw_tf;
+	pcpui->actual_ctx.tf.hw_tf = *hw_tf;
 	pcpui->cur_ctx = &pcpui->actual_ctx;
 }
 
@@ -78,7 +78,7 @@ static void set_current_ctx_sw(struct per_cpu_info *pcpui,
 		warn("Turn off IRQs until cur_ctx is set!");
 	assert(!pcpui->cur_ctx);
 	pcpui->actual_ctx.type = ROS_SW_CTX;
-	pcpui->actual_ctx.sw_tf = *sw_tf;
+	pcpui->actual_ctx.tf.sw_tf = *sw_tf;
 	pcpui->cur_ctx = &pcpui->actual_ctx;
 }
 
@@ -94,10 +94,10 @@ format_trapframe(struct hw_trapframe *hw_tf, char* buf, int bufsz)
 	int len = snprintf(buf,bufsz,"TRAP frame at %p on core %d\n",
 	                   hw_tf, core_id());
 	static const char* regnames[] = {
-	  "z ", "ra", "v0", "v1", "a0", "a1", "a2", "a3",
-	  "a4", "a5", "a6", "a7", "t0", "t1", "t2", "t3",
-	  "t4", "t5", "t6", "t7", "s0", "s1", "s2", "s3",
-	  "s4", "s5", "s6", "s7", "s8", "fp", "sp", "tp"
+	  "z ", "ra", "s0", "s1", "s2", "s3", "s4", "s5",
+	  "s6", "s7", "s8", "s9", "sA", "sB", "sp", "tp",
+	  "v0", "v1", "a0", "a1", "a2", "a3", "a4", "a5",
+	  "a6", "a7", "a8", "a9", "aA", "aB", "aC", "aD"
 	};
 	
 	hw_tf->gpr[0] = 0;
@@ -130,7 +130,7 @@ static void exit_halt_loop(struct hw_trapframe *hw_tf)
 	extern char after_cpu_halt;
 	if ((char*)hw_tf->epc >= (char*)&cpu_halt &&
 	    (char*)hw_tf->epc < &after_cpu_halt)
-		hw_tf->epc = hw_tf->gpr[1];
+		hw_tf->epc = hw_tf->gpr[GPR_RA];
 }
 
 static void handle_keypress(char c)
@@ -262,7 +262,7 @@ handle_illegal_instruction(struct hw_trapframe *state)
 	set_current_ctx_hw(pcpui, state);
 	if (emulate_fpu(state) == 0)
 	{
-		advance_pc(&pcpui->cur_ctx->hw_tf);
+		advance_pc(&pcpui->cur_ctx->tf.hw_tf);
 		return;
 	}
 
@@ -283,8 +283,8 @@ handle_fp_disabled(struct hw_trapframe *hw_tf)
 static void
 handle_syscall(struct hw_trapframe *state)
 {
-	uintptr_t a0 = state->gpr[4];
-	uintptr_t a1 = state->gpr[5];
+	uintptr_t a0 = state->gpr[GPR_A0];
+	uintptr_t a1 = state->gpr[GPR_A1];
 
 	advance_pc(state);
 	set_current_ctx_hw(&per_cpu_info[core_id()], state);

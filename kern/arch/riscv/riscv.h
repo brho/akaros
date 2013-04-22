@@ -19,7 +19,7 @@ static __inline uintptr_t
 read_pc(void)
 {
 	uintptr_t pc;
-	asm ("rdnpc %0" : "=r"(pc));
+	asm ("rdpc %0" : "=r"(pc));
 	return pc;
 }
 

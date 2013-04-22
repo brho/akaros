@@ -26,14 +26,14 @@ void proc_init_ctx(struct user_context *ctx, uint32_t vcoreid, uintptr_t entryp,
 
 	memset(tf, 0, sizeof(*tf));
 
-	tf->gpr[30] = stack_top-64;
+	tf->gpr[GPR_SP] = stack_top-64;
 	tf->sr = SR_U64;
 
 	tf->epc = entryp;
 
 	/* Coupled closely with user's entry.S.  id is the vcoreid, which entry.S
 	 * uses to determine what to do.  vcoreid == 0 is the main core/context. */
-	tf->gpr[4] = vcoreid;
+	tf->gpr[GPR_A0] = vcoreid;
 }
 
 /* TODO: handle both HW and SW contexts */

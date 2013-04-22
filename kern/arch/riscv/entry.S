@@ -16,6 +16,8 @@
   .text
   .global save_kernel_tf_asm
 save_kernel_tf_asm:
+  mfpcr  a1,ASM_CR(PCR_SR)
+
   STORE  s0,20*REGBYTES(a0)
   STORE  s1,21*REGBYTES(a0)
   STORE  s2,22*REGBYTES(a0)
@@ -28,8 +30,7 @@ save_kernel_tf_asm:
   STORE  s9,29*REGBYTES(a0)
   STORE  sp,30*REGBYTES(a0)
 
-  mfpcr  t0,ASM_CR(PCR_SR)
-  STORE  t0,32*REGBYTES(a0)
+  STORE  a1,32*REGBYTES(a0)
 
   # set EPC to this function's return address
   STORE  ra,33*REGBYTES(a0)
@@ -38,7 +39,7 @@ save_kernel_tf_asm:
   .text
   .global pop_kernel_ctx
 pop_kernel_ctx:
-  LOAD  t0,32*REGBYTES(a0)
+  LOAD  a1,32*REGBYTES(a0)
   LOAD  ra,33*REGBYTES(a0)
 
   LOAD  s0,20*REGBYTES(a0)
@@ -53,7 +54,7 @@ pop_kernel_ctx:
   LOAD  s9,29*REGBYTES(a0)
   LOAD  sp,30*REGBYTES(a0)
 
-  mtpcr  t0,ASM_CR(PCR_SR)
+  mtpcr  a1,ASM_CR(PCR_SR)
   ret
 
 
@@ -64,12 +65,12 @@ save_tf:  # write the trap frame onto the stack
   .globl  env_pop_tf
 env_pop_tf:  # write the trap frame onto the stack
   # restore gprs
-  LOAD  t0,32*REGBYTES(a0)  # restore sr (should disable interrupts)
-  mfpcr t1, ASM_CR(PCR_SR)
-  andi  t1, t1, ~(SR_PS | SR_EF | SR_U64)
-  andi  t0, t0, SR_PS | SR_EF | SR_U64
-  or    t0, t0, t1
-  mtpcr t0, ASM_CR(PCR_SR)
+  LOAD  v0,32*REGBYTES(a0)  # restore sr (should disable interrupts)
+  mfpcr v1, ASM_CR(PCR_SR)
+  andi  v1, v1, ~(SR_PS | SR_EF | SR_U64)
+  andi  v0, v0, SR_PS | SR_EF | SR_U64
+  or    v0, v0, v1
+  mtpcr v0, ASM_CR(PCR_SR)
 
   LOAD  x1,1*REGBYTES(a0)
   mtpcr  x1,ASM_CR(PCR_K0)
@@ -115,32 +116,34 @@ env_pop_tf:  # write the trap frame onto the stack
 
   .global  trap_entry
 trap_entry:
-  # save x1 and x2 so we can use them as temporaries
-  mtpcr x1, ASM_CR(PCR_K0)
-  mtpcr x2, ASM_CR(PCR_K1)
-
-  # when coming from kernel, continue below its stack
+  mtpcr x1, ASM_CR(PCR_K0)  # stash x1 in k0
   mfpcr x1, ASM_CR(PCR_SR)
-  and   x1, x1, SR_PS
+  mtpcr x2, ASM_CR(PCR_K1)  # stash x2 in k1
+  # when coming from kernel, continue below its stack
   add   x2, sp, -SIZEOF_HW_TRAPFRAME
+  and   x1, x1, SR_PS
   bnez  x1, 1f
 
   # otherwise, start at the top of the per-core stack
-  la    x2, core_stacktops
   mfpcr x1, ASM_CR(PCR_COREID)
+  lui	x2, %hi(core_stacktops)
   sll   x1, x1, LOG_REGBYTES
   add   x2, x2, x1
-  LOAD  x2, 0(x2)
+  LOAD  x2, %lo(core_stacktops)(x2)
   add   x2, x2, -SIZEOF_HW_TRAPFRAME
 
 1:# save gprs
   STORE  x3,3*REGBYTES(x2)
   STORE  x4,4*REGBYTES(x2)
+  mfpcr  x3,ASM_CR(PCR_K0)    # retrieve x1
+  mfpcr  x4,ASM_CR(PCR_K1)    # retrieve x2
   STORE  x5,5*REGBYTES(x2)
   STORE  x6,6*REGBYTES(x2)
   STORE  x7,7*REGBYTES(x2)
   STORE  x8,8*REGBYTES(x2)
   STORE  x9,9*REGBYTES(x2)
+  STORE  x3,1*REGBYTES(x2)    # save x1
+  STORE  x4,2*REGBYTES(x2)    # save x2
   STORE  x10,10*REGBYTES(x2)
   STORE  x11,11*REGBYTES(x2)
   STORE  x12,12*REGBYTES(x2)
@@ -164,22 +167,16 @@ trap_entry:
   STORE  x30,30*REGBYTES(x2)
   STORE  x31,31*REGBYTES(x2)
 
-  mfpcr  x3,ASM_CR(PCR_K0)
-  STORE  x3,1*REGBYTES(x2)          # x1 is in PCR_K0
-  mfpcr  x3,ASM_CR(PCR_K1)
-  STORE  x3,2*REGBYTES(x2)          # x2 is in PCR_K1
-
   # get sr, epc, badvaddr, cause
-  mfpcr  x3,ASM_CR(PCR_SR)          # sr
+  mfpcr  x3,ASM_CR(PCR_SR)
+  mfpcr  x4,ASM_CR(PCR_EPC)
+  mfpcr  x5,ASM_CR(PCR_BADVADDR)
+  mfpcr  x6,ASM_CR(PCR_CAUSE)
   STORE  x3,32*REGBYTES(x2)
-  mfpcr  x4,ASM_CR(PCR_EPC)          # epc
   STORE  x4,33*REGBYTES(x2)
-  mfpcr  x3,ASM_CR(PCR_BADVADDR)      # badvaddr
-  STORE  x3,34*REGBYTES(x2)
-  mfpcr  x3,ASM_CR(PCR_CAUSE)        # cause
-  STORE  x3,35*REGBYTES(x2)
+  STORE  x5,34*REGBYTES(x2)
+  STORE  x6,35*REGBYTES(x2)
 
-  li    s9, 0
   move  sp, x2
   move  a0, x2
   j     handle_trap

@@ -49,7 +49,7 @@ static inline void __pop_ros_tf(struct hw_trapframe *tf, uint32_t vcoreid,
 	register uint32_t _vcoreid = vcoreid;
 	register struct hw_trapframe* _tf = tf;
 
-	set_stack_pointer((void*)tf->gpr[30]);
+	set_stack_pointer((void*)tf->gpr[GPR_SP]);
 
 	tf = _tf;
 	vcoreid = _vcoreid;
@@ -101,7 +101,7 @@ static inline void init_user_ctx(struct user_context *ctx, uint32_t entry_pt,
 	struct hw_trapframe *u_tf = &ctx->tf.hw_tf;
 	ctx->type = ROS_HW_CTX;
 	memset(u_tf, 0, sizeof(*u_tf));
-	u_tf->gpr[30] = stack_top;
+	u_tf->gpr[GPR_SP] = stack_top;
 	u_tf->epc = entry_pt;
 }
 

@@ -21,6 +21,11 @@ struct sw_trapframe {
 	/* TODO */
 };
 
+#define GPR_RA 1
+#define GPR_SP 14
+#define GPR_A0 18
+#define GPR_A1 19
+
 typedef struct ancillary_state
 {
 	uint64_t fpr[32];
