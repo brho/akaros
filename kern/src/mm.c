@@ -540,16 +540,22 @@ void *__do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 	 * length and not any merged regions, which is why we set addr above and use
 	 * it here.
 	 *
-	 * If HPF errors out, we'll warn for now, since it is likely a bug in
-	 * userspace, though since POPULATE is an opportunistic thing, we don't need
-	 * to actually kill the process. */
+	 * If HPF errors out, we'll warn and fail for now.  This could be due to
+	 * some userspace error, but also occurs when we run out of memory.  If we
+	 * are out of memory, the kernel can't really handle it. */
 	if (flags & MAP_POPULATE && vmr->vm_prot != PROT_NONE)
 		for (int i = 0; i < num_pages; i++) {
 			retval = __handle_page_fault(p, addr + i * PGSIZE, vmr->vm_prot);
 			if (retval) {
-				warn("do_mmap() failing (%d) on addr %08p with prot %p\n",
+				warn("do_mmap() failing (%d) on addr %08p with prot %p",
 				     retval, addr + i * PGSIZE,  vmr->vm_prot);
-				break;
+				destroy_vmr(vmr);
+				set_errno(-retval);
+				if (retval == -ENOMEM) {
+					printk("[kernel] ENOMEM, killing %d\n", p->pid);
+					proc_destroy(p);
+				}
+				return MAP_FAILED;
 			}
 		}
 	return (void*SAFE)TC(addr);
