@@ -112,8 +112,9 @@ static __inline void disable_irqsave(int8_t* state)
 
 static __inline void cpu_relax(void)
 {
-	for(int i = 0; i < 100; i++)
-		asm ("nop");
+	// compute and use 0/0, which stalls Rocket for dozens of cycles
+	long scratch;
+	asm volatile ("div %0, zero, zero; move %0, %0" : "=r"(scratch));
 }
 
 static __inline void clflush(uintptr_t* addr)
