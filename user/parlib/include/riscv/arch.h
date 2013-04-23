@@ -3,6 +3,7 @@
 
 #include <ros/common.h>
 #include <ros/trapframe.h>
+#include <ros/arch/arch.h>
 
 #define internal_function
 

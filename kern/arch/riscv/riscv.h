@@ -35,18 +35,4 @@ clear_ipi()
 	mtpcr(PCR_CLR_IPI, 0);
 }
 
-static __inline uint32_t
-read_fsr(void)
-{
-	uint32_t fsr;
-	asm volatile ("mffsr %0" : "=r"(fsr));
-	return fsr;
-}
-
-static __inline void
-write_fsr(uint32_t fsr)
-{
-	asm volatile ("mtfsr %0" :: "r"(fsr));
-}
-
 #endif
