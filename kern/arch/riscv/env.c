@@ -7,12 +7,8 @@
 void
 save_fp_state(ancillary_state_t* silly)
 {
-	/* TODO: save FP state! */
-	return; // don't save FP state for now
-	uintptr_t sr = mfpcr(PCR_SR);
-	mtpcr(PCR_SR, sr | SR_EF);
-
-	asm("mffsr %0" : "=r"(silly->fsr));
+	uintptr_t sr = enable_fp();
+	uint32_t fsr = read_fsr();
 
 	asm("fsd f0,%0" : "=m"(silly->fpr[0]));
 	asm("fsd f1,%0" : "=m"(silly->fpr[1]));
@@ -47,17 +43,15 @@ save_fp_state(ancillary_state_t* silly)
 	asm("fsd f30,%0" : "=m"(silly->fpr[30]));
 	asm("fsd f31,%0" : "=m"(silly->fpr[31]));
 
+	silly->fsr = fsr;
 	mtpcr(PCR_SR, sr);
 }
 
 void
 restore_fp_state(ancillary_state_t* silly)
 {
-	return; // don't restore FP state for now
-	uintptr_t sr = mfpcr(PCR_SR);
-	mtpcr(PCR_SR, sr | SR_EF);
-
-	asm("mtfsr %0" : : "r"(silly->fsr));
+	uintptr_t sr = enable_fp();
+	uint32_t fsr = silly->fsr;
 
 	asm("fld f0,%0" : : "m"(silly->fpr[0]));
 	asm("fld f1,%0" : : "m"(silly->fpr[1]));
@@ -92,12 +86,25 @@ restore_fp_state(ancillary_state_t* silly)
 	asm("fld f30,%0" : : "m"(silly->fpr[30]));
 	asm("fld f31,%0" : : "m"(silly->fpr[31]));
 
+	write_fsr(fsr);
 	mtpcr(PCR_SR, sr);
 }
 
 void init_fp_state(void)
 {
-	/* TODO: implement me! */
+	uintptr_t sr = enable_fp();
+
+	asm("fcvt.d.w f0, x0; fcvt.d.w f1 ,x0; fcvt.d.w f2, x0; fcvt.d.w f3, x0;");
+	asm("fcvt.d.w f4, x0; fcvt.d.w f5, x0; fcvt.d.w f6, x0; fcvt.d.w f7, x0;");
+	asm("fcvt.d.w f8, x0; fcvt.d.w f9, x0; fcvt.d.w f10,x0; fcvt.d.w f11,x0;");
+	asm("fcvt.d.w f12,x0; fcvt.d.w f13,x0; fcvt.d.w f14,x0; fcvt.d.w f15,x0;");
+	asm("fcvt.d.w f16,x0; fcvt.d.w f17,x0; fcvt.d.w f18,x0; fcvt.d.w f19,x0;");
+	asm("fcvt.d.w f20,x0; fcvt.d.w f21,x0; fcvt.d.w f22,x0; fcvt.d.w f23,x0;");
+	asm("fcvt.d.w f24,x0; fcvt.d.w f25,x0; fcvt.d.w f26,x0; fcvt.d.w f27,x0;");
+	asm("fcvt.d.w f28,x0; fcvt.d.w f29,x0; fcvt.d.w f30,x0; fcvt.d.w f31,x0;");
+	asm("mtfsr x0");
+
+	mtpcr(PCR_SR, sr);
 }
 
 static int

@@ -66,6 +66,12 @@ read_tsc_serialized(void)
 }
 
 static __inline uintptr_t
+enable_fp(void)
+{
+	return setpcr(PCR_SR, SR_EF);
+}
+
+static __inline uintptr_t
 enable_irq(void)
 {
 	return setpcr(PCR_SR, SR_ET);
