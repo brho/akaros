@@ -253,6 +253,43 @@ static void fake_rdtscp(struct hw_trapframe *hw_tf)
 	hw_tf->tf_regs.reg_ecx = core_id();
 }
 
+static void handle_fperr(struct hw_trapframe *hw_tf)
+{
+	uint16_t fpcw, fpsw;
+	uint32_t mxcsr;
+	asm volatile ("fnstcw %0" : "=m"(fpcw));
+	asm volatile ("fnstsw %0" : "=m"(fpsw));
+	asm volatile ("stmxcsr %0" : "=m"(mxcsr));
+	print_trapframe(hw_tf);
+	printk("Core %d: FP ERR, CW: 0x%04x, SW: 0x%04x, MXCSR 0x%08x\n", core_id(),
+	       fpcw, fpsw, mxcsr);
+	printk("Core %d: The following faults are unmasked:\n", core_id());
+	if (fpsw & ~fpcw & FP_EXCP_IE) {
+		printk("\tInvalid Operation: ");
+		if (fpsw & FP_SW_SF) {
+			if (fpsw & FP_SW_C1)
+				printk("Stack overflow\n");
+			else
+				printk("Stack underflow\n");
+		} else {
+			printk("invalid arithmetic operand\n");
+		}
+	}
+	if (fpsw & ~fpcw & FP_EXCP_DE)
+		printk("\tDenormalized operand\n");
+	if (fpsw & ~fpcw & FP_EXCP_ZE)
+		printk("\tDivide by zero\n");
+	if (fpsw & ~fpcw & FP_EXCP_OE)
+		printk("\tNumeric Overflow\n");
+	if (fpsw & ~fpcw & FP_EXCP_UE)
+		printk("\tNumeric Underflow\n");
+	if (fpsw & ~fpcw & FP_EXCP_PE)
+		printk("\tInexact result (precision)\n");
+	printk("Killing the process.\n");
+	enable_irq();
+	proc_destroy(current);
+}
+
 /* Certain traps want IRQs enabled, such as the syscall.  Others can't handle
  * it, like the page fault handler.  Turn them on on a case-by-case basis. */
 static void trap_dispatch(struct hw_trapframe *hw_tf)
@@ -305,6 +342,9 @@ static void trap_dispatch(struct hw_trapframe *hw_tf)
 			break;
 		case T_PGFLT:
 			page_fault_handler(hw_tf);
+			break;
+		case T_FPERR:
+			handle_fperr(hw_tf);
 			break;
 		case T_SYSCALL:
 			enable_irq();

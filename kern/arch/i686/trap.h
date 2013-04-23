@@ -41,6 +41,29 @@
 #define PF_ERROR_WRITE 			0x02
 #define PF_ERROR_USER 			0x04
 
+/* Floating point constants */
+#define FP_EXCP_IE				(1 << 0)	/* invalid op */
+#define FP_EXCP_DE				(1 << 1)	/* denormalized op */
+#define FP_EXCP_ZE				(1 << 2)	/* div by zero */
+#define FP_EXCP_OE				(1 << 3)	/* numeric overflow */
+#define FP_EXCP_UE				(1 << 4)	/* numeric underflow */
+#define FP_EXCP_PE				(1 << 5)	/* precision */
+
+#define FP_SW_SF				(1 << 6)	/* stack fault */
+#define FP_SW_ES				(1 << 7)	/* error summary status */
+#define FP_SW_C0				(1 << 8)	/* condition codes */
+#define FP_SW_C1				(1 << 9)
+#define FP_SW_C2				(1 << 10)
+#define FP_SW_C3				(1 << 14)
+#define FP_CW_TOP_SHIFT			(11)
+#define FP_CW_TOP_MASK			(7 << FP_CW_TOP_SHIFT)
+
+#define FP_CW_PC_SHIFT			(8)
+#define FP_CW_PC_MASK			(3 << FP_CW_PC_SHIFT)
+#define FP_CW_RC_SHIFT			(10)
+#define FP_CW_RC_MASK			(3 << FP_CW_RC_SHIFT)
+#define FP_CW_IC				(1 << 12)
+
 /* IPIs */
 /* Testing IPI (used in testing.c) */
 #define I_TESTING		230
