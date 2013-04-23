@@ -4,8 +4,7 @@
 #include <arch/arch.h>
 #include <pmap.h>
 
-void
-save_fp_state(ancillary_state_t* silly)
+void save_fp_state(ancillary_state_t* silly)
 {
 	uintptr_t sr = enable_fp();
 	uint32_t fsr = read_fsr();
@@ -47,8 +46,7 @@ save_fp_state(ancillary_state_t* silly)
 	mtpcr(PCR_SR, sr);
 }
 
-void
-restore_fp_state(ancillary_state_t* silly)
+void restore_fp_state(ancillary_state_t* silly)
 {
 	uintptr_t sr = enable_fp();
 	uint32_t fsr = silly->fsr;

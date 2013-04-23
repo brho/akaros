@@ -339,12 +339,12 @@ handle_trap(struct hw_trapframe *hw_tf)
 		}
 	}
 	
-	extern void env_pop_tf(struct hw_trapframe *tf);	/* in asm */
+	extern void pop_hw_tf(struct hw_trapframe *tf);	/* in asm */
 	/* Return to the current process, which should be runnable.  If we're the
 	 * kernel, we should just return naturally.  Note that current and tf need
 	 * to still be okay (might not be after blocking) */
 	if (in_kernel(hw_tf))
-		env_pop_tf(hw_tf);	/* TODO: for a kernel tf?  change names? */
+		pop_hw_tf(hw_tf);
 	else
 		proc_restartcore();
 }
