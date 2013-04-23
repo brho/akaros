@@ -126,6 +126,7 @@ long __ros_syscall(unsigned int _num, long _a0, long _a1, long _a2, long _a3,
 		*errno_loc = sysc.err;
 	return sysc.retval;
 }
+libc_hidden_def(__ros_syscall)
 
 /* This version knows about errno and will handle it. */
 long __ros_syscall_errno(unsigned int _num, long _a0, long _a1, long _a2,
@@ -137,6 +138,7 @@ long __ros_syscall_errno(unsigned int _num, long _a0, long _a1, long _a2,
 		errno = sysc.err;
 	return sysc.retval;
 }
+libc_hidden_def(__ros_syscall_errno)
 
 long int syscall(long int num, ...)
 {

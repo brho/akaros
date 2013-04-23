@@ -31,6 +31,12 @@ long __ros_syscall(unsigned int _num, long _a0, long _a1, long _a2, long _a3,
 long __ros_syscall_errno(unsigned int _num, long _a0, long _a1, long _a2,
                          long _a3, long _a4, long _a5);
 
+/* Bypass PLT when invoked from within libc */
+#ifdef libc_hidden_proto
+libc_hidden_proto(__ros_syscall)
+libc_hidden_proto(__ros_syscall_errno)
+#endif
+
 /**************** Additional syscall support ****************/
 /* Simple ev_q that routes notifs to vcore0's public mbox.  This is used by the
  * default scp_syscall, but can also be used for signals or other basic
