@@ -12,8 +12,9 @@
 void proc_pop_ctx(struct user_context *ctx)
 {
 	struct hw_trapframe *tf = &ctx->tf.hw_tf;
-	assert(ctx->type = ROS_HW_CTX);
-	extern void env_pop_tf(struct hw_trapframe *tf);	/* in asm */
+	assert(ctx->type == ROS_HW_CTX);
+	extern void env_pop_tf(struct hw_trapframe *tf)
+	  __attribute__((noreturn));	/* in asm */
 	env_pop_tf(tf);
 }
 
