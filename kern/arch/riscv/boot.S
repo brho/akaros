@@ -38,7 +38,7 @@ _start:
   bnez   a6, notcore0
 
   // terminate frame pointer for backtracing and set up stack
-  li     s9, 0
+  li     s0, 0
   la     sp, percore_stacks + KSTKSIZE
   li     a7, KERN_LOAD_ADDR
   sub    sp, sp, a7

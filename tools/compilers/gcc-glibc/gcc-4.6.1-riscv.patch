@@ -8175,7 +8175,7 @@ index 0000000..26603b4
 +#include "gt-riscv.h"
 diff --git a/gcc-4.6.1/gcc/config/riscv/riscv.h b/gcc-4.6.1/gcc/config/riscv/riscv.h
 new file mode 100644
-index 0000000..e20faad
+index 0000000..036bff0
 --- /dev/null
 +++ gcc-4.6.1/gcc/config/riscv/riscv.h
 @@ -0,0 +1,1666 @@
@@ -8943,7 +8943,7 @@ index 0000000..e20faad
 +
 +/* Register to use for pushing function arguments.  */
 +#define STACK_POINTER_REGNUM (GP_REG_FIRST + 14)
-+#define HARD_FRAME_POINTER_REGNUM (GP_REG_FIRST + 3)
++#define HARD_FRAME_POINTER_REGNUM (GP_REG_FIRST + 2)
 +
 +#define THREAD_POINTER_REGNUM (GP_REG_FIRST + 15)
 +

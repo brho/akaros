@@ -23,12 +23,16 @@ int debuginfo_eip(uintptr_t eip, struct eipdebuginfo *info)
 	return 0;
 }
 
-void
-backtrace(void)
+void backtrace(void)
 {
-	static bool once = TRUE;
-	if (once) {
-		warn("Not implemented for RISC-V");
-		once = FALSE;
+	void **fp;
+	asm volatile ("move %0, s0" : "=r"(fp));
+
+	for (int i = 0; ; i++) {
+		void *pc = fp[-1], *sp = fp[-2];
+		printk("[%d] pc %p sp %p\n", i, pc, sp);
+		if (pc == 0 || (void**)sp < fp)
+			break;
+		fp = (void**)sp;
 	}
 }

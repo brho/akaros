@@ -200,10 +200,10 @@ index 0000000..22edee7
 +N (64, 64, 0, "riscv", TRUE, &arch_info_struct[0]);
 diff --git a/binutils-2.21.1/bfd/elf32-riscv.c b/binutils-2.21.1/bfd/elf32-riscv.c
 new file mode 100644
-index 0000000..76c2f26
+index 0000000..ef7f248
 --- /dev/null
 +++ binutils-2.21.1/bfd/elf32-riscv.c
-@@ -0,0 +1,2200 @@
+@@ -0,0 +1,2170 @@
 +/* MIPS-specific support for 32-bit ELF
 +   Copyright 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002,
 +   2003, 2004, 2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
@@ -706,21 +706,7 @@ index 0000000..76c2f26
 +	 0xffffffff,		/* dst_mask */
 +	 FALSE),		/* pcrel_offset */
 +
-+  /* Protected jump conversion.  This is an optimization hint.  No
-+     relocation is required for correctness.  */
-+  HOWTO (R_RISCV_JALR,		/* type */
-+	 0,			/* rightshift */
-+	 2,			/* size (0 = byte, 1 = short, 2 = long) */
-+	 32,			/* bitsize */
-+	 FALSE,			/* pc_relative */
-+	 0,			/* bitpos */
-+	 complain_overflow_dont, /* complain_on_overflow */
-+	 _bfd_riscv_elf_generic_reloc,	/* special_function */
-+	 "R_RISCV_JALR",		/* name */
-+	 FALSE,			/* partial_inplace */
-+	 0,			/* src_mask */
-+	 0x00000000,		/* dst_mask */
-+	 FALSE),		/* pcrel_offset */
++  EMPTY_HOWTO(37),
 +
 +  /* TLS relocations.  */
 +  HOWTO (R_RISCV_TLS_DTPMOD32,	/* type */
@@ -1388,21 +1374,7 @@ index 0000000..76c2f26
 +	 0xffffffff,		/* dst_mask */
 +	 FALSE),		/* pcrel_offset */
 +
-+  /* Protected jump conversion.  This is an optimization hint.  No
-+     relocation is required for correctness.  */
-+  HOWTO (R_RISCV_JALR,		/* type */
-+	 0,			/* rightshift */
-+	 2,			/* size (0 = byte, 1 = short, 2 = long) */
-+	 32,			/* bitsize */
-+	 FALSE,			/* pc_relative */
-+	 0,			/* bitpos */
-+	 complain_overflow_dont, /* complain_on_overflow */
-+	 _bfd_riscv_elf_generic_reloc,	/* special_function */
-+	 "R_RISCV_JALR",		/* name */
-+	 FALSE,			/* partial_inplace */
-+	 0,			/* src_mask */
-+	 0x00000000,		/* dst_mask */
-+	 FALSE),		/* pcrel_offset */
++  EMPTY_HOWTO(37),
 +
 +  /* TLS relocations.  */
 +  HOWTO (R_RISCV_TLS_DTPMOD32,	/* type */
@@ -2036,9 +2008,7 @@ index 0000000..76c2f26
 +  { BFD_RELOC_MIPS_CALL_LO16, R_RISCV_CALL_LO16 },
 +  { BFD_RELOC_MIPS_SCN_DISP, R_RISCV_SCN_DISP },
 +  { BFD_RELOC_MIPS_REL16, R_RISCV_REL16 },
-+  /* Use of R_RISCV_ADD_IMMEDIATE and R_RISCV_PJUMP is deprecated.  */
 +  { BFD_RELOC_MIPS_RELGOT, R_RISCV_RELGOT },
-+  { BFD_RELOC_MIPS_JALR, R_RISCV_JALR },
 +  { BFD_RELOC_MIPS_TLS_DTPMOD32, R_RISCV_TLS_DTPMOD32 },
 +  { BFD_RELOC_MIPS_TLS_DTPREL32, R_RISCV_TLS_DTPREL32 },
 +  { BFD_RELOC_MIPS_TLS_DTPMOD64, R_RISCV_TLS_DTPMOD64 },
@@ -2406,10 +2376,10 @@ index 0000000..76c2f26
 +#include "elf32-target.h"
 diff --git a/binutils-2.21.1/bfd/elf64-riscv.c b/binutils-2.21.1/bfd/elf64-riscv.c
 new file mode 100644
-index 0000000..973edc0
+index 0000000..c9c5d1a
 --- /dev/null
 +++ binutils-2.21.1/bfd/elf64-riscv.c
-@@ -0,0 +1,3028 @@
+@@ -0,0 +1,2999 @@
 +/* MIPS-specific support for 64-bit ELF
 +   Copyright 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005,
 +   2006, 2007, 2008, 2009, 2010
@@ -2955,21 +2925,7 @@ index 0000000..973edc0
 +	 0xffffffff,		/* dst_mask */
 +	 FALSE),		/* pcrel_offset */
 +
-+  /* Protected jump conversion.  This is an optimization hint.  No
-+     relocation is required for correctness.  */
-+  HOWTO (R_RISCV_JALR,		/* type */
-+	 0,			/* rightshift */
-+	 2,			/* size (0 = byte, 1 = short, 2 = long) */
-+	 32,			/* bitsize */
-+	 FALSE,			/* pc_relative */
-+	 0,			/* bitpos */
-+	 complain_overflow_dont, /* complain_on_overflow */
-+	 _bfd_riscv_elf_generic_reloc,	/* special_function */
-+	 "R_RISCV_JALR",		/* name */
-+	 FALSE,			/* partial_inplace */
-+	 0,			/* src_mask */
-+	 0x00000000,		/* dst_mask */
-+	 FALSE),		/* pcrel_offset */
++  EMPTY_HOWTO(37),
 +
 +  /* TLS relocations.  */
 +  EMPTY_HOWTO (R_RISCV_TLS_DTPMOD32),
@@ -3637,21 +3593,7 @@ index 0000000..973edc0
 +	 0xffffffff,		/* dst_mask */
 +	 FALSE),		/* pcrel_offset */
 +
-+  /* Protected jump conversion.  This is an optimization hint.  No
-+     relocation is required for correctness.  */
-+  HOWTO (R_RISCV_JALR,		/* type */
-+	 0,			/* rightshift */
-+	 2,			/* size (0 = byte, 1 = short, 2 = long) */
-+	 32,			/* bitsize */
-+	 FALSE,			/* pc_relative */
-+	 0,			/* bitpos */
-+	 complain_overflow_dont, /* complain_on_overflow */
-+	 _bfd_riscv_elf_generic_reloc,	/* special_function */
-+	 "R_RISCV_JALR",		/* name */
-+	 FALSE,			/* partial_inplace */
-+	 0,			/* src_mask */
-+	 0x00000000,		/* dst_mask */
-+	 FALSE),		/* pcrel_offset */
++  EMPTY_HOWTO(37),
 +
 +  /* TLS relocations.  */
 +  EMPTY_HOWTO (R_RISCV_TLS_DTPMOD32),
@@ -4436,7 +4378,6 @@ index 0000000..973edc0
 +  { BFD_RELOC_MIPS_REL16, R_RISCV_REL16 },
 +  /* Use of R_RISCV_ADD_IMMEDIATE and R_RISCV_PJUMP is deprecated.  */
 +  { BFD_RELOC_MIPS_RELGOT, R_RISCV_RELGOT },
-+  { BFD_RELOC_MIPS_JALR, R_RISCV_JALR },
 +  { BFD_RELOC_MIPS_TLS_DTPMOD32, R_RISCV_TLS_DTPMOD32 },
 +  { BFD_RELOC_MIPS_TLS_DTPREL32, R_RISCV_TLS_DTPREL32 },
 +  { BFD_RELOC_MIPS_TLS_DTPMOD64, R_RISCV_TLS_DTPMOD64 },
@@ -5440,10 +5381,10 @@ index 0000000..973edc0
 +#include "elf64-target.h"
 diff --git a/binutils-2.21.1/bfd/elfxx-riscv.c b/binutils-2.21.1/bfd/elfxx-riscv.c
 new file mode 100644
-index 0000000..529ee79
+index 0000000..4fdea3e
 --- /dev/null
 +++ binutils-2.21.1/bfd/elfxx-riscv.c
-@@ -0,0 +1,7401 @@
+@@ -0,0 +1,7387 @@
 +/* MIPS-specific support for ELF
 +   Copyright 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002,
 +   2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010 Free Software Foundation, Inc.
@@ -8564,15 +8505,6 @@ index 0000000..529ee79
 +      value &= howto->dst_mask;
 +      break;
 +
-+    case R_RISCV_JALR:
-+      /* This relocation is only a hint.  In some cases, we optimize
-+	 it into a bal instruction.  But we don't try to optimize
-+	 when the symbol does not resolve locally.  */
-+      if (h != NULL && !SYMBOL_CALLS_LOCAL (info, &h->root))
-+	return bfd_reloc_continue;
-+      value = symbol + addend;
-+      break;
-+
 +    case R_RISCV_PJUMP:
 +    case R_RISCV_GNU_VTINHERIT:
 +    case R_RISCV_GNU_VTENTRY:
@@ -9795,11 +9727,6 @@ index 0000000..529ee79
 +	    elf_hash_table (info)->dynobj = dynobj = abfd;
 +	  if (!mips_elf_create_got_section (dynobj, info))
 +	    return FALSE;
-+	  break;
-+
-+	  /* This is just a hint; it can safely be ignored.  Don't set
-+	     has_static_relocs for the corresponding symbol.  */
-+	case R_RISCV_JALR:
 +	  break;
 +
 +	case R_RISCV_32:
@@ -13152,10 +13079,10 @@ index 1aa9bb4..435df2b 100644
  @am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/tc-rx.Tpo $(DEPDIR)/tc-rx.Po
 diff --git a/binutils-2.21.1/gas/config/tc-riscv.c b/binutils-2.21.1/gas/config/tc-riscv.c
 new file mode 100644
-index 0000000..ddaf7cc
+index 0000000..d1ec5ff
 --- /dev/null
 +++ binutils-2.21.1/gas/config/tc-riscv.c
-@@ -0,0 +1,3858 @@
+@@ -0,0 +1,3857 @@
 +/* tc-mips.c -- assemble code for a MIPS chip.
 +   Copyright 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002,
 +   2003, 2004, 2005, 2006, 2007, 2008, 2009  Free Software Foundation, Inc.
@@ -13601,7 +13528,7 @@ index 0000000..ddaf7cc
 +insn_length (const struct mips_cl_insn *insn)
 +{
 +  /* RVC instructions have insn[1:0] != 3 */
-+  return (insn->insn_opcode & 0x3) != 0x3 ? 2 : 4;
++  return mips_opts.rvc && (insn->insn_opcode & 0x3) != 0x3 ? 2 : 4;
 +}
 +
 +static int
@@ -16010,7 +15937,6 @@ index 0000000..ddaf7cc
 +    case BFD_RELOC_MIPS_SCN_DISP:
 +    case BFD_RELOC_MIPS_REL16:
 +    case BFD_RELOC_MIPS_RELGOT:
-+    case BFD_RELOC_MIPS_JALR:
 +    case BFD_RELOC_HI16:
 +    case BFD_RELOC_HI16_S:
 +    case BFD_RELOC_GPREL16:
@@ -17221,10 +17147,10 @@ index 01c519d..49dafb5 100644
     random numbers (0x8523, 0xa7f2, etc.) to minimize the chances of collision
 diff --git a/binutils-2.21.1/include/elf/riscv.h b/binutils-2.21.1/include/elf/riscv.h
 new file mode 100644
-index 0000000..3ab671f
+index 0000000..7eb5e98
 --- /dev/null
 +++ binutils-2.21.1/include/elf/riscv.h
-@@ -0,0 +1,485 @@
+@@ -0,0 +1,484 @@
 +/* RISC-V ELF support for BFD.
 +   Copyright 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002,
 +   2003, 2004, 2005, 2008, 2009, 2010
@@ -17294,7 +17220,6 @@ index 0000000..3ab671f
 +  RELOC_NUMBER (R_RISCV_ADD_IMMEDIATE, 34)
 +  RELOC_NUMBER (R_RISCV_PJUMP, 35)
 +  RELOC_NUMBER (R_RISCV_RELGOT, 36)
-+  RELOC_NUMBER (R_RISCV_JALR, 37)
 +  /* TLS relocations.  */
 +  RELOC_NUMBER (R_RISCV_TLS_DTPMOD32, 38)
 +  RELOC_NUMBER (R_RISCV_TLS_DTPREL32, 39)
