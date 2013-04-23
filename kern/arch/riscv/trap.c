@@ -270,17 +270,6 @@ handle_illegal_instruction(struct hw_trapframe *state)
 }
 
 static void
-handle_fp_disabled(struct hw_trapframe *hw_tf)
-{
-	if (in_kernel(hw_tf))
-		panic("kernel executed an FP instruction!");
-
-	hw_tf->sr |= SR_EF;
-	extern void env_pop_tf(struct hw_trapframe *tf);	/* in asm */
-	env_pop_tf(hw_tf); /* We didn't save our TF, so don't proc_restartcore */
-}
-
-static void
 handle_syscall(struct hw_trapframe *state)
 {
 	uintptr_t a0 = state->gpr[GPR_A0];
@@ -307,7 +296,6 @@ handle_trap(struct hw_trapframe *hw_tf)
 	  [CAUSE_FAULT_FETCH] = handle_fault_fetch,
 	  [CAUSE_ILLEGAL_INSTRUCTION] = handle_illegal_instruction,
 	  [CAUSE_PRIVILEGED_INSTRUCTION] = handle_illegal_instruction,
-	  [CAUSE_FP_DISABLED] = handle_fp_disabled,
 	  [CAUSE_SYSCALL] = handle_syscall,
 	  [CAUSE_BREAKPOINT] = handle_breakpoint,
 	  [CAUSE_MISALIGNED_LOAD] = handle_misaligned_load,

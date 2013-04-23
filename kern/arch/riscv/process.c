@@ -28,7 +28,7 @@ void proc_init_ctx(struct user_context *ctx, uint32_t vcoreid, uintptr_t entryp,
 	memset(tf, 0, sizeof(*tf));
 
 	tf->gpr[GPR_SP] = stack_top-64;
-	tf->sr = SR_U64;
+	tf->sr = SR_U64 | SR_EF;
 
 	tf->epc = entryp;
 
@@ -42,7 +42,7 @@ void proc_secure_ctx(struct user_context *ctx)
 {
 	struct hw_trapframe *tf = &ctx->tf.hw_tf;
 	ctx->type = ROS_HW_CTX;
-	tf->sr = SR_U64;
+	tf->sr = SR_U64 | SR_EF;
 }
 
 /* Called when we are currently running an address space on our core and want to
