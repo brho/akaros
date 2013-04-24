@@ -12,7 +12,7 @@
 void proc_pop_ctx(struct user_context *ctx)
 {
 	struct hw_trapframe *tf = &ctx->tf.hw_tf;
-	assert(ctx->type = ROS_HW_CTX);
+	assert(ctx->type == ROS_HW_CTX);
 
 	/* Bug with this whole idea (TODO: (TLSV))*/
 	/* Load the LDT for this process.  Slightly ghetto doing it here. */
