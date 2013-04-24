@@ -123,9 +123,17 @@ static inline void pop_sw_tf(struct sw_trapframe *sw_tf, uint32_t vcoreid)
 	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
 
 	/* Restore callee-saved FPU state.  We need to clear exceptions before
-	 * reloading the FP CW, in case the new CW unmasks any. */
+	 * reloading the FP CW, in case the new CW unmasks any.  We also need to
+	 * reset the tag word to clear out the stack.
+	 *
+	 * The main issue here is that while our context was saved in an
+	 * ABI-complaint manner, we may be starting up on a somewhat random FPU
+	 * state.  Having gibberish in registers isn't a big deal, but some of the
+	 * FP environment settings could cause trouble.  If fnclex; emms isn't
+	 * enough, we could also save/restore the entire FP env with fldenv, or do
+	 * an fninit before fldcw. */
 	asm volatile ("ldmxcsr %0" : : "m"(sw_tf->tf_mxcsr));
-	asm volatile ("fnclex; fldcw %0" : : "m"(sw_tf->tf_fpucw));
+	asm volatile ("fnclex; emms; fldcw %0" : : "m"(sw_tf->tf_fpucw));
 	/* Basic plan: restore all regs, off ecx as the sw_tf.  Switch to the new
 	 * stack, push the PC so we can pop it later.  Use eax and edx for the
 	 * locations of sysc and vcpd.  Once on the new stack, we enable notifs,
