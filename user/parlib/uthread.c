@@ -368,58 +368,6 @@ void __ros_mcp_syscall_blockon(struct syscall *sysc)
 	uthread_yield(TRUE, sched_ops->thread_blockon_sysc, sysc);
 }
 
-/* Helper for run_current and run_uthread.  Make sure the uthread you want to
- * run is the current_uthread before calling this.  Both of those are just
- * wrappers for this, and they manage current_uthread and its states.   This
- * manages the TF, FP state, and related flags.
- *
- * This will adjust the thread's state, do one last check on notif_pending, and
- * pop the ctx.  Note that the notif check is an optimization.  pop_user_ctx()
- * will definitely handle it, but it will take a syscall to do so later. */
-static void __run_cur_uthread(void)
-{
-	uint32_t vcoreid = vcore_id();
-	struct preempt_data *vcpd = vcpd_of(vcoreid);
-	struct uthread *uthread;
-	/* Last check for messages.  Might not return, or cur_uth might be unset. */
-	handle_events(vcoreid);
-	/* clear_notif might have handled a preemption event, and we might not have
-	 * a current_uthread anymore.  Need to recheck */
-	cmb();
-	if (!current_uthread) {
-		/* Start over, as if we just had a notif from the kernel.
-		 * Note that  we're resetting the stack here.  Don't do anything other
-		 * than call vcore_entry() */
-		set_stack_pointer((void*)vcpd->transition_stack);
-		uthread_vcore_entry();
-		assert(0);
-	}
-	uthread = current_uthread;	/* for TLS sanity */
-	if (uthread->flags & UTHREAD_FPSAVED) {
-		uthread->flags &= ~UTHREAD_FPSAVED;
-		/* should never have a SW context that needs its FP state loaded */
-		if (uthread->flags & UTHREAD_SAVED) {
-			assert(uthread->u_ctx.type != ROS_SW_CTX);
-		} else  {
-			assert(vcpd->uthread_ctx.type != ROS_SW_CTX);
-		}
-		restore_fp_state(&uthread->as);
-	}
-	/* Go ahead and start the uthread */
-	set_tls_desc(uthread->tls_desc, vcoreid);
-	__vcoreid = vcoreid;	/* setting the uthread's TLS var */
-	/* Depending on where it was saved, we pop differently.  This assumes that
-	 * if a uthread was not saved, that it was running in the vcpd uthread_ctx.
-	 * There should never be a time that the ctx is unsaved and not in the VCPD
-	 * uthread ctx slot (or about to be in that ctx slot). */
-	if (uthread->flags & UTHREAD_SAVED) {
-		uthread->flags &= ~UTHREAD_SAVED;
-		pop_user_ctx(&uthread->u_ctx, vcoreid);
-	} else  {
-		pop_user_ctx(&vcpd->uthread_ctx, vcoreid);
-	}
-}
-
 /* Simply sets current uthread to be whatever the value of uthread is.  This
  * can be called from outside of sched_entry() to highjack the current context,
  * and make sure that the new uthread struct is used to store this context upon
@@ -436,38 +384,69 @@ void highjack_current_uthread(struct uthread *uthread)
 	__vcoreid = vcoreid;	/* setting the uthread's TLS var */
 }
 
-/* Runs whatever thread is vcore's current_uthread.  This is nothing but a
- * couple checks, then the real run_cur_uth. */
+/* Run the thread that was current_uthread, from a previous run.  Should be
+ * called only when the uthread already was running, and we were interrupted by
+ * the kernel (event, etc).  Do not call this to run a fresh uthread, even if
+ * you've set it to be current. */
 void run_current_uthread(void)
 {
 	uint32_t vcoreid = vcore_id();
 	struct preempt_data *vcpd = vcpd_of(vcoreid);
 	assert(current_uthread);
 	assert(current_uthread->state == UT_RUNNING);
+	/* Uth was already running, should not have been saved */
+	assert(!(current_uthread->flags & UTHREAD_SAVED));
+	assert(!(current_uthread->flags & UTHREAD_FPSAVED));
 	printd("[U] Vcore %d is restarting uthread %08p\n", vcoreid,
 	       current_uthread);
+	/* Go ahead and start the uthread */
+	set_tls_desc(current_uthread->tls_desc, vcoreid);
+	__vcoreid = vcoreid;	/* setting the uthread's TLS var */
 	/* Run, using the TF in the VCPD.  FP state should already be loaded */
-	__run_cur_uthread();
+	pop_user_ctx(&vcpd->uthread_ctx, vcoreid);
 	assert(0);
 }
 
-/* Launches the uthread on the vcore.  Don't call this on current_uthread.  All
- * this does is set up uthread as cur_uth, check for bugs, and then runs the
- * real run_cur_uth. */
+/* Launches the uthread on the vcore.  Don't call this on current_uthread. 
+ *
+ * In previous versions of this, we used to check for events after setting
+ * current_uthread.  That is super-dangerous.  handle_events() doesn't always
+ * return (which we used to handle), and it may also clear current_uthread.  We
+ * needed to save uthread in current_uthread, in case we didn't return.  If we
+ * didn't return, the vcore started over at vcore_entry, with current set.  When
+ * this happens, we never actually had loaded cur_uth's FP and GP onto the core,
+ * so cur_uth fails.  Check out 4602599be for more info.
+ *
+ * Ultimately, handling events again in these 'popping helpers' isn't even
+ * necessary (we only must do it once for an entire time in VC ctx, and in
+ * loops), and might have been optimizing a rare event at a cost in both
+ * instructions and complexity. */
 void run_uthread(struct uthread *uthread)
 {
-	assert(uthread != current_uthread);
-	if (uthread->state != UT_NOT_RUNNING) {
-		/* had vcore3 throw this, when the UT blocked on vcore1 and didn't come
-		 * back up yet (kernel didn't wake up, didn't send IPI) */
-		printf("Uth %08p not runnable (was %d) in run_uthread on vcore %d!\n",
-		       uthread, uthread->state, vcore_id());
-	}
+	uint32_t vcoreid = vcore_id();
+	struct preempt_data *vcpd = vcpd_of(vcoreid);
+	assert(!current_uthread);
 	assert(uthread->state == UT_NOT_RUNNING);
+	assert(uthread->flags & UTHREAD_SAVED);
+	/* For HW CTX, FPSAVED must match UTH SAVE (and both be on here).  For SW,
+	 * FP should never be saved. */
+	if (uthread->u_ctx.type == ROS_HW_CTX)
+		assert(uthread->flags & UTHREAD_FPSAVED);
+	else
+		assert(!(uthread->flags & UTHREAD_FPSAVED));
 	uthread->state = UT_RUNNING;
 	/* Save a ptr to the uthread we'll run in the transition context's TLS */
 	current_uthread = uthread;
-	__run_cur_uthread();
+	if (uthread->flags & UTHREAD_FPSAVED) {
+		uthread->flags &= ~UTHREAD_FPSAVED;
+		restore_fp_state(&uthread->as);
+	}
+	/* Go ahead and start the uthread */
+	set_tls_desc(uthread->tls_desc, vcoreid);
+	__vcoreid = vcoreid;	/* setting the uthread's TLS var */
+	/* the uth's context will soon be in the cpu (or VCPD), no longer saved */
+	uthread->flags &= ~UTHREAD_SAVED;
+	pop_user_ctx(&uthread->u_ctx, vcoreid);
 	assert(0);
 }
 
@@ -481,8 +460,7 @@ static void __run_current_uthread_raw(void)
 	/* We need to manually say we have a notif pending, so we eventually return
 	 * to vcore context.  (note the kernel turned it off for us) */
 	vcpd->notif_pending = TRUE;
-	/* utf no longer represents the current state of the uthread */
-	current_uthread->flags &= ~UTHREAD_SAVED;
+	assert(!(current_uthread->flags & UTHREAD_SAVED));
 	assert(!(current_uthread->flags & UTHREAD_FPSAVED));
 	set_tls_desc(current_uthread->tls_desc, vcoreid);
 	__vcoreid = vcoreid;	/* setting the uthread's TLS var */
