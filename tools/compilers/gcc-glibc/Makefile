@@ -203,6 +203,7 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 	            --prefix=$(INSTDIR) \
 	            --includedir=$(INSTDIR)/include \
 	            --disable-werror;
+	echo "MAKEINFO = :" >> $(BINARY_PREFIX)binutils-builddir/Makefile;
 	touch $@
 
 .$(BINARY_PREFIX)binutils-make: .$(BINARY_PREFIX)binutils-configure
@@ -318,6 +319,7 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 	          --with-__thread \
 	          --with-headers=$(INSTDIR)/$(ARCH)-ros/include \
 	          --disable-werror;
+	echo "MAKEINFO = :" >> $(BINARY_PREFIX)gcc-stage2-builddir/Makefile;
 	touch $@
 
 .$(BINARY_PREFIX)gcc-stage2-make: .$(BINARY_PREFIX)gcc-stage2-configure
