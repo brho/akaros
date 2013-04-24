@@ -491,41 +491,67 @@ static void __run_current_uthread_raw(void)
 }
 
 /* Copies the uthread trapframe and silly state from the vcpd to the uthread,
- * subject to the uthread's flags.  The uthread state might still be in the
- * uthread struct, and the FP state could be either in VCPD, in the uth struct,
- * or we might not even need to save it.
+ * subject to the uthread's flags and whatnot.
+ *
+ * For example: The uthread state might still be in the uthread struct.  Imagine
+ * the 2LS decides to run a new uthread and sets it up as current, but doesn't
+ * actually run it yet.  The 2LS happened to voluntarily give up the VC (due to
+ * some other event) and then wanted to copy out the thread.  This is pretty
+ * rare - the normal case is when an IRQ of some sort hit the core and the
+ * kernel copied the running state into VCPD.
+ *
+ * The FP state could also be in VCPD (e.g. preemption being handled remotely),
+ * it could be in the uthread struct (e.g. hasn't started running yet) or even
+ * in the FPU (e.g. took an IRQ/notif and we're handling the preemption of
+ * another vcore).
  *
  * There are some cases where we'll have a uthread SW ctx that needs to be
  * copied out: uth syscalls, notif happens, and the core comes back from the
  * kernel in VC ctx.  VC ctx calls copy_out (response to preempt_pending or done
  * while handling a preemption). */
-static void copyout_uthread(struct preempt_data *vcpd, struct uthread *uthread)
+static void copyout_uthread(struct preempt_data *vcpd, struct uthread *uthread,
+                            bool vcore_local)
 {
 	assert(uthread);
-	/* Copy out the main tf if we need to */
-	if (!(uthread->flags & UTHREAD_SAVED)) {
-		uthread->u_ctx = vcpd->uthread_ctx;
-		uthread->flags |= UTHREAD_SAVED;
-		printd("VC %d copying out uthread %08p\n", vcore_id(), uthread);
+	if (uthread->flags & UTHREAD_SAVED) {
+		/* I don't know of scenarios where HW ctxs FP state differs from GP */
+		if (uthread->u_ctx.type == ROS_HW_CTX)
+			assert(uthread->flags & UTHREAD_FPSAVED);
+		assert(vcore_local);
+		return;
 	}
-	/* FPSAVED means the state is in the uth struct, and when we run it later,
-	 * we need to restore it.  SW contexts don't need to have their FP state
-	 * saved - the minimal amount is already in the SW ctx, so it can run on any
-	 * reasonably valid FPU state. */
-	if (uthread->u_ctx.type != ROS_SW_CTX &&
-	    !(uthread->flags & UTHREAD_FPSAVED)) {
+	/* If we're copying GP state, it must be in VCPD */
+	uthread->u_ctx = vcpd->uthread_ctx;
+	uthread->flags |= UTHREAD_SAVED;
+	printd("VC %d copying out uthread %08p\n", vcore_id(), uthread);
+	/* Software contexts do not need FP state, nor should we think it has any */
+	if (uthread->u_ctx.type == ROS_SW_CTX) {
+		assert(!(uthread->flags & UTHREAD_FPSAVED));
+		return;
+	}
+	/* HW contexts also should not have it saved either.  Should be either in
+	 * the VCPD or the FPU.  Yes, this is the same assert. */
+	assert(!(uthread->flags & UTHREAD_FPSAVED));
+	/* When we're dealing with the uthread running on our own vcore, the FP
+	 * state is in the actual FPU, not VCPD.  It might also be in VCPD, but it
+	 * will always be in the FPU (the kernel maintains this for us, in the event
+	 * we were preempted since the uthread was last running). */
+	if (vcore_local)
+		save_fp_state(&uthread->as);
+	else
 		uthread->as = vcpd->preempt_anc;
-		uthread->flags |= UTHREAD_FPSAVED;
-	}
+	uthread->flags |= UTHREAD_FPSAVED;
 }
 
 /* Helper, packages up and pauses a uthread that was running on vcoreid.  Used
  * by preemption handling (and detection) so far.  Careful using this, esp if
- * it is on another vcore (need to make sure it's not running!). */
-static void __uthread_pause(struct preempt_data *vcpd, struct uthread *uthread)
+ * it is on another vcore (need to make sure it's not running!).  If you are
+ * using it on the local vcore, set vcore_local = TRUE. */
+static void __uthread_pause(struct preempt_data *vcpd, struct uthread *uthread,
+                            bool vcore_local)
 {
 	assert(!(uthread->flags & UTHREAD_DONT_MIGRATE));
-	copyout_uthread(vcpd, uthread);
+	copyout_uthread(vcpd, uthread, vcore_local);
 	uthread->state = UT_NOT_RUNNING;
 	/* Call out to the 2LS to package up its uthread */
 	assert(sched_ops->thread_paused);
@@ -555,7 +581,7 @@ bool __check_preempt_pending(uint32_t vcoreid)
 		/* If we still have a cur_uth, copy it out and hand it back to the 2LS
 		 * before yielding. */
 		if (current_uthread) {
-			__uthread_pause(vcpd_of(vcoreid), current_uthread);
+			__uthread_pause(vcpd_of(vcoreid), current_uthread, TRUE);
 			current_uthread = 0;
 		}
 		/* vcore_yield tries to yield, and will pop back up if this was a spurious
@@ -715,7 +741,7 @@ static void change_to_vcore(struct preempt_data *vcpd, uint32_t rem_vcoreid)
 	}
 	/* Now save our uthread and restart them */
 	assert(current_uthread);
-	__uthread_pause(vcpd, current_uthread);
+	__uthread_pause(vcpd, current_uthread, TRUE);
 	current_uthread = 0;
 	were_handling_remotes = ev_might_not_return();
 	__change_vcore(rem_vcoreid, TRUE);		/* noreturn on success */
@@ -816,7 +842,7 @@ static void handle_vc_preempt(struct event_msg *ev_msg, unsigned int ev_type)
 	/* we're clear to steal it */
 	printd("VC %d recovering %d, uthread %08p stolen\n", vcoreid, rem_vcoreid,
 	       current_uthread);
-	__uthread_pause(rem_vcpd, uthread_to_steal);
+	__uthread_pause(rem_vcpd, uthread_to_steal, FALSE);
 	/* can't let the cur_uth = 0 write and any writes from __uth_pause() to
 	 * pass stop_uth_stealing.  it's harmless in the cant_migrate case. */
 	wmb();
