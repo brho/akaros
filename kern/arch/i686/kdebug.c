@@ -342,3 +342,25 @@ void backtrace(void)
 		#endif /* __CONFIG_RESET_STACKS__ */
 	}
 }
+
+/* Assumes 32-bit header */
+void print_fpu_state(struct ancillary_state *fpu)
+{
+	printk("fcw:        0x%04x\n", fpu->fp_head_n64.fcw);
+	printk("fsw:        0x%04x\n", fpu->fp_head_n64.fsw);
+	printk("ftw:          0x%02x\n", fpu->fp_head_n64.ftw);
+	printk("fop:        0x%04x\n", fpu->fp_head_n64.fop);
+	printk("fpu_ip: 0x%08x\n", fpu->fp_head_n64.fpu_ip);
+	printk("cs:         0x%04x\n", fpu->fp_head_n64.cs);
+	printk("fpu_dp: 0x%08x\n", fpu->fp_head_n64.fpu_dp);
+	printk("ds:         0x%04x\n", fpu->fp_head_n64.ds);
+	printk("mxcsr:  0x%08x\n", fpu->fp_head_n64.mxcsr);
+	printk("mxcsrm: 0x%08x\n", fpu->fp_head_n64.mxcsr_mask);
+
+	for (int i = 0; i < sizeof(struct ancillary_state); i++) {
+		if (i % 20 == 0)
+			printk("\n");
+		printk("%02x ", *((uint8_t*)fpu + i));
+	}
+	printk("\n");
+}

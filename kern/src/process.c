@@ -1747,9 +1747,14 @@ static void __set_curctx_to_vcoreid(struct proc *p, uint32_t vcoreid,
 	 * state or a brand new init).  Starting a fresh VC is just referring to the
 	 * GP context we run.  The vcore itself needs to have the FPU state loaded
 	 * from when it previously ran and was saved (or a fresh FPU if it wasn't
-	 * saved).
+	 * saved).  For fresh FPUs, the main purpose is for limiting info leakage.
+	 * I think VCs that don't need FPU state for some reason (like having a
+	 * current_uthread) can handle any sort of FPU state, since it gets sorted
+	 * when they pop their next uthread.
 	 *
-	 * Note this can cause a GP fault on x86 if the state is corrupt. */
+	 * Note this can cause a GP fault on x86 if the state is corrupt.  In lieu
+	 * of reading in the huge FP state and mucking with mxcsr_mask, we should
+	 * handle this like a KPF on user code. */
 	restore_vc_fp_state(vcpd);
 	/* cur_ctx was built above (in actual_ctx), now use it */
 	pcpui->cur_ctx = &pcpui->actual_ctx;

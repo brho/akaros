@@ -57,6 +57,10 @@ static void cons_irq_init(void)
 
 void arch_init()
 {
+	/* need to reinit before saving, in case boot agents used the FPU or it is
+	 * o/w dirty.  had this happen on c89, which had a full FP stack after
+	 * booting. */
+	asm volatile ("fninit");
 	save_fp_state(&x86_default_fpu); /* used in arch/trap.h for fpu init */
 	pci_init();
 #ifdef __CONFIG_ENABLE_MPTABLES__

@@ -113,11 +113,13 @@ static inline void restore_fp_state(struct ancillary_state *silly)
 	asm volatile("fxrstor %0" : : "m"(*silly));
 }
 
-/* A regular fninit will only initialize the x87 part of the FPU, not the XMM
- * registers and the MXCSR state.  So to init, we'll just keep around a copy of
- * the default FPU state, which we grabbed during boot, and can copy that over
- * Alternatively, we can fninit, ldmxcsr with the default value, and 0 out the
- * XMM registers. */
+/* A regular fninit will only initialize the x87 header part of the FPU, not the
+ * st(n) (MMX) registers, the XMM registers, or the MXCSR state.  So to init,
+ * we'll just keep around a copy of the default FPU state, which we grabbed
+ * during boot, and can copy that over.
+ *
+ * Alternatively, we can fninit, ldmxcsr with the default value, and 0 out all
+ * of the registers manually. */
 static inline void init_fp_state(void)
 {
 	restore_fp_state(&x86_default_fpu);
