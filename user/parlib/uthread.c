@@ -70,7 +70,10 @@ void uthread_lib_init(struct uthread *uthread)
 	 * send the messages, and does not necessarily provide storage space for the
 	 * messages.  What we're doing is saying that all PREEMPT and CHECK_MSGS
 	 * events should be spammed to vcores that are running, preferring whatever
-	 * the kernel thinks is appropriate.  And IPI them. */
+	 * the kernel thinks is appropriate.  And IPI them.
+	 *
+	 * It is critical that these are either SPAM_PUB or INDIR|FALLBACK, so that
+	 * yielding vcores do not miss the preemption messages. */
 	ev_handlers[EV_VCORE_PREEMPT] = handle_vc_preempt;
 	ev_handlers[EV_CHECK_MSGS] = handle_vc_indir;
 	preempt_ev_q = get_event_q();	/* small ev_q, mostly a vehicle for flags */

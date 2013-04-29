@@ -11,30 +11,6 @@
 
 #include <ros/common.h>
 
-/* A request means to set the amt_wanted to X.  Any changes result in prodding
- * the scheduler / whatever.
- *
- * To make these requests, userspace uses SYS_resource_req, which currently is a
- * syscall to make one request.
- *
- * Another way would be to take a ptr to a resource req and length, to batch
- * requests together.  Individual syscalls are simpler than the batch.  For
- * example,  servicing the core request doesn't easily return (which could lead
- * to other requests getting ignored, or us having to worry about the
- * order of processing).  Dealing with more than one request per type could be a
- * pain too.  The batch one is nice, since it amortizes the overhead of the syscall,
- * but it doesn't really matter that much, esp when there are only a few resources.
- *
- * amt_wanted_min is the least amount you are will to run with.
- *
- * A few caveats for cores:
- * - when someone yields (esp if the wish > grant): yielding means take one
- *   away, and set wished = current.  don't yield if you want another core still
- * - if someone requests less cores than they currently have active, we'll set
- *   their wish to their active and return an error code (no core allocation
- *   changes either).
- */
-
 /* Types of resource requests */
 #define RES_CORES			 0
 #define RES_MEMORY			 1

@@ -1074,7 +1074,8 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 	/* Note we need interrupts disabled, since a __notify can come in
 	 * and set pending to FALSE */
 	if (vcpd->notif_pending) {
-		/* We lost, put it back on the list and abort the yield */
+		/* We lost, put it back on the list and abort the yield.  If we ever
+		 * build an myield, we'll need a way to deal with this for all vcores */
 		TAILQ_INSERT_TAIL(&p->online_vcs, vc, list); /* could go HEAD */
 		goto out_failed;
 	}

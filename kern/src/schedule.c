@@ -287,10 +287,7 @@ void __sched_mcp_wakeup(struct proc *p)
 		spin_unlock(&sched_lock);
 		return;
 	}
-	/* could try and prioritize p somehow (move it to the front of the list).
-	 * for now, just help them out a bit (mild help here, can remove this) */
-	if (!p->procdata->res_req[RES_CORES].amt_wanted)
-		p->procdata->res_req[RES_CORES].amt_wanted = 1;
+	/* could try and prioritize p somehow (move it to the front of the list). */
 	spin_unlock(&sched_lock);
 	/* note they could be dying at this point too. */
 	poke(&ksched_poker, p);
@@ -405,6 +402,18 @@ static uint32_t get_cores_needed(struct proc *p)
 	/* Help them out - if they ask for something impossible, give them 1 so they
 	 * can make some progress. (this is racy, and unnecessary). */
 	if (amt_wanted > p->procinfo->max_vcores) {
+		printk("[kernel] proc %d wanted more than max, wanted %d\n", p->pid,
+		       amt_wanted);
+		p->procdata->res_req[RES_CORES].amt_wanted = 1;
+		amt_wanted = 1;
+	}
+	/* There are a few cases where amt_wanted is 0, but they are still RUNNABLE
+	 * (involving yields, events, and preemptions).  In these cases, give them
+	 * at least 1, so they can make progress and yield properly.  If they are
+	 * not WAITING, they did not yield and may have missed a message. */
+	if (!amt_wanted) {
+		/* could ++, but there could be a race and we don't want to give them
+		 * more than they ever asked for (in case they haven't prepped) */
 		p->procdata->res_req[RES_CORES].amt_wanted = 1;
 		amt_wanted = 1;
 	}

@@ -283,6 +283,7 @@ try_handle_it:
  * care what other code does - we intend to set those flags no matter what. */
 void vcore_yield(bool preempt_pending)
 {
+	unsigned long old_nr;
 	uint32_t vcoreid = vcore_id();
 	struct preempt_data *vcpd = vcpd_of(vcoreid);
 	__sync_fetch_and_and(&vcpd->flags, ~VC_CAN_RCV_MSG);
@@ -298,14 +299,36 @@ void vcore_yield(bool preempt_pending)
 		return;
 	}
 	/* If we are yielding since we don't want the core, tell the kernel we want
-	 * one less vcore.  If yield fails (slight race), we may end up having more
-	 * vcores than amt_wanted for a while, and might lose one later on (after a
+	 * one less vcore (vc_yield assumes a dumb 2LS).
+	 *
+	 * If yield fails (slight race), we may end up having more vcores than
+	 * amt_wanted for a while, and might lose one later on (after a
 	 * preempt/timeslicing) - the 2LS will have to notice eventually if it
-	 * actually needs more vcores (which it already needs to do).  We need to
-	 * atomically decrement, though I don't want the kernel's data type here to
-	 * be atomic_t (only userspace cares in this one case). */
-	if (!preempt_pending)
-		__sync_fetch_and_sub(&__procdata.res_req[RES_CORES].amt_wanted, 1);
+	 * actually needs more vcores (which it already needs to do).  amt_wanted
+	 * could even be 0.
+	 *
+	 * In general, any time userspace decrements or sets to 0, it could get
+	 * preempted, so the kernel will still give us at least one, until the last
+	 * vcore properly yields without missing a message (and becomes a WAITING
+	 * proc, which the ksched will not give cores to).
+	 *
+	 * I think it's possible for userspace to do this (lock, read amt_wanted,
+	 * check all message queues for all vcores, subtract amt_wanted (not set to
+	 * 0), unlock) so long as every event handler +1s the amt wanted, but that's
+	 * a huge pain, and we already have event handling code making sure a
+	 * process can't sleep (transition to WAITING) if a message arrives (can't
+	 * yield if notif_pending, can't go WAITING without yielding, and the event
+	 * posting the notif_pending will find the online VC or be delayed by
+	 * spinlock til the proc is WAITING). */
+	if (!preempt_pending) {
+		do {
+			old_nr = __procdata.res_req[RES_CORES].amt_wanted;
+			if (old_nr == 0)
+				break;
+		} while (!__sync_bool_compare_and_swap(
+		             &__procdata.res_req[RES_CORES].amt_wanted,
+		             old_nr, old_nr - 1));
+	}
 	/* We can probably yield.  This may pop back up if notif_pending became set
 	 * by the kernel after we cleared it and we lost the race. */
 	sys_yield(preempt_pending);
