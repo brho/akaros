@@ -71,7 +71,7 @@ void set_awaiter_rel(struct alarm_waiter *waiter, uint64_t usleep)
 	then = now + usec2tsc(usleep);
 	/* This will go off if we wrap-around the TSC.  It'll never happen for legit
 	 * values, but this might catch some bugs with large usleeps. */
-	assert(now < then);
+	assert(now <= then);
 	set_awaiter_abs(waiter, then);
 }
 
