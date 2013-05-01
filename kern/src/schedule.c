@@ -97,6 +97,12 @@ static void set_ksched_alarm(void)
 	set_alarm(&per_cpu_info[core_id()].tchain, &ksched_waiter);
 }
 
+/* Need a kmsg to just run the sched, but not to rearm */
+static void __just_sched(uint32_t srcid, long a0, long a1, long a2)
+{
+	schedule();
+}
+
 /* Kmsg, to run the scheduler tick (not in interrupt context) and reset the
  * alarm.  Note that interrupts will be disabled, but this is not the same as
  * interrupt context.  We're a routine kmsg, which means the core is in a
@@ -363,16 +369,24 @@ static bool __schedule_scp(void)
 		disable_irqsave(&state);
 		/* someone is currently running, dequeue them */
 		if (pcpui->owning_proc) {
+			spin_lock(&pcpui->owning_proc->proc_lock);
+			/* process might be dying, with a KMSG to clean it up waiting on
+			 * this core.  can't do much, so we'll attempt to restart */
+			if (pcpui->owning_proc->state == PROC_DYING) {
+				send_kernel_message(core_id(), __just_sched, 0, 0, 0,
+				                    KMSG_ROUTINE);
+				spin_unlock(&pcpui->owning_proc->proc_lock);
+				enable_irqsave(&state);
+				return FALSE;
+			}
 			printd("Descheduled %d in favor of %d\n", pcpui->owning_proc->pid,
 			       p->pid);
-			/* locking just to be safe */
-			spin_lock(&p->proc_lock);
 			__proc_set_state(pcpui->owning_proc, PROC_RUNNABLE_S);
 			/* Saving FP state aggressively.  Odds are, the SCP was hit by an
 			 * IRQ and has a HW ctx, in which case we must save. */
 			__proc_save_fpu_s(pcpui->owning_proc);
 			__proc_save_context_s(pcpui->owning_proc, pcpui->cur_ctx);
-			spin_unlock(&p->proc_lock);
+			spin_unlock(&pcpui->owning_proc->proc_lock);
 			/* round-robin the SCPs (inserts at the end of the queue) */
 			switch_lists(pcpui->owning_proc, &unrunnable_scps, &runnable_scps);
 			clear_owning_proc(pcoreid);
