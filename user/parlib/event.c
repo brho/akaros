@@ -167,7 +167,6 @@ unsigned int get_event_type(struct event_mbox *ev_mbox)
 /* List of handlers, process-wide, that the 2LS should fill in.  They all must
  * return (don't context switch to a u_thread) */
 handle_event_t ev_handlers[MAX_NR_EVENT] = {[EV_EVENT] handle_ev_ev,
-                                            [EV_CHECK_MSGS] handle_check_msgs,
                                             0};
 
 /* Attempts to handle a message.  Returns 1 if we dequeued a msg, 0 o/w. */
@@ -247,25 +246,6 @@ void handle_ev_ev(struct event_msg *ev_msg, unsigned int ev_type)
 	ev_q->ev_alert_pending = FALSE;
 	wmb();	/* don't let the pending write pass the signaling of an ev recv */
 	handle_event_q(ev_q);
-}
-
-/* This handler tells us to check the public message box of a vcore. */
-void handle_check_msgs(struct event_msg *ev_msg, unsigned int ev_type)
-{
-	uint32_t rem_vcoreid;
-	assert(ev_msg);
-	rem_vcoreid = ev_msg->ev_arg2;
-	printd("[event] handle check msgs for VC %d on VC %d\n", rem_vcoreid,
-	       vcore_id());
-	/* if it is a message for ourselves, then we can abort.  Vcores will check
-	 * their own messages via handle_events() (which either we're doing now, or
-	 * will do when we are done dealing with another vcore's mbox). */
-	if (rem_vcoreid == vcore_id())
-		return;
-	/* they should have had their can_rcv turned off at some point, though it is
-	 * possible that it was turned back on by now.  we don't really care - our
-	 * job is to make sure their messages get checked. */
-	handle_vcpd_mbox(rem_vcoreid);
 }
 
 /* Attempts to handle events, if notif_pending.  The kernel always sets

@@ -78,6 +78,10 @@ void highjack_current_uthread(struct uthread *uthread);
 void run_current_uthread(void);
 void run_uthread(struct uthread *uthread);
 
+/* Event handlers - exported globally so programs can wrap them */
+void handle_vc_preempt(struct event_msg *ev_msg, unsigned int ev_type);
+void handle_vc_indir(struct event_msg *ev_msg, unsigned int ev_type);
+
 /* Asking for trouble with this API, when we just want stacktop (or whatever
  * the SP will be). */
 static inline void init_uthread_ctx(struct uthread *uth, void (*entry)(void),

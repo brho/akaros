@@ -33,7 +33,6 @@ typedef void (*handle_event_t)(struct event_msg *ev_msg, unsigned int ev_type);
 extern handle_event_t ev_handlers[];
 /* Default event handlers */
 void handle_ev_ev(struct event_msg *ev_msg, unsigned int ev_type);
-void handle_check_msgs(struct event_msg *ev_msg, unsigned int ev_type);
 
 int handle_events(uint32_t vcoreid);
 void handle_event_q(struct event_queue *ev_q);
