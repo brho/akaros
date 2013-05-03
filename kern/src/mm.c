@@ -389,10 +389,6 @@ void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 		set_errno(EBADF);
 		return MAP_FAILED;
 	}
-	if ((addr + len > UMAPTOP) || (PGOFF(addr))) {
-		set_errno(EINVAL);
-		return MAP_FAILED;
-	}
 	if (!len) {
 		set_errno(EINVAL);
 		return MAP_FAILED;
@@ -413,6 +409,11 @@ void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 		addr = BRK_END;
 	/* Still need to enforce this: */
 	addr = MAX(addr, MMAP_LOWEST_VA);
+	/* Need to check addr + len, after we do our addr adjustments */
+	if ((addr + len > UMAPTOP) || (PGOFF(addr))) {
+		set_errno(EINVAL);
+		return MAP_FAILED;
+	}
 	void *result = do_mmap(p, addr, len, prot, flags, file, offset);
 	if (file)
 		kref_put(&file->f_kref);
