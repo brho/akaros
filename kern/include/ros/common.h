@@ -115,6 +115,10 @@ static inline bool mult_will_overflow_u64(uint64_t a, uint64_t b)
 	(type*)((char*)ptr - offsetof(type, member));                             \
 })
 
+/* Force the reading exactly once of x.  You may still need mbs().  See
+ * http://lwn.net/Articles/508991/ for more info. */
+#define ACCESS_ONCE(x) (*(volatile typeof(x) *)&(x))
+
 // Ivy currently can only handle 63 bits (OCaml thing), so use this to make
 // a uint64_t programatically
 #define UINT64(upper, lower) ( (((uint64_t)(upper)) << 32) | (lower) )
