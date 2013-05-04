@@ -72,7 +72,7 @@ int main(int argc, char** argv)
 		pthread_lib_init();					/* gives us one vcore */
 		vcore_request(nr_vcores - 1);		/* ghetto incremental interface */
 		for (int i = 0; i < nr_vcores; i++) {
-			printf("Vcore %d mapped to pcore %d\n", i,
+			printd("Vcore %d mapped to pcore %d\n", i,
 			       __procinfo.vcoremap[i].pcoreid);
 		}
 	}

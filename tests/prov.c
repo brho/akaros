@@ -9,21 +9,31 @@ const char *argp_program_version = "prov v0.1475263";
 const char *argp_program_bug_address = "<akaros@lists.eecs.berkeley.edu>";
 
 static char doc[] = "prov -- control for provisioning resources";
-static char args_doc[] = "-p PID\nPROGRAM [ARGS]\n-- PROGRAM [ARGS]\n-s";
+static char args_doc[] = "-p PID\n-c PROGRAM [ARGS]\nPROGRAM [ARGS]\n"
+                         "-- PROGRAM [ARGS]\n-s";
 
 static struct argp_option options[] = {
 	{"type",		't', "TYPE",0, "Type of resource to provision"},
-	{"Possible types:", 0, 0, OPTION_DOC, "c = cores\nm = ram"},
+	{"Possible types:", 0, 0, OPTION_DOC | OPTION_NO_USAGE, "c = cores\n"
+	                                                        "m = ram"},
 	{0, 0, 0, 0, "Call with exactly one of these, or with a program and args:"},
-	{"pid",			'p', "PID",	0, "Pid of process to provision resources to"},
-	{"show",		's', 0,		0, "Show current resource provisioning"},
-	{"command",		'c', "PROG",0, "Launch a program and provision (alternate)"},
-	{0, 0, 0, OPTION_DOC, "If your command has arguments that conflict with prov, then put them after -- to keep prov from interpretting them."},
+	{"pid",			'p', "PID",	OPTION_NO_USAGE, "Pid of process to provision "
+	                                             "resources to"},
+	{0, 0, 0, 0, ""},
+	{"command",		'c', "PROG",OPTION_NO_USAGE, "Launch a program and "
+	                                             "provision (alternate)"},
+	{0, 0, 0, 0, ""},
+	{"show",		's', 0,		OPTION_NO_USAGE, "Show current resource "
+	                                             "provisioning"},
+	{0, 0, 0, OPTION_DOC, "If your command has arguments that conflict with "
+	                      "prov, then put them after -- to keep prov from "
+	                      "interpretting them."},
 	{0, 0, 0, 0, "Call with exactly one of these when changing a provision:"},
 	{"value",		'v', "VAL",	0, "Type-specific value, passed to the kernel"},
 	{"max",			'm', 0,		0, "Provision all resources of the given type"},
-	{0, 0, 0, OPTION_DOC, "Cores are provisioned to processes, so the value is a specific pcore id.  To undo a core's provisioning, pass in pid=0."},
-
+	{0, 0, 0, OPTION_DOC, "Cores are provisioned to processes, so the value is "
+	                      "a specific pcore id.  To undo a core's "
+	                      "provisioning, pass in pid=0."},
 	{ 0 }
 };
 
