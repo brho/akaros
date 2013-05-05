@@ -96,6 +96,7 @@ int __proc_set_state(struct proc *p, uint32_t state)
 	 * RGS -> W
 	 * RGM -> W
 	 * W   -> RBS
+	 * W   -> RGS
 	 * W   -> RBM
 	 * RGS -> RBM
 	 * RBM -> RGM
@@ -124,7 +125,7 @@ int __proc_set_state(struct proc *p, uint32_t state)
 				panic("Invalid State Transition! PROC_RUNNING_S to %02x", state);
 			break;
 		case PROC_WAITING:
-			if (!(state & (PROC_RUNNABLE_S | PROC_RUNNABLE_M)))
+			if (!(state & (PROC_RUNNABLE_S | PROC_RUNNING_S | PROC_RUNNABLE_M)))
 				panic("Invalid State Transition! PROC_WAITING to %02x", state);
 			break;
 		case PROC_DYING:
