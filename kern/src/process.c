@@ -392,11 +392,16 @@ static void __proc_free(struct kref *kref)
 	kmem_cache_free(proc_cache, p);
 }
 
-/* Whether or not actor can control target.  Note we currently don't need
- * locking for this. TODO: think about that, esp wrt proc's dying. */
+/* Whether or not actor can control target.  TODO: do something reasonable here.
+ * Just checking for the parent is a bit limiting.  Could walk the parent-child
+ * tree, check user ids, or some combination.  Make sure actors can always
+ * control themselves. */
 bool proc_controls(struct proc *actor, struct proc *target)
 {
+	return TRUE;
+	#if 0 /* Example: */
 	return ((actor == target) || (target->ppid == actor->pid));
+	#endif
 }
 
 /* Helper to incref by val.  Using the helper to help debug/interpose on proc
