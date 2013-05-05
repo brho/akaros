@@ -68,7 +68,7 @@ void __ros_scp_syscall_blockon(struct syscall *sysc)
 	/* Need to disable notifs before registering, so we don't take an __notify
 	 * that drops us into VC ctx and forces us to eat the notif_pending that was
 	 * meant to prevent us from yielding if the syscall completed early. */
-	__procdata.vcore_preempt_data[0].notif_disabled = FALSE;
+	__procdata.vcore_preempt_data[0].notif_disabled = TRUE;
 	/* Ask for a SYSCALL event when the sysc is done.  We don't need a handler,
 	 * we just need the kernel to restart us from proc_yield.  If register
 	 * fails, we're already done. */
@@ -78,7 +78,7 @@ void __ros_scp_syscall_blockon(struct syscall *sysc)
 		__ros_syscall(SYS_yield, FALSE, 0, 0, 0, 0, 0, 0);
 	}
 	/* Manually doing an enable_notifs for VC 0 */
-	__procdata.vcore_preempt_data[0].notif_disabled = TRUE;
+	__procdata.vcore_preempt_data[0].notif_disabled = FALSE;
 	wrmb();	/* need to read after the write that enabled notifs */
 	if (__procdata.vcore_preempt_data[0].notif_pending)
 		__ros_syscall(SYS_self_notify, 0, EV_NONE, 0, TRUE, 0, 0, 0);
