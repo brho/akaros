@@ -98,6 +98,7 @@ int __proc_set_state(struct proc *p, uint32_t state)
 	 * W   -> RBS
 	 * W   -> RGS
 	 * W   -> RBM
+	 * W   -> D
 	 * RGS -> RBM
 	 * RBM -> RGM
 	 * RGM -> RBM
@@ -125,7 +126,8 @@ int __proc_set_state(struct proc *p, uint32_t state)
 				panic("Invalid State Transition! PROC_RUNNING_S to %02x", state);
 			break;
 		case PROC_WAITING:
-			if (!(state & (PROC_RUNNABLE_S | PROC_RUNNING_S | PROC_RUNNABLE_M)))
+			if (!(state & (PROC_RUNNABLE_S | PROC_RUNNING_S | PROC_RUNNABLE_M |
+			               PROC_DYING)))
 				panic("Invalid State Transition! PROC_WAITING to %02x", state);
 			break;
 		case PROC_DYING:
@@ -685,6 +687,7 @@ void proc_destroy(struct proc *p)
 {
 	uint32_t nr_cores_revoked = 0;
 	struct kthread *sleeper;
+	struct proc *child_i, *temp;
 	/* Can't spin on the proc lock with irq disabled.  This is a problem for all
 	 * places where we grab the lock, but it is particularly bad for destroy,
 	 * since we tend to call this from trap and irq handlers */
@@ -735,7 +738,19 @@ void proc_destroy(struct proc *p)
 	 * interrupts should be on when you call proc_destroy locally, but currently
 	 * aren't for all things (like traphandlers). */
 	__proc_set_state(p, PROC_DYING);
+	/* Disown any children.  If we want to have init inherit or something,
+	 * change __disown to set the ppid accordingly and concat this with init's
+	 * list (instead of emptying it like disown does).  Careful of lock ordering
+	 * between procs (need to lock to protect lists) */
+	TAILQ_FOREACH_SAFE(child_i, &p->children, sibling_link, temp) {
+		int ret = __proc_disown_child(p, child_i);
+		/* should never fail, lock should cover the race.  invariant: any child
+		 * on the list should have us as a parent */
+		assert(!ret);
+	}
 	spin_unlock(&p->proc_lock);
+	/* Wake any of our kthreads waiting on children, so they can abort */
+	cv_broadcast(&p->child_wait);
 	/* This prevents processes from accessing their old files while dying, and
 	 * will help if these files (or similar objects in the future) hold
 	 * references to p (preventing a __proc_free()).  Need to unlock before
