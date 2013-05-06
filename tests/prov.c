@@ -125,26 +125,29 @@ static struct argp argp = {options, parse_opt, args_doc, doc};
 /* Used by both -p and -c modes (-c will use it after creating pid) */
 static int prov_pid(pid_t pid, struct prog_args *pargs)
 {
-	int retval = 0;
+	unsigned int kernel_res_type;
+	int retval;
 	switch (pargs->res_type) {
 		case ('c'):
 			if (pargs->max) {
 				/* TODO: don't guess the LL/CG layout and num pcores */
 				for (int i = 1; i < max_vcores() + 1; i++) {
-					if (retval = sys_provision(pid, RES_CORES, i)) {
+					if ((retval = sys_provision(pid, RES_CORES, i))) {
 						perror("Failed max provisioning");
 						return retval;
 					}
 				}
 			} else {
-				if (retval = sys_provision(pid, RES_CORES, pargs->res_val)) {
+				if ((retval = sys_provision(pid, RES_CORES, pargs->res_val))) {
 					perror("Failed single provision");
 					return retval;
 				}
 			}
+			kernel_res_type = RES_CORES;
 			break;
 		case ('m'):
 			printf("Provisioning memory is not supported yet\n");
+			return -1;
 			break;
 		default:
 			if (!pargs->res_type)
@@ -153,7 +156,8 @@ static int prov_pid(pid_t pid, struct prog_args *pargs)
 				printf("Unsupported resource type %c\n", pargs->res_type);
 			return -1;
 	}
-	return retval;
+	sys_poke_ksched(pid, kernel_res_type);
+	return 0;
 }
 
 int main(int argc, char **argv)
