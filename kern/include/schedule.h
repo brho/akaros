@@ -65,7 +65,7 @@ void schedule(void);
 /* Proc p's resource desires changed, or something in general that would lead to
  * a new decision.  The process can directly poke the ksched via a syscall, so
  * be careful of abuse. */
-void poke_ksched(struct proc *p, int res_type);
+void poke_ksched(struct proc *p, unsigned int res_type);
 
 /* The calling cpu/core has nothing to do and plans to idle/halt.  This is an
  * opportunity to pick the nature of that halting (low power state, etc), or

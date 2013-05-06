@@ -905,13 +905,36 @@ static int sys_change_to_m(struct proc *p)
 	return retval;
 }
 
-/* Not sure what people will need.  For now, they can send in the resource they
- * want.  Up to the ksched to support this, and other things (like -1 for all
- * resources).  Might have this info go in via procdata instead. */
-static int sys_poke_ksched(struct proc *p, int res_type)
+/* Pokes the ksched for the given resource for target_pid.  If the target pid
+ * == 0, we just poke for the calling process.  The common case is poking for
+ * self, so we avoid the lookup. 
+ *
+ * Not sure if you could harm someone via asking the kernel to look at them, so
+ * we'll do a 'controls' check for now.  In the future, we might have something
+ * in the ksched that limits or penalizes excessive pokes. */
+static int sys_poke_ksched(struct proc *p, int target_pid,
+                           unsigned int res_type)
 {
-	poke_ksched(p, res_type);
-	return 0;
+	struct proc *target;
+	int retval = 0;
+	if (!target_pid) {
+		poke_ksched(p, res_type);
+		return 0;
+	}
+	target = pid2proc(target_pid);
+	if (!target) {
+		set_errno(ESRCH);
+		return -1;
+	}
+	if (!proc_controls(p, target)) {
+		set_errno(EPERM);
+		retval = -1;
+		goto out;
+	}
+	poke_ksched(target, res_type);
+out:
+	proc_decref(target);
+	return retval;
 }
 
 /************** Platform Specific Syscalls **************/

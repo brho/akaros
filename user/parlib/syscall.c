@@ -187,7 +187,7 @@ int sys_change_to_m(void)
 	return ros_syscall(SYS_change_to_m, 0, 0, 0, 0, 0, 0);
 }
 
-int sys_poke_ksched(int res_type)
+int sys_poke_ksched(int pid, unsigned int res_type)
 {
-	return ros_syscall(SYS_poke_ksched, res_type, 0, 0, 0, 0, 0);
+	return ros_syscall(SYS_poke_ksched, pid, res_type, 0, 0, 0, 0);
 }

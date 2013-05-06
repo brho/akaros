@@ -266,7 +266,7 @@ try_handle_it:
 	 * races with yield, our desires may be old.  Not a big deal; any vcores
 	 * that pop up will just end up yielding (or get preempt messages.)  */
 	if (nr_vcores_wanted > num_vcores())
-		sys_poke_ksched(RES_CORES);
+		sys_poke_ksched(0, RES_CORES);	/* 0 -> poke for ourselves */
 	/* Unlock, (which lets someone else work), and check to see if more work
 	 * needs to be done.  If so, we'll make sure it gets handled. */
 	atomic_set(&vc_req_being_handled, 0);	/* unlock, to allow others to try */

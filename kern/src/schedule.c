@@ -526,7 +526,7 @@ void schedule(void)
 /* A process is asking the ksched to look at its resource desires.  The
  * scheduler is free to ignore this, for its own reasons, so long as it
  * eventually gets around to looking at resource desires. */
-void poke_ksched(struct proc *p, int res_type)
+void poke_ksched(struct proc *p, unsigned int res_type)
 {
 	/* ignoring res_type for now.  could post that if we wanted (would need some
 	 * other structs/flags) */
