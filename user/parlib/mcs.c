@@ -184,35 +184,34 @@ void mcs_pdr_fini(struct mcs_pdr_lock *lock)
 	free(lock->vc_qnodes);
 }
 
-/* Helper, will make sure the vcore owning qnode is running.  If we change to
- * that vcore, we'll continue when our vcore gets restarted.  If the change
- * fails, it is because the vcore is running, and we'll continue.
+
+/* Internal version of the locking function, doesn't care if notifs are
+ * disabled.  While spinning, we'll check to see if other vcores involved in the
+ * locking are running.  If we change to that vcore, we'll continue when our
+ * vcore gets restarted.  If the change fails, it is because the vcore is
+ * running, and we'll continue.
  *
  * It's worth noting that changing to another vcore won't hurt correctness.
  * Even if they are no longer the lockholder, they will be checking preemption
  * messages and will help break out of the deadlock.  So long as we don't
- * wastefully spin, we're okay. */
-static void __ensure_qnode_runs(struct mcs_pdr_qnode *qnode)
-{
-	/* This assert is somewhat useless.  __lock will compile it out, since it is
-	 * impossible.  If you have a PF around here in __lock, odds are your stack
-	 * is getting gently clobbered (syscall finished twice?). */
-	assert(qnode);
-	ensure_vcore_runs(qnode->vcoreid);
-}
-
-/* Internal version of the locking function, doesn't care about storage of qnode
- * or if notifs are disabled. */
+ * spin uncontrollably, we're okay. */
 void __mcs_pdr_lock(struct mcs_pdr_lock *lock, struct mcs_pdr_qnode *qnode)
 {
 	struct mcs_pdr_qnode *predecessor;
+	uint32_t pred_vcoreid;
 	/* Now the actual lock */
 	qnode->next = 0;
 	cmb();	/* swap provides a CPU mb() */
 	predecessor = atomic_swap_ptr((void**)&lock->lock, qnode);
 	if (predecessor) {
 		qnode->locked = 1;
-		wmb();
+		/* Read-in the vcoreid before releasing them.  We won't need to worry
+		 * about their qnode memory being freed/reused (they can't til we fill
+		 * in the 'next' slot), which is a bit of a performance win.  This also
+		 * cuts down on cache-line contention when we ensure they run, which
+		 * helps a lot too. */
+		pred_vcoreid = ACCESS_ONCE(predecessor->vcoreid);
+		wmb();	/* order the locked write before the next write */
 		predecessor->next = qnode;
 		/* no need for a wrmb(), since this will only get unlocked after they
 		 * read our previous write */
@@ -220,28 +219,26 @@ void __mcs_pdr_lock(struct mcs_pdr_lock *lock, struct mcs_pdr_qnode *qnode)
 			/* We don't know who the lock holder is (it hurts performance via
 			 * 'true' sharing to track it)  Instead we'll make sure our pred is
 			 * running, which trickles up to the lock holder. */
-			__ensure_qnode_runs(predecessor);
+			ensure_vcore_runs(pred_vcoreid);
 			cpu_relax();
 		}
 	}
-	cmb();	/* just need a cmb, the swap handles the CPU wmb/wrmb() */
 }
 
 /* Using the CAS style unlocks, since the usurper recovery is a real pain in the
  * ass */
 void __mcs_pdr_unlock(struct mcs_pdr_lock *lock, struct mcs_pdr_qnode *qnode)
 {
-	struct mcs_pdr_qnode *a_tail;
+	uint32_t a_tail_vcoreid;
 	/* Check if someone is already waiting on us to unlock */
 	if (qnode->next == 0) {
 		cmb();	/* no need for CPU mbs, since there's an atomic_cas() */
 		/* If we're still the lock, just swap it with 0 (unlock) and return */
 		if (atomic_cas_ptr((void**)&lock->lock, qnode, 0))
-			goto out;
-		cmb();	/* need to read a fresh tail.  the CAS was a CPU mb */
-		/* Read in the tail (or someone who recent was the tail, but could now
+			return;
+		/* Read in the tail (or someone who recently was the tail, but could now
 		 * be farther up the chain), in prep for our spinning. */
-		a_tail = lock->lock;
+		a_tail_vcoreid = ACCESS_ONCE(lock->lock->vcoreid);
 		/* We failed, someone is there and we are some (maybe a different)
 		 * thread's pred.  Since someone else was waiting, they should have made
 		 * themselves our next.  Spin (very briefly!) til it happens. */
@@ -249,9 +246,7 @@ void __mcs_pdr_unlock(struct mcs_pdr_lock *lock, struct mcs_pdr_qnode *qnode)
 			/* We need to get our next to run, but we don't know who they are.
 			 * If we make sure a tail is running, that will percolate up to make
 			 * sure our qnode->next is running */
-			__ensure_qnode_runs(a_tail);
-			/* Arguably, that reads new tails each time, but it'll still work
-			 * for this rare case */
+			ensure_vcore_runs(a_tail_vcoreid);
 			cpu_relax();
 		}
 		/* Alpha wants a read_barrier_depends() here */
@@ -264,9 +259,6 @@ void __mcs_pdr_unlock(struct mcs_pdr_lock *lock, struct mcs_pdr_qnode *qnode)
 		/* simply unlock whoever is next */
 		qnode->next->locked = 0;
 	}
-out:
-	/* ease of debugging */
-	qnode->next = 0;
 }
 
 /* Actual MCS-PDR locks.  These use memory in the lock for their qnodes, though
