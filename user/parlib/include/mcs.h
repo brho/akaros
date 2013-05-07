@@ -13,9 +13,9 @@ extern "C" {
 
 typedef struct mcs_lock_qnode
 {
-	volatile struct mcs_lock_qnode* volatile next;
-	volatile int locked;
-} mcs_lock_qnode_t;
+	struct mcs_lock_qnode *next;
+	int locked;
+}__attribute__((aligned(ARCH_CL_SIZE))) mcs_lock_qnode_t;
 
 typedef struct mcs_lock
 {
@@ -47,6 +47,7 @@ void mcs_lock_init(struct mcs_lock *lock);
  * in a thread control block, etc. */
 void mcs_lock_lock(struct mcs_lock *lock, struct mcs_lock_qnode *qnode);
 void mcs_lock_unlock(struct mcs_lock *lock, struct mcs_lock_qnode *qnode);
+void mcs_lock_unlock_cas(struct mcs_lock *lock, struct mcs_lock_qnode *qnode);
 /* If you lock the lock from vcore context, you must use these. */
 void mcs_lock_notifsafe(struct mcs_lock *lock, struct mcs_lock_qnode *qnode);
 void mcs_unlock_notifsafe(struct mcs_lock *lock, struct mcs_lock_qnode *qnode);
@@ -84,6 +85,12 @@ void mcs_pdr_fini(struct mcs_pdr_lock *lock);
 void mcs_pdr_lock(struct mcs_pdr_lock *lock);
 void mcs_pdr_unlock(struct mcs_pdr_lock *lock);
 
+/* Only call these if you have notifs disabled and know your vcore's qnode.
+ * Mostly used for debugging, benchmarks, or critical code. */
+void __mcs_pdr_lock(struct mcs_pdr_lock *lock, struct mcs_pdr_qnode *qnode);
+void __mcs_pdr_unlock(struct mcs_pdr_lock *lock, struct mcs_pdr_qnode *qnode);
+void __mcs_pdr_unlock_no_cas(struct mcs_pdr_lock *lock,
+                             struct mcs_pdr_qnode *qnode);
 #ifdef __cplusplus
 }
 #endif
