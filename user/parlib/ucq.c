@@ -70,6 +70,7 @@ int get_ucq_msg(struct ucq *ucq, struct event_msg *msg)
 	/* Locking stuff.  Would be better with a spinlock, if we had them, since
 	 * this should be lightly contested.  */
 	struct mcs_pdr_lock *ucq_lock = (struct mcs_pdr_lock*)(&ucq->u_lock);
+	struct mcs_pdr_qnode qnode;
 
 	do {
 loop_top:
@@ -85,13 +86,13 @@ loop_top:
 		if (slot_is_good(my_idx))
 			goto claim_slot;
 		/* Slot is bad, let's try and fix it */
-		mcs_pdr_lock(ucq_lock);
+		mcs_pdr_lock(ucq_lock, &qnode);
 		/* Reread the idx, in case someone else fixed things up while we
 		 * were waiting/fighting for the lock */
 		my_idx = atomic_read(&ucq->cons_idx);
 		if (slot_is_good(my_idx)) {
 			/* Someone else fixed it already, let's just try to get out */
-			mcs_pdr_unlock(ucq_lock);
+			mcs_pdr_unlock(ucq_lock, &qnode);
 			/* Make sure this new slot has a producer (ucq isn't empty) */
 			if (my_idx == atomic_read(&ucq->prod_idx))
 				return -1;
@@ -133,7 +134,7 @@ loop_top:
 		}
 		/* All fixed up, unlock.  Other consumers may lock and check to make
 		 * sure things are done. */
-		mcs_pdr_unlock(ucq_lock);
+		mcs_pdr_unlock(ucq_lock, &qnode);
 		/* Now that everything is fixed, try again from the top */
 		goto loop_top;
 claim_slot:

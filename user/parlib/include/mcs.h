@@ -69,21 +69,18 @@ struct mcs_pdr_qnode
 	uint32_t vcoreid;
 }__attribute__((aligned(ARCH_CL_SIZE)));
 
-/* Want to pad out so lock doesn't share a CL with qnodes.  If we align both
- * pointers so that they have their own cache line, this actually performs
- * worse.  Meaning (for some unknown reason), if the lock shares a CL with
- * other random bss/data, the lock tests perf better... */
 struct mcs_pdr_lock
 {
 	struct mcs_pdr_qnode *lock;
-	char padding[ARCH_CL_SIZE];
-	struct mcs_pdr_qnode *vc_qnodes;	/* malloc this at init time */
 };
+
+#define MCSPDR_LOCK_INIT {0}
+#define MCSPDR_QNODE_INIT {0, 0, 0}
 
 void mcs_pdr_init(struct mcs_pdr_lock *lock);
 void mcs_pdr_fini(struct mcs_pdr_lock *lock);
-void mcs_pdr_lock(struct mcs_pdr_lock *lock);
-void mcs_pdr_unlock(struct mcs_pdr_lock *lock);
+void mcs_pdr_lock(struct mcs_pdr_lock *lock, struct mcs_pdr_qnode *qnode);
+void mcs_pdr_unlock(struct mcs_pdr_lock *lock, struct mcs_pdr_qnode *qnode);
 
 /* Only call these if you have notifs disabled and know your vcore's qnode.
  * Mostly used for debugging, benchmarks, or critical code. */

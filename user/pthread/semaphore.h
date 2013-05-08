@@ -30,7 +30,7 @@ typedef struct sem
 {
 	unsigned int count;
 	struct pthread_queue queue;
-	struct mcs_pdr_lock lock;
+	struct spin_pdr_lock lock;
 } sem_t;
 
 extern int sem_init (sem_t *__sem, int __pshared, unsigned int __value);

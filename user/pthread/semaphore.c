@@ -11,7 +11,7 @@ int sem_init (sem_t *__sem, int __pshared, unsigned int __value)
 	}
 	__sem->count = __value;
 	TAILQ_INIT(&__sem->queue);
-	mcs_pdr_init(&__sem->lock);
+	spin_pdr_init(&__sem->lock);
 	return 0;
 }
 
@@ -45,15 +45,15 @@ static void __sem_block(struct uthread *uthread, void *arg)
 	__pthread_generic_yield(pthread);
 	pthread->state = PTH_BLK_MUTEX;
 	TAILQ_INSERT_TAIL(&__sem->queue, pthread, next);
-	mcs_pdr_unlock(&__sem->lock);
+	spin_pdr_unlock(&__sem->lock);
 }
 
 int sem_wait (sem_t *__sem)
 {
-	mcs_pdr_lock(&__sem->lock);
+	spin_pdr_lock(&__sem->lock);
 	if(__sem->count > 0) {
 		__sem->count--;
-		mcs_pdr_unlock(&__sem->lock);
+		spin_pdr_unlock(&__sem->lock);
 	}
 	else {
 		// We unlock in the body of __sem_block
@@ -65,24 +65,24 @@ int sem_wait (sem_t *__sem)
 int sem_trywait (sem_t *__sem)
 {
 	int ret = -1;
-	mcs_pdr_lock(&__sem->lock);
+	spin_pdr_lock(&__sem->lock);
 	if(__sem->count > 0) {
 		__sem->count--;
 		ret = 0;
 	}
-	mcs_pdr_unlock(&__sem->lock);
+	spin_pdr_unlock(&__sem->lock);
 	return ret;
 }
 
 int sem_post (sem_t *__sem)
 {
-	mcs_pdr_lock(&__sem->lock);
+	spin_pdr_lock(&__sem->lock);
 	pthread_t pthread = TAILQ_FIRST(&__sem->queue);
 	if(pthread)
 		TAILQ_REMOVE(&__sem->queue, pthread, next);
 	else
 		__sem->count++;	
-	mcs_pdr_unlock(&__sem->lock);
+	spin_pdr_unlock(&__sem->lock);
 
 	if(pthread) {
 		uthread_runnable((struct uthread*)pthread);
@@ -92,9 +92,9 @@ int sem_post (sem_t *__sem)
 
 int sem_getvalue (sem_t *__restrict __sem, int *__restrict __sval)
 {
-	mcs_pdr_lock(&__sem->lock);
+	spin_pdr_lock(&__sem->lock);
 	*__sval = __sem->count;
-	mcs_pdr_unlock(&__sem->lock);
+	spin_pdr_unlock(&__sem->lock);
 	return 0;
 }
 

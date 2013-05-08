@@ -164,26 +164,15 @@ void mcs_barrier_wait(mcs_barrier_t* b, size_t pid)
 	localflags->parity = 1-localflags->parity;
 }
 
-/* Preemption detection and recovering MCS locks.  These are memory safe ones.
- * In the future, we can make ones that you pass the qnode to, so long as you
- * never free the qnode storage (stacks) */
+/* Preemption detection and recovering MCS locks. */
 void mcs_pdr_init(struct mcs_pdr_lock *lock)
 {
 	lock->lock = 0;
-	lock->vc_qnodes = memalign(__alignof(struct mcs_pdr_qnode),
-	                           sizeof(struct mcs_pdr_qnode) * max_vcores());
-	assert(lock->vc_qnodes);
-	memset(lock->vc_qnodes, 0, sizeof(struct mcs_pdr_qnode) * max_vcores());
-	for (int i = 0; i < max_vcores(); i++)
-		lock->vc_qnodes[i].vcoreid = i;
 }
 
 void mcs_pdr_fini(struct mcs_pdr_lock *lock)
 {
-	assert(lock->vc_qnodes);
-	free(lock->vc_qnodes);
 }
-
 
 /* Internal version of the locking function, doesn't care if notifs are
  * disabled.  While spinning, we'll check to see if other vcores involved in the
@@ -261,18 +250,14 @@ void __mcs_pdr_unlock(struct mcs_pdr_lock *lock, struct mcs_pdr_qnode *qnode)
 	}
 }
 
-/* Actual MCS-PDR locks.  These use memory in the lock for their qnodes, though
- * the internal locking code doesn't care where the qnodes come from: so long as
- * they are not freed and can stand a random read of vcoreid. */
-void mcs_pdr_lock(struct mcs_pdr_lock *lock)
+/* Actual MCS-PDR locks.  Don't worry about initializing any fields of qnode.
+ * We'll do vcoreid here, and the locking code deals with the other fields */
+void mcs_pdr_lock(struct mcs_pdr_lock *lock, struct mcs_pdr_qnode *qnode)
 {
-	struct mcs_pdr_qnode *qnode;
 	/* Disable notifs, if we're an _M uthread */
 	uth_disable_notifs();
-	/* Get our qnode from the array.  vcoreid was preset, and the other fields
-	 * get handled by the lock */
-	qnode = &lock->vc_qnodes[vcore_id()];
-	assert(qnode->vcoreid == vcore_id());	/* sanity */
+	cmb();	/* in the off-chance the compiler wants to read vcoreid early */
+	qnode->vcoreid = vcore_id();
 	__mcs_pdr_lock(lock, qnode);
 }
 
@@ -342,10 +327,8 @@ void __mcs_pdr_unlock_no_cas(struct mcs_pdr_lock *lock,
 	}
 }
 
-void mcs_pdr_unlock(struct mcs_pdr_lock *lock)
+void mcs_pdr_unlock(struct mcs_pdr_lock *lock, struct mcs_pdr_qnode *qnode)
 {
-	struct mcs_pdr_qnode *qnode = &lock->vc_qnodes[vcore_id()];
-	assert(qnode->vcoreid == vcore_id());	/* sanity */
 #ifndef __riscv__
 	__mcs_pdr_unlock(lock, qnode);
 #else
