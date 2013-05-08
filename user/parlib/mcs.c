@@ -329,11 +329,7 @@ void __mcs_pdr_unlock_no_cas(struct mcs_pdr_lock *lock,
 
 void mcs_pdr_unlock(struct mcs_pdr_lock *lock, struct mcs_pdr_qnode *qnode)
 {
-#ifndef __riscv__
 	__mcs_pdr_unlock(lock, qnode);
-#else
-	__mcs_pdr_unlock_no_cas(lock, qnode);
-#endif
 	/* Enable notifs, if we're an _M uthread */
 	uth_enable_notifs();
 }
