@@ -2,19 +2,31 @@
 #include <ros/procinfo.h>
 #include <arch/arch.h>
 #include <stdio.h>
+#include <tsc-compat.h>
 
 void udelay(uint64_t usec)
 {
 	uint64_t start, end, now;
 
 	start = read_tsc();
-    end = start + (__procinfo.tsc_freq * usec) / 1000000;
-	if (end == 0) printf("This is terribly wrong \n");
+    end = start + (get_tsc_freq() * usec) / 1000000;
 	do {
         cpu_relax();
         now = read_tsc();
 	} while (now < end || (now > start && end < start));
-	return;
+}
+
+/* Not super accurate, due to overheads of reading tsc and looping */
+void ndelay(uint64_t nsec)
+{
+	uint64_t start, end, now;
+
+	start = read_tsc();
+    end = start + (get_tsc_freq() * nsec) / 1000000000;
+	do {
+        cpu_relax();
+        now = read_tsc();
+	} while (now < end || (now > start && end < start));
 }
 
 /* Difference between the ticks in microseconds */
