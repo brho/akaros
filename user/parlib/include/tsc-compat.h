@@ -40,6 +40,16 @@ static inline uint64_t get_tsc_overhead(void)
 #include <sys/time.h>
 #include <stdint.h>
 
+/* Akaros has this helper in ros/common.h. (it returns a bool btw)
+ *
+ * We wraparound if UINT_MAX < a * b, which is also UINT_MAX / a < b. */
+static inline int mult_will_overflow_u64(uint64_t a, uint64_t b)
+{
+	if (!a)
+		return FALSE;
+	return (uint64_t)(-1) / a < b;
+}
+
 # ifdef __i386__
 
 static inline uint64_t read_tsc(void)
