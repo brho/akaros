@@ -259,7 +259,7 @@ void print_throughput(void **data, unsigned int nr_steps, uint64_t interval,
 			for ( ; next_sample[i] < nr_j; next_sample[i]++) {
 				/* skip this thread if it has no more data */
 				if (get_sample(data, i, next_sample[i], &sample))
-					break;
+					continue;
 				/* break when we found one that hasn't happened yet */
 				if (!(sample <= time_now))
 					break;
