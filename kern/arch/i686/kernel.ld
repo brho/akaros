@@ -10,7 +10,7 @@ SECTIONS
 	/* Link the kernel for 0xC01000C0, but load it at 0x001000C0) */
 
 	.text 0xC01000C0 : AT(0x001000C0) {
-		*(.text .stub .text.* .gnu.linkonce.t.*)
+		*(.multiboot .text .stub .text.* .gnu.linkonce.t.*)
 	}
 
 	PROVIDE(etext = .);	/* Define the 'etext' symbol to this value */

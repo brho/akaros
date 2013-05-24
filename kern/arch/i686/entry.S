@@ -36,14 +36,14 @@
 # entry point
 ###################################################################
 
-.text
-
 # The Multiboot header
+.section .multiboot
 .align 4
 .long MULTIBOOT_HEADER_MAGIC
 .long MULTIBOOT_HEADER_FLAGS
 .long CHECKSUM
 
+.section .text
 .globl		_start
 _start:
 	movw	$0x1234,0x472			# warm boot
