@@ -131,12 +131,53 @@ static int prov_pid(pid_t pid, struct prog_args *pargs)
 		case ('c'):
 			if (pargs->max) {
 				/* TODO: don't guess the LL/CG layout and num pcores */
+				#if 1
 				for (int i = 1; i < max_vcores() + 1; i++) {
 					if ((retval = sys_provision(pid, RES_CORES, i))) {
 						perror("Failed max provisioning");
 						return retval;
 					}
 				}
+				#else
+				/* To force a vcore shuffle / least optimal ordering, change
+				 * the if 1 to 0.  Normally, we provision out in a predictable,
+				 * VCn->PCn+1 ordering.  This splits the odd and even VCs
+				 * across sockets on a 32 PC machine (c89).  This is only for
+				 * perf debugging, when using the lockprov.sh script. */
+				retval = 0;
+				retval |= sys_provision(pid, RES_CORES,  1);
+				retval |= sys_provision(pid, RES_CORES, 16);
+				retval |= sys_provision(pid, RES_CORES,  2);
+				retval |= sys_provision(pid, RES_CORES, 17);
+				retval |= sys_provision(pid, RES_CORES,  3);
+				retval |= sys_provision(pid, RES_CORES, 18);
+				retval |= sys_provision(pid, RES_CORES,  4);
+				retval |= sys_provision(pid, RES_CORES, 19);
+				retval |= sys_provision(pid, RES_CORES,  5);
+				retval |= sys_provision(pid, RES_CORES, 20);
+				retval |= sys_provision(pid, RES_CORES,  6);
+				retval |= sys_provision(pid, RES_CORES, 21);
+				retval |= sys_provision(pid, RES_CORES,  7);
+				retval |= sys_provision(pid, RES_CORES, 22);
+				retval |= sys_provision(pid, RES_CORES,  8);
+				retval |= sys_provision(pid, RES_CORES, 23);
+				retval |= sys_provision(pid, RES_CORES,  9);
+				retval |= sys_provision(pid, RES_CORES, 24);
+				retval |= sys_provision(pid, RES_CORES, 10);
+				retval |= sys_provision(pid, RES_CORES, 25);
+				retval |= sys_provision(pid, RES_CORES, 11);
+				retval |= sys_provision(pid, RES_CORES, 26);
+				retval |= sys_provision(pid, RES_CORES, 12);
+				retval |= sys_provision(pid, RES_CORES, 27);
+				retval |= sys_provision(pid, RES_CORES, 13);
+				retval |= sys_provision(pid, RES_CORES, 28);
+				retval |= sys_provision(pid, RES_CORES, 14);
+				retval |= sys_provision(pid, RES_CORES, 29);
+				retval |= sys_provision(pid, RES_CORES, 15);
+				retval |= sys_provision(pid, RES_CORES, 31);
+				retval |= sys_provision(pid, RES_CORES, 30);
+				return retval;
+				#endif
 			} else {
 				if ((retval = sys_provision(pid, RES_CORES, pargs->res_val))) {
 					perror("Failed single provision");

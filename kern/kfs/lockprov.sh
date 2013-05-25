@@ -6,7 +6,9 @@
 # TODO: take a param up to MAXVC for how many cores we preempt per loop
 # TODO: make a program that does the preemption, instead of the script.  it
 # takes around 2ms to spawn, run, and wait on a program, which messes with the
-# timing
+# timing.  When we do this, pull in the vcore shuffling code from prov.c and
+# have that be an option.
+# TODO: have better options for the two preempt styles (periodic, vs total)
 
 if [ $# -lt 2 ]
 then
@@ -15,6 +17,7 @@ then
 fi
 
 PREEMPT_DELAY=$1
+
 shift
 
 # for suppressing output later (no /dev/null, and also append doesn't work)
@@ -37,6 +40,8 @@ echo Launch lock_test, pid was $LOCKPID
 # using the retval of prov -p$LOCKPID to tell us if lock_test is around
 RET=0
 INC=0
+
+# This is the preempt, return, preempt return cycle
 while [ $RET -eq 0 ]; do
 	prov -tc -p$LOCKPID -m >> tmpfile 2>&1
 	RET=$?
@@ -44,12 +49,33 @@ while [ $RET -eq 0 ]; do
 	usleep $PREEMPT_DELAY
 	
 	prov -tc -p$PTHPID -v1 >> tmpfile 2>&1
-	#prov -tc -p$PTHPID -v2 >> tmpfile 2>&1
+	prov -tc -p$PTHPID -v2 >> tmpfile 2>&1
 
 	usleep $PREEMPT_DELAY
 
 	let INC=$INC+1
 done
+
+## This is the 'run for a bit, preempt a lot just once, then return all style
+#prov -tc -p$LOCKPID -m >> tmpfile 2>&1
+#usleep $PREEMPT_DELAY
+#prov -tc -p$PTHPID -v1 >> tmpfile 2>&1
+#prov -tc -p$PTHPID -v2 >> tmpfile 2>&1
+#prov -tc -p$PTHPID -v3 >> tmpfile 2>&1
+#prov -tc -p$PTHPID -v4 >> tmpfile 2>&1
+#prov -tc -p$PTHPID -v5 >> tmpfile 2>&1
+#prov -tc -p$PTHPID -v6 >> tmpfile 2>&1
+#prov -tc -p$PTHPID -v7 >> tmpfile 2>&1
+#prov -tc -p$PTHPID -v8 >> tmpfile 2>&1
+#prov -tc -p$PTHPID -v9 >> tmpfile 2>&1
+#usleep $PREEMPT_DELAY
+#prov -tc -p$LOCKPID -m >> tmpfile 2>&1
+#
+#while [ $RET -eq 0 ]; do
+#	prov -tc -p$LOCKPID -m >> tmpfile 2>&1
+#	RET=$?
+#	usleep $PREEMPT_DELAY
+#done
 
 echo All done, killing pth_test.  Did $INC prov-preempt loops.
 kill -9 $PTHPID
