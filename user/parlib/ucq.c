@@ -9,7 +9,7 @@
 #include <arch/atomic.h>
 #include <arch/arch.h>
 #include <ucq.h>
-#include <mcs.h>
+#include <spinlock.h>
 #include <sys/mman.h>
 #include <assert.h>
 #include <stdio.h>
@@ -31,8 +31,8 @@ void ucq_init_raw(struct ucq *ucq, uintptr_t pg1, uintptr_t pg2)
 	ucq->prod_overflow = FALSE;
 	atomic_set(&ucq->nr_extra_pgs, 0);
 	atomic_set(&ucq->spare_pg, pg2);
-	static_assert(sizeof(struct mcs_pdr_lock) <= sizeof(ucq->u_lock));
-	mcs_pdr_init((struct mcs_pdr_lock*)(&ucq->u_lock));
+	static_assert(sizeof(struct spin_pdr_lock) <= sizeof(ucq->u_lock));
+	spin_pdr_init((struct spin_pdr_lock*)(&ucq->u_lock));
 	ucq->ucq_ready = TRUE;
 }
 
@@ -57,7 +57,6 @@ void ucq_free_pgs(struct ucq *ucq)
 	assert(pg1 && pg2);
 	munmap((void*)pg1, PGSIZE);
 	munmap((void*)pg2, PGSIZE);
-	mcs_pdr_fini((struct mcs_pdr_lock*)&ucq->u_lock);
 }
 
 /* Consumer side, returns 0 on success and fills *msg with the ev_msg.  If the
@@ -67,10 +66,7 @@ int get_ucq_msg(struct ucq *ucq, struct event_msg *msg)
 	uintptr_t my_idx;
 	struct ucq_page *old_page, *other_page;
 	struct msg_container *my_msg;
-	/* Locking stuff.  Would be better with a spinlock, if we had them, since
-	 * this should be lightly contested.  */
-	struct mcs_pdr_lock *ucq_lock = (struct mcs_pdr_lock*)(&ucq->u_lock);
-	struct mcs_pdr_qnode qnode;
+	struct spin_pdr_lock *ucq_lock = (struct spin_pdr_lock*)(&ucq->u_lock);
 
 	do {
 loop_top:
@@ -86,13 +82,13 @@ loop_top:
 		if (slot_is_good(my_idx))
 			goto claim_slot;
 		/* Slot is bad, let's try and fix it */
-		mcs_pdr_lock(ucq_lock, &qnode);
+		spin_pdr_lock(ucq_lock);
 		/* Reread the idx, in case someone else fixed things up while we
 		 * were waiting/fighting for the lock */
 		my_idx = atomic_read(&ucq->cons_idx);
 		if (slot_is_good(my_idx)) {
 			/* Someone else fixed it already, let's just try to get out */
-			mcs_pdr_unlock(ucq_lock, &qnode);
+			spin_pdr_unlock(ucq_lock);
 			/* Make sure this new slot has a producer (ucq isn't empty) */
 			if (my_idx == atomic_read(&ucq->prod_idx))
 				return -1;
@@ -134,7 +130,7 @@ loop_top:
 		}
 		/* All fixed up, unlock.  Other consumers may lock and check to make
 		 * sure things are done. */
-		mcs_pdr_unlock(ucq_lock, &qnode);
+		spin_pdr_unlock(ucq_lock);
 		/* Now that everything is fixed, try again from the top */
 		goto loop_top;
 claim_slot:
