@@ -30,6 +30,18 @@
  * months).
  *
  * BUGS / COMMENTARY
+ * 		Occasional deadlocks when preempting and not giving back!
+ * 			- with the new PDRs style, though that doesn't mean the older styles
+ * 			don't have this problem
+ * 			- shouldn't be any weaker than PDR.  they all check pred_vc to see
+ * 			if they are running, and if not, they make sure someone runs
+ * 			- could be weaker if we have an old value for the lockholder,
+ * 			someone outside the chain, and we made sure they ran, and they do
+ * 			nothing (spin in the 2LS or something?)
+ * 				no, they should have gotten a msg about us being preempted,
+ * 				since whoever we turn into gets the message about us swapping.
+ * 			- anyway, it's not clear if this is with MCSPDR, event delivery,
+ * 			preemption handling, or just an artifact of the test (less likely)
  * 		why aren't MCS locks in uth_ctx getting dealt with?
  * 			- because the event is handled, but the lock holder isn't run.  the
  * 			preemption was dealt with, but nothing saved the lock holder
@@ -77,7 +89,6 @@
  * 			ex: 5000 locks/ms = 5 locks/us = 200ns/lock = 500 ticks / lock
  * 			500 ticks * 31 workers (queue) = 15000 ticks
  * 			avg acquire time was around 14K.  seems fine..
- *
  * 			when our MCSPDR throughput tanks (during preempts), it's around
  * 			400-500 locks/ms, which is around 2us/lock.  
  * 				when the locker on a preempted chain shows up, it needs to
@@ -88,7 +99,8 @@
  * 					such that it is the bottleneck for the actual lock.  2us
  * 					seems possible
  *
- * 		what does it take to get out of a preemption with MCS-PDR?
+ * 		what does it take to get out of a preemption with (old) MCS-PDR?
+ * 			- these are now called pdro locks (old)
  * 			- for a single preempt, it will take 1..n-1 changes.  avg n/2
  * 			- for multiple preempts, it's nr_pre * that (avg np/2, worst np)
  * 			- for every unlock/reacquire cycle (someone unlocks, then rejoins
@@ -136,17 +148,13 @@
  * 				- mcspdr, d = 2: 4200-5200
  * 				- as you add delay, it cuts down on contention for the
  * 				lock->lock cacheline.  but if you add in too much, you'll tank
- * 				throughput (since there is no contention at all).  sweet spot
- * 				for 31 cores on c89 was around 2-3.
+ * 				throughput (since there is no contention at all).
  * 				- as we increase the delay, we cut down on the chance of the
  * 				preempt storm / preempt-stuck-in-the-chain, though it can still
  * 				happen, even with a delay of 10us
- * 					- though as we increase the delay, we increase the chance of
- * 					the preempted vcore not being in the chain, so its not clear
- * 					that having a higher delay actually helped with MCS-chain
- * 					preemptions
  * 			- maybe add in the lockholder again? (removed in 73701d6bfb)
- * 				- massively cuts performance, like 2x throughput, without preempts
+ * 				- massively cuts performance, like 2x throughput, without
+ * 				preempts
  * 				- it's ability to help depends on impl:
  * 					in one version (old style), it didn't help much at all
  * 					- in another (optimized lockholder setting), i can't even
@@ -157,31 +165,19 @@
  * 					is less time with having "no lockholder".  (there's a brief
  * 					period where the lockholder says it is the next person, who
  * 					still spins.  they'll have to make sure their pred runs)
- * 						- read in lockholder_vcoreid.  if -1 or us, ensure pred,
- * 						o/w ensure lockholder.  when passing the lock, read
- * 						their vcoreid and set it.  if unlocked, set to -1, etc.
- * 					-adj workers doesn't matter either...
- * 						- the 2LS and preemption handling might be doing this
- * 						automatically, when handle_preempt() does a
- * 						thread_paused() on its current_uthread.
- * 						- adj_workers isn't critical if we're using some locks
- * 						that check notif_pending.  eventually someone hears
- * 						about preempted VCs (assuming we can keep up)
- * 			- or spin a bit first, before ensuring?
- * 				ensuring once every 1000 spins, for instance, didn't help break
- * 				out of the chain, and just decreased our speed in resolving
- * 				preempts
- * 			- it's not enough to know that there haven't been any new
- * 			preemptions.  your lockholder could already been preempted.
- * 			- and any mechanism that allows all lockers to know the lockholder
- * 			will cause cache traffic, (every lock acquire is a global cache
- * 			invalidate, which everyone reaquires quickly)
+ * 			-adj workers doesn't matter either...
+ * 				- the 2LS and preemption handling might be doing this
+ * 				automatically, when handle_preempt() does a
+ * 				thread_paused() on its current_uthread.
+ * 				- adj_workers isn't critical if we're using some locks
+ * 				that check notif_pending.  eventually someone hears
+ * 				about preempted VCs (assuming we can keep up)
  *
  * 			What about delays?  both hold and delay should make it easier to get
  * 			the preempted vcore to the end of the chain.  but do they have to be
  * 			too big to be reasonable?
- * 				- yes.  hold doesn't really help much until everything is slower.
- * 				even with a hold of around 1.2us, we still have the
+ * 				- yes.  hold doesn't really help much until everything is
+ * 				slower.  even with a hold of around 1.2us, we still have the
  * 				change_to-storms and lowered throughput.
  * 				- doing a combo helps too.  if you hold for 1ns (quite a bit
  * 				more actually, due to the overhead of ndelay, but sufficient to
@@ -193,6 +189,16 @@
  * 					- and it seems like if we get into the storm scenario, we
  * 					never really get out.  either we do quickly or never do.
  * 					depending on the workload, this could be a matter of luck
+ *
+ * 			So we could try tracking the lockholder, but only looking at it when
+ * 			we know someone was preempted in the chain - specifically, when our
+ * 			pred is offline.  when that happens, we don't change to them, we
+ * 			make sure the lockholder is running.
+ * 				- tracking takes us from 4200->2800 throughput or so for MCS
+ * 				- 5200 -> 3700 or so for MCS in vc_ctx (__MCSPDR)
+ * 				- main spike seems to be in the hold time.  bimodal distrib,
+ * 				with most below 91 (the usual is everything packed below 70) and
+ * 				a big spike around 320
  *
  * 	Summary:
  * 		So we need to have someone outside the chain change_to the one in the
@@ -216,6 +222,58 @@
  * 		preemption.  Arguably, if you were worried about the preempt storms and
  * 		want scalability, you might want to use mcspdr with lockholders.
  *
+ * 		The MCSPDRS (now just callced MCSPDR, these are default) locks can avoid
+ * 		the storm, but at the cost of a little more in performance.  mcspdrs
+ * 		style is about the same when not getting preempted from uth ctx compared
+ * 		to mcspdr (slight drop).  When in vc ctx, it's about 10-20% perf hit
+ * 		(PDRS gains little from --vc_ctx). 
+ *
+ * 		Turns out there is a perf hit to PDRS (and any non-stack based qnode)
+ * 		when running on c89.  The issue is that after shuffling the vcores
+ * 		around, they are no longer mapped nicely to pcores (VC0->PC1, VC1->PC2).
+ * 		This is due to some 'false sharing' of the cachelines, caused mostly by
+ * 		aggressive prefetching (notably the intel adjacent cacheline prefetcher,
+ * 		which grabs two CLs at a time!).  Basically, stack-based qnodes are
+ * 		qnodes that are very far apart in memory.  Cranking up the padding in
+ * 		qnodes in the "qnodes-in-locks" style replicates this.
+ *
+ * 		For some info on the prefetching:
+ * 			http://software.intel.com/en-us/articles/optimizing-application-performance-on-intel-coret-microarchitecture-using-hardware-implemented-prefetchers/
+ * 			http://software.intel.com/en-us/forums/topic/341769
+ *
+ * 		Here's some rough numbers of the different styles for qnodes on c89.
+ * 		'in order' is VCn->PC(n+1) (0->1, 1->2).  Worst order is with even VCs
+ * 		on one socket, odds on the other.  the number of CLs is the size of a
+ * 		qnode.  mcspdr is the new style (called mcspdrs in some places in this
+ * 		document), with lock-based qnodes.  mcspdr2 is the same, but with
+ * 		stack-based qnodes.  mcspdro is the old style (bad a recovery), stack
+ * 		based, sometimes just called mcs-pdr
+ *
+ * 		with prefetchers disabled (MCS and DCU)
+ * 			mcspdr   1CL  4.8-5.4 in order, 3.8-4.2 worst order
+ * 			mcspdr   2CL          in order,         worst order
+ * 			mcspdr   4CL  5.2-6.0 in order, 4.7-5.3 worst order
+ * 			mcspdr   8CL  5.4-6.7 in order, 5.2-6.2 worst order
+ * 			mcspdr  16CL  5.1-5.8 in order, 5.2-6.8 worst order
+ * 			mcspdr2 stck          in order,         worst order
+ * 			mcspdro stck  4-3.4.3 in order, 4.2-4.5 worst order
+ * 			mcspdro-vcctx 4.8-7.0 in order, 5.3-6.7 worst order
+ * 			can we see the 2 humps? 
+ * 				mcspdr 1CL yes but less, varied, etc
+ * 				mcspdr2 no
+ *
+ * 		test again with worst order with prefetchers enabled
+ * 			mcspdr   1CL  3.8-4.0 in order, 2.6-2.7 worst order
+ * 			mcspdr   2CL  4.2-4.4 in order, 3.8-3.9 worst order
+ * 			mcspdr   4CL  4.5-5.2 in order, 4.0-4.2 worst order
+ * 			mcspdr   8CL  4.4-5.1 in order, 4.3-4.7 worst order
+ * 			mcspdr  16CL  4.4-4.8 in order, 4.4-5.3 worst order
+ * 			mcspdr2 stck  3.0-3.0 in order, 2.9-3.0 worst order
+ * 			mcspdro stck  4.2-4.3 in order, 4.2-4.4 worst order
+ * 			mcspdro-vcctx 5.2-6.4 in order, 5.0-5.9 worst order
+ * 			can we see the 2 humps?
+ * 				mcspdrs 1CL yes, clearly
+ * 				mcspdr2 no
  *
  * PROGRAM FEATURES
  * 		- verbosity?  vcoremap, preempts, the throughput and latency histograms?
@@ -357,7 +415,8 @@ static struct argp_option options[] = {
 	                                             "\tmcs\n"
 	                                             "\tmcscas\n"
 	                                             "\tmcspdr\n"
-	                                             "\t__mcspdr\n"
+	                                             "\tmcspdro\n"
+	                                             "\t__mcspdro\n"
 	                                             "\tspin\n"
 	                                             "\tspinpdr"},
 	{0, 0, 0, 0, "Other options (not mandatory):"},
@@ -389,6 +448,7 @@ struct time_stamp {
 	uint64_t pre;
 	uint64_t acq;
 	uint64_t un;
+	bool valid;
 };
 struct time_stamp **times;
 bool run_locktest = TRUE;
@@ -400,7 +460,8 @@ pthread_barrier_t start_test;
 spinlock_t spin_lock = SPINLOCK_INITIALIZER;
 struct spin_pdr_lock spdr_lock = SPINPDR_INITIALIZER;
 struct mcs_lock mcs_lock = MCS_LOCK_INIT;
-struct mcs_pdr_lock mcspdr_lock = MCSPDR_LOCK_INIT;
+struct mcs_pdr_lock mcspdr_lock;
+struct mcs_pdro_lock mcspdro_lock = MCSPDRO_LOCK_INIT;
 
 #define lock_func(lock_name, lock_cmd, unlock_cmd)                             \
 void *lock_name##_thread(void *arg)                                            \
@@ -414,10 +475,10 @@ void *lock_name##_thread(void *arg)                                            \
 	uint64_t pre_lock, acq_lock, un_lock;                                      \
 	struct time_stamp *this_time;                                              \
 	struct mcs_lock_qnode mcs_qnode = MCS_QNODE_INIT;                          \
-	struct mcs_pdr_qnode pdr_qnode = MCSPDR_QNODE_INIT;                        \
+	struct mcs_pdro_qnode pdro_qnode = MCSPDRO_QNODE_INIT;                     \
 	/* guessing a unique vcoreid for vcoreid for the __mcspdr test.  if the
 	 * program gets preempted for that test, things may go nuts */             \
-	pdr_qnode.vcoreid = thread_id - 1;                                         \
+	pdro_qnode.vcoreid = thread_id - 1;                                        \
 	/* Wait til all threads are created.  Ideally, I'd like to busywait unless
 	 * absolutely critical to yield */                                         \
 	pthread_barrier_wait(&start_test);                                         \
@@ -445,6 +506,9 @@ void *lock_name##_thread(void *arg)                                            \
 		this_time->pre = pre_lock;                                             \
 		this_time->acq = acq_lock;                                             \
 		this_time->un = un_lock;                                               \
+		/* Can turn these on or off to control which samples we gather */      \
+		this_time->valid = TRUE;                                               \
+		/* this_time->valid = (num_vcores() == max_vcores());  */              \
                                                                                \
 		if (delay_time)                                                        \
 			ndelay(delay_time);                                                \
@@ -481,11 +545,14 @@ lock_func(mcscas,
           mcs_lock_lock(&mcs_lock, &mcs_qnode);,
           mcs_lock_unlock_cas(&mcs_lock, &mcs_qnode);)
 lock_func(mcspdr,
-          mcs_pdr_lock(&mcspdr_lock, &pdr_qnode);,
-          mcs_pdr_unlock(&mcspdr_lock, &pdr_qnode);)
-lock_func(__mcspdr,
-          __mcs_pdr_lock(&mcspdr_lock, &pdr_qnode);,
-          __mcs_pdr_unlock(&mcspdr_lock, &pdr_qnode);)
+          mcs_pdr_lock(&mcspdr_lock);,
+          mcs_pdr_unlock(&mcspdr_lock);)
+lock_func(mcspdro,
+          mcs_pdro_lock(&mcspdro_lock, &pdro_qnode);,
+          mcs_pdro_unlock(&mcspdro_lock, &pdro_qnode);)
+lock_func(__mcspdro,
+          __mcs_pdro_lock(&mcspdro_lock, &pdro_qnode);,
+          __mcs_pdro_unlock(&mcspdro_lock, &pdro_qnode);)
 lock_func(spin,
           spinlock_lock(&spin_lock);,
           spinlock_unlock(&spin_lock);)
@@ -499,6 +566,12 @@ static int get_acq_latency(void **data, int i, int j, uint64_t *sample)
 	/* 0 for initial time means we didn't measure */
 	if (times[i][j].pre == 0)
 		return -1;
+	/* can optionally throw out invalid times (keep this in sync with the
+	 * lock_test macro, based on what you want to meaasure. */
+	#if 0
+	if (!times[i][j].valid)
+		return -1;
+	#endif
 	*sample = times[i][j].acq - times[i][j].pre - get_tsc_overhead();
 	return 0;
 }
@@ -529,12 +602,15 @@ uint64_t preempts[MAX_NR_EVENT_TRACES] = {0};
 uint64_t indirs[MAX_NR_EVENT_TRACES] = {0};
 atomic_t preempt_idx;
 atomic_t indir_idx;
+atomic_t preempt_cnt;
+atomic_t indir_cnt;
 
 static void handle_preempt(struct event_msg *ev_msg, unsigned int ev_type)
 {
 	unsigned long my_slot = atomic_fetch_and_add(&preempt_idx, 1);
 	if (my_slot < MAX_NR_EVENT_TRACES)
 		preempts[my_slot] = read_tsc();
+	atomic_inc(&preempt_cnt);
 	handle_vc_preempt(ev_msg, ev_type);
 }
 
@@ -543,6 +619,7 @@ static void handle_indir(struct event_msg *ev_msg, unsigned int ev_type)
 	unsigned long my_slot = atomic_fetch_and_add(&indir_idx, 1);
 	if (my_slot < MAX_NR_EVENT_TRACES)
 		indirs[my_slot] = read_tsc();
+	atomic_inc(&indir_cnt);
 	handle_vc_indir(ev_msg, ev_type);
 }
 
@@ -555,8 +632,11 @@ static void print_preempt_trace(uint64_t starttsc, int nr_print_rows)
 		printf("No preempt trace available when faking vc ctx\n");
 		return;
 	}
+	printf("\n");
+	printf("Nr Preempts: %d\n", atomic_read(&preempt_cnt));
+	printf("Nr Indirs  : %d\n", atomic_read(&indir_cnt));
 	if (preempt_rows)
-		printf("\nPreempt/Indir events:\n-----------------\n");
+		printf("Preempt/Indir events:\n-----------------\n");
 	for (int i = 0; i < preempt_rows; i++) {
 		if (preempts[i])
 			printf("Preempt %3d at %6llu\n", i, tsc2msec(preempts[i]
@@ -579,6 +659,8 @@ static void os_prep_work(int nr_threads)
 	}
 	atomic_init(&preempt_idx, 0);
 	atomic_init(&indir_idx, 0);
+	atomic_init(&preempt_cnt, 0);
+	atomic_init(&indir_cnt, 0);
 	pthread_can_vcore_request(FALSE);	/* 2LS won't manage vcores */
 	pthread_lib_init();					/* gives us one vcore */
 	ev_handlers[EV_VCORE_PREEMPT] = handle_preempt;
@@ -659,8 +741,12 @@ static error_t parse_opt (int key, char *arg, struct argp_state *state)
 				pargs->lock_type = mcspdr_thread;
 				break;
 			}
-			if (!strcmp("__mcspdr", arg)) {
-				pargs->lock_type = __mcspdr_thread;
+			if (!strcmp("mcspdro", arg)) {
+				pargs->lock_type = mcspdro_thread;
+				break;
+			}
+			if (!strcmp("__mcspdro", arg)) {
+				pargs->lock_type = __mcspdro_thread;
 				break;
 			}
 			if (!strcmp("spin", arg)) {
@@ -716,6 +802,7 @@ int main(int argc, char** argv)
 	argp_parse(&argp, argc, argv, 0, 0, &pargs);
 	nr_threads = pargs.nr_threads;
 	nr_loops = pargs.nr_loops;
+	mcs_pdr_init(&mcspdr_lock);
 
 	worker_threads = malloc(sizeof(pthread_t) * nr_threads);
 	if (!worker_threads) {

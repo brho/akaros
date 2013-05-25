@@ -165,12 +165,14 @@ void mcs_barrier_wait(mcs_barrier_t* b, size_t pid)
 }
 
 /* Preemption detection and recovering MCS locks. */
-void mcs_pdr_init(struct mcs_pdr_lock *lock)
+/* Old style.  Has trouble getting out of 'preempt/change-to storms' under
+ * heavy contention and with preemption. */
+void mcs_pdro_init(struct mcs_pdro_lock *lock)
 {
 	lock->lock = 0;
 }
 
-void mcs_pdr_fini(struct mcs_pdr_lock *lock)
+void mcs_pdro_fini(struct mcs_pdro_lock *lock)
 {
 }
 
@@ -184,9 +186,9 @@ void mcs_pdr_fini(struct mcs_pdr_lock *lock)
  * Even if they are no longer the lockholder, they will be checking preemption
  * messages and will help break out of the deadlock.  So long as we don't
  * spin uncontrollably, we're okay. */
-void __mcs_pdr_lock(struct mcs_pdr_lock *lock, struct mcs_pdr_qnode *qnode)
+void __mcs_pdro_lock(struct mcs_pdro_lock *lock, struct mcs_pdro_qnode *qnode)
 {
-	struct mcs_pdr_qnode *predecessor;
+	struct mcs_pdro_qnode *predecessor;
 	uint32_t pred_vcoreid;
 	/* Now the actual lock */
 	qnode->next = 0;
@@ -216,7 +218,7 @@ void __mcs_pdr_lock(struct mcs_pdr_lock *lock, struct mcs_pdr_qnode *qnode)
 
 /* Using the CAS style unlocks, since the usurper recovery is a real pain in the
  * ass */
-void __mcs_pdr_unlock(struct mcs_pdr_lock *lock, struct mcs_pdr_qnode *qnode)
+void __mcs_pdro_unlock(struct mcs_pdro_lock *lock, struct mcs_pdro_qnode *qnode)
 {
 	uint32_t a_tail_vcoreid;
 	/* Check if someone is already waiting on us to unlock */
@@ -250,15 +252,15 @@ void __mcs_pdr_unlock(struct mcs_pdr_lock *lock, struct mcs_pdr_qnode *qnode)
 	}
 }
 
-/* Actual MCS-PDR locks.  Don't worry about initializing any fields of qnode.
+/* Actual MCS-PDRO locks.  Don't worry about initializing any fields of qnode.
  * We'll do vcoreid here, and the locking code deals with the other fields */
-void mcs_pdr_lock(struct mcs_pdr_lock *lock, struct mcs_pdr_qnode *qnode)
+void mcs_pdro_lock(struct mcs_pdro_lock *lock, struct mcs_pdro_qnode *qnode)
 {
 	/* Disable notifs, if we're an _M uthread */
 	uth_disable_notifs();
 	cmb();	/* in the off-chance the compiler wants to read vcoreid early */
 	qnode->vcoreid = vcore_id();
-	__mcs_pdr_lock(lock, qnode);
+	__mcs_pdro_lock(lock, qnode);
 }
 
 /* CAS-less unlock, not quite as efficient and will make sure every vcore runs
@@ -271,10 +273,10 @@ void mcs_pdr_lock(struct mcs_pdr_lock *lock, struct mcs_pdr_qnode *qnode)
  * but a little more difficult to follow.  Also, I'm adjusting this comment
  * months after writing it originally, so it is probably not sufficient, but
  * necessary. */
-void __mcs_pdr_unlock_no_cas(struct mcs_pdr_lock *lock,
-                             struct mcs_pdr_qnode *qnode)
+void __mcs_pdro_unlock_no_cas(struct mcs_pdro_lock *lock,
+                             struct mcs_pdro_qnode *qnode)
 {
-	struct mcs_pdr_qnode *old_tail, *usurper;
+	struct mcs_pdro_qnode *old_tail, *usurper;
 	/* Check if someone is already waiting on us to unlock */
 	if (qnode->next == 0) {
 		cmb();	/* no need for CPU mbs, since there's an atomic_swap() */
@@ -327,9 +329,159 @@ void __mcs_pdr_unlock_no_cas(struct mcs_pdr_lock *lock,
 	}
 }
 
-void mcs_pdr_unlock(struct mcs_pdr_lock *lock, struct mcs_pdr_qnode *qnode)
+void mcs_pdro_unlock(struct mcs_pdro_lock *lock, struct mcs_pdro_qnode *qnode)
 {
-	__mcs_pdr_unlock(lock, qnode);
+	__mcs_pdro_unlock(lock, qnode);
 	/* Enable notifs, if we're an _M uthread */
+	uth_enable_notifs();
+}
+
+/* New style: under heavy contention with preemption, they won't enter the
+ * 'preempt/change_to storm' that can happen to PDRs, at the cost of some
+ * performance.  This is the default. */
+void mcs_pdr_init(struct mcs_pdr_lock *lock)
+{
+	int ret;
+	lock->lock = 0;
+	lock->lockholder_vcoreid = MCSPDR_NO_LOCKHOLDER;
+	ret = posix_memalign((void**)&lock->qnodes,
+	                     __alignof__(struct mcs_pdr_qnode),
+	                     sizeof(struct mcs_pdr_qnode) * max_vcores());
+	assert(!ret);
+}
+
+void mcs_pdr_fini(struct mcs_pdr_lock *lock)
+{
+	free(lock->qnodes);
+}
+
+/* Similar to the original PDR lock, this tracks the lockholder for better
+ * recovery from preemptions.  Under heavy contention, changing to the
+ * lockholder instead of pred makes it more likely to have a vcore outside the
+ * MCS chain handle the preemption.  If that never happens, performance will
+ * suffer.
+ *
+ * Simply checking the lockholder causes a lot of unnecessary traffic, so we
+ * first look for signs of preemption in read-mostly locations (by comparison,
+ * the lockholder changes on every lock/unlock).
+ *
+ * We also use the "qnodes are in the lock" style, which is slightly slower than
+ * using the stack in regular MCS/MCSPDR locks, but it speeds PDR up a bit by
+ * not having to read other qnodes' memory to determine their vcoreid.  The
+ * slowdown may be due to some weird caching/prefetch settings (like Adjacent
+ * Cacheline Prefetch).
+ *
+ * Note that these locks, like all PDR locks, have opportunities to accidentally
+ * ensure some vcore runs that isn't in the chain.  Whenever we read lockholder
+ * or even pred, that particular vcore might subsequently unlock and then get
+ * preempted (or change_to someone else) before we ensure they run.  If this
+ * happens and there is another VC in the MCS chain, it will make sure the right
+ * cores run.  If there are no other vcores in the chain, it is up to the rest
+ * of the vcore/event handling system to deal with this, which should happen
+ * when one of the other vcores handles the preemption message generated by our
+ * change_to. */
+void __mcs_pdr_lock(struct mcs_pdr_lock *lock, struct mcs_pdr_qnode *qnode)
+{
+	struct mcs_pdr_qnode *predecessor;
+	uint32_t pred_vcoreid;
+	struct mcs_pdr_qnode *qnode0 = qnode - vcore_id();
+	seq_ctr_t seq;
+	qnode->next = 0;
+	cmb();	/* swap provides a CPU mb() */
+	predecessor = atomic_swap_ptr((void**)&lock->lock, qnode);
+	if (predecessor) {
+		qnode->locked = 1;
+		pred_vcoreid = predecessor - qnode0;	/* can compute this whenever */
+		wmb();	/* order the locked write before the next write */
+		predecessor->next = qnode;
+		seq = ACCESS_ONCE(__procinfo.coremap_seqctr);
+		/* no need for a wrmb(), since this will only get unlocked after they
+		 * read our pred->next write */
+		while (qnode->locked) {
+			/* Check to see if anything is amiss.  If someone in the chain is
+			 * preempted, then someone will notice.  Simply checking our pred
+			 * isn't that great of an indicator of preemption.  The reason is
+			 * that the offline vcore is most likely the lockholder (under heavy
+			 * lock contention), and we want someone farther back in the chain
+			 * to notice (someone that will stay preempted long enough for a
+			 * vcore outside the chain to recover them).  Checking the seqctr
+			 * will tell us of any preempts since we started, so if a storm
+			 * starts while we're spinning, we can join in and try to save the
+			 * lockholder before its successor gets it.
+			 *
+			 * Also, if we're the lockholder, then we need to let our pred run
+			 * so they can hand us the lock. */
+			if (vcore_is_preempted(pred_vcoreid) ||
+			    seq != __procinfo.coremap_seqctr) {
+				if (lock->lockholder_vcoreid == MCSPDR_NO_LOCKHOLDER ||
+				    lock->lockholder_vcoreid == vcore_id())
+					ensure_vcore_runs(pred_vcoreid);
+				else
+					ensure_vcore_runs(lock->lockholder_vcoreid);
+			}
+			cpu_relax();
+		}
+	} else {
+		lock->lockholder_vcoreid = vcore_id();
+	}
+}
+
+void __mcs_pdr_unlock(struct mcs_pdr_lock *lock, struct mcs_pdr_qnode *qnode)
+{
+	uint32_t a_tail_vcoreid;
+	struct mcs_pdr_qnode *qnode0 = qnode - vcore_id();
+	/* Check if someone is already waiting on us to unlock */
+	if (qnode->next == 0) {
+		cmb();	/* no need for CPU mbs, since there's an atomic_cas() */
+		/* If we're still the lock, just swap it with 0 (unlock) and return */
+		if (atomic_cas_ptr((void**)&lock->lock, qnode, 0)) {
+			/* This is racy with the new lockholder.  it's possible that we'll
+			 * clobber their legit write, though it doesn't actually hurt
+			 * correctness.  it'll get sorted out on the next unlock. */
+			lock->lockholder_vcoreid = MCSPDR_NO_LOCKHOLDER;
+			return;
+		}
+		/* Get the tail (or someone who recently was the tail, but could now
+		 * be farther up the chain), in prep for our spinning.  Could do an
+		 * ACCESS_ONCE on lock->lock */
+		a_tail_vcoreid = lock->lock - qnode0;
+		/* We failed, someone is there and we are some (maybe a different)
+		 * thread's pred.  Since someone else was waiting, they should have made
+		 * themselves our next.  Spin (very briefly!) til it happens. */
+		while (qnode->next == 0) {
+			/* We need to get our next to run, but we don't know who they are.
+			 * If we make sure a tail is running, that will percolate up to make
+			 * sure our qnode->next is running */
+			ensure_vcore_runs(a_tail_vcoreid);
+			cpu_relax();
+		}
+		/* Alpha wants a read_barrier_depends() here */
+		lock->lockholder_vcoreid = qnode->next - qnode0;
+		wmb();	/* order the vcoreid write before the unlock */
+		qnode->next->locked = 0;
+	} else {
+		/* Note we're saying someone else is the lockholder, though we still are
+		 * the lockholder until we unlock the next qnode.  Our next knows that
+		 * if it sees itself is the lockholder, that it needs to make sure we
+		 * run. */
+		lock->lockholder_vcoreid = qnode->next - qnode0;
+		/* mb()s necessary since we didn't call an atomic_swap() */
+		wmb();	/* need to make sure any previous writes don't pass unlocking */
+		rwmb();	/* need to make sure any reads happen before the unlocking */
+		/* simply unlock whoever is next */
+		qnode->next->locked = 0;
+	}
+}
+
+void mcs_pdr_lock(struct mcs_pdr_lock *lock)
+{
+	uth_disable_notifs();
+	cmb();	/* in the off-chance the compiler wants to read vcoreid early */
+	__mcs_pdr_lock(lock, &lock->qnodes[vcore_id()]);
+}
+
+void mcs_pdr_unlock(struct mcs_pdr_lock *lock)
+{
+	__mcs_pdr_unlock(lock, &lock->qnodes[vcore_id()]);
 	uth_enable_notifs();
 }

@@ -12,7 +12,6 @@ struct futex_element {
   TAILQ_ENTRY(futex_element) link;
   pthread_t pthread;
   int *uaddr;
-  struct mcs_pdr_qnode *mcs_qnode;
 };
 TAILQ_HEAD(futex_queue, futex_element);
 
@@ -38,22 +37,20 @@ static void __futex_block(struct uthread *uthread, void *arg) {
 	__pthread_generic_yield(e->pthread);
   e->pthread->state = PTH_BLK_MUTEX;
   TAILQ_INSERT_TAIL(&__futex.queue, e, link);
-  mcs_pdr_unlock(&__futex.lock, e->mcs_qnode);
+  mcs_pdr_unlock(&__futex.lock);
 }
 
 static inline int futex_wait(int *uaddr, int val)
 {
-  struct mcs_pdr_qnode qnode;
-  mcs_pdr_lock(&__futex.lock, &qnode);
+  mcs_pdr_lock(&__futex.lock);
   if(*uaddr == val) {
     // We unlock in the body of __futex_block
     struct futex_element *e = kmem_cache_alloc(__futex.element_cache, 0); 
     e->uaddr = uaddr;
-    e->mcs_qnode = &qnode;
     uthread_yield(TRUE, __futex_block, e);
   }
   else {
-    mcs_pdr_unlock(&__futex.lock, &qnode);
+    mcs_pdr_unlock(&__futex.lock);
   }
   return 0;
 }
@@ -61,8 +58,7 @@ static inline int futex_wait(int *uaddr, int val)
 static inline int futex_wake(int *uaddr, int count)
 {
   struct futex_element *e,*n = NULL;
-  struct mcs_pdr_qnode qnode;
-  mcs_pdr_lock(&__futex.lock, &qnode);
+  mcs_pdr_lock(&__futex.lock);
   e = TAILQ_FIRST(&__futex.queue);
   while(e != NULL) {
     if(count > 0) {
@@ -77,7 +73,7 @@ static inline int futex_wake(int *uaddr, int count)
     }
     else break;
   }
-  mcs_pdr_unlock(&__futex.lock, &qnode);
+  mcs_pdr_unlock(&__futex.lock);
   return 0;
 }
 

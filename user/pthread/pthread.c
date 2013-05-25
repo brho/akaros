@@ -65,7 +65,6 @@ static int __pthread_allocate_stack(struct pthread_tcb *pt);
  * event.c (table of function pointers, stuff like that). */
 void __attribute__((noreturn)) pth_sched_entry(void)
 {
-	struct mcs_pdr_qnode qnode;
 	uint32_t vcoreid = vcore_id();
 	if (current_uthread) {
 		run_current_uthread();
@@ -79,14 +78,14 @@ void __attribute__((noreturn)) pth_sched_entry(void)
 	do {
 		handle_events(vcoreid);
 		__check_preempt_pending(vcoreid);
-		mcs_pdr_lock(&queue_lock, &qnode);
+		mcs_pdr_lock(&queue_lock);
 		new_thread = TAILQ_FIRST(&ready_queue);
 		if (new_thread) {
 			TAILQ_REMOVE(&ready_queue, new_thread, next);
 			TAILQ_INSERT_TAIL(&active_queue, new_thread, next);
 			threads_active++;
 			threads_ready--;
-			mcs_pdr_unlock(&queue_lock, &qnode);
+			mcs_pdr_unlock(&queue_lock);
 			/* If you see what looks like the same uthread running in multiple
 			 * places, your list might be jacked up.  Turn this on. */
 			printd("[P] got uthread %08p on vc %d state %08p flags %08p\n",
@@ -95,7 +94,7 @@ void __attribute__((noreturn)) pth_sched_entry(void)
 			       ((struct uthread*)new_thread)->flags);
 			break;
 		}
-		mcs_pdr_unlock(&queue_lock, &qnode);
+		mcs_pdr_unlock(&queue_lock);
 		/* no new thread, try to yield */
 		printd("[P] No threads, vcore %d is yielding\n", vcore_id());
 		/* TODO: you can imagine having something smarter here, like spin for a
@@ -120,7 +119,6 @@ static void __pthread_run(void)
 void pth_thread_runnable(struct uthread *uthread)
 {
 	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
-	struct mcs_pdr_qnode qnode;
 	/* At this point, the 2LS can see why the thread blocked and was woken up in
 	 * the first place (coupling these things together).  On the yield path, the
 	 * 2LS was involved and was able to set the state.  Now when we get the
@@ -141,11 +139,11 @@ void pth_thread_runnable(struct uthread *uthread)
 	pthread->state = PTH_RUNNABLE;
 	/* Insert the newly created thread into the ready queue of threads.
 	 * It will be removed from this queue later when vcore_entry() comes up */
-	mcs_pdr_lock(&queue_lock, &qnode);
+	mcs_pdr_lock(&queue_lock);
 	/* Again, GIANT WARNING: if you change this, change batch wakeup code */
 	TAILQ_INSERT_TAIL(&ready_queue, pthread, next);
 	threads_ready++;
-	mcs_pdr_unlock(&queue_lock, &qnode);
+	mcs_pdr_unlock(&queue_lock);
 	/* Smarter schedulers should look at the num_vcores() and how much work is
 	 * going on to make a decision about how many vcores to request. */
 	if (can_adjust_vcores)
@@ -165,14 +163,13 @@ void pth_thread_runnable(struct uthread *uthread)
 void pth_thread_paused(struct uthread *uthread)
 {
 	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
-	struct mcs_pdr_qnode qnode;
 	/* Remove from the active list.  Note that I don't particularly care about
 	 * the active list.  We keep it around because it causes bugs and keeps us
 	 * honest.  After all, some 2LS may want an active list */
-	mcs_pdr_lock(&queue_lock, &qnode);
+	mcs_pdr_lock(&queue_lock);
 	threads_active--;
 	TAILQ_REMOVE(&active_queue, pthread, next);
-	mcs_pdr_unlock(&queue_lock, &qnode);
+	mcs_pdr_unlock(&queue_lock);
 	/* communicate to pth_thread_runnable */
 	pthread->state = PTH_BLK_PAUSED;
 	/* At this point, you could do something clever, like put it at the front of
@@ -226,14 +223,13 @@ void pth_thread_blockon_sysc(struct uthread *uthread, void *syscall)
 	int old_flags;
 	bool need_to_restart = FALSE;
 	uint32_t vcoreid = vcore_id();
-	struct mcs_pdr_qnode qnode;
 	/* rip from the active queue */
 	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
 	pthread->state = PTH_BLK_SYSC;
-	mcs_pdr_lock(&queue_lock, &qnode);
+	mcs_pdr_lock(&queue_lock);
 	threads_active--;
 	TAILQ_REMOVE(&active_queue, pthread, next);
-	mcs_pdr_unlock(&queue_lock, &qnode);
+	mcs_pdr_unlock(&queue_lock);
 	/* Set things up so we can wake this thread up later */
 	sysc->u_data = uthread;
 	/* Register our vcore's syscall ev_q to hear about this syscall. */
@@ -333,7 +329,6 @@ void pthread_lib_init(void)
 	uintptr_t mmap_block;
 	struct pthread_tcb *t;
 	int ret;
-	struct mcs_pdr_qnode qnode;
 	/* Some testing code might call this more than once (once for a slimmed down
 	 * pth 2LS, and another from pthread_create().  Also, this is racy, but the
 	 * first time through we are an SCP. */
@@ -353,10 +348,10 @@ void pthread_lib_init(void)
 	t->joiner = 0;
 	assert(t->id == 0);
 	/* Put the new pthread (thread0) on the active queue */
-	mcs_pdr_lock(&queue_lock, &qnode);
+	mcs_pdr_lock(&queue_lock);
 	threads_active++;
 	TAILQ_INSERT_TAIL(&active_queue, t, next);
-	mcs_pdr_unlock(&queue_lock, &qnode);
+	mcs_pdr_unlock(&queue_lock);
 	/* Tell the kernel where and how we want to receive events.  This is just an
 	 * example of what to do to have a notification turned on.  We're turning on
 	 * USER_IPIs, posting events to vcore 0's vcpd, and telling the kernel to
@@ -459,11 +454,10 @@ int pthread_create(pthread_t *thread, const pthread_attr_t *attr,
  * active queue is keeping us honest.  Need to export for sem and friends. */
 void __pthread_generic_yield(struct pthread_tcb *pthread)
 {
-	struct mcs_pdr_qnode qnode;
-	mcs_pdr_lock(&queue_lock, &qnode);
+	mcs_pdr_lock(&queue_lock);
 	threads_active--;
 	TAILQ_REMOVE(&active_queue, pthread, next);
-	mcs_pdr_unlock(&queue_lock, &qnode);
+	mcs_pdr_unlock(&queue_lock);
 }
 
 /* Callback/bottom half of join, called from __uthread_yield (vcore context).
@@ -697,7 +691,6 @@ int pthread_cond_broadcast(pthread_cond_t *c)
 	unsigned int nr_woken = 0;	/* assuming less than 4 bil threads */
 	struct pthread_queue restartees = TAILQ_HEAD_INITIALIZER(restartees);
 	struct pthread_tcb *pthread_i;
-	struct mcs_pdr_qnode qnode;
 	spin_pdr_lock(&c->spdr_lock);
 	/* moves all items from waiters onto the end of restartees */
 	TAILQ_CONCAT(&restartees, &c->waiters, next);
@@ -710,10 +703,10 @@ int pthread_cond_broadcast(pthread_cond_t *c)
 		nr_woken++;
 	}
 	/* Amortize the lock grabbing over all restartees */
-	mcs_pdr_lock(&queue_lock, &qnode);
+	mcs_pdr_lock(&queue_lock);
 	threads_ready += nr_woken;
 	TAILQ_CONCAT(&ready_queue, &restartees, next);
-	mcs_pdr_unlock(&queue_lock, &qnode);
+	mcs_pdr_unlock(&queue_lock);
 	if (can_adjust_vcores)
 		vcore_request(threads_ready);
 	return 0;
@@ -890,7 +883,6 @@ int pthread_barrier_wait(pthread_barrier_t *b)
 	struct pthread_queue restartees = TAILQ_HEAD_INITIALIZER(restartees);
 	struct pthread_tcb *pthread_i;
 	struct barrier_junk local_junk;
-	struct mcs_pdr_qnode qnode;
 	
 	long old_count = atomic_fetch_and_add(&b->count, -1);
 
@@ -920,10 +912,10 @@ int pthread_barrier_wait(pthread_barrier_t *b)
 		TAILQ_FOREACH(pthread_i, &restartees, next)
 			pthread_i->state = PTH_RUNNABLE;
 		/* bulk restart waiters (skipping pth_thread_runnable()) */
-		mcs_pdr_lock(&queue_lock, &qnode);
+		mcs_pdr_lock(&queue_lock);
 		threads_ready += nr_waiters;
 		TAILQ_CONCAT(&ready_queue, &restartees, next);
-		mcs_pdr_unlock(&queue_lock, &qnode);
+		mcs_pdr_unlock(&queue_lock);
 		if (can_adjust_vcores)
 			vcore_request(threads_ready);
 		return PTHREAD_BARRIER_SERIAL_THREAD;
