@@ -214,6 +214,9 @@ void vprintfmt(void (*putch)(int, void**), void **putdat, const char *fmt, va_li
 		case 'p':
 			putch('0', putdat);
 			putch('x', putdat);
+			/* automatically zero-pad pointers, out to the length of a ptr */
+			padc = '0';
+			width = sizeof(void*) * 2;	/* 8 bits per byte / 4 bits per char */
 			num = (unsigned long long)
 				(uintptr_t) va_arg(ap, void *);
 			base = 16;
