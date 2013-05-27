@@ -190,13 +190,13 @@ int mon_setmapperm(int argc, char **argv, struct hw_trapframe *hw_tf)
 	pde = &pgdir[PDX(va)];
 	cprintf("   Virtual    Physical  Ps Dr Ac CD WT U W\n");
 	cprintf("------------------------------------------\n");
-	cprintf("%08p  %08p  %1d  %1d  %1d  %1d  %1d  %1d %1d\n", va, page2pa(page),
+	cprintf("%p  %p  %1d  %1d  %1d  %1d  %1d  %1d %1d\n", va, page2pa(page),
 	       (*pte & PTE_PS) >> 7, (*pte & PTE_D) >> 6, (*pte & PTE_A) >> 5,
 	       (*pte & PTE_PCD) >> 4, (*pte & PTE_PWT) >> 3, (*pte & *pde & PTE_U) >> 2,
 	       (*pte & *pde & PTE_W) >> 1);
 	*pte = PTE_ADDR(*pte) | (*pte & PTE_PS) |
 	       (PGOFF(strtol(argv[2], 0, 16)) & ~PTE_PS ) | PTE_P;
-	cprintf("%08p  %08p  %1d  %1d  %1d  %1d  %1d  %1d %1d\n", va, page2pa(page),
+	cprintf("%p  %p  %1d  %1d  %1d  %1d  %1d  %1d %1d\n", va, page2pa(page),
 	       (*pte & PTE_PS) >> 7, (*pte & PTE_D) >> 6, (*pte & PTE_A) >> 5,
 	       (*pte & PTE_PCD) >> 4, (*pte & PTE_PWT) >> 3, (*pte & *pde & PTE_U) >> 2,
 	       (*pte & *pde & PTE_W) >> 1);
@@ -812,7 +812,7 @@ int mon_fs(int argc, char **argv, struct hw_trapframe *hw_tf)
 		TAILQ_FOREACH(sb, &super_blocks, s_list) {
 			printk("Superblock for %s\n", sb->s_name);
 			TAILQ_FOREACH(file, &sb->s_files, f_list)
-				printk("File: %08p, %s, Refs: %d, Drefs: %d, Irefs: %d\n", file,
+				printk("File: %p, %s, Refs: %d, Drefs: %d, Irefs: %d\n", file,
 				       file_name(file), kref_refcnt(&file->f_kref),
 				       kref_refcnt(&file->f_dentry->d_kref),
 				       kref_refcnt(&file->f_dentry->d_inode->i_kref));
@@ -822,11 +822,11 @@ int mon_fs(int argc, char **argv, struct hw_trapframe *hw_tf)
 		TAILQ_FOREACH(sb, &super_blocks, s_list) {
 			printk("Superblock for %s\n", sb->s_name);
 			TAILQ_FOREACH(inode, &sb->s_inodes, i_sb_list) {
-				printk("Inode: %08p, Refs: %d, Nlinks: %d, Size(B): %d\n",
+				printk("Inode: %p, Refs: %d, Nlinks: %d, Size(B): %d\n",
 				       inode, kref_refcnt(&inode->i_kref), inode->i_nlink,
 				       inode->i_size);
 				TAILQ_FOREACH(dentry, &inode->i_dentry, d_alias)
-					printk("\t%s: Dentry: %08p, Refs: %d\n",
+					printk("\t%s: Dentry: %p, Refs: %d\n",
 					       dentry->d_name.name, dentry,
 					       kref_refcnt(&dentry->d_kref));
 			}
@@ -841,7 +841,7 @@ int mon_fs(int argc, char **argv, struct hw_trapframe *hw_tf)
 			void print_dcache_entry(void *item)
 			{
 				struct dentry *d_i = (struct dentry*)item;
-				printk("%08p %08p %02d     %s\n", d_i, d_i->d_flags,
+				printk("%p %p %02d     %s\n", d_i, d_i->d_flags,
 				       kref_refcnt(&d_i->d_kref), d_i->d_name.name);
 			}
 			hash_for_each(sb->s_dcache, print_dcache_entry);
@@ -853,7 +853,7 @@ int mon_fs(int argc, char **argv, struct hw_trapframe *hw_tf)
 			TAILQ_FOREACH(sb, &super_blocks, s_list) {
 				printk("Superblock for %s\n", sb->s_name);
 				TAILQ_FOREACH(dentry, &sb->s_lru_d, d_lru)
-					printk("Dentry: %08p, Name: %s\n", dentry,
+					printk("Dentry: %p, Name: %s\n", dentry,
 					       dentry->d_name.name);
 			}
 		} else if (!strcmp(argv[2], "prune")) {

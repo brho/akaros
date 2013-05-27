@@ -229,7 +229,7 @@ int e1000_scan_pci(void)
 					e1000_debug("-->IO PORT MODE\n");
 					panic("IO PORT MODE NOT SUPPORTED\n");
 				} else {
-					e1000_debug("-->MMIO Mode, Base: %08p\n", result);
+					e1000_debug("-->MMIO Mode, Base: %p\n", result);
 					// Deal with the MMIO base, mapping, and size.
 					e1000_handle_bar0(result);
 				}						

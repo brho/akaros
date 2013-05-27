@@ -304,7 +304,7 @@ vm_init(void)
 	boot_pgdir = pgdir;
 	boot_cr3 = PADDR(pgdir);
 	// helpful if you want to manually walk with kvm / bochs
-	//printk("pgdir va = %08p, pgdir pa = %08p\n\n", pgdir, PADDR(pgdir));
+	//printk("pgdir va = %p, pgdir pa = %p\n\n", pgdir, PADDR(pgdir));
 
 	//////////////////////////////////////////////////////////////////////
 	// Recursively insert PD in itself as a page table, to form

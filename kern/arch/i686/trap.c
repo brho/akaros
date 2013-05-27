@@ -99,7 +99,7 @@ uintptr_t get_stack_top(void)
 		return ROUNDUP(read_esp(), PGSIZE);
 	stacktop = pcpui->tss->ts_esp0;
 	if (stacktop != ROUNDUP(read_esp(), PGSIZE))
-		panic("Bad stacktop: %08p esp one is %08p\n", stacktop,
+		panic("Bad stacktop: %p esp one is %p\n", stacktop,
 		      ROUNDUP(read_esp(), PGSIZE));
 	return stacktop;
 }
@@ -304,7 +304,7 @@ static void trap_dispatch(struct hw_trapframe *hw_tf)
 			pcpui->__lock_depth_disabled++;
 			print_trapframe(hw_tf);
 			char *fn_name = get_fn_name(hw_tf->tf_eip);
-			printk("Core %d is at %08p (%s)\n", core_id(), hw_tf->tf_eip,
+			printk("Core %d is at %p (%s)\n", core_id(), hw_tf->tf_eip,
 			       fn_name);
 			kfree(fn_name);
 			print_kmsgs(core_id());
@@ -323,7 +323,7 @@ static void trap_dispatch(struct hw_trapframe *hw_tf)
 			 * the same).  See set_current_ctx() for more info. */
 			if (!in_kernel(hw_tf))
 				hw_tf = &pcpui->cur_ctx->tf.hw_tf;
-			printd("bad opcode, eip: %08p, next 3 bytes: %x %x %x\n",
+			printd("bad opcode, eip: %p, next 3 bytes: %x %x %x\n",
 			       hw_tf->tf_eip, 
 			       *(uint8_t*)(hw_tf->tf_eip + 0), 
 			       *(uint8_t*)(hw_tf->tf_eip + 1), 
@@ -596,8 +596,8 @@ void page_fault_handler(struct hw_trapframe *hw_tf)
 		       hw_tf->tf_eip, core_id(), err);
 		print_trapframe(hw_tf);
 		/* Turn this on to help debug bad function pointers */
-		printd("esp %08p\n\t 0(esp): %08p\n\t 4(esp): %08p\n\t 8(esp): %08p\n"
-		       "\t12(esp): %08p\n", hw_tf->tf_esp,
+		printd("esp %p\n\t 0(esp): %p\n\t 4(esp): %p\n\t 8(esp): %p\n"
+		       "\t12(esp): %p\n", hw_tf->tf_esp,
 		       *(uintptr_t*)(hw_tf->tf_esp +  0),
 		       *(uintptr_t*)(hw_tf->tf_esp +  4),
 		       *(uintptr_t*)(hw_tf->tf_esp +  8),

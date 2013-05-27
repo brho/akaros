@@ -243,7 +243,7 @@ static int follow_symlink(struct nameidata *nd)
 		return 0;
 	if (nd->depth > MAX_SYMLINK_DEPTH)
 		return -ELOOP;
-	printd("Following symlink for dentry %08p %s\n", nd->dentry,
+	printd("Following symlink for dentry %p %s\n", nd->dentry,
 	       nd->dentry->d_name.name);
 	nd->depth++;
 	symname = nd->dentry->d_inode->i_op->readlink(nd->dentry);
@@ -668,7 +668,7 @@ void dentry_release(struct kref *kref)
 {
 	struct dentry *dentry = container_of(kref, struct dentry, d_kref);
 
-	printd("'Releasing' dentry %08p: %s\n", dentry, dentry->d_name.name);
+	printd("'Releasing' dentry %p: %s\n", dentry, dentry->d_name.name);
 	/* DYING dentries (recently unlinked / rmdir'd) just get freed */
 	if (dentry->d_flags & DENTRY_DYING) {
 		__dentry_free(dentry);
@@ -707,7 +707,7 @@ void dentry_release(struct kref *kref)
 void __dentry_free(struct dentry *dentry)
 {
 	if (dentry->d_inode)
-		printk("Freeing dentry %08p: %s\n", dentry, dentry->d_name.name);
+		printk("Freeing dentry %p: %s\n", dentry, dentry->d_name.name);
 	assert(dentry->d_op);	/* catch bugs.  a while back, some lacked d_op */
 	dentry->d_op->d_release(dentry);
 	/* TODO: check/test the boundaries on this. */

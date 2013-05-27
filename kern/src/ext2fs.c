@@ -462,7 +462,7 @@ void *ext2_get_ino_metablock(struct inode *inode, unsigned long ino_block)
  * the 2x and 3x walks are jacked up. */
 void ext2_print_ino_blocks(struct inode *inode)
 {
-	printk("Inode %08p, Size: %d, 512B 'blocks': %d\n-------------\n", inode,
+	printk("Inode %p, Size: %d, 512B 'blocks': %d\n-------------\n", inode,
 	       inode->i_size, inode->i_blocks);
 	for (int i = 0; i < inode->i_blocks * (inode->i_sb->s_blocksize / 512); i++)
 		printk("# %03d, Block %03d\n", i, ext2_find_inoblock(inode, i));
@@ -521,7 +521,7 @@ void ext2_check_sb(struct ext2_sb *e2sb, struct ext2_block_group *bg,
 		sum_blks += le16_to_cpu(bg[i].bg_free_blocks_cnt);
 		sum_inodes += le16_to_cpu(bg[i].bg_free_inodes_cnt);
 		if (print) {
-			printk("*** BG %d at %08p\n", i, &bg[i]);
+			printk("*** BG %d at %p\n", i, &bg[i]);
 			printk("Block bitmap:%8d\n", le32_to_cpu(bg[i].bg_block_bitmap));
 			printk("Inode bitmap:%8d\n", le32_to_cpu(bg[i].bg_inode_bitmap));
 			printk("Inode table: %8d\n", le32_to_cpu(bg[i].bg_inode_table));

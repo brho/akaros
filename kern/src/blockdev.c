@@ -135,7 +135,7 @@ void generic_breq_done(struct block_request *breq)
 	int8_t irq_state = 0;
 	if (!sem_up_irqsave(&breq->sem, &irq_state)) {
 		/* This shouldn't happen anymore.  Let brho know if it does. */
-		warn("[kernel] no one waiting on breq %08p", breq);
+		warn("[kernel] no one waiting on breq %p", breq);
 	}
 }
 
@@ -146,7 +146,7 @@ void sleep_on_breq(struct block_request *breq)
 {
 	int8_t irq_state = 0;
 	/* Since printk takes a while, this may make you lose the race */
-	printd("Sleeping on breq %08p\n", breq);
+	printd("Sleeping on breq %p\n", breq);
 	assert(irq_is_enabled());
 	sem_down_irqsave(&breq->sem, &irq_state);
 }

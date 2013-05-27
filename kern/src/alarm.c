@@ -122,7 +122,7 @@ void trigger_tchain(struct timer_chain *tchain)
 	bool changed_list = FALSE;
 	assert(!irq_is_enabled());
 	TAILQ_FOREACH_SAFE(i, &tchain->waiters, next, temp) {
-		printd("Trying to wake up %08p who is due at %llu and now is %llu\n",
+		printd("Trying to wake up %p who is due at %llu and now is %llu\n",
 		       i, i->wake_up_time, now);
 		/* TODO: Could also do something in cases where we're close to now */
 		if (i->wake_up_time <= now) {
@@ -187,7 +187,7 @@ void set_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter)
 			goto no_reset_out;
 		}
 	}
-	panic("Could not find a spot for awaiter %08p\n", waiter);
+	panic("Could not find a spot for awaiter %p\n", waiter);
 reset_out:
 	reset_tchain_interrupt(tchain);
 no_reset_out:
@@ -228,7 +228,7 @@ int sleep_on_awaiter(struct alarm_waiter *waiter)
 {
 	int8_t irq_state = 0;
 	if (waiter->func)
-		panic("Tried blocking on a waiter %08p with a func %08p!", waiter,
+		panic("Tried blocking on a waiter %p with a func %p!", waiter,
 		      waiter->func);
 	/* Put the kthread to sleep.  TODO: This can fail (or at least it will be
 	 * able to in the future) and we'll need to handle that. */
@@ -263,7 +263,7 @@ void set_pcpu_alarm_interrupt(uint64_t time, struct timer_chain *tchain)
 			rel_usec = tsc2usec(time - now);
 		rel_usec = MAX(rel_usec, 1);
 		printd("Setting alarm for %llu, it is now %llu, rel_time %llu "
-		       "tchain %08p\n", time, now, rel_usec, pcpui_tchain);
+		       "tchain %p\n", time, now, rel_usec, pcpui_tchain);
 		/* Note that sparc doesn't honor the one-shot setting, so you might get
 		 * spurious interrupts. */
 		set_core_timer(rel_usec, FALSE);
@@ -281,13 +281,13 @@ void set_pcpu_alarm_interrupt(uint64_t time, struct timer_chain *tchain)
 void print_chain(struct timer_chain *tchain)
 {
 	struct alarm_waiter *i;
-	printk("Chain %08p is%s empty, early: %llu latest: %llu\n", tchain,
+	printk("Chain %p is%s empty, early: %llu latest: %llu\n", tchain,
 	       TAILQ_EMPTY(&tchain->waiters) ? "" : " not",
 	       tchain->earliest_time,
 	       tchain->latest_time);
 	TAILQ_FOREACH(i, &tchain->waiters, next) {
 		struct kthread *kthread = TAILQ_FIRST(&i->sem.waiters);
-		printk("\tWaiter %08p, time: %llu, kthread: %08p (%08p)\n", i,
+		printk("\tWaiter %p, time: %llu, kthread: %p (%p)\n", i,
 		       i->wake_up_time, kthread, (kthread ? kthread->proc : 0));
 
 	}

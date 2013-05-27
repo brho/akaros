@@ -69,15 +69,15 @@ void show_mapping(uintptr_t start, size_t size)
 	for(i = 0; i < size; i += PGSIZE, start += PGSIZE)
 	{
 		page = page_lookup(l1_page_table,(void*)start,&pte);
-		cprintf("%08p  ",start);
+		cprintf("%p  ",start);
 		if(page)
 		{
-			cprintf("%08p  %1d %1d %1d  %1x  %1d\n",page2pa(page),
+			cprintf("%p  %1d %1d %1d  %1x  %1d\n",page2pa(page),
 			        !!(*pte & PTE_C),!!(*pte & PTE_M),
 			        !!(*pte & PTE_R),(*pte & PTE_ACC) >> 2,
 			        !!(*pte & PTE_PTE));
 		}
 		else
-			cprintf("%08p\n",0);
+			cprintf("%p\n",0);
 	}
 }

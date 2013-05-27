@@ -22,7 +22,7 @@ void send_ucq_msg(struct ucq *ucq, struct proc *p, struct event_msg *msg)
 	/* So we can try to send ucqs to _Ss before they initialize */
 	if (!ucq->ucq_ready) {
 		if (p->state & (PROC_RUNNING_M | PROC_RUNNABLE_M))
-			warn("proc %d is _M with an uninitialized ucq %08p\n", p->pid, ucq);
+			warn("proc %d is _M with an uninitialized ucq %p\n", p->pid, ucq);
 		return;
 	}
 	/* Bypass fetching/incrementing the counter if we're overflowing, helps
@@ -62,7 +62,7 @@ grab_lock:
 	if (!new_page) {
 		/* Warn if we have a ridiculous amount of pages in the ucq */
 		if (atomic_fetch_and_add(&ucq->nr_extra_pgs, 1) > UCQ_WARN_THRESH)
-			warn("Over %d pages in ucq %08p for pid %d!\n", UCQ_WARN_THRESH,
+			warn("Over %d pages in ucq %p for pid %d!\n", UCQ_WARN_THRESH,
 			     ucq, p->pid);
 		/* Giant warning: don't ask for anything other than anonymous memory at
 		 * a non-fixed location.  o/w, it may cause a TLB shootdown, which grabs
@@ -136,10 +136,10 @@ void print_ucq(struct proc *p, struct ucq *ucq)
 	struct ucq_page *ucq_pg;
 	struct proc *old_proc = switch_to(p);
 
-	printk("UCQ %08p\n", ucq);
-	printk("prod_idx: %08p, cons_idx: %08p\n", atomic_read(&ucq->prod_idx),
+	printk("UCQ %p\n", ucq);
+	printk("prod_idx: %p, cons_idx: %p\n", atomic_read(&ucq->prod_idx),
 	       atomic_read(&ucq->cons_idx));
-	printk("spare_pg: %08p, nr_extra_pgs: %d\n", atomic_read(&ucq->spare_pg),
+	printk("spare_pg: %p, nr_extra_pgs: %d\n", atomic_read(&ucq->spare_pg),
 	       atomic_read(&ucq->nr_extra_pgs));
 	printk("prod_overflow: %d\n", ucq->prod_overflow);
 	/* Try to see our previous ucqs */
@@ -148,12 +148,12 @@ void print_ucq(struct proc *p, struct ucq *ucq)
 		/* only attempt to print messages on the same page */
 		if (PTE_ADDR(i) != PTE_ADDR(atomic_read(&ucq->prod_idx)))
 			break;
-		printk("Prod idx %08p message ready is %08p\n", i, slot2msg(i)->ready);
+		printk("Prod idx %p message ready is %p\n", i, slot2msg(i)->ready);
 	}
 	/* look at the chain, starting from cons_idx */
 	ucq_pg = (struct ucq_page*)PTE_ADDR(atomic_read(&ucq->cons_idx));
 	for (int i = 0; i < 10 && ucq_pg; i++) {
-		printk("#%02d: Cons page: %08p, nr_cons: %d, next page: %08p\n", i,
+		printk("#%02d: Cons page: %p, nr_cons: %d, next page: %p\n", i,
 		       ucq_pg, ucq_pg->header.nr_cons, ucq_pg->header.cons_next_pg);
 		ucq_pg = (struct ucq_page*)(ucq_pg->header.cons_next_pg);
 	}

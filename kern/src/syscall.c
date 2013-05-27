@@ -843,7 +843,7 @@ static int sys_self_notify(struct proc *p, uint32_t vcoreid,
 	}
 	if (local_msg.ev_type >= MAX_NR_EVENT) {
 		printk("[kernel] received self-notify for vcoreid %d, ev_type %d, "
-		       "u_msg %08p, u_msg->type %d\n", vcoreid, ev_type, u_msg,
+		       "u_msg %p, u_msg->type %d\n", vcoreid, ev_type, u_msg,
 		       u_msg ? u_msg->ev_type : 0);
 		return -1;
 	}
@@ -1663,8 +1663,8 @@ intreg_t syscall(struct proc *p, uintreg_t sc_num, uintreg_t a0, uintreg_t a1,
 			coreid = core_id();
 			vcoreid = proc_get_vcoreid(p);
 			if (systrace_flags & SYSTRACE_LOUD) {
-				printk("[%16llu] Syscall %3d (%12s):(%08p, %08p, %08p, %08p, "
-				       "%08p, %08p) proc: %d core: %d vcore: %d\n", read_tsc(),
+				printk("[%16llu] Syscall %3d (%12s):(%p, %p, %p, %p, "
+				       "%p, %p) proc: %d core: %d vcore: %d\n", read_tsc(),
 				       sc_num, syscall_table[sc_num].name, a0, a1, a2, a3,
 				       a4, a5, p->pid, coreid, vcoreid);
 			} else {
@@ -1837,8 +1837,8 @@ void systrace_print(bool all, struct proc *p)
 	 * timestamp and loop around.  Careful of concurrent writes. */
 	for (int i = 0; i < systrace_bufsize; i++)
 		if (systrace_buffer[i].timestamp)
-			printk("[%16llu] Syscall %3d (%12s):(%08p, %08p, %08p, %08p, %08p,"
-			       "%08p) proc: %d core: %d vcore: %d\n",
+			printk("[%16llu] Syscall %3d (%12s):(%p, %p, %p, %p, %p,"
+			       "%p) proc: %d core: %d vcore: %d\n",
 			       systrace_buffer[i].timestamp,
 			       systrace_buffer[i].syscallno,
 			       syscall_table[systrace_buffer[i].syscallno].name,

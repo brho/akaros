@@ -2105,7 +2105,7 @@ void print_proc_info(pid_t pid)
 	printk("State: %s (%p)\n", procstate2str(p->state), p->state);
 	printk("Refcnt: %d\n", atomic_read(&p->p_kref.refcount) - 1);
 	printk("Flags: 0x%08x\n", p->env_flags);
-	printk("CR3(phys): 0x%08x\n", p->env_cr3);
+	printk("CR3(phys): %p\n", p->env_cr3);
 	printk("Num Vcores: %d\n", p->procinfo->num_vcores);
 	printk("Vcore Lists (may be in flux w/o locking):\n----------------------\n");
 	printk("Online:\n");
@@ -2126,14 +2126,14 @@ void print_proc_info(pid_t pid)
 	spin_lock(&files->lock);
 	for (int i = 0; i < files->max_files; i++)
 		if (files->fd_array[i].fd_file) {
-			printk("\tFD: %02d, File: %08p, File name: %s\n", i,
+			printk("\tFD: %02d, File: %p, File name: %s\n", i,
 			       files->fd_array[i].fd_file,
 			       file_name(files->fd_array[i].fd_file));
 		}
 	spin_unlock(&files->lock);
 	printk("Children: (PID (struct proc *))\n");
 	TAILQ_FOREACH(child, &p->children, sibling_link)
-		printk("\t%d (%08p)\n", child->pid, child);
+		printk("\t%d (%p)\n", child->pid, child);
 	/* no locking / unlocking or refcnting */
 	// spin_unlock(&p->proc_lock);
 	proc_decref(p);
@@ -2158,7 +2158,7 @@ void check_my_owner(void)
 				 * interrupts, which should cause us to skip cpu_halt() */
 				if (!STAILQ_EMPTY(&pcpui->immed_amsgs))
 					continue;
-				printk("Owned pcore (%d) has no owner, by %08p, vc %d!\n",
+				printk("Owned pcore (%d) has no owner, by %p, vc %d!\n",
 				       core_id(), p, vcore2vcoreid(p, vc_i));
 				spin_unlock(&p->proc_lock);
 				spin_unlock(&pid_hash_lock);

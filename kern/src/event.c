@@ -71,7 +71,7 @@ static void set_vcore_msgable(uint32_t vcoreid)
 static void post_ev_msg(struct proc *p, struct event_mbox *mbox,
                         struct event_msg *msg, int ev_flags)
 {
-	printd("[kernel] Sending event type %d to mbox %08p\n", msg->ev_type, mbox);
+	printd("[kernel] Sending event type %d to mbox %p\n", msg->ev_type, mbox);
 	/* Sanity check */
 	assert(p);
 	/* If they just want a bit (NOMSG), just set the bit */
@@ -343,7 +343,7 @@ void send_event(struct proc *p, struct event_queue *ev_q, struct event_msg *msg,
 	struct proc *old_proc;
 	struct event_mbox *ev_mbox = 0;
 	assert(p);
-	printd("[kernel] sending msg to proc %08p, ev_q %08p\n", p, ev_q);
+	printd("[kernel] sending msg to proc %p, ev_q %p\n", p, ev_q);
 	if (!ev_q) {
 		warn("[kernel] Null ev_q - kernel code should check before sending!");
 		return;
@@ -357,7 +357,7 @@ void send_event(struct proc *p, struct event_queue *ev_q, struct event_msg *msg,
 	 * kernel PFs on the user's behalf.  For now, we catch common userspace bugs
 	 * (had this happen a few times). */
 	if (!PTE_ADDR(ev_q)) {
-		printk("[kernel] Bad addr %08p for ev_q\n", ev_q);
+		printk("[kernel] Bad addr %p for ev_q\n", ev_q);
 		return;
 	}
 	/* ev_q is a user pointer, so we need to make sure we're in the right

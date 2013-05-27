@@ -46,7 +46,7 @@ void radix_tree_destroy(struct radix_tree *tree)
  * out of memory, EEXIST if an item is already in the tree. */
 int radix_insert(struct radix_tree *tree, unsigned long key, void *item)
 {
-	printd("RADIX: insert %08p at %d\n", item, key);
+	printd("RADIX: insert %p at %d\n", item, key);
 	struct radix_node *r_node;
 	void **slot;
 	/* Is the tree tall enough?  if not, it needs to grow a level.  This will
@@ -251,7 +251,7 @@ int radix_tag_gang_lookup(struct radix_tree *tree, void **results,
 
 void print_radix_tree(struct radix_tree *tree)
 {
-	printk("Tree %08p, Depth: %d, Bound: %d\n", tree, tree->depth,
+	printk("Tree %p, Depth: %d, Bound: %d\n", tree, tree->depth,
 	       tree->upper_bound);
 
 	void print_rnode(struct radix_node *r_node, int depth)
@@ -261,14 +261,14 @@ void print_radix_tree(struct radix_tree *tree)
 		char buf[32] = {0};
 		for (int i = 0; i < depth; i++)
 			buf[i] = '\t';
-		printk("%sRnode %08p, parent %08p, myslot %08p, %d items, leaf? %d\n",
+		printk("%sRnode %p, parent %p, myslot %p, %d items, leaf? %d\n",
 		       buf, r_node, r_node->parent, r_node->my_slot, r_node->num_items,
 		       r_node->leaf);
 		for (int i = 0; i < NR_RNODE_SLOTS; i++) {
 			if (!r_node->items[i])
 				continue;
 			if (r_node->leaf)
-				printk("\t%sRnode Item %d: %08p\n", buf, i, r_node->items[i]);
+				printk("\t%sRnode Item %d: %p\n", buf, i, r_node->items[i]);
 			else
 				print_rnode(r_node->items[i], depth + 1);
 		}

@@ -322,17 +322,17 @@ void print_pageinfo(struct page *page)
 		printk("Null page\n");
 		return;
 	}
-	printk("Page %d (%08p), Flags: %08p Refcnt: %d\n", page2ppn(page), page2kva(page),
-	       page->pg_flags, kref_refcnt(&page->pg_kref));
+	printk("Page %d (%p), Flags: 0x%08x Refcnt: %d\n", page2ppn(page),
+	       page2kva(page), page->pg_flags, kref_refcnt(&page->pg_kref));
 	if (page->pg_mapping) {
-		printk("\tMapped into object %08p at index %d\n",
+		printk("\tMapped into object %p at index %d\n",
 		       page->pg_mapping->pm_host, page->pg_index);
 	}
 	if (page->pg_flags & PG_BUFFER) {
 		struct buffer_head *bh = (struct buffer_head*)page->pg_private;
 		i = 0;
 		while (bh) {
-			printk("\tBH %d: buffer: %08p, sector: %d, nr_sector: %d\n", i,
+			printk("\tBH %d: buffer: %p, sector: %d, nr_sector: %d\n", i,
 			       bh->bh_buffer, bh->bh_sector, bh->bh_nr_sector);
 			i++;
 			bh = bh->bh_next;

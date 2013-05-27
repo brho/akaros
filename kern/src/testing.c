@@ -578,7 +578,7 @@ void test_hello_world_handler(struct hw_trapframe *hw_tf, void *data)
 	trapno = 0;
 	#endif
 
-	cprintf("Incoming IRQ, ISR: %d on core %d with tf at 0x%08x\n",
+	cprintf("Incoming IRQ, ISR: %d on core %d with tf at %p\n",
 	        trapno, core_id(), hw_tf);
 }
 
@@ -673,8 +673,8 @@ void test_circ_buffer(void)
 
 static void test_km_handler(uint32_t srcid, long a0, long a1, long a2)
 {
-	printk("Received KM on core %d from core %d: arg0= 0x%08x, arg1 = "
-	       "0x%08x, arg2 = 0x%08x\n", core_id(), srcid, a0, a1, a2);
+	printk("Received KM on core %d from core %d: arg0= %p, arg1 = %p, "
+	       "arg2 = %p\n", core_id(), srcid, a0, a1, a2);
 	return;
 }
 
@@ -905,10 +905,10 @@ void test_bcq(void)
 	/* Helpful debugger */
 	void print_a_bcq(struct my_bcq *bcq)
 	{
-		printk("A BCQ (made of ints): %08p\n", bcq);
-		printk("\tprod_idx: %08p\n", bcq->hdr.prod_idx);
-		printk("\tcons_pub_idx: %08p\n", bcq->hdr.cons_pub_idx);
-		printk("\tcons_pvt_idx: %08p\n", bcq->hdr.cons_pvt_idx);
+		printk("A BCQ (made of ints): %p\n", bcq);
+		printk("\tprod_idx: %p\n", bcq->hdr.prod_idx);
+		printk("\tcons_pub_idx: %p\n", bcq->hdr.cons_pub_idx);
+		printk("\tcons_pvt_idx: %p\n", bcq->hdr.cons_pvt_idx);
 		for (int i = 0; i < NR_ELEM_A_BCQ; i++) {
 			printk("Element %d, rdy_for_cons: %02p\n", i,
 			       bcq->wraps[i].rdy_for_cons);
@@ -1211,7 +1211,7 @@ void test_radix_tree(void)
 	assert((void*)0xdeadbeef == radix_lookup(tree, 3));
 	for (int i = 5; i < 100; i++)
 		if ((retval = radix_lookup(tree, i))) {
-			printk("Extra item %08p at slot %d in tree %08p\n", retval, i,
+			printk("Extra item %p at slot %d in tree %p\n", retval, i,
 			       tree);
 			print_radix_tree(tree);
 			monitor(0);
@@ -1302,7 +1302,7 @@ void test_random_fs(void)
 static void __test_up_sem(uint32_t srcid, long a0, long a1, long a2)
 {
 	struct semaphore *sem = (struct semaphore*)a0;
-	printk("[kmsg] Upping the sem to start the kthread, stacktop is %08p\n",
+	printk("[kmsg] Upping the sem to start the kthread, stacktop is %p\n",
 		   get_stack_top());
 	if (!sem_up(sem)) {
 		printk("[kmsg] Crap, the sem didn't have a kthread waiting!\n");
@@ -1319,7 +1319,7 @@ void test_kthreads(void)
 {
 	struct semaphore sem;
 	sem_init(&sem, 1);		/* set to 1 to test the unwind */
-	printk("We're a kthread!  Stacktop is %08p.  Testing suspend, etc...\n",
+	printk("We're a kthread!  Stacktop is %p.  Testing suspend, etc...\n",
 	       get_stack_top());
 	/* So we have something that will wake us up.  Routine messages won't get
 	 * serviced in the kernel right away. */
@@ -1332,7 +1332,7 @@ void test_kthreads(void)
 	/* This one is for real, yo.  Run and tell that. */
 	printk("About to sleep for real\n");
 	sem_down(&sem);
-	printk("Kthread restarted!, Stacktop is %08p.\n", get_stack_top());
+	printk("Kthread restarted!, Stacktop is %p.\n", get_stack_top());
 }
 
 /* Second player's kmsg */

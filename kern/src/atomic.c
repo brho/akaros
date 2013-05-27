@@ -36,14 +36,14 @@ void spin_lock(spinlock_t *lock)
 		if (!can_spinwait_irq(pcpui)) {
 			pcpui->__lock_depth_disabled++;
 			print_kctx_depths("IRQOK");
-			panic("Lock %08p tried to spin when it shouldn't\n", lock);
+			panic("Lock %p tried to spin when it shouldn't\n", lock);
 			pcpui->__lock_depth_disabled--;
 		}
 	} else {
 		if (!can_spinwait_noirq(pcpui)) {
 			pcpui->__lock_depth_disabled++;
 			print_kctx_depths("NOIRQ");
-			panic("Lock %08p tried to spin when it shouldn't\n", lock);
+			panic("Lock %p tried to spin when it shouldn't\n", lock);
 			pcpui->__lock_depth_disabled--;
 		}
 	}

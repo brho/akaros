@@ -111,7 +111,7 @@ static void eth_audio_prep_response(struct ethaud_udp_packet *incoming,
 	/* Debugging */
 	static int once = 0;
 	if (!once++)
-		printd("I will send %d bytes from %08p:%d to %08p:%d, iplen %04p, "
+		printd("I will send %d bytes from %p:%d to %p:%d, iplen %04p, "
 		       "udplen %04p\n",
 		       ntohs(outgoing->udp_hdr.length),
 		       ntohl(outgoing->ip_hdr.src_addr),

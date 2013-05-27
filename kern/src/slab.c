@@ -338,11 +338,11 @@ void print_kmem_cache(struct kmem_cache *cp)
 	printk("Objsize: %d\n", cp->obj_size);
 	printk("Align: %d\n", cp->align);
 	printk("Flags: 0x%08x\n", cp->flags);
-	printk("Constructor: 0x%08x\n", cp->ctor);
-	printk("Destructor: 0x%08x\n", cp->dtor);
-	printk("Slab Full: 0x%08x\n", cp->full_slab_list);
-	printk("Slab Partial: 0x%08x\n", cp->partial_slab_list);
-	printk("Slab Empty: 0x%08x\n", cp->empty_slab_list);
+	printk("Constructor: %p\n", cp->ctor);
+	printk("Destructor: %p\n", cp->dtor);
+	printk("Slab Full: %p\n", cp->full_slab_list);
+	printk("Slab Partial: %p\n", cp->partial_slab_list);
+	printk("Slab Empty: %p\n", cp->empty_slab_list);
 	printk("Current Allocations: %d\n", cp->nr_cur_alloc);
 	spin_unlock_irqsave(&cp->cache_lock);
 }
@@ -354,10 +354,10 @@ void print_kmem_slab(struct kmem_slab *slab)
 	printk("NumBusy: %d\n", slab->num_busy_obj);
 	printk("Num_total: %d\n", slab->num_total_obj);
 	if (slab->obj_size + sizeof(uintptr_t) < SLAB_LARGE_CUTOFF) {
-		printk("Free Small obj: 0x%08x\n", slab->free_small_obj);
+		printk("Free Small obj: %p\n", slab->free_small_obj);
 		void *buf = slab->free_small_obj;
 		for (int i = 0; i < slab->num_total_obj; i++) {
-			printk("Addr of buf: 0x%08x, Addr of next: 0x%08x\n", buf,
+			printk("Addr of buf: %p, Addr of next: %p\n", buf,
 			       *((uintptr_t**)buf));
 			buf += slab->obj_size;
 		}

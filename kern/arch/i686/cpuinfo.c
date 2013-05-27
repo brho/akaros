@@ -158,17 +158,17 @@ void show_mapping(uintptr_t start, size_t size)
 	printk("--------------------------------------------\n");
 	for(i = 0; i < size; i += PGSIZE, start += PGSIZE) {
 		pte = pgdir_walk(pgdir, (void*)start, 0);
-		printk("%08p  ", start);
+		printk("%p  ", start);
 		if (pte) {
 			pde = &pgdir[PDX(start)];
 			/* for a jumbo, pde = pte and PTE_PS (better be) = 1 */
-			printk("%08p  %1d  %1d  %1d  %1d  %1d  %1d %1d %1d\n",
+			printk("%p  %1d  %1d  %1d  %1d  %1d  %1d %1d %1d\n",
 			       PTE_ADDR(*pte), (*pte & PTE_PS) >> 7, (*pte & PTE_D) >> 6,
 			       (*pte & PTE_A) >> 5, (*pte & PTE_PCD) >> 4,
 			       (*pte & PTE_PWT) >> 3, (*pte & *pde & PTE_U) >> 2,
 			       (*pte & *pde & PTE_W) >> 1, (*pte & PTE_P));
 		} else {
-			printk("%08p\n", 0);
+			printk("%p\n", 0);
 		}
 	}
 }

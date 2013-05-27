@@ -88,7 +88,7 @@ struct vm_region *create_vmr(struct proc *p, uintptr_t va, size_t len)
 		vmr->vm_end = vmr->vm_base + len;
 	}
 	if (!vmr)
-		warn("Not making a VMR, wanted %08p, + %p = %p", va, len, va + len);
+		warn("Not making a VMR, wanted %p, + %p = %p", va, len, va + len);
 	return vmr;
 }
 
@@ -255,7 +255,7 @@ static int copy_pages(struct proc *p, struct proc *new_p, uintptr_t va_start,
 	    (PGOFF(va_end)) ||
 	    (va_end < va_start) ||	/* now, start > UMAPTOP -> end > UMAPTOP */
 	    (va_end > UMAPTOP)) {
-		warn("VMR mapping is probably screwed up (%08p - %08p)", va_start,
+		warn("VMR mapping is probably screwed up (%p - %p)", va_start,
 		     va_end);
 		return -EINVAL;
 	}
@@ -278,7 +278,7 @@ static int copy_pages(struct proc *p, struct proc *new_p, uintptr_t va_start,
 			 * original PTE */
 			panic("Swapping not supported!");
 		} else {
-			panic("Weird PTE %08p in %s!", *pte, __FUNCTION__);
+			panic("Weird PTE %p in %s!", *pte, __FUNCTION__);
 		}
 		return 0;
 	}
@@ -310,7 +310,7 @@ static int copy_pages(struct proc *p, struct proc *new_p, uintptr_t va_start,
 			 * original PTE */
 			panic("Swapping not supported!");
 		} else {
-			panic("Weird PTE %08p in %s!", *old_pte, __FUNCTION__);
+			panic("Weird PTE %p in %s!", *old_pte, __FUNCTION__);
 		}
 	}
 	return 0;
@@ -357,7 +357,7 @@ void print_vmrs(struct proc *p)
 	struct vm_region *vmr;
 	printk("VM Regions for proc %d\n", p->pid);
 	TAILQ_FOREACH(vmr, &p->vm_regions, vm_link)
-		printk("%02d: (0x%08x - 0x%08x): %08p, %08p, %08p, %08p\n", count++,
+		printk("%02d: (%p - %p): 0x%08x, 0x%08x, %p, %p\n", count++,
 		       vmr->vm_base, vmr->vm_end, vmr->vm_prot, vmr->vm_flags,
 		       vmr->vm_file, vmr->vm_foff);
 }
@@ -504,7 +504,7 @@ void *__do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 		__do_munmap(p, addr, len);
 	vmr = create_vmr(p, addr, len);
 	if (!vmr) {
-		printk("[kernel] do_mmap() aborted for %08p + %d!\n", addr, len);
+		printk("[kernel] do_mmap() aborted for %p + %d!\n", addr, len);
 		set_errno(ENOMEM);
 		return MAP_FAILED;		/* TODO: error propagation for mmap() */
 	}
@@ -548,7 +548,7 @@ void *__do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 		for (int i = 0; i < num_pages; i++) {
 			retval = __handle_page_fault(p, addr + i * PGSIZE, vmr->vm_prot);
 			if (retval) {
-				warn("do_mmap() failing (%d) on addr %08p with prot %p",
+				warn("do_mmap() failing (%d) on addr %p with prot 0x%x",
 				     retval, addr + i * PGSIZE,  vmr->vm_prot);
 				destroy_vmr(vmr);
 				set_errno(-retval);
@@ -564,7 +564,7 @@ void *__do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 
 int mprotect(struct proc *p, uintptr_t addr, size_t len, int prot)
 {
-	printd("mprotect: (addr %08p, len %08p, prot %08p)\n", addr, len, prot);
+	printd("mprotect: (addr %p, len %p, prot 0x%x)\n", addr, len, prot);
 	if (!len)
 		return 0;
 	if ((addr % PGSIZE) || (addr < MMAP_LOWEST_VA)) {
@@ -775,7 +775,7 @@ int __handle_page_fault(struct proc *p, uintptr_t va, int prot)
 			/* Debugging */
 			if (!(vmr->vm_prot & PROT_WRITE))
 				printd("[kernel] private, but unwritable file mapping of %s "
-				       "at va %08p\n", file_name(vmr->vm_file), va);
+				       "at va %p\n", file_name(vmr->vm_file), va);
 		}
 		/* if this is an executable page, we might have to flush the instruction
 		 * cache if our HW requires it. */
@@ -853,7 +853,7 @@ int map_vmap_segment(uintptr_t vaddr, uintptr_t paddr, unsigned long num_pages,
 		}
 		/* You probably should have unmapped first */
 		if (*pte)
-			warn("Existing PTE value %08p\n", *pte);
+			warn("Existing PTE value %p\n", *pte);
 		*pte = PTE(pa2ppn(paddr + i * PGSIZE), perm);
 	}
 	spin_unlock(&dyn_vmap_lock);

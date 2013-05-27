@@ -154,7 +154,7 @@ void print_kmsgs(uint32_t coreid)
 		struct kernel_message *kmsg_i;
 		STAILQ_FOREACH(kmsg_i, list, link) {
 			fn_name = get_fn_name((long)kmsg_i->pc);
-			printk("%s KMSG on %d from %d to run %08p(%s)\n", type,
+			printk("%s KMSG on %d from %d to run %p(%s)\n", type,
 			       kmsg_i->dstid, kmsg_i->srcid, kmsg_i->pc, fn_name); 
 			kfree(fn_name);
 		}
@@ -182,20 +182,20 @@ void kmsg_queue_stat(void)
 			printk("Immed msg on core %d:\n", i);
 			printk("\tsrc:  %d\n", kmsg->srcid);
 			printk("\tdst:  %d\n", kmsg->dstid);
-			printk("\tpc:   %08p\n", kmsg->pc);
-			printk("\targ0: %08p\n", kmsg->arg0);
-			printk("\targ1: %08p\n", kmsg->arg1);
-			printk("\targ2: %08p\n", kmsg->arg2);
+			printk("\tpc:   %p\n", kmsg->pc);
+			printk("\targ0: %p\n", kmsg->arg0);
+			printk("\targ1: %p\n", kmsg->arg1);
+			printk("\targ2: %p\n", kmsg->arg2);
 		}
 		if (!routine_emp) {
 			kmsg = STAILQ_FIRST(&per_cpu_info[i].routine_amsgs);
 			printk("Routine msg on core %d:\n", i);
 			printk("\tsrc:  %d\n", kmsg->srcid);
 			printk("\tdst:  %d\n", kmsg->dstid);
-			printk("\tpc:   %08p\n", kmsg->pc);
-			printk("\targ0: %08p\n", kmsg->arg0);
-			printk("\targ1: %08p\n", kmsg->arg1);
-			printk("\targ2: %08p\n", kmsg->arg2);
+			printk("\tpc:   %p\n", kmsg->pc);
+			printk("\targ0: %p\n", kmsg->arg0);
+			printk("\targ1: %p\n", kmsg->arg1);
+			printk("\targ2: %p\n", kmsg->arg2);
 		}
 			
 	}

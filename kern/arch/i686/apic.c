@@ -94,11 +94,11 @@ void lapic_print_isr(void)
 {
 	printk("LAPIC ISR on core %d\n--------------\n", core_id());
 	for (int i = 7; i >= 0; i--)
-		printk("%3d-%3d: %08p\n", (i + 1) * 32 - 1, i * 32,
+		printk("%3d-%3d: %p\n", (i + 1) * 32 - 1, i * 32,
 		       *(uint32_t*)(LAPIC_ISR + i * 0x10));
 	printk("LAPIC IRR on core %d\n--------------\n", core_id());
 	for (int i = 7; i >= 0; i--)
-		printk("%3d-%3d: %08p\n", (i + 1) * 32 - 1, i * 32,
+		printk("%3d-%3d: %p\n", (i + 1) * 32 - 1, i * 32,
 		       *(uint32_t*)(LAPIC_IRR + i * 0x10));
 }
 
