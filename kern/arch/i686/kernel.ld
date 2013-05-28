@@ -12,7 +12,7 @@ SECTIONS
 	. = 0x00100000;
 
 	.bootstrap : {
-		obj/kern/arch/i686/entry.o (.text .bootdata)
+		*(.boottext .bootdata)
 	}
 
 	/* Link the main kernel for the space after entry + KERNBASE.  We'll still
@@ -21,7 +21,6 @@ SECTIONS
 
 	.text : AT(ADDR(.text) - KERNBASE) {
 		*(.text .stub .text.* .gnu.linkonce.t.*)
-		*(EXCLUDE_FILE(*obj/kern/arch/i686/entry.o) .text)
 	}
 
 	PROVIDE(etext = .);	/* Define the 'etext' symbol to this value */
@@ -63,6 +62,7 @@ SECTIONS
 
 	.bss : {
 		*(.bss)
+		*(COMMON)
 	}
 
 	PROVIDE(end = .);

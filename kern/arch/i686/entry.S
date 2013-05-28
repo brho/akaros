@@ -18,9 +18,12 @@
 #define MULTIBOOT_HEADER_FLAGS (MULTIBOOT_MEMORY_INFO | MULTIBOOT_PAGE_ALIGN)
 #define CHECKSUM (-(MULTIBOOT_HEADER_MAGIC + MULTIBOOT_HEADER_FLAGS))
 
-.section .text
 # The kernel bootstrap (this code) is linked and loaded at physical address
 # 0x00100000 (1MB), which is the start of extended memory.  (See kernel.ld)
+
+# Flagging boottext to be text.  Check out:
+# http://sourceware.org/binutils/docs/as/Section.html
+.section .boottext, "awx"
 
 .code32
 .align 4
@@ -87,7 +90,7 @@ loop:
 	# Should never get here, but in case we do, just spin.
 spin:	jmp	spin
 
-.section .bootdata
+.section .bootdata, "aw"
 	.p2align	2		# force 4 byte alignment
 mygdt:
 	SEG_NULL			# null seg
