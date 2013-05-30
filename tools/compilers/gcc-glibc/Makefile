@@ -250,6 +250,7 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 	        --prefix=$(INSTDIR) \
 	        --with-headers=$(INSTDIR)/$(ARCH)-ros/include \
 	        $(GCC_BUILD_FLAGS);
+	echo "MAKEINFO = :" >> $(BINARY_PREFIX)gcc-stage1-builddir/Makefile;
 	touch $@
 
 .$(BINARY_PREFIX)gcc-stage1-make: .$(BINARY_PREFIX)gcc-stage1-configure
