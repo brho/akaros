@@ -172,7 +172,7 @@ realtests: $(TESTS_EXECS_C) $(TESTS_EXECS_CPP)
 #	@mkdir -p fs/$(TARGET_ARCH)/tests
 #	cp -R $(OBJDIR)/$(TESTS_DIR)/* $(TOP_DIR)/fs/$(TARGET_ARCH)/tests
 
-USER_LIBS = parlib pthread
+USER_LIBS = parlib pthread benchutil
 # for now, c3po can't be built for non-i686
 ifeq ($(TARGET_ARCH),i686)
 USER_LIBS += c3po

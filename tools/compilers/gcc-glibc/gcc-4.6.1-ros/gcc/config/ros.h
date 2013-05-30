@@ -40,5 +40,5 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 
 #undef LINK_GCC_C_SEQUENCE_SPEC
 #define LINK_GCC_C_SEQUENCE_SPEC \
-  "--whole-archive -lparlib -lm --no-whole-archive " \
+  "--whole-archive -lparlib --no-whole-archive " \
   "%{static:--start-group} %G %L %{static:--end-group}%{!static:%G}"

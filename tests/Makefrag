@@ -6,7 +6,7 @@ TESTS_CFLAGS += $(USER_CFLAGS) -g
 TESTS_CXXFLAGS += $(USER_CXXFLAGS) -g
 TESTS_LDFLAGS += $(USER_LDFLAGS)
 
-TESTS_LDLIBS := -lpthread
+TESTS_LDLIBS := -lpthread -lbenchutil -lm
 
 TESTS_SRCS_C = $(shell ls $(TESTS_DIR)/*.c)
 TESTS_SRCS_CPP = $(shell ls $(TESTS_DIR)/*.cc)
