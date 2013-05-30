@@ -235,8 +235,6 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 	cd $(BINARY_PREFIX)gcc-stage1-builddir; \
 	../gcc-$(GCC_VERSION)/configure \
 	        --enable-languages=c \
-	        --enable-shared \
-	        --enable-tls \
 	        --disable-checking \
 	        --disable-werror \
 	        --disable-multilib \
@@ -245,6 +243,11 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 	        --disable-libquadmath \
 	        --disable-libgomp \
 	        --disable-nls \
+	        --disable-libgcj \
+	        --disable-bootstrap \
+			--disable-build-with-cxx \
+			--disable-build-poststage1-with-cxx \
+	        --disable-shared \
 	        --program-prefix=$(BINARY_PREFIX) \
 	        --target=$(ARCH)-ros \
 	        --prefix=$(INSTDIR) \
@@ -254,18 +257,17 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 	touch $@
 
 .$(BINARY_PREFIX)gcc-stage1-make: .$(BINARY_PREFIX)gcc-stage1-configure
-	# Put the - in front of make because it actually fails and
-	# we don't want the whole make process to fail.
-	# It appears to still work though since this is just stage 1 of compiling
-	# Should really look into fixing this though...
-	-cd $(BINARY_PREFIX)gcc-stage1-builddir; \
-	make -j $(MAKE_JOBS) inhibit_libc=true cross-compiling=yes
+	cd $(BINARY_PREFIX)gcc-stage1-builddir; \
+	make -j $(MAKE_JOBS) inhibit_libc=true cross-compiling=yes all-gcc all-target-libgcc
 
+# Stage 1 didn't build libgcc_eh.a, which is needed later on.  We can fake it
+# with a symlink, for now.  Later, when we build stage2 gcc, we'll get a real
+# libgcc_eh
 .$(BINARY_PREFIX)gcc-stage1-install: 
-	-cd $(BINARY_PREFIX)gcc-stage1-builddir; \
-	make -j $(MAKE_JOBS) install
-	#-ln -vs libgcc.a `$(BINARY_PREFIX)gcc -print-libgcc-file-name | \
-	#                 sed 's/libgcc/&_eh/'`
+	cd $(BINARY_PREFIX)gcc-stage1-builddir; \
+	make -j $(MAKE_JOBS) install-gcc install-target-libgcc;
+	ln -fs libgcc.a `$(BINARY_PREFIX)gcc -print-libgcc-file-name | \
+	                 sed 's/libgcc/&_eh/'`
 
 .$(BINARY_PREFIX)ros-install-dummy-libs:
 	rm -rf $(INSTDIR)/$(ARCH)-ros/lib/libparlib.a
