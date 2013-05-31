@@ -182,11 +182,8 @@ HOSTCXX      = g++
 HOSTCFLAGS   = -Wall -Wno-char-subscripts -Wmissing-prototypes \
                -Wstrict-prototypes -O2 -fomit-frame-pointer
 HOSTCXXFLAGS = -O2
-HOSTOBJDUMP  = objdump
-HOSTOBJCOPY  = objcopy
 
 export CONFIG_SHELL HOSTCC HOSTCXX HOSTCFLAGS HOSTCXXFLAGS
-export HOSTOBJDUMP HOSTOBJCOPY
 
 # Beautify output
 # ---------------------------------------------------------------------------
@@ -353,14 +350,14 @@ $(kern_cpio) initramfs: $(kern_initramfs_files)
         cd $$OLDPWD; \
     done;
 
-ld_emulation := $(shell $(HOSTOBJDUMP) -i | grep -v BFD | grep ^[a-z] |head -n1)
-ld_arch := $(shell $(HOSTOBJDUMP) -i | grep -v BFD | grep "^  [a-z]" | head -n1)
+ld_emulation := $(shell $(OBJDUMP) -i | grep -v BFD | grep ^[a-z] |head -n1)
+ld_arch := $(shell $(OBJDUMP) -i | grep -v BFD | grep "^  [a-z]" | head -n1)
 
 $(kern_cpio_obj): $(kern_cpio)
-	$(Q)$(HOSTOBJCOPY) -I binary -B $(ld_arch) -O $(ld_emulation) $^ $@
+	$(Q)$(OBJCOPY) -I binary -B $(ld_arch) -O $(ld_emulation) $^ $@
 
 $(ext2_bdev_obj): $(EXT2_BDEV)
-	$(Q)$(HOSTOBJCOPY) -I binary -B $(ld_arch) -O $(ld_emulation) $^ $@
+	$(Q)$(OBJCOPY) -I binary -B $(ld_arch) -O $(ld_emulation) $^ $@
 
 quiet_cmd_link-akaros = LINK    $@
       cmd_link-akaros = $(LD) -T kern/arch/$(ARCH)/kernel.ld -o $@ \
