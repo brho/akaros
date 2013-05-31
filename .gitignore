@@ -43,3 +43,5 @@ kern/kfs/*
 *.o
 .*.cmd
 .config*
+..config*
+scripts/kconfig/zconf.lex.c

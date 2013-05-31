@@ -7,7 +7,7 @@
  */
 #define _GNU_SOURCE
 #include <string.h>
-#define LKC_DIRECT_LINK
+
 #include "lkc.h"
 #include "nconf.h"
 #include <ctype.h>
@@ -83,10 +83,10 @@ static const char nconf_readme[] = N_(
 "Text Box    (Help Window)\n"
 "--------\n"
 "o  Use the cursor keys to scroll up/down/left/right.  The VI editor\n"
-"   keys h,j,k,l function here as do <SPACE BAR> for those\n"
-"   who are familiar with less and lynx.\n"
+"   keys h,j,k,l function here as do <u>, <d> and <SPACE BAR> for\n"
+"   those who are familiar with less and lynx.\n"
 "\n"
-"o  Press <Enter>, <F1>, <F5>, <F7> or <Esc> to exit.\n"
+"o  Press <Enter>, <F1>, <F5>, <F9>, <q> or <Esc> to exit.\n"
 "\n"
 "\n"
 "Alternate Configuration Files\n"
@@ -182,8 +182,6 @@ setmod_text[] = N_(
 "This feature depends on another which\n"
 "has been configured as a module.\n"
 "As a result, this feature will be built as a module."),
-nohelp_text[] = N_(
-"There is no help available for this option.\n"),
 load_config_text[] = N_(
 "Enter the name of the configuration file you wish to load.\n"
 "Accept the name shown to restore the configuration you\n"
@@ -225,7 +223,7 @@ search_help[] = N_(
 "Defined at drivers/pci/Kconfig:47\n"
 "Depends on: X86_LOCAL_APIC && X86_IO_APIC || IA64\n"
 "Location:\n"
-"  -> Bus options (PCI, PCMCIA, EISA, MCA, ISA)\n"
+"  -> Bus options (PCI, PCMCIA, EISA, ISA)\n"
 "    -> PCI support (PCI [ = y])\n"
 "      -> PCI access mode (<choice> [ = y])\n"
 "Selects: LIBCRC32\n"
@@ -279,6 +277,9 @@ static int items_num;
 static int global_exit;
 /* the currently selected button */
 const char *current_instructions = menu_instructions;
+
+static char *dialog_input_result;
+static int dialog_input_result_len;
 
 static void conf(struct menu *menu);
 static void conf_choice(struct menu *menu);
@@ -373,18 +374,18 @@ static void print_function_line(void)
 	const int skip = 1;
 
 	for (i = 0; i < function_keys_num; i++) {
-		wattrset(main_window, attributes[FUNCTION_HIGHLIGHT]);
+		(void) wattrset(main_window, attributes[FUNCTION_HIGHLIGHT]);
 		mvwprintw(main_window, LINES-3, offset,
 				"%s",
 				function_keys[i].key_str);
-		wattrset(main_window, attributes[FUNCTION_TEXT]);
+		(void) wattrset(main_window, attributes[FUNCTION_TEXT]);
 		offset += strlen(function_keys[i].key_str);
 		mvwprintw(main_window, LINES-3,
 				offset, "%s",
 				function_keys[i].func);
 		offset += strlen(function_keys[i].func) + skip;
 	}
-	wattrset(main_window, attributes[NORMAL]);
+	(void) wattrset(main_window, attributes[NORMAL]);
 }
 
 /* help */
@@ -695,7 +696,6 @@ static void search_conf(void)
 {
 	struct symbol **sym_arr;
 	struct gstr res;
-	char dialog_input_result[100];
 	char *dialog_input;
 	int dres;
 again:
@@ -703,7 +703,7 @@ again:
 			_("Search Configuration Parameter"),
 			_("Enter " CONFIG_ " (sub)string to search for "
 				"(with or without \"" CONFIG_ "\")"),
-			"", dialog_input_result, 99);
+			"", &dialog_input_result, &dialog_input_result_len);
 	switch (dres) {
 	case 0:
 		break;
@@ -721,7 +721,7 @@ again:
 		dialog_input += strlen(CONFIG_);
 
 	sym_arr = sym_re_search(dialog_input);
-	res = get_relations_str(sym_arr);
+	res = get_relations_str(sym_arr, NULL);
 	free(sym_arr);
 	show_scroll_win(main_window,
 			_("Search Results"), str_get(&res));
@@ -953,16 +953,16 @@ static void show_menu(const char *prompt, const char *instructions,
 	current_instructions = instructions;
 
 	clear();
-	wattrset(main_window, attributes[NORMAL]);
+	(void) wattrset(main_window, attributes[NORMAL]);
 	print_in_middle(stdscr, 1, 0, COLS,
 			menu_backtitle,
 			attributes[MAIN_HEADING]);
 
-	wattrset(main_window, attributes[MAIN_MENU_BOX]);
+	(void) wattrset(main_window, attributes[MAIN_MENU_BOX]);
 	box(main_window, 0, 0);
-	wattrset(main_window, attributes[MAIN_MENU_HEADING]);
+	(void) wattrset(main_window, attributes[MAIN_MENU_HEADING]);
 	mvwprintw(main_window, 0, 3, " %s ", prompt);
-	wattrset(main_window, attributes[NORMAL]);
+	(void) wattrset(main_window, attributes[NORMAL]);
 
 	set_menu_items(curses_menu, curses_menu_items);
 
@@ -1067,7 +1067,6 @@ static void conf(struct menu *menu)
 	struct menu *submenu = 0;
 	const char *prompt = menu_get_prompt(menu);
 	struct symbol *sym;
-	struct menu *active_menu = NULL;
 	int res;
 	int current_index = 0;
 	int last_top_row = 0;
@@ -1152,13 +1151,9 @@ static void conf(struct menu *menu)
 			continue;
 
 		submenu = (struct menu *) item_data();
-		active_menu = (struct menu *)item_data();
 		if (!submenu || !menu_is_visible(submenu))
 			continue;
-		if (submenu)
-			sym = submenu->sym;
-		else
-			sym = NULL;
+		sym = submenu->sym;
 
 		switch (res) {
 		case ' ':
@@ -1222,20 +1217,13 @@ static void conf_message_callback(const char *fmt, va_list ap)
 
 static void show_help(struct menu *menu)
 {
-	struct gstr help = str_new();
+	struct gstr help;
 
-	if (menu && menu->sym && menu_has_help(menu)) {
-		if (menu->sym->name) {
-			str_printf(&help, "%s%s:\n\n", CONFIG_, menu->sym->name);
-			str_append(&help, _(menu_get_help(menu)));
-			str_append(&help, "\n");
-			get_symbol_str(&help, menu->sym);
-		} else {
-			str_append(&help, _(menu_get_help(menu)));
-		}
-	} else {
-		str_append(&help, nohelp_text);
-	}
+	if (!menu)
+		return;
+
+	help = str_new();
+	menu_get_ext_help(menu, &help);
 	show_scroll_win(main_window, _(menu_get_prompt(menu)), str_get(&help));
 	str_free(&help);
 }
@@ -1360,7 +1348,6 @@ static void conf_choice(struct menu *menu)
 static void conf_string(struct menu *menu)
 {
 	const char *prompt = menu_get_prompt(menu);
-	char dialog_input_result[256];
 
 	while (1) {
 		int res;
@@ -1383,8 +1370,8 @@ static void conf_string(struct menu *menu)
 				prompt ? _(prompt) : _("Main Menu"),
 				heading,
 				sym_get_string_value(menu->sym),
-				dialog_input_result,
-				sizeof(dialog_input_result));
+				&dialog_input_result,
+				&dialog_input_result_len);
 		switch (res) {
 		case 0:
 			if (sym_set_string_value(menu->sym,
@@ -1404,14 +1391,13 @@ static void conf_string(struct menu *menu)
 
 static void conf_load(void)
 {
-	char dialog_input_result[256];
 	while (1) {
 		int res;
 		res = dialog_inputbox(main_window,
 				NULL, load_config_text,
 				filename,
-				dialog_input_result,
-				sizeof(dialog_input_result));
+				&dialog_input_result,
+				&dialog_input_result_len);
 		switch (res) {
 		case 0:
 			if (!dialog_input_result[0])
@@ -1436,14 +1422,13 @@ static void conf_load(void)
 
 static void conf_save(void)
 {
-	char dialog_input_result[256];
 	while (1) {
 		int res;
 		res = dialog_inputbox(main_window,
 				NULL, save_config_text,
 				filename,
-				dialog_input_result,
-				sizeof(dialog_input_result));
+				&dialog_input_result,
+				&dialog_input_result_len);
 		switch (res) {
 		case 0:
 			if (!dialog_input_result[0])
@@ -1518,7 +1503,11 @@ int main(int ac, char **av)
 	}
 
 	notimeout(stdscr, FALSE);
+#if NCURSES_REENTRANT
+	set_escdelay(1);
+#else
 	ESCDELAY = 1;
+#endif
 
 	/* set btns menu */
 	curses_menu = new_menu(curses_menu_items);
