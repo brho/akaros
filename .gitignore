@@ -40,3 +40,6 @@ tools/syscall_server/sandbox/
 tools/syscall_server/apps/*
 tools/syscall_server/test/*
 kern/kfs/*
+*.o
+.*.cmd
+.config*

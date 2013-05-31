@@ -1,110 +1,94 @@
 # General Purpose configuration parameters
-#CFLAGS += $(CONFIG_APPSERVER)
-#CFLAGS += $(CONFIG_DEMO_SLAVE)
+#CFLAGS_KERNEL += $(CONFIG_APPSERVER)
+#CFLAGS_USER += $(CONFIG_APPSERVER)
 
 # Kernel configuration parameters
-KERN_CFLAGS += $(CONFIG_KFS)
-#KERN_CFLAGS += $(CONFIG_EXT2FS)
-#KERN_CFLAGS += $(CONFIG_SINGLE_CORE)
-#KERN_CFLAGS += $(CONFIG_NETWORKING)
-#KERN_CFLAGS += $(CONFIG_SERIAL_IO)
-#KERN_CFLAGS += $(CONFIG_BSD_ON_CORE0)
+CFLAGS_KERNEL += $(CONFIG_KFS)
+#CFLAGS_KERNEL += $(CONFIG_EXT2FS)
+#CFLAGS_KERNEL += $(CONFIG_SINGLE_CORE)
+#CFLAGS_KERNEL += $(CONFIG_NETWORKING)
+#CFLAGS_KERNEL += $(CONFIG_SERIAL_IO)
+#CFLAGS_KERNEL += $(CONFIG_BSD_ON_CORE0)
+#CFLAGS_KERNEL += $(CONFIG_SPINLOCK_DEBUG)
+#CFLAGS_KERNEL += $(CONFIG_SPINPDR_NO_CAS)
 # Enabling this can cause userspace to make the kernel panic.
-#KERN_CFLAGS += $(CONFIG_SEQLOCK_DEBUG)
-#KERN_CFLAGS += $(CONFIG_SPINLOCK_DEBUG)
-#KERN_CFLAGS += $(CONFIG_SPINPDR_NO_CAS)
-#KERN_CFLAGS += $(CONFIG_PAGE_COLORING)
-#KERN_CFLAGS += $(CONFIG_DEMAND_PAGING)
-#KERN_CFLAGS += $(CONFIG_NOMTRRS)
-#KERN_CFLAGS += $(CONFIG_E1000_MMIO_HACK)
-#KERN_CFLAGS += $(CONFIG_E1000_ON_BOXBORO)
-#KERN_CFLAGS += $(CONFIG_E1000_ON_S142)
-#KERN_CFLAGS += $(CONFIG_ENABLE_MPTABLES)
-#KERN_CFLAGS += $(CONFIG_MONITOR_ON_INT)
-#KERN_CFLAGS += $(CONFIG_DISABLE_SMT)
-#KERN_CFLAGS += $(CONFIG_BOXBORO)
-# Enable this to set up ARSC server
-#KERN_CFLAGS += $(CONFIG_ARSC_SERVER)
-# Resets stacks in smp_idle(), at the expense of backtrace
-#KERN_CFLAGS += $(CONFIG_RESET_STACKS)
-#KERN_CFLAGS += $(CONFIG_PCI_VERBOSE)
-# Rimas's Ethernet audio device
-#KERN_CFLAGS += $(CONFIG_ETH_AUDIO)
-# Avoid KB input on buggy nehalems (brho's machine)
-#KERN_CFLAGS += $(CONFIG_KB_CORE0_ONLY)
-#KERN_CFLAGS += $(CONFIG_KTHREAD_POISON)
-#KERN_CFLAGS += $(CONFIG_PRINTK_NO_BACKSPACE)
-
-#KERN_CFLAGS += -DDEVELOPER_NAME=waterman
-#KERN_CFLAGS += -DDEVELOPER_NAME=brho
-
+#CFLAGS_KERNEL += $(CONFIG_SEQLOCK_DEBUG)
+#CFLAGS_KERNEL += $(CONFIG_PAGE_COLORING)
+#CFLAGS_KERNEL += $(CONFIG_DEMAND_PAGING)
+#CFLAGS_KERNEL += $(CONFIG_NOMTRRS)
+#CFLAGS_KERNEL += $(CONFIG_E1000_MMIO_HACK)
+#CFLAGS_KERNEL += $(CONFIG_E1000_ON_BOXBORO)
+#CFLAGS_KERNEL += $(CONFIG_E1000_ON_S142)
+#CFLAGS_KERNEL += $(CONFIG_ENABLE_MPTABLES)
+#CFLAGS_KERNEL += $(CONFIG_MONITOR_ON_INT)
+#CFLAGS_KERNEL += $(CONFIG_DISABLE_SMT)
+#CFLAGS_KERNEL += $(CONFIG_BOXBORO)
+#CFLAGS_KERNEL += $(CONFIG_ARSC_SERVER)
+#CFLAGS_KERNEL += $(CONFIG_RESET_STACKS)
+#CFLAGS_KERNEL += $(CONFIG_PCI_VERBOSE)
+#CFLAGS_KERNEL += $(CONFIG_ETH_AUDIO)
+#CFLAGS_KERNEL += $(CONFIG_KB_CORE0_ONLY)
+#CFLAGS_KERNEL += $(CONFIG_KTHREAD_POISON)
+#CFLAGS_KERNEL += $(CONFIG_PRINTK_NO_BACKSPACE)
+#CFLAGS_KERNEL += $(CONFIG_DEBUG_BREAKPOINT)
 
 # Paths for the initramfs (need to be directories)
 #INITRAMFS_PATHS = kern/kfs obj/tests
 INITRAMFS_PATHS = kern/kfs
-# Program to execute before building the initramfs
-#INITRAMFS_BIN = tools/whatever.sh
-# Image for ext2 (RAM version) (only brho uses this )
+#INITRAMFS_BIN = tools/test.sh
 #EXT2_BDEV = mnt/ext2fs.img
 
 # Userspace configuration parameters
-#USER_CFLAGS += $(CONFIG_SYSCALL_TRAP)
-#USER_CFLAGS += $(CONFIG_USER_DEBUGINFO)
+#CFLAGS_USER += $(CONFIG_SYSCALL_TRAP)
+#CFLAGS_USER += $(CONFIG_USER_DEBUGINFO)
 
 # User tests configuration parameters
-#TESTS_CFLAGS += $(CONFIG_STATIC_APPS)
+#CFLAGS_TESTS += $(CONFIG_STATIC_APPS)
 
-# Number of jobs in make
-#MAKE_JOBS := 4
-#
 # Default for sparc (i.e. needs an appserver)
 ifeq ($(TARGET_ARCH),sparc)
-KERN_CFLAGS += $(CONFIG_APPSERVER)
-KERN_CFLAGS += -DDEVELOPER_NAME=waterman
+CFLAGS_KERNEL += $(CONFIG_APPSERVER)
 endif
 
-# brho's (edited) KVM, USB, PXE, ETC make targets
-#kvm: $(OBJDIR)/kern/kernel
-#	$(V)echo "+ (KVM) Copying to mnt/hdd"
-#	$(V)cp $(OBJDIR)/kern/kernel mnt/hdd/kernel
-#	$(V)sync
-#endif
+# brho's custom targets.  Customize to your system.
+#$(OBJDIR)/kern/.kvm.touch: $(KERNEL_OBJ)
+#	@echo "  (KVM) Copying to mnt/hdd"
+#	$(Q)cp $^ mnt/hdd/texas
+#	@sync
+#	@touch $@
 #
-#usb: $(OBJDIR)/kern/kernel
-#	$(V)echo "+ (USB) Copying to /dev/sdc4"
-#	$(V)mount /dev/sdc4
-#	$(V)cp $(OBJDIR)/kern/kernel /mnt/usbstick/kernel
-#	$(V)sync
-#	$(V)umount /mnt/usbstick
+#kvm: $(OBJDIR)/kern/.kvm.touch ;
 #
-#pxe: $(OBJDIR)/kern/kernel
-#	$(V)echo "+ (PXE) Compressing..."
-#	$(V)gzip -c $(OBJDIR)/kern/kernel > $(OBJDIR)/kern/akaros-kernel.gz
-#	$(V)echo "+ (PXE) Copying to Watson"
-#	$(V)scp $(OBJDIR)/kern/akaros-kernel.gz watson.millennium.berkeley.edu:/tftpboot/akaros/akaros-kernel.gz
-
-x86:
-	$(MAKE) TARGET_ARCH=i686
-
-ramp:
-	$(MAKE) TARGET_ARCH=sparc
-
-riscv:
-	$(MAKE) TARGET_ARCH=riscv
+#$(OBJDIR)/kern/.usb.touch: $(KERNEL_OBJ)
+#	@echo "  (USB) Copying to /dev/sdc4"
+#	$(Q)mount /dev/sdc4
+#	$(Q)cp $^ /mnt/pornstick/texas
+#	@sync
+#	$(Q)umount /mnt/pornstick
+#	@touch $@
+#
+#usb: $(OBJDIR)/kern/.usb.touch ;
+#
+#$(OBJDIR)/kern/.pxe.touch: $(CMP_KERNEL_OBJ)
+#	@echo "  (PXE) Copying to Watson"
+#	$(Q)scp $^ watson.millennium.berkeley.edu:/tftpboot/akaros/akaros-kernel.gz
+#	@touch $@
+#
+#pxe: $(OBJDIR)/kern/.pxe.touch ;
 
 # various sparc functional simulator configurations
 NP ?= 1
 fs: all
-	sparc_app -p$(NP) -fappserver_ros.conf fs obj/kern/kernel none
+	sparc_app -p$(NP) -fappserver_ros.conf fs $(KERNEL_OBJ) none
 fsd: all
-	sparc_app_debug -p$(NP) -fappserver_ros.conf fs obj/kern/kernel none
+	sparc_app_debug -p$(NP) -fappserver_ros.conf fs $(KERNEL_OBJ) none
 hw: all
-	sparc_app -p$(NP) -fappserver_ros.conf hw obj/kern/kernel none
+	sparc_app -p$(NP) -fappserver_ros.conf hw $(KERNEL_OBJ) none
 
 # risc-v functional simulator
 rvfs: all
-	riscv-isa-run -p$(NP) obj/kern/kernel
+	fesvr -p$(NP) -nopk $(KERNEL_OBJ)
 rvfsd: all
-	riscv-isa-run -d -p$(NP) obj/kern/kernel
+	fesvr -d -p$(NP) -nopk $(KERNEL_OBJ)
 
-.PHONY: fs fsd hw rvfs rvfsd
+PHONY += fs fsd hw rvfs rvfsd

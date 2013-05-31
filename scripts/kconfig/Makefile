@@ -4,15 +4,26 @@
 
 PHONY += oldconfig xconfig gconfig menuconfig config
 
+ifdef KBUILD_KCONFIG
+Kconfig := $(KBUILD_KCONFIG)
+else
+Kconfig := Kconfig
+endif
+
 xconfig: $(obj)/qconf
+	$< $(Kconfig)
 
 gconfig: $(obj)/gconf
+	$< $(Kconfig)
 
 menuconfig: $(obj)/mconf
+	$< $(Kconfig)
 
 config: $(obj)/conf
+	$< $(Kconfig)
 
 nconfig: $(obj)/nconf
+	$< $(Kconfig)
 
 # lxdialog stuff
 check-lxdialog  := $(srctree)/$(src)/lxdialog/check-lxdialog.sh

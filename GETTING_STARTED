@@ -1,7 +1,7 @@
 GETTING_STARTED
 Barret Rhoden
 
-Last updated 2013-02-07
+Last thorough update: 2013-02-07
 
 
 1. Overview
@@ -30,10 +30,14 @@ usually idling in there (alone), and if I'm at my computer, I'll respond.
 ---------------------
 I'll describe how to get x86 working.  RISCV is similar.
 
+The first step is to configure the kernel.  config, menuconfig, and some of the
+other KBuild targets work.  For example, to config for 32 bit x86:
+
+$ make ARCH=i686 config
 
 3.1 Cross compiler (and glibc)
 ----------
-First step is to build the cross compiler, which lives in
+The second step is to build the cross compiler, which lives in
 tools/compilers/gcc-glibc
 
 $ cd tools/compilers/gcc-glibc

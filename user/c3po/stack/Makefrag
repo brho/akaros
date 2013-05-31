@@ -1,6 +1,6 @@
 STACK_NAME    := stack
 STACK_UCNAME  := $(call uc, $(STACK_NAME))
-STACK_CFLAGS  := $(CFLAGS)
+STACK_CFLAGS  := $(CFLAGS_USER)
 STACK_HEADERS := $(wildcard $(STACKDIR)/*.h)
 STACK_CFILES  := $(wildcard $(STACKDIR)/*.c)
 STACK_OBJDIR  := $(OBJDIR)/$(STACK_NAME)
@@ -11,15 +11,15 @@ LIBSTACK = $(STACK_OBJDIR)/lib$(STACK_NAME).a
 
 $(STACK_NAME)-clean:
 	@echo + clean [$(LIBUCNAME) $(STACK_UCNAME)]
-	$(V)rm -rf $(STACK_OBJS) $(LIBSTACK)
-	$(V)rm -rf $(STACK_OBJDIR)
+	$(Q)rm -rf $(STACK_OBJS) $(LIBSTACK)
+	$(Q)rm -rf $(STACK_OBJDIR)
 
 $(LIBSTACK): $(STACK_OBJS)
 	@echo + ar [$(LIBUCNAME) $(STACK_UCNAME)] $@
-	$(V)$(AR) rc $@ $^
+	$(Q)$(AR) rc $@ $^
 
 $(STACK_OBJDIR)/%.o: $(STACKDIR)/%.c $(STACK_HEADERS)
 	@echo + cc [$(LIBUCNAME) $(STACK_UCNAME)] $<
 	@mkdir -p $(@D)
-	$(V)$(CC) $(STACK_CFLAGS) $(INCS) -o $@ -c $<
+	$(Q)$(CC) $(STACK_CFLAGS) $(INCS) -o $@ -c $<
 

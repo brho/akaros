@@ -302,7 +302,7 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 .$(BINARY_PREFIX)ros-install-libs:
 	cd $(ROSDIR); \
 	make userclean; \
-	make TARGET_ARCH=$(ARCH) -j $(MAKE_JOBS) install-libs
+	make ARCH=$(ARCH) -j $(MAKE_JOBS) install-libs
 
 .$(BINARY_PREFIX)gcc-stage2-configure:
 	$(MAKE) $(BINARY_PREFIX)gcc-stage2-builddir

@@ -1,13 +1,8 @@
-TARGET_ARCH ?= none	# catch bugs
-CFLAGS = -O2 -static -std=gnu99 -fomit-frame-pointer -DOPTIMIZE=2 -DNO_TIMING \
-         -Wno-deprecated-declarations
+ARCH ?= none	# catch bugs
+CFLAGS_USER += -static -fomit-frame-pointer -DOPTIMIZE=2 -DNO_TIMING \
+               -Wno-deprecated-declarations
 LIBNAME = c3po
 SUBDIRS = util stack threads #aio 
-V ?= @
-
-GCCPREFIX ?= $(TARGET_ARCH)-ros-
-CC := $(GCCPREFIX)gcc
-GCC_ROOT := $(shell which $(CC) | xargs dirname)/../
 
 SRCDIR := 
 OBJDIR := $(SRCDIR)obj
@@ -33,6 +28,7 @@ MAKEFRAGS := $(foreach x, $(SUBDIRS), $(call makefragname,$(x)))
 LIBUCNAME := $(call uc, $(LIBNAME))
 
 all: $(FINALLIB)
+	@:
 
 include $(MAKEFRAGS)
 ALLOBJS = $(foreach x, $(SUBDIRS), $(wildcard $(OBJDIR)/$(x)/*.o))
@@ -41,15 +37,15 @@ ALLLIBS = $(foreach x, $(SUBDIRS), $(call libname,$(x)))
 $(FINALLIB): $(ALLLIBS)
 	@echo + ar [$(LIBUCNAME)] $@
 	@mkdir -p $(@D)
-	$(V)$(AR) rc $@ $(ALLOBJS)
+	$(Q)$(AR) rc $@ $(ALLOBJS)
 
 install: $(FINALLIB)
-	cp $(FINALLIB) $(GCC_ROOT)/$(TARGET_ARCH)-ros/lib/
-	mkdir -p $(GCC_ROOT)/$(TARGET_ARCH)-ros/include/$(LIBNAME)
-	cp -R $(INCDIR)/* $(GCC_ROOT)/$(TARGET_ARCH)-ros/include/$(LIBNAME)
+	@cp $(FINALLIB) $(XCC_ROOT)/$(ARCH)-ros/lib/
+	@mkdir -p $(XCC_ROOT)/$(ARCH)-ros/include/$(LIBNAME)
+	@cp -R $(INCDIR)/* $(XCC_ROOT)/$(ARCH)-ros/include/$(LIBNAME)
 
 clean: $(CLEANS)
 	@echo + clean [$(LIBUCNAME)]
-	$(V)rm -rf $(FINALLIB)
-	$(V)rm -rf $(OBJDIR)
+	$(Q)rm -rf $(FINALLIB)
+	$(Q)rm -rf $(OBJDIR)
 	

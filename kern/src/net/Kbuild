@@ -1,0 +1,8 @@
+obj-y				+= ip.o
+obj-y				+= nic_common.o
+obj-y				+= pbuf.o
+obj-y				+= tcp.o
+obj-y				+= tcp_in.o
+obj-y				+= tcp_out.o
+obj-y				+= timers.o
+obj-y				+= udp.o

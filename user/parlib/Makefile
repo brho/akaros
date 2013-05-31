@@ -1,11 +1,6 @@
-TARGET_ARCH ?= none	# catch bugs
-CFLAGS = -O2 -std=gnu99 -static -fomit-frame-pointer -g
+ARCH ?= none	# catch bugs
+CFLAGS_USER += -static -fomit-frame-pointer -g
 LIBNAME = parlib
-V ?= @
-
-GCCPREFIX := $(TARGET_ARCH)-ros-
-CC := $(GCCPREFIX)gcc
-GCC_ROOT := $(shell which $(CC) | xargs dirname)/../
 
 SRCDIR := 
 OBJDIR := $(SRCDIR)obj
@@ -19,36 +14,37 @@ uc = $(shell echo $(1) | tr a-z A-Z)
 LIBUCNAME := $(call uc, $(LIBNAME))
 HEADERS := $(shell find $(INCDIR) -name *.h)
 CFILES  := $(wildcard $(SRCDIR)*.c)
-CFILES  += $(wildcard $(SRCDIR)$(TARGET_ARCH)/*.c)
-SFILES  := $(wildcard $(SRCDIR)$(TARGET_ARCH)/*.S)
+CFILES  += $(wildcard $(SRCDIR)$(ARCH)/*.c)
+SFILES  := $(wildcard $(SRCDIR)$(ARCH)/*.S)
 OBJS    := $(patsubst %.c, $(OBJDIR)/%.o, $(CFILES)) \
            $(patsubst %.S, $(OBJDIR)/%.o, $(SFILES))
 
 all: $(FINALLIB)
+	@:
 
-$(OBJDIR)/$(TARGET_ARCH)/%.o: $(SRCDIR)$(TARGET_ARCH)/%.S $(HEADERS)
+$(OBJDIR)/$(ARCH)/%.o: $(SRCDIR)$(ARCH)/%.S $(HEADERS)
 	@echo + as [$(LIBUCNAME)] $<
 	@mkdir -p $(@D)
-	$(V)$(CC) $(CFLAGS) $(INCS) -o $@ -c $<
+	$(Q)$(CC) $(CFLAGS_USER) $(INCS) -o $@ -c $<
 
 $(OBJDIR)/%.o: $(SRCDIR)%.c $(HEADERS)
 	@echo + cc [$(LIBUCNAME)] $<
 	@mkdir -p $(@D)
-	$(V)$(CC) $(CFLAGS) $(INCS) -o $@ -c $<
+	$(Q)$(CC) $(CFLAGS_USER) $(INCS) -o $@ -c $<
 
 $(FINALLIB): $(OBJS)
 	@echo + ar [$(LIBUCNAME)] $@
 	@mkdir -p $(@D)
-	$(V)$(AR) rc $@ $(OBJS)
+	$(Q)$(AR) rc $@ $(OBJS)
 
 install: $(FINALLIB)
-	cp $(FINALLIB) $(GCC_ROOT)/$(TARGET_ARCH)-ros/lib/
-	cp -R $(INCDIR)/* $(GCC_ROOT)/$(TARGET_ARCH)-ros/sys-include/
-	rm -rf $(GCC_ROOT)/$(TARGET_ARCH)-ros/sys-include/parlib  
-	ln -fs . $(GCC_ROOT)/$(TARGET_ARCH)-ros/sys-include/parlib  
+	@cp $(FINALLIB) $(XCC_ROOT)/$(ARCH)-ros/lib/
+	@cp -R $(INCDIR)/* $(XCC_ROOT)/$(ARCH)-ros/sys-include/
+	@rm -rf $(XCC_ROOT)/$(ARCH)-ros/sys-include/parlib  
+	@ln -fs . $(XCC_ROOT)/$(ARCH)-ros/sys-include/parlib  
 
 clean: 
 	@echo + clean [$(LIBUCNAME)]
-	$(V)rm -rf $(FINALLIB)
-	$(V)rm -rf $(OBJDIR)
+	$(Q)rm -rf $(FINALLIB)
+	$(Q)rm -rf $(OBJDIR)
 	

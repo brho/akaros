@@ -1,10 +1,12 @@
+# Default target is to just make
+PHONY += all install clean
+all:
+
+# TODO: when we clean this up, if we ditch OBJDIR, change the root makefile
 TESTS_DIR = tests
 
-OBJDIRS += $(TESTS_DIR)
-
-TESTS_CFLAGS += $(USER_CFLAGS) -g
-TESTS_CXXFLAGS += $(USER_CXXFLAGS) -g
-TESTS_LDFLAGS += $(USER_LDFLAGS)
+CFLAGS_TESTS += $(CFLAGS_USER) -g
+TESTS_CXXFLAGS += $(CXXFLAGS_USER) -g
 
 TESTS_LDLIBS := -lpthread -lbenchutil -lm
 
@@ -19,18 +21,17 @@ TESTS_EXECS_C  = $(patsubst $(TESTS_DIR)/%.c, \
                             $(TESTS_SRCS_C))
 
 TESTS_EXECS_CPP  = $(patsubst $(TESTS_DIR)/%.cc, \
-                            $(OBJDIR)/$(TESTS_DIR)/%, \
-                            $(TESTS_SRCS_CPP))
+                              $(OBJDIR)/$(TESTS_DIR)/%, \
+                              $(TESTS_SRCS_CPP))
 
 include $(TESTS_DIR)/c3po/Makefrag
 include $(TESTS_DIR)/openmp/Makefrag
 
-STATIC := $(findstring static,$(TESTS_CFLAGS))
+STATIC := $(findstring static,$(CFLAGS_TESTS))
 $(OBJDIR)/$(TESTS_DIR)/%: $(TESTS_LDDEPENDS_C)
 	@echo + cc [TESTS] $<
 	@mkdir -p $(@D)
-	$(V)$(CC) $(TESTS_CFLAGS) -o $@ $(TESTS_LDFLAGS) \
-	          $< $(TESTS_LDLIBS)
+	$(Q)$(CC) $(CFLAGS_TESTS) -o $@ $< $(TESTS_LDLIBS)
 	@if [ "$(STATIC)" != "static" ]; then \
 		$(OBJDUMP) -S $@ > $@.asm; \
 		$(NM) -n $@ > $@.sym; \
@@ -41,12 +42,16 @@ $(OBJDIR)/$(TESTS_DIR)/%: $(TESTS_LDDEPENDS_C)
 $(OBJDIR)/$(TESTS_DIR)/%: $(TESTS_LDDEPENDS_CPP)
 	@echo + cc [TESTS] $<
 	@mkdir -p $(@D)
-	$(V)$(CPP) $(TESTS_CXXFLAGS) -o $@ $(TESTS_LDFLAGS) \
-	          $< $(TESTS_LDLIBS)
+	$(Q)$(CPP) $(TESTS_CXXFLAGS) -o $@ $< $(TESTS_LDLIBS)
 
-install-tests: $(TESTS_EXECS_C) $(TESTS_EXECS_CPP) 
-	@echo + install [TESTS] $(FIRST_INITRAMFS_PATH)/bin/
-	$(V)for i in "$(TESTS_EXECS) $(TESTS_EXECS_CPP)"; \
-	do \
-	  cp $$i $(FIRST_INITRAMFS_PATH)/bin/; \
-	done;
+all: $(TESTS_EXECS_C) $(TESTS_EXECS_CPP) 
+	@:
+
+install: $(TESTS_EXECS_C) $(TESTS_EXECS_CPP) 
+	$(Q)cp -u $^ $(FIRST_INITRAMFS_PATH)/bin
+
+clean:
+	@echo + clean [TESTS]
+	@rm -rf $(OBJDIR)/tests/
+
+.PHONY: $(PHONY)

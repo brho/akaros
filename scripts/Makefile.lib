@@ -150,15 +150,15 @@ __a_flags	=                          $(call flags,_a_flags)
 __cpp_flags     =                          $(call flags,_cpp_flags)
 endif
 
-c_flags        = -Wp,-MD,$(depfile) $(NOSTDINC_FLAGS) $(LINUXINCLUDE)     \
+c_flags        = -Wp,-MD,$(depfile) $(NOSTDINC_FLAGS) $(AKAROSINCLUDE)    \
 		 $(__c_flags) $(modkern_cflags)                           \
 		 -D"KBUILD_STR(s)=\#s" $(basename_flags) $(modname_flags) \
 		  $(debug_flags)
 
-a_flags        = -Wp,-MD,$(depfile) $(NOSTDINC_FLAGS) $(LINUXINCLUDE)     \
+a_flags        = -Wp,-MD,$(depfile) $(NOSTDINC_FLAGS) $(AKAROSINCLUDE)    \
 		 $(__a_flags) $(modkern_aflags)
 
-cpp_flags      = -Wp,-MD,$(depfile) $(NOSTDINC_FLAGS) $(LINUXINCLUDE)     \
+cpp_flags      = -Wp,-MD,$(depfile) $(NOSTDINC_FLAGS) $(AKAROSINCLUDE)    \
 		 $(__cpp_flags)
 
 ld_flags       = $(LDFLAGS) $(ldflags-y)
