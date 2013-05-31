@@ -642,7 +642,7 @@ void e1000_setup_interrupts() {
 
 	// Enable irqs for the e1000
 	// TODO: figure out where the interrupts are actually going..
-#ifdef __CONFIG_ENABLE_MPTABLES__
+#ifdef CONFIG_ENABLE_MPTABLES
 	/* TODO: this should be for any IOAPIC EOI, not just MPTABLES */
 	ioapic_route_irq(e1000_irq, E1000_IRQ_CPU);	
 	printk("ioapic rout\n");
@@ -682,7 +682,7 @@ void e1000_interrupt_handler(struct hw_trapframe *hw_tf, void *data)
 
 	if ((icr & E1000_ICR_INT_ASSERTED) && (icr & E1000_ICR_RXT0)){
 		e1000_interrupt_debug("---->Packet Received\n");
-#ifdef __CONFIG_SOCKET__
+#ifdef CONFIG_SOCKET
 //#if 0
 		e1000_clean_rx_irq();
 		// e1000_recv_pbuf(); // really it is now performing the function of rx_clean
@@ -822,7 +822,7 @@ void e1000_handle_rx_packet() {
 	} while ((status & E1000_RXD_STAT_EOP) == 0); // Check to see if we are at the final fragment
 
 
-#ifdef __CONFIG_APPSERVER__
+#ifdef CONFIG_APPSERVER
 	// Treat as a syscall frontend response packet if eth_type says so
 	// Will eventually go away, so not too worried about elegance here...
 	uint16_t eth_type = htons(*(uint16_t*)(rx_buffer + 12));
@@ -837,7 +837,7 @@ void e1000_handle_rx_packet() {
 	}
 #endif
 
-#ifdef __CONFIG_ETH_AUDIO__
+#ifdef CONFIG_ETH_AUDIO
 	/* TODO: move this, and all packet processing, out of this driver (including
 	 * the ghetto buffer).  Note we don't handle IP fragment reassembly (though
 	 * this isn't an issue for the eth_audio). */
@@ -851,7 +851,7 @@ void e1000_handle_rx_packet() {
 		e1000_wr32(E1000_RDT, e1000_rx_index);
 		return;
 	}
-#endif /* __CONFIG_ETH_AUDIO__ */
+#endif /* CONFIG_ETH_AUDIO */
 
 	// Paul:Mildly hacky stuff for LWIP
 	// TODO: Why was this necessary for LWIP?

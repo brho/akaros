@@ -43,13 +43,13 @@ void spinlock_unlock(spinlock_t *lock);
 /* RISCV doesn't support CAS, so til it does, we use the NO_CAS, even if they
  * didn't ask for it in their config. */
 #ifdef __riscv__
-# ifndef __CONFIG_SPINPDR_NO_CAS__
-#  define __CONFIG_SPINPDR_NO_CAS__ 1
+# ifndef CONFIG_SPINPDR_NO_CAS
+#  define CONFIG_SPINPDR_NO_CAS 1
 # endif
 #endif
 
 /* Two different versions, with and without CAS.  Default is with CAS. */
-#ifndef __CONFIG_SPINPDR_NO_CAS__
+#ifndef CONFIG_SPINPDR_NO_CAS
 
 # define SPINPDR_UNLOCKED ((uint32_t)-1)
 
@@ -68,7 +68,7 @@ struct spin_pdr_lock {
 };
 # define SPINPDR_INITIALIZER {SPINLOCK_INITIALIZER, SPINPDR_VCOREID_UNKNOWN}
 
-#endif /* __CONFIG_SPINPDR_NO_CAS__ */
+#endif /* CONFIG_SPINPDR_NO_CAS */
 
 typedef struct spin_pdr_lock spinpdrlock_t;
 

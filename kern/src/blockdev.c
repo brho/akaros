@@ -25,7 +25,7 @@ void block_init(void)
 	bh_kcache = kmem_cache_create("buffer_heads", sizeof(struct buffer_head),
 	                              __alignof__(struct buffer_head), 0, 0, 0);
 
-	#ifdef __CONFIG_EXT2FS__
+	#ifdef CONFIG_EXT2FS
 	/* Now probe for and init the block device for the ext2 ram disk */
 	extern uint8_t _binary_mnt_ext2fs_img_size[];
 	extern uint8_t _binary_mnt_ext2fs_img_start[];
@@ -47,7 +47,7 @@ void block_init(void)
 	ram_bf->f_dentry->d_inode->i_mapping = &ram_bd->b_pm;
 	ram_bf->f_dentry->d_inode->i_bdev = ram_bd;	/* this holds the bd kref */
 	kref_put(&ram_bf->f_kref);
-	#endif /* __CONFIG_EXT2FS__ */
+	#endif /* CONFIG_EXT2FS */
 }
 
 /* Generic helper, returns a kref'd reference out of principle. */

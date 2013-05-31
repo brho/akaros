@@ -75,9 +75,9 @@ static void __attribute__((noinline, noreturn)) __smp_idle(void)
 
 void smp_idle(void)
 {
-	#ifdef __CONFIG_RESET_STACKS__
+	#ifdef CONFIG_RESET_STACKS
 	set_stack_pointer(get_stack_top());
-	#endif /* __CONFIG_RESET_STACKS__ */
+	#endif /* CONFIG_RESET_STACKS */
 	__smp_idle();
 	assert(0);
 }
@@ -99,9 +99,9 @@ void smp_percpu_init(void)
 	STAILQ_INIT(&per_cpu_info[coreid].routine_amsgs);
 	/* Initialize the per-core timer chain */
 	init_timer_chain(&per_cpu_info[coreid].tchain, set_pcpu_alarm_interrupt);
-#ifdef __CONFIG_KTHREAD_POISON__
+#ifdef CONFIG_KTHREAD_POISON
 	/* TODO: KTHR-STACK */
 	uintptr_t *poison = (uintptr_t*)ROUNDDOWN(get_stack_top() - 1, PGSIZE);
 	*poison = 0xdeadbeef;
-#endif /* __CONFIG_KTHREAD_POISON__ */
+#endif /* CONFIG_KTHREAD_POISON */
 }

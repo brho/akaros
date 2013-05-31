@@ -24,7 +24,7 @@
 static void __page_decref(page_t *CT(1) page);
 static error_t __page_alloc_specific(page_t** page, size_t ppn);
 
-#ifdef __CONFIG_PAGE_COLORING__
+#ifdef CONFIG_PAGE_COLORING
 #define NUM_KERNEL_COLORS 8
 #else
 #define NUM_KERNEL_COLORS 1

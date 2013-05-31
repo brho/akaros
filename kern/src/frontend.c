@@ -21,7 +21,7 @@ volatile int magic_mem[10];
 void
 frontend_proc_init(struct proc *SAFE p)
 {
-#ifdef __CONFIG_APPSERVER__
+#ifdef CONFIG_APPSERVER
 	pid_t parent_id = p->ppid, id = p->pid;
 	int32_t errno;
 	if(frontend_syscall(parent_id,APPSERVER_SYSCALL_proc_init,id,0,0,0,&errno))
@@ -32,7 +32,7 @@ frontend_proc_init(struct proc *SAFE p)
 void
 frontend_proc_free(struct proc *SAFE p)
 {
-#ifdef __CONFIG_APPSERVER__
+#ifdef CONFIG_APPSERVER
 	int32_t errno;
 	if(frontend_syscall(0,APPSERVER_SYSCALL_proc_free,p->pid,0,0,0,&errno))
 		panic("Front-end server couldn't free process!");
@@ -144,7 +144,7 @@ int32_t frontend_syscall(pid_t pid, int32_t syscall_num,
                          uint32_t arg0, uint32_t arg1, 
                          uint32_t arg2, uint32_t arg3, int32_t* errno)
 {
-#ifndef __CONFIG_APPSERVER__
+#ifndef CONFIG_APPSERVER
 	warn("No appserver support, requested syscall %d for proc %d", syscall_num,
 	     pid);
 	if(errno)

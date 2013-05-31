@@ -37,7 +37,7 @@
 #include <socket.h>
 
 
-#ifdef __CONFIG_NETWORKING__
+#ifdef CONFIG_NETWORKING
 #include <net/nic_common.h>
 extern int (*send_frame)(const char *CT(len) data, size_t len);
 extern unsigned char device_mac[6];
@@ -946,7 +946,7 @@ static ssize_t sys_serial_read(env_t* e, char *DANGEROUS _buf, size_t len)
 	if (len == 0)
 		return 0;
 
-	#ifdef __CONFIG_SERIAL_IO__
+	#ifdef CONFIG_SERIAL_IO
 	    char *COUNT(len) buf = user_mem_assert(e, _buf, len, 1, PTE_USER_RO);
 		size_t bytes_read = 0;
 		int c;
@@ -966,7 +966,7 @@ static ssize_t sys_serial_write(env_t* e, const char *DANGEROUS buf, size_t len)
 	printk("[kernel] serial writing is deprecated.\n");
 	if (len == 0)
 		return 0;
-	#ifdef __CONFIG_SERIAL_IO__
+	#ifdef CONFIG_SERIAL_IO
 		char *COUNT(len) _buf = user_mem_assert(e, buf, len, 1, PTE_USER_RO);
 		for(int i =0; i<len; i++)
 			serial_send_byte(buf[i]);
@@ -976,7 +976,7 @@ static ssize_t sys_serial_write(env_t* e, const char *DANGEROUS buf, size_t len)
 	#endif
 }
 
-#ifdef __CONFIG_NETWORKING__
+#ifdef CONFIG_NETWORKING
 // This is not a syscall we want. Its hacky. Here just for syscall stuff until get a stack.
 static ssize_t sys_eth_read(env_t* e, char *DANGEROUS buf)
 {
@@ -1468,7 +1468,7 @@ intreg_t sys_gettimeofday(struct proc *p, int *buf)
 	spin_lock(&gtod_lock);
 	if(t0 == 0)
 
-#if (defined __CONFIG_APPSERVER__)
+#if (defined CONFIG_APPSERVER)
 	t0 = ufe(time,0,0,0,0);
 #else
 	// Nanwan's birthday, bitches!!
@@ -1588,17 +1588,17 @@ const static struct sys_table_entry syscall_table[] = {
 	[SYS_self_notify] = {(syscall_t)sys_self_notify, "self_notify"},
 	[SYS_vc_entry] = {(syscall_t)sys_vc_entry, "vc_entry"},
 	[SYS_halt_core] = {(syscall_t)sys_halt_core, "halt_core"},
-#ifdef __CONFIG_SERIAL_IO__
+#ifdef CONFIG_SERIAL_IO
 	[SYS_serial_read] = {(syscall_t)sys_serial_read, "ser_read"},
 	[SYS_serial_write] = {(syscall_t)sys_serial_write, "ser_write"},
 #endif
-#ifdef __CONFIG_NETWORKING__
+#ifdef CONFIG_NETWORKING
 	[SYS_eth_read] = {(syscall_t)sys_eth_read, "eth_read"},
 	[SYS_eth_write] = {(syscall_t)sys_eth_write, "eth_write"},
 	[SYS_eth_get_mac_addr] = {(syscall_t)sys_eth_get_mac_addr, "get_mac"},
 	[SYS_eth_recv_check] = {(syscall_t)sys_eth_recv_check, "recv_check"},
 #endif
-#ifdef __CONFIG_ARSC_SERVER__
+#ifdef CONFIG_ARSC_SERVER
 	[SYS_init_arsc] = {(syscall_t)sys_init_arsc, "init_arsc"},
 #endif
 	[SYS_change_to_m] = {(syscall_t)sys_change_to_m, "change_to_m"},

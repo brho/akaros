@@ -31,7 +31,7 @@ inline void init_cache_properties(cache_t *c, size_t sz_k, size_t wa, size_t cls
 	c->sz_k = SINIT(sz_k);
 	c->clsz = SINIT(clsz);
 
-#ifdef __CONFIG_PAGE_COLORING__
+#ifdef CONFIG_PAGE_COLORING
 	//Added as optimization (derived from above);
 	size_t nc = get_cache_num_page_colors(c);
 	c->num_colors = SINIT(nc);
@@ -242,7 +242,7 @@ static inline void __cache_color_free(cache_t* c, uint8_t* colors_map)
 }
 
 uint8_t* cache_colors_map_alloc() {
-#ifdef __CONFIG_PAGE_COLORING__
+#ifdef CONFIG_PAGE_COLORING
 	uint8_t* colors_map = kmalloc(llc_cache->num_colors, 0);
 	if(colors_map)
 		CLR_BITMASK(colors_map, llc_cache->num_colors);
@@ -253,7 +253,7 @@ uint8_t* cache_colors_map_alloc() {
 }
 
 void cache_colors_map_free(uint8_t* colors_map) {
-#ifdef __CONFIG_PAGE_COLORING__
+#ifdef CONFIG_PAGE_COLORING
 	kfree(colors_map);
 #endif
 }

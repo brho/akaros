@@ -54,7 +54,7 @@ void spinlock_unlock(spinlock_t *lock)
 }
 
 /* Two different versions, with and without CAS.  Default is with CAS. */
-#ifndef __CONFIG_SPINPDR_NO_CAS__ /* CAS version */
+#ifndef CONFIG_SPINPDR_NO_CAS /* CAS version */
 
 /* Spin-PRD locks (preemption detection/recovery).  Idea is to CAS and put the
  * lockholder's vcoreid in the lock, and all spinners ensure that vcore runs. */
@@ -120,7 +120,7 @@ void __spin_pdr_unlock(struct spin_pdr_lock *pdr_lock)
 	spinlock_unlock(&pdr_lock->spinlock);
 }
 
-#endif /* __CONFIG_SPINPDR_NO_CAS__ */
+#endif /* CONFIG_SPINPDR_NO_CAS */
 
 void spin_pdr_lock(struct spin_pdr_lock *pdr_lock)
 {

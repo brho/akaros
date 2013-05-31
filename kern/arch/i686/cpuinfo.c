@@ -176,7 +176,7 @@ void show_mapping(uintptr_t start, size_t size)
 /* Like backtrace, this is probably not the best place for this. */
 void spinlock_debug(spinlock_t *lock)
 {
-#ifdef __CONFIG_SPINLOCK_DEBUG__
+#ifdef CONFIG_SPINLOCK_DEBUG
 	eipdebuginfo_t debuginfo;
 	char buf[256];
 	uint32_t eip = (uint32_t)lock->call_site;

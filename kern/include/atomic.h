@@ -41,7 +41,7 @@ extern inline bool atomic_sub_and_test(atomic_t *number, long val);
 /* Spin locks */
 struct spinlock {
 	volatile uint32_t RACY rlock;
-#ifdef __CONFIG_SPINLOCK_DEBUG__
+#ifdef CONFIG_SPINLOCK_DEBUG
 	uintptr_t call_site;
 	uint32_t calling_core;
 	bool irq_okay;
@@ -50,7 +50,7 @@ struct spinlock {
 typedef struct spinlock spinlock_t;
 #define SPINLOCK_INITIALIZER {0}
 
-#ifdef __CONFIG_SPINLOCK_DEBUG__
+#ifdef CONFIG_SPINLOCK_DEBUG
 #define SPINLOCK_INITIALIZER_IRQSAVE {0, .irq_okay = TRUE}
 #else
 #define SPINLOCK_INITIALIZER_IRQSAVE SPINLOCK_INITIALIZER
@@ -68,7 +68,7 @@ extern inline void spinlock_debug(spinlock_t *lock);
  * all builds. */
 #include <arch/atomic.h>
 
-#ifdef __CONFIG_SPINLOCK_DEBUG__
+#ifdef CONFIG_SPINLOCK_DEBUG
 /* Arch indep, in k/s/atomic.c */
 void spin_lock(spinlock_t *lock);
 void spin_unlock(spinlock_t *lock);
@@ -85,7 +85,7 @@ static inline void spin_unlock(spinlock_t *lock)
 	__spin_unlock(lock);
 }
 
-#endif /* __CONFIG_SPINLOCK_DEBUG__ */
+#endif /* CONFIG_SPINLOCK_DEBUG */
 
 /* Inlines, defined below */
 static inline void spinlock_init(spinlock_t *lock);
@@ -227,7 +227,7 @@ void waiton_barrier(barrier_t* barrier);
 static inline void spinlock_init(spinlock_t *lock)
 {
 	__spinlock_init(lock);
-#ifdef __CONFIG_SPINLOCK_DEBUG__
+#ifdef CONFIG_SPINLOCK_DEBUG
 	lock->call_site = 0;
 	lock->calling_core = 0;
 	lock->irq_okay = FALSE;
@@ -237,7 +237,7 @@ static inline void spinlock_init(spinlock_t *lock)
 static inline void spinlock_init_irqsave(spinlock_t *lock)
 {
 	__spinlock_init(lock);
-#ifdef __CONFIG_SPINLOCK_DEBUG__
+#ifdef CONFIG_SPINLOCK_DEBUG
 	lock->call_site = 0;
 	lock->calling_core = 0;
 	lock->irq_okay = TRUE;
@@ -280,7 +280,7 @@ static inline bool spin_lock_irq_enabled(spinlock_t *SAFE lock)
  * concurrent write. */
 static inline void __seq_start_write(seq_ctr_t *seq_ctr)
 {
-#ifdef _CONFIG_SEQLOCK_DEBUG_
+#ifdef CONFIG_SEQLOCK_DEBUG
 	assert(*seq_ctr % 2 == 0);
 #endif
 	(*seq_ctr)++;
@@ -291,7 +291,7 @@ static inline void __seq_start_write(seq_ctr_t *seq_ctr)
 
 static inline void __seq_end_write(seq_ctr_t *seq_ctr)
 {
-#ifdef _CONFIG_SEQLOCK_DEBUG_
+#ifdef CONFIG_SEQLOCK_DEBUG
 	assert(*seq_ctr % 2 == 1);
 #endif
 	/* Need to prevent the compiler (and some arches) from reordering older

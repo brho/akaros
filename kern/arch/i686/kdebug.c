@@ -336,10 +336,10 @@ void backtrace(void)
 			break;
 		eip = *(ebp + 1) - 1;
 		ebp = (uint32_t*)(*ebp);
-		#ifdef __CONFIG_RESET_STACKS__
+		#ifdef CONFIG_RESET_STACKS
 		if (!strncmp("__smp_idle", debuginfo.eip_fn_name, 10))
 			break;
-		#endif /* __CONFIG_RESET_STACKS__ */
+		#endif /* CONFIG_RESET_STACKS */
 	}
 }
 

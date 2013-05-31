@@ -203,7 +203,7 @@ void setup_default_mtrrs(barrier_t* smp_barrier)
 	// flush tlb
 	tlb_flush_global();
 	// disable MTRRs, and sets default type to WB (06)
-#ifndef __CONFIG_NOMTRRS__ 
+#ifndef CONFIG_NOMTRRS 
 	write_msr(IA32_MTRR_DEF_TYPE, 0x00000006);
 
 	// Now we can actually safely adjust the MTRRs

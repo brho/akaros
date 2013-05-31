@@ -4,7 +4,7 @@
 #pragma nosharc
 #endif
 
-#ifdef __CONFIG_BSD_ON_CORE0__
+#ifdef CONFIG_BSD_ON_CORE0
 #error "Yeah, it's not possible to build ROS with BSD on Core 0, sorry......"
 #else
 
@@ -102,12 +102,12 @@ void kernel_init(multiboot_info_t *mboot_info)
 	block_init();
 	enable_irq();
 	socket_init();
-#ifdef __CONFIG_EXT2FS__
+#ifdef CONFIG_EXT2FS
 	mount_fs(&ext2_fs_type, "/dev/ramdisk", "/mnt", 0);
-#endif /* __CONFIG_EXT2FS__ */
-#ifdef __CONFIG_ETH_AUDIO__
+#endif /* CONFIG_EXT2FS */
+#ifdef CONFIG_ETH_AUDIO
 	eth_audio_init();
-#endif /* __CONFIG_ETH_AUDIO__ */
+#endif /* CONFIG_ETH_AUDIO */
 
 	// zra: let's Ivy know we're done booting
 	booting = 0;

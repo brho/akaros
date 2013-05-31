@@ -168,11 +168,11 @@ void idt_init(void)
 	/* Setup a TSS so that we get the right stack when we trap to the kernel. */
 	ts.ts_esp0 = (uintptr_t)bootstacktop;
 	ts.ts_ss0 = SINIT(GD_KD);
-#ifdef __CONFIG_KTHREAD_POISON__
+#ifdef CONFIG_KTHREAD_POISON
 	/* TODO: KTHR-STACK */
 	uintptr_t *poison = (uintptr_t*)ROUNDDOWN(bootstacktop - 1, PGSIZE);
 	*poison = 0xdeadbeef;
-#endif /* __CONFIG_KTHREAD_POISON__ */
+#endif /* CONFIG_KTHREAD_POISON */
 
 	// Initialize the TSS field of the gdt.
 	SEG16ROINIT(gdt[GD_TSS >> 3],STS_T32A, (uint32_t)(&ts),sizeof(taskstate_t),0);
@@ -461,7 +461,7 @@ static bool irq_from_pic(uint32_t trap_nr)
  * IRQ number (trap_nr = PIC_OFFSET + irq) */
 static bool check_spurious_irq(uint32_t trap_nr)
 {
-#ifndef __CONFIG_ENABLE_MPTABLES__		/* TODO: our proxy for using the PIC */
+#ifndef CONFIG_ENABLE_MPTABLES		/* TODO: our proxy for using the PIC */
 	/* the PIC may send spurious irqs via one of the chips irq 7.  if the isr
 	 * doesn't show that irq, then it was spurious, and we don't send an eoi.
 	 * Check out http://wiki.osdev.org/8259_PIC#Spurious_IRQs */
@@ -501,7 +501,7 @@ static bool check_spurious_irq(uint32_t trap_nr)
 /* Helper, sends an end-of-interrupt for the trap_nr (not HW IRQ number). */
 static void send_eoi(uint32_t trap_nr)
 {
-#ifndef __CONFIG_ENABLE_MPTABLES__		/* TODO: our proxy for using the PIC */
+#ifndef CONFIG_ENABLE_MPTABLES		/* TODO: our proxy for using the PIC */
 	/* WARNING: this will break if the LAPIC requests vectors that overlap with
 	 * the PIC's range. */
 	if (irq_from_pic(trap_nr))

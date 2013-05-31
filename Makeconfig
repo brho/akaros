@@ -2,46 +2,46 @@
 # By default, each of these options will be turned off
 # To enable any of these options, add a line like the following to your Makelocal
 # CFLAGS += $(CONFIG_APPSERVER)
-CONFIG_APPSERVER:=                 -D__CONFIG_APPSERVER__
-CONFIG_DEMO_SLAVE:=                -D__CONFIG_DEMO_SLAVE__
-CONFIG_ARSC_SERVER:=               -D__CONFIG_ARSC_SERVER__
+CONFIG_APPSERVER:=                 -DCONFIG_APPSERVER
+CONFIG_DEMO_SLAVE:=                -DCONFIG_DEMO_SLAVE
+CONFIG_ARSC_SERVER:=               -DCONFIG_ARSC_SERVER
 
 # Kernel configuration parameters
 # By default, each of these options will be turned off
 # To enable any of these options, add a line like the following to your Makelocal
 # KERN_CFLAGS += $(CONFIG_KFS) $(CONFIG_BSD_ON_CORE0)
-CONFIG_KFS:=                       -D__CONFIG_KFS__
-CONFIG_EXT2FS:=                    -D__CONFIG_EXT2FS__
-CONFIG_SINGLE_CORE:=               -D__CONFIG_SINGLE_CORE__
-CONFIG_NETWORKING:=                -D__CONFIG_NETWORKING__
-CONFIG_SERIAL_IO:=                 -D__CONFIG_SERIAL_IO__
-CONFIG_BSD_ON_CORE0:=              -D__CONFIG_BSD_ON_CORE0__
-CONFIG_SEQLOCK_DEBUG:=             -D__CONFIG_SEQLOCK_DEBUG__
-CONFIG_SPINLOCK_DEBUG:=            -D__CONFIG_SPINLOCK_DEBUG__
-CONFIG_SPINPDR_NO_CAS:=            -D__CONFIG_SPINPDR_NO_CAS__
-CONFIG_PAGE_COLORING:=             -D__CONFIG_PAGE_COLORING__
-CONFIG_DEMAND_PAGING:=             -D__CONFIG_DEMAND_PAGING__
-CONFIG_NOMTRRS:=                   -D__CONFIG_NOMTRRS__
-CONFIG_E1000_MMIO_HACK:=           -D__CONFIG_E1000_MMIO_HACK__
+CONFIG_KFS:=                       -DCONFIG_KFS
+CONFIG_EXT2FS:=                    -DCONFIG_EXT2FS
+CONFIG_SINGLE_CORE:=               -DCONFIG_SINGLE_CORE
+CONFIG_NETWORKING:=                -DCONFIG_NETWORKING
+CONFIG_SERIAL_IO:=                 -DCONFIG_SERIAL_IO
+CONFIG_BSD_ON_CORE0:=              -DCONFIG_BSD_ON_CORE0
+CONFIG_SEQLOCK_DEBUG:=             -DCONFIG_SEQLOCK_DEBUG
+CONFIG_SPINLOCK_DEBUG:=            -DCONFIG_SPINLOCK_DEBUG
+CONFIG_SPINPDR_NO_CAS:=            -DCONFIG_SPINPDR_NO_CAS
+CONFIG_PAGE_COLORING:=             -DCONFIG_PAGE_COLORING
+CONFIG_DEMAND_PAGING:=             -DCONFIG_DEMAND_PAGING
+CONFIG_NOMTRRS:=                   -DCONFIG_NOMTRRS
+CONFIG_E1000_MMIO_HACK:=           -DCONFIG_E1000_MMIO_HACK
 CONFIG_E1000_ON_BOXBORO:=          -DE1000_MMIO_ADDR=0x9bb20000
 CONFIG_E1000_ON_S142:=             -DE1000_MMIO_ADDR=0xfbee0000
-CONFIG_ENABLE_MPTABLES:=           -D__CONFIG_ENABLE_MPTABLES__
-CONFIG_MONITOR_ON_INT:=            -D__CONFIG_MONITOR_ON_INT__
-CONFIG_DISABLE_SMT:=               -D__CONFIG_DISABLE_SMT__
-CONFIG_BOXBORO:=                   -D__CONFIG_BOXBORO__
-CONFIG_RESET_STACKS:=              -D__CONFIG_RESET_STACKS__
-CONFIG_PCI_VERBOSE:=               -D__CONFIG_PCI_VERBOSE__
-CONFIG_ETH_AUDIO:=                 -D__CONFIG_ETH_AUDIO__
-CONFIG_KB_CORE0_ONLY:=             -D__CONFIG_KB_CORE0_ONLY__
-CONFIG_KTHREAD_POISON:=            -D__CONFIG_KTHREAD_POISON__
-CONFIG_PRINTK_NO_BACKSPACE:=       -D__CONFIG_PRINTK_NO_BACKSPACE__
-CONFIG_SOCKET:=                    -D__CONFIG_SOCKET__
+CONFIG_ENABLE_MPTABLES:=           -DCONFIG_ENABLE_MPTABLES
+CONFIG_MONITOR_ON_INT:=            -DCONFIG_MONITOR_ON_INT
+CONFIG_DISABLE_SMT:=               -DCONFIG_DISABLE_SMT
+CONFIG_BOXBORO:=                   -DCONFIG_BOXBORO
+CONFIG_RESET_STACKS:=              -DCONFIG_RESET_STACKS
+CONFIG_PCI_VERBOSE:=               -DCONFIG_PCI_VERBOSE
+CONFIG_ETH_AUDIO:=                 -DCONFIG_ETH_AUDIO
+CONFIG_KB_CORE0_ONLY:=             -DCONFIG_KB_CORE0_ONLY
+CONFIG_KTHREAD_POISON:=            -DCONFIG_KTHREAD_POISON
+CONFIG_PRINTK_NO_BACKSPACE:=       -DCONFIG_PRINTK_NO_BACKSPACE
+CONFIG_SOCKET:=                    -DCONFIG_SOCKET
 
 # Userspace configuration parameters
 # By default, each of these options will be turned off
 # To enable any of these options, add a line like the following to your Makelocal
 # USER_CFLAGS += $(CONFIG_SYSCALL_TRAP)
-CONFIG_SYSCALL_TRAP:=              -D__CONFIG_SYSCALL_TRAP__
+CONFIG_SYSCALL_TRAP:=              -DCONFIG_SYSCALL_TRAP
 CONFIG_USER_DEBUGINFO:=            -g
 
 # User tests configuration parameters

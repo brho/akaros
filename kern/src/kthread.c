@@ -44,7 +44,7 @@ void restart_kthread(struct kthread *kthread)
 	current_stacktop = get_stack_top();
 	/* When a kthread runs, its stack is the default kernel stack */
 	set_stack_top(kthread->stacktop);
-#ifdef __CONFIG_KTHREAD_POISON__
+#ifdef CONFIG_KTHREAD_POISON
 	/* TODO: KTHR-STACK */
 	/* Assert and switch to cur stack not in use, kthr stack in use */
 	uintptr_t *cur_stack_poison, *kth_stack_poison;
@@ -54,7 +54,7 @@ void restart_kthread(struct kthread *kthread)
 	kth_stack_poison = (uintptr_t*)ROUNDDOWN(kthread->stacktop - 1, PGSIZE);
 	assert(!*kth_stack_poison);
 	*kth_stack_poison = 0xdeadbeef;
-#endif /* __CONFIG_KTHREAD_POISON__ */
+#endif /* CONFIG_KTHREAD_POISON */
 	/* Set the spare stuff (current kthread, current (not kthread) stacktop) */
 	pcpui->spare = kthread;
 	kthread->stacktop = current_stacktop;
@@ -201,17 +201,17 @@ void sem_down(struct semaphore *sem)
 		kthread = kmem_cache_alloc(kthread_kcache, 0);
 		assert(kthread);
 		assert(!kpage_alloc(&page));	/* decref'd when the kthread is freed */
-#ifdef __CONFIG_KTHREAD_POISON__
+#ifdef CONFIG_KTHREAD_POISON
 		/* TODO: KTHR-STACK don't poison like this */
 		*(uintptr_t*)page2kva(page) = 0;
-#endif /* __CONFIG_KTHREAD_POISON__ */
+#endif /* CONFIG_KTHREAD_POISON */
 		new_stacktop = (uintptr_t)page2kva(page) + PGSIZE;
 	}
 	/* This is the stacktop we are currently on and wish to save */
 	kthread->stacktop = get_stack_top();
 	/* Set the core's new default stack */
 	set_stack_top(new_stacktop);
-#ifdef __CONFIG_KTHREAD_POISON__
+#ifdef CONFIG_KTHREAD_POISON
 	/* Mark the new stack as in-use, and unmark the current kthread */
 	/* TODO: KTHR-STACK don't poison like this */
 	uintptr_t *new_stack_poison, *kth_stack_poison;
@@ -221,7 +221,7 @@ void sem_down(struct semaphore *sem)
 	kth_stack_poison = (uintptr_t*)ROUNDDOWN(kthread->stacktop - 1, PGSIZE);
 	assert(*kth_stack_poison == 0xdeadbeef);
 	*kth_stack_poison = 0;
-#endif /* __CONFIG_KTHREAD_POISON__ */
+#endif /* CONFIG_KTHREAD_POISON */
 	/* The kthread needs to stay in the process context (if there is one), but
 	 * we want the core (which could be a vcore) to stay in the context too.  In
 	 * the future, we could check owning_proc. If it isn't set, we could leave
@@ -276,12 +276,12 @@ unwind_sleep_prep:
 	pcpui->spare = kthread;
 	/* save the "freshly alloc'd" stack/page, not the one we came in on */
 	kthread->stacktop = new_stacktop;
-#ifdef __CONFIG_KTHREAD_POISON__
+#ifdef CONFIG_KTHREAD_POISON
 	/* TODO: KTHR-STACK don't unpoison like this */
 	/* switch back to old stack in use, new one not */
 	*new_stack_poison = 0;
 	*kth_stack_poison = 0xdeadbeef;
-#endif /* __CONFIG_KTHREAD_POISON__ */
+#endif /* CONFIG_KTHREAD_POISON */
 block_return_path:
 	printd("[kernel] Returning from being 'blocked'! at %llu\n", read_tsc());
 	return;

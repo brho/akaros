@@ -9,7 +9,7 @@
 
 static inline long __ros_arch_syscall(long _a0, long _a1)
 {
-	#ifdef __CONFIG_SYSCALL_TRAP__
+	#ifdef CONFIG_SYSCALL_TRAP
 		return __syscall_trap(_a0, _a1);
 	#else
 		return __syscall_sysenter(_a0, _a1);

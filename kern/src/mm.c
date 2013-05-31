@@ -493,7 +493,7 @@ void *__do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 		addr = BRK_END;
 	assert(!PGOFF(offset));
 
-#ifndef __CONFIG_DEMAND_PAGING__
+#ifndef CONFIG_DEMAND_PAGING
 	flags |= MAP_POPULATE;
 #endif
 	/* Need to make sure nothing is in our way when we want a FIXED location.

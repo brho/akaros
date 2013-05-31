@@ -34,7 +34,7 @@ void cache_init()
 	available_caches.l2 = SINIT(&l2);
 	available_caches.l3 = SINIT(&l3);
 	llc_cache = &l3;
-#ifdef __CONFIG_BOXBORO__
+#ifdef CONFIG_BOXBORO
 	/* level (ignoring L1I), size, ways, CL size) */
 	init_cache_properties(&l1,   32,  8, 64);	/* 1 color */
 	init_cache_properties(&l2,  256,  8, 64);	/* 16 colors */
@@ -43,7 +43,7 @@ void cache_init()
 	init_cache_properties(&l1,   32,  8, 64);	/* 1 color */
 	init_cache_properties(&l2,  256,  8, 64);	/* 16 colors */
 	init_cache_properties(&l3, 8192, 16, 64);	/* 128 colors */
-#endif /* __CONFIG_E1000_ON_BOXBORO__ */
+#endif /* CONFIG_E1000_ON_BOXBORO */
 	printk("Cache init successful\n");
 }
 

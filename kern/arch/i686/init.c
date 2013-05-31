@@ -44,12 +44,12 @@ static void cons_irq_init(void)
 		register_interrupt_handler(interrupt_handlers, i->irq + PIC1_OFFSET,
 		                           irq_console, i);
 		/* Route any console IRQs to core 0 */
-	#ifdef __CONFIG_ENABLE_MPTABLES__
+	#ifdef CONFIG_ENABLE_MPTABLES
 		ioapic_route_irq(i->irq, 0);
 	#else
 		pic_unmask_irq(i->irq);
 		unmask_lapic_lvt(LAPIC_LVT_LINT0);
-	#endif /* __CONFIG_ENABLE_MPTABLES__ */
+	#endif /* CONFIG_ENABLE_MPTABLES */
 		printd("Registered handler for IRQ %d (ISR %d)\n", i->irq,
 		       i->irq + PIC1_OFFSET);
 	}
@@ -63,14 +63,14 @@ void arch_init()
 	asm volatile ("fninit");
 	save_fp_state(&x86_default_fpu); /* used in arch/trap.h for fpu init */
 	pci_init();
-#ifdef __CONFIG_ENABLE_MPTABLES__
+#ifdef CONFIG_ENABLE_MPTABLES
 	mptables_parse();
 	ioapic_init(); // MUST BE AFTER PCI/ISA INIT!
 	// TODO: move these back to regular init.  requires fixing the 
-	// __CONFIG_NETWORKING__ inits to not need multiple cores running.
+	// CONFIG_NETWORKING inits to not need multiple cores running.
 #endif
 	// this returns when all other cores are done and ready to receive IPIs
-	#ifdef __CONFIG_SINGLE_CORE__
+	#ifdef CONFIG_SINGLE_CORE
 		smp_percpu_init();
 	#else
 		smp_boot();
@@ -78,7 +78,7 @@ void arch_init()
 	proc_init();
 
 	/* EXPERIMENTAL NETWORK FUNCTIONALITY
-	 * To enable, define __CONFIG_NETWORKING__ in your Makelocal
+	 * To enable, define CONFIG_NETWORKING in your Makelocal
 	 * If enabled, will load the rl8168 driver (if device exists)
 	 * and will a boot into userland matrix, so remote syscalls can be performed.
  	 * If in simulation, will do some debugging information with the ne2k device
@@ -88,15 +88,15 @@ void arch_init()
 	 *
 	 * Additionally, you should have a look at the syscall server in the tools directory
 	 */
-	#ifdef __CONFIG_NETWORKING__
-	#ifdef __CONFIG_SINGLE_CORE__
+	#ifdef CONFIG_NETWORKING
+	#ifdef CONFIG_SINGLE_CORE
 		warn("You currently can't have networking if you boot into single core mode!!\n");
 	#else
 		rl8168_init();		
 		ne2k_init();
 		e1000_init();
-	#endif // __CONFIG_SINGLE_CORE__
-	#endif // __CONFIG_NETWORKING__
+	#endif // CONFIG_SINGLE_CORE
+	#endif // CONFIG_NETWORKING
 
 	perfmon_init();
 	cons_irq_init();

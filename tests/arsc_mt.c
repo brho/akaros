@@ -1,4 +1,4 @@
-#ifdef __CONFIG_ARSC_SERVER__
+#ifdef CONFIG_ARSC_SERVER
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>

@@ -501,15 +501,15 @@ int mon_measure(int argc, char **argv, struct hw_trapframe *hw_tf)
 			return 1;
 		}
 		begin = start_timing();
-#ifdef __CONFIG_APPSERVER__
+#ifdef CONFIG_APPSERVER
 		printk("Warning: this will be inaccurate due to the appserver.\n");
 		end_refcnt = kref_refcnt(&p->p_kref) - p->procinfo->num_vcores - 1;
-#endif /* __CONFIG_APPSERVER__ */
+#endif /* CONFIG_APPSERVER */
 		enable_irqsave(&irq_state);
 		proc_destroy(p);
 		disable_irqsave(&irq_state);
 		proc_decref(p);
-#ifdef __CONFIG_APPSERVER__
+#ifdef CONFIG_APPSERVER
 		/* Won't be that accurate, since it's not actually going through the
 		 * __proc_free() path. */
 		spin_on(kref_refcnt(&p->p_kref) != end_refcnt);	
@@ -518,7 +518,7 @@ int mon_measure(int argc, char **argv, struct hw_trapframe *hw_tf)
 		 * slowing it down by messing with it, esp with the busy waiting on a
 		 * hyperthreaded core. */
 		spin_on(p->env_cr3);
-#endif /* __CONFIG_APPSERVER__ */
+#endif /* CONFIG_APPSERVER */
 		/* No noticeable difference using stop_timing instead of read_tsc() */
 		diff = stop_timing(begin);
 	} else if (!strcmp(argv[1], "preempt")) {

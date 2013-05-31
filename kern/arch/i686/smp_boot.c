@@ -158,10 +158,10 @@ void smp_boot(void)
 	// on the trampoline (which we must be careful to not deallocate)
 	__spin_lock_raw(get_smp_bootlock());
 	printk("Number of Cores Detected: %d\n", num_cpus);
-#ifdef __CONFIG_DISABLE_SMT__
+#ifdef CONFIG_DISABLE_SMT
 	assert(!(num_cpus % 2));
 	printk("Using only %d Idlecores (SMT Disabled)\n", num_cpus >> 1);
-#endif /* __CONFIG_DISABLE_SMT__ */
+#endif /* CONFIG_DISABLE_SMT */
 	smp_remap_coreids();
 
 	// Remove the mapping of the page used by the trampoline

@@ -42,7 +42,7 @@
  * This is a function rl8168 driver, that uses some really ugly hacks to achieve
  * UDP communication with a remote syscall server, without a network stack.
  *
- * To enable use, define __CONFIG_NETWORKING__ in your Makelocal
+ * To enable use, define CONFIG_NETWORKING in your Makelocal
  *
  * @author Paul Pearce <pearce@eecs.berkeley.edu>
  *
@@ -312,7 +312,7 @@ void rl8168_setup_interrupts() {
 	
 	// Kernel based interrupt stuff
 	register_interrupt_handler(interrupt_handlers, KERNEL_IRQ_OFFSET + rl8168_irq, rl8168_interrupt_handler, 0);
-#ifdef __CONFIG_ENABLE_MPTABLES__
+#ifdef CONFIG_ENABLE_MPTABLES
 	ioapic_route_irq(rl8168_irq, 1);	
 #else
 	pic_unmask_irq(rl8168_irq);
@@ -490,7 +490,7 @@ void rl8168_handle_rx_packet() {
 		
 	} while (!(current_command & DES_LS_MASK));
 
-#ifdef __CONFIG_APPSERVER__
+#ifdef CONFIG_APPSERVER
 	// Treat as a syscall frontend response packet if eth_type says so
 	// Will eventually go away, so not too worried about elegance here...
 	#include <frontend.h>
@@ -504,7 +504,7 @@ void rl8168_handle_rx_packet() {
 		return;
 	}
 #endif
-#ifdef __CONFIG_ETH_AUDIO__
+#ifdef CONFIG_ETH_AUDIO
 	/* TODO: move this, and all packet processing, out of this driver (including
 	 * the ghetto buffer).  Note we don't handle IP fragment reassembly (though
 	 * this isn't an issue for the eth_audio). */
@@ -517,7 +517,7 @@ void rl8168_handle_rx_packet() {
 		kfree(rx_buffer);
 		return;
 	}
-#endif /* __CONFIG_ETH_AUDIO__ */
+#endif /* CONFIG_ETH_AUDIO */
 
 	spin_lock(&packet_buffers_lock);
 

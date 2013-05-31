@@ -23,7 +23,7 @@ static void decrease_lock_depth(uint32_t coreid)
 	per_cpu_info[coreid].lock_depth--;
 }
 
-#ifdef __CONFIG_SPINLOCK_DEBUG__
+#ifdef CONFIG_SPINLOCK_DEBUG
 void spin_lock(spinlock_t *lock)
 {
 	uint32_t coreid = core_id();
@@ -62,7 +62,7 @@ void spin_unlock(spinlock_t *lock)
 	/* Memory barriers are handled by the particular arches */
 	__spin_unlock(lock);
 }
-#endif /* __CONFIG_SPINLOCK_DEBUG__ */
+#endif /* CONFIG_SPINLOCK_DEBUG */
 
 /* Inits a hashlock. */
 void hashlock_init(struct hashlock *hl, unsigned int nr_entries)

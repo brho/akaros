@@ -137,15 +137,15 @@ void schedule_init(void)
 	/* init the idlecore list.  if they turned off hyperthreading, give them the
 	 * odds from 1..max-1.  otherwise, give them everything by 0 (default mgmt
 	 * core).  TODO: (CG/LL) better LL/CG mgmt */
-#ifndef __CONFIG_DISABLE_SMT__
+#ifndef CONFIG_DISABLE_SMT
 	for (int i = 1; i < num_cpus; i++)
 		TAILQ_INSERT_TAIL(&idlecores, pcoreid2spc(i), alloc_next);
 #else
 	assert(!(num_cpus % 2));
 	for (int i = 1; i < num_cpus; i += 2)
 		TAILQ_INSERT_TAIL(&idlecores, pcoreid2spc(i), alloc_next);
-#endif /* __CONFIG_DISABLE_SMT__ */
-#ifdef __CONFIG_ARSC_SERVER__
+#endif /* CONFIG_DISABLE_SMT */
+#ifdef CONFIG_ARSC_SERVER
 	struct sched_pcore *a_core = TAILQ_FIRST(&idlecores);
 	assert(a_core);
 	TAILQ_REMOVE(&idlecores, a_core, alloc_next);
@@ -153,7 +153,7 @@ void schedule_init(void)
 	                    KMSG_ROUTINE);
 	warn("Using core %d for the ARSCs - there are probably issues with this.",
 	     spc2pcoreid(a_core));
-#endif /* __CONFIG_ARSC_SERVER__ */
+#endif /* CONFIG_ARSC_SERVER */
 	spin_unlock(&sched_lock);
 	return;
 }
@@ -570,11 +570,11 @@ void avail_res_changed(int res_type, long change)
 uint32_t max_vcores(struct proc *p)
 {
 /* TODO: (CG/LL) */
-#ifdef __CONFIG_DISABLE_SMT__
+#ifdef CONFIG_DISABLE_SMT
 	return num_cpus >> 1;
 #else
 	return num_cpus - 1;	/* reserving core 0 */
-#endif /* __CONFIG_DISABLE_SMT__ */
+#endif /* CONFIG_DISABLE_SMT */
 }
 
 /* This deals with a request for more cores.  The amt of new cores needed is

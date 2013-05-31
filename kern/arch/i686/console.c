@@ -73,14 +73,14 @@ static void serial_put_char(struct cons_dev *cdev, uint8_t c)
 	switch (c & 0xff) {
 		case '\b':
 		case 0x7f:
-		#ifdef __CONFIG_PRINTK_NO_BACKSPACE__
+		#ifdef CONFIG_PRINTK_NO_BACKSPACE
 			__serial_put_char(cdev->val, (uint8_t)('^'));
 			__serial_put_char(cdev->val, (uint8_t)('H'));
 		#else
 			__serial_put_char(cdev->val, '\b');
 			__serial_put_char(cdev->val, (uint8_t)(' '));
 			__serial_put_char(cdev->val, '\b');
-		#endif /* __CONFIG_PRINTK_NO_BACKSPACE__ */
+		#endif /* CONFIG_PRINTK_NO_BACKSPACE */
 			break;
 		case '\n':
 		case '\r':
@@ -323,7 +323,7 @@ cga_putc(int c)
 	switch (c & 0xff) {
 	case '\b':
 	case 0x7f:
-	#ifdef __CONFIG_PRINTK_NO_BACKSPACE__
+	#ifdef CONFIG_PRINTK_NO_BACKSPACE
 		cga_putc('^');
 		cga_putc('H');
 	#else
@@ -333,7 +333,7 @@ cga_putc(int c)
 			crt_buf[crt_pos] = (c & ~0xff) | ' ';
 			scrolling_crt_buf[scrolling_crt_pos] = crt_buf[crt_pos];
 		}
-	#endif /* __CONFIG_PRINTK_NO_BACKSPACE__ */
+	#endif /* CONFIG_PRINTK_NO_BACKSPACE */
 		break;
 	case '\n':
 		crt_pos += CRT_COLS;
@@ -500,7 +500,7 @@ kbd_proc_data(void)
 	int c;
 	uint8_t data;
 
-#ifdef __CONFIG_KB_CORE0_ONLY__
+#ifdef CONFIG_KB_CORE0_ONLY
 	/* Ghetto hack to avoid crashing brho's buggy nehalem. */
 	uint32_t eax, ebx, ecx, edx, family, model, stepping;
 	cpuid(0x1, 0x0, &eax, &ebx, &ecx, &edx);
@@ -510,7 +510,7 @@ kbd_proc_data(void)
 	if (family == 6 && model == 26 && stepping == 4)
 		if (core_id())
 			return -1;
-#endif /* __CONFIG_KB_CORE0_ONLY */
+#endif /* CONFIG_KB_CORE0_ONLY */
 
 	if ((inb(KBSTATP) & KBS_DIB) == 0)
 		return -1;
@@ -635,7 +635,7 @@ int cons_get_any_char(void)
 void cons_putc(int c)
 {
 	spin_lock_irqsave(&lock);
-	#ifndef __CONFIG_SERIAL_IO__
+	#ifndef CONFIG_SERIAL_IO
 		serial_spam_char(c);
 	#endif
 	//lpt_putc(c); 	/* very slow on the nehalem */

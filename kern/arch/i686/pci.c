@@ -51,11 +51,11 @@ void pci_init(void) {
 				pcidev->irqline = result & PCI_IRQLINE_MASK;
 				/* This is the interrupt pin the device uses (INTA# - INTD#) */
 				pcidev->irqpin = (result & PCI_IRQPIN_MASK) >> PCI_IRQPIN_SHFT;
-				#ifdef __CONFIG_PCI_VERBOSE__
+				#ifdef CONFIG_PCI_VERBOSE
 				pcidev_print_info(pcidev, 4);
 				#else
 				pcidev_print_info(pcidev, 0);
-				#endif /* __CONFIG_PCI_VERBOSE__ */
+				#endif /* CONFIG_PCI_VERBOSE */
 				if (pcidev->irqpin != PCI_NOINT) {
 					/* TODO: use a list (check for collisions for now) (massive
 					 * collisions on a desktop with bridge IRQs. */

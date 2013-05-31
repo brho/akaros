@@ -175,7 +175,7 @@ void ne2k_setup_interrupts() {
 	// Kernel based interrupt stuff
 	register_interrupt_handler(interrupt_handlers, KERNEL_IRQ_OFFSET + ne2k_irq, ne2k_interrupt_handler, (void *)0);
 	
-#ifdef __CONFIG_ENABLE_MPTABLES__
+#ifdef CONFIG_ENABLE_MPTABLES
 	ioapic_route_irq(ne2k_irq, 0);	
 #else
 	pic_unmask_irq(ne2k_irq);
@@ -365,7 +365,7 @@ void ne2k_handle_rx_packet() {
 		return;
 	}
 
-#ifdef __CONFIG_APPSERVER__
+#ifdef CONFIG_APPSERVER
 	// Treat as a syscall frontend response packet if eth_type says so
 	// Will eventually go away, so not too worried about elegance here...
 	#include <frontend.h>

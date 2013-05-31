@@ -1,4 +1,4 @@
-#ifdef __CONFIG_ARSC_SERVER__
+#ifdef CONFIG_ARSC_SERVER
 #include <parlib.h>
 #include <vcore.h>
 #include <ros/syscall.h>
