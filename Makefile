@@ -6,25 +6,29 @@
 # 	- I downloaded the kbuild guts from git://github.com/lacombar/kconfig.git,
 # 	and added things from a recent linux makefile.  It is from aug 2011, so
 # 	some things might not match up.
-# 	- There's still some mysterious bits floating around, such as compile
-# 	parameters like -D"KBUILD_STR(s)=#s" (they come from Makefile.lib).  They
-# 	don't hurt, so I'm not removing them.  We might need them in the future
-# 	too.
 # 	- Kernel output in obj/: So Linux has the ability to output into another
 # 	directory, via the KBUILD_OUTPUT variable.  This induces a recursive make
 # 	in the output directory.  I mucked with it for a little, but didn't get it
 # 	to work quite right.  Also, there will be other Akaros issues since this
 # 	makefile is also used for userspace and tests.  For now, I'm leaving things
 # 	the default Linux way.
+#	- Kconfig wants to use include/ in the root directory.  We can change some
+#	of the default settings that silentoldconfig uses, but I'll leave it as-is
+#	for now, and just symlink that into kern/include.  It'll be easier for us,
+#	and also potentially easier if we ever move kern/ up a level.  Similarly,
+#	there are default Kconfigs in arch/, not in kern/arch.  I might change
+#	that, if we want to support defconfig, or just symlink it.
 #
 # TODO:
 # 	- Connect to kconfig, have it generate our CONFIGS, instead of makelocal.
-# 		- We also want to consider having changes to .config force rebuilds.
-# 		Right now, a change to the CFLAGS (CONFIGS) rebuilds it all.  Ideally,
-# 		we'd only rebuild files that need the change. 
-# 		- CONFIG_ are getting included twice, since we have includes of KCONFIG
-# 		in both Makefile.build and here.
-# 		- Might involve auto.conf{,.cmd} too.
+#		- what about userspace / tests?
+#			the only one is SYSCALL_TRAP.  the others control building
+#			- keep them using the old style
+#		- might need to symlink arch -> kern/arch/ too
+#			- though def config is hardcoded to arch/$ARCH, instead of k/a/
+#
+#	- Consider merging the two target-detection bits (Linux's config, mixed, or
+#	dot target, and the symlink handling).
 #
 #	- Do we want some sort of default config?  Or the ability to change arches
 #	and keep common vars?
@@ -69,8 +73,7 @@ all: akaros-kernel
 
 clean-goals := clean mrproper realclean userclean testclean doxyclean objclean
 non-build-goals := %config $(clean-goals)
-goals := $(MAKECMDGOALS)
-ifeq ($(filter $(non-build-goals), $(goals)),)
+ifeq ($(filter $(non-build-goals), $(MAKECMDGOALS)),)
 goals-has-build-targets := 1
 endif
 
@@ -82,80 +85,43 @@ arch-link := $(notdir $(shell readlink kern/include/arch))
 valid-arches := $(notdir $(wildcard kern/arch/*))
 
 ifneq ($(ARCH),)
-
-ifeq ($(filter $(valid-arches), $(ARCH)),)
-$(error ARCH $(ARCH) invalid, must be one of: $(valid-arches))
-endif
-
-ifneq ($(ARCH),$(arch-link))
-
-ifeq ($(goals-has-build-targets),1)
-$(error Attempted to make [$(goals)] while changing ARCH. \
-        You need to make *config.)
-endif
-
-symlinks: clean_symlinks clean
+    ifeq ($(filter $(valid-arches), $(ARCH)),)
+        $(error ARCH $(ARCH) invalid, must be one of: $(valid-arches))
+    endif
+    ifneq ($(ARCH),$(arch-link))
+        ifeq ($(goals-has-build-targets),1)
+            $(error Attempted to make [$(MAKECMDGOALS)] while changing ARCH. \
+                    You need to make *config.)
+        endif
+symlinks: clean_symlinks
 	@echo Making symlinks...
 	$(Q)ln -fs ../arch/$(ARCH) kern/include/arch
 	$(Q)ln -fs arch/$(ARCH)/boot kern/boot
 	$(Q)ln -fs $(ARCH) user/parlib/include/arch
-else
-symlinks:
-endif # ifneq ($(ARCH),$(arch-link))
+	$(Q)$(MAKE) -f $(srctree)/Makefile clean
 
+    else
+symlinks:
+
+    endif # ifneq ($(ARCH),$(arch-link))
 else # $(ARCH) is empty
-
-ifneq ($(arch-link),)
-
-ARCH := $(arch-link)
+    ifneq ($(arch-link),)
+        ARCH := $(arch-link)
 symlinks:
 
-else
-
-# Allow a clean
-ifeq ($(filter $(clean-goals), $(goals)),)
-$(error No arch saved or specified.  Make *config with ARCH=arch. \
-        'arch' must be one of: $(valid-arches))
-endif
-
-endif # ifneq ($(arch-link),)
-
+    else
+        # Only allow a clean
+        ifeq ($(filter $(clean-goals), $(MAKECMDGOALS)),)
+            $(error No arch saved or specified.  Make *config with ARCH=arch. \
+                    'arch' must be one of: $(valid-arches))
+        endif
+        ARCH := none # catch bugs
+    endif # ifneq ($(arch-link),)
 endif # ifeq ($(ARCH),)
 
 export ARCH
 
-
-# Init / Include Stuff and Akaros Settings
-# =========================================================================
-
-KCONFIG_CONFIG ?= .config
-export KCONFIG_CONFIG
-$(KCONFIG_CONFIG): ;
-
-# The user can override this, though it won't apply for any of the in-tree
-# kernel build output.  Right now, it's only passed down to tests/
-OBJDIR ?= obj
-dummy-1 := $(shell mkdir -p $(OBJDIR)/kern/)
-
-KERNEL_OBJ := $(OBJDIR)/kern/akaros-kernel
-CMP_KERNEL_OBJ := $(KERNEL_OBJ).gz
-
-# TODO: have the KFS paths be determined in .config
-# Give it a reasonable default path for initramfs to avoid build breakage
-INITRAMFS_PATHS = kern/kfs
-FIRST_INITRAMFS_PATH = $(firstword $(INITRAMFS_PATHS))
-
-export OBJDIR INITRAMFS_PATHS FIRST_INITRAMFS_PATH
-
-# TODO: replace Makeconfig with .config, and slim down Makelocal
-# Using fake rules so make doesn't get confused (do not try to remake the file)
-$(srctree)Makeconfig: ;
-include $(srctree)Makeconfig
-$(srctree)Makelocal: ;
--include $(srctree)Makelocal
--include $(srctree)$(KCONFIG)
-
-# Some Global Settings (Kbuild stuff)
+# Generic Kbuild Environment
 # =========================================================================
 
 # To put more focus on warnings, be less verbose as default
@@ -221,26 +187,6 @@ export quiet Q KBUILD_VERBOSE
 $(srctree)/scripts/Kbuild.include: ;
 include $(srctree)/scripts/Kbuild.include
 
-# Basic helpers built in scripts/
-PHONY += scripts_basic
-scripts_basic:
-	$(Q)$(MAKE) $(build)=scripts/basic
-	$(Q)rm -f .tmp_quiet_recordmcount
-
-config: scripts_basic symlinks FORCE
-	$(Q)$(MAKE) $(build)=scripts/kconfig $@
-
-%config: scripts_basic symlinks FORCE
-	$(Q)$(MAKE) $(build)=scripts/kconfig $@
-
-PHONY += scripts
-
-# Not sure if this needs to depend on the config.  Linux's depends on
-# include/config/auto.conf include/config/tristate.conf
-scripts: scripts_basic $(KCONFIG)
-	$(Q)$(MAKE) $(build)=$(@)
-
-
 # Akaros Build Environment
 # =========================================================================
 AKAROSINCLUDE   := \
@@ -259,12 +205,11 @@ OBJDUMP	:= $(CROSS_COMPILE)objdump
 NM	    := $(CROSS_COMPILE)nm
 STRIP   := $(CROSS_COMPILE)strip
 
-ifeq ($(shell which $(CROSS_COMPILE)gcc 2>/dev/null ),)
 ifeq ($(goals-has-build-targets),1)
+ifeq ($(shell which $(CROSS_COMPILE)gcc 2>/dev/null ),)
 $(error Could not find a $(CROSS_COMPILE) version of GCC/binutils. \
         Be sure to build the cross-compiler and update your PATH)
 endif
-else
 # Computing these without a cross compiler complains loudly
 gcc-lib := $(shell $(CC) -print-libgcc-file-name)
 NOSTDINC_FLAGS += -nostdinc -isystem $(shell $(CC) -print-file-name=include)
@@ -278,6 +223,7 @@ CFLAGS_KERNEL += -fno-strict-aliasing -fno-omit-frame-pointer
 CFLAGS_KERNEL += -fno-stack-protector
 CFLAGS_KERNEL += -Wall -Wno-format -Wno-unused
 CFLAGS_KERNEL += -DROS_KERNEL 
+CFLAGS_KERNEL += -include include/generated/autoconf.h
 
 # TODO: do we need this, or can we rely on the compiler's defines?
 CFLAGS_KERNEL += -D$(ARCH)
@@ -302,6 +248,117 @@ CFLAGS_USER += -O2 -std=gnu99 -fno-stack-protector -fgnu89-inline
 CXXFLAGS_USER += -O2
 
 export CFLAGS_USER CXXFLAGS_USER
+
+# Kbuild Target/Goals Parsing
+# =========================================================================
+# Need to figure out if we're a config or not, and whether or not to include
+# our .config / auto.conf.  Configs are basically their own makefile, (ifeq),
+# and cleans are allowed to proceed without worrying about the dot-config.
+
+# Basic helpers built in scripts/
+PHONY += scripts_basic
+scripts_basic:
+	$(Q)$(MAKE) $(build)=scripts/basic
+
+PHONY += scripts
+
+scripts: scripts_basic include/config/auto.conf include/config/tristate.conf
+	$(Q)$(MAKE) $(build)=$(@)
+
+config-targets := 0
+mixed-targets  := 0
+dot-config     := 1
+
+no-dot-config-targets := $(clean-goals)
+
+ifneq ($(filter $(no-dot-config-targets), $(MAKECMDGOALS)),)
+    ifeq ($(filter-out $(no-dot-config-targets), $(MAKECMDGOALS)),)
+        dot-config := 0
+    endif
+endif
+
+ifneq ($(filter config %config,$(MAKECMDGOALS)),)
+    config-targets := 1
+    ifneq ($(filter-out config %config,$(MAKECMDGOALS)),)
+        mixed-targets := 1
+    endif
+endif
+
+ifeq ($(mixed-targets),1)
+# ===========================================================================
+# We're called with mixed targets (*config and build targets).
+# Handle them one by one.
+
+%:: FORCE
+	$(Q)$(MAKE) -C $(srctree) KBUILD_SRC= $@
+
+else
+ifeq ($(config-targets),1)
+# ===========================================================================
+# *config targets only - make sure prerequisites are updated, and descend
+# in scripts/kconfig to make the *config target
+config: scripts_basic symlinks FORCE
+	$(Q)mkdir -p include/config
+	$(Q)$(MAKE) $(build)=scripts/kconfig $@
+
+%config: scripts_basic symlinks FORCE
+	$(Q)mkdir -p include/config
+	$(Q)$(MAKE) $(build)=scripts/kconfig $@
+
+else
+# ===========================================================================
+# Build targets only - this includes vmlinux, arch specific targets, clean
+# targets and others. In general all targets except *config targets.
+
+ifeq ($(dot-config),1)
+KCONFIG_CONFIG ?= .config
+export KCONFIG_CONFIG
+
+# Read in config
+-include include/config/auto.conf
+
+# Read in dependencies to all Kconfig* files, make sure to run
+# oldconfig if changes are detected.
+-include include/config/auto.conf.cmd
+
+# To avoid any implicit rule to kick in, define an empty command
+$(KCONFIG_CONFIG) include/config/auto.conf.cmd: ;
+
+# If .config is newer than include/config/auto.conf, someone tinkered
+# with it and forgot to run make oldconfig.
+# if auto.conf.cmd is missing then we are probably in a cleaned tree so
+# we execute the config step to be sure to catch updated Kconfig files
+include/config/%.conf: $(KCONFIG_CONFIG) include/config/auto.conf.cmd
+	$(Q)$(MAKE) -f $(srctree)/Makefile silentoldconfig
+
+else
+# Dummy target needed, because used as prerequisite
+include/config/auto.conf: ;
+endif # $(dot-config)
+
+# Akaros include stuff (includes custom make targets and user overrides)
+# =========================================================================
+
+# The user can override this, though it won't apply for any of the in-tree
+# kernel build output.  Right now, it's only passed down to tests/
+OBJDIR ?= obj
+dummy-1 := $(shell mkdir -p $(OBJDIR)/kern/)
+
+# Don't need to export these, since the Makelocal is included.
+KERNEL_OBJ := $(OBJDIR)/kern/akaros-kernel
+CMP_KERNEL_OBJ := $(KERNEL_OBJ).gz
+
+# TODO: have the KFS paths be determined in .config
+# Give it a reasonable default path for initramfs to avoid build breakage
+INITRAMFS_PATHS = kern/kfs
+FIRST_INITRAMFS_PATH = $(firstword $(INITRAMFS_PATHS))
+
+export OBJDIR INITRAMFS_PATHS FIRST_INITRAMFS_PATH
+
+# Avoiding implicit rules
+$(srctree)/Makeconfig $(srctree)/Makelocal: ;
+include $(srctree)/Makeconfig
+-include $(srctree)/Makelocal
 
 # Akaros Kernel Build
 # =========================================================================
@@ -350,8 +407,8 @@ $(kern_cpio) initramfs: $(kern_initramfs_files)
         cd $$OLDPWD; \
     done;
 
-ld_emulation := $(shell $(OBJDUMP) -i | grep -v BFD | grep ^[a-z] |head -n1)
-ld_arch := $(shell $(OBJDUMP) -i | grep -v BFD | grep "^  [a-z]" | head -n1)
+ld_emulation = $(shell $(OBJDUMP) -i | grep -v BFD | grep ^[a-z] |head -n1)
+ld_arch = $(shell $(OBJDUMP) -i | grep -v BFD | grep "^  [a-z]" | head -n1)
 
 $(kern_cpio_obj): $(kern_cpio)
 	$(Q)$(OBJCOPY) -I binary -B $(ld_arch) -O $(ld_emulation) $^ $@
@@ -359,13 +416,16 @@ $(kern_cpio_obj): $(kern_cpio)
 $(ext2_bdev_obj): $(EXT2_BDEV)
 	$(Q)$(OBJCOPY) -I binary -B $(ld_arch) -O $(ld_emulation) $^ $@
 
+# TODO super-bugged objdump!  Passing -S (intermix source) and having auto.conf
+# be regenerated while the Makefile is running causes a segfault.  This would
+# happen after touching .config and remaking.  For now, just pass -d...
 quiet_cmd_link-akaros = LINK    $@
       cmd_link-akaros = $(LD) -T kern/arch/$(ARCH)/kernel.ld -o $@ \
                               $(akaros-deps) \
                               $(gcc-lib) \
                               $(kern_cpio_obj) \
                               $(ext2_bdev_obj) ; \
-                              $(OBJDUMP) -S $@ > $@.asm
+                              $(OBJDUMP) -d $@ > $@.asm
 
 # For some reason, the if_changed doesn't work with FORCE (like it does in
 # Linux).  It looks like it can't find the .cmd file or something (also
@@ -387,6 +447,11 @@ $(CMP_KERNEL_OBJ): $(KERNEL_OBJ)
 	@echo "Compressing kernel image"
 	$(Q)gzip -c $^ > $@
 
+# TODO: not sure what all we want to have available for config targets
+# (anything after this is allowed.  We currently need clean targets available
+# (config->symlinks->clean).
+endif #ifeq ($(config-targets),1)
+endif #ifeq ($(mixed-targets),1)
 
 # Akaros Userspace Building and Misc Helpers
 # =========================================================================

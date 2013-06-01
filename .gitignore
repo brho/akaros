@@ -45,3 +45,5 @@ kern/kfs/*
 .config*
 ..config*
 scripts/kconfig/zconf.lex.c
+kern/include/config/*
+kern/include/generated/*
