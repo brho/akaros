@@ -1,0 +1,16 @@
+menuconfig NETWORKING
+	bool "Networking Support"
+	default y
+	help
+		Basic networking (TCP, UDP, IP, etc).
+
+if NETWORKING
+
+config SOCKET
+	bool "Socket support"
+	default y
+	help
+		Early socket work.  Say 'n' if you have issues compiling.
+
+endif # NETWORKING
+

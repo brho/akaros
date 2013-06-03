@@ -31,9 +31,10 @@ usually idling in there (alone), and if I'm at my computer, I'll respond.
 I'll describe how to get x86 working.  RISCV is similar.
 
 The first step is to configure the kernel.  config, menuconfig, and some of the
-other KBuild targets work.  For example, to config for 32 bit x86:
+other KBuild targets work.  Defconfig gives you a default configuration.  For
+example, to config for 32 bit x86:
 
-$ make ARCH=i686 config
+$ make ARCH=i686 defconfig
 
 3.1 Cross compiler (and glibc)
 ----------

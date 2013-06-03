@@ -1,0 +1,56 @@
+# default config.  While this is x86 specific, when config'd for RISCV, the x86
+# specific items will be ignored.
+#
+# Akaros/i686 Kernel Configuration
+#
+CONFIG_X86=y
+
+#
+# x86 Hacks
+#
+# CONFIG_PCI_VERBOSE is not set
+# CONFIG_NOMTRRS is not set
+# CONFIG_ENABLE_MPTABLES is not set
+# CONFIG_KB_CORE0_ONLY is not set
+CONFIG_NETWORKING=y
+CONFIG_SOCKET=y
+
+#
+# Drivers
+#
+# CONFIG_E1000 is not set
+# CONFIG_REALTEK8168 is not set
+# CONFIG_ETH_AUDIO is not set
+
+#
+# Filesystems
+#
+CONFIG_KFS=y
+CONFIG_KFS_PATHS="kern/kfs"
+CONFIG_KFS_CPIO_BIN=""
+# CONFIG_EXT2FS is not set
+
+#
+# Memory Management
+#
+# CONFIG_DEMAND_PAGING is not set
+# CONFIG_PAGE_COLORING is not set
+
+#
+# Kernel Debugging
+#
+# CONFIG_SPINLOCK_DEBUG is not set
+# CONFIG_SEQLOCK_DEBUG is not set
+CONFIG_RESET_STACKS=y
+# CONFIG_KTHREAD_POISON is not set
+# CONFIG_DISABLE_SMT is not set
+# CONFIG_PRINTK_NO_BACKSPACE is not set
+
+#
+# Misc/Old Options
+#
+# CONFIG_ARSC_SERVER is not set
+# CONFIG_APPSERVER is not set
+# CONFIG_SERIAL_IO is not set
+# CONFIG_SINGLE_CORE is not set
+# CONFIG_BSD_ON_CORE0 is not set

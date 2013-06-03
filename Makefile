@@ -16,25 +16,18 @@
 #	of the default settings that silentoldconfig uses, but I'll leave it as-is
 #	for now, and just symlink that into kern/include.  It'll be easier for us,
 #	and also potentially easier if we ever move kern/ up a level.  Similarly,
-#	there are default Kconfigs in arch/, not in kern/arch.  I might change
-#	that, if we want to support defconfig, or just symlink it.
+#	there are default Kconfigs in arch/, not in kern/arch.  I just symlinked
+#	arch->kern/arch to keep everything simple.
 #
 # TODO:
-# 	- Connect to kconfig, have it generate our CONFIGS, instead of makelocal.
-#		- what about userspace / tests?
-#			the only one is SYSCALL_TRAP.  the others control building
-#			- keep them using the old style
-#		- might need to symlink arch -> kern/arch/ too
-#			- though def config is hardcoded to arch/$ARCH, instead of k/a/
-#
 #	- Consider merging the two target-detection bits (Linux's config, mixed, or
-#	dot target, and the symlink handling).
-#
-#	- Do we want some sort of default config?  Or the ability to change arches
-#	and keep common vars?
+#	dot target, and the symlink handling).  Also, could consider moving around
+#	the KFS and EXT2 targets.  Clean doesn't need to know about them, for
+#	instance.
 #
 #	- Review, with an eye for being better about $(srctree).  It might only be
-#	necessary in this file, if we every do the KBUILD_OUTPUT option
+#	necessary in this file, if we every do the KBUILD_OUTPUT option.  But we
+#	don't always want it (like for the implicit rule for Makefile)
 #
 #	- It's a bit crazy that we build symlinks for parlib, instead of it
 #	managing its own links based on $(ARCH)
@@ -119,7 +112,8 @@ symlinks:
     endif # ifneq ($(arch-link),)
 endif # ifeq ($(ARCH),)
 
-export ARCH
+SRCARCH := $(ARCH)
+export ARCH SRCARCH
 
 # Generic Kbuild Environment
 # =========================================================================
@@ -297,6 +291,13 @@ ifeq ($(config-targets),1)
 # ===========================================================================
 # *config targets only - make sure prerequisites are updated, and descend
 # in scripts/kconfig to make the *config target
+
+# Default config file, per arch.  This path will resolve to
+# arch/$ARCH/configs/defconfig (arch -> kern/arch).  Each arch can override
+# this if they want, or just symlink to one in the main root directory.
+KBUILD_DEFCONFIG := defconfig
+export KBUILD_DEFCONFIG
+
 config: scripts_basic symlinks FORCE
 	$(Q)mkdir -p include/config
 	$(Q)$(MAKE) $(build)=scripts/kconfig $@
@@ -348,16 +349,24 @@ dummy-1 := $(shell mkdir -p $(OBJDIR)/kern/)
 KERNEL_OBJ := $(OBJDIR)/kern/akaros-kernel
 CMP_KERNEL_OBJ := $(KERNEL_OBJ).gz
 
-# TODO: have the KFS paths be determined in .config
-# Give it a reasonable default path for initramfs to avoid build breakage
-INITRAMFS_PATHS = kern/kfs
-FIRST_INITRAMFS_PATH = $(firstword $(INITRAMFS_PATHS))
+# Since we're doing this outside of the dot-config part, some targets, such as
+# clean, won't read in our .config/auto.conf, and won't know about the
+# KFS_PATH.  Future rules related to KFS will have issues (mkdir with no
+# argument, or a find of the entire pwd).  It's also possible someone provided
+# an empty path.  To deal with both, we'll just have a sensible default.
+kfs-paths :=  $(patsubst "%",%,$(CONFIG_KFS_PATHS))
+ifeq ($(kfs-paths),)
+kfs-paths := kern/kfs
+endif
 
-export OBJDIR INITRAMFS_PATHS FIRST_INITRAMFS_PATH
+FIRST_KFS_PATH = $(firstword $(kfs-paths))
+
+export OBJDIR FIRST_KFS_PATH
 
 # Avoiding implicit rules
-$(srctree)/Makeconfig $(srctree)/Makelocal: ;
-include $(srctree)/Makeconfig
+$(srctree)/Makelocal: ;
+# TODO: one issue is that we import all types of targets: build, clean, etc.
+# That makes it a bit tougher to reorganize with ifeqs.
 -include $(srctree)/Makelocal
 
 # Akaros Kernel Build
@@ -388,19 +397,26 @@ akaros-deps := $(kbuild_akaros_main)  kern/arch/$(ARCH)/kernel.ld
 
 kern_cpio := $(OBJDIR)/kern/initramfs.cpio
 kern_cpio_obj := $(kern_cpio).o
-ifneq ($(EXT2_BDEV),)
-ext2_bdev_obj := $(OBJDIR)/kern/$(shell basename $(EXT2_BDEV)).o
+
+# ext2 will crash at runtime if we don't have a block device.  try to catch the
+# errors now.  if it is a bad one, you're just out of luck.
+ifneq ($(CONFIG_EXT2FS),)
+ext2-bdev := $(patsubst "%",%,$(CONFIG_EXT2_BDEV))
+ifeq ($(ext2-bdev),)
+$(error EXT2 selected with no block device [$(ext2-bdev)], fix your .config)
+endif
+ext2_bdev_obj = $(OBJDIR)/kern/$(shell basename $(ext2-bdev)).o
 endif
 
-kern_initramfs_files := $(shell mkdir -p $(INITRAMFS_PATHS); \
-                          find $(INITRAMFS_PATHS))
+kern_initramfs_files := $(shell mkdir -p $(kfs-paths); \
+                          find $(kfs-paths))
 
 $(kern_cpio) initramfs: $(kern_initramfs_files)
 	@echo "  Building initramfs:"
-	@if [ "$(INITRAMFS_BIN)" != "" ]; then \
-        sh $(INITRAMFS_BIN); \
+	@if [ "$(CONFIG_KFS_CPIO_BIN)" != "" ]; then \
+        sh $(CONFIG_KFS_CPIO_BIN); \
     fi
-	$(Q)for i in $(INITRAMFS_PATHS); do cd $$i; \
+	$(Q)for i in $(kfs-paths); do cd $$i; \
         echo "    Adding $$i to initramfs..."; \
         find -L . | cpio --quiet -oH newc > \
 			$(CURDIR)/$(kern_cpio); \
@@ -413,7 +429,8 @@ ld_arch = $(shell $(OBJDUMP) -i | grep -v BFD | grep "^  [a-z]" | head -n1)
 $(kern_cpio_obj): $(kern_cpio)
 	$(Q)$(OBJCOPY) -I binary -B $(ld_arch) -O $(ld_emulation) $^ $@
 
-$(ext2_bdev_obj): $(EXT2_BDEV)
+# If no ext2, this will be (empty) : (empty)
+$(ext2_bdev_obj): $(ext2-bdev)
 	$(Q)$(OBJCOPY) -I binary -B $(ld_arch) -O $(ld_emulation) $^ $@
 
 # TODO super-bugged objdump!  Passing -S (intermix source) and having auto.conf
@@ -497,10 +514,10 @@ install-tests:
 
 # TODO: cp -u all of the .sos, but flush it on an arch change (same with tests)
 fill-kfs: install-libs install-tests
-	@mkdir -p $(FIRST_INITRAMFS_PATH)/lib
+	@mkdir -p $(FIRST_KFS_PATH)/lib
 	@cp $(addprefix $(XCC_ROOT)/$(ARCH)-ros/lib/, \
-	  libc.so.6 ld.so.1 libm.so libgcc_s.so.1) $(FIRST_INITRAMFS_PATH)/lib
-	$(Q)$(STRIP) --strip-debug $(addprefix $(FIRST_INITRAMFS_PATH)/lib/, \
+	  libc.so.6 ld.so.1 libm.so libgcc_s.so.1) $(FIRST_KFS_PATH)/lib
+	$(Q)$(STRIP) --strip-debug $(addprefix $(FIRST_KFS_PATH)/lib/, \
 	                                       libc.so.6 ld.so.1)
 
 # Use doxygen to make documentation for ROS (Untested since 2010 or so)
@@ -581,6 +598,10 @@ mrproper: $(mrproper-dirs) clean clean_symlinks
 
 PHONY += FORCE
 FORCE:
+
+# Don't put the srctree on this, make is looking for Makefile, not
+# /full/path/to/Makefile.
+Makefile: ; # avoid implicit rule on Makefile
 
 # Declare the contents of the .PHONY variable as phony.  We keep that
 # information in a variable so we can use it in if_changed and friends.

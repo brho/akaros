@@ -48,7 +48,7 @@ all: $(TESTS_EXECS_C) $(TESTS_EXECS_CPP)
 	@:
 
 install: $(TESTS_EXECS_C) $(TESTS_EXECS_CPP) 
-	$(Q)cp -u $^ $(FIRST_INITRAMFS_PATH)/bin
+	$(Q)cp -u $^ $(FIRST_KFS_PATH)/bin
 
 clean:
 	@echo + clean [TESTS]

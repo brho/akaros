@@ -1,0 +1,33 @@
+config X86
+	def_bool y
+
+menu "x86 Hacks"
+
+config PCI_VERBOSE
+	bool "Verbose PCI Output"
+	default n
+	help
+		Will print out extra information related to PCI.
+
+config NOMTRRS
+	bool "Disable MTRRs"
+	default n
+	help
+		Old debug option from when we were having issues with MTRRs.  If your
+		machine won't boot, try turning this on.
+
+config ENABLE_MPTABLES
+	bool "Enable MP Tables"
+	default n
+	help
+		Turns on basic MP tables support.  If you want to route IRQs, you'll
+		need this, until we get around to parsing ACPI tables.
+
+config KB_CORE0_ONLY
+	bool "Keyboard from core0 only"
+	default n
+	help
+		Say 'n' unless you are using a buggy x86 machine that can't handle
+		polling the keyboard PIO from cores other than core 0.
+
+endmenu
