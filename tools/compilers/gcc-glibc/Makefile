@@ -140,6 +140,7 @@ binutils-$(BINUTILS_VERSION): binutils-$(BINUTILS_VERSION).tar.bz2
 	tar -jxf binutils-$(BINUTILS_VERSION).tar.bz2
 	patch -p0 < binutils-$(BINUTILS_VERSION)-ros.patch
 	patch --no-backup-if-mismatch -p0 < binutils-$(BINUTILS_VERSION)-riscv.patch
+	patch -p0 < binutils-$(BINUTILS_VERSION)-objdump.patch
 
 gcc-$(GCC_VERSION): gcc-$(GCC_VERSION).tar.bz2
 	rm -rf gcc-$(GCC_VERSION)

@@ -433,16 +433,13 @@ $(kern_cpio_obj): $(kern_cpio)
 $(ext2_bdev_obj): $(ext2-bdev)
 	$(Q)$(OBJCOPY) -I binary -B $(ld_arch) -O $(ld_emulation) $^ $@
 
-# TODO super-bugged objdump!  Passing -S (intermix source) and having auto.conf
-# be regenerated while the Makefile is running causes a segfault.  This would
-# happen after touching .config and remaking.  For now, just pass -d...
 quiet_cmd_link-akaros = LINK    $@
       cmd_link-akaros = $(LD) -T kern/arch/$(ARCH)/kernel.ld -o $@ \
                               $(akaros-deps) \
                               $(gcc-lib) \
                               $(kern_cpio_obj) \
                               $(ext2_bdev_obj) ; \
-                              $(OBJDUMP) -d $@ > $@.asm
+                              $(OBJDUMP) -S $@ > $@.asm
 
 # For some reason, the if_changed doesn't work with FORCE (like it does in
 # Linux).  It looks like it can't find the .cmd file or something (also
