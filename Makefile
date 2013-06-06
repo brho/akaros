@@ -381,7 +381,7 @@ $(srctree)/Makelocal: ;
 # We have all-arch-dirs and all-dirs, so that we can still clean even without
 # an arch symlink.
 
-core-y += kern/src/
+core-y += kern/src/ kern/drivers/
 arch-y += kern/arch/$(ARCH)/
 
 akaros-dirs     := $(patsubst %/,%,$(filter %/, $(core-y) $(arch-y)))

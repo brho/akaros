@@ -12,5 +12,13 @@ config SOCKET
 	help
 		Early socket work.  Say 'n' if you have issues compiling.
 
+config ETH_AUDIO
+	depends on NETWORKING && X86
+	bool "Ethernet audio"
+	default n
+	help
+		Build old support for David Wessel's ethernet audio device.  This is
+		less a driver than a NIC-level "intercept".
+
 endif # NETWORKING
 

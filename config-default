@@ -14,13 +14,14 @@ CONFIG_X86=y
 # CONFIG_KB_CORE0_ONLY is not set
 CONFIG_NETWORKING=y
 CONFIG_SOCKET=y
+# CONFIG_ETH_AUDIO is not set
 
 #
 # Drivers
 #
 # CONFIG_E1000 is not set
-# CONFIG_REALTEK8168 is not set
-# CONFIG_ETH_AUDIO is not set
+# CONFIG_RL8168 is not set
+# CONFIG_NE2K is not set
 
 #
 # Filesystems

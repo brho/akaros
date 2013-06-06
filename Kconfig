@@ -13,59 +13,7 @@ source "kern/arch/$SRCARCH/Kconfig"
 
 source "kern/src/net/Kconfig"
 
-menu "Drivers"
-
-menuconfig E1000
-	depends on NETWORKING && X86
-	bool "e1000 driver"
-	default n
-	help
-		Buggy e1000 driver.  Use at your own risk.
-
-if E1000
-config E1000_MMIO_HACK
-	bool "e1000 MMIO hack"
-	default n
-	help
-		Legacy option, say 'n'.
-
-config E1000_ON_BOXBORO
-	bool "e1000 on Boxboro"
-	default n
-	help
-		Legacy option, say 'n'.
-
-config E1000_ON_S142
-	bool "e1000 on s142"
-	default n
-	help
-		Legacy option, say 'n'.
-
-endif # E1000
-
-config RL8168
-	depends on NETWORKING && X86
-	bool "Realtek 8168"
-	default n
-	help
-		Buggy realtek driver.  Use at your own risk.
-
-config NE2K
-	depends on NETWORKING && X86
-	bool "NE2000"
-	default n
-	help
-		Buggy NE2000 driver.  Use at your own risk.
-
-config ETH_AUDIO
-	depends on NETWORKING && X86
-	bool "Ethernet audio"
-	default n
-	help
-		Build old support for David Wessel's ethernet audio device.  This is
-		less a driver than a NIC-level "intercept".
-
-endmenu
+source "kern/drivers/Kconfig"
 
 menu "Filesystems"
 

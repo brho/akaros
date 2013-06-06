@@ -34,9 +34,7 @@
 #define INTEL_82576_ID		0x10c9
 #define INTEL_82576NS_ID	0x150a
 
-/********** THIS NEXT FILE IS GPL'D! **************/
-#include <arch/e1000_hw.h>
-/********** Back to our regularly scheduled BSD **/
+#include "e1000_hw.h"
 
 // Offset used for indexing IRQs
 #define KERNEL_IRQ_OFFSET	32

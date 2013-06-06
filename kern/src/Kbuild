@@ -1,5 +1,3 @@
-obj-$(CONFIG_ETH_AUDIO)		+= eth_audio.o
-
 obj-y						+= alarm.o
 obj-y						+= arsc.o
 obj-y						+= atomic.o
@@ -24,6 +22,7 @@ obj-y						+= monitor.o
 obj-y						+= multiboot.o
 obj-y						+= net/
 obj-y						+= net.o
+obj-$(CONFIG_ETH_AUDIO)		+= eth_audio.o
 obj-y						+= page_alloc.o
 obj-y						+= pagemap.o
 obj-y						+= pmap.o

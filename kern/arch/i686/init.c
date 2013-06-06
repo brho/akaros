@@ -6,9 +6,6 @@
 
 #include <smp.h>
 
-#include <arch/rl8168.h>
-#include <arch/ne2k.h>
-#include <arch/e1000.h>
 #include <arch/mptables.h>
 #include <arch/pci.h>
 #include <arch/ioapic.h>
@@ -92,15 +89,17 @@ void arch_init()
 	#ifdef CONFIG_SINGLE_CORE
 		warn("You currently can't have networking if you boot into single core mode!!\n");
 	#else
-		/* TODO: need to call these init methods when we detect the devices, not
-		 * the other way around */
+		/* TODO: use something like linux's device_init() to call these. */
 		#ifdef CONFIG_RL8168
+		extern void rl8168_init(void);		
 		rl8168_init();		
 		#endif
 		#ifdef CONFIG_NE2K
+		extern void ne2k_init(void);		
 		ne2k_init();
 		#endif
 		#ifdef CONFIG_E1000
+		extern void e1000_init(void);		
 		e1000_init();
 		#endif
 	#endif // CONFIG_SINGLE_CORE

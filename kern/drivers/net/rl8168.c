@@ -18,7 +18,7 @@
 #include <arch/smp.h>
 #include <arch/apic.h>
 #include <arch/pci.h>
-#include <arch/rl8168.h>
+#include "rl8168.h"
 
 #include <ros/memlayout.h>
 

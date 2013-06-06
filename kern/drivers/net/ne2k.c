@@ -12,7 +12,7 @@
 #include <arch/smp.h>
 #include <arch/apic.h>
 #include <arch/pci.h>
-#include <arch/ne2k.h>
+#include "ne2k.h"
 
 #include <ros/memlayout.h>
 

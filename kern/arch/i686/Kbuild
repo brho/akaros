@@ -1,7 +1,3 @@
-obj-$(CONFIG_E1000)			+= e1000.o
-obj-$(CONFIG_NE2K)			+= ne2k.o
-obj-$(CONFIG_RL8168)		+= rl8168.o
-
 obj-y						+= apic.o
 obj-y						+= colored_caches.o
 obj-y						+= console.o
