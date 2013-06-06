@@ -43,21 +43,27 @@ config E1000_ON_S142
 
 endif # E1000
 
-# Mostly just a placeholder.  These options do nothing.
-config REALTEK8168
+config RL8168
 	depends on NETWORKING && X86
 	bool "Realtek 8168"
 	default n
 	help
-		Buggy realtek driver.  Use at your own risk.  This CONFIG option
-		actually does nothing; the code is built regardless.
+		Buggy realtek driver.  Use at your own risk.
+
+config NE2K
+	depends on NETWORKING && X86
+	bool "NE2000"
+	default n
+	help
+		Buggy NE2000 driver.  Use at your own risk.
 
 config ETH_AUDIO
 	depends on NETWORKING && X86
 	bool "Ethernet audio"
 	default n
 	help
-		Build old support for David Wessel's ethernet audio device.
+		Build old support for David Wessel's ethernet audio device.  This is
+		less a driver than a NIC-level "intercept".
 
 endmenu
 

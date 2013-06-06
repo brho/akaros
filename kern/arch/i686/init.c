@@ -92,9 +92,17 @@ void arch_init()
 	#ifdef CONFIG_SINGLE_CORE
 		warn("You currently can't have networking if you boot into single core mode!!\n");
 	#else
+		/* TODO: need to call these init methods when we detect the devices, not
+		 * the other way around */
+		#ifdef CONFIG_RL8168
 		rl8168_init();		
+		#endif
+		#ifdef CONFIG_NE2K
 		ne2k_init();
+		#endif
+		#ifdef CONFIG_E1000
 		e1000_init();
+		#endif
 	#endif // CONFIG_SINGLE_CORE
 	#endif // CONFIG_NETWORKING
 
