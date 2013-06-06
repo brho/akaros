@@ -1,0 +1,1 @@
+CROSS_COMPILE := i686-ros-
