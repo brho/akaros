@@ -480,11 +480,6 @@ endif #ifeq ($(mixed-targets),1)
 user-dirs = parlib pthread benchutil
 pthread: parlib
 
-ifeq ($(ARCH),i686)
-user-dirs += c3po
-c3po: parlib
-endif
-
 PHONY += install-libs $(user-dirs)
 install-libs: $(user-dirs) symlinks
 

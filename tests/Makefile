@@ -24,7 +24,6 @@ TESTS_EXECS_CPP  = $(patsubst $(TESTS_DIR)/%.cc, \
                               $(OBJDIR)/$(TESTS_DIR)/%, \
                               $(TESTS_SRCS_CPP))
 
-include $(TESTS_DIR)/c3po/Makefrag
 include $(TESTS_DIR)/openmp/Makefrag
 
 STATIC := $(findstring static,$(CFLAGS_TESTS))
