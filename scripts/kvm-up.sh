@@ -12,8 +12,23 @@ sleep 2
 /etc/init.d/net.br0 start
 /etc/init.d/dnsmasq start
 
+# set up some variables
+MNTDIR=/home/brho/classes/ros/ros-kernel/mnt
+MNTPOINT=$MNTDIR/hdd
+HDDIMG=$MNTDIR/hdd.img
+
 # mount the hdd image
 modprobe loop max_part=10
-losetup /dev/loop5 /home/brho/classes/ros/ros-kernel/mnt/hdd.img
+losetup /dev/loop5 $HDDIMG
 sleep 5
-mount /dev/loop5p1 /home/brho/classes/ros/ros-kernel/mnt/hdd
+mount /dev/loop5p1 $MNTPOINT
+chown -R brho:brho $MNTPOINT
+
+## Alternative method if you have the loopback built into the kernel
+## mount the hdd image with a hardcoded offset, specific to the image we
+## provide
+#losetup /dev/loop5 $HDDIMG
+#losetup -o 1048576 /dev/loop6 /dev/loop5
+#mount /dev/loop6 $MNTPOINT
+#chown -R brho:brho $MNTPOINT
+

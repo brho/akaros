@@ -7,7 +7,7 @@
 # brho's custom targets.  Customize to your system.
 #$(OBJDIR)/kern/.kvm.touch: $(KERNEL_OBJ)
 #	@echo "  (KVM) Copying to mnt/hdd"
-#	$(Q)cp $^ mnt/hdd/texas
+#	$(Q)cp $^ mnt/hdd/kernel
 #	@sync
 #	@touch $@
 #

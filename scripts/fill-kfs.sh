@@ -4,6 +4,7 @@
 #cp -P ../ros-gcc-glibc/install-i386-ros-gcc/i686-ros/lib/libc{-,.}* kern/kfs/lib/
 
 # Full libc SOs  careful with -u, it won't help you change between archs
+mkdir -p kern/kfs/lib
 cp -uP ../ros-gcc-glibc/install-i386-ros-gcc/i686-ros/lib/*.so* kern/kfs/lib
 #cp -uP ../ros-gcc-glibc/install-sparc-ros-gcc/sparc-ros/lib/*.so* kern/kfs/lib
 
@@ -12,4 +13,5 @@ cp -uP ../ros-gcc-glibc/install-i386-ros-gcc/i686-ros/lib/*.so* kern/kfs/lib
 
 # all test progs, something like this to get them
 # don't do this if we're using static binaries, since things will get really large
+mkdir -p kern/kfs/bin
 cp -u `find obj/tests/ -executable ! -type d` kern/kfs/bin/

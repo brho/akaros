@@ -36,6 +36,25 @@ example, to config for 32 bit x86:
 
 $ make ARCH=i686 defconfig
 
+Alternatively, you can run menuconfig to customize what settings you want:
+
+$ make ARCH=i686 menuconfig
+
+There are a lot of settings in here, which you should browse through to decide
+what you want to enable/disable.
+
+Most everyone wants KFS turned on (Filesystems --> KFS filesystem).  This is
+the in-memory filesystem that the kernel uses.  The kernel build scripts will
+look at the "KFS/Initramfs paths" string and take any of those directories and
+add them to a CPIO archive that will eventually become the root filesystem when
+Akaros runs. These settings are set by default when you do a 'make defconfig'.
+
+There are also settings for ext2.  If you turn on ext2 support, you need to
+point to an img file that has been formatted with ext2 and has files in it.  If
+you aren't messing with filesystems at all, feel free to ignore this.  It's an
+in-memory filesystem, like KFS (linked to the end of the kernel), so you won't
+gain much by using it for now.
+
 3.1 Cross compiler (and glibc)
 ----------
 The second step is to build the cross compiler, which lives in
@@ -51,6 +70,12 @@ $ cp Makelocal.template Makelocal
 You need to set your INSTDIRS to some place where you want the cross compiler
 installed.  I have a directory named ros-gcc-glibc for this.
 
+You also need to add bin directories to your PATH where the cross compiler will
+be installed.  This will vary based on your value for INSTDIRS.  For instance,
+my path contains:
+
+/home/brho/classes/ros/ros-gcc-glibc/install-i386-ros-gcc/bin
+
 You can also set up MAKE_JOBS, so you don't over or under load your system when
 building.  I have a 2 core laptop, so I use MAKE_JOBS := 3
 
@@ -60,15 +85,10 @@ $ make x86
 
 This might take a while (10-20 minutes for me on a 2007 era laptop).
 
-Finally, add the cross compiler's bin directories to your PATH.  This will vary
-based on where you installed things.  For instance, my path contains:
-
-/home/brho/classes/ros/ros-gcc-glibc/install-i386-ros-gcc/bin
-
-Just to double check, you should be able to run i686-ros-gcc from your shell.
+Just to double check everything installed correctly, you should be able to run
+i686-ros-gcc from your shell.
 
 Now, you have a cross compiler ready, and you can start to build Akaros.
-
 
 3.2 Kernel
 ----------
@@ -78,29 +98,21 @@ Like the cross compiler, the kernel has its own Makelocal.
 
 $ cp Makelocal.template Makelocal
 
-There are a lot of settings in here, which you need to uncomment to turn on.
-
-Most everyone wants KFS turned on (CONFIG_KFS).  This is the in-memory
-filesystem that the kernel uses.  The kernel build scripts will look at
-INITRAMFS_PATHS and take any of those directories and add them to a CPIO
-archive that will eventually become the root filesystem when Akaros runs.  I
-set CONFIG_KFS and suggested a INITRAMFS_PATH in the Makelocal.template.
-
-There are also settings for ext2.  If you turn on ext2 support, you need to
-point to an img file that has been formatted with ext2 and has files in it.  If
-you aren't messing with filesystems at all, feel free to ignore this.  It's an
-in-memory filesystem, like KFS (linked to the end of the kernel), so you won't
-gain much by using it for now.
+This file is used to set up custom make targets that are not part of the
+default Makefile, but fit nicely into your personal workflow. This file is not
+under version control and can me made to contain just about anything.
 
 Now you're ready to build the kernel:
 
-$ make x86
-
-On future makes, you can just 'make'.  The initial make x86 is to pick a target
-architecture.
+$ make
 
 So the kernel built, but you can't do much with it, and you probably have no
 programs.
+
+Notice that we didn't have to set the ARCH variable this time.  The make system
+knows what architecture we are set up for and will always build for that
+architecture until a new ARCh is selected (i.e. via 'make ARCH=xxx defconfig'
+etc.)
 
 3.3 Userspace
 ---------
@@ -109,12 +121,13 @@ To build userspace and test programs:
 $ make tests
 
 You now have programs and libraries, and need to put them in KFS.  To do this,
-I have a script called 'fill_kfs.sh'.  I usually have it in the directory above
-my repo root.  I put a copy of it in scripts/fill_kfs.sh in the repo.  You will
-need to edit it for your own setup.  Or you can do everything manually.  Either
-way, you need to make sure shared libraries are copied into kern/kfs/lib (given
-kern/kfs as your INITRAMFS_PATH) and you want your programs copied to
-kern/kfs/bin.
+we provide a script called 'fill_kfs.sh'.  A copy of it exists in
+scripts/fill_kfs.sh in the repo, but you will likely want to copy it to the
+directory *above* your root repo and edit it for your own setup.
+Alternatively, you can do everything manually. Either way, you need to make
+sure shared libraries are copied into kern/kfs/lib (given the default value of
+kern/kfs as the path set up for "KFS/Initramfs paths" during configuration) and
+you want your programs copied to kern/kfs/bin.
 
 Now that you've changed the contents of KFS's source, remake the kernel.  You
 should see something like
@@ -137,13 +150,17 @@ Copy that to your busybox directory (once you download and untar it, etc) and
 name it ".config".  You can get busybox from http://www.busybox.net/downloads/.
 Eventually I'll upgrade, though it hasn't been a big deal yet.
 
+$ cd BUSYBOXDIR/..
+$ wget http://www.busybox.net/downloads/busybox-1.17.3.tar.bz2
+$ tar -jxvf busybox-1.17.3.tar.bz2
+$ cd AKAROS-ROOT
 $ cp tools/patches/busybox-1.17.3.config BUSYBOXDIR/.config
 
 $ cd BUSYBOXDIR ; make
 
 Then I copy the unstripped binary to KFS.
 
-$ cp busybox_unstripped AKAROS-REPO/kern/kfs/bin/busybox
+$ cp busybox_unstripped AKAROS-ROOT/kern/kfs/bin/busybox
 
 Note I change the name to busybox (dropping the unstripped).  I want the
 unstripped binary for debugging reasons.
@@ -173,7 +190,7 @@ busybox binary whenever I update it.
 I think some of the other devs build busybox so that it spits out the links
 into an install directory.  Feel free to do whatever.  I'll probably just add a
 bunch of symlinks to the repos default KFS contents one of these days.
-Incidentally, kern/kfs/* is now ignored by git.
+Incidentally, kern/kfs/* is ignored by git.
 
 Now that you've changed KFS, don't forget to remake the kernel.
 
@@ -201,9 +218,10 @@ don't call it hdd64mb.img on my dev machine).
 Personally, I always have hdd.img mounted.  Some of the other devs have make
 targets that mount and umount it.  Whenever I reboot my development machine, I
 run a script (as root) that mounts the image file and sets up a few things for
-networking.  I put a script I use for this in scripts/kvm-up.sh.  You'll need
-to edit this to use it, and feel free to comment out the networking stuff.
-That's for using networking in qemu.
+networking.  I put a script I use for this in scripts/kvm-up.sh.  You'll likely
+want to copy it to the directory *above* the akaros root directory and edit it
+accordingly. Feel free to comment out the networking stuff.  That's for using
+networking in qemu.
 
 Now that your image file is mounted at mnt/hdd, you'll want to copy your
 freshly built kernel to the root of the image.  I have a make target in my
@@ -220,7 +238,6 @@ all: kvm
 
 Now, make kvm.  You should be able to see the new kernel in mnt/hdd/ (do an ls
 -l and check the timestamp).
-
 
 3.6 Running Qemu
 ---------
