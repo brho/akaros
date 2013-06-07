@@ -9,10 +9,6 @@
 #include <timing.h>
 #include <uthread.h>
 
-#ifdef __sparc_v8__
-# define udelay(x) udelay((x)/2000)
-#endif
-
 #define TEST_MMAP					 1
 #define TEST_ONE_CORE				 2
 #define TEST_ASK_FOR_TOO_MANY_CORES	 3

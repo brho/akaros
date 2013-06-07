@@ -1,3 +1,0 @@
-config SPARC
-	def_bool y
-	select APPSERVER

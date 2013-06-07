@@ -239,9 +239,6 @@ int load_elf(struct proc* p, struct file* f)
 	                    {ELF_AUX_PHENT, sizeof(proghdr32_t)},
 	                    {ELF_AUX_PHNUM, ei.phnum},
 	                    {ELF_AUX_ENTRY, ei.entry},
-	                    #ifdef __sparc_v8__
-	                    {ELF_AUX_HWCAP, ELF_HWCAP_SPARC_FLUSH},
-	                    #endif
 	                    {0, 0}};
 
 	// put auxp after argv, envp in procinfo
@@ -260,9 +257,6 @@ int load_elf(struct proc* p, struct file* f)
 	p->env_entry = ei.entry;
 
 	int flags = MAP_FIXED | MAP_ANONYMOUS;
-	#ifdef __sparc_v8__
-	flags |= MAP_POPULATE; // SPARC stacks must be mapped in
-	#endif
 	uintptr_t stacksz = USTACK_NUM_PAGES*PGSIZE;
 	if (do_mmap(p, USTACKTOP-stacksz, stacksz, PROT_READ | PROT_WRITE,
 	            flags, NULL, 0) == MAP_FAILED)

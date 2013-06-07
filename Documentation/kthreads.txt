@@ -130,11 +130,11 @@ pcpui->spare and move the disable_irq() down to right before save_kernel_ctx().
 What's the Deal with Stacks/Stacktops?
 -------------------------------
 When the kernel traps from userspace, it needs to know what to set the kernel
-stack pointer to.  In x86, it looks in the TSS.  In sparc, we have a data
+stack pointer to.  In x86, it looks in the TSS.  In riscv, we have a data
 structure tracking that info (core_stacktops).  One thing I considered was
-migrating the kernel from its boot stacks (x86, just core0, sparc, all the cores
+migrating the kernel from its boot stacks (x86, just core0, riscv, all the cores
 have one).  Instead, we just make sure the tables/TSS are up to date right away
-(before interrupts or traps can come in for x86, and right away for sparc).
+(before interrupts or traps can come in for x86, and right away for riscv).
 These boot stacks aren't particularly special, just note they are in the program
 data/bss sections and were never originally added to a free list.  But they can
 be freed later on.  This might be an issue in some places, but those places

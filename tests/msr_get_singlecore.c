@@ -17,10 +17,6 @@
 #include <uthread.h>
 #include <event.h>
 
-#ifdef __sparc_v8__
-# define udelay(x) udelay((x)/2000)
-#endif
-
 mcs_barrier_t b;
 
 void *core0_tls = 0;

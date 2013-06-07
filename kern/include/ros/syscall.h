@@ -7,8 +7,7 @@
 #include <ros/event.h>
 #include <ros/atomic.h>
 
-/* Flags for an individual syscall.
- * Careful, sparc can't handle flags in byte 3. */
+/* Flags for an individual syscall. */
 #define SC_DONE					0x0001		/* SC is done */
 #define SC_PROGRESS				0x0002		/* SC made progress */
 #define SC_UEVENT				0x0004		/* user has an ev_q */

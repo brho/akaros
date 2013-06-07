@@ -34,8 +34,6 @@ static inline long atomic_read(atomic_t *number)
 	return *(volatile long*)number;
 }
 
-/* Sparc needs atomic add, but the regular ROS atomic add conflicts with
- * glibc's internal one. */
 static inline void ros_atomic_add(atomic_t *number, long inc)
 {
 	atomic_fetch_and_add(number, inc);

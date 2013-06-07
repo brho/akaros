@@ -572,8 +572,6 @@ void test_hello_world_handler(struct hw_trapframe *hw_tf, void *data)
 	int trapno;
 	#if defined(__i386__)
 	trapno = hw_tf->tf_trapno;
-	#elif defined(__sparc_v8__)
-	trapno = (hw_tf->tbr >> 4) & 0xFF;
 	#else
 	trapno = 0;
 	#endif

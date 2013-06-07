@@ -264,8 +264,6 @@ void set_pcpu_alarm_interrupt(uint64_t time, struct timer_chain *tchain)
 		rel_usec = MAX(rel_usec, 1);
 		printd("Setting alarm for %llu, it is now %llu, rel_time %llu "
 		       "tchain %p\n", time, now, rel_usec, pcpui_tchain);
-		/* Note that sparc doesn't honor the one-shot setting, so you might get
-		 * spurious interrupts. */
 		set_core_timer(rel_usec, FALSE);
 		/* Make sure the caller is setting the right tchain */
 		assert(pcpui_tchain == tchain);

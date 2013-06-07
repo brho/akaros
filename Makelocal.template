@@ -30,15 +30,6 @@
 #
 #pxe: $(OBJDIR)/kern/.pxe.touch ;
 
-# various sparc functional simulator configurations
-NP ?= 1
-fs: all
-	sparc_app -p$(NP) -fappserver_ros.conf fs $(KERNEL_OBJ) none
-fsd: all
-	sparc_app_debug -p$(NP) -fappserver_ros.conf fs $(KERNEL_OBJ) none
-hw: all
-	sparc_app -p$(NP) -fappserver_ros.conf hw $(KERNEL_OBJ) none
-
 # risc-v functional simulator
 rvfs: all
 	fesvr -p$(NP) -nopk $(KERNEL_OBJ)

@@ -74,7 +74,7 @@ void mcs_lock_unlock(struct mcs_lock *lock, struct mcs_lock_qnode *qnode)
 }
 
 /* CAS style mcs locks, kept around til we use them.  We're using the
- * usurper-style, since RISCV and SPARC both don't have a real CAS. */
+ * usurper-style, since RISCV doesn't have a real CAS (yet?). */
 void mcs_lock_unlock_cas(struct mcs_lock *lock, struct mcs_lock_qnode *qnode)
 {
 	/* Check if someone is already waiting on us to unlock */

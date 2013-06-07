@@ -161,7 +161,6 @@ glibc-$(GLIBC_VERSION): glibc-$(GLIBC_VERSION).tar.bz2
 	tar -jxf glibc-$(GLIBC_VERSION).tar.bz2
 	$(MAKE) .glibc-ros-patch
 	patch --no-backup-if-mismatch -p0 < glibc-$(GLIBC_VERSION)-riscv.patch
-	rm glibc-$(GLIBC_VERSION)/sysdeps/sparc/sparc32/elf/start.S
 	rm glibc-$(GLIBC_VERSION)/sysdeps/riscv/elf/start.S
 	rm glibc-$(GLIBC_VERSION)/sysdeps/riscv/init-first.c
 	rm glibc-$(GLIBC_VERSION)/sysdeps/i386/elf/start.S

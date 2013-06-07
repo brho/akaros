@@ -26,7 +26,7 @@
 # define KERNBASE               0x80000000
 # define ULIM                   0x7F000000
 # define KERN_LOAD_ADDR           KERNBASE
-# define KERN_VMAP_TOP    		0xfec00000 /* using sparc's upper limit */
+# define KERN_VMAP_TOP    		0xfec00000
 # define NPTLEVELS                       2
 # define L1PGSHIFT                 (13+11)
 # define L1PGSIZE         (1 << L1PGSHIFT)

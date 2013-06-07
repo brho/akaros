@@ -66,9 +66,10 @@ void pop_kernel_ctx(struct kernel_ctx *ctx) __attribute__((noreturn));
 /* Sends a non-maskable interrupt, which we have print a trapframe. */
 void send_nmi(uint32_t os_coreid);
 
-/* Kernel messages.  Each arch implements them in their own way.  Both should be
- * guaranteeing in-order delivery.  Kept here in trap.h, since sparc is using
- * trap.h for KMs.  Eventually, both arches will use the same implementation.
+/* Kernel messages.  This is an in-order 'active message' style messaging
+ * subsystem, where you can instruct other cores (including your own) to execute
+ * a function (with arguments), either immediately or whenever the kernel is
+ * able to abandon its context/stack (permanent swap).
  *
  * These are different (for now) than the smp_calls in smp.h, since
  * they will be executed immediately (for urgent messages), and in the order in
@@ -88,7 +89,6 @@ void send_nmi(uint32_t os_coreid);
 
 typedef void (*amr_t)(uint32_t srcid, long a0, long a1, long a2);
 
-/* Must stay 8-byte aligned for sparc */
 struct kernel_message
 {
 	STAILQ_ENTRY(kernel_message) link;

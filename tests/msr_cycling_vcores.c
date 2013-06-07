@@ -12,10 +12,6 @@
 #include <mcs.h>
 #include <uthread.h>
 
-#ifdef __sparc_v8__
-# define udelay(x) udelay((x)/2000)
-#endif
-
 mcs_barrier_t b;
 uint64_t begin = 0, end = 0;
 

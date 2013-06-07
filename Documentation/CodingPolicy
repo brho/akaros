@@ -109,7 +109,7 @@ Contributing:
   personnel.
 
 - Expect your code to be audited by the appropriate subsystem maintainer.
-  Basically, this means that if it is related to the sparc port, you need to
+  Basically, this means that if it is related to the riscv port, you need to
   make Andrew happy.  Otherwise, you need to make Barret happy.
 
 - Despite being a research project, we make every effort to do things the

@@ -132,8 +132,8 @@ int smp_call_wait(handler_wrapper_t* wrapper)
 }
 
 /* Perform any initialization needed by per_cpu_info.  Right now, this just
- * inits the amsg list (which sparc will probably also want).  Make sure every
- * core calls this at some point in the smp_boot process. */
+ * inits the amsg list.  Make sure every core calls this at some point in the
+ * smp_boot process. */
 void __arch_pcpu_init(uint32_t coreid)
 {
 	// Switch to the real L1 page table, rather than the boot page table which
