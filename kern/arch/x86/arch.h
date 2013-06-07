@@ -86,7 +86,7 @@ read_tscp(void)
 	return tsc;
 }
 
-/* Check out k/a/i686/rdtsc_test.c for more info */
+/* Check out k/a/x86/rdtsc_test.c for more info */
 static __inline uint64_t 
 read_tsc_serialized(void)
 {

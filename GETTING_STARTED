@@ -34,11 +34,11 @@ The first step is to configure the kernel.  config, menuconfig, and some of the
 other KBuild targets work.  Defconfig gives you a default configuration.  For
 example, to config for 32 bit x86:
 
-$ make ARCH=i686 defconfig
+$ make ARCH=x86 defconfig
 
 Alternatively, you can run menuconfig to customize what settings you want:
 
-$ make ARCH=i686 menuconfig
+$ make ARCH=x86 menuconfig
 
 There are a lot of settings in here, which you should browse through to decide
 what you want to enable/disable.

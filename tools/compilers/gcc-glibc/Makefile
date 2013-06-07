@@ -77,7 +77,7 @@ x86:
 	export PATH=$(DESTDIR)$(X86_INSTDIR)/bin:$(PATH);\
 	export ARCH=$(X86_ARCH);\
 	export ARCH_CFLAGS=$(X86_CFLAGS);\
-	export ROS_ARCH_DIR=$(X86_ARCH);\
+	export ROS_ARCH_DIR=x86;\
 	export BINARY_PREFIX=$(X86_BINARY_PREFIX);\
 	export GCC_BUILD_FLAGS=$(X86_GCC_BUILD_FLAGS);\
 	$(MAKE) make-all
@@ -228,7 +228,7 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 	cp -r $(ROSDIR)/user/pthread/*.h \
 	   $(INSTDIR)/$(ARCH)-ros/sys-include/
 	rm -rf $(INSTDIR)/$(ARCH)-ros/sys-include/arch
-	ln -s $(ARCH) $(INSTDIR)/$(ARCH)-ros/sys-include/arch 
+	ln -s $(ROS_ARCH_DIR) $(INSTDIR)/$(ARCH)-ros/sys-include/arch 
 
 .$(BINARY_PREFIX)gcc-stage1-configure: 
 	$(MAKE) $(BINARY_PREFIX)gcc-stage1-builddir
@@ -302,7 +302,7 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 .$(BINARY_PREFIX)ros-install-libs:
 	cd $(ROSDIR); \
 	make userclean; \
-	make ARCH=$(ARCH) -j $(MAKE_JOBS) install-libs
+	make ARCH=$(ROS_ARCH_DIR) -j $(MAKE_JOBS) install-libs
 
 .$(BINARY_PREFIX)gcc-stage2-configure:
 	$(MAKE) $(BINARY_PREFIX)gcc-stage2-builddir

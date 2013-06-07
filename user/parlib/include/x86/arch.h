@@ -61,7 +61,7 @@ cpuid(uint32_t info1, uint32_t info2, uint32_t *eaxp, uint32_t *ebxp,
 		*edxp = edx;
 }
 
-/* Check out k/a/i686/rdtsc_test.c for more info */
+/* Check out k/a/x86/rdtsc_test.c for more info */
 static __inline uint64_t 
 read_tsc_serialized(void)
 {

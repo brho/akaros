@@ -1,8 +1,6 @@
 # default config.  While this is x86 specific, when config'd for RISCV, the x86
 # specific items will be ignored.
 #
-# Akaros/i686 Kernel Configuration
-#
 CONFIG_X86=y
 
 #

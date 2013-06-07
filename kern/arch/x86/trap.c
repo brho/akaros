@@ -632,7 +632,7 @@ void sysenter_callwrapper(struct hw_trapframe *hw_tf)
 	proc_restartcore();
 }
 
-/* Declared in i686/arch.h */
+/* Declared in x86/arch.h */
 void send_ipi(uint32_t os_coreid, uint8_t vector)
 {
 	int hw_coreid = get_hw_coreid(os_coreid);

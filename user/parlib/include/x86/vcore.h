@@ -61,7 +61,7 @@ struct restart_helper {
  * While this may seem dangerous, the kernel needs to be able to handle this
  * scenario.  It's also important that we never wait on this, since for all but
  * the first call, the DONE flag will be set.  (Set once, then never reset) */
-extern struct syscall vc_entry;	/* in i686/vcore.c */
+extern struct syscall vc_entry;	/* in x86/vcore.c */
 
 static inline void pop_hw_tf(struct hw_trapframe *tf, uint32_t vcoreid)
 {
