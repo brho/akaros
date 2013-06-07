@@ -47,6 +47,10 @@ MAKEFLAGS += -rR --no-print-directory
 PHONY := all
 all: akaros-kernel
 
+# Setup dumping ground for object files and any temporary files we need to
+# generate for non-kbuild targets
+OBJDIR ?= obj
+
 # Symlinks
 # =========================================================================
 # We have a few symlinks so that code can include <arch/whatever.h>.  This
@@ -71,8 +75,8 @@ goals-has-build-targets := 1
 endif
 
 PHONY += symlinks clean_symlinks
-clean_symlinks:
-	@-rm -f kern/include/arch kern/boot user/parlib/include/arch
+clean_symlinks: objclean
+	@rm -f kern/include/arch kern/boot user/parlib/include/arch
 
 arch-link := $(notdir $(shell readlink kern/include/arch))
 valid-arches := $(notdir $(wildcard kern/arch/*))
@@ -342,7 +346,6 @@ endif # $(dot-config)
 
 # The user can override this, though it won't apply for any of the in-tree
 # kernel build output.  Right now, it's only passed down to tests/
-OBJDIR ?= obj
 dummy-1 := $(shell mkdir -p $(OBJDIR)/kern/)
 
 # Don't need to export these, since the Makelocal is included.
@@ -501,16 +504,21 @@ tests: install-libs
 testclean:
 	@$(MAKE) -f tests/Makefile clean
 
-install-tests:
-	@$(MAKE) -f tests/Makefile install
+# KFS related stuff
+PHONY += fill-kfs unfill-kfs
+XCC_SO_FILES = $(addprefix $(XCC_TARGET_ROOT)/lib/, *.so*)
 
-# TODO: cp -u all of the .sos, but flush it on an arch change (same with tests)
-fill-kfs: install-libs install-tests
+$(OBJDIR)/.dont-force-fill-kfs:
+	@rm -rf $(addprefix  $(FIRST_KFS_PATH)/lib, $(notdir $(XCC_SO_FILES)))
+	@echo "Cross Compiler 'so' files removed from KFS"
+	@$(MAKE) -f tests/Makefile unfill-kfs
+	@touch $(OBJDIR)/.dont-force-fill-kfs
+
+fill-kfs: $(OBJDIR)/.dont-force-fill-kfs install-libs
 	@mkdir -p $(FIRST_KFS_PATH)/lib
-	@cp $(addprefix $(XCC_TARGET_ROOT)/lib/, \
-	  libc.so.6 ld.so.1 libm.so libgcc_s.so.1) $(FIRST_KFS_PATH)/lib
-	$(Q)$(STRIP) --strip-debug $(addprefix $(FIRST_KFS_PATH)/lib/, \
-	                                       libc.so.6 ld.so.1)
+	@cp -uP  $(XCC_SO_FILES) $(FIRST_KFS_PATH)/lib
+	@echo "Cross Compiler 'so' files installed to KFS"
+	@$(MAKE) -f tests/Makefile fill-kfs
 
 # Use doxygen to make documentation for ROS (Untested since 2010 or so)
 doxygen-dir := $(CUR_DIR)/Documentation/doxygen
@@ -528,7 +536,7 @@ doxyclean:
 
 objclean:
 	@echo + clean [OBJDIR]
-	@rm -rf $(OBJDIR)/*
+	@rm -rf $(OBJDIR)
 
 realclean: userclean mrproper doxyclean objclean
 

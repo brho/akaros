@@ -1,5 +1,5 @@
 # Default target is to just make
-PHONY += all install clean
+PHONY += all fill-kfs unfill-kfs clean
 all:
 
 # TODO: when we clean this up, if we ditch OBJDIR, change the root makefile
@@ -24,6 +24,8 @@ TESTS_EXECS_CPP  = $(patsubst $(TESTS_DIR)/%.cc, \
                               $(OBJDIR)/$(TESTS_DIR)/%, \
                               $(TESTS_SRCS_CPP))
 
+TESTS_EXECS = $(TESTS_EXECS_C) $(TESTS_EXECS_CPP)
+
 include $(TESTS_DIR)/openmp/Makefrag
 
 STATIC := $(findstring static,$(CFLAGS_TESTS))
@@ -43,11 +45,17 @@ $(OBJDIR)/$(TESTS_DIR)/%: $(TESTS_LDDEPENDS_CPP)
 	@mkdir -p $(@D)
 	$(Q)$(CPP) $(TESTS_CXXFLAGS) -o $@ $< $(TESTS_LDLIBS)
 
-all: $(TESTS_EXECS_C) $(TESTS_EXECS_CPP) 
+all: $(TESTS_EXECS)
 	@:
 
-install: $(TESTS_EXECS_C) $(TESTS_EXECS_CPP) 
-	$(Q)cp -u $^ $(FIRST_KFS_PATH)/bin
+fill-kfs: $(TESTS_EXECS)
+	@mkdir -p $(FIRST_KFS_PATH)/bin
+	$(Q)cp -uP $^ $(FIRST_KFS_PATH)/bin
+	@echo "User space tests installed to KFS"
+
+unfill-kfs:
+	$(Q)rm -rf $(addprefix  $(FIRST_KFS_PATH)/bin, $(notdir $(TESTS_EXECS)))
+	@echo "User space tests removed from KFS"
 
 clean:
 	@echo + clean [TESTS]

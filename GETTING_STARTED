@@ -121,13 +121,13 @@ To build userspace and test programs:
 $ make tests
 
 You now have programs and libraries, and need to put them in KFS.  To do this,
-we provide a script called 'fill_kfs.sh'.  A copy of it exists in
-scripts/fill_kfs.sh in the repo, but you will likely want to copy it to the
-directory *above* your root repo and edit it for your own setup.
-Alternatively, you can do everything manually. Either way, you need to make
-sure shared libraries are copied into kern/kfs/lib (given the default value of
-kern/kfs as the path set up for "KFS/Initramfs paths" during configuration) and
-you want your programs copied to kern/kfs/bin.
+we provide a 'fill-kfs' make target. 
+
+$ make fill-kfs
+
+The 'fill-kfs' target copies your cross compiler's shared libraries and all
+test binaries into the first "KFS/Initramfs path" you set during configuration
+(or kern/kfs/lib if you just kept the default).
 
 Now that you've changed the contents of KFS's source, remake the kernel.  You
 should see something like
@@ -294,7 +294,7 @@ $ vi tests/hello.c
 $ make tests
 (new version in obj/tests/hello)
 
-$ ../fill-kfs.sh
+$ make fill-kfs
 (updates kfs)
 
 $ make
@@ -334,7 +334,7 @@ be able to see what's going on all the time.  (unlike when building glibc...).
 
 Oh, and don't forget to:
 
-$ ../fill-kfs.sh (or whatever you do)
+$ make fill-kfs
 
 to make sure you run the new pthread_test. 
 
