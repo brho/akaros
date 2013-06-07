@@ -191,7 +191,7 @@ AKAROSINCLUDE   := -I$(srctree)/kern/include/
 
 # CROSS_COMPILE is defined per-arch.  Each arch can set other makeflags, kbuild
 # directories, etc. 
-include $(srctree)/kern/arch/$(ARCH)/Makefile
+-include $(srctree)/kern/arch/$(ARCH)/Makefile
 
 CC	    := $(CROSS_COMPILE)gcc 
 CPP	    := $(CROSS_COMPILE)g++
