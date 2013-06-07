@@ -38,10 +38,10 @@ $(FINALLIB): $(OBJS)
 	$(Q)$(AR) rc $@ $(OBJS)
 
 install: $(FINALLIB)
-	@cp $(FINALLIB) $(XCC_ROOT)/$(ARCH)-ros/lib/
-	@cp -R $(INCDIR)/* $(XCC_ROOT)/$(ARCH)-ros/sys-include/
-	@rm -rf $(XCC_ROOT)/$(ARCH)-ros/sys-include/benchutil
-	@ln -fs . $(XCC_ROOT)/$(ARCH)-ros/sys-include/benchutil
+	@cp $(FINALLIB) $(XCC_TARGET_ROOT)/lib/
+	@cp -R $(INCDIR)/* $(XCC_TARGET_ROOT)/sys-include/
+	@rm -rf $(XCC_TARGET_ROOT)/sys-include/benchutil
+	@ln -fs . $(XCC_TARGET_ROOT)/sys-include/benchutil
 
 clean: 
 	@echo + clean [$(LIBUCNAME)]

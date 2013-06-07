@@ -207,8 +207,8 @@ endif
 # Computing these without a cross compiler complains loudly
 gcc-lib := $(shell $(CC) -print-libgcc-file-name)
 NOSTDINC_FLAGS += -nostdinc -isystem $(shell $(CC) -print-file-name=include)
-# Note: calling this GCC_ROOT interferes with the host tools
-XCC_ROOT := $(dir $(shell which $(CC)))../
+XCC_TARGET_ROOT := $(dir $(shell which $(CC)))../$(patsubst %-,%,\
+                                                   $(CROSS_COMPILE))
 endif
 
 CFLAGS_KERNEL += -O2 -pipe -MD -gstabs
@@ -235,7 +235,7 @@ KBUILD_CHECKSRC := 0
 export AKAROSINCLUDE CROSS_COMPILE
 export CC CPP AS AR LD OBJCOPY OBJDUMP NM STRIP
 export CFLAGS_KERNEL AFLAGS_KERNEL
-export NOSTDINC_FLAGS XCC_ROOT
+export NOSTDINC_FLAGS XCC_TARGET_ROOT
 export KBUILD_BUILTIN KBUILD_CHECKSRC
 
 CFLAGS_USER += -O2 -std=gnu99 -fno-stack-protector -fgnu89-inline
@@ -507,7 +507,7 @@ install-tests:
 # TODO: cp -u all of the .sos, but flush it on an arch change (same with tests)
 fill-kfs: install-libs install-tests
 	@mkdir -p $(FIRST_KFS_PATH)/lib
-	@cp $(addprefix $(XCC_ROOT)/$(ARCH)-ros/lib/, \
+	@cp $(addprefix $(XCC_TARGET_ROOT)/lib/, \
 	  libc.so.6 ld.so.1 libm.so libgcc_s.so.1) $(FIRST_KFS_PATH)/lib
 	$(Q)$(STRIP) --strip-debug $(addprefix $(FIRST_KFS_PATH)/lib/, \
 	                                       libc.so.6 ld.so.1)

@@ -30,8 +30,8 @@ $(FINALLIB): $(OBJS)
 	$(Q)$(AR) rc $@ $(OBJS)
 
 install: $(FINALLIB)
-	@cp $(FINALLIB) $(XCC_ROOT)/$(ARCH)-ros/lib/
-	@cp -R $(INCDIR)/*.h $(XCC_ROOT)/$(ARCH)-ros/sys-include/
+	@cp $(FINALLIB) $(XCC_TARGET_ROOT)/lib/
+	@cp -R $(INCDIR)/*.h $(XCC_TARGET_ROOT)/sys-include/
 
 clean: 
 	@echo + clean [$(LIBUCNAME)]
