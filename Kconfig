@@ -9,6 +9,12 @@ config SRCARCH
 	string
 	option env="ARCH"
 
+config 64BIT
+	bool "64-bit kernel"
+	default n
+	help
+		Say yes to build a 64-bit kernel, amd64 / x86_64, riscv64, etc.
+
 source "kern/arch/$SRCARCH/Kconfig"
 
 source "kern/src/net/Kconfig"

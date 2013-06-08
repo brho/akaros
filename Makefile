@@ -185,68 +185,6 @@ export quiet Q KBUILD_VERBOSE
 $(srctree)/scripts/Kbuild.include: ;
 include $(srctree)/scripts/Kbuild.include
 
-# Akaros Build Environment
-# =========================================================================
-AKAROSINCLUDE   := -I$(srctree)/kern/include/
-
-# CROSS_COMPILE is defined per-arch.  Each arch can set other makeflags, kbuild
-# directories, etc. 
--include $(srctree)/kern/arch/$(ARCH)/Makefile
-
-CC	    := $(CROSS_COMPILE)gcc 
-CPP	    := $(CROSS_COMPILE)g++
-AS	    := $(CROSS_COMPILE)as
-AR	    := $(CROSS_COMPILE)ar
-LD	    := $(CROSS_COMPILE)ld
-OBJCOPY	:= $(CROSS_COMPILE)objcopy
-OBJDUMP	:= $(CROSS_COMPILE)objdump
-NM	    := $(CROSS_COMPILE)nm
-STRIP   := $(CROSS_COMPILE)strip
-
-ifeq ($(goals-has-build-targets),1)
-ifeq ($(shell which $(CROSS_COMPILE)gcc 2>/dev/null ),)
-$(error Could not find a $(CROSS_COMPILE) version of GCC/binutils. \
-        Be sure to build the cross-compiler and update your PATH)
-endif
-# Computing these without a cross compiler complains loudly
-gcc-lib := $(shell $(CC) -print-libgcc-file-name)
-NOSTDINC_FLAGS += -nostdinc -isystem $(shell $(CC) -print-file-name=include)
-XCC_TARGET_ROOT := $(dir $(shell which $(CC)))../$(patsubst %-,%,\
-                                                   $(CROSS_COMPILE))
-endif
-
-CFLAGS_KERNEL += -O2 -pipe -MD -gstabs
-CFLAGS_KERNEL += -std=gnu99 -fgnu89-inline
-CFLAGS_KERNEL += -fno-strict-aliasing -fno-omit-frame-pointer
-CFLAGS_KERNEL += -fno-stack-protector
-CFLAGS_KERNEL += -Wall -Wno-format -Wno-unused
-CFLAGS_KERNEL += -DROS_KERNEL 
-CFLAGS_KERNEL += -include include/generated/autoconf.h
-
-# TODO: do we need this, or can we rely on the compiler's defines?
-CFLAGS_KERNEL += -D$(ARCH)
-
-# TODO: this requires our own strchr (kern/src/stdio.c), which is a potential
-# source of bugs/problems.
-# note we still pull in stdbool and stddef from the compiler
-CFLAGS_KERNEL += -fno-builtin
-
-AFLAGS_KERNEL := $(CFLAGS_KERNEL)
-
-KBUILD_BUILTIN := 1
-KBUILD_CHECKSRC := 0
-
-export AKAROSINCLUDE CROSS_COMPILE
-export CC CPP AS AR LD OBJCOPY OBJDUMP NM STRIP
-export CFLAGS_KERNEL AFLAGS_KERNEL
-export NOSTDINC_FLAGS XCC_TARGET_ROOT
-export KBUILD_BUILTIN KBUILD_CHECKSRC
-
-CFLAGS_USER += -O2 -std=gnu99 -fno-stack-protector -fgnu89-inline
-CXXFLAGS_USER += -O2
-
-export CFLAGS_USER CXXFLAGS_USER
-
 # Kbuild Target/Goals Parsing
 # =========================================================================
 # Need to figure out if we're a config or not, and whether or not to include
@@ -340,6 +278,72 @@ else
 # Dummy target needed, because used as prerequisite
 include/config/auto.conf: ;
 endif # $(dot-config)
+
+# Akaros Build Environment
+# =========================================================================
+AKAROSINCLUDE   := -I$(srctree)/kern/include/
+
+# CROSS_COMPILE is defined per-arch.  Each arch can set other makeflags, kbuild
+# directories, etc. 
+-include $(srctree)/kern/arch/$(ARCH)/Makefile
+
+CC	    := $(CROSS_COMPILE)gcc 
+CPP	    := $(CROSS_COMPILE)g++
+AS	    := $(CROSS_COMPILE)as
+AR	    := $(CROSS_COMPILE)ar
+LD	    := $(CROSS_COMPILE)ld
+OBJCOPY	:= $(CROSS_COMPILE)objcopy
+OBJDUMP	:= $(CROSS_COMPILE)objdump
+NM	    := $(CROSS_COMPILE)nm
+STRIP   := $(CROSS_COMPILE)strip
+
+# These may have bogus values if there is no compiler.  The kernel and user
+# build targets will check cc-exists.  Hopefully no cleaning targets rely on
+# these.  Note that if you change configs, these will get computed once, before
+# silentoldconfig kicks in to regenerate auto.conf, and these values will
+# temporarily be stale.
+gcc-lib := $(shell $(CC) -print-libgcc-file-name 2>/dev/null)
+NOSTDINC_FLAGS += -nostdinc -isystem \
+                  $(shell $(CC) -print-file-name=include 2>/dev/null)
+XCC_TARGET_ROOT := $(dir $(shell which $(CC)))../$(patsubst %-,%,\
+                                                   $(CROSS_COMPILE))
+
+CFLAGS_KERNEL += -O2 -pipe -MD -gstabs
+CFLAGS_KERNEL += -std=gnu99 -fgnu89-inline
+CFLAGS_KERNEL += -fno-strict-aliasing -fno-omit-frame-pointer
+CFLAGS_KERNEL += -fno-stack-protector
+CFLAGS_KERNEL += -Wall -Wno-format -Wno-unused
+CFLAGS_KERNEL += -DROS_KERNEL 
+CFLAGS_KERNEL += -include include/generated/autoconf.h -include include/common.h
+ifeq ($(CONFIG_64BIT),y)
+CFLAGS_KERNEL += -m64
+else
+CFLAGS_KERNEL += -m32
+endif
+
+# TODO: do we need this, or can we rely on the compiler's defines?
+CFLAGS_KERNEL += -D$(ARCH)
+
+# TODO: this requires our own strchr (kern/src/stdio.c), which is a potential
+# source of bugs/problems.
+# note we still pull in stdbool and stddef from the compiler
+CFLAGS_KERNEL += -fno-builtin
+
+AFLAGS_KERNEL := $(CFLAGS_KERNEL)
+
+KBUILD_BUILTIN := 1
+KBUILD_CHECKSRC := 0
+
+export AKAROSINCLUDE CROSS_COMPILE
+export CC CPP AS AR LD OBJCOPY OBJDUMP NM STRIP
+export CFLAGS_KERNEL AFLAGS_KERNEL
+export NOSTDINC_FLAGS XCC_TARGET_ROOT
+export KBUILD_BUILTIN KBUILD_CHECKSRC
+
+CFLAGS_USER += -O2 -std=gnu99 -fno-stack-protector -fgnu89-inline
+CXXFLAGS_USER += -O2
+
+export CFLAGS_USER CXXFLAGS_USER
 
 # Akaros include stuff (includes custom make targets and user overrides)
 # =========================================================================
@@ -456,9 +460,14 @@ $(sort $(akaros-deps)): $(akaros-dirs) ;
 
 # Recursively Kbuild all of our directories.  If we're changing arches
 # mid-make, we might have issues ( := on akaros-dirs, etc).
-PHONY += $(akaros-dirs)
-$(akaros-dirs): scripts symlinks
+PHONY += $(akaros-dirs) cc_exists
+$(akaros-dirs): scripts symlinks cc-exists
 	$(Q)$(MAKE) $(build)=$@
+
+cc-exists:
+	@if [ "`which $(CROSS_COMPILE)gcc`" = "" ]; then echo \
+	    Could not find a $(CROSS_COMPILE) version of GCC/binutils. \
+	    Be sure to build the cross-compiler and update your PATH; exit 1; fi
 
 $(CMP_KERNEL_OBJ): $(KERNEL_OBJ)
 	@echo "Compressing kernel image"
@@ -484,7 +493,7 @@ user-dirs = parlib pthread benchutil
 pthread: parlib
 
 PHONY += install-libs $(user-dirs)
-install-libs: $(user-dirs) symlinks
+install-libs: $(user-dirs) symlinks cc-exists
 
 $(user-dirs):
 	@cd user/$@ && $(MAKE) && $(MAKE) install

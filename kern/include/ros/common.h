@@ -1,6 +1,7 @@
 #ifndef ROS_COMMON_H
 #define ROS_COMMON_H
 
+#ifndef __ASSEMBLER__
 #ifndef __IVY__
 #include <ros/noivy.h>
 #endif
@@ -165,5 +166,7 @@ static inline bool mult_will_overflow_u64(uint64_t a, uint64_t b)
 	}                                                                          \
 	initialized = TRUE;                                                        \
 }
+
+#endif /* __ASSEMBLER__ */
 
 #endif /* ROS_COMMON_H */
