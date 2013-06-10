@@ -37,31 +37,6 @@ void printnum(void (*putch)(int, void**), void **putdat,
 	putch("0123456789abcdef"[num % base], putdat);
 }
 
-// Get an unsigned int of various possible sizes from a varargs list,
-// depending on the lflag parameter.
-static unsigned long long getuint(va_list *ap, int lflag)
-{
-	if (lflag >= 2)
-		return va_arg(*ap, unsigned long long);
-	else if (lflag)
-		return va_arg(*ap, unsigned long);
-	else
-		return va_arg(*ap, unsigned int);
-}
-
-// Same as getuint but signed - can't use getuint
-// because of sign extension
-static long long getint(va_list *ap, int lflag)
-{
-	if (lflag >= 2)
-		return va_arg(*ap, long long);
-	else if (lflag)
-		return va_arg(*ap, long);
-	else
-		return va_arg(*ap, int);
-}
-
-
 // Main function to format and print a string.
 #ifdef __DEPUTY__
 void printfmt(void (*putch)(int, TV(t)), TV(t) putdat, const char *fmt, ...);
@@ -187,9 +162,13 @@ void vprintfmt(void (*putch)(int, void**), void **putdat, const char *fmt, va_li
 				putch(' ', putdat);
 			break;
 
-		// (signed) decimal
-		case 'd':
-			num = getint(&ap, lflag);
+		case 'd': /* (signed) decimal */
+			if (lflag >= 2)
+				num = va_arg(ap, long long);
+			else if (lflag)
+				num = va_arg(ap, long);
+			else
+				num = va_arg(ap, int);
 			if ((long long) num < 0) {
 				putch('-', putdat);
 				num = -(long long) num;
@@ -197,17 +176,21 @@ void vprintfmt(void (*putch)(int, void**), void **putdat, const char *fmt, va_li
 			base = 10;
 			goto number;
 
-		// unsigned decimal
-		case 'u':
-			num = getuint(&ap, lflag);
-			base = 10;
-			goto number;
-
-		// (unsigned) octal
-		case 'o':
-			// should do something with padding so it's always 3 octits
-			num = getuint(&ap, lflag);
-			base = 8;
+		case 'u': /* unsigned decimal */
+		case 'o': /* (unsigned) octal */
+		case 'x': /* (unsigned) hexadecimal */
+			if (lflag >= 2)
+				num = va_arg(ap, unsigned long long);
+			else if (lflag)
+				num = va_arg(ap, unsigned long);
+			else
+				num = va_arg(ap, unsigned int);
+			if (ch == 'u')
+				base = 10;
+			else if (ch == 'o')
+				base = 8;
+			else	/* x */
+				base = 16;
 			goto number;
 
 		// pointer
@@ -222,10 +205,6 @@ void vprintfmt(void (*putch)(int, void**), void **putdat, const char *fmt, va_li
 			base = 16;
 			goto number;
 
-		// (unsigned) hexadecimal
-		case 'x':
-			num = getuint(&ap, lflag);
-			base = 16;
 		number:
 			printnum(putch, putdat, num, base, width, padc);
 			break;
