@@ -12,14 +12,11 @@
 #define ENABLE_PERFCTR 0x00400000
 #define DISABLE_PERFCTR 0xFFAFFFFF
 
-
-static __inline uint64_t
-read_pmc(uint32_t index)
-{                                                                                                    
-    uint64_t pmc;
-
-    __asm __volatile("rdpmc" : "=A" (pmc) : "c" (index)); 
-    return pmc;                                                                                      
+static inline uint64_t read_pmc(uint32_t index)
+{
+	uint32_t edx, eax;
+	asm volatile("rdpmc" : "=d"(edx), "=a"(eax) : "c"(index));
+	return (uint64_t)edx << 32 | eax;
 }
 
 void perfmon_init();

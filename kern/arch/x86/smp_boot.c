@@ -67,7 +67,7 @@ static void smp_final_core_init(struct hw_trapframe *hw_tf, void *data)
 }
 
 // this needs to be set in smp_entry too...
-#define trampoline_pg 0x00001000
+#define trampoline_pg 0x00001000UL
 extern char (SNT SREADONLY smp_entry)[];
 extern char (SNT SREADONLY smp_entry_end)[];
 extern char (SNT SREADONLY smp_boot_lock)[];
@@ -232,10 +232,11 @@ uint32_t smp_main(void)
 	 * we use the bottom of the stack page... */
 	*(uintptr_t*)page2kva(my_stack) = (uintptr_t)gdt_etc;
 
+	/* TODO: 64b is diff, use a helper */
 	// Set up MSR for SYSENTER 
 	write_msr(MSR_IA32_SYSENTER_CS, GD_KT);
 	write_msr(MSR_IA32_SYSENTER_ESP, my_stack_top);
-	write_msr(MSR_IA32_SYSENTER_EIP, (uint32_t) &sysenter_handler);
+	write_msr(MSR_IA32_SYSENTER_EIP, (uintptr_t) &sysenter_handler);
 
 	// Build and load the gdt / gdt_pd
 	memcpy(my_gdt, gdt, sizeof(segdesc_t)*SEG_COUNT);
@@ -247,14 +248,14 @@ uint32_t smp_main(void)
 	my_ts->ts_esp0 = my_stack_top;
 	my_ts->ts_ss0 = GD_KD;
 	// Initialize the TSS field of my_gdt.
-	my_gdt[GD_TSS >> 3] = (segdesc_t)SEG16(STS_T32A, (uint32_t) (my_ts),
+	my_gdt[GD_TSS >> 3] = (segdesc_t)SEG16(STS_T32A, (uintptr_t)my_ts,
 	                      sizeof(taskstate_t), 0);
 	my_gdt[GD_TSS >> 3].sd_s = 0;
 	// Load the TSS
 	ltr(GD_TSS);
 
 	// Loads the same IDT used by the other cores
-	asm volatile("lidt idt_pd");
+	asm volatile("lidt %0" : : "m"(idt_pd));
 
 	// APIC setup
 	// set LINT0 to receive ExtINTs (KVM's default).  At reset they are 0x1000.
@@ -296,7 +297,7 @@ void __arch_pcpu_init(uint32_t coreid)
 		per_cpu_info[0].tss = &ts;
 		per_cpu_info[0].gdt = gdt;
 	} else {
-		my_stack_bot = ROUNDDOWN(read_esp(), PGSIZE);
+		my_stack_bot = ROUNDDOWN(read_sp(), PGSIZE);
 		per_cpu_info[coreid].tss = (taskstate_t*)(*(uintptr_t*)my_stack_bot);
 		per_cpu_info[coreid].gdt = (segdesc_t*)(*(uintptr_t*)my_stack_bot +
 		                           sizeof(taskstate_t) + sizeof(pseudodesc_t));

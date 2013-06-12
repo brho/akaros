@@ -22,7 +22,9 @@
  * @todo Come up with an impliment a concurrency model for use of the route/unroute functions
  * @todo Once we begin using logical core ID's for groups, adjust route/unroute to utilize this (adjust high word)
  * @todo Some notion of a 'initalized' flag we can check to ensure bootup call order.
- */
+ *
+ * TODO: fix the formatting and make helper functions.  it's hard to see what
+ * the heck is going on, esp with the rite_mmregs. */
 
 #include <arch/mmu.h>
 #include <arch/x86.h>
@@ -101,7 +103,7 @@ void ioapic_init() {
 		if (dst_apic_id == INVALID_DEST_APIC)
 			continue;
 			
-		if (ioapic_redirects[i].ioapic_address != NULL) {
+		if (ioapic_redirects[i].ioapic_address != 0) {
 			// This is technically a lie. We could in theory handle this, so long as
 			//  everything agrees.... however this shouldnt ever really happen
 			//  as this means we have both PCI and ISA claiming an interrupt
@@ -160,7 +162,8 @@ void ioapic_init() {
 
 void ioapic_route_irq(uint8_t irq, uint8_t dest) {
 	
-	if (((irq + KERNEL_IRQ_OFFSET) >= NUM_IRQS) || (ioapic_redirects[irq].ioapic_address == NULL)) {
+	if (((irq + KERNEL_IRQ_OFFSET) >= NUM_IRQS) ||
+	    (ioapic_redirects[irq].ioapic_address == 0)) {
 		panic("TRYING TO REROUTE AN INVALID IRQ!");
 	}
 
@@ -179,10 +182,10 @@ void ioapic_route_irq(uint8_t irq, uint8_t dest) {
 	
 	// YOU MUST MUST MUST MUST MUST MUST MUST write the high bits first. If you don't, you get interrupts going to crazy places
 	// Ask Paul about that afternoon of his life.
-	write_mmreg32((uint32_t)ioapic_redirects[irq].ioapic_address , IOAPIC_REDIRECT_OFFSET + 2*ioapic_redirects[irq].ioapic_int + 1);
-	write_mmreg32((uint32_t)ioapic_redirects[irq].ioapic_address  + IOAPIC_WRITE_WINDOW_OFFSET, redirect_high);
-	write_mmreg32((uint32_t)ioapic_redirects[irq].ioapic_address , IOAPIC_REDIRECT_OFFSET + 2*ioapic_redirects[irq].ioapic_int);
-	write_mmreg32((uint32_t)ioapic_redirects[irq].ioapic_address  + IOAPIC_WRITE_WINDOW_OFFSET, redirect_low);
+	write_mmreg32(ioapic_redirects[irq].ioapic_address , IOAPIC_REDIRECT_OFFSET + 2*ioapic_redirects[irq].ioapic_int + 1);
+	write_mmreg32(ioapic_redirects[irq].ioapic_address  + IOAPIC_WRITE_WINDOW_OFFSET, redirect_high);
+	write_mmreg32(ioapic_redirects[irq].ioapic_address , IOAPIC_REDIRECT_OFFSET + 2*ioapic_redirects[irq].ioapic_int);
+	write_mmreg32(ioapic_redirects[irq].ioapic_address  + IOAPIC_WRITE_WINDOW_OFFSET, redirect_low);
 }
 
 /** @brief Reconfigure the correct IOAPIC to no longer route a given irq to any core
@@ -200,15 +203,16 @@ void ioapic_route_irq(uint8_t irq, uint8_t dest) {
   */
 void ioapic_unroute_irq(uint8_t irq) {
 
-	if (((irq + KERNEL_IRQ_OFFSET) >= NUM_IRQS) || (ioapic_redirects[irq].ioapic_address == NULL)) {
+	if (((irq + KERNEL_IRQ_OFFSET) >= NUM_IRQS) ||
+	    (ioapic_redirects[irq].ioapic_address == 0)) {
 		panic("TRYING TO REROUTE AN INVALID IRQ!");
 	}
 	
 	// Must write low first, else we will reroute to a wrong core for a split before turning off
-	write_mmreg32((uint32_t)ioapic_redirects[irq].ioapic_address , IOAPIC_REDIRECT_OFFSET + 2*ioapic_redirects[irq].ioapic_int);
-	write_mmreg32((uint32_t)ioapic_redirects[irq].ioapic_address  + IOAPIC_WRITE_WINDOW_OFFSET, IOAPIC_UNROUTE_LOW);
+	write_mmreg32(ioapic_redirects[irq].ioapic_address , IOAPIC_REDIRECT_OFFSET + 2*ioapic_redirects[irq].ioapic_int);
+	write_mmreg32(ioapic_redirects[irq].ioapic_address  + IOAPIC_WRITE_WINDOW_OFFSET, IOAPIC_UNROUTE_LOW);
 	
-	write_mmreg32((uint32_t)ioapic_redirects[irq].ioapic_address , IOAPIC_REDIRECT_OFFSET + 2*ioapic_redirects[irq].ioapic_int + 1);
-	write_mmreg32((uint32_t)ioapic_redirects[irq].ioapic_address  + IOAPIC_WRITE_WINDOW_OFFSET, IOAPIC_UNROUTE_HIGH);
+	write_mmreg32(ioapic_redirects[irq].ioapic_address , IOAPIC_REDIRECT_OFFSET + 2*ioapic_redirects[irq].ioapic_int + 1);
+	write_mmreg32(ioapic_redirects[irq].ioapic_address  + IOAPIC_WRITE_WINDOW_OFFSET, IOAPIC_UNROUTE_HIGH);
 
 }

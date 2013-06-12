@@ -16,7 +16,7 @@
  * site.  Returns 0 when we can't jump back any farther. */
 static inline uintptr_t get_caller_pc(void)
 {
-	uint32_t *ebp = (uint32_t*)read_ebp();
+	unsigned long *ebp = (unsigned long*)read_bp();
 	if (!ebp)
 		return 0;
 	/* this is part of the way back into the call() instruction's bytes

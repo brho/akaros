@@ -6,11 +6,6 @@
 #define LITTLE_ENDIAN
 #endif /* !LITTLE_ENDIAN */
 
-// Represents true-or-false values
-
-#define NUM_ADDR_BITS 32
-#define MAX_VADDR     ((uint64_t)(~0) >> (64-NUM_ADDR_BITS))
-
 //Constants for byte sizes
 #define ONE_KILOBYTE  (1L<<10)
 #define ONE_MEGABYTE  (1L<<20)
@@ -31,9 +26,19 @@ typedef int pid_t;
 typedef int uid_t;
 typedef int gid_t;
 
-// Pointers and addresses are 32 bits long.
-// We use pointer types to represent virtual addresses and
-// uintptr_t to represent the numerical values of virtual addresses.
+#ifdef CONFIG_X86_64
+
+#define NUM_ADDR_BITS 64
+#define MAX_VADDR     ((uint64_t)(~0) >> (64-NUM_ADDR_BITS))
+typedef uint64_t uintptr_t;
+
+#else /* 32 bit */
+
+#define NUM_ADDR_BITS 32
+#define MAX_VADDR     ((uint64_t)(~0) >> (64-NUM_ADDR_BITS))
 typedef uint32_t uintptr_t;
+
+#endif /* 64bit / 32bit */
+
 
 #endif /* !ROS_INC_TYPES_H */

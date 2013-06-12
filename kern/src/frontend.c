@@ -152,7 +152,7 @@ int32_t frontend_syscall(pid_t pid, int32_t syscall_num,
 	return -1;
 #endif
 
-#ifdef __i386__
+#ifdef CONFIG_X86
 	if (!irq_is_enabled())
 		warn("IRQ is disabled in frontend_syscall %d for proc %d\n", syscall_num, pid);
 #endif

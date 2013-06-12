@@ -179,7 +179,7 @@ typedef struct IOAPICENTRY {
     uint8_t	apic_id;
     uint8_t	apic_version;
     uint8_t	apic_flags;
-    void*	apic_address;
+    uintptr_t	apic_address;
 } ioapic_entry_t;
 
 typedef struct INTENTRY {

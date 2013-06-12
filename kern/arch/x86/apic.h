@@ -38,7 +38,11 @@
 #define PIC_READ_ISR				0x0b	/* OCW3 irq service next CMD read */
 
 // Local APIC
-/* PBASE is the physical address.  It is mapped in at the VADDR LAPIC_BASE */
+/* PBASE is the physical address.  It is mapped in at the VADDR LAPIC_BASE.
+ * 64 bit note: it looks like this is mapped to the same place in 64 bit address
+ * spaces.  We just happen to have a slight 'hole' in addressable physical
+ * memory.  We can move the PBASE, but we're limited to 32 bit (physical)
+ * addresses. */
 #define LAPIC_PBASE					0xfee00000 /* default *physical* address */
 #define LAPIC_EOI					(LAPIC_BASE + 0x0b0)
 #define LAPIC_SPURIOUS				(LAPIC_BASE + 0x0f0)

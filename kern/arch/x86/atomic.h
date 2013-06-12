@@ -12,92 +12,77 @@
 #include <arch/x86.h>
 #include <arch/arch.h>
 
-static inline void atomic_andb(volatile uint8_t RACY* number, uint8_t mask);
-static inline void atomic_orb(volatile uint8_t RACY* number, uint8_t mask);
+static inline void atomic_andb(volatile uint8_t *number, uint8_t mask);
+static inline void atomic_orb(volatile uint8_t *number, uint8_t mask);
 
 /* Inlined functions declared above */
 static inline void atomic_init(atomic_t *number, long val)
 {
-	asm volatile("movl %1,%0" : "=m"(*number) : "r"(val));
+	asm volatile("mov %1,%0" : "=m"(*number) : "r"(val));
 }
 
 static inline long atomic_read(atomic_t *number)
 {
 	long val;
-	asm volatile("movl %1,%0" : "=r"(val) : "m"(*number));
+	asm volatile("mov %1,%0" : "=r"(val) : "m"(*number));
 	return val;
 }
 
 static inline void atomic_set(atomic_t *number, long val)
 {
-	asm volatile("movl %1,%0" : "=m"(*number) : "r"(val));
+	asm volatile("mov %1,%0" : "=m"(*number) : "r"(val));
 }
 
 static inline void atomic_add(atomic_t *number, long val)
 {
-	asm volatile("lock addl %1,%0" : "=m"(*number) : "r"(val) : "cc");
+	__sync_fetch_and_add(number, val);
 }
 
-// need to do this with pointers and deref.  %0 needs to be the memory address
 static inline void atomic_inc(atomic_t *number)
 {
-	asm volatile("lock incl %0" : "=m"(*number) : : "cc");
+	__sync_fetch_and_add(number, 1);
 }
 
 static inline void atomic_dec(atomic_t *number)
 {
-	// for instance, this doesn't work:
-	//asm volatile("lock decl (%0)" : "=r"(number) : : "cc");
-	asm volatile("lock decl %0" : "=m"(*number) : : "cc");
+	__sync_fetch_and_sub(number, 1);
 }
 
-/* Adds val to number, returning number's original value */
 static inline long atomic_fetch_and_add(atomic_t *number, long val)
 {
-	asm volatile("lock xadd %0,%1" : "=r"(val), "=m"(*number)
-	                               : "0"(val), "m"(*number)
-	                               : "cc" );
-	return val;
+	return (long)__sync_fetch_and_add(number, val);
 }
 
 static inline void atomic_and(atomic_t *number, long mask)
 {
-	asm volatile("lock andl %1,%0" : "=m"(*number) : "q"(mask) : "cc");
+	__sync_fetch_and_and(number, mask);
 }
 
 static inline void atomic_or(atomic_t *number, long mask)
 {
-	asm volatile("lock orl %1,%0" : "=m"(*number) : "q"(mask) : "cc");
+	__sync_fetch_and_or(number, mask);
 }
 
 static inline long atomic_swap(atomic_t *addr, long val)
 {
-	// this would work, but its code is bigger, and it's not like the others
-	//asm volatile("xchgl %0,(%2)" : "=r"(val) : "0"(val), "r"(addr) : "memory");
-	asm volatile("xchgl %0,%1" : "=r"(val), "=m"(*addr) : "0"(val), "m"(*addr));
-	return val;
+	/* This poorly named function does an xchg */
+	return (long)__sync_lock_test_and_set(addr, val);
 }
 
-/* reusing exp_val for the bool return.  1 (TRUE) for success (like test).  Need
- * to zero eax, since it will get set if the cmpxchgl failed. */
 static inline bool atomic_cas(atomic_t *addr, long exp_val, long new_val)
 {
-	asm volatile("lock cmpxchgl %4,%1; movl $0,%%eax; sete %%al"
-	             : "=a"(exp_val), "=m"(*addr)
-	             : "m"(*addr), "a"(exp_val), "r"(new_val)
-	             : "cc", "memory");
-	return exp_val;
+	return __sync_bool_compare_and_swap(addr, exp_val, new_val);
 }
 
 static inline bool atomic_cas_ptr(void **addr, void *exp_val, void *new_val)
 {
-	return atomic_cas((atomic_t*)addr, (long)exp_val, (long)new_val);
+	return __sync_bool_compare_and_swap(addr, exp_val, new_val);
 }
 
 static inline bool atomic_cas_u32(uint32_t *addr, uint32_t exp_val,
                                   uint32_t new_val)
 {
-	return atomic_cas((atomic_t*)addr, (long)exp_val, (long)new_val);
+	return __sync_bool_compare_and_swap(addr, exp_val, new_val);
 }
 
 /* Adds val to number, so long as number was not zero.  Returns TRUE if the
@@ -114,7 +99,7 @@ static inline bool atomic_add_not_zero(atomic_t *number, long val)
 	return TRUE;
 }
 
-/* Subtraces val from number, returning True if the new value is 0. */
+/* Subtracts val from number, returning True if the new value is 0. */
 static inline bool atomic_sub_and_test(atomic_t *number, long val)
 {
 	bool b;
@@ -124,18 +109,14 @@ static inline bool atomic_sub_and_test(atomic_t *number, long val)
 	return b;
 }
 
-/* Be sure to use "q" for byte operations (compared to longs), since this
- * constrains the asm to use e{a,b,c,d}x instead of esi and edi.  32 bit x86
- * cannot access the lower parts of esi or edi (will get warnings like "no such
- * register %sil or %dil." */
-static inline void atomic_andb(volatile uint8_t RACY*number, uint8_t mask)
+static inline void atomic_andb(volatile uint8_t *number, uint8_t mask)
 {
-	asm volatile("lock andb %1,%0" : "=m"(*number) : "q"(mask) : "cc");
+	__sync_fetch_and_and(number, mask);
 }
 
-static inline void atomic_orb(volatile uint8_t RACY*number, uint8_t mask)
+static inline void atomic_orb(volatile uint8_t *number, uint8_t mask)
 {
-	asm volatile("lock orb %1,%0" : "=m"(*number) : "q"(mask) : "cc");
+	__sync_fetch_and_or(number, mask);
 }
 
 static inline bool spin_locked(spinlock_t *lock)

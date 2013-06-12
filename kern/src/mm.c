@@ -842,7 +842,7 @@ int map_vmap_segment(uintptr_t vaddr, uintptr_t paddr, unsigned long num_pages,
 	 * For now, we'll just use the dyn_vmap_lock (which technically works). */
 	spin_lock(&dyn_vmap_lock);
 	pte_t *pte;
-#ifdef __i386__
+#ifdef CONFIG_X86
 	perm |= PTE_G;
 #endif
 	for (int i = 0; i < num_pages; i++) {

@@ -105,7 +105,7 @@ void lapic_print_isr(void)
 /* Returns TRUE if the bit 'vector' is set in the LAPIC ISR or IRR (whatever you
  * pass in.  These registers consist of 8, 32 byte registers spaced every 16
  * bytes from the base in the LAPIC. */
-static bool __lapic_get_isrr_bit(uint32_t base, uint8_t vector)
+static bool __lapic_get_isrr_bit(unsigned long base, uint8_t vector)
 {
 	int which_reg = vector >> 5;	/* 32 bits per reg */
 	uint32_t *lapic_reg = (uint32_t*)(base + which_reg * 0x10);	/* offset 16 */

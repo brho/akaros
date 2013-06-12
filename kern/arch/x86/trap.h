@@ -34,7 +34,7 @@
 // T_SYSCALL is defined by the following include:
 #include <ros/arch/syscall.h>
 
-#define T_DEFAULT   0xdeadbeef		// catchall
+#define T_DEFAULT   0x0000beef		// catchall
 
 /* Page faults return the nature of the fault in the bits of the error code: */
 #define PF_ERROR_PRESENT 		0x01
@@ -90,16 +90,12 @@
 
 /* The kernel's interrupt descriptor table */
 extern gatedesc_t idt[];
+extern pseudodesc_t idt_pd;
 extern taskstate_t ts;
+extern const char *x86_trapname(int trapno);
 
 /* Defined and set up in in arch/init.c, used for XMM initialization */
 extern struct ancillary_state x86_default_fpu;
-
-/* Determines if the given TF was in the kernel or not. */
-static inline bool in_kernel(struct hw_trapframe *hw_tf)
-{
-	return (hw_tf->tf_cs & ~3) == GD_KT;
-}
 
 static inline void save_fp_state(struct ancillary_state *silly)
 {
@@ -128,30 +124,14 @@ static inline void init_fp_state(void)
 static inline void __attribute__((always_inline))
 set_stack_pointer(uintptr_t sp)
 {
-	asm volatile("mov %0,%%esp" : : "r"(sp) : "memory","esp");
+	asm volatile("mov %0,%%"X86_REG_SP"" : : "r"(sp) : "memory", X86_REG_SP);
 }
 
-/* Save's the current kernel context into tf, setting the PC to the end of this
- * function.  Note the kernel doesn't need to save a lot. */
-static inline void save_kernel_ctx(struct kernel_ctx *ctx)
-{
-	/* Save the regs and the future esp. */
-	asm volatile("movl %%esp,(%0);       " /* save esp in it's slot*/
-	             "pushl %%eax;           " /* temp save eax */
-	             "leal 1f,%%eax;         " /* get future eip */
-	             "movl %%eax,(%1);       " /* store future eip */
-	             "popl %%eax;            " /* restore eax */
-	             "movl %2,%%esp;         " /* move to the beginning of the tf */
-	             "addl $0x20,%%esp;      " /* move to after the push_regs */
-	             "pushal;                " /* save regs */
-	             "addl $0x44,%%esp;      " /* move to esp slot */
-	             "popl %%esp;            " /* restore esp */
-	             "1:                     " /* where this tf will restart */
-	             : 
-	             : "r"(&ctx->hw_tf.tf_esp), "r"(&ctx->hw_tf.tf_eip),
-	               "g"(&ctx->hw_tf)
-	             : "eax", "memory", "cc");
-}
+#ifdef CONFIG_X86_64
+#include <arch/trap64.h>
+#else
+#include <arch/trap32.h>
+#endif
 
 #endif /* !__ASSEMBLER__ */
 

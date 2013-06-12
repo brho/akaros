@@ -21,7 +21,7 @@ HDDIMG=$MNTDIR/hdd.img
 modprobe loop max_part=10
 losetup /dev/loop5 $HDDIMG
 sleep 5
-mount /dev/loop5p1 $MNTPOINT
+mount -o sync /dev/loop5p1 $MNTPOINT
 chown -R brho:brho $MNTPOINT
 
 ## Alternative method if you have the loopback built into the kernel
@@ -29,6 +29,6 @@ chown -R brho:brho $MNTPOINT
 ## provide
 #losetup /dev/loop5 $HDDIMG
 #losetup -o 1048576 /dev/loop6 /dev/loop5
-#mount /dev/loop6 $MNTPOINT
+#mount -o sync /dev/loop6 $MNTPOINT
 #chown -R brho:brho $MNTPOINT
 

@@ -10,7 +10,7 @@
 #include <ros/memlayout.h>
 #include <stdio.h>
 
-#ifdef __i386__
+#ifdef CONFIG_X86
 #include <arch/apic.h>
 #endif
 

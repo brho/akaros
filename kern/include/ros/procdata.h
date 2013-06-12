@@ -20,7 +20,7 @@ typedef struct procdata {
 	syscall_sring_t			*syscallring;
 	sysevent_sring_t		syseventring;
 	char					pad2[SYSEVENTRINGSIZE - sizeof(sysevent_sring_t)];
-#ifdef __i386__
+#if defined (__i386__) || defined (__x86_64) /* TODO: 64b */
 	segdesc_t				*ldt; // TODO: bug with this. (TLSV)
 #endif
 	/* glibc relies on stuff above this point.  if you change it, you need to

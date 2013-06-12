@@ -296,6 +296,7 @@ OBJCOPY	:= $(CROSS_COMPILE)objcopy
 OBJDUMP	:= $(CROSS_COMPILE)objdump
 NM	    := $(CROSS_COMPILE)nm
 STRIP   := $(CROSS_COMPILE)strip
+KERNEL_LD ?= kernel.ld
 
 # These may have bogus values if there is no compiler.  The kernel and user
 # build targets will check cc-exists.  Hopefully no cleaning targets rely on
@@ -308,7 +309,7 @@ NOSTDINC_FLAGS += -nostdinc -isystem \
 XCC_TARGET_ROOT := $(dir $(shell which $(CC)))../$(patsubst %-,%,\
                                                    $(CROSS_COMPILE))
 
-CFLAGS_KERNEL += -O2 -pipe -MD -gstabs
+CFLAGS_KERNEL += -O2 -pipe -MD
 CFLAGS_KERNEL += -std=gnu99 -fgnu89-inline
 CFLAGS_KERNEL += -fno-strict-aliasing -fno-omit-frame-pointer
 CFLAGS_KERNEL += -fno-stack-protector
@@ -318,7 +319,7 @@ CFLAGS_KERNEL += -include include/generated/autoconf.h -include include/common.h
 ifeq ($(CONFIG_64BIT),y)
 CFLAGS_KERNEL += -m64
 else
-CFLAGS_KERNEL += -m32
+CFLAGS_KERNEL += -m32 -gstabs
 endif
 
 # TODO: do we need this, or can we rely on the compiler's defines?
@@ -400,7 +401,7 @@ core-y          := $(patsubst %/, %/built-in.o, $(core-y))
 arch-y          := $(patsubst %/, %/built-in.o, $(arch-y))
 
 kbuild_akaros_main := $(core-y) $(arch-y)
-akaros-deps := $(kbuild_akaros_main)  kern/arch/$(ARCH)/kernel.ld
+akaros-deps := $(kbuild_akaros_main)  kern/arch/$(ARCH)/$(KERNEL_LD)
 
 kern_cpio := $(OBJDIR)/kern/initramfs.cpio
 kern_cpio_obj := $(kern_cpio).o
@@ -441,7 +442,8 @@ $(ext2_bdev_obj): $(ext2-bdev)
 	$(Q)$(OBJCOPY) -I binary -B $(ld_arch) -O $(ld_emulation) $^ $@
 
 quiet_cmd_link-akaros = LINK    $@
-      cmd_link-akaros = $(LD) -T kern/arch/$(ARCH)/kernel.ld -o $@ \
+      cmd_link-akaros = $(LD) -T kern/arch/$(ARCH)/$(KERNEL_LD) -o $@ \
+                              $(LDFLAGS_KERNEL) \
                               $(akaros-deps) \
                               $(gcc-lib) \
                               $(kern_cpio_obj) \

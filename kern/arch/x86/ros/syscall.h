@@ -1,11 +1,15 @@
-#ifndef _ROS_ARCH_SYSCALL_H
-#define _ROS_ARCH_SYSCALL_H
+#ifndef ROS_INC_ARCH_SYSCALL_H
+#define ROS_INC_ARCH_SYSCALL_H
 
 #define T_SYSCALL	0x80
 
 #ifndef ROS_KERNEL
 
-#include <ros/arch/bits/syscall.h>
+#ifdef __x86_64__
+#include <ros/arch/syscall64.h>
+#else
+#include <ros/arch/syscall32.h>
+#endif
 
 static inline long __ros_arch_syscall(long _a0, long _a1)
 {
@@ -18,5 +22,4 @@ static inline long __ros_arch_syscall(long _a0, long _a1)
 
 #endif /* ifndef ROS_KERNEL */
 
-#endif
-
+#endif /* ROS_INC_ARCH_SYSCALL_H */

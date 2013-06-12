@@ -44,7 +44,8 @@ struct per_cpu_info {
 	// zra: Used by Ivy. Let me know if this should go elsewhere.
 	sharC_env_t sharC_env;
 #endif
-#ifdef __i386__
+	/* TODO: 64b (not sure if we'll need these at all */
+#ifdef CONFIG_X86
 	taskstate_t *tss;
 	segdesc_t *gdt;
 #endif

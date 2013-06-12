@@ -166,7 +166,7 @@ int mon_showmapping(int argc, char **argv, struct hw_trapframe *hw_tf)
 
 int mon_setmapperm(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
-#ifndef __i386__
+#ifndef CONFIG_X86
 	cprintf("I don't support this call yet!\n");
 	return 1;
 #else
@@ -378,7 +378,7 @@ int mon_exit(int argc, char **argv, struct hw_trapframe *hw_tf)
 
 int mon_kfunc(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
-	#ifndef __i386__
+	#ifndef CONFIG_X86
 	printk("Only supported on x86 for now.  =(\n");
 	return -1;
 	#endif

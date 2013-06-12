@@ -21,12 +21,17 @@ void proc_pop_ctx(struct user_context *ctx)
 	segdesc_t *ldt = current->procdata->ldt;
 	ldt = (segdesc_t*)MIN((uintptr_t)ldt, UWLIM - LDT_SIZE);
 	/* Only set up the ldt if a pointer to the ldt actually exists */
+#if 0 /* think about how to do TLS.  need better seg macros too */
 	if(ldt != NULL) {
 		segdesc_t *my_gdt = per_cpu_info[core_id()].gdt;
+		/* TODO: 64b issues here.  need to redo this anyways.  Considering how
+		 * slow userspace TLS changes are (70ns), I might opt for just changing
+		 * FS base, either via fast syscall or in userspace on newer versions */
 		segdesc_t ldt_temp = SEG_SYS(STS_LDT, (uint32_t)ldt, LDT_SIZE, 3);
 		my_gdt[GD_LDT >> 3] = ldt_temp;
 		asm volatile("lldt %%ax" :: "a"(GD_LDT));
 	}
+#endif
 
 	/* In case they are enabled elsewhere.  We can't take an interrupt in these
 	 * routines, due to how they play with the kernel stack pointer. */
@@ -42,15 +47,15 @@ void proc_pop_ctx(struct user_context *ctx)
 		 * instruction.  This exits the kernel and starts executing some
 		 * environment's code.  This function does not return.
 		 */
-		asm volatile ("movl %0,%%esp;           "
-		              "popal;                   "
-		              "popl %%gs;               "
-		              "popl %%fs;               "
-		              "popl %%es;               "
-		              "popl %%ds;               "
-		              "addl $0x8,%%esp;         "
-		              "iret                     "
-		              : : "g" (tf) : "memory");
+//		asm volatile ("movl %0,%%esp;           "
+//		              "popal;                   "
+//		              "popl %%gs;               "
+//		              "popl %%fs;               "
+//		              "popl %%es;               "
+//		              "popl %%ds;               "
+//		              "addl $0x8,%%esp;         "
+//		              "iret                     "
+//		              : : "g" (tf) : "memory");
 		panic("iret failed");  /* mostly to placate the compiler */
 	} else {
 		/* Return path of sysexit.  See sysenter_handler's asm for details.
@@ -67,20 +72,20 @@ void proc_pop_ctx(struct user_context *ctx)
 		 * interrupts are enabled.  The other option would be to throw away the
 		 * eflags, but that's less desirable. */
 		tf->tf_eflags &= !FL_IF;
-		tf->tf_esp = read_esp();
-		asm volatile ("movl %0,%%esp;           "
-		              "popal;                   "
-		              "popl %%gs;               "
-		              "popl %%fs;               "
-		              "popl %%es;               "
-		              "popl %%ds;               "
-		              "addl $0x10,%%esp;        "
-		              "popfl;                   "
-		              "movl %%ebp,%%ecx;        "
-		              "popl %%esp;              "
-		              "sti;                     "
-		              "sysexit                  "
-		              : : "g" (tf) : "memory");
+		tf->tf_esp = read_sp();
+//		asm volatile ("movl %0,%%esp;           "
+//		              "popal;                   "
+//		              "popl %%gs;               "
+//		              "popl %%fs;               "
+//		              "popl %%es;               "
+//		              "popl %%ds;               "
+//		              "addl $0x10,%%esp;        "
+//		              "popfl;                   "
+//		              "movl %%ebp,%%ecx;        "
+//		              "popl %%esp;              "
+//		              "sti;                     "
+//		              "sysexit                  "
+//		              : : "g" (tf) : "memory");
 		panic("sysexit failed");  /* mostly to placate your mom */
 	}
 }

@@ -201,7 +201,7 @@ static int sys_cache_buster(struct proc *p, uint32_t num_writes,
 
 static int sys_cache_invalidate(void)
 {
-	#ifdef __i386__
+	#ifdef CONFIG_X86
 		wbinvd();
 	#endif
 	return 0;
@@ -442,7 +442,7 @@ static ssize_t sys_fork(env_t* e)
 	memcpy(env->procinfo->argp, e->procinfo->argp, sizeof(e->procinfo->argp));
 	memcpy(env->procinfo->argbuf, e->procinfo->argbuf,
 	       sizeof(e->procinfo->argbuf));
-	#ifdef __i386__
+	#ifdef CONFIG_X86
 	/* new guy needs to know about ldt (everything else in procdata is fresh */
 	env->procdata->ldt = e->procdata->ldt;
 	#endif
@@ -520,7 +520,7 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	                           sizeof(pi->argbuf)))
 		goto mid_error;
 	/* This is the point of no return for the process. */
-	#ifdef __i386__
+	#ifdef CONFIG_X86
 	/* clear this, so the new program knows to get an LDT */
 	p->procdata->ldt = 0;
 	#endif

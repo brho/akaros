@@ -45,7 +45,7 @@
  * 		Ioapic ADDR (physical Addr)
  */
 typedef struct IOAPICREDIRECT {
-    void*			ioapic_address; // NULL means invalid
+    uintptr_t		ioapic_address; /* 0 means invalid */
 	uint8_t			ioapic_flags;
 	uint8_t			ioapic_int;
 } ioapic_redirect_t;

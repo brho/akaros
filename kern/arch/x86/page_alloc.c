@@ -58,6 +58,7 @@ void page_alloc_init()
 	//     Some of it is in use, some is free.
 	int i;
 	extern char (SNT RO end)[];
+	/* TODO 64b Might need to translate to the KERNBASE mapping */
 	physaddr_t physaddr_after_kernel = PADDR(PTRROUNDUP(boot_freemem, PGSIZE));
 
 	page_setref(&pages[0], 1);

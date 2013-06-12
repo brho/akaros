@@ -186,7 +186,7 @@ void mptables_parse() {
 		mptables_info("Virtual Wire\n");
 	}
 	
-	configuration_parse((physaddr_t)KADDR((uint32_t)(mpfps->pap)));
+	configuration_parse((physaddr_t)KADDR((uintptr_t)(mpfps->pap)));
 	
 	proc_parse();
 	bus_parse();

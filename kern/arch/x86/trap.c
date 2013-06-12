@@ -29,9 +29,7 @@ taskstate_t RO ts;
  */
 // Aligned on an 8 byte boundary (SDM V3A 5-13)
 gatedesc_t __attribute__ ((aligned (8))) (RO idt)[256] = { { 0 } };
-pseudodesc_t RO idt_pd = {
-	sizeof(idt) - 1, (uint32_t) idt
-};
+pseudodesc_t idt_pd;
 
 /* global handler table, used by core0 (for now).  allows the registration
  * of functions to be called when servicing an interrupt.  other cores
@@ -43,7 +41,7 @@ pseudodesc_t RO idt_pd = {
 spinlock_t iht_lock;
 handler_t TP(TV(t)) LCKD(&iht_lock) (RO interrupt_handlers)[NUM_INTERRUPT_HANDLERS];
 
-static const char *NTS trapname(int trapno)
+const char *x86_trapname(int trapno)
 {
     // zra: excnames is SREADONLY because Ivy doesn't trust const
 	static const char *NT const (RO excnames)[] = {
@@ -86,7 +84,7 @@ void set_stack_top(uintptr_t stacktop)
 	/* No need to reload the task register, this takes effect immediately */
 	pcpu->tss->ts_esp0 = stacktop;
 	/* Also need to make sure sysenters come in correctly */
-	write_msr(MSR_IA32_SYSENTER_ESP, stacktop);
+	x86_set_sysenter_stacktop(stacktop);
 }
 
 /* Note the check implies we only are on a one page stack (or the first page) */
@@ -96,32 +94,12 @@ uintptr_t get_stack_top(void)
 	uintptr_t stacktop;
 	/* so we can check this in interrupt handlers (before smp_boot()) */
 	if (!pcpui->tss)
-		return ROUNDUP(read_esp(), PGSIZE);
+		return ROUNDUP(read_sp(), PGSIZE);
 	stacktop = pcpui->tss->ts_esp0;
-	if (stacktop != ROUNDUP(read_esp(), PGSIZE))
+	if (stacktop != ROUNDUP(read_sp(), PGSIZE))
 		panic("Bad stacktop: %p esp one is %p\n", stacktop,
-		      ROUNDUP(read_esp(), PGSIZE));
+		      ROUNDUP(read_sp(), PGSIZE));
 	return stacktop;
-}
-
-/* Starts running the current TF, just using ret. */
-void pop_kernel_ctx(struct kernel_ctx *ctx)
-{
-	asm volatile ("movl %1,%%esp;           " /* move to future stack */
-	              "pushl %2;                " /* push cs */
-	              "movl %0,%%esp;           " /* move to TF */
-	              "addl $0x20,%%esp;        " /* move to tf_gs slot */
-	              "movl %1,(%%esp);         " /* write future esp */
-	              "subl $0x20,%%esp;        " /* move back to tf start */
-	              "popal;                   " /* restore regs */
-	              "popl %%esp;              " /* set stack ptr */
-	              "subl $0x4,%%esp;         " /* jump down past CS */
-	              "ret                      " /* return to the EIP */
-	              :
-	              : "g"(&ctx->hw_tf), "r"(ctx->hw_tf.tf_esp),
-	                "r"(ctx->hw_tf.tf_eip)
-	              : "memory");
-	panic("ret failed");				/* mostly to placate your mom */
 }
 
 /* Sends a non-maskable interrupt; the handler will print a trapframe. */
@@ -139,7 +117,7 @@ void idt_init(void)
 	// This table is made in trapentry.S by each macro in that file.
 	// It is layed out such that the ith entry is the ith's traphandler's
 	// (uint32_t) trap addr, then (uint32_t) trap number
-	struct trapinfo { uint32_t trapaddr; uint32_t trapnumber; };
+	struct trapinfo { uintptr_t trapaddr; uint32_t trapnumber; };
 	extern struct trapinfo (BND(__this,trap_tbl_end) RO trap_tbl)[];
 	extern struct trapinfo (SNT RO trap_tbl_end)[];
 	int i, trap_tbl_size = trap_tbl_end - trap_tbl;
@@ -175,16 +153,20 @@ void idt_init(void)
 #endif /* CONFIG_KTHREAD_POISON */
 
 	// Initialize the TSS field of the gdt.
-	SEG16ROINIT(gdt[GD_TSS >> 3],STS_T32A, (uint32_t)(&ts),sizeof(taskstate_t),0);
+	SEG16ROINIT(gdt[GD_TSS >> 3], STS_T32A, &ts,
+	            sizeof(taskstate_t), 0);
 	//gdt[GD_TSS >> 3] = (segdesc_t)SEG16(STS_T32A, (uint32_t) (&ts),
 	//				   sizeof(taskstate_t), 0);
 	gdt[GD_TSS >> 3].sd_s = SINIT(0);
 
-	// Load the TSS
+	/* Init the IDT PD.  Need to do this before ltr for some reason.  (Doing
+	 * this between ltr and lidt causes the machine to reboot... */
+	idt_pd.pd_lim = sizeof(idt) - 1;
+	idt_pd.pd_base = (uintptr_t)idt;
+
 	ltr(GD_TSS);
 
-	// Load the IDT
-	asm volatile("lidt idt_pd");
+	asm volatile("lidt %0" : : "m"(idt_pd));
 
 	// This will go away when we start using the IOAPIC properly
 	pic_remap();
@@ -200,57 +182,6 @@ void idt_init(void)
 	/* register the kernel message handler */
 	register_interrupt_handler(interrupt_handlers, I_KERNEL_MSG,
 	                           handle_kmsg_ipi, NULL);
-}
-
-static void print_regs(push_regs_t *regs)
-{
-	cprintf("  edi  0x%08x\n", regs->reg_edi);
-	cprintf("  esi  0x%08x\n", regs->reg_esi);
-	cprintf("  ebp  0x%08x\n", regs->reg_ebp);
-	cprintf("  oesp 0x%08x\n", regs->reg_oesp);
-	cprintf("  ebx  0x%08x\n", regs->reg_ebx);
-	cprintf("  edx  0x%08x\n", regs->reg_edx);
-	cprintf("  ecx  0x%08x\n", regs->reg_ecx);
-	cprintf("  eax  0x%08x\n", regs->reg_eax);
-}
-
-void print_trapframe(struct hw_trapframe *hw_tf)
-{
-	static spinlock_t ptf_lock = SPINLOCK_INITIALIZER_IRQSAVE;
-
-	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	/* This is only called in debug scenarios, and often when the kernel trapped
-	 * and needs to tell us about it.  Disable the lock checker so it doesn't go
-	 * nuts when we print/panic */
-	pcpui->__lock_depth_disabled++;
-	spin_lock_irqsave(&ptf_lock);
-	printk("TRAP frame at %p on core %d\n", hw_tf, core_id());
-	print_regs(&hw_tf->tf_regs);
-	printk("  gs   0x----%04x\n", hw_tf->tf_gs);
-	printk("  fs   0x----%04x\n", hw_tf->tf_fs);
-	printk("  es   0x----%04x\n", hw_tf->tf_es);
-	printk("  ds   0x----%04x\n", hw_tf->tf_ds);
-	printk("  trap 0x%08x %s\n",  hw_tf->tf_trapno, trapname(hw_tf->tf_trapno));
-	printk("  err  0x%08x\n",     hw_tf->tf_err);
-	printk("  eip  0x%08x\n",     hw_tf->tf_eip);
-	printk("  cs   0x----%04x\n", hw_tf->tf_cs);
-	printk("  flag 0x%08x\n",     hw_tf->tf_eflags);
-	/* Prevents us from thinking these mean something for nested interrupts. */
-	if (hw_tf->tf_cs != GD_KT) {
-		printk("  esp  0x%08x\n",     hw_tf->tf_esp);
-		printk("  ss   0x----%04x\n", hw_tf->tf_ss);
-	}
-	spin_unlock_irqsave(&ptf_lock);
-	pcpui->__lock_depth_disabled--;
-}
-
-static void fake_rdtscp(struct hw_trapframe *hw_tf)
-{
-	uint64_t tsc_time = read_tsc();
-	hw_tf->tf_eip += 3;
-	hw_tf->tf_regs.reg_eax = tsc_time & 0xffffffff;
-	hw_tf->tf_regs.reg_edx = tsc_time >> 32;
-	hw_tf->tf_regs.reg_ecx = core_id();
 }
 
 static void handle_fperr(struct hw_trapframe *hw_tf)
@@ -303,8 +234,8 @@ static void trap_dispatch(struct hw_trapframe *hw_tf)
 			pcpui = &per_cpu_info[core_id()];
 			pcpui->__lock_depth_disabled++;
 			print_trapframe(hw_tf);
-			char *fn_name = get_fn_name(hw_tf->tf_eip);
-			printk("Core %d is at %p (%s)\n", core_id(), hw_tf->tf_eip,
+			char *fn_name = get_fn_name(x86_get_ip_hw(hw_tf));
+			printk("Core %d is at %p (%s)\n", core_id(), x86_get_ip_hw(hw_tf),
 			       fn_name);
 			kfree(fn_name);
 			print_kmsgs(core_id());
@@ -315,6 +246,8 @@ static void trap_dispatch(struct hw_trapframe *hw_tf)
 			monitor(hw_tf);
 			break;
 		case T_ILLOP:
+		{
+			uintptr_t ip = x86_get_ip_hw(hw_tf);
 			pcpui = &per_cpu_info[core_id()];
 			pcpui->__lock_depth_disabled++;		/* for print debugging */
 			/* We will muck with the actual TF.  If we're dealing with
@@ -323,16 +256,15 @@ static void trap_dispatch(struct hw_trapframe *hw_tf)
 			 * the same).  See set_current_ctx() for more info. */
 			if (!in_kernel(hw_tf))
 				hw_tf = &pcpui->cur_ctx->tf.hw_tf;
-			printd("bad opcode, eip: %p, next 3 bytes: %x %x %x\n",
-			       hw_tf->tf_eip, 
-			       *(uint8_t*)(hw_tf->tf_eip + 0), 
-			       *(uint8_t*)(hw_tf->tf_eip + 1), 
-			       *(uint8_t*)(hw_tf->tf_eip + 2)); 
+			printd("bad opcode, eip: %p, next 3 bytes: %x %x %x\n", ip, 
+			       *(uint8_t*)(ip + 0), 
+			       *(uint8_t*)(ip + 1), 
+			       *(uint8_t*)(ip + 2)); 
 			/* rdtscp: 0f 01 f9 */
-			if (*(uint8_t*)(hw_tf->tf_eip + 0) == 0x0f, 
-			    *(uint8_t*)(hw_tf->tf_eip + 1) == 0x01, 
-			    *(uint8_t*)(hw_tf->tf_eip + 2) == 0xf9) {
-				fake_rdtscp(hw_tf);
+			if (*(uint8_t*)(ip + 0) == 0x0f, 
+			    *(uint8_t*)(ip + 1) == 0x01, 
+			    *(uint8_t*)(ip + 2) == 0xf9) {
+				x86_fake_rdtscp(hw_tf);
 				pcpui->__lock_depth_disabled--;	/* for print debugging */
 				return;
 			}
@@ -340,6 +272,7 @@ static void trap_dispatch(struct hw_trapframe *hw_tf)
 			monitor(hw_tf);
 			pcpui->__lock_depth_disabled--;		/* for print debugging */
 			break;
+		}
 		case T_PGFLT:
 			page_fault_handler(hw_tf);
 			break;
@@ -351,8 +284,9 @@ static void trap_dispatch(struct hw_trapframe *hw_tf)
 			// check for userspace, for now
 			assert(hw_tf->tf_cs != GD_KT);
 			/* Set up and run the async calls */
-			prep_syscalls(current, (struct syscall*)hw_tf->tf_regs.reg_eax,
-			              hw_tf->tf_regs.reg_edx);
+			prep_syscalls(current,
+			              (struct syscall*)x86_get_sysenter_arg0(hw_tf),
+						  (unsigned int)x86_get_sysenter_arg1(hw_tf));
 			break;
 		default:
 			// Unexpected trap: The user process or the kernel has a bug.
@@ -413,9 +347,9 @@ static void abort_halt(struct hw_trapframe *hw_tf)
 	 * like immediately after a fork (which doesn't populate the pages). */
 	if (!in_kernel(hw_tf))
 		return;
-	/* the halt instruction in 32 bit is 0xf4, and it's size is 1 byte */
-	if (*(uint8_t*)hw_tf->tf_eip == 0xf4)
-		hw_tf->tf_eip += 1;
+	/* the halt instruction in is 0xf4, and it's size is 1 byte */
+	if (*(uint8_t*)x86_get_ip_hw(hw_tf) == 0xf4)
+		x86_advance_ip(hw_tf, 1);
 }
 
 void trap(struct hw_trapframe *hw_tf)
@@ -573,46 +507,6 @@ register_interrupt_handler(handler_t TP(TV(t)) table[],
 	table[int_num].data = data;
 }
 
-void page_fault_handler(struct hw_trapframe *hw_tf)
-{
-	uint32_t fault_va = rcr2();
-	int prot = hw_tf->tf_err & PF_ERROR_WRITE ? PROT_WRITE : PROT_READ;
-	int err;
-
-	/* TODO - handle kernel page faults */
-	if ((hw_tf->tf_cs & 3) == 0) {
-		print_trapframe(hw_tf);
-		panic("Page Fault in the Kernel at 0x%08x!", fault_va);
-		/* if we want to do something like kill a process or other code, be
-		 * aware we are in a sort of irq-like context, meaning the main kernel
-		 * code we 'interrupted' could be holding locks - even irqsave locks. */
-	}
-	/* safe to reenable after rcr2 */
-	enable_irq();
-	if ((err = handle_page_fault(current, fault_va, prot))) {
-		/* Destroy the faulting process */
-		printk("[%08x] user %s fault va %08x ip %08x on core %d with err %d\n",
-		       current->pid, prot & PROT_READ ? "READ" : "WRITE", fault_va,
-		       hw_tf->tf_eip, core_id(), err);
-		print_trapframe(hw_tf);
-		/* Turn this on to help debug bad function pointers */
-		printd("esp %p\n\t 0(esp): %p\n\t 4(esp): %p\n\t 8(esp): %p\n"
-		       "\t12(esp): %p\n", hw_tf->tf_esp,
-		       *(uintptr_t*)(hw_tf->tf_esp +  0),
-		       *(uintptr_t*)(hw_tf->tf_esp +  4),
-		       *(uintptr_t*)(hw_tf->tf_esp +  8),
-		       *(uintptr_t*)(hw_tf->tf_esp + 12));
-		proc_destroy(current);
-	}
-}
-
-void sysenter_init(void)
-{
-	write_msr(MSR_IA32_SYSENTER_CS, GD_KT);
-	write_msr(MSR_IA32_SYSENTER_ESP, ts.ts_esp0);
-	write_msr(MSR_IA32_SYSENTER_EIP, (uint32_t) &sysenter_handler);
-}
-
 /* This is called from sysenter's asm, with the tf on the kernel stack. */
 /* TODO: use a sw_tf for sysenter */
 void sysenter_callwrapper(struct hw_trapframe *hw_tf)
@@ -626,8 +520,9 @@ void sysenter_callwrapper(struct hw_trapframe *hw_tf)
 	enable_irq();
 
 	/* Set up and run the async calls */
-	prep_syscalls(current, (struct syscall*)hw_tf->tf_regs.reg_eax,
-	              hw_tf->tf_regs.reg_esi);
+	prep_syscalls(current,
+				  (struct syscall*)x86_get_sysenter_arg0(hw_tf),
+				  (unsigned int)x86_get_sysenter_arg1(hw_tf));
 	/* If you use pcpui again, reread it, since you might have migrated */
 	proc_restartcore();
 }

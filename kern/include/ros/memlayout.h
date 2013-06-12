@@ -12,91 +12,10 @@
  * which are relevant to both the kernel and user-mode software.
  */
 
-/* x86's 32 bit Virtual Memory Map.  Symbols are similar on other archs
- *
- * Virtual memory map:                                Permissions
- *                                                    kernel/user
- *
- *    4 Gig -------->  +------------------------------+
- *                     :              .               :
- *  KERN_VMAP_TOP      +------------------------------+ 0xfffff000
- *                     |                              |
- *                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ RW/--
- *                     :              .               :
- *                     :              .               :
- *                     :              .               :
- *                     |~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~| RW/--
- *                     |                              | RW/--
- *                     |   Remapped Physical Memory   | RW/--
- *                     |                              | RW/--
- *    KERNBASE ----->  +------------------------------+ 0xc0000000
- *                     |  Cur. Page Table (Kern. RW)  | RW/--  PTSIZE
- *    VPT          --> +------------------------------+ 0xbfc00000
- *                     |          Local APIC          | RW/--  PGSIZE
- *    LAPIC        --> +------------------------------+ 0xbfbff000
- *                     |            IOAPIC            | RW/--  PGSIZE
- *    IOAPIC,      --> +------------------------------+ 0xbfbfe000
- *  KERN_DYN_TOP       |   Kernel Dynamic Mappings    |
- *                     |              .               |
- *                     :              .               :
- *                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ RW/--
- *                     :                              :
- *                     |      Invalid Memory (*)      | --/--
- *    ULIM      ---->  +------------------------------+ 0x80000000      --+
- *                     |  Cur. Page Table (User R-)   | R-/R-  PTSIZE     |
- *    UVPT      ---->  +------------------------------+ 0x7fc00000      --+
- *                     | Unmapped (expandable region) |                   |
- *                     |                              | R-/R-            PTSIZE
- *                     |     Per-Process R/O Info     |                   |
- * UWLIM, UINFO ---->  +------------------------------+ 0x7f800000      --+
- *                     | Unmapped (expandable region) |                   |
- *                     |                              | RW/RW            PTSIZE
- *                     |     Per-Process R/W Data     |                   |
- *    UDATA     ---->  +------------------------------+ 0x7f400000      --+
- *    UMAPTOP,         |    Global Shared R/W Data    | RW/RW  PGSIZE
- * UXSTACKTOP,UGDATA ->+------------------------------+ 0x7f3ff000
- *                     |     User Exception Stack     | RW/RW  PGSIZE
- *                     +------------------------------+ 0x7f3fe000
- *                     |       Empty Memory (*)       | --/--  PGSIZE
- *    USTACKTOP  --->  +------------------------------+ 0x7f3fd000
- *                     |      Normal User Stack       | RW/RW  256*PGSIZE (1MB)
- *                     +------------------------------+ 0x7f2fd000
- *                     |       Empty Memory (*)       | --/--  PGSIZE
- *    USTACKBOT  --->  +------------------------------+ 0x7f2fc000
- *                     |                              |
- *                     |                              |
- *                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
- *                     .                              .
- *                     .                              .
- *                     .                              .
- *                     |~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|
- *                     |     Program Data & Heap      |
- *    UTEXT -------->  +------------------------------+ 0x00800000
- *    PFTEMP ------->  |       Empty Memory (*)       |        PTSIZE
- *                     |                              |
- *    UTEMP -------->  +------------------------------+ 0x00400000      --+
- *                     |       Empty Memory (*)       |                   |
- *                     | - - - - - - - - - - - - - - -|                   |
- *                     |  User STAB Data (optional)   |                 PTSIZE
- *    USTABDATA ---->  +------------------------------+ 0x00200000        |
- *                     |       Empty Memory (*)       |                   |
- *    0 ------------>  +------------------------------+                 --+
- *
- * (*) Note: The kernel ensures that "Invalid Memory" (ULIM) is *never*
- *     mapped.  "Empty Memory" is normally unmapped, but user programs may
- *     map pages there if desired.  ROS user programs map pages temporarily
- *     at UTEMP.
- */
-
-
-// At IOPHYSMEM (640K) there is a 384K hole for I/O.  From the kernel,
-// IOPHYSMEM can be addressed at KERNBASE + IOPHYSMEM.  The hole ends
-// at physical address EXTPHYSMEM.
-#define IOPHYSMEM	0x0A0000
-#define VGAPHYSMEM	0x0A0000
-#define DEVPHYSMEM	0x0C0000
-#define BIOSPHYSMEM	0x0F0000
+/* TODO: sort out multiboot being in src/ (depends on this) */
+#ifndef EXTPHYSMEM
 #define EXTPHYSMEM	0x100000
+#endif
 
 #define KSTKSHIFT	(PGSHIFT)			/* KSTKSIZE == PGSIZE */
 #define KSTKSIZE	(1 << KSTKSHIFT)	/* size of a static kernel stack */
@@ -177,8 +96,8 @@
 extern volatile uint32_t vpt_lock;
 extern volatile uint32_t vpd_lock;
 
-extern volatile pte_t SLOCKED(&vpt_lock) (COUNT(PTSIZE) SREADONLY vpt)[]; // VA of "virtual page table"
-extern volatile pde_t SLOCKED(&vpd_lock) (COUNT(PTSIZE) SREADONLY vpd)[]; // VA of current page directory
+extern volatile pte_t *vpt; // VA of "virtual page table"
+extern volatile pde_t *vpd; // VA of current page directory
 
 #endif /* !__ASSEMBLER__ */
 #endif /* !ROS_INC_MEMLAYOUT_H */

@@ -147,10 +147,9 @@ void print_cpuinfo(void)
 
 void show_mapping(uintptr_t start, size_t size)
 {
-	pde_t LCKD(&vpd_lock) *CT(PTSIZE) pgdir =
-	    (pde_t LCKD(&vpd_lock) *CT(PTSIZE))vpd;
+	pde_t *pgdir = (pde_t*)vpd;
 	pte_t *pte;
-	pte_t LCKD(&vpd_lock) *pde;
+	pte_t *pde;
 	page_t *page;
 	uintptr_t i;
 

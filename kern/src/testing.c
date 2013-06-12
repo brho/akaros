@@ -42,7 +42,7 @@
 #define l2 (available_caches.l2)
 #define l3 (available_caches.l3)
 
-#ifdef __i386__
+#ifdef CONFIG_X86
 
 void test_ipi_sending(void)
 {
@@ -113,7 +113,7 @@ void test_ioapic_pit_reroute(void)
 	udelay(3000000);
 }
 
-#endif // __i386__
+#endif // CONFIG_X86
 
 
 void test_print_info(void)
@@ -545,7 +545,7 @@ void test_smp_call_functions(void)
 	printk("Done\n");
 }
 
-#ifdef __i386__
+#ifdef CONFIG_X86
 void test_lapic_status_bit(void)
 {
 	register_interrupt_handler(interrupt_handlers, I_TESTING,
@@ -562,7 +562,7 @@ void test_lapic_status_bit(void)
 	printk("IPIs received (should be %d): %d\n", a, NUM_IPI);
 	// hopefully that handler never fires again.  leaving it registered for now.
 }
-#endif // __i386__
+#endif // CONFIG_X86
 
 /************************************************************/
 /* ISR Handler Functions */
@@ -570,7 +570,7 @@ void test_lapic_status_bit(void)
 void test_hello_world_handler(struct hw_trapframe *hw_tf, void *data)
 {
 	int trapno;
-	#if defined(__i386__)
+	#if defined(CONFIG_X86)
 	trapno = hw_tf->tf_trapno;
 	#else
 	trapno = 0;
@@ -590,7 +590,7 @@ void test_print_info_handler(struct hw_trapframe *hw_tf, void *data)
 	cprintf("----------------------------\n");
 	cprintf("This is Core %d\n", core_id());
 	cprintf("Timestamp = %lld\n", tsc);
-#ifdef __i386__
+#ifdef CONFIG_X86
 	cprintf("Hardware core %d\n", hw_core_id());
 	cprintf("MTRR_DEF_TYPE = 0x%08x\n", read_msr(IA32_MTRR_DEF_TYPE));
 	cprintf("MTRR Phys0 Base = 0x%016llx, Mask = 0x%016llx\n",
@@ -609,7 +609,7 @@ void test_print_info_handler(struct hw_trapframe *hw_tf, void *data)
 	        read_msr(0x20c), read_msr(0x20d));
 	cprintf("MTRR Phys7 Base = 0x%016llx, Mask = 0x%016llx\n",
 	        read_msr(0x20e), read_msr(0x20f));
-#endif // __i386__
+#endif // CONFIG_X86
 	cprintf("----------------------------\n");
 	spin_unlock_irqsave(&print_info_lock);
 }
@@ -635,7 +635,7 @@ static void test_waiting_handler(struct hw_trapframe *hw_tf, void *data)
 	atomic_dec(data);
 }
 
-#ifdef __i386__
+#ifdef CONFIG_X86
 void test_pit(void)
 {
 	cprintf("Starting test for PIT now (10s)\n");
@@ -709,7 +709,7 @@ void test_kernel_messages(void)
 	udelay(5000000);
 	return;
 }
-#endif // __i386__
+#endif // CONFIG_X86
 static void test_single_cache(int iters, size_t size, int align, int flags,
                               void (*ctor)(void *, size_t),
                               void (*dtor)(void *, size_t))
@@ -1432,14 +1432,14 @@ static void __test_try_halt(uint32_t srcid, long a0, long a1, long a2)
  * comment out abort_halt() in irq_handler(). */
 void test_abort_halt(void)
 {
-#ifdef __i386__
+#ifdef CONFIG_X86
 	send_kernel_message(1, __test_try_halt, 0, 0, 0, KMSG_ROUTINE);
 	/* wait 1 sec, enough time to for core 1 to be in its KMSG */
 	udelay(1000000);
 	/* Send an IPI */
 	send_ipi(0x01, I_TESTING);
 	printk("Core 0 sent the IPI\n");
-#endif /* __i386__ */
+#endif /* CONFIG_X86 */
 }
 
 /* Funcs and global vars for test_cv() */
