@@ -107,17 +107,9 @@ void print_cpuinfo(void)
 	printk("\n");
 	cpuid(0x80000008, 0x0, &eax, &ebx, &ecx, &edx);
 	cprintf("Physical Address Bits: %d\n", eax & 0x000000FF);
-	cprintf("Cores per Die: %d\n", (ecx & 0x000000FF) + 1);
-    cprintf("This core's Default APIC ID: 0x%08x\n", lapic_get_default_id());
 	msr_val = read_msr(IA32_APIC_BASE);
-	if (msr_val & MSR_APIC_ENABLE)
-		cprintf("Local APIC Enabled\n");
-	else
-		cprintf("Local APIC Disabled\n");
-	if (msr_val & 0x00000100)
-		cprintf("I am the Boot Strap Processor\n");
-	else
-		cprintf("I am an Application Processor\n");
+	if (!(msr_val & MSR_APIC_ENABLE))
+		panic("Local APIC Disabled!!");
 	cpuid(0x80000007, 0x0, &eax, &ebx, &ecx, &edx);
 	if (edx & 0x00000100)
 		printk("Invariant TSC present\n");

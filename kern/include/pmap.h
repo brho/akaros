@@ -61,8 +61,6 @@ extern pde_t *CT(NPDENTRIES) RO boot_pgdir;
 
 extern char *RO BND(end, maxaddrpa_ptr + IVY_KERNBASE) boot_freemem;
 
-void	multiboot_detect_memory(multiboot_info_t *COUNT(1) mbi);
-void	multiboot_print_memory_map(multiboot_info_t *COUNT(1) mbi);
 bool	enable_pse(void);
 void	vm_init(void);
 

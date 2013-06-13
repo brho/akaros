@@ -54,27 +54,16 @@ void kernel_init(multiboot_info_t *mboot_info)
 {
 	extern char (RO BND(__this, end) edata)[], (RO SNT end)[];
 
-	// Before doing anything else, complete the ELF loading process.
-	// Clear the uninitialized global data (BSS) section of our program.
-	// This ensures that all static/global variables start out zero.
 	memset(edata, 0, end - edata);
-
-	// Initialize the console.
-	// Can't call cprintf until after we do this!
 	cons_init();
-
 	print_cpuinfo();
 
-	// Old way, pre Zach's Ivy annotations
-	//multiboot_detect_memory((multiboot_info_t*)((uint32_t)mboot_info + KERNBASE));
-	//multiboot_print_memory_map((multiboot_info_t*)((uint32_t)mboot_info + KERNBASE));
-	
-	// Paul: Can't use KADDR as arg to multiboot_detect_memory
-	//  since multiboot_detect_memory is what sets npages. 
-	//  Must simulate KADDR macro (ugly).
-	multiboot_detect_memory((multiboot_info_t*CT(1))TC((physaddr_t)mboot_info + KERNBASE));
-
-	multiboot_print_memory_map((multiboot_info_t*CT(1))KADDR((physaddr_t)mboot_info));
+	/* mboot_info is a physical address.  while some arches currently have the
+	 * lower memory mapped, everyone should have it mapped at kernbase by now.
+	 * also, it might be in 'free' memory, so once we start dynamically using
+	 * memory, we may clobber it. */
+	mboot_detect_memory((multiboot_info_t*)((physaddr_t)mboot_info + KERNBASE));
+	mboot_print_mmap((multiboot_info_t*)((physaddr_t)mboot_info + KERNBASE));
 
 	vm_init();                      // Sets up pages tables, turns on paging
 	cache_init();					// Determine systems's cache properties

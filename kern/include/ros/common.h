@@ -12,8 +12,8 @@
 #include <stdbool.h>
 
 typedef uintptr_t physaddr_t;
-typedef ssize_t intreg_t;
-typedef size_t uintreg_t;
+typedef long intreg_t;
+typedef unsigned long uintreg_t;
 
 #ifndef NULL
 #define NULL ((void*) 0)

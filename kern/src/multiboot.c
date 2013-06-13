@@ -1,7 +1,9 @@
-#ifdef __SHARC__
-#pragma nosharc
-#define SINIT(x) x
-#endif
+/* Copyright (c) 2009,13 The Regents of the University of California
+ * Barret Rhoden <brho@cs.berkeley.edu>
+ * Kevin Klues <klueska@cs.berkeley.edu>
+ * See LICENSE for details. 
+ *
+ * Multiboot parsing. */
 
 #include <multiboot.h>
 #include <ros/common.h>
@@ -14,65 +16,67 @@
 #include <arch/apic.h>
 #endif
 
-// These variables are set by i386_detect_memory()
-physaddr_t RO maxpa;      // Maximum physical address in the system
-physaddr_t RO maxaddrpa;  // Maximum addressable physical address
-void *SNT RO maxaddrpa_ptr;
-size_t RO npages;         // Total number of physical memory pages
-size_t RO naddrpages;	  // Number of addressable physical memory pages
+physaddr_t maxpa;		/* Maximum physical address in the system */
+physaddr_t maxaddrpa;	/* Maximum addressable physical address */
+size_t npages;			/* Total number of physical memory pages */
+size_t naddrpages;		/* num of addressable physical memory pages */
 
-static size_t RO basemem;  // Amount of base memory (in bytes)
-static size_t RO extmem;   // Amount of extended memory (in bytes)
+static size_t basemem;  /* Amount of base memory (in bytes) */
+static size_t extmem;   /* Amount of extended memory (in bytes) */
 
-void
-multiboot_detect_memory(multiboot_info_t *mbi)
+/* This only notices bios detectable memory - there's a lot more in the higher
+ * paddrs. */
+void mboot_detect_memory(multiboot_info_t *mbi)
 {
-	// Tells us how many kilobytes there are
-	size_t b = ROUNDDOWN(mbi->mem_lower*1024, PGSIZE);
-	size_t e = ROUNDDOWN(mbi->mem_upper*1024, PGSIZE);
-	basemem = SINIT(b);
-	extmem = SINIT(e);
-
-	// Calculate the maximum physical address based on whether
-	// or not there is any extended memory.  See comment in <inc/memlayout.h>
+	if (!(mbi->flags & MULTIBOOT_INFO_MEMORY)) {
+		printk("No BIOS memory info from multiboot, crash impending!\n");
+		return;
+	}
+	/* mem_lower and upper are measured in KB.  They are 32 bit values, so we're
+	 * limited to 4TB total. */
+	size_t basemem = ROUNDDOWN((size_t)mbi->mem_lower * 1024, PGSIZE);
+	size_t extmem = ROUNDDOWN((size_t)mbi->mem_upper * 1024, PGSIZE);
+	/* Calculate the maximum physical address based on whether or not there is
+	 * any extended memory. */
 	if (extmem)
-		maxpa = SINIT(EXTPHYSMEM + extmem);
+		maxpa = EXTPHYSMEM + extmem;
 	else
-		maxpa = SINIT(basemem);
-
-	npages = SINIT(maxpa / PGSIZE);
-
+		maxpa = basemem;
+	npages = maxpa / PGSIZE;
 	/* KERN_VMAP_TOP - KERNBASE is the max amount of virtual addresses we can
 	 * use for the physical memory mapping (aka - the KERNBASE mapping) */
-	maxaddrpa = SINIT(MIN(maxpa, KERN_VMAP_TOP - KERNBASE));
-	maxaddrpa_ptr = SINIT((void *SNT)maxaddrpa);
-
-	naddrpages = SINIT(maxaddrpa / PGSIZE);
-
-	cprintf("Physical memory: %dK available, ", (int)(maxpa/1024));
-	cprintf("base = %dK, extended = %dK\n", (int)(basemem/1024), (int)(extmem/1024));
-	printk("Maximum directly addressable physical memory: %dK\n", (int)(maxaddrpa/1024));
+	maxaddrpa = MIN(maxpa, KERN_VMAP_TOP - KERNBASE);
+	naddrpages = maxaddrpa / PGSIZE;
+	printk("Physical memory: %luK available, ", maxpa / 1024);
+	printk("base = %luK, extended = %luK\n", basemem / 1024, extmem / 1024);
+	printk("Maximum directly addressable physical memory: %luK\n",
+	       maxaddrpa / 1024);
 }
 
-void multiboot_print_memory_map(multiboot_info_t *mbi)
+/* TODO: Use the info from this for our free pages, instead of just using
+ * the extended memory */
+void mboot_print_mmap(multiboot_info_t *mbi)
 {
-	if(CHECK_FLAG(mbi->flags, 6)) {
-		memory_map_t *SNT mmap_b =
-			(memory_map_t *SNT)(mbi->mmap_addr + KERNBASE);
-		memory_map_t *SNT mmap_e =
-			(memory_map_t *SNT)(mbi->mmap_addr + KERNBASE + mbi->mmap_length);
-		memory_map_t *BND(mmap_b, mmap_e) mmap = TC(mmap_b);
-		printk("mmap_addr = 0x%x, mmap_length = 0x%x\n",
-		       (unsigned long)mbi->mmap_addr, (unsigned long)mbi->mmap_length);
-		while(mmap < mmap_e) {
-			printk("base = 0x%08x%08x, length = 0x%08x%08x, type = %s\n",
-			       (unsigned) mmap->base_addr_high,
-			       (unsigned) mmap->base_addr_low,
-			       (unsigned) mmap->length_high,
-			       (unsigned) mmap->length_low,
-			       mmap->type == 1 ? "FREE" : "RESERVED");
-			mmap = (memory_map_t *BND(mmap_b,mmap_e))((char *BND(mmap_b,mmap_e))mmap + mmap->size + sizeof(mmap->size));
-		}
+	multiboot_memory_map_t *mmap_b, *mmap_e, *mmap_i;
+	if (!(mbi->flags & MULTIBOOT_INFO_ELF_SHDR)) {
+		printk("No memory mapping info from multiboot\n");
+		return;
+	}
+	mmap_b = (multiboot_memory_map_t*)((size_t)mbi->mmap_addr + KERNBASE);
+	mmap_e = (multiboot_memory_map_t*)((size_t)mbi->mmap_addr + KERNBASE
+	                                   + mbi->mmap_length);
+	printd("mmap_addr = %p, mmap_length = %p\n", mbi->mmap_addr,
+	       mbi->mmap_length);
+	printd("mmap_b %p, mmap_e %p\n", mmap_b, mmap_e);
+	/* Note when we incremement mmap_i, we add in the value of size... */
+	for (mmap_i = mmap_b;
+	     mmap_i < mmap_e;
+	     mmap_i = (multiboot_memory_map_t*)((void*)mmap_i + mmap_i->size
+	                                        + sizeof(mmap_i->size))) {
+		printk("base = 0x%016llx, length = 0x%016llx : %s\n",
+		       mmap_i->addr, mmap_i->len,
+		       mmap_i->type == MULTIBOOT_MEMORY_AVAILABLE ? "FREE" :
+		                                                    "RESERVED");
 	}
 }
 
