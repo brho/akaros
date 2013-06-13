@@ -448,7 +448,7 @@ quiet_cmd_link-akaros = LINK    $@
                               $(gcc-lib) \
                               $(kern_cpio_obj) \
                               $(ext2_bdev_obj) ; \
-                              $(OBJDUMP) -S $@ > $@.asm
+                              $(OBJDUMP) $(OBJDUMP_FLAGS) -S $@ > $@.asm
 
 # For some reason, the if_changed doesn't work with FORCE (like it does in
 # Linux).  It looks like it can't find the .cmd file or something (also
