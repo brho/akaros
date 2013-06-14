@@ -27,6 +27,10 @@ void print_cpuinfo(void)
 	char vendor_id[13];
 	extern char (SNT RO _start)[];
 
+	if (sizeof(long) == 8)
+		printk("64 bit Kernel Booting...\n");
+	else
+		printk("32 bit Kernel Booting...\n");
 	asm volatile ("cpuid;"
 	          "movl    %%ebx, (%2);"
 	          "movl    %%edx, 4(%2);"

@@ -230,16 +230,36 @@ typedef unsigned long pde_t;
 
 #ifdef __ASSEMBLER__
 
-/*
- * Macros to build GDT entries in assembly.
- */
+/* Macros to build GDT entries in assembly. */
 #define SEG_NULL						\
 	.word 0, 0;						\
 	.byte 0, 0, 0, 0
-#define SEG(type,base,lim)					\
-	.word (((lim) >> 12) & 0xffff), ((base) & 0xffff);	\
-	.byte (((base) >> 16) & 0xff), (0x90 | (type)),		\
-		(0xC0 | (((lim) >> 28) & 0xf)), (((base) >> 24) & 0xff)
+
+/* 64 bit code segment.  This is for long mode, no compatibility.  If we want
+ * to support 32 bit apps later, we'll want to adjust this. */
+#define SEG_CODE_64(dpl)                                                    \
+	.word 0, 0;                                                             \
+	.byte 0;                                                                \
+	.byte (((1/*p*/) << 7) | ((dpl) << 5) | 0x18 | ((0/*c*/) << 2));        \
+	.byte (((0/*d*/) << 6) | ((1/*l*/) << 5));                              \
+	.byte 0;
+
+/* 64 bit data segment.  These are pretty much completely ignored (except if we
+ * use them for fs/gs, or compatibility mode */
+#define SEG_DATA_64                                                         \
+	.word 0, 0;                                                             \
+	.byte 0;                                                                \
+	.byte 0x90;                                                             \
+	.word 0;
+
+/* Default segment (32 bit style).  Would work for fs/gs, if needed */
+#define SEG(type, base, lim)                                                \
+	.word (((lim) >> 12) & 0xffff);                                         \
+	.word ((base) & 0xffff);                                                \
+	.byte (((base) >> 16) & 0xff);                                          \
+	.byte (0x90 | (type));                                                  \
+	.byte (0xC0 | (((lim) >> 28) & 0xf));                                   \
+	.byte (((base) >> 24) & 0xff)
 
 #else	// not __ASSEMBLER__
 

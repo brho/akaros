@@ -50,8 +50,8 @@ newcs:
 	movl	$boot_pdt, %edx
 	# identity map the first jumbo PTE from 0x0 -> 0x0
 	movl	$(PTE_P | PTE_W | PTE_PS), (%edx)
-	# map KERNBASE -> 0 for 200 MB
-	movl	$50, %ecx
+	# map KERNBASE -> 0 for 1GB (1/4 of the 1024 entries)
+	movl	$256, %ecx
 	# init loop, eax at paddr 0, and edx is advanced by KERNBASE mapping slots
 	# (with 4 bytes per PTE).
 	addl	$((KERNBASE >> PTSHIFT) << 2), %edx

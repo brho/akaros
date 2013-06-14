@@ -30,6 +30,12 @@
 #define MSR_APIC_ENABLE				0x00000800
 #define MSR_APIC_BASE_ADDRESS		0x0000000FFFFFF000
 
+#define IA32_EFER_MSR				0xc0000080
+# define IA32_EFER_SYSCALL			(1 << 0)
+# define IA32_EFER_IA32E_EN			(1 << 8)
+# define IA32_EFER_IA32E_ACT		(1 << 10)
+# define IA32_EFER_EXE_DIS_BIT		(1 << 11)
+
 /* CPUID */
 #define CPUID_PSE_SUPPORT			0x00000008
 
@@ -58,6 +64,7 @@
 
 #endif /* 64bit / 32bit */
 
+#ifndef __ASSEMBLER__
 static inline uint8_t inb(int port) __attribute__((always_inline));
 static inline void insb(int port, void *addr, int cnt)
               __attribute__((always_inline));
@@ -340,5 +347,6 @@ static inline void __cpu_relax(void)
 #ifndef UNUSED_ARG
 #define UNUSED_ARG(x) (void)x
 #endif /* This prevents compiler warnings for UNUSED_ARG */ 
+#endif /* !__ASSEMBLER__ */
 
 #endif /* !ROS_INC_X86_H */
