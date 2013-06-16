@@ -29,7 +29,7 @@ spinlock_t colored_page_free_list_lock = SPINLOCK_INITIALIZER_IRQSAVE;
  * to allocate and deallocate physical memory via the 
  * page_free_lists. 
  */
-void page_alloc_init() 
+void page_alloc_init(struct multiboot_info *mbi)
 {
 	init_once_racy(return);
 
@@ -40,9 +40,9 @@ void page_alloc_init()
 	for (size_t i = 0; i < num_colors; i++)
 		LIST_INIT(&lists[i]);
 	
-	uintptr_t first_free_page = LA2PPN(PADDR(ROUNDUP(boot_freemem, PGSIZE)));
-	uintptr_t first_invalid_page = LA2PPN(maxaddrpa);
-	assert(first_invalid_page == npages);
+	uintptr_t first_free_page = ROUNDUP(boot_freemem, PGSIZE);
+	uintptr_t first_invalid_page = LA2PPN(boot_freelimit);
+	assert(first_invalid_page == max_nr_pages);
 
 	// mark kernel pages as in-use
 	for (uintptr_t page = 0; page < first_free_page; page++)
@@ -54,6 +54,7 @@ void page_alloc_init()
 		page_setref(&pages[page], 0);
 		LIST_INSERT_HEAD(&lists[page & (num_colors-1)], &pages[page], pg_link);
 	}
+	nr_free_pages = first_invalid_page - first_free_page;
 
 	colored_page_free_list = lists;
 }

@@ -21,7 +21,7 @@ int handle_appserver_packet(const char* p, size_t size)
 
 	uintptr_t paddr = ntohl(packet->header.addr);
 	size_t copy_size = ntohl(packet->header.payload_size);
-	if(paddr % 4 || paddr >= maxaddrpa)
+	if(paddr % 4 || paddr >= max_paddr)
 		goto fail;
 	if(copy_size % 4 || copy_size > APPSERVER_MAX_PAYLOAD_SIZE)
 		goto fail;

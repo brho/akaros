@@ -145,7 +145,7 @@ typedef unsigned long pde_t;
 // use PGADDR(PDX(la), PTX(la), PGOFF(la)).
 
 // page number field of address
-#define LA2PPN(la)	(((uintptr_t) (la)) >> PTXSHIFT)
+#define LA2PPN(la)	(((uintptr_t) (la)) >> PGSHIFT)
 #define PTE2PPN(pte)	LA2PPN(pte)
 #define VPN(la)		PPN(la)		// used to index into vpt[]
 

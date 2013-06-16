@@ -1,23 +1,10 @@
-/* See COPYRIGHT for copyright information. */
-
-/** @file 
- * This file is responsible for managing physical pages as they 
- * are mapped into the page tables of a particular virtual address
- * space.  The functions defined in this file operate on these
- * page tables to insert and remove physical pages from them at 
- * particular virtual addresses.
+/* Copyright (c) 2009,13 The Regents of the University of California
+ * Barret Rhoden <brho@cs.berkeley.edu>
+ * See LICENSE for details. 
  *
- * @author Kevin Klues <klueska@cs.berkeley.edu>
- * @author Barret Rhoden <brho@cs.berkeley.edu>
- */
-
-#ifdef __SHARC__
-#pragma nosharc
-#endif
-
-#ifdef __DEPUTY__
-#pragma nodeputy
-#endif
+ * Arch independent physical memory and page table management.
+ *
+ * For page allocation, check out the family of page_alloc files. */
 
 #include <arch/arch.h>
 #include <arch/mmu.h>
@@ -33,36 +20,155 @@
 #include <process.h>
 #include <stdio.h>
 #include <mm.h>
+#include <multiboot.h>
 
-volatile uint32_t vpt_lock = 0;
-volatile uint32_t vpd_lock = 0;
+physaddr_t max_pmem = 0;	/* Total amount of physical memory (bytes) */
+physaddr_t max_paddr = 0;	/* Maximum addressable physical address */
+size_t max_nr_pages = 0;	/* Number of addressable physical memory pages */
+size_t nr_free_pages = 0;	/* TODO: actually track this, after init */
+struct page *pages = 0;
+struct multiboot_info *multiboot_kaddr = 0;
+uintptr_t boot_freemem = 0;
+uintptr_t boot_freelimit = 0;
+
+static size_t sizeof_mboot_mmentry(struct multiboot_mmap_entry *entry)
+{
+	/* Careful - addr + len is a uint64 (need to cast down for 32 bit) */
+	return (size_t)(entry->addr + entry->len);
+}
+
+static void adjust_max_pmem(struct multiboot_mmap_entry *entry, void *data)
+{
+	if (entry->type != MULTIBOOT_MEMORY_AVAILABLE)
+		return;
+	max_pmem = MAX(max_pmem, sizeof_mboot_mmentry(entry));
+}
 
 /**
- * @brief Initialize the array of physical pages and memory free list.
+ * @brief Initializes physical memory.  Determines the pmem layout, sets up the
+ * array of physical pages and memory free list, and turns on virtual
+ * memory/page tables.
  *
- * The 'pages' array has one 'page_t' entry per physical page.
- * Pages are reference counted, and free pages are kept on a linked list.
- */
-void page_init(void)
+ * Regarding max_pmem vs max_paddr and max_nr_pages: max_pmem is the largest
+ * physical address that is in a FREE region.  It includes RESERVED regions that
+ * are below this point.  max_paddr is the largest physical address, <=
+ * max_pmem, that the KERNBASE mapping can map.  It too may include reserved
+ * ranges.  The 'pages' array will track all physical pages up to max_paddr.
+ * There are max_nr_pages of them.  On 64 bit systems, max_pmem == max_paddr. */
+void pmem_init(struct multiboot_info *mbi)
 {
-	/*
-     * First, make 'pages' point to an array of size 'npages' of
-	 * type 'page_t'.
-	 * The kernel uses this structure to keep track of physical pages;
-	 * 'npages' equals the number of physical pages in memory.
-	 * round up to the nearest page
-	 */
-	pages = (page_t*)boot_alloc(npages*sizeof(page_t), PGSIZE);
-	memset(pages, 0, npages*sizeof(page_t));
-
-	/*
-     * Then initilaize everything so pages can start to be alloced and freed
-	 * from the memory free list
-	 */
-	page_alloc_init();
+	mboot_detect_memory(mbi);
+	mboot_print_mmap(mbi);
+	/* adjust the max memory based on the mmaps, since the old detection doesn't
+	 * help much on 64 bit systems */
+	mboot_foreach_mmap(mbi, adjust_max_pmem, 0);
+	/* KERN_VMAP_TOP - KERNBASE is the max amount of virtual addresses we can
+	 * use for the physical memory mapping (aka - the KERNBASE mapping).
+	 * Should't be an issue on 64b, but is usually for 32 bit. */
+	max_paddr = MIN(max_pmem, KERN_VMAP_TOP - KERNBASE);
+	/* Note not all of this memory is free. */
+	max_nr_pages = max_paddr / PGSIZE;
+	printk("Max physical RAM (appx, bytes): %lu\n", max_pmem);
+	printk("Max addressable physical RAM (appx): %lu\n", max_paddr);
+	printk("Highest page number (including reserved): %lu\n", max_nr_pages);
+	pages = (struct page*)boot_zalloc(max_nr_pages * sizeof(struct page),
+	                                  PGSIZE);
+	/* Turn on paging before turning on the page allocator, we still use
+	 * boot_alloc in vm_init.  Doesn't really matter much either way. */
+	vm_init();
+	page_alloc_init(mbi);
 
 	static_assert(PROCINFO_NUM_PAGES*PGSIZE <= PTSIZE);
 	static_assert(PROCDATA_NUM_PAGES*PGSIZE <= PTSIZE);
+}
+
+static void set_largest_freezone(struct multiboot_mmap_entry *entry, void *data)
+{
+	struct multiboot_mmap_entry **boot_zone =
+	       (struct multiboot_mmap_entry**)data;
+
+	if (entry->type != MULTIBOOT_MEMORY_AVAILABLE)
+		return;
+	if (!*boot_zone || (sizeof_mboot_mmentry(entry) >
+	                   sizeof_mboot_mmentry(*boot_zone)))
+		*boot_zone = entry;
+}
+
+/* Initialize boot freemem and its limit.
+ *
+ * "end" is a symbol marking the end of the kernel.  This covers anything linked
+ * in with the kernel (KFS, etc).  However, 'end' is a kernel load address,
+ * which differs from kernbase addrs in 64 bit.  We need to use the kernbase
+ * mapping for anything dynamic (because it could go beyond 1 GB). 
+ *
+ * Ideally, we'll use the largest mmap zone, as reported by multiboot.  If we
+ * don't have one (riscv), we'll just use the memory after the kernel.
+ *
+ * If we do have a zone, there is a chance we've already used some of it (for
+ * the kernel, etc).  We'll use the lowest address in the zone that is
+ * greater than "end" (and adjust the limit accordingly).  */
+static void boot_alloc_init(void)
+{
+	extern char end[];
+	uintptr_t boot_zone_start, boot_zone_end;
+	uintptr_t end_kva = (uintptr_t)KBASEADDR(end);
+	struct multiboot_mmap_entry *boot_zone = 0;
+
+	/* Find our largest mmap_entry; that will set bootzone */
+	mboot_foreach_mmap(multiboot_kaddr, set_largest_freezone, &boot_zone);
+	if (boot_zone) {
+		boot_zone_start = (uintptr_t)KADDR(boot_zone->addr);
+		/* one issue for 32b is that the boot_zone_end could be beyond max_paddr
+		 * and even wrap-around.  Do the min check as a uint64_t.  The result
+		 * should be a safe, unwrapped 32/64b when cast to physaddr_t. */
+		boot_zone_end = (uintptr_t)KADDR(MIN(boot_zone->addr + boot_zone->len,
+		                                 (uint64_t)max_paddr));
+		/* using KERNBASE (kva, btw) which covers the kernel and anything before
+		 * it (like the stuff below EXTPHYSMEM on x86) */
+		if (regions_collide_unsafe(KERNBASE, end_kva,
+		                           boot_zone_start, boot_zone_end))
+			boot_freemem = end_kva;
+		else
+			boot_freemem = boot_zone_start;
+		boot_freelimit = boot_zone_end;
+	} else {
+		boot_freemem = end_kva;
+		boot_freelimit = max_paddr;
+	}
+	printd("boot_zone: %p, paddr base: 0x%llx, paddr len: 0x%llx\n", boot_zone,
+	       boot_zone ? boot_zone->addr : 0,
+	       boot_zone ? boot_zone->len : 0);
+	printd("boot_freemem: %p, boot_freelimit %p\n", boot_freemem,
+	       boot_freelimit);
+}
+
+/* Low-level allocator, used before page_alloc is on.  Returns size bytes,
+ * aligned to align (should be a power of 2).  Retval is a kernbase addr.  Will
+ * panic on failure. */
+void *boot_alloc(size_t amt, size_t align)
+{
+	uintptr_t retval;
+
+	if (!boot_freemem)
+		boot_alloc_init();
+	boot_freemem = ROUNDUP(boot_freemem, align);
+	retval = boot_freemem;
+	if (boot_freemem + amt > boot_freelimit)
+		panic("Out of memory in boot alloc, you fool!\n");
+	boot_freemem += amt;
+	printd("boot alloc from %p to %p\n", retval, boot_freemem);
+	/* multiboot info probably won't ever conflict with our boot alloc */
+	if (mboot_region_collides(multiboot_kaddr, retval, boot_freemem))
+		panic("boot allocation could clobber multiboot info!  Get help!");
+	return (void*)retval;
+}
+
+void *boot_zalloc(size_t amt, size_t align)
+{
+	/* boot_alloc panics on failure */
+	void *v = boot_alloc(amt, align);
+	memset(v, 0, amt);
+	return v;
 }
 
 /** 
@@ -205,4 +311,21 @@ void tlb_invalidate(pde_t *pgdir, void *va)
 	// Flush the entry only if we're modifying the current address space.
 	// For now, there is only one address space, so always invalidate.
 	invlpg(va);
+}
+
+/* Helper, returns true if any part of (start1, end1) is within (start2, end2).
+ * Equality of endpoints (like end1 == start2) is okay.
+ * Assumes no wrap-around. */
+bool regions_collide_unsafe(uintptr_t start1, uintptr_t end1, 
+                            uintptr_t start2, uintptr_t end2)
+{
+	if (start1 <= start2) {
+		if (end1 <= start2)
+			return FALSE;
+		return TRUE;
+	} else {
+		if (end2 <= start1)
+			return FALSE;
+		return TRUE;
+	}
 }

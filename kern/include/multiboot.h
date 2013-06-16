@@ -3,11 +3,6 @@
 
 #include <ros/common.h>
 
-extern physaddr_t maxpa;		/* Maximum physical address in the system */
-extern physaddr_t maxaddrpa;	/* Maximum addressable physical address */
-extern size_t npages;			/* Total number of physical memory pages */
-extern size_t naddrpages;		/* num of addressable physical memory pages */
-
 /* multiboot.h - the header for Multiboot 0.6.96 (diff from MB2) */
 /* Copyright (C) 1999,2003,2007,2008,2009  Free Software Foundation, Inc.
  *
@@ -229,6 +224,13 @@ typedef struct multiboot_mod_list multiboot_module_t;
 
 #endif /* ! ASM_FILE */
 
-void mboot_detect_memory(multiboot_info_t *mbi);
-void mboot_print_mmap(multiboot_info_t *mbi);
+typedef void (*mboot_foreach_t)(struct multiboot_mmap_entry*, void*);
+
+void mboot_detect_memory(struct multiboot_info *mbi);
+void mboot_print_mmap(struct multiboot_info *mbi);
+void mboot_foreach_mmap(struct multiboot_info *mbi, mboot_foreach_t func,
+                        void *data);
+bool mboot_region_collides(struct multiboot_info *mbi, uintptr_t base,
+                           uintptr_t end);
+
 #endif /* !ROS_INC_MULTIBOOT_H */

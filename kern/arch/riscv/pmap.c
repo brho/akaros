@@ -17,7 +17,6 @@
 
 pde_t* boot_pgdir;		// Virtual address of boot time page directory
 physaddr_t boot_cr3;		// Physical address of boot time page directory
-page_t* pages = NULL;          // Virtual address of physical page array
 
 // --------------------------------------------------------------
 // Set up initial memory mappings and turn on MMU.

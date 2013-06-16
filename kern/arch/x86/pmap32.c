@@ -26,9 +26,6 @@
 pde_t* boot_pgdir;		// Virtual address of boot time page directory
 physaddr_t RO boot_cr3;		// Physical address of boot time page directory
 
-// Global variables
-page_t *RO pages = NULL;          // Virtual address of physical page array
-
 // Global descriptor table.
 //
 // The kernel and user segments are identical (except for the DPL).
@@ -259,10 +256,10 @@ vm_init(void)
 	if (pse) {
 		// map the first 4MB as regular entries, to support different MTRRs
 		boot_map_segment(pgdir, KERNBASE, JPGSIZE, 0, PTE_W | PTE_G);
-		boot_map_segment(pgdir, KERNBASE + JPGSIZE, maxaddrpa - JPGSIZE, JPGSIZE,
+		boot_map_segment(pgdir, KERNBASE + JPGSIZE, max_paddr - JPGSIZE, JPGSIZE,
 		                 PTE_W | PTE_G | PTE_PS);
 	} else
-		boot_map_segment(pgdir, KERNBASE, maxaddrpa, 0, PTE_W | PTE_G);
+		boot_map_segment(pgdir, KERNBASE, max_paddr, 0, PTE_W | PTE_G);
 
 	// APIC mapping: using PAT (but not *the* PAT flag) to make these type UC
 	// IOAPIC
@@ -355,10 +352,10 @@ check_boot_pgdir(bool pse)
 	//for (i = 0; KERNBASE + i != 0; i += PGSIZE)
 	// adjusted check to account for only mapping avail mem
 	if (pse)
-		for (i = 0; i < maxaddrpa; i += JPGSIZE)
+		for (i = 0; i < max_paddr; i += JPGSIZE)
 			assert(check_va2pa(pgdir, KERNBASE + i) == i);
 	else
-		for (i = 0; i < maxaddrpa; i += PGSIZE)
+		for (i = 0; i < max_paddr; i += PGSIZE)
 			assert(check_va2pa(pgdir, KERNBASE + i) == i);
 
 	// check for zero/non-zero in PDEs
@@ -373,8 +370,8 @@ check_boot_pgdir(bool pse)
 			//if (i >= PDX(KERNBASE))
 			// adjusted check to account for only mapping avail mem
 			// and you can't KADDR maxpa (just above legal range)
-			// maxaddrpa can be up to maxpa, so assume the worst
-			if (i >= PDX(KERNBASE) && i <= PDX(KADDR(maxaddrpa-1)))
+			// max_paddr can be up to maxpa, so assume the worst
+			if (i >= PDX(KERNBASE) && i <= PDX(KADDR(max_paddr-1)))
 				assert(pgdir[i]);
 			else
 				assert(pgdir[i] == 0);
@@ -406,7 +403,7 @@ check_boot_pgdir(bool pse)
 		}
 	}
 	// kernel read-write.
-	for (i = ULIM; i <= KERNBASE + maxaddrpa - PGSIZE; i+=PGSIZE) {
+	for (i = ULIM; i <= KERNBASE + max_paddr - PGSIZE; i+=PGSIZE) {
 		pte = get_va_perms(pgdir, (void*SAFE)TC(i));
 		if ((pte & PTE_P) && (i != VPT+(UVPT>>10))) {
 			assert((pte & PTE_U) != PTE_U);

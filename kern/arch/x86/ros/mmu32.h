@@ -95,6 +95,7 @@ typedef unsigned long pde_t;
 #define VGAPHYSMEM	0x0A0000
 #define DEVPHYSMEM	0x0C0000
 #define BIOSPHYSMEM	0x0F0000
+#define EXTPHYSMEM	0x100000
 
 /* **************************************** */
 /* Kernel Virtual Memory Mapping  (not really an MMU thing) */
@@ -140,7 +141,7 @@ typedef unsigned long pde_t;
 // use PGADDR(PDX(la), PTX(la), PGOFF(la)).
 
 // page number field of address
-#define LA2PPN(la)	(((uintptr_t) (la)) >> PTXSHIFT)
+#define LA2PPN(la)	(((uintptr_t) (la)) >> PGSHIFT)
 #define PTE2PPN(pte)	LA2PPN(pte)
 #define VPN(la)		PPN(la)		// used to index into vpt[]
 

@@ -16,9 +16,6 @@
 #define KMALLOC_LARGEST KMALLOC_SMALLEST << NUM_KMALLOC_CACHES
 #define KMALLOC_OFFSET ROUNDUP(sizeof(struct kmalloc_tag), KMALLOC_ALIGNMENT)
 
-void* (DALLOC(n) boot_alloc)(uint32_t n, uint32_t align);
-void* (DALLOC(n*sz) boot_calloc)(uint32_t n, size_t sz, uint32_t align);
-
 void kmalloc_init(void);
 void* (DALLOC(size) kmalloc)(size_t size, int flags);
 void* (DALLOC(size) krealloc)(void* buf, size_t size, int flags);

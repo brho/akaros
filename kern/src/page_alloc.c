@@ -166,6 +166,7 @@ void *get_cont_pages(size_t order, int flags)
 {
 	size_t npages = 1 << order;	
 
+	size_t naddrpages = max_paddr / PGSIZE;
 	// Find 'npages' free consecutive pages
 	int first = -1;
 	spin_lock_irqsave(&colored_page_free_list_lock);

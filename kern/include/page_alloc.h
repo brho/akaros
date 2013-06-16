@@ -16,6 +16,7 @@
 #include <process.h>
 #include <kref.h>
 #include <kthread.h>
+#include <multiboot.h>
 
 struct page_map;		/* preprocessor games */
 
@@ -54,7 +55,7 @@ extern page_list_t LCKD(&colored_page_free_list_lock) * RO CT(llc_num_colors)
     colored_page_free_list;
 
 /*************** Functional Interface *******************/
-void page_alloc_init(void);
+void page_alloc_init(struct multiboot_info *mbi);
 void colored_page_alloc_init(void);
 
 error_t upage_alloc(struct proc* p, page_t *SAFE *page, int zero);

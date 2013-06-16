@@ -4,7 +4,6 @@
  * Actual implementation:
  * Copyright (c) 2009 The Regents of the University of California
  * Barret Rhoden <brho@cs.berkeley.edu>
- * Kevin Klues <klueska@cs.berkeley.edu> (multiboot functions)
  * See LICENSE for details.
  *
  * Physical memory mangement, low-level virtual address space initialization and
@@ -46,28 +45,41 @@
 ({								\
 	physaddr_t __m_pa = (pa);				\
 	size_t __m_ppn = LA2PPN(__m_pa);			\
-	if (__m_ppn >= npages)					\
+	if (__m_ppn > max_nr_pages)					\
 		warn("KADDR called with invalid pa %p", __m_pa);\
 	(void*TRUSTED) (__m_pa + KERNBASE);				\
 })
 
+#define KBASEADDR(kla) KADDR(PADDR(kla))
+
 extern char (SNT RO bootstacktop)[], (SNT RO bootstack)[];
 
-// List of physical pages
-extern page_t * RO CT(npages) pages;
+extern physaddr_t max_pmem;		/* Total amount of physical memory */
+extern size_t max_nr_pages;		/* Total number of physical memory pages */
+extern physaddr_t max_paddr;	/* Maximum addressable physical address */
+extern size_t nr_free_pages;
+extern struct multiboot_info *multiboot_kaddr;
+extern uintptr_t boot_freemem;
+extern uintptr_t boot_freelimit;
+
+/* Pages are stored in an array, including for pages that we can never touch
+ * (like reserved memory from the BIOS, fake regions, etc).  Pages are reference
+ * counted, and free pages are kept on a linked list. */
+extern struct page *pages;
 
 extern physaddr_t RO boot_cr3;
 extern pde_t *CT(NPDENTRIES) RO boot_pgdir;
 
-extern char *RO BND(end, maxaddrpa_ptr + IVY_KERNBASE) boot_freemem;
+bool enable_pse(void);
+void vm_init(void);
 
-bool	enable_pse(void);
-void	vm_init(void);
+void pmem_init(struct multiboot_info *mbi);
+void *boot_alloc(size_t amt, size_t align);
+void *boot_zalloc(size_t amt, size_t align);
 
-void	page_init(void);
-void	page_check(void);
-int	    page_insert(pde_t *pgdir, struct page *page, void *SNT va, int perm);
-void	page_remove(pde_t *COUNT(NPDENTRIES) pgdir, void *SNT va);
+void page_check(void);
+int	 page_insert(pde_t *pgdir, struct page *page, void *SNT va, int perm);
+void page_remove(pde_t *COUNT(NPDENTRIES) pgdir, void *SNT va);
 page_t*COUNT(1) page_lookup(pde_t SSOMELOCK*COUNT(NPDENTRIES) pgdir, void *SNT va, pte_t **pte_store);
 error_t	pagetable_remove(pde_t *COUNT(NPDENTRIES) pgdir, void *SNT va);
 void	page_decref(page_t *COUNT(1) pp);
@@ -75,6 +87,8 @@ void	page_decref(page_t *COUNT(1) pp);
 void setup_default_mtrrs(barrier_t* smp_barrier);
 void	tlb_invalidate(pde_t *COUNT(NPDENTRIES) pgdir, void *SNT va);
 void tlb_flush_global(void);
+bool regions_collide_unsafe(uintptr_t start1, uintptr_t end1, 
+                            uintptr_t start2, uintptr_t end2);
 
 /* Arch specific implementations for these */
 pte_t *pgdir_walk(pde_t *COUNT(NPDENTRIES) pgdir, const void *SNT va, int create);
@@ -82,8 +96,8 @@ int get_va_perms(pde_t *COUNT(NPDENTRIES) pgdir, const void *SNT va);
 
 static inline page_t *SAFE ppn2page(size_t ppn)
 {
-	if( ppn >= npages )
-		warn("ppn2page called with ppn (%08lu) larger than npages", ppn);
+	if (ppn >= max_nr_pages)
+		warn("ppn2page called with ppn (%08lu) larger than max_nr_pages", ppn);
 	return &(pages[ppn]);
 }
 
@@ -99,8 +113,8 @@ static inline physaddr_t page2pa(page_t *pp)
 
 static inline page_t*COUNT(1) pa2page(physaddr_t pa)
 {
-	if (LA2PPN(pa) >= npages)
-		warn("pa2page called with pa (%p) larger than npages", pa);
+	if (LA2PPN(pa) >= max_nr_pages)
+		warn("pa2page called with pa (%p) larger than max_nr_pages", pa);
 	return &pages[LA2PPN(pa)];
 }
 

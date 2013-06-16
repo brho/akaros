@@ -90,12 +90,6 @@
  * which vpd is set in entry.S.
  */
 
-#ifdef __IVY__
-#pragma cilnoremove("vpt_lock", "vpd_lock")
-#endif
-extern volatile uint32_t vpt_lock;
-extern volatile uint32_t vpd_lock;
-
 extern volatile pte_t *vpt; // VA of "virtual page table"
 extern volatile pde_t *vpd; // VA of current page directory
 

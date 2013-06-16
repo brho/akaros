@@ -55,19 +55,23 @@ void kernel_init(multiboot_info_t *mboot_info)
 	extern char (RO BND(__this, end) edata)[], (RO SNT end)[];
 
 	memset(edata, 0, end - edata);
-	cons_init();
-	print_cpuinfo();
-
 	/* mboot_info is a physical address.  while some arches currently have the
 	 * lower memory mapped, everyone should have it mapped at kernbase by now.
 	 * also, it might be in 'free' memory, so once we start dynamically using
 	 * memory, we may clobber it. */
-	mboot_detect_memory((multiboot_info_t*)((physaddr_t)mboot_info + KERNBASE));
-	mboot_print_mmap((multiboot_info_t*)((physaddr_t)mboot_info + KERNBASE));
+	multiboot_kaddr = (struct multiboot_info*)((physaddr_t)mboot_info
+                                               + KERNBASE);
+	cons_init();
+	print_cpuinfo();
 
-	vm_init();                      // Sets up pages tables, turns on paging
 	cache_init();					// Determine systems's cache properties
-	page_init();					// Initializes free page list, etc
+	pmem_init(multiboot_kaddr);
+
+#ifdef CONFIG_X86_64
+printk("Halting/spinning...\n");
+while (1)
+	asm volatile("hlt");
+#endif
 	kmem_cache_init();              // Sets up slab allocator
 	kmalloc_init();
 	hashtable_init();
@@ -111,9 +115,15 @@ void kernel_init(multiboot_info_t *mboot_info)
 void _panic(const char *file, int line, const char *fmt,...)
 {
 	va_list ap;
-	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-
+	struct per_cpu_info *pcpui;
+	/* Debug panic, before core_id is available. */
+	if (booting) {
+		printk("Kernel panic at %s:%d\n", file, line);
+		while (1)
+			cpu_relax();
+	}
 	/* We're panicing, possibly in a place that can't handle the lock checker */
+	pcpui = &per_cpu_info[core_id()];
 	pcpui->__lock_depth_disabled++;
 	va_start(ap, fmt);
 	cprintf("kernel panic at %s:%d, from core %d: ", file, line, core_id());
@@ -136,7 +146,7 @@ void _warn(const char *file, int line, const char *fmt,...)
 	va_list ap;
 
 	va_start(ap, fmt);
-	cprintf("kernel warning at %s:%d, from core %d: ", file, line, core_id());
+	cprintf("kernel warning at %s:%d: ", file, line);
 	vcprintf(fmt, ap);
 	cprintf("\n");
 	va_end(ap);
