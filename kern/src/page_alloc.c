@@ -153,6 +153,24 @@ error_t kpage_alloc(page_t** page)
 	return ret;
 }
 
+/* Helper: allocates a refcounted page of memory for the kernel's use and
+ * returns the kernel address (kernbase), or 0 on error. */
+void *kpage_alloc_addr(void)
+{
+	struct page *a_page;
+	if (kpage_alloc(&a_page))
+		return 0;
+	return page2kva(a_page);
+}
+
+void *kpage_zalloc_addr(void)
+{
+	void *retval = kpage_alloc_addr();
+	if (retval)
+		memset(retval, 0, PGSIZE);
+	return retval;
+}
+
 /**
  * @brief Allocated 2^order contiguous physical pages.  Will increment the
  * reference count for the pages.

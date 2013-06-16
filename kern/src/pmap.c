@@ -73,10 +73,8 @@ void pmem_init(struct multiboot_info *mbi)
 	printk("Highest page number (including reserved): %lu\n", max_nr_pages);
 	pages = (struct page*)boot_zalloc(max_nr_pages * sizeof(struct page),
 	                                  PGSIZE);
-	/* Turn on paging before turning on the page allocator, we still use
-	 * boot_alloc in vm_init.  Doesn't really matter much either way. */
-	vm_init();
 	page_alloc_init(mbi);
+	vm_init();
 
 	static_assert(PROCINFO_NUM_PAGES*PGSIZE <= PTSIZE);
 	static_assert(PROCDATA_NUM_PAGES*PGSIZE <= PTSIZE);

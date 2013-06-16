@@ -60,6 +60,8 @@ void colored_page_alloc_init(void);
 
 error_t upage_alloc(struct proc* p, page_t *SAFE *page, int zero);
 error_t kpage_alloc(page_t *SAFE *page);
+void *kpage_alloc_addr(void);
+void *kpage_zalloc_addr(void);
 error_t upage_alloc_specific(struct proc* p, page_t *SAFE *page, size_t ppn);
 error_t kpage_alloc_specific(page_t *SAFE *page, size_t ppn);
 

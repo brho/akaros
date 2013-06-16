@@ -67,66 +67,9 @@ pseudodesc_t gdt_pd = {
 static void check_boot_pgdir(bool pse);
 
 //
-// Given pgdir, a pointer to a page directory,
-// walk the 2-level page table structure to find
-// the page table entry (PTE) for linear address la.
-// Return a pointer to this PTE.
-//
-// If the relevant page table doesn't exist in the page directory:
-//	- If create == 0, return 0.
-//	- Otherwise allocate a new page table, install it into pgdir,
-//	  and return a pointer into it.
-//        (Questions: What data should the new page table contain?
-//	  And what permissions should the new pgdir entry have?
-//	  Note that we use the 486-only "WP" feature of %cr0, which
-//	  affects the way supervisor-mode writes are checked.)
-//
-// This function abstracts away the 2-level nature of
-// the page directory by allocating new page tables
-// as needed.
-// 
-// boot_pgdir_walk may ONLY be used during initialization,
-// before the page_free_list has been set up.
-// It should panic on failure.  (Note that boot_alloc already panics
-// on failure.)
-//
-// Supports returning jumbo (4MB PSE) PTEs.  To create with a jumbo, pass in 2.
-// 
-// Maps non-PSE PDEs as U/W.  W so the kernel can, U so the user can read via
-// UVPT.  UVPT security comes from the UVPT mapping (U/R).  All other kernel pages
-// protected at the second layer
-static pte_t*
-boot_pgdir_walk(pde_t *COUNT(NPDENTRIES) pgdir, uintptr_t la, int create)
-{
-	pde_t* the_pde = &pgdir[PDX(la)];
-	void* new_table;
-
-	if (*the_pde & PTE_P) {
-		if (*the_pde & PTE_PS)
-			return (pte_t*)the_pde;
-		return &((pde_t*COUNT(NPTENTRIES))KADDR(PTE_ADDR(*the_pde)))[PTX(la)];
-	}
-	if (!create)
-		return NULL;
-	if (create == 2) {
-		if (JPGOFF(la))
-			panic("Attempting to find a Jumbo PTE at an unaligned VA!");
-		*the_pde = PTE_PS | PTE_P;
-		return (pte_t*)the_pde;
-	}
-	new_table = boot_alloc(PGSIZE, PGSIZE);
-	memset(new_table, 0, PGSIZE);
-	*the_pde = (pde_t)PADDR(new_table) | PTE_P | PTE_W | PTE_U | PTE_G;
-	return &((pde_t*COUNT(NPTENTRIES))KADDR(PTE_ADDR(*the_pde)))[PTX(la)];
-}
-
-//
 // Map [la, la+size) of linear address space to physical [pa, pa+size)
 // in the page table rooted at pgdir.  Size is a multiple of PGSIZE.
 // Use permission bits perm|PTE_P for the entries.
-//
-// This function may ONLY be used during initialization,
-// before the page_free_list has been set up.
 //
 // To map with Jumbos, set PTE_PS in perm
 static void
@@ -146,12 +89,14 @@ boot_map_segment(pde_t *COUNT(NPDENTRIES) pgdir, uintptr_t la, size_t size, phys
 			panic("Tried to map a Jumbo page at an unaligned address!");
 		// need to index with i instead of la + size, in case of wrap-around
 		for (i = 0; i < size; i += JPGSIZE, la += JPGSIZE, pa += JPGSIZE) {
-			pte = boot_pgdir_walk(pgdir, la, 2);
+			pte = pgdir_walk(pgdir, (void*)la, 2);
+			assert(pte);
 			*pte = PTE_ADDR(pa) | PTE_P | perm;
 		}
 	} else {
 		for (i = 0; i < size; i += PGSIZE, la += PGSIZE, pa += PGSIZE) {
-			pte = boot_pgdir_walk(pgdir, la, 1);
+			pte = pgdir_walk(pgdir, (void*)la, 1);
+			assert(pte);
 			if (*pte & PTE_PS)
 				// if we start using the extra flag for PAT, which we aren't,
 				// this will warn, since PTE_PS and PTE_PAT are the same....
@@ -217,8 +162,8 @@ vm_init(void)
 
 	//////////////////////////////////////////////////////////////////////
 	// create initial page directory.
-	pgdir = boot_alloc(PGSIZE, PGSIZE);
-	memset(pgdir, 0, PGSIZE);
+	pgdir = kpage_zalloc_addr();
+	assert(pgdir);
 	boot_pgdir = pgdir;
 	boot_cr3 = PADDR(pgdir);
 	// helpful if you want to manually walk with kvm / bochs
@@ -477,9 +422,6 @@ error_t	pagetable_remove(pde_t *pgdir, void *va)
 //    - Otherwise, pgdir_walk tries to allocate a new page table
 //	with page_alloc.  If this fails, pgdir_walk returns NULL.
 //    - Otherwise, pgdir_walk returns a pointer into the new page table.
-//
-// This is boot_pgdir_walk, but using page_alloc() instead of boot_alloc().
-// Unlike boot_pgdir_walk, pgdir_walk can fail.
 //
 // Hint: you can turn a Page * into the physical address of the
 // page it refers to with page2pa() from kern/pmap.h.
@@ -745,75 +687,3 @@ void env_pagetable_free(env_t* e)
 	page_decref(pa2page(pa));
 	tlbflush();
 }
-
-/* 
-
-    // testing code for boot_pgdir_walk 
-	pte_t* temp;
-	temp = boot_pgdir_walk(pgdir, VPT + (VPT >> 10), 1);
-	cprintf("pgdir = %p\n", pgdir);
-	cprintf("test recursive walking pte_t* = %p\n", temp);
-	cprintf("test recursive walking entry = %p\n", PTE_ADDR(temp));
-	temp = boot_pgdir_walk(pgdir, 0xc0400000, 1);
-	cprintf("LA = 0xc0400000 = %p\n", temp);
-	temp = boot_pgdir_walk(pgdir, 0xc0400070, 1);
-	cprintf("LA = 0xc0400070 = %p\n", temp);
-	temp = boot_pgdir_walk(pgdir, 0xc0800000, 0);
-	cprintf("LA = 0xc0800000, no create = %p\n", temp);
-	temp = boot_pgdir_walk(pgdir, 0xc0600070, 1);
-	cprintf("LA = 0xc0600070 = %p\n", temp);
-	temp = boot_pgdir_walk(pgdir, 0xc0600090, 0);
-	cprintf("LA = 0xc0600090, nc = %p\n", temp);
-	temp = boot_pgdir_walk(pgdir, 0xc0608070, 0);
-	cprintf("LA = 0xc0608070, nc = %p\n", temp);
-	temp = boot_pgdir_walk(pgdir, 0xc0800070, 1);
-	cprintf("LA = 0xc0800070 = %p\n", temp);
-	temp = boot_pgdir_walk(pgdir, 0xc0b00070, 0);
-	cprintf("LA = 0xc0b00070, nc = %p\n", temp);
-	temp = boot_pgdir_walk(pgdir, 0xc0c00000, 0);
-	cprintf("LA = 0xc0c00000, nc = %p\n", temp);
-
-	// testing for boot_map_seg
-	cprintf("\n");
-	cprintf("before mapping 1 page to 0x00350000\n");
-	cprintf("0xc4000000's &pte: %08x\n",boot_pgdir_walk(pgdir, 0xc4000000, 1));
-	cprintf("0xc4000000's pte: %08x\n",*(boot_pgdir_walk(pgdir, 0xc4000000, 1)));
-	boot_map_segment(pgdir, 0xc4000000, 4096, 0x00350000, PTE_W);
-	cprintf("after mapping\n");
-	cprintf("0xc4000000's &pte: %08x\n",boot_pgdir_walk(pgdir, 0xc4000000, 1));
-	cprintf("0xc4000000's pte: %08x\n",*(boot_pgdir_walk(pgdir, 0xc4000000, 1)));
-
-	cprintf("\n");
-	cprintf("before mapping 3 pages to 0x00700000\n");
-	cprintf("0xd0000000's &pte: %08x\n",boot_pgdir_walk(pgdir, 0xd0000000, 1));
-	cprintf("0xd0000000's pte: %08x\n",*(boot_pgdir_walk(pgdir, 0xd0000000, 1)));
-	cprintf("0xd0001000's &pte: %08x\n",boot_pgdir_walk(pgdir, 0xd0001000, 1));
-	cprintf("0xd0001000's pte: %08x\n",*(boot_pgdir_walk(pgdir, 0xd0001000, 1)));
-	cprintf("0xd0002000's &pte: %08x\n",boot_pgdir_walk(pgdir, 0xd0002000, 1));
-	cprintf("0xd0002000's pte: %08x\n",*(boot_pgdir_walk(pgdir, 0xd0002000, 1)));
-	boot_map_segment(pgdir, 0xd0000000, 4096*3, 0x00700000, 0);
-	cprintf("after mapping\n");
-	cprintf("0xd0000000's &pte: %08x\n",boot_pgdir_walk(pgdir, 0xd0000000, 1));
-	cprintf("0xd0000000's pte: %08x\n",*(boot_pgdir_walk(pgdir, 0xd0000000, 1)));
-	cprintf("0xd0001000's &pte: %08x\n",boot_pgdir_walk(pgdir, 0xd0001000, 1));
-	cprintf("0xd0001000's pte: %08x\n",*(boot_pgdir_walk(pgdir, 0xd0001000, 1)));
-	cprintf("0xd0002000's &pte: %08x\n",boot_pgdir_walk(pgdir, 0xd0002000, 1));
-	cprintf("0xd0002000's pte: %08x\n",*(boot_pgdir_walk(pgdir, 0xd0002000, 1)));
-
-	cprintf("\n");
-	cprintf("before mapping 1 unaligned to 0x00500010\n");
-	cprintf("0xc8000010's &pte: %08x\n",boot_pgdir_walk(pgdir, 0xc8000010, 1));
-	cprintf("0xc8000010's pte: %08x\n",*(boot_pgdir_walk(pgdir, 0xc8000010, 1)));
-	cprintf("0xc8001010's &pte: %08x\n",boot_pgdir_walk(pgdir, 0xc8001010, 1));
-	cprintf("0xc8001010's pte: %08x\n",*(boot_pgdir_walk(pgdir, 0xc8001010, 1)));
-	boot_map_segment(pgdir, 0xc8000010, 4096, 0x00500010, PTE_W);
-	cprintf("after mapping\n");
-	cprintf("0xc8000010's &pte: %08x\n",boot_pgdir_walk(pgdir, 0xc8000010, 1));
-	cprintf("0xc8000010's pte: %08x\n",*(boot_pgdir_walk(pgdir, 0xc8000010, 1)));
-	cprintf("0xc8001010's &pte: %08x\n",boot_pgdir_walk(pgdir, 0xc8001010, 1));
-	cprintf("0xc8001010's pte: %08x\n",*(boot_pgdir_walk(pgdir, 0xc8001010, 1)));
-
-	cprintf("\n");
-	boot_map_segment(pgdir, 0xe0000000, 4096, 0x10000000, PTE_W);
-
-*/
