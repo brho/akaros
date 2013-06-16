@@ -5,15 +5,7 @@
  * ld will offset our first section to 1MB within the actual file.  Multiboot
  * requires the header to be in the first two pages. */
 
-/* We're lying about our output format, so that grub thinks we are a 32 bit elf
- * and just loads our sections.  Since we're getting loaded into low memory, it
- * doesn't really matter (to grub) what our VMAs are.  Our LMAs are fine as
- * either 32 or 64 bit. */
-OUTPUT_FORMAT("elf32-i386", "elf32-i386", "elf32-i386")
-OUTPUT_ARCH(i386:x86-64)
-/* This is for a pure 64 bit elf: 
 OUTPUT_FORMAT("elf64-x86-64", "elf64-x86-64", "elf64-x86-64")
-*/
 ENTRY(_start)
 KERN_LOAD_ADDR = 0xffffffffc0000000;
 
