@@ -7,9 +7,6 @@
 #include <arch/x86.h>
 #include <ros/memlayout.h>
 
-# Shift Right Logical 
-#define SRL(val, shamt)		(((val) >> (shamt)) & ~(-1 << (32 - (shamt))))
-
 #define MULTIBOOT_PAGE_ALIGN  (1<<0)
 #define MULTIBOOT_MEMORY_INFO (1<<1)
 #define MULTIBOOT_HEADER_MAGIC (0x1BADB002)
@@ -154,14 +151,6 @@ boot_pml3_kernbase:
 
 # From here down is linked for KERNBASE
 .data
-	# TODO: do we need these in asm?
-	.globl	vpt
-	.quad	vpt
-	.set	vpt, VPT
-	.globl	vpd
-	.quad	vpd
-	.set	vpd, (VPT + SRL(VPT, 10))
-
 	.p2align	PGSHIFT		# force page alignment
 	.globl		bootstack
 bootstack:

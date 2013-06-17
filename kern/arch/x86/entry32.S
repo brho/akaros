@@ -6,9 +6,6 @@
 #include <arch/trap.h>
 #include <ros/memlayout.h>
 
-# Shift Right Logical 
-#define SRL(val, shamt)		(((val) >> (shamt)) & ~(-1 << (32 - (shamt))))
-
 .set CODE_SEL,0x8		# index of code seg within mygdt
 .set DATA_SEL,0x10		# index of data seg within mygdt
 
@@ -107,18 +104,7 @@ boot_pdt:
 
 # From here down is linked for KERNBASE
 
-###################################################################	
-# See <inc/memlayout.h> for a complete description of these two symbols.
-###################################################################
 .data
-	.globl	vpt
-	.set	vpt, VPT
-	.globl	vpd
-	.set	vpd, (VPT + SRL(VPT, 10))
-
-###################################################################
-# boot stack
-###################################################################
 	.p2align	PGSHIFT		# force page alignment
 	.globl		bootstack
 bootstack:

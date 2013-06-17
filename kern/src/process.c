@@ -194,7 +194,7 @@ static void proc_init_procinfo(struct proc* p)
 	p->procinfo->max_vcores = max_vcores(p);
 	p->procinfo->tsc_freq = system_timing.tsc_freq;
 	p->procinfo->timing_overhead = system_timing.timing_overhead;
-	p->procinfo->heap_bottom = (void*)UTEXT;
+	p->procinfo->heap_bottom = 0;
 	/* 0'ing the arguments.  Some higher function will need to set them */
 	memset(p->procinfo->argp, 0, sizeof(p->procinfo->argp));
 	memset(p->procinfo->argbuf, 0, sizeof(p->procinfo->argbuf));
@@ -270,11 +270,12 @@ error_t proc_alloc(struct proc **pp, struct proc *parent)
 	p->state = PROC_CREATED; /* shouldn't go through state machine for init */
 	p->env_flags = 0;
 	p->env_entry = 0; // cheating.  this really gets set later
-	p->heap_top = (void*)UTEXT;	/* heap_bottom set in proc_init_procinfo */
+	p->heap_top = 0;
 	spinlock_init(&p->mm_lock);
 	TAILQ_INIT(&p->vm_regions); /* could init this in the slab */
-	/* Initialize the vcore lists, we'll build the inactive list so that it includes
-	 * all vcores when we initialize procinfo.  Do this before initing procinfo. */
+	/* Initialize the vcore lists, we'll build the inactive list so that it
+	 * includes all vcores when we initialize procinfo.  Do this before initing
+	 * procinfo. */
 	TAILQ_INIT(&p->online_vcs);
 	TAILQ_INIT(&p->bulk_preempted_vcs);
 	TAILQ_INIT(&p->inactive_vcs);

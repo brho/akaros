@@ -163,6 +163,7 @@ debuginfo_eip(uintptr_t addr, eipdebuginfo_t *NONNULL info)
 		/* TODO: short circuiting this, til our user space apps pack stab data
 		 * the kernel knows about */
 		return -1;
+		#if 0
 		// The user-application linker script, user/user.ld,
 		// puts information about the application's stabs (equivalent
 		// to __STAB_BEGIN__, __STAB_END__, __STABSTR_BEGIN__, and
@@ -181,6 +182,7 @@ debuginfo_eip(uintptr_t addr, eipdebuginfo_t *NONNULL info)
 
 		// Make sure the STABS and string table memory is valid.
 		// LAB 3: Your code here.
+		#endif
 	}
 
 	if (!stab_table_valid(stabstr, stabstr_end))

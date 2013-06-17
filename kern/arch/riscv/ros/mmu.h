@@ -153,4 +153,11 @@ typedef unsigned long pte_t;
 typedef unsigned long pde_t;
 #endif
 
+/* Same as VPT but read-only for users */
+#define UVPT		(ULIM - PTSIZE)
+
+/* Arbitrary boundary between the break and the start of
+ * memory returned by calls to mmap with addr = 0 */
+#define BRK_END 0x40000000
+
 #endif /* ROS_INC_ARCH_MMU_H */

@@ -11,209 +11,284 @@ typedef unsigned long pte_t;
 typedef unsigned long pde_t;
 #endif
 
-// TODO: 64 bit
-/* x86's 32 bit Virtual Memory Map.  Symbols are similar on other archs
+/* Virtual memory map:                                  Virt Addresses
+ *                                                      perms: kernel/user
  *
- * Virtual memory map:                                Permissions
- *                                                    kernel/user
- *
- *    4 Gig -------->  +------------------------------+
- *                     :              .               :
- *  KERN_LOAD_ADDR,    +------------------------------+ 0xffffffffc0000000
- *  KERN_VMAP_TOP      |                              |
- *                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ RW/--
- *                     :              .               :
- *                     :              .               :
- *                     :              .               :
- *                     |~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~| RW/--
- *                     |                              | RW/--
- *                     |   Remapped Physical Memory   | RW/--
- *                     |                              | RW/--
- *    KERNBASE ----->  +------------------------------+ 0xffff80000000
- *
- *
- *
- *                     |  Cur. Page Table (Kern. RW)  | RW/--  PTSIZE
- *    VPT          --> +------------------------------+ 0xbfc00000
+ *                     +------------------------------+ 0xffffffffffffffff -+
+ *                     |                              |                     |
+ *                     |   Mapped to lowmem, unused   | RW/--               |
+ *                     |                              |                     |
+ *  "end" symbol  -->  +------------------------------+        PML3_PTE_REACH
+ *                     |                              |                     |
+ *                     |  Kernel link/load location   |                     |
+ *                     |    (mapped to 0, physical)   |                     |
+ *                     |                              |                     |
+ * KERN_LOAD_ADDR -->  +------------------------------+ 0xffffffffc0000000 -+
+ *                     |                              |
  *                     |          Local APIC          | RW/--  PGSIZE
- *    LAPIC        --> +------------------------------+ 0xbfbff000
+ *                     |                              |
+ *    LAPIC_BASE  -->  +------------------------------+ 0xffffffffbffff000
+ *                     |                              |
  *                     |            IOAPIC            | RW/--  PGSIZE
- *    IOAPIC,      --> +------------------------------+ 0xbfbfe000
+ *                     |                              |
+ *  IOAPIC_BASE,  -->  +------------------------------+ 0xffffffffbfffe000
  *  KERN_DYN_TOP       |   Kernel Dynamic Mappings    |
  *                     |              .               |
  *                     :              .               :
  *                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ RW/--
  *                     :                              :
- *                     |      Invalid Memory (*)      | --/--
- *    ULIM      ---->  +------------------------------+ 0x80000000      --+
- *                     |  Cur. Page Table (User R-)   | R-/R-  PTSIZE     |
- *    UVPT      ---->  +------------------------------+ 0x7fc00000      --+
- *                     | Unmapped (expandable region) |                   |
- *                     |                              | R-/R-            PTSIZE
- *                     |     Per-Process R/O Info     |                   |
- * UWLIM, UINFO ---->  +------------------------------+ 0x7f800000      --+
- *                     | Unmapped (expandable region) |                   |
- *                     |                              | RW/RW            PTSIZE
- *                     |     Per-Process R/W Data     |                   |
- *    UDATA     ---->  +------------------------------+ 0x7f400000      --+
- *    UMAPTOP,         |    Global Shared R/W Data    | RW/RW  PGSIZE
- * UXSTACKTOP,UGDATA ->+------------------------------+ 0x7f3ff000
- *                     |     User Exception Stack     | RW/RW  PGSIZE
- *                     +------------------------------+ 0x7f3fe000
- *                     |       Empty Memory (*)       | --/--  PGSIZE
- *    USTACKTOP  --->  +------------------------------+ 0x7f3fd000
- *                     |      Normal User Stack       | RW/RW  256*PGSIZE (1MB)
- *                     +------------------------------+ 0x7f2fd000
- *                     |       Empty Memory (*)       | --/--  PGSIZE
- *    USTACKBOT  --->  +------------------------------+ 0x7f2fc000
+ *                     |          Unmapped            | --/--
+ *                     |                              |
+ *                     |  Kernel static linking limit |
+ *                     +------------------------------+ 0xffffffff80000000
  *                     |                              |
  *                     |                              |
- *                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ *                     |                              |
+ *  VPT_TOP    ----->  +------------------------------+ 0xffffff0000000000 -+
+ *                     |                              |                     |
+ *                     |                              |                     |
+ *                     |  Cur. Page Table (Kern. RW)  | RW/--  P4ML_PTE_REACH
+ *                     |                              |                     |
+ *                     |                              |                     |
+ *    VPT,     ----->  +------------------------------+ 0xfffffe8000000000 -+
+ *  KERN_VMAP_TOP      |                              |
+ *                     :              .               :
+ *                     :              .               :
+ *                     :              .               :
+ *                     |~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~| RW/--
+ *                     |                              | RW/--
+ *                     |                              | RW/--
+ *                     |                              | RW/--
+ *                     |   Remapped Physical Memory   | RW/--
+ *                     |                              | RW/--
+ *                     |                              | RW/--
+ *                     |                              | RW/--
+ *    KERNBASE  ---->  +------------------------------+ 0xffff800000000000
+ *                     |                              |
+ *                     |                              |
+ *                     |                              |
+ *                     |   Non-canonical addresses    |
+ *                     |         (unusable)           |
+ *                     |                              |
+ *                     |                              |
+ * ULIM (not canon) -> +------------------------------+ 0x0000800000000000 -+
+ *                     +     Highest user address     + 0x00007fffffffffff  |
+ *                     |                              |                     |
+ *                     |  Cur. Page Table (User R-)   | R-/R-  PML4_PTE_REACH
+ *                     |                              |                     |
+ *    UVPT      ---->  +------------------------------+ 0x00007f8000000000 -+
+ *                     | Unmapped (expandable region) |                     |
+ *                     |~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|                     |
+ *                     |     Per-Process R/O Info     | R-/R-  PML2_PTE_REACH
+ *                     |         (procinfo)           |                     |
+ * UWLIM, UINFO ---->  +------------------------------+ 0x00007f7fffe00000 -+
+ *                     | Unmapped (expandable region) |                     |
+ *                     |~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|                     |
+ *                     |     Per-Process R/W Data     | RW/RW  PML2_PTE_REACH
+ *                     |         (procdata)           |                     |
+ *    UDATA     ---->  +------------------------------+ 0x00007f7fffc00000 -+
+ *                     |                              |
+ *                     |    Global Shared R/W Data    | RW/RW  PGSIZE
+ *                     |                              |
+ * UMAPTOP, UGDATA ->  +------------------------------+ 0x00007f7fffbff000
+ *    USTACKTOP        |                              |
+ *                     |      Normal User Stack       | RW/RW 256 * PGSIZE
+ *                     |                              |
+ *                     +------------------------------+ 0x00007f7fffbfb000
+ *                     |                              |
+ *                     |        Empty Memory          |
+ *                     |                              |
  *                     .                              .
  *                     .                              .
+ *    BRK_END   ---->  +------------------------------+ 0x0000400000000000
  *                     .                              .
+ *                     .                              .
+ *                     |                              |
+ *                     |        Empty Memory          |
+ *                     |                              |
  *                     |~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|
- *                     |     Program Data & Heap      |
- *    UTEXT -------->  +------------------------------+ 0x00800000
- *    PFTEMP ------->  |       Empty Memory (*)       |        PTSIZE
  *                     |                              |
- *    UTEMP -------->  +------------------------------+ 0x00400000      --+
- *                     |       Empty Memory (*)       |                   |
- *                     | - - - - - - - - - - - - - - -|                   |
- *                     |  User STAB Data (optional)   |                 PTSIZE
- *    USTABDATA ---->  +------------------------------+ 0x00200000        |
- *                     |       Empty Memory (*)       |                   |
- *    0 ------------>  +------------------------------+                 --+
- *
- * (*) Note: The kernel ensures that "Invalid Memory" (ULIM) is *never*
- *     mapped.  "Empty Memory" is normally unmapped, but user programs may
- *     map pages there if desired.  ROS user programs map pages temporarily
- *     at UTEMP.
+ *                     |     Program Data & Heap      |
+ *                     |                              |
+ *                     +------------------------------+ 0x0000000000400000
+ *                     |                              |
+ *                     |       Empty Memory (*)       |
+ *                     |                              |
+ *                     +------------------------------+ 0x0000000000000000
  */
 
+/* Physical Mapping symbols:
+ * At IOPHYSMEM (640K) there is a 384K hole for I/O.  From the kernel,
+ * IOPHYSMEM can be addressed at KERNBASE + IOPHYSMEM.  The hole ends
+ * at physical address EXTPHYSMEM. */
+#define IOPHYSMEM		0x0A0000
+#define VGAPHYSMEM		0x0A0000
+#define DEVPHYSMEM		0x0C0000
+#define BIOSPHYSMEM		0x0F0000
+#define EXTPHYSMEM		0x100000
 
-// At IOPHYSMEM (640K) there is a 384K hole for I/O.  From the kernel,
-// IOPHYSMEM can be addressed at KERNBASE + IOPHYSMEM.  The hole ends
-// at physical address EXTPHYSMEM.
-#define IOPHYSMEM	0x0A0000
-#define VGAPHYSMEM	0x0A0000
-#define DEVPHYSMEM	0x0C0000
-#define BIOSPHYSMEM	0x0F0000
-#define EXTPHYSMEM	0x100000
+/* Kernel Virtual Memory Mapping */
 
-/* **************************************** */
-/* Kernel Virtual Memory Mapping  (not really an MMU thing) */
-
-#define KERNBASE        0xffff800000000000
+/* The kernel needs to be loaded in the top 2 GB of memory, since we compile it
+ * with -mcmodel=kernel (helps with relocations).  We're actually loading it in
+ * the top 1 GB. */
 #define KERN_LOAD_ADDR  0xffffffffc0000000
-/* Top of the kernel virtual mapping area (KERNBASE) */
-#define KERN_VMAP_TOP	KERN_LOAD_ADDR /* upper 2GB reserved */
-
 /* Static kernel mappings */
-/* Virtual page table.  Entry PDX(VPT) in the PD contains a pointer to
- * the page directory itself, thereby turning the PD into a page table,
- * which maps all the PTEs containing the page mappings for the entire
- * virtual address space into that 4 Meg region starting at VPT. */
-#define VPT				(KERN_LOAD_ADDR - PTSIZE)
-#define LAPIC_BASE		(VPT - PGSIZE)
+#define LAPIC_BASE		(KERN_LOAD_ADDR - PGSIZE)
 #define IOAPIC_BASE		(LAPIC_BASE - PGSIZE)
-
 /* All arches must define this, which is the lower limit of their static
  * mappings, and where the dynamic mappings will start. */
 #define KERN_DYN_TOP	IOAPIC_BASE
 
-/* Highest user address: 0x00007fffffffffff: 1 zero, 47 ones, sign extended */
-#define ULIM            0x0000800000000000
+/* Virtual page table.  Every PML4 has a PTE at the slot (PML4(VPT))
+ * corresponding to VPT that points to that PML4's base.  In essence, the 512
+ * GB chunk of the VA space from VPT..VPT_TOP is a window into the paging
+ * structure.
+ *
+ * The VPT needs to be aligned on 39 bits.
+ *
+ * Ex: Say the VPT's entry in 9 bits is "9v".  If you construct a VA from:
+ * 9v9v9v9v000, the paging hardware will recurse 4 times, with the end result
+ * being the PML4.  That virtual address will map to the PML4 itself.
+ *
+ * If you want to see a specific PML3, figure out which entry it is in the
+ * PML4 (using PML3(va)), say 9 bits = "9X".  The VA 9v9v9v9X000 will map to
+ * that PML3. */
+#define VPT_TOP			0xffffff0000000000
+#define VPT				(VPT_TOP - PML4_PTE_REACH)
+/* Helper to return the current outer pgdir via the VPT mapping. */
+#define VPD (VPT + (VPT >> 9) + (VPT >> 18) + (VPT >> 27))
+#define vpd VPD
 
-// Use this if needed in annotations
-//#define IVY_KERNBASE (0xC000U << 16)
+/* Top of the kernel virtual mapping area (KERNBASE) */
+#define KERN_VMAP_TOP	(VPT)
+/* Base of the physical memory map. This maps from 0 physical to max_paddr */
+#define KERNBASE        0xffff800000000000
+
+/* Highest user address: 0x00007fffffffffff: 1 zero, 47 ones, sign extended.
+ * From here down to UWLIM is User Read-only */
+#define ULIM            0x0000800000000000
+/* Same as VPT but read-only for users */
+#define UVPT			(ULIM - PML4_PTE_REACH)
+/* Arbitrary boundary between the break and the start of
+ * memory returned by calls to mmap with addr = 0 */
+#define BRK_END			0x0000400000000000
 
 /* **************************************** */
 /* Page table constants, macros, etc */
 
-// A linear address 'la' has a three-part structure as follows:
-//
-// +--------10------+-------10-------+---------12----------+
-// | Page Directory |   Page Table   | Offset within Page  |
-// |      Index     |      Index     |                     |
-// +----------------+----------------+---------------------+
-//  \--- PDX(la) --/ \--- PTX(la) --/ \---- PGOFF(la) ----/
-//  \----------- PPN(la) -----------/
-//
-// The PDX, PTX, PGOFF, and PPN macros decompose linear addresses as shown.
-// To construct a linear address la from PDX(la), PTX(la), and PGOFF(la),
-// use PGADDR(PDX(la), PTX(la), PGOFF(la)).
+/* A linear address 'la' has a five-part structure as follows:
+ *
+ * +-----9------+-----9------+-----9------+-----9------+---------12----------+
+ * | PML4 bits  | PML3 bits  | PML2 bits  | PML1 bits  |     Page offset     |
+ * |   offset   |   offset   |   offset   |   offset   |                     |
+ * +------------+------------+------------+------------+---------------------+
+ *  \ PML4(la) / \ PML3(la) / \ PML2(la) / \ PML1(la) / \---- PGOFF(la) ----/
+ *  \------------------ LA2PPN(la) -------------------/
+ *
+ * The PMLx, PGOFF, and LA2PPN macros decompose linear addresses as shown.
+ * To construct a linear address la from these, use:
+ * PGADDR(PML4(la), PML3(la), PML2(la), PML1(la), PGOFF(la)).
+ * Careful, that's arch- and bit-specific.
+ *
+ * I'd somewhat like it if we started counting from the outer-most PT, though
+ * amd coined the term PML4 for the outermost, instead of PML1.  Incidentally,
+ * they also don't use numbers other than PML4, sticking with names like PDP. */
 
-// page number field of address
-#define LA2PPN(la)	(((uintptr_t) (la)) >> PGSHIFT)
+#define PML4_SHIFT		39
+#define PML3_SHIFT		30
+#define PML2_SHIFT		21
+#define PML1_SHIFT		12
+
+/* PTE reach is the amount of VM an entry can map, either as a jumbo or as
+ * further page tables.  I'd like to write these as shifts, but I can't please
+ * both the compiler and the assembler. */
+#define PML4_PTE_REACH	(0x0000008000000000)	/* No jumbos available */
+#define PML3_PTE_REACH	(0x0000000040000000)	/* 1 GB jumbos available */
+#define PML2_PTE_REACH	(0x0000000000200000)	/* 2 MB jumbos available */
+#define PML1_PTE_REACH	(0x0000000000001000)	/* aka, PGSIZE */
+
+/* Reach is the amount of VM a table can map, counting all of its entries.
+ * Note that a PML(n)_PTE is a PML(n-1) table. */
+#define PML3_REACH		(PML4_PTE_REACH)
+#define PML2_REACH		(PML3_PTE_REACH)
+#define PML1_REACH		(PML2_PTE_REACH)
+
+/* PMLx(la) gives the 9 bits specifying the la's entry in PML x */
+#define PML4(la) 		(((uintptr_t)(la) >> PML4_SHIFT) & 0x1ff)
+#define PML3(la) 		(((uintptr_t)(la) >> PML3_SHIFT) & 0x1ff)
+#define PML2(la) 		(((uintptr_t)(la) >> PML2_SHIFT) & 0x1ff)
+#define PML1(la) 		(((uintptr_t)(la) >> PML1_SHIFT) & 0x1ff)
+
+/* Common kernel helpers */
+#define PGSHIFT			PML1_SHIFT
+#define PGSIZE			PML1_PTE_REACH
+#define LA2PPN(la)		((uintptr_t)(la) >> PGSHIFT)
 #define PTE2PPN(pte)	LA2PPN(pte)
-#define VPN(la)		PPN(la)		// used to index into vpt[]
+#define PGOFF(la)		((uintptr_t)(la) & (PGSIZE - 1))
 
-// page directory index
-#define PDX(la)		((((uintptr_t) (la)) >> PDXSHIFT) & 0x3FF)
-#define VPD(la)		PDX(la)		// used to index into vpd[]
+/* construct PTE from PPN and flags */
+#define PTE(ppn, flags) ((ppn) << PGSHIFT | PGOFF(flags))
 
-// page table index
-#define PTX(la)		((((uintptr_t) (la)) >> PTXSHIFT) & 0x3FF)
+/* construct linear address from indexes and offset */
+#define PGADDR(p4, p3, p2, p1, o) ((void*)(((p4) << PML4_SHIFT) |              \
+                                           ((p3) << PML3_SHIFT) |              \
+                                           ((p2) << PML2_SHIFT) |              \
+                                           ((p1) << PML1_SHIFT) |(o)))
 
-// offset in page
-#define PGOFF(la)	(((uintptr_t) (la)) & 0xFFF)
+/* These are used in older code, referring to the outer-most page table */
+#define PDX(la)			PML4(la)
+#define NPDENTRIES		512
+/* This is used in places (procinfo) meaning "size of smallest jumbo page" */
+#define PTSIZE PML2_PTE_REACH
 
-// offset in jumbo page
-#define JPGOFF(la)	(((uintptr_t) (la)) & 0x003FFFFF)
 
-// construct PTE from PPN and flags
-#define PTE(ppn, flags) ((ppn) << PTXSHIFT | PGOFF(flags))
-
-// construct linear address from indexes and offset
-#define PGADDR(d, t, o)	((void*SNT) ((d) << PDXSHIFT | (t) << PTXSHIFT | (o)))
-
-// Page directory and page table constants.
-#define NPDENTRIES	1024		// page directory entries per page directory
-#define NPTENTRIES	1024		// page table entries per page table
-
-#define PTXSHIFT	12		// offset of PTX in a linear address
-#define PDXSHIFT	22		// offset of PDX in a linear address
-
-// Page table/directory entry flags.
-#define PTE_P		0x001	// Present
-#define PTE_W		0x002	// Writeable
-#define PTE_U		0x004	// User
-#define PTE_PWT		0x008	// Write-Through
-#define PTE_PCD		0x010	// Cache-Disable
-#define PTE_A		0x020	// Accessed
-#define PTE_D		0x040	// Dirty
-#define PTE_PS		0x080	// Page Size (only applies to PDEs)
-#define PTE_PAT		0x080	// PAT (only applies to second layer PTEs)
-#define PTE_G		0x100	// Global Page
-
-#define PTE_PERM	(PTE_W | PTE_U) // The permissions fields
-// commly used access modes
-#define PTE_KERN_RW	PTE_W		// Kernel Read/Write
-#define PTE_KERN_RO	0		// Kernel Read-Only
-#define PTE_USER_RW	(PTE_W | PTE_U)	// Kernel/User Read/Write
-#define PTE_USER_RO	PTE_U		// Kernel/User Read-Only
-
-// The PTE_AVAIL bits aren't used by the kernel or interpreted by the
-// hardware, so user processes are allowed to set them arbitrarily.
-#define PTE_AVAIL	0xE00	// Available for software use
-
-// Only flags in PTE_USER may be used in system calls.
-#define PTE_USER	(PTE_AVAIL | PTE_P | PTE_W | PTE_U)
-
-// address in page table entry
-#define PTE_ADDR(pte)	((physaddr_t) (pte) & ~0xFFF)
-
-#define PTSHIFT 22
-#define PTSIZE (1 << PTSHIFT)
-#define PGSHIFT 12
-#define PGSIZE (1 << PGSHIFT)
+/* TODO: not sure if we'll need these - limited to 64bit code */
+/* this only gives us the L1 PML */
+#define PTX(la)		((((uintptr_t) (la)) >> 12) & 0x1ff)
+#define JPGOFF(la)	(((uintptr_t) (la)) & 0x001FFFFF)
+#define NPTENTRIES		512
 #define JPGSIZE PTSIZE
 
-// we must guarantee that for any PTE, exactly one of the following is true
+
+/* Page table/directory entry flags. */
+
+/* Some things to be careful of:  Global and PAT only apply to the last PTE in
+ * a chain: so either a PTE in PML1, or a Jumbo PTE in PML2 or 3.  When PAT
+ * applies, which bit we use depends on whether we are jumbo or not.  For PML1,
+ * PAT is bit 8.  For jumbo PTEs (and only when they are for a jumbo page), we
+ * use bit 12. */
+#define PTE_P			0x001	/* Present */
+#define PTE_W			0x002	/* Writeable */
+#define PTE_U			0x004	/* User */
+#define PTE_PWT			0x008	/* Write-Through */
+#define PTE_PCD			0x010	/* Cache-Disable */
+#define PTE_A			0x020	/* Accessed */
+#define PTE_D			0x040	/* Dirty */
+#define PTE_PS			0x080	/* Page Size */
+#define PTE_PAT			0x080	/* Page attribute table */
+#define PTE_G			0x100	/* Global Page */
+#define PTE_JPAT		0x800	/* Jumbo PAT */
+
+/* Permissions fields and common access modes.  These should be read as 'just
+ * kernel or user too' and 'RO or RW'.  USER_RO means read-only for everyone. */
+#define PTE_PERM		(PTE_W | PTE_U)
+#define PTE_KERN_RW		PTE_W		// Kernel Read/Write
+#define PTE_KERN_RO		0		// Kernel Read-Only
+#define PTE_USER_RW		(PTE_W | PTE_U)	// Kernel/User Read/Write
+#define PTE_USER_RO		PTE_U		// Kernel/User Read-Only
+
+/* The PTE/translation part of a PTE/virtual(linear) address.  It's used
+ * frequently to be the page address of a virtual address. */
+#define PTE_ADDR(pte)	((physaddr_t) (pte) & ~(PGSIZE - 1))
+/* More meaningful macro, same as PTE_ADDR */
+#define PG_ADDR(la) 	((uintptr_t)(la) & ~(PGSIZE - 1))
+
+/* we must guarantee that for any PTE, exactly one of the following is true */
 #define PAGE_PRESENT(pte) ((pte) & PTE_P)
 #define PAGE_UNMAPPED(pte) ((pte) == 0)
 #define PAGE_PAGED_OUT(pte) (!PAGE_PRESENT(pte) && !PAGE_UNMAPPED(pte))
+
 
 /* **************************************** */
 /* Segmentation */
@@ -263,6 +338,7 @@ typedef unsigned long pde_t;
 
 #else	// not __ASSEMBLER__
 
+/* TODO: consider removing this, if we're just using one asm GDT */
 // Segment Descriptors
 typedef struct Segdesc {
 	unsigned sd_lim_15_0 : 16;  // Low bits of segment limit
@@ -453,4 +529,5 @@ extern pseudodesc_t gdt_pd;
 
 #define SEG_COUNT	7 		// Number of segments in the steady state
 #define LDT_SIZE	(8192 * sizeof(segdesc_t))
+
 #endif /* ROS_INC_ARCH_MMU64_H */

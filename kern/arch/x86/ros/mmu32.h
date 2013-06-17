@@ -53,7 +53,7 @@ typedef unsigned long pde_t;
  *                     |     Per-Process R/W Data     |                   |
  *    UDATA     ---->  +------------------------------+ 0x7f400000      --+
  *    UMAPTOP,         |    Global Shared R/W Data    | RW/RW  PGSIZE
- * UXSTACKTOP,UGDATA ->+------------------------------+ 0x7f3ff000
+ *      UGDATA  ---->  +------------------------------+ 0x7f3ff000
  *                     |     User Exception Stack     | RW/RW  PGSIZE
  *                     +------------------------------+ 0x7f3fe000
  *                     |       Empty Memory (*)       | --/--  PGSIZE
@@ -71,15 +71,10 @@ typedef unsigned long pde_t;
  *                     |~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|
  *                     |     Program Data & Heap      |
  *    UTEXT -------->  +------------------------------+ 0x00800000
- *    PFTEMP ------->  |       Empty Memory (*)       |        PTSIZE
  *                     |                              |
- *    UTEMP -------->  +------------------------------+ 0x00400000      --+
- *                     |       Empty Memory (*)       |                   |
- *                     | - - - - - - - - - - - - - - -|                   |
- *                     |  User STAB Data (optional)   |                 PTSIZE
- *    USTABDATA ---->  +------------------------------+ 0x00200000        |
- *                     |       Empty Memory (*)       |                   |
- *    0 ------------>  +------------------------------+                 --+
+ *                     |       Empty Memory (*)       |
+ *                     |                              |
+ *                     +------------------------------+ 0x00000000
  *
  * (*) Note: The kernel ensures that "Invalid Memory" (ULIM) is *never*
  *     mapped.  "Empty Memory" is normally unmapped, but user programs may
@@ -112,6 +107,8 @@ typedef unsigned long pde_t;
  * which maps all the PTEs containing the page mappings for the entire
  * virtual address space into that 4 Meg region starting at VPT. */
 #define VPT				(KERNBASE - PTSIZE)
+#define VPD (VPT + (VPT >> 10))
+#define vpd VPD
 #define LAPIC_BASE		(VPT - PGSIZE)
 #define IOAPIC_BASE		(LAPIC_BASE - PGSIZE)
 
@@ -120,6 +117,13 @@ typedef unsigned long pde_t;
 #define KERN_DYN_TOP	IOAPIC_BASE
 
 #define ULIM            0x80000000
+
+/* Same as VPT but read-only for users */
+#define UVPT		(ULIM - PTSIZE)
+
+/* Arbitrary boundary between the break and the start of
+ * memory returned by calls to mmap with addr = 0 */
+#define BRK_END 0x40000000
 
 // Use this if needed in annotations
 #define IVY_KERNBASE (0xC000U << 16)
@@ -143,11 +147,9 @@ typedef unsigned long pde_t;
 // page number field of address
 #define LA2PPN(la)	(((uintptr_t) (la)) >> PGSHIFT)
 #define PTE2PPN(pte)	LA2PPN(pte)
-#define VPN(la)		PPN(la)		// used to index into vpt[]
 
 // page directory index
 #define PDX(la)		((((uintptr_t) (la)) >> PDXSHIFT) & 0x3FF)
-#define VPD(la)		PDX(la)		// used to index into vpd[]
 
 // page table index
 #define PTX(la)		((((uintptr_t) (la)) >> PTXSHIFT) & 0x3FF)

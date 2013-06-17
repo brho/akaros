@@ -123,10 +123,32 @@ boot_map_segment(pde_t *COUNT(NPDENTRIES) pgdir, uintptr_t la, size_t size, phys
 //
 // From UWLIM to ULIM, the user is allowed to read but not write.
 // Above ULIM the user cannot read (or write). 
-void
-vm_init(void)
+
+#define check_sym_va(sym, addr)                                                \
+({                                                                             \
+	if ((sym) != (addr))                                                       \
+		printk("Error: " #sym " is %p, should be " #addr "\n", sym);           \
+})
+
+void vm_init(void)
 {
-// TODO: do this
+	/* Make sure our symbols are up to date (see arch/ros/mmu64.h) */
+	check_sym_va(KERN_LOAD_ADDR, 0xffffffffc0000000);
+	check_sym_va(LAPIC_BASE,     0xffffffffbffff000);
+	check_sym_va(IOAPIC_BASE,    0xffffffffbfffe000);
+	check_sym_va(VPT_TOP,        0xffffff0000000000);
+	check_sym_va(VPT,            0xfffffe8000000000);
+	check_sym_va(KERN_VMAP_TOP,  0xfffffe8000000000);
+	check_sym_va(KERNBASE,       0xffff800000000000);
+	check_sym_va(ULIM,           0x0000800000000000);
+	check_sym_va(UVPT,           0x00007f8000000000);
+	check_sym_va(UINFO,          0x00007f7fffe00000);
+	check_sym_va(UWLIM,          0x00007f7fffe00000);
+	check_sym_va(UDATA,          0x00007f7fffc00000);
+	check_sym_va(UGDATA,         0x00007f7fffbff000);
+	check_sym_va(UMAPTOP,        0x00007f7fffbff000);
+	check_sym_va(USTACKTOP,      0x00007f7fffbff000);
+	check_sym_va(BRK_END,        0x0000400000000000);
 	return;
 
 	pde_t* pgdir;
@@ -144,7 +166,7 @@ vm_init(void)
 	lcr4(rcr4() | CR4_PGE);
 
 	// set up mtrr's for core0.  other cores will do the same later
-	// XXX this will break c89
+// XXX this will break c89
 	setup_default_mtrrs(0);
 
 	/*
@@ -664,11 +686,11 @@ int env_user_mem_walk(env_t* e, void* start, size_t len,
 		uintptr_t pteno_end = (pdeno == pdeno_end - 1 && PTX(end) != 0 ?
 		                      PTX(end) : NPTENTRIES );
 		int ret;
-		for (pteno = pteno_start; pteno < pteno_end; pteno++) {
-			if (!PAGE_UNMAPPED(pt[pteno]))
-				if((ret = callback(e, &pt[pteno], PGADDR(pdeno, pteno, 0), arg)))
-					return ret;
-		}
+//		for (pteno = pteno_start; pteno < pteno_end; pteno++) {
+//			if (!PAGE_UNMAPPED(pt[pteno]))
+//				if((ret = callback(e, &pt[pteno], PGADDR(pdeno, pteno, 0), arg)))
+//					return ret;
+//		}
 	}
 	return 0;
 }
