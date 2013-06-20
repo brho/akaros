@@ -144,14 +144,11 @@ int mon_reboot(int argc, char **argv, struct hw_trapframe *hw_tf)
 int mon_showmapping(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
 	if (argc < 2) {
-		cprintf("Shows virtual -> physical mappings for a virtual address range.\n");
+		cprintf("Shows virtual -> physical mappings for a virt addr range.\n");
 		cprintf("Usage: showmapping START_ADDR [END_ADDR]\n");
 		return 1;
 	}
-	pde_t* pgdir = (pde_t*)vpd;
-	pte_t *pte, *pde;
-	page_t* page;
-	uintptr_t start, i;
+	uintptr_t start;
 	size_t size;
 	start = ROUNDDOWN(strtol(argv[1], 0, 16), PGSIZE);
 	size = (argc == 2) ? 1 : strtol(argv[2], 0, 16) - start;
@@ -166,7 +163,7 @@ int mon_showmapping(int argc, char **argv, struct hw_trapframe *hw_tf)
 
 int mon_setmapperm(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
-#ifndef CONFIG_X86
+#ifndef CONFIG_X86_32
 	cprintf("I don't support this call yet!\n");
 	return 1;
 #else

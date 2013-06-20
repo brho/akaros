@@ -132,14 +132,20 @@ spin:	jmp	spin
 
 .section .bootdata, "aw"
 	.p2align	2		# force 4 byte alignment
+.globl gdt64
 gdt64:
 	SEG_NULL
-	SEG_CODE_64(0)
+	SEG_CODE_64(0)		# kernel code segment
+	SEG_CODE_64(3)		# user code segment
+	SEG_NULL			# these two nulls are a placeholder for the TSS
+	SEG_NULL			# these two nulls are a placeholder for the TSS
+.globl gdt64desc
 gdt64desc:
 	.word	(gdt64desc - gdt64 - 1)		# sizeof(gdt64) - 1
 	.long	gdt64		# HW 0-extends this to 64 bit when loading (i think)
 # boot page tables
 	.align PGSIZE
+.globl boot_pml4
 boot_pml4:
 	.space  PGSIZE
 boot_pml3_lo:

@@ -66,12 +66,6 @@ void kernel_init(multiboot_info_t *mboot_info)
 
 	cache_init();					// Determine systems's cache properties
 	pmem_init(multiboot_kaddr);
-
-#ifdef CONFIG_X86_64
-printk("Halting/spinning...\n");
-while (1)
-	asm volatile("hlt");
-#endif
 	kmem_cache_init();              // Sets up slab allocator
 	kmalloc_init();
 	hashtable_init();
@@ -84,6 +78,14 @@ while (1)
 	page_check();
 	vfs_init();
 	devfs_init();
+
+#ifdef CONFIG_X86_64
+monitor(0);
+printk("Halting/spinning...\n");
+while (1)
+	asm volatile("hlt");
+#endif
+
 	idt_init();
 	kernel_msg_init();
 	sysenter_init();
@@ -116,12 +118,12 @@ void _panic(const char *file, int line, const char *fmt,...)
 {
 	va_list ap;
 	struct per_cpu_info *pcpui;
-	/* Debug panic, before core_id is available. */
-	if (booting) {
-		printk("Kernel panic at %s:%d\n", file, line);
-		while (1)
-			cpu_relax();
-	}
+	#if 0
+	/* Debug panic, in case we panic before core_id is available */
+	printk("Kernel panic at %s:%d\n", file, line);
+	while (1)
+		cpu_relax();
+	#endif
 	/* We're panicing, possibly in a place that can't handle the lock checker */
 	pcpui = &per_cpu_info[core_id()];
 	pcpui->__lock_depth_disabled++;

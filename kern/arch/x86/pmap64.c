@@ -1,17 +1,26 @@
-#ifdef __SHARC__
-#pragma nosharc
-#define SINIT(x) x
-#endif
+/* Copyright (c) 2013 The Regents of the University of California
+ * Barret Rhoden <brho@cs.berkeley.edu>
+ * See LICENSE for details.
+ *
+ * 64 bit virtual memory / address space management (and a touch of pmem).
+ *
+ * TODO:
+ * - better testing: check my helper funcs, a variety of inserts/segments remove
+ * it all, etc (esp with jumbos).  check permissions and the existence of
+ * mappings.
+ * - mapping segments doesn't support having a PTE already present
+ * - mtrrs break big machines
+ * - jumbo pages are only supported at the VM layer, not PM (a jumbo is 2^9
+ * little pages, for example)
+ * - usermemwalk and freeing might need some help (in higher layers of the
+ * kernel). */
 
-/* See COPYRIGHT for copyright information. */
 #include <arch/x86.h>
 #include <arch/arch.h>
 #include <arch/mmu.h>
 #include <arch/apic.h>
-
 #include <error.h>
 #include <sys/queue.h>
-
 #include <atomic.h>
 #include <string.h>
 #include <assert.h>
@@ -22,107 +31,328 @@
 #include <kmalloc.h>
 #include <page_alloc.h>
 
-// These variables are set in i386_vm_init()
-pde_t* boot_pgdir;		// Virtual address of boot time page directory
-physaddr_t RO boot_cr3;		// Physical address of boot time page directory
+extern char boot_pml4[], gdt64[], gdt64desc[];
+pde_t *boot_pgdir;
+physaddr_t boot_cr3;
+segdesc_t *gdt;
+pseudodesc_t *gdt_pd;
 
-// Global descriptor table.
-//
-// The kernel and user segments are identical (except for the DPL).
-// To load the SS register, the CPL must equal the DPL.  Thus,
-// we must duplicate the segments for the user and the kernel.
-//
-segdesc_t gdt[] =
+#define PG_WALK_SHIFT_MASK		0x00ff 		/* first byte = target shift */
+#define PG_WALK_CREATE 			0x0100
+
+pte_t *pml_walk(pte_t *pml, uintptr_t va, int flags);
+void map_segment(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa,
+                 int perm, int pml_shift);
+typedef int (*pte_cb_t)(pte_t *pte, uintptr_t kva, int pml_shift,
+                        bool visited_subs, void *arg);
+int pml_for_each(pte_t *pml, uintptr_t start, size_t len, pte_cb_t callback,
+                 void *arg);
+
+/* Helper: returns true if we do not need to walk the page table any further.
+ *
+ * The caller may or may not know if a jumbo is desired.  pml_shift determines
+ * which layer we are at in the page walk, and flags contains the target level
+ * we're looking for, like a jumbo or a default.
+ *
+ * Regardless of the desired target, if we find a jumbo page, we're also done.
+ */
+static bool walk_is_complete(pte_t *pte, int pml_shift, int flags)
 {
-	// 0x0 - unused (always faults -- for trapping NULL far pointers)
-	SEG_NULL,
+	if ((pml_shift == (flags & PG_WALK_SHIFT_MASK)) || (*pte & PTE_PS))
+		return TRUE;
+	return FALSE;
+}
 
-	// 0x8 - kernel code segment
-	[GD_KT >> 3] = SEG(STA_X | STA_R, 0x0, 0xffffffff, 0),
-
-	// 0x10 - kernel data segment
-	[GD_KD >> 3] = SEG(STA_W, 0x0, 0xffffffff, 0),
-
-	// 0x18 - user code segment
-	[GD_UT >> 3] = SEG(STA_X | STA_R, 0x0, 0xffffffff, 3),
-
-	// 0x20 - user data segment
-	[GD_UD >> 3] = SEG(STA_W, 0x0, 0xffffffff, 3),
-
-	// 0x28 - tss, initialized in idt_init()
-	[GD_TSS >> 3] = SEG_NULL,
-
-	// 0x30 - LDT, set per-process
-	[GD_LDT >> 3] = SEG_NULL
-};
-
-pseudodesc_t gdt_pd = {
-	/* 64 bit compiler complains about this.  going to redo it anyways. */
-	//sizeof(gdt) - 1, (unsigned long) gdt
-	sizeof(gdt) - 1, 0xdeadbeef
-};
-
-// --------------------------------------------------------------
-// Set up initial memory mappings and turn on MMU.
-// --------------------------------------------------------------
-
-static void check_boot_pgdir(bool pse);
-
-//
-// Map [la, la+size) of linear address space to physical [pa, pa+size)
-// in the page table rooted at pgdir.  Size is a multiple of PGSIZE.
-// Use permission bits perm|PTE_P for the entries.
-//
-// This function may ONLY be used during initialization,
-// before the page_free_list has been set up.
-//
-// To map with Jumbos, set PTE_PS in perm
-static void
-boot_map_segment(pde_t *COUNT(NPDENTRIES) pgdir, uintptr_t la, size_t size, physaddr_t pa, int perm)
+/* PTE_ADDR should only be used on a PTE that has a physical address of the next
+ * PML inside.  i.e., not a final PTE in the page table walk. */
+static pte_t *pte2pml(pte_t pte)
 {
-	uintptr_t i;
+	return (pte_t*)KADDR(PTE_ADDR(pte));
+}
+
+static pte_t *__pml_walk(pte_t *pml, uintptr_t va, int flags, int pml_shift)
+{
 	pte_t *pte;
-	// la can be page unaligned, but weird things will happen
-	// unless pa has the same offset.  pa always truncates any
-	// possible offset.  will warn.  size can be weird too. 
-	if (PGOFF(la)) {
-		warn("la not page aligned in boot_map_segment!");
-		size += PGOFF(la);
+	void *new_pml_kva;
+
+	pte = &pml[PMLx(va, pml_shift)];
+	if (walk_is_complete(pte, pml_shift, flags))
+		return pte;
+	if (!(*pte & PTE_P)) {
+		if (!(flags & PG_WALK_CREATE))
+			return NULL;
+		new_pml_kva = kpage_zalloc_addr();
+		/* Might want better error handling (we're probably out of memory) */
+		if (!new_pml_kva)
+			return NULL;
+		/* We insert the new PT into the PML with U and W perms.  Permissions on
+		 * page table walks are anded together (if any of them are !User, the
+		 * translation is !User).  We put the perms on the last entry, not the
+		 * intermediates. */
+		*pte = PADDR(new_pml_kva) | PTE_P | PTE_U | PTE_W;
 	}
-	if (perm & PTE_PS) {
-		if (JPGOFF(la) || JPGOFF(pa))
-			panic("Tried to map a Jumbo page at an unaligned address!");
-		// need to index with i instead of la + size, in case of wrap-around
-		for (i = 0; i < size; i += JPGSIZE, la += JPGSIZE, pa += JPGSIZE) {
-			pte = pgdir_walk(pgdir, (void*)la, 2);
-			assert(pte);
-			*pte = PTE_ADDR(pa) | PTE_P | perm;
-		}
-	} else {
-		for (i = 0; i < size; i += PGSIZE, la += PGSIZE, pa += PGSIZE) {
-			pte = pgdir_walk(pgdir, (void*)la, 1);
-			assert(pte);
-			if (*pte & PTE_PS)
-				// if we start using the extra flag for PAT, which we aren't,
-				// this will warn, since PTE_PS and PTE_PAT are the same....
-				warn("Possibly attempting to map a regular page into a Jumbo PDE");
-			*pte = PTE_ADDR(pa) | PTE_P | perm;
-		}
+	return __pml_walk(pte2pml(*pte), va, flags, pml_shift - BITS_PER_PML);
+}
+
+/* Returns a pointer to the page table entry corresponding to va.  Flags has
+ * some options and selects which level of the page table we're happy with
+ * stopping at.  Normally, this is PML1 for a normal page (e.g. flags =
+ * PML1_SHIFT), but could be for a jumbo page (PML3 or PML2 entry).
+ *
+ * Flags also controls whether or not intermediate page tables are created or
+ * not.  This is useful for when we are checking whether or not a mapping
+ * exists, but aren't interested in creating intermediate tables that will not
+ * get filled.  When we want to create intermediate pages (i.e. we're looking
+ * for the PTE to insert a page), pass in PG_WALK_CREATE with flags.
+ *
+ * Returns 0 on error or absence of a PTE for va. */
+pte_t *pml_walk(pte_t *pml, uintptr_t va, int flags)
+{
+	return __pml_walk(pml, va, flags, PML4_SHIFT);
+}
+
+/* Helper: determines how much va needs to be advanced until it is aligned to
+ * pml_shift. */
+static uintptr_t amt_til_aligned(uintptr_t va, int pml_shift)
+{
+	/* find the lower bits of va, subtract them from the shift to see what we
+	 * would need to add to get to the shift.  va might be aligned already, and
+	 * we subtracted 0, so we mask off the top part again. */
+	return ((1UL << pml_shift) - (va & ((1UL << pml_shift) - 1))) &
+	       ((1UL << pml_shift) - 1);
+}
+
+/* Helper: determines how much of size we can take, in chunks of pml_shift */
+static uintptr_t amt_of_aligned_bytes(uintptr_t size, int pml_shift)
+{
+	/* creates a mask all 1s from MSB down to (including) shift */
+	return (~((1UL << pml_shift) - 1)) & size;
+}
+
+/* Helper: Advance pte, given old_pte.  Will do pml walks when necessary. */
+static pte_t *get_next_pte(pte_t *old_pte, pte_t *pgdir, uintptr_t va,
+                           int flags)
+{
+	/* PTEs (undereferenced) are addresses within page tables.  so long as we
+	 * stay inside the PML, we can just advance via pointer arithmetic.  if we
+	 * advance old_pte and it points to the beginning of a page (offset == 0),
+	 * we've looped outside of our original PML, and need to get a new one. */
+	old_pte++;
+	if (!PGOFF(old_pte))
+		return pml_walk(pgdir, va, flags);
+	return old_pte;
+}
+
+/* Helper: maps pages from va to pa for size bytes, all for a given page size */
+static void map_my_pages(pte_t *pgdir, uintptr_t va, size_t size,
+                         physaddr_t pa, int perm, int pml_shift)
+{
+	/* set to trigger a pml walk on the first get_next */
+	pte_t *pte = (pte_t*)PGSIZE - 1;
+	size_t pgsize = 1UL << pml_shift;
+
+	for (size_t i = 0; i < size; i += pgsize, va += pgsize,
+	     pa += pgsize) {
+		pte = get_next_pte(pte, pgdir, va, PG_WALK_CREATE | pml_shift);
+		assert(pte);
+		*pte = PTE_ADDR(pa) | PTE_P | perm |
+		       (pml_shift != PML1_SHIFT ? PTE_PS : 0);
+		printd("Wrote *pte %p, for va %p to pa %p tried to cover %p\n",
+		       *pte, va, pa, amt_mapped);
 	}
 }
 
-// Set up a two-level page table:
-//    boot_pgdir is its linear (virtual) address of the root
-//    boot_cr3 is the physical adresss of the root
-// Then turn on paging.  Then effectively turn off segmentation.
-// (i.e., the segment base addrs are set to zero).
-// 
-// This function only sets up the kernel part of the address space
-// (ie. addresses >= ULIM).  The user part of the address space
-// will be setup later.
-//
-// From UWLIM to ULIM, the user is allowed to read but not write.
-// Above ULIM the user cannot read (or write). 
+/* Maps all pages possible from va->pa, up to size, preferring to use pages of
+ * type pml_shift (size == (1 << shift)).  Assumes that it is possible to map va
+ * to pa at the given shift. */
+static uintptr_t __map_segment(pte_t *pgdir, uintptr_t va, size_t size,
+                               physaddr_t pa, int perm, int pml_shift)
+{
+	printd("__map_segment, va %p, size %p, pa %p, shift %d\n", va, size,
+	       pa, pml_shift);
+	uintptr_t amt_to_submap, amt_to_map, amt_mapped = 0;
+
+	amt_to_submap = amt_til_aligned(va, pml_shift);
+	amt_to_submap = MIN(amt_to_submap, size);
+	if (amt_to_submap) {
+		amt_mapped = __map_segment(pgdir, va, amt_to_submap, pa, perm,
+		                           pml_shift - BITS_PER_PML);
+		va += amt_mapped;
+		pa += amt_mapped;
+		size -= amt_mapped;
+	}
+	/* Now we're either aligned and ready to map, or size == 0 */
+	amt_to_map = amt_of_aligned_bytes(size, pml_shift);
+	if (amt_to_map) {
+		map_my_pages(pgdir, va, amt_to_map, pa, perm, pml_shift);
+		va += amt_to_map;
+		pa += amt_to_map;
+		size -= amt_to_map;
+		amt_mapped += amt_to_map;
+	}
+	/* Map whatever is left over */
+	if (size)
+		amt_mapped += __map_segment(pgdir, va, amt_to_submap, pa, perm,
+		                            pml_shift - BITS_PER_PML);
+	return amt_mapped;
+}
+
+/* Returns the maximum pml shift possible between a va->pa mapping.  It is the
+ * number of least-significant bits the two addresses have in common.  For
+ * instance, if the two pages are 0x456000 and 0x156000, this returns 20.  For
+ * regular pages, it will be at least 12 (every page ends in 0x000).
+ *
+ * The max pml shift possible for an va->pa mapping is determined by the
+ * least bit that differs between va and pa.
+ *
+ * We can optimize this a bit, since we know the first 12 bits are the same, and
+ * we won't go higher than max_pml_shift. */
+static int max_possible_shift(uintptr_t va, uintptr_t pa)
+{
+	int shift = 0;
+	if (va == pa)
+		return sizeof(uintptr_t) * 8;
+	while ((va & 1) == (pa & 1)) {
+		va >>= 1;
+		pa >>= 1;
+		shift++;
+	}
+	return shift;
+}
+
+/* Map [va, va+size) of virtual (linear) address space to physical [pa, pa+size)
+ * in the page table rooted at pgdir.  Size is a multiple of PGSIZE.  Use
+ * permission bits perm|PTE_P for the entries.  Set pml_shift to the shift of
+ * the largest page size you're willing to use.
+ *
+ * Doesn't handle having pages currently mapped yet, and while supporting that
+ * is relatively easy, doing an insertion of small pages into an existing jumbo
+ * would be trickier.  Might have the vmem region code deal with this.
+ *
+ * Don't use this to set the PAT flag on jumbo pages in perm, unless you are
+ * absolultely sure you won't map regular pages.  */
+void map_segment(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa,
+                 int perm, int pml_shift)
+{
+	int max_shift_possible;
+	if (PGOFF(va) || PGOFF(pa) || PGOFF(size))
+		panic("Asked to map with bad alignment.  va %p, pa %p, size %p\n", va,
+		      pa, size);
+	/* Given the max_page_size, try and use larger pages.  We'll figure out the
+	 * largest possible jumbo page, up to whatever we were asked for. */
+	if (pml_shift != PGSHIFT) {
+		max_shift_possible = max_possible_shift(va, pa);
+		/* arch-specific limitation (can't have jumbos beyond PML3) */
+		max_shift_possible = MIN(max_shift_possible, PML3_SHIFT);
+		/* Assumes we were given a proper PML shift 12, 21, 30, etc */
+		while (pml_shift > max_shift_possible)
+			pml_shift -= BITS_PER_PML;
+	}
+	assert((pml_shift == PML1_SHIFT) ||
+	       (pml_shift == PML2_SHIFT) ||
+	       (pml_shift == PML3_SHIFT));
+	__map_segment(pgdir, va, size, pa, perm, pml_shift);
+}
+
+/* For every present PTE in [start, start + len), call callback(pte, shift,
+ * etc).  pml_shift is the shift/size of pml.
+ *
+ * This will recurse down into sub PMLs, and perform the CB in a
+ * depth-first-search.  The CB will be told which level of the paging it is at,
+ * via 'shift'.
+ *
+ * The CB will also run on intermediate PTEs: meaning, PTEs that point to page
+ * tables (and not (jumbo) pages) will be executed.  If the CB returns anything
+ * other than 0, we'll abort and propagate that back out from for_each. */
+static int __pml_for_each(pte_t *pml,  uintptr_t start, size_t len,
+                          pte_cb_t callback, void *arg, int pml_shift)
+{
+	int ret;
+	bool visited_all_subs;
+	pte_t *pte_s, *pte_e, *pte_i;
+	uintptr_t kva, pgsize = 1UL << pml_shift;
+
+	if (!len)
+		return 0;
+	pte_s = &pml[PMLx(start, pml_shift)];
+	/* Later, we'll loop up to and including pte_e.  Since start + len might not
+	 * be page aligned, we'll need to include the final pte.  If it is aligned,
+	 * we don't want to visit, so we subtract one so that the aligned case maps
+	 * to the index below it's normal pte. */
+	pte_e = &pml[PMLx(start + len - 1, pml_shift)];
+	/* tracks the virt addr pte_i works on, rounded for this PML */
+	kva = ROUNDDOWN(start, pgsize);
+	printd("PFE, start %p PMLx(S) %d, end-inc %p PMLx(E) %d shift %d, kva %p\n",
+	       start, PMLx(start, pml_shift), start + len - 1,
+	       PMLx(start + len - 1, pml_shift), pml_shift, kva);
+	for (pte_i = pte_s; pte_i <= pte_e; pte_i++, kva += pgsize) {
+		if (!(*pte_i & PTE_P))
+			continue;
+		visited_all_subs = FALSE;
+		/* Complete only on the last level (PML1_SHIFT) or on a jumbo */
+		if (!walk_is_complete(pte_i, pml_shift, PML1_SHIFT)) {
+			/* only pass truncated end points (e.g. start may not be page
+			 * aligned) when we're on the first (or last) item.  For the middle
+			 * entries, we want the subpmls to process the full range they are
+			 * responsible for: [kva, kva + pgsize). */
+			uintptr_t sub_start = MAX(kva, start);
+			size_t sub_len = MIN(start + len, kva + pgsize) - sub_start;
+			ret = __pml_for_each(pte2pml(*pte_i), sub_start, sub_len, callback,
+			                     arg, pml_shift - BITS_PER_PML);
+			if (ret)
+				return ret;
+			/* based on sub_{start,end}, we can tell if our sub visited all of
+			 * its PTES. */
+			if ((sub_start == kva) && (sub_len == pgsize))
+				visited_all_subs = TRUE;
+		}
+		if ((ret = callback(pte_i, kva, pml_shift, visited_all_subs, arg)))
+			return ret;
+	}
+	return 0;
+}
+
+int pml_for_each(pte_t *pml, uintptr_t start, size_t len, pte_cb_t callback,
+                 void *arg)
+{
+	return __pml_for_each(pml, start, len, callback, arg, PML4_SHIFT);
+}
+
+/* Older interface for page table walks - will return the PTE corresponding to
+ * VA.  If create is 1, it'll create intermediate tables.  This can return jumbo
+ * PTEs, but only if they already exist.  Otherwise, (with create), it'll walk
+ * to the lowest PML.  If the walk fails due to a lack of intermediate tables or
+ * memory, this returns 0. */
+pte_t *pgdir_walk(pde_t *pgdir, const void *va, int create)
+{
+	int flags = PML1_SHIFT;
+	if (create == 1)
+		flags |= PG_WALK_CREATE;
+	return pml_walk(pgdir, (uintptr_t)va, flags);
+}
+
+static int pml_perm_walk(pte_t *pml, const void *va, int pml_shift)
+{
+	pte_t *pte;
+	int perms_here;
+
+	pte = &pml[PMLx(va, pml_shift)];
+	if (!(*pte & PTE_P))
+		return 0;
+	perms_here = *pte & (PTE_PERM | PTE_P);
+	if (walk_is_complete(pte, pml_shift, PML1_SHIFT))
+		return perms_here;
+	return pml_perm_walk(pte2pml(*pte), va, pml_shift - BITS_PER_PML) &
+	       perms_here;
+}
+
+/* Returns the effective permissions for PTE_U, PTE_W, and PTE_P on a given
+ * virtual address.  Note we need to consider the composition of every PTE in
+ * the page table walk (we bit-and all of them together) */
+int get_va_perms(pde_t *pgdir, const void *va)
+{
+	return pml_perm_walk(pgdir, va, PML4_SHIFT);
+}
 
 #define check_sym_va(sym, addr)                                                \
 ({                                                                             \
@@ -130,7 +360,7 @@ boot_map_segment(pde_t *COUNT(NPDENTRIES) pgdir, uintptr_t la, size_t size, phys
 		printk("Error: " #sym " is %p, should be " #addr "\n", sym);           \
 })
 
-void vm_init(void)
+static void check_syms_va(void)
 {
 	/* Make sure our symbols are up to date (see arch/ros/mmu64.h) */
 	check_sym_va(KERN_LOAD_ADDR, 0xffffffffc0000000);
@@ -149,575 +379,144 @@ void vm_init(void)
 	check_sym_va(UMAPTOP,        0x00007f7fffbff000);
 	check_sym_va(USTACKTOP,      0x00007f7fffbff000);
 	check_sym_va(BRK_END,        0x0000400000000000);
-	return;
+}
 
-	pde_t* pgdir;
-	uint32_t cr0, edx;
-	size_t n;
-	bool pse;
+/* Initializes anything related to virtual memory.  Paging is already on, but we
+ * have a slimmed down page table. */
+void vm_init(void)
+{
+	boot_cr3 = (physaddr_t)boot_pml4;
+	boot_pgdir = KADDR((uintptr_t)boot_pml4);
+	gdt = KADDR((uintptr_t)gdt64);
+	gdt_pd = KADDR((uintptr_t)gdt64desc);
 
-	pse = enable_pse();
-	if (pse)
-		cprintf("PSE capability detected.\n");
-
-	// we paniced earlier if we don't support PGE.  turn it on now.
-	// it's used in boot_map_segment, which covers all of the mappings that are
-	// the same for all address spaces.  and also for the VPT mapping below.
-	lcr4(rcr4() | CR4_PGE);
-
-	// set up mtrr's for core0.  other cores will do the same later
-// XXX this will break c89
+	check_syms_va();
+	/* KERNBASE mapping: we already have 512 GB complete (one full PML3_REACH).
+	 * It's okay if we have extra, just need to make sure we reach max_paddr. */
+	if (KERNBASE + PML3_REACH < (uintptr_t)KADDR(max_paddr)) {
+		map_segment(boot_pgdir, KERNBASE + PML3_REACH,
+		            max_paddr - PML3_REACH, 0x0 + PML3_REACH,
+		            PTE_W | PTE_G, MAX_JUMBO_SHIFT);
+	}
+	/* For the LAPIC and IOAPIC, we use PAT (but not *the* PAT flag) to make
+	 * these type UC */
+	map_segment(boot_pgdir, LAPIC_BASE, PGSIZE, LAPIC_PBASE,
+	            PTE_PCD | PTE_PWT | PTE_W | PTE_G, MAX_JUMBO_SHIFT);
+	map_segment(boot_pgdir, IOAPIC_BASE, PGSIZE, IOAPIC_PBASE,
+	            PTE_PCD | PTE_PWT | PTE_W | PTE_G, MAX_JUMBO_SHIFT);
+	/* VPT mapping: recursive PTE inserted at the VPT spot */
+	boot_pgdir[PDX(VPT)] = PADDR(boot_pgdir) | PTE_W | PTE_P | PTE_G;
+	/* same for UVPT, accessible by userspace (RO). */
+	boot_pgdir[PDX(UVPT)] = PADDR(boot_pgdir) | PTE_U | PTE_P | PTE_G;
+	/* set up core0s now (mostly for debugging) */
 	setup_default_mtrrs(0);
-
-	/*
-	 * PSE status: 
-	 * - can walk and set up boot_map_segments with jumbos but can't
-	 *   insert yet.  need to look at the page_dir and friends.
-	 * - anything related to a single struct page still can't handle 
-	 *   jumbos.  will need to think about and adjust Page functions
-	 * - do we want to store info like this in the struct page?  or just check
-	 *   by walking the PTE
-	 * - when we alloc a page, and we want it to be 4MB, we'll need
-	 *   to have contiguous memory, etc
-	 * - there's a difference between having 4MB page table entries
-	 *   and having 4MB Page tracking structs.  changing the latter will
-	 *   break a lot of things
-	 * - showmapping and friends work on a 4KB granularity, but map to the
-	 *   correct entries
-	 * - need to not insert / boot_map a single page into an area that is 
-	 *   already holding a jumbo page.  will need to break the jumbo up so that
-	 *   we can then insert the lone page.  currently warns.
-	 * - some inherent issues with the pgdir_walks returning a PTE, and we
-	 *   don't know whether it is a jumbo (PDE) or a regular PTE.
-	 */
-
-	//////////////////////////////////////////////////////////////////////
-	// create initial page directory.
-	pgdir = kpage_zalloc_addr();
-	assert(pgdir);
-	boot_pgdir = pgdir;
-	boot_cr3 = PADDR(pgdir);
-	// helpful if you want to manually walk with kvm / bochs
-	//printk("pgdir va = %p, pgdir pa = %p\n\n", pgdir, PADDR(pgdir));
-
-	//////////////////////////////////////////////////////////////////////
-	// Recursively insert PD in itself as a page table, to form
-	// a virtual page table at virtual address VPT.
-	// (For now, you don't have understand the greater purpose of the
-	// following two lines.  Unless you are eagle-eyed, in which case you
-	// should already know.)
-
-	// Permissions: kernel RW, user NONE, Global Page
-	pgdir[PDX(VPT)] = PADDR(pgdir) | PTE_W | PTE_P | PTE_G;
-
-	// same for UVPT
-	// Permissions: kernel R, user R, Global Page
-	pgdir[PDX(UVPT)] = PADDR(pgdir) | PTE_U | PTE_P | PTE_G;
-
-	//////////////////////////////////////////////////////////////////////
-	// Map all of physical memory at KERNBASE. 
-	// Ie.  the VA range [KERNBASE, 2^32) should map to
-	//      the PA range [0, 2^32 - KERNBASE)
-	// We might not have 2^32 - KERNBASE bytes of physical memory, but
-	// we just set up the mapping anyway.
-	// Permissions: kernel RW, user NONE
-	// Your code goes here: 
-	
-	// this maps all of the possible phys memory
-	// note the use of unsigned underflow to get size = 0x40000000
-	//boot_map_segment(pgdir, KERNBASE, -KERNBASE, 0, PTE_W);
-	// but this only maps what is available, and saves memory.  every 4MB of
-	// mapped memory requires a 2nd level page: 2^10 entries, each covering 2^12
-	// need to modify tests below to account for this
-	if (pse) {
-		// map the first 4MB as regular entries, to support different MTRRs
-		boot_map_segment(pgdir, KERNBASE, JPGSIZE, 0, PTE_W | PTE_G);
-		boot_map_segment(pgdir, KERNBASE + JPGSIZE, max_paddr - JPGSIZE, JPGSIZE,
-		                 PTE_W | PTE_G | PTE_PS);
-	} else
-		boot_map_segment(pgdir, KERNBASE, max_paddr, 0, PTE_W | PTE_G);
-
-	// APIC mapping: using PAT (but not *the* PAT flag) to make these type UC
-	// IOAPIC
-	boot_map_segment(pgdir, IOAPIC_BASE, PGSIZE, IOAPIC_PBASE, 
-	                 PTE_PCD | PTE_PWT | PTE_W | PTE_G);
-	// Local APIC
-	boot_map_segment(pgdir, LAPIC_BASE, PGSIZE, LAPIC_PBASE,
-	                 PTE_PCD | PTE_PWT | PTE_W | PTE_G);
-
-	// Check that the initial page directory has been set up correctly.
-	check_boot_pgdir(pse);
-
-	//////////////////////////////////////////////////////////////////////
-	// On x86, segmentation maps a VA to a LA (linear addr) and
-	// paging maps the LA to a PA.  I.e. VA => LA => PA.  If paging is
-	// turned off the LA is used as the PA.  Note: there is no way to
-	// turn off segmentation.  The closest thing is to set the base
-	// address to 0, so the VA => LA mapping is the identity.
-
-	// Current mapping: VA KERNBASE+x => PA x.
-	//     (segmentation base=-KERNBASE and paging is off)
-
-	// From here on down we must maintain this VA KERNBASE + x => PA x
-	// mapping, even though we are turning on paging and reconfiguring
-	// segmentation.
-
-	// Map VA 0:4MB same as VA KERNBASE, i.e. to PA 0:4MB.
-	// (Limits our kernel to <4MB)
-	/* They mean linear address 0:4MB, and the kernel < 4MB is only until 
-	 * segmentation is turned off.
-	 * once we turn on paging, segmentation is still on, so references to
-	 * KERNBASE+x will get mapped to linear address x, which we need to make 
-	 * sure can map to phys addr x, until we can turn off segmentation and
-	 * KERNBASE+x maps to LA KERNBASE+x, which maps to PA x, via paging
-	 */
-	pgdir[0] = pgdir[PDX(KERNBASE)];
-
-	// Install page table.
-	lcr3(boot_cr3);
-
-	// Turn on paging.
-	cr0 = rcr0();
-	// CD and NW should already be on, but just in case these turn on caching
-	cr0 |= CR0_PE|CR0_PG|CR0_AM|CR0_WP|CR0_NE|CR0_MP;
-	cr0 &= ~(CR0_TS|CR0_EM|CR0_CD|CR0_NW);
-	lcr0(cr0);
-
-	// Current mapping: KERNBASE+x => x => x.
-	// (x < 4MB so uses paging pgdir[0])
-
-	// Reload all segment registers. 
-
-	/* Pending 64b rewrite */
-	//asm volatile("lgdt gdt_pd");
-	//asm volatile("movw %%ax,%%gs" :: "a" (GD_UD|3));
-	//asm volatile("movw %%ax,%%fs" :: "a" (GD_UD|3));
-	//asm volatile("movw %%ax,%%es" :: "a" (GD_KD));
-	//asm volatile("movw %%ax,%%ds" :: "a" (GD_KD));
-	//asm volatile("movw %%ax,%%ss" :: "a" (GD_KD));
-	//asm volatile("ljmp %0,$1f\n 1:\n" :: "i" (GD_KT));  // reload cs
-	//asm volatile("lldt %%ax" :: "a" (0));
-
-	// Final mapping: KERNBASE+x => KERNBASE+x => x.
-
-	// This mapping was only used after paging was turned on but
-	// before the segment registers were reloaded.
-	pgdir[0] = 0;
-
-	// Flush the TLB for good measure, to kill the pgdir[0] mapping.
-	tlb_flush_global();
-}
-
-//
-// Checks that the kernel part of virtual address space
-// has been setup roughly correctly(by i386_vm_init()).
-//
-// This function doesn't test every corner case,
-// in fact it doesn't test the permission bits at all,
-// but it is a pretty good sanity check. 
-//
-static physaddr_t check_va2pa(pde_t *COUNT(NPDENTRIES) pgdir, uintptr_t va);
-
-static void
-check_boot_pgdir(bool pse)
-{
-	unsigned long i, n;
-	pde_t *pgdir, pte;
-
-	pgdir = boot_pgdir;
-
-	// check phys mem
-	//for (i = 0; KERNBASE + i != 0; i += PGSIZE)
-	// adjusted check to account for only mapping avail mem
-	if (pse)
-		for (i = 0; i < max_paddr; i += JPGSIZE)
-			assert(check_va2pa(pgdir, KERNBASE + i) == i);
-	else
-		for (i = 0; i < max_paddr; i += PGSIZE)
-			assert(check_va2pa(pgdir, KERNBASE + i) == i);
-
-	// check for zero/non-zero in PDEs
-	for (i = 0; i < NPDENTRIES; i++) {
-		switch (i) {
-		/* XXX this old PDX shit is broken with 4 PMLs */
-		//case PDX(VPT):
-		//case PDX(UVPT):
-		case PDX(LAPIC_BASE): // LAPIC mapping.  TODO: remove when MTRRs are up
-			assert(pgdir[i]);
-			break;
-		default:
-			//if (i >= PDX(KERNBASE))
-			// adjusted check to account for only mapping avail mem
-			// and you can't KADDR maxpa (just above legal range)
-			// max_paddr can be up to maxpa, so assume the worst
-			if (i >= PDX(KERNBASE) && i <= PDX(KADDR(max_paddr-1)))
-				assert(pgdir[i]);
-			else
-				assert(pgdir[i] == 0);
-			break;
-		}
-	}
-
-	/* check permissions
-	 * user read-only.  check for user and write, should be only user
-	 * eagle-eyed viewers should be able to explain the extra cases.
-	 * for the mongoose-eyed, remember that weird shit happens when you loop
-	 * through UVPT.  Specifically, you can't loop once, then look at a jumbo
-	 * page that is kernel only.  That's the end of the page table for you, so
-	 * having a U on the entry doesn't make sense.  Thus we check for a jumbo
-	 * page, and special case it.  This will happen at 0xbf701000.  Why is this
-	 * magical?  Get your eagle glasses and figure it out. */
-	for (i = UWLIM; i < ULIM; i+=PGSIZE) {
-		pte = get_va_perms(pgdir, (void*SAFE)TC(i));
-		if (pte & PTE_P) {
-			if (i == UVPT+(VPT >> 10))
-				continue;
-			if (*pgdir_walk(pgdir, (void*SAFE)TC(i), 0) & PTE_PS) {
-				assert((pte & PTE_U) != PTE_U);
-				assert((pte & PTE_W) != PTE_W);
-			} else {
-				assert((pte & PTE_U) == PTE_U);
-				assert((pte & PTE_W) != PTE_W);
-			}
-		}
-	}
-	// kernel read-write.
-	for (i = ULIM; i <= KERNBASE + max_paddr - PGSIZE; i+=PGSIZE) {
-		pte = get_va_perms(pgdir, (void*SAFE)TC(i));
-		if ((pte & PTE_P) && (i != VPT+(UVPT>>10))) {
-			assert((pte & PTE_U) != PTE_U);
-			assert((pte & PTE_W) == PTE_W);
-		}
-	}
-	// special mappings
-	pte = get_va_perms(pgdir, (void*SAFE)TC(UVPT+(VPT>>10)));
-	assert((pte & PTE_U) != PTE_U);
-	assert((pte & PTE_W) != PTE_W);
-
-	// note this means the kernel cannot directly manipulate this virtual address
-	// convince yourself this isn't a big deal, eagle-eyes!
-	pte = get_va_perms(pgdir, (void*SAFE)TC(VPT+(UVPT>>10)));
-	assert((pte & PTE_U) != PTE_U);
-	assert((pte & PTE_W) != PTE_W);
-
-	cprintf("check_boot_pgdir() succeeded!\n");
-}
-
-// This function returns the physical address of the page containing 'va',
-// defined by the page directory 'pgdir'.  The hardware normally performs
-// this functionality for us!  We define our own version to help check
-// the check_boot_pgdir() function; it shouldn't be used elsewhere.
-
-static physaddr_t
-check_va2pa(pde_t *COUNT(NPDENTRIES) _pgdir, uintptr_t va)
-{
-	pte_t *COUNT(NPTENTRIES) p;
-	pde_t *COUNT(1) pgdir;
-
-	pgdir = &_pgdir[PDX(va)];
-	if (!(*pgdir & PTE_P))
-		return ~0;
-	if (*pgdir & PTE_PS)
-		return PTE_ADDR(*pgdir);
-	p = (pte_t*COUNT(NPTENTRIES)) KADDR(PTE_ADDR(*pgdir));
-	if (!(p[PTX(va)] & PTE_P))
-		return ~0;
-	return PTE_ADDR(p[PTX(va)]);
-}
-
-/* 
- * Remove the second level page table associated with virtual address va.
- * Will 0 out the PDE for that page table.
- * Panics if the page table has any present entries.
- * This should be called rarely and with good cause.
- * Currently errors if the PDE is jumbo or not present.
- */
-error_t	pagetable_remove(pde_t *pgdir, void *va)
-{
-	pde_t* the_pde = &pgdir[PDX(va)];
-
-	if (!(*the_pde & PTE_P) || (*the_pde & PTE_PS))
-		return -EFAULT;
-	pte_t* page_table = (pde_t*COUNT(NPTENTRIES))KADDR(PTE_ADDR(*the_pde));
-	for (int i = 0; i < NPTENTRIES; i++) 
-		if (page_table[i] & PTE_P)
-			panic("Page table not empty during attempted removal!");
-	*the_pde = 0;
-	page_decref(pa2page(PADDR(page_table)));
-	return 0;
-}
-
-// Given 'pgdir', a pointer to a page directory, pgdir_walk returns
-// a pointer to the page table entry (PTE) for linear address 'va'.
-// This requires walking the two-level page table structure.
-//
-// If the relevant page table doesn't exist in the page directory, then:
-//    - If create == 0, pgdir_walk returns NULL.
-//    - Otherwise, pgdir_walk tries to allocate a new page table
-//	with page_alloc.  If this fails, pgdir_walk returns NULL.
-//    - Otherwise, pgdir_walk returns a pointer into the new page table.
-//
-// Hint: you can turn a Page * into the physical address of the
-// page it refers to with page2pa() from kern/pmap.h.
-//
-// Supports returning jumbo (4MB PSE) PTEs.  To create with a jumbo, pass in 2.
-pte_t*
-pgdir_walk(pde_t *pgdir, const void *SNT va, int create)
-{
-	pde_t* the_pde = &pgdir[PDX(va)];
-	page_t *new_table;
-
-	if (*the_pde & PTE_P) {
-		if (*the_pde & PTE_PS)
-			return (pte_t*)the_pde;
-		return &((pde_t*COUNT(NPTENTRIES))KADDR(PTE_ADDR(*the_pde)))[PTX(va)];
-	}
-	if (!create)
-		return NULL;
-	if (create == 2) {
-		if (JPGOFF(va))
-			panic("Attempting to find a Jumbo PTE at an unaligned VA!");
-		*the_pde = PTE_PS | PTE_P;
-		return (pte_t*)the_pde;
-	}
-	if (kpage_alloc(&new_table))
-		return NULL;
-	memset(page2kva(new_table), 0, PGSIZE);
-	/* storing our ref to new_table in the PTE */
-	*the_pde = (pde_t)page2pa(new_table) | PTE_P | PTE_W | PTE_U;
-	return &((pde_t*COUNT(NPTENTRIES))KADDR(PTE_ADDR(*the_pde)))[PTX(va)];
-}
-
-/* Returns the effective permissions for PTE_U, PTE_W, and PTE_P on a given
- * virtual address.  Note we need to consider the composition of every PTE in
- * the page table walk. */
-int get_va_perms(pde_t *pgdir, const void *SNT va)
-{
-	pde_t the_pde = pgdir[PDX(va)];
-	pte_t the_pte;
-
-	if (!(the_pde & PTE_P))
-		return 0;
-	if (the_pde & PTE_PS)
-		return the_pde & (PTE_U | PTE_W | PTE_P);
-	the_pte = ((pde_t*COUNT(NPTENTRIES))KADDR(PTE_ADDR(the_pde)))[PTX(va)];
-	if (!(the_pte & PTE_P))
-		return 0;
-	return the_pte & the_pde & (PTE_U | PTE_W | PTE_P);
-}
-
-void
-page_check(void)
-{
-	page_t *pp, *pp0, *pp1, *pp2;
-	page_list_t fl[1024];
-	pte_t *ptep;
-
-	// should be able to allocate three pages
-	pp0 = pp1 = pp2 = 0;
-	assert(kpage_alloc(&pp0) == 0);
-	assert(kpage_alloc(&pp1) == 0);
-	assert(kpage_alloc(&pp2) == 0);
-
-	assert(pp0);
-	assert(pp1 && pp1 != pp0);
-	assert(pp2 && pp2 != pp1 && pp2 != pp0);
-
-	// temporarily steal the rest of the free pages
-	for(int i=0; i<llc_cache->num_colors; i++) {
-		fl[i] = colored_page_free_list[i];
-		LIST_INIT(&colored_page_free_list[i]);
-	}
-
-	// should be no free memory
-	assert(kpage_alloc(&pp) == -ENOMEM);
-
-	// Fill pp1 with bogus data and check for invalid tlb entries
-	memset(page2kva(pp1), 0xFFFFFFFF, PGSIZE);
-
-	// there is no page allocated at address 0
-	assert(page_lookup(boot_pgdir, (void *) 0x0, &ptep) == NULL);
-
-	// there is no free memory, so we can't allocate a page table 
-	assert(page_insert(boot_pgdir, pp1, 0x0, 0) < 0);
-
-	// free pp0 and try again: pp0 should be used for page table
-	page_decref(pp0);
-	assert(page_insert(boot_pgdir, pp1, 0x0, 0) == 0);
-	tlb_invalidate(boot_pgdir, 0x0);
-	// DEP Should have shot down invalid TLB entry - let's check
-	{ TRUSTEDBLOCK
-	  int *x = 0x0;
-	  assert(*x == 0xFFFFFFFF);
-	}
-	assert(PTE_ADDR(boot_pgdir[0]) == page2pa(pp0));
-	assert(check_va2pa(boot_pgdir, 0x0) == page2pa(pp1));
-	assert(kref_refcnt(&pp1->pg_kref) == 2);
-	assert(kref_refcnt(&pp0->pg_kref) == 1);
-
-	// should be able to map pp2 at PGSIZE because pp0 is already allocated for page table
-	assert(page_insert(boot_pgdir, pp2, (void*SNT) PGSIZE, 0) == 0);
-	assert(check_va2pa(boot_pgdir, PGSIZE) == page2pa(pp2));
-	assert(kref_refcnt(&pp2->pg_kref) == 2);
-
-	// Make sure that pgdir_walk returns a pointer to the pte and
-	// not the table or some other garbage
-	{
-	  pte_t *p = (pte_t*COUNT(NPTENTRIES))KADDR(PTE_ADDR(boot_pgdir[PDX(PGSIZE)]));
-	  assert(pgdir_walk(boot_pgdir, (void *SNT)PGSIZE, 0) == &p[PTX(PGSIZE)]);
-	}
-
-	// should be no free memory
-	assert(kpage_alloc(&pp) == -ENOMEM);
-
-	// should be able to map pp2 at PGSIZE because it's already there
-	assert(page_insert(boot_pgdir, pp2, (void*SNT) PGSIZE, PTE_U) == 0);
-	assert(check_va2pa(boot_pgdir, PGSIZE) == page2pa(pp2));
-	assert(kref_refcnt(&pp2->pg_kref) == 2);
-
-	// Make sure that we actually changed the permission on pp2 when we re-mapped it
-	{
-	  pte_t *p = pgdir_walk(boot_pgdir, (void*SNT)PGSIZE, 0);
-	  assert(((*p) & PTE_U) == PTE_U);
-	}
-
-	// pp2 should NOT be on the free list
-	// could happen if ref counts are handled sloppily in page_insert
-	assert(kpage_alloc(&pp) == -ENOMEM);
-
-	// should not be able to map at PTSIZE because need free page for page table
-	assert(page_insert(boot_pgdir, pp0, (void*SNT) PTSIZE, 0) < 0);
-
-	// insert pp1 at PGSIZE (replacing pp2)
-	assert(page_insert(boot_pgdir, pp1, (void*SNT) PGSIZE, 0) == 0);
-
-	// should have pp1 at both 0 and PGSIZE, pp2 nowhere, ...
-	assert(check_va2pa(boot_pgdir, 0) == page2pa(pp1));
-	assert(check_va2pa(boot_pgdir, PGSIZE) == page2pa(pp1));
-	// ... and ref counts should reflect this
-	assert(kref_refcnt(&pp1->pg_kref) == 3);
-	assert(kref_refcnt(&pp2->pg_kref) == 1);
-
-	// pp2 should be returned by page_alloc
-	page_decref(pp2);	/* should free it */
-	assert(kpage_alloc(&pp) == 0 && pp == pp2);
-
-	// unmapping pp1 at 0 should keep pp1 at PGSIZE
-	page_remove(boot_pgdir, 0x0);
-	assert(check_va2pa(boot_pgdir, 0x0) == ~0);
-	assert(check_va2pa(boot_pgdir, PGSIZE) == page2pa(pp1));
-	assert(kref_refcnt(&pp1->pg_kref) == 2);
-	assert(kref_refcnt(&pp2->pg_kref) == 1);
-
-	// unmapping pp1 at PGSIZE should free it
-	page_remove(boot_pgdir, (void*SNT) PGSIZE);
-	assert(check_va2pa(boot_pgdir, 0x0) == ~0);
-	assert(check_va2pa(boot_pgdir, PGSIZE) == ~0);
-	assert(kref_refcnt(&pp1->pg_kref) == 1);
-	assert(kref_refcnt(&pp2->pg_kref) == 1);
-	page_decref(pp1);
-
-	// so it should be returned by page_alloc
-	assert(kpage_alloc(&pp) == 0 && pp == pp1);
-
-	// should be no free memory
-	assert(kpage_alloc(&pp) == -ENOMEM);
-
-	// forcibly take pp0 back
-	assert(PTE_ADDR(boot_pgdir[0]) == page2pa(pp0));
-	boot_pgdir[0] = 0;
-	assert(kref_refcnt(&pp0->pg_kref) == 1);
-
-	// Catch invalid pointer addition in pgdir_walk - i.e. pgdir + PDX(va)
-	{
-	  // Give back pp0 for a bit
-	  page_decref(pp0);
-
-	  void *SNT va = (void *SNT)((PGSIZE * NPDENTRIES) + PGSIZE);
-	  pte_t *p2 = pgdir_walk(boot_pgdir, va, 1);
-	  pte_t *p = (pte_t*COUNT(NPTENTRIES))KADDR(PTE_ADDR(boot_pgdir[PDX(va)]));
-	  assert(p2 == &p[PTX(va)]);
-
-	  // Clean up again
-	  boot_pgdir[PDX(va)] = 0;
-	}
-
-	// give free list back
-	for(int i=0; i<llc_cache->num_colors; i++)
-		colored_page_free_list[i] = fl[i];
-
-	// free the pages we took
-	page_decref(pp0);
-	page_decref(pp1);
-	page_decref(pp2);
-	assert(!kref_refcnt(&pp0->pg_kref));
-	assert(!kref_refcnt(&pp1->pg_kref));
-	assert(!kref_refcnt(&pp2->pg_kref));
-
-	cprintf("page_check() succeeded!\n");
 }
 
 /* Walks len bytes from start, executing 'callback' on every PTE, passing it a
  * specific VA and whatever arg is passed in.  Note, this cannot handle jumbo
- * pages. */
-int env_user_mem_walk(env_t* e, void* start, size_t len,
-                      mem_walk_callback_t callback, void* arg)
+ * pages.
+ *
+ * This is just a clumsy wrapper around the more powerful pml_for_each, which
+ * can handle jumbo and intermediate pages. */
+int env_user_mem_walk(struct proc *p, void *start, size_t len,
+                      mem_walk_callback_t callback, void *arg)
 {
-	pte_t *pt;
-	uintptr_t pdeno, pteno;
-	physaddr_t pa;
-
-	assert((uintptr_t)start % PGSIZE == 0 && len % PGSIZE == 0);
-	void* end = (char*)start+len;
-	uintptr_t pdeno_start = PDX(start);
-	uintptr_t pdeno_end = PDX(ROUNDUP(end,PTSIZE));
-	/* concerned about overflow.  this should catch it for now, given the above
-	 * assert. */
-	assert((len == 0) || (pdeno_start < pdeno_end));
-
-	for (pdeno = pdeno_start; pdeno < pdeno_end; pdeno++) {
-		if (!(e->env_pgdir[pdeno] & PTE_P))
-			continue;
-		/* find the pa and a pointer to the page table */
-		pa = PTE_ADDR(e->env_pgdir[pdeno]);
-		pt = (pte_t*COUNT(NPTENTRIES)) KADDR(pa);
-		/* figure out where we start and end within the page table */
-		uintptr_t pteno_start = (pdeno == pdeno_start ? PTX(start) : 0);
-		uintptr_t pteno_end = (pdeno == pdeno_end - 1 && PTX(end) != 0 ?
-		                      PTX(end) : NPTENTRIES );
-		int ret;
-//		for (pteno = pteno_start; pteno < pteno_end; pteno++) {
-//			if (!PAGE_UNMAPPED(pt[pteno]))
-//				if((ret = callback(e, &pt[pteno], PGADDR(pdeno, pteno, 0), arg)))
-//					return ret;
-//		}
+	struct tramp_package {
+		struct proc *p;
+		mem_walk_callback_t cb;
+		void *cb_arg;
+	};
+	int trampoline_cb(pte_t *pte, uintptr_t kva, int shift, bool visited_subs,
+	                  void *data)
+	{
+		struct tramp_package *tp = (struct tramp_package*)data;
+		assert(tp->cb);
+		/* memwalk CBs don't know how to handle intermediates or jumbos */
+		if (shift != PML1_SHIFT)
+			return 0;
+		return tp->cb(tp->p, pte, (void*)kva, tp->cb_arg);
 	}
-	return 0;
+
+	struct tramp_package local_tp;
+	local_tp.p = p;
+	local_tp.cb = callback;
+	local_tp.cb_arg = arg;
+	return pml_for_each(p->env_pgdir, (uintptr_t)start, len, trampoline_cb,
+	                    &local_tp);
 }
 
 /* Frees (decrefs) all pages of the process's page table, including the page
  * directory.  Does not free the memory that is actually mapped. */
-void env_pagetable_free(env_t* e)
+void env_pagetable_free(struct proc *p)
 {
-	static_assert(UVPT % PTSIZE == 0);
-	assert(e->env_cr3 != rcr3());
-	for(uint32_t pdeno = 0; pdeno < PDX(UVPT); pdeno++)
+	/* callback: given an intermediate pte (not a final one), removes the page
+	 * table the PTE points to */
+	int pt_free_cb(pte_t *pte, uintptr_t kva, int shift, bool visited_subs,
+	               void *data)
 	{
-		// only look at mapped page tables
-		if (!(e->env_pgdir[pdeno] & PTE_P))
-			continue;
+		if ((shift == PML1_SHIFT) || (*pte * PTE_PS))
+			return 0;
+		page_decref(ppn2page(LA2PPN(pte)));
+		return 0;
+	}
+		
+	assert(p->env_cr3 != rcr3());
+	pml_for_each(p->env_pgdir, 0, UVPT, pt_free_cb, 0);
+	/* the page directory is not a PTE, so it never was freed */
+	page_decref(pa2page(p->env_cr3));
+	tlbflush();
+}
 
-		// find the pa and va of the page table
-		physaddr_t pa = PTE_ADDR(e->env_pgdir[pdeno]);
-
-		// free the page table itself
-		e->env_pgdir[pdeno] = 0;
-		page_decref(pa2page(pa));
+/* Remove the inner page tables along va's walk.  The internals are more
+ * powerful.  We'll eventually want better arch-indep VM functions. */
+error_t	pagetable_remove(pde_t *pgdir, void *va)
+{
+	int pt_maybe_free_cb(pte_t *pte, uintptr_t kva, int shift,
+	                     bool visited_subs, void *data)
+	{
+		if ((shift == PML1_SHIFT) || (*pte * PTE_PS))
+			return 0;
+		pte_t *pte_i = pte2pml(*pte);	/* first pte == pml */
+		/* make sure we have no PTEs in use */
+		for (int i = 0; i < NPTENTRIES; i++, pte_i++) {
+			if (*pte_i & PTE_P)
+				return 0;
+		}
+		page_decref(ppn2page(LA2PPN(pte)));
+		return 0;
 	}
 
-	// free the page directory
-	physaddr_t pa = e->env_cr3;
-	e->env_cr3 = 0;
-	page_decref(pa2page(pa));
-	tlbflush();
+	return pml_for_each(pgdir, (uintptr_t)va, PGSIZE, pt_maybe_free_cb, 0);
+}
+
+void page_check(void)
+{
+}
+
+/* Debugging */
+static int print_pte(pte_t *pte, uintptr_t kva, int shift, bool visited_subs,
+                     void *data)
+{
+	switch (shift) {
+		case (PML1_SHIFT):
+			printk("\t");
+			/* fall-through */
+		case (PML2_SHIFT):
+			printk("\t");
+			/* fall-through */
+		case (PML3_SHIFT):
+			printk("\t");
+	}
+	printk("KVA: %p, PTE val %p, shift %d, visit %d\n", kva, *pte, shift,
+	       visited_subs);
+	return 0;
+}
+
+void debug_print_pgdir(pte_t *pgdir)
+{
+	printk("Printing the entire page table set for %p, DFS\n", pgdir);
+	/* Need to be careful we avoid VPT/UVPT, o/w we'll recurse */
+	pml_for_each(pgdir, 0, UVPT, print_pte, 0);
+	pml_for_each(pgdir, ULIM, VPT - ULIM, print_pte, 0);
+	pml_for_each(pgdir, VPT_TOP, MAX_VADDR - VPT_TOP, print_pte, 0);
 }

@@ -401,9 +401,6 @@ typedef struct Pseudodesc {
 	uint32_t pd_base;		// Base address
 } __attribute__ ((packed)) pseudodesc_t;
 
-extern segdesc_t (COUNT(SEG_COUNT) RO gdt)[];
-extern pseudodesc_t gdt_pd;
-
 #endif /* !__ASSEMBLER__ */
 
 // Application segment type bits

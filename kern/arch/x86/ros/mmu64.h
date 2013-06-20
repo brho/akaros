@@ -157,7 +157,9 @@ typedef unsigned long pde_t;
 #define VPT_TOP			0xffffff0000000000
 #define VPT				(VPT_TOP - PML4_PTE_REACH)
 /* Helper to return the current outer pgdir via the VPT mapping. */
-#define VPD (VPT + (VPT >> 9) + (VPT >> 18) + (VPT >> 27))
+#define VPD (VPT + ((VPT & 0x0000ffffffffffff) >> 9) +                         \
+                   ((VPT & 0x0000ffffffffffff) >> 18) +                        \
+                   ((VPT & 0x0000ffffffffffff) >> 27))
 #define vpd VPD
 
 /* Top of the kernel virtual mapping area (KERNBASE) */
@@ -199,6 +201,7 @@ typedef unsigned long pde_t;
 #define PML3_SHIFT		30
 #define PML2_SHIFT		21
 #define PML1_SHIFT		12
+#define BITS_PER_PML	9
 
 /* PTE reach is the amount of VM an entry can map, either as a jumbo or as
  * further page tables.  I'd like to write these as shifts, but I can't please
@@ -214,11 +217,13 @@ typedef unsigned long pde_t;
 #define PML2_REACH		(PML3_PTE_REACH)
 #define PML1_REACH		(PML2_PTE_REACH)
 
-/* PMLx(la) gives the 9 bits specifying the la's entry in PML x */
-#define PML4(la) 		(((uintptr_t)(la) >> PML4_SHIFT) & 0x1ff)
-#define PML3(la) 		(((uintptr_t)(la) >> PML3_SHIFT) & 0x1ff)
-#define PML2(la) 		(((uintptr_t)(la) >> PML2_SHIFT) & 0x1ff)
-#define PML1(la) 		(((uintptr_t)(la) >> PML1_SHIFT) & 0x1ff)
+/* PMLx(la, shift) gives the 9 bits specifying the la's entry in the PML
+ * corresponding to shift.  PMLn(la) gives the 9 bits for PML4, etc. */
+#define PMLx(la, shift)	(((uintptr_t)(la) >> (shift)) & 0x1ff)
+#define PML4(la) 		PMLx(la, PML4_SHIFT)
+#define PML3(la) 		PMLx(la, PML3_SHIFT)
+#define PML2(la) 		PMLx(la, PML2_SHIFT)
+#define PML1(la) 		PMLx(la, PML1_SHIFT)
 
 /* Common kernel helpers */
 #define PGSHIFT			PML1_SHIFT
@@ -249,6 +254,7 @@ typedef unsigned long pde_t;
 #define JPGOFF(la)	(((uintptr_t) (la)) & 0x001FFFFF)
 #define NPTENTRIES		512
 #define JPGSIZE PTSIZE
+#define MAX_JUMBO_SHIFT PML3_SHIFT
 
 
 /* Page table/directory entry flags. */
@@ -279,7 +285,9 @@ typedef unsigned long pde_t;
 #define PTE_USER_RO		PTE_U		// Kernel/User Read-Only
 
 /* The PTE/translation part of a PTE/virtual(linear) address.  It's used
- * frequently to be the page address of a virtual address. */
+ * frequently to be the page address of a virtual address.  Note this doesn't
+ * work on jumbo PTEs due to the reserved bits.  Jumbo's don't have a PTE_ADDR
+ * in them - just a base address of wherever they point. */
 #define PTE_ADDR(pte)	((physaddr_t) (pte) & ~(PGSIZE - 1))
 /* More meaningful macro, same as PTE_ADDR */
 #define PG_ADDR(la) 	((uintptr_t)(la) & ~(PGSIZE - 1))
@@ -326,6 +334,17 @@ typedef unsigned long pde_t;
 	.byte 0;                                                                \
 	.byte 0x90;                                                             \
 	.word 0;
+
+/* System segments (TSS/LDT) are twice as long as usual (16 bytes). */
+#define SEG_SYS_64(type, base, lim, dpl)                                       \
+	.word ((lim) & 0xffff);                                                    \
+	.word ((base) & 0xffff);                                                   \
+	.byte (((base) >> 16) & 0xff);                                             \
+	.byte ((1 << 7) | ((dpl) << 5) | (type));                                  \
+	.byte (((1/*g*/) << 7) | (((lim) >> 16) & 0xf));                           \
+	.byte (((base) >> 24) & 0xff);                                             \
+	.quad ((base) >> 32);                                                      \
+	.quad 0;
 
 /* Default segment (32 bit style).  Would work for fs/gs, if needed */
 #define SEG(type, base, lim)                                                \
@@ -499,9 +518,6 @@ typedef struct Pseudodesc {
 	uint16_t pd_lim;		// Limit
 	uintptr_t pd_base;		// Base address
 } __attribute__ ((packed)) pseudodesc_t;
-
-extern segdesc_t (COUNT(SEG_COUNT) RO gdt)[];
-extern pseudodesc_t gdt_pd;
 
 #endif /* !__ASSEMBLER__ */
 

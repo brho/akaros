@@ -112,8 +112,6 @@ void send_nmi(uint32_t os_coreid)
 
 void idt_init(void)
 {
-	extern segdesc_t (RO gdt)[];
-
 	// This table is made in trapentry.S by each macro in that file.
 	// It is layed out such that the ith entry is the ith's traphandler's
 	// (uint32_t) trap addr, then (uint32_t) trap number

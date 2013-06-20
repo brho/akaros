@@ -127,6 +127,8 @@ set_stack_pointer(uintptr_t sp)
 	asm volatile("mov %0,%%"X86_REG_SP"" : : "r"(sp) : "memory", X86_REG_SP);
 }
 
+extern segdesc_t *gdt;
+
 #ifdef CONFIG_X86_64
 #include <arch/trap64.h>
 #else

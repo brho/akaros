@@ -32,7 +32,7 @@ physaddr_t RO boot_cr3;		// Physical address of boot time page directory
 // To load the SS register, the CPL must equal the DPL.  Thus,
 // we must duplicate the segments for the user and the kernel.
 //
-segdesc_t gdt[] =
+segdesc_t gdt_in_c[] =
 {
 	// 0x0 - unused (always faults -- for trapping NULL far pointers)
 	SEG_NULL,
@@ -56,8 +56,11 @@ segdesc_t gdt[] =
 	[GD_LDT >> 3] = SEG_NULL
 };
 
+/* Want gdt to be a pointer, not an array type (can replace it more easily) */
+segdesc_t *gdt = gdt_in_c;
+
 pseudodesc_t gdt_pd = {
-	sizeof(gdt) - 1, (unsigned long) gdt
+	sizeof(gdt_in_c) - 1, (unsigned long) gdt_in_c
 };
 
 // --------------------------------------------------------------

@@ -141,6 +141,14 @@ void print_cpuinfo(void)
 		printk("Always running APIC *not* detected\n");
 }
 
+#ifdef CONFIG_X86_64
+#define BIT_SPACING "        "
+#define BIT_DASHES "----------------"
+#else
+#define BIT_SPACING ""
+#define BIT_DASHES ""
+#endif
+
 void show_mapping(uintptr_t start, size_t size)
 {
 	pde_t *pgdir = (pde_t*)vpd;
@@ -149,8 +157,9 @@ void show_mapping(uintptr_t start, size_t size)
 	page_t *page;
 	uintptr_t i;
 
-	printk("   Virtual    Physical  Ps Dr Ac CD WT U W P\n");
-	printk("--------------------------------------------\n");
+	printk("   %sVirtual    %sPhysical  Ps Dr Ac CD WT U W P\n", BIT_SPACING,
+	       BIT_SPACING);
+	printk("--------------------------------------------%s\n", BIT_DASHES);
 	for(i = 0; i < size; i += PGSIZE, start += PGSIZE) {
 		pte = pgdir_walk(pgdir, (void*)start, 0);
 		printk("%p  ", start);
