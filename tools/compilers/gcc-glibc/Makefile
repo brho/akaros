@@ -1,16 +1,19 @@
 # Number of make jobs to spawn.  Define it in Makelocal
-MAKE_JOBS := 
+MAKE_JOBS :=
 
 # Defines where to install the toolchain
 -include Makelocal
 
 ifndef RISCV_INSTDIR
-ifndef X86_INSTDIR
+ifndef I686_INSTDIR
+ifndef X86_64_INSTDIR
 busted: 
-	@echo "You need to setup either a RISCV_INSTDIR or X86_INSTDIR to point to where you want the tools installed. The best way to do this is to create a 'Makelocal' file in the current directory and put it in there."; false
+	@echo "You need to setup either a RISCV_INSTDIR, an I686_INSTDIR, or an X86_64_INSTDIR to point to where you want the tools installed. The best way to do this is to create a 'Makelocal' file in the current directory and put it in there."; false
 riscv: busted
-x86: busted
+i686: busted
+x86_64: busted
 endif
+endif 
 endif 
 
 # Check to make sure that we have gawk installed on our system and not some
@@ -26,7 +29,6 @@ ifneq ($(GMP_OK),OK)
 $(error You need to have the libraries GMP, MPFR, and MPC installed on your system!)
 endif
 
-
 BINUTILS_VERSION := 2.21.1
 GCC_VERSION := 4.6.1
 GLIBC_VERSION := 2.14.1
@@ -38,24 +40,74 @@ DESTDIR ?= /
 # Configuration parameters for make-riscv
 RISCV_ARCH := riscv
 RISCV_BINARY_PREFIX := $(RISCV_ARCH)-ros-
+RISCV_GLIBC_CONFIGURE_FLAGS := 
 RISCV_GCC_BUILD_FLAGS := 
 RISCV_CFLAGS :=
 
 # Configuration parameters for x86
-X86_ARCH := i686
-X86_BINARY_PREFIX := $(X86_ARCH)-ros-
-X86_GCC_BUILD_FLAGS := 
-X86_CFLAGS := -march=i486
+I686_ARCH := i686
+I686_BINARY_PREFIX := $(I686_ARCH)-ros-
+I686_GLIBC_CONFIGURE_FLAGS := 
+I686_GCC_BUILD_FLAGS := 
+I686_CFLAGS := -march=i486
+
+# Configuration parameters for x86_64
+X86_64_ARCH := x86_64
+X86_64_BINARY_PREFIX := $(X86_64_ARCH)-ros-
+X86_64_GLIBC_CONFIGURE_FLAGS := "--disable-multi-arch"
+X86_64_GCC_BUILD_FLAGS := CFLAGS="-fPIC"
+X86_64_CFLAGS :=
+
+#If actually building the cross compiler, make sure that the akaros tree is
+#properly configured for the architecture we are creating the cross compiler
+#for.
+ifneq (,$(filter riscv,$(MAKECMDGOALS)))
+ifeq (,$(shell grep "CONFIG_RISCV=y" $(ROSDIR)/.config))
+error: 
+	@echo "Akaros tree not configured for riscv"
+	@echo "Make sure you have configured ROSDIR for this architecture before proceeding"
+	@echo "e.g. cd \$$ROSDIR"
+	@echo "     make ARCH=riscv defconfig"
+	@false
+riscv: error
+endif
+endif
+ifneq (,$(filter i686,$(MAKECMDGOALS)))
+ifeq (,$(shell grep "CONFIG_X86_32=y" $(ROSDIR)/.config))
+error: 
+	@echo "Akaros tree not configured for i686"
+	@echo "Make sure you have configured ROSDIR for this architecture before proceeding"
+	@echo "e.g. cd \$$ROSDIR"
+	@echo "     make ARCH=x86 defconfig"
+	@false
+i686: error
+endif
+endif
+ifneq (,$(filter x86_64,$(MAKECMDGOALS)))
+ifeq (,$(shell grep "CONFIG_X86_64=y" $(ROSDIR)/.config))
+error: 
+	@echo "Akaros tree not configured for x86_64"
+	@echo "Make sure you have configured ROSDIR for this architecture before proceeding"
+	@echo "e.g. cd \$$ROSDIR"
+	@echo "     make ARCH=x86 defconfig"
+	@echo "     make ARCH=x86 menuconfig -> Set 64 bit option"
+	@false
+x86_64: error
+endif
+endif
 
 all:
 	@echo "You need to run one of the following commands, "
 	@echo "depending on which version of the cross compiler you are trying to generate:"
 	@echo "  make riscv"
-	@echo "  make x86"
+	@echo "  make i686"
+	@echo "  make x86_64"
 	@echo "  make riscv-revert"
-	@echo "  make x86-revert"
+	@echo "  make i686-revert"
+	@echo "  make x86_64-revert"
 	@echo "  make riscv-uninstall"
-	@echo "  make x86-uninstall"
+	@echo "  make i686-uninstall"
+	@echo "  make x86_64-uninstall"
 	@echo "  make clean"
 
 riscv:
@@ -67,74 +119,74 @@ riscv:
 	export ARCH_CFLAGS=$(RISCV_CFLAGS);\
 	export ROS_ARCH_DIR=$(RISCV_ARCH);\
 	export BINARY_PREFIX=$(RISCV_BINARY_PREFIX);\
+	export GLIBC_CONFIGURE_FLAGS=$(RISCV_GLIBC_CONFIGURE_FLAGS);\
 	export GCC_BUILD_FLAGS=$(RISCV_GCC_BUILD_FLAGS);\
 	$(MAKE) make-all
 
-x86:
+i686:
 	export LD_LIBRARY_PATH=; \
 	export DESTDIR=$(DESTDIR);\
-	export INSTDIR=$(X86_INSTDIR);\
-	export PATH=$(DESTDIR)$(X86_INSTDIR)/bin:$(PATH);\
-	export ARCH=$(X86_ARCH);\
-	export ARCH_CFLAGS=$(X86_CFLAGS);\
+	export INSTDIR=$(I686_INSTDIR);\
+	export PATH=$(DESTDIR)$(I686_INSTDIR)/bin:$(PATH);\
+	export ARCH=$(I686_ARCH);\
+	export ARCH_CFLAGS=$(I686_CFLAGS);\
 	export ROS_ARCH_DIR=x86;\
-	export BINARY_PREFIX=$(X86_BINARY_PREFIX);\
-	export GCC_BUILD_FLAGS=$(X86_GCC_BUILD_FLAGS);\
+	export BINARY_PREFIX=$(I686_BINARY_PREFIX);\
+	export GLIBC_CONFIGURE_FLAGS=$(I686_GLIBC_CONFIGURE_FLAGS);\
+	export GCC_BUILD_FLAGS=$(I686_GCC_BUILD_FLAGS);\
+	$(MAKE) make-all
+
+x86_64:
+	export LD_LIBRARY_PATH=; \
+	export DESTDIR=$(DESTDIR);\
+	export INSTDIR=$(X86_64_INSTDIR);\
+	export PATH=$(DESTDIR)$(X86_64_INSTDIR)/bin:$(PATH);\
+	export ARCH=$(X86_64_ARCH);\
+	export ARCH_CFLAGS=$(X86_64_CFLAGS);\
+	export ROS_ARCH_DIR=x86;\
+	export BINARY_PREFIX=$(X86_64_BINARY_PREFIX);\
+	export GLIBC_CONFIGURE_FLAGS=$(X86_64_GLIBC_CONFIGURE_FLAGS);\
+	export GCC_BUILD_FLAGS=$(X86_64_GCC_BUILD_FLAGS);\
 	$(MAKE) make-all
 
 make-all: 
-	$(MAKE) .$(BINARY_PREFIX)binutils-make
 	$(MAKE) .$(BINARY_PREFIX)binutils-install
-	$(MAKE) .$(BINARY_PREFIX)ros-headers-install
-	$(MAKE) .$(BINARY_PREFIX)gcc-stage1-make
 	$(MAKE) .$(BINARY_PREFIX)gcc-stage1-install
-	$(MAKE) .$(BINARY_PREFIX)ros-install-dummy-libs
-	$(MAKE) .$(BINARY_PREFIX)glibc-make
-	$(MAKE) .$(BINARY_PREFIX)glibc-install
-	$(MAKE) .$(BINARY_PREFIX)ros-install-libs
-	$(MAKE) .$(BINARY_PREFIX)gcc-stage2-make
+	$(MAKE) .$(BINARY_PREFIX)ros-headers-install
+	$(MAKE) .$(BINARY_PREFIX)dummy-libs-install
+	$(MAKE) .$(BINARY_PREFIX)glibc-stage1-install
 	$(MAKE) .$(BINARY_PREFIX)gcc-stage2-install
-	mkdir -p $(ROSDIR)/fs/$(ARCH)/lib
-	cp -r $(INSTDIR)/$(ARCH)-ros/lib/* $(ROSDIR)/fs/$(ARCH)/lib
+	$(MAKE) .$(BINARY_PREFIX)glibc-stage2-install
+	$(MAKE) .$(BINARY_PREFIX)ros-libs-install
+	$(MAKE) .$(BINARY_PREFIX)gcc-stage3-install
 
 riscv-uninstall:
 	-rm -rf $(RISCV_INSTDIR)
 
-x86-uninstall:
-	-rm -rf $(X86_INSTDIR)
+i686-uninstall:
+	-rm -rf $(I686_INSTDIR)
+
+x86_64-uninstall:
+	-rm -rf $(X86_64_INSTDIR)
 
 riscv-revert:
 	rm -rf $(RISCV_INSTDIR)
 	cp -r $(RISCV_BINARY_PREFIX)install.bak $(RISCV_INSTDIR)
 
-x86-revert: 
-	rm -rf $(X86_INSTDIR)
-	cp -r $(X86_BINARY_PREFIX)install.bak $(X86_INSTDIR)
+i686-revert: 
+	rm -rf $(I686_INSTDIR)
+	cp -r $(I686_BINARY_PREFIX)install.bak $(I686_INSTDIR)
 
-clean:
-	rm -rf binutils-$(BINUTILS_VERSION) 
-	rm -rf gcc-$(GCC_VERSION) 
-	rm -rf glibc-$(GLIBC_VERSION) 
-	rm -rf *-builddir
-	rm -rf .*-ros-*-configure
-	rm -rf *$(BINARY_PREFIX)install.bak
-
-binutils-clean:
-	cd $(BINARY_PREFIX)binutils-builddir; \
-	make clean
-
-gcc-clean:
-	cd $(BINARY_PREFIX)gcc-stage1-builddir; \
-	cd $(BINARY_PREFIX)gcc-stage2-builddir; \
-	make clean
-
-glibc-clean:
-	cd $(BINARY_PREFIX)glibc-builddir; \
-	make clean
+x86_64-revert: 
+	rm -rf $(X86_64_INSTDIR)
+	cp -r $(X86_64_BINARY_PREFIX)install.bak $(X86_64_INSTDIR)
 
 %.tar.bz2:
 	wget http://akaros.cs.berkeley.edu/xcc/$@
 
+#################################
+########### BINUTILS ############
+#################################
 binutils-$(BINUTILS_VERSION): binutils-$(BINUTILS_VERSION).tar.bz2
 	rm -rf binutils-$(BINUTILS_VERSION);
 	tar -jxf binutils-$(BINUTILS_VERSION).tar.bz2
@@ -142,12 +194,35 @@ binutils-$(BINUTILS_VERSION): binutils-$(BINUTILS_VERSION).tar.bz2
 	patch --no-backup-if-mismatch -p0 < binutils-$(BINUTILS_VERSION)-riscv.patch
 	patch -p0 < binutils-$(BINUTILS_VERSION)-objdump.patch
 
-gcc-$(GCC_VERSION): gcc-$(GCC_VERSION).tar.bz2
-	rm -rf gcc-$(GCC_VERSION)
-	tar -jxf gcc-$(GCC_VERSION).tar.bz2
-	$(MAKE) .gcc-ros-patch
-	patch --no-backup-if-mismatch -p0 < gcc-$(GCC_VERSION)-riscv.patch
+$(BINARY_PREFIX)binutils-builddir: binutils-$(BINUTILS_VERSION)
+	rm -rf $@
+	mkdir -p $@
 
+.$(BINARY_PREFIX)binutils-configure: 
+	$(MAKE) $(BINARY_PREFIX)binutils-builddir 
+	cd $(BINARY_PREFIX)binutils-builddir; \
+	../binutils-$(BINUTILS_VERSION)/configure \
+	            --target=$(ARCH)-ros \
+	            --prefix=$(INSTDIR) \
+	            --disable-nls;
+	echo "MAKEINFO = :" >> $(BINARY_PREFIX)binutils-builddir/Makefile;
+	touch $@
+
+.$(BINARY_PREFIX)binutils-make: .$(BINARY_PREFIX)binutils-configure
+	cd $(BINARY_PREFIX)binutils-builddir; \
+	make -j $(MAKE_JOBS)
+
+.$(BINARY_PREFIX)binutils-install: .$(BINARY_PREFIX)binutils-make
+	cd $(BINARY_PREFIX)binutils-builddir; \
+	make -j $(MAKE_JOBS) install
+
+binutils-clean:
+	cd $(BINARY_PREFIX)binutils-builddir; \
+	make clean
+
+#################################
+########## GCC Stage 1 ##########
+#################################
 .gcc-ros-patch:
 	-cd gcc-$(GCC_VERSION); \
 	diff -ruB --unidirectional-new-file \
@@ -156,64 +231,73 @@ gcc-$(GCC_VERSION): gcc-$(GCC_VERSION).tar.bz2
 	     | grep -v "Only in ../gcc-$(GCC_VERSION)" \
 	     | patch -p2 
 
-glibc-$(GLIBC_VERSION): glibc-$(GLIBC_VERSION).tar.bz2
-	rm -rf glibc-$(GLIBC_VERSION)
-	tar -jxf glibc-$(GLIBC_VERSION).tar.bz2
-	$(MAKE) .glibc-ros-patch
-	patch --no-backup-if-mismatch -p0 < glibc-$(GLIBC_VERSION)-riscv.patch
-	rm glibc-$(GLIBC_VERSION)/sysdeps/riscv/elf/start.S
-	rm glibc-$(GLIBC_VERSION)/sysdeps/riscv/init-first.c
-	rm glibc-$(GLIBC_VERSION)/sysdeps/i386/elf/start.S
-	rm glibc-$(GLIBC_VERSION)/sysdeps/i386/____longjmp_chk.S
-	rm glibc-$(GLIBC_VERSION)/sysdeps/i386/init-first.c
-	rm glibc-$(GLIBC_VERSION)/sysdeps/i386/sysdep.h
-
-.glibc-ros-patch:
-	-cd glibc-$(GLIBC_VERSION); \
-	diff -ruB --unidirectional-new-file \
-	     ../glibc-$(GLIBC_VERSION) \
-	     ../glibc-$(GLIBC_VERSION)-ros \
-	     | grep -v "Only in ../glibc-$(GLIBC_VERSION)" \
-	     | patch -p2 
-
-$(BINARY_PREFIX)binutils-builddir: binutils-$(BINUTILS_VERSION)
-	rm -rf $@
-	mkdir -p $@
+gcc-$(GCC_VERSION): gcc-$(GCC_VERSION).tar.bz2
+	rm -rf gcc-$(GCC_VERSION)
+	tar -jxf gcc-$(GCC_VERSION).tar.bz2
+	$(MAKE) .gcc-ros-patch
+	patch --no-backup-if-mismatch -p0 < gcc-$(GCC_VERSION)-riscv.patch
 
 $(BINARY_PREFIX)gcc-stage1-builddir: gcc-$(GCC_VERSION)
 	rm -rf $@
 	mkdir -p $@
 	
-$(BINARY_PREFIX)glibc-builddir: glibc-$(GLIBC_VERSION)
-	rm -rf $@
-	mkdir -p $@
+.$(BINARY_PREFIX)gcc-stage1-configure: 
+	$(MAKE) $(BINARY_PREFIX)gcc-stage1-builddir
+	cd $(BINARY_PREFIX)gcc-stage1-builddir; \
+	../gcc-$(GCC_VERSION)/configure \
+	        --target=$(ARCH)-ros \
+	        --program-prefix=$(BINARY_PREFIX) \
+	        --prefix=$(INSTDIR) \
+	        --disable-nls \
+	        --disable-shared \
+	        --enable-languages=c,c++ \
+	        --without-headers \
+	        $(GCC_BUILD_FLAGS);
+	echo "MAKEINFO = :" >> $(BINARY_PREFIX)gcc-stage1-builddir/Makefile;
+	touch $@
 
+.$(BINARY_PREFIX)gcc-stage1-make: .$(BINARY_PREFIX)gcc-stage1-configure
+	cd $(BINARY_PREFIX)gcc-stage1-builddir; \
+	make -j $(MAKE_JOBS) all-gcc;
+
+.$(BINARY_PREFIX)gcc-stage1-install: .$(BINARY_PREFIX)gcc-stage1-make
+	cd $(BINARY_PREFIX)gcc-stage1-builddir; \
+	make -j $(MAKE_JOBS) install-gcc;
+
+#################################
+########## GCC Stage 2 ##########
+#################################
 $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 	rm -rf $@
 	mkdir -p $@
 	
-.$(BINARY_PREFIX)binutils-configure: 
-	$(MAKE) $(BINARY_PREFIX)binutils-builddir 
-	cd $(BINARY_PREFIX)binutils-builddir; \
-	../binutils-$(BINUTILS_VERSION)/configure \
-	            --enable-shared \
-	            --disable-multilib \
-	            --disable-nls \
-	            --target=$(ARCH)-ros \
-	            --prefix=$(INSTDIR) \
-	            --includedir=$(INSTDIR)/include \
-	            --disable-werror;
-	echo "MAKEINFO = :" >> $(BINARY_PREFIX)binutils-builddir/Makefile;
+.$(BINARY_PREFIX)gcc-stage2-configure: 
+	$(MAKE) $(BINARY_PREFIX)gcc-stage2-builddir
+	cd $(BINARY_PREFIX)gcc-stage2-builddir; \
+	../gcc-$(GCC_VERSION)/configure \
+	        --target=$(ARCH)-ros \
+	        --program-prefix=$(BINARY_PREFIX) \
+	        --prefix=$(INSTDIR) \
+	        --disable-nls \
+	        --disable-shared \
+	        --disable-multilib \
+	        --enable-languages=c \
+	        --without-headers \
+	        $(GCC_BUILD_FLAGS);
+	echo "MAKEINFO = :" >> $(BINARY_PREFIX)gcc-stage2-builddir/Makefile;
 	touch $@
 
-.$(BINARY_PREFIX)binutils-make: .$(BINARY_PREFIX)binutils-configure
-	cd $(BINARY_PREFIX)binutils-builddir; \
-	make -j $(MAKE_JOBS)
+.$(BINARY_PREFIX)gcc-stage2-make: .$(BINARY_PREFIX)gcc-stage2-configure
+	cd $(BINARY_PREFIX)gcc-stage2-builddir; \
+	make -j $(MAKE_JOBS) all-gcc all-target-libgcc;
 
-.$(BINARY_PREFIX)binutils-install:
-	cd $(BINARY_PREFIX)binutils-builddir; \
-	make -j $(MAKE_JOBS) install
+.$(BINARY_PREFIX)gcc-stage2-install: .$(BINARY_PREFIX)gcc-stage2-make
+	cd $(BINARY_PREFIX)gcc-stage2-builddir; \
+	make -j $(MAKE_JOBS) install-gcc install-target-libgcc;
 
+#################################
+######### ROS Headers ###########
+#################################
 .$(BINARY_PREFIX)ros-headers-install: $(ROSDIR)
 	rm -rf $(INSTDIR)/$(ARCH)-ros/sys-include/*
 	mkdir -p $(INSTDIR)/$(ARCH)-ros/sys-include
@@ -230,124 +314,143 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 	rm -rf $(INSTDIR)/$(ARCH)-ros/sys-include/arch
 	ln -s $(ROS_ARCH_DIR) $(INSTDIR)/$(ARCH)-ros/sys-include/arch 
 
-.$(BINARY_PREFIX)gcc-stage1-configure: 
-	$(MAKE) $(BINARY_PREFIX)gcc-stage1-builddir
-	cd $(BINARY_PREFIX)gcc-stage1-builddir; \
-	../gcc-$(GCC_VERSION)/configure \
-	        --enable-languages=c \
-	        --disable-checking \
-	        --disable-werror \
-	        --disable-multilib \
-	        --disable-libmudflap \
-	        --disable-libssp \
-	        --disable-libquadmath \
-	        --disable-libgomp \
-	        --disable-nls \
-	        --disable-libgcj \
-	        --disable-bootstrap \
-			--disable-build-with-cxx \
-			--disable-build-poststage1-with-cxx \
-	        --disable-shared \
-	        --program-prefix=$(BINARY_PREFIX) \
-	        --target=$(ARCH)-ros \
-	        --prefix=$(INSTDIR) \
-	        --with-headers=$(INSTDIR)/$(ARCH)-ros/include \
-	        $(GCC_BUILD_FLAGS);
-	echo "MAKEINFO = :" >> $(BINARY_PREFIX)gcc-stage1-builddir/Makefile;
+#################################
+###### Dummy Libs Install #######
+#################################
+.$(BINARY_PREFIX)dummy-libs-install:
+	rm -rf $(INSTDIR)/$(ARCH)-ros/lib/libparlib.a
+	rm -rf $(INSTDIR)/$(ARCH)-ros/lib/libgcc_eh.a
+	$(ARCH)-ros-ar cr $(INSTDIR)/$(ARCH)-ros/lib/libparlib.a
+	$(ARCH)-ros-ar cr $(INSTDIR)/$(ARCH)-ros/lib/libgcc_eh.a
+
+#################################
+######### Glibc Stage 1 #########
+#################################
+.glibc-ros-patch:
+	-cd glibc-$(GLIBC_VERSION); \
+	diff -ruB --unidirectional-new-file \
+	     ../glibc-$(GLIBC_VERSION) \
+	     ../glibc-$(GLIBC_VERSION)-ros \
+	     | grep -v "Only in ../glibc-$(GLIBC_VERSION)" \
+	     | patch -p2 
+
+glibc-$(GLIBC_VERSION): glibc-$(GLIBC_VERSION).tar.bz2
+	rm -rf glibc-$(GLIBC_VERSION)
+	tar -jxf glibc-$(GLIBC_VERSION).tar.bz2
+	$(MAKE) .glibc-ros-patch
+	patch --no-backup-if-mismatch -p0 < glibc-$(GLIBC_VERSION)-riscv.patch
+	rm glibc-$(GLIBC_VERSION)/sysdeps/riscv/elf/start.S
+	rm glibc-$(GLIBC_VERSION)/sysdeps/i386/elf/start.S
+	rm glibc-$(GLIBC_VERSION)/sysdeps/x86_64/elf/start.S
+
+$(BINARY_PREFIX)glibc-stage1-builddir: glibc-$(GLIBC_VERSION)
+	rm -rf $@
+	mkdir -p $@
+
+.$(BINARY_PREFIX)glibc-stage1-configure: 
+	$(MAKE) $(BINARY_PREFIX)glibc-stage1-builddir;
+	cd $(BINARY_PREFIX)glibc-stage1-builddir; \
+	../glibc-$(GLIBC_VERSION)/configure \
+	          --host=$(ARCH)-ros \
+	          --prefix=$(INSTDIR)/$(ARCH)-ros \
+	          --enable-hacker-mode \
+	          --disable-shared \
+              --disable-add-ons \
+	          --disable-nls \
+	          --with-headers=$(INSTDIR)/$(ARCH)-ros/sys-include \
+	          --with-elf \
+	          --with-tls \
+	          --with-__thread \
+	          $(GLIBC_CONFIGURE_FLAGS) \
+	          CFLAGS="$(ARCH_CFLAGS) -g -fpermissive -O2 -pipe";
 	touch $@
 
-.$(BINARY_PREFIX)gcc-stage1-make: .$(BINARY_PREFIX)gcc-stage1-configure
-	cd $(BINARY_PREFIX)gcc-stage1-builddir; \
-	make -j $(MAKE_JOBS) inhibit_libc=true cross-compiling=yes all-gcc all-target-libgcc
+.$(BINARY_PREFIX)glibc-stage1-install: .$(BINARY_PREFIX)glibc-stage1-configure
+	cd $(BINARY_PREFIX)glibc-stage1-builddir; \
+	comma=, make -j $(MAKE_JOBS) install-headers install-bootstrap-headers=yes; \
 
-# Stage 1 didn't build libgcc_eh.a, which is needed later on.  We can fake it
-# with a symlink, for now.  Later, when we build stage2 gcc, we'll get a real
-# libgcc_eh
-.$(BINARY_PREFIX)gcc-stage1-install: 
-	cd $(BINARY_PREFIX)gcc-stage1-builddir; \
-	make -j $(MAKE_JOBS) install-gcc install-target-libgcc;
-	ln -fs libgcc.a `$(BINARY_PREFIX)gcc -print-libgcc-file-name | \
-	                 sed 's/libgcc/&_eh/'`
+####################################
+########## Glibc Stage 2  ##########
+####################################
+$(BINARY_PREFIX)glibc-stage2-builddir: glibc-$(GLIBC_VERSION)
+	rm -rf $@
+	mkdir -p $@
 
-.$(BINARY_PREFIX)ros-install-dummy-libs:
-	rm -rf $(INSTDIR)/$(ARCH)-ros/lib/libparlib.a
-	$(ARCH)-ros-ar cr $(INSTDIR)/$(ARCH)-ros/lib/libparlib.a
-
-.$(BINARY_PREFIX)glibc-configure: 
-	$(MAKE) $(BINARY_PREFIX)glibc-builddir
-	cd $(BINARY_PREFIX)glibc-builddir; \
+.$(BINARY_PREFIX)glibc-stage2-configure: 
+	$(MAKE) $(BINARY_PREFIX)glibc-stage2-builddir
+	cd $(BINARY_PREFIX)glibc-stage2-builddir; \
 	../glibc-$(GLIBC_VERSION)/configure \
 	          --host=$(ARCH)-ros \
 	          --enable-hacker-mode \
 	          --enable-shared \
+	          --disable-nls \
 	          --with-elf \
 	          --with-tls \
-	          --disable-nls \
 	          --with-__thread \
 	          --with-headers=$(INSTDIR)/$(ARCH)-ros/sys-include \
 	          --prefix=$(INSTDIR)/$(ARCH)-ros \
 	          libc_cv_forced_unwind=yes \
 	          libc_cv_c_cleanup=yes \
+	          $(GLIBC_CONFIGURE_FLAGS) \
 	          CFLAGS="$(ARCH_CFLAGS) -g -fpermissive -O2 -pipe";
 	touch $@
 
-.$(BINARY_PREFIX)glibc-make: .$(BINARY_PREFIX)glibc-configure
-	cd $(BINARY_PREFIX)glibc-builddir; \
-	make -j $(MAKE_JOBS)
+.$(BINARY_PREFIX)glibc-stage2-make: .$(BINARY_PREFIX)glibc-stage2-configure
+	cd $(BINARY_PREFIX)glibc-stage2-builddir; \
+	make -j $(MAKE_JOBS) || make -j $(MAKE_JOBS)
 
-.$(BINARY_PREFIX)glibc-install: 
-	cd $(BINARY_PREFIX)glibc-builddir; \
+.$(BINARY_PREFIX)glibc-stage2-install: .$(BINARY_PREFIX)glibc-stage2-make
+	cd $(BINARY_PREFIX)glibc-stage2-builddir; \
 	make -j $(MAKE_JOBS) install
 
-.$(BINARY_PREFIX)ros-install-libs:
+#################################
+####### ROS Libs Install #######
+#################################
+.$(BINARY_PREFIX)ros-libs-install:
 	cd $(ROSDIR); \
-	make userclean; \
+	make ARCH=$(ROS_ARCH_DIR) userclean; \
 	make ARCH=$(ROS_ARCH_DIR) -j $(MAKE_JOBS) install-libs
 
-.$(BINARY_PREFIX)gcc-stage2-configure:
-	$(MAKE) $(BINARY_PREFIX)gcc-stage2-builddir
-	cd $(BINARY_PREFIX)gcc-stage2-builddir; \
+##################################
+########### Gcc Stage 3 ##########
+##################################
+$(BINARY_PREFIX)gcc-stage3-builddir: gcc-$(GCC_VERSION)
+	rm -rf $@
+	mkdir -p $@
+	
+.$(BINARY_PREFIX)gcc-stage3-configure:
+	$(MAKE) $(BINARY_PREFIX)gcc-stage3-builddir
+	cd $(BINARY_PREFIX)gcc-stage3-builddir; \
 	../gcc-$(GCC_VERSION)/configure \
+	          --target=$(ARCH)-ros \
+	          --program-prefix=$(BINARY_PREFIX) \
+	          --prefix=$(INSTDIR) \
+	          --disable-nls \
+	          --disable-werror \
+	          --disable-multilib \
 	          --enable-shared \
 	          --enable-tls \
 	          --enable-libgomp \
-	          --disable-multilib \
-	          --disable-nls \
-	          --program-prefix=$(BINARY_PREFIX) \
-	          --target=$(ARCH)-ros \
-	          --prefix=$(INSTDIR) \
 	          --enable-languages=c,c++ \
-	          $(GCC_BUILD_FLAGS) \
-	          --without-libffi \
 	          --with-__thread \
 	          --with-headers=$(INSTDIR)/$(ARCH)-ros/include \
-	          --disable-werror;
-	echo "MAKEINFO = :" >> $(BINARY_PREFIX)gcc-stage2-builddir/Makefile;
+	          $(GCC_BUILD_FLAGS);
+	echo "MAKEINFO = :" >> $(BINARY_PREFIX)gcc-stage3-builddir/Makefile;
 	touch $@
 
-.$(BINARY_PREFIX)gcc-stage2-make: .$(BINARY_PREFIX)gcc-stage2-configure
-	cd $(BINARY_PREFIX)gcc-stage2-builddir; \
+.$(BINARY_PREFIX)gcc-stage3-make: .$(BINARY_PREFIX)gcc-stage3-configure
+	cd $(BINARY_PREFIX)gcc-stage3-builddir; \
 	make -j $(MAKE_JOBS)
 
-.$(BINARY_PREFIX)gcc-stage2-install:
-	cd $(BINARY_PREFIX)gcc-stage2-builddir; \
+.$(BINARY_PREFIX)gcc-stage3-install: .$(BINARY_PREFIX)gcc-stage3-make
+	cd $(BINARY_PREFIX)gcc-stage3-builddir; \
 	make -j $(MAKE_JOBS) install
 
-patches: gcc-$(GCC_VERSION) binutils-$(BINUTILS_VERSION)
-	rm -rf orig-src
-	mkdir orig-src
-	
-	find . -name autom4te.cache | xargs rm -rf
-	patch --no-backup-if-mismatch -Rp0 < gcc-$(GCC_VERSION)-riscv.patch
-	tar -C orig-src -jxf gcc-$(GCC_VERSION).tar.bz2
-	-diff -ruN orig-src/gcc-$(GCC_VERSION) gcc-$(GCC_VERSION) \
-	      > gcc-$(GCC_VERSION)-ros.patch
-	patch --no-backup-if-mismatch -p0 < gcc-$(GCC_VERSION)-riscv.patch
-	
-	patch --no-backup-if-mismatch -Rp0 < binutils-$(BINUTILS_VERSION)-riscv.patch
-	tar -C orig-src -jxf binutils-$(BINUTILS_VERSION).tar.bz2
-	-diff -ruN orig-src/binutils-$(BINUTILS_VERSION) binutils-$(BINUTILS_VERSION) \
-	      > binutils-$(BINUTILS_VERSION)-ros.patch
-	patch --no-backup-if-mismatch -p0 < binutils-$(BINUTILS_VERSION)-riscv.patch
-	
-	rm -rf orig-src
+clean:
+	rm -rf binutils-$(BINUTILS_VERSION) 
+	rm -rf gcc-$(GCC_VERSION) 
+	rm -rf glibc-$(GLIBC_VERSION) 
+	rm -rf *-builddir
+	rm -rf .*-ros-*-configure
+	rm -rf *$(BINARY_PREFIX)install.bak
+

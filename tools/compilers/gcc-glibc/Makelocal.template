@@ -1,3 +1,4 @@
 RISCV_INSTDIR := /scratch/klueska/ros-gcc-glibc/install-riscv-ros-gcc/
-X86_INSTDIR := /scratch/klueska/ros-gcc-glibc/install-i386-ros-gcc/
+I686_INSTDIR := /scratch/klueska/ros-gcc-glibc/install-i686-ros-gcc/
+X86_64_INSTDIR := /scratch/klueska/ros-gcc-glibc/install-x86_64-ros-gcc/
 
