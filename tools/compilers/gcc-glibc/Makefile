@@ -240,7 +240,7 @@ gcc-$(GCC_VERSION): gcc-$(GCC_VERSION).tar.bz2
 $(BINARY_PREFIX)gcc-stage1-builddir: gcc-$(GCC_VERSION)
 	rm -rf $@
 	mkdir -p $@
-	
+
 .$(BINARY_PREFIX)gcc-stage1-configure: 
 	$(MAKE) $(BINARY_PREFIX)gcc-stage1-builddir
 	cd $(BINARY_PREFIX)gcc-stage1-builddir; \
@@ -270,7 +270,7 @@ $(BINARY_PREFIX)gcc-stage1-builddir: gcc-$(GCC_VERSION)
 $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 	rm -rf $@
 	mkdir -p $@
-	
+
 .$(BINARY_PREFIX)gcc-stage2-configure: 
 	$(MAKE) $(BINARY_PREFIX)gcc-stage2-builddir
 	cd $(BINARY_PREFIX)gcc-stage2-builddir; \
@@ -417,7 +417,7 @@ $(BINARY_PREFIX)glibc-stage2-builddir: glibc-$(GLIBC_VERSION)
 $(BINARY_PREFIX)gcc-stage3-builddir: gcc-$(GCC_VERSION)
 	rm -rf $@
 	mkdir -p $@
-	
+
 .$(BINARY_PREFIX)gcc-stage3-configure:
 	$(MAKE) $(BINARY_PREFIX)gcc-stage3-builddir
 	cd $(BINARY_PREFIX)gcc-stage3-builddir; \
