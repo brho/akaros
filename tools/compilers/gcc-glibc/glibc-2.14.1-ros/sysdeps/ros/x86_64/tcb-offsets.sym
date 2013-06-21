@@ -1,0 +1,11 @@
+#include <sysdep.h>
+#include <tls.h>
+
+MULTIPLE_THREADS_OFFSET	offsetof (tcbhead_t, multiple_threads)
+POINTER_GUARD		offsetof (tcbhead_t, pointer_guard)
+VGETCPU_CACHE_OFFSET	offsetof (tcbhead_t, vgetcpu_cache)
+#ifndef __ASSUME_PRIVATE_FUTEX
+PRIVATE_FUTEX		offsetof (tcbhead_t, private_futex)
+#endif
+RTLD_SAVESPACE_SSE	offsetof (tcbhead_t, rtld_savespace_sse)
+
