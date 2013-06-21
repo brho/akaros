@@ -1,6 +1,5 @@
 ifeq ($(CONFIG_X86_64),y)
-#CROSS_COMPILE := x86_64-ros-
-CROSS_COMPILE := 
+CROSS_COMPILE := x86_64-ros-
 BITS := 64
 KERNEL_LD := kernel64.ld
 CFLAGS_KERNEL += -mcmodel=kernel

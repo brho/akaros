@@ -306,8 +306,8 @@ KERNEL_LD ?= kernel.ld
 gcc-lib := $(shell $(CC) -print-libgcc-file-name 2>/dev/null)
 NOSTDINC_FLAGS += -nostdinc -isystem \
                   $(shell $(CC) -print-file-name=include 2>/dev/null)
-XCC_TARGET_ROOT := $(dir $(shell which $(CC)))../$(patsubst %-,%,\
-                                                   $(CROSS_COMPILE))
+XCC_TARGET_ROOT := $(dir $(shell which $(CC) 2> /dev/null))../$(patsubst %-,%,\
+                                                               $(CROSS_COMPILE))
 
 CFLAGS_KERNEL += -O2 -pipe -MD
 CFLAGS_KERNEL += -std=gnu99 -fgnu89-inline
