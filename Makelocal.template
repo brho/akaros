@@ -3,6 +3,7 @@
 #CFLAGS_USER += -DCONFIG_SYSCALL_TRAP
 #CFLAGS_USER += -g
 #CFLAGS_TESTS += -static
+export CFLAGS_USER CFLAGS_TESTS
 
 # brho's custom targets.  Customize to your system.
 #$(OBJDIR)/kern/.kvm.touch: $(KERNEL_OBJ)
