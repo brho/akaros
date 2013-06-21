@@ -12825,6 +12825,7 @@ index 0000000..593fbc5
 +++ gcc-4.6.1/gcc/config/riscv/ros.h
 @@ -0,0 +1,9 @@
 +#include "linux.h"
++#define LINUX_TARGET_OS_CPP_BUILTINS ROS_TARGET_OS_CPP_BUILTINS
 +
 +#undef LINUX_DYNAMIC_LINKER
 +#define LINUX_DYNAMIC_LINKER GLIBC_DYNAMIC_LINKER
