@@ -78,6 +78,7 @@ void kernel_init(multiboot_info_t *mboot_info)
 	page_check();
 	vfs_init();
 	devfs_init();
+	idt_init();
 
 #ifdef CONFIG_X86_64
 monitor(0);
@@ -86,7 +87,6 @@ while (1)
 	asm volatile("hlt");
 #endif
 
-	idt_init();
 	kernel_msg_init();
 	sysenter_init();
 	timer_init();

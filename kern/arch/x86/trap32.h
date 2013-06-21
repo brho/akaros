@@ -73,4 +73,15 @@ static inline long x86_get_sysenter_arg1(struct hw_trapframe *hw_tf)
 	return hw_tf->tf_regs.reg_esi;
 }
 
+static inline uintptr_t x86_get_stacktop_tss(struct taskstate *tss)
+{
+	return tss->ts_esp0;
+}
+
+static inline void x86_set_stacktop_tss(struct taskstate *tss, uintptr_t top)
+{
+	tss->ts_esp0 = top;
+	tss->ts_ss0 = GD_KD;
+}
+
 #endif /* ROS_KERN_ARCH_TRAP32_H */

@@ -256,6 +256,8 @@ typedef struct Segdesc {
 	unsigned sd_g : 1;          // Granularity: limit scaled by 4K when set
 	unsigned sd_base_31_24 : 8; // High bits of segment base address
 } segdesc_t;
+typedef struct Segdesc syssegdesc_t;
+
 // Null segment
 #define SEG_NULL	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
 // Segment that is loadable but faults when used
@@ -265,36 +267,28 @@ typedef struct Segdesc {
 { ((lim) >> 12) & 0xffff, (base) & 0xffff, ((base) >> 16) & 0xff,	\
     type, 1, dpl, 1, (unsigned) (lim) >> 28, 0, 0, 1, 1,			\
     (unsigned) (base) >> 24 }
-// System segment (LDT)
-#define SEG_SYS(type, base, lim, dpl) 									\
-{ ((lim) >> 12) & 0xffff, (base) & 0xffff, ((base) >> 16) & 0xff,	\
-    type, 0, dpl, 1, (unsigned) (lim) >> 28, 0, 0, 1, 1,			\
-    (unsigned) (base) >> 24 }
 
 #define SEG16(type, base, lim, dpl) 								\
 { (lim) & 0xffff, (base) & 0xffff, ((base) >> 16) & 0xff,			\
     type, 1, dpl, 1, (unsigned) (lim) >> 16, 0, 0, 1, 0,			\
     (unsigned) (base) >> 24 }
 
-#define SEG16ROINIT(seg,type,base,lim,dpl) \
-	{\
-		(seg).sd_lim_15_0 = SINIT((lim) & 0xffff);\
-		(seg).sd_base_15_0 = SINIT((uint32_t)(base)&0xffff);\
-		(seg).sd_base_23_16 = SINIT(((uint32_t)(base)>>16)&0xff);\
-		(seg).sd_type = SINIT(type);\
-		(seg).sd_s = SINIT(1);\
-		(seg).sd_dpl = SINIT(dpl);\
-		(seg).sd_p = SINIT(1);\
-		(seg).sd_lim_19_16 = SINIT((unsigned)(lim)>>16);\
-		(seg).sd_avl = SINIT(0);\
-		(seg).sd_rsv1 = SINIT(0);\
-		(seg).sd_db = SINIT(1);\
-		(seg).sd_g = SINIT(0);\
-		(seg).sd_base_31_24 = SINIT((uint32_t)(base)>> 24);\
-	}
+// System segment (LDT)
+#define SEG_SYS(type, base, lim, dpl) 								\
+{ ((lim) >> 12) & 0xffff, (base) & 0xffff, ((base) >> 16) & 0xff,	\
+    type, 0, dpl, 1, (unsigned) (lim) >> 28, 0, 0, 1, 1,			\
+    (unsigned) (base) >> 24 }
+
+#define SEG16_SYS(type, base, lim, dpl) 							\
+{ (lim) & 0xffff, (base) & 0xffff, ((base) >> 16) & 0xff,			\
+    type, 0, dpl, 1, (unsigned) (lim) >> 16, 0, 0, 1, 0,			\
+    (unsigned) (base) >> 24 }
+
+#define SEG_SYS_SMALL(type, base, lim, dpl) \
+        SEG16_SYS(type, base, lim, dpl)
 
 // Task state segment format (as described by the Pentium architecture book)
-typedef struct Taskstate {
+typedef struct taskstate {
 	uint32_t ts_link;	// Old ts selector
 	uintptr_t ts_esp0;	// Stack pointers and segment selectors
 	uint16_t ts_ss0;	//   after an increase in privilege level

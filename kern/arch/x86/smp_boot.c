@@ -245,12 +245,11 @@ uint32_t smp_main(void)
 	asm volatile("lgdt %0" : : "m"(*my_gdt_pd));
 
 	// Need to set the TSS so we know where to trap on this core
-	my_ts->ts_esp0 = my_stack_top;
-	my_ts->ts_ss0 = GD_KD;
+	x86_set_stacktop_tss(my_ts, my_stack_top);
 	// Initialize the TSS field of my_gdt.
-	my_gdt[GD_TSS >> 3] = (segdesc_t)SEG16(STS_T32A, (uintptr_t)my_ts,
-	                      sizeof(taskstate_t), 0);
-	my_gdt[GD_TSS >> 3].sd_s = 0;
+	syssegdesc_t *ts_slot = (syssegdesc_t*)&my_gdt[GD_TSS >> 3];
+	*ts_slot = (syssegdesc_t)SEG_SYS_SMALL(STS_T32A, (uintptr_t)my_ts,
+	                                       sizeof(taskstate_t), 0);
 	// Load the TSS
 	ltr(GD_TSS);
 

@@ -24,22 +24,14 @@
 
 taskstate_t RO ts;
 
-/* Interrupt descriptor table.  (Must be built at run time because
- * shifted function addresses can't be represented in relocation records.)
- */
-// Aligned on an 8 byte boundary (SDM V3A 5-13)
-gatedesc_t __attribute__ ((aligned (8))) (RO idt)[256] = { { 0 } };
+/* Interrupt descriptor table.  64 bit needs 16 byte alignment (i think). */
+gatedesc_t __attribute__((aligned (16))) idt[256] = { { 0 } };
 pseudodesc_t idt_pd;
 
 /* global handler table, used by core0 (for now).  allows the registration
  * of functions to be called when servicing an interrupt.  other cores
- * can set up their own later.
- */
-#ifdef __IVY__
-#pragma cilnoremove("iht_lock")
-#endif
-spinlock_t iht_lock;
-handler_t TP(TV(t)) LCKD(&iht_lock) (RO interrupt_handlers)[NUM_INTERRUPT_HANDLERS];
+ * can set up their own later. */
+handler_t interrupt_handlers[NUM_INTERRUPT_HANDLERS];
 
 const char *x86_trapname(int trapno)
 {
@@ -80,9 +72,9 @@ const char *x86_trapname(int trapno)
  * and then the GDT.  Still, it's a pain. */
 void set_stack_top(uintptr_t stacktop)
 {
-	struct per_cpu_info *pcpu = &per_cpu_info[core_id()];
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	/* No need to reload the task register, this takes effect immediately */
-	pcpu->tss->ts_esp0 = stacktop;
+	x86_set_stacktop_tss(pcpui->tss, stacktop);
 	/* Also need to make sure sysenters come in correctly */
 	x86_set_sysenter_stacktop(stacktop);
 }
@@ -95,7 +87,7 @@ uintptr_t get_stack_top(void)
 	/* so we can check this in interrupt handlers (before smp_boot()) */
 	if (!pcpui->tss)
 		return ROUNDUP(read_sp(), PGSIZE);
-	stacktop = pcpui->tss->ts_esp0;
+	stacktop = x86_get_stacktop_tss(pcpui->tss);
 	if (stacktop != ROUNDUP(read_sp(), PGSIZE))
 		panic("Bad stacktop: %p esp one is %p\n", stacktop,
 		      ROUNDUP(read_sp(), PGSIZE));
@@ -112,50 +104,49 @@ void send_nmi(uint32_t os_coreid)
 
 void idt_init(void)
 {
-	// This table is made in trapentry.S by each macro in that file.
-	// It is layed out such that the ith entry is the ith's traphandler's
-	// (uint32_t) trap addr, then (uint32_t) trap number
-	struct trapinfo { uintptr_t trapaddr; uint32_t trapnumber; };
-	extern struct trapinfo (BND(__this,trap_tbl_end) RO trap_tbl)[];
-	extern struct trapinfo (SNT RO trap_tbl_end)[];
+	/* This table is made in trapentry$BITS.S by each macro in that file.
+	 * It is layed out such that the ith entry is the ith's traphandler's
+	 * (uintptr_t) trap addr, then (uint32_t) trap number. */
+	struct trapinfo { uintptr_t trapaddr; uint32_t trapnumber; }
+	       __attribute__((packed));
+	extern struct trapinfo trap_tbl[];
+	extern struct trapinfo trap_tbl_end[];
 	int i, trap_tbl_size = trap_tbl_end - trap_tbl;
 	extern void ISR_default(void);
 
-	// set all to default, to catch everything
-	for(i = 0; i < 256; i++)
-		ROSETGATE(idt[i], 0, GD_KT, &ISR_default, 0);
+	/* set all to default, to catch everything */
+	for (i = 0; i < 256; i++)
+		SETGATE(idt[i], 0, GD_KT, &ISR_default, 0);
 
-	// set all entries that have real trap handlers
-	// we need to stop short of the last one, since the last is the default
-	// handler with a fake interrupt number (500) that is out of bounds of
-	// the idt[]
-	// if we set these to trap gates, be sure to handle the IRQs separately
-	// and we might need to break our pretty tables
-	for(i = 0; i < trap_tbl_size - 1; i++)
-		ROSETGATE(idt[trap_tbl[i].trapnumber], 0, GD_KT, trap_tbl[i].trapaddr, 0);
+	/* set all entries that have real trap handlers
+	 * we need to stop short of the last one, since the last is the default
+	 * handler with a fake interrupt number (500) that is out of bounds of
+	 * the idt[] */
+	for (i = 0; i < trap_tbl_size - 1; i++)
+		SETGATE(idt[trap_tbl[i].trapnumber], 0, GD_KT, trap_tbl[i].trapaddr, 0);
 
-	// turn on syscall handling and other user-accessible ints
-	// DPL 3 means this can be triggered by the int instruction
-	// STS_TG32 sets the IDT type to a Interrupt Gate (interrupts disabled)
+	/* turn on trap-based syscall handling and other user-accessible ints
+	 * DPL 3 means this can be triggered by the int instruction
+	 * STS_TG32 sets the IDT type to a Interrupt Gate (interrupts disabled) */
 	idt[T_SYSCALL].gd_dpl = SINIT(3);
 	idt[T_SYSCALL].gd_type = SINIT(STS_IG32);
 	idt[T_BRKPT].gd_dpl = SINIT(3);
 
 	/* Setup a TSS so that we get the right stack when we trap to the kernel. */
-	ts.ts_esp0 = (uintptr_t)bootstacktop;
-	ts.ts_ss0 = SINIT(GD_KD);
+	/* Note: we want 16 byte aligned kernel stack frames (AMD 2:8.9.3) */
+	x86_set_stacktop_tss(&ts, (uintptr_t)bootstacktop);
+
 #ifdef CONFIG_KTHREAD_POISON
 	/* TODO: KTHR-STACK */
 	uintptr_t *poison = (uintptr_t*)ROUNDDOWN(bootstacktop - 1, PGSIZE);
 	*poison = 0xdeadbeef;
 #endif /* CONFIG_KTHREAD_POISON */
 
-	// Initialize the TSS field of the gdt.
-	SEG16ROINIT(gdt[GD_TSS >> 3], STS_T32A, &ts,
-	            sizeof(taskstate_t), 0);
-	//gdt[GD_TSS >> 3] = (segdesc_t)SEG16(STS_T32A, (uint32_t) (&ts),
-	//				   sizeof(taskstate_t), 0);
-	gdt[GD_TSS >> 3].sd_s = SINIT(0);
+	/* Initialize the TSS field of the gdt.  The size of the TSS desc differs
+	 * between 64 and 32 bit, hence the pointer acrobatics */
+	syssegdesc_t *ts_slot = (syssegdesc_t*)&gdt[GD_TSS >> 3];
+	*ts_slot = (syssegdesc_t)SEG_SYS_SMALL(STS_T32A, (uintptr_t)&ts,
+	                                       sizeof(taskstate_t), 0);
 
 	/* Init the IDT PD.  Need to do this before ltr for some reason.  (Doing
 	 * this between ltr and lidt causes the machine to reboot... */
@@ -477,7 +468,7 @@ void irq_handler(struct hw_trapframe *hw_tf)
 
 	extern handler_wrapper_t (RO handler_wrappers)[NUM_HANDLER_WRAPPERS];
 	// determine the interrupt handler table to use.  for now, pick the global
-	handler_t TP(TV(t)) LCKD(&iht_lock) * handler_tbl = interrupt_handlers;
+	handler_t *handler_tbl = interrupt_handlers;
 	if (handler_tbl[hw_tf->tf_trapno].isr != 0)
 		handler_tbl[hw_tf->tf_trapno].isr(hw_tf,
 		                                  handler_tbl[hw_tf->tf_trapno].data);
