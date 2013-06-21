@@ -1,6 +1,6 @@
-diff -ruN orig-src/binutils-2.21.1/bfd/config.bfd binutils-2.21.1/bfd/config.bfd
---- orig-src/binutils-2.21.1/bfd/config.bfd	2011-04-01 05:02:42.000000000 -0700
-+++ binutils-2.21.1/bfd/config.bfd	2011-11-11 04:05:38.000000000 -0800
+diff -ruN binutils-2.21.1/bfd/config.bfd binutils-2.21.1-ros/bfd/config.bfd
+--- binutils-2.21.1/bfd/config.bfd	2011-04-01 05:02:42.000000000 -0700
++++ binutils-2.21.1-ros/bfd/config.bfd	2013-06-07 15:54:19.380916665 -0700
 @@ -519,6 +519,9 @@
    i[3-7]86-*-aros*)
      targ_defvec=bfd_elf32_i386_vec
@@ -11,9 +11,21 @@ diff -ruN orig-src/binutils-2.21.1/bfd/config.bfd binutils-2.21.1/bfd/config.bfd
    i[3-7]86-*-chorus*)
      targ_defvec=bfd_elf32_i386_vec
      ;;
-diff -ruN orig-src/binutils-2.21.1/config.sub binutils-2.21.1/config.sub
---- orig-src/binutils-2.21.1/config.sub	2010-06-01 10:53:40.000000000 -0700
-+++ binutils-2.21.1/config.sub	2011-11-11 04:05:38.000000000 -0800
+@@ -611,6 +614,11 @@
+     targ_archs="$targ_archs bfd_powerpc_arch bfd_rs6000_arch"
+     want64=true
+     ;;
++  x86_64-*-ros*)
++    targ_defvec=bfd_elf64_x86_64_vec
++    targ_selvecs="bfd_elf32_i386_vec bfd_elf64_l1om_vec"
++    want64=true
++    ;;
+   x86_64-*-dicos*)
+     targ_defvec=bfd_elf64_x86_64_vec
+     targ_selvecs="bfd_elf32_i386_vec bfd_elf64_l1om_vec"
+diff -ruN binutils-2.21.1/config.sub binutils-2.21.1-ros/config.sub
+--- binutils-2.21.1/config.sub	2010-06-01 10:53:40.000000000 -0700
++++ binutils-2.21.1-ros/config.sub	2013-06-07 15:48:57.128626160 -0700
 @@ -1297,7 +1297,7 @@
  	      | -hpux* | -unos* | -osf* | -luna* | -dgux* | -auroraux* | -solaris* \
  	      | -sym* | -kopensolaris* \
@@ -23,9 +35,9 @@ diff -ruN orig-src/binutils-2.21.1/config.sub binutils-2.21.1/config.sub
  	      | -nindy* | -vxsim* | -vxworks* | -ebmon* | -hms* | -mvs* \
  	      | -clix* | -riscos* | -uniplus* | -iris* | -rtu* | -xenix* \
  	      | -hiux* | -386bsd* | -knetbsd* | -mirbsd* | -netbsd* \
-diff -ruN orig-src/binutils-2.21.1/configure binutils-2.21.1/configure
---- orig-src/binutils-2.21.1/configure	2011-06-27 00:39:00.000000000 -0700
-+++ binutils-2.21.1/configure	2011-12-15 09:57:17.000000000 -0800
+diff -ruN binutils-2.21.1/configure binutils-2.21.1-ros/configure
+--- binutils-2.21.1/configure	2011-06-27 00:39:00.000000000 -0700
++++ binutils-2.21.1-ros/configure	2013-06-07 15:48:57.148626299 -0700
 @@ -6701,6 +6701,10 @@
    *-*-mingw* | *-*-cygwin ) RPATH_ENVVAR=PATH ;;
    *) RPATH_ENVVAR=LD_LIBRARY_PATH ;;
@@ -37,9 +49,9 @@ diff -ruN orig-src/binutils-2.21.1/configure binutils-2.21.1/configure
  
  # On systems where the dynamic library environment variable is PATH,
  # gcc/ will put dynamic libraries into a subdirectory to avoid adding
-diff -ruN orig-src/binutils-2.21.1/gas/configure.tgt binutils-2.21.1/gas/configure.tgt
---- orig-src/binutils-2.21.1/gas/configure.tgt	2011-04-01 05:02:42.000000000 -0700
-+++ binutils-2.21.1/gas/configure.tgt	2011-11-11 04:05:38.000000000 -0800
+diff -ruN binutils-2.21.1/gas/configure.tgt binutils-2.21.1-ros/gas/configure.tgt
+--- binutils-2.21.1/gas/configure.tgt	2011-04-01 05:02:42.000000000 -0700
++++ binutils-2.21.1-ros/gas/configure.tgt	2013-06-07 16:00:33.913598069 -0700
 @@ -180,6 +180,7 @@
    i386-*-beos*)				fmt=elf ;;
    i386-*-coff)				fmt=coff ;;
@@ -48,14 +60,17 @@ diff -ruN orig-src/binutils-2.21.1/gas/configure.tgt binutils-2.21.1/gas/configu
    i386-*-kaos*)				fmt=elf ;;
    i386-*-bsd*)				fmt=aout em=386bsd ;;
    i386-*-netbsd0.8)			fmt=aout em=386bsd ;;
-diff -ruN orig-src/binutils-2.21.1/ld/configure.tgt binutils-2.21.1/ld/configure.tgt
---- orig-src/binutils-2.21.1/ld/configure.tgt	2011-04-01 05:03:54.000000000 -0700
-+++ binutils-2.21.1/ld/configure.tgt	2011-11-11 04:05:38.000000000 -0800
-@@ -242,6 +242,7 @@
- 			esac ;;
- i[3-7]86-*-netware)	targ_emul=i386nw ;;
- i[3-7]86-*-elf*)	targ_emul=elf_i386 ;;
-+i[3-7]86-*-ros)	targ_emul=elf_i386 ;;
+diff -ruN binutils-2.21.1/ld/configure.tgt binutils-2.21.1-ros/ld/configure.tgt
+--- binutils-2.21.1/ld/configure.tgt	2011-04-01 05:03:54.000000000 -0700
++++ binutils-2.21.1-ros/ld/configure.tgt	2013-06-07 16:02:52.954598409 -0700
+@@ -245,6 +245,10 @@
  x86_64-*-elf*)		targ_emul=elf_x86_64
  			targ_extra_emuls="elf_i386 elf_l1om"
  			;;
++i[3-7]86-*-ros)	targ_emul=elf_i386 ;;
++x86_64-*-ros*)		targ_emul=elf_x86_64
++			targ_extra_emuls="elf_i386 elf_l1om"
++			;;
+ i[3-7]86-*-kaos*)	targ_emul=elf_i386 ;;
+ i[3-7]86-*-freebsdaout* | i[3-7]86-*-freebsd[12].* | i[3-7]86-*-freebsd[12])
+ 			targ_emul=i386bsd ;;
