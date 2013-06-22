@@ -81,7 +81,7 @@ building.  I have a 2 core laptop, so I use MAKE_JOBS := 3
 
 At this point, you can build:
 
-$ make x86
+$ make i686
 
 This might take a while (10-20 minutes for me on a 2007 era laptop).
 
