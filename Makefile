@@ -434,12 +434,35 @@ $(kern_cpio) initramfs: $(kern_initramfs_files)
 ld_emulation = $(shell $(OBJDUMP) -i | grep -v BFD | grep ^[a-z] |head -n1)
 ld_arch = $(shell $(OBJDUMP) -i | grep -v BFD | grep "^  [a-z]" | head -n1)
 
-$(kern_cpio_obj): $(kern_cpio)
-	$(Q)$(OBJCOPY) -I binary -B $(ld_arch) -O $(ld_emulation) $^ $@
+# Our makefile doesn't detect a change in subarch, and old binary objects that
+# don't need to be updated won't get rebuilt, but they also can't link with the
+# new subarch (32 bit vs 64 bit).  If we detect the wrong type, we'll force a
+# rebuild.
+existing-cpio-emul := $(shell objdump -f $(kern_cpio_obj) 2> /dev/null | \
+                        grep format | sed 's/.*format //g')
+ifneq ($(existing-cpio-emul),)
+ifneq ($(existing-cpio-emul),$(ld_emulation))
+$(kern_cpio_obj): cpio-rebuild
+cpio-rebuild:
+	$(Q)rm $(kern_cpio_obj)
+endif
+endif
 
-# If no ext2, this will be (empty) : (empty)
+$(kern_cpio_obj): $(kern_cpio)
+	$(Q)$(OBJCOPY) -I binary -B $(ld_arch) -O $(ld_emulation) $< $@
+
+existing-ext2b-emul := $(shell objdump -f $(kern_cpio_obj) 2> /dev/null | \
+                         grep format | sed 's/.*format //g')
+ifneq ($(existing-ext2b-emul),)
+ifneq ($(existing-ext2b-emul),$(ld_emulation))
+$(ext2_bdev_obj): ext2b-rebuild
+ext2b-rebuild:
+	$(Q)rm $(ext2_bdev_obj)
+endif
+endif
+
 $(ext2_bdev_obj): $(ext2-bdev)
-	$(Q)$(OBJCOPY) -I binary -B $(ld_arch) -O $(ld_emulation) $^ $@
+	$(Q)$(OBJCOPY) -I binary -B $(ld_arch) -O $(ld_emulation) $< $@
 
 quiet_cmd_link-akaros = LINK    $@
       cmd_link-akaros = $(LD) -T kern/arch/$(ARCH)/$(KERNEL_LD) -o $@ \
