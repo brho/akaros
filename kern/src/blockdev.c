@@ -34,7 +34,7 @@ void block_init(void)
 	memset(ram_bd, 0, sizeof(struct block_device));
 	ram_bd->b_id = 31337;
 	ram_bd->b_sector_sz = 512;
-	ram_bd->b_nr_sector = (unsigned int)_binary_mnt_ext2fs_img_size / 512;
+	ram_bd->b_nr_sector = (unsigned long)_binary_mnt_ext2fs_img_size / 512;
 	kref_init(&ram_bd->b_kref, fake_release, 1);
 	pm_init(&ram_bd->b_pm, &block_pm_op, ram_bd);
 	ram_bd->b_data = _binary_mnt_ext2fs_img_start;
