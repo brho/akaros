@@ -466,7 +466,7 @@ struct mcs_pdro_lock mcspdro_lock = MCSPDRO_LOCK_INIT;
 #define lock_func(lock_name, lock_cmd, unlock_cmd)                             \
 void *lock_name##_thread(void *arg)                                            \
 {                                                                              \
-	int thread_id = (int)arg;                                                  \
+	long thread_id = (long)arg;                                                \
 	int hold_time = ACCESS_ONCE(pargs.hold_time);                              \
 	int delay_time = ACCESS_ONCE(pargs.delay_time);                            \
 	int nr_loops = ACCESS_ONCE(pargs.nr_loops);                                \
@@ -832,7 +832,7 @@ int main(int argc, char** argv)
 	 * already.  Want to read start before the threads pass their barrier */
 	starttsc = read_tsc();
 	/* create and join on yield */
-	for (int i = 0; i < nr_threads; i++) {
+	for (long i = 0; i < nr_threads; i++) {
 		if (pthread_create(&worker_threads[i], NULL, pargs.lock_type,
 		                   (void*)i))
 			perror("pth_create failed");
