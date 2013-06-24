@@ -111,6 +111,13 @@ _start:
 	ljmp	$0x08, $long_mode
 .code64
 long_mode:
+	# zero the data segments.  Not sure if this is legit or not.
+	xor 	%rax, %rax
+	mov 	%ax, %ds
+	mov 	%ax, %es
+	mov 	%ax, %ss
+	mov 	%ax, %fs
+	mov 	%ax, %gs
 	# paging is on, and our code is still running at 0x00100000.
 	# do some miscellaneous OS setup.  the coreid stuff is so we can call
 	# core_id() before smp_boot. 
@@ -139,6 +146,7 @@ gdt64:
 	SEG_CODE_64(3)		# user code segment
 	SEG_NULL			# these two nulls are a placeholder for the TSS
 	SEG_NULL			# these two nulls are a placeholder for the TSS
+	SEG_DATA_64			# generic flat data segment (debugging for now)
 .globl gdt64desc
 gdt64desc:
 	.word	(gdt64desc - gdt64 - 1)		# sizeof(gdt64) - 1

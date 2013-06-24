@@ -1,7 +1,7 @@
 /* See COPYRIGHT for copyright information.
  * The two TRAP* macros (minus the .data parts) are from the JOS project.
  * Everything else:
- * Copyright (c) 2009 The Regents of the University of California
+ * Copyright (c) 2009, 2013 The Regents of the University of California
  * Barret Rhoden <brho@cs.berkeley.edu>
  * See LICENSE for details.
  */
@@ -32,8 +32,7 @@
 
 /* Use TRAPHANDLER_NOEC for traps where the CPU doesn't push an error code.
  * It pushes a 0 in place of the error code, so the trap frame has the same
- * format in either case.
- */
+ * format in either case.  */
 #define TRAPHANDLER_NOEC(name, num)		\
 	.text;								\
 	.globl name;						\
@@ -59,44 +58,6 @@
 	jmp _allirqs;						\
 	.data;								\
 	.quad name;							\
-	.long num
-
-/* Same as above, but takes a specific function to jump to.  See comments
- * below from _allirqs for details.
- */
-#define IRQ_HANDLER_SPEC(name, num, func)                                      \
-	.text;								                                       \
-	.globl name;						                                       \
-	.type name, @function;				                                       \
-	.align 2;							                                       \
-	name:								                                       \
-	pushq $0;                                                                  \
-	pushq $(num);                                                              \
-	cld;                                                                       \
-	pushq %ds;                                                                 \
-	pushq %es;                                                                 \
-	pushq %fs;                                                                 \
-	pushq %gs;                                                                 \
-	# pushal;                                                                  \
-	movw $0, %ax;                                                              \
-	movw %ax, %gs;                                                             \
-	movw %ax, %fs;                                                             \
-	movw $GD_KD, %ax;                                                          \
-	movw %ax, %ds;                                                             \
-	movw %ax, %es;                                                             \
-	pushq %rsp;                                                                \
-	movq $0, %rbp;                                                             \
-	call (func);                                                               \
-	popq %rsp;                                                                 \
-	# popal;                                                                   \
-	popq %gs;                                                                  \
-	popq %fs;                                                                  \
-	popq %es;                                                                  \
-	popq %ds;                                                                  \
-	addl $0x8, %rsp;                                                           \
-	iret;                                                                      \
-	.data;                                                                     \
-	.quad name;                                                                \
 	.long num
 
 .data
@@ -186,59 +147,93 @@ TRAPHANDLER_NOEC(ISR_default, T_DEFAULT)
 trap_tbl_end:
 
 /* Keep the exit paths of _alltraps, _allirqs, and sysenter_handler in sync
- * with the corrrsponding pop_tf's.
- */
+ * with the corrrsponding pop_tf's.  */
 .text
 _alltraps:
 	cld
-	# pushq %ds
-	# pushq %es
-	pushq %fs
-	pushq %gs
-	# pushal
-	movw $0, %ax;
-	movw %ax, %gs;
-	movw %ax, %fs;
-	movw $GD_KD, %ax		# data segments aren't accessible by default
-	pushq %rsp
+	/* trapno was pushed, taking up 64 bits.  we're using the upper 32 bits */
+	movw %gs, 0x4(%rsp)
+	movw %fs, 0x6(%rsp)
+	pushq %r15
+	pushq %r14
+	pushq %r13
+	pushq %r12
+	pushq %r11
+	pushq %r10
+	pushq %r9
+	pushq %r8
+	pushq %rdi
+	pushq %rsi
+	pushq %rbp
+	pushq %rdx
+	pushq %rcx
+	pushq %rbx
+	pushq %rax
 	movq $0, %rbp			# so we can backtrace to this point
+	movq %rsp, %rdi
 	call trap
-	popq %rsp
-	# popal
-	popq %gs
-	popq %fs
-	# popq %es
-	# popq %ds
-	addq $0x8, %rsp			# skip trapno and err
-	iret
+	popq %rax
+	popq %rbx
+	popq %rcx
+	popq %rdx
+	popq %rbp
+	popq %rsi
+	popq %rdi
+	popq %r8
+	popq %r9
+	popq %r10
+	popq %r11
+	popq %r12
+	popq %r13
+	popq %r14
+	popq %r15
+	movw 0x4(%rsp), %gs
+	movw 0x6(%rsp), %fs
+	addq $0x10, %rsp			# skip gs, fs, trapno, and err
+	iretq
 
-/* will need to think about when we reenable interrupts.  right now, iret does it,
- * if the previous EFLAGS had interrupts enabled
- */
 _allirqs:
 	cld
-	# pushq %ds
-	# pushq %es
-	pushq %fs
-	pushq %gs
-	# pushal
-	movw $0, %ax;
-	movw %ax, %gs;
-	movw %ax, %fs;
-	movw $GD_KD, %ax		# data segments aren't accessible by default
-	movw %ax, %ds
-	movw %ax, %es
-	pushq %rsp
+	/* trapno was pushed, taking up 64 bits.  we're using the upper 32 bits */
+	movw %gs, 0x4(%rsp)
+	movw %fs, 0x6(%rsp)
+	pushq %r15
+	pushq %r14
+	pushq %r13
+	pushq %r12
+	pushq %r11
+	pushq %r10
+	pushq %r9
+	pushq %r8
+	pushq %rdi
+	pushq %rsi
+	pushq %rbp
+	pushq %rdx
+	pushq %rcx
+	pushq %rbx
+	pushq %rax
 	movq $0, %rbp			# so we can backtrace to this point
+	movq %rsp, %rdi
 	call irq_handler
-	popq %rsp
-	# popal
-	popq %gs
-	popq %fs
-	# popq %es
-	# popq %ds
-	addq $0x8, %rsp			# skip IRQ number and err (which is 0)
-	iret
+	popq %rax
+	popq %rbx
+	popq %rcx
+	popq %rdx
+	popq %rbp
+	popq %rsi
+	popq %rdi
+	popq %r8
+	popq %r9
+	popq %r10
+	popq %r11
+	popq %r12
+	popq %r13
+	popq %r14
+	popq %r15
+	movw 0x4(%rsp), %gs
+	movw 0x6(%rsp), %fs
+	addq $0x10, %rsp			# skip gs, fs, trapno, and err (which is 0)
+	iretq
 
 .globl sysenter_handler;
 .type sysenter_handler, @function;

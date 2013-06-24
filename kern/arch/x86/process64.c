@@ -71,8 +71,8 @@ void proc_pop_ctx(struct user_context *ctx)
 		 * so that we have a chance to change esp to a good value before
 		 * interrupts are enabled.  The other option would be to throw away the
 		 * eflags, but that's less desirable. */
-		tf->tf_eflags &= !FL_IF;
-		tf->tf_esp = read_sp();
+		tf->tf_rflags &= !FL_IF;
+		tf->tf_rsp = read_sp();
 //		asm volatile ("movl %0,%%esp;           "
 //		              "popal;                   "
 //		              "popl %%gs;               "
@@ -104,19 +104,17 @@ void proc_init_ctx(struct user_context *ctx, uint32_t vcoreid, uintptr_t entryp,
 	 * GD_UT is the user text segment selector (see inc/memlayout.h).
 	 * The low 2 bits of each segment register contains the
 	 * Requestor Privilege Level (RPL); 3 means user mode. */
-	tf->tf_ds = GD_UD | 3;
-	tf->tf_es = GD_UD | 3;
 	tf->tf_ss = GD_UD | 3;
-	tf->tf_esp = stack_top-64;
+	tf->tf_rsp = stack_top-64;
 	tf->tf_cs = GD_UT | 3;
 	/* set the env's EFLAGSs to have interrupts enabled */
-	tf->tf_eflags |= 0x00000200; // bit 9 is the interrupts-enabled
+	tf->tf_rflags |= 0x00000200; // bit 9 is the interrupts-enabled
 
-	tf->tf_eip = entryp;
+	tf->tf_rip = entryp;
 
 	/* Coupled closely with user's entry.S.  id is the vcoreid, which entry.S
 	 * uses to determine what to do.  vcoreid == 0 is the main core/context. */
-	tf->tf_regs.reg_eax = vcoreid;
+	tf->tf_rax = vcoreid;
 }
 
 /* TODO: handle both HW and SW contexts */
@@ -129,13 +127,11 @@ void proc_secure_ctx(struct user_context *ctx)
 	 * necessarily know what it ought to be (we could check, but that's a pain).
 	 * the code protecting the kernel from TLS related things ought to be able
 	 * to handle GPFs on popping gs. TODO: (TLSV) */
-	tf->tf_ds = GD_UD | 3;
-	tf->tf_es = GD_UD | 3;
-	tf->tf_fs = 0;
+	//tf->tf_fs = 0;
 	//tf->tf_gs = whatevs.  ignoring this.
 	tf->tf_ss = GD_UD | 3;
 	tf->tf_cs ? GD_UT | 3 : 0; // can be 0 for sysenter TFs.
-	tf->tf_eflags |= 0x00000200; // bit 9 is the interrupts-enabled
+	tf->tf_rflags |= 0x00000200; // bit 9 is the interrupts-enabled
 }
 
 /* Called when we are currently running an address space on our core and want to

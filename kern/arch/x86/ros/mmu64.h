@@ -433,7 +433,7 @@ typedef struct taskstate {
 	uint64_t					ts_rsv3;	/* reserved / ignored */
 	uint16_t					ts_rsv4;	/* reserved / ignored */
 	uint16_t					ts_iobm;	/* IO base map (offset) */
-} taskstate_t;
+} __attribute__((packed)) taskstate_t;
 
 /* 64 bit gate descriptors for interrupts and traps */
 typedef struct Gatedesc {
@@ -504,7 +504,7 @@ typedef struct Pseudodesc {
 #define STS_IG32	0xE		/* 64-bit Interrupt Gate */
 #define STS_TG32	0xF		/* 64-bit Trap Gate */
 
-#define SEG_COUNT	5 		/* Number of GDT segments */
+#define SEG_COUNT	6 		/* Number of GDT segments */
 /* TODO: Probably won't use this */
 #define LDT_SIZE	(8192 * sizeof(segdesc_t))
 

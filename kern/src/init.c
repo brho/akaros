@@ -79,7 +79,12 @@ void kernel_init(multiboot_info_t *mboot_info)
 	vfs_init();
 	devfs_init();
 	idt_init();
-
+	kernel_msg_init();
+	sysenter_init();
+	timer_init();
+	train_timing();
+	kb_buf_init(&cons_buf);
+	
 #ifdef CONFIG_X86_64
 monitor(0);
 printk("Halting/spinning...\n");
@@ -87,12 +92,6 @@ while (1)
 	asm volatile("hlt");
 #endif
 
-	kernel_msg_init();
-	sysenter_init();
-	timer_init();
-	train_timing();
-	kb_buf_init(&cons_buf);
-	
 	arch_init();
 	block_init();
 	enable_irq();

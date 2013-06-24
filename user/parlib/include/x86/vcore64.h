@@ -70,6 +70,7 @@ extern struct syscall vc_entry;	/* in x86/vcore.c */
 
 static inline void pop_hw_tf(struct hw_trapframe *tf, uint32_t vcoreid)
 {
+	#if 0
 	struct restart_helper *rst;
 	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
 	if (!tf->tf_cs) { /* sysenter TF.  esp and eip are in other regs. */
@@ -87,7 +88,6 @@ static inline void pop_hw_tf(struct hw_trapframe *tf, uint32_t vcoreid)
 	rst->eflags = tf->tf_eflags;
 	rst->eip = tf->tf_eip;
 
-	#if 0
 	asm volatile ("movl %0,%%esp;        " /* jump esp to the utf */
 	              "popal;                " /* restore normal registers */
 	              "addl $0x24,%%esp;     " /* move to the esp slot in the tf */
@@ -202,6 +202,7 @@ static inline void pop_user_ctx(struct user_context *ctx, uint32_t vcoreid)
  * interrupts a uthread that is in the process of disabling notifs. */
 static inline void pop_user_ctx_raw(struct user_context *ctx, uint32_t vcoreid)
 {
+	#if 0
 	struct hw_trapframe *tf = &ctx->tf.hw_tf;
 	assert(ctx->type == ROS_HW_CTX);
 	struct restart_helper *rst;
@@ -219,7 +220,6 @@ static inline void pop_user_ctx_raw(struct user_context *ctx, uint32_t vcoreid)
 	rst->eflags = tf->tf_eflags;
 	rst->eip = tf->tf_eip;
 
-	#if 0
 	asm volatile ("movl %0,%%esp;        " /* jump esp to the utf */
 	              "popal;                " /* restore normal registers */
 	              "addl $0x24,%%esp;     " /* move to the esp slot in the tf */
@@ -313,6 +313,7 @@ static inline void save_user_ctx_hw(struct user_context *ctx)
 static inline void init_user_ctx(struct user_context *ctx, uint32_t entry_pt,
                                  uint32_t stack_top)
 {
+	#if 0
 	struct sw_trapframe *sw_tf = &ctx->tf.sw_tf;
 	ctx->type = ROS_SW_CTX;
 	/* No need to bother with setting the other GP registers; the called
@@ -321,6 +322,7 @@ static inline void init_user_ctx(struct user_context *ctx, uint32_t entry_pt,
 	sw_tf->tf_eip = entry_pt;
 	sw_tf->tf_mxcsr = 0x00001f80;	/* x86 default mxcsr */
 	sw_tf->tf_fpucw = 0x037f;		/* x86 default FP CW */
+	#endif
 }
 
 // this is how we get our thread id on entry.
@@ -334,6 +336,7 @@ static inline void init_user_ctx(struct user_context *ctx, uint32_t entry_pt,
 #include <stdio.h>
 static void print_hw_tf(struct hw_trapframe *tf)
 {
+	#if 0
 	printf("[user] HW TRAP frame %08p\n", tf);
 	printf("  edi  0x%08x\n", tf->tf_regs.reg_edi);
 	printf("  esi  0x%08x\n", tf->tf_regs.reg_esi);
@@ -354,10 +357,12 @@ static void print_hw_tf(struct hw_trapframe *tf)
 	printf("  flag 0x%08x\n", tf->tf_eflags);
 	printf("  esp  0x%08x\n", tf->tf_esp);
 	printf("  ss   0x----%04x\n", tf->tf_ss);
+	#endif
 }
 
 static void print_sw_tf(struct sw_trapframe *sw_tf)
 {
+	#if 0
 	printf("[user] SW TRAP frame %08p\n", sw_tf);
 	printf("  ebp  0x%08x\n", sw_tf->tf_ebp);
 	printf("  ebx  0x%08x\n", sw_tf->tf_ebx);
@@ -367,6 +372,7 @@ static void print_sw_tf(struct sw_trapframe *sw_tf)
 	printf("  eip  0x%08x\n", sw_tf->tf_eip);
 	printf(" mxcsr 0x%08x\n", sw_tf->tf_mxcsr);
 	printf(" fpucw 0x----%04x\n", sw_tf->tf_fpucw);
+	#endif
 }
 
 static void print_user_context(struct user_context *ctx)

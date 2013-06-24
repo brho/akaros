@@ -45,18 +45,6 @@ void pop_kernel_ctx(struct kernel_ctx *ctx)
 	panic("ret failed");
 }
 
-static void print_regs(push_regs_t *regs)
-{
-	printk("  edi  0x%08x\n", regs->reg_edi);
-	printk("  esi  0x%08x\n", regs->reg_esi);
-	printk("  ebp  0x%08x\n", regs->reg_ebp);
-	printk("  oesp 0x%08x\n", regs->reg_oesp);
-	printk("  ebx  0x%08x\n", regs->reg_ebx);
-	printk("  edx  0x%08x\n", regs->reg_edx);
-	printk("  ecx  0x%08x\n", regs->reg_ecx);
-	printk("  eax  0x%08x\n", regs->reg_eax);
-}
-
 void print_trapframe(struct hw_trapframe *hw_tf)
 {
 	static spinlock_t ptf_lock = SPINLOCK_INITIALIZER_IRQSAVE;
@@ -68,22 +56,31 @@ void print_trapframe(struct hw_trapframe *hw_tf)
 	pcpui->__lock_depth_disabled++;
 	spin_lock_irqsave(&ptf_lock);
 	printk("TRAP frame at %p on core %d\n", hw_tf, core_id());
-	print_regs(&hw_tf->tf_regs);
-	printk("  gs   0x----%04x\n", hw_tf->tf_gs);
-	printk("  fs   0x----%04x\n", hw_tf->tf_fs);
-	printk("  es   0x----%04x\n", hw_tf->tf_es);
-	printk("  ds   0x----%04x\n", hw_tf->tf_ds);
-	printk("  trap 0x%08x %s\n",  hw_tf->tf_trapno,
-	                              x86_trapname(hw_tf->tf_trapno));
-	printk("  err  0x%08x\n",     hw_tf->tf_err);
-	printk("  eip  0x%08x\n",     hw_tf->tf_eip);
-	printk("  cs   0x----%04x\n", hw_tf->tf_cs);
-	printk("  flag 0x%08x\n",     hw_tf->tf_eflags);
-	/* Prevents us from thinking these mean something for nested interrupts. */
-	if (hw_tf->tf_cs != GD_KT) {
-		printk("  esp  0x%08x\n",     hw_tf->tf_esp);
-		printk("  ss   0x----%04x\n", hw_tf->tf_ss);
-	}
+	printk("  rax  0x%016lx\n",           hw_tf->tf_rax);
+	printk("  rbx  0x%016lx\n",           hw_tf->tf_rbx);
+	printk("  rcx  0x%016lx\n",           hw_tf->tf_rcx);
+	printk("  rdx  0x%016lx\n",           hw_tf->tf_rdx);
+	printk("  rbp  0x%016lx\n",           hw_tf->tf_rbp);
+	printk("  rsi  0x%016lx\n",           hw_tf->tf_rsi);
+	printk("  rdi  0x%016lx\n",           hw_tf->tf_rdi);
+	printk("  r8   0x%016lx\n",           hw_tf->tf_r8);
+	printk("  r9   0x%016lx\n",           hw_tf->tf_r9);
+	printk("  r10  0x%016lx\n",           hw_tf->tf_r10);
+	printk("  r11  0x%016lx\n",           hw_tf->tf_r11);
+	printk("  r12  0x%016lx\n",           hw_tf->tf_r12);
+	printk("  r13  0x%016lx\n",           hw_tf->tf_r13);
+	printk("  r14  0x%016lx\n",           hw_tf->tf_r14);
+	printk("  r15  0x%016lx\n",           hw_tf->tf_r15);
+	printk("  trap 0x%08x %s\n",          hw_tf->tf_trapno,
+	                                      x86_trapname(hw_tf->tf_trapno));
+	printk("  gs   0x%04x\n",             hw_tf->tf_gs);
+	printk("  fs   0x%04x\n",             hw_tf->tf_fs);
+	printk("  err  0x--------%08x\n",     hw_tf->tf_err);
+	printk("  rip  0x%016lx\n",           hw_tf->tf_rip);
+	printk("  cs   0x------------%04x\n", hw_tf->tf_cs);
+	printk("  flag 0x%016lx\n",           hw_tf->tf_rflags);
+	printk("  rsp  0x%016lx\n",           hw_tf->tf_rsp);
+	printk("  ss   0x------------%04x\n", hw_tf->tf_ss);
 	spin_unlock_irqsave(&ptf_lock);
 	pcpui->__lock_depth_disabled--;
 }
@@ -108,15 +105,15 @@ void page_fault_handler(struct hw_trapframe *hw_tf)
 		/* Destroy the faulting process */
 		printk("[%08x] user %s fault va %08x ip %08x on core %d with err %d\n",
 		       current->pid, prot & PROT_READ ? "READ" : "WRITE", fault_va,
-		       hw_tf->tf_eip, core_id(), err);
+		       hw_tf->tf_rip, core_id(), err);
 		print_trapframe(hw_tf);
 		/* Turn this on to help debug bad function pointers */
-		printd("esp %p\n\t 0(esp): %p\n\t 4(esp): %p\n\t 8(esp): %p\n"
-		       "\t12(esp): %p\n", hw_tf->tf_esp,
-		       *(uintptr_t*)(hw_tf->tf_esp +  0),
-		       *(uintptr_t*)(hw_tf->tf_esp +  4),
-		       *(uintptr_t*)(hw_tf->tf_esp +  8),
-		       *(uintptr_t*)(hw_tf->tf_esp + 12));
+		printd("rsp %p\n\t 0(rsp): %p\n\t 8(rsp): %p\n\t 16(rsp): %p\n"
+		       "\t24(rsp): %p\n", hw_tf->tf_rsp,
+		       *(uintptr_t*)(hw_tf->tf_rsp +  0),
+		       *(uintptr_t*)(hw_tf->tf_rsp +  8),
+		       *(uintptr_t*)(hw_tf->tf_rsp + 16),
+		       *(uintptr_t*)(hw_tf->tf_rsp + 24));
 		proc_destroy(current);
 	}
 }
