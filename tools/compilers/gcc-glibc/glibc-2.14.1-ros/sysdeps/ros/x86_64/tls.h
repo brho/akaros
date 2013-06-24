@@ -429,6 +429,8 @@ static inline void *__get_tls_desc(uint32_t vcoreid)
 /* passing in the vcoreid, since it'll be in TLS of the caller */
 static inline void __set_tls_desc(void *tls_desc, uint32_t vcoreid)
 {
+/* Pending rewrite / redesign of 64 bit TLS */
+#if 0
 	/* Keep this technique in sync with sysdeps/ros/i386/tls.h */
 	segdesc_t tmp = SEG(STA_W, (uint64_t)tls_desc, 0xffffffff, 3);
 	__procdata.ldt[vcoreid] = tmp;
@@ -437,6 +439,7 @@ static inline void __set_tls_desc(void *tls_desc, uint32_t vcoreid)
 	 * re-read of the LDT. */
 	uint32_t fs = (vcoreid << 3) | 0x07;
 	asm volatile("movl %0,%%fs" : : "r" (fs) : "memory");
+#endif
 }
 
 static const char* tls_init_tp(void* thrdescr)
@@ -451,6 +454,8 @@ static const char* tls_init_tp(void* thrdescr)
   // rthreads struct that we manually fill in in _start(). 
   int core_id = __ros_syscall(SYS_getvcoreid, 0, 0, 0, 0, 0, 0, NULL);
 
+/* Pending rewrite / redesign of 64 bit TLS */
+#if 0
   /* Bug with this whole idea (TODO: (TLSV))*/
   if(__procdata.ldt == NULL)
   {
@@ -468,6 +473,7 @@ static const char* tls_init_tp(void* thrdescr)
     // force kernel crossing
 	__ros_syscall(SYS_getpid, 0, 0, 0, 0, 0, 0, NULL);
   }
+#endif
 
   __set_tls_desc(thrdescr, core_id);
   return NULL;
