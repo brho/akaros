@@ -21,6 +21,7 @@
 #include <assert.h>
 #include <page_alloc.h>
 #include <multiboot.h>
+#include <arch/pmap.h>
 
 /* This macro takes a kernel virtual address -- an address that points above
  * KERNBASE, where the machine's maximum 256MB of physical memory is mapped --
@@ -84,7 +85,6 @@ page_t*COUNT(1) page_lookup(pde_t SSOMELOCK*COUNT(NPDENTRIES) pgdir, void *SNT v
 error_t	pagetable_remove(pde_t *COUNT(NPDENTRIES) pgdir, void *SNT va);
 void	page_decref(page_t *COUNT(1) pp);
 
-void setup_default_mtrrs(barrier_t* smp_barrier);
 void	tlb_invalidate(pde_t *COUNT(NPDENTRIES) pgdir, void *SNT va);
 void tlb_flush_global(void);
 bool regions_collide_unsafe(uintptr_t start1, uintptr_t end1, 

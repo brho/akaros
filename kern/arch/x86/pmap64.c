@@ -35,7 +35,7 @@ extern char boot_pml4[], gdt64[], gdt64desc[];
 pde_t *boot_pgdir;
 physaddr_t boot_cr3;
 segdesc_t *gdt;
-pseudodesc_t *gdt_pd;
+pseudodesc_t gdt_pd;
 
 #define PG_WALK_SHIFT_MASK		0x00ff 		/* first byte = target shift */
 #define PG_WALK_CREATE 			0x0100
@@ -47,6 +47,7 @@ typedef int (*pte_cb_t)(pte_t *pte, uintptr_t kva, int pml_shift,
                         bool visited_subs, void *arg);
 int pml_for_each(pte_t *pml, uintptr_t start, size_t len, pte_cb_t callback,
                  void *arg);
+int unmap_segment(pde_t *pgdir, uintptr_t va, size_t size);
 
 /* Helper: returns true if we do not need to walk the page table any further.
  *
@@ -318,6 +319,36 @@ int pml_for_each(pte_t *pml, uintptr_t start, size_t len, pte_cb_t callback,
 	return __pml_for_each(pml, start, len, callback, arg, PML4_SHIFT);
 }
 
+/* Unmaps [va, va + size) from pgdir, freeing any intermediate page tables.
+ * This does not free the actual memory pointed to by the page tables, nor does
+ * it flush the TLB. */
+int unmap_segment(pde_t *pgdir, uintptr_t va, size_t size)
+{
+	int pt_free_cb(pte_t *pte, uintptr_t kva, int shift, bool visited_subs,
+	               void *data)
+	{
+		if ((shift == PML1_SHIFT) || (*pte * PTE_PS)) {
+			*pte = 0;	/* helps with debugging */
+			return 0;
+		}
+		/* If we haven't visited all of our subs, we might still have some
+		 * mappings hanging our this page table. */
+		if (!visited_subs) {
+			pte_t *pte_i = pte2pml(*pte);	/* first pte == pml */
+			/* make sure we have no PTEs in use */
+			for (int i = 0; i < NPTENTRIES; i++, pte_i++) {
+				if (*pte_i & PTE_P)
+					return 0;
+			}
+		}
+		page_decref(ppn2page(LA2PPN(pte)));
+		*pte = 0;
+		return 0;
+	}
+
+	return pml_for_each(pgdir, va, size, pt_free_cb, 0);
+}
+
 /* Older interface for page table walks - will return the PTE corresponding to
  * VA.  If create is 1, it'll create intermediate tables.  This can return jumbo
  * PTEs, but only if they already exist.  Otherwise, (with create), it'll walk
@@ -388,7 +419,6 @@ void vm_init(void)
 	boot_cr3 = (physaddr_t)boot_pml4;
 	boot_pgdir = KADDR((uintptr_t)boot_pml4);
 	gdt = KADDR((uintptr_t)gdt64);
-	gdt_pd = KADDR((uintptr_t)gdt64desc);
 
 	check_syms_va();
 	/* KERNBASE mapping: we already have 512 GB complete (one full PML3_REACH).
@@ -410,6 +440,18 @@ void vm_init(void)
 	boot_pgdir[PDX(UVPT)] = PADDR(boot_pgdir) | PTE_U | PTE_P | PTE_G;
 	/* set up core0s now (mostly for debugging) */
 	setup_default_mtrrs(0);
+	/* Our current gdt_pd (gdt64desc) is pointing to a physical address for the
+	 * GDT.  We need to switch over to pointing to one with a virtual address,
+	 * so we can later unmap the low memory */
+	gdt_pd = (pseudodesc_t) {sizeof(segdesc_t) * SEG_COUNT - 1,
+	                         (uintptr_t)gdt};
+	asm volatile("lgdt %0" : : "m"(gdt_pd));
+}
+
+void x86_cleanup_bootmem(void)
+{
+	unmap_segment(boot_pgdir, 0, PML3_PTE_REACH);
+	tlbflush();
 }
 
 /* Walks len bytes from start, executing 'callback' on every PTE, passing it a
@@ -471,22 +513,7 @@ void env_pagetable_free(struct proc *p)
  * powerful.  We'll eventually want better arch-indep VM functions. */
 error_t	pagetable_remove(pde_t *pgdir, void *va)
 {
-	int pt_maybe_free_cb(pte_t *pte, uintptr_t kva, int shift,
-	                     bool visited_subs, void *data)
-	{
-		if ((shift == PML1_SHIFT) || (*pte * PTE_PS))
-			return 0;
-		pte_t *pte_i = pte2pml(*pte);	/* first pte == pml */
-		/* make sure we have no PTEs in use */
-		for (int i = 0; i < NPTENTRIES; i++, pte_i++) {
-			if (*pte_i & PTE_P)
-				return 0;
-		}
-		page_decref(ppn2page(LA2PPN(pte)));
-		return 0;
-	}
-
-	return pml_for_each(pgdir, (uintptr_t)va, PGSIZE, pt_maybe_free_cb, 0);
+	return unmap_segment(pgdir, (uintptr_t)va, PGSIZE);
 }
 
 void page_check(void)
@@ -507,8 +534,8 @@ static int print_pte(pte_t *pte, uintptr_t kva, int shift, bool visited_subs,
 		case (PML3_SHIFT):
 			printk("\t");
 	}
-	printk("KVA: %p, PTE val %p, shift %d, visit %d\n", kva, *pte, shift,
-	       visited_subs);
+	printk("KVA: %p, PTE val %p, shift %d, visit %d%s\n", kva, *pte, shift,
+	       visited_subs, (*pte & PTE_PS ? " (jumbo)" : ""));
 	return 0;
 }
 

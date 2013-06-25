@@ -278,6 +278,15 @@ vm_init(void)
 	tlb_flush_global();
 }
 
+void x86_cleanup_bootmem(void)
+{
+	#define trampoline_pg 0x00001000UL
+	// Remove the mapping of the page used by the trampoline
+	page_remove(boot_pgdir, (void*)trampoline_pg);
+	// Remove the page table used for that mapping
+	pagetable_remove(boot_pgdir, (void*)trampoline_pg);
+}
+
 //
 // Checks that the kernel part of virtual address space
 // has been setup roughly correctly(by i386_vm_init()).
