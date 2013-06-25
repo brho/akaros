@@ -132,9 +132,10 @@ void idt_init(void)
 	idt[T_SYSCALL].gd_type = SINIT(STS_IG32);
 	idt[T_BRKPT].gd_dpl = SINIT(3);
 
-	/* Setup a TSS so that we get the right stack when we trap to the kernel. */
+	/* Set up our kernel stack when changing rings */
 	/* Note: we want 16 byte aligned kernel stack frames (AMD 2:8.9.3) */
 	x86_set_stacktop_tss(&ts, (uintptr_t)bootstacktop);
+	x86_sysenter_init((uintptr_t)bootstacktop);
 
 #ifdef CONFIG_KTHREAD_POISON
 	/* TODO: KTHR-STACK */

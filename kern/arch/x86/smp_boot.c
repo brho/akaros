@@ -232,20 +232,15 @@ uint32_t smp_main(void)
 	 * we use the bottom of the stack page... */
 	*(uintptr_t*)page2kva(my_stack) = (uintptr_t)gdt_etc;
 
-	/* TODO: 64b is diff, use a helper */
-	// Set up MSR for SYSENTER 
-	write_msr(MSR_IA32_SYSENTER_CS, GD_KT);
-	write_msr(MSR_IA32_SYSENTER_ESP, my_stack_top);
-	write_msr(MSR_IA32_SYSENTER_EIP, (uintptr_t) &sysenter_handler);
-
 	// Build and load the gdt / gdt_pd
 	memcpy(my_gdt, gdt, sizeof(segdesc_t)*SEG_COUNT);
 	*my_gdt_pd = (pseudodesc_t) {
 		sizeof(segdesc_t)*SEG_COUNT - 1, (uintptr_t) my_gdt };
 	asm volatile("lgdt %0" : : "m"(*my_gdt_pd));
 
-	// Need to set the TSS so we know where to trap on this core
+	/* Set up our kernel stack when changing rings */
 	x86_set_stacktop_tss(my_ts, my_stack_top);
+	x86_sysenter_init(my_stack_top);
 	// Initialize the TSS field of my_gdt.
 	syssegdesc_t *ts_slot = (syssegdesc_t*)&my_gdt[GD_TSS >> 3];
 	*ts_slot = (syssegdesc_t)SEG_SYS_SMALL(STS_T32A, (uintptr_t)my_ts,

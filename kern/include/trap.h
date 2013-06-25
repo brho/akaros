@@ -43,9 +43,6 @@ void page_fault_handler(struct hw_trapframe *hw_tf);
 void set_core_timer(uint32_t usec, bool periodic);
 void timer_interrupt(struct hw_trapframe *hw_tf, void *data);
 
-void sysenter_init(void);
-extern void sysenter_handler();
-
 extern inline void save_fp_state(struct ancillary_state *silly);
 extern inline void restore_fp_state(struct ancillary_state *silly);
 extern inline void init_fp_state(void);

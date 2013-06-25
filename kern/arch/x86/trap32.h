@@ -58,6 +58,13 @@ static inline void x86_fake_rdtscp(struct hw_trapframe *hw_tf)
 	hw_tf->tf_regs.reg_ecx = core_id();
 }
 
+static inline void x86_sysenter_init(uintptr_t stacktop)
+{
+	write_msr(MSR_IA32_SYSENTER_CS, GD_KT);
+	write_msr(MSR_IA32_SYSENTER_ESP, stacktop);
+	write_msr(MSR_IA32_SYSENTER_EIP, (uintptr_t) &sysenter_handler);
+}
+
 static inline void x86_set_sysenter_stacktop(uintptr_t stacktop)
 {
 	write_msr(MSR_IA32_SYSENTER_ESP, stacktop);

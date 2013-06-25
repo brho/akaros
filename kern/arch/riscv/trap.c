@@ -53,11 +53,6 @@ idt_init(void)
 {
 }
 
-void
-sysenter_init(void)
-{
-}
-
 /* Helper.  For now, this copies out the TF to pcpui, and sets cur_ctx to point
  * to it. */
 static void set_current_ctx_hw(struct per_cpu_info *pcpui,
