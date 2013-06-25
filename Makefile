@@ -544,14 +544,14 @@ PHONY += fill-kfs unfill-kfs
 XCC_SO_FILES = $(addprefix $(XCC_TARGET_ROOT)/lib/, *.so*)
 
 $(OBJDIR)/.dont-force-fill-kfs:
-	@rm -rf $(addprefix  $(FIRST_KFS_PATH)/lib, $(notdir $(XCC_SO_FILES)))
+	$(Q)rm -rf $(addprefix $(FIRST_KFS_PATH)/lib/, $(notdir $(XCC_SO_FILES)))
 	@echo "Cross Compiler 'so' files removed from KFS"
 	@$(MAKE) -f tests/Makefile unfill-kfs
 	@touch $(OBJDIR)/.dont-force-fill-kfs
 
 fill-kfs: $(OBJDIR)/.dont-force-fill-kfs install-libs
 	@mkdir -p $(FIRST_KFS_PATH)/lib
-	@cp -uP  $(XCC_SO_FILES) $(FIRST_KFS_PATH)/lib
+	$(Q)cp -uP $(XCC_SO_FILES) $(FIRST_KFS_PATH)/lib
 	@echo "Cross Compiler 'so' files installed to KFS"
 	@$(MAKE) -f tests/Makefile fill-kfs
 

@@ -54,7 +54,7 @@ fill-kfs: $(TESTS_EXECS)
 	@echo "User space tests installed to KFS"
 
 unfill-kfs:
-	$(Q)rm -rf $(addprefix  $(FIRST_KFS_PATH)/bin, $(notdir $(TESTS_EXECS)))
+	$(Q)rm -rf $(addprefix $(FIRST_KFS_PATH)/bin/, $(notdir $(TESTS_EXECS)))
 	@echo "User space tests removed from KFS"
 
 clean:
