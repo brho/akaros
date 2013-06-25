@@ -88,6 +88,9 @@ here:
 	sti                     # so we can get the IPI
 	hlt                     # wait for the IPI to run smp_pcu_init()
 	call 	smp_idle 		# idle loop, will have interrupts turned on
+	# smp_idle should never return
+spin:
+	jmp spin
 
 	# Below here is just data, stored with the code text
 	.p2align	2						# force 4 byte alignment

@@ -1,6 +1,7 @@
 #include <arch/mmu.h>
 #include <ros/memlayout.h>
 #include <arch/trap.h>
+#include <arch/x86.h>
 
 #define	RELOC(x) ((x) - KERNBASE)
 #define	CPUID_PSE_SUPPORT	0x00000008
@@ -15,7 +16,6 @@ spin_start:						# grab lock in real mode
 	xchgw	%ax, smp_boot_lock - smp_entry + 0x1000
 	test	%ax, %ax
 	jne		spin_start
-
 	# Set up rudimentary segmentation
 	xorw	%ax, %ax			# Segment number zero
 	movw	%ax, %ds			# -> Data Segment
@@ -24,15 +24,12 @@ spin_start:						# grab lock in real mode
 	# Would like to patch all of these 0x1000's at trampoline relocation time
 	# There's three of them, so we could patch the trampoline code when we load,
 	# once we're sure the entry code will not change anymore
-	# Note that this GDT is straight through, with no KERNBASE translation
 	lgdt	gdtdesc - smp_entry + 0x1000
-
 	# Turn on protected mode
 	movl	%cr0, %eax
 	orl		$CR0_PE, %eax
 	movl	%eax, %cr0
 	ljmp	$GD_KT, $(protcseg - smp_entry + 0x1000)
-	
 .code32
 protcseg:
 	# Set up the protected-mode data segment registers
@@ -42,70 +39,67 @@ protcseg:
 	movw	%ax, %ss		# -> SS: Stack Segment
 	movw	%ax, %fs		# -> FS
 	movw	%ax, %gs		# -> GS
-
-	# Turn on Paging
-	# crap, how do we sort out the relocs such that this is reachable from 32
-	# bit code?  need to put these in a magic location?
-	# XXX movl	RELOC(boot_cr3), %eax
+	# Turn on Paging.  We're using the symbol from entry64, which we'll have no
+	# problem linking against (compared to boot_cr3).  this assumes we use the
+	# boot stuff at least through smp_boot.
+	movl	$boot_pml4, %eax
 	movl	%eax, %cr3
-	# Enable PSE, if available
-	movl	$1, %eax
-	cpuid
-	test	$CPUID_PSE_SUPPORT, %edx
-	jz		past_pse
+	# turn on paging option in cr4.  note we assume PSE support.  if we didn't
+	# have it, then our jumbo page mappings are going to fail.  we also want
+	# global pages (for performance).  PAE is the basics needed for long paging
 	movl	%cr4, %eax
-	orl		$CR4_PSE, %eax
+	orl		$(CR4_PSE | CR4_PGE | CR4_PAE), %eax
 	movl	%eax, %cr4
-past_pse:
-	# Turn on PGE, no matter what.  Ghetto, but we panic if it's not supported.
-	movl	%cr4, %eax
-	orl		$CR4_PGE, %eax
-	movl	%eax, %cr4
-	movl	%cr0, %eax	
-	# These cr0 flags are the same as in pmap.c.  Keep them in sync
-	orl		$(CR0_PE|CR0_PG|CR0_AM|CR0_WP|CR0_NE|CR0_MP), %eax  
-	andl	$(~(CR0_TS|CR0_EM|CR0_CD|CR0_NW)), %eax  
+	# Turn on the IA32E enabled bit.
+	# rd/wrmsr use ecx for the addr, and eax as the in/out register.
+	movl	$IA32_EFER_MSR, %ecx
+	rdmsr
+	orl		$IA32_EFER_IA32E_EN, %eax
+	wrmsr
+	# Setup cr0.  PE and PG are critical for now.  The others are similar to
+	# what we want in general (-AM with 64 bit, it's useless).
+	movl	%cr0, %eax
+	orl		$(CR0_PE | CR0_PG | CR0_WP | CR0_NE | CR0_MP), %eax  
+	andl	$(~(CR0_AM | CR0_TS | CR0_EM | CR0_CD | CR0_NW)), %eax  
 	movl	%eax, %cr0
-
-	# Reload Segments, using the same gdt_pd as Core 0
-	# XXX lgdt	gdt_pd
-	movw	$GD_KD, %ax		# Kernel segment selector
-	movw	%ax, %ds		# -> DS: Data Segment
-	movw	%ax, %es		# -> ES: Extra Segment
-	movw	%ax, %ss		# -> SS: Stack Segment
-	movw	$GD_UD|3, %ax	# User segment selector, with RPL=3
-	movw	%ax, %fs		# -> FS
-	movw	%ax, %gs		# -> GS
-	# TODO: this reloc is mucking up.  it assembles for 32 bit okay, but if you asm
-	# for 64 bit, or if you objcopy ther 32 to 64, it can't find 'here'.  tried
-	# other names too.  is it because the linker doesn't know where smp entry
-	# is going to be, or that it later becomes a 64 bit reloc (unlike in
-	# _start, where we know it is linked for low mem).  Subtracting them gives
-	# the linker the ability to do the math now. (don't forget you can't trust
-	# the disassembly when the format doesn't match the code type)
-	# 
-	# we're going to have issues with all of the relocs like that - trying to
-	# find 64 bit addresses in 32 bit code.  for all of the external ones,
-	# we're going to need to either put the memory in here, so we don't need to
-	# reloc, or do it after we turn on 64b mode
-
-
-	# ljmp	$GD_KT, $(here)	# jumping to original location of trampoline!
-	ljmp	$GD_KT, $(here - smp_entry + 0x1000)
-here:
-	xorl	%eax, %eax
+	# load the 64bit GDT and jump to long mode (symbol from entry64)
+	lgdt	gdt64desc
+	# Want to jump to the label long_mode, but we need to relocate to code
+	# reachable by 32 bit code: on our trampoline page.
+	ljmp	$0x08, $(long_mode - smp_entry + 0x1000)
+.code64
+long_mode:
+	# Note: we are still running code on the trampoline
+	# zero the data segments.  Not sure if this is legit or not.
+	xor		%rax, %rax
+	mov		%ax, %ds
+	mov		%ax, %es
+	mov		%ax, %ss
+	mov		%ax, %fs
+	mov		%ax, %gs
 	lldt	%ax
-	# XXX incl	num_cpus
-	# XXX movl	(smp_stack_top), %esp
-	movl	$0, %ebp		# so backtrace works
+	incl	num_cpus		# uint32_t
+	movq	(smp_stack_top), %rsp
+	movq	$0, %rbp		# so backtrace works
+	# We're on the trampoline, but want to be in the real location of the smp
+	# code (somewhere above KERN_LOAD_ADDR).  This allows us to easily unmap
+	# the boot up memory, which the trampoline is part of.
+	movabs	$(non_trampoline), %rax
+	call	*%rax
+non_trampoline:
 	call	smp_main
-	movl	%eax, %esp		# use our new stack, value returned from smp_main
-	# note the next two lines are using the direct mapping from smp_boot()
+	movq	%rax, %rsp		# use our new stack, value returned from smp_main
+	# note the next two lines are using the direct mapping from smp_boot().
+	# Remember, the stuff at 0x1000 is a *copy* of the code and data at
+	# KERN_LOAD_ADDR.
 	movw	$0, smp_boot_lock - smp_entry + 0x1000 	# release lock
 	lock decw	smp_semaphore - smp_entry + 0x1000  # show we are done
 	sti                     # so we can get the IPI
 	hlt                     # wait for the IPI to run smp_pcu_init()
-	call 	smp_idle 		# idle loop, will have interrupts turned on
+	call 	smp_idle		# idle loop, will have interrupts turned on
+	# smp_idle should never return
+spin:
+	jmp spin
 
 	# Below here is just data, stored with the code text
 	.p2align	2						# force 4 byte alignment

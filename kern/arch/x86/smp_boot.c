@@ -73,16 +73,20 @@ extern char (SNT SREADONLY smp_entry_end)[];
 extern char (SNT SREADONLY smp_boot_lock)[];
 extern char (SNT SREADONLY smp_semaphore)[];
 
-static inline volatile uint32_t *COUNT(1)
-get_smp_semaphore()
+static inline uint16_t *get_smp_semaphore()
 {
-	return (volatile uint32_t *COUNT(1))TC(smp_semaphore - smp_entry + trampoline_pg);
+	return (uint16_t *)(smp_semaphore - smp_entry + trampoline_pg);
 }
 
-static inline uint32_t *COUNT(1)
-get_smp_bootlock()
+static void __spin_bootlock_raw(void)
 {
-	return (uint32_t *COUNT(1))TC(smp_boot_lock - smp_entry + trampoline_pg);
+	uint16_t *bootlock = (uint16_t*)(smp_boot_lock - smp_entry + trampoline_pg);
+	/* Same lock code as in smp_entry */
+	asm volatile ("movw $1, %%ax;   "
+				  "1:               "
+	              "xchgw %%ax, %0;  "
+	              "test %%ax, %%ax; "
+	              "jne 1b;" : : "m"(*bootlock) : "eax", "cc", "memory");
 }
 
 /* hw_coreid_lookup will get packed, but keep it's hw values.  
@@ -119,9 +123,12 @@ void smp_boot(void)
 	memcpy(KADDR(trampoline_pg), (void *COUNT(PGSIZE))TC(smp_entry),
            smp_entry_end - smp_entry);
 
+	/* 64 bit already has the tramp pg mapped (1 GB of lowmem)  */
+#ifndef CONFIG_X86_64
 	// This mapping allows access to the trampoline with paging on and off
 	// via trampoline_pg
 	page_insert(boot_pgdir, pa2page(trampoline_pg), (void*SNT)trampoline_pg, PTE_W);
+#endif
 
 	// Allocate a stack for the cores starting up.  One for all, must share
 	if (kpage_alloc(&smp_stack))
@@ -145,7 +152,8 @@ void smp_boot(void)
 	// all in smp_entry.  It's purpose is to keep Core0 from competing for the
 	// smp_boot_lock.  So long as one AP increments the sem before the final
 	// LAPIC timer goes off, all available cores will be initialized.
-	while(*get_smp_semaphore());
+	while (*get_smp_semaphore())
+		cpu_relax();
 
 	// From here on, no other cores are coming up.  Grab the lock to ensure it.
 	// Another core could be in it's prelock phase and be trying to grab the lock
@@ -156,7 +164,7 @@ void smp_boot(void)
 	// booting.  Specifically, it's when they turn on paging and have that temp
 	// mapping pulled out from under them.  Now, if a core loses, it will spin
 	// on the trampoline (which we must be careful to not deallocate)
-	__spin_lock_raw(get_smp_bootlock());
+	__spin_bootlock_raw();
 	printk("Number of Cores Detected: %d\n", num_cpus);
 #ifdef CONFIG_DISABLE_SMT
 	assert(!(num_cpus % 2));
@@ -164,15 +172,13 @@ void smp_boot(void)
 #endif /* CONFIG_DISABLE_SMT */
 	smp_remap_coreids();
 
-	// Remove the mapping of the page used by the trampoline
-	page_remove(boot_pgdir, (void*SNT)trampoline_pg);
+	/* cleans up the trampoline page, and any other low boot mem mappings */
+	x86_cleanup_bootmem();
 	// It had a refcount of 2 earlier, so we need to dec once more to free it
 	// but only if all cores are in (or we reset / reinit those that failed)
 	// TODO after we parse ACPI tables
 	if (num_cpus == 8) // TODO - ghetto coded for our 8 way SMPs
 		page_decref(pa2page(trampoline_pg));
-	// Remove the page table used for that mapping
-	pagetable_remove(boot_pgdir, (void*SNT)trampoline_pg);
 	// Dealloc the temp shared stack
 	page_decref(smp_stack);
 
@@ -193,7 +199,7 @@ void smp_boot(void)
  *
  * Do not use per_cpu_info in here.  Do whatever you need in smp_percpu_init().
  */
-uint32_t smp_main(void)
+uintptr_t smp_main(void)
 {
 	/*
 	// Print some diagnostics.  Uncomment if there're issues.

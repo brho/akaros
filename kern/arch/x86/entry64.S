@@ -112,12 +112,13 @@ _start:
 .code64
 long_mode:
 	# zero the data segments.  Not sure if this is legit or not.
-	xor 	%rax, %rax
-	mov 	%ax, %ds
-	mov 	%ax, %es
-	mov 	%ax, %ss
-	mov 	%ax, %fs
-	mov 	%ax, %gs
+	xor		%rax, %rax
+	mov		%ax, %ds
+	mov		%ax, %es
+	mov		%ax, %ss
+	mov		%ax, %fs
+	mov		%ax, %gs
+	lldt	%ax
 	# paging is on, and our code is still running at 0x00100000.
 	# do some miscellaneous OS setup.  the coreid stuff is so we can call
 	# core_id() before smp_boot. 
