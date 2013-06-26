@@ -11,10 +11,6 @@
 /* Arch Constants */
 #define ARCH_CL_SIZE 64
 
-#ifdef __riscv64
-# define KERN64
-#endif
-
 void print_cpuinfo(void);
 void show_mapping(uintptr_t start, size_t size);
 void backtrace(void);

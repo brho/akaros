@@ -8,7 +8,7 @@
 #include <smp.h>
 #include <arch/arch.h>
 
-#ifdef KERN64
+#ifdef CONFIG_64BIT
 # define elf_field(obj, field) (elf64 ? (obj##64)->field : (obj##32)->field)
 #else
 # define elf_field(obj, field) ((obj##32)->field)
@@ -53,9 +53,15 @@ static int load_one_elf(struct proc *p, struct file *f, uintptr_t pgoffset,
 		printk("[kernel] load_one_elf: ID as both 32 and 64 bit\n");
 		goto fail;
 	}
-	#ifndef KERN64
+	#ifndef CONFIG_64BIT
 	if (elf64) {
 		printk("[kernel] load_one_elf: 64 bit elf on 32 bit kernel\n");
+		goto fail;
+	}
+	#endif
+	#ifdef CONFIG_X86_64
+	if (elf32) {
+		printk("[kernel] load_one_elf: 32 bit elf on 64 bit kernel\n");
 		goto fail;
 	}
 	#endif
