@@ -142,12 +142,14 @@ spin:	jmp	spin
 	.p2align	2		# force 4 byte alignment
 .globl gdt64
 gdt64:
+	# keep the number of these in sync with SEG_COUNT
 	SEG_NULL
 	SEG_CODE_64(0)		# kernel code segment
+	SEG_DATA_64(0)		# kernel data segment
 	SEG_CODE_64(3)		# user code segment
+	SEG_DATA_64(3)		# user data segment
 	SEG_NULL			# these two nulls are a placeholder for the TSS
 	SEG_NULL			# these two nulls are a placeholder for the TSS
-	SEG_DATA_64			# generic flat data segment (debugging for now)
 .globl gdt64desc
 gdt64desc:
 	.word	(gdt64desc - gdt64 - 1)		# sizeof(gdt64) - 1

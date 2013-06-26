@@ -544,6 +544,6 @@ void debug_print_pgdir(pte_t *pgdir)
 	printk("Printing the entire page table set for %p, DFS\n", pgdir);
 	/* Need to be careful we avoid VPT/UVPT, o/w we'll recurse */
 	pml_for_each(pgdir, 0, UVPT, print_pte, 0);
-	pml_for_each(pgdir, ULIM, VPT - ULIM, print_pte, 0);
+	pml_for_each(pgdir, KERNBASE, VPT - KERNBASE, print_pte, 0);
 	pml_for_each(pgdir, VPT_TOP, MAX_VADDR - VPT_TOP, print_pte, 0);
 }

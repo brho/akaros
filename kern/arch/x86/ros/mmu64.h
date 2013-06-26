@@ -304,17 +304,14 @@ typedef unsigned long pde_t;
 /* Global descriptor numbers */
 #define GD_NULL			0x00	/* NULL descriptor */
 #define GD_KT			0x08	/* kernel text */
-#define GD_UT			0x10	/* user text */
-#define GD_TSS			0x18	/* Task segment selector */
-#define GD_TSS2			0x20	/* Placeholder, TSS is 2-descriptors wide */
+#define GD_KD			0x10	/* kernel data */
+#define GD_UT			0x18	/* user text */
+#define GD_UD			0x20	/* user data */
+#define GD_TSS			0x28	/* Task segment selector */
+#define GD_TSS2			0x30	/* Placeholder, TSS is 2-descriptors wide */
 /* These two aren't in the GDT yet (might never be) */
-#define GD_LDT			0x28	/* Local descriptor table */
-#define GD_LDT2			0x30	/* Placeholder */
-
-/* Kept around to help compile, will remove */
-#define GD_KD     0x10     // kernel data
-#define GD_UD     0x20     // user data
-
+#define GD_LDT			0x38	/* Local descriptor table */
+#define GD_LDT2			0x40	/* Placeholder */
 
 #ifdef __ASSEMBLER__
 
@@ -334,11 +331,12 @@ typedef unsigned long pde_t;
 
 /* 64 bit data segment.  These are pretty much completely ignored (except if we
  * use them for fs/gs, or compatibility mode */
-#define SEG_DATA_64                                                         \
-	.word 0, 0;                                                             \
+#define SEG_DATA_64(dpl)                                                    \
+	.word 0xffff, 0;                                                        \
 	.byte 0;                                                                \
-	.byte 0x90;                                                             \
-	.word 0;
+	.byte (0x92 | ((dpl) << 5));                                            \
+	.byte 0x8f;                                                             \
+	.byte 0;
 
 /* System segments (TSS/LDT) are twice as long as usual (16 bytes). */
 #define SEG_SYS_64(type, base, lim, dpl)                                       \
@@ -504,7 +502,7 @@ typedef struct Pseudodesc {
 #define STS_IG32	0xE		/* 64-bit Interrupt Gate */
 #define STS_TG32	0xF		/* 64-bit Trap Gate */
 
-#define SEG_COUNT	6 		/* Number of GDT segments */
+#define SEG_COUNT	7 		/* Number of GDT segments */
 /* TODO: Probably won't use this */
 #define LDT_SIZE	(8192 * sizeof(segdesc_t))
 

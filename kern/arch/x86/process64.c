@@ -36,26 +36,31 @@ void proc_pop_ctx(struct user_context *ctx)
 	/* In case they are enabled elsewhere.  We can't take an interrupt in these
 	 * routines, due to how they play with the kernel stack pointer. */
 	disable_irq();
-	/*
-	 * If the process entered the kernel via sysenter, we need to leave via
+	/* If the process entered the kernel via sysenter, we need to leave via
 	 * sysexit.  sysenter trapframes have 0 for a CS, which is pushed in
-	 * sysenter_handler.
-	 */
-	if(tf->tf_cs) {
-		/*
-		 * Restores the register values in the Trapframe with the 'iret'
-		 * instruction.  This exits the kernel and starts executing some
-		 * environment's code.  This function does not return.
-		 */
-//		asm volatile ("movl %0,%%esp;           "
-//		              "popal;                   "
-//		              "popl %%gs;               "
-//		              "popl %%fs;               "
-//		              "popl %%es;               "
-//		              "popl %%ds;               "
-//		              "addl $0x8,%%esp;         "
-//		              "iret                     "
-//		              : : "g" (tf) : "memory");
+	 * sysenter_handler. */
+	if (tf->tf_cs) {
+		asm volatile ("movq %0, %%rsp;          "
+		              "popq %%rax;              "
+		              "popq %%rbx;              "
+		              "popq %%rcx;              "
+		              "popq %%rdx;              "
+		              "popq %%rbp;              "
+		              "popq %%rsi;              "
+		              "popq %%rdi;              "
+		              "popq %%r8;               "
+		              "popq %%r9;               "
+		              "popq %%r10;              "
+		              "popq %%r11;              "
+		              "popq %%r12;              "
+		              "popq %%r13;              "
+		              "popq %%r14;              "
+		              "popq %%r15;              "
+		              "movw 0x4(%%rsp), %%gs;   "
+		              "movw 0x6(%%rsp), %%fs;   "
+		              "addq $0x10, %%rsp;       "
+		              "iretq                    "
+		              : : "g" (tf) : "memory");
 		panic("iret failed");  /* mostly to placate the compiler */
 	} else {
 		/* Return path of sysexit.  See sysenter_handler's asm for details.
