@@ -118,10 +118,3 @@ void page_fault_handler(struct hw_trapframe *hw_tf)
 		proc_destroy(current);
 	}
 }
-
-void sysenter_init(void)
-{
-	write_msr(MSR_IA32_SYSENTER_CS, GD_KT);
-	write_msr(MSR_IA32_SYSENTER_ESP, ts.ts_esp0);
-	write_msr(MSR_IA32_SYSENTER_EIP, (uint32_t) &sysenter_handler);
-}

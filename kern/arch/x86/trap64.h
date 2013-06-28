@@ -63,14 +63,14 @@ static inline void x86_fake_rdtscp(struct hw_trapframe *hw_tf)
 /* TODO: use syscall.  all of this sysenter stuff is wrong  */
 static inline void x86_sysenter_init(uintptr_t stacktop)
 {
-	write_msr(MSR_IA32_SYSENTER_CS, GD_KT);
-	write_msr(MSR_IA32_SYSENTER_ESP, stacktop);
-	write_msr(MSR_IA32_SYSENTER_EIP, (uintptr_t) &sysenter_handler);
+	//write_msr(MSR_IA32_SYSENTER_CS, GD_KT);
+	//write_msr(MSR_IA32_SYSENTER_EIP, (uintptr_t) &sysenter_handler);
+	asm volatile ("movq %0, %%gs:0" : : "r"(stacktop));
 }
 
 static inline void x86_set_sysenter_stacktop(uintptr_t stacktop)
 {
-	write_msr(MSR_IA32_SYSENTER_ESP, stacktop);
+	asm volatile ("movq %0, %%gs:0" : : "r"(stacktop));
 }
 
 static inline long x86_get_sysenter_arg0(struct hw_trapframe *hw_tf)

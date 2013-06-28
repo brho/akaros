@@ -88,6 +88,8 @@ void print_trapframe(struct hw_trapframe *hw_tf)
 	/* Used in trapentry64.S */
 	static_assert(offsetof(struct hw_trapframe, tf_cs) - 
 	              offsetof(struct hw_trapframe, tf_rax) == 0x90);
+	/* Used in trap64.h */
+	static_assert(offsetof(struct per_cpu_info, stacktop) == 0);
 }
 
 void page_fault_handler(struct hw_trapframe *hw_tf)
@@ -121,11 +123,4 @@ void page_fault_handler(struct hw_trapframe *hw_tf)
 		       *(uintptr_t*)(hw_tf->tf_rsp + 24));
 		proc_destroy(current);
 	}
-}
-
-void sysenter_init(void)
-{
-	//write_msr(MSR_IA32_SYSENTER_CS, GD_KT);
-	//write_msr(MSR_IA32_SYSENTER_ESP, ts.ts_esp0);
-	//write_msr(MSR_IA32_SYSENTER_EIP, (uint32_t) &sysenter_handler);
 }

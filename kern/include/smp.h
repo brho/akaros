@@ -23,6 +23,9 @@ typedef sharC_env_t;
 #endif
 
 struct per_cpu_info {
+#ifdef CONFIG_X86_64
+	uintptr_t stacktop;
+#endif
 	spinlock_t lock;
 	/* Process management */
 	// cur_proc should be valid on all cores that are not management cores.

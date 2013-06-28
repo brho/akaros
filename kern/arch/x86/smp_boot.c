@@ -246,7 +246,6 @@ uintptr_t smp_main(void)
 
 	/* Set up our kernel stack when changing rings */
 	x86_set_stacktop_tss(my_ts, my_stack_top);
-	x86_sysenter_init(my_stack_top);
 	// Initialize the TSS field of my_gdt.
 	syssegdesc_t *ts_slot = (syssegdesc_t*)&my_gdt[GD_TSS >> 3];
 	*ts_slot = (syssegdesc_t)SEG_SYS_SMALL(STS_T32A, (uintptr_t)my_ts,
@@ -313,6 +312,8 @@ void __arch_pcpu_init(uint32_t coreid)
 		write_msr(MSR_KERN_GS_BASE, (uint64_t)pcpui);
 	}
 #endif
+	/* Don't try setting up til after setting GS */
+	x86_sysenter_init(x86_get_stacktop_tss(pcpui->tss));
 	/* need to init perfctr before potentiall using it in timer handler */
 	perfmon_init();
 }
