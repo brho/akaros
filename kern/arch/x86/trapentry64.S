@@ -7,6 +7,7 @@
  */
 #include <arch/mmu.h>
 #include <arch/trap.h>
+#include <arch/x86.h>
 #include <ros/memlayout.h>
 
 ###################################################################
@@ -146,14 +147,10 @@ TRAPHANDLER_NOEC(ISR_default, T_DEFAULT)
 .globl trap_tbl_end
 trap_tbl_end:
 
-/* Keep the exit paths of _alltraps, _allirqs, and sysenter_handler in sync
- * with the corrrsponding pop_tf's.  */
 .text
 _alltraps:
 	cld
-	/* trapno was pushed, taking up 64 bits.  we're using the upper 32 bits */
-	movw %gs, 0x4(%rsp)
-	movw %fs, 0x6(%rsp)
+	swapgs			# harmless if we were already in the kernel
 	pushq %r15
 	pushq %r14
 	pushq %r13
@@ -169,9 +166,38 @@ _alltraps:
 	pushq %rcx
 	pushq %rbx
 	pushq %rax
+	cmpw $GD_KT, 0x90(%rsp)	# 0x90 - diff btw tf_cs and tf_rax
+	je trap_kernel_tf
+	# this is a user TF, so we need to save their fs/gsbase and load gs base for
+	# the kernel.
+	movl $MSR_FS_BASE, %ecx
+	rdmsr
+	shl $32, %rdx
+	orq %rax, %rdx
+	pushq %rdx
+	# because we swapped gs earlier, the TF in use is now in KERN_GS_BASE
+	movl $MSR_KERN_GS_BASE, %ecx
+	rdmsr
+	shl $32, %rdx
+	orq %rax, %rdx
+	pushq %rdx
+	# make sure the kernel's gs base is loaded into the KERN slot at all times
+	movl $MSR_GS_BASE, %ecx
+	rdmsr
+	movl $MSR_KERN_GS_BASE, %ecx
+	wrmsr
+	jmp trap_all_tf
+trap_kernel_tf:
+	# we don't muck with fs/gsbase, push placeholders
+	movq $0xdeadbeef, %rax
+	pushq %rax
+	pushq %rax
+trap_all_tf:
 	movq $0, %rbp			# so we can backtrace to this point
 	movq %rsp, %rdi
 	call trap
+	# the return paths are only used by the kernel
+	addq $0x10, %rsp			# skip fs/gs base
 	popq %rax
 	popq %rbx
 	popq %rcx
@@ -187,16 +213,13 @@ _alltraps:
 	popq %r13
 	popq %r14
 	popq %r15
-	movw 0x4(%rsp), %gs
-	movw 0x6(%rsp), %fs
-	addq $0x10, %rsp			# skip gs, fs, trapno, and err
+	addq $0x10, %rsp			# skip trapno and err
 	iretq
 
+# might merge this with _alltraps
 _allirqs:
 	cld
-	/* trapno was pushed, taking up 64 bits.  we're using the upper 32 bits */
-	movw %gs, 0x4(%rsp)
-	movw %fs, 0x6(%rsp)
+	swapgs			# harmless if we were already in the kernel
 	pushq %r15
 	pushq %r14
 	pushq %r13
@@ -212,9 +235,38 @@ _allirqs:
 	pushq %rcx
 	pushq %rbx
 	pushq %rax
+	cmpw $GD_KT, 0x90(%rsp)	# 0x90 - diff btw tf_cs and tf_rax
+	je irq_kernel_tf
+	# this is a user TF, so we need to save their fs/gsbase and load gs base for
+	# the kernel.
+	movl $MSR_FS_BASE, %ecx
+	rdmsr
+	shl $32, %rdx
+	orq %rax, %rdx
+	pushq %rdx
+	# because we swapped gs earlier, the TF in use is now in KERN_GS_BASE
+	movl $MSR_KERN_GS_BASE, %ecx
+	rdmsr
+	shl $32, %rdx
+	orq %rax, %rdx
+	pushq %rdx
+	# make sure the kernel's gs base is loaded into the KERN slot at all times
+	movl $MSR_GS_BASE, %ecx
+	rdmsr
+	movl $MSR_KERN_GS_BASE, %ecx
+	wrmsr
+	jmp irq_all_tf
+irq_kernel_tf:
+	# we don't muck with fs/gsbase, push placeholders
+	movq $0xdeadbeef, %rax
+	pushq %rax
+	pushq %rax
+irq_all_tf:
 	movq $0, %rbp			# so we can backtrace to this point
 	movq %rsp, %rdi
 	call irq_handler
+	# the return paths are only used by the kernel
+	addq $0x10, %rsp			# skip fs/gs base
 	popq %rax
 	popq %rbx
 	popq %rcx
@@ -230,9 +282,7 @@ _allirqs:
 	popq %r13
 	popq %r14
 	popq %r15
-	movw 0x4(%rsp), %gs
-	movw 0x6(%rsp), %fs
-	addq $0x10, %rsp			# skip gs, fs, trapno, and err (which is 0)
+	addq $0x10, %rsp			# skip trapno and err
 	iretq
 
 .globl sysenter_handler;

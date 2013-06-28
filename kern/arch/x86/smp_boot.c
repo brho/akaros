@@ -280,6 +280,7 @@ uintptr_t smp_main(void)
 void __arch_pcpu_init(uint32_t coreid)
 {
 	uintptr_t my_stack_bot;
+	struct per_cpu_info *pcpui = &per_cpu_info[coreid];
 
 	/* Flushes any potentially old mappings from smp_boot() (note the page table
 	 * removal) */
@@ -294,14 +295,24 @@ void __arch_pcpu_init(uint32_t coreid)
 
 	/* core 0 sets up via the global gdt symbol */
 	if (!coreid) {
-		per_cpu_info[0].tss = &ts;
-		per_cpu_info[0].gdt = gdt;
+		pcpui->tss = &ts;
+		pcpui->gdt = gdt;
 	} else {
 		my_stack_bot = ROUNDDOWN(read_sp(), PGSIZE);
-		per_cpu_info[coreid].tss = (taskstate_t*)(*(uintptr_t*)my_stack_bot);
-		per_cpu_info[coreid].gdt = (segdesc_t*)(*(uintptr_t*)my_stack_bot +
-		                           sizeof(taskstate_t) + sizeof(pseudodesc_t));
+		pcpui->tss = (taskstate_t*)(*(uintptr_t*)my_stack_bot);
+		pcpui->gdt = (segdesc_t*)(*(uintptr_t*)my_stack_bot +
+		                          sizeof(taskstate_t) + sizeof(pseudodesc_t));
 	}
+#ifdef CONFIG_X86_64
+	/* Core 0 set up the base MSRs in entry64 */
+	if (!coreid) {
+		assert(read_msr(MSR_GS_BASE) == (uint64_t)pcpui);
+		assert(read_msr(MSR_KERN_GS_BASE) == (uint64_t)pcpui);
+	} else {
+		write_msr(MSR_GS_BASE, (uint64_t)pcpui);
+		write_msr(MSR_KERN_GS_BASE, (uint64_t)pcpui);
+	}
+#endif
 	/* need to init perfctr before potentiall using it in timer handler */
 	perfmon_init();
 }

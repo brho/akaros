@@ -130,6 +130,13 @@ void print_cpuinfo(void)
 	else
 		printk("RDTSCP not supported: don't trust detailed measurements\n");
 	printk("FS/GS MSRs %ssupported\n", edx & (1 << 29) ? "" : "not ");
+	#ifdef CONFIG_X86_64
+	if (!(edx & (1 << 29))) {
+		printk("Can't handle no FS/GS MSRs!\n");
+		while (1)
+			asm volatile ("hlt");
+	}
+	#endif
 	msr_val = read_msr(IA32_MISC_ENABLE);
 	/* we want this to be not set for cpuid.6h to work. */
 	if (msr_val & (1 << 22))

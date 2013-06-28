@@ -73,8 +73,9 @@ void print_trapframe(struct hw_trapframe *hw_tf)
 	printk("  r15  0x%016lx\n",           hw_tf->tf_r15);
 	printk("  trap 0x%08x %s\n",          hw_tf->tf_trapno,
 	                                      x86_trapname(hw_tf->tf_trapno));
-	printk("  gs   0x%04x\n",             hw_tf->tf_gs);
-	printk("  fs   0x%04x\n",             hw_tf->tf_fs);
+	/* FYI: these aren't physically adjacent to trap and err */
+	printk("  gsbs 0x%016lx\n",           hw_tf->tf_gsbase);
+	printk("  fsbs 0x%016lx\n",           hw_tf->tf_fsbase);
 	printk("  err  0x--------%08x\n",     hw_tf->tf_err);
 	printk("  rip  0x%016lx\n",           hw_tf->tf_rip);
 	printk("  cs   0x------------%04x\n", hw_tf->tf_cs);
@@ -83,6 +84,10 @@ void print_trapframe(struct hw_trapframe *hw_tf)
 	printk("  ss   0x------------%04x\n", hw_tf->tf_ss);
 	spin_unlock_irqsave(&ptf_lock);
 	pcpui->__lock_depth_disabled--;
+
+	/* Used in trapentry64.S */
+	static_assert(offsetof(struct hw_trapframe, tf_cs) - 
+	              offsetof(struct hw_trapframe, tf_rax) == 0x90);
 }
 
 void page_fault_handler(struct hw_trapframe *hw_tf)

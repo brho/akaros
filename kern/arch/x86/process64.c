@@ -36,6 +36,8 @@ void proc_pop_ctx(struct user_context *ctx)
 	/* In case they are enabled elsewhere.  We can't take an interrupt in these
 	 * routines, due to how they play with the kernel stack pointer. */
 	disable_irq();
+	write_msr(MSR_GS_BASE, (uint64_t)tf->tf_gsbase);
+	write_msr(MSR_FS_BASE, (uint64_t)tf->tf_fsbase);
 	/* If the process entered the kernel via sysenter, we need to leave via
 	 * sysexit.  sysenter trapframes have 0 for a CS, which is pushed in
 	 * sysenter_handler. */
@@ -56,11 +58,9 @@ void proc_pop_ctx(struct user_context *ctx)
 		              "popq %%r13;              "
 		              "popq %%r14;              "
 		              "popq %%r15;              "
-		              "movw 0x4(%%rsp), %%gs;   "
-		              "movw 0x6(%%rsp), %%fs;   "
 		              "addq $0x10, %%rsp;       "
 		              "iretq                    "
-		              : : "g" (tf) : "memory");
+		              : : "g" (&tf->tf_rax) : "memory");
 		panic("iret failed");  /* mostly to placate the compiler */
 	} else {
 		/* Return path of sysexit.  See sysenter_handler's asm for details.
@@ -90,7 +90,9 @@ void proc_pop_ctx(struct user_context *ctx)
 //		              "popl %%esp;              "
 //		              "sti;                     "
 //		              "sysexit                  "
-//		              : : "g" (tf) : "memory");
+//		              : : "g" (&tf->tf_rax) : "memory");
+		// keep in mind, we can take an interrupt in here (depending on what GS
+		// tricks there are)
 		panic("sysexit failed");  /* mostly to placate your mom */
 	}
 }

@@ -6,6 +6,8 @@
 #endif
 
 struct hw_trapframe {
+	uint64_t tf_gsbase;
+	uint64_t tf_fsbase;
 	uint64_t tf_rax;
 	uint64_t tf_rbx;
 	uint64_t tf_rcx;
@@ -22,8 +24,7 @@ struct hw_trapframe {
 	uint64_t tf_r14;
 	uint64_t tf_r15;
 	uint32_t tf_trapno;
-	uint16_t tf_gs;
-	uint16_t tf_fs;
+	uint32_t tf_padding5;
 	/* below here defined by x86 hardware (error code optional) */
 	uint32_t tf_err;
 	uint32_t tf_padding4;

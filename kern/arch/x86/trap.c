@@ -126,10 +126,8 @@ void idt_init(void)
 		SETGATE(idt[trap_tbl[i].trapnumber], 0, GD_KT, trap_tbl[i].trapaddr, 0);
 
 	/* turn on trap-based syscall handling and other user-accessible ints
-	 * DPL 3 means this can be triggered by the int instruction
-	 * STS_TG32 sets the IDT type to a Interrupt Gate (interrupts disabled) */
+	 * DPL 3 means this can be triggered by the int instruction */
 	idt[T_SYSCALL].gd_dpl = SINIT(3);
-	idt[T_SYSCALL].gd_type = SINIT(STS_IG32);
 	idt[T_BRKPT].gd_dpl = SINIT(3);
 
 	/* Set up our kernel stack when changing rings */

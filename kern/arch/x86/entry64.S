@@ -126,6 +126,15 @@ long_mode:
 	movl	$0x0, (%rax)
 	movabs 	$(hw_coreid_lookup), %rax
 	movl	$0x0, (%rax)
+	# set up gs to point to our pcpu info (both GS base and KERN GS base)
+	movabs	$(per_cpu_info), %rdx
+	movq	%rdx, %rax
+	shrq	$32, %rdx
+	andl	$0xffffffff, %eax
+	movl	$MSR_GS_BASE, %ecx
+	wrmsr
+	movl	$MSR_KERN_GS_BASE, %ecx
+	wrmsr
 	# Clear the frame pointer for proper backtraces
 	movq	$0x0, %rbp
  	movabs	$(bootstacktop), %rsp
