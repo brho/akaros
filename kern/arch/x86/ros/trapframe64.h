@@ -41,15 +41,19 @@ struct hw_trapframe {
 };
 
 struct sw_trapframe {
-	uint32_t tf_ebp;
-	uint32_t tf_ebx;
-	uint32_t tf_esi;
-	uint32_t tf_edi;
-	uint32_t tf_esp;
-	uint32_t tf_eip;
+	uint64_t tf_gsbase;
+	uint64_t tf_fsbase;
+	uint64_t tf_rbx;
+	uint64_t tf_rbp;
+	uint64_t tf_r12;
+	uint64_t tf_r13;
+	uint64_t tf_r14;
+	uint64_t tf_r15;
+	uint64_t tf_rip;
+	uint64_t tf_rsp;
 	uint32_t tf_mxcsr;
 	uint16_t tf_fpucw;
-	uint16_t tf_gs;		/* something to track TLS is callee-saved (sort of) */
+	uint16_t tf_padding0;
 };
 
 #endif /* ROS_INC_ARCH_TRAPFRAME64_H */

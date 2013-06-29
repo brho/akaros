@@ -111,6 +111,7 @@ static inline void pop_hw_tf(struct hw_trapframe *tf, uint32_t vcoreid)
 	              "popl %%eax;           " /* &sysc, trap arg0 */
 	              "pushl %%edx;          " /* save edx, will be trap arg1 */
 	              "movl $0x1,%%edx;      " /* sending one async syscall: arg1 */
+				  TODO double check these args
 	              "int %1;               " /* fire the syscall */
 	              "popl %%edx;           " /* restore regs after syscall */
 	              "jmp 2f;               " /* skip 1:, already popped */
@@ -167,6 +168,7 @@ static inline void pop_sw_tf(struct sw_trapframe *sw_tf, uint32_t vcoreid)
 	              /* Actual syscall.  Note we don't wait on the async call.
 	               * &sysc is already in eax (trap arg0). */
 	              "movl $0x1,%%edx;      " /* sending one async syscall: arg1 */
+				  TODO double check these args
 	              "int %3;               " /* fire the syscall */
 	              "1: ret;               " /* retaddr was pushed earlier */
 	              :

@@ -155,8 +155,8 @@ gdt64:
 	SEG_NULL
 	SEG_CODE_64(0)		# kernel code segment
 	SEG_DATA_64(0)		# kernel data segment
-	SEG_CODE_64(3)		# user code segment
 	SEG_DATA_64(3)		# user data segment
+	SEG_CODE_64(3)		# user code segment
 	SEG_NULL			# these two nulls are a placeholder for the TSS
 	SEG_NULL			# these two nulls are a placeholder for the TSS
 .globl gdt64desc

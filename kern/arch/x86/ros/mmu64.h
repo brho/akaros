@@ -305,8 +305,10 @@ typedef unsigned long pde_t;
 #define GD_NULL			0x00	/* NULL descriptor */
 #define GD_KT			0x08	/* kernel text */
 #define GD_KD			0x10	/* kernel data */
-#define GD_UT			0x18	/* user text */
-#define GD_UD			0x20	/* user data */
+/* syscall/sysret wants UD before UT, but KT before KD.  it really wants UT32,
+ * UD, UT64.  anyways... */
+#define GD_UD			0x18	/* user data */
+#define GD_UT			0x20	/* user text */
 #define GD_TSS			0x28	/* Task segment selector */
 #define GD_TSS2			0x30	/* Placeholder, TSS is 2-descriptors wide */
 /* These two aren't in the GDT yet (might never be) */

@@ -8,40 +8,15 @@
 #include <assert.h>
 #include <stdio.h>
 
-/* TODO: handle user and kernel contexts */
 void proc_pop_ctx(struct user_context *ctx)
 {
-	struct hw_trapframe *tf = &ctx->tf.hw_tf;
-	assert(ctx->type == ROS_HW_CTX);
-
-	/* Bug with this whole idea (TODO: (TLSV))*/
-	/* Load the LDT for this process.  Slightly ghetto doing it here. */
-	/* copy-in and check the LDT location.  the segmentation hardware writes the
-	 * accessed bit, so we want the memory to be in the user-writeable area. */
-	segdesc_t *ldt = current->procdata->ldt;
-	ldt = (segdesc_t*)MIN((uintptr_t)ldt, UWLIM - LDT_SIZE);
-	/* Only set up the ldt if a pointer to the ldt actually exists */
-#if 0 /* think about how to do TLS.  need better seg macros too */
-	if(ldt != NULL) {
-		segdesc_t *my_gdt = per_cpu_info[core_id()].gdt;
-		/* TODO: 64b issues here.  need to redo this anyways.  Considering how
-		 * slow userspace TLS changes are (70ns), I might opt for just changing
-		 * FS base, either via fast syscall or in userspace on newer versions */
-		segdesc_t ldt_temp = SEG_SYS(STS_LDT, (uint32_t)ldt, LDT_SIZE, 3);
-		my_gdt[GD_LDT >> 3] = ldt_temp;
-		asm volatile("lldt %%ax" :: "a"(GD_LDT));
-	}
-#endif
-
-	/* In case they are enabled elsewhere.  We can't take an interrupt in these
-	 * routines, due to how they play with the kernel stack pointer. */
 	disable_irq();
-	write_msr(MSR_GS_BASE, (uint64_t)tf->tf_gsbase);
-	write_msr(MSR_FS_BASE, (uint64_t)tf->tf_fsbase);
-	/* If the process entered the kernel via sysenter, we need to leave via
-	 * sysexit.  sysenter trapframes have 0 for a CS, which is pushed in
-	 * sysenter_handler. */
-	if (tf->tf_cs) {
+	/* for both HW and SW, note we pass an offset into the TF, beyond the fs and
+	 * gs bases */
+	if (ctx->type == ROS_HW_CTX) {
+		struct hw_trapframe *tf = &ctx->tf.hw_tf;
+		write_msr(MSR_GS_BASE, (uint64_t)tf->tf_gsbase);
+		write_msr(MSR_FS_BASE, (uint64_t)tf->tf_fsbase);
 		asm volatile ("movq %0, %%rsp;          "
 		              "popq %%rax;              "
 		              "popq %%rbx;              "
@@ -61,39 +36,34 @@ void proc_pop_ctx(struct user_context *ctx)
 		              "addq $0x10, %%rsp;       "
 		              "iretq                    "
 		              : : "g" (&tf->tf_rax) : "memory");
-		panic("iret failed");  /* mostly to placate the compiler */
+		panic("iretq failed");
 	} else {
-		/* Return path of sysexit.  See sysenter_handler's asm for details.
-		 * One difference is that this tf could be somewhere other than a stack
-		 * (like in a struct proc).  We need to make sure esp is valid once
-		 * interrupts are turned on (which would happen on popfl normally), so
-		 * we need to save and restore a decent esp (the current one).  We need
-		 * a place to save it that is accessible after we change the stack
-		 * pointer to the tf *and* that is specific to this core/instance of
-		 * sysexit.  The simplest and nicest is to use the tf_esp, which we
-		 * can just pop.  Incidentally, the value in oesp would work too.
-		 * To prevent popfl from turning interrupts on, we hack the tf's eflags
-		 * so that we have a chance to change esp to a good value before
-		 * interrupts are enabled.  The other option would be to throw away the
-		 * eflags, but that's less desirable. */
-		tf->tf_rflags &= !FL_IF;
-		tf->tf_rsp = read_sp();
-//		asm volatile ("movl %0,%%esp;           "
-//		              "popal;                   "
-//		              "popl %%gs;               "
-//		              "popl %%fs;               "
-//		              "popl %%es;               "
-//		              "popl %%ds;               "
-//		              "addl $0x10,%%esp;        "
-//		              "popfl;                   "
-//		              "movl %%ebp,%%ecx;        "
-//		              "popl %%esp;              "
-//		              "sti;                     "
-//		              "sysexit                  "
-//		              : : "g" (&tf->tf_rax) : "memory");
-		// keep in mind, we can take an interrupt in here (depending on what GS
-		// tricks there are)
-		panic("sysexit failed");  /* mostly to placate your mom */
+		struct sw_trapframe *tf = &ctx->tf.sw_tf;
+		write_msr(MSR_GS_BASE, (uint64_t)tf->tf_gsbase);
+		write_msr(MSR_FS_BASE, (uint64_t)tf->tf_fsbase);
+		/* We need to 0 out any registers that aren't part of the sw_tf and that
+		 * we won't use/clobber on the out-path.  While these aren't part of the
+		 * sw_tf, we also don't want to leak any kernel register content. */
+		asm volatile ("movq %0, %%rsp;          "
+		              "movq $0, %%rax;          "
+					  "movq $0, %%rdx;          "
+					  "movq $0, %%rsi;          "
+					  "movq $0, %%rdi;          "
+					  "movq $0, %%r8;           "
+					  "movq $0, %%r9;           "
+					  "movq $0, %%r10;          "
+		              "popq %%rbx;              "
+		              "popq %%rbp;              "
+		              "popq %%r12;              "
+		              "popq %%r13;              "
+		              "popq %%r14;              "
+		              "popq %%r15;              "
+					  "movq %1, %%r11;          "
+		              "popq %%rcx;              "
+		              "popq %%rsp;              "
+		              "rex.w sysret             "
+		              : : "g"(&tf->tf_rbx), "i"(FL_IF) : "memory");
+		panic("sysret failed");
 	}
 }
 

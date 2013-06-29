@@ -175,7 +175,7 @@ _alltraps:
 	shl $32, %rdx
 	orq %rax, %rdx
 	pushq %rdx
-	# because we swapped gs earlier, the TF in use is now in KERN_GS_BASE
+	# because we swapped gs earlier, the user GS is now in KERN_GS_BASE
 	movl $MSR_KERN_GS_BASE, %ecx
 	rdmsr
 	shl $32, %rdx
@@ -244,7 +244,7 @@ _allirqs:
 	shl $32, %rdx
 	orq %rax, %rdx
 	pushq %rdx
-	# because we swapped gs earlier, the TF in use is now in KERN_GS_BASE
+	# because we swapped gs earlier, the user GS is now in KERN_GS_BASE
 	movl $MSR_KERN_GS_BASE, %ecx
 	rdmsr
 	shl $32, %rdx
@@ -287,39 +287,53 @@ irq_all_tf:
 
 .globl sysenter_handler;
 .type sysenter_handler, @function;
-# All of the pushq zeros are to keep the trap frame looking the same as when we
-# receive a trap or an interrupt
+
 sysenter_handler:
-	cld
-	pushq $0				# ss
-	pushq $0				# rsp
-	pushfq					# eflags
-	pushq $0				# CS == 0 lets the kernel know it was a sysenter	
-	pushq $0				# eip
-	pushq $0				# err 
-	pushq $T_SYSCALL		# helps with print_trapframe
-	# pushq %ds
-	# pushq %es
-	pushq %fs
-	pushq %gs
-	# pushal
-	movw $0, %ax;
-	movw %ax, %gs;
-	movw %ax, %fs;
-	movw $GD_KD, %ax
-	movw %ax, %ds
-	movw %ax, %es
-	pushq %rsp
+	# Rough plan to do a quick TLS / FS base change, never changing stacks
+#	compare rdi with a non-canon magic number (never a sysc)
+#	mov rcx to rdi (save it)
+#	cx, dx, and ax are available, can do an wrmsr on MSR_FS_BASE
+#	rsi has the new FS base
+#	mov rdi back to rcx
+#	sysret
+
+	# cld is handled by the SFMASK
+	swapgs
+	movq %gs:0, %rsp
+	# Saving the FPU callee-saved state for now.  Might be able to have the
+	# preempt handler deal with it.
+	pushq $0			# space for mxcsr and fpucw
+	fnstcw 0x4(%rsp)
+	stmxcsr (%rsp)
+	pushq %rdx			# rsp, saved by userspace
+	pushq %rcx			# rip, saved by hardware
+	pushq %r15
+	pushq %r14
+	pushq %r13
+	pushq %r12
+	pushq %rbp
+	pushq %rbx
+	# save fs and gs base
+	movl $MSR_FS_BASE, %ecx
+	rdmsr
+	shl $32, %rdx
+	orq %rax, %rdx
+	pushq %rdx
+	# because we swapped gs earlier, the user GS is now in KERN_GS_BASE
+	movl $MSR_KERN_GS_BASE, %ecx
+	rdmsr
+	shl $32, %rdx
+	orq %rax, %rdx
+	pushq %rdx
+	# make sure the kernel's gs base is loaded into the KERN slot at all times
+	movl $MSR_GS_BASE, %ecx
+	rdmsr
+	movl $MSR_KERN_GS_BASE, %ecx
+	wrmsr
 	movq $0, %rbp			# so we can backtrace to this point
+	movq %rsp, %rdx
+	# arg0, rdi: struct sysc*.  arg1, rsi: count.  arg2, rdx: sw_tf
 	call sysenter_callwrapper
-	popq %rsp
-	# popal
-	popq %gs
-	popq %fs
-	# popq %es
-	# popq %ds
-	addq $0x10, %rsp		# pop T_SYSCALL and the three zeros
-	popfq					# restore EFLAGS (and usually enables interrupts!)
-	movq %rbp, %rcx
-	sti						# interrupts are turned off when starting a core
-	sysexit
+	# return via pop_tf, never this path
+sysenter_spin:
+	jmp sysenter_spin

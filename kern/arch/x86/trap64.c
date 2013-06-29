@@ -55,7 +55,7 @@ void print_trapframe(struct hw_trapframe *hw_tf)
 	 * nuts when we print/panic */
 	pcpui->__lock_depth_disabled++;
 	spin_lock_irqsave(&ptf_lock);
-	printk("TRAP frame at %p on core %d\n", hw_tf, core_id());
+	printk("HW TRAP frame at %p on core %d\n", hw_tf, core_id());
 	printk("  rax  0x%016lx\n",           hw_tf->tf_rax);
 	printk("  rbx  0x%016lx\n",           hw_tf->tf_rbx);
 	printk("  rcx  0x%016lx\n",           hw_tf->tf_rcx);
@@ -74,7 +74,10 @@ void print_trapframe(struct hw_trapframe *hw_tf)
 	printk("  trap 0x%08x %s\n",          hw_tf->tf_trapno,
 	                                      x86_trapname(hw_tf->tf_trapno));
 	/* FYI: these aren't physically adjacent to trap and err */
-	printk("  gsbs 0x%016lx\n",           hw_tf->tf_gsbase);
+	if (hw_tf->tf_cs == GD_KT)
+		printk("  gsbs 0x%016lx\n",       read_msr(MSR_GS_BASE));
+	else
+		printk("  gsbs 0x%016lx\n",       hw_tf->tf_gsbase);
 	printk("  fsbs 0x%016lx\n",           hw_tf->tf_fsbase);
 	printk("  err  0x--------%08x\n",     hw_tf->tf_err);
 	printk("  rip  0x%016lx\n",           hw_tf->tf_rip);
@@ -90,6 +93,29 @@ void print_trapframe(struct hw_trapframe *hw_tf)
 	              offsetof(struct hw_trapframe, tf_rax) == 0x90);
 	/* Used in trap64.h */
 	static_assert(offsetof(struct per_cpu_info, stacktop) == 0);
+}
+
+void print_swtrapframe(struct sw_trapframe *sw_tf)
+{
+	static spinlock_t ptf_lock = SPINLOCK_INITIALIZER_IRQSAVE;
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	pcpui->__lock_depth_disabled++;
+	spin_lock_irqsave(&ptf_lock);
+	printk("SW TRAP frame at %p on core %d\n", sw_tf, core_id());
+	printk("  rbx  0x%016lx\n",           sw_tf->tf_rbx);
+	printk("  rbp  0x%016lx\n",           sw_tf->tf_rbp);
+	printk("  r12  0x%016lx\n",           sw_tf->tf_r12);
+	printk("  r13  0x%016lx\n",           sw_tf->tf_r13);
+	printk("  r14  0x%016lx\n",           sw_tf->tf_r14);
+	printk("  r15  0x%016lx\n",           sw_tf->tf_r15);
+	printk("  gsbs 0x%016lx\n",           sw_tf->tf_gsbase);
+	printk("  fsbs 0x%016lx\n",           sw_tf->tf_fsbase);
+	printk("  rip  0x%016lx\n",           sw_tf->tf_rip);
+	printk("  rsp  0x%016lx\n",           sw_tf->tf_rsp);
+	printk(" mxcsr 0x%08x\n",             sw_tf->tf_mxcsr);
+	printk(" fpucw 0x%04x\n",             sw_tf->tf_fpucw);
+	spin_unlock_irqsave(&ptf_lock);
+	pcpui->__lock_depth_disabled--;
 }
 
 void page_fault_handler(struct hw_trapframe *hw_tf)

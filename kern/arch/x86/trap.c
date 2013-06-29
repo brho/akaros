@@ -272,6 +272,7 @@ static void trap_dispatch(struct hw_trapframe *hw_tf)
 			// check for userspace, for now
 			assert(hw_tf->tf_cs != GD_KT);
 			/* Set up and run the async calls */
+			/* TODO: this is using the wrong reg1 for traps for 32 bit */
 			prep_syscalls(current,
 			              (struct syscall*)x86_get_sysenter_arg0(hw_tf),
 						  (unsigned int)x86_get_sysenter_arg1(hw_tf));
@@ -495,6 +496,26 @@ register_interrupt_handler(handler_t TP(TV(t)) table[],
 	table[int_num].data = data;
 }
 
+/* It's a moderate pain in the ass to put these in bit-specific files (header
+ * hell with the set_current_ helpers) */
+#ifdef CONFIG_X86_64
+void sysenter_callwrapper(struct syscall *sysc, unsigned long count,
+                          struct sw_trapframe *sw_tf)
+{
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	set_current_ctx_sw(pcpui, sw_tf);
+	/* Once we've set_current_ctx, we can enable interrupts.  This used to be
+	 * mandatory (we had immediate KMSGs that would muck with cur_ctx).  Now it
+	 * should only help for sanity/debugging. */
+	enable_irq();
+	/* Set up and run the async calls */
+	prep_syscalls(current, sysc, count);
+	/* If you use pcpui again, reread it, since you might have migrated */
+	proc_restartcore();
+}
+
+#else
+
 /* This is called from sysenter's asm, with the tf on the kernel stack. */
 /* TODO: use a sw_tf for sysenter */
 void sysenter_callwrapper(struct hw_trapframe *hw_tf)
@@ -514,6 +535,7 @@ void sysenter_callwrapper(struct hw_trapframe *hw_tf)
 	/* If you use pcpui again, reread it, since you might have migrated */
 	proc_restartcore();
 }
+#endif
 
 /* Declared in x86/arch.h */
 void send_ipi(uint32_t os_coreid, uint8_t vector)
