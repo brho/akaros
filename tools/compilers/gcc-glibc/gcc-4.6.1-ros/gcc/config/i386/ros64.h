@@ -62,8 +62,12 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
    When the -shared link option is used a final link is not being
    done.  */
 
+/* The current LINKER settings will not work for multiarch.  We'll want to use
+ * lib64 and set up a more unique name.  Check out
+ * glibc-2.14.1-ros/sysdeps/unix/sysv/linux/configure and
+ * glibc-2.14.1-ros/shlib-versions for some starters. */
 #define GLIBC_DYNAMIC_LINKER32 "/lib/ld-ros.so.2"
-#define GLIBC_DYNAMIC_LINKER64 "/lib64/ld-ros-x86-64.so.2"
+#define GLIBC_DYNAMIC_LINKER64 "/lib/ld.so.1"
 
 #if TARGET_64BIT_DEFAULT
 #define SPEC_32 "m32"
