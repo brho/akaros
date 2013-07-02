@@ -1702,8 +1702,10 @@ void run_local_syscall(struct syscall *sysc)
 
 	/* TODO: (UMEM) assert / pin the memory for the sysc */
 	assert(irq_is_enabled());	/* in case we proc destroy */
-	user_mem_assert(pcpui->cur_proc, sysc, sizeof(struct syscall),
-	                sizeof(uintptr_t), PTE_USER_RW);
+	/* Abort on mem check failure, for now */
+	if (!user_mem_check(pcpui->cur_proc, sysc, sizeof(struct syscall),
+	                    sizeof(uintptr_t), PTE_USER_RW))
+		return;
 	pcpui->cur_sysc = sysc;			/* let the core know which sysc it is */
 	sysc->retval = syscall(pcpui->cur_proc, sysc->num, sysc->arg0, sysc->arg1,
 	                       sysc->arg2, sysc->arg3, sysc->arg4, sysc->arg5);
