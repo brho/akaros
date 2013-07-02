@@ -289,14 +289,31 @@ irq_all_tf:
 .type sysenter_handler, @function;
 
 sysenter_handler:
-	# Rough plan to do a quick TLS / FS base change, never changing stacks
-#	compare rdi with a non-canon magic number (never a sysc)
-#	mov rcx to rdi (save it)
-#	cx, dx, and ax are available, can do an wrmsr on MSR_FS_BASE
-#	rsi has the new FS base
-#	mov rdi back to rcx
-#	sysret
-
+#ifndef CONFIG_NOFASTCALL_FSBASE
+	# Do a quick TLS / FS base change, never changing stacks.
+	# When rdi has the magic number, rsi has the new base
+	movabs $FASTCALL_SETFSBASE, %rax
+	cmp %rax, %rdi
+	jne normal_syscall	# could profile this and handle the jump differently
+	# need to check rsi, make sure it is canonical (will enfore below ULIM).
+	# need to either do this check, or handle the kernel GP fault on wrmsr.
+	movq %rsi, %rdi
+	shrq $47, %rdi
+	cmp $0, %rdi
+	jne fastcall_pop
+	# need to use cx, dx, and ax for the wrmsr.  dx and ax are free.
+	movq %rcx, %rdi		# save rcx, the retaddr
+	movq %rsi, %rdx
+	movq %rsi, %rax
+	shrq $32, %rdx
+	andl $0xffffffff, %eax
+	movl $MSR_FS_BASE, %ecx
+	wrmsr
+	movq %rdi, %rcx 	# restore retaddr
+fastcall_pop:
+	rex.w sysret
+normal_syscall:
+#endif
 	# cld is handled by the SFMASK
 	swapgs
 	movq %gs:0, %rsp

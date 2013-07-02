@@ -508,4 +508,7 @@ typedef struct Pseudodesc {
 /* TODO: Probably won't use this */
 #define LDT_SIZE	(8192 * sizeof(segdesc_t))
 
+/* TLS 'syscall', coupled to trapentry64.S.  Needed a non-canon 'addr' */
+#define FASTCALL_SETFSBASE 0xf0f0000000000001
+
 #endif /* ROS_INC_ARCH_MMU64_H */

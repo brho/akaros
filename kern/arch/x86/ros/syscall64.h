@@ -12,6 +12,7 @@
 #include <sys/types.h>
 #include <stdint.h>
 #include <ros/common.h>
+#include <ros/arch/mmu.h>
 #include <assert.h>
 
 static inline intreg_t __syscall_sysenter(uintreg_t a0, uintreg_t a1)
@@ -45,6 +46,15 @@ static inline intreg_t __syscall_trap(uintreg_t a0, uintreg_t a1)
 	               "S" (a1)
 	             : "cc", "memory");
 	return ret;
+}
+
+/* The kernel has a fast path for setting the fs base, used for TLS changes on
+ * machines that can't do it from user space.  The magic value for rdi (D) is a
+ * non-canonical address, which should never be a legitamate syscall. */
+static inline void __fastcall_setfsbase(uintptr_t fsbase)
+{
+	asm volatile ("syscall" : : "D"(FASTCALL_SETFSBASE), "S"(fsbase)
+	                        : "rax", "r11", "rcx", "rdx", "memory");
 }
 
 #endif

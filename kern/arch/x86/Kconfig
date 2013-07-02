@@ -7,13 +7,26 @@ config X86_32
 config X86_64
 	def_bool 64BIT
 
-menu "x86 Hacks"
+menu "x86 Options"
 
 config PCI_VERBOSE
 	bool "Verbose PCI Output"
 	default n
 	help
 		Will print out extra information related to PCI.
+
+config NOFASTCALL_FSBASE
+	depends on X86_64
+	bool "Disable fastcall to set FS base"
+	default n
+	help
+		Disable the fast path syscall to set FS base.  If your hardware allows
+		setting FS base from userspace, you can say y to disable the fastcall
+		for a slight improvement for all syscalls.  If unsure, say n.
+
+endmenu
+
+menu "x86 Hacks"
 
 config NOMTRRS
 	bool "Disable MTRRs"

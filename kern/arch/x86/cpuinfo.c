@@ -120,10 +120,19 @@ void print_cpuinfo(void)
 	else
 		printk("Invariant TSC not present\n");
 	cpuid(0x07, 0x0, &eax, &ebx, &ecx, &edx);
-	if (ebx & 0x00000001)
+	if (ebx & 0x00000001) {
 		printk("FS/GS Base RD/W supported\n");
-	else
+		/* Untested, since we don't have a machine that supports this.  Email us
+		 * if this fails. */
+		printk("Attempting to enable WRFSBASE...\n");
+		lcr4(rcr4() | (1 << 16));
+	} else {
 		printk("FS/GS Base RD/W not supported\n");
+		#ifdef CONFIG_NOFASTCALL_FSBASE
+		printk("\nGIANT WARNING: Can't write FS Base from userspace, "
+		       "and no FASTCALL support!\n\n");
+		#endif
+	}
 	cpuid(0x80000001, 0x0, &eax, &ebx, &ecx, &edx);
 	if (edx & (1 << 27))
 		printk("RDTSCP supported\n");
