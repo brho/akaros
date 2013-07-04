@@ -414,32 +414,16 @@ extern void _dl_x86_64_restore_sse (void);
   } while (0)
 # endif
 
-/* Reading from the LDT.  Could also use %gs, but that would require including
- * half of libc's TLS header.  Sparc will probably ignore the vcoreid, so don't
- * rely on it too much.  The intent of it is vcoreid is the caller's vcoreid,
- * and that vcoreid might be in the TLS of the caller (it will be for transition
- * stacks) and we could avoid a trap on x86 to sys_getvcoreid(). */
 static inline void *__get_tls_desc(uint32_t vcoreid)
 {
-	return (void*)(uint64_t)(__procdata.ldt[vcoreid].sd_base_31_24 << 24 |
-	                         __procdata.ldt[vcoreid].sd_base_23_16 << 16 |
-	                         __procdata.ldt[vcoreid].sd_base_15_0);
+	/* the tcb->self pointer is set to the TLS base address */
+	return THREAD_SELF;
 }
 
-/* passing in the vcoreid, since it'll be in TLS of the caller */
 static inline void __set_tls_desc(void *tls_desc, uint32_t vcoreid)
 {
-/* Pending rewrite / redesign of 64 bit TLS */
-#if 0
-	/* Keep this technique in sync with sysdeps/ros/i386/tls.h */
-	segdesc_t tmp = SEG(STA_W, (uint64_t)tls_desc, 0xffffffff, 3);
-	__procdata.ldt[vcoreid] = tmp;
-
-	/* GS is still the same (should be!), but it needs to be reloaded to force a
-	 * re-read of the LDT. */
-	uint32_t fs = (vcoreid << 3) | 0x07;
-	asm volatile("movl %0,%%fs" : : "r" (fs) : "memory");
-#endif
+	/* TODO: check for and use WRFSBASE */
+	__fastcall_setfsbase((uintptr_t)tls_desc);
 }
 
 static const char* tls_init_tp(void* thrdescr)
@@ -453,27 +437,6 @@ static const char* tls_init_tp(void* thrdescr)
   //TODO: think about how to avoid this. Probably add a field to the 
   // rthreads struct that we manually fill in in _start(). 
   int core_id = __ros_syscall(SYS_getvcoreid, 0, 0, 0, 0, 0, 0, NULL);
-
-/* Pending rewrite / redesign of 64 bit TLS */
-#if 0
-  /* Bug with this whole idea (TODO: (TLSV))*/
-  if(__procdata.ldt == NULL)
-  {
-    size_t sz= (sizeof(segdesc_t)*__procinfo.max_vcores+PGSIZE-1)/PGSIZE*PGSIZE;
-    
-	/* Can't directly call mmap because it tries to set errno, and errno doesn't
-	 * exist yet (it relies on tls, and we are currently in the process of
-	 * setting it up...) */
-	void *ldt = (void*)__ros_syscall(SYS_mmap, 0, sz, PROT_READ | PROT_WRITE,
-	                                 MAP_ANONYMOUS | MAP_POPULATE, -1, 0, NULL);
-    if (ldt == MAP_FAILED)
-      return "tls couldn't allocate memory\n";
-
-    __procdata.ldt = ldt;
-    // force kernel crossing
-	__ros_syscall(SYS_getpid, 0, 0, 0, 0, 0, 0, NULL);
-  }
-#endif
 
   __set_tls_desc(thrdescr, core_id);
   return NULL;
