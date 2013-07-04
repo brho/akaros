@@ -94,7 +94,7 @@ typedef unsigned long pde_t;
  *    USTACKTOP        |                              |
  *                     |      Normal User Stack       | RW/RW 256 * PGSIZE
  *                     |                              |
- *                     +------------------------------+ 0x00007f7fffbfb000
+ *                     +------------------------------+ 0x00007f7fffaff000
  *                     |                              |
  *                     |        Empty Memory          |
  *                     |                              |

@@ -519,9 +519,13 @@ void *__do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 		/* TODO: consider locking the file while checking (not as manadatory as
 		 * in handle_page_fault() */
 		if (nr_pages(offset + len) > nr_pages(file->f_dentry->d_inode->i_size)) {
-			destroy_vmr(vmr);
-			set_errno(ESPIPE); /* linux sends a SIGBUS at access time */
-			return MAP_FAILED;
+			/* We're allowing them to set up the VMR, though if they attempt to
+			 * fault in any pages beyond the file's limit, they'll fail.  Since
+			 * they might not access the region, we need to make sure POPULATE
+			 * is off.  FYI, 64 bit glibc shared libs map in an extra 2MB of
+			 * unaligned space between their RO and RW sections, but then
+			 * immediately mprotect it to PROT_NONE. */
+			flags &= ~MAP_POPULATE;
 		}
 		kref_get(&file->f_kref, 1);
 	}

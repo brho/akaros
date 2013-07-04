@@ -136,7 +136,7 @@ void page_fault_handler(struct hw_trapframe *hw_tf)
 	enable_irq();
 	if ((err = handle_page_fault(current, fault_va, prot))) {
 		/* Destroy the faulting process */
-		printk("[%08x] user %s fault va %08x ip %08x on core %d with err %d\n",
+		printk("[%08x] user %s fault va %p ip %p on core %d with err %d\n",
 		       current->pid, prot & PROT_READ ? "READ" : "WRITE", fault_va,
 		       hw_tf->tf_rip, core_id(), err);
 		print_trapframe(hw_tf);
