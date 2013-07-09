@@ -14,6 +14,11 @@
 #error "Do not include arch/trap32.h directly."
 #endif
 
+/* For kernel contexts, when we save/restore/move them around. */
+struct kernel_ctx {
+	struct hw_trapframe 		hw_tf;
+};
+
 static inline bool in_kernel(struct hw_trapframe *hw_tf)
 {
 	return (hw_tf->tf_cs & ~3) == GD_KT;

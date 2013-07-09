@@ -26,22 +26,19 @@
 /* Starts running the current TF, just using ret. */
 void pop_kernel_ctx(struct kernel_ctx *ctx)
 {
-	#if 0
-	asm volatile ("movl %1,%%esp;           " /* move to future stack */
-	              "pushl %2;                " /* push cs */
-	              "movl %0,%%esp;           " /* move to TF */
-	              "addl $0x20,%%esp;        " /* move to tf_gs slot */
-	              "movl %1,(%%esp);         " /* write future esp */
-	              "subl $0x20,%%esp;        " /* move back to tf start */
-	              "popal;                   " /* restore regs */
-	              "popl %%esp;              " /* set stack ptr */
-	              "subl $0x4,%%esp;         " /* jump down past CS */
-	              "ret                      " /* return to the EIP */
-	              :
-	              : "g"(&ctx->hw_tf), "r"(ctx->hw_tf.tf_esp),
-	                "r"(ctx->hw_tf.tf_eip)
-	              : "memory");
-	#endif
+	struct sw_trapframe *tf = &ctx->sw_tf;
+	/* We're starting at rbx's spot in the sw_tf */
+	asm volatile ("movq %0, %%rsp;          "
+				  "popq %%rbx;              "
+				  "popq %%rbp;              "
+				  "popq %%r12;              "
+				  "popq %%r13;              "
+				  "popq %%r14;              "
+				  "popq %%r15;              "
+				  "popq %%rax;              " /* pop rip */
+				  "popq %%rsp;              "
+				  "jmp *%%rax;              " /* stored rip */
+				  : : "g"(&ctx->sw_tf.tf_rbx) : "memory");
 	panic("ret failed");
 }
 

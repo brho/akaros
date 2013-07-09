@@ -7,18 +7,6 @@
 #include <arch/arch.h>
 #include <arch/mmu.h>
 #include <sys/queue.h>
-/* #include <arch/trap.h> included below */
-
-/* For kernel contexts, when we save/restore/move them around.  For now, we'll
- * just use the old trapframe/hw_trap, but in the future we can slim this down a
- * bit.  Additionally, we might have different types of these in the future, if
- * we ever do non-cooperative kthread scheduling. */
-struct kernel_ctx {
-	/* RISCV's current pop_kernel_ctx assumes the hw_tf is the first member */
-	struct hw_trapframe 		hw_tf;
-};
-
-/* Arch needs to hear about kernel_ctx */
 #include <arch/trap.h>
 
 // func ptr for interrupt service routines

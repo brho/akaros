@@ -19,6 +19,12 @@
 /* Kernel message interrupt vector.  ignored, for the most part */
 #define I_KERNEL_MSG 255
 
+/* For kernel contexts, when we save/restore/move them around. */
+struct kernel_ctx {
+	/* RISCV's current pop_kernel_ctx assumes the hw_tf is the first member */
+	struct hw_trapframe 		hw_tf;
+};
+
 static inline bool in_kernel(struct hw_trapframe *hw_tf)
 {
 	return hw_tf->sr & SR_PS;

@@ -14,6 +14,11 @@
 #error "Do not include arch/trap64.h directly."
 #endif
 
+/* For kernel contexts, when we save/restore/move them around. */
+struct kernel_ctx {
+	struct sw_trapframe 		sw_tf;
+};
+
 void print_swtrapframe(struct sw_trapframe *sw_tf);
 
 static inline bool in_kernel(struct hw_trapframe *hw_tf)
@@ -21,26 +26,24 @@ static inline bool in_kernel(struct hw_trapframe *hw_tf)
 	return (hw_tf->tf_cs & ~3) == GD_KT;
 }
 
+/* Using SW contexts for now, for x86_64 */
 static inline void save_kernel_ctx(struct kernel_ctx *ctx)
 {
-	#if 0
-	/* Save the regs and the future esp. */
-	asm volatile("movl %%esp,(%0);       " /* save esp in it's slot*/
-	             "pushl %%eax;           " /* temp save eax */
-	             "leal 1f,%%eax;         " /* get future eip */
-	             "movl %%eax,(%1);       " /* store future eip */
-	             "popl %%eax;            " /* restore eax */
-	             "movl %2,%%esp;         " /* move to the beginning of the tf */
-	             "addl $0x20,%%esp;      " /* move to after the push_regs */
-	             "pushal;                " /* save regs */
-	             "addl $0x44,%%esp;      " /* move to esp slot */
-	             "popl %%esp;            " /* restore esp */
+	/* not bothering with the FP fields */
+	asm volatile("mov %%rsp, 0x48(%0);   " /* save rsp in its slot*/
+	             "leaq 1f, %%rax;        " /* get future rip */
+	             "mov %%rax, 0x40(%0);   " /* save rip in its slot*/
+	             "mov %%r15, 0x38(%0);   "
+	             "mov %%r14, 0x30(%0);   "
+	             "mov %%r13, 0x28(%0);   "
+	             "mov %%r12, 0x20(%0);   "
+	             "mov %%rbp, 0x18(%0);   "
+	             "mov %%rbx, 0x10(%0);   "
 	             "1:                     " /* where this tf will restart */
 	             : 
-	             : "r"(&ctx->hw_tf.tf_esp), "r"(&ctx->hw_tf.tf_eip),
-	               "g"(&ctx->hw_tf)
-	             : "eax", "memory", "cc");
-	#endif
+				 : "D"(&ctx->sw_tf)
+	             : "rax", "rcx", "rdx", "rsi", "r8", "r9", "r10", "r11",
+	               "memory", "cc");
 }
 
 static inline uintptr_t x86_get_ip_hw(struct hw_trapframe *hw_tf)
@@ -50,7 +53,7 @@ static inline uintptr_t x86_get_ip_hw(struct hw_trapframe *hw_tf)
 
 static inline void x86_advance_ip(struct hw_trapframe *hw_tf, size_t bytes)
 {
-		hw_tf->tf_rip += bytes;
+	hw_tf->tf_rip += bytes;
 }
 
 static inline void x86_fake_rdtscp(struct hw_trapframe *hw_tf)
