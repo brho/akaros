@@ -342,11 +342,16 @@ static inline void init_user_ctx(struct user_context *ctx, uintptr_t entry_pt,
 {
 	struct sw_trapframe *sw_tf = &ctx->tf.sw_tf;
 	ctx->type = ROS_SW_CTX;
-	/* No need to bother with setting the other GP registers; the called
-	 * function won't care about their contents. */
-	sw_tf->tf_rsp = stack_top;
+	/* Stack pointers in a fresh stackframe need to be such that adding or
+	 * subtracting 8 will result in 16 byte alignment (AMD64 ABI).  The reason
+	 * is so that input arguments (on the stack) are 16 byte aligned.  The
+	 * extra 8 bytes is the retaddr, pushed on the stack.  Compilers know they
+	 * can subtract 8 to get 16 byte alignment for instructions like movaps. */
+	sw_tf->tf_rsp = ROUNDDOWN(stack_top, 16) - 8;
 	sw_tf->tf_rip = entry_pt;
 	sw_tf->tf_rbp = 0;	/* for potential backtraces */
+	/* No need to bother with setting the other GP registers; the called
+	 * function won't care about their contents. */
 	sw_tf->tf_mxcsr = 0x00001f80;	/* x86 default mxcsr */
 	sw_tf->tf_fpucw = 0x037f;		/* x86 default FP CW */
 }

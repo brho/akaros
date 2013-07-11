@@ -81,7 +81,12 @@ void proc_init_ctx(struct user_context *ctx, uint32_t vcoreid, uintptr_t entryp,
 	 * The low 2 bits of each segment register contains the
 	 * Requestor Privilege Level (RPL); 3 means user mode. */
 	tf->tf_ss = GD_UD | 3;
-	tf->tf_rsp = stack_top-64;
+	/* Stack pointers in a fresh stackframe need to be such that adding or
+	 * subtracting 8 will result in 16 byte alignment (AMD64 ABI).  The reason
+	 * is so that input arguments (on the stack) are 16 byte aligned.  The
+	 * extra 8 bytes is the retaddr, pushed on the stack.  Compilers know they
+	 * can subtract 8 to get 16 byte alignment for instructions like movaps. */
+	tf->tf_rsp = ROUNDDOWN(stack_top, 16) - 8;
 	tf->tf_cs = GD_UT | 3;
 	/* set the env's EFLAGSs to have interrupts enabled */
 	tf->tf_rflags |= 0x00000200; // bit 9 is the interrupts-enabled
