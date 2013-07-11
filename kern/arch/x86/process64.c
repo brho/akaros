@@ -65,6 +65,7 @@ void proc_pop_ctx(struct user_context *ctx)
 		              : : "g"(&tf->tf_rbx), "i"(FL_IF) : "memory");
 		panic("sysret failed");
 	}
+	panic("Unknown context type!\n");
 }
 
 /* TODO: consider using a SW context */
@@ -90,16 +91,31 @@ void proc_init_ctx(struct user_context *ctx, uint32_t vcoreid, uintptr_t entryp,
 	tf->tf_rax = vcoreid;
 }
 
-/* TODO: handle both HW and SW contexts.  Though I think this is only ever
- * called on HW ctxs (we never try to pop a SW ctx that userspace had access
- * to). */
+/* Helper: if *addr isn't a canonical user address, poison it.  Use this when
+ * you need a canonical address (like MSR_FS_BASE) */
+static void enforce_user_canon(uintptr_t *addr)
+{
+	if (*addr >> 47 != 0)
+		*addr = 0x5a5a5a5a;
+}
+
 void proc_secure_ctx(struct user_context *ctx)
 {
-	struct hw_trapframe *tf = &ctx->tf.hw_tf;
-	ctx->type = ROS_HW_CTX;
-	tf->tf_ss = GD_UD | 3;
-	tf->tf_cs = GD_UT | 3;
-	tf->tf_rflags |= 0x00000200; // bit 9 is the interrupts-enabled
+	if (ctx->type == ROS_SW_CTX) {
+		struct sw_trapframe *tf = &ctx->tf.sw_tf;
+		enforce_user_canon(&tf->tf_gsbase);
+		enforce_user_canon(&tf->tf_fsbase);
+	} else {
+		/* If we aren't SW, we're assuming (and forcing) a HW ctx.  If this is
+		 * somehow fucked up, userspace should die rather quickly. */
+		struct hw_trapframe *tf = &ctx->tf.hw_tf;
+		ctx->type = ROS_HW_CTX;
+		enforce_user_canon(&tf->tf_gsbase);
+		enforce_user_canon(&tf->tf_fsbase);
+		tf->tf_ss = GD_UD | 3;
+		tf->tf_cs = GD_UT | 3;
+		tf->tf_rflags |= 0x00000200; // bit 9 is the interrupts-enabled
+	}
 }
 
 /* Called when we are currently running an address space on our core and want to
