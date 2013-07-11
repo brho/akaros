@@ -37,7 +37,7 @@
  *
  * Related to that is whether or not our stack pointer is sufficiently far down
  * so that restarting *this* code won't clobber shit we need later.  The way we
- * do this is that we do any "stack jumping" after we enable interrupts/notifs.
+ * do this is that we do any "stack jumping" before we enable interrupts/notifs.
  * These jumps are when we directly modify esp, specifically in the down
  * direction (subtracts).  Adds would be okay.
  *

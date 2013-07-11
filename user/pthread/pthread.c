@@ -438,8 +438,8 @@ int pthread_create(pthread_t *thread, const pthread_attr_t *attr,
 	/* Set the u_tf to start up in __pthread_run, which will call the real
 	 * start_routine and pass it the arg.  Note those aren't set until later in
 	 * pthread_create(). */
-	init_user_ctx(&pthread->uthread.u_ctx, (long)&__pthread_run,
-	              (long)(pthread->stacktop));
+	init_user_ctx(&pthread->uthread.u_ctx, (uintptr_t)&__pthread_run,
+	              (uintptr_t)(pthread->stacktop));
 	pthread->start_routine = start_routine;
 	pthread->arg = arg;
 	/* Initialize the uthread */

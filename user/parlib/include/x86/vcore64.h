@@ -12,7 +12,6 @@
 #include <ros/arch/mmu.h>
 #include <sys/vcore-tls.h>
 
-/* TODO 64b */
 /* Here's how the HW popping works:  It sets up the future stack pointer to
  * have extra stuff after it, and then it pops the registers, then pops the new
  * context's stack pointer.  Then it uses the extra stuff (the new PC is on the
@@ -22,14 +21,13 @@
  *
  * This is what the target uthread's stack will look like (growing down):
  *
- * Target ESP -> |   u_thread's old stuff   | the future %esp, tf->tf_esp
- *               |   new eip                | 0x04 below %esp (one slot is 0x04)
- *               |   eflags space           | 0x08 below
- *               |   eax save space         | 0x0c below
- *               |   actual syscall         | 0x10 below (0x30 space)
- *               |   *sysc ptr to syscall   | 0x40 below (0x10 + 0x30)
- *               |   notif_pending_loc      | 0x44 below (0x10 + 0x30)
- *               |   notif_disabled_loc     | 0x48 below (0x10 + 0x30)
+ * Target RSP -> |   u_thread's old stuff   | the future %rsp, tf->tf_rsp
+ *               |   new rip                | 0x08 below %rsp (one slot is 0x08)
+ *               |   rflags space           | 0x10 below
+ *               |   rdi save space         | 0x18 below
+ *               |   *sysc ptr to syscall   | 0x20 below
+ *               |   notif_pending_loc      | 0x28 below
+ *               |   notif_disabled_loc     | 0x30 below
  *
  * The important thing is that it can handle a notification after it enables
  * notifications, and when it gets resumed it can ultimately run the new
@@ -38,27 +36,30 @@
  *
  * Related to that is whether or not our stack pointer is sufficiently far down
  * so that restarting *this* code won't clobber shit we need later.  The way we
- * do this is that we do any "stack jumping" after we enable interrupts/notifs.
- * These jumps are when we directly modify esp, specifically in the down
+ * do this is that we do any "stack jumping" before we enable interrupts/notifs.
+ * These jumps are when we directly modify rsp, specifically in the down
  * direction (subtracts).  Adds would be okay.
  *
- * Another related concern is the storage for sysc.  It used to be on the
- * vcore's stack, but if an interrupt comes in before we use it, we trash the
- * vcore's stack (and thus the storage for sysc!).  Instead, we put it on the
- * stack of the user tf.  Moral: don't touch a vcore's stack with notifs
- * enabled. */
+ * Another 64-bit concern is the red-zone.  The AMD64 ABI allows the use of
+ * space below the stack pointer by regular programs.  If we allowed this, we
+ * would clobber that space when we do our TF restarts, much like with OSs and
+ * IRQ handlers.  Thus we have the cross compiler automatically disabling the
+ * redzone (-mno-red-zone is a built-in option).
+ *
+ * When compared to the 32 bit code, notice we use rdi, instead of eax, for our
+ * work.  This is because rdi is the arg0 of a syscall.  Using it saves us some
+ * extra moves, since we need to pop the *sysc before saving any other
+ * registers. */
 
-/* Helper for writing the info we need later to the u_tf's stack.  Note, this
- * could get fucked if the struct syscall isn't a multiple of 4-bytes.  Also,
- * note this goes backwards, since memory reads up the stack. */
+/* Helper for writing the info we need later to the u_tf's stack.  Also, note
+ * this goes backwards, since memory reads up the stack. */
 struct restart_helper {
 	void						*notif_disab_loc;
 	void						*notif_pend_loc;
 	struct syscall				*sysc;
-	struct syscall				local_sysc;	/* unused for now */
-	uint32_t					eax_save;
-	uint32_t					eflags;
-	uint32_t					eip;
+	uint64_t					rdi_save;
+	uint64_t					rflags;
+	uint64_t					rip;
 };
 
 /* Static syscall, used for self-notifying.  We never wait on it, and we
@@ -70,67 +71,76 @@ extern struct syscall vc_entry;	/* in x86/vcore.c */
 
 static inline void pop_hw_tf(struct hw_trapframe *tf, uint32_t vcoreid)
 {
-	#if 0
 	struct restart_helper *rst;
 	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
-	if (!tf->tf_cs) { /* sysenter TF.  esp and eip are in other regs. */
-		tf->tf_esp = tf->tf_regs.reg_ebp;
-		tf->tf_eip = tf->tf_regs.reg_edx;
-	}
 	/* The stuff we need to write will be below the current stack of the utf */
-	rst = (struct restart_helper*)((void*)tf->tf_esp -
+	rst = (struct restart_helper*)((void*)tf->tf_rsp -
 	                               sizeof(struct restart_helper));
 	/* Fill in the info we'll need later */
 	rst->notif_disab_loc = &vcpd->notif_disabled;
 	rst->notif_pend_loc = &vcpd->notif_pending;
 	rst->sysc = &vc_entry;
-	rst->eax_save = 0;			/* avoid bugs */
-	rst->eflags = tf->tf_eflags;
-	rst->eip = tf->tf_eip;
+	rst->rdi_save = 0;			/* avoid bugs */
+	rst->rflags = tf->tf_rflags;
+	rst->rip = tf->tf_rip;
 
-	asm volatile ("movl %0,%%esp;        " /* jump esp to the utf */
-	              "popal;                " /* restore normal registers */
-	              "addl $0x24,%%esp;     " /* move to the esp slot in the tf */
-	              "popl %%esp;           " /* change to the utf's %esp */
-	              "subl $0x08,%%esp;     " /* move esp to below eax's slot */
-	              "pushl %%eax;          " /* save eax, will clobber soon */
-				  "movl %2,%%eax;        " /* sizeof struct syscall */
-				  "addl $0x0c,%%eax;     " /* more offset btw eax/notif_en_loc*/
-	              "subl %%eax,%%esp;     " /* move to notif_en_loc slot */
-	              "popl %%eax;           " /* load notif_disabled addr */
-	              "movb $0x00,(%%eax);   " /* enable notifications */
+	asm volatile ("movq %0, %%rsp;       " /* jump rsp to the utf */
+	              "popq %%rax;           " /* restore registers */
+	              "popq %%rbx;           "
+	              "popq %%rcx;           "
+	              "popq %%rdx;           "
+	              "popq %%rbp;           "
+	              "popq %%rsi;           "
+	              "popq %%rdi;           "
+	              "popq %%r8;            "
+	              "popq %%r9;            "
+	              "popq %%r10;           "
+	              "popq %%r11;           "
+	              "popq %%r12;           "
+	              "popq %%r13;           "
+	              "popq %%r14;           "
+	              "popq %%r15;           "
+	              "addq $0x28, %%rsp;    " /* move to the rsp slot in the tf */
+	              "popq %%rsp;           " /* change to the utf's %rsp */
+	              "subq $0x10, %%rsp;    " /* move rsp to below rdi's slot */
+	              "pushq %%rdi;          " /* save rdi, will clobber soon */
+	              "subq $0x18, %%rsp;    " /* move to notif_dis_loc slot */
+	              "popq %%rdi;           " /* load notif_disabled addr */
+	              "movb $0x00, (%%rdi);  " /* enable notifications */
 				  /* Need a wrmb() here so the write of enable_notif can't pass
 				   * the read of notif_pending (racing with a potential
 				   * cross-core call with proc_notify()). */
-				  "lock addl $0,(%%esp); " /* LOCK is a CPU mb() */
+				  "lock addq $0, (%%rdi);" /* LOCK is a CPU mb() */
 				  /* From here down, we can get interrupted and restarted */
-	              "popl %%eax;           " /* get notif_pending status */
-	              "testb $0x01,(%%eax);  " /* test if a notif is pending */
+	              "popq %%rdi;           " /* get notif_pending status loc */
+	              "testb $0x01, (%%rdi); " /* test if a notif is pending */
 	              "jz 1f;                " /* if not pending, skip syscall */
 				  /* Actual syscall.  Note we don't wait on the async call */
-	              "popl %%eax;           " /* &sysc, trap arg0 */
-	              "pushl %%edx;          " /* save edx, will be trap arg1 */
-	              "movl $0x1,%%edx;      " /* sending one async syscall: arg1 */
-				  TODO double check these args
+	              "popq %%rdi;           " /* &sysc, trap arg0 */
+	              "pushq %%rsi;          " /* save rax, will be trap arg1 */
+	              "pushq %%rax;          " /* save rax, will be trap ret */
+	              "movq $0x1, %%rsi;     " /* sending one async syscall: arg1 */
 	              "int %1;               " /* fire the syscall */
-	              "popl %%edx;           " /* restore regs after syscall */
+	              "popq %%rax;           " /* restore regs after syscall */
+	              "popq %%rsi;           "
 	              "jmp 2f;               " /* skip 1:, already popped */
-				  "1: popl %%eax;        " /* discard &sysc (on non-sc path) */
-	              "2: addl %2,%%esp;     " /* jump over the sysc (both paths) */
-	              "popl %%eax;           " /* restore tf's %eax */
-				  "popfl;                " /* restore utf's eflags */
+				  "1: addq $0x08, %%rsp; " /* discard &sysc (on non-sc path) */
+	              "2: popq %%rdi;        " /* restore tf's %rdi (both paths) */
+				  "popfq;                " /* restore utf's rflags */
 	              "ret;                  " /* return to the new PC */
 	              :
-	              : "g"(tf), "i"(T_SYSCALL), "i"(sizeof(struct syscall))
+	              : "g"(&tf->tf_rax), "i"(T_SYSCALL)
 	              : "memory");
-	#endif
 }
 
 static inline void pop_sw_tf(struct sw_trapframe *sw_tf, uint32_t vcoreid)
 {
 	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
-
-	#if 0
+	/* If we have a TLS base set in the TF, then it was saved by the kernel.
+	 * whoever calls pop_tf should have set their TF, so we could assert it is
+	 * the same here.  Can remove for perf reasons. */
+	if (sw_tf->tf_fsbase)
+		assert(get_tls_desc(vcoreid) == (void*)sw_tf->tf_fsbase);
 	/* Restore callee-saved FPU state.  We need to clear exceptions before
 	 * reloading the FP CW, in case the new CW unmasks any.  We also need to
 	 * reset the tag word to clear out the stack.
@@ -143,43 +153,39 @@ static inline void pop_sw_tf(struct sw_trapframe *sw_tf, uint32_t vcoreid)
 	 * an fninit before fldcw. */
 	asm volatile ("ldmxcsr %0" : : "m"(sw_tf->tf_mxcsr));
 	asm volatile ("fnclex; emms; fldcw %0" : : "m"(sw_tf->tf_fpucw));
-	/* Basic plan: restore all regs, off ecx as the sw_tf.  Switch to the new
-	 * stack, push the PC so we can pop it later.  Use eax and edx for the
-	 * locations of sysc and vcpd.  Once on the new stack, we enable notifs,
-	 * check if we missed one, and if so, self notify. */
-	asm volatile ("movl 0x00(%0),%%ebp;  " /* restore regs */
-	              "movl 0x04(%0),%%ebx;  "
-	              "movl 0x08(%0),%%esi;  "
-	              "movl 0x0c(%0),%%edi;  "
-	              "movl 0x10(%0),%%esp;  " /* jump to future stack */
-	              "pushl 0x14(%0);       " /* save PC for future ret */
-	              "movl %2,%%ecx;        " /* vcpd loc into ecx */
-	              "addl %4,%%ecx;        " /* notif_disabled loc into ecx */
-	              "movb $0x00,(%%ecx);   " /* enable notifications */
+	/* Basic plan: restore all regs, off rcx as the sw_tf.  Switch to the new
+	 * stack, save the PC so we can jump to it later.  Use clobberably
+	 * registers for the locations of sysc, notif_dis, and notif_pend. Once on
+	 * the new stack, we enable notifs, check if we missed one, and if so, self
+	 * notify.  Note the syscall clobbers rax. */
+	asm volatile ("movq 0x00(%0), %%rbx; " /* restore regs */
+	              "movq 0x08(%0), %%rbp; "
+	              "movq 0x10(%0), %%r12; "
+	              "movq 0x18(%0), %%r13; "
+	              "movq 0x20(%0), %%r14; "
+	              "movq 0x28(%0), %%r15; "
+	              "movq 0x30(%0), %%r8;  " /* save rip in r8 */
+	              "movq 0x38(%0), %%rsp; " /* jump to future stack */
+	              "movb $0x00, (%2);     " /* enable notifications */
 	              /* Need a wrmb() here so the write of enable_notif can't pass
 	               * the read of notif_pending (racing with a potential
 	               * cross-core call with proc_notify()). */
-	              "lock addl $0,(%%esp); " /* LOCK is a CPU mb() */
+	              "lock addq $0, (%2);   " /* LOCK is a CPU mb() */
 	              /* From here down, we can get interrupted and restarted */
-	              "movl %2,%%ecx;        " /* vcpd loc into ecx */
-	              "addl %5,%%ecx;        " /* notif_pending loc into ecx */
-	              "testb $0x01,(%%ecx);  " /* test if a notif is pending */
+	              "testb $0x01, (%3);    " /* test if a notif is pending */
 	              "jz 1f;                " /* if not pending, skip syscall */
 	              /* Actual syscall.  Note we don't wait on the async call.
-	               * &sysc is already in eax (trap arg0). */
-	              "movl $0x1,%%edx;      " /* sending one async syscall: arg1 */
-				  TODO double check these args
-	              "int %3;               " /* fire the syscall */
-	              "1: ret;               " /* retaddr was pushed earlier */
+	               * &vc_entry is already in rdi (trap arg0). */
+	              "movq $0x1, %%rsi;     " /* sending one async syscall: arg1 */
+	              "int %4;               " /* fire the syscall */
+	              "1: jmp *%%r8;         " /* ret saved earlier */
 	              :
-	              : "c"(sw_tf),
-	                "a"(&vc_entry),
-	                "d"(vcpd),
-	                "i"(T_SYSCALL),
-	                "i"(offsetof(struct preempt_data, notif_disabled)),
-	                "i"(offsetof(struct preempt_data, notif_pending))
+	              : "c"(&sw_tf->tf_rbx),
+	                "D"(&vc_entry),
+	                "S"(&vcpd->notif_disabled),
+	                "d"(&vcpd->notif_pending),
+	                "i"(T_SYSCALL)
 	              : "memory");
-	#endif
 }
 
 /* Pops a user context, reanabling notifications at the same time.  A Userspace
@@ -204,50 +210,53 @@ static inline void pop_user_ctx(struct user_context *ctx, uint32_t vcoreid)
  * interrupts a uthread that is in the process of disabling notifs. */
 static inline void pop_user_ctx_raw(struct user_context *ctx, uint32_t vcoreid)
 {
-	#if 0
 	struct hw_trapframe *tf = &ctx->tf.hw_tf;
 	assert(ctx->type == ROS_HW_CTX);
 	struct restart_helper *rst;
 	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
-	if (!tf->tf_cs) { /* sysenter TF.  esp and eip are in other regs. */
-		tf->tf_esp = tf->tf_regs.reg_ebp;
-		tf->tf_eip = tf->tf_regs.reg_edx;
-	}
 	/* The stuff we need to write will be below the current stack of the utf */
-	rst = (struct restart_helper*)((void*)tf->tf_esp -
+	rst = (struct restart_helper*)((void*)tf->tf_rsp -
 	                               sizeof(struct restart_helper));
 	/* Fill in the info we'll need later */
 	rst->notif_disab_loc = &vcpd->notif_disabled;
-	rst->eax_save = 0;			/* avoid bugs */
-	rst->eflags = tf->tf_eflags;
-	rst->eip = tf->tf_eip;
+	rst->rdi_save = 0;			/* avoid bugs */
+	rst->rflags = tf->tf_rflags;
+	rst->rip = tf->tf_rip;
 
-	asm volatile ("movl %0,%%esp;        " /* jump esp to the utf */
-	              "popal;                " /* restore normal registers */
-	              "addl $0x24,%%esp;     " /* move to the esp slot in the tf */
-	              "popl %%esp;           " /* change to the utf's %esp */
-	              "subl $0x08,%%esp;     " /* move esp to below eax's slot */
-	              "pushl %%eax;          " /* save eax, will clobber soon */
-				  "movl %2,%%eax;        " /* sizeof struct syscall */
-				  "addl $0x0c,%%eax;     " /* more offset btw eax/notif_en_loc*/
-	              "subl %%eax,%%esp;     " /* move to notif_en_loc slot */
-	              "popl %%eax;           " /* load notif_disabled addr */
-	              "movb $0x00,(%%eax);   " /* enable notifications */
+	asm volatile ("movq %0, %%rsp;       " /* jump esp to the utf */
+	              "popq %%rax;           " /* restore registers */
+	              "popq %%rbx;           "
+	              "popq %%rcx;           "
+	              "popq %%rdx;           "
+	              "popq %%rbp;           "
+	              "popq %%rsi;           "
+	              "popq %%rdi;           "
+	              "popq %%r8;            "
+	              "popq %%r9;            "
+	              "popq %%r10;           "
+	              "popq %%r11;           "
+	              "popq %%r12;           "
+	              "popq %%r13;           "
+	              "popq %%r14;           "
+	              "popq %%r15;           "
+	              "addq $0x28, %%rsp;    " /* move to the rsp slot in the tf */
+	              "popq %%rsp;           " /* change to the utf's %rsp */
+	              "subq $0x10, %%rsp;    " /* move rsp to below rdi's slot */
+	              "pushq %%rdi;          " /* save rdi, will clobber soon */
+	              "subq $0x18, %%rsp;    " /* move to notif_dis_loc slot */
+	              "popq %%rdi;           " /* load notif_disabled addr */
+	              "movb $0x00, (%%rdi);  " /* enable notifications */
 				  /* Here's where we differ from the regular pop_user_ctx().
-				   * We do the same pops/esp moves, just to keep things similar
-				   * and simple, but don't do test, clear notif_pending, or
-				   * call a syscall. */
+				   * We need to adjust rsp and whatnot, but don't do test,
+				   * clear notif_pending, or call a syscall. */
 				  /* From here down, we can get interrupted and restarted */
-	              "popl %%eax;           " /* get notif_pending status */
-				  "popl %%eax;           " /* discard &sysc (on non-sc path) */
-	              "addl %2,%%esp;        " /* jump over the sysc (both paths) */
-	              "popl %%eax;           " /* restore tf's %eax */
-				  "popfl;                " /* restore utf's eflags */
+	              "addq $0x10, %%rsp;    " /* move to rdi save slot */
+	              "popq %%rdi;           " /* restore tf's %rdi */
+				  "popfq;                " /* restore utf's rflags */
 	              "ret;                  " /* return to the new PC */
 	              :
-	              : "g"(tf), "i"(T_SYSCALL), "i"(sizeof(struct syscall))
+	              : "g"(&tf->tf_rax)
 	              : "memory");
-	#endif
 }
 
 /* Save's a SW context, setting the PC to the end of this function.  We only
@@ -264,117 +273,137 @@ static inline void pop_user_ctx_raw(struct user_context *ctx, uint32_t vcoreid)
  * them early to set some variables.  Arguably we should do this different. */
 static inline void save_user_ctx(struct user_context *ctx)
 {
-	#if 0
 	struct sw_trapframe *sw_tf = &ctx->tf.sw_tf;
 	ctx->type = ROS_SW_CTX;
 	asm volatile ("stmxcsr %0" : "=m"(sw_tf->tf_mxcsr));
 	asm volatile ("fnstcw %0" : "=m"(sw_tf->tf_fpucw));
 	/* Pretty simple: save all the regs, IAW the sys-v ABI */
-	asm volatile ("movl %%ebp,0x00(%0);   "
-	              "movl %%ebx,0x04(%0);   "
-	              "movl %%esi,0x08(%0);   "
-	              "movl %%edi,0x0c(%0);   "
-	              "movl %%esp,0x10(%0);   "
-	              "leal 1f,%%eax;         " /* get future eip */
-	              "movl %%eax,0x14(%0);   "
-	              "1:                     " /* where this tf will restart */
-	              :
-	              : "c"(sw_tf)
-	              : "eax", "edx", "memory", "cc");
-	#endif
+	asm volatile("mov %%rsp, 0x48(%0);   " /* save rsp in its slot*/
+	             "leaq 1f, %%rax;        " /* get future rip */
+	             "mov %%rax, 0x40(%0);   " /* save rip in its slot*/
+	             "mov %%r15, 0x38(%0);   "
+	             "mov %%r14, 0x30(%0);   "
+	             "mov %%r13, 0x28(%0);   "
+	             "mov %%r12, 0x20(%0);   "
+	             "mov %%rbp, 0x18(%0);   "
+	             "mov %%rbx, 0x10(%0);   "
+	             "1:                     " /* where this tf will restart */
+	             : 
+				 : "D"(sw_tf)
+	             : "rax", "rcx", "rdx", "rsi", "r8", "r9", "r10", "r11",
+	               "memory", "cc");
 }
 
 /* The old version, kept around for testing */
+/* Hasn't been used yet for 64 bit.  If you use this, it's worth checking to
+ * make sure rax isn't selected for 0, 1, or 2. (and we probably don't need to
+ * save rax in the beginning) */
 static inline void save_user_ctx_hw(struct user_context *ctx)
 {
-	#if 0
 	struct hw_trapframe *tf = &ctx->tf.hw_tf;
 	ctx->type = ROS_HW_CTX;
 	memset(tf, 0, sizeof(struct hw_trapframe)); /* sanity */
 	/* set CS and make sure eflags is okay */
 	tf->tf_cs = GD_UT | 3;
-	tf->tf_eflags = 0x00000200; /* interrupts enabled.  bare minimum eflags. */
-	/* Save the regs and the future esp. */
-	asm volatile("movl %%esp,(%0);       " /* save esp in it's slot*/
-	             "pushl %%eax;           " /* temp save eax */
-	             "leal 1f,%%eax;         " /* get future eip */
-	             "movl %%eax,(%1);       " /* store future eip */
-	             "popl %%eax;            " /* restore eax */
-	             "movl %2,%%esp;         " /* move to the beginning of the tf */
-	             "addl $0x20,%%esp;      " /* move to after the push_regs */
-	             "pushal;                " /* save regs */
-	             "addl $0x44,%%esp;      " /* move to esp slot */
-	             "popl %%esp;            " /* restore esp */
+	tf->tf_rflags = 0x200; /* interrupts enabled.  bare minimum rflags. */
+	/* Save the regs and the future rsp. */
+	asm volatile("movq %%rsp, (%0);      " /* save rsp in it's slot*/
+	             "pushq %%rax;           " /* temp save rax */
+	             "leaq 1f, %%rax;        " /* get future rip */
+	             "movq %%rax, (%1);      " /* store future rip */
+	             "popq %%rax;            " /* restore rax */
+	             "movq %2, %%rsp;        " /* move to the rax slot of the tf */
+	             "addl $0x78,%%esp;      " /* move to just past r15 */
+	             "pushq %%r15;           " /* save regs */
+	             "pushq %%r14;           "
+	             "pushq %%r13;           "
+	             "pushq %%r12;           "
+	             "pushq %%r11;           "
+	             "pushq %%r10;           "
+	             "pushq %%r9;            "
+	             "pushq %%r8;            "
+	             "pushq %%rdi;           "
+	             "pushq %%rsi;           "
+	             "pushq %%rbp;           "
+	             "pushq %%rdx;           "
+	             "pushq %%rcx;           "
+	             "pushq %%rbx;           "
+	             "pushq %%rax;           "
+	             "addq $0xa0, %%rsp;     " /* move to rsp slot */
+	             "popq %%rsp;            " /* restore saved/original rsp */
 	             "1:                     " /* where this tf will restart */
 	             : 
-	             : "g"(&tf->tf_esp), "g"(&tf->tf_eip), "g"(tf)
-	             : "eax", "memory", "cc");
-	#endif
+	             : "g"(&tf->tf_rsp), "g"(&tf->tf_rip), "g"(tf->tf_rax)
+	             : "rax", "memory", "cc");
 }
 
-static inline void init_user_ctx(struct user_context *ctx, uint32_t entry_pt,
-                                 uint32_t stack_top)
+static inline void init_user_ctx(struct user_context *ctx, uintptr_t entry_pt,
+                                 uintptr_t stack_top)
 {
-	#if 0
 	struct sw_trapframe *sw_tf = &ctx->tf.sw_tf;
 	ctx->type = ROS_SW_CTX;
 	/* No need to bother with setting the other GP registers; the called
 	 * function won't care about their contents. */
-	sw_tf->tf_esp = stack_top;
-	sw_tf->tf_eip = entry_pt;
+	sw_tf->tf_rsp = stack_top;
+	sw_tf->tf_rip = entry_pt;
+	sw_tf->tf_rbp = 0;	/* for potential backtraces */
 	sw_tf->tf_mxcsr = 0x00001f80;	/* x86 default mxcsr */
 	sw_tf->tf_fpucw = 0x037f;		/* x86 default FP CW */
-	#endif
 }
 
 // this is how we get our thread id on entry.
 #define __vcore_id_on_entry \
 ({ \
-	register int temp asm ("eax"); \
+	register int temp asm ("rax"); \
 	temp; \
 })
 
 /* For debugging. */
 #include <stdio.h>
-static void print_hw_tf(struct hw_trapframe *tf)
+static void print_hw_tf(struct hw_trapframe *hw_tf)
 {
-	#if 0
-	printf("[user] HW TRAP frame %08p\n", tf);
-	printf("  edi  0x%08x\n", tf->tf_regs.reg_edi);
-	printf("  esi  0x%08x\n", tf->tf_regs.reg_esi);
-	printf("  ebp  0x%08x\n", tf->tf_regs.reg_ebp);
-	printf("  oesp 0x%08x\n", tf->tf_regs.reg_oesp);
-	printf("  ebx  0x%08x\n", tf->tf_regs.reg_ebx);
-	printf("  edx  0x%08x\n", tf->tf_regs.reg_edx);
-	printf("  ecx  0x%08x\n", tf->tf_regs.reg_ecx);
-	printf("  eax  0x%08x\n", tf->tf_regs.reg_eax);
-	printf("  gs   0x----%04x\n", tf->tf_gs);
-	printf("  fs   0x----%04x\n", tf->tf_fs);
-	printf("  es   0x----%04x\n", tf->tf_es);
-	printf("  ds   0x----%04x\n", tf->tf_ds);
-	printf("  trap 0x%08x\n", tf->tf_trapno);
-	printf("  err  0x%08x\n", tf->tf_err);
-	printf("  eip  0x%08x\n", tf->tf_eip);
-	printf("  cs   0x----%04x\n", tf->tf_cs);
-	printf("  flag 0x%08x\n", tf->tf_eflags);
-	printf("  esp  0x%08x\n", tf->tf_esp);
-	printf("  ss   0x----%04x\n", tf->tf_ss);
-	#endif
+	printf("[user] HW TRAP frame 0x%016x\n", hw_tf);
+	printf("  rax  0x%016lx\n",           hw_tf->tf_rax);
+	printf("  rbx  0x%016lx\n",           hw_tf->tf_rbx);
+	printf("  rcx  0x%016lx\n",           hw_tf->tf_rcx);
+	printf("  rdx  0x%016lx\n",           hw_tf->tf_rdx);
+	printf("  rbp  0x%016lx\n",           hw_tf->tf_rbp);
+	printf("  rsi  0x%016lx\n",           hw_tf->tf_rsi);
+	printf("  rdi  0x%016lx\n",           hw_tf->tf_rdi);
+	printf("  r8   0x%016lx\n",           hw_tf->tf_r8);
+	printf("  r9   0x%016lx\n",           hw_tf->tf_r9);
+	printf("  r10  0x%016lx\n",           hw_tf->tf_r10);
+	printf("  r11  0x%016lx\n",           hw_tf->tf_r11);
+	printf("  r12  0x%016lx\n",           hw_tf->tf_r12);
+	printf("  r13  0x%016lx\n",           hw_tf->tf_r13);
+	printf("  r14  0x%016lx\n",           hw_tf->tf_r14);
+	printf("  r15  0x%016lx\n",           hw_tf->tf_r15);
+	printf("  trap 0x%08x\n",             hw_tf->tf_trapno);
+	printf("  gsbs 0x%016lx\n",           hw_tf->tf_gsbase);
+	printf("  fsbs 0x%016lx\n",           hw_tf->tf_fsbase);
+	printf("  err  0x--------%08x\n",     hw_tf->tf_err);
+	printf("  rip  0x%016lx\n",           hw_tf->tf_rip);
+	printf("  cs   0x------------%04x\n", hw_tf->tf_cs);
+	printf("  flag 0x%016lx\n",           hw_tf->tf_rflags);
+	printf("  rsp  0x%016lx\n",           hw_tf->tf_rsp);
+	printf("  ss   0x------------%04x\n", hw_tf->tf_ss);
 }
 
 static void print_sw_tf(struct sw_trapframe *sw_tf)
 {
-	#if 0
-	printf("[user] SW TRAP frame %08p\n", sw_tf);
-	printf("  ebp  0x%08x\n", sw_tf->tf_ebp);
-	printf("  ebx  0x%08x\n", sw_tf->tf_ebx);
-	printf("  esi  0x%08x\n", sw_tf->tf_esi);
-	printf("  edi  0x%08x\n", sw_tf->tf_edi);
-	printf("  esp  0x%08x\n", sw_tf->tf_esp);
-	printf("  eip  0x%08x\n", sw_tf->tf_eip);
-	printf(" mxcsr 0x%08x\n", sw_tf->tf_mxcsr);
-	printf(" fpucw 0x----%04x\n", sw_tf->tf_fpucw);
-	#endif
+	printf("[user] SW TRAP frame 0x%016p\n", sw_tf);
+	printf("  rbx  0x%016lx\n",           sw_tf->tf_rbx);
+	printf("  rbp  0x%016lx\n",           sw_tf->tf_rbp);
+	printf("  r12  0x%016lx\n",           sw_tf->tf_r12);
+	printf("  r13  0x%016lx\n",           sw_tf->tf_r13);
+	printf("  r14  0x%016lx\n",           sw_tf->tf_r14);
+	printf("  r15  0x%016lx\n",           sw_tf->tf_r15);
+	printf("  gsbs 0x%016lx\n",           sw_tf->tf_gsbase);
+	printf("  fsbs 0x%016lx\n",           sw_tf->tf_fsbase);
+	printf("  rip  0x%016lx\n",           sw_tf->tf_rip);
+	printf("  rsp  0x%016lx\n",           sw_tf->tf_rsp);
+	printf(" mxcsr 0x%08x\n",             sw_tf->tf_mxcsr);
+	printf(" fpucw 0x%04x\n",             sw_tf->tf_fpucw);
 }
 
 static void print_user_context(struct user_context *ctx)
