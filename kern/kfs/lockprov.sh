@@ -27,7 +27,7 @@ echo "" >> tmpfile
 max_vcores
 MAXVC=$?
 # pth_test exists to hog the machine
-pthread_test 100 999999999999999 $MAXVC >> tmpfile 2>&1 &
+pthread_test 100 999999999 $MAXVC >> tmpfile 2>&1 &
 PTHPID=$!
 echo Launch pth_test, pid was $PTHPID
 
