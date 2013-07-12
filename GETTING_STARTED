@@ -32,7 +32,7 @@ I'll describe how to get x86 working.  RISCV is similar.
 
 The first step is to configure the kernel.  config, menuconfig, and some of the
 other KBuild targets work.  Defconfig gives you a default configuration.  For
-example, to config for 32 bit x86:
+example, to config for 64-bit x86:
 
 $ make ARCH=x86 defconfig
 
@@ -40,8 +40,11 @@ Alternatively, you can run menuconfig to customize what settings you want:
 
 $ make ARCH=x86 menuconfig
 
-There are a lot of settings in here, which you should browse through to decide
-what you want to enable/disable.
+For x86, you can choose between 32 and 64 bit when you make menuconfig.  This
+selection must match your cross compiler make command.  The default is 64 bit.
+
+There are a lot of other settings when you make config, and you should browse
+through to decide what you want to enable/disable.
 
 Most everyone wants KFS turned on (Filesystems --> KFS filesystem).  This is
 the in-memory filesystem that the kernel uses.  The kernel build scripts will
@@ -74,19 +77,23 @@ You also need to add bin directories to your PATH where the cross compiler will
 be installed.  This will vary based on your value for INSTDIRS.  For instance,
 my path contains:
 
-/home/brho/classes/ros/ros-gcc-glibc/install-i386-ros-gcc/bin
+/home/brho/classes/ros/ros-gcc-glibc/install-x86_64-ros-gcc/bin
+
+	and
+
+/home/brho/classes/ros/ros-gcc-glibc/install-i686-ros-gcc/bin
 
 You can also set up MAKE_JOBS, so you don't over or under load your system when
 building.  I have a 2 core laptop, so I use MAKE_JOBS := 3
 
-At this point, you can build:
+At this point, you can build (for example):
 
-$ make i686
+$ make x86_64
 
 This might take a while (10-20 minutes for me on a 2007 era laptop).
 
 Just to double check everything installed correctly, you should be able to run
-i686-ros-gcc from your shell.
+x86_64-ros-gcc from your shell.
 
 Now, you have a cross compiler ready, and you can start to build Akaros.
 
@@ -147,8 +154,11 @@ manually).
 
 I'm running busybox 1.17.3, and the config file I use is in tools/patches.
 Copy that to your busybox directory (once you download and untar it, etc) and
-name it ".config".  You can get busybox from http://www.busybox.net/downloads/.
-Eventually I'll upgrade, though it hasn't been a big deal yet.
+name it ".config".  This config file assumes you want x86_64-ros-gcc.  If you
+are builidng for 32 bit x86 or riscv, you will need to edit the config file.
+
+You can get busybox from http://www.busybox.net/downloads/.  Eventually I'll
+upgrade, though it hasn't been a big deal yet.
 
 $ cd BUSYBOXDIR/..
 $ wget http://www.busybox.net/downloads/busybox-1.17.3.tar.bz2
@@ -337,6 +347,10 @@ Oh, and don't forget to:
 $ make fill-kfs
 
 to make sure you run the new pthread_test. 
+
+Additionally, when switching between 32 and 64 bit x86, make objclean before
+filling KFS.  This is the easiest way to make sure you get the appropriate
+libraries loaded in KFS.
 
 Early on as a dev, there are lots of times where you accidentally don't run the
 right program (or kernel) and won't understand why your change isn't happening.

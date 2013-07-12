@@ -1,13 +1,21 @@
 # default config.  While this is x86 specific, when config'd for RISCV, the x86
 # specific items will be ignored.
 #
+CONFIG_64BIT=y
 CONFIG_X86=y
+# CONFIG_X86_32 is not set
+CONFIG_X86_64=y
+
+#
+# x86 Options
+#
+# CONFIG_PCI_VERBOSE is not set
+# CONFIG_NOFASTCALL_FSBASE is not set
 
 #
 # x86 Hacks
 #
-# CONFIG_PCI_VERBOSE is not set
-# CONFIG_NOMTRRS is not set
+CONFIG_NOMTRRS=y
 # CONFIG_ENABLE_MPTABLES is not set
 # CONFIG_KB_CORE0_ONLY is not set
 CONFIG_NETWORKING=y
