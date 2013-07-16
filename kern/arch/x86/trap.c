@@ -274,8 +274,8 @@ static void trap_dispatch(struct hw_trapframe *hw_tf)
 			/* Set up and run the async calls */
 			/* TODO: this is using the wrong reg1 for traps for 32 bit */
 			prep_syscalls(current,
-			              (struct syscall*)x86_get_sysenter_arg0(hw_tf),
-						  (unsigned int)x86_get_sysenter_arg1(hw_tf));
+			              (struct syscall*)x86_get_systrap_arg0(hw_tf),
+						  (unsigned int)x86_get_systrap_arg1(hw_tf));
 			break;
 		default:
 			// Unexpected trap: The user process or the kernel has a bug.

@@ -94,6 +94,16 @@ static inline long x86_get_sysenter_arg1(struct hw_trapframe *hw_tf)
 	return hw_tf->tf_rsi;
 }
 
+static inline long x86_get_systrap_arg0(struct hw_trapframe *hw_tf)
+{
+	return hw_tf->tf_rdi;
+}
+
+static inline long x86_get_systrap_arg1(struct hw_trapframe *hw_tf)
+{
+	return hw_tf->tf_rsi;
+}
+
 static inline uintptr_t x86_get_stacktop_tss(struct taskstate *tss)
 {
 	return tss->ts_rsp0;
