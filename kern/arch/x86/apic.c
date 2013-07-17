@@ -19,6 +19,7 @@
 #include <bitmask.h>
 
 system_timing_t RO system_timing = {0, 0, 0xffff, 0};
+bool core_id_ready = FALSE;
 
 /* * Remaps the Programmable Interrupt Controller to use IRQs 32-47
  * http://wiki.osdev.org/PIC

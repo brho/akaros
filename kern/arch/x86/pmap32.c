@@ -276,6 +276,7 @@ vm_init(void)
 
 	// Flush the TLB for good measure, to kill the pgdir[0] mapping.
 	tlb_flush_global();
+	core_id_ready = TRUE;
 }
 
 void x86_cleanup_bootmem(void)

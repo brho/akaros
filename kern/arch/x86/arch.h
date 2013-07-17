@@ -30,6 +30,7 @@ static inline int get_hw_coreid(uint32_t coreid) __attribute__((always_inline));
 static inline int hw_core_id(void) __attribute__((always_inline));
 static inline int get_os_coreid(int hw_coreid) __attribute__((always_inline));
 static inline int core_id(void) __attribute__((always_inline));
+static inline int core_id_early(void) __attribute__((always_inline));
 static inline void cache_flush(void) __attribute__((always_inline));
 static inline void reboot(void)
               __attribute__((always_inline)) __attribute__((noreturn));
@@ -170,6 +171,13 @@ static inline int get_os_coreid(int hw_coreid)
 static inline int core_id(void)
 {
 	return get_os_coreid(hw_core_id());
+}
+
+static inline int core_id_early(void)
+{
+	if (!core_id_ready)
+		return 0;
+	return core_id();
 }
 
 static inline void cache_flush(void)

@@ -142,6 +142,11 @@ static __inline int core_id(void)
 	return get_os_coreid(hw_core_id());
 }
 
+static __inline int core_id_early(void)
+{
+	return core_id();
+}
+
 static __inline void cache_flush(void)
 {
 }

@@ -123,6 +123,21 @@ typedef struct system_timing {
 
 extern system_timing_t system_timing;
 
+/* Tracks whether it is safe to execute core_id() or not.  If we're using the
+ * LAPIC, we need to have the LAPIC mapped into VM.  vm_init() sets this to
+ * TRUE.
+ *
+ * If we're using rdtscp, if the instruction is supported, we can call core_id()
+ * without rebooting.  cpuinfo should have panic'd if we're running on a machine
+ * that doesn't support rdtscp, before vm_init().
+ *
+ * If we're using something else (like segmentation), then that will need to get
+ * set up before vm_init(), at least for core 0.
+ *
+ * Note that core_id() will return 0 (or possibly another wrong answer) on cores
+ * other than core 0 when it is called before smp_boot completes. */
+extern bool core_id_ready;
+
 void pic_remap(void);
 void pic_mask_irq(uint8_t irq);
 void pic_unmask_irq(uint8_t irq);

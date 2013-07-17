@@ -28,7 +28,7 @@ static void decrease_lock_depth(uint32_t coreid)
 #ifdef CONFIG_SPINLOCK_DEBUG
 void spin_lock(spinlock_t *lock)
 {
-	uint32_t coreid = core_id();
+	uint32_t coreid = core_id_early();
 	struct per_cpu_info *pcpui = &per_cpu_info[coreid];
 	/* Short circuit our lock checking, so we can print or do other things to
 	 * announce the failure that require locks. */

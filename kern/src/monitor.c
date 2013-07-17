@@ -762,19 +762,20 @@ void monitor(struct hw_trapframe *hw_tf)
 	#define MON_CMD_LENGTH 256
 	char buf[MON_CMD_LENGTH];
 	int cnt;
+	int coreid = core_id_early();
 
 	/* they are always disabled, since we have this irqsave lock */
 	if (irq_is_enabled())
-		printk("Entering Nanwan's Dungeon on Core %d (Ints on):\n", core_id());
+		printk("Entering Nanwan's Dungeon on Core %d (Ints on):\n", coreid);
 	else
-		printk("Entering Nanwan's Dungeon on Core %d (Ints off):\n", core_id());
+		printk("Entering Nanwan's Dungeon on Core %d (Ints off):\n", coreid);
 	printk("Type 'help' for a list of commands.\n");
 
 	if (hw_tf != NULL)
 		print_trapframe(hw_tf);
 
 	while (1) {
-		cnt = readline(buf, MON_CMD_LENGTH, "ROS(Core %d)> ", core_id());
+		cnt = readline(buf, MON_CMD_LENGTH, "ROS(Core %d)> ", coreid);
 		if (cnt > 0) {
 			buf[cnt] = 0;
 			if (runcmd(buf, hw_tf) < 0)

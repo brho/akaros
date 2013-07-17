@@ -108,17 +108,12 @@ void _panic(const char *file, int line, const char *fmt,...)
 {
 	va_list ap;
 	struct per_cpu_info *pcpui;
-	#if 0
-	/* Debug panic, in case we panic before core_id is available */
-	printk("Kernel panic at %s:%d\n", file, line);
-	while (1)
-		cpu_relax();
-	#endif
 	/* We're panicing, possibly in a place that can't handle the lock checker */
-	pcpui = &per_cpu_info[core_id()];
+	pcpui = &per_cpu_info[core_id_early()];
 	pcpui->__lock_depth_disabled++;
 	va_start(ap, fmt);
-	cprintf("kernel panic at %s:%d, from core %d: ", file, line, core_id());
+	printk("kernel panic at %s:%d, from core %d: ", file, line,
+	       core_id_early());
 	vcprintf(fmt, ap);
 	cprintf("\n");
 	va_end(ap);
@@ -138,7 +133,8 @@ void _warn(const char *file, int line, const char *fmt,...)
 	va_list ap;
 
 	va_start(ap, fmt);
-	cprintf("kernel warning at %s:%d: ", file, line);
+	printk("kernel warning at %s:%d, from core %d: ", file, line,
+	       core_id_early());
 	vcprintf(fmt, ap);
 	cprintf("\n");
 	va_end(ap);
