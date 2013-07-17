@@ -155,8 +155,4 @@ static inline void __spinlock_init(spinlock_t *lock)
 	lock->rlock = 0;
 }
 
-static inline void spinlock_debug(spinlock_t* lock)
-{
-}
-
 #endif /* ROS_KERN_ARCH_ATOMIC_H */

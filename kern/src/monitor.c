@@ -375,11 +375,6 @@ int mon_exit(int argc, char **argv, struct hw_trapframe *hw_tf)
 
 int mon_kfunc(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
-	#ifndef CONFIG_X86
-	printk("Only supported on x86 for now.  =(\n");
-	return -1;
-	#endif
-
 	void (*func)(void *arg, ...);
 
 	if (argc < 2) {
@@ -387,7 +382,7 @@ int mon_kfunc(int argc, char **argv, struct hw_trapframe *hw_tf)
 		printk("Arguments must be in hex.  Can take 6 args.\n");
 		return 1;
 	}
-	func = debug_get_fn_addr(argv[1]);
+	func = (void*)get_symbol_addr(argv[1]);
 	if (!func) {
 		printk("Function not found.\n");
 		return 1;

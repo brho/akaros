@@ -192,25 +192,3 @@ void show_mapping(uintptr_t start, size_t size)
 		}
 	}
 }
-
-/* Like backtrace, this is probably not the best place for this. */
-void spinlock_debug(spinlock_t *lock)
-{
-#ifdef CONFIG_SPINLOCK_DEBUG
-	eipdebuginfo_t debuginfo;
-	char buf[256];
-	uint32_t eip = (uint32_t)lock->call_site;
-
-	if (!eip) {
-		printk("Lock %p: never locked\n", lock);
-		return;
-	}
-	debuginfo_eip(eip, &debuginfo);
-	memset(buf, 0, 256);
-	strncpy(buf, debuginfo.eip_fn_name, MIN(debuginfo.eip_fn_namelen, 256));
-	buf[MIN(debuginfo.eip_fn_namelen, 255)] = 0;
-	printk("Lock %p: last locked at [<%p>] in %s(%p) on core %d\n", lock, eip, buf,
-	       debuginfo.eip_fn_addr, lock->calling_core);
-#endif
-}
-

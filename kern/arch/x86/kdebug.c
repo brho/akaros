@@ -8,6 +8,7 @@
 #include <kdebug.h>
 #include <pmap.h>
 #include <process.h>
+#include <kmalloc.h>
 
 #include <ros/memlayout.h>
 
@@ -312,6 +313,7 @@ void backtrace(void)
 	unsigned long *ebp, eip;
 	eipdebuginfo_t debuginfo;
 	char buf[256];
+	char *func_name;
 	int j, i = 1;
 	ebp = (unsigned long*)read_bp();
 	// this is part of the way back into the call() instruction's bytes
@@ -323,6 +325,11 @@ void backtrace(void)
 	printk("Stack Backtrace on Core %d:\n", core_id());
 	// on each iteration, ebp holds the stack frame and eip an addr in that func
 	while (1) {
+		#ifdef CONFIG_X86_64
+		func_name = get_fn_name(eip);
+		printk("#%02d [<%p>] in %s\n", i++,  eip, func_name);
+		kfree(func_name);
+		#else
 		debuginfo_eip(eip, &debuginfo);
 		memset(buf, 0, 256);
 		strncpy(buf, debuginfo.eip_fn_name, MIN(debuginfo.eip_fn_namelen, 256));
@@ -334,12 +341,14 @@ void backtrace(void)
 		for (j = 0; j < MIN(debuginfo.eip_fn_narg, 5); j++)
 			cprintf(" %08x", *(ebp + 2 + j));
 		cprintf("\n");
+		func_name = (char*)debuginfo.eip_fn_name;
+		#endif
 		if (!ebp)
 			break;
 		eip = *(ebp + 1) - 1;
 		ebp = (unsigned long*)(*ebp);
 		#ifdef CONFIG_RESET_STACKS
-		if (!strncmp("__smp_idle", debuginfo.eip_fn_name, 10))
+		if (!strncmp("__smp_idle", func_name, 10))
 			break;
 		#endif /* CONFIG_RESET_STACKS */
 	}

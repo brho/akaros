@@ -61,7 +61,6 @@ extern inline void __spinlock_init(spinlock_t *lock);
 extern inline bool spin_locked(spinlock_t *lock);
 extern inline void __spin_lock(spinlock_t *lock);
 extern inline void __spin_unlock(spinlock_t *lock);
-extern inline void spinlock_debug(spinlock_t *lock);
 
 /* So we can inline a __spin_lock if we want.  Even though we don't need this
  * if we're debugging, its helpful to keep the include at the same place for
@@ -72,6 +71,7 @@ extern inline void spinlock_debug(spinlock_t *lock);
 /* Arch indep, in k/s/atomic.c */
 void spin_lock(spinlock_t *lock);
 void spin_unlock(spinlock_t *lock);
+void spinlock_debug(spinlock_t *lock);
 
 #else
 /* Just inline the arch-specific __ versions */
@@ -83,6 +83,10 @@ static inline void spin_lock(spinlock_t *lock)
 static inline void spin_unlock(spinlock_t *lock)
 {
 	__spin_unlock(lock);
+}
+
+static inline void spinlock_debug(spinlock_t *lock)
+{
 }
 
 #endif /* CONFIG_SPINLOCK_DEBUG */

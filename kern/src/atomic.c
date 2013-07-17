@@ -12,6 +12,8 @@
 #include <assert.h>
 #include <hashtable.h>
 #include <smp.h>
+#include <kmalloc.h>
+#include <kdebug.h>
 
 static void increase_lock_depth(uint32_t coreid)
 {
@@ -62,6 +64,22 @@ void spin_unlock(spinlock_t *lock)
 	/* Memory barriers are handled by the particular arches */
 	__spin_unlock(lock);
 }
+
+void spinlock_debug(spinlock_t *lock)
+{
+	uintptr_t pc = lock->call_site;
+	char *func_name;
+
+	if (!pc) {
+		printk("Lock %p: never locked\n", lock);
+		return;
+	}
+	func_name = get_fn_name(pc);
+	printk("Lock %p: last locked at [<%p>] in %s on core %d\n", lock, pc,
+	       func_name, lock->calling_core);
+	kfree(func_name);
+}
+
 #endif /* CONFIG_SPINLOCK_DEBUG */
 
 /* Inits a hashlock. */
