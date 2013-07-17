@@ -84,7 +84,7 @@ static inline uint64_t read_tscp(void)
 /* Check out k/a/x86/rdtsc_test.c for more info */
 static inline uint64_t read_tsc_serialized(void)
 {
-	asm volatile("lfence");	/* mfence on amd */
+	asm volatile("lfence" ::: "memory");	/* mfence on amd? */
 	return read_tsc();
 }
 
