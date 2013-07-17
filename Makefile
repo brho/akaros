@@ -464,15 +464,17 @@ endif
 $(ext2_bdev_obj): $(ext2-bdev)
 	$(Q)$(OBJCOPY) -I binary -B $(ld_arch) -O $(ld_emulation) $< $@
 
+# Not the worlds most elegant link command.  link-kernel takes the obj output
+# name, then the linker script, then everything else you'd dump on the ld
+# command line, including linker options and objects to link together.
+# 
+# After the script is done, we run the arch-specific command directly.
 quiet_cmd_link-akaros = LINK    $@
-      cmd_link-akaros = $(LD) -T kern/arch/$(ARCH)/$(KERNEL_LD) -o $@ \
-                              $(LDFLAGS_KERNEL) \
-                              $(akaros-deps) \
-                              $(gcc-lib) \
-                              $(kern_cpio_obj) \
-                              $(ext2_bdev_obj) ; \
-                              $(OBJDUMP) -S $@ > $@.asm; \
-                              $(ARCH_POST_LINK_CMD)
+      cmd_link-akaros = $(CONFIG_SHELL) scripts/link-kernel.sh $@ \
+                        kern/arch/$(ARCH)/$(KERNEL_LD) $(LDFLAGS_KERNEL) \
+                        $(akaros-deps) $(gcc-lib) $(kern_cpio_obj) \
+                        $(ext2_bdev_obj); \
+                        $(ARCH_POST_LINK_CMD)
 
 # For some reason, the if_changed doesn't work with FORCE (like it does in
 # Linux).  It looks like it can't find the .cmd file or something (also
