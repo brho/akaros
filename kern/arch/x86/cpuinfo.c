@@ -134,10 +134,20 @@ void print_cpuinfo(void)
 		#endif
 	}
 	cpuid(0x80000001, 0x0, &eax, &ebx, &ecx, &edx);
-	if (edx & (1 << 27))
+	if (edx & (1 << 27)) {
 		printk("RDTSCP supported\n");
-	else
-		printk("RDTSCP not supported: don't trust detailed measurements\n");
+		/* Set core 0's id, for use during boot (if FAST_COREID) */
+		write_msr(MSR_TSC_AUX, 0);
+	} else {
+		printk("RDTSCP not supported, but emulated for userspace\n");
+		#ifdef CONFIG_FAST_COREID
+		printk("\nCONFIG_FAST_COREID selected, but RDTSCP not available!\n");
+		printk("\nRebuild your kernel without CONFIG_FAST_COREID\n\n");
+		panic("Cannot boot\n");
+		#endif
+	}
+	/* Regardless, make sure userspace can access rdtsc (and rdtscp) */
+	lcr4(rcr4() & ~CR4_TSD);
 	printk("1 GB Jumbo pages %ssupported\n", edx & (1 << 26) ? "" : "not ");
 	printk("FS/GS MSRs %ssupported\n", edx & (1 << 29) ? "" : "not ");
 	#ifdef CONFIG_X86_64

@@ -165,6 +165,14 @@ static inline int get_os_coreid(int hw_coreid)
 	return os_coreid_lookup[hw_coreid];
 }
 
+#ifdef CONFIG_FAST_COREID
+static inline int core_id(void)
+{
+	int ret;
+	asm volatile ("rdtscp" : "=c"(ret) : : "eax", "edx");
+	return ret;
+}
+#else
 /* core_id() returns the OS core number, not to be confused with the
  * hardware-specific core identifier (such as the lapic id) returned by
  * hw_core_id() */
@@ -172,6 +180,7 @@ static inline int core_id(void)
 {
 	return get_os_coreid(hw_core_id());
 }
+#endif /* CONFIG_FAST_COREID */
 
 static inline int core_id_early(void)
 {

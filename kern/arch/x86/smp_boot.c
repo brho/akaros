@@ -61,6 +61,11 @@ static void init_smp_call_function(void)
 
 static void smp_final_core_init(struct hw_trapframe *hw_tf, void *data)
 {
+#ifdef CONFIG_FAST_COREID
+	/* Need to bootstrap the rdtscp MSR with our OS coreid */
+	int coreid = get_os_coreid(hw_core_id());
+	write_msr(MSR_TSC_AUX, coreid);
+#endif
 	setup_default_mtrrs(data);
 	smp_percpu_init();
 	waiton_barrier(data);

@@ -36,6 +36,8 @@
 # define IA32_EFER_IA32E_ACT		(1 << 10)
 # define IA32_EFER_EXE_DIS_BIT		(1 << 11)
 
+#define MSR_TSC_AUX					0xc0000103
+
 #define MSR_FS_BASE					0xc0000100
 #define MSR_GS_BASE					0xc0000101
 #define MSR_KERN_GS_BASE			0xc0000102
