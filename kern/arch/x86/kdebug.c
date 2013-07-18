@@ -328,6 +328,10 @@ void backtrace(void)
 		#ifdef CONFIG_X86_64
 		func_name = get_fn_name(eip);
 		printk("#%02d [<%p>] in %s\n", i++,  eip, func_name);
+		# ifdef CONFIG_RESET_STACKS
+		if (func_name && !strncmp("__smp_idle", func_name, 10))
+			break;
+		# endif /* CONFIG_RESET_STACKS */
 		kfree(func_name);
 		#else
 		debuginfo_eip(eip, &debuginfo);
@@ -341,16 +345,15 @@ void backtrace(void)
 		for (j = 0; j < MIN(debuginfo.eip_fn_narg, 5); j++)
 			cprintf(" %08x", *(ebp + 2 + j));
 		cprintf("\n");
-		func_name = (char*)debuginfo.eip_fn_name;
-		#endif
+		# ifdef CONFIG_RESET_STACKS
+		if (!strncmp("__smp_idle", (char*)debuginfo.eip_fn_name, 10))
+			break;
+		# endif /* CONFIG_RESET_STACKS */
+		#endif /* CONFIG_X86_64 */
 		if (!ebp)
 			break;
 		eip = *(ebp + 1) - 1;
 		ebp = (unsigned long*)(*ebp);
-		#ifdef CONFIG_RESET_STACKS
-		if (!strncmp("__smp_idle", func_name, 10))
-			break;
-		#endif /* CONFIG_RESET_STACKS */
 	}
 }
 
