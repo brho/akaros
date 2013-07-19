@@ -254,8 +254,6 @@ typedef unsigned long pde_t;
 #define JPGOFF(la)	(((uintptr_t) (la)) & 0x001FFFFF)
 #define NPTENTRIES		512
 #define JPGSIZE PTSIZE
-#define MAX_JUMBO_SHIFT PML3_SHIFT
-
 
 /* Page table/directory entry flags. */
 

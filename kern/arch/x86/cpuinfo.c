@@ -138,6 +138,7 @@ void print_cpuinfo(void)
 		printk("RDTSCP supported\n");
 	else
 		printk("RDTSCP not supported: don't trust detailed measurements\n");
+	printk("1 GB Jumbo pages %ssupported\n", edx & (1 << 26) ? "" : "not ");
 	printk("FS/GS MSRs %ssupported\n", edx & (1 << 29) ? "" : "not ");
 	#ifdef CONFIG_X86_64
 	if (!(edx & (1 << 29))) {

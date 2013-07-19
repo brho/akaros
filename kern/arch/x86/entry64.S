@@ -27,9 +27,28 @@ multiboot_header:
 .long MULTIBOOT_HEADER_FLAGS
 .long CHECKSUM
 
+# Calling convention for internal functions:
+#
+# my convention:
+# 	callee saved ebp, ebx
+# 	caller saves eax ecx edx esi edi
+# 	args: a0 edi, a1 esi, a2 edx, a3 ecx, a4 eax, a5+ stack
+# 	ret eax
+#
+# for reference, the normal convention:
+# 	callee saved: esi, edi, ebp, ebx
+# 	caller saved: eax, ecx, edx
+# 	args on stack
+# 	ret eax
+
 /* Helper: creates count mappings in the PML3 for 1GB jumbo pages for the given
  * vaddr to paddr range in physical memory.  Then it puts that PML3's addr in
- * the PML4's appropriate slot.  A few notes:
+ * the PML4's appropriate slot.  Using a macro mostly to help with 64 bit
+ * argument marshalling.  
+ *
+ * This will clobber ax, dx, cx, di, si.
+ *
+ * A few notes about the jumbo GB mapping:
  * 	- PML3 is responsible for the 9 bits from 30-38, hence the >> 30 and mask
  * 	- PML4 is responsible for the 9 bits from 47-39, hence the >> 39 and mask
  * 	- We use the jumbo PTE_PS flag only on PML3 - can't do it for PML4.
@@ -39,49 +58,244 @@ multiboot_header:
  * 	- The paddr for the PML3 PTEs is split across two 32-byte halves of the PTE.
  * 	We drop off the lower 30 bits, since we're dealing with 1GB pages.  The 2
  * 	LSBs go at the top of the first half of the PTE, and the remaining 30 are
- * 	the lower 30 of the top half.
- * 	- In general, I use eax as the offset in a PML (the entry is determined by
- * 	the vaddr), edx for the entry I'm writing, and ecx for the value I'm
- * 	writing.  For PML3's mappings, esi tracks which paddr we are on.  Finally,
- * 	I'm using edi for loop control. */
+ * 	the lower 30 of the top half. */
 #define MAP_GB_PAGES(pml3, vaddr, paddr, count)                                \
-	movl	$(pml3), %edx;                                                     \
-	movl	$(((vaddr) >> 30) & 0x1ff), %eax;                                  \
-	movl	$((paddr) >> 30), %esi;                                            \
-	movl	$(count), %edi;                                                    \
-1:;                                                                            \
-	movl	%esi, %ecx;                                                        \
-	shll	$30, %ecx;                       /* lower part of PTE ADDR */      \
-	orl		$(PTE_P | PTE_W | PTE_PS), %ecx;                                   \
-	movl	%ecx, (%edx, %eax, 8);                                             \
-	movl	%esi, %ecx;                                                        \
-	shrl	$2, %ecx;                        /* upper part of PTE ADDR */      \
-	movl	%ecx, 4(%edx, %eax, 8);                                            \
-	/* prep for next loop */;                                                  \
-	incl	%eax;                                                              \
-	incl	%esi;                                                              \
-	/* could test eax against count, if we're short on regs */;                \
-	decl	%edi;                                                              \
-	jnz		1b;                                                                \
-	/* now insert the PML3 into pml4 */;                                       \
-	movl	$(((vaddr) >> 39) & 0x1ff), %eax;                                  \
-	movl	$boot_pml4, %edx;                                                  \
-	movl	$(pml3), %ecx;                                                     \
-	orl		$(PTE_P | PTE_W), %ecx;                                            \
-	movl	%ecx, (%edx, %eax, 8);                                             \
-	movl	$0x0, 4(%edx, %eax, 8)
+	movl	$(boot_pml4), %eax;                                                \
+	push	%eax;                                                              \
+	movl	$(count), %eax;                                                    \
+	push	%eax;                                                              \
+	movl	$(pml3), %edi;                                                     \
+	movl	$(vaddr >> 32), %esi;                                              \
+	movl	$(vaddr & 0xffffffff), %edx;                                       \
+	movl	$(paddr >> 32), %ecx;                                              \
+	movl	$(paddr & 0xffffffff), %eax;                                       \
+	call	map_gb_pages;                                                      \
+	add		$0x8, %esp
+
+# Maps count GBs (up to 512) of vaddr -> paddr using pml3 and pml4 in 1GB pages
+#
+# edi pml3, esi vaddr_hi, edx vaddr_lo, ecx paddr_hi, eax paddr_lo,
+# stack: count, pml4
+map_gb_pages:
+	push	%ebx
+	movl	0x8(%esp), %ebx
+	# save these 3, need them for the next call
+	push	%edi
+	push	%esi
+	push	%edx
+	# arg5 on stack.  other args already in regs.
+	push	%ebx
+	call	fill_jpml3
+	add		$0x4, %esp 		# pop arg5 frame
+	# restore our regs/args for next call
+	pop		%edx
+	pop		%esi
+	pop		%edi
+	movl	0xc(%esp), %ecx
+	call	insert_pml3
+	pop		%ebx
+	ret
+	
+# Fills pml3 with "count" jumbo entries, mapping from vaddr -> paddr.
+# pml3s are responsible for bits 38..30 of vaddr space and 30 bit paddr entries
+#
+# edi pml3, esi vaddr_hi, edx vaddr_lo, ecx paddr_hi, eax paddr_lo, stack count
+fill_jpml3:
+	push	%ebx
+	movl	0x8(%esp), %ebx
+	# want (vaddr >> 30) & 0x1ff into esi.  append upper 2 bits of edx to esi.
+	shll	$2, %esi
+	shrl	$30, %edx
+	orl		%edx, %esi
+	andl	$0x1ff, %esi
+	# want (paddr >> 30) into ecx.
+	shll	$2, %ecx
+	shrl	$30, %eax
+	orl		%eax, %ecx
+1:
+	movl	%ecx, %eax
+	shll	$30, %eax					# lower part of PTE ADDR
+	orl		$(PTE_P | PTE_W | PTE_PS), %eax
+	movl	%eax, (%edi, %esi, 8)
+	movl	%ecx, %eax
+	shrl	$2, %eax					# upper part of PTE ADDR
+	movl	%eax, 4(%edi, %esi, 8)
+	# prep for next loop
+	incl	%esi
+	incl	%ecx
+	decl	%ebx
+	jnz		1b
+	pop		%ebx
+	ret
+	
+#define MAP_2MB_PAGES(pml3, vaddr, paddr, count, pml2base)                     \
+	movl	$(pml2base), %eax;                                                 \
+	push	%eax;                                                              \
+	movl	$(boot_pml4), %eax;                                                \
+	push	%eax;                                                              \
+	movl	$(count), %eax;                                                    \
+	push	%eax;                                                              \
+	movl	$(pml3), %edi;                                                     \
+	movl	$(vaddr >> 32), %esi;                                              \
+	movl	$(vaddr & 0xffffffff), %edx;                                       \
+	movl	$(paddr >> 32), %ecx;                                              \
+	movl	$(paddr & 0xffffffff), %eax;                                       \
+	call	map_2mb_pages;                                                     \
+	add		$0xc, %esp
+
+# Maps count GBs (up to 512) of vaddr -> paddr using pml3, pml4, and an array of
+# pml2s in 2MB pages
+#
+# edi pml3, esi vaddr_hi, edx vaddr_lo, ecx paddr_hi, eax paddr_lo,
+# stack: count, pml4, pml2_base
+map_2mb_pages:
+	push	%ebx
+	# save these 3, need them for the next call
+	push	%edi
+	push	%esi
+	push	%edx
+	# arg5 and 7 on stack.  other args already in regs.
+	movl	0x1c(%esp), %ebx	# arg7 (4 pushes, 1 retaddr, arg 5, arg6)
+	push	%ebx
+	movl	0x18(%esp), %ebx	# arg5 (5 pushes, 1 retaddr)
+	push	%ebx
+	call	fill_pml3
+	add		$0x8, %esp 			# pop args frame
+	# restore our regs/args for next call
+	pop		%edx
+	pop		%esi
+	pop		%edi
+	movl	0xc(%esp), %ecx
+	call	insert_pml3
+	pop		%ebx
+	ret
+	
+# Fills pml3 with "count" pml2 entries, mapping from vaddr -> paddr.
+# pml3s are responsible for bits 38..30 of vaddr space and 30 bit paddr entries
+#
+# edi pml3, esi vaddr_hi, edx vaddr_lo, ecx paddr_hi, eax paddr_lo,
+# stack count, pml2base
+fill_pml3:
+	push	%ebx
+	push	%ebp						# scratch register
+	movl	0xc(%esp), %ebx
+1:
+	push	%edi						# save edi = pml3
+	push	%esi
+	push	%edx
+	push	%ecx
+	push	%eax
+	movl	$512, %ebp					# count = 512 for PML2 (map it all)
+	push	%ebp
+	# compute pml2 (pml2base + (total count - current count) * PGSIZE)
+	movl	0x28(%esp), %ebp			# pml2base (8 push, 1 ret, arg5)
+	movl	0x24(%esp), %edi			# total count
+	subl	%ebx, %edi
+	shll	$12, %edi
+	addl	%edi, %ebp
+	movl	%ebp, %edi					# arg0 for the func call
+	call	fill_jpml2
+	add		$0x4, %esp
+	pop		%eax
+	pop		%ecx
+	pop		%edx
+	pop		%esi
+	pop		%edi
+	# re-save our register frame
+	push	%edi
+	push	%esi
+	push	%edx
+	push	%ecx
+	push	%eax
+	# prep call to insert (ecx = pml3, edi = pml2)
+	movl	%edi, %ecx
+	movl	%ebp, %edi
+	call	insert_pml2
+	pop		%eax
+	pop		%ecx
+	pop		%edx
+	pop		%esi
+	pop		%edi
+	# prep for next loop.  need to advance vaddr and paddr by 1GB
+	addl	$(1 << 30), %edx
+	adcl 	$0, %esi
+	addl	$(1 << 30), %eax
+	adcl 	$0, %ecx
+	decl	%ebx
+	jnz		1b
+	pop		%ebp
+	pop		%ebx
+	ret
+
+# Fills pml2 with "count" jumbo entries, mapping from vaddr -> paddr
+# pml2s are responsible for bits 29..21 of vaddr space and 21 bit paddr entries
+#
+# edi pml2, esi vaddr_hi, edx vaddr_lo, ecx paddr_hi, eax paddr_lo, stack count
+fill_jpml2:
+	push	%ebx
+	movl	0x8(%esp), %ebx
+	# want (vaddr >> 21) & 0x1ff into esi.
+	shrl	$21, %edx
+	movl	%edx, %esi
+	andl	$0x1ff, %esi
+	# want (paddr >> 21) into ecx.
+	shll	$11, %ecx
+	shrl	$21, %eax
+	orl		%eax, %ecx
+1:
+	movl	%ecx, %eax
+	shll	$21, %eax					# lower part of PTE ADDR
+	orl		$(PTE_P | PTE_W | PTE_PS), %eax
+	movl	%eax, (%edi, %esi, 8)
+	movl	%ecx, %eax
+	shrl	$11, %eax					# upper part of PTE ADDR
+	movl	%eax, 4(%edi, %esi, 8)
+	# prep for next loop
+	incl	%esi
+	incl	%ecx
+	decl	%ebx
+	jnz		1b
+	pop		%ebx
+	ret
+
+# Inserts a pml3 into pml4, so that it handles mapping for vaddr
+#
+# edi pml3, esi vaddr_hi, edx vaddr_lo, ecx pml4
+insert_pml3:
+	shrl	$7, %esi 	# want to shift vaddr >> 39
+	andl	$0x1ff, %esi
+	orl		$(PTE_P | PTE_W), %edi
+	movl	%edi, (%ecx, %esi, 8)
+	movl	$0x0, 4(%ecx, %esi, 8)
+	ret
+
+# Inserts a pml2 into pml3, so that it handles mapping for vaddr
+#
+# edi pml2, esi vaddr_hi, edx vaddr_lo, ecx pml3
+insert_pml2:
+	# want (vaddr >> 30) & 0x1ff into esi.  append upper 2 bits of edx to esi.
+	shll	$2, %esi
+	shrl	$30, %edx
+	orl		%edx, %esi
+	andl	$0x1ff, %esi
+	orl		$(PTE_P | PTE_W), %edi
+	movl	%edi, (%ecx, %esi, 8)
+	movl	$0x0, 4(%ecx, %esi, 8)
+	ret
 
 .globl		_start
 _start:
+	movl	$stack32top, %esp
+	push	%ebx					# save mulitboot info
 	movw	$0x1234,0x472			# warm boot
 	movl	$0x80000001, %eax
-	# some machines / VMs might not support long mode or (more likely) PML3
-	# jumbos (which we use)
+	# some machines / VMs might not support long mode
 	cpuid
-	test 	$(1 << 29), %edx
+	test	$(1 << 29), %edx
 	jz		err_no_long
-	test 	$(1 << 26), %edx
-	jz		err_no_pml3ps
+	# others don't support 1GB jumbo pages, which is a shame
+	test	$(1 << 26), %edx
+	jz		no_pml3ps
 	# build page table.  need mappings for
 	# 	- current code/data at 0x00100000 -> 0x00100000
 	#	- kernel load location: 0xffffffffc0000000 -> 0x0000000000000000
@@ -89,9 +303,15 @@ _start:
 	# we'll need one table for the PML4, and three PML3 (PDPE)'s.  1GB will
 	# suffice for lo and hi (til we do the VPT and LAPIC mappings).  For
 	# kernbase, we'll do all 512 PML3 entries (covers 512GB)
-	MAP_GB_PAGES(boot_pml3_lo,       0x0000000000000000, 0x0, 1)
-	MAP_GB_PAGES(boot_pml3_hi,       0xffffffffc0000000, 0x0, 1)
-	MAP_GB_PAGES(boot_pml3_kernbase, 0xffff800000000000, 0x0, 512)
+	MAP_GB_PAGES(boot_pml3_lo, 0x0000000000000000, 0x0, 1)
+	MAP_GB_PAGES(boot_pml3_hi, 0xffffffffc0000000, 0x0, 1)
+	MAP_GB_PAGES(boot_pml3_kb, 0xffff800000000000, 0x0, 512)
+	jmp		post_mapping
+no_pml3ps:
+	MAP_2MB_PAGES(boot_pml3_lo, 0x0000000000000000, 0x0,   1, boot_pml2_lo)
+	MAP_2MB_PAGES(boot_pml3_hi, 0xffffffffc0000000, 0x0,   1, boot_pml2_hi)
+	MAP_2MB_PAGES(boot_pml3_kb, 0xffff800000000000, 0x0, 512, boot_pml2_kb)
+post_mapping:
 	# load cr3 - note that in long mode, cr3 is 64 bits wide.  our boot pml4 is
 	# in lower memory, so it'll be fine if the HW 0 extends.
 	movl	$boot_pml4, %eax
@@ -114,6 +334,7 @@ _start:
 	orl		$(CR0_PE | CR0_PG | CR0_WP | CR0_NE | CR0_MP), %eax  
 	andl	$(~(CR0_AM | CR0_TS | CR0_EM | CR0_CD | CR0_NW)), %eax  
 	movl	%eax, %cr0
+	pop		%ebx				# restore multiboot info
 	# load the 64bit GDT and jump to long mode
 	lgdt	gdt64desc
 	ljmp	$0x08, $long_mode
@@ -178,8 +399,8 @@ long_mode:
 	wrmsr
 	# Clear the frame pointer for proper backtraces
 	movq	$0x0, %rbp
- 	movabs	$(bootstacktop), %rsp
-	movabs 	$(num_cpus), %rax
+	movabs	$(bootstacktop), %rsp
+	movabs	$(num_cpus), %rax
 	movl	$0x1, (%rax)
 	# Pass multiboot info to kernel_init (%rdi == arg1)
 	movq 	%rbx, %rdi
@@ -217,8 +438,18 @@ boot_pml3_lo:
 	.space  PGSIZE
 boot_pml3_hi:
 	.space  PGSIZE
-boot_pml3_kernbase:
+boot_pml3_kb:
 	.space  PGSIZE
+stack32:
+	.space  PGSIZE
+stack32top:
+# Could make all of the no-jumbo stuff a config var
+boot_pml2_lo:		# one pml2 (1GB in the lo pml3)
+	.space  PGSIZE
+boot_pml2_hi:		# one pml2 (1GB in the hi pml3)
+	.space  PGSIZE
+boot_pml2_kb: 		# 512 pml2s in the kb pml3
+	.space  PGSIZE * 512
 
 # From here down is linked for KERNBASE
 .data
@@ -226,5 +457,5 @@ boot_pml3_kernbase:
 	.globl		bootstack
 bootstack:
 	.space		KSTKSIZE
-	.globl		bootstacktop   
+	.globl		bootstacktop
 bootstacktop:

@@ -36,6 +36,7 @@ pde_t *boot_pgdir;
 physaddr_t boot_cr3;
 segdesc_t *gdt;
 pseudodesc_t gdt_pd;
+unsigned int max_jumbo_shift;
 
 #define PG_WALK_SHIFT_MASK		0x00ff 		/* first byte = target shift */
 #define PG_WALK_CREATE 			0x0100
@@ -416,24 +417,28 @@ static void check_syms_va(void)
  * have a slimmed down page table. */
 void vm_init(void)
 {
+	uint32_t edx;
 	boot_cr3 = (physaddr_t)boot_pml4;
 	boot_pgdir = KADDR((uintptr_t)boot_pml4);
 	gdt = KADDR((uintptr_t)gdt64);
 
+	/* We need to limit our mappings on machines that don't support 1GB pages */
+	cpuid(0x80000001, 0x0, 0, 0, 0, &edx);
+	max_jumbo_shift = edx & (1 << 26) ? PML3_SHIFT : PML2_SHIFT;
 	check_syms_va();
 	/* KERNBASE mapping: we already have 512 GB complete (one full PML3_REACH).
 	 * It's okay if we have extra, just need to make sure we reach max_paddr. */
 	if (KERNBASE + PML3_REACH < (uintptr_t)KADDR(max_paddr)) {
 		map_segment(boot_pgdir, KERNBASE + PML3_REACH,
 		            max_paddr - PML3_REACH, 0x0 + PML3_REACH,
-		            PTE_W | PTE_G, MAX_JUMBO_SHIFT);
+		            PTE_W | PTE_G, max_jumbo_shift);
 	}
 	/* For the LAPIC and IOAPIC, we use PAT (but not *the* PAT flag) to make
 	 * these type UC */
 	map_segment(boot_pgdir, LAPIC_BASE, PGSIZE, LAPIC_PBASE,
-	            PTE_PCD | PTE_PWT | PTE_W | PTE_G, MAX_JUMBO_SHIFT);
+	            PTE_PCD | PTE_PWT | PTE_W | PTE_G, max_jumbo_shift);
 	map_segment(boot_pgdir, IOAPIC_BASE, PGSIZE, IOAPIC_PBASE,
-	            PTE_PCD | PTE_PWT | PTE_W | PTE_G, MAX_JUMBO_SHIFT);
+	            PTE_PCD | PTE_PWT | PTE_W | PTE_G, max_jumbo_shift);
 	/* VPT mapping: recursive PTE inserted at the VPT spot */
 	boot_pgdir[PDX(VPT)] = PADDR(boot_pgdir) | PTE_W | PTE_P | PTE_G;
 	/* same for UVPT, accessible by userspace (RO). */
@@ -544,6 +549,9 @@ void debug_print_pgdir(pte_t *pgdir)
 	printk("Printing the entire page table set for %p, DFS\n", pgdir);
 	/* Need to be careful we avoid VPT/UVPT, o/w we'll recurse */
 	pml_for_each(pgdir, 0, UVPT, print_pte, 0);
-	pml_for_each(pgdir, KERNBASE, VPT - KERNBASE, print_pte, 0);
+	if (max_jumbo_shift < PML3_SHIFT)
+		printk("(skipping kernbase mapping - too many entries)\n");
+	else
+		pml_for_each(pgdir, KERNBASE, VPT - KERNBASE, print_pte, 0);
 	pml_for_each(pgdir, VPT_TOP, MAX_VADDR - VPT_TOP, print_pte, 0);
 }
