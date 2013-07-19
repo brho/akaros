@@ -74,6 +74,14 @@ multiboot_header:
 .globl		_start
 _start:
 	movw	$0x1234,0x472			# warm boot
+	movl	$0x80000001, %eax
+	# some machines / VMs might not support long mode or (more likely) PML3
+	# jumbos (which we use)
+	cpuid
+	test 	$(1 << 29), %edx
+	jz		err_no_long
+	test 	$(1 << 26), %edx
+	jz		err_no_pml3ps
 	# build page table.  need mappings for
 	# 	- current code/data at 0x00100000 -> 0x00100000
 	#	- kernel load location: 0xffffffffc0000000 -> 0x0000000000000000
@@ -109,6 +117,39 @@ _start:
 	# load the 64bit GDT and jump to long mode
 	lgdt	gdt64desc
 	ljmp	$0x08, $long_mode
+	# these are error handlers, we're jumping over these
+err_no_long:
+	mov		$no_long_string, %esi
+	jmp		printstring
+err_no_pml3ps:
+	mov		$no_pml3ps_string, %esi
+	jmp		printstring
+printstring:
+	mov		$0xb8a00, %edi		# assuming CGA buffer, 16 lines down
+	mov		$0, %ecx
+1:
+	movb	(%esi, %ecx), %bl
+	test	%bl, %bl
+	je		printdone
+	# print to the console (0x07 is white letters on black background)
+	mov		$0x07, %bh
+	mov		%bx, (%edi, %ecx, 2)
+	# print to serial
+	mov		$(0x3f8 + 5), %edx	# assuming COM1
+2:
+	inb		%dx, %al
+	test	$0x20, %al			# ready check
+	jz		2b
+	mov		$0x3f8, %edx		# assuming COM1
+	mov		%bl, %al
+	outb	%al, %dx
+	# advance the loop
+	inc		%ecx
+	jmp		1b
+printdone:
+	hlt
+	jmp		printdone
+
 .code64
 long_mode:
 	# zero the data segments.  Not sure if this is legit or not.
@@ -163,6 +204,10 @@ gdt64:
 gdt64desc:
 	.word	(gdt64desc - gdt64 - 1)		# sizeof(gdt64) - 1
 	.long	gdt64		# HW 0-extends this to 64 bit when loading (i think)
+no_long_string:
+	.string "Unable to boot: long mode not supported"
+no_pml3ps_string:
+	.string "Unable to boot: 1 GB pages not supported"
 # boot page tables
 	.align PGSIZE
 .globl boot_pml4
