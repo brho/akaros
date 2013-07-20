@@ -61,6 +61,19 @@
 	.long name;							\
 	.long num
 
+/* Only used in the kernel during SMP boot.  Send a LAPIC_EOI and iret. */
+#define POKE_HANDLER(name, num)			\
+	.text;								\
+	.globl name;						\
+	.type name, @function;				\
+	.align 2;							\
+	name:;								\
+	movl $0, (LAPIC_BASE + 0x0b0);      \
+	iret;								\
+	.data;								\
+	.long name;							\
+	.long num
+
 /* Same as above, but takes a specific function to jump to.  See comments
  * below from _allirqs for details.
  */
@@ -173,7 +186,7 @@ IRQ_HANDLER(IRQ218, 250)
 IRQ_HANDLER(IRQ219, 251)
 IRQ_HANDLER(IRQ220, 252)
 IRQ_HANDLER(IRQ221, 253)
-IRQ_HANDLER(IRQ222, 254)
+POKE_HANDLER(IRQ222, 254)
 IRQ_HANDLER(IRQ223, I_KERNEL_MSG)
 
 /* Technically, these HANDLER entries do not need to be in numeric order */

@@ -87,6 +87,7 @@ here:
 	lock decw	smp_semaphore - smp_entry + 0x1000  # show we are done
 	sti                     # so we can get the IPI
 	hlt                     # wait for the IPI to run smp_pcu_init()
+	call 	smp_final_core_init
 	call 	smp_idle 		# idle loop, will have interrupts turned on
 	# smp_idle should never return
 spin:

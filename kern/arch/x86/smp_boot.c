@@ -31,6 +31,7 @@
 extern handler_wrapper_t (RO handler_wrappers)[NUM_HANDLER_WRAPPERS];
 volatile uint32_t num_cpus = 0xee;
 uintptr_t RO smp_stack_top;
+barrier_t generic_barrier;
 
 #define DECLARE_HANDLER_CHECKLISTS(vector)                          \
 	INIT_CHECKLIST(f##vector##_cpu_list, MAX_NUM_CPUS);
@@ -59,16 +60,16 @@ static void init_smp_call_function(void)
 
 /******************************************************************************/
 
-static void smp_final_core_init(struct hw_trapframe *hw_tf, void *data)
+void smp_final_core_init(void)
 {
 #ifdef CONFIG_FAST_COREID
 	/* Need to bootstrap the rdtscp MSR with our OS coreid */
 	int coreid = get_os_coreid(hw_core_id());
 	write_msr(MSR_TSC_AUX, coreid);
 #endif
-	setup_default_mtrrs(data);
+	setup_default_mtrrs(&generic_barrier);
 	smp_percpu_init();
-	waiton_barrier(data);
+	waiton_barrier(&generic_barrier);
 }
 
 // this needs to be set in smp_entry too...
@@ -191,10 +192,10 @@ void smp_boot(void)
 	init_smp_call_function();
 
 	/* Final core initialization */
-	barrier_t generic_barrier;
 	init_barrier(&generic_barrier, num_cpus);
 	/* This will break the cores out of their hlt in smp_entry.S */
-	smp_call_function_all(smp_final_core_init, &generic_barrier, 0);
+	send_broadcast_ipi(254);
+	smp_final_core_init();	/* need to init ourselves as well */
 }
 
 /* This is called from smp_entry by each core to finish the core bootstrapping.
