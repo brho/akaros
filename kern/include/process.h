@@ -70,6 +70,7 @@ void proc_incref(struct proc *p, unsigned int val);
 void proc_decref(struct proc *p);
 void proc_run_s(struct proc *p);
 void __proc_run_m(struct proc *p);
+void __proc_startcore(struct proc *p, struct user_context *ctx);
 void proc_restartcore(void);
 void proc_destroy(struct proc *p);
 void proc_signal_parent(struct proc *child);

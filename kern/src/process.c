@@ -32,7 +32,6 @@
 struct kmem_cache *proc_cache;
 
 /* Other helpers, implemented later. */
-static void __proc_startcore(struct proc *p, struct user_context *ctx);
 static bool is_mapped_vcore(struct proc *p, uint32_t pcoreid);
 static uint32_t get_vcoreid(struct proc *p, uint32_t pcoreid);
 static uint32_t try_get_pcoreid(struct proc *p, uint32_t vcoreid);
@@ -610,7 +609,9 @@ void __proc_run_m(struct proc *p)
 	}
 }
 
-/* Actually runs the given context (trapframe) of process p on the core this
+/* You must disable IRQs and PRKM before calling this.
+ *
+ * Actually runs the given context (trapframe) of process p on the core this
  * code executes on.  This is called directly by __startcore, which needs to
  * bypass the routine_kmsg check.  Interrupts should be off when you call this.
  *
@@ -623,7 +624,7 @@ void __proc_run_m(struct proc *p)
  * in current and you have one reference, like proc_run(non_current_p), then
  * also do nothing.  The refcnt for your *p will count for the reference stored
  * in current. */
-static void __proc_startcore(struct proc *p, struct user_context *ctx)
+void __proc_startcore(struct proc *p, struct user_context *ctx)
 {
 	assert(!irq_is_enabled());
 	__set_proc_current(p);
@@ -638,11 +639,7 @@ static void __proc_startcore(struct proc *p, struct user_context *ctx)
  * In case there are pending routine messages, like __death, __preempt, or
  * __notify, we need to run them.  Alternatively, if there are any, we could
  * self_ipi, and run the messages immediately after popping back to userspace,
- * but that would have crappy overhead.
- *
- * Refcnting: this will not return, and it assumes that you've accounted for
- * your reference as if it was the ref for "current" (which is what happens when
- * returning from local traps and such. */
+ * but that would have crappy overhead. */
 void proc_restartcore(void)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
@@ -653,7 +650,7 @@ void proc_restartcore(void)
 	 * do this, we'd just get them in userspace, but this might save us some
 	 * effort/overhead. */
 	enable_irq();
-	/* Need ints disabled when we return from processing (race on missing
+	/* Need ints disabled when we return from PRKM (race on missing
 	 * messages/IPIs) */
 	disable_irq();
 	process_routine_kmsg();

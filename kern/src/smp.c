@@ -30,12 +30,16 @@ atomic_t outstanding_calls = 0;
 static void try_run_proc(void)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-
-	disable_irq();
 	/* There was a process running here, and we should return to it. */
 	if (pcpui->owning_proc) {
-		proc_restartcore();
+		assert(!pcpui->cur_sysc);
+		assert(pcpui->cur_ctx);
+		__proc_startcore(pcpui->owning_proc, pcpui->cur_ctx);
 		assert(0);
+	} else {
+		/* Make sure we have abandoned core.  It's possible to have an owner
+		 * without a current (smp_idle, __startcore, __death). */
+		abandon_core();
 	}
 }
 
@@ -43,21 +47,15 @@ static void try_run_proc(void)
  * don't know explicitly what to do.  Non-zero cores call it when they are done
  * booting.  Other cases include after getting a DEATH IPI.
  *
- * All cores attempt to run the context of any owning proc.  Barring that, the
- * cores enter a loop.  They halt and wake up when interrupted, do any work on
- * their work queue, then halt again.  In between, the ksched gets a chance to
- * tell it to do something else, or perhaps to halt in another manner. */
+ * All cores attempt to run the context of any owning proc.  Barring that, they
+ * halt and wake up when interrupted, do any work on their work queue, then halt
+ * again.  In between, the ksched gets a chance to tell it to do something else,
+ * or perhaps to halt in another manner. */
 static void __attribute__((noinline, noreturn)) __smp_idle(void)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	clear_rkmsg(pcpui);
-	/* TODO: idle, abandon_core(), and proc_restartcore() need cleaned up */
-	enable_irq();	/* get any IRQs before we halt later */
-	try_run_proc();
-	/* if we made it here, we truly want to idle */
-	/* in the future, we may need to proactively leave process context here.
-	 * for now, it is possible to have a current loaded, even if we are idle
-	 * (and presumably about to execute a kmsg or fire up a vcore). */
+	enable_irq();	/* one-shot change to get any IRQs before we halt later */
 	while (1) {
 		disable_irq();
 		process_routine_kmsg();
