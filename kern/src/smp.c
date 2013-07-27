@@ -19,6 +19,9 @@
 #include <process.h>
 #include <schedule.h>
 #include <trap.h>
+#include <trace.h>
+#include <kdebug.h>
+#include <kmalloc.h>
 
 struct per_cpu_info per_cpu_info[MAX_NUM_CPUS];
 
@@ -85,6 +88,8 @@ void smp_idle(void)
 void smp_percpu_init(void)
 {
 	uint32_t coreid = core_id();
+	struct per_cpu_info *pcpui = &per_cpu_info[coreid];
+	void *trace_buf;
 	/* Don't initialize __ctx_depth here, since it is already 1 (at least on
 	 * x86), since this runs in irq context. */
 	/* Do this first */
@@ -102,4 +107,57 @@ void smp_percpu_init(void)
 	uintptr_t *poison = (uintptr_t*)ROUNDDOWN(get_stack_top() - 1, PGSIZE);
 	*poison = 0xdeadbeef;
 #endif /* CONFIG_KTHREAD_POISON */
+	/* Init generic tracing ring */
+	trace_buf = kpage_alloc_addr();
+	assert(trace_buf);
+	trace_ring_init(&pcpui->traces, trace_buf, PGSIZE,
+	                sizeof(struct pcpu_trace_event));
+}
+
+/* PCPUI Trace Rings: */
+
+/* Add specific trace handlers here: */
+trace_handler_t pcpui_tr_handlers[PCPUI_NR_TYPES] = {
+                                  0,
+                                  };
+
+/* Generic handler for the pcpui ring.  Will switch out to the appropriate
+ * type's handler */
+static void pcpui_trace_fn(void *event, void *data)
+{
+	struct pcpu_trace_event *te = (struct pcpu_trace_event*)event;
+	int desired_type = (int)(long)data;
+	if (te->type >= PCPUI_NR_TYPES)
+		printk("Bad trace type %d\n", te->type);
+	/* desired_type == 0 means all types */
+	if (desired_type && desired_type != te->type)
+		return;
+	if (pcpui_tr_handlers[te->type])
+		pcpui_tr_handlers[te->type](event, data);
+}
+
+void pcpui_tr_foreach(int coreid, int type)
+{
+	struct trace_ring *tr = &per_cpu_info[coreid].traces;
+	assert(tr);
+	printk("\n\nTrace Ring on Core %d\n--------------\n", coreid);
+	trace_ring_foreach(tr, pcpui_trace_fn, (void*)(long)type);
+}
+
+void pcpui_tr_foreach_all(int type)
+{
+	for (int i = 0; i < num_cpus; i++)
+		pcpui_tr_foreach(i, type);
+}
+
+void pcpui_tr_reset_all(void)
+{
+	for (int i = 0; i < num_cpus; i++)
+		trace_ring_reset(&per_cpu_info[i].traces);
+}
+
+void pcpui_tr_reset_and_clear_all(void)
+{
+	for (int i = 0; i < num_cpus; i++)
+		trace_ring_reset_and_clear(&per_cpu_info[i].traces);
 }

@@ -642,6 +642,8 @@ int mon_trace(int argc, char **argv, struct hw_trapframe *hw_tf)
 		printk("\tsyscall start [silent] [pid]: starts tracing\n");
 		printk("\tsyscall stop: stops tracing, prints if it was silent\n");
 		printk("\tcoretf COREID: cause the other core to print its TF (NMI)\n");
+		printk("\tpcpui [type [coreid]]: runs pcpui trace ring handlers\n");
+		printk("\tpcpui-reset [noclear]: resets/clears pcpui trace ring\n");
 		return 1;
 	}
 	if (!strcmp(argv[1], "syscall")) {
@@ -685,6 +687,27 @@ int mon_trace(int argc, char **argv, struct hw_trapframe *hw_tf)
 		}
 		send_nmi(core);
 		udelay(1000000);
+	} else if (!strcmp(argv[1], "pcpui")) {
+		int pcpui_type, pcpui_coreid;
+		if (argc >= 3)
+			pcpui_type = strtol(argv[2], 0, 0);
+		else
+			pcpui_type = 0;
+		printk("\nRunning PCPUI Trace Ring handlers for type %d\n", pcpui_type);
+		if (argc >= 4) {
+			pcpui_coreid = strtol(argv[3], 0, 0); 
+			pcpui_tr_foreach(pcpui_coreid, pcpui_type);
+		} else {
+			pcpui_tr_foreach_all(pcpui_type);
+		}
+	} else if (!strcmp(argv[1], "pcpui-reset")) {
+		if (argc >= 3) {
+			printk("\nResetting all PCPUI Trace Rings\n");
+			pcpui_tr_reset_all();
+		} else {
+			printk("\nResetting and clearing all PCPUI Trace Rings\n");
+			pcpui_tr_reset_and_clear_all();
+		}
 	} else if (!strcmp(argv[1], "opt2")) {
 		if (argc != 3) {
 			printk("ERRRRRRRRRR.\n");

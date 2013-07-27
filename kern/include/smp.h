@@ -17,6 +17,7 @@
 #include <process.h>
 #include <syscall.h>
 #include <alarm.h>
+#include <trace.h>
 
 #ifdef __SHARC__
 typedef sharC_env_t;
@@ -40,6 +41,7 @@ struct per_cpu_info {
 	struct kthread *spare;		/* useful when restarting */
 	struct timer_chain tchain;	/* for the per-core alarm */
 	unsigned int lock_depth;
+	struct trace_ring traces;
 
 #ifdef __SHARC__
 	// held spin-locks. this will have to go elsewhere if multiple kernel
@@ -88,4 +90,24 @@ int smp_call_function_single(uint32_t dest, poly_isr_t handler, TV(t) data,
                              handler_wrapper_t** wait_wrapper);
 int smp_call_wait(handler_wrapper_t*SAFE wrapper);
 
-#endif /* !ROS_INC_SMP_H */
+/* PCPUI Trace Rings: */
+struct pcpu_trace_event {
+	int							type;
+	int							arg0;
+	uint64_t					arg1;
+};
+
+/* If you want to add a type, use the next available number, increment NR_TYPES,
+ * use your own macro, and provide a handler.  Add your handler to
+ * pcpui_tr_handlers in smp.c. */
+#define PCPUI_TR_TYPE_NULL		0
+#define PCPUI_NR_TYPES			1
+
+/* Run the handlers for all events in a pcpui ring.  Can run on all cores, or
+ * just one core.  'type' selects which event type is handled (0 for all). */
+void pcpui_tr_foreach(int coreid, int type);
+void pcpui_tr_foreach_all(int type);
+void pcpui_tr_reset_all(void);
+void pcpui_tr_reset_and_clear_all(void);
+
+#endif /* ROS_INC_SMP_H */
