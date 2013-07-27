@@ -29,6 +29,7 @@ static inline bool in_kernel(struct hw_trapframe *hw_tf)
 /* Using SW contexts for now, for x86_64 */
 static inline void save_kernel_ctx(struct kernel_ctx *ctx)
 {
+	long dummy;
 	/* not bothering with the FP fields */
 	asm volatile("mov %%rsp, 0x48(%0);   " /* save rsp in its slot*/
 	             "leaq 1f, %%rax;        " /* get future rip */
@@ -40,7 +41,7 @@ static inline void save_kernel_ctx(struct kernel_ctx *ctx)
 	             "mov %%rbp, 0x18(%0);   "
 	             "mov %%rbx, 0x10(%0);   "
 	             "1:                     " /* where this tf will restart */
-	             : 
+				 : "=D"(dummy) /* force rdi clobber */
 				 : "D"(&ctx->sw_tf)
 	             : "rax", "rcx", "rdx", "rsi", "r8", "r9", "r10", "r11",
 	               "memory", "cc");

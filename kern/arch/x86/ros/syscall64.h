@@ -18,6 +18,7 @@
 static inline intreg_t __syscall_sysenter(uintreg_t a0, uintreg_t a1)
 {
 	intreg_t ret = 0;
+	long dummy;
 	/* we're calling using the amd function call abi.  this asm and the kernel
 	 * will save the callee-saved state.  We'll use the clobber list to force
 	 * the compiler to save caller-saved state.  As with uthread code, you need
@@ -28,9 +29,8 @@ static inline intreg_t __syscall_sysenter(uintreg_t a0, uintreg_t a1)
 	 * The kernel will restore it for us. */
 	asm volatile ("movq %%rsp, %%rdx;       "
 	              "syscall;                 "
-	              : "=a" (ret)
-	              : "D" (a0),
-	                "S" (a1)
+	              : "=a"(ret), "=D"(dummy), "=S"(dummy) /* force D, S clobber */
+	              : "D"(a0), "S"(a1)
 	              : "cc", "memory", "rcx", "rdx", "r8", "r9", "r10", "r11");
 	return ret;
 }
@@ -53,7 +53,9 @@ static inline intreg_t __syscall_trap(uintreg_t a0, uintreg_t a1)
  * non-canonical address, which should never be a legitamate syscall. */
 static inline void __fastcall_setfsbase(uintptr_t fsbase)
 {
-	asm volatile ("syscall" : : "D"(FASTCALL_SETFSBASE), "S"(fsbase)
+	long dummy;
+	asm volatile ("syscall" : "=D"(dummy), "=S"(dummy) /* force D, S clobber */
+	                        : "D"(FASTCALL_SETFSBASE), "S"(fsbase)
 	                        : "rax", "r11", "rcx", "rdx", "memory");
 }
 

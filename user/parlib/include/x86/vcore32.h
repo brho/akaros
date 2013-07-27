@@ -256,6 +256,7 @@ static inline void pop_user_ctx_raw(struct user_context *ctx, uint32_t vcoreid)
 static inline void save_user_ctx(struct user_context *ctx)
 {
 	struct sw_trapframe *sw_tf = &ctx->tf.sw_tf;
+	long dummy;
 	ctx->type = ROS_SW_CTX;
 	asm volatile ("stmxcsr %0" : "=m"(sw_tf->tf_mxcsr));
 	asm volatile ("fnstcw %0" : "=m"(sw_tf->tf_fpucw));
@@ -268,7 +269,7 @@ static inline void save_user_ctx(struct user_context *ctx)
 	              "leal 1f,%%eax;         " /* get future eip */
 	              "movl %%eax,0x14(%0);   "
 	              "1:                     " /* where this tf will restart */
-	              :
+	              : "=c"(dummy)	/* force clobber for ecx */
 	              : "c"(sw_tf)
 	              : "eax", "edx", "memory", "cc");
 }

@@ -27,6 +27,7 @@ static inline bool in_kernel(struct hw_trapframe *hw_tf)
 static inline void save_kernel_ctx(struct kernel_ctx *ctx)
 {
 	/* Save the regs and the future esp. */
+	/* Careful when updating; %0, %1, and %2 are not listed as clobbers */
 	asm volatile("movl %%esp,(%0);       " /* save esp in it's slot*/
 	             "pushl %%eax;           " /* temp save eax */
 	             "leal 1f,%%eax;         " /* get future eip */
