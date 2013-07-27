@@ -40,6 +40,7 @@ obj-y						+= syscall.o
 obj-y						+= sysevent.o
 obj-y						+= testing.o
 obj-y						+= time.o
+obj-y						+= trace.o
 obj-y						+= trap.o
 obj-y						+= ucq.o
 obj-y						+= umem.o
