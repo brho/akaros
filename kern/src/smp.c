@@ -116,9 +116,21 @@ void smp_percpu_init(void)
 
 /* PCPUI Trace Rings: */
 
+static void pcpui_trace_kmsg_handler(void *event, void *data)
+{
+	struct pcpu_trace_event *te = (struct pcpu_trace_event*)event;
+	char *func_name;
+	uintptr_t addr;
+	addr = te->arg1;
+	func_name = get_fn_name(addr);
+	printk("\tKMSG %p: %s\n", addr, func_name);
+	kfree(func_name);
+}
+
 /* Add specific trace handlers here: */
 trace_handler_t pcpui_tr_handlers[PCPUI_NR_TYPES] = {
                                   0,
+                                  pcpui_trace_kmsg_handler,
                                   };
 
 /* Generic handler for the pcpui ring.  Will switch out to the appropriate

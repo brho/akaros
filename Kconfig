@@ -94,6 +94,15 @@ endmenu
 
 menu "Kernel Debugging"
 
+config TRACE_KMSGS
+	bool "KMSG Tracing"
+	default n
+	help
+		Turns on KMSG tracing, using the per-cpu ring buffer (holds about 256
+		events).  You can access this from the monitor via "trace pcpui".  Turn
+		this off for a slight performance improvement on every KMSG (and every
+		MCP proc_yield).
+
 config SPINLOCK_DEBUG
 	bool "Spinlock debugging"
 	default n

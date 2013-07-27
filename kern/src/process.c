@@ -1098,6 +1098,8 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 		TAILQ_INSERT_TAIL(&p->online_vcs, vc, list); /* could go HEAD */
 		goto out_failed;
 	}
+	/* Not really a kmsg, but it acts like one w.r.t. proc mgmt */
+	pcpui_trace_kmsg(pcpui, (uintptr_t)proc_yield);
 	/* We won the race with event sending, we can safely yield */
 	TAILQ_INSERT_HEAD(&p->inactive_vcs, vc, list);
 	/* Note this protects stuff userspace should look at, which doesn't

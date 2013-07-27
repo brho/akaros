@@ -76,6 +76,7 @@ void handle_kmsg_ipi(struct hw_trapframe *hw_tf, void *data)
 	/* The lock serves as a cmb to force a re-read of the head of the list */
 	spin_lock(&pcpui->immed_amsg_lock);
 	STAILQ_FOREACH_SAFE(kmsg_i, &pcpui->immed_amsgs, link, temp) {
+		pcpui_trace_kmsg(pcpui, (uintptr_t)kmsg_i->pc);
 		kmsg_i->pc(kmsg_i->srcid, kmsg_i->arg0, kmsg_i->arg1, kmsg_i->arg2);
 		STAILQ_REMOVE(&pcpui->immed_amsgs, kmsg_i, kernel_message, link);
 		kmem_cache_free(kernel_msg_cache, (void*)kmsg_i);
@@ -125,6 +126,7 @@ void process_routine_kmsg(void)
 		kmem_cache_free(kernel_msg_cache, (void*)kmsg);
 		assert(msg_cp.dstid == pcoreid);	/* caught a brutal bug with this */
 		set_rkmsg(pcpui);					/* we're now in early RKM ctx */
+		pcpui_trace_kmsg(pcpui, (uintptr_t)msg_cp.pc);
 		msg_cp.pc(msg_cp.srcid, msg_cp.arg0, msg_cp.arg1, msg_cp.arg2);
 		/* If we aren't still in early RKM, it is because the KMSG blocked
 		 * (thus leaving early RKM, finishing in default context) and then
