@@ -88,6 +88,22 @@ void __ros_scp_syscall_blockon(struct syscall *sysc)
  * blockon before becoming an MCP.  Default is the glibc SCP handler */
 void (*ros_syscall_blockon)(struct syscall *sysc) = __ros_scp_syscall_blockon;
 
+/* Issue a single syscall and block into the 2LS until it completes */
+void ros_syscall_sync(struct syscall *sysc)
+{
+	/* There is only one syscall in the syscall array when we want to do it
+	* synchronously */
+	__ros_arch_syscall((long)sysc, 1);
+	/* Don't proceed til we are done */
+	while (!(atomic_read(&sysc->flags) & SC_DONE))
+		ros_syscall_blockon(sysc);
+	/* Need to wait til it is unlocked.  It's not really done until SC_DONE &
+	 * !SC_K_LOCK. */
+	while (atomic_read(&sysc->flags) & SC_K_LOCK)
+		cpu_relax();
+}
+libc_hidden_def(ros_syscall_sync)
+
 /* TODO: make variants of __ros_syscall() based on the number of args (0 - 6) */
 /* These are simple synchronous system calls, built on top of the kernel's async
  * interface.  This version makes no assumptions about errno.  You usually don't
@@ -96,7 +112,6 @@ static inline struct syscall
 __ros_syscall_inline(unsigned int _num, long _a0, long _a1, long _a2, long _a3,
                      long _a4, long _a5)
 {
-	int num_started;	/* not used yet */
 	struct syscall sysc = {0};
 	sysc.num = _num;
 	sysc.ev_q = 0;
@@ -106,14 +121,7 @@ __ros_syscall_inline(unsigned int _num, long _a0, long _a1, long _a2, long _a3,
 	sysc.arg3 = _a3;
 	sysc.arg4 = _a4;
 	sysc.arg5 = _a5;
-	num_started = __ros_arch_syscall(&sysc, 1);
-	/* Don't proceed til we are done */
-	while (!(atomic_read(&sysc.flags) & SC_DONE))
-		ros_syscall_blockon(&sysc);
-	/* Need to wait til it is unlocked.  It's not really done until SC_DONE &
-	 * !SC_K_LOCK. */
-	while (atomic_read(&sysc.flags) & SC_K_LOCK)
-		cpu_relax();
+    ros_syscall_sync(&sysc);
 	return sysc;
 }
 
