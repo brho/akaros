@@ -54,9 +54,13 @@ void uthread_lib_init(struct uthread *uthread);
  * pthread_create(), which can wrap these with their own stuff (like attrs,
  * retvals, etc). */
 
-/* Does the uthread initialization of a uthread that the caller created.  Call
- * this whenever you are "starting over" with a thread. */
-void uthread_init(struct uthread *new_thread);
+/* uthread_init() does the uthread initialization of a uthread that the caller
+ * created.  Call this whenever you are "starting over" with a thread.  Pass in
+ * attr, if you want to override any defaults. */
+struct uth_thread_attr {
+	bool want_tls;		/* default, no */
+};
+void uthread_init(struct uthread *new_thread, struct uth_thread_attr *attr);
 /* Low-level _S code calls this for basic uthreading without a 2LS */
 void uthread_slim_init(void);
 /* Call this when you are done with a uthread, forever, but before you free it */

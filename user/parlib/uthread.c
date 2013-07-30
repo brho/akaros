@@ -16,7 +16,9 @@ __thread struct uthread *current_uthread = 0;
  * extensively about the details.  Will call out when necessary. */
 struct event_queue *preempt_ev_q;
 
-/* static helpers: */
+/* Helpers: */
+#define UTH_TLSDESC_NOTLS (void*)(-1)
+static inline bool __uthread_has_tls(struct uthread *uthread);
 static int __uthread_allocate_tls(struct uthread *uthread);
 static int __uthread_reinit_tls(struct uthread *uthread);
 static void __uthread_free_tls(struct uthread *uthread);
@@ -28,7 +30,13 @@ static void __ros_mcp_syscall_blockon(struct syscall *sysc);
 /* Helper, make the uthread code manage thread0.  This sets up uthread such
  * that the calling code and its TLS are tracked by the uthread struct, and
  * vcore0 thinks the uthread is running there.  Called only by slim_init (early
- * _S code) and lib_init. */
+ * _S code) and lib_init.
+ *
+ * Whether or not uthreads have TLS, thread0 has TLS, given to it by glibc.
+ * This TLS will get set whenever we use thread0, regardless of whether or not
+ * we use TLS for uthreads in general.  glibc cares about this TLS and will use
+ * it at exit.  We can't simply use that TLS for VC0 either, since we don't know
+ * where thread0 will be running when the program ends. */
 static void uthread_manage_thread0(struct uthread *uthread)
 {
 	assert(uthread);
@@ -177,7 +185,7 @@ void __attribute__((noreturn)) uthread_vcore_entry(void)
 
 /* Does the uthread initialization of a uthread that the caller created.  Call
  * this whenever you are "starting over" with a thread. */
-void uthread_init(struct uthread *new_thread)
+void uthread_init(struct uthread *new_thread, struct uth_thread_attr *attr)
 {
 	int ret;
 	assert(new_thread);
@@ -188,13 +196,17 @@ void uthread_init(struct uthread *new_thread)
 	 * There is no FP context to be restored yet.  We only save the FPU when we
 	 * were interrupted off a core. */
 	new_thread->flags |= UTHREAD_SAVED;
-	/* Get a TLS.  If we already have one, reallocate/refresh it */
-	if (new_thread->tls_desc)
-		ret = __uthread_reinit_tls(new_thread);
-	else
-		ret = __uthread_allocate_tls(new_thread);
-	assert(!ret);
-	uthread_set_tls_var(new_thread, current_uthread, new_thread);
+	if (attr && attr->want_tls) {
+		/* Get a TLS.  If we already have one, reallocate/refresh it */
+		if (new_thread->tls_desc)
+			ret = __uthread_reinit_tls(new_thread);
+		else
+			ret = __uthread_allocate_tls(new_thread);
+		assert(!ret);
+		uthread_set_tls_var(new_thread, current_uthread, new_thread);
+	} else {
+		new_thread->tls_desc = UTH_TLSDESC_NOTLS;
+	}
 }
 
 /* This is a wrapper for the sched_ops thread_runnable, for use by functions
@@ -300,11 +312,18 @@ void uthread_yield(bool save_state, void (*yield_func)(struct uthread*, void*),
 		save_fp_state(&uthread->as);
 		uthread->flags |= UTHREAD_FPSAVED;
 	}
-	/* Change to the transition context (both TLS and stack). */
-	extern void** vcore_thread_control_blocks;
-	set_tls_desc(vcore_thread_control_blocks[vcoreid], vcoreid);
-	assert(current_uthread == uthread);
-	assert(in_vcore_context());	/* technically, we aren't fully in vcore ctx */
+	/* Change to the transition context (both TLS (if applicable) and stack). */
+	if (__uthread_has_tls(uthread)) {
+		extern void **vcore_thread_control_blocks;
+		set_tls_desc(vcore_thread_control_blocks[vcoreid], vcoreid);
+		assert(current_uthread == uthread);
+		assert(in_vcore_context());
+	} else {
+		/* Since uthreads and vcores share TLS (it's always the vcore's TLS, the
+		 * uthread one just bootstraps from it), we need to change our state at
+		 * boundaries between the two 'contexts' */
+		__vcore_context = TRUE;
+	}
 	/* After this, make sure you don't use local variables.  Also, make sure the
 	 * compiler doesn't use them without telling you (TODO).
 	 *
@@ -329,7 +348,8 @@ void uthread_cleanup(struct uthread *uthread)
 {
 	printd("[U] thread %08p on vcore %d is DYING!\n", uthread, vcore_id());
 	/* we alloc and manage the TLS, so lets get rid of it */
-	__uthread_free_tls(uthread);
+	if (__uthread_has_tls(uthread))
+		__uthread_free_tls(uthread);
 }
 
 static void __ros_syscall_spinon(struct syscall *sysc)
@@ -377,12 +397,32 @@ void highjack_current_uthread(struct uthread *uthread)
 {
 	uint32_t vcoreid = vcore_id();
 	assert(uthread != current_uthread);
-	assert(uthread->tls_desc);
 	current_uthread->state = UT_NOT_RUNNING;
 	uthread->state = UT_RUNNING;
-	vcore_set_tls_var(current_uthread, uthread);
-	set_tls_desc(uthread->tls_desc, vcoreid);
-	__vcoreid = vcoreid;	/* setting the uthread's TLS var */
+	/* Make sure the vcore is tracking the new uthread struct */
+	if (__uthread_has_tls(current_uthread))
+		vcore_set_tls_var(current_uthread, uthread);
+	else
+		current_uthread = uthread;
+	/* and make sure we are using the correct TLS for the new uthread */
+	if (__uthread_has_tls(uthread)) {
+		assert(uthread->tls_desc);
+		set_tls_desc(uthread->tls_desc, vcoreid);
+		__vcoreid = vcoreid;	/* setting the uthread's TLS var */
+	}
+}
+
+/* Helper: loads a uthread's TLS on this vcore, if applicable.  If our uthreads
+ * do not have their own TLS, we simply switch the __vc_ctx, signalling that the
+ * context running here is (soon to be) a uthread. */
+static void set_uthread_tls(struct uthread *uthread, uint32_t vcoreid)
+{
+	if (__uthread_has_tls(uthread)) {
+		set_tls_desc(uthread->tls_desc, vcoreid);
+		__vcoreid = vcoreid;	/* setting the uthread's TLS var */
+	} else {
+		__vcore_context = FALSE;
+	}
 }
 
 /* Run the thread that was current_uthread, from a previous run.  Should be
@@ -401,8 +441,7 @@ void run_current_uthread(void)
 	printd("[U] Vcore %d is restarting uthread %08p\n", vcoreid,
 	       current_uthread);
 	/* Go ahead and start the uthread */
-	set_tls_desc(current_uthread->tls_desc, vcoreid);
-	__vcoreid = vcoreid;	/* setting the uthread's TLS var */
+	set_uthread_tls(current_uthread, vcoreid);
 	/* Run, using the TF in the VCPD.  FP state should already be loaded */
 	pop_user_ctx(&vcpd->uthread_ctx, vcoreid);
 	assert(0);
@@ -442,9 +481,7 @@ void run_uthread(struct uthread *uthread)
 		uthread->flags &= ~UTHREAD_FPSAVED;
 		restore_fp_state(&uthread->as);
 	}
-	/* Go ahead and start the uthread */
-	set_tls_desc(uthread->tls_desc, vcoreid);
-	__vcoreid = vcoreid;	/* setting the uthread's TLS var */
+	set_uthread_tls(uthread, vcoreid);
 	/* the uth's context will soon be in the cpu (or VCPD), no longer saved */
 	uthread->flags &= ~UTHREAD_SAVED;
 	pop_user_ctx(&uthread->u_ctx, vcoreid);
@@ -463,8 +500,7 @@ static void __run_current_uthread_raw(void)
 	vcpd->notif_pending = TRUE;
 	assert(!(current_uthread->flags & UTHREAD_SAVED));
 	assert(!(current_uthread->flags & UTHREAD_FPSAVED));
-	set_tls_desc(current_uthread->tls_desc, vcoreid);
-	__vcoreid = vcoreid;	/* setting the uthread's TLS var */
+	set_uthread_tls(current_uthread, vcoreid);
 	pop_user_ctx_raw(&vcpd->uthread_ctx, vcoreid);
 	assert(0);
 }
@@ -759,7 +795,8 @@ void handle_vc_preempt(struct event_msg *ev_msg, unsigned int ev_type)
 	/* At this point, we need to try to recover */
 	/* This case handles when the remote core was in vcore context */
 	if (rem_vcpd->notif_disabled) {
-		printd("VC %d recovering %d, notifs were disabled\n", vcoreid, rem_vcoreid);
+		printd("VC %d recovering %d, notifs were disabled\n", vcoreid,
+		       rem_vcoreid);
 		change_to_vcore(vcpd, rem_vcoreid);
 		return;	/* in case it returns.  we've done our job recovering */
 	}
@@ -777,7 +814,8 @@ void handle_vc_preempt(struct event_msg *ev_msg, unsigned int ev_type)
 	 * don't need to worry about handling the message any further.  Future
 	 * preemptions will generate another message, so we can ignore getting the
 	 * uthread or anything like that. */
-	printd("VC %d recovering %d, trying to steal uthread\n", vcoreid, rem_vcoreid);
+	printd("VC %d recovering %d, trying to steal uthread\n", vcoreid,
+	       rem_vcoreid);
 	if (!(atomic_read(&rem_vcpd->flags) & VC_PREEMPTED))
 		goto out_stealing;
 	/* Might be preempted twice quickly, and the second time had notifs
@@ -811,7 +849,8 @@ void handle_vc_preempt(struct event_msg *ev_msg, unsigned int ev_type)
 	/* Extremely rare: they have a uthread, but it can't migrate.  So we'll need
 	 * to change to them. */
 	if (cant_migrate) {
-		printd("VC %d recovering %d, can't migrate uthread!\n", vcoreid, rem_vcoreid);
+		printd("VC %d recovering %d, can't migrate uthread!\n", vcoreid,
+		       rem_vcoreid);
 		stop_uth_stealing(rem_vcpd);
 		change_to_vcore(vcpd, rem_vcoreid);
 		return;	/* in case it returns.  we've done our job recovering */
@@ -899,6 +938,11 @@ void deregister_evq(struct syscall *sysc)
 		/* Note we don't care if the SC_DONE flag is getting set.  We just need
 		 * to avoid clobbering flags */
 	} while (!atomic_cas(&sysc->flags, old_flags, old_flags & ~SC_UEVENT));
+}
+
+static inline bool __uthread_has_tls(struct uthread *uthread)
+{
+	return uthread->tls_desc != UTH_TLSDESC_NOTLS;
 }
 
 /* TLS helpers */

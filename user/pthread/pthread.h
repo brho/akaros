@@ -131,6 +131,7 @@ typedef dtls_key_t pthread_key_t;
 
 /* Akaros pthread extensions / hacks */
 void pthread_can_vcore_request(bool can);	/* default is TRUE */
+void pthread_need_tls(bool need);			/* default is TRUE */
 void pthread_lib_init(void);
 void __pthread_generic_yield(struct pthread_tcb *pthread);
 

@@ -662,6 +662,7 @@ static void os_prep_work(int nr_threads)
 	atomic_init(&preempt_cnt, 0);
 	atomic_init(&indir_cnt, 0);
 	pthread_can_vcore_request(FALSE);	/* 2LS won't manage vcores */
+	pthread_need_tls(FALSE);
 	pthread_lib_init();					/* gives us one vcore */
 	ev_handlers[EV_VCORE_PREEMPT] = handle_preempt;
 	ev_handlers[EV_CHECK_MSGS] = handle_indir;

@@ -136,11 +136,6 @@ static inline void pop_hw_tf(struct hw_trapframe *tf, uint32_t vcoreid)
 static inline void pop_sw_tf(struct sw_trapframe *sw_tf, uint32_t vcoreid)
 {
 	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
-	/* If we have a TLS base set in the TF, then it was saved by the kernel.
-	 * whoever calls pop_tf should have set their TF, so we could assert it is
-	 * the same here.  Can remove for perf reasons. */
-	if (sw_tf->tf_fsbase)
-		assert(get_tls_desc(vcoreid) == (void*)sw_tf->tf_fsbase);
 	/* Restore callee-saved FPU state.  We need to clear exceptions before
 	 * reloading the FP CW, in case the new CW unmasks any.  We also need to
 	 * reset the tag word to clear out the stack.

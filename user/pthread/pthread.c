@@ -22,6 +22,7 @@ struct mcs_pdr_lock queue_lock;
 int threads_ready = 0;
 int threads_active = 0;
 bool can_adjust_vcores = TRUE;
+bool need_tls = TRUE;
 
 /* Array of per-vcore structs to manage waiting on syscalls and handling
  * overflow.  Init'd in pth_init(). */
@@ -272,6 +273,11 @@ void pthread_can_vcore_request(bool can)
 	can_adjust_vcores = can;
 }
 
+void pthread_need_tls(bool need)
+{
+	need_tls = need;
+}
+
 /* Pthread interface stuff and helpers */
 
 int pthread_attr_init(pthread_attr_t *a)
@@ -316,6 +322,7 @@ int pthread_attr_setstacksize(pthread_attr_t *attr, size_t stacksize)
 	attr->stacksize = stacksize;
 	return 0;
 }
+
 int pthread_attr_getstacksize(const pthread_attr_t *attr, size_t *stacksize)
 {
 	*stacksize = attr->stacksize;
@@ -413,6 +420,7 @@ void pthread_lib_init(void)
 int pthread_create(pthread_t *thread, const pthread_attr_t *attr,
                    void *(*start_routine)(void *), void *arg)
 {
+	struct uth_thread_attr uth_attr = {0};
 	run_once(pthread_lib_init());
 	/* Create the actual thread */
 	struct pthread_tcb *pthread;
@@ -443,7 +451,9 @@ int pthread_create(pthread_t *thread, const pthread_attr_t *attr,
 	pthread->start_routine = start_routine;
 	pthread->arg = arg;
 	/* Initialize the uthread */
-	uthread_init((struct uthread*)pthread);
+	if (need_tls)
+		uth_attr.want_tls = TRUE;
+	uthread_init((struct uthread*)pthread, &uth_attr);
 	pth_thread_runnable((struct uthread*)pthread);
 	*thread = pthread;
 	return 0;
