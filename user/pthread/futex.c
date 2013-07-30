@@ -18,7 +18,6 @@ TAILQ_HEAD(futex_queue, futex_element);
 struct futex_data {
   struct mcs_pdr_lock lock;
   struct futex_queue queue;
-  struct kmem_cache *element_cache;
 };
 static struct futex_data __futex;
 
@@ -26,28 +25,26 @@ static inline void futex_init()
 {
   mcs_pdr_init(&__futex.lock);
   TAILQ_INIT(&__futex.queue);
-  __futex.element_cache = kmem_cache_create("futex_element_cache", 
-    sizeof(struct futex_element), __alignof__(struct futex_element),
-    0, NULL, NULL);
 }
 
 static void __futex_block(struct uthread *uthread, void *arg) {
+  pthread_t pthread = (pthread_t)uthread;
   struct futex_element *e = (struct futex_element*)arg;
-  e->pthread = (pthread_t)uthread;
-	__pthread_generic_yield(e->pthread);
-  e->pthread->state = PTH_BLK_MUTEX;
-  TAILQ_INSERT_TAIL(&__futex.queue, e, link);
-  mcs_pdr_unlock(&__futex.lock);
+  __pthread_generic_yield(pthread);
+  pthread->state = PTH_BLK_MUTEX;
+  e->pthread = pthread;
 }
 
 static inline int futex_wait(int *uaddr, int val)
 {
   mcs_pdr_lock(&__futex.lock);
   if(*uaddr == val) {
-    // We unlock in the body of __futex_block
-    struct futex_element *e = kmem_cache_alloc(__futex.element_cache, 0); 
-    e->uaddr = uaddr;
-    uthread_yield(TRUE, __futex_block, e);
+    struct futex_element e;
+    e.uaddr = uaddr;
+    e.pthread = NULL;
+    TAILQ_INSERT_TAIL(&__futex.queue, &e, link);
+    mcs_pdr_unlock(&__futex.lock);
+    uthread_yield(TRUE, __futex_block, &e);
   }
   else {
     mcs_pdr_unlock(&__futex.lock);
@@ -58,6 +55,10 @@ static inline int futex_wait(int *uaddr, int val)
 static inline int futex_wake(int *uaddr, int count)
 {
   struct futex_element *e,*n = NULL;
+  struct futex_queue q = TAILQ_HEAD_INITIALIZER(q);
+
+  // Atomically grab all relevant futex blockers
+  // from the global futex queue
   mcs_pdr_lock(&__futex.lock);
   e = TAILQ_FIRST(&__futex.queue);
   while(e != NULL) {
@@ -65,8 +66,7 @@ static inline int futex_wake(int *uaddr, int count)
       n = TAILQ_NEXT(e, link);
       if(e->uaddr == uaddr) {
         TAILQ_REMOVE(&__futex.queue, e, link);
-        uthread_runnable((struct uthread*)e->pthread);
-        kmem_cache_free(__futex.element_cache, e); 
+        TAILQ_INSERT_TAIL(&q, e, link);
         count--;
       }
       e = n;
@@ -74,6 +74,17 @@ static inline int futex_wake(int *uaddr, int count)
     else break;
   }
   mcs_pdr_unlock(&__futex.lock);
+
+  // Unblock them outside the lock
+  e = TAILQ_FIRST(&q);
+  while(e != NULL) {
+    n = TAILQ_NEXT(e, link);
+    TAILQ_REMOVE(&q, e, link);
+    while(e->pthread == NULL)
+      cpu_relax();
+    uthread_runnable((struct uthread*)e->pthread);
+    e = n;
+  }
   return 0;
 }
 
