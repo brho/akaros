@@ -66,6 +66,18 @@ void smp_final_core_init(void)
 	/* Need to bootstrap the rdtscp MSR with our OS coreid */
 	int coreid = get_os_coreid(hw_core_id());
 	write_msr(MSR_TSC_AUX, coreid);
+
+	/* Busted versions of qemu bug out here (32 bit) */
+	int rdtscp_ecx;
+	asm volatile ("rdtscp" : "=c"(rdtscp_ecx) : : "eax", "edx");
+	if (read_msr(MSR_TSC_AUX) != rdtscp_ecx) {
+		printk("Broken rdtscp detected!  Rebuild without CONFIG_FAST_COREID\n");
+		if (coreid)
+			while(1);
+		/* note this panic may think it is not core 0, and core 0 might not have
+		 * an issue (seems random) */
+		panic("");
+	}
 #endif
 	setup_default_mtrrs(&generic_barrier);
 	smp_percpu_init();
