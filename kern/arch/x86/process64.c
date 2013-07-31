@@ -68,9 +68,17 @@ void proc_pop_ctx(struct user_context *ctx)
 	panic("Unknown context type!\n");
 }
 
+/* Helper: if *addr isn't a canonical user address, poison it.  Use this when
+ * you need a canonical address (like MSR_FS_BASE) */
+static void enforce_user_canon(uintptr_t *addr)
+{
+	if (*addr >> 47 != 0)
+		*addr = 0x5a5a5a5a;
+}
+
 /* TODO: consider using a SW context */
 void proc_init_ctx(struct user_context *ctx, uint32_t vcoreid, uintptr_t entryp,
-                   uintptr_t stack_top)
+                   uintptr_t stack_top, uintptr_t tls_desc)
 {
 	struct hw_trapframe *tf = &ctx->tf.hw_tf;
 	ctx->type = ROS_HW_CTX;
@@ -94,14 +102,8 @@ void proc_init_ctx(struct user_context *ctx, uint32_t vcoreid, uintptr_t entryp,
 	/* Coupled closely with user's entry.S.  id is the vcoreid, which entry.S
 	 * uses to determine what to do.  vcoreid == 0 is the main core/context. */
 	tf->tf_rax = vcoreid;
-}
-
-/* Helper: if *addr isn't a canonical user address, poison it.  Use this when
- * you need a canonical address (like MSR_FS_BASE) */
-static void enforce_user_canon(uintptr_t *addr)
-{
-	if (*addr >> 47 != 0)
-		*addr = 0x5a5a5a5a;
+	tf->tf_fsbase = tls_desc;
+	enforce_user_canon(&tf->tf_fsbase);
 }
 
 void proc_secure_ctx(struct user_context *ctx)

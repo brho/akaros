@@ -20,10 +20,19 @@ void proc_pop_ctx(struct user_context *ctx)
 
 /* TODO: consider using a SW context */
 void proc_init_ctx(struct user_context *ctx, uint32_t vcoreid, uintptr_t entryp,
-                   uintptr_t stack_top)
+                   uintptr_t stack_top, uintptr_t tls_desc)
 {
 	struct hw_trapframe *tf = &ctx->tf.hw_tf;
 	ctx->type = ROS_HW_CTX;
+
+	/* TODO: If you'd like, take tls_desc and save it in the ctx somehow, so
+	 * that proc_pop_ctx will set up that TLS before launching.  If you do this,
+	 * you can change _start.c to not reset the TLS in userspace.
+	 *
+	 * This is a bigger deal on amd64, where we take a (fast) syscall to change
+	 * the TLS desc, right after the kernel just 0'd out the TLS desc.  If you
+	 * can change your HW TLS desc with negligible overhead, then feel free to
+	 * do whatever.  Long term, it might be better to do whatever amd64 does. */
 
 	memset(tf, 0, sizeof(*tf));
 

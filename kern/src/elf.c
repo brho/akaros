@@ -259,7 +259,7 @@ int load_elf(struct proc* p, struct file* f)
 	memcpy(p->procinfo->argp+auxp_pos,auxp,sizeof(auxp));
 
 	uintptr_t core0_entry = ei.dynamic ? interp_ei.entry : ei.entry;
-	proc_init_ctx(&p->scp_ctx, 0, core0_entry, USTACKTOP);
+	proc_init_ctx(&p->scp_ctx, 0, core0_entry, USTACKTOP, 0);
 	p->env_entry = ei.entry;
 
 	int flags = MAP_FIXED | MAP_ANONYMOUS;

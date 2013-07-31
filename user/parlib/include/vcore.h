@@ -50,6 +50,8 @@ static inline bool vcore_is_preempted(uint32_t vcoreid);
 static inline struct preempt_data *vcpd_of(uint32_t vcoreid);
 static inline bool preempt_is_pending(uint32_t vcoreid);
 static inline bool __preempt_is_pending(uint32_t vcoreid);
+static inline void *get_vcpd_tls_desc(uint32_t vcoreid);
+static inline void set_vcpd_tls_desc(uint32_t vcoreid, void *tls_desc);
 void vcore_init(void);
 void vcore_event_init(void);
 void vcore_change_to_m(void);
@@ -143,6 +145,17 @@ static inline bool __preempt_is_pending(uint32_t vcoreid)
 	return __procinfo.vcoremap[vcoreid].preempt_pending;
 }
 
+/* The kernel interface uses uintptr_t, but we have a lot of older code that
+ * uses void *, hence the casting. */
+static inline void *get_vcpd_tls_desc(uint32_t vcoreid)
+{
+	return (void*)__procdata.vcore_preempt_data[vcoreid].vcore_tls_desc;
+}
+
+static inline void set_vcpd_tls_desc(uint32_t vcoreid, void *tls_desc)
+{
+	__procdata.vcore_preempt_data[vcoreid].vcore_tls_desc = (uintptr_t)tls_desc;
+}
 
 #ifndef __PIC__
 
@@ -245,9 +258,8 @@ static inline bool __preempt_is_pending(uint32_t vcoreid)
 
 #define vcore_set_tls_var(name, val)                                           \
 ({                                                                             \
-	extern void** vcore_thread_control_blocks;                                 \
 	typeof(val) __val = val;                                                   \
-	begin_access_tls_vars(vcore_thread_control_blocks[vcoreid]);               \
+	begin_access_tls_vars(get_vcpd_tls_desc(vcoreid));                         \
 	name = __val;                                                              \
 	end_access_tls_vars();                                                     \
 })
@@ -255,7 +267,7 @@ static inline bool __preempt_is_pending(uint32_t vcoreid)
 #define vcore_get_tls_var(name)                                                \
 ({                                                                             \
 	typeof(name) val;                                                          \
-	begin_access_tls_vars(vcore_tls_descs[vcoreid]);                           \
+	begin_access_tls_vars(get_vcpd_tls_desc(vcoreid));                         \
 	val = name;                                                                \
 	end_access_tls_vars();                                                     \
 	val;                                                                       \

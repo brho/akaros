@@ -53,8 +53,7 @@ static void uthread_manage_thread0(struct uthread *uthread)
 	 * issue is that vcore0's transition-TLS isn't TLS_INITed yet.  Until it is
 	 * (right before vcore_entry(), don't try and take the address of any of
 	 * its TLS vars. */
-	extern void** vcore_thread_control_blocks;
-	set_tls_desc(vcore_thread_control_blocks[0], 0);
+	set_tls_desc(get_vcpd_tls_desc(0), 0);
 	/* We might have a basic uthread already installed (from slim_init), so
 	 * free it before installing the new one. */
 	if (current_uthread)
@@ -314,8 +313,7 @@ void uthread_yield(bool save_state, void (*yield_func)(struct uthread*, void*),
 	}
 	/* Change to the transition context (both TLS (if applicable) and stack). */
 	if (__uthread_has_tls(uthread)) {
-		extern void **vcore_thread_control_blocks;
-		set_tls_desc(vcore_thread_control_blocks[vcoreid], vcoreid);
+		set_tls_desc(get_vcpd_tls_desc(vcoreid), vcoreid);
 		assert(current_uthread == uthread);
 		assert(in_vcore_context());
 	} else {
@@ -773,7 +771,6 @@ void handle_vc_preempt(struct event_msg *ev_msg, unsigned int ev_type)
 	struct preempt_data *vcpd = vcpd_of(vcoreid);
 	uint32_t rem_vcoreid = ev_msg->ev_arg2;
 	struct preempt_data *rem_vcpd = vcpd_of(rem_vcoreid);
-	extern void **vcore_thread_control_blocks;
 	struct uthread *uthread_to_steal = 0;
 	bool cant_migrate = FALSE;
 
@@ -836,7 +833,7 @@ void handle_vc_preempt(struct event_msg *ev_msg, unsigned int ev_type)
 	vcoreid = vcore_id();	/* need to copy this out to our stack var */
 	/* We want to minimize the time we're in the remote vcore's TLS, so we peak
 	 * and make the minimum changes we need, and deal with everything later. */
-	set_tls_desc(vcore_thread_control_blocks[rem_vcoreid], vcoreid);
+	set_tls_desc(get_vcpd_tls_desc(rem_vcoreid), vcoreid);
 	if (current_uthread) {
 		if (current_uthread->flags & UTHREAD_DONT_MIGRATE) {
 			cant_migrate = TRUE;
@@ -845,7 +842,7 @@ void handle_vc_preempt(struct event_msg *ev_msg, unsigned int ev_type)
 			current_uthread = 0;
 		}
 	}
-	set_tls_desc(vcore_thread_control_blocks[vcoreid], vcoreid);
+	set_tls_desc(get_vcpd_tls_desc(vcoreid), vcoreid);
 	/* Extremely rare: they have a uthread, but it can't migrate.  So we'll need
 	 * to change to them. */
 	if (cant_migrate) {

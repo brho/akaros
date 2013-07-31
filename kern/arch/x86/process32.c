@@ -87,7 +87,7 @@ void proc_pop_ctx(struct user_context *ctx)
 
 /* TODO: consider using a SW context */
 void proc_init_ctx(struct user_context *ctx, uint32_t vcoreid, uintptr_t entryp,
-                   uintptr_t stack_top)
+                   uintptr_t stack_top, uintptr_t tls_desc)
 {
 	struct hw_trapframe *tf = &ctx->tf.hw_tf;
 	ctx->type = ROS_HW_CTX;
@@ -112,6 +112,8 @@ void proc_init_ctx(struct user_context *ctx, uint32_t vcoreid, uintptr_t entryp,
 	/* Coupled closely with user's entry.S.  id is the vcoreid, which entry.S
 	 * uses to determine what to do.  vcoreid == 0 is the main core/context. */
 	tf->tf_regs.reg_eax = vcoreid;
+	/* Note we don't pass the tlsdesc.  32 bit TLS is pretty jacked up, so we
+	 * let userspace deal with it. TODO: (TLSV) */
 }
 
 /* TODO: handle both HW and SW contexts */

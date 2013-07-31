@@ -19,7 +19,6 @@ static size_t _max_vcores_ever_wanted = 1;
 atomic_t nr_new_vcores_wanted;
 atomic_t vc_req_being_handled;
 
-extern void** vcore_thread_control_blocks;
 bool vc_initialized = FALSE;
 __thread struct syscall __vcore_one_sysc = {.flags = (atomic_t)SC_DONE, 0};
 
@@ -29,10 +28,11 @@ static __thread void (*__vcore_reentry_func)(void) = NULL;
 /* TODO: probably don't want to dealloc.  Considering caching */
 static void free_transition_tls(int id)
 {
-	if(vcore_thread_control_blocks[id])
-	{
-		free_tls(vcore_thread_control_blocks[id]);
-		vcore_thread_control_blocks[id] = NULL;
+	if (get_vcpd_tls_desc(id)) {
+		/* Note we briefly have no TLS desc in VCPD.  This is fine so long as
+		 * that vcore doesn't get started fresh before we put in a new desc */
+		free_tls(get_vcpd_tls_desc(id));
+		set_vcpd_tls_desc(id, NULL);
 	}
 }
 
@@ -46,11 +46,11 @@ static int allocate_transition_tls(int id)
 	free_transition_tls(id);
 
 	void *tcb = allocate_tls();
-
-	if ((vcore_thread_control_blocks[id] = tcb) == NULL) {
+	if (!tcb) {
 		errno = ENOMEM;
 		return -1;
 	}
+	set_vcpd_tls_desc(id, tcb);
 	return 0;
 }
 
@@ -83,16 +83,11 @@ void vcore_init(void)
 	/* Note this is racy, but okay.  The first time through, we are _S */
 	init_once_racy(return);
 
-	vcore_thread_control_blocks = (void**)calloc(max_vcores(),sizeof(void*));
-
-	if(!vcore_thread_control_blocks)
-		goto vcore_init_fail;
-
 	/* Need to alloc vcore0's transition stuff here (technically, just the TLS)
 	 * so that schedulers can use vcore0's transition TLS before it comes up in
 	 * vcore_entry() */
 	if(allocate_transition_stack(0) || allocate_transition_tls(0))
-		goto vcore_init_tls_fail;
+		goto vcore_init_fail;
 
 	/* Initialize our VCPD event queues' ucqs, two pages per ucq, 4 per vcore */
 	mmap_block = (uintptr_t)mmap(0, PGSIZE * 4 * max_vcores(),
@@ -120,8 +115,6 @@ void vcore_init(void)
 	 * _M) */
 	vc_initialized = TRUE;
 	return;
-vcore_init_tls_fail:
-	free(vcore_thread_control_blocks);
 vcore_init_fail:
 	assert(0);
 }

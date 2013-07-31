@@ -114,6 +114,7 @@ struct preempt_data {
 	struct ancillary_state		preempt_anc;
 	struct user_context			uthread_ctx;		/* for preempts or notifs */
 	uintptr_t					transition_stack;	/* advertised by the user */
+	uintptr_t					vcore_tls_desc;		/* advertised by the user */
 	atomic_t					flags;
 	int							rflags;				/* racy flags */
 	bool						notif_disabled;		/* vcore unwilling to recv*/

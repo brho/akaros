@@ -504,7 +504,7 @@ void proc_run_s(struct proc *p)
 				pcpui->cur_ctx = &pcpui->actual_ctx;
 				memset(pcpui->cur_ctx, 0, sizeof(struct user_context));
 				proc_init_ctx(pcpui->cur_ctx, 0, p->env_entry,
-				              vcpd->transition_stack);
+				              vcpd->transition_stack, vcpd->vcore_tls_desc);
 			} else {
 				/* If they have no transition stack, then they can't receive
 				 * events.  The most they are getting is a wakeup from the
@@ -1760,7 +1760,7 @@ static void __set_curctx_to_vcoreid(struct proc *p, uint32_t vcoreid,
 	} else { /* not restarting from a preemption, use a fresh vcore */
 		assert(vcpd->transition_stack);
 		proc_init_ctx(&pcpui->actual_ctx, vcoreid, p->env_entry,
-		              vcpd->transition_stack);
+		              vcpd->transition_stack, vcpd->vcore_tls_desc);
 		/* Disable/mask active notifications for fresh vcores */
 		vcpd->notif_disabled = TRUE;
 	}
@@ -1990,7 +1990,7 @@ void __notify(uint32_t srcid, long a0, long a1, long a2)
 	vcpd->uthread_ctx = *pcpui->cur_ctx;
 	memset(pcpui->cur_ctx, 0, sizeof(struct user_context));
 	proc_init_ctx(pcpui->cur_ctx, vcoreid, p->env_entry,
-	              vcpd->transition_stack);
+	              vcpd->transition_stack, vcpd->vcore_tls_desc);
 	/* this cur_ctx will get run when the kernel returns / idles */
 }
 

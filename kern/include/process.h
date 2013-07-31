@@ -140,7 +140,7 @@ void __tlbshootdown(uint32_t srcid, long a0, long a1, long a2);
 /* Arch Specific */
 void proc_pop_ctx(struct user_context *ctx) __attribute__((noreturn));
 void proc_init_ctx(struct user_context *ctx, uint32_t vcoreid, uintptr_t entryp,
-                   uintptr_t stack_top);
+                   uintptr_t stack_top, uintptr_t tls_desc);
 void proc_secure_ctx(struct user_context *ctx);
 void __abandon_core(void);
 
