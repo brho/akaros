@@ -50,10 +50,10 @@ static bool pa64_is_in_kernel(uint64_t paddr)
 {
 	extern char end[];
 	/* kernel is linked and loaded here (in kernel{32,64}.ld */
-	return (EXTPHYSMEM <= paddr) && (paddr <= PADDR(end));
+	return (EXTPHYSMEM <= paddr) && (paddr < PADDR(end));
 }
 
-/* Helper.  For every page in the entry, this will determine whther or not the
+/* Helper.  For every page in the entry, this will determine whether or not the
  * page is free, and handle accordingly. */
 static void parse_mboot_region(struct multiboot_mmap_entry *entry, void *data)
 {
@@ -64,7 +64,17 @@ static void parse_mboot_region(struct multiboot_mmap_entry *entry, void *data)
 	if (entry->type != MULTIBOOT_MEMORY_AVAILABLE)
 		return;
 	/* TODO: we'll have some issues with jumbo allocation */
-	for (uint64_t i = ROUNDUP(entry->addr, PGSIZE);
+	/* Most entries are page aligned, though on some machines below EXTPHYSMEM
+	 * we may have some that aren't.  If two regions collide on the same page
+	 * (one of them starts unaligned), we need to only handle the page once, and
+	 * err on the side of being busy.
+	 *
+	 * Since these regions happen below EXTPHYSMEM, they are all marked busy (or
+	 * else we'll panic).  I'll probably rewrite this for jumbos before I find a
+	 * machine with unaligned mboot entries in higher memory. */
+	if (PGOFF(entry->addr))
+		assert(entry->addr < EXTPHYSMEM);
+	for (uint64_t i = ROUNDDOWN(entry->addr, PGSIZE);
 	     i < entry->addr + entry->len;
 	     i += PGSIZE) {
 		/* Skip pages we'll never map (above KERNBASE).  Once we hit one of
