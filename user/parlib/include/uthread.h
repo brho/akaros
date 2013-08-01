@@ -81,6 +81,7 @@ void deregister_evq(struct syscall *sysc);
 void highjack_current_uthread(struct uthread *uthread);
 void run_current_uthread(void);
 void run_uthread(struct uthread *uthread);
+static inline struct uthread **get_cur_uth_addr(uint32_t vcoreid);
 
 /* Event handlers - exported globally so programs can wrap them */
 void handle_vc_preempt(struct event_msg *ev_msg, unsigned int ev_type);
@@ -110,5 +111,14 @@ static inline void init_uthread_ctx(struct uthread *uth, void (*entry)(void),
 	end_access_tls_vars();                                                     \
 	val;                                                                       \
 })
+
+/* This works so long as we don't dlopen parlib (which we never do) */
+static inline struct uthread **get_cur_uth_addr(uint32_t vcoreid)
+{
+	uintptr_t vc_tls_desc = (uintptr_t)get_vcpd_tls_desc(vcoreid);
+	uintptr_t cur_uth_off = (uintptr_t)&current_uthread -
+	                        (uintptr_t)get_tls_desc(vcore_id());
+	return (struct uthread**)(vc_tls_desc + cur_uth_off);
+}
 
 #endif /* _UTHREAD_H */

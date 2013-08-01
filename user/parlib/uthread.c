@@ -772,6 +772,7 @@ void handle_vc_preempt(struct event_msg *ev_msg, unsigned int ev_type)
 	uint32_t rem_vcoreid = ev_msg->ev_arg2;
 	struct preempt_data *rem_vcpd = vcpd_of(rem_vcoreid);
 	struct uthread *uthread_to_steal = 0;
+	struct uthread **rem_cur_uth;
 	bool cant_migrate = FALSE;
 
 	assert(in_vcore_context());
@@ -828,39 +829,31 @@ void handle_vc_preempt(struct event_msg *ev_msg, unsigned int ev_type)
 	 * handler will bail when it fails to steal. */
 	if (rem_vcpd->notif_disabled)
 		goto out_stealing;
-	/* At this point, we're clear to try and steal the uthread.  Need to switch
-	 * into their TLS to take their uthread */
-	vcoreid = vcore_id();	/* need to copy this out to our stack var */
-	/* We want to minimize the time we're in the remote vcore's TLS, so we peak
-	 * and make the minimum changes we need, and deal with everything later. */
-	set_tls_desc(get_vcpd_tls_desc(rem_vcoreid), vcoreid);
-	if (current_uthread) {
-		if (current_uthread->flags & UTHREAD_DONT_MIGRATE) {
-			cant_migrate = TRUE;
+	/* At this point, we're clear to try and steal the uthread.  We used to
+	 * switch to their TLS to steal the uthread, but we can access their
+	 * current_uthread directly. */
+	rem_cur_uth = get_cur_uth_addr(rem_vcoreid);
+	uthread_to_steal = *rem_cur_uth;
+	if (uthread_to_steal) {
+		/* Extremely rare: they have a uthread, but it can't migrate.  So we'll
+		 * need to change to them. */
+		if (uthread_to_steal->flags & UTHREAD_DONT_MIGRATE) {
+			printd("VC %d recovering %d, can't migrate uthread!\n", vcoreid,
+			       rem_vcoreid);
+			stop_uth_stealing(rem_vcpd);
+			change_to_vcore(vcpd, rem_vcoreid);
+			return;	/* in case it returns.  we've done our job recovering */
 		} else {
-			uthread_to_steal = current_uthread;
-			current_uthread = 0;
+			*rem_cur_uth = 0;
+			/* we're clear to steal it */
+			printd("VC %d recovering %d, uthread %08p stolen\n", vcoreid,
+			       rem_vcoreid, uthread_to_steal);
+			__uthread_pause(rem_vcpd, uthread_to_steal, FALSE);
+			/* can't let the cur_uth = 0 write and any writes from __uth_pause()
+			 * to pass stop_uth_stealing. */
+			wmb();
 		}
 	}
-	set_tls_desc(get_vcpd_tls_desc(vcoreid), vcoreid);
-	/* Extremely rare: they have a uthread, but it can't migrate.  So we'll need
-	 * to change to them. */
-	if (cant_migrate) {
-		printd("VC %d recovering %d, can't migrate uthread!\n", vcoreid,
-		       rem_vcoreid);
-		stop_uth_stealing(rem_vcpd);
-		change_to_vcore(vcpd, rem_vcoreid);
-		return;	/* in case it returns.  we've done our job recovering */
-	}
-	if (!uthread_to_steal)
-		goto out_stealing;
-	/* we're clear to steal it */
-	printd("VC %d recovering %d, uthread %08p stolen\n", vcoreid, rem_vcoreid,
-	       current_uthread);
-	__uthread_pause(rem_vcpd, uthread_to_steal, FALSE);
-	/* can't let the cur_uth = 0 write and any writes from __uth_pause() to
-	 * pass stop_uth_stealing.  it's harmless in the cant_migrate case. */
-	wmb();
 	/* Fallthrough */
 out_stealing:
 	stop_uth_stealing(rem_vcpd);
