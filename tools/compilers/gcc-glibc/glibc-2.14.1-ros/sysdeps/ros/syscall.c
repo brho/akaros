@@ -89,7 +89,7 @@ void __ros_scp_syscall_blockon(struct syscall *sysc)
 void (*ros_syscall_blockon)(struct syscall *sysc) = __ros_scp_syscall_blockon;
 
 /* Issue a single syscall and block into the 2LS until it completes */
-void ros_syscall_sync(struct syscall *sysc)
+static inline void __ros_syscall_sync(struct syscall *sysc)
 {
 	/* There is only one syscall in the syscall array when we want to do it
 	* synchronously */
@@ -101,6 +101,9 @@ void ros_syscall_sync(struct syscall *sysc)
 	 * !SC_K_LOCK. */
 	while (atomic_read(&sysc->flags) & SC_K_LOCK)
 		cpu_relax();
+}
+void ros_syscall_sync(struct syscall *sysc) {
+	__ros_syscall_sync(sysc);
 }
 libc_hidden_def(ros_syscall_sync)
 
@@ -121,7 +124,7 @@ __ros_syscall_inline(unsigned int _num, long _a0, long _a1, long _a2, long _a3,
 	sysc.arg3 = _a3;
 	sysc.arg4 = _a4;
 	sysc.arg5 = _a5;
-    ros_syscall_sync(&sysc);
+    __ros_syscall_sync(&sysc);
 	return sysc;
 }
 
