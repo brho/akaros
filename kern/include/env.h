@@ -20,6 +20,7 @@
 #include <mm.h>
 #include <vfs.h>
 #include <schedule.h>
+#include <plan9.h>
 
 TAILQ_HEAD(vcore_tailq, vcore);
 /* 'struct proc_list' declared in sched.h (not ideal...) */
@@ -83,6 +84,8 @@ struct proc {
 	struct fs_struct			fs_env;
 	struct files_struct			open_files;
 
+	/* Plan 9 namespace. Evil plan: replace three things above. */
+	struct chan *root;
 	/* UCQ hashlocks */
 	struct hashlock				*ucq_hashlock;
 	struct small_hashlock		ucq_hl_noref;	/* don't reference directly */

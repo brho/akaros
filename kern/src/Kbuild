@@ -2,6 +2,7 @@ obj-y						+= alarm.o
 obj-y						+= arsc.o
 obj-y						+= atomic.o
 obj-y						+= blockdev.o
+obj-y						+= chan.o
 obj-y						+= colored_caches.o
 obj-y						+= console.o
 obj-y						+= devfs.o

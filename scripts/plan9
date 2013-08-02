@@ -1,0 +1,9 @@
+#!/bin/sh
+
+sed -i 's/Chan/struct chan/g' $i
+sed -i 's/Mount/struct mount/g' $i
+sed -i 's/MHead/struct mhead/g' $i
+sed -i 's/Path/struct path/g' $i
+sed -i 's/Dev/struct dev/g' $i
+sed -i 's/Lock/spinlock_t/g' $i
+sed -i 's/nil/NULL/g' $i
