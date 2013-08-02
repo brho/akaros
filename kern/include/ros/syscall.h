@@ -26,6 +26,7 @@ struct syscall {
 	long						arg3;
 	long						arg4;
 	long						arg5;
+	char						errstr[32];
 };
 
 #ifndef ROS_KERNEL
