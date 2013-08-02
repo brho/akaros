@@ -1,0 +1,36 @@
+#!/bin/sh
+#Plan 9 source can be converted for akaros via a set of scripts.
+#This is a WIP. 
+# At this point, we take it just so far and do the rest
+# by hand. Cocci has its issues, and we're not here to debug
+# and fix them all. Also, we may create some post-conversion
+# scripts as well. We'll see.
+#
+#We preserve the waserror/poperror style, which adds complications
+#but leaves the source relatively clean.
+#
+#To convert plan 9 source, we have to do several things.
+#We use spatch, the semantic patch tool. BUT, that tool can be
+#painful for some stuff, so we also use sed. And in some cases
+#we clean up things that we do with spatch with a sed pass.
+#Ugly but effective. Some scripts are idempotent, so we mark
+#them as such. 
+#
+# waserror/poperror fixing, via script/spatch/waserror.cocci
+spatch --sp-file scripts/spatch/waserror.cocci --in-place $1
+# General Plan 9 fixing, via script/spatch/waserror.cocci
+spatch --sp-file scripts/spatch/plan9.cocci --in-place $1
+# include fixing. Idempotent. 
+sh scripts/fixincludes $1
+# undo extraneous errbuf insertions. Idempotent.
+spatch --sp-file scripts/spatch/unerrbuf.cocci --in-place $1
+# Scalars. Idempotent.
+sh scripts/scalar $1
+# Stuff we might want to think about later. Idempotent
+sh scripts/temporary_hack $1
+# malloc. Idempotent.
+spatch --sp-file scripts/spatch/malloc.cocci --in-place $1
+# type names, via scripts/plan9. idempotent.
+sh scripts/plan9 $1
+# kref. Idempotent.
+spatch --sp-file scripts/spatch/kref.cocci --in-place $1

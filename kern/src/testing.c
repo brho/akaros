@@ -1604,7 +1604,7 @@ void __attribute__((noinline)) __longjmp_wrapper(struct jmpbuf* jb)
 {
 	asm ("");
 	printk("Starting: %s\n", __FUNCTION__);
-	longjmp(jb, 1);
+	longjmp(jb, (void *)1);
 	// Should never get here
 	printk("Exiting: %s\n", __FUNCTION__); 
 }

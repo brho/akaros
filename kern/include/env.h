@@ -85,7 +85,15 @@ struct proc {
 	struct files_struct			open_files;
 
 	/* Plan 9 namespace. Evil plan: replace three things above. */
-	struct chan *root;
+	struct chan *slash;
+    struct chan *dot;
+	struct pgrp *pgrp;
+    struct fgrp *fgrp, *closingfgrp;
+    char user[32]; /* hey! let's do user NAMES! I AM NOT A NUMBER! */
+	/* hack for Plan 9. This grows the struct and we'll remove later
+	 * once we get a better way to do this.
+	 */
+  char *genbuf, *errstr;
 	/* UCQ hashlocks */
 	struct hashlock				*ucq_hashlock;
 	struct small_hashlock		ucq_hl_noref;	/* don't reference directly */

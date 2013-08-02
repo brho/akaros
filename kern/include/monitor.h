@@ -32,5 +32,5 @@ int mon_monitor(int argc, char **argv, struct hw_trapframe *hw_tf);
 int mon_fs(int argc, char **argv, struct hw_trapframe *hw_tf);
 int mon_bb(int argc, char **argv, struct hw_trapframe *hw_tf);
 int mon_alarm(int argc, char **argv, struct hw_trapframe *hw_tf);
-
+int mon_9open(int argc, char **argv, struct hw_trapframe *hw_tf);
 #endif	// !ROS_KERN_MONITOR_H
