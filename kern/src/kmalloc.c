@@ -80,6 +80,15 @@ void *kmalloc(size_t size, int flags)
 	return buf + KMALLOC_OFFSET;
 }
 
+void *kzmalloc(size_t size, int flags) 
+{
+	void *v = kmalloc(size, flags);
+	if (! v)
+		return v;
+	memset(v, 0, size);
+	return v;
+}
+
 void *krealloc(void* buf, size_t size, int flags) {
 	struct kmalloc_tag *tag = (struct kmalloc_tag*)(buf - KMALLOC_OFFSET);
 	if (tag->my_cache->obj_size >= size)

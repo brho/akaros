@@ -18,12 +18,15 @@
 
 void kmalloc_init(void);
 void* (DALLOC(size) kmalloc)(size_t size, int flags);
+void* (DALLOC(size) kzmalloc)(size_t size, int flags);
 void* (DALLOC(size) krealloc)(void* buf, size_t size, int flags);
 void  (DFREE(addr) kfree)(void *addr);
 
 /* Flags */
 #define KMALLOC_TAG_CACHE 1
 #define KMALLOC_TAG_PAGES 2
+/* Not implemented yet. Block until it is available. */
+#define KMALLOC_WAIT	4
 
 #define KMALLOC_CANARY 0xdeadbabe
 
