@@ -1,9 +1,23 @@
 #!/bin/sh
 
-sed -i 's/Chan/struct chan/g' $i
-sed -i 's/Mount/struct mount/g' $i
-sed -i 's/MHead/struct mhead/g' $i
-sed -i 's/Path/struct path/g' $i
-sed -i 's/Dev/struct dev/g' $i
-sed -i 's/Lock/spinlock_t/g' $i
-sed -i 's/nil/NULL/g' $i
+sed -i 's/Block/struct block/g' $1
+sed -i 's/Chan/struct chan/g' $1
+sed -i 's/Dir/struct dir/g' $1
+sed -i 's/Qid/struct qid/g' $1
+sed -i 's/Waitqid/struct waitqid/g' $1
+sed -i 's/Mount/struct mount/g' $1
+sed -i 's/Mhead/struct mhead/g' $1
+sed -i 's/Path/struct path/g' $1
+sed -i 's/Dev/struct dev/g' $1
+sed -i 's/Dirtab/struct dirtab/g' $1
+sed -i 's/Lock/spinlock_t lock/g' $1
+sed -i 's/Ref/struct kref/g' $1
+sed -i 's/Walkqid/struct walkqid/g' $1
+sed -i 's/nil/NULL/g' $1
+sed -i 's/KERN_WAIT/KMALLOC_WAIT/g' $1
+
+# stuff I'm not smart enough to do with spatch
+sed -i 's/(void,  *struct errbuf.*perrbuf)/(void)/' $1
+sed -i '/skipslash.*perrbuf/s/,.*errbuf//' $1
+sed -i '/validname.*perrbuf/s/, *struct.*errbuf//' $1
+sed -i '/validnamedup.*perrbuf/s/, *struct.*errbuf//' $1

@@ -1,0 +1,4 @@
+#!/bin/sh
+# Hacks to build, but we might not want long term
+sed -i 's/DBGFLG/2/' $1
+sed -i 's/DBG/printk/' $1

@@ -1,3 +1,9 @@
+@ print@
+@@
+-print(
++printd(
+...)
+
 @ channel @
 identifier d;
 @@
@@ -93,3 +99,36 @@ expression E1;
 @@
 @@
 -setmalloctag(...);
+
+@@
+type T;
+@@
+-T validname0(...){...}
+
+@@
+type T;
+@@
+-T kstrcpy(...){...}
+
+@@
+@@
+-if (up){
+...
+-} else {...}
+
+@@
+expression E;
+@@
+-strcpy(up->errstr,
++set_errstr(
+E)
+@@
+@@
+-saveregisters(...);
+@@
+@@
+-saveregisters(...){...}
+@@
+@@
++//
+muxclose(...);

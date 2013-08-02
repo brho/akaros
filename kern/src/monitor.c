@@ -28,6 +28,7 @@
 #include <event.h>
 #include <trap.h>
 #include <time.h>
+#include <env.h>
 
 #include <ros/memlayout.h>
 #include <ros/event.h>
@@ -64,6 +65,8 @@ static command_t (RO commands)[] = {
 	{ "fs", "Filesystem Diagnostics", mon_fs},
 	{ "bb", "Try to run busybox (ash)", mon_bb},
 	{ "alarm", "Alarm Diagnostics", mon_alarm},
+	/* here beginneth Plan 9.5 */
+	{ "9open", "Call the plan 9 open", mon_9open},
 };
 #define NCOMMANDS (sizeof(commands)/sizeof(commands[0]))
 
@@ -953,3 +956,34 @@ int mon_alarm(int argc, char **argv, struct hw_trapframe *hw_tf)
 	}
 	return 0;
 }
+
+static struct proc up[1];
+static int initted9 = 0;
+static struct errbuf errbuf[1];
+void
+init9proc()
+{
+	if (initted9)
+		return;
+	if (waserror()){
+	  printd("SUCK\n");
+	  return;
+	}
+	up[0].fgrp = dupfgrp(NULL, errbuf);
+}
+
+int mon_9open(int argc, char **argv, struct hw_trapframe *hw_tf)
+{
+  int
+    sysopen(struct proc *up, char *name, int omode);
+
+	if (argc < 2)
+		return -1;
+
+	char *name = argv[0];
+	int mode = strtol(argv[1], 0, 0);
+	printd("Open %s %o\n", name, mode);
+	sysopen(up, name, mode);
+	return 0;
+}
+
