@@ -173,6 +173,7 @@ struct inode *kfs_alloc_inode(struct super_block *sb)
 	inode->i_fs_info = kmem_cache_alloc(kfs_i_kcache, 0);
 	TAILQ_INIT(&((struct kfs_i_info*)inode->i_fs_info)->children);
 	((struct kfs_i_info*)inode->i_fs_info)->filestart = 0;
+	((struct kfs_i_info*)inode->i_fs_info)->init_size = 0;
 	return inode;
 }
 
