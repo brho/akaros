@@ -102,6 +102,18 @@ void set_errno(int errno)
 		pcpui->cur_sysc->err = errno;
 }
 
+void set_errstr(char *errstr)
+{
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	size_t errstrlen;
+	if (!pcpui->cur_sysc)
+		return;
+	errstrlen = MIN(strlen(errstr) + 1, MAX_ERRSTR_LEN);
+	memcpy(pcpui->cur_sysc->errstr, errstr, errstrlen);
+	/* enforce null termination */
+	pcpui->cur_sysc->errstr[MAX_ERRSTR_LEN - 1] = '\0';
+}
+
 /************** Utility Syscalls **************/
 
 static int sys_null(void)

@@ -13,6 +13,8 @@
 #define SC_UEVENT				0x0004		/* user has an ev_q */
 #define SC_K_LOCK				0x0008		/* kernel locked sysc */
 
+#define MAX_ERRSTR_LEN			32
+
 struct syscall {
 	unsigned int				num;
 	int							err;			/* errno */
@@ -26,7 +28,7 @@ struct syscall {
 	long						arg3;
 	long						arg4;
 	long						arg5;
-	char						errstr[32];
+	char						errstr[MAX_ERRSTR_LEN];
 };
 
 #ifndef ROS_KERNEL
