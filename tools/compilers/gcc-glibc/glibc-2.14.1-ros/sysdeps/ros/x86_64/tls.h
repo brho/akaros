@@ -434,11 +434,7 @@ static const char* tls_init_tp(void* thrdescr)
   head->tcb = thrdescr;
   head->self = thrdescr;
 
-  //TODO: think about how to avoid this. Probably add a field to the 
-  // rthreads struct that we manually fill in in _start(). 
-  int core_id = __ros_syscall(SYS_getvcoreid, 0, 0, 0, 0, 0, 0, NULL);
-
-  __set_tls_desc(thrdescr, core_id);
+  __set_tls_desc(thrdescr, 0x00dead00);	/* we ignore vcoreid, pass gibberish */
   return NULL;
 }
 
