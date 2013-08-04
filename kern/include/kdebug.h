@@ -10,6 +10,7 @@ struct symtab_entry {
 };
 
 void backtrace(void);
+void backtrace_frame(uintptr_t pc, uintptr_t fp);
 
 /* Arch dependent, listed here for ease-of-use */
 static inline uintptr_t get_caller_pc(void);

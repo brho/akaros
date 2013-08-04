@@ -95,6 +95,7 @@ void page_fault_handler(struct hw_trapframe *hw_tf)
 	/* TODO - handle kernel page faults */
 	if ((hw_tf->tf_cs & 3) == 0) {
 		print_trapframe(hw_tf);
+		backtrace_kframe(hw_tf);
 		panic("Page Fault in the Kernel at 0x%08x!", fault_va);
 		/* if we want to do something like kill a process or other code, be
 		 * aware we are in a sort of irq-like context, meaning the main kernel

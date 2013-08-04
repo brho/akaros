@@ -115,4 +115,14 @@ static inline void x86_set_stacktop_tss(struct taskstate *tss, uintptr_t top)
 	tss->ts_rsp0 = top;
 }
 
+static inline uintptr_t x86_get_hwtf_pc(struct hw_trapframe *hw_tf)
+{
+	return hw_tf->tf_rip;
+}
+
+static inline uintptr_t x86_get_hwtf_fp(struct hw_trapframe *hw_tf)
+{
+	return hw_tf->tf_rbp;
+}
+
 #endif /* ROS_KERN_ARCH_TRAP64_H */

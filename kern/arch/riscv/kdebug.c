@@ -24,3 +24,8 @@ void backtrace(void)
 		fp = (void**)sp;
 	}
 }
+
+void backtrace_frame(uintptr_t pc, uintptr_t fp)
+{
+	printk("\n\tTODO: backtrace frame on riscv\n\n");
+}

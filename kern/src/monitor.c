@@ -127,7 +127,19 @@ static char RO* function_of(uint32_t address)
 
 int mon_backtrace(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
-	backtrace();
+	uintptr_t pc, fp;
+	if (argc == 1) {
+		backtrace();
+		return 0;
+	}
+	if (argc != 3) {
+		printk("Need either no arguments, or two (PC and FP) in hex\n");
+		return 1;
+	}
+	pc = strtol(argv[1], 0, 16);
+	fp = strtol(argv[2], 0, 16);
+	printk("Backtrace from instruction %p, with frame pointer %p\n", pc, fp);
+	backtrace_frame(pc, fp);
 	return 0;
 }
 

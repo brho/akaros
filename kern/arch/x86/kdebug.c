@@ -307,24 +307,16 @@ void *debug_get_fn_addr(char *fn_name)
 	return retval;
 }
 
-void backtrace(void)
+void backtrace_frame(uintptr_t eip, uintptr_t ebp)
 { 
 	extern char (SNT RO _start)[];
-	unsigned long *ebp, eip;
 	eipdebuginfo_t debuginfo;
 	char buf[256];
 	char *func_name;
 	int j, i = 1;
-	ebp = (unsigned long*)read_bp();
-	// this is part of the way back into the call() instruction's bytes
-	// eagle-eyed readers should be able to explain why this is good enough,
-	// and retaddr (just *(ebp + 1) is not)
-	eip = *(ebp + 1) - 1;
-	// jump back a frame (out of backtrace)
-	ebp = (unsigned long*)(*ebp);
-	printk("Stack Backtrace on Core %d:\n", core_id());
+
 	// on each iteration, ebp holds the stack frame and eip an addr in that func
-	while (1) {
+	while (ebp) {
 		#ifdef CONFIG_X86_64
 		func_name = get_fn_name(eip);
 		printk("#%02d [<%p>] in %s\n", i++,  eip, func_name);
@@ -343,18 +335,32 @@ void backtrace(void)
 		        debuginfo.eip_fn_addr, debuginfo.eip_file, debuginfo.eip_line);
 		cprintf("    ebp: %x   Args:", ebp);
 		for (j = 0; j < MIN(debuginfo.eip_fn_narg, 5); j++)
-			cprintf(" %08x", *(ebp + 2 + j));
+			cprintf(" %08x", *(uintptr_t*)(ebp + 2 + j));
 		cprintf("\n");
 		# ifdef CONFIG_RESET_STACKS
 		if (!strncmp("__smp_idle", (char*)debuginfo.eip_fn_name, 10))
 			break;
 		# endif /* CONFIG_RESET_STACKS */
 		#endif /* CONFIG_X86_64 */
-		if (!ebp)
-			break;
-		eip = *(ebp + 1) - 1;
-		ebp = (unsigned long*)(*ebp);
+		eip = *(uintptr_t*)(ebp + sizeof(uintptr_t)) - 1;
+		ebp = *(uintptr_t*)ebp;
 	}
+}
+
+void backtrace(void)
+{
+	uintptr_t ebp, eip;
+	ebp = read_bp();
+	/* retaddr is right above ebp on the stack.  we subtract an additional 1 to
+	 * make sure the eip we get is actually in the function that called us.
+	 * i had a couple cases early on where call was the last instruction in a
+	 * function, and simply reading the retaddr would point into another
+	 * function (the next one in the object) */
+	eip = *(uintptr_t*)(ebp + sizeof(uintptr_t)) - 1;
+	/* jump back a frame (out of backtrace) */
+	ebp = *(uintptr_t*)ebp;
+	printk("Stack Backtrace on Core %d:\n", core_id());
+	backtrace_frame(eip, ebp);
 }
 
 /* Assumes 32-bit header */

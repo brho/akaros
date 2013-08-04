@@ -209,6 +209,15 @@ static void handle_fperr(struct hw_trapframe *hw_tf)
 	proc_destroy(current);
 }
 
+void backtrace_kframe(struct hw_trapframe *hw_tf)
+{
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	pcpui->__lock_depth_disabled++;
+	printk("\nBacktrace of faulting kernel context on Core %d:\n", core_id());
+	backtrace_frame(x86_get_hwtf_pc(hw_tf), x86_get_hwtf_fp(hw_tf));
+	pcpui->__lock_depth_disabled--;
+}
+
 /* Certain traps want IRQs enabled, such as the syscall.  Others can't handle
  * it, like the page fault handler.  Turn them on on a case-by-case basis. */
 static void trap_dispatch(struct hw_trapframe *hw_tf)
