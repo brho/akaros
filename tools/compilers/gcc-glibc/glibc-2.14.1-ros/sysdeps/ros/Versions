@@ -1,6 +1,11 @@
 libc {
   GLIBC_2.0 {
+    __errno_location_tls;
+    __errstr_location_tls;
+    ros_errno_loc;
+    ros_errstr_loc;
     __errno_location;
+    errstr;
     ros_syscall_blockon;
     ros_syscall_sync;
     __ros_scp_syscall_blockon;

@@ -113,6 +113,25 @@ static void scp_vcctx_ready(void)
 	                     old_flags & ~VC_SCP_NOVCCTX));
 }
 
+/* For both of these, VC ctx uses the usual TLS errno/errstr.  Uthreads use
+ * their own storage.  Since we're called after manage_thread0, we should always
+ * have current_uthread if we are not in vc ctx. */
+static int *__ros_errno_loc(void)
+{
+	if (in_vcore_context())
+		return __errno_location_tls();
+	else
+		return &current_uthread->err_no;
+}
+
+static char *__ros_errstr_loc(void)
+{
+	if (in_vcore_context())
+		return __errstr_location_tls();
+	else
+		return current_uthread->err_str;
+}
+
 /* Slim-init - sets up basic uthreading for when we are in _S mode and before
  * we set up the 2LS.  Some apps may not have a 2LS and thus never do the full
  * vcore/2LS/uthread init. */
@@ -133,6 +152,10 @@ void uthread_slim_init(void)
 	 * before blocking while an _M.  it's harmless (and probably saner) to do it
 	 * earlier, so we do it as early as possible. */
 	ros_syscall_blockon = __ros_mcp_syscall_blockon;
+	/* Switch our errno/errstr functions to be uthread-aware.  See glibc's
+	 * errno.c for more info. */
+	ros_errno_loc = __ros_errno_loc;
+	ros_errstr_loc = __ros_errstr_loc;
 }
 
 /* 2LSs shouldn't call uthread_vcore_entry directly */

@@ -28,6 +28,8 @@ struct uthread {
 	int state;
 	void (*yield_func)(struct uthread*, void*);
 	void *yield_arg;
+	int err_no;
+	char err_str[MAX_ERRSTR_LEN];
 };
 typedef struct uthread uthread_t;
 extern __thread struct uthread *current_uthread;
