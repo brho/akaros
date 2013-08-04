@@ -75,13 +75,13 @@ void __ros_scp_syscall_blockon(struct syscall *sysc)
 	if (register_evq(sysc, &__ros_scp_simple_evq)) {
 		/* Sending false for now - we want to signal proc code that we want to
 		 * wait (piggybacking on the MCP meaning of this variable) */
-		__ros_syscall(SYS_yield, FALSE, 0, 0, 0, 0, 0, 0);
+		__ros_syscall_noerrno(SYS_yield, FALSE, 0, 0, 0, 0, 0);
 	}
 	/* Manually doing an enable_notifs for VC 0 */
 	__procdata.vcore_preempt_data[0].notif_disabled = FALSE;
 	wrmb();	/* need to read after the write that enabled notifs */
 	if (__procdata.vcore_preempt_data[0].notif_pending)
-		__ros_syscall(SYS_self_notify, 0, EV_NONE, 0, TRUE, 0, 0, 0);
+		__ros_syscall_noerrno(SYS_self_notify, 0, EV_NONE, 0, TRUE, 0, 0);
 }
 
 /* Function pointer for the blockon function.  MCPs need to switch to the parlib
@@ -128,16 +128,14 @@ __ros_syscall_inline(unsigned int _num, long _a0, long _a1, long _a2, long _a3,
 	return sysc;
 }
 
-long __ros_syscall(unsigned int _num, long _a0, long _a1, long _a2, long _a3,
-                   long _a4, long _a5, int *errno_loc)
+long __ros_syscall_noerrno(unsigned int _num, long _a0, long _a1, long _a2,
+                           long _a3, long _a4, long _a5)
 {
 	struct syscall sysc = __ros_syscall_inline(_num, _a0, _a1, _a2, _a3,
 	                                           _a4, _a5);
-	if (__builtin_expect(errno_loc && sysc.err, 0))
-		*errno_loc = sysc.err;
 	return sysc.retval;
 }
-libc_hidden_def(__ros_syscall)
+libc_hidden_def(__ros_syscall_noerrno)
 
 /* This version knows about errno and will handle it. */
 long __ros_syscall_errno(unsigned int _num, long _a0, long _a1, long _a2,

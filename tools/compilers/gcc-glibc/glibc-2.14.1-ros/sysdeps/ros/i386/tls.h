@@ -465,7 +465,7 @@ static const char* tls_init_tp(void* thrdescr)
 
   //TODO: think about how to avoid this. Probably add a field to the 
   // rthreads struct that we manually fill in in _start(). 
-  int core_id = __ros_syscall(SYS_getvcoreid, 0, 0, 0, 0, 0, 0, NULL);
+  int core_id = __ros_syscall_noerrno(SYS_getvcoreid, 0, 0, 0, 0, 0, 0);
 
   /* Bug with this whole idea (TODO: (TLSV))*/
   if(__procdata.ldt == NULL)
@@ -475,14 +475,16 @@ static const char* tls_init_tp(void* thrdescr)
 	/* Can't directly call mmap because it tries to set errno, and errno doesn't
 	 * exist yet (it relies on tls, and we are currently in the process of
 	 * setting it up...) */
-	void *ldt = (void*)__ros_syscall(SYS_mmap, 0, sz, PROT_READ | PROT_WRITE,
-	                                 MAP_ANONYMOUS | MAP_POPULATE, -1, 0, NULL);
+	void *ldt = (void*)__ros_syscall_noerrno(SYS_mmap, 0, sz,
+	                                         PROT_READ | PROT_WRITE,
+	                                         MAP_ANONYMOUS | MAP_POPULATE,
+	                                         -1, 0);
     if (ldt == MAP_FAILED)
       return "tls couldn't allocate memory\n";
 
     __procdata.ldt = ldt;
     // force kernel crossing
-	__ros_syscall(SYS_getpid, 0, 0, 0, 0, 0, 0, NULL);
+	__ros_syscall_noerrno(SYS_getpid, 0, 0, 0, 0, 0, 0);
   }
 
   __set_tls_desc(thrdescr, core_id);

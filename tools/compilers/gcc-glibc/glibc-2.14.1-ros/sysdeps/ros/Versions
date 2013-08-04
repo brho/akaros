@@ -5,7 +5,7 @@ libc {
     ros_syscall_sync;
     __ros_scp_syscall_blockon;
     __ros_scp_simple_evq;
-    __ros_syscall;
+    __ros_syscall_noerrno;
     __ros_syscall_errno;
 
     set_tls_desc;

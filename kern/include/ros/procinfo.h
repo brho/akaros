@@ -118,7 +118,7 @@ static inline uint32_t __get_vcoreid_from_procinfo(void)
 	do {
 		cmb();
 		old_seq = __procinfo.coremap_seqctr;
-		kpcoreid = __ros_syscall(SYS_getpcoreid, 0, 0, 0, 0, 0, 0, NULL);
+		kpcoreid = __ros_syscall_noerrno(SYS_getpcoreid, 0, 0, 0, 0, 0, 0);
 		if (!__procinfo.pcoremap[kpcoreid].valid)
 			continue;
 		kvcoreid = __procinfo.pcoremap[kpcoreid].vcoreid;

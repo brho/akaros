@@ -25,10 +25,10 @@ extern "C" {
 /* Issue a single syscall and block into the 2LS until it completes */
 void ros_syscall_sync(struct syscall *sysc);
 
-/* Raw syscall, user-provided errno (send in 0 if you don't want it).  This is
- * usually used by code that can't handle errno (TLS). */
-long __ros_syscall(unsigned int _num, long _a0, long _a1, long _a2, long _a3,
-                   long _a4, long _a5, int *errno_loc);
+/* Raw syscall, ignores errors.  Usually used by code that can't handle errno
+ * (TLS). */
+long __ros_syscall_noerrno(unsigned int _num, long _a0, long _a1, long _a2,
+                           long _a3, long _a4, long _a5);
 
 /* This version knows about errno and will handle it. */
 long __ros_syscall_errno(unsigned int _num, long _a0, long _a1, long _a2,
@@ -37,7 +37,7 @@ long __ros_syscall_errno(unsigned int _num, long _a0, long _a1, long _a2,
 /* Bypass PLT when invoked from within libc */
 #ifdef libc_hidden_proto
 libc_hidden_proto(ros_syscall_sync)
-libc_hidden_proto(__ros_syscall)
+libc_hidden_proto(__ros_syscall_noerrno)
 libc_hidden_proto(__ros_syscall_errno)
 #endif
 
