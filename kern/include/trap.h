@@ -41,7 +41,7 @@ uintptr_t get_stack_top(void);
 
 /* It's important that this is inline and that ctx is not a stack variable */
 static inline void save_kernel_ctx(struct kernel_ctx *ctx)
-                   __attribute__((always_inline));
+                   __attribute__((always_inline, returns_twice));
 void pop_kernel_ctx(struct kernel_ctx *ctx) __attribute__((noreturn));
 
 /* Sends a non-maskable interrupt, which we have print a trapframe. */

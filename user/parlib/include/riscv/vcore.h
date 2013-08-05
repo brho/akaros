@@ -21,7 +21,7 @@
 typedef void (*helper_fn)(struct hw_trapframe*, struct preempt_data*, uint32_t);
 void __pop_ros_tf_regs(struct hw_trapframe *tf, struct preempt_data* vcpd,
                     uint32_t vcoreid, helper_fn helper) __attribute__((noreturn));
-void __save_ros_tf_regs(struct hw_trapframe *tf);
+void __save_ros_tf_regs(struct hw_trapframe *tf) __attribute__((returns_twice));
 
 /* Helper function that may handle notifications after re-enabling them. */
 static void __pop_ros_tf_notifs(struct hw_trapframe *tf,

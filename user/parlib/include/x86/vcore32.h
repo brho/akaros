@@ -272,7 +272,7 @@ static inline void save_user_ctx(struct user_context *ctx)
 	              : "=c"(dummy)	/* force clobber for ecx */
 	              : "c"(sw_tf)
 	              : "eax", "edx", "memory", "cc");
-}
+} __attribute__((always_inline, returns_twice))
 
 /* The old version, kept around for testing */
 static inline void save_user_ctx_hw(struct user_context *ctx)
@@ -298,7 +298,7 @@ static inline void save_user_ctx_hw(struct user_context *ctx)
 	             : 
 	             : "g"(&tf->tf_esp), "g"(&tf->tf_eip), "g"(tf)
 	             : "eax", "memory", "cc");
-}
+} __attribute__((always_inline, returns_twice))
 
 static inline void init_user_ctx(struct user_context *ctx, uint32_t entry_pt,
                                  uint32_t stack_top)

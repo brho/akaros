@@ -288,7 +288,7 @@ static inline void save_user_ctx(struct user_context *ctx)
 				 : "D"(sw_tf)
 	             : "rax", "rcx", "rdx", "rsi", "r8", "r9", "r10", "r11",
 	               "memory", "cc");
-}
+} __attribute__((always_inline, returns_twice))
 
 /* The old version, kept around for testing */
 /* Hasn't been used yet for 64 bit.  If you use this, it's worth checking to
@@ -331,7 +331,7 @@ static inline void save_user_ctx_hw(struct user_context *ctx)
 	             : 
 	             : "g"(&tf->tf_rsp), "g"(&tf->tf_rip), "g"(tf->tf_rax)
 	             : "rax", "memory", "cc");
-}
+} __attribute__((always_inline, returns_twice))
 
 static inline void init_user_ctx(struct user_context *ctx, uintptr_t entry_pt,
                                  uintptr_t stack_top)
