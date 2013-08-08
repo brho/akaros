@@ -497,6 +497,12 @@ static bool SLOCKED(&lock) crt_scrolled = FALSE;
 static int
 kbd_proc_data(void)
 {
+#ifdef CONFIG_X86_DISABLE_KEYBOARD
+	/* on some machines with usb keyboards, any keyboard input triggers SMM
+	 * interference on all of the cores. */
+	return -1;
+#endif /* CONFIG_X86_DISABLE_KEYBOARD */
+
 	int c;
 	uint8_t data;
 

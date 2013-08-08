@@ -58,4 +58,16 @@ config KB_CORE0_ONLY
 		Say 'n' unless you are using a buggy x86 machine that can't handle
 		polling the keyboard PIO from cores other than core 0.
 
+config X86_DISABLE_KEYBOARD
+	bool "Disable Keyboard"
+	default n
+	help
+		x86 machines with a legacy USB keyboard often implement the USB stack
+		in SMM mode.  When doing anything with the keyboard, including polling
+		the keyboard from the kernel monitor, SMM mode can dramatically
+		interfere with other cores (like a 10-15x performance impact on some
+		benchmarks).
+		
+		Say 'y' if you have such a machine and do not need the keyboard.
+
 endmenu
