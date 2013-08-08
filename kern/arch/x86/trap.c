@@ -230,7 +230,10 @@ static void trap_dispatch(struct hw_trapframe *hw_tf)
 			 * deadlock if we were printing when we NMIed. */
 			pcpui = &per_cpu_info[core_id()];
 			pcpui->__lock_depth_disabled++;
-			print_trapframe(hw_tf);
+			/* This is a bit hacky, but we don't have a decent API yet */
+			extern bool mon_verbose_trace;
+			if (mon_verbose_trace)
+				print_trapframe(hw_tf);
 			char *fn_name = get_fn_name(x86_get_ip_hw(hw_tf));
 			printk("Core %d is at %p (%s)\n", core_id(), x86_get_ip_hw(hw_tf),
 			       fn_name);

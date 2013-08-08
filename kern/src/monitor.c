@@ -646,16 +646,20 @@ int mon_measure(int argc, char **argv, struct hw_trapframe *hw_tf)
 	return 0;
 }
 
+/* Used in various debug locations.  Not a kernel API or anything. */
+bool mon_verbose_trace = FALSE;
+
 int mon_trace(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
-	uint32_t core;
+	int core;
 	if (argc < 2) {
 		printk("Usage: trace OPTION\n");
 		printk("\tsyscall start [silent] [pid]: starts tracing\n");
 		printk("\tsyscall stop: stops tracing, prints if it was silent\n");
-		printk("\tcoretf COREID: cause the other core to print its TF (NMI)\n");
+		printk("\tcoretf COREID: prints PC, -1 for all cores, verbose => TF\n");
 		printk("\tpcpui [type [coreid]]: runs pcpui trace ring handlers\n");
 		printk("\tpcpui-reset [noclear]: resets/clears pcpui trace ring\n");
+		printk("\tverbose: toggles verbosity, depends on trace command\n");
 		return 1;
 	}
 	if (!strcmp(argv[1], "syscall")) {
@@ -693,11 +697,18 @@ int mon_trace(int argc, char **argv, struct hw_trapframe *hw_tf)
 			return 1;
 		}
 		core = strtol(argv[2], 0, 0);
-		if (core >= num_cpus) {
-			printk("No such core!  Maybe it's in another cell...\n");
-			return 1;
+		if (core < 0) {
+			printk("Sending NMIs to all cores:\n");
+			for (int i = 0; i < num_cpus; i++)
+				send_nmi(i);
+		} else {
+			printk("Sending NMI core %d:\n", core);
+			if (core >= num_cpus) {
+				printk("No such core!  Maybe it's in another cell...\n");
+				return 1;
+			}
+			send_nmi(core);
 		}
-		send_nmi(core);
 		udelay(1000000);
 	} else if (!strcmp(argv[1], "pcpui")) {
 		int pcpui_type, pcpui_coreid;
@@ -719,6 +730,14 @@ int mon_trace(int argc, char **argv, struct hw_trapframe *hw_tf)
 		} else {
 			printk("\nResetting and clearing all PCPUI Trace Rings\n");
 			pcpui_tr_reset_and_clear_all();
+		}
+	} else if (!strcmp(argv[1], "verbose")) {
+		if (mon_verbose_trace) {
+			printk("Turning trace verbosity off\n");
+			mon_verbose_trace = FALSE;
+		} else {
+			printk("Turning trace verbosity on\n");
+			mon_verbose_trace = TRUE;
 		}
 	} else if (!strcmp(argv[1], "opt2")) {
 		if (argc != 3) {
