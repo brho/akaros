@@ -11,6 +11,7 @@ obj-y						+= kdebug.o
 obj-y						+= page_alloc.o
 obj-y						+= pmap.o
 obj-y						+= process.o
+obj-y						+= setjmp.o
 obj-y						+= smp.o
 obj-y						+= softfloat.o
 obj-y						+= time.o
