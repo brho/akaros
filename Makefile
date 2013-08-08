@@ -362,7 +362,7 @@ CMP_KERNEL_OBJ := $(KERNEL_OBJ).gz
 # KFS_PATH.  Future rules related to KFS will have issues (mkdir with no
 # argument, or a find of the entire pwd).  It's also possible someone provided
 # an empty path.  To deal with both, we'll just have a sensible default.
-kfs-paths :=  $(patsubst "%",%,$(CONFIG_KFS_PATHS))
+kfs-paths :=  $(subst $\",,$(CONFIG_KFS_PATHS))
 ifeq ($(kfs-paths),)
 kfs-paths := kern/kfs
 endif
@@ -419,15 +419,16 @@ endif
 kern_initramfs_files := $(shell mkdir -p $(kfs-paths); \
                           find $(kfs-paths))
 
+# Need to make an empty cpio, then append each kfs-path's contents
 $(kern_cpio) initramfs: $(kern_initramfs_files)
 	@echo "  Building initramfs:"
 	@if [ "$(CONFIG_KFS_CPIO_BIN)" != "" ]; then \
         sh $(CONFIG_KFS_CPIO_BIN); \
     fi
+	@cat /dev/null | cpio --quiet -oH newc -O $(kern_cpio)
 	$(Q)for i in $(kfs-paths); do cd $$i; \
         echo "    Adding $$i to initramfs..."; \
-        find -L . | cpio --quiet -oH newc > \
-			$(CURDIR)/$(kern_cpio); \
+        find -L . | cpio --quiet -oAH newc -O $(CURDIR)/$(kern_cpio); \
         cd $$OLDPWD; \
     done;
 

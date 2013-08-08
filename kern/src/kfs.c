@@ -335,6 +335,8 @@ struct dentry *kfs_lookup(struct inode *dir, struct dentry *dentry,
 	struct dentry *d_i;
 
 	assert(dir_dent && dir_dent == TAILQ_LAST(&dir->i_dentry, dentry_tailq));
+	/* had this fail when kern/kfs has a symlink go -> ../../../go, though
+	 * a symlink like lib2 -> lib work okay. */
 	assert(S_ISDIR(dir->i_mode));
 	assert(kref_refcnt(&dentry->d_kref) == 1);
 	TAILQ_FOREACH(d_i, &dir_dent->d_subdirs, d_subdirs_link) {
