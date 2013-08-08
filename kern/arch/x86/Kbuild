@@ -15,6 +15,7 @@ obj-y						+= perfmon.o
 obj-y						+= pmap.o pmap$(BITS).o
 obj-y						+= process$(BITS).o
 obj-y						+= rdtsc_test.o
+obj-y						+= setjmp$(BITS).o
 obj-y						+= smp.o
 obj-y						+= smp_boot.o
 obj-y						+= smp_entry$(BITS).o

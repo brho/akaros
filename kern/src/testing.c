@@ -37,6 +37,7 @@
 #include <schedule.h>
 #include <umem.h>
 #include <ucq.h>
+#include <setjmp.h>
 
 #define l1 (available_caches.l1)
 #define l2 (available_caches.l2)
@@ -1597,3 +1598,27 @@ void test_memset(void)
 	run_check(bytes, 0xc0fe, 20);
 	printk("Done!\n");
 }
+
+void __attribute__((noinline)) __longjmp_wrapper(struct jmpbuf* jb)
+{
+	asm ("");
+	printk("Starting: %s\n", __FUNCTION__);
+	longjmp(jb, 1);
+	// Should never get here
+	printk("Exiting: %s\n", __FUNCTION__); 
+}
+
+void test_setjmp()
+{
+	struct jmpbuf jb;
+	printk("Starting: %s\n", __FUNCTION__);
+	if (setjmp(&jb)) {
+	  printk("After second setjmp return: %s\n", __FUNCTION__);
+    }
+    else {
+	  printk("After first setjmp return: %s\n", __FUNCTION__);
+      __longjmp_wrapper(&jb);
+    }
+	printk("Exiting: %s\n", __FUNCTION__);
+}
+
