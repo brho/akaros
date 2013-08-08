@@ -207,12 +207,18 @@ Now that you've changed KFS, don't forget to remake the kernel.
 3.5 Building and Loading a Virtual Machine Image
 ---------
 At this point, you probably have a runnable kernel with programs in KFS.  It
-should be sitting at obj/kernel/kernel.  However, you need a place to run it.
+should be sitting at obj/kernel/akaros-kernel.  When running in a VM, you can
+either run the kernel directly from qemu, or put it in a virtual machine image
+file. 
 
-I run my kernels either in KVM (Qemu) or off a bootable USB stick.
+If you don't want to bother with the image, skip this section.  I tend to run
+my images off an image file, since qemu acts more like hardware (as far as
+multiboot goes).  The downside is the boot up is slower, especially if you have
+a large kernel (>100MB).  It also takes some effort to set up the VM image.
 
-You'll need an image file that looks like a hard disk to boot qemu off of.  I
-put one similar to mine at: http://akaros.cs.berkeley.edu/files/hdd268mb.img
+If you are still reading, you'll need an image file that looks like a hard disk
+to boot qemu off of.  I put one similar to mine at:
+http://akaros.cs.berkeley.edu/files/hdd268mb.img
 
 It's around 268MB (256MiB, or whatever).  If you want to make your own, check
 out Documentation/howtos/make-bootable-grub-hdd.txt.  That's actually the
@@ -254,7 +260,10 @@ Now, make kvm.  You should be able to see the new kernel in mnt/hdd/ (do an ls
 Here is the command I use to run qemu/kvm.  It's evolved over the years, and it
 will vary based on your linux distribution.  Don't run it just yet:
 
-$ qemu-system-i386 -s -enable-kvm -cpu coreduo -smp 8 -m 1024 -nographic -monitor /dev/pts/3 -net nic,model=e1000 -net tap,ifname=tap0,script=no mnt/hdd.img
+$ qemu-system-i386 -s -enable-kvm -cpu phenom -smp 8 -m 2048 -nographic -monitor /dev/pts/3 -net nic,model=e1000 -net tap,ifname=tap0,script=no mnt/hdd.img
+
+If you skipped making a virtual machine image, replace "mnt/hdd.img" with
+"-kernel obj/kern/akaros-kernel".
 
 The -monitor is the qemu monitor, which is a CLI for qemu.  Pick a
 tab/terminal/pty in Linux that you will only use for qemu monitoring, and enter
