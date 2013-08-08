@@ -148,6 +148,23 @@ static void check_mboot_region(struct multiboot_mmap_entry *entry, void *data)
 	}
 }
 
+/* Since we can't parse multiboot mmap entries, we need to just guess at what
+ * pages are free and which ones aren't.  We'll just go with:
+ *
+ * 		[ 0, ROUNDUP(boot_freemem_paddr, PGSIZE) ) = busy
+ * 		[ ROUNDUP(boot_freemem_paddr, PGSIZE), max_paddr ) = free
+ *
+ * This will ignore the hairy areas below EXTPHYSMEM, and mark the entire kernel
+ * and anything we've boot alloc'd as busy. */
+static void account_for_pages(physaddr_t boot_freemem_paddr)
+{
+	physaddr_t top_of_busy = ROUNDUP(boot_freemem_paddr, PGSIZE);
+	for (physaddr_t i = 0; i < top_of_busy; i += PGSIZE)
+		page_setref(pa64_to_page(i), 1);
+	for (physaddr_t i = top_of_busy; i < max_paddr; i += PGSIZE)
+		track_free_page(pa64_to_page(i));
+}
+
 /* Initialize the memory free lists.  After this, do not use boot_alloc. */
 void page_alloc_init(struct multiboot_info *mbi)
 {
@@ -171,9 +188,14 @@ void page_alloc_init(struct multiboot_info *mbi)
 	 * sections are jumbo-aligned. */
 	physaddr_t boot_freemem_paddr = PADDR(PTRROUNDUP(boot_freemem, PGSIZE));
 
-	mboot_foreach_mmap(mbi, parse_mboot_region, (void*)boot_freemem_paddr);
+	if (mboot_has_mmaps(mbi)) {
+		mboot_foreach_mmap(mbi, parse_mboot_region, (void*)boot_freemem_paddr);
+		/* Test the page alloc - if this gets slow, we can CONFIG it */
+		mboot_foreach_mmap(mbi, check_mboot_region, (void*)boot_freemem_paddr);
+	} else {
+		/* No multiboot mmap regions (probably run from qemu with -kernel) */
+		account_for_pages(boot_freemem_paddr);
+	}
 	printk("Number of free pages: %lu\n", nr_free_pages);
-	/* Test the page alloc - if this gets slow, we can CONFIG it */
-	mboot_foreach_mmap(mbi, check_mboot_region, (void*)boot_freemem_paddr);
 	printk("Page alloc init successful\n");
 }

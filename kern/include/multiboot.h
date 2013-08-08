@@ -226,6 +226,7 @@ typedef struct multiboot_mod_list multiboot_module_t;
 
 typedef void (*mboot_foreach_t)(struct multiboot_mmap_entry*, void*);
 
+bool mboot_has_mmaps(struct multiboot_info *mbi);
 void mboot_detect_memory(struct multiboot_info *mbi);
 void mboot_print_mmap(struct multiboot_info *mbi);
 void mboot_foreach_mmap(struct multiboot_info *mbi, mboot_foreach_t func,

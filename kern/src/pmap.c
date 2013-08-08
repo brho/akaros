@@ -131,7 +131,7 @@ static void boot_alloc_init(void)
 		boot_freelimit = boot_zone_end;
 	} else {
 		boot_freemem = end_kva;
-		boot_freelimit = max_paddr;
+		boot_freelimit = max_paddr + KERNBASE;
 	}
 	printd("boot_zone: %p, paddr base: 0x%llx, paddr len: 0x%llx\n", boot_zone,
 	       boot_zone ? boot_zone->addr : 0,

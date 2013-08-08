@@ -17,6 +17,26 @@
 #include <arch/apic.h>
 #endif
 
+/* Misc dead code to read from mboot.  We'll need to do this to run a legit
+ * initrd from grub (module /initramfs.cpio, or whatever). */
+static void mboot_parsing(struct multiboot_info *mbi)
+{
+	if (mbi->flags & MULTIBOOT_INFO_BOOTDEV)
+		printk("MBI: boot_device = 0x%08x\n", mbi->boot_device);
+	if (mbi->flags & MULTIBOOT_INFO_CMDLINE)
+		printk("MBI: command line: %s\n",
+		       (char*)((physaddr_t)mbi->cmdline + KERNBASE));
+	if (mbi->flags & MULTIBOOT_INFO_MODS) {
+		printk("MBI: nr mods, %d: mods addr %p\n", mbi->mods_count,
+		       mbi->mods_addr);
+	}
+}
+
+bool mboot_has_mmaps(struct multiboot_info *mbi)
+{
+	return mbi->flags & MULTIBOOT_INFO_ELF_SHDR;
+}
+
 /* This only notices bios detectable memory - there's a lot more in the higher
  * paddrs. */
 void mboot_detect_memory(struct multiboot_info *mbi)
@@ -53,8 +73,8 @@ void mboot_foreach_mmap(struct multiboot_info *mbi, mboot_foreach_t func,
                         void *data)
 {
 	struct multiboot_mmap_entry *mmap_b, *mmap_e, *mmap_i;
-	if (!(mbi->flags & MULTIBOOT_INFO_ELF_SHDR)) {
-		printk("No memory mapping info from multiboot\n");
+	if (!mboot_has_mmaps(mbi)) {
+		printd("No memory mapping info from multiboot\n");
 		return;
 	}
 	mmap_b = (struct multiboot_mmap_entry*)((size_t)mbi->mmap_addr + KERNBASE);
