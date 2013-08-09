@@ -7,6 +7,7 @@
 #define UTHREAD_DONT_MIGRATE		0x001 /* don't move to another vcore */
 #define UTHREAD_SAVED				0x002 /* uthread's state is in utf */
 #define UTHREAD_FPSAVED				0x004 /* uthread's FP state is in uth->as */
+#define UTHREAD_IS_THREAD0			0x008 /* thread0: glibc's main() thread */
 
 /* Thread States */
 #define UT_RUNNING		1

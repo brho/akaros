@@ -21,6 +21,7 @@ struct pthread_queue active_queue = TAILQ_HEAD_INITIALIZER(active_queue);
 struct mcs_pdr_lock queue_lock;
 int threads_ready = 0;
 int threads_active = 0;
+atomic_t threads_total;
 bool can_adjust_vcores = TRUE;
 bool need_tls = TRUE;
 
@@ -415,6 +416,7 @@ void pthread_lib_init(void)
 	 * have its init stuff use things like vcore stacks or TLSs, we'll need to
 	 * change this. */
 	uthread_lib_init((struct uthread*)t);
+	atomic_init(&threads_total, 1);			/* one for thread0 */
 }
 
 int pthread_create(pthread_t *thread, const pthread_attr_t *attr,
@@ -456,6 +458,7 @@ int pthread_create(pthread_t *thread, const pthread_attr_t *attr,
 	uthread_init((struct uthread*)pthread, &uth_attr);
 	pth_thread_runnable((struct uthread*)pthread);
 	*thread = pthread;
+	atomic_inc(&threads_total);
 	return 0;
 }
 
@@ -549,11 +552,19 @@ static void __pth_exit_cb(struct uthread *uthread, void *junk)
 			pth_thread_runnable((struct uthread*)temp_pth);
 		}
 	}
+	/* If we were the last pthread, we exit for the whole process.  Keep in mind
+	 * that thread0 is counted in this, so this will only happen if that thread
+	 * calls pthread_exit(). */
+	if ((atomic_fetch_and_add(&threads_total, -1) == 1))
+		exit(0);
 }
 
 void pthread_exit(void *ret)
 {
 	struct pthread_tcb *pthread = pthread_self();
+	/* Some apps could call pthread_exit before initing.  This will slow down
+	 * our pthread exits slightly. */
+	pthread_lib_init();
 	pthread->retval = ret;
 	destroy_dtls();
 	uthread_yield(FALSE, __pth_exit_cb, 0);

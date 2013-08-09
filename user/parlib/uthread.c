@@ -48,6 +48,8 @@ static void uthread_manage_thread0(struct uthread *uthread)
 	uthread->state = UT_RUNNING;
 	/* utf/as doesn't represent the state of the uthread (we are running) */
 	uthread->flags &= ~(UTHREAD_SAVED | UTHREAD_FPSAVED);
+	/* need to track thread0 for TLS deallocation */
+	uthread->flags |= UTHREAD_IS_THREAD0;
 	/* Change temporarily to vcore0s tls region so we can save the newly created
 	 * tcb into its current_uthread variable and then restore it.  One minor
 	 * issue is that vcore0's transition-TLS isn't TLS_INITed yet.  Until it is
@@ -368,8 +370,9 @@ yield_return_path:
 void uthread_cleanup(struct uthread *uthread)
 {
 	printd("[U] thread %08p on vcore %d is DYING!\n", uthread, vcore_id());
-	/* we alloc and manage the TLS, so lets get rid of it */
-	if (__uthread_has_tls(uthread))
+	/* we alloc and manage the TLS, so lets get rid of it, except for thread0.
+	 * glibc owns it.  might need to keep it around for a full exit() */
+	if (__uthread_has_tls(uthread) && !(uthread->flags & UTHREAD_IS_THREAD0))
 		__uthread_free_tls(uthread);
 }
 
