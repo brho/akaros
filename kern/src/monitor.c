@@ -4,7 +4,7 @@
 #ifdef __SHARC__
 #pragma nosharc
 #endif
-
+#define DEBUG
 #include <arch/arch.h>
 #include <stab.h>
 #include <smp.h>
@@ -962,17 +962,26 @@ int mon_alarm(int argc, char **argv, struct hw_trapframe *hw_tf)
 
 static struct proc up[1];
 static int initted9 = 0;
-static struct errbuf errbuf[1];
+
 void
 init9proc()
 {
+    PERRBUF;
+    ERRSTACK(2);
 	if (initted9)
 		return;
+	initted9++;
 	if (waserror()){
-	  printd("SUCK\n");
-	  return;
+	  panic("init9proc");
 	}
-	up[0].fgrp = dupfgrp(NULL, errbuf);
+	printd("init9proc done waserror\n");
+	up[0].fgrp = dupfgrp(NULL, perrbuf);
+	printd("init9proc done dupfg\n");
+	up[0].pgrp = newpgrp();
+	printd("init9proc done duppg\n");
+	if (!up[0].pgrp)
+	    error("pgrp");
+	printd("done init9proc\n");
 }
 
 int mon_9open(int argc, char **argv, struct hw_trapframe *hw_tf)
@@ -983,9 +992,12 @@ int mon_9open(int argc, char **argv, struct hw_trapframe *hw_tf)
 	if (argc < 2)
 		return -1;
 
-	char *name = argv[0];
-	int mode = strtol(argv[1], 0, 0);
+	char *name = argv[1];
+	int mode = strtol(argv[2], 0, 0);
 	printd("Open %s %o\n", name, mode);
+	init9proc();
+	printd("call sysopen\n");
+	printd("call sysopen\n");
 	sysopen(up, name, mode);
 	return 0;
 }

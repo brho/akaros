@@ -140,7 +140,7 @@ devattach(int dc, char *spec, struct errbuf *perrbuf)
 	if(spec == NULL)
 		spec = "";
 	buf = kzmalloc(len, KMALLOC_WAIT);
-	snprintf(buf, len, "#%C%s", dc, spec);
+	snprintf(buf, len, "#%c%s", dc, spec);
 	c->path = newpath(buf, perrbuf);
 	kfree(buf);
 	return c;
@@ -179,9 +179,7 @@ devwalk(struct proc *up,
 	struct chan *c, struct chan *nc, char **name, int nname,
 	struct dirtab *tab, int ntab, devgen_t *gen, struct errbuf *perrbuf)
 {
-	struct errbuf errbuf[1];
-	struct errbuf *errstack;
-	errstack = perrbuf; perrbuf = errbuf;
+    ERRSTACK(2);
 	int i, j, alloc;
 	struct walkqid *wq;
 	char *n;
@@ -210,7 +208,7 @@ devwalk(struct proc *up,
 	for(j=0; j<nname; j++){
 		if(!(nc->qid.type & QTDIR)){
 			if(j==0)
-				error(Enotdir, perrbuf);
+			    error(Enotdir);
 			goto Done;
 		}
 		n = name[j];
@@ -227,7 +225,7 @@ devwalk(struct proc *up,
 			if((*gen)(nc, NULL, tab, ntab, DEVDOTDOT, &dir) != 1){
 				printd("devgen walk .. in dev%s %#llux broken\n",
 					c->dev->name, nc->qid.path, perrbuf);
-				error("broken devgen", perrbuf);
+				error("broken devgen");
 			}
 			nc->qid = dir.qid;
 			goto Accept;
@@ -247,7 +245,7 @@ devwalk(struct proc *up,
 			case -1:
 			Notfound:
 				if(j == 0)
-					error(Enonexist, perrbuf);
+				    error(Enonexist);
 				kstrcpy(up->errstr, Enonexist, ERRMAX);
 				goto Done;
 			case 0:
@@ -305,11 +303,11 @@ devstat(struct chan *c, uint8_t *db, long n, struct dirtab *tab, int ntab, devge
 				devdir(c, c->qid, elem, 0, eve, DMDIR|0555, &dir);
 				n = convD2M(&dir, db, n);
 				if(n == 0)
-					error(Ebadarg, perrbuf);
+					error(Ebadarg);
 				return n;
 			}
 
-			error(Enonexist, perrbuf);
+			error(Enonexist);
 		case 0:
 			break;
 		case 1:
@@ -318,7 +316,7 @@ devstat(struct chan *c, uint8_t *db, long n, struct dirtab *tab, int ntab, devge
 					dir.mode |= DMMOUNT;
 				n = convD2M(&dir, db, n);
 				if(n == 0)
-					error(Ebadarg, perrbuf);
+					error(Ebadarg);
 				return n;
 			}
 			break;
@@ -344,7 +342,7 @@ devdirread(struct chan *c, char *d, long n, struct dirtab *tab, int ntab, devgen
 		    dsz = convD2M(&dir, (uint8_t*)d, n-m);
 			if(dsz <= BIT16SZ){	/* <= not < because this isn't stat; read is stuck */
 				if(m == 0)
-					error(Eshort, perrbuf);
+					error(Eshort);
 				return m;
 			}
 			m += dsz;
@@ -375,7 +373,7 @@ devpermcheck(struct proc *up, char *fileuid, int perm, int omode, struct errbuf 
 
 	t = access[omode&3];
 	if((t&perm) != t)
-		error(Eperm, perrbuf);
+		error(Eperm);
 }
 
 struct chan*
@@ -401,7 +399,7 @@ devopen(struct proc *up, struct chan *c, int omode, struct dirtab *tab, int ntab
 Return:
 	c->offset = 0;
 	if((c->qid.type & QTDIR) && omode!=OREAD)
-		error(Eperm, perrbuf);
+		error(Eperm);
 	c->mode = openmode(omode, perrbuf);
 	c->flag |= COPEN;
 	return c;
@@ -410,7 +408,7 @@ Return:
 void
 devcreate(struct proc *up, struct chan*a, char*b, int c, int d, struct errbuf *perrbuf)
 {
-	error(Eperm, perrbuf);
+	error(Eperm);
 }
 
 /* no analog in akaros yet. */
@@ -418,17 +416,15 @@ devcreate(struct proc *up, struct chan*a, char*b, int c, int d, struct errbuf *p
 struct block*
 devbread(struct chan *c, long n, int64_t offset, struct errbuf *perrbuf)
 {
-	struct errbuf errbuf[1];
-	struct errbuf *errstack;
-	errstack = perrbuf; perrbuf = errbuf;
+    ERRSTACK(2);
 	struct block *bp;
 
 	bp = allocb(n);
 	if(bp == 0)
-		error(Enomem, perrbuf);
+		error(Enomem);
 	if(waserror()) {
-	  freeb(bp);
-	    nexterror(perrbuf);
+	    freeb(bp);
+	    nexterror();
 	}
 	bp->wp += c->dev->read(c, bp->wp, n, offset, perrbuf);
 	return bp;
@@ -437,14 +433,12 @@ devbread(struct chan *c, long n, int64_t offset, struct errbuf *perrbuf)
 long
 devbwrite(struct chan *c, struct block *bp, int64_t offset, struct errbuf *perrbuf)
 {
-	struct errbuf errbuf[1];
-	struct errbuf *errstack;
-	errstack = perrbuf; perrbuf = errbuf;
+    ERRSTACK(2);
 	long n;
 
 	if(waserror()) {
 	    freeb(bp);
-	    nexterror( perrbuf);
+	    nexterror();
 	}
 	n = c->dev->write(c, bp->rp, BLEN(bp), offset, perrbuf);
 	freeb(bp);
@@ -455,25 +449,25 @@ devbwrite(struct chan *c, struct block *bp, int64_t offset, struct errbuf *perrb
 void
 devremove(struct chan*c, struct errbuf *perrbuf)
 {
-	error(Eperm, perrbuf);
+	error(Eperm);
 }
 
 long
 devwstat(struct proc *up, struct chan*c, uint8_t*a, long b, struct errbuf *perrbuf)
 {
-	error(Eperm, perrbuf);
+	error(Eperm);
 	return 0;
 }
 
 void
 devpower(int onoff, struct errbuf *perrbuf)
 {
-	error(Eperm, perrbuf);
+	error(Eperm);
 }
 
 int
 devconfig(int a, char *b, void *v, struct errbuf *perrbuf)
 {
-	error(Eperm, perrbuf);
+	error(Eperm);
 	return 0;
 }

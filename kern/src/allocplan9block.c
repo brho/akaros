@@ -86,8 +86,7 @@ iallocb(int size)
 			if(mp++ > 1000){
 			    panic("iallocb");
 			}
-			printd("iallocb: no memory %lud/%lud\n",
-				ialloc.bytes, conf.ialloc, perrbuf);
+			printd("iallocb: no memory \n");
 		}
 		return NULL;
 	}
@@ -145,8 +144,8 @@ checkb(struct block *b, char *msg)
 	if(b->base == dead || b->lim == dead || b->next == dead
 	  || b->rp == dead || b->wp == dead){
 		printd("checkb: base %#p lim %#p next %#p\n",
-			b->base, b->lim, b->next, perrbuf);
-		printd("checkb: rp %#p wp %#p\n", b->rp, b->wp, perrbuf);
+		       b->base, b->lim, b->next);
+		printd("checkb: rp %#p wp %#p\n", b->rp, b->wp);
 		panic("checkb dead: %s\n", msg);
 	}
 
@@ -165,5 +164,5 @@ checkb(struct block *b, char *msg)
 void
 iallocsummary(void)
 {
-	printd("ialloc %lud/%lud\n", ialloc.bytes, conf.ialloc);
+  printd("ialloc %lud\n", ialloc.bytes);
 }

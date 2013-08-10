@@ -1,6 +1,7 @@
 /*
  * Stub.
  */
+#define DEBUG
 #include <vfs.h>
 #include <kfs.h>
 #include <slab.h>
@@ -64,6 +65,7 @@ devtabget(int dc, int user, struct errbuf *perrbuf)
 	int i;
 
 	for(i = 0; devtab[i] != NULL; i++){
+printd("i %d dc %d devtab dc %d\n", i, dc, devtab[i]->dc);
 		if(devtab[i]->dc == dc)
 			return devtab[i];
 	}
@@ -85,7 +87,7 @@ devtabread(struct proc *up, struct chan*c, void* buf, long n, int64_t off, struc
 
 	alloc = kzmalloc(/*READSTR*/4096, KMALLOC_WAIT);
 	if(alloc == NULL)
-		error(Enomem, perrbuf);
+	  error(Enomem);
 
 	p = alloc;
 	e = p + 4096; //READSTR;
