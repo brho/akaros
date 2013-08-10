@@ -37,8 +37,8 @@ extern __thread int __vcoreid;
 extern __thread struct syscall __vcore_one_sysc;	/* see sys_change_vcore */
 
 /* Vcore API functions */
-static inline size_t max_vcores(void);
-static inline size_t num_vcores(void);
+static inline uint32_t max_vcores(void);
+static inline uint32_t num_vcores(void);
 static inline int vcore_id(void);
 static inline bool in_vcore_context(void);
 static inline bool in_multi_mode(void);
@@ -67,12 +67,12 @@ uint32_t get_vcoreid(void);
 bool check_vcoreid(const char *str, uint32_t vcoreid);
 
 /* Static inlines */
-static inline size_t max_vcores(void)
+static inline uint32_t max_vcores(void)
 {
 	return MIN(__procinfo.max_vcores, MAX_VCORES);
 }
 
-static inline size_t num_vcores(void)
+static inline uint32_t num_vcores(void)
 {
 	return __procinfo.num_vcores;
 }

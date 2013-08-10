@@ -42,7 +42,7 @@ struct pcore {
 typedef struct procinfo {
 	pid_t pid;
 	pid_t ppid;
-	size_t max_vcores;
+	size_t max_vcores;	/* TODO: change to a uint32_t */
 	uint64_t tsc_freq;
 	uint64_t timing_overhead;
 	void *heap_bottom;
