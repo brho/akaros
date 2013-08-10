@@ -2,6 +2,7 @@
  * Copyright 2013 Google Inc.
  * Copyright (c) 1989-2003 by Lucent Technologies, Bell Laboratories.
  */
+#define DEBUG
 #include <setjmp.h>
 #include <vfs.h>
 #include <kfs.h>
@@ -18,11 +19,11 @@
 #include <fcall.h>
 
 int
-openmode(int omode, struct errbuf *e)
+openmode(int omode, struct errbuf *perrbuf)
 {
 	omode &= ~(OTRUNC|OCEXEC|ORCLOSE);
 	if(omode > OEXEC)
-	    error(Ebadarg, e);
+	  error(Ebadarg);
 	if(omode == OEXEC)
 		return OREAD;
 	return omode;
@@ -113,24 +114,28 @@ newfd(struct proc *up, struct chan *c)
 int
 sysopen(struct proc *up, char *name, int omode)
 {
+    PERRBUF;
+    ERRSTACK(2);
     struct chan *c = NULL;
     int fd;
-	struct errbuf errbuf[1];
-	struct errbuf *perrbuf = errbuf;
-
+printd("sysopen call waserror\n");
 	if (waserror()){
+		panic("sysopen waserror");
 	    if(c)
 		cclose(c, perrbuf);
 	    printd("bad mode %x\n", omode);
 	    return -1;
 	}
 
+printd("sysopen call openmode\n");
 	openmode(omode, perrbuf);	/* error check only */
 
+	printd("sysopen call namec %s \n", name);
 	c = namec(up, name, Aopen, omode, 0, perrbuf);
+	printd("namec returns %p\n", c);
 	fd = newfd(up,c);
 	if(fd < 0)
-	    error(Enofd, perrbuf);
+	    error(Enofd);
 	return fd;
 }
 

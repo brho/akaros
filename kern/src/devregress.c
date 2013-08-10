@@ -1,3 +1,4 @@
+#define DEBUG
 #include <vfs.h>
 #include <kfs.h>
 #include <slab.h>
@@ -29,6 +30,7 @@ int verbose = 0;
 static struct chan*
 regressattach(struct proc *up, char* spec, struct errbuf *perrbuf)
 {
+printd("RAT\n");
 	return devattach('Z', spec, perrbuf);
 }
 
@@ -69,7 +71,7 @@ regressread(struct chan *c, void *a, long n, int64_t offset, struct errbuf *perr
 		break;
 
 	default:
-		error(Eperm, perrbuf);
+	    error(Eperm);
 		break;
 	}
 
@@ -96,11 +98,11 @@ regresswrite(struct chan *c, void *a, long n, int64_t offset, struct errbuf *per
 		} else if (*p == 'V')
 			verbose++;
 		else
-			error("Only v or V", perrbuf);
+		    error("Only v or V");
 		return n;
 		
 	default:
-		error(Eperm, perrbuf);
+	    error(Eperm);
 		break;
 	}
 	return 0;

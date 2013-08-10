@@ -93,7 +93,7 @@ struct proc {
 	/* hack for Plan 9. This grows the struct and we'll remove later
 	 * once we get a better way to do this.
 	 */
-  char *genbuf, *errstr;
+  char genbuf[129], *errstr;
 	/* UCQ hashlocks */
 	struct hashlock				*ucq_hashlock;
 	struct small_hashlock		ucq_hl_noref;	/* don't reference directly */

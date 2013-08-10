@@ -46,7 +46,7 @@ validname0(char *aname, int slashok, int dup, uintptr_t pc, struct errbuf *perrb
 	ename = memchr(name, 0, (1<<16));
 
 	if(ename==NULL || ename-name>=(1<<16))
-		error("name too long", perrbuf);
+	  error("name too long");
 
 	s = NULL;
 	if(dup){
@@ -62,12 +62,12 @@ validname0(char *aname, int slashok, int dup, uintptr_t pc, struct errbuf *perrb
 		/* all characters above '~' are ok */
 		c = *(uint8_t*)name;
 		if(c >= Runeself){
-		    error("No UTF-8 in Akaros", perrbuf);
+		    error("No UTF-8 in Akaros");
 		}else{
 			if(isfrog[c])
 				if(!slashok || c!='/'){
 				    kfree(s);
-				    error("Bad character in name", perrbuf);
+				    error("Bad character in name");
 			}
 			name++;
 		}

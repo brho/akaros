@@ -16,6 +16,7 @@ obj-y						+= devtab.o
 obj-y						+= elf.o
 obj-y						+= env.o
 obj-y						+= errstr.o
+obj-y						+= err.o
 obj-y						+= event.o
 obj-y						+= ext2fs.o
 obj-y						+= frontend.o

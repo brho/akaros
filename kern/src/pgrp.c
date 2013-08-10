@@ -20,9 +20,9 @@ enum {
 	Whinesecs = 10,		/* frequency of out-of-resources printing */
 };
 
-static struct kref pgrpid[1];
+static struct kref pgrpid[1] = {{(void *)1, fake_release}};
 static spinlock_t mountidlock[1];
-static struct kref mountid[1];
+static struct kref mountid[1] = {{(void *)1, fake_release}};
 
 #if 0
 /* exception handling. We need to talk.*/
@@ -38,7 +38,7 @@ pgrpnote(uint32_t noteid, char *a, long n, int flag, struct errbuf *perrbuf)
 	memmove(buf, a, n);
 	buf[n] = 0;
 	p = proctab(0, perrbuf);
-	ep = p+conf.nproc;
+	pp = p+conf.nproc;
 	for(; p < ep; p++) {
 		if(p->state == Dead)
 			continue;
@@ -188,7 +188,7 @@ dupfgrp(struct fgrp *f, struct errbuf *perrbuf)
 	if(new->fd == NULL){
 		spin_unlock(&f->lock);
 		kfree(new);
-		error("no memory for fgrp", perrbuf);
+		error("no memory for fgrp");
 	}
 	kref_init(&new->ref, fake_release, 1);
 

@@ -2,6 +2,7 @@
  * Copyright 2013 Google Inc.
  * Copyright (c) 1989-2003 by Lucent Technologies, Bell Laboratories.
  */
+#define DEBUG
 #include <setjmp.h>
 #include <vfs.h>
 #include <kfs.h>
@@ -44,6 +45,21 @@ struct Elemlist
 	int	nerror;
 	int	prefix;
 };
+
+static void mh_release(struct kref *kref)
+{
+    printd("mh release\n");
+}
+
+static void chan_release(struct kref *kref)
+{
+    printd("Chan release\n");
+}
+
+static void path9_release(struct kref *kref)
+{
+    printd("path release\n");
+}
 
 char*
 chanpath(struct chan *c, struct errbuf *perrbuf)
@@ -113,7 +129,7 @@ newchan(void)
 
 	c->dev = NULL;
 	c->flag = 0;
-	kref_init(&c->ref, fake_release, 1);
+	kref_init(&c->ref, chan_release, 1);
 	c->devno = 0;
 	c->offset = 0;
 	c->devoffset = 0;
@@ -132,7 +148,12 @@ newchan(void)
 	return c;
 }
 
-struct kref npath[1];
+static void fake_npath_release(struct kref *kref)
+{
+    panic("decremented npath below 1!");
+}
+
+struct kref npath[1] = {{(void *)1, fake_npath_release}};
 
 struct path*
 newpath(char *s, struct errbuf *perrbuf)
@@ -146,7 +167,7 @@ newpath(char *s, struct errbuf *perrbuf)
 	p->alen = i+PATHSLOP;
 	p->s = kzmalloc(p->alen, KMALLOC_WAIT);
 	memmove(p->s, s, i+1);
-	kref_init(&p->ref, fake_release, 1);
+	kref_init(&p->ref, path9_release, 1);
 	kref_get(npath, 1);
 
 	/*
@@ -155,7 +176,7 @@ newpath(char *s, struct errbuf *perrbuf)
 	 * allowed, but other names with / in them draw warnings.
 	 */
 	if(strchr(s, '/') && strcmp(s, "#/") != 0 && strcmp(s, "/") != 0)
-		printd("newpath: %s from %#p\n", s, getcallerpc(&s, perrbuf), perrbuf);
+		printd("newpath: %s from %#p\n", s, getcallerpc(&s), perrbuf);
 
 	p->mlen = 1;
 	p->malen = PATHMSLOP;
@@ -170,7 +191,7 @@ copypath(struct path *p, struct errbuf *perrbuf)
 	struct path *pp;
 
 	pp = kzmalloc(sizeof(struct path), KMALLOC_WAIT);
-	kref_init(&pp->ref, fake_release, 1);
+	kref_init(&pp->ref, path9_release, 1);
 	kref_get(npath, 1);
 	printd("copypath %s %#p => %#p\n", p->s, p, pp);
 
@@ -204,7 +225,7 @@ pathclose(struct path *p, struct errbuf *perrbuf)
 		printd(" %#p", p->mtpt[i]);
 	printd("\n");
 
-	if(kref_put(&p->ref))
+	if(!kref_put(&p->ref))
 		return;
 	kref_put(npath);
 	kfree(p->s);
@@ -308,6 +329,7 @@ addelem(struct path *p, char *s, struct chan *from, struct errbuf *perrbuf)
 void
 chanfree(struct chan *c, struct errbuf *perrbuf)
 {
+printd("chanfree %p\n", c);
 	c->flag = CFREE;
 
 	if(c->dirrock != NULL){
@@ -350,17 +372,15 @@ chanfree(struct chan *c, struct errbuf *perrbuf)
 void
 cclose(struct chan *c, struct errbuf *perrbuf)
 {
-	struct errbuf errbuf[1];
-	struct errbuf *errstack;
-	errstack = perrbuf; perrbuf = errbuf;
+    ERRSTACK(4);
 
 	if(c->flag&CFREE)
-	    panic("cclose %#p", getcallerpc(&c));
+	    panic("cclose FREE %#p", getcallerpc(&c));
 
 	printd("cclose %#p name=%s ref=%d\n", c, c->path->s, c->ref);
-	if(kref_put(&c->ref))
+	if(!kref_put(&c->ref))
 		return;
-	errstack = perrbuf; perrbuf = errbuf;
+
 	if(!waserror()){
 		if(c->dev != NULL)			//XDYNX
 		    c->dev->close(c, perrbuf);
@@ -393,7 +413,7 @@ ccloseq(struct chan *c, struct errbuf *perrbuf)
 
 	printd("ccloseq %#p name=%s ref=%d\n", c, c->path->s, c->ref);
 
-	if(kref_put(&c->ref))
+	if(!kref_put(&c->ref))
 		return;
 
 	spin_lock(&(&clunkq.l)->lock);
@@ -420,8 +440,6 @@ static void
 closeproc(void*, struct errbuf *perrbuf)
 {
 	struct chan *c;
-	struct errbuf errbuf[1];
-	struct errbuf *errstack;
 
 	for(;;){
 		qlock(&clunkq.q, perrbuf);
@@ -505,7 +523,7 @@ newmhead(struct chan *from, struct errbuf *perrbuf)
 	struct mhead *mh;
 
 	mh = kzmalloc(sizeof(struct mhead), KMALLOC_WAIT);
-	kref_init(&mh->ref, fake_release, 1);
+	kref_init(&mh->ref, mh_release, 1);
 	mh->from = from;
 	kref_get(&from->ref, 1);
 	return mh;
@@ -514,8 +532,7 @@ newmhead(struct chan *from, struct errbuf *perrbuf)
 int
 cmount(struct proc *up, struct chan **newp, struct chan *old, int flag, char *spec, struct errbuf *perrbuf)
 {
-	struct errbuf errbuf[1];
-	struct errbuf *errstack;
+    ERRSTACK(4);
 
 	int order, flg;
 	struct chan *new;
@@ -524,15 +541,15 @@ cmount(struct proc *up, struct chan **newp, struct chan *old, int flag, char *sp
 	struct pgrp *pg;
 
 	if(QTDIR & (old->qid.type^(*newp)->qid.type))
-		error(Emount, perrbuf);
+		error(Emount);
 
 	if(old->umh)
-		printd("cmount: unexpected umh, caller %#p\n", getcallerpc(&newp, perrbuf), perrbuf);
+		printd("cmount: unexpected umh, caller %#p\n", getcallerpc(&newp), perrbuf);
 
 	order = flag&MORDER;
 
 	if(!(old->qid.type & QTDIR) && order != MREPL)
-		error(Emount, perrbuf);
+		error(Emount);
 
 	new = *newp;
 	mh = new->umh;
@@ -557,7 +574,7 @@ cmount(struct proc *up, struct chan **newp, struct chan *old, int flag, char *sp
 	 */
 	if((flag&MCREATE) && mh && mh->mount
 	&& (mh->mount->next || !(mh->mount->mflag&MCREATE)))
-		error(Emount, perrbuf);
+		error(Emount);
 	pg = up->pgrp;
 	wlock(&pg->ns);
 
@@ -584,10 +601,10 @@ cmount(struct proc *up, struct chan **newp, struct chan *old, int flag, char *sp
 			mhead->mount = newmount(mhead, old, 0, 0, perrbuf);
 	}
 	wlock(&mhead->lock);
-	errstack = perrbuf; perrbuf = errbuf;
+
 	if(waserror()){
 		wunlock(&mhead->lock);
-		nexterror( perrbuf);
+		nexterror();
 	}
 	wunlock(&pg->ns);
 
@@ -660,7 +677,7 @@ cunmount(struct proc *up, struct chan *mnt, struct chan *mounted, struct errbuf 
 
 	if(mh == 0){
 	    wunlock(&pg->ns);
-		error(Eunmount, perrbuf);
+		error(Eunmount);
 	}
 
 	wlock(&mh->lock);
@@ -699,7 +716,7 @@ cunmount(struct proc *up, struct chan *mnt, struct chan *mounted, struct errbuf 
 	}
 	wunlock(&mh->lock);
 	wunlock(&pg->ns);
-	error(Eunion, perrbuf);
+	error(Eunion);
 }
 
 struct chan*
@@ -710,7 +727,7 @@ cclone(struct proc *up, struct chan *c, struct errbuf *perrbuf)
 
 	wq = c->dev->walk(up, c, NULL, NULL, 0, perrbuf);		//XDYNX?
 	if(wq == NULL)
-		error("clone failed", perrbuf);
+		error("clone failed");
 	nc = wq->clone;
 	kfree(wq);
 	nc->path = c->path;
@@ -800,8 +817,7 @@ undomount(struct proc *up, struct chan *c, struct path *path, struct errbuf *per
 
 	if(kref_refcnt(&path->ref) != 1 || path->mlen == 0)
 		printd("undomount: path %s ref %d mlen %d caller %#p\n",
-			path->s, path->ref, path->mlen, getcallerpc(&c, perrbuf), perrbuf);
-
+			path->s, path->ref, path->mlen, getcallerpc(&c), perrbuf);
 	if(path->mlen>0 && (nc=path->mtpt[path->mlen-1]) != NULL){
 		printd("undomount %#p %s => remove %p\n", path, path->s, nc);
 		cclose(c, perrbuf);
@@ -817,11 +833,10 @@ undomount(struct proc *up, struct chan *c, struct path *path, struct errbuf *per
 static struct walkqid*
 ewalk(struct proc *up, struct chan *c, struct chan *nc, char **name, int nname, struct errbuf *perrbuf)
 {
-	struct errbuf errbuf[1];
-	struct errbuf *errstack;
+    ERRSTACK(3);
 
 	struct walkqid *wq;
-	errstack = perrbuf; perrbuf = errbuf;
+
 	if(waserror())
 		return NULL;
 	wq = c->dev->walk(up, c, nc, name, nname, perrbuf);
@@ -986,7 +1001,7 @@ walk(struct proc *up, struct chan **cp, char **names, int nnames, int nomount, i
 	}
 
 	putmhead(mh, perrbuf);
-
+printd("walk: cuni\n");
 	c = cunique(up, c, perrbuf);
 
 	if(c->umh != NULL){	//BUG
@@ -995,13 +1010,17 @@ walk(struct proc *up, struct chan **cp, char **names, int nnames, int nomount, i
 		c->umh = NULL;
 	}
 
+printd("walk: before pc\n");
 	pathclose(c->path, perrbuf);
+printd("walk: after pc\n");
 	c->path = path;
 
 	cclose(*cp, perrbuf);
+printd("walk: after ccl\n");
 	*cp = c;
 	if(nerror)
 		*nerror = nhave;
+printd("wlak: done\n");
 	return 0;
 }
 
@@ -1011,17 +1030,16 @@ walk(struct proc *up, struct chan **cp, char **names, int nnames, int nomount, i
 struct chan*
 createdir(struct proc *up, struct chan *c, struct mhead *mh, struct errbuf *perrbuf)
 {
-	struct errbuf errbuf[1];
-	struct errbuf *errstack;
+    ERRSTACK(3);
 
 	struct chan *nc;
 	struct mount *f;
 
 	rlock(&mh->lock);
-	errstack = perrbuf; perrbuf = errbuf;
+
 	if(waserror()){
 		runlock(&mh->lock);
-		nexterror( perrbuf);
+		nexterror();
 	}
 	for(f = mh->mount; f; f = f->next){
 		if(f->mflag&MCREATE){
@@ -1031,7 +1049,7 @@ createdir(struct proc *up, struct chan *c, struct mhead *mh, struct errbuf *perr
 			return nc;
 		}
 	}
-	error(Enocreate, perrbuf);
+	error(Enocreate);
 	return 0;
 }
 
@@ -1186,8 +1204,7 @@ nameerror(struct proc *up, char *name, char *err)
 struct chan*
 namec(struct proc *up, char *aname, int amode, int omode, int perm, struct errbuf *perrbuf)
 {
-	struct errbuf errbuf[1];
-	struct errbuf *errstack;
+    ERRSTACK(4);
 	int len, n, nomount;
 	struct chan *c, *cnew;
 	struct path *path;
@@ -1196,14 +1213,16 @@ namec(struct proc *up, char *aname, int amode, int omode, int perm, struct errbu
 	char *createerr, tmperrbuf[ERRMAX];
 	char *name;
 	struct dev *dev;
-
+	printd("namec name %s\n", aname);
 	if(aname[0] == '\0')
-		error("empty file name", perrbuf);
+		error("empty file name");
 	aname = validnamedup(aname, 1, perrbuf);
-	
+
 	if(waserror()){
+		printd("WA\n");
 		kfree(aname);
-		nexterror(perrbuf);
+		printd("WA N\n");
+		nexterror();
 	}
 	printd("namec %s %d %d\n", aname, amode, omode);
 	name = aname;
@@ -1221,15 +1240,17 @@ namec(struct proc *up, char *aname, int amode, int omode, int perm, struct errbu
 		break;
 
 	case '#':
+printd("#\n");
 		nomount = 1;
 		up->genbuf[0] = '\0';
 		n = 0;
 		while(*name != '\0' && (*name != '/' || n < 2)){
 			if(n >= sizeof(up->genbuf)-1)
-				error(Efilename, perrbuf);
+				error(Efilename);
 			up->genbuf[n++] = *name++;
 		}
 		up->genbuf[n] = '\0';
+printd("name %s\n", up->genbuf);
 		/*
 		 *  noattach is sandboxing.
 		 *
@@ -1243,23 +1264,27 @@ namec(struct proc *up, char *aname, int amode, int omode, int perm, struct errbu
 		 *	   any others left unprotected)
 		 */
 		/* actually / is caught by parsing earlier */
-		if(up->genbuf[0] == 'M')
-			error(Enoattach, perrbuf);
+		if(up->genbuf[1] == 'M')
+			error(Enoattach);
+printd("up->pgrp %p \n", up->pgrp);
 		if (up->pgrp->noattach) {
-		    if (up->genbuf[0] != '|' &&
-			up->genbuf[0] != 'e' &&
-			up->genbuf[0] != 'c' && 
-			up->genbuf[0] != 'p')
-			error(Enoattach, perrbuf);
+		    if (up->genbuf[1] != '|' &&
+			up->genbuf[1] != 'e' &&
+			up->genbuf[1] != 'c' && 
+			up->genbuf[1] != 'p')
+			error(Enoattach);
 		}
-		dev = devtabget(up->genbuf[0], 1, perrbuf);			//XDYNX
+printd("efore devtabget\n");
+		dev = devtabget(up->genbuf[1], 1, perrbuf);			//XDYNX
+printd("af devtabget %p\n", dev);
 		if(dev == NULL)
-			error(Ebadsharp, perrbuf);
+			error(Ebadsharp);
+printd("dev %p\n", dev);
 		//if(waserror()){
 		//	devtabdecr(dev);
 		//	nexterror();
 		//}
-		c = dev->attach(up, up->genbuf+n, perrbuf);
+		c = dev->attach(up, up->genbuf+2, perrbuf);
 		//poperror();
 		//devtabdecr(dev);
 		break;
@@ -1285,7 +1310,7 @@ namec(struct proc *up, char *aname, int amode, int omode, int perm, struct errbu
 		 * Prepare nice error, showing first e.nerror elements of name.
 		 */
 		if(e.nerror == 0)
-			nexterror( perrbuf);
+			nexterror();
 		strncpy(tmperrbuf, up->errstr, sizeof(tmperrbuf));
 		if(e.off[e.nerror]==0)
 			printd("nerror=%d but off=%d\n",
@@ -1312,28 +1337,29 @@ namec(struct proc *up, char *aname, int amode, int omode, int perm, struct errbu
 		/* perm must have DMDIR if last element is / or /. */
 		if(e.mustbedir && !(perm&DMDIR)){
 			e.nerror = e.nelems;
-			error("create without DMDIR", perrbuf);
+			error("create without DMDIR");
 		}
 
 		/* don't try to walk the last path element just yet. */
 		if(e.nelems == 0)
-			error(Eexist, perrbuf);
+			error(Eexist);
 		e.nelems--;
 	}
-
+printd("namec: walk\n");
 	if(walk(up, &c, e.elems, e.nelems, nomount, &e.nerror, perrbuf) < 0){
 		if(e.nerror < 0 || e.nerror > e.nelems){
 			printd("namec %s walk error nerror=%d\n", aname, e.nerror, perrbuf);
 			e.nerror = 0;
 		}
-		nexterror( perrbuf);
+		nexterror();
 	}
 
+printd("namec: walk done\n");
 	if(e.mustbedir && !(c->qid.type & QTDIR))
-		error("not a directory", perrbuf);
+		error("not a directory");
 
 	if(amode == Aopen && (omode&3) == OEXEC && (c->qid.type & QTDIR))
-		error("cannot exec directory", perrbuf);
+		error("cannot exec directory");
 
 	switch(amode){
 	case Abind:
@@ -1351,6 +1377,7 @@ namec(struct proc *up, char *aname, int amode, int omode, int perm, struct errbu
 	case Aopen:
 	Open:
 		/* save&update the name; domount might change c */
+printd("open ...\n");
 		path = c->path;
 		kref_get(&path->ref, 1);
 		mh = NULL;
@@ -1412,7 +1439,7 @@ if(c->umh != NULL){
 		 * so one may mount on / or . and see the effect.
 		 */
 		if(!(c->qid.type & QTDIR))
-			error(Enotdir, perrbuf);
+			error(Enotdir);
 		break;
 
 	case Amount:
@@ -1433,7 +1460,7 @@ if(c->umh != NULL){
 		e.nerror++;
 		if(walk(up, &c, e.elems+e.nelems-1, 1, nomount, NULL, perrbuf) == 0){
 			if(omode&OEXCL)
-				error(Eexist, perrbuf);
+				error(Eexist);
 			omode |= OTRUNC;
 			goto Open;
 		}
@@ -1519,14 +1546,14 @@ if(c->umh != NULL){
 		if(mh)
 			putmhead(mh, perrbuf);
 		if(omode & OEXCL)
-			nexterror( perrbuf);
+			nexterror();
 		/* save error */
 		createerr = up->errstr;
 		up->errstr = tmperrbuf;
 		/* note: we depend that walk does not error */
 		if(walk(up, &c, e.elems+e.nelems-1, 1, nomount, NULL, perrbuf) < 0){
 			up->errstr = createerr;
-			error(createerr, perrbuf);	/* report true error */
+			error(createerr);	/* report true error */
 		}
 		up->errstr = createerr;
 		omode |= OTRUNC;
@@ -1587,7 +1614,7 @@ isdir(struct chan *c, struct errbuf *perrbuf)
 {
 	if(c->qid.type & QTDIR)
 		return;
-	error(Enotdir, perrbuf);
+	error(Enotdir);
 }
 
 /*

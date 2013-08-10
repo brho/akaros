@@ -23,7 +23,7 @@
 #include <slab.h>
 #include <assert.h>
 
-#define kmallocdebug(args...)  //printk(args)
+#define kmallocdebug(args...)  printk(args)
 
 //List of physical pages used by kmalloc
 static spinlock_t pages_list_lock = SPINLOCK_INITIALIZER;
@@ -86,6 +86,7 @@ void *kzmalloc(size_t size, int flags)
 	if (! v)
 		return v;
 	memset(v, 0, size);
+	printd("kzmalloc %p\n", v);
 	return v;
 }
 

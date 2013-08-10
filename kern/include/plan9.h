@@ -397,9 +397,12 @@ extern char Ecmdargs[];		/* wrong #args in control message */
 extern char Ebadip[];		/* bad ip address syntax */
 extern char Edirseek[];		/* seek in directory */
 
-#define waserror() setjmp(&(errbuf[0].jmp_buf))
-#define error(x,e) {set_errstr(x); longjmp(&e->jmp_buf, (void *)x);}
-#define nexterror(x) longjmp(&perrbuf->jmp_buf, x)
+#define PERRBUF struct errbuf *perrbuf = NULL;
+#define nel(x) (sizeof(x)/sizeof(x[0]))
+#define ERRSTACK(x) struct errbuf errstack[(x)]; int curindex = 0;
+#define waserror() pusherror(errstack, nel(errstack), &curindex, &perrbuf) || setjmp(&(perrbuf->jmp_buf))
+#define error(x) {set_errstr(x); longjmp(&perrbuf->jmp_buf, (void *)x);}
+#define nexterror() {poperror(errstack, nel(errstack), &curindex, &perrbuf); longjmp(&perrbuf->jmp_buf, (void *)1);}
 
 /* this would be useful at some point ... */
 static inline uintptr_t getcallerpc(void *unused)
@@ -449,6 +452,7 @@ void forceclosefgrp(struct proc *up, struct errbuf *perrbuf);
 struct mount *newmount(struct mhead *mh, struct chan *to, int flag, char *spec, struct errbuf *perrbuf);
 void mountfree(struct mount *m, struct errbuf *perrbuf);
 void resrcwait(struct proc *up, char *reason, struct errbuf *perrbuf);
+struct pgrp *newpgrp(void);
 
 
 /* kern/src/devtab.c */
@@ -489,6 +493,13 @@ int devconfig(int a, char *b, void *v, struct errbuf *perrbuf);
 
 /* kern/src/plan9file.c */
 int openmode(int omode, struct errbuf *e);
+
+/* ker/src/err.c */
+int pusherror(struct errbuf *errstack, int stacksize,
+	      int *curindex, struct errbuf  **perrbuf);
+struct errbuf *poperror(struct errbuf *errstack, int stacksize,
+			int *curindex, struct errbuf  **perrbuf);
+
 
 /* no support for reader/writer locks yet. */
 #define rlock(x) spin_lock(x)

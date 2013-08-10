@@ -159,8 +159,8 @@ static void map_my_pages(pte_t *pgdir, uintptr_t va, size_t size,
 		assert(pte);
 		*pte = PTE_ADDR(pa) | PTE_P | perm |
 		       (pml_shift != PML1_SHIFT ? PTE_PS : 0);
-		printd("Wrote *pte %p, for va %p to pa %p tried to cover %p\n",
-		       *pte, va, pa, amt_mapped);
+		printd("Wrote *pte %p, for va %p to pa %p \n",
+		       *pte, va, pa);
 	}
 }
 
