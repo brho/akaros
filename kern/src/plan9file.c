@@ -120,7 +120,6 @@ sysopen(struct proc *up, char *name, int omode)
     int fd;
 printd("sysopen call waserror\n");
 	if (waserror()){
-		panic("sysopen waserror");
 	    if(c)
 		cclose(c, perrbuf);
 	    printd("bad mode %x\n", omode);
