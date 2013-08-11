@@ -381,6 +381,7 @@ cclose(struct chan *c, struct errbuf *perrbuf)
 	if(!kref_put(&c->ref))
 		return;
 
+	printd("cclose REALLY close\n");
 	if(!waserror()){
 		if(c->dev != NULL)			//XDYNX
 		    c->dev->close(c, perrbuf);
