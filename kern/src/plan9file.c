@@ -568,6 +568,57 @@ sysread(struct proc *up, int fd, void *p, size_t n, off_t off)
 	return nnn;
 }
 
+long
+syswrite(struct proc *up, int fd, void *p, size_t n, off_t off)
+{
+    PERRBUF;
+ 	ERRSTACK(2);
+
+	long r = n;
+	struct chan *c;
+
+	n = 0;
+	c = fdtochan(up, fd, OWRITE, 1, 1, perrbuf);
+	if(waserror()) {
+#if 0
+	    /* what should the rules be? Who owns offset? */
+		if(!ispwrite){
+			spin_lock(&c->lock);
+			c->offset -= n;
+			spin_unlock(&c->lock);
+		}
+#endif
+		cclose(c, perrbuf);
+		nexterror();
+	}
+
+	if(c->qid.type & QTDIR)
+		error(Eisdir);
+
+	n = r;
+
+#if 0
+	if(off == ~0LL){	/* use and maintain channel's offset */
+		spin_lock(&c->lock);
+		off = c->offset;
+		c->offset += n;
+		spin_unlock(&c->lock);
+	}
+#endif
+	r = c->dev->write(c, p, n, off, perrbuf);
+
+/*
+	if(!ispwrite && r < n){
+		spin_lock(&c->lock);
+		c->offset -= n - r;
+		spin_unlock(&c->lock);
+	}
+*/
+	cclose(c, perrbuf);
+
+	return r;
+}
+
 int
 sysopen(struct proc *up, char *name, int omode)
 {
