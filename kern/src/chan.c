@@ -737,7 +737,7 @@ cclone(struct proc *up, struct chan *c, struct errbuf *perrbuf)
 }
 
 /* also used by sysfile.c:/^mountfix */
-static int
+int
 findmount(struct proc *up, struct chan **cp, struct mhead **mp, int dc, unsigned int devno, struct qid qid, struct errbuf *perrbuf)
 {
 	struct pgrp *pg;

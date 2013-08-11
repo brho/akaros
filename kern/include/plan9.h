@@ -310,6 +310,7 @@ struct chan
     struct mhead*	umh;			/* mount point that derived struct chan; used in unionread */
     struct chan*	umc;			/* channel in union; held for union read */
     // need a queued lock not a spin lock. QLock	umqlock;		/* serialize unionreads */
+    spinlock_t umqlock;
     int	uri;			/* union read index */
     int	dri;			/* devdirread index */
     unsigned char*	dirrock;		/* directory entry rock for translations */
@@ -400,7 +401,7 @@ extern char Edirseek[];		/* seek in directory */
 #define PERRBUF struct errbuf *perrbuf = NULL;
 #define nel(x) (sizeof(x)/sizeof(x[0]))
 #define ERRSTACK(x) struct errbuf errstack[(x)]; int curindex = 0;
-#define waserror() pusherror(errstack, nel(errstack), &curindex, &perrbuf) || setjmp(&(perrbuf->jmp_buf))
+#define waserror() (pusherror(errstack, nel(errstack), &curindex, &perrbuf) || setjmp(&(perrbuf->jmp_buf)))
 #define error(x) {set_errstr(x); longjmp(&perrbuf->jmp_buf, (void *)x);}
 #define nexterror() {poperror(errstack, nel(errstack), &curindex, &perrbuf); longjmp(&perrbuf->jmp_buf, (void *)1);}
 
@@ -413,6 +414,8 @@ static inline uintptr_t getcallerpc(void *unused)
 void kstrcpy(char *s, char *t, int ns);
 
 /* kern/src/chan.c */
+int findmount(struct proc *up, struct chan **cp, struct mhead **mp, int dc, unsigned int devno, struct qid qid, struct errbuf *perrbuf);
+int eqchanddq(struct chan *c, int dc, unsigned int devno, struct qid qid, int skipvers, struct errbuf *perrbuf);
 char *chanpath(struct chan *c, struct errbuf *perrbuf);
 int isdotdot(char *p, struct errbuf *perrbuf);
 int emptystr(char *s, struct errbuf *perrbuf);
@@ -493,6 +496,9 @@ int devconfig(int a, char *b, void *v, struct errbuf *perrbuf);
 
 /* kern/src/plan9file.c */
 int openmode(int omode, struct errbuf *e);
+long sysread(struct proc *up, int fd, void *p, size_t n, off_t off);
+int sysopen(struct proc *up, char *name, int omode);
+
 
 /* ker/src/err.c */
 int pusherror(struct errbuf *errstack, int stacksize,
@@ -506,6 +512,10 @@ struct errbuf *poperror(struct errbuf *errstack, int stacksize,
 #define runlock(x) spin_unlock(x)
 #define wlock(x) spin_lock(x)
 #define wunlock(x) spin_unlock(x)
+
+/* qlocks are somewhat special, so leave the calls the same for now. */
+#define qlock(x) spin_lock(x)
+#define qunlock(x) spin_unlock(x)
 
 /* plan 9 has a concept of a hostowner, which is a name. For now, we got with a define. */
 #define eve "eve"
