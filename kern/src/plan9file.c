@@ -572,13 +572,18 @@ long
 syswrite(struct proc *up, int fd, void *p, size_t n, off_t off)
 {
     PERRBUF;
- 	ERRSTACK(2);
+ 	ERRSTACK(3);
 
 	long r = n;
 	struct chan *c;
 
 	n = 0;
+	if (waserror()) {
+		return -1;
+	}
+
 	c = fdtochan(up, fd, OWRITE, 1, 1, perrbuf);
+	printd("chan %p\n", c);
 	if(waserror()) {
 #if 0
 	    /* what should the rules be? Who owns offset? */
@@ -588,6 +593,7 @@ syswrite(struct proc *up, int fd, void *p, size_t n, off_t off)
 			spin_unlock(&c->lock);
 		}
 #endif
+		printd("was an err\n");
 		cclose(c, perrbuf);
 		nexterror();
 	}
@@ -605,7 +611,9 @@ syswrite(struct proc *up, int fd, void *p, size_t n, off_t off)
 		spin_unlock(&c->lock);
 	}
 #endif
+	printd("call dev write\n");
 	r = c->dev->write(c, p, n, off, perrbuf);
+	printd("back from  dev write\n");
 
 /*
 	if(!ispwrite && r < n){
@@ -615,7 +623,7 @@ syswrite(struct proc *up, int fd, void *p, size_t n, off_t off)
 	}
 */
 	cclose(c, perrbuf);
-
+	printd("syswrite: return %d\n", r);
 	return r;
 }
 

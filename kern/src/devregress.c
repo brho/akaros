@@ -104,6 +104,7 @@ regresswrite(struct chan *c, void *a, long n, int64_t offset, struct errbuf *per
 		return n;
 		
 	default:
+		printd("devreg eperm\n");
 	    error(Eperm);
 		break;
 	}
