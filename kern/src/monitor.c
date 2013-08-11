@@ -68,6 +68,7 @@ static command_t (RO commands)[] = {
 	/* here beginneth Plan 9.5 */
 	{ "9open", "Call the plan 9 open", mon_9open},
 	{ "9read", "Call the plan 9 read", mon_9read},
+	{ "9write", "Call the plan 9 write", mon_9write},
 };
 #define NCOMMANDS (sizeof(commands)/sizeof(commands[0]))
 
@@ -1002,6 +1003,27 @@ int mon_9read(int argc, char **argv, struct hw_trapframe *hw_tf)
 	init9proc();
 	printd("call sysread\n");
 	ret = sysread(up, fd, buf, len, off);
+	printd("ret is %d\n", ret);
+	return 0;
+}
+
+int mon_9write(int argc, char **argv, struct hw_trapframe *hw_tf)
+{
+    long syswrite(struct proc *up, int fd, void *p, size_t n, off_t off);
+    char *buf;
+    int ret;
+
+	if (argc < 4)
+		return -1;
+
+	int fd = strtol(argv[1], 0, 0);
+	buf = argv[2];
+	int len = strtol(argv[3], 0, 0);
+	off_t off = strtol(argv[4], 0, 0);
+	printd("Write %d %d %lld\n", fd, len, off);
+	init9proc();
+	printd("call syswrite\n");
+	ret = syswrite(up, fd, buf, len, off);
 	printd("ret is %d\n", ret);
 	return 0;
 }

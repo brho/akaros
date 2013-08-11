@@ -61,6 +61,7 @@ static long
 regressread(struct chan *c, void *a, long n, int64_t offset, struct errbuf *perrbuf)
 {
 	char *buf, *p;
+printd("regressread %d\n", (uint32_t)c->qid.path);
 
 	switch((uint32_t)c->qid.path){
 
@@ -99,6 +100,7 @@ regresswrite(struct chan *c, void *a, long n, int64_t offset, struct errbuf *per
 			verbose++;
 		else
 		    error("Only v or V");
+		printd("Regression verbosity now %d\n", verbose);
 		return n;
 		
 	default:
