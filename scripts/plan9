@@ -3,6 +3,7 @@
 sed -i 's/Block/struct block/g' $1
 sed -i 's/Chan/struct chan/g' $1
 sed -i 's/Dir/struct dir/g' $1
+sed -i 's/Fgrp/struct fgrp/g' $1
 sed -i 's/Qid/struct qid/g' $1
 sed -i 's/Waitqid/struct waitqid/g' $1
 sed -i 's/Mount/struct mount/g' $1

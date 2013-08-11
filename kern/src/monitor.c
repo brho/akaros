@@ -67,6 +67,7 @@ static command_t (RO commands)[] = {
 	{ "alarm", "Alarm Diagnostics", mon_alarm},
 	/* here beginneth Plan 9.5 */
 	{ "9open", "Call the plan 9 open", mon_9open},
+	{ "9read", "Call the plan 9 read", mon_9read},
 };
 #define NCOMMANDS (sizeof(commands)/sizeof(commands[0]))
 
@@ -979,6 +980,27 @@ init9proc()
 	if (!up[0].pgrp)
 	    error("pgrp");
 	printd("done init9proc\n");
+}
+
+int mon_9read(int argc, char **argv, struct hw_trapframe *hw_tf)
+{
+    long sysread(struct proc *up, int fd, void *p, size_t n, off_t off);
+    char buf[512];
+    int ret;
+
+	if (argc < 4)
+		return -1;
+
+	int fd = strtol(argv[1], 0, 0);
+	int len = strtol(argv[2], 0, 0);
+	off_t off = strtol(argv[3], 0, 0);
+	if (len > sizeof(buf)) len = sizeof(buf);
+	printd("Read %d %d %lld\n", fd, len, off);
+	init9proc();
+	printd("call sysread\n");
+	ret = sysread(up, fd, buf, len, off);
+	printd("ret is %d\n", ret);
+	return 0;
 }
 
 int mon_9open(int argc, char **argv, struct hw_trapframe *hw_tf)

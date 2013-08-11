@@ -48,3 +48,4 @@ char Eshortstat[] = "stat buffer too small";
 char Ebadstat[] = "malformed stat buffer";
 char Enegoff[] = "negative i/o offset";
 char Ecmdargs[] = "wrong #args in control message";
+char Edirseek[] = "seek in a directory";

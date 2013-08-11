@@ -1,4 +1,5 @@
 #!/bin/sh
+set -e
 #Plan 9 source can be converted for akaros via a set of scripts.
 #This is a WIP. 
 # At this point, we take it just so far and do the rest
