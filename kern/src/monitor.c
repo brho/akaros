@@ -988,6 +988,7 @@ int mon_9open(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
   int
     sysopen(struct proc *up, char *name, int omode);
+	int fd;
 
 	if (argc < 2)
 		return -1;
@@ -998,7 +999,8 @@ int mon_9open(int argc, char **argv, struct hw_trapframe *hw_tf)
 	init9proc();
 	printd("call sysopen\n");
 	printd("call sysopen\n");
-	sysopen(up, name, mode);
+	fd = sysopen(up, name, mode);
+	printd("fd is %d\n", fd);
 	return 0;
 }
 
