@@ -497,6 +497,8 @@ int devconfig(int a, char *b, void *v, struct errbuf *perrbuf);
 /* kern/src/plan9file.c */
 int openmode(int omode, struct errbuf *e);
 long sysread(struct proc *up, int fd, void *p, size_t n, off_t off);
+long syswrite(struct proc *up, int fd, void *p, size_t n, off_t off);
+
 int sysopen(struct proc *up, char *name, int omode);
 int plan9setup(struct proc *up);
 

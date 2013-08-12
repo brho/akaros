@@ -497,134 +497,168 @@ sysread(struct proc *up, int fd, void *p, size_t n, off_t off)
 {
     PERRBUF;
     
-	ERRSTACK(2);
-	long nn, nnn;
-	struct chan *c;
-	int ispread = 1;
-	printd("sysread %d %p %d %lld\n", fd, p, n, off);
-	c = fdtochan(up, fd, OREAD, 1, 1, perrbuf);
-
-	if(waserror()){
-	  printd("bad ...\n");
-	    cclose(c, perrbuf);
-	    return -1;
-	}
-
-	/*
-	 * The offset is passed through on directories, normally.
-	 * Sysseek complains, but pread is used by servers like exportfs,
-	 * that shouldn't need to worry about this issue.
-	 *
-	 * Notice that c->devoffset is the offset that c's dev is seeing.
-	 * The number of bytes read on this fd (c->offset) may be different
-	 * due to rewritings in mountfix.
-	 */
-	if(off == ~0LL){	/* use and maintain channel's offset */
-	    off = c->offset;
-	    ispread = 0;
-	}
-
-	if(c->qid.type & QTDIR){
-		/*
-		 * struct directory read:
-		 * rewind to the beginning of the file if necessary;
-		 * try to fill the buffer via mountrockread;
-		 * clear ispread to always maintain the struct chan offset.
-		 */
-		if(off == 0LL){
-			if(!ispread){
-				c->offset = 0;
-				c->devoffset = 0;
-			}
-			mountrewind(c);
-			unionrewind(c, perrbuf);
-		}
-
-		if(!mountrockread(c, p, n, &nn)){
-			if(c->umh)
-			    nn = unionread(up, c, p, n, perrbuf);
-			else{
-				if(off != c->offset)
-					error(Edirseek);
-				nn = c->dev->read(c, p, n, c->devoffset, perrbuf);
-			}
-		}
-		nnn = mountfix(up, c, p, nn, n, perrbuf);
-
-		ispread = 0;
-	}
-	else
-	    nnn = nn = c->dev->read(c, p, n, off, perrbuf);
-
-	if(!ispread){
-		spin_lock(&c->lock);
-		c->devoffset += nn;
-		c->offset += nnn;
-		spin_unlock(&c->lock);
-	}
-
+    ERRSTACK(2);
+    long nn, nnn;
+    struct chan *c;
+    int ispread = 1;
+    printd("sysread %d %p %d %lld\n", fd, p, n, off);
+    c = fdtochan(up, fd, OREAD, 1, 1, perrbuf);
+    
+    if(waserror()){
+	printd("bad sysread...\n");
 	cclose(c, perrbuf);
-
-	return nnn;
+	return -1;
+    }
+    
+    /*
+     * The offset is passed through on directories, normally.
+     * Sysseek complains, but pread is used by servers like exportfs,
+     * that shouldn't need to worry about this issue.
+     *
+     * Notice that c->devoffset is the offset that c's dev is seeing.
+     * The number of bytes read on this fd (c->offset) may be different
+     * due to rewritings in mountfix.
+     */
+    if(off == ~0LL){	/* use and maintain channel's offset */
+	off = c->offset;
+	ispread = 0;
+    }
+    
+    if(c->qid.type & QTDIR){
+	/*
+	 * struct directory read:
+	 * rewind to the beginning of the file if necessary;
+	 * try to fill the buffer via mountrockread;
+	 * clear ispread to always maintain the struct chan offset.
+	 */
+	if(off == 0LL){
+	    if(!ispread){
+		c->offset = 0;
+		c->devoffset = 0;
+	    }
+	    mountrewind(c);
+	    unionrewind(c, perrbuf);
+	}
+	
+	if(!mountrockread(c, p, n, &nn)){
+	    if(c->umh)
+		nn = unionread(up, c, p, n, perrbuf);
+	    else{
+		if(off != c->offset)
+		    error(Edirseek);
+		nn = c->dev->read(c, p, n, c->devoffset, perrbuf);
+	    }
+	}
+	nnn = mountfix(up, c, p, nn, n, perrbuf);
+	
+	ispread = 0;
+    }
+    else
+	nnn = nn = c->dev->read(c, p, n, off, perrbuf);
+    
+    if(!ispread){
+	spin_lock(&c->lock);
+	c->devoffset += nn;
+	c->offset += nnn;
+	spin_unlock(&c->lock);
+    }
+    
+    cclose(c, perrbuf);
+    
+    return nnn;
 }
 
 long
 syswrite(struct proc *up, int fd, void *p, size_t n, off_t off)
 {
     PERRBUF;
- 	ERRSTACK(3);
+    ERRSTACK(3);
 
-	long r = n;
-	struct chan *c;
+    int ispwrite = 1;
+    long r = n;
+    struct chan *c;
 
-	n = 0;
-	if (waserror()) {
-		return -1;
+    n = 0;
+    if (waserror()) {
+	return -1;
+    }
+    
+    c = fdtochan(up, fd, OWRITE, 1, 1, perrbuf);
+    printd("chan %p\n", c);
+    if(waserror()) {
+
+	if(!ispwrite){
+	    spin_lock(&c->lock);
+	    c->offset -= n;
+	    spin_unlock(&c->lock);
 	}
-
-	c = fdtochan(up, fd, OWRITE, 1, 1, perrbuf);
-	printd("chan %p\n", c);
-	if(waserror()) {
-#if 0
-	    /* what should the rules be? Who owns offset? */
-		if(!ispwrite){
-			spin_lock(&c->lock);
-			c->offset -= n;
-			spin_unlock(&c->lock);
-		}
-#endif
-		printd("was an err\n");
-		cclose(c, perrbuf);
-		nexterror();
-	}
-
-	if(c->qid.type & QTDIR)
-		error(Eisdir);
-
-	n = r;
-
-#if 0
-	if(off == ~0LL){	/* use and maintain channel's offset */
-		spin_lock(&c->lock);
-		off = c->offset;
-		c->offset += n;
-		spin_unlock(&c->lock);
-	}
-#endif
-	printd("call dev write\n");
-	r = c->dev->write(c, p, n, off, perrbuf);
-	printd("back from  dev write\n");
-
-/*
-	if(!ispwrite && r < n){
-		spin_lock(&c->lock);
-		c->offset -= n - r;
-		spin_unlock(&c->lock);
-	}
-*/
+	printd("was an err\n");
 	cclose(c, perrbuf);
-	printd("syswrite: return %d\n", r);
-	return r;
+	nexterror();
+    }
+    
+    if(c->qid.type & QTDIR)
+	error(Eisdir);
+    
+    n = r;
+    
+
+    if(off == ~0LL){	/* use and maintain channel's offset */
+	spin_lock(&c->lock);
+	off = c->offset;
+	c->offset += n;
+	spin_unlock(&c->lock);
+    }
+
+    printd("call dev write\n");
+    r = c->dev->write(c, p, n, off, perrbuf);
+    printd("back from  dev write\n");
+    
+
+    if(!ispwrite && r < n){
+	spin_lock(&c->lock);
+	c->offset -= n - r;
+	spin_unlock(&c->lock);
+    }
+    
+    cclose(c, perrbuf);
+    printd("syswrite: return %d\n", r);
+    return r;
+}
+
+int
+syscreate(struct proc *up, char *name, int omode)
+{
+    PERRBUF;
+    ERRSTACK(2);
+    struct chan *c = NULL;
+    int fd;
+    /* if it exists, it is truncated. 
+     * if it does not exists, it's created.
+     * so we don't need these flags.
+     * TODO; convert all flags to akaros flags.
+     */
+    omode &= ~(O_CREAT|O_TRUNC);
+      
+printd("syscreate call waserror\n");
+	if (waserror()){
+	    if(c)
+		cclose(c, perrbuf);
+	    printd("syscreate fail 1 mode  %x\n", omode);
+	    return -1;
+	}
+
+printd("syscreate call openmode\n");
+	openmode(omode, perrbuf);	/* error check only */
+
+	printd("syscreate call namec %s \n", name);
+	c = namec(up, name, Acreate, omode, 0, perrbuf);
+	printd("namec returns %p\n", c);
+	fd = newfd(up,c);
+	if(fd < 0)
+	    error(Enofd);
+	printd("syscreate: RETURNING %d\n", fd);
+	return fd;
 }
 
 int
@@ -634,6 +668,9 @@ sysopen(struct proc *up, char *name, int omode)
     ERRSTACK(2);
     struct chan *c = NULL;
     int fd;
+	if (omode & (O_CREAT|O_TRUNC))
+	    return syscreate(up, name, omode);
+
 printd("sysopen call waserror\n");
 	if (waserror()){
 	    if(c)
@@ -641,7 +678,6 @@ printd("sysopen call waserror\n");
 	    printd("sysopen fail 1 mode  %x\n", omode);
 	    return -1;
 	}
-
 printd("sysopen call openmode\n");
 	openmode(omode, perrbuf);	/* error check only */
 

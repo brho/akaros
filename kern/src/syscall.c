@@ -1093,6 +1093,13 @@ static int sys_eth_recv_check(env_t* e)
 static intreg_t sys_read(struct proc *p, int fd, void *buf, int len)
 {
 	ssize_t ret;
+	if (fd >= PLAN9FDBASE) {
+	    fd -= PLAN9FDBASE;
+	    ret = sysread(p, fd, buf, len, (off_t) -1);
+	    printd("plan 9 write returns %d\n", ret);
+	    return ret;
+	}
+
 	struct file *file = get_file_from_fd(&p->open_files, fd);
 	if (!file) {
 		set_errno(EBADF);
@@ -1114,6 +1121,12 @@ static intreg_t sys_read(struct proc *p, int fd, void *buf, int len)
 static intreg_t sys_write(struct proc *p, int fd, const void *buf, int len)
 {
 	ssize_t ret;
+	if (fd >= PLAN9FDBASE) {
+	    fd -= PLAN9FDBASE;
+	    ret = syswrite(p, fd, buf, len, (off_t) -1);
+	    printd("plan 9 write returns %d\n", ret);
+	    return ret;
+	}
 	struct file *file = get_file_from_fd(&p->open_files, fd);
 	if (!file) {
 		set_errno(EBADF);
