@@ -310,6 +310,8 @@ error_t proc_alloc(struct proc **pp, struct proc *parent)
 
 	atomic_inc(&num_envs);
 	frontend_proc_init(p);
+	/* plan 9 */
+	plan9setup(p);
 	printd("[%08x] new process %08x\n", current ? current->pid : 0, p->pid);
 	} // INIT_STRUCT
 	*pp = p;

@@ -36,7 +36,6 @@
 #include <termios.h>
 #include <socket.h>
 
-
 #ifdef CONFIG_NETWORKING
 #include <net/nic_common.h>
 extern int (*send_frame)(const char *CT(len) data, size_t len);
@@ -1141,12 +1140,20 @@ static intreg_t sys_open(struct proc *p, const char *path, size_t path_l,
 	int fd = 0;
 	struct file *file;
 
-	printd("File %s Open attempt\n", path);
+	printd("File %s Open attempt oflag %x mode %x\n", path, oflag, mode);
 	char *t_path = user_strdup_errno(p, path, path_l);
 	if (!t_path)
 		return -1;
 	mode &= ~p->fs_env.umask;
 	file = do_file_open(t_path, oflag, mode);
+	if (!file){
+	    fd = sysopen(p, t_path, oflag);
+	    if (fd >= 0){
+		printd("SYS_OPEN plan 9 open %s %x\n", t_path, fd);
+		user_memdup_free(p, t_path);
+		return fd+PLAN9FDBASE;
+	    }
+	}
 	user_memdup_free(p, t_path);
 	if (!file)
 		return -1;

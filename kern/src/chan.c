@@ -1236,6 +1236,7 @@ namec(struct proc *up, char *aname, int amode, int omode, int perm, struct errbu
 	nomount = 0;
 	switch(name[0]){
 	case '/':
+		error("not yet");
 		c = up->slash;
 		kref_get(&c->ref, 1);
 		break;
