@@ -498,6 +498,7 @@ int devconfig(int a, char *b, void *v, struct errbuf *perrbuf);
 int openmode(int omode, struct errbuf *e);
 long sysread(struct proc *up, int fd, void *p, size_t n, off_t off);
 int sysopen(struct proc *up, char *name, int omode);
+int plan9setup(struct proc *up);
 
 
 /* ker/src/err.c */
@@ -519,3 +520,6 @@ struct errbuf *poperror(struct errbuf *errstack, int stacksize,
 
 /* plan 9 has a concept of a hostowner, which is a name. For now, we got with a define. */
 #define eve "eve"
+
+/* for interop purposes, we start plan 9 fds at a speciall offset */
+#define PLAN9FDBASE ((unsigned long)('p'<<24)|('l'<<16)|('a'<<8)|'n')

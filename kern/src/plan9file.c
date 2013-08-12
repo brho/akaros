@@ -638,7 +638,7 @@ printd("sysopen call waserror\n");
 	if (waserror()){
 	    if(c)
 		cclose(c, perrbuf);
-	    printd("bad mode %x\n", omode);
+	    printd("sysopen fail 1 mode  %x\n", omode);
 	    return -1;
 	}
 
@@ -651,6 +651,22 @@ printd("sysopen call openmode\n");
 	fd = newfd(up,c);
 	if(fd < 0)
 	    error(Enofd);
+	printd("sysopen: RETURNING %d\n", fd);
 	return fd;
+}
+
+int
+plan9setup(struct proc *up)
+{
+    PERRBUF;
+    ERRSTACK(2);
+    if (waserror()){
+      printd("plan9setup failed\n");
+      return -1;
+    }
+
+    up->fgrp = dupfgrp(NULL, perrbuf);
+    up->pgrp = newpgrp();
+    return 0;
 }
 
