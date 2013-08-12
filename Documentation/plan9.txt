@@ -14,4 +14,80 @@ to relearn what they learned from scratch.
 Currently we have a lot of the code in and are testing a first device -- 
 the regression device from NxM.
 
+Issues.
+
+The biggest issue so far is implemented the Plan 9 error handling.
+In Plan 9, errors are managed via a longjmp-like mechanism. For example,
+in a call chain such as:
+a()
+ b()
+  c()
+   d()
+
+It is possible for d to invoke an error that returns to a directly. 
+This model has many advantages over the standard model, which looks like
+this:
+a{ b();}
+ b{ if c() return OK; else return -1;}
+  c{ if d() return OK; else return -1;}
+   d{ if something return OK; else return -1;}
+
+In Plan 9 it can look like this:
+
+a{ b();}
+ b{ c(); something else();}
+  c{ d(); other thing();}
+   d{ if something return OK; else error("bad");}
+
+Note that the intermediate functions can be written as though nothing
+went wrong, since anything that goes wrong gets bounced to the first level
+error handler. 
+
+The handling is implemented via something called waserror().
+In a() we do this:
+
+a(){
+   if (waserror())  { handle error; }
+   b();
+}
+
+and in d we might have this:
+d(){
+   do something; 
+   if (bad) error("bad");
+   return 0;
+}
+
+What if there's more than one error? There can be multiple invocations
+of waserror in one function:
+a(){
+   if (waserror()){ printf("b failed");return -2;}
+   b();
+   if (waserror()) { printf("z failed"); nexterror(); }
+   z();
+
+}
+
+Note that the error could have been anywhere in the call chain;
+we don't care. From the point of view of a(), something failed, and we only
+know about b() or z(), so we blame them. We also show in this example
+nexterror(). Nexterror() pops back to the next error in the error stack,
+which might be in this function or somewhere up the call chain.
+
+How do we find out the ultimate blame? Recall that error takes a string,
+and that can be anything. We can tell from that. 
+
+Where does the string in error() go?
+In Plan 9, it goes into the proc struct; in Akaros,
+it's copied to a user-mode buffer. 
+
+waserror()/error()/nexterror() manipulate an error call stack, similar to
+the function call stack. In Plan 9, this stack is maintained in the proc
+struct. This is cheap in Plan 9, since the compiler has caller-save, and
+hence each stack entry is a stack and a PC. In a callee-save world, the
+stack entries are much, much larger; so large that maintaining the stack
+in the proc struct is impractical.
+
+Hence, we've had to make changes that add a bit of inconvenience but
+leave the code mostly intact.
 
