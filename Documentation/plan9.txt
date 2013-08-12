@@ -1,0 +1,17 @@
+We're adding the plan 9 file system to akaros.We're bringing in the
+name space interface, including the ability to do binds, union mounts,
+and the like. We will extend it to support things we might need,
+in particular mmap. 
+
+By bringing this model in, we can make the interface more powerful,
+and simpler. We can remove 16 system calls right away and yet still have
+the functions they provided, for example. 
+
+This is not a from scratch effort but a code translation. The Plan 9 code
+deals with very subtle situations and has been hardened over time. No need
+to relearn what they learned from scratch.
+
+Currently we have a lot of the code in and are testing a first device -- 
+the regression device from NxM.
+
+
