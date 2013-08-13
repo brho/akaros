@@ -128,7 +128,8 @@ unsigned int	sizeS2M(Fcall*);
 
 int	statcheck(uint8_t *abuf, unsigned int nbuf);
 unsigned int	convM2D(uint8_t*, unsigned int, struct dir*, char*);
-unsigned int	convM2A(uint8_t*, unsigned int, struct kdirent*);
+unsigned int convM2kdirent(uint8_t *buf, unsigned int nbuf, struct kdirent *kd);
+unsigned int convM2kstat(uint8_t *buf, unsigned int nbuf, struct kstat *ks);
 unsigned int	convD2M(struct dir*, uint8_t*, unsigned int);
 unsigned int	sizeD2M(struct dir*);
 

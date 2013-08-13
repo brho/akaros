@@ -503,6 +503,7 @@ int openmode(int omode, struct errbuf *e);
 long sysread(struct proc *up, int fd, void *p, size_t n, off_t off);
 long syswrite(struct proc *up, int fd, void *p, size_t n, off_t off);
 int sysstat(struct proc *up, char *name, uint8_t *statbuf, int len);
+int sysfstat(struct proc *up, int fd, uint8_t *statbuf, int len);
 int sysopen(struct proc *up, char *name, int omode);
 int plan9setup(struct proc *up);
 
@@ -528,4 +529,5 @@ struct errbuf *poperror(struct errbuf *errstack, int stacksize,
 #define eve "eve"
 
 /* for interop purposes, we start plan 9 fds at a speciall offset */
-#define PLAN9FDBASE ((unsigned long)('p'<<24)|('l'<<16)|('a'<<8)|'n')
+//#define PLAN9FDBASE ((unsigned long)('p'<<24)|('l'<<16)|('a'<<8)|'n')
+#define PLAN9FDBASE 0x5555

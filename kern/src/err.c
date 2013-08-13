@@ -1,7 +1,7 @@
 /*
  * Copyright 2013 Google Inc.
  */
-#define DEBUG
+//#define DEBUG
 #include <setjmp.h>
 #include <vfs.h>
 #include <kfs.h>
