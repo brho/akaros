@@ -93,12 +93,12 @@ findfreefd(struct fgrp *f, int start)
 }
 
 int
-newfd(struct proc *up, struct chan *c)
+newfd(struct chan *c)
 {
 	int fd;
 	struct fgrp *f;
 
-	f = up->fgrp;
+	f = current->fgrp;
 	spin_lock(&f->lock);
 	fd = findfreefd(f, 0);
 	if(fd < 0){
@@ -113,11 +113,11 @@ newfd(struct proc *up, struct chan *c)
 }
 
 static int
-newfd2(struct proc *up, int fd[2], struct chan *c[2])
+newfd2(int fd[2], struct chan *c[2])
 {
 	struct fgrp *f;
 
-	f = up->fgrp;
+	f = current->fgrp;
 	spin_lock(&f->lock);
 	fd[0] = findfreefd(f, 0);
 	if(fd[0] < 0){
@@ -139,13 +139,13 @@ newfd2(struct proc *up, int fd[2], struct chan *c[2])
 }
 
 struct chan*
-fdtochan(struct proc *up, int fd, int mode, int chkmnt, int iref, struct errbuf *perrbuf)
+fdtochan(int fd, int mode, int chkmnt, int iref, struct errbuf *perrbuf)
 {
 	struct chan *c;
 	struct fgrp *f;
 
 	c = NULL;
-	f = up->fgrp;
+	f = current->fgrp;
 
 	spin_lock(&f->lock);
 	if(fd<0 || f->nfd<=fd || (c = f->fd[fd])==0) {
@@ -181,7 +181,7 @@ fdtochan(struct proc *up, int fd, int mode, int chkmnt, int iref, struct errbuf 
 }
 
 static long
-unionread(struct proc *up, struct chan *c, void *va, long n, struct errbuf *perrbuf)
+unionread(struct chan *c, void *va, long n, struct errbuf *perrbuf)
 {
     ERRSTACK(2);
 	int i;
@@ -202,8 +202,8 @@ unionread(struct proc *up, struct chan *c, void *va, long n, struct errbuf *perr
 		/* Error causes component of union to be skipped */
 		if(mount->to && !waserror()){
 			if(c->umc == NULL){
-			  c->umc = cclone(up, mount->to, perrbuf);
-			    c->umc = c->umc->dev->open(up, c->umc, OREAD, perrbuf);
+			  c->umc = cclone(mount->to, perrbuf);
+			    c->umc = c->umc->dev->open(c->umc, OREAD, perrbuf);
 			}
 
 			nr = c->umc->dev->read(c->umc, va, n, c->umc->offset, perrbuf);
@@ -418,7 +418,7 @@ mountrewind(struct chan *c)
  * of statting what is mounted there.  Except leave the old names.
  */
 static long
-mountfix(struct proc *up, struct chan *c, uint8_t *op, long n, long maxn, struct errbuf *perrbuf)
+mountfix(struct chan *c, uint8_t *op, long n, long maxn, struct errbuf *perrbuf)
 {
     ERRSTACK(2);
 	char *name;
@@ -440,7 +440,7 @@ mountfix(struct proc *up, struct chan *c, uint8_t *op, long n, long maxn, struct
 			break;
 		nc = NULL;
 		mh = NULL;
-		if(findmount(up, &nc, &mh, d.type, d.dev, d.qid, perrbuf)){
+		if(findmount(&nc, &mh, d.type, d.dev, d.qid, perrbuf)){
 			/*
 			 * If it's a union directory and the original is
 			 * in the union, don't rewrite anything.
@@ -509,7 +509,7 @@ mountfix(struct proc *up, struct chan *c, uint8_t *op, long n, long maxn, struct
 }
 
 long
-sysread(struct proc *up, int fd, void *p, size_t n, off_t off)
+sysread(int fd, void *p, size_t n, off_t off)
 {
     PERRBUF;
     
@@ -524,7 +524,7 @@ sysread(struct proc *up, int fd, void *p, size_t n, off_t off)
 	return -1;
     }
 
-    c = fdtochan(up, fd, OREAD, 1, 1, perrbuf);
+    c = fdtochan(fd, OREAD, 1, 1, perrbuf);
     
     if(waserror()){
 	cclose(c, perrbuf);
@@ -572,14 +572,14 @@ sysread(struct proc *up, int fd, void *p, size_t n, off_t off)
 	 */
 	if(!mountrockread(c, p, n, &nn)){
 	    if(c->umh)
-		nn = unionread(up, c, ents, 2048, perrbuf);
+		nn = unionread(c, ents, 2048, perrbuf);
 	    else{
 		if(off != c->offset)
 		    error(Edirseek);
 		nn = c->dev->read(c, ents, 2048, c->devoffset, perrbuf);
 	    }
 	}
-	nnn = mountfix(up, c, ents, nn, n, perrbuf);
+	nnn = mountfix(c, ents, nn, n, perrbuf);
 	/* now convert to akaros kdents. This whole thing needs fixin' */
 	nnn =  convM2kdirent(ents, nnn, (struct kdirent *) p);
 	
@@ -601,7 +601,7 @@ sysread(struct proc *up, int fd, void *p, size_t n, off_t off)
 }
 
 long
-syswrite(struct proc *up, int fd, void *p, size_t n, off_t off)
+syswrite(int fd, void *p, size_t n, off_t off)
 {
     PERRBUF;
     ERRSTACK(3);
@@ -616,7 +616,7 @@ syswrite(struct proc *up, int fd, void *p, size_t n, off_t off)
 	return -1;
     }
     
-    c = fdtochan(up, fd, OWRITE, 1, 1, perrbuf);
+    c = fdtochan(fd, OWRITE, 1, 1, perrbuf);
     //printd("chan %p\n", c);
     if(waserror()) {
 
@@ -656,7 +656,7 @@ syswrite(struct proc *up, int fd, void *p, size_t n, off_t off)
 }
 
 int
-syscreate(struct proc *up, char *name, int omode)
+syscreate(char *name, int omode)
 {
     PERRBUF;
     ERRSTACK(2);
@@ -678,15 +678,15 @@ syscreate(struct proc *up, char *name, int omode)
 
 	openmode(omode, perrbuf);	/* error check only */
 
-	c = namec(up, name, Acreate, omode, 0, perrbuf);
-	fd = newfd(up,c);
+	c = namec(name, Acreate, omode, 0, perrbuf);
+	fd = newfd(c);
 	if(fd < 0)
 	    error(Enofd);
 	return fd;
 }
 
 int
-sysopen(struct proc *up, char *name, int omode)
+sysopen(char *name, int omode)
 {
     PERRBUF;
     ERRSTACK(2);
@@ -703,7 +703,7 @@ sysopen(struct proc *up, char *name, int omode)
 	mustdir = 1;
     }
 	if (omode & (O_CREAT|O_TRUNC))
-	    return syscreate(up, name, omode);
+	    return syscreate(name, omode);
 
 	if (waserror()){
 	    if(c)
@@ -712,8 +712,8 @@ sysopen(struct proc *up, char *name, int omode)
 	}
 	openmode(omode, perrbuf);	/* error check only */
 
-	c = namec(up, name, Aopen, omode, 0, perrbuf);
-	fd = newfd(up,c);
+	c = namec(name, Aopen, omode, 0, perrbuf);
+	fd = newfd(c);
 	if(fd < 0)
 	    error(Enofd);
 	printd("sysopen %s returns %d %x\n", name, fd, fd);
@@ -721,7 +721,7 @@ sysopen(struct proc *up, char *name, int omode)
 }
 
 int
-sysstat(struct proc *up, char *name, uint8_t *statbuf, int len)
+sysstat(char *name, uint8_t *statbuf, int len)
 {
     PERRBUF;
     ERRSTACK(2);
@@ -737,7 +737,7 @@ sysstat(struct proc *up, char *name, uint8_t *statbuf, int len)
 	return -1;
     }
 
-    c = namec(up, name, Aaccess, 0, 0, perrbuf);
+    c = namec(name, Aaccess, 0, 0, perrbuf);
 
     r = c->dev->stat(c, data, sizeof(data), perrbuf);
 
@@ -753,7 +753,7 @@ sysstat(struct proc *up, char *name, uint8_t *statbuf, int len)
 }
 
 int
-sysfstat(struct proc *up, int fd, uint8_t *statbuf, int len)
+sysfstat(int fd, uint8_t *statbuf, int len)
 {
     PERRBUF;
     ERRSTACK(2);
@@ -765,7 +765,7 @@ sysfstat(struct proc *up, int fd, uint8_t *statbuf, int len)
 	return -1;
     }
 
-    c = fdtochan(up, fd, -1, 0, 1, perrbuf);
+    c = fdtochan(fd, -1, 0, 1, perrbuf);
 
     if(waserror()) {
       cclose(c, perrbuf);
@@ -781,7 +781,7 @@ sysfstat(struct proc *up, int fd, uint8_t *statbuf, int len)
 }
 
 int
-sysdup(struct proc *up, int ofd, int nfd)
+sysdup(int ofd, int nfd)
 {
     ERRSTACKBASE(1);
 	struct chan *nc, *oc;
@@ -798,10 +798,10 @@ sysdup(struct proc *up, int ofd, int nfd)
 	    return -1;
 	}
 
-	oc = fdtochan(up, ofd, -1, 0, 1, perrbuf);
+	oc = fdtochan(ofd, -1, 0, 1, perrbuf);
 
 	if(nfd != -1){
-		f = up->fgrp;
+		f = current->fgrp;
 		spin_lock(&f->lock);
 		if(nfd < 0 || growfd(f, nfd) < 0) {
 			unlockfgrp(f);
@@ -821,7 +821,7 @@ sysdup(struct proc *up, int ofd, int nfd)
 		    cclose(oc, perrbuf);
 		    nexterror();
 		}
-		nfd = newfd(up, oc);
+		nfd = newfd(oc);
 		if(nfd < 0)
 		    error(Enofd);
 	}
@@ -831,7 +831,7 @@ sysdup(struct proc *up, int ofd, int nfd)
 
 
 int
-plan9setup(struct proc *up)
+plan9setup()
 {
     PERRBUF;
     ERRSTACK(2);
@@ -840,8 +840,8 @@ plan9setup(struct proc *up)
       return -1;
     }
 
-    up->fgrp = dupfgrp(NULL, perrbuf);
-    up->pgrp = newpgrp();
+    current->fgrp = dupfgrp(NULL, perrbuf);
+    current->pgrp = newpgrp();
     return 0;
 }
 

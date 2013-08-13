@@ -27,25 +27,25 @@ struct dev *devtab[] = {
 };
 
 void
-devtabreset(struct proc *up)
+devtabreset()
 {
 	int i;
 
 	for(i = 0; devtab[i] != NULL; i++)
-		devtab[i]->reset(up);
+		devtab[i]->reset(current);
 }
 
 void
-devtabinit(struct proc *up)
+devtabinit()
 {
 	int i;
 
 	for(i = 0; devtab[i] != NULL; i++)
-		devtab[i]->init(up);
+		devtab[i]->init(current);
 }
 
 void
-devtabshutdown(struct proc *up)
+devtabshutdown()
 {
 	int i;
 
@@ -55,7 +55,7 @@ devtabshutdown(struct proc *up)
 	for(i = 0; devtab[i] != NULL; i++)
 		;
 	for(i--; i >= 0; i--)
-		devtab[i]->shutdown(up);
+		devtab[i]->shutdown(current);
 }
 
 
@@ -76,7 +76,7 @@ devtabget(int dc, int user, struct errbuf *perrbuf)
 }
 
 long
-devtabread(struct proc *up, struct chan*c, void* buf, long n, int64_t off, struct errbuf *perrbuf)
+devtabread(struct chan*c, void* buf, long n, int64_t off, struct errbuf *perrbuf)
 {
 	int ret;
 
@@ -109,7 +109,7 @@ devtabread(struct proc *up, struct chan*c, void* buf, long n, int64_t off, struc
 	// akaros assumes it all went. 
 	// and no support for offsets. 
 	// and it won't throw an error, so no need for any waserror.
-	ret = memcpy_to_user(up, buf, alloc, n);
+	ret = memcpy_to_user(current, buf, alloc, n);
 	
 	kfree(alloc);
 

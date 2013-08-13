@@ -1096,7 +1096,7 @@ static intreg_t sys_read(struct proc *p, int fd, void *buf, int len)
 	ssize_t ret;
 	if (fd >= PLAN9FDBASE) {
 	    fd -= PLAN9FDBASE;
-	    ret = sysread(p, fd, buf, len, (off_t) -1);
+	    ret = sysread(fd, buf, len, (off_t) -1);
 	    printd("plan 9 read returns %d\n", ret);
 	    return ret;
 	}
@@ -1126,7 +1126,7 @@ static intreg_t sys_write(struct proc *p, int fd, const void *buf, int len)
 printd("write fd %d\n", fd);
 	    fd -= PLAN9FDBASE;
 printd("write fd %d\n", fd);
-	    ret = syswrite(p, fd, buf, len, (off_t) -1);
+	    ret = syswrite(fd, buf, len, (off_t) -1);
 	    printd("plan 9 write returns %d\n", ret);
 	    return ret;
 	}
@@ -1163,7 +1163,7 @@ static intreg_t sys_open(struct proc *p, const char *path, size_t path_l,
 	mode &= ~p->fs_env.umask;
 	file = do_file_open(t_path, oflag, mode);
 	if (!file){
-	    fd = sysopen(p, t_path, oflag);
+	    fd = sysopen(t_path, oflag);
 	    if (fd >= 0){
 		printd("SYS_OPEN plan 9 open %s %x\n", t_path, fd);
 		user_memdup_free(p, t_path);
@@ -1213,7 +1213,7 @@ static intreg_t sys_fstat(struct proc *p, int fd, struct kstat *u_stat)
 		set_errno(ENOMEM);
 		return -1;
 	    }
-	    r = sysfstat(p, fd, kbuf, sizeof(*kbuf));
+	    r = sysfstat(fd, (uint8_t*)kbuf, sizeof(*kbuf));
 	    printd("sysfstat returns %d\n", r);
 	    
 	    if (r < 0 || memcpy_to_user_errno(p, u_stat, kbuf, sizeof(struct kstat))) {
@@ -1268,7 +1268,7 @@ static intreg_t stat_helper(struct proc *p, const char *path, size_t path_l,
 		kref_put(&path_d->d_kref);
 		return -1;
 	    }
-	    r = sysstat(p, t_path, kbuf, sizeof(*kbuf));
+	    r = sysstat(t_path, (uint8_t*)kbuf, sizeof(*kbuf));
 printd("sysstat returns %d\n", r);
 
 	    user_memdup_free(p, t_path);
@@ -1319,7 +1319,7 @@ static intreg_t sys_plan9fcntl(struct proc *p, int fd, int cmd, int arg)
 	switch (cmd) {
 	case (F_DUPFD):
 	    printd("fcntl dupfd\n");
-	    retval = sysdup(p, fd, arg);
+	    retval = sysdup(fd, arg);
 	    if (retval < 0) {
 		retval = -1;
 	    }

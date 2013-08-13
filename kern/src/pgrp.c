@@ -70,7 +70,7 @@ newpgrp(void)
 }
 
 void
-closepgrp(struct proc *up, struct pgrp *p, struct errbuf *perrbuf)
+closepgrp(struct pgrp *p, struct errbuf *perrbuf)
 {
 	struct mhead **h, **e, *f, *next;
 
@@ -206,7 +206,7 @@ dupfgrp(struct fgrp *f, struct errbuf *perrbuf)
 }
 
 void
-closefgrp(struct proc *up, struct fgrp *f, struct errbuf *perrbuf)
+closefgrp(struct fgrp *f, struct errbuf *perrbuf)
 {
 	int i;
 	struct chan *c;
@@ -221,7 +221,7 @@ closefgrp(struct proc *up, struct fgrp *f, struct errbuf *perrbuf)
 	 * If we get into trouble, forceclosefgrp
 	 * will bail us out.
 	 */
-	up->closingfgrp = f;
+	current->closingfgrp = f;
 	for(i = 0; i <= f->maxfd; i++){
 	    c = f->fd[i];
 	    if(c){
@@ -229,7 +229,7 @@ closefgrp(struct proc *up, struct fgrp *f, struct errbuf *perrbuf)
 		cclose(c, perrbuf);
 	    }
 	}
-	up->closingfgrp = NULL;
+	current->closingfgrp = NULL;
 	
 	kfree(f->fd);
 	kfree(f);
@@ -246,18 +246,18 @@ closefgrp(struct proc *up, struct fgrp *f, struct errbuf *perrbuf)
  * interrupted will finish by itself.
  */
 void
-forceclosefgrp(struct proc *up, struct errbuf *perrbuf)
+forceclosefgrp(struct errbuf *perrbuf)
 {
 	int i;
 	struct chan *c;
 	struct fgrp *f;
 
-	if(/* check that we're exiting somehow ...up->procctl != Proc_exitme || */up->closingfgrp == NULL){
+	if(/* check that we're exiting somehow ...up->procctl != Proc_exitme || */current->closingfgrp == NULL){
 		printd("bad forceclosefgrp call");
 		return;
 	}
 
-	f = up->closingfgrp;
+	f = current->closingfgrp;
 	for(i = 0; i <= f->maxfd; i++){
 	    c = f->fd[i];
 	    if(c){

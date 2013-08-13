@@ -974,18 +974,18 @@ init9proc()
 	  panic("init9proc");
 	}
 	printd("init9proc done waserror\n");
-	up[0].fgrp = dupfgrp(NULL, perrbuf);
+	current[0].fgrp = dupfgrp(NULL, perrbuf);
 	printd("init9proc done dupfg\n");
-	up[0].pgrp = newpgrp();
+	current[0].pgrp = newpgrp();
 	printd("init9proc done duppg\n");
-	if (!up[0].pgrp)
+	if (!current[0].pgrp)
 	    error("pgrp");
 	printd("done init9proc\n");
 }
 
 int mon_9read(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
-    long sysread(struct proc *up, int fd, void *p, size_t n, off_t off);
+    long sysread(int fd, void *p, size_t n, off_t off);
     char buf[512];
     int ret;
 
@@ -999,14 +999,14 @@ int mon_9read(int argc, char **argv, struct hw_trapframe *hw_tf)
 	printd("Read %d %d %lld\n", fd, len, off);
 	init9proc();
 	printd("call sysread\n");
-	ret = sysread(up, fd, buf, len, off);
+	ret = sysread(fd, buf, len, off);
 	printd("ret is %d\n", ret);
 	return 0;
 }
 
 int mon_9write(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
-    long syswrite(struct proc *up, int fd, void *p, size_t n, off_t off);
+    long syswrite( int fd, void *p, size_t n, off_t off);
     char *buf;
     int ret;
 
@@ -1020,7 +1020,7 @@ int mon_9write(int argc, char **argv, struct hw_trapframe *hw_tf)
 	printd("Write %d %d %lld\n", fd, len, off);
 	init9proc();
 	printd("call syswrite\n");
-	ret = syswrite(up, fd, buf, len, off);
+	ret = syswrite(fd, buf, len, off);
 	printd("ret is %d\n", ret);
 	return 0;
 }
@@ -1028,7 +1028,7 @@ int mon_9write(int argc, char **argv, struct hw_trapframe *hw_tf)
 int mon_9open(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
   int
-    sysopen(struct proc *up, char *name, int omode);
+    sysopen( char *name, int omode);
 	int fd;
 
 	if (argc < 2)
@@ -1040,7 +1040,7 @@ int mon_9open(int argc, char **argv, struct hw_trapframe *hw_tf)
 	init9proc();
 	printd("call sysopen\n");
 	printd("call sysopen\n");
-	fd = sysopen(up, name, mode);
+	fd = sysopen(name, mode);
 	printd("fd is %d\n", fd);
 	return 0;
 }
