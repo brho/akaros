@@ -400,7 +400,11 @@ extern char Edirseek[];		/* seek in directory */
 
 #define PERRBUF struct errbuf *perrbuf = NULL;
 #define nel(x) (sizeof(x)/sizeof(x[0]))
-#define ERRSTACK(x) struct errbuf errstack[(x)]; int curindex = 0;
+/* add 1 in case they forget they need an entry for the passed-in errbuf */
+#define ERRSTACK(x) struct errbuf errstack[(x)+1]; int curindex = 0;
+/* this replaces PERRBUF */
+#define ERRSTACKBASE(x) struct errbuf *perrbuf = NULL;\
+			struct errbuf errstack[(x)+1]; int curindex = 0;
 #define waserror() (pusherror(errstack, nel(errstack), &curindex, &perrbuf) || setjmp(&(perrbuf->jmp_buf)))
 #define error(x) {set_errstr(x); longjmp(&perrbuf->jmp_buf, (void *)x);}
 #define nexterror() {poperror(errstack, nel(errstack), &curindex, &perrbuf); longjmp(&perrbuf->jmp_buf, (void *)1);}
@@ -498,7 +502,7 @@ int devconfig(int a, char *b, void *v, struct errbuf *perrbuf);
 int openmode(int omode, struct errbuf *e);
 long sysread(struct proc *up, int fd, void *p, size_t n, off_t off);
 long syswrite(struct proc *up, int fd, void *p, size_t n, off_t off);
-
+int sysstat(struct proc *up, char *name, uint8_t *statbuf, int len);
 int sysopen(struct proc *up, char *name, int omode);
 int plan9setup(struct proc *up);
 

@@ -236,6 +236,21 @@ unionrewind(struct chan *c, struct errbuf *perrbuf)
 	spin_unlock(&c->umqlock);
 }
 
+static char*
+pathlast(struct path *p)
+{
+	char *s;
+
+	if(p == NULL)
+		return NULL;
+	if(p->len == 0)
+		return NULL;
+	s = strrchr(p->s, '/');
+	if(s)
+		return s+1;
+	return p->s;
+}
+
 static unsigned long
 dirfixed(uint8_t *p, unsigned char *e, struct dir *d, struct errbuf *perrbuf)
 {
@@ -689,6 +704,38 @@ printd("sysopen call openmode\n");
 	    error(Enofd);
 	printd("sysopen: RETURNING %d\n", fd);
 	return fd;
+}
+
+int
+sysstat(struct proc *up, char *name, uint8_t *statbuf, int len)
+{
+    PERRBUF;
+    ERRSTACK(2);
+    int r;
+    struct chan *c = NULL;
+    char *aname;
+    int fd;
+    uint8_t data[sizeof(struct dir)];
+    
+    if (waserror()){
+	if(c)
+	    cclose(c, perrbuf);
+	printd("sysstat fail path %s\n", name);
+	return -1;
+    }
+
+    c = namec(up, name, Aaccess, 0, 0, perrbuf);
+
+    r = c->dev->stat(c, data, sizeof(data), perrbuf);
+    aname = pathlast(c->path);
+    if(aname)
+	r = dirsetname(aname, strlen(aname), data, r, sizeof(data));
+    
+    cclose(c, perrbuf);
+    /* now convert for akaros. */
+    convM2A(data, sizeof(data), (void *)statbuf);
+    
+    return sizeof(struct kdirent);
 }
 
 int

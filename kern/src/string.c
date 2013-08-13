@@ -109,6 +109,19 @@ strchr(const char *s, char c)
 	return 0;
 }
 
+// Return a pointer to the last occurrence of 'c' in 's',
+// or a null pointer if the string has no 'c'.
+// N.B. yes you can do it from the end, but you then
+// have to scan it all anyway. So Keep It Simple Smarty!
+char *
+strrchr(const char *s, char c)
+{
+	char *end = NULL, *next;
+	for(next = strchr(s, c); next; next = strchr(s, c))
+		end = next;
+	return end;
+}
+
 void *
 memchr(void* mem, int chr, int len)
 {
