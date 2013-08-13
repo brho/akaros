@@ -4,7 +4,7 @@
 #pragma nosharc
 #endif
 
-//#define DEBUG
+#define DEBUG
 #include <ros/common.h>
 #include <arch/types.h>
 #include <arch/arch.h>
@@ -44,7 +44,7 @@ extern unsigned char device_mac[6];
 #endif
 
 /* Tracing Globals */
-int systrace_flags = 0;
+int systrace_flags = 0|SYSTRACE_ON;
 struct systrace_record *systrace_buffer = 0;
 uint32_t systrace_bufidx = 0;
 size_t systrace_bufsize = 0;
@@ -1123,7 +1123,9 @@ static intreg_t sys_write(struct proc *p, int fd, const void *buf, int len)
 {
 	ssize_t ret;
 	if (fd >= PLAN9FDBASE) {
+printd("write fd %d\n", fd);
 	    fd -= PLAN9FDBASE;
+printd("write fd %d\n", fd);
 	    ret = syswrite(p, fd, buf, len, (off_t) -1);
 	    printd("plan 9 write returns %d\n", ret);
 	    return ret;
@@ -1184,12 +1186,12 @@ static intreg_t sys_open(struct proc *p, const char *path, size_t path_l,
 
 static intreg_t sys_close(struct proc *p, int fd)
 {
+	if (fd >= PLAN9FDBASE) {
+    		fd -= PLAN9FDBASE;
+		return 0;
+	}
 	struct file *file = put_file_from_fd(&p->open_files, fd);
 	if (!file) {
-		if (fd >= PLAN9FDBASE) {
-	    		fd -= PLAN9FDBASE;
-			return 0;
-		}
 		set_errno(EBADF);
 		return -1;
 	}
@@ -1204,26 +1206,29 @@ static intreg_t sys_close(struct proc *p, int fd)
 static intreg_t sys_fstat(struct proc *p, int fd, struct kstat *u_stat)
 {
 	struct kstat *kbuf;
+	if (fd >= PLAN9FDBASE) {
+	    int i, r;
+	    kbuf = kmalloc(sizeof(struct kstat), 0);
+	    if (!kbuf) {
+		set_errno(ENOMEM);
+		return -1;
+	    }
+	    r = sysfstat(p, fd, kbuf, sizeof(*kbuf));
+	    printd("sysfstat returns %d\n", r);
+	    
+	    if (r < 0 || memcpy_to_user_errno(p, u_stat, kbuf, sizeof(struct kstat))) {
+		set_errno(EBADF);
+		r = -1;
+	    }
+	    kfree(kbuf);
+	    printd("plan 9 fstat returns %d\n", r);
+	    return 0;
+	}
+	
 	struct file *file = get_file_from_fd(&p->open_files, fd);
 	if (!file) {
-	    int i, r;
-	    if (fd >= PLAN9FDBASE) {
-		kbuf = kmalloc(sizeof(struct kstat), 0);
-		if (!kbuf) {
-		    set_errno(ENOMEM);
-		    return -1;
-		}
-		r = sysfstat(p, fd, kbuf, sizeof(*kbuf));
-		printd("sysfstat returns %d\n", r);
-
-		if (r < 0 || memcpy_to_user_errno(p, u_stat, kbuf, sizeof(struct kstat))) {
-		    set_errno(EBADF);
-		    r = -1;
-		}
-		kfree(kbuf);
-		printd("plan 9 fstat returns %d\n", r);
-		return 0;
-	    }
+	    set_errno(EBADF);
+	    return -1;
 	}
 
 	kbuf = kmalloc(sizeof(struct kstat), 0);
@@ -1307,9 +1312,50 @@ static intreg_t sys_lstat(struct proc *p, const char *path, size_t path_l,
 	return stat_helper(p, path, path_l, u_stat, 0);
 }
 
+static intreg_t sys_plan9fcntl(struct proc *p, int fd, int cmd, int arg)
+{
+	int retval = 0;
+	printd("fcntl %d for Plan 9\n", fd);
+	switch (cmd) {
+	case (F_DUPFD):
+	    printd("fcntl dupfd\n");
+	    retval = sysdup(p, fd, arg);
+	    if (retval < 0) {
+		retval = -1;
+	    }
+	    break;
+	case (F_GETFD):
+	    printd("fcntl getfd\n");
+	    retval = 0;
+	    break;
+	case (F_SETFD):
+	    printd("fcntl setfd\n");
+	    //if (arg == FD_CLOEXEC)
+	    //	file->f_flags |= O_CLOEXEC;
+	    break;
+	case (F_GETFL):
+	    printd("fcntl getfl\n");
+	    retval = 0; //file->f_flags;
+	    break;
+	case (F_SETFL):
+	    printd("fcntl setfl\n");
+	    /* only allowed to set certain flags. */
+	    //arg &= O_FCNTL_FLAGS;
+	    //file->f_flags = (file->f_flags & ~O_FCNTL_FLAGS) | arg;
+	    break;
+	default:
+	    warn("Unsupported fcntl cmd %d\n", cmd);
+	}
+	return retval;
+}
+
 intreg_t sys_fcntl(struct proc *p, int fd, int cmd, int arg)
 {
 	int retval = 0;
+	if (fd >= PLAN9FDBASE){
+
+	    return sys_plan9fcntl(p, fd-PLAN9FDBASE, cmd, arg);
+	}
 	struct file *file = get_file_from_fd(&p->open_files, fd);
 	if (!file) {
 		set_errno(EBADF);

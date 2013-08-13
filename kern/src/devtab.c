@@ -65,7 +65,6 @@ devtabget(int dc, int user, struct errbuf *perrbuf)
 	int i;
 
 	for(i = 0; devtab[i] != NULL; i++){
-printd("i %d dc %d devtab dc %d\n", i, dc, devtab[i]->dc);
 		if(devtab[i]->dc == dc)
 			return devtab[i];
 	}

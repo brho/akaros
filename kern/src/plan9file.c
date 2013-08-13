@@ -693,7 +693,7 @@ sysopen(struct proc *up, char *name, int omode)
     struct chan *c = NULL;
     int fd;
     int mustdir = 0;
-	printd("sysopen %s mode %o\n", name, omode);
+    //printd("sysopen %s mode %o\n", name, omode);
     if (omode & O_NONBLOCK) /* what to do? */
 	omode &= ~O_NONBLOCK;
     if (omode & O_CLOEXEC) /* FIX ME */
@@ -702,14 +702,12 @@ sysopen(struct proc *up, char *name, int omode)
 	omode &= ~O_DIRECTORY;
 	mustdir = 1;
     }
-	printd("sysopen %s mode %o\n", name, omode);
 	if (omode & (O_CREAT|O_TRUNC))
 	    return syscreate(up, name, omode);
 
 	if (waserror()){
 	    if(c)
 		cclose(c, perrbuf);
-	    printd("sysopen fail %s 1 mode  %o\n", name, omode);
 	    return -1;
 	}
 	openmode(omode, perrbuf);	/* error check only */
@@ -718,7 +716,7 @@ sysopen(struct proc *up, char *name, int omode)
 	fd = newfd(up,c);
 	if(fd < 0)
 	    error(Enofd);
-	printd("sysopen returns %d %x\n", fd, fd);
+	printd("sysopen %s returns %d %x\n", name, fd, fd);
 	return fd;
 }
 
@@ -736,7 +734,6 @@ sysstat(struct proc *up, char *name, uint8_t *statbuf, int len)
     if (waserror()){
 	if(c)
 	    cclose(c, perrbuf);
-	printd("sysstat fail path %s\n", name);
 	return -1;
     }
 
@@ -765,7 +762,6 @@ sysfstat(struct proc *up, int fd, uint8_t *statbuf, int len)
     uint8_t data[sizeof(struct dir)];
     
     if (waserror()){
-      printd("sysfstat fail fd %d\n", fd);
 	return -1;
     }
 
@@ -780,9 +776,59 @@ sysfstat(struct proc *up, int fd, uint8_t *statbuf, int len)
     cclose(c, perrbuf);
     /* now convert for akaros. */
     convM2kstat(data, sizeof(data), (struct kstat *)statbuf);
-    
+ printd("sysfstat fd %d ok\n", fd);   
     return 0;
 }
+
+int
+sysdup(struct proc *up, int ofd, int nfd)
+{
+    ERRSTACKBASE(1);
+	struct chan *nc, *oc;
+	struct fgrp *f;
+
+	/*
+	 * int dup(int oldfd, int newfd);
+	 * if newfd is < 0, pick anything.
+	 *
+	 * Close after dup'ing, so date > #d/1 works
+	 */
+	if (waserror()){
+	    set_errno(EBADF);
+	    return -1;
+	}
+
+	oc = fdtochan(up, ofd, -1, 0, 1, perrbuf);
+
+	if(nfd != -1){
+		f = up->fgrp;
+		spin_lock(&f->lock);
+		if(nfd < 0 || growfd(f, nfd) < 0) {
+			unlockfgrp(f);
+			cclose(oc, perrbuf);
+			error(Ebadfd);
+		}
+		if(nfd > f->maxfd)
+			f->maxfd = nfd;
+
+		nc = f->fd[nfd];
+		f->fd[nfd] = oc;
+		unlockfgrp(f);
+		if(nc != NULL)
+		    cclose(nc, perrbuf);
+	}else{
+		if(waserror()) {
+		    cclose(oc, perrbuf);
+		    nexterror();
+		}
+		nfd = newfd(up, oc);
+		if(nfd < 0)
+		    error(Enofd);
+	}
+
+	return nfd;
+}
+
 
 int
 plan9setup(struct proc *up)
