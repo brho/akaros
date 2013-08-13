@@ -73,7 +73,7 @@ devdir(struct chan *c, struct qid qid, char *n, int64_t length, char *user, long
  * devstat assumes (ii).  if the struct devgen in question follows (i)
  * for this particular c, devstat will not find the necessary info.
  * with our particular struct devgen functions, this happens only for
- * directories, so devstat makes something up, assuming
+ * directories, so devstat makes something assuming
  * c->name, c->qid, eve, DMDIR|0555.
  *
  * devdirread assumes (i).  the callers have to make sure
@@ -108,17 +108,17 @@ devgen(struct chan *c, char *name, struct dirtab *tab, int ntab, int i, struct d
 }
 
 void
-devreset(struct proc *up)
+devreset()
 {
 }
 
 void
-devinit(struct proc *up)
+devinit()
 {
 }
 
 void
-devshutdown(struct proc *up)
+devshutdown()
 {
 }
 
@@ -175,8 +175,7 @@ devclone(struct chan *c, struct errbuf *perrbuf)
 }
 
 struct walkqid*
-devwalk(struct proc *up,
-	struct chan *c, struct chan *nc, char **name, int nname,
+devwalk(struct chan *c, struct chan *nc, char **name, int nname,
 	struct dirtab *tab, int ntab, devgen_t *gen, struct errbuf *perrbuf)
 {
     ERRSTACK(2);
@@ -246,7 +245,7 @@ devwalk(struct proc *up,
 			Notfound:
 				if(j == 0)
 				    error(Enonexist);
-				kstrcpy(up->errstr, Enonexist, ERRMAX);
+				kstrcpy(current->errstr, Enonexist, ERRMAX);
 				goto Done;
 			case 0:
 				continue;
@@ -358,15 +357,15 @@ devdirread(struct chan *c, char *d, long n, struct dirtab *tab, int ntab, devgen
  * error(Eperm) if open permission not granted for up->user.
  */
 void
-devpermcheck(struct proc *up, char *fileuid, int perm, int omode, struct errbuf *perrbuf)
+devpermcheck(char *fileuid, int perm, int omode, struct errbuf *perrbuf)
 {
 	int t;
 	static int access[] = { 0400, 0200, 0600, 0100 };
 
-	if(strcmp(up->user, fileuid) == 0)
+	if(strcmp(current->user, fileuid) == 0)
 		perm <<= 0;
 	else
-	if(strcmp(up->user, eve) == 0)
+	if(strcmp(current->user, eve) == 0)
 		perm <<= 3;
 	else
 		perm <<= 6;
@@ -377,7 +376,7 @@ devpermcheck(struct proc *up, char *fileuid, int perm, int omode, struct errbuf 
 }
 
 struct chan*
-devopen(struct proc *up, struct chan *c, int omode, struct dirtab *tab, int ntab, devgen_t *gen, struct errbuf *perrbuf)
+devopen(struct chan *c, int omode, struct dirtab *tab, int ntab, devgen_t *gen, struct errbuf *perrbuf)
 {
 	int i;
 	struct dir dir;
@@ -390,7 +389,7 @@ devopen(struct proc *up, struct chan *c, int omode, struct dirtab *tab, int ntab
 			break;
 		case 1:
 			if(c->qid.path == dir.qid.path) {
-			    devpermcheck(up, dir.uid, dir.mode, omode, perrbuf);
+			    devpermcheck(dir.uid, dir.mode, omode, perrbuf);
 				goto Return;
 			}
 			break;
@@ -406,7 +405,7 @@ Return:
 }
 
 void
-devcreate(struct proc *up, struct chan*a, char*b, int c, int d, struct errbuf *perrbuf)
+devcreate(struct chan*a, char*b, int c, int d, struct errbuf *perrbuf)
 {
 	error(Eperm);
 }
@@ -453,7 +452,7 @@ devremove(struct chan*c, struct errbuf *perrbuf)
 }
 
 long
-devwstat(struct proc *up, struct chan*c, uint8_t*a, long b, struct errbuf *perrbuf)
+devwstat(struct chan*c, uint8_t*a, long b, struct errbuf *perrbuf)
 {
 	error(Eperm);
 	return 0;

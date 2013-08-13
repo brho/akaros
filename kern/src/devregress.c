@@ -28,15 +28,15 @@ static struct dirtab regressdir[Qmax] = {
 int verbose = 0;
 
 static struct chan*
-regressattach(struct proc *up, char* spec, struct errbuf *perrbuf)
+regressattach(char* spec, struct errbuf *perrbuf)
 {
 	return devattach('Z', spec, perrbuf);
 }
 
 struct walkqid*
-regresswalk(struct proc *up, struct chan* c, struct chan *nc, char** name, int nname, struct errbuf *perrbuf)
+regresswalk(struct chan* c, struct chan *nc, char** name, int nname, struct errbuf *perrbuf)
 {
-    return devwalk(up, c, nc, name, nname, regressdir, Qmax, devgen, perrbuf);
+    return devwalk(c, nc, name, nname, regressdir, Qmax, devgen, perrbuf);
 }
 
 static long
@@ -46,9 +46,9 @@ regressstat(struct chan* c, uint8_t* dp, long n, struct errbuf *perrbuf)
 }
 
 static struct chan*
-regressopen(struct proc *up, struct chan* c, int omode, struct errbuf *perrbuf)
+regressopen(struct chan* c, int omode, struct errbuf *perrbuf)
 {
-    return devopen(up, c, omode, regressdir, Qmax, devgen, perrbuf);
+    return devopen(c, omode, regressdir, Qmax, devgen, perrbuf);
 }
 
 static void

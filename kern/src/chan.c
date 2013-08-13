@@ -471,12 +471,12 @@ closeproc(void*, struct errbuf *perrbuf)
  * Make sure we have the only copy of c.  (Copy on write.)
  */
 struct chan*
-cunique(struct proc *up, struct chan *c, struct errbuf *perrbuf)
+cunique(struct chan *c, struct errbuf *perrbuf)
 {
 	struct chan *nc;
 
 	if(kref_refcnt(&c->ref) != 1){
-	    nc = cclone(up, c, perrbuf);
+	    nc = cclone(c, perrbuf);
 		cclose(c, perrbuf);
 		c = nc;
 	}
@@ -531,7 +531,7 @@ newmhead(struct chan *from, struct errbuf *perrbuf)
 }
 
 int
-cmount(struct proc *up, struct chan **newp, struct chan *old, int flag, char *spec, struct errbuf *perrbuf)
+cmount(struct chan **newp, struct chan *old, int flag, char *spec, struct errbuf *perrbuf)
 {
     ERRSTACK(4);
 
@@ -576,7 +576,7 @@ cmount(struct proc *up, struct chan **newp, struct chan *old, int flag, char *sp
 	if((flag&MCREATE) && mh && mh->mount
 	&& (mh->mount->next || !(mh->mount->mflag&MCREATE)))
 		error(Emount);
-	pg = up->pgrp;
+	pg = current->pgrp;
 	wlock(&pg->ns);
 
 	l = &MOUNTH(pg, old->qid);
@@ -650,7 +650,7 @@ cmount(struct proc *up, struct chan **newp, struct chan *old, int flag, char *sp
 }
 
 void
-cunmount(struct proc *up, struct chan *mnt, struct chan *mounted, struct errbuf *perrbuf)
+cunmount(struct chan *mnt, struct chan *mounted, struct errbuf *perrbuf)
 {
 	struct pgrp *pg;
 	struct mhead *mh, **l;
@@ -667,7 +667,7 @@ cunmount(struct proc *up, struct chan *mnt, struct chan *mounted, struct errbuf 
 	 * Although surprising, this is okay, since the
 	 * cclose will take care of freeing the umh.
 	 */
-	pg = up->pgrp;
+	pg = current->pgrp;
 	wlock(&pg->ns);
 	l = &MOUNTH(pg, mnt->qid);
 	for(mh = *l; mh; mh = mh->hash){
@@ -721,12 +721,12 @@ cunmount(struct proc *up, struct chan *mnt, struct chan *mounted, struct errbuf 
 }
 
 struct chan*
-cclone(struct proc *up, struct chan *c, struct errbuf *perrbuf)
+cclone(struct chan *c, struct errbuf *perrbuf)
 {
 	struct chan *nc;
 	struct walkqid *wq;
 
-	wq = c->dev->walk(up, c, NULL, NULL, 0, perrbuf);		//XDYNX?
+	wq = c->dev->walk(c, NULL, NULL, 0, perrbuf);		//XDYNX?
 	if(wq == NULL)
 		error("clone failed");
 	nc = wq->clone;
@@ -739,12 +739,12 @@ cclone(struct proc *up, struct chan *c, struct errbuf *perrbuf)
 
 /* also used by sysfile.c:/^mountfix */
 int
-findmount(struct proc *up, struct chan **cp, struct mhead **mp, int dc, unsigned int devno, struct qid qid, struct errbuf *perrbuf)
+findmount(struct chan **cp, struct mhead **mp, int dc, unsigned int devno, struct qid qid, struct errbuf *perrbuf)
 {
 	struct pgrp *pg;
 	struct mhead *mh;
 
-	pg = up->pgrp;
+	pg = current->pgrp;
 	rlock(&pg->ns);
 	for(mh = MOUNTH(pg, qid); mh; mh = mh->hash){
 		rlock(&mh->lock);
@@ -779,12 +779,12 @@ findmount(struct proc *up, struct chan **cp, struct mhead **mp, int dc, unsigned
  * Calls findmount but also updates path.
  */
 static int
-domount(struct proc *up, struct chan **cp, struct mhead **mp, struct path **path, struct errbuf *perrbuf)
+domount(struct chan **cp, struct mhead **mp, struct path **path, struct errbuf *perrbuf)
 {
 	struct chan **lc;
 	struct path *p;
 
-	if(findmount(up, cp, mp, (*cp)->dev->dc, (*cp)->devno, (*cp)->qid, perrbuf) == 0)
+	if(findmount(cp, mp, (*cp)->dev->dc, (*cp)->devno, (*cp)->qid, perrbuf) == 0)
 		return 0;
 
 	if(path){
@@ -812,7 +812,7 @@ domount(struct proc *up, struct chan **cp, struct mhead **mp, struct path **path
  * so name had better be ours to change!
  */
 static struct chan*
-undomount(struct proc *up, struct chan *c, struct path *path, struct errbuf *perrbuf)
+undomount(struct chan *c, struct path *path, struct errbuf *perrbuf)
 {
 	struct chan *nc;
 
@@ -832,7 +832,7 @@ undomount(struct proc *up, struct chan *c, struct path *path, struct errbuf *per
  * Call dev walk but catch errors.
  */
 static struct walkqid*
-ewalk(struct proc *up, struct chan *c, struct chan *nc, char **name, int nname, struct errbuf *perrbuf)
+ewalk(struct chan *c, struct chan *nc, char **name, int nname, struct errbuf *perrbuf)
 {
     ERRSTACK(3);
 
@@ -840,7 +840,7 @@ ewalk(struct proc *up, struct chan *c, struct chan *nc, char **name, int nname, 
 
 	if(waserror())
 		return NULL;
-	wq = c->dev->walk(up, c, nc, name, nname, perrbuf);
+	wq = c->dev->walk(c, nc, name, nname, perrbuf);
 	return wq;
 }
 
@@ -850,7 +850,7 @@ ewalk(struct proc *up, struct chan *c, struct chan *nc, char **name, int nname, 
  */
 static char Edoesnotexist[] = "does not exist";
 int
-walk(struct proc *up, struct chan **cp, char **names, int nnames, int nomount, int *nerror, struct errbuf *perrbuf)
+walk(struct chan **cp, char **names, int nnames, int nomount, int *nerror, struct errbuf *perrbuf)
 {
 	int dc, devno, didmount, dotdot, i, n, nhave, ntry;
 	struct chan *c, *nc, *mtpt;
@@ -885,7 +885,7 @@ walk(struct proc *up, struct chan **cp, char **names, int nnames, int nomount, i
 				*nerror = nhave;
 			pathclose(path, perrbuf);
 			cclose(c, perrbuf);
-			strncpy(up->errstr, Enotdir, sizeof(up->errstr));
+			strncpy(current->errstr, Enotdir, sizeof(current->errstr));
 			if(mh != NULL)
 				putmhead(mh, perrbuf);
 			return -1;
@@ -906,12 +906,12 @@ walk(struct proc *up, struct chan **cp, char **names, int nnames, int nomount, i
 		}
 
 		if(!dotdot && !nomount && !didmount)
-		    domount(up, &c, &mh, &path, perrbuf);
+		    domount(&c, &mh, &path, perrbuf);
 
 		dc = c->dev->dc;
 		devno = c->devno;
 
-		if((wq = ewalk(up, c, NULL, names+nhave, ntry, perrbuf)) == NULL){
+		if((wq = ewalk(c, NULL, names+nhave, ntry, perrbuf)) == NULL){
 			/* try a union mount, if any */
 			if(mh && !nomount){
 				/*
@@ -920,7 +920,7 @@ walk(struct proc *up, struct chan **cp, char **names, int nnames, int nomount, i
 				rlock(&mh->lock);
 				if(mh->mount){
 					for(f = mh->mount->next; f != NULL; f = f->next){
-					  if((wq = ewalk(up, f->to, NULL, names+nhave, ntry, perrbuf)) != NULL){
+					  if((wq = ewalk(f->to, NULL, names+nhave, ntry, perrbuf)) != NULL){
 							dc = f->to->dev->dc;
 							devno = f->to->devno;
 							break;
@@ -947,13 +947,13 @@ walk(struct proc *up, struct chan **cp, char **names, int nnames, int nomount, i
 			assert(wq->clone != NULL);
 
 			path = addelem(path, "..", NULL, perrbuf);
-			nc = undomount(up, wq->clone, path, perrbuf);
+			nc = undomount(wq->clone, path, perrbuf);
 			n = 1;
 		}else{
 			nc = NULL;
 			if(!nomount){
 				for(i=0; i<wq->nqid && i<ntry-1; i++){
-				    if(findmount(up, &nc, &nmh, dc, devno, wq->qid[i], perrbuf)){
+				    if(findmount(&nc, &nmh, dc, devno, wq->qid[i], perrbuf)){
 						didmount = 1;
 						break;
 					}
@@ -966,11 +966,11 @@ walk(struct proc *up, struct chan **cp, char **names, int nnames, int nomount, i
 					if(wq->nqid==0 || (wq->qid[wq->nqid-1].type & QTDIR)){
 						if(nerror)
 							*nerror = nhave+wq->nqid+1;
-						strncpy(up->errstr, Edoesnotexist, sizeof(up->errstr));
+						strncpy(current->errstr, Edoesnotexist, sizeof(current->errstr));
 					}else{
 						if(nerror)
 							*nerror = nhave+wq->nqid;
-						strncpy(up->errstr, Enotdir, sizeof(up->errstr));
+						strncpy(current->errstr, Enotdir, sizeof(current->errstr));
 					}
 					kfree(wq);
 					if(mh != NULL)
@@ -1003,7 +1003,7 @@ walk(struct proc *up, struct chan **cp, char **names, int nnames, int nomount, i
 
 	putmhead(mh, perrbuf);
 printd("walk: cuni\n");
-	c = cunique(up, c, perrbuf);
+	c = cunique(c, perrbuf);
 
 	if(c->umh != NULL){	//BUG
 		printd("walk umh\n", perrbuf);
@@ -1029,7 +1029,7 @@ printd("wlak: done\n");
  * c is a mounted non-creatable directory.  find a creatable one.
  */
 struct chan*
-createdir(struct proc *up, struct chan *c, struct mhead *mh, struct errbuf *perrbuf)
+createdir(struct chan *c, struct mhead *mh, struct errbuf *perrbuf)
 {
     ERRSTACK(3);
 
@@ -1044,7 +1044,7 @@ createdir(struct proc *up, struct chan *c, struct mhead *mh, struct errbuf *perr
 	}
 	for(f = mh->mount; f; f = f->next){
 		if(f->mflag&MCREATE){
-		    nc = cclone(up, f->to, perrbuf);
+		    nc = cclone(f->to, perrbuf);
 			runlock(&mh->lock);
 			cclose(c, perrbuf);
 			return nc;
@@ -1137,7 +1137,7 @@ memrchr(void *va, int c, long n)
 }
 
 static void
-namelenerror(struct proc *up, char *aname, int len, char *err)
+namelenerror(char *aname, int len, char *err)
 {
 	char *ename, *name, *next;
 	int i, errlen;
@@ -1147,7 +1147,7 @@ namelenerror(struct proc *up, char *aname, int len, char *err)
 	 */
 	errlen = strlen(err);
 	if(len < ERRMAX/3 || len+errlen < 2*ERRMAX/3)
-		snprintf(up->genbuf, sizeof up->genbuf, "%.*s",
+		snprintf(current->genbuf, sizeof current->genbuf, "%.*s",
 			 len, aname);
 	else{
 		/*
@@ -1174,16 +1174,16 @@ namelenerror(struct proc *up, char *aname, int len, char *err)
 			for(i=0; (*name&0xC0)==0x80 && i<UTFmax; i++)
 				name++;
 		}
-		snprintf(up->genbuf, sizeof up->genbuf, "...%.*s",
+		snprintf(current->genbuf, sizeof current->genbuf, "...%.*s",
 			 strlen(name), name);
 	}
-	snprintf(up->errstr, ERRMAX, "%#q %s", up->genbuf, err);
+	snprintf(current->errstr, ERRMAX, "%#q %s", current->genbuf, err);
 }
 
 void
-nameerror(struct proc *up, char *name, char *err)
+nameerror(char *name, char *err)
 {
-    namelenerror(up, name, strlen(name), err);
+    namelenerror(name, strlen(name), err);
 }
 
 /*
@@ -1203,7 +1203,7 @@ nameerror(struct proc *up, char *name, char *err)
  * correct name so they can rewrite the stat info.
  */
 struct chan*
-namec(struct proc *up, char *aname, int amode, int omode, int perm, struct errbuf *perrbuf)
+namec(char *aname, int amode, int omode, int perm, struct errbuf *perrbuf)
 {
     ERRSTACK(4);
 	int len, n, nomount;
@@ -1237,22 +1237,22 @@ namec(struct proc *up, char *aname, int amode, int omode, int perm, struct errbu
 	switch(name[0]){
 	case '/':
 		error("not yet");
-		c = up->slash;
+		c = current->slash;
 		kref_get(&c->ref, 1);
 		break;
 
 	case '#':
 printd("#\n");
 		nomount = 1;
-		up->genbuf[0] = '\0';
+		current->genbuf[0] = '\0';
 		n = 0;
 		while(*name != '\0' && (*name != '/' || n < 2)){
-			if(n >= sizeof(up->genbuf)-1)
+			if(n >= sizeof(current->genbuf)-1)
 				error(Efilename);
-			up->genbuf[n++] = *name++;
+			current->genbuf[n++] = *name++;
 		}
-		up->genbuf[n] = '\0';
-printd("name %s\n", up->genbuf);
+		current->genbuf[n] = '\0';
+printd("name %s\n", current->genbuf);
 		/*
 		 *  noattach is sandboxing.
 		 *
@@ -1266,18 +1266,18 @@ printd("name %s\n", up->genbuf);
 		 *	   any others left unprotected)
 		 */
 		/* actually / is caught by parsing earlier */
-		if(up->genbuf[1] == 'M')
+		if(current->genbuf[1] == 'M')
 			error(Enoattach);
-printd("up->pgrp %p \n", up->pgrp);
-		if (up->pgrp->noattach) {
-		    if (up->genbuf[1] != '|' &&
-			up->genbuf[1] != 'e' &&
-			up->genbuf[1] != 'c' && 
-			up->genbuf[1] != 'p')
+printd("up->pgrp %p \n", current->pgrp);
+		if (current->pgrp->noattach) {
+		    if (current->genbuf[1] != '|' &&
+			current->genbuf[1] != 'e' &&
+			current->genbuf[1] != 'c' && 
+			current->genbuf[1] != 'p')
 			error(Enoattach);
 		}
 printd("efore devtabget\n");
-		dev = devtabget(up->genbuf[1], 1, perrbuf);			//XDYNX
+		dev = devtabget(current->genbuf[1], 1, perrbuf);			//XDYNX
 printd("af devtabget %p\n", dev);
 		if(dev == NULL)
 			error(Ebadsharp);
@@ -1286,13 +1286,13 @@ printd("dev %p\n", dev);
 		//	devtabdecr(dev);
 		//	nexterror();
 		//}
-		c = dev->attach(up, up->genbuf+2, perrbuf);
+		c = dev->attach(current->genbuf+2, perrbuf);
 		//poperror();
 		//devtabdecr(dev);
 		break;
 
 	default:
-		c = up->dot;
+		c = current->dot;
 		kref_get(&c->ref, 1);
 		break;
 	}
@@ -1313,7 +1313,7 @@ printd("dev %p\n", dev);
 		 */
 		if(e.nerror == 0)
 			nexterror();
-		strncpy(tmperrbuf, up->errstr, sizeof(tmperrbuf));
+		strncpy(tmperrbuf, current->errstr, sizeof(tmperrbuf));
 		if(e.off[e.nerror]==0)
 			printd("nerror=%d but off=%d\n",
 				e.nerror, e.off[e.nerror], perrbuf);
@@ -1324,7 +1324,7 @@ printd("dev %p\n", dev);
 		}
 		len = e.prefix+e.off[e.nerror];
 		kfree(e.off);
-		namelenerror(up, aname, len, tmperrbuf);
+		namelenerror(aname, len, tmperrbuf);
 	}
 
 	/*
@@ -1348,7 +1348,7 @@ printd("dev %p\n", dev);
 		e.nelems--;
 	}
 printd("namec: walk\n");
-	if(walk(up, &c, e.elems, e.nelems, nomount, &e.nerror, perrbuf) < 0){
+	if(walk(&c, e.elems, e.nelems, nomount, &e.nerror, perrbuf) < 0){
 		if(e.nerror < 0 || e.nerror > e.nelems){
 			printd("namec %s walk error nerror=%d\n", aname, e.nerror, perrbuf);
 			e.nerror = 0;
@@ -1368,7 +1368,7 @@ printd("namec: walk done\n");
 		/* no need to maintain path - cannot dotdot an Abind */
 		mh = NULL;
 		if(!nomount)
-		    domount(up, &c, &mh, NULL, perrbuf);
+		    domount(&c, &mh, NULL, perrbuf);
 		if(c->umh != NULL)
 			putmhead(c->umh, perrbuf);
 		c->umh = mh;
@@ -1384,10 +1384,10 @@ printd("open ...\n");
 		kref_get(&path->ref, 1);
 		mh = NULL;
 		if(!nomount)
-		    domount(up, &c, &mh, &path, perrbuf);
+		    domount(&c, &mh, &path, perrbuf);
 
 		/* our own copy to open or remove */
-		c = cunique(up, c, perrbuf);
+		c = cunique(c, perrbuf);
 
 		/* now it's our copy anyway, we can put the name back */
 		pathclose(c->path, perrbuf);
@@ -1425,7 +1425,7 @@ if(c->umh != NULL){
 // if no error and read/write
 // then fill in c->dev and
 // don't put
-			c = c->dev->open(up, c, omode&~OCEXEC, perrbuf);
+			c = c->dev->open(c, omode&~OCEXEC, perrbuf);
 
 			if(omode & OCEXEC)
 				c->flag |= CCEXEC;
@@ -1460,7 +1460,7 @@ if(c->umh != NULL){
 		 */
 		e.nelems++;
 		e.nerror++;
-		if(walk(up, &c, e.elems+e.nelems-1, 1, nomount, NULL, perrbuf) == 0){
+		if(walk(&c, e.elems+e.nelems-1, 1, nomount, NULL, perrbuf) == 0){
 			if(omode&OEXCL)
 				error(Eexist);
 			omode |= OTRUNC;
@@ -1510,8 +1510,8 @@ if(c->umh != NULL){
 		mh = NULL;
 		cnew = NULL;		/* is this assignment necessary? */
 		if(!waserror()){	/* try create */
-		    if(!nomount && findmount(up, &cnew, &mh, c->dev->dc, c->devno, c->qid, perrbuf))
-			cnew = createdir(up, cnew, mh, perrbuf);
+		    if(!nomount && findmount(&cnew, &mh, c->dev->dc, c->devno, c->qid, perrbuf))
+			cnew = createdir(cnew, mh, perrbuf);
 			else{
 				cnew = c;
 				kref_get(&cnew->ref, 1);
@@ -1523,7 +1523,7 @@ if(c->umh != NULL){
 			 * our own copy, we can fix the name, which might be wrong
 			 * if findmount gave us a new struct chan.
 			 */
-		    cnew = cunique(up, cnew, perrbuf);
+		    cnew = cunique(cnew, perrbuf);
 			pathclose(cnew->path, perrbuf);
 			cnew->path = c->path;
 			kref_get(&cnew->path->ref, 1);
@@ -1531,7 +1531,7 @@ if(c->umh != NULL){
 //create:						//XDYNX
 // like open regarding read/write?
 
-			cnew->dev->create(up, cnew, e.elems[e.nelems-1], omode&~(OEXCL|OCEXEC), perm, perrbuf);
+			cnew->dev->create(cnew, e.elems[e.nelems-1], omode&~(OEXCL|OCEXEC), perm, perrbuf);
 			if(omode & OCEXEC)
 				cnew->flag |= CCEXEC;
 			if(omode & ORCLOSE)
@@ -1550,14 +1550,14 @@ if(c->umh != NULL){
 		if(omode & OEXCL)
 			nexterror();
 		/* save error */
-		createerr = up->errstr;
-		up->errstr = tmperrbuf;
+		createerr = current->errstr;
+		current->errstr = tmperrbuf;
 		/* note: we depend that walk does not error */
-		if(walk(up, &c, e.elems+e.nelems-1, 1, nomount, NULL, perrbuf) < 0){
-			up->errstr = createerr;
+		if(walk(&c, e.elems+e.nelems-1, 1, nomount, NULL, perrbuf) < 0){
+			current->errstr = createerr;
 			error(createerr);	/* report true error */
 		}
-		up->errstr = createerr;
+		current->errstr = createerr;
 		omode |= OTRUNC;
 		goto Open;
 
@@ -1567,9 +1567,9 @@ if(c->umh != NULL){
 
 	/* place final element in genbuf for e.g. exec */
 	if(e.nelems > 0)
-		kstrcpy(up->genbuf, e.elems[e.nelems-1], sizeof up->genbuf);
+		kstrcpy(current->genbuf, e.elems[e.nelems-1], sizeof current->genbuf);
 	else
-	    kstrcpy(up->genbuf, ".", sizeof(up->genbuf));
+	    kstrcpy(current->genbuf, ".", sizeof(current->genbuf));
 	kfree(e.name);
 	kfree(e.elems);
 	kfree(e.off);/* e c */
