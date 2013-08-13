@@ -30,7 +30,6 @@ int verbose = 0;
 static struct chan*
 regressattach(struct proc *up, char* spec, struct errbuf *perrbuf)
 {
-printd("RAT\n");
 	return devattach('Z', spec, perrbuf);
 }
 

@@ -505,6 +505,8 @@ long syswrite(struct proc *up, int fd, void *p, size_t n, off_t off);
 int sysstat(struct proc *up, char *name, uint8_t *statbuf, int len);
 int sysfstat(struct proc *up, int fd, uint8_t *statbuf, int len);
 int sysopen(struct proc *up, char *name, int omode);
+int sysdup(struct proc *up, int ofd, int nfd);
+
 int plan9setup(struct proc *up);
 
 
