@@ -54,7 +54,6 @@ spinlock_t systrace_lock = SPINLOCK_INITIALIZER_IRQSAVE;
 /* Not enforcing the packing of systrace_procs yet, but don't rely on that */
 static bool proc_is_traced(struct proc *p)
 {
-	printd("%s called\n", __func__);
 	for (int i = 0; i < MAX_NUM_TRACED; i++)
 		if (systrace_procs[i] == p)
 			return true;
@@ -88,7 +87,6 @@ static void finish_sysc(struct syscall *sysc, struct proc *p)
  * issues with unpinning this if we never return. */
 static void finish_current_sysc(int retval)
 {
-	printd("%s called\n", __func__);
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	assert(pcpui->cur_sysc);
 	pcpui->cur_sysc->retval = retval;
@@ -99,7 +97,6 @@ static void finish_current_sysc(int retval)
  */
 void set_errno(int errno)
 {
-	printd("%s called\n", __func__);
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	if (pcpui->cur_sysc)
 		pcpui->cur_sysc->err = errno;
@@ -107,7 +104,6 @@ void set_errno(int errno)
 
 void set_errstr(char *errstr)
 {
-	printd("%s called\n", __func__);
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	size_t errstrlen;
 	if (!pcpui->cur_sysc)
@@ -122,7 +118,6 @@ void set_errstr(char *errstr)
 
 static int sys_null(void)
 {
-	printd("%s called\n", __func__);
 	return 0;
 }
 
@@ -130,7 +125,6 @@ static int sys_null(void)
  * async I/O handling. */
 static int sys_block(struct proc *p, unsigned int usec)
 {
-	printd("%s called\n", __func__);
 	struct timer_chain *tchain = &per_cpu_info[core_id()].tchain;
 	struct alarm_waiter a_waiter;
 	init_awaiter(&a_waiter, 0);
@@ -150,7 +144,6 @@ static int sys_block(struct proc *p, unsigned int usec)
 static int sys_cache_buster(struct proc *p, uint32_t num_writes,
                              uint32_t num_pages, uint32_t flags)
 {
-	printd("%s called\n", __func__); TRUSTEDBLOCK /* zra: this is not really part of the kernel */
 	#define BUSTER_ADDR		0xd0000000L  // around 512 MB deep
 	#define MAX_WRITES		1048576*8
 	#define MAX_PAGES		32
@@ -220,7 +213,6 @@ static int sys_cache_buster(struct proc *p, uint32_t num_writes,
 
 static int sys_cache_invalidate(void)
 {
-	printd("%s called\n", __func__);
 	#ifdef CONFIG_X86
 		wbinvd();
 	#endif
@@ -233,7 +225,6 @@ static int sys_cache_invalidate(void)
 static ssize_t sys_cputs(struct proc *p, const char *DANGEROUS string,
                          size_t strlen)
 {
-	printd("%s called\n", __func__);
 	char *t_string;
 	t_string = user_strdup_errno(p, string, strlen);
 	if (!t_string)
@@ -248,7 +239,6 @@ static ssize_t sys_cputs(struct proc *p, const char *DANGEROUS string,
 /* TODO: remove me */
 static uint16_t sys_cgetc(struct proc *p)
 {
-	printd("%s called\n", __func__);
 	uint16_t c;
 
 	// The cons_get_any_char() primitive doesn't wait for a character,
@@ -262,7 +252,6 @@ static uint16_t sys_cgetc(struct proc *p)
 /* Returns the id of the physical core this syscall is executed on. */
 static uint32_t sys_getpcoreid(void)
 {
-	printd("%s called\n", __func__);
 	return core_id();
 }
 
@@ -270,7 +259,6 @@ static uint32_t sys_getpcoreid(void)
 // this is removed from the user interface
 static size_t sys_getvcoreid(struct proc *p)
 {
-	printd("%s called\n", __func__);
 	return proc_get_vcoreid(p);
 }
 
@@ -279,7 +267,6 @@ static size_t sys_getvcoreid(struct proc *p)
 /* Returns the calling process's pid */
 static pid_t sys_getpid(struct proc *p)
 {
-	printd("%s called\n", __func__);
 	return p->pid;
 }
 
@@ -289,7 +276,6 @@ static pid_t sys_getpid(struct proc *p)
 static int sys_proc_create(struct proc *p, char *path, size_t path_l,
                            struct procinfo *pi)
 {
-	printd("%s called\n", __func__);
 	int pid = 0;
 	char *t_path;
 	struct file *program;
@@ -337,7 +323,6 @@ mid_error:
 /* Makes process PID runnable.  Consider moving the functionality to process.c */
 static error_t sys_proc_run(struct proc *p, unsigned pid)
 {
-	printd("%s called\n", __func__);
 	struct proc *target = pid2proc(pid);
 	error_t retval = 0;
 
@@ -369,7 +354,6 @@ out_error:
  * - EPERM: if caller does not control pid */
 static error_t sys_proc_destroy(struct proc *p, pid_t pid, int exitcode)
 {
-	printd("%s called\n", __func__);
 	error_t r;
 	struct proc *p_to_die = pid2proc(pid);
 
@@ -414,7 +398,6 @@ static int sys_proc_yield(struct proc *p, bool being_nice)
 static int sys_change_vcore(struct proc *p, uint32_t vcoreid,
                              bool enable_my_notif)
 {
-	printd("%s called\n", __func__);
 	/* Note retvals can be negative, but we don't mess with errno in case
 	 * callers use this in low-level code and want to extract the 'errno'. */
 	return proc_change_to_vcore(p, vcoreid, enable_my_notif);
@@ -422,7 +405,6 @@ static int sys_change_vcore(struct proc *p, uint32_t vcoreid,
 
 static ssize_t sys_fork(env_t* e)
 {
-	printd("%s called\n", __func__);
 	struct proc *temp;
 	int8_t state = 0;
 	// TODO: right now we only support fork for single-core processes
@@ -501,7 +483,6 @@ static ssize_t sys_fork(env_t* e)
 static int sys_exec(struct proc *p, char *path, size_t path_l,
                     struct procinfo *pi)
 {
-	printd("%s called\n", __func__);
 	int ret = -1;
 	char *t_path;
 	struct file *program;
@@ -603,7 +584,6 @@ all_out:
 static pid_t try_wait(struct proc *parent, struct proc *child, int *ret_status,
                       int options)
 {
-	printd("%s called\n", __func__);
 	if (child->state == PROC_DYING) {
 		/* Disown returns -1 if it's already been disowned or we should o/w
 		 * abort.  This can happen if we have concurrent waiters, both with
@@ -630,7 +610,6 @@ static pid_t try_wait(struct proc *parent, struct proc *child, int *ret_status,
  * children tailq and reaping bits.*/
 static pid_t try_wait_any(struct proc *parent, int *ret_status, int options)
 {
-	printd("%s called\n", __func__);
 	struct proc *i, *temp;
 	pid_t retval;
 	if (TAILQ_EMPTY(&parent->children))
@@ -655,7 +634,6 @@ static pid_t try_wait_any(struct proc *parent, int *ret_status, int options)
 static pid_t wait_one(struct proc *parent, struct proc *child, int *ret_status,
                       int options)
 {
-	printd("%s called\n", __func__);
 	pid_t retval;
 	cv_lock(&parent->child_wait);
 	/* retval == 0 means we should block */
@@ -690,7 +668,6 @@ out_unlock:
  * if there are children and we need to block but WNOHANG was set. */
 static pid_t wait_any(struct proc *parent, int *ret_status, int options)
 {
-	printd("%s called\n", __func__);
 	pid_t retval;
 	cv_lock(&parent->child_wait);
 	retval = try_wait_any(parent, ret_status, options);
@@ -726,7 +703,6 @@ out_unlock:
 static pid_t sys_waitpid(struct proc *parent, pid_t pid, int *status,
                          int options)
 {
-	printd("%s called\n", __func__);
 	struct proc *child;
 	pid_t retval = 0;
 	int ret_status = 0;
@@ -765,19 +741,16 @@ out:
 static void *sys_mmap(struct proc *p, uintptr_t addr, size_t len, int prot,
                       int flags, int fd, off_t offset)
 {
-	printd("%s called\n", __func__);
 	return mmap(p, addr, len, prot, flags, fd, offset);
 }
 
 static intreg_t sys_mprotect(struct proc *p, void *addr, size_t len, int prot)
 {
-	printd("%s called\n", __func__);
 	return mprotect(p, (uintptr_t)addr, len, prot);
 }
 
 static intreg_t sys_munmap(struct proc *p, void *addr, size_t len)
 {
-	printd("%s called\n", __func__);
 	return munmap(p, (uintptr_t)addr, len);
 }
 
@@ -786,14 +759,12 @@ static ssize_t sys_shared_page_alloc(env_t* p1,
                                      int p1_flags, int p2_flags
                                     )
 {
-	printd("%s called\n", __func__);
 	printk("[kernel] shared page alloc is deprecated/unimplemented.\n");
 	return -1;
 }
 
 static int sys_shared_page_free(env_t* p1, void*DANGEROUS addr, pid_t p2)
 {
-	printd("%s called\n", __func__);
 	return -1;
 }
 
@@ -801,7 +772,6 @@ static int sys_shared_page_free(env_t* p1, void*DANGEROUS addr, pid_t p2)
 static int prov_resource(struct proc *target, unsigned int res_type,
                          long res_val)
 {
-	printd("%s called\n", __func__);
 	switch (res_type) {
 		case (RES_CORES):
 			/* in the off chance we have a kernel scheduler that can't
@@ -819,7 +789,6 @@ static int prov_resource(struct proc *target, unsigned int res_type,
 static int sys_provision(struct proc *p, int target_pid,
                          unsigned int res_type, long res_val)
 {
-	printd("%s called\n", __func__);
 	struct proc *target = pid2proc(target_pid);
 	int retval;
 	if (!target) {
@@ -841,7 +810,6 @@ static int sys_provision(struct proc *p, int target_pid,
 static int sys_notify(struct proc *p, int target_pid, unsigned int ev_type,
                       struct event_msg *u_msg)
 {
-	printd("%s called\n", __func__);
 	struct event_msg local_msg = {0};
 	struct proc *target = pid2proc(target_pid);
 	if (!target) {
@@ -875,7 +843,6 @@ static int sys_self_notify(struct proc *p, uint32_t vcoreid,
                            unsigned int ev_type, struct event_msg *u_msg,
                            bool priv)
 {
-	printd("%s called\n", __func__);
 	struct event_msg local_msg = {0};
 	/* if the user provided an ev_msg, copy it in and use that */
 	if (u_msg) {
@@ -903,7 +870,6 @@ static int sys_self_notify(struct proc *p, uint32_t vcoreid,
  * ourselves a __notify. */
 static int sys_vc_entry(struct proc *p)
 {
-	printd("%s called\n", __func__);
 	send_kernel_message(core_id(), __notify, (long)p, 0, 0, KMSG_ROUTINE);
 	return 0;
 }
@@ -942,7 +908,6 @@ static int sys_halt_core(struct proc *p, unsigned int usec)
  * but that's fine thanks to the async kernel interface. */
 static int sys_change_to_m(struct proc *p)
 {
-	printd("%s called\n", __func__);
 	int retval = proc_change_to_m(p);
 	/* convert the kernel error code into (-1, errno) */
 	if (retval) {
@@ -962,7 +927,6 @@ static int sys_change_to_m(struct proc *p)
 static int sys_poke_ksched(struct proc *p, int target_pid,
                            unsigned int res_type)
 {
-	printd("%s called\n", __func__);
 	struct proc *target;
 	int retval = 0;
 	if (!target_pid) {
@@ -1028,7 +992,6 @@ static ssize_t sys_serial_write(env_t* e, const char *DANGEROUS buf, size_t len)
 // This is not a syscall we want. Its hacky. Here just for syscall stuff until get a stack.
 static ssize_t sys_eth_read(env_t* e, char *DANGEROUS buf)
 {
-	printd("%s called\n", __func__);
 	if (eth_up) {
 
 		uint32_t len;
@@ -1064,7 +1027,6 @@ static ssize_t sys_eth_read(env_t* e, char *DANGEROUS buf)
 // This is not a syscall we want. Its hacky. Here just for syscall stuff until get a stack.
 static ssize_t sys_eth_write(env_t* e, const char *DANGEROUS buf, size_t len)
 {
-	printd("%s called\n", __func__);
 	if (eth_up) {
 
 		if (len == 0)
@@ -1110,7 +1072,6 @@ static ssize_t sys_eth_write(env_t* e, const char *DANGEROUS buf, size_t len)
 
 static ssize_t sys_eth_get_mac_addr(env_t* e, char *DANGEROUS buf) 
 {
-	printd("%s called\n", __func__);
 	if (eth_up) {
 		for (int i = 0; i < 6; i++)
 			buf[i] = device_mac[i];
@@ -1122,7 +1083,6 @@ static ssize_t sys_eth_get_mac_addr(env_t* e, char *DANGEROUS buf)
 
 static int sys_eth_recv_check(env_t* e) 
 {
-	printd("%s called\n", __func__);
 	if (num_packet_buffers != 0) 
 		return 1;
 	else
@@ -1133,12 +1093,11 @@ static int sys_eth_recv_check(env_t* e)
 
 static intreg_t sys_read(struct proc *p, int fd, void *buf, int len)
 {
-	printd("%s called\n", __func__);
 	ssize_t ret;
 	if (fd >= PLAN9FDBASE) {
 	    fd -= PLAN9FDBASE;
 	    ret = sysread(p, fd, buf, len, (off_t) -1);
-	    printd("plan 9 write returns %d\n", ret);
+	    printd("plan 9 read returns %d\n", ret);
 	    return ret;
 	}
 
@@ -1162,7 +1121,6 @@ static intreg_t sys_read(struct proc *p, int fd, void *buf, int len)
 
 static intreg_t sys_write(struct proc *p, int fd, const void *buf, int len)
 {
-	printd("%s called\n", __func__);
 	ssize_t ret;
 	if (fd >= PLAN9FDBASE) {
 	    fd -= PLAN9FDBASE;
@@ -1193,7 +1151,6 @@ static intreg_t sys_write(struct proc *p, int fd, const void *buf, int len)
 static intreg_t sys_open(struct proc *p, const char *path, size_t path_l,
                          int oflag, int mode)
 {
-	printd("%s called\n", __func__);
 	int fd = 0;
 	struct file *file;
 
@@ -1208,6 +1165,7 @@ static intreg_t sys_open(struct proc *p, const char *path, size_t path_l,
 	    if (fd >= 0){
 		printd("SYS_OPEN plan 9 open %s %x\n", t_path, fd);
 		user_memdup_free(p, t_path);
+		printd("sysopen returns %d %x\n", fd+PLAN9FDBASE, fd+PLAN9FDBASE);
 		return fd+PLAN9FDBASE;
 	    }
 	}
@@ -1226,9 +1184,12 @@ static intreg_t sys_open(struct proc *p, const char *path, size_t path_l,
 
 static intreg_t sys_close(struct proc *p, int fd)
 {
-	printd("%s called\n", __func__);
 	struct file *file = put_file_from_fd(&p->open_files, fd);
 	if (!file) {
+		if (fd >= PLAN9FDBASE) {
+	    		fd -= PLAN9FDBASE;
+			return 0;
+		}
 		set_errno(EBADF);
 		return -1;
 	}
@@ -1242,13 +1203,29 @@ static intreg_t sys_close(struct proc *p, int fd)
 
 static intreg_t sys_fstat(struct proc *p, int fd, struct kstat *u_stat)
 {
-	printd("%s called\n", __func__);
 	struct kstat *kbuf;
 	struct file *file = get_file_from_fd(&p->open_files, fd);
 	if (!file) {
-		set_errno(EBADF);
-		return -1;
+	    int i, r;
+	    if (fd >= PLAN9FDBASE) {
+		kbuf = kmalloc(sizeof(struct kstat), 0);
+		if (!kbuf) {
+		    set_errno(ENOMEM);
+		    return -1;
+		}
+		r = sysfstat(p, fd, kbuf, sizeof(*kbuf));
+		printd("sysfstat returns %d\n", r);
+
+		if (r < 0 || memcpy_to_user_errno(p, u_stat, kbuf, sizeof(struct kstat))) {
+		    set_errno(EBADF);
+		    r = -1;
+		}
+		kfree(kbuf);
+		printd("plan 9 fstat returns %d\n", r);
+		return 0;
+	    }
 	}
+
 	kbuf = kmalloc(sizeof(struct kstat), 0);
 	if (!kbuf) {
 		kref_put(&file->f_kref);
@@ -1272,7 +1249,6 @@ static intreg_t sys_fstat(struct proc *p, int fd, struct kstat *u_stat)
 static intreg_t stat_helper(struct proc *p, const char *path, size_t path_l,
                             struct kstat *u_stat, int flags)
 {
-	printd("%s called %s\n", __func__, path);
 	struct kstat *kbuf;
 	struct dentry *path_d;
 	char *t_path = user_strdup_errno(p, path, path_l);
@@ -1321,7 +1297,6 @@ printd("sysstat returns %d\n", r);
 static intreg_t sys_stat(struct proc *p, const char *path, size_t path_l,
                          struct kstat *u_stat)
 {
-	printd("%s called\n", __func__);
 	return stat_helper(p, path, path_l, u_stat, LOOKUP_FOLLOW);
 }
 
@@ -1329,13 +1304,11 @@ static intreg_t sys_stat(struct proc *p, const char *path, size_t path_l,
 static intreg_t sys_lstat(struct proc *p, const char *path, size_t path_l,
                           struct kstat *u_stat)
 {
-	printd("%s called\n", __func__);
 	return stat_helper(p, path, path_l, u_stat, 0);
 }
 
 intreg_t sys_fcntl(struct proc *p, int fd, int cmd, int arg)
 {
-	printd("%s called\n", __func__);
 	int retval = 0;
 	struct file *file = get_file_from_fd(&p->open_files, fd);
 	if (!file) {
@@ -1375,7 +1348,6 @@ intreg_t sys_fcntl(struct proc *p, int fd, int cmd, int arg)
 static intreg_t sys_access(struct proc *p, const char *path, size_t path_l,
                            int mode)
 {
-	printd("%s called\n", __func__);
 	int retval;
 	char *t_path = user_strdup_errno(p, path, path_l);
 	if (!t_path)
@@ -1392,7 +1364,6 @@ static intreg_t sys_access(struct proc *p, const char *path, size_t path_l,
 
 intreg_t sys_umask(struct proc *p, int mask)
 {
-	printd("%s called\n", __func__);
 	int old_mask = p->fs_env.umask;
 	p->fs_env.umask = mask & S_PMASK;
 	return old_mask;
@@ -1400,7 +1371,6 @@ intreg_t sys_umask(struct proc *p, int mask)
 
 intreg_t sys_chmod(struct proc *p, const char *path, size_t path_l, int mode)
 {
-	printd("%s called\n", __func__);
 	int retval;
 	char *t_path = user_strdup_errno(p, path, path_l);
 	if (!t_path)
@@ -1420,7 +1390,6 @@ intreg_t sys_chmod(struct proc *p, const char *path, size_t path_l, int mode)
 static intreg_t sys_llseek(struct proc *p, int fd, off_t offset_hi,
                            off_t offset_lo, off64_t *result, int whence)
 {
-	printd("%s called\n", __func__);
 	off64_t retoff = 0;
 	off64_t tempoff = 0;
 	int ret = 0;
@@ -1444,7 +1413,6 @@ static intreg_t sys_llseek(struct proc *p, int fd, off_t offset_hi,
 intreg_t sys_link(struct proc *p, char *old_path, size_t old_l,
                   char *new_path, size_t new_l)
 {
-	printd("%s called\n", __func__);
 	int ret;
 	char *t_oldpath = user_strdup_errno(p, old_path, old_l);
 	if (t_oldpath == NULL)
@@ -1462,7 +1430,6 @@ intreg_t sys_link(struct proc *p, char *old_path, size_t old_l,
 
 intreg_t sys_unlink(struct proc *p, const char *path, size_t path_l)
 {
-	printd("%s called\n", __func__);
 	int retval;
 	char *t_path = user_strdup_errno(p, path, path_l);
 	if (!t_path)
@@ -1475,7 +1442,6 @@ intreg_t sys_unlink(struct proc *p, const char *path, size_t path_l)
 intreg_t sys_symlink(struct proc *p, char *old_path, size_t old_l,
                      char *new_path, size_t new_l)
 {
-	printd("%s called\n", __func__);
 	int ret;
 	char *t_oldpath = user_strdup_errno(p, old_path, old_l);
 	if (t_oldpath == NULL)
@@ -1494,7 +1460,6 @@ intreg_t sys_symlink(struct proc *p, char *old_path, size_t old_l,
 intreg_t sys_readlink(struct proc *p, char *path, size_t path_l,
                       char *u_buf, size_t buf_l)
 {
-	printd("%s called\n", __func__);
 	char *symname;
 	ssize_t copy_amt;
 	struct dentry *path_d;
@@ -1518,7 +1483,6 @@ intreg_t sys_readlink(struct proc *p, char *path, size_t path_l,
 
 intreg_t sys_chdir(struct proc *p, const char *path, size_t path_l)
 {
-	printd("%s called\n", __func__);
 	int retval;
 	char *t_path = user_strdup_errno(p, path, path_l);
 	if (!t_path)
@@ -1535,7 +1499,6 @@ intreg_t sys_chdir(struct proc *p, const char *path, size_t path_l)
 /* Note cwd_l is not a strlen, it's an absolute size */
 intreg_t sys_getcwd(struct proc *p, char *u_cwd, size_t cwd_l)
 {
-	printd("%s called\n", __func__);
 	int retval = 0;
 	char *kfree_this;
 	char *k_cwd = do_getcwd(&p->fs_env, &kfree_this, cwd_l);
@@ -1549,7 +1512,6 @@ intreg_t sys_getcwd(struct proc *p, char *u_cwd, size_t cwd_l)
 
 intreg_t sys_mkdir(struct proc *p, const char *path, size_t path_l, int mode)
 {
-	printd("%s called\n", __func__);
 	int retval;
 	char *t_path = user_strdup_errno(p, path, path_l);
 	if (!t_path)
@@ -1562,7 +1524,6 @@ intreg_t sys_mkdir(struct proc *p, const char *path, size_t path_l, int mode)
 
 intreg_t sys_rmdir(struct proc *p, const char *path, size_t path_l)
 {
-	printd("%s called\n", __func__);
 	int retval;
 	char *t_path = user_strdup_errno(p, path, path_l);
 	if (!t_path)
@@ -1613,7 +1574,6 @@ all_out:
 
 intreg_t sys_gettimeofday(struct proc *p, int *buf)
 {
-	printd("%s called\n", __func__);
 	static spinlock_t gtod_lock = SPINLOCK_INITIALIZER;
 	static int t0 = 0;
 
@@ -1638,7 +1598,6 @@ intreg_t sys_gettimeofday(struct proc *p, int *buf)
 
 intreg_t sys_tcgetattr(struct proc *p, int fd, void *termios_p)
 {
-	printd("%s called\n", __func__);
 	int retval = 0;
 	/* TODO: actually support this call on tty FDs.  Right now, we just fake
 	 * what my linux box reports for a bash pty. */
@@ -1692,7 +1651,6 @@ intreg_t sys_tcgetattr(struct proc *p, int fd, void *termios_p)
 intreg_t sys_tcsetattr(struct proc *p, int fd, int optional_actions,
                        const void *termios_p)
 {
-	printd("%s called\n", __func__);
 	/* TODO: do this properly too.  For now, we just say 'it worked' */
 	return 0;
 }
@@ -1703,13 +1661,11 @@ intreg_t sys_tcsetattr(struct proc *p, int fd, int optional_actions,
  * these calls.  Someday. */
 intreg_t sys_setuid(struct proc *p, uid_t uid)
 {
-	printd("%s called\n", __func__);
 	return 0;
 }
 
 intreg_t sys_setgid(struct proc *p, gid_t gid)
 {
-	printd("%s called\n", __func__);
 	return 0;
 }
 
@@ -1915,7 +1871,6 @@ void __signal_syscall(struct syscall *sysc, struct proc *p)
 /* Syscall tracing */
 static void __init_systrace(void)
 {
-	printd("%s called\n", __func__);
 	systrace_buffer = kmalloc(MAX_SYSTRACES*sizeof(struct systrace_record), 0);
 	if (!systrace_buffer)
 		panic("Unable to alloc a trace buffer\n");
@@ -1928,7 +1883,6 @@ static void __init_systrace(void)
 /* If you call this while it is running, it will change the mode */
 void systrace_start(bool silent)
 {
-	printd("%s called\n", __func__);
 	static bool init = FALSE;
 	spin_lock_irqsave(&systrace_lock);
 	if (!init) {
@@ -1941,7 +1895,6 @@ void systrace_start(bool silent)
 
 int systrace_reg(bool all, struct proc *p)
 {
-	printd("%s called\n", __func__);
 	int retval = 0;
 	spin_lock_irqsave(&systrace_lock);
 	if (all) {
@@ -1964,7 +1917,6 @@ int systrace_reg(bool all, struct proc *p)
 
 void systrace_stop(void)
 {
-	printd("%s called\n", __func__);
 	spin_lock_irqsave(&systrace_lock);
 	systrace_flags = 0;
 	for (int i = 0; i < MAX_NUM_TRACED; i++)
@@ -1976,7 +1928,6 @@ void systrace_stop(void)
  * specifically.  Or just fully stop, which will do it for all. */
 int systrace_dereg(bool all, struct proc *p)
 {
-	printd("%s called\n", __func__);
 	spin_lock_irqsave(&systrace_lock);
 	if (all) {
 		printk("No longer tracing syscalls for all processes.\n");
@@ -1996,7 +1947,6 @@ int systrace_dereg(bool all, struct proc *p)
 /* Regardless of locking, someone could be writing into the buffer */
 void systrace_print(bool all, struct proc *p)
 {
-	printd("%s called\n", __func__);
 	spin_lock_irqsave(&systrace_lock);
 	/* if you want to be clever, you could make this start from the earliest
 	 * timestamp and loop around.  Careful of concurrent writes. */
@@ -2021,7 +1971,6 @@ void systrace_print(bool all, struct proc *p)
 
 void systrace_clear_buffer(void)
 {
-	printd("%s called\n", __func__);
 	spin_lock_irqsave(&systrace_lock);
 	memset(systrace_buffer, 0, sizeof(struct systrace_record) * MAX_SYSTRACES);
 	spin_unlock_irqsave(&systrace_lock);

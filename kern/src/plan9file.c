@@ -17,6 +17,7 @@
 #include <pmap.h>
 #include <smp.h>
 #include <fcall.h>
+#include <ros/fs.h>
 
 int
 openmode(int omode, struct errbuf *perrbuf)
@@ -517,10 +518,15 @@ sysread(struct proc *up, int fd, void *p, size_t n, off_t off)
     struct chan *c;
     int ispread = 1;
     printd("sysread %d %p %d %lld\n", fd, p, n, off);
+
+    if(waserror()){
+	set_errno(EBADF);
+	return -1;
+    }
+
     c = fdtochan(up, fd, OREAD, 1, 1, perrbuf);
     
     if(waserror()){
-	printd("bad sysread...\n");
 	cclose(c, perrbuf);
 	return -1;
     }
@@ -540,12 +546,18 @@ sysread(struct proc *up, int fd, void *p, size_t n, off_t off)
     }
     
     if(c->qid.type & QTDIR){
+	unsigned char *ents;
 	/*
 	 * struct directory read:
 	 * rewind to the beginning of the file if necessary;
 	 * try to fill the buffer via mountrockread;
 	 * clear ispread to always maintain the struct chan offset.
 	 */
+	/* this is a bit of a hack until we resolve akaros direntry format. */
+	ents = kmalloc(8192, KMALLOC_WAIT);
+	if (! ents)
+		error(Enomem);
+
 	if(off == 0LL){
 	    if(!ispread){
 		c->offset = 0;
@@ -555,16 +567,21 @@ sysread(struct proc *up, int fd, void *p, size_t n, off_t off)
 	    unionrewind(c, perrbuf);
 	}
 	
+	/* tell it we have less than we have to make sure it will
+	 * fit in the large akaros dirents.
+	 */
 	if(!mountrockread(c, p, n, &nn)){
 	    if(c->umh)
-		nn = unionread(up, c, p, n, perrbuf);
+		nn = unionread(up, c, ents, 2048, perrbuf);
 	    else{
 		if(off != c->offset)
 		    error(Edirseek);
-		nn = c->dev->read(c, p, n, c->devoffset, perrbuf);
+		nn = c->dev->read(c, ents, 2048, c->devoffset, perrbuf);
 	    }
 	}
-	nnn = mountfix(up, c, p, nn, n, perrbuf);
+	nnn = mountfix(up, c, ents, nn, n, perrbuf);
+	/* now convert to akaros kdents. This whole thing needs fixin' */
+	nnn =  convM2kdirent(ents, nnn, (struct kdirent *) p);
 	
 	ispread = 0;
     }
@@ -595,11 +612,12 @@ syswrite(struct proc *up, int fd, void *p, size_t n, off_t off)
 
     n = 0;
     if (waserror()) {
+	set_errno(EBADF);
 	return -1;
     }
     
     c = fdtochan(up, fd, OWRITE, 1, 1, perrbuf);
-    printd("chan %p\n", c);
+    //printd("chan %p\n", c);
     if(waserror()) {
 
 	if(!ispwrite){
@@ -607,7 +625,6 @@ syswrite(struct proc *up, int fd, void *p, size_t n, off_t off)
 	    c->offset -= n;
 	    spin_unlock(&c->lock);
 	}
-	printd("was an err\n");
 	cclose(c, perrbuf);
 	nexterror();
     }
@@ -625,10 +642,8 @@ syswrite(struct proc *up, int fd, void *p, size_t n, off_t off)
 	spin_unlock(&c->lock);
     }
 
-    printd("call dev write\n");
+    //printd("call dev write\n");
     r = c->dev->write(c, p, n, off, perrbuf);
-    printd("back from  dev write\n");
-    
 
     if(!ispwrite && r < n){
 	spin_lock(&c->lock);
@@ -637,7 +652,6 @@ syswrite(struct proc *up, int fd, void *p, size_t n, off_t off)
     }
     
     cclose(c, perrbuf);
-    printd("syswrite: return %d\n", r);
     return r;
 }
 
@@ -655,7 +669,6 @@ syscreate(struct proc *up, char *name, int omode)
      */
     omode &= ~(O_CREAT|O_TRUNC);
       
-printd("syscreate call waserror\n");
 	if (waserror()){
 	    if(c)
 		cclose(c, perrbuf);
@@ -663,16 +676,12 @@ printd("syscreate call waserror\n");
 	    return -1;
 	}
 
-printd("syscreate call openmode\n");
 	openmode(omode, perrbuf);	/* error check only */
 
-	printd("syscreate call namec %s \n", name);
 	c = namec(up, name, Acreate, omode, 0, perrbuf);
-	printd("namec returns %p\n", c);
 	fd = newfd(up,c);
 	if(fd < 0)
 	    error(Enofd);
-	printd("syscreate: RETURNING %d\n", fd);
 	return fd;
 }
 
@@ -683,26 +692,33 @@ sysopen(struct proc *up, char *name, int omode)
     ERRSTACK(2);
     struct chan *c = NULL;
     int fd;
+    int mustdir = 0;
+	printd("sysopen %s mode %o\n", name, omode);
+    if (omode & O_NONBLOCK) /* what to do? */
+	omode &= ~O_NONBLOCK;
+    if (omode & O_CLOEXEC) /* FIX ME */
+	omode &= ~O_CLOEXEC;
+    if (omode & O_DIRECTORY){
+	omode &= ~O_DIRECTORY;
+	mustdir = 1;
+    }
+	printd("sysopen %s mode %o\n", name, omode);
 	if (omode & (O_CREAT|O_TRUNC))
 	    return syscreate(up, name, omode);
 
-printd("sysopen call waserror\n");
 	if (waserror()){
 	    if(c)
 		cclose(c, perrbuf);
-	    printd("sysopen fail 1 mode  %x\n", omode);
+	    printd("sysopen fail %s 1 mode  %o\n", name, omode);
 	    return -1;
 	}
-printd("sysopen call openmode\n");
 	openmode(omode, perrbuf);	/* error check only */
 
-	printd("sysopen call namec %s \n", name);
 	c = namec(up, name, Aopen, omode, 0, perrbuf);
-	printd("namec returns %p\n", c);
 	fd = newfd(up,c);
 	if(fd < 0)
 	    error(Enofd);
-	printd("sysopen: RETURNING %d\n", fd);
+	printd("sysopen returns %d %x\n", fd, fd);
 	return fd;
 }
 
@@ -727,15 +743,45 @@ sysstat(struct proc *up, char *name, uint8_t *statbuf, int len)
     c = namec(up, name, Aaccess, 0, 0, perrbuf);
 
     r = c->dev->stat(c, data, sizeof(data), perrbuf);
+
     aname = pathlast(c->path);
     if(aname)
 	r = dirsetname(aname, strlen(aname), data, r, sizeof(data));
     
     cclose(c, perrbuf);
     /* now convert for akaros. */
-    convM2A(data, sizeof(data), (void *)statbuf);
+    convM2kstat(data, sizeof(data), (struct kstat *)statbuf);
     
-    return sizeof(struct kdirent);
+    return 0;
+}
+
+int
+sysfstat(struct proc *up, int fd, uint8_t *statbuf, int len)
+{
+    PERRBUF;
+    ERRSTACK(2);
+    int r;
+    struct chan *c = NULL;
+    uint8_t data[sizeof(struct dir)];
+    
+    if (waserror()){
+      printd("sysfstat fail fd %d\n", fd);
+	return -1;
+    }
+
+    c = fdtochan(up, fd, -1, 0, 1, perrbuf);
+
+    if(waserror()) {
+      cclose(c, perrbuf);
+	nexterror();
+    }
+    r = c->dev->stat(c, data, sizeof(data), perrbuf);
+    
+    cclose(c, perrbuf);
+    /* now convert for akaros. */
+    convM2kstat(data, sizeof(data), (struct kstat *)statbuf);
+    
+    return 0;
 }
 
 int

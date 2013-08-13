@@ -124,7 +124,7 @@ is record */
 #endif
 
 unsigned int
-  convM2A(uint8_t *buf, unsigned int nbuf, struct kdirent *kd)
+  convM2kdirent(uint8_t *buf, unsigned int nbuf, struct kdirent *kd)
 {
 	uint8_t *p, *ebuf;
 	char *sv[4];
@@ -172,5 +172,50 @@ unsigned int
 	kd->d_reclen = ns;
 	memmove(kd->d_name, p, ns);
 	
+	return p - buf;
+}
+
+unsigned int
+  convM2kstat(uint8_t *buf, unsigned int nbuf, struct kstat *ks)
+{
+	uint8_t *p, *ebuf;
+	char *sv[4];
+	int i, ns;
+	uint32_t junk;
+
+	if(nbuf < STATFIXLEN)
+		return 0; 
+
+	p = buf;
+	ebuf = buf + nbuf;
+
+	p += BIT16SZ;	/* ignore size */
+	junk /*kd->d_type*/ = GBIT16(p);
+	p += BIT16SZ;
+	ks->st_rdev = ks->st_dev = GBIT32(p);
+	p += BIT32SZ;
+	junk /*qid.type*/= GBIT8(p);
+	p += BIT8SZ;
+	junk /*qid.vers */= GBIT32(p);
+	p += BIT32SZ;
+	ks->st_ino = GBIT64(p);
+	p += BIT64SZ;
+	ks->st_mode = GBIT32(p);
+	if (ks->st_mode & DMDIR){
+		ks->st_mode &= ~DMDIR;
+		ks->st_mode |= __S_IFDIR;
+	}
+	p += BIT32SZ;
+	ks->st_atime.tv_sec = GBIT32(p);
+	p += BIT32SZ;
+	ks->st_mtime.tv_sec = GBIT32(p);
+	p += BIT32SZ;
+	ks->st_size = GBIT64(p);
+	p += BIT64SZ;
+	ks->st_blksize = 512;
+	ks->st_blocks = ROUNDUP(ks->st_size, ks->st_blksize)/ks->st_blksize;
+
+	ks->st_nlink = 2; // links make no sense any more. 
+	ks->st_uid = ks->st_gid = 0;
 	return p - buf;
 }
