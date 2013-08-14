@@ -532,6 +532,3 @@ struct errbuf *poperror(struct errbuf *errstack, int stacksize,
 /* plan 9 has a concept of a hostowner, which is a name. For now, we got with a define. */
 #define eve "eve"
 
-/* for interop purposes, we start plan 9 fds at a speciall offset */
-//#define PLAN9FDBASE ((unsigned long)('p'<<24)|('l'<<16)|('a'<<8)|'n')
-#define PLAN9FDBASE 0x5555

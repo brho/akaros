@@ -645,6 +645,7 @@ syswrite(int fd, void *p, size_t n, off_t off)
     long r = n;
     struct chan *c;
 
+	printd("syswrite %d %p %d\n", fd, p, n);
     n = 0;
     if (waserror()) {
 	set_errno(EBADF);
@@ -652,7 +653,7 @@ syswrite(int fd, void *p, size_t n, off_t off)
     }
     
     c = fdtochan(fd, OWRITE, 1, 1, perrbuf);
-    //printd("chan %p\n", c);
+    printd("syswrite chan %p\n", c);
     if(waserror()) {
 
 	if(!ispwrite){
@@ -677,7 +678,7 @@ syswrite(int fd, void *p, size_t n, off_t off)
 	spin_unlock(&c->lock);
     }
 
-    //printd("call dev write\n");
+    printd("call dev write\n");
     r = c->dev->write(c, p, n, off, perrbuf);
 
     if(!ispwrite && r < n){
@@ -687,7 +688,9 @@ syswrite(int fd, void *p, size_t n, off_t off)
     }
     
     cclose(c, perrbuf);
+printd("syswrite retturns %d\n", r);
     return r;
+
 }
 
 int
@@ -818,7 +821,7 @@ sysfstat(int fd, uint8_t *statbuf, int len)
 int
 sysdup(int ofd, int nfd)
 {
-    ERRSTACKBASE(1);
+    ERRSTACKBASE(2);
 	struct chan *nc, *oc;
 	struct fgrp *f;
 
