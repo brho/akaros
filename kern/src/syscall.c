@@ -1094,27 +1094,26 @@ static int sys_eth_recv_check(env_t* e)
 static intreg_t sys_read(struct proc *p, int fd, void *buf, int len)
 {
 	ssize_t ret;
-	if (fd >= PLAN9FDBASE) {
-	    fd -= PLAN9FDBASE;
-	    ret = sysread(fd, buf, len, (off_t) -1);
-	    printd("plan 9 read returns %d\n", ret);
-	    return ret;
-	}
-
 	struct file *file = get_file_from_fd(&p->open_files, fd);
 	if (!file) {
 		set_errno(EBADF);
 		return -1;
 	}
-	if (!file->f_op->read) {
-		kref_put(&file->f_kref);
-		set_errno(EINVAL);
-		return -1;
+	if (file->plan9){
+	    ret = sysread(file->plan9fd, buf, len, (off_t) -1);
+	    printd("plan 9 read returns %d\n", ret);
+	} else {
+		if (!file->f_op->read) {
+			kref_put(&file->f_kref);
+			set_errno(EINVAL);
+			return -1;
+		}
+		/* TODO: (UMEM) currently, read() handles user memcpy
+		 * issues, but we probably should user_mem_check and
+		 * pin the region here, so read doesn't worry about
+		 * it */
+		ret = file->f_op->read(file, buf, len, &file->f_pos);
 	}
-	/* TODO: (UMEM) currently, read() handles user memcpy issues, but we
-	 * probably should user_mem_check and pin the region here, so read doesn't
-	 * worry about it */
-	ret = file->f_op->read(file, buf, len, &file->f_pos);
 	kref_put(&file->f_kref);
 	return ret;
 }
@@ -1122,26 +1121,24 @@ static intreg_t sys_read(struct proc *p, int fd, void *buf, int len)
 static intreg_t sys_write(struct proc *p, int fd, const void *buf, int len)
 {
 	ssize_t ret;
-	if (fd >= PLAN9FDBASE) {
-printd("write fd %d\n", fd);
-	    fd -= PLAN9FDBASE;
-printd("write fd %d\n", fd);
-	    ret = syswrite(fd, buf, len, (off_t) -1);
-	    printd("plan 9 write returns %d\n", ret);
-	    return ret;
-	}
 	struct file *file = get_file_from_fd(&p->open_files, fd);
 	if (!file) {
 		set_errno(EBADF);
 		return -1;
 	}
-	if (!file->f_op->write) {
-		kref_put(&file->f_kref);
-		set_errno(EINVAL);
-		return -1;
+	if (file->plan9){
+	    ret = syswrite(file->plan9fd, buf, len, (off_t) -1);
+	    printd("plan 9 write returns %d\n", ret);
+	} else {
+		
+		if (!file->f_op->write) {
+			kref_put(&file->f_kref);
+			set_errno(EINVAL);
+			return -1;
+		}
+		/* TODO: (UMEM) */
+		ret = file->f_op->write(file, buf, len, &file->f_pos);
 	}
-	/* TODO: (UMEM) */
-	ret = file->f_op->write(file, buf, len, &file->f_pos);
 	kref_put(&file->f_kref);
 	return ret;
 }
@@ -1165,10 +1162,11 @@ static intreg_t sys_open(struct proc *p, const char *path, size_t path_l,
 	if (!file){
 	    fd = sysopen(t_path, oflag);
 	    if (fd >= 0){
+	    	file = alloc_file();
+		file->plan9 = 1;
+		file->plan9fd = fd;
 		printd("SYS_OPEN plan 9 open %s %x\n", t_path, fd);
-		user_memdup_free(p, t_path);
-		printd("sysopen returns %d %x\n", fd+PLAN9FDBASE, fd+PLAN9FDBASE);
-		return fd+PLAN9FDBASE;
+		printd("sysopen returns %d\n", fd);
 	    }
 	}
 	user_memdup_free(p, t_path);
@@ -1186,10 +1184,6 @@ static intreg_t sys_open(struct proc *p, const char *path, size_t path_l,
 
 static intreg_t sys_close(struct proc *p, int fd)
 {
-	if (fd >= PLAN9FDBASE) {
-    		fd -= PLAN9FDBASE;
-		return 0;
-	}
 	struct file *file = put_file_from_fd(&p->open_files, fd);
 	if (!file) {
 		set_errno(EBADF);
@@ -1206,24 +1200,6 @@ static intreg_t sys_close(struct proc *p, int fd)
 static intreg_t sys_fstat(struct proc *p, int fd, struct kstat *u_stat)
 {
 	struct kstat *kbuf;
-	if (fd >= PLAN9FDBASE) {
-	    int i, r;
-	    kbuf = kmalloc(sizeof(struct kstat), 0);
-	    if (!kbuf) {
-		set_errno(ENOMEM);
-		return -1;
-	    }
-	    r = sysfstat(fd, (uint8_t*)kbuf, sizeof(*kbuf));
-	    printd("sysfstat returns %d\n", r);
-	    
-	    if (r < 0 || memcpy_to_user_errno(p, u_stat, kbuf, sizeof(struct kstat))) {
-		set_errno(EBADF);
-		r = -1;
-	    }
-	    kfree(kbuf);
-	    printd("plan 9 fstat returns %d\n", r);
-	    return 0;
-	}
 	
 	struct file *file = get_file_from_fd(&p->open_files, fd);
 	if (!file) {
@@ -1237,7 +1213,13 @@ static intreg_t sys_fstat(struct proc *p, int fd, struct kstat *u_stat)
 		set_errno(ENOMEM);
 		return -1;
 	}
-	stat_inode(file->f_dentry->d_inode, kbuf);
+	if (file->plan9){
+		int r;
+	    r = sysfstat(fd, (uint8_t*)kbuf, sizeof(*kbuf));
+	    printd("sysfstat returns %d\n", r);
+	} else {
+		stat_inode(file->f_dentry->d_inode, kbuf);
+	}
 	kref_put(&file->f_kref);
 	/* TODO: UMEM: pin the memory, copy directly, and skip the kernel buffer */
 	if (memcpy_to_user_errno(p, u_stat, kbuf, sizeof(struct kstat))) {
@@ -1318,12 +1300,13 @@ static intreg_t sys_plan9fcntl(struct proc *p, int fd, int cmd, int arg)
 	printd("fcntl %d for Plan 9\n", fd);
 	switch (cmd) {
 	case (F_DUPFD):
-	    printd("fcntl dupfd\n");
-	    retval = sysdup(fd, arg);
+	    printd("fcntl dupfd fd %d arg %d\n", fd, arg);
+	    retval = sysdup(fd, -1);
 	    if (retval < 0) {
 		retval = -1;
 	    }
-		retval += PLAN9FDBASE;
+
+	printd("fcntl returns %d for Plan 9\n", retval);
 	    break;
 	case (F_GETFD):
 	    printd("fcntl getfd\n");
@@ -1353,15 +1336,13 @@ static intreg_t sys_plan9fcntl(struct proc *p, int fd, int cmd, int arg)
 intreg_t sys_fcntl(struct proc *p, int fd, int cmd, int arg)
 {
 	int retval = 0;
-	if (fd >= PLAN9FDBASE){
 
-	    return sys_plan9fcntl(p, fd-PLAN9FDBASE, cmd, arg);
-	}
 	struct file *file = get_file_from_fd(&p->open_files, fd);
 	if (!file) {
 		set_errno(EBADF);
 		return -1;
 	}
+
 	switch (cmd) {
 		case (F_DUPFD):
 			retval = insert_file(&p->open_files, file, arg);

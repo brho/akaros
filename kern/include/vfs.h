@@ -285,6 +285,10 @@ struct file {
 	int fd; // all it contains is an appserver fd (for pid 0, aka kernel)
 	int refcnt;
 	spinlock_t lock;
+	/* Plan 9 support */
+	int plan9;
+	/* since 0 is valid ... */
+	int plan9fd;
 };
 
 struct file_operations {
