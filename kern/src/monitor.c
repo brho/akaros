@@ -977,11 +977,11 @@ init9proc()
 	  panic("init9proc");
 	}
 	printd("init9proc done waserror\n");
-	current[0].fgrp = dupfgrp(NULL, perrbuf);
+	up[0].fgrp = dupfgrp(NULL, perrbuf);
 	printd("init9proc done dupfg\n");
-	current[0].pgrp = newpgrp();
+	up[0].pgrp = newpgrp();
 	printd("init9proc done duppg\n");
-	if (!current[0].pgrp)
+	if (!up[0].pgrp)
 	    error("pgrp");
 	printd("done init9proc\n");
 }

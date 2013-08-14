@@ -204,6 +204,8 @@ unsigned int
 	if (ks->st_mode & DMDIR){
 		ks->st_mode &= ~DMDIR;
 		ks->st_mode |= __S_IFDIR;
+	} else {
+		ks->st_mode |= __S_IFREG;
 	}
 	p += BIT32SZ;
 	ks->st_atime.tv_sec = GBIT32(p);

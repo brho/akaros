@@ -60,6 +60,7 @@ static long
 regressread(struct chan *c, void *a, long n, int64_t offset, struct errbuf *perrbuf)
 {
 	char *buf, *p;
+	static char ctl[128];
 printd("regressread %d\n", (uint32_t)c->qid.path);
 
 	switch((uint32_t)c->qid.path){
@@ -68,6 +69,12 @@ printd("regressread %d\n", (uint32_t)c->qid.path);
 		return devdirread(c, a, n, regressdir, Qmax, devgen, perrbuf);
 
 	case Qmalloc:
+		break;
+
+	case Qctl:
+		snprintf(ctl, sizeof(ctl), "verbosity %d", verbose);
+		n = MIN(strlen(ctl),n);
+		n = readstr(offset, a, sizeof(ctl), ctl);
 		break;
 
 	default:

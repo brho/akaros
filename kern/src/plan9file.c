@@ -19,6 +19,41 @@
 #include <fcall.h>
 #include <ros/fs.h>
 
+/* simple functions for common uses. Read a num/string to user mode,
+ * accounting for offset.
+ */
+int
+readnum(unsigned long off, char *buf, unsigned long n, unsigned long val, int size)
+{
+	char tmp[64];
+	size = MIN(sizeof(tmp),size);
+
+	/* we really need the %* format. */
+	snprintf(tmp, size, "%lud", val);
+	tmp[size-1] = ' ';
+	if(off >= size)
+		return 0;
+	if(off+n > size)
+		n = size-off;
+	memmove(buf, tmp+off, n);
+	return n;
+}
+
+long
+readstr(long offset, char *buf, long n, char *str)
+{
+	long size;
+
+	size = strlen(str);
+	if(offset >= size)
+		return 0;
+	if(offset+n > size)
+		n = size-offset;
+	memmove(buf, str+offset, n);
+	return n;
+}
+
+
 int
 openmode(int omode, struct errbuf *perrbuf)
 {
@@ -693,7 +728,7 @@ sysopen(char *name, int omode)
     struct chan *c = NULL;
     int fd;
     int mustdir = 0;
-    //printd("sysopen %s mode %o\n", name, omode);
+    printd("sysopen %s mode %o\n", name, omode);
     if (omode & O_NONBLOCK) /* what to do? */
 	omode &= ~O_NONBLOCK;
     if (omode & O_CLOEXEC) /* FIX ME */
@@ -831,7 +866,7 @@ sysdup(int ofd, int nfd)
 
 
 int
-plan9setup()
+plan9setup(struct proc *up)
 {
     PERRBUF;
     ERRSTACK(2);
@@ -840,8 +875,8 @@ plan9setup()
       return -1;
     }
 
-    current->fgrp = dupfgrp(NULL, perrbuf);
-    current->pgrp = newpgrp();
+    up->fgrp = dupfgrp(NULL, perrbuf);
+    up->pgrp = newpgrp();
     return 0;
 }
 
