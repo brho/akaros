@@ -28,7 +28,7 @@ perrbuf,*perrbuf);
 
     *curindex = *curindex + 1;
     if (*curindex >= stacksize)
-	panic("stack overflow");
+	panic("Error stack overflow");
     *perrbuf = &errstack[*curindex];
     return 0;
 }
@@ -40,7 +40,7 @@ poperror(struct errbuf *errstack, int stacksize,
 printd("pope %p %d %d\n", errstack, stacksize, *curindex);
     *curindex = *curindex - 1;
     if (*curindex < 0)
-	panic("stack underflow");
+	panic("Error stack underflow");
 
     if (*curindex == 0)
 	*perrbuf = *(struct errbuf**)errstack;
