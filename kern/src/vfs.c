@@ -1971,6 +1971,9 @@ void file_release(struct kref *kref)
 {
 	struct file *file = container_of(kref, struct file, f_kref);
 
+	if (file->plan9){
+		return;
+	}
 	struct super_block *sb = file->f_dentry->d_sb;
 	spin_lock(&sb->s_lock);
 	TAILQ_REMOVE(&sb->s_files, file, f_list);

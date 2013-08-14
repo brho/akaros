@@ -505,6 +505,7 @@ long syswrite(int fd, void *p, size_t n, off_t off);
 int sysstat(char *name, uint8_t *statbuf, int len);
 int sysfstat(int fd, uint8_t *statbuf, int len);
 int sysopen(char *name, int omode);
+int sysclose(int fd);
 int sysdup(int ofd, int nfd);
 
 int plan9setup();
