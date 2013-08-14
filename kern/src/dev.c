@@ -1,3 +1,4 @@
+#define DEBUG
 #include <vfs.h>
 #include <kfs.h>
 #include <slab.h>
@@ -314,6 +315,7 @@ devstat(struct chan *c, uint8_t *db, long n, struct dirtab *tab, int ntab, devge
 				if(c->flag&CMSG)
 					dir.mode |= DMMOUNT;
 				n = convD2M(&dir, db, n);
+printd("devstat: return %d\n", n);
 				if(n == 0)
 					error(Ebadarg);
 				return n;

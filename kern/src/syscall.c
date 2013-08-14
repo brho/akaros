@@ -1323,6 +1323,7 @@ static intreg_t sys_plan9fcntl(struct proc *p, int fd, int cmd, int arg)
 	    if (retval < 0) {
 		retval = -1;
 	    }
+		retval += PLAN9FDBASE;
 	    break;
 	case (F_GETFD):
 	    printd("fcntl getfd\n");

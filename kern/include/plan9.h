@@ -509,6 +509,8 @@ int sysdup(int ofd, int nfd);
 
 int plan9setup();
 
+long readstr(long offset, char *buf, long n, char *str);
+int readnum(unsigned long off, char *buf, unsigned long n, unsigned long val, int size);
 
 /* ker/src/err.c */
 int pusherror(struct errbuf *errstack, int stacksize,
