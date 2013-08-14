@@ -1189,6 +1189,11 @@ static intreg_t sys_close(struct proc *p, int fd)
 		set_errno(EBADF);
 		return -1;
 	}
+	if (file->plan9){
+		sysclose(fd);
+		kmem_cache_free(file_kcache, file);
+	}
+
 	return 0;
 }
 

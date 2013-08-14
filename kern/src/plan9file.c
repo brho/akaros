@@ -53,6 +53,35 @@ readstr(long offset, char *buf, long n, char *str)
 	return n;
 }
 
+void
+fdclose(int fd, int flag, struct errbuf *perrbuf)
+{
+	int i;
+	struct chan *c;
+	struct fgrp *f;
+
+	f = current->fgrp;
+	spin_lock(&f->lock);
+	c = f->fd[fd];
+	if(c == NULL){
+		/* can happen for users with shared fd tables */
+		spin_unlock(&f->lock);
+		return;
+	}
+	if(flag){
+		if(c == NULL || !(c->flag&flag)){
+			spin_unlock(&f->lock);
+			return;
+		}
+	}
+	f->fd[fd] = NULL;
+	if(fd == f->maxfd)
+		for(i = fd; --i >= 0 && f->fd[i] == 0; )
+			f->maxfd = i;
+
+	spin_unlock(&f->lock);
+	cclose(c, perrbuf);
+}
 
 int
 openmode(int omode, struct errbuf *perrbuf)
@@ -756,6 +785,19 @@ sysopen(char *name, int omode)
 	    error(Enofd);
 	printd("sysopen %s returns %d %x\n", name, fd, fd);
 	return fd;
+}
+
+int sysclose(int fd)
+{
+	ERRSTACKBASE(1);
+
+	if (waserror()){
+		return -1;
+	}
+
+	fdtochan(fd, -1, 0, 0, perrbuf);
+	fdclose(fd, 0, perrbuf);
+	return 0;
 }
 
 int
