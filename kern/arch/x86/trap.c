@@ -137,7 +137,8 @@ void idt_init(void)
 
 #ifdef CONFIG_KTHREAD_POISON
 	/* TODO: KTHR-STACK */
-	uintptr_t *poison = (uintptr_t*)ROUNDDOWN(bootstacktop - 1, PGSIZE);
+	uintptr_t *poison = (uintptr_t*)ROUNDDOWN((uintptr_t)bootstacktop - 1,
+	                                          PGSIZE);
 	*poison = 0xdeadbeef;
 #endif /* CONFIG_KTHREAD_POISON */
 

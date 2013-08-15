@@ -66,8 +66,8 @@ void *user_mem_check(struct proc *p, const void *DANGEROUS va, size_t len,
 	int page_perms = 0;
 
 	perm |= PTE_P;
-	start = ROUNDDOWN((void*DANGEROUS)va, PGSIZE);
-	end = ROUNDUP((void*DANGEROUS)va + len, PGSIZE);
+	start = (void*)ROUNDDOWN((uintptr_t)va, PGSIZE);
+	end = (void*)ROUNDUP((uintptr_t)va + len, PGSIZE);
 	if (start >= end) {
 		warn("Blimey!  Wrap around in VM range calculation!");	
 		return NULL;
@@ -151,8 +151,8 @@ int memcpy_from_user(struct proc *p, void *dest, const void *DANGEROUS va,
 
 	static_assert(ULIM % PGSIZE == 0 && ULIM != 0); // prevent wrap-around
 
-	start = ROUNDDOWN(va, PGSIZE);
-	end = ROUNDUP(va + len, PGSIZE);
+	start = (void*)ROUNDDOWN((uintptr_t)va, PGSIZE);
+	end = (void*)ROUNDUP((uintptr_t)va + len, PGSIZE);
 
 	if (start >= (void*SNT)ULIM || end > (void*SNT)ULIM)
 		return -EFAULT;
@@ -217,8 +217,8 @@ int memcpy_to_user(struct proc *p, void *va, const void *src, size_t len)
 
 	static_assert(ULIM % PGSIZE == 0 && ULIM != 0); // prevent wrap-around
 
-	start = ROUNDDOWN(va, PGSIZE);
-	end = ROUNDUP(va + len, PGSIZE);
+	start = (void*)ROUNDDOWN((uintptr_t)va, PGSIZE);
+	end = (void*)ROUNDUP((uintptr_t)va + len, PGSIZE);
 
 	if (start >= (void*SNT)ULIM || end > (void*SNT)ULIM)
 		return -EFAULT;

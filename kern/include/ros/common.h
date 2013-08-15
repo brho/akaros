@@ -48,31 +48,35 @@ typedef unsigned long uintreg_t;
 })
 #endif
 
-// Rounding operations (efficient when n is a power of 2)
-// Round down to the nearest multiple of n
-#define ROUNDDOWN(a, n)						\
-({								\
-	uintptr_t __a = (uintptr_t) (a);				\
-	(typeof(a)) (__a - __a % (n));				\
-})
-// Round up to the nearest multiple of n
-#define ROUNDUP(a, n)						\
-({								\
-	uintptr_t __n = (uintptr_t) (n);				\
-	(typeof(a)) (ROUNDDOWN((uintptr_t) (a) + __n - 1, __n));	\
+/* Rounding operations (efficient when n is a power of 2)
+ * Round down to the nearest multiple of n.
+ * The compiler should compile out the branch.  This is needed for 32 bit, so
+ * that we can round down uint64_t, without chopping off the top 32 bits. */
+#define ROUNDDOWN(a, n)                                                        \
+({                                                                             \
+	typeof(a) __b;                                                             \
+	if (sizeof(a) == 8) {                                                      \
+		uint64_t __a = (uint64_t) (a);                                         \
+		__b = (typeof(a)) (__a - __a % (n));                                   \
+	} else {                                                                   \
+		uintptr_t __a = (uintptr_t) (a);                                       \
+		__b = (typeof(a)) (__a - __a % (n));                                   \
+	}                                                                          \
+	__b;                                                                       \
 })
 
-// Round down to the nearest multiple of n
-#define PTRROUNDDOWN(a, n)						\
-({								\
-	char * __a = (char *) (a);				\
-	(typeof(a)) (__a - (uintptr_t)__a % (n));				\
-})
-// Round pointer up to the nearest multiple of n
-#define PTRROUNDUP(a, n)						\
-({								\
-	uintptr_t __n = (uintptr_t) (n);				\
-	(typeof(a)) (PTRROUNDDOWN((char *) (a) + __n - 1, __n));	\
+/* Round up to the nearest multiple of n */
+#define ROUNDUP(a, n)                                                          \
+({                                                                             \
+	typeof(a) __b;                                                             \
+	if (sizeof(a) == 8) {                                                      \
+		uint64_t __n = (uint64_t) (n);                                         \
+		__b = (typeof(a)) (ROUNDDOWN((uint64_t) (a) + __n - 1, __n));          \
+	} else {                                                                   \
+		uintptr_t __n = (uintptr_t) (n);                                       \
+		__b = (typeof(a)) (ROUNDDOWN((uintptr_t) (a) + __n - 1, __n));         \
+	}                                                                          \
+	__b;                                                                       \
 })
 
 // Return the integer logarithm of the value provided rounded down

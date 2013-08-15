@@ -107,7 +107,7 @@ static void kmem_slab_destroy(struct kmem_cache *cp, struct kmem_slab *a_slab)
 				buf += a_slab->obj_size;
 			}
 		}
-		page_decref(kva2page(ROUNDDOWN(a_slab, PGSIZE)));
+		page_decref(kva2page((void*)ROUNDDOWN((uintptr_t)a_slab, PGSIZE)));
 	} else {
 		struct kmem_bufctl *i;
 		void *page_start = (void*)-1;
@@ -212,8 +212,8 @@ void kmem_cache_free(struct kmem_cache *cp, void *buf)
 	spin_lock_irqsave(&cp->cache_lock);
 	if (cp->obj_size <= SLAB_LARGE_CUTOFF) {
 		// find its slab
-		a_slab = (struct kmem_slab*)(ROUNDDOWN(buf, PGSIZE) + PGSIZE -
-		                             sizeof(struct kmem_slab));
+		a_slab = (struct kmem_slab*)(ROUNDDOWN((uintptr_t)buf, PGSIZE) +
+		                             PGSIZE - sizeof(struct kmem_slab));
 		/* write location of next free small obj to the space at the end of the
 		 * buffer, then list buf as the next free small obj */
 		*(uintptr_t**)(buf + cp->obj_size) = a_slab->free_small_obj;

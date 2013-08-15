@@ -647,7 +647,7 @@ int env_user_mem_walk(env_t* e, void* start, size_t len,
 	physaddr_t pa;
 
 	assert((uintptr_t)start % PGSIZE == 0 && len % PGSIZE == 0);
-	void* end = (char*)start+len;
+	uintptr_t end = (uintptr_t)start+len;
 	uint32_t pdeno_start = PDX(start);
 	uint32_t pdeno_end = PDX(ROUNDUP(end,PTSIZE));
 	/* concerned about overflow.  this should catch it for now, given the above
