@@ -1,7 +1,7 @@
 /*
  * Stub.
  */
-#define DEBUG
+//#define DEBUG
 #include <vfs.h>
 #include <kfs.h>
 #include <slab.h>

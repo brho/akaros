@@ -1,4 +1,4 @@
-#define DEBUG
+//#define DEBUG
 #include <vfs.h>
 #include <kfs.h>
 #include <slab.h>
@@ -130,7 +130,8 @@ unsigned int
 	char *sv[4];
 	int i, ns;
 	uint32_t junk;
-printd("convM2kdirent >>>>>>>>>nbuf %d STATFIXLEN %d\n", nbuf, STATFIXLEN);
+	printd("%s >>>>>>>>>nbuf %d STATFIXLEN %d\n",
+		__func__, nbuf, STATFIXLEN);
 	if(nbuf < STATFIXLEN)
 		return 0; 
 
@@ -172,6 +173,7 @@ printd("convM2kdirent >>>>>>>>>nbuf %d STATFIXLEN %d\n", nbuf, STATFIXLEN);
 			return 0;
 		if (i == 0){
 			kd->d_reclen = ns;
+			printd("memmove %p %p %d\n", kd->d_name, p, ns);
 			memmove(kd->d_name, p, ns);
 			kd->d_name[ns] = 0;
 		}

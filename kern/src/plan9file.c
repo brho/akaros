@@ -2,7 +2,7 @@
  * Copyright 2013 Google Inc.
  * Copyright (c) 1989-2003 by Lucent Technologies, Bell Laboratories.
  */
-#define DEBUG
+//#define DEBUG
 #include <setjmp.h>
 #include <vfs.h>
 #include <kfs.h>
@@ -124,7 +124,7 @@ growfd(struct fgrp *f, int fd)	/* fd is always >= 0 */
 	printd("no free file descriptors\n");
 	return -1;
     }
-    newfd = kmalloc((f->nfd+DELTAFD)*sizeof(struct chan*), KMALLOC_WAIT);
+    newfd = kzmalloc((f->nfd+DELTAFD)*sizeof(struct chan*), KMALLOC_WAIT);
     if(newfd == 0)
 	goto Exhausted;
     oldfd = f->fd;
@@ -412,7 +412,7 @@ mountrock(struct chan *c, uint8_t *p, unsigned char **pe)
 	spin_lock(&c->rockqlock);
 	if(c->nrock+len > c->mrock){
 		n = ROUNDUP(c->nrock+len, 1024);
-		r = kmalloc(n, 0);
+		r = kzmalloc(n, KMALLOC_WAIT);
 		memmove(r, c->dirrock, c->nrock);
 		kfree(c->dirrock);
 		c->dirrock = r;
@@ -522,7 +522,7 @@ mountfix(struct chan *c, uint8_t *op, long n, long maxn, struct errbuf *perrbuf)
 			 * Might as well skip it.
 			 */
 			if(buf == NULL){
-				buf = kmalloc(4096, 0);
+				buf = kzmalloc(4096, KMALLOC_WAIT);
 				nbuf = 4096;
 			}
 			if(waserror())
@@ -575,9 +575,8 @@ mountfix(struct chan *c, uint8_t *op, long n, long maxn, struct errbuf *perrbuf)
 long
 sysread(int fd, void *p, size_t n, off_t off)
 {
-    PERRBUF;
-    
-    ERRSTACK(2);
+    ERRSTACKBASE(2);
+    uint8_t *ep = p;
     long nn, nnn;
     struct chan *c;
     int ispread = 1;
@@ -592,9 +591,9 @@ sysread(int fd, void *p, size_t n, off_t off)
     
     if(waserror()){
 	cclose(c, perrbuf);
-	return -1;
+	nexterror();
     }
-    
+
     /*
      * The offset is passed through on directories, normally.
      * Sysseek complains, but pread is used by servers like exportfs,
@@ -618,7 +617,7 @@ sysread(int fd, void *p, size_t n, off_t off)
 	 * clear ispread to always maintain the struct chan offset.
 	 */
 	/* this is a bit of a hack until we resolve akaros direntry format. */
-	ents = kmalloc(8192, KMALLOC_WAIT);
+	ents = kzmalloc(8192, KMALLOC_WAIT);
 	if (! ents)
 		error(Enomem);
 
@@ -634,7 +633,8 @@ sysread(int fd, void *p, size_t n, off_t off)
 	/* tell it we have less than we have to make sure it will
 	 * fit in the large akaros dirents.
 	 */
-	if(!mountrockread(c, p, n, &nn)){
+	if(!mountrockread(c, ents, 2048, &nn)){
+		printd("Rock read failed, going to the source\n");
 	    if(c->umh)
 		nn = unionread(c, ents, 2048, perrbuf);
 	    else{
@@ -642,22 +642,18 @@ sysread(int fd, void *p, size_t n, off_t off)
 		    error(Edirseek);
 		nn = c->dev->read(c, ents, 2048, c->devoffset, perrbuf);
 	    }
-	}
+	} else printd("rock read ok\n");
 	nnn = mountfix(c, ents, nn, n, perrbuf);
-printd("sysread: dir: nn %d nnn %d\n", nn, nnn);
 	/* now convert to akaros kdents. This whole thing needs fixin' */
 	int total, amt = 0, iter = 0;
 	for(total = 0; total < nnn; total += amt){
-		printd("Converted nnn %d... total %d amt %d\n", nnn, total, amt);
-		amt = convM2kdirent(ents, nnn-total, (struct kdirent *) p);
-printd("amt after call %d\n", amt);
+		amt = convM2kdirent(ents, nnn-total, (struct kdirent *) ep);
 		ents += amt;
-		if (iter++ > 4)
-			break;
+		ep = (uint8_t *)ep + sizeof(struct kdirent);
 	} 
-printd("sysread: dir: nn %d nnn %d\n", nn, nnn);
 	
 	ispread = 0;
+	nnn = ep - (uint8_t *)p;
     }
     else
 	nnn = nn = c->dev->read(c, p, n, off, perrbuf);
