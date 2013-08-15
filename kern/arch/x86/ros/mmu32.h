@@ -18,7 +18,7 @@ typedef unsigned long pde_t;
  *
  *    4 Gig -------->  +------------------------------+
  *                     :              .               :
- *  KERN_VMAP_TOP      +------------------------------+ 0xfffff000
+ *  KERN_VMAP_TOP      +------------------------------+ 0xfec00000
  *                     |                              |
  *                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ RW/--
  *                     :              .               :
@@ -80,6 +80,9 @@ typedef unsigned long pde_t;
  *     mapped.  "Empty Memory" is normally unmapped, but user programs may
  *     map pages there if desired.  ROS user programs map pages temporarily
  *     at UTEMP.
+ *
+ *     KERN_VMAP_TOP is set to the IO_APIC_BASE, where we'll map in the IOAPIC
+ *     and LAPIC.  We need to not give out this region as free pages.
  */
 
 

@@ -52,13 +52,21 @@ void mboot_detect_memory(struct multiboot_info *mbi)
 	/* mem_lower and upper are measured in KB.  They are 32 bit values, so we're
 	 * limited to 4TB total. */
 	basemem = ROUNDDOWN((size_t)mbi->mem_lower * 1024, PGSIZE);
+	/* On 32 bit, This shift << 10 could cause us to lose some memory, but we
+	 * weren't going to access it anyways (won't go beyond ~1GB) */
 	extmem = ROUNDDOWN((size_t)mbi->mem_upper * 1024, PGSIZE);
 	/* Calculate the maximum physical address based on whether or not there is
 	 * any extended memory. */
-	if (extmem)
+	if (extmem) {
 		max_bios_mem = EXTPHYSMEM + extmem;
-	else
+		/* On 32 bit, if we had enough RAM that adding a little wrapped us
+		 * around, we'll back off a little and run with just extmem amount (in
+		 * essence, subtracing 1MB). */
+		if (max_bios_mem < extmem)
+			max_bios_mem = extmem;
+	} else {
 		max_bios_mem = basemem;
+	}
 	max_bios_addr = MIN(max_bios_mem, KERN_VMAP_TOP - KERNBASE);
 	printk("Base memory: %luK, Extended memory: %luK\n", basemem / 1024,
 	       extmem / 1024);
