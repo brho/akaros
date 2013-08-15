@@ -1,3 +1,4 @@
+//#define DEBUG
 #include <vfs.h>
 #include <kfs.h>
 #include <slab.h>
@@ -11,7 +12,6 @@
 #include <pmap.h>
 #include <smp.h>
 #include <fcall.h>
-
 
 unsigned int
 sizeD2M(struct dir *d)
@@ -44,7 +44,7 @@ convD2M(struct dir *d, uint8_t *buf, unsigned int nbuf)
 
 	p = buf;
 	ebuf = buf + nbuf;
-
+printd(">>>>>>>>>>>>>>>>>>>>>>convD2M: name: %s\n", d->name);
 	sv[0] = d->name;
 	sv[1] = d->uid;
 	sv[2] = d->gid;
@@ -101,6 +101,6 @@ convD2M(struct dir *d, uint8_t *buf, unsigned int nbuf)
 
 	if(ss != p - buf)
 		return 0;
-
+printd("------------------>%s: return %d\n", __func__, p-buf);
 	return p - buf;
 }

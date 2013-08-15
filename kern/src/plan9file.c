@@ -630,7 +630,7 @@ sysread(int fd, void *p, size_t n, off_t off)
 	    mountrewind(c);
 	    unionrewind(c, perrbuf);
 	}
-	
+	printd("sysread: dir: ispread %d @ %lld\n", ispread, off);
 	/* tell it we have less than we have to make sure it will
 	 * fit in the large akaros dirents.
 	 */
@@ -644,8 +644,18 @@ sysread(int fd, void *p, size_t n, off_t off)
 	    }
 	}
 	nnn = mountfix(c, ents, nn, n, perrbuf);
+printd("sysread: dir: nn %d nnn %d\n", nn, nnn);
 	/* now convert to akaros kdents. This whole thing needs fixin' */
-	nnn =  convM2kdirent(ents, nnn, (struct kdirent *) p);
+	int total, amt = 0, iter = 0;
+	for(total = 0; total < nnn; total += amt){
+		printd("Converted nnn %d... total %d amt %d\n", nnn, total, amt);
+		amt = convM2kdirent(ents, nnn-total, (struct kdirent *) p);
+printd("amt after call %d\n", amt);
+		ents += amt;
+		if (iter++ > 4)
+			break;
+	} 
+printd("sysread: dir: nn %d nnn %d\n", nn, nnn);
 	
 	ispread = 0;
     }

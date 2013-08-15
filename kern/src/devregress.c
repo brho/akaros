@@ -69,7 +69,11 @@ printd("regressread %d\n", (uint32_t)c->qid.path);
 		return devdirread(c, a, n, regressdir, Qmax, devgen, perrbuf);
 
 	case Qmalloc:
+		{
+		char *usage = "malloc size-in-meg";
+		n = readstr(offset, a, sizeof(usage), usage);
 		break;
+		}
 
 	case Qctl:
 		snprintf(ctl, sizeof(ctl), "verbosity %d", verbose);
@@ -94,7 +98,6 @@ regresswrite(struct chan *c, void *a, long n, int64_t offset, struct errbuf *per
 	switch((uint32_t)c->qid.path){
 
 	case Qmalloc:
-	    printd("hi\n");
 		return n;
 
 	case Qctl:

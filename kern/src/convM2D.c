@@ -1,3 +1,4 @@
+#define DEBUG
 #include <vfs.h>
 #include <kfs.h>
 #include <slab.h>
@@ -11,7 +12,6 @@
 #include <pmap.h>
 #include <smp.h>
 #include <fcall.h>
-
 
 int
 statcheck(uint8_t *buf, unsigned nbuf)
@@ -119,7 +119,7 @@ is record */
         unsigned char                           d_type;
         char                                            d_name[MAX_FILENAME_SZ 
 + 1];   /* filename */
-} __attribute__((aligned(8)));
+i __attribute__((aligned(8)));
 
 #endif
 
@@ -130,7 +130,7 @@ unsigned int
 	char *sv[4];
 	int i, ns;
 	uint32_t junk;
-
+printd("convM2kdirent >>>>>>>>>nbuf %d STATFIXLEN %d\n", nbuf, STATFIXLEN);
 	if(nbuf < STATFIXLEN)
 		return 0; 
 
@@ -160,18 +160,25 @@ unsigned int
 
 	/* for now, uids in akaros are ints. Does not
 	 * matter; kdirents are limited in what they tell you.
-	 * get the name, ignore the rest
+	 * get the name, ignore the rest. Maybe we can
+	 * fix this later. 
 	 */
-	if(p + BIT16SZ > ebuf)
-		return 0;
-	/* name size. */
-	ns = GBIT16(p);
-	p += BIT16SZ;
-	if(p + ns > ebuf)
-		return 0;
-	kd->d_reclen = ns;
-	memmove(kd->d_name, p, ns);
-	
+	for(i = 0; i < 4; i++){
+		if(p + BIT16SZ > ebuf)
+			return 0;
+		ns = GBIT16(p);
+		p += BIT16SZ;
+		if(p + ns > ebuf)
+			return 0;
+		if (i == 0){
+			kd->d_reclen = ns;
+			memmove(kd->d_name, p, ns);
+			kd->d_name[ns] = 0;
+		}
+		p += ns;
+	}
+
+	printd("%s returns %d %s\n", __func__, p-buf, kd->d_name);
 	return p - buf;
 }
 
