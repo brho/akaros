@@ -4,7 +4,7 @@
 #pragma nosharc
 #endif
 
-#define DEBUG
+//#define DEBUG
 #include <ros/common.h>
 #include <arch/types.h>
 #include <arch/arch.h>
@@ -44,7 +44,7 @@ extern unsigned char device_mac[6];
 #endif
 
 /* Tracing Globals */
-int systrace_flags = 0|SYSTRACE_ON;
+int systrace_flags = 0;
 struct systrace_record *systrace_buffer = 0;
 uint32_t systrace_bufidx = 0;
 size_t systrace_bufsize = 0;
@@ -1100,7 +1100,7 @@ static intreg_t sys_read(struct proc *p, int fd, void *buf, int len)
 		return -1;
 	}
 	if (file->plan9){
-	    ret = sysread(file->plan9fd, buf, len, (off_t) -1);
+	    ret = sysread(file->plan9fd, buf, len, ~0LL);
 	    printd("plan 9 read returns %d\n", ret);
 	} else {
 		if (!file->f_op->read) {

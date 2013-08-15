@@ -38,17 +38,17 @@ convD2M(struct dir *d, uint8_t *buf, unsigned int nbuf)
 	uint8_t *p, *ebuf;
 	char *sv[4];
 	int i, ns, nsv[4], ss;
-
+	printd("d %d buf %p, nbuf %d\n", d, buf, nbuf);
 	if(nbuf < BIT16SZ)
 		return 0;
 
 	p = buf;
 	ebuf = buf + nbuf;
-printd(">>>>>>>>>>>>>>>>>>>>>>convD2M: name: %s\n", d->name);
+	printd(">>>>>>>>>>>>>>>>>>>>>>convD2M: name: %s\n", d->name);
 	sv[0] = d->name;
-	sv[1] = d->uid;
-	sv[2] = d->gid;
-	sv[3] = d->muid;
+	sv[1] = NULL; //d->uid;
+	sv[2] = NULL; //d->gid;
+	sv[3] = NULL; //d->muid;
 
 	ns = 0;
 	for(i = 0; i < 4; i++){
@@ -56,11 +56,11 @@ printd(">>>>>>>>>>>>>>>>>>>>>>convD2M: name: %s\n", d->name);
 			nsv[i] = strlen(sv[i]);
 		else
 			nsv[i] = 0;
+		printd("nsv [%d] = %d\n", i, nsv[i]);
 		ns += nsv[i];
 	}
 
 	ss = STATFIXLEN + ns;
-
 	/* set size before erroring, so user can know how much is needed */
 	/* note that length excludes count field itself */
 	PBIT16(p, ss-BIT16SZ);
@@ -68,7 +68,6 @@ printd(">>>>>>>>>>>>>>>>>>>>>>convD2M: name: %s\n", d->name);
 
 	if(ss > nbuf)
 		return BIT16SZ;
-
 	PBIT16(p, d->type);
 	p += BIT16SZ;
 	PBIT32(p, d->dev);
@@ -87,7 +86,6 @@ printd(">>>>>>>>>>>>>>>>>>>>>>convD2M: name: %s\n", d->name);
 	p += BIT32SZ;
 	PBIT64(p, d->length);
 	p += BIT64SZ;
-
 	for(i = 0; i < 4; i++){
 		ns = nsv[i];
 		if(p + ns + BIT16SZ > ebuf)
@@ -101,6 +99,5 @@ printd(">>>>>>>>>>>>>>>>>>>>>>convD2M: name: %s\n", d->name);
 
 	if(ss != p - buf)
 		return 0;
-printd("------------------>%s: return %d\n", __func__, p-buf);
 	return p - buf;
 }
