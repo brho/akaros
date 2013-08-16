@@ -329,7 +329,6 @@ addelem(struct path *p, char *s, struct chan *from, struct errbuf *perrbuf)
 void
 chanfree(struct chan *c, struct errbuf *perrbuf)
 {
-printd("chanfree %p\n", c);
 	c->flag = CFREE;
 
 	if(c->dirrock != NULL){
@@ -725,7 +724,6 @@ cclone(struct chan *c, struct errbuf *perrbuf)
 {
 	struct chan *nc;
 	struct walkqid *wq;
-
 	wq = c->dev->walk(c, NULL, NULL, 0, perrbuf);		//XDYNX?
 	if(wq == NULL)
 		error("clone failed");
@@ -1002,7 +1000,6 @@ walk(struct chan **cp, char **names, int nnames, int nomount, int *nerror, struc
 	}
 
 	putmhead(mh, perrbuf);
-printd("walk: cuni\n");
 	c = cunique(c, perrbuf);
 
 	if(c->umh != NULL){	//BUG
@@ -1011,17 +1008,13 @@ printd("walk: cuni\n");
 		c->umh = NULL;
 	}
 
-printd("walk: before pc\n");
 	pathclose(c->path, perrbuf);
-printd("walk: after pc\n");
 	c->path = path;
 
 	cclose(*cp, perrbuf);
-printd("walk: after ccl\n");
 	*cp = c;
 	if(nerror)
 		*nerror = nhave;
-printd("wlak: done\n");
 	return 0;
 }
 
@@ -1220,9 +1213,7 @@ namec(char *aname, int amode, int omode, int perm, struct errbuf *perrbuf)
 	aname = validnamedup(aname, 1, perrbuf);
 
 	if(waserror()){
-		printd("WA\n");
 		kfree(aname);
-		printd("WA N\n");
 		nexterror();
 	}
 	printd("namec %s %d %d\n", aname, amode, omode);
@@ -1242,7 +1233,6 @@ namec(char *aname, int amode, int omode, int perm, struct errbuf *perrbuf)
 		break;
 
 	case '#':
-printd("#\n");
 		nomount = 1;
 		current->genbuf[0] = '\0';
 		n = 0;
@@ -1252,7 +1242,6 @@ printd("#\n");
 			current->genbuf[n++] = *name++;
 		}
 		current->genbuf[n] = '\0';
-printd("name %s\n", current->genbuf);
 		/*
 		 *  noattach is sandboxing.
 		 *
@@ -1268,7 +1257,6 @@ printd("name %s\n", current->genbuf);
 		/* actually / is caught by parsing earlier */
 		if(current->genbuf[1] == 'M')
 			error(Enoattach);
-printd("up->pgrp %p \n", current->pgrp);
 		if (current->pgrp->noattach) {
 		    if (current->genbuf[1] != '|' &&
 			current->genbuf[1] != 'e' &&
@@ -1276,12 +1264,9 @@ printd("up->pgrp %p \n", current->pgrp);
 			current->genbuf[1] != 'p')
 			error(Enoattach);
 		}
-printd("efore devtabget\n");
 		dev = devtabget(current->genbuf[1], 1, perrbuf);			//XDYNX
-printd("af devtabget %p\n", dev);
 		if(dev == NULL)
 			error(Ebadsharp);
-printd("dev %p\n", dev);
 		//if(waserror()){
 		//	devtabdecr(dev);
 		//	nexterror();
@@ -1347,7 +1332,6 @@ printd("dev %p\n", dev);
 			error(Eexist);
 		e.nelems--;
 	}
-printd("namec: walk\n");
 	if(walk(&c, e.elems, e.nelems, nomount, &e.nerror, perrbuf) < 0){
 		if(e.nerror < 0 || e.nerror > e.nelems){
 			printd("namec %s walk error nerror=%d\n", aname, e.nerror, perrbuf);
@@ -1356,7 +1340,6 @@ printd("namec: walk\n");
 		nexterror();
 	}
 
-printd("namec: walk done\n");
 	if(e.mustbedir && !(c->qid.type & QTDIR))
 		error("not a directory");
 
@@ -1379,7 +1362,6 @@ printd("namec: walk done\n");
 	case Aopen:
 	Open:
 		/* save&update the name; domount might change c */
-printd("open ...\n");
 		path = c->path;
 		kref_get(&path->ref, 1);
 		mh = NULL;
