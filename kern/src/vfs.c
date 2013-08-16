@@ -40,9 +40,9 @@ struct vfsmount *__mount_fs(struct fs_type *fs, char *dev_name,
 
 	/* this first ref is stored in the NS tailq below */
 	kref_init(&vmnt->mnt_kref, fake_release, 1);
-	/* Build the vfsmount, if there is no mnt_pt, mnt is the root vfsmount (for now).
-	 * fields related to the actual FS, like the sb and the mnt_root are set in
-	 * the fs-specific get_sb() call. */
+	/* Build the vfsmount, if there is no mnt_pt, mnt is the root vfsmount (for
+	 * now).  fields related to the actual FS, like the sb and the mnt_root are
+	 * set in the fs-specific get_sb() call. */
 	if (!mnt_pt) {
 		vmnt->mnt_parent = NULL;
 		vmnt->mnt_mountpoint = NULL;
@@ -1995,3 +1995,138 @@ int ls_dash_r(char *path)
 	path_release(nd);
 	return 0;
 }
+
+/* Dummy ops, to catch weird operations we weren't expecting */
+int dummy_create(struct inode *dir, struct dentry *dentry, int mode,
+                 struct nameidata *nd)
+{
+	printk("Dummy VFS function %s called!\n", __FUNCTION__);
+	return -1;
+}
+
+struct dentry *dummy_lookup(struct inode *dir, struct dentry *dentry,
+                          struct nameidata *nd)
+{
+	printk("Dummy VFS function %s called!\n", __FUNCTION__);
+	return 0;
+}
+
+int dummy_link(struct dentry *old_dentry, struct inode *dir,
+             struct dentry *new_dentry)
+{
+	printk("Dummy VFS function %s called!\n", __FUNCTION__);
+	return -1;
+}
+
+int dummy_unlink(struct inode *dir, struct dentry *dentry)
+{
+	printk("Dummy VFS function %s called!\n", __FUNCTION__);
+	return -1;
+}
+
+int dummy_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
+{
+	printk("Dummy VFS function %s called!\n", __FUNCTION__);
+	return -1;
+}
+
+int dummy_mkdir(struct inode *dir, struct dentry *dentry, int mode)
+{
+	printk("Dummy VFS function %s called!\n", __FUNCTION__);
+	return -1;
+}
+
+int dummy_rmdir(struct inode *dir, struct dentry *dentry)
+{
+	printk("Dummy VFS function %s called!\n", __FUNCTION__);
+	return -1;
+}
+
+int dummy_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t rdev)
+{
+	printk("Dummy VFS function %s called!\n", __FUNCTION__);
+	return -1;
+}
+
+int dummy_rename(struct inode *old_dir, struct dentry *old_dentry,
+               struct inode *new_dir, struct dentry *new_dentry)
+{
+	printk("Dummy VFS function %s called!\n", __FUNCTION__);
+	return -1;
+}
+
+char *dummy_readlink(struct dentry *dentry)
+{
+	printk("Dummy VFS function %s called!\n", __FUNCTION__);
+	return 0;
+}
+
+void dummy_truncate(struct inode *inode)
+{
+	printk("Dummy VFS function %s called!\n", __FUNCTION__);
+}
+
+int dummy_permission(struct inode *inode, int mode, struct nameidata *nd)
+{
+	printk("Dummy VFS function %s called!\n", __FUNCTION__);
+	return -1;
+}
+
+int dummy_d_revalidate(struct dentry *dir, struct nameidata *nd)
+{
+	printk("Dummy VFS function %s called!\n", __FUNCTION__);
+	return -1;
+}
+
+int dummy_d_hash(struct dentry *dentry, struct qstr *name)
+{
+	printk("Dummy VFS function %s called!\n", __FUNCTION__);
+	return -1;
+}
+
+int dummy_d_compare(struct dentry *dir, struct qstr *name1, struct qstr *name2)
+{
+	printk("Dummy VFS function %s called!\n", __FUNCTION__);
+	return -1;
+}
+
+int dummy_d_delete(struct dentry *dentry)
+{
+	printk("Dummy VFS function %s called!\n", __FUNCTION__);
+	return -1;
+}
+
+int dummy_d_release(struct dentry *dentry)
+{
+	printk("Dummy VFS function %s called!\n", __FUNCTION__);
+	return -1;
+}
+
+void dummy_d_iput(struct dentry *dentry, struct inode *inode)
+{
+	printk("Dummy VFS function %s called!\n", __FUNCTION__);
+}
+
+struct inode_operations dummy_i_op = {
+	dummy_create,
+	dummy_lookup,
+	dummy_link,
+	dummy_unlink,
+	dummy_symlink,
+	dummy_mkdir,
+	dummy_rmdir,
+	dummy_mknod,
+	dummy_rename,
+	dummy_readlink,
+	dummy_truncate,
+	dummy_permission,
+};
+
+struct dentry_operations dummy_d_op = {
+	dummy_d_revalidate,
+	dummy_d_hash,
+	dummy_d_compare,
+	dummy_d_delete,
+	dummy_d_release,
+	dummy_d_iput,
+};
