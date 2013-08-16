@@ -1178,7 +1178,7 @@ static intreg_t sys_open(struct proc *p, const char *path, size_t path_l,
 		warn("File insertion failed");
 		return -1;
 	}
-	printd("File %s Open, res=%d\n", path, fd);
+	printd("File %s Open, fd=%d\n", path, fd);
 	return fd;
 }
 

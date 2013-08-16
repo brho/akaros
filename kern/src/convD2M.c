@@ -1,4 +1,4 @@
-//#define DEBUG
+#define DEBUG
 #include <vfs.h>
 #include <kfs.h>
 #include <slab.h>
@@ -38,7 +38,7 @@ convD2M(struct dir *d, uint8_t *buf, unsigned int nbuf)
 	uint8_t *p, *ebuf;
 	char *sv[4];
 	int i, ns, nsv[4], ss;
-	printd("d %d buf %p, nbuf %d\n", d, buf, nbuf);
+	printd("%s: d %d buf %p, nbuf %d\n", __func__, d, buf, nbuf);
 	if(nbuf < BIT16SZ)
 		return 0;
 
