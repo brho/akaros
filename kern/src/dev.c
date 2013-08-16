@@ -154,7 +154,7 @@ devclone(struct chan *c, struct errbuf *perrbuf)
 	struct chan *nc;
 
 	if(c->flag & COPEN){
-		panic("devclone: file of type %C already open\n",
+		panic("devclone: file of type %c already open\n",
 			c->dev != NULL? c->dev->dc: -1, perrbuf);
 	}
 
@@ -187,9 +187,8 @@ devwalk(struct chan *c, struct chan *nc, char **name, int nname,
 
 	if(nname > 0)
 		isdir(c, perrbuf);
-
 	alloc = 0;
-	wq = kzmalloc(sizeof(struct walkqid) + (nname - 1) * sizeof(struct qid), KMALLOC_WAIT);
+	wq = kzmalloc(sizeof(struct walkqid) + (nname) * sizeof(struct qid), KMALLOC_WAIT);
 	if(waserror()){
 		if(alloc && wq->clone!=NULL)
 			cclose(wq->clone, perrbuf);
@@ -204,7 +203,6 @@ devwalk(struct chan *c, struct chan *nc, char **name, int nname,
 		alloc = 1;
 	}
 	wq->clone = nc;
-
 	for(j=0; j<nname; j++){
 		if(!(nc->qid.type & QTDIR)){
 			if(j==0)
@@ -291,7 +289,6 @@ devstat(struct chan *c, uint8_t *db, long n, struct dirtab *tab, int ntab, devge
 	for(i=0;; i++){
 		switch((*gen)(c, NULL, tab, ntab, i, &dir)){
 		case -1:
-printd("devstat: case -1\n");
 			if(c->qid.type & QTDIR){
 				if(c->path == NULL)
 					elem = "???";
@@ -310,15 +307,12 @@ printd("devstat: case -1\n");
 
 			error(Enonexist);
 		case 0:
-printd("devstat: case 0\n");
 			break;
 		case 1:
-printd("devstat: case 1\n");
 			if(c->qid.path == dir.qid.path) {
 				if(c->flag&CMSG)
 					dir.mode |= DMMOUNT;
 				n = convD2M(&dir, db, n);
-printd("devstat: return %d\n", n);
 				if(n == 0)
 					error(Ebadarg);
 				return n;
