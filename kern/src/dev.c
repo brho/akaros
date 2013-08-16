@@ -291,6 +291,7 @@ devstat(struct chan *c, uint8_t *db, long n, struct dirtab *tab, int ntab, devge
 	for(i=0;; i++){
 		switch((*gen)(c, NULL, tab, ntab, i, &dir)){
 		case -1:
+printd("devstat: case -1\n");
 			if(c->qid.type & QTDIR){
 				if(c->path == NULL)
 					elem = "???";
@@ -309,8 +310,10 @@ devstat(struct chan *c, uint8_t *db, long n, struct dirtab *tab, int ntab, devge
 
 			error(Enonexist);
 		case 0:
+printd("devstat: case 0\n");
 			break;
 		case 1:
+printd("devstat: case 1\n");
 			if(c->qid.path == dir.qid.path) {
 				if(c->flag&CMSG)
 					dir.mode |= DMMOUNT;
