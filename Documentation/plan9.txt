@@ -1,11 +1,12 @@
 We're adding the plan 9 file system to akaros.We're bringing in the
 name space interface, including the ability to do binds, union mounts,
 and the like. We will extend it to support things we might need,
-in particular mmap. 
+in particular mmap.  We will use it to add things to Akaros we 
+need, such as virtio drivers, ethernet drivers, and TCP.
 
-By bringing this model in, we can make the interface more powerful,
-and simpler. We can remove 16 system calls right away and yet still have
-the functions they provided, for example. 
+By bringing this model in, we can make the Akaros interface more powerful,
+yet simpler. We can remove a number of system calls right away 
+and yet still have the functions they provide, for example. 
 
 This is not a from scratch effort but a code translation. The Plan 9 code
 deals with very subtle situations and has been hardened over time. No need
@@ -16,7 +17,7 @@ the regression device from NxM.
 
 Issues.
 
-The biggest issue so far is implemented the Plan 9 error handling.
+The biggest issue so far is implementing the Plan 9 error handling.
 In Plan 9, errors are managed via a longjmp-like mechanism. For example,
 in a call chain such as:
 a()
@@ -24,7 +25,7 @@ a()
   c()
    d()
 
-It is possible for d to invoke an error that returns to a directly. 
+It is possible for 'd' to invoke an error that returns to 'a' directly. 
 This model has many advantages over the standard model, which looks like
 this:
 a{ b();}
@@ -79,7 +80,7 @@ and that can be anything. We can tell from that.
 
 Where does the string in error() go?
 In Plan 9, it goes into the proc struct; in Akaros,
-it's copied to a user-mode buffer. 
+it's copied to a user-mode buffer via set_errstr(). 
 
 waserror()/error()/nexterror() manipulate an error call stack, similar to
 the function call stack. In Plan 9, this stack is maintained in the proc
@@ -89,5 +90,56 @@ stack entries are much, much larger; so large that maintaining the stack
 in the proc struct is impractical.
 
 Hence, we've had to make changes that add a bit of inconvenience but
-leave the code mostly intact.
+leave the code mostly intact. The error code in Akaros is tested in every
+circumstance at this point due to all the bugs we had in our port
+of the Plan 9 file system code.
+
+So, we'll go from the easiest case to the hardest.
+
+Case 1: you're a leaf function that does not use error(). No change.
+
+Case 2: You're a leaf function that needs error(). You must
+add a final paramater to your code, struct errbuf *perrbuf. 
+The spatch scripts in scripts/spatches that convert from Plan 9 
+source to Akaros source for the most part do this automatically.
+
+Case 3: A harder one. You're an intermediate function that
+calls functions that use error(), even though you do not.
+In this case, you need to still add the perrbuf parameter, 
+and pass it on. This one bit is probably the most inconvient.
+Again, the spatch scripts automate most of it.
+
+Those are in some sense the easier cases. Now it starts to get a
+bit harder.
+
+Case 4: you're a leaf or intermediate function that uses waserror().
+You still need to add the errbuf argument, but you also 
+need to use a macro which creates an array
+of errbuf structs as automatics. The waserror() usage does not change.
+The macro is ERRSTACK(x), where x is the number of calls to waserror()
+in your function. See kern/sys/chan.c.
+
+Case 5: you're a root node, i.e. you're the start of a chain of calls
+via syscall that must do the "root" errbuf setup, so that all error
+calls eventually return to you. In this case, you need to start the error
+stack. For that, you use the ERRSTACKBASE(x) macro, with the same 
+meaning as ERRSTACK: x should correspond to the number of waserror calls
+in the function.  See kern/src/plan9file.c:/sysread/
+
+Finally, if, in a waserror, you are finished and want to pop out to the
+next error in the chain, either in the same function or up the call stack,
+just call nexterror().
+
+This can be handy for debugging: in any function that supports error(),
+i.e. has a perrbuf parameter, simply call error and it bails you
+out of wherever you are, doing appropriate cleanup on the way out.
+No need to add return value processing to intermediate functions;
+if you try this out you will likely find it is extremely handy. I really
+miss it on Linux. It made a lot of the port debugging to Akaros a lot
+easier.
+
+There is error checking in error()/waserror()/nexterror().
+If you overflow or underflow the error stack the kernel will panic.
+The implementation is in kern/src/error.c, the macros are in
+kern/include/plan9.h.
 
