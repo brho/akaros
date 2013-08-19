@@ -83,6 +83,7 @@
 #define SYS_getcwd				117
 #define SYS_mkdir				118
 #define SYS_rmdir				119
+#define SYS_pipe				120
 
 /* Misc syscalls */
 #define SYS_gettimeofday		140

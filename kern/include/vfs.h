@@ -49,6 +49,7 @@ struct file;
 struct file_operations;
 struct fs_type;
 struct vfsmount;
+struct pipe_inode_info;
 
 /* List def's we need */
 TAILQ_HEAD(sb_tailq, super_block);
@@ -333,6 +334,16 @@ struct vfsmount {
 	struct namespace			*mnt_namespace;
 };
 
+struct pipe_inode_info
+{
+	char						*p_buf;
+	size_t						p_rd_off;
+	size_t						p_wr_off;
+	unsigned int				p_nr_readers;
+	unsigned int				p_nr_writers;
+	struct cond_var				p_cv;
+};
+
 /* Per-process structs */
 #define NR_OPEN_FILES_DEFAULT 32
 #define NR_FILE_DESC_DEFAULT 32
@@ -460,6 +471,7 @@ int do_access(char *path, int mode);
 int do_chmod(char *path, int mode);
 int do_mkdir(char *path, int mode);
 int do_rmdir(char *path);
+int do_pipe(struct file **pipe_files, int flags);
 struct file *dentry_open(struct dentry *dentry, int flags);
 void file_release(struct kref *kref);
 

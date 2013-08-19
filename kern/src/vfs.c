@@ -1044,14 +1044,18 @@ void inode_release(struct kref *kref)
 	} else {
 		inode->i_sb->s_op->delete_inode(inode);
 	}
+	if (S_ISFIFO(inode->i_mode)) {
+		page_decref(kva2page(inode->i_pipe->p_buf));
+		kfree(inode->i_pipe);
+	}
+	/* TODO: (BDEV) */
+	// kref_put(inode->i_bdev->kref); /* assuming it's a bdev, could be a pipe*/
 	/* Either way, we dealloc the in-memory version */
 	inode->i_sb->s_op->dealloc_inode(inode);	/* FS-specific clean-up */
 	kref_put(&inode->i_sb->s_kref);
 	/* TODO: clean this up */
 	assert(inode->i_mapping == &inode->i_pm);
 	kmem_cache_free(inode_kcache, inode);
-	/* TODO: (BDEV) */
-	// kref_put(inode->i_bdev->kref); /* assuming it's a bdev */
 }
 
 /* Fills in kstat with the stat information for the inode */
@@ -1636,6 +1640,257 @@ out_dentry:
 out_path_only:
 	path_release(nd);
 	return retval;
+}
+
+/* Pipes: Doing a simple buffer with reader and writer offsets.  Size is power
+ * of two, so we can easily compute its status and whatnot. */
+
+#define PIPE_SZ					(1 << PGSHIFT)
+
+static size_t pipe_get_rd_idx(struct pipe_inode_info *pii)
+{
+	return pii->p_rd_off & (PIPE_SZ - 1);
+}
+
+static size_t pipe_get_wr_idx(struct pipe_inode_info *pii)
+{
+
+	return pii->p_wr_off & (PIPE_SZ - 1);
+}
+
+static bool pipe_is_empty(struct pipe_inode_info *pii)
+{
+	return __ring_empty(pii->p_wr_off, pii->p_rd_off);
+}
+
+static bool pipe_is_full(struct pipe_inode_info *pii)
+{
+	return __ring_full(PIPE_SZ, pii->p_wr_off, pii->p_rd_off);
+}
+
+static size_t pipe_nr_full(struct pipe_inode_info *pii)
+{
+	return __ring_nr_full(pii->p_wr_off, pii->p_rd_off);
+}
+
+static size_t pipe_nr_empty(struct pipe_inode_info *pii)
+{
+	return __ring_nr_empty(PIPE_SZ, pii->p_wr_off, pii->p_rd_off);
+}
+
+ssize_t pipe_file_read(struct file *file, char *buf, size_t count,
+                       off64_t *offset)
+{
+	struct pipe_inode_info *pii = file->f_dentry->d_inode->i_pipe;
+	size_t copy_amt, amt_copied = 0;
+
+	cv_lock(&pii->p_cv);
+	while (pipe_is_empty(pii)) {
+		/* We wait til the pipe is drained before sending EOF if there are no
+		 * writers (instead of aborting immediately) */
+		if (!pii->p_nr_writers) {
+			cv_unlock(&pii->p_cv);
+			return 0;
+		}
+		if (file->f_flags & O_NONBLOCK) {
+			cv_unlock(&pii->p_cv);
+			set_errno(EAGAIN);
+			return -1;
+		}
+		cv_wait(&pii->p_cv);
+		cpu_relax();
+	}
+	/* We might need to wrap-around with our copy, so we'll do the copy in two
+	 * passes.  This will copy up to the end of the buffer, then on the next
+	 * pass will copy the rest to the beginning of the buffer (if necessary) */
+	for (int i = 0; i < 2; i++) {
+		copy_amt = MIN(PIPE_SZ - pipe_get_rd_idx(pii),
+		               MIN(pipe_nr_full(pii), count));
+		assert(current);	/* shouldn't pipe from the kernel */
+		memcpy_to_user(current, buf, pii->p_buf + pipe_get_rd_idx(pii),
+		               copy_amt);
+		buf += copy_amt;
+		count -= copy_amt;
+		pii->p_rd_off += copy_amt;
+		amt_copied += copy_amt;
+	}
+	/* Just using one CV for both readers and writers.  We should rarely have
+	 * multiple readers or writers. */
+	if (amt_copied)
+		__cv_broadcast(&pii->p_cv);
+	cv_unlock(&pii->p_cv);
+	return amt_copied;
+}
+
+/* Note: we're not dealing with PIPE_BUF and minimum atomic chunks, unless I
+ * have to later. */
+ssize_t pipe_file_write(struct file *file, const char *buf, size_t count,
+                        off64_t *offset)
+{
+	struct pipe_inode_info *pii = file->f_dentry->d_inode->i_pipe;
+	size_t copy_amt, amt_copied = 0;
+
+	cv_lock(&pii->p_cv);
+	/* Write aborts right away if there are no readers, regardless of pipe
+	 * status. */
+	if (!pii->p_nr_readers) {
+		cv_unlock(&pii->p_cv);
+		set_errno(EPIPE);
+		return -1;
+	}
+	while (pipe_is_full(pii)) {
+		if (file->f_flags & O_NONBLOCK) {
+			cv_unlock(&pii->p_cv);
+			set_errno(EAGAIN);
+			return -1;
+		}
+		cv_wait(&pii->p_cv);
+		cpu_relax();
+	}
+	/* We might need to wrap-around with our copy, so we'll do the copy in two
+	 * passes.  This will copy up to the end of the buffer, then on the next
+	 * pass will copy the rest to the beginning of the buffer (if necessary) */
+	for (int i = 0; i < 2; i++) {
+		copy_amt = MIN(PIPE_SZ - pipe_get_wr_idx(pii),
+		               MIN(pipe_nr_empty(pii), count));
+		assert(current);	/* shouldn't pipe from the kernel */
+		memcpy_from_user(current, pii->p_buf + pipe_get_wr_idx(pii), buf,
+		                 copy_amt);
+		buf += copy_amt;
+		count -= copy_amt;
+		pii->p_wr_off += copy_amt;
+		amt_copied += copy_amt;
+	}
+	/* Just using one CV for both readers and writers.  We should rarely have
+	 * multiple readers or writers. */
+	if (amt_copied)
+		__cv_broadcast(&pii->p_cv);
+	cv_unlock(&pii->p_cv);
+	return amt_copied;
+}
+
+/* In open and release, we need to track the number of readers and writers,
+ * which we can differentiate by the file flags. */
+int pipe_open(struct inode *inode, struct file *file)
+{
+	struct pipe_inode_info *pii = inode->i_pipe;
+	cv_lock(&pii->p_cv);
+	/* Ugliness due to not using flags for O_RDONLY and friends... */
+	if ((file->f_flags & O_ACCMODE) == O_RDONLY) {
+		pii->p_nr_readers++;
+	} else if ((file->f_flags & O_ACCMODE) == O_WRONLY) {
+		pii->p_nr_writers++;
+	} else {
+		warn("Bad pipe file flags 0x%x\n", file->f_flags);
+	}
+	cv_unlock(&pii->p_cv);
+	return 0;
+}
+
+int pipe_release(struct inode *inode, struct file *file)
+{
+	struct pipe_inode_info *pii = inode->i_pipe;
+	cv_lock(&pii->p_cv);
+	/* Ugliness due to not using flags for O_RDONLY and friends... */
+	if ((file->f_flags & O_ACCMODE) == O_RDONLY) {
+		pii->p_nr_readers--;
+	} else if ((file->f_flags & O_ACCMODE) == O_WRONLY) {
+		pii->p_nr_writers--;
+	} else {
+		warn("Bad pipe file flags 0x%x\n", file->f_flags);
+	}
+	cv_unlock(&pii->p_cv);
+	return 0;
+}
+
+struct file_operations pipe_f_op = {
+	.read = pipe_file_read,
+	.write = pipe_file_write,
+	.open = pipe_open,
+	.release = pipe_release,
+	0
+};
+
+/* General plan: get a dentry/inode to represent the pipe.  We'll alloc it from
+ * the default_ns SB, but won't actually link it anywhere.  It'll only be held
+ * alive by the krefs, til all the FDs are closed. */
+int do_pipe(struct file **pipe_files, int flags)
+{
+	struct dentry *pipe_d;
+	struct inode *pipe_i;
+	struct file *pipe_f_read, *pipe_f_write;
+	struct super_block *def_sb = default_ns.root->mnt_sb;
+	struct pipe_inode_info *pii;
+
+	pipe_d = get_dentry(def_sb, 0, "pipe");
+	if (!pipe_d) {
+		set_errno(ENOMEM);
+		return -1;
+	}
+	pipe_d->d_op = &dummy_d_op;
+	pipe_i = get_inode(pipe_d);
+	if (!pipe_i) {
+		set_errno(ENOMEM);
+		goto error_with_dentry;
+	}
+	/* preemptively mark the dentry for deletion.  we have an unlinked dentry
+	 * right off the bat, held in only by the kref chain (pipe_d is the ref). */
+	pipe_d->d_flags |= DENTRY_DYING;
+	/* pipe_d->d_inode still has one ref to pipe_i, keeping the inode alive */
+	kref_put(&pipe_i->i_kref);
+	/* init inode fields.  note we're using the dummy ops for i_op and d_op */
+	pipe_i->i_mode = S_IRWXU | S_IRWXG | S_IRWXO;
+	SET_FTYPE(pipe_i->i_mode, __S_IFIFO);	/* using type == FIFO */
+	pipe_i->i_nlink = 1;			/* one for the dentry */
+	pipe_i->i_uid = 0;
+	pipe_i->i_gid = 0;
+	pipe_i->i_size = PGSIZE;
+	pipe_i->i_blocks = 0;
+	pipe_i->i_atime.tv_sec = 0;
+	pipe_i->i_atime.tv_nsec = 0;
+	pipe_i->i_mtime.tv_sec = 0;
+	pipe_i->i_mtime.tv_nsec = 0;
+	pipe_i->i_ctime.tv_sec = 0;
+	pipe_i->i_ctime.tv_nsec = 0;
+	pipe_i->i_fs_info = 0;
+	pipe_i->i_op = &dummy_i_op;
+	pipe_i->i_fop = &pipe_f_op;
+	pipe_i->i_socket = FALSE;
+	/* Actually build the pipe.  We're using one page, hanging off the
+	 * pipe_inode_info struct.  When we release the inode, we free the pipe
+	 * memory too */
+	pipe_i->i_pipe = kmalloc(sizeof(struct pipe_inode_info), KMALLOC_WAIT);
+	pii = pipe_i->i_pipe;
+	if (!pii) {
+		set_errno(ENOMEM);
+		goto error_with_dentry;
+	}
+	pii->p_buf = kpage_zalloc_addr();
+	if (!pii->p_buf) {
+		set_errno(ENOMEM);
+		goto error_with_dentry;
+	}
+	pii->p_rd_off = 0;
+	pii->p_wr_off = 0;
+	cv_init(&pii->p_cv);	/* must do this before dentry_open / pipe_open */
+	/* Now we have an inode for the pipe.  We need two files for the read and
+	 * write ends of the pipe. */
+	flags &= ~(O_ACCMODE);	/* avoid user bugs */
+	pipe_f_read = dentry_open(pipe_d, flags | O_RDONLY);
+	if (!pipe_f_read)
+		goto error_with_dentry;
+	pipe_f_write = dentry_open(pipe_d, flags | O_WRONLY);
+	if (!pipe_f_write) {
+		kref_put(&pipe_f_read->f_kref);
+		goto error_with_dentry;
+	}
+	pipe_files[0] = pipe_f_read;
+	pipe_files[1] = pipe_f_write;
+	return 0;
+	/* Note we only free the dentry on failure. */
+error_with_dentry:
+	kref_put(&pipe_d->d_kref);
+	return -1;
 }
 
 struct file *alloc_file(void)
