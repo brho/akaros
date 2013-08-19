@@ -64,6 +64,8 @@ enum
 
 /* stuff which has no equal. */
 #define DEVDOTDOT -1
+#define NUMSIZE 12 /* size of formatted number */
+#define READSTR 4000 /* temporary buffer size for device reads */
 
 #define	MORDER	0x0003	/* mask for bits defining order of mounting */
 #define	MREPL	0x0000	/* mount replaces object */
@@ -376,6 +378,38 @@ struct fgrp
     int	exceed;			/* debugging */
 };
 
+/*
+ *  IO queues
+ */
+struct queue
+{
+	spinlock_t lock;
+
+	struct block*	bfirst;		/* buffer */
+	struct block*	blast;
+
+	int	len;		/* bytes allocated to queue */
+	int	dlen;		/* data bytes in queue */
+	int	limit;		/* max bytes in queue */
+	int	iNULLim;		/* initial limit */
+	int	state;
+	int	noblock;	/* true if writes return immediately when q full */
+	int	eof;		/* number of eofs read by user */
+
+	void	(*kick)(void*);	/* restart output */
+	void	(*bypass)(void*, struct block*);	/* bypass queue altogether */
+	void*	arg;		/* argument to kick */
+
+	qlock_t rlock;		/* mutex for reading processes */
+	/* how do we do this Rendez	rr;		/ * process waiting to read */
+	qlock_t wlock;		/* mutex for writing processes */
+	/* how do we do this Rendez	wr;		/ * process waiting to write */
+
+	char	err[ERRMAX];
+};
+
+extern unsigned int	qiomaxatomic;
+
 typedef int    devgen_t(struct chan*c, char*name, struct dirtab*dirtab, int, int, struct dir*);
 
 extern char Enoerror[];		/* no error */
@@ -551,6 +585,55 @@ int pusherror(struct errbuf *errstack, int stacksize,
 	      int *curindex, struct errbuf  **perrbuf);
 struct errbuf *poperror(struct errbuf *errstack, int stacksize,
 			int *curindex, struct errbuf  **perrbuf);
+/* kern/src/qio.c */
+void ixsummary(void);
+void freeblist(struct block *b);
+struct block *padblock(struct block *bp, int size);
+int blocklen(struct block *bp);
+int blockalloclen(struct block *bp);
+struct block *concatblock(struct block *bp);
+struct block *pullupblock(struct block *bp, int n);
+struct block *pullupqueue(struct queue *q, int n);
+struct block *trimblock(struct block *bp, int offset, int len);
+struct block *copyblock(struct block *bp, int count);
+struct block *adjustblock(struct block *bp, int len);
+int pullblock(struct block **bph, int count);
+struct block *qget(struct queue *q);
+int qdiscard(struct queue *q, int len);
+int qconsume(struct queue *q, void *vp, int len);
+int qpass(struct queue *q, struct block *b);
+int qpassnolim(struct queue *q, struct block *b);
+struct block *packblock(struct block *bp);
+int qproduce(struct queue *q, void *vp, int len);
+struct block *qcopy(struct queue *q, int len, uint32_t offset);
+struct queue *qopen(int limit, int msg, void (*kick)(void *), void *arg);
+struct queue *qbypass(void (*bypass)(void *, struct block *), void *arg);
+void qaddlist(struct queue *q, struct block *b);
+struct block *qremove(struct queue *q);
+struct block *bl2mem(uint8_t *p, struct block *b, int n);
+struct block *mem2bl(uint8_t *p, int len, struct errbuf *perrbuf);
+void qputback(struct queue *q, struct block *b);
+struct block *qbread(struct queue *q, int len, struct errbuf *perrbuf);
+long qread(struct queue *q, void *vp, int len, struct errbuf *perrbuf);
+long qbwrite(struct queue *q, struct block *b, struct errbuf *perrbuf);
+int qwrite(struct queue *q, void *vp, int len, struct errbuf *perrbuf);
+int qiwrite(struct queue *q, void *vp, int len);
+void qclose(struct queue *q);
+void qfree(struct queue *q);
+void qhangup(struct queue *q, char *msg);
+int qisclosed(struct queue *q);
+void qreopen(struct queue *q);
+int qlen(struct queue *q);
+int qwindow(struct queue *q);
+int qcanread(struct queue *q);
+void qsetlimit(struct queue *q, int limit);
+void qnoblock(struct queue *q, int onoff);
+void qflush(struct queue *q);
+int qfull(struct queue *q);
+int qstate(struct queue *q);
+
+/* xdr */
+unsigned int convM2D(uint8_t *buf, unsigned int nbuf, struct dir *d, char *strs);
 
 /* plan 9 has a concept of a hostowner, which is a name. For now, we got with a define. */
 #define eve "eve"

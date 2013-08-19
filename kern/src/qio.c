@@ -11,6 +11,7 @@
 #include <pmap.h>
 #include <smp.h>
 
+#warning " need rendezvous"
 
 static uint32_t padblockcnt;
 static uint32_t concatblockcnt;
@@ -23,39 +24,6 @@ static uint32_t qcopycnt;
 static int debugging;
 
 #define QDEBUG	if(0)
-
-/*
- *  IO queues
- */
-typedef struct Queue	Queue;
-
-struct Queue
-{
-	spinlock_t lock;
-
-	struct block*	bfirst;		/* buffer */
-	struct block*	blast;
-
-	int	len;		/* bytes allocated to queue */
-	int	dlen;		/* data bytes in queue */
-	int	limit;		/* max bytes in queue */
-	int	iNULLim;		/* initial limit */
-	int	state;
-	int	noblock;	/* true if writes return immediately when q full */
-	int	eof;		/* number of eofs read by user */
-
-	void	(*kick)(void*);	/* restart output */
-	void	(*bypass)(void*, struct block*);	/* bypass queue altogether */
-	void*	arg;		/* argument to kick */
-
-	qlock_t rlock;		/* mutex for reading processes */
-#warning " need rendezvous"
-	/* how do we do this Rendez	rr;		/* process waiting to read */
-	qlock_t wlock;		/* mutex for writing processes */
-	/* how do we do this Rendez	wr;		/* process waiting to write */
-
-	char	err[ERRMAX];
-};
 
 enum
 {
@@ -261,7 +229,7 @@ pullupblock(struct block *bp, int n)
  *  make sure the first block has at least n bytes
  */
 struct block*
-pullupqueue(Queue *q, int n)
+pullupqueue(struct queue *q, int n)
 {
 	struct block *b;
 
@@ -416,7 +384,7 @@ pullblock(struct block **bph, int count)
  * This is an interrupt-level function. 
  */
 struct block*
-qget(Queue *q)
+qget(struct queue *q)
 {
 	int dowakeup;
 	struct block *b;
@@ -457,7 +425,7 @@ qget(Queue *q)
  *  throw away the next 'len' bytes in the queue
  */
 int
-qdiscard(Queue *q, int len)
+qdiscard(struct queue *q, int len)
 {
 	struct block *b;
 	int dowakeup, n, sofar;
@@ -514,7 +482,7 @@ qdiscard(Queue *q, int len)
  *  Interrupt level copy out of a queue, return # bytes copied.
  */
 int
-qconsume(Queue *q, void *vp, int len)
+qconsume(struct queue *q, void *vp, int len)
 {
 	struct block *b;
 	int n, dowakeup;
@@ -584,7 +552,7 @@ qconsume(Queue *q, void *vp, int len)
 }
 
 int
-qpass(Queue *q, struct block *b)
+qpass(struct queue *q, struct block *b)
 {
 	int dlen, len, dowakeup;
 
@@ -639,7 +607,7 @@ qpass(Queue *q, struct block *b)
 }
 
 int
-qpassnolim(Queue *q, struct block *b)
+qpassnolim(struct queue *q, struct block *b)
 {
 	int dlen, len, dowakeup;
 
@@ -713,7 +681,7 @@ packblock(struct block *bp)
 }
 
 int
-qproduce(Queue *q, void *vp, int len)
+qproduce(struct queue *q, void *vp, int len)
 {
 	struct block *b;
 	int dowakeup;
@@ -769,7 +737,7 @@ qproduce(Queue *q, void *vp, int len)
  *  copy from offset in the queue
  */
 struct block*
-qcopy(Queue *q, int len, uint32_t offset)
+qcopy(struct queue *q, int len, uint32_t offset)
 {
 	int sofar;
 	int n;
@@ -819,12 +787,12 @@ qcopy(Queue *q, int len, uint32_t offset)
 /*
  *  called by non-interrupt code
  */
-Queue*
+struct queue*
 qopen(int limit, int msg, void (*kick)(void*), void *arg)
 {
-	Queue *q;
+	struct queue *q;
 
-	q = kmalloc(sizeof(Queue), 0);
+	q = kmalloc(sizeof(struct queue), 0);
 	if(q == 0)
 		return 0;
 
@@ -841,12 +809,12 @@ qopen(int limit, int msg, void (*kick)(void*), void *arg)
 }
 
 /* open a queue to be bypassed */
-Queue*
+struct queue*
 qbypass(void (*bypass)(void*, struct block*), void *arg)
 {
-	Queue *q;
+	struct queue *q;
 
-	q = kmalloc(sizeof(Queue), 0);
+	q = kmalloc(sizeof(struct queue), 0);
 	if(q == 0)
 		return 0;
 
@@ -861,7 +829,7 @@ qbypass(void (*bypass)(void*, struct block*), void *arg)
 static int
 notempty(void *a)
 {
-	Queue *q = a;
+	struct queue *q = a;
 
 	return (q->state & Qclosed) || q->bfirst != 0;
 }
@@ -871,7 +839,7 @@ notempty(void *a)
  *  called with q ilocked.
  */
 static int
-qwait(Queue *q)
+qwait(struct queue *q)
 {
 	/* wait for data */
 	for(;;){
@@ -900,7 +868,7 @@ qwait(Queue *q)
  * add a block list to a queue
  */
 void
-qaddlist(Queue *q, struct block *b)
+qaddlist(struct queue *q, struct block *b)
 {
 	/* queue the block */
 	if(q->bfirst)
@@ -918,7 +886,7 @@ qaddlist(Queue *q, struct block *b)
  *  called with q ilocked
  */
 struct block*
-qremove(Queue *q)
+qremove(struct queue *q)
 {
 	struct block *b;
 
@@ -999,7 +967,7 @@ mem2bl(uint8_t *p, int len, struct errbuf *perrbuf)
  *  called with q ilocked
  */
 void
-qputback(Queue *q, struct block *b)
+qputback(struct queue *q, struct block *b)
 {
 	b->next = q->bfirst;
 	if(q->bfirst == NULL)
@@ -1014,7 +982,7 @@ qputback(Queue *q, struct block *b)
  *  called with q ilocked
  */
 static void
-qwakeup_iunlock(Queue *q)
+qwakeup_iunlock(struct queue *q)
 {
 	int dowakeup;
 
@@ -1040,7 +1008,7 @@ qwakeup_iunlock(Queue *q)
  *  get next block from a queue (up to a limit)
  */
 struct block*
-qbread(Queue *q, int len, struct errbuf *perrbuf)
+qbread(struct queue *q, int len, struct errbuf *perrbuf)
 {
 	ERRSTACK(2);
 	struct block *b, *nb;
@@ -1094,7 +1062,7 @@ qbread(Queue *q, int len, struct errbuf *perrbuf)
  *  and wait on its Rendez.
  */
 long
-qread(Queue *q, void *vp, int len, struct errbuf *perrbuf)
+qread(struct queue *q, void *vp, int len, struct errbuf *perrbuf)
 {
 	ERRSTACK(2);
 	struct block *b, *first, **l;
@@ -1177,7 +1145,7 @@ again:
 static int
 qnotfull(void *a)
 {
-	Queue *q = a;
+	struct queue *q = a;
 
 	return q->len < q->limit || (q->state & Qclosed);
 }
@@ -1188,7 +1156,7 @@ uint32_t noblockcnt;
  *  add a block to a queue obeying flow control
  */
 long
-qbwrite(Queue *q, struct block *b, struct errbuf *perrbuf)
+qbwrite(struct queue *q, struct block *b, struct errbuf *perrbuf)
 {
 	ERRSTACK(2);
 	int n, dowakeup;
@@ -1287,7 +1255,7 @@ qbwrite(Queue *q, struct block *b, struct errbuf *perrbuf)
  *  write to a queue.  only Maxatomic bytes at a time is atomic.
  */
 int
-qwrite(Queue *q, void *vp, int len, struct errbuf *perrbuf)
+qwrite(struct queue *q, void *vp, int len, struct errbuf *perrbuf)
 {
 	ERRSTACK(1);
 	int n, sofar;
@@ -1324,7 +1292,7 @@ qwrite(Queue *q, void *vp, int len, struct errbuf *perrbuf)
  *  the free space of block n.
  */
 int
-qiwrite(Queue *q, void *vp, int len)
+qiwrite(struct queue *q, void *vp, int len)
 {
 	int n, sofar, dowakeup;
 	struct block *b;
@@ -1388,7 +1356,7 @@ qiwrite(Queue *q, void *vp, int len)
  *  All blocks are released.
  */
 void
-qclose(Queue *q)
+qclose(struct queue *q)
 {
 	struct block *bfirst;
 
@@ -1420,7 +1388,7 @@ qclose(Queue *q)
  *  as there is no reference accounting
  */
 void
-qfree(Queue *q)
+qfree(struct queue *q)
 {
 	qclose(q);
 	kfree(q);
@@ -1431,7 +1399,7 @@ qfree(Queue *q)
  *  blocks.
  */
 void
-qhangup(Queue *q, char *msg)
+qhangup(struct queue *q, char *msg)
 {
 	/* mark it */
 	ilock(&q->lock);
@@ -1451,7 +1419,7 @@ qhangup(Queue *q, char *msg)
  *  return non-zero if the q is hungup
  */
 int
-qisclosed(Queue *q)
+qisclosed(struct queue *q)
 {
 	return q->state & Qclosed;
 }
@@ -1460,7 +1428,7 @@ qisclosed(Queue *q)
  *  mark a queue as no longer hung up
  */
 void
-qreopen(Queue *q)
+qreopen(struct queue *q)
 {
 	ilock(&q->lock);
 	q->state &= ~Qclosed;
@@ -1474,7 +1442,7 @@ qreopen(Queue *q)
  *  return bytes queued
  */
 int
-qlen(Queue *q)
+qlen(struct queue *q)
 {
 	return q->dlen;
 }
@@ -1483,7 +1451,7 @@ qlen(Queue *q)
  * return space remaining before flow control
  */
 int
-qwindow(Queue *q)
+qwindow(struct queue *q)
 {
 	int l;
 
@@ -1497,7 +1465,7 @@ qwindow(Queue *q)
  *  return true if we can read without blocking
  */
 int
-qcanread(Queue *q)
+qcanread(struct queue *q)
 {
 	return q->bfirst!=0;
 }
@@ -1506,7 +1474,7 @@ qcanread(Queue *q)
  *  change queue limit
  */
 void
-qsetlimit(Queue *q, int limit)
+qsetlimit(struct queue *q, int limit)
 {
 	q->limit = limit;
 }
@@ -1515,7 +1483,7 @@ qsetlimit(Queue *q, int limit)
  *  set blocking/nonblocking
  */
 void
-qnoblock(Queue *q, int onoff)
+qnoblock(struct queue *q, int onoff)
 {
 	q->noblock = onoff;
 }
@@ -1524,7 +1492,7 @@ qnoblock(Queue *q, int onoff)
  *  flush the output queue
  */
 void
-qflush(Queue *q)
+qflush(struct queue *q)
 {
 	struct block *bfirst;
 
@@ -1544,13 +1512,13 @@ qflush(Queue *q)
 }
 
 int
-qfull(Queue *q)
+qfull(struct queue *q)
 {
 	return q->state & Qflow;
 }
 
 int
-qstate(Queue *q)
+qstate(struct queue *q)
 {
 	return q->state;
 }
