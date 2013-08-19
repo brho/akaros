@@ -18,6 +18,26 @@
 
 #define ALIGNED(p, a)	(!(((uintptr)(p)) & ((a)-1)))
 
+/* The lock issue is still undecided. For now, we preserve the lock type
+ * and plan to revisit the issue when it makes sense.
+ */
+
+/* no support for reader/writer locks yet. */
+typedef spinlock_t rwlock_t;
+#define rlock(x) spin_lock(x)
+#define runlock(x) spin_unlock(x)
+#define wlock(x) spin_lock(x)
+#define wunlock(x) spin_unlock(x)
+
+/* qlocks are somewhat special, so leave the calls the same for now. */
+typedef spinlock_t qlock_t;
+#define qlock(x) spin_lock(x)
+#define qunlock(x) spin_unlock(x)
+
+/* ilock is a lock that occurs during interrupts. */
+#define ilock(x) spin_lock(x)
+#define iunlock(x) spin_unlock(x)
+
 /* UTF support is removed. 
  */
 enum
@@ -26,6 +46,20 @@ enum
 	Runesync	= 0x80,		/* cannot represent part of a UTF sequence */
 	Runeself	= 0x80,		/* rune and UTF sequences are the same (<) */
 	Runeerror	= 0xFFFD,	/* decoding error in UTF */
+};
+
+
+/* defines for queue state -- currently used in qio.c */
+/* queue state bits,  Qmsg, Qcoalesce, and Qkick can be set in qopen */
+enum
+{
+	/* Queue.state */
+	Qstarve		= (1<<0),	/* consumer starved */
+	Qmsg		= (1<<1),	/* message stream */
+	Qclosed		= (1<<2),	/* queue has been closed/hungup */
+	Qflow		= (1<<3),	/* producer flow controlled */
+	Qcoalesce	= (1<<4),	/* coallesce packets on read */
+	Qkick		= (1<<5),	/* always call the kick routine after qwrite */
 };
 
 /* stuff which has no equal. */
@@ -287,8 +321,7 @@ struct pgrp
 	int	noattach;
 	unsigned long	pgrpid;
   spinlock_t	debug;			/* single access via devproc.c */
-  // not supported yet.	RWlock	ns;	/* Namespace n read/one write lock */
-  spinlock_t	ns;			/* Namespace n read/one write lock */
+  rwlock_t	ns;			/* Namespace n read/one write lock */
 	struct mhead	*mnthash[MNTHASH];
 };
 
@@ -518,17 +551,6 @@ int pusherror(struct errbuf *errstack, int stacksize,
 	      int *curindex, struct errbuf  **perrbuf);
 struct errbuf *poperror(struct errbuf *errstack, int stacksize,
 			int *curindex, struct errbuf  **perrbuf);
-
-
-/* no support for reader/writer locks yet. */
-#define rlock(x) spin_lock(x)
-#define runlock(x) spin_unlock(x)
-#define wlock(x) spin_lock(x)
-#define wunlock(x) spin_unlock(x)
-
-/* qlocks are somewhat special, so leave the calls the same for now. */
-#define qlock(x) spin_lock(x)
-#define qunlock(x) spin_unlock(x)
 
 /* plan 9 has a concept of a hostowner, which is a name. For now, we got with a define. */
 #define eve "eve"

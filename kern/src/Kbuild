@@ -58,3 +58,7 @@ obj-y						+= ucq.o
 obj-y						+= umem.o
 obj-y						+= validname.o
 obj-y						+= vfs.o
+
+# Plan 9 stuff that in the long term we may replace
+# qio is kind of an mbuf equivalent.
+obj-y						+= qio.o
