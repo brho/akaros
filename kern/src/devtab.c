@@ -20,9 +20,11 @@
 //extern struct dev* devtab[];
 
 extern struct dev regressdevtab;
+extern struct dev pipedevtab;
 
 struct dev *devtab[] = {
     &regressdevtab,
+	&pipedevtab,
     NULL,
 };
 

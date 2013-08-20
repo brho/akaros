@@ -410,7 +410,7 @@ struct queue
 
 extern unsigned int	qiomaxatomic;
 
-typedef int    devgen_t(struct chan*c, char*name, struct dirtab*dirtab, int, int, struct dir*);
+typedef int devgen_t(struct chan*c, char*name, struct dirtab*dirtab, int, int, struct dir*, struct errbuf *perrbuf);
 
 extern char Enoerror[];		/* no error */
 extern char Emount[];		/* inconsistent mount */
@@ -544,7 +544,7 @@ void checkb(struct block *b, char *msg);
 void iallocsummary(void);
 
 /* kern/src/dev.c */
-int devgen(struct chan *c, char *name, struct dirtab *tab, int ntab, int i, struct dir *dp);
+int devgen(struct chan *c, char *name, struct dirtab *tab, int ntab, int i, struct dir *dp, struct errbuf *perrbuf);
 void mkqid(struct qid *q, int64_t path, uint32_t vers, int type, struct errbuf *perrbuf);
 void devdir(struct chan *c, struct qid qid, char *n, int64_t length, char *user, long perm, struct dir *db);
 void devreset();
@@ -634,6 +634,8 @@ int qstate(struct queue *q);
 
 /* xdr */
 unsigned int convM2D(uint8_t *buf, unsigned int nbuf, struct dir *d, char *strs);
+unsigned int sizeD2M(struct dir *d);
+unsigned int convD2M(struct dir *d, uint8_t *buf, unsigned int nbuf);
 
 /* plan 9 has a concept of a hostowner, which is a name. For now, we got with a define. */
 #define eve "eve"

@@ -38,7 +38,7 @@ netifinit(struct netif *nif, char *name, int nfile, uint32_t limit)
  *  generate a 3 level directory
  */
 static int
-netifgen(struct chan *c, char*unused, struct dirtab *vp, int iunused, int i, struct dir *dp)
+netifgen(struct chan *c, char*unused, struct dirtab *vp, int iunused, int i, struct dir *dp, struct errbuf *perrbuf)
 {
 	struct qid q;
 	struct netif *nif = (struct netif*)vp;
