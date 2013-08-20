@@ -384,7 +384,7 @@ pipebwrite(struct chan *c, struct block *bp, int64_t unused, struct errbuf *perr
 }
 
 struct dev pipedevtab = {
-	'|',
+	'P',
 	"pipe",
 
 	devreset,
