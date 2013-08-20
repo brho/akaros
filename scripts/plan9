@@ -12,6 +12,8 @@ sed -i 's/Waitqid/struct waitqid/g' $1
 sed -i 's/Mount/struct mount/g' $1
 sed -i 's/Mhead/struct mhead/g' $1
 sed -i 's/Path/struct path/g' $1
+sed -i 's/Proc/struct proc/g' $1
+sed -i 's/Pgrp/struct pgrp/g' $1
 sed -i 's/Dev/struct dev/g' $1
 sed -i 's/Dirtab/struct dirtab/g' $1
 sed -i 's/QLock/qlock_t qlock/g' $1
@@ -21,9 +23,12 @@ sed -i 's/Ref/struct kref/g' $1
 sed -i 's/Walkqid/struct walkqid/g' $1
 sed -i 's/nil/NULL/g' $1
 sed -i 's/KERN_WAIT/KMALLOC_WAIT/g' $1
+sed -i 's/nelem/ARRAY_SIZE/g' $1
 
 # stuff I'm not smart enough to do with spatch
 sed -i 's/(void,  *struct errbuf.*perrbuf)/(void)/' $1
 sed -i '/skipslash.*perrbuf/s/,.*errbuf//' $1
 sed -i '/validname.*perrbuf/s/, *struct.*errbuf//' $1
 sed -i '/validnamedup.*perrbuf/s/, *struct.*errbuf//' $1
+sed -i '/strcpy.*(\(.*\),\(.*\));/s//strncpy(\1, \2, sizeof(\1));/' $1
+sed -i '/snprint(/s//snprintf(/' $1

@@ -1,7 +1,7 @@
 /*
  * Stub.
  */
-//#define DEBUG
+#define DEBUG
 #include <vfs.h>
 #include <kfs.h>
 #include <slab.h>
@@ -21,11 +21,14 @@
 
 extern struct dev regressdevtab;
 extern struct dev pipedevtab;
-
+extern struct dev procdevtab;
+extern struct dev miscdevtab;
 struct dev *devtab[] = {
-    &regressdevtab,
+	&miscdevtab,
+	&regressdevtab,
 	&pipedevtab,
-    NULL,
+	&procdevtab,
+	NULL,
 };
 
 void
@@ -71,49 +74,39 @@ devtabget(int dc, int user, struct errbuf *perrbuf)
 			return devtab[i];
 	}
 
-	if(user == 0)
-		panic("devtabget %C\n", dc, perrbuf);
-
-	return NULL;
+	printd("devtabget %c\n", dc, perrbuf);
+	error(Enonexist);
 }
 
 long
 devtabread(struct chan*c, void* buf, long n, int64_t off, struct errbuf *perrbuf)
 {
-	int ret;
+	ERRSTACK(1);
 
 	int i;
 	struct dev *dev;
 	char *alloc, *e, *p;
 
-	alloc = kzmalloc(/*READSTR*/4096, KMALLOC_WAIT);
+	alloc = kzmalloc(READSTR, KMALLOC_WAIT);
 	if(alloc == NULL)
 	  error(Enomem);
 
 	p = alloc;
-	e = p + 4096; //READSTR;
+	e = p + READSTR;
 	for(i = 0; devtab[i] != NULL; i++){
 		dev = devtab[i];
-		/* hmm.
-		p = seprint(p, e, "#%C %s\n", dev->dc, dev->name, perrbuf);
-		*/
-		p += snprintf(p, e-p, "#%C %s\n", dev->dc, dev->name, perrbuf);
+printd("p %p e %p e-p %d\n", p, e, e-p);
+printd("do %d %c %s\n", i, dev->dc, dev->name);
+		p += snprintf(p, e-p, "#%c %s\n", dev->dc, dev->name);
 	}
 
-	/*
-	errstack = perrbuf; perrbuf = errbuf;
 	if(waserror()){
 		kfree(alloc);
-		nexterror(errstack);
+		nexterror();
 	}
-	*/
-	//n = readstr(off, buf, n, alloc, perrbuf);
-	// akaros assumes it all went. 
-	// and no support for offsets. 
-	// and it won't throw an error, so no need for any waserror.
-	ret = memcpy_to_user(current, buf, alloc, n);
+	n = readstr(off, buf, n, alloc);
 	
 	kfree(alloc);
 
-	return ret;
+	return n;
 }

@@ -772,6 +772,7 @@ int sysopen(char *name, int omode)
 		return syscreate(name, omode);
 
 	if (waserror()) {
+		printd("error\n");
 		if (c)
 			cclose(c, perrbuf);
 		return -1;

@@ -68,3 +68,6 @@ obj-y						+= netif.o
 obj-y						+= devpipe.o
 # drivers for hardware
 #obj-y						+= 9dev/
+# sort of drivers
+obj-y						+= devproc.o
+obj-y						+= devmisc.o
