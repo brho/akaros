@@ -65,3 +65,5 @@ obj-y						+= qio.o
 # file system methods for network interfaces. Used by, among
 # other things, devether.
 obj-y						+= netif.o
+# drivers for hardware
+obj-y						+= 9dev/

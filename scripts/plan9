@@ -1,6 +1,9 @@
 #!/bin/sh
 
 sed -i 's/Block/struct block/g' $1
+sed -i 's/Ctlr/struct ctlr/g' $1
+sed -i 's/Ether/struct ether/g' $1
+sed -i 's/Etherpkt/struct etherpkt/g' $1
 sed -i 's/Chan/struct chan/g' $1
 sed -i 's/Dir/struct dir/g' $1
 sed -i 's/Fgrp/struct fgrp/g' $1
