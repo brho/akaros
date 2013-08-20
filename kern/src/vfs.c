@@ -139,6 +139,10 @@ static struct dentry *do_lookup(struct dentry *parent, char *name)
 {
 	struct dentry *result, *query;
 	query = get_dentry(parent->d_sb, parent, name);
+	if (!query) {
+		warn("OOM in do_lookup(), probably wasn't expected\n");
+		return 0;
+	}
 	result = dcache_get(parent->d_sb, query); 
 	if (result) {
 		__dentry_free(query);
@@ -571,6 +575,8 @@ void init_sb(struct super_block *sb, struct vfsmount *vmnt,
 	 * by vfsmount's mnt_root.  The parent is dealt with later. */
 	struct dentry *d_root = get_dentry(sb, 0,  "/");	/* probably right */
 
+	if (!d_root)
+		panic("OOM!  init_sb() can't fail yet!");
 	/* a lot of here on down is normally done in lookup() or create, since
 	 * get_dentry isn't a fully usable dentry.  The two FS-specific settings are
 	 * normally inherited from a parent within the same FS in get_dentry, but we
@@ -623,8 +629,10 @@ struct dentry *get_dentry(struct super_block *sb, struct dentry *parent,
 	struct dentry *dentry = kmem_cache_alloc(dentry_kcache, 0);
 	char *l_name = 0;
 
-	if (!dentry)
+	if (!dentry) {
+		set_errno(ENOMEM);
 		return 0;
+	}
 	//memset(dentry, 0, sizeof(struct dentry));
 	kref_init(&dentry->d_kref, dentry_release, 1);	/* this ref is returned */
 	spinlock_init(&dentry->d_lock);
@@ -1319,6 +1327,8 @@ struct file *do_file_open(char *path, int flags, int mode)
 		}
 		/* Create the inode/file.  get a fresh dentry too: */
 		file_d = get_dentry(nd->dentry->d_sb, nd->dentry, nd->last.name);
+		if (!file_d)
+			goto out_path_only;
 		parent_i = nd->dentry->d_inode;
 		/* Note that the mode technically should only apply to future opens,
 		 * but we apply it immediately. */
@@ -1375,10 +1385,8 @@ int do_symlink(char *path, const char *symname, int mode)
 	}
 	/* Doesn't already exist, let's try to make it: */
 	sym_d = get_dentry(nd->dentry->d_sb, nd->dentry, nd->last.name);
-	if (!sym_d) {
-		set_errno(ENOMEM);
+	if (!sym_d)
 		goto out_path_only;
-	}
 	parent_i = nd->dentry->d_inode;
 	if (create_symlink(parent_i, sym_d, symname, mode))
 		goto out_sym_d;
@@ -1417,10 +1425,8 @@ int do_link(char *old_path, char *new_path)
 	/* Doesn't already exist, let's try to make it.  Still need to stitch it to
 	 * an inode and set its FS-specific stuff after this.*/
 	link_d = get_dentry(nd->dentry->d_sb, nd->dentry, nd->last.name);
-	if (!link_d) {
-		set_errno(ENOMEM);
+	if (!link_d)
 		goto out_path_only;
-	}
 	/* Now let's get the old_path target */
 	old_d = lookup_dentry(old_path, LOOKUP_FOLLOW);
 	if (!old_d)					/* errno set by lookup_dentry */
@@ -1567,10 +1573,8 @@ int do_mkdir(char *path, int mode)
 	}
 	/* Doesn't already exist, let's try to make it: */
 	dentry = get_dentry(nd->dentry->d_sb, nd->dentry, nd->last.name);
-	if (!dentry) {
-		set_errno(ENOMEM);
+	if (!dentry)
 		goto out_path_only;
-	}
 	parent_i = nd->dentry->d_inode;
 	if (create_dir(parent_i, dentry, mode))
 		goto out_dentry;
@@ -1823,10 +1827,8 @@ int do_pipe(struct file **pipe_files, int flags)
 	struct pipe_inode_info *pii;
 
 	pipe_d = get_dentry(def_sb, 0, "pipe");
-	if (!pipe_d) {
-		set_errno(ENOMEM);
+	if (!pipe_d)
 		return -1;
-	}
 	pipe_d->d_op = &dummy_d_op;
 	pipe_i = get_inode(pipe_d);
 	if (!pipe_i) {
