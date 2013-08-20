@@ -84,7 +84,7 @@ devdir(struct chan *c, struct qid qid, char *n, int64_t length, char *user, long
  * the zeroth element of the table MUST be the directory itself for ..
 */
 int
-devgen(struct chan *c, char *name, struct dirtab *tab, int ntab, int i, struct dir *dp)
+devgen(struct chan *c, char *name, struct dirtab *tab, int ntab, int i, struct dir *dp, struct errbuf *perrbuf)
 {
 	if(tab == 0)
 		return -1;
@@ -179,7 +179,7 @@ struct walkqid*
 devwalk(struct chan *c, struct chan *nc, char **name, int nname,
 	struct dirtab *tab, int ntab, devgen_t *gen, struct errbuf *perrbuf)
 {
-    ERRSTACK(2);
+	ERRSTACK(2);
 	int i, j, alloc;
 	struct walkqid *wq;
 	char *n;
@@ -220,7 +220,7 @@ devwalk(struct chan *c, struct chan *nc, char **name, int nname,
 			 * Use c->dev->name in the error because
 			 * nc->dev should be NULL here.
 			 */
-			if((*gen)(nc, NULL, tab, ntab, DEVDOTDOT, &dir) != 1){
+			if((*gen)(nc, NULL, tab, ntab, DEVDOTDOT, &dir, perrbuf) != 1){
 				printd("devgen walk .. in dev%s %#llux broken\n",
 					c->dev->name, nc->qid.path, perrbuf);
 				error("broken devgen");
@@ -239,7 +239,7 @@ devwalk(struct chan *c, struct chan *nc, char **name, int nname,
 		if(gen==devgen && nc->qid.path!=tab[0].qid.path)
 			goto Notfound;
 		for(i=0;; i++) {
-			switch((*gen)(nc, n, tab, ntab, i, &dir)){
+			switch((*gen)(nc, n, tab, ntab, i, &dir, perrbuf)){
 			case -1:
 			Notfound:
 				if(j == 0)
@@ -287,7 +287,7 @@ devstat(struct chan *c, uint8_t *db, long n, struct dirtab *tab, int ntab, devge
 	char *p, *elem;
 
 	for(i=0;; i++){
-		switch((*gen)(c, NULL, tab, ntab, i, &dir)){
+		switch((*gen)(c, NULL, tab, ntab, i, &dir, perrbuf)){
 		case -1:
 			if(c->qid.type & QTDIR){
 				if(c->path == NULL)
@@ -329,7 +329,7 @@ devdirread(struct chan *c, char *d, long n, struct dirtab *tab, int ntab, devgen
 	struct dir dir;
 
 	for(m=0; m<n; c->dri++) {
-		switch((*gen)(c, NULL, tab, ntab, c->dri, &dir)){
+		switch((*gen)(c, NULL, tab, ntab, c->dri, &dir, perrbuf)){
 		case -1:
 			return m;
 
@@ -381,7 +381,7 @@ devopen(struct chan *c, int omode, struct dirtab *tab, int ntab, devgen_t *gen, 
 	struct dir dir;
 
 	for(i=0;; i++) {
-		switch((*gen)(c, NULL, tab, ntab, i, &dir)){
+		switch((*gen)(c, NULL, tab, ntab, i, &dir, perrbuf)){
 		case -1:
 			goto Return;
 		case 0:
