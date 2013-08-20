@@ -5,7 +5,6 @@
 #include <setjmp.h>
 #include <atomic.h>
 
-
 /*
  * Memory and machine-specific definitions.  Used in C and assembler.
  */
@@ -17,6 +16,9 @@
 #define EiB		1152921504606846976ull	/* Exbi 0x1000000000000000 */
 
 #define ALIGNED(p, a)	(!(((uintptr)(p)) & ((a)-1)))
+
+/* no such macro in akaros that we have found. */
+#define ARRAY_SIZE(x) (sizeof((x))/sizeof((x)[0]))
 
 /* The lock issue is still undecided. For now, we preserve the lock type
  * and plan to revisit the issue when it makes sense.
@@ -37,6 +39,26 @@ typedef spinlock_t qlock_t;
 /* ilock is a lock that occurs during interrupts. */
 #define ilock(x) spin_lock(x)
 #define iunlock(x) spin_unlock(x)
+
+/* command tables for drivers. */
+enum
+{
+	NCMDFIELD = 128
+};
+
+struct cmdbuf
+{
+	char	*buf;
+	char	**f;
+	int	nf;
+};
+
+struct cmdtab
+{
+	int	index;	/* used by client to switch on result */
+	char	*cmd;	/* command name */
+	int	narg;	/* expected #args; 0 ==> variadic */
+};
 
 /* UTF support is removed. 
  */

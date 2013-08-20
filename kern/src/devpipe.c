@@ -1,3 +1,4 @@
+#define DEBUG
 #include <vfs.h>
 #include <kfs.h>
 #include <slab.h>
@@ -61,6 +62,7 @@ static void pipe_release(struct kref *kref)
 static void
 pipeinit(void)
 {
+	printd("%s\n", __func__);
 }
 
 /*
@@ -72,6 +74,7 @@ pipeattach(char *spec, struct errbuf *perrbuf)
 	struct pipe *p;
 	struct chan *c;
 
+	printd("%s\n", __func__);
 	c = devattach('|', spec, perrbuf);
 	p = kzmalloc(sizeof(struct pipe), 0);
 	if(p == 0)
@@ -107,8 +110,9 @@ pipegen(struct chan *c, char*unused, struct dirtab *tab, int ntab, int i, struct
 	int len;
 	struct pipe *p;
 
+	printd("%s\n", __func__);
 	if(i == DEVDOTDOT){
-		devdir(c, c->qid, "#|", 0, eve, DMDIR|0555, dp);
+		devdir(c, c->qid, "#P", 0, eve, DMDIR|0555, dp);
 		return 1;
 	}
 	i++;	/* skip . */
@@ -140,6 +144,7 @@ pipewalk(struct chan *c, struct chan *nc, char **name, int nname, struct errbuf 
 	struct walkqid *wq;
 	struct pipe *p;
 
+	printd("%s\n", __func__);
 	wq = devwalk(c, nc, name, nname, pipedir, NPIPEDIR, pipegen, perrbuf);
 	if(wq != NULL && wq->clone != NULL && wq->clone != c){
 		p = c->aux;
@@ -167,6 +172,7 @@ pipestat(struct chan *c, uint8_t *db, long n, struct errbuf *perrbuf)
 	struct pipe *p;
 	struct dir dir;
 
+	printd("%s\n", __func__);
 	p = c->aux;
 
 	switch(PIPETYPE(c->qid.path)){
@@ -196,6 +202,7 @@ pipeopen(struct chan *c, int omode, struct errbuf *perrbuf)
 {
 	struct pipe *p;
 
+	printd("%s\n", __func__);
 	if(c->qid.type & QTDIR){
 		if(omode != OREAD)
 			error(Ebadarg);
@@ -229,6 +236,7 @@ pipeclose(struct chan *c, struct errbuf *perrbuf)
 {
 	struct pipe *p;
 
+	printd("%s\n", __func__);
 	p = c->aux;
 	qlock(&p->qlock);
 
@@ -281,6 +289,7 @@ piperead(struct chan *c, void *va, long n, int64_t unused, struct errbuf *perrbu
 {
 	struct pipe *p;
 
+	printd("%s\n", __func__);
 	p = c->aux;
 
 	switch(PIPETYPE(c->qid.path)){
@@ -301,6 +310,7 @@ pipebread(struct chan *c, long n, int64_t offset, struct errbuf *perrbuf)
 {
 	struct pipe *p;
 
+	printd("%s\n", __func__);
 	p = c->aux;
 
 	switch(PIPETYPE(c->qid.path)){
@@ -323,6 +333,7 @@ pipewrite(struct chan *c, void *va, long n, int64_t unused, struct errbuf *perrb
 	ERRSTACK(2);
 	struct pipe *p;
 
+	printd("%s\n", __func__);
 	if(waserror()) {
 		/* how do we deliver this one
 		if((c->flag & CMSG) == 0)
@@ -356,6 +367,7 @@ pipebwrite(struct chan *c, struct block *bp, int64_t unused, struct errbuf *perr
 	long n;
 	struct pipe *p;
 
+	printd("%s\n", __func__);
 	if(waserror()) {
 		/* avoid notes when pipe is a mounted queue 
 		   how do we do this
