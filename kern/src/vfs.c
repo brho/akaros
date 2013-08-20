@@ -1831,10 +1831,8 @@ int do_pipe(struct file **pipe_files, int flags)
 		return -1;
 	pipe_d->d_op = &dummy_d_op;
 	pipe_i = get_inode(pipe_d);
-	if (!pipe_i) {
-		set_errno(ENOMEM);
-		goto error_with_dentry;
-	}
+	if (!pipe_i)
+		goto error_post_dentry;
 	/* preemptively mark the dentry for deletion.  we have an unlinked dentry
 	 * right off the bat, held in only by the kref chain (pipe_d is the ref). */
 	pipe_d->d_flags |= DENTRY_DYING;
@@ -1865,12 +1863,12 @@ int do_pipe(struct file **pipe_files, int flags)
 	pii = pipe_i->i_pipe;
 	if (!pii) {
 		set_errno(ENOMEM);
-		goto error_with_dentry;
+		goto error_kmalloc;
 	}
 	pii->p_buf = kpage_zalloc_addr();
 	if (!pii->p_buf) {
 		set_errno(ENOMEM);
-		goto error_with_dentry;
+		goto error_kpage;
 	}
 	pii->p_rd_off = 0;
 	pii->p_wr_off = 0;
@@ -1880,17 +1878,24 @@ int do_pipe(struct file **pipe_files, int flags)
 	flags &= ~(O_ACCMODE);	/* avoid user bugs */
 	pipe_f_read = dentry_open(pipe_d, flags | O_RDONLY);
 	if (!pipe_f_read)
-		goto error_with_dentry;
+		goto error_f_read;
 	pipe_f_write = dentry_open(pipe_d, flags | O_WRONLY);
-	if (!pipe_f_write) {
-		kref_put(&pipe_f_read->f_kref);
-		goto error_with_dentry;
-	}
+	if (!pipe_f_write)
+		goto error_f_write;
 	pipe_files[0] = pipe_f_read;
 	pipe_files[1] = pipe_f_write;
 	return 0;
+
+error_f_write:
+	kref_put(&pipe_f_read->f_kref);
+error_f_read:
+	page_decref(kva2page(pii->p_buf));
+error_kpage:
+	kfree(pipe_i->i_pipe);
+error_kmalloc:
+	/* We don't need to free the pipe_i; putting the dentry will free it */
+error_post_dentry:
 	/* Note we only free the dentry on failure. */
-error_with_dentry:
 	kref_put(&pipe_d->d_kref);
 	return -1;
 }
