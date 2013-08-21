@@ -7,21 +7,22 @@ enum
 	ETHERMAXTU	= 1514,		/* maximum transmit size */
 	ETHERHDRSIZE	= 14,		/* size of an ethernet header */
 
-	Maxstruct ether	= 48,
+	Maxether	= 48,
 	Ntypes		= 8,
 };
 
 struct ether {
-
+	int port;
+	int irq;
 	int	ctlrno;
 	int	tbdf;			/* type+busno+devno+funcno */
-	uchar	ea[Eaddrlen];
+	uint8_t	ea[Eaddrlen];
 
-	void	(*attach)(struct ether*);	/* filled in by reset routine */
-	void	(*detach)(struct ether*);
+	void	(*attach)(struct ether*,struct errbuf*);	/* filled in by reset routine */
+	void	(*detach)(struct ether*,struct errbuf*);
 	void	(*transmit)(struct ether*);
-	void	(*interrupt)(Ureg*, void*);
-	long	(*ifstat)(struct ether*, void*, long, ulong);
+	void	(*interrupt)(/*Ureg*/void*, void*);
+	long	(*ifstat)(struct ether*, void*, long, unsigned long,struct errbuf*);
 	long 	(*ctl)(struct ether*, void*, long); /* custom ctl messages */
 	void	(*power)(struct ether*, int);	/* power on/off */
 	void	(*shutdown)(struct ether*);	/* shutdown hardware before reboot */
@@ -35,16 +36,16 @@ struct ether {
 
 struct etherpkt
 {
-	uchar	d[Eaddrlen];
-	uchar	s[Eaddrlen];
-	uchar	type[2];
-	uchar	data[1500];
+	uint8_t	d[Eaddrlen];
+	uint8_t	s[Eaddrlen];
+	uint8_t	type[2];
+	uint8_t	data[1500];
 };
 
 extern struct block* etheriq(struct ether*, struct block*, int);
 extern void addethercard(char*, int(*)(struct ether*));
-extern ulong ethercrc(uchar*, int);
-extern int parseether(uchar*, char*);
+extern uint32_t ethercrc(uint8_t*, int);
+extern int parseether(uint8_t*, char*);
 
 #define NEXT(x, l)	(((x)+1)%(l))
 #define PREV(x, l)	(((x) == 0) ? (l)-1: (x)-1)
