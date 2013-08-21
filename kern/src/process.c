@@ -2,6 +2,7 @@
  * Barret Rhoden <brho@cs.berkeley.edu>
  * See LICENSE for details. */
 
+#define DEBUG
 #ifdef __SHARC__
 #pragma nosharc
 #endif
@@ -28,6 +29,7 @@
 #include <elf.h>
 #include <arsc_server.h>
 #include <devfs.h>
+#include <kmalloc.h>
 
 struct kmem_cache *proc_cache;
 
@@ -162,6 +164,50 @@ struct proc *pid2proc(pid_t pid)
 		if (!kref_get_not_zero(&p->p_kref, 1))
 			p = 0;
 	spin_unlock(&pid_hash_lock);
+	return p;
+}
+
+/* Used by devproc for successive reads of the proc table.
+ * Returns a pointer to the nth proc, or 0 if there is none.
+ * This uses get_not_zero, since it is possible the refcnt is 0, which means the
+ * process is dying and we should not have the ref (and thus return 0).  We need
+ * to lock to protect us from getting p, (someone else removes and frees p),
+ * then get_not_zero() on p.
+ * Don't push the locking into the hashtable without dealing with this. */
+struct proc *pid_nth(unsigned int n)
+{
+	struct proc *p;
+	spin_lock(&pid_hash_lock);
+	if (!hashtable_count(pid_hash)) {
+		spin_unlock(&pid_hash_lock);
+		return NULL;
+	}
+	struct hashtable_itr *iter = hashtable_iterator(pid_hash);
+	p = hashtable_iterator_value(iter);
+	
+	while (p) {
+		/* if this process is not valid, it doesn't count,
+		 * so continue
+		 */
+
+		if (kref_get_not_zero(&p->p_kref, 1)){
+			/* this one counts */
+			if (! n){
+				printd("pid_nth: at end, p %p\n", p);
+				break;
+			}
+			kref_put(&p->p_kref);
+			n--;
+		}
+		if (!hashtable_iterator_advance(iter)){
+			p = NULL;
+			break;
+		}
+		p = hashtable_iterator_value(iter);		
+	}
+	
+	spin_unlock(&pid_hash_lock);
+	kfree(iter);
 	return p;
 }
 
