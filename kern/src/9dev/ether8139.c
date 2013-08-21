@@ -15,6 +15,7 @@
 #include <cpio.h>
 #include <pmap.h>
 #include <smp.h>
+#include <arch/pci.h>
 
 #include <etherif.h>
 
@@ -182,7 +183,7 @@ enum {
 
 typedef struct ctlr {
 	int	port;
-	//Pcidev*	pcidev;
+	struct pci_device *pci;
 	struct ctlr*	next;
 	int	active;
 	int	id;
@@ -219,10 +220,10 @@ static struct ctlr* ctlrhead;
 static struct ctlr* ctlrtail;
 
 #define csr8r(c, r)	(inb((c)->port+(r)))
-#define csr16r(c, r)	(ins((c)->port+(r)))
+#define csr16r(c, r)	(inw((c)->port+(r)))
 #define csr32r(c, r)	(inl((c)->port+(r)))
 #define csr8w(c, r, b)	(outb((c)->port+(r), (int)(b)))
-#define csr16w(c, r, w)	(outs((c)->port+(r), (uint16_t)(w)))
+#define csr16w(c, r, w)	(outw((c)->port+(r), (uint16_t)(w)))
 #define csr32w(c, r, l)	(outl((c)->port+(r), (uint32_t)(l)))
 
 static struct ether *kickdev;
@@ -248,7 +249,7 @@ rtl8139promiscuous(void* arg, int on)
 
 enum {
 	/* everyone else uses 0x04c11db7, but they both produce the same crc */
-	struct etherpolybe = 0x04c11db6,
+	Etherpolybe = 0x04c11db6,
 	Bytemask = (1<<8) - 1,
 };
 
@@ -258,7 +259,8 @@ ethercrcbe(uint8_t *addr, long len)
 	int i, j;
 	uint32_t c, crc, carry;
 
-	crc = ~0UL;
+	crc = 0;
+	crc = ~crc;
 	for (i = 0; i < len; i++) {
 		c = addr[i];
 		for (j = 0; j < 8; j++) {
@@ -266,7 +268,7 @@ ethercrcbe(uint8_t *addr, long len)
 			crc <<= 1;
 			c >>= 1;
 			if (carry)
-				crc = (crc ^ struct etherpolybe) | carry;
+				crc = (crc ^ Etherpolybe) | carry;
 		}
 	}
 	return crc;
@@ -275,8 +277,8 @@ ethercrcbe(uint8_t *addr, long len)
 static uint32_t
 swabl(uint32_t l)
 {
-	return l>>24 | (l>>8) & (Bytemask<<8) |
-		(l<<8) & (Bytemask<<16) | l<<24;
+	return (l>>24) | ((l>>8) & (Bytemask<<8)) |
+		((l<<8) & (Bytemask<<16)) | (l<<24);
 }
 
 static void
@@ -310,7 +312,7 @@ rtl8139multicast(void* ether, uint8_t *eaddr, int add)
 }
 
 static long
-rtl8139ifstat(struct ether* edev, void* a, long n, uint32_t offset)
+rtl8139ifstat(struct ether* edev, void* a, long n, unsigned long offset, struct errbuf *perrbuf)
 {
 	int l;
 	char *p;
@@ -320,33 +322,33 @@ rtl8139ifstat(struct ether* edev, void* a, long n, uint32_t offset)
 	p = kmalloc(READSTR, 0);
 	if(p == NULL)
 		error(Enomem);
-	l = snprint(p, READSTR, "rcr %#8.8ux\n", ctlr->rcr);
-	l += snprint(p+l, READSTR-l, "multicast %ud\n", ctlr->mcast);
-	l += snprint(p+l, READSTR-l, "ierrs %d\n", ctlr->ierrs);
-	l += snprint(p+l, READSTR-l, "etxth %d\n", ctlr->etxth);
-	l += snprint(p+l, READSTR-l, "taligned %d\n", ctlr->taligned);
-	l += snprint(p+l, READSTR-l, "tunaligned %d\n", ctlr->tunaligned);
+	l = snprintf(p, READSTR, "rcr %#8.8ux\n", ctlr->rcr);
+	l += snprintf(p+l, READSTR-l, "multicast %ud\n", ctlr->mcast);
+	l += snprintf(p+l, READSTR-l, "ierrs %d\n", ctlr->ierrs);
+	l += snprintf(p+l, READSTR-l, "etxth %d\n", ctlr->etxth);
+	l += snprintf(p+l, READSTR-l, "taligned %d\n", ctlr->taligned);
+	l += snprintf(p+l, READSTR-l, "tunaligned %d\n", ctlr->tunaligned);
 	ctlr->dis += csr16r(ctlr, Dis);
-	l += snprint(p+l, READSTR-l, "dis %d\n", ctlr->dis);
+	l += snprintf(p+l, READSTR-l, "dis %d\n", ctlr->dis);
 	ctlr->fcsc += csr16r(ctlr, Fcsc);
-	l += snprint(p+l, READSTR-l, "fcscnt %d\n", ctlr->fcsc);
+	l += snprintf(p+l, READSTR-l, "fcscnt %d\n", ctlr->fcsc);
 	ctlr->rec += csr16r(ctlr, Rec);
-	l += snprint(p+l, READSTR-l, "rec %d\n", ctlr->rec);
+	l += snprintf(p+l, READSTR-l, "rec %d\n", ctlr->rec);
 
-	l += snprint(p+l, READSTR-l, "Tcr %#8.8lux\n", csr32r(ctlr, Tcr));
-	l += snprint(p+l, READSTR-l, "Config0 %#2.2ux\n", csr8r(ctlr, Config0));
-	l += snprint(p+l, READSTR-l, "Config1 %#2.2ux\n", csr8r(ctlr, Config1));
-	l += snprint(p+l, READSTR-l, "Msr %#2.2ux\n", csr8r(ctlr, Msr));
-	l += snprint(p+l, READSTR-l, "Config3 %#2.2ux\n", csr8r(ctlr, Config3));
-	l += snprint(p+l, READSTR-l, "Config4 %#2.2ux\n", csr8r(ctlr, Config4));
+	l += snprintf(p+l, READSTR-l, "Tcr %#8.8lux\n", csr32r(ctlr, Tcr));
+	l += snprintf(p+l, READSTR-l, "Config0 %#2.2ux\n", csr8r(ctlr, Config0));
+	l += snprintf(p+l, READSTR-l, "Config1 %#2.2ux\n", csr8r(ctlr, Config1));
+	l += snprintf(p+l, READSTR-l, "Msr %#2.2ux\n", csr8r(ctlr, Msr));
+	l += snprintf(p+l, READSTR-l, "Config3 %#2.2ux\n", csr8r(ctlr, Config3));
+	l += snprintf(p+l, READSTR-l, "Config4 %#2.2ux\n", csr8r(ctlr, Config4));
 
-	l += snprint(p+l, READSTR-l, "Bmcr %#4.4ux\n", csr16r(ctlr, Bmcr));
-	l += snprint(p+l, READSTR-l, "Bmsr %#4.4ux\n", csr16r(ctlr, Bmsr));
-	l += snprint(p+l, READSTR-l, "Anar %#4.4ux\n", csr16r(ctlr, Anar));
-	l += snprint(p+l, READSTR-l, "Anlpar %#4.4ux\n", csr16r(ctlr, Anlpar));
-	l += snprint(p+l, READSTR-l, "Aner %#4.4ux\n", csr16r(ctlr, Aner));
-	l += snprint(p+l, READSTR-l, "Nwaytr %#4.4ux\n", csr16r(ctlr, Nwaytr));
-	snprint(p+l, READSTR-l, "Cscr %#4.4ux\n", csr16r(ctlr, Cscr));
+	l += snprintf(p+l, READSTR-l, "Bmcr %#4.4ux\n", csr16r(ctlr, Bmcr));
+	l += snprintf(p+l, READSTR-l, "Bmsr %#4.4ux\n", csr16r(ctlr, Bmsr));
+	l += snprintf(p+l, READSTR-l, "Anar %#4.4ux\n", csr16r(ctlr, Anar));
+	l += snprintf(p+l, READSTR-l, "Anlpar %#4.4ux\n", csr16r(ctlr, Anlpar));
+	l += snprintf(p+l, READSTR-l, "Aner %#4.4ux\n", csr16r(ctlr, Aner));
+	l += snprintf(p+l, READSTR-l, "Nwaytr %#4.4ux\n", csr16r(ctlr, Nwaytr));
+	snprintf(p+l, READSTR-l, "Cscr %#4.4ux\n", csr16r(ctlr, Cscr));
 	n = readstr(offset, a, n, p);
 	kfree(p);
 
@@ -370,7 +372,7 @@ rtl8139reset(struct ctlr* ctlr)
 	for(timeo = 0; timeo < 1000; timeo++){
 		if(!(csr8r(ctlr, Cr) & Rst))
 			return 0;
-		delay(1);
+		udelay(1000);
 	}
 
 	return -1;
@@ -434,7 +436,8 @@ rtl8139init(struct ether* edev)
 	ctlr->rbstart = alloc;
 	alloc += ctlr->rblen+16;
 	memset(ctlr->rbstart, 0, ctlr->rblen+16);
-	csr32w(ctlr, Rbstart, PCIWADDR(ctlr->rbstart));
+#warning "how do we write to pci mmio space?"
+	//	csr32w(ctlr, Rbstart, PCIWADDR(ctlr->rbstart));
 	ctlr->rcr = Rxfth256|Rblen|Mrxdmaunlimited|Ab|Am|Apm;
 
 	/*
@@ -472,7 +475,7 @@ rtl8139init(struct ether* edev)
 }
 
 static void
-rtl8139attach(struct ether* edev)
+rtl8139attach(struct ether* edev, struct errbuf *perrbuf)
 {
 	struct ctlr *ctlr;
 
@@ -495,7 +498,7 @@ rtl8139attach(struct ether* edev)
 		}
 		rtl8139init(edev);
 		kickdev = edev;
-		addclock0link(kickme, 7);
+		//addclock0link(kickme, 7);
 	}
 	qunlock(&ctlr->alock);
 }
@@ -510,7 +513,7 @@ rtl8139txstart(struct ether* edev)
 
 	ctlr = edev->ctlr;
 	while(ctlr->ntd < Ntd){
-		bp = qget(edev->oq);
+		bp = qget(edev->netif.oq);
 		if(bp == NULL)
 			break;
 		size = BLEN(bp);
@@ -519,12 +522,13 @@ rtl8139txstart(struct ether* edev)
 		if(((uintptr_t)bp->rp) & 0x03){
 			memmove(td->data, bp->rp, size);
 			freeb(bp);
-			csr32w(ctlr, td->tsad, PCIWADDR(td->data));
+#warning "how do we write to pci mmio space?"
+			//		csr32w(ctlr, td->tsad, PCIWADDR(td->data));
 			ctlr->tunaligned++;
 		}
 		else{
 			td->bp = bp;
-			csr32w(ctlr, td->tsad, PCIWADDR(bp->rp));
+			//csr32w(ctlr, td->tsad, PCIWADDR(bp->rp));
 			ctlr->taligned++;
 		}
 		csr32w(ctlr, td->tsd, (ctlr->etxth<<EtxthSHIFT)|size);
@@ -577,11 +581,11 @@ rtl8139receive(struct ether* edev)
 
 		if(!(status & Rcok)){
 			if(status & (Ise|Fae))
-				edev->frames++;
+				edev->netif.frames++;
 			if(status & Crc)
-				edev->crcs++;
+				edev->netif.crcs++;
 			if(status & (Runt|Long))
-				edev->buffs++;
+				edev->netif.buffs++;
 
 			/*
 			 * Reset the receiver.
@@ -590,7 +594,8 @@ rtl8139receive(struct ether* edev)
 			 */
 			cr = csr8r(ctlr, Cr);
 			csr8w(ctlr, Cr, cr & ~Re);
-			csr32w(ctlr, Rbstart, PCIWADDR(ctlr->rbstart));
+#warning "PCIWADDR"
+			//			csr32w(ctlr, Rbstart, PCIWADDR(ctlr->rbstart));
 			csr8w(ctlr, Cr, cr);
 			csr32w(ctlr, Rcr, ctlr->rcr);
 
@@ -632,7 +637,7 @@ rtl8139receive(struct ether* edev)
 }
 
 static void
-rtl8139interrupt(Ureg*, void* arg)
+rtl8139interrupt(void*unused, void* arg)
 {
 	Td *td;
 	struct ctlr *ctlr;
@@ -674,7 +679,7 @@ rtl8139interrupt(Ureg*, void* arg)
 						if(ctlr->etxth < ETHERMAXTU/32)
 							ctlr->etxth++;
 					}
-					edev->oerrs++;
+					edev->netif.oerrs++;
 				}
 
 				if(td->bp != NULL){
@@ -696,13 +701,13 @@ rtl8139interrupt(Ureg*, void* arg)
 			 */
 			msr = csr8r(ctlr, Msr);
 			if(!(msr & Linkb)){
-				if(!(msr & Speed10) && edev->mbps != 100){
-					edev->mbps = 100;
-					qsetlimit(edev->oq, 256*1024);
+				if(!(msr & Speed10) && edev->netif.mbps != 100){
+					edev->netif.mbps = 100;
+					qsetlimit(edev->netif.oq, 256*1024);
 				}
-				else if((msr & Speed10) && edev->mbps != 10){
-					edev->mbps = 10;
-					qsetlimit(edev->oq, 65*1024);
+				else if((msr & Speed10) && edev->netif.mbps != 10){
+					edev->netif.mbps = 10;
+					qsetlimit(edev->netif.oq, 65*1024);
 				}
 			}
 			isr &= ~(Clc|PunLc);
@@ -716,7 +721,7 @@ rtl8139interrupt(Ureg*, void* arg)
 		 * other than try to reinitialise the chip?
 		 */
 		if((isr & (Serr|Timerbit)) != 0){
-			iprint("rtl8139interrupt: imr %#4.4ux isr %#4.4ux\n",
+			printk("rtl8139interrupt: imr %#4.4ux isr %#4.4ux\n",
 				csr16r(ctlr, Imr), isr);
 			if(isr & Timerbit)
 				csr32w(ctlr, TimerInt, 0);
@@ -733,59 +738,9 @@ kickme(void)
 		rtl8139interrupt(NULL, kickdev);
 }
 
-static struct ctlr*
-rtl8139match(struct ether* edev, int id)
-{
-	Pcidev *p;
-	struct ctlr *ctlr;
-	int i, port;
-
-	/*
-	 * Any adapter matches if no edev->port is supplied,
-	 * otherwise the ports must match.
-	 */
-	for(ctlr = ctlrhead; ctlr != NULL; ctlr = ctlr->next){
-		if(ctlr->active)
-			continue;
-		p = ctlr->pcidev;
-		if(((p->did<<16)|p->vid) != id)
-			continue;
-		port = p->mem[0].bar & ~0x01;
-		if(edev->port != 0 && edev->port != port)
-			continue;
-
-		if(ioalloc(port, p->mem[0].size, 0, "rtl8139") < 0){
-			printd("rtl8139: port %#ux in use\n", port);
-			continue;
-		}
-
-		if(pcigetpms(p) > 0){
-			pcisetpms(p, 0);
-	
-			for(i = 0; i < 6; i++)
-				pcicfgw32(p, PciBAR0+i*4, p->mem[i].bar);
-			pcicfgw8(p, PciINTL, p->intl);
-			pcicfgw8(p, PciLTR, p->ltr);
-			pcicfgw8(p, PciCLS, p->cls);
-			pcicfgw16(p, PciPCR, p->pcr);
-		}
-
-		ctlr->port = port;
-		if(rtl8139reset(ctlr)) {
-			iofree(port);
-			continue;
-		}
-		pcisetbme(p);
-
-		ctlr->active = 1;
-		return ctlr;
-	}
-	return NULL;
-}
-
 static struct {
 	char*	name;
-	int	id;
+	uint32_t	id;
 } rtl8139pci[] = {
 	{ "rtl8139",	(0x8139<<16)|0x10EC, },	/* generic */
 	{ "smc1211",	(0x1211<<16)|0x1113, },	/* SMC EZ-Card */
@@ -794,64 +749,79 @@ static struct {
 	{ NULL },
 };
 
+static int irq;
+uint32_t device_id = 0;
+
 static int
 rtl8139pnp(struct ether* edev)
 {
-	int i, id;
-	Pcidev *p;
+	int i;
+	struct pci_device *p;
 	struct ctlr *ctlr;
 	uint8_t ea[Eaddrlen];
+	uint32_t id = 0;
 
-	/*
-	 * Make a list of all ethernet controllers
-	 * if not already done.
-	 */
-	if(ctlrhead == NULL){
-		p = NULL;
-		while(p = pcimatch(p, 0, 0)){
-			if(p->ccrb != 0x02 || p->ccru != 0)
+	struct pci_device *pcidev;
+	uint32_t result;
+	printk("Searching for rtl8139 Network device...");
+	STAILQ_FOREACH(pcidev, &pci_devices, all_dev) {
+		id = pcidev->ven_id << 16 | pcidev->dev_id;
+		for(i = 0; i < ARRAY_SIZE(rtl8139pci); i++)
+			if (rtl8139pci[i].id == id)
+				break;
+		if (i == ARRAY_SIZE(rtl8139pci))
+			continue;
+
+		printk(" found on BUS %x DEV %x FUNC %x\n", pcidev->bus, pcidev->dev,
+		       pcidev->func);
+		device_id = pcidev->dev_id;
+		/* Find the IRQ */
+		irq = pcidev->irqline;
+		printd("-->IRQ: %u\n", irq);
+		/* Loop over the BARs */
+		/* TODO: pci layer should scan these things and put them in a pci_dev
+		 * struct */
+		/* SelectBars based on the IORESOURCE_MEM */
+		for (int k = 0; k <= 5; k++) {
+	    	/* TODO: clarify this magic */
+			int reg = 4 + k;
+			result = pcidev_read32(pcidev, reg << 2);
+
+			if (result == 0) // (0 denotes no valid data)
 				continue;
-			ctlr = kmalloc(sizeof(struct ctlr), 0);
-			if(ctlr == NULL)
-				error(Enomem);
-			ctlr->pcidev = p;
-			ctlr->id = (p->did<<16)|p->vid;
-
-			if(ctlrhead != NULL)
-				ctlrtail->next = ctlr;
-			else
-				ctlrhead = ctlr;
-			ctlrtail = ctlr;
+			// Read the bottom bit of the BAR. 
+			if (result & PCI_BAR_IO_MASK) {
+				result = result & PCI_IO_MASK;
+				printd("-->BAR%u: %s --> %x\n", k, "IO", result);
+			} else {
+				result = result & PCI_MEM_MASK;
+				printd("-->BAR%u: %s --> %x\n", k, "MEM", result);
+			}
 		}
+		break;
 	}
-
-	/*
-	 * Is it an RTL8139 under a different name?
-	 * Normally a search is made through all the found controllers
-	 * for one which matches any of the known vid+did pairs.
-	 * If a vid+did pair is specified a search is made for that
-	 * specific controller only.
-	 */
-	id = 0;
-	for(i = 0; i < edev->nopt; i++){
-		if(cistrncmp(edev->opt[i], "id=", 3) == 0)
-			id = strtol(&edev->opt[i][3], NULL, 0);
-	}
-
-	ctlr = NULL;
-	if(id != 0)
-		ctlr = rtl8139match(edev, id);
-	else for(i = 0; rtl8139pci[i].name; i++){
-		if((ctlr = rtl8139match(edev, rtl8139pci[i].id)) != NULL)
-			break;
-	}
+	if (device_id)
+		return 0;
+	printk(" not found. No device configured.\n");
+	return -1;
+	ctlr = kmalloc(sizeof(struct ctlr), 0);
 	if(ctlr == NULL)
-		return -1;
+		panic(Enomem);
+	ctlr->pci = p;
+	ctlr->id = id;
+
+	if(ctlrhead != NULL)
+		ctlrtail->next = ctlr;
+	else
+		ctlrhead = ctlr;
+	ctlrtail = ctlr;
 
 	edev->ctlr = ctlr;
 	edev->port = ctlr->port;
-	edev->irq = ctlr->pcidev->intl;
-	edev->tbdf = ctlr->pcidev->tbdf;
+	/* how do we set interrupts? */
+#warning "set interrupts -- how?"
+	//	edev->netif.irq = ctlr->pci->intl;
+	//	edev->tbdf = ctlr->pci->tbdf;
 
 	/*
 	 * Check if the adapter's station address is to be overridden.
@@ -869,21 +839,21 @@ rtl8139pnp(struct ether* edev)
 		edev->ea[5] = i>>8;
 	}
 
-	edev->arg = edev;
+	edev->netif.arg = edev;
 	edev->attach = rtl8139attach;
 	edev->transmit = rtl8139transmit;
 	edev->interrupt = rtl8139interrupt;
 	edev->ifstat = rtl8139ifstat;
 
-	edev->promiscuous = rtl8139promiscuous;
-	edev->multicast = rtl8139multicast;
+	edev->netif.promiscuous = rtl8139promiscuous;
+	edev->netif.multicast = rtl8139multicast;
 	edev->shutdown = rtl8139shutdown;
 
 	/*
 	 * This should be much more dynamic but will do for now.
 	 */
 	if((csr8r(ctlr, Msr) & (Speed10|Linkb)) == 0)
-		edev->mbps = 100;
+		edev->netif.mbps = 100;
 
 	return 0;
 }
@@ -891,5 +861,6 @@ rtl8139pnp(struct ether* edev)
 void
 ether8139link(void)
 {
+	ERRSTACKBASE(1);
 	addethercard("rtl8139", rtl8139pnp);
 }

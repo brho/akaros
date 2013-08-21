@@ -23,11 +23,13 @@ extern struct dev regressdevtab;
 extern struct dev pipedevtab;
 extern struct dev procdevtab;
 extern struct dev miscdevtab;
+extern struct dev etherdevtab;
 struct dev *devtab[] = {
 	&miscdevtab,
 	&regressdevtab,
 	&pipedevtab,
 	&procdevtab,
+	&etherdevtab,
 	NULL,
 };
 

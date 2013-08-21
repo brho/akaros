@@ -26,7 +26,9 @@ etherattach(char* spec, struct errbuf *perrbuf)
 	ctlrno = 0;
 	/* 'spec' is the special, i.e. l0, l1, etc. */
 	if(spec && *spec){
-		ctlrno = strtoul(spec, &p, 0);
+#warning "using strtol instead of strtoul"
+	  //		ctlrno = strtoul(spec, &p, 0);
+		ctlrno = strtol(spec, &p, 0);
 		if((ctlrno == 0 && p == spec) || *p || (ctlrno >= Maxether))
 			error(Ebadarg);
 	}
@@ -35,43 +37,43 @@ etherattach(char* spec, struct errbuf *perrbuf)
 
 	chan = devattach('l', spec, perrbuf);
 	if(waserror()){
-		chanfree(chan);
+		chanfree(chan, perrbuf);
 		nexterror();
 	}
 	chan->devno = ctlrno;
 	if(etherxx[ctlrno]->attach)
-		etherxx[ctlrno]->attach(etherxx[ctlrno]);
-	if (0)poperror();
+		etherxx[ctlrno]->attach(etherxx[ctlrno], perrbuf);
+
 	return chan;
 }
 
 static struct walkqid*
 etherwalk(struct chan* chan, struct chan* nchan, char** name, int nname, struct errbuf *perrbuf)
 {
-	return netifwalk(etherxx[chan->devno], chan, nchan, name, nname, perrbuf);
+	return netifwalk(&etherxx[chan->devno]->netif, chan, nchan, name, nname, perrbuf);
 }
 
 static long
 etherstat(struct chan* chan, uint8_t* dp, long n, struct errbuf *perrbuf)
 {
-	return netifstat(etherxx[chan->devno], chan, dp, n, perrbuf);
+	return netifstat(&etherxx[chan->devno]->netif, chan, dp, n, perrbuf);
 }
 
 static struct chan*
 etheropen(struct chan* chan, int omode, struct errbuf *perrbuf)
 {
-	return netifopen(etherxx[chan->devno], chan, omode, perrbuf);
+	return netifopen(&etherxx[chan->devno]->netif, chan, omode, perrbuf);
 }
 
 static void
-ethercreate(struct chan*, char*, int, int, struct errbuf *perrbuf)
+ethercreate(struct chan*u1, char*u2, int u3, int u4, struct errbuf *perrbuf)
 {
 }
 
 static void
 etherclose(struct chan* chan, struct errbuf *perrbuf)
 {
-	netifclose(etherxx[chan->devno], chan, perrbuf);
+	netifclose(&etherxx[chan->devno]->netif, chan, perrbuf);
 }
 
 static long
@@ -92,19 +94,19 @@ etherread(struct chan* chan, void* buf, long n, int64_t off, struct errbuf *perr
 			ether->ifstat(ether, buf, 0, offset, perrbuf);
 	}
 
-	return netifread(ether, chan, buf, n, offset, perrbuf);
+	return netifread(&ether->netif, chan, buf, n, offset, perrbuf);
 }
 
 static struct block*
 etherbread(struct chan* chan, long n, int64_t offset, struct errbuf *perrbuf)
 {
-	return netifbread(etherxx[chan->devno], chan, n, offset, perrbuf);
+	return netifbread(&etherxx[chan->devno]->netif, chan, n, offset, perrbuf);
 }
 
 static long
 etherwstat(struct chan* chan, uint8_t* dp, long n, struct errbuf *perrbuf)
 {
-	return netifwstat(etherxx[chan->devno], chan, dp, n, perrbuf);
+	return netifwstat(&etherxx[chan->devno]->netif, chan, dp, n, perrbuf);
 }
 
 #if 0 
@@ -144,21 +146,21 @@ etheriq(struct ether* ether, struct block* bp, int fromwire)
 	struct etherpkt *pkt;
 	uint16_t type;
 	int len, multi, tome, fromme;
-	Netfile **ep, *f, **fp, *fx;
+	struct netfile **ep, *f, **fp, *fx;
 	struct block *xbp;
 
-	ether->inpackets++;
+	ether->netif.inpackets++;
 
 	pkt = (struct etherpkt*)bp->rp;
 	len = BLEN(bp);
 	type = (pkt->type[0]<<8)|pkt->type[1];
 	fx = 0;
-	ep = &ether->f[Ntypes];
+	ep = &ether->netif.f[Ntypes];
 
 	multi = pkt->d[0] & 1;
 	/* check for valid multicast addresses */
-	if(multi && memcmp(pkt->d, ether->bcast, sizeof(pkt->d)) != 0 && ether->prom == 0){
-		if(!activemulti(ether, pkt->d, sizeof(pkt->d))){
+	if(multi && memcmp(pkt->d, ether->netif.bcast, sizeof(pkt->d)) != 0 && ether->netif.prom == 0){
+		if(!activemulti(&ether->netif, pkt->d, sizeof(pkt->d))){
 			if(fromwire){
 				freeb(bp);
 				bp = 0;
@@ -177,8 +179,8 @@ etheriq(struct ether* ether, struct block* bp, int fromwire)
 	 * attempt to simply pass it into one of the connections, thereby
 	 * saving a copy of the data (usual case hopefully).
 	 */
-	for(fp = ether->f; fp < ep; fp++){
-		if(f = *fp)
+	for(fp = ether->netif.f; fp < ep; fp++){
+		if((f = *fp))
 		if(f->type == type || f->type < 0)
 		if(tome || multi || f->prom || f->bridge & 2){
 			/* Don't want to hear bridged packets */
@@ -187,23 +189,23 @@ etheriq(struct ether* ether, struct block* bp, int fromwire)
 			if(!f->headersonly){
 				if(fromwire && fx == 0)
 					fx = f;
-				else if(xbp = iallocb(len)){
+				else if((xbp = iallocb(len))){
 					memmove(xbp->wp, pkt, len);
 					xbp->wp += len;
 					if(qpass(f->iq, xbp) < 0)
-						ether->soverflows++;
+						ether->netif.soverflows++;
 				}
 				else
-					ether->soverflows++;
+					ether->netif.soverflows++;
 			}
 			else
-				etherrtrace(f, pkt, len);
+				;//etherrtrace(f, pkt, len);
 		}
 	}
 
 	if(fx){
 		if(qpass(fx->iq, bp) < 0)
-			ether->soverflows++;
+			ether->netif.soverflows++;
 		return 0;
 	}
 	if(fromwire){
@@ -215,12 +217,12 @@ etheriq(struct ether* ether, struct block* bp, int fromwire)
 }
 
 static int
-etheroq(struct ether* ether, struct block* bp)
+etheroq(struct ether* ether, struct block* bp, struct errbuf *perrbuf)
 {
 	int len, loopback, s;
 	struct etherpkt *pkt;
 
-	ether->outpackets++;
+	ether->netif.outpackets++;
 
 	/*
 	 * Check if the packet has to be placed back onto the input queue,
@@ -234,14 +236,14 @@ etheroq(struct ether* ether, struct block* bp)
 	pkt = (struct etherpkt*)bp->rp;
 	len = BLEN(bp);
 	loopback = memcmp(pkt->d, ether->ea, sizeof(pkt->d)) == 0;
-	if(loopback || memcmp(pkt->d, ether->bcast, sizeof(pkt->d)) == 0 || ether->prom){
-		s = splhi();
+	if(loopback || memcmp(pkt->d, ether->netif.bcast, sizeof(pkt->d)) == 0 || ether->netif.prom){
+		//s = splhi();
 		etheriq(ether, bp, 0);
-		splx(s);
+		//splx(s);
 	}
 
 	if(!loopback){
-		qbwrite(ether->oq, bp);
+		qbwrite(ether->netif.oq, bp, perrbuf);
 		if(ether->transmit != NULL)
 			ether->transmit(ether);
 	} else
@@ -257,13 +259,15 @@ etherwrite(struct chan* chan, void* buf, long n, int64_t unused, struct errbuf *
 	struct ether *ether;
 	struct block *bp;
 	int nn, onoff;
-	Cmdbuf *cb;
+	struct cmdbuf *cb;
 
 	ether = etherxx[chan->devno];
 	if(NETTYPE(chan->qid.path) != Ndataqid) {
-		nn = netifwrite(ether, chan, buf, n);
+		nn = netifwrite(&ether->netif, chan, buf, n, perrbuf);
 		if(nn >= 0)
 			return nn;
+		error("no cmd write yet");
+#if 0
 		cb = parsecmd(buf, n);
 		if(cb->f[0] && strcmp(cb->f[0], "nonblocking") == 0){
 			if(cb->nf <= 1)
@@ -279,11 +283,12 @@ etherwrite(struct chan* chan, void* buf, long n, int64_t unused, struct errbuf *
 			return ether->ctl(ether, buf, n);
 
 		error(Ebadctl);
+#endif
 	}
 
-	if(n > ether->mtu)
+	if(n > ether->netif.mtu)
 		error(Etoobig);
-	if(n < ether->minmtu)
+	if(n < ether->netif.minmtu)
 		error(Etoosmall);
 
 	bp = allocb(n);
@@ -292,17 +297,18 @@ etherwrite(struct chan* chan, void* buf, long n, int64_t unused, struct errbuf *
 		nexterror();
 	}
 	memmove(bp->rp, buf, n);
-	if((ether->f[NETID(chan->qid.path)]->bridge & 2) == 0)
+	if((ether->netif.f[NETID(chan->qid.path)]->bridge & 2) == 0)
 		memmove(bp->rp+Eaddrlen, ether->ea, Eaddrlen);
-	if (0)poperror();
+
 	bp->wp += n;
 
-	return etheroq(ether, bp);
+	return etheroq(ether, bp, perrbuf);
 }
 
 static long
 etherbwrite(struct chan* chan, struct block* bp, int64_t unused, struct errbuf *perrbuf)
 {
+	ERRSTACK(1);
 	struct ether *ether;
 	long n;
 
@@ -313,22 +319,21 @@ etherbwrite(struct chan* chan, struct block* bp, int64_t unused, struct errbuf *
 			nexterror();
 		}
 		n = etherwrite(chan, bp->rp, n, 0, perrbuf);
-		if (0)poperror();
 		freeb(bp);
 		return n;
 	}
 	ether = etherxx[chan->devno];
 
-	if(n > ether->mtu){
+	if(n > ether->netif.mtu){
 		freeb(bp);
 		error(Etoobig);
 	}
-	if(n < ether->minmtu){
+	if(n < ether->netif.minmtu){
 		freeb(bp);
 		error(Etoosmall);
 	}
 
-	return etheroq(ether, bp);
+	return etheroq(ether, bp, perrbuf);
 }
 
 static struct {
@@ -364,7 +369,8 @@ parseether(uint8_t *to, char *from)
 			return -1;
 		nip[1] = *p++;
 		nip[2] = 0;
-		to[i] = strtoul(nip, 0, 16);
+#warning "using strol instead of strtoul"
+		to[i] = strtol(nip, 0, 16);
 		if(*p == ':')
 			p++;
 	}
@@ -381,15 +387,18 @@ etherprobe(int cardno, int ctlrno)
 	ether = kmalloc(sizeof(struct ether), 0);
 	memset(ether, 0, sizeof(struct ether));
 	ether->ctlrno = ctlrno;
-	ether->tbdf = BUSUNKNOWN;
-	ether->mbps = 10;
-	ether->minmtu = ETHERMINTU;
-	ether->mtu = ETHERMAXTU;
-	ether->maxmtu = ETHERMAXTU;
+	ether->tbdf = 0;
+	ether->netif.mbps = 10;
+	ether->netif.minmtu = ETHERMINTU;
+	ether->netif.mtu = ETHERMAXTU;
+	ether->netif.maxmtu = ETHERMAXTU;
 
 	if(cardno < 0){
 		for(cardno = 0; cards[cardno].type; cardno++){
-			if(cistrcmp(cards[cardno].type, ether->type))
+#warning "using strcmp instead of cistrcmp"
+#if 0
+Ron ran out of steam
+			if(/*ci*/strcmp(cards[cardno].type, ether->type))
 				continue;
 			for(i = 0; i < ether->nopt; i++){
 				if(strncmp(ether->opt[i], "ea=", 3))
@@ -398,6 +407,7 @@ etherprobe(int cardno, int ctlrno)
 					memset(ether->ea, 0, Eaddrlen);
 			}
 			break;
+#endif
 		}
 	}
 
@@ -417,41 +427,46 @@ etherprobe(int cardno, int ctlrno)
 	 */
 	if(ether->irq == 2)
 		ether->irq = 9;
-	snprint(name, sizeof(name), "ether%d", ctlrno);
+	snprintf(name, sizeof(name), "ether%d", ctlrno);
 
 	/*
 	 * If ether->irq is <0, it is a hack to indicate no interrupt
 	 * used by ethersink.
 	 */
+#warning "how do we enable interrupts?"
 	if(ether->irq >= 0)
-		intrenable(ether->irq, ether->interrupt, ether, ether->tbdf, name);
+		printk("NOT ENABLING INTERRUPTS\n");
+	//intrenable(ether->irq, ether->interrupt, ether, ether->tbdf, name);
 
-	i = sprint(buf, "#l%d: %s: %dMbps port %#p irq %d tu %d",
-		ctlrno, cards[cardno].type, ether->mbps, ether->port, ether->irq, ether->mtu);
+	i = snprintf(buf, sizeof(buf),"#l%d: %s: %dMbps port %#p irq %d tu %d",
+		ctlrno, cards[cardno].type, ether->netif.mbps, ether->port, ether->irq, ether->netif.mtu);
+#if 0
 	if(ether->mem)
 		i += sprint(buf+i, " addr %#p", ether->mem);
+
 	if(ether->size)
 		i += sprint(buf+i, " size 0x%luX", ether->size);
-	i += sprint(buf+i, ": %2.2ux%2.2ux%2.2ux%2.2ux%2.2ux%2.2ux",
+#endif
+	i += snprintf(buf+i, sizeof(buf)-i, ": %2.2ux%2.2ux%2.2ux%2.2ux%2.2ux%2.2ux",
 		ether->ea[0], ether->ea[1], ether->ea[2],
 		ether->ea[3], ether->ea[4], ether->ea[5]);
-	sprint(buf+i, "\n");
+	snprintf(buf+i, sizeof(buf)-i,"\n");
 	printd(buf);
 
-	j = ether->mbps;
+	j = ether->netif.mbps;
 	if(j > 1000)
 		j *= 10;
 	for(i = 0; j >= 100; i++)
 		j /= 10;
 	i = (128<<i)*1024;
-	netifinit(ether, name, Ntypes, i);
-	if(ether->oq == 0)
-		ether->oq = qopen(i, Qmsg, 0, 0);
-	if(ether->oq == 0)
+	netifinit(&ether->netif, name, Ntypes, i);
+	if(ether->netif.oq == 0)
+		ether->netif.oq = qopen(i, Qmsg, 0, 0);
+	if(ether->netif.oq == 0)
 		panic("etherreset %s", name);
-	ether->alen = Eaddrlen;
-	memmove(ether->addr, ether->ea, Eaddrlen);
-	memset(ether->bcast, 0xFF, Eaddrlen);
+	ether->netif.alen = Eaddrlen;
+	memmove(ether->netif.addr, ether->ea, Eaddrlen);
+	memset(ether->netif.bcast, 0xFF, Eaddrlen);
 
 	return ether;
 }
@@ -467,9 +482,6 @@ etherreset(void)
 			continue;
 		etherxx[ctlrno] = ether;
 	}
-
-	if(getconf("*noetherprobe"))
-		return;
 
 	cardno = ctlrno = 0;
 	while(cards[cardno].type != NULL && ctlrno < Maxether){
@@ -501,7 +513,7 @@ ethershutdown(void)
 			printd("#l%d: no shutdown function\n", i);
 			continue;
 		}
-		snprint(name, sizeof(name), "ether%d", i);
+		snprintf(name, sizeof(name), "ether%d", i);
 		if(ether->irq >= 0){
 		//	intrdisable(ether->irq, ether->interrupt, ether, ether->tbdf, name);
 		}
@@ -510,7 +522,7 @@ ethershutdown(void)
 }
 
 
-#define POLY 0xedb88320
+#define ROLYPOLY 0xedb88320
 
 /* really slow 32 bit crc for ethers */
 uint32_t
@@ -523,7 +535,7 @@ ethercrc(uint8_t *p, int len)
 	for(i = 0; i < len; i++){
 		b = *p++;
 		for(j = 0; j < 8; j++){
-			crc = (crc>>1) ^ (((crc^b) & 1) ? POLY : 0);
+			crc = (crc>>1) ^ (((crc^b) & 1) ? ROLYPOLY : 0);
 			b >>= 1;
 		}
 	}
