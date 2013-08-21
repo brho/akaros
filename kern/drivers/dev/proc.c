@@ -237,10 +237,10 @@ procgen(struct chan *c, char *name, struct dirtab *tab, int unused, int s,
 			if (!p)
 				return -1;
 		} else {
-			pid = s;
-			p = pid2proc(pid);
+			p = pid_nth(s);
 			if (!p)
 				return -1;
+			pid = p->pid;
 		}
 
 		snprintf(current->genbuf, sizeof current->genbuf, "%ud", pid);
