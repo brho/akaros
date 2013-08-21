@@ -11,54 +11,49 @@
 #include <pmap.h>
 #include <smp.h>
 
-
-enum
-{
-	Hdrspc		= 64,		/* leave room for high-level headers */
-	Bdead		= 0x51494F42,	/* "QIOB" */
-	BLOCKALIGN      = 32, /* known to be good for all systems. */
+enum {
+	Hdrspc = 64,				/* leave room for high-level headers */
+	Bdead = 0x51494F42,	/* "QIOB" */
+	BLOCKALIGN = 32,	/* known to be good for all systems. */
 };
 
-struct
-{
+struct {
 	spinlock_t lock;
-	uint32_t	bytes;
+	uint32_t bytes;
 } ialloc;
 
-static struct block*
-_allocb(int size)
+static struct block *_allocb(int size)
 {
-    struct block *b;
-    uint8_t *p;
-    int n;
-    
-    n = BLOCKALIGN + ROUNDUP(size+Hdrspc, BLOCKALIGN) + sizeof(struct block);
-    if((p = kzmalloc(n, KMALLOC_WAIT)) == NULL)
-	return NULL;
-    
-    b = (struct block*)(p + n - sizeof(struct block));	/* block at end of allocated space */
-    b->base = p;
-    
-    b->next = NULL;
-    b->list = NULL;
-    b->free = 0;
-    b->flag = 0;
-    
-    /* align base and bounds of data */
-    b->lim = (uint8_t*)((uint64_t)b & ~(BLOCKALIGN-1));
-    
-    /* align start of writable data, leaving space below for added headers */
-    b->rp = b->lim - ROUNDUP(size, BLOCKALIGN);
-    b->wp = b->rp;
-    
-    if(b->rp < b->base || b->lim - b->rp < size)
-	panic("_allocb");
-    
-    return b;
+	struct block *b;
+	uint8_t *p;
+	int n;
+
+	n = BLOCKALIGN + ROUNDUP(size + Hdrspc, BLOCKALIGN) + sizeof(struct block);
+	if ((p = kzmalloc(n, KMALLOC_WAIT)) == NULL)
+		return NULL;
+
+	b = (struct block *)(p + n - sizeof(struct block));	/* block at end of allocated space */
+	b->base = p;
+
+	b->next = NULL;
+	b->list = NULL;
+	b->free = 0;
+	b->flag = 0;
+
+	/* align base and bounds of data */
+	b->lim = (uint8_t *) ((uint64_t) b & ~(BLOCKALIGN - 1));
+
+	/* align start of writable data, leaving space below for added headers */
+	b->rp = b->lim - ROUNDUP(size, BLOCKALIGN);
+	b->wp = b->rp;
+
+	if (b->rp < b->base || b->lim - b->rp < size)
+		panic("_allocb");
+
+	return b;
 }
 
-struct block*
-allocb(int size)
+struct block *allocb(int size)
 {
 	struct block *b;
 
@@ -67,7 +62,7 @@ allocb(int size)
 	 * Can still error out of here, though.
 	 * should only be called from user context.
 	 */
-	if((b = _allocb(size)) == NULL){
+	if ((b = _allocb(size)) == NULL) {
 		panic("allocb: no memory for %d bytes\n", size);
 	}
 
@@ -75,16 +70,15 @@ allocb(int size)
 }
 
 /* interrupt context allocb. */
-struct block*
-iallocb(int size)
+struct block *iallocb(int size)
 {
 	struct block *b;
 	static int m1, m2, mp;
 
-	if((b = _allocb(size)) == NULL){
-		if((m2++%10000)==0){
-			if(mp++ > 1000){
-			    panic("iallocb");
+	if ((b = _allocb(size)) == NULL) {
+		if ((m2++ % 10000) == 0) {
+			if (mp++ > 1000) {
+				panic("iallocb");
 			}
 			printd("iallocb: no memory \n");
 		}
@@ -99,27 +93,26 @@ iallocb(int size)
 	return b;
 }
 
-void
-freeb(struct block *b)
+void freeb(struct block *b)
 {
-	void *dead = (void*)Bdead;
+	void *dead = (void *)Bdead;
 	uint8_t *p;
 
-	if(b == NULL)
+	if (b == NULL)
 		return;
 
 	/*
 	 * drivers which perform non cache coherent DMA manage their own buffer
 	 * pool of uncached buffers and provide their own free routine.
 	 */
-	if(b->free) {
+	if (b->free) {
 		b->free(b);
 		return;
 	}
-	if(b->flag & BINTR) {
-	    spin_lock(&ialloc.lock);
-	    ialloc.bytes -= b->lim - b->base;
-	    spin_unlock(&ialloc.lock);
+	if (b->flag & BINTR) {
+		spin_lock(&ialloc.lock);
+		ialloc.bytes -= b->lim - b->base;
+		spin_unlock(&ialloc.lock);
 	}
 
 	p = b->base;
@@ -134,35 +127,32 @@ freeb(struct block *b)
 	kfree(p);
 }
 
-void
-checkb(struct block *b, char *msg)
+void checkb(struct block *b, char *msg)
 {
-	void *dead = (void*)Bdead;
+	void *dead = (void *)Bdead;
 
-	if(b == dead)
-	    panic("checkb b %s %#p", msg, b);
-	if(b->base == dead || b->lim == dead || b->next == dead
-	  || b->rp == dead || b->wp == dead){
-		printd("checkb: base %#p lim %#p next %#p\n",
-		       b->base, b->lim, b->next);
+	if (b == dead)
+		panic("checkb b %s %#p", msg, b);
+	if (b->base == dead || b->lim == dead || b->next == dead
+		|| b->rp == dead || b->wp == dead) {
+		printd("checkb: base %#p lim %#p next %#p\n", b->base, b->lim, b->next);
 		printd("checkb: rp %#p wp %#p\n", b->rp, b->wp);
 		panic("checkb dead: %s\n", msg);
 	}
 
-	if(b->base > b->lim)
+	if (b->base > b->lim)
 		panic("checkb 0 %s %#p %#p", msg, b->base, b->lim);
-	if(b->rp < b->base)
+	if (b->rp < b->base)
 		panic("checkb 1 %s %#p %#p", msg, b->base, b->rp);
-	if(b->wp < b->base)
+	if (b->wp < b->base)
 		panic("checkb 2 %s %#p %#p", msg, b->base, b->wp);
-	if(b->rp > b->lim)
+	if (b->rp > b->lim)
 		panic("checkb 3 %s %#p %#p", msg, b->rp, b->lim);
-	if(b->wp > b->lim)
+	if (b->wp > b->lim)
 		panic("checkb 4 %s %#p %#p", msg, b->wp, b->lim);
 }
 
-void
-iallocsummary(void)
+void iallocsummary(void)
 {
-  printd("ialloc %lud\n", ialloc.bytes);
+	printd("ialloc %lud\n", ialloc.bytes);
 }

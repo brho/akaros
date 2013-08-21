@@ -10,13 +10,13 @@
 #include <pmap.h>
 #include <smp.h>
 
-static char isfrog[256]={
-	/*NUL*/	1, 1, 1, 1, 1, 1, 1, 1,
-	/*BKS*/	1, 1, 1, 1, 1, 1, 1, 1,
-	/*DLE*/	1, 1, 1, 1, 1, 1, 1, 1,
-	/*CAN*/	1, 1, 1, 1, 1, 1, 1, 1,
-	['/']	1,
-	[0x7f]	1,
+static char isfrog[256] = {
+	 /*NUL*/ 1, 1, 1, 1, 1, 1, 1, 1,
+	 /*BKS*/ 1, 1, 1, 1, 1, 1, 1, 1,
+	 /*DLE*/ 1, 1, 1, 1, 1, 1, 1, 1,
+	 /*CAN*/ 1, 1, 1, 1, 1, 1, 1, 1,
+	['/'] 1,
+	[0x7f] 1,
 };
 
 /*
@@ -36,21 +36,21 @@ static char isfrog[256]={
  * This was from Plan 9, but the Rune support is gone.
  * Also, we removed the 'user pointer' check, but might want it again later. 
  */
-char*
-validname0(char *aname, int slashok, int dup, uintptr_t pc, struct errbuf *perrbuf)
+char *validname0(char *aname, int slashok, int dup, uintptr_t pc,
+				 struct errbuf *perrbuf)
 {
 	char *ename, *name, *s;
 	int c, n;
 
 	name = aname;
-	ename = memchr(name, 0, (1<<16));
+	ename = memchr(name, 0, (1 << 16));
 
-	if(ename==NULL || ename-name>=(1<<16))
-	  error("name too long");
+	if (ename == NULL || ename - name >= (1 << 16))
+		error("name too long");
 
 	s = NULL;
-	if(dup){
-		n = ename-name;
+	if (dup) {
+		n = ename - name;
 		s = kzmalloc(n + 1, KMALLOC_WAIT);
 		memmove(s, name, n);
 		s[n] = 0;
@@ -58,17 +58,17 @@ validname0(char *aname, int slashok, int dup, uintptr_t pc, struct errbuf *perrb
 		name = s;
 	}
 
-	while(*name){
+	while (*name) {
 		/* all characters above '~' are ok */
-		c = *(uint8_t*)name;
-		if(c >= Runeself){
-		    error("No UTF-8 in Akaros");
-		}else{
-			if(isfrog[c])
-				if(!slashok || c!='/'){
-				    kfree(s);
-				    error("Bad character in name");
-			}
+		c = *(uint8_t *) name;
+		if (c >= Runeself) {
+			error("No UTF-8 in Akaros");
+		} else {
+			if (isfrog[c])
+				if (!slashok || c != '/') {
+					kfree(s);
+					error("Bad character in name");
+				}
 			name++;
 		}
 	}
@@ -81,26 +81,24 @@ validname0(char *aname, int slashok, int dup, uintptr_t pc, struct errbuf *perrb
  * and puts ... at the end of the string if it's too long.  Usually used to
  * save a string in up->genbuf;
  */
-void
-kstrcpy(char *s, char *t, int ns)
+void kstrcpy(char *s, char *t, int ns)
 {
 	int nt;
 
 	nt = strlen(t);
-	if(nt+1 <= ns){
-		memmove(s, t, nt+1);
+	if (nt + 1 <= ns) {
+		memmove(s, t, nt + 1);
 		return;
 	}
 	/* too long */
-	if(ns < 4){
+	if (ns < 4) {
 		/* but very short! */
 		strncpy(s, t, ns);
 		return;
 	}
 	/* truncate with ... at character boundary (very rare case) */
-	memmove(s, t, ns-4);
+	memmove(s, t, ns - 4);
 	ns -= 4;
 	s[ns] = '\0';
-	memmove(s+ns, "...", 3);
+	memmove(s + ns, "...", 3);
 }
-

@@ -21,9 +21,7 @@
 #include <pmap.h>
 #include <smp.h>
 
-
-enum
-{
+enum {
 	Qdir,
 	Qtrace,
 	Qtracepids,
@@ -48,8 +46,7 @@ enum
 	Qcore,
 };
 
-enum
-{
+enum {
 	CMclose,
 	CMclosefiles,
 	CMfixedpri,
@@ -80,7 +77,7 @@ enum
 	CMcore,
 };
 
-enum{
+enum {
 	Nevents = 0x4000,
 	Emask = Nevents - 1,
 	Ntracedpids = 1024,
@@ -94,62 +91,61 @@ enum{
  * particularly on shared servers.
  * Arguably, ns and fd shouldn't be readable; if you'd prefer, change them to 0000
  */
-struct dirtab procdir[] =
-{
-	{"args",		{Qargs},	0,			0660},
-	{"ctl",		{Qctl},		0,			0000},
-	{"fd",		{Qfd},		0,			0444},
-	{"fpregs",	{Qfpregs},	0,			0000},
-	//	{"kregs",	{Qkregs},	sizeof(Ureg),		0600},
-	{"mem",		{Qmem},		0,			0000},
-	{"note",		{Qnote},	0,			0000},
-	{"noteid",	{Qnoteid},	0,			0664},
-	{"notepg",	{Qnotepg},	0,			0000},
-	{"ns",		{Qns},		0,			0444},
-	{"proc",		{Qproc},	0,			0400},
-	//	{"regs",		{Qregs},	sizeof(Ureg),		0000},
-	{"segment",	{Qsegment},	0,			0444},
-	{"status",	{Qstatus},	STATSIZE,		0444},
-	{"text",		{Qtext},	0,			0000},
-	{"wait",		{Qwait},	0,			0400},
-	{"profile",	{Qprofile},	0,			0400},
-	{"syscall",	{Qsyscall},	0,			0400},	
-	{"core",		{Qcore},	0,			0444},
+struct dirtab procdir[] = {
+	{"args", {Qargs}, 0, 0660},
+	{"ctl", {Qctl}, 0, 0000},
+	{"fd", {Qfd}, 0, 0444},
+	{"fpregs", {Qfpregs}, 0, 0000},
+	//  {"kregs",   {Qkregs},   sizeof(Ureg),       0600},
+	{"mem", {Qmem}, 0, 0000},
+	{"note", {Qnote}, 0, 0000},
+	{"noteid", {Qnoteid}, 0, 0664},
+	{"notepg", {Qnotepg}, 0, 0000},
+	{"ns", {Qns}, 0, 0444},
+	{"proc", {Qproc}, 0, 0400},
+	//  {"regs",        {Qregs},    sizeof(Ureg),       0000},
+	{"segment", {Qsegment}, 0, 0444},
+	{"status", {Qstatus}, STATSIZE, 0444},
+	{"text", {Qtext}, 0, 0000},
+	{"wait", {Qwait}, 0, 0400},
+	{"profile", {Qprofile}, 0, 0400},
+	{"syscall", {Qsyscall}, 0, 0400},
+	{"core", {Qcore}, 0, 0444},
 };
 
 static
 struct cmdtab proccmd[] = {
-	{CMclose,		"close",		2},
-	{CMclosefiles,		"closefiles",		1},
-	{CMfixedpri,		"fixedpri",		2},
-	{CMhang,			"hang",			1},
-	{CMnohang,		"nohang",		1},
-	{CMnoswap,		"noswap",		1},
-	{CMkill,			"kill",			1},
-	{CMpri,			"pri",			2},
-	{CMprivate,		"private",		1},
-	{CMprofile,		"profile",		1},
-	{CMstart,		"start",		1},
-	{CMstartstop,		"startstop",		1},
-	{CMstartsyscall,		"startsyscall",		1},
-	{CMstop,			"stop",			1},
-	{CMwaitstop,		"waitstop",		1},
-	{CMwired,		"wired",		2},
-	{CMtrace,		"trace",		0},
-	{CMperiod,		"period",		2},
-	{CMdeadline,		"deadline",		2},
-	{CMcost,			"cost",			2},
-	{CMsporadic,		"sporadic",		1},
-	{CMdeadlinenotes,	"deadlinenotes",	1},
-	{CMadmit,		"admit",		1},
-	{CMextra,		"extra",		1},
-	{CMexpel,		"expel",		1},
-	{CMevent,		"event",		1},
-	{CMcore,			"core",			2},
+	{CMclose, "close", 2},
+	{CMclosefiles, "closefiles", 1},
+	{CMfixedpri, "fixedpri", 2},
+	{CMhang, "hang", 1},
+	{CMnohang, "nohang", 1},
+	{CMnoswap, "noswap", 1},
+	{CMkill, "kill", 1},
+	{CMpri, "pri", 2},
+	{CMprivate, "private", 1},
+	{CMprofile, "profile", 1},
+	{CMstart, "start", 1},
+	{CMstartstop, "startstop", 1},
+	{CMstartsyscall, "startsyscall", 1},
+	{CMstop, "stop", 1},
+	{CMwaitstop, "waitstop", 1},
+	{CMwired, "wired", 2},
+	{CMtrace, "trace", 0},
+	{CMperiod, "period", 2},
+	{CMdeadline, "deadline", 2},
+	{CMcost, "cost", 2},
+	{CMsporadic, "sporadic", 1},
+	{CMdeadlinenotes, "deadlinenotes", 1},
+	{CMadmit, "admit", 1},
+	{CMextra, "extra", 1},
+	{CMexpel, "expel", 1},
+	{CMevent, "event", 1},
+	{CMcore, "core", 2},
 };
 
 /* Segment type from portdat.h */
-static char *sname[]={ "Text", "Data", "Bss", "Stack", "Shared", "Phys", };
+static char *sname[] = { "Text", "Data", "Bss", "Stack", "Shared", "Phys", };
 
 /*
  * struct qids are, in path:
@@ -169,12 +165,12 @@ static char *sname[]={ "Text", "Data", "Bss", "Stack", "Shared", "Phys", };
 #define PID(q)		((q).vers)
 #define NOTEID(q)	((q).vers)
 
-static void	procctlreq(struct proc*, char*, int);
-static int	procctlmemio(struct proc*, uintptr_t, int, void*, int);
-//static struct chan*	proctext(struct chan*, struct proc*);
+static void procctlreq(struct proc *, char *, int);
+static int procctlmemio(struct proc *, uintptr_t, int, void *, int);
+//static struct chan*   proctext(struct chan*, struct proc*);
 //static Segment* txt2data(struct proc*, Segment*);
-//static int	procstopped(void*);
-static void	mntscan(struct mntwalk*, struct proc*);
+//static int    procstopped(void*);
+static void mntscan(struct mntwalk *, struct proc *);
 
 //static Traceevent *tevents;
 static char *tpids, *tpidsc, *tpidse;
@@ -186,24 +182,24 @@ static int tproduced, tconsumed;
 //void (*proctrace)(struct proc*, int, int64_t) = notrace;
 
 #if 0
-static void
-profclock(Ureg *ur, Timer *)
+static void profclock(Ureg * ur, Timer *)
 {
 	Tos *tos;
 
-	if(up == NULL || current->state != Running)
+	if (up == NULL || current->state != Running)
 		return;
 
 	/* user profiling clock */
-	if(userureg(ur)){
-		tos = (Tos*)(USTKTOP-sizeof(Tos));
+	if (userureg(ur)) {
+		tos = (Tos *) (USTKTOP - sizeof(Tos));
 		tos->clock += TK2MS(1);
 		segclock(userpc(ur));
 	}
 }
 #endif
 static int
-procgen(struct chan *c, char *name, struct dirtab *tab, int unused, int s, struct dir *dp, struct errbuf *perrbuf)
+procgen(struct chan *c, char *name, struct dirtab *tab, int unused, int s,
+		struct dir *dp, struct errbuf *perrbuf)
 {
 	struct qid qid;
 	struct proc *p;
@@ -212,39 +208,38 @@ procgen(struct chan *c, char *name, struct dirtab *tab, int unused, int s, struc
 	int pid;
 	uint32_t path, perm, len;
 
-	if(s == DEVDOTDOT){
+	if (s == DEVDOTDOT) {
 		mkqid(&qid, Qdir, 0, QTDIR, perrbuf);
 		devdir(c, qid, "#p", 0, eve, 0555, dp);
 		return 1;
 	}
 
-	if(c->qid.path == Qdir){
-		if(s == 0){
-			strncpy(current->genbuf,  "trace", sizeof(current->genbuf));
+	if (c->qid.path == Qdir) {
+		if (s == 0) {
+			strncpy(current->genbuf, "trace", sizeof(current->genbuf));
 			mkqid(&qid, Qtrace, -1, QTFILE, perrbuf);
 			devdir(c, qid, current->genbuf, 0, eve, 0444, dp);
 			return 1;
 		}
-		if(s == 1){
-			strncpy(current->genbuf,  "tracepids", sizeof(current->genbuf));
+		if (s == 1) {
+			strncpy(current->genbuf, "tracepids", sizeof(current->genbuf));
 			mkqid(&qid, Qtracepids, -1, QTFILE, perrbuf);
 			devdir(c, qid, current->genbuf, 0, eve, 0444, dp);
 			return 1;
 		}
 		s -= 2;
-		if(name != NULL){
+		if (name != NULL) {
 			/* ignore s and use name to find pid */
 			pid = strtol(name, &ename, 10);
-			if(pid<=0 || ename[0]!='\0')
+			if (pid <= 0 || ename[0] != '\0')
 				return -1;
 			p = pid2proc(pid);
-			if(! p)
+			if (!p)
 				return -1;
-		}
-		else {
+		} else {
 			pid = s;
 			p = pid2proc(pid);
-			if(! p)
+			if (!p)
 				return -1;
 		}
 
@@ -253,38 +248,38 @@ procgen(struct chan *c, char *name, struct dirtab *tab, int unused, int s, struc
 		 * String comparison is done in devwalk so
 		 * name must match its formatted pid.
 		 */
-		if(name != NULL && strcmp(name, current->genbuf) != 0)
+		if (name != NULL && strcmp(name, current->genbuf) != 0)
 			return -1;
-		mkqid(&qid, (s+1)<<QSHIFT, pid, QTDIR, perrbuf);
-		devdir(c, qid, current->genbuf, 0, p->user, DMDIR|0555, dp);
+		mkqid(&qid, (s + 1) << QSHIFT, pid, QTDIR, perrbuf);
+		devdir(c, qid, current->genbuf, 0, p->user, DMDIR | 0555, dp);
 		kref_put(&p->p_kref);
 		return 1;
 	}
-	if(c->qid.path == Qtrace){
-		strncpy(current->genbuf,  "trace", sizeof(current->genbuf));
+	if (c->qid.path == Qtrace) {
+		strncpy(current->genbuf, "trace", sizeof(current->genbuf));
 		mkqid(&qid, Qtrace, -1, QTFILE, perrbuf);
 		devdir(c, qid, current->genbuf, 0, eve, 0444, dp);
 		return 1;
 	}
-	if(c->qid.path == Qtracepids){
-		strncpy(current->genbuf,  "tracepids", sizeof(current->genbuf));
+	if (c->qid.path == Qtracepids) {
+		strncpy(current->genbuf, "tracepids", sizeof(current->genbuf));
 		mkqid(&qid, Qtrace, -1, QTFILE, perrbuf);
 		devdir(c, qid, current->genbuf, 0, eve, 0444, dp);
 		return 1;
 	}
-	if(s >= ARRAY_SIZE(procdir))
+	if (s >= ARRAY_SIZE(procdir))
 		return -1;
-	if(tab)
+	if (tab)
 		panic("procgen");
 
 	tab = &procdir[s];
-	path = c->qid.path&~(((1<<QSHIFT)-1));	/* slot component */
+	path = c->qid.path & ~(((1 << QSHIFT) - 1));	/* slot component */
 
-	if((p = pid2proc(SLOT(c->qid))) == NULL)
+	if ((p = pid2proc(SLOT(c->qid))) == NULL)
 		return -1;
 	perm = 0444 | tab->perm;
 #if 0
-	if(perm == 0)
+	if (perm == 0)
 		perm = p->procmode;
 	else	/* just copy read bits */
 		perm |= p->procmode & 0444;
@@ -292,49 +287,47 @@ procgen(struct chan *c, char *name, struct dirtab *tab, int unused, int s, struc
 
 	len = tab->length;
 #if 0
-	switch(QID(c->qid)) {
-	case Qwait:
-		len = p->nwait;	/* incorrect size, but >0 means there's something to read */
-		break;
-	case Qprofile:
-		q = p->seg[TSEG];
-		if(q && q->profile) {
-			len = (q->top-q->base)>>LRESPROF;
-			len *= sizeof(*q->profile);
-		}
-		break;
+	switch (QID(c->qid)) {
+		case Qwait:
+			len = p->nwait;	/* incorrect size, but >0 means there's something to read */
+			break;
+		case Qprofile:
+			q = p->seg[TSEG];
+			if (q && q->profile) {
+				len = (q->top - q->base) >> LRESPROF;
+				len *= sizeof(*q->profile);
+			}
+			break;
 	}
 #endif
 
-	mkqid(&qid, path|tab->qid.path, c->qid.vers, QTFILE, perrbuf);
+	mkqid(&qid, path | tab->qid.path, c->qid.vers, QTFILE, perrbuf);
 	devdir(c, qid, tab->name, len, p->user, perm, dp);
 	kref_put(&p->p_kref);
 	return 1;
 }
 
 #if 0
-static void
-notrace(struct proc*, Tevent, int64_t)
+static void notrace(struct proc *, Tevent, int64_t)
 {
 }
+
 static spinlock_t lock tlck;
 
-static void
-_proctrace(struct proc* p, Tevent etype, int64_t ts)
+static void _proctrace(struct proc *p, Tevent etype, int64_t ts)
 {
 	Traceevent *te;
 	int tp;
 
 	ilock(&tlck);
-	if (p->trace == 0 || topens == 0 ||
-		tproduced - tconsumed >= Nevents){
+	if (p->trace == 0 || topens == 0 || tproduced - tconsumed >= Nevents) {
 		iunlock(&tlck);
 		return;
 	}
 	tp = tproduced++;
 	iunlock(&tlck);
 
-	te = &tevents[tp&Emask];
+	te = &tevents[tp & Emask];
 	te->pid = p->pid;
 	te->etype = etype;
 	if (ts == 0)
@@ -344,42 +337,39 @@ _proctrace(struct proc* p, Tevent etype, int64_t ts)
 	te->core = m->machno;
 }
 
-void
-proctracepid(struct proc *p)
+void proctracepid(struct proc *p)
 {
-	if(p->trace == 1 && proctrace != notrace){
+	if (p->trace == 1 && proctrace != notrace) {
 		p->trace = 2;
 		ilock(&tlck);
 		tpidsc = seprint(tpidsc, tpidse, "%d %s\n", p->pid, p->text);
 		iunlock(&tlck);
 	}
 }
-	
+
 #endif
-static void
-procinit(void)
+static void procinit(void)
 {
 #if 0
-	if(conf.nproc >= (SLOTMASK>>QSHIFT) - 1)
+	if (conf.nproc >= (SLOTMASK >> QSHIFT) - 1)
 		printd("warning: too many procs for devproc\n");
 	addclock0link((void (*)(void))profclock, 113);	/* Relative prime to HZ */
 #endif
 }
 
-static struct chan*
-procattach(char *spec, struct errbuf *perrbuf)
+static struct chan *procattach(char *spec, struct errbuf *perrbuf)
 {
 	return devattach('p', spec, perrbuf);
 }
 
-static struct walkqid*
-procwalk(struct chan *c, struct chan *nc, char **name, int nname, struct errbuf *perrbuf)
+static struct walkqid *procwalk(struct chan *c, struct chan *nc, char **name,
+								int nname, struct errbuf *perrbuf)
 {
 	return devwalk(c, nc, name, nname, 0, 0, procgen, perrbuf);
 }
 
 static long
-procstat(struct chan *c, uint8_t *db, long n, struct errbuf *perrbuf)
+procstat(struct chan *c, uint8_t * db, long n, struct errbuf *perrbuf)
 {
 	return devstat(c, db, n, 0, 0, procgen, perrbuf);
 }
@@ -390,23 +380,21 @@ procstat(struct chan *c, uint8_t *db, long n, struct errbuf *perrbuf)
  *  servers running as none should they be
  *  subverted by, for example, a stack attack.
  */
-static void
-nonone(struct proc *p)
+static void nonone(struct proc *p)
 {
 	return;
 #if 0
-	if(p == up)
+	if (p == up)
 		return;
-	if(strcmp(current->user, "none") != 0)
+	if (strcmp(current->user, "none") != 0)
 		return;
-	if(iseve())
+	if (iseve())
 		return;
 	error(Eperm);
 #endif
 }
 
-static struct chan*
-procopen(struct chan *c, int omode, struct errbuf *perrbuf)
+static struct chan *procopen(struct chan *c, int omode, struct errbuf *perrbuf)
 {
 	ERRSTACK(2);
 	struct proc *p;
@@ -414,28 +402,28 @@ procopen(struct chan *c, int omode, struct errbuf *perrbuf)
 	struct chan *tc;
 	int pid;
 
-	if(c->qid.type & QTDIR)
+	if (c->qid.type & QTDIR)
 		return devopen(c, omode, 0, 0, procgen, perrbuf);
 
-	if(QID(c->qid) == Qtrace){
+	if (QID(c->qid) == Qtrace) {
 		error("not yet");
 #if 0
 		if (omode != OREAD)
 			error(Eperm);
 		lock(&tlock);
-		if (waserror()){
+		if (waserror()) {
 			unlock(&tlock);
 			nexterror();
 		}
 		if (topens > 0)
 			error("already open");
 		topens++;
-		if (tevents == NULL){
-			tevents = (Traceevent*)kmalloc(sizeof(Traceevent) * Nevents, 0);
-			if(tevents == NULL)
+		if (tevents == NULL) {
+			tevents = (Traceevent *) kmalloc(sizeof(Traceevent) * Nevents, 0);
+			if (tevents == NULL)
 				error(Enomem);
 			tpids = kmalloc(Ntracedpids * 20, 0);
-			if(tpids == NULL){
+			if (tpids == NULL) {
 				kfree(tpids);
 				tpids = NULL;
 				error(Enomem);
@@ -454,7 +442,7 @@ procopen(struct chan *c, int omode, struct errbuf *perrbuf)
 		return c;
 #endif
 	}
-	if(QID(c->qid) == Qtracepids){
+	if (QID(c->qid) == Qtracepids) {
 		error("not yet");
 #if 0
 		if (omode != OREAD)
@@ -466,99 +454,97 @@ procopen(struct chan *c, int omode, struct errbuf *perrbuf)
 #endif
 	}
 #if 0
-	if((p = pid2proc(SLOT(c->qid))) == NULL)
+	if ((p = pid2proc(SLOT(c->qid))) == NULL)
 		error(Eprocdied);
 	qlock(&p->debug);
-	if(waserror()){
+	if (waserror()) {
 		qunlock(&p->debug);
 		kref_put(&p->p_kref);
 		nexterror();
 	}
 	pid = PID(c->qid);
-	if(p->pid != pid)
+	if (p->pid != pid)
 		error(Eprocdied);
 
 	omode = openmode(omode, perrbuf);
 
-	switch(QID(c->qid)){
-	case Qtext:
-		if(omode != OREAD)
-			error(Eperm);
-		tc = proctext(c, p);
-		tc->offset = 0;
-		qunlock(&p->debug);
-		kref_put(&p->p_kref);
-		cclose(c);
-		return tc;
+	switch (QID(c->qid)) {
+		case Qtext:
+			if (omode != OREAD)
+				error(Eperm);
+			tc = proctext(c, p);
+			tc->offset = 0;
+			qunlock(&p->debug);
+			kref_put(&p->p_kref);
+			cclose(c);
+			return tc;
 
-	case Qproc:
-	case Qsegment:
-	case Qprofile:
-	case Qfd:
-		if(omode != OREAD)
-			error(Eperm);
-		break;
+		case Qproc:
+		case Qsegment:
+		case Qprofile:
+		case Qfd:
+			if (omode != OREAD)
+				error(Eperm);
+			break;
 
-	case Qnote:
-		if(p->privatemem)
-			error(Eperm);
-		break;
+		case Qnote:
+			if (p->privatemem)
+				error(Eperm);
+			break;
 
-	case Qmem:
-	case Qctl:
-		if(p->privatemem)
-			error(Eperm);
-		nonone(p);
-		break;
+		case Qmem:
+		case Qctl:
+			if (p->privatemem)
+				error(Eperm);
+			nonone(p);
+			break;
 
-	case Qargs:
-	case Qnoteid:
-	case Qstatus:
-	case Qwait:
-	case Qregs:
-	case Qfpregs:
-	case Qkregs:
-	case Qsyscall:
-	case Qcore:
-		nonone(p);
-		break;
+		case Qargs:
+		case Qnoteid:
+		case Qstatus:
+		case Qwait:
+		case Qregs:
+		case Qfpregs:
+		case Qkregs:
+		case Qsyscall:
+		case Qcore:
+			nonone(p);
+			break;
 
-	case Qns:
-		if(omode != OREAD)
-			error(Eperm);
-		c->aux = kmalloc(sizeof(Mntwalk), 0);
-		break;
+		case Qns:
+			if (omode != OREAD)
+				error(Eperm);
+			c->aux = kmalloc(sizeof(Mntwalk), 0);
+			break;
 
-	case Qnotepg:
-		nonone(p);
-		pg = p->pgrp;
-		if(pg == NULL)
-			error(Eprocdied);
-		if(omode!=OWRITE || pg->pgrpid == 1)
-			error(Eperm);
-		c->pgrpid.path = pg->pgrpid+1;
-		c->pgrpid.vers = p->noteid;
-		break;
+		case Qnotepg:
+			nonone(p);
+			pg = p->pgrp;
+			if (pg == NULL)
+				error(Eprocdied);
+			if (omode != OWRITE || pg->pgrpid == 1)
+				error(Eperm);
+			c->pgrpid.path = pg->pgrpid + 1;
+			c->pgrpid.vers = p->noteid;
+			break;
 
-
-	default:
+		default:
 #endif
 #if 0
-		qunlock(&p->debug);
-		kref_put(&p->p_kref);
-		pprint("procopen %#llux\n", c->qid.path);
+			qunlock(&p->debug);
+			kref_put(&p->p_kref);
+			pprint("procopen %#llux\n", c->qid.path);
 #endif
-		error(Egreg);
+			error(Egreg);
 #if 0
 	}
 
-
 	/* Affix pid to qid */
-	if(p->state != Dead)
+	if (p->state != Dead)
 		c->qid.vers = p->pid;
 	/* make sure the process slot didn't get reallocated while we were playing */
 	coherence();
-	if(p->pid != pid)
+	if (p->pid != pid)
 		error(Eprocdied);
 
 #endif
@@ -572,7 +558,7 @@ procopen(struct chan *c, int omode, struct errbuf *perrbuf)
 }
 
 static long
-procwstat(struct chan *c, uint8_t *db, long n, struct errbuf *perrbuf)
+procwstat(struct chan *c, uint8_t * db, long n, struct errbuf *perrbuf)
 {
 	ERRSTACK(2);
 	error("not yet");
@@ -580,42 +566,42 @@ procwstat(struct chan *c, uint8_t *db, long n, struct errbuf *perrbuf)
 	struct proc *p;
 	struct dir *d;
 
-	if(c->qid.type & QTDIR)
+	if (c->qid.type & QTDIR)
 		error(Eperm);
 
-	if(QID(c->qid) == Qtrace)
+	if (QID(c->qid) == Qtrace)
 		return devwstat(c, db, n, perrbuf);
 
-	if((p = pid2proc(SLOT(c->qid))) == NULL)
+	if ((p = pid2proc(SLOT(c->qid))) == NULL)
 		error(Eprocdied);
 	nonone(p);
 	d = NULL;
 	qlock(&p->debug);
-	if(waserror()){
+	if (waserror()) {
 		qunlock(&p->debug);
 		kref_put(&p->p_kref);
 		kfree(d);
 		nexterror();
 	}
 
-	if(p->pid != PID(c->qid))
+	if (p->pid != PID(c->qid))
 		error(Eprocdied);
 
-	if(strcmp(current->user, p->user) != 0 && strcmp(current->user, eve) != 0)
+	if (strcmp(current->user, p->user) != 0 && strcmp(current->user, eve) != 0)
 		error(Eperm);
 
 	d = kmalloc(sizeof(struct dir) + n, 0);
-	n = convM2D(db, n, &d[0], (char*)&d[1]);
-	if(n == 0)
+	n = convM2D(db, n, &d[0], (char *)&d[1]);
+	if (n == 0)
 		error(Eshortstat);
-	if(!emptystr(d->uid) && strcmp(d->uid, p->user) != 0){
-		if(strcmp(current->user, eve) != 0)
+	if (!emptystr(d->uid) && strcmp(d->uid, p->user) != 0) {
+		if (strcmp(current->user, eve) != 0)
 			error(Eperm);
 		else
 			kstrdup(&p->user, d->uid);
 	}
-	if(d->mode != ~0UL)
-		p->procmode = d->mode&0777;
+	if (d->mode != ~0UL)
+		p->procmode = d->mode & 0777;
 
 	qunlock(&p->debug);
 	kref_put(&p->p_kref);
@@ -625,49 +611,42 @@ procwstat(struct chan *c, uint8_t *db, long n, struct errbuf *perrbuf)
 #endif
 }
 
-
 #if 0
-static long
-procoffset(long offset, char *va, int *np)
+static long procoffset(long offset, char *va, int *np)
 {
-	if(offset > 0) {
+	if (offset > 0) {
 		offset -= *np;
-		if(offset < 0) {
-			memmove(va, va+*np+offset, -offset);
+		if (offset < 0) {
+			memmove(va, va + *np + offset, -offset);
 			*np = -offset;
-		}
-		else
+		} else
 			*np = 0;
 	}
 	return offset;
 }
 
-static int
-procqidwidth(struct chan *c)
+static int procqidwidth(struct chan *c)
 {
 	char buf[32];
 
 	return sprint(buf, "%lud", c->qid.vers);
 }
 
-int
-procfdprint(struct chan *c, int fd, int w, char *s, int ns)
+int procfdprint(struct chan *c, int fd, int w, char *s, int ns)
 {
 	int n;
 
-	if(w == 0)
+	if (w == 0)
 		w = procqidwidth(c);
-	n = snprint(s, ns, "%3d %.2s %C %4ud (%.16llux %*lud %.2ux) %5ld %8lld %s\n",
-		fd,
-		&"r w rw"[(c->mode&3)<<1],
-		c->dev->dc, c->devno,
-		c->qid.path, w, c->qid.vers, c->qid.type,
-		c->iounit, c->offset, c->path->s);
+	n = snprint(s, ns,
+				"%3d %.2s %C %4ud (%.16llux %*lud %.2ux) %5ld %8lld %s\n", fd,
+				&"r w rw"[(c->mode & 3) << 1], c->dev->dc, c->devno,
+				c->qid.path, w, c->qid.vers, c->qid.type, c->iounit, c->offset,
+				c->path->s);
 	return n;
 }
 
-static int
-procfds(struct proc *p, char *va, int count, long offset)
+static int procfds(struct proc *p, char *va, int count, long offset)
 {
 	ERRSTACK(2);
 	struct fgrp *f;
@@ -677,41 +656,41 @@ procfds(struct proc *p, char *va, int count, long offset)
 	char *a;
 
 	/* print to buf to avoid holding fgrp lock while writing to user space */
-	if(count > sizeof buf)
+	if (count > sizeof buf)
 		count = sizeof buf;
 	a = buf;
 
 	qlock(&p->debug);
 	f = p->fgrp;
-	if(f == NULL){
+	if (f == NULL) {
 		qunlock(&p->debug);
 		return 0;
 	}
 	lock(f);
-	if(waserror()){
+	if (waserror()) {
 		unlock(f);
 		qunlock(&p->debug);
 		nexterror();
 	}
 
 	n = readstr(0, a, count, p->dot->path->s);
-	n += snprint(a+n, count-n, "\n");
+	n += snprint(a + n, count - n, "\n");
 	offset = procoffset(offset, a, &n);
 	/* compute width of qid.path */
 	w = 0;
-	for(i = 0; i <= f->maxfd; i++) {
+	for (i = 0; i <= f->maxfd; i++) {
 		c = f->fd[i];
-		if(c == NULL)
+		if (c == NULL)
 			continue;
 		ww = procqidwidth(c);
-		if(ww > w)
+		if (ww > w)
 			w = ww;
 	}
-	for(i = 0; i <= f->maxfd; i++) {
+	for (i = 0; i <= f->maxfd; i++) {
 		c = f->fd[i];
-		if(c == NULL)
+		if (c == NULL)
 			continue;
-		n += procfdprint(c, i, w, a+n, count-n);
+		n += procfdprint(c, i, w, a + n, count - n);
 		offset = procoffset(offset, a, &n);
 	}
 	unlock(f);
@@ -723,80 +702,75 @@ procfds(struct proc *p, char *va, int count, long offset)
 	return n;
 }
 #endif
-static void
-procclose(struct chan * c, struct errbuf *perrbuf)
+static void procclose(struct chan *c, struct errbuf *perrbuf)
 {
-	if(QID(c->qid) == Qtrace){
+	if (QID(c->qid) == Qtrace) {
 		spin_lock(&tlock);
-		if(topens > 0)
+		if (topens > 0)
 			topens--;
 		/* ??
-		if(topens == 0)
-			proctrace = notrace;
-		*/
+		   if(topens == 0)
+		   proctrace = notrace;
+		 */
 		spin_unlock(&tlock);
 	}
-	if(QID(c->qid) == Qns && c->aux != 0)
+	if (QID(c->qid) == Qns && c->aux != 0)
 		kfree(c->aux);
 }
 
 #if 0
-static void
-int2flag(int flag, char *s)
+static void int2flag(int flag, char *s)
 {
-	if(flag == 0){
+	if (flag == 0) {
 		*s = '\0';
 		return;
 	}
 	*s++ = '-';
-	if(flag & MAFTER)
+	if (flag & MAFTER)
 		*s++ = 'a';
-	if(flag & MBEFORE)
+	if (flag & MBEFORE)
 		*s++ = 'b';
-	if(flag & MCREATE)
+	if (flag & MCREATE)
 		*s++ = 'c';
-	if(flag & MCACHE)
+	if (flag & MCACHE)
 		*s++ = 'C';
 	*s = '\0';
 }
 
-static char*
-argcpy(char *s, char *p)
+static char *argcpy(char *s, char *p)
 {
 	char *t, *tp, *te;
 	int n;
 
 	n = p - s;
-	if(n > 128)
+	if (n > 128)
 		n = 128;
-	if(n <= 0){
+	if (n <= 0) {
 		t = kmalloc(1, 0);
 		*t = 0;
 		return t;
 	}
 	t = kmalloc(n, 0);
 	tp = t;
-	te = t+n;
+	te = t + n;
 
-	while(tp + 1 < te){
-		for(p--; p>s && p[-1] != 0; p--)
-			;
+	while (tp + 1 < te) {
+		for (p--; p > s && p[-1] != 0; p--) ;
 		tp = seprint(tp, te, "%q ", p);
-		if(p == s)
+		if (p == s)
 			break;
 	}
-	if(*tp == ' ')
+	if (*tp == ' ')
 		*tp = 0;
 	return t;
 }
 
-static int
-procargs(struct proc *p, char *buf, int nbuf)
+static int procargs(struct proc *p, char *buf, int nbuf)
 {
 	char *s;
 
-	if(p->setargs == 0){
-		s = argcpy(p->args, p->args+p->nargs);
+	if (p->setargs == 0) {
+		s = argcpy(p->args, p->args + p->nargs);
 		kfree(p->args);
 		p->nargs = strlen(s);
 		p->args = s;
@@ -805,8 +779,7 @@ procargs(struct proc *p, char *buf, int nbuf)
 	return snprint(buf, nbuf, "%s", p->args);
 }
 
-static int
-eventsavailable(void *)
+static int eventsavailable(void *)
 {
 	return tproduced > tconsumed;
 }
@@ -825,26 +798,26 @@ procread(struct chan *c, void *va, long n, int64_t off, struct errbuf *perrbuf)
 	Mntwalk *mw;
 	Segment *sg, *s;
 	int i, j, navail, pid, rsize;
-	char flag[10], *sps, *srv, statbuf[NSEG*64];
+	char flag[10], *sps, *srv, statbuf[NSEG * 64];
 	uintptr_t offset, u;
 	int tesz;
 #endif
-	if(c->qid.type & QTDIR)
+	if (c->qid.type & QTDIR)
 		return devdirread(c, va, n, 0, 0, procgen, perrbuf);
 
 #if 0
 	offset = off;
 
-	if(QID(c->qid) == Qtrace){
-		if(!eventsavailable(NULL))
+	if (QID(c->qid) == Qtrace) {
+		if (!eventsavailable(NULL))
 			return 0;
 
 		rptr = va;
 		tesz = BIT32SZ + BIT32SZ + BIT64SZ + BIT32SZ;
 		navail = tproduced - tconsumed;
-		if(navail > n / tesz)
+		if (navail > n / tesz)
 			navail = n / tesz;
-		while(navail > 0) {
+		while (navail > 0) {
 			PBIT32(rptr, tevents[tconsumed & Emask].pid);
 			rptr += BIT32SZ;
 			PBIT32(rptr, tevents[tconsumed & Emask].etype);
@@ -856,340 +829,343 @@ procread(struct chan *c, void *va, long n, int64_t off, struct errbuf *perrbuf)
 			tconsumed++;
 			navail--;
 		}
-		return rptr - (uint8_t*)va;
+		return rptr - (uint8_t *) va;
 	}
 
-	if(QID(c->qid) == Qtracepids)
-		if(tpids == NULL)
+	if (QID(c->qid) == Qtracepids)
+		if (tpids == NULL)
 			return 0;
 		else
 			return readstr(off, va, n, tpids);
 
-	if((p = pid2proc(SLOT(c->qid))) == NULL)
+	if ((p = pid2proc(SLOT(c->qid))) == NULL)
 		error(Eprocdied);
-	if(p->pid != PID(c->qid)){
+	if (p->pid != PID(c->qid)) {
 		kref_put(&p->p_kref);
 		error(Eprocdied);
 	}
 
-	switch(QID(c->qid)){
-	default:
-		kref_put(&p->p_kref);
-		break;
-	case Qargs:
-		qlock(&p->debug);
-		j = procargs(p, current->genbuf, sizeof current->genbuf);
-		qunlock(&p->debug);
-		kref_put(&p->p_kref);
-		if(offset >= j)
-			return 0;
-		if(offset+n > j)
-			n = j-offset;
-		memmove(va, &current->genbuf[offset], n);
-		return n;
-
-	case Qsyscall:
-		if(p->syscalltrace == NULL)
-			return 0;
-		return readstr(offset, va, n, p->syscalltrace);
-
-	case Qcore:
-		i = 0;
-		ac = p->ac;
-		wired = p->wired;
-		if(ac != NULL)
-			i = ac->machno;
-		else if(wired != NULL)
-			i = wired->machno;
-		snprint(statbuf, sizeof statbuf, "%d\n", i);
-		return readstr(offset, va, n, statbuf);
-
-	case Qmem:
-		if(offset < KZERO
-		|| (offset >= USTKTOP-USTKSIZE && offset < USTKTOP)){
-			r = procctlmemio(p, offset, n, va, 1);
+	switch (QID(c->qid)) {
+		default:
 			kref_put(&p->p_kref);
-			return r;
-		}
-
-		if(!iseve()){
+			break;
+		case Qargs:
+			qlock(&p->debug);
+			j = procargs(p, current->genbuf, sizeof current->genbuf);
+			qunlock(&p->debug);
 			kref_put(&p->p_kref);
-			error(Eperm);
-		}
-
-		/* validate kernel addresses */
-		if(offset < PTR2UINT(end)) {
-			if(offset+n > PTR2UINT(end))
-				n = PTR2UINT(end) - offset;
-			memmove(va, UINT2PTR(offset), n);
-			kref_put(&p->p_kref);
+			if (offset >= j)
+				return 0;
+			if (offset + n > j)
+				n = j - offset;
+			memmove(va, &current->genbuf[offset], n);
 			return n;
-		}
-		for(i=0; i<nelem(conf.mem); i++){
-			cm = &conf.mem[i];
-			/* klimit-1 because klimit might be zero! */
-			if(cm->kbase <= offset && offset <= cm->klimit-1){
-				if(offset+n >= cm->klimit-1)
-					n = cm->klimit - offset;
+
+		case Qsyscall:
+			if (p->syscalltrace == NULL)
+				return 0;
+			return readstr(offset, va, n, p->syscalltrace);
+
+		case Qcore:
+			i = 0;
+			ac = p->ac;
+			wired = p->wired;
+			if (ac != NULL)
+				i = ac->machno;
+			else if (wired != NULL)
+				i = wired->machno;
+			snprint(statbuf, sizeof statbuf, "%d\n", i);
+			return readstr(offset, va, n, statbuf);
+
+		case Qmem:
+			if (offset < KZERO
+				|| (offset >= USTKTOP - USTKSIZE && offset < USTKTOP)) {
+				r = procctlmemio(p, offset, n, va, 1);
+				kref_put(&p->p_kref);
+				return r;
+			}
+
+			if (!iseve()) {
+				kref_put(&p->p_kref);
+				error(Eperm);
+			}
+
+			/* validate kernel addresses */
+			if (offset < PTR2UINT(end)) {
+				if (offset + n > PTR2UINT(end))
+					n = PTR2UINT(end) - offset;
 				memmove(va, UINT2PTR(offset), n);
 				kref_put(&p->p_kref);
 				return n;
 			}
-		}
-		kref_put(&p->p_kref);
-		error(Ebadarg);
-
-	case Qprofile:
-		s = p->seg[TSEG];
-		if(s == 0 || s->profile == 0)
-			error("profile is off");
-		i = (s->top-s->base)>>LRESPROF;
-		i *= sizeof(*s->profile);
-		if(offset >= i){
+			for (i = 0; i < nelem(conf.mem); i++) {
+				cm = &conf.mem[i];
+				/* klimit-1 because klimit might be zero! */
+				if (cm->kbase <= offset && offset <= cm->klimit - 1) {
+					if (offset + n >= cm->klimit - 1)
+						n = cm->klimit - offset;
+					memmove(va, UINT2PTR(offset), n);
+					kref_put(&p->p_kref);
+					return n;
+				}
+			}
 			kref_put(&p->p_kref);
-			return 0;
-		}
-		if(offset+n > i)
-			n = i - offset;
-		memmove(va, ((char*)s->profile)+offset, n);
-		kref_put(&p->p_kref);
-		return n;
+			error(Ebadarg);
 
-	case Qnote:
-		qlock(&p->debug);
-		if(waserror()){
+		case Qprofile:
+			s = p->seg[TSEG];
+			if (s == 0 || s->profile == 0)
+				error("profile is off");
+			i = (s->top - s->base) >> LRESPROF;
+			i *= sizeof(*s->profile);
+			if (offset >= i) {
+				kref_put(&p->p_kref);
+				return 0;
+			}
+			if (offset + n > i)
+				n = i - offset;
+			memmove(va, ((char *)s->profile) + offset, n);
+			kref_put(&p->p_kref);
+			return n;
+
+		case Qnote:
+			qlock(&p->debug);
+			if (waserror()) {
+				qunlock(&p->debug);
+				kref_put(&p->p_kref);
+				nexterror();
+			}
+			if (p->pid != PID(c->qid))
+				error(Eprocdied);
+			if (n < 1)	/* must accept at least the '\0' */
+				error(Etoosmall);
+			if (p->nnote == 0)
+				n = 0;
+			else {
+				i = strlen(p->note[0].msg) + 1;
+				if (i > n)
+					i = n;
+				rptr = va;
+				memmove(rptr, p->note[0].msg, i);
+				rptr[i - 1] = '\0';
+				p->nnote--;
+				memmove(p->note, p->note + 1, p->nnote * sizeof(Note));
+				n = i;
+			}
+			if (p->nnote == 0)
+				p->notepending = 0;
 			qunlock(&p->debug);
 			kref_put(&p->p_kref);
-			nexterror();
-		}
-		if(p->pid != PID(c->qid))
-			error(Eprocdied);
-		if(n < 1)	/* must accept at least the '\0' */
-			error(Etoosmall);
-		if(p->nnote == 0)
-			n = 0;
-		else {
-			i = strlen(p->note[0].msg) + 1;
-			if(i > n)
-				i = n;
-			rptr = va;
-			memmove(rptr, p->note[0].msg, i);
-			rptr[i-1] = '\0';
-			p->nnote--;
-			memmove(p->note, p->note+1, p->nnote*sizeof(Note));
-			n = i;
-		}
-		if(p->nnote == 0)
-			p->notepending = 0;
-		qunlock(&p->debug);
-		kref_put(&p->p_kref);
-		return n;
+			return n;
 
-	case Qproc:
-		if(offset >= sizeof(struct proc)){
+		case Qproc:
+			if (offset >= sizeof(struct proc)) {
+				kref_put(&p->p_kref);
+				return 0;
+			}
+			if (offset + n > sizeof(struct proc))
+				n = sizeof(struct proc) - offset;
+			memmove(va, ((char *)p) + offset, n);
 			kref_put(&p->p_kref);
-			return 0;
-		}
-		if(offset+n > sizeof(struct proc))
-			n = sizeof(struct proc) - offset;
-		memmove(va, ((char*)p)+offset, n);
-		kref_put(&p->p_kref);
-		return n;
+			return n;
 
-	case Qregs:
-		rptr = (uint8_t*)p->dbgreg;
-		rsize = sizeof(Ureg);
-	regread:
-		if(rptr == 0){
+		case Qregs:
+			rptr = (uint8_t *) p->dbgreg;
+			rsize = sizeof(Ureg);
+regread:
+			if (rptr == 0) {
+				kref_put(&p->p_kref);
+				error(Enoreg);
+			}
+			if (offset >= rsize) {
+				kref_put(&p->p_kref);
+				return 0;
+			}
+			if (offset + n > rsize)
+				n = rsize - offset;
+			memmove(va, rptr + offset, n);
 			kref_put(&p->p_kref);
-			error(Enoreg);
-		}
-		if(offset >= rsize){
+			return n;
+
+		case Qkregs:
+			memset(&kur, 0, sizeof(Ureg));
+			setkernur(&kur, p);
+			rptr = (uint8_t *) & kur;
+			rsize = sizeof(Ureg);
+			goto regread;
+
+		case Qfpregs:
+			r = fpudevprocio(p, va, n, offset, 0);
 			kref_put(&p->p_kref);
-			return 0;
-		}
-		if(offset+n > rsize)
-			n = rsize - offset;
-		memmove(va, rptr+offset, n);
-		kref_put(&p->p_kref);
-		return n;
+			return r;
 
-	case Qkregs:
-		memset(&kur, 0, sizeof(Ureg));
-		setkernur(&kur, p);
-		rptr = (uint8_t*)&kur;
-		rsize = sizeof(Ureg);
-		goto regread;
+		case Qstatus:
+			if (offset >= STATSIZE) {
+				kref_put(&p->p_kref);
+				return 0;
+			}
+			if (offset + n > STATSIZE)
+				n = STATSIZE - offset;
 
-	case Qfpregs:
-		r = fpudevprocio(p, va, n, offset, 0);
-		kref_put(&p->p_kref);
-		return r;
+			sps = p->psstate;
+			if (sps == 0)
+				sps = statename[p->state];
+			memset(statbuf, ' ', sizeof statbuf);
+			j = 2 * KNAMELEN + 12;
+			snprint(statbuf, j + 1, "%-*.*s%-*.*s%-12.11s",
+					KNAMELEN, KNAMELEN - 1, p->text,
+					KNAMELEN, KNAMELEN - 1, p->user, sps);
 
-	case Qstatus:
-		if(offset >= STATSIZE){
+			for (i = 0; i < 6; i++) {
+				l = p->time[i];
+				if (i == TReal)
+					l = sys->ticks - l;
+				l = TK2MS(l);
+				readnum(0, statbuf + j + NUMSIZE * i, NUMSIZE, l, NUMSIZE);
+			}
+			/* ignore stack, which is mostly non-existent */
+			u = 0;
+			for (i = 1; i < NSEG; i++) {
+				s = p->seg[i];
+				if (s)
+					u += s->top - s->base;
+			}
+			readnum(0, statbuf + j + NUMSIZE * 6, NUMSIZE, u >> 10u, NUMSIZE);	/* wrong size */
+			readnum(0, statbuf + j + NUMSIZE * 7, NUMSIZE, p->basepri, NUMSIZE);
+			readnum(0, statbuf + j + NUMSIZE * 8, NUMSIZE, p->priority,
+					NUMSIZE);
+
+			/*
+			 * NIX: added # of traps, syscalls, and iccs
+			 */
+			readnum(0, statbuf + j + NUMSIZE * 9, NUMSIZE, p->ntrap, NUMSIZE);
+			readnum(0, statbuf + j + NUMSIZE * 10, NUMSIZE, p->nintr, NUMSIZE);
+			readnum(0, statbuf + j + NUMSIZE * 11, NUMSIZE, p->nsyscall,
+					NUMSIZE);
+			readnum(0, statbuf + j + NUMSIZE * 12, NUMSIZE, p->nicc, NUMSIZE);
+			readnum(0, statbuf + j + NUMSIZE * 13, NUMSIZE, p->nactrap,
+					NUMSIZE);
+			readnum(0, statbuf + j + NUMSIZE * 14, NUMSIZE, p->nacsyscall,
+					NUMSIZE);
+			memmove(va, statbuf + offset, n);
 			kref_put(&p->p_kref);
-			return 0;
-		}
-		if(offset+n > STATSIZE)
-			n = STATSIZE - offset;
+			return n;
 
-		sps = p->psstate;
-		if(sps == 0)
-			sps = statename[p->state];
-		memset(statbuf, ' ', sizeof statbuf);
-		j = 2*KNAMELEN + 12;
-		snprint(statbuf, j+1, "%-*.*s%-*.*s%-12.11s",
-			KNAMELEN, KNAMELEN-1, p->text,
-			KNAMELEN, KNAMELEN-1, p->user,
-			sps);
-
-		for(i = 0; i < 6; i++) {
-			l = p->time[i];
-			if(i == TReal)
-				l = sys->ticks - l;
-			l = TK2MS(l);
-			readnum(0, statbuf+j+NUMSIZE*i, NUMSIZE, l, NUMSIZE);
-		}
-		/* ignore stack, which is mostly non-existent */
-		u = 0;
-		for(i=1; i<NSEG; i++){
-			s = p->seg[i];
-			if(s)
-				u += s->top - s->base;
-		}
-		readnum(0, statbuf+j+NUMSIZE*6, NUMSIZE, u>>10u, NUMSIZE);	/* wrong size */
-		readnum(0, statbuf+j+NUMSIZE*7, NUMSIZE, p->basepri, NUMSIZE);
-		readnum(0, statbuf+j+NUMSIZE*8, NUMSIZE, p->priority, NUMSIZE);
-
-		/*
-		 * NIX: added # of traps, syscalls, and iccs
-		 */
-		readnum(0, statbuf+j+NUMSIZE*9, NUMSIZE, p->ntrap, NUMSIZE);
-		readnum(0, statbuf+j+NUMSIZE*10, NUMSIZE, p->nintr, NUMSIZE);
-		readnum(0, statbuf+j+NUMSIZE*11, NUMSIZE, p->nsyscall, NUMSIZE);
-		readnum(0, statbuf+j+NUMSIZE*12, NUMSIZE, p->nicc, NUMSIZE);
-		readnum(0, statbuf+j+NUMSIZE*13, NUMSIZE, p->nactrap, NUMSIZE);
-		readnum(0, statbuf+j+NUMSIZE*14, NUMSIZE, p->nacsyscall, NUMSIZE);
-		memmove(va, statbuf+offset, n);
-		kref_put(&p->p_kref);
-		return n;
-
-	case Qsegment:
-		j = 0;
-		for(i = 0; i < NSEG; i++) {
-			sg = p->seg[i];
-			if(sg == 0)
-				continue;
-			j += sprint(statbuf+j, "%-6s %c%c %p %p %4d\n",
-				sname[sg->type&SG_TYPE],
-				sg->type&SG_RONLY ? 'R' : ' ',
-				sg->profile ? 'P' : ' ',
-				sg->base, sg->top, sg->ref);
-		}
-		kref_put(&p->p_kref);
-		if(offset >= j)
-			return 0;
-		if(offset+n > j)
-			n = j-offset;
-		if(n == 0 && offset == 0)
-			exhausted("segments");
-		memmove(va, &statbuf[offset], n);
-		return n;
-
-	case Qwait:
-		if(!canqlock(&p->qwaitr)){
+		case Qsegment:
+			j = 0;
+			for (i = 0; i < NSEG; i++) {
+				sg = p->seg[i];
+				if (sg == 0)
+					continue;
+				j += sprint(statbuf + j, "%-6s %c%c %p %p %4d\n",
+							sname[sg->type & SG_TYPE],
+							sg->type & SG_RONLY ? 'R' : ' ',
+							sg->profile ? 'P' : ' ',
+							sg->base, sg->top, sg->ref);
+			}
 			kref_put(&p->p_kref);
-			error(Einuse);
-		}
+			if (offset >= j)
+				return 0;
+			if (offset + n > j)
+				n = j - offset;
+			if (n == 0 && offset == 0)
+				exhausted("segments");
+			memmove(va, &statbuf[offset], n);
+			return n;
 
-		if(waserror()) {
+		case Qwait:
+			if (!canqlock(&p->qwaitr)) {
+				kref_put(&p->p_kref);
+				error(Einuse);
+			}
+
+			if (waserror()) {
+				qunlock(&p->qwaitr);
+				kref_put(&p->p_kref);
+				nexterror();
+			}
+
+			lock(&p->exl);
+			if (up == p && p->nchild == 0 && p->waitq == 0) {
+				unlock(&p->exl);
+				error(Enochild);
+			}
+			pid = p->pid;
+			while (p->waitq == 0) {
+				unlock(&p->exl);
+				sleep(&p->waitr, haswaitq, p);
+				if (p->pid != pid)
+					error(Eprocdied);
+				lock(&p->exl);
+			}
+			wq = p->waitq;
+			p->waitq = wq->next;
+			p->nwait--;
+			unlock(&p->exl);
+
 			qunlock(&p->qwaitr);
 			kref_put(&p->p_kref);
-			nexterror();
-		}
+			n = snprint(va, n, "%d %lud %lud %lud %q",
+						wq->w.pid,
+						wq->w.time[TUser], wq->w.time[TSys], wq->w.time[TReal],
+						wq->w.msg);
+			kfree(wq);
+			return n;
 
-		lock(&p->exl);
-		if(up == p && p->nchild == 0 && p->waitq == 0) {
-			unlock(&p->exl);
-			error(Enochild);
-		}
-		pid = p->pid;
-		while(p->waitq == 0) {
-			unlock(&p->exl);
-			sleep(&p->waitr, haswaitq, p);
-			if(p->pid != pid)
+		case Qns:
+			qlock(&p->debug);
+			if (waserror()) {
+				qunlock(&p->debug);
+				kref_put(&p->p_kref);
+				nexterror();
+			}
+			if (p->pgrp == NULL || p->pid != PID(c->qid))
 				error(Eprocdied);
-			lock(&p->exl);
-		}
-		wq = p->waitq;
-		p->waitq = wq->next;
-		p->nwait--;
-		unlock(&p->exl);
-
-		qunlock(&p->qwaitr);
-		kref_put(&p->p_kref);
-		n = snprint(va, n, "%d %lud %lud %lud %q",
-			wq->w.pid,
-			wq->w.time[TUser], wq->w.time[TSys], wq->w.time[TReal],
-			wq->w.msg);
-		kfree(wq);
-		return n;
-
-	case Qns:
-		qlock(&p->debug);
-		if(waserror()){
-			qunlock(&p->debug);
-			kref_put(&p->p_kref);
-			nexterror();
-		}
-		if(p->pgrp == NULL || p->pid != PID(c->qid))
-			error(Eprocdied);
-		mw = c->aux;
-		if(mw->cddone){
-			qunlock(&p->debug);
-			kref_put(&p->p_kref);
-			return 0;
-		}
-		mntscan(mw, p);
-		if(mw->mh == 0){
-			mw->cddone = 1;
-			i = snprint(va, n, "cd %s\n", p->dot->path->s);
+			mw = c->aux;
+			if (mw->cddone) {
+				qunlock(&p->debug);
+				kref_put(&p->p_kref);
+				return 0;
+			}
+			mntscan(mw, p);
+			if (mw->mh == 0) {
+				mw->cddone = 1;
+				i = snprint(va, n, "cd %s\n", p->dot->path->s);
+				qunlock(&p->debug);
+				kref_put(&p->p_kref);
+				return i;
+			}
+			int2flag(mw->cm->mflag, flag);
+			if (strcmp(mw->cm->to->path->s, "#M") == 0) {
+				srv = srvname(mw->cm->to->mchan);
+				i = snprint(va, n, "mount %s %s %s %s\n", flag,
+							srv == NULL ? mw->cm->to->mchan->path->s : srv,
+							mw->mh->from->path->s,
+							mw->cm->spec ? mw->cm->spec : "");
+				kfree(srv);
+			} else
+				i = snprint(va, n, "bind %s %s %s\n", flag,
+							mw->cm->to->path->s, mw->mh->from->path->s);
 			qunlock(&p->debug);
 			kref_put(&p->p_kref);
 			return i;
-		}
-		int2flag(mw->cm->mflag, flag);
-		if(strcmp(mw->cm->to->path->s, "#M") == 0){
-			srv = srvname(mw->cm->to->mchan);
-			i = snprint(va, n, "mount %s %s %s %s\n", flag,
-				srv==NULL? mw->cm->to->mchan->path->s : srv,
-				mw->mh->from->path->s, mw->cm->spec? mw->cm->spec : "");
-			kfree(srv);
-		}else
-			i = snprint(va, n, "bind %s %s %s\n", flag,
-				mw->cm->to->path->s, mw->mh->from->path->s);
-		qunlock(&p->debug);
-		kref_put(&p->p_kref);
-		return i;
 
-	case Qnoteid:
-		r = readnum(offset, va, n, p->noteid, NUMSIZE);
-		kref_put(&p->p_kref);
-		return r;
-	case Qfd:
-		r = procfds(p, va, n, offset);
-		kref_put(&p->p_kref);
-		return r;
+		case Qnoteid:
+			r = readnum(offset, va, n, p->noteid, NUMSIZE);
+			kref_put(&p->p_kref);
+			return r;
+		case Qfd:
+			r = procfds(p, va, n, offset);
+			kref_put(&p->p_kref);
+			return r;
 	}
 #endif
 	error(Egreg);
-	return 0;			/* not reached */
+	return 0;	/* not reached */
 }
 
 #if 0
-static void
-mntscan(Mntwalk *mw, struct proc *p)
+static void mntscan(Mntwalk * mw, struct proc *p)
 {
 	Pgrp *pg;
 	struct mount *t;
@@ -1200,17 +1176,16 @@ mntscan(Mntwalk *mw, struct proc *p)
 	rlock(&pg->ns);
 
 	nxt = 0;
-	best = (int)(~0U>>1);		/* largest 2's complement int */
+	best = (int)(~0U >> 1);	/* largest 2's complement int */
 
 	last = 0;
-	if(mw->mh)
+	if (mw->mh)
 		last = mw->cm->mountid;
 
-	for(i = 0; i < MNTHASH; i++) {
-		for(f = pg->mnthash[i]; f; f = f->hash) {
-			for(t = f->mount; t; t = t->next) {
-				if(mw->mh == 0 ||
-				  (t->mountid > last && t->mountid < best)) {
+	for (i = 0; i < MNTHASH; i++) {
+		for (f = pg->mnthash[i]; f; f = f->hash) {
+			for (t = f->mount; t; t = t->next) {
+				if (mw->mh == 0 || (t->mountid > last && t->mountid < best)) {
 					mw->cm = t;
 					mw->mh = f;
 					best = mw->cm->mountid;
@@ -1219,7 +1194,7 @@ mntscan(Mntwalk *mw, struct proc *p)
 			}
 		}
 	}
-	if(nxt == 0)
+	if (nxt == 0)
 		mw->mh = 0;
 
 	runlock(&pg->ns);
@@ -1238,111 +1213,111 @@ procwrite(struct chan *c, void *va, long n, int64_t off, struct errbuf *perrbuf)
 	char *args, buf[ERRMAX];
 	uintptr_t offset;
 
-	if(c->qid.type & QTDIR)
+	if (c->qid.type & QTDIR)
 		error(Eisdir);
 
 	/* Use the remembered noteid in the channel rather
 	 * than the process pgrpid
 	 */
-	if(QID(c->qid) == Qnotepg) {
+	if (QID(c->qid) == Qnotepg) {
 		pgrpnote(NOTEID(c->pgrpid), va, n, NUser);
 		return n;
 	}
 
-	if((p = pid2proc(SLOT(c->qid))) == NULL)
+	if ((p = pid2proc(SLOT(c->qid))) == NULL)
 		error(Eprocdied);
 
 	qlock(&p->debug);
-	if(waserror()){
+	if (waserror()) {
 		qunlock(&p->debug);
 		kref_put(&p->p_kref);
 		nexterror();
 	}
-	if(p->pid != PID(c->qid))
+	if (p->pid != PID(c->qid))
 		error(Eprocdied);
 
 	offset = off;
 
-	switch(QID(c->qid)){
-	case Qargs:
-		if(n == 0)
-			error(Eshort);
-		if(n >= sizeof buf - strlen(p->text) - 1)
-			error(Etoobig);
-		l = snprint(buf, sizeof buf, "%s [%s]", p->text, (char*)va);
-		args = kmalloc(l + 1, 0);
-		if(args == NULL)
-			error(Enomem);
-		memmove(args, buf, l);
-		args[l] = 0;
-		kfree(p->args);
-		p->nargs = l;
-		p->args = args;
-		p->setargs = 1;
-		break;
-
-	case Qmem:
-		if(p->state != Stopped)
-			error(Ebadctl);
-
-		n = procctlmemio(p, offset, n, va, 0);
-		break;
-
-	case Qregs:
-		if(offset >= sizeof(Ureg))
-			n = 0;
-		else if(offset+n > sizeof(Ureg))
-			n = sizeof(Ureg) - offset;
-		if(p->dbgreg == 0)
-			error(Enoreg);
-		setregisters(p->dbgreg, (char*)(p->dbgreg)+offset, va, n);
-		break;
-
-	case Qfpregs:
-		n = fpudevprocio(p, va, n, offset, 1);
-		break;
-
-	case Qctl:
-		procctlreq(p, va, n);
-		break;
-
-	case Qnote:
-		if(p->kp)
-			error(Eperm);
-		if(n >= ERRMAX-1)
-			error(Etoobig);
-		memmove(buf, va, n);
-		buf[n] = 0;
-		if(!postnote(p, 0, buf, NUser))
-			error("note not posted");
-		break;
-	case Qnoteid:
-		id = atoi(va);
-		if(id == p->pid) {
-			p->noteid = id;
+	switch (QID(c->qid)) {
+		case Qargs:
+			if (n == 0)
+				error(Eshort);
+			if (n >= sizeof buf - strlen(p->text) - 1)
+				error(Etoobig);
+			l = snprint(buf, sizeof buf, "%s [%s]", p->text, (char *)va);
+			args = kmalloc(l + 1, 0);
+			if (args == NULL)
+				error(Enomem);
+			memmove(args, buf, l);
+			args[l] = 0;
+			kfree(p->args);
+			p->nargs = l;
+			p->args = args;
+			p->setargs = 1;
 			break;
-		}
-		for(i = 0; (t = pid2proc(i)) != NULL; i++){
-			if(t->state == Dead || t->noteid != id){
-				kref_put(&p->p_kref);
-				continue;
-			}
-			if(strcmp(p->user, t->user) != 0){
-				kref_put(&p->p_kref);
+
+		case Qmem:
+			if (p->state != Stopped)
+				error(Ebadctl);
+
+			n = procctlmemio(p, offset, n, va, 0);
+			break;
+
+		case Qregs:
+			if (offset >= sizeof(Ureg))
+				n = 0;
+			else if (offset + n > sizeof(Ureg))
+				n = sizeof(Ureg) - offset;
+			if (p->dbgreg == 0)
+				error(Enoreg);
+			setregisters(p->dbgreg, (char *)(p->dbgreg) + offset, va, n);
+			break;
+
+		case Qfpregs:
+			n = fpudevprocio(p, va, n, offset, 1);
+			break;
+
+		case Qctl:
+			procctlreq(p, va, n);
+			break;
+
+		case Qnote:
+			if (p->kp)
 				error(Eperm);
-			}
-			kref_put(&p->p_kref);
-			p->noteid = id;
+			if (n >= ERRMAX - 1)
+				error(Etoobig);
+			memmove(buf, va, n);
+			buf[n] = 0;
+			if (!postnote(p, 0, buf, NUser))
+				error("note not posted");
 			break;
-		}
-		if(p->noteid != id)
-			error(Ebadarg);
-		break;
-	default:
-		qunlock(&p->debug);
-		kref_put(&p->p_kref);
-		pprint("unknown qid %#llux in procwrite\n", c->qid.path);
-		error(Egreg);
+		case Qnoteid:
+			id = atoi(va);
+			if (id == p->pid) {
+				p->noteid = id;
+				break;
+			}
+			for (i = 0; (t = pid2proc(i)) != NULL; i++) {
+				if (t->state == Dead || t->noteid != id) {
+					kref_put(&p->p_kref);
+					continue;
+				}
+				if (strcmp(p->user, t->user) != 0) {
+					kref_put(&p->p_kref);
+					error(Eperm);
+				}
+				kref_put(&p->p_kref);
+				p->noteid = id;
+				break;
+			}
+			if (p->noteid != id)
+				error(Ebadarg);
+			break;
+		default:
+			qunlock(&p->debug);
+			kref_put(&p->p_kref);
+			pprint("unknown qid %#llux in procwrite\n", c->qid.path);
+			error(Egreg);
 	}
 	qunlock(&p->debug);
 	kref_put(&p->p_kref);
@@ -1372,8 +1347,7 @@ struct dev procdevtab = {
 };
 
 #if 0
-static struct chan*
-proctext(struct chan *c, struct proc *p)
+static struct chan *proctext(struct chan *c, struct proc *p)
 {
 	ERRSTACK(2);
 	struct chan *tc;
@@ -1381,35 +1355,36 @@ proctext(struct chan *c, struct proc *p)
 	Segment *s;
 
 	s = p->seg[TSEG];
-	if(s == 0)
+	if (s == 0)
 		error(Enonexist);
-	if(p->state==Dead)
+	if (p->state == Dead)
 		error(Eprocdied);
 
 	lock(s);
 	i = s->image;
-	if(i == 0) {
+	if (i == 0) {
 		unlock(s);
 		error(Eprocdied);
 	}
 	unlock(s);
 
 	lock(i);
-	if(waserror()) {
+	if (waserror()) {
 		unlock(i);
 		nexterror();
 	}
 
 	tc = i->c;
-	if(tc == 0)
+	if (tc == 0)
 		error(Eprocdied);
 
-	if(kref_get(&tc->ref, 1) == 1 || (tc->flag&COPEN) == 0 || tc->mode!=OREAD) {
+	if (kref_get(&tc->ref, 1) == 1 || (tc->flag & COPEN) == 0
+		|| tc->mode != OREAD) {
 		cclose(tc);
 		error(Eprocdied);
 	}
 
-	if(p->pid != PID(c->qid)){
+	if (p->pid != PID(c->qid)) {
 		cclose(tc);
 		error(Eprocdied);
 	}
@@ -1419,41 +1394,39 @@ proctext(struct chan *c, struct proc *p)
 	return tc;
 }
 
-void
-procstopwait(struct proc *p, int ctl)
+void procstopwait(struct proc *p, int ctl)
 {
 	ERRSTACK(2);
 	int pid;
 
-	if(p->pdbg)
+	if (p->pdbg)
 		error(Einuse);
-	if(procstopped(p) || p->state == Broken)
+	if (procstopped(p) || p->state == Broken)
 		return;
 
-	if(ctl != 0)
+	if (ctl != 0)
 		p->procctl = ctl;
 	p->pdbg = up;
 	pid = p->pid;
 	qunlock(&p->debug);
 	current->psstate = "Stopwait";
-	if(waserror()) {
+	if (waserror()) {
 		p->pdbg = 0;
 		qlock(&p->debug);
 		nexterror();
 	}
 	sleep(&current->sleep, procstopped, p);
 	qlock(&p->debug);
-	if(p->pid != pid)
+	if (p->pid != pid)
 		error(Eprocdied);
 }
 
-static void
-procctlcloseone(struct proc *p, struct fgrp *f, int fd)
+static void procctlcloseone(struct proc *p, struct fgrp *f, int fd)
 {
 	struct chan *c;
 
 	c = f->fd[fd];
-	if(c == NULL)
+	if (c == NULL)
 		return;
 	f->fd[fd] = NULL;
 	unlock(f);
@@ -1463,20 +1436,19 @@ procctlcloseone(struct proc *p, struct fgrp *f, int fd)
 	lock(f);
 }
 
-void
-procctlclosefiles(struct proc *p, int all, int fd)
+void procctlclosefiles(struct proc *p, int all, int fd)
 {
 	int i;
 	struct fgrp *f;
 
 	f = p->fgrp;
-	if(f == NULL)
+	if (f == NULL)
 		error(Eprocdied);
 
 	lock(f);
 	f->ref++;
-	if(all)
-		for(i = 0; i < f->maxfd; i++)
+	if (all)
+		for (i = 0; i < f->maxfd; i++)
 			procctlcloseone(p, f, i);
 	else
 		procctlcloseone(p, f, fd);
@@ -1484,41 +1456,40 @@ procctlclosefiles(struct proc *p, int all, int fd)
 	closefgrp(f);
 }
 
-static char *
-parsetime(int64_t *rt, char *s)
+static char *parsetime(int64_t * rt, char *s)
 {
 	uint64_t ticks;
 	uint32_t l;
 	char *e, *p;
-	static int p10[] = {100000000, 10000000, 1000000, 100000, 10000, 1000, 100, 10, 1};
+	static int p10[] =
+		{ 100000000, 10000000, 1000000, 100000, 10000, 1000, 100, 10, 1 };
 
 	if (s == NULL)
-		return("missing value");
-	ticks=strtoul(s, &e, 10);
-	if (*e == '.'){
-		p = e+1;
+		return ("missing value");
+	ticks = strtoul(s, &e, 10);
+	if (*e == '.') {
+		p = e + 1;
 		l = strtoul(p, &e, 10);
-		if(e-p > nelem(p10))
+		if (e - p > nelem(p10))
 			return "too many digits after decimal point";
-		if(e-p == 0)
+		if (e - p == 0)
 			return "ill-formed number";
-		l *= p10[e-p-1];
-	}else
+		l *= p10[e - p - 1];
+	} else
 		l = 0;
-	if (*e == '\0' || strcmp(e, "s") == 0){
+	if (*e == '\0' || strcmp(e, "s") == 0) {
 		ticks = 1000000000 * ticks + l;
-	}else if (strcmp(e, "ms") == 0){
-		ticks = 1000000 * ticks + l/1000;
-	}else if (strcmp(e, "µs") == 0 || strcmp(e, "us") == 0){
-		ticks = 1000 * ticks + l/1000000;
-	}else if (strcmp(e, "ns") != 0)
+	} else if (strcmp(e, "ms") == 0) {
+		ticks = 1000000 * ticks + l / 1000;
+	} else if (strcmp(e, "µs") == 0 || strcmp(e, "us") == 0) {
+		ticks = 1000 * ticks + l / 1000000;
+	} else if (strcmp(e, "ns") != 0)
 		return "unrecognized unit";
 	*rt = ticks;
 	return NULL;
 }
 
-static void
-procctlreq(struct proc *p, char *va, int n)
+static void procctlreq(struct proc *p, char *va, int n)
 {
 	ERRSTACK(2);
 	Segment *s;
@@ -1528,200 +1499,199 @@ procctlreq(struct proc *p, char *va, int n)
 	int64_t time;
 	char *e;
 
-	if(p->kp)	/* no ctl requests to kprocs */
+	if (p->kp)	/* no ctl requests to kprocs */
 		error(Eperm);
 
 	cb = parsecmd(va, n);
-	if(waserror()){
+	if (waserror()) {
 		kfree(cb);
 		nexterror();
 	}
 
 	ct = lookupcmd(cb, proccmd, nelem(proccmd));
 
-	switch(ct->index){
-	case CMclose:
-		procctlclosefiles(p, 0, atoi(cb->f[1]));
-		break;
-	case CMclosefiles:
-		procctlclosefiles(p, 1, 0);
-		break;
-	case CMhang:
-		p->hang = 1;
-		break;
-	case CMkill:
-		switch(p->state) {
-		case Broken:
-			unbreak(p);
+	switch (ct->index) {
+		case CMclose:
+			procctlclosefiles(p, 0, atoi(cb->f[1]));
 			break;
-		case Stopped:
-		case Semdown:
-			p->procctl = struct proc_exitme;
-			postnote(p, 0, "sys: killed", NExit);
+		case CMclosefiles:
+			procctlclosefiles(p, 1, 0);
+			break;
+		case CMhang:
+			p->hang = 1;
+			break;
+		case CMkill:
+			switch (p->state) {
+				case Broken:
+					unbreak(p);
+					break;
+				case Stopped:
+				case Semdown:
+					p->procctl = struct proc_exitme;
+					postnote(p, 0, "sys: killed", NExit);
+					ready(p);
+					break;
+				default:
+					p->procctl = struct proc_exitme;
+					postnote(p, 0, "sys: killed", NExit);
+			}
+			break;
+		case CMnohang:
+			p->hang = 0;
+			break;
+		case CMnoswap:
+			p->noswap = 1;
+			break;
+		case CMpri:
+			pri = atoi(cb->f[1]);
+			if (pri > PriNormal && !iseve())
+				error(Eperm);
+			procpriority(p, pri, 0);
+			break;
+		case CMfixedpri:
+			pri = atoi(cb->f[1]);
+			if (pri > PriNormal && !iseve())
+				error(Eperm);
+			procpriority(p, pri, 1);
+			break;
+		case CMprivate:
+			p->privatemem = 1;
+			break;
+		case CMprofile:
+			s = p->seg[TSEG];
+			if (s == 0 || (s->type & SG_TYPE) != SG_TEXT)
+				error(Ebadctl);
+			if (s->profile != 0)
+				kfree(s->profile);
+			npc = (s->top - s->base) >> LRESPROF;
+			s->profile = kmalloc(npc * sizeof(*s->profile), 0);
+			if (s->profile == 0)
+				error(Enomem);
+			break;
+		case CMstart:
+			if (p->state != Stopped)
+				error(Ebadctl);
 			ready(p);
 			break;
-		default:
-			p->procctl = struct proc_exitme;
-			postnote(p, 0, "sys: killed", NExit);
-		}
-		break;
-	case CMnohang:
-		p->hang = 0;
-		break;
-	case CMnoswap:
-		p->noswap = 1;
-		break;
-	case CMpri:
-		pri = atoi(cb->f[1]);
-		if(pri > PriNormal && !iseve())
-			error(Eperm);
-		procpriority(p, pri, 0);
-		break;
-	case CMfixedpri:
-		pri = atoi(cb->f[1]);
-		if(pri > PriNormal && !iseve())
-			error(Eperm);
-		procpriority(p, pri, 1);
-		break;
-	case CMprivate:
-		p->privatemem = 1;
-		break;
-	case CMprofile:
-		s = p->seg[TSEG];
-		if(s == 0 || (s->type&SG_TYPE) != SG_TEXT)
-			error(Ebadctl);
-		if(s->profile != 0)
-			kfree(s->profile);
-		npc = (s->top-s->base)>>LRESPROF;
-		s->profile = kmalloc(npc * sizeof(*s->profile), 0);
-		if(s->profile == 0)
-			error(Enomem);
-		break;
-	case CMstart:
-		if(p->state != Stopped)
-			error(Ebadctl);
-		ready(p);
-		break;
-	case CMstartstop:
-		if(p->state != Stopped)
-			error(Ebadctl);
-		p->procctl = struct proc_traceme;
-		ready(p);
-		procstopwait(p, struct proc_traceme);
-		break;
-	case CMstartsyscall:
-		if(p->state != Stopped)
-			error(Ebadctl);
-		p->procctl = struct proc_tracesyscall;
-		ready(p);
-		procstopwait(p, struct proc_tracesyscall);
-		break;
-	case CMstop:
-		procstopwait(p, struct proc_stopme);
-		break;
-	case CMwaitstop:
-		procstopwait(p, 0);
-		break;
-	case CMwired:
-		core = atoi(cb->f[1]);
-		procwired(p, core);
-		sched();
-		break;
-	case CMtrace:
-		switch(cb->nf){
-		case 1:
-			p->trace ^= 1;
+		case CMstartstop:
+			if (p->state != Stopped)
+				error(Ebadctl);
+			p->procctl = struct proc_traceme;
+			ready(p);
+			procstopwait(p, struct proc_traceme);
 			break;
-		case 2:
-			p->trace = (atoi(cb->f[1]) != 0);
+		case CMstartsyscall:
+			if (p->state != Stopped)
+				error(Ebadctl);
+			p->procctl = struct proc_tracesyscall;
+			ready(p);
+			procstopwait(p, struct proc_tracesyscall);
 			break;
-		default:
-			error("args");
-		}
-		break;
-	/* real time */
-	case CMperiod:
-		if(p->edf == NULL)
-			edfinit(p);
-		if(e=parsetime(&time, cb->f[1]))	/* time in ns */
-			error(e);
-		edfstop(p);
-		p->edf->T = time/1000;			/* Edf times are in µs */
-		break;
-	case CMdeadline:
-		if(p->edf == NULL)
-			edfinit(p);
-		if(e=parsetime(&time, cb->f[1]))
-			error(e);
-		edfstop(p);
-		p->edf->D = time/1000;
-		break;
-	case CMcost:
-		if(p->edf == NULL)
-			edfinit(p);
-		if(e=parsetime(&time, cb->f[1]))
-			error(e);
-		edfstop(p);
-		p->edf->C = time/1000;
-		break;
-	case CMsporadic:
-		if(p->edf == NULL)
-			edfinit(p);
-		p->edf->flags |= Sporadic;
-		break;
-	case CMdeadlinenotes:
-		if(p->edf == NULL)
-			edfinit(p);
-		p->edf->flags |= Sendnotes;
-		break;
-	case CMadmit:
-		if(p->edf == 0)
-			error("edf params");
-		if(e = edfadmit(p))
-			error(e);
-		break;
-	case CMextra:
-		if(p->edf == NULL)
-			edfinit(p);
-		p->edf->flags |= Extratime;
-		break;
-	case CMexpel:
-		if(p->edf)
-			edfstop(p);
-		break;
-	case CMevent:
-		if(current->trace)
-			proctrace(up, SUser, 0);
-		break;
-	case CMcore:
-		core = atoi(cb->f[1]);
-		if(core >= MACHMAX)
-			error("wrong core number");
-		else if(core == 0){
-			if(p->ac == NULL)
-				error("not running in an ac");
-			p->procctl = struct proc_totc;
-			if(p != up && p->state == Exotic){
-				/* see the comment in postnote */
-				intrac(p);
+		case CMstop:
+			procstopwait(p, struct proc_stopme);
+			break;
+		case CMwaitstop:
+			procstopwait(p, 0);
+			break;
+		case CMwired:
+			core = atoi(cb->f[1]);
+			procwired(p, core);
+			sched();
+			break;
+		case CMtrace:
+			switch (cb->nf) {
+				case 1:
+					p->trace ^= 1;
+					break;
+				case 2:
+					p->trace = (atoi(cb->f[1]) != 0);
+					break;
+				default:
+					error("args");
 			}
-		}else{
-			if(p->ac != NULL)
-				error("running in an ac");
-			if(core < 0)
-				p->ac = getac(p, -1);
-			else
-				p->ac = getac(p, core);
-			p->procctl = struct proc_toac;
-			p->prepagemem = 1;
-		}
-		break;
+			break;
+			/* real time */
+		case CMperiod:
+			if (p->edf == NULL)
+				edfinit(p);
+			if (e = parsetime(&time, cb->f[1]))	/* time in ns */
+				error(e);
+			edfstop(p);
+			p->edf->T = time / 1000;	/* Edf times are in µs */
+			break;
+		case CMdeadline:
+			if (p->edf == NULL)
+				edfinit(p);
+			if (e = parsetime(&time, cb->f[1]))
+				error(e);
+			edfstop(p);
+			p->edf->D = time / 1000;
+			break;
+		case CMcost:
+			if (p->edf == NULL)
+				edfinit(p);
+			if (e = parsetime(&time, cb->f[1]))
+				error(e);
+			edfstop(p);
+			p->edf->C = time / 1000;
+			break;
+		case CMsporadic:
+			if (p->edf == NULL)
+				edfinit(p);
+			p->edf->flags |= Sporadic;
+			break;
+		case CMdeadlinenotes:
+			if (p->edf == NULL)
+				edfinit(p);
+			p->edf->flags |= Sendnotes;
+			break;
+		case CMadmit:
+			if (p->edf == 0)
+				error("edf params");
+			if (e = edfadmit(p))
+				error(e);
+			break;
+		case CMextra:
+			if (p->edf == NULL)
+				edfinit(p);
+			p->edf->flags |= Extratime;
+			break;
+		case CMexpel:
+			if (p->edf)
+				edfstop(p);
+			break;
+		case CMevent:
+			if (current->trace)
+				proctrace(up, SUser, 0);
+			break;
+		case CMcore:
+			core = atoi(cb->f[1]);
+			if (core >= MACHMAX)
+				error("wrong core number");
+			else if (core == 0) {
+				if (p->ac == NULL)
+					error("not running in an ac");
+				p->procctl = struct proc_totc;
+				if (p != up && p->state == Exotic) {
+					/* see the comment in postnote */
+					intrac(p);
+				}
+			} else {
+				if (p->ac != NULL)
+					error("running in an ac");
+				if (core < 0)
+					p->ac = getac(p, -1);
+				else
+					p->ac = getac(p, core);
+				p->procctl = struct proc_toac;
+				p->prepagemem = 1;
+			}
+			break;
 	}
 	kfree(cb);
 }
 
-static int
-procstopped(void *a)
+static int procstopped(void *a)
 {
 	struct proc *p = a;
 	return p->state == Stopped;
@@ -1734,71 +1704,70 @@ procctlmemio(struct proc *p, uintptr_t offset, int n, void *va, int read)
 	Pte *pte;
 	Page *pg;
 	Segment *s;
-	uintptr_t soff, l;	/* hmmmm */
+	uintptr_t soff, l;			/* hmmmm */
 	uint8_t *b;
 	uintmem pgsz;
 
-	for(;;) {
+	for (;;) {
 		s = seg(p, offset, 1);
-		if(s == 0)
+		if (s == 0)
 			error(Ebadarg);
 
-		if(offset+n >= s->top)
-			n = s->top-offset;
+		if (offset + n >= s->top)
+			n = s->top - offset;
 
-		if(!read && (s->type&SG_TYPE) == SG_TEXT)
+		if (!read && (s->type & SG_TYPE) == SG_TEXT)
 			s = txt2data(p, s);
 
 		s->steal++;
-		soff = offset-s->base;
-		if(waserror()) {
+		soff = offset - s->base;
+		if (waserror()) {
 			s->steal--;
 			nexterror();
 		}
-		if(fixfault(s, offset, read, 0, s->color) == 0)
+		if (fixfault(s, offset, read, 0, s->color) == 0)
 			break;
 		s->steal--;
 	}
-	pte = s->map[soff/PTEMAPMEM];
-	if(pte == 0)
+	pte = s->map[soff / PTEMAPMEM];
+	if (pte == 0)
 		panic("procctlmemio");
 	pgsz = m->pgsz[s->pgszi];
-	pg = pte->pages[(soff&(PTEMAPMEM-1))/pgsz];
-	if(pagedout(pg))
+	pg = pte->pages[(soff & (PTEMAPMEM - 1)) / pgsz];
+	if (pagedout(pg))
 		panic("procctlmemio1");
 
-	l = pgsz - (offset&(pgsz-1));
-	if(n > l)
+	l = pgsz - (offset & (pgsz - 1));
+	if (n > l)
 		n = l;
 
 	k = kmap(pg);
-	if(waserror()) {
+	if (waserror()) {
 		s->steal--;
 		kunmap(k);
 		nexterror();
 	}
-	b = (uint8_t*)VA(k);
-	b += offset&(pgsz-1);
-	if(read == 1)
+	b = (uint8_t *) VA(k);
+	b += offset & (pgsz - 1);
+	if (read == 1)
 		memmove(va, b, n);	/* This can fault */
 	else
 		memmove(b, va, n);
 	kunmap(k);
 
 	/* Ensure the process sees text page changes */
-	if(s->flushme)
+	if (s->flushme)
 		memset(pg->cachectl, PG_TXTFLUSH, sizeof(pg->cachectl));
 
 	s->steal--;
 
-	if(read == 0)
+	if (read == 0)
 		p->newtlb = 1;
 
 	return n;
 }
 
-static Segment*
-txt2data(struct proc *p, Segment *s)
+static Segment *txt2data(struct proc *p, Segment * s)
 {
 	int i;
 	Segment *ps;
@@ -1811,10 +1780,10 @@ txt2data(struct proc *p, Segment *s)
 	ps->flushme = 1;
 
 	qlock(&p->seglock);
-	for(i = 0; i < NSEG; i++)
-		if(p->seg[i] == s)
+	for (i = 0; i < NSEG; i++)
+		if (p->seg[i] == s)
 			break;
-	if(i == NSEG)
+	if (i == NSEG)
 		panic("segment gone");
 
 	qunlock(&s->lk);
@@ -1826,8 +1795,7 @@ txt2data(struct proc *p, Segment *s)
 	return ps;
 }
 
-Segment*
-data2txt(Segment *s)
+Segment *data2txt(Segment * s)
 {
 	Segment *ps;
 

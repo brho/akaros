@@ -8,60 +8,58 @@
 #define	MAXWELEM	16
 
 typedef
-struct	Fcall
-{
-	uint8_t	type;
-	uint32_t	fid;
-	uint16_t	tag;
+	struct Fcall {
+	uint8_t type;
+	uint32_t fid;
+	uint16_t tag;
 	union {
 		struct {
-			uint32_t	msize;		/* Tversion, Rversion */
-			char	*version;	/* Tversion, Rversion */
+			uint32_t msize;		/* Tversion, Rversion */
+			char *version;		/* Tversion, Rversion */
 		};
 		struct {
-			uint16_t	oldtag;		/* Tflush */
+			uint16_t oldtag;	/* Tflush */
 		};
 		struct {
-			char	*ename;		/* Rerror */
+			char *ename;		/* Rerror */
 		};
 		struct {
-			struct qid	qid;		/* Rattach, Ropen, Rcreate */
-			uint32_t	iounit;		/* Ropen, Rcreate */
+			struct qid qid;		/* Rattach, Ropen, Rcreate */
+			uint32_t iounit;	/* Ropen, Rcreate */
 		};
 		struct {
-			struct qid	aqid;		/* Rauth */
+			struct qid aqid;	/* Rauth */
 		};
 		struct {
-			uint32_t	afid;		/* Tauth, Tattach */
-			char	*uname;		/* Tauth, Tattach */
-			char	*aname;		/* Tauth, Tattach */
+			uint32_t afid;		/* Tauth, Tattach */
+			char *uname;		/* Tauth, Tattach */
+			char *aname;		/* Tauth, Tattach */
 		};
 		struct {
-			uint32_t	perm;		/* Tcreate */ 
-			char	*name;		/* Tcreate */
-			uint8_t	mode;		/* Tcreate, Topen */
+			uint32_t perm;		/* Tcreate */
+			char *name;			/* Tcreate */
+			uint8_t mode;		/* Tcreate, Topen */
 		};
 		struct {
-			uint32_t	newfid;		/* Twalk */
-			uint16_t	nwname;		/* Twalk */
-			char	*wname[MAXWELEM];	/* Twalk */
+			uint32_t newfid;	/* Twalk */
+			uint16_t nwname;	/* Twalk */
+			char *wname[MAXWELEM];	/* Twalk */
 		};
 		struct {
-			uint16_t	nwqid;		/* Rwalk */
-			struct qid	wqid[MAXWELEM];		/* Rwalk */
+			uint16_t nwqid;		/* Rwalk */
+			struct qid wqid[MAXWELEM];	/* Rwalk */
 		};
 		struct {
-			int64_t	offset;		/* Tread, Twrite */
-			uint32_t	count;		/* Tread, Twrite, Rread */
-			char	*data;		/* Twrite, Rread */
+			int64_t offset;		/* Tread, Twrite */
+			uint32_t count;		/* Tread, Twrite, Rread */
+			char *data;			/* Twrite, Rread */
 		};
 		struct {
-			uint16_t	nstat;		/* Twstat, Rstat */
-			uint8_t	*stat;		/* Twstat, Rstat */
+			uint16_t nstat;		/* Twstat, Rstat */
+			uint8_t *stat;		/* Twstat, Rstat */
 		};
 	};
 } Fcall;
-
 
 #define	GBIT8(p)	((p)[0])
 #define	GBIT16(p)	((p)[0]|((p)[1]<<8))
@@ -89,49 +87,49 @@ struct	Fcall
 #define	NOFID		(uint32_t)~0U	/* Dummy fid */
 #define	IOHDRSZ		24	/* ample room for Twrite/Rread header (iounit) */
 
-enum
-{
-	Tversion =	100,
+enum {
+	Tversion = 100,
 	Rversion,
-	Tauth =		102,
+	Tauth = 102,
 	Rauth,
-	Tattach =	104,
+	Tattach = 104,
 	Rattach,
-	Terror =	106,	/* illegal */
+	Terror = 106,	/* illegal */
 	Rerror,
-	Tflush =	108,
+	Tflush = 108,
 	Rflush,
-	Twalk =		110,
+	Twalk = 110,
 	Rwalk,
-	Topen =		112,
+	Topen = 112,
 	Ropen,
-	Tcreate =	114,
+	Tcreate = 114,
 	Rcreate,
-	Tread =		116,
+	Tread = 116,
 	Rread,
-	Twrite =	118,
+	Twrite = 118,
 	Rwrite,
-	Tclunk =	120,
+	Tclunk = 120,
 	Rclunk,
-	Tremove =	122,
+	Tremove = 122,
 	Rremove,
-	Tstat =		124,
+	Tstat = 124,
 	Rstat,
-	Twstat =	126,
+	Twstat = 126,
 	Rwstat,
 	Tmax,
 };
 
-unsigned int	convM2S(uint8_t*, unsigned int, Fcall*);
-unsigned int	convS2M(Fcall*, uint8_t*, unsigned int);
-unsigned int	sizeS2M(Fcall*);
+unsigned int convM2S(uint8_t *, unsigned int, Fcall *);
+unsigned int convS2M(Fcall *, uint8_t *, unsigned int);
+unsigned int sizeS2M(Fcall *);
 
-int	statcheck(uint8_t *abuf, unsigned int nbuf);
-unsigned int	convM2D(uint8_t*, unsigned int, struct dir*, char*);
-unsigned int convM2kdirent(uint8_t *buf, unsigned int nbuf, struct kdirent *kd);
-unsigned int convM2kstat(uint8_t *buf, unsigned int nbuf, struct kstat *ks);
-unsigned int	convD2M(struct dir*, uint8_t*, unsigned int);
-unsigned int	sizeD2M(struct dir*);
+int statcheck(uint8_t * abuf, unsigned int nbuf);
+unsigned int convM2D(uint8_t *, unsigned int, struct dir *, char *);
+unsigned int convM2kdirent(uint8_t * buf, unsigned int nbuf,
+						   struct kdirent *kd);
+unsigned int convM2kstat(uint8_t * buf, unsigned int nbuf, struct kstat *ks);
+unsigned int convD2M(struct dir *, uint8_t *, unsigned int);
+unsigned int sizeD2M(struct dir *);
 
 /*
  * at some point we want the plan 9 print. It's handy for
@@ -141,4 +139,4 @@ int	fcallfmt(Fmt*);
 int	dirfmt(Fmt*);
 int	dirmodefmt(Fmt*);
 */
-int	read9pmsg(int, void*, unsigned int);
+int read9pmsg(int, void *, unsigned int);
