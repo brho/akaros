@@ -33,46 +33,40 @@ struct dev *devtab[] = {
 	NULL,
 };
 
-void
-devtabreset()
+void devtabreset()
 {
 	int i;
 
-	for(i = 0; devtab[i] != NULL; i++)
+	for (i = 0; devtab[i] != NULL; i++)
 		devtab[i]->reset(current);
 }
 
-void
-devtabinit()
+void devtabinit()
 {
 	int i;
 
-	for(i = 0; devtab[i] != NULL; i++)
+	for (i = 0; devtab[i] != NULL; i++)
 		devtab[i]->init(current);
 }
 
-void
-devtabshutdown()
+void devtabshutdown()
 {
 	int i;
 
 	/*
 	 * Shutdown in reverse order.
 	 */
-	for(i = 0; devtab[i] != NULL; i++)
-		;
-	for(i--; i >= 0; i--)
+	for (i = 0; devtab[i] != NULL; i++) ;
+	for (i--; i >= 0; i--)
 		devtab[i]->shutdown(current);
 }
 
-
-struct dev*
-devtabget(int dc, int user, struct errbuf *perrbuf)
+struct dev *devtabget(int dc, int user, struct errbuf *perrbuf)
 {
 	int i;
 
-	for(i = 0; devtab[i] != NULL; i++){
-		if(devtab[i]->dc == dc)
+	for (i = 0; devtab[i] != NULL; i++) {
+		if (devtab[i]->dc == dc)
 			return devtab[i];
 	}
 
@@ -81,7 +75,8 @@ devtabget(int dc, int user, struct errbuf *perrbuf)
 }
 
 long
-devtabread(struct chan*c, void* buf, long n, int64_t off, struct errbuf *perrbuf)
+devtabread(struct chan *c, void *buf, long n, int64_t off,
+		   struct errbuf *perrbuf)
 {
 	ERRSTACK(1);
 
@@ -90,24 +85,24 @@ devtabread(struct chan*c, void* buf, long n, int64_t off, struct errbuf *perrbuf
 	char *alloc, *e, *p;
 
 	alloc = kzmalloc(READSTR, KMALLOC_WAIT);
-	if(alloc == NULL)
-	  error(Enomem);
+	if (alloc == NULL)
+		error(Enomem);
 
 	p = alloc;
 	e = p + READSTR;
-	for(i = 0; devtab[i] != NULL; i++){
+	for (i = 0; devtab[i] != NULL; i++) {
 		dev = devtab[i];
-printd("p %p e %p e-p %d\n", p, e, e-p);
-printd("do %d %c %s\n", i, dev->dc, dev->name);
-		p += snprintf(p, e-p, "#%c %s\n", dev->dc, dev->name);
+		printd("p %p e %p e-p %d\n", p, e, e - p);
+		printd("do %d %c %s\n", i, dev->dc, dev->name);
+		p += snprintf(p, e - p, "#%c %s\n", dev->dc, dev->name);
 	}
 
-	if(waserror()){
+	if (waserror()) {
 		kfree(alloc);
 		nexterror();
 	}
 	n = readstr(off, buf, n, alloc);
-	
+
 	kfree(alloc);
 
 	return n;

@@ -15,14 +15,14 @@
 #include <pmap.h>
 #include <smp.h>
 
-
 enum {
-	Whinesecs = 10,		/* frequency of out-of-resources printing */
+	Whinesecs = 10,				/* frequency of out-of-resources printing */
 };
 
-static struct kref pgrpid[1] = {{(void *)1, fake_release}};
+static struct kref pgrpid[1] = { {(void *)1, fake_release} };
+
 static spinlock_t mountidlock[1];
-static struct kref mountid[1] = {{(void *)1, fake_release}};
+static struct kref mountid[1] = { {(void *)1, fake_release} };
 
 #if 0
 /* exception handling. We need to talk.*/
@@ -32,23 +32,23 @@ pgrpnote(uint32_t noteid, char *a, long n, int flag, struct errbuf *perrbuf)
 	Proc *p, *ep;
 	char buf[ERRMAX];
 
-	if(n >= ERRMAX-1)
+	if (n >= ERRMAX - 1)
 		error(Etoobig, perrbuf);
 
 	memmove(buf, a, n);
 	buf[n] = 0;
 	p = proctab(0, perrbuf);
-	pp = p+conf.nproc;
-	for(; p < ep; p++) {
-		if(p->state == Dead)
+	pp = p + conf.nproc;
+	for (; p < ep; p++) {
+		if (p->state == Dead)
 			continue;
-		if(up != p && p->noteid == noteid && p->kp == 0) {
+		if (up != p && p->noteid == noteid && p->kp == 0) {
 			qlock(&p->debug, perrbuf);
-			if(p->pid == 0 || p->noteid != noteid){
+			if (p->pid == 0 || p->noteid != noteid) {
 				qunlock(&p->debug, perrbuf);
 				continue;
 			}
-			if(!waserror()) {
+			if (!waserror()) {
 				postnote(p, 0, buf, flag, perrbuf);
 			}
 			qunlock(&p->debug, perrbuf);
@@ -57,8 +57,7 @@ pgrpnote(uint32_t noteid, char *a, long n, int flag, struct errbuf *perrbuf)
 }
 #endif
 
-struct pgrp*
-newpgrp(void)
+struct pgrp *newpgrp(void)
 {
 	struct pgrp *p;
 
@@ -69,12 +68,11 @@ newpgrp(void)
 	return p;
 }
 
-void
-closepgrp(struct pgrp *p, struct errbuf *perrbuf)
+void closepgrp(struct pgrp *p, struct errbuf *perrbuf)
 {
 	struct mhead **h, **e, *f, *next;
 
-	if(kref_put(&p->ref) != 0)
+	if (kref_put(&p->ref) != 0)
 		return;
 
 	/* the p->debug stuff is not needed -- we think. */
@@ -83,8 +81,8 @@ closepgrp(struct pgrp *p, struct errbuf *perrbuf)
 	p->pgrpid = -1;
 
 	e = &p->mnthash[MNTHASH];
-	for(h = p->mnthash; h < e; h++) {
-		for(f = *h; f; f = next) {
+	for (h = p->mnthash; h < e; h++) {
+		for (f = *h; f; f = next) {
 			wlock(&f->lock);
 			cclose(f->from, perrbuf);
 			mountfree(f->mount, perrbuf);
@@ -99,18 +97,17 @@ closepgrp(struct pgrp *p, struct errbuf *perrbuf)
 	kfree(p);
 }
 
-void
-pgrpinsert(struct mount **order, struct mount *m, struct errbuf *perrbuf)
+void pgrpinsert(struct mount **order, struct mount *m, struct errbuf *perrbuf)
 {
 	struct mount *f;
 
 	m->order = 0;
-	if(*order == 0) {
+	if (*order == 0) {
 		*order = m;
 		return;
 	}
-	for(f = *order; f; f = f->order) {
-		if(m->mountid < f->mountid) {
+	for (f = *order; f; f = f->order) {
+		if (m->mountid < f->mountid) {
 			m->order = f;
 			*order = m;
 			return;
@@ -123,8 +120,7 @@ pgrpinsert(struct mount **order, struct mount *m, struct errbuf *perrbuf)
 /*
  * pgrpcpy MUST preserve the mountid allocation order of the parent group
  */
-void
-pgrpcpy(struct pgrp *to, struct pgrp *from, struct errbuf *perrbuf)
+void pgrpcpy(struct pgrp *to, struct pgrp *from, struct errbuf *perrbuf)
 {
 	int i;
 	struct mount *n, *m, **link, *order;
@@ -133,16 +129,16 @@ pgrpcpy(struct pgrp *to, struct pgrp *from, struct errbuf *perrbuf)
 	wlock(&from->ns);
 	order = 0;
 	tom = to->mnthash;
-	for(i = 0; i < MNTHASH; i++) {
+	for (i = 0; i < MNTHASH; i++) {
 		l = tom++;
-		for(f = from->mnthash[i]; f; f = f->hash) {
+		for (f = from->mnthash[i]; f; f = f->hash) {
 			rlock(&f->lock);
 			mh = newmhead(f->from, perrbuf);
 			*l = mh;
 			l = &mh->hash;
 			link = &mh->mount;
-			for(m = f->mount; m; m = m->next) {
-			    n = newmount(mh, m->to, m->mflag, m->spec, perrbuf);
+			for (m = f->mount; m; m = m->next) {
+				n = newmount(mh, m->to, m->mflag, m->spec, perrbuf);
 				m->copy = n;
 				pgrpinsert(&order, m, perrbuf);
 				*link = n;
@@ -156,22 +152,21 @@ pgrpcpy(struct pgrp *to, struct pgrp *from, struct errbuf *perrbuf)
 	 */
 	spin_lock(mountidlock);
 	/* this may not get the ids right. */
-	for(m = order; m; m = m->order)
-	    m->copy->mountid = kref_refcnt(mountid);
+	for (m = order; m; m = m->order)
+		m->copy->mountid = kref_refcnt(mountid);
 	kref_get(mountid, 1);
 	spin_unlock(mountidlock);
 	wunlock(&from->ns);
 }
 
-struct fgrp*
-dupfgrp(struct fgrp *f, struct errbuf *perrbuf)
+struct fgrp *dupfgrp(struct fgrp *f, struct errbuf *perrbuf)
 {
 	struct fgrp *new;
 	struct chan *c;
 	int i;
 
 	new = kzmalloc(sizeof(struct fgrp), KMALLOC_WAIT);
-	if(f == NULL){
+	if (f == NULL) {
 		new->fd = kzmalloc(DELTAFD * sizeof(struct chan *), KMALLOC_WAIT);
 		new->nfd = DELTAFD;
 		kref_init(&new->ref, fake_release, 1);
@@ -180,12 +175,12 @@ dupfgrp(struct fgrp *f, struct errbuf *perrbuf)
 
 	spin_lock(&f->lock);
 	/* Make new fd list shorter if possible, preserving quantization */
-	new->nfd = f->maxfd+1;
-	i = new->nfd%DELTAFD;
-	if(i != 0)
+	new->nfd = f->maxfd + 1;
+	i = new->nfd % DELTAFD;
+	if (i != 0)
 		new->nfd += DELTAFD - i;
 	new->fd = kzmalloc(new->nfd * sizeof(struct chan *), KMALLOC_WAIT);
-	if(new->fd == NULL){
+	if (new->fd == NULL) {
 		spin_unlock(&f->lock);
 		kfree(new);
 		error("no memory for fgrp");
@@ -193,9 +188,9 @@ dupfgrp(struct fgrp *f, struct errbuf *perrbuf)
 	kref_init(&new->ref, fake_release, 1);
 
 	new->maxfd = f->maxfd;
-	for(i = 0; i <= f->maxfd; i++) {
-	    c = f->fd[i];
-	    if(c){
+	for (i = 0; i <= f->maxfd; i++) {
+		c = f->fd[i];
+		if (c) {
 			kref_get(&c->ref, 1);
 			new->fd[i] = c;
 		}
@@ -205,16 +200,15 @@ dupfgrp(struct fgrp *f, struct errbuf *perrbuf)
 	return new;
 }
 
-void
-closefgrp(struct fgrp *f, struct errbuf *perrbuf)
+void closefgrp(struct fgrp *f, struct errbuf *perrbuf)
 {
 	int i;
 	struct chan *c;
 
-	if(f == 0)
+	if (f == 0)
 		return;
 
-	if(kref_put(&f->ref) != 0)
+	if (kref_put(&f->ref) != 0)
 		return;
 
 	/*
@@ -222,15 +216,15 @@ closefgrp(struct fgrp *f, struct errbuf *perrbuf)
 	 * will bail us out.
 	 */
 	current->closingfgrp = f;
-	for(i = 0; i <= f->maxfd; i++){
-	    c = f->fd[i];
-	    if(c){
-		f->fd[i] = NULL;
-		cclose(c, perrbuf);
-	    }
+	for (i = 0; i <= f->maxfd; i++) {
+		c = f->fd[i];
+		if (c) {
+			f->fd[i] = NULL;
+			cclose(c, perrbuf);
+		}
 	}
 	current->closingfgrp = NULL;
-	
+
 	kfree(f->fd);
 	kfree(f);
 }
@@ -245,32 +239,31 @@ closefgrp(struct fgrp *f, struct errbuf *perrbuf)
  * are finished, the blocked cclose that we've 
  * interrupted will finish by itself.
  */
-void
-forceclosefgrp(struct errbuf *perrbuf)
+void forceclosefgrp(struct errbuf *perrbuf)
 {
 	int i;
 	struct chan *c;
 	struct fgrp *f;
 
-	if(/* check that we're exiting somehow ...up->procctl != Proc_exitme || */current->closingfgrp == NULL){
+	if ( /* check that we're exiting somehow ...up->procctl != Proc_exitme || */
+		current->closingfgrp == NULL) {
 		printd("bad forceclosefgrp call");
 		return;
 	}
 
 	f = current->closingfgrp;
-	for(i = 0; i <= f->maxfd; i++){
-	    c = f->fd[i];
-	    if(c){
-		f->fd[i] = NULL;
-		printd("Not calling ccloseq ... fix me\n");
-		//ccloseq(c, perrbuf);
-	    }
+	for (i = 0; i <= f->maxfd; i++) {
+		c = f->fd[i];
+		if (c) {
+			f->fd[i] = NULL;
+			printd("Not calling ccloseq ... fix me\n");
+			//ccloseq(c, perrbuf);
+		}
 	}
 }
 
-
-struct mount*
-newmount(struct mhead *mh, struct chan *to, int flag, char *spec, struct errbuf *perrbuf)
+struct mount *newmount(struct mhead *mh, struct chan *to, int flag, char *spec,
+					   struct errbuf *perrbuf)
 {
 	struct mount *m;
 
@@ -281,18 +274,17 @@ newmount(struct mhead *mh, struct chan *to, int flag, char *spec, struct errbuf 
 	kref_get(mountid, 1);
 	m->mountid = kref_refcnt(mountid);
 	m->mflag = flag;
-	if(spec != 0)
-	    kstrdup(&m->spec, spec, perrbuf);
+	if (spec != 0)
+		kstrdup(&m->spec, spec, perrbuf);
 
 	return m;
 }
 
-void
-mountfree(struct mount *m, struct errbuf *perrbuf)
+void mountfree(struct mount *m, struct errbuf *perrbuf)
 {
 	struct mount *f;
 
-	while(m) {
+	while (m) {
 		f = m->next;
 		cclose(m->to, perrbuf);
 		m->mountid = 0;
@@ -304,22 +296,21 @@ mountfree(struct mount *m, struct errbuf *perrbuf)
 
 /* nah */
 #if 0
-void
-resrcwait(struct proc *up, char *reason, struct errbuf *perrbuf)
+void resrcwait(struct proc *up, char *reason, struct errbuf *perrbuf)
 {
 	uint32_t now;
 	char *p;
 	static uint32_t lastwhine;
 
-	if(up == 0)
+	if (up == 0)
 		panic("resrcwait");
 
 	p = up->psstate;
-	if(reason) {
+	if (reason) {
 		up->psstate = reason;
 		now = seconds(perrbuf);
 		/* don't tie up the console with complaints */
-		if(now - lastwhine > Whinesecs) {
+		if (now - lastwhine > Whinesecs) {
 			lastwhine = now;
 			printd("%s\n", reason);
 		}

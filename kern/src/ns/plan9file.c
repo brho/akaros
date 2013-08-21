@@ -24,7 +24,7 @@
  */
 int
 readnum(unsigned long off, char *buf, unsigned long n, unsigned long val,
-	int size)
+		int size)
 {
 	char tmp[64];
 	size = MIN(sizeof(tmp), size);
@@ -104,7 +104,7 @@ static void unlockfgrp(struct fgrp *f)
 }
 
 int growfd(struct fgrp *f, int fd)
-{				/* fd is always >= 0 */
+{	/* fd is always >= 0 */
 	struct chan **newfd, **oldfd;
 
 	if (fd < f->nfd)
@@ -119,8 +119,7 @@ Exhausted:
 		printd("no free file descriptors\n");
 		return -1;
 	}
-	newfd =
-	    kzmalloc((f->nfd + DELTAFD) * sizeof(struct chan *), KMALLOC_WAIT);
+	newfd = kzmalloc((f->nfd + DELTAFD) * sizeof(struct chan *), KMALLOC_WAIT);
 	if (newfd == 0)
 		goto Exhausted;
 	oldfd = f->fd;
@@ -197,7 +196,7 @@ static int newfd2(int fd[2], struct chan *c[2])
 }
 
 struct chan *fdtochan(int fd, int mode, int chkmnt, int iref,
-		      struct errbuf *perrbuf)
+					  struct errbuf *perrbuf)
 {
 	struct chan *c;
 	struct fgrp *f;
@@ -260,12 +259,10 @@ static long unionread(struct chan *c, void *va, long n, struct errbuf *perrbuf)
 		if (mount->to && !waserror()) {
 			if (c->umc == NULL) {
 				c->umc = cclone(mount->to, perrbuf);
-				c->umc =
-				    c->umc->dev->open(c->umc, OREAD, perrbuf);
+				c->umc = c->umc->dev->open(c->umc, OREAD, perrbuf);
 			}
 
-			nr = c->umc->dev->read(c->umc, va, n, c->umc->offset,
-					       perrbuf);
+			nr = c->umc->dev->read(c->umc, va, n, c->umc->offset, perrbuf);
 			c->umc->offset += nr;
 		}
 		if (nr > 0)
@@ -319,7 +316,7 @@ dirfixed(uint8_t * p, unsigned char *e, struct dir *d, struct errbuf *perrbuf)
 	if (p + len > e)
 		return 0;
 
-	p += BIT16SZ;		/* ignore size */
+	p += BIT16SZ;	/* ignore size */
 	dev = devtabget(GBIT16(p), 1, perrbuf);	//XDYNX
 	if (dev != NULL) {
 		d->type = dev->dc;
@@ -349,7 +346,7 @@ dirfixed(uint8_t * p, unsigned char *e, struct dir *d, struct errbuf *perrbuf)
 static char *dirname(uint8_t * p, unsigned long *n)
 {
 	p += BIT16SZ + BIT16SZ + BIT32SZ + BIT8SZ + BIT32SZ + BIT64SZ
-	    + BIT32SZ + BIT32SZ + BIT32SZ + BIT64SZ;
+		+ BIT32SZ + BIT32SZ + BIT32SZ + BIT64SZ;
 	*n = GBIT16(p);
 
 	return (char *)p + BIT16SZ;
@@ -357,7 +354,7 @@ static char *dirname(uint8_t * p, unsigned long *n)
 
 static unsigned long
 dirsetname(char *name, unsigned long len, uint8_t * p, unsigned long n,
-	   unsigned long maxn)
+		   unsigned long maxn)
 {
 	char *oname;
 	unsigned long nn, olen;
@@ -373,8 +370,7 @@ dirsetname(char *name, unsigned long len, uint8_t * p, unsigned long n,
 		return BIT16SZ;
 
 	if (len != olen)
-		memmove(oname + len, oname + olen,
-			p + n - (uint8_t *) (oname + olen));
+		memmove(oname + len, oname + olen, p + n - (uint8_t *) (oname + olen));
 	PBIT16((uint8_t *) (oname - 2), len);
 	memmove(oname, name, len);
 
@@ -473,7 +469,7 @@ static void mountrewind(struct chan *c)
  */
 static long
 mountfix(struct chan *c, uint8_t * op, long n, long maxn,
-	 struct errbuf *perrbuf)
+		 struct errbuf *perrbuf)
 {
 	ERRSTACK(2);
 	char *name;
@@ -501,9 +497,7 @@ mountfix(struct chan *c, uint8_t * op, long n, long maxn,
 			 * in the union, don't rewrite anything.
 			 */
 			for (mount = mh->mount; mount; mount = mount->next)
-				if (eqchanddq
-				    (mount->to, d.type, d.dev, d.qid, 1,
-				     perrbuf))
+				if (eqchanddq(mount->to, d.type, d.dev, d.qid, 1, perrbuf))
 					goto Norewrite;
 
 			name = dirname(p, &nname);
@@ -632,8 +626,7 @@ long sysread(int fd, void *p, size_t n, off_t off)
 			else {
 				if (off != c->offset)
 					error(Edirseek);
-				nn = c->dev->read(c, ents, 2048, c->devoffset,
-						  perrbuf);
+				nn = c->dev->read(c, ents, 2048, c->devoffset, perrbuf);
 			}
 		} else
 			printd("rock read ok\n");
@@ -641,9 +634,7 @@ long sysread(int fd, void *p, size_t n, off_t off)
 		/* now convert to akaros kdents. This whole thing needs fixin' */
 		int total, amt = 0, iter = 0;
 		for (total = 0; total < nnn; total += amt) {
-			amt =
-			    convM2kdirent(ents, nnn - total,
-					  (struct kdirent *)ep);
+			amt = convM2kdirent(ents, nnn - total, (struct kdirent *)ep);
 			ents += amt;
 			ep = (uint8_t *) ep + sizeof(struct kdirent);
 		}
