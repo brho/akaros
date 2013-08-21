@@ -1,1 +1,2 @@
+obj-y						+= dev/
 obj-y						+= net/

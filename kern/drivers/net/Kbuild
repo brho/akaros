@@ -1,3 +1,7 @@
+# Old stack drivers
 obj-$(CONFIG_E1000)			+= e1000.o
 obj-$(CONFIG_NE2K)			+= ne2k.o
 obj-$(CONFIG_RL8168)		+= rl8168.o
+
+# plan9 style drivers
+obj-y						+= ether8139.o
