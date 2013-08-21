@@ -1,0 +1,13 @@
+obj-y						+= allocplan9block.o
+obj-y						+= chan.o
+obj-y						+= cleanname.o
+obj-y						+= convD2M.o
+obj-y						+= convM2D.o
+obj-y						+= dev.o
+# not building this yet, might remove
+#obj-y						+= namespace.o
+obj-y						+= pgrp.o
+obj-y						+= plan9file.o
+# qio is kind of an mbuf equivalent, might replace
+obj-y						+= qio.o
+obj-y						+= validname.o

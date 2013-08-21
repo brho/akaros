@@ -1,3 +1,4 @@
+# Old unix-style network half-stack
 obj-y						+= ip.o
 obj-y						+= nic_common.o
 obj-y						+= pbuf.o
@@ -6,3 +7,6 @@ obj-y						+= tcp_in.o
 obj-y						+= tcp_out.o
 obj-y						+= timers.o
 obj-y						+= udp.o
+
+# plan9-style network stack
+obj-y						+= netif.o

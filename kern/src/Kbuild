@@ -3,16 +3,9 @@ obj-y						+= apipe.o
 obj-y						+= arsc.o
 obj-y						+= atomic.o
 obj-y						+= blockdev.o
-obj-y						+= chan.o
-obj-y						+= cleanname.o
 obj-y						+= colored_caches.o
 obj-y						+= console.o
-obj-y						+= convD2M.o
-obj-y						+= convM2D.o
-obj-y						+= dev.o
 obj-y						+= devfs.o
-obj-y						+= devregress.o
-obj-y						+= devtab.o
 obj-y						+= elf.o
 obj-y						+= env.o
 obj-y						+= errstr.o
@@ -32,11 +25,10 @@ obj-y						+= monitor.o
 obj-y						+= multiboot.o
 obj-y						+= net/
 obj-y						+= net.o
+obj-y						+= ns/
 obj-$(CONFIG_ETH_AUDIO)		+= eth_audio.o
 obj-y						+= page_alloc.o
 obj-y						+= pagemap.o
-obj-y						+= pgrp.o
-obj-y						+= plan9file.o
 obj-y						+= pmap.o
 obj-y						+= printf.o
 obj-y						+= printfmt.o
@@ -56,19 +48,4 @@ obj-y						+= trace.o
 obj-y						+= trap.o
 obj-y						+= ucq.o
 obj-y						+= umem.o
-obj-y						+= validname.o
 obj-y						+= vfs.o
-
-# Plan 9 stuff that in the long term we may replace
-# qio is kind of an mbuf equivalent.
-obj-y						+= qio.o
-# file system methods for network interfaces. Used by, among
-# other things, devether.
-obj-y						+= netif.o
-obj-y						+= devpipe.o
-# drivers for hardware
-obj-y						+= devether.o
-obj-y						+= 9dev/
-# sort of drivers
-obj-y						+= devproc.o
-obj-y						+= devmisc.o
