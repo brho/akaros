@@ -1872,6 +1872,8 @@ int do_pipe(struct file **pipe_files, int flags)
 	}
 	pii->p_rd_off = 0;
 	pii->p_wr_off = 0;
+	pii->p_nr_readers = 0;
+	pii->p_nr_writers = 0;
 	cv_init(&pii->p_cv);	/* must do this before dentry_open / pipe_open */
 	/* Now we have an inode for the pipe.  We need two files for the read and
 	 * write ends of the pipe. */
