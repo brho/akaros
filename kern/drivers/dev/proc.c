@@ -243,7 +243,7 @@ procgen(struct chan *c, char *name, struct dirtab *tab, int unused, int s,
 			pid = p->pid;
 		}
 
-		snprintf(current->genbuf, sizeof current->genbuf, "%ud", pid);
+		snprintf(current->genbuf, sizeof current->genbuf, "%u", pid);
 		/*
 		 * String comparison is done in devwalk so
 		 * name must match its formatted pid.
