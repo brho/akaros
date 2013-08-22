@@ -1261,45 +1261,37 @@ static intreg_t stat_helper(struct proc *p, const char *path, size_t path_l,
 	struct kstat *kbuf;
 	struct dentry *path_d;
 	char *t_path = user_strdup_errno(p, path, path_l);
+	int retval = 0;
 	if (!t_path)
 		return -1;
-	path_d = lookup_dentry(t_path, flags);
-	if (!path_d){
-	    int r;
-	    kbuf = kmalloc(sizeof(struct kstat), 0);
-	    if (!kbuf) {
-		set_errno(ENOMEM);
-		kref_put(&path_d->d_kref);
-		return -1;
-	    }
-	    r = sysstat(t_path, (uint8_t*)kbuf, sizeof(*kbuf));
-printd("sysstat returns %d\n", r);
-
-	    user_memdup_free(p, t_path);
-
-	    if (r < 0 || memcpy_to_user_errno(p, u_stat, kbuf, sizeof(struct kstat))) {
-		r = -1;
-	    }
-	    kfree(kbuf);
-	    return 0;
-	}
-
-	user_memdup_free(p, t_path);
 	kbuf = kmalloc(sizeof(struct kstat), 0);
 	if (!kbuf) {
 		set_errno(ENOMEM);
+		retval = -1;
+		goto out_with_path;
+	}
+	/* Check VFS for path */
+	path_d = lookup_dentry(t_path, flags);
+	if (path_d) {
+		stat_inode(path_d->d_inode, kbuf);
 		kref_put(&path_d->d_kref);
-		return -1;
+	} else {
+		/* VFS failed, checking 9ns */
+		retval = sysstat(t_path, (uint8_t*)kbuf, sizeof(*kbuf));
+		printd("sysstat returns %d\n", retval);
+		/* both VFS and 9ns failed, bail out */
+		if (retval < 0)
+			goto out_with_kbuf;
 	}
-	stat_inode(path_d->d_inode, kbuf);
-	kref_put(&path_d->d_kref);
 	/* TODO: UMEM: pin the memory, copy directly, and skip the kernel buffer */
-	if (memcpy_to_user_errno(p, u_stat, kbuf, sizeof(struct kstat))) {
-		kfree(kbuf);
-		return -1;
-	}
+	if (memcpy_to_user_errno(p, u_stat, kbuf, sizeof(struct kstat)))
+		retval = -1;
+	/* Fall-through */
+out_with_kbuf:
 	kfree(kbuf);
-	return 0;
+out_with_path:
+	user_memdup_free(p, t_path);
+	return retval;
 }
 
 /* Follow a final symlink */
