@@ -1980,8 +1980,9 @@ void file_release(struct kref *kref)
 {
 	struct file *file = container_of(kref, struct file, f_kref);
 
-	if (file->plan9){
+	if (file->plan9) {
 		file->plan9 = 0;
+		kmem_cache_free(file_kcache, file);
 		return;
 	}
 	struct super_block *sb = file->f_dentry->d_sb;
