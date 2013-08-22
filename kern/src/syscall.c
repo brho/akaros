@@ -1150,7 +1150,7 @@ static intreg_t sys_write(struct proc *p, int fd, const void *buf, int len)
 static intreg_t sys_open(struct proc *p, const char *path, size_t path_l,
                          int oflag, int mode)
 {
-	int fd = 0;
+	int fd, plan9fd;
 	struct file *file;
 
 	printd("File %s Open attempt oflag %x mode %x\n", path, oflag, mode);
@@ -1159,17 +1159,21 @@ static intreg_t sys_open(struct proc *p, const char *path, size_t path_l,
 		return -1;
 	mode &= ~p->fs_env.umask;
 	file = do_file_open(t_path, oflag, mode);
-	if (!file){
-	    fd = sysopen(t_path, oflag);
-	    if (fd >= 0){
-	    	file = alloc_file();
-		file->plan9 = 1;
-		file->plan9fd = fd;
-		printd("SYS_OPEN plan 9 open %s %x\n", t_path, fd);
-		printd("sysopen returns %d\n", fd);
-	    }
+	if (!file) {
+		plan9fd = sysopen(t_path, oflag);
+		if (plan9fd >= 0) {
+			file = alloc_file();
+			if (!file) {
+				user_memdup_free(p, t_path);
+				return -1;
+			}
+			file->plan9 = 1;
+			file->plan9fd = plan9fd;
+			printd("SYS_OPEN plan 9 open %s %x\n", t_path, plan9fd);
+		}
 	}
 	user_memdup_free(p, t_path);
+	/* check for a file that tracks either a 9ns file or VFS file */
 	if (!file)
 		return -1;
 	fd = insert_file(&p->open_files, file, 0);	/* stores the ref to file */
@@ -1184,16 +1188,29 @@ static intreg_t sys_open(struct proc *p, const char *path, size_t path_l,
 
 static intreg_t sys_close(struct proc *p, int fd)
 {
-	struct file *file = put_file_from_fd(&p->open_files, fd);
+	struct file *file = get_file_from_fd(&p->open_files, fd);
+	int retval = 0;
+	/* VFS file check */
 	if (!file) {
 		set_errno(EBADF);
 		return -1;
 	}
-	if (file->plan9){
-		sysclose(fd);
-		kmem_cache_free(file_kcache, file);
+	if (file->plan9) {
+		/* file will get freed when its last ref releases (should be in
+		 * put_file_from).  sysclose internally does its own EBADF checks. */
+		retval = sysclose(file->plan9fd);
 	}
-
+	kref_put(&file->f_kref);	/* Drop the ref from get_file */
+	/* Bail out early if sysclose aborted */
+	if (retval)
+		return retval;
+	/* Still need to pull it from the table, for any type */
+	file = put_file_from_fd(&p->open_files, fd);
+	/* Need to check again, slight chance we lost a race */
+	if (!file) {
+		set_errno(EBADF);
+		return -1;
+	}
 	return 0;
 }
 
