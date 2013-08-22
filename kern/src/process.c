@@ -2,7 +2,6 @@
  * Barret Rhoden <brho@cs.berkeley.edu>
  * See LICENSE for details. */
 
-#define DEBUG
 #ifdef __SHARC__
 #pragma nosharc
 #endif

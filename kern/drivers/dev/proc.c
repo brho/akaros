@@ -263,7 +263,7 @@ procgen(struct chan *c, char *name, struct dirtab *tab, int unused, int s,
 	}
 	if (c->qid.path == Qtracepids) {
 		strncpy(current->genbuf, "tracepids", sizeof(current->genbuf));
-		mkqid(&qid, Qtrace, -1, QTFILE, perrbuf);
+		mkqid(&qid, Qtracepids, -1, QTFILE, perrbuf);
 		devdir(c, qid, current->genbuf, 0, eve, 0444, dp);
 		return 1;
 	}
