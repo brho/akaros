@@ -513,7 +513,7 @@ int walk(struct chan **cp, char **names, int nnames, int nomount, int *nerror,
 		 struct errbuf *perrbuf);
 struct chan *createdir(struct chan *c, struct mhead *mh,
 					   struct errbuf *perrbuf);
-void nameerror(char *name, char *err);
+void nameerror(char *name, char *err, struct errbuf *perrbuf);
 struct chan *namec(char *aname, int amode, int omode, int perm,
 				   struct errbuf *perrbuf);
 char *skipslash(char *name);
