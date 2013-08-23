@@ -2,7 +2,7 @@
  * Copyright 2013 Google Inc.
  * Copyright (c) 1989-2003 by Lucent Technologies, Bell Laboratories.
  */
-//#define DEBUG
+#define DEBUG
 #include <setjmp.h>
 #include <vfs.h>
 #include <kfs.h>
@@ -1206,7 +1206,6 @@ struct chan *namec(char *aname, int amode, int omode, int perm,
 	nomount = 0;
 	switch (name[0]) {
 		case '/':
-			error("not yet");
 			c = current->slash;
 			kref_get(&c->ref, 1);
 			break;

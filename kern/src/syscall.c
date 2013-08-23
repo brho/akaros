@@ -4,7 +4,7 @@
 #pragma nosharc
 #endif
 
-//#define DEBUG
+#define DEBUG
 #include <ros/common.h>
 #include <arch/types.h>
 #include <arch/arch.h>
@@ -1713,9 +1713,9 @@ intreg_t sys_setgid(struct proc *p, gid_t gid)
 
 /* long bind(char* name, char* old, int flag); */
 intreg_t sys_nbind(struct proc *p,
-		   unsigned int flag,
 		   char *new_path, size_t new_l,
-		   char *old_path, size_t old_l)
+		   char *old_path, size_t old_l,
+		   unsigned int flag)
 
 {
 	int ret;
@@ -1727,6 +1727,7 @@ intreg_t sys_nbind(struct proc *p,
 		user_memdup_free(p, t_oldpath);
 		return -1;
 	}
+	printd("sys_nbind: %s -> %s flag %d\n", t_newpath, t_oldpath, flag);
 	ret = bindmount(0, -1, -1, t_newpath, t_oldpath, flag, NULL);
 	user_memdup_free(p, t_oldpath);
 	user_memdup_free(p, t_newpath);
