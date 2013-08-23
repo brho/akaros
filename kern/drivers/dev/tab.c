@@ -18,13 +18,16 @@
 
 /* at some point this will be done via ldscript Hackes. */
 //extern struct dev* devtab[];
+// the sooner the better!
 
 extern struct dev regressdevtab;
 extern struct dev pipedevtab;
 extern struct dev procdevtab;
 extern struct dev miscdevtab;
 extern struct dev etherdevtab;
+extern struct dev rootdevtab;
 struct dev *devtab[] = {
+	&rootdevtab,
 	&miscdevtab,
 	&regressdevtab,
 	&pipedevtab,
