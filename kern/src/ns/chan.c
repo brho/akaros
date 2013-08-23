@@ -1111,8 +1111,9 @@ static void *memrchr(void *va, int c, long n)
 	return NULL;
 }
 
-static void namelenerror(char *aname, int len, char *err)
+static void namelenerror(char *aname, int len, char *err, struct errbuf *perrbuf)
 {
+	ERRSTACK(1);
 	char *ename, *name, *next;
 	int i, errlen;
 
@@ -1151,11 +1152,12 @@ static void namelenerror(char *aname, int len, char *err)
 				 strlen(name), name);
 	}
 	snprintf(current->errstr, ERRMAX, "%#q %s", current->genbuf, err);
+	nexterror();
 }
 
-void nameerror(char *name, char *err)
+void nameerror(char *name, char *err, struct errbuf *perrbuf)
 {
-	namelenerror(name, strlen(name), err);
+	namelenerror(name, strlen(name), err, perrbuf);
 }
 
 /*
@@ -1287,7 +1289,7 @@ struct chan *namec(char *aname, int amode, int omode, int perm,
 		}
 		len = e.prefix + e.off[e.nerror];
 		kfree(e.off);
-		namelenerror(aname, len, tmperrbuf);
+		namelenerror(aname, len, tmperrbuf, perrbuf);
 	}
 
 	/*
