@@ -19,7 +19,8 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	ret = syscall(145, argv[1], argv[2], 0);
+	ret = syscall(145, argv[1], strlen(argv[1]), argv[2], 
+		strlen(argv[2]), 0);
 
 	printf("%d\n", ret);
 }

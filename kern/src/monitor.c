@@ -69,6 +69,7 @@ static command_t (RO commands)[] = {
 	{ "9open", "Call the plan 9 open", mon_9open},
 	{ "9read", "Call the plan 9 read", mon_9read},
 	{ "9write", "Call the plan 9 write", mon_9write},
+	{ "9bind", "Call the plan 9 bind", mon_9bind},
 };
 #define NCOMMANDS (sizeof(commands)/sizeof(commands[0]))
 
@@ -1042,6 +1043,30 @@ int mon_9open(int argc, char **argv, struct hw_trapframe *hw_tf)
 	printd("call sysopen\n");
 	fd = sysopen(name, mode);
 	printd("fd is %d\n", fd);
+	return 0;
+}
+
+int mon_9bind(int argc, char **argv, struct hw_trapframe *hw_tf)
+{
+	int bindmount(int ismount, int fd, int afd,
+              char* arg0, char* arg1, int flag, char* spec);
+	int ret;
+	printd("9bind: argc %d\n", argc);
+	int i;
+	for(i = 0; i < argc; i++) printd("%s ", argv[i]);
+	printd("\n");
+
+	if (argc < 4)
+		return 0;
+
+	char *new = argv[1];
+	char *old = argv[2];
+	int flag = strtol(argv[3], 0, 0);
+	printd("Bind %s %s %o\n", new, old, flag);
+	init9proc();
+	printd("call bindmount\n");
+	ret = bindmount(0, -1, -1, new, old, flag, NULL);
+	printd("ret is %d\n", ret);
 	return 0;
 }
 
