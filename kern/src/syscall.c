@@ -1711,6 +1711,70 @@ intreg_t sys_setgid(struct proc *p, gid_t gid)
 	return 0;
 }
 
+/* long bind(char* name, char* old, int flag); */
+intreg_t sys_nbind(struct proc *p,
+		   unsigned int flag,
+		   char *new_path, size_t new_l,
+		   char *old_path, size_t old_l)
+
+{
+	int ret;
+	char *t_oldpath = user_strdup_errno(p, old_path, old_l);
+	if (t_oldpath == NULL)
+		return -1;
+	char *t_newpath = user_strdup_errno(p, new_path, new_l);
+	if (t_newpath == NULL) {
+		user_memdup_free(p, t_oldpath);
+		return -1;
+	}
+	ret = bindmount(0, -1, -1, t_newpath, t_oldpath, flag, NULL);
+	user_memdup_free(p, t_oldpath);
+	user_memdup_free(p, t_newpath);
+	return ret;
+}
+
+/* int mount(int fd, int afd, char* old, int flag, char* aname); */
+intreg_t sys_nmount(struct proc *p,
+		    int fd, int afd,
+		    char *old_path, size_t old_l,
+		    unsigned int flag,
+		    char *auth, size_t auth_l)
+{
+	int ret;
+	char *t_oldpath = user_strdup_errno(p, old_path, old_l);
+	if (t_oldpath == NULL)
+		return -1;
+	char *t_auth = user_strdup_errno(p, auth, auth_l);
+	if (t_auth == NULL) {
+		user_memdup_free(p, t_oldpath);
+		return -1;
+	}
+	ret = bindmount(1, fd, afd, NULL, t_oldpath, flag, t_auth);
+	printd("go do it\n");
+	user_memdup_free(p, t_oldpath);
+	user_memdup_free(p, t_auth);
+	return ret;
+}
+
+/* int mount(int fd, int afd, char* old, int flag, char* aname); */
+intreg_t sys_nunmount(struct proc *p, char *name, int name_l, char *old_path, int old_l)
+{
+	int ret;
+	char *t_oldpath = user_strdup_errno(p, old_path, old_l);
+	if (t_oldpath == NULL)
+		return -1;
+	char *t_name = user_strdup_errno(p, name, name_l);
+	if (t_name == NULL) {
+		user_memdup_free(p, t_oldpath);
+		return -1;
+	}
+	ret = sysunmount(t_name, t_oldpath);
+	printd("go do it\n");
+	user_memdup_free(p, t_oldpath);
+	user_memdup_free(p, t_name);
+	return ret;
+}
+
 /************** Syscall Invokation **************/
 
 const static struct sys_table_entry syscall_table[] = {
@@ -1796,7 +1860,12 @@ const static struct sys_table_entry syscall_table[] = {
 	[SYS_tcgetattr] = {(syscall_t)sys_tcgetattr, "tcgetattr"},
 	[SYS_tcsetattr] = {(syscall_t)sys_tcsetattr, "tcsetattr"},
 	[SYS_setuid] = {(syscall_t)sys_setuid, "setuid"},
-	[SYS_setgid] = {(syscall_t)sys_setgid, "setgid"}
+	[SYS_setgid] = {(syscall_t)sys_setgid, "setgid"},
+	/* special! */
+	[SYS_nbind] ={(syscall_t)sys_bind, "nbind"},
+	[SYS_nmount] ={(syscall_t)sys_nmount, "nmount"},
+	[SYS_nunmount] ={(syscall_t)sys_nunmount, "nunmount"},
+
 };
 
 /* Executes the given syscall.

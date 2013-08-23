@@ -18,7 +18,7 @@
 #include <fcall.h>
 
 int
-pusherror(struct errbuf *errstack, int stacksize,
+errpush(struct errbuf *errstack, int stacksize,
 		  int *curindex, struct errbuf **perrbuf)
 {
 	printd("pushe %p %d %d perr %p *per %p\n", errstack, stacksize, *curindex,
@@ -33,7 +33,7 @@ pusherror(struct errbuf *errstack, int stacksize,
 	return 0;
 }
 
-struct errbuf *poperror(struct errbuf *errstack, int stacksize,
+struct errbuf *errpop(struct errbuf *errstack, int stacksize,
 						int *curindex, struct errbuf **perrbuf)
 {
 	printd("pope %p %d %d\n", errstack, stacksize, *curindex);

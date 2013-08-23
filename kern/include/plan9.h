@@ -474,9 +474,10 @@ extern char Edirseek[];			/* seek in directory */
 /* this replaces PERRBUF */
 #define ERRSTACKBASE(x) struct errbuf *perrbuf = NULL;\
 			struct errbuf errstack[(x)+1]; int curindex = 0;
-#define waserror() (pusherror(errstack, nel(errstack), &curindex, &perrbuf) || setjmp(&(perrbuf->jmp_buf)))
+#define waserror() (errpush(errstack, nel(errstack), &curindex, &perrbuf) || setjmp(&(perrbuf->jmp_buf)))
 #define error(x) {set_errstr(x); longjmp(&perrbuf->jmp_buf, (void *)x);}
-#define nexterror() {poperror(errstack, nel(errstack), &curindex, &perrbuf); longjmp(&perrbuf->jmp_buf, (void *)1);}
+#define nexterror() {errpop(errstack, nel(errstack), &curindex, &perrbuf); longjmp(&perrbuf->jmp_buf, (void *)1);}
+#define poperror() {errpop(errstack, nel(errstack), &curindex, &perrbuf);}
 
 /* this would be useful at some point ... */
 static inline uintptr_t getcallerpc(void *unused)
@@ -594,17 +595,19 @@ int sysfstat(int fd, uint8_t * statbuf, int len);
 int sysopen(char *name, int omode);
 int sysclose(int fd);
 int sysdup(int ofd, int nfd);
+int bindmount(int ismount, int fd, int afd,
+	      char* arg0, char* arg1, int flag, char* spec);
+int sysunmount(char *name, char *old);
 
 int plan9setup();
-
 long readstr(long offset, char *buf, long n, char *str);
 int readnum(unsigned long off, char *buf, unsigned long n, unsigned long val,
 			int size);
 
 /* ker/src/err.c */
-int pusherror(struct errbuf *errstack, int stacksize,
+int errpush(struct errbuf *errstack, int stacksize,
 			  int *curindex, struct errbuf **perrbuf);
-struct errbuf *poperror(struct errbuf *errstack, int stacksize,
+struct errbuf *errpop(struct errbuf *errstack, int stacksize,
 						int *curindex, struct errbuf **perrbuf);
 /* kern/src/qio.c */
 void ixsummary(void);
