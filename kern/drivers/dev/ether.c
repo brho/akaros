@@ -467,7 +467,8 @@ static struct ether *etherprobe(int cardno, int ctlrno)
 	return ether;
 }
 
-static void etherreset(void)
+//static
+void etherreset(void)
 {
 	struct ether *ether;
 	int cardno, ctlrno;

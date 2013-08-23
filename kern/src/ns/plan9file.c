@@ -911,3 +911,164 @@ int plan9setup(struct proc *up)
 	up->pgrp = newpgrp();
 	return 0;
 }
+
+/* bindmount -- common to bind and mount, since they're almost the same.
+ * fd
+ * afd -- auth fd, used to authenticate to a server if needed
+ * arg0 -- what we're mounting on top of (i.e. 'old')
+ * arg1 -- what is being mounted on to it (i.e. 'new')
+ * flags -- options, i.e. MAFTER, MBEFORE, etc.
+ * spec -- additional third argument used in special cases like dosfs, etc.
+ */
+int
+bindmount(int ismount,
+	  int fd,
+	  int afd,
+	  char* arg0,
+	  char* arg1,
+	  int flag,
+	  char* spec)
+{
+	ERRSTACKBASE(10); // it's complicated.
+	int i;
+	struct dev *dev;
+	struct chan *c0, *c1, *ac, *bc;
+	struct{
+		struct chan	*chan;
+		struct chan	*authchan;
+		char	*spec;
+		int	flags;
+	}bogus;
+ 
+	if (waserror()){
+		printk("bindmount: too bad. Too, too bad\n");
+		return -1;
+	}
+
+	if((flag&~MMASK) || (flag&MORDER)==(MBEFORE|MAFTER))
+		error(Ebadarg);
+
+	bogus.flags = flag & MCACHE;
+
+	if(ismount){
+		if(current->pgrp->noattach)
+			error(Enoattach);
+
+		ac = NULL;
+		bc = fdtochan(fd, ORDWR, 0, 1, perrbuf);
+		if(waserror()) {
+			if(ac)
+				cclose(ac, perrbuf);
+			cclose(bc, perrbuf);
+			nexterror();
+		}
+
+		if(afd >= 0)
+			ac = fdtochan(afd, ORDWR, 0, 1, perrbuf);
+
+		bogus.chan = bc;
+		bogus.authchan = ac;
+
+		bogus.spec = spec;
+		if(waserror())
+			error(Ebadspec);
+		spec = validnamedup(spec, 1, perrbuf);
+		poperror();
+
+		if(waserror()){
+			kfree(spec);
+			nexterror();
+		}
+
+		dev = devtabget('M', 0, perrbuf);		//XDYNX
+		if(waserror()){
+			//devtabdecr(dev);
+			nexterror();
+		}
+		c0 = dev->attach((char*)&bogus, perrbuf);
+		poperror();
+		//devtabdecr(dev);
+
+		poperror();	/* spec */
+		kfree(spec);
+		poperror();	/* ac bc */
+		if(ac)
+			cclose(ac, perrbuf);
+		cclose(bc, perrbuf);
+	}else{
+		bogus.spec = NULL;
+		c0 = namec(arg0, Abind, 0, 0, perrbuf);
+	}
+
+	if(waserror()){
+		cclose(c0, perrbuf);
+		nexterror();
+	}
+
+	c1 = namec(arg1, Amount, 0, 0, perrbuf);
+	if(waserror()){
+		cclose(c1, perrbuf);
+		nexterror();
+	}
+
+	i = cmount(&c0, c1, flag, bogus.spec, perrbuf);
+
+	poperror();
+	cclose(c1, perrbuf);
+	poperror();
+	cclose(c0, perrbuf);
+	if(ismount)
+		fdclose(fd, 0, perrbuf);
+
+	return i;
+}
+
+/*
+ * int unmount(char* name, char* old);
+ */
+int
+sysunmount(char *name, char *old)
+{
+	ERRSTACKBASE(2);
+	int ret;
+	struct chan *cmount, *cmounted;
+
+	if (waserror()){
+		printd("unmount went poorly\n");
+		return -1;
+	}
+
+
+	cmount = namec(old, Amount, 0, 0, perrbuf);
+
+	cmounted = NULL;
+	if(name != NULL) {
+		if(waserror()) {
+			cclose(cmount, perrbuf);
+			nexterror();
+		}
+
+		/*
+		 * This has to be namec(..., Aopen, ...) because
+		 * if arg[0] is something like /srv/cs or /fd/0,
+		 * opening it is the only way to get at the real
+		 * struct chan underneath.
+		 */
+		cmounted = namec(name, Aopen, OREAD, 0, perrbuf);
+		poperror();
+	}
+
+	if(waserror()) {
+		cclose(cmount, perrbuf);
+		if(cmounted != NULL)
+			cclose(cmounted, perrbuf);
+		nexterror();
+	}
+
+	cunmount(cmount, cmounted, perrbuf);
+	cclose(cmount, perrbuf);
+	if(cmounted != NULL)
+		cclose(cmounted, perrbuf);
+	return 0;
+}
+
