@@ -120,6 +120,18 @@ char *current_errstr(void)
 	return pcpui->cur_sysc->errstr;
 }
 
+struct errbuf *get_cur_errbuf(void)
+{
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	return (struct errbuf*)pcpui->cur_errbuf;
+}
+
+void set_cur_errbuf(struct errbuf *ebuf)
+{
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	pcpui->cur_errbuf = ebuf;
+}
+
 /************** Utility Syscalls **************/
 
 static int sys_null(void)

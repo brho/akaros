@@ -1629,6 +1629,7 @@ void abandon_core(void)
 	/* Syscalls that don't return will ultimately call abadon_core(), so we need
 	 * to make sure we don't think we are still working on a syscall. */
 	pcpui->cur_sysc = 0;
+	pcpui->cur_errbuf = 0;	/* just in case */
 	if (pcpui->cur_proc)
 		__abandon_core();
 }

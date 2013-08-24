@@ -30,6 +30,7 @@ struct kthread {
 	uintptr_t					stacktop;
 	struct proc					*proc;
 	struct syscall				*sysc;
+	void						*errbuf;	/* TODO: avoiding include loops */
 	TAILQ_ENTRY(kthread)		link;
 	/* ID, other shit, etc */
 };
