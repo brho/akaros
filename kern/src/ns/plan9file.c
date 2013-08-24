@@ -658,8 +658,7 @@ long sysread(int fd, void *p, size_t n, off_t off)
 
 long syswrite(int fd, void *p, size_t n, off_t off)
 {
-	PERRBUF;
-	ERRSTACK(3);
+	ERRSTACKBASE(3);
 
 	int ispwrite = 1;
 	long r = n;
@@ -714,8 +713,7 @@ long syswrite(int fd, void *p, size_t n, off_t off)
 
 int syscreate(char *name, int omode)
 {
-	PERRBUF;
-	ERRSTACK(2);
+	ERRSTACKBASE(2);
 	struct chan *c = NULL;
 	int fd;
 	/* if it exists, it is truncated. 
@@ -743,8 +741,7 @@ int syscreate(char *name, int omode)
 
 int sysopen(char *name, int omode)
 {
-	PERRBUF;
-	ERRSTACK(2);
+	ERRSTACKBASE(2);
 	struct chan *c = NULL;
 	int fd;
 	int mustdir = 0;
@@ -792,8 +789,7 @@ int sysclose(int fd)
 
 int sysstat(char *name, uint8_t * statbuf, int len)
 {
-	PERRBUF;
-	ERRSTACK(2);
+	ERRSTACKBASE(2);
 	int r;
 	struct chan *c = NULL;
 	char *aname;
@@ -825,8 +821,7 @@ int sysstat(char *name, uint8_t * statbuf, int len)
 
 int sysfstat(int fd, uint8_t * statbuf, int len)
 {
-	PERRBUF;
-	ERRSTACK(2);
+	ERRSTACKBASE(2);
 	int r;
 	struct chan *c = NULL;
 	uint8_t data[sizeof(struct dir)];
@@ -900,8 +895,7 @@ int sysdup(int ofd, int nfd)
 
 int plan9setup(struct proc *up)
 {
-	PERRBUF;
-	ERRSTACK(2);
+	ERRSTACKBASE(2);
 	if (waserror()) {
 		printd("plan9setup failed\n");
 		return -1;

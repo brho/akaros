@@ -1206,6 +1206,7 @@ struct chan *namec(char *aname, int amode, int omode, int perm,
 	nomount = 0;
 	switch (name[0]) {
 		case '/':
+			error("not yet");
 			c = current->slash;
 			/* TODO: we still have scenarios where there is no current / */
 			if (!c)

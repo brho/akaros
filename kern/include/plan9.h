@@ -467,17 +467,16 @@ extern char Ecmdargs[];			/* wrong #args in control message */
 extern char Ebadip[];			/* bad ip address syntax */
 extern char Edirseek[];			/* seek in directory */
 
-#define PERRBUF struct errbuf *perrbuf = NULL;
 #define nel(x) (sizeof(x)/sizeof(x[0]))
 /* add 1 in case they forget they need an entry for the passed-in errbuf */
 #define ERRSTACK(x) struct errbuf errstack[(x)+1]; int curindex = 0;
 /* this replaces PERRBUF */
 #define ERRSTACKBASE(x) struct errbuf *perrbuf = NULL;\
 			struct errbuf errstack[(x)+1]; int curindex = 0;
-#define waserror() (errpush(errstack, nel(errstack), &curindex, &perrbuf) || setjmp(&(perrbuf->jmp_buf)))
-#define error(x) {set_errstr(x); longjmp(&perrbuf->jmp_buf, (void *)x);}
-#define nexterror() {errpop(errstack, nel(errstack), &curindex, &perrbuf); longjmp(&perrbuf->jmp_buf, (void *)1);}
-#define poperror() {errpop(errstack, nel(errstack), &curindex, &perrbuf);}
+#define waserror() (errpush(errstack, nel(errstack), &curindex) || setjmp(&(get_cur_errbuf()->jmp_buf)))
+#define error(x) {set_errstr(x); longjmp(&get_cur_errbuf()->jmp_buf, (void *)x);}
+#define nexterror() {errpop(errstack, nel(errstack), &curindex); longjmp(&(get_cur_errbuf())->jmp_buf, (void *)1);}
+#define poperror() {errpop(errstack, nel(errstack), &curindex);}
 
 /* this would be useful at some point ... */
 static inline uintptr_t getcallerpc(void *unused)
@@ -605,10 +604,8 @@ int readnum(unsigned long off, char *buf, unsigned long n, unsigned long val,
 			int size);
 
 /* ker/src/err.c */
-int errpush(struct errbuf *errstack, int stacksize,
-			  int *curindex, struct errbuf **perrbuf);
-struct errbuf *errpop(struct errbuf *errstack, int stacksize,
-						int *curindex, struct errbuf **perrbuf);
+int errpush(struct errbuf *errstack, int stacksize, int *curindex);
+void errpop(struct errbuf *errstack, int stacksize,int *curindex);
 /* kern/src/qio.c */
 void ixsummary(void);
 void freeblist(struct block *b);

@@ -969,8 +969,7 @@ static int initted9 = 0;
 void
 init9proc()
 {
-    PERRBUF;
-    ERRSTACK(2);
+	ERRSTACKBASE(2);
 	if (initted9)
 		return;
 	initted9++;

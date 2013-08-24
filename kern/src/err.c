@@ -18,23 +18,20 @@
 #include <fcall.h>
 
 int
-errpush(struct errbuf *errstack, int stacksize,
-		  int *curindex, struct errbuf **perrbuf)
+errpush(struct errbuf *errstack, int stacksize, int *curindex)
 {
-	printd("pushe %p %d %d perr %p *per %p\n", errstack, stacksize, *curindex,
-		   perrbuf, *perrbuf);
+	printd("pushe %p %d %dp\n", errstack, stacksize, *curindex);
 	if (*curindex == 0)
-		*(struct errbuf **)errstack = *perrbuf;
+		*(struct errbuf **)errstack = get_cur_errbuf();
 
 	*curindex = *curindex + 1;
 	if (*curindex >= stacksize)
 		panic("Error stack overflow");
-	*perrbuf = &errstack[*curindex];
+	set_cur_errbuf(&errstack[*curindex]);
 	return 0;
 }
 
-struct errbuf *errpop(struct errbuf *errstack, int stacksize,
-						int *curindex, struct errbuf **perrbuf)
+void errpop(struct errbuf *errstack, int stacksize, int *curindex)
 {
 	printd("pope %p %d %d\n", errstack, stacksize, *curindex);
 	*curindex = *curindex - 1;
@@ -42,9 +39,7 @@ struct errbuf *errpop(struct errbuf *errstack, int stacksize,
 		panic("Error stack underflow");
 
 	if (*curindex == 0)
-		*perrbuf = *(struct errbuf **)errstack;
+		set_cur_errbuf(*(struct errbuf **)errstack);
 	else
-		*perrbuf = &errstack[*curindex];
-
-	return *perrbuf;
+		set_cur_errbuf(&errstack[*curindex]);
 }
