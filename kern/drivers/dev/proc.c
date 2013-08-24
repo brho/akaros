@@ -434,6 +434,7 @@ static struct chan *procopen(struct chan *c, int omode, struct errbuf *perrbuf)
 			tproduced = tconsumed = 0;
 		}
 		proctrace = _proctrace;
+		poperror();
 		unlock(&tlock);
 
 		c->mode = openmode(omode, perrbuf);
@@ -474,6 +475,7 @@ static struct chan *procopen(struct chan *c, int omode, struct errbuf *perrbuf)
 				error(Eperm);
 			tc = proctext(c, p);
 			tc->offset = 0;
+			poperror();
 			qunlock(&p->debug);
 			kref_put(&p->p_kref);
 			cclose(c);
@@ -529,6 +531,7 @@ static struct chan *procopen(struct chan *c, int omode, struct errbuf *perrbuf)
 			break;
 
 		default:
+			poperror();
 #endif
 #if 0
 			qunlock(&p->debug);
@@ -549,6 +552,7 @@ static struct chan *procopen(struct chan *c, int omode, struct errbuf *perrbuf)
 
 #endif
 	tc = devopen(c, omode, 0, 0, procgen, perrbuf);
+	poperror();
 #if 0
 	qunlock(&p->debug);
 	kref_put(&p->p_kref);
@@ -603,6 +607,7 @@ procwstat(struct chan *c, uint8_t * db, long n, struct errbuf *perrbuf)
 	if (d->mode != ~0UL)
 		p->procmode = d->mode & 0777;
 
+	poperror();
 	qunlock(&p->debug);
 	kref_put(&p->p_kref);
 	kfree(d);
@@ -693,6 +698,7 @@ static int procfds(struct proc *p, char *va, int count, long offset)
 		n += procfdprint(c, i, w, a + n, count - n);
 		offset = procoffset(offset, a, &n);
 	}
+	poperror();
 	unlock(f);
 	qunlock(&p->debug);
 
@@ -954,6 +960,7 @@ procread(struct chan *c, void *va, long n, int64_t off, struct errbuf *perrbuf)
 			}
 			if (p->nnote == 0)
 				p->notepending = 0;
+			poperror();
 			qunlock(&p->debug);
 			kref_put(&p->p_kref);
 			return n;
@@ -1103,6 +1110,7 @@ regread:
 			p->nwait--;
 			unlock(&p->exl);
 
+			poperror();
 			qunlock(&p->qwaitr);
 			kref_put(&p->p_kref);
 			n = snprint(va, n, "%d %lud %lud %lud %q",
@@ -1123,6 +1131,7 @@ regread:
 				error(Eprocdied);
 			mw = c->aux;
 			if (mw->cddone) {
+				poperror();
 				qunlock(&p->debug);
 				kref_put(&p->p_kref);
 				return 0;
@@ -1131,6 +1140,7 @@ regread:
 			if (mw->mh == 0) {
 				mw->cddone = 1;
 				i = snprint(va, n, "cd %s\n", p->dot->path->s);
+				poperror();
 				qunlock(&p->debug);
 				kref_put(&p->p_kref);
 				return i;
@@ -1146,6 +1156,7 @@ regread:
 			} else
 				i = snprint(va, n, "bind %s %s %s\n", flag,
 							mw->cm->to->path->s, mw->mh->from->path->s);
+			poperror();
 			qunlock(&p->debug);
 			kref_put(&p->p_kref);
 			return i;
@@ -1314,11 +1325,13 @@ procwrite(struct chan *c, void *va, long n, int64_t off, struct errbuf *perrbuf)
 				error(Ebadarg);
 			break;
 		default:
+			poperror();
 			qunlock(&p->debug);
 			kref_put(&p->p_kref);
 			pprint("unknown qid %#llux in procwrite\n", c->qid.path);
 			error(Egreg);
 	}
+	poperror();
 	qunlock(&p->debug);
 	kref_put(&p->p_kref);
 	return n;
@@ -1389,6 +1402,7 @@ static struct chan *proctext(struct chan *c, struct proc *p)
 		error(Eprocdied);
 	}
 
+	poperror();
 	unlock(i);
 
 	return tc;
@@ -1416,6 +1430,7 @@ void procstopwait(struct proc *p, int ctl)
 		nexterror();
 	}
 	sleep(&current->sleep, procstopped, p);
+	poperror();
 	qlock(&p->debug);
 	if (p->pid != pid)
 		error(Eprocdied);
@@ -1688,6 +1703,7 @@ static void procctlreq(struct proc *p, char *va, int n)
 			}
 			break;
 	}
+	poperror();
 	kfree(cb);
 }
 
@@ -1727,8 +1743,10 @@ procctlmemio(struct proc *p, uintptr_t offset, int n, void *va, int read)
 		}
 		if (fixfault(s, offset, read, 0, s->color) == 0)
 			break;
+		poperror();
 		s->steal--;
 	}
+	poperror();
 	pte = s->map[soff / PTEMAPMEM];
 	if (pte == 0)
 		panic("procctlmemio");
@@ -1753,6 +1771,7 @@ procctlmemio(struct proc *p, uintptr_t offset, int n, void *va, int read)
 		memmove(va, b, n);	/* This can fault */
 	else
 		memmove(b, va, n);
+	poperror();
 	kunmap(k);
 
 	/* Ensure the process sees text page changes */

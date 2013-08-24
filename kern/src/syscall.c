@@ -1898,6 +1898,8 @@ const static struct sys_table_entry syscall_table[] = {
 intreg_t syscall(struct proc *p, uintreg_t sc_num, uintreg_t a0, uintreg_t a1,
                  uintreg_t a2, uintreg_t a3, uintreg_t a4, uintreg_t a5)
 {
+	intreg_t ret = -1;
+	ERRSTACKBASE(1);
 	const int max_syscall = sizeof(syscall_table)/sizeof(syscall_table[0]);
 
 	uint32_t coreid, vcoreid;
@@ -1935,7 +1937,25 @@ intreg_t syscall(struct proc *p, uintreg_t sc_num, uintreg_t a0, uintreg_t a1,
 	if (sc_num > max_syscall || syscall_table[sc_num].call == NULL)
 		panic("Invalid syscall number %d for proc %x!", sc_num, p);
 
-	return syscall_table[sc_num].call(p, a0, a1, a2, a3, a4, a5);
+	if (waserror()){
+		/* if we got here, then the errbuf was right.
+		 * no need to check!
+		 */
+		return -1;
+	}
+printd("before syscall errstack %p\n", errstack);
+printd("before syscall errstack base %p\n", get_cur_errbuf());
+	ret = syscall_table[sc_num].call(p, a0, a1, a2, a3, a4, a5);
+printd("after syscall errstack base %p\n", get_cur_errbuf());
+	if (get_cur_errbuf() != &errstack[1]){
+		printk("[%16llu] Syscall %3d (%12s):(%p, %p, %p, %p, "
+		       "%p, %p) proc: %d core: %d vcore: %d\n", read_tsc(),
+		       sc_num, syscall_table[sc_num].name, a0, a1, a2, a3,
+		       a4, a5, p->pid, coreid, vcoreid);
+		if (sc_num != SYS_fork)
+			printk("YOU SHOULD PANIC: errstack mismatch");
+	}
+	return ret;
 }
 
 /* Execute the syscall on the local core */

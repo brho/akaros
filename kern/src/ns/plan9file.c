@@ -278,6 +278,7 @@ static long unionread(struct chan *c, void *va, long n, struct errbuf *perrbuf)
 	}
 	runlock(&mh->lock);
 	spin_unlock(&c->umqlock);
+	poperror();
 	return nr;
 }
 
@@ -561,7 +562,7 @@ Norewrite:
 
 long sysread(int fd, void *p, size_t n, off_t off)
 {
-	ERRSTACKBASE(2);
+	ERRSTACK(2);struct errbuf *perrbuf;
 	uint8_t *ep = p;
 	long nn, nnn;
 	struct chan *c;
@@ -570,7 +571,7 @@ long sysread(int fd, void *p, size_t n, off_t off)
 
 	if (waserror()) {
 		set_errno(EBADF);
-		return -1;
+		nexterror();
 	}
 
 	c = fdtochan(fd, OREAD, 1, 1, perrbuf);
@@ -658,7 +659,7 @@ long sysread(int fd, void *p, size_t n, off_t off)
 
 long syswrite(int fd, void *p, size_t n, off_t off)
 {
-	ERRSTACKBASE(3);
+	ERRSTACK(3);struct errbuf *perrbuf;
 
 	int ispwrite = 1;
 	long r = n;
@@ -668,7 +669,7 @@ long syswrite(int fd, void *p, size_t n, off_t off)
 	n = 0;
 	if (waserror()) {
 		set_errno(EBADF);
-		return -1;
+		nexterror();
 	}
 
 	c = fdtochan(fd, OWRITE, 1, 1, perrbuf);
@@ -713,7 +714,7 @@ long syswrite(int fd, void *p, size_t n, off_t off)
 
 int syscreate(char *name, int omode)
 {
-	ERRSTACKBASE(2);
+	ERRSTACK(2);struct errbuf *perrbuf;
 	struct chan *c = NULL;
 	int fd;
 	/* if it exists, it is truncated. 
@@ -727,7 +728,7 @@ int syscreate(char *name, int omode)
 		if (c)
 			cclose(c, perrbuf);
 		printd("syscreate fail 1 mode  %x\n", omode);
-		return -1;
+		nexterror();
 	}
 
 	openmode(omode, perrbuf);	/* error check only */
@@ -741,7 +742,7 @@ int syscreate(char *name, int omode)
 
 int sysopen(char *name, int omode)
 {
-	ERRSTACKBASE(2);
+	ERRSTACK(2);struct errbuf *perrbuf;
 	struct chan *c = NULL;
 	int fd;
 	int mustdir = 0;
@@ -770,16 +771,17 @@ int sysopen(char *name, int omode)
 	fd = newfd(c);
 	if (fd < 0)
 		error(Enofd);
+	poperror();
 	printd("sysopen %s returns %d %x\n", name, fd, fd);
 	return fd;
 }
 
 int sysclose(int fd)
 {
-	ERRSTACKBASE(1);
+	ERRSTACK(1);struct errbuf *perrbuf;
 
 	if (waserror()) {
-		return -1;
+		nexterror();
 	}
 
 	fdtochan(fd, -1, 0, 0, perrbuf);
@@ -789,7 +791,7 @@ int sysclose(int fd)
 
 int sysstat(char *name, uint8_t * statbuf, int len)
 {
-	ERRSTACKBASE(2);
+	ERRSTACK(2);struct errbuf *perrbuf;
 	int r;
 	struct chan *c = NULL;
 	char *aname;
@@ -799,7 +801,7 @@ int sysstat(char *name, uint8_t * statbuf, int len)
 	if (waserror()) {
 		if (c)
 			cclose(c, perrbuf);
-		return -1;
+		nexterror();
 	}
 
 	c = namec(name, Aaccess, 0, 0, perrbuf);
@@ -813,6 +815,7 @@ int sysstat(char *name, uint8_t * statbuf, int len)
 		r = dirsetname(aname, strlen(aname), data, r, sizeof(data));
 #endif
 	cclose(c, perrbuf);
+	poperror();
 	/* now convert for akaros. */
 	convM2kstat(data, sizeof(data), (struct kstat *)statbuf);
 
@@ -821,13 +824,13 @@ int sysstat(char *name, uint8_t * statbuf, int len)
 
 int sysfstat(int fd, uint8_t * statbuf, int len)
 {
-	ERRSTACKBASE(2);
+	ERRSTACK(2);struct errbuf *perrbuf;
 	int r;
 	struct chan *c = NULL;
 	uint8_t data[sizeof(struct dir)];
 
 	if (waserror()) {
-		return -1;
+		nexterror();
 	}
 
 	c = fdtochan(fd, -1, 0, 1, perrbuf);
@@ -847,7 +850,7 @@ int sysfstat(int fd, uint8_t * statbuf, int len)
 
 int sysdup(int ofd, int nfd)
 {
-	ERRSTACKBASE(2);
+	ERRSTACK(2);struct errbuf *perrbuf;
 	struct chan *nc, *oc;
 	struct fgrp *f;
 
@@ -859,7 +862,7 @@ int sysdup(int ofd, int nfd)
 	 */
 	if (waserror()) {
 		set_errno(EBADF);
-		return -1;
+		nexterror();
 	}
 
 	oc = fdtochan(ofd, -1, 0, 1, perrbuf);
@@ -895,7 +898,7 @@ int sysdup(int ofd, int nfd)
 
 int plan9setup(struct proc *up)
 {
-	ERRSTACKBASE(2);
+	ERRSTACK(2);struct errbuf *perrbuf;
 	if (waserror()) {
 		printd("plan9setup failed\n");
 		return -1;
@@ -923,7 +926,7 @@ bindmount(int ismount,
 	  int flag,
 	  char* spec)
 {
-	ERRSTACKBASE(10); // it's complicated.
+	ERRSTACK(10); struct errbuf *perrbuf;// it's complicated.
 	int i;
 	struct dev *dev;
 	struct chan *c0, *c1, *ac, *bc;
@@ -936,7 +939,7 @@ bindmount(int ismount,
  
 	if (waserror()){
 		printk("bindmount: too bad. Too, too bad\n");
-		return -1;
+		nexterror();
 	}
 
 	if((flag&~MMASK) || (flag&MORDER)==(MBEFORE|MAFTER))
@@ -1023,13 +1026,13 @@ bindmount(int ismount,
 int
 sysunmount(char *name, char *old)
 {
-	ERRSTACKBASE(2);
+	ERRSTACK(2);struct errbuf *perrbuf;
 	int ret;
 	struct chan *cmount, *cmounted;
 
 	if (waserror()){
 		printd("unmount went poorly\n");
-		return -1;
+		nexterror();
 	}
 
 

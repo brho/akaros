@@ -369,6 +369,7 @@ void cclose(struct chan *c, struct errbuf *perrbuf)
 	if (!waserror()) {
 		if (c->dev != NULL)	//XDYNX
 			c->dev->close(c, perrbuf);
+		poperror();
 	}
 	chanfree(c, perrbuf);
 }
@@ -428,6 +429,7 @@ static void closeproc(void *, struct errbuf *perrbuf)
 		if (clunkq.head == NULL) {
 			if (!waserror()) {
 				tsleep(&clunkq.r, clunkwork, NULL, 5000, perrbuf);
+				poperror();
 			}
 			if (clunkq.head == NULL) {
 				qunlock(&clunkq.q, perrbuf);
@@ -443,6 +445,7 @@ static void closeproc(void *, struct errbuf *perrbuf)
 		if (!waserror()) {
 			if (c->dev != NULL)	//XDYNX
 				c->dev->close(c);
+			poperror();
 		}
 		chanfree(c, perrbuf);
 	}
@@ -625,6 +628,7 @@ cmount(struct chan **newp, struct chan *old, int flag, char *spec,
 	}
 
 	wunlock(&mhead->lock);
+	poperror();
 	return nm->mountid;
 }
 
@@ -820,6 +824,7 @@ static struct walkqid *ewalk(struct chan *c, struct chan *nc, char **name,
 	if (waserror())
 		return NULL;
 	wq = c->dev->walk(c, nc, name, nname, perrbuf);
+	poperror();
 	return wq;
 }
 
@@ -1022,6 +1027,7 @@ struct chan *createdir(struct chan *c, struct mhead *mh, struct errbuf *perrbuf)
 		if (f->mflag & MCREATE) {
 			nc = cclone(f->to, perrbuf);
 			runlock(&mh->lock);
+			poperror();
 			cclose(c, perrbuf);
 			return nc;
 		}
@@ -1499,6 +1505,7 @@ Open:
 
 				cnew->dev->create(cnew, e.elems[e.nelems - 1],
 								  omode & ~(OEXCL | OCEXEC), perm, perrbuf);
+				poperror();
 				if (omode & OCEXEC)
 					cnew->flag |= CCEXEC;
 				if (omode & ORCLOSE)
@@ -1540,7 +1547,9 @@ Open:
 	kfree(e.name);
 	kfree(e.elems);
 	kfree(e.off);	/* e c */
+	poperror();
 	kfree(aname);	/* aname */
+	poperror();
 
 	return c;
 }
