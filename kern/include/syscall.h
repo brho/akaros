@@ -47,6 +47,8 @@ intreg_t syscall(struct proc *p, uintreg_t sc_num, uintreg_t a0, uintreg_t a1,
 void set_errno(int errno);
 void set_errstr(char *errstr);
 char *current_errstr(void);
+struct errbuf *get_cur_errbuf(void);
+void set_cur_errbuf(struct errbuf *ebuf);
 void __signal_syscall(struct syscall *sysc, struct proc *p);
 
 /* Tracing functions */

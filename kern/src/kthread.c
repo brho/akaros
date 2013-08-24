@@ -72,6 +72,7 @@ void restart_kthread(struct kthread *kthread)
 	/* Tell the core which syscall we are running (if any) */
 	assert(!pcpui->cur_sysc);	/* catch bugs, prev user should clear */
 	pcpui->cur_sysc = kthread->sysc;
+	pcpui->cur_errbuf = kthread->errbuf;
 	/* Finally, restart our thread */
 	pop_kernel_ctx(&kthread->context);
 }
@@ -229,7 +230,9 @@ void sem_down(struct semaphore *sem)
 	kthread->proc = current;
 	/* kthread tracks the syscall it is working on, which implies errno */
 	kthread->sysc = pcpui->cur_sysc;
+	kthread->errbuf = pcpui->cur_errbuf;
 	pcpui->cur_sysc = 0;				/* this core no longer works on sysc */
+	pcpui->cur_errbuf = 0;				/* this core no longer has an errbuf */
 	if (kthread->proc)
 		proc_incref(kthread->proc, 1);
 	/* Save the context, toggle blocking for the reactivation */
