@@ -1207,6 +1207,9 @@ struct chan *namec(char *aname, int amode, int omode, int perm,
 	switch (name[0]) {
 		case '/':
 			c = current->slash;
+			/* TODO: we still have scenarios where there is no current / */
+			if (!c)
+				error(Enotdir);
 			kref_get(&c->ref, 1);
 			break;
 
