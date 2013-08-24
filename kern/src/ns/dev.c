@@ -242,7 +242,7 @@ Accept:
 Notfound:
 					if (j == 0)
 						error(Enonexist);
-					kstrcpy(current->errstr, Enonexist, ERRMAX);
+					set_errstr(Enonexist);
 					goto Done;
 				case 0:
 					continue;

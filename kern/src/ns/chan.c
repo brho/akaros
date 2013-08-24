@@ -865,7 +865,7 @@ walk(struct chan **cp, char **names, int nnames, int nomount, int *nerror,
 				*nerror = nhave;
 			pathclose(path, perrbuf);
 			cclose(c, perrbuf);
-			strncpy(current->errstr, Enotdir, sizeof(current->errstr));
+			set_errstr(Enotdir);
 			if (mh != NULL)
 				putmhead(mh, perrbuf);
 			return -1;
@@ -948,13 +948,11 @@ walk(struct chan **cp, char **names, int nnames, int nomount, int *nerror,
 					if (wq->nqid == 0 || (wq->qid[wq->nqid - 1].type & QTDIR)) {
 						if (nerror)
 							*nerror = nhave + wq->nqid + 1;
-						strncpy(current->errstr, Edoesnotexist,
-								sizeof(current->errstr));
+						set_errstr(Edoesnotexist);
 					} else {
 						if (nerror)
 							*nerror = nhave + wq->nqid;
-						strncpy(current->errstr, Enotdir,
-								sizeof(current->errstr));
+						set_errstr(Enotdir);
 					}
 					kfree(wq);
 					if (mh != NULL)
@@ -1151,7 +1149,7 @@ static void namelenerror(char *aname, int len, char *err, struct errbuf *perrbuf
 		snprintf(current->genbuf, sizeof current->genbuf, "...%.*s",
 				 strlen(name), name);
 	}
-	snprintf(current->errstr, ERRMAX, "%#q %s", current->genbuf, err);
+	snprintf(current_errstr(), MAX_ERRSTR_LEN, "%#q %s", current->genbuf, err);
 	nexterror();
 }
 
@@ -1185,7 +1183,7 @@ struct chan *namec(char *aname, int amode, int omode, int perm,
 	struct path *path;
 	Elemlist e;
 	struct mhead *mh;
-	char *createerr, tmperrbuf[ERRMAX];
+	char tmperrbuf[ERRMAX];	/* ERRMAX still, for namelenerror */
 	char *name;
 	struct dev *dev;
 	printd("namec name %s\n", aname);
@@ -1278,7 +1276,7 @@ struct chan *namec(char *aname, int amode, int omode, int perm,
 		 */
 		if (e.nerror == 0)
 			nexterror();
-		strncpy(tmperrbuf, current->errstr, sizeof(tmperrbuf));
+		strncpy(tmperrbuf, current_errstr(), MAX_ERRSTR_LEN);
 		if (e.off[e.nerror] == 0)
 			printd("nerror=%d but off=%d\n",
 				   e.nerror, e.off[e.nerror], perrbuf);
@@ -1515,15 +1513,14 @@ Open:
 				putmhead(mh, perrbuf);
 			if (omode & OEXCL)
 				nexterror();
-			/* save error */
-			createerr = current->errstr;
-			current->errstr = tmperrbuf;
+			/* save error, so walk doesn't clobber our existing errstr */
+			strncpy(tmperrbuf, current_errstr(), MAX_ERRSTR_LEN);
 			/* note: we depend that walk does not error */
-			if (walk(&c, e.elems + e.nelems - 1, 1, nomount, NULL, perrbuf) < 0) {
-				current->errstr = createerr;
-				error(createerr);	/* report true error */
+			if (walk(&c, e.elems + e.nelems - 1, 1, nomount, NULL, perrbuf)
+			    < 0) {
+				error(tmperrbuf);	/* report the error we had originally */
 			}
-			current->errstr = createerr;
+			strncpy(current_errstr(), tmperrbuf, MAX_ERRSTR_LEN);
 			omode |= OTRUNC;
 			goto Open;
 

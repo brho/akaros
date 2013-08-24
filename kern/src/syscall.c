@@ -105,13 +105,19 @@ void set_errno(int errno)
 void set_errstr(char *errstr)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	size_t errstrlen;
 	if (!pcpui->cur_sysc)
 		return;
-	errstrlen = MIN(strlen(errstr) + 1, MAX_ERRSTR_LEN);
-	memcpy(pcpui->cur_sysc->errstr, errstr, errstrlen);
+	strncpy(pcpui->cur_sysc->errstr, errstr, MAX_ERRSTR_LEN);
 	/* enforce null termination */
 	pcpui->cur_sysc->errstr[MAX_ERRSTR_LEN - 1] = '\0';
+}
+
+char *current_errstr(void)
+{
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	/* no one should call this that doesn't have a sysc */
+	assert(!pcpui->cur_sysc);
+	return pcpui->cur_sysc->errstr;
 }
 
 /************** Utility Syscalls **************/
@@ -1127,7 +1133,7 @@ static intreg_t sys_write(struct proc *p, int fd, const void *buf, int len)
 		return -1;
 	}
 	if (file->plan9){
-	    ret = syswrite(file->plan9fd, buf, len, (off_t) -1);
+	    ret = syswrite(file->plan9fd, (void*)buf, len, (off_t) -1);
 	    printd("plan 9 write returns %d\n", ret);
 	} else {
 		

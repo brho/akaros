@@ -91,9 +91,8 @@ struct proc {
     struct fgrp *fgrp, *closingfgrp;
     char user[32]; /* hey! let's do user NAMES! I AM NOT A NUMBER! */
 	/* hack for Plan 9. This grows the struct and we'll remove later
-	 * once we get a better way to do this.
-	 */
-  char genbuf[129], *errstr;
+	 * once we get a better way to do this. */
+	char genbuf[129];
 	/* UCQ hashlocks */
 	struct hashlock				*ucq_hashlock;
 	struct small_hashlock		ucq_hl_noref;	/* don't reference directly */
