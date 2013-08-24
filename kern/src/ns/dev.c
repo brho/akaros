@@ -127,7 +127,7 @@ struct chan *devattach(int dc, char *spec, struct errbuf *perrbuf)
 {
 	struct chan *c;
 	char *buf;
-	int len = strlen(spec) + 1;
+	int len = strlen(spec) + 2 + 1;	/* 2 for #c, 1 for \0 */
 	/*
 	 * There are no error checks here because
 	 * this can only be called from the driver of dc
