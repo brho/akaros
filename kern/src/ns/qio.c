@@ -926,6 +926,7 @@ struct block *mem2bl(uint8_t * p, int len, struct errbuf *perrbuf)
 		len -= n;
 		l = &b->next;
 	} while (len > 0);
+	poperror();
 
 	return first;
 }
@@ -990,6 +991,7 @@ struct block *qbread(struct queue *q, int len, struct errbuf *perrbuf)
 			/* queue closed */
 			iunlock(&q->lock);
 			qunlock(&q->rlock);
+			poperror();
 			return NULL;
 		case -1:
 			/* multiple reads on a closed queue */
@@ -1017,6 +1019,7 @@ struct block *qbread(struct queue *q, int len, struct errbuf *perrbuf)
 	/* restart producer */
 	qwakeup_iunlock(q);
 
+	poperror();
 	qunlock(&q->rlock);
 	return nb;
 }
@@ -1153,6 +1156,7 @@ long qbwrite(struct queue *q, struct block *b, struct errbuf *perrbuf)
 			freeb(b);
 			noblockcnt += n;
 			qunlock(&q->wlock);
+			poperror();
 			return n;
 		}
 	}

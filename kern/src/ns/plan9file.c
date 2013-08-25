@@ -519,6 +519,7 @@ mountfix(struct chan *c, uint8_t * op, long n, long maxn,
 			r = dirsetname(name, nname, buf, l, nbuf);
 			if (r == BIT16SZ)
 				error("dirsetname");
+			poperror();
 
 			/*
 			 * Shift data in buffer to accomodate new entry,
@@ -652,6 +653,7 @@ long sysread(int fd, void *p, size_t n, off_t off)
 		spin_unlock(&c->lock);
 	}
 
+	poperror();
 	cclose(c, perrbuf);
 
 	return nnn;
@@ -706,6 +708,7 @@ long syswrite(int fd, void *p, size_t n, off_t off)
 		spin_unlock(&c->lock);
 	}
 
+	poperror();
 	cclose(c, perrbuf);
 	printd("syswrite retturns %d\n", r);
 	return r;
@@ -737,6 +740,7 @@ int syscreate(char *name, int omode)
 	fd = newfd(c);
 	if (fd < 0)
 		error(Enofd);
+	poperror();
 	return fd;
 }
 
@@ -778,12 +782,7 @@ int sysopen(char *name, int omode)
 
 int sysclose(int fd)
 {
-	ERRSTACK(1);struct errbuf *perrbuf;
-
-	if (waserror()) {
-		nexterror();
-	}
-
+	struct errbuf *perrbuf = NULL;
 	fdtochan(fd, -1, 0, 0, perrbuf);
 	fdclose(fd, 0, perrbuf);
 	return 0;
@@ -814,8 +813,9 @@ int sysstat(char *name, uint8_t * statbuf, int len)
 	if (aname)
 		r = dirsetname(aname, strlen(aname), data, r, sizeof(data));
 #endif
-	cclose(c, perrbuf);
 	poperror();
+	cclose(c, perrbuf);
+
 	/* now convert for akaros. */
 	convM2kstat(data, sizeof(data), (struct kstat *)statbuf);
 
@@ -841,6 +841,7 @@ int sysfstat(int fd, uint8_t * statbuf, int len)
 	}
 	r = c->dev->stat(c, data, sizeof(data), perrbuf);
 
+	poperror();
 	cclose(c, perrbuf);
 	/* now convert for akaros. */
 	convM2kstat(data, sizeof(data), (struct kstat *)statbuf);
@@ -891,6 +892,7 @@ int sysdup(int ofd, int nfd)
 		nfd = newfd(oc);
 		if (nfd < 0)
 			error(Enofd);
+		poperror();
 	}
 
 	return nfd;
@@ -1066,6 +1068,7 @@ sysunmount(char *name, char *old)
 	cclose(cmount, perrbuf);
 	if(cmounted != NULL)
 		cclose(cmounted, perrbuf);
+	poperror();
 	return 0;
 }
 
