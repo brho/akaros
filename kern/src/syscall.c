@@ -1255,7 +1255,7 @@ static intreg_t sys_fstat(struct proc *p, int fd, struct kstat *u_stat)
 	}
 	if (file->plan9){
 		int r;
-	    r = sysfstat(fd, (uint8_t*)kbuf, sizeof(*kbuf));
+	    r = sysfstat(file->plan9fd, (uint8_t*)kbuf, sizeof(*kbuf));
 	    printd("sysfstat returns %d\n", r);
 	} else {
 		stat_inode(file->f_dentry->d_inode, kbuf);
@@ -1938,15 +1938,16 @@ intreg_t syscall(struct proc *p, uintreg_t sc_num, uintreg_t a0, uintreg_t a1,
 		panic("Invalid syscall number %d for proc %x!", sc_num, p);
 
 	if (waserror()){
+		printd("Plan 9 system call returned via waserror()\n");
 		/* if we got here, then the errbuf was right.
 		 * no need to check!
 		 */
 		return -1;
 	}
-printd("before syscall errstack %p\n", errstack);
-printd("before syscall errstack base %p\n", get_cur_errbuf());
+	//printd("before syscall errstack %p\n", errstack);
+	//printd("before syscall errstack base %p\n", get_cur_errbuf());
 	ret = syscall_table[sc_num].call(p, a0, a1, a2, a3, a4, a5);
-printd("after syscall errstack base %p\n", get_cur_errbuf());
+	//printd("after syscall errstack base %p\n", get_cur_errbuf());
 	if (get_cur_errbuf() != &errstack[1]){
 		printk("[%16llu] Syscall %3d (%12s):(%p, %p, %p, %p, "
 		       "%p, %p) proc: %d core: %d vcore: %d\n", read_tsc(),
