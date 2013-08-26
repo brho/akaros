@@ -1047,6 +1047,7 @@ again:
 			/* queue closed */
 			iunlock(&q->lock);
 			qunlock(&q->rlock);
+			poperror();
 			return 0;
 		case -1:
 			/* multiple reads on a closed queue */
@@ -1104,6 +1105,7 @@ again:
 	/* restart producer */
 	qwakeup_iunlock(q);
 
+	poperror();
 	qunlock(&q->rlock);
 	return n;
 }
@@ -1212,6 +1214,7 @@ long qbwrite(struct queue *q, struct block *b, struct errbuf *perrbuf)
 	}
 
 	qunlock(&q->wlock);
+	poperror();
 	return n;
 }
 
@@ -1237,6 +1240,7 @@ int qwrite(struct queue *q, void *vp, int len, struct errbuf *perrbuf)
 			nexterror();
 		}
 		memmove(b->wp, p + sofar, n);
+		poperror();
 		b->wp += n;
 
 		qbwrite(q, b, perrbuf);

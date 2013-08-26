@@ -50,6 +50,7 @@ pgrpnote(uint32_t noteid, char *a, long n, int flag, struct errbuf *perrbuf)
 			}
 			if (!waserror()) {
 				postnote(p, 0, buf, flag, perrbuf);
+				poperror();
 			}
 			qunlock(&p->debug, perrbuf);
 		}

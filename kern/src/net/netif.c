@@ -400,6 +400,7 @@ netifwrite(struct netif *nif, struct chan *c, void *a, long n,
 	} else
 		n = -1;
 	qunlock(&nif->qlock);
+	poperror();
 	return n;
 }
 
@@ -577,7 +578,7 @@ static int openfile(struct netif *nif, int id, struct errbuf *perrbuf)
 		netown(f, current->user, 0);
 		qunlock(&f->qlock);
 		qunlock(&nif->qlock);
-
+		poperror();
 		return fp - nif->f;
 	}
 	error(Enodev);

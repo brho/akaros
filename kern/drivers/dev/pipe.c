@@ -349,6 +349,7 @@ pipewrite(struct chan *c, void *va, long n, int64_t unused,
 			panic("pipewrite");
 	}
 
+	poperror();
 	return n;
 }
 
@@ -385,6 +386,7 @@ pipebwrite(struct chan *c, struct block *bp, int64_t unused,
 			panic("pipebwrite");
 	}
 
+	poperror();
 	return n;
 }
 

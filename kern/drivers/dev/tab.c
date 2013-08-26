@@ -107,6 +107,7 @@ devtabread(struct chan *c, void *buf, long n, int64_t off,
 	n = readstr(off, buf, n, alloc);
 
 	kfree(alloc);
+	poperror();
 
 	return n;
 }

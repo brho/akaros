@@ -261,6 +261,7 @@ Notfound:
 	 * the cloned channel and return just the struct qids of the walks.
 	 */
 Done:
+	poperror();
 	if (wq->nqid < nname) {
 		if (alloc)
 			cclose(wq->clone, perrbuf);
@@ -422,6 +423,7 @@ struct block *devbread(struct chan *c, long n, int64_t offset,
 		nexterror();
 	}
 	bp->wp += c->dev->read(c, bp->wp, n, offset, perrbuf);
+	poperror();
 	return bp;
 }
 
@@ -437,6 +439,7 @@ devbwrite(struct chan *c, struct block *bp, int64_t offset,
 		nexterror();
 	}
 	n = c->dev->write(c, bp->rp, BLEN(bp), offset, perrbuf);
+	poperror();
 	freeb(bp);
 
 	return n;
