@@ -406,7 +406,7 @@ static struct chan *procopen(struct chan *c, int omode, struct errbuf *perrbuf)
 		return devopen(c, omode, 0, 0, procgen, perrbuf);
 
 	if (QID(c->qid) == Qtrace) {
-		error("not yet");
+		error("proc: Qtrace: not yet");
 #if 0
 		if (omode != OREAD)
 			error(Eperm);
@@ -444,7 +444,7 @@ static struct chan *procopen(struct chan *c, int omode, struct errbuf *perrbuf)
 #endif
 	}
 	if (QID(c->qid) == Qtracepids) {
-		error("not yet");
+		error("Proc: Qtracepids: not yet");
 #if 0
 		if (omode != OREAD)
 			error(Eperm);
@@ -565,7 +565,7 @@ static long
 procwstat(struct chan *c, uint8_t * db, long n, struct errbuf *perrbuf)
 {
 	ERRSTACK(2);
-	error("not yet");
+	error("procwwstat: not yet");
 #if 0
 	struct proc *p;
 	struct dir *d;
@@ -1216,7 +1216,7 @@ static long
 procwrite(struct chan *c, void *va, long n, int64_t off, struct errbuf *perrbuf)
 {
 	ERRSTACK(2);
-	error("not yet");
+	error("procwrite: not yet");
 	return 0;
 #if 0
 	struct proc *p, *t;
