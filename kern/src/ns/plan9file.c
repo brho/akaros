@@ -948,7 +948,7 @@ bindmount(int ismount,
 	}bogus;
  
 	if (waserror()){
-		printk("bindmount: too bad. Too, too bad\n");
+		printk("bindmount: %s\n", current_errstr());
 		nexterror();
 	}
 

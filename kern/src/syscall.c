@@ -116,7 +116,7 @@ char *current_errstr(void)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	/* no one should call this that doesn't have a sysc */
-	assert(!pcpui->cur_sysc);
+	assert(pcpui->cur_sysc);
 	return pcpui->cur_sysc->errstr;
 }
 
@@ -1939,6 +1939,7 @@ intreg_t syscall(struct proc *p, uintreg_t sc_num, uintreg_t a0, uintreg_t a1,
 
 	if (waserror()){
 		printd("Plan 9 system call returned via waserror()\n");
+		printd("String: '%s'\n", current_errstr());
 		/* if we got here, then the errbuf was right.
 		 * no need to check!
 		 */
