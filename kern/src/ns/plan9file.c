@@ -577,6 +577,8 @@ long sysread(int fd, void *p, size_t n, off_t off)
 
 	c = fdtochan(fd, OREAD, 1, 1, perrbuf);
 
+	poperror();
+
 	if (waserror()) {
 		cclose(c, perrbuf);
 		nexterror();
@@ -675,6 +677,8 @@ long syswrite(int fd, void *p, size_t n, off_t off)
 	}
 
 	c = fdtochan(fd, OWRITE, 1, 1, perrbuf);
+
+	poperror();
 	printd("syswrite chan %p\n", c);
 	if (waserror()) {
 
@@ -835,6 +839,8 @@ int sysfstat(int fd, uint8_t * statbuf, int len)
 
 	c = fdtochan(fd, -1, 0, 1, perrbuf);
 
+	poperror();
+
 	if (waserror()) {
 		cclose(c, perrbuf);
 		nexterror();
@@ -867,6 +873,8 @@ int sysdup(int ofd, int nfd)
 	}
 
 	oc = fdtochan(ofd, -1, 0, 1, perrbuf);
+
+	poperror();
 
 	if (nfd != -1) {
 		f = current->fgrp;
