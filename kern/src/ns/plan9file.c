@@ -1000,22 +1000,26 @@ bindmount(int ismount,
 			cclose(ac);
 		cclose(bc);
 	}else{
+I_AM_HERE;
 		bogus.spec = NULL;
 		c0 = namec(arg0, Abind, 0, 0);
 	}
 
 	if(waserror()){
+I_AM_HERE;
 		cclose(c0);
 		nexterror();
 	}
 
 	c1 = namec(arg1, Amount, 0, 0);
 	if(waserror()){
+I_AM_HERE;
 		cclose(c1);
 		nexterror();
 	}
 
-	i = cmount(&c0, c1, flag, bogus.spec);
+//	i = cmount(&c0, c1, flag, bogus.spec);
+i=-1;
 
 	poperror();
 	cclose(c1);
@@ -1023,7 +1027,7 @@ bindmount(int ismount,
 	cclose(c0);
 	if(ismount)
 		fdclose(fd, 0);
-
+	poperror();
 	return i;
 }
 
