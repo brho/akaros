@@ -967,24 +967,24 @@ int mon_alarm(int argc, char **argv, struct hw_trapframe *hw_tf)
 static struct proc up[1];
 static int initted9 = 0;
 
-void
-init9proc()
+static void init9proc(struct proc *p)
 {
-	ERRSTACKBASE(2);
-	if (initted9)
-		return;
-	initted9++;
-	if (waserror()){
-	  panic("init9proc");
-	}
-	printd("init9proc done waserror\n");
-	up[0].fgrp = dupfgrp(NULL);
+        ERRSTACKBASE(1);
+        if (initted9)
+                return;
+        initted9++;
+        if (waserror()){
+          panic("init9proc");
+        }
+	p->fgrp = dupfgrp(NULL);
 	printd("init9proc done dupfg\n");
-	up[0].pgrp = newpgrp();
+	p->pgrp = newpgrp();
 	printd("init9proc done duppg\n");
-	if (!up[0].pgrp)
+	if (!p->pgrp)
 	    error("pgrp");
-	printd("done init9proc\n");
+
+	poperror();
+
 }
 
 int mon_9read(int argc, char **argv, struct hw_trapframe *hw_tf)
@@ -1001,7 +1001,7 @@ int mon_9read(int argc, char **argv, struct hw_trapframe *hw_tf)
 	off_t off = strtol(argv[3], 0, 0);
 	if (len > sizeof(buf)) len = sizeof(buf);
 	printd("Read %d %d %lld\n", fd, len, off);
-	init9proc();
+	init9proc(&up[0]);
 	printd("call sysread\n");
 	ret = sysread(fd, buf, len, off);
 	printd("ret is %d\n", ret);
@@ -1022,7 +1022,7 @@ int mon_9write(int argc, char **argv, struct hw_trapframe *hw_tf)
 	int len = strtol(argv[3], 0, 0);
 	off_t off = strtol(argv[4], 0, 0);
 	printd("Write %d %d %lld\n", fd, len, off);
-	init9proc();
+	init9proc(&up[0]);
 	printd("call syswrite\n");
 	ret = syswrite(fd, buf, len, off);
 	printd("ret is %d\n", ret);
@@ -1041,7 +1041,7 @@ int mon_9open(int argc, char **argv, struct hw_trapframe *hw_tf)
 	char *name = argv[1];
 	int mode = strtol(argv[2], 0, 0);
 	printd("Open %s %o\n", name, mode);
-	init9proc();
+	init9proc(&up[0]);
 	printd("call sysopen\n");
 	printd("call sysopen\n");
 	fd = sysopen(name, mode);
@@ -1066,7 +1066,7 @@ int mon_9bind(int argc, char **argv, struct hw_trapframe *hw_tf)
 	char *old = argv[2];
 	int flag = strtol(argv[3], 0, 0);
 	printd("Bind %s %s %o\n", new, old, flag);
-	init9proc();
+	init9proc(&up[0]);
 	printd("call bindmount\n");
 	ret = bindmount(0, -1, -1, new, old, flag, NULL);
 	printd("ret is %d\n", ret);

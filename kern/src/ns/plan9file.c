@@ -906,7 +906,7 @@ int sysdup(int ofd, int nfd)
 
 int plan9setup(struct proc *up)
 {
-	ERRSTACK(2);struct errbuf *perrbuf;
+	ERRSTACK(1);
 	if (waserror()) {
 		printd("plan9setup failed\n");
 		return -1;
@@ -916,7 +916,6 @@ int plan9setup(struct proc *up)
 	up->pgrp = newpgrp();
 	return 0;
 }
-
 /* bindmount -- common to bind and mount, since they're almost the same.
  * fd
  * afd -- auth fd, used to authenticate to a server if needed
@@ -1076,5 +1075,26 @@ sysunmount(char *name, char *old)
 		cclose(cmounted);
 	poperror();
 	return 0;
+}
+
+/* init a raw plan 9 name space. Used by monitor.c and
+ * (for now) namec
+ */
+void
+init9ns(struct proc *p)
+{
+	ERRSTACKBASE(2);
+	if (waserror()){
+		panic("init9");
+	}
+        /*
+         * These are o.k. because rootinit is null.
+         * Then early kproc's will have a root and dot.
+         */
+        p->slash = namec("#r", Atodir, 0, 0);
+        pathclose(p->slash->path);
+        p->slash->path = newpath("/");
+        p->dot = cclone(p->slash);
+	printd("done init9ns\n");
 }
 

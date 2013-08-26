@@ -1,4 +1,3 @@
-//#define DEBUG
 #include <vfs.h>
 #include <kfs.h>
 #include <slab.h>
@@ -12,89 +11,229 @@
 #include <pmap.h>
 #include <smp.h>
 
-/* trivial root file system for testing. bind #r /
- * then do stuff like
- * bind '#p' /proc
- */
-enum {
+
+enum
+{
 	Qdir = 0,
-	Qnet = 1,
-	Qproc,
-	Qbin,
-	Qmax,
+	Qboot = 0x1000,
+
+	Nrootfiles = 32,
+	Nbootfiles = 32,
 };
 
-static struct dirtab rootdir[Qmax] = {
-	{".", {Qdir, 0, QTDIR}, 0, 0555,},
-	{"net", {Qnet, 0, QTDIR}, 0, 0555,},
-	{"proc", {Qproc, 0, QTDIR}, 0, 0555,},
-	{"bin", {Qbin, 0, QTDIR}, 0, 0555,},
+struct dirlist
+{
+	unsigned int base;
+	struct dirtab *dir;
+	uint8_t **data;
+	int ndir;
+	int mdir;
 };
 
-static struct chan *rootattach(char *spec)
+static struct dirtab rootdir[Nrootfiles] = {
+	{"#/",	{Qdir, 0, QTDIR},	0,		DMDIR|0555},
+	{"boot",	{Qboot, 0, QTDIR},	0,		DMDIR|0555},
+};
+static uint8_t *rootdata[Nrootfiles];
+static struct dirlist rootlist =
+{
+	0,
+	rootdir,
+	rootdata,
+	2,
+	Nrootfiles
+};
+
+static struct dirtab bootdir[Nbootfiles] = {
+	{"boot",	{Qboot, 0, QTDIR},	0,		DMDIR|0555},
+};
+static uint8_t *bootdata[Nbootfiles];
+static struct dirlist bootlist =
+{
+	Qboot,
+	bootdir,
+	bootdata,
+	1,
+	Nbootfiles
+};
+
+/*
+ *  add a file to the list
+ */
+static void
+addlist(struct dirlist *l, char *name, uint8_t *contents, uint32_t len, int perm)
+{
+	struct dirtab *d;
+
+	if(l->ndir >= l->mdir)
+		panic("too many root files");
+	l->data[l->ndir] = contents;
+	d = &l->dir[l->ndir];
+	strncpy(d->name,  name, sizeof(d->name));
+	d->length = len;
+	d->perm = perm;
+	d->qid.type = 0;
+	d->qid.vers = 0;
+	d->qid.path = ++l->ndir + l->base;
+	if(perm & DMDIR)
+		d->qid.type |= QTDIR;
+}
+
+/*
+ *  add a root file
+ */
+void
+addbootfile(char *name, uint8_t *contents, uint32_t len)
+{
+	addlist(&bootlist, name, contents, len, 0555);
+}
+
+/*
+ *  add a root directory
+ */
+static void
+addrootdir(char *name)
+{
+	addlist(&rootlist, name, NULL, 0, DMDIR|0555);
+}
+
+static void
+rootreset(void)
+{
+	addrootdir("bin");
+	addrootdir("dev");
+	addrootdir("env");
+	addrootdir("fd");
+	addrootdir("mnt");
+	addrootdir("net");
+	addrootdir("net.alt");
+	addrootdir("proc");
+	addrootdir("root");
+	addrootdir("srv");
+}
+
+static struct chan*
+rootattach(char *spec)
 {
 	return devattach('r', spec);
 }
 
-struct walkqid *rootwalk(struct chan *c, struct chan *nc, char **name,
-							int nname)
+static int
+rootgen(struct chan *c, char *name, struct dirtab*unused_d, int unused_i, int s, struct dir *dp)
 {
-	return devwalk(c, nc, name, nname, rootdir, Qmax, devgen);
+	int t;
+	struct dirtab *d;
+	struct dirlist *l;
+
+	switch((int)c->qid.path){
+	case Qdir:
+		if(s == DEVDOTDOT){
+			devdir(c, (struct qid){Qdir, 0, QTDIR}, "#/", 0, eve, 0555, dp);
+			return 1;
+		}
+		return devgen(c, name, rootlist.dir, rootlist.ndir, s, dp);
+	case Qboot:
+		if(s == DEVDOTDOT){
+			devdir(c, (struct qid){Qdir, 0, QTDIR}, "#/", 0, eve, 0555, dp);
+			return 1;
+		}
+		return devgen(c, name, bootlist.dir, bootlist.ndir, s, dp);
+	default:
+		if(s == DEVDOTDOT){
+			if((int)c->qid.path < Qboot)
+				devdir(c, (struct qid){Qdir, 0, QTDIR}, "#/", 0, eve, 0555, dp);
+			else
+				devdir(c, (struct qid){Qboot, 0, QTDIR}, "#/", 0, eve, 0555, dp);
+			return 1;
+		}
+		if(s != 0)
+			return -1;
+		if((int)c->qid.path < Qboot){
+			t = c->qid.path-1;
+			l = &rootlist;
+		}else{
+			t = c->qid.path - Qboot - 1;
+			l = &bootlist;
+		}
+		if(t >= l->ndir)
+			return -1;
+if(t < 0){
+printd("rootgen %#llux %d %d\n", c->qid.path, s, t);
+panic("whoops");
+}
+		d = &l->dir[t];
+		devdir(c, d->qid, d->name, d->length, eve, d->perm, dp);
+		return 1;
+	}
+}
+
+static struct walkqid*
+rootwalk(struct chan *c, struct chan *nc, char **name, int nname)
+{
+	return devwalk(c,  nc, name, nname, NULL, 0, rootgen);
 }
 
 static long
-rootstat(struct chan *c, uint8_t * dp, long n)
+rootstat(struct chan *c, uint8_t *dp, long n)
 {
-	return devstat(c, dp, n, rootdir, Qmax, devgen);
+	return devstat(c, dp, n, NULL, 0, rootgen);
 }
 
-static struct chan *rootopen(struct chan *c, int omode,
-			     struct errbuf *perrbuf)
+static struct chan*
+rootopen(struct chan *c, int omode)
 {
-	return devopen(c, omode, rootdir, Qmax, devgen);
+	return devopen(c, omode, NULL, 0, devgen);
 }
 
-static void rootclose(struct chan *c)
+/*
+ * sysremove() knows this is a nop
+ */
+static void
+rootclose(struct chan*c)
 {
 }
 
 static long
-rootread(struct chan *c, void *a, long n, int64_t offset,
-			struct errbuf *perrbuf)
+rootread(struct chan *c, void *buf, long n, int64_t off)
 {
-	char *buf, *p;
-	static char ctl[128];
-	printd("rootread %d\n", (uint32_t) c->qid.path);
+	uint32_t t;
+	struct dirtab *d;
+	struct dirlist *l;
+	uint8_t *data;
+	uint32_t offset = off;
 
-	switch ((uint32_t) c->qid.path) {
-
-		case Qdir:
-		case Qnet:
-		case Qproc:
-		case Qbin:
-			return devdirread(c, a, n, rootdir, Qmax, devgen);
-			/* you may have files some day! */
-		default:
-			error(Eperm);
-			break;
+	t = c->qid.path;
+	switch(t){
+	case Qdir:
+	case Qboot:
+		return devdirread(c, buf, n, NULL, 0, rootgen);
 	}
 
+	if(t<Qboot)
+		l = &rootlist;
+	else{
+		t -= Qboot;
+		l = &bootlist;
+	}
+
+	t--;
+	if(t >= l->ndir)
+		error(Egreg);
+
+	d = &l->dir[t];
+	data = l->data[t];
+	if(offset >= d->length)
+		return 0;
+	if(offset+n > d->length)
+		n = d->length - offset;
+	memmove(buf, data+offset, n);
 	return n;
 }
 
 static long
-rootwrite(struct chan *c, void *a, long n, int64_t offset,
-			 struct errbuf *perrbuf)
+rootwrite(struct chan*c, void*v, long l, int64_t o)
 {
-	char *p;
-	unsigned long amt;
-
-	switch ((uint32_t) c->qid.path) {
-		default:
-			printd("devroot eperm\n");
-			error(Eperm);
-			break;
-	}
+	error(Egreg);
 	return 0;
 }
 
@@ -102,7 +241,7 @@ struct dev rootdevtab = {
 	'r',
 	"root",
 
-	devreset,
+	rootreset,
 	devinit,
 	devshutdown,
 	rootattach,
@@ -118,3 +257,4 @@ struct dev rootdevtab = {
 	devremove,
 	devwstat,
 };
+

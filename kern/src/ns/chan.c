@@ -1185,6 +1185,7 @@ struct chan *namec(char *aname, int amode, int omode, int perm)
 	char *name;
 	struct dev *dev;
 	printd("namec name %s\n", aname);
+I_AM_HERE;
 	if (aname[0] == '\0')
 		error("empty file name");
 	aname = validnamedup(aname, 1);
@@ -1204,6 +1205,7 @@ struct chan *namec(char *aname, int amode, int omode, int perm)
 	nomount = 0;
 	switch (name[0]) {
 		case '/':
+I_AM_HERE;
 			c = current->slash;
 			/* TODO: we still have scenarios where there is no current / */
 			if (!c)
@@ -1212,6 +1214,7 @@ struct chan *namec(char *aname, int amode, int omode, int perm)
 			break;
 
 		case '#':
+I_AM_HERE;
 			nomount = 1;
 			current->genbuf[0] = '\0';
 			n = 0;
@@ -1221,6 +1224,7 @@ struct chan *namec(char *aname, int amode, int omode, int perm)
 				current->genbuf[n++] = *name++;
 			}
 			current->genbuf[n] = '\0';
+I_AM_HERE;
 			/*
 			 *  noattach is sandboxing.
 			 *
@@ -1242,7 +1246,9 @@ struct chan *namec(char *aname, int amode, int omode, int perm)
 					current->genbuf[1] != 'c' && current->genbuf[1] != 'p')
 					error(Enoattach);
 			}
+I_AM_HERE;
 			dev = devtabget(current->genbuf[1], 1);	//XDYNX
+I_AM_HERE;
 			if (dev == NULL)
 				error(Ebadsharp);
 			//if(waserror()){
@@ -1295,6 +1301,7 @@ struct chan *namec(char *aname, int amode, int omode, int perm)
 	 * Build a list of elements in the name.
 	 */
 	parsename(name, &e);
+I_AM_HERE;
 
 	/*
 	 * On create, ....
@@ -1311,6 +1318,7 @@ struct chan *namec(char *aname, int amode, int omode, int perm)
 			error(Eexist);
 		e.nelems--;
 	}
+I_AM_HERE;
 	if (walk(&c, e.elems, e.nelems, nomount, &e.nerror) < 0) {
 		if (e.nerror < 0 || e.nerror > e.nelems) {
 			printd("namec %s walk error nerror=%d\n", aname, e.nerror);
@@ -1319,6 +1327,7 @@ struct chan *namec(char *aname, int amode, int omode, int perm)
 		nexterror();
 	}
 
+I_AM_HERE;
 	if (e.mustbedir && !(c->qid.type & QTDIR))
 		error("not a directory");
 
@@ -1396,6 +1405,7 @@ Open:
 			break;
 
 		case Atodir:
+I_AM_HERE;
 			/*
 			 * Directories (e.g. for cd) are left before the mount point,
 			 * so one may mount on / or . and see the effect.

@@ -425,6 +425,10 @@ static ssize_t sys_fork(env_t* e)
 {
 	struct proc *temp;
 	int8_t state = 0;
+	if (! current->slash && current) {
+		/* hideous. Not sure where else to do it. */
+		init9ns(current);
+	}
 	// TODO: right now we only support fork for single-core processes
 	if (e->state != PROC_RUNNING_S) {
 		set_errno(EINVAL);
@@ -1738,11 +1742,16 @@ intreg_t sys_nbind(struct proc *p,
 {
 	int ret;
 	char *t_oldpath = user_strdup_errno(p, old_path, old_l);
-	if (t_oldpath == NULL)
+	if (t_oldpath == NULL){
+		printd("oldpath dup failed ptr %p size %d\n", 
+			old_path, old_l);
 		return -1;
+	}
 	char *t_newpath = user_strdup_errno(p, new_path, new_l);
 	if (t_newpath == NULL) {
 		user_memdup_free(p, t_oldpath);
+		printd("newpath dup failed ptr %p size %d\n", 
+			new_path, new_l);
 		return -1;
 	}
 	printd("sys_nbind: %s -> %s flag %d\n", t_newpath, t_oldpath, flag);
@@ -1881,7 +1890,7 @@ const static struct sys_table_entry syscall_table[] = {
 	[SYS_setuid] = {(syscall_t)sys_setuid, "setuid"},
 	[SYS_setgid] = {(syscall_t)sys_setgid, "setgid"},
 	/* special! */
-	[SYS_nbind] ={(syscall_t)sys_bind, "nbind"},
+	[SYS_nbind] ={(syscall_t)sys_nbind, "nbind"},
 	[SYS_nmount] ={(syscall_t)sys_nmount, "nmount"},
 	[SYS_nunmount] ={(syscall_t)sys_nunmount, "nunmount"},
 
