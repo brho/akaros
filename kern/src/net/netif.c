@@ -13,7 +13,7 @@
 #include <netif.h>
 
 static int netown(struct netfile *p, char *o, int omode);
-static int openfile(struct netif *nif, int id, struct errbuf *perrbuf);
+static int openfile(struct netif *nif, int id);
 static char *matchtoken(char *p, char *token);
 static char *netmulti(struct netif *nif, struct netfile *f, uint8_t * addr,
 					  int add);
@@ -39,7 +39,7 @@ void netifinit(struct netif *nif, char *name, int nfile, uint32_t limit)
  */
 static int
 netifgen(struct chan *c, char *unused, struct dirtab *vp, int iunused, int i,
-		 struct dir *dp, struct errbuf *perrbuf)
+		 struct dir *dp)
 {
 	struct qid q;
 	struct netif *nif = (struct netif *)vp;
@@ -161,14 +161,12 @@ netifgen(struct chan *c, char *unused, struct dirtab *vp, int iunused, int i,
 }
 
 struct walkqid *netifwalk(struct netif *nif, struct chan *c, struct chan *nc,
-						  char **name, int nname, struct errbuf *perrbuf)
+						  char **name, int nname)
 {
-	return devwalk(c, nc, name, nname, (struct dirtab *)nif, 0, netifgen,
-				   perrbuf);
+	return devwalk(c, nc, name, nname, (struct dirtab *)nif, 0, netifgen);
 }
 
-struct chan *netifopen(struct netif *nif, struct chan *c, int omode,
-					   struct errbuf *perrbuf)
+struct chan *netifopen(struct netif *nif, struct chan *c, int omode)
 {
 	int id;
 	struct netfile *f;
@@ -182,10 +180,10 @@ struct chan *netifopen(struct netif *nif, struct chan *c, int omode,
 			case Ndataqid:
 			case Nctlqid:
 				id = NETID(c->qid.path);
-				openfile(nif, id, perrbuf);
+				openfile(nif, id);
 				break;
 			case Ncloneqid:
-				id = openfile(nif, -1, perrbuf);
+				id = openfile(nif, -1);
 				c->qid.path = NETQID(id, Nctlqid);
 				break;
 			default:
@@ -197,13 +195,13 @@ struct chan *netifopen(struct netif *nif, struct chan *c, int omode,
 			case Nctlqid:
 				f = nif->f[id];
 				if (netown(f, current->user, omode & 7) < 0) {
-					netifclose(nif, c, perrbuf);
+					netifclose(nif, c);
 					error(Eperm);
 				}
 				break;
 		}
 	}
-	c->mode = openmode(omode, perrbuf);
+	c->mode = openmode(omode);
 	c->flag |= COPEN;
 	c->offset = 0;
 	c->iounit = qiomaxatomic;
@@ -211,8 +209,7 @@ struct chan *netifopen(struct netif *nif, struct chan *c, int omode,
 }
 
 long
-netifread(struct netif *nif, struct chan *c, void *a, long n, int64_t off,
-		  struct errbuf *perrbuf)
+netifread(struct netif *nif, struct chan *c, void *a, long n, int64_t off)
 {
 	int i, j;
 	struct netfile *f;
@@ -220,13 +217,13 @@ netifread(struct netif *nif, struct chan *c, void *a, long n, int64_t off,
 	long offset;
 
 	if (c->qid.type & QTDIR)
-		return devdirread(c, a, n, (struct dirtab *)nif, 0, netifgen, perrbuf);
+		return devdirread(c, a, n, (struct dirtab *)nif, 0, netifgen);
 
 	offset = off;
 	switch (NETTYPE(c->qid.path)) {
 		case Ndataqid:
 			f = nif->f[NETID(c->qid.path)];
-			return qread(f->iq, a, n, perrbuf);
+			return qread(f->iq, a, n);
 		case Nctlqid:
 			return readnum(offset, a, n, NETID(c->qid.path), NUMSIZE);
 		case Nstatqid:
@@ -280,12 +277,12 @@ netifread(struct netif *nif, struct chan *c, void *a, long n, int64_t off,
 }
 
 struct block *netifbread(struct netif *nif, struct chan *c, long n,
-						 int64_t offset, struct errbuf *perrbuf)
+						 int64_t offset)
 {
 	if ((c->qid.type & QTDIR) || NETTYPE(c->qid.path) != Ndataqid)
-		return devbread(c, n, offset, perrbuf);
+		return devbread(c, n, offset);
 
-	return qbread(nif->f[NETID(c->qid.path)]->iq, n, perrbuf);
+	return qbread(nif->f[NETID(c->qid.path)]->iq, n);
 }
 
 /*
@@ -313,8 +310,7 @@ static int typeinuse(struct netif *nif, int type)
  *  the devxxx.c that calls us handles writing data, it knows best
  */
 long
-netifwrite(struct netif *nif, struct chan *c, void *a, long n,
-		   struct errbuf *perrbuf)
+netifwrite(struct netif *nif, struct chan *c, void *a, long n)
 {
 	ERRSTACK(2);
 	struct netfile *f;
@@ -405,8 +401,7 @@ netifwrite(struct netif *nif, struct chan *c, void *a, long n,
 }
 
 long
-netifwstat(struct netif *nif, struct chan *c, uint8_t * db, long n,
-		   struct errbuf *perrbuf)
+netifwstat(struct netif *nif, struct chan *c, uint8_t * db, long n)
 {
 	struct dir *dir;
 	struct netfile *f;
@@ -425,7 +420,7 @@ netifwstat(struct netif *nif, struct chan *c, uint8_t * db, long n,
 		kfree(dir);
 		error(Eshortstat);
 	}
-	if (!emptystr(dir[0].uid, perrbuf))
+	if (!emptystr(dir[0].uid))
 		strncpy(f->owner, dir[0].uid, KNAMELEN);
 	if (dir[0].mode != ~0UL)
 		f->mode = dir[0].mode;
@@ -434,13 +429,12 @@ netifwstat(struct netif *nif, struct chan *c, uint8_t * db, long n,
 }
 
 long
-netifstat(struct netif *nif, struct chan *c, uint8_t * db, long n,
-		  struct errbuf *perrbuf)
+netifstat(struct netif *nif, struct chan *c, uint8_t * db, long n)
 {
-	return devstat(c, db, n, (struct dirtab *)nif, 0, netifgen, perrbuf);
+	return devstat(c, db, n, (struct dirtab *)nif, 0, netifgen);
 }
 
-void netifclose(struct netif *nif, struct chan *c, struct errbuf *perrbuf)
+void netifclose(struct netif *nif, struct chan *c)
 {
 	struct netfile *f;
 	int t;
@@ -531,7 +525,7 @@ static int netown(struct netfile *p, char *o, int omode)
  *  Increment the reference count of a network device.
  *  If id < 0, return an unused ether device.
  */
-static int openfile(struct netif *nif, int id, struct errbuf *perrbuf)
+static int openfile(struct netif *nif, int id)
 {
 	ERRSTACK(2);
 	struct netfile *f, **fp, **efp;

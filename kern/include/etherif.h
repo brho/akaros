@@ -17,12 +17,11 @@ struct ether {
 	int tbdf;					/* type+busno+devno+funcno */
 	uint8_t ea[Eaddrlen];
 
-	void (*attach) (struct ether *, struct errbuf *);	/* filled in by reset routine */
-	void (*detach) (struct ether *, struct errbuf *);
+	void (*attach) (struct ether *);	/* filled in by reset routine */
+	void (*detach) (struct ether *);
 	void (*transmit) (struct ether *);
 	void (*interrupt) ( /*Ureg */ void *, void *);
-	long (*ifstat) (struct ether *, void *, long, unsigned long,
-					struct errbuf *);
+	long (*ifstat) (struct ether *, void *, long, unsigned long);
 	long (*ctl) (struct ether *, void *, long);	/* custom ctl messages */
 	void (*power) (struct ether *, int);	/* power on/off */
 	void (*shutdown) (struct ether *);	/* shutdown hardware before reboot */

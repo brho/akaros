@@ -53,7 +53,7 @@ long readstr(long offset, char *buf, long n, char *str)
 	return n;
 }
 
-void fdclose(int fd, int flag, struct errbuf *perrbuf)
+void fdclose(int fd, int flag)
 {
 	int i;
 	struct chan *c;
@@ -79,10 +79,10 @@ void fdclose(int fd, int flag, struct errbuf *perrbuf)
 			f->maxfd = i;
 
 	spin_unlock(&f->lock);
-	cclose(c, perrbuf);
+	cclose(c);
 }
 
-int openmode(int omode, struct errbuf *perrbuf)
+int openmode(int omode)
 {
 	omode &= ~(OTRUNC | OCEXEC | ORCLOSE);
 	if (omode > OEXEC)
@@ -195,8 +195,7 @@ static int newfd2(int fd[2], struct chan *c[2])
 	return 0;
 }
 
-struct chan *fdtochan(int fd, int mode, int chkmnt, int iref,
-					  struct errbuf *perrbuf)
+struct chan *fdtochan(int fd, int mode, int chkmnt, int iref)
 {
 	struct chan *c;
 	struct fgrp *f;
@@ -215,7 +214,7 @@ struct chan *fdtochan(int fd, int mode, int chkmnt, int iref,
 
 	if (chkmnt && (c->flag & CMSG)) {
 		if (iref)
-			cclose(c, perrbuf);
+			cclose(c);
 		error(Ebadusefd);
 	}
 
@@ -224,20 +223,20 @@ struct chan *fdtochan(int fd, int mode, int chkmnt, int iref,
 
 	if ((mode & OTRUNC) && c->mode == OREAD) {
 		if (iref)
-			cclose(c, perrbuf);
+			cclose(c);
 		error(Ebadusefd);
 	}
 
 	if ((mode & ~OTRUNC) != c->mode) {
 		if (iref)
-			cclose(c, perrbuf);
+			cclose(c);
 		error(Ebadusefd);
 	}
 
 	return c;
 }
 
-static long unionread(struct chan *c, void *va, long n, struct errbuf *perrbuf)
+static long unionread(struct chan *c, void *va, long n)
 {
 	ERRSTACK(2);
 	int i;
@@ -258,11 +257,11 @@ static long unionread(struct chan *c, void *va, long n, struct errbuf *perrbuf)
 		/* Error causes component of union to be skipped */
 		if (mount->to && !waserror()) {
 			if (c->umc == NULL) {
-				c->umc = cclone(mount->to, perrbuf);
-				c->umc = c->umc->dev->open(c->umc, OREAD, perrbuf);
+				c->umc = cclone(mount->to);
+				c->umc = c->umc->dev->open(c->umc, OREAD);
 			}
 
-			nr = c->umc->dev->read(c->umc, va, n, c->umc->offset, perrbuf);
+			nr = c->umc->dev->read(c->umc, va, n, c->umc->offset);
 			c->umc->offset += nr;
 		}
 		if (nr > 0)
@@ -271,7 +270,7 @@ static long unionread(struct chan *c, void *va, long n, struct errbuf *perrbuf)
 		/* Advance to next element */
 		c->uri++;
 		if (c->umc) {
-			cclose(c->umc, perrbuf);
+			cclose(c->umc);
 			c->umc = NULL;
 		}
 		mount = mount->next;
@@ -282,12 +281,12 @@ static long unionread(struct chan *c, void *va, long n, struct errbuf *perrbuf)
 	return nr;
 }
 
-static void unionrewind(struct chan *c, struct errbuf *perrbuf)
+static void unionrewind(struct chan *c)
 {
 	spin_lock(&c->umqlock);
 	c->uri = 0;
 	if (c->umc) {
-		cclose(c->umc, perrbuf);
+		cclose(c->umc);
 		c->umc = NULL;
 	}
 	spin_unlock(&c->umqlock);
@@ -308,7 +307,7 @@ static char *pathlast(struct path *p)
 }
 
 static unsigned long
-dirfixed(uint8_t * p, unsigned char *e, struct dir *d, struct errbuf *perrbuf)
+dirfixed(uint8_t * p, unsigned char *e, struct dir *d)
 {
 	int len;
 	struct dev *dev;
@@ -318,7 +317,7 @@ dirfixed(uint8_t * p, unsigned char *e, struct dir *d, struct errbuf *perrbuf)
 		return 0;
 
 	p += BIT16SZ;	/* ignore size */
-	dev = devtabget(GBIT16(p), 1, perrbuf);	//XDYNX
+	dev = devtabget(GBIT16(p), 1);	//XDYNX
 	if (dev != NULL) {
 		d->type = dev->dc;
 		//devtabdecr(dev);
@@ -469,8 +468,7 @@ static void mountrewind(struct chan *c)
  * of statting what is mounted there.  Except leave the old names.
  */
 static long
-mountfix(struct chan *c, uint8_t * op, long n, long maxn,
-		 struct errbuf *perrbuf)
+mountfix(struct chan *c, uint8_t * op, long n, long maxn)
 {
 	ERRSTACK(2);
 	char *name;
@@ -487,18 +485,18 @@ mountfix(struct chan *c, uint8_t * op, long n, long maxn,
 	buf = NULL;
 	nbuf = 0;
 	for (e = &p[n]; p + BIT16SZ < e; p += dirlen) {
-		dirlen = dirfixed(p, e, &d, perrbuf);
+		dirlen = dirfixed(p, e, &d);
 		if (dirlen == 0)
 			break;
 		nc = NULL;
 		mh = NULL;
-		if (findmount(&nc, &mh, d.type, d.dev, d.qid, perrbuf)) {
+		if (findmount(&nc, &mh, d.type, d.dev, d.qid)) {
 			/*
 			 * If it's a union directory and the original is
 			 * in the union, don't rewrite anything.
 			 */
 			for (mount = mh->mount; mount; mount = mount->next)
-				if (eqchanddq(mount->to, d.type, d.dev, d.qid, 1, perrbuf))
+				if (eqchanddq(mount->to, d.type, d.dev, d.qid, 1))
 					goto Norewrite;
 
 			name = dirname(p, &nname);
@@ -515,7 +513,7 @@ mountfix(struct chan *c, uint8_t * op, long n, long maxn,
 			}
 			if (waserror())
 				goto Norewrite;
-			l = nc->dev->stat(nc, buf, nbuf, perrbuf);
+			l = nc->dev->stat(nc, buf, nbuf);
 			r = dirsetname(name, nname, buf, l, nbuf);
 			if (r == BIT16SZ)
 				error("dirsetname");
@@ -548,8 +546,8 @@ mountfix(struct chan *c, uint8_t * op, long n, long maxn,
 			memmove(p, buf, r);
 
 Norewrite:
-			cclose(nc, perrbuf);
-			putmhead(mh, perrbuf);
+			cclose(nc);
+			putmhead(mh);
 		}
 	}
 	if (buf)
@@ -575,12 +573,12 @@ long sysread(int fd, void *p, size_t n, off_t off)
 		nexterror();
 	}
 
-	c = fdtochan(fd, OREAD, 1, 1, perrbuf);
+	c = fdtochan(fd, OREAD, 1, 1);
 
 	poperror();
 
 	if (waserror()) {
-		cclose(c, perrbuf);
+		cclose(c);
 		nexterror();
 	}
 
@@ -617,7 +615,7 @@ long sysread(int fd, void *p, size_t n, off_t off)
 				c->devoffset = 0;
 			}
 			mountrewind(c);
-			unionrewind(c, perrbuf);
+			unionrewind(c);
 		}
 		printd("sysread: dir: ispread %d @ %lld\n", ispread, off);
 		/* tell it we have less than we have to make sure it will
@@ -626,15 +624,15 @@ long sysread(int fd, void *p, size_t n, off_t off)
 		if (!mountrockread(c, ents, 2048, &nn)) {
 			printd("Rock read failed, going to the source\n");
 			if (c->umh)
-				nn = unionread(c, ents, 2048, perrbuf);
+				nn = unionread(c, ents, 2048);
 			else {
 				if (off != c->offset)
 					error(Edirseek);
-				nn = c->dev->read(c, ents, 2048, c->devoffset, perrbuf);
+				nn = c->dev->read(c, ents, 2048, c->devoffset);
 			}
 		} else
 			printd("rock read ok\n");
-		nnn = mountfix(c, ents, nn, n, perrbuf);
+		nnn = mountfix(c, ents, nn, n);
 		/* now convert to akaros kdents. This whole thing needs fixin' */
 		int total, amt = 0, iter = 0;
 		for (total = 0; total < nnn; total += amt) {
@@ -646,7 +644,7 @@ long sysread(int fd, void *p, size_t n, off_t off)
 		ispread = 0;
 		nnn = ep - (uint8_t *) p;
 	} else
-		nnn = nn = c->dev->read(c, p, n, off, perrbuf);
+		nnn = nn = c->dev->read(c, p, n, off);
 
 	if (!ispread) {
 		spin_lock(&c->lock);
@@ -656,7 +654,7 @@ long sysread(int fd, void *p, size_t n, off_t off)
 	}
 
 	poperror();
-	cclose(c, perrbuf);
+	cclose(c);
 
 	return nnn;
 }
@@ -676,7 +674,7 @@ long syswrite(int fd, void *p, size_t n, off_t off)
 		nexterror();
 	}
 
-	c = fdtochan(fd, OWRITE, 1, 1, perrbuf);
+	c = fdtochan(fd, OWRITE, 1, 1);
 
 	poperror();
 	printd("syswrite chan %p\n", c);
@@ -687,7 +685,7 @@ long syswrite(int fd, void *p, size_t n, off_t off)
 			c->offset -= n;
 			spin_unlock(&c->lock);
 		}
-		cclose(c, perrbuf);
+		cclose(c);
 		nexterror();
 	}
 
@@ -704,7 +702,7 @@ long syswrite(int fd, void *p, size_t n, off_t off)
 	}
 
 	printd("call dev write\n");
-	r = c->dev->write(c, p, n, off, perrbuf);
+	r = c->dev->write(c, p, n, off);
 
 	if (!ispwrite && r < n) {
 		spin_lock(&c->lock);
@@ -713,7 +711,7 @@ long syswrite(int fd, void *p, size_t n, off_t off)
 	}
 
 	poperror();
-	cclose(c, perrbuf);
+	cclose(c);
 	printd("syswrite retturns %d\n", r);
 	return r;
 
@@ -733,14 +731,14 @@ int syscreate(char *name, int omode)
 
 	if (waserror()) {
 		if (c)
-			cclose(c, perrbuf);
+			cclose(c);
 		printd("syscreate fail 1 mode  %x\n", omode);
 		nexterror();
 	}
 
-	openmode(omode, perrbuf);	/* error check only */
+	openmode(omode);	/* error check only */
 
-	c = namec(name, Acreate, omode, 0, perrbuf);
+	c = namec(name, Acreate, omode, 0);
 	fd = newfd(c);
 	if (fd < 0)
 		error(Enofd);
@@ -771,11 +769,11 @@ int sysopen(char *name, int omode)
 	if (waserror()) {
 		printd("error\n");
 		if (c)
-			cclose(c, perrbuf);
+			cclose(c);
 		return -1;
 	}
-	openmode(omode, perrbuf);	/* error check only */
-	c = namec(name, Aopen, omode, 0, perrbuf);
+	openmode(omode);	/* error check only */
+	c = namec(name, Aopen, omode, 0);
 	fd = newfd(c);
 	if (fd < 0)
 		error(Enofd);
@@ -787,8 +785,8 @@ int sysopen(char *name, int omode)
 int sysclose(int fd)
 {
 	struct errbuf *perrbuf = NULL;
-	fdtochan(fd, -1, 0, 0, perrbuf);
-	fdclose(fd, 0, perrbuf);
+	fdtochan(fd, -1, 0, 0);
+	fdclose(fd, 0);
 	return 0;
 }
 
@@ -803,13 +801,13 @@ int sysstat(char *name, uint8_t * statbuf, int len)
 
 	if (waserror()) {
 		if (c)
-			cclose(c, perrbuf);
+			cclose(c);
 		nexterror();
 	}
 
-	c = namec(name, Aaccess, 0, 0, perrbuf);
+	c = namec(name, Aaccess, 0, 0);
 
-	r = c->dev->stat(c, data, sizeof(data), perrbuf);
+	r = c->dev->stat(c, data, sizeof(data));
 
 #if 0
 	/* we don't currently set the path in stat. Plan9/NIX do. */
@@ -818,7 +816,7 @@ int sysstat(char *name, uint8_t * statbuf, int len)
 		r = dirsetname(aname, strlen(aname), data, r, sizeof(data));
 #endif
 	poperror();
-	cclose(c, perrbuf);
+	cclose(c);
 
 	/* now convert for akaros. */
 	convM2kstat(data, sizeof(data), (struct kstat *)statbuf);
@@ -837,18 +835,18 @@ int sysfstat(int fd, uint8_t * statbuf, int len)
 		nexterror();
 	}
 
-	c = fdtochan(fd, -1, 0, 1, perrbuf);
+	c = fdtochan(fd, -1, 0, 1);
 
 	poperror();
 
 	if (waserror()) {
-		cclose(c, perrbuf);
+		cclose(c);
 		nexterror();
 	}
-	r = c->dev->stat(c, data, sizeof(data), perrbuf);
+	r = c->dev->stat(c, data, sizeof(data));
 
 	poperror();
-	cclose(c, perrbuf);
+	cclose(c);
 	/* now convert for akaros. */
 	convM2kstat(data, sizeof(data), (struct kstat *)statbuf);
 	printd("sysfstat fd %d ok\n", fd);
@@ -872,7 +870,7 @@ int sysdup(int ofd, int nfd)
 		nexterror();
 	}
 
-	oc = fdtochan(ofd, -1, 0, 1, perrbuf);
+	oc = fdtochan(ofd, -1, 0, 1);
 
 	poperror();
 
@@ -881,7 +879,7 @@ int sysdup(int ofd, int nfd)
 		spin_lock(&f->lock);
 		if (nfd < 0 || growfd(f, nfd) < 0) {
 			unlockfgrp(f);
-			cclose(oc, perrbuf);
+			cclose(oc);
 			error(Ebadfd);
 		}
 		if (nfd > f->maxfd)
@@ -891,10 +889,10 @@ int sysdup(int ofd, int nfd)
 		f->fd[nfd] = oc;
 		unlockfgrp(f);
 		if (nc != NULL)
-			cclose(nc, perrbuf);
+			cclose(nc);
 	} else {
 		if (waserror()) {
-			cclose(oc, perrbuf);
+			cclose(oc);
 			nexterror();
 		}
 		nfd = newfd(oc);
@@ -914,7 +912,7 @@ int plan9setup(struct proc *up)
 		return -1;
 	}
 
-	up->fgrp = dupfgrp(NULL, perrbuf);
+	up->fgrp = dupfgrp(NULL);
 	up->pgrp = newpgrp();
 	return 0;
 }
@@ -962,16 +960,16 @@ bindmount(int ismount,
 			error(Enoattach);
 
 		ac = NULL;
-		bc = fdtochan(fd, ORDWR, 0, 1, perrbuf);
+		bc = fdtochan(fd, ORDWR, 0, 1);
 		if(waserror()) {
 			if(ac)
-				cclose(ac, perrbuf);
-			cclose(bc, perrbuf);
+				cclose(ac);
+			cclose(bc);
 			nexterror();
 		}
 
 		if(afd >= 0)
-			ac = fdtochan(afd, ORDWR, 0, 1, perrbuf);
+			ac = fdtochan(afd, ORDWR, 0, 1);
 
 		bogus.chan = bc;
 		bogus.authchan = ac;
@@ -979,7 +977,7 @@ bindmount(int ismount,
 		bogus.spec = spec;
 		if(waserror())
 			error(Ebadspec);
-		spec = validnamedup(spec, 1, perrbuf);
+		spec = validnamedup(spec, 1);
 		poperror();
 
 		if(waserror()){
@@ -987,12 +985,12 @@ bindmount(int ismount,
 			nexterror();
 		}
 
-		dev = devtabget('M', 0, perrbuf);		//XDYNX
+		dev = devtabget('M', 0);		//XDYNX
 		if(waserror()){
 			//devtabdecr(dev);
 			nexterror();
 		}
-		c0 = dev->attach((char*)&bogus, perrbuf);
+		c0 = dev->attach((char*)&bogus);
 		poperror();
 		//devtabdecr(dev);
 
@@ -1000,32 +998,32 @@ bindmount(int ismount,
 		kfree(spec);
 		poperror();	/* ac bc */
 		if(ac)
-			cclose(ac, perrbuf);
-		cclose(bc, perrbuf);
+			cclose(ac);
+		cclose(bc);
 	}else{
 		bogus.spec = NULL;
-		c0 = namec(arg0, Abind, 0, 0, perrbuf);
+		c0 = namec(arg0, Abind, 0, 0);
 	}
 
 	if(waserror()){
-		cclose(c0, perrbuf);
+		cclose(c0);
 		nexterror();
 	}
 
-	c1 = namec(arg1, Amount, 0, 0, perrbuf);
+	c1 = namec(arg1, Amount, 0, 0);
 	if(waserror()){
-		cclose(c1, perrbuf);
+		cclose(c1);
 		nexterror();
 	}
 
-	i = cmount(&c0, c1, flag, bogus.spec, perrbuf);
+	i = cmount(&c0, c1, flag, bogus.spec);
 
 	poperror();
-	cclose(c1, perrbuf);
+	cclose(c1);
 	poperror();
-	cclose(c0, perrbuf);
+	cclose(c0);
 	if(ismount)
-		fdclose(fd, 0, perrbuf);
+		fdclose(fd, 0);
 
 	return i;
 }
@@ -1046,12 +1044,12 @@ sysunmount(char *name, char *old)
 	}
 
 
-	cmount = namec(old, Amount, 0, 0, perrbuf);
+	cmount = namec(old, Amount, 0, 0);
 
 	cmounted = NULL;
 	if(name != NULL) {
 		if(waserror()) {
-			cclose(cmount, perrbuf);
+			cclose(cmount);
 			nexterror();
 		}
 
@@ -1061,21 +1059,21 @@ sysunmount(char *name, char *old)
 		 * opening it is the only way to get at the real
 		 * struct chan underneath.
 		 */
-		cmounted = namec(name, Aopen, OREAD, 0, perrbuf);
+		cmounted = namec(name, Aopen, OREAD, 0);
 		poperror();
 	}
 
 	if(waserror()) {
-		cclose(cmount, perrbuf);
+		cclose(cmount);
 		if(cmounted != NULL)
-			cclose(cmounted, perrbuf);
+			cclose(cmounted);
 		nexterror();
 	}
 
-	cunmount(cmount, cmounted, perrbuf);
-	cclose(cmount, perrbuf);
+	cunmount(cmount, cmounted);
+	cclose(cmount);
 	if(cmounted != NULL)
-		cclose(cmounted, perrbuf);
+		cclose(cmounted);
 	poperror();
 	return 0;
 }

@@ -259,25 +259,19 @@ struct dev {
 	void (*reset) ();
 	void (*init) ();
 	void (*shutdown) ();
-	struct chan *(*attach) (char *path, struct errbuf * e);
+	struct chan *(*attach) (char *path);
 	struct walkqid *(*walk) (struct chan * from, struct chan * to, char **paths,
-							 int npath, struct errbuf * e);
-	long (*stat) (struct chan * dir, uint8_t * path, long l, struct errbuf * e);
-	struct chan *(*open) (struct chan * file, int mode, struct errbuf * e);
-	void (*create) (struct chan * dir, char *path, int mode, int perm,
-					struct errbuf * e);
-	void (*close) (struct chan * chan, struct errbuf * e);
-	long (*read) (struct chan * chan, void *p, long len, int64_t off,
-				  struct errbuf * e);
-	struct block *(*bread) (struct chan * chan, long len, int64_t off,
-							struct errbuf * e);
-	long (*write) (struct chan * chan, void *p, long len, int64_t off,
-				   struct errbuf * e);
-	long (*bwrite) (struct chan * chan, struct block * b, int64_t off,
-					struct errbuf * e);
-	void (*remove) (struct chan * chan, struct errbuf * e);
-	long (*wstat) (struct chan * chan, uint8_t * new, long size,
-				   struct errbuf * e);
+							 int npath);
+	long (*stat) (struct chan * dir, uint8_t * path, long l);
+	struct chan *(*open) (struct chan * file, int mode);
+	void (*create) (struct chan * dir, char *path, int mode, int perm);
+	void (*close) (struct chan * chan);
+	long (*read) (struct chan * chan, void *p, long len, int64_t off);
+	struct block *(*bread) (struct chan * chan, long len, int64_t off);
+	long (*write) (struct chan * chan, void *p, long len, int64_t off);
+	long (*bwrite) (struct chan * chan, struct block * b, int64_t off);
+	void (*remove) (struct chan * chan);
+	long (*wstat) (struct chan * chan, uint8_t * new, long size);
 	void (*power) (int control);	/* power mgt: power(1) => on, power (0) => off */
 	int (*config) (int opts, char *command, void *conf);	/* returns 0 on error */
 };
@@ -412,7 +406,7 @@ struct queue {
 extern unsigned int qiomaxatomic;
 
 typedef int devgen_t(struct chan *c, char *name, struct dirtab *dirtab, int,
-					 int, struct dir *, struct errbuf *perrbuf);
+					 int, struct dir *);
 
 extern char Enoerror[];			/* no error */
 extern char Emount[];			/* inconsistent mount */
@@ -488,63 +482,56 @@ void kstrcpy(char *s, char *t, int ns);
 
 /* kern/src/chan.c */
 int findmount(struct chan **cp, struct mhead **mp, int dc, unsigned int devno,
-			  struct qid qid, struct errbuf *perrbuf);
+			  struct qid qid);
 int eqchanddq(struct chan *c, int dc, unsigned int devno, struct qid qid,
-			  int skipvers, struct errbuf *perrbuf);
-char *chanpath(struct chan *c, struct errbuf *perrbuf);
-int isdotdot(char *p, struct errbuf *perrbuf);
-int emptystr(char *s, struct errbuf *perrbuf);
-void kstrdup(char **p, char *s, struct errbuf *perrbuf);
+			  int skipvers);
+char *chanpath(struct chan *c);
+int isdotdot(char *p);
+int emptystr(char *s);
+void kstrdup(char **p, char *s);
 struct chan *newchan(void);
-struct path *newpath(char *s, struct errbuf *perrbuf);
-void pathclose(struct path *p, struct errbuf *perrbuf);
-void chanfree(struct chan *c, struct errbuf *perrbuf);
-void cclose(struct chan *c, struct errbuf *perrbuf);
-void ccloseq(struct chan *c, struct errbuf *perrbuf);
-struct chan *cunique(struct chan *c, struct errbuf *perrbuf);
-int eqqid(struct qid a, struct qid b, struct errbuf *perrbuf);
-struct mhead *newmhead(struct chan *from, struct errbuf *perrbuf);
-int cmount(struct chan **newp, struct chan *old, int flag, char *spec,
-		   struct errbuf *perrbuf);
-void cunmount(struct chan *mnt, struct chan *mounted, struct errbuf *perrbuf);
-struct chan *cclone(struct chan *c, struct errbuf *perrbuf);
-int walk(struct chan **cp, char **names, int nnames, int nomount, int *nerror,
-		 struct errbuf *perrbuf);
-struct chan *createdir(struct chan *c, struct mhead *mh,
-					   struct errbuf *perrbuf);
-void nameerror(char *name, char *err, struct errbuf *perrbuf);
-struct chan *namec(char *aname, int amode, int omode, int perm,
-				   struct errbuf *perrbuf);
+struct path *newpath(char *s);
+void pathclose(struct path *p);
+void chanfree(struct chan *c);
+void cclose(struct chan *c);
+void ccloseq(struct chan *c);
+struct chan *cunique(struct chan *c);
+int eqqid(struct qid a, struct qid b);
+struct mhead *newmhead(struct chan *from);
+int cmount(struct chan **newp, struct chan *old, int flag, char *spec);
+void cunmount(struct chan *mnt, struct chan *mounted);
+struct chan *cclone(struct chan *c);
+int walk(struct chan **cp, char **names, int nnames, int nomount, int *nerror);
+struct chan *createdir(struct chan *c, struct mhead *mh);
+void nameerror(char *name, char *err);
+struct chan *namec(char *aname, int amode, int omode, int perm);
 char *skipslash(char *name);
-void validname(char *aname, int slashok, struct errbuf *perrbuf);
-char *validnamedup(char *aname, int slashok, struct errbuf *perrbuf);
-void isdir(struct chan *c, struct errbuf *perrbuf);
-void putmhead(struct mhead *mh, struct errbuf *perrbuf);
+void validname(char *aname, int slashok);
+char *validnamedup(char *aname, int slashok);
+void isdir(struct chan *c);
+void putmhead(struct mhead *mh);
 
 /* plan9.c */
-char *validname0(char *aname, int slashok, int dup, uintptr_t pc,
-				 struct errbuf *perrbuf);
+char *validname0(char *aname, int slashok, int dup, uintptr_t pc);
 
 /* cleanname.c */
 char *cleanname(char *name);
 
 /* kern/src/pgrp.c */
-struct fgrp *dupfgrp(struct fgrp *f, struct errbuf *perrbuf);
-void pgrpinsert(struct mount **order, struct mount *m, struct errbuf *perrbuf);
-void forceclosefgrp(struct errbuf *perrbuf);
-struct mount *newmount(struct mhead *mh, struct chan *to, int flag, char *spec,
-					   struct errbuf *perrbuf);
-void mountfree(struct mount *m, struct errbuf *perrbuf);
-void resrcwait(char *reason, struct errbuf *perrbuf);
+struct fgrp *dupfgrp(struct fgrp *f);
+void pgrpinsert(struct mount **order, struct mount *m);
+void forceclosefgrp(void);
+struct mount *newmount(struct mhead *mh, struct chan *to, int flag, char *spec);
+void mountfree(struct mount *m);
+void resrcwait(char *reason);
 struct pgrp *newpgrp(void);
 
 /* kern/src/devtabc */
 void devtabreset();
 void devtabinit();
 void devtabshutdown();
-struct dev *devtabget(int dc, int user, struct errbuf *perrbuf);
-long devtabread(struct chan *, void *buf, long n, int64_t off,
-				struct errbuf *perrbuf);
+struct dev *devtabget(int dc, int user);
+long devtabread(struct chan *, void *buf, long n, int64_t off);
 
 /* kern/src/allocplan9block.c */
 struct block *allocb(int size);
@@ -555,38 +542,34 @@ void iallocsummary(void);
 
 /* kern/src/dev.c */
 int devgen(struct chan *c, char *name, struct dirtab *tab, int ntab, int i,
-		   struct dir *dp, struct errbuf *perrbuf);
-void mkqid(struct qid *q, int64_t path, uint32_t vers, int type,
-		   struct errbuf *perrbuf);
+		   struct dir *dp);
+void mkqid(struct qid *q, int64_t path, uint32_t vers, int type);
 void devdir(struct chan *c, struct qid qid, char *n, int64_t length, char *user,
 			long perm, struct dir *db);
 void devreset();
 void devinit();
 void devshutdown();
-struct chan *devattach(int dc, char *spec, struct errbuf *perrbuf);
-struct chan *devclone(struct chan *c, struct errbuf *perrbuf);
+struct chan *devattach(int dc, char *spec);
+struct chan *devclone(struct chan *c);
 struct walkqid *devwalk(struct chan *c, struct chan *nc, char **name, int nname,
-						struct dirtab *tab, int ntab, devgen_t * gen,
-						struct errbuf *perrbuf);
+						struct dirtab *tab, int ntab, devgen_t * gen);
 long devstat(struct chan *c, uint8_t * db, long n, struct dirtab *tab, int ntab,
-			 devgen_t * gen, struct errbuf *perrbuf);
+			 devgen_t * gen);
 long devdirread(struct chan *c, char *d, long n, struct dirtab *tab, int ntab,
-				devgen_t * gen, struct errbuf *perrbuf);
-void devpermcheck(char *fileuid, int perm, int omode, struct errbuf *perrbuf);
+				devgen_t * gen);
+void devpermcheck(char *fileuid, int perm, int omode);
 struct chan *devopen(struct chan *c, int omode, struct dirtab *tab, int ntab,
-					 devgen_t * gen, struct errbuf *perrbuf);
-void devcreate(struct chan *a, char *b, int c, int d, struct errbuf *perrbuf);
-struct block *devbread(struct chan *c, long n, int64_t offset,
-					   struct errbuf *perrbuf);
-long devbwrite(struct chan *c, struct block *bp, int64_t offset,
-			   struct errbuf *perrbuf);
-void devremove(struct chan *c, struct errbuf *perrbuf);
-long devwstat(struct chan *c, uint8_t * a, long b, struct errbuf *perrbuf);
-void devpower(int onoff, struct errbuf *perrbuf);
-int devconfig(int a, char *b, void *v, struct errbuf *perrbuf);
+					 devgen_t * gen);
+void devcreate(struct chan *a, char *b, int c, int d);
+struct block *devbread(struct chan *c, long n, int64_t offset);
+long devbwrite(struct chan *c, struct block *bp, int64_t offset);
+void devremove(struct chan *c);
+long devwstat(struct chan *c, uint8_t * a, long b);
+void devpower(int onoff);
+int devconfig(int a, char *b, void *v);
 
 /* kern/src/plan9file.c */
-int openmode(int omode, struct errbuf *e);
+int openmode(int omode);
 long sysread(int fd, void *p, size_t n, off_t off);
 long syswrite(int fd, void *p, size_t n, off_t off);
 int sysstat(char *name, uint8_t * statbuf, int len);
@@ -632,12 +615,12 @@ struct queue *qbypass(void (*bypass) (void *, struct block *), void *arg);
 void qaddlist(struct queue *q, struct block *b);
 struct block *qremove(struct queue *q);
 struct block *bl2mem(uint8_t * p, struct block *b, int n);
-struct block *mem2bl(uint8_t * p, int len, struct errbuf *perrbuf);
+struct block *mem2bl(uint8_t * p, int len);
 void qputback(struct queue *q, struct block *b);
-struct block *qbread(struct queue *q, int len, struct errbuf *perrbuf);
-long qread(struct queue *q, void *vp, int len, struct errbuf *perrbuf);
-long qbwrite(struct queue *q, struct block *b, struct errbuf *perrbuf);
-int qwrite(struct queue *q, void *vp, int len, struct errbuf *perrbuf);
+struct block *qbread(struct queue *q, int len);
+long qread(struct queue *q, void *vp, int len);
+long qbwrite(struct queue *q, struct block *b);
+int qwrite(struct queue *q, void *vp, int len);
 int qiwrite(struct queue *q, void *vp, int len);
 void qclose(struct queue *q);
 void qfree(struct queue *q);

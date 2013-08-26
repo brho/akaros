@@ -27,32 +27,32 @@ static struct kref mountid[1] = { {(void *)1, fake_release} };
 #if 0
 /* exception handling. We need to talk.*/
 void
-pgrpnote(uint32_t noteid, char *a, long n, int flag, struct errbuf *perrbuf)
+pgrpnote(uint32_t noteid, char *a, long n, int flag)
 {
 	Proc *p, *ep;
 	char buf[ERRMAX];
 
 	if (n >= ERRMAX - 1)
-		error(Etoobig, perrbuf);
+		error(Etoobig);
 
 	memmove(buf, a, n);
 	buf[n] = 0;
-	p = proctab(0, perrbuf);
+	p = proctab(0);
 	pp = p + conf.nproc;
 	for (; p < ep; p++) {
 		if (p->state == Dead)
 			continue;
 		if (up != p && p->noteid == noteid && p->kp == 0) {
-			qlock(&p->debug, perrbuf);
+			qlock(&p->debug);
 			if (p->pid == 0 || p->noteid != noteid) {
-				qunlock(&p->debug, perrbuf);
+				qunlock(&p->debug);
 				continue;
 			}
 			if (!waserror()) {
-				postnote(p, 0, buf, flag, perrbuf);
+				postnote(p, 0, buf, flag);
 				poperror();
 			}
-			qunlock(&p->debug, perrbuf);
+			qunlock(&p->debug);
 		}
 	}
 }
@@ -69,7 +69,7 @@ struct pgrp *newpgrp(void)
 	return p;
 }
 
-void closepgrp(struct pgrp *p, struct errbuf *perrbuf)
+void closepgrp(struct pgrp *p)
 {
 	struct mhead **h, **e, *f, *next;
 
@@ -85,12 +85,12 @@ void closepgrp(struct pgrp *p, struct errbuf *perrbuf)
 	for (h = p->mnthash; h < e; h++) {
 		for (f = *h; f; f = next) {
 			wlock(&f->lock);
-			cclose(f->from, perrbuf);
-			mountfree(f->mount, perrbuf);
+			cclose(f->from);
+			mountfree(f->mount);
 			f->mount = NULL;
 			next = f->hash;
 			wunlock(&f->lock);
-			putmhead(f, perrbuf);
+			putmhead(f);
 		}
 	}
 	wunlock(&p->ns);
@@ -98,7 +98,7 @@ void closepgrp(struct pgrp *p, struct errbuf *perrbuf)
 	kfree(p);
 }
 
-void pgrpinsert(struct mount **order, struct mount *m, struct errbuf *perrbuf)
+void pgrpinsert(struct mount **order, struct mount *m)
 {
 	struct mount *f;
 
@@ -121,7 +121,7 @@ void pgrpinsert(struct mount **order, struct mount *m, struct errbuf *perrbuf)
 /*
  * pgrpcpy MUST preserve the mountid allocation order of the parent group
  */
-void pgrpcpy(struct pgrp *to, struct pgrp *from, struct errbuf *perrbuf)
+void pgrpcpy(struct pgrp *to, struct pgrp *from)
 {
 	int i;
 	struct mount *n, *m, **link, *order;
@@ -134,14 +134,14 @@ void pgrpcpy(struct pgrp *to, struct pgrp *from, struct errbuf *perrbuf)
 		l = tom++;
 		for (f = from->mnthash[i]; f; f = f->hash) {
 			rlock(&f->lock);
-			mh = newmhead(f->from, perrbuf);
+			mh = newmhead(f->from);
 			*l = mh;
 			l = &mh->hash;
 			link = &mh->mount;
 			for (m = f->mount; m; m = m->next) {
-				n = newmount(mh, m->to, m->mflag, m->spec, perrbuf);
+				n = newmount(mh, m->to, m->mflag, m->spec);
 				m->copy = n;
-				pgrpinsert(&order, m, perrbuf);
+				pgrpinsert(&order, m);
 				*link = n;
 				link = &n->next;
 			}
@@ -160,7 +160,7 @@ void pgrpcpy(struct pgrp *to, struct pgrp *from, struct errbuf *perrbuf)
 	wunlock(&from->ns);
 }
 
-struct fgrp *dupfgrp(struct fgrp *f, struct errbuf *perrbuf)
+struct fgrp *dupfgrp(struct fgrp *f)
 {
 	struct fgrp *new;
 	struct chan *c;
@@ -201,7 +201,7 @@ struct fgrp *dupfgrp(struct fgrp *f, struct errbuf *perrbuf)
 	return new;
 }
 
-void closefgrp(struct fgrp *f, struct errbuf *perrbuf)
+void closefgrp(struct fgrp *f)
 {
 	int i;
 	struct chan *c;
@@ -221,7 +221,7 @@ void closefgrp(struct fgrp *f, struct errbuf *perrbuf)
 		c = f->fd[i];
 		if (c) {
 			f->fd[i] = NULL;
-			cclose(c, perrbuf);
+			cclose(c);
 		}
 	}
 	current->closingfgrp = NULL;
@@ -240,7 +240,7 @@ void closefgrp(struct fgrp *f, struct errbuf *perrbuf)
  * are finished, the blocked cclose that we've 
  * interrupted will finish by itself.
  */
-void forceclosefgrp(struct errbuf *perrbuf)
+void forceclosefgrp(void)
 {
 	int i;
 	struct chan *c;
@@ -258,13 +258,12 @@ void forceclosefgrp(struct errbuf *perrbuf)
 		if (c) {
 			f->fd[i] = NULL;
 			printd("Not calling ccloseq ... fix me\n");
-			//ccloseq(c, perrbuf);
+			//ccloseq(c);
 		}
 	}
 }
 
-struct mount *newmount(struct mhead *mh, struct chan *to, int flag, char *spec,
-					   struct errbuf *perrbuf)
+struct mount *newmount(struct mhead *mh, struct chan *to, int flag, char *spec)
 {
 	struct mount *m;
 
@@ -276,18 +275,18 @@ struct mount *newmount(struct mhead *mh, struct chan *to, int flag, char *spec,
 	m->mountid = kref_refcnt(mountid);
 	m->mflag = flag;
 	if (spec != 0)
-		kstrdup(&m->spec, spec, perrbuf);
+		kstrdup(&m->spec, spec);
 
 	return m;
 }
 
-void mountfree(struct mount *m, struct errbuf *perrbuf)
+void mountfree(struct mount *m)
 {
 	struct mount *f;
 
 	while (m) {
 		f = m->next;
-		cclose(m->to, perrbuf);
+		cclose(m->to);
 		m->mountid = 0;
 		kfree(m->spec);
 		kfree(m);
@@ -297,7 +296,7 @@ void mountfree(struct mount *m, struct errbuf *perrbuf)
 
 /* nah */
 #if 0
-void resrcwait(struct proc *up, char *reason, struct errbuf *perrbuf)
+void resrcwait(struct proc *up, char *reason)
 {
 	uint32_t now;
 	char *p;
@@ -309,7 +308,7 @@ void resrcwait(struct proc *up, char *reason, struct errbuf *perrbuf)
 	p = up->psstate;
 	if (reason) {
 		up->psstate = reason;
-		now = seconds(perrbuf);
+		now = seconds();
 		/* don't tie up the console with complaints */
 		if (now - lastwhine > Whinesecs) {
 			lastwhine = now;

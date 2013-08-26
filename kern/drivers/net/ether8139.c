@@ -473,7 +473,7 @@ static void rtl8139init(struct ether *edev)
 	iunlock(&ctlr->ilock);
 }
 
-static void rtl8139attach(struct ether *edev, struct errbuf *perrbuf)
+static void rtl8139attach(struct ether *edev)
 {
 	struct ctlr *ctlr;
 

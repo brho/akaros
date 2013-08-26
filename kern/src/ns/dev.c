@@ -17,8 +17,7 @@
 uint32_t kerndate = 0;
 
 void
-mkqid(struct qid *q, int64_t path, uint32_t vers, int type,
-	  struct errbuf *perrbuf)
+mkqid(struct qid *q, int64_t path, uint32_t vers, int type)
 {
 	q->type = type;
 	q->vers = vers;
@@ -87,7 +86,7 @@ devdir(struct chan *c, struct qid qid, char *n, int64_t length, char *user,
 */
 int
 devgen(struct chan *c, char *name, struct dirtab *tab, int ntab, int i,
-	   struct dir *dp, struct errbuf *perrbuf)
+	   struct dir *dp)
 {
 	if (tab == 0)
 		return -1;
@@ -123,7 +122,7 @@ void devshutdown()
 {
 }
 
-struct chan *devattach(int dc, char *spec, struct errbuf *perrbuf)
+struct chan *devattach(int dc, char *spec)
 {
 	struct chan *c;
 	char *buf;
@@ -135,24 +134,24 @@ struct chan *devattach(int dc, char *spec, struct errbuf *perrbuf)
 	 * succeed.
 	 */
 	c = newchan();
-	mkqid(&c->qid, 0, 0, QTDIR, perrbuf);
-	c->dev = devtabget(dc, 0, perrbuf);
+	mkqid(&c->qid, 0, 0, QTDIR);
+	c->dev = devtabget(dc, 0);
 	if (spec == NULL)
 		spec = "";
 	buf = kzmalloc(len, KMALLOC_WAIT);
 	snprintf(buf, len, "#%c%s", dc, spec);
-	c->path = newpath(buf, perrbuf);
+	c->path = newpath(buf);
 	kfree(buf);
 	return c;
 }
 
-struct chan *devclone(struct chan *c, struct errbuf *perrbuf)
+struct chan *devclone(struct chan *c)
 {
 	struct chan *nc;
 
 	if (c->flag & COPEN) {
 		panic("devclone: file of type %c already open\n",
-			  c->dev != NULL ? c->dev->dc : -1, perrbuf);
+			  c->dev != NULL ? c->dev->dc : -1);
 	}
 
 	nc = newchan();
@@ -173,8 +172,7 @@ struct chan *devclone(struct chan *c, struct errbuf *perrbuf)
 }
 
 struct walkqid *devwalk(struct chan *c, struct chan *nc, char **name, int nname,
-						struct dirtab *tab, int ntab, devgen_t * gen,
-						struct errbuf *perrbuf)
+						struct dirtab *tab, int ntab, devgen_t * gen)
 {
 	ERRSTACK(2);
 	int i, j, alloc;
@@ -183,18 +181,18 @@ struct walkqid *devwalk(struct chan *c, struct chan *nc, char **name, int nname,
 	struct dir dir;
 
 	if (nname > 0)
-		isdir(c, perrbuf);
+		isdir(c);
 	alloc = 0;
 	wq = kzmalloc(sizeof(struct walkqid) + (nname) * sizeof(struct qid),
 				  KMALLOC_WAIT);
 	if (waserror()) {
 		if (alloc && wq->clone != NULL)
-			cclose(wq->clone, perrbuf);
+			cclose(wq->clone);
 		kfree(wq);
 		return NULL;
 	}
 	if (nc == NULL) {
-		nc = devclone(c, perrbuf);
+		nc = devclone(c);
 		/*
 		 * nc->dev remains NULL for now.        //XDYNX
 		 */
@@ -218,9 +216,9 @@ Accept:
 			 * Use c->dev->name in the error because
 			 * nc->dev should be NULL here.
 			 */
-			if ((*gen) (nc, NULL, tab, ntab, DEVDOTDOT, &dir, perrbuf) != 1) {
+			if ((*gen) (nc, NULL, tab, ntab, DEVDOTDOT, &dir) != 1) {
 				printd("devgen walk .. in dev%s %#llux broken\n",
-					   c->dev->name, nc->qid.path, perrbuf);
+					   c->dev->name, nc->qid.path);
 				error("broken devgen");
 			}
 			nc->qid = dir.qid;
@@ -237,7 +235,7 @@ Accept:
 		if (gen == devgen && nc->qid.path != tab[0].qid.path)
 			goto Notfound;
 		for (i = 0;; i++) {
-			switch ((*gen) (nc, n, tab, ntab, i, &dir, perrbuf)) {
+			switch ((*gen) (nc, n, tab, ntab, i, &dir)) {
 				case -1:
 Notfound:
 					if (j == 0)
@@ -264,7 +262,7 @@ Done:
 	poperror();
 	if (wq->nqid < nname) {
 		if (alloc)
-			cclose(wq->clone, perrbuf);
+			cclose(wq->clone);
 		wq->clone = NULL;
 	} else if (wq->clone) {
 		/* attach cloned channel to same device */
@@ -280,14 +278,14 @@ Done:
 
 long
 devstat(struct chan *c, uint8_t * db, long n, struct dirtab *tab, int ntab,
-		devgen_t * gen, struct errbuf *perrbuf)
+		devgen_t * gen)
 {
 	int i;
 	struct dir dir;
 	char *p, *elem;
 
 	for (i = 0;; i++) {
-		switch ((*gen) (c, NULL, tab, ntab, i, &dir, perrbuf)) {
+		switch ((*gen) (c, NULL, tab, ntab, i, &dir)) {
 			case -1:
 				if (c->qid.type & QTDIR) {
 					if (c->path == NULL)
@@ -324,13 +322,13 @@ devstat(struct chan *c, uint8_t * db, long n, struct dirtab *tab, int ntab,
 
 long
 devdirread(struct chan *c, char *d, long n, struct dirtab *tab, int ntab,
-		   devgen_t * gen, struct errbuf *perrbuf)
+		   devgen_t * gen)
 {
 	long m, dsz;
 	struct dir dir;
 
 	for (m = 0; m < n; c->dri++) {
-		switch ((*gen) (c, NULL, tab, ntab, c->dri, &dir, perrbuf)) {
+		switch ((*gen) (c, NULL, tab, ntab, c->dri, &dir)) {
 			case -1:
 				return m;
 
@@ -356,7 +354,7 @@ devdirread(struct chan *c, char *d, long n, struct dirtab *tab, int ntab,
 /*
  * error(Eperm) if open permission not granted for up->user.
  */
-void devpermcheck(char *fileuid, int perm, int omode, struct errbuf *perrbuf)
+void devpermcheck(char *fileuid, int perm, int omode)
 {
 	int t;
 	static int access[] = { 0400, 0200, 0600, 0100 };
@@ -374,20 +372,20 @@ void devpermcheck(char *fileuid, int perm, int omode, struct errbuf *perrbuf)
 }
 
 struct chan *devopen(struct chan *c, int omode, struct dirtab *tab, int ntab,
-					 devgen_t * gen, struct errbuf *perrbuf)
+					 devgen_t * gen)
 {
 	int i;
 	struct dir dir;
 
 	for (i = 0;; i++) {
-		switch ((*gen) (c, NULL, tab, ntab, i, &dir, perrbuf)) {
+		switch ((*gen) (c, NULL, tab, ntab, i, &dir)) {
 			case -1:
 				goto Return;
 			case 0:
 				break;
 			case 1:
 				if (c->qid.path == dir.qid.path) {
-					devpermcheck(dir.uid, dir.mode, omode, perrbuf);
+					devpermcheck(dir.uid, dir.mode, omode);
 					goto Return;
 				}
 				break;
@@ -397,20 +395,19 @@ Return:
 	c->offset = 0;
 	if ((c->qid.type & QTDIR) && omode != OREAD)
 		error(Eperm);
-	c->mode = openmode(omode, perrbuf);
+	c->mode = openmode(omode);
 	c->flag |= COPEN;
 	return c;
 }
 
-void devcreate(struct chan *a, char *b, int c, int d, struct errbuf *perrbuf)
+void devcreate(struct chan *a, char *b, int c, int d)
 {
 	error(Eperm);
 }
 
 /* no analog in akaros yet. */
 
-struct block *devbread(struct chan *c, long n, int64_t offset,
-					   struct errbuf *perrbuf)
+struct block *devbread(struct chan *c, long n, int64_t offset)
 {
 	ERRSTACK(2);
 	struct block *bp;
@@ -422,14 +419,13 @@ struct block *devbread(struct chan *c, long n, int64_t offset,
 		freeb(bp);
 		nexterror();
 	}
-	bp->wp += c->dev->read(c, bp->wp, n, offset, perrbuf);
+	bp->wp += c->dev->read(c, bp->wp, n, offset);
 	poperror();
 	return bp;
 }
 
 long
-devbwrite(struct chan *c, struct block *bp, int64_t offset,
-		  struct errbuf *perrbuf)
+devbwrite(struct chan *c, struct block *bp, int64_t offset)
 {
 	ERRSTACK(2);
 	long n;
@@ -438,30 +434,30 @@ devbwrite(struct chan *c, struct block *bp, int64_t offset,
 		freeb(bp);
 		nexterror();
 	}
-	n = c->dev->write(c, bp->rp, BLEN(bp), offset, perrbuf);
+	n = c->dev->write(c, bp->rp, BLEN(bp), offset);
 	poperror();
 	freeb(bp);
 
 	return n;
 }
 
-void devremove(struct chan *c, struct errbuf *perrbuf)
+void devremove(struct chan *c)
 {
 	error(Eperm);
 }
 
-long devwstat(struct chan *c, uint8_t * a, long b, struct errbuf *perrbuf)
+long devwstat(struct chan *c, uint8_t * a, long b)
 {
 	error(Eperm);
 	return 0;
 }
 
-void devpower(int onoff, struct errbuf *perrbuf)
+void devpower(int onoff)
 {
 	error(Eperm);
 }
 
-int devconfig(int a, char *b, void *v, struct errbuf *perrbuf)
+int devconfig(int a, char *b, void *v)
 {
 	error(Eperm);
 	return 0;

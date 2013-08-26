@@ -902,7 +902,7 @@ struct block *bl2mem(uint8_t * p, struct block *b, int n)
  *  copy the contents of memory into a string of blocks.
  *  return NULL on error.
  */
-struct block *mem2bl(uint8_t * p, int len, struct errbuf *perrbuf)
+struct block *mem2bl(uint8_t * p, int len)
 {
 	ERRSTACK(2);
 	int n;
@@ -973,7 +973,7 @@ static void qwakeup_iunlock(struct queue *q)
 /*
  *  get next block from a queue (up to a limit)
  */
-struct block *qbread(struct queue *q, int len, struct errbuf *perrbuf)
+struct block *qbread(struct queue *q, int len)
 {
 	ERRSTACK(2);
 	struct block *b, *nb;
@@ -1028,7 +1028,7 @@ struct block *qbread(struct queue *q, int len, struct errbuf *perrbuf)
  *  read a queue.  if no data is queued, post a struct block
  *  and wait on its Rendez.
  */
-long qread(struct queue *q, void *vp, int len, struct errbuf *perrbuf)
+long qread(struct queue *q, void *vp, int len)
 {
 	ERRSTACK(2);
 	struct block *b, *first, **l;
@@ -1122,7 +1122,7 @@ uint32_t noblockcnt;
 /*
  *  add a block to a queue obeying flow control
  */
-long qbwrite(struct queue *q, struct block *b, struct errbuf *perrbuf)
+long qbwrite(struct queue *q, struct block *b)
 {
 	ERRSTACK(2);
 	int n, dowakeup;
@@ -1221,7 +1221,7 @@ long qbwrite(struct queue *q, struct block *b, struct errbuf *perrbuf)
 /*
  *  write to a queue.  only Maxatomic bytes at a time is atomic.
  */
-int qwrite(struct queue *q, void *vp, int len, struct errbuf *perrbuf)
+int qwrite(struct queue *q, void *vp, int len)
 {
 	ERRSTACK(1);
 	int n, sofar;
@@ -1243,7 +1243,7 @@ int qwrite(struct queue *q, void *vp, int len, struct errbuf *perrbuf)
 		poperror();
 		b->wp += n;
 
-		qbwrite(q, b, perrbuf);
+		qbwrite(q, b);
 
 		sofar += n;
 	} while (sofar < len && (q->state & Qmsg) == 0);

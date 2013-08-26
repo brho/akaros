@@ -62,13 +62,13 @@ static void pipeinit(void)
 /*
  *  create a pipe, no streams are created until an open
  */
-static struct chan *pipeattach(char *spec, struct errbuf *perrbuf)
+static struct chan *pipeattach(char *spec)
 {
 	struct pipe *p;
 	struct chan *c;
 
 	printd("%s\n", __func__);
-	c = devattach('|', spec, perrbuf);
+	c = devattach('|', spec);
 	p = kzmalloc(sizeof(struct pipe), 0);
 	if (p == 0)
 		panic("memory");
@@ -90,7 +90,7 @@ static struct chan *pipeattach(char *spec, struct errbuf *perrbuf)
 	p->path = ++pipealloc.path;
 	spin_unlock(&pipealloc.lock);
 
-	mkqid(&c->qid, PIPEQID(2 * p->path, Qdir), 0, QTDIR, perrbuf);
+	mkqid(&c->qid, PIPEQID(2 * p->path, Qdir), 0, QTDIR);
 	c->aux = p;
 	c->devno = 0;
 	return c;
@@ -98,7 +98,7 @@ static struct chan *pipeattach(char *spec, struct errbuf *perrbuf)
 
 static int
 pipegen(struct chan *c, char *unused, struct dirtab *tab, int ntab, int i,
-		struct dir *dp, struct errbuf *perrbuf)
+		struct dir *dp)
 {
 	struct qid q;
 	int len;
@@ -126,19 +126,19 @@ pipegen(struct chan *c, char *unused, struct dirtab *tab, int ntab, int i,
 			len = tab->length;
 			break;
 	}
-	mkqid(&q, PIPEQID(PIPEID(c->qid.path), tab->qid.path), 0, QTFILE, perrbuf);
+	mkqid(&q, PIPEQID(PIPEID(c->qid.path), tab->qid.path), 0, QTFILE);
 	devdir(c, q, tab->name, len, eve, tab->perm, dp);
 	return 1;
 }
 
 static struct walkqid *pipewalk(struct chan *c, struct chan *nc, char **name,
-								int nname, struct errbuf *perrbuf)
+								int nname)
 {
 	struct walkqid *wq;
 	struct pipe *p;
 
 	printd("%s\n", __func__);
-	wq = devwalk(c, nc, name, nname, pipedir, NPIPEDIR, pipegen, perrbuf);
+	wq = devwalk(c, nc, name, nname, pipedir, NPIPEDIR, pipegen);
 	if (wq != NULL && wq->clone != NULL && wq->clone != c) {
 		p = c->aux;
 		qlock(&p->qlock);
@@ -160,7 +160,7 @@ static struct walkqid *pipewalk(struct chan *c, struct chan *nc, char **name,
 }
 
 static long
-pipestat(struct chan *c, uint8_t * db, long n, struct errbuf *perrbuf)
+pipestat(struct chan *c, uint8_t * db, long n)
 {
 	struct pipe *p;
 	struct dir dir;
@@ -190,7 +190,7 @@ pipestat(struct chan *c, uint8_t * db, long n, struct errbuf *perrbuf)
 /*
  *  if the stream doesn't exist, create it
  */
-static struct chan *pipeopen(struct chan *c, int omode, struct errbuf *perrbuf)
+static struct chan *pipeopen(struct chan *c, int omode)
 {
 	struct pipe *p;
 
@@ -216,14 +216,14 @@ static struct chan *pipeopen(struct chan *c, int omode, struct errbuf *perrbuf)
 	}
 	qunlock(&p->qlock);
 
-	c->mode = openmode(omode, perrbuf);
+	c->mode = openmode(omode);
 	c->flag |= COPEN;
 	c->offset = 0;
 	c->iounit = qiomaxatomic;
 	return c;
 }
 
-static void pipeclose(struct chan *c, struct errbuf *perrbuf)
+static void pipeclose(struct chan *c)
 {
 	struct pipe *p;
 
@@ -285,11 +285,11 @@ piperead(struct chan *c, void *va, long n, int64_t unused,
 
 	switch (PIPETYPE(c->qid.path)) {
 		case Qdir:
-			return devdirread(c, va, n, pipedir, NPIPEDIR, pipegen, perrbuf);
+			return devdirread(c, va, n, pipedir, NPIPEDIR, pipegen);
 		case Qdata0:
-			return qread(p->q[0], va, n, perrbuf);
+			return qread(p->q[0], va, n);
 		case Qdata1:
-			return qread(p->q[1], va, n, perrbuf);
+			return qread(p->q[1], va, n);
 		default:
 			panic("piperead");
 	}
@@ -306,12 +306,12 @@ static struct block *pipebread(struct chan *c, long n, int64_t offset,
 
 	switch (PIPETYPE(c->qid.path)) {
 		case Qdata0:
-			return qbread(p->q[0], n, perrbuf);
+			return qbread(p->q[0], n);
 		case Qdata1:
-			return qbread(p->q[1], n, perrbuf);
+			return qbread(p->q[1], n);
 	}
 
-	return devbread(c, n, offset, perrbuf);
+	return devbread(c, n, offset);
 }
 
 /*
@@ -338,11 +338,11 @@ pipewrite(struct chan *c, void *va, long n, int64_t unused,
 
 	switch (PIPETYPE(c->qid.path)) {
 		case Qdata0:
-			n = qwrite(p->q[1], va, n, perrbuf);
+			n = qwrite(p->q[1], va, n);
 			break;
 
 		case Qdata1:
-			n = qwrite(p->q[0], va, n, perrbuf);
+			n = qwrite(p->q[0], va, n);
 			break;
 
 		default:
@@ -374,11 +374,11 @@ pipebwrite(struct chan *c, struct block *bp, int64_t unused,
 	p = c->aux;
 	switch (PIPETYPE(c->qid.path)) {
 		case Qdata0:
-			n = qbwrite(p->q[1], bp, perrbuf);
+			n = qbwrite(p->q[1], bp);
 			break;
 
 		case Qdata1:
-			n = qbwrite(p->q[0], bp, perrbuf);
+			n = qbwrite(p->q[0], bp);
 			break;
 
 		default:

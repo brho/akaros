@@ -314,13 +314,6 @@ int mon_bin_run(int argc, char **argv, struct hw_trapframe *hw_tf)
 	struct proc *p = proc_create(program, p_argv, p_envp);
 	kfree(p_argv);
 
-	/* not sure where to do this yet. So do it here.
-	 */
-        p->slash = namec("#/", Atodir, 0, 0);
-        pathclose(p->slash->path);
-        p->slash->path = newpath("/");
-        p->dot = cclone(p->slash);
-
 	proc_wakeup(p);
 	proc_decref(p); /* let go of the reference created in proc_create() */
 	kref_put(&program->f_kref);
@@ -985,7 +978,7 @@ init9proc()
 	  panic("init9proc");
 	}
 	printd("init9proc done waserror\n");
-	up[0].fgrp = dupfgrp(NULL, perrbuf);
+	up[0].fgrp = dupfgrp(NULL);
 	printd("init9proc done dupfg\n");
 	up[0].pgrp = newpgrp();
 	printd("init9proc done duppg\n");

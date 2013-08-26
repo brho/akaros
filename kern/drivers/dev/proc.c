@@ -199,7 +199,7 @@ static void profclock(Ureg * ur, Timer *)
 #endif
 static int
 procgen(struct chan *c, char *name, struct dirtab *tab, int unused, int s,
-		struct dir *dp, struct errbuf *perrbuf)
+		struct dir *dp)
 {
 	struct qid qid;
 	struct proc *p;
@@ -209,7 +209,7 @@ procgen(struct chan *c, char *name, struct dirtab *tab, int unused, int s,
 	uint32_t path, perm, len;
 
 	if (s == DEVDOTDOT) {
-		mkqid(&qid, Qdir, 0, QTDIR, perrbuf);
+		mkqid(&qid, Qdir, 0, QTDIR);
 		devdir(c, qid, "#p", 0, eve, 0555, dp);
 		return 1;
 	}
@@ -217,13 +217,13 @@ procgen(struct chan *c, char *name, struct dirtab *tab, int unused, int s,
 	if (c->qid.path == Qdir) {
 		if (s == 0) {
 			strncpy(current->genbuf, "trace", sizeof(current->genbuf));
-			mkqid(&qid, Qtrace, -1, QTFILE, perrbuf);
+			mkqid(&qid, Qtrace, -1, QTFILE);
 			devdir(c, qid, current->genbuf, 0, eve, 0444, dp);
 			return 1;
 		}
 		if (s == 1) {
 			strncpy(current->genbuf, "tracepids", sizeof(current->genbuf));
-			mkqid(&qid, Qtracepids, -1, QTFILE, perrbuf);
+			mkqid(&qid, Qtracepids, -1, QTFILE);
 			devdir(c, qid, current->genbuf, 0, eve, 0444, dp);
 			return 1;
 		}
@@ -250,20 +250,20 @@ procgen(struct chan *c, char *name, struct dirtab *tab, int unused, int s,
 		 */
 		if (name != NULL && strcmp(name, current->genbuf) != 0)
 			return -1;
-		mkqid(&qid, (s + 1) << QSHIFT, pid, QTDIR, perrbuf);
+		mkqid(&qid, (s + 1) << QSHIFT, pid, QTDIR);
 		devdir(c, qid, current->genbuf, 0, p->user, DMDIR | 0555, dp);
 		kref_put(&p->p_kref);
 		return 1;
 	}
 	if (c->qid.path == Qtrace) {
 		strncpy(current->genbuf, "trace", sizeof(current->genbuf));
-		mkqid(&qid, Qtrace, -1, QTFILE, perrbuf);
+		mkqid(&qid, Qtrace, -1, QTFILE);
 		devdir(c, qid, current->genbuf, 0, eve, 0444, dp);
 		return 1;
 	}
 	if (c->qid.path == Qtracepids) {
 		strncpy(current->genbuf, "tracepids", sizeof(current->genbuf));
-		mkqid(&qid, Qtracepids, -1, QTFILE, perrbuf);
+		mkqid(&qid, Qtracepids, -1, QTFILE);
 		devdir(c, qid, current->genbuf, 0, eve, 0444, dp);
 		return 1;
 	}
@@ -301,7 +301,7 @@ procgen(struct chan *c, char *name, struct dirtab *tab, int unused, int s,
 	}
 #endif
 
-	mkqid(&qid, path | tab->qid.path, c->qid.vers, QTFILE, perrbuf);
+	mkqid(&qid, path | tab->qid.path, c->qid.vers, QTFILE);
 	devdir(c, qid, tab->name, len, p->user, perm, dp);
 	kref_put(&p->p_kref);
 	return 1;
@@ -357,21 +357,21 @@ static void procinit(void)
 #endif
 }
 
-static struct chan *procattach(char *spec, struct errbuf *perrbuf)
+static struct chan *procattach(char *spec)
 {
-	return devattach('p', spec, perrbuf);
+	return devattach('p', spec);
 }
 
 static struct walkqid *procwalk(struct chan *c, struct chan *nc, char **name,
-								int nname, struct errbuf *perrbuf)
+								int nname)
 {
-	return devwalk(c, nc, name, nname, 0, 0, procgen, perrbuf);
+	return devwalk(c, nc, name, nname, 0, 0, procgen);
 }
 
 static long
-procstat(struct chan *c, uint8_t * db, long n, struct errbuf *perrbuf)
+procstat(struct chan *c, uint8_t * db, long n)
 {
-	return devstat(c, db, n, 0, 0, procgen, perrbuf);
+	return devstat(c, db, n, 0, 0, procgen);
 }
 
 /*
@@ -394,7 +394,7 @@ static void nonone(struct proc *p)
 #endif
 }
 
-static struct chan *procopen(struct chan *c, int omode, struct errbuf *perrbuf)
+static struct chan *procopen(struct chan *c, int omode)
 {
 	ERRSTACK(2);
 	struct proc *p;
@@ -403,7 +403,7 @@ static struct chan *procopen(struct chan *c, int omode, struct errbuf *perrbuf)
 	int pid;
 
 	if (c->qid.type & QTDIR)
-		return devopen(c, omode, 0, 0, procgen, perrbuf);
+		return devopen(c, omode, 0, 0, procgen);
 
 	if (QID(c->qid) == Qtrace) {
 		error("proc: Qtrace: not yet");
@@ -437,7 +437,7 @@ static struct chan *procopen(struct chan *c, int omode, struct errbuf *perrbuf)
 		poperror();
 		unlock(&tlock);
 
-		c->mode = openmode(omode, perrbuf);
+		c->mode = openmode(omode);
 		c->flag |= COPEN;
 		c->offset = 0;
 		return c;
@@ -448,7 +448,7 @@ static struct chan *procopen(struct chan *c, int omode, struct errbuf *perrbuf)
 #if 0
 		if (omode != OREAD)
 			error(Eperm);
-		c->mode = openmode(omode, perrbuf);
+		c->mode = openmode(omode);
 		c->flag |= COPEN;
 		c->offset = 0;
 		return c;
@@ -467,7 +467,7 @@ static struct chan *procopen(struct chan *c, int omode, struct errbuf *perrbuf)
 	if (p->pid != pid)
 		error(Eprocdied);
 
-	omode = openmode(omode, perrbuf);
+	omode = openmode(omode);
 
 	switch (QID(c->qid)) {
 		case Qtext:
@@ -551,7 +551,7 @@ static struct chan *procopen(struct chan *c, int omode, struct errbuf *perrbuf)
 		error(Eprocdied);
 
 #endif
-	tc = devopen(c, omode, 0, 0, procgen, perrbuf);
+	tc = devopen(c, omode, 0, 0, procgen);
 	poperror();
 #if 0
 	qunlock(&p->debug);
@@ -562,7 +562,7 @@ static struct chan *procopen(struct chan *c, int omode, struct errbuf *perrbuf)
 }
 
 static long
-procwstat(struct chan *c, uint8_t * db, long n, struct errbuf *perrbuf)
+procwstat(struct chan *c, uint8_t * db, long n)
 {
 	ERRSTACK(2);
 	error("procwwstat: not yet");
@@ -574,7 +574,7 @@ procwstat(struct chan *c, uint8_t * db, long n, struct errbuf *perrbuf)
 		error(Eperm);
 
 	if (QID(c->qid) == Qtrace)
-		return devwstat(c, db, n, perrbuf);
+		return devwstat(c, db, n);
 
 	if ((p = pid2proc(SLOT(c->qid))) == NULL)
 		error(Eprocdied);
@@ -708,7 +708,7 @@ static int procfds(struct proc *p, char *va, int count, long offset)
 	return n;
 }
 #endif
-static void procclose(struct chan *c, struct errbuf *perrbuf)
+static void procclose(struct chan *c)
 {
 	if (QID(c->qid) == Qtrace) {
 		spin_lock(&tlock);
@@ -791,7 +791,7 @@ static int eventsavailable(void *)
 }
 #endif
 static long
-procread(struct chan *c, void *va, long n, int64_t off, struct errbuf *perrbuf)
+procread(struct chan *c, void *va, long n, int64_t off)
 {
 #if 0
 	struct proc *p;
@@ -809,7 +809,7 @@ procread(struct chan *c, void *va, long n, int64_t off, struct errbuf *perrbuf)
 	int tesz;
 #endif
 	if (c->qid.type & QTDIR)
-		return devdirread(c, va, n, 0, 0, procgen, perrbuf);
+		return devdirread(c, va, n, 0, 0, procgen);
 
 #if 0
 	offset = off;
@@ -1213,7 +1213,7 @@ static void mntscan(Mntwalk * mw, struct proc *p)
 #endif
 
 static long
-procwrite(struct chan *c, void *va, long n, int64_t off, struct errbuf *perrbuf)
+procwrite(struct chan *c, void *va, long n, int64_t off)
 {
 	ERRSTACK(2);
 	error("procwrite: not yet");

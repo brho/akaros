@@ -14,7 +14,7 @@
 
 static struct ether *etherxx[Maxether];
 
-struct chan *etherattach(char *spec, struct errbuf *perrbuf)
+struct chan *etherattach(char *spec)
 {
 	ERRSTACK(2);
 	uint32_t ctlrno;
@@ -33,50 +33,47 @@ struct chan *etherattach(char *spec, struct errbuf *perrbuf)
 	if (etherxx[ctlrno] == 0)
 		error(Enodev);
 
-	chan = devattach('l', spec, perrbuf);
+	chan = devattach('l', spec);
 	if (waserror()) {
-		chanfree(chan, perrbuf);
+		chanfree(chan);
 		nexterror();
 	}
 	chan->devno = ctlrno;
 	if (etherxx[ctlrno]->attach)
-		etherxx[ctlrno]->attach(etherxx[ctlrno], perrbuf);
+		etherxx[ctlrno]->attach(etherxx[ctlrno]);
 
 	return chan;
 }
 
 static struct walkqid *etherwalk(struct chan *chan, struct chan *nchan,
-								 char **name, int nname, struct errbuf *perrbuf)
+								 char **name, int nname)
 {
-	return netifwalk(&etherxx[chan->devno]->netif, chan, nchan, name, nname,
-					 perrbuf);
+	return netifwalk(&etherxx[chan->devno]->netif, chan, nchan, name, nname);
 }
 
 static long
-etherstat(struct chan *chan, uint8_t * dp, long n, struct errbuf *perrbuf)
+etherstat(struct chan *chan, uint8_t * dp, long n)
 {
-	return netifstat(&etherxx[chan->devno]->netif, chan, dp, n, perrbuf);
+	return netifstat(&etherxx[chan->devno]->netif, chan, dp, n);
 }
 
-static struct chan *etheropen(struct chan *chan, int omode,
-							  struct errbuf *perrbuf)
+static struct chan *etheropen(struct chan *chan, int omode)
 {
-	return netifopen(&etherxx[chan->devno]->netif, chan, omode, perrbuf);
+	return netifopen(&etherxx[chan->devno]->netif, chan, omode);
 }
 
 static void
-ethercreate(struct chan *u1, char *u2, int u3, int u4, struct errbuf *perrbuf)
+ethercreate(struct chan *u1, char *u2, int u3, int u4)
 {
 }
 
-static void etherclose(struct chan *chan, struct errbuf *perrbuf)
+static void etherclose(struct chan *chan)
 {
-	netifclose(&etherxx[chan->devno]->netif, chan, perrbuf);
+	netifclose(&etherxx[chan->devno]->netif, chan);
 }
 
 static long
-etherread(struct chan *chan, void *buf, long n, int64_t off,
-		  struct errbuf *perrbuf)
+etherread(struct chan *chan, void *buf, long n, int64_t off)
 {
 	struct ether *ether;
 	uint32_t offset = off;
@@ -88,24 +85,23 @@ etherread(struct chan *chan, void *buf, long n, int64_t off,
 		 * into the chip to extract statistics.
 		 */
 		if (NETTYPE(chan->qid.path) == Nifstatqid)
-			return ether->ifstat(ether, buf, n, offset, perrbuf);
+			return ether->ifstat(ether, buf, n, offset);
 		else if (NETTYPE(chan->qid.path) == Nstatqid)
-			ether->ifstat(ether, buf, 0, offset, perrbuf);
+			ether->ifstat(ether, buf, 0, offset);
 	}
 
-	return netifread(&ether->netif, chan, buf, n, offset, perrbuf);
+	return netifread(&ether->netif, chan, buf, n, offset);
 }
 
-static struct block *etherbread(struct chan *chan, long n, int64_t offset,
-								struct errbuf *perrbuf)
+static struct block *etherbread(struct chan *chan, long n, int64_t offset)
 {
-	return netifbread(&etherxx[chan->devno]->netif, chan, n, offset, perrbuf);
+	return netifbread(&etherxx[chan->devno]->netif, chan, n, offset);
 }
 
 static long
-etherwstat(struct chan *chan, uint8_t * dp, long n, struct errbuf *perrbuf)
+etherwstat(struct chan *chan, uint8_t * dp, long n)
 {
-	return netifwstat(&etherxx[chan->devno]->netif, chan, dp, n, perrbuf);
+	return netifwstat(&etherxx[chan->devno]->netif, chan, dp, n);
 }
 
 #if 0
@@ -211,7 +207,7 @@ struct block *etheriq(struct ether *ether, struct block *bp, int fromwire)
 }
 
 static int
-etheroq(struct ether *ether, struct block *bp, struct errbuf *perrbuf)
+etheroq(struct ether *ether, struct block *bp)
 {
 	int len, loopback, s;
 	struct etherpkt *pkt;
@@ -238,7 +234,7 @@ etheroq(struct ether *ether, struct block *bp, struct errbuf *perrbuf)
 	}
 
 	if (!loopback) {
-		qbwrite(ether->netif.oq, bp, perrbuf);
+		qbwrite(ether->netif.oq, bp);
 		if (ether->transmit != NULL)
 			ether->transmit(ether);
 	} else
@@ -248,8 +244,7 @@ etheroq(struct ether *ether, struct block *bp, struct errbuf *perrbuf)
 }
 
 static long
-etherwrite(struct chan *chan, void *buf, long n, int64_t unused,
-		   struct errbuf *perrbuf)
+etherwrite(struct chan *chan, void *buf, long n, int64_t unused)
 {
 	ERRSTACK(2);
 	struct ether *ether;
@@ -259,7 +254,7 @@ etherwrite(struct chan *chan, void *buf, long n, int64_t unused,
 
 	ether = etherxx[chan->devno];
 	if (NETTYPE(chan->qid.path) != Ndataqid) {
-		nn = netifwrite(&ether->netif, chan, buf, n, perrbuf);
+		nn = netifwrite(&ether->netif, chan, buf, n);
 		if (nn >= 0)
 			return nn;
 		error("no cmd write yet");
@@ -298,12 +293,11 @@ etherwrite(struct chan *chan, void *buf, long n, int64_t unused,
 
 	bp->wp += n;
 
-	return etheroq(ether, bp, perrbuf);
+	return etheroq(ether, bp);
 }
 
 static long
-etherbwrite(struct chan *chan, struct block *bp, int64_t unused,
-			struct errbuf *perrbuf)
+etherbwrite(struct chan *chan, struct block *bp, int64_t unused)
 {
 	ERRSTACK(1);
 	struct ether *ether;
@@ -315,7 +309,7 @@ etherbwrite(struct chan *chan, struct block *bp, int64_t unused,
 			freeb(bp);
 			nexterror();
 		}
-		n = etherwrite(chan, bp->rp, n, 0, perrbuf);
+		n = etherwrite(chan, bp->rp, n, 0);
 		freeb(bp);
 		return n;
 	}
@@ -330,7 +324,7 @@ etherbwrite(struct chan *chan, struct block *bp, int64_t unused,
 		error(Etoosmall);
 	}
 
-	return etheroq(ether, bp, perrbuf);
+	return etheroq(ether, bp);
 }
 
 static struct {

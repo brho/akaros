@@ -103,18 +103,12 @@ struct netif {
 
 void netifinit(struct netif *, char *, int, uint32_t);
 struct walkqid *netifwalk(struct netif *, struct chan *, struct chan *, char **,
-						  int, struct errbuf *perrbuf);
-struct chan *netifopen(struct netif *, struct chan *, int,
-					   struct errbuf *perrbuf);
-void netifclose(struct netif *, struct chan *, struct errbuf *perrbuf);
-long netifread(struct netif *, struct chan *, void *, long, int64_t,
-			   struct errbuf *perrbuf);
-struct block *netifbread(struct netif *, struct chan *, long, int64_t,
-						 struct errbuf *perrbuf);
-long netifwrite(struct netif *, struct chan *, void *, long,
-				struct errbuf *perrbuf);
-long netifwstat(struct netif *, struct chan *, uint8_t *, long,
-				struct errbuf *perrbuf);
-long netifstat(struct netif *, struct chan *, uint8_t *, long,
-			   struct errbuf *perrbuf);
+						  int);
+struct chan *netifopen(struct netif *, struct chan *, int);
+void netifclose(struct netif *, struct chan *);
+long netifread(struct netif *, struct chan *, void *, long, int64_t);
+struct block *netifbread(struct netif *, struct chan *, long, int64_t);
+long netifwrite(struct netif *, struct chan *, void *, long);
+long netifwstat(struct netif *, struct chan *, uint8_t *, long);
+long netifstat(struct netif *, struct chan *, uint8_t *, long);
 int activemulti(struct netif *, uint8_t *, int);

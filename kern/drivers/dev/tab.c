@@ -64,7 +64,7 @@ void devtabshutdown()
 		devtab[i]->shutdown(current);
 }
 
-struct dev *devtabget(int dc, int user, struct errbuf *perrbuf)
+struct dev *devtabget(int dc, int user)
 {
 	int i;
 
@@ -73,13 +73,12 @@ struct dev *devtabget(int dc, int user, struct errbuf *perrbuf)
 			return devtab[i];
 	}
 
-	printd("devtabget %c\n", dc, perrbuf);
+	printd("devtabget %c\n", dc);
 	error(Enonexist);
 }
 
 long
-devtabread(struct chan *c, void *buf, long n, int64_t off,
-		   struct errbuf *perrbuf)
+devtabread(struct chan *c, void *buf, long n, int64_t off)
 {
 	ERRSTACK(1);
 

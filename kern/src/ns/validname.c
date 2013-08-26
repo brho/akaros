@@ -36,8 +36,7 @@ static char isfrog[256] = {
  * This was from Plan 9, but the Rune support is gone.
  * Also, we removed the 'user pointer' check, but might want it again later. 
  */
-char *validname0(char *aname, int slashok, int dup, uintptr_t pc,
-				 struct errbuf *perrbuf)
+char *validname0(char *aname, int slashok, int dup, uintptr_t pc)
 {
 	char *ename, *name, *s;
 	int c, n;

@@ -69,37 +69,36 @@ static void consinit(void)
 {
 }
 
-static struct chan *consattach(char *spec, struct errbuf *perrbuf)
+static struct chan *consattach(char *spec)
 {
-	return devattach('c', spec, perrbuf);
+	return devattach('c', spec);
 }
 
 static struct walkqid *conswalk(struct chan *c, struct chan *nc, char **name,
-								int nname, struct errbuf *perrbuf)
+								int nname)
 {
-	return devwalk(c, nc, name, nname, consdir, ARRAY_SIZE(consdir), devgen,
-				   perrbuf);
+	return devwalk(c, nc, name, nname, consdir, ARRAY_SIZE(consdir), devgen);
 }
 
 static long
-consstat(struct chan *c, uint8_t * dp, long n, struct errbuf *perrbuf)
+consstat(struct chan *c, uint8_t * dp, long n)
 {
-	return devstat(c, dp, n, consdir, ARRAY_SIZE(consdir), devgen, perrbuf);
+	return devstat(c, dp, n, consdir, ARRAY_SIZE(consdir), devgen);
 }
 
-static struct chan *consopen(struct chan *c, int omode, struct errbuf *perrbuf)
+static struct chan *consopen(struct chan *c, int omode)
 {
 	c->aux = NULL;
-	c = devopen(c, omode, consdir, ARRAY_SIZE(consdir), devgen, perrbuf);
+	c = devopen(c, omode, consdir, ARRAY_SIZE(consdir), devgen);
 	return c;
 }
 
-static void consclose(struct chan *c, struct errbuf *perrbuf)
+static void consclose(struct chan *c)
 {
 }
 
 static long
-consread(struct chan *c, void *buf, long n, int64_t off, struct errbuf *perrbuf)
+consread(struct chan *c, void *buf, long n, int64_t off)
 {
 	uint32_t l;
 	char *b, *bp, ch, *s, *e;
@@ -114,8 +113,7 @@ consread(struct chan *c, void *buf, long n, int64_t off, struct errbuf *perrbuf)
 	offset = off;
 	switch ((uint32_t) c->qid.path) {
 		case Qdir:
-			return devdirread(c, buf, n, consdir, ARRAY_SIZE(consdir), devgen,
-							  perrbuf);
+			return devdirread(c, buf, n, consdir, ARRAY_SIZE(consdir), devgen);
 
 		case Qcputime:
 			error("not now");
@@ -195,7 +193,7 @@ consread(struct chan *c, void *buf, long n, int64_t off, struct errbuf *perrbuf)
 			return randomread(buf, n);
 #endif
 		case Qdrivers:
-			return devtabread(c, buf, n, off, perrbuf);
+			return devtabread(c, buf, n, off);
 
 		case Qzero:
 			memset(buf, 0, n);
@@ -226,7 +224,7 @@ consread(struct chan *c, void *buf, long n, int64_t off, struct errbuf *perrbuf)
 }
 
 static long
-conswrite(struct chan *c, void *va, long n, int64_t off, struct errbuf *perrbuf)
+conswrite(struct chan *c, void *va, long n, int64_t off)
 {
 	char buf[256], ch;
 	long l, bp;

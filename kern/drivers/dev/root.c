@@ -31,30 +31,30 @@ static struct dirtab rootdir[Qmax] = {
 	{"bin", {Qbin, 0, QTDIR}, 0, 0555,},
 };
 
-static struct chan *rootattach(char *spec, struct errbuf *perrbuf)
+static struct chan *rootattach(char *spec)
 {
-	return devattach('r', spec, perrbuf);
+	return devattach('r', spec);
 }
 
 struct walkqid *rootwalk(struct chan *c, struct chan *nc, char **name,
-							int nname, struct errbuf *perrbuf)
+							int nname)
 {
-	return devwalk(c, nc, name, nname, rootdir, Qmax, devgen, perrbuf);
+	return devwalk(c, nc, name, nname, rootdir, Qmax, devgen);
 }
 
 static long
-rootstat(struct chan *c, uint8_t * dp, long n, struct errbuf *perrbuf)
+rootstat(struct chan *c, uint8_t * dp, long n)
 {
-	return devstat(c, dp, n, rootdir, Qmax, devgen, perrbuf);
+	return devstat(c, dp, n, rootdir, Qmax, devgen);
 }
 
 static struct chan *rootopen(struct chan *c, int omode,
 			     struct errbuf *perrbuf)
 {
-	return devopen(c, omode, rootdir, Qmax, devgen, perrbuf);
+	return devopen(c, omode, rootdir, Qmax, devgen);
 }
 
-static void rootclose(struct chan *c, struct errbuf *perrbuf)
+static void rootclose(struct chan *c)
 {
 }
 
@@ -72,7 +72,7 @@ rootread(struct chan *c, void *a, long n, int64_t offset,
 		case Qnet:
 		case Qproc:
 		case Qbin:
-			return devdirread(c, a, n, rootdir, Qmax, devgen, perrbuf);
+			return devdirread(c, a, n, rootdir, Qmax, devgen);
 			/* you may have files some day! */
 		default:
 			error(Eperm);

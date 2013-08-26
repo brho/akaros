@@ -27,30 +27,30 @@ static struct dirtab regressdir[Qmax] = {
 
 int verbose = 0;
 
-static struct chan *regressattach(char *spec, struct errbuf *perrbuf)
+static struct chan *regressattach(char *spec)
 {
-	return devattach('Z', spec, perrbuf);
+	return devattach('Z', spec);
 }
 
 struct walkqid *regresswalk(struct chan *c, struct chan *nc, char **name,
-							int nname, struct errbuf *perrbuf)
+							int nname)
 {
-	return devwalk(c, nc, name, nname, regressdir, Qmax, devgen, perrbuf);
+	return devwalk(c, nc, name, nname, regressdir, Qmax, devgen);
 }
 
 static long
-regressstat(struct chan *c, uint8_t * dp, long n, struct errbuf *perrbuf)
+regressstat(struct chan *c, uint8_t * dp, long n)
 {
-	return devstat(c, dp, n, regressdir, Qmax, devgen, perrbuf);
+	return devstat(c, dp, n, regressdir, Qmax, devgen);
 }
 
 static struct chan *regressopen(struct chan *c, int omode,
 								struct errbuf *perrbuf)
 {
-	return devopen(c, omode, regressdir, Qmax, devgen, perrbuf);
+	return devopen(c, omode, regressdir, Qmax, devgen);
 }
 
-static void regressclose(struct chan *c, struct errbuf *perrbuf)
+static void regressclose(struct chan *c)
 {
 }
 
@@ -65,7 +65,7 @@ regressread(struct chan *c, void *a, long n, int64_t offset,
 	switch ((uint32_t) c->qid.path) {
 
 		case Qdir:
-			return devdirread(c, a, n, regressdir, Qmax, devgen, perrbuf);
+			return devdirread(c, a, n, regressdir, Qmax, devgen);
 
 		case Qmalloc:
 			{
