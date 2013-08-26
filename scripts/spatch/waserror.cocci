@@ -10,5 +10,4 @@ waserror() ...}
 
 @@
 @@
-+if (0)
 poperror(...);

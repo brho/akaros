@@ -4,4 +4,5 @@ obj-y						+= pipe.o
 obj-y						+= proc.o
 obj-y						+= regress.o
 obj-y						+= root.o
+obj-y						+= rooter.o
 obj-y						+= tab.o

@@ -23,8 +23,6 @@ spatch --sp-file scripts/spatch/waserror.cocci --in-place $1
 spatch --sp-file scripts/spatch/plan9.cocci --in-place $1
 # include fixing. Idempotent. 
 sh scripts/fixincludes $1
-# undo extraneous errbuf insertions. Idempotent.
-spatch --sp-file scripts/spatch/unerrbuf.cocci --in-place $1
 # Scalars. Idempotent.
 sh scripts/scalar $1
 # Stuff we might want to think about later. Idempotent
