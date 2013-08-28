@@ -1780,9 +1780,9 @@ int pipe_open(struct inode *inode, struct file *file)
 	struct pipe_inode_info *pii = inode->i_pipe;
 	cv_lock(&pii->p_cv);
 	/* Ugliness due to not using flags for O_RDONLY and friends... */
-	if ((file->f_flags & O_ACCMODE) == O_RDONLY) {
+	if (file->f_mode == S_IRUSR) {
 		pii->p_nr_readers++;
-	} else if ((file->f_flags & O_ACCMODE) == O_WRONLY) {
+	} else if (file->f_mode == S_IWUSR) {
 		pii->p_nr_writers++;
 	} else {
 		warn("Bad pipe file flags 0x%x\n", file->f_flags);
@@ -1796,9 +1796,9 @@ int pipe_release(struct inode *inode, struct file *file)
 	struct pipe_inode_info *pii = inode->i_pipe;
 	cv_lock(&pii->p_cv);
 	/* Ugliness due to not using flags for O_RDONLY and friends... */
-	if ((file->f_flags & O_ACCMODE) == O_RDONLY) {
+	if (file->f_mode == S_IRUSR) {
 		pii->p_nr_readers--;
-	} else if ((file->f_flags & O_ACCMODE) == O_WRONLY) {
+	} else if (file->f_mode == S_IWUSR) {
 		pii->p_nr_writers--;
 	} else {
 		warn("Bad pipe file flags 0x%x\n", file->f_flags);
