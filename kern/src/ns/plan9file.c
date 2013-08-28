@@ -752,9 +752,9 @@ int sysopen(char *name, int omode)
 	struct chan *c = NULL;
 	int fd;
 	int mustdir = 0;
+	if (name[0] == '/' && name[1] == '9')
+		name += 2;
 	printd("sysopen %s mode %o\n", name, omode);
-	if (*name != '#')
-		return -1;
 	if (omode & O_NONBLOCK)	/* what to do? */
 		omode &= ~O_NONBLOCK;
 	if (omode & O_CLOEXEC)	/* FIX ME */
@@ -770,7 +770,7 @@ int sysopen(char *name, int omode)
 		printd("error\n");
 		if (c)
 			cclose(c);
-		return -1;
+		nexterror();
 	}
 	openmode(omode);	/* error check only */
 	c = namec(name, Aopen, omode, 0);
@@ -799,6 +799,8 @@ int sysstat(char *name, uint8_t * statbuf, int len)
 	int fd;
 	uint8_t data[sizeof(struct dir)];
 
+	if (name[0] == '/' && name[1] == '9')
+		name += 2;
 	if (waserror()) {
 		if (c)
 			cclose(c);
@@ -1000,26 +1002,22 @@ bindmount(int ismount,
 			cclose(ac);
 		cclose(bc);
 	}else{
-I_AM_HERE;
 		bogus.spec = NULL;
 		c0 = namec(arg0, Abind, 0, 0);
 	}
 
 	if(waserror()){
-I_AM_HERE;
 		cclose(c0);
 		nexterror();
 	}
 
 	c1 = namec(arg1, Amount, 0, 0);
 	if(waserror()){
-I_AM_HERE;
 		cclose(c1);
 		nexterror();
 	}
 
-//	i = cmount(&c0, c1, flag, bogus.spec);
-i=-1;
+	i = cmount(&c0, c1, flag, bogus.spec);
 
 	poperror();
 	cclose(c1);
@@ -1082,10 +1080,10 @@ sysunmount(char *name, char *old)
 }
 
 /* init a raw plan 9 name space. Used by monitor.c and
- * (for now) namec
+ * (for now) namec. Assumes current is set up.
  */
 void
-init9ns(struct proc *p)
+init9ns()
 {
 	ERRSTACKBASE(2);
 	if (waserror()){
@@ -1095,10 +1093,10 @@ init9ns(struct proc *p)
          * These are o.k. because rootinit is null.
          * Then early kproc's will have a root and dot.
          */
-        p->slash = namec("#r", Atodir, 0, 0);
-        pathclose(p->slash->path);
-        p->slash->path = newpath("/");
-        p->dot = cclone(p->slash);
+        current->slash = namec("#r", Atodir, 0, 0);
+        pathclose(current->slash->path);
+        current->slash->path = newpath("/");
+        current->dot = cclone(current->slash);
 	printd("done init9ns\n");
 }
 

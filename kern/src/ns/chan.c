@@ -626,6 +626,7 @@ cmount(struct chan **newp, struct chan *old, int flag, char *spec)
 
 	wunlock(&mhead->lock);
 	poperror();
+	printd("Mount successed, mountid %d\n", nm->mountid);
 	return nm->mountid;
 }
 
@@ -1184,8 +1185,8 @@ struct chan *namec(char *aname, int amode, int omode, int perm)
 	char tmperrbuf[ERRMAX];	/* ERRMAX still, for namelenerror */
 	char *name;
 	struct dev *dev;
-	printd("namec name %s\n", aname);
-I_AM_HERE;
+	printd("namec name %s slash %p dot %p\n", aname, 
+			current->slash, current->dot);
 	if (aname[0] == '\0')
 		error("empty file name");
 	aname = validnamedup(aname, 1);
@@ -1205,16 +1206,14 @@ I_AM_HERE;
 	nomount = 0;
 	switch (name[0]) {
 		case '/':
-I_AM_HERE;
 			c = current->slash;
 			/* TODO: we still have scenarios where there is no current / */
 			if (!c)
-				error(Enotdir);
+				error("namec / starting point / is bad?");
 			kref_get(&c->ref, 1);
 			break;
 
 		case '#':
-I_AM_HERE;
 			nomount = 1;
 			current->genbuf[0] = '\0';
 			n = 0;
@@ -1224,7 +1223,6 @@ I_AM_HERE;
 				current->genbuf[n++] = *name++;
 			}
 			current->genbuf[n] = '\0';
-I_AM_HERE;
 			/*
 			 *  noattach is sandboxing.
 			 *
@@ -1246,9 +1244,7 @@ I_AM_HERE;
 					current->genbuf[1] != 'c' && current->genbuf[1] != 'p')
 					error(Enoattach);
 			}
-I_AM_HERE;
 			dev = devtabget(current->genbuf[1], 1);	//XDYNX
-I_AM_HERE;
 			if (dev == NULL)
 				error(Ebadsharp);
 			//if(waserror()){
@@ -1301,7 +1297,6 @@ I_AM_HERE;
 	 * Build a list of elements in the name.
 	 */
 	parsename(name, &e);
-I_AM_HERE;
 
 	/*
 	 * On create, ....
@@ -1318,7 +1313,6 @@ I_AM_HERE;
 			error(Eexist);
 		e.nelems--;
 	}
-I_AM_HERE;
 	if (walk(&c, e.elems, e.nelems, nomount, &e.nerror) < 0) {
 		if (e.nerror < 0 || e.nerror > e.nelems) {
 			printd("namec %s walk error nerror=%d\n", aname, e.nerror);
@@ -1327,7 +1321,6 @@ I_AM_HERE;
 		nexterror();
 	}
 
-I_AM_HERE;
 	if (e.mustbedir && !(c->qid.type & QTDIR))
 		error("not a directory");
 
@@ -1405,7 +1398,6 @@ Open:
 			break;
 
 		case Atodir:
-I_AM_HERE;
 			/*
 			 * Directories (e.g. for cd) are left before the mount point,
 			 * so one may mount on / or . and see the effect.
