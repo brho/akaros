@@ -12,29 +12,30 @@
 #include <string.h>
 #include <stdarg.h>
 
-/*
- * Print a number (base <= 16) in reverse order,
- * using specified putch function and associated pointer putdat.
- */
-#ifdef __DEPUTY__
-void printnum(void (*putch)(int, TV(t)), TV(t) putdat,
-	                 unsigned long long num, unsigned base, int width, int padc)
-#else
+/* Print a number (base <= 16) in reverse order,
+ * using specified putch function and associated pointer putdat. */
 void printnum(void (*putch)(int, void**), void **putdat,
-	                 unsigned long long num, unsigned base, int width, int padc)
-#endif
+              unsigned long long num, unsigned base, int width, int padc)
 {
-	// first recursively print all preceding (more significant) digits
-	if (num >= base) {
-		printnum(putch, putdat, num / base, base, width - 1, padc);
-	} else {
-		// print any needed pad characters before first digit
-		while (--width > 0)
-			putch(padc, putdat);
+	unsigned long long temp = num;
+	int nr_digits = 1;
+	/* Determine how many leading zeros we need.
+	 * For every digit/nibble beyond base, we do one less width padding */
+	while ((temp /= base)) {
+		nr_digits++;
+		width--;
 	}
-
-	// then print this (the least significant) digit
-	putch("0123456789abcdef"[num % base], putdat);
+	/* And another one less, since we'll always print the last digit */
+	while (--width > 0)
+		putch(padc, putdat);
+	for (int i = nr_digits; i > 0; i--) {
+		temp = num;
+		/* To get digit i, we only div (i-1) times */
+		for (int j = 0; j < i - 1; j++) {
+			temp /= base;
+		}
+		putch("0123456789abcdef"[temp % base], putdat);
+	}
 }
 
 // Main function to format and print a string.
