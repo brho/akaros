@@ -1098,5 +1098,6 @@ init9ns()
         current->slash->path = newpath("/");
         current->dot = cclone(current->slash);
 	printd("done init9ns\n");
+	poperror();
 }
 
