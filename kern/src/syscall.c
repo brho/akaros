@@ -1165,10 +1165,14 @@ static intreg_t sys_write(struct proc *p, int fd, const void *buf, int len)
 	return ret;
 }
 
+static bool is_9path(char *path)
+{
+	bool ret = (path[0] == '#') || (path[0] == '/' && path[1] == '9');
+	return ret;
+}
+
 /* Checks args/reads in the path, opens the file, and inserts it into the
- * process's open file list. 
- *
- * TODO: take the path length */
+ * process's open file list. */
 static intreg_t sys_open(struct proc *p, const char *path, size_t path_l,
                          int oflag, int mode)
 {
@@ -1181,7 +1185,7 @@ static intreg_t sys_open(struct proc *p, const char *path, size_t path_l,
 		return -1;
 	mode &= ~p->fs_env.umask;
 	file = do_file_open(t_path, oflag, mode);
-	if (!file) {
+	if (!file && is_9path(t_path)) {
 		plan9fd = sysopen(t_path, oflag);
 		if (plan9fd >= 0) {
 			file = alloc_file();
@@ -1297,7 +1301,7 @@ static intreg_t stat_helper(struct proc *p, const char *path, size_t path_l,
 	if (path_d) {
 		stat_inode(path_d->d_inode, kbuf);
 		kref_put(&path_d->d_kref);
-	} else {
+	} else if (is_9path(t_path)) {
 		/* VFS failed, checking 9ns */
 		retval = sysstat(t_path, (uint8_t*)kbuf, sizeof(*kbuf));
 		printd("sysstat returns %d\n", retval);
