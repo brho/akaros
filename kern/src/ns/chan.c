@@ -1109,6 +1109,8 @@ static void *memrchr(void *va, int c, long n)
 	return NULL;
 }
 
+/* If you use this to implement something like nameerror(), make sure that the
+ * caller (whoever set up waserror()) is the one to call nexterror(). */
 static void namelenerror(char *aname, int len, char *err)
 {
 	ERRSTACK(1);
@@ -1150,12 +1152,6 @@ static void namelenerror(char *aname, int len, char *err)
 				 strlen(name), name);
 	}
 	snprintf(current_errstr(), MAX_ERRSTR_LEN, "%#q %s", current->genbuf, err);
-	nexterror();
-}
-
-void nameerror(char *name, char *err)
-{
-	namelenerror(name, strlen(name), err);
 }
 
 /*
@@ -1291,6 +1287,7 @@ struct chan *namec(char *aname, int amode, int omode, int perm)
 		len = e.prefix + e.off[e.nerror];
 		kfree(e.off);
 		namelenerror(aname, len, tmperrbuf);
+		nexterror();
 	}
 
 	/*

@@ -503,7 +503,6 @@ void cunmount(struct chan *mnt, struct chan *mounted);
 struct chan *cclone(struct chan *c);
 int walk(struct chan **cp, char **names, int nnames, int nomount, int *nerror);
 struct chan *createdir(struct chan *c, struct mhead *mh);
-void nameerror(char *name, char *err);
 struct chan *namec(char *aname, int amode, int omode, int perm);
 char *skipslash(char *name);
 void validname(char *aname, int slashok);
