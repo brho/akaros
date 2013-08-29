@@ -381,10 +381,16 @@ static struct ether *etherprobe(int cardno, int ctlrno)
 	ether->netif.mtu = ETHERMAXTU;
 	ether->netif.maxmtu = ETHERMAXTU;
 
+#if 0
+/* this was used to modify ethernet devices via comment line.
+ * e.g. type=rtl8193,irq=x,ea=a:b:c:d:e:f, etc. 
+ * it was for isa config and is no longer needed.
+ * Unless somebody decides we want it, it will go away
+ * very soon.
+ */
 	if (cardno < 0) {
 		for (cardno = 0; cards[cardno].type; cardno++) {
 #warning "using strcmp instead of cistrcmp"
-#if 0
 			Ron ran out of steam
 				if ( /*ci */ strcmp(cards[cardno].type, ether->type))
 				 continue;
@@ -395,10 +401,10 @@ static struct ether *etherprobe(int cardno, int ctlrno)
 					memset(ether->ea, 0, Eaddrlen);
 			}
 			break;
-#endif
 		}
 	}
 
+#endif
 	if (cardno >= Maxether || cards[cardno].type == NULL) {
 		kfree(ether);
 		return NULL;
@@ -417,14 +423,16 @@ static struct ether *etherprobe(int cardno, int ctlrno)
 		ether->irq = 9;
 	snprintf(name, sizeof(name), "ether%d", ctlrno);
 
+#warning "not enabling interrupts in devether; enabled lower down"
+#if 0
 	/*
 	 * If ether->irq is <0, it is a hack to indicate no interrupt
 	 * used by ethersink.
 	 */
-#warning "how do we enable interrupts?"
 	if (ether->irq >= 0)
 		printk("NOT ENABLING INTERRUPTS\n");
 	//intrenable(ether->irq, ether->interrupt, ether, ether->tbdf, name);
+#endif
 
 	i = snprintf(buf, sizeof(buf), "#l%d: %s: %dMbps port %#p irq %d tu %d",
 				 ctlrno, cards[cardno].type, ether->netif.mbps, ether->port,
@@ -461,17 +469,23 @@ static struct ether *etherprobe(int cardno, int ctlrno)
 	return ether;
 }
 
-//static
+static
 void etherreset(void)
 {
 	struct ether *ether;
 	int cardno, ctlrno;
 
+#warning "Remove isa config stuff in next commit"
+#if 0
+	/* this was ONLY for the case of setting 
+	 * command line parameters into etherdevs.
+	 * going away in the next CL.
+	 */
 	for (ctlrno = 0; ctlrno < Maxether; ctlrno++) {
 		if ((ether = etherprobe(-1, ctlrno)) == NULL)
 			continue;
-		etherxx[ctlrno] = ether;
 	}
+#endif
 
 	cardno = ctlrno = 0;
 	while (cards[cardno].type != NULL && ctlrno < Maxether) {
@@ -485,6 +499,7 @@ void etherreset(void)
 		}
 		etherxx[ctlrno] = ether;
 		ctlrno++;
+		break;
 	}
 }
 

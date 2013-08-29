@@ -1,4 +1,5 @@
 #include <netif.h>
+#include <ros/trapframe.h>
 
 enum {
 	Eaddrlen = 6,
@@ -20,7 +21,7 @@ struct ether {
 	void (*attach) (struct ether *);	/* filled in by reset routine */
 	void (*detach) (struct ether *);
 	void (*transmit) (struct ether *);
-	void (*interrupt) ( /*Ureg */ void *, void *);
+	void (*interrupt) ( struct hw_trapframe *, void *);
 	long (*ifstat) (struct ether *, void *, long, unsigned long);
 	long (*ctl) (struct ether *, void *, long);	/* custom ctl messages */
 	void (*power) (struct ether *, int);	/* power on/off */

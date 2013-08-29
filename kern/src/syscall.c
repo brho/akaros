@@ -4,7 +4,7 @@
 #pragma nosharc
 #endif
 
-#define DEBUG
+//#define DEBUG
 #include <ros/common.h>
 #include <arch/types.h>
 #include <arch/arch.h>

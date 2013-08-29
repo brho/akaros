@@ -308,9 +308,7 @@ static void rtl8139multicast(void *ether, uint8_t * eaddr, int add)
 }
 
 static long
-rtl8139ifstat(struct ether *edev, void *a, long n, unsigned long offset,
-			  struct errbuf *perrbuf)
-{
+rtl8139ifstat(struct ether *edev, void *a, long n, unsigned long offset){
 	int l;
 	char *p;
 	struct ctlr *ctlr;
@@ -434,8 +432,9 @@ static void rtl8139init(struct ether *edev)
 	ctlr->rbstart = alloc;
 	alloc += ctlr->rblen + 16;
 	memset(ctlr->rbstart, 0, ctlr->rblen + 16);
-#warning "how do we write to pci mmio space?"
-	//  csr32w(ctlr, Rbstart, PCIWADDR(ctlr->rbstart));
+	printk("Setting rbstart %p phys %p into rbstart\n", ctlr->rbstart,
+	       (void *)PADDR(ctlr->rbstart));
+	csr32w(ctlr, Rbstart, PADDR(ctlr->rbstart));
 	ctlr->rcr = Rxfth256 | Rblen | Mrxdmaunlimited | Ab | Am | Apm;
 
 	/*
@@ -519,12 +518,11 @@ static void rtl8139txstart(struct ether *edev)
 		if (((uintptr_t) bp->rp) & 0x03) {
 			memmove(td->data, bp->rp, size);
 			freeb(bp);
-#warning "how do we write to pci mmio space?"
-			//      csr32w(ctlr, td->tsad, PCIWADDR(td->data));
+			csr32w(ctlr, td->tsad, PADDR(td->data));
 			ctlr->tunaligned++;
 		} else {
 			td->bp = bp;
-			//csr32w(ctlr, td->tsad, PCIWADDR(bp->rp));
+			csr32w(ctlr, td->tsad, PADDR(bp->rp));
 			ctlr->taligned++;
 		}
 		csr32w(ctlr, td->tsd, (ctlr->etxth << EtxthSHIFT) | size);
@@ -588,8 +586,7 @@ static void rtl8139receive(struct ether *edev)
 			 */
 			cr = csr8r(ctlr, Cr);
 			csr8w(ctlr, Cr, cr & ~Re);
-#warning "PCIWADDR"
-			//          csr32w(ctlr, Rbstart, PCIWADDR(ctlr->rbstart));
+			csr32w(ctlr, Rbstart, PADDR(ctlr->rbstart));
 			csr8w(ctlr, Cr, cr);
 			csr32w(ctlr, Rcr, ctlr->rcr);
 
@@ -630,7 +627,7 @@ static void rtl8139receive(struct ether *edev)
 	}
 }
 
-static void rtl8139interrupt(void *unused, void *arg)
+static void rtl8139interrupt(struct hw_trapframe *hw_tf, void *arg)
 {
 	Td *td;
 	struct ctlr *ctlr;
@@ -759,7 +756,7 @@ static int rtl8139pnp(struct ether *edev)
 	uint32_t result;
 	printk("Searching for rtl8139 Network device...");
 	STAILQ_FOREACH(pcidev, &pci_devices, all_dev) {
-		id = pcidev->ven_id << 16 | pcidev->dev_id;
+		id = pcidev->dev_id << 16 | pcidev->ven_id;
 		for (i = 0; i < ARRAY_SIZE(rtl8139pci); i++)
 			if (rtl8139pci[i].id == id)
 				break;
@@ -771,6 +768,8 @@ static int rtl8139pnp(struct ether *edev)
 		device_id = pcidev->dev_id;
 		/* Find the IRQ */
 		irq = pcidev->irqline;
+		register_interrupt_handler(interrupt_handlers, irq, rtl8139interrupt, edev);
+
 		printd("-->IRQ: %u\n", irq);
 		/* Loop over the BARs */
 		/* TODO: pci layer should scan these things and put them in a pci_dev
@@ -813,9 +812,8 @@ static int rtl8139pnp(struct ether *edev)
 	edev->ctlr = ctlr;
 	edev->port = ctlr->port;
 	/* how do we set interrupts? */
-#warning "set interrupts -- how?"
-	//  edev->netif.irq = ctlr->pci->intl;
-	//  edev->tbdf = ctlr->pci->tbdf;
+	edev->irq = irq;
+	edev->tbdf = MK_CONFIG_ADDR(pcidev->bus, pcidev->dev, pcidev->func, 0);
 
 	/*
 	 * Check if the adapter's station address is to be overridden.

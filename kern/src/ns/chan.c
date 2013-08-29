@@ -2,7 +2,7 @@
  * Copyright 2013 Google Inc.
  * Copyright (c) 1989-2003 by Lucent Technologies, Bell Laboratories.
  */
-#define DEBUG
+//#define DEBUG
 #include <setjmp.h>
 #include <vfs.h>
 #include <kfs.h>
@@ -489,16 +489,12 @@ int
 eqchanddq(struct chan *c, int dc, unsigned int devno, struct qid qid,
 		  int skipvers)
 {
-printd("c path %lld path %lld\n", c->qid.path, qid.path);
 	if (c->qid.path != qid.path)
 		return 0;
-printd("c vers %d vers %d\n", c->qid.vers, qid.vers);
 	if (!skipvers && c->qid.vers != qid.vers)
 		return 0;
-printd("dev dc %d dc %d\n", c->dev->dc, dc);
 	if (c->dev->dc != dc)
 		return 0;
-printd("c devno %d devno %d\n", c->devno, devno);
 	if (c->devno != devno)
 		return 0;
 	return 1;
@@ -540,7 +536,6 @@ cmount(struct chan **newp, struct chan *old, int flag, char *spec)
 	new = *newp;
 	mh = new->umh;
 
-printd("mh %p\n", mh);
 	/*
 	 * Not allowed to bind when the old directory is itself a union.
 	 * (Maybe it should be allowed, but I don't see what the semantics
@@ -566,13 +561,11 @@ printd("mh %p\n", mh);
 	wlock(&pg->ns);
 
 	l = &MOUNTH(pg, old->qid);
-printd("Iniitla MOUNTH in cmount is %p\n", l);
 	for (mhead = *l; mhead; mhead = mhead->hash) {
 		if (eqchan(mhead->from, old, 1))
 			break;
 		l = &mhead->hash;
 	}
-printd("mhead %p\n", mhead);
 
 	if (mhead == NULL) {
 		/*
@@ -588,7 +581,6 @@ printd("mhead %p\n", mhead);
 		 */
 		if (order != MREPL)
 			mhead->mount = newmount(mhead, old, 0, 0);
-printd("mhead->mount is %p\n", mhead->mount);
 	}
 	wlock(&mhead->lock);
 
@@ -599,7 +591,6 @@ printd("mhead->mount is %p\n", mhead->mount);
 	wunlock(&pg->ns);
 
 	nm = newmount(mhead, new, flag, spec);
-printd("nm in cmount is %p\n", nm);
 	if (mh != NULL && mh->mount != NULL) {
 		/*
 		 *  copy a union when binding it onto a directory
@@ -733,14 +724,8 @@ findmount(struct chan **cp, struct mhead **mp, int dc, unsigned int devno,
 	struct mhead *mh;
 
 	pg = current->pgrp;
-printk("FINDMOUNT: slash is %p, dot %p, pg %p, fg %p\n", 
-	current->slash, current->dot, pg, current->fgrp);
-printd("FINDMOUNT: the hash is %d\n", (qid).path&((1<<MNTLOG)-1));
-printd("FINDMOUNT: dc %c devno %d\n", dc, devno);
-printd("FINDMOUNT: mh %p\n", MOUNTH(pg, qid));
 	rlock(&pg->ns);
 	for (mh = MOUNTH(pg, qid); mh; mh = mh->hash) {
-printk("FINDMOUNT: mh loop in findmount, mh->from %p\n", mh->from);
 		rlock(&mh->lock);
 		if (mh->from == NULL) {
 			printd("mh %#p: mh->from NULL\n", mh);
@@ -759,7 +744,6 @@ printk("FINDMOUNT: mh loop in findmount, mh->from %p\n", mh->from);
 				cclose(*cp);
 			kref_get(&mh->mount->to->ref, 1);
 			*cp = mh->mount->to;
-printd("findmount: *cp set to %p\n", *cp);
 			runlock(&mh->lock);
 			return 1;
 		}
@@ -767,7 +751,6 @@ printd("findmount: *cp set to %p\n", *cp);
 	}
 
 	runlock(&pg->ns);
-printd("findmount: nothing there\n");
 	return 0;
 }
 
@@ -780,12 +763,10 @@ domount(struct chan **cp, struct mhead **mp, struct path **path)
 	struct chan **lc;
 	struct path *p;
 
-printd("domount: ...\n");
 	if (findmount(cp, mp, (*cp)->dev->dc, (*cp)->devno, (*cp)->qid) ==
 		0)
 		return 0;
 
-printd("findmount was non-zero\n");
 	if (path) {
 		p = *path;
 		p = uniquepath(p);
@@ -802,7 +783,6 @@ printd("findmount was non-zero\n");
 		}
 		*path = p;
 	}
-printd("domount returns 1\n");
 	return 1;
 }
 
@@ -1364,7 +1344,6 @@ Open:
 			mh = NULL;
 			if (!nomount)
 				domount(&c, &mh, &path);
-printd("AOPEN: c %p mh %p path %p\n", c, mh, path);
 
 			/* our own copy to open or remove */
 			c = cunique(c);
