@@ -88,8 +88,8 @@ void kernel_init(multiboot_info_t *mboot_info)
 	enable_irq();
 	void ether8139link(void);
 	ether8139link();
-void etherreset(void);
-	etherreset();
+void devtabreset(void);
+	devtabreset();
 	socket_init();
 #ifdef CONFIG_EXT2FS
 	mount_fs(&ext2_fs_type, "/dev/ramdisk", "/mnt", 0);

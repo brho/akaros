@@ -559,6 +559,7 @@ Norewrite:
 	return e - op;
 }
 
+extern struct dev procdevtab, rootdevtab;
 long sysread(int fd, void *p, size_t n, off_t off)
 {
 	ERRSTACK(2);struct errbuf *perrbuf;
@@ -629,6 +630,9 @@ long sysread(int fd, void *p, size_t n, off_t off)
 				if (off != c->offset)
 					error(Edirseek);
 				nn = c->dev->read(c, ents, 2048, c->devoffset);
+printd("procdevtab %p rootdevtab %p\n", &procdevtab, &rootdevtab);
+printd("c->dev %p\n", c->dev);
+printd("c.dev.read %d\n", nn);
 			}
 		} else
 			printd("rock read ok\n");
@@ -913,9 +917,20 @@ int plan9setup(struct proc *up)
 		printd("plan9setup failed\n");
 		return -1;
 	}
+#warning get the plan 9 rfork flags implemented
+	if (! current){
+		up->fgrp = dupfgrp(NULL);
+		up->pgrp = newpgrp();
+		return 0;
+	}
 
-	up->fgrp = dupfgrp(NULL);
-	up->pgrp = newpgrp();
+	up->fgrp = dupfgrp(current->fgrp);
+	up->pgrp = current->pgrp;
+	kref_get(&up->pgrp->ref, 1);
+	up->slash = current->slash;
+	up->dot = current->dot;
+printd("PLAN9SETUP: slash is %p, dot %p, pgrp %p, fgrp %p\n",
+	current->slash, current->dot, current->pgrp, current->fgrp);
 	return 0;
 }
 /* bindmount -- common to bind and mount, since they're almost the same.

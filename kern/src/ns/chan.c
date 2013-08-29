@@ -360,7 +360,7 @@ void cclose(struct chan *c)
 	if (c->flag & CFREE)
 		panic("cclose FREE %#p", getcallerpc(&c));
 
-	printd("cclose %#p name=%s ref=%d\n", c, c->path->s, c->ref);
+	printd("cclose %#p name=%s ref=%d\n", c, c->path ? c->path->s:"", c->ref);
 	if (!kref_put(&c->ref))
 		return;
 
@@ -489,12 +489,16 @@ int
 eqchanddq(struct chan *c, int dc, unsigned int devno, struct qid qid,
 		  int skipvers)
 {
+printd("c path %lld path %lld\n", c->qid.path, qid.path);
 	if (c->qid.path != qid.path)
 		return 0;
+printd("c vers %d vers %d\n", c->qid.vers, qid.vers);
 	if (!skipvers && c->qid.vers != qid.vers)
 		return 0;
+printd("dev dc %d dc %d\n", c->dev->dc, dc);
 	if (c->dev->dc != dc)
 		return 0;
+printd("c devno %d devno %d\n", c->devno, devno);
 	if (c->devno != devno)
 		return 0;
 	return 1;
@@ -536,6 +540,7 @@ cmount(struct chan **newp, struct chan *old, int flag, char *spec)
 	new = *newp;
 	mh = new->umh;
 
+printd("mh %p\n", mh);
 	/*
 	 * Not allowed to bind when the old directory is itself a union.
 	 * (Maybe it should be allowed, but I don't see what the semantics
@@ -561,11 +566,13 @@ cmount(struct chan **newp, struct chan *old, int flag, char *spec)
 	wlock(&pg->ns);
 
 	l = &MOUNTH(pg, old->qid);
+printd("Iniitla MOUNTH in cmount is %p\n", l);
 	for (mhead = *l; mhead; mhead = mhead->hash) {
 		if (eqchan(mhead->from, old, 1))
 			break;
 		l = &mhead->hash;
 	}
+printd("mhead %p\n", mhead);
 
 	if (mhead == NULL) {
 		/*
@@ -581,6 +588,7 @@ cmount(struct chan **newp, struct chan *old, int flag, char *spec)
 		 */
 		if (order != MREPL)
 			mhead->mount = newmount(mhead, old, 0, 0);
+printd("mhead->mount is %p\n", mhead->mount);
 	}
 	wlock(&mhead->lock);
 
@@ -591,6 +599,7 @@ cmount(struct chan **newp, struct chan *old, int flag, char *spec)
 	wunlock(&pg->ns);
 
 	nm = newmount(mhead, new, flag, spec);
+printd("nm in cmount is %p\n", nm);
 	if (mh != NULL && mh->mount != NULL) {
 		/*
 		 *  copy a union when binding it onto a directory
@@ -626,7 +635,7 @@ cmount(struct chan **newp, struct chan *old, int flag, char *spec)
 
 	wunlock(&mhead->lock);
 	poperror();
-	printd("Mount successed, mountid %d\n", nm->mountid);
+	printd("Mount successed, mh %p mountid %d\n", mh , nm->mountid);
 	return nm->mountid;
 }
 
@@ -724,8 +733,14 @@ findmount(struct chan **cp, struct mhead **mp, int dc, unsigned int devno,
 	struct mhead *mh;
 
 	pg = current->pgrp;
+printk("FINDMOUNT: slash is %p, dot %p, pg %p, fg %p\n", 
+	current->slash, current->dot, pg, current->fgrp);
+printd("FINDMOUNT: the hash is %d\n", (qid).path&((1<<MNTLOG)-1));
+printd("FINDMOUNT: dc %c devno %d\n", dc, devno);
+printd("FINDMOUNT: mh %p\n", MOUNTH(pg, qid));
 	rlock(&pg->ns);
 	for (mh = MOUNTH(pg, qid); mh; mh = mh->hash) {
+printk("FINDMOUNT: mh loop in findmount, mh->from %p\n", mh->from);
 		rlock(&mh->lock);
 		if (mh->from == NULL) {
 			printd("mh %#p: mh->from NULL\n", mh);
@@ -744,6 +759,7 @@ findmount(struct chan **cp, struct mhead **mp, int dc, unsigned int devno,
 				cclose(*cp);
 			kref_get(&mh->mount->to->ref, 1);
 			*cp = mh->mount->to;
+printd("findmount: *cp set to %p\n", *cp);
 			runlock(&mh->lock);
 			return 1;
 		}
@@ -751,6 +767,7 @@ findmount(struct chan **cp, struct mhead **mp, int dc, unsigned int devno,
 	}
 
 	runlock(&pg->ns);
+printd("findmount: nothing there\n");
 	return 0;
 }
 
@@ -763,10 +780,12 @@ domount(struct chan **cp, struct mhead **mp, struct path **path)
 	struct chan **lc;
 	struct path *p;
 
+printd("domount: ...\n");
 	if (findmount(cp, mp, (*cp)->dev->dc, (*cp)->devno, (*cp)->qid) ==
 		0)
 		return 0;
 
+printd("findmount was non-zero\n");
 	if (path) {
 		p = *path;
 		p = uniquepath(p);
@@ -783,6 +802,7 @@ domount(struct chan **cp, struct mhead **mp, struct path **path)
 		}
 		*path = p;
 	}
+printd("domount returns 1\n");
 	return 1;
 }
 
@@ -1113,7 +1133,6 @@ static void *memrchr(void *va, int c, long n)
  * caller (whoever set up waserror()) is the one to call nexterror(). */
 static void namelenerror(char *aname, int len, char *err)
 {
-	ERRSTACK(1);
 	char *ename, *name, *next;
 	int i, errlen;
 
@@ -1181,10 +1200,10 @@ struct chan *namec(char *aname, int amode, int omode, int perm)
 	char tmperrbuf[ERRMAX];	/* ERRMAX still, for namelenerror */
 	char *name;
 	struct dev *dev;
-	printd("namec name %s slash %p dot %p\n", aname, 
-			current->slash, current->dot);
 	if (aname[0] == '\0')
 		error("empty file name");
+	if (!current)
+		error("no current");
 	aname = validnamedup(aname, 1);
 
 	if (waserror()) {
@@ -1345,6 +1364,7 @@ Open:
 			mh = NULL;
 			if (!nomount)
 				domount(&c, &mh, &path);
+printd("AOPEN: c %p mh %p path %p\n", c, mh, path);
 
 			/* our own copy to open or remove */
 			c = cunique(c);

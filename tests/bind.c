@@ -20,8 +20,6 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 	flag = strtol(argv[3], 0, 0);
-	argv[1] = "#p";
-	argv[2] = "#r/boot";
 	printf("access %s is %d\n", argv[1], access(argv[1], X_OK|R_OK));
 
 	printf("access %s is %d\n", argv[2], access(argv[2], X_OK|R_OK));

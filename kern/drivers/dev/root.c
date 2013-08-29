@@ -170,6 +170,7 @@ panic("whoops");
 static struct walkqid*
 rootwalk(struct chan *c, struct chan *nc, char **name, int nname)
 {
+printd("rootwalk nname %d name[0] %s\n", nname, name[0]);
 	return devwalk(c,  nc, name, nname, NULL, 0, rootgen);
 }
 
