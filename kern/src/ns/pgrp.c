@@ -73,7 +73,7 @@ void closepgrp(struct pgrp *p)
 {
 	struct mhead **h, **e, *f, *next;
 
-	if (kref_put(&p->ref) != 0)
+	if (!kref_put(&p->ref))
 		return;
 
 	/* the p->debug stuff is not needed -- we think. */
@@ -209,7 +209,7 @@ void closefgrp(struct fgrp *f)
 	if (f == 0)
 		return;
 
-	if (kref_put(&f->ref) != 0)
+	if (!kref_put(&f->ref))
 		return;
 
 	/*

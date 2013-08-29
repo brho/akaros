@@ -1622,7 +1622,7 @@ void isdir(struct chan *c)
  */
 void putmhead(struct mhead *mh)
 {
-	if (mh && kref_put(&mh->ref) == 0) {
+	if (mh && kref_put(&mh->ref) != 0) {
 		mh->mount = (struct mount *)0xCafeBeef;
 		kfree(mh);
 	}
