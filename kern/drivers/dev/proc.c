@@ -248,8 +248,11 @@ procgen(struct chan *c, char *name, struct dirtab *tab, int unused, int s,
 		 * String comparison is done in devwalk so
 		 * name must match its formatted pid.
 		 */
-		if (name != NULL && strcmp(name, current->genbuf) != 0)
+		if (name != NULL && strcmp(name, current->genbuf) != 0) {
+			warn("pid-name mismatch, name: %s, pid %d\n", name, pid);
+			kref_put(&p->p_kref);
 			return -1;
+		}
 		mkqid(&qid, (s + 1) << QSHIFT, pid, QTDIR);
 		devdir(c, qid, current->genbuf, 0, p->user, DMDIR | 0555, dp);
 		kref_put(&p->p_kref);
