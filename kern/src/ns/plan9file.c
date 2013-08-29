@@ -910,27 +910,54 @@ int sysdup(int ofd, int nfd)
 	return nfd;
 }
 
-int plan9setup(struct proc *up)
+/* TODO: 9ns ns inheritance flags: Shared, copied, or empty.  Looks like we're
+ * copying the fgrp, and sharing the pgrp. */
+int plan9setup(struct proc *new_proc, struct proc *parent)
 {
-	ERRSTACK(1);
+	struct proc *old_current;
+	struct kref *new_dot_ref;
+	ERRSTACKBASE(1);
 	if (waserror()) {
 		printd("plan9setup failed\n");
 		return -1;
 	}
-#warning get the plan 9 rfork flags implemented
-	if (! current){
-		up->fgrp = dupfgrp(NULL);
-		up->pgrp = newpgrp();
+	if (!parent) {
+		/* We are probably spawned by the kernel directly, and have no parent to
+		 * inherit from.  Be sure to set up fgrp/pgrp before calling namec().
+		 *
+		 * TODO: One problem is namec wants a current set for things like
+		 * genbuf.  So we'll use new_proc for this bootstrapping.  Note
+		 * switch_to() also loads the cr3. */
+		new_proc->fgrp = dupfgrp(NULL);
+		new_proc->pgrp = newpgrp();
+		old_current = switch_to(new_proc);
+		new_proc->slash = namec("#r", Atodir, 0, 0);
+		switch_back(new_proc, old_current);
+		/* Want the name to be "/" instead of "#r" */
+		pathclose(new_proc->slash->path);
+		new_proc->slash->path = newpath("/");
+		new_proc->dot = cclone(new_proc->slash);
+		poperror();
 		return 0;
 	}
-
-	up->fgrp = dupfgrp(current->fgrp);
-	up->pgrp = current->pgrp;
-	kref_get(&up->pgrp->ref, 1);
-	up->slash = current->slash;
-	up->dot = current->dot;
-printd("PLAN9SETUP: slash is %p, dot %p, pgrp %p, fgrp %p\n",
-	current->slash, current->dot, current->pgrp, current->fgrp);
+	/* Copy semantics */
+	new_proc->fgrp = dupfgrp(parent->fgrp);
+	/* Shared semantics */
+	kref_get(&parent->pgrp->ref, 1);
+	new_proc->pgrp = parent->pgrp;
+	/* copy semantics on / and . (doesn't make a lot of sense in akaros o/w) */
+	/* / should never disappear while we hold a ref to parent */
+	kref_get(&parent->slash->ref, 1);
+	new_proc->slash = parent->slash;
+	/* dot could change concurrently, and we could fail to gain a ref if whoever
+	 * decref'd dot triggered the release.  if that did happen, new_proc->dot
+	 * should update and we can try again. */
+	while (!(new_dot_ref = kref_get_not_zero(&parent->dot->ref, 1)))
+		cpu_relax();
+	/* And now, we can't trust parent->dot, and need to determine our dot from
+	 * the ref we obtained. */
+	new_proc->dot = container_of(new_dot_ref, struct chan, ref);
+	poperror();
 	return 0;
 }
 
@@ -1101,26 +1128,3 @@ sysunmount(char *name, char *old)
 	poperror();
 	return 0;
 }
-
-/* init a raw plan 9 name space. Used by monitor.c and
- * (for now) namec. Assumes current is set up.
- */
-void
-init9ns()
-{
-	ERRSTACKBASE(2);
-	if (waserror()){
-		panic("init9");
-	}
-        /*
-         * These are o.k. because rootinit is null.
-         * Then early kproc's will have a root and dot.
-         */
-        current->slash = namec("#r", Atodir, 0, 0);
-        pathclose(current->slash->path);
-        current->slash->path = newpath("/");
-        current->dot = cclone(current->slash);
-	printd("done init9ns\n");
-	poperror();
-}
-

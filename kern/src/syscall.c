@@ -425,10 +425,7 @@ static ssize_t sys_fork(env_t* e)
 {
 	struct proc *temp;
 	int8_t state = 0;
-	if (current && ! current->slash) {
-		/* hideous. Not sure where else to do it. */
-		init9ns();
-	}
+
 	// TODO: right now we only support fork for single-core processes
 	if (e->state != PROC_RUNNING_S) {
 		set_errno(EINVAL);
@@ -1952,10 +1949,6 @@ intreg_t syscall(struct proc *p, uintreg_t sc_num, uintreg_t a0, uintreg_t a1,
 	if (sc_num > max_syscall || syscall_table[sc_num].call == NULL)
 		panic("Invalid syscall number %d for proc %x!", sc_num, p);
 
-	/* yuk, but here for now. *
-	if (! current->slash)
-		init9ns();
-*/
 	if (waserror()){
 		printd("Plan 9 system call returned via waserror()\n");
 		printd("String: '%s'\n", current_errstr());

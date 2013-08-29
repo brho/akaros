@@ -580,11 +580,10 @@ int bindmount(int ismount, int fd, int afd,
 	      char* arg0, char* arg1, int flag, char* spec);
 int sysunmount(char *name, char *old);
 
-int plan9setup(struct proc *p);
+int plan9setup(struct proc *new_proc, struct proc *parent);
 long readstr(long offset, char *buf, long n, char *str);
 int readnum(unsigned long off, char *buf, unsigned long n, unsigned long val,
 			int size);
-void init9ns(void);
 
 /* ker/src/err.c */
 int errpush(struct errbuf *errstack, int stacksize, int *curindex);
