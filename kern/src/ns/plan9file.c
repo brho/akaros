@@ -933,14 +933,18 @@ printd("PLAN9SETUP: slash is %p, dot %p, pgrp %p, fgrp %p\n",
 	current->slash, current->dot, current->pgrp, current->fgrp);
 	return 0;
 }
+
 /* bindmount -- common to bind and mount, since they're almost the same.
  * fd
  * afd -- auth fd, used to authenticate to a server if needed
- * arg0 -- what we're mounting on top of (i.e. 'old')
- * arg1 -- what is being mounted on to it (i.e. 'new')
+ *
+ * arg0 -- *source* of what we are mounting (old_dir / device in linux)
+ * arg1 -- where we are mounting *onto* (new_dir / dir in linux)
  * flags -- options, i.e. MAFTER, MBEFORE, etc.
  * spec -- additional third argument used in special cases like dosfs, etc.
- */
+ *
+ * We're not renaming arg0 and arg1 for ease of diffing with the original 9ns
+ * source code (for now). */
 int
 bindmount(int ismount,
 	  int fd,
@@ -1018,6 +1022,8 @@ bindmount(int ismount,
 		cclose(bc);
 	}else{
 		bogus.spec = NULL;
+		/* this is the thing you will bind onto the mount.  old_dir (or device)
+		 * in linux terms.  *src* in akaros. */
 		c0 = namec(arg0, Abind, 0, 0);
 	}
 
@@ -1026,6 +1032,8 @@ bindmount(int ismount,
 		nexterror();
 	}
 
+	/* c1 is the target, where we will mount onto.  new_dir, (or just dir) in
+	 * linux terms.  *onto* in Akaros */
 	c1 = namec(arg1, Amount, 0, 0);
 	if(waserror()){
 		cclose(c1);

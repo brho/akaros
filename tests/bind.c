@@ -10,23 +10,28 @@
 #include <dirent.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ros/syscall.h>
 
+/* The naming for the args in bind is messy historically.  We do:
+ * 		bind src_path onto_path
+ * plan9 says bind NEW OLD, where new is *src*, and old is *onto*.
+ * Linux says mount --bind OLD NEW, where OLD is *src* and NEW is *onto*. */
 int main(int argc, char *argv[]) 
 { 
 	int ret;
 	int flag;
-	if (argc < 4){
-		fprintf(stderr, "usage: %s new old flag\n", argv[0]);
+	if (argc < 4) {
+		fprintf(stderr, "usage: %s src_path onto_path flag\n", argv[0]);
 		exit(1);
 	}
 	flag = strtol(argv[3], 0, 0);
-	printf("access %s is %d\n", argv[1], access(argv[1], X_OK|R_OK));
-
-	printf("access %s is %d\n", argv[2], access(argv[2], X_OK|R_OK));
+	/* til we support access in 9ns */
+	//printf("access %s is %d\n", argv[1], access(argv[1], X_OK|R_OK));
+	//printf("access %s is %d\n", argv[2], access(argv[2], X_OK|R_OK));
 	printf("%s %d %s %d %d\n", argv[1], strlen(argv[1]), argv[2], 
-		strlen(argv[2]), flag);
-	ret = syscall(145, argv[1], strlen(argv[1]), argv[2], 
-		strlen(argv[2]), 0);
+	       strlen(argv[2]), flag);
+	ret = syscall(SYS_nbind, argv[1], strlen(argv[1]), argv[2],
+	              strlen(argv[2]), 0);
 
 	printf("%d\n", ret);
 }

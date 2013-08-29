@@ -1733,53 +1733,55 @@ intreg_t sys_setgid(struct proc *p, gid_t gid)
 	return 0;
 }
 
-/* long bind(char* name, char* old, int flag); */
+/* long bind(char* src_path, char* onto_path, int flag);
+ *
+ * The naming for the args in bind is messy historically.  We do:
+ * 		bind src_path onto_path
+ * plan9 says bind NEW OLD, where new is *src*, and old is *onto*.
+ * Linux says mount --bind OLD NEW, where OLD is *src* and NEW is *onto*. */
 intreg_t sys_nbind(struct proc *p,
-		   char *new_path, size_t new_l,
-		   char *old_path, size_t old_l,
-		   unsigned int flag)
+                   char *src_path, size_t src_l,
+                   char *onto_path, size_t onto_l,
+                   unsigned int flag)
 
 {
 	int ret;
-	char *t_oldpath = user_strdup_errno(p, old_path, old_l);
-	if (t_oldpath == NULL){
-		printd("oldpath dup failed ptr %p size %d\n", 
-			old_path, old_l);
+	char *t_srcpath = user_strdup_errno(p, src_path, src_l);
+	if (t_srcpath == NULL) {
+		printd("srcpath dup failed ptr %p size %d\n", src_path, src_l);
 		return -1;
 	}
-	char *t_newpath = user_strdup_errno(p, new_path, new_l);
-	if (t_newpath == NULL) {
-		user_memdup_free(p, t_oldpath);
-		printd("newpath dup failed ptr %p size %d\n", 
-			new_path, new_l);
+	char *t_ontopath = user_strdup_errno(p, onto_path, onto_l);
+	if (t_ontopath == NULL) {
+		user_memdup_free(p, t_srcpath);
+		printd("ontopath dup failed ptr %p size %d\n", onto_path, onto_l);
 		return -1;
 	}
-	printd("sys_nbind: %s -> %s flag %d\n", t_newpath, t_oldpath, flag);
-	ret = bindmount(0, -1, -1, t_newpath, t_oldpath, flag, NULL);
-	user_memdup_free(p, t_oldpath);
-	user_memdup_free(p, t_newpath);
+	printd("sys_nbind: %s -> %s flag %d\n", t_srcpath, t_ontopath, flag);
+	ret = bindmount(0, -1, -1, t_srcpath, t_ontopath, flag, NULL);
+	user_memdup_free(p, t_srcpath);
+	user_memdup_free(p, t_ontopath);
 	return ret;
 }
 
-/* int mount(int fd, int afd, char* old, int flag, char* aname); */
+/* int mount(int fd, int afd, char* onto_path, int flag, char* aname); */
 intreg_t sys_nmount(struct proc *p,
-		    int fd, int afd,
-		    char *old_path, size_t old_l,
-		    unsigned int flag,
-		    char *auth, size_t auth_l)
+                    int fd, int afd,
+                    char *onto_path, size_t onto_l,
+                    unsigned int flag,
+                    char *auth, size_t auth_l)
 {
 	int ret;
-	char *t_oldpath = user_strdup_errno(p, old_path, old_l);
-	if (t_oldpath == NULL)
+	char *t_ontopath = user_strdup_errno(p, onto_path, onto_l);
+	if (t_ontopath == NULL)
 		return -1;
 	char *t_auth = user_strdup_errno(p, auth, auth_l);
 	if (t_auth == NULL) {
-		user_memdup_free(p, t_oldpath);
+		user_memdup_free(p, t_ontopath);
 		return -1;
 	}
-	ret = bindmount(1, fd, afd, NULL, t_oldpath, flag, t_auth);
-	printd("go do it\n");
-	user_memdup_free(p, t_oldpath);
+	ret = bindmount(1, fd, afd, NULL, t_ontopath, flag, t_auth);
+	user_memdup_free(p, t_ontopath);
 	user_memdup_free(p, t_auth);
 	return ret;
 }
