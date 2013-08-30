@@ -381,30 +381,6 @@ static struct ether *etherprobe(int cardno, int ctlrno)
 	ether->netif.mtu = ETHERMAXTU;
 	ether->netif.maxmtu = ETHERMAXTU;
 
-#if 0
-/* this was used to modify ethernet devices via comment line.
- * e.g. type=rtl8193,irq=x,ea=a:b:c:d:e:f, etc. 
- * it was for isa config and is no longer needed.
- * Unless somebody decides we want it, it will go away
- * very soon.
- */
-	if (cardno < 0) {
-		for (cardno = 0; cards[cardno].type; cardno++) {
-#warning "using strcmp instead of cistrcmp"
-			Ron ran out of steam
-				if ( /*ci */ strcmp(cards[cardno].type, ether->type))
-				 continue;
-			for (i = 0; i < ether->nopt; i++) {
-				if (strncmp(ether->opt[i], "ea=", 3))
-					continue;
-				if (parseether(ether->ea, &ether->opt[i][3]))
-					memset(ether->ea, 0, Eaddrlen);
-			}
-			break;
-		}
-	}
-
-#endif
 	if (cardno >= Maxether || cards[cardno].type == NULL) {
 		kfree(ether);
 		return NULL;
@@ -474,18 +450,6 @@ void etherreset(void)
 {
 	struct ether *ether;
 	int cardno, ctlrno;
-
-#warning "Remove isa config stuff in next commit"
-#if 0
-	/* this was ONLY for the case of setting 
-	 * command line parameters into etherdevs.
-	 * going away in the next CL.
-	 */
-	for (ctlrno = 0; ctlrno < Maxether; ctlrno++) {
-		if ((ether = etherprobe(-1, ctlrno)) == NULL)
-			continue;
-	}
-#endif
 
 	cardno = ctlrno = 0;
 	while (cards[cardno].type != NULL && ctlrno < Maxether) {
