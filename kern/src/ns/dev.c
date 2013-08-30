@@ -189,6 +189,7 @@ struct walkqid *devwalk(struct chan *c, struct chan *nc, char **name, int nname,
 		if (alloc && wq->clone != NULL)
 			cclose(wq->clone);
 		kfree(wq);
+		poperror();
 		return NULL;
 	}
 	if (nc == NULL) {

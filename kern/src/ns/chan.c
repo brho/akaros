@@ -365,11 +365,15 @@ void cclose(struct chan *c)
 		return;
 
 	printd("cclose REALLY close\n");
+	/* this style discards the error from close().  picture it as
+	 * if (waserror()) { } else { close(); } chanfree_no_matter_what();  */
 	if (!waserror()) {
 		if (c->dev != NULL)	//XDYNX
 			c->dev->close(c);
-		poperror();
 	}
+	/* need to poperror regardless of whether we error'd or not */
+	poperror();
+	/* and chan free no matter what */
 	chanfree(c);
 }
 
@@ -428,8 +432,8 @@ static void closeproc(void *)
 		if (clunkq.head == NULL) {
 			if (!waserror()) {
 				tsleep(&clunkq.r, clunkwork, NULL, 5000);
-				poperror();
 			}
+			poperror();
 			if (clunkq.head == NULL) {
 				qunlock(&clunkq.q);
 				pexit("no work", 1);
@@ -444,8 +448,8 @@ static void closeproc(void *)
 		if (!waserror()) {
 			if (c->dev != NULL)	//XDYNX
 				c->dev->close(c);
-			poperror();
 		}
+		poperror();
 		chanfree(c);
 	}
 }
@@ -817,8 +821,10 @@ static struct walkqid *ewalk(struct chan *c, struct chan *nc, char **name,
 
 	struct walkqid *wq;
 
-	if (waserror())
+	if (waserror()) {
+		poperror();
 		return NULL;
+	}
 	wq = c->dev->walk(c, nc, name, nname);
 	poperror();
 	return wq;
@@ -1468,6 +1474,10 @@ Open:
 			 */
 			mh = NULL;
 			cnew = NULL;	/* is this assignment necessary? */
+			/* TODO: This is extremely confusing.  It looks like we are
+			 * discarding errors, but then we break out at the end of our try
+			 * block, such that there is no "no matter what" block, and treat
+			 * the follow-on code as if it was the error handling. */
 			if (!waserror()) {	/* try create */
 				if (!nomount
 					&& findmount(&cnew, &mh, c->dev->dc, c->devno, c->qid))
@@ -1493,6 +1503,8 @@ Open:
 
 				cnew->dev->create(cnew, e.elems[e.nelems - 1],
 								  omode & ~(OEXCL | OCEXEC), perm);
+				/* for the create attempt that discarded errors.  not sure why
+				 * it is here, and not right before break */
 				poperror();
 				if (omode & OCEXEC)
 					cnew->flag |= CCEXEC;
@@ -1511,7 +1523,8 @@ Open:
 			if (mh)
 				putmhead(mh);
 			if (omode & OEXCL)
-				nexterror();
+				nexterror();	/* corresponding to the discarded waserror() */
+			poperror();	/* for the discarded waserror for the create attempt */
 			/* save error, so walk doesn't clobber our existing errstr */
 			strncpy(tmperrbuf, current_errstr(), MAX_ERRSTR_LEN);
 			/* note: we depend that walk does not error */
