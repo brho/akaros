@@ -113,7 +113,14 @@ void manager_brho(void)
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 
 	if (first) {	
-		printk("*** Hit shift-g to get into the monitor. ***\n");
+		printk("*** IRQs must be enabled for input emergency codes ***\n");
+		#ifdef CONFIG_X86
+		printk("*** Hit ctrl-g or shift-g to enter the monitor. ***\n");
+		printk("*** Hit ctrl-q to force-enter the monitor. ***\n");
+		printk("*** Hit ctrl-b for a backtrace of core 0 ***\n");
+		#else
+		printk("*** Hit shift-g to enter the monitor. ***\n");
+		#endif
 		first = FALSE;
 	}
 	/* just idle, and deal with things via interrupts.  or via face. */

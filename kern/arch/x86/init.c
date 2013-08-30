@@ -13,8 +13,11 @@
 #include <arch/perfmon.h>
 #include <arch/init.h>
 #include <console.h>
+#include <monitor.h>
 
 struct ancillary_state x86_default_fpu;
+
+#define capchar2ctl(x) ((x) - '@')
 
 /* irq handler for the console (kb, serial, etc) */
 static void irq_console(struct hw_trapframe *hw_tf, void *data)
@@ -24,6 +27,24 @@ static void irq_console(struct hw_trapframe *hw_tf, void *data)
 	assert(cdev);
 	if (cons_get_char(cdev, &c))
 		return;
+	/* Control code intercepts */
+	switch (c) {
+		case capchar2ctl('G'):
+			/* traditional 'shift-g', will put you in the monitor gracefully */
+			send_kernel_message(core_id(), __run_mon, 0, 0, 0, KMSG_ROUTINE);
+			return;
+		case capchar2ctl('Q'):
+			/* force you into the monitor.  you might deadlock. */
+			printk("\nForcing entry to the monitor\n");
+			monitor(hw_tf);
+			return;
+		case capchar2ctl('B'):
+			/* backtrace / debugging for the core receiving the irq */
+			printk("\nForced trapframe and backtrace for core %d\n", core_id());
+			print_trapframe(hw_tf);
+			backtrace_kframe(hw_tf);
+			return;
+	}
 	/* Do our work in an RKM, instead of interrupt context.  Note the RKM will
 	 * cast 'c' to a char. */
 	if (c == 'G')
