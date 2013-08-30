@@ -275,8 +275,7 @@ static void pipeclose(struct chan *c)
 }
 
 static long
-piperead(struct chan *c, void *va, long n, int64_t unused,
-		 struct errbuf *perrbuf)
+piperead(struct chan *c, void *va, long n, int64_t unused)
 {
 	struct pipe *p;
 
@@ -296,8 +295,7 @@ piperead(struct chan *c, void *va, long n, int64_t unused,
 	return -1;	/* not reached */
 }
 
-static struct block *pipebread(struct chan *c, long n, int64_t offset,
-							   struct errbuf *perrbuf)
+static struct block *pipebread(struct chan *c, long n, int64_t offset)
 {
 	struct pipe *p;
 
@@ -319,8 +317,7 @@ static struct block *pipebread(struct chan *c, long n, int64_t offset,
  *  the process.
  */
 static long
-pipewrite(struct chan *c, void *va, long n, int64_t unused,
-		  struct errbuf *perrbuf)
+pipewrite(struct chan *c, void *va, long n, int64_t unused)
 {
 	ERRSTACK(2);
 	struct pipe *p;
@@ -354,8 +351,7 @@ pipewrite(struct chan *c, void *va, long n, int64_t unused,
 }
 
 static long
-pipebwrite(struct chan *c, struct block *bp, int64_t unused,
-		   struct errbuf *perrbuf)
+pipebwrite(struct chan *c, struct block *bp, int64_t unused)
 {
 	ERRSTACK(2);
 	long n;

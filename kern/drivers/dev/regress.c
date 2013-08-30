@@ -44,8 +44,7 @@ regressstat(struct chan *c, uint8_t * dp, long n)
 	return devstat(c, dp, n, regressdir, Qmax, devgen);
 }
 
-static struct chan *regressopen(struct chan *c, int omode,
-								struct errbuf *perrbuf)
+static struct chan *regressopen(struct chan *c, int omode)
 {
 	return devopen(c, omode, regressdir, Qmax, devgen);
 }
@@ -55,8 +54,7 @@ static void regressclose(struct chan *c)
 }
 
 static long
-regressread(struct chan *c, void *a, long n, int64_t offset,
-			struct errbuf *perrbuf)
+regressread(struct chan *c, void *a, long n, int64_t offset)
 {
 	char *buf, *p;
 	static char ctl[128];
@@ -89,8 +87,7 @@ regressread(struct chan *c, void *a, long n, int64_t offset,
 }
 
 static long
-regresswrite(struct chan *c, void *a, long n, int64_t offset,
-			 struct errbuf *perrbuf)
+regresswrite(struct chan *c, void *a, long n, int64_t offset)
 {
 	char *p;
 	unsigned long amt;
