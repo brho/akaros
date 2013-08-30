@@ -562,7 +562,7 @@ Norewrite:
 extern struct dev procdevtab, rootdevtab;
 long sysread(int fd, void *p, size_t n, off_t off)
 {
-	ERRSTACK(2);struct errbuf *perrbuf;
+	ERRSTACK(2);
 	uint8_t *ep = p;
 	long nn, nnn;
 	struct chan *c;
@@ -665,7 +665,7 @@ printd("c.dev.read %d\n", nn);
 
 long syswrite(int fd, void *p, size_t n, off_t off)
 {
-	ERRSTACK(3);struct errbuf *perrbuf;
+	ERRSTACK(3);
 
 	int ispwrite = 1;
 	long r = n;
@@ -723,7 +723,7 @@ long syswrite(int fd, void *p, size_t n, off_t off)
 
 int syscreate(char *name, int omode)
 {
-	ERRSTACK(2);struct errbuf *perrbuf;
+	ERRSTACK(2);
 	struct chan *c = NULL;
 	int fd;
 	/* if it exists, it is truncated. 
@@ -752,7 +752,7 @@ int syscreate(char *name, int omode)
 
 int sysopen(char *name, int omode)
 {
-	ERRSTACK(2);struct errbuf *perrbuf;
+	ERRSTACK(2);
 	struct chan *c = NULL;
 	int fd;
 	int mustdir = 0;
@@ -788,7 +788,6 @@ int sysopen(char *name, int omode)
 
 int sysclose(int fd)
 {
-	struct errbuf *perrbuf = NULL;
 	fdtochan(fd, -1, 0, 0);
 	fdclose(fd, 0);
 	return 0;
@@ -796,7 +795,7 @@ int sysclose(int fd)
 
 int sysstat(char *name, uint8_t * statbuf, int len)
 {
-	ERRSTACK(2);struct errbuf *perrbuf;
+	ERRSTACK(2);
 	int r;
 	struct chan *c = NULL;
 	char *aname;
@@ -832,7 +831,7 @@ int sysstat(char *name, uint8_t * statbuf, int len)
 
 int sysfstat(int fd, uint8_t * statbuf, int len)
 {
-	ERRSTACK(2);struct errbuf *perrbuf;
+	ERRSTACK(2);
 	int r;
 	struct chan *c = NULL;
 	uint8_t data[sizeof(struct dir)];
@@ -861,7 +860,7 @@ int sysfstat(int fd, uint8_t * statbuf, int len)
 
 int sysdup(int ofd, int nfd)
 {
-	ERRSTACK(2);struct errbuf *perrbuf;
+	ERRSTACK(2);
 	struct chan *nc, *oc;
 	struct fgrp *f;
 
@@ -916,7 +915,7 @@ int plan9setup(struct proc *new_proc, struct proc *parent)
 {
 	struct proc *old_current;
 	struct kref *new_dot_ref;
-	ERRSTACKBASE(1);
+	ERRSTACK(1);
 	if (waserror()) {
 		printd("plan9setup failed\n");
 		return -1;
@@ -981,7 +980,7 @@ bindmount(int ismount,
 	  int flag,
 	  char* spec)
 {
-	ERRSTACK(10); struct errbuf *perrbuf;// it's complicated.
+	ERRSTACK(10);// it's complicated.
 	int i;
 	struct dev *dev;
 	struct chan *c0, *c1, *ac, *bc;
@@ -1085,7 +1084,7 @@ bindmount(int ismount,
 int
 sysunmount(char *name, char *old)
 {
-	ERRSTACK(2);struct errbuf *perrbuf;
+	ERRSTACK(2);
 	int ret;
 	struct chan *cmount, *cmounted;
 

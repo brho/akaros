@@ -465,9 +465,6 @@ extern char Edirseek[];			/* seek in directory */
 #define nel(x) (sizeof(x)/sizeof(x[0]))
 /* add 1 in case they forget they need an entry for the passed-in errbuf */
 #define ERRSTACK(x) struct errbuf errstack[(x)+1]; int curindex = 0;
-/* this replaces PERRBUF */
-#define ERRSTACKBASE(x) struct errbuf *perrbuf = NULL;\
-			struct errbuf errstack[(x)+1]; int curindex = 0;
 #define waserror() (errpush(errstack, nel(errstack), &curindex) || setjmp(&(get_cur_errbuf()->jmp_buf)))
 #define error(x) {set_errstr(x); longjmp(&get_cur_errbuf()->jmp_buf, (void *)x);}
 #define nexterror() {errpop(errstack, nel(errstack), &curindex); longjmp(&(get_cur_errbuf())->jmp_buf, (void *)1);}

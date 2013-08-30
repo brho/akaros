@@ -969,7 +969,7 @@ static int initted9 = 0;
 
 static void init9proc(struct proc *p)
 {
-        ERRSTACKBASE(1);
+        ERRSTACK(1);
         if (initted9)
                 return;
         initted9++;

@@ -43,7 +43,7 @@ devdir(struct chan *c, struct qid qid, char *n, int64_t length, char *user,
 	db->dev = c->devno;
 	db->mode = perm;
 	db->mode |= qid.type << 24;
-	db->atime = 0;	//seconds( perrbuf);
+	db->atime = 0;	//seconds
 	db->mtime = kerndate;
 	db->length = length;
 	db->uid = user;

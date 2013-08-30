@@ -852,6 +852,6 @@ static int rtl8139pnp(struct ether *edev)
 
 void ether8139link(void)
 {
-	ERRSTACKBASE(1);
+	ERRSTACK(1);
 	addethercard("rtl8139", rtl8139pnp);
 }

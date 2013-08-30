@@ -1911,7 +1911,7 @@ intreg_t syscall(struct proc *p, uintreg_t sc_num, uintreg_t a0, uintreg_t a1,
                  uintreg_t a2, uintreg_t a3, uintreg_t a4, uintreg_t a5)
 {
 	intreg_t ret = -1;
-	ERRSTACKBASE(1);
+	ERRSTACK(1);
 	const int max_syscall = sizeof(syscall_table)/sizeof(syscall_table[0]);
 
 	uint32_t coreid, vcoreid;
