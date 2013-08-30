@@ -11,3 +11,7 @@ obj-y						+= plan9file.o
 # qio is kind of an mbuf equivalent, might replace
 obj-y						+= qio.o
 obj-y						+= validname.o
+# command parsing
+obj-y						+= tokenize.o
+obj-y						+= parse.o
+
