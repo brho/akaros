@@ -1141,13 +1141,14 @@ static intreg_t sys_write(struct proc *p, int fd, const void *buf, int len)
 {
 	ssize_t ret;
 	struct file *file = get_file_from_fd(&p->open_files, fd);
+
 	if (!file) {
 		set_errno(EBADF);
 		return -1;
 	}
 	if (file->plan9){
-	    ret = syswrite(file->plan9fd, (void*)buf, len, (off_t) -1);
-	    printd("plan 9 write returns %d\n", ret);
+		ret = syswrite(file->plan9fd, (void*)buf, len, (off_t) -1);
+		printd("plan 9 write returns %d\n", ret);
 	} else {
 		
 		if (!file->f_op->write) {
@@ -1190,7 +1191,7 @@ static intreg_t sys_open(struct proc *p, const char *path, size_t path_l,
 				user_memdup_free(p, t_path);
 				return -1;
 			}
-			file->plan9 = 1;
+			file->plan9 = 0xcafebeef;
 			file->plan9fd = plan9fd;
 			printd("SYS_OPEN plan 9 open %s %x\n", t_path, plan9fd);
 		}
@@ -1949,9 +1950,10 @@ intreg_t syscall(struct proc *p, uintreg_t sc_num, uintreg_t a0, uintreg_t a1,
 	if (sc_num > max_syscall || syscall_table[sc_num].call == NULL)
 		panic("Invalid syscall number %d for proc %x!", sc_num, p);
 
+	/* N.B. This is going away. */
 	if (waserror()){
-		printd("Plan 9 system call returned via waserror()\n");
-		printd("String: '%s'\n", current_errstr());
+		printk("Plan 9 system call returned via waserror()\n");
+		printk("String: '%s'\n", current_errstr());
 		/* if we got here, then the errbuf was right.
 		 * no need to check!
 		 */

@@ -30,7 +30,7 @@ readnum(unsigned long off, char *buf, unsigned long n, unsigned long val,
 	size = MIN(sizeof(tmp), size);
 
 	/* we really need the %* format. */
-	snprintf(tmp, size, "%lud", val);
+	snprintf(tmp, size, "%lu", val);
 	tmp[size - 1] = ' ';
 	if (off >= size)
 		return 0;
@@ -671,26 +671,27 @@ long syswrite(int fd, void *p, size_t n, off_t off)
 	long r = n;
 	struct chan *c;
 
-	printd("syswrite %d %p %d\n", fd, p, n);
 	n = 0;
 	if (waserror()) {
+		printk("syswrite %d: '%s'\n", fd, current_errstr());
 		set_errno(EBADF);
-		nexterror();
+		poperror();
+		return -1;
 	}
 
 	c = fdtochan(fd, OWRITE, 1, 1);
 
 	poperror();
-	printd("syswrite chan %p\n", c);
 	if (waserror()) {
-
+		printk("syswrite %d: '%s'\n", fd, current_errstr());
 		if (!ispwrite) {
 			spin_lock(&c->lock);
 			c->offset -= n;
 			spin_unlock(&c->lock);
 		}
 		cclose(c);
-		nexterror();
+		poperror();
+		return -1;
 	}
 
 	if (c->qid.type & QTDIR)
@@ -705,7 +706,6 @@ long syswrite(int fd, void *p, size_t n, off_t off)
 		spin_unlock(&c->lock);
 	}
 
-	printd("call dev write\n");
 	r = c->dev->write(c, p, n, off);
 
 	if (!ispwrite && r < n) {
@@ -716,7 +716,6 @@ long syswrite(int fd, void *p, size_t n, off_t off)
 
 	poperror();
 	cclose(c);
-	printd("syswrite retturns %d\n", r);
 	return r;
 
 }

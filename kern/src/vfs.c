@@ -1981,6 +1981,9 @@ void file_release(struct kref *kref)
 	struct file *file = container_of(kref, struct file, f_kref);
 
 	if (file->plan9) {
+		if (file->plan9 != 0xcafebeef)
+			printk("corruption. file->plan9 is 0x%x, expected 0xcafebeef\n",
+				file->plan9);
 		file->plan9 = 0;
 		kmem_cache_free(file_kcache, file);
 		return;
