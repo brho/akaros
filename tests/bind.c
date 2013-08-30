@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ros/syscall.h>
+//#include <plan9.h>
 
 /* The naming for the args in bind is messy historically.  We do:
  * 		bind src_path onto_path
@@ -19,19 +20,31 @@
 int main(int argc, char *argv[]) 
 { 
 	int ret;
-	int flag;
-	if (argc < 4) {
-		fprintf(stderr, "usage: %s src_path onto_path flag\n", argv[0]);
+	int flag = 0;
+	char *src_path, *onto_path;
+	/* crap arg handling for now. */
+	argc--,argv++;
+	if (argc > 2){
+		switch(argv[0][1]){
+			case 'b': flag = 1;
+			break;
+			case 'a': flag = 2;
+			break;
+			default: 
+				printf("-a or -b for now\n");
+				exit(0);
+		}
+		argc--, argv++;
+	}
+
+	if (argc < 2) {
+		fprintf(stderr, "usage: bind [-a|-b] src_path onto_path\n");
 		exit(1);
 	}
-	flag = strtol(argv[3], 0, 0);
-	/* til we support access in 9ns */
-	//printf("access %s is %d\n", argv[1], access(argv[1], X_OK|R_OK));
-	//printf("access %s is %d\n", argv[2], access(argv[2], X_OK|R_OK));
-	printf("%s %d %s %d %d\n", argv[1], strlen(argv[1]), argv[2], 
-	       strlen(argv[2]), flag);
-	ret = syscall(SYS_nbind, argv[1], strlen(argv[1]), argv[2],
-	              strlen(argv[2]), 0);
-
-	printf("%d\n", ret);
+	src_path = argv[0];
+	onto_path = argv[1];
+	printf("bind %s -> %s flag %d\n", src_path, onto_path, flag);
+	ret = syscall(SYS_nbind, src_path, strlen(src_path),
+			onto_path, strlen(onto_path));
+	return ret;
 }

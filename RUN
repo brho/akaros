@@ -1,3 +1,0 @@
-sudo qemu-system-x86_64 -s -cpu phenom -smp 8 -m 6024 -nographic  -net nic,model=rtl8139 mnt/hdd268mb.img -kernel mnt/hdd/kernel $*
-
-# -S -s -gdb tcp::1234

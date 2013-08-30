@@ -28,6 +28,7 @@ int main(int argc, char *argv[])
 	if (read(netctl, name, sizeof(name)) < 1)
 		perror("read name");
 	sprintf(path, "#l/ether0/%s/data", name);
+	printf("Write a packet to %s\n", path);
 	netfd = open(path, O_RDWR);
 	if (write(netfd, path, sizeof(path)) < sizeof(path))
 		perror("write to net");

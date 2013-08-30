@@ -1,0 +1,1 @@
+sudo qemu-system-x86_64 -s -cpu phenom -smp 8 -m 6024  -monitor /dev/pts/$1 -net nic,model=e1000 mnt/hdd268mb.img -kernel mnt/hdd/kernel
