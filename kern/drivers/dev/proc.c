@@ -1394,7 +1394,9 @@ static struct chan *proctext(struct chan *c, struct proc *p)
 	if (tc == 0)
 		error(Eprocdied);
 
-	if (kref_get(&tc->ref, 1) == 1 || (tc->flag & COPEN) == 0
+	/* TODO: what do you want here?  you can't get a kref and have the new val
+	 * be 1.  Here is the old code: if (kref_get(&tc->ref, 1) == 1 || ... ) */
+	if (kref_refcnt(&tc->ref, 1) == 1 || (tc->flag & COPEN) == 0
 		|| tc->mode != OREAD) {
 		cclose(tc);
 		error(Eprocdied);
