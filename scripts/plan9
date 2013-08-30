@@ -17,6 +17,8 @@ sed -i '/typedef *struct *Path *Path;/d' $1
 sed -i '/typedef *struct *Proc *Proc;/d' $1
 sed -i '/typedef *struct *Pgrp *Pgrp;/d' $1
 sed -i '/typedef *struct *Dev *Dev;/d' $1
+sed -i '/typedef *struct *Cmdbuf *Cmdbuf;/d' $1
+sed -i '/typedef *struct *Cmdtab *Cmdtab;/d' $1
 
 sed -i 's/Block/struct block/g' $1
 sed -i 's/Ctlr/struct ctlr/g' $1
@@ -40,6 +42,8 @@ sed -i 's/RWLock/rwlock_t rwlock/g' $1
 sed -i 's/Lock/spinlock_t lock/g' $1
 sed -i 's/Ref/struct kref/g' $1
 sed -i 's/Walkqid/struct walkqid/g' $1
+sed -i 's/Cmdbuf/struct cmdbuf/g' $1
+sed -i 's/Cmdtab/struct cmdtab/g' $1
 sed -i 's/nil/NULL/g' $1
 sed -i 's/KERN_WAIT/KMALLOC_WAIT/g' $1
 sed -i 's/nelem/ARRAY_SIZE/g' $1
@@ -47,6 +51,7 @@ sed -i 's/nelem/ARRAY_SIZE/g' $1
 # stuff I'm not smart enough to do with spatch
 sed -i '/strcpy.*(\(.*\),\(.*\));/s//strncpy(\1, \2, sizeof(\1));/' $1
 sed -i '/snprint(/s//snprintf(/' $1
+sed -i '/seprint(/s//seprintf(/' $1
 
 # And the stupid stuff
 
