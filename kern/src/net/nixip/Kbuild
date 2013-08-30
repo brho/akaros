@@ -1,0 +1,22 @@
+# Plan 9 tcp/ip stack, includes ipv6.
+#obj-y						+= arp.o
+#obj-y						+= chandial.o
+#obj-y						+= devip.o
+#obj-y						+= ethermedium.o
+#obj-y						+= gre.o
+#obj-y						+= icmp6.o
+#obj-y						+= icmp.o
+#obj-y						+= inferno.o
+#obj-y						+= ipaux.o
+#obj-y						+= ip.o
+#obj-y						+= ipifc.o
+#obj-y						+= iproute.o
+#obj-y						+= ipv6.o
+#obj-y						+= loopbackmedium.o
+#obj-y						+= netdevmedium.o
+#obj-y						+= netlog.o
+obj-y						+= nullmedium.o
+#obj-y						+= pktmedium.o
+#obj-y						+= ptclbsum.o
+#obj-y						+= tcp.o
+#obj-y						+= udp.o
