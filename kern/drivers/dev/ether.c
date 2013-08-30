@@ -257,15 +257,13 @@ etherwrite(struct chan *chan, void *buf, long n, int64_t unused)
 		nn = netifwrite(&ether->netif, chan, buf, n);
 		if (nn >= 0)
 			return nn;
-		error("no cmd write yet");
-#if 0
 		cb = parsecmd(buf, n);
 		if (cb->f[0] && strcmp(cb->f[0], "nonblocking") == 0) {
 			if (cb->nf <= 1)
 				onoff = 1;
 			else
 				onoff = atoi(cb->f[1]);
-			qnoblock(ether->oq, onoff);
+			qnoblock(ether->netif.oq, onoff);
 			kfree(cb);
 			return n;
 		}
@@ -274,7 +272,6 @@ etherwrite(struct chan *chan, void *buf, long n, int64_t unused)
 			return ether->ctl(ether, buf, n);
 
 		error(Ebadctl);
-#endif
 	}
 
 	if (n > ether->netif.mtu)
