@@ -230,25 +230,25 @@ netifread(struct netif *nif, struct chan *c, void *a, long n, int64_t off)
 			p = kzmalloc(READSTR, 0);
 			if (p == NULL)
 				error(Enomem);
-			j = snprintf(p, READSTR, "in: %llud\n", nif->inpackets);
+			j = snprintf(p, READSTR, "in: %lld\n", nif->inpackets);
 			j += snprintf(p + j, READSTR - j, "link: %d\n", nif->link);
-			j += snprintf(p + j, READSTR - j, "out: %llud\n", nif->outpackets);
-			j += snprintf(p + j, READSTR - j, "crc errs: %llud\n", nif->crcs);
-			j += snprintf(p + j, READSTR - j, "overflows: %llud\n",
+			j += snprintf(p + j, READSTR - j, "out: %lld\n", nif->outpackets);
+			j += snprintf(p + j, READSTR - j, "crc errs: %lld\n", nif->crcs);
+			j += snprintf(p + j, READSTR - j, "overflows: %lld\n",
 						  nif->overflows);
-			j += snprintf(p + j, READSTR - j, "soft overflows: %llud\n",
+			j += snprintf(p + j, READSTR - j, "soft overflows: %lld\n",
 						  nif->soverflows);
-			j += snprintf(p + j, READSTR - j, "framing errs: %llud\n",
+			j += snprintf(p + j, READSTR - j, "framing errs: %lld\n",
 						  nif->frames);
-			j += snprintf(p + j, READSTR - j, "buffer errs: %llud\n",
+			j += snprintf(p + j, READSTR - j, "buffer errs: %lld\n",
 						  nif->buffs);
-			j += snprintf(p + j, READSTR - j, "output errs: %llud\n",
+			j += snprintf(p + j, READSTR - j, "output errs: %lld\n",
 						  nif->oerrs);
 			j += snprintf(p + j, READSTR - j, "prom: %d\n", nif->prom);
 			j += snprintf(p + j, READSTR - j, "mbps: %d\n", nif->mbps);
 			j += snprintf(p + j, READSTR - j, "addr: ");
 			for (i = 0; i < nif->alen; i++)
-				j += snprintf(p + j, READSTR - j, "%2.2ux", nif->addr[i]);
+				j += snprintf(p + j, READSTR - j, "%2.2x", nif->addr[i]);
 			snprintf(p + j, READSTR - j, "\n");
 			n = readstr(offset, a, n, p);
 			kfree(p);
@@ -257,7 +257,7 @@ netifread(struct netif *nif, struct chan *c, void *a, long n, int64_t off)
 			p = kzmalloc(READSTR, 0);
 			j = 0;
 			for (i = 0; i < nif->alen; i++)
-				j += snprintf(p + j, READSTR - j, "%2.2ux", nif->addr[i]);
+				j += snprintf(p + j, READSTR - j, "%2.2x", nif->addr[i]);
 			n = readstr(offset, a, n, p);
 			kfree(p);
 			return n;
@@ -268,7 +268,7 @@ netifread(struct netif *nif, struct chan *c, void *a, long n, int64_t off)
 			return 0;
 		case Nmtuqid:
 			snprintf(current->genbuf, sizeof current->genbuf,
-					 "%11.ud %11.ud %11.ud\n", nif->minmtu, nif->mtu,
+					 "%11.d %11.d %11.d\n", nif->minmtu, nif->mtu,
 					 nif->maxmtu);
 			return readstr(offset, a, n, current->genbuf);
 	}
