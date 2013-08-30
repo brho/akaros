@@ -551,6 +551,8 @@ static int openfile(struct netif *nif, int id)
 		f = *fp;
 		if (f == 0) {
 			f = kzmalloc(sizeof(struct netfile), 0);
+			/* TODO: irqsave lock? */
+			spinlock_init(&f->qlock);
 			if (f == 0)
 				panic("memory");
 			f->iq = qopen(nif->limit, Qmsg, 0, 0);

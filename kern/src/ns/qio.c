@@ -767,10 +767,14 @@ struct queue *qopen(int limit, int msg, void (*kick) (void *), void *arg)
 {
 	struct queue *q;
 
-	q = kmalloc(sizeof(struct queue), 0);
+	q = kzmalloc(sizeof(struct queue), 0);
 	if (q == 0)
 		return 0;
 
+	/* TODO: Assuming non-irqsave for now */
+	spinlock_init(&q->lock);
+	spinlock_init(&q->rlock);
+	spinlock_init(&q->wlock);
 	q->limit = q->iNULLim = limit;
 	q->kick = kick;
 	q->arg = arg;
@@ -788,10 +792,14 @@ struct queue *qbypass(void (*bypass) (void *, struct block *), void *arg)
 {
 	struct queue *q;
 
-	q = kmalloc(sizeof(struct queue), 0);
+	q = kzmalloc(sizeof(struct queue), 0);
 	if (q == 0)
 		return 0;
 
+	/* TODO: Assuming non-irqsave for now */
+	spinlock_init(&q->lock);
+	spinlock_init(&q->rlock);
+	spinlock_init(&q->wlock);
 	q->limit = 0;
 	q->arg = arg;
 	q->bypass = bypass;
