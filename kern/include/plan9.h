@@ -41,7 +41,8 @@ typedef spinlock_t qlock_t;
 #define iunlock(x) spin_unlock(x)
 
 /* command tables for drivers. */
-enum {
+enum
+{
 	NCMDFIELD = 128
 };
 
@@ -640,6 +641,14 @@ unsigned int convM2D(uint8_t * buf, unsigned int nbuf, struct dir *d,
 					 char *strs);
 unsigned int sizeD2M(struct dir *d);
 unsigned int convD2M(struct dir *d, uint8_t * buf, unsigned int nbuf);
+
+/* kern/src/ns/parse.c */
+struct cmdbuf *parsecmd(char *p, int n);
+void cmderror(struct cmdbuf *cb, char *s);
+struct cmdtab *lookupcmd(struct cmdbuf *cb, struct cmdtab *ctab, int nctab);
+/* kern/src/ns/tokenize.c */
+int gettokens(char *s, char **args, int maxargs, char *sep);
+int tokenize(char *s, char **args, int maxargs);
 
 /* plan 9 has a concept of a hostowner, which is a name. For now, we got with a define. */
 #define eve "eve"
