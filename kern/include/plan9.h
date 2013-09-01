@@ -27,6 +27,7 @@
 /* no support for reader/writer locks yet. */
 typedef spinlock_t rwlock_t;
 #define rlock(x) spin_lock(x)
+#define canrlock(x)  (! spin_locked(x))
 #define runlock(x) spin_unlock(x)
 #define wlock(x) spin_lock(x)
 #define wunlock(x) spin_unlock(x)
@@ -649,6 +650,12 @@ int tokenize(char *s, char **args, int maxargs);
 
 /* plan 9 has a concept of a hostowner, which is a name. For now, we got with a define. */
 #define eve "eve"
+
+/* functions we need to do something with someday */
+#define kproc(...)
+#define tsleep(...)
+#define postnote(...)
+#define pexit(...)
 
 /* include for now.
  * It's the easiest way to ensure we don't have odd conflicts.

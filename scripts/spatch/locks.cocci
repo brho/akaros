@@ -23,6 +23,13 @@ rlock(
 @@
 expression E;
 @@
+canrlock(
+-E
++&E->rwlock
+ )
+@@
+expression E;
+@@
 runlock(
 -E
 +&E->rwlock

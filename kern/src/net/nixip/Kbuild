@@ -12,7 +12,7 @@
 #obj-y						+= ipifc.o
 #obj-y						+= iproute.o
 #obj-y						+= ipv6.o
-#obj-y						+= loopbackmedium.o
+obj-y						+= loopbackmedium.o
 #obj-y						+= netdevmedium.o
 #obj-y						+= netlog.o
 obj-y						+= nullmedium.o

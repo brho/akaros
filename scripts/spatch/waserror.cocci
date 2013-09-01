@@ -8,6 +8,4 @@ T f(...)
 ... 
 waserror() ...}
 
-@@
-@@
-poperror(...);
+

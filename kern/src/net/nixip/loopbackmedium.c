@@ -1,11 +1,15 @@
-#include "u.h"
-#include "../port/lib.h"
-#include "mem.h"
-#include "dat.h"
-#include "fns.h"
-#include "../port/error.h"
-
-#include "ip.h"
+#include <vfs.h>
+#include <kfs.h>
+#include <slab.h>
+#include <kmalloc.h>
+#include <kref.h>
+#include <string.h>
+#include <stdio.h>
+#include <assert.h>
+#include <error.h>
+#include <cpio.h>
+#include <pmap.h>
+#include <smp.h>
 
 enum
 {
@@ -15,21 +19,21 @@ enum
 typedef struct LB LB;
 struct LB
 {
-	Proc	*readp;
-	Queue	*q;
-	Fs	*f;
+	struct proc	*readp;
+	struct queue	*q;
+	struct fs	*f;
 };
 
 static void loopbackread(void *a);
 
 static void
-loopbackbind(Ipifc *ifc, int, char**)
+loopbackbind(struct ipifc *ifc, int unused_int, char **unused_char_pp_t)
 {
 	LB *lb;
 
-	lb = smalloc(sizeof(*lb));
+	lb = kmalloc(sizeof(*lb), 0);
 	lb->f = ifc->conv->p->f;
-	lb->q = qopen(1024*1024, Qmsg, nil, nil);
+	lb->q = qopen(1024*1024, Qmsg, NULL, NULL);
 	ifc->arg = lb;
 	ifc->mbps = 1000;
 
@@ -38,7 +42,7 @@ loopbackbind(Ipifc *ifc, int, char**)
 }
 
 static void
-loopbackunbind(Ipifc *ifc)
+loopbackunbind(struct ipifc *ifc)
 {
 	LB *lb = ifc->arg;
 
@@ -47,15 +51,15 @@ loopbackunbind(Ipifc *ifc)
 
 	/* wait for reader to die */
 	while(lb->readp != 0)
-		tsleep(&up->sleep, return0, 0, 300);
+		; //tsleep(&up->sleep, return0, 0, 300);
 
 	/* clean up */
 	qfree(lb->q);
-	free(lb);
+	kfree(lb);
 }
 
 static void
-loopbackbwrite(Ipifc *ifc, Block *bp, int, uchar*)
+loopbackbwrite(struct ipifc *ifc, struct block *bp, int unused_int, uint8_t *unused_uint8_p_t)
 {
 	LB *lb;
 
@@ -68,40 +72,41 @@ loopbackbwrite(Ipifc *ifc, Block *bp, int, uchar*)
 static void
 loopbackread(void *a)
 {
-	Ipifc *ifc;
-	Block *bp;
+	ERRSTACK(1);
+	struct ipifc *ifc;
+	struct block *bp;
 	LB *lb;
 
 	ifc = a;
 	lb = ifc->arg;
-	lb->readp = up;	/* hide identity under a rock for unbind */
+	lb->readp = current;	/* hide identity under a rock for unbind */
 	if(waserror()){
 		lb->readp = 0;
 		pexit("hangup", 1);
 	}
 	for(;;){
 		bp = qbread(lb->q, Maxtu);
-		if(bp == nil)
+		if(bp == NULL)
 			continue;
 		ifc->in++;
-		if(!canrlock(ifc)){
+		if(!canrlock(&ifc->rwlock)){
 			freeb(bp);
 			continue;
 		}
 		if(waserror()){
-			runlock(ifc);
+			runlock(&ifc->rwlock);
 			nexterror();
 		}
-		if(ifc->lifc == nil)
+		if(ifc->lifc == NULL)
 			freeb(bp);
 		else
 			ipiput4(lb->f, ifc, bp);
-		runlock(ifc);
+		runlock(&ifc->rwlock);
 		poperror();
 	}
 }
 
-Medium loopbackmedium =
+struct medium loopbackmedium =
 {
 .hsize=		0,
 .mintu=		0,

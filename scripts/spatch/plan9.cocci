@@ -113,8 +113,8 @@ type T;
 @@
 @@
 -if (up){
-...
--} else {...}
++if (current){
+...  } else {...}
 
 @@
 expression E;
