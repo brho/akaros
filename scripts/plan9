@@ -1,49 +1,4 @@
 #!/bin/sh
-# blow away the 'typedef thing thing;' stuff. 
-sed -i '/typedef *struct *Block *Block;/d' $1
-sed -i '/typedef *struct *Ctlr *Ctlr;/d' $1
-sed -i '/typedef *struct *Ether *Ether;/d' $1
-sed -i '/typedef *struct *Etherpkt *Etherpkt;/d' $1
-sed -i '/typedef *struct *Chan *Chan;/d' $1
-sed -i '/typedef *struct *Dirtab *Dirtab;/d' $1
-sed -i '/typedef *struct *Dirlist *Dirlist;/d' $1
-sed -i '/typedef *struct *Dir *Dir;/d' $1
-sed -i '/typedef *struct *Fgrp *Fgrp;/d' $1
-sed -i '/typedef *struct *Qid *Qid;/d' $1
-sed -i '/typedef *struct *Waitqid *Waitqid;/d' $1
-sed -i '/typedef *struct *Mount *Mount;/d' $1
-sed -i '/typedef *struct *Mhead *Mhead;/d' $1
-sed -i '/typedef *struct *Path *Path;/d' $1
-sed -i '/typedef *struct *Proc *Proc;/d' $1
-sed -i '/typedef *struct *Pgrp *Pgrp;/d' $1
-sed -i '/typedef *struct *Dev *Dev;/d' $1
-sed -i '/typedef *struct *Cmdbuf *Cmdbuf;/d' $1
-sed -i '/typedef *struct *Cmdtab *Cmdtab;/d' $1
-
-sed -i 's/Block/struct block/g' $1
-sed -i 's/Ctlr/struct ctlr/g' $1
-sed -i 's/Ether/struct ether/g' $1
-sed -i 's/Etherpkt/struct etherpkt/g' $1
-sed -i 's/Chan/struct chan/g' $1
-sed -i 's/Dirtab/struct dirtab/g' $1
-sed -i 's/Dirlist/struct dirlist/g' $1
-sed -i 's/Dir/struct dir/g' $1
-sed -i 's/Fgrp/struct fgrp/g' $1
-sed -i 's/Qid/struct qid/g' $1
-sed -i 's/Waitqid/struct waitqid/g' $1
-sed -i 's/Mount/struct mount/g' $1
-sed -i 's/Mhead/struct mhead/g' $1
-sed -i 's/Path/struct path/g' $1
-sed -i 's/Proc/struct proc/g' $1
-sed -i 's/Pgrp/struct pgrp/g' $1
-sed -i 's/Dev/struct dev/g' $1
-sed -i 's/QLock/qlock_t qlock/g' $1
-sed -i 's/RWLock/rwlock_t rwlock/g' $1
-sed -i 's/Lock/spinlock_t lock/g' $1
-sed -i 's/Ref/struct kref/g' $1
-sed -i 's/Walkqid/struct walkqid/g' $1
-sed -i 's/Cmdbuf/struct cmdbuf/g' $1
-sed -i 's/Cmdtab/struct cmdtab/g' $1
 sed -i 's/nil/NULL/g' $1
 sed -i 's/KERN_WAIT/KMALLOC_WAIT/g' $1
 sed -i 's/nelem/ARRAY_SIZE/g' $1
@@ -52,7 +7,15 @@ sed -i 's/nelem/ARRAY_SIZE/g' $1
 sed -i '/strcpy.*(\(.*\),\(.*\));/s//strncpy(\1, \2, sizeof(\1));/' $1
 sed -i '/snprint(/s//snprintf(/' $1
 sed -i '/seprint(/s//seprintf(/' $1
+sed -i 's/[ \t][ \t]*QLock;/	qlock_t qlock;/' $1
 
-# And the stupid stuff
+# spatch can't do this yet -- we've talked to them.
+sed -i 's/struct ipifc\*,/struct ipifc *unused_ipifc,/' $1
+sed -i 's/(struct ipifc\*)/(struct ipifc *unused_ipifc)/' $1
+sed -i 's/ *uint8_t,/ uint8_t unused_uint8_t,/' $1
+sed -i 's/ *uint8_t\*,/ uint8_t *unused_uint8_p_t,/' $1
+sed -i 's/ *uint8_t)/ uint8_t unused_uint8_t)/' $1
+sed -i 's/ *uint8_t\*)/ uint8_t *unused_uint8_p_t)/' $1
+sed -i 's/ *int,/ int unused_int,/' $1
+sed -i '/USED(.*);/d' $1
 
-sed -i '/struct struct/s//struct/' $1

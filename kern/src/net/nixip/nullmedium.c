@@ -10,7 +10,6 @@
 #include <cpio.h>
 #include <pmap.h>
 #include <smp.h>
-#include <ip.h>
 
 static void nullbind(struct ipifc *ipifc, int i, char **cpp)
 {

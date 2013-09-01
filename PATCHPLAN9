@@ -18,9 +18,13 @@ set -e
 #them as such. 
 #
 # waserror/poperror fixing, via script/spatch/waserror.cocci
+# N.B. Need r18 or later.
 spatch --sp-file scripts/spatch/waserror.cocci --in-place $1
 # General Plan 9 fixing, via script/spatch/waserror.cocci
 spatch --sp-file scripts/spatch/plan9.cocci --in-place $1
+spatch --sp-file scripts/spatch/scalar.cocci --in-place $1
+spatch --sp-file scripts/spatch/typedef.cocci --in-place $1
+spatch --sp-file scripts/spatch/locks.cocci --in-place $1
 # include fixing. Idempotent. 
 sh scripts/fixincludes $1
 # Scalars. Idempotent.
@@ -29,7 +33,8 @@ sh scripts/scalar $1
 sh scripts/temporary_hack $1
 # malloc. Idempotent.
 spatch --sp-file scripts/spatch/malloc.cocci --in-place $1
-# type names, via scripts/plan9. idempotent.
+# type names, via scripts/plan9. NOT idempotent.
+# in fact, we almost certainly don't want it.
 sh scripts/plan9 $1
 # kref. Idempotent.
 spatch --sp-file scripts/spatch/kref.cocci --in-place $1

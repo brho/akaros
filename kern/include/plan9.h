@@ -650,3 +650,8 @@ int tokenize(char *s, char **args, int maxargs);
 /* plan 9 has a concept of a hostowner, which is a name. For now, we got with a define. */
 #define eve "eve"
 
+/* include for now.
+ * It's the easiest way to ensure we don't have odd conflicts.
+ */
+
+#include <ip.h>
