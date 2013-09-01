@@ -1,6 +1,23 @@
 @@
 expression E;
 @@
+-lock(
++spin_lock(
+-E
++&E->rwlock
+ )
+@@
+expression E;
+@@
+-unlock(
++spin_unlock(
+-E
++&E->rwlock
+ )
+
+@@
+expression E;
+@@
 wlock(
 -E
 +&E->rwlock

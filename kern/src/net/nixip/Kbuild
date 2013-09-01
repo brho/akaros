@@ -7,7 +7,7 @@
 #obj-y						+= icmp6.o
 #obj-y						+= icmp.o
 #obj-y						+= inferno.o
-#obj-y						+= ipaux.o
+obj-y						+= ipaux.o
 #obj-y						+= ip.o
 #obj-y						+= ipifc.o
 #obj-y						+= iproute.o
