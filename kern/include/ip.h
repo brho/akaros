@@ -179,7 +179,7 @@ struct conv {
 	char cerr[ERRMAX];
 
 	qlock_t listenq;
-	//    Rendez  listenr;
+	/*    Rendez  */int listenr;
 
 	struct Ipmulti *multi;		/* multicast bindings for this interface */
 

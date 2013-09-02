@@ -66,3 +66,10 @@ qunlock(
 -E
 +&E->qlock
  )
+@@
+expression E;
+@@
+canqlock(
+-E
++&E->qlock
+ )

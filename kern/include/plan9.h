@@ -37,6 +37,7 @@ typedef spinlock_t rwlock_t;
 typedef spinlock_t qlock_t;
 #define qlock(x) spin_lock(x)
 #define qunlock(x) spin_unlock(x)
+#define canqlock(x)  (! spin_locked(x))
 
 /* ilock is a lock that occurs during interrupts. */
 #define ilock(x) spin_lock(x)
@@ -655,6 +656,7 @@ int tokenize(char *s, char **args, int maxargs);
 /* functions we need to do something with someday */
 #define kproc(...)
 #define tsleep(...)
+#define sleep(...)
 #define postnote(...)
 #define pexit(...)
 
