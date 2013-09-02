@@ -290,4 +290,23 @@ int snprintf(char *buf, int n, const char *fmt, ...)
 	return rc;
 }
 
+/* convenience function: do a print, return the pointer to the end. */
+char *seprintf(char *buf, char *end, const char *fmt, ...)
+{
+	va_list ap;
+	int rc;
+	int n = end-buf;
+
+	if (n <= 0)
+		return buf;
+
+	va_start(ap, fmt);
+	rc = vsnprintf(buf, n, fmt, ap);
+	va_end(ap);
+
+	if (rc >= 0)
+		return buf + rc;
+	else
+		return buf;
+}
 

@@ -1,0 +1,5 @@
+#!/bin/bash
+sed -i 's/qunlock(&(&ip->fraglock4)->qlock)/qunlock(\&ip->fraglock4)/' $1
+sed -i 's/qlock(&(&ip->fraglock4)->qlock)/qlock(\&ip->fraglock4)/' $1
+sed -i 's/kref_get(&(&ip->id4)->ref/kref_get(\&ip->id4/' $1
+

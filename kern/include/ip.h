@@ -27,8 +27,9 @@ enum {
 	IP_VER4 = 0x40,
 	IP_VER6 = 0x60,
 	IP_HLEN4 = 5,	/* v4: Header length in words */
-#if 0
-	define in other includes.They should be removed.IP_DF = 0x4000,	/* v4: Don't fragment */
+	/* barf. Temporary. */
+#ifndef IP_DF
+	IP_DF = 0x4000,	/* v4: Don't fragment */
 	IP_MF = 0x2000,	/* v4: More fragments */
 #endif
 	IP4HDR = 20,	/* sizeof(struct Ip4hdr) */
@@ -497,7 +498,7 @@ struct V6route {
 };
 
 struct route {
-	struct routeTree routeTree;;
+	struct routeTree routeTree;
 
 	union {
 		struct V6route v6;

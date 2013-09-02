@@ -40,6 +40,7 @@ int	vcprintf(const char * NTS fmt, va_list);
 
 // lib/sprintf.c
 int	snprintf(char *COUNT(size) str, int size, const char *NTS fmt, ...);
+char *	seprintf(char *COUNT(size) str, char *end, const char *NTS fmt, ...);
 int	vsnprintf(char *COUNT(size) str, int size, const char *NTS fmt, va_list);
 
 // lib/fprintf.c

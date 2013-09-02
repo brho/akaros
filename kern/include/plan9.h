@@ -2,6 +2,7 @@
  * Copyright 2013 Google Inc.
  * Copyright (c) 1989-2003 by Lucent Technologies, Bell Laboratories.
  */
+#ifndef KERN_INCLUDE_PLAN9_H
 #include <setjmp.h>
 #include <atomic.h>
 
@@ -662,3 +663,5 @@ int tokenize(char *s, char **args, int maxargs);
  */
 
 #include <ip.h>
+
+#endif /* KERN_INCLUDE_PLAN9_H */
