@@ -1,21 +1,27 @@
-#include	"u.h"
-#include	"../port/lib.h"
-#include	"mem.h"
-#include	"dat.h"
-#include	"fns.h"
-#include	"../port/error.h"
-#include	"../ip/ip.h"
+#include <vfs.h>
+#include <kfs.h>
+#include <slab.h>
+#include <kmalloc.h>
+#include <kref.h>
+#include <string.h>
+#include <stdio.h>
+#include <assert.h>
+#include <error.h>
+#include <cpio.h>
+#include <pmap.h>
+#include <smp.h>
 
-typedef struct DS DS;
-static Chan*	call(char*, char*, DS*);
-static void	_dial_string_parse(char*, DS*);
+struct ds;
+
+static struct chan*	call( char *unused_char_p_t, char*, struct ds*);
+static void	_dial_string_parse( char *unused_char_p_t, struct ds*);
 
 enum
 {
 	Maxstring=	128,
 };
 
-struct DS
+struct ds
 {
 	char	buf[Maxstring];			/* dist string */
 	char	*netdir;
@@ -23,16 +29,16 @@ struct DS
 	char	*rem;
 	char	*local;				/* other args */
 	char	*dir;
-	Chan	**ctlp;
+	struct chan	**ctlp;
 };
 
 /*
  *  the dialstring is of the form '[/net/]proto!dest'
  */
-Chan*
-chandial(char *dest, char *local, char *dir, Chan **ctlp)
+struct chan*
+chandial(char *dest, char *local, char *dir, struct chan **ctlp)
 {
-	DS ds;
+	struct ds ds;
 	char clone[Maxpath];
 
 	ds.local = local;
@@ -44,15 +50,16 @@ chandial(char *dest, char *local, char *dir, Chan **ctlp)
 		ds.netdir = "/net";
 
 	/* no connection server, don't translate */
-	snprint(clone, sizeof(clone), "%s/%s/clone", ds.netdir, ds.proto);
+	snprintf(clone, sizeof(clone), "%s/%s/clone", ds.netdir, ds.proto);
 	return call(clone, ds.rem, &ds);
 }
 
-static Chan*
-call(char *clone, char *dest, DS *ds)
+static struct chan*
+call(char *clone, char *dest, struct ds *ds)
 {
+	ERRSTACK(2);
 	int n;
-	Chan *dchan, *cchan;
+	struct chan *dchan, *cchan;
 	char name[Maxpath], data[Maxpath], *p;
 
 	cchan = namec(clone, Aopen, ORDWR, 0);
@@ -66,18 +73,18 @@ call(char *clone, char *dest, DS *ds)
 	name[n] = 0;
 	for(p = name; *p == ' '; p++)
 		;
-	sprint(name, "%lud", strtoul(p, 0, 0));
+	snprintf(name, sizeof(name), "%lud", strtol/*strtoul*/(p, 0, 0));
 	p = strrchr(clone, '/');
 	*p = 0;
 	if(ds->dir)
-		snprint(ds->dir, Maxpath, "%s/%s", clone, name);
-	snprint(data, sizeof(data), "%s/%s/data", clone, name);
+		snprintf(ds->dir, Maxpath, "%s/%s", clone, name);
+	snprintf(data, sizeof(data), "%s/%s/data", clone, name);
 
 	/* connect */
 	if(ds->local)
-		snprint(name, sizeof(name), "connect %s %s", dest, ds->local);
+		snprintf(name, sizeof(name), "connect %s %s", dest, ds->local);
 	else
-		snprint(name, sizeof(name), "connect %s", dest);
+		snprintf(name, sizeof(name), "connect %s", dest);
 	cchan->dev->write(cchan, name, strlen(name), 0);
 
 	/* open data connection */
@@ -95,7 +102,7 @@ call(char *clone, char *dest, DS *ds)
  *  parse a dial string
  */
 static void
-_dial_string_parse(char *str, DS *ds)
+_dial_string_parse(char *str, struct ds *ds)
 {
 	char *p, *p2;
 
