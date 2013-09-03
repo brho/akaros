@@ -680,7 +680,7 @@ enum {
 	uint8_t	src[IPaddrlen]; \
 	uint8_t	dst[IPaddrlen]
 
-struct	Ip6hdr {
+struct	ip6hdr {
 	IPV6HDR;
 	uint8_t	payload[];
 };
