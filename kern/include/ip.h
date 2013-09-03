@@ -251,7 +251,7 @@ struct Iplink {
 	struct Iplink *lifclink;	/* next link for this ifc */
 	uint32_t expire;
 	struct Iplink *next;		/* free list */
-	int ref;
+	struct kref ref;
 };
 
 /* rfc 2461, pp.40—43. */
