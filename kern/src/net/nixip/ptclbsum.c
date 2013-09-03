@@ -1,27 +1,32 @@
-#include	"u.h"
-#include	"../port/lib.h"
-#include	"mem.h"
-#include	"dat.h"
-#include	"fns.h"
-#include	"../port/error.h"
-#include	"ip.h"
+#include <vfs.h>
+#include <kfs.h>
+#include <slab.h>
+#include <kmalloc.h>
+#include <kref.h>
+#include <string.h>
+#include <stdio.h>
+#include <assert.h>
+#include <error.h>
+#include <cpio.h>
+#include <pmap.h>
+#include <smp.h>
 
 static	short	endian	= 1;
-static	uchar*	aendian	= (uchar*)&endian;
+static	uint8_t*aendian	= ( uint8_t *)&endian;
 #define	LITTLE	*aendian
 
-ushort
-ptclbsum(uchar *addr, int len)
+uint16_t
+ptclbsum(uint8_t *addr, int len)
 {
-	ulong losum, hisum, mdsum, x;
-	ulong t1, t2;
+	uint32_t losum, hisum, mdsum, x;
+	uint32_t t1, t2;
 
 	losum = 0;
 	hisum = 0;
 	mdsum = 0;
 
 	x = 0;
-	if(PTR2UINT(addr) & 1) {
+	if(((uintptr_t)addr) & 1) {
 		if(len) {
 			hisum += addr[0];
 			len--;
@@ -30,20 +35,20 @@ ptclbsum(uchar *addr, int len)
 		x = 1;
 	}
 	while(len >= 16) {
-		t1 = *(ushort*)(addr+0);
-		t2 = *(ushort*)(addr+2);	mdsum += t1;
-		t1 = *(ushort*)(addr+4);	mdsum += t2;
-		t2 = *(ushort*)(addr+6);	mdsum += t1;
-		t1 = *(ushort*)(addr+8);	mdsum += t2;
-		t2 = *(ushort*)(addr+10);	mdsum += t1;
-		t1 = *(ushort*)(addr+12);	mdsum += t2;
-		t2 = *(ushort*)(addr+14);	mdsum += t1;
+		t1 = *(uint16_t*)(addr+0);
+		t2 = *(uint16_t*)(addr+2);	mdsum += t1;
+		t1 = *(uint16_t*)(addr+4);	mdsum += t2;
+		t2 = *(uint16_t*)(addr+6);	mdsum += t1;
+		t1 = *(uint16_t*)(addr+8);	mdsum += t2;
+		t2 = *(uint16_t*)(addr+10);	mdsum += t1;
+		t1 = *(uint16_t*)(addr+12);	mdsum += t2;
+		t2 = *(uint16_t*)(addr+14);	mdsum += t1;
 		mdsum += t2;
 		len -= 16;
 		addr += 16;
 	}
 	while(len >= 2) {
-		mdsum += *(ushort*)addr;
+		mdsum += *(uint16_t*)addr;
 		len -= 2;
 		addr += 2;
 	}
@@ -65,7 +70,7 @@ ptclbsum(uchar *addr, int len)
 
 	losum += hisum >> 8;
 	losum += (hisum & 0xff) << 8;
-	while(hisum = losum>>16)
+	while(hisum = (losum>>16))
 		losum = hisum + (losum & 0xffff);
 
 	return losum & 0xffff;

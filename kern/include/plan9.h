@@ -187,7 +187,7 @@ enum {
 struct path path;
 struct chan chan;
 
-/* Plan 9 Block. Not used, may never be used, but who knows? */
+/* Plan 9 Block. */
 struct block {
 	struct block *next;
 	struct block *list;
@@ -659,6 +659,7 @@ int tokenize(char *s, char **args, int maxargs);
 #define sleep(...)
 #define postnote(...)
 #define pexit(...)
+#define wakeup(...)
 
 /* include for now.
  * It's the easiest way to ensure we don't have odd conflicts.

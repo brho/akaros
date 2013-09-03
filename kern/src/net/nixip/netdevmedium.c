@@ -1,26 +1,44 @@
-#include "u.h"
-#include "../port/lib.h"
-#include "mem.h"
-#include "dat.h"
-#include "fns.h"
-#include "../port/error.h"
+#include <vfs.h>
+#include <kfs.h>
+#include <slab.h>
+#include <kmalloc.h>
+#include <kref.h>
+#include <string.h>
+#include <stdio.h>
+#include <assert.h>
+#include <error.h>
+#include <cpio.h>
+#include <pmap.h>
+#include <smp.h>
 
-#include "ip.h"
+#include <vfs.h>
+#include <kfs.h>
+#include <slab.h>
+#include <kmalloc.h>
+#include <kref.h>
+#include <string.h>
+#include <stdio.h>
+#include <assert.h>
+#include <error.h>
+#include <cpio.h>
+#include <pmap.h>
+#include <smp.h>
 
-static void	netdevbind(Ipifc *ifc, int argc, char **argv);
-static void	netdevunbind(Ipifc *ifc);
-static void	netdevbwrite(Ipifc *ifc, Block *bp, int version, uchar *ip);
+static void	netdevbind(struct ipifc *ifc, int argc, char **argv);
+static void	netdevunbind(struct ipifc *ifc);
+static void	netdevbwrite(struct ipifc *ifc, struct block *bp, int version,
+				uint8_t *ip);
 static void	netdevread(void *a);
 
 typedef struct	Netdevrock Netdevrock;
 struct Netdevrock
 {
-	Fs	*f;		/* file system we belong to */
-	Proc	*readp;		/* reading process */
-	Chan	*mchan;		/* Data channel */
+	struct fs	*f;		/* file system we belong to */
+	struct proc	*readp;		/* reading process */
+	struct chan	*mchan;		/* Data channel */
 };
 
-Medium netdevmedium =
+struct medium netdevmedium =
 {
 .name=		"netdev",
 .hsize=		0,
@@ -38,9 +56,9 @@ Medium netdevmedium =
  *  called with ifc qlock'd
  */
 static void
-netdevbind(Ipifc *ifc, int argc, char **argv)
+netdevbind(struct ipifc *ifc, int argc, char **argv)
 {
-	Chan *mchan;
+	struct chan *mchan;
 	Netdevrock *er;
 
 	if(argc < 2)
@@ -48,7 +66,7 @@ netdevbind(Ipifc *ifc, int argc, char **argv)
 
 	mchan = namec(argv[2], Aopen, ORDWR, 0);
 
-	er = smalloc(sizeof(*er));
+	er = kmalloc(sizeof(*er), 0);
 	er->mchan = mchan;
 	er->f = ifc->conv->p->f;
 
@@ -61,28 +79,28 @@ netdevbind(Ipifc *ifc, int argc, char **argv)
  *  called with ifc wlock'd
  */
 static void
-netdevunbind(Ipifc *ifc)
+netdevunbind(struct ipifc *ifc)
 {
 	Netdevrock *er = ifc->arg;
 
-	if(er->readp != nil)
+	if(er->readp != NULL)
 		postnote(er->readp, 1, "unbind", 0);
 
 	/* wait for readers to die */
-	while(er->readp != nil)
+	while(er->readp != NULL)
 		tsleep(&up->sleep, return0, 0, 300);
 
-	if(er->mchan != nil)
+	if(er->mchan != NULL)
 		cclose(er->mchan);
 
-	free(er);
+	kfree(er);
 }
 
 /*
  *  called by ipoput with a single block to write
  */
 static void
-netdevbwrite(Ipifc *ifc, Block *bp, int, uchar*)
+netdevbwrite(struct ipifc *ifc, struct block *bp, int unused_int, uint8_t *unused_uint8_p_t)
 {
 	Netdevrock *er = ifc->arg;
 
@@ -101,47 +119,48 @@ netdevbwrite(Ipifc *ifc, Block *bp, int, uchar*)
 static void
 netdevread(void *a)
 {
-	Ipifc *ifc;
-	Block *bp;
+	ERRSTACK(2);
+	struct ipifc *ifc;
+	struct block *bp;
 	Netdevrock *er;
 	char *argv[1];
 
 	ifc = a;
 	er = ifc->arg;
-	er->readp = up;	/* hide identity under a rock for unbind */
+	er->readp = current;	/* hide identity under a rock for unbind */
 	if(waserror()){
-		er->readp = nil;
+		er->readp = NULL;
 		pexit("hangup", 1);
 	}
 	for(;;){
 		bp = er->mchan->dev->bread(er->mchan, ifc->maxtu, 0);
-		if(bp == nil){
+		if(bp == NULL){
 			/*
 			 * get here if mchan is a pipe and other side hangs up
 			 * clean up this interface & get out
 ZZZ is this a good idea?
 			 */
 			poperror();
-			er->readp = nil;
+			er->readp = NULL;
 			argv[0] = "unbind";
 			if(!waserror())
 				ifc->conv->p->ctl(ifc->conv, argv, 1);
 			pexit("hangup", 1);
 		}
-		if(!canrlock(ifc)){
+		if(!canrlock(&ifc->rwlock)){
 			freeb(bp);
 			continue;
 		}
 		if(waserror()){
-			runlock(ifc);
+			runlock(&ifc->rwlock);
 			nexterror();
 		}
 		ifc->in++;
-		if(ifc->lifc == nil)
+		if(ifc->lifc == NULL)
 			freeb(bp);
 		else
 			ipiput4(er->f, ifc, bp);
-		runlock(ifc);
+		runlock(&ifc->rwlock);
 		poperror();
 	}
 }

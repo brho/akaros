@@ -482,7 +482,7 @@ struct routeTree {
 	uint8_t ifcid;				/* must match ifc->id */
 	struct ipifc *ifc;
 	char tag[4];
-	int ref;
+	struct kref ref;
 };
 
 struct V4route {
