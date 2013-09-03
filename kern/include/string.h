@@ -19,6 +19,8 @@ int	strncmp(const STRING s1, const STRING s2, size_t size);
 STRING	strchr(const STRING s, char c);
 STRING	strrchr(const STRING s, char c);
 STRING	strfind(const STRING s, char c);
+STRING  strstr(const STRING haystack, const STRING needle);
+void    strcat(STRING to, const STRING from);
 
 void * (DMEMSET(1, 2, 3) memset)(void* p, int what, size_t sz);
 int    (DMEMCMP(1, 2, 3) memcmp)(const void* s1, const void* s2, size_t sz);

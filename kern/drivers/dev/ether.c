@@ -340,29 +340,6 @@ void addethercard(char *t, int (*r) (struct ether *))
 	ncard++;
 }
 
-int parseether(uint8_t * to, char *from)
-{
-	char nip[4];
-	char *p;
-	int i;
-
-	p = from;
-	for (i = 0; i < Eaddrlen; i++) {
-		if (*p == 0)
-			return -1;
-		nip[0] = *p++;
-		if (*p == 0)
-			return -1;
-		nip[1] = *p++;
-		nip[2] = 0;
-#warning "using strol instead of strtoul"
-		to[i] = strtol(nip, 0, 16);
-		if (*p == ':')
-			p++;
-	}
-	return 0;
-}
-
 static struct ether *etherprobe(int cardno, int ctlrno)
 {
 	int i, j;

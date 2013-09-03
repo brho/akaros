@@ -751,7 +751,8 @@ static void icmpiput6(struct proto *icmp, struct ipifc *ipifc, struct block *bp)
 
 		case TimeExceedV6:
 			if (p->code == 0) {
-				sprint(m2, "ttl exceeded at %I", p->src);
+				snprintf(m2, sizeof(m2),
+					"ttl exceeded at %I", p->src);
 
 				bp->rp += IPICMPSZ;
 				if (blocklen(bp) < 8) {

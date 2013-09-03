@@ -432,7 +432,7 @@ static void etherremmulti(struct ipifc *ifc, uint8_t * a, uint8_t * unused)
 	int version;
 
 	version = multicastea(mac, a);
-	sprint(buf, "remmulti %E", mac);
+	snprintf(buf, sizeof(buf), "remmulti %E", mac);
 	switch (version) {
 		case V4:
 			er->cchan4->dev->write(er->cchan4, buf, strlen(buf), 0);

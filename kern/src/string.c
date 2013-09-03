@@ -372,3 +372,24 @@ atoi(const char* s)
 	// no overflow detection
 	return (int)strtol(s,NULL,10);
 }
+
+/* for Plan 8 */
+char *strstr(const char *haystack, const char *needle)
+{
+	int hlen = strlen(haystack);
+	int nlen = strlen(needle);
+	while (hlen > nlen){
+		if (! strcmp(haystack, needle))
+			return (char *)haystack;
+		haystack++;
+		hlen--;
+	}
+	return NULL;
+}
+
+/* they seem to know what they are doing */
+void strcat(char *to, const char *from)
+{
+	int tolen = strlen(to);
+	strncpy(to+tolen,from, strlen(from));
+}

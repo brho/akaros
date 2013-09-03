@@ -100,6 +100,7 @@ struct Ipfrag {
 };
 
 #define IPFRAGSZ offsetof(struct Ipfrag, payload[0])
+#define CLASS(p) ((*(uint8_t*)(p))>>6)
 
 /* an instance of struct IP */
 struct IP {
@@ -549,6 +550,7 @@ extern uint8_t v4prefix[IPaddrlen];
 extern uint8_t IPallbits[IPaddrlen];
 
 #define	NOW	tsc2msec(read_tsc_serialized())
+#define	seconds() tsc2sec(read_tsc_serialized())
 
 /*
  *  media
@@ -744,6 +746,13 @@ void icmppkttoobig6(struct fs *f, struct ipifc *ifc, struct block *bp);
 void icmphostunr(struct fs *f, struct ipifc *ifc,
 		 struct block *bp, int code, int free);
 
+static inline int abs(int x)
+{
+	if (x < 0)
+		return -x;
+	return x;
+}
+
 /* kern/src/net/nixip/arp.c */
 void arpinit(struct fs *f);
 void cleanarpent(struct arp *arp, struct arpent *a);
@@ -894,3 +903,40 @@ char *udpctl(struct conv *c, char **f, int n);
 void udpadvise(struct proto *udp, struct block *bp, char *msg);
 int udpstats(struct proto *udp, char *buf, int len);
 void udpinit(struct fs *fs);
+
+/* IP library */
+
+/* kern/src/libip/bo.c */
+void hnputv(void *p, uint64_t v);
+void hnputl(void *p, unsigned int v);
+void hnputs(void *p, uint16_t v);
+uint64_t nhgetv(void *p);
+unsigned int nhgetl(void *p);
+uint16_t nhgets(void *p);
+/* kern/src/libip/classmask.c */
+uint8_t *defmask(uint8_t *ip);
+void maskip(uint8_t *from, uint8_t *mask, uint8_t *to);
+/* kern/src/libip/eipfmt.c */
+int eipfmt(void *);
+/* kern/src/libip/equivip.c */
+int equivip4(uint8_t *a, uint8_t *b);
+int equivip6(uint8_t *a, uint8_t *b);
+/* kern/src/libip/ipaux.c */
+int isv4(uint8_t *ip);
+void v4tov6(uint8_t *v6, uint8_t *v4);
+int v6tov4(uint8_t *v4, uint8_t *v6);
+/* kern/src/libip/myetheraddr.c */
+int myetheraddr(uint8_t *to, char *dev);
+/* kern/src/libip/myipaddr.c */
+int myipaddr(uint8_t *ip, char *net);
+/* kern/src/libip/parseether.c */
+int parseether(uint8_t *to, char *from);
+/* kern/src/libip/parseip.c */
+char *v4parseip(uint8_t *to, char *from);
+int64_t parseip(uint8_t *to, char *from);
+int64_t parseipmask(uint8_t *to, char *from);
+char *v4parsecidr(uint8_t *addr, uint8_t *mask, char *from);
+/* kern/src/libip/ptclbsum.c */
+uint16_t ptclbsum(uint8_t *addr, int len);
+/* kern/src/libip/readipifc.c */
+struct ipifc *readipifc(char *net, struct ipifc *ifc, int index);

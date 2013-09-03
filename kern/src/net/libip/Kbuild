@@ -1,0 +1,10 @@
+# Plan 9 ip library, used in both kernel and user modes on Plan 9
+obj-y						+= bo.o
+obj-y						+= classmask.o
+obj-y						+= eipfmt.o
+obj-y						+= equivip.o
+obj-y						+= ipaux.o
+obj-y						+= parseether.o
+obj-y						+= parseip.o
+obj-y						+= ptclbsum.o
+obj-y						+= ptclbsum.o

@@ -377,7 +377,8 @@ icmpiput(struct proto *icmp, struct ipifc *unused_ipifc, struct block *bp)
 			break;
 		case TimeExceed:
 			if (p->code == 0) {
-				sprint(m2, "ttl exceeded at %V", p->src);
+				snprintf(m2, sizeof(m2),
+					"ttl exceeded at %V", p->src);
 
 				bp->rp += ICMP_IPSIZE + ICMP_HDRSIZE;
 				if (blocklen(bp) < MinAdvise) {

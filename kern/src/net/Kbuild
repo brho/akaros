@@ -10,4 +10,5 @@ obj-y						+= udp.o
 
 # plan9-style network stack
 obj-y						+= netif.o
-#obj-y						+= nixip/
+obj-y						+= libip/
+obj-y						+= nixip/

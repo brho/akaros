@@ -866,7 +866,7 @@ static void tcpstart(struct conv *s, int mode)
 	if (tpriv->ackprocstarted == 0) {
 		qlock(&tpriv->apl);
 		if (tpriv->ackprocstarted == 0) {
-			sprint(kpname, "#I%dtcpack", s->p->f->dev);
+			snprintf(kpname, sizeof(kpname), "#I%dtcpack", s->p->f->dev);
 			kproc(kpname, tcpackproc, s->p);
 			tpriv->ackprocstarted = 1;
 		}
@@ -899,7 +899,7 @@ static char *tcpflag(uint16_t flag)
 {
 	static char buf[128];
 
-	sprint(buf, "%d", flag >> 10);	/* Head len */
+	snprintf(buf, sizeof(buf), "%d", flag >> 10);	/* Head len */
 	if (flag & URG)
 		strcat(buf, " URG");
 	if (flag & ACK)

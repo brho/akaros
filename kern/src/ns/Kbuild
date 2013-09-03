@@ -13,5 +13,6 @@ obj-y						+= qio.o
 obj-y						+= validname.o
 # command parsing
 obj-y						+= tokenize.o
+obj-y						+= getfields.o
 obj-y						+= parse.o
 

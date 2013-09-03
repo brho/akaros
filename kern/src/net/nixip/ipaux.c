@@ -205,8 +205,6 @@ enum {
 	Isprefix = 16,
 };
 
-#define CLASS(p) ((*( uint8_t *unused_uint8_p_t)(p))>>6)
-
 void ipv62smcast(uint8_t * smcast, uint8_t * a)
 {
 	assert(IPaddrlen == 16);

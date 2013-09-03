@@ -649,9 +649,12 @@ struct cmdtab *lookupcmd(struct cmdbuf *cb, struct cmdtab *ctab, int nctab);
 /* kern/src/ns/tokenize.c */
 int gettokens(char *s, char **args, int maxargs, char *sep);
 int tokenize(char *s, char **args, int maxargs);
+/* ker/src/ns/getfields.c */
+int getfields(char *str, char **args, int max, int mflag, char *unused_set);
 
 /* plan 9 has a concept of a hostowner, which is a name. For now, we got with a define. */
 #define eve "eve"
+#define iseve() (1)
 
 /* functions we need to do something with someday */
 #define kproc(...)
@@ -660,6 +663,11 @@ int tokenize(char *s, char **args, int maxargs);
 #define postnote(...)
 #define pexit(...)
 #define wakeup(...)
+#define strtoul strtol
+
+/* need a random number generator */
+#define nrand(x) (x/4)
+#define sched() panic("sched called")
 
 /* include for now.
  * It's the easiest way to ensure we don't have odd conflicts.
