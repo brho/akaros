@@ -1,4 +1,6 @@
 # Plan 9 tcp/ip stack, includes ipv6.
+obj-y						+= tcp.o
+obj-y						+= udp.o
 obj-y						+= ipv6.o
 obj-y						+= iproute.o
 obj-y						+= ptclbsum.o
@@ -16,5 +18,3 @@ obj-y						+= ip.o
 obj-y						+= loopbackmedium.o
 obj-y						+= nullmedium.o
 obj-y						+= pktmedium.o
-#obj-y						+= tcp.o
-#obj-y						+= udp.o

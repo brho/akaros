@@ -368,3 +368,8 @@ typedef Cmdtab;
 -Cmdtab
 +struct cmdtab
 
+@@
+typedef Tcppriv;
+@@
+-Tcppriv
++struct tcppriv
