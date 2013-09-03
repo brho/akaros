@@ -53,6 +53,12 @@ typedef Fragment6;
 +struct fragment6
 
 @@
+typedef Fraghdr6;
+@@
+-Fraghdr6
++struct fraghdr6
+
+@@
 typedef Fs;
 @@
 -Fs

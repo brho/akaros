@@ -1,12 +1,28 @@
-#include	"u.h"
-#include	"../port/lib.h"
-#include	"mem.h"
-#include	"dat.h"
-#include	"fns.h"
-#include	"../port/error.h"
+#include <vfs.h>
+#include <kfs.h>
+#include <slab.h>
+#include <kmalloc.h>
+#include <kref.h>
+#include <string.h>
+#include <stdio.h>
+#include <assert.h>
+#include <error.h>
+#include <cpio.h>
+#include <pmap.h>
+#include <smp.h>
 
-#include	"ip.h"
-#include	"ipv6.h"
+#include <vfs.h>
+#include <kfs.h>
+#include <slab.h>
+#include <kmalloc.h>
+#include <kref.h>
+#include <string.h>
+#include <stdio.h>
+#include <assert.h>
+#include <error.h>
+#include <cpio.h>
+#include <pmap.h>
+#include <smp.h>
 
 enum
 {
@@ -14,40 +30,44 @@ enum
 };
 
 #define IPV6CLASS(hdr)	(((hdr)->vcf[0]&0x0F)<<2 | ((hdr)->vcf[1]&0xF0)>>2)
-#define BLKIPVER(xp)	(((Ip6hdr*)((xp)->rp))->vcf[0] & 0xF0)
+#define BLKIPVER(xp)	(((struct ip6hdr*)((xp)->rp))->vcf[0] & 0xF0)
 /*
  * This sleazy macro is stolen shamelessly from ip.c, see comment there.
  */
-#define BKFG(xp)	((Ipfrag*)((xp)->base))
+#define BKFG(xp)	((struct Ipfrag*)((xp)->base))
 
-Block*		ip6reassemble(IP*, int, Block*, Ip6hdr*);
-Fragment6*	ipfragallo6(IP*);
-void		ipfragfree6(IP*, Fragment6*);
-Block*		procopts(Block *bp);
-static Block*	procxtns(IP *ip, Block *bp, int doreasm);
-int		unfraglen(Block *bp, uchar *nexthdr, int setfh);
+struct block*		ip6reassemble(struct IP*, int unused_int,
+					   struct block*, struct ip6hdr*);
+struct fragment6*	ipfragallo6(struct IP*);
+void		ipfragfree6(struct IP*, struct fragment6*);
+struct block*		procopts(struct block *bp);
+static struct block*	procxtns(struct IP *ip,
+				     struct block *bp, int doreasm);
+int		unfraglen(struct block *bp, uint8_t *nexthdr, int setfh);
 
 int
-ipoput6(Fs *f, Block *bp, int gating, int ttl, int tos, Conv *c)
+ipoput6(struct fs *f,
+	struct block *bp, int gating, int ttl, int tos, struct conv *c)
 {
+	ERRSTACK(2);
 	int medialen, len, chunk, uflen, flen, seglen, lid, offset, fragoff;
 	int morefrags, blklen, rv = 0, tentative;
-	uchar *gate, nexthdr;
-	Block *xp, *nb;
-	Fraghdr6 fraghdr;
-	IP *ip;
-	Ip6hdr *eh;
-	Ipifc *ifc;
-	Route *r, *sr;
+	uint8_t *gate, nexthdr;
+	struct block *xp, *nb;
+	struct fraghdr6 fraghdr;
+	struct IP *ip;
+	struct ip6hdr *eh;
+	struct ipifc *ifc;
+	struct route *r, *sr;
 
 	ip = f->ip;
 
 	/* Fill out the ip header */
-	eh = (Ip6hdr*)(bp->rp);
+	eh = (struct ip6hdr*)(bp->rp);
 
 	ip->stats[OutRequests]++;
 
-	/* Number of uchars in data and ip header to write */
+	/* Number of uint8_ts in data and ip header to write */
 	len = blocklen(bp);
 
 	tentative = iptentative(f, eh->src);
@@ -75,7 +95,7 @@ ipoput6(Fs *f, Block *bp, int gating, int ttl, int tos, Conv *c)
 	}
 
 	r = v6lookup(f, eh->dst, c);
-	if(r == nil){
+	if(r == NULL){
 //		print("no route for %I, src %I free\n", eh->dst, eh->src);
 		ip->stats[OutNoRoutes]++;
 		netlog(f, Logip, "no interface %I\n", eh->dst);
@@ -83,14 +103,14 @@ ipoput6(Fs *f, Block *bp, int gating, int ttl, int tos, Conv *c)
 		goto free;
 	}
 
-	ifc = r->ifc;
-	if(r->type & (Rifc|Runi))
+	ifc = r->routeTree.ifc;
+	if(r->routeTree.type & (Rifc|Runi))
 		gate = eh->dst;
-	else if(r->type & (Rbcast|Rmulti)) {
+	else if(r->routeTree.type & (Rbcast|Rmulti)) {
 		gate = eh->dst;
-		sr = v6lookup(f, eh->src, nil);
-		if(sr && (sr->type & Runi))
-			ifc = sr->ifc;
+		sr = v6lookup(f, eh->src, NULL);
+		if(sr && (sr->routeTree.type & Runi))
+			ifc = sr->routeTree.ifc;
 	}
 	else
 		gate = r->v6.gate;
@@ -103,15 +123,15 @@ ipoput6(Fs *f, Block *bp, int gating, int ttl, int tos, Conv *c)
 		eh->vcf[1]  = tos << 4;
 	}
 
-	if(!canrlock(ifc))
+	if(!canrlock(&ifc->rwlock))
 		goto free;
 
 	if(waserror()){
-		runlock(ifc);
+		runlock(&ifc->rwlock);
 		nexterror();
 	}
 
-	if(ifc->medium == nil)
+	if(ifc->medium == NULL)
 		goto raise;
 
 	/* If we dont need to fragment just send it */
@@ -119,7 +139,7 @@ ipoput6(Fs *f, Block *bp, int gating, int ttl, int tos, Conv *c)
 	if(len <= medialen) {
 		hnputs(eh->ploadlen, len - IP6HDR);
 		ifc->medium->bwrite(ifc, bp, V6, gate);
-		runlock(ifc);
+		runlock(&ifc->rwlock);
 		poperror();
 		return 0;
 	}
@@ -154,7 +174,7 @@ ipoput6(Fs *f, Block *bp, int gating, int ttl, int tos, Conv *c)
 		goto raise;
 	}
 
-	lid = incref(&ip->id6);
+	lid = kref_get(&ip->id6, 1);
 	fraghdr.nexthdr = nexthdr;
 	fraghdr.res = 0;
 	hnputl(fraghdr.id, lid);
@@ -215,7 +235,7 @@ ipoput6(Fs *f, Block *bp, int gating, int ttl, int tos, Conv *c)
 	ip->stats[FragOKs]++;
 
 raise:
-	runlock(ifc);
+	runlock(&ifc->rwlock);
 	poperror();
 free:
 	freeblist(bp);
@@ -223,15 +243,15 @@ free:
 }
 
 void
-ipiput6(Fs *f, Ipifc *ifc, Block *bp)
+ipiput6(struct fs *f, struct ipifc *ifc, struct block *bp)
 {
 	int hl, hop, tos, notforme, tentative;
-	uchar proto;
-	uchar v6dst[IPaddrlen];
-	IP *ip;
-	Ip6hdr *h;
-	Proto *p;
-	Route *r, *sr;
+	uint8_t proto;
+	uint8_t v6dst[IPaddrlen];
+	struct IP *ip;
+	struct ip6hdr *h;
+	struct proto *p;
+	struct route *r, *sr;
 
 	ip = f->ip;
 	ip->stats[InReceives]++;
@@ -248,18 +268,18 @@ ipiput6(Fs *f, Ipifc *ifc, Block *bp)
 		if(hl > 64)
 			hl = 64;
 		bp = pullupblock(bp, hl);
-		if(bp == nil)
+		if(bp == NULL)
 			return;
 	}
 
-	h = (Ip6hdr *)bp->rp;
+	h = (struct ip6hdr *)bp->rp;
 
 	memmove(&v6dst[0], &h->dst[0], IPaddrlen);
 	notforme = ipforme(f, v6dst) == 0;
 	tentative = iptentative(f, v6dst);
 
 	if(tentative && h->proto != ICMPv6) {
-		print("tentative addr, drop\n");
+		printd("tentative addr, drop\n");
 		freeblist(bp);
 		return;
 	}
@@ -288,10 +308,10 @@ ipiput6(Fs *f, Ipifc *ifc, Block *bp)
 		}
 
 		/* don't forward to source's network */
-		sr = v6lookup(f, h->src, nil);
-		r  = v6lookup(f, h->dst, nil);
+		sr = v6lookup(f, h->src, NULL);
+		r  = v6lookup(f, h->dst, NULL);
 
-		if(r == nil || sr == r){
+		if(r == NULL || sr == r){
 			ip->stats[OutDiscards]++;
 			freeblist(bp);
 			return;
@@ -307,24 +327,24 @@ ipiput6(Fs *f, Ipifc *ifc, Block *bp)
 		}
 
 		/* process headers & reassemble if the interface expects it */
-		bp = procxtns(ip, bp, r->ifc->reassemble);
-		if(bp == nil)
+		bp = procxtns(ip, bp, r->routeTree.ifc->reassemble);
+		if(bp == NULL)
 			return;
 
 		ip->stats[ForwDatagrams]++;
-		h = (Ip6hdr *)bp->rp;
+		h = (struct ip6hdr *)bp->rp;
 		tos = IPV6CLASS(h);
 		hop = h->ttl;
-		ipoput6(f, bp, 1, hop-1, tos, nil);
+		ipoput6(f, bp, 1, hop-1, tos, NULL);
 		return;
 	}
 
 	/* reassemble & process headers if needed */
 	bp = procxtns(ip, bp, 1);
-	if(bp == nil)
+	if(bp == NULL)
 		return;
 
-	h = (Ip6hdr *) (bp->rp);
+	h = (struct ip6hdr *) (bp->rp);
 	proto = h->proto;
 	p = Fsrcvpcol(f, proto);
 	if(p && p->rcv) {
@@ -342,16 +362,16 @@ ipiput6(Fs *f, Ipifc *ifc, Block *bp)
  * ipfragfree6 - copied from ipfragfree4 - assume hold fraglock6
  */
 void
-ipfragfree6(IP *ip, Fragment6 *frag)
+ipfragfree6(struct IP *ip, struct fragment6 *frag)
 {
-	Fragment6 *fl, **l;
+	struct fragment6 *fl, **l;
 
 	if(frag->blist)
 		freeblist(frag->blist);
 
 	memset(frag->src, 0, IPaddrlen);
 	frag->id = 0;
-	frag->blist = nil;
+	frag->blist = NULL;
 
 	l = &ip->flisthead6;
 	for(fl = *l; fl; fl = fl->next) {
@@ -369,12 +389,12 @@ ipfragfree6(IP *ip, Fragment6 *frag)
 /*
  * ipfragallo6 - copied from ipfragalloc4
  */
-Fragment6*
-ipfragallo6(IP *ip)
+struct fragment6*
+ipfragallo6(struct IP *ip)
 {
-	Fragment6 *f;
+	struct fragment6 *f;
 
-	while(ip->fragfree6 == nil) {
+	while(ip->fragfree6 == NULL) {
 		/* free last entry on fraglist */
 		for(f = ip->flisthead6; f->next; f = f->next)
 			;
@@ -389,20 +409,20 @@ ipfragallo6(IP *ip)
 	return f;
 }
 
-static Block*
-procxtns(IP *ip, Block *bp, int doreasm)
+static struct block*
+procxtns(struct IP *ip, struct block *bp, int doreasm)
 {
 	int offset;
-	uchar proto;
-	Ip6hdr *h;
+	uint8_t proto;
+	struct ip6hdr *h;
 
-	h = (Ip6hdr *)bp->rp;
+	h = (struct ip6hdr *)bp->rp;
 	offset = unfraglen(bp, &proto, 0);
 
 	if(proto == FH && doreasm != 0) {
 		bp = ip6reassemble(ip, offset, bp, h);
-		if(bp == nil)
-			return nil;
+		if(bp == NULL)
+			return NULL;
 		offset = unfraglen(bp, &proto, 0);
 	}
 
@@ -418,9 +438,9 @@ procxtns(IP *ip, Block *bp, int doreasm)
  * field of the last header in the "Unfragmentable part" is set to FH.
  */
 int
-unfraglen(Block *bp, uchar *nexthdr, int setfh)
+unfraglen(struct block *bp, uint8_t *nexthdr, int setfh)
 {
-	uchar *p, *q;
+	uint8_t *p, *q;
 	int ufl, hs;
 
 	p = bp->rp;
@@ -444,23 +464,23 @@ unfraglen(Block *bp, uchar *nexthdr, int setfh)
 	return ufl;
 }
 
-Block*
-procopts(Block *bp)
+struct block*
+procopts(struct block *bp)
 {
 	return bp;
 }
 
-Block*
-ip6reassemble(IP* ip, int uflen, Block* bp, Ip6hdr* ih)
+struct block*
+ip6reassemble(struct IP* ip, int uflen, struct block* bp, struct ip6hdr* ih)
 {
 	int fend, offset, ovlap, len, fragsize, pktposn;
-	uint id;
-	uchar src[IPaddrlen], dst[IPaddrlen];
-	Block *bl, **l, *last, *prev;
-	Fraghdr6 *fraghdr;
-	Fragment6 *f, *fnext;
+	unsigned int id;
+	uint8_t src[IPaddrlen], dst[IPaddrlen];
+	struct block *bl, **l, *last, *prev;
+	struct fraghdr6 *fraghdr;
+	struct fragment6 *f, *fnext;
 
-	fraghdr = (Fraghdr6 *)(bp->rp + uflen);
+	fraghdr = (struct fraghdr6 *)(bp->rp + uflen);
 	memmove(src, ih->src, IPaddrlen);
 	memmove(dst, ih->dst, IPaddrlen);
 	id = nhgetl(fraghdr->id);
@@ -471,7 +491,7 @@ ip6reassemble(IP* ip, int uflen, Block* bp, Ip6hdr* ih)
 	 */
 	if(bp->next){
 		bp = pullupblock(bp, blocklen(bp));
-		ih = (Ip6hdr *)bp->rp;
+		ih = (struct ip6hdr *)bp->rp;
 	}
 
 	qlock(&ip->fraglock6);
@@ -512,7 +532,7 @@ ip6reassemble(IP* ip, int uflen, Block* bp, Ip6hdr* ih)
 	BKFG(bp)->flen = nhgets(ih->ploadlen) + IP6HDR - uflen - IP6FHDR;
 
 	/* First fragment allocates a reassembly queue */
-	if(f == nil) {
+	if(f == NULL) {
 		f = ipfragallo6(ip);
 		f->id = id;
 		memmove(f->src, src, IPaddrlen);
@@ -522,16 +542,16 @@ ip6reassemble(IP* ip, int uflen, Block* bp, Ip6hdr* ih)
 
 		qunlock(&ip->fraglock6);
 		ip->stats[ReasmReqds]++;
-		return nil;
+		return NULL;
 	}
 
 	/*
 	 *  find the new fragment's position in the queue
 	 */
-	prev = nil;
+	prev = NULL;
 	l = &f->blist;
 	bl = f->blist;
-	while(bl != nil && BKFG(bp)->foff > BKFG(bl)->foff) {
+	while(bl != NULL && BKFG(bp)->foff > BKFG(bl)->foff) {
 		prev = bl;
 		l = &bl->next;
 		bl = bl->next;
@@ -544,7 +564,7 @@ ip6reassemble(IP* ip, int uflen, Block* bp, Ip6hdr* ih)
 			if(ovlap >= BKFG(bp)->flen) {
 				freeblist(bp);
 				qunlock(&ip->fraglock6);
-				return nil;
+				return NULL;
 			}
 			BKFG(prev)->flen -= ovlap;
 		}
@@ -573,7 +593,7 @@ ip6reassemble(IP* ip, int uflen, Block* bp, Ip6hdr* ih)
 				break;
 			}
 			last = (*l)->next;
-			(*l)->next = nil;
+			(*l)->next = NULL;
 			freeblist(*l);
 			*l = last;
 		}
@@ -585,14 +605,14 @@ ip6reassemble(IP* ip, int uflen, Block* bp, Ip6hdr* ih)
 	 */
 	pktposn = 0;
 	for(bl = f->blist; bl && BKFG(bl)->foff == pktposn; bl = bl->next) {
-		fraghdr = (Fraghdr6 *)(bl->rp + uflen);
+		fraghdr = (struct fraghdr6 *)(bl->rp + uflen);
 		if((fraghdr->offsetRM[1] & 1) == 0) {
 			bl = f->blist;
 
 			/* get rid of frag header in first fragment */
 			memmove(bl->rp + IP6FHDR, bl->rp, uflen);
 			bl->rp += IP6FHDR;
-			len = nhgets(((Ip6hdr*)bl->rp)->ploadlen) - IP6FHDR;
+			len = nhgets(((struct ip6hdr*)bl->rp)->ploadlen) - IP6FHDR;
 			bl->wp = bl->rp + len + IP6HDR;
 			/*
 			 * Pullup all the fragment headers and
@@ -606,9 +626,9 @@ ip6reassemble(IP* ip, int uflen, Block* bp, Ip6hdr* ih)
 			}
 
 			bl = f->blist;
-			f->blist = nil;
+			f->blist = NULL;
 			ipfragfree6(ip, f);
-			ih = (Ip6hdr*)bl->rp;
+			ih = (struct ip6hdr*)bl->rp;
 			hnputs(ih->ploadlen, len);
 			qunlock(&ip->fraglock6);
 			ip->stats[ReasmOKs]++;
@@ -617,5 +637,5 @@ ip6reassemble(IP* ip, int uflen, Block* bp, Ip6hdr* ih)
 		pktposn += BKFG(bl)->flen;
 	}
 	qunlock(&ip->fraglock6);
-	return nil;
+	return NULL;
 }

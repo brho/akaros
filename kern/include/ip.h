@@ -703,7 +703,7 @@ struct	Routinghdr {		/* unused */
 	uint8_t	segrem;
 };
 
-struct	Fraghdr6 {
+struct	fraghdr6 {
 	uint8_t	nexthdr;
 	uint8_t	res;
 	uint8_t	offsetRM[2];	/* Offset, Res, M flag */
