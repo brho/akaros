@@ -1,8 +1,8 @@
 # Plan 9 tcp/ip stack, includes ipv6.
+obj-y						+= ethermedium.o
 obj-y						+= devip.o
 obj-y						+= chandial.o
 obj-y						+= arp.o
-#obj-y						+= ethermedium.o
 #obj-y						+= gre.o
 #obj-y						+= icmp6.o
 #obj-y						+= icmp.o

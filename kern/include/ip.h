@@ -548,7 +548,7 @@ extern uint8_t IPnoaddr[IPaddrlen];
 extern uint8_t v4prefix[IPaddrlen];
 extern uint8_t IPallbits[IPaddrlen];
 
-#define	NOW	TK2MS(sys->ticks)
+#define	NOW	tsc2msec(read_tsc_serialized())
 
 /*
  *  media
