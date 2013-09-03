@@ -743,3 +743,154 @@ void icmpttlexceeded6(struct fs *f, struct ipifc *ifc, struct block *bp);
 void icmppkttoobig6(struct fs *f, struct ipifc *ifc, struct block *bp);
 void icmphostunr(struct fs *f, struct ipifc *ifc,
 		 struct block *bp, int code, int free);
+
+/* kern/src/net/nixip/arp.c */
+void arpinit(struct fs *f);
+void cleanarpent(struct arp *arp, struct arpent *a);
+struct arpent *arpget(struct arp *arp, struct block *bp, int version, struct ipifc *ifc, uint8_t *ip, uint8_t *mac);
+void arprelease(struct arp *arp, struct arpent *arpent);
+struct block *arpresolve(struct arp *arp, struct arpent *a, struct medium *type, uint8_t *mac);
+void arpenter(struct fs *fs, int version, uint8_t *ip, uint8_t *mac, int n, int refresh);
+int arpwrite(struct fs *fs, char *s, int len);
+int arpread(struct arp *arp, char *p, uint32_t offset, int len);
+int rxmitsols(struct arp *arp);
+/* kern/src/net/nixip/chandial.c */
+struct chan *chandial(char *dest, char *local, char *dir, struct chan **ctlp);
+/* kern/src/net/nixip/devip.c */
+struct IPaux *newipaux(char *owner, char *tag);
+void closeconv(struct conv *cv);
+char *setluniqueport(struct conv *c, int lport);
+char *setlport(struct conv *c);
+char *setladdrport(struct conv *c, char *str, int announcing);
+char *Fsstdconnect(struct conv *c, char *argv[], int argc);
+char *Fsstdannounce(struct conv *c, char *argv[], int argc);
+char *Fsstdbind(struct conv *c, char *argv[], int argc);
+int Fsproto(struct fs *f, struct proto *p);
+int Fsbuiltinproto(struct fs *f, uint8_t proto);
+struct conv *Fsprotoclone(struct proto *p, char *user);
+int Fsconnected(struct conv *c, char *msg);
+struct proto *Fsrcvpcol(struct fs *f, uint8_t proto);
+struct proto *Fsrcvpcolx(struct fs *f, uint8_t proto);
+struct conv *Fsnewcall(struct conv *c, uint8_t *raddr, uint16_t rport, uint8_t *laddr, uint16_t lport, uint8_t version);
+long ndbwrite(struct fs *f, char *a, uint32_t off, int n);
+uint32_t scalednconv(void);
+/* kern/src/net/nixip/ethermedium.c */
+void ethermediumlink(void);
+/* kern/src/net/nixip/icmp6.c */
+void icmpadvise6(struct proto *icmp, struct block *bp, char *msg);
+char *icmpctl6(struct conv *c, char **argv, int argc);
+void icmpns(struct fs *f, uint8_t *src, int suni, uint8_t *targ, int tuni, uint8_t *mac);
+void icmpna(struct fs *f, uint8_t *src, uint8_t *dst, uint8_t *targ, uint8_t *mac, uint8_t flags);
+void icmphostunr(struct fs *f, struct ipifc *ifc, struct block *bp, int code, int free);
+void icmpttlexceeded6(struct fs *f, struct ipifc *ifc, struct block *bp);
+void icmppkttoobig6(struct fs *f, struct ipifc *ifc, struct block *bp);
+int icmpstats6(struct proto *icmp6, char *buf, int len);
+void icmp6init(struct fs *fs);
+/* kern/src/net/nixip/icmp.c */
+char *icmpconnect(struct conv *c, char **argv, int argc);
+int icmpstate(struct conv *c, char *state, int n);
+char *icmpannounce(struct conv *c, char **argv, int argc);
+void icmpclose(struct conv *c);
+void icmpttlexceeded(struct fs *f, uint8_t *ia, struct block *bp);
+void icmpnoconv(struct fs *f, struct block *bp);
+void icmpcantfrag(struct fs *f, struct block *bp, int mtu);
+void icmpadvise(struct proto *icmp, struct block *bp, char *msg);
+int icmpstats(struct proto *icmp, char *buf, int len);
+void icmpinit(struct fs *fs);
+/* kern/src/net/nixip/ipaux.c */
+uint16_t ptclcsum(struct block *bp, int offset, int len);
+void ipv62smcast(uint8_t *smcast, uint8_t *a);
+int parsemac(uint8_t *to, char *from, int len);
+uint32_t iphash(uint8_t *sa, uint16_t sp, uint8_t *da, uint16_t dp);
+void iphtadd(struct Ipht *ht, struct conv *c);
+void iphtrem(struct Ipht *ht, struct conv *c);
+struct conv *iphtlook(struct Ipht *ht, uint8_t *sa, uint16_t sp, uint8_t *da, uint16_t dp);
+/* kern/src/net/nixip/ip.c */
+void ip_init_6(struct fs *f);
+void initfrag(struct IP *ip, int size);
+void ip_init(struct fs *f);
+void iprouting(struct fs *f, int on);
+int ipoput4(struct fs *f, struct block *bp, int gating, int ttl, int tos, struct conv *c);
+void ipiput4(struct fs *f, struct ipifc *ifc, struct block *bp);
+int ipstats(struct fs *f, char *buf, int len);
+struct block *ip4reassemble(struct IP *ip, int offset, struct block *bp, struct Ip4hdr *ih);
+void ipfragfree4(struct IP *ip, struct fragment4 *frag);
+struct fragment4 *ipfragallo4(struct IP *ip);
+uint16_t ipcsum(uint8_t *addr);
+/* kern/src/net/nixip/ipifc.c */
+void addipmedium(struct medium *med);
+struct medium *ipfindmedium(char *name);
+char *ipifcsetmtu(struct ipifc *ifc, char **argv, int argc);
+char *ipifcadd(struct ipifc *ifc, char **argv, int argc, int tentative, struct iplifc *lifcp);
+char *ipifcrem(struct ipifc *ifc, char **argv, int argc);
+void ipifcaddroute(struct fs *f, int vers, uint8_t *addr, uint8_t *mask, uint8_t *gate, int type);
+void ipifcremroute(struct fs *f, int vers, uint8_t *addr, uint8_t *mask);
+char *ipifcra6(struct ipifc *ifc, char **argv, int argc);
+int ipifcstats(struct proto *ipifc, char *buf, int len);
+void ipifcinit(struct fs *f);
+long ipselftabread(struct fs *f, char *cp, uint32_t offset, int n);
+int iptentative(struct fs *f, uint8_t *addr);
+int ipforme(struct fs *f, uint8_t *addr);
+struct ipifc *findipifc(struct fs *f, uint8_t *remote, int type);
+int v6addrtype(uint8_t *addr);
+void findlocalip(struct fs *f, uint8_t *local, uint8_t *remote);
+int ipv4local(struct ipifc *ifc, uint8_t *addr);
+int ipv6local(struct ipifc *ifc, uint8_t *addr);
+int ipv6anylocal(struct ipifc *ifc, uint8_t *addr);
+struct iplifc *iplocalonifc(struct ipifc *ifc, uint8_t *ip);
+int ipproxyifc(struct fs *f, struct ipifc *ifc, uint8_t *ip);
+int ipismulticast(uint8_t *ip);
+int ipisbm(uint8_t *ip);
+void ipifcaddmulti(struct conv *c, uint8_t *ma, uint8_t *ia);
+void ipifcremmulti(struct conv *c, uint8_t *ma, uint8_t *ia);
+char *ipifcadd6(struct ipifc *ifc, char **argv, int argc);
+/* kern/src/net/nixip/iproute.c */
+void v4addroute(struct fs *f, char *tag, uint8_t *a, uint8_t *mask, uint8_t *gate, int type);
+void v6addroute(struct fs *f, char *tag, uint8_t *a, uint8_t *mask, uint8_t *gate, int type);
+struct route **looknode(struct route **cur, struct route *r);
+void v4delroute(struct fs *f, uint8_t *a, uint8_t *mask, int dolock);
+void v6delroute(struct fs *f, uint8_t *a, uint8_t *mask, int dolock);
+struct route *v4lookup(struct fs *f, uint8_t *a, struct conv *c);
+struct route *v6lookup(struct fs *f, uint8_t *a, struct conv *c);
+void routetype(int type, char *p);
+void convroute(struct route *r, uint8_t *addr, uint8_t *mask, uint8_t *gate, char *t, int *nifc);
+void ipwalkroutes(struct fs *f, struct routewalk *rw);
+long routeread(struct fs *f, char *p, uint32_t offset, int n);
+void delroute(struct fs *f, struct route *r, int dolock);
+int routeflush(struct fs *f, struct route *r, char *tag);
+struct route *iproute(struct fs *fs, uint8_t *ip);
+long routewrite(struct fs *f, struct chan *c, char *p, int n);
+/* kern/src/net/nixip/ipv6.c */
+int ipoput6(struct fs *f, struct block *bp, int gating, int ttl, int tos, struct conv *c);
+void ipiput6(struct fs *f, struct ipifc *ifc, struct block *bp);
+void ipfragfree6(struct IP *ip, struct fragment6 *frag);
+struct fragment6 *ipfragallo6(struct IP *ip);
+int unfraglen(struct block *bp, uint8_t *nexthdr, int setfh);
+struct block *procopts(struct block *bp);
+struct block *ip6reassemble(struct IP *ip, int uflen, struct block *bp, struct ip6hdr *ih);
+/* kern/src/net/nixip/loopbackmedium.c */
+void loopbackmediumlink(void);
+/* kern/src/net/nixip/netdevmedium.c */
+void netdevmediumlink(void);
+/* kern/src/net/nixip/netlog.c */
+void netloginit(struct fs *f);
+void netlogopen(struct fs *f);
+void netlogclose(struct fs *f);
+long netlogread(struct fs *f, void *a, uint32_t unused_len, long n);
+void netlogctl(struct fs *f, char *s, int n);
+void netlog(struct fs *f, int mask, char *fmt, ...);
+/* kern/src/net/nixip/nullmedium.c */
+void nullmediumlink(void);
+/* kern/src/net/nixip/pktmedium.c */
+void pktmediumlink(void);
+/* kern/src/net/nixip/ptclbsum.c */
+uint16_t ptclbsum(uint8_t *addr, int len);
+/* kern/src/net/nixip/tcp.c */
+void tcpinit(struct fs *fs);
+/* kern/src/net/nixip/udp.c */
+void udpkick(void *x, struct block *bp);
+void udpiput(struct proto *udp, struct ipifc *ifc, struct block *bp);
+char *udpctl(struct conv *c, char **f, int n);
+void udpadvise(struct proto *udp, struct block *bp, char *msg);
+int udpstats(struct proto *udp, char *buf, int len);
+void udpinit(struct fs *fs);
