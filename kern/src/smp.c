@@ -129,10 +129,25 @@ static void pcpui_trace_kmsg_handler(void *event, void *data)
 	kfree(func_name);
 }
 
+static void pcpui_trace_locks_handler(void *event, void *data)
+{
+	struct pcpu_trace_event *te = (struct pcpu_trace_event*)event;
+	char *func_name;
+	uintptr_t lock_addr = te->arg1;
+	if (lock_addr > KERN_LOAD_ADDR)
+		func_name = get_fn_name(lock_addr);
+	else
+		func_name = "Dynamic lock";
+	printk("Time %uus, lock %p (%s)\n", te->arg0, lock_addr, func_name);
+	if (lock_addr > KERN_LOAD_ADDR)
+		kfree(func_name);
+}
+
 /* Add specific trace handlers here: */
 trace_handler_t pcpui_tr_handlers[PCPUI_NR_TYPES] = {
                                   0,
                                   pcpui_trace_kmsg_handler,
+                                  pcpui_trace_locks_handler,
                                   };
 
 /* Generic handler for the pcpui ring.  Will switch out to the appropriate

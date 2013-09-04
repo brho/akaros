@@ -102,7 +102,8 @@ struct pcpu_trace_event {
  * pcpui_tr_handlers in smp.c. */
 #define PCPUI_TR_TYPE_NULL		0
 #define PCPUI_TR_TYPE_KMSG		1
-#define PCPUI_NR_TYPES			2
+#define PCPUI_TR_TYPE_LOCKS		2
+#define PCPUI_NR_TYPES			3
 
 #ifdef CONFIG_TRACE_KMSGS
 
@@ -120,6 +121,25 @@ struct pcpu_trace_event {
 # define pcpui_trace_kmsg(pcpui, pc)
 
 #endif /* CONFIG_TRACE_KMSGS */
+
+
+#ifdef CONFIG_TRACE_LOCKS
+
+# define pcpui_trace_locks(pcpui, lock)                                        \
+{                                                                              \
+	struct pcpu_trace_event *e = get_trace_slot_overwrite(&pcpui->traces);     \
+	if (e) {                                                                   \
+		e->type = PCPUI_TR_TYPE_LOCKS;                                         \
+		e->arg0 = (int)tsc2usec(read_tsc());                                   \
+		e->arg1 = (uintptr_t)lock;                                             \
+	}                                                                          \
+}
+
+#else
+
+# define pcpui_trace_locks(pcpui, lock)
+
+#endif /* CONFIG_TRACE_LOCKS */
 
 /* Run the handlers for all events in a pcpui ring.  Can run on all cores, or
  * just one core.  'type' selects which event type is handled (0 for all). */

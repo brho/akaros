@@ -48,8 +48,16 @@ int vcprintf(const char *fmt, va_list ap)
 	int *cntp = &cnt;
 	volatile int i;
 
-	// lock all output.  this will catch any printfs at line granularity
+	/* lock all output.  this will catch any printfs at line granularity.  when
+	 * tracing, we short-circuit the main lock call, so as not to clobber the
+	 * results as we print. */
+	#ifdef CONFIG_TRACE_LOCKS
+	int8_t irq_state = 0;
+	disable_irqsave(&irq_state);
+	__spin_lock(&output_lock);
+	#else
 	spin_lock_irqsave(&output_lock);
+	#endif
 
 	// do the buffered printf
 	#ifdef __DEPUTY__
@@ -61,7 +69,12 @@ int vcprintf(const char *fmt, va_list ap)
 	// write out remaining chars in the buffer
 	buffered_putch(-1,&cntp);
 
+	#ifdef CONFIG_TRACE_LOCKS
+	__spin_unlock(&output_lock);
+	enable_irqsave(&irq_state);
+	#else
 	spin_unlock_irqsave(&output_lock);
+	#endif
 
 	return cnt;
 }

@@ -94,6 +94,8 @@ endmenu
 
 menu "Kernel Debugging"
 
+menu "Per-cpu Tracers"
+
 config TRACE_KMSGS
 	bool "KMSG Tracing"
 	default n
@@ -102,6 +104,18 @@ config TRACE_KMSGS
 		events).  You can access this from the monitor via "trace pcpui".  Turn
 		this off for a slight performance improvement on every KMSG (and every
 		MCP proc_yield).
+
+config TRACE_LOCKS
+	bool "Lock Tracing"
+	depends on SPINLOCK_DEBUG
+	default n
+	help
+		Turns on lock tracing, using the per-cpu ring buffer.  This records the
+		a timestamp and lock address, in an over-write tracing style (meaning
+		it'll clobber older events).  If you have locking issues, this may give
+		you clues as to which locks were grabbed recently.
+
+endmenu
 
 config SPINLOCK_DEBUG
 	bool "Spinlock debugging"

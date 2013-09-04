@@ -640,13 +640,26 @@ int cons_get_any_char(void)
 /* output a character to all console outputs (monitor and all serials) */
 void cons_putc(int c)
 {
+	#ifdef CONFIG_TRACE_LOCKS
+	int8_t irq_state = 0;
+	disable_irqsave(&irq_state);
+	__spin_lock(&lock);
+	#else
 	spin_lock_irqsave(&lock);
+	#endif
+
 	#ifndef CONFIG_SERIAL_IO
 		serial_spam_char(c);
 	#endif
 	//lpt_putc(c); 	/* very slow on the nehalem */
 	cga_putc(c);
+
+	#ifdef CONFIG_TRACE_LOCKS
+	__spin_unlock(&lock);
+	enable_irqsave(&irq_state);
+	#else
 	spin_unlock_irqsave(&lock);
+	#endif
 }
 
 // `High'-level console I/O.  Used by readline and cprintf.

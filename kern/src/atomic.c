@@ -50,6 +50,7 @@ void spin_lock(spinlock_t *lock)
 			pcpui->__lock_checking_enabled++;
 		}
 	}
+	pcpui_trace_locks(pcpui, lock);
 lock:
 	__spin_lock(lock);
 	lock->call_site = get_caller_pc();
