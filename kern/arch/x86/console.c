@@ -241,20 +241,20 @@ lpt_putc(int c)
 #define MAX_SCROLL_LENGTH	20
 #define SCROLLING_CRT_SIZE	(MAX_SCROLL_LENGTH * CRT_SIZE)
 
-static spinlock_t SRACY lock = SPINLOCK_INITIALIZER_IRQSAVE;
+static spinlock_t console_lock = SPINLOCK_INITIALIZER_IRQSAVE;
 
 static unsigned SREADONLY addr_6845;
-static uint16_t *SLOCKED(&lock) COUNT(CRT_SIZE) crt_buf;
-static uint16_t SLOCKED(&lock) crt_pos;
+static uint16_t *crt_buf;
+static uint16_t crt_pos;
 
-static uint16_t (SLOCKED(&lock) scrolling_crt_buf)[SCROLLING_CRT_SIZE];
-static uint16_t SLOCKED(&lock) scrolling_crt_pos;
-static uint8_t	SLOCKED(&lock) current_crt_buf;
+static uint16_t scrolling_crt_buf[SCROLLING_CRT_SIZE];
+static uint16_t scrolling_crt_pos;
+static uint8_t	current_crt_buf;
 
 void
 cga_init(void)
 {
-	volatile uint16_t SLOCKED(&lock)*COUNT(CRT_SIZE) cp;
+	volatile uint16_t *cp;
 	uint16_t was;
 	unsigned pos;
 
@@ -275,7 +275,7 @@ cga_init(void)
 	outb(addr_6845, 15);
 	pos |= inb(addr_6845 + 1);
 
-	crt_buf = (uint16_t SLOCKED(&lock)*COUNT(CRT_SIZE)) cp;
+	crt_buf = (uint16_t*)cp;
 	crt_pos = pos;
 	scrolling_crt_pos = 0;
 	current_crt_buf = 0;
@@ -490,8 +490,8 @@ static uint8_t * COUNT(256) (SREADONLY charcode)[4] = {
  * Get data from the keyboard.  If we finish a character, return it.  Else 0.
  * Return -1 if no data.
  */
-static uint32_t SLOCKED(&lock) shift;
-static bool SLOCKED(&lock) crt_scrolled = FALSE;
+static uint32_t shift;
+static bool crt_scrolled = FALSE;
 
 /* TODO: i'm concerned about the (lack of) locking when scrolling the screen. */
 static int
@@ -643,9 +643,9 @@ void cons_putc(int c)
 	#ifdef CONFIG_TRACE_LOCKS
 	int8_t irq_state = 0;
 	disable_irqsave(&irq_state);
-	__spin_lock(&lock);
+	__spin_lock(&console_lock);
 	#else
-	spin_lock_irqsave(&lock);
+	spin_lock_irqsave(&console_lock);
 	#endif
 
 	#ifndef CONFIG_SERIAL_IO
@@ -655,10 +655,10 @@ void cons_putc(int c)
 	cga_putc(c);
 
 	#ifdef CONFIG_TRACE_LOCKS
-	__spin_unlock(&lock);
+	__spin_unlock(&console_lock);
 	enable_irqsave(&irq_state);
 	#else
-	spin_unlock_irqsave(&lock);
+	spin_unlock_irqsave(&console_lock);
 	#endif
 }
 
