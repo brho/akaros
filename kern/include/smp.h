@@ -36,7 +36,7 @@ struct per_cpu_info {
 	struct user_context *cur_ctx;	/* user ctx we came in on (can be 0) */
 	struct user_context actual_ctx;	/* storage for cur_ctx */
 	uint32_t __ctx_depth;		/* don't access directly.  see trap.h. */
-	int __lock_depth_disabled;	/* disables spinlock depth checking */
+	int __lock_checking_enabled;/* == 1, enables spinlock depth checking */
 	struct syscall *cur_sysc;	/* ptr is into cur_proc's address space */
 	struct kthread *spare;		/* useful when restarting */
 	struct timer_chain tchain;	/* for the per-core alarm */

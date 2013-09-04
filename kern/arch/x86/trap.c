@@ -213,10 +213,10 @@ static void handle_fperr(struct hw_trapframe *hw_tf)
 void backtrace_kframe(struct hw_trapframe *hw_tf)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	pcpui->__lock_depth_disabled++;
+	pcpui->__lock_checking_enabled--;
 	printk("\nBacktrace of faulting kernel context on Core %d:\n", core_id());
 	backtrace_frame(x86_get_hwtf_pc(hw_tf), x86_get_hwtf_fp(hw_tf));
-	pcpui->__lock_depth_disabled--;
+	pcpui->__lock_checking_enabled++;
 }
 
 /* Certain traps want IRQs enabled, such as the syscall.  Others can't handle
@@ -230,7 +230,7 @@ static void trap_dispatch(struct hw_trapframe *hw_tf)
 			/* Temporarily disable deadlock detection when we print.  We could
 			 * deadlock if we were printing when we NMIed. */
 			pcpui = &per_cpu_info[core_id()];
-			pcpui->__lock_depth_disabled++;
+			pcpui->__lock_checking_enabled--;
 			/* This is a bit hacky, but we don't have a decent API yet */
 			extern bool mon_verbose_trace;
 			if (mon_verbose_trace) {
@@ -242,7 +242,7 @@ static void trap_dispatch(struct hw_trapframe *hw_tf)
 			       fn_name);
 			kfree(fn_name);
 			print_kmsgs(core_id());
-			pcpui->__lock_depth_disabled--;
+			pcpui->__lock_checking_enabled++;
 			break;
 		case T_BRKPT:
 			enable_irq();
@@ -252,7 +252,7 @@ static void trap_dispatch(struct hw_trapframe *hw_tf)
 		{
 			uintptr_t ip = x86_get_ip_hw(hw_tf);
 			pcpui = &per_cpu_info[core_id()];
-			pcpui->__lock_depth_disabled++;		/* for print debugging */
+			pcpui->__lock_checking_enabled--;		/* for print debugging */
 			/* We will muck with the actual TF.  If we're dealing with
 			 * userspace, we need to make sure we edit the actual TF that will
 			 * get restarted (pcpui), and not the TF on the kstack (which aren't
@@ -268,12 +268,12 @@ static void trap_dispatch(struct hw_trapframe *hw_tf)
 			    *(uint8_t*)(ip + 1) == 0x01, 
 			    *(uint8_t*)(ip + 2) == 0xf9) {
 				x86_fake_rdtscp(hw_tf);
-				pcpui->__lock_depth_disabled--;	/* for print debugging */
+				pcpui->__lock_checking_enabled++;	/* for print debugging */
 				return;
 			}
 			enable_irq();
 			monitor(hw_tf);
-			pcpui->__lock_depth_disabled--;		/* for print debugging */
+			pcpui->__lock_checking_enabled++;		/* for print debugging */
 			break;
 		}
 		case T_PGFLT:

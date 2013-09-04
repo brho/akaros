@@ -110,7 +110,7 @@ void _panic(const char *file, int line, const char *fmt,...)
 	struct per_cpu_info *pcpui;
 	/* We're panicing, possibly in a place that can't handle the lock checker */
 	pcpui = &per_cpu_info[core_id_early()];
-	pcpui->__lock_depth_disabled++;
+	pcpui->__lock_checking_enabled--;
 	va_start(ap, fmt);
 	printk("kernel panic at %s:%d, from core %d: ", file, line,
 	       core_id_early());
@@ -123,7 +123,7 @@ dead:
 	/* We could consider turning the lock checker back on here, but things are
 	 * probably a mess anyways, and with it on we would probably lock up right
 	 * away when we idle. */
-	//pcpui->__lock_depth_disabled--;
+	//pcpui->__lock_checking_enabled++;
 	smp_idle();
 }
 

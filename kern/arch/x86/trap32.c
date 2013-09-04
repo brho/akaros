@@ -63,7 +63,7 @@ void print_trapframe(struct hw_trapframe *hw_tf)
 	/* This is only called in debug scenarios, and often when the kernel trapped
 	 * and needs to tell us about it.  Disable the lock checker so it doesn't go
 	 * nuts when we print/panic */
-	pcpui->__lock_depth_disabled++;
+	pcpui->__lock_checking_enabled--;
 	spin_lock_irqsave(&ptf_lock);
 	printk("TRAP frame at %p on core %d\n", hw_tf, core_id());
 	print_regs(&hw_tf->tf_regs);
@@ -83,7 +83,7 @@ void print_trapframe(struct hw_trapframe *hw_tf)
 		printk("  ss   0x----%04x\n", hw_tf->tf_ss);
 	}
 	spin_unlock_irqsave(&ptf_lock);
-	pcpui->__lock_depth_disabled--;
+	pcpui->__lock_checking_enabled++;
 }
 
 void page_fault_handler(struct hw_trapframe *hw_tf)

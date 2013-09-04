@@ -31,22 +31,23 @@ void spin_lock(spinlock_t *lock)
 	uint32_t coreid = core_id_early();
 	struct per_cpu_info *pcpui = &per_cpu_info[coreid];
 	/* Short circuit our lock checking, so we can print or do other things to
-	 * announce the failure that require locks. */
-	if (pcpui->__lock_depth_disabled)
+	 * announce the failure that require locks.  Also avoids anything else
+	 * requiring pcpui initialization. */
+	if (pcpui->__lock_checking_enabled != 1)
 		goto lock;
 	if (lock->irq_okay) {
 		if (!can_spinwait_irq(pcpui)) {
-			pcpui->__lock_depth_disabled++;
+			pcpui->__lock_checking_enabled--;
 			print_kctx_depths("IRQOK");
 			panic("Lock %p tried to spin when it shouldn't\n", lock);
-			pcpui->__lock_depth_disabled--;
+			pcpui->__lock_checking_enabled++;
 		}
 	} else {
 		if (!can_spinwait_noirq(pcpui)) {
-			pcpui->__lock_depth_disabled++;
+			pcpui->__lock_checking_enabled--;
 			print_kctx_depths("NOIRQ");
 			panic("Lock %p tried to spin when it shouldn't\n", lock);
-			pcpui->__lock_depth_disabled--;
+			pcpui->__lock_checking_enabled++;
 		}
 	}
 lock:

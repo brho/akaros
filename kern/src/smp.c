@@ -112,6 +112,8 @@ void smp_percpu_init(void)
 	assert(trace_buf);
 	trace_ring_init(&pcpui->traces, trace_buf, PGSIZE,
 	                sizeof(struct pcpu_trace_event));
+	/* Enable full lock debugging, after all pcpui work is done */
+	pcpui->__lock_checking_enabled = 1;
 }
 
 /* PCPUI Trace Rings: */
