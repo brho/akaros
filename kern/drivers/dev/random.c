@@ -15,7 +15,6 @@
 
 struct Rb
 {
-	qlock_t qlock;
 	struct cond_var	producer;
 	struct cond_var	consumer;
 	uint32_t	randomcount;
@@ -69,6 +68,7 @@ randomclock(void)
 
 	if(rb.wakeme){
 		printd("wakeup consumer\n");
+		/* if we link into a clock IRQ, this CV needs to be irqsave */
 		cv_signal(&rb.consumer);
 	}
 }
@@ -89,7 +89,10 @@ genrandom(uint32_t srcid, long a0, long a1, long a2)
 		schedule();
 		if(!rbnotfull()){
 			printd("random producer sleeps\n");
+			/* Syncing with randomread */
+			cv_lock(&rb.producer);
 			cv_wait(&rb.producer);
+			cv_unlock(&rb.producer);
 			printd("random producer is woken\n");
 		}
 	}
@@ -121,11 +124,13 @@ randomread(void *xp, uint32_t n)
 	p = xp;
 printk("readrandom\n");
 	if(waserror()){
-		qunlock(&rb.qlock);
+		cv_unlock(&rb.consumer);
 		nexterror();
 	}
 
-	qlock(&rb.qlock);
+	/* TODO: using the consumer CV lock here, since we'll wait on it later.
+	 * Review all this gen stuff.  Intent is to have one reader at a time. */
+	cv_lock(&rb.consumer);
 	for(e = p + n; p < e; ){
 		if(rb.wp == rb.rp){
 			printd("out of numbers\n");
@@ -152,7 +157,7 @@ printk("readrandom\n");
 		else
 			rb.rp = rb.rp+1;
 	}
-	qunlock(&rb.qlock);
+	cv_unlock(&rb.consumer);
 	poperror();
 
 	cv_signal(&rb.producer);
