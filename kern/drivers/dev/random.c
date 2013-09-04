@@ -1,3 +1,4 @@
+//#define DEBUG
 #include <vfs.h>
 #include <kfs.h>
 #include <slab.h>
@@ -66,8 +67,10 @@ randomclock(void)
 	else
 		rb.wp = rb.wp+1;
 
-	if(rb.wakeme)
-		wakeup(&rb.consumer);
+	if(rb.wakeme){
+		printd("wakeup consumer\n");
+		cv_signal(&rb.consumer);
+	}
 }
 
 static void
@@ -84,8 +87,11 @@ genrandom(uint32_t srcid, long a0, long a1, long a2)
 				break;
 		}
 		schedule();
-		if(!rbnotfull())
+		if(!rbnotfull()){
+			printd("random producer sleeps\n");
 			cv_wait(&rb.producer);
+			printd("random producer is woken\n");
+		}
 	}
 }
 
@@ -122,9 +128,13 @@ printk("readrandom\n");
 	qlock(&rb.qlock);
 	for(e = p + n; p < e; ){
 		if(rb.wp == rb.rp){
+			printd("out of numbers\n");
 			rb.wakeme = 1;
+			printd("Wake the producer\n");
 			cv_signal(&rb.producer);
+			printd("consumer sleeps\n");
 			cv_wait(&rb.consumer);
+			printd("consumer was awoken\n");
 			rb.wakeme = 0;
 			continue;
 		}
@@ -145,7 +155,7 @@ printk("readrandom\n");
 	qunlock(&rb.qlock);
 	poperror();
 
-	wakeup(&rb.producer);
+	cv_signal(&rb.producer);
 
 	return n;
 }
