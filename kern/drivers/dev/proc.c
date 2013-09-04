@@ -1616,7 +1616,7 @@ static void procctlreq(struct proc *p, char *va, int n)
 		case CMwired:
 			core = atoi(cb->f[1]);
 			procwired(p, core);
-			sched();
+			shedule();
 			break;
 		case CMtrace:
 			switch (cb->nf) {

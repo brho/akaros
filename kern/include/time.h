@@ -32,6 +32,7 @@ uint64_t sec2tsc(uint64_t sec);
 uint64_t msec2tsc(uint64_t msec);
 uint64_t usec2tsc(uint64_t usec);
 uint64_t nsec2tsc(uint64_t nsec);
+void udelay_sched(int usec);
 
 /* Just takes a time measurement.  Meant to be paired with stop_timing.  Use
  * this if you don't want to muck with overheads or subtraction. */

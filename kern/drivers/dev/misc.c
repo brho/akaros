@@ -67,6 +67,36 @@ static struct dirtab consdir[] = {
 
 static void consinit(void)
 {
+	printk("consinit\n");
+	randominit();
+}
+
+static uint32_t randn;
+
+static void
+seedrand(void)
+{
+	ERRSTACK(1);
+	if(!waserror()){
+		randomread((void*)&randn, sizeof(randn));
+		poperror();
+	}
+}
+
+int
+nrand(int n)
+{
+	if(randn == 0)
+		seedrand();
+	randn = randn*1103515245 + 12345 + tsc2msec(read_tsc_serialized());
+	return (randn>>16) % n;
+}
+
+int
+rand(void)
+{
+	nrand(1);
+	return randn;
 }
 
 static struct chan *consattach(char *spec)
@@ -188,10 +218,9 @@ consread(struct chan *c, void *buf, long n, int64_t off)
 			if (sysname == NULL)
 				return 0;
 			return readstr(offset, buf, n, sysname);
-
+#endif
 		case Qrandom:
 			return randomread(buf, n);
-#endif
 		case Qdrivers:
 			return devtabread(c, buf, n, off);
 

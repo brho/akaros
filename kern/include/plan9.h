@@ -658,16 +658,18 @@ int getfields(char *str, char **args, int max, int mflag, char *unused_set);
 
 /* functions we need to do something with someday */
 #define kproc(...)
-#define tsleep(...)
 #define sleep(...)
+#define tsleep(...)
 #define postnote(...)
 #define pexit(...)
 #define wakeup(...)
 #define strtoul strtol
 
-/* need a random number generator */
-#define nrand(x) (x/4)
-#define sched() panic("sched called")
+/* kern/drivers/dev/misc.c */
+int nrand(int n);
+
+/* kern/drivers/dev/random.c */
+uint32_t randomread(void *xp, uint32_t n);
 
 /* include for now.
  * It's the easiest way to ensure we don't have odd conflicts.

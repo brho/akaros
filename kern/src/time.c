@@ -118,3 +118,14 @@ uint64_t nsec2tsc(uint64_t nsec)
 	else
 		return (nsec * system_timing.tsc_freq) / 1000000000;
 }
+
+/* being able to delay is just plain handy, and let someone else run. */
+void udelay_sched(int usec)
+{
+        struct timer_chain *tchain = &per_cpu_info[core_id()].tchain;
+        struct alarm_waiter a_waiter;
+        init_awaiter(&a_waiter, 0);
+        set_awaiter_rel(&a_waiter, usec);
+        set_alarm(tchain, &a_waiter);
+        sleep_on_awaiter(&a_waiter);
+}

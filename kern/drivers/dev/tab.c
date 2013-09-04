@@ -39,6 +39,7 @@ struct dev *devtab[] = {
 void devtabreset()
 {
 	int i;
+	printk("devtabresets\n");
 
 	for (i = 0; devtab[i] != NULL; i++)
 		devtab[i]->reset(current);
@@ -48,6 +49,7 @@ void devtabinit()
 {
 	int i;
 
+	printk("devtabinit\n");
 	for (i = 0; devtab[i] != NULL; i++)
 		devtab[i]->init(current);
 }

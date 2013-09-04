@@ -10,6 +10,7 @@
 #include <cpio.h>
 #include <pmap.h>
 #include <smp.h>
+#include <schedule.h>
 
 enum {
 	QMAX = 64 * 1024 - 1,
@@ -2612,7 +2613,7 @@ static void tcpoutput(struct conv *s)
 		}
 		if ((msgs % 4) == 1) {
 			qunlock(&s->qlock);
-			sched();
+			schedule();
 			qlock(&s->qlock);
 		}
 	}

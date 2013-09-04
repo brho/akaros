@@ -88,6 +88,8 @@ void kernel_init(multiboot_info_t *mboot_info)
 	enable_irq();
 	void ether8139link(void);
 	ether8139link();
+void devtabinit(void);
+	devtabinit();
 void devtabreset(void);
 	devtabreset();
 	socket_init();
