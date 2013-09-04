@@ -29,7 +29,7 @@ loopbackbind(struct ipifc *ifc, int unused_int, char **unused_char_pp_t)
 {
 	LB *lb;
 
-	lb = kmalloc(sizeof(*lb), 0);
+	lb = kzmalloc(sizeof(*lb), 0);
 	lb->f = ifc->conv->p->f;
 	lb->q = qopen(1024 * 1024, Qmsg, NULL, NULL);
 	ifc->arg = lb;

@@ -256,7 +256,7 @@ void iphtadd(struct Ipht *ht, struct conv *c)
 	struct iphash *h;
 
 	hv = iphash(c->raddr, c->rport, c->laddr, c->lport);
-	h = kmalloc(sizeof(*h), 0);
+	h = kzmalloc(sizeof(*h), 0);
 	if (ipcmp(c->raddr, IPnoaddr) != 0)
 		h->match = IPmatchexact;
 	else {

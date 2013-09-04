@@ -431,7 +431,7 @@ char *ipifcadd(struct ipifc *ifc, char **argv, int argc, int tentative,
 	}
 
 	/* add the address to the list of logical ifc's for this ifc */
-	lifc = kmalloc(sizeof(struct iplifc), 0);
+	lifc = kzmalloc(sizeof(struct iplifc), 0);
 	ipmove(lifc->local, ip);
 	ipmove(lifc->mask, mask);
 	ipmove(lifc->remote, rem);
@@ -786,7 +786,7 @@ void ipifcinit(struct fs *f)
 {
 	struct proto *ipifc;
 
-	ipifc = kmalloc(sizeof(struct proto), 0);
+	ipifc = kzmalloc(sizeof(struct proto), 0);
 	ipifc->name = "ipifc";
 	ipifc->connect = ipifcconnect;
 	ipifc->announce = NULL;
@@ -805,7 +805,7 @@ void ipifcinit(struct fs *f)
 	ipifc->ptclsize = sizeof(struct ipifc);
 
 	f->ipifc = ipifc;	/* hack for ipifcremroute, findipifc, ... */
-	f->self = kmalloc(sizeof(struct Ipselftab), 0);	/* hack for ipforme */
+	f->self = kzmalloc(sizeof(struct Ipselftab), 0);	/* hack for ipforme */
 
 	Fsproto(f, ipifc);
 }
@@ -832,7 +832,7 @@ addselfcache(struct fs *f, struct ipifc *ifc,
 
 	/* allocate a local address and add to hash chain */
 	if (p == NULL) {
-		p = kmalloc(sizeof(*p), 0);
+		p = kzmalloc(sizeof(*p), 0);
 		ipmove(p->a, a);
 		p->type = type;
 		p->next = f->self->hash[h];
@@ -850,7 +850,7 @@ addselfcache(struct fs *f, struct ipifc *ifc,
 
 	/* allocate a lifc-to-local link and link to both */
 	if (lp == NULL) {
-		lp = kmalloc(sizeof(*lp), 0);
+		lp = kzmalloc(sizeof(*lp), 0);
 		kref_init(&lp->ref, fake_release, 1);
 		lp->lifc = lifc;
 		lp->self = p;
@@ -1401,7 +1401,7 @@ void ipifcaddmulti(struct conv *c, uint8_t * ma, uint8_t * ia)
 		if (ipcmp(ma, (*l)->ma) == 0 && ipcmp(ia, (*l)->ia) == 0)
 			return;	/* it's already there */
 
-	multi = *l = kmalloc(sizeof(*multi), 0);
+	multi = *l = kzmalloc(sizeof(*multi), 0);
 	ipmove(multi->ma, ma);
 	ipmove(multi->ia, ia);
 	multi->next = NULL;
@@ -1593,7 +1593,7 @@ char *ipifcadd6(struct ipifc *ifc, char **argv, int argc)
 		plen > 64 || islinklocal(prefix))
 		return Ebadarg;
 
-	lifc = kmalloc(sizeof(struct iplifc), 0);
+	lifc = kzmalloc(sizeof(struct iplifc), 0);
 	lifc->onlink = (onlink != 0);
 	lifc->autoflag = (autoflag != 0);
 	lifc->validlt = validlt;

@@ -50,7 +50,7 @@ static void netdevbind(struct ipifc *ifc, int argc, char **argv)
 
 	mchan = namec(argv[2], Aopen, ORDWR, 0);
 
-	er = kmalloc(sizeof(*er), 0);
+	er = kzmalloc(sizeof(*er), 0);
 	er->mchan = mchan;
 	er->f = ifc->conv->p->f;
 

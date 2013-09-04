@@ -454,8 +454,8 @@ void icmpinit(struct fs *fs)
 {
 	struct proto *icmp;
 
-	icmp = kmalloc(sizeof(struct proto), 0);
-	icmp->priv = kmalloc(sizeof(Icmppriv), 0);
+	icmp = kzmalloc(sizeof(struct proto), 0);
+	icmp->priv = kzmalloc(sizeof(Icmppriv), 0);
 	icmp->name = "icmp";
 	icmp->connect = icmpconnect;
 	icmp->announce = icmpannounce;

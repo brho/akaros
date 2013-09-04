@@ -267,7 +267,7 @@ static struct fs *ipgetfs(int dev)
 
 	qlock(&fslock);
 	if (ipfs[dev] == NULL) {
-		f = kmalloc(sizeof(struct fs), 0);
+		f = kzmalloc(sizeof(struct fs), 0);
 		ip_init(f);
 		arpinit(f);
 		netloginit(f);
@@ -286,7 +286,7 @@ struct IPaux *newipaux(char *owner, char *tag)
 	struct IPaux *a;
 	int n;
 
-	a = kmalloc(sizeof(*a), 0);
+	a = kzmalloc(sizeof(*a), 0);
 	kstrdup(&a->owner, owner);
 	memset(a->tag, ' ', sizeof(a->tag));
 	n = strlen(tag);
@@ -633,13 +633,13 @@ static long ipread(struct chan *ch, void *a, long n, int64_t off)
 		case Qlog:
 			return netlogread(f, a, offset, n);
 		case Qctl:
-			buf = kmalloc(16, 0);
+			buf = kzmalloc(16, 0);
 			snprintf(buf, 16, "%lud", CONV(ch->qid));
 			rv = readstr(offset, p, n, buf);
 			kfree(buf);
 			return rv;
 		case Qremote:
-			buf = kmalloc(Statelen, 0);
+			buf = kzmalloc(Statelen, 0);
 			x = f->p[PROTO(ch->qid)];
 			c = x->conv[CONV(ch->qid)];
 			if (x->remote == NULL) {
@@ -651,7 +651,7 @@ static long ipread(struct chan *ch, void *a, long n, int64_t off)
 			kfree(buf);
 			return rv;
 		case Qlocal:
-			buf = kmalloc(Statelen, 0);
+			buf = kzmalloc(Statelen, 0);
 			x = f->p[PROTO(ch->qid)];
 			c = x->conv[CONV(ch->qid)];
 			if (x->local == NULL) {
@@ -663,7 +663,7 @@ static long ipread(struct chan *ch, void *a, long n, int64_t off)
 			kfree(buf);
 			return rv;
 		case Qstatus:
-			buf = kmalloc(Statelen, 0);
+			buf = kzmalloc(Statelen, 0);
 			x = f->p[PROTO(ch->qid)];
 			c = x->conv[CONV(ch->qid)];
 			(*x->state) (c, buf, Statelen - 2);
@@ -683,7 +683,7 @@ static long ipread(struct chan *ch, void *a, long n, int64_t off)
 			x = f->p[PROTO(ch->qid)];
 			if (x->stats == NULL)
 				error("stats not implemented");
-			buf = kmalloc(Statelen, 0);
+			buf = kzmalloc(Statelen, 0);
 			(*x->stats) (x, buf, Statelen);
 			rv = readstr(offset, p, n, buf);
 			kfree(buf);
@@ -1224,7 +1224,7 @@ int Fsproto(struct fs *f, struct proto *p)
 
 	p->qid.type = QTDIR;
 	p->qid.path = QID(f->np, 0, Qprotodir);
-	p->conv = kmalloc(sizeof(struct conv *) * (p->nc + 1), 0);
+	p->conv = kzmalloc(sizeof(struct conv *) * (p->nc + 1), 0);
 	if (p->conv == NULL)
 		panic("Fsproto");
 
@@ -1257,14 +1257,14 @@ retry:
 	for (pp = p->conv; pp < ep; pp++) {
 		c = *pp;
 		if (c == NULL) {
-			c = kmalloc(sizeof(struct conv), 0);
+			c = kzmalloc(sizeof(struct conv), 0);
 			if (c == NULL)
 				error(Enomem);
 			qlock(&c->qlock);
 			c->p = p;
 			c->x = pp - p->conv;
 			if (p->ptclsize != 0) {
-				c->ptcl = kmalloc(p->ptclsize, 0);
+				c->ptcl = kzmalloc(p->ptclsize, 0);
 				if (c->ptcl == NULL) {
 					kfree(c);
 					error(Enomem);

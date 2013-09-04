@@ -51,7 +51,7 @@ parsecmd(char *p, int n)
 	nf = ncmdfield(p, n);
 
 	/* allocate struct cmdbuf plus string pointers plus copy of string including \0 */
-	sp = kmalloc(sizeof(*cb) + nf * sizeof(char *) + n + 1, 0);
+	sp = kzmalloc(sizeof(*cb) + nf * sizeof(char *) + n + 1, 0);
 	cb = (struct cmdbuf*)sp;
 	cb->f = (char**)(&cb[1]);
 	cb->buf = (char*)(&cb->f[nf]);

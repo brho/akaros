@@ -346,7 +346,7 @@ static struct ether *etherprobe(int cardno, int ctlrno)
 	struct ether *ether;
 	char buf[128], name[32];
 
-	ether = kmalloc(sizeof(struct ether), 0);
+	ether = kzmalloc(sizeof(struct ether), 0);
 	memset(ether, 0, sizeof(struct ether));
 	ether->ctlrno = ctlrno;
 	ether->tbdf = 0;

@@ -53,7 +53,7 @@ static struct route *allocroute(int type)
 	if (r != NULL) {
 		*l = r->routeTree.mid;
 	} else {
-		r = kmalloc(n, 0);
+		r = kzmalloc(n, 0);
 		if (r == NULL)
 			panic("out of routing nodes");
 	}

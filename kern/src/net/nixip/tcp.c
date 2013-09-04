@@ -1467,7 +1467,7 @@ limbo(struct conv *s, uint8_t * source, uint8_t * dest, Tcp * seg, int version)
 			tpriv->lht[h] = lp->next;
 			lp->next = NULL;
 		} else {
-			lp = kmalloc(sizeof(*lp), 0);
+			lp = kzmalloc(sizeof(*lp), 0);
 			if (lp == NULL)
 				return;
 			tpriv->nlimbo++;
@@ -2854,7 +2854,7 @@ addreseq(Tcpctl * tcb, struct tcppriv *tpriv, Tcp * seg,
 	Reseq *rp, *rp1;
 	int i, rqlen, qmax;
 
-	rp = kmalloc(sizeof(Reseq), 0);
+	rp = kzmalloc(sizeof(Reseq), 0);
 	if (rp == NULL) {
 		freeblist(bp);	/* bp always consumed by add_reseq */
 		return 0;
@@ -3156,8 +3156,8 @@ void tcpinit(struct fs *fs)
 	struct proto *tcp;
 	struct tcppriv *tpriv;
 
-	tcp = kmalloc(sizeof(struct proto), 0);
-	tpriv = tcp->priv = kmalloc(sizeof(struct tcppriv), 0);
+	tcp = kzmalloc(sizeof(struct proto), 0);
+	tpriv = tcp->priv = kzmalloc(sizeof(struct tcppriv), 0);
 	tcp->name = "tcp";
 	tcp->connect = tcpconnect;
 	tcp->announce = tcpannounce;

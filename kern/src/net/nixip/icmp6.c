@@ -871,9 +871,9 @@ extern void icmpclose(struct conv *c);
 
 void icmp6init(struct fs *fs)
 {
-	struct proto *icmp6 = kmalloc(sizeof(struct proto), 0);
+	struct proto *icmp6 = kzmalloc(sizeof(struct proto), 0);
 
-	icmp6->priv = kmalloc(sizeof(Icmppriv6), 0);
+	icmp6->priv = kzmalloc(sizeof(Icmppriv6), 0);
 	icmp6->name = "icmpv6";
 	icmp6->connect = icmpconnect;
 	icmp6->announce = icmpannounce;

@@ -1,7 +1,7 @@
 /*
  * Stub.
  */
-#define DEBUG
+//#define DEBUG
 #include <vfs.h>
 #include <kfs.h>
 #include <slab.h>
@@ -26,6 +26,7 @@ extern struct dev procdevtab;
 extern struct dev miscdevtab;
 extern struct dev etherdevtab;
 extern struct dev rootdevtab;
+extern struct dev ipdevtab;
 struct dev *devtab[] = {
 	&rootdevtab,
 	&miscdevtab,
@@ -33,6 +34,7 @@ struct dev *devtab[] = {
 	&pipedevtab,
 	&procdevtab,
 	&etherdevtab,
+	&ipdevtab,
 	NULL,
 };
 

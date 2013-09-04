@@ -172,7 +172,7 @@ static void etherbind(struct ipifc *ifc, int argc, char **argv)
 	 *  get mac address and speed
 	 */
 	snprintf(addr, sizeof(addr), "%s/stats", argv[2]);
-	buf = kmalloc(512, 0);
+	buf = kzmalloc(512, 0);
 	schan = namec(addr, Aopen, OREAD, 0);
 	if (waserror()) {
 		cclose(schan);
@@ -216,7 +216,7 @@ static void etherbind(struct ipifc *ifc, int argc, char **argv)
 	 */
 	cchan6->dev->write(cchan6, nbmsg, strlen(nbmsg), 0);
 
-	er = kmalloc(sizeof(*er), 0);
+	er = kzmalloc(sizeof(*er), 0);
 	er->mchan4 = mchan4;
 	er->cchan4 = cchan4;
 	er->achan = achan;

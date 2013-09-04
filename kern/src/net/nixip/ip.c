@@ -52,7 +52,7 @@ void ip_init_6(struct fs *f)
 {
 	struct v6params *v6p;
 
-	v6p = kmalloc(sizeof(struct v6params), 0);
+	v6p = kzmalloc(sizeof(struct v6params), 0);
 
 	v6p->rp.mflag = 0;	/* default not managed */
 	v6p->rp.oflag = 0;
@@ -77,7 +77,7 @@ void initfrag(struct IP *ip, int size)
 	struct fragment6 *fq6, *eq6;
 
 	ip->fragfree4 =
-		(struct fragment4 *)kmalloc(sizeof(struct fragment4) * size, 0);
+		(struct fragment4 *)kzmalloc(sizeof(struct fragment4) * size, 0);
 	if (ip->fragfree4 == NULL)
 		panic("initfrag");
 
@@ -88,7 +88,7 @@ void initfrag(struct IP *ip, int size)
 	ip->fragfree4[size - 1].next = NULL;
 
 	ip->fragfree6 =
-		(struct fragment6 *)kmalloc(sizeof(struct fragment6) * size, 0);
+		(struct fragment6 *)kzmalloc(sizeof(struct fragment6) * size, 0);
 	if (ip->fragfree6 == NULL)
 		panic("initfrag");
 
@@ -103,7 +103,7 @@ void ip_init(struct fs *f)
 {
 	struct IP *ip;
 
-	ip = kmalloc(sizeof(struct IP), 0);
+	ip = kzmalloc(sizeof(struct IP), 0);
 	initfrag(ip, 100);
 	f->ip = ip;
 

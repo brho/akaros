@@ -72,7 +72,7 @@ expression E1;
 @@
 
 - smalloc(E1
-+ kmalloc(E1, 0
++ kzmalloc(E1, 0
    )
 
 @ rulem @
@@ -90,7 +90,7 @@ expression E1;
 @@
 
 - malloc(E1
-+ kmalloc(E1, 0
++ kzmalloc(E1, 0
    )
 
 @@

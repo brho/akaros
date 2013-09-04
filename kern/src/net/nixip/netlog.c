@@ -73,7 +73,7 @@ struct cmdtab routecmd[] = {
 
 void netloginit(struct fs *f)
 {
-	f->alog = kmalloc(sizeof(struct netlog), 0);
+	f->alog = kzmalloc(sizeof(struct netlog), 0);
 }
 
 void netlogopen(struct fs *f)
@@ -86,7 +86,7 @@ void netlogopen(struct fs *f)
 	}
 	if (f->alog->opens == 0) {
 		if (f->alog->buf == NULL)
-			f->alog->buf = kmalloc(Nlog, 0);
+			f->alog->buf = kzmalloc(Nlog, 0);
 		if (f->alog->buf == NULL)
 			error(Enomem);
 		f->alog->rptr = f->alog->buf;

@@ -588,8 +588,8 @@ void udpinit(struct fs *fs)
 {
 	struct proto *udp;
 
-	udp = kmalloc(sizeof(struct proto), 0);
-	udp->priv = kmalloc(sizeof(Udppriv), 0);
+	udp = kzmalloc(sizeof(struct proto), 0);
+	udp->priv = kzmalloc(sizeof(Udppriv), 0);
 	udp->name = "udp";
 	udp->connect = udpconnect;
 	udp->announce = udpannounce;
