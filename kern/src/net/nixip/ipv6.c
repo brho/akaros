@@ -158,7 +158,11 @@ ipoput6(struct fs *f,
 		goto raise;
 	}
 
-	lid = kref_get(&ip->id6, 1);
+	/* TODO: this probably doesn't do what you want.  if you're trying to get a
+	 * unique ID, this will not work (concurrent users would could read the same
+	 * refcnt). */
+	kref_get(&ip->id6, 1);
+	lid = kref_refcnt(&ip->id6);
 	fraghdr.nexthdr = nexthdr;
 	fraghdr.res = 0;
 	hnputl(fraghdr.id, lid);

@@ -411,6 +411,9 @@ void v4delroute(struct fs *f, uint8_t * a, uint8_t * mask, int dolock)
 		r = looknode(&f->v4root[h], &rt);
 		if (r) {
 			p = *r;
+			/* TODO: bad usage of kref (use a release).  I didn't change this
+			 * one, since it looks like the if code is when we want to release.
+			 * */
 			if (kref_put(&p->routeTree.ref)) {
 				*r = 0;
 				addqueue(&f->queue, p->routeTree.left);
@@ -454,6 +457,9 @@ void v6delroute(struct fs *f, uint8_t * a, uint8_t * mask, int dolock)
 		r = looknode(&f->v6root[h], &rt);
 		if (r) {
 			p = *r;
+			/* TODO: bad usage of kref (use a release).  I didn't change this
+			 * one, since it looks like the if code is when we want to release.
+			 * TODO: better code reuse btw v4 and v6... */
 			if (kref_put(&p->routeTree.ref)) {
 				*r = 0;
 				addqueue(&f->queue, p->routeTree.left);

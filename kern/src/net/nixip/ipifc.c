@@ -973,7 +973,9 @@ remselfcache(struct fs *f, struct ipifc *ifc, struct iplifc *lifc, uint8_t * a)
 	if (link == NULL)
 		panic("remselfcache");
 
-	if (kref_put(&link->ref))
+	/* TODO: bad usage of krefs.  Looks like the stuff below this is the
+	 * 'release'.  Read this as 'if we didn't release', skip the cleanup. */
+	if (!kref_put(&link->ref))
 		goto out;
 
 	if ((p->type & Rmulti) && ifc->medium->remmulti != NULL)

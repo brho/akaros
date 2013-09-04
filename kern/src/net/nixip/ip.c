@@ -200,8 +200,12 @@ ipoput4(struct fs *f,
 	else
 		medialen = ifc->maxtu - ifc->medium->hsize;
 	if (len <= medialen) {
-		if (!gating)
-			hnputs(eh->id, kref_get(&ip->id4, 1));
+		if (!gating) {
+			/* TODO: not sure what you want here.  The only thing we can
+			 * guarantee about the ref you read is that it is > 0. */
+			kref_get(&ip->id4, 1);
+			hnputs(eh->id, kref_refcnt(&ip->id4));
+		}
 		hnputs(eh->length, len);
 		if (!gating) {
 			eh->frag[0] = 0;
@@ -238,10 +242,14 @@ ipoput4(struct fs *f,
 
 	dlen = len - IP4HDR;
 	xp = bp;
-	if (gating)
+	if (gating) {
 		lid = nhgets(eh->id);
-	else
-		lid = kref_get(&ip->id4, 1);
+	} else {
+		/* TODO: not sure what you want here.  The only thing we can
+		 * guarantee about the ref you read is that it is > 0. */
+		kref_get(&ip->id4, 1);
+		lid = kref_refcnt(&ip->id4);
+	}
 
 	offset = IP4HDR;
 	while (xp != NULL && offset && offset >= BLEN(xp)) {
