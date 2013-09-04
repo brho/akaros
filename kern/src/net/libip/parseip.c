@@ -52,7 +52,7 @@ v4parseip(uint8_t *to, char *from)
 static int
 ipcharok(int c)
 {
-	return c == '.' || c == ':' || isascii(c) && isxdigit(c);
+	return c == '.' || c == ':' || (isascii(c) && isxdigit(c));
 }
 
 static int
@@ -60,7 +60,7 @@ delimchar(int c)
 {
 	if(c == '\0')
 		return 1;
-	if(c == '.' || c == ':' || isascii(c) && isalnum(c))
+	if(c == '.' || c == ':' || (isascii(c) && isalnum(c)))
 		return 0;
 	return 1;
 }
@@ -91,7 +91,7 @@ parseip(uint8_t *to, char *from)
 			break;
 		}
 		/* v6: at most 4 hex digits, followed by colon or delim */
-		if(x != (uint16_t)x || *p != ':' && !delimchar(*p)) {
+		if(x != (uint16_t)x || (*p != ':' && !delimchar(*p))) {
 			memset(to, 0, IPaddrlen);
 			return -1;			/* parse error */
 		}

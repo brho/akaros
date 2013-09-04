@@ -205,10 +205,10 @@ static void balancetree(struct route **cur)
 	 */
 	p = *cur;
 	dl = 0;
-	if (l = p->routeTree.left)
+	if ((l = p->routeTree.left))
 		dl = l->routeTree.depth;
 	dr = 0;
-	if (r = p->routeTree.right)
+	if ((r = p->routeTree.right))
 		dr = r->routeTree.depth;
 
 	if (dl > dr + 1) {
@@ -307,7 +307,7 @@ v4addroute(struct fs *f, char *tag, uint8_t * a, uint8_t * mask,
 
 		wlock(&routelock);
 		addnode(f, &f->v4root[h], p);
-		while (p = f->queue) {
+		while ((p = f->queue)) {
 			f->queue = p->routeTree.mid;
 			walkadd(f, &f->v4root[h], p->routeTree.left);
 			freeroute(p);
@@ -353,7 +353,7 @@ v6addroute(struct fs *f, char *tag, uint8_t * a, uint8_t * mask,
 
 		wlock(&routelock);
 		addnode(f, &f->v6root[h], p);
-		while (p = f->queue) {
+		while ((p = f->queue)) {
 			f->queue = p->routeTree.mid;
 			walkadd(f, &f->v6root[h], p->routeTree.left);
 			freeroute(p);
@@ -417,7 +417,7 @@ void v4delroute(struct fs *f, uint8_t * a, uint8_t * mask, int dolock)
 				addqueue(&f->queue, p->routeTree.mid);
 				addqueue(&f->queue, p->routeTree.right);
 				freeroute(p);
-				while (p = f->queue) {
+				while ((p = f->queue)) {
 					f->queue = p->routeTree.mid;
 					walkadd(f, &f->v4root[h], p->routeTree.left);
 					freeroute(p);
@@ -460,7 +460,7 @@ void v6delroute(struct fs *f, uint8_t * a, uint8_t * mask, int dolock)
 				addqueue(&f->queue, p->routeTree.mid);
 				addqueue(&f->queue, p->routeTree.right);
 				freeroute(p);
-				while (p = f->queue) {
+				while ((p = f->queue)) {
 					f->queue = p->routeTree.mid;
 					walkadd(f, &f->v6root[h], p->routeTree.left);
 					freeroute(p);

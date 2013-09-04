@@ -529,7 +529,7 @@ static void resolveaddr6(struct ipifc *ifc, struct arpent *a)
 	a->rxtsrem--;
 	arprelease(er->f->arp, a);
 
-	if (sflag = ipv6anylocal(ifc, ipsrc))
+	if ((sflag = ipv6anylocal(ifc, ipsrc)))
 		icmpns(er->f, ipsrc, sflag, a->ip, TARG_MULTI, ifc->mac);
 }
 

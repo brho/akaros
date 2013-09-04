@@ -11,7 +11,7 @@
 #include <pmap.h>
 #include <smp.h>
 
-#define DPRINT if(0)print
+#define DPRINT printd
 
 enum {
 	UDP_UDPHDR_SZ = 8,
