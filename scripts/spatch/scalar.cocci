@@ -26,6 +26,18 @@ typedef uint32_t;
 +uint32_t
 
 @@
+typedef usize;
+@@
+-usize
++unsigned long
+
+@@
+typedef u32int;
+@@
+-u32int
++uint32_t
+
+@@
 typedef ushort;
 typedef uint16_t;
 @@

@@ -19,6 +19,34 @@
 #include <fcall.h>
 #include <ros/fs.h>
 
+void
+validstat(uint8_t *s, unsigned long n)
+{
+	unsigned long m;
+	char buf[64];
+
+	if(statcheck(s, n) < 0)
+		error(Ebadstat);
+	/* verify that name entry is acceptable */
+	s += STATFIXLEN - 4*BIT16SZ;	/* location of first string */
+	/*
+	 * s now points at count for first string.
+	 * if it's too long, let the server decide; this is
+	 * only for his protection anyway. otherwise
+	 * we'd have to allocate and waserror.
+	 */
+	m = GBIT16(s);
+	s += BIT16SZ;
+	if(m+1 > sizeof buf)
+		return;
+	memmove(buf, s, m);
+	buf[m] = '\0';
+	/* name could be '/' */
+	if(strcmp(buf, "/") != 0)
+		validname(buf, 0);
+}
+
+
 /* simple functions for common uses. Read a num/string to user mode,
  * accounting for offset.
  */

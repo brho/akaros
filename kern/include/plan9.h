@@ -291,6 +291,22 @@ struct mntwalk {				/* state for /proc/#/ns */
 	struct mount *cm;
 };
 
+struct mnt
+{
+	spinlock_t lock;
+	/* references are counted using c->ref; channels on this mount point incref(c->mchan) == Mnt.c */
+	struct chan	*c;		/* Channel to file service */
+	struct proc	*rip;		/* Reader in progress */
+	struct mntrpc	*queue;		/* Queue of pending requests on this channel */
+	unsigned int	id;		/* Multiplexer id for channel check */
+	struct mnt	*list;		/* Free list */
+	int	flags;		/* cache */
+	int	msize;		/* data + IOHDRSZ */
+	char	*version;	/* 9P version */
+	struct queue	*q;		/* input queue */
+};
+
+
 struct mount {
 	int mountid;
 	struct mount *next;
@@ -346,13 +362,13 @@ struct chan {
 	struct mhead *umh;			/* mount point that derived struct chan; used in unionread */
 	struct chan *umc;			/* channel in union; held for union read */
 	// need a queued lock not a spin lock. QLock    umqlock;        /* serialize unionreads */
-	spinlock_t umqlock;
+	qlock_t umqlock;
 	int uri;					/* union read index */
 	int dri;					/* devdirread index */
 	unsigned char *dirrock;		/* directory entry rock for translations */
 	int nrock;
 	int mrock;
-	spinlock_t rockqlock;
+	qlock_t rockqlock;
 
 	int ismtpt;
 	int mc;
@@ -569,6 +585,7 @@ void devpower(int onoff);
 int devconfig(int a, char *b, void *v);
 
 /* kern/src/plan9file.c */
+void validstat(uint8_t *s, unsigned long n);
 int openmode(int omode);
 long sysread(int fd, void *p, size_t n, off_t off);
 long syswrite(int fd, void *p, size_t n, off_t off);

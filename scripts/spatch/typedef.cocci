@@ -373,3 +373,27 @@ typedef Tcppriv;
 @@
 -Tcppriv
 +struct tcppriv
+
+@@
+typedef Mnt;
+@@
+-Mnt
++struct mnt
+
+@@
+typedef Mntwalk;
+@@
+-Mntwalk
++struct mntwalk
+
+@@
+typedef Mntrpc;
+@@
+-Mntrpc
++struct mntrpc
+
+@@
+typedef Fcall;
+@@
+-Fcall
++struct fcall

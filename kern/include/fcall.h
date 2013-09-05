@@ -7,8 +7,7 @@
 
 #define	MAXWELEM	16
 
-typedef
-	struct Fcall {
+	struct fcall {
 	uint8_t type;
 	uint32_t fid;
 	uint16_t tag;
@@ -59,7 +58,7 @@ typedef
 			uint8_t *stat;		/* Twstat, Rstat */
 		};
 	};
-} Fcall;
+} fcall;
 
 #define	GBIT8(p)	((p)[0])
 #define	GBIT16(p)	((p)[0]|((p)[1]<<8))
@@ -119,9 +118,9 @@ enum {
 	Tmax,
 };
 
-unsigned int convM2S(uint8_t *, unsigned int, Fcall *);
-unsigned int convS2M(Fcall *, uint8_t *, unsigned int);
-unsigned int sizeS2M(Fcall *);
+unsigned int convM2S(uint8_t *, unsigned int, struct fcall *);
+unsigned int convS2M(struct fcall *, uint8_t *, unsigned int);
+unsigned int sizeS2M(struct fcall *);
 
 int statcheck(uint8_t * abuf, unsigned int nbuf);
 unsigned int convM2D(uint8_t *, unsigned int, struct dir *, char *);

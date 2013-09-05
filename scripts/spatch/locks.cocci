@@ -4,7 +4,7 @@ expression E;
 -lock(
 +spin_lock(
 -E
-+&E->rwlock
++&E->lock
  )
 @@
 expression E;
@@ -12,7 +12,7 @@ expression E;
 -unlock(
 +spin_unlock(
 -E
-+&E->rwlock
++&E->lock
  )
 
 @@
