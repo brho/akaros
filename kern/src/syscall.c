@@ -68,7 +68,7 @@ static void finish_sysc(struct syscall *sysc, struct proc *p)
 	 * CASing with userspace.  We need the atomics since we're racing with
 	 * userspace for the event_queue registration.  The 'lock' tells userspace
 	 * to not muck with the flags while we're signalling. */
-	atomic_or(&sysc->flags, SC_K_LOCK | SC_DONE); 
+	atomic_or(&sysc->flags, SC_K_LOCK | SC_DONE);
 	__signal_syscall(sysc, p);
 	atomic_and(&sysc->flags, ~SC_K_LOCK); 
 }
@@ -1118,8 +1118,12 @@ static intreg_t sys_read(struct proc *p, int fd, void *buf, int len)
 		set_errno(EBADF);
 		return -1;
 	}
+	/* if file succeeds, then we're going to accept the race
+	 * condition on open files. This is all temporary scaffolding
+	 * anyway we hope.
+	 */
 	if (file->plan9){
-	    ret = sysread(file->plan9fd, buf, len, ~0LL);
+	    ret = sysread(p->open_files.fd[fd].plan9fd, buf, len, ~0LL);
 	    printd("plan 9 read returns %d\n", ret);
 	} else {
 		if (!file->f_op->read) {
@@ -1147,7 +1151,7 @@ static intreg_t sys_write(struct proc *p, int fd, const void *buf, int len)
 		return -1;
 	}
 	if (file->plan9){
-		ret = syswrite(file->plan9fd, (void*)buf, len, (off_t) -1);
+		ret = syswrite(p->open_files.fd[fd].plan9fd, (void*)buf, len, (off_t) -1);
 		printd("plan 9 write returns %d\n", ret);
 	} else {
 		
@@ -1174,7 +1178,7 @@ static bool is_9path(char *path)
 static intreg_t sys_open(struct proc *p, const char *path, size_t path_l,
                          int oflag, int mode)
 {
-	int fd, plan9fd;
+	int fd, plan9fd = -1;
 	struct file *file;
 
 	printd("File %s Open attempt oflag %x mode %x\n", path, oflag, mode);
@@ -1191,8 +1195,6 @@ static intreg_t sys_open(struct proc *p, const char *path, size_t path_l,
 				user_memdup_free(p, t_path);
 				return -1;
 			}
-			file->plan9 = 0xcafebeef;
-			file->plan9fd = plan9fd;
 			printd("SYS_OPEN plan 9 open %s %x\n", t_path, plan9fd);
 		}
 	}
@@ -1201,6 +1203,10 @@ static intreg_t sys_open(struct proc *p, const char *path, size_t path_l,
 	if (!file)
 		return -1;
 	fd = insert_file(&p->open_files, file, 0);	/* stores the ref to file */
+	if (plan9fd > -1){
+		file->plan9 = 0xcafebeef;
+		p->open_files.fd[fd].plan9fd = plan9fd;
+	}
 	kref_put(&file->f_kref);
 	if (fd < 0) {
 		warn("File insertion failed");
@@ -1219,10 +1225,12 @@ static intreg_t sys_close(struct proc *p, int fd)
 		set_errno(EBADF);
 		return -1;
 	}
+	printd("sys_close %d\n", fd);
 	if (file->plan9) {
 		/* file will get freed when its last ref releases (should be in
 		 * put_file_from).  sysclose internally does its own EBADF checks. */
-		retval = sysclose(file->plan9fd);
+		retval = sysclose(p->open_files.fd[fd].plan9fd);
+		p->open_files.fd[fd].plan9fd = 0;
 	}
 	kref_put(&file->f_kref);	/* Drop the ref from get_file */
 	/* Bail out early if sysclose aborted */
@@ -1261,7 +1269,7 @@ static intreg_t sys_fstat(struct proc *p, int fd, struct kstat *u_stat)
 	}
 	if (file->plan9){
 		int r;
-	    r = sysfstat(file->plan9fd, (uint8_t*)kbuf, sizeof(*kbuf));
+	    r = sysfstat(p->open_files.fd[fd].plan9fd, (uint8_t*)kbuf, sizeof(*kbuf));
 	    printd("sysfstat returns %d\n", r);
 	} else {
 		stat_inode(file->f_dentry->d_inode, kbuf);
@@ -1332,50 +1340,13 @@ static intreg_t sys_lstat(struct proc *p, const char *path, size_t path_l,
 	return stat_helper(p, path, path_l, u_stat, 0);
 }
 
-static intreg_t sys_plan9fcntl(struct proc *p, int fd, int cmd, int arg)
-{
-	int retval = 0;
-	printd("fcntl %d for Plan 9\n", fd);
-	switch (cmd) {
-	case (F_DUPFD):
-	    printd("fcntl dupfd fd %d arg %d\n", fd, arg);
-	    retval = sysdup(fd, -1);
-	    if (retval < 0) {
-		retval = -1;
-	    }
-
-	printd("fcntl returns %d for Plan 9\n", retval);
-	    break;
-	case (F_GETFD):
-	    printd("fcntl getfd\n");
-	    retval = 0;
-	    break;
-	case (F_SETFD):
-	    printd("fcntl setfd\n");
-	    //if (arg == FD_CLOEXEC)
-	    //	file->f_flags |= O_CLOEXEC;
-	    break;
-	case (F_GETFL):
-	    printd("fcntl getfl\n");
-	    retval = 0; //file->f_flags;
-	    break;
-	case (F_SETFL):
-	    printd("fcntl setfl\n");
-	    /* only allowed to set certain flags. */
-	    //arg &= O_FCNTL_FLAGS;
-	    //file->f_flags = (file->f_flags & ~O_FCNTL_FLAGS) | arg;
-	    break;
-	default:
-	    warn("Unsupported fcntl cmd %d\n", cmd);
-	}
-	return retval;
-}
-
 intreg_t sys_fcntl(struct proc *p, int fd, int cmd, int arg)
 {
 	int retval = 0;
+	int newplan9fd = -1, newfd;
 
 	struct file *file = get_file_from_fd(&p->open_files, fd);
+	struct file *newfile;
 	if (!file) {
 		set_errno(EBADF);
 		return -1;
@@ -1383,10 +1354,25 @@ intreg_t sys_fcntl(struct proc *p, int fd, int cmd, int arg)
 
 	switch (cmd) {
 		case (F_DUPFD):
-			retval = insert_file(&p->open_files, file, arg);
+			if (file->plan9)
+				retval = sysdup(p->open_files.fd[fd].plan9fd, -1);
 			if (retval < 0) {
 				set_errno(-retval);
 				retval = -1;
+			} else
+				newplan9fd = retval;
+			retval = insert_file(&p->open_files, file, arg);
+			if (retval < 0) {
+				if (file->plan9)
+					sysclose(newplan9fd);
+				set_errno(-retval);
+				retval = -1;
+			}
+			if (file->plan9){
+				newfd = retval;
+				p->open_files.fd[newfd].plan9fd = newplan9fd;
+				printd("fcntl dup: set newfd %d -> plan9 fd %d\n",
+					newfd, newplan9fd);
 			}
 			break;
 		case (F_GETFD):
@@ -1651,7 +1637,7 @@ intreg_t sys_gettimeofday(struct proc *p, int *buf)
 #else
 	// Nanwan's birthday, bitches!!
 	t0 = 1242129600;
-#endif 
+#endif
 	spin_unlock(&gtod_lock);
 
 	long long dt = read_tsc();
@@ -1905,7 +1891,7 @@ const static struct sys_table_entry syscall_table[] = {
  * Note tf is passed in, which points to the tf of the context on the kernel
  * stack.  If any syscall needs to block, it needs to save this info, as well as
  * any silly state.
- * 
+ *
  * This syscall function is used by both local syscall and arsc, and should
  * remain oblivious of the caller. */
 intreg_t syscall(struct proc *p, uintreg_t sc_num, uintreg_t a0, uintreg_t a1,
@@ -2016,7 +2002,7 @@ void prep_syscalls(struct proc *p, struct syscall *sysc, unsigned int nr_syscs)
 
 /* Call this when something happens on the syscall where userspace might want to
  * get signaled.  Passing p, since the caller should know who the syscall
- * belongs to (probably is current). 
+ * belongs to (probably is current).
  *
  * You need to have SC_K_LOCK set when you call this. */
 void __signal_syscall(struct syscall *sysc, struct proc *p)
@@ -2057,7 +2043,7 @@ void systrace_start(bool silent)
 		__init_systrace();
 		init = TRUE;
 	}
-	systrace_flags = silent ? SYSTRACE_ON : SYSTRACE_ON | SYSTRACE_LOUD; 
+	systrace_flags = silent ? SYSTRACE_ON : SYSTRACE_ON | SYSTRACE_LOUD;
 	spin_unlock_irqsave(&systrace_lock);
 }
 

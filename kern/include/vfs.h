@@ -285,10 +285,9 @@ struct file {
 	int fd; // all it contains is an appserver fd (for pid 0, aka kernel)
 	int refcnt;
 	spinlock_t lock;
-	/* Plan 9 support */
+	/* Plan 9 support. Whether it is plan 9 is a property of the file. */
 	int plan9;
-	/* since 0 is valid ... */
-	int plan9fd;
+
 };
 
 struct file_operations {
@@ -375,10 +374,15 @@ struct small_fd_set {
 #define FD_ZERO(p)    memset((void*)(p),0,sizeof(*(p)))
 
 /* Describes an open file.  We need this, since the FD flags are supposed to be
- * per file descriptor, not per file (like the file status flags). */
+ * per file descriptor, not per file (like the file status flags).
+ * The plan 9 fd has to be here for dup to work. I can't wait until we can
+ * make this all go away :-)
+ */
 struct file_desc {
 	struct file					*fd_file;
 	unsigned int				fd_flags;
+	/* since 0 is valid ... */
+	int plan9fd;
 };
 
 /* All open files for a process */

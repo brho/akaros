@@ -817,6 +817,7 @@ int sysclose(int fd)
 {
 	fdtochan(fd, -1, 0, 0);
 	fdclose(fd, 0);
+	printd("sysclose %d\n", fd);
 	return 0;
 }
 
@@ -933,6 +934,7 @@ int sysdup(int ofd, int nfd)
 		poperror();
 	}
 
+	printd("sysdup %d -> %d\n", ofd, nfd);
 	return nfd;
 }
 
