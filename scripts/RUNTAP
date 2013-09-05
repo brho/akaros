@@ -1,0 +1,13 @@
+brctl addbr br0
+tunctl -u rminnich -t tap0
+ifconfig tap0 0.0.0.0 up
+brctl addif br0 tap0
+#    need to rebuild tap0 and br0 each time, ifconfig tap0 up, or give
+#it an /etc/init (and config_tap0("null")) init.d br0, dnsmasq, iptables
+#(currently in default RL) iptables is set to masq to either eth0 or
+#wlan0. if you ever add wlan0 to br0, this probably needs changing echo
+#1 > /proc/sys/net/ipv4/ip_forward echo 1 > /proc/sys/net/ipv4/ip_dynaddr
+
+sudo qemu-system-x86_64 -s -cpu phenom -smp 8 -m 6024 -nographic  -net nic,model=rtl8139 -netdev tap,id=mynet0 mnt/hdd268mb.img -kernel mnt/hdd/kernel $*
+
+# -S -s -gdb tcp::1234
