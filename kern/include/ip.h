@@ -338,7 +338,7 @@ struct iphash {
 struct Ipht {
 	spinlock_t lock;
 	rwlock_t rwlock;
-	struct Iphash *tab[Nipht];
+	struct iphash *tab[Nipht];
 };
 void iphtadd(struct Ipht *, struct conv *);
 void iphtrem(struct Ipht *, struct conv *);
