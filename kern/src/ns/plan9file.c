@@ -658,9 +658,6 @@ long sysread(int fd, void *p, size_t n, off_t off)
 				if (off != c->offset)
 					error(Edirseek);
 				nn = c->dev->read(c, ents, 2048, c->devoffset);
-printd("procdevtab %p rootdevtab %p\n", &procdevtab, &rootdevtab);
-printd("c->dev %p\n", c->dev);
-printd("c.dev.read %d\n", nn);
 			}
 		} else
 			printd("rock read ok\n");
@@ -1019,7 +1016,7 @@ bindmount(int ismount,
 		char	*spec;
 		int	flags;
 	}bogus;
- 
+
 	if (waserror()){
 		printk("bindmount: %s\n", current_errstr());
 		nexterror();

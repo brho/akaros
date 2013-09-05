@@ -630,7 +630,7 @@ cmount(struct chan **newp, struct chan *old, int flag, char *spec)
 
 	wunlock(&mhead->lock);
 	poperror();
-	printd("Mount successed, mh %p mountid %d\n", mh , nm->mountid);
+	printd("Mount succeeded, mh %p mountid %d\n", mh , nm->mountid);
 	return nm->mountid;
 }
 
