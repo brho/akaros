@@ -25,35 +25,21 @@ struct Rb
 	uint32_t	randn;
 } rb;
 
-/*
- *  produce random bits in a circular buffer
- */
-static void
-randomclock(void)
-{
-	if(rb.randomcount == 0)
-		return;
-
-	rb.bits = (rb.bits<<2) ^ rb.randomcount;
-	rb.randomcount = 0;
-
-	/* this is not quite right but
-	 * the original code requires us to xor
-	 * with what we last wrote. Apipes don't
-	 * let us do that. So we need to think on this
-	 * a bit.
-	 */
-	apipe_write(&rb.ap, &rb.bits, 2);
-}
-
 static void
 genrandom(uint32_t srcid, long a0, long a1, long a2)
 {
 	for(;;){
-		for(;;){
-			udelay_sched(772);
-			randomclock();
-		}
+		udelay_sched(772);
+		rb.randomcount++;
+		rb.bits = (rb.bits<<2) ^ rb.randomcount;
+		
+		/* this is not quite right but
+		 * the original code requires us to xor
+		 * with what we last wrote. Apipes don't
+		 * let us do that. So we need to think on this
+		 * a bit.
+		 */
+		apipe_write(&rb.ap, &rb.bits, 2);
 	}
 }
 
@@ -78,7 +64,6 @@ randomread(void *xp, uint32_t n)
 	uint32_t x;
 	int amt;
 	p = xp;
-printk("readrandom\n");
 	if(waserror()){
 		nexterror();
 	}
