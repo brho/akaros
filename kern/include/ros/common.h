@@ -102,6 +102,11 @@ static inline uintptr_t ROUNDUPPWR2(uintptr_t value)
 	return 1 << LOG2_UP(value);
 }
 
+static inline uintptr_t ROUNDDOWNPWR2(uintptr_t value)
+{
+	return 1 << LOG2_DOWN(value);
+}
+
 /* We wraparound if UINT_MAX < a * b, which is also UINT_MAX / a < b. */
 static inline bool mult_will_overflow_u64(uint64_t a, uint64_t b)
 {
