@@ -1,4 +1,4 @@
-
+//#define DEBUG
 /* proc on plan 9 has lots of capabilities, some of which we might
  * want for akaros:
  * debug control
@@ -25,6 +25,7 @@ enum {
 	Qdir,
 	Qtrace,
 	Qtracepids,
+	Qns,
 	Qargs,
 	Qctl,
 	Qfd,
@@ -34,7 +35,6 @@ enum {
 	Qnote,
 	Qnoteid,
 	Qnotepg,
-	Qns,
 	Qproc,
 	Qregs,
 	Qsegment,
@@ -207,7 +207,6 @@ procgen(struct chan *c, char *name, struct dirtab *tab, int unused, int s,
 
 	int pid;
 	uint32_t path, perm, len;
-
 	if (s == DEVDOTDOT) {
 		mkqid(&qid, Qdir, 0, QTDIR);
 		devdir(c, qid, "#p", 0, eve, 0555, dp);
@@ -249,7 +248,7 @@ procgen(struct chan *c, char *name, struct dirtab *tab, int unused, int s,
 		 * name must match its formatted pid.
 		 */
 		if (name != NULL && strcmp(name, current->genbuf) != 0) {
-			warn("pid-name mismatch, name: %s, pid %d\n", name, pid);
+			printk("pid-name mismatch, name: %s, pid %d\n", name, pid);
 			kref_put(&p->p_kref);
 			return -1;
 		}
@@ -277,8 +276,7 @@ procgen(struct chan *c, char *name, struct dirtab *tab, int unused, int s,
 
 	tab = &procdir[s];
 	path = c->qid.path & ~(((1 << QSHIFT) - 1));	/* slot component */
-
-	if ((p = pid2proc(SLOT(c->qid))) == NULL)
+	if ((p = pid_nth(SLOT(c->qid))) == NULL)
 		return -1;
 	perm = 0444 | tab->perm;
 #if 0
@@ -457,12 +455,11 @@ static struct chan *procopen(struct chan *c, int omode)
 		return c;
 #endif
 	}
-#if 0
-	if ((p = pid2proc(SLOT(c->qid))) == NULL)
+	if ((p = pid_nth(SLOT(c->qid))) == NULL)
 		error(Eprocdied);
-	qlock(&p->debug);
+	//qlock(&p->debug);
 	if (waserror()) {
-		qunlock(&p->debug);
+		//qunlock(&p->debug);
 		kref_put(&p->p_kref);
 		nexterror();
 	}
@@ -474,6 +471,8 @@ static struct chan *procopen(struct chan *c, int omode)
 
 	switch (QID(c->qid)) {
 		case Qtext:
+			error("notyet");
+/*
 			if (omode != OREAD)
 				error(Eperm);
 			tc = proctext(c, p);
@@ -483,7 +482,7 @@ static struct chan *procopen(struct chan *c, int omode)
 			kref_put(&p->p_kref);
 			cclose(c);
 			return tc;
-
+*/
 		case Qproc:
 		case Qsegment:
 		case Qprofile:
@@ -493,15 +492,15 @@ static struct chan *procopen(struct chan *c, int omode)
 			break;
 
 		case Qnote:
-			if (p->privatemem)
+//			if (p->privatemem)
 				error(Eperm);
 			break;
 
 		case Qmem:
 		case Qctl:
-			if (p->privatemem)
+//			if (p->privatemem)
 				error(Eperm);
-			nonone(p);
+			//nonone(p);
 			break;
 
 		case Qargs:
@@ -519,10 +518,12 @@ static struct chan *procopen(struct chan *c, int omode)
 		case Qns:
 			if (omode != OREAD)
 				error(Eperm);
-			c->aux = kmalloc(sizeof(Mntwalk), 0);
+			c->aux = kmalloc(sizeof(struct mntwalk), 0);
 			break;
 
 		case Qnotepg:
+			error("not yet");
+#if 0
 			nonone(p);
 			pg = p->pgrp;
 			if (pg == NULL)
@@ -531,36 +532,29 @@ static struct chan *procopen(struct chan *c, int omode)
 				error(Eperm);
 			c->pgrpid.path = pg->pgrpid + 1;
 			c->pgrpid.vers = p->noteid;
+#endif
 			break;
 
 		default:
 			poperror();
-#endif
-#if 0
-			qunlock(&p->debug);
+			//qunlock(&p->debug);
 			kref_put(&p->p_kref);
-			pprint("procopen %#llux\n", c->qid.path);
-#endif
+			printk("procopen %#llux\n", c->qid.path);
 			error(Egreg);
-#if 0
 	}
 
 	/* Affix pid to qid */
-	if (p->state != Dead)
+//	if (p->state != Dead)
 		c->qid.vers = p->pid;
 	/* make sure the process slot didn't get reallocated while we were playing */
-	coherence();
+	//coherence();
 	if (p->pid != pid)
 		error(Eprocdied);
 
-#endif
 	tc = devopen(c, omode, 0, 0, procgen);
 	poperror();
-#if 0
-	qunlock(&p->debug);
+	//qunlock(&p->debug);
 	kref_put(&p->p_kref);
-
-#endif
 	return tc;
 }
 
@@ -579,7 +573,7 @@ procwstat(struct chan *c, uint8_t * db, long n)
 	if (QID(c->qid) == Qtrace)
 		return devwstat(c, db, n);
 
-	if ((p = pid2proc(SLOT(c->qid))) == NULL)
+	if ((p = pid_nth(SLOT(c->qid))) == NULL)
 		error(Eprocdied);
 	nonone(p);
 	d = NULL;
@@ -727,8 +721,7 @@ static void procclose(struct chan *c)
 		kfree(c->aux);
 }
 
-#if 0
-static void int2flag(int flag, char *s)
+void int2flag(int flag, char *s)
 {
 	if (flag == 0) {
 		*s = '\0';
@@ -746,6 +739,7 @@ static void int2flag(int flag, char *s)
 	*s = '\0';
 }
 
+#if 0
 static char *argcpy(char *s, char *p)
 {
 	char *t, *tp, *te;
@@ -796,27 +790,33 @@ static int eventsavailable(void *)
 static long
 procread(struct chan *c, void *va, long n, int64_t off)
 {
-#if 0
+	ERRSTACK(5);
 	struct proc *p;
-	Mach *ac, *wired;
 	long l, r;
-	Waitq *wq;
-	Ureg kur;
-	uint8_t *rptr;
-	Confmem *cm;
-	Mntwalk *mw;
-	Segment *sg, *s;
 	int i, j, navail, pid, rsize;
-	char flag[10], *sps, *srv, statbuf[NSEG * 64];
+	char flag[10], *sps, *srv, statbuf[512];
 	uintptr_t offset, u;
 	int tesz;
-#endif
-	if (c->qid.type & QTDIR)
-		return devdirread(c, va, n, 0, 0, procgen);
-
+	uint8_t *rptr;
+	struct mntwalk *mw;
 #if 0
-	offset = off;
+	Mach *ac, *wired;
+	Waitq *wq;
+	Ureg kur;
+	Confmem *cm;
+	Segment *sg, *s;
+#endif
+	if (c->qid.type & QTDIR){
+		int nn;
+		printd("procread: dir\n");
+		nn =  devdirread(c, va, n, 0, 0, procgen);
+		printd("procread: %d\n", nn);
+		return nn;
+	}
 
+
+	offset = off;
+#if 0
 	if (QID(c->qid) == Qtrace) {
 		if (!eventsavailable(NULL))
 			return 0;
@@ -846,18 +846,18 @@ procread(struct chan *c, void *va, long n, int64_t off)
 			return 0;
 		else
 			return readstr(off, va, n, tpids);
-
-	if ((p = pid2proc(SLOT(c->qid))) == NULL)
+#endif
+	if ((p = pid_nth(SLOT(c->qid))) == NULL)
 		error(Eprocdied);
 	if (p->pid != PID(c->qid)) {
 		kref_put(&p->p_kref);
 		error(Eprocdied);
 	}
-
 	switch (QID(c->qid)) {
 		default:
 			kref_put(&p->p_kref);
 			break;
+#if 0
 		case Qargs:
 			qlock(&p->debug);
 			j = procargs(p, current->genbuf, sizeof current->genbuf);
@@ -1122,11 +1122,11 @@ regread:
 						wq->w.msg);
 			kfree(wq);
 			return n;
-
+#endif
 		case Qns:
-			qlock(&p->debug);
+			//qlock(&p->debug);
 			if (waserror()) {
-				qunlock(&p->debug);
+				//qunlock(&p->debug);
 				kref_put(&p->p_kref);
 				nexterror();
 			}
@@ -1135,35 +1135,35 @@ regread:
 			mw = c->aux;
 			if (mw->cddone) {
 				poperror();
-				qunlock(&p->debug);
+				//qunlock(&p->debug);
 				kref_put(&p->p_kref);
 				return 0;
 			}
 			mntscan(mw, p);
 			if (mw->mh == 0) {
 				mw->cddone = 1;
-				i = snprint(va, n, "cd %s\n", p->dot->path->s);
+				i = snprintf(va, n, "cd %s\n", p->dot->path->s);
 				poperror();
-				qunlock(&p->debug);
+				//qunlock(&p->debug);
 				kref_put(&p->p_kref);
 				return i;
 			}
 			int2flag(mw->cm->mflag, flag);
 			if (strcmp(mw->cm->to->path->s, "#M") == 0) {
 				srv = srvname(mw->cm->to->mchan);
-				i = snprint(va, n, "mount %s %s %s %s\n", flag,
+				i = snprintf(va, n, "mount %s %s %s %s\n", flag,
 							srv == NULL ? mw->cm->to->mchan->path->s : srv,
 							mw->mh->from->path->s,
 							mw->cm->spec ? mw->cm->spec : "");
 				kfree(srv);
 			} else
-				i = snprint(va, n, "bind %s %s %s\n", flag,
+				i = snprintf(va, n, "bind %s %s %s\n", flag,
 							mw->cm->to->path->s, mw->mh->from->path->s);
 			poperror();
-			qunlock(&p->debug);
+			//qunlock(&p->debug);
 			kref_put(&p->p_kref);
 			return i;
-
+#if 0
 		case Qnoteid:
 			r = readnum(offset, va, n, p->noteid, NUMSIZE);
 			kref_put(&p->p_kref);
@@ -1172,16 +1172,16 @@ regread:
 			r = procfds(p, va, n, offset);
 			kref_put(&p->p_kref);
 			return r;
-	}
 #endif
+	}
+
 	error(Egreg);
 	return 0;	/* not reached */
 }
 
-#if 0
-static void mntscan(Mntwalk * mw, struct proc *p)
+static void mntscan(struct mntwalk * mw, struct proc *p)
 {
-	Pgrp *pg;
+	struct pgrp *pg;
 	struct mount *t;
 	struct mhead *f;
 	int best, i, last, nxt;
@@ -1213,7 +1213,6 @@ static void mntscan(Mntwalk * mw, struct proc *p)
 
 	runlock(&pg->ns);
 }
-#endif
 
 static long
 procwrite(struct chan *c, void *va, long n, int64_t off)
@@ -1238,7 +1237,7 @@ procwrite(struct chan *c, void *va, long n, int64_t off)
 		return n;
 	}
 
-	if ((p = pid2proc(SLOT(c->qid))) == NULL)
+	if ((p = pid_nth(SLOT(c->qid))) == NULL)
 		error(Eprocdied);
 
 	qlock(&p->debug);
@@ -1258,7 +1257,7 @@ procwrite(struct chan *c, void *va, long n, int64_t off)
 				error(Eshort);
 			if (n >= sizeof buf - strlen(p->text) - 1)
 				error(Etoobig);
-			l = snprint(buf, sizeof buf, "%s [%s]", p->text, (char *)va);
+			l = snprintf(buf, sizeof buf, "%s [%s]", p->text, (char *)va);
 			args = kmalloc(l + 1, 0);
 			if (args == NULL)
 				error(Enomem);
@@ -1311,7 +1310,7 @@ procwrite(struct chan *c, void *va, long n, int64_t off)
 				p->noteid = id;
 				break;
 			}
-			for (i = 0; (t = pid2proc(i)) != NULL; i++) {
+			for (i = 0; (t = pid_nth(i)) != NULL; i++) {
 				if (t->state == Dead || t->noteid != id) {
 					kref_put(&p->p_kref);
 					continue;
