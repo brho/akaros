@@ -38,6 +38,7 @@
 #include <umem.h>
 #include <ucq.h>
 #include <setjmp.h>
+#include <apipe.h>
 
 #define l1 (available_caches.l1)
 #define l2 (available_caches.l2)
@@ -1622,3 +1623,90 @@ void test_setjmp()
 	printk("Exiting: %s\n", __FUNCTION__);
 }
 
+void test_apipe(void)
+{
+	static struct atomic_pipe test_pipe;
+
+	struct some_struct {
+		long x;
+		int y;
+	};
+	/* Don't go too big, or you'll run off the stack */
+	#define MAX_BATCH 100
+
+	void __test_apipe_writer(uint32_t srcid, long a0, long a1, long a2)
+	{
+		int ret, count_todo;
+		int total = 0;
+		struct some_struct local_str[MAX_BATCH];
+		for (int i = 0; i < MAX_BATCH; i++) {
+			local_str[i].x = 0xf00;
+			local_str[i].y = 0xba5;
+		}
+		/* testing 0, and max out at 50. [0, ... 50] */
+		for (int i = 0; i < MAX_BATCH + 1; i++) {
+			count_todo = i;
+			while (count_todo) {
+				ret = apipe_write(&test_pipe, &local_str, count_todo);
+				/* Shouldn't break, based on the loop counters */
+				if (!ret) {
+					printk("Writer breaking with %d left\n", count_todo);
+					break;
+				}
+				total += ret;
+				count_todo -= ret;
+			}
+		}
+		printk("Writer done, added %d elems\n", total);
+		apipe_close_writer(&test_pipe);
+	}
+
+	void __test_apipe_reader(uint32_t srcid, long a0, long a1, long a2)
+	{
+		int ret, count_todo;
+		int total = 0;
+		struct some_struct local_str[MAX_BATCH] = {{0}};
+		/* reversed loop compared to the writer [50, ... 0] */
+		for (int i = MAX_BATCH; i >= 0; i--) {
+			count_todo = i;
+			while (count_todo) {
+				ret = apipe_read(&test_pipe, &local_str, count_todo);
+				if (!ret) {
+					printk("Reader breaking with %d left\n", count_todo);
+					break;
+				}
+				total += ret;
+				count_todo -= ret;
+			}
+		}
+		printk("Reader done, took %d elems\n", total);
+		for (int i = 0; i < MAX_BATCH; i++) {
+			assert(local_str[i].x == 0xf00);
+			assert(local_str[i].y == 0xba5);
+		}
+		apipe_close_reader(&test_pipe);
+	}
+
+	void *pipe_buf = kpage_alloc_addr();
+	assert(pipe_buf);
+	apipe_init(&test_pipe, pipe_buf, PGSIZE, sizeof(struct some_struct));
+	printd("*ap_buf %p\n", test_pipe.ap_buf);
+	printd("ap_ring_sz %p\n", test_pipe.ap_ring_sz);
+	printd("ap_elem_sz %p\n", test_pipe.ap_elem_sz);
+	printd("ap_rd_off %p\n", test_pipe.ap_rd_off);
+	printd("ap_wr_off %p\n", test_pipe.ap_wr_off);
+	printd("ap_nr_readers %p\n", test_pipe.ap_nr_readers);
+	printd("ap_nr_writers %p\n", test_pipe.ap_nr_writers);
+	send_kernel_message(0, __test_apipe_writer, 0, 0, 0, KMSG_ROUTINE);
+	__test_apipe_reader(0, 0, 0, 0);
+	/* Wait til the first test is done */
+	while (test_pipe.ap_nr_writers) {
+		kthread_yield();
+		cpu_relax();
+	}
+//	/* Try cross core (though CV wake ups schedule on the waking core) */
+//	apipe_open_reader(&test_pipe);
+//	apipe_open_writer(&test_pipe);
+//	send_kernel_message(1, __test_apipe_writer, 0, 0, 0, KMSG_ROUTINE);
+//	__test_apipe_reader(0, 0, 0, 0);
+}

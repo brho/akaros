@@ -1,4 +1,5 @@
 obj-y						+= alarm.o
+obj-y						+= apipe.o
 obj-y						+= arsc.o
 obj-y						+= atomic.o
 obj-y						+= blockdev.o
