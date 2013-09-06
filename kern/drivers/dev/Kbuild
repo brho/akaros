@@ -7,3 +7,4 @@ obj-y						+= regress.o
 obj-y						+= root.o
 obj-y						+= tab.o
 obj-y						+= random.o
+obj-y						+= srv.o

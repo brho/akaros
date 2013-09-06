@@ -67,6 +67,7 @@ static struct dirtab consdir[] = {
 
 static void consinit(void)
 {
+	void randominit(void);
 	printk("consinit\n");
 	randominit();
 }

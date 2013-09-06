@@ -24,9 +24,7 @@ struct chan *etherattach(char *spec)
 	ctlrno = 0;
 	/* 'spec' is the special, i.e. l0, l1, etc. */
 	if (spec && *spec) {
-#warning "using strtol instead of strtoul"
-		//        ctlrno = strtoul(spec, &p, 0);
-		ctlrno = strtol(spec, &p, 0);
+		ctlrno = strtoul(spec, &p, 0);
 		if ((ctlrno == 0 && p == spec) || *p || (ctlrno >= Maxether))
 			error(Ebadarg);
 	}

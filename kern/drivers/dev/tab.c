@@ -28,6 +28,7 @@ extern struct dev etherdevtab;
 extern struct dev rootdevtab;
 extern struct dev ipdevtab;
 extern struct dev mntdevtab;
+extern struct dev srvdevtab;
 struct dev *devtab[] = {
 	&rootdevtab,
 	&miscdevtab,
@@ -37,6 +38,7 @@ struct dev *devtab[] = {
 	&etherdevtab,
 	&ipdevtab,
 	&mntdevtab,
+	&srvdevtab,
 	NULL,
 };
 

@@ -2,7 +2,7 @@
  * Copyright 2013 Google Inc.
  * Copyright (c) 1989-2003 by Lucent Technologies, Bell Laboratories.
  */
-//#define DEBUG
+#define DEBUG
 #include <setjmp.h>
 #include <vfs.h>
 #include <kfs.h>

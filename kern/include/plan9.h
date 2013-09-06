@@ -287,7 +287,7 @@ enum {
 
 struct mntwalk {				/* state for /proc/#/ns */
 	int cddone;
-	struct head *mh;
+	struct mhead *mh;
 	struct mount *cm;
 };
 
@@ -585,6 +585,7 @@ void devpower(int onoff);
 int devconfig(int a, char *b, void *v);
 
 /* kern/src/plan9file.c */
+struct chan *fdtochan(int fd, int mode, int chkmnt, int iref);
 void validstat(uint8_t *s, unsigned long n);
 int openmode(int omode);
 long sysread(int fd, void *p, size_t n, off_t off);
@@ -680,16 +681,18 @@ int getfields(char *str, char **args, int max, int mflag, char *unused_set);
 #define postnote(...)
 #define pexit(...)
 #define wakeup(...)
-#define strtoul strtol
 
 /* kern/drivers/dev/misc.c */
 int nrand(int n);
+/* kern/drivers/dev/srv.c */
+char*srvname(struct chan *c);
+/* kern/drivers/dev/proc.c */
+void int2flag(int flag, char *s);
 
 /* kern/drivers/dev/random.c */
 uint32_t randomread(void *xp, uint32_t n);
 
 /* include for now.
- * It's the easiest way to ensure we don't have odd conflicts.
  */
 
 #include <ip.h>

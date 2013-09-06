@@ -397,3 +397,9 @@ typedef Fcall;
 @@
 -Fcall
 +struct fcall
+
+@@
+typedef Srv;
+@@
+-Srv
++struct srv
