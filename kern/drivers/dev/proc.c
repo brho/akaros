@@ -420,10 +420,10 @@ static struct chan *procopen(struct chan *c, int omode)
 			error("already open");
 		topens++;
 		if (tevents == NULL) {
-			tevents = (Traceevent *) kmalloc(sizeof(Traceevent) * Nevents, 0);
+			tevents = (Traceevent *) kzmalloc(sizeof(Traceevent) * Nevents, 0);
 			if (tevents == NULL)
 				error(Enomem);
-			tpids = kmalloc(Ntracedpids * 20, 0);
+			tpids = kzmalloc(Ntracedpids * 20, 0);
 			if (tpids == NULL) {
 				kfree(tpids);
 				tpids = NULL;
@@ -518,7 +518,7 @@ static struct chan *procopen(struct chan *c, int omode)
 		case Qns:
 			if (omode != OREAD)
 				error(Eperm);
-			c->aux = kmalloc(sizeof(struct mntwalk), 0);
+			c->aux = kzmalloc(sizeof(struct mntwalk), 0);
 			break;
 
 		case Qnotepg:
@@ -591,7 +591,7 @@ procwstat(struct chan *c, uint8_t * db, long n)
 	if (strcmp(current->user, p->user) != 0 && strcmp(current->user, eve) != 0)
 		error(Eperm);
 
-	d = kmalloc(sizeof(struct dir) + n, 0);
+	d = kzmalloc(sizeof(struct dir) + n, 0);
 	n = convM2D(db, n, &d[0], (char *)&d[1]);
 	if (n == 0)
 		error(Eshortstat);
@@ -749,11 +749,11 @@ static char *argcpy(char *s, char *p)
 	if (n > 128)
 		n = 128;
 	if (n <= 0) {
-		t = kmalloc(1, 0);
+		t = kzmalloc(1, 0);
 		*t = 0;
 		return t;
 	}
-	t = kmalloc(n, 0);
+	t = kzmalloc(n, 0);
 	tp = t;
 	te = t + n;
 
@@ -1258,7 +1258,7 @@ procwrite(struct chan *c, void *va, long n, int64_t off)
 			if (n >= sizeof buf - strlen(p->text) - 1)
 				error(Etoobig);
 			l = snprintf(buf, sizeof buf, "%s [%s]", p->text, (char *)va);
-			args = kmalloc(l + 1, 0);
+			args = kzmalloc(l + 1, 0);
 			if (args == NULL)
 				error(Enomem);
 			memmove(args, buf, l);
@@ -1583,7 +1583,7 @@ static void procctlreq(struct proc *p, char *va, int n)
 			if (s->profile != 0)
 				kfree(s->profile);
 			npc = (s->top - s->base) >> LRESPROF;
-			s->profile = kmalloc(npc * sizeof(*s->profile), 0);
+			s->profile = kzmalloc(npc * sizeof(*s->profile), 0);
 			if (s->profile == 0)
 				error(Enomem);
 			break;
