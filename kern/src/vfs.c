@@ -1750,6 +1750,13 @@ ssize_t pipe_file_write(struct file *file, const char *buf, size_t count,
 		}
 		cv_wait(&pii->p_cv);
 		cpu_relax();
+		/* Still need to check in the loop, in case the last reader left while
+		 * we slept. */
+		if (!pii->p_nr_readers) {
+			cv_unlock(&pii->p_cv);
+			set_errno(EPIPE);
+			return -1;
+		}
 	}
 	/* We might need to wrap-around with our copy, so we'll do the copy in two
 	 * passes.  This will copy up to the end of the buffer, then on the next
