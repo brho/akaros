@@ -640,8 +640,7 @@ static int parseaddr(uint8_t * to, char *from, int alen)
 			return -1;
 		nip[1] = *p++;
 		nip[2] = 0;
-#warning "using strtol instead of strtoul"
-		to[i] = strtol(nip, 0, 16);
+		to[i] = strtoul(nip, 0, 16);
 		//to[i] = strtoul(nip, 0, 16);
 		if (*p == ':')
 			p++;
