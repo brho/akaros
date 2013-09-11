@@ -988,7 +988,7 @@ mountmux(struct mnt *mnt, struct mntrpc *r)
 		l = &q->list;
 	}
 	spin_unlock(&mnt->lock);
-	printd("unexpected reply tag %ud; type %d\n", r->reply.tag, r->reply.type);
+	printd("unexpected reply tag %u; type %d\n", r->reply.tag, r->reply.type);
 }
 
 /*

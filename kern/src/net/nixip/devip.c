@@ -181,7 +181,7 @@ ipgen(struct chan *c, char *unused_char_p_t, struct dirtab *unused_dirtab,
 		case Qtopdir:
 			if (s == DEVDOTDOT) {
 				mkqid(&q, QID(0, 0, Qtopdir), 0, QTDIR);
-				snprintf(current->genbuf, sizeof current->genbuf, "#I%ud",
+				snprintf(current->genbuf, sizeof current->genbuf, "#I%u",
 						 c->devno);
 				devdir(c, q, current->genbuf, 0, network, 0555, dp);
 				return 1;
@@ -204,7 +204,7 @@ ipgen(struct chan *c, char *unused_char_p_t, struct dirtab *unused_dirtab,
 		case Qprotodir:
 			if (s == DEVDOTDOT) {
 				mkqid(&q, QID(0, 0, Qtopdir), 0, QTDIR);
-				snprintf(current->genbuf, sizeof current->genbuf, "#I%ud",
+				snprintf(current->genbuf, sizeof current->genbuf, "#I%u",
 						 c->devno);
 				devdir(c, q, current->genbuf, 0, network, 0555, dp);
 				return 1;

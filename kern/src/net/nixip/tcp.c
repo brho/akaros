@@ -1604,7 +1604,7 @@ static struct conv *tcpincoming(struct conv *s, Tcp * segp, uint8_t * src,
 	h = hashipa(src, segp->source);
 	for (l = &tpriv->lht[h]; (lp = *l) != NULL; l = &lp->next) {
 		netlog(s->p->f, Logtcp,
-			   "tcpincoming s %I!%ud/%I!%ud d %I!%ud/%I!%ud v %d/%d\n", src,
+			   "tcpincoming s %I!%u/%I!%u d %I!%u/%I!%u v %d/%d\n", src,
 			   segp->source, lp->raddr, lp->rport, dst, segp->dest, lp->laddr,
 			   lp->lport, version, lp->version);
 

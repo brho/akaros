@@ -88,7 +88,7 @@ void e1000_dump_rx() {
 	for (int i = 0; i < 10; i++) {
 		
 		printk("%u:  %lx%lx\n", i, *(uint64_t*)(&rx_des_kva[i]), *((uint64_t*)(&rx_des_kva[i]) + 1));
-		printk("%ud: %lx\n", i, *(uint64_t*)(KADDR(rx_des_kva[i].buffer_addr)));	
+		printk("%u: %lx\n", i, *(uint64_t*)(KADDR(rx_des_kva[i].buffer_addr)));	
 	}
 
 }
