@@ -1,4 +1,5 @@
 *.swp
+*.swo
 .bochsout
 bochs.out
 bochs.log
