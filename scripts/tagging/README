@@ -1,0 +1,39 @@
+scripts/tagging holds a few utilities for code tagging.
+
+MAKETAGS is Ron's script for ctags.
+
+The other stuff is for brho's Gnu Global setup.  If you want to use it, add the
+bashrc chunk to your bashrc, and put the scripts in your path.  I put them in
+~/scripts.
+
+The global scripts are made to work similar to git grep, allowing you to run
+global on a subdirectory.  For instance, you can run gl (the bash alias for
+global) on kern/ to limit your search to only kernel files.
+
+I commonly run something like:
+$ gl functi(TAB TAB) (uses the tab complete)
+$ gl function
+
+To see info about 'function'.  Add -x for "explicit" info, and -r for
+"references" (who calls function).  Check out
+http://www.gnu.org/software/global/ for more info.
+
+Whenever you change files, you need to update the GTAGS database, otherwise the
+system will be out of date.  It's not a huge deal, but you'll be off by a
+couple lines.  This hurts more when integrated with your editor.
+
+To update, run 'gtu' (my alias for scripts/tagging/gtags-update.sh)
+
+Global integrates nicely with vi (and other editors).  For instance, in my
+vimrc, I have:
+
+noremap <c-k> :GtagsCursor<CR>
+
+Which binds the global command to Ctrl-K.
+
+I also use:
+
+noremap <c-h> :nohlsearch<CR> :ccl<CR>
+
+to clear my highlighted search and to close the little search window opened by
+global.
