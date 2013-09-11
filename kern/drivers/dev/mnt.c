@@ -859,6 +859,7 @@ mountio(struct mnt *mnt, struct mntrpc *r)
 	mntflushfree(mnt, r);
 }
 
+/* call the device read and fill the queue with blocks from it. */
 static int
 doread(struct mnt *mnt, int len)
 {
@@ -882,6 +883,7 @@ mntrpcread(struct mnt *mnt, struct mntrpc *r)
 {
 	int i, t, len, hlen;
 	struct block *b, **l, *nb;
+	uint8_t *header;
 
 	r->reply.type = 0;
 	r->reply.tag = 0;
@@ -889,19 +891,26 @@ mntrpcread(struct mnt *mnt, struct mntrpc *r)
 	/* read at least length, type, and tag and pullup to a single block */
 	if(doread(mnt, BIT32SZ+BIT8SZ+BIT16SZ) < 0)
 		return -1;
-	nb = pullupqueue(mnt->q, BIT32SZ+BIT8SZ+BIT16SZ);
+	/* size for the worst case. */
+	header = kmalloc(BIT32SZ+BIT8SZ+BIT16SZ+BIT32SZ, KMALLOC_WAIT);
+	/* but the additional 32 bits is only on read.
+	 * Were it me, I would have made all headers same and had an
+	 * unused field and avoided this extra work. :-)
+	 */
+	if (qread(mnt->q, header, BIT32SZ+BIT8SZ+BIT16SZ) < BIT32SZ+BIT8SZ+BIT16SZ)
+		error("mntrpcread: can't happen 1");
 
 	/* read in the rest of the message, avoid ridiculous (for now) message sizes */
-	len = GBIT32(nb->rp);
+	len = GBIT32(header);
 	if(len > mnt->msize){
 		qdiscard(mnt->q, qlen(mnt->q));
 		return -1;
 	}
-	if(doread(mnt, len) < 0)
+	if(doread(mnt, len-BIT32SZ+BIT8SZ+BIT16SZ) < 0)
 		return -1;
 
-	/* pullup the header (i.e. everything except data) */
-	t = nb->rp[BIT32SZ];
+	/* get the header (i.e. everything except data) */
+	t = header[BIT32SZ];
 	switch(t){
 	case Rread:
 		hlen = BIT32SZ+BIT8SZ+BIT16SZ+BIT32SZ;
@@ -910,9 +919,12 @@ mntrpcread(struct mnt *mnt, struct mntrpc *r)
 		hlen = len;
 		break;
 	}
-	nb = pullupqueue(mnt->q, hlen);
+	/* read in the rest of the read request. */
+	if (qread(mnt->q, &header[BIT32SZ+BIT8SZ+BIT16SZ],
+		       BIT32SZ) < BIT32SZ)
+		error("mntrpcread: can't happen 2");
 
-	if(convM2S(nb->rp, len, &r->reply) <= 0){
+	if(convM2S(header, len, &r->reply) <= 0){
 		/* bad message, dump it */
 		printd("mntrpcread: convM2S failed\n");
 		qdiscard(mnt->q, len);
@@ -921,30 +933,8 @@ mntrpcread(struct mnt *mnt, struct mntrpc *r)
 
 	/* hang the data off of the fcall struct */
 	l = &r->b;
-	*l = NULL;
-	do {
-		b = qremove(mnt->q);
-		if(hlen > 0){
-			b->rp += hlen;
-			len -= hlen;
-			hlen = 0;
-		}
-		i = BLEN(b);
-		if(i <= len){
-			len -= i;
-			*l = b;
-			l = &(b->next);
-		} else {
-			/* split block and put unused bit back */
-			nb = allocb(i-len);
-			memmove(nb->wp, b->rp+len, i-len);
-			b->wp = b->rp+len;
-			nb->wp += i-len;
-			qputback(mnt->q, nb);
-			*l = b;
-			return 0;
-		}
-	}while(len > 0);
+	b = qbread(mnt->q,len-hlen);
+	*l = b;
 
 	return 0;
 }

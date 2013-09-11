@@ -5,7 +5,7 @@
 #ifndef KERN_INCLUDE_PLAN9_H
 #include <setjmp.h>
 #include <atomic.h>
-
+#include <apipe.h>
 /*
  * Memory and machine-specific definitions.  Used in C and assembler.
  */
@@ -397,6 +397,7 @@ struct fgrp {
 /*
  *  IO queues
  */
+#if 0
 struct queue {
 	spinlock_t lock;
 
@@ -406,7 +407,7 @@ struct queue {
 	int len;					/* bytes allocated to queue */
 	int dlen;					/* data bytes in queue */
 	int limit;					/* max bytes in queue */
-	int iNULLim;				/* initial limit */
+	int inilim;				/* initial limit */
 	int state;
 	int noblock;				/* true if writes return immediately when q full */
 	int eof;					/* number of eofs read by user */
@@ -423,6 +424,35 @@ struct queue {
 	char err[ERRMAX];
 };
 
+#else
+struct queue {
+	spinlock_t lock;
+	/* short name to make debugging simpler. Leave empty if you wish. */
+	char name[32];
+	struct atomic_pipe pipe;
+	/* we need this placeholder which we manipulate
+	 * to concat/pullup blocks.
+	 */
+	struct block *head;
+	int len;
+	int limit;
+	int inilim;
+
+	int dlen;					/* data bytes in queue */
+	int state;
+	int noblock;				/* true if writes return immediately when q full */
+	int eof;					/* number of eofs read by user */
+
+	void (*kick) (void *);		/* restart output */
+	void (*bypass) (void *, struct block *);	/* bypass queue altogether */
+	void *arg;					/* argument to kick */
+	qlock_t rlock;				/* mutex for reading processes */
+	/* how do we do this Rendez rr;     / * process waiting to read */
+	qlock_t wlock;				/* mutex for writing processes */
+
+	char err[ERRMAX];
+};
+#endif
 extern unsigned int qiomaxatomic;
 
 typedef int devgen_t(struct chan *c, char *name, struct dirtab *dirtab, int,
@@ -620,6 +650,7 @@ struct block *trimblock(struct block *bp, int offset, int len);
 struct block *copyblock(struct block *bp, int count);
 struct block *adjustblock(struct block *bp, int len);
 int pullblock(struct block **bph, int count);
+struct block *qhead(struct queue *q);
 struct block *qget(struct queue *q);
 int qdiscard(struct queue *q, int len);
 int qconsume(struct queue *q, void *vp, int len);
