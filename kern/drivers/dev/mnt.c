@@ -892,7 +892,7 @@ mntrpcread(struct mnt *mnt, struct mntrpc *r)
 	if(doread(mnt, BIT32SZ+BIT8SZ+BIT16SZ) < 0)
 		return -1;
 	/* size for the worst case. */
-	header = kmalloc(BIT32SZ+BIT8SZ+BIT16SZ+BIT32SZ, KMALLOC_WAIT);
+	header = kzmalloc(BIT32SZ + BIT8SZ + BIT16SZ + BIT32SZ, KMALLOC_WAIT);
 	/* but the additional 32 bits is only on read.
 	 * Were it me, I would have made all headers same and had an
 	 * unused field and avoided this extra work. :-)

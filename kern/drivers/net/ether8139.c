@@ -314,7 +314,7 @@ rtl8139ifstat(struct ether *edev, void *a, long n, unsigned long offset){
 	struct ctlr *ctlr;
 
 	ctlr = edev->ctlr;
-	p = kmalloc(READSTR, 0);
+	p = kzmalloc(READSTR, 0);
 	if (p == NULL)
 		error(Enomem);
 	l = snprintf(p, READSTR, "rcr %#8.8x\n", ctlr->rcr);
@@ -488,7 +488,7 @@ static void rtl8139attach(struct ether *edev)
 	qlock(&ctlr->alock);
 	if (ctlr->alloc == NULL) {
 		ctlr->rblen = 1 << ((Rblen >> RblenSHIFT) + 13);
-		ctlr->alloc = kmalloc(ctlr->rblen + 16 + Ntd * Tdbsz + 32, 0);
+		ctlr->alloc = kzmalloc(ctlr->rblen + 16 + Ntd * Tdbsz + 32, 0);
 		if (ctlr->alloc == NULL) {
 			qunlock(&ctlr->alock);
 			error(Enomem);
@@ -797,7 +797,7 @@ static int rtl8139pnp(struct ether *edev)
 		return 0;
 	printk(" not found. No device configured.\n");
 	return -1;
-	ctlr = kmalloc(sizeof(struct ctlr), 0);
+	ctlr = kzmalloc(sizeof(struct ctlr), 0);
 	if (ctlr == NULL)
 		panic(Enomem);
 	ctlr->pci = p;
