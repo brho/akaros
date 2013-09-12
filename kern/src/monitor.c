@@ -829,7 +829,10 @@ void monitor(struct hw_trapframe *hw_tf)
 		print_trapframe(hw_tf);
 
 	while (1) {
-		cnt = readline(buf, MON_CMD_LENGTH, "ROS(Core %d)> ", coreid);
+		/* on occasion, the kernel monitor can migrate (like if you run
+		 * something that blocks / syncs and wakes up on another core) */
+		cmb();
+		cnt = readline(buf, MON_CMD_LENGTH, "ROS(Core %d)> ", core_id_early());
 		if (cnt > 0) {
 			buf[cnt] = 0;
 			if (runcmd(buf, hw_tf) < 0)

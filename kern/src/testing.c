@@ -1698,15 +1698,20 @@ void test_apipe(void)
 	printd("ap_nr_readers %p\n", test_pipe.ap_nr_readers);
 	printd("ap_nr_writers %p\n", test_pipe.ap_nr_writers);
 	send_kernel_message(0, __test_apipe_writer, 0, 0, 0, KMSG_ROUTINE);
+	/* Once we start synchronizing with a kmsg / kthread that could be on a
+	 * different core, we run the chance of being migrated when we block. */
 	__test_apipe_reader(0, 0, 0, 0);
 	/* Wait til the first test is done */
 	while (test_pipe.ap_nr_writers) {
 		kthread_yield();
 		cpu_relax();
 	}
-//	/* Try cross core (though CV wake ups schedule on the waking core) */
-//	apipe_open_reader(&test_pipe);
-//	apipe_open_writer(&test_pipe);
-//	send_kernel_message(1, __test_apipe_writer, 0, 0, 0, KMSG_ROUTINE);
-//	__test_apipe_reader(0, 0, 0, 0);
+	/* Try cross core (though CV wake ups schedule on the waking core) */
+	apipe_open_reader(&test_pipe);
+	apipe_open_writer(&test_pipe);
+	send_kernel_message(1, __test_apipe_writer, 0, 0, 0, KMSG_ROUTINE);
+	__test_apipe_reader(0, 0, 0, 0);
+	/* We could be on core 1 now.  If we were called from core0, our caller
+	 * might expect us to return while being on core 0 (like if we were kfunc'd
+	 * from the monitor.  Be careful if you copy this code. */
 }
