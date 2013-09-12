@@ -660,6 +660,7 @@ static void sprintroute(struct route *r, struct routewalk *rw)
 	char t[5], *iname, ifbuf[5];
 	uint8_t addr[IPaddrlen], mask[IPaddrlen], gate[IPaddrlen];
 	char *p;
+	int i;
 
 	convroute(r, addr, mask, gate, t, &nifc);
 	iname = "-";
@@ -667,8 +668,24 @@ static void sprintroute(struct route *r, struct routewalk *rw)
 		iname = ifbuf;
 		snprintf(ifbuf, sizeof ifbuf, "%d", nifc);
 	}
+	/* we *really* need this.
 	p = seprintf(rw->p, rw->e, rformat, addr, mask, gate, t, r->routeTree.tag,
 				 iname);
+	 */
+
+	/* leaving this this way because I think it sucks. */
+	p = rw->p;
+	for(i = 0; i < sizeof(addr); i++){
+		p = seprintf(p, rw->e, "%02x:",addr[i]);
+	}
+	for(i = 0; i < sizeof(mask); i++){
+		p = seprintf(p, rw->e, "%02x:",mask[i]);
+	}
+	for(i = 0; i < sizeof(gate); i++){
+		p = seprintf(p, rw->e, "%02x:",gate[i]);
+	}
+	p = seprintf(p, rw->e, "%s", iname);
+
 	if (rw->o < 0) {
 		n = p - rw->p;
 		if (n > -rw->o) {

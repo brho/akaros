@@ -1,10 +1,10 @@
 #!/bin/ash
-bind -a '#I' /net
-bind -a '#l0' /net
-cat /9/net/ipifc/clone
-# bind the ether0 to it
-myecho /9/net/ipifc/0/ctl 'bind ether /net/ether0'
-exit
+#bind -a '#I' /net
+#bind -a '#l0' /net
+#cat /9/net/ipifc/clone
+## bind the ether0 to it
+#myecho /9/net/ipifc/0/ctl 'bind ether /net/ether0'
+#exit
 
 # ifconfig it
 
@@ -21,7 +21,10 @@ export rootsrv=boot
 # test fsaddr='tcp!135.$xyzip(4)^!564'
 # (me network server server-addr
 # wrong addresses.
-ip=(135.104.9.32 255.255.255.0 135.104.9.0 135.104.9.1)
+me=10.0.2.15
+net=10.0.2.0
+vm=10.0.2.1
+rote=10.0.2.0
 
 #
 # Post the read-only filesystem in #s/$beetroot
@@ -50,14 +53,20 @@ bind -a '#l0' /net
 
 # note: dhcp is possible, just not done yet.
 #get an instance of a network stack
-i=`{sed '' /9/net/ipifc/clone}
+#i=`{sed '' /9/net/ipifc/clone}
+#ah, busybox, you suck.
+#i=`cat /net/ipifc/clone`
+cat /9/net/ipifc/clone
+i=0
 # bind the ether0 to it
-echo bind ether /net/ether0 > /9/net/ipifc/$i/ctl
+myecho  /9/net/ipifc/$i/ctl "bind ether /net/ether0 "
 # ifconfig it
-echo add $ip(1) $ip(2) $ip(3) > /9/net/ipifc/$i/ctl
-echo add 0 0 $ip(4) >>/9/net/iproute
-echo I am $ip(1)^, default route $ip(4)
+myecho  /9/net/ipifc/$i/ctl "add $me $net $vm"
+myecho /9/net/iproute "add 0 0 $route"
+echo I am $me, default route $route
 
-i=`{sed '' /net/ipifc/clone}
-echo bind loopback /dev/null > /9/net/ipifc/$i/ctl
-echo add 127.0.0.1 255.0.0.0 127.0.0.0 > /9/net/ipifc/$i/ctl
+#i=`cat /net/ipifc/clone`
+cat /9/net/ipifc/clone
+i=1
+myecho  /9/net/ipifc/$i/ctl "bind loopback /dev/null "
+myecho  /9/net/ipifc/$i/ctl "add 127.0.0.1 255.0.0.0 127.0.0.0 "

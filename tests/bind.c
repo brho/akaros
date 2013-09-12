@@ -30,8 +30,10 @@ int main(int argc, char *argv[])
 			break;
 			case 'a': flag = 2;
 			break;
+			case 'c': flag = 4;
+			break;
 			default: 
-				printf("-a or -b for now\n");
+				printf("-a or -b and/or -c for now\n");
 				exit(0);
 		}
 		argc--, argv++;
