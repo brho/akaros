@@ -3,8 +3,15 @@
  * Copyright (c) 1989-2003 by Lucent Technologies, Bell Laboratories.
  */
 
+#include <string.h>
 static char qsep[] = " \t\r\n";
 
+int sep(char *s)
+{
+	if (strchr(qsep, *s))
+		return 1;
+	return 0;
+}
 /* s is output string, t is input string.
  * warning: modifies data in place.
  */
@@ -16,7 +23,7 @@ qtoken(char *s, char *sep)
 
 	quoting = 0;
 	t = s;
-	while(*t!='\0' && (quoting)){ //(quoting  || utfrune(sep, *t)==NULL)){
+	while(*t!='\0' && (quoting || (strchr(sep,*t)==NULL))){
 		if(*t != '\''){
 			*s++ = *t++;
 			continue;
@@ -53,7 +60,7 @@ etoken(char *t, char *sep)
 
 	/* move to end of next token */
 	quoting = 0;
-	while(*t!='\0' && (quoting)){// || utfrune(sep, *t)==nil)){
+	while(*t!='\0' && (quoting || (strchr(sep,*t) == NULL))){
 		if(*t != '\''){
 			t++;
 			continue;
@@ -83,7 +90,7 @@ gettokens(char *s, char **args, int maxargs, char *sep)
 	int nargs;
 
 	for(nargs=0; nargs<maxargs; nargs++){
-		while(*s!='\0')// && utfrune(sep, *s)!=NULL)
+		while((*s!='\0') && (strchr(sep, *s)!=NULL))
 			*s++ = '\0';
 		if(*s == '\0')
 			break;
@@ -100,7 +107,7 @@ tokenize(char *s, char **args, int maxargs)
 	int nargs;
 
 	for(nargs=0; nargs<maxargs; nargs++){
-		while(*s!='\0')// && utfrune(qsep, *s)!=nil)
+		while((*s!='\0') && sep(s))
 			s++;
 		if(*s == '\0')
 			break;

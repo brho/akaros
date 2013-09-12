@@ -1,0 +1,54 @@
+#!/bin/ash
+export cputype=amd64
+export objtype=$cputype
+export service=cpu
+export authid=bootes
+export rootdir=/root
+export rootspec=''
+export rootsrv=boot
+
+#authentication='nvram=/boot/adm/nvram auth/factotum -sfactotum -S'      # -a ...
+# test xyzip=(0 0 0 104.9.33)
+# test fsaddr='tcp!135.$xyzip(4)^!564'
+# (me network server server-addr
+# wrong addresses.
+ip=(135.104.9.32 255.255.255.0 135.104.9.0 135.104.9.1)
+
+#
+# Post the read-only filesystem in #s/$beetroot
+# and mount it on /boot so the commands in /boot/$cputype/bin
+# are available to create the namespace (namespaces like to
+# mount #s/boot on / and that should not be the read-only
+# filesystem).
+# Must set hostowner to be that of the owner of the nvram file
+# before paqfs starts otherwise factotum will not be able to
+# open it.
+#
+#/boot/echo -n sys > '#c/hostowner'
+#/boot/paqfs -p -S $beetroot -m /boot -q /boot/$beetroot
+#cd /boot/$cputype/bin
+bind '#c' /dev
+#bind '#d' /fd
+#bind -c '#e' /env
+bind '#p' /proc
+bind -c '#s' /srv
+
+#
+# Configure the networks.
+#
+bind -a '#I' /net
+bind -a '#l0' /net
+
+# note: dhcp is possible, just not done yet.
+#get an instance of a network stack
+i=`{sed '' /9/net/ipifc/clone}
+# bind the ether0 to it
+echo bind ether /net/ether0 > /9/net/ipifc/$i/ctl
+# ifconfig it
+echo add $ip(1) $ip(2) $ip(3) > /9/net/ipifc/$i/ctl
+echo add 0 0 $ip(4) >>/9/net/iproute
+echo I am $ip(1)^, default route $ip(4)
+
+i=`{sed '' /net/ipifc/clone}
+echo bind loopback /dev/null > /9/net/ipifc/$i/ctl
+echo add 127.0.0.1 255.0.0.0 127.0.0.0 > /9/net/ipifc/$i/ctl

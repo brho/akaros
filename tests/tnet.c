@@ -32,5 +32,6 @@ int main(int argc, char *argv[])
 	netfd = open(path, O_RDWR);
 	if (write(netfd, path, sizeof(path)) < sizeof(path))
 		perror("write to net");
+	return 0;
 
 }

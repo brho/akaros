@@ -113,6 +113,7 @@ static char *ipifcbind(struct conv *c, char **argv, int argc)
 
 	/* bind the device to the interface */
 	medium = ipfindmedium(argv[1]);
+printk("find type %s\n", argv[1]);
 	if (medium == NULL)
 		return "unknown interface type";
 
@@ -219,7 +220,7 @@ char sfixedformat[] = "device %s maxtu %d sendra %d recvra %d mflag %d oflag"
 	" %d maxraint %d minraint %d linkmtu %d reachtime %d rxmitra %d ttl %d routerlt"
 	" %d pktin %lud pktout %lud errin %lud errout %lud\n";
 
-char slineformat[] = "	%-40I %-10M %-40I %-12lud %-12lud\n";
+char slineformat[] = "	%-40I %-10M %-40I %-12lu %-12lu\n";
 
 static int ipifcstate(struct conv *c, char *state, int n)
 {
